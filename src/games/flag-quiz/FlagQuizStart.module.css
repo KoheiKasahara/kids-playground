@@ -21,10 +21,12 @@
   color: var(--color-text-muted);
 }
 
+/* ボタンが3つ（モード2つ＋もどる）になったぶん、
+   space-lg のままだと縦に間延びするので space-md に詰める */
 .actions {
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-  margin-top: var(--space-lg);
+  margin-top: var(--space-md);
 }

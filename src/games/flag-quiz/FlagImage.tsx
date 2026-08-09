@@ -3,12 +3,13 @@ import styles from './FlagImage.module.css'
 
 type FlagImageProps = {
   country: Country
-  size?: 'large' | 'small'
+  size?: 'large' | 'small' | 'choice'
 }
 
 const sizeClass: Record<NonNullable<FlagImageProps['size']>, string> = {
   large: styles.large,
   small: styles.small,
+  choice: styles.choice,
 }
 
 export default function FlagImage({ country, size = 'large' }: FlagImageProps) {

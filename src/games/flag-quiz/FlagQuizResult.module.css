@@ -16,6 +16,13 @@
   color: var(--color-primary-dark);
 }
 
+/* どちらのモードで遊んだ結果かを一目で分かるようにする小さいラベル */
+.modeLabel {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
 .score {
   font-size: 44px;
   font-weight: 800;

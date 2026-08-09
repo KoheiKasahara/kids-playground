@@ -1,5 +1,6 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import type { QuizMode } from './types'
 import styles from './FlagQuizResult.module.css'
 
 type ResultState = {
@@ -29,7 +30,21 @@ function getPraise(correctCount: number, totalCount: number): { emoji: string; m
   return { emoji: '😊', message: 'またあそぼう！' }
 }
 
-export default function FlagQuizResult() {
+const playPathByMode: Record<QuizMode, string> = {
+  flagToName: '/games/flag-quiz/flag-to-name/play',
+  nameToFlag: '/games/flag-quiz/name-to-flag/play',
+}
+
+const modeLabel: Record<QuizMode, string> = {
+  flagToName: 'こっき → なまえ',
+  nameToFlag: 'なまえ → こっき',
+}
+
+type FlagQuizResultProps = {
+  mode: QuizMode
+}
+
+export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -43,6 +58,7 @@ export default function FlagQuizResult() {
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>けっか</h1>
+      <p className={styles.modeLabel}>{modeLabel[mode]}</p>
       <p className={styles.score}>
         {correctCount} / {totalCount}もん せいかい！
       </p>
@@ -52,9 +68,12 @@ export default function FlagQuizResult() {
       <div className={styles.actions}>
         <BigButton
           variant="primary"
-          onClick={() => navigate('/games/flag-quiz/play', { replace: true })}
+          onClick={() => navigate(playPathByMode[mode], { replace: true })}
         >
           もういちど
+        </BigButton>
+        <BigButton variant="secondary" onClick={() => navigate('/games/flag-quiz')}>
+          べつの クイズ
         </BigButton>
         <BigButton variant="secondary" onClick={() => navigate('/')}>
           ホームへ

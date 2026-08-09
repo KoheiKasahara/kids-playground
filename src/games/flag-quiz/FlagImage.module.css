@@ -31,3 +31,13 @@
   width: 96px;
   height: auto;
 }
+
+/*
+ * なまえ→こっきモードの選択肢用。ボタン（グリッドセル）いっぱいに広げたいため、
+ * large/small のように固定サイズを持たず、親要素の幅・高さに追従させる。
+ */
+.choice {
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+}

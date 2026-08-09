@@ -24,6 +24,6 @@ describe('Home', () => {
     )
     await user.click(screen.getByRole('button', { name: 'こっきクイズ' }))
     expect(screen.getByRole('heading', { name: 'こっきクイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'はじめる' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'こっきを みて こたえる' })).toBeInTheDocument()
   })
 })
