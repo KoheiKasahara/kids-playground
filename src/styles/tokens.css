@@ -1,0 +1,50 @@
+/* デザイントークン: 子ども向けに明るい配色・大きめのフォントサイズを基準にする */
+:root {
+  /* colors */
+  --color-primary: #4c6ef5;
+  --color-primary-dark: #3b5bdb;
+  --color-accent: #ff922b;
+  --color-accent-dark: #e8590c;
+  --color-success: #40c057;
+  --color-success-dark: #2b8a3e;
+  --color-success-bg: #ebfbee;
+  --color-danger: #fa5252;
+  --color-danger-dark: #c92a2a;
+  --color-danger-bg: #fff5f5;
+  --color-background: #fffdf7;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f3f5;
+  --color-border: #dee2e6;
+  --color-text: #212529;
+  --color-text-muted: #495057;
+  --color-text-on-primary: #ffffff;
+
+  /* typography */
+  --font-family-base:
+    'Hiragino Maru Gothic ProN', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP',
+    system-ui, sans-serif;
+  --font-size-base: 20px;
+  --font-size-large: 28px;
+  --font-size-xlarge: 40px;
+
+  /* spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* radius */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-round: 999px;
+
+  /* layout */
+  --content-max-width: 640px;
+  --tap-target-min: 64px;
+
+  /* shadow */
+  --shadow-sm: 0 2px 6px rgba(33, 37, 41, 0.12);
+  --shadow-md: 0 4px 12px rgba(33, 37, 41, 0.16);
+}

@@ -1,0 +1,33 @@
+/*
+ * 国旗SVGは 4:3 で統一されている（flag-icons の 4x3 セット）。
+ * 枠に 4:3 を固定し object-fit: cover にすることで、
+ * 国旗の左右・上下に余白（背景色）が出ないようにしている。
+ */
+.flag {
+  display: block;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background-color: var(--color-surface);
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+/*
+ * 親要素（.flagArea, FlagQuizPlay.module.css）が flex: 1 で残りの縦スペースを
+ * 埋めるため、国旗はその高さいっぱいに追従させる（height: 100%）。
+ * 画面が高い端末や PC では国旗だけが際限なく大きくならないよう
+ * max-height で上限を設けている。
+ */
+.large {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 280px;
+  margin: 0 auto;
+}
+
+.small {
+  width: 96px;
+  height: auto;
+}
