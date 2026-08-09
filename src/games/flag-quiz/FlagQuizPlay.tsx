@@ -80,7 +80,7 @@ export default function FlagQuizPlay() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={answered ? `${styles.page} ${styles.pageAnswered}` : styles.page}>
       <div className={styles.header}>
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
           やめる
@@ -96,31 +96,6 @@ export default function FlagQuizPlay() {
       <div className={styles.body}>
         <div className={styles.flagArea}>
           <FlagImage country={question.answer} size="large" />
-
-          {/*
-            正誤メッセージは国旗エリアに重ねるオーバーレイにして縦スペースを節約する。
-            未回答時はDOMに置かず、回答直後にマウントしてpop-inアニメーションを都度再生する。
-          */}
-          {answered && (
-            <div
-              className={
-                isCorrect
-                  ? `${styles.feedbackOverlay} ${styles.feedbackOverlaySuccess}`
-                  : `${styles.feedbackOverlay} ${styles.feedbackOverlayWrong}`
-              }
-            >
-              <p
-                className={
-                  isCorrect
-                    ? `${styles.feedbackText} ${styles.correctText}`
-                    : `${styles.feedbackText} ${styles.wrongText}`
-                }
-              >
-                {isCorrect ? '🎉 せいかい！' : 'ざんねん…'}
-              </p>
-              <p className={styles.answerText}>こたえ: {question.answer.nameJa}</p>
-            </div>
-          )}
         </div>
 
         <div className={styles.content}>
@@ -143,21 +118,46 @@ export default function FlagQuizPlay() {
               )
             })}
           </div>
-
-          {/*
-            「つぎへ」ボタンは選択肢の直下に常に描画し、未回答時は disabled にする。
-            こうすることで回答前後でボタンの位置が飛ばない。
-          */}
-          <BigButton
-            variant="primary"
-            className={styles.nextButton}
-            disabled={!answered}
-            onClick={handleNext}
-          >
-            {isLastQuestion ? 'けっかを みる' : 'つぎへ'}
-          </BigButton>
         </div>
       </div>
+
+      {/*
+        正誤メッセージと「つぎへ」は、通常フローから外して画面下部に固定する。
+        こうすることで画面の高さに関係なく「つぎへ」が必ず可視・操作可能になる
+        （iPhone SE 相当の低背端末でも画面外に出ない）。
+        未回答時はDOMに置かず、回答直後にマウントしてアニメーションを都度再生する。
+        隠れ防止の余白は .pageAnswered の padding-bottom で確保している。
+      */}
+      {answered && (
+        <div
+          className={
+            isCorrect
+              ? `${styles.feedbackBar} ${styles.feedbackBarSuccess}`
+              : `${styles.feedbackBar} ${styles.feedbackBarWrong}`
+          }
+          role="status"
+          aria-live="polite"
+        >
+          <div className={styles.feedbackBarInner}>
+            <div className={styles.feedbackTexts}>
+              <p
+                className={
+                  isCorrect
+                    ? `${styles.feedbackText} ${styles.correctText}`
+                    : `${styles.feedbackText} ${styles.wrongText}`
+                }
+              >
+                {isCorrect ? '🎉 せいかい！' : 'ざんねん！'}
+              </p>
+              <p className={styles.answerText}>こたえ: {question.answer.nameJa}</p>
+            </div>
+
+            <BigButton variant="primary" className={styles.nextButton} onClick={handleNext}>
+              {isLastQuestion ? 'けっかを みる' : 'つぎへ'}
+            </BigButton>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
