@@ -1,16 +1,28 @@
 /*
  * .page は 100dvh（未対応環境は 100vh）のフレックスコンテナ。
- * 直下の子は header と body の2つだけ。body がさらに flagArea / content に
- * 分かれ、flagArea だけが縦方向に伸縮する（flex: 1）。他の要素は決まった
- * 高さを持つ。これにより iPhone SE などの小型スマホ縦画面でもスクロール
- * なしに収まり、逆に画面が高い端末では国旗エリアが自然に大きくなる
+ * 直下の子は header と body の2つ（回答後はさらに固定バー .feedbackBar が加わるが、
+ * これは position: fixed のため通常フローの高さ計算には影響しない）。
+ * body がさらに flagArea / content に分かれ、flagArea だけが縦方向に伸縮する（flex: 1）。
+ * 他の要素は決まった高さを持つ。これにより iPhone SE などの小型スマホ縦画面でも
+ * スクロールなしに収まり、逆に画面が高い端末では国旗エリアが自然に大きくなる
  * （国旗自体は FlagImage.module.css 側で max-height を上限にして肥大化を防ぐ）。
  *
+ * 「つぎへ」ボタンは通常フローに置かず、回答後に画面下部へ固定表示する（.feedbackBar）。
+ * 画面の高さに関係なく常に可視・操作可能にするためで、固定バーに隠れないぶんの余白は
+ * .pageAnswered の padding-bottom（--feedback-bar-height）で確保する。
+ *
  * 横向き・低背の画面（@media (orientation: landscape) and (max-height: 560px)）
- * では body を横並びにし、左に国旗・右に問題文/選択肢/つぎへボタンを置く
+ * では body を横並びにし、左に国旗・右に問題文/選択肢を置く
  * 2カラムレイアウトに切り替える（ファイル末尾）。
  */
 .page {
+  /* 回答後に確保する下部余白＝固定バーの想定高さ（safe-area 分を除く）。
+     バー内の要素は高さが確定しているため（見出し1行＋国名1行＋ボタン＋余白＝約158px）、
+     この値で実高さを十分にカバーできる。ブレークポイントごとに上書きする。
+     safe-area 分は global.css の body の padding-bottom と、
+     バー自身の padding-bottom で二重に持たせず1回だけ効かせる。 */
+  --feedback-bar-height: 164px;
+
   min-height: 100vh;
   min-height: 100dvh;
   max-width: var(--content-max-width);
@@ -19,6 +31,31 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+}
+
+/* 回答後のみ、固定フィードバックバーに選択肢が隠れないよう下部余白を確保する。
+   （小型端末では回答前にこの余白を取ると国旗エリアが潰れてしまうため、回答後だけ確保する） */
+.pageAnswered {
+  padding-bottom: var(--feedback-bar-height);
+}
+
+/*
+ * タブレット・PC（横幅に余裕がある＝選択肢が2列になり縦が余る）と、縦に十分長い端末では、
+ * 回答前から常に固定バーぶんの余白を確保しておく。こうすると回答した瞬間に
+ * レイアウトが動かず、国旗の位置・大きさが変わらない
+ * （回答前は余白がそのまま空きスペースになるだけ）。
+ *
+ * 判定に高さではなく幅（min-width: 640px）を主に使うのは、PC のウィンドウ高さが
+ * OS のディスプレイ拡大率次第で 700px を下回ることがあり、高さ基準だと
+ * PC で分岐に入らない取りこぼしが起きるため。カンマは OR。
+ *
+ * これに当てはまらない小型スマホ（縦画面）は、回答前にこの余白を取ると
+ * 国旗エリアが潰れてしまうので .pageAnswered による回答後だけの確保に任せる。
+ */
+@media (min-width: 640px) and (min-height: 600px), (min-height: 760px) {
+  .page {
+    padding-bottom: var(--feedback-bar-height);
+  }
 }
 
 /* 幅の狭いスマートフォンでは左右パディングを詰めて、ボタン幅を活かす */
@@ -73,7 +110,7 @@
   text-align: right;
 }
 
-/* header 以外（国旗・設問・選択肢・つぎへボタン）をまとめるコンテナ。
+/* header 以外（国旗・設問・選択肢）をまとめるコンテナ。
    縦画面では単純に縦積み、横向き低背では横並びに切り替える（末尾のmedia参照） */
 .body {
   flex: 1 1 auto;
@@ -83,19 +120,17 @@
   gap: var(--space-sm);
 }
 
-/* 残りの縦スペースを埋める伸縮エリア。中の国旗画像を中央に配置する。
-   position: relative にして、正誤メッセージのオーバーレイを重ねられるようにする */
+/* 残りの縦スペースを埋める伸縮エリア。中の国旗画像を中央に配置する */
 .flagArea {
   flex: 1 1 auto;
   min-height: 0;
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-xs) 0;
 }
 
-/* 問題文・選択肢・つぎへボタンをまとめる縦積みコンテナ */
+/* 問題文・選択肢をまとめる縦積みコンテナ */
 .content {
   flex: 0 0 auto;
   display: flex;
@@ -138,45 +173,67 @@
   }
 }
 
-.nextButton {
-  flex: 0 0 auto;
-  min-height: clamp(68px, 16vw, 76px);
-  font-size: 24px;
-}
-
 /*
- * 正誤メッセージのオーバーレイ。flagArea の下寄せに、半透明ではない
- * 背景パネル（角丸＋影）として重ねる。国旗の全体が隠れても構わないが、
- * 内容ぶんのサイズに留めて国旗が完全に隠れないようにする。
+ * 画面下部に固定するフィードバックエリア。
+ * position: fixed により通常フローの高さ計算から外れるため、画面が低い端末でも
+ * 「つぎへ」が画面外に出ることがない。
+ * バー自体は横幅いっぱいに敷いて画面下端との隙間をなくし、中身（.feedbackBarInner）だけを
+ * --content-max-width で中央寄せすることで、タブレット・PCでも間延びしないようにする。
  */
-.feedbackOverlay {
-  position: absolute;
-  left: 50%;
-  bottom: 4px;
-  transform: translateX(-50%);
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  max-width: calc(100% - 16px);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
-  text-align: center;
+.feedbackBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  padding: 10px var(--space-md) calc(12px + env(safe-area-inset-bottom));
+  border-top: 2px solid var(--color-border);
+  box-shadow: 0 -4px 12px rgba(33, 37, 41, 0.16);
+  animation: bar-in 0.18s ease-out;
 }
 
-.feedbackOverlaySuccess {
+/* prefers-reduced-motion: reduce は src/styles/global.css の共通ルールで
+   すべてのアニメーション時間を強制的に短くしているため、ここでは対応不要 */
+@keyframes bar-in {
+  0% {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.feedbackBarSuccess {
   background-color: var(--color-success-bg);
 }
 
-.feedbackOverlayWrong {
+.feedbackBarWrong {
   background-color: var(--color-danger-bg);
 }
 
+.feedbackBarInner {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feedbackTexts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+/* 見出し・国名とも1行に収まる想定のサイズ。320px幅でも折り返さないよう
+   下限を控えめにしている（--feedback-bar-height の見積りの前提） */
 .feedbackText {
-  font-size: clamp(28px, 6vw, 32px);
+  font-size: clamp(22px, 5.5vw, 28px);
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .correctText {
@@ -184,8 +241,6 @@
   animation: pop-in 0.25s ease-out;
 }
 
-/* prefers-reduced-motion: reduce は src/styles/global.css の共通ルールで
-   すべてのアニメーション時間を強制的に短くしているため、ここでは対応不要 */
 @keyframes pop-in {
   0% {
     transform: scale(0.7);
@@ -202,25 +257,42 @@
 }
 
 .answerText {
-  font-size: clamp(20px, 5vw, 24px);
+  font-size: clamp(17px, 4.2vw, 20px);
   font-weight: 700;
+  line-height: 1.2;
   color: var(--color-text);
 }
 
-/* 背の低い縦画面（iPhone SE 相当）では国旗エリア自体が 80px 前後しかないため、
-   オーバーレイが進捗バーまでせり上がらないよう少しだけ小さくする */
+.nextButton {
+  flex: 0 0 auto;
+  min-height: clamp(60px, 14vw, 68px);
+  font-size: 24px;
+}
+
+/* 背の低い縦画面（iPhone 5/SE 第1世代の 568px 相当）では、固定バーが画面を
+   占有しすぎないよう各要素を少しずつ詰め、確保する余白も合わせて縮める。
+   選択肢ボタンも 64px → 56px にして、国旗エリアが潰れないだけの高さを残す
+   （56px はタップターゲットとして十分な大きさを保つ下限） */
 @media (orientation: portrait) and (max-height: 620px) {
-  .feedbackOverlay {
-    gap: 2px;
-    padding: var(--space-xs) var(--space-sm);
+  .page {
+    --feedback-bar-height: 146px;
+  }
+
+  .choiceButton {
+    min-height: 56px;
   }
 
   .feedbackText {
-    font-size: 26px;
+    font-size: 24px;
   }
 
   .answerText {
-    font-size: 20px;
+    font-size: 18px;
+  }
+
+  .nextButton {
+    min-height: 60px;
+    font-size: 22px;
   }
 }
 
@@ -231,19 +303,27 @@
  * max-height: 560px を超えるためこの分岐には入らず、既存の縦積み+2列グリッド
  * のまま自然に収まる。
  *
- * 選択肢は右カラム内で2列×2行（縦方向の占有 約214px→約120px）にすることで
- * 生まれた余裕を使い、余白・行間・ボタンサイズを読みやすい値まで戻す。
+ * 選択肢は右カラム内で2列×2行にすることで生まれた余裕を使い、
+ * 余白・行間・ボタンサイズを読みやすい値まで戻す。
  * さらに横向きのときだけ .page の max-width を広げ（960px、
  * --content-max-width トークン自体は変更しない）、右カラムの選択肢ボタン
  * 1つあたりの横幅を200px以上確保して「ニュージーランド」等の長い国名でも
  * 折り返さないようにする。
+ *
+ * 固定バーも縦積みだと高さを取りすぎるため、1行（左にテキスト・右にボタン）に切り替える。
  */
 @media (orientation: landscape) and (max-height: 560px) {
   .page {
+    --feedback-bar-height: 76px;
+
     max-width: 960px;
     padding-top: 8px;
     padding-bottom: calc(8px + env(safe-area-inset-bottom));
     gap: 8px;
+  }
+
+  .pageAnswered {
+    padding-bottom: calc(var(--feedback-bar-height) + env(safe-area-inset-bottom));
   }
 
   .header {
@@ -299,8 +379,37 @@
     font-size: 20px;
   }
 
+  .feedbackBar {
+    padding: 6px var(--space-md) calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .feedbackBarInner {
+    max-width: 960px;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .feedbackTexts {
+    flex: 1 1 auto;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .feedbackText {
+    font-size: 22px;
+  }
+
+  .answerText {
+    font-size: 17px;
+  }
+
   .nextButton {
-    min-height: 56px;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 200px;
+    min-height: 48px;
+    padding: var(--space-sm) var(--space-lg);
     font-size: 20px;
   }
 
