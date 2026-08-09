@@ -101,6 +101,17 @@ Windows のファイアウォールでアクセスがブロックされる場合
 
   を確認してください。
 
+  なお `env(safe-area-inset-*)`（ノッチ・ホームインジケータのぶんの余白）は
+  DevTools のデバイスツールバーでは常に 0 になり、iPhone をホーム画面から
+  全画面（standalone）で起動したときだけ値が入ります。PC で再現したいときは
+  Console から `src/styles/tokens.css` の `--safe-*` を上書きしてください。
+
+  ```js
+  // iPhone 13 の全画面表示相当（縦）
+  document.documentElement.style.setProperty('--safe-top', '47px')
+  document.documentElement.style.setProperty('--safe-bottom', '34px')
+  ```
+
 ### 5-2. ソースマップ付きブレークポイント
 
 開発サーバーではソースマップが有効なので、DevTools の **Sources** タブで `src/` 配下の `.tsx` を直接開いてブレークポイントを置けます。

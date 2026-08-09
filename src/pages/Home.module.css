@@ -1,7 +1,10 @@
 .page {
   max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: var(--space-xl) var(--space-lg);
+  /* セーフエリアぶんは body ではなくこの画面側で確保する
+     （src/styles/tokens.css の --safe-* を参照） */
+  padding: calc(var(--space-xl) + var(--safe-top)) calc(var(--space-lg) + var(--safe-right))
+    calc(var(--space-xl) + var(--safe-bottom)) calc(var(--space-lg) + var(--safe-left));
   display: flex;
   flex-direction: column;
   align-items: center;

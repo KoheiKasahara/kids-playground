@@ -44,6 +44,19 @@
   --content-max-width: 640px;
   --tap-target-min: 64px;
 
+  /* セーフエリア（ノッチ・ホームインジケータ）。
+     iPhone のホーム画面から起動した全画面表示（standalone）では
+     env(safe-area-inset-*) が 0 以外になる。
+     body に padding として持たせると 100dvh の中身に上下 80px 前後が
+     上乗せされて不要な縦スクロールが出るため、body ではなく
+     各画面のルート要素（min-height: 100dvh かつ box-sizing: border-box）の
+     padding に足し込んで、必ず 100dvh の内側に収める。
+     env() 未対応の環境では 0px にフォールバックする。 */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
   /* shadow */
   --shadow-sm: 0 2px 6px rgba(33, 37, 41, 0.12);
   --shadow-md: 0 4px 12px rgba(33, 37, 41, 0.16);
