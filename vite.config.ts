@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -13,13 +14,17 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: null,
       includeAssets: ['favicon.svg'],
       manifest: {
+        id: base,
         name: 'こどもミニゲーム',
         short_name: 'ミニゲーム',
         description: '子ども向けのミニゲーム集',
         lang: 'ja',
         display: 'standalone',
+        orientation: 'portrait',
+        categories: ['games', 'education'],
         theme_color: '#4C6EF5',
         background_color: '#FFFDF7',
         start_url: base,
@@ -29,6 +34,13 @@ export default defineConfig({
             src: 'icons/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'icons/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
           },
           {
             src: 'icons/icon-512.png',
@@ -40,6 +52,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        navigateFallback: `${base}index.html`,
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
       },
     }),
   ],
@@ -47,5 +62,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    alias: {
+      'virtual:pwa-register/react': fileURLToPath(
+        new URL('./src/test/pwaRegisterStub.ts', import.meta.url),
+      ),
+    },
   },
 })
