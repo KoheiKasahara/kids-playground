@@ -21,31 +21,7 @@ Node.js が入っていない場合は [nodejs.org](https://nodejs.org/) の LTS
 
 ## 2. 初回セットアップ
 
-### 2-1. 【重要】不要ディレクトリの削除
-
-初期実装時にサンドボックス環境が残した `node_modules_broken` というディレクトリ（約 122MB）と、
-中途半端な状態の `node_modules` がリポジトリ直下に存在する場合があります。
-**依存関係のインストール前に必ず削除してください。**
-
-PowerShell:
-
-```powershell
-cd C:\GitHub\kids-playground
-Remove-Item -Recurse -Force node_modules_broken -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
-```
-
-コマンドプロンプト:
-
-```cmd
-cd /d C:\GitHub\kids-playground
-rmdir /s /q node_modules_broken
-rmdir /s /q node_modules
-```
-
-> `node_modules_broken` は `.gitignore` に登録済みなので Git の管理対象外です。削除しても問題ありません。
-
-### 2-2. 依存関係のインストール
+### 2-1. 依存関係のインストール
 
 ```bash
 npm install
@@ -62,7 +38,7 @@ npm ci
 - 実行時: `react` / `react-dom` / `react-router-dom`
 - 開発時: `vite` / `typescript` / `@vitejs/plugin-react` / `vite-plugin-pwa` / `vitest` / `@testing-library/*` / `jsdom` / `eslint` 一式
 
-### 2-3. 動作確認（ここまで通ればセットアップ完了）
+### 2-2. 動作確認（ここまで通ればセットアップ完了）
 
 ```bash
 npm run lint    # ESLint。エラーなしで終了すればOK
@@ -232,7 +208,7 @@ set GITHUB_PAGES=true && npm run build:pages && set GITHUB_PAGES=
 
 | 症状 | 原因と対処 |
 | --- | --- |
-| `npm install` が権限エラーで失敗する | `node_modules` / `node_modules_broken` が残っている。§2-1 の手順で削除してから再実行 |
+| `npm install` が権限エラーで失敗する | `node_modules` が中途半端な状態で残っている。削除してから `npm install` を再実行 |
 | 国旗画像が表示されない（404） | `public/flags/` に 31 個の SVG があるか確認。`Country.flag` は `flags/xx.svg` のような **base 相対パス**（先頭スラッシュなし）である必要がある |
 | GitHub Pages でアセットが 404 | `GITHUB_PAGES` 環境変数なしでビルドしている。CI の `build:pages` ステップの `env` 設定を確認 |
 | 結果画面を開くと開始画面に戻される | 仕様どおりの挙動（`location.state` が無いため）。プレイ画面から 10 問回答して到達してください |
