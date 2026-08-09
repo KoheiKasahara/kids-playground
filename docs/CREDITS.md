@@ -45,9 +45,13 @@ SOFTWARE.
 ### 収録している国旗一覧
 
 `public/flags/` には、`src/games/flag-quiz/data/countries.ts` で使用する
-以下31か国分のSVGファイルを収録しています。
+以下100か国分のSVGファイルを収録しています。
 
 ```
 jp kr cn th in ph vn id tr gb fr de it es ch se ru gr nl
-us ca mx br ar pe eg za ke ng au nz
+us ca mx br ar pe eg za ke ng au nz sg my mm kh np lk pk
+mn tw sa ae il ir kp qa kw jo lb kz bd pt be at no dk fi
+is ie pl cz hu ro ua hr rs lu mt mc va sk cu pa cr jm do
+gt cl co ve ec bo py uy ma tn dz et gh tz ug sn ci cm mg
+zw fj pg ws to
 ```

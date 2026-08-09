@@ -97,7 +97,7 @@ src/
 │     ├─ FlagImage.tsx
 │     ├─ questionGenerator.ts   # 問題生成ロジック（Unit Test対象、モードに依存しない）
 │     ├─ types.ts
-│     └─ data/countries.ts      # 国データ（31か国）
+│     └─ data/countries.ts      # 国データ（100か国）
 ├─ components/         # ゲーム間で共通のUI部品 (BigButton, ProgressBar など)
 ├─ styles/             # グローバルCSS・デザイントークン
 └─ test/setup.ts        # Vitestのテストセットアップ
