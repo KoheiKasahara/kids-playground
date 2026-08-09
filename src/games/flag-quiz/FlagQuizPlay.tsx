@@ -7,6 +7,7 @@ import { countriesForLevel } from './data/countries'
 import { generateQuestions } from './questionGenerator'
 import { isQuizLevel, LEVEL_LABEL, MODE_PATH } from './types'
 import type { Country, QuizLevel, QuizMode } from './types'
+import { playCorrectSound, playIncorrectSound } from '../../utils/quizSound'
 import styles from './FlagQuizPlay.module.css'
 
 type PlayState = {
@@ -94,7 +95,13 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
 
   const handleSelect = (choiceId: string) => {
     if (answered) return
-    dispatch({ type: 'select', choiceId, correct: choiceId === question.answer.id })
+    const correct = choiceId === question.answer.id
+    dispatch({ type: 'select', choiceId, correct })
+    if (correct) {
+      playCorrectSound()
+    } else {
+      playIncorrectSound()
+    }
   }
 
   const handleNext = () => {
