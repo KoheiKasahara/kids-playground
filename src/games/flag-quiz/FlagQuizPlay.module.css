@@ -19,15 +19,25 @@
   /* 回答後に確保する下部余白＝固定バーの想定高さ（safe-area 分を除く）。
      バー内の要素は高さが確定しているため（見出し1行＋国名1行＋ボタン＋余白＝約158px）、
      この値で実高さを十分にカバーできる。ブレークポイントごとに上書きする。
-     safe-area 分は global.css の body の padding-bottom と、
-     バー自身の padding-bottom で二重に持たせず1回だけ効かせる。 */
+     バー自身の padding-bottom に safe-area 分が入るため、
+     この高さを下部余白として使う箇所では --safe-bottom を別途足す。 */
   --feedback-bar-height: 164px;
 
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* min-height ではなく height を指定して「高さが確定したフレックスコンテナ」にする。
+     min-height だと高さが auto のままなので、中身（国旗の自然な大きさ＋選択肢）が
+     画面より高いときにフレックスの縮小が働かず、そのぶん縦スクロールが出てしまう。
+     height を確定させると .flagArea（flex: 1 / min-height: 0）が先に縮み、
+     国旗が画面の高さに合わせて小さくなる。
+     ヘッダーや選択肢だけで画面を超えるような極端なケースでは、
+     overflow: visible のままなのでこれまで通りスクロールできる（内容が切れることはない）。 */
+  height: 100vh;
+  height: 100dvh;
   max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: var(--space-sm) var(--space-lg) calc(var(--space-sm) + env(safe-area-inset-bottom));
+  /* セーフエリアぶんはこの padding に含める（100dvh の内側に収めるため）。
+     詳細は src/styles/tokens.css の --safe-* を参照 */
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-lg) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-lg) + var(--safe-left));
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
@@ -36,7 +46,7 @@
 /* 回答後のみ、固定フィードバックバーに選択肢が隠れないよう下部余白を確保する。
    （小型端末では回答前にこの余白を取ると国旗エリアが潰れてしまうため、回答後だけ確保する） */
 .pageAnswered {
-  padding-bottom: var(--feedback-bar-height);
+  padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
 }
 
 /*
@@ -54,15 +64,15 @@
  */
 @media (min-width: 640px) and (min-height: 600px), (min-height: 760px) {
   .page {
-    padding-bottom: var(--feedback-bar-height);
+    padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
   }
 }
 
 /* 幅の狭いスマートフォンでは左右パディングを詰めて、ボタン幅を活かす */
 @media (max-width: 480px) {
   .page {
-    padding-left: var(--space-md);
-    padding-right: var(--space-md);
+    padding-left: calc(var(--space-md) + var(--safe-left));
+    padding-right: calc(var(--space-md) + var(--safe-right));
   }
 }
 
@@ -83,8 +93,8 @@
 /* 誤タップを避けるため、遊ぶ操作から離れた画面右上に固定する */
 .quit {
   position: fixed;
-  top: calc(var(--space-sm) + env(safe-area-inset-top));
-  right: calc(var(--space-md) + env(safe-area-inset-right));
+  top: calc(var(--space-sm) + var(--safe-top));
+  right: calc(var(--space-md) + var(--safe-right));
   z-index: 200;
   min-height: 40px;
   padding: var(--space-xs) var(--space-md);
@@ -195,7 +205,7 @@
   right: 0;
   bottom: 0;
   z-index: 100;
-  padding: 10px var(--space-md) calc(12px + env(safe-area-inset-bottom));
+  padding: 10px var(--space-md) calc(12px + var(--safe-bottom));
   border-top: 2px solid var(--color-border);
   box-shadow: 0 -4px 12px rgba(33, 37, 41, 0.16);
   animation: bar-in 0.18s ease-out;
@@ -326,13 +336,13 @@
     --feedback-bar-height: 76px;
 
     max-width: 960px;
-    padding-top: 8px;
-    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    padding-top: calc(8px + var(--safe-top));
+    padding-bottom: calc(8px + var(--safe-bottom));
     gap: 8px;
   }
 
   .pageAnswered {
-    padding-bottom: calc(var(--feedback-bar-height) + env(safe-area-inset-bottom));
+    padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
   }
 
   .header {
@@ -389,7 +399,7 @@
   }
 
   .feedbackBar {
-    padding: 6px var(--space-md) calc(8px + env(safe-area-inset-bottom));
+    padding: 6px var(--space-md) calc(8px + var(--safe-bottom));
   }
 
   .feedbackBarInner {

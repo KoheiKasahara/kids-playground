@@ -3,7 +3,10 @@
   margin: 0 auto;
   min-height: 100vh;
   min-height: 100dvh;
-  padding: var(--space-xl) var(--space-lg);
+  /* セーフエリアぶんはこの padding に含める（100dvh の内側に収めるため）。
+     詳細は src/styles/tokens.css の --safe-* を参照 */
+  padding: calc(var(--space-xl) + var(--safe-top)) calc(var(--space-lg) + var(--safe-right))
+    calc(var(--space-xl) + var(--safe-bottom)) calc(var(--space-lg) + var(--safe-left));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -30,4 +33,44 @@
   flex-direction: column;
   gap: var(--space-md);
   margin-top: var(--space-md);
+}
+
+/*
+ * 画面の高さが足りない端末（スマホ横向き、背の低い端末）では、
+ * 余白・文字サイズ・ボタン高さを詰めて縦スクロールなしに収める。
+ * 縦画面の小型端末（iPhone SE 相当）は max-height: 700px の方だけが効く。
+ */
+@media (max-height: 700px) {
+  .page {
+    padding-top: calc(var(--space-md) + var(--safe-top));
+    padding-bottom: calc(var(--space-md) + var(--safe-bottom));
+    gap: var(--space-sm);
+  }
+
+  .title {
+    font-size: 32px;
+  }
+
+  .actions {
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+  }
+}
+
+@media (max-height: 560px) {
+  .title {
+    font-size: 28px;
+  }
+
+  .description {
+    font-size: 20px;
+  }
+
+  /* BigButton は別ファイル（CSS Modules）でクラス名が異なるため要素セレクタで詰める。
+     56px はタップターゲットとして十分な大きさを保つ下限 */
+  .actions button {
+    min-height: 56px;
+    padding-top: var(--space-sm);
+    padding-bottom: var(--space-sm);
+  }
 }

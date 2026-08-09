@@ -1,8 +1,10 @@
 .container {
   position: fixed;
-  left: var(--space-md);
-  right: var(--space-md);
-  bottom: var(--space-md);
+  left: calc(var(--space-md) + var(--safe-left));
+  right: calc(var(--space-md) + var(--safe-right));
+  /* position: fixed は画面（ビューポート）基準のため、
+     ホームインジケータに重ならないよう自前でセーフエリアぶんを持ち上げる */
+  bottom: calc(var(--space-md) + var(--safe-bottom));
   z-index: 1000;
   display: flex;
   flex-direction: column;

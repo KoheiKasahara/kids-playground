@@ -3,7 +3,10 @@
   margin: 0 auto;
   min-height: 100vh;
   min-height: 100dvh;
-  padding: var(--space-xl) var(--space-lg);
+  /* セーフエリアぶんはこの padding に含める（100dvh の内側に収めるため）。
+     詳細は src/styles/tokens.css の --safe-* を参照 */
+  padding: calc(var(--space-xl) + var(--safe-top)) calc(var(--space-lg) + var(--safe-right))
+    calc(var(--space-xl) + var(--safe-bottom)) calc(var(--space-lg) + var(--safe-left));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -51,4 +54,55 @@
   font-size: 15px;
   font-weight: 500;
   opacity: 0.9;
+}
+
+/* 高さの足りない端末では余白・文字サイズを詰めて縦スクロールなしに収める
+   （FlagQuizStart.module.css と同じ考え方） */
+@media (max-height: 700px) {
+  .page {
+    padding-top: calc(var(--space-md) + var(--safe-top));
+    padding-bottom: calc(var(--space-md) + var(--safe-bottom));
+  }
+
+  .title {
+    font-size: 32px;
+  }
+
+  .actions {
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+  }
+
+  .levelDescription {
+    font-size: 14px;
+  }
+}
+
+/* 横向き（低背）では、むずかしさ3つ＋もどるの4ボタンを2列×2行にして縦を節約する */
+@media (max-height: 560px) {
+  .title {
+    font-size: 26px;
+  }
+
+  .modeLabel {
+    font-size: 16px;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .levelButton {
+    padding-top: var(--space-sm);
+    padding-bottom: var(--space-sm);
+  }
+
+  .levelLabel {
+    font-size: 22px;
+  }
+
+  .actions button {
+    min-height: 56px;
+  }
 }
