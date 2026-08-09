@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
-import { countries } from './data/countries'
+import { countries, countriesForLevel } from './data/countries'
 import { QUESTION_COUNT } from './types'
 import type { Country } from './types'
 
@@ -37,8 +37,8 @@ function getCorrectCountry(container: HTMLElement): Country {
 }
 
 /**
- * 「やめる」「つぎへ」「けっかを みる」「もういちど」「べつの クイズ」「ホームへ」を除いた、
- * 選択肢（国名）ボタンの一覧を取得する。
+ * 「やめる」「つぎへ」「けっかを みる」「もういちど」「べつの むずかしさ」「べつの クイズ」「ホームへ」
+ * を除いた、選択肢（国名）ボタンの一覧を取得する。
  * 「つぎへ」ボタンは回答後に画面下部の固定フィードバックバー内へマウントされるため、
  * 回答後は role による絞り込みだけでは選択肢ボタンと区別できない。
  * ボタンのテキストで明示的に除外する。
@@ -49,6 +49,7 @@ function getChoiceButtons(): HTMLElement[] {
     'つぎへ',
     'けっかを みる',
     'もういちど',
+    'べつの むずかしさ',
     'べつの クイズ',
     'ホームへ',
   ])
@@ -77,25 +78,57 @@ async function answerCurrentQuestion(
 
 describe('FlagQuizPlay', () => {
   test('クイズを開始すると、国旗と4つの選択肢ボタンが表示される', () => {
-    const { container } = renderApp(['/games/flag-quiz/flag-to-name/play'])
+    const { container } = renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
     const img = container.querySelector('img')
     expect(img).toBeTruthy()
     expect(img?.getAttribute('src')).toMatch(/flags\/[a-z]{2}\.svg$/)
     expect(getChoiceButtons()).toHaveLength(4)
   })
 
-  test('旧URL (/games/flag-quiz/play) にアクセスすると、こっき→なまえモードにリダイレクトされる', () => {
+  test('むずかしさが表示される', () => {
+    renderApp(['/games/flag-quiz/flag-to-name/normal/play'])
+    expect(screen.getByText('ふつう')).toBeInTheDocument()
+  })
+
+  test('かんたんでは、easyランクの国しか出題されない', () => {
+    const easyIds = new Set(countriesForLevel('easy').map((c) => c.id))
+    for (let seed = 0; seed < 10; seed += 1) {
+      const { container, unmount } = renderApp(['/games/flag-quiz/flag-to-name/easy/play'])
+      const correctCountry = getCorrectCountry(container)
+      expect(easyIds.has(correctCountry.id)).toBe(true)
+      for (const btn of getChoiceButtons()) {
+        const country = countries.find((c) => c.nameJa === btn.textContent)
+        expect(country).toBeDefined()
+        expect(easyIds.has(country!.id)).toBe(true)
+      }
+      unmount()
+    }
+  })
+
+  test('不正な level でアクセスすると、むずかしさ選択画面へリダイレクトされる', () => {
+    renderApp(['/games/flag-quiz/flag-to-name/super-hard/play'])
+    expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
+  })
+
+  test('旧URL (/games/flag-quiz/play) にアクセスすると、こっき→なまえ・むずかしいモードにリダイレクトされる', () => {
     const { container } = renderApp(['/games/flag-quiz/play'])
     const img = container.querySelector('img')
     expect(img).toBeTruthy()
     expect(img?.getAttribute('src')).toMatch(/flags\/[a-z]{2}\.svg$/)
     expect(screen.getByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
+    expect(screen.getByText('むずかしい')).toBeInTheDocument()
     expect(getChoiceButtons()).toHaveLength(4)
+  })
+
+  test('旧URL (/games/flag-quiz/flag-to-name/play) にアクセスすると、むずかしいモードにリダイレクトされる', () => {
+    renderApp(['/games/flag-quiz/flag-to-name/play'])
+    expect(screen.getByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
+    expect(screen.getByText('むずかしい')).toBeInTheDocument()
   })
 
   test('正解の選択肢を押すと「せいかい」のフィードバックが表示される', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp(['/games/flag-quiz/flag-to-name/play'])
+    const { container } = renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
     const correctCountry = getCorrectCountry(container)
     const button = screen.getByRole('button', { name: correctCountry.nameJa })
     await user.click(button)
@@ -104,7 +137,7 @@ describe('FlagQuizPlay', () => {
 
   test('不正解の選択肢を押すと不正解のフィードバックと正しい国名が表示される', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp(['/games/flag-quiz/flag-to-name/play'])
+    const { container } = renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
     const correctCountry = getCorrectCountry(container)
     const choiceButtons = getChoiceButtons()
     const wrongButton = choiceButtons.find((btn) => btn.textContent !== correctCountry.nameJa)
@@ -116,7 +149,7 @@ describe('FlagQuizPlay', () => {
 
   test('回答前は「つぎへ」が表示されず、回答後に表示される', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/flag-to-name/play'])
+    renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
     expect(screen.queryByRole('button', { name: /つぎへ|けっかを みる/ })).not.toBeInTheDocument()
     await user.click(getChoiceButtons()[0])
     expect(screen.getByRole('button', { name: /つぎへ|けっかを みる/ })).toBeEnabled()
@@ -124,7 +157,7 @@ describe('FlagQuizPlay', () => {
 
   test('回答後のフィードバックはスクリーンリーダーに通知される（role=status）', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/flag-to-name/play'])
+    renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
     await user.click(getChoiceButtons()[0])
     const status = screen.getByRole('status')
     expect(status).toHaveTextContent(/せいかい！|ざんねん！/)
@@ -135,7 +168,7 @@ describe('FlagQuizPlay', () => {
 
   test('回答後は選択肢ボタンがすべて disabled になる', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/flag-to-name/play'])
+    renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
     const choiceButtons = getChoiceButtons()
     await user.click(choiceButtons[0])
     for (const btn of choiceButtons) {
@@ -145,7 +178,7 @@ describe('FlagQuizPlay', () => {
 
   test('「つぎへ」を押すと次の問題に進み、進捗表示が更新される', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/flag-to-name/play'])
+    renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
     expect(screen.getByRole('progressbar', { name: '1 / 10 もん' })).toBeInTheDocument()
     const choiceButtons = getChoiceButtons()
     await user.click(choiceButtons[0])
@@ -158,7 +191,7 @@ describe('FlagQuizPlay', () => {
     '10問すべてに正解すると結果画面へ遷移し、正解数が表示される',
     async () => {
       const user = userEvent.setup()
-      const { container } = renderApp(['/games/flag-quiz/flag-to-name/play'])
+      const { container } = renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, container, true)
       }
@@ -172,7 +205,7 @@ describe('FlagQuizPlay', () => {
     '一部を不正解にすると、正解数がその件数どおりに結果画面へ表示される',
     async () => {
       const user = userEvent.setup()
-      const { container } = renderApp(['/games/flag-quiz/flag-to-name/play'])
+      const { container } = renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
       // 10問中 6問正解・4問不正解
       const pattern = [true, false, true, true, false, true, false, true, false, true]
       for (const correct of pattern) {
@@ -187,7 +220,7 @@ describe('FlagQuizPlay', () => {
     '結果画面の「もういちど」でクイズが再開され、1問目に戻る',
     async () => {
       const user = userEvent.setup()
-      const { container } = renderApp(['/games/flag-quiz/flag-to-name/play'])
+      const { container } = renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, container, true)
       }
@@ -199,10 +232,25 @@ describe('FlagQuizPlay', () => {
   )
 
   test(
+    '結果画面の「べつの むずかしさ」でむずかしさ選択画面に戻る',
+    async () => {
+      const user = userEvent.setup()
+      const { container } = renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
+      for (let i = 0; i < QUESTION_COUNT; i += 1) {
+        await answerCurrentQuestion(user, container, true)
+      }
+      const levelButton = screen.getByRole('button', { name: 'べつの むずかしさ' })
+      await user.click(levelButton)
+      expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
+    },
+    20000,
+  )
+
+  test(
     '結果画面の「ホームへ」でホーム画面に戻る',
     async () => {
       const user = userEvent.setup()
-      const { container } = renderApp(['/games/flag-quiz/flag-to-name/play'])
+      const { container } = renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, container, true)
       }
@@ -214,13 +262,19 @@ describe('FlagQuizPlay', () => {
   )
 
   test('結果画面へ直接アクセス（stateなし）すると開始画面へリダイレクトされる', () => {
-    renderApp(['/games/flag-quiz/flag-to-name/result'])
+    renderApp(['/games/flag-quiz/flag-to-name/hard/result'])
     expect(screen.getByRole('heading', { name: 'こっきクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'こっきを みて こたえる' })).toBeInTheDocument()
   })
 
   test('旧結果URL (/games/flag-quiz/result) へ直接アクセスすると開始画面へリダイレクトされる', () => {
     renderApp(['/games/flag-quiz/result'])
+    expect(screen.getByRole('heading', { name: 'こっきクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'こっきを みて こたえる' })).toBeInTheDocument()
+  })
+
+  test('旧結果URL (/games/flag-quiz/flag-to-name/result) へ直接アクセスすると開始画面へリダイレクトされる', () => {
+    renderApp(['/games/flag-quiz/flag-to-name/result'])
     expect(screen.getByRole('heading', { name: 'こっきクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'こっきを みて こたえる' })).toBeInTheDocument()
   })

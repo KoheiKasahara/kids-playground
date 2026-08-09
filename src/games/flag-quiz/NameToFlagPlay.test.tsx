@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
-import { countries } from './data/countries'
+import { countries, countriesForLevel } from './data/countries'
 import { QUESTION_COUNT } from './types'
 import type { Country } from './types'
 
@@ -73,7 +73,7 @@ async function answerCurrentQuestion(user: UserEvent, correct: boolean): Promise
 
 describe('NameToFlagPlay', () => {
   test('クイズを開始すると、国名の設問と4つの国旗選択肢ボタンが表示される', () => {
-    renderApp(['/games/flag-quiz/name-to-flag/play'])
+    renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
     const questionCountry = getQuestionCountry()
     expect(screen.getByRole('heading')).toHaveTextContent(
       `「${questionCountry.nameJa}」の こっきは どれ？`,
@@ -81,9 +81,38 @@ describe('NameToFlagPlay', () => {
     expect(getFlagChoiceButtons()).toHaveLength(4)
   })
 
+  test('むずかしさが表示される', () => {
+    renderApp(['/games/flag-quiz/name-to-flag/easy/play'])
+    expect(screen.getByText('かんたん')).toBeInTheDocument()
+  })
+
+  test('かんたんでは、easyランクの国しか出題されない', () => {
+    const easyIds = new Set(countriesForLevel('easy').map((c) => c.id))
+    for (let seed = 0; seed < 10; seed += 1) {
+      const { unmount } = renderApp(['/games/flag-quiz/name-to-flag/easy/play'])
+      const questionCountry = getQuestionCountry()
+      expect(easyIds.has(questionCountry.id)).toBe(true)
+      for (const btn of getFlagChoiceButtons()) {
+        expect(easyIds.has(countryIdFromButton(btn))).toBe(true)
+      }
+      unmount()
+    }
+  })
+
+  test('不正な level でアクセスすると、むずかしさ選択画面へリダイレクトされる', () => {
+    renderApp(['/games/flag-quiz/name-to-flag/super-hard/play'])
+    expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
+  })
+
+  test('旧URL (/games/flag-quiz/name-to-flag/play) にアクセスすると、むずかしいモードにリダイレクトされる', () => {
+    renderApp(['/games/flag-quiz/name-to-flag/play'])
+    expect(getFlagChoiceButtons()).toHaveLength(4)
+    expect(screen.getByText('むずかしい')).toBeInTheDocument()
+  })
+
   test('正解の国旗を押すと「せいかい」のフィードバックが表示される', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/name-to-flag/play'])
+    renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
     const questionCountry = getQuestionCountry()
     const target = findButtonForCountry(getFlagChoiceButtons(), questionCountry)
     await user.click(target)
@@ -92,7 +121,7 @@ describe('NameToFlagPlay', () => {
 
   test('誤答の国旗を押すと「ざんねん！」と正しい国名が表示される', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/name-to-flag/play'])
+    renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
     const questionCountry = getQuestionCountry()
     const buttons = getFlagChoiceButtons()
     const wrongButton = buttons.find((btn) => countryIdFromButton(btn) !== questionCountry.id)
@@ -104,7 +133,7 @@ describe('NameToFlagPlay', () => {
 
   test('回答後は選択肢ボタンがすべて disabled になる', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/name-to-flag/play'])
+    renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
     const buttons = getFlagChoiceButtons()
     await user.click(buttons[0])
     for (const btn of buttons) {
@@ -116,7 +145,7 @@ describe('NameToFlagPlay', () => {
     '10問すべてに正解すると結果画面へ遷移し、正解数が表示される',
     async () => {
       const user = userEvent.setup()
-      renderApp(['/games/flag-quiz/name-to-flag/play'])
+      renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, true)
       }
@@ -130,7 +159,7 @@ describe('NameToFlagPlay', () => {
     '結果画面の「もういちど」でなまえ→こっきモードの1問目に戻る',
     async () => {
       const user = userEvent.setup()
-      renderApp(['/games/flag-quiz/name-to-flag/play'])
+      renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, true)
       }

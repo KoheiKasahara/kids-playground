@@ -1,5 +1,6 @@
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import { isQuizLevel, LEVEL_LABEL, MODE_LABEL, MODE_PATH } from './types'
 import type { QuizMode } from './types'
 import styles from './FlagQuizResult.module.css'
 
@@ -30,16 +31,6 @@ function getPraise(correctCount: number, totalCount: number): { emoji: string; m
   return { emoji: '😊', message: 'またあそぼう！' }
 }
 
-const playPathByMode: Record<QuizMode, string> = {
-  flagToName: '/games/flag-quiz/flag-to-name/play',
-  nameToFlag: '/games/flag-quiz/name-to-flag/play',
-}
-
-const modeLabel: Record<QuizMode, string> = {
-  flagToName: 'こっき → なまえ',
-  nameToFlag: 'なまえ → こっき',
-}
-
 type FlagQuizResultProps = {
   mode: QuizMode
 }
@@ -47,9 +38,15 @@ type FlagQuizResultProps = {
 export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { level } = useParams()
 
   if (!isResultState(location.state)) {
     return <Navigate to="/games/flag-quiz" replace />
+  }
+
+  // 不正な level（URL直打ちなど）の場合は、このモードのむずかしさ選択画面へ戻す
+  if (!isQuizLevel(level)) {
+    return <Navigate to={`/games/flag-quiz/${MODE_PATH[mode]}`} replace />
   }
 
   const { correctCount, totalCount } = location.state
@@ -58,7 +55,9 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>けっか</h1>
-      <p className={styles.modeLabel}>{modeLabel[mode]}</p>
+      <p className={styles.modeLabel}>
+        {MODE_LABEL[mode]} ・ {LEVEL_LABEL[level]}
+      </p>
       <p className={styles.score}>
         {correctCount} / {totalCount}もん せいかい！
       </p>
@@ -68,9 +67,15 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
       <div className={styles.actions}>
         <BigButton
           variant="primary"
-          onClick={() => navigate(playPathByMode[mode], { replace: true })}
+          onClick={() => navigate(`/games/flag-quiz/${MODE_PATH[mode]}/${level}/play`, { replace: true })}
         >
           もういちど
+        </BigButton>
+        <BigButton
+          variant="secondary"
+          onClick={() => navigate(`/games/flag-quiz/${MODE_PATH[mode]}`)}
+        >
+          べつの むずかしさ
         </BigButton>
         <BigButton variant="secondary" onClick={() => navigate('/games/flag-quiz')}>
           べつの クイズ

@@ -25,6 +25,7 @@ function makeCountries(count: number): Country[] {
     nameEn: `Country${i}`,
     continent: 'asia',
     flag: `flags/c${i}.svg`,
+    level: 'hard',
   }));
 }
 
