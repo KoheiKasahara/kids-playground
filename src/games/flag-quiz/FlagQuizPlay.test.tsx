@@ -38,9 +38,9 @@ function getCorrectCountry(container: HTMLElement): Country {
 
 /**
  * 「やめる」「つぎへ」「けっかを みる」を除いた、選択肢（国名）ボタンの一覧を取得する。
- * 「つぎへ」ボタンは回答前後で位置が動かないよう常にDOMに描画され disabled 属性で
- * 表示/非表示相当を切り替える実装のため、role による絞り込みだけでは選択肢ボタンと
- * 区別できない。ボタンのテキストで明示的に除外する。
+ * 「つぎへ」ボタンは回答後に画面下部の固定フィードバックバー内へマウントされるため、
+ * 回答後は role による絞り込みだけでは選択肢ボタンと区別できない。
+ * ボタンのテキストで明示的に除外する。
  */
 function getChoiceButtons(): HTMLElement[] {
   const excluded = new Set(['やめる', 'つぎへ', 'けっかを みる'])
@@ -93,8 +93,27 @@ describe('FlagQuizPlay', () => {
     const wrongButton = choiceButtons.find((btn) => btn.textContent !== correctCountry.nameJa)
     if (!wrongButton) throw new Error('wrong choice button not found')
     await user.click(wrongButton)
-    expect(screen.getByText('ざんねん…')).toBeInTheDocument()
+    expect(screen.getByText('ざんねん！')).toBeInTheDocument()
     expect(screen.getByText(`こたえ: ${correctCountry.nameJa}`)).toBeInTheDocument()
+  })
+
+  test('回答前は「つぎへ」が表示されず、回答後に表示される', async () => {
+    const user = userEvent.setup()
+    renderApp(['/games/flag-quiz/play'])
+    expect(screen.queryByRole('button', { name: /つぎへ|けっかを みる/ })).not.toBeInTheDocument()
+    await user.click(getChoiceButtons()[0])
+    expect(screen.getByRole('button', { name: /つぎへ|けっかを みる/ })).toBeEnabled()
+  })
+
+  test('回答後のフィードバックはスクリーンリーダーに通知される（role=status）', async () => {
+    const user = userEvent.setup()
+    renderApp(['/games/flag-quiz/play'])
+    await user.click(getChoiceButtons()[0])
+    const status = screen.getByRole('status')
+    expect(status).toHaveTextContent(/せいかい！|ざんねん！/)
+    expect(status).toHaveTextContent(/こたえ:/)
+    // 「つぎへ」は固定フィードバックバーの中に置かれている
+    expect(status).toContainElement(screen.getByRole('button', { name: /つぎへ|けっかを みる/ }))
   })
 
   test('回答後は選択肢ボタンがすべて disabled になる', async () => {
