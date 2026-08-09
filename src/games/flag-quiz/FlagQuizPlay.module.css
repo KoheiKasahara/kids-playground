@@ -110,6 +110,15 @@
   text-align: right;
 }
 
+/* 現在のむずかしさを進捗表示のすぐ隣に小さく添える */
+.levelLabel {
+  margin-right: var(--space-sm);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  opacity: 0.85;
+}
+
 /* header 以外（国旗・設問・選択肢）をまとめるコンテナ。
    縦画面では単純に縦積み、横向き低背では横並びに切り替える（末尾のmedia参照） */
 .body {

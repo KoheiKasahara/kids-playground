@@ -1,11 +1,12 @@
 import { useReducer, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
 import FlagImage from './FlagImage'
-import { countries } from './data/countries'
+import { countriesForLevel } from './data/countries'
 import { generateQuestions } from './questionGenerator'
-import type { Country, QuizMode } from './types'
+import { isQuizLevel, LEVEL_LABEL, MODE_PATH } from './types'
+import type { Country, QuizLevel, QuizMode } from './types'
 import styles from './FlagQuizPlay.module.css'
 
 type PlayState = {
@@ -60,18 +61,29 @@ function flagChoiceClassName(variant: ChoiceVariant): string {
   return classes.join(' ')
 }
 
-const resultPathByMode: Record<QuizMode, string> = {
-  flagToName: '/games/flag-quiz/flag-to-name/result',
-  nameToFlag: '/games/flag-quiz/name-to-flag/result',
-}
-
 type FlagQuizPlayProps = {
   mode: QuizMode
 }
 
 export default function FlagQuizPlay({ mode }: FlagQuizPlayProps) {
+  const { level } = useParams()
+
+  // 不正な level（URL直打ちなど）の場合は、このモードのむずかしさ選択画面へ戻す
+  if (!isQuizLevel(level)) {
+    return <Navigate to={`/games/flag-quiz/${MODE_PATH[mode]}`} replace />
+  }
+
+  return <FlagQuizPlayGame mode={mode} level={level} />
+}
+
+type FlagQuizPlayGameProps = {
+  mode: QuizMode
+  level: QuizLevel
+}
+
+function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
   const navigate = useNavigate()
-  const [questions] = useState(() => generateQuestions(countries))
+  const [questions] = useState(() => generateQuestions(countriesForLevel(level)))
   const [state, dispatch] = useReducer(reducer, initialState)
 
   const totalCount = questions.length
@@ -87,7 +99,7 @@ export default function FlagQuizPlay({ mode }: FlagQuizPlayProps) {
 
   const handleNext = () => {
     if (isLastQuestion) {
-      navigate(resultPathByMode[mode], {
+      navigate(`/games/flag-quiz/${MODE_PATH[mode]}/${level}/result`, {
         replace: true,
         state: { correctCount: state.correctCount, totalCount },
       })
@@ -114,6 +126,7 @@ export default function FlagQuizPlay({ mode }: FlagQuizPlayProps) {
         </button>
         <div className={styles.progressArea}>
           <p className={styles.progressLabel}>
+            <span className={styles.levelLabel}>{LEVEL_LABEL[level]}</span>
             {state.index + 1} / {totalCount}
           </p>
           <ProgressBar current={state.index + 1} total={totalCount} />
