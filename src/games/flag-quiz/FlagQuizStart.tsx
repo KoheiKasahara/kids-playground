@@ -10,8 +10,11 @@ export default function FlagQuizStart() {
       <h1 className={styles.title}>こっきクイズ</h1>
       <p className={styles.description}>ぜんぶで 10もん あるよ</p>
       <div className={styles.actions}>
-        <BigButton variant="primary" onClick={() => navigate('/games/flag-quiz/play')}>
-          はじめる
+        <BigButton variant="primary" onClick={() => navigate('/games/flag-quiz/flag-to-name/play')}>
+          <span aria-hidden="true">🚩</span> こっきを みて こたえる
+        </BigButton>
+        <BigButton variant="primary" onClick={() => navigate('/games/flag-quiz/name-to-flag/play')}>
+          <span aria-hidden="true">🔎</span> なまえを みて こたえる
         </BigButton>
         <BigButton variant="secondary" onClick={() => navigate('/')}>
           もどる

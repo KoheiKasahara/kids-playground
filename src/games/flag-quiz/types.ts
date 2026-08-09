@@ -24,6 +24,9 @@ export type Question = {
   choices: Country[];
 };
 
+/** 出題形式。flagToName: 国旗を見て国名を選ぶ / nameToFlag: 国名を見て国旗を選ぶ */
+export type QuizMode = 'flagToName' | 'nameToFlag';
+
 /** 1ゲームの問題数 */
 export const QUESTION_COUNT = 10;
 /** 1問あたりの選択肢数 */

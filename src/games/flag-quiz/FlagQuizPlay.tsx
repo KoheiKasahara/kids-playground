@@ -5,7 +5,7 @@ import ProgressBar from '../../components/ProgressBar'
 import FlagImage from './FlagImage'
 import { countries } from './data/countries'
 import { generateQuestions } from './questionGenerator'
-import type { Country } from './types'
+import type { Country, QuizMode } from './types'
 import styles from './FlagQuizPlay.module.css'
 
 type PlayState = {
@@ -52,7 +52,24 @@ function choiceMark(variant: ChoiceVariant): string {
   return ''
 }
 
-export default function FlagQuizPlay() {
+/** なまえ→こっきモードの国旗選択肢ボタンの見た目クラス。正解・不正解のみ枠色を変える */
+function flagChoiceClassName(variant: ChoiceVariant): string {
+  const classes = [styles.flagChoiceButton]
+  if (variant === 'correct') classes.push(styles.flagChoiceCorrect)
+  if (variant === 'wrong') classes.push(styles.flagChoiceWrong)
+  return classes.join(' ')
+}
+
+const resultPathByMode: Record<QuizMode, string> = {
+  flagToName: '/games/flag-quiz/flag-to-name/result',
+  nameToFlag: '/games/flag-quiz/name-to-flag/result',
+}
+
+type FlagQuizPlayProps = {
+  mode: QuizMode
+}
+
+export default function FlagQuizPlay({ mode }: FlagQuizPlayProps) {
   const navigate = useNavigate()
   const [questions] = useState(() => generateQuestions(countries))
   const [state, dispatch] = useReducer(reducer, initialState)
@@ -70,7 +87,7 @@ export default function FlagQuizPlay() {
 
   const handleNext = () => {
     if (isLastQuestion) {
-      navigate('/games/flag-quiz/result', {
+      navigate(resultPathByMode[mode], {
         replace: true,
         state: { correctCount: state.correctCount, totalCount },
       })
@@ -79,8 +96,18 @@ export default function FlagQuizPlay() {
     dispatch({ type: 'next' })
   }
 
+  // nameToFlagモードはフィードバックバーに国旗の行が増えるぶん高さが変わるため、
+  // ページ側の下部余白（--feedback-bar-height）をモード別クラスで切り替える
+  const pageClassName = [
+    styles.page,
+    answered ? styles.pageAnswered : '',
+    mode === 'nameToFlag' ? styles.pageNameToFlag : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className={answered ? `${styles.page} ${styles.pageAnswered}` : styles.page}>
+    <div className={pageClassName}>
       <div className={styles.header}>
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
           やめる
@@ -94,31 +121,70 @@ export default function FlagQuizPlay() {
       </div>
 
       <div className={styles.body}>
-        <div className={styles.flagArea}>
-          <FlagImage country={question.answer} size="large" />
-        </div>
+        {mode === 'flagToName' ? (
+          <>
+            <div className={styles.flagArea}>
+              <FlagImage country={question.answer} size="large" />
+            </div>
 
-        <div className={styles.content}>
-          <h1 className={styles.question}>この くにの なまえは？</h1>
+            <div className={styles.content}>
+              <h1 className={styles.question}>この くにの なまえは？</h1>
 
-          <div className={styles.choices}>
-            {question.choices.map((choice) => {
-              const variant = choiceVariant(choice, question.answer, state.selectedId)
-              return (
-                <BigButton
-                  key={choice.id}
-                  className={styles.choiceButton}
-                  variant={variant}
-                  disabled={answered}
-                  onClick={() => handleSelect(choice.id)}
-                >
-                  {answered ? choiceMark(variant) : ''}
-                  {choice.nameJa}
-                </BigButton>
-              )
-            })}
-          </div>
-        </div>
+              <div className={styles.choices}>
+                {question.choices.map((choice) => {
+                  const variant = choiceVariant(choice, question.answer, state.selectedId)
+                  return (
+                    <BigButton
+                      key={choice.id}
+                      className={styles.choiceButton}
+                      variant={variant}
+                      disabled={answered}
+                      onClick={() => handleSelect(choice.id)}
+                    >
+                      {answered ? choiceMark(variant) : ''}
+                      {choice.nameJa}
+                    </BigButton>
+                  )
+                })}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <h1 className={styles.question}>
+              「<span className={styles.questionCountry}>{question.answer.nameJa}</span>」の こっきは どれ？
+            </h1>
+
+            <div className={styles.flagChoices}>
+              {question.choices.map((choice, index) => {
+                const variant = choiceVariant(choice, question.answer, state.selectedId)
+                return (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    className={flagChoiceClassName(variant)}
+                    disabled={answered}
+                    aria-label={`${index + 1}ばんめ の こっき`}
+                    onClick={() => handleSelect(choice.id)}
+                  >
+                    <FlagImage country={choice} size="choice" />
+                    {/* 色だけに頼らず判別できるよう、枠色に加えて記号バッジを重ねる */}
+                    {answered && variant === 'correct' && (
+                      <span className={`${styles.choiceBadge} ${styles.badgeCorrect}`} aria-hidden="true">
+                        ◯
+                      </span>
+                    )}
+                    {answered && variant === 'wrong' && (
+                      <span className={`${styles.choiceBadge} ${styles.badgeWrong}`} aria-hidden="true">
+                        ✕
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       {/*
@@ -150,6 +216,11 @@ export default function FlagQuizPlay() {
                 {isCorrect ? '🎉 せいかい！' : 'ざんねん！'}
               </p>
               <p className={styles.answerText}>こたえ: {question.answer.nameJa}</p>
+              {mode === 'nameToFlag' && (
+                <div className={styles.answerFlags}>
+                  <FlagImage country={question.answer} size="small" />
+                </div>
+              )}
             </div>
 
             <BigButton variant="primary" className={styles.nextButton} onClick={handleNext}>
