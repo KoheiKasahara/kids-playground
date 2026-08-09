@@ -16,6 +16,7 @@ html {
 
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   font-family: var(--font-family-base);
   font-size: var(--font-size-base);
   color: var(--color-text);
@@ -30,6 +31,7 @@ body {
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 button {
