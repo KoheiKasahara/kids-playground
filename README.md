@@ -2,7 +2,7 @@
 
 子ども向けのミニゲーム集Webアプリです。スマートフォン・タブレット・PCのブラウザで遊べます。
 
-初期リリースでは「こっきクイズ（国旗クイズ）」を実装しています。国旗を見て、対応する国名を4択から選ぶゲームです（1ゲーム10問）。今後、他のミニゲームも追加していく予定です。
+初期リリースでは「こっきクイズ（国旗クイズ）」を実装しています。4択クイズで1ゲーム10問、「こっきを みて なまえを こたえる」モードと「なまえを みて こっきを こたえる」モードの2種類から選べます。今後、他のミニゲームも追加していく予定です。
 
 - セットアップ・デバッグ手順の詳細は [docs/SETUP.md](docs/SETUP.md) を参照してください。
 - 設計の詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
@@ -35,7 +35,7 @@ npm test          # 一度だけ実行 (vitest run)
 npm run test:watch  # ウォッチモードで実行 (vitest)
 ```
 
-`questionGenerator.ts` の問題生成ロジックに対するUnit Testと、`FlagQuizPlay` / `Home` など画面の挙動に対するComponent Test（React Testing Library）が含まれます。
+`questionGenerator.ts` の問題生成ロジックに対するUnit Testと、`FlagQuizPlay`（こっき → なまえモード、旧URLからのリダイレクトを含む）/ `NameToFlagPlay.test.tsx`（なまえ → こっきモード）/ `Home` など画面の挙動に対するComponent Test（React Testing Library）が含まれます。
 
 ## ビルド
 
@@ -91,11 +91,11 @@ src/
 │  └─ Home.tsx        # ホーム（ゲーム選択）画面
 ├─ games/
 │  └─ flag-quiz/       # 国旗クイズ（ゲーム固有の画面・ロジック・データ）
-│     ├─ FlagQuizStart.tsx
-│     ├─ FlagQuizPlay.tsx
-│     ├─ FlagQuizResult.tsx
+│     ├─ FlagQuizStart.tsx      # モード選択画面（こっき→なまえ / なまえ→こっき）
+│     ├─ FlagQuizPlay.tsx       # プレイ画面（2モード共用、mode propで出し分け）
+│     ├─ FlagQuizResult.tsx     # 結果画面（2モード共用、mode propで出し分け）
 │     ├─ FlagImage.tsx
-│     ├─ questionGenerator.ts   # 問題生成ロジック（Unit Test対象）
+│     ├─ questionGenerator.ts   # 問題生成ロジック（Unit Test対象、モードに依存しない）
 │     ├─ types.ts
 │     └─ data/countries.ts      # 国データ（31か国）
 ├─ components/         # ゲーム間で共通のUI部品 (BigButton, ProgressBar など)
@@ -120,7 +120,6 @@ docs/
 
 - 難易度（出題対象国の数によるかんたん／ふつう／むずかしい）
 - 地域別モード（アジア／ヨーロッパなど）
-- 国名 → 国旗（現在は国旗 → 国名のみ）
 - 効果音
 - スコア履歴・LocalStorageへの保存
 - 苦手な国旗を中心に出題するモード
