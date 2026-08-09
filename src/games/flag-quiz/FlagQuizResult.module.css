@@ -2,6 +2,7 @@
   max-width: var(--content-max-width);
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: var(--space-xl) var(--space-lg);
   display: flex;
   flex-direction: column;
