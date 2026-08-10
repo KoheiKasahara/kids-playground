@@ -62,8 +62,10 @@ function flagChoiceClassName(variant: ChoiceVariant): string {
   return classes.join(' ')
 }
 
+// panelFlag はパネル専用の PanelFlagQuizPlay を使うため、このコンポーネントの
+// props からは型レベルで除外する（誤って panelFlag を渡すとコンパイルエラーになる）。
 type FlagQuizPlayProps = {
-  mode: QuizMode
+  mode: Exclude<QuizMode, 'panelFlag'>
 }
 
 export default function FlagQuizPlay({ mode }: FlagQuizPlayProps) {
@@ -78,7 +80,7 @@ export default function FlagQuizPlay({ mode }: FlagQuizPlayProps) {
 }
 
 type FlagQuizPlayGameProps = {
-  mode: QuizMode
+  mode: Exclude<QuizMode, 'panelFlag'>
   level: QuizLevel
 }
 

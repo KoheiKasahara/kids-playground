@@ -4,7 +4,7 @@
 
 子どもがスマートフォン・タブレット・PCなどで遊べる、シンプルなミニゲームWebアプリを作成する。
 
-初期リリースの「国旗クイズ」に加え、「はたらくくるまクイズ」「さんすうクイズ」を実装する。はたらくくるまクイズの画面・URL・24車両・素材・検収条件は [WORKING_VEHICLE_QUIZ_DESIGN.md](WORKING_VEHICLE_QUIZ_DESIGN.md) を正とし、さんすうクイズの画面・URL・4演算×3むずかしさの出題プール・検収条件は [MATH_QUIZ_DESIGN.md](MATH_QUIZ_DESIGN.md) を正とする。新規ミニゲームの共通規約は [MINIGAME_DEVELOPMENT_GUIDELINES.md](MINIGAME_DEVELOPMENT_GUIDELINES.md) に定める。
+初期リリースの「国旗クイズ」に加え、「はたらくくるまクイズ」「さんすうクイズ」を実装する。はたらくくるまクイズの画面・URL・24車両・素材・検収条件は [WORKING_VEHICLE_QUIZ_DESIGN.md](WORKING_VEHICLE_QUIZ_DESIGN.md) を正とし、さんすうクイズの画面・URL・4演算×3むずかしさの出題プール・検収条件は [MATH_QUIZ_DESIGN.md](MATH_QUIZ_DESIGN.md) を正とする。国旗クイズには「パネルめくり」モード（国旗を覆う16枚のパネルを少しずつめくって国名を当てる）を追加しており、画面・URL・パネル仕様・得点計算・検収条件は [PANEL_FLAG_QUIZ_DESIGN.md](PANEL_FLAG_QUIZ_DESIGN.md) を正とする。新規ミニゲームの共通規約は [MINIGAME_DEVELOPMENT_GUIDELINES.md](MINIGAME_DEVELOPMENT_GUIDELINES.md) に定める。
 
 将来的には、国旗クイズだけではなく以下のような簡易ゲームを追加できる構成とする。
 
@@ -211,6 +211,15 @@ React Routerを使用する。
 
 /games/flag-quiz/name-to-flag/:level/result
 └─ 国旗クイズ結果（なまえ → こっき）
+
+/games/flag-quiz/panel-flag
+└─ 国旗クイズ むずかしさ選択（パネルめくり）
+
+/games/flag-quiz/panel-flag/:level/play
+└─ 国旗クイズプレイ（パネルめくり、:level は easy / normal / hard）
+
+/games/flag-quiz/panel-flag/:level/result
+└─ 国旗クイズ結果（パネルめくり）
 ```
 
 `:level` は `easy` / `normal` / `hard` 以外の値だった場合、そのモードのむずかしさ選択画面へ
@@ -300,6 +309,18 @@ GitHub PagesでReact Routerを利用する際のリロード・404対策につ�
 
 🇨🇳 🇯🇵
 🇰🇷 🇹🇭
+```
+
+### パネルめくり
+
+実装済み。国旗を覆う4×4＝16枚のパネルを「もう1まい めくる！」ボタンで少しずつめくりながら、対応する国名を4択から選択する。少ない枚数で当てるほど得点が高い（詳細は [PANEL_FLAG_QUIZ_DESIGN.md](PANEL_FLAG_QUIZ_DESIGN.md)）。
+
+```text
+┌─┬─┬─┬─┐
+├─┼─┼─┼─┤   この くにの なまえは？
+├─┼─┼─┼─┤
+└─┴─┴─┴─┘   にほん   かんこく
+             ちゅうごく タイ
 ```
 
 ---

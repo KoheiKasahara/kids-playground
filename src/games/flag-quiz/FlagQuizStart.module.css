@@ -25,7 +25,7 @@
   color: var(--color-text-muted);
 }
 
-/* ボタンが3つ（モード2つ＋もどる）になったぶん、
+/* ボタンが4つ（モード3つ＋もどる）になったぶん、
    space-lg のままだと縦に間延びするので space-md に詰める */
 .actions {
   width: 100%;
@@ -72,5 +72,18 @@
     min-height: 56px;
     padding-top: var(--space-sm);
     padding-bottom: var(--space-sm);
+  }
+}
+
+/*
+ * スマホを横に持った低背端末（例: iPhone SE 横向き）では、4ボタン（モード3つ＋もどる）を
+ * 縦積みのままにすると窮屈になるため、2列×2行のグリッドに切り替える
+ * （WorkingVehicleQuizStart / MathQuizStart と同じ考え方）。
+ */
+@media (orientation: landscape) and (max-height: 560px) {
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
   }
 }

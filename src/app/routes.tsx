@@ -4,6 +4,7 @@ import FlagQuizStart from '../games/flag-quiz/FlagQuizStart'
 import FlagQuizLevelSelect from '../games/flag-quiz/FlagQuizLevelSelect'
 import FlagQuizPlay from '../games/flag-quiz/FlagQuizPlay'
 import FlagQuizResult from '../games/flag-quiz/FlagQuizResult'
+import PanelFlagQuizPlay from '../games/flag-quiz/PanelFlagQuizPlay'
 import WorkingVehicleQuizStart from '../games/working-vehicle-quiz/WorkingVehicleQuizStart'
 import WorkingVehicleQuizLevelSelect from '../games/working-vehicle-quiz/WorkingVehicleQuizLevelSelect'
 import WorkingVehicleQuizPlay from '../games/working-vehicle-quiz/WorkingVehicleQuizPlay'
@@ -39,6 +40,15 @@ export const routes: RouteObject[] = [
   {
     path: '/games/flag-quiz/name-to-flag/:level/result',
     element: <FlagQuizResult mode="nameToFlag" />,
+  },
+  { path: '/games/flag-quiz/panel-flag', element: <FlagQuizLevelSelect mode="panelFlag" /> },
+  {
+    path: '/games/flag-quiz/panel-flag/:level/play',
+    element: <PanelFlagQuizPlay />,
+  },
+  {
+    path: '/games/flag-quiz/panel-flag/:level/result',
+    element: <FlagQuizResult mode="panelFlag" />,
   },
   { path: '/games/working-vehicle-quiz', element: <WorkingVehicleQuizStart /> },
   {

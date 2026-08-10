@@ -16,6 +16,9 @@ export default function FlagQuizStart() {
         <BigButton variant="primary" onClick={() => navigate('/games/flag-quiz/name-to-flag')}>
           <span aria-hidden="true">🔎</span> なまえを みて こたえる
         </BigButton>
+        <BigButton variant="primary" onClick={() => navigate('/games/flag-quiz/panel-flag')}>
+          <span aria-hidden="true">🧩</span> パネルを めくって こたえる
+        </BigButton>
         <BigButton variant="secondary" onClick={() => navigate('/')}>
           もどる
         </BigButton>

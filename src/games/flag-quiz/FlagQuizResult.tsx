@@ -7,15 +7,22 @@ import styles from './FlagQuizResult.module.css'
 type ResultState = {
   correctCount: number
   totalCount: number
+  /** パネルめくりモードなど、得点制のモードでだけ渡される。既存の flagToName/nameToFlag は渡さない */
+  score?: number
+  maxScore?: number
 }
 
 function isResultState(value: unknown): value is ResultState {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Record<string, unknown>
-  return (
-    typeof candidate.correctCount === 'number' &&
-    typeof candidate.totalCount === 'number'
-  )
+  if (typeof candidate.correctCount !== 'number' || typeof candidate.totalCount !== 'number') {
+    return false
+  }
+  // score/maxScore は任意。存在する既存state（scoreなし）はそのまま受理しつつ、
+  // 値がある場合は number であることだけ確認する。
+  if (candidate.score !== undefined && typeof candidate.score !== 'number') return false
+  if (candidate.maxScore !== undefined && typeof candidate.maxScore !== 'number') return false
+  return true
 }
 
 function getPraise(correctCount: number, totalCount: number): { emoji: string; message: string } {
@@ -49,8 +56,9 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
     return <Navigate to={`/games/flag-quiz/${MODE_PATH[mode]}`} replace />
   }
 
-  const { correctCount, totalCount } = location.state
+  const { correctCount, totalCount, score, maxScore } = location.state
   const praise = getPraise(correctCount, totalCount)
+  const hasScore = typeof score === 'number' && typeof maxScore === 'number'
 
   return (
     <div className={styles.page}>
@@ -61,6 +69,11 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
       <p className={styles.score}>
         {correctCount} / {totalCount}もん せいかい！
       </p>
+      {hasScore && (
+        <p className={styles.scoreLine}>
+          とくてん: {score} / {maxScore}てん
+        </p>
+      )}
       <p className={styles.praise}>
         <span aria-hidden="true">{praise.emoji}</span> {praise.message}
       </p>

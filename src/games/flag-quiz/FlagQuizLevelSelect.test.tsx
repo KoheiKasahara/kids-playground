@@ -37,6 +37,11 @@ describe('FlagQuizLevelSelect', () => {
     expect(screen.getByText('なまえ → こっき')).toBeInTheDocument()
   })
 
+  test('パネルめくりモードでは選んでいるモード名が表示される', () => {
+    renderApp(['/games/flag-quiz/panel-flag'])
+    expect(screen.getByText('パネルめくり')).toBeInTheDocument()
+  })
+
   test('「かんたん」を押すと、こっき→なまえモードのかんたんのプレイ画面に遷移する', async () => {
     const user = userEvent.setup()
     renderApp(['/games/flag-quiz/flag-to-name'])
@@ -51,6 +56,14 @@ describe('FlagQuizLevelSelect', () => {
     await user.click(screen.getByRole('button', { name: /むずかしい/ }))
     expect(screen.getAllByRole('button', { name: /ばんめ の こっき/ })).toHaveLength(4)
     expect(screen.getByText('むずかしい')).toBeInTheDocument()
+  })
+
+  test('パネルめくりモードで「かんたん」を押すと、パネルクイズのプレイ画面に遷移する', async () => {
+    const user = userEvent.setup()
+    renderApp(['/games/flag-quiz/panel-flag'])
+    await user.click(screen.getByRole('button', { name: /かんたん/ }))
+    expect(screen.getByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
+    expect(screen.getByText('かんたん')).toBeInTheDocument()
   })
 
   test('「もどる」を押すとモード選択画面に戻る', async () => {

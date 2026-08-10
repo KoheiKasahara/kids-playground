@@ -1,0 +1,442 @@
+/*
+ * 基本構造は FlagQuizPlay.module.css（flagToNameモード）とほぼ同じ。
+ * .page は 100dvh（未対応環境は 100vh）のフレックスコンテナで、直下の子は header と body の2つ
+ * （回答後はさらに固定バー .feedbackBar が加わるが、position: fixed のため
+ * 通常フローの高さ計算には影響しない）。
+ * body がさらに flagArea / content に分かれ、flagArea だけが縦方向に伸縮する（flex: 1）。
+ * これにより iPhone SE などの小型スマホ縦画面でもスクロールなしに収まる。
+ *
+ * 「もう1まい めくる！」「つぎのもんだい」は画面下部やcontent内の固定位置に置き、
+ * 画面の高さに関係なく操作可能にする。
+ *
+ * 横向き・低背の画面（@media (orientation: landscape) and (max-height: 560px)）では
+ * body を横並びにし、左に国旗・右に問題文/めくるボタン/選択肢を置く2カラムレイアウトに切り替える
+ * （ファイル末尾）。
+ */
+.page {
+  /* 回答後に確保する下部余白＝固定バーの想定高さ（safe-area 分を除く）。
+     見出し1行＋国名1行＋結果詳細1行＋ボタン＋余白ぶん、flagToNameより1行多い。
+     ブレークポイントごとに上書きする。 */
+  --feedback-bar-height: 196px;
+
+  height: 100vh;
+  height: 100dvh;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-lg) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-lg) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.pageAnswered {
+  padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
+}
+
+/* タブレット・PC（横幅に余裕がある）と、縦に十分長い端末では、
+   回答前から固定バーぶんの余白を確保しておく（FlagQuizPlay.module.css と同じ理由） */
+@media (min-width: 640px) and (min-height: 600px), (min-height: 760px) {
+  .page {
+    padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding-left: calc(var(--space-md) + var(--safe-left));
+    padding-right: calc(var(--space-md) + var(--safe-right));
+  }
+}
+
+.header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 820px) {
+  .header {
+    padding-right: 96px;
+  }
+}
+
+.quit {
+  position: fixed;
+  top: calc(var(--space-sm) + var(--safe-top));
+  right: calc(var(--space-md) + var(--safe-right));
+  z-index: 200;
+  min-height: 40px;
+  padding: var(--space-xs) var(--space-md);
+  font-size: 18px;
+  color: var(--color-text-muted);
+  background-color: var(--color-surface-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.progressArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.progressLabel {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.levelLabel {
+  margin-right: var(--space-sm);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  opacity: 0.85;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.flagArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xs) 0;
+}
+
+.content {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.question {
+  flex: 0 0 auto;
+  font-size: clamp(19px, 5.5vw, 28px);
+  line-height: 1.3;
+  text-align: center;
+  color: var(--color-text);
+}
+
+/* 「もう1まい めくる！」ボタンと残り枚数の行。
+   ボタンは主操作の一つなので min-height はタップ領域の目安である64px以上を確保する。 */
+.revealRow {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.revealButton {
+  min-height: var(--tap-target-min);
+  font-size: 20px;
+}
+
+.remainingText {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.choices {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.choiceButton {
+  min-height: clamp(56px, 13vw, 64px);
+  font-size: 20px;
+}
+
+@media (min-width: 640px) {
+  .choices {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+  }
+
+  .choiceButton {
+    min-height: 68px;
+    font-size: 22px;
+  }
+
+  .revealButton {
+    min-height: 68px;
+    font-size: 22px;
+  }
+}
+
+.feedbackBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  padding: 10px var(--space-md) calc(12px + var(--safe-bottom));
+  border-top: 2px solid var(--color-border);
+  box-shadow: 0 -4px 12px rgba(33, 37, 41, 0.16);
+  animation: bar-in 0.18s ease-out;
+}
+
+/* prefers-reduced-motion: reduce は src/styles/global.css の共通ルールで
+   すべてのアニメーション時間を強制的に短くしているため、ここでは対応不要 */
+@keyframes bar-in {
+  0% {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.feedbackBarSuccess {
+  background-color: var(--color-success-bg);
+}
+
+.feedbackBarWrong {
+  background-color: var(--color-danger-bg);
+}
+
+.feedbackBarInner {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feedbackTexts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.feedbackText {
+  font-size: clamp(22px, 5.5vw, 28px);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.correctText {
+  color: var(--color-success-dark);
+  animation: pop-in 0.25s ease-out;
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.wrongText {
+  color: var(--color-danger-dark);
+}
+
+.answerText {
+  font-size: clamp(17px, 4.2vw, 20px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+/* 「Nまいで わかった！」「Mてん」/「0てん」を表示する行。国名の下に添える説明なので、
+   answerText よりわずかに控えめなサイズにする */
+.detailText {
+  font-size: clamp(15px, 3.8vw, 18px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text-muted);
+}
+
+.nextButton {
+  flex: 0 0 auto;
+  min-height: clamp(60px, 14vw, 68px);
+  font-size: 24px;
+}
+
+/* 背の低い縦画面（iPhone 5/SE 第1世代の 568px 相当）では、固定バーが画面を
+   占有しすぎないよう各要素を少しずつ詰める */
+@media (orientation: portrait) and (max-height: 620px) {
+  .page {
+    --feedback-bar-height: 180px;
+  }
+
+  .choiceButton {
+    min-height: 52px;
+  }
+
+  .revealButton {
+    min-height: 56px;
+  }
+
+  .feedbackText {
+    font-size: 22px;
+  }
+
+  .answerText {
+    font-size: 17px;
+  }
+
+  .detailText {
+    font-size: 15px;
+  }
+
+  .nextButton {
+    min-height: 56px;
+    font-size: 20px;
+  }
+}
+
+/*
+ * 横向き・低背の画面（スマホを横に持った状態を想定）向けの2カラムレイアウト。
+ * 左カラムに国旗、右カラムに問題文・めくるボタン・選択肢をまとめる
+ * （FlagQuizPlay.module.css の flagToNameモードと同じ考え方）。
+ */
+@media (orientation: landscape) and (max-height: 560px) {
+  .page {
+    --feedback-bar-height: 84px;
+
+    max-width: 960px;
+    padding-top: calc(8px + var(--safe-top));
+    padding-bottom: calc(8px + var(--safe-bottom));
+    gap: 8px;
+  }
+
+  .pageAnswered {
+    padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
+  }
+
+  .header {
+    padding-right: 96px;
+  }
+
+  .progressArea {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .progressLabel {
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  .body {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .flagArea {
+    flex: 0 0 320px;
+    max-width: 320px;
+    padding: 0;
+  }
+
+  .content {
+    flex: 1 1 auto;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .question {
+    font-size: 19px;
+    line-height: 1.25;
+  }
+
+  .revealRow {
+    flex-direction: row;
+    justify-content: center;
+    gap: var(--space-sm);
+  }
+
+  .revealButton {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .remainingText {
+    font-size: 14px;
+  }
+
+  .choices {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .choiceButton {
+    min-height: 48px;
+    font-size: 17px;
+  }
+
+  .feedbackBar {
+    padding: 6px var(--space-md) calc(8px + var(--safe-bottom));
+  }
+
+  .feedbackBarInner {
+    max-width: 960px;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .feedbackTexts {
+    flex: 1 1 auto;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .feedbackText {
+    font-size: 20px;
+  }
+
+  .answerText {
+    font-size: 16px;
+  }
+
+  .detailText {
+    font-size: 14px;
+  }
+
+  .nextButton {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 180px;
+    min-height: 44px;
+    padding: var(--space-sm) var(--space-lg);
+    font-size: 18px;
+  }
+
+  /* iPhone SE 横向き相当（736px前後）など幅の狭い端末では、左カラム（国旗）を
+     さらに狭めて右カラムの選択肢ボタン幅を確保する */
+  @media (max-width: 780px) {
+    .flagArea {
+      flex: 0 0 220px;
+      max-width: 220px;
+    }
+  }
+}
