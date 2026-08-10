@@ -129,6 +129,23 @@ describe('quizSound', () => {
     expect(last.frequency.value).toBeGreaterThan(secondLast.frequency.value)
   })
 
+  test('playPanelRevealSound は残り枚数が多くても（残り15枚）甲高くなりすぎない（全て1500Hz以下）', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPanelRevealSound } = await import('./quizSound')
+
+    const total = 15
+    for (let step = 1; step <= total; step += 1) {
+      playPanelRevealSound(step, total)
+    }
+
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(total)
+    for (let i = 0; i < total; i += 1) {
+      const oscillator = instances[0].createOscillator.mock.results[i].value as MockOscillatorNode
+      expect(oscillator.frequency.value).toBeLessThanOrEqual(1500)
+    }
+  })
+
   test('setSoundEnabled(false) の間は AudioContext を作らず、どの音も鳴らない', async () => {
     ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
     vi.resetModules()

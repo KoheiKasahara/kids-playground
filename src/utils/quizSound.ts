@@ -115,7 +115,9 @@ const REVEAL_BASE_FREQUENCY = 587.33
 
 /**
  * 正解後（または不正解後の種明かし）に、残りのパネルを連続でめくっていくときの音。
- * step（1始まり）が進むほどペンタトニックスケールを駆け上がるように音を高くし、
+ * 残り枚数（total）に関わらず、burst 全体でペンタトニックスケール1オクターブぶんだけ
+ * 均等に駆け上がるよう、step を 0〜1 の進捗率に正規化してからスケールの音数に割り当てる
+ * （残りが2枚でも15枚でも、常に587Hz(D5)〜988Hz(B5)程度の範囲に収まり、耳に刺さらない）。
  * 最後の1枚（step === total）だけさらに一段高く鳴らして「見えた！」の達成感を出す。
  * 連続再生されるため、通常のパネル音より小さい音量・短い長さにしてある。
  */
@@ -127,11 +129,9 @@ export function playPanelRevealSound(step: number, total: number): void {
   const safeStep = Math.min(Math.max(Math.trunc(step), 1), safeTotal)
   const isLast = safeStep >= safeTotal
 
-  // 進んだ枚数ぶんだけスケールを駆け上がる（5音で1オクターブ上がって続く）
-  const scaleIndex = safeStep - 1
-  const octave = Math.floor(scaleIndex / PENTATONIC_STEPS.length)
-  const semitones =
-    PENTATONIC_STEPS[scaleIndex % PENTATONIC_STEPS.length] + octave * 12 + (isLast ? 5 : 0)
+  const progress = safeTotal > 1 ? (safeStep - 1) / (safeTotal - 1) : 0
+  const scaleIndex = Math.round(progress * (PENTATONIC_STEPS.length - 1)) // 0〜4
+  const semitones = PENTATONIC_STEPS[scaleIndex] + (isLast ? 5 : 0)
   const frequency = REVEAL_BASE_FREQUENCY * 2 ** (semitones / 12)
 
   const now = ctx.currentTime
