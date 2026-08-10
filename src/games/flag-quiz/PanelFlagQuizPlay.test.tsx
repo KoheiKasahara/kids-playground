@@ -261,6 +261,16 @@ describe('PanelFlagQuizPlay', () => {
     expect(getOpenPanelCount()).toBe(1)
   })
 
+  test('回答前後でページのルート要素の className が変化しない（レイアウトシフトしない）', async () => {
+    const user = userEvent.setup()
+    const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    const pageElement = container.firstElementChild
+    const classNameBefore = pageElement?.className
+    expect(classNameBefore).toBeTruthy()
+    await user.click(getChoiceButtons()[0])
+    expect(container.firstElementChild?.className).toBe(classNameBefore)
+  })
+
   test('回答後は選択肢ボタンと「もう1まい めくる！」ボタンが disabled になる', async () => {
     const user = userEvent.setup()
     renderApp(['/games/flag-quiz/panel-flag/hard/play'])

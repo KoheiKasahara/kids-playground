@@ -2,6 +2,7 @@ import { useReducer, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
+import QuizResultOverlay from '../../components/QuizResultOverlay'
 import FlagImage from './FlagImage'
 import { countriesForLevel } from './data/countries'
 import { generateQuestions } from './questionGenerator'
@@ -117,13 +118,9 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
     dispatch({ type: 'next' })
   }
 
-  // nameToFlagモードはフィードバックバーに国旗の行が増えるぶん高さが変わるため、
+  // nameToFlagモードはオーバーレイに国旗の行が増えるぶん高さが変わるため、
   // ページ側の下部余白（--feedback-bar-height）をモード別クラスで切り替える
-  const pageClassName = [
-    styles.page,
-    answered ? styles.pageAnswered : '',
-    mode === 'nameToFlag' ? styles.pageNameToFlag : '',
-  ]
+  const pageClassName = [styles.page, mode === 'nameToFlag' ? styles.pageNameToFlag : '']
     .filter(Boolean)
     .join(' ')
 
@@ -210,46 +207,21 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
       </div>
 
       {/*
-        正誤メッセージと「つぎへ」は、通常フローから外して画面下部に固定する。
-        こうすることで画面の高さに関係なく「つぎへ」が必ず可視・操作可能になる
-        （iPhone SE 相当の低背端末でも画面外に出ない）。
+        正誤メッセージと「つぎのもんだい」は、通常フローから外し共通コンポーネント
+        QuizResultOverlay が画面下部に固定して表示する。こうすることで画面の高さに
+        関係なく必ず可視・操作可能になる（iPhone SE 相当の低背端末でも画面外に出ない）。
         未回答時はDOMに置かず、回答直後にマウントしてアニメーションを都度再生する。
-        隠れ防止の余白は .pageAnswered の padding-bottom で確保している。
+        隠れ防止の余白は .page（nameToFlagモードは .pageNameToFlag）側の
+        padding-bottom で、回答したかどうかに関わらずビューポートの幅・高さだけで確保している。
       */}
       {answered && (
-        <div
-          className={
-            isCorrect
-              ? `${styles.feedbackBar} ${styles.feedbackBarSuccess}`
-              : `${styles.feedbackBar} ${styles.feedbackBarWrong}`
-          }
-          role="status"
-          aria-live="polite"
-        >
-          <div className={styles.feedbackBarInner}>
-            <div className={styles.feedbackTexts}>
-              <p
-                className={
-                  isCorrect
-                    ? `${styles.feedbackText} ${styles.correctText}`
-                    : `${styles.feedbackText} ${styles.wrongText}`
-                }
-              >
-                {isCorrect ? '🎉 せいかい！' : 'ざんねん！'}
-              </p>
-              <p className={styles.answerText}>こたえ: {question.answer.nameJa}</p>
-              {mode === 'nameToFlag' && (
-                <div className={styles.answerFlags}>
-                  <FlagImage country={question.answer} size="small" />
-                </div>
-              )}
-            </div>
-
-            <BigButton variant="primary" className={styles.nextButton} onClick={handleNext}>
-              {isLastQuestion ? 'けっかを みる' : 'つぎへ'}
-            </BigButton>
-          </div>
-        </div>
+        <QuizResultOverlay
+          result={isCorrect ? 'correct' : 'wrong'}
+          answer={question.answer.nameJa}
+          media={mode === 'nameToFlag' ? <FlagImage country={question.answer} size="small" /> : undefined}
+          nextLabel={isLastQuestion ? 'けっかを みる' : 'つぎのもんだい'}
+          onNext={handleNext}
+        />
       )}
     </div>
   )

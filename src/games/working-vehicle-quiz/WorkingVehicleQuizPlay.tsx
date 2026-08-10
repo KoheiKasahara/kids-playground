@@ -2,6 +2,7 @@ import { useReducer, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
+import QuizResultOverlay from '../../components/QuizResultOverlay'
 import { playCorrectSound, playIncorrectSound } from '../../utils/quizSound'
 import { isQuizLevel, LEVEL_LABEL } from '../quiz-core/types'
 import type { QuizLevel } from '../quiz-core/types'
@@ -113,11 +114,7 @@ function WorkingVehicleQuizPlayGame({ mode, level }: WorkingVehicleQuizPlayGameP
     dispatch({ type: 'next' })
   }
 
-  const pageClassName = [
-    styles.page,
-    answered ? styles.pageAnswered : '',
-    mode === 'nameToPhoto' ? styles.pageNameToPhoto : '',
-  ]
+  const pageClassName = [styles.page, mode === 'nameToPhoto' ? styles.pageNameToPhoto : '']
     .filter(Boolean)
     .join(' ')
 
@@ -203,31 +200,24 @@ function WorkingVehicleQuizPlayGame({ mode, level }: WorkingVehicleQuizPlayGameP
         )}
       </div>
 
+      {/*
+        正誤メッセージと「つぎのもんだい」は、通常フローから外し共通コンポーネント
+        QuizResultOverlay が画面下部に固定して表示する。隠れ防止の余白は .page
+        （nameToPhotoモードは .pageNameToPhoto）側の padding-bottom で、
+        回答したかどうかに関わらずビューポートの幅・高さだけで確保している。
+      */}
       {answered && (
-        <div
-          className={`${styles.feedbackBar} ${
-            isCorrect ? styles.feedbackBarSuccess : styles.feedbackBarWrong
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          <div className={styles.feedbackBarInner}>
-            <div className={styles.feedbackTexts}>
-              <p className={`${styles.feedbackText} ${isCorrect ? styles.correctText : styles.wrongText}`}>
-                {isCorrect ? '🎉 せいかい！' : 'ざんねん！'}
-              </p>
-              <p className={styles.answerText}>こたえ: {question.answer.nameJa}</p>
-              {mode === 'nameToPhoto' && (
-                <div className={styles.answerPhoto}>
-                  <VehiclePhoto vehicle={question.answer} size="small" revealName />
-                </div>
-              )}
-            </div>
-            <BigButton variant="primary" className={styles.nextButton} onClick={handleNext}>
-              {isLastQuestion ? 'けっかを みる' : 'つぎへ'}
-            </BigButton>
-          </div>
-        </div>
+        <QuizResultOverlay
+          result={isCorrect ? 'correct' : 'wrong'}
+          answer={question.answer.nameJa}
+          media={
+            mode === 'nameToPhoto' ? (
+              <VehiclePhoto vehicle={question.answer} size="small" revealName />
+            ) : undefined
+          }
+          nextLabel={isLastQuestion ? 'けっかを みる' : 'つぎのもんだい'}
+          onNext={handleNext}
+        />
       )}
     </main>
   )

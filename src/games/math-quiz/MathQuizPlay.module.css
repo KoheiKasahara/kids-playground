@@ -1,17 +1,25 @@
+/*
+ * オーバーレイ（回答後に表示する QuizResultOverlay）ぶんの下部余白は、回答したかどうかには
+ * 一切依存させず、ビューポートの幅・高さだけで決める（回答前後で同じ .page の padding を使う）。
+ * 分岐は次の4系統（PanelFlagQuizPlay.module.css と同じ考え方）：
+ *   1. タブレット/PC（幅640px以上 かつ 高さ600px以上）: 常に固定オーバーレイ分の余白を確保する。
+ *   2. 背の高いスマホ縦（幅639px以下 かつ 高さ760px以上）: オーバーレイをコンパクト化した分だけ
+ *      余白を減らす。
+ *   3. 背の低いスマホ縦（上記どちらにも当てはまらない縦画面。iPhone SE/5 相当）: 余白を確保しない。
+ *      回答後、オーバーレイは選択肢ボタン（disabled）の上にそのまま重なって表示される。
+ *   4. 低背の横画面（landscape かつ 高さ560px以下）: 回答前から常にオーバーレイ分の余白を確保する。
+ * これにより、回答した瞬間に .page の padding が変化することはない。
+ */
 .page {
-  --feedback-bar-height: 148px;
+  --feedback-bar-height: 172px;
   max-width: var(--content-max-width);
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: var(--space-sm) var(--space-lg) calc(var(--space-sm) + env(safe-area-inset-bottom));
+  padding: var(--space-sm) var(--space-lg) calc(var(--space-sm) + var(--safe-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-}
-
-.pageAnswered {
-  padding-bottom: var(--feedback-bar-height);
 }
 
 .header {
@@ -23,8 +31,8 @@
 
 .quit {
   position: fixed;
-  top: calc(var(--space-sm) + env(safe-area-inset-top));
-  right: calc(var(--space-md) + env(safe-area-inset-right));
+  top: calc(var(--space-sm) + var(--safe-top));
+  right: calc(var(--space-md) + var(--safe-right));
   z-index: 200;
   min-width: 76px;
   min-height: 44px;
@@ -99,83 +107,27 @@
   font-variant-numeric: tabular-nums;
 }
 
-.feedbackBar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 100;
-  padding: 10px var(--space-md) calc(12px + env(safe-area-inset-bottom));
-  border-top: 2px solid var(--color-border);
-  box-shadow: 0 -4px 12px rgba(33, 37, 41, 0.16);
-  animation: bar-in 0.18s ease-out;
-}
-
-@keyframes bar-in {
-  from {
-    transform: translateY(12px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.feedbackBarSuccess {
-  background: var(--color-success-bg);
-}
-
-.feedbackBarWrong {
-  background: var(--color-danger-bg);
-}
-
-.feedbackBarInner {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.feedbackTexts {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: center;
-  text-align: center;
-}
-
-.feedbackText {
-  font-size: clamp(22px, 5.5vw, 28px);
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.correctText {
-  color: var(--color-success-dark);
-}
-
-.wrongText {
-  color: var(--color-danger-dark);
-}
-
-.answerText {
-  font-size: clamp(17px, 4.2vw, 20px);
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.nextButton {
-  min-height: clamp(60px, 14vw, 68px);
-  font-size: 24px;
-}
-
-@media (min-width: 640px) and (min-height: 600px), (min-height: 760px) {
+/* 1. タブレット・PC: 回答前から常にオーバーレイぶんの余白を確保する */
+@media (min-width: 640px) and (min-height: 600px) {
   .page {
-    padding-bottom: var(--feedback-bar-height);
+    padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
   }
 }
+
+/* 2. 背の高いスマホ縦（iPhone 14 / Pro Max, Pixel 7 相当）:
+   オーバーレイをコンパクト化した分だけ --feedback-bar-height を下げる。 */
+@media (max-width: 639px) and (min-height: 760px) {
+  .page {
+    --feedback-bar-height: 90px;
+
+    padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
+  }
+}
+
+/* 3. 背の低いスマホ縦（iPhone SE / iPhone 5 相当。上記どちらにも当てはまらない）は、
+   ここでは何もしない＝.page の padding-bottom は既定（空き無し）のまま。
+   オーバーレイは選択肢ボタンの上に重なって表示される（回答後の選択肢は disabled のため
+   操作上の問題はない）。 */
 
 @media (max-width: 480px) {
   .page {
@@ -184,11 +136,9 @@
   }
 }
 
+/* 背の低い縦画面（system 3 = オーバーレイ分の余白を確保しない側）では、選択肢ボタンを
+   さらに一段詰め、オーバーレイが重なる面積を減らす */
 @media (orientation: portrait) and (max-height: 620px) {
-  .page {
-    --feedback-bar-height: 140px;
-  }
-
   .question {
     font-size: clamp(34px, 11vw, 52px);
   }
@@ -196,26 +146,15 @@
   .choiceButton {
     min-height: 64px;
   }
-
-  .feedbackText {
-    font-size: 23px;
-  }
-
-  .nextButton {
-    min-height: 56px;
-    font-size: 21px;
-  }
 }
 
+/* 4. 低背の横画面: 回答前から常にオーバーレイぶんの余白を確保する
+   （回答後だけ余白が増えて式が潰れる、という事故を防ぐため）。 */
 @media (orientation: landscape) and (max-height: 560px) {
   .page {
-    --feedback-bar-height: 82px;
+    --feedback-bar-height: 76px;
     max-width: 960px;
-    padding: 8px var(--space-md) calc(8px + env(safe-area-inset-bottom));
-  }
-
-  .pageAnswered {
-    padding-bottom: calc(var(--feedback-bar-height) + env(safe-area-inset-bottom));
+    padding: 8px var(--space-md) calc(var(--feedback-bar-height) + var(--safe-bottom));
   }
 
   .progressArea {
@@ -244,38 +183,5 @@
   .choiceButton {
     min-height: 56px;
     font-size: 22px;
-  }
-
-  .feedbackBar {
-    padding: 6px var(--space-md) calc(8px + env(safe-area-inset-bottom));
-  }
-
-  .feedbackBarInner {
-    max-width: 960px;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-md);
-  }
-
-  .feedbackTexts {
-    flex: 1;
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .feedbackText {
-    font-size: 21px;
-  }
-
-  .answerText {
-    font-size: 17px;
-  }
-
-  .nextButton {
-    width: auto;
-    min-width: 190px;
-    min-height: 52px;
-    padding: var(--space-sm) var(--space-lg);
-    font-size: 20px;
   }
 }

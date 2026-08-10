@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
+import QuizResultOverlay from '../../components/QuizResultOverlay'
 import PanelFlag, { PANEL_COUNT } from './PanelFlag'
 import { countriesForLevel } from './data/countries'
 import { generateQuestions, shuffle } from './questionGenerator'
@@ -306,50 +307,23 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
       </div>
 
       {/*
-        正誤メッセージと「つぎのもんだい」は通常フローから外し、画面下部に固定した
-        オーバーレイ（.feedbackBar）として下から迫り上がるように表示する（背景を暗くする
-        モーダルにはしない＝国旗やボタンは隠れるだけで、それ以外の画面は一切動かない）。
+        正誤メッセージと「つぎのもんだい」は通常フローから外し、共通コンポーネント
+        QuizResultOverlay が画面下部に固定したオーバーレイとして下から迫り上がるように
+        表示する（背景を暗くするモーダルにはしない＝国旗やボタンは隠れるだけで、
+        それ以外の画面は一切動かない）。
         回答の前後で .page 側のレイアウト・padding は変えていない（=下の要素は動かない）。
         下部余白の確保はビューポートの高さ・幅だけで決めており（PanelFlagQuizPlay.module.css）、
         背の低いスマホ縦では余白を確保せず、パネルは選択肢ボタンの上にそのまま重なる
         （回答後の選択肢は disabled のため操作上の問題はない）。
       */}
       {answered && (
-        <div
-          className={
-            isCorrect
-              ? `${styles.feedbackBar} ${styles.feedbackBarSuccess}`
-              : `${styles.feedbackBar} ${styles.feedbackBarWrong}`
-          }
-          role="status"
-          aria-live="polite"
-        >
-          <div className={styles.feedbackBarInner}>
-            <div className={styles.feedbackTexts}>
-              <p
-                className={
-                  isCorrect
-                    ? `${styles.feedbackText} ${styles.correctText}`
-                    : `${styles.feedbackText} ${styles.wrongText}`
-                }
-              >
-                {isCorrect ? '🎉 せいかい！' : 'ざんねん！'}
-              </p>
-              <p className={styles.answerText}>こたえ: {question.answer.nameJa}</p>
-              {isCorrect ? (
-                <p className={styles.detailText}>
-                  {state.openedCount}まいで わかった！ {questionScore}てん
-                </p>
-              ) : (
-                <p className={styles.detailText}>0てん</p>
-              )}
-            </div>
-
-            <BigButton variant="primary" className={styles.nextButton} onClick={handleNext}>
-              {isLastQuestion ? 'けっかを みる' : 'つぎのもんだい'}
-            </BigButton>
-          </div>
-        </div>
+        <QuizResultOverlay
+          result={isCorrect ? 'correct' : 'wrong'}
+          answer={question.answer.nameJa}
+          detail={isCorrect ? `${state.openedCount}まいで わかった！ ${questionScore}てん` : '0てん'}
+          nextLabel={isLastQuestion ? 'けっかを みる' : 'つぎのもんだい'}
+          onNext={handleNext}
+        />
       )}
     </div>
   )

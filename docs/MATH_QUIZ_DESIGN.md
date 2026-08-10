@@ -82,7 +82,7 @@
 - ヘッダーに「やめる」ボタン（固定表示）、現在のむずかしさラベル、`現在 / 10`、進捗バーを表示する。
 - 本体に計算式を見出し（`<h1>`）として `{left} {演算記号} {right} = ?` の形式で表示し、その下に選択肢4件を2列グリッドで表示する。
 - 回答後は全選択肢を無効化し、正解のボタンには緑系の枠と `◯`、選んだ誤答のボタンには赤系の枠と `✕` を付ける。
-- 画面下部の固定領域（`feedbackBar`）に正誤メッセージ（「🎉 せいかい！」/「ざんねん！」）と正解の数値（「こたえ: {answer}」）、次の操作ボタンを表示する。
+- 画面下部の固定領域（共通コンポーネント`QuizResultOverlay`）に正誤メッセージ（「🎉 せいかい！」/「ざんねん！」）と正解の数値（「こたえ: {answer}」）、次の操作ボタンを表示する。下部余白は回答したかどうかに依存させず、ビューポートの幅・高さだけで決める（`PanelFlagQuizPlay`と同じ4系統。詳細は`docs/PANEL_FLAG_QUIZ_DESIGN.md`参照）。
 - 最終問（10問目）の次操作ボタンは「けっかを みる」に変わる。
 
 ### 4.4 結果（`MathQuizResult.tsx`）
@@ -187,10 +187,10 @@
 - 数字の見やすさ: 式（`.question`）と選択肢（`.choiceButton`）には `font-variant-numeric: tabular-nums`（等幅数字）を指定し、式はさらに `ui-monospace` 系のフォントスタックで桁がそろうようにしている。サイズはビューポート追従の `clamp()` で決め、式は `clamp(40px, 13vw, 68px)`、選択肢の数字は `clamp(26px, 8vw, 36px)`。
 - 選択肢レイアウト: `.choices` は `display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))` の2列グリッドで、`.choiceButton` は `min-height: 72px` のタップ領域を確保している。
 - 色以外のフィードバック: 回答後は `choiceVariant` で正解ボタンを `correct`、選んだ誤答ボタンを `wrong`、その他を `secondary` にし、`choiceMark` で正解には `◯`、選んだ誤答には `✕` をボタン文字列の先頭に付ける（色だけに頼らない）。
-- 回答結果の通知: 画面下部固定の `feedbackBar` に `role="status"` と `aria-live="polite"` を付け、正誤メッセージと「こたえ: {answer}」をスクリーンリーダーへ通知する。
+- 回答結果の通知: 画面下部固定の `QuizResultOverlay` に `role="status"` と `aria-live="polite"` を付け、正誤メッセージと「こたえ: {answer}」をスクリーンリーダーへ通知する。
 - 装飾絵文字: 開始画面のヒーロー絵文字とモードボタンの絵文字（`MODE_EMOJI`）、むずかしさ選択の星（`LEVEL_STARS`）、結果画面の成績絵文字はすべて `aria-hidden="true"`。
-- 狭い縦画面: `@media (orientation: portrait) and (max-height: 620px)` でプレイ画面の式・選択肢・フィードバックバーのフォントサイズと高さを縮小する。開始画面は `@media (max-height: 700px)` でヒーロー絵文字と余白を詰める。
-- 低い横画面: `@media (orientation: landscape) and (max-height: 560px)` で、プレイ画面は本体を横並び（`flex-direction: row`）にし、フィードバックバーもテキスト＋ボタンの横並びに変える。開始画面はヒーロー絵文字を非表示にしてボタンを2列グリッドに、むずかしさ選択画面は3列グリッドにする。
+- 狭い縦画面: `@media (orientation: portrait) and (max-height: 620px)` でプレイ画面の式・選択肢のフォントサイズと高さを縮小する（オーバーレイ`QuizResultOverlay`自体の縮小は共通CSS側で行う）。開始画面は `@media (max-height: 700px)` でヒーロー絵文字と余白を詰める。
+- 低い横画面: `@media (orientation: landscape) and (max-height: 560px)` で、プレイ画面は本体を横並び（`flex-direction: row`）にする（`QuizResultOverlay`もテキスト＋ボタンの横並びになる）。開始画面はヒーロー絵文字を非表示にしてボタンを2列グリッドに、むずかしさ選択画面は3列グリッドにする。
 - 選択肢・ナビゲーションはネイティブ `button`（`BigButton` コンポーネント）を使い、タッチとキーボードの両方に対応する。
 
 ## 9. 効果音

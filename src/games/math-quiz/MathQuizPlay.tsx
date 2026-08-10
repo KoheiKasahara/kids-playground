@@ -2,6 +2,7 @@ import { useReducer, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
+import QuizResultOverlay from '../../components/QuizResultOverlay'
 import { playCorrectSound, playIncorrectSound } from '../../utils/quizSound'
 import { isQuizLevel, LEVEL_LABEL } from '../quiz-core/types'
 import type { QuizLevel } from '../quiz-core/types'
@@ -103,12 +104,8 @@ function MathQuizPlayGame({ mode, level }: MathQuizPlayGameProps) {
     dispatch({ type: 'next' })
   }
 
-  const pageClassName = [styles.page, answered ? styles.pageAnswered : '']
-    .filter(Boolean)
-    .join(' ')
-
   return (
-    <main className={pageClassName}>
+    <main className={styles.page}>
       <div className={styles.header}>
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
           やめる
@@ -148,35 +145,19 @@ function MathQuizPlayGame({ mode, level }: MathQuizPlayGameProps) {
       </div>
 
       {/*
-        正誤メッセージと「つぎへ」は、通常フローから外して画面下部に固定する。
-        こうすることで画面の高さに関係なく「つぎへ」が必ず可視・操作可能になる。
-        未回答時はDOMに置かず、回答直後にマウントしてアニメーションを都度再生する。
-        隠れ防止の余白は .pageAnswered の padding-bottom で確保している。
+        正誤メッセージと「つぎのもんだい」は、通常フローから外し共通コンポーネント
+        QuizResultOverlay が画面下部に固定して表示する。こうすることで画面の高さに
+        関係なく必ず可視・操作可能になる。未回答時はDOMに置かず、回答直後にマウントして
+        アニメーションを都度再生する。隠れ防止の余白は .page 側の padding-bottom で、
+        回答したかどうかに関わらずビューポートの幅・高さだけで確保している。
       */}
       {answered && (
-        <div
-          className={`${styles.feedbackBar} ${
-            isCorrect ? styles.feedbackBarSuccess : styles.feedbackBarWrong
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          <div className={styles.feedbackBarInner}>
-            <div className={styles.feedbackTexts}>
-              <p
-                className={`${styles.feedbackText} ${
-                  isCorrect ? styles.correctText : styles.wrongText
-                }`}
-              >
-                {isCorrect ? '🎉 せいかい！' : 'ざんねん！'}
-              </p>
-              <p className={styles.answerText}>こたえ: {question.problem.answer}</p>
-            </div>
-            <BigButton variant="primary" className={styles.nextButton} onClick={handleNext}>
-              {isLastQuestion ? 'けっかを みる' : 'つぎへ'}
-            </BigButton>
-          </div>
-        </div>
+        <QuizResultOverlay
+          result={isCorrect ? 'correct' : 'wrong'}
+          answer={question.problem.answer}
+          nextLabel={isLastQuestion ? 'けっかを みる' : 'つぎのもんだい'}
+          onNext={handleNext}
+        />
       )}
     </main>
   )
