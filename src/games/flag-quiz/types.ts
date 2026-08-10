@@ -33,19 +33,31 @@ export type Country = {
 
 export type Question = QuizQuestion<Country>;
 
-/** 出題形式。flagToName: 国旗を見て国名を選ぶ / nameToFlag: 国名を見て国旗を選ぶ */
-export type QuizMode = 'flagToName' | 'nameToFlag';
+/**
+ * 出題形式。
+ * flagToName: 国旗を見て国名を選ぶ / nameToFlag: 国名を見て国旗を選ぶ /
+ * panelFlag: 国旗を覆う16枚のパネルを少しずつめくって国名を選ぶ
+ *
+ * panelFlag は `FlagQuizLevelSelect` / `FlagQuizResult` をそのまま再利用するが、
+ * プレイ画面だけは既存の `FlagQuizPlay`（flagToName/nameToFlagの二分岐）とは
+ * 表示・状態管理が大きく異なるため `PanelFlagQuizPlay` に分離する
+ * （`FlagQuizPlay` の props は `Exclude<QuizMode, 'panelFlag'>` に絞り、
+ * panelFlag が誤って渡らないよう型で防ぐ）。
+ */
+export type QuizMode = 'flagToName' | 'nameToFlag' | 'panelFlag';
 
 /** URLのパスセグメントとしてのモード名。ルーティング・画面遷移のパス組み立てで共有する */
 export const MODE_PATH: Record<QuizMode, string> = {
   flagToName: 'flag-to-name',
   nameToFlag: 'name-to-flag',
+  panelFlag: 'panel-flag',
 };
 
 /** むずかしさ選択画面・結果画面などで共有する、モードの日本語ラベル */
 export const MODE_LABEL: Record<QuizMode, string> = {
   flagToName: 'こっき → なまえ',
   nameToFlag: 'なまえ → こっき',
+  panelFlag: 'パネルめくり',
 };
 
 /** むずかしさ選択画面に表示する、出題対象の国の説明 */

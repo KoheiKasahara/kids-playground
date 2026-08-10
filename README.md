@@ -2,13 +2,14 @@
 
 子ども向けのミニゲーム集Webアプリです。スマートフォン・タブレット・PCのブラウザで遊べます。
 
-「こっきクイズ」「はたらくくるまクイズ」「さんすうクイズ」を収録しています。こっきクイズとはたらくくるまクイズは1ゲーム10問の4択クイズで、写真・図案から名前を答えるモードと、名前から写真・図案を答えるモードがあります。さんすうクイズはたしざん／ひきざん／かけざん／わりざんの4モードから選び、写真ではなく計算式（例: `3 ＋ 4 = ?`）を出題して答えの数値を4択で選びます。いずれのゲームもかんたん／ふつう／むずかしいの3段階から選べます。
+「こっきクイズ」「はたらくくるまクイズ」「さんすうクイズ」を収録しています。こっきクイズとはたらくくるまクイズは1ゲーム10問の4択クイズで、写真・図案から名前を答えるモードと、名前から写真・図案を答えるモードがあります。こっきクイズにはさらに、国旗を覆う16枚のパネルを少しずつめくって国名を当てる「パネルめくり」モードもあります。さんすうクイズはたしざん／ひきざん／かけざん／わりざんの4モードから選び、写真ではなく計算式（例: `3 ＋ 4 = ?`）を出題して答えの数値を4択で選びます。いずれのゲームもかんたん／ふつう／むずかしいの3段階から選べます。
 
 - セットアップ・デバッグ手順の詳細は [docs/SETUP.md](docs/SETUP.md) を参照してください。
 - 設計の詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
 - ミニゲーム追加の規約は [docs/MINIGAME_DEVELOPMENT_GUIDELINES.md](docs/MINIGAME_DEVELOPMENT_GUIDELINES.md) を参照してください。
 - はたらくくるまクイズの詳細は [docs/WORKING_VEHICLE_QUIZ_DESIGN.md](docs/WORKING_VEHICLE_QUIZ_DESIGN.md) を参照してください。
 - さんすうクイズの詳細は [docs/MATH_QUIZ_DESIGN.md](docs/MATH_QUIZ_DESIGN.md) を参照してください。
+- こっきクイズ「パネルめくり」モードの詳細は [docs/PANEL_FLAG_QUIZ_DESIGN.md](docs/PANEL_FLAG_QUIZ_DESIGN.md) を参照してください。
 
 ## 技術構成
 
@@ -95,10 +96,13 @@ src/
 ├─ games/
 │  ├─ quiz-core/       # ID付き4択クイズの基本型・問題生成
 │  ├─ flag-quiz/       # 国旗クイズ（ゲーム固有の画面・ロジック・データ）
-│  │  ├─ FlagQuizStart.tsx      # モード選択画面
-│  │  ├─ FlagQuizLevelSelect.tsx # むずかしさ選択画面
-│  │  ├─ FlagQuizPlay.tsx       # プレイ画面（2モード共用）
-│  │  ├─ FlagQuizResult.tsx     # 結果画面（2モード共用）
+│  │  ├─ FlagQuizStart.tsx      # モード選択画面（3モード）
+│  │  ├─ FlagQuizLevelSelect.tsx # むずかしさ選択画面（3モード共用）
+│  │  ├─ FlagQuizPlay.tsx       # プレイ画面（flagToName/nameToFlagの2モード共用）
+│  │  ├─ FlagQuizResult.tsx     # 結果画面（3モード共用、得点表示は任意）
+│  │  ├─ PanelFlagQuizPlay.tsx  # パネルめくりモードのプレイ画面
+│  │  ├─ PanelFlag.tsx          # 国旗の上に16枚のパネルを重ねて表示
+│  │  ├─ panelScore.ts          # パネルめくりモードの得点計算
 │  │  ├─ questionGenerator.ts   # 共通問題生成への互換ラッパー
 │  │  ├─ types.ts
 │  │  └─ data/countries.ts # 国データ（100か国）
@@ -117,6 +121,7 @@ docs/
 ├─ DESIGN.md                         # 概要設計書
 ├─ WORKING_VEHICLE_QUIZ_DESIGN.md    # はたらくくるまクイズ基本設計
 ├─ MATH_QUIZ_DESIGN.md               # さんすうクイズ基本設計
+├─ PANEL_FLAG_QUIZ_DESIGN.md         # こっきクイズ「パネルめくり」モード基本設計
 ├─ MINIGAME_DEVELOPMENT_GUIDELINES.md # ミニゲーム開発規約
 ├─ SETUP.md                          # セットアップ・デバッグ手順
 └─ CREDITS.md                        # 素材のクレジット・ライセンス表記

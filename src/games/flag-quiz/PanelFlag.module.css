@@ -1,0 +1,75 @@
+/*
+ * フレームの大きさは FlagImage.module.css の .large と同じ考え方を踏襲する。
+ * height を親（flagArea, flex: 1）に追従させ、aspect-ratio: 4/3 で幅を自動計算することで、
+ * 国旗画像（flag-icons の 4x3 セット）とぴったり同じ縦横比のまま伸縮する。
+ * max-height で肥大化を防ぐのも FlagImage と同じ。
+ * position: relative にして、中の国旗画像とパネルグリッドを同じ矩形に絶対配置で重ねる。
+ */
+.frame {
+  position: relative;
+  height: 100%;
+  width: auto;
+  aspect-ratio: 4 / 3;
+  max-width: 100%;
+  max-height: 280px;
+  margin: 0 auto;
+  background-color: var(--color-surface);
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+/*
+ * 国旗画像は .frame いっぱいに敷き詰める（絶対配置 + inset: 0）。
+ * パネルグリッドも同じ矩形に重なるため、パネルが開いた（消えた）ときに
+ * ちょうど下の国旗の該当マスが見える。
+ */
+.flag {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+}
+
+/*
+ * パネル1枚。国旗と同じく明るい配色を使い、縦横の目地が見えるよう
+ * 薄い枠線を付ける（正誤とは無関係の装飾なので色数は絞る）。
+ * 開く演出は opacity + わずかな scale/rotateY のみで、派手にしすぎない
+ * （200〜300ms 程度の軽いトランジション）。
+ */
+.panel {
+  background-color: var(--color-primary);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  opacity: 1;
+  transform: scale(1) rotateY(0deg);
+  transform-origin: center;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+/* 1マスおきに色を変え、市松模様にして「パネルをめくっている」感を出す */
+.panel:nth-child(even) {
+  background-color: var(--color-accent);
+}
+
+/*
+ * 開いたパネルは透明にして下の国旗を見せる。回答判定には関わらない
+ * 演出だけの変化なので、prefers-reduced-motion: reduce は
+ * src/styles/global.css の共通ルールで transition 時間を強制的に短くする形で
+ * 対応済み（このファイルでの個別対応は不要）。
+ */
+.panelOpen {
+  opacity: 0;
+  transform: scale(0.82) rotateY(55deg);
+  pointer-events: none;
+}
