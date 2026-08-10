@@ -2,10 +2,12 @@
 
 子ども向けのミニゲーム集Webアプリです。スマートフォン・タブレット・PCのブラウザで遊べます。
 
-初期リリースでは「こっきクイズ（国旗クイズ）」を実装しています。4択クイズで1ゲーム10問、「こっきを みて なまえを こたえる」モードと「なまえを みて こっきを こたえる」モードの2種類から選べます。モードを選んだ後にはむずかしさ（かんたん／ふつう／むずかしい）も選択でき、出題対象となる国の数が20／45／100か国と変わります（選択肢数は常に4択のまま）。今後、他のミニゲームも追加していく予定です。
+「こっきクイズ」と「はたらくくるまクイズ」を収録しています。どちらも1ゲーム10問の4択クイズで、写真・図案から名前を答えるモードと、名前から写真・図案を答えるモードがあります。かんたん／ふつう／むずかしいの3段階から選べます。
 
 - セットアップ・デバッグ手順の詳細は [docs/SETUP.md](docs/SETUP.md) を参照してください。
 - 設計の詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
+- ミニゲーム追加の規約は [docs/MINIGAME_DEVELOPMENT_GUIDELINES.md](docs/MINIGAME_DEVELOPMENT_GUIDELINES.md) を参照してください。
+- はたらくくるまクイズの詳細は [docs/WORKING_VEHICLE_QUIZ_DESIGN.md](docs/WORKING_VEHICLE_QUIZ_DESIGN.md) を参照してください。
 
 ## 技術構成
 
@@ -35,7 +37,7 @@ npm test          # 一度だけ実行 (vitest run)
 npm run test:watch  # ウォッチモードで実行 (vitest)
 ```
 
-`questionGenerator.ts` の問題生成ロジックと `data/countries.ts` の国データ・むずかしさ別フィルタ（`countriesForLevel`）に対するUnit Testに加え、`FlagQuizLevelSelect`（むずかしさ選択画面）/ `FlagQuizPlay`（こっき → なまえモード、旧URLからのリダイレクトを含む）/ `NameToFlagPlay.test.tsx`（なまえ → こっきモード）/ `Home` など画面の挙動に対するComponent Test（React Testing Library）が含まれます。
+共通問題生成、国旗・車両データと難易度、両ゲームの画面遷移・2モード・10問完了、ホームとルーティングの重要挙動を検証します。
 
 ## ビルド
 
@@ -74,11 +76,11 @@ https://<ユーザー名>.github.io/kids-playground/
 
 - Web App Manifestで `display: "standalone"` を指定しており、スマートフォン・タブレットのホーム画面に追加すると、ブラウザUI（アドレスバーなど）を抑えたアプリのような見た目で起動できます。
 - ホーム画面に追加しなくても、通常のWebブラウザ（Chrome / Safari など）からそのままアクセスして遊べます。
-- `vite-plugin-pwa` が生成するService Worker（`sw.js`）が、アプリ本体のJS/CSS/HTMLや国旗画像などの静的リソースをキャッシュします。
+- `vite-plugin-pwa` が生成するService Worker（`sw.js`）が、アプリ本体のJS/CSS/HTML、国旗SVG、はたらくくるま写真などの静的リソースをキャッシュします。
 
-## 国旗画像の出典・ライセンス
+## 画像の出典・ライセンス
 
-`public/flags/` の国旗SVGは [flag-icons](https://github.com/lipis/flag-icons)（MIT License）から取得しています。詳細・ライセンス全文は [docs/CREDITS.md](docs/CREDITS.md) を参照してください。flag-icons本体は `package.json` の依存関係には追加せず、必要な国旗SVGファイルのみを同梱しています。
+`public/flags/` の国旗SVGは [flag-icons](https://github.com/lipis/flag-icons)（MIT License）由来、`public/vehicles/` の24写真はWikimedia Commonsの再配布可能な原作由来です。素材ごとの出典、作者、ライセンス、加工内容は [docs/CREDITS.md](docs/CREDITS.md) を参照してください。
 
 ## ディレクトリ構成
 
@@ -90,27 +92,31 @@ src/
 ├─ pages/
 │  └─ Home.tsx        # ホーム（ゲーム選択）画面
 ├─ games/
-│  └─ flag-quiz/       # 国旗クイズ（ゲーム固有の画面・ロジック・データ）
-│     ├─ FlagQuizStart.tsx      # モード選択画面（こっき→なまえ / なまえ→こっき）
-│     ├─ FlagQuizLevelSelect.tsx # むずかしさ選択画面（かんたん / ふつう / むずかしい、2モード共用）
-│     ├─ FlagQuizPlay.tsx       # プレイ画面（2モード共用、mode propで出し分け）
-│     ├─ FlagQuizResult.tsx     # 結果画面（2モード共用、mode propで出し分け）
-│     ├─ FlagImage.tsx
-│     ├─ questionGenerator.ts   # 問題生成ロジック（Unit Test対象、モードに依存しない）
-│     ├─ types.ts
-│     └─ data/countries.ts      # 国データ（100か国、各国にむずかしさ(level)を付与）
+│  ├─ quiz-core/       # ID付き4択クイズの基本型・問題生成
+│  ├─ flag-quiz/       # 国旗クイズ（ゲーム固有の画面・ロジック・データ）
+│  │  ├─ FlagQuizStart.tsx      # モード選択画面
+│  │  ├─ FlagQuizLevelSelect.tsx # むずかしさ選択画面
+│  │  ├─ FlagQuizPlay.tsx       # プレイ画面（2モード共用）
+│  │  ├─ FlagQuizResult.tsx     # 結果画面（2モード共用）
+│  │  ├─ questionGenerator.ts   # 共通問題生成への互換ラッパー
+│  │  ├─ types.ts
+│  │  └─ data/countries.ts # 国データ（100か国）
+│  └─ working-vehicle-quiz/ # はたらくくるまクイズ（24車両・2モード）
 ├─ components/         # ゲーム間で共通のUI部品 (BigButton, ProgressBar など)
 ├─ styles/             # グローバルCSS・デザイントークン
 └─ test/setup.ts        # Vitestのテストセットアップ
 
 public/
 ├─ flags/               # 国旗SVG（flag-icons由来）
-└─ icons/                # PWAアイコン
+├─ vehicles/            # はたらくくるま写真（WebP、24枚）
+└─ icons/               # PWAアイコン
 
 docs/
-├─ DESIGN.md            # 概要設計書
-├─ SETUP.md             # セットアップ・デバッグ手順
-└─ CREDITS.md           # 素材のクレジット・ライセンス表記
+├─ DESIGN.md                         # 概要設計書
+├─ WORKING_VEHICLE_QUIZ_DESIGN.md    # はたらくくるまクイズ基本設計
+├─ MINIGAME_DEVELOPMENT_GUIDELINES.md # ミニゲーム開発規約
+├─ SETUP.md                          # セットアップ・デバッグ手順
+└─ CREDITS.md                        # 素材のクレジット・ライセンス表記
 ```
 
 新しいゲームを追加する場合は `games/<game-name>/` 以下にまとめ、既存ゲームへの影響を抑える方針です。
@@ -126,4 +132,4 @@ docs/
 - お気に入り国旗
 - オフライン対応の強化
 - Playwrightを使ったE2Eテスト
-- こっきクイズ以外のミニゲーム（かずクイズ、どうぶつクイズ、のりものクイズ、ひらがなゲーム、神経衰弱など）
+- その他のミニゲーム（かずクイズ、どうぶつクイズ、ひらがなゲーム、神経衰弱など）

@@ -4,6 +4,10 @@ import FlagQuizStart from '../games/flag-quiz/FlagQuizStart'
 import FlagQuizLevelSelect from '../games/flag-quiz/FlagQuizLevelSelect'
 import FlagQuizPlay from '../games/flag-quiz/FlagQuizPlay'
 import FlagQuizResult from '../games/flag-quiz/FlagQuizResult'
+import WorkingVehicleQuizStart from '../games/working-vehicle-quiz/WorkingVehicleQuizStart'
+import WorkingVehicleQuizLevelSelect from '../games/working-vehicle-quiz/WorkingVehicleQuizLevelSelect'
+import WorkingVehicleQuizPlay from '../games/working-vehicle-quiz/WorkingVehicleQuizPlay'
+import WorkingVehicleQuizResult from '../games/working-vehicle-quiz/WorkingVehicleQuizResult'
 
 export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
@@ -25,6 +29,31 @@ export const routes: RouteObject[] = [
   {
     path: '/games/flag-quiz/name-to-flag/:level/result',
     element: <FlagQuizResult mode="nameToFlag" />,
+  },
+  { path: '/games/working-vehicle-quiz', element: <WorkingVehicleQuizStart /> },
+  {
+    path: '/games/working-vehicle-quiz/photo-to-name',
+    element: <WorkingVehicleQuizLevelSelect mode="photoToName" />,
+  },
+  {
+    path: '/games/working-vehicle-quiz/photo-to-name/:level/play',
+    element: <WorkingVehicleQuizPlay mode="photoToName" />,
+  },
+  {
+    path: '/games/working-vehicle-quiz/photo-to-name/:level/result',
+    element: <WorkingVehicleQuizResult mode="photoToName" />,
+  },
+  {
+    path: '/games/working-vehicle-quiz/name-to-photo',
+    element: <WorkingVehicleQuizLevelSelect mode="nameToPhoto" />,
+  },
+  {
+    path: '/games/working-vehicle-quiz/name-to-photo/:level/play',
+    element: <WorkingVehicleQuizPlay mode="nameToPhoto" />,
+  },
+  {
+    path: '/games/working-vehicle-quiz/name-to-photo/:level/result',
+    element: <WorkingVehicleQuizResult mode="nameToPhoto" />,
   },
   // 旧URL（むずかしさ追加前）のブックマークやホーム画面ショートカット互換のためのリダイレクト。
   // むずかしさ追加前は全100か国が出題対象だったため、旧 /play はすべて「むずかしい」へ倒す。

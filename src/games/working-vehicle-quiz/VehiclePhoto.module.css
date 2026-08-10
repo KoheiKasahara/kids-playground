@@ -1,0 +1,29 @@
+.photo {
+  display: block;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  object-position: center;
+  background: var(--color-surface-muted);
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  user-select: none;
+}
+
+.large {
+  width: min(100%, 520px);
+  height: 100%;
+  max-height: 300px;
+  margin: 0 auto;
+}
+
+.small {
+  width: 112px;
+  height: 84px;
+}
+
+.choice {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
