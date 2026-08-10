@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
+import QuizResultOverlay from '../../components/QuizResultOverlay'
 import PanelFlag, { PANEL_COUNT } from './PanelFlag'
 import { countriesForLevel } from './data/countries'
 import { generateQuestions, shuffle } from './questionGenerator'
@@ -105,8 +106,8 @@ function choiceVariant(choice: Country, answer: Country, selectedId: string | nu
 
 /** 色だけに頼らず判別できるよう、回答後の正解・不正解の選択肢に記号を添える */
 function choiceMark(variant: ChoiceVariant): string {
-  if (variant === 'correct') return '◯ '
-  if (variant === 'wrong') return '✕ '
+  if (variant === 'correct') return '◯'
+  if (variant === 'wrong') return '✕'
   return ''
 }
 
@@ -288,6 +289,7 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
               const choiceButtonClassName = [styles.choiceButton, variant === 'secondary' ? styles.choiceButtonUnselected : '']
                 .filter(Boolean)
                 .join(' ')
+              const mark = answered ? choiceMark(variant) : ''
               return (
                 <BigButton
                   key={choice.id}
@@ -296,7 +298,14 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
                   disabled={answered}
                   onClick={() => handleSelect(choice.id)}
                 >
-                  <span className={styles.choiceMark}>{answered ? choiceMark(variant) : ''}</span>
+                  <span className={styles.choiceMark}>{mark}</span>
+                  {/* 記号は絶対配置で見た目には影響しないが、スクリーンリーダー向けの
+                      読み上げ名（アクセシブルネーム）では「◯ こくめい」のように
+                      記号とラベルの間に区切りが必要。半角スペースをspan内に含めると
+                      アクセシブルネーム計算時に末尾空白として落ちてしまうため、
+                      記号spanの外に独立したテキストノードとして置く
+                      （FlagQuizPlay/MathQuizPlay/WorkingVehicleQuizPlayと同じ対策）。 */}
+                  {mark && ' '}
                   {choice.nameJa}
                 </BigButton>
               )
@@ -306,50 +315,23 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
       </div>
 
       {/*
-        正誤メッセージと「つぎのもんだい」は通常フローから外し、画面下部に固定した
-        オーバーレイ（.feedbackBar）として下から迫り上がるように表示する（背景を暗くする
-        モーダルにはしない＝国旗やボタンは隠れるだけで、それ以外の画面は一切動かない）。
+        正誤メッセージと「つぎのもんだい」は通常フローから外し、共通コンポーネント
+        QuizResultOverlay が画面下部に固定したオーバーレイとして下から迫り上がるように
+        表示する（背景を暗くするモーダルにはしない＝国旗やボタンは隠れるだけで、
+        それ以外の画面は一切動かない）。
         回答の前後で .page 側のレイアウト・padding は変えていない（=下の要素は動かない）。
         下部余白の確保はビューポートの高さ・幅だけで決めており（PanelFlagQuizPlay.module.css）、
         背の低いスマホ縦では余白を確保せず、パネルは選択肢ボタンの上にそのまま重なる
         （回答後の選択肢は disabled のため操作上の問題はない）。
       */}
       {answered && (
-        <div
-          className={
-            isCorrect
-              ? `${styles.feedbackBar} ${styles.feedbackBarSuccess}`
-              : `${styles.feedbackBar} ${styles.feedbackBarWrong}`
-          }
-          role="status"
-          aria-live="polite"
-        >
-          <div className={styles.feedbackBarInner}>
-            <div className={styles.feedbackTexts}>
-              <p
-                className={
-                  isCorrect
-                    ? `${styles.feedbackText} ${styles.correctText}`
-                    : `${styles.feedbackText} ${styles.wrongText}`
-                }
-              >
-                {isCorrect ? '🎉 せいかい！' : 'ざんねん！'}
-              </p>
-              <p className={styles.answerText}>こたえ: {question.answer.nameJa}</p>
-              {isCorrect ? (
-                <p className={styles.detailText}>
-                  {state.openedCount}まいで わかった！ {questionScore}てん
-                </p>
-              ) : (
-                <p className={styles.detailText}>0てん</p>
-              )}
-            </div>
-
-            <BigButton variant="primary" className={styles.nextButton} onClick={handleNext}>
-              {isLastQuestion ? 'けっかを みる' : 'つぎのもんだい'}
-            </BigButton>
-          </div>
-        </div>
+        <QuizResultOverlay
+          result={isCorrect ? 'correct' : 'wrong'}
+          answer={question.answer.nameJa}
+          detail={isCorrect ? `${state.openedCount}まいで わかった！ ${questionScore}てん` : '0てん'}
+          nextLabel={isLastQuestion ? 'けっかを みる' : 'つぎのもんだい'}
+          onNext={handleNext}
+        />
       )}
     </div>
   )

@@ -56,7 +56,7 @@ function findButtonForCountry(buttons: HTMLElement[], country: Country): HTMLEle
 }
 
 /**
- * 現在の問題に回答し、「つぎへ」（最終問なら「けっかを みる」）まで進める。
+ * 現在の問題に回答し、「つぎのもんだい」（最終問なら「けっかを みる」）まで進める。
  * correct が true なら正解の国旗を、false なら不正解の国旗をクリックする。
  */
 async function answerCurrentQuestion(user: UserEvent, correct: boolean): Promise<void> {
@@ -67,7 +67,7 @@ async function answerCurrentQuestion(user: UserEvent, correct: boolean): Promise
     : buttons.find((btn) => countryIdFromButton(btn) !== questionCountry.id)
   if (!target) throw new Error('target choice button not found')
   await user.click(target)
-  const nextButton = screen.getByRole('button', { name: /つぎへ|けっかを みる/ })
+  const nextButton = screen.getByRole('button', { name: /つぎのもんだい|けっかを みる/ })
   await user.click(nextButton)
 }
 
@@ -139,6 +139,16 @@ describe('NameToFlagPlay', () => {
     for (const btn of buttons) {
       expect(btn).toBeDisabled()
     }
+  })
+
+  test('回答前後でページのルート要素の className が変化しない（レイアウトシフトしない）', async () => {
+    const user = userEvent.setup()
+    const { container } = renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
+    const pageElement = container.firstElementChild
+    const classNameBefore = pageElement?.className
+    expect(classNameBefore).toBeTruthy()
+    await user.click(getFlagChoiceButtons()[0])
+    expect(container.firstElementChild?.className).toBe(classNameBefore)
   })
 
   test(

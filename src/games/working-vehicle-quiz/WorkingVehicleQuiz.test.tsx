@@ -51,7 +51,7 @@ async function answerPhotoToName(user: UserEvent, correct: boolean) {
     : buttons.find((button) => button.textContent !== answer.nameJa)
   if (!target) throw new Error('answer button not found')
   await user.click(target)
-  await user.click(screen.getByRole('button', { name: /つぎへ|けっかを みる/ }))
+  await user.click(screen.getByRole('button', { name: /つぎのもんだい|けっかを みる/ }))
 }
 
 async function answerNameToPhoto(user: UserEvent, correct: boolean) {
@@ -62,7 +62,7 @@ async function answerNameToPhoto(user: UserEvent, correct: boolean) {
     : buttons.find((button) => vehicleIdFromImage(button.querySelector('img')) !== answer.id)
   if (!target) throw new Error('photo answer button not found')
   await user.click(target)
-  await user.click(screen.getByRole('button', { name: /つぎへ|けっかを みる/ }))
+  await user.click(screen.getByRole('button', { name: /つぎのもんだい|けっかを みる/ }))
 }
 
 describe('はたらくくるまクイズ', () => {
@@ -110,6 +110,17 @@ describe('はたらくくるまクイズ', () => {
     expect(status).toHaveTextContent('せいかい！')
     expect(status).toHaveTextContent(`こたえ: ${answer.nameJa}`)
     expect(screen.getByRole('button', { name: `◯ ${answer.nameJa}` })).toBeDisabled()
+  })
+
+  test('回答前後でページのルート要素の className が変化しない（レイアウトシフトしない）', async () => {
+    const user = userEvent.setup()
+    const { container } = renderApp('/games/working-vehicle-quiz/photo-to-name/hard/play')
+    const pageElement = container.firstElementChild
+    const classNameBefore = pageElement?.className
+    expect(classNameBefore).toBeTruthy()
+    const answer = questionVehicleFromPhoto()
+    await user.click(screen.getByRole('button', { name: answer.nameJa }))
+    expect(container.firstElementChild?.className).toBe(classNameBefore)
   })
 
   test('不正なlevelは同じモードのむずかしさ選択へ安全に戻す', () => {

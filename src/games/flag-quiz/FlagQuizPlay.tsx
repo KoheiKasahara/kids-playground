@@ -2,6 +2,7 @@ import { useReducer, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
+import QuizResultOverlay from '../../components/QuizResultOverlay'
 import FlagImage from './FlagImage'
 import { countriesForLevel } from './data/countries'
 import { generateQuestions } from './questionGenerator'
@@ -49,8 +50,8 @@ function choiceVariant(choice: Country, answer: Country, selectedId: string | nu
 
 /** 色だけに頼らず判別できるよう、回答後の正解・不正解の選択肢に記号を添える */
 function choiceMark(variant: ChoiceVariant): string {
-  if (variant === 'correct') return '◯ '
-  if (variant === 'wrong') return '✕ '
+  if (variant === 'correct') return '◯'
+  if (variant === 'wrong') return '✕'
   return ''
 }
 
@@ -117,13 +118,9 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
     dispatch({ type: 'next' })
   }
 
-  // nameToFlagモードはフィードバックバーに国旗の行が増えるぶん高さが変わるため、
+  // nameToFlagモードはオーバーレイに国旗の行が増えるぶん高さが変わるため、
   // ページ側の下部余白（--feedback-bar-height）をモード別クラスで切り替える
-  const pageClassName = [
-    styles.page,
-    answered ? styles.pageAnswered : '',
-    mode === 'nameToFlag' ? styles.pageNameToFlag : '',
-  ]
+  const pageClassName = [styles.page, mode === 'nameToFlag' ? styles.pageNameToFlag : '']
     .filter(Boolean)
     .join(' ')
 
@@ -155,15 +152,30 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
               <div className={styles.choices}>
                 {question.choices.map((choice) => {
                   const variant = choiceVariant(choice, question.answer, state.selectedId)
+                  // secondary（正解でも選んだ誤答でもない、回答後の「その他」の選択肢）だけ、
+                  // 従来どおり枠線の色を見せる（PanelFlagQuizPlayと同じ方針）。
+                  const choiceButtonClassName = [
+                    styles.choiceButton,
+                    variant === 'secondary' ? styles.choiceButtonUnselected : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                  const mark = answered ? choiceMark(variant) : ''
                   return (
                     <BigButton
                       key={choice.id}
-                      className={styles.choiceButton}
+                      className={choiceButtonClassName}
                       variant={variant}
                       disabled={answered}
                       onClick={() => handleSelect(choice.id)}
                     >
-                      {answered ? choiceMark(variant) : ''}
+                      <span className={styles.choiceMark}>{mark}</span>
+                      {/* 記号は絶対配置で見た目には影響しないが、スクリーンリーダー向けの
+                          読み上げ名（アクセシブルネーム）では「◯ こくめい」のように
+                          記号とラベルの間に区切りが必要。半角スペースをspan内に含めると
+                          アクセシブルネーム計算時に末尾空白として落ちてしまうため、
+                          記号spanの外に独立したテキストノードとして置く。 */}
+                      {mark && ' '}
                       {choice.nameJa}
                     </BigButton>
                   )
@@ -210,46 +222,21 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
       </div>
 
       {/*
-        正誤メッセージと「つぎへ」は、通常フローから外して画面下部に固定する。
-        こうすることで画面の高さに関係なく「つぎへ」が必ず可視・操作可能になる
-        （iPhone SE 相当の低背端末でも画面外に出ない）。
+        正誤メッセージと「つぎのもんだい」は、通常フローから外し共通コンポーネント
+        QuizResultOverlay が画面下部に固定して表示する。こうすることで画面の高さに
+        関係なく必ず可視・操作可能になる（iPhone SE 相当の低背端末でも画面外に出ない）。
         未回答時はDOMに置かず、回答直後にマウントしてアニメーションを都度再生する。
-        隠れ防止の余白は .pageAnswered の padding-bottom で確保している。
+        隠れ防止の余白は .page（nameToFlagモードは .pageNameToFlag）側の
+        padding-bottom で、回答したかどうかに関わらずビューポートの幅・高さだけで確保している。
       */}
       {answered && (
-        <div
-          className={
-            isCorrect
-              ? `${styles.feedbackBar} ${styles.feedbackBarSuccess}`
-              : `${styles.feedbackBar} ${styles.feedbackBarWrong}`
-          }
-          role="status"
-          aria-live="polite"
-        >
-          <div className={styles.feedbackBarInner}>
-            <div className={styles.feedbackTexts}>
-              <p
-                className={
-                  isCorrect
-                    ? `${styles.feedbackText} ${styles.correctText}`
-                    : `${styles.feedbackText} ${styles.wrongText}`
-                }
-              >
-                {isCorrect ? '🎉 せいかい！' : 'ざんねん！'}
-              </p>
-              <p className={styles.answerText}>こたえ: {question.answer.nameJa}</p>
-              {mode === 'nameToFlag' && (
-                <div className={styles.answerFlags}>
-                  <FlagImage country={question.answer} size="small" />
-                </div>
-              )}
-            </div>
-
-            <BigButton variant="primary" className={styles.nextButton} onClick={handleNext}>
-              {isLastQuestion ? 'けっかを みる' : 'つぎへ'}
-            </BigButton>
-          </div>
-        </div>
+        <QuizResultOverlay
+          result={isCorrect ? 'correct' : 'wrong'}
+          answer={question.answer.nameJa}
+          media={mode === 'nameToFlag' ? <FlagImage country={question.answer} size="small" /> : undefined}
+          nextLabel={isLastQuestion ? 'けっかを みる' : 'つぎのもんだい'}
+          onNext={handleNext}
+        />
       )}
     </div>
   )

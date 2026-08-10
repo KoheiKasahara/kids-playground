@@ -1,0 +1,235 @@
+/*
+ * クイズ回答結果の共通オーバーレイ。PanelFlagQuizPlay.module.css の feedbackBar 実装を
+ * そのまま共通コンポーネント用に移植したもの（クラス名のみ改名）。
+ * 画面下部に固定（position: fixed）されるため、通常フローの高さ計算には影響しない。
+ * 呼び出し元の各 *QuizPlay.module.css 側で、このオーバーレイぶんの下部余白
+ * （--feedback-bar-height 相当）をビューポートの幅・高さだけを基準に確保すること
+ * （回答したかどうかには依存させない。詳細は各ゲームのCSSを参照）。
+ *
+ * 背景を暗くするモーダルにはせず、下から迫り上がって「答え合わせパネルが差し込まれる」
+ * 演出にする（子ども向けに「ふわっ→ポン」くらいの控えめな動きに留める）。
+ */
+.overlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  padding: 10px var(--space-md) calc(12px + var(--safe-bottom));
+  border-top: 2px solid var(--color-border);
+  box-shadow: 0 -4px 12px rgba(33, 37, 41, 0.16);
+  animation: result-panel-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes result-panel-up {
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 「動きを減らす」設定では迫り上がりアニメーションも止め、最終状態のまま表示する。
+   src/styles/global.css の共通ルールで duration は既にほぼ0になるが、ここでも明示しておく。 */
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    animation: none;
+  }
+
+  .correctText {
+    animation: none;
+  }
+}
+
+.correct {
+  background-color: var(--color-success-bg);
+}
+
+.wrong {
+  background-color: var(--color-danger-bg);
+}
+
+.inner {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.resultText {
+  font-size: clamp(22px, 5.5vw, 28px);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.correctText {
+  color: var(--color-success-dark);
+  animation: pop-in 0.25s ease-out;
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.wrongText {
+  color: var(--color-danger-dark);
+}
+
+.answerText {
+  font-size: clamp(17px, 4.2vw, 20px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+/* 「Nまいで わかった！」「Mてん」/「0てん」のような補足1行。国名の下に添えるので、
+   answerText よりわずかに控えめなサイズにする */
+.detailText {
+  font-size: clamp(15px, 3.8vw, 18px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text-muted);
+}
+
+/*
+ * 正解の国旗・写真などの補足ビジュアル。オーバーレイの実高が暴れないよう高さの上限を付ける。
+ * 中の img は元の固有サイズ（FlagImage/VehiclePhotoの small など）に関わらず、
+ * この高さに収まるよう縦横比を保ったまま縮小する。
+ *
+ * .media 自体に（max-heightではなく）確定した height を与えているのは、
+ * 639px以下の横並びレイアウト（下のメディアクエリ）で .texts が
+ * align-items: flex-start になり、子要素の幅がstretchされず内容に応じた
+ * fit-content幅になるため。この状態で img 側が width:auto かつ max-height（不確定な
+ * 親の高さに対する%指定や、heightを持たない親のmax-height）に頼ると、img自身の
+ * 幅の基準になる高さが定まらず、意図しない極小サイズに縮んでしまう
+ * （SVG/写真とも幅・高さの内在サイズを持たないため）。
+ * .media に確定 height を与え、img 側は height: 100% を親の確定値から解決させることで、
+ * どのレイアウトでも正しい大きさで描画される。
+ */
+.media {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 2px;
+  height: 64px;
+}
+
+.media img {
+  height: 100%;
+  width: auto;
+}
+
+.nextButton {
+  flex: 0 0 auto;
+  min-height: clamp(60px, 14vw, 68px);
+  font-size: 24px;
+}
+
+/*
+ * スマホ縦（639px以下）: オーバーレイを横並び（左＝結果テキスト、右＝「つぎのもんだい」ボタン）
+ * にしてコンパクト化する（表示内容は変えない）。縦に長いスタックだと画面高の25%を超えやすいため、
+ * 横並びにして実高を抑える。
+ */
+@media (max-width: 639px) and (orientation: portrait) {
+  .inner {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .texts {
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .resultText {
+    font-size: clamp(18px, 5vw, 22px);
+  }
+
+  .answerText {
+    font-size: clamp(14px, 3.6vw, 16px);
+  }
+
+  .detailText {
+    font-size: clamp(12px, 3.2vw, 14px);
+  }
+
+  .media {
+    height: 44px;
+  }
+
+  .nextButton {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 150px;
+    min-height: 52px;
+    padding: var(--space-sm) var(--space-lg);
+    font-size: 18px;
+    white-space: nowrap;
+  }
+}
+
+/* 横向き・低背の画面（スマホを横に持った状態を想定）。左にテキスト、右にボタンの1行にする。 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .overlay {
+    padding: 6px var(--space-md) calc(8px + var(--safe-bottom));
+  }
+
+  .inner {
+    max-width: 960px;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .texts {
+    flex: 1 1 auto;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .resultText {
+    font-size: 20px;
+  }
+
+  .answerText {
+    font-size: 16px;
+  }
+
+  .detailText {
+    font-size: 14px;
+  }
+
+  .media {
+    height: 44px;
+  }
+
+  .nextButton {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 180px;
+    min-height: 44px;
+    padding: var(--space-sm) var(--space-lg);
+    font-size: 18px;
+  }
+}

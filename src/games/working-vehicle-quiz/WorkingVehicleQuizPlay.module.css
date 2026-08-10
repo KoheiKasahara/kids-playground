@@ -1,17 +1,25 @@
+/*
+ * オーバーレイ（回答後に表示する QuizResultOverlay）ぶんの下部余白は、回答したかどうかには
+ * 一切依存させず、ビューポートの幅・高さだけで決める（回答前後で同じ .page の padding を使う）。
+ * 分岐は次の4系統（PanelFlagQuizPlay.module.css と同じ考え方）：
+ *   1. タブレット/PC（幅640px以上 かつ 高さ600px以上）: 常に固定オーバーレイ分の余白を確保する。
+ *   2. 背の高いスマホ縦（幅639px以下 かつ 高さ760px以上）: オーバーレイをコンパクト化した分だけ
+ *      余白を減らす。
+ *   3. 背の低いスマホ縦（上記どちらにも当てはまらない縦画面。iPhone SE/5 相当）: 余白を確保しない。
+ *      回答後、オーバーレイは選択肢ボタン（disabled）の上にそのまま重なって表示される。
+ *   4. 低背の横画面（landscape かつ 高さ560px以下）: 回答前から常にオーバーレイ分の余白を確保する。
+ * これにより、回答した瞬間に .page の padding が変化することはない。
+ */
 .page {
-  --feedback-bar-height: 164px;
+  --feedback-bar-height: 172px;
   max-width: var(--content-max-width);
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: var(--space-sm) var(--space-lg) calc(var(--space-sm) + env(safe-area-inset-bottom));
+  padding: var(--space-sm) var(--space-lg) calc(var(--space-sm) + var(--safe-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-}
-
-.pageAnswered {
-  padding-bottom: var(--feedback-bar-height);
 }
 
 .header {
@@ -23,8 +31,8 @@
 
 .quit {
   position: fixed;
-  top: calc(var(--space-sm) + env(safe-area-inset-top));
-  right: calc(var(--space-md) + env(safe-area-inset-right));
+  top: calc(var(--space-sm) + var(--safe-top));
+  right: calc(var(--space-md) + var(--safe-right));
   z-index: 200;
   min-width: 76px;
   min-height: 44px;
@@ -101,11 +109,42 @@
   gap: var(--space-sm);
 }
 
+/*
+ * position: relative は回答前後どちらでも常に適用する（.choiceMark の絶対配置の基準にするため）。
+ * BigButton の secondary variant だけが border: 2px solid を持ち、primary/correct/wrong は
+ * border なし（0px）になる。回答後は「選ばれなかった正解でも不正解でもない」選択肢が
+ * secondary になるため、そのままだとボタンごとに枠線の有無で高さが2px×2＝4px変わってしまう
+ * （PanelFlagQuizPlayと同じ原因・同じ対策）。border-width を常に2pxに揃えて防ぎ、
+ * 上下 padding を既存値（var(--space-sm)=8px）より2pxずつ減らして総高さを維持する
+ * （左右は var(--space-sm) のまま）。 */
 .choiceButton {
+  position: relative;
   min-height: 64px;
-  padding: var(--space-sm);
+  padding: 6px var(--space-sm);
+  border-width: 2px;
+  border-style: solid;
+  border-color: transparent;
   font-size: clamp(17px, 4.5vw, 21px);
   overflow-wrap: anywhere;
+}
+
+/* secondary（正解でも選んだ誤答でもない、回答後の「その他」の選択肢）だけ、
+   従来どおり枠線の色を見せる。太さは .choiceButton 側で揃えているので高さには影響しない。 */
+.choiceButtonUnselected {
+  border-color: var(--color-border);
+}
+
+/*
+ * 正誤の◯✕は通常のテキストフローに置かず、絶対配置の span にする。
+ * こうすることで「記号が付くと車名が2行に折り返してボタンが高くなる」という事故が起きず、
+ * 回答前後でボタンの高さが完全に一致する（PanelFlagQuizPlayと同じ対策）。
+ */
+.choiceMark {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  line-height: 0;
+  transform: translateY(-50%);
 }
 
 .questionVehicle {
@@ -185,91 +224,38 @@
   background: var(--color-danger);
 }
 
-.feedbackBar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 100;
-  padding: 10px var(--space-md) calc(12px + env(safe-area-inset-bottom));
-  border-top: 2px solid var(--color-border);
-  box-shadow: 0 -4px 12px rgba(33, 37, 41, 0.16);
-  animation: bar-in 0.18s ease-out;
-}
-
-@keyframes bar-in {
-  from {
-    transform: translateY(12px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.feedbackBarSuccess {
-  background: var(--color-success-bg);
-}
-
-.feedbackBarWrong {
-  background: var(--color-danger-bg);
-}
-
-.feedbackBarInner {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.feedbackTexts {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: center;
-  text-align: center;
-}
-
-.feedbackText {
-  font-size: clamp(22px, 5.5vw, 28px);
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.correctText {
-  color: var(--color-success-dark);
-}
-
-.wrongText {
-  color: var(--color-danger-dark);
-}
-
-.answerText {
-  font-size: clamp(17px, 4.2vw, 20px);
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.nextButton {
-  min-height: clamp(60px, 14vw, 68px);
-  font-size: 24px;
-}
-
+/* オーバーレイに正解の写真（size="small"、QuizResultOverlayの.media）の行が増えるぶん、
+   photoToNameモードより縦に高さが必要になる。--feedback-bar-height をモード別に上書きする
+   （PC/タブレット用の既定値。system 2・4 の値はそれぞれのメディアクエリ内で上書きする）。 */
 .pageNameToPhoto {
-  --feedback-bar-height: 260px;
+  --feedback-bar-height: 240px;
 }
 
-.answerPhoto {
-  padding-top: 2px;
-}
-
-@media (min-width: 640px) and (min-height: 600px), (min-height: 760px) {
+/* 1. タブレット・PC: 回答前から常にオーバーレイぶんの余白を確保する */
+@media (min-width: 640px) and (min-height: 600px) {
   .page {
-    padding-bottom: var(--feedback-bar-height);
+    padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
   }
 }
+
+/* 2. 背の高いスマホ縦（iPhone 14 / Pro Max, Pixel 7 相当）:
+   オーバーレイをコンパクト化した分だけ --feedback-bar-height を下げる。 */
+@media (max-width: 639px) and (min-height: 760px) {
+  .page {
+    --feedback-bar-height: 90px;
+
+    padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
+  }
+
+  .pageNameToPhoto {
+    --feedback-bar-height: 128px;
+  }
+}
+
+/* 3. 背の低いスマホ縦（iPhone SE / iPhone 5 相当。上記どちらにも当てはまらない）は、
+   ここでは何もしない＝.page の padding-bottom は既定（空き無し）のまま。
+   オーバーレイは選択肢ボタンの上に重なって表示される（回答後の選択肢は disabled のため
+   操作上の問題はない）。 */
 
 @media (max-width: 480px) {
   .page {
@@ -278,38 +264,21 @@
   }
 }
 
+/* 背の低い縦画面（system 3 = オーバーレイ分の余白を確保しない側）では、選択肢ボタンを
+   さらに一段詰め、オーバーレイが重なる面積を減らす */
 @media (orientation: portrait) and (max-height: 620px) {
-  .page {
-    --feedback-bar-height: 148px;
-  }
-
-  .pageNameToPhoto {
-    --feedback-bar-height: 246px;
-  }
-
   .choiceButton {
     min-height: 54px;
   }
-
-  .feedbackText {
-    font-size: 23px;
-  }
-
-  .nextButton {
-    min-height: 56px;
-    font-size: 21px;
-  }
 }
 
+/* 4. 低背の横画面: 回答前から常にオーバーレイぶんの余白を確保する
+   （回答後だけ余白が増えて写真が潰れる、という事故を防ぐため）。 */
 @media (orientation: landscape) and (max-height: 560px) {
   .page {
-    --feedback-bar-height: 82px;
+    --feedback-bar-height: 76px;
     max-width: 960px;
-    padding: 8px var(--space-md) calc(8px + env(safe-area-inset-bottom));
-  }
-
-  .pageAnswered {
-    padding-bottom: calc(var(--feedback-bar-height) + env(safe-area-inset-bottom));
+    padding: 8px var(--space-md) calc(var(--feedback-bar-height) + var(--safe-bottom));
   }
 
   .progressArea {
@@ -346,41 +315,8 @@
     font-size: 18px;
   }
 
-  .feedbackBar {
-    padding: 6px var(--space-md) calc(8px + env(safe-area-inset-bottom));
-  }
-
-  .feedbackBarInner {
-    max-width: 960px;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-md);
-  }
-
-  .feedbackTexts {
-    flex: 1;
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .feedbackText {
-    font-size: 21px;
-  }
-
-  .answerText {
-    font-size: 17px;
-  }
-
-  .nextButton {
-    width: auto;
-    min-width: 190px;
-    min-height: 52px;
-    padding: var(--space-sm) var(--space-lg);
-    font-size: 20px;
-  }
-
   .pageNameToPhoto {
-    --feedback-bar-height: 102px;
+    --feedback-bar-height: 120px;
   }
 
   .pageNameToPhoto .body {
@@ -390,17 +326,5 @@
   .photoChoices {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-template-rows: 1fr;
-  }
-
-  .pageNameToPhoto .feedbackTexts {
-    display: grid;
-    grid-template-columns: auto auto;
-    column-gap: var(--space-md);
-    align-items: center;
-  }
-
-  .pageNameToPhoto .answerPhoto {
-    grid-column: 2;
-    grid-row: 1 / 3;
   }
 }

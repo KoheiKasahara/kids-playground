@@ -1,8 +1,8 @@
 /*
  * 基本構造は FlagQuizPlay.module.css（flagToNameモード）とほぼ同じ。
  * .page は 100dvh（未対応環境は 100vh）のフレックスコンテナで、直下の子は header と body の2つ
- * （回答後はさらに固定バー .feedbackBar が加わるが、position: fixed のため
- * 通常フローの高さ計算には影響しない）。
+ * （回答後はさらに共通コンポーネント QuizResultOverlay（下部固定オーバーレイ）が加わるが、
+ * position: fixed のため通常フローの高さ計算には影響しない）。
  * body がさらに flagArea / content に分かれ、flagArea だけが縦方向に伸縮する（flex: 1）。
  * これにより iPhone SE などの小型スマホ縦画面でもスクロールなしに収まる。
  *
@@ -24,15 +24,16 @@
  * これにより、回答した瞬間に .page の padding が変化することはなく、
  * 国旗・見出し・ボタン類の位置とサイズは回答前後でぴったり一致する。
  *
- * 正誤メッセージと「つぎのもんだい」は画面を暗くするモーダルにはせず、画面下端に固定した
- * オーバーレイ（.feedbackBar）が下から迫り上がって表示する（アニメーションは末尾）。
+ * 正誤メッセージと「つぎのもんだい」は画面を暗くするモーダルにはせず、共通コンポーネント
+ * QuizResultOverlay（src/components/QuizResultOverlay.module.css）が画面下端に固定した
+ * オーバーレイとして下から迫り上がって表示する。
  *
  * 横向き・低背の画面（@media (orientation: landscape) and (max-height: 560px)）では
  * body を横並びにし、左に国旗・右に問題文/めくるボタン/選択肢を置く2カラムレイアウトに切り替える
  * （ファイル末尾）。
  */
 .page {
-  /* 結果パネル（.feedbackBar）ぶんに確保する下部余白の既定値（タブレット/PC用）。
+  /* 結果パネル（QuizResultOverlay）ぶんに確保する下部余白の既定値（タブレット/PC用）。
      スマホ縦用のコンパクトな値は下のメディアクエリで上書きする。 */
   --feedback-bar-height: 196px;
 
@@ -254,158 +255,6 @@
   }
 }
 
-.feedbackBar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 100;
-  padding: 10px var(--space-md) calc(12px + var(--safe-bottom));
-  border-top: 2px solid var(--color-border);
-  box-shadow: 0 -4px 12px rgba(33, 37, 41, 0.16);
-  animation: result-panel-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-/*
- * 背景を暗くするモーダルにはせず、下から迫り上がって「答え合わせパネルが差し込まれる」演出にする。
- * 子ども向けに「ふわっ→ポン」くらいの控えめな動きに留める（派手な演出はしない）。
- */
-@keyframes result-panel-up {
-  0% {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-/* 「動きを減らす」設定では迫り上がりアニメーションも止め、最終状態のまま表示する。
-   src/styles/global.css の共通ルールで duration は既にほぼ0になるが、ここでも明示しておく。 */
-@media (prefers-reduced-motion: reduce) {
-  .feedbackBar {
-    animation: none;
-  }
-
-  .correctText {
-    animation: none;
-  }
-}
-
-.feedbackBarSuccess {
-  background-color: var(--color-success-bg);
-}
-
-.feedbackBarWrong {
-  background-color: var(--color-danger-bg);
-}
-
-.feedbackBarInner {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.feedbackTexts {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: center;
-}
-
-.feedbackText {
-  font-size: clamp(22px, 5.5vw, 28px);
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.correctText {
-  color: var(--color-success-dark);
-  animation: pop-in 0.25s ease-out;
-}
-
-@keyframes pop-in {
-  0% {
-    transform: scale(0.7);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.wrongText {
-  color: var(--color-danger-dark);
-}
-
-.answerText {
-  font-size: clamp(17px, 4.2vw, 20px);
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--color-text);
-}
-
-/* 「Nまいで わかった！」「Mてん」/「0てん」を表示する行。国名の下に添える説明なので、
-   answerText よりわずかに控えめなサイズにする */
-.detailText {
-  font-size: clamp(15px, 3.8vw, 18px);
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--color-text-muted);
-}
-
-.nextButton {
-  flex: 0 0 auto;
-  min-height: clamp(60px, 14vw, 68px);
-  font-size: 24px;
-}
-
-/*
- * スマホ縦（639px以下）: 結果パネルを横並び（左＝結果テキスト3行、右＝「つぎのもんだい」ボタン）
- * にしてコンパクト化する（表示内容は変えない）。縦に長い3行スタックだと画面高の25%を超えやすいため、
- * 横並びにしてパネルの実高を抑える。国旗を拡大するための余白確保は .page 側（上部）で行う。
- */
-@media (max-width: 639px) and (orientation: portrait) {
-  .feedbackBarInner {
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-md);
-  }
-
-  .feedbackTexts {
-    flex: 1 1 auto;
-    min-width: 0;
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .feedbackText {
-    font-size: clamp(18px, 5vw, 22px);
-  }
-
-  .answerText {
-    font-size: clamp(14px, 3.6vw, 16px);
-  }
-
-  .detailText {
-    font-size: clamp(12px, 3.2vw, 14px);
-  }
-
-  .nextButton {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 150px;
-    min-height: 52px;
-    padding: var(--space-sm) var(--space-lg);
-    font-size: 18px;
-    white-space: nowrap;
-  }
-}
-
 /* 背の低い縦画面（高さ760px未満＝.page が結果パネル分の余白を確保しない側。iPhone 5/SE 相当）は、
    パネルが選択肢ボタンに重なる面積を減らすため、めくるボタン・選択肢ボタンをさらに一段詰める。 */
 @media (orientation: portrait) and (max-height: 759px) {
@@ -497,44 +346,6 @@
   .choiceButton {
     min-height: 48px;
     font-size: 17px;
-  }
-
-  .feedbackBar {
-    padding: 6px var(--space-md) calc(8px + var(--safe-bottom));
-  }
-
-  .feedbackBarInner {
-    max-width: 960px;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-md);
-  }
-
-  .feedbackTexts {
-    flex: 1 1 auto;
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .feedbackText {
-    font-size: 20px;
-  }
-
-  .answerText {
-    font-size: 16px;
-  }
-
-  .detailText {
-    font-size: 14px;
-  }
-
-  .nextButton {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 180px;
-    min-height: 44px;
-    padding: var(--space-sm) var(--space-lg);
-    font-size: 18px;
   }
 
   /* iPhone SE 横向き相当（736px前後）など幅の狭い端末では、左カラム（国旗）を

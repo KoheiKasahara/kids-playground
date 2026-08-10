@@ -62,7 +62,7 @@ async function answerQuestion(user: UserEvent, correct: boolean) {
     : buttons.find((button) => button.textContent?.trim() !== String(answer))
   if (!target) throw new Error('answer button not found')
   await user.click(target)
-  await user.click(screen.getByRole('button', { name: /つぎへ|けっかを みる/ }))
+  await user.click(screen.getByRole('button', { name: /つぎのもんだい|けっかを みる/ }))
 }
 
 describe('さんすうクイズ', () => {
@@ -132,6 +132,16 @@ describe('さんすうクイズ', () => {
     const status = screen.getByRole('status')
     expect(status).toHaveTextContent('ざんねん！')
     expect(status).toHaveTextContent(`こたえ: ${answer}`)
+  })
+
+  test('回答前後でページのルート要素の className が変化しない（レイアウトシフトしない）', async () => {
+    const user = userEvent.setup()
+    const { container } = renderApp('/games/math-quiz/add/easy/play')
+    const pageElement = container.firstElementChild
+    const classNameBefore = pageElement?.className
+    expect(classNameBefore).toBeTruthy()
+    await user.click(choiceButtons()[0])
+    expect(container.firstElementChild?.className).toBe(classNameBefore)
   })
 
   test('結果画面の「もういちど」で1問目に戻る', async () => {
