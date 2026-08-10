@@ -106,8 +106,8 @@ function choiceVariant(choice: Country, answer: Country, selectedId: string | nu
 
 /** 色だけに頼らず判別できるよう、回答後の正解・不正解の選択肢に記号を添える */
 function choiceMark(variant: ChoiceVariant): string {
-  if (variant === 'correct') return '◯ '
-  if (variant === 'wrong') return '✕ '
+  if (variant === 'correct') return '◯'
+  if (variant === 'wrong') return '✕'
   return ''
 }
 
@@ -289,6 +289,7 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
               const choiceButtonClassName = [styles.choiceButton, variant === 'secondary' ? styles.choiceButtonUnselected : '']
                 .filter(Boolean)
                 .join(' ')
+              const mark = answered ? choiceMark(variant) : ''
               return (
                 <BigButton
                   key={choice.id}
@@ -297,7 +298,14 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
                   disabled={answered}
                   onClick={() => handleSelect(choice.id)}
                 >
-                  <span className={styles.choiceMark}>{answered ? choiceMark(variant) : ''}</span>
+                  <span className={styles.choiceMark}>{mark}</span>
+                  {/* 記号は絶対配置で見た目には影響しないが、スクリーンリーダー向けの
+                      読み上げ名（アクセシブルネーム）では「◯ こくめい」のように
+                      記号とラベルの間に区切りが必要。半角スペースをspan内に含めると
+                      アクセシブルネーム計算時に末尾空白として落ちてしまうため、
+                      記号spanの外に独立したテキストノードとして置く
+                      （FlagQuizPlay/MathQuizPlay/WorkingVehicleQuizPlayと同じ対策）。 */}
+                  {mark && ' '}
                   {choice.nameJa}
                 </BigButton>
               )

@@ -51,8 +51,8 @@ function choiceVariant(
 }
 
 function choiceMark(variant: ChoiceVariant): string {
-  if (variant === 'correct') return '◯ '
-  if (variant === 'wrong') return '✕ '
+  if (variant === 'correct') return '◯'
+  if (variant === 'wrong') return '✕'
   return ''
 }
 
@@ -148,15 +148,30 @@ function WorkingVehicleQuizPlayGame({ mode, level }: WorkingVehicleQuizPlayGameP
               <div className={styles.choices}>
                 {question.choices.map((choice) => {
                   const variant = choiceVariant(choice, question.answer, state.selectedId)
+                  // secondary（正解でも選んだ誤答でもない、回答後の「その他」の選択肢）だけ、
+                  // 従来どおり枠線の色を見せる（PanelFlagQuizPlayと同じ方針）。
+                  const choiceButtonClassName = [
+                    styles.choiceButton,
+                    variant === 'secondary' ? styles.choiceButtonUnselected : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                  const mark = answered ? choiceMark(variant) : ''
                   return (
                     <BigButton
                       key={choice.id}
-                      className={styles.choiceButton}
+                      className={choiceButtonClassName}
                       variant={variant}
                       disabled={answered}
                       onClick={() => handleSelect(choice.id)}
                     >
-                      {answered ? choiceMark(variant) : ''}
+                      <span className={styles.choiceMark}>{mark}</span>
+                      {/* 記号は絶対配置で見た目には影響しないが、スクリーンリーダー向けの
+                          読み上げ名（アクセシブルネーム）では「◯ しゃめい」のように
+                          記号とラベルの間に区切りが必要。半角スペースをspan内に含めると
+                          アクセシブルネーム計算時に末尾空白として落ちてしまうため、
+                          記号spanの外に独立したテキストノードとして置く。 */}
+                      {mark && ' '}
                       {choice.nameJa}
                     </BigButton>
                   )

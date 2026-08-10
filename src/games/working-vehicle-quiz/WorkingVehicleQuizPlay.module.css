@@ -109,11 +109,42 @@
   gap: var(--space-sm);
 }
 
+/*
+ * position: relative は回答前後どちらでも常に適用する（.choiceMark の絶対配置の基準にするため）。
+ * BigButton の secondary variant だけが border: 2px solid を持ち、primary/correct/wrong は
+ * border なし（0px）になる。回答後は「選ばれなかった正解でも不正解でもない」選択肢が
+ * secondary になるため、そのままだとボタンごとに枠線の有無で高さが2px×2＝4px変わってしまう
+ * （PanelFlagQuizPlayと同じ原因・同じ対策）。border-width を常に2pxに揃えて防ぎ、
+ * 上下 padding を既存値（var(--space-sm)=8px）より2pxずつ減らして総高さを維持する
+ * （左右は var(--space-sm) のまま）。 */
 .choiceButton {
+  position: relative;
   min-height: 64px;
-  padding: var(--space-sm);
+  padding: 6px var(--space-sm);
+  border-width: 2px;
+  border-style: solid;
+  border-color: transparent;
   font-size: clamp(17px, 4.5vw, 21px);
   overflow-wrap: anywhere;
+}
+
+/* secondary（正解でも選んだ誤答でもない、回答後の「その他」の選択肢）だけ、
+   従来どおり枠線の色を見せる。太さは .choiceButton 側で揃えているので高さには影響しない。 */
+.choiceButtonUnselected {
+  border-color: var(--color-border);
+}
+
+/*
+ * 正誤の◯✕は通常のテキストフローに置かず、絶対配置の span にする。
+ * こうすることで「記号が付くと車名が2行に折り返してボタンが高くなる」という事故が起きず、
+ * 回答前後でボタンの高さが完全に一致する（PanelFlagQuizPlayと同じ対策）。
+ */
+.choiceMark {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  line-height: 0;
+  transform: translateY(-50%);
 }
 
 .questionVehicle {
