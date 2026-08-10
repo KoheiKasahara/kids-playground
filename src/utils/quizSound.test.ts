@@ -78,4 +78,87 @@ describe('quizSound', () => {
     expect(() => playIncorrectSound()).not.toThrow()
     expect(instances).toHaveLength(0)
   })
+
+  test('primeAudio は AudioContext を作成する（iOS対策で操作イベント内から先に用意する用）', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { primeAudio } = await import('./quizSound')
+
+    primeAudio()
+
+    expect(instances).toHaveLength(1)
+  })
+
+  test('playPanelOpenSound はオシレーターを1つ生成し、600Hz〜1kHz帯の音を鳴らす', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPanelOpenSound } = await import('./quizSound')
+
+    playPanelOpenSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(1)
+    const oscillator = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    expect(oscillator.frequency.value).toBeGreaterThanOrEqual(600)
+    expect(oscillator.frequency.value).toBeLessThanOrEqual(1000)
+  })
+
+  test('playPanelRevealSound は step が進むほど周波数が高くなる', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPanelRevealSound } = await import('./quizSound')
+
+    playPanelRevealSound(1, 5)
+    playPanelRevealSound(3, 5)
+
+    const first = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    const third = instances[0].createOscillator.mock.results[1].value as MockOscillatorNode
+    expect(third.frequency.value).toBeGreaterThan(first.frequency.value)
+  })
+
+  test('playPanelRevealSound は最後の1枚(step === total)で、その手前より高い音を鳴らす', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPanelRevealSound } = await import('./quizSound')
+
+    playPanelRevealSound(4, 5)
+    playPanelRevealSound(5, 5)
+
+    const secondLast = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    const last = instances[0].createOscillator.mock.results[1].value as MockOscillatorNode
+    expect(last.frequency.value).toBeGreaterThan(secondLast.frequency.value)
+  })
+
+  test('playPanelRevealSound は残り枚数が多くても（残り15枚）甲高くなりすぎない（全て1500Hz以下）', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPanelRevealSound } = await import('./quizSound')
+
+    const total = 15
+    for (let step = 1; step <= total; step += 1) {
+      playPanelRevealSound(step, total)
+    }
+
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(total)
+    for (let i = 0; i < total; i += 1) {
+      const oscillator = instances[0].createOscillator.mock.results[i].value as MockOscillatorNode
+      expect(oscillator.frequency.value).toBeLessThanOrEqual(1500)
+    }
+  })
+
+  test('setSoundEnabled(false) の間は AudioContext を作らず、どの音も鳴らない', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPanelOpenSound, playPanelRevealSound, playCorrectSound, setSoundEnabled, isSoundEnabled } =
+      await import('./quizSound')
+
+    setSoundEnabled(false)
+    expect(isSoundEnabled()).toBe(false)
+
+    playPanelOpenSound()
+    playPanelRevealSound(1, 3)
+    playCorrectSound()
+
+    expect(instances).toHaveLength(0)
+  })
 })

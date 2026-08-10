@@ -1,4 +1,4 @@
-import { useReducer, useState } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
@@ -8,7 +8,13 @@ import { generateQuestions, shuffle } from './questionGenerator'
 import { scoreForPanels } from './panelScore'
 import { isQuizLevel, LEVEL_LABEL, MODE_PATH } from './types'
 import type { Country, QuizLevel } from './types'
-import { playCorrectSound, playIncorrectSound } from '../../utils/quizSound'
+import {
+  playCorrectSound,
+  playIncorrectSound,
+  playPanelOpenSound,
+  playPanelRevealSound,
+  primeAudio,
+} from '../../utils/quizSound'
 import styles from './PanelFlagQuizPlay.module.css'
 
 /** 1問ぶんの満点（パネル1枚で正解したときの得点） */
@@ -17,10 +23,21 @@ const MAX_SCORE_PER_QUESTION = 100
 /** シャッフル対象の 0〜PANEL_COUNT-1 のインデックス列。モジュールレベルの定数として使い回す */
 const PANEL_INDICES = Array.from({ length: PANEL_COUNT }, (_, index) => index)
 
+/** 正解後に残りパネルをパパパッと自動でめくり終えるまでの目標時間（ms）の目安 */
+const AUTO_REVEAL_TOTAL_MS = 600
+/** 自動めくりの1枚あたりの間隔の下限・上限（ms） */
+const AUTO_REVEAL_MIN_INTERVAL_MS = 30
+const AUTO_REVEAL_MAX_INTERVAL_MS = 70
+/** 自動めくりを始めるまでの待ち時間（ms）。正解/不正解のフィードバック（表示・効果音）を先に見せるため。 */
+const AUTO_REVEAL_START_DELAY_CORRECT_MS = 250
+const AUTO_REVEAL_START_DELAY_WRONG_MS = 300
+
 type PlayState = {
   index: number
-  /** このもんだいで、これまでに開いた（めくった）パネルの枚数。1〜PANEL_COUNT */
+  /** このもんだいで、これまでに開いた（めくった）パネルの枚数。1〜PANEL_COUNT。得点計算の対象 */
   openedCount: number
+  /** 正解/不正解の回答後に自動でパパパッと開いたパネル。演出だけで得点には一切影響しない */
+  revealedPanels: number[]
   selectedId: string | null
   correctCount: number
   /** ここまでの合計得点 */
@@ -29,12 +46,14 @@ type PlayState = {
 
 type PlayAction =
   | { type: 'reveal' }
+  | { type: 'burst'; panel: number }
   | { type: 'select'; choiceId: string; correct: boolean }
   | { type: 'next' }
 
 const initialState: PlayState = {
   index: 0,
   openedCount: 1,
+  revealedPanels: [],
   selectedId: null,
   correctCount: 0,
   score: 0,
@@ -48,6 +67,11 @@ function reducer(state: PlayState, action: PlayAction): PlayState {
       if (state.selectedId !== null) return state
       if (state.openedCount >= PANEL_COUNT) return state
       return { ...state, openedCount: state.openedCount + 1 }
+    case 'burst':
+      // 回答後の自動めくり専用。同じ index が重複して積まれないようにする
+      // （openedCount 側には絶対に足さない。得点や「〇まいで わかった！」表示が膨らむ事故を防ぐ）。
+      if (state.revealedPanels.includes(action.panel)) return state
+      return { ...state, revealedPanels: [...state.revealedPanels, action.panel] }
     case 'select':
       if (state.selectedId !== null) return state
       return {
@@ -60,6 +84,7 @@ function reducer(state: PlayState, action: PlayAction): PlayState {
       return {
         index: state.index + 1,
         openedCount: 1,
+        revealedPanels: [],
         selectedId: null,
         correctCount: state.correctCount,
         score: state.score,
@@ -83,6 +108,11 @@ function choiceMark(variant: ChoiceVariant): string {
   if (variant === 'correct') return '◯ '
   if (variant === 'wrong') return '✕ '
   return ''
+}
+
+/** 「動きを減らす」設定が有効かどうか。matchMedia 非対応環境（jsdom 等）でも例外を投げない */
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
 }
 
 export default function PanelFlagQuizPlay() {
@@ -118,17 +148,26 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
   // 「開いているパネル」は openOrder の先頭 openedCount 件から導出する。
   // シャッフル済みの配列から slice するだけなので、重複や PANEL_COUNT 超過は構造的に起こらない。
   const openOrder = openOrders[state.index]
-  const openedPanels = openOrder.slice(0, state.openedCount)
+  const openedPanels = useMemo(() => openOrder.slice(0, state.openedCount), [openOrder, state.openedCount])
+  // 画面に表示する「開いているパネル」は、ユーザーが自分で開いた分 ∪ 回答後に自動で開いた分。
+  const displayOpenedPanels = useMemo(
+    () => new Set([...openedPanels, ...state.revealedPanels]),
+    [openedPanels, state.revealedPanels],
+  )
   const remainingPanels = PANEL_COUNT - state.openedCount
   const questionScore = scoreForPanels(state.openedCount, isCorrect)
 
   const handleReveal = () => {
     if (answered || state.openedCount >= PANEL_COUNT) return
+    // iOS Safari 対策: ユーザー操作イベントの中で AudioContext を先に用意しておく
+    primeAudio()
     dispatch({ type: 'reveal' })
+    playPanelOpenSound()
   }
 
   const handleSelect = (choiceId: string) => {
     if (answered) return
+    primeAudio()
     const correct = choiceId === question.answer.id
     dispatch({ type: 'select', choiceId, correct })
     if (correct) {
@@ -154,6 +193,57 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
     dispatch({ type: 'next' })
   }
 
+  /*
+   * 回答後、まだ閉じているパネルをランダム順で時間差（stagger）に自動めくりし、
+   * 国旗全体を「パパパッ」と見せる演出。
+   * - openedCount（ユーザーが自分で開いた枚数）はここでは絶対に増やさない（burst アクションのみ）。
+   * - 正解時は「🎉 せいかい！」表示・正解音を先に見せたいので約250ms、
+   *   不正解時はブブー音と重ならないよう約300ms 待ってから開始する。
+   * - 全部開き終わるまでをおよそ0.5〜1秒に収めるため、間隔は残り枚数から動的に決める。
+   * - timer は必ず cleanup で clearTimeout する。問題切替（next）や unmount で
+   *   古い timer が残って state を更新しないようにする。
+   * - answered が true の間、openedPanels・isCorrect は変化しない（回答後は openedCount が
+   *   固定されるため）ので、依存配列に含めても余計な再スケジュールは起きない。
+   */
+  useEffect(() => {
+    if (!answered) return
+
+    const alreadyOpen = new Set(openedPanels)
+    const remaining = shuffle(PANEL_INDICES.filter((panel) => !alreadyOpen.has(panel)))
+    if (remaining.length === 0) return
+
+    const startDelay = isCorrect ? AUTO_REVEAL_START_DELAY_CORRECT_MS : AUTO_REVEAL_START_DELAY_WRONG_MS
+    const timerIds: number[] = []
+
+    if (prefersReducedMotion()) {
+      // 動きを減らす設定では stagger をやめて残り全部を一度に開き、効果音も1回だけにする。
+      const timerId = window.setTimeout(() => {
+        remaining.forEach((panel) => dispatch({ type: 'burst', panel }))
+        playPanelRevealSound(remaining.length, remaining.length)
+      }, startDelay)
+      timerIds.push(timerId)
+    } else {
+      const interval = Math.min(
+        AUTO_REVEAL_MAX_INTERVAL_MS,
+        Math.max(AUTO_REVEAL_MIN_INTERVAL_MS, Math.round(AUTO_REVEAL_TOTAL_MS / remaining.length)),
+      )
+      remaining.forEach((panel, order) => {
+        const timerId = window.setTimeout(
+          () => {
+            dispatch({ type: 'burst', panel })
+            playPanelRevealSound(order + 1, remaining.length)
+          },
+          startDelay + order * interval,
+        )
+        timerIds.push(timerId)
+      })
+    }
+
+    return () => {
+      timerIds.forEach((timerId) => window.clearTimeout(timerId))
+    }
+  }, [answered, state.index, openedPanels, isCorrect])
+
   const pageClassName = [styles.page, answered ? styles.pageAnswered : ''].filter(Boolean).join(' ')
 
   return (
@@ -173,7 +263,7 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
 
       <div className={styles.body}>
         <div className={styles.flagArea}>
-          <PanelFlag country={question.answer} openedPanels={openedPanels} revealAll={answered} />
+          <PanelFlag country={question.answer} openedPanels={displayOpenedPanels} />
         </div>
 
         <div className={styles.content}>

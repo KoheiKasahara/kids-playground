@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
@@ -222,11 +222,43 @@ describe('PanelFlagQuizPlay', () => {
     expect(screen.getByText('0てん')).toBeInTheDocument()
   })
 
-  test('回答後は16枚すべてのパネルが開き、国旗全体が見える', async () => {
+  test('回答後は自動めくりで16枚すべてのパネルが開き、国旗全体が見える', async () => {
     const user = userEvent.setup()
     renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     await user.click(getChoiceButtons()[0])
-    expect(getOpenPanelCount()).toBe(PANEL_COUNT)
+    // 自動めくりはランダム順の時間差（stagger）で開くため、即時ではなく waitFor で待つ
+    await waitFor(() => expect(getOpenPanelCount()).toBe(PANEL_COUNT), { timeout: 2000 })
+  })
+
+  test('回答後の自動めくりで枚数は増えるが、得点表示の「〇まいで わかった！」は自分で開いた枚数のまま変わらない', async () => {
+    const user = userEvent.setup()
+    const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await user.click(getRevealButton())
+    expect(getOpenPanelCount()).toBe(2)
+    const correctCountry = getCorrectCountry(container)
+    const button = screen.getByRole('button', { name: correctCountry.nameJa })
+    await user.click(button)
+    expect(screen.getByText(/2まいで わかった/)).toBeInTheDocument()
+    // 自動めくりが完了して16枚すべて開いた後も…
+    await waitFor(() => expect(getOpenPanelCount()).toBe(PANEL_COUNT), { timeout: 2000 })
+    // 得点・「〇まいで わかった！」の表示は増えず、自分で開いた2枚のままであること
+    expect(screen.getByText(/2まいで わかった/)).toBeInTheDocument()
+    expect(screen.getByText(/90てん/)).toBeInTheDocument()
+  })
+
+  test('回答直後に「つぎのもんだい」を押すと、前問の自動めくり timer が残らず、次の問題は1枚だけ開いた状態になる', async () => {
+    const user = userEvent.setup()
+    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await user.click(getChoiceButtons()[0])
+    const nextButton = screen.getByRole('button', { name: /つぎのもんだい|けっかを みる/ })
+    await user.click(nextButton)
+    expect(getOpenPanelCount()).toBe(1)
+    // 前問の stagger timer が cleanup されていれば、実時間で待っても burst は起きない
+    // （1問目の自動めくりが最大でもかかりうる時間より長く待つ）。
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+    })
+    expect(getOpenPanelCount()).toBe(1)
   })
 
   test('回答後は選択肢ボタンと「もう1まい めくる！」ボタンが disabled になる', async () => {
