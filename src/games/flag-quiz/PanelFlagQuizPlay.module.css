@@ -188,9 +188,11 @@
 }
 
 /*
- * position: relative と左右対称の padding は回答前後どちらでも常に適用する
- * （.choiceMark の絶対配置の基準にするためと、テキストの折返し位置を回答前後で
- * 一致させ、ボタンの高さが回答した瞬間に変わらないようにするため）。
+ * position: relative は回答前後どちらでも常に適用する（.choiceMark の絶対配置の基準にするため）。
+ * .choiceMark は通常フローから外れた絶対配置なので、左右 padding を広げてテキスト用の
+ * スペースを空ける必要はない（左右は BigButton 既定の var(--space-lg) のまま）。
+ * padding を変えると長い国名の折返し位置がベースラインからずれてしまうため、
+ * 左右はここでは触らない。
  */
 .choiceButton {
   position: relative;
@@ -203,7 +205,7 @@
      そちらが有効なままになる）。上下 padding を BigButton の既定（16px）より2pxずつ
      減らしているのは、この2px分のborderを足した合計がBigButton既定のボタン高さと
      ほぼ変わらないようにするため（枠線を足した分だけ国旗エリアが縮む事故を防ぐ）。 */
-  padding: 14px 40px;
+  padding: 14px var(--space-lg);
   border-width: 2px;
   border-style: solid;
   border-color: transparent;
@@ -220,10 +222,15 @@
  * 正誤の◯✕は通常のテキストフローに置かず、絶対配置の span にする。
  * こうすることで「記号が付くと国名が2行に折り返してボタンが高くなる」という事故が起きず、
  * 回答前後でボタンの高さが完全に一致する（原因Bの対策）。
+ * 絶対配置でテキストのフローには影響しないため、.choiceButton 側の左右 padding を
+ * 広げて記号ぶんのスペースを確保する必要はない（padding を広げると長い国名の折返し位置が
+ * ベースラインからずれてしまうため、左右は var(--space-lg) のまま触らない）。
+ * left はボタン枠のごく近く（2px）に寄せ、中央寄せの国名ラベルが最も左に寄る
+ * （＝長い国名でほぼ折返しギリギリまで文字が詰まる）ケースでも重ならないようにしている。
  */
 .choiceMark {
   position: absolute;
-  left: var(--space-md);
+  left: 2px;
   top: 50%;
   line-height: 0;
   transform: translateY(-50%);
