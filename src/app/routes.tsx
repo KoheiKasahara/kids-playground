@@ -15,6 +15,9 @@ import MathQuizPlay from '../games/math-quiz/MathQuizPlay'
 import MathQuizResult from '../games/math-quiz/MathQuizResult'
 import { MODE_PATH as MATH_QUIZ_MODE_PATH } from '../games/math-quiz/types'
 import type { MathQuizMode } from '../games/math-quiz/types'
+import PrefectureQuizStart from '../games/prefecture-quiz/PrefectureQuizStart'
+import PrefectureQuizPlay from '../games/prefecture-quiz/PrefectureQuizPlay'
+import PrefectureQuizResult from '../games/prefecture-quiz/PrefectureQuizResult'
 
 // さんすうクイズは4モード(add/sub/mul/div)ぶんの「むずかしさ選択・プレイ・結果」が
 // 完全に同型のため、直書きの繰り返しを避けて配列から組み立てる。
@@ -76,6 +79,9 @@ export const routes: RouteObject[] = [
     element: <WorkingVehicleQuizResult mode="nameToPhoto" />,
   },
   { path: '/games/math-quiz', element: <MathQuizStart /> },
+  { path: '/games/prefecture-quiz', element: <PrefectureQuizStart /> },
+  { path: '/games/prefecture-quiz/:mode/play', element: <PrefectureQuizPlay /> },
+  { path: '/games/prefecture-quiz/:mode/result', element: <PrefectureQuizResult /> },
   ...MATH_QUIZ_MODES.flatMap((mode) => [
     {
       path: `/games/math-quiz/${MATH_QUIZ_MODE_PATH[mode]}`,

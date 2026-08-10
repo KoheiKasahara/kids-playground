@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../app/App'
 
 describe('Home', () => {
-  test('ゲーム一覧に「こっきクイズ」「はたらくくるまクイズ」「さんすうクイズ」が表示される', () => {
+  test('ゲーム一覧に「こっきクイズ」「はたらくくるまクイズ」「さんすうクイズ」「都道府県クイズ」が表示される', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -15,6 +15,15 @@ describe('Home', () => {
     expect(screen.getByRole('button', { name: 'こっきクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'さんすうクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '都道府県クイズ' })).toBeInTheDocument()
+  })
+
+  test('「都道府県クイズ」を押すと開始画面に遷移する', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await user.click(screen.getByRole('button', { name: '都道府県クイズ' }))
+    expect(screen.getByRole('heading', { name: '都道府県クイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /かたちを みて/ })).toBeInTheDocument()
   })
 
   test('「こっきクイズ」を押すと国旗クイズの開始画面に遷移する', async () => {

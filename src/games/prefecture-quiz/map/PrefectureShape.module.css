@@ -1,0 +1,2 @@
+.shape { width: min(100%, 380px); height: min(34dvh, 240px); min-height: 130px; }
+.path { fill: #8bd3ff; stroke: #195b83; stroke-width: 1.5; vector-effect: non-scaling-stroke; }

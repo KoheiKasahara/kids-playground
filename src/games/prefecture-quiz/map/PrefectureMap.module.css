@@ -1,0 +1,12 @@
+.map { width: min(100%, 540px); height: min(48dvh, 400px); min-height: 220px; display: block; margin: 0 auto; }
+.map.compact { width: 112px; height: 64px; min-height: 64px; }
+.prefecture { fill: #d8effb; stroke: #276987; stroke-width: 1.2; vector-effect: non-scaling-stroke; cursor: pointer; outline: none; }
+.insetFrame { fill: #f7fbfd; stroke: #276987; stroke-width: 1.2; stroke-dasharray: 3 2; }
+.hitTarget { fill: rgba(255, 231, 138, .45); stroke: #5d4500; stroke-width: 1.2; cursor: pointer; outline: none; }
+.hitTarget:hover, .hitTarget:focus-visible { fill: #ffe78a; stroke-width: 2.5; }
+.hitTargetText { font-size: 16px; font-weight: 800; fill: #3a2b00; pointer-events: none; }
+.mapMarker { font-size: 13px; font-weight: 800; fill: #3a2b00; stroke: #fffdf7; stroke-width: 3px; paint-order: stroke; pointer-events: none; }
+.prefecture:hover, .prefecture:focus-visible { fill: #ffe78a; stroke: #5d4500; stroke-width: 2.5; }
+.correct { fill: #71cc82; stroke: #165e29; stroke-width: 2.5; }
+.wrong { fill: #ffaaa2; stroke: #a3261d; stroke-width: 2.5; }
+@media (max-width: 480px) { .map { min-height: 200px; height: min(43dvh, 320px); } }
