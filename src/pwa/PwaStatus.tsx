@@ -13,6 +13,45 @@ const OFFLINE_READY_KEY = 'pwa-offline-ready'
 // オフライン対応トーストを表示しておく時間（ミリ秒）。常駐させず自動で消す。
 const OFFLINE_TOAST_DURATION_MS = 5000
 
+// Service Worker の更新確認を行う間隔（ミリ秒）。長時間開きっぱなしのタブでも
+// 新しいバージョンに気づけるよう、1時間おきにバックグラウンドで確認する。
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000
+
+/**
+ * onRegisteredSW から渡される registration に対して、起動時・復帰時・定期の
+ * 3タイミングで registration.update() を仕込む。
+ *
+ * React 18 の StrictMode では開発時に副作用が二重実行されるため、
+ * onRegisteredSW 自体が複数回呼ばれる可能性がある。setInterval や
+ * addEventListener をそのまま登録すると多重登録になってしまうので、
+ * モジュールスコープのフラグで「登録済みの registration」を1つだけに絞り込み、
+ * 2回目以降の呼び出しでは何もしない（冪等にする）ことで対策する。
+ */
+let updateWatcherRegistration: ServiceWorkerRegistration | undefined
+
+function setupUpdateChecks(registration: ServiceWorkerRegistration | undefined) {
+  if (!registration) return
+  if (updateWatcherRegistration === registration) return
+  updateWatcherRegistration = registration
+
+  const checkForUpdate = () => {
+    void registration.update()
+  }
+
+  // 起動時（登録直後）に1回確認する。
+  checkForUpdate()
+
+  // タブがバックグラウンドから復帰したタイミングで確認する。
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkForUpdate()
+    }
+  })
+
+  // 長時間開きっぱなしでも気づけるよう、定期的に確認する。
+  setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL_MS)
+}
+
 function readOfflineReadyFlag(): boolean {
   try {
     return window.localStorage.getItem(OFFLINE_READY_KEY) === 'true'
@@ -43,7 +82,11 @@ export default function PwaStatus() {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh],
     updateServiceWorker,
-  } = useRegisterSW()
+  } = useRegisterSW({
+    onRegisteredSW(_swUrl, registration) {
+      setupUpdateChecks(registration)
+    },
+  })
 
   // localStorage の「過去にオフライン準備が完了したか」フラグは、初回マウント時に一度だけ読む。
   // offlineReady が今回のセッションで true になった場合は、これに OR して即座に反映する

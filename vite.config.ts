@@ -13,7 +13,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'autoUpdate' だと新しいSWが有効化された瞬間に自動で window.location.reload() が
+      // 走ってしまい、クイズの途中でも進行が消えてしまう。
+      // 'prompt' にして、更新は PwaStatus のトースト経由でユーザーが
+      // 「こうしんする」を押したときだけ反映されるようにする。
+      registerType: 'prompt',
       injectRegister: null,
       includeAssets: ['favicon.svg'],
       manifest: {
