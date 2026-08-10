@@ -1,7 +1,7 @@
 # セットアップ & デバッグ手順
 
 このリポジトリを手元で動かし、デバッグを始めるまでの手順をまとめた資料です。
-アプリの概要は [README.md](../README.md)、設計は [DESIGN.md](./DESIGN.md) を参照してください。
+アプリの概要は [README.md](../README.md)、設計は [DESIGN.md](./DESIGN.md) を参照してください。はたらくくるまクイズは [WORKING_VEHICLE_QUIZ_DESIGN.md](./WORKING_VEHICLE_QUIZ_DESIGN.md)、ミニゲーム追加規約は [MINIGAME_DEVELOPMENT_GUIDELINES.md](./MINIGAME_DEVELOPMENT_GUIDELINES.md) を参照してください。
 
 ---
 
@@ -79,6 +79,10 @@ Windows のファイアウォールでアクセスがブロックされる場合
 | こっきクイズ 開始 | `http://localhost:5173/#/games/flag-quiz` |
 | こっきクイズ プレイ | `http://localhost:5173/#/games/flag-quiz/play` |
 | こっきクイズ 結果 | `http://localhost:5173/#/games/flag-quiz/result` |
+| はたらくくるまクイズ 開始 | `http://localhost:5173/#/games/working-vehicle-quiz` |
+| 写真 → 名前 プレイ | `http://localhost:5173/#/games/working-vehicle-quiz/photo-to-name/easy/play` |
+| 名前 → 写真 プレイ | `http://localhost:5173/#/games/working-vehicle-quiz/name-to-photo/easy/play` |
+| はたらくくるまクイズ 結果 | `http://localhost:5173/#/games/working-vehicle-quiz/photo-to-name/easy/result` |
 
 > 結果画面は正解数を `location.state` で受け取る仕様です。
 > URL に直接アクセスすると state が無いため、開始画面へ自動的にリダイレクトされます（仕様どおりの挙動です）。
@@ -93,7 +97,7 @@ Windows のファイアウォールでアクセスがブロックされる場合
 
 - **Console** … `console.log` と実行時エラーの確認
 - **Elements** … CSS Modules 適用後のクラス名・スタイルの確認
-- **Network** … 国旗 SVG（`/flags/xx.svg`）が 200 で取得できているかの確認
+- **Network** … 国旗SVG（`/flags/xx.svg`）と車両写真（`/vehicles/<id>.webp`）が200で取得できているかの確認
 - **デバイスツールバー**（`Ctrl + Shift + M`）… 子ども向け UI の要である**スマホ縦画面の表示確認**。
   `iPhone SE (375×667)` や `Galaxy S8+ (360×740)` あたりで、
   - 国旗・選択肢・回答後の「つぎへ」バーが縦スクロールなしに収まるか
@@ -221,6 +225,7 @@ set GITHUB_PAGES=true && npm run build:pages && set GITHUB_PAGES=
 | --- | --- |
 | `npm install` が権限エラーで失敗する | `node_modules` が中途半端な状態で残っている。削除してから `npm install` を再実行 |
 | 国旗画像が表示されない（404） | `public/flags/` に 100 個の SVG があるか確認。`Country.flag` は `flags/xx.svg` のような **base 相対パス**（先頭スラッシュなし）である必要がある |
+| 車両写真が表示されない（404） | `public/vehicles/` に24個のWebPがあるか確認。`Vehicle.photo` は `vehicles/<id>.webp` のような **base 相対パス**で指定する |
 | GitHub Pages でアセットが 404 | `GITHUB_PAGES` 環境変数なしでビルドしている。CI の `build:pages` ステップの `env` 設定を確認 |
 | 結果画面を開くと開始画面に戻される | 仕様どおりの挙動（`location.state` が無いため）。プレイ画面から 10 問回答して到達してください |
 | 変更が画面に反映されない | Service Worker が古いキャッシュを返している可能性。DevTools → Application → Service Workers → **Unregister** 後にリロード（またはハードリロード `Ctrl + Shift + R`） |

@@ -24,6 +24,20 @@
   gap: var(--space-md);
 }
 
+@media (min-width: 560px) {
+  .list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card {
+    min-height: 132px;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
 .card {
   width: 100%;
   min-height: 96px;
@@ -41,6 +55,11 @@
 
 .card:active {
   transform: scale(0.97);
+}
+
+.card:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
 }
 
 .emoji {
