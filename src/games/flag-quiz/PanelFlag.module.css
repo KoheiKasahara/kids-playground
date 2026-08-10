@@ -21,6 +21,17 @@
 }
 
 /*
+ * スマホ縦（639px以下）のみ、結果パネルのコンパクト化（PanelFlagQuizPlay.module.css）で
+ * 浮いた余白ぶん国旗を大きく見せるため max-height を引き上げる。
+ * タブレット/PC・横画面は現状維持（280pxのまま）。
+ */
+@media (max-width: 639px) and (orientation: portrait) {
+  .frame {
+    max-height: 330px;
+  }
+}
+
+/*
  * 国旗画像は .frame いっぱいに敷き詰める（絶対配置 + inset: 0）。
  * パネルグリッドも同じ矩形に重なるため、パネルが開いた（消えた）ときに
  * ちょうど下の国旗の該当マスが見える。

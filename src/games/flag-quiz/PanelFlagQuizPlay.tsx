@@ -244,10 +244,8 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
     }
   }, [answered, state.index, openedPanels, isCorrect])
 
-  const pageClassName = [styles.page, answered ? styles.pageAnswered : ''].filter(Boolean).join(' ')
-
   return (
-    <div className={pageClassName}>
+    <div className={styles.page}>
       <div className={styles.header}>
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
           やめる
@@ -284,15 +282,21 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
           <div className={styles.choices}>
             {question.choices.map((choice) => {
               const variant = choiceVariant(choice, question.answer, state.selectedId)
+              // secondary（正解でも選んだ誤答でもない、回答後の「その他」の選択肢）だけ、
+              // 従来どおり枠線の色を見せる。枠線の太さ自体は styles.choiceButton 側で
+              // 全variant共通の2pxに揃えているため、ここで色を足しても高さには影響しない。
+              const choiceButtonClassName = [styles.choiceButton, variant === 'secondary' ? styles.choiceButtonUnselected : '']
+                .filter(Boolean)
+                .join(' ')
               return (
                 <BigButton
                   key={choice.id}
-                  className={styles.choiceButton}
+                  className={choiceButtonClassName}
                   variant={variant}
                   disabled={answered}
                   onClick={() => handleSelect(choice.id)}
                 >
-                  {answered ? choiceMark(variant) : ''}
+                  <span className={styles.choiceMark}>{answered ? choiceMark(variant) : ''}</span>
                   {choice.nameJa}
                 </BigButton>
               )
@@ -302,10 +306,13 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
       </div>
 
       {/*
-        正誤メッセージと「つぎのもんだい」は、既存の FlagQuizPlay と同じく通常フローから外して
-        画面下部に固定する。こうすることで画面の高さに関係なく操作ボタンが必ず可視・操作可能になる
-        （iPhone SE 相当の低背端末でも画面外に出ない）。
-        隠れ防止の余白は .pageAnswered の padding-bottom で確保している。
+        正誤メッセージと「つぎのもんだい」は通常フローから外し、画面下部に固定した
+        オーバーレイ（.feedbackBar）として下から迫り上がるように表示する（背景を暗くする
+        モーダルにはしない＝国旗やボタンは隠れるだけで、それ以外の画面は一切動かない）。
+        回答の前後で .page 側のレイアウト・padding は変えていない（=下の要素は動かない）。
+        下部余白の確保はビューポートの高さ・幅だけで決めており（PanelFlagQuizPlay.module.css）、
+        背の低いスマホ縦では余白を確保せず、パネルは選択肢ボタンの上にそのまま重なる
+        （回答後の選択肢は disabled のため操作上の問題はない）。
       */}
       {answered && (
         <div
