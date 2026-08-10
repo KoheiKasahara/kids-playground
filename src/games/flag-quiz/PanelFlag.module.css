@@ -43,33 +43,91 @@
 }
 
 /*
- * パネル1枚。国旗と同じく明るい配色を使い、縦横の目地が見えるよう
- * 薄い枠線を付ける（正誤とは無関係の装飾なので色数は絞る）。
- * 開く演出は opacity + わずかな scale/rotateY のみで、派手にしすぎない
- * （200〜300ms 程度の軽いトランジション）。
+ * 1マス分の「セル」。レイアウト（絶対配置の基準）だけを持ち、見た目（色・厚み・アニメーション）は
+ * 中の .lid に任せる。パネル自体はタップ操作を受け付けない演出要素なので、
+ * cursor や hover/active のような「押せる」ふうの見た目は付けない
+ * （めくる操作は「もう1まい めくる！」ボタンに一本化している）。
  */
-.panel {
+.cell {
+  position: relative;
+}
+
+/*
+ * パネルの「フタ」。国旗の市松配色（青/オレンジ）はそのまま維持しつつ、
+ * ごく軽いグラデーションと内側の影で「上に乗っているフタ」らしい厚みを付ける。
+ * border-radius は付けない（角から下の国旗がチラ見えしてしまうため）。
+ */
+.lid {
+  position: absolute;
+  inset: 0;
   background-color: var(--color-primary);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  opacity: 1;
-  transform: scale(1) rotateY(0deg);
+  background-image: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.26),
+    rgba(255, 255, 255, 0) 55%,
+    rgba(0, 0, 0, 0.1)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.16),
+    0 1px 2px rgba(0, 0, 0, 0.06);
   transform-origin: center;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  opacity: 1;
+  transform: perspective(320px) rotateY(0deg) scale(1);
 }
 
 /* 1マスおきに色を変え、市松模様にして「パネルをめくっている」感を出す */
-.panel:nth-child(even) {
+.cell:nth-child(even) .lid {
   background-color: var(--color-accent);
 }
 
 /*
- * 開いたパネルは透明にして下の国旗を見せる。回答判定には関わらない
- * 演出だけの変化なので、prefers-reduced-motion: reduce は
- * src/styles/global.css の共通ルールで transition 時間を強制的に短くする形で
- * 対応済み（このファイルでの個別対応は不要）。
+ * 「パカッ」とめくれるアニメーション本体。
+ * 0%〜20% で一瞬押し込まれ（押した実感）、20%〜70% はそのまま保持、
+ * 70%〜100% で奥へ回転しながら消えていく。perspective() は transform に内包しているので
+ * 親要素の perspective 指定に依存しない。
  */
-.panelOpen {
+@keyframes panelLidFlip {
+  0% {
+    transform: perspective(320px) rotateY(0deg) scale(1);
+    opacity: 1;
+  }
+  20% {
+    transform: perspective(320px) rotateY(0deg) scale(0.9);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(320px) rotateY(-92deg) scale(0.9);
+    opacity: 0;
+  }
+}
+
+/*
+ * 開いた状態。animation はクラスが「閉→開」に変わった瞬間だけ再生され、
+ * 同じ className のまま再レンダリングされても再生されない
+ * （animation-name が変わらない限りブラウザは再トリガーしない）。
+ * opacity / transform は最終フレームと同じ値を静的にも指定しておくことで、
+ * prefers-reduced-motion によって animation-duration がほぼ0にされた場合でも
+ * 確実に開いた状態（見えない/消えている状態）になる。
+ */
+.lidOpen {
+  animation: panelLidFlip 280ms ease forwards;
   opacity: 0;
-  transform: scale(0.82) rotateY(55deg);
+  transform: perspective(320px) rotateY(-92deg) scale(0.9);
   pointer-events: none;
+}
+
+/*
+ * 動きを抑えたい設定のユーザーには、めくるアニメーション自体を止める。
+ * src/styles/global.css の共通ルールで transition/animation の duration が
+ * 0.001ms に強制されるが、念のためこのファイルでも明示的に無効化しておく。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .lid {
+    animation: none;
+  }
 }
