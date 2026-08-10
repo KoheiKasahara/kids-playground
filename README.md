@@ -2,12 +2,13 @@
 
 子ども向けのミニゲーム集Webアプリです。スマートフォン・タブレット・PCのブラウザで遊べます。
 
-「こっきクイズ」と「はたらくくるまクイズ」を収録しています。どちらも1ゲーム10問の4択クイズで、写真・図案から名前を答えるモードと、名前から写真・図案を答えるモードがあります。かんたん／ふつう／むずかしいの3段階から選べます。
+「こっきクイズ」「はたらくくるまクイズ」「さんすうクイズ」を収録しています。こっきクイズとはたらくくるまクイズは1ゲーム10問の4択クイズで、写真・図案から名前を答えるモードと、名前から写真・図案を答えるモードがあります。さんすうクイズはたしざん／ひきざん／かけざん／わりざんの4モードから選び、写真ではなく計算式（例: `3 ＋ 4 = ?`）を出題して答えの数値を4択で選びます。いずれのゲームもかんたん／ふつう／むずかしいの3段階から選べます。
 
 - セットアップ・デバッグ手順の詳細は [docs/SETUP.md](docs/SETUP.md) を参照してください。
 - 設計の詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
 - ミニゲーム追加の規約は [docs/MINIGAME_DEVELOPMENT_GUIDELINES.md](docs/MINIGAME_DEVELOPMENT_GUIDELINES.md) を参照してください。
 - はたらくくるまクイズの詳細は [docs/WORKING_VEHICLE_QUIZ_DESIGN.md](docs/WORKING_VEHICLE_QUIZ_DESIGN.md) を参照してください。
+- さんすうクイズの詳細は [docs/MATH_QUIZ_DESIGN.md](docs/MATH_QUIZ_DESIGN.md) を参照してください。
 
 ## 技術構成
 
@@ -37,7 +38,7 @@ npm test          # 一度だけ実行 (vitest run)
 npm run test:watch  # ウォッチモードで実行 (vitest)
 ```
 
-共通問題生成、国旗・車両データと難易度、両ゲームの画面遷移・2モード・10問完了、ホームとルーティングの重要挙動を検証します。
+共通問題生成、国旗・車両データと難易度、さんすうの出題プールと誤答生成、各ゲームの画面遷移・モード・10問完了、ホームとルーティングの重要挙動を検証します。
 
 ## ビルド
 
@@ -101,7 +102,8 @@ src/
 │  │  ├─ questionGenerator.ts   # 共通問題生成への互換ラッパー
 │  │  ├─ types.ts
 │  │  └─ data/countries.ts # 国データ（100か国）
-│  └─ working-vehicle-quiz/ # はたらくくるまクイズ（24車両・2モード）
+│  ├─ working-vehicle-quiz/ # はたらくくるまクイズ（24車両・2モード）
+│  └─ math-quiz/        # さんすうクイズ（4演算×3むずかしさ、出題は計算式）
 ├─ components/         # ゲーム間で共通のUI部品 (BigButton, ProgressBar など)
 ├─ styles/             # グローバルCSS・デザイントークン
 └─ test/setup.ts        # Vitestのテストセットアップ
@@ -114,6 +116,7 @@ public/
 docs/
 ├─ DESIGN.md                         # 概要設計書
 ├─ WORKING_VEHICLE_QUIZ_DESIGN.md    # はたらくくるまクイズ基本設計
+├─ MATH_QUIZ_DESIGN.md               # さんすうクイズ基本設計
 ├─ MINIGAME_DEVELOPMENT_GUIDELINES.md # ミニゲーム開発規約
 ├─ SETUP.md                          # セットアップ・デバッグ手順
 └─ CREDITS.md                        # 素材のクレジット・ライセンス表記
@@ -132,4 +135,4 @@ docs/
 - お気に入り国旗
 - オフライン対応の強化
 - Playwrightを使ったE2Eテスト
-- その他のミニゲーム（かずクイズ、どうぶつクイズ、ひらがなゲーム、神経衰弱など）
+- その他のミニゲーム（どうぶつクイズ、ひらがなゲーム、神経衰弱など）

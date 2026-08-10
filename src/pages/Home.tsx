@@ -16,6 +16,7 @@ const games: GameCard[] = [
     emoji: '🚒',
     path: '/games/working-vehicle-quiz',
   },
+  { id: 'math-quiz', title: 'さんすうクイズ', emoji: '🔢', path: '/games/math-quiz' },
 ]
 
 export default function Home() {
