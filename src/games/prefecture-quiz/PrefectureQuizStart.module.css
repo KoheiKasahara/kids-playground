@@ -1,0 +1,6 @@
+.page { min-height: 100dvh; max-width: var(--content-max-width); margin: 0 auto; padding: calc(var(--space-lg) + var(--safe-top)) calc(var(--space-lg) + var(--safe-right)) calc(var(--space-lg) + var(--safe-bottom)) calc(var(--space-lg) + var(--safe-left)); display: flex; flex-direction: column; justify-content: center; gap: var(--space-lg); text-align: center; }
+.title { font-size: var(--font-size-xlarge); color: var(--color-primary-dark); }
+.description { font-size: 20px; line-height: 1.6; }
+.actions { display: flex; flex-direction: column; gap: var(--space-md); }
+@media (max-height: 600px) { .page { gap: var(--space-sm); } .title { font-size: 32px; } .actions { gap: var(--space-sm); } }
+@media (orientation: landscape) and (max-height: 560px) { .page { padding-top: calc(var(--space-sm) + var(--safe-top)); padding-bottom: calc(var(--space-sm) + var(--safe-bottom)); gap: var(--space-sm); } .title { font-size: 28px; } .description { font-size: 16px; } .actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; } .actions button { min-height: 48px; padding: 8px; font-size: 17px; } }

@@ -15,6 +15,8 @@ type QuizResultOverlayProps = {
   media?: ReactNode
   /** 「つぎのもんだい」ボタンの文言。既定は「つぎのもんだい」 */
   nextLabel?: string
+  /** 不正解時の見出し。既定の文言は既存クイズとの互換性のため維持する。 */
+  wrongLabel?: string
   onNext: () => void
 }
 
@@ -31,6 +33,7 @@ export default function QuizResultOverlay({
   detail,
   media,
   nextLabel = 'つぎのもんだい',
+  wrongLabel = 'ざんねん！',
   onNext,
 }: QuizResultOverlayProps) {
   const isCorrect = result === 'correct'
@@ -50,7 +53,7 @@ export default function QuizResultOverlay({
                 : `${styles.resultText} ${styles.wrongText}`
             }
           >
-            {isCorrect ? '🎉 せいかい！' : 'ざんねん！'}
+            {isCorrect ? '🎉 せいかい！' : wrongLabel}
           </p>
           {answer !== undefined && <p className={styles.answerText}>こたえ: {answer}</p>}
           {detail !== undefined && <p className={styles.detailText}>{detail}</p>}

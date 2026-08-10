@@ -1,5 +1,20 @@
 # クレジット / ライセンス表記
 
+## 都道府県地図 (src/games/prefecture-quiz/data/prefectures.json)
+
+都道府県境界は、[smartnews-smri/japan-topography](https://github.com/smartnews-smri/japan-topography) の
+`data/municipality/geojson/s0001/prefectures.json` を、コミット
+[`b676ea056ac50c271cc7d17f61cc2f1def1279c6`](https://github.com/smartnews-smri/japan-topography/tree/b676ea056ac50c271cc7d17f61cc2f1def1279c6)
+から取得して同梱しています。外部通信には使用しません。
+
+- 原典: [「国土数値情報（行政区域データ）」2021年版（国土交通省）](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2021.html)（SmartNews Media Research Instituteによる取得日: 2021年9月28日）
+- 加工・配布: SmartNews Media Research Institute / smartnews-smri
+- 本アプリでの加工: GeoJSONを静的バンドルし、SVGパスとして投影して表示。県の境界・属性は変更していません。
+
+出典表記: 上記URLの「国土数値情報（行政区域データ）」（国土交通省）を加工して SmartNews Media Research Institute が公開した都道府県GeoJSONをもとに、kids-playground向けにWeb Mercator投影・SVG表示加工。
+
+国土数値情報の利用条件に従い、出典を表記しています。詳細は元リポジトリおよび国土数値情報の利用規約を参照してください。
+
 ## 国旗画像 (public/flags/*.svg)
 
 このアプリの国旗画像は [flag-icons](https://github.com/lipis/flag-icons)
