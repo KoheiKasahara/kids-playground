@@ -69,6 +69,17 @@ describe('quizSound', () => {
     expect(instances[0].createOscillator).toHaveBeenCalledTimes(2)
   })
 
+  test('playColorMixSound は短い混ざる音を2音鳴らす', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playColorMixSound } = await import('./quizSound')
+
+    playColorMixSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(2)
+  })
+
   test('AudioContext 非対応環境では例外を投げず何もしない', async () => {
     ;(window as unknown as { AudioContext?: unknown }).AudioContext = undefined
     vi.resetModules()

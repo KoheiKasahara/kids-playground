@@ -96,6 +96,19 @@ export function playIncorrectSound(): void {
 }
 
 /**
+ * 2色の絵の具が寄って混ざる短い「ぽこっ」という音。
+ * 成功チャイムとは時間をずらして ColorMixQuizPlay 側で鳴らすため、二つの演出が重ならない。
+ */
+export function playColorMixSound(): void {
+  if (!soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 430, now, 0.14, 0.1, 'triangle')
+  playTone(ctx, 610, now + 0.07, 0.11, 0.08, 'sine')
+}
+
+/**
  * パネルを1枚めくったときの「ポン♪」音。
  * びっくりさせない柔らかい音にするため、低音は避けて 600Hz〜1kHz 帯の一音だけを
  * 短く（130ms）鳴らす。正解音より控えめな音量にしてある。
