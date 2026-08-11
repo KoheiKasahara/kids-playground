@@ -53,7 +53,41 @@
  * 数字パッドに被る場合がある。この画面だけ2行分を見込んだ余白に広げる。
  */
 @media (max-width: 480px) and (max-height: 620px) { .page:has(.mapAnswer) { --feedback: 150px; } }
-/* 横向き低画面: なまえ→ちずは問題文を上段、地図とパッドを下段の2カラムに配置して1画面へ収める */
-@media (orientation: landscape) and (max-height: 560px) { .page { --feedback: 54px; padding-top: calc(3px + var(--safe-top)); gap: 3px; } .header { min-height: 30px; }.progress p { margin: 0; font-size: 14px; } .body { display: grid; grid-template-columns: minmax(160px, .8fr) 1fr; grid-template-rows: auto 1fr; gap: 4px 10px; align-items: center; }.body > svg:first-child { grid-row: 1 / span 2; width: 100%; height: min(58dvh, 170px); min-height: 100px; }.body > .question { width: 100%; font-size: 19px; }.shapeChoices, .nameChoices { grid-column: 2; max-height: 170px; }.shapeChoices { gap: 5px; }.shapeChoices svg { min-height: 50px; height: 68px; }.nameChoices { grid-template-columns: repeat(2, 1fr); gap: 5px; }.choice { min-height: 44px; font-size: 17px; padding: 6px; }.body > .question:has(+ .mapAnswer) { grid-row: 1; grid-column: 1 / span 2; }.body > .question + .mapAnswer { grid-row: 2; grid-column: 1 / span 2; display: grid; grid-template-columns: minmax(140px, .9fr) 1fr; gap: 4px 10px; align-items: center; }
-/* 横向きは.mapAnswer自体がgrid化されるため、縦方向flex伸縮は無効化し、既存の固定高さクランプに戻す。 */
-.mapAnswer > svg[data-prefecture-map] { flex: initial; height: min(56dvh, 165px); max-height: none; min-height: 120px; width: 100%; }.numberPad { width: 100%; max-width: none; margin: 0; }.mapHint { display: none; } }
+/*
+ * 横向き低画面: ヘッダー・進捗まわりのクロームだけを詰めて、詰めた分を
+ * コンテンツ（下のorientation:landscapeブロック）に回す。グリッド構造や
+ * カード寸法はここでは触らない（高さ非依存でclamp()により連続的に決まる）。
+ */
+@media (orientation: landscape) and (max-height: 650px) { .page { padding-top: calc(3px + var(--safe-top)); gap: 3px; } .header { min-height: 30px; }.progress p { margin: 0; font-size: 14px; } }
+/* QuizResultOverlayの横向き専用レイアウト（低い縦画面で1行化）はそのファイル側で高さ560px以下に固定されているため、下部予約もそれに合わせて560px以下だけ縮める。 */
+@media (orientation: landscape) and (max-height: 560px) { .page { --feedback: 54px; } }
+/*
+ * 横向き全般（スマホ横向き〜タブレット横向き）: 問題文と選択肢を左右2カラムに
+ * 配置し、幅・高さの余裕に応じてclamp()/dvhでカード等の寸法を連続的に拡大する。
+ * 固定ブレークポイントを高さごとに何段も用意する代わりに、1本のグリッドで
+ * スマホの横向き（低背）からタブレットの横向き（高背）まで自然にカバーする。
+ *
+ * grid-template-rows を「auto 1fr」ではなく「auto auto」にし、align-content: center
+ * を付けているのが要点。1frの行にすると余った縦スペースが最後の行だけに
+ * （多くの場合コンテンツ下部だけに）溜まり、「横画面なのに中身が上に寄って
+ * 下が大きく空く」問題が起きる。行をどちらもcontent-sizedにしておき、
+ * align-content: center で「コンテンツのかたまり」ごと.bodyの縦中央へ寄せることで、
+ * 余白は上下へ均等に配分される。
+ */
+@media (orientation: landscape) {
+  .page { max-width: min(92vw, 1100px); }
+  .body { display: grid; grid-template-columns: minmax(160px, 38%) minmax(0, 1fr); grid-template-rows: auto auto; align-items: center; align-content: center; gap: clamp(4px, 1dvh, 16px) clamp(18px, 4.5vw, 56px); }
+  .body > svg:first-child { grid-row: 1 / span 2; width: 100%; height: clamp(170px, 60dvh, 420px); }
+  .body > .question { width: 100%; font-size: clamp(20px, 3.4dvh, 34px); }
+  .shapeChoices, .nameChoices { grid-column: 2; max-height: clamp(170px, 60dvh, 460px); }
+  .shapeChoices { gap: clamp(5px, 1.4dvh, 20px); }
+  .shapeChoices svg { min-height: 0; height: clamp(56px, 20dvh, 190px); }
+  .nameChoices { grid-template-columns: repeat(2, 1fr); gap: clamp(5px, 1.4dvh, 20px); }
+  .choice { min-height: clamp(44px, 13dvh, 92px); font-size: clamp(17px, 2.4dvh, 26px); padding: clamp(6px, 1.2dvh, 14px); }
+  .body > .question:has(+ .mapAnswer) { grid-row: 1; grid-column: 1 / span 2; }
+  .body > .question + .mapAnswer { grid-row: 2; grid-column: 1 / span 2; display: grid; grid-template-columns: minmax(140px, 40%) minmax(0, 1fr); gap: clamp(4px, 1dvh, 16px) clamp(18px, 4.5vw, 48px); align-items: center; }
+  /* 横向きは.mapAnswer自体がgrid化されるため、縦方向flex伸縮は無効化し、高さはclamp()で直接決める。 */
+  .mapAnswer > svg[data-prefecture-map] { flex: initial; height: clamp(140px, 56dvh, 460px); max-height: none; min-height: 0; width: 100%; }
+  .numberPad { width: 100%; max-width: none; margin: 0; }
+  .mapHint { display: none; }
+}
