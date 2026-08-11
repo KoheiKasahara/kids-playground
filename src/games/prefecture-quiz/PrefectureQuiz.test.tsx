@@ -8,6 +8,7 @@ import { numberedPrefecturesForRegion, prefecturesForRegion, prefectureNumberInR
 import PrefectureMap from './map/PrefectureMap'
 import mapStyles from './map/PrefectureMap.module.css'
 import PrefectureNumberPad from './PrefectureNumberPad'
+import padStyles from './PrefectureNumberPad.module.css'
 
 /** 見出し「「◯◯」は どこ？」からその問題の正解県を読み取る。 */
 function currentAnswerPrefecture() {
@@ -162,6 +163,21 @@ describe('Prefecture quiz screens', () => {
     const places = within(map).getAllByRole('button')
     await user.click(places[0])
     expect(screen.getByRole('status')).toHaveTextContent(/(🎉 せいかい！|おしい！)/)
+  })
+
+  test('nameToMapは地図で正解を選ぶと、対応する数字ボタンも正解状態になる', async () => {
+    const user = userEvent.setup()
+    const { answer } = renderNameToMapWithAlternatives()
+    const number = prefectureNumberInRegion(answer)
+    const map = screen.getByRole('group', { name: '都道府県をえらぶ ちず' })
+    // 地図上の正解県pathを直接クリックする（地図タップ経路）。
+    await user.click(within(map).getByRole('button', { name: `${number}ばんめ の ばしょを えらぶ` }))
+    expect(screen.getByRole('status')).toHaveTextContent('🎉 せいかい！')
+    // 対応する数字ボタンが正解表示（◯ + correctクラス）になる。
+    const pad = screen.getByRole('group', { name: 'ばんごうで こたえる' })
+    const padButton = within(pad).getByRole('button', { name: `${number}ばん ${answer.nameHiragana}` })
+    expect(padButton).toHaveClass(padStyles.correct)
+    expect(padButton).toHaveTextContent('◯')
   })
 
   test('nameToMapは地図と数字ボタンが同じ回答処理を使い、回答後は両方ロックされる', async () => {

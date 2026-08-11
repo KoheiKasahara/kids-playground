@@ -18,6 +18,16 @@ const OKINAWA_INSET_WIDTH = 102
 const OKINAWA_INSET_HEIGHT = 56
 const OKINAWA_INSET_CENTER: Position = [OKINAWA_INSET_X + OKINAWA_INSET_WIDTH / 2, OKINAWA_INSET_Y + OKINAWA_INSET_HEIGHT / 2]
 
+/**
+ * 地方主図のfit高さ。viewBoxは常に360×280だが、沖縄専用inset（REGION_INSET_IDS、
+ * 現状は九州・沖縄のみ）がある地方だけは、insetの枠(y=OKINAWA_INSET_Y〜272)と
+ * 重ならないよう主図の高さを抑える。それ以外の地方はinsetが無い＝下部に何も
+ * 置かないため、viewBoxの全高をそのまま主図に使う（以前あった補助タップ枠
+ * レール用の余白は、その仕組みの廃止に伴い不要になった）。
+ */
+export const REGION_MAP_HEIGHT_WITH_INSET = OKINAWA_INSET_Y + 2 // insetの枠の少し上まで（216+2=218）
+export const REGION_MAP_HEIGHT_FULL = 280 // viewBoxの全高
+
 type PrefectureMapProps = {
   answer?: Prefecture
   items?: readonly Prefecture[]
@@ -64,7 +74,9 @@ export default function PrefectureMap({ answer, items = prefectures, selectedId,
   // 東京都・鹿児島県の main piece は伊豆諸島など近い離島を含むため、合計bboxでfitすると
   // 離島の緯度幅に引っ張られて本土側の各県が小さくなる。fit範囲は本土（最大polygon）基準にする。
   const localBounds = mergeBounds(mainItems.map((prefecture) => primaryProjectedBounds(displayPiecesForPrefecture(prefecture).main)))
-  const localProject = items.length === prefectures.length ? project : createProjection(localBounds, 360, 218, 14)
+  const hasDedicatedInset = insetIds.length > 0
+  const regionMapHeight = hasDedicatedInset ? REGION_MAP_HEIGHT_WITH_INSET : REGION_MAP_HEIGHT_FULL
+  const localProject = items.length === prefectures.length ? project : createProjection(localBounds, 360, regionMapHeight, 14)
   const selectable = Boolean(onSelect)
   const interactive = Boolean(onSelect) && !disabled
   const labelPositions = numbered ? labelPositionsFor(mainItems, localProject) : undefined
