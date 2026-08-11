@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { prefectures } from '../data/prefectures'
 import type { RegionId } from '../data/prefectures'
 import { prefecturesForRegion, REGION_INSET_IDS } from '../data/regions'
-import { createProjection, mergeBounds, projectedBoundsForGeometry } from './geometry'
+import { createProjection, mergeBounds, primaryProjectedBounds } from './geometry'
 import { displayPiecesForPrefecture } from './features'
 import { labelPositionsFor } from './labelPlacement'
 
@@ -12,7 +12,8 @@ const REGIONS: readonly RegionId[] = ['hokkaido', 'tohoku', 'kanto', 'chubu', 'k
 function projectForRegion(region: RegionId) {
   const insetIds = REGION_INSET_IDS[region] ?? []
   const mainItems = prefecturesForRegion(region).filter((prefecture) => !insetIds.includes(prefecture.id))
-  const bounds = mergeBounds(mainItems.map((prefecture) => projectedBoundsForGeometry(displayPiecesForPrefecture(prefecture).main)))
+  // PrefectureMap.tsxのlocalBoundsと同じく、離島に引っ張られないよう本土（最大polygon）基準でfitする。
+  const bounds = mergeBounds(mainItems.map((prefecture) => primaryProjectedBounds(displayPiecesForPrefecture(prefecture).main)))
   return { mainItems, project: createProjection(bounds, 360, 218, 14) }
 }
 

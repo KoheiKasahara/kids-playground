@@ -1,7 +1,7 @@
 import { Fragment, type KeyboardEvent } from 'react'
 import type { Prefecture, RegionId } from '../data/prefectures'
 import { prefectures } from '../data/prefectures'
-import { createProjection, mergeBounds, pathForGeometry, projectedBoundsForGeometry } from './geometry'
+import { createProjection, mergeBounds, pathForGeometry, primaryProjectedBounds, projectedBoundsForGeometry } from './geometry'
 import type { Position } from './geometry'
 import { displayPiecesForPrefecture, featureForPrefecture } from './features'
 import { REGION_INSET_IDS, prefectureNumberInRegion } from '../data/regions'
@@ -61,7 +61,9 @@ export default function PrefectureMap({ answer, items = prefectures, selectedId,
   const region = items.length > 0 && items.every((prefecture) => prefecture.region === items[0].region) ? items[0].region : undefined
   const insetIds = region ? REGION_INSET_IDS[region] ?? [] : []
   const mainItems = items.filter((prefecture) => !insetIds.includes(prefecture.id))
-  const localBounds = mergeBounds(mainItems.map((prefecture) => projectedBoundsForGeometry(displayPiecesForPrefecture(prefecture).main)))
+  // 東京都・鹿児島県の main piece は伊豆諸島など近い離島を含むため、合計bboxでfitすると
+  // 離島の緯度幅に引っ張られて本土側の各県が小さくなる。fit範囲は本土（最大polygon）基準にする。
+  const localBounds = mergeBounds(mainItems.map((prefecture) => primaryProjectedBounds(displayPiecesForPrefecture(prefecture).main)))
   const localProject = items.length === prefectures.length ? project : createProjection(localBounds, 360, 218, 14)
   const selectable = Boolean(onSelect)
   const interactive = Boolean(onSelect) && !disabled

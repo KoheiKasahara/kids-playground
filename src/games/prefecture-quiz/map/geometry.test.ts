@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { prefectures } from '../data/prefectures'
-import { boundsForGeometry, mergeBounds, pathForGeometry, projectedBoundsForGeometry, splitPolygons } from './geometry'
+import { boundsForGeometry, mergeBounds, pathForGeometry, primaryProjectedBounds, projectedBoundsForGeometry, splitPolygons } from './geometry'
 import { displayPiecesForPrefecture, featureForPrefecture, polygonCount } from './features'
 import { REGION_INSET_IDS, prefecturesForRegion } from '../data/regions'
 
@@ -36,6 +36,21 @@ describe('prefecture map geometry', () => {
     if (!okinawa) throw new Error('沖縄県がありません')
     expect(projectedBoundsForGeometry(displayPiecesForPrefecture(okinawa).main).minY).toBeLessThan(bounds.minY)
     expect(displayPiecesForPrefecture(okinawa).insets).not.toHaveLength(0)
+  })
+
+  test('primaryProjectedBoundsは東京都の伊豆諸島など近い離島に引っ張られず本土だけのboundsを返す', () => {
+    const tokyo = prefectures.find((prefecture) => prefecture.id === '13')
+    if (!tokyo) throw new Error('東京都がありません')
+    const main = displayPiecesForPrefecture(tokyo).main
+    const fullBounds = projectedBoundsForGeometry(main)
+    const primaryBounds = primaryProjectedBounds(main)
+    // 本土＋伊豆諸島の合計bboxより、本土だけのbboxのほうが緯度方向に狭い。
+    const fullHeight = fullBounds.maxY - fullBounds.minY
+    const primaryHeight = primaryBounds.maxY - primaryBounds.minY
+    expect(primaryHeight).toBeLessThan(fullHeight)
+    // 単一polygonのgeometryでは分割しても同じboundsになる。
+    const single = { type: 'Polygon' as const, coordinates: [[[139, 35], [140, 35], [140, 36], [139, 35]]] }
+    expect(primaryProjectedBounds(single)).toEqual(projectedBoundsForGeometry(single))
   })
 
   test('splitPolygonsはPolygonをそのまま1件、MultiPolygonを要素ごとのPolygonへ分割する', () => {

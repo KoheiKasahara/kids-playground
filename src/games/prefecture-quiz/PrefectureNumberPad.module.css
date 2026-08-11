@@ -11,8 +11,17 @@
 
 .mark { position: absolute; right: 4px; top: 1px; font-size: 15px; font-weight: 800; }
 
-@media (max-width: 480px) and (max-height: 620px) {
+/*
+ * 高さに余裕がない縦画面全般（「普通の縦持ちスマホ」も含む）では、列数を
+ * tight化して行数を抑える。タップ領域は既定の64pxのまま変えない
+ * （SE相当・横向き低画面ではこの下でさらに絞る）。
+ */
+@media (max-height: 820px) {
   .pad { grid-template-columns: repeat(var(--pad-columns-tight), minmax(0, 1fr)); gap: 6px; }
+}
+
+@media (max-width: 480px) and (max-height: 620px) {
+  .pad { gap: 6px; }
   .button { min-height: 56px; font-size: 21px; }
 }
 
