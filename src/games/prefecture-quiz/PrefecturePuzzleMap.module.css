@@ -1,0 +1,12 @@
+.map { display: block; width: 100%; height: min(48dvh, 430px); min-height: 250px; touch-action: none; }
+.prefecture { fill: #d8effb; stroke: #276987; stroke-width: 1.4; vector-effect: non-scaling-stroke; cursor: pointer; outline: none; transition: fill .14s ease, stroke-width .14s ease; }
+.insetFrame { fill: #f7fbfd; stroke: #276987; stroke-width: 1.2; stroke-dasharray: 3 2; }
+.insetHit { fill: transparent; stroke: #276987; stroke-width: 1.2; cursor: pointer; outline: none; }
+.prefecture:hover, .prefecture:focus-visible, .ready { fill: #fff0aa; stroke: #8a6710; stroke-width: 2.5; }
+.label rect { fill: #fffdf7; stroke: #276987; stroke-width: 1; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .16)); }
+.label text { fill: #173b4c; font-size: 9px; font-weight: 800; }
+.correct { fill: #a9e7ae; stroke: #27723a; stroke-width: 2.8; animation: sparkle .55s ease-out; }
+.wrong { fill: #ffe1aa; stroke: #c77421; stroke-width: 2.8; animation: nudge .38s ease-in-out; }
+@keyframes sparkle { 50% { filter: brightness(1.15); stroke-width: 4; } }
+@keyframes nudge { 25%, 75% { transform: translateX(2px); } 50% { transform: translateX(-2px); } }
+@media (max-width: 480px) { .map { min-height: 220px; height: min(43dvh, 350px); } }

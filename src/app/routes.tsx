@@ -18,6 +18,8 @@ import type { MathQuizMode } from '../games/math-quiz/types'
 import PrefectureQuizStart from '../games/prefecture-quiz/PrefectureQuizStart'
 import PrefectureQuizPlay from '../games/prefecture-quiz/PrefectureQuizPlay'
 import PrefectureQuizResult from '../games/prefecture-quiz/PrefectureQuizResult'
+import PrefecturePuzzleStart from '../games/prefecture-quiz/PrefecturePuzzleStart'
+import PrefecturePuzzlePlay from '../games/prefecture-quiz/PrefecturePuzzlePlay'
 
 // さんすうクイズは4モード(add/sub/mul/div)ぶんの「むずかしさ選択・プレイ・結果」が
 // 完全に同型のため、直書きの繰り返しを避けて配列から組み立てる。
@@ -80,6 +82,8 @@ export const routes: RouteObject[] = [
   },
   { path: '/games/math-quiz', element: <MathQuizStart /> },
   { path: '/games/prefecture-quiz', element: <PrefectureQuizStart /> },
+  { path: '/games/prefecture-quiz/puzzle', element: <PrefecturePuzzleStart /> },
+  { path: '/games/prefecture-quiz/puzzle/:region/play', element: <PrefecturePuzzlePlay /> },
   { path: '/games/prefecture-quiz/:mode/play', element: <PrefectureQuizPlay /> },
   { path: '/games/prefecture-quiz/:mode/result', element: <PrefectureQuizResult /> },
   ...MATH_QUIZ_MODES.flatMap((mode) => [
