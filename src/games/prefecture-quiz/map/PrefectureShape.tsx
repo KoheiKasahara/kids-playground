@@ -5,7 +5,7 @@ import styles from './PrefectureShape.module.css'
 
 type PrefectureShapeProps = { prefecture: Prefecture; label?: string; className?: string; revealed?: boolean }
 
-/** 県を一つだけ大きく表示する。離島を含む元データをそのまま path にしている。 */
+/** 県を一つだけ大きく表示する。遠隔離島は表示用geometryから除外済み。 */
 export default function PrefectureShape({ prefecture, label, className, revealed = false }: PrefectureShapeProps) {
   const pieces = displayPiecesForPrefecture(prefecture)
   const path = pathForGeometry(pieces.main, createProjection(projectedBoundsForGeometry(pieces.main), 240, 170, 14))

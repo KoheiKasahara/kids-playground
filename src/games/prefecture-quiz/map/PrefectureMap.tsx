@@ -3,7 +3,7 @@ import type { Prefecture, RegionId } from '../data/prefectures'
 import { prefectures } from '../data/prefectures'
 import { createProjection, mergeBounds, pathForGeometry, primaryProjectedBounds, projectedBoundsForGeometry } from './geometry'
 import type { Position } from './geometry'
-import { displayPiecesForPrefecture, featureForPrefecture } from './features'
+import { displayPiecesForPrefecture } from './features'
 import { REGION_INSET_IDS, prefectureNumberInRegion } from '../data/regions'
 import { labelPositionsFor } from './labelPlacement'
 import styles from './PrefectureMap.module.css'
@@ -71,8 +71,7 @@ export default function PrefectureMap({ answer, items = prefectures, selectedId,
   const region = items.length > 0 && items.every((prefecture) => prefecture.region === items[0].region) ? items[0].region : undefined
   const insetIds = region ? REGION_INSET_IDS[region] ?? [] : []
   const mainItems = items.filter((prefecture) => !insetIds.includes(prefecture.id))
-  // 東京都・鹿児島県の main piece は伊豆諸島など近い離島を含むため、合計bboxでfitすると
-  // 離島の緯度幅に引っ張られて本土側の各県が小さくなる。fit範囲は本土（最大polygon）基準にする。
+  // 各県の表示用geometryは、画像を小さくする遠隔離島を除外済み。主図は最大polygon基準でfitする。
   const localBounds = mergeBounds(mainItems.map((prefecture) => primaryProjectedBounds(displayPiecesForPrefecture(prefecture).main)))
   const hasDedicatedInset = insetIds.length > 0
   const regionMapHeight = hasDedicatedInset ? REGION_MAP_HEIGHT_WITH_INSET : REGION_MAP_HEIGHT_FULL
@@ -114,7 +113,7 @@ export default function PrefectureMap({ answer, items = prefectures, selectedId,
         const isAnswer = answer?.id === prefecture.id
         const isSelected = selectedId === prefecture.id
         const classes = [styles.prefecture, isAnswer && selectedId ? styles.correct : '', isSelected && !isAnswer ? styles.wrong : ''].filter(Boolean).join(' ')
-        const geometry = featureForPrefecture(prefecture).geometry
+        const geometry = displayPiecesForPrefecture(prefecture).main
         const number = numberInItems(prefecture, items, region)
         return <Fragment key={`${prefecture.id}-dedicated-inset`}>
           <rect x={OKINAWA_INSET_X} y={OKINAWA_INSET_Y} width={OKINAWA_INSET_WIDTH} height={OKINAWA_INSET_HEIGHT} rx="5" className={styles.insetFrame} aria-hidden="true" />

@@ -132,16 +132,42 @@ export function primaryProjectedBounds(geometry: Geometry): Bounds {
 }
 
 /**
- * 離島が極端に離れている県は、全国図・単県図で本土部分を読める大きさに保つために
- * polygon 単位で切り出す。元の GeoJSON は変更せず、表示にだけ適用する。
+ * 主島を基準に、画像の表示倍率を大きく下げる離島だけを除外する。
+ *
+ * 県の形として十分近い島や、主島のbbox内に収まる佐渡島のような島は残す。一方で、
+ * 小さな離島のために県全体の画像が縮小される場合は描画対象から外す。元のGeoJSONは
+ * 変更せず、表示用geometryにだけ適用する。
  */
-export function cropGeometry(geometry: Geometry, keep: (bounds: Bounds) => boolean): Geometry {
+export function trimDisplayIslands(geometry: Geometry, minimumScaleRatio = 0.92): Geometry {
   const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
   if (!Array.isArray(polygons)) return geometry
-  const kept = polygons.filter((polygon) => {
-    const bounds = boundsForGeometry({ type: 'Polygon', coordinates: polygon })
-    return keep(bounds)
-  })
-  if (kept.length === 0) return geometry
-  return { type: 'MultiPolygon', coordinates: kept }
+  if (polygons.length <= 1) return geometry
+
+  const pieces = polygons.map((coordinates, index) => {
+    const polygon: Geometry = { type: 'Polygon', coordinates }
+    const bounds = projectedBoundsForGeometry(polygon)
+    return { index, coordinates, bounds, area: (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) }
+  }).sort((a, b) => b.area - a.area)
+
+  const main = pieces[0]
+  const scaleForBounds = (bounds: Bounds) => {
+    const width = Math.max(bounds.maxX - bounds.minX, 0.01)
+    const height = Math.max(bounds.maxY - bounds.minY, 0.01)
+    // PrefectureShapeの描画領域（240×170、padding 14）と同じ縦横比で判定する。
+    return Math.min(212 / width, 142 / height)
+  }
+
+  const mainScale = scaleForBounds(main.bounds)
+  let keptBounds = main.bounds
+  const keptIndexes = new Set([main.index])
+
+  for (const piece of pieces.slice(1)) {
+    const nextBounds = mergeBounds([keptBounds, piece.bounds])
+    if (scaleForBounds(nextBounds) / mainScale >= minimumScaleRatio) {
+      keptBounds = nextBounds
+      keptIndexes.add(piece.index)
+    }
+  }
+
+  return { type: 'MultiPolygon', coordinates: polygons.filter((_, index) => keptIndexes.has(index)) }
 }
