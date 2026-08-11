@@ -71,7 +71,7 @@ describe('Prefecture quiz screens', () => {
     expect(screen.getByRole('button', { name: '1ばんめ の かたち' })).not.toBeDisabled()
   })
 
-  test('名前→地図は地方だけを表示し、Enterで選び、回答後に全国locatorを出す', async () => {
+  test('名前→地図は地方だけを表示し、Enterで選び、回答後に答えを出す', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/name-to-map/play']}><App /></MemoryRouter>)
     const map = screen.getByRole('group', { name: '都道府県をえらぶ ちず' })
@@ -81,7 +81,8 @@ describe('Prefecture quiz screens', () => {
     expect(places[0]).toHaveAccessibleName('1ばんめ の ばしょを えらぶ')
     places[0].focus()
     await user.keyboard('{Enter}')
-    expect(screen.getByRole('status')).toHaveTextContent('にほんでは このへん！')
+    expect(screen.getByRole('status')).toHaveTextContent('こたえ:')
+    expect(screen.getByRole('status')).not.toHaveTextContent('にほんでは このへん！')
   })
 
   test('沖縄を含む九州・沖縄地方では沖縄の専用insetもキーボードで選べる', async () => {
