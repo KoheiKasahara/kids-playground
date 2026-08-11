@@ -5,8 +5,9 @@ import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
 import { playCorrectSound } from '../../utils/quizSound'
 import { prefectures } from './data/prefectures'
-import { prefecturesForRegion, REGION_LABEL } from './data/regions'
+import { numberedPrefecturesForRegion, prefecturesForRegion, REGION_LABEL } from './data/regions'
 import PrefectureMap from './map/PrefectureMap'
+import PrefectureNumberPad from './PrefectureNumberPad'
 import PrefectureShape from './map/PrefectureShape'
 import { generateMapQuestions, generatePrefectureQuestions } from './questionGenerator'
 import { MODE_PATH } from './types'
@@ -38,6 +39,7 @@ function PrefectureQuizPlayGame({ mode }: { mode: PrefectureQuizMode }) {
   const answered = state.selectedId !== null
   const isCorrect = state.selectedId === question.answer.id
   const isLast = state.index === questions.length - 1
+  const numbered = numberedPrefecturesForRegion(question.answer.region)
   const select = (id: string) => {
     if (answered) return
     const correct = id === question.answer.id
@@ -56,7 +58,7 @@ function PrefectureQuizPlayGame({ mode }: { mode: PrefectureQuizMode }) {
     <section className={styles.body} aria-label="もんだい">
       {mode === 'shapeToName' && <><PrefectureShape prefecture={question.answer} revealed={answered} /><h1 className={styles.question}>この かたちは なーんだ？</h1><ChoiceNames choices={question.choices} answerId={question.answer.id} selectedId={state.selectedId} onSelect={select} /></>}
       {mode === 'nameToShape' && <><h1 className={styles.question}>「<strong>{question.answer.nameHiragana}</strong>」は どれ？</h1><div className={styles.shapeChoices}>{question.choices.map((choice, index) => <button key={choice.id} type="button" className={choiceClass(choice.id, question.answer.id, state.selectedId)} disabled={answered} aria-label={answered ? `${choice.nameHiragana} の かたち` : `${index + 1}ばんめ の かたち`} onClick={() => select(choice.id)}><PrefectureShape prefecture={choice} revealed={answered} /><span aria-hidden="true">{mark(choice.id, question.answer.id, state.selectedId)}</span></button>)}</div></>}
-      {mode === 'nameToMap' && <><h1 className={styles.question}>「<strong>{question.answer.nameHiragana}</strong>」は どこ？</h1><PrefectureMap items={prefecturesForRegion(question.answer.region)} answer={question.answer} selectedId={state.selectedId} onSelect={select} disabled={answered} revealed={answered} label={answered ? `${REGION_LABEL[question.answer.region]}の ちず` : '都道府県をえらぶ ちず'} /><p className={styles.mapHint}>{REGION_LABEL[question.answer.region]}の ちずを タップして えらぼう</p></>}
+      {mode === 'nameToMap' && <><h1 className={styles.question}>「<strong>{question.answer.nameHiragana}</strong>」は どこ？</h1><div className={styles.mapAnswer}><PrefectureMap items={prefecturesForRegion(question.answer.region)} answer={question.answer} selectedId={state.selectedId} onSelect={select} disabled={answered} revealed={answered} numbered label={answered ? `${REGION_LABEL[question.answer.region]}の ちず` : '都道府県をえらぶ ちず'} /><PrefectureNumberPad items={numbered} answerId={question.answer.id} selectedId={state.selectedId} onSelect={select} className={styles.numberPad} /><p className={styles.mapHint}>ちずか ばんごうで こたえよう</p></div></>}
     </section>
     {answered && <QuizResultOverlay result={isCorrect ? 'correct' : 'wrong'} wrongLabel="おしい！" answer={question.answer.nameHiragana} nextLabel={isLast ? 'けっかを みる' : 'つぎの もんだい'} onNext={next} media={mode === 'nameToMap' ? <div className={styles.locator}><span>にほんでは このへん！</span><PrefectureMap answer={question.answer} selectedId={question.answer.id} disabled compact revealed /></div> : undefined} />}
   </main>
