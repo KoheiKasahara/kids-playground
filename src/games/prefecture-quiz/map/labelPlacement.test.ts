@@ -5,16 +5,19 @@ import { prefecturesForRegion, REGION_INSET_IDS } from '../data/regions'
 import { createProjection, mergeBounds, primaryProjectedBounds } from './geometry'
 import { displayPiecesForPrefecture } from './features'
 import { labelPositionsFor } from './labelPlacement'
+import { REGION_MAP_HEIGHT_FULL, REGION_MAP_HEIGHT_WITH_INSET } from './PrefectureMap'
 
 const REGIONS: readonly RegionId[] = ['hokkaido', 'tohoku', 'kanto', 'chubu', 'kinki', 'chugoku', 'shikoku', 'kyushuOkinawa']
 
-/** PrefectureMapが地方主図で使う投影と同じ考え方でlocalProjectを作る（inset県は除く）。 */
+/** PrefectureMapが地方主図で使う投影と同じ計算でlocalProjectを作る（inset県は除く）。 */
 function projectForRegion(region: RegionId) {
   const insetIds = REGION_INSET_IDS[region] ?? []
   const mainItems = prefecturesForRegion(region).filter((prefecture) => !insetIds.includes(prefecture.id))
   // PrefectureMap.tsxのlocalBoundsと同じく、離島に引っ張られないよう本土（最大polygon）基準でfitする。
   const bounds = mergeBounds(mainItems.map((prefecture) => primaryProjectedBounds(displayPiecesForPrefecture(prefecture).main)))
-  return { mainItems, project: createProjection(bounds, 360, 218, 14) }
+  // 沖縄専用insetがある地方だけ主図の高さを抑え、それ以外はviewBoxの全高を使う（PrefectureMap.tsxと同じ）。
+  const regionMapHeight = insetIds.length > 0 ? REGION_MAP_HEIGHT_WITH_INSET : REGION_MAP_HEIGHT_FULL
+  return { mainItems, project: createProjection(bounds, 360, regionMapHeight, 14) }
 }
 
 describe('labelPositionsFor', () => {
