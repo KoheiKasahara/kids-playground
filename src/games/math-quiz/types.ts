@@ -66,14 +66,14 @@ export const OPERATION_SIGN: Record<MathOperation, string> = {
 /** むずかしさ選択画面に表示する、出題対象の計算の説明。 */
 export const LEVEL_DESCRIPTION: Record<MathQuizMode, Record<QuizLevel, string>> = {
   add: {
-    easy: 'こたえが 10まで',
-    normal: 'こたえが 20まで',
-    hard: '2けたの たしざん',
+    easy: '1けたの けいさん',
+    normal: '20までの けいさん',
+    hard: '2けたの けいさん',
   },
   sub: {
-    easy: '10までの ひきざん',
-    normal: '20までの ひきざん',
-    hard: '2けたの ひきざん',
+    easy: '1けたの けいさん',
+    normal: '20までの けいさん',
+    hard: '2けたの けいさん',
   },
   mul: {
     easy: '1から5の かけざん',

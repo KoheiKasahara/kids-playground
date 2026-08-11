@@ -6,33 +6,22 @@ function makeProblem(operation: MathOperation, left: number, right: number, answ
   return { id: `${operation}-${left}-${right}`, operation, left, right, answer }
 }
 
-/** たしざん: left + right <= maxSum を満たす 0以上の整数の組を全列挙する。 */
-function addSumProblems(maxSum: number): MathProblem[] {
+/** たしざん: min〜max の整数どうしの組を全列挙する。 */
+function addRangeProblems(min: number, max: number): MathProblem[] {
   const problems: MathProblem[] = []
-  for (let left = 0; left <= maxSum; left += 1) {
-    for (let right = 0; right <= maxSum - left; right += 1) {
+  for (let left = min; left <= max; left += 1) {
+    for (let right = min; right <= max; right += 1) {
       problems.push(makeProblem('add', left, right, left + right))
     }
   }
   return problems
 }
 
-/** たしざん むずかしい: 2けたどうし (0〜99) を全列挙する。 */
-function addHardProblems(): MathProblem[] {
+/** ひきざん: min <= right < left <= max を満たす組を全列挙する。答えは必ず1以上になる。 */
+function subRangeProblems(min: number, max: number): MathProblem[] {
   const problems: MathProblem[] = []
-  for (let left = 0; left <= 99; left += 1) {
-    for (let right = 0; right <= 99; right += 1) {
-      problems.push(makeProblem('add', left, right, left + right))
-    }
-  }
-  return problems
-}
-
-/** ひきざん: 0 <= right <= left <= max を満たす組を全列挙する。答えは必ず0以上になる。 */
-function subProblems(max: number): MathProblem[] {
-  const problems: MathProblem[] = []
-  for (let left = 0; left <= max; left += 1) {
-    for (let right = 0; right <= left; right += 1) {
+  for (let left = min; left <= max; left += 1) {
+    for (let right = min; right < left; right += 1) {
       problems.push(makeProblem('sub', left, right, left - right))
     }
   }
@@ -87,18 +76,20 @@ function divHardProblems(): MathProblem[] {
  * 演算・むずかしさごとの出題プールの作り方。
  * 毎回ランダム生成して重複を弾くのではなく全列挙してから抽選することで、
  * 「1ゲーム内で正解問題が重複しない」ことが構造的に保証される。
- * easy ⊂ normal ⊂ hard になるように各範囲を定義している。
+ * 足し算・引き算は、各難易度で数字の桁数をはっきり分けている。
+ * かんたん・ふつう・むずかしいの問題が混ざらないため、
+ * 子どもが選んだ難易度に合った計算だけを出題できる。
  */
 const POOL_BUILDERS: Record<MathOperation, Record<QuizLevel, () => MathProblem[]>> = {
   add: {
-    easy: () => addSumProblems(10),
-    normal: () => addSumProblems(20),
-    hard: addHardProblems,
+    easy: () => addRangeProblems(1, 9),
+    normal: () => addRangeProblems(1, 20).filter((problem) => problem.left >= 10 || problem.right >= 10),
+    hard: () => addRangeProblems(10, 99),
   },
   sub: {
-    easy: () => subProblems(10),
-    normal: () => subProblems(20),
-    hard: () => subProblems(99),
+    easy: () => subRangeProblems(1, 9),
+    normal: () => subRangeProblems(1, 20).filter((problem) => problem.left >= 10 || problem.right >= 10),
+    hard: () => subRangeProblems(10, 99),
   },
   mul: {
     easy: () => mulSquareProblems(5),
@@ -114,7 +105,7 @@ const POOL_BUILDERS: Record<MathOperation, Record<QuizLevel, () => MathProblem[]
 
 /**
  * 一度作ったプールを使い回すためのキャッシュ。
- * 全プールを合計すると17,024件になるため、モジュール読み込み時にまとめて作ると
+ * 全プールを合計すると14,075件になるため、モジュール読み込み時にまとめて作ると
  * さんすうクイズを遊ばない利用者のアプリ起動まで重くなる。実際に遊ぶ演算・むずかしさの
  * ぶんだけを初回アクセス時に作る。
  */

@@ -6,8 +6,8 @@ const OPERATIONS: readonly MathOperation[] = ['add', 'sub', 'mul', 'div']
 const LEVELS: readonly QuizLevel[] = ['easy', 'normal', 'hard']
 
 const EXPECTED_COUNT: Record<MathOperation, Record<QuizLevel, number>> = {
-  add: { easy: 66, normal: 231, hard: 10000 },
-  sub: { easy: 66, normal: 231, hard: 5050 },
+  add: { easy: 81, normal: 319, hard: 8100 },
+  sub: { easy: 36, normal: 154, hard: 4005 },
   mul: { easy: 25, normal: 81, hard: 891 },
   div: { easy: 25, normal: 81, hard: 277 },
 }
@@ -25,10 +25,10 @@ describe('problemsFor', () => {
         expect(problemsFor(operation, level).length).toBeGreaterThanOrEqual(10)
       })
 
-      test(`${operation}/${level} は answer が0以上の整数で、演算結果と一致する`, () => {
+      test(`${operation}/${level} は answer が1以上の整数で、演算結果と一致する`, () => {
         for (const problem of problemsFor(operation, level)) {
           expect(Number.isInteger(problem.answer)).toBe(true)
-          expect(problem.answer).toBeGreaterThanOrEqual(0)
+          expect(problem.answer).toBeGreaterThanOrEqual(1)
 
           if (operation === 'add') expect(problem.left + problem.right).toBe(problem.answer)
           if (operation === 'sub') expect(problem.left - problem.right).toBe(problem.answer)
@@ -39,10 +39,49 @@ describe('problemsFor', () => {
     }
   }
 
-  test('sub は全件で left >= right', () => {
+  test('add/sub のかんたんは0を使わない1けたどうしで、9 + 9も含む', () => {
+    for (const operation of ['add', 'sub'] as const) {
+      for (const problem of problemsFor(operation, 'easy')) {
+        expect(problem.left).toBeGreaterThanOrEqual(1)
+        expect(problem.left).toBeLessThanOrEqual(9)
+        expect(problem.right).toBeGreaterThanOrEqual(1)
+        expect(problem.right).toBeLessThanOrEqual(9)
+      }
+    }
+
+    expect(problemsFor('add', 'easy')).toContainEqual(
+      expect.objectContaining({ left: 9, right: 9, answer: 18 }),
+    )
+  })
+
+  test('add/sub のふつうは0を使わず、少なくとも片方が2けた', () => {
+    for (const operation of ['add', 'sub'] as const) {
+      for (const problem of problemsFor(operation, 'normal')) {
+        expect(problem.left).toBeGreaterThanOrEqual(1)
+        expect(problem.left).toBeLessThanOrEqual(20)
+        expect(problem.right).toBeGreaterThanOrEqual(1)
+        expect(problem.right).toBeLessThanOrEqual(20)
+        expect(problem.left >= 10 || problem.right >= 10).toBe(true)
+      }
+    }
+  })
+
+  test('add/sub のむずかしいは2けたどうしで、0単体を使わない', () => {
+    for (const operation of ['add', 'sub'] as const) {
+      for (const problem of problemsFor(operation, 'hard')) {
+        expect(problem.left).toBeGreaterThanOrEqual(10)
+        expect(problem.left).toBeLessThanOrEqual(99)
+        expect(problem.right).toBeGreaterThanOrEqual(10)
+        expect(problem.right).toBeLessThanOrEqual(99)
+      }
+    }
+  })
+
+  test('sub は全件で left > right、答えは1以上', () => {
     for (const level of LEVELS) {
       for (const problem of problemsFor('sub', level)) {
-        expect(problem.left).toBeGreaterThanOrEqual(problem.right)
+        expect(problem.left).toBeGreaterThan(problem.right)
+        expect(problem.answer).toBeGreaterThanOrEqual(1)
       }
     }
   })
@@ -56,7 +95,7 @@ describe('problemsFor', () => {
     }
   })
 
-  for (const operation of OPERATIONS) {
+  for (const operation of ['mul', 'div'] as const) {
     test(`${operation}: かんたん ⊂ ふつう ⊂ むずかしい で、件数が真に増える`, () => {
       const easy = new Set(problemsFor(operation, 'easy').map((problem) => problem.id))
       const normal = new Set(problemsFor(operation, 'normal').map((problem) => problem.id))
