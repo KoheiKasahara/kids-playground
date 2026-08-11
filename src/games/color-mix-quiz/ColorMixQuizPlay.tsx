@@ -71,12 +71,31 @@ function ColorMixQuizGame({ level }: { level: QuizLevel }) {
         </div>
       </header>
       <section className={styles.body} aria-label="いろを まぜる もんだい">
-        <h1 className={styles.question}>この 2しょくを まぜると？</h1>
-        <div className={correct ? `${styles.paintStage} ${styles.mixing}` : styles.paintStage} key={`${question.problem.id}-${state.selected ?? 'new'}`}>
-          <span className={`${styles.paint} ${styles.paintA}`} style={{ '--paint-color': question.problem.inputColors[0] } as CSSProperties} aria-hidden="true" />
-          <span className={styles.plus} aria-hidden="true">＋</span>
-          <span className={`${styles.paint} ${styles.paintB}`} style={{ '--paint-color': question.problem.inputColors[1] } as CSSProperties} aria-hidden="true" />
-          {correct && <><span className={styles.mixedPaint} style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" /><span className={styles.done}>できた！</span></>}
+        <h1 className={styles.question}>この {question.problem.inputColors.length}しょくを まぜると？</h1>
+        <div
+          className={[styles.paintStage, answered ? styles.mixing : '', question.problem.inputColors.length === 3 ? styles.trio : ''].filter(Boolean).join(' ')}
+          key={`${question.problem.id}-${state.selected ?? 'new'}`}
+        >
+          {question.problem.inputColors.flatMap((color, index) => {
+            const paintClass = index === 0 ? styles.paintA : index === 1 ? styles.paintB : styles.paintC
+            const nodes = []
+            if (index > 0) nodes.push(<span key={`plus-${index}`} className={styles.plus} aria-hidden="true">＋</span>)
+            nodes.push(<span key={`paint-${index}`} className={`${styles.paint} ${paintClass}`} style={{ '--paint-color': color } as CSSProperties} aria-hidden="true" />)
+            return nodes
+          })}
+          {answered && correct && <><span className={styles.mixedPaint} data-testid="mixed-paint" style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" /><span className={styles.done}>できた！</span></>}
+          {answered && !correct && (
+            <div className={styles.compare}>
+              <div className={styles.compareItem}>
+                <span className={styles.compareLabel}>えらんだいろ</span>
+                <span className={styles.compareSwatch} style={{ '--paint-color': state.selected } as CSSProperties} aria-hidden="true" />
+              </div>
+              <div className={styles.compareItem}>
+                <span className={styles.compareLabel}>まざったいろ</span>
+                <span className={styles.compareSwatch} data-testid="mixed-paint" style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" />
+              </div>
+            </div>
+          )}
         </div>
         <div className={styles.choices}>
           {question.choices.map((color, index) => {

@@ -8,16 +8,29 @@
 .body { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 2.6vh, 20px); }
 .question { font-size: clamp(25px, 7.2vw, 36px); line-height: 1.2; color: var(--color-text); text-align: center; }
 .paintStage { position: relative; width: min(250px, 64vw); height: clamp(116px, 23vh, 160px); display: flex; align-items: center; justify-content: center; gap: 10px; }
+.paintStage.trio { width: min(330px, 92vw); gap: 6px; }
 .paint { position: relative; z-index: 2; width: clamp(72px, 20vw, 102px); aspect-ratio: 1; background: var(--paint-color); border: 4px solid rgb(255 255 255 / .7); border-radius: 48% 52% 45% 55% / 52% 45% 55% 48%; box-shadow: inset 7px 8px 12px rgb(255 255 255 / .2), 0 4px 0 rgb(0 0 0 / .12); }
 .paint::after { content: ''; position: absolute; width: 32%; height: 18%; top: 14%; left: 18%; border-radius: 50%; background: rgb(255 255 255 / .28); transform: rotate(-22deg); }
+.paintStage.trio .paint { width: clamp(54px, 15vw, 78px); }
 .plus { z-index: 3; color: var(--color-text-muted); font-size: clamp(28px, 8vw, 42px); font-weight: 800; }
+.paintStage.trio .plus { font-size: clamp(20px, 6vw, 30px); }
 .mixedPaint { display: none; }
 .done { display: none; }
+.compare { display: none; }
 .mixing .paintA { animation: slideA .46s ease-in forwards, swirl .46s ease-in forwards; }
 .mixing .paintB { animation: slideB .46s ease-in forwards, swirl .46s ease-in reverse forwards; }
+.mixing.trio .paintA { animation: slideA .46s ease-in forwards, swirl .46s ease-in forwards; }
+.mixing.trio .paintB { animation: shrinkFade .46s ease-in forwards; }
+.mixing.trio .paintC { animation: slideB .46s ease-in forwards, swirl .46s ease-in reverse forwards; }
 .mixing .plus { animation: fade .22s ease-out forwards; }
 .mixing .mixedPaint { position: absolute; z-index: 4; display: block; width: clamp(90px, 25vw, 122px); aspect-ratio: 1; border-radius: 52% 48% 55% 45% / 45% 55% 48% 52%; background: var(--paint-color); box-shadow: inset 8px 9px 14px rgb(255 255 255 / .25), 0 4px 0 rgb(0 0 0 / .12); animation: reveal .18s .38s both; }
 .mixing .done { position: absolute; z-index: 5; right: -6px; top: 0; display: block; color: var(--color-primary-dark); font-size: 23px; font-weight: 800; transform: rotate(8deg); animation: reveal .18s .46s both; }
+/* 不正解時、選んだ色とまざった色（正解の色）を比べて見せる。.paintStage は position: relative なので
+   ここを position: absolute にしておけば通常フロー（ページ下部の余白計算）に影響しない。 */
+.mixing .compare { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; display: flex; align-items: flex-end; justify-content: center; gap: 18px; width: min(300px, 84vw); animation: revealCompare .18s .38s both; }
+.compareItem { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.compareLabel { font-size: 13px; font-weight: 700; color: var(--color-text-muted); }
+.compareSwatch { width: clamp(58px, 17vw, 82px); aspect-ratio: 1; border-radius: 50%; background: var(--paint-color); border: 4px solid rgb(255 255 255 / .7); box-shadow: inset 5px 6px 10px rgb(255 255 255 / .2), 0 4px 0 rgb(0 0 0 / .12); }
 .choices { width: min(100%, 390px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .choice { min-height: clamp(74px, 13vh, 104px); border: 4px solid rgb(255 255 255 / .9); border-radius: 18px; box-shadow: 0 4px 0 rgb(0 0 0 / .16), inset 0 0 0 2px rgb(0 0 0 / .08); cursor: pointer; transition: transform .12s ease; }
 .choice:not(:disabled):active { transform: translateY(3px); box-shadow: 0 1px 0 rgb(0 0 0 / .16), inset 0 0 0 2px rgb(0 0 0 / .08); }
@@ -27,9 +40,11 @@
 .answer span, .wrong span { display: grid; place-items: center; width: 38px; height: 38px; margin: auto; border-radius: 50%; background: rgb(255 255 255 / .88); color: var(--color-primary-dark); font-size: 27px; font-weight: 900; }
 @keyframes slideA { to { transform: translateX(48px) rotate(155deg) scale(.84); opacity: .08; } }
 @keyframes slideB { to { transform: translateX(-48px) rotate(-155deg) scale(.84); opacity: .08; } }
+@keyframes shrinkFade { to { transform: scale(.3); opacity: 0; } }
 @keyframes swirl { 55% { filter: brightness(1.12); } 100% { filter: brightness(.96); } }
 @keyframes fade { to { opacity: 0; transform: scale(.4); } }
 @keyframes reveal { from { opacity: 0; transform: scale(.3) rotate(-25deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes revealCompare { from { opacity: 0; transform: translate(-50%, -50%) scale(.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @media (max-height: 620px) and (orientation: portrait) { .page { --feedback-space: 0px; } .paintStage { height: 104px; } .question { font-size: 25px; } .choice { min-height: 68px; } }
-@media (orientation: landscape) and (max-height: 560px) { .page { --feedback-space: 76px; max-width: 960px; padding-top: 7px; } .progressArea { display: flex; gap: var(--space-sm); align-items: center; } .progressLabel { white-space: nowrap; } .body { flex-direction: row; gap: clamp(24px, 5vw, 60px); } .paintStage { width: 220px; height: 128px; } .choices { width: 340px; } .choice { min-height: 57px; } }
-@media (prefers-reduced-motion: reduce) { .mixing .paintA, .mixing .paintB, .mixing .plus, .mixing .mixedPaint, .mixing .done { animation-duration: 1ms; animation-delay: 0ms; } .choice { transition: none; } }
+@media (orientation: landscape) and (max-height: 560px) { .page { --feedback-space: 76px; max-width: 960px; padding-top: 7px; } .progressArea { display: flex; gap: var(--space-sm); align-items: center; } .progressLabel { white-space: nowrap; } .body { flex-direction: row; gap: clamp(24px, 5vw, 60px); } .paintStage { width: 220px; height: 128px; } .paintStage.trio { width: min(260px, 46vw); height: 128px; } .paintStage.trio .paint { width: clamp(40px, 9vw, 54px); } .paintStage.trio .plus { font-size: 18px; } .choices { width: 340px; } .choice { min-height: 57px; } }
+@media (prefers-reduced-motion: reduce) { .mixing .paintA, .mixing .paintB, .mixing .paintC, .mixing .plus, .mixing .mixedPaint, .mixing .done, .mixing .compare { animation-duration: 1ms; animation-delay: 0ms; } .choice { transition: none; } }

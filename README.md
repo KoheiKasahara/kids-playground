@@ -11,6 +11,7 @@
 - さんすうクイズの詳細は [docs/MATH_QUIZ_DESIGN.md](docs/MATH_QUIZ_DESIGN.md) を参照してください。
 - こっきクイズ「パネルめくり」モードの詳細は [docs/PANEL_FLAG_QUIZ_DESIGN.md](docs/PANEL_FLAG_QUIZ_DESIGN.md) を参照してください。
 - 都道府県クイズの設計は [docs/PREFECTURE_QUIZ_DESIGN.md](docs/PREFECTURE_QUIZ_DESIGN.md) を参照してください。
+- いろまぜクイズの設計は [docs/COLOR_MIX_QUIZ_DESIGN.md](docs/COLOR_MIX_QUIZ_DESIGN.md) を参照してください。
 
 ## 技術構成
 
@@ -125,6 +126,7 @@ docs/
 ├─ WORKING_VEHICLE_QUIZ_DESIGN.md    # はたらくくるまクイズ基本設計
 ├─ MATH_QUIZ_DESIGN.md               # さんすうクイズ基本設計
 ├─ PANEL_FLAG_QUIZ_DESIGN.md         # こっきクイズ「パネルめくり」モード基本設計
+├─ COLOR_MIX_QUIZ_DESIGN.md          # いろまぜクイズ基本設計
 ├─ MINIGAME_DEVELOPMENT_GUIDELINES.md # ミニゲーム開発規約
 ├─ SETUP.md                          # セットアップ・デバッグ手順
 └─ CREDITS.md                        # 素材のクレジット・ライセンス表記
