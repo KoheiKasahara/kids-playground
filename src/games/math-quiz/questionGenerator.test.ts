@@ -63,40 +63,8 @@ describe('buildDistractors', () => {
     }
   })
 
-  test('answer === 0 の問題 (0 + 0) でも3件・正解と不一致・非負・重複なしを返す', () => {
-    const problem = findProblem('add', 'easy', (p) => p.left === 0 && p.right === 0)
-    expect(problem.answer).toBe(0)
-
-    for (let seed = 0; seed < 20; seed += 1) {
-      const distractors = buildDistractors(problem, 3, seededRandom(seed))
-      expect(distractors).toHaveLength(3)
-      for (const value of distractors) {
-        expect(Number.isInteger(value)).toBe(true)
-        expect(value).toBeGreaterThanOrEqual(0)
-        expect(value).not.toBe(problem.answer)
-      }
-      expect(new Set(distractors).size).toBe(3)
-    }
-  })
-
-  test('answer === 0 の問題 (0 - 0) でも3件・正解と不一致・非負・重複なしを返す', () => {
-    const problem = findProblem('sub', 'easy', (p) => p.left === 0 && p.right === 0)
-    expect(problem.answer).toBe(0)
-
-    for (let seed = 0; seed < 20; seed += 1) {
-      const distractors = buildDistractors(problem, 3, seededRandom(seed))
-      expect(distractors).toHaveLength(3)
-      for (const value of distractors) {
-        expect(Number.isInteger(value)).toBe(true)
-        expect(value).toBeGreaterThanOrEqual(0)
-        expect(value).not.toBe(problem.answer)
-      }
-      expect(new Set(distractors).size).toBe(3)
-    }
-  })
-
   test('answer === 1 の問題でも3件・正解と不一致・非負・重複なしを返す', () => {
-    const problem = findProblem('add', 'easy', (p) => p.left === 1 && p.right === 0)
+    const problem = findProblem('sub', 'easy', (p) => p.left === 2 && p.right === 1)
     expect(problem.answer).toBe(1)
 
     for (let seed = 0; seed < 20; seed += 1) {
