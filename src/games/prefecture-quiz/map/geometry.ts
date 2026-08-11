@@ -102,6 +102,13 @@ export function pathForGeometry(geometry: Geometry, project: Projection): string
   return polygons.flatMap((polygon) => Array.isArray(polygon) ? polygon.map((ring) => ringPath(ring, project)) : []).join(' ')
 }
 
+/** GeometryをPolygon単位に分割する（MultiPolygonなら要素ごと、Polygonなら1件の配列）。 */
+export function splitPolygons(geometry: Geometry): Geometry[] {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  if (!Array.isArray(polygons)) return []
+  return polygons.map((polygon) => ({ type: 'Polygon', coordinates: polygon }))
+}
+
 /**
  * 離島が極端に離れている県は、全国図・単県図で本土部分を読める大きさに保つために
  * polygon 単位で切り出す。元の GeoJSON は変更せず、表示にだけ適用する。

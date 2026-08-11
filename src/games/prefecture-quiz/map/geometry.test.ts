@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { prefectures } from '../data/prefectures'
-import { boundsForGeometry, mergeBounds, pathForGeometry, projectedBoundsForGeometry } from './geometry'
+import { boundsForGeometry, mergeBounds, pathForGeometry, projectedBoundsForGeometry, splitPolygons } from './geometry'
 import { displayPiecesForPrefecture, featureForPrefecture, polygonCount } from './features'
 import { REGION_INSET_IDS, prefecturesForRegion } from '../data/regions'
 
@@ -36,5 +36,15 @@ describe('prefecture map geometry', () => {
     if (!okinawa) throw new Error('沖縄県がありません')
     expect(projectedBoundsForGeometry(displayPiecesForPrefecture(okinawa).main).minY).toBeLessThan(bounds.minY)
     expect(displayPiecesForPrefecture(okinawa).insets).not.toHaveLength(0)
+  })
+
+  test('splitPolygonsはPolygonをそのまま1件、MultiPolygonを要素ごとのPolygonへ分割する', () => {
+    const single = { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }
+    expect(splitPolygons(single)).toEqual([single])
+    const multi = { type: 'MultiPolygon' as const, coordinates: [[[[0, 0], [1, 0], [1, 1], [0, 0]]], [[[2, 2], [3, 2], [3, 3], [2, 2]]]] }
+    const parts = splitPolygons(multi)
+    expect(parts).toHaveLength(2)
+    expect(parts.every((part) => part.type === 'Polygon')).toBe(true)
+    expect(parts.map((part) => pathForGeometry(part, ([x, y]) => [x, y]))).toEqual(multi.coordinates.map((polygon) => pathForGeometry({ type: 'Polygon', coordinates: polygon }, ([x, y]) => [x, y])))
   })
 })

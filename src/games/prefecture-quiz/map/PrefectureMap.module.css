@@ -4,9 +4,12 @@
 .insetFrame { fill: #f7fbfd; stroke: #276987; stroke-width: 1.2; stroke-dasharray: 3 2; }
 .hitTarget { fill: rgba(255, 231, 138, .45); stroke: #5d4500; stroke-width: 1.2; cursor: pointer; outline: none; }
 .hitTarget:hover, .hitTarget:focus-visible { fill: #ffe78a; stroke-width: 2.5; }
-.hitTargetText { font-size: 16px; font-weight: 800; fill: #3a2b00; pointer-events: none; }
-.mapMarker { font-size: 13px; font-weight: 800; fill: #3a2b00; stroke: #fffdf7; stroke-width: 3px; paint-order: stroke; pointer-events: none; }
 .prefecture:hover, .prefecture:focus-visible { fill: #ffe78a; stroke: #5d4500; stroke-width: 2.5; }
+/* 番号バッジ: 地図の下地(海・県境)と十分なコントラストが出る明るい円+濃色の太字数字 */
+.badge circle { fill: #fffdf7; stroke: #276987; stroke-width: 1.6; }
+.badge text { font-size: 14px; font-weight: 800; fill: #1c3d4d; }
+.badgeCorrect circle { stroke: #165e29; stroke-width: 2.4; }
+.badgeWrong circle { stroke: #a3261d; stroke-width: 2.4; }
 .correct { fill: #71cc82; stroke: #165e29; stroke-width: 2.5; }
 .wrong { fill: #ffaaa2; stroke: #a3261d; stroke-width: 2.5; }
 @media (max-width: 480px) { .map { min-height: 200px; height: min(43dvh, 320px); } }
