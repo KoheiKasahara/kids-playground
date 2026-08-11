@@ -17,15 +17,14 @@ describe('prefecture map geometry', () => {
     })
   })
 
-  test('遠隔離島を持つ県もpolygonを削らず主図とinsetに全て表示する', () => {
-    for (const id of ['13', '46', '47']) {
-      const prefecture = prefectures.find((candidate) => candidate.id === id)
-      if (!prefecture) throw new Error('都道府県がありません')
-      const original = polygonCount(featureForPrefecture(prefecture).geometry)
-      const pieces = displayPiecesForPrefecture(prefecture)
-      expect(pieces.insets).not.toHaveLength(0)
-      expect(polygonCount(pieces.main) + pieces.insets.reduce((count, inset) => count + polygonCount(inset.geometry), 0)).toBe(original)
-    }
+  test('画像を小さくする遠隔離島は除き、表示範囲に収まる佐渡島は残す', () => {
+    const tokyo = prefectures.find((candidate) => candidate.id === '13')
+    const niigata = prefectures.find((candidate) => candidate.id === '15')
+    if (!tokyo || !niigata) throw new Error('都道府県がありません')
+
+    expect(polygonCount(displayPiecesForPrefecture(tokyo).main)).toBeLessThan(polygonCount(featureForPrefecture(tokyo).geometry))
+    expect(displayPiecesForPrefecture(tokyo).insets).toHaveLength(0)
+    expect(polygonCount(displayPiecesForPrefecture(niigata).main)).toBe(polygonCount(featureForPrefecture(niigata).geometry))
   })
 
   test('九州・沖縄の地方主図boundsには沖縄を含めず、沖縄は専用insetとして扱う', () => {
@@ -35,19 +34,22 @@ describe('prefecture map geometry', () => {
     const okinawa = region.find((prefecture) => prefecture.id === '47')
     if (!okinawa) throw new Error('沖縄県がありません')
     expect(projectedBoundsForGeometry(displayPiecesForPrefecture(okinawa).main).minY).toBeLessThan(bounds.minY)
-    expect(displayPiecesForPrefecture(okinawa).insets).not.toHaveLength(0)
+    expect(polygonCount(displayPiecesForPrefecture(okinawa).main)).toBeLessThan(polygonCount(featureForPrefecture(okinawa).geometry))
   })
 
-  test('primaryProjectedBoundsは東京都の伊豆諸島など近い離島に引っ張られず本土だけのboundsを返す', () => {
+  test('primaryProjectedBoundsは最大polygonのboundsを返す', () => {
     const tokyo = prefectures.find((prefecture) => prefecture.id === '13')
     if (!tokyo) throw new Error('東京都がありません')
     const main = displayPiecesForPrefecture(tokyo).main
-    const fullBounds = projectedBoundsForGeometry(main)
     const primaryBounds = primaryProjectedBounds(main)
-    // 本土＋伊豆諸島の合計bboxより、本土だけのbboxのほうが緯度方向に狭い。
-    const fullHeight = fullBounds.maxY - fullBounds.minY
-    const primaryHeight = primaryBounds.maxY - primaryBounds.minY
-    expect(primaryHeight).toBeLessThan(fullHeight)
+    const largestPolygon = splitPolygons(main).reduce((largest, polygon) => {
+      const bounds = projectedBoundsForGeometry(polygon)
+      const largestBounds = projectedBoundsForGeometry(largest)
+      const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY)
+      const largestArea = (largestBounds.maxX - largestBounds.minX) * (largestBounds.maxY - largestBounds.minY)
+      return area > largestArea ? polygon : largest
+    })
+    expect(primaryBounds).toEqual(projectedBoundsForGeometry(largestPolygon))
     // 単一polygonのgeometryでは分割しても同じboundsになる。
     const single = { type: 'Polygon' as const, coordinates: [[[139, 35], [140, 35], [140, 36], [139, 35]]] }
     expect(primaryProjectedBounds(single)).toEqual(projectedBoundsForGeometry(single))
