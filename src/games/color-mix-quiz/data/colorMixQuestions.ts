@@ -1,40 +1,72 @@
-import type { QuizLevel } from '../../quiz-core/types'
-import type { ColorMixProblem } from '../types'
+import { LEVEL_RANK } from '../types'
+import type { ColorMixProblem, QuizLevel } from '../types'
 
-const easy: ColorMixProblem[] = [
-  { id: 'red-yellow', inputColors: ['#e94b3c', '#f6d743'], resultColor: '#ef8a2f', choices: ['#ef8a2f', '#5aa95a', '#8054a5', '#e94b3c'] },
-  { id: 'yellow-blue', inputColors: ['#f6d743', '#3977c7'], resultColor: '#58a85c', choices: ['#58a85c', '#ef8a2f', '#8054a5', '#e95c86'] },
-  // Keep each pair in a canonical order: blue + red is intentionally not another problem.
-  { id: 'red-blue', inputColors: ['#e94b3c', '#3977c7'], resultColor: '#7950a1', choices: ['#7950a1', '#58a85c', '#ef8a2f', '#e7c73e'] },
-  { id: 'red-white', inputColors: ['#e94b3c', '#fffdf7'], resultColor: '#ef91a0', choices: ['#ef91a0', '#a7d7ee', '#f6dc83', '#c8c8c8'] },
-  { id: 'blue-white', inputColors: ['#3977c7', '#fffdf7'], resultColor: '#9bcdea', choices: ['#9bcdea', '#ef91a0', '#c9e1ae', '#b4a0d0'] },
-  { id: 'yellow-white', inputColors: ['#f6d743', '#fffdf7'], resultColor: '#f7e69a', choices: ['#f7e69a', '#9bcdea', '#ef91a0', '#7950a1'] },
+// Base paints. Every problem's inputColors is either one of these or a SECONDARY_* below
+// (which is itself defined as the resultColor of the problem that produces it).
+const BASE_RED = '#e94b3c'
+const BASE_YELLOW = '#f6d743'
+const BASE_BLUE = '#3977c7'
+const BASE_WHITE = '#fffdf7'
+const BASE_BLACK = '#263238'
+
+// Secondary paints. Their hex MUST equal the resultColor of the problem that mixes them
+// (red-yellow, yellow-blue, red-blue, red-white, blue-white below) — see validateColorMixProblems.
+const SECONDARY_ORANGE = '#ef8a2f'
+const SECONDARY_GREEN = '#58a85c'
+const SECONDARY_PURPLE = '#7950a1'
+const SECONDARY_PINK = '#ef91a0'
+const SECONDARY_LIGHT_BLUE = '#9bcdea'
+
+// Mixing model: each listed input paint contributes one equal part. A secondary paint is never
+// decomposed into its primaries, so {green, red} and {red, blue, yellow} are different questions
+// and may have different (both plausible) results. A three-colour mix carries proportionally more
+// pigment relative to white than the equivalent two-colour mix, so e.g. red+yellow+white comes out
+// as a deeper peach than orange+white. Every result is hand-authored to look like real poster paint,
+// never computed from the inputs. See docs/COLOR_MIX_QUIZ_DESIGN.md for the full rationale.
+const colorMixProblems: readonly ColorMixProblem[] = [
+  // --- easy: 12 ---------------------------------------------------------
+  { id: 'red-yellow', level: 'easy', inputColors: [BASE_RED, BASE_YELLOW], resultColor: SECONDARY_ORANGE, choices: [SECONDARY_ORANGE, SECONDARY_GREEN, SECONDARY_PURPLE, BASE_BLUE] },
+  { id: 'yellow-blue', level: 'easy', inputColors: [BASE_YELLOW, BASE_BLUE], resultColor: SECONDARY_GREEN, choices: [SECONDARY_GREEN, SECONDARY_ORANGE, SECONDARY_PURPLE, SECONDARY_PINK] },
+  { id: 'red-blue', level: 'easy', inputColors: [BASE_RED, BASE_BLUE], resultColor: SECONDARY_PURPLE, choices: [SECONDARY_PURPLE, SECONDARY_GREEN, SECONDARY_ORANGE, BASE_YELLOW] },
+  { id: 'red-white', level: 'easy', inputColors: [BASE_RED, BASE_WHITE], resultColor: SECONDARY_PINK, choices: [SECONDARY_PINK, SECONDARY_LIGHT_BLUE, '#f7e69a', '#888b89'] },
+  { id: 'blue-white', level: 'easy', inputColors: [BASE_BLUE, BASE_WHITE], resultColor: SECONDARY_LIGHT_BLUE, choices: [SECONDARY_LIGHT_BLUE, SECONDARY_PINK, SECONDARY_PURPLE, '#913f43'] },
+  { id: 'yellow-white', level: 'easy', inputColors: [BASE_YELLOW, BASE_WHITE], resultColor: '#f7e69a', choices: ['#f7e69a', SECONDARY_LIGHT_BLUE, SECONDARY_PINK, SECONDARY_PURPLE] },
+  { id: 'white-black', level: 'easy', inputColors: [BASE_WHITE, BASE_BLACK], resultColor: '#888b89', choices: ['#888b89', BASE_RED, SECONDARY_PINK, SECONDARY_PURPLE] },
+  { id: 'green-white', level: 'easy', inputColors: [SECONDARY_GREEN, BASE_WHITE], resultColor: '#a9d49e', choices: ['#a9d49e', SECONDARY_PURPLE, SECONDARY_PINK, BASE_RED] },
+  { id: 'orange-white', level: 'easy', inputColors: [SECONDARY_ORANGE, BASE_WHITE], resultColor: '#f3bb83', choices: ['#f3bb83', SECONDARY_PURPLE, '#2f9a91', BASE_RED] },
+  { id: 'purple-white', level: 'easy', inputColors: [SECONDARY_PURPLE, BASE_WHITE], resultColor: '#b7a2c9', choices: ['#b7a2c9', SECONDARY_GREEN, SECONDARY_ORANGE, BASE_BLACK] },
+  { id: 'yellow-green', level: 'easy', inputColors: [BASE_YELLOW, SECONDARY_GREEN], resultColor: '#a8c93f', choices: ['#a8c93f', SECONDARY_PURPLE, SECONDARY_ORANGE, BASE_BLUE] },
+  { id: 'blue-green', level: 'easy', inputColors: [BASE_BLUE, SECONDARY_GREEN], resultColor: '#2f9a91', choices: ['#2f9a91', BASE_RED, SECONDARY_ORANGE, SECONDARY_PURPLE] },
+
+  // --- normal: +10 (22 total) --------------------------------------------
+  { id: 'red-black', level: 'normal', inputColors: [BASE_RED, BASE_BLACK], resultColor: '#913f43', choices: ['#913f43', BASE_RED, '#a95d31', SECONDARY_PURPLE] },
+  { id: 'blue-black', level: 'normal', inputColors: [BASE_BLUE, BASE_BLACK], resultColor: '#354f78', choices: ['#354f78', BASE_BLUE, SECONDARY_PURPLE, '#37613c'] },
+  { id: 'yellow-black', level: 'normal', inputColors: [BASE_YELLOW, BASE_BLACK], resultColor: '#8b8438', choices: ['#8b8438', BASE_YELLOW, '#37613c', '#a95d31'] },
+  { id: 'green-black', level: 'normal', inputColors: [SECONDARY_GREEN, BASE_BLACK], resultColor: '#37613c', choices: ['#37613c', SECONDARY_GREEN, '#8b8438', '#354f78'] },
+  { id: 'orange-black', level: 'normal', inputColors: [SECONDARY_ORANGE, BASE_BLACK], resultColor: '#a95d31', choices: ['#a95d31', SECONDARY_ORANGE, '#913f43', '#8b8438'] },
+  { id: 'purple-black', level: 'normal', inputColors: [SECONDARY_PURPLE, BASE_BLACK], resultColor: '#4b3560', choices: ['#4b3560', SECONDARY_PINK, '#354f78', '#913f43'] },
+  { id: 'red-orange', level: 'normal', inputColors: [BASE_RED, SECONDARY_ORANGE], resultColor: '#ec6a33', choices: ['#ec6a33', SECONDARY_PURPLE, BASE_YELLOW, '#2f9a91'] },
+  { id: 'green-red', level: 'normal', inputColors: [SECONDARY_GREEN, BASE_RED], resultColor: '#8f5a3c', choices: ['#8f5a3c', SECONDARY_LIGHT_BLUE, SECONDARY_PURPLE, '#f7e69a'] },
+  { id: 'orange-blue', level: 'normal', inputColors: [SECONDARY_ORANGE, BASE_BLUE], resultColor: '#7d6a4f', choices: ['#7d6a4f', SECONDARY_PINK, '#a8c93f', SECONDARY_LIGHT_BLUE] },
+  { id: 'purple-yellow', level: 'normal', inputColors: [SECONDARY_PURPLE, BASE_YELLOW], resultColor: '#8a7b4a', choices: ['#8a7b4a', SECONDARY_LIGHT_BLUE, SECONDARY_PINK, '#2f9a91'] },
+
+  // --- hard: +10 (32 total). 4 complex two-colour mixes, then 6 three-colour mixes. ------
+  // A "near" distractor (ΔE within [HARD_NEAR_MIN_DELTA_E, HARD_NEAR_MAX_DELTA_E]) is deliberately
+  // authored for just these two problems, both two-colour — never on a three-colour problem.
+  { id: 'purple-green', level: 'hard', inputColors: [SECONDARY_PURPLE, SECONDARY_GREEN], resultColor: '#5b6b4b', choices: ['#5b6b4b', '#6e8e58', SECONDARY_PURPLE, '#a95d31'] },
+  { id: 'orange-purple', level: 'hard', inputColors: [SECONDARY_ORANGE, SECONDARY_PURPLE], resultColor: '#a05a4a', choices: ['#a05a4a', '#b67b55', '#4b3560', '#7f9a4e'] },
+  { id: 'green-orange', level: 'hard', inputColors: [SECONDARY_GREEN, SECONDARY_ORANGE], resultColor: '#7f9a4e', choices: ['#7f9a4e', SECONDARY_PURPLE, SECONDARY_LIGHT_BLUE, SECONDARY_PINK] },
+  { id: 'pink-green', level: 'hard', inputColors: [SECONDARY_PINK, SECONDARY_GREEN], resultColor: '#b79a8f', choices: ['#b79a8f', BASE_BLUE, '#354f78', BASE_YELLOW] },
+  { id: 'red-blue-yellow', level: 'hard', inputColors: [BASE_RED, BASE_BLUE, BASE_YELLOW], resultColor: '#8c6239', choices: ['#8c6239', '#2f9a91', SECONDARY_PINK, '#a8c93f'] },
+  { id: 'red-yellow-white', level: 'hard', inputColors: [BASE_RED, BASE_YELLOW, BASE_WHITE], resultColor: '#f0a463', choices: ['#f0a463', SECONDARY_PURPLE, '#354f78', '#2f9a91'] },
+  { id: 'blue-yellow-white', level: 'hard', inputColors: [BASE_BLUE, BASE_YELLOW, BASE_WHITE], resultColor: '#86c68a', choices: ['#86c68a', BASE_RED, SECONDARY_PURPLE, '#a95d31'] },
+  { id: 'red-blue-white', level: 'hard', inputColors: [BASE_RED, BASE_BLUE, BASE_WHITE], resultColor: '#a186c0', choices: ['#a186c0', '#354f78', SECONDARY_ORANGE, '#8a7b4a'] },
+  { id: 'red-green-white', level: 'hard', inputColors: [BASE_RED, SECONDARY_GREEN, BASE_WHITE], resultColor: '#c2a184', choices: ['#c2a184', SECONDARY_PURPLE, '#354f78', '#2f9a91'] },
+  { id: 'red-white-black', level: 'hard', inputColors: [BASE_RED, BASE_WHITE, BASE_BLACK], resultColor: '#b58f8c', choices: ['#b58f8c', '#2f9a91', BASE_BLUE, '#a8c93f'] },
 ]
 
-const normal: ColorMixProblem[] = [
-  { id: 'white-black', inputColors: ['#fffdf7', '#263238'], resultColor: '#888b89', choices: ['#888b89', '#b9bbba', '#555b59', '#9bcdea'] },
-  { id: 'black-red', inputColors: ['#263238', '#e94b3c'], resultColor: '#913f43', choices: ['#913f43', '#b34a4b', '#6b4148', '#7950a1'] },
-  { id: 'white-green', inputColors: ['#fffdf7', '#58a85c'], resultColor: '#a9d49e', choices: ['#a9d49e', '#b9e0ae', '#95c58c', '#a6c7b5'] },
-  { id: 'white-purple', inputColors: ['#fffdf7', '#7950a1'], resultColor: '#b7a2c9', choices: ['#b7a2c9', '#c6b3d7', '#a48eb9', '#b49fbd'] },
-  { id: 'black-yellow', inputColors: ['#263238', '#f6d743'], resultColor: '#8b8438', choices: ['#8b8438', '#a39b3e', '#68672f', '#913f43'] },
-  { id: 'black-blue', inputColors: ['#263238', '#3977c7'], resultColor: '#354f78', choices: ['#354f78', '#3f6292', '#303c62', '#7950a1'] },
-  { id: 'white-orange', inputColors: ['#fffdf7', '#ef8a2f'], resultColor: '#f3bb83', choices: ['#f3bb83', '#f6c99e', '#eaa66e', '#efb49d'] },
-  { id: 'black-orange', inputColors: ['#263238', '#ef8a2f'], resultColor: '#a95d31', choices: ['#a95d31', '#bd6836', '#8d522f', '#913f43'] },
-]
-
-const hard: ColorMixProblem[] = [
-  { id: 'hard-warm-orange', inputColors: ['#e94b3c', '#f6d743'], resultColor: '#ef8a2f', choices: ['#ef8a2f', '#ff9838', '#dd793a', '#e89348'] },
-  { id: 'hard-leaf-green', inputColors: ['#3977c7', '#f6d743'], resultColor: '#58a85c', choices: ['#58a85c', '#68b866', '#48974e', '#69a94e'] },
-  { id: 'hard-plum', inputColors: ['#3977c7', '#e94b3c'], resultColor: '#7950a1', choices: ['#7950a1', '#895fb0', '#68458f', '#7a64b5'] },
-  { id: 'hard-rose', inputColors: ['#e94b3c', '#fffdf7'], resultColor: '#ef91a0', choices: ['#ef91a0', '#ff9faf', '#dc7e91', '#eaa8b3'] },
-  { id: 'hard-sky', inputColors: ['#3977c7', '#fffdf7'], resultColor: '#9bcdea', choices: ['#9bcdea', '#aadcf8', '#89bddb', '#a1bbd9'] },
-  { id: 'hard-olive', inputColors: ['#263238', '#f6d743'], resultColor: '#8b8438', choices: ['#8b8438', '#9d953f', '#777530', '#947247'] },
-  { id: 'hard-navy', inputColors: ['#263238', '#3977c7'], resultColor: '#354f78', choices: ['#354f78', '#45618a', '#294265', '#484c84'] },
-  { id: 'hard-gray', inputColors: ['#fffdf7', '#263238'], resultColor: '#888b89', choices: ['#888b89', '#9c9f9d', '#737878', '#84989b'] },
-]
-
-export const colorMixProblemsByLevel: Record<QuizLevel, readonly ColorMixProblem[]> = { easy, normal, hard }
+export { colorMixProblems }
 
 export function problemsForColorMix(level: QuizLevel): readonly ColorMixProblem[] {
-  return colorMixProblemsByLevel[level]
+  return colorMixProblems.filter((problem) => LEVEL_RANK[problem.level] <= LEVEL_RANK[level])
 }
