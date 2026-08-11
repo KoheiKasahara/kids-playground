@@ -20,6 +20,10 @@ import PrefectureQuizPlay from '../games/prefecture-quiz/PrefectureQuizPlay'
 import PrefectureQuizResult from '../games/prefecture-quiz/PrefectureQuizResult'
 import PrefecturePuzzleStart from '../games/prefecture-quiz/PrefecturePuzzleStart'
 import PrefecturePuzzlePlay from '../games/prefecture-quiz/PrefecturePuzzlePlay'
+import ColorMixQuizStart from '../games/color-mix-quiz/ColorMixQuizStart'
+import ColorMixQuizLevelSelect from '../games/color-mix-quiz/ColorMixQuizLevelSelect'
+import ColorMixQuizPlay from '../games/color-mix-quiz/ColorMixQuizPlay'
+import ColorMixQuizResult from '../games/color-mix-quiz/ColorMixQuizResult'
 
 // さんすうクイズは4モード(add/sub/mul/div)ぶんの「むずかしさ選択・プレイ・結果」が
 // 完全に同型のため、直書きの繰り返しを避けて配列から組み立てる。
@@ -81,6 +85,10 @@ export const routes: RouteObject[] = [
     element: <WorkingVehicleQuizResult mode="nameToPhoto" />,
   },
   { path: '/games/math-quiz', element: <MathQuizStart /> },
+  { path: '/games/color-mix-quiz', element: <ColorMixQuizStart /> },
+  { path: '/games/color-mix-quiz/level', element: <ColorMixQuizLevelSelect /> },
+  { path: '/games/color-mix-quiz/:level/play', element: <ColorMixQuizPlay /> },
+  { path: '/games/color-mix-quiz/:level/result', element: <ColorMixQuizResult /> },
   { path: '/games/prefecture-quiz', element: <PrefectureQuizStart /> },
   { path: '/games/prefecture-quiz/puzzle', element: <PrefecturePuzzleStart /> },
   { path: '/games/prefecture-quiz/puzzle/:region/play', element: <PrefecturePuzzlePlay /> },
