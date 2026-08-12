@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { countries } from '../flag-quiz/data/countries'
 import { countryById } from './data/travelCountries'
 import { travelCourses } from './data/travelCourses'
 import { answerPositionBag, generateTravelQuestions } from './questionGenerator'
@@ -29,6 +30,18 @@ describe('generateTravelQuestions', () => {
       expect(question.choices[question.answerIndex]).toBe(question.answer)
     }
   })
+
+  test('国旗モード用に全国家プールから誤答を作っても4択条件を守る', () => {
+    const course = travelCourses[0]
+    const questions = generateTravelQuestions(course, seededRandom(17), countries)
+    for (const question of questions) {
+      expect(question.choices).toHaveLength(4)
+      expect(new Set(question.choices.map((choice) => choice.id)).size).toBe(4)
+      expect(question.choices.filter((choice) => choice.id === question.answer.id)).toHaveLength(1)
+    }
+    expect(questions.some((question) => question.choices.some((choice) => !course.countryIds.includes(choice.id)))).toBe(true)
+  })
+
   test('正解位置バッグは元配列を壊さず、各位置が偏りすぎない', () => {
     const positions = answerPositionBag(seededRandom(8))
     expect(positions).toHaveLength(10)
