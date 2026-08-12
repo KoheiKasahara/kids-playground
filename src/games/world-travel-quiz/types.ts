@@ -5,6 +5,10 @@ export const CHOICE_COUNT = 4
 
 export const TRAVEL_REGIONS = ['asia', 'europe', 'africa', 'northAmerica', 'southAmerica', 'oceania'] as const
 export type TravelRegion = (typeof TRAVEL_REGIONS)[number]
+
+export const ANSWER_MODES = ['country-name', 'flag'] as const
+export type AnswerMode = (typeof ANSWER_MODES)[number]
+
 export type TravelCountry = {
   countryId: Country['id']
   /** Natural Earth / ISO 3166-1 numeric country id. */
@@ -19,4 +23,8 @@ export type TravelPhase = 'answering' | 'feedback' | 'traveling'
 
 export function isTravelRegion(value: string | undefined): value is TravelRegion {
   return Boolean(value && (TRAVEL_REGIONS as readonly string[]).includes(value))
+}
+
+export function isAnswerMode(value: string | undefined): value is AnswerMode {
+  return Boolean(value && (ANSWER_MODES as readonly string[]).includes(value))
 }
