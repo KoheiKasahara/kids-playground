@@ -227,7 +227,7 @@ React Routerを使用する。
 
 むずかしさ追加前の旧URL（`/games/flag-quiz/play`, `/games/flag-quiz/flag-to-name/play`,
 `/games/flag-quiz/name-to-flag/play`, 各 `/result`）は、ブックマークやPWAホーム画面
-ショートカットの互換のためリダイレクトとして残す。むずかしさ追加前は全100か国が出題対象
+ショートカットの互換のためリダイレクトとして残す。むずかしさ追加前は全105か国が出題対象
 だったため、`/play` 系はすべて `hard`（むずかしい）へ倒す。`/result` 系は結果がstate
 （正解数など）に依存し復元できないため、モード選択画面（`/games/flag-quiz`）へ遷移させる。
 
@@ -394,7 +394,7 @@ GitHub PagesでReact Routerを利用する際のリロード・404対策につ�
 
 ## むずかしい
 
-世界中の100か国すべてを対象とする。
+世界中の105か国すべてを対象とする。
 
 ---
 

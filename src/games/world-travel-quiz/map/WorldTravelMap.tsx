@@ -6,10 +6,17 @@ import { bezierPath, boundsForGeometry, cameraForBounds, cameraForCountryBounds,
 import styles from './WorldTravelMap.module.css'
 
 type Props = { course: TravelCourse; questionIndex: number; phase: TravelPhase; onTravelComplete: () => void; result?: boolean }
-type CachedFeature = { id: number; path: string; bounds: Bounds; primary: Bounds }
+type CachedFeature = { key: string; id: number; path: string; bounds: Bounds; primary: Bounds }
 
-const cachedFeatures: readonly CachedFeature[] = worldFeatures.map((item) => ({ id: item.id, path: pathForGeometry(item.geometry), bounds: boundsForGeometry(item.geometry), primary: primaryBounds(item.geometry) }))
-const featuresById = new Map(cachedFeatures.map((item) => [item.id, item]))
+const cachedFeatures: readonly CachedFeature[] = worldFeatures.map((item, index) => ({ key: `${item.id}-${index}`, id: item.id, path: pathForGeometry(item.geometry), bounds: boundsForGeometry(item.geometry), primary: primaryBounds(item.geometry) }))
+// Natural Earth は同じ国IDに小さな離島のFeatureを持つことがある。地図上で国を
+// フォーカスする際は、主領土が最も大きいFeatureを使う。
+const featuresById = cachedFeatures.reduce((items, feature) => {
+  const current = items.get(feature.id)
+  const area = (bounds: Bounds) => (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY)
+  if (!current || area(feature.primary) > area(current.primary)) items.set(feature.id, feature)
+  return items
+}, new Map<number, CachedFeature>())
 const worldCamera: Camera = { scale: 1, x: 0, y: 0 }
 const durationFor = (from: Position, to: Position) => Math.max(800, Math.min(1200, 800 + Math.hypot(to[0] - from[0], to[1] - from[1]) * 0.55))
 const transform = (camera: Camera) => `translate(${camera.x.toFixed(2)} ${camera.y.toFixed(2)}) scale(${camera.scale.toFixed(3)})`
@@ -97,7 +104,7 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
     <svg className={styles.map} viewBox="0 0 1000 560" role="img" aria-label={result ? '旅した国の地図' : '国をさがす世界地図'} preserveAspectRatio="xMidYMid meet">
       <rect width="1000" height="560" className={styles.ocean} />
       <g ref={cameraRef} transform={transform(worldCamera)}>
-        {cachedFeatures.map((item) => <path key={item.id} d={item.path} className={result && visitedMapIds.has(item.id) ? styles.visitedCountry : styles.country} fillRule="evenodd" />)}
+        {cachedFeatures.map((item) => <path key={item.key} d={item.path} className={result && visitedMapIds.has(item.id) ? styles.visitedCountry : styles.country} fillRule="evenodd" />)}
         {!result && activeMapId !== undefined && <path d={featuresById.get(activeMapId)?.path} className={styles.activeCountry} fillRule="evenodd" />}
         {Array.from({ length: completedSegments }, (_, index) => {
           const from = countryPoint(routeIds[index]); const to = countryPoint(routeIds[index + 1])

@@ -34,7 +34,7 @@ export const countries: readonly Country[] = [
   { id: 'au', nameJa: 'オーストラリア', nameEn: 'Australia', continent: 'oceania', flag: 'flags/au.svg', level: 'easy' },
   { id: 'nz', nameJa: 'ニュージーランド', nameEn: 'New Zealand', continent: 'oceania', flag: 'flags/nz.svg', level: 'easy' },
 
-  // ここから追加分 (30 → 100か国)
+  // ここから追加分 (30 → 105か国)
   { id: 'sg', nameJa: 'シンガポール', nameEn: 'Singapore', continent: 'asia', flag: 'flags/sg.svg', level: 'normal' },
   { id: 'my', nameJa: 'マレーシア', nameEn: 'Malaysia', continent: 'asia', flag: 'flags/my.svg', level: 'normal' },
   { id: 'mm', nameJa: 'ミャンマー', nameEn: 'Myanmar', continent: 'asia', flag: 'flags/mm.svg', level: 'hard' },
@@ -83,6 +83,7 @@ export const countries: readonly Country[] = [
   { id: 'jm', nameJa: 'ジャマイカ', nameEn: 'Jamaica', continent: 'northAmerica', flag: 'flags/jm.svg', level: 'hard' },
   { id: 'do', nameJa: 'ドミニカきょうわこく', nameEn: 'Dominican Republic', continent: 'northAmerica', flag: 'flags/do.svg', level: 'hard' },
   { id: 'gt', nameJa: 'グアテマラ', nameEn: 'Guatemala', continent: 'northAmerica', flag: 'flags/gt.svg', level: 'hard' },
+  { id: 'bs', nameJa: 'バハマ', nameEn: 'Bahamas', continent: 'northAmerica', flag: 'flags/bs.svg', level: 'hard' },
 
   { id: 'cl', nameJa: 'チリ', nameEn: 'Chile', continent: 'southAmerica', flag: 'flags/cl.svg', level: 'normal' },
   { id: 'co', nameJa: 'コロンビア', nameEn: 'Colombia', continent: 'southAmerica', flag: 'flags/co.svg', level: 'normal' },
@@ -109,6 +110,10 @@ export const countries: readonly Country[] = [
   { id: 'pg', nameJa: 'パプアニューギニア', nameEn: 'Papua New Guinea', continent: 'oceania', flag: 'flags/pg.svg', level: 'hard' },
   { id: 'ws', nameJa: 'サモア', nameEn: 'Samoa', continent: 'oceania', flag: 'flags/ws.svg', level: 'hard' },
   { id: 'to', nameJa: 'トンガ', nameEn: 'Tonga', continent: 'oceania', flag: 'flags/to.svg', level: 'hard' },
+  { id: 'sb', nameJa: 'ソロモンしょとう', nameEn: 'Solomon Islands', continent: 'oceania', flag: 'flags/sb.svg', level: 'hard' },
+  { id: 'vu', nameJa: 'バヌアツ', nameEn: 'Vanuatu', continent: 'oceania', flag: 'flags/vu.svg', level: 'hard' },
+  { id: 'fm', nameJa: 'ミクロネシアれんぽう', nameEn: 'Micronesia', continent: 'oceania', flag: 'flags/fm.svg', level: 'hard' },
+  { id: 'mh', nameJa: 'マーシャルしょとう', nameEn: 'Marshall Islands', continent: 'oceania', flag: 'flags/mh.svg', level: 'hard' },
 ];
 
 /**

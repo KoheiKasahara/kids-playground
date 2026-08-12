@@ -27,8 +27,17 @@ export function boundsForGeometry(geometry: Geometry): Bounds {
 }
 export function primaryBounds(geometry: Geometry): Bounds {
   const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : Array.isArray(geometry.coordinates) ? geometry.coordinates : []
-  const candidates = polygons.map((coordinates) => boundsForGeometry({ type: 'Polygon', coordinates }))
+  // フィジーのように日付変更線をまたぐ国は、元の座標の外接矩形だと世界幅になる。
+  // 描画と同じく帯ごとに分割してから、もっとも大きい主領土を選ぶ。
+  const candidates = polygons.flatMap((coordinates) => Array.isArray(coordinates)
+    ? coordinates.flatMap((ring) => antimeridianClippedRings(ring).map((points) => boundsForPoints(points)))
+    : [])
   return candidates.reduce((best, candidate) => ((candidate.maxX - candidate.minX) * (candidate.maxY - candidate.minY) > (best.maxX - best.minX) * (best.maxY - best.minY) ? candidate : best), candidates[0] ?? emptyBounds())
+}
+
+function boundsForPoints(points: readonly Position[]): Bounds {
+  if (!points.length) return emptyBounds()
+  return points.map(project).reduce<Bounds>((bounds, [x, y]) => ({ minX: Math.min(bounds.minX, x), minY: Math.min(bounds.minY, y), maxX: Math.max(bounds.maxX, x), maxY: Math.max(bounds.maxY, y) }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity })
 }
 export function mergeBounds(bounds: readonly Bounds[]): Bounds {
   if (!bounds.length) return emptyBounds()
