@@ -21,7 +21,6 @@ import PrefectureQuizResult from '../games/prefecture-quiz/PrefectureQuizResult'
 import PrefecturePuzzleStart from '../games/prefecture-quiz/PrefecturePuzzleStart'
 import PrefecturePuzzlePlay from '../games/prefecture-quiz/PrefecturePuzzlePlay'
 import ColorMixQuizStart from '../games/color-mix-quiz/ColorMixQuizStart'
-import ColorMixQuizLevelSelect from '../games/color-mix-quiz/ColorMixQuizLevelSelect'
 import ColorMixQuizPlay from '../games/color-mix-quiz/ColorMixQuizPlay'
 import ColorMixQuizResult from '../games/color-mix-quiz/ColorMixQuizResult'
 
@@ -86,9 +85,12 @@ export const routes: RouteObject[] = [
   },
   { path: '/games/math-quiz', element: <MathQuizStart /> },
   { path: '/games/color-mix-quiz', element: <ColorMixQuizStart /> },
-  { path: '/games/color-mix-quiz/level', element: <ColorMixQuizLevelSelect /> },
-  { path: '/games/color-mix-quiz/:level/play', element: <ColorMixQuizPlay /> },
-  { path: '/games/color-mix-quiz/:level/result', element: <ColorMixQuizResult /> },
+  { path: '/games/color-mix-quiz/play', element: <ColorMixQuizPlay /> },
+  { path: '/games/color-mix-quiz/result', element: <ColorMixQuizResult /> },
+  // Old difficulty URLs now begin the single colour-mix game directly.
+  { path: '/games/color-mix-quiz/level', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
+  { path: '/games/color-mix-quiz/:level/play', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
+  { path: '/games/color-mix-quiz/:level/result', element: <Navigate to="/games/color-mix-quiz" replace /> },
   { path: '/games/prefecture-quiz', element: <PrefectureQuizStart /> },
   { path: '/games/prefecture-quiz/puzzle', element: <PrefecturePuzzleStart /> },
   { path: '/games/prefecture-quiz/puzzle/:region/play', element: <PrefecturePuzzlePlay /> },
