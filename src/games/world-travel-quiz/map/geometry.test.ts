@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { worldFeatures } from '../data/worldFeatures'
-import { antimeridianClippedRings, cameraForBounds, MAP_HEIGHT, MAP_WIDTH, project, quadraticBezier, type Geometry, type Position } from './geometry'
+import { antimeridianClippedRings, boundsForGeometry, cameraForBounds, cameraForCountryBounds, MAP_HEIGHT, MAP_WIDTH, primaryBounds, project, quadraticBezier, type Geometry, type Position } from './geometry'
 
 function ringsFor(geometry: Geometry): unknown[] {
   return geometry.type === 'Polygon'
@@ -22,6 +22,25 @@ describe('world map geometry', () => {
     expect(camera.scale).toBeLessThanOrEqual(9)
     expect(500 * camera.scale + camera.x).toBeCloseTo(MAP_WIDTH / 2)
     expect(280 * camera.scale + camera.y).toBeCloseTo(MAP_HEIGHT / 2)
+  })
+  test('小さい国ほど拡大し、通常サイズの国は従来の倍率を保つ', () => {
+    const boundsFor = (id: number, fitMode: 'primary' | 'all' = 'primary') => {
+      const geometry = worldFeatures.find((item) => item.id === id)?.geometry
+      expect(geometry).toBeDefined()
+      return fitMode === 'all' ? boundsForGeometry(geometry!) : primaryBounds(geometry!)
+    }
+    const singapore = cameraForCountryBounds(boundsFor(702))
+    const netherlands = cameraForCountryBounds(boundsFor(528))
+    const japanBounds = boundsFor(392, 'all')
+    const japan = cameraForCountryBounds(japanBounds)
+    const brazilBounds = boundsFor(76)
+    const brazil = cameraForCountryBounds(brazilBounds)
+
+    expect(singapore.scale).toBeGreaterThan(25)
+    expect(singapore.scale).toBeGreaterThan(netherlands.scale)
+    expect(netherlands.scale).toBeGreaterThan(9)
+    expect(japan).toEqual(cameraForBounds(japanBounds))
+    expect(brazil).toEqual(cameraForBounds(brazilBounds))
   })
   test('Bezier は両端を通り、途中では上側へ弧を描く', () => {
     expect(quadraticBezier([100, 300], [500, 300], 0)).toEqual([100, 300])
