@@ -1,20 +1,32 @@
 import { describe, expect, test } from 'vitest'
 import { countries } from '../flag-quiz/data/countries'
-import { countryById } from './data/travelCountries'
+import { countryById, travelCountries, travelCountryIdsForRegion, travelRegionForCountry } from './data/travelCountries'
 import { travelCourses } from './data/travelCourses'
 import { answerPositionBag, generateTravelQuestions } from './questionGenerator'
 
 function seededRandom(seed: number): () => number { let value = seed; return () => { value = (value * 1664525 + 1013904223) >>> 0; return value / 0x100000000 } }
 
 describe('world travel courses', () => {
-  test('各地域に3本あり、10か国が地域内で重複しない', () => {
-    expect(new Set(travelCourses.map((course) => course.region))).toEqual(new Set(['asia', 'europe', 'africa', 'northAmerica', 'southAmerica', 'oceania']))
+  test('4地域の各コースは10か国が地域内で重複しない', () => {
+    expect(new Set(travelCourses.map((course) => course.region))).toEqual(new Set(['asiaOceania', 'europe', 'africa', 'americas']))
     for (const course of travelCourses) {
       expect(course.countryIds).toHaveLength(10)
       expect(new Set(course.countryIds).size).toBe(10)
-      expect(travelCourses.filter((other) => other.region === course.region)).toHaveLength(3)
-      for (const id of course.countryIds) expect(countryById.get(id)?.continent).toBe(course.region)
+      for (const id of course.countryIds) expect(travelRegionForCountry(id)).toBe(course.region)
     }
+  })
+
+  test('旧6地域で対象だった国を新4地域へ欠落なく移し、全対象国がどこかのコースに登場する', () => {
+    const oldAsiaOceania = travelCountries.filter((travelCountry) => ['asia', 'oceania'].includes(countryById.get(travelCountry.countryId)?.continent ?? '')).map((country) => country.countryId)
+    const oldAmericas = travelCountries.filter((travelCountry) => ['northAmerica', 'southAmerica'].includes(countryById.get(travelCountry.countryId)?.continent ?? '')).map((country) => country.countryId)
+    expect(new Set(travelCountryIdsForRegion('asiaOceania'))).toEqual(new Set(oldAsiaOceania))
+    expect(new Set(travelCountryIdsForRegion('americas'))).toEqual(new Set(oldAmericas))
+
+    const routed = new Set(travelCourses.flatMap((course) => course.countryIds))
+    for (const countryId of travelCountryIdsForRegion('asiaOceania')) expect(routed).toContain(countryId)
+    for (const countryId of travelCountryIdsForRegion('europe')) expect(routed).toContain(countryId)
+    for (const countryId of travelCountryIdsForRegion('africa')) expect(routed).toContain(countryId)
+    for (const countryId of travelCountryIdsForRegion('americas')) expect(routed).toContain(countryId)
   })
 })
 
