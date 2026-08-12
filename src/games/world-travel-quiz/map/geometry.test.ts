@@ -42,6 +42,11 @@ describe('world map geometry', () => {
     expect(japan).toEqual(cameraForBounds(japanBounds))
     expect(brazil).toEqual(cameraForBounds(brazilBounds))
   })
+  test.each([[44, 'バハマ'], [242, 'フィジー'], [548, 'バヌアツ'], [776, 'トンガ'], [882, 'サモア'], [583, 'ミクロネシア'], [584, 'マーシャルしょとう']] as const)('%s (%s) は小国向けに拡大できる', (id, name) => {
+    const geometry = worldFeatures.find((item) => item.id === id)?.geometry
+    expect(geometry, name).toBeDefined()
+    expect(cameraForCountryBounds(primaryBounds(geometry!)).scale).toBeGreaterThan(9)
+  })
   test('Bezier は両端を通り、途中では上側へ弧を描く', () => {
     expect(quadraticBezier([100, 300], [500, 300], 0)).toEqual([100, 300])
     expect(quadraticBezier([100, 300], [500, 300], 1)).toEqual([500, 300])
