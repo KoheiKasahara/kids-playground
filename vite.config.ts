@@ -27,7 +27,6 @@ export default defineConfig({
         description: '子ども向けのミニゲーム集',
         lang: 'ja',
         display: 'standalone',
-        orientation: 'any',
         categories: ['games', 'education'],
         theme_color: '#4C6EF5',
         background_color: '#FFFDF7',
