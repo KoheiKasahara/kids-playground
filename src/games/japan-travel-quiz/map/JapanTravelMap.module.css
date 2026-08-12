@@ -1,0 +1,12 @@
+.map { width: 100%; min-height: 0; display: block; border: 3px solid #8bc7e8; border-radius: var(--radius-lg); background: #cdecfa; overflow: hidden; }
+.ocean { fill: #cdecfa; }
+.prefecture { fill: #f9e8b7; stroke: #5280a1; stroke-width: 1.15; vector-effect: non-scaling-stroke; }
+.visited { fill: #b9df8a; stroke: #3c7a4a; stroke-width: 1.8; vector-effect: non-scaling-stroke; }
+.active { fill: #ffbd4a; stroke: #b74920; stroke-width: 3.5; vector-effect: non-scaling-stroke; }
+.insetFrame { fill: rgba(247, 251, 253, .72); stroke: #5280a1; stroke-width: 1.15; stroke-dasharray: 3 2; }
+.route { fill: none; stroke: #e7573d; stroke-width: 3.4; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.travelingRoute { stroke-dasharray: 4 3; animation: dash 700ms linear infinite; }
+.plane { font-size: 18px; text-anchor: middle; paint-order: stroke; stroke: white; stroke-width: 2.5; }
+.visitedDot { fill: #e7573d; stroke: white; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+@keyframes dash { to { stroke-dashoffset: -14; } }
+@media (prefers-reduced-motion: reduce) { .travelingRoute { animation: none; } }
