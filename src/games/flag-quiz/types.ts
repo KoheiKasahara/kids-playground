@@ -64,5 +64,5 @@ export const MODE_LABEL: Record<QuizMode, string> = {
 export const LEVEL_DESCRIPTION: Record<QuizLevel, string> = {
   easy: 'よく しってる 20の くに',
   normal: '45の くに',
-  hard: 'せかいの 100の くに',
+  hard: 'せかいの 105の くに',
 };
