@@ -7,6 +7,9 @@ const regions: readonly { id: TravelRegion; title: string; emoji: string; descri
   { id: 'asia', title: 'アジア', emoji: '🗾', description: 'にほん から とうなんアジアへ' },
   { id: 'europe', title: 'ヨーロッパ', emoji: '🏰', description: 'いろいろな くにを めぐろう' },
   { id: 'africa', title: 'アフリカ', emoji: '🦁', description: 'さばく や そうげんを たびしよう' },
+  { id: 'northAmerica', title: '北アメリカ', emoji: '🗽', description: 'カナダ から カリブの うみへ' },
+  { id: 'southAmerica', title: '南アメリカ', emoji: '🦜', description: 'アンデス や アマゾンを たびしよう' },
+  { id: 'oceania', title: 'オセアニア', emoji: '🐠', description: 'たいへいようの しまを めぐろう' },
 ]
 
 export default function WorldTravelQuizStart() {
