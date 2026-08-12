@@ -7,7 +7,7 @@ function seededRandom(seed: number): () => number { let value = seed; return () 
 
 describe('world travel courses', () => {
   test('各地域に3本あり、10か国が地域内で重複しない', () => {
-    expect(new Set(travelCourses.map((course) => course.region))).toEqual(new Set(['asia', 'europe', 'africa']))
+    expect(new Set(travelCourses.map((course) => course.region))).toEqual(new Set(['asia', 'europe', 'africa', 'northAmerica', 'southAmerica', 'oceania']))
     for (const course of travelCourses) {
       expect(course.countryIds).toHaveLength(10)
       expect(new Set(course.countryIds).size).toBe(10)
