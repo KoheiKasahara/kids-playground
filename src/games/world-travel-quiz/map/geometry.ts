@@ -113,17 +113,33 @@ export function pathForGeometry(geometry: Geometry): string {
   return polygons.flatMap((polygon) => Array.isArray(polygon) ? polygon.map((ring) => ringPath(ring)) : []).join(' ')
 }
 export type Camera = { scale: number; x: number; y: number }
-export function cameraForBounds(bounds: Bounds, coverage = 0.52): Camera {
-  const width = Math.max(20, bounds.maxX - bounds.minX)
-  const height = Math.max(20, bounds.maxY - bounds.minY)
-  const scale = Math.max(1, Math.min(9, Math.min((MAP_WIDTH * coverage) / width, (MAP_HEIGHT * coverage) / height)))
+type CameraLimits = { minimumDimension?: number; maximumScale?: number }
+
+export function cameraForBounds(bounds: Bounds, coverage = 0.52, { minimumDimension = 20, maximumScale = 9 }: CameraLimits = {}): Camera {
+  const width = Math.max(minimumDimension, bounds.maxX - bounds.minX)
+  const height = Math.max(minimumDimension, bounds.maxY - bounds.minY)
+  const scale = Math.max(1, Math.min(maximumScale, Math.min((MAP_WIDTH * coverage) / width, (MAP_HEIGHT * coverage) / height)))
   return { scale, x: MAP_WIDTH / 2 - ((bounds.minX + bounds.maxX) / 2) * scale, y: MAP_HEIGHT / 2 - ((bounds.minY + bounds.maxY) / 2) * scale }
+}
+
+/**
+ * 国土の外接矩形が小さいときだけ、周辺地理を残せる範囲で拡大上限を上げる。
+ * 通常サイズ以上の国は従来と同じ cameraForBounds の計算を使う。
+ */
+export function cameraForCountryBounds(bounds: Bounds): Camera {
+  const longestDimension = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)
+  const smallCountryThreshold = 14
+  if (longestDimension >= smallCountryThreshold) return cameraForBounds(bounds)
+
+  // 14以下から少しずつ寄せ、シンガポール級では最大30倍まで許可する。
+  const maximumScale = Math.min(30, 9 + (smallCountryThreshold - longestDimension) * 1.7)
+  return cameraForBounds(bounds, 0.52, { minimumDimension: 10, maximumScale })
 }
 export function quadraticBezier(from: Position, to: Position, t: number): Position {
   const mx = (from[0] + to[0]) / 2
   const my = (from[1] + to[1]) / 2 - Math.min(75, Math.abs(to[0] - from[0]) * 0.18 + 20)
   const u = 1 - t
-  return [u * u * from[0] + 2 * u * t * mx + t * t * to[0], u * u * from[1] + 2 * u * t * my + t * t * to[1]]
+  return [u * u * from[0] + 2 * u * t * mx + t * t * to[0], u * u * from[1] + 2 * u * t * mx + t * t * to[1]]
 }
 export function bezierPath(from: Position, to: Position): string {
   const mx = (from[0] + to[0]) / 2
