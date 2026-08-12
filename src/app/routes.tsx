@@ -1,3 +1,4 @@
+import { lazy, Suspense, type ComponentType } from 'react'
 import { Navigate, type RouteObject } from 'react-router-dom'
 import Home from '../pages/Home'
 import FlagQuizStart from '../games/flag-quiz/FlagQuizStart'
@@ -23,6 +24,13 @@ import PrefecturePuzzlePlay from '../games/prefecture-quiz/PrefecturePuzzlePlay'
 import ColorMixQuizStart from '../games/color-mix-quiz/ColorMixQuizStart'
 import ColorMixQuizPlay from '../games/color-mix-quiz/ColorMixQuizPlay'
 import ColorMixQuizResult from '../games/color-mix-quiz/ColorMixQuizResult'
+
+// 50m世界地図は大きいため、旅行クイズを開くときだけ読込む。Vite PWAは生成された
+// chunkもprecacheするため、初回取得後は他のゲームと同様にオフラインで遊べる。
+const travelRoute = (loader: () => Promise<{ default: ComponentType }>) => {
+  const Screen = lazy(loader)
+  return <Suspense fallback={null}><Screen /></Suspense>
+}
 
 // さんすうクイズは4モード(add/sub/mul/div)ぶんの「むずかしさ選択・プレイ・結果」が
 // 完全に同型のため、直書きの繰り返しを避けて配列から組み立てる。
@@ -96,6 +104,9 @@ export const routes: RouteObject[] = [
   { path: '/games/prefecture-quiz/puzzle/:region/play', element: <PrefecturePuzzlePlay /> },
   { path: '/games/prefecture-quiz/:mode/play', element: <PrefectureQuizPlay /> },
   { path: '/games/prefecture-quiz/:mode/result', element: <PrefectureQuizResult /> },
+  { path: '/games/world-travel-quiz', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizStart')) },
+  { path: '/games/world-travel-quiz/:region/play', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizPlay')) },
+  { path: '/games/world-travel-quiz/:region/result', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizResult')) },
   ...MATH_QUIZ_MODES.flatMap((mode) => [
     {
       path: `/games/math-quiz/${MATH_QUIZ_MODE_PATH[mode]}`,

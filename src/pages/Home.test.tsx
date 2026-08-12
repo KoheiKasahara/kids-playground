@@ -16,6 +16,7 @@ describe('Home', () => {
     expect(screen.getByRole('button', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'さんすうクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '都道府県クイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'せかい旅行クイズ' })).toBeInTheDocument()
   })
 
   test('「都道府県クイズ」を押すと開始画面に遷移する', async () => {
@@ -60,5 +61,12 @@ describe('Home', () => {
     await user.click(screen.getByRole('button', { name: 'さんすうクイズ' }))
     expect(screen.getByRole('heading', { name: 'さんすうクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /たしざん/ })).toBeInTheDocument()
+  })
+
+  test('「せかい旅行クイズ」を押すと遅延読込した開始画面に遷移する', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await user.click(screen.getByRole('button', { name: 'せかい旅行クイズ' }))
+    expect(await screen.findByRole('heading', { name: 'せかい旅行クイズ' })).toBeInTheDocument()
   })
 })

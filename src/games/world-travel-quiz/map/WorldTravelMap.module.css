@@ -1,0 +1,10 @@
+.map { width: 100%; min-height: 0; display: block; border: 3px solid #8bc7e8; border-radius: var(--radius-lg); background: #cdecfa; overflow: hidden; }
+.ocean { fill: #cdecfa; }
+.country { fill: #f9e8b7; stroke: #5280a1; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.visitedCountry { fill: #b9df8a; stroke: #3c7a4a; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.activeCountry { fill: #ffbd4a; stroke: #b74920; stroke-width: 3.5; vector-effect: non-scaling-stroke; }
+.route { fill: none; stroke: #e7573d; stroke-width: 4; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.anchor circle:first-child { fill: rgba(255, 255, 255, .36); stroke: #bd4028; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.anchor circle:last-child { fill: #e7573d; stroke: white; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.plane text { font-size: 28px; paint-order: stroke; stroke: white; stroke-width: 3; }
+.visitedDot { fill: #e7573d; stroke: white; stroke-width: 2; vector-effect: non-scaling-stroke; }
