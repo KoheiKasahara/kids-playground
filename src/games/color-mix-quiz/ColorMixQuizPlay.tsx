@@ -10,11 +10,6 @@ import styles from './ColorMixQuizPlay.module.css'
 type State = { index: number; selected: string | null; correctCount: number }
 type Action = { type: 'select'; color: string; correct: boolean } | { type: 'next' }
 const initialState: State = { index: 0, selected: null, correctCount: 0 }
-const SUBTRACTION_INTRO_DURATION = 1050
-
-function prefersReducedMotion(): boolean {
-  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-}
 
 function reducer(state: State, action: Action): State {
   if (action.type === 'select') {
@@ -37,21 +32,7 @@ function ColorMixQuizGame() {
   const correct = state.selected === question.problem.resultColor
   const last = state.index === questions.length - 1
   const isSubtraction = question.problem.kind === 'subtraction'
-  const [subtractionIntroId, setSubtractionIntroId] = useState<string | null>(() => (
-    isSubtraction && !prefersReducedMotion() ? question.problem.id : null
-  ))
-  const isSubtracting = isSubtraction && subtractionIntroId === question.problem.id
-
-  // Show the removal before the choices unlock. The finished paint stays the
-  // original colour, so the four-choice answer is never exposed by the motion.
-  useEffect(() => {
-    if (!isSubtracting) return undefined
-    const problemId = question.problem.id
-    const timer = window.setTimeout(() => {
-      setSubtractionIntroId((activeId) => activeId === problemId ? null : activeId)
-    }, SUBTRACTION_INTRO_DURATION)
-    return () => window.clearTimeout(timer)
-  }, [isSubtracting, question.problem.id])
+  const isSubtracting = isSubtraction && answered
 
   // The success chime follows the visual mix. The timer is always cleared on next question/unmount.
   useEffect(() => {
@@ -61,7 +42,7 @@ function ColorMixQuizGame() {
   }, [correct, question.problem.id])
 
   const select = (color: string) => {
-    if (answered || isSubtracting) return
+    if (answered) return
     const isCorrect = color === question.problem.resultColor
     // This runs inside the tap event so iOS can unlock the shared AudioContext before delayed audio.
     primeAudio()
@@ -78,8 +59,6 @@ function ColorMixQuizGame() {
       navigate('/games/color-mix-quiz/result', { replace: true, state: { correctCount: state.correctCount, totalCount: questions.length } })
       return
     }
-    const nextQuestion = questions[state.index + 1]
-    setSubtractionIntroId(nextQuestion.problem.kind === 'subtraction' && !prefersReducedMotion() ? nextQuestion.problem.id : null)
     dispatch({ type: 'next' })
   }
 
@@ -102,14 +81,14 @@ function ColorMixQuizGame() {
             </Fragment>
           ))}
           {isSubtraction && <span className={styles.removalParticles} style={{ '--paint-color': question.problem.inputColors[1] } as CSSProperties} aria-hidden="true" data-testid="subtraction-removal-particles"><i /><i /><i /></span>}
-          {correct && !isSubtraction && <><span className={styles.mixedPaint} style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" /><span className={styles.done}>できた！</span></>}
+          {((correct && !isSubtraction) || isSubtracting) && <><span className={styles.mixedPaint} style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" /><span className={styles.done}>できた！</span></>}
         </div>
         <div className={styles.choices}>
           {question.choices.map((color, index) => {
             const isAnswer = color === question.problem.resultColor
             const selected = color === state.selected
             const className = [styles.choice, answered && isAnswer ? styles.answer : '', answered && selected && !isAnswer ? styles.wrong : ''].filter(Boolean).join(' ')
-            return <button key={color} type="button" className={className} style={{ backgroundColor: color }} aria-label={`${index + 1}ばんめの いろ`} disabled={answered || isSubtracting} onClick={() => select(color)}>
+            return <button key={color} type="button" className={className} style={{ backgroundColor: color }} aria-label={`${index + 1}ばんめの いろ`} disabled={answered} onClick={() => select(color)}>
               {answered && isAnswer && <span aria-hidden="true">◯</span>}
               {answered && selected && !isAnswer && <span aria-hidden="true">✕</span>}
             </button>
