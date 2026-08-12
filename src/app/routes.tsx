@@ -105,8 +105,9 @@ export const routes: RouteObject[] = [
   { path: '/games/prefecture-quiz/:mode/play', element: <PrefectureQuizPlay /> },
   { path: '/games/prefecture-quiz/:mode/result', element: <PrefectureQuizResult /> },
   { path: '/games/world-travel-quiz', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizStart')) },
-  { path: '/games/world-travel-quiz/:region/play', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizPlay')) },
-  { path: '/games/world-travel-quiz/:region/result', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizResult')) },
+  { path: '/games/world-travel-quiz/:region/answer-mode', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelAnswerModeSelect')) },
+  { path: '/games/world-travel-quiz/:region/:answerMode/play', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizPlay')) },
+  { path: '/games/world-travel-quiz/:region/:answerMode/result', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizResult')) },
   ...MATH_QUIZ_MODES.flatMap((mode) => [
     {
       path: `/games/math-quiz/${MATH_QUIZ_MODE_PATH[mode]}`,
