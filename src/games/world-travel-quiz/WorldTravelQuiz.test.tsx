@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import WorldTravelQuizPlay from './WorldTravelQuizPlay'
 import WorldTravelQuizResult from './WorldTravelQuizResult'
+import WorldTravelQuizStart from './WorldTravelQuizStart'
 
 const originalMatchMedia = window.matchMedia
 afterEach(() => { window.matchMedia = originalMatchMedia })
@@ -21,6 +22,30 @@ describe('WorldTravelQuizPlay', () => {
     await user.dblClick(next)
     expect(screen.getByText('2 / 10')).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  test.each(['northAmerica', 'southAmerica', 'oceania'] as const)('%s を選んでもゲームを開始できる', (region) => {
+    reducedMotion()
+    render(<MemoryRouter initialEntries={[`/games/world-travel-quiz/${region}/play`]}><Routes><Route path="/games/world-travel-quiz/:region/play" element={<WorldTravelQuizPlay />} /></Routes></MemoryRouter>)
+    expect(screen.getByText('1 / 10')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'この くには どこ？' })).toBeInTheDocument()
+  })
+
+  test.each(['northAmerica', 'southAmerica', 'oceania'] as const)('%s は10問を終えて結果まで進める', async (region) => {
+    reducedMotion(); const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={[`/games/world-travel-quiz/${region}/play`]}><Routes><Route path="/games/world-travel-quiz/:region/play" element={<WorldTravelQuizPlay />} /><Route path="/games/world-travel-quiz/:region/result" element={<WorldTravelQuizResult />} /><Route path="/games/world-travel-quiz" element={<h1>start</h1>} /></Routes></MemoryRouter>)
+    for (let index = 0; index < 10; index += 1) {
+      await user.click(screen.getAllByRole('button').find((button) => button.textContent !== 'やめる')!)
+      await user.click(screen.getByRole('button', { name: index === 9 ? 'けっかを みる' : 'つぎの くにへ' }))
+    }
+    expect(screen.getByRole('heading', { name: 'たびが しゅうりょう！' })).toBeInTheDocument()
+  })
+})
+
+describe('WorldTravelQuizStart', () => {
+  test('6地域を選べる', () => {
+    render(<MemoryRouter><WorldTravelQuizStart /></MemoryRouter>)
+    for (const name of ['アジア', 'ヨーロッパ', 'アフリカ', '北アメリカ', '南アメリカ', 'オセアニア']) expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument()
   })
 })
 
