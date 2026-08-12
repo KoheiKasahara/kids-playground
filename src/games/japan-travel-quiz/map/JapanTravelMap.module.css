@@ -6,7 +6,7 @@
 .insetFrame { fill: rgba(247, 251, 253, .72); stroke: #5280a1; stroke-width: 1.15; stroke-dasharray: 3 2; }
 .route { fill: none; stroke: #e7573d; stroke-width: 3.4; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .travelingRoute { stroke-dasharray: 4 3; animation: dash 700ms linear infinite; }
-.plane { font-size: 18px; text-anchor: middle; paint-order: stroke; stroke: white; stroke-width: 2.5; }
+.plane text { font-size: 18px; text-anchor: middle; paint-order: stroke; stroke: white; stroke-width: 2.5; }
 .visitedDot { fill: #e7573d; stroke: white; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 @keyframes dash { to { stroke-dashoffset: -14; } }
 @media (prefers-reduced-motion: reduce) { .travelingRoute { animation: none; } }
