@@ -1,8 +1,0 @@
-.page { max-width: var(--content-max-width); min-height: 100vh; min-height: 100dvh; margin: 0 auto; padding: var(--space-lg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-sm); text-align: center; }
-.hero { font-size: 48px; line-height: 1; }
-.title { font-size: clamp(30px, 8vw, var(--font-size-xlarge)); color: var(--color-primary-dark); }
-.actions { width: 100%; margin-top: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); }
-.levelButton { display: flex; flex-direction: column; align-items: center; gap: 2px; padding-block: 10px; }
-.levelLabel { font-size: var(--font-size-large); }
-.levelDescription { font-size: 15px; font-weight: 500; opacity: .9; }
-@media (orientation: landscape) and (max-height: 560px) { .page { max-width: 920px; padding-block: var(--space-sm); } .hero { display: none; } .title { font-size: 27px; } .actions { display: grid; grid-template-columns: repeat(3, 1fr); } .actions > :last-child { grid-column: 1 / -1; } }
