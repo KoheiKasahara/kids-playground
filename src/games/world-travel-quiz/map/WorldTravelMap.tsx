@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { travelCountryById } from '../data/travelCountries'
 import { worldFeatures } from '../data/worldFeatures'
 import type { TravelCourse, TravelPhase } from '../types'
-import { bezierPath, boundsForGeometry, cameraForBounds, mergeBounds, pathForGeometry, primaryBounds, project, quadraticBezier, type Bounds, type Camera, type Position } from './geometry'
+import { bezierPath, boundsForGeometry, cameraForBounds, cameraForCountryBounds, mergeBounds, pathForGeometry, primaryBounds, project, quadraticBezier, type Bounds, type Camera, type Position } from './geometry'
 import styles from './WorldTravelMap.module.css'
 
 type Props = { course: TravelCourse; questionIndex: number; phase: TravelPhase; onTravelComplete: () => void; result?: boolean }
@@ -13,6 +13,7 @@ const featuresById = new Map(cachedFeatures.map((item) => [item.id, item]))
 const worldCamera: Camera = { scale: 1, x: 0, y: 0 }
 const durationFor = (from: Position, to: Position) => Math.max(800, Math.min(1200, 800 + Math.hypot(to[0] - from[0], to[1] - from[1]) * 0.55))
 const transform = (camera: Camera) => `translate(${camera.x.toFixed(2)} ${camera.y.toFixed(2)}) scale(${camera.scale.toFixed(3)})`
+const markerTransform = (point: Position, camera: Camera) => `translate(${(point[0] * camera.scale + camera.x).toFixed(2)} ${(point[1] * camera.scale + camera.y).toFixed(2)})`
 
 function targetBounds(countryId: string): Bounds {
   const country = travelCountryById.get(countryId)
@@ -30,6 +31,7 @@ function countryPoint(countryId: string): Position {
 /** 同一 SVG を保ったまま camera g の transform だけを更新する世界地図。 */
 export default function WorldTravelMap({ course, questionIndex, phase, onTravelComplete, result = false }: Props) {
   const cameraRef = useRef<SVGGElement>(null)
+  const anchorRef = useRef<SVGGElement>(null)
   const planeRef = useRef<SVGGElement>(null)
   const travelingRouteRef = useRef<SVGPathElement>(null)
   const frameRef = useRef<number | null>(null)
@@ -46,7 +48,8 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
   useEffect(() => () => { if (frameRef.current !== null) cancelAnimationFrame(frameRef.current) }, [])
 
   useEffect(() => {
-    const destination = result ? cameraForBounds(finalBounds, 0.82) : cameraForBounds(targetBounds(activeId))
+    const activePoint = countryPoint(activeId)
+    const destination = result ? cameraForBounds(finalBounds, 0.82) : cameraForCountryBounds(targetBounds(activeId))
     const origin = previousCamera.current
     const plane = planeRef.current
     const camera = cameraRef.current
@@ -57,7 +60,10 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
     const from = travel ? countryPoint(routeIds[questionIndex]) : null
     const to = travel ? countryPoint(routeIds[questionIndex + 1]) : null
     const duration = from && to ? durationFor(from, to) : 800
-    const setCamera = (value: Camera) => camera.setAttribute('transform', transform(value))
+    const setCamera = (value: Camera) => {
+      camera.setAttribute('transform', transform(value))
+      anchorRef.current?.setAttribute('transform', markerTransform(activePoint, value))
+    }
     const setTravelProgress = (progress: number) => travelingRouteRef.current?.setAttribute('stroke-dashoffset', String(1 - progress))
     const finish = () => { previousCamera.current = destination; setCamera(destination); setTravelProgress(1); if (plane) plane.setAttribute('visibility', 'hidden'); if (travel) onTravelComplete() }
     if (reduced) { finish(); return }
@@ -98,10 +104,10 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
           return <path key={`${routeIds[index]}-${routeIds[index + 1]}`} d={bezierPath(from, to)} className={styles.route} aria-hidden="true" />
         })}
         {phase === 'traveling' && !result && <path ref={travelingRouteRef} d={bezierPath(countryPoint(routeIds[questionIndex]), countryPoint(routeIds[questionIndex + 1]))} className={styles.route} pathLength="1" strokeDasharray="1" strokeDashoffset="1" aria-hidden="true" />}
-        {!result && <g className={styles.anchor} transform={`translate(${countryPoint(activeId).join(' ')})`} aria-hidden="true"><circle r="13" /><circle r="6" /></g>}
         {result && routeIds.map((countryId) => <circle key={countryId} className={styles.visitedDot} cx={countryPoint(countryId)[0]} cy={countryPoint(countryId)[1]} r="4.5" aria-hidden="true" />)}
         <g ref={planeRef} className={styles.plane} visibility="hidden" aria-hidden="true"><text x="-10" y="8">✈</text></g>
       </g>
+      {!result && <g ref={anchorRef} className={styles.anchor} transform={markerTransform(countryPoint(activeId), worldCamera)} aria-hidden="true"><circle r="6" /><circle r="2.5" /></g>}
     </svg>
   )
 }
