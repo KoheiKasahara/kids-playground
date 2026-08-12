@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
+import FlagChoiceGrid from './FlagChoiceGrid'
 import FlagImage from './FlagImage'
 import { countriesForLevel } from './data/countries'
 import { generateQuestions } from './questionGenerator'
@@ -55,14 +56,6 @@ function choiceMark(variant: ChoiceVariant): string {
   return ''
 }
 
-/** なまえ→こっきモードの国旗選択肢ボタンの見た目クラス。正解・不正解のみ枠色を変える */
-function flagChoiceClassName(variant: ChoiceVariant): string {
-  const classes = [styles.flagChoiceButton]
-  if (variant === 'correct') classes.push(styles.flagChoiceCorrect)
-  if (variant === 'wrong') classes.push(styles.flagChoiceWrong)
-  return classes.join(' ')
-}
-
 // panelFlag はパネル専用の PanelFlagQuizPlay を使うため、このコンポーネントの
 // props からは型レベルで除外する（誤って panelFlag を渡すとコンパイルエラーになる）。
 type FlagQuizPlayProps = {
@@ -72,7 +65,6 @@ type FlagQuizPlayProps = {
 export default function FlagQuizPlay({ mode }: FlagQuizPlayProps) {
   const { level } = useParams()
 
-  // 不正な level（URL直打ちなど）の場合は、このモードのむずかしさ選択画面へ戻す
   if (!isQuizLevel(level)) {
     return <Navigate to={`/games/flag-quiz/${MODE_PATH[mode]}`} replace />
   }
@@ -118,8 +110,6 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
     dispatch({ type: 'next' })
   }
 
-  // nameToFlagモードはオーバーレイに国旗の行が増えるぶん高さが変わるため、
-  // ページ側の下部余白（--feedback-bar-height）をモード別クラスで切り替える
   const pageClassName = [styles.page, mode === 'nameToFlag' ? styles.pageNameToFlag : '']
     .filter(Boolean)
     .join(' ')
@@ -152,8 +142,6 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
               <div className={styles.choices}>
                 {question.choices.map((choice) => {
                   const variant = choiceVariant(choice, question.answer, state.selectedId)
-                  // secondary（正解でも選んだ誤答でもない、回答後の「その他」の選択肢）だけ、
-                  // 従来どおり枠線の色を見せる（PanelFlagQuizPlayと同じ方針）。
                   const choiceButtonClassName = [
                     styles.choiceButton,
                     variant === 'secondary' ? styles.choiceButtonUnselected : '',
@@ -170,11 +158,6 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
                       onClick={() => handleSelect(choice.id)}
                     >
                       <span className={styles.choiceMark}>{mark}</span>
-                      {/* 記号は絶対配置で見た目には影響しないが、スクリーンリーダー向けの
-                          読み上げ名（アクセシブルネーム）では「◯ こくめい」のように
-                          記号とラベルの間に区切りが必要。半角スペースをspan内に含めると
-                          アクセシブルネーム計算時に末尾空白として落ちてしまうため、
-                          記号spanの外に独立したテキストノードとして置く。 */}
                       {mark && ' '}
                       {choice.nameJa}
                     </BigButton>
@@ -188,47 +171,18 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
             <h1 className={styles.question}>
               「<span className={styles.questionCountry}>{question.answer.nameJa}</span>」の こっきは どれ？
             </h1>
-
-            <div className={styles.flagChoices}>
-              {question.choices.map((choice, index) => {
-                const variant = choiceVariant(choice, question.answer, state.selectedId)
-                return (
-                  <button
-                    key={choice.id}
-                    type="button"
-                    className={flagChoiceClassName(variant)}
-                    disabled={answered}
-                    aria-label={`${index + 1}ばんめ の こっき`}
-                    onClick={() => handleSelect(choice.id)}
-                  >
-                    <FlagImage country={choice} size="choice" />
-                    {/* 色だけに頼らず判別できるよう、枠色に加えて記号バッジを重ねる */}
-                    {answered && variant === 'correct' && (
-                      <span className={`${styles.choiceBadge} ${styles.badgeCorrect}`} aria-hidden="true">
-                        ◯
-                      </span>
-                    )}
-                    {answered && variant === 'wrong' && (
-                      <span className={`${styles.choiceBadge} ${styles.badgeWrong}`} aria-hidden="true">
-                        ✕
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+            <FlagChoiceGrid
+              choices={question.choices}
+              answer={question.answer}
+              selectedId={state.selectedId}
+              disabled={answered}
+              onSelect={handleSelect}
+              className={styles.flagChoices}
+            />
           </>
         )}
       </div>
 
-      {/*
-        正誤メッセージと「つぎのもんだい」は、通常フローから外し共通コンポーネント
-        QuizResultOverlay が画面下部に固定して表示する。こうすることで画面の高さに
-        関係なく必ず可視・操作可能になる（iPhone SE 相当の低背端末でも画面外に出ない）。
-        未回答時はDOMに置かず、回答直後にマウントしてアニメーションを都度再生する。
-        隠れ防止の余白は .page（nameToFlagモードは .pageNameToFlag）側の
-        padding-bottom で、回答したかどうかに関わらずビューポートの幅・高さだけで確保している。
-      */}
       {answered && (
         <QuizResultOverlay
           result={isCorrect ? 'correct' : 'wrong'}
