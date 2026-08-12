@@ -7,7 +7,7 @@ import { playCorrectSound } from '../../utils/quizSound'
 import { coursesForRegion } from './data/travelCourses'
 import WorldTravelMap from './map/WorldTravelMap'
 import { generateTravelQuestions } from './questionGenerator'
-import { QUESTION_COUNT, isTravelRegion, type TravelCourse, type TravelPhase } from './types'
+import { QUESTION_COUNT, isTravelRegion, type TravelCourse, type TravelPhase, type TravelRegion } from './types'
 import styles from './WorldTravelQuizPlay.module.css'
 
 export default function WorldTravelQuizPlay() {
@@ -16,7 +16,7 @@ export default function WorldTravelQuizPlay() {
   return <TravelGame region={pathRegion} />
 }
 
-function TravelGame({ region }: { region: 'asia' | 'europe' | 'africa' }) {
+function TravelGame({ region }: { region: TravelRegion }) {
   const navigate = useNavigate()
   const [course] = useState<TravelCourse>(() => {
     const choices = coursesForRegion(region)
