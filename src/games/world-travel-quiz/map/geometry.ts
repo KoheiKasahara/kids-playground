@@ -139,7 +139,7 @@ export function quadraticBezier(from: Position, to: Position, t: number): Positi
   const mx = (from[0] + to[0]) / 2
   const my = (from[1] + to[1]) / 2 - Math.min(75, Math.abs(to[0] - from[0]) * 0.18 + 20)
   const u = 1 - t
-  return [u * u * from[0] + 2 * u * t * mx + t * t * to[0], u * u * from[1] + 2 * u * t * mx + t * t * to[1]]
+  return [u * u * from[0] + 2 * u * t * mx + t * t * to[0], u * u * from[1] + 2 * u * t * my + t * t * to[1]]
 }
 export function bezierPath(from: Position, to: Position): string {
   const mx = (from[0] + to[0]) / 2
