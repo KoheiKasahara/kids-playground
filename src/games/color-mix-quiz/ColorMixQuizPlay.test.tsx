@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -50,8 +50,7 @@ describe('ColorMixQuizPlay', () => {
     for (const choice of choices) expect(choice).toBeDisabled()
   })
 
-  test('引き算では色の粒を抜いてから4択を有効化し、答え色は演出に表示しない', () => {
-    vi.useFakeTimers()
+  test('引き算では回答後に色の粒を抜き、正解色を表示する', async () => {
     questionGeneratorMock.questions = [{
       problem: {
         id: 'purple-minus-blue-red',
@@ -67,11 +66,12 @@ describe('ColorMixQuizPlay', () => {
     renderApp('/games/color-mix-quiz/play')
 
     expect(screen.getByTestId('subtraction-removal-particles')).toBeInTheDocument()
-    for (const choice of screen.getAllByRole('button', { name: /[1-4]ばんめの いろ/ })) expect(choice).toBeDisabled()
+    for (const choice of screen.getAllByRole('button', { name: /[1-4]ばんめの いろ/ })) expect(choice).toBeEnabled()
     expect(screen.queryByText('できた！')).not.toBeInTheDocument()
 
-    act(() => { vi.advanceTimersByTime(1050) })
-    for (const choice of screen.getAllByRole('button', { name: /[1-4]ばんめの いろ/ })) expect(choice).toBeEnabled()
+    await userEvent.setup().click(screen.getByRole('button', { name: '1ばんめの いろ' }))
+    for (const choice of screen.getAllByRole('button', { name: /[1-4]ばんめの いろ/ })) expect(choice).toBeDisabled()
+    expect(screen.getByText('できた！')).toBeInTheDocument()
   })
 
   test('旧難易度URLも単一のプレイ画面へ進む', () => {
