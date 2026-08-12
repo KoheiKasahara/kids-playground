@@ -1,10 +1,8 @@
-import { useEffect, useReducer, useState, type CSSProperties } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Fragment, useEffect, useReducer, useState, type CSSProperties } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
 import { playColorMixSound, playCorrectSound, playIncorrectSound, primeAudio } from '../../utils/quizSound'
-import { isQuizLevel, LEVEL_LABEL } from '../quiz-core/types'
-import type { QuizLevel } from '../quiz-core/types'
 import { generateColorMixQuestions } from './questionGenerator'
 import type { ColorMixQuestion } from './types'
 import styles from './ColorMixQuizPlay.module.css'
@@ -22,14 +20,12 @@ function reducer(state: State, action: Action): State {
 }
 
 export default function ColorMixQuizPlay() {
-  const { level } = useParams()
-  if (!isQuizLevel(level)) return <Navigate to="/games/color-mix-quiz/level" replace />
-  return <ColorMixQuizGame level={level} />
+  return <ColorMixQuizGame />
 }
 
-function ColorMixQuizGame({ level }: { level: QuizLevel }) {
+function ColorMixQuizGame() {
   const navigate = useNavigate()
-  const [questions] = useState<ColorMixQuestion[]>(() => generateColorMixQuestions(level))
+  const [questions] = useState<ColorMixQuestion[]>(() => generateColorMixQuestions())
   const [state, dispatch] = useReducer(reducer, initialState)
   const question = questions[state.index]
   const answered = state.selected !== null
@@ -55,7 +51,7 @@ function ColorMixQuizGame({ level }: { level: QuizLevel }) {
 
   const next = () => {
     if (last) {
-      navigate(`/games/color-mix-quiz/${level}/result`, { replace: true, state: { correctCount: state.correctCount, totalCount: questions.length } })
+      navigate('/games/color-mix-quiz/result', { replace: true, state: { correctCount: state.correctCount, totalCount: questions.length } })
       return
     }
     dispatch({ type: 'next' })
@@ -66,36 +62,20 @@ function ColorMixQuizGame({ level }: { level: QuizLevel }) {
       <header className={styles.header}>
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>やめる</button>
         <div className={styles.progressArea}>
-          <p className={styles.progressLabel}><span>{LEVEL_LABEL[level]}</span>{state.index + 1} / {questions.length}</p>
+          <p className={styles.progressLabel}>{state.index + 1} / {questions.length}</p>
           <ProgressBar current={state.index + 1} total={questions.length} />
         </div>
       </header>
       <section className={styles.body} aria-label="いろを まぜる もんだい">
-        <h1 className={styles.question}>この {question.problem.inputColors.length}しょくを まぜると？</h1>
-        <div
-          className={[styles.paintStage, answered ? styles.mixing : '', question.problem.inputColors.length === 3 ? styles.trio : ''].filter(Boolean).join(' ')}
-          key={`${question.problem.id}-${state.selected ?? 'new'}`}
-        >
-          {question.problem.inputColors.flatMap((color, index) => {
-            const paintClass = index === 0 ? styles.paintA : index === 1 ? styles.paintB : styles.paintC
-            const nodes = []
-            if (index > 0) nodes.push(<span key={`plus-${index}`} className={styles.plus} aria-hidden="true">＋</span>)
-            nodes.push(<span key={`paint-${index}`} className={`${styles.paint} ${paintClass}`} style={{ '--paint-color': color } as CSSProperties} aria-hidden="true" />)
-            return nodes
-          })}
-          {answered && correct && <><span className={styles.mixedPaint} data-testid="mixed-paint" style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" /><span className={styles.done}>できた！</span></>}
-          {answered && !correct && (
-            <div className={styles.compare}>
-              <div className={styles.compareItem}>
-                <span className={styles.compareLabel}>えらんだいろ</span>
-                <span className={styles.compareSwatch} style={{ '--paint-color': state.selected } as CSSProperties} aria-hidden="true" />
-              </div>
-              <div className={styles.compareItem}>
-                <span className={styles.compareLabel}>まざったいろ</span>
-                <span className={styles.compareSwatch} data-testid="mixed-paint" style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" />
-              </div>
-            </div>
-          )}
+        <h1 className={styles.question}>{question.problem.kind === 'subtraction' ? 'この いろから ひくと？' : `この ${question.problem.inputColors.length}しょくを まぜると？`}</h1>
+        <div className={[styles.paintStage, question.problem.inputColors.length === 3 ? styles.threePaintStage : '', correct ? styles.mixing : ''].filter(Boolean).join(' ')} key={`${question.problem.id}-${state.selected ?? 'new'}`}>
+          {question.problem.inputColors.map((color, index) => (
+            <Fragment key={`${color}-${index}`}>
+              <span className={`${styles.paint} ${index === 0 ? styles.paintA : index === 1 ? styles.paintB : styles.paintC}`} style={{ '--paint-color': color } as CSSProperties} aria-hidden="true" />
+              {index < question.problem.inputColors.length - 1 && <span className={styles.plus} aria-hidden="true">{question.problem.kind === 'subtraction' ? '−' : '＋'}</span>}
+            </Fragment>
+          ))}
+          {correct && <><span className={styles.mixedPaint} style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" /><span className={styles.done}>できた！</span></>}
         </div>
         <div className={styles.choices}>
           {question.choices.map((color, index) => {
