@@ -1,5 +1,5 @@
 import { countries } from '../../flag-quiz/data/countries'
-import type { TravelCountry } from '../types'
+import type { TravelCountry, TravelRegion } from '../types'
 
 type Entry = readonly [string, number, readonly [number, number], ('primary' | 'all')?]
 const entries: readonly Entry[] = [
@@ -14,3 +14,17 @@ const entries: readonly Entry[] = [
 export const travelCountries: readonly TravelCountry[] = entries.map(([countryId, mapId, anchor, fitMode]) => ({ countryId, mapId, anchor, fitMode }))
 export const travelCountryById = new Map(travelCountries.map((country) => [country.countryId, country]))
 export const countryById = new Map(countries.map((country) => [country.id, country]))
+
+/** 国旗クイズの旧6大陸分類を、旅行クイズの4地域へ写す。国そのもののデータは変更しない。 */
+export function travelRegionForCountry(countryId: string): TravelRegion | undefined {
+  const continent = countryById.get(countryId)?.continent
+  if (continent === 'asia' || continent === 'oceania') return 'asiaOceania'
+  if (continent === 'northAmerica' || continent === 'southAmerica') return 'americas'
+  return continent
+}
+
+export function travelCountryIdsForRegion(region: TravelRegion): readonly string[] {
+  return travelCountries
+    .map((country) => country.countryId)
+    .filter((countryId) => travelRegionForCountry(countryId) === region)
+}

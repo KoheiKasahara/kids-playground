@@ -19,6 +19,9 @@ export function project(position: Position): Position {
   const [x, y] = webMercator(position)
   return [MAP_WIDTH / 2 + x * (MAP_WIDTH / (2 * Math.PI)), MAP_HEIGHT / 2 - y * (MAP_WIDTH / (2 * Math.PI))]
 }
+export function boundsForPositions(points: readonly Position[]): Bounds {
+  return boundsForPoints(points)
+}
 function pointsForGeometry(geometry: Geometry): Position[] { const result: Position[] = []; positions(geometry.coordinates, result); return result }
 export function boundsForGeometry(geometry: Geometry): Bounds {
   const points = pointsForGeometry(geometry).map(project)
@@ -140,9 +143,25 @@ export function cameraForCountryBounds(bounds: Bounds): Camera {
   const smallCountryThreshold = 14
   if (longestDimension >= smallCountryThreshold) return cameraForBounds(bounds)
 
-  // 14以下から少しずつ寄せ、シンガポール級では最大30倍まで許可する。
-  const maximumScale = Math.min(30, 9 + (smallCountryThreshold - longestDimension) * 1.7)
-  return cameraForBounds(bounds, 0.52, { minimumDimension: 10, maximumScale })
+  // 小国は色で強調済みなので、形の拡大より周辺との位置関係を優先する。
+  // 最大4.8倍ならバヌアツ等でも近くの島・オーストラリア側を画面に残せる。
+  return cameraForBounds(bounds, 0.58, { minimumDimension: 22, maximumScale: 4.8 })
+}
+
+/** -180〜180 の経度を、reference から最短になる連続座標へ移す。 */
+export function longitudeNear(longitude: number, reference: number): number {
+  const normalized = ((longitude + 180) % 360 + 360) % 360 - 180
+  return normalized + 360 * Math.round((reference - normalized) / 360)
+}
+
+/** 日付変更線をまたぐ行程も、地球上で短い方向へ連続化する。 */
+export function shortestLongitudePath(points: readonly Position[]): Position[] {
+  if (!points.length) return []
+  const result: Position[] = [[points[0][0], points[0][1]]]
+  for (const [longitude, latitude] of points.slice(1)) {
+    result.push([longitudeNear(longitude, result[result.length - 1][0]), latitude])
+  }
+  return result
 }
 export function quadraticBezier(from: Position, to: Position, t: number): Position {
   const mx = (from[0] + to[0]) / 2

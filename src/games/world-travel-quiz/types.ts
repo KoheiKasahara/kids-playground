@@ -3,7 +3,7 @@ import type { Country } from '../flag-quiz/types'
 export const QUESTION_COUNT = 10
 export const CHOICE_COUNT = 4
 
-export const TRAVEL_REGIONS = ['asia', 'europe', 'africa', 'northAmerica', 'southAmerica', 'oceania'] as const
+export const TRAVEL_REGIONS = ['asiaOceania', 'europe', 'africa', 'americas'] as const
 export type TravelRegion = (typeof TRAVEL_REGIONS)[number]
 
 export const ANSWER_MODES = ['country-name', 'flag'] as const

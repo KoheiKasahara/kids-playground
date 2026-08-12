@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { worldFeatures } from '../data/worldFeatures'
-import { antimeridianClippedRings, boundsForGeometry, cameraForBounds, cameraForCountryBounds, MAP_HEIGHT, MAP_WIDTH, primaryBounds, project, quadraticBezier, type Geometry, type Position } from './geometry'
+import { antimeridianClippedRings, boundsForGeometry, cameraForBounds, cameraForCountryBounds, longitudeNear, MAP_HEIGHT, MAP_WIDTH, primaryBounds, project, quadraticBezier, shortestLongitudePath, type Geometry, type Position } from './geometry'
 
 function ringsFor(geometry: Geometry): unknown[] {
   return geometry.type === 'Polygon'
@@ -36,16 +36,25 @@ describe('world map geometry', () => {
     const brazilBounds = boundsFor(76)
     const brazil = cameraForCountryBounds(brazilBounds)
 
-    expect(singapore.scale).toBeGreaterThan(25)
-    expect(singapore.scale).toBeGreaterThan(netherlands.scale)
-    expect(netherlands.scale).toBeGreaterThan(9)
-    expect(japan).toEqual(cameraForBounds(japanBounds))
-    expect(brazil).toEqual(cameraForBounds(brazilBounds))
+    expect(singapore.scale).toBeLessThanOrEqual(4.8)
+    expect(singapore.scale).toBeGreaterThanOrEqual(netherlands.scale)
+    expect(netherlands.scale).toBeLessThanOrEqual(4.8)
+    expect(japan.scale).toBeGreaterThan(1)
+    expect(brazil.scale).toBeGreaterThan(1)
   })
-  test.each([[44, 'バハマ'], [242, 'フィジー'], [548, 'バヌアツ'], [776, 'トンガ'], [882, 'サモア'], [583, 'ミクロネシア'], [584, 'マーシャルしょとう']] as const)('%s (%s) は小国向けに拡大できる', (id, name) => {
+  test.each([[44, 'バハマ'], [242, 'フィジー'], [548, 'バヌアツ'], [776, 'トンガ'], [882, 'サモア'], [583, 'ミクロネシア'], [584, 'マーシャルしょとう']] as const)('%s (%s) は周辺を残す上限内で拡大できる', (id, name) => {
     const geometry = worldFeatures.find((item) => item.id === id)?.geometry
     expect(geometry, name).toBeDefined()
-    expect(cameraForCountryBounds(primaryBounds(geometry!)).scale).toBeGreaterThan(9)
+    const camera = cameraForCountryBounds(primaryBounds(geometry!))
+    expect(camera.scale).toBeGreaterThan(1)
+    expect(camera.scale).toBeLessThanOrEqual(4.8)
+  })
+  test('日付変更線をまたぐ移動は短い方向に連続化する', () => {
+    expect(longitudeNear(-170, 170)).toBe(190)
+    expect(longitudeNear(170, -170)).toBe(-190)
+    const path = shortestLongitudePath([[170, -18], [-172, -14], [-175, -21], [178, -18]])
+    expect(path.map(([longitude]) => longitude)).toEqual([170, 188, 185, 178])
+    expect(path.slice(1).every((point, index) => Math.abs(point[0] - path[index][0]) <= 180)).toBe(true)
   })
   test('Bezier は両端を通り、途中では上側へ弧を描く', () => {
     expect(quadraticBezier([100, 300], [500, 300], 0)).toEqual([100, 300])
