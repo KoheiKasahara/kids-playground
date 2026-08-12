@@ -10,7 +10,7 @@ export default function ColorMixQuizStart() {
       <h1 className={styles.title}>いろまぜクイズ</h1>
       <p className={styles.description}>えのぐを まぜて、できる いろを あてよう！</p>
       <div className={styles.actions}>
-        <BigButton variant="primary" onClick={() => navigate('/games/color-mix-quiz/level')}>
+        <BigButton variant="primary" onClick={() => navigate('/games/color-mix-quiz/play')}>
           はじめる
         </BigButton>
         <BigButton variant="secondary" onClick={() => navigate('/')}>もどる</BigButton>
