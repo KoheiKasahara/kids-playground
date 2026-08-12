@@ -16,8 +16,8 @@ export default function WorldTravelQuizStart() {
   const navigate = useNavigate()
   return <main className={styles.page}>
     <h1 className={styles.title}>せかい旅行クイズ</h1>
-    <p className={styles.description}>ちずの ひかっている くには どこ？ 10この くにを たびしよう！</p>
-    <div className={styles.regions}>{regions.map((region) => <BigButton key={region.id} variant="primary" className={styles.region} onClick={() => navigate(`/games/world-travel-quiz/${region.id}/play`)}><span aria-hidden="true">{region.emoji}</span><span><strong>{region.title}</strong><small>{region.description}</small></span></BigButton>)}</div>
+    <p className={styles.description}>ちずの ひかっている くにを あてながら、10この くにを たびしよう！</p>
+    <div className={styles.regions}>{regions.map((region) => <BigButton key={region.id} variant="primary" className={styles.region} onClick={() => navigate(`/games/world-travel-quiz/${region.id}/answer-mode`)}><span aria-hidden="true">{region.emoji}</span><span><strong>{region.title}</strong><small>{region.description}</small></span></BigButton>)}</div>
     <BigButton variant="secondary" onClick={() => navigate('/')}>もどる</BigButton>
   </main>
 }
