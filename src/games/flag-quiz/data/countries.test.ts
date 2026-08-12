@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { countries, countriesForLevel } from './countries';
 
 describe('countries', () => {
-  it('全部で100か国ある', () => {
-    expect(countries).toHaveLength(100);
+  it('全部で105か国ある', () => {
+    expect(countries).toHaveLength(105);
   });
 
   it('国idに重複がない', () => {
@@ -27,8 +27,8 @@ describe('countriesForLevel', () => {
     expect(countriesForLevel('normal')).toHaveLength(45);
   });
 
-  it('むずかしいは100か国（全部）', () => {
-    expect(countriesForLevel('hard')).toHaveLength(100);
+  it('むずかしいは105か国（全部）', () => {
+    expect(countriesForLevel('hard')).toHaveLength(105);
   });
 
   it('かんたん ⊂ ふつう ⊂ むずかしい（包含関係が成り立つ）', () => {
