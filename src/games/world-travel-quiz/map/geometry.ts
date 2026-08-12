@@ -1,0 +1,132 @@
+export type Position = readonly [number, number]
+export type Geometry = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown }
+export type Bounds = { minX: number; minY: number; maxX: number; maxY: number }
+
+export const MAP_WIDTH = 1000
+export const MAP_HEIGHT = 560
+const emptyBounds = (): Bounds => ({ minX: 0, minY: 0, maxX: MAP_WIDTH, maxY: MAP_HEIGHT })
+
+function positions(value: unknown, output: Position[]): void {
+  if (!Array.isArray(value)) return
+  if (typeof value[0] === 'number' && typeof value[1] === 'number') { output.push([value[0], value[1]]); return }
+  value.forEach((child) => positions(child, output))
+}
+export function webMercator([longitude, latitude]: Position): Position {
+  const clipped = Math.max(-85, Math.min(85, latitude)) * Math.PI / 180
+  return [longitude * Math.PI / 180, Math.log(Math.tan(Math.PI / 4 + clipped / 2))]
+}
+export function project(position: Position): Position {
+  const [x, y] = webMercator(position)
+  return [MAP_WIDTH / 2 + x * (MAP_WIDTH / (2 * Math.PI)), MAP_HEIGHT / 2 - y * (MAP_WIDTH / (2 * Math.PI))]
+}
+function pointsForGeometry(geometry: Geometry): Position[] { const result: Position[] = []; positions(geometry.coordinates, result); return result }
+export function boundsForGeometry(geometry: Geometry): Bounds {
+  const points = pointsForGeometry(geometry).map(project)
+  if (!points.length) return emptyBounds()
+  return points.reduce<Bounds>((bounds, [x, y]) => ({ minX: Math.min(bounds.minX, x), minY: Math.min(bounds.minY, y), maxX: Math.max(bounds.maxX, x), maxY: Math.max(bounds.maxY, y) }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity })
+}
+export function primaryBounds(geometry: Geometry): Bounds {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : Array.isArray(geometry.coordinates) ? geometry.coordinates : []
+  const candidates = polygons.map((coordinates) => boundsForGeometry({ type: 'Polygon', coordinates }))
+  return candidates.reduce((best, candidate) => ((candidate.maxX - candidate.minX) * (candidate.maxY - candidate.minY) > (best.maxX - best.minX) * (best.maxY - best.minY) ? candidate : best), candidates[0] ?? emptyBounds())
+}
+export function mergeBounds(bounds: readonly Bounds[]): Bounds {
+  if (!bounds.length) return emptyBounds()
+  return bounds.reduce<Bounds>((all, current) => ({ minX: Math.min(all.minX, current.minX), minY: Math.min(all.minY, current.minY), maxX: Math.max(all.maxX, current.maxX), maxY: Math.max(all.maxY, current.maxY) }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity })
+}
+function pointsForRing(ring: unknown): Position[] {
+  if (!Array.isArray(ring)) return []
+  return ring.filter((point): point is Position => Array.isArray(point) && typeof point[0] === 'number' && typeof point[1] === 'number')
+}
+
+/**
+ * 経度を連続した座標系にほどく。170°→-170°のような反子午線またぎを
+ * -340°の直線ではなく、170°→190°という短い辺として扱えるようにする。
+ */
+function unwrapRing(points: readonly Position[]): Position[] {
+  if (!points.length) return []
+  const result: Position[] = [[points[0][0], points[0][1]]]
+  for (const [longitude, latitude] of points.slice(1)) {
+    let unwrapped = longitude
+    const previous = result[result.length - 1][0]
+    while (unwrapped - previous > 180) unwrapped -= 360
+    while (unwrapped - previous < -180) unwrapped += 360
+    result.push([unwrapped, latitude])
+  }
+  return result
+}
+
+function intersection(a: Position, b: Position, boundary: number): Position {
+  const distance = b[0] - a[0]
+  if (distance === 0) return [boundary, a[1]]
+  const t = (boundary - a[0]) / distance
+  return [boundary, a[1] + (b[1] - a[1]) * t]
+}
+
+function clipAtBoundary(points: readonly Position[], boundary: number, keepGreater: boolean): Position[] {
+  if (!points.length) return []
+  const result: Position[] = []
+  for (let index = 0; index < points.length; index += 1) {
+    const previous = points[(index + points.length - 1) % points.length]
+    const current = points[index]
+    const wasInside = keepGreater ? previous[0] >= boundary : previous[0] <= boundary
+    const isInside = keepGreater ? current[0] >= boundary : current[0] <= boundary
+    if (isInside !== wasInside) result.push(intersection(previous, current, boundary))
+    if (isInside) result.push(current)
+  }
+  return result
+}
+
+/**
+ * 反子午線をまたぐリングを [-180, 180] の世界にクリップする。
+ *
+ * Sutherland–Hodgman で各360°帯に切り出すため、ロシア・フィジー・南極の
+ * 隣接点がSVGの左右端を横断する一本の辺になることはない。穴もfillRule=evenodd
+ * の別リングとして同じ規則で扱える。
+ */
+export function antimeridianClippedRings(ring: unknown): Position[][] {
+  const unwrapped = unwrapRing(pointsForRing(ring))
+  if (unwrapped.length < 3) return []
+  const longitudes = unwrapped.map(([longitude]) => longitude)
+  const firstBand = Math.floor((Math.min(...longitudes) + 180) / 360)
+  const lastBand = Math.floor((Math.max(...longitudes) + 180 - Number.EPSILON) / 360)
+  const clipped: Position[][] = []
+  for (let band = firstBand; band <= lastBand; band += 1) {
+    const left = -180 + band * 360
+    const right = 180 + band * 360
+    const afterLeft = clipAtBoundary(unwrapped, left, true)
+    const inBand = clipAtBoundary(afterLeft, right, false)
+    if (inBand.length >= 3) clipped.push(inBand.map(([longitude, latitude]) => [longitude - band * 360, latitude]))
+  }
+  return clipped
+}
+
+function ringPath(ring: unknown): string {
+  return antimeridianClippedRings(ring).map((items) => items.map((point, index) => {
+    const [x, y] = project(point)
+    return `${index ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`
+  }).join(' ') + 'Z').join(' ')
+}
+export function pathForGeometry(geometry: Geometry): string {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  if (!Array.isArray(polygons)) return ''
+  return polygons.flatMap((polygon) => Array.isArray(polygon) ? polygon.map((ring) => ringPath(ring)) : []).join(' ')
+}
+export type Camera = { scale: number; x: number; y: number }
+export function cameraForBounds(bounds: Bounds, coverage = 0.52): Camera {
+  const width = Math.max(20, bounds.maxX - bounds.minX)
+  const height = Math.max(20, bounds.maxY - bounds.minY)
+  const scale = Math.max(1, Math.min(9, Math.min((MAP_WIDTH * coverage) / width, (MAP_HEIGHT * coverage) / height)))
+  return { scale, x: MAP_WIDTH / 2 - ((bounds.minX + bounds.maxX) / 2) * scale, y: MAP_HEIGHT / 2 - ((bounds.minY + bounds.maxY) / 2) * scale }
+}
+export function quadraticBezier(from: Position, to: Position, t: number): Position {
+  const mx = (from[0] + to[0]) / 2
+  const my = (from[1] + to[1]) / 2 - Math.min(75, Math.abs(to[0] - from[0]) * 0.18 + 20)
+  const u = 1 - t
+  return [u * u * from[0] + 2 * u * t * mx + t * t * to[0], u * u * from[1] + 2 * u * t * my + t * t * to[1]]
+}
+export function bezierPath(from: Position, to: Position): string {
+  const mx = (from[0] + to[0]) / 2
+  const my = (from[1] + to[1]) / 2 - Math.min(75, Math.abs(to[0] - from[0]) * 0.18 + 20)
+  return `M${from[0]} ${from[1]} Q${mx} ${my} ${to[0]} ${to[1]}`
+}

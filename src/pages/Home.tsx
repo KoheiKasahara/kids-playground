@@ -19,6 +19,7 @@ const games: GameCard[] = [
   { id: 'math-quiz', title: 'さんすうクイズ', emoji: '🔢', path: '/games/math-quiz' },
   { id: 'color-mix-quiz', title: 'いろまぜクイズ', emoji: '🎨', path: '/games/color-mix-quiz' },
   { id: 'prefecture-quiz', title: '都道府県クイズ', emoji: '🗾', path: '/games/prefecture-quiz' },
+  { id: 'world-travel-quiz', title: 'せかい旅行クイズ', emoji: '✈️', path: '/games/world-travel-quiz' },
 ]
 
 export default function Home() {

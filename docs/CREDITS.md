@@ -1,5 +1,16 @@
 # クレジット / ライセンス表記
 
+## 世界地図 (world-atlas / countries-50m.json)
+
+世界地図の国境は [world-atlas](https://github.com/topojson/world-atlas) npmパッケージ
+**2.0.2** の [`countries-50m.json`](https://unpkg.com/world-atlas@2.0.2/countries-50m.json) を、ビルド時に静的importしてバンドルしています。実行時のCDN・地図API通信は行いません。
+
+- 原典: Natural Earth の 1:50m Cultural Vectors（Admin 0 Countries）
+- データ配布: world-atlas / Mike Bostock
+- world-atlas のライセンス: ISC License
+- Natural Earth の利用条件: [Public Domain](https://www.naturalearthdata.com/about/terms-of-use/)
+- 本アプリでの加工: TopoJSONを一度GeoJSON Featureへ展開し、Web Mercator投影・SVGパス化、国別bboxによる表示範囲調整と旅行ルート描画を行います。国境データ自体は変更していません。
+
 ## 都道府県地図 (src/games/prefecture-quiz/data/prefectures.json)
 
 都道府県境界は、[smartnews-smri/japan-topography](https://github.com/smartnews-smri/japan-topography) の
