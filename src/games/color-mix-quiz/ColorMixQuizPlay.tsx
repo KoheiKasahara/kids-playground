@@ -33,6 +33,7 @@ function ColorMixQuizGame() {
   const last = state.index === questions.length - 1
   const isSubtraction = question.problem.kind === 'subtraction'
   const isSubtracting = isSubtraction && answered
+  const shouldRevealResult = answered
 
   // The success chime follows the visual mix. The timer is always cleared on next question/unmount.
   useEffect(() => {
@@ -73,7 +74,7 @@ function ColorMixQuizGame() {
       </header>
       <section className={styles.body} aria-label={isSubtraction ? 'いろを ひく もんだい' : 'いろを まぜる もんだい'}>
         <h1 className={styles.question}>{question.problem.kind === 'subtraction' ? 'この いろから ひくと？' : `この ${question.problem.inputColors.length}しょくを まぜると？`}</h1>
-        <div className={[styles.paintStage, question.problem.inputColors.length === 3 ? styles.threePaintStage : '', correct && !isSubtraction ? styles.mixing : '', isSubtraction && isSubtracting ? styles.removing : ''].filter(Boolean).join(' ')} aria-busy={isSubtracting} key={`${question.problem.id}-${state.selected ?? 'new'}`}>
+        <div className={[styles.paintStage, question.problem.inputColors.length === 3 ? styles.threePaintStage : '', answered && !isSubtraction ? styles.mixing : '', isSubtraction && isSubtracting ? styles.removing : ''].filter(Boolean).join(' ')} aria-busy={isSubtracting} key={`${question.problem.id}-${state.selected ?? 'new'}`}>
           {question.problem.inputColors.map((color, index) => (
             <Fragment key={`${color}-${index}`}>
               <span className={`${styles.paint} ${index === 0 ? styles.paintA : index === 1 ? styles.paintB : styles.paintC}`} style={{ '--paint-color': color } as CSSProperties} aria-hidden="true" />
@@ -81,7 +82,7 @@ function ColorMixQuizGame() {
             </Fragment>
           ))}
           {isSubtraction && <span className={styles.removalParticles} style={{ '--paint-color': question.problem.inputColors[1] } as CSSProperties} aria-hidden="true" data-testid="subtraction-removal-particles"><i /><i /><i /></span>}
-          {((correct && !isSubtraction) || isSubtracting) && <><span className={styles.mixedPaint} style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" /><span className={styles.done}>できた！</span></>}
+          {shouldRevealResult && <><span className={styles.mixedPaint} style={{ '--paint-color': question.problem.resultColor } as CSSProperties} aria-hidden="true" /><span className={styles.done}>できた！</span></>}
         </div>
         <div className={styles.choices}>
           {question.choices.map((color, index) => {
