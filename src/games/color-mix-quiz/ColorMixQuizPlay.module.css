@@ -48,8 +48,8 @@
 @keyframes pullParticleB { 0%, 26% { transform: translate(4px, 5px) scale(.3); opacity: 0; } 45% { opacity: .88; } 100% { transform: translate(clamp(88px, 25vw, 130px), 19px) scale(.5); opacity: 0; } }
 @keyframes pullParticleC { 0%, 31% { transform: translate(-4px, -6px) scale(.25); opacity: 0; } 49% { opacity: .8; } 100% { transform: translate(clamp(74px, 22vw, 116px), -53px) scale(.42); opacity: 0; } }
 @media (max-height: 620px) and (orientation: portrait) { .page { --feedback-space: 0px; } .paintStage { height: 104px; } .question { font-size: 25px; } .choice { min-height: 68px; } }
-/* 横向きでも、問題（文と絵の具）を上、色の選択肢を下に積む。
-   横一列にすると問題・絵の具・色パネルが視線を横断してしまうため、
-   タブレット横向きでも縦画面と同じ順序で読み取れる構成に保つ。 */
-@media (orientation: landscape) and (max-height: 560px) { .page { --feedback-space: 76px; max-width: 960px; padding-top: 7px; } .progressArea { display: flex; gap: var(--space-sm); align-items: center; } .progressLabel { white-space: nowrap; } .body { flex-direction: column; gap: 8px; } .question { font-size: 23px; } .paintStage { width: 240px; height: 94px; } .threePaintStage { width: 300px; } .choices { width: min(100%, 360px); gap: 8px; } .choice { min-height: 50px; } }
+/* 横向き・低背の画面は、左に問題（文と絵の具）、右に4択の色パネルを置く2カラムにする。
+   縦に積むと高さが足りず絵の具も色パネルも小さくなるため、横幅を使って両方を大きく見せる。
+   縦画面のレイアウトはこのメディアクエリの外にあり、変更していない。 */
+@media (orientation: landscape) and (max-height: 560px) { .page { --feedback-space: 76px; max-width: 960px; padding-top: 7px; } .progressArea { display: flex; gap: var(--space-sm); align-items: center; } .progressLabel { white-space: nowrap; } .body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); grid-template-rows: auto auto; align-content: center; align-items: center; justify-items: center; column-gap: clamp(16px, 4vw, 44px); row-gap: 8px; } .question { grid-column: 1; grid-row: 1; font-size: clamp(20px, 5.4vh, 27px); } .paintStage { grid-column: 1; grid-row: 2; width: min(100%, 300px); height: clamp(94px, 30vh, 134px); } .threePaintStage { width: min(100%, 340px); } .choices { grid-column: 2; grid-row: 1 / span 2; width: min(100%, 340px); gap: 8px; } .choice { min-height: clamp(50px, 18vh, 86px); } }
 @media (prefers-reduced-motion: reduce) { .mixing .paintA, .mixing .paintB, .mixing .paintC, .mixing .plus, .mixing .mixedPaint, .mixing .done, .removing .paintA, .removing .paintB, .removing .plus, .removing .mixedPaint, .removing .done, .removalParticles i { animation-duration: 1ms; animation-delay: 0ms; } .choice { transition: none; } }
