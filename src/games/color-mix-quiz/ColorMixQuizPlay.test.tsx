@@ -79,6 +79,35 @@ describe('ColorMixQuizPlay', () => {
     expect(screen.getByRole('heading', { name: /この (2|3)しょくを まぜると？|この いろから ひくと？/ })).toBeInTheDocument()
   })
 
+  test('10問を正解と不正解を混ぜて進めると、正確な結果を表示する', async () => {
+    questionGeneratorMock.questions = Array.from({ length: 10 }, (_, index) => ({
+      problem: {
+        id: `test-${index}`,
+        kind: 'two-color-addition' as const,
+        inputColors: ['#111111', '#222222'],
+        resultColor: '#333333',
+        choices: ['#333333', '#444444', '#555555', '#666666'],
+      },
+      choices: ['#333333', '#444444', '#555555', '#666666'],
+    }))
+    const user = userEvent.setup()
+    renderApp('/games/color-mix-quiz/play')
+
+    for (let index = 0; index < 10; index += 1) {
+      // 最終問題も正解にして、結果遷移直前の加点が取りこぼされないことを守る。
+      await user.click(screen.getByRole('button', { name: `${index % 2 === 1 ? 1 : 2}ばんめの いろ` }))
+      expect(screen.getByRole('status')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: index === 9 ? 'けっかを みる' : 'つぎのもんだい' }))
+    }
+
+    expect(await screen.findByText('5 / 10もん せいかい！')).toBeInTheDocument()
+  })
+
+  test('有効な結果stateなしで結果URLを開くと開始画面へ戻る', () => {
+    renderApp('/games/color-mix-quiz/result')
+    expect(screen.getByRole('heading', { name: 'いろまぜクイズ' })).toBeInTheDocument()
+  })
+
   test('共有する難易度選択は他のクイズでそのまま使える', () => {
     renderApp('/games/flag-quiz/flag-to-name')
     expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()

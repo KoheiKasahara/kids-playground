@@ -1,5 +1,6 @@
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import { isQuizResultState } from '../quiz-core/resultState'
 import { isQuizLevel, LEVEL_LABEL, MODE_LABEL, MODE_PATH } from './types'
 import type { QuizMode } from './types'
 import styles from './FlagQuizResult.module.css'
@@ -13,15 +14,22 @@ type ResultState = {
 }
 
 function isResultState(value: unknown): value is ResultState {
-  if (typeof value !== 'object' || value === null) return false
+  if (!isQuizResultState(value)) return false
   const candidate = value as Record<string, unknown>
-  if (typeof candidate.correctCount !== 'number' || typeof candidate.totalCount !== 'number') {
-    return false
-  }
-  // score/maxScore は任意。存在する既存state（scoreなし）はそのまま受理しつつ、
-  // 値がある場合は number であることだけ確認する。
-  if (candidate.score !== undefined && typeof candidate.score !== 'number') return false
-  if (candidate.maxScore !== undefined && typeof candidate.maxScore !== 'number') return false
+  const hasScore = candidate.score !== undefined
+  const hasMaxScore = candidate.maxScore !== undefined
+  // score/maxScore は任意だが、どちらかを渡すなら得点として一貫した整数の組にする。
+  if (hasScore !== hasMaxScore) return false
+  if (!hasScore) return true
+  if (
+    typeof candidate.score !== 'number' ||
+    !Number.isInteger(candidate.score) ||
+    typeof candidate.maxScore !== 'number' ||
+    !Number.isInteger(candidate.maxScore) ||
+    candidate.maxScore < 0 ||
+    candidate.score < 0 ||
+    candidate.score > candidate.maxScore
+  ) return false
   return true
 }
 

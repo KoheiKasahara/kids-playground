@@ -1,28 +1,10 @@
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import { isQuizLevel, LEVEL_LABEL } from '../quiz-core/types'
+import { isQuizResultState } from '../quiz-core/resultState'
 import { MODE_LABEL, MODE_PATH } from './types'
 import type { MathQuizMode } from './types'
 import styles from './MathQuizResult.module.css'
-
-type ResultState = {
-  correctCount: number
-  totalCount: number
-}
-
-function isResultState(value: unknown): value is ResultState {
-  if (typeof value !== 'object' || value === null) return false
-  const candidate = value as Record<string, unknown>
-  return (
-    typeof candidate.correctCount === 'number' &&
-    Number.isInteger(candidate.correctCount) &&
-    typeof candidate.totalCount === 'number' &&
-    Number.isInteger(candidate.totalCount) &&
-    candidate.totalCount > 0 &&
-    candidate.correctCount >= 0 &&
-    candidate.correctCount <= candidate.totalCount
-  )
-}
 
 function getPraise(correctCount: number, totalCount: number) {
   if (correctCount === totalCount) return { emoji: '🏆', message: 'かんぺき！' }
@@ -40,7 +22,7 @@ export default function MathQuizResult({ mode }: MathQuizResultProps) {
   const location = useLocation()
   const { level } = useParams()
 
-  if (!isResultState(location.state)) {
+  if (!isQuizResultState(location.state)) {
     return <Navigate to="/games/math-quiz" replace />
   }
 

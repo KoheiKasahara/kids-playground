@@ -1,3 +1,7 @@
+/// <reference types="node" />
+
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { countries, countriesForLevel } from './countries';
 
@@ -14,6 +18,12 @@ describe('countries', () => {
   it('各国のflagパスが flags/<id>.svg 形式である', () => {
     for (const country of countries) {
       expect(country.flag).toBe(`flags/${country.id}.svg`);
+    }
+  });
+
+  it('105か国すべてのflagはpublic配下に実ファイルがある', () => {
+    for (const country of countries) {
+      expect(existsSync(resolve('public', country.flag))).toBe(true);
     }
   });
 });

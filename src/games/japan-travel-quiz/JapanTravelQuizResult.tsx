@@ -1,5 +1,6 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import { isQuizResultState } from '../quiz-core/resultState'
 import { japanTravelCourses } from './data/travelCourses'
 import JapanTravelMap from './map/JapanTravelMap'
 import type { JapanTravelCourse } from './types'
@@ -9,7 +10,7 @@ type ResultState = { correctCount: number; totalCount: number; courseId: string 
 function isResult(value: unknown): value is ResultState {
   if (!value || typeof value !== 'object') return false
   const state = value as Record<string, unknown>
-  return Number.isInteger(state.correctCount) && typeof state.correctCount === 'number' && state.correctCount >= 0 && state.correctCount <= 10 && state.totalCount === 10 && typeof state.courseId === 'string'
+  return isQuizResultState(value, 10) && typeof state.courseId === 'string'
 }
 function praise(score: number) { return score === 10 ? 'かんぺき！🏆' : score >= 7 ? 'すごい！🎉' : score >= 4 ? 'よくできました 👍' : 'また たびしよう！😊' }
 

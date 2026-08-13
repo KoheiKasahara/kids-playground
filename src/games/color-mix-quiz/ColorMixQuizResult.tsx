@@ -1,14 +1,7 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import { isQuizResultState } from '../quiz-core/resultState'
 import styles from './ColorMixQuizResult.module.css'
-
-type ResultState = { correctCount: number; totalCount: number }
-
-function isResultState(value: unknown): value is ResultState {
-  if (!value || typeof value !== 'object') return false
-  const state = value as Record<string, unknown>
-  return typeof state.correctCount === 'number' && Number.isInteger(state.correctCount) && typeof state.totalCount === 'number' && Number.isInteger(state.totalCount) && state.totalCount > 0 && state.correctCount >= 0 && state.correctCount <= state.totalCount
-}
 
 function praise(score: number, total: number) {
   if (score === total) return ['🏆', 'かんぺき！']
@@ -20,7 +13,7 @@ function praise(score: number, total: number) {
 export default function ColorMixQuizResult() {
   const navigate = useNavigate()
   const location = useLocation()
-  if (!isResultState(location.state)) return <Navigate to="/games/color-mix-quiz" replace />
+  if (!isQuizResultState(location.state)) return <Navigate to="/games/color-mix-quiz" replace />
   const [emoji, message] = praise(location.state.correctCount, location.state.totalCount)
   return (
     <main className={styles.page}>
