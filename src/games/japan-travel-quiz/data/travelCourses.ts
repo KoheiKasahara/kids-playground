@@ -16,7 +16,7 @@ export const japanTravelCourses: readonly JapanTravelCourse[] = [
   { id: 'mountain-to-sea', name: 'やまと うみを いったりきたり', prefectureIds: ['03', '10', '12', '13', '14', '25', '27', '32', '38', '41'] },
   { id: 'northwest-south', name: 'にほんかいから みなみのしまへ', prefectureIds: ['06', '15', '17', '21', '23', '28', '33', '35', '42', '47'] },
   { id: 'seven-seas', name: 'ひがしから にしへ だいぼうけん', prefectureIds: ['05', '07', '09', '11', '16', '19', '22', '29', '36', '40'] },
-  { id: 'cross-country', name: 'ぜんこく よこだん たび', prefectureIds: ['02', '08', '20', '24', '25', '31', '39', '44', '46', '01'] },
+  { id: 'cross-country', name: 'ぜんこくの たび', prefectureIds: ['02', '08', '20', '24', '25', '31', '39', '44', '46', '01'] },
   { id: 'city-and-nature', name: 'まちと しぜんを めぐろう', prefectureIds: ['04', '18', '23', '27', '30', '34', '38', '41', '45', '12'] },
   { id: 'sunny-route', name: 'おひさま きらきら たび', prefectureIds: ['14', '10', '20', '17', '26', '28', '35', '43', '42', '47'] },
   { id: 'zigzag', name: 'にほん じぐざぐ たび', prefectureIds: ['01', '03', '06', '11', '15', '21', '24', '29', '37', '40'] },
