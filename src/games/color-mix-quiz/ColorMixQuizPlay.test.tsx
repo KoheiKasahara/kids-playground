@@ -74,6 +74,28 @@ describe('ColorMixQuizPlay', () => {
     expect(screen.getByText('できた！')).toBeInTheDocument()
   })
 
+  test('足し算では不正解でも混色アニメーションと正解色を表示する', async () => {
+    questionGeneratorMock.questions = [{
+      problem: {
+        id: 'blue-plus-yellow-green',
+        kind: 'two-color-addition',
+        inputColors: ['#3977c7', '#f6d743'],
+        resultColor: '#58a85c',
+        choices: ['#e94b3c', '#58a85c', '#ef8a2f', '#7950a1'],
+      },
+      choices: ['#e94b3c', '#58a85c', '#ef8a2f', '#7950a1'],
+    }]
+
+    renderApp('/games/color-mix-quiz/play')
+
+    await userEvent.setup().click(screen.getByRole('button', { name: '1ばんめの いろ' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('ざんねん！')
+    expect(screen.getByText('できた！')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '2ばんめの いろ' })).toHaveTextContent('◯')
+    expect(screen.getByRole('button', { name: '1ばんめの いろ' })).toHaveTextContent('✕')
+  })
+
   test('旧難易度URLも単一のプレイ画面へ進む', () => {
     renderApp('/games/color-mix-quiz/expert/play')
     expect(screen.getByRole('heading', { name: /この (2|3)しょくを まぜると？|この いろから ひくと？/ })).toBeInTheDocument()
