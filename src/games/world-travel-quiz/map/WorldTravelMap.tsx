@@ -3,7 +3,7 @@ import { travelCountryById } from '../data/travelCountries'
 import { travelRegionById } from '../data/travelRegions'
 import { worldFeatures } from '../data/worldFeatures'
 import type { TravelCourse, TravelPhase } from '../types'
-import { bezierPath, boundsForGeometry, boundsForPositionsNear, cameraForBounds, cameraForCountryBounds, mergeBounds, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
+import { bezierPath, boundsForGeometry, boundsForGeometryNear, boundsForPositionsNear, cameraForBounds, cameraForCountryBounds, mergeBounds, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
 import styles from './WorldTravelMap.module.css'
 
 type Props = { course: TravelCourse; questionIndex: number; phase: TravelPhase; onTravelComplete: () => void; result?: boolean }
@@ -27,19 +27,24 @@ function translateBounds(bounds: Bounds, x: number): Bounds {
   return { ...bounds, minX: bounds.minX + x, maxX: bounds.maxX + x }
 }
 
-function targetBounds(countryId: string, point: Position): Bounds {
+function targetBounds(countryId: string, point: Position, referenceLongitude: number): Bounds {
   const country = travelCountryById.get(countryId)
   if (!country) return { minX: 480, minY: 260, maxX: 520, maxY: 300 }
   const item = featuresById.get(country.mapId)
   const anchorX = project(country.anchor)[0]
   if (!item) return { minX: point[0] - 10, minY: point[1] - 10, maxX: point[0] + 10, maxY: point[1] + 10 }
-  return translateBounds(country.fitMode === 'all' ? item.bounds : item.primary, point[0] - anchorX)
+  if (country.fitMode === 'all') return boundsForGeometryNear(item.geometry, referenceLongitude)
+  return translateBounds(item.primary, point[0] - anchorX)
 }
 
 /** 日付変更線の処理前の、経度・緯度で表した国のアンカー。 */
 function countryCoordinates(countryId: string): Position {
   const country = travelCountryById.get(countryId)
   return country?.anchor ?? [0, 0]
+}
+
+function routeCoordinatesForCountryIds(countryIds: readonly string[]): Position[] {
+  return shortestLongitudePath(countryIds.map(countryCoordinates))
 }
 
 /**
@@ -49,7 +54,12 @@ function countryCoordinates(countryId: string): Position {
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function routePointsForCountryIds(countryIds: readonly string[]): Position[] {
-  return shortestLongitudePath(countryIds.map(countryCoordinates)).map(project)
+  return routeCoordinatesForCountryIds(countryIds).map(project)
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function cameraForTargetCountry(countryId: string, point: Position, referenceLongitude: number): Camera {
+  return cameraForCountryBounds(targetBounds(countryId, point, referenceLongitude))
 }
 
 function cameraForRegion(course: TravelCourse, referenceLongitude: number): Camera {
@@ -70,7 +80,8 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
   const initialCamera = useMemo(() => cameraForRegion(course, displayLongitude), [course, displayLongitude])
   const previousCamera = useRef<Camera>(initialCamera)
   const routeIds = course.countryIds
-  const routePoints = useMemo(() => routePointsForCountryIds(routeIds), [routeIds])
+  const routeCoordinates = useMemo(() => routeCoordinatesForCountryIds(routeIds), [routeIds])
+  const routePoints = useMemo(() => routeCoordinates.map(project), [routeCoordinates])
   const displayFeatures = useMemo(() => cachedFeatures.map((item) => ({ ...item, path: pathForGeometryNear(item.geometry, displayLongitude) })), [displayLongitude])
   const activeIndex = result ? routeIds.length - 1 : phase === 'traveling' ? questionIndex + 1 : questionIndex
   const activeId = routeIds[Math.min(activeIndex, routeIds.length - 1)]
@@ -78,13 +89,13 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
   // 移動中の区間は別レイヤーで伸ばす。ここには完了済みだけを置く。
   const completedSegments = result ? routeIds.length - 1 : questionIndex
   const visitedMapIds = useMemo(() => new Set(routeIds.map((countryId) => travelCountryById.get(countryId)?.mapId)), [routeIds])
-  const finalBounds = useMemo(() => mergeBounds(routeIds.map((countryId, index) => targetBounds(countryId, routePoints[index]))), [routeIds, routePoints])
+  const finalBounds = useMemo(() => mergeBounds(routeIds.map((countryId, index) => targetBounds(countryId, routePoints[index], routeCoordinates[index][0]))), [routeCoordinates, routeIds, routePoints])
 
   useEffect(() => () => { if (frameRef.current !== null) cancelAnimationFrame(frameRef.current) }, [])
 
   useEffect(() => {
     const activePoint = routePoints[Math.min(activeIndex, routePoints.length - 1)]
-    const destination = result ? cameraForBounds(finalBounds, 0.82) : cameraForCountryBounds(targetBounds(activeId, activePoint))
+    const destination = result ? cameraForBounds(finalBounds, 0.82) : cameraForTargetCountry(activeId, activePoint, routeCoordinates[Math.min(activeIndex, routeCoordinates.length - 1)][0])
     const origin = previousCamera.current
     const plane = planeRef.current
     const camera = cameraRef.current
@@ -126,7 +137,7 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
     }
     frameRef.current = requestAnimationFrame(tick)
     return () => { if (frameRef.current !== null) cancelAnimationFrame(frameRef.current) }
-  }, [activeId, activeIndex, finalBounds, onTravelComplete, phase, questionIndex, result, routeIds, routePoints])
+  }, [activeId, activeIndex, finalBounds, onTravelComplete, phase, questionIndex, result, routeCoordinates, routeIds, routePoints])
 
   return (
     <svg className={styles.map} viewBox="0 0 1000 560" role="img" aria-label={result ? '旅した国の地図' : '国をさがす世界地図'} preserveAspectRatio="xMidYMid meet">

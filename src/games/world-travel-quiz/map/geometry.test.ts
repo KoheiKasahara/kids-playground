@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { worldFeatures } from '../data/worldFeatures'
-import { antimeridianClippedRings, boundsForGeometry, cameraForBounds, cameraForCountryBounds, longitudeNear, MAP_HEIGHT, MAP_WIDTH, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Geometry, type Position } from './geometry'
+import { antimeridianClippedRings, boundsForGeometry, boundsForGeometryNear, cameraForBounds, cameraForCountryBounds, longitudeNear, MAP_HEIGHT, MAP_WIDTH, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Geometry, type Position } from './geometry'
 
 function ringsFor(geometry: Geometry): unknown[] {
   return geometry.type === 'Polygon'
@@ -74,6 +74,13 @@ describe('world map geometry', () => {
     const xValues = [...path.matchAll(/[ML]([\d.-]+)\s/g)].map((match) => Number(match[1]))
     expect(xValues.length).toBeGreaterThan(3)
     expect(Math.max(...xValues) - Math.min(...xValues)).toBeLessThan(MAP_WIDTH / 10)
+  })
+  test('日付変更線の反対側にある島を含む国も、同じ経度帯のboundsへ収める', () => {
+    const newZealand = worldFeatures.find((item) => item.id === 554)?.geometry
+    expect(newZealand).toBeDefined()
+
+    const bounds = boundsForGeometryNear(newZealand!, 172)
+    expect(bounds.maxX - bounds.minX).toBeLessThan(MAP_WIDTH / 4)
   })
   test('Bezier は両端を通り、途中では上側へ弧を描く', () => {
     expect(quadraticBezier([100, 300], [500, 300], 0)).toEqual([100, 300])
