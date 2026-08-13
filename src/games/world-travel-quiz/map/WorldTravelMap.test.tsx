@@ -40,6 +40,18 @@ describe('WorldTravelMap route coordinates', () => {
     expect(y * camera.scale + camera.y).toBeLessThan(380)
   })
 
+  test.each([['fr', [2, 46], 'フランス'], ['nl', [5, 52], 'オランダ']] as const)('%s (%s) は海外領土でなく欧州本土を中央へズームする', (countryId, anchor, name) => {
+    const point = routePointsForCountryIds([countryId])[0]
+    const camera = cameraForTargetCountry(countryId, point, anchor[0])
+    const [x, y] = point
+
+    expect(camera.scale, name).toBeGreaterThan(1)
+    expect(x * camera.scale + camera.x).toBeGreaterThan(400)
+    expect(x * camera.scale + camera.x).toBeLessThan(600)
+    expect(y * camera.scale + camera.y).toBeGreaterThan(220)
+    expect(y * camera.scale + camera.y).toBeLessThan(380)
+  })
+
   test.each(travelCourses)('$name は背景地図とルートを同じ世界コピーへ表示する', (course) => {
     const displayLongitude = displayLongitudeForCountryIds(course.countryIds)
     const displayX = project([displayLongitude, 0])[0]
