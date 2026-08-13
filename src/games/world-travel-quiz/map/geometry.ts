@@ -22,6 +22,37 @@ export function project(position: Position): Position {
 export function boundsForPositions(points: readonly Position[]): Bounds {
   return boundsForPoints(points)
 }
+
+export type LongitudeBounds = { minLongitude: number; maxLongitude: number; centerLongitude: number }
+
+/**
+ * 点群を含む最短の経度範囲を、連続した経度（必要なら 180° を超える値）で返す。
+ * 例: 170°, 175°, -175° は 170°〜185° として扱う。
+ */
+export function shortestLongitudeBounds(longitudes: readonly number[]): LongitudeBounds {
+  if (!longitudes.length) return { minLongitude: -180, maxLongitude: 180, centerLongitude: 0 }
+  const normalized = longitudes.map((longitude) => ((longitude % 360) + 360) % 360).sort((a, b) => a - b)
+  if (normalized.length === 1) return { minLongitude: normalized[0], maxLongitude: normalized[0], centerLongitude: normalized[0] }
+
+  let largestGap = -1
+  let afterLargestGap = 0
+  for (let index = 0; index < normalized.length; index += 1) {
+    const next = index === normalized.length - 1 ? normalized[0] + 360 : normalized[index + 1]
+    const gap = next - normalized[index]
+    if (gap > largestGap) {
+      largestGap = gap
+      afterLargestGap = (index + 1) % normalized.length
+    }
+  }
+  const minLongitude = normalized[afterLargestGap]
+  const maxLongitude = minLongitude + 360 - largestGap
+  return { minLongitude, maxLongitude, centerLongitude: (minLongitude + maxLongitude) / 2 }
+}
+
+/** 指定した経度帯に合わせて点群を連続化してから地図上の bounds を求める。 */
+export function boundsForPositionsNear(points: readonly Position[], referenceLongitude: number): Bounds {
+  return boundsForPoints(points.map(([longitude, latitude]) => [longitudeNear(longitude, referenceLongitude), latitude] as Position))
+}
 function pointsForGeometry(geometry: Geometry): Position[] { const result: Position[] = []; positions(geometry.coordinates, result); return result }
 export function boundsForGeometry(geometry: Geometry): Bounds {
   const points = pointsForGeometry(geometry).map(project)
@@ -123,6 +154,24 @@ export function pathForGeometry(geometry: Geometry): string {
   const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
   if (!Array.isArray(polygons)) return ''
   return polygons.flatMap((polygon) => Array.isArray(polygon) ? polygon.map((ring) => ringPath(ring)) : []).join(' ')
+}
+
+/**
+ * 国境を referenceLongitude に近い世界コピーへ一度だけ描画する。
+ * 常に3枚の世界地図を重ねる方式を避け、日付変更線の両側を同じ連続座標帯に置く。
+ */
+export function pathForGeometryNear(geometry: Geometry, referenceLongitude: number): string {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  if (!Array.isArray(polygons)) return ''
+  return polygons.flatMap((polygon) => Array.isArray(polygon) ? polygon.map((ring) => {
+    const unwrapped = unwrapRing(pointsForRing(ring))
+    if (unwrapped.length < 3) return ''
+    const offset = longitudeNear(unwrapped[0][0], referenceLongitude) - unwrapped[0][0]
+    return unwrapped.map(([longitude, latitude], index) => {
+      const [x, y] = project([longitude + offset, latitude])
+      return `${index ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`
+    }).join(' ') + 'Z'
+  }) : []).join(' ')
 }
 export type Camera = { scale: number; x: number; y: number }
 type CameraLimits = { minimumDimension?: number; maximumScale?: number }

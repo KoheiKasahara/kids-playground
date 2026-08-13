@@ -3,13 +3,13 @@ import { travelCountryById } from '../data/travelCountries'
 import { travelRegionById } from '../data/travelRegions'
 import { worldFeatures } from '../data/worldFeatures'
 import type { TravelCourse, TravelPhase } from '../types'
-import { bezierPath, boundsForGeometry, boundsForPositions, cameraForBounds, cameraForCountryBounds, MAP_WIDTH, mergeBounds, pathForGeometry, primaryBounds, project, quadraticBezier, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
+import { bezierPath, boundsForGeometry, boundsForPositionsNear, cameraForBounds, cameraForCountryBounds, longitudeNear, mergeBounds, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
 import styles from './WorldTravelMap.module.css'
 
 type Props = { course: TravelCourse; questionIndex: number; phase: TravelPhase; onTravelComplete: () => void; result?: boolean }
-type CachedFeature = { key: string; id: number; path: string; bounds: Bounds; primary: Bounds }
+type CachedFeature = { key: string; id: number; geometry: (typeof worldFeatures)[number]['geometry']; bounds: Bounds; primary: Bounds }
 
-const cachedFeatures: readonly CachedFeature[] = worldFeatures.map((item, index) => ({ key: `${item.id}-${index}`, id: item.id, path: pathForGeometry(item.geometry), bounds: boundsForGeometry(item.geometry), primary: primaryBounds(item.geometry) }))
+const cachedFeatures: readonly CachedFeature[] = worldFeatures.map((item, index) => ({ key: `${item.id}-${index}`, id: item.id, geometry: item.geometry, bounds: boundsForGeometry(item.geometry), primary: primaryBounds(item.geometry) }))
 // Natural Earth は同じ国IDに小さな離島のFeatureを持つことがある。地図上で国を
 // フォーカスする際は、主領土が最も大きいFeatureを使う。
 const featuresById = cachedFeatures.reduce((items, feature) => {
@@ -19,7 +19,6 @@ const featuresById = cachedFeatures.reduce((items, feature) => {
   return items
 }, new Map<number, CachedFeature>())
 const worldCamera: Camera = { scale: 1, x: 0, y: 0 }
-const worldOffsets = [-MAP_WIDTH, 0, MAP_WIDTH] as const
 const durationFor = (from: Position, to: Position) => Math.max(800, Math.min(1200, 800 + Math.hypot(to[0] - from[0], to[1] - from[1]) * 0.55))
 const transform = (camera: Camera) => `translate(${camera.x.toFixed(2)} ${camera.y.toFixed(2)}) scale(${camera.scale.toFixed(3)})`
 const markerTransform = (point: Position, camera: Camera) => `translate(${(point[0] * camera.scale + camera.x).toFixed(2)} ${(point[1] * camera.scale + camera.y).toFixed(2)})`
@@ -42,11 +41,11 @@ function countryAnchor(countryId: string): Position {
   return project(country?.anchor ?? [0, 0])
 }
 
-function cameraForRegion(course: TravelCourse): Camera {
+function cameraForRegion(course: TravelCourse, referenceLongitude: number): Camera {
   const frame = travelRegionById.get(course.region)?.mapFrame
   if (!frame) return worldCamera
   const [minLongitude, minLatitude, maxLongitude, maxLatitude] = frame
-  return cameraForBounds(boundsForPositions([[minLongitude, minLatitude], [maxLongitude, minLatitude], [maxLongitude, maxLatitude], [minLongitude, maxLatitude]]), 0.9)
+  return cameraForBounds(boundsForPositionsNear([[minLongitude, minLatitude], [maxLongitude, minLatitude], [maxLongitude, maxLatitude], [minLongitude, maxLatitude]], referenceLongitude), 0.9)
 }
 
 /** 同一 SVG を保ったまま camera g の transform だけを更新する世界地図。 */
@@ -56,10 +55,12 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
   const planeRef = useRef<SVGGElement>(null)
   const travelingRouteRef = useRef<SVGPathElement>(null)
   const frameRef = useRef<number | null>(null)
-  const initialCamera = useMemo(() => cameraForRegion(course), [course])
+  const displayLongitude = useMemo(() => shortestLongitudeBounds(course.countryIds.map((countryId) => travelCountryById.get(countryId)?.anchor[0] ?? 0)).centerLongitude, [course.countryIds])
+  const initialCamera = useMemo(() => cameraForRegion(course, displayLongitude), [course, displayLongitude])
   const previousCamera = useRef<Camera>(initialCamera)
   const routeIds = course.countryIds
-  const routePoints = useMemo(() => shortestLongitudePath(routeIds.map(countryAnchor)), [routeIds])
+  const routePoints = useMemo(() => shortestLongitudePath(routeIds.map(countryAnchor)).map(([longitude, latitude]) => [longitudeNear(longitude, displayLongitude), latitude] as Position), [displayLongitude, routeIds])
+  const displayFeatures = useMemo(() => cachedFeatures.map((item) => ({ ...item, path: pathForGeometryNear(item.geometry, displayLongitude) })), [displayLongitude])
   const activeIndex = result ? routeIds.length - 1 : phase === 'traveling' ? questionIndex + 1 : questionIndex
   const activeId = routeIds[Math.min(activeIndex, routeIds.length - 1)]
   const activeMapId = travelCountryById.get(activeId)?.mapId
@@ -120,8 +121,8 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
     <svg className={styles.map} viewBox="0 0 1000 560" role="img" aria-label={result ? '旅した国の地図' : '国をさがす世界地図'} preserveAspectRatio="xMidYMid meet">
       <rect width="1000" height="560" className={styles.ocean} />
       <g ref={cameraRef} transform={transform(initialCamera)}>
-        {worldOffsets.flatMap((offset) => cachedFeatures.map((item) => <path key={`${item.key}-${offset}`} d={item.path} transform={`translate(${offset} 0)`} className={result && visitedMapIds.has(item.id) ? styles.visitedCountry : styles.country} fillRule="evenodd" />))}
-        {!result && activeMapId !== undefined && worldOffsets.map((offset) => <path key={`active-${offset}`} d={featuresById.get(activeMapId)?.path} transform={`translate(${offset} 0)`} className={styles.activeCountry} fillRule="evenodd" />)}
+        {displayFeatures.map((item) => <path key={item.key} d={item.path} className={result && visitedMapIds.has(item.id) ? styles.visitedCountry : styles.country} fillRule="evenodd" />)}
+        {!result && activeMapId !== undefined && <path d={pathForGeometryNear(featuresById.get(activeMapId)?.geometry ?? { type: 'Polygon', coordinates: [] }, displayLongitude)} className={styles.activeCountry} fillRule="evenodd" />}
         {Array.from({ length: completedSegments }, (_, index) => {
           const from = routePoints[index]; const to = routePoints[index + 1]
           return <path key={`${routeIds[index]}-${routeIds[index + 1]}`} d={bezierPath(from, to)} className={styles.route} aria-hidden="true" />

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { worldFeatures } from '../data/worldFeatures'
-import { antimeridianClippedRings, boundsForGeometry, cameraForBounds, cameraForCountryBounds, longitudeNear, MAP_HEIGHT, MAP_WIDTH, primaryBounds, project, quadraticBezier, shortestLongitudePath, type Geometry, type Position } from './geometry'
+import { antimeridianClippedRings, boundsForGeometry, cameraForBounds, cameraForCountryBounds, longitudeNear, MAP_HEIGHT, MAP_WIDTH, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Geometry, type Position } from './geometry'
 
 function ringsFor(geometry: Geometry): unknown[] {
   return geometry.type === 'Polygon'
@@ -55,6 +55,25 @@ describe('world map geometry', () => {
     const path = shortestLongitudePath([[170, -18], [-172, -14], [-175, -21], [178, -18]])
     expect(path.map(([longitude]) => longitude)).toEqual([170, 188, 185, 178])
     expect(path.slice(1).every((point, index) => Math.abs(point[0] - path[index][0]) <= 180)).toBe(true)
+  })
+  test.each([
+    [[130, 140, 150], [130, 150]],
+    [[170, 175, -175], [170, 185]],
+    [[-170, -175, 175], [175, 190]],
+  ] as const)('最短経度bounds %o は %o として連続化する', (longitudes, [minimum, maximum]) => {
+    const bounds = shortestLongitudeBounds(longitudes)
+    expect(bounds.minLongitude).toBeCloseTo(minimum)
+    expect(bounds.maxLongitude).toBeCloseTo(maximum)
+    expect(bounds.maxLongitude - bounds.minLongitude).toBeLessThan(30)
+  })
+  test('日付変更線をまたぐ国境は太平洋側の同じ座標帯へ描画できる', () => {
+    const path = pathForGeometryNear({
+      type: 'Polygon',
+      coordinates: [[[170, 10], [-170, 10], [-170, -10], [170, -10], [170, 10]]],
+    }, 180)
+    const xValues = [...path.matchAll(/[ML]([\d.-]+)\s/g)].map((match) => Number(match[1]))
+    expect(xValues.length).toBeGreaterThan(3)
+    expect(Math.max(...xValues) - Math.min(...xValues)).toBeLessThan(MAP_WIDTH / 10)
   })
   test('Bezier は両端を通り、途中では上側へ弧を描く', () => {
     expect(quadraticBezier([100, 300], [500, 300], 0)).toEqual([100, 300])
