@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { worldFeatures } from '../data/worldFeatures'
-import { antimeridianClippedRings, boundsForGeometry, boundsForGeometryNear, cameraForBounds, cameraForCountryBounds, longitudeNear, MAP_HEIGHT, MAP_WIDTH, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Geometry, type Position } from './geometry'
+import { antimeridianClippedRings, boundsForGeometry, boundsForGeometryNear, boundsForGeometryNearAnchor, cameraForBounds, cameraForCountryBounds, longitudeNear, MAP_HEIGHT, MAP_WIDTH, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Geometry, type Position } from './geometry'
 
 function ringsFor(geometry: Geometry): unknown[] {
   return geometry.type === 'Polygon'
@@ -41,6 +41,18 @@ describe('world map geometry', () => {
     expect(netherlands.scale).toBeLessThanOrEqual(4.8)
     expect(japan.scale).toBeGreaterThan(1)
     expect(brazil.scale).toBeGreaterThan(1)
+  })
+  test.each([[250, [2, 46], 'フランス'], [528, [5, 52], 'オランダ']] as const)('%s (%s) は海外領土でなく代表地点に近い本土をズーム対象にする', (id, anchor, name) => {
+    const geometry = worldFeatures.find((item) => item.id === id)?.geometry
+    expect(geometry, name).toBeDefined()
+    const bounds = boundsForGeometryNearAnchor(geometry!, anchor)
+    const [anchorX, anchorY] = project(anchor)
+
+    expect(anchorX).toBeGreaterThanOrEqual(bounds.minX)
+    expect(anchorX).toBeLessThanOrEqual(bounds.maxX)
+    expect(anchorY).toBeGreaterThanOrEqual(bounds.minY)
+    expect(anchorY).toBeLessThanOrEqual(bounds.maxY)
+    expect(cameraForCountryBounds(bounds).scale).toBeGreaterThan(1)
   })
   test.each([[44, 'バハマ'], [242, 'フィジー'], [548, 'バヌアツ'], [776, 'トンガ'], [882, 'サモア'], [583, 'ミクロネシア'], [584, 'マーシャルしょとう']] as const)('%s (%s) は周辺を残す上限内で拡大できる', (id, name) => {
     const geometry = worldFeatures.find((item) => item.id === id)?.geometry

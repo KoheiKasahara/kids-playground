@@ -3,7 +3,7 @@ import { travelCountryById } from '../data/travelCountries'
 import { travelRegionById } from '../data/travelRegions'
 import { worldFeatures } from '../data/worldFeatures'
 import type { TravelCourse, TravelPhase } from '../types'
-import { bezierPath, boundsForGeometry, boundsForGeometryNear, boundsForPositionsNear, cameraForBounds, cameraForCountryBounds, longitudeNear, mergeBounds, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
+import { bezierPath, boundsForGeometry, boundsForGeometryNear, boundsForGeometryNearAnchor, boundsForPositionsNear, cameraForBounds, cameraForCountryBounds, longitudeNear, mergeBounds, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
 import styles from './WorldTravelMap.module.css'
 
 type Props = { course: TravelCourse; questionIndex: number; phase: TravelPhase; onTravelComplete: () => void; result?: boolean }
@@ -28,9 +28,13 @@ function targetBounds(countryId: string, point: Position, referenceLongitude: nu
   if (!country) return { minX: 480, minY: 260, maxX: 520, maxY: 300 }
   const item = featuresById.get(country.mapId)
   if (!item) return { minX: point[0] - 10, minY: point[1] - 10, maxX: point[0] + 10, maxY: point[1] + 10 }
-  // カメラは描画と同じ連続経度帯で国境を測る。以前の primary を anchor 分だけ
-  // 平行移動する方式では、地域ごとの表示経度帯とずれて国が画面外になり得た。
-  return boundsForGeometryNear(item.geometry, referenceLongitude)
+  // 国全体を学ぶ対象は離島も含める。通常は代表地点に近い本土側だけを使い、
+  // フランス・オランダなどの海外領土で世界規模に引くことを防ぐ。
+  if (country.fitMode === 'all') return boundsForGeometryNear(item.geometry, referenceLongitude)
+  const anchorX = project(country.anchor)[0]
+  const mainlandBounds = boundsForGeometryNearAnchor(item.geometry, country.anchor)
+  const offset = point[0] - anchorX
+  return { ...mainlandBounds, minX: mainlandBounds.minX + offset, maxX: mainlandBounds.maxX + offset }
 }
 
 /** 日付変更線の処理前の、経度・緯度で表した国のアンカー。 */
