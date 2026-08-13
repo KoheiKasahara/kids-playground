@@ -81,6 +81,26 @@ export function primaryBounds(geometry: Geometry): Bounds {
   return candidates.reduce((best, candidate) => ((candidate.maxX - candidate.minX) * (candidate.maxY - candidate.minY) > (best.maxX - best.minX) * (best.maxY - best.minY) ? candidate : best), candidates[0] ?? emptyBounds())
 }
 
+/**
+ * 指定した代表地点を含む、または最も近い領域の bounds を返す。
+ * 海外領土を含む国は、国全体を fit すると世界地図まで引いてしまうため、
+ * クイズ用の代表地点（フランスなら欧州本土）を基準にする。
+ */
+export function boundsForGeometryNearAnchor(geometry: Geometry, anchor: Position): Bounds {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : Array.isArray(geometry.coordinates) ? geometry.coordinates : []
+  const candidates = polygons.flatMap((coordinates) => Array.isArray(coordinates)
+    ? coordinates.flatMap((ring) => antimeridianClippedRings(ring).map((points) => boundsForPoints(points)))
+    : [])
+  if (!candidates.length) return emptyBounds()
+  const [anchorX, anchorY] = project(anchor)
+  const distanceTo = (bounds: Bounds) => {
+    const closestX = Math.max(bounds.minX, Math.min(anchorX, bounds.maxX))
+    const closestY = Math.max(bounds.minY, Math.min(anchorY, bounds.maxY))
+    return Math.hypot(anchorX - closestX, anchorY - closestY)
+  }
+  return candidates.reduce((nearest, candidate) => distanceTo(candidate) < distanceTo(nearest) ? candidate : nearest)
+}
+
 function boundsForPoints(points: readonly Position[]): Bounds {
   if (!points.length) return emptyBounds()
   return points.map(project).reduce<Bounds>((bounds, [x, y]) => ({ minX: Math.min(bounds.minX, x), minY: Math.min(bounds.minY, y), maxX: Math.max(bounds.maxX, x), maxY: Math.max(bounds.maxY, y) }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity })
