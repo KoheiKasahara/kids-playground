@@ -3,7 +3,7 @@ import { travelCountryById } from '../data/travelCountries'
 import { travelRegionById } from '../data/travelRegions'
 import { worldFeatures } from '../data/worldFeatures'
 import type { TravelCourse, TravelPhase } from '../types'
-import { bezierPath, boundsForGeometry, boundsForGeometryNear, boundsForPositionsNear, cameraForBounds, cameraForCountryBounds, mergeBounds, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
+import { bezierPath, boundsForGeometry, boundsForGeometryNear, boundsForPositionsNear, cameraForBounds, cameraForCountryBounds, longitudeNear, mergeBounds, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
 import styles from './WorldTravelMap.module.css'
 
 type Props = { course: TravelCourse; questionIndex: number; phase: TravelPhase; onTravelComplete: () => void; result?: boolean }
@@ -44,6 +44,18 @@ function routeCoordinatesForCountryIds(countryIds: readonly string[]): Position[
 }
 
 /**
+ * 背景地図を、ルートと同じ連続経度帯へ配置する。
+ * shortestLongitudeBounds は 0〜360° 側を返すことがあるため、ヨーロッパや
+ * 南北アメリカでは先頭地点に近い同値の経度へ戻さないと地図だけ1周ずれる。
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function displayLongitudeForCountryIds(countryIds: readonly string[]): number {
+  const routeCoordinates = routeCoordinatesForCountryIds(countryIds)
+  const centerLongitude = shortestLongitudeBounds(routeCoordinates.map(([longitude]) => longitude)).centerLongitude
+  return longitudeNear(centerLongitude, routeCoordinates[0]?.[0] ?? centerLongitude)
+}
+
+/**
  * 経度を連続化してから SVG 座標に投影する。
  * 投影済みの X 座標を longitudeNear に渡すと、経度として誤って折り返されるため、
  * この順序を1か所に固定する。
@@ -72,11 +84,11 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
   const planeRef = useRef<SVGGElement>(null)
   const travelingRouteRef = useRef<SVGPathElement>(null)
   const frameRef = useRef<number | null>(null)
-  const displayLongitude = useMemo(() => shortestLongitudeBounds(course.countryIds.map((countryId) => travelCountryById.get(countryId)?.anchor[0] ?? 0)).centerLongitude, [course.countryIds])
-  const initialCamera = useMemo(() => cameraForRegion(course, displayLongitude), [course, displayLongitude])
-  const previousCamera = useRef<Camera>(initialCamera)
   const routeIds = course.countryIds
   const routeCoordinates = useMemo(() => routeCoordinatesForCountryIds(routeIds), [routeIds])
+  const displayLongitude = useMemo(() => displayLongitudeForCountryIds(routeIds), [routeIds])
+  const initialCamera = useMemo(() => cameraForRegion(course, displayLongitude), [course, displayLongitude])
+  const previousCamera = useRef<Camera>(initialCamera)
   const routePoints = useMemo(() => routeCoordinates.map(project), [routeCoordinates])
   const displayFeatures = useMemo(() => cachedFeatures.map((item) => ({ ...item, path: pathForGeometryNear(item.geometry, displayLongitude) })), [displayLongitude])
   const activeIndex = result ? routeIds.length - 1 : phase === 'traveling' ? questionIndex + 1 : questionIndex
