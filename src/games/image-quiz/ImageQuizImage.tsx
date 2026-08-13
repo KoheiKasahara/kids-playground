@@ -7,12 +7,16 @@ type ImageQuizImageProps = {
   alt?: string
 }
 
+const sizeClass = {
+  large: styles.imageLarge,
+  small: styles.imageSmall,
+  choice: styles.imageChoiceMedia,
+}
+
 export default function ImageQuizImage({ item, size, alt = '' }: ImageQuizImageProps) {
   return (
     <img
-      className={[styles.image, styles[`image${size[0].toUpperCase()}${size.slice(1)}`]]
-        .filter(Boolean)
-        .join(' ')}
+      className={`${styles.image} ${sizeClass[size]}`}
       src={import.meta.env.BASE_URL + item.image}
       alt={alt}
     />
