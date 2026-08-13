@@ -143,17 +143,41 @@
   .nameChoice { min-height: 56px; }
   .imageLarge { max-height: min(33dvh, 220px); }
 }
-@media (orientation: landscape) and (max-height: 620px) {
+/*
+ * 低背の横画面は国旗クイズと同じ構成にする。
+ * イラスト→名前は「左: 問題イラスト / 右: 問題文と 2×2 の選択肢」にし、
+ * 名前→イラストは設問の下に 4 枚を横一列に置く。単に画像を小さくするよりも、
+ * 子どもが問題と選択肢を同時に見比べやすく、スクロールも発生しない。
+ */
+@media (orientation: landscape) and (max-height: 560px) {
   .playPage {
     --feedback-bar-height: 76px;
-    padding-top: calc(var(--space-sm) + var(--safe-top));
+    max-width: 960px;
+    padding-top: calc(8px + var(--safe-top));
     padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
-    gap: var(--space-xs);
+    gap: 8px;
   }
-  .imageLarge { max-height: 180px; }
-  .nameChoice { min-height: 52px; }
+
+  .progressArea { flex-direction: row; align-items: center; gap: var(--space-sm); }
+  .progressLabel { line-height: 1.3; white-space: nowrap; }
+
+  .body { flex-direction: row; align-items: stretch; gap: 10px; }
+  .imageArea { flex: 0 0 320px; max-width: 320px; padding: 0; }
+  .imageLarge { max-height: 100%; }
+  .nameContent { flex: 1 1 auto; justify-content: center; gap: 8px; }
+  .question { font-size: 19px; line-height: 1.25; }
+  .nameChoices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .nameChoice { min-height: 56px; font-size: 20px; }
 
   .playPageNameToImage {
     --feedback-bar-height: 120px;
+  }
+
+  .playPageNameToImage .body { flex-direction: column; }
+  .playPageNameToImage .imageChoices { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+
+  /* iPhone SE 横向き相当では、左側を少し狭めて名前ボタンの幅を保つ。 */
+  @media (max-width: 780px) {
+    .imageArea { flex-basis: 240px; max-width: 240px; }
   }
 }
