@@ -3,7 +3,7 @@ import { travelCountryById } from '../data/travelCountries'
 import { travelRegionById } from '../data/travelRegions'
 import { worldFeatures } from '../data/worldFeatures'
 import type { TravelCourse, TravelPhase } from '../types'
-import { bezierPath, boundsForGeometry, boundsForPositionsNear, cameraForBounds, cameraForCountryBounds, longitudeNear, mergeBounds, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
+import { bezierPath, boundsForGeometry, boundsForPositionsNear, cameraForBounds, cameraForCountryBounds, mergeBounds, pathForGeometryNear, primaryBounds, project, quadraticBezier, shortestLongitudeBounds, shortestLongitudePath, type Bounds, type Camera, type Position } from './geometry'
 import styles from './WorldTravelMap.module.css'
 
 type Props = { course: TravelCourse; questionIndex: number; phase: TravelPhase; onTravelComplete: () => void; result?: boolean }
@@ -36,9 +36,20 @@ function targetBounds(countryId: string, point: Position): Bounds {
   return translateBounds(country.fitMode === 'all' ? item.bounds : item.primary, point[0] - anchorX)
 }
 
-function countryAnchor(countryId: string): Position {
+/** 日付変更線の処理前の、経度・緯度で表した国のアンカー。 */
+function countryCoordinates(countryId: string): Position {
   const country = travelCountryById.get(countryId)
-  return project(country?.anchor ?? [0, 0])
+  return country?.anchor ?? [0, 0]
+}
+
+/**
+ * 経度を連続化してから SVG 座標に投影する。
+ * 投影済みの X 座標を longitudeNear に渡すと、経度として誤って折り返されるため、
+ * この順序を1か所に固定する。
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function routePointsForCountryIds(countryIds: readonly string[]): Position[] {
+  return shortestLongitudePath(countryIds.map(countryCoordinates)).map(project)
 }
 
 function cameraForRegion(course: TravelCourse, referenceLongitude: number): Camera {
@@ -59,7 +70,7 @@ export default function WorldTravelMap({ course, questionIndex, phase, onTravelC
   const initialCamera = useMemo(() => cameraForRegion(course, displayLongitude), [course, displayLongitude])
   const previousCamera = useRef<Camera>(initialCamera)
   const routeIds = course.countryIds
-  const routePoints = useMemo(() => shortestLongitudePath(routeIds.map(countryAnchor)).map(([longitude, latitude]) => [longitudeNear(longitude, displayLongitude), latitude] as Position), [displayLongitude, routeIds])
+  const routePoints = useMemo(() => routePointsForCountryIds(routeIds), [routeIds])
   const displayFeatures = useMemo(() => cachedFeatures.map((item) => ({ ...item, path: pathForGeometryNear(item.geometry, displayLongitude) })), [displayLongitude])
   const activeIndex = result ? routeIds.length - 1 : phase === 'traveling' ? questionIndex + 1 : questionIndex
   const activeId = routeIds[Math.min(activeIndex, routeIds.length - 1)]
