@@ -10,6 +10,7 @@ type GameCard = {
 
 const games: GameCard[] = [
   { id: 'flag-quiz', title: 'こっきクイズ', emoji: '🌏', path: '/games/flag-quiz' },
+  { id: 'vegetable-quiz', title: 'おやさいクイズ', emoji: '🥕', path: '/games/vegetable-quiz' },
   {
     id: 'working-vehicle-quiz',
     title: 'はたらくくるまクイズ',

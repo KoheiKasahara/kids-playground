@@ -10,6 +10,7 @@ import WorkingVehicleQuizStart from '../games/working-vehicle-quiz/WorkingVehicl
 import WorkingVehicleQuizLevelSelect from '../games/working-vehicle-quiz/WorkingVehicleQuizLevelSelect'
 import WorkingVehicleQuizPlay from '../games/working-vehicle-quiz/WorkingVehicleQuizPlay'
 import WorkingVehicleQuizResult from '../games/working-vehicle-quiz/WorkingVehicleQuizResult'
+import { VegetableQuizPlay, VegetableQuizResult, VegetableQuizStart } from '../games/vegetable-quiz/VegetableQuiz'
 import MathQuizStart from '../games/math-quiz/MathQuizStart'
 import MathQuizLevelSelect from '../games/math-quiz/MathQuizLevelSelect'
 import MathQuizPlay from '../games/math-quiz/MathQuizPlay'
@@ -91,6 +92,11 @@ export const routes: RouteObject[] = [
     path: '/games/working-vehicle-quiz/name-to-photo/:level/result',
     element: <WorkingVehicleQuizResult mode="nameToPhoto" />,
   },
+  { path: '/games/vegetable-quiz', element: <VegetableQuizStart /> },
+  { path: '/games/vegetable-quiz/image-to-name/play', element: <VegetableQuizPlay mode="imageToName" /> },
+  { path: '/games/vegetable-quiz/image-to-name/result', element: <VegetableQuizResult mode="imageToName" /> },
+  { path: '/games/vegetable-quiz/name-to-image/play', element: <VegetableQuizPlay mode="nameToImage" /> },
+  { path: '/games/vegetable-quiz/name-to-image/result', element: <VegetableQuizResult mode="nameToImage" /> },
   { path: '/games/math-quiz', element: <MathQuizStart /> },
   { path: '/games/color-mix-quiz', element: <ColorMixQuizStart /> },
   { path: '/games/color-mix-quiz/play', element: <ColorMixQuizPlay /> },
