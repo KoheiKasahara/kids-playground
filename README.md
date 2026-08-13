@@ -81,13 +81,13 @@ https://<ユーザー名>.github.io/kids-playground/
 
 - Web App Manifestで `display: "standalone"` を指定しており、スマートフォン・タブレットのホーム画面に追加すると、ブラウザUI（アドレスバーなど）を抑えたアプリのような見た目で起動できます。
 - ホーム画面に追加しなくても、通常のWebブラウザ（Chrome / Safari など）からそのままアクセスして遊べます。
-- `vite-plugin-pwa` が生成するService Worker（`sw.js`）が、アプリ本体のJS/CSS/HTML、国旗SVG、はたらくくるま写真、都道府県GeoJSONなどの静的リソースをキャッシュします。
+- `vite-plugin-pwa` が生成するService Worker（`sw.js`）が、アプリ本体のJS/CSS/HTML、国旗SVG、はたらくくるまイラスト、都道府県GeoJSONなどの静的リソースをキャッシュします。
 - 更新方式は `registerType: 'prompt'` です。新しいバージョンが見つかっても、遊んでいる最中に勝手にリロードされることはありません。画面下部に「あたらしい バージョンが あります」というトーストが表示され、「こうしんする」を押したときだけ更新が反映されます（クイズの途中で進行が消えるのを防ぐため）。
 - 更新確認（`registration.update()`）は、アプリ起動時・タブがバックグラウンドから復帰したとき・60分ごとに自動で行われます。確認するだけで、反映は上記のとおりユーザー操作が必要です。
 
 ## 画像の出典・ライセンス
 
-`public/flags/` の国旗SVGは [flag-icons](https://github.com/lipis/flag-icons)（MIT License）由来、`public/vehicles/` の24写真はWikimedia Commonsの再配布可能な原作由来です。素材ごとの出典、作者、ライセンス、加工内容は [docs/CREDITS.md](docs/CREDITS.md) を参照してください。
+`public/flags/` の国旗SVGは [flag-icons](https://github.com/lipis/flag-icons)（MIT License）由来です。素材ごとの出典、作者、ライセンス、加工内容は [docs/CREDITS.md](docs/CREDITS.md) を参照してください。はたらくくるまクイズ・おやさいクイズなどのイラスト画像はアプリ向けに用意したオリジナル素材です。
 
 ## ディレクトリ構成
 
@@ -111,7 +111,7 @@ src/
 │  │  ├─ questionGenerator.ts   # 共通問題生成への互換ラッパー
 │  │  ├─ types.ts
 │  │  └─ data/countries.ts # 国データ（105か国）
-│  ├─ working-vehicle-quiz/ # はたらくくるまクイズ（24車両・2モード）
+│  ├─ working-vehicle-quiz/ # はたらくくるまクイズ（15車両・2モード）
 │  └─ math-quiz/        # さんすうクイズ（4演算×3むずかしさ、出題は計算式）
 ├─ components/         # ゲーム間で共通のUI部品 (BigButton, ProgressBar など)
 ├─ styles/             # グローバルCSS・デザイントークン
@@ -119,7 +119,9 @@ src/
 
 public/
 ├─ flags/               # 国旗SVG（flag-icons由来）
-├─ vehicles/            # はたらくくるま写真（WebP、24枚）
+├─ images/
+│  ├─ working-vehicles/ # はたらくくるまイラスト（PNG、15枚）
+│  └─ vegetables/       # おやさいイラスト（PNG）
 └─ icons/               # PWAアイコン
 
 docs/

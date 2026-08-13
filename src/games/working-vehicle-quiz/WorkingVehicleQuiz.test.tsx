@@ -3,9 +3,10 @@ import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test } from 'vitest'
 import App from '../../app/App'
-import { vehicles } from './data/vehicles'
+import { vehicles, vehiclesForLevel } from './data/vehicles'
 import type { Vehicle } from './types'
-import { QUESTION_COUNT } from '../quiz-core/types'
+import { LEVEL_LABEL, QUESTION_COUNT } from '../quiz-core/types'
+import type { QuizLevel } from '../quiz-core/types'
 
 function renderApp(path: string) {
   return render(
@@ -17,7 +18,7 @@ function renderApp(path: string) {
 
 function vehicleIdFromImage(image: Element | null): string {
   const src = image?.getAttribute('src') ?? ''
-  const match = src.match(/vehicles\/([a-z-]+)\.webp$/)
+  const match = src.match(/images\/working-vehicles\/([a-z-]+)\.png$/)
   if (!match) throw new Error(`unexpected vehicle src: ${src}`)
   return match[1]
 }
@@ -73,14 +74,16 @@ describe('はたらくくるまクイズ', () => {
     expect(screen.getByRole('button', { name: /なまえを みて こたえる/ })).toBeInTheDocument()
   })
 
-  test('モード選択後に12/18/24種類のむずかしさを選べる', async () => {
+  test('モード選択後にレベルごとの種類数を選べる', async () => {
     const user = userEvent.setup()
     renderApp('/games/working-vehicle-quiz')
     await user.click(screen.getByRole('button', { name: /しゃしんを みて こたえる/ }))
     expect(screen.getByText('しゃしん → なまえ')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /12しゅるい/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /18しゅるい/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /24しゅるい/ })).toBeInTheDocument()
+    for (const level of ['easy', 'normal', 'hard'] as const satisfies QuizLevel[]) {
+      const count = vehiclesForLevel(level).length
+      const namePattern = new RegExp(`${LEVEL_LABEL[level]}.*${count}しゅるい`)
+      expect(screen.getByRole('button', { name: namePattern })).toBeInTheDocument()
+    }
   })
 
   test('写真→名前は問題写真と名前4択を表示する', () => {
