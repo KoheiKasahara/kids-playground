@@ -27,4 +27,15 @@ describe('WorldTravelMap route coordinates', () => {
     expect(y * camera.scale + camera.y).toBeGreaterThan(220)
     expect(y * camera.scale + camera.y).toBeLessThan(380)
   })
+
+  test('ヨーロッパのポーランドも、国境とマーカーを同じ位置へ表示する', () => {
+    const point = routePointsForCountryIds(['pl'])[0]
+    const camera = cameraForTargetCountry('pl', point, 19)
+    const [x, y] = point
+
+    expect(x * camera.scale + camera.x).toBeGreaterThan(400)
+    expect(x * camera.scale + camera.x).toBeLessThan(600)
+    expect(y * camera.scale + camera.y).toBeGreaterThan(220)
+    expect(y * camera.scale + camera.y).toBeLessThan(380)
+  })
 })
