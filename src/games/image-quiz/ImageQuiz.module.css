@@ -63,7 +63,7 @@
 .image { display: block; object-fit: contain; object-position: center; }
 .imageLarge { max-width: min(100%, 360px); max-height: min(42dvh, 330px); width: auto; height: auto; }
 .imageSmall { max-width: 96px; max-height: 64px; width: auto; height: auto; }
-.imageChoice { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+.imageChoiceMedia { max-width: 100%; max-height: 100%; width: auto; height: auto; }
 
 @media (min-width: 640px) {
   .startPage,
