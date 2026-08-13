@@ -59,6 +59,18 @@ export function boundsForGeometry(geometry: Geometry): Bounds {
   if (!points.length) return emptyBounds()
   return points.reduce<Bounds>((bounds, [x, y]) => ({ minX: Math.min(bounds.minX, x), minY: Math.min(bounds.minY, y), maxX: Math.max(bounds.maxX, x), maxY: Math.max(bounds.maxY, y) }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity })
 }
+/** 描画と同じ連続した経度帯で、国全体の外接矩形を求める。 */
+export function boundsForGeometryNear(geometry: Geometry, referenceLongitude: number): Bounds {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  if (!Array.isArray(polygons)) return emptyBounds()
+  const points = polygons.flatMap((polygon) => Array.isArray(polygon) ? polygon.flatMap((ring) => {
+    const unwrapped = unwrapRing(pointsForRing(ring))
+    if (unwrapped.length < 3) return []
+    const offset = longitudeNear(unwrapped[0][0], referenceLongitude) - unwrapped[0][0]
+    return unwrapped.map(([longitude, latitude]) => [longitude + offset, latitude] as Position)
+  }) : [])
+  return boundsForPoints(points)
+}
 export function primaryBounds(geometry: Geometry): Bounds {
   const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : Array.isArray(geometry.coordinates) ? geometry.coordinates : []
   // フィジーのように日付変更線をまたぐ国は、元の座標の外接矩形だと世界幅になる。
