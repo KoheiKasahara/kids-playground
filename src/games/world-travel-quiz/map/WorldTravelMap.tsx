@@ -23,18 +23,14 @@ const durationFor = (from: Position, to: Position) => Math.max(800, Math.min(120
 const transform = (camera: Camera) => `translate(${camera.x.toFixed(2)} ${camera.y.toFixed(2)}) scale(${camera.scale.toFixed(3)})`
 const markerTransform = (point: Position, camera: Camera) => `translate(${(point[0] * camera.scale + camera.x).toFixed(2)} ${(point[1] * camera.scale + camera.y).toFixed(2)})`
 
-function translateBounds(bounds: Bounds, x: number): Bounds {
-  return { ...bounds, minX: bounds.minX + x, maxX: bounds.maxX + x }
-}
-
 function targetBounds(countryId: string, point: Position, referenceLongitude: number): Bounds {
   const country = travelCountryById.get(countryId)
   if (!country) return { minX: 480, minY: 260, maxX: 520, maxY: 300 }
   const item = featuresById.get(country.mapId)
-  const anchorX = project(country.anchor)[0]
   if (!item) return { minX: point[0] - 10, minY: point[1] - 10, maxX: point[0] + 10, maxY: point[1] + 10 }
-  if (country.fitMode === 'all') return boundsForGeometryNear(item.geometry, referenceLongitude)
-  return translateBounds(item.primary, point[0] - anchorX)
+  // カメラは描画と同じ連続経度帯で国境を測る。以前の primary を anchor 分だけ
+  // 平行移動する方式では、地域ごとの表示経度帯とずれて国が画面外になり得た。
+  return boundsForGeometryNear(item.geometry, referenceLongitude)
 }
 
 /** 日付変更線の処理前の、経度・緯度で表した国のアンカー。 */
