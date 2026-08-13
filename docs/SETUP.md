@@ -97,7 +97,7 @@ Windows のファイアウォールでアクセスがブロックされる場合
 
 - **Console** … `console.log` と実行時エラーの確認
 - **Elements** … CSS Modules 適用後のクラス名・スタイルの確認
-- **Network** … 国旗SVG（`/flags/xx.svg`）と車両写真（`/vehicles/<id>.webp`）が200で取得できているかの確認
+- **Network** … 国旗SVG（`/flags/xx.svg`）と車両イラスト（`/images/working-vehicles/<id>.png`）が200で取得できているかの確認
 - **デバイスツールバー**（`Ctrl + Shift + M`）… 子ども向け UI の要である**スマホ縦画面の表示確認**。
   `iPhone SE (375×667)` や `Galaxy S8+ (360×740)` あたりで、
   - 国旗・選択肢・回答後の結果オーバーレイ（`QuizResultOverlay`）が縦スクロールなしに収まるか
@@ -226,7 +226,7 @@ set GITHUB_PAGES=true && npm run build:pages && set GITHUB_PAGES=
 | --- | --- |
 | `npm install` が権限エラーで失敗する | `node_modules` が中途半端な状態で残っている。削除してから `npm install` を再実行 |
 | 国旗画像が表示されない（404） | `public/flags/` に 100 個の SVG があるか確認。`Country.flag` は `flags/xx.svg` のような **base 相対パス**（先頭スラッシュなし）である必要がある |
-| 車両写真が表示されない（404） | `public/vehicles/` に24個のWebPがあるか確認。`Vehicle.photo` は `vehicles/<id>.webp` のような **base 相対パス**で指定する |
+| 車両イラストが表示されない（404） | `public/images/working-vehicles/` に11個のPNGがあるか確認。`Vehicle.photo` は `images/working-vehicles/<id>.png` のような **base 相対パス**で指定する |
 | GitHub Pages でアセットが 404 | `GITHUB_PAGES` 環境変数なしでビルドしている。CI の `build:pages` ステップの `env` 設定を確認 |
 | 結果画面を開くと開始画面に戻される | 仕様どおりの挙動（`location.state` が無いため）。プレイ画面から 10 問回答して到達してください |
 | 変更が画面に反映されない | Service Worker が古いキャッシュを返している可能性。DevTools → Application → Service Workers → **Unregister** 後にリロード（またはハードリロード `Ctrl + Shift + R`） |
