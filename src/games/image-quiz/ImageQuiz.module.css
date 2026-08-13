@@ -152,6 +152,8 @@
 @media (orientation: landscape) and (max-height: 560px) {
   .playPage {
     --feedback-bar-height: 76px;
+    /* 通常レイアウトの 640px 幅を上書きして、国旗クイズと同じ横画面幅を使う。 */
+    width: min(100%, 960px);
     max-width: 960px;
     padding-top: calc(8px + var(--safe-top));
     padding-bottom: calc(var(--feedback-bar-height) + var(--safe-bottom));
