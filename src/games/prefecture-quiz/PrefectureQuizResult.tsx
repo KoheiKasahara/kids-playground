@@ -1,13 +1,10 @@
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import { isQuizResultState } from '../quiz-core/resultState'
 import { MODE_PATH } from './types'
 import type { PrefectureQuizMode } from './types'
 import styles from './PrefectureQuizResult.module.css'
 
-type ResultState = { correctCount: number; totalCount: number }
-function isResultState(value: unknown): value is ResultState {
-  return typeof value === 'object' && value !== null && typeof (value as ResultState).correctCount === 'number' && typeof (value as ResultState).totalCount === 'number'
-}
 const pathToMode: Record<string, PrefectureQuizMode> = { 'shape-to-name': 'shapeToName', 'name-to-shape': 'nameToShape', 'name-to-map': 'nameToMap' }
 
 export default function PrefectureQuizResult() {
@@ -15,7 +12,7 @@ export default function PrefectureQuizResult() {
   const location = useLocation()
   const navigate = useNavigate()
   const mode = modePath ? pathToMode[modePath] : undefined
-  if (!mode || !isResultState(location.state)) return <Navigate to="/games/prefecture-quiz" replace />
+  if (!mode || !isQuizResultState(location.state)) return <Navigate to="/games/prefecture-quiz" replace />
   const { correctCount, totalCount } = location.state
   const praise = correctCount === totalCount ? 'かんぺき！' : correctCount >= 7 ? 'すごい！' : correctCount >= 4 ? 'よくできました' : 'また あそぼう！'
   return <main className={styles.page}>
