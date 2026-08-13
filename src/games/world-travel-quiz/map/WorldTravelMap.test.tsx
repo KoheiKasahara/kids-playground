@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
+import { travelCourses } from '../data/travelCourses'
 import { project } from './geometry'
-import { cameraForTargetCountry, routePointsForCountryIds } from './WorldTravelMap'
+import { cameraForTargetCountry, displayLongitudeForCountryIds, routePointsForCountryIds } from './WorldTravelMap'
 
 describe('WorldTravelMap route coordinates', () => {
   test('通常のコースは経度を連続化してから投影し、マレーシアを正しい位置へ置く', () => {
@@ -37,5 +38,13 @@ describe('WorldTravelMap route coordinates', () => {
     expect(x * camera.scale + camera.x).toBeLessThan(600)
     expect(y * camera.scale + camera.y).toBeGreaterThan(220)
     expect(y * camera.scale + camera.y).toBeLessThan(380)
+  })
+
+  test.each(travelCourses)('$name は背景地図とルートを同じ世界コピーへ表示する', (course) => {
+    const displayLongitude = displayLongitudeForCountryIds(course.countryIds)
+    const displayX = project([displayLongitude, 0])[0]
+    const route = routePointsForCountryIds(course.countryIds)
+
+    expect(route.every(([x]) => Math.abs(x - displayX) <= 500)).toBe(true)
   })
 })
