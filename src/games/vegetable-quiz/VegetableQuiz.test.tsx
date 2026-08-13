@@ -46,6 +46,19 @@ describe('おやさいクイズ', () => {
     expect(screen.getByRole('button', { name: `◯ ${answer.name}` })).toBeDisabled()
   })
 
+  test('イラスト→名前は回答後に次の問題へ進める', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/vegetable-quiz/image-to-name/play')
+    const firstAnswer = vegetableForQuestionImage()
+
+    await user.click(screen.getByRole('button', { name: firstAnswer.name }))
+    await user.click(screen.getByRole('button', { name: 'つぎのもんだい' }))
+
+    expect(screen.getByRole('heading', { name: 'これは なに？' })).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2')
+    expect(screen.getAllByRole('button', { name: /^(?!やめる$).+/ })).toHaveLength(4)
+  })
+
   test('名前→イラストは4択画像を表示し、不正解でも正しい名前と画像を示す', async () => {
     const user = userEvent.setup()
     renderApp('/games/vegetable-quiz/name-to-image/play')
@@ -57,5 +70,16 @@ describe('おやさいクイズ', () => {
     expect(screen.getByRole('status')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('こたえ:')
     expect(screen.getByAltText(/せいかいの/)).toBeInTheDocument()
+  })
+
+  test('名前→イラストは回答後に次の問題へ進める', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/vegetable-quiz/name-to-image/play')
+
+    await user.click(screen.getAllByRole('button', { name: /ばんめ の イラスト/ })[0])
+    await user.click(screen.getByRole('button', { name: 'つぎのもんだい' }))
+
+    expect(screen.getAllByRole('button', { name: /ばんめ の イラスト/ })).toHaveLength(4)
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2')
   })
 })
