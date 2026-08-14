@@ -1,0 +1,217 @@
+/*
+ * .fit: 呼び出し側が確保した領域いっぱいに広がり、useBoardScale が計測する対象になる。
+ * .stage: useBoardScale が計算した実サイズ（px）。中央寄せして余白を均等にする。
+ * .logical: 論理座標 400×600 のレイヤー。scale を transform で掛けるだけで、
+ *   中身のすべての子要素は論理座標の数値をそのまま left/top/width/height に使える。
+ */
+/*
+ * 呼び出し側が用意した領域（position: relative であること）を absolute + inset: 0 で
+ * 埋める。height: 100% にすると、親がフレックスで高さを与えられている場合でも
+ * ブラウザが百分率の基準を確定できず、「盤面の中身の高さ(600px)」が
+ * .fit の高さとして採用されてしまう。その高さを useBoardScale が測って scale を
+ * 決めるため、scale が 1 から動かなくなる（＝タブレットで盤面が拡大されない）
+ * 循環参照が起きる。absolute にすると大きさが子要素に依存しなくなり循環が切れる。
+ */
+.fit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+}
+
+.logical {
+  position: relative;
+  transform-origin: 0 0;
+  /* 壁の厚みぶんのはみ出し・盤外脱出したボールをここで見えなくする */
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+/* 子どもが楽しい、明るい淡色のグラデーション背景 */
+.background {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(255, 146, 43, 0.18), rgba(255, 146, 43, 0) 42%),
+    linear-gradient(180deg, #eef2ff 0%, #fdf6ff 45%, #fff9ec 100%);
+}
+
+/* --- 壁 ------------------------------------------------------------------ */
+
+.wall {
+  position: absolute;
+  transform-origin: center;
+  background-color: rgba(76, 110, 245, 0.55);
+  border-radius: var(--radius-sm);
+}
+
+.guideWall {
+  position: absolute;
+  transform-origin: center;
+  background-color: rgba(255, 146, 43, 0.65);
+  border-radius: var(--radius-round);
+}
+
+.divider {
+  position: absolute;
+  background-color: rgba(33, 37, 41, 0.16);
+  border-radius: var(--radius-sm);
+}
+
+/* --- 障害物 ---------------------------------------------------------------- */
+
+.bumper {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffd08a, var(--color-accent) 65%, var(--color-accent-dark) 100%);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.6),
+    var(--shadow-sm);
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.peg {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #b6c7ff, var(--color-primary) 70%, var(--color-primary-dark) 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.55),
+    var(--shadow-sm);
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+/* バンパー／ピンにボールが当たったときの一瞬の発光・拡大。usePinballEngine から
+   classList を直接操作して付け外しするため、React stateは介さない。 */
+.bumper.hit,
+.peg.hit {
+  transform: scale(1.22);
+  filter: brightness(1.35) saturate(1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bumper,
+  .peg {
+    transition: none;
+  }
+}
+
+/* --- 得点ゾーン -------------------------------------------------------------- */
+
+.zone {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: var(--space-md);
+  border-top: 2px dashed rgba(33, 37, 41, 0.18);
+  background-color: rgba(76, 110, 245, 0.08);
+}
+
+/* 得点が高いゾーンほど濃く目立つ色にして、中央が高得点だと色でも分かるようにする */
+.zone[data-score='300'] {
+  background-color: rgba(76, 110, 245, 0.16);
+}
+
+.zone[data-score='1000'] {
+  background: linear-gradient(180deg, rgba(255, 146, 43, 0.32), rgba(255, 146, 43, 0.14));
+}
+
+/*
+ * 1ゾーンの内寸（80px − 仕切り8px = 72px）に「1000」の4桁が収まる大きさにする。
+ * これより大きくすると桁が隣のゾーンへはみ出し、数字どうしが重なって読めなくなる。
+ */
+.zoneScore {
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--color-text);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.zone[data-score='1000'] .zoneScore {
+  color: var(--color-accent-dark);
+}
+
+/* --- 得点ポップ -------------------------------------------------------------- */
+
+@keyframes scorePopIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.6);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(-50%, -18px) scale(1.12);
+  }
+  75% {
+    transform: translate(-50%, -14px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -26px) scale(1);
+  }
+}
+
+.scorePop {
+  position: absolute;
+  /* left・widthはPinballBoard側でzoneの中心xを渡す（インラインstyleで上書きされる） */
+  top: 470px;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--color-accent-dark);
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.9),
+    0 2px 0 rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  white-space: nowrap;
+  animation: scorePopIn 900ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scorePop {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, -18px) scale(1);
+  }
+}
+
+/* --- ボール ---------------------------------------------------------------- */
+
+.ballSlot {
+  /*
+   * FlagBall 自体（.ball）には触れず、絶対配置専用のラッパーとして用意する。
+   * usePinballEngine は「.logical コンテナの原点(0,0)を基準にした
+   * transform: translate(x, y)」をこのラッパーへ直接書き込むため、position は
+   * 常に absolute でなければならない。position の上書きをCSS結合順に依存させないよう、
+   * PinballBoard.tsx 側でこのラッパー div を FlagBall の外側に置く構造そのもので保証する
+   * （!important は使わない）。
+   */
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* 初期状態は usePinballEngine が射出時まで visibility: hidden にする */
+  visibility: hidden;
+  will-change: transform;
+}
+
+/* --- 読み上げ専用の通知（視覚上は非表示） -------------------------------------- */
+
+.announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

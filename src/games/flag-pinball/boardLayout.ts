@@ -7,8 +7,12 @@
 export const BOARD_WIDTH = 400
 export const BOARD_HEIGHT = 600
 
-/** 国旗ボールの半径（論理座標） */
-export const BALL_RADIUS = 18
+/**
+ * 国旗ボールの半径（論理座標）。
+ * 盤面幅の1割強を占める大きさにしてある。4〜5歳が3球を同時に目で追え、
+ * 転がっている国旗の模様まで見分けられることを、盤面のすき間の広さより優先している。
+ */
+export const BALL_RADIUS = 22
 
 /** ピン／バンパー。中心座標と半径で表す静的な円 */
 export type CircleObstacle = {
@@ -78,30 +82,31 @@ export function zoneAtX(x: number): ScoreZone {
 
 // --- 障害物（バンパー・ピン） -----------------------------------------------
 
-const BUMPER_RADIUS = 28
+const BUMPER_RADIUS = 26
 const BUMPER_RESTITUTION = 0.75
-const PEG_RADIUS = 11
+const PEG_RADIUS = 10
 const PEG_RESTITUTION = 0.6
 
 /**
  * バンパー3個・ピン6個の合計9個。中央上寄りにバンパー1個、その左右下にバンパー2個を置き、
  * ピンはその間を上下2段（合計3段構成のうち残り2段）で埋めて、左右対称でスカスカにも
  * ゴチャゴチャにもならない密度にしている。
- * 障害物同士は中心距離が「半径の和 + ボール直径」以上離れており、ボールが必ず通り抜けられる。
+ * 障害物同士は中心距離が「半径の和 + ボール直径」以上離れており、ボールが必ず通り抜けられる
+ * （ボールを大きくしたぶん、バンパー・ピンは小さめにして通り道の広さを保っている）。
  */
 export const OBSTACLES: readonly CircleObstacle[] = [
   { id: 'bumper-center', kind: 'bumper', x: BOARD_WIDTH / 2, y: 250, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
-  { id: 'bumper-left', kind: 'bumper', x: 100, y: 375, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
-  { id: 'bumper-right', kind: 'bumper', x: 300, y: 375, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
+  { id: 'bumper-left', kind: 'bumper', x: 100, y: 395, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
+  { id: 'bumper-right', kind: 'bumper', x: 300, y: 395, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
 
   { id: 'peg-top-left', kind: 'peg', x: 90, y: 150, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
   { id: 'peg-top-right', kind: 'peg', x: 310, y: 150, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
 
-  { id: 'peg-mid-left', kind: 'peg', x: 140, y: 305, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-mid-right', kind: 'peg', x: 260, y: 305, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-mid-left', kind: 'peg', x: 125, y: 300, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-mid-right', kind: 'peg', x: 275, y: 300, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
 
-  { id: 'peg-low-left', kind: 'peg', x: 160, y: 460, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-low-right', kind: 'peg', x: 240, y: 460, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-low-left', kind: 'peg', x: 160, y: 455, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-low-right', kind: 'peg', x: 240, y: 455, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
 ]
 
 // --- 壁 --------------------------------------------------------------------

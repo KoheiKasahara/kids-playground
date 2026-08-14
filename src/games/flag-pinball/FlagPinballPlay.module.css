@@ -1,0 +1,75 @@
+/*
+ * 盤面を最大化することを最優先にする。ヘッダは高さを詰め、
+ * 残りの高さをすべて .boardArea（PinballBoard）へ渡す。
+ */
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: calc(var(--space-xs) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-xs) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/*
+ * 「やめる」は盤面（ボールの発射・着弾操作がある領域）から離した左上に固定配置し、
+ * 誤タップを避ける。44px以上のタップ領域を確保する。
+ */
+.quit {
+  position: fixed;
+  z-index: 200;
+  top: calc(var(--space-xs) + var(--safe-top));
+  left: calc(var(--space-xs) + var(--safe-left));
+  min-width: 64px;
+  min-height: 44px;
+  padding: 5px 12px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background-color: var(--color-surface-muted);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quit:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* 3つの国旗ボールと得点を横に並べる、高さを詰めた細いヘッダ */
+.header {
+  flex: none;
+  height: 64px;
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+}
+
+.ballScore {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.score {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/*
+ * ヘッダを除いた残りの高さをすべて盤面に渡す。
+ * PinballBoard 側の .fit は absolute + inset: 0 でこの領域を埋めるため、
+ * 基準となる position: relative をここで必ず与える。
+ */
+.boardArea {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}

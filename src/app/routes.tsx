@@ -27,9 +27,10 @@ import ColorMixQuizStart from '../games/color-mix-quiz/ColorMixQuizStart'
 import ColorMixQuizPlay from '../games/color-mix-quiz/ColorMixQuizPlay'
 import ColorMixQuizResult from '../games/color-mix-quiz/ColorMixQuizResult'
 
-// 50m世界地図は大きいため、旅行クイズを開くときだけ読込む。Vite PWAは生成された
-// chunkもprecacheするため、初回取得後は他のゲームと同様にオフラインで遊べる。
-const travelRoute = (loader: () => Promise<{ default: ComponentType }>) => {
+// 50m世界地図やmatter-js(物理エンジン)など、特定ゲームだけが必要とする重い依存は
+// そのゲームを開くときだけ読込む。Vite PWAは生成されたchunkもprecacheするため、
+// 初回取得後は他のゲームと同様にオフラインで遊べる。
+const lazyRoute = (loader: () => Promise<{ default: ComponentType }>) => {
   const Screen = lazy(loader)
   return <Suspense fallback={null}><Screen /></Suspense>
 }
@@ -111,18 +112,23 @@ export const routes: RouteObject[] = [
   { path: '/games/color-mix-quiz/level', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
   { path: '/games/color-mix-quiz/:level/play', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
   { path: '/games/color-mix-quiz/:level/result', element: <Navigate to="/games/color-mix-quiz" replace /> },
+  // こっきピンボールは物理エンジン(matter-js)を含み main chunk のサイズ警告を超えるため、
+  // 旅行クイズの世界地図と同様に開くときだけ読込む。
+  { path: '/games/flag-pinball', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballSelect')) },
+  { path: '/games/flag-pinball/play', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballPlay')) },
+  { path: '/games/flag-pinball/result', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballResult')) },
   { path: '/games/prefecture-quiz', element: <PrefectureQuizStart /> },
   { path: '/games/prefecture-quiz/puzzle', element: <PrefecturePuzzleStart /> },
   { path: '/games/prefecture-quiz/puzzle/:region/play', element: <PrefecturePuzzlePlay /> },
   { path: '/games/prefecture-quiz/:mode/play', element: <PrefectureQuizPlay /> },
   { path: '/games/prefecture-quiz/:mode/result', element: <PrefectureQuizResult /> },
-  { path: '/games/world-travel-quiz', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizStart')) },
-  { path: '/games/world-travel-quiz/:region/answer-mode', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelAnswerModeSelect')) },
-  { path: '/games/world-travel-quiz/:region/:answerMode/play', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizPlay')) },
-  { path: '/games/world-travel-quiz/:region/:answerMode/result', element: travelRoute(() => import('../games/world-travel-quiz/WorldTravelQuizResult')) },
-  { path: '/games/japan-travel-quiz', element: travelRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizStart')) },
-  { path: '/games/japan-travel-quiz/play', element: travelRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizPlay')) },
-  { path: '/games/japan-travel-quiz/result', element: travelRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizResult')) },
+  { path: '/games/world-travel-quiz', element: lazyRoute(() => import('../games/world-travel-quiz/WorldTravelQuizStart')) },
+  { path: '/games/world-travel-quiz/:region/answer-mode', element: lazyRoute(() => import('../games/world-travel-quiz/WorldTravelAnswerModeSelect')) },
+  { path: '/games/world-travel-quiz/:region/:answerMode/play', element: lazyRoute(() => import('../games/world-travel-quiz/WorldTravelQuizPlay')) },
+  { path: '/games/world-travel-quiz/:region/:answerMode/result', element: lazyRoute(() => import('../games/world-travel-quiz/WorldTravelQuizResult')) },
+  { path: '/games/japan-travel-quiz', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizStart')) },
+  { path: '/games/japan-travel-quiz/play', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizPlay')) },
+  { path: '/games/japan-travel-quiz/result', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizResult')) },
   ...MATH_QUIZ_MODES.flatMap((mode) => [
     {
       path: `/games/math-quiz/${MATH_QUIZ_MODE_PATH[mode]}`,

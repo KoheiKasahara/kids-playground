@@ -40,6 +40,9 @@
 flag-icons 本体はこのプロジェクトの依存関係（`package.json`）には追加せず、
 必要な国旗SVGファイルのみを `public/flags/` にコピーして同梱しています。
 
+「こっきピンボール」（`src/games/flag-pinball/`）でも、新しい国旗SVGを追加せず、
+この一覧の中から選んだ20か国分をそのまま再利用しています。
+
 ### MIT License 全文
 
 ```
