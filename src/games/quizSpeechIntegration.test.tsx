@@ -95,6 +95,16 @@ const cases: Case[] = [
     heading: /は\s*どれ？/,
   },
   {
+    name: 'くだものクイズ（イラスト→なまえ）',
+    render: () => renderApp('/games/fruit-quiz/image-to-name/play'),
+    heading: 'これは なに？',
+  },
+  {
+    name: 'くだものクイズ（なまえ→イラスト）',
+    render: () => renderApp('/games/fruit-quiz/name-to-image/play'),
+    heading: /は\s*どれ？/,
+  },
+  {
     name: 'さんすうクイズ',
     render: () => renderApp('/games/math-quiz/add/easy/play'),
     heading: /=\s*\?/,
