@@ -16,15 +16,19 @@
 }
 
 /*
- * 国旗SVGは 4:3。object-fit: cover だと左右が切れて模様の特徴（縞・十字など）が
- * 丸の中から消えてしまう国が出る（例: フランスは左右の青・赤が切れて白ばかりになる）。
- * fill で正方形いっぱいに引き伸ばし、縦横比が崩れても特徴を必ず円の中に残す。
+ * 国旗SVGは viewBox="0 0 640 480"（4:3）。SVGの preserveAspectRatio の既定値は meet のため、
+ * object-fit: fill だけでは正方形ビューポートの上下に12.5%ずつレターボックスが残る。
+ * FlagBall.tsx が 4/3 から導出した scale(sqrt(4/3), 4/3) をここで適用し、縦を完全に埋める。
+ * 横の約7.7%ずつは親の overflow: hidden でクロップするが、cover（左右25%クロップ）より
+ * 模様を残し、正方形へ完全に引き伸ばすより歪みを抑える折衷にしている。
  */
 .flagImage {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: fill;
+  transform: scale(var(--flag-scale-x), var(--flag-scale-y));
+  transform-origin: center;
   pointer-events: none;
 }
 

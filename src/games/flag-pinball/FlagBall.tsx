@@ -1,4 +1,4 @@
-import type { Ref } from 'react'
+import type { CSSProperties, Ref } from 'react'
 import { BALL_RADIUS } from './boardLayout'
 import type { PinballFlag } from './types'
 import styles from './FlagBall.module.css'
@@ -15,13 +15,22 @@ type FlagBallProps = {
 /** 国旗ボールの直径（論理座標）。BALL_RADIUS は半径なので2倍する */
 const DEFAULT_SIZE = BALL_RADIUS * 2
 
+/** public/flags/*.svg の viewBox（640×480）から導出した表示補正値。 */
+const FLAG_SVG_ASPECT_RATIO = 4 / 3
+const FLAG_IMAGE_SCALE_STYLE = {
+  '--flag-scale-x': Math.sqrt(FLAG_SVG_ASPECT_RATIO),
+  '--flag-scale-y': FLAG_SVG_ASPECT_RATIO,
+} as CSSProperties
+
 /**
  * 国旗そのものに見える球。
  * 「丸の中に小さい四角い国旗」ではなく、丸自体が国旗である見た目にするため、
- * img を正方形いっぱいに object-fit: fill で引き伸ばしてから円形にクロップする。
- * 国旗SVGは 4:3 なので、cover だと左右が切れて縞・十字などの模様が消える国が出てしまう
- * （例: フランスは左右の青・赤が切れて白一色に近く見える）。fill で縦横比を崩してでも
- * 模様の特徴を丸の中に必ず残す方を優先する（ボールとしての「らしさ」より視認性を取る）。
+ * img のビューポートを正方形にしてから円形にクロップする。
+ * ただし SVG の preserveAspectRatio の既定値は xMidYMid meet なので、object-fit: fill だけでは
+ * 4:3 の絵が正方形ビューポート内で上下にレターボックス表示される。そこで、4:3 から
+ * scale(sqrt(4/3), 4/3) を導出して画像だけを補正する。縦は正方形いっぱいにし、横は
+ * 左右を最小限（約7.7%ずつ）クロップする折衷で、cover（左右25%クロップ）より模様を残す。
+ * 国旗SVG自体を正方形へ完全に引き伸ばすより歪みを抑えつつ、上下の白い帯をなくす。
  */
 export default function FlagBall({ flag, size, className, ref }: FlagBallProps) {
   const diameter = size ?? DEFAULT_SIZE
@@ -36,6 +45,7 @@ export default function FlagBall({ flag, size, className, ref }: FlagBallProps) 
         src={import.meta.env.BASE_URL + flag.flag}
         alt=""
         draggable={false}
+        style={FLAG_IMAGE_SCALE_STYLE}
       />
       <span className={styles.highlight} aria-hidden="true" />
     </div>
