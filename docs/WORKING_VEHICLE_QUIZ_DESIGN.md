@@ -84,22 +84,37 @@
 | excavator | ショベルカー |
 | bulldozer | ブルドーザー |
 | crane-truck | クレーンしゃ |
-| ladder-fire-truck | はしごしゃ |
+| tractor | トラクター |
 
-### ふつう: 13種類（3種類追加）
+### ふつう: 20種類（10種類追加）
 
 | ID | 表示名 |
 | --- | --- |
+| ladder-fire-truck | はしごしゃ |
 | road-roller | ロードローラー |
 | wheel-loader | ホイールローダー |
-| aerial-work-platform | こうしょさぎょうしゃ |
+| forklift | フォークリフト |
+| tow-truck | レッカーしゃ |
+| concrete-mixer | ミキサーしゃ |
+| tanker-truck | タンクローリー |
+| snowplow | じょせつしゃ |
+| tour-bus | かんこうバス |
+| delivery-truck | はいたつトラック |
 
-### むずかしい: 15種類（2種類追加）
+### むずかしい: 30種類（10種類追加）
 
 | ID | 表示名 |
 | --- | --- |
+| aerial-work-platform | こうしょさぎょうしゃ |
 | container-trailer | トレーラー |
 | street-sweeper | せいそうしゃ |
+| airport-fire-truck | くうこうしょうぼうしゃ |
+| airport-tug | ひこうきけんいんしゃ |
+| bookmobile | いどうとしょかん |
+| car-carrier | キャリアカー |
+| combine-harvester | コンバイン |
+| rice-transplanter | たうえき |
+| rotary-snowplow | ロータリーじょせつしゃ |
 
 ## 6. 出題と結果判定
 
@@ -138,8 +153,8 @@
 
 ## 10. テストと受け入れ条件
 
-- 15件、ID・名前・イラストパスの一意性、イラスト実在。
-- レベル別10 / 13 / 15件と累積包含関係。
+- 30件、ID・名前・イラストパスの一意性、イラスト実在。
+- レベル別10 / 20 / 30件と累積包含関係。
 - 各レベルで10問、4択、正解1件、問題・選択肢重複なし。
 - 開始、モード選択、むずかしさ、両モードの回答と10問進行、結果、再挑戦。
 - 不正levelとstateなし結果URLの安全な戻り。
