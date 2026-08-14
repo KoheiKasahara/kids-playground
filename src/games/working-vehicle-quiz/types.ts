@@ -40,6 +40,6 @@ export const MODE_LABEL: Record<VehicleQuizMode, string> = {
 
 export const LEVEL_DESCRIPTION: Record<QuizLevel, string> = {
   easy: 'よく みる 10しゅるい',
-  normal: '13しゅるい',
-  hard: 'ぜんぶで 15しゅるい',
+  normal: '20しゅるい',
+  hard: 'ぜんぶで 30しゅるい',
 }

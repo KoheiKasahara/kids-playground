@@ -111,7 +111,7 @@ src/
 │  │  ├─ questionGenerator.ts   # 共通問題生成への互換ラッパー
 │  │  ├─ types.ts
 │  │  └─ data/countries.ts # 国データ（105か国）
-│  ├─ working-vehicle-quiz/ # はたらくくるまクイズ（15車両・2モード）
+│  ├─ working-vehicle-quiz/ # はたらくくるまクイズ（30車両・2モード）
 │  └─ math-quiz/        # さんすうクイズ（4演算×3むずかしさ、出題は計算式）
 ├─ components/         # ゲーム間で共通のUI部品 (BigButton, ProgressBar など)
 ├─ styles/             # グローバルCSS・デザイントークン
@@ -120,7 +120,7 @@ src/
 public/
 ├─ flags/               # 国旗SVG（flag-icons由来）
 ├─ images/
-│  ├─ working-vehicles/ # はたらくくるまイラスト（PNG、15枚）
+│  ├─ working-vehicles/ # はたらくくるまイラスト（PNG、30枚）
 │  └─ vegetables/       # おやさいイラスト（PNG）
 └─ icons/               # PWAアイコン
 

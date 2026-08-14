@@ -6,11 +6,11 @@ import { describe, expect, test } from 'vitest'
 import { vehicles, vehiclesForLevel } from './vehicles'
 
 describe('vehicles', () => {
-  test('15種類あり、ID・日本語名・写真パスが重複しない', () => {
-    expect(vehicles).toHaveLength(15)
-    expect(new Set(vehicles.map((vehicle) => vehicle.id)).size).toBe(15)
-    expect(new Set(vehicles.map((vehicle) => vehicle.nameJa)).size).toBe(15)
-    expect(new Set(vehicles.map((vehicle) => vehicle.photo)).size).toBe(15)
+  test('30種類あり、ID・日本語名・写真パスが重複しない', () => {
+    expect(vehicles).toHaveLength(30)
+    expect(new Set(vehicles.map((vehicle) => vehicle.id)).size).toBe(30)
+    expect(new Set(vehicles.map((vehicle) => vehicle.nameJa)).size).toBe(30)
+    expect(new Set(vehicles.map((vehicle) => vehicle.photo)).size).toBe(30)
   })
 
   test('写真パスは images/working-vehicles/<id>.png で、public配下に実ファイルがある', () => {
@@ -24,8 +24,8 @@ describe('vehicles', () => {
 describe('vehiclesForLevel', () => {
   test.each([
     ['easy', 10],
-    ['normal', 13],
-    ['hard', 15],
+    ['normal', 20],
+    ['hard', 30],
   ] as const)('%sは累積で%d種類', (level, count) => {
     expect(vehiclesForLevel(level)).toHaveLength(count)
   })
