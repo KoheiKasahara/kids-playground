@@ -53,7 +53,9 @@ describe('Prefecture quiz screens', () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/shape-to-name/play']}><App /></MemoryRouter>)
     expect(screen.getByRole('img', { name: '都道府県の かたち' })).toBeInTheDocument()
-    const choices = screen.getAllByRole('button').filter((button) => button.textContent !== 'やめる')
+    const choices = screen
+      .getAllByRole('button')
+      .filter((button) => button.textContent !== 'やめる' && !(button.textContent ?? '').includes('よみあげ'))
     await user.click(choices[0])
     expect(screen.getByRole('status')).toHaveTextContent('こたえ:')
     expect(screen.getByRole('status')).not.toHaveTextContent('都道府県の かたち')
@@ -62,7 +64,9 @@ describe('Prefecture quiz screens', () => {
   test('名前→形は4択を一度選ぶとロックし、次問へ進める', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/name-to-shape/play']}><App /></MemoryRouter>)
-    const choices = screen.getAllByRole('button').filter((button) => button.textContent !== 'やめる')
+    const choices = screen
+      .getAllByRole('button')
+      .filter((button) => button.textContent !== 'やめる' && !(button.textContent ?? '').includes('よみあげ'))
     expect(choices).toHaveLength(4)
     expect(choices[0]).toHaveAccessibleName('1ばんめ の かたち')
     await user.click(choices[0])
@@ -206,7 +210,9 @@ describe('Prefecture quiz screens', () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/shape-to-name/play']}><App /></MemoryRouter>)
     for (let index = 0; index < 10; index += 1) {
-      const choice = screen.getAllByRole('button').find((button) => button.textContent !== 'やめる')
+      const choice = screen
+        .getAllByRole('button')
+        .find((button) => button.textContent !== 'やめる' && !(button.textContent ?? '').includes('よみあげ'))
       if (!choice) throw new Error('選択肢がありません')
       await user.click(choice)
       await user.click(screen.getByRole('button', { name: index === 9 ? 'けっかを みる' : 'つぎの もんだい' }))

@@ -16,6 +16,7 @@ import {
   playPanelRevealSound,
   primeAudio,
 } from '../../utils/quizSound'
+import { SpeechToggle, useQuestionSpeech } from '../../speech'
 import styles from './PanelFlagQuizPlay.module.css'
 
 /** 1問ぶんの満点（パネル1枚で正解したときの得点） */
@@ -158,6 +159,8 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
   const remainingPanels = PANEL_COUNT - state.openedCount
   const questionScore = scoreForPanels(state.openedCount, isCorrect)
 
+  useQuestionSpeech('この くにの なまえは？', state.index)
+
   const handleReveal = () => {
     if (answered || state.openedCount >= PANEL_COUNT) return
     // iOS Safari 対策: ユーザー操作イベントの中で AudioContext を先に用意しておく
@@ -248,6 +251,7 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
+        <SpeechToggle />
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
           やめる
         </button>

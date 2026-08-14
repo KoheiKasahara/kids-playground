@@ -10,6 +10,7 @@ import { generateQuestions } from './questionGenerator'
 import { isQuizLevel, LEVEL_LABEL, MODE_PATH } from './types'
 import type { Country, QuizLevel, QuizMode } from './types'
 import { playCorrectSound, playIncorrectSound } from '../../utils/quizSound'
+import { SpeechToggle, useQuestionSpeech } from '../../speech'
 import styles from './FlagQuizPlay.module.css'
 
 type PlayState = {
@@ -88,6 +89,11 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
   const answered = state.selectedId !== null
   const isCorrect = state.selectedId === question.answer.id
 
+  useQuestionSpeech(
+    mode === 'flagToName' ? 'この くにの なまえは？' : `${question.answer.nameJa}の こっきは どれ？`,
+    state.index,
+  )
+
   const handleSelect = (choiceId: string) => {
     if (answered) return
     const correct = choiceId === question.answer.id
@@ -117,6 +123,7 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
   return (
     <div className={pageClassName}>
       <div className={styles.header}>
+        <SpeechToggle />
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
           やめる
         </button>

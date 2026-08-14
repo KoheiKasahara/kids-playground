@@ -5,6 +5,8 @@ import styles from './SpeechToggle.module.css'
 
 type SpeechToggleProps = {
   className?: string
+  /** アイコンのみの幅の狭い表示。横幅に余裕がないヘッダ（都道府県パズル）で使う。 */
+  compact?: boolean
 }
 
 /**
@@ -12,7 +14,7 @@ type SpeechToggleProps = {
  * 各クイズのヘッダに置かれる想定なので、見た目は既存のヘッダ高さを絶対に超えないサイズに
  * 抑えつつ（詳細は SpeechToggle.module.css）、タップ領域は疑似要素で広げてある。
  */
-export default function SpeechToggle({ className }: SpeechToggleProps) {
+export default function SpeechToggle({ className, compact }: SpeechToggleProps) {
   // 対応状況はマウント後に変わるものではないため、初回に一度だけ判定して固定する
   // （レンダーのたびに isSpeechSupported() を呼び直して結果がちらつくのを防ぐ）。
   const [supported] = useState(() => isSpeechSupported())
@@ -24,7 +26,13 @@ export default function SpeechToggle({ className }: SpeechToggleProps) {
       ? 'よみあげ ON。おすと よみあげを OFF にします'
       : 'よみあげ OFF。おすと よみあげを ON にします'
 
-  const classes = [styles.toggle, enabled && styles.toggleOn, !supported && styles.toggleUnsupported, className]
+  const classes = [
+    styles.toggle,
+    enabled && styles.toggleOn,
+    !supported && styles.toggleUnsupported,
+    compact && styles.toggleCompact,
+    className,
+  ]
     .filter(Boolean)
     .join(' ')
 
@@ -40,7 +48,7 @@ export default function SpeechToggle({ className }: SpeechToggleProps) {
       <span className={styles.icon} aria-hidden="true">
         {enabled ? '🔊' : '🔇'}
       </span>
-      <span className={styles.label}>よみあげ</span>
+      {!compact && <span className={styles.label}>よみあげ</span>}
     </button>
   )
 }

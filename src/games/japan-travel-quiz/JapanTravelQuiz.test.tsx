@@ -31,7 +31,10 @@ describe('JapanTravelQuizPlay', () => {
   test('回答と次へを連打しても、reduced-motionで次の問題へ一度だけ進む', async () => {
     reducedMotion(); const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/japan-travel-quiz/play']}><Routes><Route path="/games/japan-travel-quiz/play" element={<JapanTravelQuizPlay />} /></Routes></MemoryRouter>)
-    const choices = screen.getAllByRole('button').filter((button) => button.textContent !== 'やめる')
+    // ヘッダの「やめる」「よみあげ」トグルを除いた、選択肢ボタンだけを対象にする。
+    const choices = screen
+      .getAllByRole('button')
+      .filter((button) => button.textContent !== 'やめる' && !(button.textContent ?? '').includes('よみあげ'))
     await user.click(choices[0])
     expect(screen.getByRole('status')).toBeInTheDocument()
     for (const choice of choices) expect(choice).toBeDisabled()

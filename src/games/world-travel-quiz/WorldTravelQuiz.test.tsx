@@ -17,7 +17,12 @@ describe('WorldTravelQuizPlay', () => {
   test('国名モードで回答と次へを連打しても、reduced-motionで次の問題へ一度だけ進む', async () => {
     reducedMotion(); const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/world-travel-quiz/asiaOceania/country-name/play']}><Routes><Route path="/games/world-travel-quiz/:region/:answerMode/play" element={<WorldTravelQuizPlay />} /></Routes></MemoryRouter>)
-    await user.click(screen.getAllByRole('button').find((button) => button.textContent !== 'やめる')!)
+    // ヘッダの「やめる」「よみあげ」トグルを除いた最初の選択肢ボタンをクリックする。
+    await user.click(
+      screen
+        .getAllByRole('button')
+        .find((button) => button.textContent !== 'やめる' && !(button.textContent ?? '').includes('よみあげ'))!,
+    )
     expect(screen.getByRole('status')).toBeInTheDocument()
     const next = screen.getByRole('button', { name: 'つぎの くにへ' })
     await user.dblClick(next)

@@ -76,4 +76,25 @@ describe('SpeechToggle', () => {
 
     expect(screen.getByRole('button')).toHaveClass('my-extra-class')
   })
+
+  test('compact では「よみあげ」テキストを表示しないが aria-label は変わらない', () => {
+    installSpeechSynthesisMock()
+    render(<SpeechToggle compact />)
+
+    const button = screen.getByRole('button')
+    expect(button).not.toHaveTextContent('よみあげ')
+    expect(button).toHaveAttribute('aria-label', 'よみあげ OFF。おすと よみあげを ON にします')
+  })
+
+  test('compact でもクリックで ON/OFF が切り替わる', async () => {
+    installSpeechSynthesisMock()
+    const user = userEvent.setup()
+    render(<SpeechToggle compact />)
+
+    const button = screen.getByRole('button')
+    await user.click(button)
+
+    expect(button).toHaveAttribute('aria-pressed', 'true')
+    expect(button).toHaveAttribute('aria-label', 'よみあげ ON。おすと よみあげを OFF にします')
+  })
 })

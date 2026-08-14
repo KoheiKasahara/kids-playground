@@ -63,6 +63,15 @@ export const OPERATION_SIGN: Record<MathOperation, string> = {
   div: '÷',
 }
 
+/** 問題文よみあげ用の、演算記号の読み上げ形。「＋」等の記号は TTS が読み上げると不自然なため、
+ *  よみあげテキストの組み立てにはこちらを使う（画面表示には OPERATION_SIGN を使い続ける）。 */
+export const OPERATION_SPEECH_WORD: Record<MathOperation, string> = {
+  add: 'たす',
+  sub: 'ひく',
+  mul: 'かける',
+  div: 'わる',
+}
+
 /** むずかしさ選択画面に表示する、出題対象の計算の説明。 */
 export const LEVEL_DESCRIPTION: Record<MathQuizMode, Record<QuizLevel, string>> = {
   add: {

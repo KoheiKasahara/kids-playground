@@ -4,6 +4,7 @@ import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
 import { playCorrectSound } from '../../utils/quizSound'
+import { SpeechToggle, useQuestionSpeech } from '../../speech'
 import { prefectures } from './data/prefectures'
 import { numberedPrefecturesForRegion, prefecturesForRegion, REGION_LABEL } from './data/regions'
 import PrefectureMap from './map/PrefectureMap'
@@ -40,6 +41,8 @@ function PrefectureQuizPlayGame({ mode }: { mode: PrefectureQuizMode }) {
   const isCorrect = state.selectedId === question.answer.id
   const isLast = state.index === questions.length - 1
   const numbered = numberedPrefecturesForRegion(question.answer.region)
+  const speechText = mode === 'shapeToName' ? 'この かたちは なーんだ？' : mode === 'nameToShape' ? `${question.answer.nameHiragana}は どれ？` : `${question.answer.nameHiragana}は どこ？`
+  useQuestionSpeech(speechText, state.index)
   const select = (id: string) => {
     if (answered) return
     const correct = id === question.answer.id
@@ -52,6 +55,7 @@ function PrefectureQuizPlayGame({ mode }: { mode: PrefectureQuizMode }) {
   }
   return <main className={styles.page}>
     <header className={styles.header}>
+      <SpeechToggle />
       <button type="button" className={styles.quit} onClick={() => navigate('/games/prefecture-quiz')}>やめる</button>
       <div className={styles.progress}><p>{state.index + 1} / {questions.length}</p><ProgressBar current={state.index + 1} total={questions.length} /></div>
     </header>

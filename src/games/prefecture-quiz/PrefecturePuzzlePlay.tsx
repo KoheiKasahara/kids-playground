@@ -2,6 +2,7 @@ import { useRef, useState, type DragEvent, type PointerEvent } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import { playCorrectSound, playPanelOpenSound } from '../../utils/quizSound'
+import { SpeechToggle, useQuestionSpeech } from '../../speech'
 import { prefecturesForRegion, REGION_LABEL } from './data/regions'
 import type { PrefectureId, RegionId } from './data/prefectures'
 import PrefecturePuzzleMap from './PrefecturePuzzleMap'
@@ -41,6 +42,8 @@ function PuzzleGame({ region }: { region: RegionId }) {
   const score = correctCount(placements, ids)
   const unplaced = pieceOrder.filter((id) => !Object.values(placements).includes(id))
   const byId = new Map(items.map((item) => [item.id, item]))
+
+  useQuestionSpeech(`${REGION_LABEL[region]}地方の パズルだよ。ピースを えらんで、ちずの ばしょを おしてね`, region)
 
   const choosePiece = (id: PrefectureId) => {
     if (checked) return
@@ -86,7 +89,7 @@ function PuzzleGame({ region }: { region: RegionId }) {
   return <main className={styles.page}>
     <header className={styles.header}>
       <button type="button" className={styles.back} onClick={() => navigate('/games/prefecture-quiz/puzzle')}>もどる</button>
-      <div><h1>{REGION_LABEL[region]}地方 パズル</h1><p>{Object.values(placements).filter(Boolean).length} / {ids.length} おいたよ</p></div>
+      <div><h1>{REGION_LABEL[region]}地方 パズル</h1><div className={styles.progressRow}><p>{Object.values(placements).filter(Boolean).length} / {ids.length} おいたよ</p><SpeechToggle compact /></div></div>
     </header>
     {checked && <section className={styles.result} aria-live="polite"><strong>{praise}</strong><span>みどりは せいかい。オレンジは「ここだったよ」の しるしだよ。</span></section>}
     <section className={styles.mapPanel}>

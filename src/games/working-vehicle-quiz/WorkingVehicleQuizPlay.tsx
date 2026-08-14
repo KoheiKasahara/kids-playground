@@ -4,6 +4,7 @@ import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
 import { playCorrectSound, playIncorrectSound } from '../../utils/quizSound'
+import { SpeechToggle, useQuestionSpeech } from '../../speech'
 import { isQuizLevel, LEVEL_LABEL } from '../quiz-core/types'
 import type { QuizLevel } from '../quiz-core/types'
 import { vehiclesForLevel } from './data/vehicles'
@@ -95,6 +96,11 @@ function WorkingVehicleQuizPlayGame({ mode, level }: WorkingVehicleQuizPlayGameP
   const isCorrect = state.selectedId === question.answer.id
   const isLastQuestion = state.index === totalCount - 1
 
+  useQuestionSpeech(
+    mode === 'photoToName' ? 'この くるまの なまえは？' : `${question.answer.nameJa}は どれ？`,
+    state.index,
+  )
+
   const handleSelect = (choiceId: string) => {
     if (answered) return
     const correct = choiceId === question.answer.id
@@ -121,6 +127,7 @@ function WorkingVehicleQuizPlayGame({ mode, level }: WorkingVehicleQuizPlayGameP
   return (
     <main className={pageClassName}>
       <div className={styles.header}>
+        <SpeechToggle />
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
           やめる
         </button>

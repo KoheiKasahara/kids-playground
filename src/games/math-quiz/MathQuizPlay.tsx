@@ -4,10 +4,11 @@ import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
 import { playCorrectSound, playIncorrectSound } from '../../utils/quizSound'
+import { SpeechToggle, useQuestionSpeech } from '../../speech'
 import { isQuizLevel, LEVEL_LABEL } from '../quiz-core/types'
 import type { QuizLevel } from '../quiz-core/types'
 import { generateMathQuestions } from './questionGenerator'
-import { MODE_PATH, OPERATION_SIGN } from './types'
+import { MODE_PATH, OPERATION_SIGN, OPERATION_SPEECH_WORD } from './types'
 import type { MathQuestion, MathQuizMode } from './types'
 import styles from './MathQuizPlay.module.css'
 
@@ -82,6 +83,11 @@ function MathQuizPlayGame({ mode, level }: MathQuizPlayGameProps) {
   const isCorrect = state.selected === question.problem.answer
   const isLastQuestion = state.index === totalCount - 1
 
+  useQuestionSpeech(
+    `${question.problem.left} ${OPERATION_SPEECH_WORD[question.problem.operation]} ${question.problem.right} は？`,
+    state.index,
+  )
+
   const handleSelect = (choice: number) => {
     if (answered) return
     const correct = choice === question.problem.answer
@@ -107,6 +113,7 @@ function MathQuizPlayGame({ mode, level }: MathQuizPlayGameProps) {
   return (
     <main className={styles.page}>
       <div className={styles.header}>
+        <SpeechToggle />
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
           やめる
         </button>
