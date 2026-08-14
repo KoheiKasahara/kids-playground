@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
 import { playColorMixSound, playCorrectSound, playIncorrectSound, primeAudio } from '../../utils/quizSound'
+import { SpeechToggle, useQuestionSpeech } from '../../speech'
 import { generateColorMixQuestions } from './questionGenerator'
 import type { ColorMixQuestion } from './types'
 import styles from './ColorMixQuizPlay.module.css'
@@ -35,6 +36,11 @@ function ColorMixQuizGame() {
   const isSubtracting = isSubtraction && answered
   const shouldRevealResult = answered
 
+  useQuestionSpeech(
+    isSubtraction ? 'この いろから ひくと？' : `この ${question.problem.inputColors.length}しょくを まぜると？`,
+    question.problem.id,
+  )
+
   // The success chime follows the visual mix. The timer is always cleared on next question/unmount.
   useEffect(() => {
     if (!correct) return undefined
@@ -66,6 +72,7 @@ function ColorMixQuizGame() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
+        <SpeechToggle />
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>やめる</button>
         <div className={styles.progressArea}>
           <p className={styles.progressLabel}>{state.index + 1} / {questions.length}</p>

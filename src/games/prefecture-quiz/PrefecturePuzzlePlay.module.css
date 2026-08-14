@@ -1,6 +1,9 @@
 .page { min-height: 100dvh; max-width: 880px; margin: 0 auto; padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-md) + var(--safe-right)) calc(var(--space-md) + var(--safe-bottom)) calc(var(--space-md) + var(--safe-left)); display: flex; flex-direction: column; gap: var(--space-sm); }
 .header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-sm); text-align: center; }
 .header h1 { color: var(--color-primary-dark); font-size: clamp(23px, 6vw, 32px); }.header p { font-weight: 700; }
+/* 進捗テキストの行によみあげトグルを並べる。タイトル行の幅を奪わないので、
+   地方名が長くても見出しが折り返さず、ヘッダの高さが変わらない。 */
+.progressRow { display: flex; align-items: center; justify-content: center; gap: var(--space-sm); }
 .back, .returnButton { border: 2px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); min-height: 44px; padding: 6px 12px; font: inherit; font-weight: 700; cursor: pointer; }
 .mapPanel { border-radius: var(--radius-lg); background: #f7fcff; border: 2px solid #b8dced; padding: 2px; overflow: hidden; }
 .hint { min-height: 1.4em; text-align: center; font-weight: 700; color: #315366; }.returnButton { align-self: center; }

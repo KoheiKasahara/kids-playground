@@ -6,6 +6,7 @@ import QuizResultOverlay from '../../components/QuizResultOverlay'
 import FlagChoiceGrid from '../flag-quiz/FlagChoiceGrid'
 import { countries } from '../flag-quiz/data/countries'
 import { playCorrectSound } from '../../utils/quizSound'
+import { SpeechToggle, useQuestionSpeech } from '../../speech'
 import { coursesForRegion } from './data/travelCourses'
 import WorldTravelMap from './map/WorldTravelMap'
 import { generateTravelQuestions } from './questionGenerator'
@@ -51,8 +52,9 @@ function TravelGame({ region, answerMode }: { region: TravelRegion; answerMode: 
     setIndex((value) => value + 1); setSelectedId(null); setPhase('answering')
   }, [])
   const isCorrect = selectedId === question.answer.id
+  useQuestionSpeech(answerMode === 'flag' ? 'この くにの こっきは どれ？' : 'この くには どこ？', index)
   return <main className={styles.page}>
-    <header className={styles.header}><button type="button" className={styles.quit} onClick={() => navigate('/games/world-travel-quiz')}>やめる</button><div className={styles.progress}><p>{index + 1} / {QUESTION_COUNT}</p><ProgressBar current={index + 1} total={QUESTION_COUNT} /></div></header>
+    <header className={styles.header}><SpeechToggle /><button type="button" className={styles.quit} onClick={() => navigate('/games/world-travel-quiz')}>やめる</button><div className={styles.progress}><p>{index + 1} / {QUESTION_COUNT}</p><ProgressBar current={index + 1} total={QUESTION_COUNT} /></div></header>
     <section className={styles.content} aria-label="せかい旅行クイズのもんだい">
       <div className={styles.mapWrap}><WorldTravelMap course={course} questionIndex={index} phase={phase} onTravelComplete={completeTravel} /><p className={styles.mapHint}>{phase === 'traveling' ? 'ひこうきで いどう中…' : 'ひかっている くにを さがそう！'}</p></div>
       <div className={styles.answerWrap}>

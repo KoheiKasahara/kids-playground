@@ -51,9 +51,15 @@ function getChoiceButtons(): HTMLElement[] {
     'べつの クイズ',
     'ホームへ',
   ])
+  // ヘッダの「よみあげ」トグルも role=button で描画されるため、選択肢ボタンからは除外する。
   return screen
     .getAllByRole('button')
-    .filter((btn) => !excluded.has(btn.textContent ?? '') && !/めくる/.test(btn.textContent ?? ''))
+    .filter(
+      (btn) =>
+        !excluded.has(btn.textContent ?? '') &&
+        !/めくる/.test(btn.textContent ?? '') &&
+        !(btn.textContent ?? '').includes('よみあげ'),
+    )
 }
 
 function getRevealButton(): HTMLElement {

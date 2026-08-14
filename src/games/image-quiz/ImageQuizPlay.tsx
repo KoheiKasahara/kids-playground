@@ -4,6 +4,7 @@ import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
 import { playCorrectSound, playIncorrectSound } from '../../utils/quizSound'
+import { SpeechToggle, useQuestionSpeech } from '../../speech'
 import ImageQuizImage from './ImageQuizImage'
 import { generateImageQuizQuestions } from './questionGenerator'
 import type { ImageQuizConfig, ImageQuizItem, ImageQuizMode } from './types'
@@ -58,6 +59,11 @@ export default function ImageQuizPlay({ config, mode }: ImageQuizPlayProps) {
   const isCorrect = state.selectedId === question.answer.id
   const isLastQuestion = state.index === totalCount - 1
 
+  useQuestionSpeech(
+    mode === 'imageToName' ? 'これは なに？' : `${question.answer.name}は どれ？`,
+    state.index,
+  )
+
   const handleSelect = (choiceId: string) => {
     if (answered) return
     const correct = choiceId === question.answer.id
@@ -80,6 +86,7 @@ export default function ImageQuizPlay({ config, mode }: ImageQuizPlayProps) {
   return (
     <main className={[styles.playPage, mode === 'nameToImage' ? styles.playPageNameToImage : ''].filter(Boolean).join(' ')}>
       <header className={styles.header}>
+        <SpeechToggle />
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>やめる</button>
         <div className={styles.progressArea}>
           <p className={styles.progressLabel}>{state.index + 1} / {totalCount}</p>
