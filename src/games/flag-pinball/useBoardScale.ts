@@ -19,7 +19,7 @@ export type BoardScale = {
  * 横幅だけに合わせると縦画面で下が余ったり、逆に横長画面で盤面がはみ出したりするため、
  * 幅・高さそれぞれから求めた倍率のうち小さい方（＝両方が必ず収まる方）を採用する。
  */
-function computeScale(availableWidth: number, availableHeight: number): number {
+export function computeBoardScale(availableWidth: number, availableHeight: number): number {
   // 初回計測前やテスト環境（jsdomはレイアウトを持たず clientWidth/Height が常に0）では
   // 計測値が0のことがある。0除算やscale=0での描画崩れを避け、等倍にフォールバックする。
   if (availableWidth <= 0 || availableHeight <= 0) return 1
@@ -34,7 +34,8 @@ function computeScale(availableWidth: number, availableHeight: number): number {
 }
 
 /**
- * 論理座標 400×600 の盤面を、利用できる領域に収まる最大の倍率で拡縮するための Hook。
+ * 論理座標 BOARD_WIDTH×BOARD_HEIGHT の盤面を、利用できる領域に収まる最大の倍率で
+ * 拡縮するための Hook。
  * 盤面の見た目・物理は論理座標だけで組み立て、実機サイズへの反映はこの Hook が返す
  * scale ぶんの CSS transform（呼び出し側の責務）に一本化する。
  */
@@ -50,7 +51,7 @@ export function useBoardScale(): BoardScale {
     if (!container) return
 
     const measure = () => {
-      setScale(computeScale(container.clientWidth, container.clientHeight))
+      setScale(computeBoardScale(container.clientWidth, container.clientHeight))
     }
     measure()
 

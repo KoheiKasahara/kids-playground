@@ -32,6 +32,8 @@ type PinballBoardProps = {
 const OBSTACLE_HIT_FLASH_MS = 220
 /** 得点ポップを表示しておく時間(ms) */
 const SCORE_POP_DURATION_MS = 900
+/** 得点ゾーンの上端から少し上にポップを出す。盤面高さを変えても位置が追従する。 */
+const SCORE_POP_OFFSET_Y = 50
 
 type ScorePop = {
   id: number
@@ -202,7 +204,7 @@ export default function PinballBoard({ flagIds, runId, onBallScored, onFinished 
               key={pop.id}
               aria-hidden="true"
               className={styles.scorePop}
-              style={{ left: pop.x, width: pop.width }}
+              style={{ left: pop.x, width: pop.width, top: ZONE_TOP - SCORE_POP_OFFSET_Y }}
             >
               {pop.score}てん！
             </div>

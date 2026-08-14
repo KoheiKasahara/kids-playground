@@ -1,18 +1,18 @@
 /**
- * 盤面は論理座標 400×600（縦2:3）で固定する。
+ * 盤面は論理座標 480×1000（縦横比0.48）で固定する。
  * 実機の画面サイズは知らず、拡縮は表示側（CSS transform）の責務にする。
  * こうすることで、物理パラメータ（反発係数・初速など）をこの1つの座標系だけで
  * 一度調整すれば、どの端末でも同じ挙動になる。
  */
-export const BOARD_WIDTH = 400
-export const BOARD_HEIGHT = 600
+export const BOARD_WIDTH = 480
+export const BOARD_HEIGHT = 1000
 
 /**
  * 国旗ボールの半径（論理座標）。
- * 盤面幅の1割強を占める大きさにしてある。4〜5歳が3球を同時に目で追え、
- * 転がっている国旗の模様まで見分けられることを、盤面のすき間の広さより優先している。
+ * 直径48pxは盤面幅の1割で、4〜5歳が3球を同時に目で追え、転がっている国旗の
+ * 模様まで見分けられる大きさを、障害物間の余白より優先している。
  */
-export const BALL_RADIUS = 22
+export const BALL_RADIUS = 24
 
 /** ピン／バンパー。中心座標と半径で表す静的な円 */
 export type CircleObstacle = {
@@ -56,8 +56,8 @@ const ZONE_WIDTH = BOARD_WIDTH / ZONE_COUNT
 /** 左から中央が最も高得点になるよう、中央から外側へ向けて単調非増加にしてある */
 const ZONE_SCORES: readonly number[] = [100, 300, 1000, 300, 100]
 
-/** 得点ゾーンの上端 y。ここから下がゾーン領域（高さ約80） */
-export const ZONE_TOP = 520
+/** 得点ゾーンの上端 y。ここから下がゾーン領域（高さ125） */
+export const ZONE_TOP = 875
 /** ゾーンを仕切る壁の厚み */
 export const ZONE_DIVIDER_WIDTH = 8
 
@@ -82,31 +82,62 @@ export function zoneAtX(x: number): ScoreZone {
 
 // --- 障害物（バンパー・ピン） -----------------------------------------------
 
-const BUMPER_RADIUS = 26
-const BUMPER_RESTITUTION = 0.75
-const PEG_RADIUS = 10
-const PEG_RESTITUTION = 0.6
+const BUMPER_RADIUS = 28
+const BUMPER_RESTITUTION = 0.98
+const PEG_RADIUS = 8
+const PEG_RESTITUTION = 0.9
 
 /**
- * バンパー3個・ピン6個の合計9個。中央上寄りにバンパー1個、その左右下にバンパー2個を置き、
- * ピンはその間を上下2段（合計3段構成のうち残り2段）で埋めて、左右対称でスカスカにも
- * ゴチャゴチャにもならない密度にしている。
- * 障害物同士は中心距離が「半径の和 + ボール直径」以上離れており、ボールが必ず通り抜けられる
- * （ボールを大きくしたぶん、バンパー・ピンは小さめにして通り道の広さを保っている）。
+ * バンパー3個・ピン31個の合計34個。ピンは7段の千鳥配置にして、上から下まで
+ * ボールが左右へ散る機会を作る。下側のピン段はバンパーと同じyに重ねず、
+ * 障害物が横一列の壁になることを避けている。
+ * 障害物同士は中心距離が「半径の和 + ボール直径 + 16px」以上離れており、
+ * ボールが詰まらず素直に通り抜けられる余裕を確保している。
  */
 export const OBSTACLES: readonly CircleObstacle[] = [
-  { id: 'bumper-center', kind: 'bumper', x: BOARD_WIDTH / 2, y: 250, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
-  { id: 'bumper-left', kind: 'bumper', x: 100, y: 395, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
-  { id: 'bumper-right', kind: 'bumper', x: 300, y: 395, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
+  { id: 'bumper-center', kind: 'bumper', x: BOARD_WIDTH / 2, y: 385, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
+  { id: 'bumper-left', kind: 'bumper', x: 90, y: 655, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
+  { id: 'bumper-right', kind: 'bumper', x: 390, y: 655, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
 
-  { id: 'peg-top-left', kind: 'peg', x: 90, y: 150, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-top-right', kind: 'peg', x: 310, y: 150, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  // 1段目。隣の段とxを半ピッチずらす千鳥配置の基準になる。
+  { id: 'peg-row-1-1', kind: 'peg', x: 70, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-1-2', kind: 'peg', x: 155, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-1-3', kind: 'peg', x: 240, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-1-4', kind: 'peg', x: 325, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-1-5', kind: 'peg', x: 410, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
 
-  { id: 'peg-mid-left', kind: 'peg', x: 125, y: 300, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-mid-right', kind: 'peg', x: 275, y: 300, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-2-1', kind: 'peg', x: 112.5, y: 210, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-2-2', kind: 'peg', x: 197.5, y: 210, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-2-3', kind: 'peg', x: 282.5, y: 210, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-2-4', kind: 'peg', x: 367.5, y: 210, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
 
-  { id: 'peg-low-left', kind: 'peg', x: 160, y: 455, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-low-right', kind: 'peg', x: 240, y: 455, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-3-1', kind: 'peg', x: 70, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-3-2', kind: 'peg', x: 155, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-3-3', kind: 'peg', x: 240, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-3-4', kind: 'peg', x: 325, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-3-5', kind: 'peg', x: 410, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+
+  // 3段目と4段目の間は広めに取り、中央バンパーがピンの壁を作らないようにする。
+  { id: 'peg-row-4-1', kind: 'peg', x: 112.5, y: 480, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-4-2', kind: 'peg', x: 197.5, y: 480, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-4-3', kind: 'peg', x: 282.5, y: 480, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-4-4', kind: 'peg', x: 367.5, y: 480, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+
+  { id: 'peg-row-5-1', kind: 'peg', x: 70, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-5-2', kind: 'peg', x: 155, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-5-3', kind: 'peg', x: 240, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-5-4', kind: 'peg', x: 325, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-5-5', kind: 'peg', x: 410, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+
+  { id: 'peg-row-7-1', kind: 'peg', x: 155, y: 735, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-7-2', kind: 'peg', x: 240, y: 735, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-7-3', kind: 'peg', x: 325, y: 735, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+
+  { id: 'peg-row-8-1', kind: 'peg', x: 70, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-8-2', kind: 'peg', x: 155, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-8-3', kind: 'peg', x: 240, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-8-4', kind: 'peg', x: 325, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-row-8-5', kind: 'peg', x: 410, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
 ]
 
 // --- 壁 --------------------------------------------------------------------
@@ -115,10 +146,10 @@ export const OBSTACLES: readonly CircleObstacle[] = [
 const WALL_THICKNESS = 30
 /** 射出口から盤面へ導く上部の斜め壁の厚み・長さ */
 const GUIDE_WALL_THICKNESS = 16
-const GUIDE_WALL_LENGTH = 160
+const GUIDE_WALL_LENGTH = 180
 /** 上部斜め壁の傾き（ラジアン）。左右対称に内向きへ倒す */
-const GUIDE_WALL_ANGLE = 0.5
-const WALL_RESTITUTION = 0.3
+const GUIDE_WALL_ANGLE = 0.45
+const WALL_RESTITUTION = 0.65
 
 export const WALLS: readonly WallSegment[] = [
   // 左右の外壁: 中心を盤面の端(x=0 / x=BOARD_WIDTH)に置き、厚みの半分を外側にはみ出させる
@@ -127,8 +158,8 @@ export const WALLS: readonly WallSegment[] = [
   // 上壁も同様に、中心を y=0 に置いて半分を外側にはみ出させる
   { id: 'wall-top', x: BOARD_WIDTH / 2, y: 0, width: BOARD_WIDTH, height: WALL_THICKNESS, angle: 0, restitution: WALL_RESTITUTION },
   // 射出口(LAUNCH)から出たボールを盤面中央側へ導く斜め壁。左右対称に内向きへ倒す
-  { id: 'wall-guide-left', x: 90, y: 90, width: GUIDE_WALL_LENGTH, height: GUIDE_WALL_THICKNESS, angle: -GUIDE_WALL_ANGLE, restitution: WALL_RESTITUTION },
-  { id: 'wall-guide-right', x: BOARD_WIDTH - 90, y: 90, width: GUIDE_WALL_LENGTH, height: GUIDE_WALL_THICKNESS, angle: GUIDE_WALL_ANGLE, restitution: WALL_RESTITUTION },
+  { id: 'wall-guide-left', x: 110, y: 105, width: GUIDE_WALL_LENGTH, height: GUIDE_WALL_THICKNESS, angle: -GUIDE_WALL_ANGLE, restitution: WALL_RESTITUTION },
+  { id: 'wall-guide-right', x: BOARD_WIDTH - 110, y: 105, width: GUIDE_WALL_LENGTH, height: GUIDE_WALL_THICKNESS, angle: GUIDE_WALL_ANGLE, restitution: WALL_RESTITUTION },
   // 盤面の底。得点ゾーンで止まるための床がないとボールが盤外へ落ち続けてしまう。
   // 左右・上壁と同じく中心を盤面の端(y=BOARD_HEIGHT)に置き、厚みの半分を外側にはみ出させる
   { id: 'wall-bottom', x: BOARD_WIDTH / 2, y: BOARD_HEIGHT, width: BOARD_WIDTH, height: WALL_THICKNESS, angle: 0, restitution: WALL_RESTITUTION },
@@ -154,17 +185,17 @@ export const ZONE_DIVIDERS: readonly WallSegment[] = SCORE_ZONES.slice(1).map((z
 // --- 射出パラメータ ----------------------------------------------------------
 
 /**
- * 射出パラメータ。毎回同じ軌道にならないよう位置と初速に微小な揺らぎを持たせる。
- * y は上壁(厚みぶん盤面内側は約 WALL_THICKNESS/2)より少し下に置く。
+ * 射出パラメータ。毎回同じ軌道にならないよう位置と初速に揺らぎを持たせる。
+ * y は上壁（厚みぶん盤面内側は約 WALL_THICKNESS/2）より十分下に置く。
  */
 export const LAUNCH = {
   x: BOARD_WIDTH / 2,
-  y: 50,
-  jitterX: 6,
-  minVx: -1.2,
-  maxVx: 1.2,
-  minVy: 2,
-  maxVy: 4,
+  y: 70,
+  jitterX: 30,
+  minVx: -5,
+  maxVx: 5,
+  minVy: 6,
+  maxVy: 10,
 }
 
 /**

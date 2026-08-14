@@ -1,5 +1,5 @@
 /*
- * 盤面を最大化することを最優先にする。ヘッダは高さを詰め、
+ * 盤面を最大化することを最優先にする。ヘッダはやめるボタンと同じ行に収めて高さを詰め、
  * 残りの高さをすべて .boardArea（PinballBoard）へ渡す。
  */
 .page {
@@ -42,12 +42,13 @@
 /* 3つの国旗ボールと得点を横に並べる、高さを詰めた細いヘッダ */
 .header {
   flex: none;
-  height: 64px;
-  margin-top: 40px;
+  height: 48px;
+  min-height: 48px;
+  padding-left: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-lg);
+  gap: var(--space-md);
 }
 
 .ballScore {
@@ -57,7 +58,7 @@
 }
 
 .score {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--color-text);
   white-space: nowrap;
@@ -72,4 +73,28 @@
   position: relative;
   flex: 1;
   min-height: 0;
+}
+
+/* 狭い縦画面では、固定の「やめる」と同じ行に3球の情報を収めて盤面を優先する。 */
+@media (max-width: 480px) {
+  .header {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-xs);
+    padding-left: 72px;
+    padding-right: 0;
+  }
+
+  .ballScore {
+    min-width: 0;
+    justify-content: center;
+    gap: var(--space-xs);
+  }
+
+  .score {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+  }
 }

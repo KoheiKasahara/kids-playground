@@ -1,6 +1,6 @@
 /// <reference types="node" />
 
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { countries } from '../../flag-quiz/data/countries'
@@ -27,6 +27,15 @@ describe('PINBALL_FLAG_IDS / pinballFlags', () => {
     for (const flag of pinballFlags) {
       expect(flag.flag).toBe(`flags/${flag.id}.svg`)
       expect(existsSync(resolve('public', flag.flag))).toBe(true)
+    }
+  })
+
+  it('全SVGのviewBoxが4:3（0 0 640 480）で、国旗ボールの補正前提を守る', () => {
+    for (const flag of pinballFlags) {
+      const svg = readFileSync(resolve('public', flag.flag), 'utf8')
+      const viewBox = svg.match(/\bviewBox\s*=\s*["']([^"']+)["']/i)
+      const values = viewBox?.[1].trim().split(/\s+/).map(Number)
+      expect(values).toEqual([0, 0, 640, 480])
     }
   })
 })

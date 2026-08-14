@@ -1,13 +1,13 @@
 /*
  * .fit: 呼び出し側が確保した領域いっぱいに広がり、useBoardScale が計測する対象になる。
  * .stage: useBoardScale が計算した実サイズ（px）。中央寄せして余白を均等にする。
- * .logical: 論理座標 400×600 のレイヤー。scale を transform で掛けるだけで、
+ * .logical: 論理座標 480×1000 のレイヤー。scale を transform で掛けるだけで、
  *   中身のすべての子要素は論理座標の数値をそのまま left/top/width/height に使える。
  */
 /*
  * 呼び出し側が用意した領域（position: relative であること）を absolute + inset: 0 で
  * 埋める。height: 100% にすると、親がフレックスで高さを与えられている場合でも
- * ブラウザが百分率の基準を確定できず、「盤面の中身の高さ(600px)」が
+ * ブラウザが百分率の基準を確定できず、「盤面の中身の高さ(1000px)」が
  * .fit の高さとして採用されてしまう。その高さを useBoardScale が測って scale を
  * 決めるため、scale が 1 から動かなくなる（＝タブレットで盤面が拡大されない）
  * 循環参照が起きる。absolute にすると大きさが子要素に依存しなくなり循環が切れる。
@@ -124,7 +124,7 @@
 }
 
 /*
- * 1ゾーンの内寸（80px − 仕切り8px = 72px）に「1000」の4桁が収まる大きさにする。
+ * 1ゾーンの内寸（96px − 仕切り8px = 88px）に「1000」の4桁が収まる大きさにする。
  * これより大きくすると桁が隣のゾーンへはみ出し、数字どうしが重なって読めなくなる。
  */
 .zoneScore {
@@ -162,7 +162,6 @@
 .scorePop {
   position: absolute;
   /* left・widthはPinballBoard側でzoneの中心xを渡す（インラインstyleで上書きされる） */
-  top: 470px;
   text-align: center;
   font-size: 26px;
   font-weight: 700;
