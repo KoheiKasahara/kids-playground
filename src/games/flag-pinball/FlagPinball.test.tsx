@@ -87,11 +87,11 @@ describe('FlagPinball 選択画面', () => {
     expect(screen.getByText('ボールを 3こ えらんでね！')).toBeInTheDocument()
   })
 
-  test('20個の国旗ボールのボタンが並ぶ', async () => {
+  test('40個の国旗ボールのボタンが並ぶ', async () => {
     renderApp('/games/flag-pinball')
     await screen.findByRole('heading', { name: 'こっきピンボール' })
     const flagButtons = screen.getAllByRole('button').filter((btn) => btn.hasAttribute('aria-pressed'))
-    expect(flagButtons).toHaveLength(20)
+    expect(flagButtons).toHaveLength(40)
   })
 
   test('国旗を最大3個まで選択できる（4個目を押しても3個のまま）', async () => {
