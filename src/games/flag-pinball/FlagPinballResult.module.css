@@ -1,0 +1,207 @@
+.page {
+  max-width: var(--content-max-width);
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: calc(var(--space-lg) + var(--safe-top)) calc(var(--space-lg) + var(--safe-right))
+    calc(var(--space-lg) + var(--safe-bottom)) calc(var(--space-lg) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  text-align: center;
+}
+
+.title {
+  font-size: var(--font-size-large);
+  color: var(--color-primary-dark);
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.rows {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 「スウェーデン」「バングラデシュ」のような長い名前が1文字ずつ縦に折り返さないようにする。
+   狭い画面では下のメディアクエリで余白と文字を詰めて、折り返さずに収まる幅を確保する。 */
+.name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.rowScore {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-accent-dark);
+  white-space: nowrap;
+}
+
+/* 合計得点はどの端末でも一目で分かるよう、いちばん大きく表示する */
+.total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+  color: var(--color-primary-dark);
+}
+
+.totalLabel {
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: 800;
+}
+
+.totalValue {
+  font-size: clamp(40px, 14vw, 64px);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.praise {
+  font-size: var(--font-size-large);
+  font-weight: 700;
+  color: var(--color-accent-dark);
+}
+
+.actions {
+  width: 100%;
+  max-width: 360px;
+  margin-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* 320px級の狭い縦画面では、余白と文字が既定のままだと国名の置き場所が足りず
+   1文字ずつ折り返してしまうため、行の余白と文字サイズを詰めて幅を作る */
+@media (max-width: 400px) {
+  .page {
+    padding-inline: calc(var(--space-md) + var(--safe-left));
+  }
+
+  .row {
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .name {
+    font-size: 16px;
+  }
+
+  .rowScore {
+    font-size: 20px;
+  }
+}
+
+/* 縦に低い画面（iPhone SE 級の縦、タブレット横）では、そのままだと「もういちど」が
+   画面外へ出るため、装飾的な見出しを省き、補助の2ボタンを横並びにして1画面へ収める */
+@media (max-height: 820px) {
+  .title {
+    display: none;
+  }
+
+  .page,
+  .summary {
+    gap: var(--space-sm);
+  }
+
+  .page {
+    padding-block: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-bottom));
+  }
+
+  .actions {
+    margin-top: var(--space-sm);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* 「もういちど」がいちばん使う操作なので、2カラムでも横幅いっぱいで目立たせる */
+  .actions > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .totalValue {
+    font-size: clamp(32px, 10vw, 48px);
+  }
+
+  .praise {
+    font-size: 20px;
+  }
+
+  /* 2カラムに並ぶ「ボールをかえる」「ホームへ」が折り返さない大きさにする。
+     左右の余白が既定(--space-lg)のままだと文字の置き場所が足りなくなるため合わせて詰める */
+  .actions button {
+    padding-inline: var(--space-sm);
+    font-size: 17px;
+  }
+}
+
+/* 横向きの低い画面では縦積みだと画面外へはみ出しやすいため、
+   左に得点まとめ・右に操作ボタンの2カラムにする */
+@media (orientation: landscape) and (max-height: 560px) {
+  .page {
+    max-width: 920px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-lg);
+    padding-block: var(--space-sm);
+  }
+
+  .title {
+    display: none;
+  }
+
+  .summary {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .rows,
+  .actions {
+    max-width: 300px;
+  }
+
+  /* 上の max-height 用クエリで grid（2カラム）にしているが、ここでは右カラム自体が
+     細いので、3ボタンとも横幅いっぱいの縦積みに戻す */
+  .actions {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+  }
+
+  .totalValue {
+    font-size: clamp(28px, 6vh, 44px);
+  }
+
+  .praise {
+    font-size: 18px;
+  }
+}

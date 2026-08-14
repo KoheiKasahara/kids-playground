@@ -4,7 +4,7 @@
 
 子どもがスマートフォン・タブレット・PCなどで遊べる、シンプルなミニゲームWebアプリを作成する。
 
-初期リリースの「国旗クイズ」に加え、「はたらくくるまクイズ」「さんすうクイズ」を実装する。はたらくくるまクイズの画面・URL・24車両・素材・検収条件は [WORKING_VEHICLE_QUIZ_DESIGN.md](WORKING_VEHICLE_QUIZ_DESIGN.md) を正とし、さんすうクイズの画面・URL・4演算×3むずかしさの出題プール・検収条件は [MATH_QUIZ_DESIGN.md](MATH_QUIZ_DESIGN.md) を正とする。国旗クイズには「パネルめくり」モード（国旗を覆う16枚のパネルを少しずつめくって国名を当てる）を追加しており、画面・URL・パネル仕様・得点計算・検収条件は [PANEL_FLAG_QUIZ_DESIGN.md](PANEL_FLAG_QUIZ_DESIGN.md) を正とする。新規ミニゲームの共通規約は [MINIGAME_DEVELOPMENT_GUIDELINES.md](MINIGAME_DEVELOPMENT_GUIDELINES.md) に定める。
+初期リリースの「国旗クイズ」に加え、「はたらくくるまクイズ」「さんすうクイズ」を実装する。はたらくくるまクイズの画面・URL・24車両・素材・検収条件は [WORKING_VEHICLE_QUIZ_DESIGN.md](WORKING_VEHICLE_QUIZ_DESIGN.md) を正とし、さんすうクイズの画面・URL・4演算×3むずかしさの出題プール・検収条件は [MATH_QUIZ_DESIGN.md](MATH_QUIZ_DESIGN.md) を正とする。国旗クイズには「パネルめくり」モード（国旗を覆う16枚のパネルを少しずつめくって国名を当てる）を追加しており、画面・URL・パネル仕様・得点計算・検収条件は [PANEL_FLAG_QUIZ_DESIGN.md](PANEL_FLAG_QUIZ_DESIGN.md) を正とする。国旗ボールを打ち出して得点ゾーンを競う「こっきピンボール」の画面・URL・盤面と物理パラメータ・得点仕様は [FLAG_PINBALL_DESIGN.md](FLAG_PINBALL_DESIGN.md) を正とする。新規ミニゲームの共通規約は [MINIGAME_DEVELOPMENT_GUIDELINES.md](MINIGAME_DEVELOPMENT_GUIDELINES.md) に定める。
 
 将来的には、国旗クイズだけではなく以下のような簡易ゲームを追加できる構成とする。
 
@@ -220,6 +220,15 @@ React Routerを使用する。
 
 /games/flag-quiz/panel-flag/:level/result
 └─ 国旗クイズ結果（パネルめくり）
+
+/games/flag-pinball
+└─ こっきピンボール ボール選択（3個えらぶ）
+
+/games/flag-pinball/play
+└─ こっきピンボール プレイ（3球射出、むずかしさ選択なし）
+
+/games/flag-pinball/result
+└─ こっきピンボール 結果
 ```
 
 `:level` は `easy` / `normal` / `hard` 以外の値だった場合、そのモードのむずかしさ選択画面へ
@@ -661,6 +670,14 @@ src/
 │  │  │
 │  │  └─ data/
 │  │     └─ countries.json
+│  │
+│  ├─ flag-pinball/
+│  │  ├─ FlagPinballSelect.tsx  # ボール選択画面
+│  │  ├─ FlagPinballPlay.tsx    # プレイ画面
+│  │  ├─ FlagPinballResult.tsx  # 結果画面
+│  │  ├─ usePinballEngine.ts    # matter-jsをヘッドレスで回すフック
+│  │  ├─ boardLayout.ts         # 盤面・得点ゾーンの論理座標データ
+│  │  └─ data/pinballFlags.ts   # 選択画面に並べる国旗ボール（flag-quizのCountryを再利用）
 │  │
 │  └─ ...
 │

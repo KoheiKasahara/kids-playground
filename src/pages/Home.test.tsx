@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../app/App'
 
 describe('Home', () => {
-  test('ゲーム一覧に現在の7ゲームすべてが表示される', () => {
+  test('ゲーム一覧に現在の10ゲームすべてが表示される', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -13,6 +13,9 @@ describe('Home', () => {
     )
     expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'こっきクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'こっきピンボール' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'おやさいクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'くだものクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'さんすうクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'いろまぜクイズ' })).toBeInTheDocument()
@@ -78,6 +81,14 @@ describe('Home', () => {
     await user.click(screen.getByRole('button', { name: 'いろまぜクイズ' }))
     expect(screen.getByRole('heading', { name: 'いろまぜクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'はじめる' })).toBeInTheDocument()
+  })
+
+  test('「こっきピンボール」を押すと遅延読込したボール選択画面に遷移する', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await user.click(screen.getByRole('button', { name: 'こっきピンボール' }))
+    expect(await screen.findByRole('heading', { name: 'こっきピンボール' })).toBeInTheDocument()
+    expect(screen.getByText('ボールを 3こ えらんでね！')).toBeInTheDocument()
   })
 
   test('「にほん旅行クイズ」を押すと遅延読込した開始画面に遷移する', async () => {

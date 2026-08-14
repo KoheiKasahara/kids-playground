@@ -150,3 +150,70 @@ export function playPanelRevealSound(step: number, total: number): void {
   const now = ctx.currentTime
   playTone(ctx, frequency, now, 0.1, 0.08, 'sine')
 }
+
+// --- こっきピンボール専用の効果音 --------------------------------------------
+
+/**
+ * ボールを打ち出す「シュッ」。他のplayTone呼び出しと同様に周波数オートメーションは使わず、
+ * 低い音→高い音の2音を間を詰めて連続再生することで「駆け上がる」勢いを表す。
+ */
+export function playPinballLaunchSound(): void {
+  if (!soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 320, now, 0.09, 0.12, 'triangle')
+  playTone(ctx, 640, now + 0.05, 0.1, 0.12, 'triangle')
+}
+
+/**
+ * バンパー音の連続再生を間引くクールダウン（ms）。
+ * 3球が同時にバンパーへ何度も当たるゲーム性のため、間引かないと音が濁って耳障りになる。
+ * モジュールスコープで前回再生時刻を持つ（複数のバンパーに当たっても1つの間隔として扱う）。
+ */
+const BUMPER_SOUND_MIN_INTERVAL_MS = 70
+let lastBumperSoundAt = 0
+
+/** バンパー衝突の「コッ」。短く控えめな音を、クールダウンで間引きながら鳴らす */
+export function playPinballBumperSound(): void {
+  if (!soundEnabled) return
+  const now = Date.now()
+  if (now - lastBumperSoundAt < BUMPER_SOUND_MIN_INTERVAL_MS) return
+  lastBumperSoundAt = now
+  const ctx = getAudioContext()
+  if (!ctx) return
+  // 400〜700Hz帯の中で毎回わずかに高さを変え、単調な連打に聞こえないようにする
+  const frequency = 400 + Math.random() * 300
+  playTone(ctx, frequency, ctx.currentTime, 0.06, 0.05, 'triangle')
+}
+
+/** 得点ゾーンの得点。1000点にいちばん近いほど高く華やかな音になる */
+export function playPinballScoreSound(score: number): void {
+  if (!soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  // 得点(100〜1000)を0〜1に正規化し、ペンタトニックスケール1オクターブぶんの高さへ割り当てる
+  const progress = Math.min(1, Math.max(0, score / 1000))
+  const scaleIndex = Math.round(progress * (PENTATONIC_STEPS.length - 1))
+  const frequency = 523.25 * 2 ** (PENTATONIC_STEPS[scaleIndex] / 12) // C5 基準
+  playTone(ctx, frequency, now, 0.22, 0.16, 'sine')
+  // 高得点ほどオクターブ上を薄く重ねて、華やかさを足す
+  if (score >= 1000) {
+    playTone(ctx, frequency * 2, now + 0.05, 0.3, 0.1, 'sine')
+  }
+}
+
+/** 合計点発表のファンファーレ。ペンタトニックで3音、駆け上がる */
+export function playPinballTotalSound(): void {
+  if (!soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  const base = 523.25 // C5
+  const steps = [PENTATONIC_STEPS[0], PENTATONIC_STEPS[2], PENTATONIC_STEPS[4]]
+  steps.forEach((semitones, i) => {
+    const frequency = base * 2 ** (semitones / 12)
+    playTone(ctx, frequency, now + i * 0.16, 0.32, 0.18, 'sine')
+  })
+}

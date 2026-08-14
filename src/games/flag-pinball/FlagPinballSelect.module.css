@@ -1,0 +1,180 @@
+/*
+ * 画面全体はスクロールしてよい（20個の国旗ボールを並べるため）。
+ * 「あそぶ！」だけは常に見えている必要があるため、.actions を position: sticky で
+ * 画面下端に固定する（position: fixed にすると .grid の下に隠れず常時かぶってしまい、
+ * スクロール中にグリッド最下段を隠すため、sticky を選ぶ）。
+ */
+.page {
+  max-width: var(--content-max-width);
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: calc(var(--space-lg) + var(--safe-top)) calc(var(--space-md) + var(--safe-right)) 0
+    calc(var(--space-md) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: var(--space-md);
+}
+
+.title {
+  font-size: clamp(28px, 8vw, var(--font-size-xlarge));
+  color: var(--color-primary-dark);
+}
+
+.instruction {
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-large);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.indicator {
+  margin-top: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.dots {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.dotEmpty,
+.dotFilled {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary);
+}
+
+.dotEmpty {
+  background-color: transparent;
+}
+
+.dotFilled {
+  background-color: var(--color-primary);
+}
+
+.status {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-accent-dark);
+}
+
+/* 狭い画面で4列、広い画面で5〜6列になるよう、セル最小幅から自動で列数を決める */
+.grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: var(--space-sm);
+  padding-bottom: var(--space-md);
+}
+
+.cell {
+  min-height: 100px;
+  min-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: 3px solid transparent;
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+
+.cell:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.ballWrap {
+  position: relative;
+  line-height: 0;
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+}
+
+/* 選択中: 少し拡大＋太い枠＋チェックマーク。色だけに頼らないよう aria-pressed も併用する */
+.selected {
+  border-color: var(--color-primary);
+  transform: scale(1.08);
+  animation: pop 220ms ease-out;
+}
+
+.check {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background-color: var(--color-success);
+  color: var(--color-text-on-primary);
+  font-size: 16px;
+  font-weight: 900;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 3個そろっている間の未選択セル。押しても増えないだけで disabled にはしないため、
+   「これ以上は選べない」ことが見た目だけでも伝わるよう薄くする。 */
+.dimmed {
+  opacity: 0.55;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(1.16);
+  }
+  100% {
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selected {
+    animation: none;
+  }
+  .cell {
+    transition: none;
+  }
+}
+
+.actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0 calc(var(--space-md) + var(--safe-bottom));
+  /* ぼかしの帯はバーの高さに対する割合ではなく固定の10pxにする。
+     割合(28%)だとバーの高さぶんだけ帯が伸びて「あそぶ！」の上半分まで半透明になり、
+     背後の国旗セルが（とくに未選択で半透明のときに）透けて見えてしまう。 */
+  background: linear-gradient(180deg, rgba(255, 253, 247, 0) 0, var(--color-background) 10px);
+}
+
+@media (min-width: 560px) {
+  .grid {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  }
+}
