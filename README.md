@@ -121,7 +121,8 @@ public/
 ├─ flags/               # 国旗SVG（flag-icons由来）
 ├─ images/
 │  ├─ working-vehicles/ # はたらくくるまイラスト（PNG、30枚）
-│  └─ vegetables/       # おやさいイラスト（PNG）
+│  ├─ vegetables/       # おやさいイラスト（PNG）
+│  └─ fruits/           # くだものイラスト（PNG）
 └─ icons/               # PWAアイコン
 
 docs/
