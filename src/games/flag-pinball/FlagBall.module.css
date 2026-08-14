@@ -16,19 +16,20 @@
 }
 
 /*
- * 国旗SVGは viewBox="0 0 640 480"（4:3）。SVGの preserveAspectRatio の既定値は meet のため、
- * object-fit: fill だけでは正方形ビューポートの上下に12.5%ずつレターボックスが残る。
- * FlagBall.tsx が 4/3 から導出した scale(sqrt(4/3), 4/3) をここで適用し、縦を完全に埋める。
- * 横の約7.7%ずつは親の overflow: hidden でクロップするが、cover（左右25%クロップ）より
- * 模様を残し、正方形へ完全に引き伸ばすより歪みを抑える折衷にしている。
+ * 国旗SVGは viewBox="0 0 640 480"（4:3）。これを正方形ビューポートへ object-fit: cover で入れる。
+ * cover は縦横同じ倍率で拡大してから溢れた分を切るので、国旗の縦横比は完全に保たれる
+ * （日の丸・太極・ブラジルの天球のような丸い意匠が楕円にならない）。
+ * 4:3 の絵を正方形へ cover すると高さがちょうど埋まり、左右が各1/6（絵の幅の12.5%ずつ）
+ * だけ切れる。上下の白いレターボックスは出ない。
+ * 以前は object-fit: fill + 非等方 scale(sqrt(4/3), 4/3) で埋めていたが、
+ * これは絵のアスペクト比を 4:3 から 1.1547:1 へ変えてしまい国旗が縦に伸びていたため廃止した。
  */
 .flagImage {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: fill;
-  transform: scale(var(--flag-scale-x), var(--flag-scale-y));
-  transform-origin: center;
+  object-fit: cover;
+  object-position: center;
   pointer-events: none;
 }
 

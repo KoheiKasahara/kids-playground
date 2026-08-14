@@ -1,7 +1,16 @@
 import type { Country } from '../flag-quiz/types'
 
-/** ピンボールで使う国旗ボール。国旗クイズの Country をそのまま再利用する */
-export type PinballFlag = Country
+/**
+ * ピンボールで使う国旗ボール。国旗クイズの Country を再利用し、
+ * 丸くクロップしたときだけ必要になる表示調整を任意プロパティとして足す。
+ */
+export type PinballFlag = Country & {
+  /**
+   * 円形ボールにしたときの横方向の表示位置。0=左端寄せ / 0.5=中央 / 1=右端寄せ。
+   * 省略時は中央。端に意匠がある国旗を欠けさせないためだけに使う。
+   */
+  ballPositionX?: number
+}
 
 /** 1プレイで射出するボールの数 */
 export const BALL_COUNT = 3
