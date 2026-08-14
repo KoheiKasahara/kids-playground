@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as Matter from 'matter-js'
 import {
   BALL_RADIUS,
-  BOARD_HEIGHT,
   BOARD_WIDTH,
   LAUNCH,
   LAUNCH_DELAYS_MS,
@@ -11,10 +10,33 @@ import {
   WALLS,
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
-  ZONE_TOP,
   zoneAtX,
   type ScoreZone,
 } from './boardLayout'
+import {
+  BALL_DENSITY,
+  BALL_FRICTION,
+  BALL_FRICTION_AIR,
+  BALL_RESTITUTION,
+  GRAVITY,
+  MAX_ANGULAR_VELOCITY,
+  MAX_FRAME_DELTA_MS,
+  MAX_SPEED,
+  MAX_SUBSTEPS,
+  OBSTACLE_FRICTION,
+  OBSTACLE_HIT_COOLDOWN_MS,
+  OBSTACLE_SOUND_GLOBAL_COOLDOWN_MS,
+  OUT_OF_BOUNDS_MARGIN_X,
+  OUT_OF_BOUNDS_Y,
+  SAFETY_TIMEOUT_MS,
+  STALL_DURATION_MS,
+  STALL_NUDGE_SPEED,
+  STALL_SPEED_THRESHOLD,
+  STEP_MS,
+  WALL_FRICTION,
+  ZONE_SENSOR_HEIGHT,
+  ZONE_SENSOR_Y,
+} from './pinballPhysics'
 
 const { Engine, Bodies, Body, Composite, Events } = Matter
 
@@ -37,54 +59,6 @@ export type PinballEngineHandle = {
   /** ボールの DOM 要素を ballIndex ごとに登録する ref コールバック（参照は安定させること） */
   registerBall: (ballIndex: number) => (el: HTMLElement | null) => void
 }
-
-// --- 固定パラメータ ----------------------------------------------------------
-// 物理更新は 60fps 固定のタイムステップで進める。可変フレームレートのまま
-// Engine.update に渡すと、端末ごとに反発の強さや飛距離が変わってしまうため。
-const STEP_MS = 1000 / 60
-/** 1フレームぶんのdeltaがこれを超えたらクランプする（タブを裏に回して復帰した直後の暴走防止） */
-const MAX_FRAME_DELTA_MS = 100
-/** 1フレームで進める物理ステップの上限。MAX_FRAME_DELTA_MS ぶんを一気に消化しない */
-const MAX_SUBSTEPS = 5
-
-/** ボールの最大速度(px/step)。これを超えたら向きを保ったまま縮め、薄い壁のすり抜けを防ぐ */
-const MAX_SPEED = 22
-/** ボールの最大角速度(rad/step)。国旗が読めなくなるほど速く回らないようにする */
-const MAX_ANGULAR_VELOCITY = 0.22
-
-/** 同じ障害物への連続ヒット音・演出を間引くクールダウン(ms) */
-const OBSTACLE_HIT_COOLDOWN_MS = 120
-
-/** これ未満の速さ(px/step)を「停滞」とみなす */
-const STALL_SPEED_THRESHOLD = 0.4
-/** 停滞がこれだけ続いたらナッジする(ms) */
-const STALL_DURATION_MS = 1500
-/**
- * 停滞ナッジで直接与える水平方向の速さ(px/step)。
- * matter-js の Body.applyForce は velocity += force / mass * delta^2 として適用され、
- * delta≈16.67ms のとき係数は約278倍にもなる。そのため applyForce で「小さく突く」ことは
- * 事実上できず（MAX_SPEEDで頭打ちになり、最大速度で真横へ弾き飛ばす挙動になってしまう）、
- * Body.setVelocity で狙った速さをそのまま与える。
- */
-const STALL_NUDGE_SPEED = 2.2
-
-/** 射出から確定までの安全タイマー(ms)。通常プレイでは発動しない想定の最終手段 */
-const SAFETY_TIMEOUT_MS = 18000
-/** 盤外脱出とみなす、盤面下端からの余裕(px) */
-const OUT_OF_BOUNDS_Y = BOARD_HEIGHT + 100
-/** 盤外脱出とみなす、盤面左右からの余裕(px) */
-const OUT_OF_BOUNDS_MARGIN_X = 150
-
-/** 得点ゾーンのセンサー（矩形）の高さと中心y */
-const ZONE_SENSOR_HEIGHT = 20
-const ZONE_SENSOR_Y = ZONE_TOP + 30
-
-const WALL_FRICTION = 0.05
-const OBSTACLE_FRICTION = 0.02
-const BALL_RESTITUTION = 0.5
-const BALL_FRICTION = 0.02
-const BALL_FRICTION_AIR = 0.005
-const BALL_DENSITY = 0.002
 
 /** ball-N ラベルからボールの ballIndex を取り出す。ボール以外のラベルは null */
 function ballIndexFromLabel(label: string): number | null {
@@ -151,7 +125,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
     // 世界が作り直される事態になるため、依存に入れている flagIdsKey から導出する。
     const ballCount = flagIdsKey === '' ? 0 : flagIdsKey.split(',').length
 
-    const engine = Engine.create({ gravity: { x: 0, y: 1 } })
+    const engine = Engine.create({ gravity: { ...GRAVITY } })
 
     // --- 静的な壁（外壁・ガイド壁・ゾーン仕切り） ---------------------------
     const wallBodies = [...WALLS, ...ZONE_DIVIDERS].map((wall) =>
@@ -251,6 +225,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
 
     // --- 衝突判定 ---------------------------------------------------------
     const lastObstacleHitAt = new Map<string, number>()
+    let lastObstacleSoundAt = -Infinity
 
     function handleCollisionStart(event: Matter.IEventCollision<Matter.Engine>) {
       const now = performance.now()
@@ -272,9 +247,13 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
         }
 
         if (obstacleIds.has(other.label)) {
-          const lastHit = lastObstacleHitAt.get(other.label) ?? 0
-          if (now - lastHit >= OBSTACLE_HIT_COOLDOWN_MS) {
+          const lastHit = lastObstacleHitAt.get(other.label) ?? -Infinity
+          if (
+            now - lastHit >= OBSTACLE_HIT_COOLDOWN_MS &&
+            now - lastObstacleSoundAt >= OBSTACLE_SOUND_GLOBAL_COOLDOWN_MS
+          ) {
             lastObstacleHitAt.set(other.label, now)
+            lastObstacleSoundAt = now
             optionsRef.current.onObstacleHit(other.label)
           }
         }

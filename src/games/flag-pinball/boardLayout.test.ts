@@ -14,6 +14,8 @@ import {
 } from './boardLayout'
 import { BALL_COUNT } from './types'
 
+const REQUIRED_CLEARANCE_MARGIN = 16
+
 describe('SCORE_ZONES', () => {
   it('5つあり、得点が左から [100, 300, 1000, 300, 100]', () => {
     expect(SCORE_ZONES).toHaveLength(5)
@@ -44,12 +46,44 @@ describe('SCORE_ZONES', () => {
   })
 })
 
+describe('board dimensions', () => {
+  it('縦長の論理座標を使い、得点ゾーンは盤面下部に追従する', () => {
+    expect(BOARD_HEIGHT).toBeGreaterThan(BOARD_WIDTH * 2)
+    expect(ZONE_TOP).toBeGreaterThan(BOARD_HEIGHT * 0.8)
+    expect(BOARD_HEIGHT - ZONE_TOP).toBeGreaterThan(BALL_RADIUS * 2)
+  })
+})
+
 describe('OBSTACLES', () => {
-  it('8〜12個で、idに重複がない', () => {
-    expect(OBSTACLES.length).toBeGreaterThanOrEqual(8)
-    expect(OBSTACLES.length).toBeLessThanOrEqual(12)
+  it('30〜40個で、バンパー3個・十分な数のピン、idに重複がない', () => {
+    expect(OBSTACLES.length).toBeGreaterThanOrEqual(30)
+    expect(OBSTACLES.length).toBeLessThanOrEqual(40)
+    expect(OBSTACLES.filter((obstacle) => obstacle.kind === 'bumper')).toHaveLength(3)
+    expect(OBSTACLES.filter((obstacle) => obstacle.kind === 'peg').length).toBeGreaterThanOrEqual(27)
     const ids = OBSTACLES.map((o) => o.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('ピンは複数段の半ピッチ千鳥配置で、盤面全体に分散している', () => {
+    const pegs = OBSTACLES.filter((obstacle) => obstacle.kind === 'peg')
+    const rows = new Map<number, number[]>()
+    for (const peg of pegs) rows.set(peg.y, [...(rows.get(peg.y) ?? []), peg.x])
+    const sortedRows = [...rows.entries()].sort(([a], [b]) => a - b)
+    expect(sortedRows.length).toBeGreaterThanOrEqual(6)
+    expect(sortedRows.length).toBeLessThanOrEqual(9)
+    for (const [, xs] of sortedRows) {
+      expect(xs.length).toBeGreaterThanOrEqual(3)
+      expect(xs.length).toBeLessThanOrEqual(5)
+      expect(xs).toEqual([...xs].sort((a, b) => a - b))
+    }
+    for (let i = 1; i < sortedRows.length; i += 1) {
+      const [previousY, previousXs] = sortedRows[i - 1]
+      const [currentY, currentXs] = sortedRows[i]
+      expect(currentY).toBeGreaterThan(previousY)
+      if (currentXs.length !== 3 && previousXs.length !== 3) {
+        expect(Math.abs(currentXs[0] - previousXs[0])).toBeCloseTo(42.5, 5)
+      }
+    }
   })
 
   it('すべて盤面内（半径ぶん含めて 0..BOARD_WIDTH / 0..ZONE_TOP の内側）にある', () => {
@@ -61,16 +95,22 @@ describe('OBSTACLES', () => {
     }
   })
 
-  it('障害物同士の中心距離が「半径の和 + ボール直径」以上あり、ボールが詰まらない', () => {
+  it('障害物同士の中心距離に16px以上の余裕があり、ボールが詰まらない', () => {
+    let minimumMargin = Number.POSITIVE_INFINITY
     for (let i = 0; i < OBSTACLES.length; i += 1) {
       for (let j = i + 1; j < OBSTACLES.length; j += 1) {
         const a = OBSTACLES[i]
         const b = OBSTACLES[j]
         const distance = Math.hypot(a.x - b.x, a.y - b.y)
-        const required = a.radius + b.radius + BALL_RADIUS * 2
+        const required = a.radius + b.radius + BALL_RADIUS * 2 + REQUIRED_CLEARANCE_MARGIN
+        minimumMargin = Math.min(
+          minimumMargin,
+          distance - (a.radius + b.radius + BALL_RADIUS * 2),
+        )
         expect(distance).toBeGreaterThanOrEqual(required)
       }
     }
+    expect(minimumMargin).toBeGreaterThanOrEqual(REQUIRED_CLEARANCE_MARGIN)
   })
 })
 
