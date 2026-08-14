@@ -1,0 +1,46 @@
+/*
+ * 国旗そのものがボールに見えるよう、丸くクロップした枠。
+ * box-shadow は要素の overflow: hidden に関係なく描画されるため、
+ * 白い縁取り(inset)と外側の落ち影(通常の box-shadow)を同時に付けられる。
+ * 配置方法（盤面上での絶対配置か、選択画面でのグリッド配置か）は呼び出し側の
+ * className に任せるため、position はここでは決めない。
+ */
+.ball {
+  position: relative;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: var(--color-surface);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.7),
+    0 3px 6px rgba(33, 37, 41, 0.35);
+}
+
+/*
+ * 国旗SVGは 4:3。object-fit: cover だと左右が切れて模様の特徴（縞・十字など）が
+ * 丸の中から消えてしまう国が出る（例: フランスは左右の青・赤が切れて白ばかりになる）。
+ * fill で正方形いっぱいに引き伸ばし、縦横比が崩れても特徴を必ず円の中に残す。
+ */
+.flagImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+
+/*
+ * 上部のごく淡いハイライトで「球」らしい立体感を足す。
+ * 国旗の視認性を損なわないよう、中心は透明・上端だけ薄い白を乗せる程度に留める。
+ */
+.highlight {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 32% 26%,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.18) 30%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  pointer-events: none;
+}

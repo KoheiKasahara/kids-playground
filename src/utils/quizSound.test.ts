@@ -172,4 +172,75 @@ describe('quizSound', () => {
 
     expect(instances).toHaveLength(0)
   })
+
+  test('playPinballLaunchSound は低→高の2音を鳴らす', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPinballLaunchSound } = await import('./quizSound')
+
+    playPinballLaunchSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(2)
+    const first = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    const second = instances[0].createOscillator.mock.results[1].value as MockOscillatorNode
+    expect(second.frequency.value).toBeGreaterThan(first.frequency.value)
+  })
+
+  test('playPinballBumperSound はクールダウン内での2回目を鳴らさない', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPinballBumperSound } = await import('./quizSound')
+
+    playPinballBumperSound()
+    playPinballBumperSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(1)
+  })
+
+  test('playPinballScoreSound は得点が高いほど高い音を鳴らす', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPinballScoreSound } = await import('./quizSound')
+
+    playPinballScoreSound(100)
+    playPinballScoreSound(1000)
+
+    const low = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    const high = instances[0].createOscillator.mock.results[1].value as MockOscillatorNode
+    expect(high.frequency.value).toBeGreaterThan(low.frequency.value)
+  })
+
+  test('playPinballTotalSound はペンタトニックで3音鳴らす', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playPinballTotalSound } = await import('./quizSound')
+
+    playPinballTotalSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(3)
+  })
+
+  test('サウンドOFFのときピンボール系の音はどれも鳴らさない', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const {
+      playPinballLaunchSound,
+      playPinballBumperSound,
+      playPinballScoreSound,
+      playPinballTotalSound,
+      setSoundEnabled,
+    } = await import('./quizSound')
+
+    setSoundEnabled(false)
+
+    playPinballLaunchSound()
+    playPinballBumperSound()
+    playPinballScoreSound(1000)
+    playPinballTotalSound()
+
+    expect(instances).toHaveLength(0)
+  })
 })
