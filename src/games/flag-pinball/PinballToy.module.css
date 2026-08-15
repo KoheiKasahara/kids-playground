@@ -1,0 +1,98 @@
+.toyButton {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-round);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 90ms ease-out;
+}
+
+.toyButton:active {
+  transform: scale(0.97);
+}
+
+.toyButton:focus-visible {
+  outline: 3px solid var(--color-accent-dark);
+  outline-offset: 3px;
+}
+
+.toyVisual {
+  --toy-spin: 0rad;
+  --toy-pulse: 0;
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: var(--pinball-toy-bg, radial-gradient(circle at 35% 30%, #fff8b8, #ffb347 62%, #ec7c20 100%));
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.38),
+    var(--shadow-sm);
+  transform: rotate(var(--toy-spin)) scale(calc(1 + 0.12 * var(--toy-pulse)));
+  transform-origin: center;
+  transition: filter 120ms ease;
+  will-change: transform;
+}
+
+.toyVisual[data-toy-kind='spinner']::before,
+.toyVisual[data-toy-kind='spinner']::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: var(--radius-round);
+  background: var(--pinball-toy-mark, rgba(76, 110, 245, 0.8));
+  transform: translate(-50%, -50%);
+}
+
+.toyVisual[data-toy-kind='spinner']::before {
+  width: 78%;
+  height: 15%;
+}
+
+.toyVisual[data-toy-kind='spinner']::after {
+  width: 15%;
+  height: 78%;
+}
+
+.toyVisual[data-toy-kind='launcher'] {
+  background: var(--pinball-toy-launcher-bg, radial-gradient(circle at 35% 30%, #d8f8ff, #73c9e8 62%, #398eb7 100%));
+}
+
+.toyVisual[data-toy-kind='launcher']::before {
+  content: '';
+  position: absolute;
+  inset: 20%;
+  border: 3px solid rgba(255, 255, 255, 0.88);
+  border-radius: 50%;
+  border-top-color: var(--pinball-toy-launcher-ring, rgba(76, 110, 245, 0.85));
+}
+
+.toyVisual[data-toy-kind='launcher']::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18%;
+  height: 18%;
+  border-radius: 50%;
+  background: var(--pinball-toy-launcher-core, #fff);
+  transform: translate(-50%, -50%);
+}
+
+.toyVisual[data-toy-active='true'] {
+  filter: brightness(1.18) saturate(1.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toyButton,
+  .toyVisual {
+    transition: none;
+  }
+}

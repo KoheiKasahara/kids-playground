@@ -20,6 +20,13 @@
   margin-bottom: var(--space-md);
 }
 
+/* テーマ操作をモード切替と国旗グリッドから離し、狭い画面でも詰まりすぎないようにする */
+.themePicker {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-bottom: var(--space-md);
+}
+
 .title {
   font-size: clamp(28px, 8vw, var(--font-size-xlarge));
   color: var(--color-primary-dark);
@@ -236,5 +243,49 @@
 @media (min-width: 560px) {
   .grid {
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  }
+}
+
+/* 320px級の縦画面では、長い国旗グリッドだけをスクロールさせて
+   「あそぶ！」と「もどる」を常に画面内に残す。 */
+@media (max-width: 360px) {
+  .page {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    padding-top: calc(var(--space-sm) + var(--safe-top));
+    padding-left: calc(var(--space-sm) + var(--safe-left));
+    padding-right: calc(var(--space-sm) + var(--safe-right));
+  }
+
+  .header {
+    margin-bottom: var(--space-sm);
+  }
+
+  .instruction {
+    font-size: 22px;
+  }
+
+  .indicator {
+    margin-top: var(--space-xs);
+    gap: 2px;
+  }
+
+  .themePicker {
+    margin-bottom: var(--space-sm);
+  }
+
+  .grid {
+    min-height: 96px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: var(--space-sm);
+  }
+
+  .actions {
+    position: static;
+    flex: 0 0 auto;
+    padding-top: var(--space-xs);
+    padding-bottom: calc(var(--space-sm) + var(--safe-bottom));
   }
 }

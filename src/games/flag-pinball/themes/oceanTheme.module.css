@@ -1,0 +1,355 @@
+.oceanBoard {
+  --pinball-board-bg:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.26) 0 14%, transparent 14% 28%, rgba(255, 255, 255, 0.13) 28% 41%, transparent 41% 100%),
+    linear-gradient(180deg, #dceff4 0%, #c7e7e7 48%, #a9d5d2 100%);
+  --pinball-wall: rgba(37, 119, 137, 0.58);
+  --pinball-guide-wall: rgba(224, 132, 96, 0.68);
+  --pinball-divider: rgba(24, 79, 89, 0.2);
+  --pinball-bumper: radial-gradient(circle at 35% 30%, #ffd39b, #e38b73 65%, #b75c62 100%);
+  --pinball-peg: radial-gradient(circle at 35% 30%, #bdeef0, #45aeb4 70%, #267c8b 100%);
+  --pinball-zone-bg: rgba(38, 145, 157, 0.13);
+  --pinball-zone-bg-300: rgba(38, 145, 157, 0.22);
+  --pinball-zone-bg-1000: linear-gradient(180deg, rgba(232, 151, 111, 0.3), rgba(45, 145, 151, 0.13));
+  --pinball-zone-border: rgba(24, 79, 89, 0.25);
+  --pinball-zone-text: #174b58;
+  --pinball-zone-text-1000: #9b4d42;
+  --pinball-score-pop: #a34e43;
+}
+
+.oceanBackdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 17% 22%, transparent 0 9px, rgba(255, 255, 255, 0.52) 10px 11px, transparent 12px),
+    radial-gradient(circle at 84% 38%, transparent 0 13px, rgba(255, 255, 255, 0.42) 14px 15px, transparent 16px),
+    radial-gradient(circle at 30% 77%, transparent 0 6px, rgba(255, 255, 255, 0.46) 7px 8px, transparent 9px),
+    radial-gradient(circle at 67% 70%, transparent 0 8px, rgba(255, 255, 255, 0.35) 9px 10px, transparent 11px);
+  opacity: 0.9;
+}
+
+.oceanBackdrop::before {
+  position: absolute;
+  inset: -15% -20%;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(112deg, transparent 35%, rgba(255, 255, 255, 0.2) 39%, transparent 45%),
+    linear-gradient(78deg, transparent 50%, rgba(255, 255, 255, 0.13) 54%, transparent 60%);
+  transform: rotate(-5deg);
+}
+
+.oceanBackdrop::after {
+  position: absolute;
+  right: 8%;
+  bottom: 9%;
+  width: 12%;
+  height: 12%;
+  border-radius: 50%;
+  pointer-events: none;
+  content: '';
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.45), rgba(92, 170, 169, 0.18) 68%, transparent 70%);
+}
+
+.oceanToy {
+  --pinball-toy-bg: radial-gradient(circle at 35% 30%, #fef0ca, #e49a73 62%, #af5d62 100%);
+  --pinball-toy-launcher-bg: radial-gradient(circle at 35% 30%, #fff6c9, #f1b06f 62%, #d47767 100%);
+  --pinball-toy-mark: transparent;
+  --pinball-toy-launcher-ring: transparent;
+  --pinball-toy-launcher-core: transparent;
+}
+
+.oceanToy[data-toy-kind='spinner'],
+.oceanToy[data-toy-kind='launcher'] {
+  transform: scale(calc(1 + 0.12 * var(--toy-pulse)));
+}
+
+.oceanToy[data-toy-kind='spinner']::before,
+.oceanToy[data-toy-kind='spinner']::after,
+.oceanToy[data-toy-kind='launcher']::before,
+.oceanToy[data-toy-kind='launcher']::after {
+  display: none;
+  content: none;
+}
+
+.oceanSpinnerMark {
+  position: absolute;
+  inset: 8%;
+  display: block;
+  pointer-events: none;
+  transform: rotate(var(--toy-spin));
+  transform-origin: center;
+  will-change: transform;
+}
+
+.oceanSpinnerArm,
+.oceanSpinnerCore,
+.oceanSpinnerCoreDot {
+  position: absolute;
+  pointer-events: none;
+}
+
+.oceanSpinnerArm {
+  left: 50%;
+  top: 50%;
+  width: 25%;
+  height: 45%;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 78% 35% 88% 35%;
+  background: linear-gradient(160deg, #ffbf83 0%, #ef766c 62%, #cf5665 100%);
+  box-shadow: inset 0 -2px 0 rgba(145, 67, 79, 0.22), 0 1px 2px rgba(71, 105, 110, 0.22);
+  transform-origin: 50% 100%;
+  transform: translate(-50%, -100%);
+}
+
+.oceanSpinnerArmEast {
+  transform: translate(-50%, -100%) rotate(72deg);
+}
+
+.oceanSpinnerArmSouth {
+  transform: translate(-50%, -100%) rotate(144deg);
+}
+
+.oceanSpinnerArmWest {
+  transform: translate(-50%, -100%) rotate(216deg);
+}
+
+.oceanSpinnerArmNorthEast {
+  transform: translate(-50%, -100%) rotate(288deg);
+}
+
+.oceanSpinnerCore {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 25%;
+  height: 25%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #fff6c7, #f3b36f 68%, #d8785e 100%);
+  box-shadow: 0 1px 3px rgba(91, 67, 56, 0.28);
+  transform: translate(-50%, -50%);
+}
+
+.oceanSpinnerCoreDot {
+  left: 50%;
+  top: 50%;
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: #fffbe0;
+  transform: translate(-50%, -50%);
+}
+
+.oceanSpinnerArmNorthEast {
+  background: linear-gradient(160deg, #ffd08a 0%, #ef776b 62%, #cf5665 100%);
+}
+
+.oceanSpinnerArmSouth,
+.oceanSpinnerArmWest {
+  background: linear-gradient(160deg, #ffca86 0%, #e86e6d 62%, #c95865 100%);
+}
+
+.oceanToy[data-toy-kind='spinner'][data-toy-active='true'] .oceanSpinnerMark {
+  filter: saturate(1.1) brightness(1.06);
+}
+
+.oceanLauncherMark {
+  position: absolute;
+  inset: 4%;
+  display: block;
+  pointer-events: none;
+}
+
+.oceanWhaleSpout,
+.oceanWhaleWaterMain,
+.oceanWhaleWaterDrop,
+.oceanWhaleTail,
+.oceanWhaleBody,
+.oceanWhaleBelly,
+.oceanWhaleFin,
+.oceanWhaleEye,
+.oceanWhaleBlowhole {
+  position: absolute;
+  pointer-events: none;
+}
+
+.oceanWhaleSpout {
+  left: 50%;
+  top: 2%;
+  width: 48%;
+  height: 50%;
+  opacity: 0;
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+.oceanWhaleWaterMain {
+  left: 50%;
+  bottom: 0;
+  width: 22%;
+  height: 86%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 54% 54% 32% 32% / 92% 92% 22% 22%;
+  background: linear-gradient(180deg, #f2ffff 0%, #8edfe4 48%, #41aeba 100%);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.72);
+  transform: translateX(-50%) scaleY(calc(0.12 + 0.88 * var(--toy-pulse)));
+  transform-origin: center bottom;
+}
+
+.oceanWhaleWaterDrop {
+  bottom: 13%;
+  width: 23%;
+  height: 47%;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 58% 42% 54% 46% / 74% 74% 34% 26%;
+  background: linear-gradient(180deg, #f4ffff, #79d0da 72%, #42a9b8);
+  transform-origin: center bottom;
+}
+
+.oceanWhaleWaterDropLeft {
+  left: 18%;
+  transform: rotate(-24deg) scaleY(calc(0.12 + 0.88 * var(--toy-pulse)));
+}
+
+.oceanWhaleWaterDropRight {
+  right: 18%;
+  transform: scaleX(-1) rotate(-24deg) scaleY(calc(0.12 + 0.88 * var(--toy-pulse)));
+}
+
+.oceanWhaleTail {
+  left: 6%;
+  top: 48%;
+  width: 27%;
+  height: 25%;
+  border-radius: 50%;
+  background: #273f83;
+  transform: rotate(-18deg);
+  z-index: 2;
+}
+
+.oceanWhaleTail::before,
+.oceanWhaleTail::after {
+  position: absolute;
+  top: 0;
+  width: 68%;
+  height: 62%;
+  border: 2px solid rgba(255, 255, 255, 0.78);
+  border-radius: 80% 25% 80% 25%;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(160deg, #6f86c8, #263d80 76%);
+}
+
+.oceanWhaleTail::before {
+  left: -12%;
+  transform: rotate(24deg);
+}
+
+.oceanWhaleTail::after {
+  right: -12%;
+  transform: scaleX(-1) rotate(24deg);
+}
+
+.oceanWhaleBody {
+  left: 18%;
+  top: 40%;
+  width: 68%;
+  height: 43%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 52% 64% 56% 44% / 68% 68% 46% 44%;
+  background: linear-gradient(180deg, #617bc0 0%, #344b96 58%, #263a7a 100%);
+  box-shadow: inset 0 -3px 0 rgba(17, 32, 83, 0.3), 0 1px 4px rgba(25, 49, 103, 0.38);
+  transform: translateY(calc(2% * var(--toy-pulse))) scaleY(calc(1 - 0.06 * var(--toy-pulse)));
+  transform-origin: center bottom;
+  z-index: 3;
+}
+
+.oceanWhaleBody::before {
+  position: absolute;
+  right: 8%;
+  top: 12%;
+  width: 42%;
+  height: 20%;
+  border-radius: 50%;
+  pointer-events: none;
+  content: '';
+  background: rgba(188, 207, 255, 0.34);
+  transform: rotate(-10deg);
+}
+
+.oceanWhaleBelly {
+  left: 17%;
+  bottom: 7%;
+  width: 62%;
+  height: 25%;
+  border-radius: 50%;
+  background: #f6cf85;
+  opacity: 0.92;
+  transform: rotate(-4deg);
+}
+
+.oceanWhaleFin {
+  right: 17%;
+  bottom: -11%;
+  width: 28%;
+  height: 25%;
+  border: 2px solid rgba(255, 255, 255, 0.74);
+  border-radius: 75% 22% 75% 22%;
+  background: #415ba5;
+  transform: rotate(26deg);
+}
+
+.oceanWhaleEye {
+  right: 17%;
+  top: 34%;
+  width: 9%;
+  height: 14%;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  background: #162454;
+  box-shadow: 0 0 0 1px rgba(255, 228, 157, 0.42);
+}
+
+.oceanWhaleBlowhole {
+  left: 50%;
+  top: 38%;
+  width: 12%;
+  height: 8%;
+  border-radius: 50%;
+  background: #17275a;
+  transform: translateX(-50%);
+  z-index: 4;
+}
+
+.oceanToy[data-toy-kind='launcher'][data-toy-active='true'] .oceanWhaleSpout {
+  opacity: calc(0.12 + 0.88 * var(--toy-pulse));
+  animation: oceanWhaleSpoutBurst 260ms ease-out;
+}
+
+.oceanToy[data-toy-kind='launcher'][data-toy-active='true'] .oceanWhaleBody {
+  box-shadow:
+    inset 0 -3px 0 rgba(17, 32, 83, 0.3),
+    0 0 0 2px rgba(255, 220, 132, 0.28),
+    0 1px 7px rgba(86, 214, 219, 0.56);
+}
+
+@keyframes oceanWhaleSpoutBurst {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+
+  35% {
+    filter: brightness(1.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oceanSpinnerMark {
+    will-change: auto;
+  }
+
+  .oceanWhaleSpout {
+    animation: none;
+  }
+}

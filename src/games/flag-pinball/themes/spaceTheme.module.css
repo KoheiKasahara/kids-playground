@@ -1,0 +1,333 @@
+.spaceBoard {
+  --pinball-board-bg:
+    radial-gradient(circle at 16% 13%, rgba(255, 255, 255, 0.8) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 74% 28%, rgba(255, 255, 255, 0.7) 0 1.5px, transparent 2.2px),
+    radial-gradient(circle at 42% 68%, rgba(210, 211, 255, 0.75) 0 1px, transparent 1.8px),
+    linear-gradient(180deg, #171b44 0%, #272052 52%, #3d2c68 100%);
+  --pinball-wall: rgba(157, 145, 230, 0.72);
+  --pinball-guide-wall: rgba(255, 185, 101, 0.78);
+  --pinball-divider: rgba(226, 220, 255, 0.22);
+  --pinball-bumper: radial-gradient(circle at 35% 30%, #ffd98e, #bf79d9 65%, #733f9f 100%);
+  --pinball-peg: radial-gradient(circle at 35% 30%, #b9bcff, #6e72d6 70%, #4d4c9f 100%);
+  --pinball-zone-bg: rgba(91, 95, 187, 0.24);
+  --pinball-zone-bg-300: rgba(110, 85, 193, 0.34);
+  --pinball-zone-bg-1000: linear-gradient(180deg, rgba(245, 166, 78, 0.34), rgba(205, 105, 148, 0.2));
+  --pinball-zone-border: rgba(233, 226, 255, 0.3);
+  --pinball-zone-text: #f8f5ff;
+  --pinball-zone-text-1000: #ffd889;
+  --pinball-score-pop: #ffd889;
+}
+
+.spaceBackdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 80% 23%, rgba(255, 214, 130, 0.24) 0 10%, transparent 10.7%),
+    radial-gradient(circle at 80% 23%, transparent 0 13%, rgba(255, 214, 130, 0.2) 13.6% 14.3%, transparent 15%),
+    radial-gradient(circle at 24% 78%, rgba(132, 121, 220, 0.22) 0 12%, transparent 12.6%);
+  opacity: 0.9;
+}
+
+.spaceBackdrop::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background:
+    radial-gradient(circle at 11% 42%, rgba(255, 255, 255, 0.72) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 31% 20%, rgba(255, 255, 255, 0.65) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 62% 12%, rgba(255, 255, 255, 0.72) 0 1.4px, transparent 2px),
+    radial-gradient(circle at 91% 57%, rgba(219, 218, 255, 0.68) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 52% 88%, rgba(255, 255, 255, 0.58) 0 1px, transparent 1.7px);
+}
+
+.spaceBackdrop::after {
+  position: absolute;
+  left: 72%;
+  top: 17%;
+  width: 17%;
+  height: 17%;
+  border-radius: 50%;
+  pointer-events: none;
+  content: '';
+  background: radial-gradient(circle at 35% 30%, #f6d39a, #b778b4 72%, #633e8f 100%);
+  box-shadow: 0 0 0 6px rgba(255, 214, 130, 0.12);
+  opacity: 0.72;
+}
+
+.spaceToy {
+  --pinball-toy-bg: radial-gradient(circle at 35% 30%, #f7e4ff, #8f79dd 62%, #4b3c9e 100%);
+  --pinball-toy-launcher-bg: radial-gradient(circle at 35% 30%, #d9f1ff, #668fd2 62%, #3d4e9b 100%);
+  --pinball-toy-mark: transparent;
+  --pinball-toy-launcher-ring: transparent;
+  --pinball-toy-launcher-core: transparent;
+}
+
+.spaceToy[data-toy-kind='spinner'],
+.spaceToy[data-toy-kind='launcher'] {
+  transform: scale(calc(1 + 0.12 * var(--toy-pulse)));
+}
+
+.spaceToy[data-toy-kind='spinner']::before,
+.spaceToy[data-toy-kind='spinner']::after,
+.spaceToy[data-toy-kind='launcher']::before,
+.spaceToy[data-toy-kind='launcher']::after {
+  display: none;
+  content: none;
+}
+
+.spaceSpinnerMark {
+  position: absolute;
+  inset: 8%;
+  display: block;
+  pointer-events: none;
+  transform: rotate(var(--toy-spin));
+  transform-origin: center;
+  will-change: transform;
+}
+
+.spaceSpinnerDome,
+.spaceSpinnerDish,
+.spaceSpinnerBand,
+.spaceSpinnerLight,
+.spaceSpinnerCore {
+  position: absolute;
+  pointer-events: none;
+}
+
+.spaceSpinnerDish {
+  left: 6%;
+  top: 42%;
+  width: 88%;
+  height: 36%;
+  border: 2px solid rgba(236, 250, 255, 0.94);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #b8eaff 0%, #6885db 48%, #4c3d9e 100%);
+  box-shadow: inset 0 -3px 0 rgba(39, 38, 112, 0.38), 0 1px 4px rgba(8, 10, 42, 0.38);
+  z-index: 1;
+}
+
+.spaceSpinnerDome {
+  left: 28%;
+  top: 10%;
+  width: 44%;
+  height: 49%;
+  border: 2px solid rgba(236, 250, 255, 0.92);
+  border-radius: 50% 50% 42% 42%;
+  background: radial-gradient(circle at 34% 25%, #fff8cc 0 14%, #a4e1f6 45%, #6e71d1 100%);
+  box-shadow: inset 0 -2px 0 rgba(77, 60, 158, 0.28);
+  z-index: 2;
+}
+
+.spaceSpinnerBand {
+  left: 9%;
+  top: 49%;
+  width: 82%;
+  height: 16%;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+  background: linear-gradient(90deg, #ffcf83, #fff1a8 48%, #ffcf83);
+  box-shadow: 0 0 4px rgba(255, 216, 137, 0.42);
+  z-index: 3;
+}
+
+.spaceSpinnerLight {
+  width: 12%;
+  height: 12%;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  background: #a8f0ff;
+  box-shadow: 0 0 4px rgba(168, 240, 255, 0.92);
+  transform: translate(-50%, -50%);
+  z-index: 4;
+}
+
+.spaceSpinnerLightNorth {
+  left: 50%;
+  top: 10%;
+}
+
+.spaceSpinnerLightEast {
+  left: 90%;
+  top: 50%;
+  background: #ffd889;
+  box-shadow: 0 0 4px rgba(255, 216, 137, 0.92);
+}
+
+.spaceSpinnerLightSouth {
+  left: 50%;
+  top: 90%;
+  background: #f0a7e9;
+  box-shadow: 0 0 4px rgba(240, 167, 233, 0.92);
+}
+
+.spaceSpinnerLightWest {
+  left: 10%;
+  top: 50%;
+}
+
+.spaceSpinnerCore {
+  left: 50%;
+  top: 58%;
+  width: 17%;
+  height: 17%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 25%, #fffbd4, #ffd889 70%, #da8f62 100%);
+  box-shadow: 0 0 5px rgba(255, 216, 137, 0.6);
+  transform: translate(-50%, -50%);
+  z-index: 5;
+}
+
+.spaceLauncherMark {
+  position: absolute;
+  inset: 7%;
+  display: block;
+  pointer-events: none;
+}
+
+.spaceLauncherFlame,
+.spaceLauncherFlameCore,
+.spaceLauncherBody,
+.spaceLauncherWindow {
+  position: absolute;
+  pointer-events: none;
+}
+
+.spaceLauncherFlame {
+  left: 50%;
+  top: 61%;
+  width: 28%;
+  height: 40%;
+  border-radius: 50% 50% 68% 68% / 24% 24% 76% 76%;
+  background: linear-gradient(180deg, #fffbd0 0%, #ffd45e 34%, #ff8a47 68%, rgba(255, 112, 82, 0) 100%);
+  opacity: 0;
+  transform: translateX(-50%) scaleY(calc(0.2 + 0.95 * var(--toy-pulse)));
+  transform-origin: top center;
+  filter: drop-shadow(0 2px 4px rgba(255, 149, 74, 0.72));
+  z-index: 1;
+}
+
+.spaceLauncherFlameCore {
+  left: 50%;
+  top: 10%;
+  width: 48%;
+  height: 70%;
+  border-radius: 50% 50% 64% 64% / 28% 28% 72% 72%;
+  background: linear-gradient(180deg, #ffffff 0%, #fff2a4 48%, #ffad4d 100%);
+  opacity: 0.9;
+  transform: translateX(-50%) scaleY(calc(0.56 + 0.44 * var(--toy-pulse)));
+  transform-origin: top center;
+}
+
+.spaceLauncherBody {
+  left: 50%;
+  top: 9%;
+  width: 46%;
+  height: 66%;
+  border: 2px solid rgba(232, 250, 255, 0.96);
+  border-radius: 50% 50% 42% 42% / 38% 38% 62% 62%;
+  background: linear-gradient(180deg, #e7fbff 0%, #7bc2e8 48%, #5168c1 100%);
+  box-shadow: inset 0 -3px 0 rgba(47, 56, 143, 0.32), 0 1px 4px rgba(8, 10, 42, 0.4);
+  transform: translateX(-50%) translateY(calc(4% * var(--toy-pulse)))
+    scaleY(calc(1 - 0.08 * var(--toy-pulse)));
+  transform-origin: center bottom;
+  z-index: 2;
+}
+
+.spaceLauncherBody::before,
+.spaceLauncherBody::after {
+  position: absolute;
+  bottom: 9%;
+  width: 38%;
+  height: 29%;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 70% 20% 70% 20%;
+  pointer-events: none;
+  content: '';
+  background: #f19bc9;
+}
+
+.spaceLauncherBody::before {
+  left: -24%;
+  transform: rotate(-23deg);
+}
+
+.spaceLauncherBody::after {
+  right: -24%;
+  transform: scaleX(-1) rotate(-23deg);
+}
+
+.spaceLauncherWindow {
+  left: 50%;
+  top: 24%;
+  width: 43%;
+  height: 26%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 25%, #fff9ca 0 17%, #8de4f2 55%, #5e67c5 100%);
+  box-shadow: 0 0 4px rgba(168, 240, 255, 0.5);
+  transform: translateX(-50%);
+}
+
+.spaceToy[data-toy-kind='spinner'][data-toy-active='true'] .spaceSpinnerLight {
+  animation: spaceUfoLightBlink 320ms ease-out;
+}
+
+.spaceToy[data-toy-kind='spinner'][data-toy-active='true'] .spaceSpinnerLightEast {
+  animation-delay: 45ms;
+}
+
+.spaceToy[data-toy-kind='spinner'][data-toy-active='true'] .spaceSpinnerLightSouth {
+  animation-delay: 90ms;
+}
+
+.spaceToy[data-toy-kind='spinner'][data-toy-active='true'] .spaceSpinnerLightWest {
+  animation-delay: 135ms;
+}
+
+.spaceToy[data-toy-kind='launcher'][data-toy-active='true'] .spaceLauncherFlame {
+  opacity: calc(0.25 + 0.75 * var(--toy-pulse));
+  animation: spaceRocketFlameFlicker 220ms ease-out;
+}
+
+.spaceToy[data-toy-kind='launcher'][data-toy-active='true'] .spaceLauncherBody {
+  box-shadow:
+    inset 0 -3px 0 rgba(47, 56, 143, 0.32),
+    0 0 0 2px rgba(255, 216, 137, 0.28),
+    0 1px 7px rgba(255, 216, 137, 0.5);
+}
+
+@keyframes spaceUfoLightBlink {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+
+  45% {
+    filter: brightness(1.65);
+  }
+}
+
+@keyframes spaceRocketFlameFlicker {
+  0%,
+  100% {
+    filter: drop-shadow(0 2px 4px rgba(255, 149, 74, 0.72)) brightness(1);
+  }
+
+  45% {
+    filter: drop-shadow(0 2px 6px rgba(255, 216, 137, 0.94)) brightness(1.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spaceSpinnerMark {
+    will-change: auto;
+  }
+
+  .spaceSpinnerLight,
+  .spaceLauncherFlame {
+    animation: none;
+  }
+}

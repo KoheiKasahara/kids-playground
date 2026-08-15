@@ -6,6 +6,7 @@ import { PINBALL_FLAG_IDS, pinballFlags } from './data/pinballFlags'
 import { isSelectionComplete, MAX_SELECTION, remainingCount, toggleSelection } from './selection'
 import type { PinballMode } from './types'
 import { primeAudio } from '../../utils/quizSound'
+import PinballThemePicker from './PinballThemePicker'
 import styles from './FlagPinballSelect.module.css'
 
 /** ボールの選択状況インジケータに並べる丸の数。MAX_SELECTION と同じ意味の値だが、
@@ -78,6 +79,10 @@ export default function FlagPinballSelect() {
           <p className={styles.instruction}>{pinballFlags.length}この こっきが じゅんばんに おちてくるよ！</p>
         )}
       </header>
+
+      <div className={styles.themePicker}>
+        <PinballThemePicker />
+      </div>
 
       {mode === 'normal' && (
         <div className={styles.grid}>

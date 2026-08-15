@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_FLAGS_LAUNCH_INTERVAL_MS, launchDelaysMs } from './boardLayout'
 import { PINBALL_FLAG_IDS } from './data/pinballFlags'
-import { SAFETY_TIMEOUT_MS, STEP_MS } from './pinballPhysics'
+import { STEP_MS } from './pinballPhysics'
 import { simulatePinballRun } from './pinballSimulation'
 
 const TRIAL_COUNT = 32
 const SEED_BASE = 0x1f2e3d4c
 const SEED_STEP = 7919
+const RAPID_TAP_TRIAL_COUNT = 12
+const RAPID_TAP_INTERVAL_MS = 100
 
 describe('pinball fixed-step play-time simulation', () => {
-  it('32個のシード付き試行で、全3球が通常の得点確定まで到達する', () => {
+  it('おもちゃをタップしない32個のシード付き試行が、従来と同程度の時間で完了する', () => {
     const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
-      simulatePinballRun(SEED_BASE + index * SEED_STEP),
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, { toyTapIntervalMs: null }),
     )
     const seconds = results.map((result) => result.durationSeconds).sort((a, b) => a - b)
     const median = (seconds[TRIAL_COUNT / 2 - 1] + seconds[TRIAL_COUNT / 2]) / 2
@@ -27,10 +29,37 @@ describe('pinball fixed-step play-time simulation', () => {
     expect(results.every((result) => result.completed)).toBe(true)
     expect(results.every((result) => !result.usedSafetyTimeout)).toBe(true)
     expect(results.every((result) => result.steps * STEP_MS === result.durationMs)).toBe(true)
-    expect(min).toBeGreaterThanOrEqual(4)
-    expect(median).toBeGreaterThanOrEqual(9.5)
-    expect(median).toBeLessThan(15)
-    expect(max).toBeLessThan(SAFETY_TIMEOUT_MS / 1000)
+    // おもちゃのBodyは含めるがタップはしないため、従来の測定値から少しずれる。
+    // 物理エンジンや受動的な接触のわずかな差で壊れないよう、実測値より広く取る。
+    expect(min).toBeGreaterThanOrEqual(3)
+    expect(median).toBeGreaterThanOrEqual(7)
+    expect(median).toBeLessThan(20)
+    expect(max).toBeLessThan(35)
+  })
+
+  it('おもちゃを100ms間隔で連打しても、安全タイマーなしで全試行が完了する', () => {
+    const results = Array.from({ length: RAPID_TAP_TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, {
+        toyTapIntervalMs: RAPID_TAP_INTERVAL_MS,
+      }),
+    )
+    const seconds = results.map((result) => result.durationSeconds).sort((a, b) => a - b)
+    const median =
+      (seconds[RAPID_TAP_TRIAL_COUNT / 2 - 1] + seconds[RAPID_TAP_TRIAL_COUNT / 2]) / 2
+    const min = seconds[0]
+    const max = seconds[seconds.length - 1]
+    const mean = seconds.reduce((sum, value) => sum + value, 0) / seconds.length
+
+    // launcherToy.tsのMath.randomにより固定値にはできないため、成立性と緩い上限だけを検証する。
+    console.info(
+      `pinball rapid toy taps (${RAPID_TAP_TRIAL_COUNT} trials, ${RAPID_TAP_INTERVAL_MS}ms): min=${min.toFixed(3)}s median=${median.toFixed(3)}s mean=${mean.toFixed(3)}s max=${max.toFixed(3)}s`,
+    )
+
+    expect(results.every((result) => result.completed)).toBe(true)
+    expect(results.every((result) => !result.usedSafetyTimeout)).toBe(true)
+    expect(results.every((result) => result.steps * STEP_MS === result.durationMs)).toBe(true)
+    // 45秒の安全タイマーより5秒以上短い余裕を残し、連打で停滞していないことを確認する。
+    expect(max).toBeLessThan(40)
   })
 })
 
