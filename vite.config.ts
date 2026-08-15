@@ -54,6 +54,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Rapierのwasmはbase64でrapier.mjsへ埋め込まれており、約2.24MiBあります。
+        // この構造上これ以上の圧縮が難しいため、理由を明示して3MiBへ引き上げます。
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,webmanifest}'],
         navigateFallback: `${base}index.html`,
         cleanupOutdatedCaches: true,
