@@ -1,12 +1,18 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, type CSSProperties } from 'react'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import {
   AREA_HEIGHT,
   AREA_WIDTH,
   BALL_RADIUS,
+  EXIT_SENSOR_HEIGHT,
+  EXIT_SWALLOW_MS,
+  EXIT_WIDTH,
+  ENTRY_EMERGE_MS,
 } from './adventurePhysics'
 import { AREAS } from './data/areas'
+import { areaGroundRects, cupWellRect, worldSize } from './adventureGeometry'
 import type { FlagBallData } from '../../components/flag-ball/flagBalls'
+import type { PortalKind } from './types'
 import AreaBackground from './AreaBackground'
 import AreaForeground from './AreaForeground'
 import { ADVENTURE_LAYER_Z_INDEX } from './layerOrder'
@@ -24,6 +30,15 @@ type AdventureStageProps = {
 
 /** ピンの発光を見せる時間。React stateではなくclassListにするための固定値。 */
 const PIN_HIT_FLASH_MS = 220
+
+const portalKindClass: Record<PortalKind, string> = {
+  hole: styles.portalHole,
+  tunnel: styles.portalTunnel,
+  pipe: styles.portalPipe,
+  cavemouth: styles.portalCavemouth,
+}
+
+const WORLD_SIZE = worldSize(AREAS)
 
 /**
  * 固定カメラの1画面を描く。
@@ -56,7 +71,7 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
     pinTimeoutsRef.current.set(pinId, timeoutId)
   }, [])
 
-  const { registerBall, registerWorld } = useAdventureEngine({
+  const { registerBall, registerBallVisual, registerWorld } = useAdventureEngine({
     runId,
     onAreaEnter,
     onGoal,
@@ -79,7 +94,7 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
           <div
             ref={registerWorld}
             className={styles.world}
-            style={{ width: AREA_WIDTH, height: AREA_HEIGHT * AREAS.length }}
+            style={{ width: WORLD_SIZE.width, height: WORLD_SIZE.height }}
           >
             {AREAS.map((area) => (
               <div
@@ -125,18 +140,53 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
                     )
                   })}
 
+                  {areaGroundRects(area).map((rect, index) => (
+                    <div
+                      key={`ground-${area.id}-${index}`}
+                      className={styles.portalFloor}
+                      style={rect}
+                    />
+                  ))}
+
+                  {area.entries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={[styles.portal, styles.entryPortal, portalKindClass[entry.kind]].join(' ')}
+                      data-portal-id={entry.id}
+                      data-portal-kind={entry.kind}
+                      style={{
+                        left: entry.x - EXIT_WIDTH / 2,
+                        top: entry.y - EXIT_SENSOR_HEIGHT / 2,
+                        width: EXIT_WIDTH,
+                        height: EXIT_SENSOR_HEIGHT,
+                      }}
+                    >
+                      <span className={styles.portalInner} />
+                    </div>
+                  ))}
+
                   {area.exits.map((exit) => (
                     <div
                       key={exit.id}
-                      className={[styles.exit, exit.to === null ? styles.goalExit : ''].filter(Boolean).join(' ')}
+                      className={[styles.portal, styles.exitPortal, portalKindClass[exit.kind]].join(' ')}
+                      data-portal-id={exit.id}
+                      data-portal-kind={exit.kind}
                       style={{
                         left: exit.x - exit.width / 2,
                         top: exit.y - exit.height / 2,
                         width: exit.width,
                         height: exit.height,
                       }}
-                    />
+                    >
+                      <span className={styles.portalInner} />
+                    </div>
                   ))}
+
+                  {area.cup && (
+                    <div className={styles.cupBack} data-cup-id={area.cup.id} style={cupWellRect(area.cup)}>
+                      <span className={styles.cupOpening} />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -147,13 +197,27 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
               style={{ zIndex: ADVENTURE_LAYER_Z_INDEX.ball }}
               aria-hidden="true"
             >
-              <FlagBall flag={flag} size={BALL_RADIUS * 2} />
+              <div
+                ref={registerBallVisual}
+                className={styles.ballVisual}
+                style={
+                  {
+                    '--exit-swallow-ms': `${EXIT_SWALLOW_MS}ms`,
+                    '--entry-emerge-ms': `${ENTRY_EMERGE_MS}ms`,
+                  } as CSSProperties
+                }
+              >
+                <FlagBall flag={flag} size={BALL_RADIUS * 2} />
+              </div>
             </div>
 
             {AREAS.map((area) => (
               <AreaForeground
                 key={area.id}
                 theme={area.theme}
+                entries={area.entries}
+                exits={area.exits}
+                cup={area.cup}
                 style={{ left: area.origin.x, top: area.origin.y, width: AREA_WIDTH, height: AREA_HEIGHT }}
               />
             ))}

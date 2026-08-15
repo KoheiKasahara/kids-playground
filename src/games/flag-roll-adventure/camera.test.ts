@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AREA_COLUMN_STEP, AREA_HEIGHT } from './adventurePhysics'
 import {
   cameraPositionForArea,
   easeInOutCubic,
@@ -7,10 +8,12 @@ import {
 
 describe('camera', () => {
   it('エリアidからoriginを使ったカメラ位置を返す', () => {
-    expect(cameraPositionForArea('sky')).toEqual({ x: 0, y: 0 })
-    expect(cameraPositionForArea('forest')).toEqual({ x: 0, y: 720 })
-    expect(cameraPositionForArea('cave')).toEqual({ x: 0, y: 1440 })
-    expect(cameraPositionForArea('goal')).toEqual({ x: 0, y: 2160 })
+    expect(cameraPositionForArea('sky')).toEqual({ x: AREA_COLUMN_STEP, y: 0 })
+    expect(cameraPositionForArea('forest')).toEqual({ x: AREA_COLUMN_STEP, y: AREA_HEIGHT })
+    expect(cameraPositionForArea('cave')).toEqual({ x: 0, y: AREA_HEIGHT * 2 })
+    expect(cameraPositionForArea('river')).toEqual({ x: AREA_COLUMN_STEP * 2, y: AREA_HEIGHT * 2 })
+    expect(cameraPositionForArea('cloud')).toEqual({ x: AREA_COLUMN_STEP, y: AREA_HEIGHT * 3 })
+    expect(cameraPositionForArea('goal')).toEqual({ x: AREA_COLUMN_STEP, y: AREA_HEIGHT * 4 })
   })
 
   it('easeInOutCubicはt=0/0.5/1で端点と中央を返す', () => {
@@ -26,9 +29,16 @@ describe('camera', () => {
     }
 
     const from = { x: 0, y: 0 }
-    const to = { x: 0, y: 720 }
+    const to = { x: 0, y: AREA_HEIGHT }
     expect(interpolateCameraPosition(from, to, 0)).toEqual(from)
     expect(interpolateCameraPosition(from, to, 1)).toEqual(to)
-    expect(interpolateCameraPosition(from, to, 0.5)).toEqual({ x: 0, y: 360 })
+    expect(interpolateCameraPosition(from, to, 0.5)).toEqual({ x: 0, y: AREA_HEIGHT / 2 })
+
+    const horizontalFrom = { x: AREA_COLUMN_STEP, y: AREA_HEIGHT }
+    const horizontalTo = { x: 0, y: AREA_HEIGHT * 2 }
+    expect(interpolateCameraPosition(horizontalFrom, horizontalTo, 0.5)).toEqual({
+      x: AREA_COLUMN_STEP / 2,
+      y: AREA_HEIGHT * 1.5,
+    })
   })
 })

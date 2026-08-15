@@ -1,4 +1,4 @@
-/* 背景はコースのDOMより下に置く。Phase 1はCSSの図形だけで、画像素材は追加しない。 */
+/* 背景はコースのDOMより下に置く。Phase 2も6テーマのCSS図形だけで、画像素材は追加しない。 */
 .background,
 .layerBase,
 .layerFar,
@@ -17,6 +17,60 @@
 .layerDecor,
 .foreground {
   display: block;
+}
+
+/* ポータルの下側だけを前景で覆い、吸い込み・出現の途中を穴の奥へ隠す。 */
+.portalFront {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 5px solid rgba(43, 39, 58, 0.9);
+  border-top-width: 3px;
+  border-radius: 0 0 50% 50%;
+  background: rgba(37, 31, 46, 0.9);
+  box-shadow: inset 0 5px 0 rgba(255, 255, 255, 0.16), var(--shadow-sm);
+}
+
+.portalFront[data-portal-kind='hole'] {
+  border-color: rgba(255, 255, 255, 0.72);
+  background: rgba(82, 139, 170, 0.92);
+}
+
+.portalFront[data-portal-kind='tunnel'] {
+  border-color: #75472f;
+  background: #5a3a39;
+}
+
+.portalFront[data-portal-kind='pipe'] {
+  border-color: #8d84aa;
+  background: #37304f;
+}
+
+.portalFront[data-portal-kind='cavemouth'] {
+  border-color: #3c384b;
+  background: #252233;
+}
+
+/* カップの手前側だけを前景へ置き、ボールの下半分を隠して「穴へ沈んだ」と見せる。 */
+.cupFront {
+  position: absolute;
+  box-sizing: border-box;
+  border: 7px solid #b7772a;
+  border-top-width: 9px;
+  border-radius: 0 0 50% 50%;
+  background: #9b5928;
+  box-shadow: inset 0 -5px 0 rgba(255, 224, 143, 0.38), var(--shadow-sm);
+}
+
+.cupFrontLip {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 0;
+  height: 12px;
+  border-radius: 50%;
+  background: #c9852e;
+  box-shadow: inset 0 3px 0 rgba(255, 232, 159, 0.55);
 }
 
 /* --- 空 ----------------------------------------------------------------- */
@@ -164,6 +218,107 @@
   transform: rotate(-18deg) scale(0.78);
 }
 
+/* --- 川 ------------------------------------------------------------------ */
+.themeRiver .layerBase {
+  background:
+    radial-gradient(circle at 20% 24%, rgba(206, 255, 249, 0.5) 0 9%, transparent 30%),
+    linear-gradient(180deg, #8de2e5 0%, #55c8c9 55%, #238f9e 100%);
+}
+
+.themeRiver .farShape,
+.themeRiver .farShapeSecondary {
+  position: absolute;
+  width: 190px;
+  height: 250px;
+  border-radius: 50% 50% 24% 24%;
+  background: rgba(18, 112, 126, 0.3);
+}
+
+.themeRiver .farShape {
+  left: -88px;
+  top: 170px;
+  transform: rotate(8deg);
+}
+
+.themeRiver .farShapeSecondary {
+  right: -88px;
+  top: 360px;
+  transform: rotate(-8deg) scale(0.86);
+  background: rgba(9, 91, 112, 0.28);
+}
+
+.themeRiver .decorShape,
+.themeRiver .decorShapeSecondary {
+  position: absolute;
+  width: 112px;
+  height: 16px;
+  border-top: 4px solid rgba(221, 255, 252, 0.62);
+  border-bottom: 3px solid rgba(18, 125, 139, 0.26);
+  border-radius: 50%;
+}
+
+.themeRiver .decorShape {
+  top: 220px;
+  left: -18px;
+  transform: rotate(-9deg);
+}
+
+.themeRiver .decorShapeSecondary {
+  top: 520px;
+  right: -20px;
+  transform: rotate(8deg) scale(0.78);
+}
+
+/* --- 雲 ------------------------------------------------------------------ */
+.themeCloud .layerBase {
+  background:
+    radial-gradient(circle at 72% 22%, rgba(255, 255, 255, 0.96) 0 13%, transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f6f2ff 54%, #d9d4f2 100%);
+}
+
+.themeCloud .farShape,
+.themeCloud .farShapeSecondary {
+  position: absolute;
+  width: 210px;
+  height: 86px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 48px -22px 0 -8px rgba(255, 255, 255, 0.72), 96px 8px 0 -18px rgba(224, 217, 248, 0.72);
+}
+
+.themeCloud .farShape {
+  left: -92px;
+  top: 132px;
+}
+
+.themeCloud .farShapeSecondary {
+  right: -118px;
+  top: 420px;
+  transform: scale(0.82);
+  background: rgba(226, 219, 249, 0.78);
+}
+
+.themeCloud .decorShape,
+.themeCloud .decorShapeSecondary {
+  position: absolute;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 0 0 6px rgba(190, 182, 225, 0.28);
+}
+
+.themeCloud .decorShape {
+  top: 280px;
+  left: 54px;
+}
+
+.themeCloud .decorShapeSecondary {
+  top: 590px;
+  right: 46px;
+  transform: scale(0.68);
+}
+
 /* --- ゴール -------------------------------------------------------------- */
 .themeGoal .layerBase {
   background:
@@ -212,7 +367,7 @@
   transform: rotate(45deg) scale(0.7);
 }
 
-/* Phase 1では背景アニメーションを入れていないため、reduced-motionでも追加の停止処理は不要。
+/* Phase 2では背景アニメーションを入れていないため、reduced-motionでも追加の停止処理は不要。
    このメディアクエリは将来動きを足す場合の差し込み場所として残しておく。 */
 @media (prefers-reduced-motion: reduce) {
   .background,

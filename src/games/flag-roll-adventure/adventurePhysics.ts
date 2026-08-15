@@ -7,6 +7,113 @@ export const AREA_WIDTH = 480
 export const AREA_HEIGHT = 720
 
 /**
+ * 横にエリアを並べるときの隙間。隣のエリアの外壁とボールが接触すると、別ルートの物理へ力が伝わるため余白を置く。
+ */
+export const AREA_COLUMN_GAP = 60
+export const AREA_COLUMN_STEP = AREA_WIDTH + AREA_COLUMN_GAP
+
+/** 端の出口を外壁から少し離し、出口の左右にボールを受ける床を残す。 */
+export const SIDE_EXIT_INSET = 80
+
+/** そらは長い斜面を3枚つなぎ、入口の雲風ピンで1〜2回だけ反応を見せる基準コース。 */
+export const SKY_SLOPE_X = AREA_WIDTH / 2
+export const SKY_SLOPE_WIDTH = 300
+export const SKY_SLOPE_HEIGHT = 18
+export const SKY_SLOPE_TOP_Y = 170
+export const SKY_SLOPE_MIDDLE_Y = 360
+export const SKY_SLOPE_BOTTOM_Y = 550
+export const SKY_SLOPE_ANGLE = 0.36
+export const SKY_CLOUD_PIN_LEFT_X = 20
+export const SKY_CLOUD_PIN_RIGHT_X = AREA_WIDTH - SKY_CLOUD_PIN_LEFT_X
+export const SKY_CLOUD_PIN_RADIUS = 16
+export const SKY_CLOUD_PIN_TOP_Y = 80
+export const SKY_CLOUD_PIN_MIDDLE_Y = 260
+export const SKY_CLOUD_PIN_BOTTOM_Y = 640
+
+/** 分岐後の入口で左右から中央へ寄せる初速。出口へ入ったときの速度をそのまま引き継がず、合流を見せる。 */
+export const MERGE_ENTRY_SPEED = 2.2
+export const MERGE_ENTRY_VERTICAL_SPEED = 0.2
+
+/** 森の分岐前に左右の丸太とキノコを置き、通過してから分かれ道へ入る流れを作る。 */
+export const FOREST_APPROACH_LOG_LEFT_X = 130
+export const FOREST_APPROACH_LOG_RIGHT_X = AREA_WIDTH - FOREST_APPROACH_LOG_LEFT_X
+export const FOREST_APPROACH_LOG_Y = 120
+export const FOREST_APPROACH_LOG_WIDTH = 140
+export const FOREST_APPROACH_LOG_HEIGHT = 18
+export const FOREST_APPROACH_LOG_ANGLE = 0.28
+export const FOREST_APPROACH_MUSHROOM_LEFT_X = 90
+export const FOREST_APPROACH_MUSHROOM_RIGHT_X = AREA_WIDTH - FOREST_APPROACH_MUSHROOM_LEFT_X
+export const FOREST_APPROACH_MUSHROOM_Y = 260
+export const FOREST_APPROACH_MUSHROOM_RADIUS = 18
+
+/** 森の左右出口と分岐の障害物。出口間の帯を狭め、中央の尾根でボールが止まらないようにする。 */
+export const FOREST_LEFT_EXIT_X = 100
+export const FOREST_RIGHT_EXIT_X = AREA_WIDTH - FOREST_LEFT_EXIT_X
+/** 中心の真上を避け、初速の小さな違いが左右の反射に分かれる起点を作る。 */
+export const FOREST_BRANCH_BUMPER_OFFSET_X = 3
+export const FOREST_BRANCH_BUMPER_X = AREA_WIDTH / 2 + FOREST_BRANCH_BUMPER_OFFSET_X
+export const FOREST_BRANCH_BUMPER_Y = 250
+export const FOREST_BRANCH_BUMPER_RADIUS = 32
+export const FOREST_BRANCH_ROOF_LEFT_X = 140
+export const FOREST_BRANCH_ROOF_RIGHT_X = AREA_WIDTH - FOREST_BRANCH_ROOF_LEFT_X
+export const FOREST_BRANCH_ROOF_Y = 420
+export const FOREST_BRANCH_ROOF_WIDTH = 120
+export const FOREST_BRANCH_ROOF_HEIGHT = 18
+export const FOREST_BRANCH_ROOF_ANGLE = 0.55
+export const FOREST_BRANCH_RIDGE_Y = 650
+export const FOREST_BRANCH_RIDGE_RADIUS = 32
+
+/** 洞窟は短い板を左右交互に突き出し、中央の岩を避ける狭いジグザグにする。 */
+export const CAVE_ZIGZAG_LEFT_X = 140
+export const CAVE_ZIGZAG_RIGHT_X = AREA_WIDTH - CAVE_ZIGZAG_LEFT_X
+export const CAVE_ZIGZAG_WALL_WIDTH = 220
+export const CAVE_ZIGZAG_WALL_HEIGHT = 18
+export const CAVE_ZIGZAG_ANGLE = 0.32
+export const CAVE_ZIGZAG_TOP_Y = 130
+export const CAVE_ZIGZAG_SECOND_Y = 380
+export const CAVE_ZIGZAG_BOTTOM_Y = 640
+export const CAVE_ROCK_X = AREA_WIDTH / 2
+export const CAVE_ROCK_RADIUS = 16
+export const CAVE_ROCK_TOP_Y = 255
+export const CAVE_ROCK_BOTTOM_Y = 505
+
+/** 川は長い板を左右いっぱいへ渡し、ゆるい角度で横移動を主役にする。 */
+export const RIVER_SWEEP_WIDTH = 340
+export const RIVER_SWEEP_HEIGHT = 18
+export const RIVER_SWEEP_TOP_Y = 140
+export const RIVER_SWEEP_SECOND_Y = 360
+export const RIVER_SWEEP_BOTTOM_Y = 610
+export const RIVER_SWEEP_ANGLE = 0.3
+
+/** 雲の入口は左右に離し、V字の2枚板で通常幅の出口へ中央寄せする。 */
+export const CLOUD_ENTRY_LEFT_X = 120
+export const CLOUD_ENTRY_RIGHT_X = AREA_WIDTH - CLOUD_ENTRY_LEFT_X
+export const CLOUD_EXIT_X = AREA_WIDTH / 2
+export const CLOUD_V_LEFT_X = 110
+export const CLOUD_V_RIGHT_X = AREA_WIDTH - CLOUD_V_LEFT_X
+export const CLOUD_V_Y = 590
+export const CLOUD_V_WIDTH = 200
+export const CLOUD_V_HEIGHT = 18
+export const CLOUD_V_ANGLE = 0.36
+
+/** ゴールは既存のV字と中央ピンを保ち、カップ周辺の物理・幾何はTask Aの数値を変えない。 */
+export const GOAL_FUNNEL_TOP_LEFT_X = 110
+export const GOAL_FUNNEL_TOP_RIGHT_X = AREA_WIDTH - GOAL_FUNNEL_TOP_LEFT_X
+export const GOAL_FUNNEL_TOP_Y = 250
+export const GOAL_FUNNEL_TOP_WIDTH = 160
+export const GOAL_FUNNEL_LOWER_LEFT_X = 106
+export const GOAL_FUNNEL_LOWER_RIGHT_X = AREA_WIDTH - GOAL_FUNNEL_LOWER_LEFT_X
+export const GOAL_FUNNEL_LOWER_Y = 505
+export const GOAL_FUNNEL_LOWER_WIDTH = 180
+export const GOAL_FUNNEL_TOP_ANGLE = 0.35
+export const GOAL_FUNNEL_LOWER_ANGLE = 0.55
+export const GOAL_FUNNEL_WALL_HEIGHT = 18
+export const GOAL_SPARK_X = AREA_WIDTH / 2
+export const GOAL_SPARK_Y = 370
+export const GOAL_SPARK_RADIUS = 18
+export const GOAL_CUP_BOTTOM_MARGIN = 34
+
+/**
  * 物理演算とヘッドレス測定で共用する固定タイムステップ。
  * 可変フレームレートのまま Engine.update へ渡すと、端末ごとに反発や落下のテンポが
  * 変わってしまうため、ピンボールと同じ60fpsの論理時間で進める。
@@ -95,5 +202,46 @@ export const AREA_ENTRY_CLEARANCE = 60
 
 /** 外壁をデータから省き、全エリアへ自動生成する板の厚み。すり抜け防止のため少し厚めにする。 */
 export const OUTER_WALL_THICKNESS = 28
-/** 出口センサーをエリア下端に置く高さ。下方向の進行を取りこぼさないための幅。 */
-export const EXIT_SENSOR_HEIGHT = 24
+/** 穴を「下端全体」ではなく、ボールが狙える開口として見せる幅。 */
+export const EXIT_WIDTH = 140
+/** 出口センサーと見た目のポータルを揃える高さ。 */
+export const EXIT_SENSOR_HEIGHT = 40
+/** 出口中心を床の少し上へ置き、ボールが穴へ落ちる途中で検知できるようにする距離。 */
+export const EXIT_CENTER_OFFSET_FROM_BOTTOM = 52
+/** 出口の左右に残す受け皿の板厚。開口以外から下へ抜けないようにする。 */
+export const PORTAL_FLOOR_HEIGHT = 28
+
+/** 出口へ吸い込まれる時間。物理を止めてもワープに見えない最小限の間を取る(ms)。 */
+export const EXIT_SWALLOW_MS = 260
+/** 入口から出てくるとき、透明状態から通常サイズへ戻る時間(ms)。 */
+export const ENTRY_EMERGE_MS = 220
+/** 40px高のポータルの下側60%を前景で覆い、吸い込みの最後だけを隠す高さ(px)。 */
+export const PORTAL_FRONT_LIP_HEIGHT = 24
+
+/** カップの内側。ボール直径より十分広く、斜めに入っても底へ落ちる幅を残す。 */
+export const CUP_INNER_WIDTH = 104
+/** リムから底までの深さ。センサーをリム接触より十分下へ置くための余白も含む。 */
+export const CUP_INNER_DEPTH = 96
+/** 薄すぎてボールが抜けないようにするカップ壁・底の厚み。 */
+export const CUP_WALL_THICKNESS = 16
+/** ボール中心がこの深さまで下がるまでは、リム接触をカップインとみなさない距離(px)。 */
+export const CUP_SENSOR_INSET = 48
+/** センサーはボール半径ぶん下げ、衝突開始時点で中心が判定線を越えるようにする高さ。 */
+export const CUP_SENSOR_HEIGHT = 24
+/** センサー矩形の上端。先に定めた中心判定線へ球が届いてから接触を始める位置。 */
+export const CUP_SENSOR_TOP_OFFSET = CUP_SENSOR_INSET + BALL_RADIUS
+/**
+ * リムから48px下の638pxを前景上端にする。センサー上端は660pxなので、判定時は
+ * ボールの上端（616px）がまだ見え、底で静止する上端642pxは638pxより下へ入るため、
+ * 沈み込みを見せてから完全に隠せる（rimY=590px、深さ96px、半径22pxの場合）。
+ */
+export const CUP_FRONT_LIP_TOP_OFFSET = 48
+/** カップ壁・底はほぼ跳ねず、内側へ落ち着きやすい接触にする。 */
+export const CUP_RESTITUTION = 0.05
+export const CUP_FRICTION = 0.3
+/** カップイン後も底へ沈む様子を見せる時間(ms)。 */
+export const CUP_SETTLE_MS = 520
+/** 範囲外・タイムアウト時にカップ口の真上へ置き直す高さ(px)。 */
+export const CUP_RESCUE_DROP_HEIGHT = 120
+/** ゴールでの救済を繰り返し続けず、2回目だけ底への最終保険を使う。 */
+export const GOAL_RESCUE_DROP_LIMIT = 2
