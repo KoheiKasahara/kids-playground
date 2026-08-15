@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
-import FlagBall from './FlagBall'
+import FlagBall from '../../components/flag-ball/FlagBall'
 import { findPinballFlag } from './data/pinballFlags'
 import { parsePinballResultState } from './playState'
 import { playPinballTotalSound } from '../../utils/quizSound'

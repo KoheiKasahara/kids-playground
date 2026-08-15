@@ -1,16 +1,11 @@
-import type { Country } from '../flag-quiz/types'
+import type { FlagBallData } from '../../components/flag-ball/flagBalls'
 
 /**
- * ピンボールで使う国旗ボール。国旗クイズの Country を再利用し、
- * 丸くクロップしたときだけ必要になる表示調整を任意プロパティとして足す。
+ * 既存のピンボール固有名を残した互換別名。
+ * 国旗ボールを2ゲームの共通基盤へ移したあとも、既存シグネチャとテストのimportを
+ * 一度に書き換えずに済むよう、型だけを FlagBallData へ向ける。
  */
-export type PinballFlag = Country & {
-  /**
-   * 円形ボールにしたときの横方向の表示位置。0=左端寄せ / 0.5=中央 / 1=右端寄せ。
-   * 省略時は中央。端に意匠がある国旗を欠けさせないためだけに使う。
-   */
-  ballPositionX?: number
-}
+export type PinballFlag = FlagBallData
 
 /** 遊びかた。'normal' = 自分で3こ選ぶ / 'allFlags' = 選べる国旗をぜんぶ順番に射出する */
 export type PinballMode = 'normal' | 'allFlags'

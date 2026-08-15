@@ -4,13 +4,14 @@
 
 子どもがスマートフォン・タブレット・PCなどで遊べる、シンプルなミニゲームWebアプリを作成する。
 
-初期リリースの「国旗クイズ」に加え、「はたらくくるまクイズ」「さんすうクイズ」を実装する。はたらくくるまクイズの画面・URL・24車両・素材・検収条件は [WORKING_VEHICLE_QUIZ_DESIGN.md](WORKING_VEHICLE_QUIZ_DESIGN.md) を正とし、さんすうクイズの画面・URL・4演算×3むずかしさの出題プール・検収条件は [MATH_QUIZ_DESIGN.md](MATH_QUIZ_DESIGN.md) を正とする。国旗クイズには「パネルめくり」モード（国旗を覆う16枚のパネルを少しずつめくって国名を当てる）を追加しており、画面・URL・パネル仕様・得点計算・検収条件は [PANEL_FLAG_QUIZ_DESIGN.md](PANEL_FLAG_QUIZ_DESIGN.md) を正とする。国旗ボールを打ち出して得点ゾーンを競う「こっきピンボール」の画面・URL・盤面と物理パラメータ・得点仕様は [FLAG_PINBALL_DESIGN.md](FLAG_PINBALL_DESIGN.md) を正とする。新規ミニゲームの共通規約は [MINIGAME_DEVELOPMENT_GUIDELINES.md](MINIGAME_DEVELOPMENT_GUIDELINES.md) に定める。
+初期リリースの「国旗クイズ」に加え、「はたらくくるまクイズ」「さんすうクイズ」を実装する。はたらくくるまクイズの画面・URL・24車両・素材・検収条件は [WORKING_VEHICLE_QUIZ_DESIGN.md](WORKING_VEHICLE_QUIZ_DESIGN.md) を正とし、さんすうクイズの画面・URL・4演算×3むずかしさの出題プール・検収条件は [MATH_QUIZ_DESIGN.md](MATH_QUIZ_DESIGN.md) を正とする。国旗クイズには「パネルめくり」モード（国旗を覆う16枚のパネルを少しずつめくって国名を当てる）を追加しており、画面・URL・パネル仕様・得点計算・検収条件は [PANEL_FLAG_QUIZ_DESIGN.md](PANEL_FLAG_QUIZ_DESIGN.md) を正とする。国旗ボールを打ち出して得点ゾーンを競う「こっきピンボール」の画面・URL・盤面と物理パラメータ・得点仕様は [FLAG_PINBALL_DESIGN.md](FLAG_PINBALL_DESIGN.md) を正とする。国旗ボールを1個選び4エリアを操作せずに見守る「こっきコロコロぼうけん」のPhase 1仕様は [FLAG_ROLL_ADVENTURE_DESIGN.md](FLAG_ROLL_ADVENTURE_DESIGN.md) を正とする。新規ミニゲームの共通規約は [MINIGAME_DEVELOPMENT_GUIDELINES.md](MINIGAME_DEVELOPMENT_GUIDELINES.md) に定める。
 
 将来的には、国旗クイズだけではなく以下のような簡易ゲームを追加できる構成とする。
 
 - 国旗クイズ
 - はたらくくるまクイズ
 - さんすうクイズ
+- こっきコロコロぼうけん
 - どうぶつクイズ
 - のりものクイズ
 - ひらがなゲーム
@@ -229,6 +230,15 @@ React Routerを使用する。
 
 /games/flag-pinball/result
 └─ こっきピンボール 結果
+
+/games/flag-roll-adventure
+└─ こっきコロコロぼうけん 国旗選択（1個えらぶ）
+
+/games/flag-roll-adventure/play
+└─ こっきコロコロぼうけん プレイ（4エリアを見守る）
+
+/games/flag-roll-adventure/goal
+└─ こっきコロコロぼうけん ゴール（選んだ国旗と国名）
 ```
 
 `:level` は `easy` / `normal` / `hard` 以外の値だった場合、そのモードのむずかしさ選択画面へ

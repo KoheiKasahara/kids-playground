@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
-import FlagBall from './FlagBall'
+import FlagBall from '../../components/flag-ball/FlagBall'
 import { PINBALL_FLAG_IDS, pinballFlags } from './data/pinballFlags'
 import { isSelectionComplete, MAX_SELECTION, remainingCount, toggleSelection } from './selection'
 import type { PinballMode } from './types'

@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest'
+import { simulateAdventureRun } from './adventureSimulation'
+
+const TRIAL_COUNT = 24
+const SEED_BASE = 0x1f2e3d4c
+const SEED_STEP = 7919
+
+describe('adventure fixed-step play-time simulation', () => {
+  it('複数シードでゴールへ到達し、テンポと開始揺らぎを回帰検証する', () => {
+    const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      simulateAdventureRun(SEED_BASE + index * SEED_STEP),
+    )
+    const seconds = results.map((result) => result.totalSeconds).sort((a, b) => a - b)
+    const median = (seconds[TRIAL_COUNT / 2 - 1] + seconds[TRIAL_COUNT / 2]) / 2
+    const min = seconds[0]
+    const max = seconds[seconds.length - 1]
+    const mean = seconds.reduce((sum, value) => sum + value, 0) / seconds.length
+    const dwellMeanByArea = Object.fromEntries(
+      ['sky', 'forest', 'cave', 'goal'].map((areaId) => [
+        areaId,
+        results.reduce((sum, result) => sum + result.dwellSecondsByArea[areaId], 0) / results.length,
+      ]),
+    )
+    const totalTimeSignatures = new Set(results.map((result) => result.totalSeconds))
+
+    console.info(
+      `adventure simulation (${TRIAL_COUNT} trials): min=${min.toFixed(3)}s median=${median.toFixed(3)}s ` +
+        `mean=${mean.toFixed(3)}s max=${max.toFixed(3)}s ` +
+        `dwell=${JSON.stringify(dwellMeanByArea)}`,
+    )
+    console.info(
+      `adventure safety: maxStallNudge=${Math.max(...results.map((result) => result.stallNudgeCount))} ` +
+        `maxAreaTimeout=${Math.max(...results.map((result) => result.areaTimeoutCount))} ` +
+        `maxRescue=${Math.max(...results.map((result) => result.rescueCount))}`,
+    )
+    console.info(`adventure variance: distinctTotals=${totalTimeSignatures.size}/${TRIAL_COUNT}`)
+
+    expect(results.every((result) => result.completed)).toBe(true)
+    expect(results.every((result) => result.visitedAreaIds.join('>') === 'sky>forest>cave>goal')).toBe(true)
+    expect(results.every((result) => result.rescueCount === 0)).toBe(true)
+    expect(results.every((result) => result.areaTimeoutCount === 0)).toBe(true)
+    expect(min).toBeGreaterThanOrEqual(15)
+    expect(max).toBeLessThanOrEqual(30)
+
+    // 軌道の座標ではなく、シードでプレイ時間が変わる性質だけを固定する。
+    expect(totalTimeSignatures.size).toBeGreaterThan(1)
+  })
+})

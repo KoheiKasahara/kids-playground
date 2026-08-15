@@ -1,0 +1,133 @@
+/*
+ * fitは呼び出し側のflex領域を埋め、stageはuseAreaScaleが返す実pxの大きさを持つ。
+ * viewportだけを論理座標からscaleし、worldのtranslateは論理pxのまま適用する。
+ */
+.fit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+}
+
+.viewport {
+  position: relative;
+  transform-origin: 0 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  background: #eaf7ff;
+}
+
+.world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(0, 0);
+  will-change: transform;
+}
+
+.area {
+  position: absolute;
+  overflow: hidden;
+}
+
+.course {
+  position: absolute;
+  inset: 0;
+}
+
+/* エリアごとにコースの色を変え、背景だけでなく障害物も一目で区別できるようにする。 */
+.wall {
+  position: absolute;
+  transform-origin: center;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.themeSky .wall {
+  background: rgba(113, 190, 225, 0.8);
+}
+
+.themeForest .wall {
+  background: #93613f;
+  border: 3px solid rgba(255, 226, 169, 0.55);
+}
+
+.themeCave .wall {
+  background: #8d82a7;
+  border: 2px solid rgba(231, 224, 255, 0.32);
+}
+
+.themeGoal .wall {
+  background: #e7a63b;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+}
+
+.pin {
+  position: absolute;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.58),
+    var(--shadow-sm);
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.themeSky .pin {
+  background: radial-gradient(circle at 35% 28%, #ffffff, #9bdaf3 62%, #4d9bc1);
+}
+
+.themeForest .pin {
+  background: radial-gradient(circle at 35% 28%, #ffe3e8, #ee7786 62%, #b83d58);
+}
+
+.themeCave .pin {
+  border-radius: 42% 58% 48% 52%;
+  background: radial-gradient(circle at 35% 28%, #d8d0e6, #857a9a 63%, #4b465c);
+  transform: rotate(-12deg);
+}
+
+.themeGoal .pin {
+  background: radial-gradient(circle at 35% 28%, #fff7c7, #ffd166 62%, #e09a2f);
+}
+
+/* pinIdごとのclassList直接操作で、衝突の瞬間だけ少し明るくする。 */
+.pin.hit {
+  transform: scale(1.18);
+  filter: brightness(1.3) saturate(1.12);
+}
+
+.themeCave .pin.hit {
+  transform: rotate(-12deg) scale(1.18);
+}
+
+.exit {
+  position: absolute;
+  border-top: 3px dashed rgba(255, 255, 255, 0.72);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent);
+}
+
+.goalExit {
+  border: 4px solid rgba(255, 177, 45, 0.86);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.86), rgba(255, 209, 102, 0.45));
+}
+
+.ballSlot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin {
+    transition: none;
+  }
+}
