@@ -307,8 +307,8 @@ describe('spinnerToy の固定ステップ物理', () => {
     const verticalBlade = partSizes[1]
     if (!horizontalBlade || !verticalBlade) throw new Error('spinner test: blade parts are missing')
     expect(horizontalBlade.width).toBeCloseTo(SPINNER_PLACEMENT.radius * 2, 1)
-    expect(horizontalBlade.height).toBeCloseTo(12, 1)
-    expect(verticalBlade.width).toBeCloseTo(12, 1)
+    expect(horizontalBlade.height).toBeCloseTo(13, 1)
+    expect(verticalBlade.width).toBeCloseTo(13, 1)
     expect(verticalBlade.height).toBeCloseTo(SPINNER_PLACEMENT.radius * 2, 1)
     harness.runtime.activate(0)
     advanceSteps(harness, 90)
@@ -357,5 +357,86 @@ describe('spinnerToy の固定ステップ物理', () => {
 
     expect(ball.body.position.y).toBeGreaterThan(initialY + 100)
     expect(ball.body.position.y).toBeGreaterThan(SPINNER_PLACEMENT.y + 20)
+  })
+})
+
+describe('左右2個の回転Toy（同じ共通ロジックの独立インスタンス）', () => {
+  const LEFT_PLACEMENT: ToyPlacement = SPINNER_PLACEMENT
+  const RIGHT_PLACEMENT: ToyPlacement = {
+    ...SPINNER_PLACEMENT,
+    id: 'test-spinner-right',
+    x: BOARD_WIDTH - SPINNER_PLACEMENT.x,
+  }
+
+  it('左だけ発動しても右は静止したまま（片方の状態がもう片方へ漏れない）', () => {
+    const left = createSpinnerToy(LEFT_PLACEMENT)
+    const right = createSpinnerToy(RIGHT_PLACEMENT)
+    const leftBody = firstBody(left)
+    const rightBody = firstBody(right)
+
+    left.activate(0)
+    let now = 0
+    for (let step = 0; step < 60; step += 1) {
+      left.update(now, [])
+      right.update(now, [])
+      now += STEP_MS
+    }
+
+    expect(Math.abs(leftBody.angularVelocity)).toBeGreaterThan(0)
+    expect(left.readVisualState().active).toBe(true)
+    expect(rightBody.angularVelocity).toBe(0)
+    expect(right.readVisualState().active).toBe(false)
+  })
+
+  it('右だけ発動しても左は静止したまま', () => {
+    const left = createSpinnerToy(LEFT_PLACEMENT)
+    const right = createSpinnerToy(RIGHT_PLACEMENT)
+    const leftBody = firstBody(left)
+    const rightBody = firstBody(right)
+
+    right.activate(0)
+    let now = 0
+    for (let step = 0; step < 60; step += 1) {
+      left.update(now, [])
+      right.update(now, [])
+      now += STEP_MS
+    }
+
+    expect(leftBody.angularVelocity).toBe(0)
+    expect(left.readVisualState().active).toBe(false)
+    expect(Math.abs(rightBody.angularVelocity)).toBeGreaterThan(0)
+    expect(right.readVisualState().active).toBe(true)
+  })
+
+  it('両方発動すると両方回り、同じ角速度上限を共有する（左右で性能差がない）', () => {
+    const left = createSpinnerToy(LEFT_PLACEMENT)
+    const right = createSpinnerToy(RIGHT_PLACEMENT)
+    const leftBody = firstBody(left)
+    const rightBody = firstBody(right)
+
+    left.activate(0)
+    right.activate(0)
+    let now = 0
+    for (let step = 0; step < 60; step += 1) {
+      left.update(now, [])
+      right.update(now, [])
+      now += STEP_MS
+    }
+
+    expect(Math.abs(leftBody.angularVelocity)).toBeCloseTo(Math.abs(rightBody.angularVelocity), 8)
+    expect(Math.abs(leftBody.angularVelocity)).toBeCloseTo(SPINNER_MAX_ANGULAR_VELOCITY, 2)
+  })
+
+  it('見た目の羽根サイズ（長さ・厚さ）が左右で同じで、Bodyの寸法と一致する', () => {
+    const left = createSpinnerToy(LEFT_PLACEMENT)
+    const right = createSpinnerToy(RIGHT_PLACEMENT)
+    const dimensionsOf = (runtime: ToyRuntime) => {
+      const body = firstBody(runtime)
+      const widths = body.parts.slice(1).map((part) => part.bounds.max.x - part.bounds.min.x)
+      const heights = body.parts.slice(1).map((part) => part.bounds.max.y - part.bounds.min.y)
+      return { maxWidth: Math.max(...widths), maxHeight: Math.max(...heights) }
+    }
+
+    expect(dimensionsOf(left)).toEqual(dimensionsOf(right))
   })
 })

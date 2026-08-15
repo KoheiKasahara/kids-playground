@@ -30,8 +30,12 @@ const SPINNER_NUDGE_COOLDOWN_MS = 200
 const PASSIVE_SPIN_DURATION_MS = 420
 /** 非回転時の角速度を十分小さくし、接触したボールを弾き飛ばさないようにする。 */
 const PASSIVE_SPIN_MAX_ANGULAR_VELOCITY = 0.022
-/** 羽根を細くして十字の隙間を残し、直径48pxのボールが周囲へ抜けられるようにする。 */
-const BLADE_THICKNESS = 12
+/**
+ * 羽根を細くして十字の隙間を残し、直径48pxのボールが周囲へ抜けられるようにする。
+ * 長さ（= placement.radius * 2）と同じ比率（約35%）で太さも一緒に大きくし、
+ * 「長いだけで細い羽根」にならないようにする。
+ */
+const BLADE_THICKNESS = 13
 /** 角を丸めて接触時の急な引っ掛かりを減らす。 */
 const BLADE_CHAMFER_RADIUS = 4
 /** 既存の障害物・得点ゾーン・ball-N と衝突せず、盤面側の特殊処理を発火させない名前にする。 */

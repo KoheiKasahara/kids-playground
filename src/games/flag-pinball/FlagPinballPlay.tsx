@@ -8,8 +8,14 @@ import { createScoreState, recordBallScore, scoredCount, totalScore, type Pinbal
 import type { PinballMode } from './types'
 import styles from './FlagPinballPlay.module.css'
 
-/** 最後の得点ポップ（例: 「1000てん！」）を見せてから結果画面へ進むまでの待ち時間(ms) */
-const FINISH_TRANSITION_DELAY_MS = 700
+/**
+ * 最後のボールがゴールしてから結果画面へ進むまでの待ち時間(ms)。
+ * 得点確定・ゴール判定そのものは即座に行い（scoreState・onFinishedの契約は変えない）、
+ * ここでは「結果画面への画面遷移だけ」を遅らせる。得点ポップ（900ms表示）が最後まで見え、
+ * かつ盤面上でボールが着地する余韻も少し見えるよう、900msより余裕を持たせた1500msにする
+ * （子どもが「入った！」を確認する前に画面が切り替わらないようにするため）。
+ */
+const FINISH_TRANSITION_DELAY_MS = 1500
 
 export default function FlagPinballPlay() {
   const location = useLocation()
