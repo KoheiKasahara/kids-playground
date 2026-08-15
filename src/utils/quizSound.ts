@@ -187,6 +187,43 @@ export function playPinballBumperSound(): void {
   playTone(ctx, frequency, ctx.currentTime, 0.06, 0.05, 'triangle')
 }
 
+/** おもちゃの連打で音が重なりすぎないよう、2種類のおもちゃで共通の間隔を設ける。 */
+const PINBALL_TOY_SOUND_MIN_INTERVAL_MS = 70
+let lastPinballToySoundAt: number | null = null
+
+function canPlayPinballToySound(): boolean {
+  if (!soundEnabled) return false
+  const now = Date.now()
+  if (
+    lastPinballToySoundAt !== null &&
+    now - lastPinballToySoundAt < PINBALL_TOY_SOUND_MIN_INTERVAL_MS
+  ) {
+    return false
+  }
+  lastPinballToySoundAt = now
+  return true
+}
+
+/** 回転おもちゃの「くるくる」。短い2音を少しずらし、主役の音より控えめに鳴らす。 */
+export function playPinballSpinnerSound(): void {
+  if (!canPlayPinballToySound()) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 620, now, 0.06, 0.05, 'sine')
+  playTone(ctx, 820, now + 0.04, 0.07, 0.05, 'sine')
+}
+
+/** 押し上げおもちゃの「ポンッ」。短い低音から高音へつなぎ、弾む感じだけを添える。 */
+export function playPinballLauncherSound(): void {
+  if (!canPlayPinballToySound()) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 300, now, 0.06, 0.06, 'triangle')
+  playTone(ctx, 640, now + 0.025, 0.09, 0.06, 'sine')
+}
+
 /** 得点ゾーンの得点。1000点にいちばん近いほど高く華やかな音になる */
 export function playPinballScoreSound(score: number): void {
   if (!soundEnabled) return

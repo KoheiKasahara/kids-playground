@@ -15,10 +15,15 @@ import FlagBall from '../../components/flag-ball/FlagBall'
 import { useBoardScale } from './useBoardScale'
 import { usePinballEngine } from './usePinballEngine'
 import type { PinballMode } from './types'
+import PinballToy from './PinballToy'
+import { TOYS } from './toyLayout'
+import { usePinballTheme } from './themeStore'
 import {
   playPinballBumperSound,
+  playPinballLauncherSound,
   playPinballLaunchSound,
   playPinballScoreSound,
+  playPinballSpinnerSound,
 } from '../../utils/quizSound'
 import styles from './PinballBoard.module.css'
 
@@ -49,6 +54,7 @@ type ScorePop = {
 
 export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFinished }: PinballBoardProps) {
   const { containerRef, scale, width, height } = useBoardScale()
+  const theme = usePinballTheme()
 
   // 壁の見た目もモードで変える（全射出モードでは床(wall-bottom)の見た目も消す）。
   // usePinballEngine 側の物理壁と同じ関数から導出することで、見た目と当たり判定がずれない。
@@ -112,7 +118,7 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
     popTimeoutsRef.current.add(timeoutId)
   }, [])
 
-  const { registerBall } = usePinballEngine({
+  const { registerBall, registerToy, activateToy } = usePinballEngine({
     flagIds,
     mode,
     runId,
@@ -139,10 +145,16 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
     <div ref={containerRef} className={styles.fit}>
       <div className={styles.stage} style={{ width, height }}>
         <div
-          className={styles.logical}
+          className={`${styles.logical} ${theme.boardClassName}`}
           style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT, transform: `scale(${scale})` }}
         >
           <div className={styles.background} aria-hidden="true" />
+
+          {theme.renderBackdrop ? (
+            <div className={styles.backdropLayer} aria-hidden="true">
+              {theme.renderBackdrop()}
+            </div>
+          ) : null}
 
           {walls.map((wall) => (
             <div
@@ -217,6 +229,24 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
             >
               {pop.score}てん！
             </div>
+          ))}
+
+          {/* おもちゃはボールより先に描き、国旗ボールを隠さないようにする。 */}
+          {TOYS.map((toy) => (
+            <PinballToy
+              key={toy.id}
+              toy={toy}
+              theme={theme}
+              registerToy={registerToy}
+              onActivate={(toyId) => {
+                if (toy.kind === 'spinner') {
+                  playPinballSpinnerSound()
+                } else {
+                  playPinballLauncherSound()
+                }
+                activateToy(toyId)
+              }}
+            />
           ))}
 
           {/*

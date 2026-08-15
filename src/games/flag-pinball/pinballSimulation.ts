@@ -30,6 +30,9 @@ import {
   ZONE_SENSOR_HEIGHT,
   ZONE_SENSOR_Y,
 } from './pinballPhysics'
+import { TOYS } from './toyLayout'
+import { createToyRuntime } from './toyRuntime'
+import type { ToyBall } from './toyRuntime'
 import type { PinballMode } from './types'
 
 const { Engine, Bodies, Body, Composite, Events } = Matter
@@ -47,8 +50,9 @@ export type PinballSimulationResult = {
 }
 
 /**
- * simulatePinballRun のオプション。すべて既定値を持ち、省略時は既存呼び出し（3球・通常モード）と
- * 1ミリも挙動を変えない。全射出モードの測定など、球数・射出間隔・モードを変えたいときに使う。
+ * simulatePinballRun のオプション。省略時は3球・通常モード・おもちゃをタップしない設定になる。
+ * おもちゃのBody自体は実機と同じ盤面に含めるため、従来の測定結果とは一致しない。
+ * 全射出モードの測定など、球数・射出間隔・モードを変えたいときにも使う。
  */
 export type PinballSimulationOptions = {
   /** 射出する球数。既定 SIMULATION_BALL_COUNT */
@@ -57,6 +61,8 @@ export type PinballSimulationOptions = {
   launchDelaysMs?: readonly number[]
   /** モード。既定 'normal'（'allFlags' なら wall-bottom を置かない） */
   mode?: PinballMode
+  /** おもちゃを全てタップする間隔(ms)。nullまたは省略時はタップしない */
+  toyTapIntervalMs?: number | null
 }
 
 function createSeededRandom(seed: number): () => number {
@@ -85,6 +91,11 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
   const ballCount = options?.ballCount ?? SIMULATION_BALL_COUNT
   const mode = options?.mode ?? 'normal'
   const delaysMs = options?.launchDelaysMs ?? LAUNCH_DELAYS_MS
+  const toyTapIntervalMs = options?.toyTapIntervalMs ?? null
+
+  if (toyTapIntervalMs !== null && (!Number.isFinite(toyTapIntervalMs) || toyTapIntervalMs <= 0)) {
+    throw new Error('flag-pinball: toyTapIntervalMs は正の有限値またはnullで指定してください')
+  }
 
   const random = createSeededRandom(seed)
   const engine = Engine.create({ gravity: { ...GRAVITY } })
@@ -116,6 +127,11 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
   )
   Composite.add(engine.world, [...wallBodies, ...obstacleBodies, ...zoneSensors])
 
+  // おもちゃのBodyも実機と同じ物理世界へ加える。タップしない測定でも障害物として
+  // 残るため、画面側とヘッドレス測定の盤面構成を一致させる。
+  const toyRuntimes = TOYS.map(createToyRuntime)
+  Composite.add(engine.world, toyRuntimes.flatMap((runtime) => runtime.bodies))
+
   const ballBodies: Matter.Body[] = []
   for (let i = 0; i < ballCount; i += 1) {
     ballBodies.push(
@@ -128,6 +144,11 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
       }),
     )
   }
+  const toyBallEntries: readonly ToyBall[] = ballBodies.map((body, ballIndex) => ({
+    ballIndex,
+    body,
+  }))
+  const activeToyBalls: ToyBall[] = []
 
   const launchSteps = delaysMs.slice(0, ballCount).map((delay) => Math.round(delay / STEP_MS))
   const launched = ballBodies.map(() => false)
@@ -141,6 +162,7 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
   let usedSafetyTimeout = false
   let inFlightCount = 0
   let maxConcurrentBalls = 0
+  let nextToyTapAtMs = toyTapIntervalMs === null ? null : 0
 
   const finalizeBall = (ballIndex: number, safetyTimeout: boolean) => {
     if (scored[ballIndex]) return
@@ -218,6 +240,28 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
       } else if (launchedAtMs[ballIndex] !== null && nowMs - launchedAtMs[ballIndex]! >= SAFETY_TIMEOUT_MS) {
         finalizeBall(ballIndex, true)
       }
+    }
+
+    // 射出済みかつ未得点の球だけをおもちゃへ渡す。得点確定後の球が再びおもちゃの
+    // 物理処理へ入ると、終了済みの球が別の球のプレイ時間へ影響してしまうため。
+    activeToyBalls.length = 0
+    for (let ballIndex = 0; ballIndex < ballCount; ballIndex += 1) {
+      if (launched[ballIndex] && !scored[ballIndex]) {
+        activeToyBalls.push(toyBallEntries[ballIndex])
+      }
+    }
+
+    if (toyTapIntervalMs !== null && nextToyTapAtMs !== null && nowMs >= nextToyTapAtMs) {
+      for (const runtime of toyRuntimes) {
+        runtime.activate(nowMs)
+      }
+      // launcherToy.ts の散らしは Math.random を使うため、createSeededRandom を使う
+      // この測定でもタップありのシナリオは完全再現にならない。テストは固定値ではなく
+      // 十分に緩い上限で成立性だけを確認する。
+      nextToyTapAtMs += toyTapIntervalMs
+    }
+    for (const runtime of toyRuntimes) {
+      runtime.update(nowMs, activeToyBalls)
     }
   }
 

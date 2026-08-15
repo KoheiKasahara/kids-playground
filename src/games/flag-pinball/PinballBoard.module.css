@@ -38,9 +38,15 @@
 .background {
   position: absolute;
   inset: 0;
-  background:
+  background: var(
+    --pinball-board-bg,
     radial-gradient(circle at 50% 8%, rgba(255, 146, 43, 0.18), rgba(255, 146, 43, 0) 42%),
-    linear-gradient(180deg, #eef2ff 0%, #fdf6ff 45%, #fff9ec 100%);
+    linear-gradient(180deg, #eef2ff 0%, #fdf6ff 45%, #fff9ec 100%)
+  );
+}
+
+.backdropLayer {
+  pointer-events: none;
 }
 
 /* --- 壁 ------------------------------------------------------------------ */
@@ -48,20 +54,20 @@
 .wall {
   position: absolute;
   transform-origin: center;
-  background-color: rgba(76, 110, 245, 0.55);
+  background-color: var(--pinball-wall, rgba(76, 110, 245, 0.55));
   border-radius: var(--radius-sm);
 }
 
 .guideWall {
   position: absolute;
   transform-origin: center;
-  background-color: rgba(255, 146, 43, 0.65);
+  background-color: var(--pinball-guide-wall, rgba(255, 146, 43, 0.65));
   border-radius: var(--radius-round);
 }
 
 .divider {
   position: absolute;
-  background-color: rgba(33, 37, 41, 0.16);
+  background-color: var(--pinball-divider, rgba(33, 37, 41, 0.16));
   border-radius: var(--radius-sm);
 }
 
@@ -70,9 +76,12 @@
 .bumper {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffd08a, var(--color-accent) 65%, var(--color-accent-dark) 100%);
+  background: var(
+    --pinball-bumper,
+    radial-gradient(circle at 35% 30%, #ffd08a, var(--color-accent) 65%, var(--color-accent-dark) 100%)
+  );
   box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.6),
+    inset 0 0 0 3px var(--pinball-bumper-highlight, rgba(255, 255, 255, 0.6)),
     var(--shadow-sm);
   transition: transform 120ms ease, filter 120ms ease;
 }
@@ -80,9 +89,12 @@
 .peg {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #b6c7ff, var(--color-primary) 70%, var(--color-primary-dark) 100%);
+  background: var(
+    --pinball-peg,
+    radial-gradient(circle at 35% 30%, #b6c7ff, var(--color-primary) 70%, var(--color-primary-dark) 100%)
+  );
   box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.55),
+    inset 0 0 0 2px var(--pinball-peg-highlight, rgba(255, 255, 255, 0.55)),
     var(--shadow-sm);
   transition: transform 120ms ease, filter 120ms ease;
 }
@@ -110,17 +122,20 @@
   align-items: flex-start;
   justify-content: center;
   padding-top: var(--space-md);
-  border-top: 2px dashed rgba(33, 37, 41, 0.18);
-  background-color: rgba(76, 110, 245, 0.08);
+  border-top: 2px dashed var(--pinball-zone-border, rgba(33, 37, 41, 0.18));
+  background-color: var(--pinball-zone-bg, rgba(76, 110, 245, 0.08));
 }
 
 /* 得点が高いゾーンほど濃く目立つ色にして、中央が高得点だと色でも分かるようにする */
 .zone[data-score='300'] {
-  background-color: rgba(76, 110, 245, 0.16);
+  background-color: var(--pinball-zone-bg-300, rgba(76, 110, 245, 0.16));
 }
 
 .zone[data-score='1000'] {
-  background: linear-gradient(180deg, rgba(255, 146, 43, 0.32), rgba(255, 146, 43, 0.14));
+  background: var(
+    --pinball-zone-bg-1000,
+    linear-gradient(180deg, rgba(255, 146, 43, 0.32), rgba(255, 146, 43, 0.14))
+  );
 }
 
 /*
@@ -131,12 +146,12 @@
   font-size: 26px;
   line-height: 1;
   font-weight: 700;
-  color: var(--color-text);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  color: var(--pinball-zone-text, var(--color-text));
+  text-shadow: 0 1px 0 var(--pinball-zone-text-shadow, rgba(255, 255, 255, 0.8));
 }
 
 .zone[data-score='1000'] .zoneScore {
-  color: var(--color-accent-dark);
+  color: var(--pinball-zone-text-1000, var(--color-accent-dark));
 }
 
 /* --- 得点ポップ -------------------------------------------------------------- */
@@ -165,10 +180,10 @@
   text-align: center;
   font-size: 26px;
   font-weight: 700;
-  color: var(--color-accent-dark);
+  color: var(--pinball-score-pop, var(--color-accent-dark));
   text-shadow:
-    0 0 6px rgba(255, 255, 255, 0.9),
-    0 2px 0 rgba(255, 255, 255, 0.9);
+    0 0 6px var(--pinball-score-pop-glow, rgba(255, 255, 255, 0.9)),
+    0 2px 0 var(--pinball-score-pop-shadow, rgba(255, 255, 255, 0.9));
   pointer-events: none;
   white-space: nowrap;
   animation: scorePopIn 900ms ease-out forwards;
@@ -196,6 +211,8 @@
   position: absolute;
   top: 0;
   left: 0;
+  /* ボールは表示専用にして、おもちゃのタップ領域を遮らないようにする。 */
+  pointer-events: none;
   /* 初期状態は usePinballEngine が射出時まで visibility: hidden にする */
   visibility: hidden;
   will-change: transform;

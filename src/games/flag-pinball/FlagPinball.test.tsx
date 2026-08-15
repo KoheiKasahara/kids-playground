@@ -14,7 +14,11 @@ const engineMock = vi.hoisted(() => ({ options: undefined as PinballEngineOption
 vi.mock('./usePinballEngine', () => ({
   usePinballEngine: (options: PinballEngineOptions) => {
     engineMock.options = options
-    return { registerBall: () => () => {} }
+    return {
+      registerBall: () => () => {},
+      registerToy: () => () => {},
+      activateToy: () => {},
+    }
   },
 }))
 

@@ -38,6 +38,9 @@ import {
   ZONE_SENSOR_HEIGHT,
   ZONE_SENSOR_Y,
 } from './pinballPhysics'
+import { createToyRuntime } from './toyRuntime'
+import type { ToyBall, ToyRuntime } from './toyRuntime'
+import { TOYS } from './toyLayout'
 import type { PinballMode } from './types'
 
 const { Engine, Bodies, Body, Composite, Events } = Matter
@@ -62,6 +65,10 @@ export type PinballEngineOptions = {
 export type PinballEngineHandle = {
   /** ボールの DOM 要素を ballIndex ごとに登録する ref コールバック（参照は安定させること） */
   registerBall: (ballIndex: number) => (el: HTMLElement | null) => void
+  /** おもちゃの見た目を持つ DOM 要素を toyId ごとに登録する ref コールバック */
+  registerToy: (toyId: string) => (el: HTMLElement | null) => void
+  /** アクティブな物理世界のおもちゃを発動する */
+  activateToy: (toyId: string) => void
 }
 
 /** ball-N ラベルからボールの ballIndex を取り出す。ボール以外のラベルは null */
@@ -91,6 +98,11 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
   // ため、物理エフェクトの依存には含めない（実行のたびに作り直さない）。
   const ballElementsRef = useRef<Map<number, HTMLElement | null>>(new Map())
   const registerBallFnsRef = useRef<Map<number, (el: HTMLElement | null) => void>>(new Map())
+  const toyElementsRef = useRef<Map<string, HTMLElement | null>>(new Map())
+  const registerToyFnsRef = useRef<Map<string, (el: HTMLElement | null) => void>>(new Map())
+  const toyRuntimesRef = useRef<Map<string, ToyRuntime>>(new Map())
+  // 物理エフェクトのcleanup後に残ったタップから、古いランタイムを発動させないためのトークン。
+  const activeRunRef = useRef<symbol | null>(null)
   // registerBall は呼び出し側（PinballBoard）へ渡す安定した参照。useMemo の初期化子は
   // ref を「あとで読む関数」を作るだけで .current を読まないため、render中のref読み取り
   // 禁止ルールには抵触しない。
@@ -105,6 +117,21 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
         registerBallFnsRef.current.set(ballIndex, fn)
         return fn
       },
+      registerToy: (toyId: string) => {
+        const existing = registerToyFnsRef.current.get(toyId)
+        if (existing) return existing
+        const fn = (el: HTMLElement | null) => {
+          toyElementsRef.current.set(toyId, el)
+        }
+        registerToyFnsRef.current.set(toyId, fn)
+        return fn
+      },
+      activateToy: (toyId: string) => {
+        if (activeRunRef.current === null) return
+        const runtime = toyRuntimesRef.current.get(toyId)
+        if (!runtime) return
+        runtime.activate(performance.now())
+      },
     }),
     [],
   )
@@ -112,12 +139,6 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
   // flagIds の「内容」が変わったときだけ作り直したいので、配列参照ではなく内容を依存に使う
   // （選択画面から同じ3件がそのまま渡ってくる場合に不要な再構築をしないため）。
   const flagIdsKey = options.flagIds.join(',')
-
-  // 「今アクティブな世界」を指すトークン。React StrictMode の開発時二重実行
-  // （mount→cleanup→mountが同期的に走る）でも、rAF/setTimeoutのコールバックが
-  // 自分の世界のcleanup後に紛れ込んで動かないよう、cancelAnimationFrame/clearTimeout
-  // に加えて二重にガードする。cleanupで必ずnullへリセットする。
-  const activeRunRef = useRef<symbol | null>(null)
 
   useEffect(() => {
     const runToken = Symbol('pinball-run')
@@ -169,6 +190,16 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
 
     Composite.add(engine.world, [...wallBodies, ...obstacleBodies, ...zoneSensors])
 
+    // おもちゃの物理Bodyとランタイムを同じ世界へ登録する。ランタイムの種類分岐は
+    // createToyRuntimeに閉じ込め、エンジン側は共通インターフェースだけを扱う。
+    const toyRuntimes = TOYS.map(createToyRuntime)
+    const toyRuntimeMap = toyRuntimesRef.current
+    toyRuntimeMap.clear()
+    for (const runtime of toyRuntimes) {
+      toyRuntimeMap.set(runtime.placement.id, runtime)
+    }
+    Composite.add(engine.world, toyRuntimes.flatMap((runtime) => runtime.bodies))
+
     // --- ボール本体。最初はワールドに追加せず、時間差射出のタイミングで追加する ---
     const ballBodies: Matter.Body[] = []
     for (let i = 0; i < ballCount; i += 1) {
@@ -182,6 +213,11 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
         }),
       )
     }
+    const toyBallEntries: readonly ToyBall[] = ballBodies.map((body, ballIndex) => ({
+      ballIndex,
+      body,
+    }))
+    const activeToyBalls: ToyBall[] = []
 
     const launched = ballBodies.map(() => false)
     const scored = ballBodies.map(() => false)
@@ -317,6 +353,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
     let rafId: number | null = null
     let lastFrameTime: number | null = null
     let accumulator = 0
+    const previousToyActive = new Map<string, boolean>()
 
     function tick(now: number) {
       // cleanup後に紛れ込んだ呼び出しがあっても再スケジュールしない（cancelAnimationFrameとの二重防御）
@@ -417,13 +454,43 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
           el.style.transform = `translate(${x}px, ${y}px) rotate(${body.angle}rad)`
         }
       }
+
+      // 射出済みかつ削除されていない球だけを、毎フレーム同じ配列へ詰め直して渡す。
+      // 配列を作り直さないことで、おもちゃが増えても更新ループの割り当てを増やさない。
+      activeToyBalls.length = 0
+      for (let ballIndex = 0; ballIndex < ballCount; ballIndex += 1) {
+        if (launched[ballIndex] && !removed[ballIndex]) {
+          activeToyBalls.push(toyBallEntries[ballIndex])
+        }
+      }
+      for (const runtime of toyRuntimes) {
+        runtime.update(now, activeToyBalls)
+      }
+
+      // おもちゃの見た目はReactを再レンダーせず、ボールと同じくDOMへ直接反映する。
+      // activeのdata属性だけは状態が変わったフレームに限定して書き換える。
+      for (const runtime of toyRuntimes) {
+        const visual = runtime.readVisualState()
+        const el = toyElementsRef.current.get(runtime.placement.id)
+        if (!el) continue
+        el.style.setProperty('--toy-spin', `${visual.spinRad}rad`)
+        el.style.setProperty('--toy-pulse', `${visual.pulse}`)
+        const previousActive = previousToyActive.get(runtime.placement.id)
+        if (previousActive !== visual.active) {
+          el.dataset.toyActive = visual.active ? 'true' : 'false'
+          previousToyActive.set(runtime.placement.id, visual.active)
+        }
+      }
     }
     rafId = requestAnimationFrame(tick)
 
     return () => {
       // 「今アクティブな世界」トークンをリセットし、cleanup後に紛れ込んだ
       // rAF/setTimeoutコールバックが処理を続行しないようにする
-      if (activeRunRef.current === runToken) activeRunRef.current = null
+      if (activeRunRef.current === runToken) {
+        activeRunRef.current = null
+        toyRuntimeMap.clear()
+      }
       if (rafId !== null) cancelAnimationFrame(rafId)
       timeoutIds.forEach((id) => clearTimeout(id))
       Events.off(engine, 'collisionStart', handleCollisionStart)
