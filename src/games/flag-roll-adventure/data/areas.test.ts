@@ -4,12 +4,15 @@ import {
   AREA_HEIGHT,
   AREA_WIDTH,
   BALL_RADIUS,
+  CANNON_MUZZLE_OFFSET,
   CUP_FRONT_LIP_TOP_OFFSET,
   CUP_INNER_DEPTH,
   CUP_INNER_WIDTH,
   CUP_SENSOR_INSET,
   CUP_SENSOR_TOP_OFFSET,
   EXIT_WIDTH,
+  MAX_SPEED,
+  PORTAL_FLOOR_HEIGHT,
 } from '../adventurePhysics'
 import { areaGroundRects, cupBottomRect, cupFrontLipRect, cupSensorRect, cupWellRect, worldSize } from '../adventureGeometry'
 import { AREAS, findArea, START_AREA_ID } from './areas'
@@ -24,6 +27,32 @@ function objectExtents(object: (typeof AREAS)[number]['objects'][number]) {
     x: cosine * halfWidth + sine * halfHeight,
     y: sine * halfWidth + cosine * halfHeight,
   }
+}
+
+function segmentIntersectsRect(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  rect: { left: number; top: number; right: number; bottom: number },
+): boolean {
+  let minimum = 0
+  let maximum = 1
+  for (const [origin, delta, lower, upper] of [
+    [start.x, end.x - start.x, rect.left, rect.right],
+    [start.y, end.y - start.y, rect.top, rect.bottom],
+  ]) {
+    if (Math.abs(delta) < Number.EPSILON) {
+      if (origin < lower || origin > upper) return false
+      continue
+    }
+    const first = (lower - origin) / delta
+    const second = (upper - origin) / delta
+    const entry = Math.min(first, second)
+    const exit = Math.max(first, second)
+    minimum = Math.max(minimum, entry)
+    maximum = Math.min(maximum, exit)
+    if (minimum > maximum) return false
+  }
+  return true
 }
 
 function canReachArea(startAreaId: string, targetAreaId: string): boolean {
@@ -283,10 +312,83 @@ describe('area data', () => {
   it('各エリアの上端AREA_ENTRY_CLEARANCEには障害物を置かない', () => {
     for (const area of AREAS) {
       for (const object of area.objects) {
-        const minY = object.kind === 'wall'
-          ? object.y - objectExtents(object).y
-          : object.y - object.radius
+        const minY = object.kind === 'pin'
+          ? object.y - object.radius
+          : object.y - objectExtents(object).y
         expect(minY).toBeGreaterThanOrEqual(AREA_ENTRY_CLEARANCE)
+      }
+    }
+  })
+
+  it('ギミックの速度・砲口・ゾーン境界を保つ', () => {
+    for (const area of AREAS) {
+      for (const object of area.objects) {
+        if (object.kind === 'jump') {
+          expect(object.power, `${area.id}:${object.id}`).toBeLessThanOrEqual(MAX_SPEED)
+        }
+      }
+
+      for (const zone of area.zones ?? []) {
+        if (zone.kind === 'cannon') {
+          expect(zone.power, `${area.id}:${zone.id}`).toBeLessThanOrEqual(MAX_SPEED)
+          expect(CANNON_MUZZLE_OFFSET, `${area.id}:${zone.id}`).toBeGreaterThan(zone.radius)
+          expect(zone.x - zone.radius, `${area.id}:${zone.id} left`).toBeGreaterThanOrEqual(0)
+          expect(zone.x + zone.radius, `${area.id}:${zone.id} right`).toBeLessThanOrEqual(AREA_WIDTH)
+          expect(zone.y - zone.radius, `${area.id}:${zone.id} top`).toBeGreaterThanOrEqual(0)
+          expect(zone.y + zone.radius, `${area.id}:${zone.id} bottom`).toBeLessThanOrEqual(AREA_HEIGHT)
+          const muzzleEnd = {
+            x: zone.x + Math.cos(zone.angle) * 250,
+            y: zone.y + Math.sin(zone.angle) * 250,
+          }
+          for (const exit of area.exits) {
+            expect(
+              segmentIntersectsRect(
+                { x: zone.x, y: zone.y },
+                muzzleEnd,
+                {
+                  left: exit.x - exit.width / 2,
+                  top: exit.y - exit.height / 2,
+                  right: exit.x + exit.width / 2,
+                  bottom: exit.y + exit.height / 2,
+                },
+              ),
+              `${area.id}:${zone.id}/${exit.id} cannon path`,
+            ).toBe(false)
+            expect(Math.hypot(zone.x - exit.x, zone.y - exit.y), `${area.id}:${zone.id}/${exit.id} distance`).toBeGreaterThanOrEqual(120)
+          }
+          continue
+        }
+
+        if (zone.kind === 'float') {
+          expect(zone.gravityScale).toBeGreaterThanOrEqual(0)
+          expect(zone.gravityScale).toBeLessThanOrEqual(1)
+        }
+        const halfWidth = zone.width / 2
+        const halfHeight = zone.height / 2
+        const zoneAngle = zone.kind === 'boost' ? zone.angle : 0
+        const cosine = Math.abs(Math.cos(zoneAngle))
+        const sine = Math.abs(Math.sin(zoneAngle))
+        const extentX = cosine * halfWidth + sine * halfHeight
+        const extentY = sine * halfWidth + cosine * halfHeight
+        expect(zone.x - extentX, `${area.id}:${zone.id} left`).toBeGreaterThanOrEqual(0)
+        expect(zone.x + extentX, `${area.id}:${zone.id} right`).toBeLessThanOrEqual(AREA_WIDTH)
+        expect(zone.y - extentY, `${area.id}:${zone.id} top`).toBeGreaterThanOrEqual(0)
+        expect(zone.y + extentY, `${area.id}:${zone.id} bottom`).toBeLessThanOrEqual(AREA_HEIGHT)
+      }
+    }
+  })
+
+  it('各エリアの160px帯には回転後AABBが交差するオブジェクトがある', () => {
+    const bandHeight = 160
+    for (const area of AREAS) {
+      const floorY = area.cup ? area.cup.rimY : AREA_HEIGHT - PORTAL_FLOOR_HEIGHT
+      for (let bandTop = AREA_ENTRY_CLEARANCE; bandTop < floorY; bandTop += bandHeight) {
+        const bandBottom = Math.min(floorY, bandTop + bandHeight)
+        const hasObject = area.objects.some((object) => {
+          const extents = objectExtents(object)
+          return object.y - extents.y < bandBottom && object.y + extents.y > bandTop
+        })
+        expect(hasObject, `${area.id}:${bandTop}-${bandBottom}`).toBe(true)
       }
     }
   })
@@ -312,5 +414,11 @@ describe('area data', () => {
         }
       }
     }
+  })
+
+  it('cave cannon launches upward', () => {
+    const caveCannons = (findArea('cave')?.zones ?? []).filter((zone) => zone.kind === 'cannon')
+    expect(caveCannons.length).toBeGreaterThan(0)
+    expect(caveCannons.every((cannon) => Math.sin(cannon.angle) < 0)).toBe(true)
   })
 })

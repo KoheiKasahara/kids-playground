@@ -4,6 +4,7 @@ import {
   AREA_HEIGHT,
   AREA_WIDTH,
   BALL_RADIUS,
+  CANNON_MUZZLE_OFFSET,
   EXIT_SENSOR_HEIGHT,
   EXIT_SWALLOW_MS,
   EXIT_WIDTH,
@@ -18,7 +19,13 @@ import AreaForeground from './AreaForeground'
 import { ADVENTURE_LAYER_Z_INDEX } from './layerOrder'
 import { useAdventureEngine } from './useAdventureEngine'
 import { useAreaScale } from './useAreaScale'
-import { playPinballBumperSound, playPinballLaunchSound } from '../../utils/quizSound'
+import {
+  playPinballBumperSound,
+  playPinballLaunchSound,
+  playPinballLauncherSound,
+  playPinballSpinnerSound,
+} from '../../utils/quizSound'
+import type { AdventureGimmickEvent } from './gimmicks'
 import styles from './AdventureStage.module.css'
 
 type AdventureStageProps = {
@@ -30,6 +37,7 @@ type AdventureStageProps = {
 
 /** ピンの発光を見せる時間。React stateではなくclassListにするための固定値。 */
 const PIN_HIT_FLASH_MS = 220
+const GIMMICK_FLASH_MS = 360
 
 const portalKindClass: Record<PortalKind, string> = {
   hole: styles.portalHole,
@@ -40,6 +48,23 @@ const portalKindClass: Record<PortalKind, string> = {
 
 const WORLD_SIZE = worldSize(AREAS)
 
+function gimmickElementKey(kind: string, id: string): string {
+  return `${kind}:${id}`
+}
+
+function gimmickClassName(event: AdventureGimmickEvent): string {
+  switch (event.kind) {
+    case 'cannon-capture':
+      return styles.cannonLoaded
+    case 'cannon-fire':
+      return styles.cannonFired
+    case 'jump':
+      return styles.jumpHit
+    case 'boost':
+      return styles.boostActive
+  }
+}
+
 /**
  * 固定カメラの1画面を描く。
  * fit > stage > viewport > world の入れ子にして、stageの実pxとworldの論理座標を分離する。
@@ -49,13 +74,35 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
   const { containerRef, scale, width, height } = useAreaScale()
   const pinElementsRef = useRef<Map<string, HTMLDivElement | null>>(new Map())
   const pinTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const gimmickElementsRef = useRef<Map<string, HTMLDivElement | null>>(new Map())
+  const gimmickTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   useEffect(() => {
     const timeouts = pinTimeoutsRef.current
+    const gimmickTimeouts = gimmickTimeoutsRef.current
     return () => {
       timeouts.forEach((timeoutId) => clearTimeout(timeoutId))
       timeouts.clear()
+      gimmickTimeouts.forEach((timeoutId) => clearTimeout(timeoutId))
+      gimmickTimeouts.clear()
     }
+  }, [])
+
+  const flashGimmick = useCallback((event: AdventureGimmickEvent) => {
+    const element = gimmickElementsRef.current.get(gimmickElementKey(event.kind.split('-')[0] ?? event.kind, event.id))
+    if (!element) return
+    const className = gimmickClassName(event)
+    const timeoutKey = `${event.kind}:${event.id}`
+    element.classList.add(className)
+    if (event.kind === 'cannon-capture') return
+    if (event.kind === 'cannon-fire') element.classList.remove(styles.cannonLoaded)
+    const previous = gimmickTimeoutsRef.current.get(timeoutKey)
+    if (previous) clearTimeout(previous)
+    const timeoutId = setTimeout(() => {
+      element.classList.remove(className)
+      gimmickTimeoutsRef.current.delete(timeoutKey)
+    }, GIMMICK_FLASH_MS)
+    gimmickTimeoutsRef.current.set(timeoutKey, timeoutId)
   }, [])
 
   const flashPin = useCallback((pinId: string) => {
@@ -82,6 +129,12 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
       playPinballBumperSound()
       flashPin(pinId)
     },
+    onGimmick: (event) => {
+      flashGimmick(event)
+      if (event.kind === 'cannon-fire') playPinballLauncherSound()
+      if (event.kind === 'jump') playPinballBumperSound()
+      if (event.kind === 'boost') playPinballSpinnerSound()
+    },
   })
 
   return (
@@ -105,6 +158,72 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
                 <AreaBackground theme={area.theme} />
 
                 <div className={styles.course} style={{ zIndex: ADVENTURE_LAYER_Z_INDEX.course }} aria-hidden="true">
+                  {(area.zones ?? []).map((zone) => {
+                    const key = gimmickElementKey(zone.kind, zone.id)
+                    if (zone.kind === 'cannon') {
+                      return (
+                        <div
+                          key={zone.id}
+                          ref={(element) => {
+                            gimmickElementsRef.current.set(key, element)
+                          }}
+                          className={styles.cannon}
+                          data-gimmick-id={zone.id}
+                          style={{
+                            left: zone.x - zone.radius,
+                            top: zone.y - zone.radius,
+                            width: zone.radius * 2,
+                            height: zone.radius * 2,
+                            transform: `rotate(${zone.angle}rad)`,
+                          }}
+                        >
+                          <span
+                            className={styles.cannonBarrel}
+                            style={{ '--cannon-barrel-length': `${CANNON_MUZZLE_OFFSET + 18}px` } as CSSProperties}
+                          />
+                          <span className={styles.cannonMuzzle} />
+                          <span className={styles.cannonArrow}>➜</span>
+                        </div>
+                      )
+                    }
+                    if (zone.kind === 'boost') {
+                      return (
+                        <div
+                          key={zone.id}
+                          ref={(element) => {
+                            gimmickElementsRef.current.set(key, element)
+                          }}
+                          className={styles.boostLane}
+                          data-gimmick-id={zone.id}
+                          style={{
+                            left: zone.x - zone.width / 2,
+                            top: zone.y - zone.height / 2,
+                            width: zone.width,
+                            height: zone.height,
+                            transform: `rotate(${zone.angle}rad)`,
+                          }}
+                        >
+                          <span className={styles.boostArrows}>» » »</span>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div
+                        key={zone.id}
+                        className={styles.floatZone}
+                        data-gimmick-id={zone.id}
+                        style={{
+                          left: zone.x - zone.width / 2,
+                          top: zone.y - zone.height / 2,
+                          width: zone.width,
+                          height: zone.height,
+                        }}
+                      >
+                        <span className={styles.floatDots}>· · ·</span>
+                      </div>
+                    )
+                  })}
+
                   {area.objects.map((object) => {
                     if (object.kind === 'wall') {
                       return (
@@ -120,6 +239,33 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
                             transform: `rotate(${object.angle}rad)`,
                           }}
                         />
+                      )
+                    }
+                    if (object.kind === 'jump') {
+                      const key = gimmickElementKey(object.kind, object.id)
+                      return (
+                        <div
+                          key={object.id}
+                          ref={(element) => {
+                            gimmickElementsRef.current.set(key, element)
+                          }}
+                          className={styles.jumpPad}
+                          data-object-id={object.id}
+                          style={{
+                            left: object.x - object.width / 2,
+                            top: object.y - object.height / 2,
+                            width: object.width,
+                            height: object.height,
+                            transform: `rotate(${object.angle}rad)`,
+                          }}
+                        >
+                          <span
+                            className={styles.jumpArrow}
+                            style={{ transform: `rotate(${object.launchAngle - object.angle}rad)` }}
+                          >
+                            ↑
+                          </span>
+                        </div>
                       )
                     }
                     return (
