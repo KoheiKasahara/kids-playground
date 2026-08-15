@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../app/App'
 
 describe('Home', () => {
-  test('ゲーム一覧に現在の10ゲームすべてが表示される', () => {
+  test('ゲーム一覧に現在の12ゲームすべてが表示される', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -14,6 +14,7 @@ describe('Home', () => {
     expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'こっきクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'こっきピンボール' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'こっきドミノ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'おやさいクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'くだものクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
@@ -97,5 +98,13 @@ describe('Home', () => {
     await user.click(screen.getByRole('button', { name: 'にほん旅行クイズ' }))
     expect(await screen.findByRole('heading', { name: 'にほん旅行クイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'たびに しゅっぱつ！' })).toBeInTheDocument()
+  })
+
+  test('「こっきドミノ」を押すと遅延読込したプレイ画面に遷移する', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await user.click(screen.getByRole('button', { name: 'こっきドミノ' }))
+    expect(await screen.findByRole('heading', { name: 'こっきドミノ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'スタート！' })).toBeInTheDocument()
   })
 })

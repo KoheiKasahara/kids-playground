@@ -117,6 +117,7 @@ export const routes: RouteObject[] = [
   { path: '/games/flag-pinball', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballSelect')) },
   { path: '/games/flag-pinball/play', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballPlay')) },
   { path: '/games/flag-pinball/result', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballResult')) },
+  { path: '/games/domino-flag', element: lazyRoute(() => import('../games/domino-flag/DominoFlagPlay')) },
   { path: '/games/flag-roll-adventure', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventureSelect')) },
   { path: '/games/flag-roll-adventure/play', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventurePlay')) },
   { path: '/games/flag-roll-adventure/goal', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventureGoal')) },
