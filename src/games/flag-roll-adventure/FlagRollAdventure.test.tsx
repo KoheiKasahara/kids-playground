@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -23,14 +23,32 @@ function renderApp(path: string) {
   )
 }
 
+/**
+ * このゲームの3画面は matter-js を含むため lazy(import()) で読み込む（src/app/routes.tsx）。
+ * ルート遷移直後はまだチャンク読込中で Suspense の fallback（null）しか無いため、
+ * 画面をまたぐ要素の取得には findBy* を使う。さらに CI の遅いランナーでは既定の1秒では
+ * 足りずに落ちることがあったので、チャンク読込を待つ箇所だけ待ち時間を延ばす。
+ */
+const LAZY_ROUTE_TIMEOUT_MS = 5000
+
 async function clickButton(user: ReturnType<typeof userEvent.setup>, name: string) {
-  await user.click(await screen.findByRole('button', { name }))
+  await user.click(await screen.findByRole('button', { name }, { timeout: LAZY_ROUTE_TIMEOUT_MS }))
+}
+
+/** lazy な画面が現れるまで待って「やめる」を掴む。プレイ画面に入れたことの確認を兼ねる。 */
+async function findQuitButton() {
+  return screen.findByRole('button', { name: 'やめる' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })
 }
 
 async function selectJapanAndPlay(user: ReturnType<typeof userEvent.setup>) {
   await clickButton(user, 'にほん')
-  await clickButton(user, 'スタート！')
-  await screen.findByRole('button', { name: 'やめる' })
+  // 「スタート！」は未選択のあいだ disabled。選択の反映前に押すと無効ボタンへの
+  // 空クリックになり、選択画面に留まったまま次の待機がタイムアウトしてしまう。
+  // 押せる状態になったことを確かめてからクリックし、その競合を断つ。
+  const startButton = await screen.findByRole('button', { name: 'スタート！' })
+  await waitFor(() => expect(startButton).toBeEnabled())
+  await user.click(startButton)
+  await findQuitButton()
   expect(engineMock.options).toBeDefined()
 }
 
@@ -51,7 +69,7 @@ async function reachGoal() {
     await vi.advanceTimersByTimeAsync(1)
   })
   vi.useRealTimers()
-  await screen.findByRole('heading', { name: 'ゴール！' })
+  await screen.findByRole('heading', { name: 'ゴール！' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })
 }
 
 afterEach(() => {
@@ -65,14 +83,14 @@ describe('FlagRollAdventure 選択画面', () => {
     const user = userEvent.setup()
     renderApp('/')
     await user.click(screen.getByRole('button', { name: 'こっきコロコロぼうけん' }))
-    expect(await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })).toBeInTheDocument()
     expect(screen.getByText('こっきを 1こ えらんでね！')).toBeInTheDocument()
   })
 
   test('40個の国旗が並び、2つ目を押すと1つ目の選択が置き換わる', async () => {
     const user = userEvent.setup()
     renderApp('/games/flag-roll-adventure')
-    await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' })
+    await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })
     const flagButtons = screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
     expect(flagButtons).toHaveLength(40)
 
@@ -85,7 +103,7 @@ describe('FlagRollAdventure 選択画面', () => {
 
   test('未選択では「スタート！」が押せない', async () => {
     renderApp('/games/flag-roll-adventure')
-    const startButton = await screen.findByRole('button', { name: 'スタート！' })
+    const startButton = await screen.findByRole('button', { name: 'スタート！' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })
     expect(startButton).toBeDisabled()
   })
 })
@@ -132,7 +150,7 @@ describe('FlagRollAdventure プレイとゴール', () => {
     await reachGoal()
 
     await clickButton(user, 'もういっかい')
-    await screen.findByRole('button', { name: 'やめる' })
+    await findQuitButton()
     expect(screen.getByText('そら')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'やめる' })).toBeInTheDocument()
     expect(engineMock.options).toBeDefined()
@@ -145,7 +163,7 @@ describe('FlagRollAdventure プレイとゴール', () => {
     await reachGoal()
 
     await clickButton(user, 'べつの こっき')
-    expect(await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })).toBeInTheDocument()
     expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0)
     expect(screen.getByRole('button', { name: 'スタート！' })).toBeDisabled()
   })
@@ -162,10 +180,10 @@ describe('FlagRollAdventure プレイとゴール', () => {
 
   test('stateなしでplay/goalを直接開くと選択画面へ戻る', async () => {
     const playView = renderApp('/games/flag-roll-adventure/play')
-    expect(await playView.findByRole('heading', { name: 'こっきコロコロぼうけん' })).toBeInTheDocument()
+    expect(await playView.findByRole('heading', { name: 'こっきコロコロぼうけん' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })).toBeInTheDocument()
     playView.unmount()
 
     const goalView = renderApp('/games/flag-roll-adventure/goal')
-    expect(await goalView.findByRole('heading', { name: 'こっきコロコロぼうけん' })).toBeInTheDocument()
+    expect(await goalView.findByRole('heading', { name: 'こっきコロコロぼうけん' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })).toBeInTheDocument()
   })
 })
