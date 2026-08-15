@@ -10,7 +10,7 @@ import {
   ENTRY_EMERGE_MS,
 } from './adventurePhysics'
 import { AREAS } from './data/areas'
-import { areaGroundRects, cupWellRect } from './adventureGeometry'
+import { areaGroundRects, cupWellRect, worldSize } from './adventureGeometry'
 import type { FlagBallData } from '../../components/flag-ball/flagBalls'
 import type { PortalKind } from './types'
 import AreaBackground from './AreaBackground'
@@ -37,6 +37,8 @@ const portalKindClass: Record<PortalKind, string> = {
   pipe: styles.portalPipe,
   cavemouth: styles.portalCavemouth,
 }
+
+const WORLD_SIZE = worldSize(AREAS)
 
 /**
  * 固定カメラの1画面を描く。
@@ -92,7 +94,7 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
           <div
             ref={registerWorld}
             className={styles.world}
-            style={{ width: AREA_WIDTH, height: AREA_HEIGHT * AREAS.length }}
+            style={{ width: WORLD_SIZE.width, height: WORLD_SIZE.height }}
           >
             {AREAS.map((area) => (
               <div

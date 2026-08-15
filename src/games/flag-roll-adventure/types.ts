@@ -1,4 +1,4 @@
-export type AreaTheme = 'sky' | 'forest' | 'cave' | 'goal'
+export type AreaTheme = 'sky' | 'forest' | 'cave' | 'goal' | 'river' | 'cloud'
 
 /** 静的な壁・斜めすべり台。x,y はローカル座標の中心、angle はラジアン */
 export type AreaWall = {

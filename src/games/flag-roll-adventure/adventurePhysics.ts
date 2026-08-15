@@ -7,6 +7,12 @@ export const AREA_WIDTH = 480
 export const AREA_HEIGHT = 720
 
 /**
+ * 横にエリアを並べるときの隙間。隣のエリアの外壁とボールが接触すると、別ルートの物理へ力が伝わるため余白を置く。
+ */
+export const AREA_COLUMN_GAP = 60
+export const AREA_COLUMN_STEP = AREA_WIDTH + AREA_COLUMN_GAP
+
+/**
  * 物理演算とヘッドレス測定で共用する固定タイムステップ。
  * 可変フレームレートのまま Engine.update へ渡すと、端末ごとに反発や落下のテンポが
  * 変わってしまうため、ピンボールと同じ60fpsの論理時間で進める。

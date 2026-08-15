@@ -69,6 +69,16 @@
   border: 3px solid rgba(255, 255, 255, 0.55);
 }
 
+.themeRiver .wall {
+  background: #238f9e;
+  border: 3px solid rgba(188, 255, 250, 0.62);
+}
+
+.themeCloud .wall {
+  background: #aaa2d2;
+  border: 3px solid rgba(255, 255, 255, 0.78);
+}
+
 .pin {
   position: absolute;
   border-radius: 50%;
@@ -94,6 +104,14 @@
 
 .themeGoal .pin {
   background: radial-gradient(circle at 35% 28%, #fff7c7, #ffd166 62%, #e09a2f);
+}
+
+.themeRiver .pin {
+  background: radial-gradient(circle at 35% 28%, #e9fffc, #55d0cf 62%, #167887);
+}
+
+.themeCloud .pin {
+  background: radial-gradient(circle at 35% 28%, #ffffff, #d8d1f4 62%, #9389c0);
 }
 
 /* pinIdごとのclassList直接操作で、衝突の瞬間だけ少し明るくする。 */
@@ -209,6 +227,14 @@
 
 .themeGoal .portalFloor {
   background: #e7a63b;
+}
+
+.themeRiver .portalFloor {
+  background: #238f9e;
+}
+
+.themeCloud .portalFloor {
+  background: #aaa2d2;
 }
 
 .cupBack {

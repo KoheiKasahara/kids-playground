@@ -12,6 +12,8 @@ const themeClass: Record<AreaTheme, string> = {
   forest: styles.themeForest,
   cave: styles.themeCave,
   goal: styles.themeGoal,
+  river: styles.themeRiver,
+  cloud: styles.themeCloud,
 }
 
 type AreaBackgroundProps = { theme: AreaTheme }

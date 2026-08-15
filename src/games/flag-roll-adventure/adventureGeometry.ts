@@ -21,22 +21,47 @@ export type AdventureRect = {
 
 type PortalRect = Pick<AreaExit, 'x' | 'y' | 'width' | 'height'>
 
-function openGroundRects(openingCenterX: number, openingWidth: number, top: number): AdventureRect[] {
-  const openingLeft = openingCenterX - openingWidth / 2
-  const openingRight = openingCenterX + openingWidth / 2
-  return [
-    { left: 0, top, width: openingLeft, height: AREA_HEIGHT - top },
-    { left: openingRight, top, width: AREA_WIDTH - openingRight, height: AREA_HEIGHT - top },
-  ]
+type GroundOpening = {
+  x: number
+  width: number
 }
 
-/** 通常出口は下端の薄い受け皿、カップエリアはリムから下端までの地面になる。 */
+/** 開口を左から走査して、開口と開口の間だけに地面を残す。物理と描画が同じ矩形を使うため、ここで分割方法を一つに揃える。 */
+function openGroundRects(openings: readonly GroundOpening[], top: number): AdventureRect[] {
+  const height = AREA_HEIGHT - top
+  const rects: AdventureRect[] = []
+  let previousOpeningRight = 0
+
+  for (const opening of openings) {
+    const openingLeft = opening.x - opening.width / 2
+    const openingRight = opening.x + opening.width / 2
+    rects.push({ left: previousOpeningRight, top, width: openingLeft - previousOpeningRight, height })
+    previousOpeningRight = openingRight
+  }
+
+  rects.push({ left: previousOpeningRight, top, width: AREA_WIDTH - previousOpeningRight, height })
+  return rects
+}
+
+/** 通常出口はx順の複数開口の間を下端の薄い受け皿で埋め、カップエリアはリムから下端までの地面になる。 */
 export function areaGroundRects(area: AdventureArea): AdventureRect[] {
-  if (area.cup) return openGroundRects(area.cup.x, CUP_INNER_WIDTH, area.cup.rimY)
-  const exit = area.exits[0]
-  return exit
-    ? openGroundRects(exit.x, exit.width, AREA_HEIGHT - PORTAL_FLOOR_HEIGHT)
-    : []
+  if (area.cup) return openGroundRects([{ x: area.cup.x, width: CUP_INNER_WIDTH }], area.cup.rimY)
+  if (area.exits.length === 0) return []
+
+  const openings = [...area.exits]
+    .sort((first, second) => first.x - second.x)
+    .map((exit) => ({ x: exit.x, width: exit.width }))
+  return openGroundRects(openings, AREA_HEIGHT - PORTAL_FLOOR_HEIGHT)
+}
+
+/** エリアのoriginを基準に、すべてのエリアを含むワールド矩形の大きさを求める。 */
+export function worldSize(areas: readonly AdventureArea[]) {
+  const maxOriginX = areas.reduce((max, area) => Math.max(max, area.origin.x), 0)
+  const maxOriginY = areas.reduce((max, area) => Math.max(max, area.origin.y), 0)
+  return {
+    width: maxOriginX + AREA_WIDTH,
+    height: maxOriginY + AREA_HEIGHT,
+  }
 }
 
 /** カップの暗い井戸。リムから底の内側までを描画と物理の共通座標にする。 */

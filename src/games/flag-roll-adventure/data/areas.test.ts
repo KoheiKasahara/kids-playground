@@ -26,6 +26,23 @@ function objectExtents(object: (typeof AREAS)[number]['objects'][number]) {
 }
 
 describe('area data', () => {
+  it('出口の開口はエリア内で重ならない', () => {
+    for (const area of AREAS) {
+      const exits = [...area.exits].sort((first, second) => first.x - second.x)
+      for (let index = 0; index < exits.length; index += 1) {
+        const exit = exits[index]
+        if (!exit) continue
+        const left = exit.x - exit.width / 2
+        const right = exit.x + exit.width / 2
+        expect(left).toBeGreaterThanOrEqual(0)
+        expect(right).toBeLessThanOrEqual(AREA_WIDTH)
+        const previous = exits[index - 1]
+        if (previous) {
+          expect(left).toBeGreaterThanOrEqual(previous.x + previous.width / 2)
+        }
+      }
+    }
+  })
   it('エリアidに重複がない', () => {
     const ids = AREAS.map((area) => area.id)
     expect(new Set(ids).size).toBe(ids.length)

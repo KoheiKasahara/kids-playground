@@ -36,7 +36,7 @@ import {
   WALL_FRICTION,
   WALL_RESTITUTION,
 } from './adventurePhysics'
-import { AREAS, findArea, resolveExitTarget, START_AREA_ID } from './data/areas'
+import { AREAS, findArea, pickExitForBallX, resolveExitTarget, START_AREA_ID } from './data/areas'
 import { areaGroundRects, cupBottomRect, cupSensorRect, type AdventureRect } from './adventureGeometry'
 import type { AreaCup, AreaEntry, AreaExit, AreaPin, AreaWall } from './types'
 
@@ -439,7 +439,7 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
       if (area.cup) {
         resetBallToCupDrop()
       } else {
-        const exit = area.exits[0]
+        const exit = pickExitForBallX(area, localX)
         if (exit) startExitTransition({ areaId: area.id, exit }, true)
         else resetBallToAreaEntry(currentAreaId, true)
       }
@@ -468,7 +468,8 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
       return
     }
 
-    const exit = area.exits[0]
+    const localX = ballBody.position.x - area.origin.x
+    const exit = pickExitForBallX(area, localX)
     if (exit) startExitTransition({ areaId: area.id, exit }, true)
     else resetBallToAreaEntry(currentAreaId, true)
   }

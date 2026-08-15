@@ -42,7 +42,7 @@ import {
   WALL_FRICTION,
   WALL_RESTITUTION,
 } from './adventurePhysics'
-import { AREAS, findArea, resolveExitTarget, START_AREA_ID } from './data/areas'
+import { AREAS, findArea, pickExitForBallX, resolveExitTarget, START_AREA_ID } from './data/areas'
 import stageStyles from './AdventureStage.module.css'
 import { cameraPositionForArea, interpolateCameraPosition, type CameraPosition } from './camera'
 import { areaGroundRects, cupBottomRect, cupSensorRect, type AdventureRect } from './adventureGeometry'
@@ -624,7 +624,7 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
         if (area.cup) {
           resetBallToCupDrop()
         } else {
-          const exit = area.exits[0]
+          const exit = pickExitForBallX(area, localX)
           if (exit) startExitTransition({ areaId: area.id, exit }, now, true)
           else resetBallToAreaEntry(currentAreaId, true)
         }
@@ -652,7 +652,8 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
         return
       }
 
-      const exit = area.exits[0]
+      const localX = ballBody.position.x - area.origin.x
+      const exit = pickExitForBallX(area, localX)
       if (exit) startExitTransition({ areaId: area.id, exit }, now, true)
       else resetBallToAreaEntry(currentAreaId, true)
     }

@@ -218,6 +218,107 @@
   transform: rotate(-18deg) scale(0.78);
 }
 
+/* --- 川 ------------------------------------------------------------------ */
+.themeRiver .layerBase {
+  background:
+    radial-gradient(circle at 20% 24%, rgba(206, 255, 249, 0.5) 0 9%, transparent 30%),
+    linear-gradient(180deg, #8de2e5 0%, #55c8c9 55%, #238f9e 100%);
+}
+
+.themeRiver .farShape,
+.themeRiver .farShapeSecondary {
+  position: absolute;
+  width: 190px;
+  height: 250px;
+  border-radius: 50% 50% 24% 24%;
+  background: rgba(18, 112, 126, 0.3);
+}
+
+.themeRiver .farShape {
+  left: -88px;
+  top: 170px;
+  transform: rotate(8deg);
+}
+
+.themeRiver .farShapeSecondary {
+  right: -88px;
+  top: 360px;
+  transform: rotate(-8deg) scale(0.86);
+  background: rgba(9, 91, 112, 0.28);
+}
+
+.themeRiver .decorShape,
+.themeRiver .decorShapeSecondary {
+  position: absolute;
+  width: 112px;
+  height: 16px;
+  border-top: 4px solid rgba(221, 255, 252, 0.62);
+  border-bottom: 3px solid rgba(18, 125, 139, 0.26);
+  border-radius: 50%;
+}
+
+.themeRiver .decorShape {
+  top: 220px;
+  left: -18px;
+  transform: rotate(-9deg);
+}
+
+.themeRiver .decorShapeSecondary {
+  top: 520px;
+  right: -20px;
+  transform: rotate(8deg) scale(0.78);
+}
+
+/* --- 雲 ------------------------------------------------------------------ */
+.themeCloud .layerBase {
+  background:
+    radial-gradient(circle at 72% 22%, rgba(255, 255, 255, 0.96) 0 13%, transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f6f2ff 54%, #d9d4f2 100%);
+}
+
+.themeCloud .farShape,
+.themeCloud .farShapeSecondary {
+  position: absolute;
+  width: 210px;
+  height: 86px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 48px -22px 0 -8px rgba(255, 255, 255, 0.72), 96px 8px 0 -18px rgba(224, 217, 248, 0.72);
+}
+
+.themeCloud .farShape {
+  left: -92px;
+  top: 132px;
+}
+
+.themeCloud .farShapeSecondary {
+  right: -118px;
+  top: 420px;
+  transform: scale(0.82);
+  background: rgba(226, 219, 249, 0.78);
+}
+
+.themeCloud .decorShape,
+.themeCloud .decorShapeSecondary {
+  position: absolute;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 0 0 6px rgba(190, 182, 225, 0.28);
+}
+
+.themeCloud .decorShape {
+  top: 280px;
+  left: 54px;
+}
+
+.themeCloud .decorShapeSecondary {
+  top: 590px;
+  right: 46px;
+  transform: scale(0.68);
+}
+
 /* --- ゴール -------------------------------------------------------------- */
 .themeGoal .layerBase {
   background:
