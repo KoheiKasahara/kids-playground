@@ -12,6 +12,44 @@ export const AREA_HEIGHT = 720
 export const AREA_COLUMN_GAP = 60
 export const AREA_COLUMN_STEP = AREA_WIDTH + AREA_COLUMN_GAP
 
+/** 分岐後の入口で左右から中央へ寄せる初速。出口へ入ったときの速度をそのまま引き継がず、合流を見せる。 */
+export const MERGE_ENTRY_SPEED = 2.2
+export const MERGE_ENTRY_VERTICAL_SPEED = 0.2
+
+/** 森の左右出口と分岐の障害物。出口間の帯を狭め、中央の尾根でボールが止まらないようにする。 */
+export const FOREST_LEFT_EXIT_X = 100
+export const FOREST_RIGHT_EXIT_X = AREA_WIDTH - FOREST_LEFT_EXIT_X
+/** 中心の真上を避け、初速の小さな違いが左右の反射に分かれる起点を作る。 */
+export const FOREST_BRANCH_BUMPER_OFFSET_X = 3
+export const FOREST_BRANCH_BUMPER_X = AREA_WIDTH / 2 + FOREST_BRANCH_BUMPER_OFFSET_X
+export const FOREST_BRANCH_BUMPER_Y = 250
+export const FOREST_BRANCH_BUMPER_RADIUS = 32
+export const FOREST_BRANCH_ROOF_LEFT_X = 140
+export const FOREST_BRANCH_ROOF_RIGHT_X = AREA_WIDTH - FOREST_BRANCH_ROOF_LEFT_X
+export const FOREST_BRANCH_ROOF_Y = 420
+export const FOREST_BRANCH_ROOF_WIDTH = 120
+export const FOREST_BRANCH_ROOF_HEIGHT = 18
+export const FOREST_BRANCH_ROOF_ANGLE = 0.55
+export const FOREST_BRANCH_RIDGE_Y = 650
+export const FOREST_BRANCH_RIDGE_RADIUS = 32
+
+/** 川は左右の揺れを見せるため、3枚の板を同じ幅で置き、上下の間隔を広く取る。 */
+export const RIVER_SWEEP_WIDTH = 300
+export const RIVER_SWEEP_HEIGHT = 18
+export const RIVER_SWEEP_TOP_Y = 170
+export const RIVER_SWEEP_MIDDLE_Y = 390
+export const RIVER_SWEEP_BOTTOM_Y = 610
+export const RIVER_SWEEP_ANGLE = 0.42
+
+/** 雲の入口は左右に離し、同じ出口へ届くまでの中央寄せを初速で見せる。 */
+export const CLOUD_ENTRY_LEFT_X = 120
+export const CLOUD_ENTRY_RIGHT_X = AREA_WIDTH - CLOUD_ENTRY_LEFT_X
+export const CLOUD_EXIT_X = AREA_WIDTH / 2
+/** 左右から中央へ寄り切れない場合も出口へ落ちるよう、雲だけ開口を広くして床の滞留を防ぐ。 */
+export const CLOUD_EXIT_WIDTH = 360
+export const CLOUD_SOFT_BUMPER_Y = 360
+export const CLOUD_SOFT_BUMPER_RADIUS = 20
+
 /**
  * 物理演算とヘッドレス測定で共用する固定タイムステップ。
  * 可変フレームレートのまま Engine.update へ渡すと、端末ごとに反発や落下のテンポが

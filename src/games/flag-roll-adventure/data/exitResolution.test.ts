@@ -59,4 +59,19 @@ describe('pickExitForBallX', () => {
     if (!goal) return
     expect(pickExitForBallX(goal, 240)).toBeUndefined()
   })
+
+  it('実際のforestでは左寄りがcave、右寄りがriverを選ぶ', () => {
+    const forest = findArea('forest')
+    expect(forest).toBeDefined()
+    if (!forest) return
+
+    const leftExit = forest.exits.find((exit) => exit.to === 'cave')
+    const rightExit = forest.exits.find((exit) => exit.to === 'river')
+    expect(leftExit).toBeDefined()
+    expect(rightExit).toBeDefined()
+    if (!leftExit || !rightExit) return
+
+    expect(pickExitForBallX(forest, leftExit.x)?.to).toBe('cave')
+    expect(pickExitForBallX(forest, rightExit.x)?.to).toBe('river')
+  })
 })

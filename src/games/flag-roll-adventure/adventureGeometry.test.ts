@@ -33,7 +33,7 @@ describe('adventure geometry', () => {
   it('全エリアがoriginから算出したworld矩形の中に収まる', () => {
     const size = worldSize(AREAS)
 
-    expect(size).toEqual({ width: AREA_WIDTH, height: AREA_HEIGHT * AREAS.length })
+    expect(size).toEqual({ width: AREA_COLUMN_STEP * 2 + AREA_WIDTH, height: AREA_HEIGHT * 5 })
     for (const area of AREAS) {
       expect(area.origin.x).toBeGreaterThanOrEqual(0)
       expect(area.origin.y).toBeGreaterThanOrEqual(0)
@@ -94,5 +94,17 @@ describe('adventure geometry', () => {
 
   it('出口0個でカップ無しのエリアは地面を作らない', () => {
     expect(areaGroundRects(makeArea([]))).toEqual([])
+  })
+
+  it('端に接する開口や重なる開口から幅0以下の矩形を返さない', () => {
+    const touchingEdge = areaGroundRects(makeArea([makeExit('edge', 70, 140)]))
+    const overlapping = areaGroundRects(makeArea([
+      makeExit('left', 120, 140),
+      makeExit('right', 160, 140),
+    ]))
+
+    expect(touchingEdge).toHaveLength(1)
+    expect(overlapping.every((rect) => rect.width > 0)).toBe(true)
+    expect(touchingEdge.every((rect) => rect.width > 0)).toBe(true)
   })
 })

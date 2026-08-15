@@ -45,6 +45,7 @@ const { Engine, Bodies, Body, Composite, Events } = Matter
 export type AdventureSimulationResult = {
   readonly totalSeconds: number
   readonly dwellSecondsByArea: Readonly<Record<string, number>>
+  readonly stallNudgeCountByArea: Readonly<Record<string, number>>
   readonly visitedAreaIds: readonly string[]
   readonly completed: boolean
   readonly cupIn: boolean
@@ -108,8 +109,8 @@ function createPortalFloorBodies(area: (typeof AREAS)[number]): Matter.Body[] {
       isStatic: true,
       ...material,
       label: area.cup
-        ? `cup-ground:${area.id}:${index === 0 ? 'left' : 'right'}`
-        : `portal-floor:${area.id}:${index === 0 ? 'left' : 'right'}`,
+        ? `cup-ground:${area.id}:${index}`
+        : `portal-floor:${area.id}:${index}`,
     }),
   )
 }
@@ -243,6 +244,7 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
   Composite.add(engine.world, ballBody)
 
   const dwellMsByArea = new Map(AREAS.map((area) => [area.id, 0]))
+  const stallNudgeCountByArea = new Map(AREAS.map((area) => [area.id, 0]))
   const visitedAreaIds: string[] = [START_AREA_ID]
   let currentAreaId = START_AREA_ID
   let motion: Motion = 'running'
@@ -415,6 +417,7 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
         })
         stallSinceMs = elapsedMs
         stallNudgeCount += 1
+        stallNudgeCountByArea.set(currentAreaId, (stallNudgeCountByArea.get(currentAreaId) ?? 0) + 1)
       }
     } else {
       stallSinceMs = null
@@ -542,9 +545,13 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
   const dwellSecondsByArea = Object.fromEntries(
     AREAS.map((area) => [area.id, (dwellMsByArea.get(area.id) ?? 0) / 1000]),
   )
+  const stallNudgeCountByAreaRecord = Object.fromEntries(
+    AREAS.map((area) => [area.id, stallNudgeCountByArea.get(area.id) ?? 0]),
+  )
   return {
     totalSeconds: elapsedMs / 1000,
     dwellSecondsByArea,
+    stallNudgeCountByArea: stallNudgeCountByAreaRecord,
     visitedAreaIds,
     completed,
     cupIn,

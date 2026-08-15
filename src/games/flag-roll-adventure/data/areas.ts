@@ -1,13 +1,41 @@
 import {
   AREA_ENTRY_CLEARANCE,
   AREA_HEIGHT,
+  AREA_COLUMN_STEP,
   AREA_WIDTH,
   BALL_RADIUS,
+  CLOUD_ENTRY_LEFT_X,
+  CLOUD_ENTRY_RIGHT_X,
+  CLOUD_EXIT_X,
+  CLOUD_EXIT_WIDTH,
+  CLOUD_SOFT_BUMPER_RADIUS,
+  CLOUD_SOFT_BUMPER_Y,
   CUP_INNER_DEPTH,
   EXIT_CENTER_OFFSET_FROM_BOTTOM,
   EXIT_SENSOR_HEIGHT,
   EXIT_WIDTH,
+  FOREST_BRANCH_BUMPER_RADIUS,
+  FOREST_BRANCH_BUMPER_X,
+  FOREST_BRANCH_BUMPER_Y,
+  FOREST_BRANCH_RIDGE_RADIUS,
+  FOREST_BRANCH_RIDGE_Y,
+  FOREST_BRANCH_ROOF_ANGLE,
+  FOREST_BRANCH_ROOF_HEIGHT,
+  FOREST_BRANCH_ROOF_LEFT_X,
+  FOREST_BRANCH_ROOF_RIGHT_X,
+  FOREST_BRANCH_ROOF_Y,
+  FOREST_BRANCH_ROOF_WIDTH,
+  FOREST_LEFT_EXIT_X,
+  FOREST_RIGHT_EXIT_X,
+  MERGE_ENTRY_SPEED,
+  MERGE_ENTRY_VERTICAL_SPEED,
   PIN_RESTITUTION,
+  RIVER_SWEEP_ANGLE,
+  RIVER_SWEEP_BOTTOM_Y,
+  RIVER_SWEEP_HEIGHT,
+  RIVER_SWEEP_MIDDLE_Y,
+  RIVER_SWEEP_TOP_Y,
+  RIVER_SWEEP_WIDTH,
   WALL_RESTITUTION,
 } from '../adventurePhysics'
 import type { AdventureArea, AreaEntry, AreaExit } from '../types'
@@ -18,16 +46,16 @@ const ENTRY_Y = AREA_ENTRY_CLEARANCE + BALL_RADIUS
 const EXIT_Y = AREA_HEIGHT - EXIT_CENTER_OFFSET_FROM_BOTTOM
 /** Phase 1の最下段の斜面が最後にボールを寄せる側。出口だけをその流れに合わせる。 */
 const SKY_EXIT_X = AREA_WIDTH - 80
-const FOREST_EXIT_X = AREA_WIDTH / 2 - 140
 const CAVE_EXIT_X = AREA_WIDTH - 80
+const RIVER_EXIT_X = AREA_WIDTH - 80
 const PORTAL_SIZE = { width: EXIT_WIDTH, height: EXIT_SENSOR_HEIGHT }
 
 /** 開始エリアをデータから参照するためのid。分岐追加時も入口生成を自動にしない。 */
 export const START_AREA_ID = 'sky'
 
 /**
- * 4エリアを縦に積んだPhase 2 Task Aのコース。
- * 壁・ピンはPhase 1の配置をほぼ保ち、下端だけを明示的なポータルとして扱う。
+ * 6エリアを上下左右に配置したPhase 2 Task Bのコース。
+ * 森で左右に分岐し、洞窟と川が雲で合流する流れを出口データで表す。
  * 出口左右の床とゴールの床・カップ本体は、出口/cupの寸法から物理側で生成する。
  */
 export const AREAS: readonly AdventureArea[] = [
@@ -35,7 +63,7 @@ export const AREAS: readonly AdventureArea[] = [
     id: 'sky',
     nameJa: 'そら',
     theme: 'sky',
-    origin: { x: 0, y: 0 },
+    origin: { x: 1 * AREA_COLUMN_STEP, y: 0 * AREA_HEIGHT },
     entries: [{ id: 'sky-entry', kind: 'hole', x: AREA_WIDTH / 2, y: ENTRY_Y }],
     objects: [
       // 中央の板で受けてから左右へ送るため、入口直後でも落下の向きが毎回少し変わる。
@@ -62,25 +90,35 @@ export const AREAS: readonly AdventureArea[] = [
     id: 'forest',
     nameJa: 'もり',
     theme: 'forest',
-    origin: { x: 0, y: AREA_HEIGHT },
+    origin: { x: 1 * AREA_COLUMN_STEP, y: 1 * AREA_HEIGHT },
     entries: [{ id: 'forest-entry', kind: 'hole', x: AREA_WIDTH / 2, y: ENTRY_Y }],
     objects: [
-      { kind: 'wall', id: 'forest-log-right', x: 240, y: 170, width: 280, height: 22, angle: -0.36, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'forest-log-left', x: 240, y: 360, width: 280, height: 22, angle: 0.36, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'forest-log-right-lower', x: 240, y: 550, width: 280, height: 22, angle: -0.36, restitution: WALL_RESTITUTION },
-      { kind: 'pin', id: 'forest-mushroom-1', x: 460, y: 80, radius: 18, restitution: PIN_RESTITUTION },
-      { kind: 'pin', id: 'forest-mushroom-2', x: 20, y: 260, radius: 18, restitution: PIN_RESTITUTION },
-      { kind: 'pin', id: 'forest-mushroom-3', x: 460, y: 640, radius: 18, restitution: PIN_RESTITUTION },
+      // 中央の大きなキノコ風バンパーで、初速の違いを左右の分岐へ広げる。
+      { kind: 'pin', id: 'forest-mushroom-bumper', x: FOREST_BRANCH_BUMPER_X, y: FOREST_BRANCH_BUMPER_Y, radius: FOREST_BRANCH_BUMPER_RADIUS, restitution: PIN_RESTITUTION },
+      // 中央を高くした屋根を左右に分け、落下したボールをそれぞれの出口側へ送る。
+      { kind: 'wall', id: 'forest-branch-roof-left', x: FOREST_BRANCH_ROOF_LEFT_X, y: FOREST_BRANCH_ROOF_Y, width: FOREST_BRANCH_ROOF_WIDTH, height: FOREST_BRANCH_ROOF_HEIGHT, angle: -FOREST_BRANCH_ROOF_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'forest-branch-roof-right', x: FOREST_BRANCH_ROOF_RIGHT_X, y: FOREST_BRANCH_ROOF_Y, width: FOREST_BRANCH_ROOF_WIDTH, height: FOREST_BRANCH_ROOF_HEIGHT, angle: FOREST_BRANCH_ROOF_ANGLE, restitution: WALL_RESTITUTION },
+      // 出口間の帯は44pxより広いため、中央の尾根でボールが帯の上に静止しないようにする。
+      { kind: 'pin', id: 'forest-branch-ridge', x: FOREST_BRANCH_BUMPER_X, y: FOREST_BRANCH_RIDGE_Y, radius: FOREST_BRANCH_RIDGE_RADIUS, restitution: PIN_RESTITUTION },
     ],
     exits: [
       {
         id: 'forest-to-cave',
         kind: 'tunnel',
-        x: FOREST_EXIT_X,
+        x: FOREST_LEFT_EXIT_X,
         y: EXIT_Y,
         ...PORTAL_SIZE,
         to: 'cave',
         toEntry: 'cave-entry',
+      },
+      {
+        id: 'forest-to-river',
+        kind: 'hole',
+        x: FOREST_RIGHT_EXIT_X,
+        y: EXIT_Y,
+        ...PORTAL_SIZE,
+        to: 'river',
+        toEntry: 'river-entry',
       },
     ],
   },
@@ -88,7 +126,7 @@ export const AREAS: readonly AdventureArea[] = [
     id: 'cave',
     nameJa: 'どうくつ',
     theme: 'cave',
-    origin: { x: 0, y: AREA_HEIGHT * 2 },
+    origin: { x: 0 * AREA_COLUMN_STEP, y: 2 * AREA_HEIGHT },
     entries: [{ id: 'cave-entry', kind: 'tunnel', x: AREA_WIDTH / 2, y: ENTRY_Y }],
     objects: [
       { kind: 'wall', id: 'cave-slope-left', x: 240, y: 160, width: 220, height: 18, angle: 0.3, restitution: WALL_RESTITUTION },
@@ -102,11 +140,71 @@ export const AREAS: readonly AdventureArea[] = [
     ],
     exits: [
       {
-        id: 'cave-to-goal',
+        id: 'cave-to-cloud',
         kind: 'pipe',
         x: CAVE_EXIT_X,
         y: EXIT_Y,
         ...PORTAL_SIZE,
+        to: 'cloud',
+        toEntry: 'cloud-entry-left',
+      },
+    ],
+  },
+  {
+    id: 'river',
+    nameJa: 'かわ',
+    theme: 'river',
+    origin: { x: 2 * AREA_COLUMN_STEP, y: 2 * AREA_HEIGHT },
+    entries: [{ id: 'river-entry', kind: 'hole', x: AREA_WIDTH / 2, y: ENTRY_Y }],
+    objects: [
+      { kind: 'wall', id: 'river-sweep-top', x: AREA_WIDTH / 2, y: RIVER_SWEEP_TOP_Y, width: RIVER_SWEEP_WIDTH, height: RIVER_SWEEP_HEIGHT, angle: RIVER_SWEEP_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'river-sweep-middle', x: AREA_WIDTH / 2, y: RIVER_SWEEP_MIDDLE_Y, width: RIVER_SWEEP_WIDTH, height: RIVER_SWEEP_HEIGHT, angle: -RIVER_SWEEP_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'river-sweep-bottom', x: AREA_WIDTH / 2, y: RIVER_SWEEP_BOTTOM_Y, width: RIVER_SWEEP_WIDTH, height: RIVER_SWEEP_HEIGHT, angle: RIVER_SWEEP_ANGLE, restitution: WALL_RESTITUTION },
+    ],
+    exits: [
+      {
+        id: 'river-to-cloud',
+        kind: 'hole',
+        x: RIVER_EXIT_X,
+        y: EXIT_Y,
+        ...PORTAL_SIZE,
+        to: 'cloud',
+        toEntry: 'cloud-entry-right',
+      },
+    ],
+  },
+  {
+    id: 'cloud',
+    nameJa: 'くも',
+    theme: 'cloud',
+    origin: { x: 1 * AREA_COLUMN_STEP, y: 3 * AREA_HEIGHT },
+    entries: [
+      {
+        id: 'cloud-entry-left',
+        kind: 'pipe',
+        x: CLOUD_ENTRY_LEFT_X,
+        y: ENTRY_Y,
+        velocity: { x: MERGE_ENTRY_SPEED, y: MERGE_ENTRY_VERTICAL_SPEED },
+      },
+      {
+        id: 'cloud-entry-right',
+        kind: 'hole',
+        x: CLOUD_ENTRY_RIGHT_X,
+        y: ENTRY_Y,
+        velocity: { x: -MERGE_ENTRY_SPEED, y: MERGE_ENTRY_VERTICAL_SPEED },
+      },
+    ],
+    objects: [
+      { kind: 'pin', id: 'cloud-soft-bumper', x: CLOUD_EXIT_X, y: CLOUD_SOFT_BUMPER_Y, radius: CLOUD_SOFT_BUMPER_RADIUS, restitution: PIN_RESTITUTION },
+    ],
+    exits: [
+      {
+        id: 'cloud-to-goal',
+        kind: 'pipe',
+        x: CLOUD_EXIT_X,
+        y: EXIT_Y,
+        ...PORTAL_SIZE,
+        width: CLOUD_EXIT_WIDTH,
         to: 'goal',
         toEntry: 'goal-entry',
       },
@@ -116,7 +214,7 @@ export const AREAS: readonly AdventureArea[] = [
     id: 'goal',
     nameJa: 'ゴール',
     theme: 'goal',
-    origin: { x: 0, y: AREA_HEIGHT * 3 },
+    origin: { x: 1 * AREA_COLUMN_STEP, y: 4 * AREA_HEIGHT },
     entries: [{ id: 'goal-entry', kind: 'pipe', x: AREA_WIDTH / 2, y: ENTRY_Y }],
     objects: [
       // 上側のV字はそのまま残し、ボールを中央へ寄せるコースの流れを維持する。

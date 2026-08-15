@@ -110,8 +110,8 @@ function createPortalFloorBodies(area: (typeof AREAS)[number]): Matter.Body[] {
       isStatic: true,
       ...material,
       label: area.cup
-        ? `cup-ground:${area.id}:${index === 0 ? 'left' : 'right'}`
-        : `portal-floor:${area.id}:${index === 0 ? 'left' : 'right'}`,
+        ? `cup-ground:${area.id}:${index}`
+        : `portal-floor:${area.id}:${index}`,
     }),
   )
 }
@@ -145,7 +145,7 @@ function createCupBodies(
 /**
  * matter-jsのEngineだけを動かす。
  * カメラとボールの座標は毎フレームDOMへ直接書き込み、Reactの再レンダーを通さない。
- * 物理世界は全4エリアを最初に生成するが、Engine.updateはrunning/cup-inだけ呼ぶ。
+ * 物理世界は全6エリアを最初に生成するが、Engine.updateはrunning/cup-inだけ呼ぶ。
  */
 export function useAdventureEngine(options: AdventureEngineOptions): AdventureEngineHandle {
   const optionsRef = useRef(options)

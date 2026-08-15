@@ -10,7 +10,7 @@ import {
   CUP_SENSOR_INSET,
   CUP_SENSOR_TOP_OFFSET,
 } from '../adventurePhysics'
-import { areaGroundRects, cupBottomRect, cupFrontLipRect, cupSensorRect, cupWellRect } from '../adventureGeometry'
+import { areaGroundRects, cupBottomRect, cupFrontLipRect, cupSensorRect, cupWellRect, worldSize } from '../adventureGeometry'
 import { AREAS, findArea, START_AREA_ID } from './areas'
 
 function objectExtents(object: (typeof AREAS)[number]['objects'][number]) {
@@ -25,7 +25,102 @@ function objectExtents(object: (typeof AREAS)[number]['objects'][number]) {
   }
 }
 
+function canReachArea(startAreaId: string, targetAreaId: string): boolean {
+  const visited = new Set<string>([startAreaId])
+  const queue = [startAreaId]
+  while (queue.length > 0) {
+    const areaId = queue.shift()
+    if (!areaId) continue
+    if (areaId === targetAreaId) return true
+    const area = findArea(areaId)
+    if (!area) continue
+    for (const exit of area.exits) {
+      if (!visited.has(exit.to)) {
+        visited.add(exit.to)
+        queue.push(exit.to)
+      }
+    }
+  }
+  return false
+}
+
 describe('area data', () => {
+  it('forestはcaveとriverへ向かう2つの異なる出口を持つ', () => {
+    const forest = findArea('forest')
+    expect(forest).toBeDefined()
+    if (!forest) return
+
+    expect(forest.exits).toHaveLength(2)
+    expect(forest.exits.map((exit) => exit.to).sort()).toEqual(['cave', 'river'])
+    expect(new Set(forest.exits.map((exit) => exit.to)).size).toBe(2)
+  })
+
+  it('caveとriverは異なる入口idでcloudへ合流する', () => {
+    const caveExit = findArea('cave')?.exits[0]
+    const riverExit = findArea('river')?.exits[0]
+    expect(caveExit?.to).toBe('cloud')
+    expect(riverExit?.to).toBe('cloud')
+    expect(caveExit?.toEntry).toBeDefined()
+    expect(riverExit?.toEntry).toBeDefined()
+    expect(caveExit?.toEntry).not.toBe(riverExit?.toEntry)
+  })
+
+  it('forestの左右どちらの出口からもgoalへ到達できる', () => {
+    const forest = findArea('forest')
+    expect(forest).toBeDefined()
+    if (!forest) return
+
+    for (const exit of forest.exits) {
+      expect(canReachArea(exit.to, 'goal')).toBe(true)
+    }
+  })
+
+  it('全エリアがworld矩形に収まり、origin同士が重ならない', () => {
+    const size = worldSize(AREAS)
+    for (const area of AREAS) {
+      expect(area.origin.x).toBeGreaterThanOrEqual(0)
+      expect(area.origin.y).toBeGreaterThanOrEqual(0)
+      expect(area.origin.x + AREA_WIDTH).toBeLessThanOrEqual(size.width)
+      expect(area.origin.y + AREA_HEIGHT).toBeLessThanOrEqual(size.height)
+    }
+
+    for (let firstIndex = 0; firstIndex < AREAS.length; firstIndex += 1) {
+      const first = AREAS[firstIndex]
+      if (!first) continue
+      for (let secondIndex = firstIndex + 1; secondIndex < AREAS.length; secondIndex += 1) {
+        const second = AREAS[secondIndex]
+        if (!second) continue
+        const separated =
+          first.origin.x + AREA_WIDTH <= second.origin.x ||
+          second.origin.x + AREA_WIDTH <= first.origin.x ||
+          first.origin.y + AREA_HEIGHT <= second.origin.y ||
+          second.origin.y + AREA_HEIGHT <= first.origin.y
+        expect(separated, `${first.id}/${second.id}`).toBe(true)
+      }
+    }
+  })
+
+  it('forestの左右出口は重ならず、間に正の幅の地面帯を残す', () => {
+    const forest = findArea('forest')
+    expect(forest).toBeDefined()
+    if (!forest) return
+    const exits = [...forest.exits].sort((first, second) => first.x - second.x)
+    const leftExit = exits[0]
+    const rightExit = exits[1]
+    expect(leftExit).toBeDefined()
+    expect(rightExit).toBeDefined()
+    if (!leftExit || !rightExit) return
+
+    const leftOpeningRight = leftExit.x + leftExit.width / 2
+    const rightOpeningLeft = rightExit.x - rightExit.width / 2
+    expect(leftOpeningRight).toBeLessThan(rightOpeningLeft)
+
+    const ground = areaGroundRects(forest)
+    expect(ground).toHaveLength(3)
+    expect(ground[1]?.left).toBe(leftOpeningRight)
+    expect(ground[1]?.width).toBe(rightOpeningLeft - leftOpeningRight)
+    expect(ground[1]?.width).toBeGreaterThan(0)
+  })
   it('出口の開口はエリア内で重ならない', () => {
     for (const area of AREAS) {
       const exits = [...area.exits].sort((first, second) => first.x - second.x)
@@ -34,6 +129,7 @@ describe('area data', () => {
         if (!exit) continue
         const left = exit.x - exit.width / 2
         const right = exit.x + exit.width / 2
+        expect(exit.width).toBeGreaterThan(0)
         expect(left).toBeGreaterThanOrEqual(0)
         expect(right).toBeLessThanOrEqual(AREA_WIDTH)
         const previous = exits[index - 1]

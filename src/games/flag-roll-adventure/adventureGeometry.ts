@@ -40,7 +40,7 @@ function openGroundRects(openings: readonly GroundOpening[], top: number): Adven
   }
 
   rects.push({ left: previousOpeningRight, top, width: AREA_WIDTH - previousOpeningRight, height })
-  return rects
+  return rects.filter((rect) => rect.width > 0)
 }
 
 /** 通常出口はx順の複数開口の間を下端の薄い受け皿で埋め、カップエリアはリムから下端までの地面になる。 */
