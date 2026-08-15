@@ -475,6 +475,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
         if (!el) continue
         el.style.setProperty('--toy-spin', `${visual.spinRad}rad`)
         el.style.setProperty('--toy-pulse', `${visual.pulse}`)
+        el.style.setProperty('--toy-scale', `${visual.scale}`)
         const previousActive = previousToyActive.get(runtime.placement.id)
         if (previousActive !== visual.active) {
           el.dataset.toyActive = visual.active ? 'true' : 'false'

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_FLAGS_LAUNCH_INTERVAL_MS, launchDelaysMs } from './boardLayout'
+import { ALL_FLAGS_LAUNCH_INTERVAL_MS, launchDelaysMs, SCORE_ZONES } from './boardLayout'
 import { PINBALL_FLAG_IDS } from './data/pinballFlags'
-import { STEP_MS } from './pinballPhysics'
+import { SIMULATION_BALL_COUNT, STEP_MS } from './pinballPhysics'
 import { simulatePinballRun } from './pinballSimulation'
 
 const TRIAL_COUNT = 32
@@ -60,6 +60,19 @@ describe('pinball fixed-step play-time simulation', () => {
     expect(results.every((result) => result.steps * STEP_MS === result.durationMs)).toBe(true)
     // 45秒の安全タイマーより5秒以上短い余裕を残し、連打で停滞していないことを確認する。
     expect(max).toBeLessThan(40)
+  })
+
+  it('scoredZoneIdsが球数と一致し、すべて既知のゾーンIDになる', () => {
+    const knownZoneIds = new Set(SCORE_ZONES.map((zone) => zone.id))
+    const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, { toyTapIntervalMs: null }),
+    )
+
+    for (const result of results) {
+      expect(result.scoredZoneIds).toHaveLength(SIMULATION_BALL_COUNT)
+      expect(result.scoredZoneIds).toHaveLength(result.scoreSteps.length)
+      expect(result.scoredZoneIds.every((zoneId) => knownZoneIds.has(zoneId))).toBe(true)
+    }
   })
 })
 

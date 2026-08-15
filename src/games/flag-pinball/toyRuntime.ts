@@ -17,6 +17,8 @@ export type ToyVisualState = {
   pulse: number
   /** いま発動中か（テーマ側のアニメーション切り替え用） */
   active: boolean
+  /** 見た目と物理の両方へ同じ値を適用する倍率。通常は1 */
+  scale: number
 }
 
 export type ToyRuntime = {

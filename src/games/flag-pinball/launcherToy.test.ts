@@ -10,7 +10,12 @@ import {
   MAX_SPEED,
   STEP_MS,
 } from './pinballPhysics'
-import { createLauncherToy } from './launcherToy'
+import {
+  createLauncherToy,
+  LAUNCHER_ARMED_DURATION_MS,
+  LAUNCHER_ARMED_SCALE,
+  LAUNCHER_INFLUENCE_RADIUS,
+} from './launcherToy'
 import type { ToyPlacement } from './toyLayout'
 import type { ToyBall, ToyRuntime } from './toyRuntime'
 
@@ -26,14 +31,24 @@ const LAUNCHER_PLACEMENT: ToyPlacement = {
   labelJa: 'ぽーん おもちゃ',
 }
 
+/** 作用範囲内へ置く座標を、接触距離を越えた位置から導出する。 */
+const IN_RANGE_OFFSET = LAUNCHER_INFLUENCE_RADIUS * 0.5
 /** 実装の作用範囲の外へ少しだけ離し、境界値に依存しないテスト位置にする。 */
-const OUTSIDE_RANGE_MARGIN = 20
+const OUTSIDE_RANGE_MARGIN = LAUNCHER_INFLUENCE_RADIUS * 0.25
 /** 上方判定の境界より十分上へ置き、浮遊中の球を対象にしないことを確認する。 */
-const ABOVE_TOY_MARGIN = 80
+const ABOVE_TOY_MARGIN = LAUNCHER_INFLUENCE_RADIUS * 0.75
+/** タップ後に落下してくる球を、最初は作用範囲から十分離しておく。 */
+const LATE_BALL_VERTICAL_OFFSET = LAUNCHER_INFLUENCE_RADIUS * 1.5
+/** 落下中も静的パッドへ直接ぶつからず、作用範囲だけへ入る横位置にする。 */
+const LATE_BALL_HORIZONTAL_OFFSET = LAUNCHER_INFLUENCE_RADIUS * 0.75
+/** 得点ゾーン直前の球が作用範囲から遠いことを、作用範囲から導出して表す。 */
+const SCORE_ZONE_APPROACH_OFFSET = LAUNCHER_INFLUENCE_RADIUS * 0.1
+/** パルスが収束しても有効状態は続くことを確認する時刻。 */
+const PULSE_SETTLED_TIME_MS = LAUNCHER_ARMED_DURATION_MS * 0.2
 /** ゲーム終了性を見るため、既存の安全タイマー45秒より短い上限にする。 */
 const GAME_END_TEST_TIMEOUT_MS = 25_000
-/** グローバル間隔は過ぎているが、同じボールの個別間隔には届かない時刻として使う。 */
-const AFTER_GLOBAL_BEFORE_BALL_COOLDOWN_MS = 400
+/** 有効窓の中で、同じボールの個別間隔には届かない再タップ時刻として使う。 */
+const BEFORE_BALL_COOLDOWN_MS = LAUNCHER_ARMED_DURATION_MS * 0.2
 
 type BallSpec = {
   readonly x: number
@@ -76,6 +91,12 @@ function getOnlyBall(harness: LauncherHarness): ToyBall {
   return ball
 }
 
+function getLauncherBody(harness: LauncherHarness): Matter.Body {
+  const body = harness.runtime.bodies[0]
+  if (!body) throw new Error('launcher test: launcher body is missing')
+  return body
+}
+
 function speedOf(ball: ToyBall): number {
   return Math.hypot(ball.body.velocity.x, ball.body.velocity.y)
 }
@@ -91,11 +112,188 @@ function advanceOneStep(
 }
 
 describe('launcherToy の固定ステップ物理', () => {
+  it('タップで有効状態になり、見た目の倍率も切り替わる', () => {
+    const harness = createHarness([])
+
+    harness.runtime.activate(0)
+
+    expect(harness.runtime.readVisualState().active).toBe(true)
+    expect(harness.runtime.readVisualState().scale).toBe(LAUNCHER_ARMED_SCALE)
+  })
+
+  it('有効状態が一定時間続き、終了時に元へ戻る', () => {
+    const harness = createHarness([])
+
+    harness.runtime.activate(0)
+    harness.runtime.update(LAUNCHER_ARMED_DURATION_MS / 2, harness.balls)
+    expect(harness.runtime.readVisualState().active).toBe(true)
+    expect(harness.runtime.readVisualState().scale).toBe(LAUNCHER_ARMED_SCALE)
+
+    harness.runtime.update(LAUNCHER_ARMED_DURATION_MS, harness.balls)
+    expect(harness.runtime.readVisualState().active).toBe(false)
+    expect(harness.runtime.readVisualState().scale).toBe(1)
+  })
+
+  it('タップ後にあとから作用範囲へ入ったボールを上向きへ弾く', () => {
+    const harness = createHarness([
+      {
+        x: LAUNCHER_PLACEMENT.x + LATE_BALL_HORIZONTAL_OFFSET,
+        y: LAUNCHER_PLACEMENT.y - LATE_BALL_VERTICAL_OFFSET,
+        velocity: { x: 0, y: 0 },
+      },
+    ])
+    const ball = getOnlyBall(harness)
+    let enteredInfluence = false
+    let wasLaunched = false
+
+    harness.runtime.activate(0)
+    const maxSteps = Math.ceil(LAUNCHER_ARMED_DURATION_MS / STEP_MS)
+    for (let step = 0; step < maxSteps; step += 1) {
+      const now = step * STEP_MS
+      Engine.update(harness.engine, STEP_MS)
+      harness.runtime.update(now + STEP_MS, harness.balls)
+      const distance = Math.hypot(
+        ball.body.position.x - LAUNCHER_PLACEMENT.x,
+        ball.body.position.y - LAUNCHER_PLACEMENT.y,
+      )
+      if (distance <= LAUNCHER_INFLUENCE_RADIUS) enteredInfluence = true
+      if (enteredInfluence && ball.body.velocity.y < 0) {
+        wasLaunched = true
+        break
+      }
+    }
+
+    expect(enteredInfluence).toBe(true)
+    expect(wasLaunched).toBe(true)
+    expect(ball.body.velocity.y).toBeLessThan(0)
+  })
+
+  it('タップしていなければ落下中に作用範囲へ入っても押し上げない', () => {
+    const harness = createHarness([
+      {
+        x: LAUNCHER_PLACEMENT.x + LATE_BALL_HORIZONTAL_OFFSET,
+        y: LAUNCHER_PLACEMENT.y - LATE_BALL_VERTICAL_OFFSET,
+        velocity: { x: 0, y: 0 },
+      },
+    ])
+    const ball = getOnlyBall(harness)
+    let enteredInfluence = false
+    const maxSteps = Math.ceil(LAUNCHER_ARMED_DURATION_MS / STEP_MS)
+
+    for (let step = 0; step < maxSteps; step += 1) {
+      const now = step * STEP_MS
+      Engine.update(harness.engine, STEP_MS)
+      harness.runtime.update(now + STEP_MS, harness.balls)
+      const distance = Math.hypot(
+        ball.body.position.x - LAUNCHER_PLACEMENT.x,
+        ball.body.position.y - LAUNCHER_PLACEMENT.y,
+      )
+      if (distance <= LAUNCHER_INFLUENCE_RADIUS) {
+        enteredInfluence = true
+        expect(ball.body.velocity.y).toBeGreaterThanOrEqual(0)
+        break
+      }
+    }
+
+    expect(enteredInfluence).toBe(true)
+  })
+
+  it('有効時間終了後に作用範囲へ入ったボールには作用しない', () => {
+    const harness = createHarness([
+      {
+        x: LAUNCHER_PLACEMENT.x + LATE_BALL_HORIZONTAL_OFFSET,
+        y: LAUNCHER_PLACEMENT.y - LATE_BALL_VERTICAL_OFFSET,
+        velocity: { x: 0, y: 0 },
+      },
+    ])
+    const ball = getOnlyBall(harness)
+    let enteredInfluence = false
+
+    harness.runtime.activate(0)
+    harness.runtime.update(LAUNCHER_ARMED_DURATION_MS, harness.balls)
+    expect(harness.runtime.readVisualState().active).toBe(false)
+
+    const maxSteps = Math.ceil(LAUNCHER_ARMED_DURATION_MS / STEP_MS)
+    for (let step = 0; step < maxSteps; step += 1) {
+      const now = LAUNCHER_ARMED_DURATION_MS + step * STEP_MS
+      Engine.update(harness.engine, STEP_MS)
+      harness.runtime.update(now + STEP_MS, harness.balls)
+      const distance = Math.hypot(
+        ball.body.position.x - LAUNCHER_PLACEMENT.x,
+        ball.body.position.y - LAUNCHER_PLACEMENT.y,
+      )
+      if (distance <= LAUNCHER_INFLUENCE_RADIUS) {
+        enteredInfluence = true
+        expect(ball.body.velocity.y).toBeGreaterThanOrEqual(0)
+        break
+      }
+    }
+
+    expect(enteredInfluence).toBe(true)
+  })
+
+  it('有効中の拡大と当たり判定が同期し、往復しても半径と中心に誤差を残さない', () => {
+    const harness = createHarness([])
+    const launcherBody = getLauncherBody(harness)
+    const initialPosition = { ...launcherBody.position }
+
+    expect(launcherBody.circleRadius).toBeCloseTo(LAUNCHER_PLACEMENT.radius, 8)
+
+    harness.runtime.activate(0)
+    expect(launcherBody.circleRadius).toBeCloseTo(
+      LAUNCHER_PLACEMENT.radius * LAUNCHER_ARMED_SCALE,
+      8,
+    )
+    expect(launcherBody.position.x).toBeCloseTo(initialPosition.x, 8)
+    expect(launcherBody.position.y).toBeCloseTo(initialPosition.y, 8)
+
+    harness.runtime.update(LAUNCHER_ARMED_DURATION_MS, harness.balls)
+    expect(launcherBody.circleRadius).toBeCloseTo(LAUNCHER_PLACEMENT.radius, 8)
+    expect(launcherBody.position.x).toBeCloseTo(initialPosition.x, 8)
+    expect(launcherBody.position.y).toBeCloseTo(initialPosition.y, 8)
+
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      const now = LAUNCHER_ARMED_DURATION_MS * (cycle + 1)
+      harness.runtime.activate(now)
+      expect(launcherBody.circleRadius).toBeCloseTo(
+        LAUNCHER_PLACEMENT.radius * LAUNCHER_ARMED_SCALE,
+        8,
+      )
+      harness.runtime.update(now + LAUNCHER_ARMED_DURATION_MS, harness.balls)
+      expect(launcherBody.circleRadius).toBeCloseTo(LAUNCHER_PLACEMENT.radius, 8)
+      expect(launcherBody.position.x).toBeCloseTo(initialPosition.x, 8)
+      expect(launcherBody.position.y).toBeCloseTo(initialPosition.y, 8)
+    }
+  })
+
+  it('再タップで有効時間が延長される', () => {
+    const harness = createHarness([])
+
+    harness.runtime.activate(0)
+    harness.runtime.update(LAUNCHER_ARMED_DURATION_MS * 0.75, harness.balls)
+    harness.runtime.activate(LAUNCHER_ARMED_DURATION_MS * 0.75)
+
+    harness.runtime.update(LAUNCHER_ARMED_DURATION_MS * 1.1, harness.balls)
+    expect(harness.runtime.readVisualState().active).toBe(true)
+    harness.runtime.update(LAUNCHER_ARMED_DURATION_MS * 1.75, harness.balls)
+    expect(harness.runtime.readVisualState().active).toBe(false)
+  })
+
+  it('新しいランタイムはリスタート時の初期状態を持つ', () => {
+    const runtime = createLauncherToy(LAUNCHER_PLACEMENT)
+    const launcherBody = runtime.bodies[0]
+    if (!launcherBody) throw new Error('launcher test: launcher body is missing')
+
+    expect(runtime.readVisualState().active).toBe(false)
+    expect(runtime.readVisualState().scale).toBe(1)
+    expect(launcherBody.circleRadius).toBeCloseTo(LAUNCHER_PLACEMENT.radius, 8)
+  })
+
   it('作用範囲内で落下中のボールを上向きへ弾く', () => {
     const harness = createHarness([
       {
-        x: LAUNCHER_PLACEMENT.x + 40,
-        y: LAUNCHER_PLACEMENT.y + 60,
+        x: LAUNCHER_PLACEMENT.x + IN_RANGE_OFFSET,
+        y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
         velocity: { x: 0, y: 2 },
       },
     ])
@@ -111,8 +309,8 @@ describe('launcherToy の固定ステップ物理', () => {
     const initialVelocity = { x: 0.7, y: 2.5 }
     const harness = createHarness([
       {
-        x: LAUNCHER_PLACEMENT.x + 120 + OUTSIDE_RANGE_MARGIN,
-        y: LAUNCHER_PLACEMENT.y + 60,
+        x: LAUNCHER_PLACEMENT.x + LAUNCHER_INFLUENCE_RADIUS + OUTSIDE_RANGE_MARGIN,
+        y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
         velocity: initialVelocity,
       },
     ])
@@ -130,7 +328,7 @@ describe('launcherToy の固定ステップ物理', () => {
     const harness = createHarness([
       {
         x: LAUNCHER_PLACEMENT.x,
-        y: ZONE_TOP - 10,
+        y: ZONE_TOP - SCORE_ZONE_APPROACH_OFFSET,
         velocity: initialVelocity,
       },
     ])
@@ -165,7 +363,7 @@ describe('launcherToy の固定ステップ物理', () => {
     const harness = createHarness([
       {
         x: LAUNCHER_PLACEMENT.x,
-        y: LAUNCHER_PLACEMENT.y + 60,
+        y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
         velocity: { x: 0, y: 2 },
       },
     ])
@@ -182,11 +380,11 @@ describe('launcherToy の固定ステップ物理', () => {
     expect(maxSpeed).toBeLessThanOrEqual(MAX_SPEED)
   })
 
-  it('クールダウン中の再発動では物理を二重に適用しない', () => {
+  it('有効中の再タップでも同じボールへ物理を二重に適用しない', () => {
     const harness = createHarness([
       {
-        x: LAUNCHER_PLACEMENT.x + 50,
-        y: LAUNCHER_PLACEMENT.y + 60,
+        x: LAUNCHER_PLACEMENT.x + IN_RANGE_OFFSET,
+        y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
         velocity: { x: 0, y: 2 },
       },
     ])
@@ -196,8 +394,8 @@ describe('launcherToy の固定ステップ物理', () => {
     harness.runtime.update(0, harness.balls)
     const velocityAfterFirstTap = { ...ball.body.velocity }
 
-    harness.runtime.activate(100)
-    harness.runtime.update(100, harness.balls)
+    harness.runtime.activate(BEFORE_BALL_COOLDOWN_MS)
+    harness.runtime.update(BEFORE_BALL_COOLDOWN_MS, harness.balls)
 
     expect(ball.body.velocity.x).toBe(velocityAfterFirstTap.x)
     expect(ball.body.velocity.y).toBe(velocityAfterFirstTap.y)
@@ -207,7 +405,7 @@ describe('launcherToy の固定ステップ物理', () => {
     const harness = createHarness([
       {
         x: LAUNCHER_PLACEMENT.x,
-        y: LAUNCHER_PLACEMENT.y + 60,
+        y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
         velocity: { x: 0, y: 2 },
       },
     ])
@@ -217,9 +415,9 @@ describe('launcherToy の固定ステップ物理', () => {
     harness.runtime.update(0, harness.balls)
     Body.setVelocity(ball.body, { x: 0, y: 2 })
 
-    // グローバル間隔は過ぎているため、個別クールダウンがなければ再発動できる時刻にする。
-    harness.runtime.activate(AFTER_GLOBAL_BEFORE_BALL_COOLDOWN_MS)
-    harness.runtime.update(AFTER_GLOBAL_BEFORE_BALL_COOLDOWN_MS, harness.balls)
+    // 有効窓の中で、個別クールダウンがなければ再発動できる時刻にする。
+    harness.runtime.activate(BEFORE_BALL_COOLDOWN_MS)
+    harness.runtime.update(BEFORE_BALL_COOLDOWN_MS, harness.balls)
 
     expect(ball.body.velocity.x).toBeCloseTo(0, 8)
     expect(ball.body.velocity.y).toBeCloseTo(2, 8)
@@ -233,8 +431,8 @@ describe('launcherToy の固定ステップ物理', () => {
         velocity: { x: 0, y: 1.2 },
       },
       {
-        x: LAUNCHER_PLACEMENT.x + 40,
-        y: LAUNCHER_PLACEMENT.y + 60,
+        x: LAUNCHER_PLACEMENT.x + IN_RANGE_OFFSET,
+        y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
         velocity: { x: 0, y: 2 },
       },
     ])
@@ -249,18 +447,18 @@ describe('launcherToy の固定ステップ物理', () => {
 
     Body.setPosition(firstBall.body, {
       x: LAUNCHER_PLACEMENT.x,
-      y: LAUNCHER_PLACEMENT.y + 60,
+      y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
     })
     Body.setVelocity(firstBall.body, { x: 0, y: 2 })
     Body.setVelocity(secondBall.body, { x: 0, y: 2 })
-    harness.runtime.activate(AFTER_GLOBAL_BEFORE_BALL_COOLDOWN_MS)
-    harness.runtime.update(AFTER_GLOBAL_BEFORE_BALL_COOLDOWN_MS, harness.balls)
+    harness.runtime.activate(BEFORE_BALL_COOLDOWN_MS)
+    harness.runtime.update(BEFORE_BALL_COOLDOWN_MS, harness.balls)
 
     expect(firstBall.body.velocity.y).toBeLessThan(0)
     expect(secondBall.body.velocity.y).toBeCloseTo(2, 8)
   })
 
-  it('空振りでもpulseが立ち、例外を投げない', () => {
+  it('空振りでも手応えが立ち、例外を投げない', () => {
     const harness = createHarness([])
 
     expect(() => {
@@ -270,27 +468,31 @@ describe('launcherToy の固定ステップ物理', () => {
     expect(harness.runtime.readVisualState().pulse).toBe(1)
     expect(harness.runtime.readVisualState().active).toBe(true)
 
-    harness.runtime.update(300, harness.balls)
+    harness.runtime.update(PULSE_SETTLED_TIME_MS, harness.balls)
     expect(harness.runtime.readVisualState().pulse).toBe(0)
+    expect(harness.runtime.readVisualState().active).toBe(true)
+    expect(harness.runtime.readVisualState().scale).toBe(LAUNCHER_ARMED_SCALE)
+    harness.runtime.update(LAUNCHER_ARMED_DURATION_MS, harness.balls)
     expect(harness.runtime.readVisualState().active).toBe(false)
+    expect(harness.runtime.readVisualState().scale).toBe(1)
     expect(harness.runtime.readVisualState().spinRad).toBe(0)
   })
 
   it('作用条件を満たす複数のボールすべてに作用する', () => {
     const harness = createHarness([
       {
-        x: LAUNCHER_PLACEMENT.x - 100,
-        y: LAUNCHER_PLACEMENT.y + 60,
+        x: LAUNCHER_PLACEMENT.x - IN_RANGE_OFFSET,
+        y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
         velocity: { x: 0, y: 2 },
       },
       {
         x: LAUNCHER_PLACEMENT.x,
-        y: LAUNCHER_PLACEMENT.y + 60,
+        y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
         velocity: { x: 0, y: 2 },
       },
       {
-        x: LAUNCHER_PLACEMENT.x + 100,
-        y: LAUNCHER_PLACEMENT.y + 60,
+        x: LAUNCHER_PLACEMENT.x + IN_RANGE_OFFSET,
+        y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
         velocity: { x: 0, y: 2 },
       },
     ])
@@ -307,7 +509,7 @@ describe('launcherToy の固定ステップ物理', () => {
     const harness = createHarness([
       {
         x: LAUNCHER_PLACEMENT.x,
-        y: LAUNCHER_PLACEMENT.y + 110,
+        y: LAUNCHER_PLACEMENT.y + LAUNCHER_INFLUENCE_RADIUS * 1.25,
         velocity: { x: 0, y: 1.5 },
       },
     ])
@@ -335,7 +537,7 @@ describe('launcherToy の固定ステップ物理', () => {
       const harness = createHarness([
         {
           x: LAUNCHER_PLACEMENT.x,
-          y: LAUNCHER_PLACEMENT.y + 60,
+          y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
           velocity: { x: 0, y: 2 },
         },
       ])

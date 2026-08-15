@@ -5,26 +5,36 @@ import type { ToyRuntime, ToyVisualState } from './toyRuntime'
 
 const { Body, Bodies } = Matter
 
-/** 発動直後の「ポンッ」を260msで見せ切り、タップの手応えだけを短く残す。 */
-const ACTIVE_DURATION_MS = 260
-/** 連打のたびに速度を更新せず、子どもの連続タップを受け止める短い間隔にする。 */
-const PHYSICS_COOLDOWN_MS = 360
+/** タップ後にボールを待ち受ける有効時間。 */
+export const LAUNCHER_ARMED_DURATION_MS = 2000
+/** 有効中に見た目と物理へ同じ倍率を適用し、押した手応えを分かりやすくする。 */
+export const LAUNCHER_ARMED_SCALE = 1.15
+/** タップ直後の手応えだけを見せるパルスの時間。有効時間とは分離する。 */
+const PULSE_DURATION_MS = 300
 /** 同じボールを何度も救い続けないようにし、別のボールには同じタップ機会を残す。 */
 const BALL_PHYSICS_COOLDOWN_MS = 1200
-/** おもちゃ半径とボール半径に少し余裕を足した近距離だけを補助し、得点直前の球を拾わない。 */
-const INFLUENCE_RADIUS = 130
+/**
+ * 有効時間で待てるため、離れた球を拾う不自然さを減らして96pxに絞る。
+ * 拡大時のおもちゃ半径34.5pxとボール半径24pxを足した接触距離58.5pxに十分な余裕があり、
+ * 「触れたら跳ねる」に近い範囲を保つ。
+ */
+export const LAUNCHER_INFLUENCE_RADIUS = 96
 /** おもちゃの中心より30px上までは救えるが、それより上の浮遊中の球は追わない。 */
 const UPPER_TARGET_MARGIN = 30
-/** 射出口の初速6〜10px/stepと同程度にし、落下球を少しだけ上へ戻す。 */
-const LAUNCH_UP_SPEED = 9
+/**
+ * 重力0.55px/stepでの上昇量は11.5^2/(2*0.55)≒120pxとなり、ボール直径約48pxの2.5個分だけ上へ戻す。
+ */
+const LAUNCH_UP_SPEED = 11.5
 /** 横方向の速度を小さく抑え、真上へ固定せず盤面中央を狙い続けないようにする。 */
 const MAX_HORIZONTAL_SPEED = 4
 /** 左右の散らしを最低限残し、タップごとに同じ得点帯へ寄らないようにする。 */
 const RANDOM_HORIZONTAL_MIN_SPEED = 0.8
 /** 横成分をこの値以下にし、斜め上への補助が盤外へ飛ばす力にならないようにする。 */
 const RANDOM_HORIZONTAL_MAX_SPEED = 1.8
-/** 通常の合成速度より十分大きく、異常値が入っても既存の上限24px/stepを越えない安全弁にする。 */
-const LAUNCH_SPEED_CAP = Math.min(MAX_SPEED * 0.5, 12)
+/**
+ * 上向き11.5と横最大4の合成速度約12.2が通常運用で頭打ちにならず、全体上限24px/stepの半分強に留める安全弁にする。
+ */
+const LAUNCH_SPEED_CAP = Math.min(MAX_SPEED * 0.55, 13)
 /** 静的パッドの反発を控えめにし、接触だけでボールが過度に跳ね続けないようにする。 */
 const LAUNCHER_RESTITUTION = 0.45
 /** 障害物・得点ゾーン・ball-Nの特殊処理と衝突しない専用ラベルにする。 */
@@ -46,7 +56,7 @@ function createLauncherBody(placement: ToyPlacement): Matter.Body {
 function setLaunchVelocity(body: Matter.Body, placement: ToyPlacement): boolean {
   const offsetX = body.position.x - placement.x
   const offsetY = body.position.y - placement.y
-  const isWithinInfluenceRange = Math.hypot(offsetX, offsetY) <= INFLUENCE_RADIUS
+  const isWithinInfluenceRange = Math.hypot(offsetX, offsetY) <= LAUNCHER_INFLUENCE_RADIUS
   const isLowEnough = body.position.y >= placement.y - UPPER_TARGET_MARGIN
   const isAlreadyRising = body.velocity.y <= -LAUNCH_UP_SPEED
   if (!isWithinInfluenceRange || !isLowEnough || isAlreadyRising) return false
@@ -80,35 +90,44 @@ function setLaunchVelocity(body: Matter.Body, placement: ToyPlacement): boolean 
 
 export function createLauncherToy(placement: ToyPlacement): ToyRuntime {
   const launcherBody = createLauncherBody(placement)
-  let activatedAt: number | null = null
-  let pendingPhysicsActivationAt: number | null = null
-  let lastPhysicsActivationAt: number | null = null
+  let armedUntil: number | null = null
+  let lastPulseAt: number | null = null
+  let appliedScale = 1
   const lastBallPhysicsActivationAt = new Map<number, number>()
   const visual: ToyVisualState = {
     spinRad: 0,
     pulse: 0,
     active: false,
+    scale: 1,
+  }
+
+  function applyScaleIfNeeded(targetScale: number): void {
+    if (targetScale === appliedScale) return
+    Body.scale(launcherBody, targetScale / appliedScale, targetScale / appliedScale)
+    appliedScale = targetScale
+    visual.scale = targetScale
   }
 
   return {
     placement,
     bodies: [launcherBody],
     activate(now) {
-      activatedAt = now
+      // 終了時刻を「現在時刻から2000ms」の最大値にするため、連打しても有効時間が積み上がらず暴走しない。
+      armedUntil = Math.max(armedUntil ?? -Infinity, now + LAUNCHER_ARMED_DURATION_MS)
+      lastPulseAt = now
       visual.active = true
-      // クールダウン中も見た目は反応させ、タップが無視された印象を与えない。
       visual.pulse = 1
-
-      const canApplyPhysics =
-        lastPhysicsActivationAt === null ||
-        now - lastPhysicsActivationAt >= PHYSICS_COOLDOWN_MS
-      if (canApplyPhysics) pendingPhysicsActivationAt = now
+      applyScaleIfNeeded(LAUNCHER_ARMED_SCALE)
     },
     update(now, balls) {
-      if (
-        pendingPhysicsActivationAt !== null &&
-        now >= pendingPhysicsActivationAt
-      ) {
+      const isArmed = armedUntil !== null && now < armedUntil
+      if (!isArmed && armedUntil !== null) {
+        armedUntil = null
+      }
+      visual.active = isArmed
+      applyScaleIfNeeded(isArmed ? LAUNCHER_ARMED_SCALE : 1)
+
+      if (isArmed) {
         for (const ball of balls) {
           const lastBallActivationAt = lastBallPhysicsActivationAt.get(ball.ballIndex)
           if (
@@ -121,16 +140,10 @@ export function createLauncherToy(placement: ToyPlacement): ToyRuntime {
             lastBallPhysicsActivationAt.set(ball.ballIndex, now)
           }
         }
-        lastPhysicsActivationAt = now
-        pendingPhysicsActivationAt = null
       }
 
-      if (activatedAt !== null) {
-        const elapsed = Math.max(0, now - activatedAt)
-        const clampedElapsed = Math.min(elapsed, ACTIVE_DURATION_MS)
-        visual.active = elapsed < ACTIVE_DURATION_MS
-        visual.pulse = 1 - clampedElapsed / ACTIVE_DURATION_MS
-      }
+      const pulseElapsed = lastPulseAt === null ? PULSE_DURATION_MS : Math.max(0, now - lastPulseAt)
+      visual.pulse = 1 - clamp(pulseElapsed / PULSE_DURATION_MS, 0, 1)
       visual.spinRad = 0
     },
     readVisualState() {

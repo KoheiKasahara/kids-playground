@@ -59,13 +59,6 @@
   --pinball-toy-launcher-core: transparent;
 }
 
-.candyToy[data-toy-kind='spinner'],
-.candyToy[data-toy-kind='launcher'] {
-  transform: scale(calc(1 + 0.12 * var(--toy-pulse)));
-}
-
-.candyToy[data-toy-kind='spinner']::before,
-.candyToy[data-toy-kind='spinner']::after,
 .candyToy[data-toy-kind='launcher']::before,
 .candyToy[data-toy-kind='launcher']::after {
   display: none;
@@ -74,91 +67,111 @@
 
 .candySpinnerMark {
   position: absolute;
-  inset: 4%;
+  inset: 0;
   display: block;
   pointer-events: none;
-  transform: rotate(var(--toy-spin));
-  transform-origin: center;
-  will-change: transform;
 }
 
-.candyLollipopStick,
-.candyLollipopDisk,
-.candyLollipopSwirl,
-.candyLollipopSwirlInner,
-.candyLollipopHighlight {
+.candySpinnerBlade,
+.candySpinnerHub,
+.candySpinnerHubDot {
   position: absolute;
   pointer-events: none;
 }
 
-.candyLollipopStick {
-  left: 47%;
-  top: 53%;
-  width: 9%;
-  height: 42%;
-  border: 2px solid rgba(255, 255, 255, 0.86);
-  border-radius: 50%;
-  background: repeating-linear-gradient(180deg, #fff8d3 0 5px, #db71a2 5px 9px);
-  transform: rotate(8deg);
-}
-
-.candyLollipopDisk {
-  left: 18%;
-  top: 5%;
-  width: 64%;
-  height: 64%;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.94);
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 28%, #fffce0 0 12%, #ffd875 52%, #ef9b63 100%);
-  box-shadow: inset 0 -3px 0 rgba(176, 90, 106, 0.2), 0 1px 3px rgba(125, 67, 96, 0.28);
-}
-
-.candyLollipopSwirl {
+.candySpinnerBlade {
   left: 50%;
   top: 50%;
-  width: 72%;
-  height: 72%;
-  border: 4px solid #e5689b;
-  border-right-color: transparent;
-  border-radius: 50%;
-  transform: translate(-50%, -50%) rotate(-35deg);
+  width: var(--toy-blade-thickness);
+  height: var(--toy-blade-length);
+  border: 2px solid rgba(255, 255, 255, 0.86);
+  box-shadow: inset 0 -2px 0 rgba(176, 90, 106, 0.2), 0 1px 3px rgba(125, 67, 96, 0.28);
+  transform-origin: center;
 }
 
-.candyLollipopSwirl::before {
+.candySpinnerBladeNorth {
+  border-radius: 46% 46% 12% 12%;
+  background: repeating-linear-gradient(180deg, #fff8d3 0 5px, #db71a2 5px 9px);
+  transform: translate(-50%, -100%);
+}
+
+.candySpinnerBladeEast {
+  width: var(--toy-blade-length);
+  height: var(--toy-blade-thickness);
+  border-radius: 12% 46% 46% 12%;
+  background: repeating-linear-gradient(90deg, #fff4ae 0 5px, #ee8bb1 5px 9px);
+  transform: translate(0, -50%);
+}
+
+.candySpinnerBladeSouth {
+  border-radius: 12% 12% 46% 46%;
+  background: repeating-linear-gradient(180deg, #fff8d3 0 5px, #78cbbd 5px 9px);
+  transform: translate(-50%, 0);
+}
+
+.candySpinnerBladeWest {
+  width: var(--toy-blade-length);
+  height: var(--toy-blade-thickness);
+  border-radius: 46% 12% 12% 46%;
+  background: repeating-linear-gradient(90deg, #fff4ae 0 5px, #9b83dc 5px 9px);
+  transform: translate(-100%, -50%);
+}
+
+.candySpinnerBlade::after {
   position: absolute;
-  inset: 12%;
-  border: 4px solid #fff4ae;
-  border-left-color: transparent;
+  left: 20%;
+  top: 12%;
+  width: 24%;
+  height: 14%;
   border-radius: 50%;
   pointer-events: none;
   content: '';
+  background: rgba(255, 255, 255, 0.72);
 }
 
-.candyLollipopSwirlInner {
+.candySpinnerBladeEast::after,
+.candySpinnerBladeWest::after {
+  left: 12%;
+  top: 20%;
+  width: 14%;
+  height: 24%;
+}
+
+.candySpinnerBladeWest::after {
+  left: 74%;
+}
+
+.candySpinnerBladeSouth::after {
+  left: 56%;
+  top: 74%;
+}
+
+.candySpinnerHub {
   left: 50%;
   top: 50%;
-  width: 31%;
-  height: 31%;
-  border: 3px solid #e5689b;
-  border-bottom-color: transparent;
+  width: 30%;
+  height: 30%;
+  border: 2px solid rgba(255, 255, 255, 0.94);
   border-radius: 50%;
-  transform: translate(-50%, -50%) rotate(18deg);
+  background: radial-gradient(circle at 35% 28%, #fffce0 0 12%, #ffd875 52%, #ef9b63 100%);
+  box-shadow: 0 1px 3px rgba(125, 67, 96, 0.28);
+  transform: translate(-50%, -50%);
+  z-index: 2;
 }
 
-.candyLollipopHighlight {
-  left: 24%;
-  top: 18%;
-  width: 13%;
-  height: 20%;
+.candySpinnerHubDot {
+  left: 50%;
+  top: 50%;
+  width: 28%;
+  height: 28%;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.8);
-  transform: rotate(28deg);
+  background: #e5689b;
+  transform: translate(-50%, -50%);
 }
 
 .candyToy[data-toy-kind='spinner'][data-toy-active='true'] .candySpinnerMark {
   filter: saturate(1.12) brightness(1.05);
-  animation: candyLollipopSpinFlash 360ms ease-out;
+  animation: candySpinnerFlash 360ms ease-out;
 }
 
 .candyLauncherMark {
@@ -306,10 +319,11 @@
   box-shadow:
     inset 0 -3px 0 rgba(131, 56, 107, 0.2),
     0 0 0 2px rgba(255, 241, 167, 0.3),
+    0 0 0 4px rgba(255, 241, 167, 0.1),
     0 1px 7px rgba(231, 111, 155, 0.48);
 }
 
-@keyframes candyLollipopSpinFlash {
+@keyframes candySpinnerFlash {
   0%,
   100% {
     filter: brightness(1);

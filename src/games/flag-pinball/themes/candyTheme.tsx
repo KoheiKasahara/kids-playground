@@ -7,12 +7,12 @@ function renderCandyToy(kind: ToyKind): ReactNode {
   if (kind === 'spinner') {
     return (
       <span className={styles.candySpinnerMark}>
-        <span className={styles.candyLollipopStick} />
-        <span className={styles.candyLollipopDisk}>
-          <span className={styles.candyLollipopSwirl}>
-            <span className={styles.candyLollipopSwirlInner} />
-          </span>
-          <span className={styles.candyLollipopHighlight} />
+        <span className={`${styles.candySpinnerBlade} ${styles.candySpinnerBladeNorth}`} />
+        <span className={`${styles.candySpinnerBlade} ${styles.candySpinnerBladeEast}`} />
+        <span className={`${styles.candySpinnerBlade} ${styles.candySpinnerBladeSouth}`} />
+        <span className={`${styles.candySpinnerBlade} ${styles.candySpinnerBladeWest}`} />
+        <span className={styles.candySpinnerHub}>
+          <span className={styles.candySpinnerHubDot} />
         </span>
       </span>
     )
