@@ -27,18 +27,41 @@ export type AreaPin = {
 
 export type AreaObject = AreaWall | AreaPin
 
-/**
- * 出口。Phase 1 は各エリア1つだが、配列で持つことでPhase 2の分岐を
- * エリアデータの追加だけで表現できるようにする。
- */
+/** 出入口の見た目の種類。物理には影響せず、CSSのクラス選択にだけ使う。 */
+export type PortalKind = 'hole' | 'tunnel' | 'pipe' | 'cavemouth'
+
+/** 出口。ボールがここへ入ると、接続先エリアの入口へ送られる。 */
 export type AreaExit = {
   id: string
+  kind: PortalKind
   x: number
   y: number
   width: number
   height: number
-  /** 次のエリアid。null ならゴール */
-  to: string | null
+  /** 接続先エリアid */
+  to: string
+  /** 接続先エリアの入口id */
+  toEntry: string
+}
+
+/** 入口。出口から送られてきたボールがここから出てくる。 */
+export type AreaEntry = {
+  id: string
+  kind: PortalKind
+  /** ボール中心を置くローカル座標 */
+  x: number
+  y: number
+  /** 入口から出るときの初速(px/step)。省略時は出口へ入ったときの速度を引き継ぐ。 */
+  velocity?: { x: number; y: number }
+}
+
+/** ゴールのゴルフ風カップ。壁・底・内部センサーは物理側で自動生成する。 */
+export type AreaCup = {
+  id: string
+  /** カップ口の中心x（ローカル座標） */
+  x: number
+  /** カップ口（リム）の上端y（ローカル座標） */
+  rimY: number
 }
 
 export type AdventureArea = {
@@ -49,5 +72,7 @@ export type AdventureArea = {
   /** ワールド上の原点。Phase 1でも配列位置から計算せず、将来の分岐配置に備えて明示する。 */
   origin: { x: number; y: number }
   objects: readonly AreaObject[]
+  entries: readonly AreaEntry[]
   exits: readonly AreaExit[]
+  cup?: AreaCup
 }

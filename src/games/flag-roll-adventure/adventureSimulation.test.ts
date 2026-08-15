@@ -31,12 +31,15 @@ describe('adventure fixed-step play-time simulation', () => {
     console.info(
       `adventure safety: maxStallNudge=${Math.max(...results.map((result) => result.stallNudgeCount))} ` +
         `maxAreaTimeout=${Math.max(...results.map((result) => result.areaTimeoutCount))} ` +
-        `maxRescue=${Math.max(...results.map((result) => result.rescueCount))}`,
+        `maxRescue=${Math.max(...results.map((result) => result.rescueCount))} ` +
+        `maxGoalRescueDrop=${Math.max(...results.map((result) => result.goalRescueDropCount))}`,
     )
     console.info(`adventure variance: distinctTotals=${totalTimeSignatures.size}/${TRIAL_COUNT}`)
 
     expect(results.every((result) => result.completed)).toBe(true)
+    expect(results.every((result) => result.cupIn)).toBe(true)
     expect(results.every((result) => result.visitedAreaIds.join('>') === 'sky>forest>cave>goal')).toBe(true)
+    expect(results.every((result) => result.goalRescueDropCount === 0)).toBe(true)
     expect(results.every((result) => result.rescueCount === 0)).toBe(true)
     expect(results.every((result) => result.areaTimeoutCount === 0)).toBe(true)
     expect(min).toBeGreaterThanOrEqual(15)

@@ -95,5 +95,46 @@ export const AREA_ENTRY_CLEARANCE = 60
 
 /** 外壁をデータから省き、全エリアへ自動生成する板の厚み。すり抜け防止のため少し厚めにする。 */
 export const OUTER_WALL_THICKNESS = 28
-/** 出口センサーをエリア下端に置く高さ。下方向の進行を取りこぼさないための幅。 */
-export const EXIT_SENSOR_HEIGHT = 24
+/** 穴を「下端全体」ではなく、ボールが狙える開口として見せる幅。 */
+export const EXIT_WIDTH = 140
+/** 出口センサーと見た目のポータルを揃える高さ。 */
+export const EXIT_SENSOR_HEIGHT = 40
+/** 出口中心を床の少し上へ置き、ボールが穴へ落ちる途中で検知できるようにする距離。 */
+export const EXIT_CENTER_OFFSET_FROM_BOTTOM = 52
+/** 出口の左右に残す受け皿の板厚。開口以外から下へ抜けないようにする。 */
+export const PORTAL_FLOOR_HEIGHT = 28
+
+/** 出口へ吸い込まれる時間。物理を止めてもワープに見えない最小限の間を取る(ms)。 */
+export const EXIT_SWALLOW_MS = 260
+/** 入口から出てくるとき、透明状態から通常サイズへ戻る時間(ms)。 */
+export const ENTRY_EMERGE_MS = 220
+/** 40px高のポータルの下側60%を前景で覆い、吸い込みの最後だけを隠す高さ(px)。 */
+export const PORTAL_FRONT_LIP_HEIGHT = 24
+
+/** カップの内側。ボール直径より十分広く、斜めに入っても底へ落ちる幅を残す。 */
+export const CUP_INNER_WIDTH = 104
+/** リムから底までの深さ。センサーをリム接触より十分下へ置くための余白も含む。 */
+export const CUP_INNER_DEPTH = 96
+/** 薄すぎてボールが抜けないようにするカップ壁・底の厚み。 */
+export const CUP_WALL_THICKNESS = 16
+/** ボール中心がこの深さまで下がるまでは、リム接触をカップインとみなさない距離(px)。 */
+export const CUP_SENSOR_INSET = 48
+/** センサーはボール半径ぶん下げ、衝突開始時点で中心が判定線を越えるようにする高さ。 */
+export const CUP_SENSOR_HEIGHT = 24
+/** センサー矩形の上端。先に定めた中心判定線へ球が届いてから接触を始める位置。 */
+export const CUP_SENSOR_TOP_OFFSET = CUP_SENSOR_INSET + BALL_RADIUS
+/**
+ * リムから48px下の638pxを前景上端にする。センサー上端は660pxなので、判定時は
+ * ボールの上端（616px）がまだ見え、底で静止する上端642pxは638pxより下へ入るため、
+ * 沈み込みを見せてから完全に隠せる（rimY=590px、深さ96px、半径22pxの場合）。
+ */
+export const CUP_FRONT_LIP_TOP_OFFSET = 48
+/** カップ壁・底はほぼ跳ねず、内側へ落ち着きやすい接触にする。 */
+export const CUP_RESTITUTION = 0.05
+export const CUP_FRICTION = 0.3
+/** カップイン後も底へ沈む様子を見せる時間(ms)。 */
+export const CUP_SETTLE_MS = 520
+/** 範囲外・タイムアウト時にカップ口の真上へ置き直す高さ(px)。 */
+export const CUP_RESCUE_DROP_HEIGHT = 120
+/** ゴールでの救済を繰り返し続けず、2回目だけ底への最終保険を使う。 */
+export const GOAL_RESCUE_DROP_LIMIT = 2
