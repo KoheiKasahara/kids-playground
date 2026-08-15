@@ -1,3 +1,5 @@
+import type { PinballMode } from './types'
+
 /**
  * 盤面は論理座標 480×1000（縦横比0.48）で固定する。
  * 実機の画面サイズは知らず、拡縮は表示側（CSS transform）の責務にする。
@@ -203,3 +205,26 @@ export const LAUNCH = {
  * 途中で3球が同時に動いている状態を作るため、1球分の落下時間より短い間隔にしてある。
  */
 export const LAUNCH_DELAYS_MS: readonly number[] = [0, 350, 700]
+
+/**
+ * 全射出モードで1球ずつ射出する間隔(ms)。
+ * 1球が射出から得点ゾーン通過まで約9秒（pinballSimulation の実測）かかるため、
+ * この間隔だと盤面上に常時10球前後が散らばる。射出口(LAUNCH)からは1球あたり
+ * 300px以上進んでから次が出るので、盤面上部に密集しない。
+ */
+export const ALL_FLAGS_LAUNCH_INTERVAL_MS = 800
+
+/** モードごとの射出タイミング(ms)。通常モードは既存の LAUNCH_DELAYS_MS をそのまま使う */
+export function launchDelaysMs(mode: PinballMode, ballCount: number): number[] {
+  if (mode === 'normal') return LAUNCH_DELAYS_MS.slice(0, ballCount)
+  return Array.from({ length: ballCount }, (_, index) => index * ALL_FLAGS_LAUNCH_INTERVAL_MS)
+}
+
+/**
+ * モードごとの壁。全射出モードは得点ゾーンを通過したボールをそのまま画面外へ
+ * 落として消すため、床(wall-bottom)を置かない。
+ */
+export function wallsForMode(mode: PinballMode): readonly WallSegment[] {
+  if (mode === 'normal') return WALLS
+  return WALLS.filter((wall) => wall.id !== 'wall-bottom')
+}

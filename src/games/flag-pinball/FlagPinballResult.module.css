@@ -64,6 +64,38 @@
   white-space: nowrap;
 }
 
+/*
+ * 全射出モード用のコンパクトな行リスト。40行を縦一列に並べると画面外へ出るため、
+ * この要素だけを最大高さ+スクロールにし、2列グリッドで縦の長さも半分にする。
+ * 「ごうけい」「ほめ言葉」「3つのボタン」はこの要素の外にあるため、
+ * スクロール量に関わらず常に見える／押せる。
+ */
+.rowsCompact {
+  max-width: 480px;
+  max-height: 38vh;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+  /* スクロールバーぶんで右側の行が見切れないよう内側に余白を作る */
+  padding-right: var(--space-xs);
+}
+
+.rowCompact {
+  gap: var(--space-xs);
+  padding: 6px var(--space-xs);
+}
+
+.rowCompact .name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowCompact .rowScore {
+  font-size: 15px;
+}
+
 /* 合計得点はどの端末でも一目で分かるよう、いちばん大きく表示する */
 .total {
   display: flex;

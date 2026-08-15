@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ALL_FLAGS_LAUNCH_INTERVAL_MS,
   BALL_RADIUS,
   BOARD_HEIGHT,
   BOARD_WIDTH,
@@ -10,6 +11,8 @@ import {
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
   ZONE_TOP,
+  launchDelaysMs,
+  wallsForMode,
   zoneAtX,
 } from './boardLayout'
 import { BALL_COUNT } from './types'
@@ -171,5 +174,39 @@ describe('LAUNCH_DELAYS_MS', () => {
     for (let i = 1; i < LAUNCH_DELAYS_MS.length; i += 1) {
       expect(LAUNCH_DELAYS_MS[i]).toBeGreaterThan(LAUNCH_DELAYS_MS[i - 1])
     }
+  })
+})
+
+describe('launchDelaysMs', () => {
+  it("normal は LAUNCH_DELAYS_MS と一致する", () => {
+    expect(launchDelaysMs('normal', BALL_COUNT)).toEqual(LAUNCH_DELAYS_MS)
+  })
+
+  it('allFlags は長さnで、狭義単調増加、かつ ALL_FLAGS_LAUNCH_INTERVAL_MS の等間隔である', () => {
+    const n = 40
+    const delays = launchDelaysMs('allFlags', n)
+    expect(delays).toHaveLength(n)
+    expect(delays[0]).toBe(0)
+    for (let i = 1; i < delays.length; i += 1) {
+      expect(delays[i]).toBeGreaterThan(delays[i - 1])
+      expect(delays[i] - delays[i - 1]).toBe(ALL_FLAGS_LAUNCH_INTERVAL_MS)
+    }
+  })
+})
+
+describe('wallsForMode', () => {
+  it('normal には wall-bottom がある', () => {
+    const walls = wallsForMode('normal')
+    expect(walls.some((wall) => wall.id === 'wall-bottom')).toBe(true)
+  })
+
+  it('allFlags には wall-bottom がない', () => {
+    const walls = wallsForMode('allFlags')
+    expect(walls.some((wall) => wall.id === 'wall-bottom')).toBe(false)
+  })
+
+  it('allFlags は wall-bottom 以外の壁を全部持つ（WALLSからwall-bottomだけを除いたもの）', () => {
+    const expected = WALLS.filter((wall) => wall.id !== 'wall-bottom')
+    expect(wallsForMode('allFlags')).toEqual(expected)
   })
 })

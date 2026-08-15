@@ -12,7 +12,10 @@ export type PinballFlag = Country & {
   ballPositionX?: number
 }
 
-/** 1プレイで射出するボールの数 */
+/** 遊びかた。'normal' = 自分で3こ選ぶ / 'allFlags' = 選べる国旗をぜんぶ順番に射出する */
+export type PinballMode = 'normal' | 'allFlags'
+
+/** 通常モード('normal')で選ぶボールの数。全射出モードの球数は選べる国旗の総数になる */
 export const BALL_COUNT = 3
 
 /** 1球の得点結果。ballIndex は 0..BALL_COUNT-1 で、選択順と一致する */

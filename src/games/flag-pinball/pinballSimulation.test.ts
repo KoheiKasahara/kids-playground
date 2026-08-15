@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { ALL_FLAGS_LAUNCH_INTERVAL_MS, launchDelaysMs } from './boardLayout'
+import { PINBALL_FLAG_IDS } from './data/pinballFlags'
 import { SAFETY_TIMEOUT_MS, STEP_MS } from './pinballPhysics'
 import { simulatePinballRun } from './pinballSimulation'
 
@@ -29,5 +31,25 @@ describe('pinball fixed-step play-time simulation', () => {
     expect(median).toBeGreaterThanOrEqual(9.5)
     expect(median).toBeLessThan(15)
     expect(max).toBeLessThan(SAFETY_TIMEOUT_MS / 1000)
+  })
+})
+
+describe('pinball 全射出モードのシミュレーション', () => {
+  it('40球・800ms間隔でも全球が得点確定し、安全タイマーに頼らない', () => {
+    const ballCount = PINBALL_FLAG_IDS.length
+    const result = simulatePinballRun(0x2468ace0, {
+      ballCount,
+      launchDelaysMs: launchDelaysMs('allFlags', ballCount),
+      mode: 'allFlags',
+    })
+
+    expect(result.completed).toBe(true)
+    expect(result.usedSafetyTimeout).toBe(false)
+    expect(result.scoreSteps).toHaveLength(ballCount)
+    // 射出間隔どおりに時間差で射出されるため、常に何球かは同時に盤面上にいる
+    // （1球だけが順番に進んでいくわけではない）ことを確認する。
+    expect(result.maxConcurrentBalls).toBeGreaterThan(1)
+    expect(result.maxConcurrentBalls).toBeLessThanOrEqual(ballCount)
+    expect(ALL_FLAGS_LAUNCH_INTERVAL_MS).toBeGreaterThan(0)
   })
 })
