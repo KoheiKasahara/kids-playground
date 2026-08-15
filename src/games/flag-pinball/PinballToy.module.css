@@ -25,6 +25,7 @@
 .toyVisual {
   --toy-spin: 0rad;
   --toy-pulse: 0;
+  --toy-scale: 1;
   position: relative;
   display: block;
   flex: 0 0 auto;
@@ -34,12 +35,32 @@
   box-shadow:
     inset 0 0 0 3px rgba(255, 255, 255, 0.38),
     var(--shadow-sm);
-  transform: rotate(var(--toy-spin)) scale(calc(1 + 0.12 * var(--toy-pulse)));
+  transform: rotate(var(--toy-spin)) scale(calc(var(--toy-scale) * (1 + 0.12 * var(--toy-pulse))));
   transform-origin: center;
   transition: filter 120ms ease;
   will-change: transform;
 }
 
+/*
+ * 見た目の十字をMatterの羽根（長さ = 半径×2、厚さ12px）と一致させるため、
+ * spinnerだけは円形の背景・枠・影を外す。回転は`.toyVisual`のrotateだけで行い、
+ * テーマ側はtransformを上書きしない。
+ */
+.toyVisual[data-toy-kind='spinner'] {
+  /* Matterの羽根（長さ = 半径×2 = 68px、厚さ12px）に一致させる比率。
+   * テーマ側の羽根はこの2つだけを使い、縦横を入れ替えて十字を作る。 */
+  --toy-blade-thickness: 17.6%;
+  --toy-blade-length: 50%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/*
+ * 横羽根は100% × 17.6%、縦羽根は17.6% × 100%（12px / 68px）。
+ * テーマが`--pinball-toy-mark`をtransparentにする場合は、テーマ別羽根の下地になる。
+ */
 .toyVisual[data-toy-kind='spinner']::before,
 .toyVisual[data-toy-kind='spinner']::after {
   content: '';
@@ -52,13 +73,13 @@
 }
 
 .toyVisual[data-toy-kind='spinner']::before {
-  width: 78%;
-  height: 15%;
+  width: 100%;
+  height: var(--toy-blade-thickness);
 }
 
 .toyVisual[data-toy-kind='spinner']::after {
-  width: 15%;
-  height: 78%;
+  width: var(--toy-blade-thickness);
+  height: 100%;
 }
 
 .toyVisual[data-toy-kind='launcher'] {

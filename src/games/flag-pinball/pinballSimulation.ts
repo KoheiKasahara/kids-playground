@@ -8,6 +8,7 @@ import {
   SCORE_ZONES,
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
+  zoneAtX,
   wallsForMode,
 } from './boardLayout'
 import {
@@ -43,6 +44,8 @@ export type PinballSimulationResult = {
   readonly durationMs: number
   readonly durationSeconds: number
   readonly scoreSteps: readonly number[]
+  /** 各球が得点確定したゾーンID。scoreStepsと同じ順序で観測に使う */
+  readonly scoredZoneIds: readonly string[]
   readonly completed: boolean
   readonly usedSafetyTimeout: boolean
   /** 射出済みかつ未得点だった球の同時最大数。射出間隔の妥当性確認に使う */
@@ -156,6 +159,7 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
   const launchedAtMs: (number | null)[] = ballBodies.map(() => null)
   const stallSinceMs: (number | null)[] = ballBodies.map(() => null)
   const scoreSteps: number[] = []
+  const scoredZoneIds: string[] = []
   let scoredCount = 0
   let physicsStep = 0
   let firstLaunchStep: number | null = null
@@ -164,20 +168,21 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
   let maxConcurrentBalls = 0
   let nextToyTapAtMs = toyTapIntervalMs === null ? null : 0
 
-  const finalizeBall = (ballIndex: number, safetyTimeout: boolean) => {
+  const finalizeBall = (ballIndex: number, zoneId: string, safetyTimeout: boolean) => {
     if (scored[ballIndex]) return
     scored[ballIndex] = true
     scoredCount += 1
     inFlightCount -= 1
     if (safetyTimeout) usedSafetyTimeout = true
     scoreSteps.push(physicsStep)
+    scoredZoneIds.push(zoneId)
   }
 
   Events.on(engine, 'collisionStart', (event: Matter.IEventCollision<Matter.Engine>) => {
     for (const pair of event.pairs) {
       const collision = ballIndexAndOther(pair)
       if (!collision || !collision.other.label.startsWith('zone-')) continue
-      finalizeBall(collision.ballIndex, false)
+      finalizeBall(collision.ballIndex, collision.other.label, false)
     }
   })
 
@@ -236,9 +241,9 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
         body.position.x < -OUT_OF_BOUNDS_MARGIN_X ||
         body.position.x > BOARD_WIDTH + OUT_OF_BOUNDS_MARGIN_X
       if (outOfBounds) {
-        finalizeBall(ballIndex, false)
+        finalizeBall(ballIndex, zoneAtX(body.position.x).id, false)
       } else if (launchedAtMs[ballIndex] !== null && nowMs - launchedAtMs[ballIndex]! >= SAFETY_TIMEOUT_MS) {
-        finalizeBall(ballIndex, true)
+        finalizeBall(ballIndex, zoneAtX(body.position.x).id, true)
       }
     }
 
@@ -273,6 +278,7 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
     durationMs: steps * STEP_MS,
     durationSeconds: (steps * STEP_MS) / 1000,
     scoreSteps,
+    scoredZoneIds,
     completed: scoredCount === ballCount,
     usedSafetyTimeout,
     maxConcurrentBalls,

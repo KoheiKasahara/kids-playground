@@ -11,7 +11,6 @@ function renderOceanToy(kind: ToyKind): ReactNode {
         <span className={`${styles.oceanSpinnerArm} ${styles.oceanSpinnerArmEast}`} />
         <span className={`${styles.oceanSpinnerArm} ${styles.oceanSpinnerArmSouth}`} />
         <span className={`${styles.oceanSpinnerArm} ${styles.oceanSpinnerArmWest}`} />
-        <span className={`${styles.oceanSpinnerArm} ${styles.oceanSpinnerArmNorthEast}`} />
         <span className={styles.oceanSpinnerCore}>
           <span className={styles.oceanSpinnerCoreDot} />
         </span>

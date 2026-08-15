@@ -7,13 +7,10 @@ function renderSpaceToy(kind: ToyKind): ReactNode {
   if (kind === 'spinner') {
     return (
       <span className={styles.spaceSpinnerMark}>
-        <span className={styles.spaceSpinnerDome} />
-        <span className={styles.spaceSpinnerDish} />
-        <span className={styles.spaceSpinnerBand} />
-        <span className={`${styles.spaceSpinnerLight} ${styles.spaceSpinnerLightNorth}`} />
-        <span className={`${styles.spaceSpinnerLight} ${styles.spaceSpinnerLightEast}`} />
-        <span className={`${styles.spaceSpinnerLight} ${styles.spaceSpinnerLightSouth}`} />
-        <span className={`${styles.spaceSpinnerLight} ${styles.spaceSpinnerLightWest}`} />
+        <span className={`${styles.spaceSpinnerPanel} ${styles.spaceSpinnerPanelNorth}`} />
+        <span className={`${styles.spaceSpinnerPanel} ${styles.spaceSpinnerPanelEast}`} />
+        <span className={`${styles.spaceSpinnerPanel} ${styles.spaceSpinnerPanelSouth}`} />
+        <span className={`${styles.spaceSpinnerPanel} ${styles.spaceSpinnerPanelWest}`} />
         <span className={styles.spaceSpinnerCore} />
       </span>
     )

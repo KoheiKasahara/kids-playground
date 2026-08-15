@@ -18,15 +18,9 @@
 
 .normalToy {
   --pinball-toy-theme: normal;
+  --pinball-toy-mark: transparent;
 }
 
-.normalToy[data-toy-kind='spinner'],
-.normalToy[data-toy-kind='launcher'] {
-  transform: scale(calc(1 + 0.12 * var(--toy-pulse)));
-}
-
-.normalToy[data-toy-kind='spinner']::before,
-.normalToy[data-toy-kind='spinner']::after,
 .normalToy[data-toy-kind='launcher']::before,
 .normalToy[data-toy-kind='launcher']::after {
   display: none;
@@ -35,54 +29,57 @@
 
 .normalSpinnerMark {
   position: absolute;
-  inset: 12%;
+  inset: 0;
   display: block;
   pointer-events: none;
-  transform: rotate(var(--toy-spin));
-  transform-origin: center;
-  will-change: transform;
 }
 
 .normalSpinnerBlade {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 31%;
-  height: 43%;
+  width: var(--toy-blade-thickness);
+  height: var(--toy-blade-length);
   border: 2px solid rgba(255, 255, 255, 0.72);
-  border-radius: 88% 20% 88% 20%;
   pointer-events: none;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.14);
-  transform-origin: 50% 100%;
-  transform: translate(-50%, -100%);
+  transform-origin: center;
 }
 
 .normalSpinnerBladeNorth {
   background: #f28b62;
-  transform: translate(-50%, -100%) rotate(0deg);
+  border-radius: 55% 55% 12% 12%;
+  transform: translate(-50%, -100%);
 }
 
 .normalSpinnerBladeEast {
+  width: var(--toy-blade-length);
+  height: var(--toy-blade-thickness);
   background: #6f8fe9;
-  transform: translate(-50%, -100%) rotate(90deg);
+  border-radius: 12% 55% 55% 12%;
+  transform: translate(0, -50%);
 }
 
 .normalSpinnerBladeSouth {
   background: #e97e9c;
-  transform: translate(-50%, -100%) rotate(180deg);
+  border-radius: 12% 12% 55% 55%;
+  transform: translate(-50%, 0);
 }
 
 .normalSpinnerBladeWest {
+  width: var(--toy-blade-length);
+  height: var(--toy-blade-thickness);
   background: #71bfa6;
-  transform: translate(-50%, -100%) rotate(270deg);
+  border-radius: 55% 12% 12% 55%;
+  transform: translate(-100%, -50%);
 }
 
 .normalSpinnerHub {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 24%;
-  height: 24%;
+  width: 30%;
+  height: 30%;
   border: 2px solid rgba(255, 255, 255, 0.92);
   border-radius: 50%;
   pointer-events: none;
@@ -169,6 +166,7 @@
 
 .normalToy[data-toy-kind='launcher'][data-toy-active='true'] .normalLauncherPop {
   opacity: calc(0.28 + 0.5 * var(--toy-pulse));
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.16), 0 0 7px rgba(119, 150, 245, 0.24);
   animation: normalLauncherPopFlash 280ms ease-out;
 }
 

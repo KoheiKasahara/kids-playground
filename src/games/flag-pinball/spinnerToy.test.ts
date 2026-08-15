@@ -11,11 +11,14 @@ import {
   BALL_FRICTION_AIR,
   BALL_RESTITUTION,
   GRAVITY,
-  MAX_ANGULAR_VELOCITY,
   MAX_SPEED,
   STEP_MS,
 } from './pinballPhysics'
-import { createSpinnerToy } from './spinnerToy'
+import {
+  createSpinnerToy,
+  SPINNER_ACTIVE_DURATION_MS,
+  SPINNER_MAX_ANGULAR_VELOCITY,
+} from './spinnerToy'
 import type { ToyPlacement } from './toyLayout'
 import type { ToyBall, ToyRuntime } from './toyRuntime'
 
@@ -196,11 +199,13 @@ describe('spinnerToy の固定ステップ物理', () => {
     const ball = harness.balls[0]
     if (!ball) throw new Error('spinner test: ball is missing')
     let maxNearSpeed = 0
+    let maxAngularVelocity = 0
 
     let now = 0
     for (let step = 0; step < 300; step += 1) {
       harness.runtime.activate(now)
       advanceOneStep(harness, now)
+      maxAngularVelocity = Math.max(maxAngularVelocity, Math.abs(firstBody(harness.runtime).angularVelocity))
       if (distanceFromSpinner(ball) <= SPINNER_INFLUENCE_RADIUS) {
         maxNearSpeed = Math.max(maxNearSpeed, speedOf(ball))
       }
@@ -210,6 +215,7 @@ describe('spinnerToy の固定ステップ物理', () => {
     // 安全装置が毎フレーム働く影響圏内だけを観測し、重力による盤面下部の速度は評価対象にしない。
     expect(maxNearSpeed).toBeGreaterThan(0)
     expect(maxNearSpeed).toBeLessThanOrEqual(MAX_SPEED * 0.5 + 0.001)
+    expect(maxAngularVelocity).toBeLessThanOrEqual(SPINNER_MAX_ANGULAR_VELOCITY + 0.001)
   })
 
   it('連打中もボールが盤面の想定範囲から飛び出さない', () => {
@@ -237,15 +243,52 @@ describe('spinnerToy の固定ステップ物理', () => {
     repeatedHarness.runtime.activate(0)
 
     let now = 0
-    for (let step = 0; step < 48; step += 1) {
-      if (step === 24) repeatedHarness.runtime.activate(now)
+    for (let step = 0; step < 180; step += 1) {
+      if (step === 90) repeatedHarness.runtime.activate(now)
       advanceOneStep(singleHarness, now)
       advanceOneStep(repeatedHarness, now)
       now += STEP_MS
     }
 
-    expect(Math.abs(repeatedBody.angle - singleBody.angle)).toBeLessThan(1)
-    expect(Math.abs(repeatedBody.angularVelocity)).toBeLessThanOrEqual(MAX_ANGULAR_VELOCITY)
+    expect(Math.abs(repeatedBody.angle)).toBeGreaterThanOrEqual(Math.abs(singleBody.angle))
+    expect(Math.abs(repeatedBody.angularVelocity)).toBeLessThanOrEqual(
+      SPINNER_MAX_ANGULAR_VELOCITY + 0.001,
+    )
+  })
+
+  it('回転中に再タップしても次フレームの角速度が下がらない', () => {
+    const harness = createHarness([])
+    const body = firstBody(harness.runtime)
+
+    harness.runtime.activate(0)
+    harness.runtime.update(1500, harness.balls)
+    const recordedVelocity = Math.abs(body.angularVelocity)
+
+    harness.runtime.activate(1500)
+    harness.runtime.update(1500 + STEP_MS, harness.balls)
+
+    expect(Math.abs(body.angularVelocity)).toBeGreaterThanOrEqual(recordedVelocity)
+    expect(Math.abs(body.angularVelocity)).toBeLessThanOrEqual(
+      SPINNER_MAX_ANGULAR_VELOCITY + 0.001,
+    )
+  })
+
+  it('回転中の再タップで効果時間が延長され、無制限には積み上がらない', () => {
+    const singleHarness = createHarness([])
+    const repeatedHarness = createHarness([])
+    const stopCheckTime = SPINNER_ACTIVE_DURATION_MS + STEP_MS
+    const retapTime = SPINNER_ACTIVE_DURATION_MS / 2
+
+    singleHarness.runtime.activate(0)
+    repeatedHarness.runtime.activate(0)
+    repeatedHarness.runtime.update(retapTime, repeatedHarness.balls)
+    repeatedHarness.runtime.activate(retapTime)
+
+    singleHarness.runtime.update(stopCheckTime, singleHarness.balls)
+    repeatedHarness.runtime.update(stopCheckTime, repeatedHarness.balls)
+
+    expect(singleHarness.runtime.readVisualState().active).toBe(false)
+    expect(repeatedHarness.runtime.readVisualState().active).toBe(true)
   })
 
   it('羽根のBodyが静的で、回転しても中心位置が動かない', () => {
@@ -255,6 +298,18 @@ describe('spinnerToy の固定ステップ物理', () => {
 
     expect(body.isStatic).toBe(true)
     expect(body.parts).toHaveLength(3)
+    const partSizes = body.parts.slice(1).map((part) => ({
+      height: part.bounds.max.y - part.bounds.min.y,
+      width: part.bounds.max.x - part.bounds.min.x,
+    }))
+    partSizes.sort((a, b) => b.width - a.width)
+    const horizontalBlade = partSizes[0]
+    const verticalBlade = partSizes[1]
+    if (!horizontalBlade || !verticalBlade) throw new Error('spinner test: blade parts are missing')
+    expect(horizontalBlade.width).toBeCloseTo(SPINNER_PLACEMENT.radius * 2, 1)
+    expect(horizontalBlade.height).toBeCloseTo(12, 1)
+    expect(verticalBlade.width).toBeCloseTo(12, 1)
+    expect(verticalBlade.height).toBeCloseTo(SPINNER_PLACEMENT.radius * 2, 1)
     harness.runtime.activate(0)
     advanceSteps(harness, 90)
 
@@ -266,7 +321,13 @@ describe('spinnerToy の固定ステップ物理', () => {
     const harness = createHarness([])
     const body = firstBody(harness.runtime)
     harness.runtime.activate(0)
-    advanceSteps(harness, 100)
+    harness.runtime.update(SPINNER_ACTIVE_DURATION_MS / 2, harness.balls)
+
+    const halfwayVisual = harness.runtime.readVisualState()
+    expect(halfwayVisual.active).toBe(true)
+    expect(Math.abs(body.angularVelocity)).toBeGreaterThan(0)
+
+    harness.runtime.update(SPINNER_ACTIVE_DURATION_MS + STEP_MS, harness.balls)
 
     const visual = harness.runtime.readVisualState()
     expect(visual.active).toBe(false)
