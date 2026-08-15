@@ -67,3 +67,11 @@ export const ZONE_SENSOR_Y = ZONE_TOP + 30
 
 /** シミュレーションで使う固定球数。3球同時プレイの仕様と一致させる。 */
 export const SIMULATION_BALL_COUNT = 3
+
+/**
+ * 全射出モードで、得点確定済みなのに盤外へ抜けない球を強制回収するまでの猶予(ms)。
+ * 得点ゾーン(y≈905)から盤外(y=1100)までは通常0.3秒程度で通過するため、
+ * これは「まれに盤外へ抜けきらない」場合の保険。これがあることで
+ * 「全射出モードが必ず終了する」ことを構造で保証する。
+ */
+export const SCORED_BALL_REMOVAL_TIMEOUT_MS = 3000

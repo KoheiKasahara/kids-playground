@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import FlagBall from './FlagBall'
 import { findPinballFlag } from './data/pinballFlags'
-import { isPinballResultState } from './playState'
+import { parsePinballResultState } from './playState'
 import { playPinballTotalSound } from '../../utils/quizSound'
 import styles from './FlagPinballResult.module.css'
 
@@ -22,10 +22,10 @@ export default function FlagPinballResult() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // フックはコンポーネント本体の先頭で無条件に呼ぶ必要があるため、型ガードによる
+  // フックはコンポーネント本体の先頭で無条件に呼ぶ必要があるため、parse による
   // early return より前に置く。location.state は不正な形のこともあるので、
   // 以降はこの検証済み変数だけを参照する（total は不正時は安全な0にフォールバックする）。
-  const resultState = isPinballResultState(location.state) ? location.state : null
+  const resultState = parsePinballResultState(location.state)
   const total = resultState ? resultState.scores.reduce((sum, score) => sum + score, 0) : 0
 
   // マウント時に一度だけ鳴らす。resultState は同じ画面にとどまる限り参照が変わらないため、
@@ -38,7 +38,8 @@ export default function FlagPinballResult() {
   if (!resultState) {
     return <Navigate to="/games/flag-pinball" replace />
   }
-  const { flagIds, scores } = resultState
+  const { mode, flagIds, scores } = resultState
+  const isAllFlags = mode === 'allFlags'
 
   const rows = flagIds.map((flagId, ballIndex) => {
     const flag = findPinballFlag(flagId)
@@ -51,10 +52,16 @@ export default function FlagPinballResult() {
       <h1 className={styles.title}>けっか</h1>
 
       <div className={styles.summary}>
-        <ul className={styles.rows}>
+        {/*
+          全射出モードは40行あり縦一列だと画面外へ出るため、この <ul> だけを
+          max-height + overflow-y: auto のスクロール領域にする（.rowsCompact）。
+          「ごうけい」「ほめ言葉」「3つのボタン」はこの要素の外に置いてあるので、
+          どれだけスクロールしてもどの端末でも常に見える／押せる。
+        */}
+        <ul className={isAllFlags ? `${styles.rows} ${styles.rowsCompact}` : styles.rows}>
           {rows.map(({ flag, score }) => (
-            <li key={flag.id} className={styles.row}>
-              <FlagBall flag={flag} size={56} />
+            <li key={flag.id} className={isAllFlags ? `${styles.row} ${styles.rowCompact}` : styles.row}>
+              <FlagBall flag={flag} size={isAllFlags ? 36 : 56} />
               <span className={styles.name}>{flag.nameJa}</span>
               <span className={styles.rowScore}>{score}てん</span>
             </li>
@@ -73,7 +80,7 @@ export default function FlagPinballResult() {
       <div className={styles.actions}>
         <BigButton
           variant="primary"
-          onClick={() => navigate('/games/flag-pinball/play', { replace: true, state: { flagIds } })}
+          onClick={() => navigate('/games/flag-pinball/play', { replace: true, state: { mode, flagIds } })}
         >
           もういちど
         </BigButton>
