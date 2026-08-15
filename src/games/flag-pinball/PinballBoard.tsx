@@ -7,10 +7,11 @@ import {
   WALLS,
   ZONE_DIVIDERS,
   ZONE_TOP,
+  BALL_RADIUS,
   type ScoreZone,
 } from './boardLayout'
 import { findPinballFlag } from './data/pinballFlags'
-import FlagBall from './FlagBall'
+import FlagBall from '../../components/flag-ball/FlagBall'
 import { useBoardScale } from './useBoardScale'
 import { usePinballEngine } from './usePinballEngine'
 import {
@@ -220,7 +221,7 @@ export default function PinballBoard({ flagIds, runId, onBallScored, onFinished 
           */}
           {flags.map((flag, ballIndex) => (
             <div key={flag.id} ref={registerBall(ballIndex)} className={styles.ballSlot} aria-hidden="true">
-              <FlagBall flag={flag} />
+              <FlagBall flag={flag} size={BALL_RADIUS * 2} />
             </div>
           ))}
         </div>

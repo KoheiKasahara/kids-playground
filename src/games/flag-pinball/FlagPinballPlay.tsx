@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import FlagBall from './FlagBall'
+import FlagBall from '../../components/flag-ball/FlagBall'
 import PinballBoard from './PinballBoard'
 import { findPinballFlag } from './data/pinballFlags'
 import { isPinballPlayState } from './playState'
