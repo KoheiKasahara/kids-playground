@@ -1,0 +1,226 @@
+/* 背景はコースのDOMより下に置く。Phase 1はCSSの図形だけで、画像素材は追加しない。 */
+.background,
+.layerBase,
+.layerFar,
+.layerDecor,
+.foreground {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.background {
+  overflow: hidden;
+}
+
+.layerFar,
+.layerDecor,
+.foreground {
+  display: block;
+}
+
+/* --- 空 ----------------------------------------------------------------- */
+.themeSky .layerBase {
+  background:
+    radial-gradient(circle at 70% 18%, rgba(255, 255, 255, 0.75) 0 10%, transparent 28%),
+    linear-gradient(180deg, #bde7ff 0%, #e9f8ff 62%, #f8fcff 100%);
+}
+
+.themeSky .farShape,
+.themeSky .farShapeSecondary {
+  position: absolute;
+  width: 180px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: 54px 8px 0 -8px rgba(255, 255, 255, 0.58);
+}
+
+.themeSky .farShape {
+  top: 88px;
+  left: -36px;
+}
+
+.themeSky .farShapeSecondary {
+  top: 300px;
+  right: -68px;
+  transform: scale(0.78);
+  opacity: 0.7;
+}
+
+.themeSky .decorShape,
+.themeSky .decorShapeSecondary {
+  position: absolute;
+  width: 86px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.42);
+}
+
+.themeSky .decorShape {
+  top: 430px;
+  right: 44px;
+}
+
+.themeSky .decorShapeSecondary {
+  top: 610px;
+  left: 36px;
+  transform: scale(0.7);
+}
+
+/* --- 森 ----------------------------------------------------------------- */
+.themeForest .layerBase {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 246, 190, 0.48) 0 8%, transparent 30%),
+    linear-gradient(180deg, #c9f1c1 0%, #e9f7cf 58%, #bde3a6 100%);
+}
+
+.themeForest .farShape,
+.themeForest .farShapeSecondary {
+  position: absolute;
+  bottom: 80px;
+  width: 190px;
+  height: 170px;
+  border-radius: 50% 50% 20% 20%;
+  background: rgba(71, 139, 75, 0.25);
+}
+
+.themeForest .farShape {
+  left: -62px;
+}
+
+.themeForest .farShapeSecondary {
+  right: -68px;
+  transform: scale(0.82);
+  background: rgba(43, 108, 61, 0.25);
+}
+
+.themeForest .decorShape,
+.themeForest .decorShapeSecondary {
+  position: absolute;
+  width: 16px;
+  height: 90px;
+  border-radius: 8px;
+  background: rgba(91, 63, 42, 0.3);
+  box-shadow: 0 -20px 0 16px rgba(68, 145, 73, 0.3);
+}
+
+.themeForest .decorShape {
+  bottom: 12px;
+  left: 56px;
+}
+
+.themeForest .decorShapeSecondary {
+  right: 54px;
+  bottom: 28px;
+  transform: scale(0.72);
+}
+
+/* --- 洞窟 ---------------------------------------------------------------- */
+.themeCave .layerBase {
+  background:
+    radial-gradient(circle at 50% 58%, rgba(137, 126, 190, 0.24), transparent 42%),
+    linear-gradient(180deg, #322d4d 0%, #514765 55%, #29263d 100%);
+}
+
+.themeCave .farShape,
+.themeCave .farShapeSecondary {
+  position: absolute;
+  top: 82px;
+  width: 150px;
+  height: 360px;
+  border-radius: 48% 48% 22% 22%;
+  background: rgba(24, 22, 39, 0.3);
+}
+
+.themeCave .farShape {
+  left: -82px;
+  transform: rotate(7deg);
+}
+
+.themeCave .farShapeSecondary {
+  right: -82px;
+  transform: rotate(-7deg);
+}
+
+.themeCave .decorShape,
+.themeCave .decorShapeSecondary {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 40% 60% 50% 45%;
+  background: rgba(187, 176, 209, 0.2);
+  transform: rotate(24deg);
+}
+
+.themeCave .decorShape {
+  top: 120px;
+  left: 46px;
+}
+
+.themeCave .decorShapeSecondary {
+  top: 570px;
+  right: 48px;
+  transform: rotate(-18deg) scale(0.78);
+}
+
+/* --- ゴール -------------------------------------------------------------- */
+.themeGoal .layerBase {
+  background:
+    radial-gradient(circle at 50% 36%, rgba(255, 255, 255, 0.9), transparent 34%),
+    linear-gradient(180deg, #fff1af 0%, #fff9db 52%, #ffe4a8 100%);
+}
+
+.themeGoal .farShape,
+.themeGoal .farShapeSecondary {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border: 12px solid rgba(255, 190, 66, 0.28);
+  border-radius: 50%;
+}
+
+.themeGoal .farShape {
+  top: 120px;
+  left: -42px;
+}
+
+.themeGoal .farShapeSecondary {
+  top: 410px;
+  right: -42px;
+  transform: scale(0.68);
+}
+
+.themeGoal .decorShape,
+.themeGoal .decorShapeSecondary {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #ffd166;
+  transform: rotate(45deg);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.55);
+}
+
+.themeGoal .decorShape {
+  top: 180px;
+  left: 78px;
+}
+
+.themeGoal .decorShapeSecondary {
+  top: 340px;
+  right: 76px;
+  transform: rotate(45deg) scale(0.7);
+}
+
+/* Phase 1では背景アニメーションを入れていないため、reduced-motionでも追加の停止処理は不要。
+   このメディアクエリは将来動きを足す場合の差し込み場所として残しておく。 */
+@media (prefers-reduced-motion: reduce) {
+  .background,
+  .layerBase,
+  .layerFar,
+  .layerDecor,
+  .foreground {
+    animation: none;
+    transition: none;
+  }
+}

@@ -1,0 +1,98 @@
+.page {
+  max-width: var(--content-max-width);
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: calc(var(--space-lg) + var(--safe-top)) calc(var(--space-lg) + var(--safe-right))
+    calc(var(--space-lg) + var(--safe-bottom)) calc(var(--space-lg) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  text-align: center;
+}
+
+.title {
+  font-size: clamp(36px, 12vw, 56px);
+  color: var(--color-success-dark);
+}
+
+.result {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.name {
+  font-size: clamp(26px, 8vw, 36px);
+  font-weight: 800;
+  color: var(--color-primary-dark);
+}
+
+/* キラキラだけを軽く置く。紙吹雪や大量のDOM演出はPhase 1では入れない。 */
+.sparkles {
+  position: absolute;
+  inset: -8px -40px auto;
+  height: 150px;
+  pointer-events: none;
+  color: #f0ad23;
+  font-size: 28px;
+}
+
+.sparkles span {
+  position: absolute;
+  animation: sparkle 1.4s ease-in-out infinite alternate;
+}
+
+.sparkleOne { top: 16px; left: 8px; }
+.sparkleTwo { top: 62px; right: 4px; animation-delay: 220ms !important; }
+.sparkleThree { bottom: 12px; left: 34px; animation-delay: 420ms !important; }
+
+@keyframes sparkle {
+  from { opacity: 0.35; transform: scale(0.78) rotate(0deg); }
+  to { opacity: 1; transform: scale(1.08) rotate(18deg); }
+}
+
+.actions {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkles span {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
+/* 低い縦画面でも3つの操作を画面外へ押し出さない。 */
+@media (max-height: 720px) {
+  .page {
+    gap: var(--space-sm);
+    padding-block: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-bottom));
+  }
+
+  .title {
+    font-size: 34px;
+  }
+
+  .result {
+    gap: var(--space-xs);
+  }
+}
+
+@media (max-width: 400px) {
+  .page {
+    padding-inline: calc(var(--space-md) + var(--safe-left));
+  }
+
+  .actions {
+    max-width: 320px;
+  }
+}
