@@ -59,3 +59,35 @@ describe('TOYS', () => {
     }
   })
 })
+
+describe('左右の回転Toy', () => {
+  const spinners = TOYS.filter((toy) => toy.kind === 'spinner')
+
+  it('左右2個の回転Toyが存在する', () => {
+    expect(spinners).toHaveLength(2)
+  })
+
+  it('右Toyが左Toyの盤面中心に対する鏡写しの位置にある（yは共通）', () => {
+    const left = spinners.find((toy) => toy.id === 'toy-spinner-left')
+    const right = spinners.find((toy) => toy.id === 'toy-spinner-right')
+    if (!left || !right) throw new Error('toyLayout test: 左右の回転Toyが見つかりません')
+
+    expect(right.x).toBe(BOARD_WIDTH - left.x)
+    expect(right.y).toBe(left.y)
+    // 盤面中心から見て左右等距離であること（対称配置の直接的な確認）
+    expect(Math.abs(left.x - BOARD_WIDTH / 2)).toBeCloseTo(Math.abs(right.x - BOARD_WIDTH / 2), 8)
+  })
+
+  it('左右で見た目・当たり判定のサイズに差がない（性能差を付けない）', () => {
+    const [first, second] = spinners
+    expect(second.radius).toBe(first.radius)
+    expect(second.tapRadius).toBe(first.tapRadius)
+  })
+
+  it('idとラベルが左右で別々（スクリーンリーダー上も区別でき、idの重複もない）', () => {
+    const ids = spinners.map((toy) => toy.id)
+    const labels = spinners.map((toy) => toy.labelJa)
+    expect(new Set(ids).size).toBe(2)
+    expect(new Set(labels).size).toBe(2)
+  })
+})

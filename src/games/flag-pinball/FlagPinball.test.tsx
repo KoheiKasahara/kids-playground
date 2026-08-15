@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -69,7 +69,7 @@ function allFlagsProgressText(scored: number, totalBalls: number, totalScoreValu
 }
 
 /**
- * 3球ぶんの得点を発火し、onFinished 後の700ms遷移をfake timersで進めて結果画面へ進む。
+ * 3球ぶんの得点を発火し、onFinished 後の1500ms遷移をfake timersで進めて結果画面へ進む。
  * userEvent（@testing-library/user-event）はfake timers有効中の click 待機と相性が悪く
  * ハングするため、fake timersは「この関数の中だけ」有効にし、抜けるときは必ず real timers へ戻す
  * （呼び出し側は前後で普段どおり userEvent.click を使ってよい）。
@@ -81,7 +81,7 @@ async function finishWithScores(zones: readonly [ScoreZone, ScoreZone, ScoreZone
     engineMock.options!.onFinished()
   })
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(700)
+    await vi.advanceTimersByTimeAsync(1500)
   })
   vi.useRealTimers()
   await screen.findByRole('heading', { name: 'けっか' })
@@ -207,7 +207,7 @@ describe('FlagPinball プレイ画面', () => {
       engineMock.options!.onFinished()
     })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(700)
+      await vi.advanceTimersByTimeAsync(1500)
     })
     vi.useRealTimers()
 
@@ -231,9 +231,9 @@ describe('FlagPinball プレイ画面', () => {
       engineMock.options!.onFinished()
     })
 
-    // 700ms 経過するまではまだ結果画面へ遷移しない（最後の得点ポップを見せる猶予）
+    // 1500ms 経過するまではまだ結果画面へ遷移しない（最後の得点ポップ・盤面の余韻を見せる猶予）
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(650)
+      await vi.advanceTimersByTimeAsync(1450)
     })
     expect(screen.queryByRole('heading', { name: 'けっか' })).not.toBeInTheDocument()
 
@@ -247,6 +247,39 @@ describe('FlagPinball プレイ画面', () => {
     expect(screen.getByText('1000てん')).toBeInTheDocument()
     expect(screen.getByText('ごうけい')).toBeInTheDocument()
     expect(screen.getByText('1200てん！')).toBeInTheDocument()
+  })
+
+  test('待ち時間中におもちゃを連打しても結果画面への遷移が延長されない', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/flag-pinball')
+    await selectDefaultThreeAndPlay(user)
+
+    vi.useFakeTimers()
+    act(() => {
+      engineMock.options!.onBallScored(0, SCORE_ZONES[0])
+      engineMock.options!.onBallScored(1, SCORE_ZONES[0])
+      engineMock.options!.onBallScored(2, SCORE_ZONES[0])
+      engineMock.options!.onFinished()
+    })
+
+    // onFinished 後の待ち時間中に、左の回転おもちゃを何度もタップする
+    // （タップは usePinballEngine 側の activateToy を呼ぶだけで、結果画面遷移のタイマーには触れない）。
+    // fake timers 有効中は findByRole/userEvent.click 側の待機がハングしうるため、
+    // 盤面は既に描画済みであることを踏まえ、待機を伴わない getByRole + fireEvent を使う。
+    const spinnerButton = screen.getByRole('button', { name: 'くるくる おもちゃ（ひだり）' })
+    act(() => {
+      for (let i = 0; i < 5; i += 1) {
+        fireEvent.pointerDown(spinnerButton)
+      }
+    })
+
+    // 連打していても、既定の待ち時間（1500ms）ちょうどで結果画面へ進む
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500)
+    })
+    vi.useRealTimers()
+
+    expect(await screen.findByRole('heading', { name: 'けっか' })).toBeInTheDocument()
   })
 })
 
@@ -364,7 +397,7 @@ describe('FlagPinball 全射出モード', () => {
       engineMock.options!.onFinished()
     })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(700)
+      await vi.advanceTimersByTimeAsync(1500)
     })
     vi.useRealTimers()
 
@@ -385,7 +418,7 @@ describe('FlagPinball 全射出モード', () => {
       engineMock.options!.onFinished()
     })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(700)
+      await vi.advanceTimersByTimeAsync(1500)
     })
     vi.useRealTimers()
     await screen.findByRole('heading', { name: 'けっか' })
