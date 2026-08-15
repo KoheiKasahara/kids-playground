@@ -15,77 +15,156 @@ export const AREA_COLUMN_STEP = AREA_WIDTH + AREA_COLUMN_GAP
 /** 端の出口を外壁から少し離し、出口の左右にボールを受ける床を残す。 */
 export const SIDE_EXIT_INSET = 80
 
-/** そらは長い斜面を3枚つなぎ、入口の雲風ピンで1〜2回だけ反応を見せる基準コース。 */
-export const SKY_SLOPE_X = AREA_WIDTH / 2
-export const SKY_SLOPE_WIDTH = 300
+/** そらは長い坂の合間へ雲風ピンを置き、板の端から次の反射へつなぐ軽快な導入にする。 */
+export const SKY_SLOPE_LEFT_X = 150
+export const SKY_SLOPE_RIGHT_X = AREA_WIDTH - SKY_SLOPE_LEFT_X
+export const SKY_SLOPE_TOP_WIDTH = 120
+export const SKY_SLOPE_MIDDLE_LEFT_X = 120
+export const SKY_SLOPE_MIDDLE_RIGHT_X = AREA_WIDTH - SKY_SLOPE_MIDDLE_LEFT_X
+export const SKY_SLOPE_MIDDLE_WIDTH = 120
+export const SKY_SLOPE_BOTTOM_LEFT_X = 120
+export const SKY_SLOPE_BOTTOM_RIGHT_X = AREA_WIDTH - SKY_SLOPE_BOTTOM_LEFT_X
+export const SKY_SLOPE_BOTTOM_WIDTH = 120
 export const SKY_SLOPE_HEIGHT = 18
 export const SKY_SLOPE_TOP_Y = 170
-export const SKY_SLOPE_MIDDLE_Y = 360
-export const SKY_SLOPE_BOTTOM_Y = 550
-export const SKY_SLOPE_ANGLE = 0.36
-export const SKY_CLOUD_PIN_LEFT_X = 20
+export const SKY_SLOPE_MIDDLE_Y = 400
+export const SKY_SLOPE_BOTTOM_Y = 630
+export const SKY_SLOPE_ANGLE = 0.4
+/** 坂の端で横へ逃げた球を、次の坂や雲風バンパーへ戻す少数の目印。 */
+/** 最後の坂の先を空白にせず、出口へ向かう落下を大きく受け止める雲風バンパー。 */
+export const SKY_CLOUD_PIN_LEFT_X = 28
 export const SKY_CLOUD_PIN_RIGHT_X = AREA_WIDTH - SKY_CLOUD_PIN_LEFT_X
-export const SKY_CLOUD_PIN_RADIUS = 16
-export const SKY_CLOUD_PIN_TOP_Y = 80
-export const SKY_CLOUD_PIN_MIDDLE_Y = 260
-export const SKY_CLOUD_PIN_BOTTOM_Y = 640
+export const SKY_CLOUD_PIN_LEFT_Y = 260
+export const SKY_CLOUD_PIN_RIGHT_Y = SKY_CLOUD_PIN_LEFT_Y
+export const SKY_CLOUD_PIN_RADIUS = 12
+export const SKY_CLOUD_SIDE_LEFT_X = 24
+export const SKY_CLOUD_SIDE_RIGHT_X = AREA_WIDTH - SKY_CLOUD_SIDE_LEFT_X
+export const SKY_CLOUD_SIDE_Y = 500
+export const SKY_CLOUD_SIDE_RADIUS = 10
+export const SKY_CLOUD_BUMPER_X = AREA_WIDTH / 2
+export const SKY_CLOUD_BUMPER_Y = 300
+export const SKY_CLOUD_BUMPER_RADIUS = 14
+export const SKY_CLOUD_CATCHER_Y = 515
+export const SKY_CLOUD_CATCHER_WIDTH = 140
+export const SKY_CLOUD_CATCHER_ANGLE = 0.2
 
 /** 分岐後の入口で左右から中央へ寄せる初速。出口へ入ったときの速度をそのまま引き継がず、合流を見せる。 */
 export const MERGE_ENTRY_SPEED = 2.2
 export const MERGE_ENTRY_VERTICAL_SPEED = 0.2
 
-/** 森の分岐前に左右の丸太とキノコを置き、通過してから分かれ道へ入る流れを作る。 */
+/** 森の分岐前は左右の丸太を短い受け板にし、その下へ3段の千鳥ピン群をつなぐ。 */
 export const FOREST_APPROACH_LOG_LEFT_X = 130
 export const FOREST_APPROACH_LOG_RIGHT_X = AREA_WIDTH - FOREST_APPROACH_LOG_LEFT_X
-export const FOREST_APPROACH_LOG_Y = 120
+export const FOREST_APPROACH_LOG_Y = 90
 export const FOREST_APPROACH_LOG_WIDTH = 140
 export const FOREST_APPROACH_LOG_HEIGHT = 18
 export const FOREST_APPROACH_LOG_ANGLE = 0.28
-export const FOREST_APPROACH_MUSHROOM_LEFT_X = 90
-export const FOREST_APPROACH_MUSHROOM_RIGHT_X = AREA_WIDTH - FOREST_APPROACH_MUSHROOM_LEFT_X
-export const FOREST_APPROACH_MUSHROOM_Y = 260
-export const FOREST_APPROACH_MUSHROOM_RADIUS = 18
+export const FOREST_APPROACH_RAMP_X = AREA_WIDTH / 2
+export const FOREST_APPROACH_RAMP_Y = 130
+export const FOREST_APPROACH_RAMP_WIDTH = 100
+export const FOREST_APPROACH_RAMP_HEIGHT = 18
+export const FOREST_APPROACH_RAMP_ANGLE = 0.05
+export const FOREST_PIN_ROW_TOP_Y = 200
+export const FOREST_PIN_ROW_MIDDLE_Y = 550
+export const FOREST_PIN_ROW_BOTTOM_Y = 600
+export const FOREST_PIN_RADIUS = 12
+/** 入口の中央を少しずつ左右へ渡す2段の木の実で、乗り上げない分岐起点にする。 */
+export const FOREST_BRANCH_PIN_TOP_X = AREA_WIDTH / 2
+export const FOREST_BRANCH_PIN_TOP_Y = 282
+export const FOREST_BRANCH_PIN_RADIUS = 8
+export const FOREST_BRANCH_PIN_SIDE_LEFT_X = 160
+export const FOREST_BRANCH_PIN_SIDE_RIGHT_X = AREA_WIDTH - FOREST_BRANCH_PIN_SIDE_LEFT_X
+export const FOREST_BRANCH_PIN_SIDE_RADIUS = 10
+export const FOREST_PIN_MIDDLE_LEFT_X = 140
+export const FOREST_PIN_MIDDLE_RIGHT_X = AREA_WIDTH - FOREST_PIN_MIDDLE_LEFT_X
+export const FOREST_PIN_BOTTOM_LEFT_X = 50
+export const FOREST_PIN_BOTTOM_RIGHT_X = AREA_WIDTH - FOREST_PIN_BOTTOM_LEFT_X
+/** 下流の中央尾根は左右の出口へ落ちる直前の向きを変え、中央帯での静止を防ぐ。 */
+export const FOREST_BRANCH_RIDGE_X = AREA_WIDTH / 2
+export const FOREST_BRANCH_RIDGE_Y = 620
+export const FOREST_BRANCH_RIDGE_RADIUS = 12
 
-/** 森の左右出口と分岐の障害物。出口間の帯を狭め、中央の尾根でボールが止まらないようにする。 */
-export const FOREST_LEFT_EXIT_X = 100
+/** 森の左右出口へピン群の結果を送り、最後の短い屋根で左右の出口へ分ける。 */
+export const FOREST_LEFT_EXIT_X = 130
 export const FOREST_RIGHT_EXIT_X = AREA_WIDTH - FOREST_LEFT_EXIT_X
-/** 中心の真上を避け、初速の小さな違いが左右の反射に分かれる起点を作る。 */
-export const FOREST_BRANCH_BUMPER_OFFSET_X = 3
-export const FOREST_BRANCH_BUMPER_X = AREA_WIDTH / 2 + FOREST_BRANCH_BUMPER_OFFSET_X
-export const FOREST_BRANCH_BUMPER_Y = 250
-export const FOREST_BRANCH_BUMPER_RADIUS = 32
-export const FOREST_BRANCH_ROOF_LEFT_X = 140
+export const FOREST_EXIT_WIDTH = 180
+export const FOREST_BRANCH_ROOF_LEFT_X = 160
 export const FOREST_BRANCH_ROOF_RIGHT_X = AREA_WIDTH - FOREST_BRANCH_ROOF_LEFT_X
-export const FOREST_BRANCH_ROOF_Y = 420
-export const FOREST_BRANCH_ROOF_WIDTH = 120
+export const FOREST_BRANCH_ROOF_Y = 430
+export const FOREST_BRANCH_ROOF_WIDTH = 100
 export const FOREST_BRANCH_ROOF_HEIGHT = 18
 export const FOREST_BRANCH_ROOF_ANGLE = 0.55
-export const FOREST_BRANCH_RIDGE_Y = 650
-export const FOREST_BRANCH_RIDGE_RADIUS = 32
+export const FOREST_EXIT_RAMP_LEFT_X = 35
+export const FOREST_EXIT_RAMP_RIGHT_X = AREA_WIDTH - FOREST_EXIT_RAMP_LEFT_X
+export const FOREST_EXIT_RAMP_Y = 568
+export const FOREST_EXIT_RAMP_WIDTH = 60
+export const FOREST_EXIT_RAMP_HEIGHT = 18
+export const FOREST_EXIT_RAMP_ANGLE = FOREST_BRANCH_ROOF_ANGLE
+export const FOREST_EXIT_GUIDE_LEFT_X = 70
+export const FOREST_EXIT_GUIDE_RIGHT_X = AREA_WIDTH - FOREST_EXIT_GUIDE_LEFT_X
+export const FOREST_EXIT_GUIDE_Y = 610
+export const FOREST_EXIT_GUIDE_WIDTH = 80
+export const FOREST_EXIT_GUIDE_HEIGHT = 18
 
-/** 洞窟は短い板を左右交互に突き出し、中央の岩を避ける狭いジグザグにする。 */
-export const CAVE_ZIGZAG_LEFT_X = 140
+/** 洞窟は短い板を左右交互に突き出し、2段の岩群を避ける狭いジグザグにする。 */
+export const CAVE_ZIGZAG_LEFT_X = 150
 export const CAVE_ZIGZAG_RIGHT_X = AREA_WIDTH - CAVE_ZIGZAG_LEFT_X
-export const CAVE_ZIGZAG_WALL_WIDTH = 220
+export const CAVE_ZIGZAG_WALL_WIDTH = 120
+export const CAVE_ZIGZAG_SECOND_LEFT_X = 80
+export const CAVE_ZIGZAG_SECOND_RIGHT_X = AREA_WIDTH - CAVE_ZIGZAG_SECOND_LEFT_X
+export const CAVE_ZIGZAG_BOTTOM_LEFT_X = 120
+export const CAVE_ZIGZAG_BOTTOM_RIGHT_X = AREA_WIDTH - CAVE_ZIGZAG_BOTTOM_LEFT_X
+export const CAVE_ZIGZAG_BOTTOM_WIDTH = 180
+export const CAVE_CHANNEL_LEFT_X = 90
+export const CAVE_CHANNEL_RIGHT_X = AREA_WIDTH - CAVE_CHANNEL_LEFT_X
+export const CAVE_CHANNEL_Y = 485
+export const CAVE_CHANNEL_WIDTH = 32
+export const CAVE_CHANNEL_HEIGHT = 8
+export const CAVE_CHANNEL_ANGLE = 0.35
 export const CAVE_ZIGZAG_WALL_HEIGHT = 18
-export const CAVE_ZIGZAG_ANGLE = 0.32
-export const CAVE_ZIGZAG_TOP_Y = 130
+export const CAVE_ZIGZAG_ANGLE = 0.4
+export const CAVE_ZIGZAG_TOP_Y = 150
 export const CAVE_ZIGZAG_SECOND_Y = 380
-export const CAVE_ZIGZAG_BOTTOM_Y = 640
-export const CAVE_ROCK_X = AREA_WIDTH / 2
-export const CAVE_ROCK_RADIUS = 16
-export const CAVE_ROCK_TOP_Y = 255
-export const CAVE_ROCK_BOTTOM_Y = 505
+export const CAVE_ZIGZAG_BOTTOM_Y = 600
+export const CAVE_ROCK_RADIUS = 12
+/** 入口側の岩は板際でボールを止めず、下段だけ少し大きくして次の板へ受け渡す。 */
+export const CAVE_TOP_ROCK_RADIUS = 10
+export const CAVE_ROCK_TOP_Y = 260
+export const CAVE_ROCK_BOTTOM_Y = 460
+export const CAVE_ROCK_TOP_CENTER_X = AREA_WIDTH / 2
+export const CAVE_ROCK_BOTTOM_RIGHT_X = AREA_WIDTH / 2
+export const CAVE_BOTTOM_ROCK_RADIUS = 8
+export const CAVE_BOTTOM_ROCK_RESTITUTION = 0.55
+export const CAVE_ROCK_MIDDLE_LEFT_X = 210
+export const CAVE_ROCK_MIDDLE_LEFT_Y = 360
+export const CAVE_ROCK_MIDDLE_LEFT_RADIUS = 6
+export const CAVE_ROCK_MIDDLE_LEFT_RESTITUTION = 0.55
+/** 洞窟上段の共通導線へ置く大砲の装填室。分岐前の球を確実に受ける。 */
+export const CAVE_CANNON_APPROACH_X = AREA_WIDTH / 2
+export const CAVE_CANNON_APPROACH_Y = 230
+export const CAVE_CANNON_APPROACH_RADIUS = 40
+/** 上段砲の射出後に戻る帯を受け、次の岩ピンへ渡す着地ピン。 */
+export const CAVE_CANNON_LANDING_X = 150
+export const CAVE_CANNON_LANDING_Y = 265
+export const CAVE_CANNON_LANDING_RADIUS = 20
+/** 射出直後の着地ピンは少しだけ弾みを抑え、次の岩群へ滞在を渡す反発係数。 */
+export const CAVE_CANNON_LANDING_RESTITUTION = 0.5
 
-/** 川は長い板を左右いっぱいへ渡し、ゆるい角度で横移動を主役にする。 */
-export const RIVER_SWEEP_WIDTH = 340
+/** 川は長い板を左右へ渡し、板の端で向きを変える少数のピンを置いて横移動を主役にする。 */
+export const RIVER_SWEEP_WIDTH = 240
+export const RIVER_SWEEP_BOTTOM_WIDTH = 200
 export const RIVER_SWEEP_HEIGHT = 18
-export const RIVER_SWEEP_TOP_Y = 140
-export const RIVER_SWEEP_SECOND_Y = 360
+export const RIVER_SWEEP_TOP_Y = 120
+export const RIVER_SWEEP_SECOND_Y = 380
+export const RIVER_SWEEP_SECOND_X = AREA_WIDTH - 120
+export const RIVER_SWEEP_SECOND_WIDTH = 120
 export const RIVER_SWEEP_BOTTOM_Y = 610
-export const RIVER_SWEEP_ANGLE = 0.3
+export const RIVER_SWEEP_ANGLE = 0.28
+export const RIVER_PIN_TOP_RIGHT_X = AREA_WIDTH - 96
+export const RIVER_PIN_TOP_Y = 250
+export const RIVER_PIN_RADIUS = 14
 
-/** 雲の入口は左右に離し、V字の2枚板で通常幅の出口へ中央寄せする。 */
+/** 雲の入口は左右に離し、V字と3個の大きな雲バンパーでふわっと中央へ寄せる。 */
 export const CLOUD_ENTRY_LEFT_X = 120
 export const CLOUD_ENTRY_RIGHT_X = AREA_WIDTH - CLOUD_ENTRY_LEFT_X
 export const CLOUD_EXIT_X = AREA_WIDTH / 2
@@ -95,6 +174,14 @@ export const CLOUD_V_Y = 590
 export const CLOUD_V_WIDTH = 200
 export const CLOUD_V_HEIGHT = 18
 export const CLOUD_V_ANGLE = 0.36
+export const CLOUD_BUMPER_LEFT_X = 180
+export const CLOUD_BUMPER_LEFT_Y = 180
+export const CLOUD_BUMPER_RIGHT_X = 300
+export const CLOUD_BUMPER_RIGHT_Y = 220
+export const CLOUD_BUMPER_CENTER_X = AREA_WIDTH / 2
+export const CLOUD_BUMPER_CENTER_Y = 450
+export const CLOUD_BUMPER_SIDE_RADIUS = 30
+export const CLOUD_BUMPER_CENTER_RADIUS = 32
 
 /** ゴールは既存のV字と中央ピンを保ち、カップ周辺の物理・幾何はTask Aの数値を変えない。 */
 export const GOAL_FUNNEL_TOP_LEFT_X = 110
@@ -162,12 +249,39 @@ export const PIN_RESTITUTION = 0.7
 /** 壁に沿って落ちるときの減速を残すための接触摩擦。 */
 export const WALL_FRICTION = 0.06
 /** ピンに当たったあと横へ流れやすくするが、急加速はさせない摩擦。 */
-export const PIN_FRICTION = 0.02
+export const PIN_FRICTION = 0
 
 /** 薄い壁を1ステップで飛び越えないための速度上限(px/step)。 */
 export const MAX_SPEED = 14
 /** 国旗の模様が読めなくなるほど回転しないための角速度上限(rad/step)。 */
 export const MAX_ANGULAR_VELOCITY = 0.22
+
+/** 大砲へ入ったボールを子どもが見てから射出できる中間の溜め時間(ms)。 */
+export const CANNON_HOLD_MS = 520
+/** 大砲は重力から離れた動きを見せつつ、速度上限まで余裕を残す初期値(px/step)。 */
+export const CANNON_POWER = 9.5
+/** 洞窟の短い導線では、射出先の板へ確実に届きつつ川の加速感を残す威力(px/step)。 */
+export const CAVE_CANNON_POWER = 8
+/** 大砲の捕獲円。砲身の見た目と入口の狙いやすさを両立する半径(px)。 */
+export const CANNON_SENSOR_RADIUS = 30
+/** 射出直後に捕獲センサーへ戻らないよう、センサー半径より外へ出す距離(px)。 */
+export const CANNON_MUZZLE_OFFSET = 42
+/** 射出直後の同じ大砲への再捕獲を防ぐ待ち時間(ms)。 */
+export const CANNON_RECAPTURE_COOLDOWN_MS = 700
+/** ジャンプ台は大砲より低く跳ね、コースの流れを読みやすく保つ初期値(px/step)。 */
+export const JUMP_POWER = 8
+/** 川の長い坂の終端でスピード感を出し、MAX_SPEEDを超えない範囲で上向きに跳ねる速度(px/step)。 */
+export const RIVER_JUMP_POWER = 9
+/** ジャンプ台が同じ接触で連続発火しないための短い待ち時間(ms)。 */
+export const JUMP_COOLDOWN_MS = 250
+/** 加速レーンの1ステップ加速度。触れたことが分かるが急加速しすぎない値(px/step)。 */
+export const BOOST_ACCELERATION = 0.35
+/** 加速レーン内でも既存の速度感を壊さない上限(px/step)。 */
+export const BOOST_MAX_SPEED = 11
+/** 加速レーンの通知音を再入場時に鳴らしすぎない待ち時間(ms)。 */
+export const BOOST_SOUND_COOLDOWN_MS = 500
+/** ふわふわゾーンで残す重力の割合。落下感を保ちながら滞空を見せる値。 */
+export const FLOAT_GRAVITY_SCALE = 0.45
 
 /** タブ復帰直後に実時間の大きな差分をそのまま物理へ渡さないための上限(ms)。 */
 export const MAX_FRAME_DELTA_MS = 100
@@ -186,8 +300,8 @@ export const STALL_DURATION_MS = 1200
 /** 停滞ナッジの横速度。ワープではなく、次の接触を生むための小さな押し出しに留める。 */
 export const STALL_NUDGE_SPEED = 1.8
 
-/** 同じエリアで偶発的に止まり続けても、必ず次へ進めるための上限滞在時間(ms)。 */
-export const AREA_TIMEOUT_MS = 12_000
+/** 同じエリアで偶発的に止まり続けても、密度を味わえる時間を確保してから進める保険(ms)。 */
+export const AREA_TIMEOUT_MS = 15_000
 /** 左右へこの距離以上はみ出したら、現在エリアの入口へ戻す救済マージン(px)。 */
 export const OUT_OF_BOUNDS_MARGIN_X = 80
 /** 上へこの距離以上はみ出したら、コースから外れたとみなす救済マージン(px)。 */

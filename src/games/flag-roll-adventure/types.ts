@@ -25,7 +25,58 @@ export type AreaPin = {
   restitution?: number
 }
 
-export type AreaObject = AreaWall | AreaPin
+/** 触れると指定方向へ跳ねるソリッドな板。 */
+export type AreaJumpPad = {
+  kind: 'jump'
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+  angle: number
+  launchAngle: number
+  power: number
+}
+
+export type AreaObject = AreaWall | AreaPin | AreaJumpPad
+
+/** ボールを一時捕獲して指定方向へ射出するセンサー円。 */
+export type AreaCannon = {
+  kind: 'cannon'
+  id: string
+  x: number
+  y: number
+  radius: number
+  angle: number
+  power: number
+  holdMs?: number
+}
+
+/** 通過中のボールを進行方向へ加速するセンサー矩形。 */
+export type AreaBoostLane = {
+  kind: 'boost'
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+  angle: number
+  force?: number
+  maxSpeed?: number
+}
+
+/** 中にいる間だけ重力の一部を打ち消すセンサー矩形。 */
+export type AreaFloatZone = {
+  kind: 'float'
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+  gravityScale: number
+}
+
+export type AreaZone = AreaCannon | AreaBoostLane | AreaFloatZone
 
 /** 出入口の見た目の種類。物理には影響せず、CSSのクラス選択にだけ使う。 */
 export type PortalKind = 'hole' | 'tunnel' | 'pipe' | 'cavemouth'
@@ -72,6 +123,7 @@ export type AdventureArea = {
   /** ワールド上の原点。配列位置から計算せず、分岐したエリアの配置を明示する。 */
   origin: { x: number; y: number }
   objects: readonly AreaObject[]
+  zones?: readonly AreaZone[]
   entries: readonly AreaEntry[]
   exits: readonly AreaExit[]
   cup?: AreaCup

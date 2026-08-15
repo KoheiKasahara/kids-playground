@@ -4,51 +4,48 @@ import {
   AREA_HEIGHT,
   AREA_TIMEOUT_MS,
   AREA_WIDTH,
-  BALL_DENSITY,
-  BALL_FRICTION,
-  BALL_FRICTION_AIR,
   BALL_RADIUS,
-  BALL_RESTITUTION,
   CAMERA_SETTLE_MS,
   CAMERA_TRANSITION_MS,
-  CUP_FRICTION,
+  BOOST_SOUND_COOLDOWN_MS,
   CUP_INNER_DEPTH,
   CUP_INNER_WIDTH,
   CUP_RESCUE_DROP_HEIGHT,
-  CUP_RESTITUTION,
   CUP_SENSOR_INSET,
   CUP_SETTLE_MS,
-  EXIT_SENSOR_HEIGHT,
   EXIT_SWALLOW_MS,
   ENTRY_EMERGE_MS,
-  GRAVITY,
   GOAL_RESCUE_DROP_LIMIT,
+  JUMP_COOLDOWN_MS,
   MAX_ANGULAR_VELOCITY,
   MAX_FRAME_DELTA_MS,
   MAX_SPEED,
   MAX_SUBSTEPS,
   OUT_OF_BOUNDS_MARGIN_X,
   OUT_OF_BOUNDS_MARGIN_Y,
-  OUTER_WALL_THICKNESS,
-  PIN_FRICTION,
   PIN_HIT_COOLDOWN_MS,
-  PIN_RESTITUTION,
   PIN_SOUND_GLOBAL_COOLDOWN_MS,
-  START,
   STALL_DURATION_MS,
   STALL_NUDGE_SPEED,
   STALL_SPEED_THRESHOLD,
   STEP_MS,
-  WALL_FRICTION,
-  WALL_RESTITUTION,
 } from './adventurePhysics'
-import { AREAS, findArea, pickExitForBallX, resolveExitTarget, START_AREA_ID } from './data/areas'
+import { findArea, pickExitForBallX, resolveExitTarget, START_AREA_ID } from './data/areas'
+import { createAdventureWorld, type AdventureZoneEntry } from './adventureWorld'
+import {
+  canRecaptureCannon,
+  calculateZoneEffects,
+  getCannonHoldMs,
+  getCannonLaunchVelocity,
+  getCannonMuzzlePosition,
+  getJumpLaunchVelocity,
+  type AdventureGimmickEvent,
+} from './gimmicks'
 import stageStyles from './AdventureStage.module.css'
 import { cameraPositionForArea, interpolateCameraPosition, type CameraPosition } from './camera'
-import { areaGroundRects, cupBottomRect, cupSensorRect, type AdventureRect } from './adventureGeometry'
-import type { AreaCup, AreaEntry, AreaExit, AreaPin, AreaWall } from './types'
+import type { AreaCannon, AreaEntry, AreaExit, AreaJumpPad } from './types'
 
-const { Engine, Bodies, Body, Composite, Events } = Matter
+const { Engine, Body, Composite, Events } = Matter
 
 export type AdventureEngineOptions = {
   /** プレイの世代。値が変わったら物理世界を作り直して最初から始める。 */
@@ -59,6 +56,8 @@ export type AdventureEngineOptions = {
   onGoal: () => void
   /** ピン衝突の演出用通知。物理の軌道をReact stateで描画しないための軽いイベント。 */
   onPinHit: (pinId: string) => void
+  /** ギミックの捕獲・射出・発火を見た目と音へ伝える軽いイベント。 */
+  onGimmick?: (event: AdventureGimmickEvent) => void
   /** 最初のボールをワールドへ追加したときの効果音用通知。 */
   onBallLaunched?: () => void
 }
@@ -73,8 +72,13 @@ export type AdventureEngineHandle = {
 }
 
 type ExitEntry = { areaId: string; exit: AreaExit }
-type CupEntry = { areaId: string; cup: AreaCup }
 type LinearVelocity = { x: number; y: number }
+type ActiveCannon = {
+  label: string
+  areaId: string
+  cannon: AreaCannon
+  startedAt: number
+}
 
 /** area objectをworld座標へ置くための変換。ローカル座標を変更しないことが重要。 */
 function worldPoint(areaId: string, x: number, y: number) {
@@ -92,54 +96,6 @@ function clampLinearVelocity(velocity: LinearVelocity): LinearVelocity {
 
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
-}
-
-/** 出口・カップ以外の下抜けを防ぐ床。開口だけを残すので、外側へ落ちたときも通常は救済に頼らない。 */
-function createRectBody(areaId: string, rect: AdventureRect, options: Matter.IChamferableBodyDefinition): Matter.Body {
-  const center = worldPoint(areaId, rect.left + rect.width / 2, rect.top + rect.height / 2)
-  return Bodies.rectangle(center.x, center.y, rect.width, rect.height, options)
-}
-
-/** ゴールの地面はカップのリムから続く左右の塊にし、見た目と内側の側壁を同じ矩形から作る。 */
-function createPortalFloorBodies(area: (typeof AREAS)[number]): Matter.Body[] {
-  const material = area.cup
-    ? { restitution: CUP_RESTITUTION, friction: CUP_FRICTION }
-    : { restitution: WALL_RESTITUTION, friction: WALL_FRICTION }
-  return areaGroundRects(area).map((rect, index) =>
-    createRectBody(area.id, rect, {
-      isStatic: true,
-      ...material,
-      label: area.cup
-        ? `cup-ground:${area.id}:${index}`
-        : `portal-floor:${area.id}:${index}`,
-    }),
-  )
-}
-
-function createCupBodies(
-  area: (typeof AREAS)[number],
-  cupByLabel: Map<string, CupEntry>,
-): Matter.Body[] {
-  if (!area.cup) return []
-  const { cup } = area
-  const common = {
-    isStatic: true,
-    restitution: CUP_RESTITUTION,
-    friction: CUP_FRICTION,
-  }
-  const bottom = createRectBody(area.id, cupBottomRect(cup), {
-    ...common,
-    label: `cup-bottom:${area.id}:${cup.id}`,
-  })
-
-  // センサー上端を「判定線+ボール半径」まで下げることで、球の中心が判定線を越えてから衝突が始まる。
-  const sensor = createRectBody(area.id, cupSensorRect(cup), {
-    isStatic: true,
-    isSensor: true,
-    label: `cup-sensor:${area.id}:${cup.id}`,
-  })
-  cupByLabel.set(sensor.label, { areaId: area.id, cup })
-  return [bottom, sensor]
 }
 
 /**
@@ -179,126 +135,33 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
     const runToken = Symbol('adventure-run')
     activeRunRef.current = runToken
 
-    const startArea = findArea(START_AREA_ID)
-    const startEntry = startArea?.entries[0]
-    if (!startArea || !startEntry) {
-      throw new Error(`flag-roll-adventure: START_AREA_IDまたは既定入口が見つかりません: ${START_AREA_ID}`)
-    }
-
     const reducedMotion = prefersReducedMotion()
     const exitSwallowMs = reducedMotion ? 0 : EXIT_SWALLOW_MS
     const cameraTransitionMs = reducedMotion ? 0 : CAMERA_TRANSITION_MS
     const cameraSettleMs = reducedMotion ? 0 : CAMERA_SETTLE_MS
     const entryEmergeMs = reducedMotion ? 0 : ENTRY_EMERGE_MS
     const cupSettleMs = CUP_SETTLE_MS
-    const engine = Engine.create({ gravity: { ...GRAVITY } })
-
-    // 外壁はコースの面白さを表すarea dataへ混ぜず、全エリアで共通の安全柵として生成する。
-    const outerWalls = AREAS.flatMap((area) => {
-      const left = Bodies.rectangle(
-        area.origin.x,
-        area.origin.y + AREA_HEIGHT / 2,
-        OUTER_WALL_THICKNESS,
-        AREA_HEIGHT,
-        { isStatic: true, restitution: WALL_RESTITUTION, friction: WALL_FRICTION, label: `outer-left:${area.id}` },
-      )
-      const right = Bodies.rectangle(
-        area.origin.x + AREA_WIDTH,
-        area.origin.y + AREA_HEIGHT / 2,
-        OUTER_WALL_THICKNESS,
-        AREA_HEIGHT,
-        { isStatic: true, restitution: WALL_RESTITUTION, friction: WALL_FRICTION, label: `outer-right:${area.id}` },
-      )
-      const top =
-        area.id === START_AREA_ID
-          ? [
-              Bodies.rectangle(
-                area.origin.x + AREA_WIDTH / 2,
-                area.origin.y,
-                AREA_WIDTH,
-                OUTER_WALL_THICKNESS,
-                { isStatic: true, restitution: WALL_RESTITUTION, friction: WALL_FRICTION, label: `outer-top:${area.id}` },
-              ),
-            ]
-          : []
-      return [left, right, ...top]
-    })
-
-    const wallBodies: Matter.Body[] = []
-    const pinBodies: Matter.Body[] = []
-    const pinByLabel = new Map<string, AreaPin>()
-    for (const area of AREAS) {
-      for (const object of area.objects) {
-        const point = worldPoint(area.id, object.x, object.y)
-        if (object.kind === 'wall') {
-          const wall = object as AreaWall
-          wallBodies.push(
-            Bodies.rectangle(point.x, point.y, wall.width, wall.height, {
-              isStatic: true,
-              angle: wall.angle,
-              restitution: wall.restitution ?? WALL_RESTITUTION,
-              friction: WALL_FRICTION,
-              label: `wall:${area.id}:${wall.id}`,
-            }),
-          )
-        } else {
-          const pin = object as AreaPin
-          const label = `pin:${area.id}:${pin.id}`
-          pinBodies.push(
-            Bodies.circle(point.x, point.y, pin.radius, {
-              isStatic: true,
-              restitution: pin.restitution ?? PIN_RESTITUTION,
-              friction: PIN_FRICTION,
-              label,
-            }),
-          )
-          pinByLabel.set(label, pin)
-        }
-      }
-    }
-
-    const exitByLabel = new Map<string, ExitEntry>()
-    const exitSensors = AREAS.flatMap((area) =>
-      area.exits.map((exit) => {
-        const point = worldPoint(area.id, exit.x, exit.y)
-        const label = `exit:${area.id}:${exit.id}`
-        exitByLabel.set(label, { areaId: area.id, exit })
-        return Bodies.rectangle(point.x, point.y, exit.width, exit.height || EXIT_SENSOR_HEIGHT, {
-          isStatic: true,
-          isSensor: true,
-          label,
-        })
-      }),
-    )
-
-    const cupByLabel = new Map<string, CupEntry>()
-    const portalFloors = AREAS.flatMap((area) => createPortalFloorBodies(area))
-    const cupBodies = AREAS.flatMap((area) => createCupBodies(area, cupByLabel))
-    Composite.add(engine.world, [...outerWalls, ...wallBodies, ...pinBodies, ...portalFloors, ...exitSensors, ...cupBodies])
-
-    const initialPosition = worldPoint(
-      START_AREA_ID,
-      startEntry.x + (Math.random() * 2 - 1) * START.jitterX,
-      startEntry.y,
-    )
-    const ballBody = Bodies.circle(initialPosition.x, initialPosition.y, BALL_RADIUS, {
-      restitution: BALL_RESTITUTION,
-      friction: BALL_FRICTION,
-      frictionAir: BALL_FRICTION_AIR,
-      density: BALL_DENSITY,
-      label: 'adventure-ball',
-    })
-    Body.setVelocity(ballBody, {
-      x: START.minVx + Math.random() * (START.maxVx - START.minVx),
-      y: START.minVy + Math.random() * (START.maxVy - START.minVy),
-    })
-    Composite.add(engine.world, ballBody)
+    const {
+      engine,
+      ballBody,
+      pinByLabel,
+      jumpByLabel,
+      exitByLabel,
+      cupByLabel,
+      zoneByLabel,
+    } = createAdventureWorld(Math.random)
+    const zoneWorldGeometry = [...zoneByLabel.values()].map((entry) => ({
+      zone: entry.zone,
+      x: entry.body.position.x,
+      y: entry.body.position.y,
+      angle: entry.body.angle,
+    }))
 
     const ballElement = ballElementRef.current
     if (ballElement) ballElement.style.visibility = 'visible'
 
     let currentAreaId = START_AREA_ID
-    let motion: 'running' | 'exiting' | 'moving' | 'cup-in' | 'goal' = 'running'
+    let motion: 'running' | 'exiting' | 'moving' | 'cannon' | 'cup-in' | 'goal' = 'running'
     let currentCamera = cameraPositionForArea(START_AREA_ID)
     let areaEnteredAt = performance.now()
     let stallSince: number | null = null
@@ -324,6 +187,12 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
     let cupInStartedAt: number | null = null
     let goalTimeoutCount = 0
     let goalNotified = false
+    let activeCannon: ActiveCannon | null = null
+    const cannonLastFiredAt = new Map<string, number>()
+    const jumpLastHitAt = new Map<string, number>()
+    const jumpUsed = new Set<string>()
+    const boostInsideIds = new Set<string>()
+    const boostLastNotifiedAt = new Map<string, number>()
 
     function writeCamera(position: CameraPosition) {
       const worldElement = worldElementRef.current
@@ -345,6 +214,97 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
       element.classList.remove(stageStyles.ballSwallow, stageStyles.ballEmerge)
       if (kind === 'swallow') element.classList.add(stageStyles.ballSwallow)
       if (kind === 'emerge') element.classList.add(stageStyles.ballEmerge)
+    }
+
+    function updateZoneEffects() {
+      const effects = calculateZoneEffects(
+        ballBody.position,
+        ballBody.velocity,
+        ballBody.mass,
+        engine.gravity.y,
+        engine.gravity.scale,
+        zoneWorldGeometry,
+      )
+      if (effects.velocity.x !== ballBody.velocity.x || effects.velocity.y !== ballBody.velocity.y) {
+        Body.setVelocity(ballBody, effects.velocity)
+      }
+      if (effects.counterGravityForce.x !== 0 || effects.counterGravityForce.y !== 0) {
+        Body.applyForce(ballBody, ballBody.position, effects.counterGravityForce)
+      }
+
+      const now = performance.now()
+      const nextBoostIds = new Set(effects.boostIds)
+      for (const boostId of nextBoostIds) {
+        if (boostInsideIds.has(boostId)) continue
+        const lastNotifiedAt = boostLastNotifiedAt.get(boostId) ?? -Infinity
+        if (now - lastNotifiedAt < BOOST_SOUND_COOLDOWN_MS) continue
+        boostLastNotifiedAt.set(boostId, now)
+        optionsRef.current.onGimmick?.({ kind: 'boost', id: boostId })
+      }
+      boostInsideIds.clear()
+      nextBoostIds.forEach((boostId) => boostInsideIds.add(boostId))
+    }
+
+    function captureCannon(entry: AdventureZoneEntry, now: number) {
+      if (entry.zone.kind !== 'cannon' || motion !== 'running') return
+      const lastFiredAt = cannonLastFiredAt.get(entry.body.label) ?? null
+      if (!canRecaptureCannon(activeCannon !== null, lastFiredAt, now)) return
+      activeCannon = {
+        label: entry.body.label,
+        areaId: entry.areaId,
+        cannon: entry.zone,
+        startedAt: now,
+      }
+      motion = 'cannon'
+      Body.setPosition(ballBody, entry.body.position)
+      Body.setVelocity(ballBody, { x: 0, y: 0 })
+      Body.setAngularVelocity(ballBody, 0)
+      stallSince = null
+      optionsRef.current.onGimmick?.({ kind: 'cannon-capture', id: entry.zone.id })
+    }
+
+    function fireCannon(now: number) {
+      if (!activeCannon) return
+      const pending = activeCannon
+      const muzzle = getCannonMuzzlePosition(pending.cannon)
+      Body.setPosition(ballBody, worldPoint(pending.areaId, muzzle.x, muzzle.y))
+      Body.setVelocity(ballBody, getCannonLaunchVelocity(pending.cannon))
+      Body.setAngularVelocity(ballBody, 0)
+      cannonLastFiredAt.set(pending.label, now)
+      activeCannon = null
+      motion = 'running'
+      stallSince = null
+      clampVelocity()
+      optionsRef.current.onGimmick?.({ kind: 'cannon-fire', id: pending.cannon.id })
+    }
+
+    function updateCannon(now: number) {
+      if (!activeCannon) {
+        motion = 'running'
+        return
+      }
+      const cannonBody = zoneByLabel.get(activeCannon.label)?.body
+      if (!cannonBody) {
+        activeCannon = null
+        motion = 'running'
+        return
+      }
+      Body.setPosition(ballBody, cannonBody.position)
+      Body.setVelocity(ballBody, { x: 0, y: 0 })
+      Body.setAngularVelocity(ballBody, 0)
+      if (now - activeCannon.startedAt >= getCannonHoldMs(activeCannon.cannon)) fireCannon(now)
+    }
+
+    function applyJumpPad(entry: { areaId: string; jump: AreaJumpPad }, now: number) {
+      if (motion !== 'running') return
+      const jumpKey = entry.areaId + ':' + entry.jump.id
+      if (jumpUsed.has(jumpKey)) return
+      const lastHitAt = jumpLastHitAt.get(jumpKey) ?? -Infinity
+      if (now - lastHitAt < JUMP_COOLDOWN_MS) return
+      Body.setVelocity(ballBody, getJumpLaunchVelocity(entry.jump))
+      jumpLastHitAt.set(jumpKey, now)
+      jumpUsed.add(jumpKey)
+      optionsRef.current.onGimmick?.({ kind: 'jump', id: entry.jump.id })
     }
 
     function resetBallToAreaEntry(areaId: string, resetVelocity: boolean) {
@@ -487,6 +447,18 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
           continue
         }
 
+        const jump = jumpByLabel.get(other.label)
+        if (jump) {
+          applyJumpPad(jump, now)
+          continue
+        }
+
+        const zone = zoneByLabel.get(other.label)
+        if (zone) {
+          captureCannon(zone, now)
+          continue
+        }
+
         const cup = cupByLabel.get(other.label)
         if (cup) {
           const area = findArea(cup.areaId)
@@ -504,16 +476,19 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
 
         const pin = pinByLabel.get(other.label)
         if (!pin || motion !== 'running') continue
-        const lastHit = lastPinHitAt.get(pin.id) ?? -Infinity
+        const pinId = pin.pin.id
+        const lastHit = lastPinHitAt.get(pinId) ?? -Infinity
         if (now - lastHit < PIN_HIT_COOLDOWN_MS || now - lastPinSoundAt < PIN_SOUND_GLOBAL_COOLDOWN_MS) {
           continue
         }
-        lastPinHitAt.set(pin.id, now)
+        lastPinHitAt.set(pinId, now)
         lastPinSoundAt = now
-        optionsRef.current.onPinHit(pin.id)
+        optionsRef.current.onPinHit(pinId)
       }
     }
     Events.on(engine, 'collisionStart', handleCollisionStart)
+    const handleBeforeUpdate = () => updateZoneEffects()
+    Events.on(engine, 'beforeUpdate', handleBeforeUpdate)
 
     let rafId: number | null = null
     let lastFrameTime: number | null = null
@@ -685,6 +660,8 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
         updateExit(now)
       } else if (motion === 'moving') {
         updateCamera(now)
+      } else if (motion === 'cannon') {
+        updateCannon(now)
       } else if (motion === 'running') {
         clampVelocity()
         applyStallNudge(now)
@@ -710,6 +687,7 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
       if (settleTimeout !== null) clearTimeout(settleTimeout)
       if (entryVisualTimeout !== null) clearTimeout(entryVisualTimeout)
       Events.off(engine, 'collisionStart', handleCollisionStart)
+      Events.off(engine, 'beforeUpdate', handleBeforeUpdate)
       Composite.clear(engine.world, false)
       Engine.clear(engine)
       setBallVisualMotion('normal')

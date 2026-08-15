@@ -3,49 +3,57 @@ import {
   AREA_HEIGHT,
   AREA_TIMEOUT_MS,
   AREA_WIDTH,
-  BALL_DENSITY,
-  BALL_FRICTION,
-  BALL_FRICTION_AIR,
   BALL_RADIUS,
-  BALL_RESTITUTION,
   CAMERA_SETTLE_MS,
   CAMERA_TRANSITION_MS,
-  CUP_FRICTION,
   CUP_INNER_DEPTH,
   CUP_INNER_WIDTH,
   CUP_RESCUE_DROP_HEIGHT,
-  CUP_RESTITUTION,
   CUP_SENSOR_INSET,
   CUP_SETTLE_MS,
-  EXIT_SENSOR_HEIGHT,
   EXIT_SWALLOW_MS,
   GOAL_RESCUE_DROP_LIMIT,
-  GRAVITY,
+  JUMP_COOLDOWN_MS,
   MAX_ANGULAR_VELOCITY,
   MAX_SPEED,
   OUT_OF_BOUNDS_MARGIN_X,
   OUT_OF_BOUNDS_MARGIN_Y,
-  OUTER_WALL_THICKNESS,
-  PIN_FRICTION,
-  PIN_RESTITUTION,
-  START,
   STALL_DURATION_MS,
   STALL_NUDGE_SPEED,
   STALL_SPEED_THRESHOLD,
   STEP_MS,
-  WALL_FRICTION,
-  WALL_RESTITUTION,
 } from './adventurePhysics'
 import { AREAS, findArea, pickExitForBallX, resolveExitTarget, START_AREA_ID } from './data/areas'
-import { areaGroundRects, cupBottomRect, cupSensorRect, type AdventureRect } from './adventureGeometry'
-import type { AreaCup, AreaEntry, AreaExit, AreaPin, AreaWall } from './types'
+import { createAdventureWorld, type AdventureZoneEntry } from './adventureWorld'
+import {
+  canRecaptureCannon,
+  calculateZoneEffects,
+  getCannonHoldMs,
+  getCannonLaunchVelocity,
+  getCannonMuzzlePosition,
+  getJumpLaunchVelocity,
+} from './gimmicks'
+import type { AreaCannon, AreaEntry, AreaExit, AreaJumpPad } from './types'
 
-const { Engine, Bodies, Body, Composite, Events } = Matter
+const { Engine, Body, Composite, Events, Query } = Matter
 
 export type AdventureSimulationResult = {
   readonly totalSeconds: number
   readonly dwellSecondsByArea: Readonly<Record<string, number>>
+  readonly maxSpeedByArea: Readonly<Record<string, number>>
   readonly stallNudgeCountByArea: Readonly<Record<string, number>>
+  readonly pinHitCount: number
+  readonly pinHitCountByArea: Readonly<Record<string, number>>
+  readonly pinHitCountById: Readonly<Record<string, number>>
+  readonly maxAirborneSeconds: number
+  readonly maxAirborneSecondsByArea: Readonly<Record<string, number>>
+  readonly maxContactlessDropPx: number
+  readonly maxContactlessDropPxByArea: Readonly<Record<string, number>>
+  readonly cannonFireCount: number
+  readonly cannonFireCountById: Readonly<Record<string, number>>
+  readonly jumpCount: number
+  readonly jumpCountById: Readonly<Record<string, number>>
+  readonly boostSeconds: number
   readonly visitedAreaIds: readonly string[]
   readonly completed: boolean
   readonly cupIn: boolean
@@ -56,9 +64,14 @@ export type AdventureSimulationResult = {
 }
 
 type ExitEntry = { areaId: string; exit: AreaExit }
-type CupEntry = { areaId: string; cup: AreaCup }
 type LinearVelocity = { x: number; y: number }
-type Motion = 'running' | 'exiting' | 'moving' | 'cup-in' | 'goal'
+type Motion = 'running' | 'exiting' | 'moving' | 'cannon' | 'cup-in' | 'goal'
+type ActiveCannon = {
+  label: string
+  areaId: string
+  cannon: AreaCannon
+  startedAtMs: number
+}
 type PendingExit = {
   entry: ExitEntry
   targetAreaId: string
@@ -95,156 +108,35 @@ function clampLinearVelocity(velocity: LinearVelocity): LinearVelocity {
   return { x: velocity.x * factor, y: velocity.y * factor }
 }
 
-function createRectBody(areaId: string, rect: AdventureRect, options: Matter.IChamferableBodyDefinition): Matter.Body {
-  const center = worldPoint(areaId, rect.left + rect.width / 2, rect.top + rect.height / 2)
-  return Bodies.rectangle(center.x, center.y, rect.width, rect.height, options)
-}
-
-function createPortalFloorBodies(area: (typeof AREAS)[number]): Matter.Body[] {
-  const material = area.cup
-    ? { restitution: CUP_RESTITUTION, friction: CUP_FRICTION }
-    : { restitution: WALL_RESTITUTION, friction: WALL_FRICTION }
-  return areaGroundRects(area).map((rect, index) =>
-    createRectBody(area.id, rect, {
-      isStatic: true,
-      ...material,
-      label: area.cup
-        ? `cup-ground:${area.id}:${index}`
-        : `portal-floor:${area.id}:${index}`,
-    }),
-  )
-}
-
-function createCupBodies(
-  area: (typeof AREAS)[number],
-  cupByLabel: Map<string, CupEntry>,
-): Matter.Body[] {
-  if (!area.cup) return []
-  const { cup } = area
-  const common = { isStatic: true, restitution: CUP_RESTITUTION, friction: CUP_FRICTION }
-  const bottom = createRectBody(area.id, cupBottomRect(cup), {
-    ...common,
-    label: `cup-bottom:${area.id}:${cup.id}`,
-  })
-  const sensor = createRectBody(area.id, cupSensorRect(cup), {
-    isStatic: true,
-    isSensor: true,
-    label: `cup-sensor:${area.id}:${cup.id}`,
-  })
-  cupByLabel.set(sensor.label, { areaId: area.id, cup })
-  return [bottom, sensor]
-}
-
 /**
  * useAdventureEngineと同じエリアデータ・物理定数で、固定ステップだけを進める測定器。
  * CSS scaleや画面サイズを参照しないため、端末に依存しないテンポ回帰テストに使える。
  */
 export function simulateAdventureRun(seed: number): AdventureSimulationResult {
   const random = createSeededRandom(seed)
-  const startArea = findArea(START_AREA_ID)
-  const startEntry = startArea?.entries[0]
-  if (!startArea || !startEntry) throw new Error(`flag-roll-adventure: start entry is missing`)
-
-  const engine = Engine.create({ gravity: { ...GRAVITY } })
-
-  const outerWalls = AREAS.flatMap((area) => {
-    const left = Bodies.rectangle(
-      area.origin.x,
-      area.origin.y + AREA_HEIGHT / 2,
-      OUTER_WALL_THICKNESS,
-      AREA_HEIGHT,
-      { isStatic: true, restitution: WALL_RESTITUTION, friction: WALL_FRICTION },
-    )
-    const right = Bodies.rectangle(
-      area.origin.x + AREA_WIDTH,
-      area.origin.y + AREA_HEIGHT / 2,
-      OUTER_WALL_THICKNESS,
-      AREA_HEIGHT,
-      { isStatic: true, restitution: WALL_RESTITUTION, friction: WALL_FRICTION },
-    )
-    const top =
-      area.id === START_AREA_ID
-        ? [
-            Bodies.rectangle(
-              area.origin.x + AREA_WIDTH / 2,
-              area.origin.y,
-              AREA_WIDTH,
-              OUTER_WALL_THICKNESS,
-              { isStatic: true, restitution: WALL_RESTITUTION, friction: WALL_FRICTION },
-            ),
-          ]
-        : []
-    return [left, right, ...top]
-  })
-
-  const wallBodies: Matter.Body[] = []
-  const pinBodies: Matter.Body[] = []
-  for (const area of AREAS) {
-    for (const object of area.objects) {
-      const point = worldPoint(area.id, object.x, object.y)
-      if (object.kind === 'wall') {
-        const wall = object as AreaWall
-        wallBodies.push(
-          Bodies.rectangle(point.x, point.y, wall.width, wall.height, {
-            isStatic: true,
-            angle: wall.angle,
-            restitution: wall.restitution ?? WALL_RESTITUTION,
-            friction: WALL_FRICTION,
-            label: `wall:${area.id}:${wall.id}`,
-          }),
-        )
-      } else {
-        const pin = object as AreaPin
-        pinBodies.push(
-          Bodies.circle(point.x, point.y, pin.radius, {
-            isStatic: true,
-            restitution: pin.restitution ?? PIN_RESTITUTION,
-            friction: PIN_FRICTION,
-            label: `pin:${area.id}:${pin.id}`,
-          }),
-        )
-      }
-    }
-  }
-
-  const exitByLabel = new Map<string, ExitEntry>()
-  const exitSensors = AREAS.flatMap((area) =>
-    area.exits.map((exit) => {
-      const point = worldPoint(area.id, exit.x, exit.y)
-      const label = `exit:${area.id}:${exit.id}`
-      exitByLabel.set(label, { areaId: area.id, exit })
-      return Bodies.rectangle(point.x, point.y, exit.width, exit.height || EXIT_SENSOR_HEIGHT, {
-        isStatic: true,
-        isSensor: true,
-        label,
-      })
-    }),
-  )
-  const cupByLabel = new Map<string, CupEntry>()
-  const portalFloors = AREAS.flatMap((area) => createPortalFloorBodies(area))
-  const cupBodies = AREAS.flatMap((area) => createCupBodies(area, cupByLabel))
-  Composite.add(engine.world, [...outerWalls, ...wallBodies, ...pinBodies, ...portalFloors, ...exitSensors, ...cupBodies])
-
-  const initialPosition = worldPoint(
-    START_AREA_ID,
-    startEntry.x + (random() * 2 - 1) * START.jitterX,
-    startEntry.y,
-  )
-  const ballBody = Bodies.circle(initialPosition.x, initialPosition.y, BALL_RADIUS, {
-    restitution: BALL_RESTITUTION,
-    friction: BALL_FRICTION,
-    frictionAir: BALL_FRICTION_AIR,
-    density: BALL_DENSITY,
-    label: 'adventure-ball',
-  })
-  Body.setVelocity(ballBody, {
-    x: START.minVx + random() * (START.maxVx - START.minVx),
-    y: START.minVy + random() * (START.maxVy - START.minVy),
-  })
-  Composite.add(engine.world, ballBody)
+  const {
+    engine,
+    ballBody,
+    solidBodies,
+    pinByLabel,
+    jumpByLabel,
+    exitByLabel,
+    cupByLabel,
+    zoneByLabel,
+  } = createAdventureWorld(random)
+  const zoneWorldGeometry = [...zoneByLabel.values()].map((entry) => ({
+    zone: entry.zone,
+    x: entry.body.position.x,
+    y: entry.body.position.y,
+    angle: entry.body.angle,
+  }))
 
   const dwellMsByArea = new Map(AREAS.map((area) => [area.id, 0]))
+  const maxSpeedByArea = new Map(AREAS.map((area) => [area.id, 0]))
   const stallNudgeCountByArea = new Map(AREAS.map((area) => [area.id, 0]))
+  const pinHitCountByArea = new Map(AREAS.map((area) => [area.id, 0]))
+  const pinHitCountById = new Map<string, number>()
+  const maxAirborneMsByArea = new Map(AREAS.map((area) => [area.id, 0]))
   const visitedAreaIds: string[] = [START_AREA_ID]
   let currentAreaId = START_AREA_ID
   let motion: Motion = 'running'
@@ -262,6 +154,154 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
   let areaTimeoutCount = 0
   let rescueCount = 0
   let goalTimeoutCount = 0
+  let pinHitCount = 0
+  let airborneSinceMs: number | null = null
+  let maxAirborneMs = 0
+  let contactlessDropStartY: number | null = null
+  let maxContactlessDropPx = 0
+  const maxContactlessDropPxByArea = new Map(AREAS.map((area) => [area.id, 0]))
+  let activeCannon: ActiveCannon | null = null
+  const cannonLastFiredAt = new Map<string, number>()
+  let cannonFireCount = 0
+  const cannonFireCountById = new Map<string, number>()
+  const jumpLastHitAt = new Map<string, number>()
+  const jumpUsed = new Set<string>()
+  let jumpCount = 0
+  const jumpCountById = new Map<string, number>()
+  let boostSeconds = 0
+
+  function finishAirborne(nowMs: number) {
+    if (airborneSinceMs === null) return
+    const durationMs = Math.max(0, nowMs - airborneSinceMs)
+    maxAirborneMs = Math.max(maxAirborneMs, durationMs)
+    maxAirborneMsByArea.set(
+      currentAreaId,
+      Math.max(maxAirborneMsByArea.get(currentAreaId) ?? 0, durationMs),
+    )
+    airborneSinceMs = null
+  }
+
+  function updateAirborne(hasSolidContact: boolean) {
+    if (motion !== 'running' || hasSolidContact) {
+      finishAirborne(elapsedMs)
+      return
+    }
+    if (airborneSinceMs === null) {
+      airborneSinceMs = Math.max(0, elapsedMs - STEP_MS)
+    }
+  }
+
+  function finishContactlessDrop() {
+    if (contactlessDropStartY === null) return
+    const area = findArea(currentAreaId)
+    const currentY = ballBody.position.y - (area?.origin.y ?? 0)
+    const dropPx = currentY - contactlessDropStartY
+    if (dropPx > 0) {
+      maxContactlessDropPx = Math.max(maxContactlessDropPx, dropPx)
+      maxContactlessDropPxByArea.set(
+        currentAreaId,
+        Math.max(maxContactlessDropPxByArea.get(currentAreaId) ?? 0, dropPx),
+      )
+    }
+    contactlessDropStartY = null
+  }
+
+  function updateContactlessDrop(hasSolidContact: boolean) {
+    if (motion !== 'running' || hasSolidContact) {
+      finishContactlessDrop()
+      return
+    }
+    if (contactlessDropStartY === null) {
+      const area = findArea(currentAreaId)
+      contactlessDropStartY = ballBody.position.y - (area?.origin.y ?? 0)
+    }
+  }
+
+  function updateZoneEffects() {
+    const effects = calculateZoneEffects(
+      ballBody.position,
+      ballBody.velocity,
+      ballBody.mass,
+      engine.gravity.y,
+      engine.gravity.scale,
+      zoneWorldGeometry,
+    )
+    if (effects.velocity.x !== ballBody.velocity.x || effects.velocity.y !== ballBody.velocity.y) {
+      Body.setVelocity(ballBody, effects.velocity)
+    }
+    if (effects.counterGravityForce.x !== 0 || effects.counterGravityForce.y !== 0) {
+      Body.applyForce(ballBody, ballBody.position, effects.counterGravityForce)
+    }
+    if (effects.boostIds.length > 0) boostSeconds += STEP_MS / 1000
+  }
+
+  function captureCannon(entry: AdventureZoneEntry) {
+    if (entry.zone.kind !== 'cannon' || motion !== 'running') return
+    const lastFiredAt = cannonLastFiredAt.get(entry.body.label) ?? null
+    if (!canRecaptureCannon(activeCannon !== null, lastFiredAt, elapsedMs)) return
+    finishAirborne(elapsedMs)
+    finishContactlessDrop()
+    activeCannon = {
+      label: entry.body.label,
+      areaId: entry.areaId,
+      cannon: entry.zone,
+      startedAtMs: elapsedMs,
+    }
+    motion = 'cannon'
+    Body.setPosition(ballBody, entry.body.position)
+    Body.setVelocity(ballBody, { x: 0, y: 0 })
+    Body.setAngularVelocity(ballBody, 0)
+    stallSinceMs = null
+  }
+
+  function fireCannon() {
+    if (!activeCannon) return
+    const pending = activeCannon
+    finishAirborne(elapsedMs)
+    finishContactlessDrop()
+    const muzzle = getCannonMuzzlePosition(pending.cannon)
+    Body.setPosition(ballBody, worldPoint(pending.areaId, muzzle.x, muzzle.y))
+    Body.setVelocity(ballBody, getCannonLaunchVelocity(pending.cannon))
+    Body.setAngularVelocity(ballBody, 0)
+    cannonLastFiredAt.set(pending.label, elapsedMs)
+    activeCannon = null
+    motion = 'running'
+    airborneSinceMs = null
+    contactlessDropStartY = null
+    stallSinceMs = null
+    clampVelocity()
+    cannonFireCount += 1
+    cannonFireCountById.set(pending.cannon.id, (cannonFireCountById.get(pending.cannon.id) ?? 0) + 1)
+  }
+
+  function updateCannon() {
+    if (!activeCannon) {
+      motion = 'running'
+      return
+    }
+    const cannonBody = zoneByLabel.get(activeCannon.label)?.body
+    if (!cannonBody) {
+      activeCannon = null
+      motion = 'running'
+      return
+    }
+    Body.setPosition(ballBody, cannonBody.position)
+    Body.setVelocity(ballBody, { x: 0, y: 0 })
+    Body.setAngularVelocity(ballBody, 0)
+    if (elapsedMs - activeCannon.startedAtMs >= getCannonHoldMs(activeCannon.cannon)) fireCannon()
+  }
+
+  function applyJumpPad(entry: { areaId: string; jump: AreaJumpPad }, label: string) {
+    if (motion !== 'running') return
+    if (jumpUsed.has(label)) return
+    const lastHitAt = jumpLastHitAt.get(label) ?? -Infinity
+    if (elapsedMs - lastHitAt < JUMP_COOLDOWN_MS) return
+    Body.setVelocity(ballBody, getJumpLaunchVelocity(entry.jump))
+    jumpLastHitAt.set(label, elapsedMs)
+    jumpUsed.add(label)
+    jumpCount += 1
+    jumpCountById.set(entry.jump.id, (jumpCountById.get(entry.jump.id) ?? 0) + 1)
+  }
 
   function addDwellUntil(nowMs: number) {
     const previous = dwellMsByArea.get(currentAreaId) ?? 0
@@ -278,6 +318,8 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
       Body.setAngularVelocity(ballBody, 0)
     }
     stallSinceMs = null
+    finishAirborne(elapsedMs)
+    finishContactlessDrop()
   }
 
   function resetBallToCupDrop() {
@@ -288,6 +330,8 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
     Body.setVelocity(ballBody, { x: 0, y: 0 })
     Body.setAngularVelocity(ballBody, 0)
     stallSinceMs = null
+    finishAirborne(elapsedMs)
+    finishContactlessDrop()
     goalRescueDropCount += 1
   }
 
@@ -299,11 +343,15 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
     Body.setVelocity(ballBody, { x: 0, y: 0 })
     Body.setAngularVelocity(ballBody, 0)
     stallSinceMs = null
+    finishAirborne(elapsedMs)
+    finishContactlessDrop()
     goalRescueDropCount += 1
   }
 
   function notifyGoal() {
     if (motion === 'goal') return
+    finishAirborne(elapsedMs)
+    finishContactlessDrop()
     addDwellUntil(elapsedMs)
     motion = 'goal'
     completed = true
@@ -311,6 +359,8 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
 
   function beginCupIn() {
     if (motion !== 'running') return
+    finishAirborne(elapsedMs)
+    finishContactlessDrop()
     motion = 'cup-in'
     cupIn = true
     cupInStartedAtMs = elapsedMs
@@ -341,6 +391,7 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
       notifyGoal()
       return
     }
+    finishAirborne(elapsedMs)
     addDwellUntil(elapsedMs)
     exitLatched = true
     pendingExit = {
@@ -371,6 +422,18 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
         continue
       }
 
+      const jump = jumpByLabel.get(other.label)
+      if (jump) {
+        applyJumpPad(jump, other.label)
+        continue
+      }
+
+      const zone = zoneByLabel.get(other.label)
+      if (zone) {
+        captureCannon(zone)
+        continue
+      }
+
       const cup = cupByLabel.get(other.label)
       if (cup) {
         const area = findArea(cup.areaId)
@@ -384,8 +447,18 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
         }
         continue
       }
+
+      const pin = pinByLabel.get(other.label)
+      if (pin) {
+        pinHitCount += 1
+        pinHitCountByArea.set(pin.areaId, (pinHitCountByArea.get(pin.areaId) ?? 0) + 1)
+        pinHitCountById.set(other.label, (pinHitCountById.get(other.label) ?? 0) + 1)
+        continue
+      }
     }
   })
+  const handleBeforeUpdate = () => updateZoneEffects()
+  Events.on(engine, 'beforeUpdate', handleBeforeUpdate)
 
   function clampVelocity() {
     const velocity = clampLinearVelocity({ x: ballBody.velocity.x, y: ballBody.velocity.y })
@@ -452,6 +525,12 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
     resetBallToAreaEntry(currentAreaId, true)
   }
 
+  function observeRunningSpeed() {
+    if (motion !== 'running') return
+    const speed = Math.hypot(ballBody.velocity.x, ballBody.velocity.y)
+    maxSpeedByArea.set(currentAreaId, Math.max(maxSpeedByArea.get(currentAreaId) ?? 0, speed))
+  }
+
   function applyAreaTimeout() {
     if (elapsedMs - areaEnteredAtMs < AREA_TIMEOUT_MS || motion !== 'running') return
     areaTimeoutCount += 1
@@ -509,6 +588,8 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
         motion = 'running'
         pendingMove = null
         exitLatched = false
+        airborneSinceMs = null
+        contactlessDropStartY = null
         const velocity = pending.entry.velocity
           ? clampLinearVelocity(pending.entry.velocity)
           : pending.velocity
@@ -519,39 +600,79 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
       continue
     }
 
+    if (loopMotion === 'cannon') {
+      updateCannon()
+      continue
+    }
+
     if (loopMotion === 'goal') break
 
     Engine.update(engine, STEP_MS)
     // collisionStartのコールバックがEngine.update中にmotionを変えるため、状態を再取得する。
     const motionAfterPhysics = motion as Motion
-    if (motionAfterPhysics === 'exiting' || motionAfterPhysics === 'moving') continue
+    if (motionAfterPhysics === 'exiting' || motionAfterPhysics === 'moving') {
+      finishAirborne(elapsedMs)
+      continue
+    }
     if (motionAfterPhysics === 'cup-in') {
+      finishAirborne(elapsedMs)
       clampVelocity()
       if (cupInStartedAtMs !== null && elapsedMs - cupInStartedAtMs >= CUP_SETTLE_MS) notifyGoal()
       continue
     }
     if (motionAfterPhysics !== 'running') continue
 
+    const hasSolidContact = Query.collides(ballBody, solidBodies).length > 0
+    updateAirborne(hasSolidContact)
+    updateContactlessDrop(hasSolidContact)
     clampVelocity()
+    observeRunningSpeed()
     applyStallNudge()
     applyOutOfBoundsRecovery()
     if (motion === 'running') applyAreaTimeout()
   }
 
   Events.off(engine, 'collisionStart')
+  Events.off(engine, 'beforeUpdate', handleBeforeUpdate)
+  finishAirborne(elapsedMs)
+  finishContactlessDrop()
   Composite.clear(engine.world, false)
   Engine.clear(engine)
 
   const dwellSecondsByArea = Object.fromEntries(
     AREAS.map((area) => [area.id, (dwellMsByArea.get(area.id) ?? 0) / 1000]),
   )
+  const maxSpeedByAreaRecord = Object.fromEntries(maxSpeedByArea)
   const stallNudgeCountByAreaRecord = Object.fromEntries(
     AREAS.map((area) => [area.id, stallNudgeCountByArea.get(area.id) ?? 0]),
   )
+  const pinHitCountByAreaRecord = Object.fromEntries(
+    AREAS.map((area) => [area.id, pinHitCountByArea.get(area.id) ?? 0]),
+  )
+  const pinHitCountByIdRecord = Object.fromEntries(pinHitCountById)
+  const maxAirborneSecondsByArea = Object.fromEntries(
+    AREAS.map((area) => [area.id, (maxAirborneMsByArea.get(area.id) ?? 0) / 1000]),
+  )
+  const maxContactlessDropPxByAreaRecord = Object.fromEntries(maxContactlessDropPxByArea)
+  const cannonFireCountByIdRecord = Object.fromEntries(cannonFireCountById)
+  const jumpCountByIdRecord = Object.fromEntries(jumpCountById)
   return {
     totalSeconds: elapsedMs / 1000,
     dwellSecondsByArea,
+    maxSpeedByArea: maxSpeedByAreaRecord,
     stallNudgeCountByArea: stallNudgeCountByAreaRecord,
+    pinHitCount,
+    pinHitCountByArea: pinHitCountByAreaRecord,
+    pinHitCountById: pinHitCountByIdRecord,
+    maxAirborneSeconds: maxAirborneMs / 1000,
+    maxAirborneSecondsByArea,
+    maxContactlessDropPx,
+    maxContactlessDropPxByArea: maxContactlessDropPxByAreaRecord,
+    cannonFireCount,
+    cannonFireCountById: cannonFireCountByIdRecord,
+    jumpCount,
+    jumpCountById: jumpCountByIdRecord,
+    boostSeconds,
     visitedAreaIds,
     completed,
     cupIn,
