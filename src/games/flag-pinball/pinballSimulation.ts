@@ -6,9 +6,9 @@ import {
   LAUNCH_DELAYS_MS,
   OBSTACLES,
   SCORE_ZONES,
-  WALLS,
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
+  wallsForMode,
 } from './boardLayout'
 import {
   BALL_DENSITY,
@@ -30,17 +30,33 @@ import {
   ZONE_SENSOR_HEIGHT,
   ZONE_SENSOR_Y,
 } from './pinballPhysics'
+import type { PinballMode } from './types'
 
 const { Engine, Bodies, Body, Composite, Events } = Matter
 
 export type PinballSimulationResult = {
-  /** 1球目の射出から3球目の得点確定までに進んだ固定ステップ数 */
+  /** 1球目の射出から最後の球の得点確定までに進んだ固定ステップ数 */
   readonly steps: number
   readonly durationMs: number
   readonly durationSeconds: number
   readonly scoreSteps: readonly number[]
   readonly completed: boolean
   readonly usedSafetyTimeout: boolean
+  /** 射出済みかつ未得点だった球の同時最大数。射出間隔の妥当性確認に使う */
+  readonly maxConcurrentBalls: number
+}
+
+/**
+ * simulatePinballRun のオプション。すべて既定値を持ち、省略時は既存呼び出し（3球・通常モード）と
+ * 1ミリも挙動を変えない。全射出モードの測定など、球数・射出間隔・モードを変えたいときに使う。
+ */
+export type PinballSimulationOptions = {
+  /** 射出する球数。既定 SIMULATION_BALL_COUNT */
+  ballCount?: number
+  /** 各球の射出遅延(ms)。長さは ballCount 以上を想定し、先頭から ballCount 件を使う。既定 LAUNCH_DELAYS_MS */
+  launchDelaysMs?: readonly number[]
+  /** モード。既定 'normal'（'allFlags' なら wall-bottom を置かない） */
+  mode?: PinballMode
 }
 
 function createSeededRandom(seed: number): () => number {
@@ -65,11 +81,15 @@ function ballIndexAndOther(pair: Matter.Pair): { ballIndex: number; other: Matte
  * usePinballEngine と同じ盤面・物理定数で、rAFなしに固定ステップを進める測定器。
  * 画面サイズやCSS scaleを一切参照しないため、ここで得る時間は端末に依存しない。
  */
-export function simulatePinballRun(seed: number): PinballSimulationResult {
+export function simulatePinballRun(seed: number, options?: PinballSimulationOptions): PinballSimulationResult {
+  const ballCount = options?.ballCount ?? SIMULATION_BALL_COUNT
+  const mode = options?.mode ?? 'normal'
+  const delaysMs = options?.launchDelaysMs ?? LAUNCH_DELAYS_MS
+
   const random = createSeededRandom(seed)
   const engine = Engine.create({ gravity: { ...GRAVITY } })
 
-  const wallBodies = [...WALLS, ...ZONE_DIVIDERS].map((wall) =>
+  const wallBodies = [...wallsForMode(mode), ...ZONE_DIVIDERS].map((wall) =>
     Bodies.rectangle(wall.x, wall.y, wall.width, wall.height, {
       isStatic: true,
       angle: wall.angle,
@@ -97,7 +117,7 @@ export function simulatePinballRun(seed: number): PinballSimulationResult {
   Composite.add(engine.world, [...wallBodies, ...obstacleBodies, ...zoneSensors])
 
   const ballBodies: Matter.Body[] = []
-  for (let i = 0; i < SIMULATION_BALL_COUNT; i += 1) {
+  for (let i = 0; i < ballCount; i += 1) {
     ballBodies.push(
       Bodies.circle(LAUNCH.x, LAUNCH.y, BALL_RADIUS, {
         restitution: BALL_RESTITUTION,
@@ -109,9 +129,7 @@ export function simulatePinballRun(seed: number): PinballSimulationResult {
     )
   }
 
-  const launchSteps = LAUNCH_DELAYS_MS.slice(0, SIMULATION_BALL_COUNT).map((delay) =>
-    Math.round(delay / STEP_MS),
-  )
+  const launchSteps = delaysMs.slice(0, ballCount).map((delay) => Math.round(delay / STEP_MS))
   const launched = ballBodies.map(() => false)
   const scored = ballBodies.map(() => false)
   const launchedAtMs: (number | null)[] = ballBodies.map(() => null)
@@ -121,11 +139,14 @@ export function simulatePinballRun(seed: number): PinballSimulationResult {
   let physicsStep = 0
   let firstLaunchStep: number | null = null
   let usedSafetyTimeout = false
+  let inFlightCount = 0
+  let maxConcurrentBalls = 0
 
   const finalizeBall = (ballIndex: number, safetyTimeout: boolean) => {
     if (scored[ballIndex]) return
     scored[ballIndex] = true
     scoredCount += 1
+    inFlightCount -= 1
     if (safetyTimeout) usedSafetyTimeout = true
     scoreSteps.push(physicsStep)
   }
@@ -138,9 +159,12 @@ export function simulatePinballRun(seed: number): PinballSimulationResult {
     }
   })
 
-  const maxSteps = Math.ceil((SAFETY_TIMEOUT_MS + Math.max(...LAUNCH_DELAYS_MS)) / STEP_MS) + 10
-  while (scoredCount < SIMULATION_BALL_COUNT && physicsStep < maxSteps) {
-    for (let ballIndex = 0; ballIndex < SIMULATION_BALL_COUNT; ballIndex += 1) {
+  // 全射出モードは射出間隔が長く球数も多いため、安全タイマー分の余裕に加えて
+  // 「最後の球の射出遅延」ぶんも見込んで上限ステップ数を決める（そうしないと
+  // 終盤の球がまだ射出待ちのうちにループを打ち切ってしまう）。
+  const maxSteps = Math.ceil((SAFETY_TIMEOUT_MS + Math.max(...delaysMs, 0)) / STEP_MS) + 10
+  while (scoredCount < ballCount && physicsStep < maxSteps) {
+    for (let ballIndex = 0; ballIndex < ballCount; ballIndex += 1) {
       if (launched[ballIndex] || physicsStep < launchSteps[ballIndex]) continue
       const body = ballBodies[ballIndex]
       Body.setPosition(body, {
@@ -155,13 +179,15 @@ export function simulatePinballRun(seed: number): PinballSimulationResult {
       launched[ballIndex] = true
       launchedAtMs[ballIndex] = physicsStep * STEP_MS
       if (firstLaunchStep === null) firstLaunchStep = physicsStep
+      inFlightCount += 1
+      maxConcurrentBalls = Math.max(maxConcurrentBalls, inFlightCount)
     }
 
     physicsStep += 1
     Engine.update(engine, STEP_MS)
     const nowMs = physicsStep * STEP_MS
 
-    for (let ballIndex = 0; ballIndex < SIMULATION_BALL_COUNT; ballIndex += 1) {
+    for (let ballIndex = 0; ballIndex < ballCount; ballIndex += 1) {
       if (!launched[ballIndex] || scored[ballIndex]) continue
       const body = ballBodies[ballIndex]
       const speed = Math.hypot(body.velocity.x, body.velocity.y)
@@ -203,7 +229,8 @@ export function simulatePinballRun(seed: number): PinballSimulationResult {
     durationMs: steps * STEP_MS,
     durationSeconds: (steps * STEP_MS) / 1000,
     scoreSteps,
-    completed: scoredCount === SIMULATION_BALL_COUNT,
+    completed: scoredCount === ballCount,
     usedSafetyTimeout,
+    maxConcurrentBalls,
   }
 }

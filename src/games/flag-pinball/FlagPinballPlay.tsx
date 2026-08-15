@@ -3,8 +3,9 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import PinballBoard from './PinballBoard'
 import { findPinballFlag } from './data/pinballFlags'
-import { isPinballPlayState } from './playState'
-import { createScoreState, recordBallScore, type PinballScoreState } from './scoring'
+import { parsePinballPlayState } from './playState'
+import { createScoreState, recordBallScore, scoredCount, totalScore, type PinballScoreState } from './scoring'
+import type { PinballMode } from './types'
 import styles from './FlagPinballPlay.module.css'
 
 /** 最後の得点ポップ（例: 「1000てん！」）を見せてから結果画面へ進むまでの待ち時間(ms) */
@@ -12,16 +13,17 @@ const FINISH_TRANSITION_DELAY_MS = 700
 
 export default function FlagPinballPlay() {
   const location = useLocation()
-  if (!isPinballPlayState(location.state)) {
+  const playState = parsePinballPlayState(location.state)
+  if (!playState) {
     return <Navigate to="/games/flag-pinball" replace />
   }
   // key={location.key} で内部コンポーネントを丸ごと作り直す。「もういちど」で同じURLへ
   // 遷移し直したときも、物理エンジン・得点・演出のすべてが確実に初期化され、
   // 「再プレイ時に前回の得点や物理状態が残らない」を構造で保証できる。
-  return <PinballGame key={location.key} flagIds={location.state.flagIds} />
+  return <PinballGame key={location.key} mode={playState.mode} flagIds={playState.flagIds} />
 }
 
-function PinballGame({ flagIds }: { flagIds: string[] }) {
+function PinballGame({ mode, flagIds }: { mode: PinballMode; flagIds: string[] }) {
   const navigate = useNavigate()
   const [scoreState, setScoreState] = useState<PinballScoreState>(() => createScoreState(flagIds))
   const finishTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -48,11 +50,11 @@ function PinballGame({ flagIds }: { flagIds: string[] }) {
   const handleFinished = () => {
     // 最後の得点ポップ演出を見せてから結果画面へ進む。
     finishTimeoutRef.current = setTimeout(() => {
-      // onFinished は3球すべての得点確定後にのみ呼ばれる契約（usePinballEngine）なので
+      // onFinished は全球の得点確定後にのみ呼ばれる契約（usePinballEngine）なので
       // null は残らない想定だが、型の上では number | null のままなので
       // ?? 0 で安全に number[] へ変換する（as によるアンセーフなキャストは避ける）。
       const scores = scoreStateRef.current.scores.map((score) => score ?? 0)
-      navigate('/games/flag-pinball/result', { replace: true, state: { flagIds, scores } })
+      navigate('/games/flag-pinball/result', { replace: true, state: { mode, flagIds, scores } })
     }, FINISH_TRANSITION_DELAY_MS)
   }
 
@@ -69,19 +71,30 @@ function PinballGame({ flagIds }: { flagIds: string[] }) {
       </button>
 
       <header className={styles.header}>
-        {flags.map((flag, ballIndex) => {
-          const score = scoreState.scores[ballIndex]
-          return (
-            <div key={flag.id} className={styles.ballScore}>
-              <FlagBall flag={flag} size={32} />
-              <span className={styles.score}>{score === null ? '・・・' : `${score}てん`}</span>
-            </div>
-          )
-        })}
+        {mode === 'normal' ? (
+          flags.map((flag, ballIndex) => {
+            const score = scoreState.scores[ballIndex]
+            return (
+              <div key={flag.id} className={styles.ballScore}>
+                <FlagBall flag={flag} size={32} />
+                <span className={styles.score}>{score === null ? '・・・' : `${score}てん`}</span>
+              </div>
+            )
+          })
+        ) : (
+          // 40球ぶんは並べられないため、進み具合と合計だけを1行で表示する
+          // （ヘッダ高さ48pxを超えず、盤面の高さを削らない）。
+          <p className={styles.progress}>
+            {/* こ と ごうけい の間は全角スペースで区切る。JSXのテキストに直接書くと
+                no-irregular-whitespace lint ルールに引っかかるため、文字列リテラルの中に
+                入れる（ルールは既定で文字列リテラル内までは見ない）。 */}
+            {scoredCount(scoreState)} / {flagIds.length} こ{'　'}ごうけい {totalScore(scoreState)}てん
+          </p>
+        )}
       </header>
 
       <div className={styles.boardArea}>
-        <PinballBoard flagIds={flagIds} runId={0} onBallScored={handleBallScored} onFinished={handleFinished} />
+        <PinballBoard flagIds={flagIds} mode={mode} runId={0} onBallScored={handleBallScored} onFinished={handleFinished} />
       </div>
     </main>
   )

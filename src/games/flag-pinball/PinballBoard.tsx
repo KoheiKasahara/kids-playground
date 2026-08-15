@@ -4,16 +4,17 @@ import {
   BOARD_WIDTH,
   OBSTACLES,
   SCORE_ZONES,
-  WALLS,
   ZONE_DIVIDERS,
   ZONE_TOP,
   BALL_RADIUS,
+  wallsForMode,
   type ScoreZone,
 } from './boardLayout'
 import { findPinballFlag } from './data/pinballFlags'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { useBoardScale } from './useBoardScale'
 import { usePinballEngine } from './usePinballEngine'
+import type { PinballMode } from './types'
 import {
   playPinballBumperSound,
   playPinballLaunchSound,
@@ -22,8 +23,10 @@ import {
 import styles from './PinballBoard.module.css'
 
 type PinballBoardProps = {
-  /** 選択された3つの flagId（並び順が ballIndex） */
+  /** 選択された flagId（並び順が ballIndex） */
   flagIds: readonly string[]
+  /** 遊びかた。壁の構成・射出間隔・終了判定が変わるため usePinballEngine へそのまま渡す */
+  mode: PinballMode
   runId: number
   onBallScored: (ballIndex: number, score: number) => void
   onFinished: () => void
@@ -44,8 +47,12 @@ type ScorePop = {
   score: number
 }
 
-export default function PinballBoard({ flagIds, runId, onBallScored, onFinished }: PinballBoardProps) {
+export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFinished }: PinballBoardProps) {
   const { containerRef, scale, width, height } = useBoardScale()
+
+  // 壁の見た目もモードで変える（全射出モードでは床(wall-bottom)の見た目も消す）。
+  // usePinballEngine 側の物理壁と同じ関数から導出することで、見た目と当たり判定がずれない。
+  const walls = wallsForMode(mode)
 
   // flagIdsは選択画面（PINBALL_FLAG_IDSの範囲）から渡ってくる前提。
   // 解決できないidが来るのはデータ不整合なので、pinballFlags.tsと同じ方針で早期に気付けるようthrowする。
@@ -107,6 +114,7 @@ export default function PinballBoard({ flagIds, runId, onBallScored, onFinished 
 
   const { registerBall } = usePinballEngine({
     flagIds,
+    mode,
     runId,
     onBallLaunched: () => {
       playPinballLaunchSound()
@@ -136,7 +144,7 @@ export default function PinballBoard({ flagIds, runId, onBallScored, onFinished 
         >
           <div className={styles.background} aria-hidden="true" />
 
-          {WALLS.map((wall) => (
+          {walls.map((wall) => (
             <div
               key={wall.id}
               aria-hidden="true"

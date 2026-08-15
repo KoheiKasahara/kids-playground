@@ -4,12 +4,12 @@ import {
   BALL_RADIUS,
   BOARD_WIDTH,
   LAUNCH,
-  LAUNCH_DELAYS_MS,
   OBSTACLES,
   SCORE_ZONES,
-  WALLS,
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
+  launchDelaysMs,
+  wallsForMode,
   zoneAtX,
   type ScoreZone,
 } from './boardLayout'
@@ -29,6 +29,7 @@ import {
   OUT_OF_BOUNDS_MARGIN_X,
   OUT_OF_BOUNDS_Y,
   SAFETY_TIMEOUT_MS,
+  SCORED_BALL_REMOVAL_TIMEOUT_MS,
   STALL_DURATION_MS,
   STALL_NUDGE_SPEED,
   STALL_SPEED_THRESHOLD,
@@ -37,12 +38,15 @@ import {
   ZONE_SENSOR_HEIGHT,
   ZONE_SENSOR_Y,
 } from './pinballPhysics'
+import type { PinballMode } from './types'
 
 const { Engine, Bodies, Body, Composite, Events } = Matter
 
 export type PinballEngineOptions = {
-  /** 選択された3つの flagId。配列の並び順が ballIndex（0..2）になる */
+  /** 選択された flagId。配列の並び順が ballIndex（0..flagIds.length-1）になる */
   flagIds: readonly string[]
+  /** 遊びかた。壁の構成・射出間隔・終了判定がモードごとに変わる */
+  mode: PinballMode
   /** プレイの世代。値が変わったら物理世界を作り直して最初から射出する（「もういちど」用） */
   runId: number
   /** 1球の得点が確定したとき（同じ ballIndex では必ず一度だけ呼ぶ） */
@@ -51,7 +55,7 @@ export type PinballEngineOptions = {
   onObstacleHit: (obstacleId: string) => void
   /** 1球が射出されたとき（効果音用） */
   onBallLaunched: (ballIndex: number) => void
-  /** 3球すべての得点が確定したとき（必ず一度だけ呼ぶ） */
+  /** 射出予定の全球が settled（後述）になったとき（必ず一度だけ呼ぶ） */
   onFinished: () => void
 }
 
@@ -119,6 +123,8 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
     const runToken = Symbol('pinball-run')
     activeRunRef.current = runToken
 
+    const mode = options.mode
+
     // ballCount は flagIdsKey（=このeffectの依存）から求める。
     // options.flagIds.length を直接使うと react-hooks/exhaustive-deps が
     // options.flagIds 自体を依存に求めてしまい、内容が同じでも配列参照が変わるたびに
@@ -127,8 +133,9 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
 
     const engine = Engine.create({ gravity: { ...GRAVITY } })
 
-    // --- 静的な壁（外壁・ガイド壁・ゾーン仕切り） ---------------------------
-    const wallBodies = [...WALLS, ...ZONE_DIVIDERS].map((wall) =>
+    // --- 静的な壁（外壁・ガイド壁・ゾーン仕切り）。壁の構成はモードで変える -------
+    // （全射出モードは得点ゾーン通過後のボールをそのまま盤外へ落として消すため、床を置かない）
+    const wallBodies = [...wallsForMode(mode), ...ZONE_DIVIDERS].map((wall) =>
       Bodies.rectangle(wall.x, wall.y, wall.width, wall.height, {
         isStatic: true,
         angle: wall.angle,
@@ -178,9 +185,16 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
 
     const launched = ballBodies.map(() => false)
     const scored = ballBodies.map(() => false)
+    // 得点確定後に画面外へ落として World から削除した球かどうか。全射出モードの終了判定
+    // （settled = scored && removed）と、削除済み球を以降の処理から完全に除外するために使う。
+    const removed = ballBodies.map(() => false)
+    // settled（後述の isSettled）に達したことを1度だけ数えるためのガード。
+    const settled = ballBodies.map(() => false)
     const launchedAt = ballBodies.map(() => 0)
+    const scoredAt = ballBodies.map(() => 0)
     const stallSince: (number | null)[] = ballBodies.map(() => null)
-    let scoredCount = 0
+    let launchedCount = 0
+    let settledCount = 0
     let finished = false
 
     // 射出前は見えない状態にしておく（射出時に visible へ切り替える）
@@ -191,7 +205,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
 
     // --- 時間差射出 -----------------------------------------------------
     const timeoutIds: ReturnType<typeof setTimeout>[] = []
-    LAUNCH_DELAYS_MS.slice(0, ballCount).forEach((delay, ballIndex) => {
+    launchDelaysMs(mode, ballCount).forEach((delay, ballIndex) => {
       const timeoutId = setTimeout(() => {
         if (activeRunRef.current !== runToken) return
         const body = ballBodies[ballIndex]
@@ -203,6 +217,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
         })
         Composite.add(engine.world, body)
         launched[ballIndex] = true
+        launchedCount += 1
         launchedAt[ballIndex] = performance.now()
         const el = ballElementsRef.current.get(ballIndex)
         if (el) el.style.visibility = 'visible'
@@ -211,16 +226,53 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
       timeoutIds.push(timeoutId)
     })
 
-    /** ballIndex の得点を確定する。二重確定・二重の onFinished を防ぐゲートを兼ねる */
-    function finalizeBall(ballIndex: number, zone: ScoreZone) {
-      if (scored[ballIndex]) return
-      scored[ballIndex] = true
-      scoredCount += 1
-      optionsRef.current.onBallScored(ballIndex, zone)
-      if (!finished && scoredCount >= ballCount) {
+    /**
+     * ballIndex の「これ以上プレイに関与しない」状態（settled）を判定する。
+     * 通常モードは得点確定がそのままプレイ終了（床の上に球が残る現在の見た目を維持するため、
+     * removed は終了条件に含めない）。全射出モードは得点確定に加えて盤外へ削除されるまでを待つ
+     * （得点ゾーン通過後は床がなく、削除されるまで盤面上に残り続けるため）。
+     */
+    function isSettled(ballIndex: number): boolean {
+      return mode === 'allFlags' ? scored[ballIndex] && removed[ballIndex] : scored[ballIndex]
+    }
+
+    /**
+     * settled になったボールを1度だけ数え、射出予定の全球が settled になったら onFinished を呼ぶ。
+     * 「射出済みの球すべてが settled」だけでなく「射出予定の全球が射出済み」も条件にすることで、
+     * 射出間隔が長い全射出モードで終盤の球がまだ射出待ちのうちに終了してしまわないようにする。
+     */
+    function maybeSettle(ballIndex: number) {
+      if (settled[ballIndex]) return
+      if (!isSettled(ballIndex)) return
+      settled[ballIndex] = true
+      settledCount += 1
+      if (!finished && launchedCount === ballCount && settledCount === ballCount) {
         finished = true
         optionsRef.current.onFinished()
       }
+    }
+
+    /** ballIndex の得点を確定する。二重確定を防ぐゲートを兼ねる（この関数は絶対に緩めないこと） */
+    function finalizeBall(ballIndex: number, zone: ScoreZone) {
+      if (scored[ballIndex]) return
+      scored[ballIndex] = true
+      scoredAt[ballIndex] = performance.now()
+      optionsRef.current.onBallScored(ballIndex, zone)
+      maybeSettle(ballIndex)
+    }
+
+    /**
+     * 得点確定済みの ballIndex を World から取り除き、DOM 上でも隠す。
+     * 全射出モードで得点ゾーン通過後のボールを盤面から消すための処理（通常モードでは
+     * 床(wall-bottom)があるため、盤外脱出の救済ルート以外でこの経路に入ることは実質ない）。
+     */
+    function removeBall(ballIndex: number) {
+      if (removed[ballIndex]) return
+      removed[ballIndex] = true
+      Composite.remove(engine.world, ballBodies[ballIndex])
+      const el = ballElementsRef.current.get(ballIndex)
+      if (el) el.style.visibility = 'hidden'
+      maybeSettle(ballIndex)
     }
 
     // --- 衝突判定 ---------------------------------------------------------
@@ -290,6 +342,8 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
 
       for (let ballIndex = 0; ballIndex < ballCount; ballIndex += 1) {
         if (!launched[ballIndex]) continue
+        // 削除済みの球は速度クランプ・DOM書き込みを含め以降の処理を全部スキップする
+        if (removed[ballIndex]) continue
         const body = ballBodies[ballIndex]
 
         // 速度クランプ（薄い壁のすり抜け防止）。得点確定後も転がり続けるボールに
@@ -324,18 +378,34 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
           } else {
             stallSince[ballIndex] = null
           }
+        }
 
-          // 盤外脱出の救済
-          const outOfBounds =
-            body.position.y > OUT_OF_BOUNDS_Y ||
-            body.position.x < -OUT_OF_BOUNDS_MARGIN_X ||
-            body.position.x > BOARD_WIDTH + OUT_OF_BOUNDS_MARGIN_X
-          if (outOfBounds) {
-            finalizeBall(ballIndex, zoneAtX(body.position.x))
-          } else if (now - launchedAt[ballIndex] >= SAFETY_TIMEOUT_MS) {
-            // 安全タイマー（通常プレイでは発動しない想定の最終手段）
-            finalizeBall(ballIndex, zoneAtX(body.position.x))
-          }
+        // 盤外脱出の判定。得点済みの球も対象にするのは、全射出モードでは得点ゾーン通過後に
+        // 床(wall-bottom)がなくそのまま盤外へ落ちるため、ここで World から削除する必要があるため
+        // （通常モードは床があるため、scored後の球がこの経路に入ることは実質ない）。
+        const outOfBounds =
+          body.position.y > OUT_OF_BOUNDS_Y ||
+          body.position.x < -OUT_OF_BOUNDS_MARGIN_X ||
+          body.position.x > BOARD_WIDTH + OUT_OF_BOUNDS_MARGIN_X
+        if (outOfBounds) {
+          // 未確定のまま盤外へ出た場合は、抜けた x 位置からゾーンを推定して救済する
+          if (!scored[ballIndex]) finalizeBall(ballIndex, zoneAtX(body.position.x))
+          removeBall(ballIndex)
+          continue
+        }
+        if (!scored[ballIndex] && now - launchedAt[ballIndex] >= SAFETY_TIMEOUT_MS) {
+          // 安全タイマー（通常プレイでは発動しない想定の最終手段）
+          finalizeBall(ballIndex, zoneAtX(body.position.x))
+        }
+        // 全射出モードのみ: 得点済みなのに盤外へ抜けない球を強制回収する保険。
+        // これがあることで「全射出モードが必ず終了する」ことを構造で保証する。
+        if (
+          mode === 'allFlags' &&
+          scored[ballIndex] &&
+          now - scoredAt[ballIndex] >= SCORED_BALL_REMOVAL_TIMEOUT_MS
+        ) {
+          removeBall(ballIndex)
+          continue
         }
 
         // DOMへ直接反映する。React の再レンダーは経由しない。
@@ -360,7 +430,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
       Composite.clear(engine.world, false)
       Engine.clear(engine)
     }
-  }, [options.runId, flagIdsKey])
+  }, [options.runId, options.mode, flagIdsKey])
 
   return handle
 }

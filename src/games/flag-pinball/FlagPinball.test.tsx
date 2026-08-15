@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
 import { SCORE_ZONES, type ScoreZone } from './boardLayout'
+import { PINBALL_FLAG_IDS } from './data/pinballFlags'
 import type { PinballEngineOptions } from './usePinballEngine'
 
 // 物理エンジン(matter-js)はjsdomでは動かさず、ゲーム進行のロジック（選択→プレイ→結果）だけを
@@ -48,6 +49,22 @@ async function selectDefaultThreeAndPlay(user: ReturnType<typeof userEvent.setup
 }
 
 /**
+ * 選択画面で「ぜんぶ ながす」（全射出モード）を選び、「あそぶ！」を押す。
+ * プレイ画面（lazy）が実際にマウントされ、engineMock.options に
+ * usePinballEngine の呼び出しオプションが入るまで待ってから返す。
+ */
+async function selectAllFlagsAndPlay(user: ReturnType<typeof userEvent.setup>) {
+  await clickButton(user, 'ぜんぶ ながす')
+  await clickButton(user, 'あそぶ！')
+  await screen.findByRole('button', { name: 'やめる' })
+}
+
+/** 全射出モードのヘッダ文言（「n / 40 こ(全角スペース)ごうけい ○○てん」）を、正規化後の空白と比べて作る */
+function allFlagsProgressText(scored: number, totalBalls: number, totalScoreValue: number): string {
+  return `${scored} / ${totalBalls} こ ごうけい ${totalScoreValue}てん`
+}
+
+/**
  * 3球ぶんの得点を発火し、onFinished 後の700ms遷移をfake timersで進めて結果画面へ進む。
  * userEvent（@testing-library/user-event）はfake timers有効中の click 待機と相性が悪く
  * ハングするため、fake timersは「この関数の中だけ」有効にし、抜けるときは必ず real timers へ戻す
@@ -73,6 +90,16 @@ function flagImageFilenames(): string[] {
   return Array.from(new Set(filenames)).sort()
 }
 
+/**
+ * 国旗セルのボタンだけを絞り込む。選択画面には「3こ えらぶ」「ぜんぶ ながす」という
+ * モード切替ボタンも aria-pressed を持つため（方針書どおり国旗セルと同じ方式で選択状態を表す）、
+ * 単純に aria-pressed の有無や pressed 状態だけでは国旗セルを一意に絞り込めない。
+ * 国旗セルだけが中に画像（FlagBall の img）を持つため、それを目印にする。
+ */
+function flagButtons(): HTMLElement[] {
+  return screen.getAllByRole('button').filter((btn) => btn.querySelector('img'))
+}
+
 afterEach(() => {
   engineMock.options = undefined
   vi.useRealTimers()
@@ -90,8 +117,7 @@ describe('FlagPinball 選択画面', () => {
   test('40個の国旗ボールのボタンが並ぶ', async () => {
     renderApp('/games/flag-pinball')
     await screen.findByRole('heading', { name: 'こっきピンボール' })
-    const flagButtons = screen.getAllByRole('button').filter((btn) => btn.hasAttribute('aria-pressed'))
-    expect(flagButtons).toHaveLength(40)
+    expect(flagButtons()).toHaveLength(40)
   })
 
   test('国旗を最大3個まで選択できる（4個目を押しても3個のまま）', async () => {
@@ -102,7 +128,7 @@ describe('FlagPinball 選択画面', () => {
     await clickButton(user, 'ちゅうごく')
     await clickButton(user, 'バングラデシュ')
 
-    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(3)
+    expect(flagButtons().filter((btn) => btn.getAttribute('aria-pressed') === 'true')).toHaveLength(3)
     expect(screen.getByRole('button', { name: 'バングラデシュ' })).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -129,8 +155,17 @@ describe('FlagPinball 選択画面', () => {
 
     await user.click(jp)
     expect(jp).toHaveAttribute('aria-pressed', 'false')
-    // queryAllByRole を使う: getAllByRole は0件のとき例外を投げるため
-    expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0)
+    expect(flagButtons().filter((btn) => btn.getAttribute('aria-pressed') === 'true')).toHaveLength(0)
+  })
+
+  test('「ぜんぶ ながす」を選ぶと国旗を選ばなくても「あそぶ！」が押せる', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/flag-pinball')
+    const playButton = await screen.findByRole('button', { name: 'あそぶ！' })
+    expect(playButton).toBeDisabled()
+
+    await clickButton(user, 'ぜんぶ ながす')
+    expect(playButton).toBeEnabled()
   })
 
   test('state無しで /play や /result を直接開くと選択画面へ戻る', async () => {
@@ -241,7 +276,7 @@ describe('FlagPinball 結果画面', () => {
     await clickButton(user, 'ボールをかえる')
 
     expect(await screen.findByRole('heading', { name: 'こっきピンボール' })).toBeInTheDocument()
-    expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0)
+    expect(flagButtons().filter((btn) => btn.getAttribute('aria-pressed') === 'true')).toHaveLength(0)
     expect(screen.getByRole('button', { name: 'あそぶ！' })).toBeDisabled()
   })
 
@@ -261,5 +296,105 @@ describe('FlagPinball 結果画面', () => {
 
     await clickButton(user, 'ホームへ')
     expect(await screen.findByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
+  })
+})
+
+describe('FlagPinball 全射出モード', () => {
+  test('「ぜんぶ ながす」で「あそぶ！」→ プレイ画面へ進み、全国旗が射出対象になる', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/flag-pinball')
+    await selectAllFlagsAndPlay(user)
+
+    expect(engineMock.options?.mode).toBe('allFlags')
+    expect(engineMock.options?.flagIds).toEqual(PINBALL_FLAG_IDS)
+  })
+
+  test('同じballIndexへの2回目の発火は無視される', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/flag-pinball')
+    await selectAllFlagsAndPlay(user)
+
+    act(() => {
+      engineMock.options!.onBallScored(0, SCORE_ZONES[2]) // 1000点
+      engineMock.options!.onBallScored(0, SCORE_ZONES[0]) // 同じballIndexへの2回目。無視される想定
+    })
+
+    // 二重加算されていれば 1000+100 = 1100 になってしまうところ、一度だけの加算なら 1000 のまま。
+    expect(
+      await screen.findByText(
+        (content) => content === allFlagsProgressText(1, PINBALL_FLAG_IDS.length, 1000),
+      ),
+    ).toBeInTheDocument()
+  })
+
+  test('onFinishedを呼ぶ前は結果画面へ遷移しない（最後の球の処理前に結果が出ない）', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/flag-pinball')
+    await selectAllFlagsAndPlay(user)
+
+    act(() => {
+      for (let ballIndex = 0; ballIndex < PINBALL_FLAG_IDS.length - 1; ballIndex += 1) {
+        engineMock.options!.onBallScored(ballIndex, SCORE_ZONES[0])
+      }
+      // 最後の1球はまだ処理していない＝onFinishedも呼ばれていない
+    })
+
+    expect(
+      await screen.findByText(
+        (content) => content === allFlagsProgressText(PINBALL_FLAG_IDS.length - 1, PINBALL_FLAG_IDS.length, (PINBALL_FLAG_IDS.length - 1) * 100),
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'けっか' })).not.toBeInTheDocument()
+  })
+
+  test('全40球ぶん発火＋onFinishedの後、結果画面に正しい合計が表示される', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/flag-pinball')
+    await selectAllFlagsAndPlay(user)
+
+    vi.useFakeTimers()
+    act(() => {
+      PINBALL_FLAG_IDS.forEach((_, ballIndex) => {
+        engineMock.options!.onBallScored(ballIndex, SCORE_ZONES[0]) // 100点
+      })
+      engineMock.options!.onFinished()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700)
+    })
+    vi.useRealTimers()
+
+    expect(await screen.findByRole('heading', { name: 'けっか' })).toBeInTheDocument()
+    expect(screen.getByText(`${PINBALL_FLAG_IDS.length * 100}てん！`)).toBeInTheDocument()
+  })
+
+  test('結果画面で「もういちど」→ 全40球のプレイ画面に戻り、得点表示が初期化されている', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/flag-pinball')
+    await selectAllFlagsAndPlay(user)
+
+    vi.useFakeTimers()
+    act(() => {
+      PINBALL_FLAG_IDS.forEach((_, ballIndex) => {
+        engineMock.options!.onBallScored(ballIndex, SCORE_ZONES[0])
+      })
+      engineMock.options!.onFinished()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700)
+    })
+    vi.useRealTimers()
+    await screen.findByRole('heading', { name: 'けっか' })
+
+    await clickButton(user, 'もういちど')
+    await screen.findByRole('button', { name: 'やめる' })
+
+    expect(engineMock.options?.mode).toBe('allFlags')
+    expect(engineMock.options?.flagIds).toEqual(PINBALL_FLAG_IDS)
+    expect(
+      await screen.findByText(
+        (content) => content === allFlagsProgressText(0, PINBALL_FLAG_IDS.length, 0),
+      ),
+    ).toBeInTheDocument()
   })
 })

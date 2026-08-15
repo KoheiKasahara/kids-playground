@@ -64,6 +64,14 @@
   white-space: nowrap;
 }
 
+/* 全射出モード用。40球ぶんは並べられないため、進み具合と合計を1行にまとめる */
+.progress {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
 /*
  * ヘッダを除いた残りの高さをすべて盤面に渡す。
  * PinballBoard 側の .fit は absolute + inset: 0 でこの領域を埋めるため、
@@ -95,6 +103,16 @@
     min-width: 0;
     overflow: hidden;
     font-size: 12px;
+    text-overflow: ellipsis;
+  }
+
+  /* 全射出モードの1行表示は、3球ぶんの grid-template-columns があっても
+     全幅で中央寄せにする（.progress は常に単独の子なので3分割にする意味がないため） */
+  .progress {
+    grid-column: 1 / -1;
+    text-align: center;
+    overflow: hidden;
+    font-size: 13px;
     text-overflow: ellipsis;
   }
 }
