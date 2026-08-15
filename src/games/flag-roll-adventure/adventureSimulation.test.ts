@@ -43,6 +43,13 @@ describe('adventure fixed-step play-time simulation', () => {
     }, {})
     const caveRuns = results.filter((result) => result.visitedAreaIds.includes('cave')).length
     const riverRuns = results.filter((result) => result.visitedAreaIds.includes('river')).length
+    const caveRouteMean = results
+      .filter((result) => result.visitedAreaIds.includes('cave'))
+      .reduce((sum, result) => sum + result.totalSeconds, 0) / caveRuns
+    const riverRouteMean = results
+      .filter((result) => result.visitedAreaIds.includes('river'))
+      .reduce((sum, result) => sum + result.totalSeconds, 0) / riverRuns
+    const routeMeanDifference = Math.abs(caveRouteMean - riverRouteMean)
     const repeatedResults = Array.from({ length: TRIAL_COUNT }, (_, index) =>
       simulateAdventureRun(SEED_BASE + index * SEED_STEP),
     )
@@ -55,6 +62,10 @@ describe('adventure fixed-step play-time simulation', () => {
         `dwellVisited=${JSON.stringify(dwellMeanByVisitedRunArea)}`,
     )
     console.info(`adventure routes: ${JSON.stringify(routeCounts)}`)
+    console.info(
+      `adventure route means: cave=${caveRouteMean.toFixed(3)}s river=${riverRouteMean.toFixed(3)}s ` +
+        `difference=${routeMeanDifference.toFixed(3)}s`,
+    )
     console.info(
       `adventure safety: maxStallNudge=${Math.max(...results.map((result) => result.stallNudgeCount))} ` +
         `nudgeByArea=${JSON.stringify(stallNudgeTotalsByArea)} ` +
@@ -69,6 +80,7 @@ describe('adventure fixed-step play-time simulation', () => {
     expect(results.every((result) => /^sky>forest>(cave|river)>cloud>goal$/.test(result.visitedAreaIds.join('>')))).toBe(true)
     expect(caveRuns).toBeGreaterThanOrEqual(4)
     expect(riverRuns).toBeGreaterThanOrEqual(4)
+    expect(routeMeanDifference).toBeLessThanOrEqual(2)
     expect(repeatedResults.map((result) => result.visitedAreaIds)).toEqual(results.map((result) => result.visitedAreaIds))
     expect(results.every((result) => result.stallNudgeCount === 0)).toBe(true)
     expect(results.every((result) => result.goalRescueDropCount === 0)).toBe(true)

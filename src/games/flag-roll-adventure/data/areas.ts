@@ -7,13 +7,38 @@ import {
   CLOUD_ENTRY_LEFT_X,
   CLOUD_ENTRY_RIGHT_X,
   CLOUD_EXIT_X,
-  CLOUD_EXIT_WIDTH,
-  CLOUD_SOFT_BUMPER_RADIUS,
-  CLOUD_SOFT_BUMPER_Y,
+  CLOUD_V_ANGLE,
+  CLOUD_V_HEIGHT,
+  CLOUD_V_LEFT_X,
+  CLOUD_V_RIGHT_X,
+  CLOUD_V_WIDTH,
+  CLOUD_V_Y,
+  CAVE_ROCK_RADIUS,
+  CAVE_ROCK_BOTTOM_Y,
+  CAVE_ROCK_TOP_Y,
+  CAVE_ROCK_X,
+  CAVE_ZIGZAG_ANGLE,
+  CAVE_ZIGZAG_BOTTOM_Y,
+  CAVE_ZIGZAG_LEFT_X,
+  CAVE_ZIGZAG_RIGHT_X,
+  CAVE_ZIGZAG_SECOND_Y,
+  CAVE_ZIGZAG_TOP_Y,
+  CAVE_ZIGZAG_WALL_HEIGHT,
+  CAVE_ZIGZAG_WALL_WIDTH,
   CUP_INNER_DEPTH,
   EXIT_CENTER_OFFSET_FROM_BOTTOM,
   EXIT_SENSOR_HEIGHT,
   EXIT_WIDTH,
+  FOREST_APPROACH_LOG_ANGLE,
+  FOREST_APPROACH_LOG_HEIGHT,
+  FOREST_APPROACH_LOG_LEFT_X,
+  FOREST_APPROACH_LOG_RIGHT_X,
+  FOREST_APPROACH_LOG_WIDTH,
+  FOREST_APPROACH_LOG_Y,
+  FOREST_APPROACH_MUSHROOM_LEFT_X,
+  FOREST_APPROACH_MUSHROOM_RADIUS,
+  FOREST_APPROACH_MUSHROOM_RIGHT_X,
+  FOREST_APPROACH_MUSHROOM_Y,
   FOREST_BRANCH_BUMPER_RADIUS,
   FOREST_BRANCH_BUMPER_X,
   FOREST_BRANCH_BUMPER_Y,
@@ -27,15 +52,44 @@ import {
   FOREST_BRANCH_ROOF_WIDTH,
   FOREST_LEFT_EXIT_X,
   FOREST_RIGHT_EXIT_X,
+  GOAL_CUP_BOTTOM_MARGIN,
+  GOAL_FUNNEL_LOWER_ANGLE,
+  GOAL_FUNNEL_LOWER_LEFT_X,
+  GOAL_FUNNEL_LOWER_RIGHT_X,
+  GOAL_FUNNEL_LOWER_WIDTH,
+  GOAL_FUNNEL_LOWER_Y,
+  GOAL_FUNNEL_TOP_ANGLE,
+  GOAL_FUNNEL_TOP_LEFT_X,
+  GOAL_FUNNEL_TOP_RIGHT_X,
+  GOAL_FUNNEL_TOP_WIDTH,
+  GOAL_FUNNEL_TOP_Y,
+  GOAL_FUNNEL_WALL_HEIGHT,
+  GOAL_SPARK_RADIUS,
+  GOAL_SPARK_X,
+  GOAL_SPARK_Y,
   MERGE_ENTRY_SPEED,
   MERGE_ENTRY_VERTICAL_SPEED,
   PIN_RESTITUTION,
   RIVER_SWEEP_ANGLE,
   RIVER_SWEEP_BOTTOM_Y,
   RIVER_SWEEP_HEIGHT,
-  RIVER_SWEEP_MIDDLE_Y,
+  RIVER_SWEEP_SECOND_Y,
   RIVER_SWEEP_TOP_Y,
   RIVER_SWEEP_WIDTH,
+  SIDE_EXIT_INSET,
+  SKY_CLOUD_PIN_BOTTOM_Y,
+  SKY_CLOUD_PIN_LEFT_X,
+  SKY_CLOUD_PIN_MIDDLE_Y,
+  SKY_CLOUD_PIN_RADIUS,
+  SKY_CLOUD_PIN_RIGHT_X,
+  SKY_CLOUD_PIN_TOP_Y,
+  SKY_SLOPE_ANGLE,
+  SKY_SLOPE_BOTTOM_Y,
+  SKY_SLOPE_HEIGHT,
+  SKY_SLOPE_MIDDLE_Y,
+  SKY_SLOPE_TOP_Y,
+  SKY_SLOPE_WIDTH,
+  SKY_SLOPE_X,
   WALL_RESTITUTION,
 } from '../adventurePhysics'
 import type { AdventureArea, AreaEntry, AreaExit } from '../types'
@@ -44,18 +98,18 @@ import type { AdventureArea, AreaEntry, AreaExit } from '../types'
 const ENTRY_Y = AREA_ENTRY_CLEARANCE + BALL_RADIUS
 /** 出口は床の左右に受け皿を残せる高さへ置き、穴へ落ちる途中のボールを検知する。 */
 const EXIT_Y = AREA_HEIGHT - EXIT_CENTER_OFFSET_FROM_BOTTOM
-/** Phase 1の最下段の斜面が最後にボールを寄せる側。出口だけをその流れに合わせる。 */
-const SKY_EXIT_X = AREA_WIDTH - 80
-const CAVE_EXIT_X = AREA_WIDTH - 80
-const RIVER_EXIT_X = AREA_WIDTH - 80
+/** 最下段の斜面が最後にボールを寄せる側。出口だけをその流れに合わせる。 */
+const SKY_EXIT_X = AREA_WIDTH - SIDE_EXIT_INSET
+const CAVE_EXIT_X = AREA_WIDTH / 2
+const RIVER_EXIT_X = AREA_WIDTH - SIDE_EXIT_INSET
 const PORTAL_SIZE = { width: EXIT_WIDTH, height: EXIT_SENSOR_HEIGHT }
 
 /** 開始エリアをデータから参照するためのid。分岐追加時も入口生成を自動にしない。 */
 export const START_AREA_ID = 'sky'
 
 /**
- * 6エリアを上下左右に配置したPhase 2 Task Bのコース。
- * 森で左右に分岐し、洞窟と川が雲で合流する流れを出口データで表す。
+ * 6エリアを上下左右に配置したPhase 2 Task Cのコース。
+ * 森で左右に分岐し、洞窟と川が雲で合流する流れを、エリアごとに異なる板とピンで見せる。
  * 出口左右の床とゴールの床・カップ本体は、出口/cupの寸法から物理側で生成する。
  */
 export const AREAS: readonly AdventureArea[] = [
@@ -67,12 +121,12 @@ export const AREAS: readonly AdventureArea[] = [
     entries: [{ id: 'sky-entry', kind: 'hole', x: AREA_WIDTH / 2, y: ENTRY_Y }],
     objects: [
       // 中央の板で受けてから左右へ送るため、入口直後でも落下の向きが毎回少し変わる。
-      { kind: 'wall', id: 'sky-slide-left', x: 240, y: 170, width: 300, height: 18, angle: 0.36, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'sky-slide-right', x: 240, y: 360, width: 300, height: 18, angle: -0.36, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'sky-slide-lower', x: 240, y: 550, width: 300, height: 18, angle: 0.36, restitution: WALL_RESTITUTION },
-      { kind: 'pin', id: 'sky-cloud-1', x: 20, y: 80, radius: 16, restitution: PIN_RESTITUTION },
-      { kind: 'pin', id: 'sky-cloud-2', x: 460, y: 260, radius: 16, restitution: PIN_RESTITUTION },
-      { kind: 'pin', id: 'sky-cloud-3', x: 20, y: 640, radius: 16, restitution: PIN_RESTITUTION },
+      { kind: 'wall', id: 'sky-slide-left', x: SKY_SLOPE_X, y: SKY_SLOPE_TOP_Y, width: SKY_SLOPE_WIDTH, height: SKY_SLOPE_HEIGHT, angle: SKY_SLOPE_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'sky-slide-right', x: SKY_SLOPE_X, y: SKY_SLOPE_MIDDLE_Y, width: SKY_SLOPE_WIDTH, height: SKY_SLOPE_HEIGHT, angle: -SKY_SLOPE_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'sky-slide-lower', x: SKY_SLOPE_X, y: SKY_SLOPE_BOTTOM_Y, width: SKY_SLOPE_WIDTH, height: SKY_SLOPE_HEIGHT, angle: SKY_SLOPE_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'pin', id: 'sky-cloud-1', x: SKY_CLOUD_PIN_LEFT_X, y: SKY_CLOUD_PIN_TOP_Y, radius: SKY_CLOUD_PIN_RADIUS, restitution: PIN_RESTITUTION },
+      { kind: 'pin', id: 'sky-cloud-2', x: SKY_CLOUD_PIN_RIGHT_X, y: SKY_CLOUD_PIN_MIDDLE_Y, radius: SKY_CLOUD_PIN_RADIUS, restitution: PIN_RESTITUTION },
+      { kind: 'pin', id: 'sky-cloud-3', x: SKY_CLOUD_PIN_LEFT_X, y: SKY_CLOUD_PIN_BOTTOM_Y, radius: SKY_CLOUD_PIN_RADIUS, restitution: PIN_RESTITUTION },
     ],
     exits: [
       {
@@ -93,6 +147,11 @@ export const AREAS: readonly AdventureArea[] = [
     origin: { x: 1 * AREA_COLUMN_STEP, y: 1 * AREA_HEIGHT },
     entries: [{ id: 'forest-entry', kind: 'hole', x: AREA_WIDTH / 2, y: ENTRY_Y }],
     objects: [
+      // 分岐へ入る前に左右の丸太を横切り、キノコで森を通った感触を足す。左右対称にして分岐の偏りを増やさない。
+      { kind: 'wall', id: 'forest-approach-log-left', x: FOREST_APPROACH_LOG_LEFT_X, y: FOREST_APPROACH_LOG_Y, width: FOREST_APPROACH_LOG_WIDTH, height: FOREST_APPROACH_LOG_HEIGHT, angle: FOREST_APPROACH_LOG_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'forest-approach-log-right', x: FOREST_APPROACH_LOG_RIGHT_X, y: FOREST_APPROACH_LOG_Y, width: FOREST_APPROACH_LOG_WIDTH, height: FOREST_APPROACH_LOG_HEIGHT, angle: -FOREST_APPROACH_LOG_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'pin', id: 'forest-approach-mushroom-left', x: FOREST_APPROACH_MUSHROOM_LEFT_X, y: FOREST_APPROACH_MUSHROOM_Y, radius: FOREST_APPROACH_MUSHROOM_RADIUS, restitution: PIN_RESTITUTION },
+      { kind: 'pin', id: 'forest-approach-mushroom-right', x: FOREST_APPROACH_MUSHROOM_RIGHT_X, y: FOREST_APPROACH_MUSHROOM_Y, radius: FOREST_APPROACH_MUSHROOM_RADIUS, restitution: PIN_RESTITUTION },
       // 中央の大きなキノコ風バンパーで、初速の違いを左右の分岐へ広げる。
       { kind: 'pin', id: 'forest-mushroom-bumper', x: FOREST_BRANCH_BUMPER_X, y: FOREST_BRANCH_BUMPER_Y, radius: FOREST_BRANCH_BUMPER_RADIUS, restitution: PIN_RESTITUTION },
       // 中央を高くした屋根を左右に分け、落下したボールをそれぞれの出口側へ送る。
@@ -129,14 +188,13 @@ export const AREAS: readonly AdventureArea[] = [
     origin: { x: 0 * AREA_COLUMN_STEP, y: 2 * AREA_HEIGHT },
     entries: [{ id: 'cave-entry', kind: 'tunnel', x: AREA_WIDTH / 2, y: ENTRY_Y }],
     objects: [
-      { kind: 'wall', id: 'cave-slope-left', x: 240, y: 160, width: 220, height: 18, angle: 0.3, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'cave-slope-right', x: 240, y: 330, width: 220, height: 18, angle: -0.3, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'cave-slope-left-lower', x: 240, y: 500, width: 220, height: 18, angle: 0.3, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'cave-slope-right-lower', x: 240, y: 650, width: 180, height: 18, angle: -0.2, restitution: WALL_RESTITUTION },
-      { kind: 'pin', id: 'cave-rock-1', x: 20, y: 80, radius: 17, restitution: PIN_RESTITUTION },
-      { kind: 'pin', id: 'cave-rock-2', x: 460, y: 260, radius: 17, restitution: PIN_RESTITUTION },
-      { kind: 'pin', id: 'cave-rock-3', x: 20, y: 440, radius: 17, restitution: PIN_RESTITUTION },
-      { kind: 'pin', id: 'cave-rock-4', x: 460, y: 620, radius: 17, restitution: PIN_RESTITUTION },
+      // 短い板を左右交互に置き、長い斜面とは違う狭いジグザグを作る。
+      { kind: 'wall', id: 'cave-zigzag-left-top', x: CAVE_ZIGZAG_LEFT_X, y: CAVE_ZIGZAG_TOP_Y, width: CAVE_ZIGZAG_WALL_WIDTH, height: CAVE_ZIGZAG_WALL_HEIGHT, angle: CAVE_ZIGZAG_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'cave-zigzag-right-second', x: CAVE_ZIGZAG_RIGHT_X, y: CAVE_ZIGZAG_SECOND_Y, width: CAVE_ZIGZAG_WALL_WIDTH, height: CAVE_ZIGZAG_WALL_HEIGHT, angle: -CAVE_ZIGZAG_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'cave-zigzag-left-bottom', x: CAVE_ZIGZAG_LEFT_X, y: CAVE_ZIGZAG_BOTTOM_Y, width: CAVE_ZIGZAG_WALL_WIDTH, height: CAVE_ZIGZAG_WALL_HEIGHT, angle: CAVE_ZIGZAG_ANGLE, restitution: WALL_RESTITUTION },
+      // 岩は板の間隔を広く取った位置に置き、中央の縦落下路を塞ぎながら静止点を作らない。
+      { kind: 'pin', id: 'cave-rock-top', x: CAVE_ROCK_X, y: CAVE_ROCK_TOP_Y, radius: CAVE_ROCK_RADIUS, restitution: PIN_RESTITUTION },
+      { kind: 'pin', id: 'cave-rock-bottom', x: CAVE_ROCK_X, y: CAVE_ROCK_BOTTOM_Y, radius: CAVE_ROCK_RADIUS, restitution: PIN_RESTITUTION },
     ],
     exits: [
       {
@@ -157,8 +215,9 @@ export const AREAS: readonly AdventureArea[] = [
     origin: { x: 2 * AREA_COLUMN_STEP, y: 2 * AREA_HEIGHT },
     entries: [{ id: 'river-entry', kind: 'hole', x: AREA_WIDTH / 2, y: ENTRY_Y }],
     objects: [
+      // 反対側まで届く長い板をゆるく反転させ、落差より左右への渡りを目立たせる。
       { kind: 'wall', id: 'river-sweep-top', x: AREA_WIDTH / 2, y: RIVER_SWEEP_TOP_Y, width: RIVER_SWEEP_WIDTH, height: RIVER_SWEEP_HEIGHT, angle: RIVER_SWEEP_ANGLE, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'river-sweep-middle', x: AREA_WIDTH / 2, y: RIVER_SWEEP_MIDDLE_Y, width: RIVER_SWEEP_WIDTH, height: RIVER_SWEEP_HEIGHT, angle: -RIVER_SWEEP_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'river-sweep-second', x: AREA_WIDTH / 2, y: RIVER_SWEEP_SECOND_Y, width: RIVER_SWEEP_WIDTH, height: RIVER_SWEEP_HEIGHT, angle: -RIVER_SWEEP_ANGLE, restitution: WALL_RESTITUTION },
       { kind: 'wall', id: 'river-sweep-bottom', x: AREA_WIDTH / 2, y: RIVER_SWEEP_BOTTOM_Y, width: RIVER_SWEEP_WIDTH, height: RIVER_SWEEP_HEIGHT, angle: RIVER_SWEEP_ANGLE, restitution: WALL_RESTITUTION },
     ],
     exits: [
@@ -195,7 +254,9 @@ export const AREAS: readonly AdventureArea[] = [
       },
     ],
     objects: [
-      { kind: 'pin', id: 'cloud-soft-bumper', x: CLOUD_EXIT_X, y: CLOUD_SOFT_BUMPER_Y, radius: CLOUD_SOFT_BUMPER_RADIUS, restitution: PIN_RESTITUTION },
+      // 左右の入口から下りる2枚の板をV字にし、中央の通常幅ポータルへ自然に集める。
+      { kind: 'wall', id: 'cloud-v-left', x: CLOUD_V_LEFT_X, y: CLOUD_V_Y, width: CLOUD_V_WIDTH, height: CLOUD_V_HEIGHT, angle: CLOUD_V_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'cloud-v-right', x: CLOUD_V_RIGHT_X, y: CLOUD_V_Y, width: CLOUD_V_WIDTH, height: CLOUD_V_HEIGHT, angle: -CLOUD_V_ANGLE, restitution: WALL_RESTITUTION },
     ],
     exits: [
       {
@@ -204,7 +265,6 @@ export const AREAS: readonly AdventureArea[] = [
         x: CLOUD_EXIT_X,
         y: EXIT_Y,
         ...PORTAL_SIZE,
-        width: CLOUD_EXIT_WIDTH,
         to: 'goal',
         toEntry: 'goal-entry',
       },
@@ -218,14 +278,14 @@ export const AREAS: readonly AdventureArea[] = [
     entries: [{ id: 'goal-entry', kind: 'pipe', x: AREA_WIDTH / 2, y: ENTRY_Y }],
     objects: [
       // 上側のV字はそのまま残し、ボールを中央へ寄せるコースの流れを維持する。
-      { kind: 'wall', id: 'goal-funnel-left', x: 110, y: 250, width: 160, height: 18, angle: 0.35, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'goal-funnel-right', x: 370, y: 250, width: 160, height: 18, angle: -0.35, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'goal-funnel-lower-left', x: 106, y: 505, width: 180, height: 18, angle: 0.55, restitution: WALL_RESTITUTION },
-      { kind: 'wall', id: 'goal-funnel-lower-right', x: 374, y: 505, width: 180, height: 18, angle: -0.55, restitution: WALL_RESTITUTION },
-      { kind: 'pin', id: 'goal-spark', x: 240, y: 370, radius: 18, restitution: PIN_RESTITUTION },
+      { kind: 'wall', id: 'goal-funnel-left', x: GOAL_FUNNEL_TOP_LEFT_X, y: GOAL_FUNNEL_TOP_Y, width: GOAL_FUNNEL_TOP_WIDTH, height: GOAL_FUNNEL_WALL_HEIGHT, angle: GOAL_FUNNEL_TOP_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'goal-funnel-right', x: GOAL_FUNNEL_TOP_RIGHT_X, y: GOAL_FUNNEL_TOP_Y, width: GOAL_FUNNEL_TOP_WIDTH, height: GOAL_FUNNEL_WALL_HEIGHT, angle: -GOAL_FUNNEL_TOP_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'goal-funnel-lower-left', x: GOAL_FUNNEL_LOWER_LEFT_X, y: GOAL_FUNNEL_LOWER_Y, width: GOAL_FUNNEL_LOWER_WIDTH, height: GOAL_FUNNEL_WALL_HEIGHT, angle: GOAL_FUNNEL_LOWER_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'wall', id: 'goal-funnel-lower-right', x: GOAL_FUNNEL_LOWER_RIGHT_X, y: GOAL_FUNNEL_LOWER_Y, width: GOAL_FUNNEL_LOWER_WIDTH, height: GOAL_FUNNEL_WALL_HEIGHT, angle: -GOAL_FUNNEL_LOWER_ANGLE, restitution: WALL_RESTITUTION },
+      { kind: 'pin', id: 'goal-spark', x: GOAL_SPARK_X, y: GOAL_SPARK_Y, radius: GOAL_SPARK_RADIUS, restitution: PIN_RESTITUTION },
     ],
     exits: [],
-    cup: { id: 'goal-cup', x: AREA_WIDTH / 2, rimY: AREA_HEIGHT - CUP_INNER_DEPTH - 34 },
+    cup: { id: 'goal-cup', x: AREA_WIDTH / 2, rimY: AREA_HEIGHT - CUP_INNER_DEPTH - GOAL_CUP_BOTTOM_MARGIN },
   },
 ]
 

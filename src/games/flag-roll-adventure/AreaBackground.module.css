@@ -1,4 +1,4 @@
-/* 背景はコースのDOMより下に置く。Phase 1はCSSの図形だけで、画像素材は追加しない。 */
+/* 背景はコースのDOMより下に置く。Phase 2も6テーマのCSS図形だけで、画像素材は追加しない。 */
 .background,
 .layerBase,
 .layerFar,
@@ -367,7 +367,7 @@
   transform: rotate(45deg) scale(0.7);
 }
 
-/* Phase 1では背景アニメーションを入れていないため、reduced-motionでも追加の停止処理は不要。
+/* Phase 2では背景アニメーションを入れていないため、reduced-motionでも追加の停止処理は不要。
    このメディアクエリは将来動きを足す場合の差し込み場所として残しておく。 */
 @media (prefers-reduced-motion: reduce) {
   .background,

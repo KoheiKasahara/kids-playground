@@ -69,7 +69,7 @@ export type AdventureArea = {
   /** 子どもに見せるエリア名（例: 「そら」） */
   nameJa: string
   theme: AreaTheme
-  /** ワールド上の原点。Phase 1でも配列位置から計算せず、将来の分岐配置に備えて明示する。 */
+  /** ワールド上の原点。配列位置から計算せず、分岐したエリアの配置を明示する。 */
   origin: { x: number; y: number }
   objects: readonly AreaObject[]
   entries: readonly AreaEntry[]

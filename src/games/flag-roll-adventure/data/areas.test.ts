@@ -9,6 +9,7 @@ import {
   CUP_INNER_WIDTH,
   CUP_SENSOR_INSET,
   CUP_SENSOR_TOP_OFFSET,
+  EXIT_WIDTH,
 } from '../adventurePhysics'
 import { areaGroundRects, cupBottomRect, cupFrontLipRect, cupSensorRect, cupWellRect, worldSize } from '../adventureGeometry'
 import { AREAS, findArea, START_AREA_ID } from './areas'
@@ -136,6 +137,14 @@ describe('area data', () => {
         if (previous) {
           expect(left).toBeGreaterThanOrEqual(previous.x + previous.width / 2)
         }
+      }
+    }
+  })
+  it('すべての出口幅は通常ポータルの範囲に収まる', () => {
+    for (const area of AREAS) {
+      for (const exit of area.exits) {
+        expect(exit.width).toBeGreaterThanOrEqual(EXIT_WIDTH)
+        expect(exit.width).toBeLessThanOrEqual(180)
       }
     }
   })

@@ -12,9 +12,39 @@ export const AREA_HEIGHT = 720
 export const AREA_COLUMN_GAP = 60
 export const AREA_COLUMN_STEP = AREA_WIDTH + AREA_COLUMN_GAP
 
+/** 端の出口を外壁から少し離し、出口の左右にボールを受ける床を残す。 */
+export const SIDE_EXIT_INSET = 80
+
+/** そらは長い斜面を3枚つなぎ、入口の雲風ピンで1〜2回だけ反応を見せる基準コース。 */
+export const SKY_SLOPE_X = AREA_WIDTH / 2
+export const SKY_SLOPE_WIDTH = 300
+export const SKY_SLOPE_HEIGHT = 18
+export const SKY_SLOPE_TOP_Y = 170
+export const SKY_SLOPE_MIDDLE_Y = 360
+export const SKY_SLOPE_BOTTOM_Y = 550
+export const SKY_SLOPE_ANGLE = 0.36
+export const SKY_CLOUD_PIN_LEFT_X = 20
+export const SKY_CLOUD_PIN_RIGHT_X = AREA_WIDTH - SKY_CLOUD_PIN_LEFT_X
+export const SKY_CLOUD_PIN_RADIUS = 16
+export const SKY_CLOUD_PIN_TOP_Y = 80
+export const SKY_CLOUD_PIN_MIDDLE_Y = 260
+export const SKY_CLOUD_PIN_BOTTOM_Y = 640
+
 /** 分岐後の入口で左右から中央へ寄せる初速。出口へ入ったときの速度をそのまま引き継がず、合流を見せる。 */
 export const MERGE_ENTRY_SPEED = 2.2
 export const MERGE_ENTRY_VERTICAL_SPEED = 0.2
+
+/** 森の分岐前に左右の丸太とキノコを置き、通過してから分かれ道へ入る流れを作る。 */
+export const FOREST_APPROACH_LOG_LEFT_X = 130
+export const FOREST_APPROACH_LOG_RIGHT_X = AREA_WIDTH - FOREST_APPROACH_LOG_LEFT_X
+export const FOREST_APPROACH_LOG_Y = 120
+export const FOREST_APPROACH_LOG_WIDTH = 140
+export const FOREST_APPROACH_LOG_HEIGHT = 18
+export const FOREST_APPROACH_LOG_ANGLE = 0.28
+export const FOREST_APPROACH_MUSHROOM_LEFT_X = 90
+export const FOREST_APPROACH_MUSHROOM_RIGHT_X = AREA_WIDTH - FOREST_APPROACH_MUSHROOM_LEFT_X
+export const FOREST_APPROACH_MUSHROOM_Y = 260
+export const FOREST_APPROACH_MUSHROOM_RADIUS = 18
 
 /** 森の左右出口と分岐の障害物。出口間の帯を狭め、中央の尾根でボールが止まらないようにする。 */
 export const FOREST_LEFT_EXIT_X = 100
@@ -33,22 +63,55 @@ export const FOREST_BRANCH_ROOF_ANGLE = 0.55
 export const FOREST_BRANCH_RIDGE_Y = 650
 export const FOREST_BRANCH_RIDGE_RADIUS = 32
 
-/** 川は左右の揺れを見せるため、3枚の板を同じ幅で置き、上下の間隔を広く取る。 */
-export const RIVER_SWEEP_WIDTH = 300
-export const RIVER_SWEEP_HEIGHT = 18
-export const RIVER_SWEEP_TOP_Y = 170
-export const RIVER_SWEEP_MIDDLE_Y = 390
-export const RIVER_SWEEP_BOTTOM_Y = 610
-export const RIVER_SWEEP_ANGLE = 0.42
+/** 洞窟は短い板を左右交互に突き出し、中央の岩を避ける狭いジグザグにする。 */
+export const CAVE_ZIGZAG_LEFT_X = 140
+export const CAVE_ZIGZAG_RIGHT_X = AREA_WIDTH - CAVE_ZIGZAG_LEFT_X
+export const CAVE_ZIGZAG_WALL_WIDTH = 220
+export const CAVE_ZIGZAG_WALL_HEIGHT = 18
+export const CAVE_ZIGZAG_ANGLE = 0.32
+export const CAVE_ZIGZAG_TOP_Y = 130
+export const CAVE_ZIGZAG_SECOND_Y = 380
+export const CAVE_ZIGZAG_BOTTOM_Y = 640
+export const CAVE_ROCK_X = AREA_WIDTH / 2
+export const CAVE_ROCK_RADIUS = 16
+export const CAVE_ROCK_TOP_Y = 255
+export const CAVE_ROCK_BOTTOM_Y = 505
 
-/** 雲の入口は左右に離し、同じ出口へ届くまでの中央寄せを初速で見せる。 */
+/** 川は長い板を左右いっぱいへ渡し、ゆるい角度で横移動を主役にする。 */
+export const RIVER_SWEEP_WIDTH = 340
+export const RIVER_SWEEP_HEIGHT = 18
+export const RIVER_SWEEP_TOP_Y = 140
+export const RIVER_SWEEP_SECOND_Y = 360
+export const RIVER_SWEEP_BOTTOM_Y = 610
+export const RIVER_SWEEP_ANGLE = 0.3
+
+/** 雲の入口は左右に離し、V字の2枚板で通常幅の出口へ中央寄せする。 */
 export const CLOUD_ENTRY_LEFT_X = 120
 export const CLOUD_ENTRY_RIGHT_X = AREA_WIDTH - CLOUD_ENTRY_LEFT_X
 export const CLOUD_EXIT_X = AREA_WIDTH / 2
-/** 左右から中央へ寄り切れない場合も出口へ落ちるよう、雲だけ開口を広くして床の滞留を防ぐ。 */
-export const CLOUD_EXIT_WIDTH = 360
-export const CLOUD_SOFT_BUMPER_Y = 360
-export const CLOUD_SOFT_BUMPER_RADIUS = 20
+export const CLOUD_V_LEFT_X = 110
+export const CLOUD_V_RIGHT_X = AREA_WIDTH - CLOUD_V_LEFT_X
+export const CLOUD_V_Y = 590
+export const CLOUD_V_WIDTH = 200
+export const CLOUD_V_HEIGHT = 18
+export const CLOUD_V_ANGLE = 0.36
+
+/** ゴールは既存のV字と中央ピンを保ち、カップ周辺の物理・幾何はTask Aの数値を変えない。 */
+export const GOAL_FUNNEL_TOP_LEFT_X = 110
+export const GOAL_FUNNEL_TOP_RIGHT_X = AREA_WIDTH - GOAL_FUNNEL_TOP_LEFT_X
+export const GOAL_FUNNEL_TOP_Y = 250
+export const GOAL_FUNNEL_TOP_WIDTH = 160
+export const GOAL_FUNNEL_LOWER_LEFT_X = 106
+export const GOAL_FUNNEL_LOWER_RIGHT_X = AREA_WIDTH - GOAL_FUNNEL_LOWER_LEFT_X
+export const GOAL_FUNNEL_LOWER_Y = 505
+export const GOAL_FUNNEL_LOWER_WIDTH = 180
+export const GOAL_FUNNEL_TOP_ANGLE = 0.35
+export const GOAL_FUNNEL_LOWER_ANGLE = 0.55
+export const GOAL_FUNNEL_WALL_HEIGHT = 18
+export const GOAL_SPARK_X = AREA_WIDTH / 2
+export const GOAL_SPARK_Y = 370
+export const GOAL_SPARK_RADIUS = 18
+export const GOAL_CUP_BOTTOM_MARGIN = 34
 
 /**
  * 物理演算とヘッドレス測定で共用する固定タイムステップ。

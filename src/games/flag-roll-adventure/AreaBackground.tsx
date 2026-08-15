@@ -20,7 +20,7 @@ type AreaBackgroundProps = { theme: AreaTheme }
 
 /**
  * 1エリア分の仮背景。
- * Phase 1では画像を使わず、将来の背景素材もlayerBase/layerFar/layerDecorの
+ * Phase 2では画像を使わず、6テーマの仮背景をlayerBase/layerFar/layerDecorの
  * 役割ごとに差し替えられるよう、背景3枚の概念レイヤーをDOMに用意しておく。
  */
 export default function AreaBackground({ theme }: AreaBackgroundProps) {
