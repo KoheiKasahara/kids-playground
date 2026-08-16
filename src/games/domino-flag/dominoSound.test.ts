@@ -5,7 +5,9 @@ import {
   advanceDominoSoundSchedule,
   createDominoFallTracker,
   createDominoSoundController,
+  dominoTickIntensityForCount,
 } from './dominoSound'
+import { createDominoCourse } from './dominoCourse'
 
 function createTilts(dominoCount: number, fallenCount: number): number[] {
   return Array.from({ length: dominoCount }, (_, index) => (index < fallenCount ? 0.5 : 0))
@@ -169,5 +171,37 @@ describe('dominoSound', () => {
     expect(waiting.intensity).toBeNull()
     expect(waiting.state.pendingCount).toBe(3)
     expect(played.intensity).toBe(0.7)
+  })
+
+  test('ロング255枚でも同時倒伏の間引きと残数を維持する', () => {
+    const dominoCount = createDominoCourse('long', 'jp').placements.length
+    expect(dominoCount).toBe(255)
+
+    const tracker = createDominoFallTracker(dominoCount)
+    const allFallen = createTilts(dominoCount, dominoCount)
+    expect(tracker.countNewFalls(allFallen)).toBe(dominoCount)
+    expect(tracker.getRemainingCount()).toBe(0)
+    expect(dominoTickIntensityForCount(dominoCount)).toBeLessThanOrEqual(1)
+
+    const playTick = vi.fn()
+    const playComplete = vi.fn()
+    const controller = createDominoSoundController({
+      dominoCount,
+      playTick,
+      playComplete,
+      soundEnabled: true,
+      now: () => 0,
+    })
+    const firstBatch = createTilts(dominoCount, Math.floor(dominoCount / 2))
+    controller.scan(firstBatch, 0)
+    controller.scan(allFallen, DOMINO_SOUND_MIN_INTERVAL_MS - 1)
+    expect(playTick).toHaveBeenCalledTimes(1)
+
+    controller.scan(allFallen, DOMINO_SOUND_MIN_INTERVAL_MS)
+    expect(playTick).toHaveBeenCalledTimes(2)
+    expect(
+      playTick.mock.calls.every(([intensity]) => intensity <= 1),
+    ).toBe(true)
+    controller.dispose()
   })
 })
