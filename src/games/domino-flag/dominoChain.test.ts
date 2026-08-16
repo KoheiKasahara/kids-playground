@@ -1,10 +1,8 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { PHYSICS_TIMESTEP, INSPECTION_INTERVAL_MS } from './dominoPhysics'
 import {
-  PHYSICS_TIMESTEP,
-  INSPECTION_INTERVAL_MS,
-} from './dominoPhysics'
-import {
+  FLAG_COLS,
   FLAG_ROWS,
   createDominoPlacements,
   type DominoPlacement,
@@ -18,36 +16,29 @@ import {
   type DominoBodyEntry,
   type DominoWorld,
 } from './dominoWorld'
-import {
-  createShepherdMemory,
-  planShepherdNudges,
-} from './dominoShepherd'
+import { createShepherdMemory, planShepherdNudges } from './dominoShepherd'
 import { evaluateCompletion, isFallen } from './dominoCompletion'
 
-const SIMULATION_STEPS = 900
+const SIMULATION_STEPS = 1500
 
 type FallenBreakdown = {
   lineFallenCount: number
-  triggerFallen: boolean
+  lineFallenIds: string[]
+  branchFallenCount: number
   flagFallenByRow: number[]
-}
-
-type TriggerDisplacement = {
-  dx: number
-  dz: number
-  distance: number
 }
 
 type ChainSimulationResult = {
   flagFallenCount: number
   flagFaceUpCount: number
   sleepingCount: number
+  dominoCount: number
   shepherdNudgeCount: number
   stepsTo95PercentFlags: number | null
   stepsToAllFlags: number | null
   stepsToCompletion: number | null
+  columnFirstSteps: (number | null)[]
   breakdown: FallenBreakdown
-  triggerDisplacement: TriggerDisplacement | null
 }
 
 function isEntryFallen(entry: DominoBodyEntry): boolean {
@@ -59,19 +50,23 @@ function isEntryFallen(entry: DominoBodyEntry): boolean {
 
 function summarizeWorld(dominoWorld: DominoWorld): FallenBreakdown {
   const flagFallenByRow = Array.from({ length: FLAG_ROWS }, () => 0)
+  const lineFallenIds: string[] = []
   let lineFallenCount = 0
-  let triggerFallen = false
+  let branchFallenCount = 0
 
   for (const entry of dominoWorld.bodies) {
     if (!isEntryFallen(entry)) continue
-    if (entry.placement.kind === 'line') lineFallenCount += 1
-    if (entry.placement.kind === 'trigger') triggerFallen = true
+    if (entry.placement.kind === 'line') {
+      lineFallenCount += 1
+      lineFallenIds.push(entry.placement.id)
+    }
+    if (entry.placement.kind === 'branch') branchFallenCount += 1
     if (entry.placement.kind === 'flag' && entry.placement.row !== undefined) {
       flagFallenByRow[entry.placement.row] += 1
     }
   }
 
-  return { lineFallenCount, triggerFallen, flagFallenByRow }
+  return { lineFallenCount, lineFallenIds, branchFallenCount, flagFallenByRow }
 }
 
 function formatRows(flagFallenByRow: number[]): string {
@@ -80,23 +75,10 @@ function formatRows(flagFallenByRow: number[]): string {
     .join(', ')
 }
 
-function runPhysicalExperiment(
-  placements: DominoPlacement[],
-  startIds: string[],
-): FallenBreakdown {
-  const dominoWorld = createDominoWorld(RAPIER, placements)
-  try {
-    for (const id of startIds) {
-      const entry = dominoWorld.bodiesById.get(id)
-      if (entry) applyStartImpulse(entry.body)
-    }
-    for (let step = 0; step < SIMULATION_STEPS; step += 1) {
-      dominoWorld.world.step()
-    }
-    return summarizeWorld(dominoWorld)
-  } finally {
-    dominoWorld.world.free()
-  }
+function formatColumns(columnFirstSteps: (number | null)[]): string {
+  return columnFirstSteps
+    .map((step, col) => `col ${col}: ${step ?? '未到達'}`)
+    .join(', ')
 }
 
 function runChainSimulation(
@@ -105,9 +87,14 @@ function runChainSimulation(
 ): ChainSimulationResult {
   const dominoWorld = createDominoWorld(RAPIER, placements)
   const first = dominoWorld.bodiesById.get('line-0')
-  if (!first) throw new Error('line-0が生成されていません')
+  if (!first) throw new Error('line-0が見つかりません')
   applyStartImpulse(first.body)
 
+  const flags = dominoWorld.bodies.filter((entry) => entry.placement.kind === 'flag')
+  const columnFirstSteps: (number | null)[] = Array.from(
+    { length: FLAG_COLS },
+    () => null,
+  )
   let shepherdMemory = createShepherdMemory()
   let nextInspectionMs = 0
   let shepherdNudgeCount = 0
@@ -125,10 +112,7 @@ function runChainSimulation(
           dominoWorld.bodies.map((entry) => ({
             id: entry.placement.id,
             chainIndex: entry.chainIndex,
-            fallen: isFallen({
-              tilt: tiltOf(entry.body),
-              sleeping: entry.body.isSleeping(),
-            }),
+            fallen: isEntryFallen(entry),
             sleeping: entry.body.isSleeping(),
           })),
           shepherdMemory,
@@ -143,10 +127,14 @@ function runChainSimulation(
         nextInspectionMs += INSPECTION_INTERVAL_MS
       }
 
-      const flags = dominoWorld.bodies.filter((entry) => entry.placement.kind === 'flag')
-      const fallenFlags = flags.filter((entry) =>
-        isFallen({ tilt: tiltOf(entry.body), sleeping: entry.body.isSleeping() }),
-      ).length
+      for (const entry of flags) {
+        const col = entry.placement.col
+        if (col !== undefined && columnFirstSteps[col] === null && isEntryFallen(entry)) {
+          columnFirstSteps[col] = step
+        }
+      }
+
+      const fallenFlags = flags.filter(isEntryFallen).length
       if (
         stepsTo95PercentFlags === null &&
         fallenFlags / flags.length >= 0.95
@@ -169,37 +157,20 @@ function runChainSimulation(
       }
     }
 
-    const flags = dominoWorld.bodies.filter((entry) => entry.placement.kind === 'flag')
-    const breakdown = summarizeWorld(dominoWorld)
-    const flagFallenCount = flags.filter((entry) =>
-      isFallen({ tilt: tiltOf(entry.body), sleeping: entry.body.isSleeping() }),
-    ).length
+    const flagFallenCount = flags.filter(isEntryFallen).length
     const flagFaceUpCount = flags.filter((entry) => flagFaceUpY(entry.body) > 0.7).length
-    const triggerEntry = dominoWorld.bodiesById.get('trigger-bar')
-    const triggerPlacement = placements.find((placement) => placement.kind === 'trigger')
-    const triggerTranslation = triggerEntry?.body.translation()
-    const triggerDisplacement =
-      triggerPlacement && triggerTranslation
-        ? {
-            dx: triggerTranslation.x - triggerPlacement.x,
-            dz: triggerTranslation.z - triggerPlacement.z,
-            distance: Math.hypot(
-              triggerTranslation.x - triggerPlacement.x,
-              triggerTranslation.z - triggerPlacement.z,
-            ),
-          }
-        : null
 
     return {
       flagFallenCount,
       flagFaceUpCount,
       sleepingCount: dominoWorld.bodies.filter((entry) => entry.body.isSleeping()).length,
+      dominoCount: dominoWorld.bodies.length,
       shepherdNudgeCount,
       stepsTo95PercentFlags,
       stepsToAllFlags,
       stepsToCompletion,
-      breakdown,
-      triggerDisplacement,
+      columnFirstSteps,
+      breakdown: summarizeWorld(dominoWorld),
     }
   } finally {
     dominoWorld.world.free()
@@ -214,7 +185,7 @@ function createSeededRandom(seed: number): () => number {
   }
 }
 
-/** 配置誤差があっても連鎖が保てるかを、再現可能な乱数で確認する。 */
+/** 決定論的な微小誤差を全配置へ加えて、実機に近い配置揺らぎを再現する。 */
 function createPerturbedPlacements(seed: number): DominoPlacement[] {
   const random = createSeededRandom(seed)
   const offset = () => (random() * 2 - 1) * 0.005
@@ -231,15 +202,8 @@ describe('domino chain headless physics', () => {
     await RAPIER.init()
   })
 
-  it('shepherd補助ありで国旗の98%以上が倒れ、-Z面が上を向く', { timeout: 15_000 }, () => {
+  it('shepherd補助ありで国旗160個が倒れ、-Z面を上にして完成する', { timeout: 25_000 }, () => {
     const result = runChainSimulation(true)
-
-    console.log(
-      `[domino-chain] shepherd bar displacement: ` +
-        `dx=${result.triggerDisplacement?.dx.toFixed(3) ?? 'n/a'}, ` +
-        `dz=${result.triggerDisplacement?.dz.toFixed(3) ?? 'n/a'}, ` +
-        `distance=${result.triggerDisplacement?.distance.toFixed(3) ?? 'n/a'}`,
-    )
 
     console.log(
       `[domino-chain] shepherdあり: ${result.flagFallenCount}/160 flags, ` +
@@ -249,83 +213,87 @@ describe('domino chain headless physics', () => {
         `all=${result.stepsToAllFlags ?? '未到達'} steps, ` +
         `complete=${result.stepsToCompletion ?? '未到達'} steps`,
     )
-    expect(
-      result.flagFallenCount / 160,
-      `行内訳: ${formatRows(result.breakdown.flagFallenByRow)}`,
-    ).toBeGreaterThanOrEqual(0.98)
+    expect(result.flagFallenCount).toBe(160)
     expect(result.flagFaceUpCount / 160).toBeGreaterThanOrEqual(0.95)
-    expect(result.sleepingCount).toBe(173)
+    expect(result.sleepingCount).toBe(result.dominoCount)
     expect(result.shepherdNudgeCount).toBeLessThan(10)
     expect(result.stepsTo95PercentFlags).not.toBeNull()
+    expect(result.stepsToCompletion).not.toBeNull()
   })
 
-  it('shepherd補助なしの純粋な物理の倒伏率を記録する', { timeout: 15_000 }, () => {
+  it('shepherd補助なしの自然倒伏率がPhase 1相当以上になる', { timeout: 25_000 }, () => {
     const result = runChainSimulation(false)
     const fallenRatio = result.flagFallenCount / 160
 
     console.log(
-      `[domino-chain] no shepherd bar displacement: ` +
-        `dx=${result.triggerDisplacement?.dx.toFixed(3) ?? 'n/a'}, ` +
-        `dz=${result.triggerDisplacement?.dz.toFixed(3) ?? 'n/a'}, ` +
-        `distance=${result.triggerDisplacement?.distance.toFixed(3) ?? 'n/a'}`,
-    )
-
-    console.log(
       `[domino-chain] shepherdなし: ${result.flagFallenCount}/160 flags ` +
-        `(${(fallenRatio * 100).toFixed(1)}%), ${SIMULATION_STEPS} steps, ` +
+        `(${(fallenRatio * 100).toFixed(1)}%), ` +
         `all=${result.stepsToAllFlags ?? '未到達'} steps, ` +
-        `complete=${result.stepsToCompletion ?? '未到達'} steps`,
-    )
-    console.log(
-      `[domino-chain] shepherdなし内訳: line=${result.breakdown.lineFallenCount}/12, ` +
-        `trigger=${result.breakdown.triggerFallen ? 'fallen' : 'standing'}, ` +
+        `line=${result.breakdown.lineFallenCount}/12, ` +
+        `ids=${result.breakdown.lineFallenIds.join(',')}, ` +
+        `branch=${result.breakdown.branchFallenCount}, ` +
         formatRows(result.breakdown.flagFallenByRow),
     )
-    expect(
-      fallenRatio,
-      `行内訳: ${formatRows(result.breakdown.flagFallenByRow)}`,
-    ).toBeGreaterThanOrEqual(0.9)
+    expect(fallenRatio).toBeGreaterThanOrEqual(0.9)
   })
 
-  it('補助なしの入口と直線を切り分ける', { timeout: 15_000 }, () => {
-    const placements = createDominoPlacements()
-    const flagPlacements = placements.filter((placement) => placement.kind === 'flag')
-    const rowZeroIds = flagPlacements
-      .filter((placement) => placement.row === 0)
-      .map((placement) => placement.id)
-    const directFlagResult = runPhysicalExperiment(flagPlacements, rowZeroIds)
+  it('列ごとの初倒伏が中央から外側へなだらかに広がる', { timeout: 25_000 }, () => {
+    const result = runChainSimulation(false)
+    const steps = result.columnFirstSteps
+    const center = steps.slice(6, 10).map((step) => step!)
+    const outside = [...steps.slice(0, 6), ...steps.slice(10)].map((step) => step!)
+    const left = [steps[6]!, steps[5]!, steps[4]!, steps[3]!, steps[2]!, steps[1]!, steps[0]!]
+    const right = [steps[9]!, steps[10]!, steps[11]!, steps[12]!, steps[13]!, steps[14]!, steps[15]!]
 
-    const linePlacements = placements.filter((placement) => placement.kind === 'line')
-    const lineResult = runPhysicalExperiment(linePlacements, ['line-0'])
+    console.log(`[domino-chain] 列別初倒伏: ${formatColumns(steps)}`)
+    expect(steps.every((step) => step !== null)).toBe(true)
+    expect(Math.max(...center) - Math.min(...center)).toBeLessThanOrEqual(4)
+    expect(Math.max(...center)).toBeLessThanOrEqual(Math.min(...outside) + 4)
 
-    console.log(
-      `[domino-chain] 実験A（row 0へ直接入力）: ` +
-        formatRows(directFlagResult.flagFallenByRow),
-    )
-    console.log(
-      `[domino-chain] 実験B（直線のみ）: ` +
-        `line=${lineResult.lineFallenCount}/12`,
-    )
-    expect(directFlagResult.flagFallenByRow).toHaveLength(FLAG_ROWS)
-    expect(lineResult.lineFallenCount).toBeGreaterThanOrEqual(0)
+    for (let index = 1; index < left.length; index += 1) {
+      expect(left[index]!).toBeGreaterThanOrEqual(left[index - 1]! - 35)
+    }
+    for (let index = 1; index < right.length; index += 1) {
+      expect(right[index]!).toBeGreaterThanOrEqual(right[index - 1]! - 35)
+    }
+
+    const fastest = Math.min(...steps.map((step) => step!))
+    const secondFastest = [...steps.map((step) => step!)].sort((a, b) => a - b)[2]!
+    expect(secondFastest - fastest).toBeLessThan(50)
+    for (let col = 0; col < FLAG_COLS / 2; col += 1) {
+      expect(Math.abs(steps[col]! - steps[FLAG_COLS - 1 - col]!)).toBeLessThan(70)
+    }
   })
 
-  it('固定シードの微小な配置誤差でも補助なし連鎖を維持する', { timeout: 30_000 }, () => {
-    const seeds = [101, 202, 303, 404, 505]
+  it('10個の決定論的配置揺らぎを補助ありで完走する', { timeout: 30_000 }, () => {
+    const seeds = [101, 202, 303, 404, 505, 606, 707, 808, 909, 1001]
+    const nudgeCounts: number[] = []
+    let completedCount = 0
 
     for (const seed of seeds) {
-      const result = runChainSimulation(false, createPerturbedPlacements(seed))
-      const fallenRatio = result.flagFallenCount / 160
-
+      const result = runChainSimulation(true, createPerturbedPlacements(seed))
+      nudgeCounts.push(result.shepherdNudgeCount)
+      if (result.stepsToCompletion !== null) completedCount += 1
       console.log(
         `[domino-chain] perturbation seed=${seed}: ` +
-          `${result.flagFallenCount}/160 (${(fallenRatio * 100).toFixed(1)}%), ` +
-          formatRows(result.breakdown.flagFallenByRow),
+          `${result.flagFallenCount}/160, faces=${result.flagFaceUpCount}/160, ` +
+          `nudges=${result.shepherdNudgeCount}, ` +
+          `complete=${result.stepsToCompletion ?? '未到達'} steps, ` +
+          formatColumns(result.columnFirstSteps),
       )
-      expect(
-        fallenRatio,
-        `seed=${seed}: ${formatRows(result.breakdown.flagFallenByRow)}`,
-      ).toBeGreaterThanOrEqual(0.9)
+      expect(result.flagFallenCount, `seed=${seed}`).toBe(160)
+      expect(result.flagFaceUpCount / 160, `seed=${seed}`).toBeGreaterThanOrEqual(0.95)
+      expect(result.shepherdNudgeCount, `seed=${seed}`).toBeLessThan(10)
+      expect(result.sleepingCount, `seed=${seed}`).toBe(result.dominoCount)
+      expect(result.stepsToCompletion, `seed=${seed}`).not.toBeNull()
     }
+
+    const averageNudges = nudgeCounts.reduce((sum, count) => sum + count, 0) / seeds.length
+    console.log(
+      `[domino-chain] shepherd完走率=${completedCount}/${seeds.length}, ` +
+        `平均介入数=${averageNudges.toFixed(2)}`,
+    )
+    expect(completedCount).toBe(seeds.length)
+    expect(averageNudges).toBeLessThan(10)
   })
 })

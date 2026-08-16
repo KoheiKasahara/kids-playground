@@ -28,12 +28,6 @@ export const GROUND_FRICTION = 0.85
 export const LINEAR_DAMPING = 0.05
 export const ANGULAR_DAMPING = 0.08
 
-/** トリガーバーは幅が大きく、同じ密度だと直線ドミノの17.6倍重くなるため軽くする。 */
-export const TRIGGER_BAR_DENSITY = 0.1
-
-/** バーは地面で止まらず旗側へ滑りながら接触を渡せるよう、専用摩擦を低くする。 */
-export const TRIGGER_BAR_FRICTION = 0.1
-
 /** 地面は全レイアウトと倒れた後の余裕を覆う固定キューブにする。 */
 export const GROUND_SIZE = 40
 export const GROUND_THICKNESS = 0.1

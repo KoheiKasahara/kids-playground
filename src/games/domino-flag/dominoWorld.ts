@@ -2,7 +2,6 @@ import type { RigidBody, World } from '@dimforge/rapier3d-compat'
 import {
   DOMINO_DEPTH,
   DOMINO_HEIGHT,
-  LINE_COUNT,
   createDominoPlacements,
   type DominoPlacement,
 } from './dominoLayout'
@@ -20,8 +19,6 @@ import {
   PHYSICS_TIMESTEP,
   SHEPHERD_IMPULSE_Z,
   START_IMPULSE_Z,
-  TRIGGER_BAR_DENSITY,
-  TRIGGER_BAR_FRICTION,
 } from './dominoPhysics'
 
 /** Hookとheadlessテストが同じRapierコンストラクタを使うための最小インターフェース。 */
@@ -44,9 +41,7 @@ export type DominoWorld = {
 }
 
 function getChainIndex(placement: DominoPlacement): number {
-  if (placement.kind === 'line') return Number(placement.id.slice('line-'.length))
-  if (placement.kind === 'trigger') return LINE_COUNT
-  return LINE_COUNT + 1 + (placement.row ?? 0)
+  return placement.chainIndex
 }
 
 /** 寸法・密度・摩擦を一か所で適用し、地面と173個の動的ドミノを作る。 */
@@ -72,25 +67,29 @@ export function createDominoWorld(
   const bodies: DominoBodyEntry[] = []
   const bodiesById = new Map<string, DominoBodyEntry>()
   for (const placement of placements) {
+    const yaw = placement.yaw ?? 0
     const body = world.createRigidBody(
       rapier.RigidBodyDesc.dynamic()
         .setTranslation(placement.x, DOMINO_HEIGHT / 2, placement.z)
+        .setRotation({
+          x: 0,
+          y: Math.sin(yaw / 2),
+          z: 0,
+          w: Math.cos(yaw / 2),
+        })
         .setLinearDamping(LINEAR_DAMPING)
         .setAngularDamping(ANGULAR_DAMPING)
         .setCanSleep(true)
         .setSleeping(true),
     )
-    const density = placement.kind === 'trigger' ? TRIGGER_BAR_DENSITY : DOMINO_DENSITY
     world.createCollider(
       rapier.ColliderDesc.cuboid(
         placement.width / 2,
         DOMINO_HEIGHT / 2,
         DOMINO_DEPTH / 2,
       )
-        .setDensity(density)
-        .setFriction(
-          placement.kind === 'trigger' ? TRIGGER_BAR_FRICTION : DOMINO_FRICTION,
-        )
+        .setDensity(DOMINO_DENSITY)
+        .setFriction(DOMINO_FRICTION)
         .setRestitution(DOMINO_RESTITUTION),
       body,
     )
