@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { primeAudio } from '../../utils/quizSound'
 import { dominoFlags, type DominoFlagId } from './flagDefinitions'
+import DominoCompleteConfetti from './DominoCompleteConfetti'
 import styles from './DominoFlagPlay.module.css'
 import { useDominoEngine } from './useDominoEngine'
 
@@ -11,6 +13,7 @@ export default function DominoFlagPlay() {
   const [gameState, setGameState] = useState<DominoGameState>('select')
   const [flagId, setFlagId] = useState<DominoFlagId | null>(null)
   const [runId, setRunId] = useState(0)
+  const [soundOn, setSoundOn] = useState(true)
   const selectedFlag = flagId === null
     ? null
     : dominoFlags.find((flag) => flag.id === flagId) ?? null
@@ -21,15 +24,18 @@ export default function DominoFlagPlay() {
     onComplete: () => {
       if (flagId !== null) setGameState('complete')
     },
+    soundEnabled: soundOn,
   })
 
   const handleSelectFlag = (nextFlagId: DominoFlagId) => {
+    primeAudio()
     setFlagId(nextFlagId)
     setGameState('ready')
   }
 
   const handleStart = () => {
     if (gameState !== 'ready' || flagId === null) return
+    primeAudio()
     start()
     setGameState('running')
   }
@@ -50,6 +56,9 @@ export default function DominoFlagPlay() {
   return (
     <main className={styles.page}>
       <div ref={registerContainer} className={styles.scene} aria-hidden="true" />
+      {gameState === 'complete' && flagId !== null && (
+        <DominoCompleteConfetti key={`${runId}-${flagId}`} />
+      )}
 
       <div className={styles.ui}>
         <h1 id="domino-flag-heading" className={styles.title}>
@@ -146,6 +155,15 @@ export default function DominoFlagPlay() {
 
       <button type="button" className={styles.home} onClick={() => navigate('/')}>
         もどる
+      </button>
+
+      <button
+        type="button"
+        className={styles.soundToggle}
+        aria-label={soundOn ? 'おとを けす' : 'おとを だす'}
+        onClick={() => setSoundOn((current) => !current)}
+      >
+        <span aria-hidden="true">{soundOn ? '🔊' : '🔇'}</span>
       </button>
     </main>
   )

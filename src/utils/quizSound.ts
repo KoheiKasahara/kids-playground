@@ -254,3 +254,76 @@ export function playPinballTotalSound(): void {
     playTone(ctx, frequency, now + i * 0.16, 0.32, 0.18, 'sine')
   })
 }
+
+// --- こっきドミノ専用の効果音 --------------------------------------------
+
+/** 倒伏音の基準となる短いクリックの周波数。幼児向けに中音域へ収める。 */
+const DOMINO_TICK_CLICK_FREQUENCY = 480
+/** 倒伏音に重ねる木片のボディ音の周波数。クリックより少し低くして厚みを出す。 */
+const DOMINO_TICK_BODY_FREQUENCY = 390
+/** 打撃音の立ち上がり。既存playToneの20msでは短い木片音の頭が丸くなるため専用値にする。 */
+const DOMINO_CLICK_ATTACK_SECONDS = 0.003
+/** 指数減衰の終端。AudioParamは0へ指数補間できないため、最後に明示的に0へ落とす。 */
+const DOMINO_CLICK_MIN_GAIN = 0.0001
+
+/** 既存playToneと違い、数msで立ち上がって指数的に減衰する打撃音用エンベロープ。 */
+function playDominoClick(
+  ctx: AudioContext,
+  frequency: number,
+  startTime: number,
+  duration: number,
+  volume: number,
+  type: OscillatorType,
+): void {
+  const oscillator = ctx.createOscillator()
+  const gain = ctx.createGain()
+  const stopTime = startTime + duration
+  oscillator.type = type
+  oscillator.frequency.value = frequency
+  gain.gain.setValueAtTime(DOMINO_CLICK_MIN_GAIN, startTime)
+  gain.gain.linearRampToValueAtTime(volume, startTime + DOMINO_CLICK_ATTACK_SECONDS)
+  gain.gain.exponentialRampToValueAtTime(DOMINO_CLICK_MIN_GAIN, stopTime)
+  gain.gain.setValueAtTime(0, stopTime)
+  oscillator.connect(gain)
+  gain.connect(ctx.destination)
+  oscillator.start(startTime)
+  oscillator.stop(stopTime)
+}
+
+/** ドミノが倒れ始めたときの「カタッ」。連打を前提に短く小さく鳴らす。 */
+export function playDominoTickSound(intensity: number): void {
+  if (!soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+
+  const safeIntensity = Number.isFinite(intensity)
+    ? Math.min(1, Math.max(0, intensity))
+    : 0
+  // 音程と音量を少しだけ揺らし、連続した同音の機械的な印象を避ける。
+  const frequencyVariation = 0.92 + Math.random() * 0.16
+  const volumeVariation = 0.9 + Math.random() * 0.2
+  const clickFrequency =
+    (DOMINO_TICK_CLICK_FREQUENCY + safeIntensity * 40) * frequencyVariation
+  const bodyFrequency =
+    (DOMINO_TICK_BODY_FREQUENCY + safeIntensity * 40) * frequencyVariation
+  const baseVolume = (0.03 + safeIntensity * 0.06) * volumeVariation
+  const now = ctx.currentTime
+
+  playDominoClick(ctx, clickFrequency, now, 0.045, baseVolume * 0.8, 'triangle')
+  playDominoClick(ctx, bodyFrequency, now + 0.006, 0.06, baseVolume * 0.65, 'sine')
+}
+
+/** 国旗完成の「できた！」。短い4音の上行アルペジオで倒伏音と区別する。 */
+export function playDominoCompleteSound(): void {
+  if (!soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+
+  const now = ctx.currentTime
+  const frequencies = [523.25, 659.25, 783.99, 1046.5] // C5→E5→G5→C6
+  frequencies.forEach((frequency, index) => {
+    playTone(ctx, frequency, now + index * 0.11, 0.32, 0.18, 'triangle')
+  })
+  // 最後のC6だけ薄く重ね、短い成功感を足す。
+  playTone(ctx, 2093, now + 0.34, 0.42, 0.08, 'sine')
+}

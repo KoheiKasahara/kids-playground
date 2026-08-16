@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
+import { playDominoCompleteSound, playDominoTickSound } from '../../utils/quizSound'
 import { FLAG_COLOR_HEX, type DominoFlagId } from './flagDefinitions'
 import {
   DOMINO_DEPTH,
@@ -33,6 +34,7 @@ import {
   isFallen,
   type DominoRuntimeState,
 } from './dominoCompletion'
+import { FALL_SCAN_INTERVAL_MS, createDominoSoundController } from './dominoSound'
 import type { World } from '@dimforge/rapier3d-compat'
 
 let rapierInitPromise: Promise<void> | null = null
@@ -50,6 +52,8 @@ export type DominoEngineOptions = {
   flagId: DominoFlagId | null
   /** 完成判定が立ったときに一度だけ呼ぶ。 */
   onComplete: () => void
+  /** このrunのドミノ効果音を鳴らすか。useEffectの再生成条件には含めない。 */
+  soundEnabled: boolean
 }
 
 export type DominoEngineHandle = {
@@ -129,7 +133,17 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     let lastFrameTime: number | null = null
     let accumulator = 0
     let lastInspectionAt = Number.NEGATIVE_INFINITY
+    let lastFallScanAt = Number.NEGATIVE_INFINITY
     let shepherdMemory: ShepherdMemory = createShepherdMemory()
+    const soundController = createDominoSoundController({
+      dominoCount: placements.length,
+      playTick: playDominoTickSound,
+      playComplete: playDominoCompleteSound,
+      soundEnabled: () => optionsRef.current.soundEnabled,
+      now: () => performance.now(),
+      setTimeoutFn: (handler, timeoutMs) => globalThis.setTimeout(handler, timeoutMs),
+      clearTimeoutFn: (timerId) => globalThis.clearTimeout(timerId),
+    })
 
     const bodyMatrix = new THREE.Matrix4()
     const flagMatrix = new THREE.Matrix4()
@@ -153,6 +167,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
 
       if (activeRunRef.current === runToken) activeRunRef.current = null
       startActionRef.current = () => undefined
+      soundController.dispose()
 
       if (rafId !== null) {
         cancelAnimationFrame(rafId)
@@ -274,6 +289,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
 
       if (completion.complete && !completeNotified) {
         completeNotified = true
+        soundController.notifyComplete(now)
         optionsRef.current.onComplete()
         return
       }
@@ -323,6 +339,18 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       if (started && now - lastInspectionAt >= INSPECTION_INTERVAL_MS) {
         lastInspectionAt = now
         inspectPhysics(now)
+      }
+      if (
+        started &&
+        !completeNotified &&
+        optionsRef.current.soundEnabled &&
+        now - lastFallScanAt >= FALL_SCAN_INTERVAL_MS
+      ) {
+        lastFallScanAt = now
+        soundController.scan(
+          (index) => tiltOf(bodies[index]!.body),
+          now,
+        )
       }
       if (renderer && scene && camera) renderer.render(scene, camera)
     }
