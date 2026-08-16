@@ -72,3 +72,12 @@
   font-weight: 700;
   color: var(--color-text);
 }
+
+.description {
+  max-width: 32em;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+  text-align: center;
+  color: var(--color-text-muted);
+}
