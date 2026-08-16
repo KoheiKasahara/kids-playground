@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
+import { FLAG_COLOR_HEX, type DominoFlagId } from './flagDefinitions'
 import {
   DOMINO_DEPTH,
   DOMINO_HEIGHT,
@@ -45,6 +46,8 @@ function initializeRapier(): Promise<void> {
 export type DominoEngineOptions = {
   /** 値が変わったら世界を作り直す（もういちど用）。 */
   runId: number
+  /** nullの間は国旗選択中として、Three.jsとRapierを作らない。 */
+  flagId: DominoFlagId | null
   /** 完成判定が立ったときに一度だけ呼ぶ。 */
   onComplete: () => void
 }
@@ -90,7 +93,14 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     const runToken = Symbol('domino-flag-run')
     activeRunRef.current = runToken
 
-    const placements = createDominoPlacements()
+    const flagId = options.flagId
+    if (flagId === null) {
+      activeRunRef.current = null
+      startActionRef.current = () => undefined
+      return
+    }
+
+    const placements = createDominoPlacements(flagId)
     const layoutBounds = getLayoutBounds(placements)
     const flagPlacements = placements.filter((placement) => placement.kind === 'flag')
     const bodies: RenderDominoBodyEntry[] = []
@@ -371,9 +381,12 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
           const color = 0xfff1cf
           dominoMesh.setColorAt(index, new THREE.Color(color))
           if (placement.kind === 'flag') {
+            if (placement.color === undefined) {
+              throw new Error('国旗ドミノの色が未定義です')
+            }
             flagMesh.setColorAt(
               flagInstanceIndex,
-              new THREE.Color(placement.color === 'red' ? '#bc002d' : '#fffdf5'),
+              new THREE.Color(FLAG_COLOR_HEX[placement.color]),
             )
             flagInstanceIndex += 1
           }
@@ -424,7 +437,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       })
 
     return release
-  }, [options.runId])
+  }, [options.runId, options.flagId])
 
   return handle
 }
