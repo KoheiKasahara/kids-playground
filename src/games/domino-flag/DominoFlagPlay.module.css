@@ -1,7 +1,8 @@
 .page {
   position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* 選択一覧を内側でスクロールさせるため、外側の高さをビューポートに固定する。 */
+  height: 100vh;
+  height: 100dvh;
   box-sizing: border-box;
   overflow: hidden;
   background: var(--color-background);
@@ -25,8 +26,7 @@
 .ui {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100%;
   box-sizing: border-box;
   padding: calc(var(--space-md) + var(--safe-top)) calc(var(--space-md) + var(--safe-right))
     calc(var(--space-md) + var(--safe-bottom)) calc(var(--space-md) + var(--safe-left));
@@ -54,7 +54,16 @@
 
 .selection {
   width: min(100%, 520px);
+  flex: 1 1 auto;
+  min-height: 0;
   margin: clamp(var(--space-md), 6vh, var(--space-xl)) auto 0;
+  box-sizing: border-box;
+  padding-bottom: var(--space-md);
+  overflow-y: auto;
+  /* 選択画面の端でページ全体が引っ張られないようにしつつ、iOSでも慣性を効かせる。 */
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
   pointer-events: auto;
 }
 
@@ -126,8 +135,20 @@
   text-align: center;
 }
 
+.selectionStatus,
+.result {
+  width: min(100%, 360px);
+  max-width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  text-wrap: balance;
+}
+
 .selectionStatus {
   color: var(--color-primary-dark);
+  padding-inline: var(--space-sm);
+  font-size: clamp(var(--font-size-base), 6.5vw, var(--font-size-large));
+  line-height: 1.3;
 }
 
 .runningStatus {
@@ -136,12 +157,13 @@
 
 .result {
   margin: var(--space-md) 0 0;
-  padding: var(--space-sm) var(--space-lg);
+  padding: var(--space-sm) clamp(var(--space-sm), 4vw, var(--space-lg));
   border-radius: var(--radius-round);
   color: var(--color-success-dark);
   background: var(--color-success-bg);
-  font-size: var(--font-size-large);
+  font-size: clamp(var(--font-size-base), 7vw, var(--font-size-large));
   font-weight: 700;
+  line-height: 1.25;
 }
 
 .actions {
@@ -236,16 +258,7 @@
   }
 
   .flagCard {
-    min-height: 100px;
-    padding: var(--space-xs);
-  }
-
-  .flagImageFrame {
-    max-width: min(110px, 24vh);
-  }
-
-  .flagName {
-    font-size: 18px;
+    min-height: 144px;
   }
 
   .actions {

@@ -1,9 +1,10 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DominoEngineOptions } from './useDominoEngine'
 import DominoFlagPlay from './DominoFlagPlay'
+import { dominoFlags } from './flagDefinitions'
 
 // WebGLとRapierはjsdomで動かさず、フックに渡された状態とコールバックだけを使って画面を検証する。
 const engineMock = vi.hoisted(() => ({
@@ -31,13 +32,24 @@ function renderPlay() {
 
 type User = ReturnType<typeof userEvent.setup>
 
+async function chooseFlag(user: User, name: string) {
+  await user.click(screen.getByRole('button', { name }))
+  expect(screen.getByRole('status')).toHaveTextContent(`${name}の こっき！`)
+}
+
 async function chooseAmerica(user: User) {
-  await user.click(screen.getByRole('button', { name: 'アメリカ' }))
-  expect(screen.getByRole('status')).toHaveTextContent('アメリカの こっき！')
+  await chooseFlag(user, 'アメリカ')
 }
 
 async function completeAmerica(user: User) {
   await chooseAmerica(user)
+  await user.click(screen.getByRole('button', { name: 'スタート！' }))
+  expect(engineMock.options).toBeDefined()
+  act(() => engineMock.options!.onComplete())
+}
+
+async function completeFlag(user: User, name: string) {
+  await chooseFlag(user, name)
   await user.click(screen.getByRole('button', { name: 'スタート！' }))
   expect(engineMock.options).toBeDefined()
   act(() => engineMock.options!.onComplete())
@@ -49,13 +61,20 @@ afterEach(() => {
 })
 
 describe('DominoFlagPlay', () => {
-  it('初期表示で4か国のカードを表示する', () => {
+  it('初期表示でdominoFlagsの全20か国を定義順にカード表示する', () => {
     renderPlay()
 
     expect(screen.getByRole('heading', { name: 'こっきドミノ' })).toBeInTheDocument()
     expect(screen.getByText('どの こっきに する？')).toBeInTheDocument()
-    for (const name of ['にほん', 'フランス', 'アメリカ', 'イギリス']) {
-      expect(screen.getByRole('button', { name })).not.toHaveAttribute('aria-pressed')
+    const selection = screen.getByRole('region', { name: 'どの こっきに する？' })
+    const flagButtons = within(selection).getAllByRole('button')
+
+    expect(flagButtons).toHaveLength(dominoFlags.length)
+    expect(flagButtons.map((button) => button.getAttribute('aria-label'))).toEqual(
+      dominoFlags.map((flag) => flag.nameJa),
+    )
+    for (const button of flagButtons) {
+      expect(button).not.toHaveAttribute('aria-pressed')
     }
     expect(engineMock.options?.flagId).toBeNull()
     expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
@@ -93,6 +112,14 @@ describe('DominoFlagPlay', () => {
     expect(screen.getByRole('status')).toHaveTextContent('アメリカ！')
     expect(screen.getByRole('button', { name: 'もういちど' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'こっきをかえる' })).toBeEnabled()
+  })
+
+  it('バングラデシュを選んで完成すると長い国名も表示する', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await completeFlag(user, 'バングラデシュ')
+
+    expect(screen.getByRole('status')).toHaveTextContent('バングラデシュ！')
   })
 
   it('もういちどで同じ国のreadyへ戻り、runIdを進める', async () => {
