@@ -49,17 +49,9 @@ npm run test:watch  # ウォッチモードで実行 (vitest)
 ## ビルド
 
 ```bash
-npm run build       # 通常ビルド（base path は '/'）
+npm run build       # dist/ を生成（base path は '/'）
 npm run preview     # ビルド結果をローカルでプレビュー
 ```
-
-GitHub Pages用にビルドする場合は、`GITHUB_PAGES` 環境変数を指定します。
-
-```bash
-npm run build:pages
-```
-
-`GITHUB_PAGES=true` のときは `vite.config.ts` 内で base path が `/kids-playground/` に切り替わります（未設定時は `/`）。
 
 ## Lint
 
@@ -67,15 +59,15 @@ npm run build:pages
 npm run lint
 ```
 
-## GitHub Pages での公開
+## GitHub Pages（カスタムドメイン）での公開
 
-公開URLは以下になります（`<ユーザー名>` は実際のGitHubユーザー名に置き換えてください）。
+カスタムドメイン直下で公開しているため、公開URLは以下になります。
 
 ```
-https://<ユーザー名>.github.io/kids-playground/
+https://kids.kasapg.com/
 ```
 
-- `.github/workflows/ci.yml` は push / pull request のたびに lint・test・`build:pages`（`GITHUB_PAGES=true`）を実行し、`main` ブランチへのpush時のみ GitHub Pages へ自動デプロイします。
+- `.github/workflows/ci.yml` は push / pull request のたびに lint・test・`build`を実行し、`main` ブランチへのpush時のみ GitHub Pages へ自動デプロイします。
 - リポジトリ側の設定として、**Settings → Pages → Source を「GitHub Actions」に設定する**必要があります（この設定がないとデプロイが反映されません）。
 - ルーティングには `HashRouter` を採用しています。GitHub Pagesは静的ホスティングでサーバー側ルーティングを持たないため、`BrowserRouter` だと `/games/flag-quiz/play` のようなパスを直接リロードした際に404になりますが、`HashRouter`（URLが `#/games/flag-quiz/play` の形になる）であればどのページをリロードしても404になりません。
 
