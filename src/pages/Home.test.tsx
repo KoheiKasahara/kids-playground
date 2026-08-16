@@ -100,11 +100,15 @@ describe('Home', () => {
     expect(screen.getByRole('button', { name: 'たびに しゅっぱつ！' })).toBeInTheDocument()
   })
 
-  test('「こっきドミノ」を押すと遅延読込したプレイ画面に遷移する', async () => {
+  test('「こっきドミノ」を押すと遅延読込した国選択画面に遷移する', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     await user.click(screen.getByRole('button', { name: 'こっきドミノ' }))
     expect(await screen.findByRole('heading', { name: 'こっきドミノ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'スタート！' })).toBeInTheDocument()
+    expect(screen.getByText('どの こっきに する？')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'にほん' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'フランス' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'アメリカ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'イギリス' })).toBeInTheDocument()
   })
 })

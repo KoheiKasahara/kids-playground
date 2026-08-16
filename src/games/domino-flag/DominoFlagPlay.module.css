@@ -44,6 +44,96 @@
   text-shadow: 0 2px 0 var(--color-surface);
 }
 
+.instruction {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-text-muted);
+  font-size: clamp(24px, 6vw, var(--font-size-large));
+  font-weight: 700;
+  text-align: center;
+}
+
+.selection {
+  width: min(100%, 520px);
+  margin: clamp(var(--space-md), 6vh, var(--space-xl)) auto 0;
+  pointer-events: auto;
+}
+
+.flagGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(var(--space-sm), 3vw, var(--space-lg));
+}
+
+.flagCard {
+  position: relative;
+  min-width: 0;
+  min-height: 144px;
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  border: 3px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.flagCard:active {
+  transform: scale(0.97);
+  box-shadow: none;
+}
+
+.flagCard:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.flagImageFrame {
+  width: 100%;
+  max-width: 160px;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flagImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.flagName {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.selectionStatus,
+.runningStatus {
+  margin: var(--space-lg) 0 0;
+  font-size: var(--font-size-large);
+  font-weight: 700;
+  text-align: center;
+}
+
+.selectionStatus {
+  color: var(--color-primary-dark);
+}
+
+.runningStatus {
+  color: var(--color-text-muted);
+}
+
 .result {
   margin: var(--space-md) 0 0;
   padding: var(--space-sm) var(--space-lg);
@@ -117,7 +207,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .button,
-  .home {
+  .home,
+  .flagCard {
     transition: none;
   }
 }
@@ -129,6 +220,32 @@
 
   .title {
     font-size: 28px;
+  }
+
+  .instruction {
+    margin-top: var(--space-xs);
+    font-size: 22px;
+  }
+
+  .selection {
+    margin-top: var(--space-sm);
+  }
+
+  .flagGrid {
+    gap: var(--space-sm);
+  }
+
+  .flagCard {
+    min-height: 100px;
+    padding: var(--space-xs);
+  }
+
+  .flagImageFrame {
+    max-width: min(110px, 24vh);
+  }
+
+  .flagName {
+    font-size: 18px;
   }
 
   .actions {

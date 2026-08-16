@@ -1,3 +1,10 @@
+import {
+  createFlagGrid,
+  type DominoFlagId,
+  type FlagCellColor,
+} from './flagDefinitions'
+export type { FlagCellColor } from './flagDefinitions'
+
 /**
  * ワールド座標はXが右、Yが上、Zがカメラへ向かう手前。
  * 連鎖は奥の小さいZから手前の大きいZへ進み、薄いZ軸を持つドミノは
@@ -21,8 +28,6 @@ export const FLAG_PITCH_Z = 0.7
 export const LINE_COUNT = 12
 /** 直線と分岐の間隔を、ドミノの高さの0.7倍で揃える。 */
 export const LINE_PITCH_Z = 0.7
-
-export type FlagCellColor = 'red' | 'white'
 
 export type DominoPlacement = {
   id: string
@@ -72,19 +77,6 @@ const FAN_ARM_INSET_X = 0.28
 const FAN_SPUR_GROUP_COUNT = FLAG_COLS / 4
 /** 直線12個の後に根1個と曲線4段を置いた、左右共通の最終曲線の到達順位。 */
 const FAN_BRANCH_BASE_CHAIN_INDEX = LINE_COUNT + 4
-
-/** 16×10の日本国旗ドット絵。row 0が最も奥（カメラから遠い）。 */
-export function createJapanFlagGrid(): FlagCellColor[][] {
-  const radius = FLAG_ROWS * FLAG_PITCH_Z * 0.3
-
-  return Array.from({ length: FLAG_ROWS }, (_, row) =>
-    Array.from({ length: FLAG_COLS }, (_, col) => {
-      const x = (col - (FLAG_COLS - 1) / 2) * FLAG_PITCH_X
-      const z = (row - (FLAG_ROWS - 1) / 2) * FLAG_PITCH_Z
-      return Math.hypot(x, z) <= radius ? 'red' : 'white'
-    }),
-  )
-}
 
 function flagX(col: number): number {
   return (col - (FLAG_COLS - 1) / 2) * FLAG_PITCH_X
@@ -274,12 +266,12 @@ function createFlagPlacements(grid: FlagCellColor[][]): DominoPlacement[] {
   )
 }
 
-/** 直線 → 扇状分岐 → 16×10の日本国旗、という全ドミノ配置を作る。 */
-export function createDominoPlacements(): DominoPlacement[] {
+/** 直線 → 扇状分岐 → 16×10の国旗、という全ドミノ配置を作る。 */
+export function createDominoPlacements(flagId: DominoFlagId = 'jp'): DominoPlacement[] {
   return [
     ...createLinePlacements(),
     ...createFanPlacements(),
-    ...createFlagPlacements(createJapanFlagGrid()),
+    ...createFlagPlacements(createFlagGrid(flagId)),
   ]
 }
 

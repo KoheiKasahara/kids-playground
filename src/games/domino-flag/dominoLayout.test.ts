@@ -4,59 +4,9 @@ import {
   FLAG_ROWS,
   FLAG_PITCH_X,
   createDominoPlacements,
-  createJapanFlagGrid,
+  type DominoPlacement,
 } from './dominoLayout'
-
-describe('createJapanFlagGrid', () => {
-  it('10行×16列のグリッドを作る', () => {
-    const grid = createJapanFlagGrid()
-
-    expect(grid).toHaveLength(FLAG_ROWS)
-    expect(grid.every((row) => row.length === FLAG_COLS)).toBe(true)
-  })
-
-  it('赤セルの面積比が日の丸として妥当な範囲になる', () => {
-    const grid = createJapanFlagGrid()
-    const redCount = grid.flat().filter((color) => color === 'red').length
-    const redRatio = redCount / (FLAG_ROWS * FLAG_COLS)
-
-    expect(redRatio).toBeGreaterThanOrEqual(0.15)
-    expect(redRatio).toBeLessThanOrEqual(0.23)
-  })
-
-  it('左右対称かつ上下対称である', () => {
-    const grid = createJapanFlagGrid()
-
-    for (let row = 0; row < FLAG_ROWS; row += 1) {
-      for (let col = 0; col < FLAG_COLS; col += 1) {
-        expect(grid[row][col]).toBe(grid[row][FLAG_COLS - 1 - col])
-        expect(grid[row][col]).toBe(grid[FLAG_ROWS - 1 - row][col])
-      }
-    }
-  })
-
-  it('中央4セルが赤で四隅が白である', () => {
-    const grid = createJapanFlagGrid()
-
-    for (const row of [4, 5]) {
-      for (const col of [7, 8]) expect(grid[row][col]).toBe('red')
-    }
-    for (const [row, col] of [
-      [0, 0],
-      [0, FLAG_COLS - 1],
-      [FLAG_ROWS - 1, 0],
-      [FLAG_ROWS - 1, FLAG_COLS - 1],
-    ]) {
-      expect(grid[row][col]).toBe('white')
-    }
-  })
-
-  it('赤と白の両方を含む', () => {
-    const colors = new Set(createJapanFlagGrid().flat())
-
-    expect(colors).toEqual(new Set(['red', 'white']))
-  })
-})
+import { createFlagGrid, dominoFlags } from './flagDefinitions'
 
 describe('createDominoPlacements', () => {
   it('合計211個で、直線12・扇状分岐39・国旗160の内訳になる', () => {
@@ -127,11 +77,37 @@ describe('createDominoPlacements', () => {
   })
 
   it('国旗ドミノの色がグリッドと一致する', () => {
-    const grid = createJapanFlagGrid()
-    const flags = createDominoPlacements().filter((placement) => placement.kind === 'flag')
+    for (const definition of dominoFlags) {
+      const grid = createFlagGrid(definition.id)
+      const flags = createDominoPlacements(definition.id).filter(
+        (placement) => placement.kind === 'flag',
+      )
 
-    for (const flag of flags) {
-      expect(flag.color).toBe(grid[flag.row!][flag.col!])
+      for (const flag of flags) {
+        expect(flag.color).toBe(grid[flag.row!][flag.col!])
+      }
+    }
+  })
+
+  it('4か国でplacementの非color項目は一致し、差分はcolorだけになる', () => {
+    const comparable = ({
+      id,
+      kind,
+      x,
+      z,
+      width,
+      yaw,
+      chainIndex,
+      row,
+      col,
+    }: DominoPlacement) => ({ id, kind, x, z, width, yaw, chainIndex, row, col })
+    const base = createDominoPlacements('jp').map(
+      comparable,
+    )
+
+    for (const definition of dominoFlags.filter((flag) => flag.id !== 'jp')) {
+      const placements = createDominoPlacements(definition.id).map(comparable)
+      expect(placements).toEqual(base)
     }
   })
 })
