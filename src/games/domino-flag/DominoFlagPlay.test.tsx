@@ -1,15 +1,37 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DominoEngineOptions } from './useDominoEngine'
 import DominoFlagPlay from './DominoFlagPlay'
 import { dominoFlags } from './flagDefinitions'
+
+const originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
+
+function stubMatchMedia(reducedMotion: boolean) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn((query: string) => ({
+      matches: reducedMotion,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => true),
+    })),
+  })
+}
 
 // WebGLとRapierはjsdomで動かさず、フックに渡された状態とコールバックだけを使って画面を検証する。
 const engineMock = vi.hoisted(() => ({
   options: undefined as DominoEngineOptions | undefined,
   start: vi.fn(),
+}))
+const soundMock = vi.hoisted(() => ({
+  primeAudio: vi.fn(),
 }))
 
 vi.mock('./useDominoEngine', () => ({
@@ -20,6 +42,10 @@ vi.mock('./useDominoEngine', () => ({
       start: engineMock.start,
     }
   },
+}))
+
+vi.mock('../../utils/quizSound', () => ({
+  primeAudio: soundMock.primeAudio,
 }))
 
 function renderPlay() {
@@ -55,9 +81,19 @@ async function completeFlag(user: User, name: string) {
   act(() => engineMock.options!.onComplete())
 }
 
+beforeEach(() => {
+  stubMatchMedia(false)
+})
+
 afterEach(() => {
   engineMock.options = undefined
   engineMock.start.mockReset()
+  soundMock.primeAudio.mockReset()
+  if (originalMatchMediaDescriptor) {
+    Object.defineProperty(window, 'matchMedia', originalMatchMediaDescriptor)
+  } else {
+    delete (window as unknown as Record<string, unknown>).matchMedia
+  }
 })
 
 describe('DominoFlagPlay', () => {
@@ -91,6 +127,36 @@ describe('DominoFlagPlay', () => {
     expect(engineMock.options?.flagId).toBe('us')
   })
 
+  it('スタートを押すとprimeAudioを呼ぶ', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await chooseAmerica(user)
+    soundMock.primeAudio.mockClear()
+
+    await user.click(screen.getByRole('button', { name: 'スタート！' }))
+
+    expect(soundMock.primeAudio).toHaveBeenCalledTimes(1)
+  })
+
+  it('ミュートボタンでエンジンへ渡すsoundEnabledを切り替える', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    expect(engineMock.options?.soundEnabled).toBe(true)
+    const muteButton = screen.getByRole('button', { name: 'おとを けす' })
+    expect(muteButton).not.toHaveAttribute('aria-pressed')
+
+    await user.click(muteButton)
+
+    expect(engineMock.options?.soundEnabled).toBe(false)
+    const unmuteButton = screen.getByRole('button', { name: 'おとを だす' })
+    expect(unmuteButton).not.toHaveAttribute('aria-pressed')
+
+    await user.click(unmuteButton)
+
+    expect(engineMock.options?.soundEnabled).toBe(true)
+  })
+
   it('スタート後はrunningになり、操作ボタンが押せなくなる', async () => {
     const user = userEvent.setup()
     renderPlay()
@@ -102,6 +168,34 @@ describe('DominoFlagPlay', () => {
     expect(screen.getByRole('button', { name: 'スタート！' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'こっきをかえる' })).toBeDisabled()
     expect(engineMock.start).toHaveBeenCalledTimes(1)
+  })
+
+  it('完成前は紙吹雪を表示しない', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    expect(screen.queryByTestId('domino-complete-confetti')).not.toBeInTheDocument()
+
+    await chooseAmerica(user)
+    expect(screen.queryByTestId('domino-complete-confetti')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'スタート！' }))
+    expect(screen.queryByTestId('domino-complete-confetti')).not.toBeInTheDocument()
+  })
+
+  it('完成通知後に紙吹雪を表示する', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await completeAmerica(user)
+
+    expect(screen.getByTestId('domino-complete-confetti')).toBeInTheDocument()
+  })
+
+  it('紙吹雪は最大28個を超えない', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await completeAmerica(user)
+
+    const confetti = screen.getByTestId('domino-complete-confetti')
+    expect(confetti.querySelectorAll('span').length).toBeLessThanOrEqual(28)
   })
 
   it('完成時に選んだ国名と、もういちど・こっきをかえるを表示する', async () => {
@@ -129,10 +223,15 @@ describe('DominoFlagPlay', () => {
 
     await user.click(screen.getByRole('button', { name: 'もういちど' }))
 
+    expect(screen.queryByTestId('domino-complete-confetti')).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('アメリカの こっき！')
     expect(screen.getByRole('button', { name: 'スタート！' })).toBeEnabled()
     expect(engineMock.options?.flagId).toBe('us')
     expect(engineMock.options?.runId).toBe(1)
+
+    await user.click(screen.getByRole('button', { name: 'スタート！' }))
+    act(() => engineMock.options!.onComplete())
+    expect(screen.getByTestId('domino-complete-confetti')).toBeInTheDocument()
   })
 
   it('こっきをかえるで選択画面へ戻り、3Dを止めるflagIdがnullになる', async () => {
@@ -142,8 +241,50 @@ describe('DominoFlagPlay', () => {
 
     await user.click(screen.getByRole('button', { name: 'こっきをかえる' }))
 
+    expect(screen.queryByTestId('domino-complete-confetti')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'こっきドミノ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'にほん' })).toBeInTheDocument()
     expect(engineMock.options?.flagId).toBeNull()
+  })
+
+  it('国を変えても同じ紙吹雪演出を表示する', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await completeAmerica(user)
+    expect(screen.getByTestId('domino-complete-confetti')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'こっきをかえる' }))
+    await chooseFlag(user, 'にほん')
+    await user.click(screen.getByRole('button', { name: 'スタート！' }))
+    act(() => engineMock.options!.onComplete())
+
+    expect(screen.getByRole('status')).toHaveTextContent('にほん！')
+    expect(screen.getByTestId('domino-complete-confetti')).toBeInTheDocument()
+  })
+
+  it('reduced-motionでは紙吹雪を表示せず完成表示は残す', async () => {
+    stubMatchMedia(true)
+    const user = userEvent.setup()
+    renderPlay()
+    await completeAmerica(user)
+
+    expect(screen.getByRole('status')).toHaveTextContent('アメリカ！')
+    expect(screen.queryByTestId('domino-complete-confetti')).not.toBeInTheDocument()
+  })
+
+  it('完成後ももういちどとこっきをかえるをクリックできる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await completeAmerica(user)
+
+    await user.click(screen.getByRole('button', { name: 'こっきをかえる' }))
+    expect(screen.getByRole('button', { name: 'にほん' })).toBeInTheDocument()
+
+    await chooseAmerica(user)
+    await user.click(screen.getByRole('button', { name: 'スタート！' }))
+    act(() => engineMock.options!.onComplete())
+    await user.click(screen.getByRole('button', { name: 'もういちど' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('アメリカの こっき！')
   })
 })

@@ -16,7 +16,11 @@ class MockOscillatorNode {
 }
 
 class MockGainNode {
-  gain = { setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() }
+  gain = {
+    setValueAtTime: vi.fn(),
+    linearRampToValueAtTime: vi.fn(),
+    exponentialRampToValueAtTime: vi.fn(),
+  }
   connect = vi.fn()
 }
 
@@ -83,10 +87,17 @@ describe('quizSound', () => {
   test('AudioContext 非対応環境では例外を投げず何もしない', async () => {
     ;(window as unknown as { AudioContext?: unknown }).AudioContext = undefined
     vi.resetModules()
-    const { playCorrectSound, playIncorrectSound } = await import('./quizSound')
+    const {
+      playCorrectSound,
+      playIncorrectSound,
+      playDominoTickSound,
+      playDominoCompleteSound,
+    } = await import('./quizSound')
 
     expect(() => playCorrectSound()).not.toThrow()
     expect(() => playIncorrectSound()).not.toThrow()
+    expect(() => playDominoTickSound(0.5)).not.toThrow()
+    expect(() => playDominoCompleteSound()).not.toThrow()
     expect(instances).toHaveLength(0)
   })
 
@@ -160,8 +171,15 @@ describe('quizSound', () => {
   test('setSoundEnabled(false) の間は AudioContext を作らず、どの音も鳴らない', async () => {
     ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
     vi.resetModules()
-    const { playPanelOpenSound, playPanelRevealSound, playCorrectSound, setSoundEnabled, isSoundEnabled } =
-      await import('./quizSound')
+    const {
+      playPanelOpenSound,
+      playPanelRevealSound,
+      playCorrectSound,
+      playDominoTickSound,
+      playDominoCompleteSound,
+      setSoundEnabled,
+      isSoundEnabled,
+    } = await import('./quizSound')
 
     setSoundEnabled(false)
     expect(isSoundEnabled()).toBe(false)
@@ -169,8 +187,22 @@ describe('quizSound', () => {
     playPanelOpenSound()
     playPanelRevealSound(1, 3)
     playCorrectSound()
+    playDominoTickSound(1)
+    playDominoCompleteSound()
 
     expect(instances).toHaveLength(0)
+  })
+
+  test('こっきドミノの倒伏音は2音、完成音は上行5音を鳴らす', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playDominoTickSound, playDominoCompleteSound } = await import('./quizSound')
+
+    playDominoTickSound(1.5)
+    playDominoCompleteSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(7)
   })
 
   test('playPinballLaunchSound は低→高の2音を鳴らす', async () => {
