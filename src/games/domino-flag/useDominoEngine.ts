@@ -368,7 +368,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
 
         let flagInstanceIndex = 0
         for (const [index, placement] of placements.entries()) {
-          const color = placement.kind === 'trigger' ? 0xe0ad6b : 0xfff1cf
+          const color = 0xfff1cf
           dominoMesh.setColorAt(index, new THREE.Color(color))
           if (placement.kind === 'flag') {
             flagMesh.setColorAt(

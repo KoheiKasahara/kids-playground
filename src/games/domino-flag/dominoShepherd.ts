@@ -31,6 +31,8 @@ export const SHEPHERD_STALL_MS = 1500
 export const SHEPHERD_MAX_NUDGES = 3
 export const SHEPHERD_NUDGE_COOLDOWN_MS = 600
 export const SHEPHERD_STRENGTHS = [0.75, 1.05, 1.4] as const
+/** V字波面の停滞時に、一度に起こす経路ドミノ数の上限。 */
+export const SHEPHERD_STALL_MAX_NUDGES = 3
 
 export function createShepherdMemory(): ShepherdMemory {
   return {
@@ -142,13 +144,17 @@ export function planShepherdNudges(
     (nextMemory.lastStallNudgeAt === null ||
       nowMs - nextMemory.lastStallNudgeAt >= SHEPHERD_NUDGE_COOLDOWN_MS)
   ) {
+    let stallNudgeCount = 0
     for (const domino of dominoes) {
+      if (stallNudgeCount >= SHEPHERD_STALL_MAX_NUDGES) break
       if (
         !domino.fallen &&
         domino.sleeping &&
         domino.chainIndex === wavefront + 1
       ) {
+        const nudgesBefore = nudges.length
         addNudge(domino)
+        stallNudgeCount += nudges.length - nudgesBefore
       }
     }
     if (nudges.length > 0) nextMemory.lastStallNudgeAt = nowMs
