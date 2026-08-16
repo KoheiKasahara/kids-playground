@@ -6,12 +6,25 @@ import { FLAG_COLOR_HEX, type DominoFlagId } from './flagDefinitions'
 import {
   DOMINO_DEPTH,
   DOMINO_HEIGHT,
-  createDominoPlacements,
   getLayoutBounds,
 } from './dominoLayout'
-import { computeCameraSetup } from './dominoCamera'
+import { createDominoCourse, type DominoCourseType } from './dominoCourse'
+import { cameraDistanceOf, computeCameraSetup } from './dominoCamera'
 import {
-  GROUND_SIZE,
+  advanceRailProgress,
+  approachCameraDistanceFor,
+  buildLongCameraRail,
+  CAMERA_LAMBDA,
+  CAMERA_PROGRESS_TILT_RAD,
+  cameraPositionFor,
+  dampFactor,
+  PROGRESS_LAMBDA,
+  sampleCameraRail,
+  wideCameraPoseFor,
+  type CameraRailAnchor,
+  type RailVec3,
+} from './dominoCameraRail'
+import {
   INSPECTION_INTERVAL_MS,
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
@@ -39,6 +52,9 @@ import type { World } from '@dimforge/rapier3d-compat'
 
 let rapierInitPromise: Promise<void> | null = null
 
+// 144×144の地面全体をロングの俯瞰から描画するための値。通常モードは100のままにする。
+const LONG_CAMERA_FAR = 150
+
 /** Rapierのwasm初期化をモジュール内で一度だけ実行し、再入場時に共有する。 */
 function initializeRapier(): Promise<void> {
   if (rapierInitPromise === null) rapierInitPromise = RAPIER.init()
@@ -50,6 +66,8 @@ export type DominoEngineOptions = {
   runId: number
   /** nullの間は国旗選択中として、Three.jsとRapierを作らない。 */
   flagId: DominoFlagId | null
+  /** normal/longを切り替えたら物理世界も作り直す。 */
+  courseType: DominoCourseType
   /** 完成判定が立ったときに一度だけ呼ぶ。 */
   onComplete: () => void
   /** このrunのドミノ効果音を鳴らすか。useEffectの再生成条件には含めない。 */
@@ -104,8 +122,9 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       return
     }
 
-    const placements = createDominoPlacements(flagId)
-    const layoutBounds = getLayoutBounds(placements)
+    const course = createDominoCourse(options.courseType, flagId)
+    const placements = course.placements
+    const layoutBounds = course.flagCameraBounds
     const flagPlacements = placements.filter((placement) => placement.kind === 'flag')
     const bodies: RenderDominoBodyEntry[] = []
     const bodiesById = new Map<string, DominoBodyEntry>()
@@ -134,6 +153,16 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     let accumulator = 0
     let lastInspectionAt = Number.NEGATIVE_INFINITY
     let lastFallScanAt = Number.NEGATIVE_INFINITY
+    const isLongCourse = course.approachCount > 0
+    const reducedMotion =
+      isLongCourse &&
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+    let cameraRail: CameraRailAnchor[] = []
+    let cameraFrontier = 0
+    let smoothedProgress = 0
+    let smoothedTarget: RailVec3 | null = null
+    let smoothedDistance = 0
     let shepherdMemory: ShepherdMemory = createShepherdMemory()
     const soundController = createDominoSoundController({
       dominoCount: placements.length,
@@ -235,10 +264,63 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       const aspect = width / height
       const setup = computeCameraSetup(layoutBounds, aspect)
       camera.aspect = aspect
-      camera.position.set(setup.position.x, setup.position.y, setup.position.z)
-      camera.lookAt(setup.target.x, setup.target.y, setup.target.z)
+      if (course.approachCount === 0) {
+        camera.position.set(setup.position.x, setup.position.y, setup.position.z)
+        camera.lookAt(setup.target.x, setup.target.y, setup.target.z)
+      } else {
+        cameraRail = buildLongCameraRail(
+          course.approachPath,
+          {
+            target: setup.target,
+            distance: cameraDistanceOf(setup),
+          },
+          {
+            reducedMotion,
+            approachDistance: approachCameraDistanceFor(aspect),
+            cameraProgressCount: course.cameraProgressCount,
+            wideCamera: wideCameraPoseFor(getLayoutBounds(placements), aspect),
+          },
+        )
+        if (smoothedTarget === null) {
+          const initialPose = sampleCameraRail(cameraRail, smoothedProgress)
+          smoothedTarget = { ...initialPose.target }
+          smoothedDistance = initialPose.distance
+        }
+        const position = cameraPositionFor(smoothedTarget, smoothedDistance)
+        camera.position.set(position.x, position.y, position.z)
+        camera.lookAt(smoothedTarget.x, smoothedTarget.y, smoothedTarget.z)
+      }
       camera.updateProjectionMatrix()
       renderer.setSize(width, height)
+    }
+
+    function updateLongCamera(deltaSeconds: number) {
+      if (!isLongCourse || !camera || cameraRail.length === 0 || smoothedTarget === null) return
+
+      while (
+        cameraFrontier < course.cameraProgressCount &&
+        tiltOf(bodies[cameraFrontier]!.body) >= CAMERA_PROGRESS_TILT_RAD
+      ) {
+        cameraFrontier += 1
+      }
+      const rawProgress = cameraFrontier / course.cameraProgressCount
+      smoothedProgress = advanceRailProgress(
+        smoothedProgress,
+        rawProgress,
+        deltaSeconds,
+        PROGRESS_LAMBDA,
+      )
+      const pose = sampleCameraRail(cameraRail, smoothedProgress)
+      const factor = dampFactor(CAMERA_LAMBDA, deltaSeconds)
+      smoothedTarget = {
+        x: smoothedTarget.x + (pose.target.x - smoothedTarget.x) * factor,
+        y: smoothedTarget.y + (pose.target.y - smoothedTarget.y) * factor,
+        z: smoothedTarget.z + (pose.target.z - smoothedTarget.z) * factor,
+      }
+      smoothedDistance += (pose.distance - smoothedDistance) * factor
+      const position = cameraPositionFor(smoothedTarget, smoothedDistance)
+      camera.position.set(position.x, position.y, position.z)
+      camera.lookAt(smoothedTarget.x, smoothedTarget.y, smoothedTarget.z)
     }
 
     function writeVisuals() {
@@ -268,9 +350,9 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       if (started || !world || bodies.length === 0) return
       started = true
       startedAt = performance.now()
-      const first = bodies[0]
+      const first = bodiesById.get(course.startId)
       if (!first) return
-      applyStartImpulse(first.body)
+      applyStartImpulse(first.body, first.placement.chainYaw)
     }
 
     function requestStart() {
@@ -285,7 +367,11 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         tilt: tiltOf(entry.body),
         sleeping: entry.body.isSleeping(),
       }))
-      const completion = evaluateCompletion(states, now - startedAt)
+      const completion = evaluateCompletion(
+        states,
+        now - startedAt,
+        course.hardTimeoutMs,
+      )
 
       if (completion.complete && !completeNotified) {
         completeNotified = true
@@ -308,19 +394,23 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       shepherdMemory = shepherd.memory
       for (const nudge of shepherd.plan.nudges) {
         const entry = bodiesById.get(nudge.id)
-        if (entry) applyShepherdImpulse(entry.body, nudge.strength)
+        if (entry) {
+          applyShepherdImpulse(entry.body, nudge.strength, entry.placement.chainYaw)
+        }
       }
     }
 
     function tick(now: number) {
       if (activeRunRef.current !== runToken || released) return
       rafId = requestAnimationFrame(tick)
+      let deltaSeconds = 0
 
       if (lastFrameTime === null) {
         lastFrameTime = now
       } else {
         const deltaMs = Math.min(Math.max(0, now - lastFrameTime), MAX_FRAME_DELTA_MS)
         lastFrameTime = now
+        deltaSeconds = deltaMs / 1000
         if (started && world !== null) {
           accumulator += deltaMs / 1000
           let substeps = 0
@@ -336,6 +426,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       }
 
       writeVisuals()
+      if (course.approachCount > 0) updateLongCamera(deltaSeconds)
       if (started && now - lastInspectionAt >= INSPECTION_INTERVAL_MS) {
         lastInspectionAt = now
         inspectPhysics(now)
@@ -374,13 +465,14 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         scene = new THREE.Scene()
         scene.background = new THREE.Color('#e7f5ff')
         camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100)
+        if (course.approachCount > 0) camera.far = LONG_CAMERA_FAR
 
         const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x8bbf91, 1.8)
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1.1)
         directionalLight.position.set(-4, 8, 6)
         scene.add(hemisphereLight, directionalLight)
 
-        groundGeometry = new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE)
+        groundGeometry = new THREE.PlaneGeometry(course.groundSize, course.groundSize)
         groundMaterial = new THREE.MeshLambertMaterial({ color: 0x9bd38f })
         const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial)
         groundMesh.rotation.x = -Math.PI / 2
@@ -423,7 +515,9 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         if (flagMesh.instanceColor) flagMesh.instanceColor.needsUpdate = true
         scene.add(dominoMesh, flagMesh)
 
-        const dominoWorld = createDominoWorld(RAPIER, placements)
+        const dominoWorld = createDominoWorld(RAPIER, placements, {
+          groundSize: course.groundSize,
+        })
         world = dominoWorld.world
         let flagBodyIndex = 0
         for (const entry of dominoWorld.bodies) {
@@ -465,7 +559,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       })
 
     return release
-  }, [options.runId, options.flagId])
+  }, [options.runId, options.flagId, options.courseType])
 
   return handle
 }

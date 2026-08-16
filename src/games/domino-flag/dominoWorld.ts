@@ -48,16 +48,18 @@ function getChainIndex(placement: DominoPlacement): number {
 export function createDominoWorld(
   rapier: RapierModule,
   placements: DominoPlacement[] = createDominoPlacements(),
+  options: { groundSize?: number } = {},
 ): DominoWorld {
   const world = new rapier.World({ x: 0, y: GRAVITY_Y, z: 0 })
   world.timestep = PHYSICS_TIMESTEP
+  const groundSize = options.groundSize ?? GROUND_SIZE
 
   // 親RigidBodyを持たないColliderは固定物として扱われるため、剛体数を173に保てる。
   world.createCollider(
     rapier.ColliderDesc.cuboid(
-      GROUND_SIZE / 2,
+      groundSize / 2,
       GROUND_THICKNESS / 2,
-      GROUND_SIZE / 2,
+      groundSize / 2,
     )
       .setTranslation(0, -GROUND_THICKNESS / 2, 0)
       .setFriction(GROUND_FRICTION)
@@ -140,16 +142,32 @@ function pointNearTop(body: RigidBody): VectorLike {
   }
 }
 
-/** 最初のドミノの上端を+Zへ押す共通処理。 */
-export function applyStartImpulse(body: RigidBody): void {
-  body.applyImpulseAtPoint({ x: 0, y: 0, z: START_IMPULSE_Z }, pointNearTop(body), true)
+/** 最初のドミノの上端を、配置が示す連鎖方向へ押す共通処理。 */
+export function applyStartImpulse(body: RigidBody, chainYaw = 0): void {
+  body.applyImpulseAtPoint(
+    {
+      x: Math.sin(chainYaw) * START_IMPULSE_Z,
+      y: 0,
+      z: Math.cos(chainYaw) * START_IMPULSE_Z,
+    },
+    pointNearTop(body),
+    true,
+  )
   body.wakeUp()
 }
 
 /** shepherdの倍率だけを受け取り、物理的な基準値はこのファイルの定数から使う。 */
-export function applyShepherdImpulse(body: RigidBody, strength: number): void {
+export function applyShepherdImpulse(
+  body: RigidBody,
+  strength: number,
+  chainYaw = 0,
+): void {
   body.applyImpulseAtPoint(
-    { x: 0, y: 0, z: SHEPHERD_IMPULSE_Z * strength },
+    {
+      x: Math.sin(chainYaw) * SHEPHERD_IMPULSE_Z * strength,
+      y: 0,
+      z: Math.cos(chainYaw) * SHEPHERD_IMPULSE_Z * strength,
+    },
     pointNearTop(body),
     true,
   )

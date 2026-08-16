@@ -13,6 +13,8 @@ export const COMPLETE_RATIO = 0.92
 export const TIMEOUT_RATIO = 0.8
 /** 25秒を超えて動き続ける場合の上限時間。 */
 export const HARD_TIMEOUT_MS = 25_000
+/** 道中を含むロングコースが落ち着くまで待つ上限時間。 */
+export const LONG_HARD_TIMEOUT_MS = 45_000
 
 export function isFallen(state: DominoRuntimeState): boolean {
   return state.tilt >= FALLEN_TILT_RAD
@@ -37,11 +39,12 @@ export type CompletionResult = {
 export function evaluateCompletion(
   states: DominoRuntimeState[],
   elapsedMs: number,
+  hardTimeoutMs = HARD_TIMEOUT_MS,
 ): CompletionResult {
   const fallenRatio = states.length === 0 ? 0 : countFallen(states) / states.length
   const settled = states.length > 0 && states.every((state) => state.sleeping)
   const completeBySettled = fallenRatio >= COMPLETE_RATIO && settled
-  const completeByTimeout = elapsedMs >= HARD_TIMEOUT_MS && fallenRatio >= TIMEOUT_RATIO
+  const completeByTimeout = elapsedMs >= hardTimeoutMs && fallenRatio >= TIMEOUT_RATIO
 
   return {
     fallenRatio,

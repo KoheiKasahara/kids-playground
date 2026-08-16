@@ -116,6 +116,71 @@ describe('DominoFlagPlay', () => {
     expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
   })
 
+  it('初期コースはふつうが選択されている', () => {
+    renderPlay()
+
+    const courseGroup = screen.getByRole('group', { name: 'コース' })
+    expect(within(courseGroup).getByRole('button', { name: 'ふつう' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(within(courseGroup).getByRole('button', { name: 'ロング' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(engineMock.options?.courseType).toBe('normal')
+  })
+
+  it('ロングを選ぶと表示とエンジンのcourseTypeが切り替わる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'ロング' }))
+
+    expect(screen.getByRole('button', { name: 'ロング' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(engineMock.options?.courseType).toBe('long')
+  })
+
+  it('国旗を選んだready画面にコース名を表示する', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await chooseAmerica(user)
+
+    expect(screen.getByText('ふつう コース')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('アメリカの こっき！')
+  })
+
+  it('こっきをかえるで戻ってもコース選択を維持する', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await user.click(screen.getByRole('button', { name: 'ロング' }))
+    await chooseAmerica(user)
+    await user.click(screen.getByRole('button', { name: 'こっきをかえる' }))
+
+    expect(screen.getByRole('button', { name: 'ロング' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(engineMock.options?.courseType).toBe('long')
+  })
+
+  it('ロング＋アメリカからふつう＋にほんへ切り替えると状態を初期化する', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await user.click(screen.getByRole('button', { name: 'ロング' }))
+    await chooseAmerica(user)
+    await user.click(screen.getByRole('button', { name: 'こっきをかえる' }))
+    await user.click(screen.getByRole('button', { name: 'ふつう' }))
+    await chooseFlag(user, 'にほん')
+
+    expect(engineMock.options?.courseType).toBe('normal')
+    expect(engineMock.options?.flagId).toBe('jp')
+    expect(engineMock.options?.runId).toBe(2)
+  })
+
   it('アメリカを選ぶとreadyになり、スタートを押せる', async () => {
     const user = userEvent.setup()
     renderPlay()

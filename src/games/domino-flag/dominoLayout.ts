@@ -31,12 +31,14 @@ export const LINE_PITCH_Z = 0.7
 
 export type DominoPlacement = {
   id: string
-  kind: 'line' | 'branch' | 'flag'
+  kind: 'line' | 'branch' | 'flag' | 'approach'
   x: number
   z: number
   width: number
   /** Y軸周りの回転角（ラジアン）。0は表面の法線が+Zを向く。 */
   yaw?: number
+  /** 連鎖が進む方向。未指定の既存配置は+Zとして扱う。 */
+  chainYaw?: number
   /** この配置経路から求めた、倒伏が到達する順番の目安。 */
   chainIndex: number
   color?: FlagCellColor

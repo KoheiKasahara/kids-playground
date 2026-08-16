@@ -11,10 +11,19 @@ export type CameraSetup = {
   fov: number
 }
 
-const CAMERA_FOV = 50
-const CAMERA_ELEVATION_RAD = (50 * Math.PI) / 180
+export const CAMERA_FOV = 50
+export const CAMERA_ELEVATION_RAD = (50 * Math.PI) / 180
 const CAMERA_MARGIN = 1.12
-const CAMERA_TARGET_Y = 0.32
+export const CAMERA_TARGET_Y = 0.32
+
+/** 固定カメラのtargetとpositionから、同じ方位・仰角の距離だけを取り出す。 */
+export function cameraDistanceOf(setup: CameraSetup): number {
+  return Math.hypot(
+    setup.position.x - setup.target.x,
+    setup.position.y - setup.target.y,
+    setup.position.z - setup.target.z,
+  )
+}
 
 /**
  * レイアウト境界と画面アスペクト比から、全体が収まる固定カメラを決める。
