@@ -11,17 +11,53 @@ import {
   FLAG_ROWS,
 } from './dominoLayout'
 import {
+  FLAG_CELL_COLOR_BY_CHAR,
+  FLAG_COLOR_HEX,
   createFlagGrid,
   dominoFlags,
   type DominoFlagId,
   type FlagCellColor,
 } from './flagDefinitions'
 
-const flagIds: DominoFlagId[] = ['jp', 'fr', 'us', 'gb']
-const knownColors = new Set<FlagCellColor>(['red', 'white', 'blue'])
+const flagIds: DominoFlagId[] = [
+  'jp',
+  'fr',
+  'us',
+  'gb',
+  'it',
+  'de',
+  'nl',
+  'be',
+  'pl',
+  'ua',
+  'id',
+  'ch',
+  'se',
+  'fi',
+  'bd',
+  'ca',
+  'br',
+  'kr',
+  'in',
+  'tr',
+]
+const knownColors = new Set<FlagCellColor>([
+  'red',
+  'white',
+  'blue',
+  'black',
+  'yellow',
+  'green',
+  'orange',
+])
 
 describe('dominoFlags', () => {
-  it('4か国すべてが10行×16列の160セルである', () => {
+  it('20か国が指定順で一意に定義されている', () => {
+    expect(dominoFlags.map((definition) => definition.id)).toEqual(flagIds)
+    expect(new Set(flagIds).size).toBe(flagIds.length)
+  })
+
+  it('20か国すべてが10行×16列の160セルである', () => {
     for (const id of flagIds) {
       const grid = createFlagGrid(id)
 
@@ -31,12 +67,23 @@ describe('dominoFlags', () => {
     }
   })
 
-  it('全セルがred/white/blueのいずれかに解決される', () => {
+  it('全セルが共通パレットのいずれかに解決される', () => {
     for (const id of flagIds) {
       const grid = createFlagGrid(id)
 
       expect(grid.flat().every((color) => knownColors.has(color))).toBe(true)
     }
+  })
+
+  it('追加色のHEXと文字マッピングが共通定義になっている', () => {
+    expect(FLAG_COLOR_HEX.red).toBe('#bc002d')
+    expect(FLAG_COLOR_HEX.white).toBe('#fffdf5')
+    expect(FLAG_COLOR_HEX.blue).toBe('#1f4aa8')
+
+    const paletteKeys = new Set(Object.keys(FLAG_COLOR_HEX))
+    const mappedColors = new Set(Object.values(FLAG_CELL_COLOR_BY_CHAR))
+    expect(mappedColors).toEqual(paletteKeys)
+    expect(paletteKeys.size).toBeLessThanOrEqual(7)
   })
 
   it('未知の国旗IDを渡すとthrowする', () => {
@@ -128,6 +175,235 @@ describe('dominoFlags', () => {
     expect(blueRatio).toBeLessThan(0.25)
   })
 
+  it('追加11か国が主要色と視認しやすい形状を持つ', () => {
+    for (const [id, colors] of [
+      ['it', ['green', 'white', 'red']],
+      ['de', ['black', 'red', 'yellow']],
+      ['nl', ['red', 'white', 'blue']],
+      ['be', ['black', 'yellow', 'red']],
+      ['pl', ['white', 'red']],
+      ['ua', ['blue', 'yellow']],
+      ['id', ['red', 'white']],
+      ['ch', ['red', 'white']],
+      ['se', ['blue', 'yellow']],
+      ['fi', ['white', 'blue']],
+      ['bd', ['green', 'red']],
+    ] as const) {
+      expect(new Set(createFlagGrid(id).flat())).toEqual(new Set(colors))
+    }
+
+    const italy = createFlagGrid('it')
+    expect(italy[0]!.slice(0, 5)).toEqual([
+      'green',
+      'green',
+      'green',
+      'green',
+      'green',
+    ])
+    expect(italy[0]![5]).toBe('white')
+    expect(italy[0]![11]).toBe('red')
+
+    const germany = createFlagGrid('de')
+    expect(germany[0]![0]).toBe('black')
+    expect(germany[3]![0]).toBe('red')
+    expect(germany[7]![0]).toBe('yellow')
+
+    const netherlands = createFlagGrid('nl')
+    expect(netherlands[0]![0]).toBe('red')
+    expect(netherlands[3]![0]).toBe('white')
+    expect(netherlands[7]![0]).toBe('blue')
+
+    const belgium = createFlagGrid('be')
+    expect(belgium[0]![0]).toBe('black')
+    expect(belgium[0]![5]).toBe('yellow')
+    expect(belgium[0]![11]).toBe('red')
+
+    const poland = createFlagGrid('pl')
+    expect(poland[0]![0]).toBe('white')
+    expect(poland[5]![0]).toBe('red')
+
+    const ukraine = createFlagGrid('ua')
+    expect(ukraine[0]![0]).toBe('blue')
+    expect(ukraine[5]![0]).toBe('yellow')
+
+    const indonesia = createFlagGrid('id')
+    expect(indonesia[0]![0]).toBe('red')
+    expect(indonesia[5]![0]).toBe('white')
+
+    const switzerland = createFlagGrid('ch')
+    const swissBorder = [
+      ...switzerland[0]!,
+      ...switzerland[9]!,
+      ...switzerland.map((row) => row[0]),
+      ...switzerland.map((row) => row[15]),
+    ]
+    expect(swissBorder.every((color) => color === 'red')).toBe(true)
+    expect(switzerland[4]![7]).toBe('white')
+    expect(switzerland[4]![4]).toBe('red')
+    expect(switzerland[4]![10]).toBe('white')
+    expect(switzerland[4]![11]).toBe('red')
+    expect(switzerland[2]![7]).toBe('white')
+    expect(switzerland[1]![7]).toBe('red')
+    const swissWhiteRatio =
+      switzerland.flat().filter((color) => color === 'white').length / 160
+    expect(swissWhiteRatio).toBeGreaterThanOrEqual(0.1)
+    expect(swissWhiteRatio).toBeLessThan(0.2)
+
+    const sweden = createFlagGrid('se')
+    expect(sweden[0]![0]).toBe('blue')
+    expect(sweden[0]![5]).toBe('yellow')
+    expect(sweden[4]).toEqual(Array.from({ length: 16 }, () => 'yellow'))
+
+    const finland = createFlagGrid('fi')
+    expect(finland[0]![0]).toBe('white')
+    expect(finland[0]![5]).toBe('blue')
+    expect(finland[4]).toEqual(Array.from({ length: 16 }, () => 'blue'))
+
+    const bangladesh = createFlagGrid('bd')
+    expect(bangladesh[0]![0]).toBe('green')
+    expect(bangladesh[4]![7]).toBe('red')
+    const redCells = bangladesh.flatMap((row) =>
+      row.flatMap((color, col) => (color === 'red' ? [col] : [])),
+    )
+    const redColumnCenter = redCells.reduce((sum, col) => sum + col, 0) / redCells.length
+    expect(redColumnCenter).toBeLessThan((FLAG_COLS - 1) / 2)
+  })
+
+  it('新規5か国が主要色と旗の特徴を持つ', () => {
+    for (const [id, colors] of [
+      ['ca', ['red', 'white']],
+      ['br', ['green', 'yellow', 'blue']],
+      ['kr', ['white', 'red', 'blue', 'black']],
+      ['in', ['orange', 'white', 'green', 'blue']],
+      ['tr', ['red', 'white']],
+    ] as const) {
+      expect(new Set(createFlagGrid(id).flat())).toEqual(new Set(colors))
+    }
+
+    const canada = createFlagGrid('ca')
+    expect(
+      canada.every(
+        (row) =>
+          row.slice(0, 4).every((color) => color === 'red') &&
+          row.slice(12).every((color) => color === 'red'),
+      ),
+    ).toBe(true)
+    expect(canada.some((row) => row.slice(4, 12).includes('red'))).toBe(true)
+    expect(canada.every((row) => row[4] === 'white' && row[11] === 'white')).toBe(true)
+    expect(canada.some((row) => row.every((color) => color === 'red'))).toBe(false)
+    expect(canada[8]![7]).toBe('red')
+    expect(canada[0]![7]).toBe('white')
+    expect(canada[2]![5]).toBe('red')
+    expect(canada[2]![6]).toBe('white')
+    expect(canada[2]![9]).toBe('white')
+    expect(canada[2]![10]).toBe('red')
+    const canadaLeafWidths = canada.map(
+      (row) => row.slice(4, 12).filter((color) => color === 'red').length,
+    )
+    expect(canadaLeafWidths).toEqual([0, 2, 4, 6, 6, 4, 2, 2, 2, 0])
+    expect(canadaLeafWidths).not.toEqual([...canadaLeafWidths].reverse())
+    const canadaRedRows = canada.flatMap((row, rowIndex) =>
+      row.flatMap((color) => (color === 'red' ? [rowIndex] : [])),
+    )
+    const canadaRedCenter =
+      canadaRedRows.reduce((sum, rowIndex) => sum + rowIndex, 0) / canadaRedRows.length
+    expect(canadaRedCenter).toBeLessThan((FLAG_ROWS - 1) / 2)
+
+    const brazil = createFlagGrid('br')
+    const brazilDiamondWidths = brazil.map(
+      (row) => row.filter((color) => color !== 'green').length,
+    )
+    expect(brazilDiamondWidths).toEqual([2, 4, 6, 8, 10, 10, 8, 6, 4, 2])
+    const brazilBlueCells = brazil.flatMap((row, rowIndex) =>
+      row.flatMap((color, col) =>
+        color === 'blue' ? [{ row: rowIndex, col }] : [],
+      ),
+    )
+    expect(brazilBlueCells.length).toBeGreaterThan(0)
+    for (const { row, col } of brazilBlueCells) {
+      const surroundingColors = []
+      for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
+        for (let colOffset = -1; colOffset <= 1; colOffset += 1) {
+          if (rowOffset === 0 && colOffset === 0) continue
+          surroundingColors.push(brazil[row + rowOffset]![col + colOffset])
+        }
+      }
+      expect(
+        surroundingColors
+          .filter((color) => color !== 'blue')
+          .every((color) => color === 'yellow'),
+      ).toBe(true)
+    }
+
+    const korea = createFlagGrid('kr')
+    const blackAreas = [
+      { rows: [1, 2], cols: [1, 2, 3] },
+      { rows: [1, 2], cols: [12, 13, 14] },
+      { rows: [7, 8], cols: [1, 2, 3] },
+      { rows: [7, 8], cols: [12, 13, 14] },
+    ]
+    for (const area of blackAreas) {
+      expect(
+        area.rows.every((row) =>
+          area.cols.every((col) => korea[row]![col] === 'black'),
+        ),
+      ).toBe(true)
+    }
+    const isBlackArea = (row: number, col: number) =>
+      ((row === 1 || row === 2 || row === 7 || row === 8) &&
+        ((col >= 1 && col <= 3) || (col >= 12 && col <= 14)))
+    const koreaBlackCells = korea.flatMap((row, rowIndex) =>
+      row.flatMap((color, col) =>
+        color === 'black' ? [{ row: rowIndex, col }] : [],
+      ),
+    )
+    expect(koreaBlackCells.every(({ row, col }) => isBlackArea(row, col))).toBe(true)
+    expect(korea.some((row) => row.includes('red'))).toBe(true)
+    expect(korea.some((row) => row.includes('blue'))).toBe(true)
+
+    const india = createFlagGrid('in')
+    expect(india[0]).toEqual(Array.from({ length: FLAG_COLS }, () => 'orange'))
+    expect(india[9]).toEqual(Array.from({ length: FLAG_COLS }, () => 'green'))
+    expect(
+      india.every(
+        (row, rowIndex) =>
+          rowIndex >= 3 && rowIndex <= 6 ? true : !row.includes('blue'),
+      ),
+    ).toBe(true)
+    expect(india[3]![7]).toBe('blue')
+    expect(india[4]![6]).toBe('blue')
+    expect(india[4]![7]).toBe('white')
+    expect(india[4]![8]).toBe('white')
+    expect(india[4]![9]).toBe('blue')
+
+    const turkey = createFlagGrid('tr')
+    const countWhite = (start: number, end: number) =>
+      turkey.reduce(
+        (total, row) => total + row.slice(start, end).filter((color) => color === 'white').length,
+        0,
+      )
+    const leftWhite = countWhite(0, 8)
+    const rightWhite = countWhite(8, 16)
+    expect(leftWhite).toBeGreaterThan(rightWhite)
+    expect(rightWhite).toBeGreaterThan(0)
+    const whiteColumns = (rowIndex: number) =>
+      turkey[rowIndex]!.flatMap((color, col) =>
+        color === 'white' ? [col] : [],
+      )
+    expect(whiteColumns(2)).toEqual([4, 5, 6, 7])
+    expect(whiteColumns(3)).toEqual([3, 4, 5, 6])
+    expect(whiteColumns(4)).toEqual([3, 4, 5, 10])
+    expect(whiteColumns(5)).toEqual([3, 4, 5, 9, 10, 11])
+    expect(whiteColumns(6)).toEqual([3, 4, 5, 6, 10])
+    expect(whiteColumns(7)).toEqual([4, 5, 6, 7])
+    expect(turkey[2]![7]).toBe('white')
+    expect(turkey[3]![7]).toBe('red')
+    expect(turkey[4]![7]).toBe('red')
+    expect(turkey[6]![7]).toBe('red')
+    expect(turkey[5]![7]).toBe('red')
+    expect(turkey[5]!.slice(9, 12)).toEqual(['white', 'white', 'white'])
+  })
+
   it('id・nameJa・画像パスがflag-quizのマスターと一致する', () => {
     for (const definition of dominoFlags) {
       const country = countries.find((candidate) => candidate.id === definition.id)
@@ -138,7 +414,7 @@ describe('dominoFlags', () => {
     }
   })
 
-  it('4か国の画像ファイルがpublic/flagsに実在する', () => {
+  it('20か国の画像ファイルがpublic/flagsに実在する', () => {
     for (const definition of dominoFlags) {
       expect(existsSync(resolve('public', definition.imagePath))).toBe(true)
     }

@@ -14,6 +14,7 @@ export default function DominoFlagPlay() {
   const selectedFlag = flagId === null
     ? null
     : dominoFlags.find((flag) => flag.id === flagId) ?? null
+
   const { registerContainer, start } = useDominoEngine({
     runId,
     flagId,
@@ -39,6 +40,7 @@ export default function DominoFlagPlay() {
     setGameState('ready')
   }
 
+  // 選択画面はアンマウントされるため、戻るたびに一覧が先頭から表示される。
   const handleChangeFlag = () => {
     if (gameState === 'running') return
     setFlagId(null)
@@ -61,7 +63,7 @@ export default function DominoFlagPlay() {
             </p>
             <section className={styles.selection} aria-labelledby="domino-flag-instruction">
               <div className={styles.flagGrid}>
-                {dominoFlags.map((flag) => {
+                {dominoFlags.map((flag, index) => {
                   return (
                     <button
                       key={flag.id}
@@ -76,6 +78,8 @@ export default function DominoFlagPlay() {
                           src={import.meta.env.BASE_URL + flag.imagePath}
                           alt=""
                           draggable={false}
+                          loading={index < 4 ? 'eager' : 'lazy'}
+                          decoding="async"
                         />
                       </span>
                       <span className={styles.flagName}>{flag.nameJa}</span>
