@@ -4,9 +4,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// GitHub Pages ではリポジトリ名がパスに含まれるため、
-// GITHUB_PAGES=true のときだけ base を '/kids-playground/' に切り替える。
-const base = process.env.GITHUB_PAGES === 'true' ? '/kids-playground/' : '/'
+// カスタムドメイン（https://kids.kasapg.com/）直下で公開するため base は常に '/'。
+const base = '/'
 
 export default defineConfig({
   base,

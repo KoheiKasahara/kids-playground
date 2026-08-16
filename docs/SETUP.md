@@ -178,27 +178,6 @@ npm run preview   # dist/ を http://localhost:4173/ で配信
 > ブラウザによっては PWA のインストールに HTTPS が必要です。`localhost` は例外として許可されますが、
 > スマホ実機での最終確認は GitHub Pages へデプロイした後に行うのが確実です。
 
-### GitHub Pages 向けビルドをローカルで再現する
-
-`GITHUB_PAGES=true` のときだけ base が `/kids-playground/` に切り替わります。
-
-PowerShell:
-
-```powershell
-$env:GITHUB_PAGES = "true"
-npm run build:pages
-Remove-Item Env:\GITHUB_PAGES
-```
-
-コマンドプロンプト:
-
-```cmd
-set GITHUB_PAGES=true && npm run build:pages && set GITHUB_PAGES=
-```
-
-`dist/index.html` 内のアセットパスが `/kids-playground/...` になっていれば成功です。
-なお、この状態で `npm run preview` すると `http://localhost:4173/kids-playground/` を開く必要があります。
-
 ---
 
 ## 7. GitHub へ反映して公開するまで
@@ -213,10 +192,8 @@ set GITHUB_PAGES=true && npm run build:pages && set GITHUB_PAGES=
    ```
 
 3. GitHub の **Actions** タブでワークフローの進行を確認する
-   （`npm ci` → `lint` → `test` → `build:pages` → Pages デプロイ の順に実行されます）
-4. 完了後、`https://<ユーザー名>.github.io/kids-playground/` で公開されます
-
-> リポジトリ名を `kids-playground` 以外に変更した場合は、`vite.config.ts` の `base` の値も合わせて変更してください。
+   （`npm ci` → `lint` → `test` → `build` → Pages デプロイ の順に実行されます）
+4. 完了後、`https://kids.kasapg.com/` で公開されます（カスタムドメイン / Enforce HTTPS 設定はリポジトリ側で設定済み）
 
 ---
 

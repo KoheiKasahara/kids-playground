@@ -295,7 +295,7 @@ Geolonia `japanese-prefectures`も調査しましたが、GFDLで、一部離島
 - JSバンドルは現行Workboxのprecache対象なので、JSON拡張子を`globPatterns`へ追加する必要はありません。
 - 地図を`public`の独立JSONへ変更した場合だけ、`json`をprecache対象へ追加し、base相対パスと生成Service Worker内の登録をテストします。
 - 新しい画像・音声ファイルは追加しません。Workboxの最大ファイルサイズは引き上げません。
-- 通常base `/`とPages base `/kids-playground/`の両方で確認します。
+- base `/`で確認します。
 
 ## 12. テスト方針
 
