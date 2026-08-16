@@ -49,6 +49,9 @@ export default function Home() {
           </button>
         ))}
       </div>
+      <p className={styles.description}>
+        こどもミニゲームは、幼児・子ども向けの無料ミニゲーム集です。国旗、都道府県、野菜、果物、算数などのテーマを、スマホやタブレットで楽しく遊びながら学べます。PWAに対応しているので、ホーム画面に追加すればオフラインでも遊べます。
+      </p>
     </div>
   )
 }
