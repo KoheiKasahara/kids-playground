@@ -41,11 +41,11 @@
 
 選択UI（`PinballThemePicker`）は、左右の64px以上の丸いボタンで前後のテーマを循環させる単純な操作です。現在のテーマには絵文字と名前を表示し、盤面と同じCSS変数を使う小さなプレビューにバンパーとピンも描きます。テーマを選んだ瞬間に`kids-playground:pinball-theme`をキーとして`normal`/`space`/`ocean`/`candy`のidを`localStorage`へ保存します。未設定・空文字・未知のidや読み取り例外はノーマルへフォールバックします。保存時の例外で書き込めない場合も、画面上はメモリ内の選択で切り替えられます。
 
-## 国旗ボール20種と円形描画の方針
+## 国旗ボール75種と円形描画の方針
 
-`src/games/flag-pinball/data/pinballFlags.ts`の`PINBALL_FLAG_IDS`が、選択画面に並べる20か国を定義します。既存の国旗クイズ（`flag-quiz`）の`Country`データをそのまま`PinballFlag`として再利用し、新しい静的素材は追加していません。20か国は、丸くクロップしても模様の特徴（縞・十字など）が一目で分かる国だけを選んでいます。
+`src/games/flag-pinball/data/pinballFlags.ts`の`PINBALL_FLAG_IDS`（実体は`components/flag-ball/flagBalls.ts`）が、選択画面に並べる75か国を定義します。大半は既存の国旗クイズ（`flag-quiz`）の`Country`データをそのまま`PinballFlag`として再利用していますが、北マケドニアとブルガリアの2か国だけは105か国マスターに含まれないため`flag-ball/flagBalls.ts`内で個別に追加しています（新しい静的素材の追加はブルガリアのSVG1件のみ）。75か国は、丸くクロップしても模様の特徴（縞・十字など）が一目で分かる国だけを選んでいます。
 
-`FlagBall`コンポーネントは、国旗SVG（4:3）を円形にクロップします。SVGは`preserveAspectRatio`未指定時の既定値`xMidYMid meet`によって正方形のビューポート内に上下のレターボックスを作るため、`object-fit: fill`だけではこの余白を解除できません。そこで画像に`scale(sqrt(4/3), 4/3)`を適用し、縦方向を正方形いっぱいにしつつ、横方向は左右約7.7%だけを`overflow: hidden`でクロップします。`cover`だと左右が切れて模様が消える国（例: フランスの青・赤）が出るため、横のクロップを最小限にして特徴を丸の中に残すことを優先しています。全20件のSVGが`viewBox="0 0 640 480"`であることは`data/pinballFlags.test.ts`で検証しています。
+`FlagBall`コンポーネントは、国旗SVG（4:3）を`object-fit: cover`で正方形へ収めてから円形にクロップします。`cover`は縦横同じ倍率で拡大してから溢れた分を切るため国旗の縦横比は保たれますが、高さが基準になる分、左右が絵の幅の12.5%ずつ切れます。端に意匠がある国旗（シンガポール・ネパール・モンゴル・トンガ）だけは`ballPositionX`で左端寄せにして、主要な模様が欠けないようにしています。全75件のSVGが`viewBox="0 0 640 480"`であることは`components/flag-ball/flagBalls.test.ts`で検証しています。
 
 ## 盤面と物理パラメータ
 

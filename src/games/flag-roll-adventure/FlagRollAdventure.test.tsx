@@ -87,12 +87,12 @@ describe('FlagRollAdventure 選択画面', () => {
     expect(screen.getByText('こっきを 1こ えらんでね！')).toBeInTheDocument()
   })
 
-  test('40個の国旗が並び、2つ目を押すと1つ目の選択が置き換わる', async () => {
+  test('75個の国旗が並び、2つ目を押すと1つ目の選択が置き換わる', async () => {
     const user = userEvent.setup()
     renderApp('/games/flag-roll-adventure')
     await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })
     const flagButtons = screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
-    expect(flagButtons).toHaveLength(40)
+    expect(flagButtons).toHaveLength(75)
 
     await clickButton(user, 'にほん')
     await clickButton(user, 'かんこく')
