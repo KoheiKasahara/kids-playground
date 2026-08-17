@@ -372,19 +372,20 @@ const jamaicaRows = [
   'YYGGGGGGGGGGGGYY',
 ] as const
 
-// 上半分を白、下半分を赤にし、左端で8列、中央付近で1列まで先細る青い三角形を重ねる。
-// 単なる縦帯にならないよう、行ごとに幅を8,6,4,3,1,1,3,4,6,8と変える。
+// 上半分を白、下半分を赤にし、左端の列0を全10行とも青にして、中央へ近づく列ほど
+// 青が上下中央(行4,5)へ収束するようにする。三角形は列方向に先細り、行方向には
+// 先細らせない（行ごとの幅ではなく、列ごとの高さで先細らせる）。
 const czechRows = [
-  'BBBBBBBBWWWWWWWW',
-  'BBBBBBWWWWWWWWWW',
-  'BBBBWWWWWWWWWWWW',
-  'BBBWWWWWWWWWWWWW',
   'BWWWWWWWWWWWWWWW',
-  'BRRRRRRRRRRRRRRR',
-  'BBBRRRRRRRRRRRRR',
-  'BBBBRRRRRRRRRRRR',
-  'BBBBBBRRRRRRRRRR',
+  'BBWWWWWWWWWWWWWW',
+  'BBBBWWWWWWWWWWWW',
+  'BBBBBBWWWWWWWWWW',
+  'BBBBBBBBWWWWWWWW',
   'BBBBBBBBRRRRRRRR',
+  'BBBBBBRRRRRRRRRR',
+  'BBBBRRRRRRRRRRRR',
+  'BBRRRRRRRRRRRRRR',
+  'BRRRRRRRRRRRRRRR',
 ] as const
 
 // 左4列を白帯にし、残り12列を緑地にする。トルコの三日月・星のドット配置を

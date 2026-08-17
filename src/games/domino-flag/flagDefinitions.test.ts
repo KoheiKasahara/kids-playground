@@ -457,14 +457,25 @@ describe('dominoFlags', () => {
     expect(jamaica[4]![0]).toBe('black')
     expect(jamaica[4]![15]).toBe('black')
 
-    // チェコ: 上半分が白、下半分が赤、左端の青い三角形は中央へ向かって細くなる
+    // チェコ: 上半分が白、下半分が赤。青い三角形は列0(ホイスト側)で全10行を占め、
+    // 列が中央へ近づくほど上下中央(行4,5)だけへ収束する
+    // （行ごとの幅ではなく列ごとの高さで先細る三角形であることを確認する）
     const czech = createFlagGrid('cz')
     expect(czech[0]![15]).toBe('white')
     expect(czech[9]![15]).toBe('red')
+    expect(czech.every((row) => row[0] === 'blue')).toBe(true)
+    const czechBlueHeights = Array.from({ length: FLAG_COLS }, (_, col) =>
+      czech.filter((row) => row[col] === 'blue').length,
+    )
+    expect(czechBlueHeights[0]).toBe(10)
+    for (let col = 1; col < FLAG_COLS - 1; col += 1) {
+      expect(czechBlueHeights[col]).toBeLessThanOrEqual(czechBlueHeights[col - 1])
+    }
+    expect(czechBlueHeights[FLAG_COLS - 1]).toBe(0)
     const czechBlueWidths = czech.map(
       (row) => row.filter((color) => color === 'blue').length,
     )
-    expect(czechBlueWidths).toEqual([8, 6, 4, 3, 1, 1, 3, 4, 6, 8])
+    expect(czechBlueWidths).toEqual([1, 2, 4, 6, 8, 8, 6, 4, 2, 1])
 
     // パキスタン: 左4列が白帯、残りは緑地に白い三日月と星
     const pakistan = createFlagGrid('pk')
