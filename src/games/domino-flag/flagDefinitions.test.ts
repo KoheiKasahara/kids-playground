@@ -40,7 +40,15 @@ const flagIds: DominoFlagId[] = [
   'kr',
   'in',
   'tr',
+  'gr',
+  'jm',
+  'cz',
+  'pk',
+  'mk',
+  'za',
 ]
+/** flag-quizのcountriesマスターに存在しない国旗ID。北マケドニアはこっきドミノ限定の追加国。 */
+const idsWithoutFlagQuizMaster = new Set<DominoFlagId>(['mk'])
 const knownColors = new Set<FlagCellColor>([
   'red',
   'white',
@@ -52,12 +60,12 @@ const knownColors = new Set<FlagCellColor>([
 ])
 
 describe('dominoFlags', () => {
-  it('20か国が指定順で一意に定義されている', () => {
+  it('26か国が指定順で一意に定義されている', () => {
     expect(dominoFlags.map((definition) => definition.id)).toEqual(flagIds)
     expect(new Set(flagIds).size).toBe(flagIds.length)
   })
 
-  it('20か国すべてが10行×16列の160セルである', () => {
+  it('26か国すべてが10行×16列の160セルである', () => {
     for (const id of flagIds) {
       const grid = createFlagGrid(id)
 
@@ -404,8 +412,9 @@ describe('dominoFlags', () => {
     expect(turkey[5]!.slice(9, 12)).toEqual(['white', 'white', 'white'])
   })
 
-  it('id・nameJa・画像パスがflag-quizのマスターと一致する', () => {
+  it('id・nameJa・画像パスがflag-quizのマスターと一致する（北マケドニアを除く）', () => {
     for (const definition of dominoFlags) {
+      if (idsWithoutFlagQuizMaster.has(definition.id)) continue
       const country = countries.find((candidate) => candidate.id === definition.id)
 
       expect(country?.id).toBe(definition.id)
@@ -414,9 +423,80 @@ describe('dominoFlags', () => {
     }
   })
 
-  it('20か国の画像ファイルがpublic/flagsに実在する', () => {
+  it('26か国の画像ファイルがpublic/flagsに実在する', () => {
     for (const definition of dominoFlags) {
       expect(existsSync(resolve('public', definition.imagePath))).toBe(true)
     }
+  })
+
+  it('新規6か国が主要色と旗の特徴を持つ', () => {
+    for (const [id, colors] of [
+      ['gr', ['blue', 'white']],
+      ['jm', ['green', 'yellow', 'black']],
+      ['cz', ['white', 'red', 'blue']],
+      ['pk', ['green', 'white']],
+      ['mk', ['red', 'yellow']],
+      ['za', ['green', 'black', 'yellow', 'white', 'red', 'blue']],
+    ] as const) {
+      expect(new Set(createFlagGrid(id).flat())).toEqual(new Set(colors))
+    }
+
+    // ギリシャ: 左上のカントンが白十字を持つ青地で、アメリカ国旗と違って赤を含まない
+    const greece = createFlagGrid('gr')
+    expect(greece.flat().includes('red')).toBe(false)
+    expect(greece[0]![3]).toBe('white')
+    expect(greece[2]!.slice(0, 7)).toEqual(Array.from({ length: 7 }, () => 'white'))
+
+    // ジャマイカ: 黄色い斜め十字が中央を横切り、上下は緑、左右は黒
+    const jamaica = createFlagGrid('jm')
+    for (const row of [4, 5]) {
+      expect(jamaica[row]!.slice(6, 10).every((color) => color === 'yellow')).toBe(true)
+    }
+    expect(jamaica[0]![7]).toBe('green')
+    expect(jamaica[0]![0]).toBe('yellow')
+    expect(jamaica[4]![0]).toBe('black')
+    expect(jamaica[4]![15]).toBe('black')
+
+    // チェコ: 上半分が白、下半分が赤、左端の青い三角形は中央へ向かって細くなる
+    const czech = createFlagGrid('cz')
+    expect(czech[0]![15]).toBe('white')
+    expect(czech[9]![15]).toBe('red')
+    const czechBlueWidths = czech.map(
+      (row) => row.filter((color) => color === 'blue').length,
+    )
+    expect(czechBlueWidths).toEqual([8, 6, 4, 3, 1, 1, 3, 4, 6, 8])
+
+    // パキスタン: 左4列が白帯、残りは緑地に白い三日月と星
+    const pakistan = createFlagGrid('pk')
+    expect(pakistan.every((row) => row.slice(0, 4).every((color) => color === 'white'))).toBe(
+      true,
+    )
+    expect(pakistan.every((row) => row.slice(4).some((color) => color === 'green'))).toBe(true)
+    expect(pakistan[4]!.slice(5, 8).every((color) => color === 'white')).toBe(true)
+
+    // 北マケドニア: 中央から黄色い光線が放射状に伸び、赤地が過半数を占める
+    const macedonia = createFlagGrid('mk')
+    expect(macedonia[4]).toEqual(Array.from({ length: FLAG_COLS }, () => 'yellow'))
+    expect(macedonia.every((row) => row[7] === 'yellow' && row[8] === 'yellow')).toBe(true)
+    const macedoniaYellowRatio =
+      macedonia.flat().filter((color) => color === 'yellow').length / 160
+    expect(macedoniaYellowRatio).toBeGreaterThan(0.2)
+    expect(macedoniaYellowRatio).toBeLessThan(0.5)
+
+    // 南アフリカ: 中央に緑のY字、左に黒い三角形、右上が赤・右下が青
+    const southAfrica = createFlagGrid('za')
+    expect(southAfrica[0]![0]).toBe('red')
+    expect(southAfrica[9]![0]).toBe('blue')
+    expect(southAfrica[4]![0]).toBe('black')
+    const greenCells = southAfrica.flatMap((row, rowIndex) =>
+      row.flatMap((color, col) => (color === 'green' ? [{ row: rowIndex, col }] : [])),
+    )
+    expect(greenCells.length).toBeGreaterThan(20)
+    // 緑は左端(黒の右)から右端の角近くまで連なり、単なる「左黒・右上赤・右下青」ではない
+    const greenCols = greenCells.map(({ col }) => col)
+    expect(Math.min(...greenCols)).toBeLessThanOrEqual(3)
+    expect(Math.max(...greenCols)).toBeGreaterThanOrEqual(13)
+    expect(southAfrica[0]!.some((color) => color === 'green')).toBe(true)
+    expect(southAfrica[9]!.some((color) => color === 'green')).toBe(true)
   })
 })
