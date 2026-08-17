@@ -53,7 +53,7 @@ export default function FlagPinballResult() {
 
       <div className={styles.summary}>
         {/*
-          全射出モードは40行あり縦一列だと画面外へ出るため、この <ul> だけを
+          全射出モードは75行あり縦一列だと画面外へ出るため、この <ul> だけを
           max-height + overflow-y: auto のスクロール領域にする（.rowsCompact）。
           「ごうけい」「ほめ言葉」「3つのボタン」はこの要素の外に置いてあるので、
           どれだけスクロールしてもどの端末でも常に見える／押せる。

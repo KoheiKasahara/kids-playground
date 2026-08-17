@@ -88,7 +88,7 @@ function PinballGame({ mode, flagIds }: { mode: PinballMode; flagIds: string[] }
             )
           })
         ) : (
-          // 40球ぶんは並べられないため、進み具合と合計だけを1行で表示する
+          // 75球ぶんは並べられないため、進み具合と合計だけを1行で表示する
           // （ヘッダ高さ48pxを超えず、盤面の高さを削らない）。
           <p className={styles.progress}>
             {/* こ と ごうけい の間は全角スペースで区切る。JSXのテキストに直接書くと

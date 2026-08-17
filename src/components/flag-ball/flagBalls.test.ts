@@ -6,20 +6,23 @@ import { describe, expect, it } from 'vitest'
 import { countries } from '../../games/flag-quiz/data/countries'
 import { findFlagBall, FLAG_BALL_IDS, flagBalls } from './flagBalls'
 
+/** flag-quizのcountriesマスターに存在しない国旗id。国旗ボール専用の追加国。 */
+const idsWithoutFlagQuizMaster = new Set(['mk', 'bg'])
+
 describe('FLAG_BALL_IDS / flagBalls', () => {
-  it('ちょうど40件ある', () => {
-    expect(FLAG_BALL_IDS).toHaveLength(40)
-    expect(flagBalls).toHaveLength(40)
+  it('ちょうど75件ある', () => {
+    expect(FLAG_BALL_IDS).toHaveLength(75)
+    expect(flagBalls).toHaveLength(75)
   })
 
   it('idに重複がない', () => {
     expect(new Set(FLAG_BALL_IDS).size).toBe(FLAG_BALL_IDS.length)
   })
 
-  it('全idがcountriesに存在する', () => {
+  it('全idがcountriesかSUPPLEMENTAL_COUNTRIES(北マケドニア・ブルガリア)のいずれかに存在する', () => {
     const countryIds = new Set(countries.map((c) => c.id))
     for (const id of FLAG_BALL_IDS) {
-      expect(countryIds.has(id)).toBe(true)
+      expect(countryIds.has(id) || idsWithoutFlagQuizMaster.has(id)).toBe(true)
     }
   })
 
@@ -47,9 +50,15 @@ describe('円形クロップの表示調整', () => {
     expect(findFlagBall('sg')?.ballPositionX).toBe(0)
   })
 
+  it('ネパール・モンゴル・トンガも左端寄せにして、主要な意匠が欠けないようにしている', () => {
+    expect(findFlagBall('np')?.ballPositionX).toBe(0)
+    expect(findFlagBall('mn')?.ballPositionX).toBe(0)
+    expect(findFlagBall('to')?.ballPositionX).toBe(0)
+  })
+
   it('調整が要らない国旗は ballPositionX を持たない（CSSのcenterのまま）', () => {
     const adjusted = flagBalls.filter((flag) => flag.ballPositionX !== undefined)
-    expect(adjusted.map((flag) => flag.id)).toEqual(['sg'])
+    expect(adjusted.map((flag) => flag.id)).toEqual(['sg', 'mn', 'np', 'to'])
   })
 })
 
@@ -60,5 +69,47 @@ describe('findFlagBall', () => {
 
   it('未知のidはundefined', () => {
     expect(findFlagBall('xx')).toBeUndefined()
+  })
+})
+
+describe('75か国への追加(既存40か国 + 新規35か国)', () => {
+  const originalIds = [
+    'jp', 'kr', 'cn', 'in', 'bd', 'th', 'vn', 'id', 'ph', 'sg', 'pk',
+    'gb', 'fr', 'de', 'it', 'es', 'pt', 'nl', 'be', 'ch', 'se',
+    'fi', 'no', 'dk', 'gr', 'tr', 'pl', 'ua', 'at', 'ie',
+    'us', 'ca', 'mx', 'br', 'ar',
+    'za', 'eg', 'ke',
+    'au', 'nz',
+  ]
+  const addedIds = [
+    'my', 'mn', 'np', 'kz', 'il', 'sa', 'lk', 'kh',
+    'cz', 'is', 'hr', 'mk', 'ro', 'hu', 'bg',
+    'cl', 'co', 'jm', 'uy', 'cu', 'pe', 've', 'cr',
+    'ma', 'ng', 'et', 'tz', 'gh', 'sn', 'cm', 'dz',
+    'pg', 'ws', 'fj', 'to',
+  ]
+
+  it('既存40か国が欠落していない', () => {
+    expect(originalIds).toHaveLength(40)
+    for (const id of originalIds) {
+      expect(FLAG_BALL_IDS).toContain(id)
+    }
+  })
+
+  it('新規35か国がすべて追加されている', () => {
+    expect(addedIds).toHaveLength(35)
+    for (const id of addedIds) {
+      expect(FLAG_BALL_IDS).toContain(id)
+    }
+  })
+
+  it('既存40か国 + 新規35か国で過不足なく75件になる', () => {
+    expect(new Set([...originalIds, ...addedIds])).toEqual(new Set(FLAG_BALL_IDS))
+  })
+
+  it('ラオス・アルバニア・セルビアは追加されていない', () => {
+    for (const id of ['la', 'al', 'rs']) {
+      expect(FLAG_BALL_IDS).not.toContain(id)
+    }
   })
 })
