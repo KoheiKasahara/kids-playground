@@ -39,6 +39,12 @@ export type DominoFlagId =
   | 'kr'
   | 'in'
   | 'tr'
+  | 'gr'
+  | 'jm'
+  | 'cz'
+  | 'pk'
+  | 'mk'
+  | 'za'
 
 export type DominoFlagDefinition = {
   id: DominoFlagId
@@ -336,7 +342,97 @@ const turkeyRows = [
   'RRRRRRRRRRRRRRRR',
 ] as const
 
-/** こっきドミノで使う20か国。次の選択画面でもこの順序をそのまま使える。 */
+// 青白の横縞を全面に敷き、左上7列×5行だけ青地へ白十字を重ねる。
+// 十字は縞の途中で切らず、カントンの中で行7も列3も貫通させてアメリカ国旗と見分ける。
+const greeceRows = [
+  'BBBWBBBBBBBBBBBB',
+  'BBBWBBBWWWWWWWWW',
+  'WWWWWWWBBBBBBBBB',
+  'BBBWBBBWWWWWWWWW',
+  'BBBWBBBBBBBBBBBB',
+  'WWWWWWWWWWWWWWWW',
+  'BBBBBBBBBBBBBBBB',
+  'WWWWWWWWWWWWWWWW',
+  'BBBBBBBBBBBBBBBB',
+  'WWWWWWWWWWWWWWWW',
+] as const
+
+// 黄色い斜め十字を中央で2〜4セルの太さにし、隙間で途切れないようにする。
+// 十字の外側は符号の組み合わせで上下を緑、左右を黒に振り分ける。
+const jamaicaRows = [
+  'YYGGGGGGGGGGGGYY',
+  'KYYGGGGGGGGGGYYK',
+  'KKKYYGGGGGGYYKKK',
+  'KKKKYYYGGYYYKKKK',
+  'KKKKKKYYYYKKKKKK',
+  'KKKKKKYYYYKKKKKK',
+  'KKKKYYYGGYYYKKKK',
+  'KKKYYGGGGGGYYKKK',
+  'KYYGGGGGGGGGGYYK',
+  'YYGGGGGGGGGGGGYY',
+] as const
+
+// 上半分を白、下半分を赤にし、左端で8列、中央付近で1列まで先細る青い三角形を重ねる。
+// 単なる縦帯にならないよう、行ごとに幅を8,6,4,3,1,1,3,4,6,8と変える。
+const czechRows = [
+  'BBBBBBBBWWWWWWWW',
+  'BBBBBBWWWWWWWWWW',
+  'BBBBWWWWWWWWWWWW',
+  'BBBWWWWWWWWWWWWW',
+  'BWWWWWWWWWWWWWWW',
+  'BRRRRRRRRRRRRRRR',
+  'BBBRRRRRRRRRRRRR',
+  'BBBBRRRRRRRRRRRR',
+  'BBBBBBRRRRRRRRRR',
+  'BBBBBBBBRRRRRRRR',
+] as const
+
+// 左4列を白帯にし、残り12列を緑地にする。トルコの三日月・星のドット配置を
+// 2列右へずらして移植し、緑地の中に白い三日月と小さな星を置く。
+const pakistanRows = [
+  'WWWWGGGGGGGGGGGG',
+  'WWWWGGGGGGGGGGGG',
+  'WWWWGGWWWWGGGGGG',
+  'WWWWGWWWWGGGGGGG',
+  'WWWWGWWWGGGGWGGG',
+  'WWWWGWWWGGGWWWGG',
+  'WWWWGWWWWGGGWGGG',
+  'WWWWGGWWWWGGGGGG',
+  'WWWWGGGGGGGGGGGG',
+  'WWWWGGGGGGGGGGGG',
+] as const
+
+// 中央の行4,5と列7,8を黄色い十字にして全辺へ届かせ、四隅へ向かう対角線を
+// 1セルずつ足して8本の光線に見せる。赤地が半分以上残るよう黄色は4割に抑える。
+const northMacedoniaRows = [
+  'YRRRRRRYYRRRRRRY',
+  'RRYRRRRYYRRRRYRR',
+  'RRRYRRRYYRRRYRRR',
+  'RRRRRYRYYRYRRRRR',
+  'YYYYYYYYYYYYYYYY',
+  'YYYYYYYYYYYYYYYY',
+  'RRRRRYRYYRYRRRRR',
+  'RRRYRRRYYRRRYRRR',
+  'RRYRRRRYYRRRRYRR',
+  'YRRRRRRYYRRRRRRY',
+] as const
+
+// 左端から黒い三角形を段階的に細らせ、黄色い縁を添える。中央から続く緑のY字は
+// 先端をそれぞれ2セル幅にして開いた間だけ白を挟み、上を赤、下を青にする。
+const southAfricaRows = [
+  'RRRRRRRRRRRRRRGG',
+  'RRRRRRRRRRRRGGGG',
+  'YYRRRRRRRRGGGGWW',
+  'KKGGRRRRGGGGWWWW',
+  'KKKKGGGGGGWWWWWW',
+  'KKKKGGGGGGWWWWWW',
+  'KKGGBBBBGGGGWWWW',
+  'YYBBBBBBBBGGGGWW',
+  'BBBBBBBBBBBBGGGG',
+  'BBBBBBBBBBBBBBGG',
+] as const
+
+/** こっきドミノで使う26か国。次の選択画面でもこの順序をそのまま使える。 */
 export const dominoFlags: readonly DominoFlagDefinition[] = [
   {
     id: 'jp',
@@ -457,6 +553,42 @@ export const dominoFlags: readonly DominoFlagDefinition[] = [
     nameJa: 'トルコ',
     imagePath: 'flags/tr.svg',
     rows: turkeyRows,
+  },
+  {
+    id: 'gr',
+    nameJa: 'ギリシャ',
+    imagePath: 'flags/gr.svg',
+    rows: greeceRows,
+  },
+  {
+    id: 'jm',
+    nameJa: 'ジャマイカ',
+    imagePath: 'flags/jm.svg',
+    rows: jamaicaRows,
+  },
+  {
+    id: 'cz',
+    nameJa: 'チェコ',
+    imagePath: 'flags/cz.svg',
+    rows: czechRows,
+  },
+  {
+    id: 'pk',
+    nameJa: 'パキスタン',
+    imagePath: 'flags/pk.svg',
+    rows: pakistanRows,
+  },
+  {
+    id: 'mk',
+    nameJa: '北マケドニア',
+    imagePath: 'flags/mk.svg',
+    rows: northMacedoniaRows,
+  },
+  {
+    id: 'za',
+    nameJa: 'みなみアフリカ',
+    imagePath: 'flags/za.svg',
+    rows: southAfricaRows,
   },
 ]
 
