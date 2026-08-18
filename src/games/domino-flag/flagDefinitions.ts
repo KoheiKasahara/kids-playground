@@ -6,8 +6,13 @@ export type FlagCellColor =
   | 'yellow'
   | 'green'
   | 'orange'
+  | 'lightBlue'
 
-/** ドミノが倒れたときに見える国旗面で使う、共通の7色。 */
+/**
+ * ドミノが倒れたときに見える国旗面で使う、共通の8色。
+ * lightBlueはアルゼンチンの水色専用で、通常のblue（濃紺寄り）では
+ * 認識性が大きく損なわれるための唯一の例外として追加した。
+ */
 export const FLAG_COLOR_HEX: Readonly<Record<FlagCellColor, string>> = {
   red: '#bc002d',
   white: '#fffdf5',
@@ -16,6 +21,7 @@ export const FLAG_COLOR_HEX: Readonly<Record<FlagCellColor, string>> = {
   yellow: '#f2c94c',
   green: '#1f7a3d',
   orange: '#f28c28',
+  lightBlue: '#74acdf',
 }
 
 export type DominoFlagId =
@@ -45,6 +51,20 @@ export type DominoFlagId =
   | 'pk'
   | 'mk'
   | 'za'
+  | 'es'
+  | 'pt'
+  | 'dk'
+  | 'no'
+  | 'cn'
+  | 'vn'
+  | 'th'
+  | 'ph'
+  | 'at'
+  | 'ie'
+  | 'ro'
+  | 'hu'
+  | 'bg'
+  | 'ar'
 
 export type DominoFlagDefinition = {
   id: DominoFlagId
@@ -55,7 +75,7 @@ export type DominoFlagDefinition = {
   rows: readonly string[]
 }
 
-export type FlagCellCharacter = 'R' | 'W' | 'B' | 'K' | 'Y' | 'G' | 'O'
+export type FlagCellCharacter = 'R' | 'W' | 'B' | 'K' | 'Y' | 'G' | 'O' | 'L'
 
 /** 文字列の旗データを、Three.jsで使う色IDへ変換する表。 */
 export const FLAG_CELL_COLOR_BY_CHAR: Readonly<
@@ -68,6 +88,7 @@ export const FLAG_CELL_COLOR_BY_CHAR: Readonly<
   Y: 'yellow',
   G: 'green',
   O: 'orange',
+  L: 'lightBlue',
 }
 
 const japanRows = [
@@ -433,7 +454,208 @@ const southAfricaRows = [
   'BBBBBBBBBBBBBBGG',
 ] as const
 
-/** こっきドミノで使う26か国。次の選択画面でもこの順序をそのまま使える。 */
+// 上下の赤(2行)より中央の黄色(6行)を太くし、黄色帯の左寄りに国章の代わりとなる
+// 小さな赤いアクセント(3行×2列)を置いて、単純な横三色との違いを出す。
+const spainRows = [
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'YYYYYYYYYYYYYYYY',
+  'YYYRRYYYYYYYYYYY',
+  'YYYRRYYYYYYYYYYY',
+  'YYYRRYYYYYYYYYYY',
+  'YYYYYYYYYYYYYYYY',
+  'YYYYYYYYYYYYYYYY',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+] as const
+
+// 緑を左6列、赤を右10列にして実物同様に赤を広くする。国章の代わりに、
+// 境界をまたぐ列5,6の行3-6へ黄色いまとまりを置き、単純な縦二色と区別する。
+const portugalRows = [
+  'GGGGGGRRRRRRRRRR',
+  'GGGGGGRRRRRRRRRR',
+  'GGGGGGRRRRRRRRRR',
+  'GGGGGYYRRRRRRRRR',
+  'GGGGGYYRRRRRRRRR',
+  'GGGGGYYRRRRRRRRR',
+  'GGGGGYYRRRRRRRRR',
+  'GGGGGGRRRRRRRRRR',
+  'GGGGGGRRRRRRRRRR',
+  'GGGGGGRRRRRRRRRR',
+] as const
+
+// スウェーデン/フィンランドと同じ列5,6・行4,5の十字位置に、赤地へ白い十字だけを重ねる。
+// 青を含まないため、青入りのノルウェーとは一目で見分けられる。
+const denmarkRows = [
+  'RRRRRWWRRRRRRRRR',
+  'RRRRRWWRRRRRRRRR',
+  'RRRRRWWRRRRRRRRR',
+  'RRRRRWWRRRRRRRRR',
+  'WWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'RRRRRWWRRRRRRRRR',
+  'RRRRRWWRRRRRRRRR',
+  'RRRRRWWRRRRRRRRR',
+  'RRRRRWWRRRRRRRRR',
+] as const
+
+// 白い十字(列4-7・行3-6)の内側へ、ひとまわり細い青い十字(列5,6・行4,5)を重ねる。
+// デンマークと同じ十字位置でも青の有無で明確に区別できるようにする。
+const norwayRows = [
+  'RRRRWBBWRRRRRRRR',
+  'RRRRWBBWRRRRRRRR',
+  'RRRRWBBWRRRRRRRR',
+  'WWWWWBBWWWWWWWWW',
+  'BBBBBBBBBBBBBBBB',
+  'BBBBBBBBBBBBBBBB',
+  'WWWWWBBWWWWWWWWW',
+  'RRRRWBBWRRRRRRRR',
+  'RRRRWBBWRRRRRRRR',
+  'RRRRWBBWRRRRRRRR',
+] as const
+
+// 左上に中心から上下左右斜めへ広がる黄色いひし形(大きな星)を置き、
+// その右側に4つの一マス星を弧状に添える。星はすべてベトナムより左上へ寄せる。
+const chinaRows = [
+  'RRRYRRRYRRRRRRRR',
+  'RRYYYRRRRRRRRRRR',
+  'RYYYYYRRYRRRRRRR',
+  'RRYYYRRRRRRRRRRR',
+  'RRRYRRRRYRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRYRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+] as const
+
+// 中央から上下左右斜めへ広がる大きな黄色いひし形を1つだけ中央に置く。
+// 星が左上に寄る中国と違い、中央に置くことで一目で見分けられるようにする。
+const vietnamRows = [
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRYRRRRRRRR',
+  'RRRRRRYYYRRRRRRR',
+  'RRRRRYYYYYRRRRRR',
+  'RRRRYYYYYYYRRRRR',
+  'RRRRRYYYYYRRRRRR',
+  'RRRRRRYYYRRRRRRR',
+  'RRRRRRRYRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+] as const
+
+// 赤・白・青(4行)・白・赤の5帯にし、中央の青帯だけ他の倍の太さにする。
+const thailandRows = [
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'WWWWWWWWWWWWWWWW',
+  'BBBBBBBBBBBBBBBB',
+  'BBBBBBBBBBBBBBBB',
+  'BBBBBBBBBBBBBBBB',
+  'BBBBBBBBBBBBBBBB',
+  'WWWWWWWWWWWWWWWW',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+] as const
+
+// 列0で10行すべてを占める白い三角形を、列が進むごとに上下中央(行4,5)へ
+// 先細らせる（チェコの青い三角形と同じ考え方）。上半分を青、下半分を赤にし、
+// 三角形の中央付近(列1,2・行4,5)だけ黄色にして太陽の代わりにする。
+const philippinesRows = [
+  'WBBBBBBBBBBBBBBB',
+  'WWBBBBBBBBBBBBBB',
+  'WWWBBBBBBBBBBBBB',
+  'WWWWBBBBBBBBBBBB',
+  'WYYWWBBBBBBBBBBB',
+  'WYYWWRRRRRRRRRRR',
+  'WWWWRRRRRRRRRRRR',
+  'WWWRRRRRRRRRRRRR',
+  'WWRRRRRRRRRRRRRR',
+  'WRRRRRRRRRRRRRRR',
+] as const
+
+const austriaRows = [
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'WWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+] as const
+
+const irelandRows = [
+  'GGGGGWWWWWWOOOOO',
+  'GGGGGWWWWWWOOOOO',
+  'GGGGGWWWWWWOOOOO',
+  'GGGGGWWWWWWOOOOO',
+  'GGGGGWWWWWWOOOOO',
+  'GGGGGWWWWWWOOOOO',
+  'GGGGGWWWWWWOOOOO',
+  'GGGGGWWWWWWOOOOO',
+  'GGGGGWWWWWWOOOOO',
+  'GGGGGWWWWWWOOOOO',
+] as const
+
+const romaniaRows = [
+  'BBBBBYYYYYYRRRRR',
+  'BBBBBYYYYYYRRRRR',
+  'BBBBBYYYYYYRRRRR',
+  'BBBBBYYYYYYRRRRR',
+  'BBBBBYYYYYYRRRRR',
+  'BBBBBYYYYYYRRRRR',
+  'BBBBBYYYYYYRRRRR',
+  'BBBBBYYYYYYRRRRR',
+  'BBBBBYYYYYYRRRRR',
+  'BBBBBYYYYYYRRRRR',
+] as const
+
+const hungaryRows = [
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'WWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'GGGGGGGGGGGGGGGG',
+  'GGGGGGGGGGGGGGGG',
+  'GGGGGGGGGGGGGGGG',
+] as const
+
+// ハンガリー(赤・白・緑)と帯の順序を逆にし、白・緑・赤にして混同を避ける。
+const bulgariaRows = [
+  'WWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'GGGGGGGGGGGGGGGG',
+  'GGGGGGGGGGGGGGGG',
+  'GGGGGGGGGGGGGGGG',
+  'GGGGGGGGGGGGGGGG',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+  'RRRRRRRRRRRRRRRR',
+] as const
+
+// 水色・白・水色の横三色にし、白帯の中央(列6-8・行3-5)へ小さな黄色い
+// 放射状のまとまりを置いて太陽の代わりにする。単なる三色旗にしないための黄色。
+const argentinaRows = [
+  'LLLLLLLLLLLLLLLL',
+  'LLLLLLLLLLLLLLLL',
+  'LLLLLLLLLLLLLLLL',
+  'WWWWWWWYWWWWWWWW',
+  'WWWWWWYYYWWWWWWW',
+  'WWWWWWWYWWWWWWWW',
+  'WWWWWWWWWWWWWWWW',
+  'LLLLLLLLLLLLLLLL',
+  'LLLLLLLLLLLLLLLL',
+  'LLLLLLLLLLLLLLLL',
+] as const
+
+/** こっきドミノで使う40か国。次の選択画面でもこの順序をそのまま使える。 */
 export const dominoFlags: readonly DominoFlagDefinition[] = [
   {
     id: 'jp',
@@ -590,6 +812,90 @@ export const dominoFlags: readonly DominoFlagDefinition[] = [
     nameJa: 'みなみアフリカ',
     imagePath: 'flags/za.svg',
     rows: southAfricaRows,
+  },
+  {
+    id: 'es',
+    nameJa: 'スペイン',
+    imagePath: 'flags/es.svg',
+    rows: spainRows,
+  },
+  {
+    id: 'pt',
+    nameJa: 'ポルトガル',
+    imagePath: 'flags/pt.svg',
+    rows: portugalRows,
+  },
+  {
+    id: 'dk',
+    nameJa: 'デンマーク',
+    imagePath: 'flags/dk.svg',
+    rows: denmarkRows,
+  },
+  {
+    id: 'no',
+    nameJa: 'ノルウェー',
+    imagePath: 'flags/no.svg',
+    rows: norwayRows,
+  },
+  {
+    id: 'cn',
+    nameJa: 'ちゅうごく',
+    imagePath: 'flags/cn.svg',
+    rows: chinaRows,
+  },
+  {
+    id: 'vn',
+    nameJa: 'ベトナム',
+    imagePath: 'flags/vn.svg',
+    rows: vietnamRows,
+  },
+  {
+    id: 'th',
+    nameJa: 'タイ',
+    imagePath: 'flags/th.svg',
+    rows: thailandRows,
+  },
+  {
+    id: 'ph',
+    nameJa: 'フィリピン',
+    imagePath: 'flags/ph.svg',
+    rows: philippinesRows,
+  },
+  {
+    id: 'at',
+    nameJa: 'オーストリア',
+    imagePath: 'flags/at.svg',
+    rows: austriaRows,
+  },
+  {
+    id: 'ie',
+    nameJa: 'アイルランド',
+    imagePath: 'flags/ie.svg',
+    rows: irelandRows,
+  },
+  {
+    id: 'ro',
+    nameJa: 'ルーマニア',
+    imagePath: 'flags/ro.svg',
+    rows: romaniaRows,
+  },
+  {
+    id: 'hu',
+    nameJa: 'ハンガリー',
+    imagePath: 'flags/hu.svg',
+    rows: hungaryRows,
+  },
+  {
+    id: 'bg',
+    nameJa: 'ブルガリア',
+    imagePath: 'flags/bg.svg',
+    rows: bulgariaRows,
+  },
+  {
+    id: 'ar',
+    nameJa: 'アルゼンチン',
+    imagePath: 'flags/ar.svg',
+    rows: argentinaRows,
   },
 ]
 

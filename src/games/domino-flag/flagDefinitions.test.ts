@@ -46,9 +46,26 @@ const flagIds: DominoFlagId[] = [
   'pk',
   'mk',
   'za',
+  'es',
+  'pt',
+  'dk',
+  'no',
+  'cn',
+  'vn',
+  'th',
+  'ph',
+  'at',
+  'ie',
+  'ro',
+  'hu',
+  'bg',
+  'ar',
 ]
-/** flag-quizのcountriesマスターに存在しない国旗ID。北マケドニアはこっきドミノ限定の追加国。 */
-const idsWithoutFlagQuizMaster = new Set<DominoFlagId>(['mk'])
+/**
+ * flag-quizのcountriesマスターに存在しない国旗ID。
+ * 北マケドニアとブルガリアは、こっきドミノ限定の追加国。
+ */
+const idsWithoutFlagQuizMaster = new Set<DominoFlagId>(['mk', 'bg'])
 const knownColors = new Set<FlagCellColor>([
   'red',
   'white',
@@ -57,15 +74,16 @@ const knownColors = new Set<FlagCellColor>([
   'yellow',
   'green',
   'orange',
+  'lightBlue',
 ])
 
 describe('dominoFlags', () => {
-  it('26か国が指定順で一意に定義されている', () => {
+  it('40か国が指定順で一意に定義されている', () => {
     expect(dominoFlags.map((definition) => definition.id)).toEqual(flagIds)
     expect(new Set(flagIds).size).toBe(flagIds.length)
   })
 
-  it('26か国すべてが10行×16列の160セルである', () => {
+  it('40か国すべてが10行×16列の160セルである', () => {
     for (const id of flagIds) {
       const grid = createFlagGrid(id)
 
@@ -91,7 +109,7 @@ describe('dominoFlags', () => {
     const paletteKeys = new Set(Object.keys(FLAG_COLOR_HEX))
     const mappedColors = new Set(Object.values(FLAG_CELL_COLOR_BY_CHAR))
     expect(mappedColors).toEqual(paletteKeys)
-    expect(paletteKeys.size).toBeLessThanOrEqual(7)
+    expect(paletteKeys.size).toBeLessThanOrEqual(8)
   })
 
   it('未知の国旗IDを渡すとthrowする', () => {
@@ -412,7 +430,7 @@ describe('dominoFlags', () => {
     expect(turkey[5]!.slice(9, 12)).toEqual(['white', 'white', 'white'])
   })
 
-  it('id・nameJa・画像パスがflag-quizのマスターと一致する（北マケドニアを除く）', () => {
+  it('id・nameJa・画像パスがflag-quizのマスターと一致する（北マケドニア・ブルガリアを除く）', () => {
     for (const definition of dominoFlags) {
       if (idsWithoutFlagQuizMaster.has(definition.id)) continue
       const country = countries.find((candidate) => candidate.id === definition.id)
@@ -423,7 +441,7 @@ describe('dominoFlags', () => {
     }
   })
 
-  it('26か国の画像ファイルがpublic/flagsに実在する', () => {
+  it('40か国の画像ファイルがpublic/flagsに実在する', () => {
     for (const definition of dominoFlags) {
       expect(existsSync(resolve('public', definition.imagePath))).toBe(true)
     }
@@ -509,5 +527,154 @@ describe('dominoFlags', () => {
     expect(Math.max(...greenCols)).toBeGreaterThanOrEqual(13)
     expect(southAfrica[0]!.some((color) => color === 'green')).toBe(true)
     expect(southAfrica[9]!.some((color) => color === 'green')).toBe(true)
+  })
+
+  it('新規14か国が主要色と旗の特徴を持つ', () => {
+    for (const [id, colors] of [
+      ['es', ['red', 'yellow']],
+      ['pt', ['green', 'red', 'yellow']],
+      ['dk', ['red', 'white']],
+      ['no', ['red', 'white', 'blue']],
+      ['cn', ['red', 'yellow']],
+      ['vn', ['red', 'yellow']],
+      ['th', ['red', 'white', 'blue']],
+      ['ph', ['white', 'blue', 'red', 'yellow']],
+      ['at', ['red', 'white']],
+      ['ie', ['green', 'white', 'orange']],
+      ['ro', ['blue', 'yellow', 'red']],
+      ['hu', ['red', 'white', 'green']],
+      ['bg', ['white', 'green', 'red']],
+      ['ar', ['lightBlue', 'white', 'yellow']],
+    ] as const) {
+      expect(new Set(createFlagGrid(id).flat())).toEqual(new Set(colors))
+    }
+
+    // スペイン: 上下は赤、中央は黄色で黄色帯のほうが太く、
+    // 黄色帯の中に国章代わりの小さな赤いアクセントがある
+    const spain = createFlagGrid('es')
+    expect(spain[0]!.every((color) => color === 'red')).toBe(true)
+    expect(spain[9]!.every((color) => color === 'red')).toBe(true)
+    const spainRedTotal = spain.flat().filter((color) => color === 'red').length
+    const spainYellowTotal = spain.flat().filter((color) => color === 'yellow').length
+    expect(spainYellowTotal).toBeGreaterThan(spainRedTotal)
+    expect(spain[4]![3]).toBe('red')
+    expect(spain[4]![4]).toBe('red')
+
+    // ポルトガル: 緑(左)より赤(右)のほうが広く、境界付近に黄色いまとまりがある
+    const portugal = createFlagGrid('pt')
+    expect(portugal[0]![0]).toBe('green')
+    expect(portugal[0]![15]).toBe('red')
+    const portugalGreenTotal = portugal.flat().filter((color) => color === 'green').length
+    const portugalRedTotal = portugal.flat().filter((color) => color === 'red').length
+    expect(portugalRedTotal).toBeGreaterThan(portugalGreenTotal)
+    expect(portugalGreenTotal / 160).toBeGreaterThan(0.3)
+    expect(portugalGreenTotal / 160).toBeLessThan(0.45)
+    expect(portugal[4]![5]).toBe('yellow')
+
+    // デンマーク: 青を含まず、左寄りの白い十字だけを持つ
+    const denmark = createFlagGrid('dk')
+    expect(denmark.flat().includes('blue')).toBe(false)
+    expect(denmark[4]).toEqual(Array.from({ length: FLAG_COLS }, () => 'white'))
+    expect(denmark[0]![5]).toBe('white')
+    expect(denmark[0]![6]).toBe('white')
+    expect(5).toBeLessThan((FLAG_COLS - 1) / 2)
+
+    // ノルウェー: デンマークと同じ左寄り十字位置だが、白で縁取られた青を含む
+    const norway = createFlagGrid('no')
+    expect(norway.flat().includes('blue')).toBe(true)
+    expect(norway[4]).toEqual(Array.from({ length: FLAG_COLS }, () => 'blue'))
+    expect(norway[0]![5]).toBe('blue')
+    expect(norway[0]![4]).toBe('white')
+    expect(norway[0]![7]).toBe('white')
+
+    // 中国: 左上に大きな黄色い星を持ち、すべての黄色セルが左上寄りに収まる
+    const china = createFlagGrid('cn')
+    expect(china[2]![3]).toBe('yellow')
+    const chinaYellowCells = china.flatMap((row, rowIndex) =>
+      row.flatMap((color, col) => (color === 'yellow' ? [{ row: rowIndex, col }] : [])),
+    )
+    expect(chinaYellowCells.every(({ row, col }) => row <= 6 && col <= 8)).toBe(true)
+    expect(Math.max(...chinaYellowCells.map(({ col }) => col))).toBeLessThanOrEqual(FLAG_COLS / 2)
+
+    // ベトナム: 星が中央にあり、中国よりも大きく中心寄りである
+    const vietnam = createFlagGrid('vn')
+    const vietnamYellowCells = vietnam.flatMap((row, rowIndex) =>
+      row.flatMap((color, col) => (color === 'yellow' ? [{ row: rowIndex, col }] : [])),
+    )
+    const vietnamColCenter =
+      vietnamYellowCells.reduce((sum, { col }) => sum + col, 0) / vietnamYellowCells.length
+    const vietnamRowCenter =
+      vietnamYellowCells.reduce((sum, { row }) => sum + row, 0) / vietnamYellowCells.length
+    expect(Math.abs(vietnamColCenter - (FLAG_COLS - 1) / 2)).toBeLessThan(1)
+    expect(Math.abs(vietnamRowCenter - (FLAG_ROWS - 1) / 2)).toBeLessThan(1)
+    expect(vietnamYellowCells.length).toBeGreaterThan(chinaYellowCells.length)
+
+    // タイ: 中央の青帯(行3-6)が、赤帯(各2行)や白帯(各1行)より太い
+    const thailand = createFlagGrid('th')
+    expect(thailand.slice(3, 7).every((row) => row.every((color) => color === 'blue'))).toBe(true)
+    expect(thailand.slice(0, 2).every((row) => row.every((color) => color === 'red'))).toBe(true)
+    expect(thailand.slice(8, 10).every((row) => row.every((color) => color === 'red'))).toBe(true)
+    expect(thailand[2]!.every((color) => color === 'white')).toBe(true)
+    expect(thailand[7]!.every((color) => color === 'white')).toBe(true)
+
+    // フィリピン: ホイスト側(列0)で全高を占める白い三角形が列とともに先細り、
+    // 上半分は青・下半分は赤で、黄色は三角形の中に収まる
+    const philippines = createFlagGrid('ph')
+    expect(philippines.every((row) => row[0] === 'white')).toBe(true)
+    const philippinesWhiteHeights = Array.from({ length: FLAG_COLS }, (_, col) =>
+      philippines.filter((row) => row[col] === 'white').length,
+    )
+    expect(philippinesWhiteHeights[0]).toBe(10)
+    for (let col = 1; col < 6; col += 1) {
+      expect(philippinesWhiteHeights[col]).toBeLessThanOrEqual(philippinesWhiteHeights[col - 1])
+    }
+    expect(philippinesWhiteHeights[15]).toBe(0)
+    expect(philippines[0]![15]).toBe('blue')
+    expect(philippines[9]![15]).toBe('red')
+    const philippinesYellowCells = philippines.flatMap((row, rowIndex) =>
+      row.flatMap((color, col) => (color === 'yellow' ? [{ row: rowIndex, col }] : [])),
+    )
+    expect(philippinesYellowCells.length).toBeGreaterThan(0)
+    expect(philippinesYellowCells.every(({ col }) => col < 6)).toBe(true)
+
+    // オーストリア: 赤・白・赤が均等に近い厚さで存在する
+    const austria = createFlagGrid('at')
+    expect(austria[0]!.every((color) => color === 'red')).toBe(true)
+    expect(austria[4]!.every((color) => color === 'white')).toBe(true)
+    expect(austria[9]!.every((color) => color === 'red')).toBe(true)
+
+    // アイルランド: 左から緑・白・オレンジの順
+    const ireland = createFlagGrid('ie')
+    expect(ireland.every((row) => row[0] === 'green' && row[15] === 'orange')).toBe(true)
+    expect(ireland[0]![8]).toBe('white')
+
+    // ルーマニア: 左から青・黄・赤の順
+    const romania = createFlagGrid('ro')
+    expect(romania[0]![0]).toBe('blue')
+    expect(romania[0]![8]).toBe('yellow')
+    expect(romania[0]![15]).toBe('red')
+
+    // ハンガリー: 上から赤・白・緑の順
+    const hungary = createFlagGrid('hu')
+    expect(hungary[0]!.every((color) => color === 'red')).toBe(true)
+    expect(hungary[9]!.every((color) => color === 'green')).toBe(true)
+
+    // ブルガリア: 上から白・緑・赤の順で、ハンガリーとは先頭の色が異なる
+    const bulgaria = createFlagGrid('bg')
+    expect(bulgaria[0]!.every((color) => color === 'white')).toBe(true)
+    expect(bulgaria[9]!.every((color) => color === 'red')).toBe(true)
+    expect(hungary[0]![0]).not.toBe(bulgaria[0]![0])
+
+    // アルゼンチン: 上下が水色(通常のblueとは別色)、中央が白で、
+    // 中央付近に黄色い太陽のアクセントが残る
+    const argentina = createFlagGrid('ar')
+    expect(argentina[0]!.every((color) => color === 'lightBlue')).toBe(true)
+    expect(argentina[9]!.every((color) => color === 'lightBlue')).toBe(true)
+    expect(argentina.flat().includes('blue')).toBe(false)
+    const argentinaYellowCells = argentina.flatMap((row, rowIndex) =>
+      row.flatMap((color, col) => (color === 'yellow' ? [{ row: rowIndex, col }] : [])),
+    )
+    expect(argentinaYellowCells.length).toBeGreaterThan(0)
+    expect(argentinaYellowCells.every(({ row }) => row >= 3 && row <= 6)).toBe(true)
   })
 })
