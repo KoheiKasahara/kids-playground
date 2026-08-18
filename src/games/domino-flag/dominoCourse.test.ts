@@ -102,7 +102,7 @@ describe('createDominoCourse', () => {
     )
     expect(ball!.triggerDominoId).toBe('approach-14')
     expect(ball!.receiverDominoId).toBe('approach-30')
-    expect(ball!.railSegments).toHaveLength(5)
+    expect(ball!.railSegments).toHaveLength(14)
     expect(course.cameraApproachPath).toHaveLength(44)
     expect(last.x).toBeCloseTo(0)
     expect(last.z).toBeCloseTo(lineZero.z - LINE_PITCH_Z)

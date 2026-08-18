@@ -4,6 +4,8 @@ export type ShepherdDomino = {
   fallen: boolean
   /** 倒れきらずに静止している場合だけ補助対象にする。 */
   sleeping: boolean
+  /** trueの間は取り残し救出・停滞救出のどちらの対象にもしない(ボール到達待ちなど)。 */
+  nudgeDisabled?: boolean
 }
 
 export type ShepherdPlan = {
@@ -113,6 +115,7 @@ export function planShepherdNudges(
 
   const nudgedIds = new Set<string>()
   const addNudge = (domino: ShepherdDomino) => {
+    if (domino.nudgeDisabled) return
     if (nudgedIds.has(domino.id)) return
     const count = nextMemory.nudgeCounts[domino.id] ?? 0
     if (count >= SHEPHERD_MAX_NUDGES) return

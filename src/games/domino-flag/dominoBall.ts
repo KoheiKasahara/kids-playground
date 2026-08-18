@@ -15,8 +15,9 @@ export const BALL_RAIL_FRICTION = 0.62
 
 /** スタート台は水平にして、前段ドミノが押すまで球が動かないようにする。 */
 export const BALL_START_DECK_LENGTH = 0.3
-export const BALL_START_DECK_SURFACE_Y = 0.22
-/** 約10.8ユニットの区間で0.18下げる、見た目にも急すぎない坂。 */
+/** これ以上上げると前段ドミノの倒伏が届かず球に接触できなくなる(実測上限は0.45未満)。 */
+export const BALL_START_DECK_SURFACE_Y = 0.38
+/** 約10.8ユニットの区間で0.34下げ、転がりが体感できる速さにする。 */
 export const BALL_EXIT_SURFACE_Y = 0.04
 
 export type BallRailSegment = {
@@ -67,7 +68,8 @@ export function createDominoBallSection(
   const trigger = pointAt(approachPath, 14)
   const startPoint = pointAt(approachPath, 15)
   const receiver = pointAt(approachPath, 30)
-  const railIndexes = [18, 21, 24, 27, 29] as const
+  // 折り返し中の各ドミノ位置を使い、坂を細かく分割してカーブと勾配のカクつきを減らす。
+  const railIndexes = Array.from({ length: 14 }, (_, i) => 16 + i)
   // 最初の坂を少し前から始め、前段ドミノが坂の垂直な端で止まらないようにする。
   const railPoints = [
     {

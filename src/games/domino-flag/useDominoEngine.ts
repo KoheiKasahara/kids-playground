@@ -436,12 +436,15 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       }
       if (completeNotified) return
 
+      const receiverDominoId = course.ballSection?.receiverDominoId ?? null
       const shepherd = planShepherdNudges(
         bodies.map((entry, index) => ({
           id: entry.placement.id,
           chainIndex: entry.chainIndex,
           fallen: isFallen(states[index]!),
           sleeping: states[index]!.sleeping,
+          // 後段の先頭ドミノは球の到達でのみ倒れるべきで、停滞救出の対象にはしない。
+          nudgeDisabled: entry.placement.id === receiverDominoId,
         })),
         shepherdMemory,
         now,
