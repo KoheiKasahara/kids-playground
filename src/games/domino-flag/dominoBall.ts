@@ -15,9 +15,9 @@ export const BALL_RAIL_FRICTION = 0.62
 
 /** スタート台は水平にして、前段ドミノが押すまで球が動かないようにする。 */
 export const BALL_START_DECK_LENGTH = 0.3
-/** これ以上上げると前段ドミノの倒伏が届かず球に接触できなくなる(実測上限は0.45未満)。 */
-export const BALL_START_DECK_SURFACE_Y = 0.38
-/** 約10.8ユニットの区間で0.34下げ、転がりが体感できる速さにする。 */
+/** これ以上上げると前段ドミノの倒伏が届かず球に接触できなくなる(揺らぎ込みの実測上限は0.42未満)。 */
+export const BALL_START_DECK_SURFACE_Y = 0.4
+/** 約10.8ユニットの区間で0.36下げ、転がりが体感できる速さにする。 */
 export const BALL_EXIT_SURFACE_Y = 0.04
 
 export type BallRailSegment = {
@@ -181,6 +181,54 @@ export function getBallRailPieces(section: DominoBallSection): BallRailPiece[] {
     throw new Error('ボール区間のスタート台の向きが不正です')
   }
   return pieces
+}
+
+/** スタート台の手前に置く階段の段数と、前段ドミノの倒伏経路に干渉しない範囲の踏み込み量。 */
+export const BALL_STAIR_STEP_COUNT = 4
+export const BALL_STAIR_RUN = 0.6
+export const BALL_STAIR_WIDTH = BALL_RAIL_WIDTH + BALL_RAIL_WALL_THICKNESS * 2
+
+export type BallStairStep = {
+  center: { x: number; y: number; z: number }
+  yaw: number
+  width: number
+  height: number
+  depth: number
+}
+
+/**
+ * スタート台が地面から浮いて見えないよう、台の裏側(前段ドミノ側)に地面まで続く段を並べる。
+ * 段は表示専用で、球も前段ドミノもここには触れない。
+ */
+export function getBallStairSteps(section: DominoBallSection): BallStairStep[] {
+  const first = section.railSegments[0]
+  if (!first) throw new Error('ボール区間に坂がありません')
+  const firstYaw = Math.atan2(first.end.x - first.start.x, first.end.z - first.start.z)
+  const forward = { x: Math.sin(firstYaw), z: Math.cos(firstYaw) }
+  const deckBackEdge = {
+    x: section.start.x - forward.x * (BALL_START_DECK_LENGTH / 2),
+    z: section.start.z - forward.z * (BALL_START_DECK_LENGTH / 2),
+  }
+  const stepDepth = BALL_STAIR_RUN / BALL_STAIR_STEP_COUNT
+  const stepHeight = BALL_START_DECK_SURFACE_Y / BALL_STAIR_STEP_COUNT
+  const steps: BallStairStep[] = []
+  for (let stepFromDeck = 1; stepFromDeck <= BALL_STAIR_STEP_COUNT; stepFromDeck += 1) {
+    // 台に最も近い段(stepFromDeck=1)を台と同じ高さにし、地面側ほど低い段を積む。
+    const treadHeight = stepHeight * (BALL_STAIR_STEP_COUNT - stepFromDeck + 1)
+    const distanceBack = stepDepth * (stepFromDeck - 0.5)
+    steps.push({
+      center: {
+        x: deckBackEdge.x - forward.x * distanceBack,
+        y: treadHeight / 2,
+        z: deckBackEdge.z - forward.z * distanceBack,
+      },
+      yaw: firstYaw,
+      width: BALL_STAIR_WIDTH,
+      height: treadHeight,
+      depth: stepDepth,
+    })
+  }
+  return steps
 }
 
 /**
