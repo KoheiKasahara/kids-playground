@@ -32,12 +32,17 @@ const PASSIVE_SPIN_DURATION_MS = 420
 const PASSIVE_SPIN_MAX_ANGULAR_VELOCITY = 0.022
 /**
  * 羽根を細くして十字の隙間を残し、直径48pxのボールが周囲へ抜けられるようにする。
- * 長さ（= placement.radius * 2）と同じ比率（約35%）で太さも一緒に大きくし、
- * 「長いだけで細い羽根」にならないようにする。
+ * 長さ（= placement.radius * 2）と同じ比率（元の13/74 ≒ 17.57%）を保って太さも一緒に
+ * 大きくし、「長いだけで細い羽根」にならないようにする。
  */
-const BLADE_THICKNESS = 13
-/** 角を丸めて接触時の急な引っ掛かりを減らす。 */
-const BLADE_CHAMFER_RADIUS = 4
+const BLADE_THICKNESS = 15.6
+/**
+ * 角を丸めて接触時の急な引っ掛かりを減らす。厚さの半分に固定し、羽根の短辺（先端・両端）を
+ * 完全な半円にする。半分未満だと先端に平らな帯が残り、無回転時（一度もタップされていない間）
+ * にボールがその上でちょうど静止してしまう罠になる（1.2倍化でこの帯が広がり、実際にスタック
+ * する試行が発生したため、平らな帯そのものをなくす形で対処した）。
+ */
+const BLADE_CHAMFER_RADIUS = BLADE_THICKNESS / 2
 /** 既存の障害物・得点ゾーン・ball-N と衝突せず、盤面側の特殊処理を発火させない名前にする。 */
 const SPINNER_BODY_LABEL = 'toy-spinner-blade'
 
