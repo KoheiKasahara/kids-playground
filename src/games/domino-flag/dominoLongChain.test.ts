@@ -71,12 +71,14 @@ function runLongChainSimulation(
       const elapsedMs = step * PHYSICS_TIMESTEP * 1000
 
       if (withShepherd && elapsedMs >= nextInspectionMs) {
+        const receiverDominoId = course.ballSection?.receiverDominoId ?? null
         const shepherd = planShepherdNudges(
           dominoWorld.bodies.map((entry) => ({
             id: entry.placement.id,
             chainIndex: entry.chainIndex,
             fallen: isEntryFallen(entry),
             sleeping: entry.body.isSleeping(),
+            nudgeDisabled: entry.placement.id === receiverDominoId,
           })),
           shepherdMemory,
           elapsedMs,
