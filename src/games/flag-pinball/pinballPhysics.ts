@@ -51,11 +51,8 @@ export const STALL_DURATION_MS = 1500
  * delta≈16.67msのとき係数は約278倍にもなる。そのためapplyForceで「小さく突く」ことは
  * 事実上できず（MAX_SPEEDで頭打ちになり、最大速度で真横へ弾き飛ばす挙動になってしまう）、
  * Body.setVelocityで狙った速さをそのまま与える。
- * 回転Toyを1.2倍化した際、無回転で静止した羽根の上にボールが乗って長時間動かなくなる
- * 試行が32回中9回発生した（元は2.2で0回）。3.8まで上げるとタップなしの32回・連打12回の
- * どちらも安全タイマーに頼らず自然に得点確定するため、この値にした。
  */
-export const STALL_NUDGE_SPEED = 3.8
+export const STALL_NUDGE_SPEED = 2.2
 
 /** 射出から確定までの安全タイマー(ms)。通常プレイでは発動しない想定の最終手段。 */
 export const SAFETY_TIMEOUT_MS = 45_000
