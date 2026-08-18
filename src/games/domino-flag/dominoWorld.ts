@@ -33,6 +33,7 @@ import {
   getBallRailPieces,
   type DominoBallSection,
 } from './dominoBall'
+import { getStairPlatforms } from './dominoStairs'
 
 /** Hookとheadlessテストが同じRapierコンストラクタを使うための最小インターフェース。 */
 export type RapierModule = Pick<
@@ -90,9 +91,10 @@ export function createDominoWorld(
   const bodiesById = new Map<string, DominoBodyEntry>()
   for (const placement of placements) {
     const yaw = placement.yaw ?? 0
+    const baseY = placement.baseY ?? 0
     const body = world.createRigidBody(
       rapier.RigidBodyDesc.dynamic()
-        .setTranslation(placement.x, DOMINO_HEIGHT / 2, placement.z)
+        .setTranslation(placement.x, baseY + DOMINO_HEIGHT / 2, placement.z)
         .setRotation({
           x: 0,
           y: Math.sin(yaw / 2),
@@ -122,6 +124,22 @@ export function createDominoWorld(
     }
     bodies.push(entry)
     bodiesById.set(placement.id, entry)
+  }
+
+  // ボール区間トリガーへ登る階段。台は固定物として、地面から各段の高さまで支える。
+  for (const platform of getStairPlatforms(placements)) {
+    world.createCollider(
+      rapier.ColliderDesc.cuboid(platform.width / 2, platform.height / 2, platform.depth / 2)
+        .setTranslation(platform.center.x, platform.center.y, platform.center.z)
+        .setRotation({
+          x: 0,
+          y: Math.sin(platform.yaw / 2),
+          z: 0,
+          w: Math.cos(platform.yaw / 2),
+        })
+        .setFriction(GROUND_FRICTION)
+        .setRestitution(DOMINO_RESTITUTION),
+    )
   }
 
   let ball: DominoBallBodyEntry | null = null

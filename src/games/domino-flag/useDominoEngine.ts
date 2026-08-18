@@ -48,6 +48,7 @@ import {
   getBallRailPieces,
   getBallStairSteps,
 } from './dominoBall'
+import { getStairPlatforms } from './dominoStairs'
 import {
   createShepherdMemory,
   planShepherdNudges,
@@ -157,6 +158,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     let ballMesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshLambertMaterial> | null = null
     let railFloorMaterial: THREE.MeshLambertMaterial | null = null
     let railWallMaterial: THREE.MeshLambertMaterial | null = null
+    let stairPlatformMaterial: THREE.MeshLambertMaterial | null = null
     const railGeometries: THREE.BoxGeometry[] = []
     const railMeshes: THREE.Mesh[] = []
     let resizeObserver: ResizeObserver | null = null
@@ -240,6 +242,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       ballMaterial?.dispose()
       railFloorMaterial?.dispose()
       railWallMaterial?.dispose()
+      stairPlatformMaterial?.dispose()
       for (const geometry of railGeometries) geometry.dispose()
 
       if (renderer !== null) {
@@ -269,6 +272,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       ballMesh = null
       railFloorMaterial = null
       railWallMaterial = null
+      stairPlatformMaterial = null
       railGeometries.length = 0
       railMeshes.length = 0
       dominoBall = null
@@ -627,7 +631,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
             }
           }
 
-          // スタート台が地面から浮いて見えないよう、前段ドミノ側に表示専用の階段を並べる。
+          // スタート台が足場から浮いて見えないよう、トリガー側に表示専用の短い連結段を並べる。
           for (const step of getBallStairSteps(course.ballSection)) {
             const stepGeometry = new THREE.BoxGeometry(step.width, step.height, step.depth)
             railGeometries.push(stepGeometry)
@@ -636,6 +640,22 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
             stepMesh.rotation.y = step.yaw
             railMeshes.push(stepMesh)
             scene.add(stepMesh)
+          }
+
+          // トリガーへ向けて道中のドミノ自身が登る、実際に支える階段。
+          stairPlatformMaterial = new THREE.MeshLambertMaterial({ color: 0xc9a06b })
+          for (const platform of getStairPlatforms(placements)) {
+            const platformGeometry = new THREE.BoxGeometry(
+              platform.width,
+              platform.height,
+              platform.depth,
+            )
+            railGeometries.push(platformGeometry)
+            const platformMesh = new THREE.Mesh(platformGeometry, stairPlatformMaterial)
+            platformMesh.position.set(platform.center.x, platform.center.y, platform.center.z)
+            platformMesh.rotation.y = platform.yaw
+            railMeshes.push(platformMesh)
+            scene.add(platformMesh)
           }
         }
 
