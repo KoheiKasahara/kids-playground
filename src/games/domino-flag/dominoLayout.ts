@@ -44,6 +44,8 @@ export type DominoPlacement = {
   color?: FlagCellColor
   row?: number
   col?: number
+  /** ドミノが立つ台の高さ。未指定は地面(0)。階段区間だけ正の値を持つ。 */
+  baseY?: number
 }
 
 const FLAG_Z0 = -((FLAG_ROWS - 1) / 2) * FLAG_PITCH_Z

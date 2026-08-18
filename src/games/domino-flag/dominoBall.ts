@@ -59,11 +59,13 @@ function distance(a: { x: number; z: number }, b: { x: number; z: number }) {
 }
 
 /**
- * 既存の180度折り返し15枚を、5枚の緩いCuboid坂とガイド壁へ置き換える。
+ * 既存の180度折り返し15枚を、14枚の緩いCuboid坂とガイド壁へ置き換える。
  * 前後のドミノ位置・向きはそのまま残すため、ロング全体の経路は作り直さない。
+ * triggerBaseYは、階段区間でトリガードミノ自身がすでに登っている高さ(地面基準)。
  */
 export function createDominoBallSection(
   approachPath: readonly { x: number; z: number; yaw: number }[],
+  triggerBaseY = 0,
 ): DominoBallSection {
   const trigger = pointAt(approachPath, 14)
   const startPoint = pointAt(approachPath, 15)
@@ -83,6 +85,9 @@ export function createDominoBallSection(
     (total, point, index) => total + distance(railPoints[index]!, point),
     0,
   )
+  // スタート台は階段の最上段のさらに上。出口は据え置きの地面基準の高さなので、
+  // 階段を上げるほど坂の落差が広がりボールが速くなる。
+  const startSurfaceY = triggerBaseY + BALL_START_DECK_SURFACE_Y
   let consumedLength = 0
   const railSegments: BallRailSegment[] = railPoints.slice(1).map((point, index) => {
     const start = railPoints[index]!
@@ -91,8 +96,7 @@ export function createDominoBallSection(
     consumedLength += segmentLength
     const endRatio = consumedLength / totalLength
     const surfaceY = (ratio: number) =>
-      BALL_START_DECK_SURFACE_Y +
-      (BALL_EXIT_SURFACE_Y - BALL_START_DECK_SURFACE_Y) * ratio
+      startSurfaceY + (BALL_EXIT_SURFACE_Y - startSurfaceY) * ratio
     return {
       start: { x: start.x, y: surfaceY(startRatio), z: start.z },
       end: { x: point.x, y: surfaceY(endRatio), z: point.z },
@@ -115,7 +119,7 @@ export function createDominoBallSection(
     start: {
       // 前段の倒伏中に直接接触する位置。坂端とは干渉しないよう元の1枚ぶんより少し前へ置く。
       x: startPoint.x + Math.sin(startPoint.yaw) * 0.4,
-      y: BALL_START_DECK_SURFACE_Y + BALL_RADIUS,
+      y: startSurfaceY + BALL_RADIUS,
       z: startPoint.z + Math.cos(startPoint.yaw) * 0.4,
     },
     railSegments,
@@ -142,18 +146,20 @@ export function getBallRailPieces(section: DominoBallSection): BallRailPiece[] {
   const firstDz = first.end.z - first.start.z
   const firstYaw = Math.atan2(firstDx, firstDz)
   const deckForward = { x: Math.sin(firstYaw), z: Math.cos(firstYaw) }
+  // スタート台の高さはレール先頭と一致する(階段区間の分だけ地面より高いことがある)。
+  const deckSurfaceY = first.start.y
   const pieces: BallRailPiece[] = [
     {
       kind: 'deck',
       center: {
         x: section.start.x,
-        y: BALL_START_DECK_SURFACE_Y,
+        y: deckSurfaceY,
         z: section.start.z,
       },
       yaw: firstYaw,
       pitch: 0,
       length: BALL_START_DECK_LENGTH,
-      surfaceY: BALL_START_DECK_SURFACE_Y,
+      surfaceY: deckSurfaceY,
     },
   ]
   for (const segment of section.railSegments) {
@@ -197,8 +203,9 @@ export type BallStairStep = {
 }
 
 /**
- * スタート台が地面から浮いて見えないよう、台の裏側(前段ドミノ側)に地面まで続く段を並べる。
- * 段は表示専用で、球も前段ドミノもここには触れない。
+ * スタート台が階段の最上段(トリガードミノの足場)から浮いて見えないよう、
+ * 台の裏側(前段ドミノ側)に足場まで続く短い段を並べる。段は表示専用で、
+ * 球も前段ドミノもここには触れない。
  */
 export function getBallStairSteps(section: DominoBallSection): BallStairStep[] {
   const first = section.railSegments[0]
@@ -209,17 +216,19 @@ export function getBallStairSteps(section: DominoBallSection): BallStairStep[] {
     x: section.start.x - forward.x * (BALL_START_DECK_LENGTH / 2),
     z: section.start.z - forward.z * (BALL_START_DECK_LENGTH / 2),
   }
+  // スタート台は「階段の足場 + ローカルの台高さ」なので、足場の高さを逆算する。
+  const triggerBaseY = section.start.y - BALL_RADIUS - BALL_START_DECK_SURFACE_Y
   const stepDepth = BALL_STAIR_RUN / BALL_STAIR_STEP_COUNT
   const stepHeight = BALL_START_DECK_SURFACE_Y / BALL_STAIR_STEP_COUNT
   const steps: BallStairStep[] = []
   for (let stepFromDeck = 1; stepFromDeck <= BALL_STAIR_STEP_COUNT; stepFromDeck += 1) {
-    // 台に最も近い段(stepFromDeck=1)を台と同じ高さにし、地面側ほど低い段を積む。
+    // 台に最も近い段(stepFromDeck=1)を台と同じ高さにし、足場側ほど低い段を積む。
     const treadHeight = stepHeight * (BALL_STAIR_STEP_COUNT - stepFromDeck + 1)
     const distanceBack = stepDepth * (stepFromDeck - 0.5)
     steps.push({
       center: {
         x: deckBackEdge.x - forward.x * distanceBack,
-        y: treadHeight / 2,
+        y: triggerBaseY + treadHeight / 2,
         z: deckBackEdge.z - forward.z * distanceBack,
       },
       yaw: firstYaw,

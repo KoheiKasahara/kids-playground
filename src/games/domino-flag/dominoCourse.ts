@@ -14,6 +14,7 @@ import {
   withoutBallSectionApproachPlacements,
   type DominoBallSection,
 } from './dominoBall'
+import { STAIR_STEP_COUNT, STAIR_STEP_RISE, STAIR_TOP_BASE_Y } from './dominoStairs'
 
 export type DominoCourseType = 'normal' | 'long'
 
@@ -170,15 +171,33 @@ function createNormalCourse(flagId: DominoFlagId): DominoCourse {
   }
 }
 
+/** ボール区間トリガー(approach-14)の道中インデックス。dominoBall.tsの前提と揃える。 */
+const BALL_TRIGGER_APPROACH_INDEX = 14
+
+/**
+ * トリガーの手前STAIR_STEP_COUNT枚に、1段ずつ高くなるbaseYを与える。
+ * トリガー自身は最後の段と同じ高さの「平場」にし、トリガーへの一押しは
+ * 平らな道中と同じ受け渡しにして、球への接触精度を落とさない。
+ * x/z/yawは既存の道中経路のまま変えないため、旋回中でも階段として登っていける。
+ */
+function withApproachStairs(placements: DominoPlacement[]): DominoPlacement[] {
+  const stairStartIndex = BALL_TRIGGER_APPROACH_INDEX - STAIR_STEP_COUNT
+  return placements.map((placement, index) => {
+    if (index < stairStartIndex || index > BALL_TRIGGER_APPROACH_INDEX) return placement
+    const stepNumber = Math.min(index - stairStartIndex + 1, STAIR_STEP_COUNT)
+    return { ...placement, baseY: STAIR_STEP_RISE * stepNumber }
+  })
+}
+
 function createLongCourse(flagId: DominoFlagId): DominoCourse {
   const flagCoursePlacements = createDominoPlacements(flagId)
   const lineZero = flagCoursePlacements.find((placement) => placement.id === 'line-0')
   if (!lineZero) throw new Error('通常コースにline-0がありません')
 
   const approach = createApproachPlacements(lineZero)
-  const ballSection = createDominoBallSection(approach.path)
+  const ballSection = createDominoBallSection(approach.path, STAIR_TOP_BASE_Y)
   const ballFreeApproachPlacements = withoutBallSectionApproachPlacements(
-    approach.placements,
+    withApproachStairs(approach.placements),
     ballSection,
   )
   const approachCount = ballFreeApproachPlacements.length
