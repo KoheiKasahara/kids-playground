@@ -47,7 +47,7 @@
  * テーマ側はtransformを上書きしない。
  */
 .toyVisual[data-toy-kind='spinner'] {
-  /* Matterの羽根（長さ = 半径×2 = 74px、厚さ13px）に一致させる比率。
+  /* Matterの羽根（長さ = 半径×2 = 88.8px、厚さ15.6px）に一致させる比率。
    * テーマ側の羽根はこの2つだけを使い、縦横を入れ替えて十字を作る。 */
   --toy-blade-thickness: 17.57%;
   --toy-blade-length: 50%;
@@ -58,7 +58,7 @@
 }
 
 /*
- * 横羽根は100% × 17.57%、縦羽根は17.57% × 100%（13px / 74px）。
+ * 横羽根は100% × 17.57%、縦羽根は17.57% × 100%（15.6px / 88.8px）。
  * テーマが`--pinball-toy-mark`をtransparentにする場合は、テーマ別羽根の下地になる。
  */
 .toyVisual[data-toy-kind='spinner']::before,

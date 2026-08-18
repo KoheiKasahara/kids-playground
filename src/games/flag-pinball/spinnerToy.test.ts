@@ -307,8 +307,8 @@ describe('spinnerToy の固定ステップ物理', () => {
     const verticalBlade = partSizes[1]
     if (!horizontalBlade || !verticalBlade) throw new Error('spinner test: blade parts are missing')
     expect(horizontalBlade.width).toBeCloseTo(SPINNER_PLACEMENT.radius * 2, 1)
-    expect(horizontalBlade.height).toBeCloseTo(13, 1)
-    expect(verticalBlade.width).toBeCloseTo(13, 1)
+    expect(horizontalBlade.height).toBeCloseTo(15.6, 1)
+    expect(verticalBlade.width).toBeCloseTo(15.6, 1)
     expect(verticalBlade.height).toBeCloseTo(SPINNER_PLACEMENT.radius * 2, 1)
     harness.runtime.activate(0)
     advanceSteps(harness, 90)
