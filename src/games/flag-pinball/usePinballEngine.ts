@@ -8,6 +8,7 @@ import {
   SCORE_ZONES,
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
+  findCornerEscapeZone,
   launchDelaysMs,
   wallsForMode,
   zoneAtX,
@@ -405,11 +406,20 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
             if (stallSince[ballIndex] === null) {
               stallSince[ballIndex] = now
             } else if (now - stallSince[ballIndex]! >= STALL_DURATION_MS) {
-              const sign = Math.random() < 0.5 ? -1 : 1
-              const magnitude = STALL_NUDGE_SPEED * (0.5 + Math.random() * 0.5)
-              // 停滞したボールを「小さく突く」。applyForce は matter-js 内部で delta の二乗が
-              // 掛かって速度変化が過大になるため、狙った速さを setVelocity で直接与える。
-              Body.setVelocity(body, { x: sign * magnitude, y: body.velocity.y - 0.6 })
+              const escapeZone = findCornerEscapeZone(body.position.x, body.position.y)
+              if (escapeZone) {
+                // 射出ガイド壁と外壁が挟む隅は、ボールが両面に同時接触して動けなくなる
+                // 幾何学的な一点を持つ（boardLayout.ts の CORNER_ESCAPE_ZONES 参照）。
+                // 通常のナッジでは脱出できないため、その一点だけ通り抜けさせる。
+                Body.setPosition(body, { x: escapeZone.toX, y: escapeZone.toY })
+                Body.setVelocity(body, { x: 0, y: Math.max(body.velocity.y, 2) })
+              } else {
+                const sign = Math.random() < 0.5 ? -1 : 1
+                const magnitude = STALL_NUDGE_SPEED * (0.5 + Math.random() * 0.5)
+                // 停滞したボールを「小さく突く」。applyForce は matter-js 内部で delta の二乗が
+                // 掛かって速度変化が過大になるため、狙った速さを setVelocity で直接与える。
+                Body.setVelocity(body, { x: sign * magnitude, y: body.velocity.y - 0.6 })
+              }
               stallSince[ballIndex] = now
             }
           } else {

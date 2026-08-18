@@ -8,6 +8,7 @@ import {
   SCORE_ZONES,
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
+  findCornerEscapeZone,
   zoneAtX,
   wallsForMode,
 } from './boardLayout'
@@ -227,9 +228,17 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
         if (stallSinceMs[ballIndex] === null) {
           stallSinceMs[ballIndex] = nowMs
         } else if (nowMs - stallSinceMs[ballIndex]! >= STALL_DURATION_MS) {
-          const magnitude = STALL_NUDGE_SPEED * (0.5 + random() * 0.5)
-          const direction = random() < 0.5 ? -1 : 1
-          Body.setVelocity(body, { x: direction * magnitude, y: body.velocity.y - 0.6 })
+          const escapeZone = findCornerEscapeZone(body.position.x, body.position.y)
+          if (escapeZone) {
+            // 射出ガイド壁と外壁が挟む隅（CORNER_ESCAPE_ZONES）は通常のナッジでは
+            // 脱出できないため、その一点だけ通り抜けさせる。
+            Body.setPosition(body, { x: escapeZone.toX, y: escapeZone.toY })
+            Body.setVelocity(body, { x: 0, y: Math.max(body.velocity.y, 2) })
+          } else {
+            const magnitude = STALL_NUDGE_SPEED * (0.5 + random() * 0.5)
+            const direction = random() < 0.5 ? -1 : 1
+            Body.setVelocity(body, { x: direction * magnitude, y: body.velocity.y - 0.6 })
+          }
           stallSinceMs[ballIndex] = nowMs
         }
       } else {

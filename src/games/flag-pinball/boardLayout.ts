@@ -167,6 +167,39 @@ export const WALLS: readonly WallSegment[] = [
   { id: 'wall-bottom', x: BOARD_WIDTH / 2, y: BOARD_HEIGHT, width: BOARD_WIDTH, height: WALL_THICKNESS, angle: 0, restitution: WALL_RESTITUTION },
 ]
 
+/** 隅ですり抜けさせるボールの逃がし先。真下・外壁から離れる向きへ寄せる。 */
+export type CornerEscapeZone = {
+  readonly x: number
+  readonly y: number
+  readonly radius: number
+  readonly toX: number
+  readonly toY: number
+}
+
+/**
+ * wall-guide-left/right（斜め壁）とwall-left/wall-right（外壁）が挟む隅。
+ * 2直線が浅い角度で交わるため、半径24pxのボールがちょうど両方の面に同時接触できる
+ * 一点（外壁側と斜め壁側から受ける力が打ち消し合い、静止摩擦なしでも動けなくなる点）
+ * が幾何学的に必ず存在する。壁の形状を変えて塞ごうとすると、新しく増やした面がまた
+ * 別の一点で既存の面と交わってしまい、隙間そのものをなくすことができなかった
+ * （角度・厚み・丸ピン・継ぎ足し壁など複数のアプローチを多数の初期位置・速度で検証済み）。
+ * 実測でこの一点は座標(38.8, 104)付近（左右対称にBOARD_WIDTH-38.8, 104）に必ず収束する
+ * ため、壁の見た目は変えず、この一点だけ「すり抜け」させて盤面中央側へ逃がす。
+ * usePinballEngine.ts と pinballSimulation.ts の停滞ナッジ処理から参照する。
+ */
+export const CORNER_ESCAPE_ZONES: readonly CornerEscapeZone[] = [
+  { x: 38.8, y: 104, radius: 14, toX: 55, toY: 170 },
+  { x: BOARD_WIDTH - 38.8, y: 104, radius: 14, toX: BOARD_WIDTH - 55, toY: 170 },
+]
+
+/** (x,y) がCORNER_ESCAPE_ZONESのいずれかに入っていれば、そのゾーンを返す。 */
+export function findCornerEscapeZone(x: number, y: number): CornerEscapeZone | null {
+  for (const zone of CORNER_ESCAPE_ZONES) {
+    if (Math.hypot(x - zone.x, y - zone.y) <= zone.radius) return zone
+  }
+  return null
+}
+
 // --- 得点ゾーンの仕切り ------------------------------------------------------
 
 /**
