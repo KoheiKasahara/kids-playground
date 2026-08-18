@@ -7,6 +7,7 @@ import {
   DOMINO_DEPTH,
   DOMINO_HEIGHT,
   getLayoutBounds,
+  LINE_COUNT,
 } from './dominoLayout'
 import { createDominoCourse, type DominoCourseType } from './dominoCourse'
 import { cameraDistanceOf, computeCameraSetup } from './dominoCamera'
@@ -37,6 +38,15 @@ import {
   tiltOf,
   type DominoBodyEntry,
 } from './dominoWorld'
+import {
+  BALL_RADIUS,
+  BALL_RAIL_THICKNESS,
+  BALL_RAIL_WALL_HEIGHT,
+  BALL_RAIL_WALL_THICKNESS,
+  BALL_RAIL_WIDTH,
+  ballRailProgress,
+  getBallRailPieces,
+} from './dominoBall'
 import {
   createShepherdMemory,
   planShepherdNudges,
@@ -141,6 +151,13 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     let groundMaterial: THREE.MeshLambertMaterial | null = null
     let dominoMaterial: THREE.MeshLambertMaterial | null = null
     let flagMaterial: THREE.MeshBasicMaterial | null = null
+    let ballGeometry: THREE.SphereGeometry | null = null
+    let ballMaterial: THREE.MeshLambertMaterial | null = null
+    let ballMesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshLambertMaterial> | null = null
+    let railFloorMaterial: THREE.MeshLambertMaterial | null = null
+    let railWallMaterial: THREE.MeshLambertMaterial | null = null
+    const railGeometries: THREE.BoxGeometry[] = []
+    const railMeshes: THREE.Mesh[] = []
     let resizeObserver: ResizeObserver | null = null
     let hasWindowResizeListener = false
     let rafId: number | null = null
@@ -164,6 +181,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     let smoothedTarget: RailVec3 | null = null
     let smoothedDistance = 0
     let shepherdMemory: ShepherdMemory = createShepherdMemory()
+    let dominoBall: ReturnType<typeof createDominoWorld>['ball'] = null
     const soundController = createDominoSoundController({
       dominoCount: placements.length,
       playTick: playDominoTickSound,
@@ -217,6 +235,11 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       groundMaterial?.dispose()
       dominoMaterial?.dispose()
       flagMaterial?.dispose()
+      ballGeometry?.dispose()
+      ballMaterial?.dispose()
+      railFloorMaterial?.dispose()
+      railWallMaterial?.dispose()
+      for (const geometry of railGeometries) geometry.dispose()
 
       if (renderer !== null) {
         const canvas = renderer.domElement
@@ -240,6 +263,14 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       groundMaterial = null
       dominoMaterial = null
       flagMaterial = null
+      ballGeometry = null
+      ballMaterial = null
+      ballMesh = null
+      railFloorMaterial = null
+      railWallMaterial = null
+      railGeometries.length = 0
+      railMeshes.length = 0
+      dominoBall = null
       scene?.clear()
       scene = null
       camera = null
@@ -269,7 +300,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         camera.lookAt(setup.target.x, setup.target.y, setup.target.z)
       } else {
         cameraRail = buildLongCameraRail(
-          course.approachPath,
+          course.cameraApproachPath,
           {
             target: setup.target,
             distance: cameraDistanceOf(setup),
@@ -298,12 +329,30 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       if (!isLongCourse || !camera || cameraRail.length === 0 || smoothedTarget === null) return
 
       while (
-        cameraFrontier < course.cameraProgressCount &&
+        cameraFrontier < course.approachCount + LINE_COUNT &&
         tiltOf(bodies[cameraFrontier]!.body) >= CAMERA_PROGRESS_TILT_RAD
       ) {
         cameraFrontier += 1
       }
-      const rawProgress = cameraFrontier / course.cameraProgressCount
+      let cameraProgressIndex = cameraFrontier
+      if (course.ballSection !== null && dominoBall !== null) {
+        const trigger = bodiesById.get(course.ballSection.triggerDominoId)
+        const receiver = bodiesById.get(course.ballSection.receiverDominoId)
+        const triggerHasFallen = trigger !== undefined && tiltOf(trigger.body) >= CAMERA_PROGRESS_TILT_RAD
+        const receiverHasFallen = receiver !== undefined && tiltOf(receiver.body) >= CAMERA_PROGRESS_TILT_RAD
+        const virtualCount = course.ballSection.replacedApproachIndexes.length
+        const ballStartProgress = course.ballSection.replacedApproachIndexes[0] ?? 0
+        if (triggerHasFallen && !receiverHasFallen) {
+          const position = dominoBall.body.translation()
+          // カメラ位置は常に演出用レールから算出する。球の進行度はレール内の補間にだけ使う。
+          cameraProgressIndex =
+            ballStartProgress + ballRailProgress(course.ballSection, position) * virtualCount
+        } else if (receiverHasFallen) {
+          // 物理ドミノには存在しないボール区間ぶんを、出口後の進行度へ加算する。
+          cameraProgressIndex += virtualCount
+        }
+      }
+      const rawProgress = cameraProgressIndex / course.cameraProgressCount
       smoothedProgress = advanceRailProgress(
         smoothedProgress,
         rawProgress,
@@ -344,6 +393,12 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       }
       dominoMesh.instanceMatrix.needsUpdate = true
       flagMesh.instanceMatrix.needsUpdate = true
+      if (dominoBall !== null && ballMesh !== null) {
+        const translation = dominoBall.body.translation()
+        const rotation = dominoBall.body.rotation()
+        ballMesh.position.set(translation.x, translation.y, translation.z)
+        ballMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+      }
     }
 
     function beginStart() {
@@ -515,10 +570,66 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         if (flagMesh.instanceColor) flagMesh.instanceColor.needsUpdate = true
         scene.add(dominoMesh, flagMesh)
 
+        if (course.ballSection !== null) {
+          ballGeometry = new THREE.SphereGeometry(BALL_RADIUS, 24, 16)
+          ballMaterial = new THREE.MeshLambertMaterial({ color: 0xff8a3d })
+          ballMesh = new THREE.Mesh(ballGeometry, ballMaterial)
+          scene.add(ballMesh)
+
+          railFloorMaterial = new THREE.MeshLambertMaterial({ color: 0x5b7891 })
+          railWallMaterial = new THREE.MeshLambertMaterial({ color: 0x7e9db5 })
+          for (const piece of getBallRailPieces(course.ballSection)) {
+            const floorGeometry = new THREE.BoxGeometry(
+              BALL_RAIL_WIDTH,
+              BALL_RAIL_THICKNESS,
+              piece.length + 0.14,
+            )
+            railGeometries.push(floorGeometry)
+            const floor = new THREE.Mesh(floorGeometry, railFloorMaterial)
+            floor.position.set(
+              piece.center.x,
+              piece.center.y - BALL_RAIL_THICKNESS / 2,
+              piece.center.z,
+            )
+            const halfYaw = piece.yaw / 2
+            const halfPitch = piece.pitch / 2
+            floor.quaternion.set(
+              Math.cos(halfYaw) * Math.sin(halfPitch),
+              Math.sin(halfYaw) * Math.cos(halfPitch),
+              -Math.sin(halfYaw) * Math.sin(halfPitch),
+              Math.cos(halfYaw) * Math.cos(halfPitch),
+            )
+            railMeshes.push(floor)
+            scene.add(floor)
+
+            const sideX = Math.cos(piece.yaw) * (BALL_RAIL_WIDTH / 2 - BALL_RAIL_WALL_THICKNESS / 2)
+            const sideZ = -Math.sin(piece.yaw) * (BALL_RAIL_WIDTH / 2 - BALL_RAIL_WALL_THICKNESS / 2)
+            for (const side of [-1, 1] as const) {
+              const wallGeometry = new THREE.BoxGeometry(
+                BALL_RAIL_WALL_THICKNESS,
+                BALL_RAIL_WALL_HEIGHT,
+                piece.length + 0.14,
+              )
+              railGeometries.push(wallGeometry)
+              const wall = new THREE.Mesh(wallGeometry, railWallMaterial)
+              wall.position.set(
+                piece.center.x + side * sideX,
+                piece.surfaceY + BALL_RAIL_WALL_HEIGHT / 2,
+                piece.center.z + side * sideZ,
+              )
+              wall.rotation.y = piece.yaw
+              railMeshes.push(wall)
+              scene.add(wall)
+            }
+          }
+        }
+
         const dominoWorld = createDominoWorld(RAPIER, placements, {
           groundSize: course.groundSize,
+          ballSection: course.ballSection,
         })
         world = dominoWorld.world
+        dominoBall = dominoWorld.ball
         let flagBodyIndex = 0
         for (const entry of dominoWorld.bodies) {
           const renderEntry: RenderDominoBodyEntry = {

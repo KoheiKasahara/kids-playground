@@ -20,6 +20,19 @@ import {
   SHEPHERD_IMPULSE_Z,
   START_IMPULSE_Z,
 } from './dominoPhysics'
+import {
+  BALL_FRICTION,
+  BALL_MASS,
+  BALL_RADIUS,
+  BALL_RAIL_FRICTION,
+  BALL_RAIL_THICKNESS,
+  BALL_RAIL_WALL_HEIGHT,
+  BALL_RAIL_WALL_THICKNESS,
+  BALL_RAIL_WIDTH,
+  BALL_RESTITUTION,
+  getBallRailPieces,
+  type DominoBallSection,
+} from './dominoBall'
 
 /** Hookとheadlessテストが同じRapierコンストラクタを使うための最小インターフェース。 */
 export type RapierModule = Pick<
@@ -33,11 +46,18 @@ export type DominoBodyEntry = {
   chainIndex: number
 }
 
+export type DominoBallBodyEntry = {
+  body: RigidBody
+  section: DominoBallSection
+}
+
 export type DominoWorld = {
   world: World
   placements: DominoPlacement[]
   bodies: DominoBodyEntry[]
   bodiesById: Map<string, DominoBodyEntry>
+  /** normalではnull。ロングにだけ動的Sphereを1個作る。 */
+  ball: DominoBallBodyEntry | null
 }
 
 function getChainIndex(placement: DominoPlacement): number {
@@ -48,7 +68,7 @@ function getChainIndex(placement: DominoPlacement): number {
 export function createDominoWorld(
   rapier: RapierModule,
   placements: DominoPlacement[] = createDominoPlacements(),
-  options: { groundSize?: number } = {},
+  options: { groundSize?: number; ballSection?: DominoBallSection | null } = {},
 ): DominoWorld {
   const world = new rapier.World({ x: 0, y: GRAVITY_Y, z: 0 })
   world.timestep = PHYSICS_TIMESTEP
@@ -104,7 +124,79 @@ export function createDominoWorld(
     bodiesById.set(placement.id, entry)
   }
 
-  return { world, placements, bodies, bodiesById }
+  let ball: DominoBallBodyEntry | null = null
+  if (options.ballSection !== null && options.ballSection !== undefined) {
+    const section = options.ballSection
+    const ballBody = world.createRigidBody(
+      rapier.RigidBodyDesc.dynamic()
+        .setTranslation(section.start.x, section.start.y, section.start.z)
+        .setLinearDamping(0.025)
+        .setAngularDamping(0.02)
+        .setCcdEnabled(true)
+        .setCanSleep(true)
+        .setSleeping(true),
+    )
+    world.createCollider(
+      rapier.ColliderDesc.ball(BALL_RADIUS)
+        .setMass(BALL_MASS)
+        .setFriction(BALL_FRICTION)
+        .setRestitution(BALL_RESTITUTION),
+      ballBody,
+    )
+
+    for (const piece of getBallRailPieces(section)) {
+      const halfYaw = piece.yaw / 2
+      const halfPitch = piece.pitch / 2
+      // Yaw * pitch。ローカル+Zが坂の下り方向を向く回転。
+      const rotation = {
+        x: Math.cos(halfYaw) * Math.sin(halfPitch),
+        y: Math.sin(halfYaw) * Math.cos(halfPitch),
+        z: -Math.sin(halfYaw) * Math.sin(halfPitch),
+        w: Math.cos(halfYaw) * Math.cos(halfPitch),
+      }
+      world.createCollider(
+        rapier.ColliderDesc.cuboid(
+          BALL_RAIL_WIDTH / 2,
+          BALL_RAIL_THICKNESS / 2,
+          piece.length / 2 + 0.07,
+        )
+          .setTranslation(piece.center.x, piece.center.y - BALL_RAIL_THICKNESS / 2, piece.center.z)
+          .setRotation(rotation)
+          .setFriction(BALL_RAIL_FRICTION)
+          .setRestitution(BALL_RESTITUTION),
+      )
+
+      // 低い左右ガイドは見た目にもそのまま表示する。球を閉じ込める透明Colliderは使わない。
+      const sideX = Math.cos(piece.yaw) * (BALL_RAIL_WIDTH / 2 - BALL_RAIL_WALL_THICKNESS / 2)
+      const sideZ = -Math.sin(piece.yaw) * (BALL_RAIL_WIDTH / 2 - BALL_RAIL_WALL_THICKNESS / 2)
+      const wallRotation = {
+        x: 0,
+        y: Math.sin(halfYaw),
+        z: 0,
+        w: Math.cos(halfYaw),
+      }
+      for (const side of [-1, 1] as const) {
+        world.createCollider(
+          rapier.ColliderDesc.cuboid(
+            BALL_RAIL_WALL_THICKNESS / 2,
+            BALL_RAIL_WALL_HEIGHT / 2,
+            piece.length / 2 + 0.07,
+          )
+            .setTranslation(
+              piece.center.x + side * sideX,
+              piece.surfaceY + BALL_RAIL_WALL_HEIGHT / 2,
+              piece.center.z + side * sideZ,
+            )
+            .setRotation(wallRotation)
+            .setFriction(BALL_RAIL_FRICTION)
+            .setRestitution(BALL_RESTITUTION),
+        )
+      }
+    }
+    ball = { body: ballBody, section }
+  }
+
+  return { world, placements, bodies, bodiesById, ball }
 }
 
 type QuaternionLike = { x: number; y: number; z: number; w: number }
