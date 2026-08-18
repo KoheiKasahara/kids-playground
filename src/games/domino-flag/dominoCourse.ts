@@ -9,6 +9,11 @@ import {
 } from './dominoLayout'
 import { HARD_TIMEOUT_MS, LONG_HARD_TIMEOUT_MS } from './dominoCompletion'
 import { GROUND_SIZE } from './dominoPhysics'
+import {
+  createDominoBallSection,
+  withoutBallSectionApproachPlacements,
+  type DominoBallSection,
+} from './dominoBall'
 
 export type DominoCourseType = 'normal' | 'long'
 
@@ -29,6 +34,10 @@ export type DominoCourse = {
   cameraProgressCount: number
   /** ロング道中の中心線。Task Bのカメラレール生成で使う。 */
   approachPath: readonly { x: number; z: number; yaw: number }[]
+  /** ボール区間の演出用一点を含む、ロングカメラ専用の中心線。 */
+  cameraApproachPath: readonly { x: number; z: number; yaw: number }[]
+  /** ロング専用のボールと坂。normalでは必ずnull。 */
+  ballSection: DominoBallSection | null
 }
 
 type ApproachSegment =
@@ -156,6 +165,8 @@ function createNormalCourse(flagId: DominoFlagId): DominoCourse {
     approachCount: 0,
     cameraProgressCount: 0,
     approachPath: [],
+    cameraApproachPath: [],
+    ballSection: null,
   }
 }
 
@@ -165,9 +176,18 @@ function createLongCourse(flagId: DominoFlagId): DominoCourse {
   if (!lineZero) throw new Error('通常コースにline-0がありません')
 
   const approach = createApproachPlacements(lineZero)
-  const approachCount = approach.placements.length
+  const ballSection = createDominoBallSection(approach.path)
+  const ballFreeApproachPlacements = withoutBallSectionApproachPlacements(
+    approach.placements,
+    ballSection,
+  )
+  const approachCount = ballFreeApproachPlacements.length
   const placements = [
-    ...approach.placements,
+    ...ballFreeApproachPlacements.map((placement, chainIndex) => ({
+      ...placement,
+      // ボールを挟んでもshepherdが存在しない連番を待たないよう、物理ドミノは連番にする。
+      chainIndex,
+    })),
     ...flagCoursePlacements.map((placement) => ({
       ...placement,
       chainIndex: placement.chainIndex + approachCount,
@@ -183,8 +203,15 @@ function createLongCourse(flagId: DominoFlagId): DominoCourse {
     // 道中を含めないことで、通常コースの国旗画面の構図をそのまま保つ。
     flagCameraBounds: getLayoutBounds(flagCoursePlacements),
     approachCount,
-    cameraProgressCount: approachCount + LINE_COUNT,
-    approachPath: approach.path,
+    // 取り除いた15枚の位置をカメラ専用レールとして残し、球が転がる坂全体を滑らかに見せる。
+    cameraProgressCount: approach.path.length + LINE_COUNT,
+    approachPath: ballFreeApproachPlacements.map((placement) => ({
+      x: placement.x,
+      z: placement.z,
+      yaw: placement.yaw ?? 0,
+    })),
+    cameraApproachPath: approach.path,
+    ballSection,
   }
 }
 

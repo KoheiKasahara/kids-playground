@@ -32,7 +32,7 @@ function createRail(aspect: number, reducedMotion = false) {
     flagSetup,
     wideCamera,
     rail: buildLongCameraRail(
-      course.approachPath,
+      course.cameraApproachPath,
       {
         target: flagSetup.target,
         distance: cameraDistanceOf(flagSetup),
@@ -84,6 +84,12 @@ function groundPointForNdc(
 
 function worstFrameNdc(aspect: number, reducedMotion: boolean, lag: number) {
   const { course, rail } = createRail(aspect, reducedMotion)
+  const cameraProgressPoints = [
+    ...course.cameraApproachPath.map((point) => ({ x: point.x, z: point.z })),
+    ...course.placements
+      .slice(course.approachCount, course.approachCount + 12)
+      .map((placement) => ({ x: placement.x, z: placement.z })),
+  ]
   let worst = {
     value: 0,
     index: 0,
@@ -93,7 +99,7 @@ function worstFrameNdc(aspect: number, reducedMotion: boolean, lag: number) {
   for (let index = 0; index < course.cameraProgressCount; index += 1) {
     const progress = Math.max(0, index - lag) / course.cameraProgressCount
     const pose = sampleCameraRail(rail, progress)
-    const placement = course.placements[index]!
+    const placement = cameraProgressPoints[index]!
     const ndc = projectWorldPoint(aspect, pose, {
       x: placement.x,
       y: 0.5,
@@ -119,7 +125,7 @@ describe('dominoCameraRail', () => {
     expect(position.x).toBeCloseTo(flagSetup.position.x, 10)
     expect(position.y).toBeCloseTo(flagSetup.position.y, 10)
     expect(position.z).toBeCloseTo(flagSetup.position.z, 10)
-    expect(course.approachPath.length).toBeGreaterThan(0)
+    expect(course.cameraApproachPath.length).toBeGreaterThan(0)
   })
 
   it('アンカー間を線形補間し、範囲外を端で丸める', () => {
@@ -145,12 +151,12 @@ describe('dominoCameraRail', () => {
 
   it('道中の密なアンカーと終盤からの引きを作る', () => {
     const { course, flagSetup, rail } = createRail(1.8)
-    const blendStart = course.approachCount - CAMERA_BLEND_APPROACH_COUNT
+    const blendStart = course.cameraApproachPath.length - CAMERA_BLEND_APPROACH_COUNT
     const transitionCount = course.cameraProgressCount - blendStart
 
     expect(rail).toHaveLength(course.cameraProgressCount + 1)
     expect(rail.slice(0, blendStart).map((anchor) => anchor.progress)).toEqual(
-      course.approachPath
+      course.cameraApproachPath
         .slice(0, blendStart)
         .map((_, index) => index / course.cameraProgressCount),
     )
@@ -377,7 +383,7 @@ describe('dominoCameraRail', () => {
       const wideCamera = wideCameraPoseFor(getLayoutBounds(course.placements), aspect)
       for (const reducedMotion of [false, true]) {
         const rail = buildLongCameraRail(
-          course.approachPath,
+          course.cameraApproachPath,
           {
             target: flagSetup.target,
             distance: cameraDistanceOf(flagSetup),
