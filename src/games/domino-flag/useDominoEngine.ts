@@ -46,6 +46,7 @@ import {
   BALL_RAIL_WIDTH,
   ballRailProgress,
   getBallRailPieces,
+  getBallStairSteps,
 } from './dominoBall'
 import {
   createShepherdMemory,
@@ -624,6 +625,17 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
               railMeshes.push(wall)
               scene.add(wall)
             }
+          }
+
+          // スタート台が地面から浮いて見えないよう、前段ドミノ側に表示専用の階段を並べる。
+          for (const step of getBallStairSteps(course.ballSection)) {
+            const stepGeometry = new THREE.BoxGeometry(step.width, step.height, step.depth)
+            railGeometries.push(stepGeometry)
+            const stepMesh = new THREE.Mesh(stepGeometry, railFloorMaterial)
+            stepMesh.position.set(step.center.x, step.center.y, step.center.z)
+            stepMesh.rotation.y = step.yaw
+            railMeshes.push(stepMesh)
+            scene.add(stepMesh)
           }
         }
 
