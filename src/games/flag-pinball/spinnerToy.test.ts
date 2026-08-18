@@ -180,7 +180,11 @@ describe('spinnerToy の固定ステップ物理', () => {
     const ball = harness.balls[0]
     if (!ball) throw new Error('spinner test: ball is missing')
 
-    // 未発動時のpassive回転を一度だけ消化し、羽根が完全停止した状態を作る。
+    // 停滞（SPINNER_STALL_SPEED_THRESHOLD未満）とみなされない速さを保ったまま置いておく。
+    // 止まりかけたボールは触れ続けている間ずっとpassive回転を再発火させる仕様になった
+    // ため、停滞速度で置くと減衰が進まず「羽根が完全停止」を作れない。
+    Body.setVelocity(ball.body, { x: 1, y: 0 })
+    // 最初の接触ぶんのpassive回転を消化し、羽根が完全停止した状態を作る。
     harness.runtime.update(0, harness.balls)
     harness.runtime.update(1000, harness.balls)
     const initialSpeed = 18

@@ -157,14 +157,17 @@ export function createSpinnerToy(placement: ToyPlacement): ToyRuntime {
         if (distance > influenceRadius) continue
 
         currentInsideBallIndices.add(ball.ballIndex)
-        if (!isActive && !insideBallIndices.has(ball.ballIndex)) {
-          const passiveIsActive = passiveUntil !== null && now < passiveUntil
-          if (!passiveIsActive) passiveStartedAt = now
-          passiveUntil = Math.max(passiveUntil ?? -Infinity, now + PASSIVE_SPIN_DURATION_MS)
-          passiveRotationVelocity = Math.max(
-            passiveRotationVelocity,
-            PASSIVE_SPIN_MAX_ANGULAR_VELOCITY,
-          )
+        // 新しく触れた瞬間だけでなく、止まりかけたボールが乗ったままでも毎フレーム
+        // 発火させる。そうしないと「乗ったまま静止」を一度も抜け出せず、羽根が
+        // 完全に止まったまま止まったボールを支え続けてしまう（1.2倍化で発覚した罠）。
+        // 触れ続けている間はpassiveStartedAtを毎回nowへ揃えるため減衰が進まず、
+        // 離れた瞬間から通常どおりPASSIVE_SPIN_DURATION_MSぶん減衰する。
+        const isNewContact = !insideBallIndices.has(ball.ballIndex)
+        const isStalledContact = speedOf(ball.body) < SPINNER_STALL_SPEED_THRESHOLD
+        if (!isActive && (isNewContact || isStalledContact)) {
+          passiveStartedAt = now
+          passiveUntil = now + PASSIVE_SPIN_DURATION_MS
+          passiveRotationVelocity = PASSIVE_SPIN_MAX_ANGULAR_VELOCITY
         }
       }
       insideBallIndices.clear()
