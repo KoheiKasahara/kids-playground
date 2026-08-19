@@ -1,4 +1,4 @@
-export type ToyKind = 'spinner' | 'launcher' | 'jumppad' | 'seesaw'
+export type ToyKind = 'spinner' | 'launcher' | 'jumppad' | 'seesaw' | 'hammer'
 
 /**
  * launcher（押し出しおもちゃ）を「潮流」寄りに振る舞わせるための任意設定。

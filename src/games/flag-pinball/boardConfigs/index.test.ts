@@ -24,10 +24,6 @@ describe('BOARD_CONFIGS', () => {
     expect(() => getBoardConfig('unknown-theme' as PinballThemeId)).toThrow()
   })
 
-  it('Phase C時点でもおかしは通常盤面と同じ内容の配置を持つ（宇宙・海のみ専用盤面に変更済み）', () => {
-    expect(candyBoard).toEqual(normalBoard)
-  })
-
   it('宇宙は専用盤面になっており、通常盤面とは異なる配置を持つ', () => {
     expect(spaceBoard).not.toEqual(normalBoard)
     expect(spaceBoard.obstacles).not.toEqual(normalBoard.obstacles)
@@ -40,6 +36,13 @@ describe('BOARD_CONFIGS', () => {
     expect(oceanBoard.obstacles).not.toEqual(normalBoard.obstacles)
     expect(oceanBoard.walls).not.toEqual(normalBoard.walls)
     expect(oceanBoard.toys).not.toEqual(normalBoard.toys)
+  })
+
+  it('Phase Dでおかしも専用盤面になっており、通常盤面とは異なる配置を持つ', () => {
+    expect(candyBoard).not.toEqual(normalBoard)
+    expect(candyBoard.obstacles).not.toEqual(normalBoard.obstacles)
+    expect(candyBoard.walls).not.toEqual(normalBoard.walls)
+    expect(candyBoard.toys).not.toEqual(normalBoard.toys)
   })
 
   it('テーマ設定同士は内容が同じでも同一のmutableオブジェクトを共有していない', () => {

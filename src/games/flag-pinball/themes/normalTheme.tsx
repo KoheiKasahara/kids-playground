@@ -39,6 +39,17 @@ function renderNormalToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'hammer') {
+    // Phase D時点ではノーマルの盤面にハンマーは置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、簡素な棒＋ヘッドにしておく。
+    return (
+      <span className={styles.normalHammerMark}>
+        <span className={styles.normalHammerHandle} />
+        <span className={styles.normalHammerHead} />
+      </span>
+    )
+  }
+
   return (
     <span className={styles.normalLauncherMark}>
       <span className={styles.normalLauncherBase} />

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { DEFAULT_PINBALL_THEME_ID, PINBALL_THEMES, resolvePinballTheme } from './index'
 import type { PinballThemeId } from './types'
 
-const toyKinds = ['spinner', 'launcher', 'jumppad', 'seesaw'] as const
+const toyKinds = ['spinner', 'launcher', 'jumppad', 'seesaw', 'hammer'] as const
 const expectedDefinitionKeys = [
   'boardClassName',
   'emoji',
