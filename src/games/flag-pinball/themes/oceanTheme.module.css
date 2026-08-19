@@ -374,6 +374,82 @@
   }
 }
 
+.oceanSeesawMark {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.oceanSeesawPivot,
+.oceanSeesawPlank,
+.oceanSeesawPlankEnd {
+  position: absolute;
+  pointer-events: none;
+}
+
+/*
+ * 支点の岩。物理的な支点は動かないため、親（.toyVisual）に掛かる板の傾き(--toy-spin)を
+ * 打ち消す向きへ逆回転させ、板がどれだけ傾いても岩だけは常に水平のまま見えるようにする。
+ */
+.oceanSeesawPivot {
+  left: 50%;
+  bottom: 40%;
+  width: 24%;
+  height: 32%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 32% 32% 46% 46%;
+  background: linear-gradient(160deg, #8a9a93 0%, #5c6d68 62%, #3f4d49 100%);
+  box-shadow: inset 0 -2px 0 rgba(20, 35, 32, 0.32), 0 2px 3px rgba(20, 40, 40, 0.3);
+  transform: translateX(-50%) rotate(calc(-1 * var(--toy-spin)));
+  transform-origin: 50% 100%;
+  z-index: 1;
+}
+
+/* 板本体。木目を帯状のグラデーションで表現し、両端に浮き輪のような留め具を付ける。 */
+.oceanSeesawPlank {
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 15%;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-radius: 40%;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 5%, transparent 5% 11%),
+    linear-gradient(180deg, #dfab6e 0%, #bd8047 55%, #8f5a2f 100%);
+  box-shadow: inset 0 -2px 0 rgba(80, 45, 20, 0.35), 0 1px 3px rgba(20, 40, 40, 0.3);
+  transform: translate(-50%, -50%);
+  transition: box-shadow 120ms ease;
+  z-index: 2;
+}
+
+.oceanSeesawPlankEnd {
+  top: 50%;
+  width: 15%;
+  height: 220%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffdca0, #d99a52 62%, #8f5a2f 100%);
+  transform: translateY(-50%);
+}
+
+.oceanSeesawPlankEndLeft {
+  left: -3%;
+}
+
+.oceanSeesawPlankEndRight {
+  right: -3%;
+}
+
+/* ボールが乗って作動中は、板の縁をうっすら光らせて「動いている」ことを強調する。 */
+.oceanToy[data-toy-kind='seesaw'][data-toy-active='true'] .oceanSeesawPlank {
+  box-shadow:
+    inset 0 -2px 0 rgba(80, 45, 20, 0.35),
+    0 0 0 2px rgba(255, 220, 132, 0.32),
+    0 0 0 4px rgba(255, 220, 132, 0.12),
+    0 1px 6px rgba(86, 214, 219, 0.5);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .oceanSpinnerMark {
     will-change: auto;

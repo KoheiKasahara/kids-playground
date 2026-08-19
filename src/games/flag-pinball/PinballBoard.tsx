@@ -23,6 +23,7 @@ import {
   playPinballLauncherSound,
   playPinballLaunchSound,
   playPinballScoreSound,
+  playPinballSeesawSound,
   playPinballSpinnerSound,
 } from '../../utils/quizSound'
 import styles from './PinballBoard.module.css'
@@ -247,6 +248,8 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
                   playPinballSpinnerSound()
                 } else if (toy.kind === 'jumppad') {
                   playPinballJumppadSound()
+                } else if (toy.kind === 'seesaw') {
+                  playPinballSeesawSound()
                 } else {
                   playPinballLauncherSound()
                 }

@@ -28,6 +28,17 @@ function renderNormalToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'seesaw') {
+    // Phase C時点ではノーマルの盤面にシーソーは置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、簡素な板にしておく。
+    return (
+      <span className={styles.normalSeesawMark}>
+        <span className={styles.normalSeesawPivot} />
+        <span className={styles.normalSeesawPlank} />
+      </span>
+    )
+  }
+
   return (
     <span className={styles.normalLauncherMark}>
       <span className={styles.normalLauncherBase} />

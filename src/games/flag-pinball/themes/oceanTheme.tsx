@@ -29,6 +29,21 @@ function renderOceanToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'seesaw') {
+    // 海テーマ専用のシーソーtoy。木の板が岩（支点）の上で傾く「浮き橋」のイメージ。
+    // 支点の岩だけは板の傾き(--toy-spin)を打ち消す向きに回転させ、常に水平を保つ
+    // （実際の物理的な支点は動かないため、見た目もそれに合わせる）。
+    return (
+      <span className={styles.oceanSeesawMark}>
+        <span className={styles.oceanSeesawPivot} />
+        <span className={styles.oceanSeesawPlank}>
+          <span className={`${styles.oceanSeesawPlankEnd} ${styles.oceanSeesawPlankEndLeft}`} />
+          <span className={`${styles.oceanSeesawPlankEnd} ${styles.oceanSeesawPlankEndRight}`} />
+        </span>
+      </span>
+    )
+  }
+
   return (
     <span className={styles.oceanLauncherMark}>
       <span className={styles.oceanWhaleSpout}>

@@ -32,6 +32,12 @@ const RANDOM_HORIZONTAL_MIN_SPEED = 0.8
 /** 横成分をこの値以下にし、斜め上への補助が盤外へ飛ばす力にならないようにする。 */
 const RANDOM_HORIZONTAL_MAX_SPEED = 1.8
 /**
+ * placement.launcherTide が設定されているときに、指定した向き(biasDirection)へ
+ * 実際に押し出す確率。100%固定にすると「決まったルートへ強制する」ことになってしまうため、
+ * 一定確率で逆向きにも散らし、「潮に乗る／外れる」の両方が起こる余地を残す。
+ */
+const TIDE_BIAS_PROBABILITY = 0.75
+/**
  * 上向き11.5と横最大4の合成速度約12.2が通常運用で頭打ちにならず、全体上限24px/stepの半分強に留める安全弁にする。
  */
 const LAUNCH_SPEED_CAP = Math.min(MAX_SPEED * 0.55, 13)
@@ -61,22 +67,40 @@ function setLaunchVelocity(body: Matter.Body, placement: ToyPlacement): boolean 
   const isAlreadyRising = body.velocity.y <= -LAUNCH_UP_SPEED
   if (!isWithinInfluenceRange || !isLowEnough || isAlreadyRising) return false
 
+  // 海テーマなど launcherTide が設定された配置だけ、上向き主体から横向き主体（潮流）へ
+  // 倍率で振る舞いを変える。未指定なら両方とも1のままで、既存の挙動から一切変わらない。
+  const tide = placement.launcherTide
+  const upSpeedScale = tide?.upSpeedScale ?? 1
+  const horizontalSpeedScale = tide?.horizontalSpeedScale ?? 1
+  const maxHorizontalSpeed = MAX_HORIZONTAL_SPEED * horizontalSpeedScale
+
   // 既存の横速度は少しだけ残し、そこへ左右ランダムの小さな散らしを足す。
   const dampedHorizontalVelocity = clamp(
     body.velocity.x * 0.25,
-    -MAX_HORIZONTAL_SPEED,
-    MAX_HORIZONTAL_SPEED,
+    -maxHorizontalSpeed,
+    maxHorizontalSpeed,
   )
-  const randomHorizontalDirection = Math.random() < 0.5 ? -1 : 1
+  // tideが未指定なら従来どおり完全ランダムな向き。指定されていれば、その向きへ
+  // TIDE_BIAS_PROBABILITY の確率で偏らせつつ、残りの確率では逆向きにも散らす
+  // （「潮に乗る」「潮を外れる」の両方が起こる余地を残すため、100%固定にはしない）。
+  const randomHorizontalDirection =
+    tide === undefined
+      ? Math.random() < 0.5
+        ? -1
+        : 1
+      : Math.random() < TIDE_BIAS_PROBABILITY
+        ? tide.biasDirection
+        : -tide.biasDirection
   const randomHorizontalSpeed =
-    RANDOM_HORIZONTAL_MIN_SPEED +
-    Math.random() * (RANDOM_HORIZONTAL_MAX_SPEED - RANDOM_HORIZONTAL_MIN_SPEED)
+    (RANDOM_HORIZONTAL_MIN_SPEED +
+      Math.random() * (RANDOM_HORIZONTAL_MAX_SPEED - RANDOM_HORIZONTAL_MIN_SPEED)) *
+    horizontalSpeedScale
   const horizontalVelocity = clamp(
     dampedHorizontalVelocity + randomHorizontalDirection * randomHorizontalSpeed,
-    -MAX_HORIZONTAL_SPEED,
-    MAX_HORIZONTAL_SPEED,
+    -maxHorizontalSpeed,
+    maxHorizontalSpeed,
   )
-  const verticalVelocity = -LAUNCH_UP_SPEED
+  const verticalVelocity = -LAUNCH_UP_SPEED * upSpeedScale
   const rawSpeed = Math.hypot(horizontalVelocity, verticalVelocity)
   const speedScale = rawSpeed > LAUNCH_SPEED_CAP ? LAUNCH_SPEED_CAP / rawSpeed : 1
 
