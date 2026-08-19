@@ -1,6 +1,7 @@
 import { candyTheme } from './candyTheme'
 import { normalTheme } from './normalTheme'
 import { oceanTheme } from './oceanTheme'
+import { skyTheme } from './skyTheme'
 import { spaceTheme } from './spaceTheme'
 import type { PinballThemeDefinition, PinballThemeId } from './types'
 
@@ -9,6 +10,7 @@ export const PINBALL_THEMES: readonly PinballThemeDefinition[] = [
   spaceTheme,
   oceanTheme,
   candyTheme,
+  skyTheme,
 ]
 
 export const DEFAULT_PINBALL_THEME_ID: PinballThemeId = 'normal'

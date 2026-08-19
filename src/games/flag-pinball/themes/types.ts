@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { ToyKind } from '../toyLayout'
 
-export type PinballThemeId = 'normal' | 'space' | 'ocean' | 'candy'
+export type PinballThemeId = 'normal' | 'space' | 'ocean' | 'candy' | 'sky'
 
 export type PinballThemeDefinition = {
   readonly id: PinballThemeId

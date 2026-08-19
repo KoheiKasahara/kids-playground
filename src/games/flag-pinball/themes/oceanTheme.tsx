@@ -44,6 +44,18 @@ function renderOceanToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'wind') {
+    // Phase E時点では海の盤面に風toyは置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、簡素な矢印3本にしておく。
+    return (
+      <span className={styles.oceanWindMark}>
+        <span className={styles.oceanWindArrow} />
+        <span className={styles.oceanWindArrow} />
+        <span className={styles.oceanWindArrow} />
+      </span>
+    )
+  }
+
   if (kind === 'hammer') {
     // Phase D時点では海の盤面にハンマーは置かれないが、テーマ定義としては
     // 全おもちゃ種別の見た目を返す必要があるため、簡素な棒＋ヘッドにしておく。

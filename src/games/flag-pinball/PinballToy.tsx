@@ -35,6 +35,7 @@ export default function PinballToy({ toy, theme, registerToy, onActivate }: Pinb
         ref={registerToy(toy.id)}
         className={`${styles.toyVisual} ${theme.toyClassName}`}
         data-toy-kind={toy.kind}
+        data-toy-id={toy.id}
         aria-hidden="true"
         style={{ width: toy.radius * 2, height: toy.radius * 2 }}
       >
