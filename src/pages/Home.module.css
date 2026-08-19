@@ -50,6 +50,8 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
+  color: inherit;
+  text-decoration: none;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 

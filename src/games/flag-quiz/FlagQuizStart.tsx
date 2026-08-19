@@ -6,7 +6,7 @@ export default function FlagQuizStart() {
   const navigate = useNavigate()
 
   return (
-    <div className={styles.page}>
+    <main className={styles.page}>
       <h1 className={styles.title}>こっきクイズ</h1>
       <p className={styles.description}>ぜんぶで 10もん あるよ</p>
       <div className={styles.actions}>
@@ -23,6 +23,6 @@ export default function FlagQuizStart() {
           もどる
         </BigButton>
       </div>
-    </div>
+    </main>
   )
 }

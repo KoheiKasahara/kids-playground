@@ -113,7 +113,7 @@ describe('FlagPinball 選択画面', () => {
   test('ホームの「こっきピンボール」から選択画面へ行ける', async () => {
     const user = userEvent.setup()
     renderApp('/')
-    await user.click(screen.getByRole('button', { name: 'こっきピンボール' }))
+    await user.click(screen.getByRole('link', { name: 'こっきピンボール' }))
     expect(await screen.findByRole('heading', { name: 'こっきピンボール' })).toBeInTheDocument()
     expect(screen.getByText('ボールを 3こ えらんでね！')).toBeInTheDocument()
   })

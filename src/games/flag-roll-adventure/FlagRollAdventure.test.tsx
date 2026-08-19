@@ -82,7 +82,7 @@ describe('FlagRollAdventure 選択画面', () => {
   test('ホームの「こっきコロコロぼうけん」から選択画面へ行ける', async () => {
     const user = userEvent.setup()
     renderApp('/')
-    await user.click(screen.getByRole('button', { name: 'こっきコロコロぼうけん' }))
+    await user.click(screen.getByRole('link', { name: 'こっきコロコロぼうけん' }))
     expect(await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })).toBeInTheDocument()
     expect(screen.getByText('こっきを 1こ えらんでね！')).toBeInTheDocument()
   })
