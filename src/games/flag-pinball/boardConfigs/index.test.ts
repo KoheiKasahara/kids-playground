@@ -1,0 +1,71 @@
+import { describe, expect, it } from 'vitest'
+import type { PinballThemeId } from '../themes/types'
+import { BOARD_CONFIGS, candyBoard, getBoardConfig, normalBoard, oceanBoard, spaceBoard } from './index'
+
+const THEME_IDS: readonly PinballThemeId[] = ['normal', 'space', 'ocean', 'candy']
+
+describe('BOARD_CONFIGS', () => {
+  it('4テーマすべてに盤面設定が存在する', () => {
+    for (const themeId of THEME_IDS) {
+      expect(BOARD_CONFIGS[themeId]).toBeDefined()
+    }
+    expect(Object.keys(BOARD_CONFIGS).sort()).toEqual([...THEME_IDS].sort())
+  })
+
+  it('getBoardConfig はテーマIDから対応する盤面設定を取得できる', () => {
+    expect(getBoardConfig('normal')).toBe(normalBoard)
+    expect(getBoardConfig('space')).toBe(spaceBoard)
+    expect(getBoardConfig('ocean')).toBe(oceanBoard)
+    expect(getBoardConfig('candy')).toBe(candyBoard)
+  })
+
+  it('不明なテーマIDを渡すと既定盤面へ握りつぶさずthrowする', () => {
+    // PinballThemeId の範囲外の値が紛れ込んだ場合（呼び出し側の不具合）を想定した検査
+    expect(() => getBoardConfig('unknown-theme' as PinballThemeId)).toThrow()
+  })
+
+  it('Phase A時点では宇宙・海・おかしは通常盤面と同じ内容の配置を持つ', () => {
+    for (const config of [spaceBoard, oceanBoard, candyBoard]) {
+      expect(config).toEqual(normalBoard)
+    }
+  })
+
+  it('テーマ設定同士は内容が同じでも同一のmutableオブジェクトを共有していない', () => {
+    const configs = [normalBoard, spaceBoard, oceanBoard, candyBoard]
+    for (let i = 0; i < configs.length; i += 1) {
+      for (let j = i + 1; j < configs.length; j += 1) {
+        expect(configs[i]).not.toBe(configs[j])
+        expect(configs[i].obstacles).not.toBe(configs[j].obstacles)
+        expect(configs[i].walls).not.toBe(configs[j].walls)
+        expect(configs[i].toys).not.toBe(configs[j].toys)
+        expect(configs[i].launch).not.toBe(configs[j].launch)
+      }
+    }
+  })
+
+  it('一方のテーマの配列を書き換えても、他テーマの配置には影響しない', () => {
+    const spaceToysBefore = spaceBoard.toys.length
+    const oceanToysBefore = oceanBoard.toys.length
+    const normalToysBefore = normalBoard.toys.length
+
+    // space.toys.push(...) のような事故を模した破壊的変更。
+    // spaceBoard.toys は readonly 型だが、実行時の配列参照が独立していることを
+    // 確認するため、あえて型を迂回して push する。
+    ;(spaceBoard.toys as unknown as unknown[]).push({
+      id: 'test-injected-toy',
+      kind: 'spinner',
+      x: 0,
+      y: 0,
+      radius: 1,
+      tapRadius: 1,
+      labelJa: 'test',
+    })
+
+    expect(spaceBoard.toys.length).toBe(spaceToysBefore + 1)
+    expect(oceanBoard.toys.length).toBe(oceanToysBefore)
+    expect(normalBoard.toys.length).toBe(normalToysBefore)
+
+    // テスト後始末: 他のテストへ影響しないよう注入した要素を取り除く
+    ;(spaceBoard.toys as unknown as unknown[]).pop()
+  })
+})

@@ -5,6 +5,10 @@ import type { PinballMode } from './types'
  * 実機の画面サイズは知らず、拡縮は表示側（CSS transform）の責務にする。
  * こうすることで、物理パラメータ（反発係数・初速など）をこの1つの座標系だけで
  * 一度調整すれば、どの端末でも同じ挙動になる。
+ *
+ * このファイルには「全テーマ共通」の盤面情報だけを置く。
+ * ピン・バンパー・壁・おもちゃなど、テーマごとに変わりうる配置データは
+ * boardConfigs/ 以下（テーマ別のBoardConfig）へ分離してある。
  */
 export const BOARD_WIDTH = 480
 export const BOARD_HEIGHT = 1000
@@ -49,7 +53,17 @@ export type ScoreZone = {
   readonly width: number
 }
 
+/** 隅ですり抜けさせるボールの逃がし先。真下・外壁から離れる向きへ寄せる。 */
+export type CornerEscapeZone = {
+  readonly x: number
+  readonly y: number
+  readonly radius: number
+  readonly toX: number
+  readonly toY: number
+}
+
 // --- 得点ゾーン -----------------------------------------------------------
+// ゴール判定はテーマに関わらず共通（盤面幅から等分するだけ）。
 
 /** 得点ゾーンの数。盤面幅を等分する基準になる */
 const ZONE_COUNT = 5
@@ -62,6 +76,8 @@ const ZONE_SCORES: readonly number[] = [100, 300, 1000, 300, 100]
 export const ZONE_TOP = 875
 /** ゾーンを仕切る壁の厚み */
 export const ZONE_DIVIDER_WIDTH = 8
+/** 壁の反発係数の既定値。ゾーン仕切りなど、テーマに依存しない共通壁で使う。 */
+const WALL_RESTITUTION = 0.65
 
 export const SCORE_ZONES: readonly ScoreZone[] = ZONE_SCORES.map((score, index) => ({
   id: `zone-${index}`,
@@ -82,130 +98,11 @@ export function zoneAtX(x: number): ScoreZone {
   return SCORE_ZONES[clampedIndex]
 }
 
-// --- 障害物（バンパー・ピン） -----------------------------------------------
-
-const BUMPER_RADIUS = 28
-const BUMPER_RESTITUTION = 0.98
-const PEG_RADIUS = 8
-const PEG_RESTITUTION = 0.9
-
 /**
- * バンパー3個・ピン31個の合計34個。ピンは7段の千鳥配置にして、上から下まで
- * ボールが左右へ散る機会を作る。下側のピン段はバンパーと同じyに重ねず、
- * 障害物が横一列の壁になることを避けている。
- * 障害物同士は中心距離が「半径の和 + ボール直径 + 16px」以上離れており、
- * ボールが詰まらず素直に通り抜けられる余裕を確保している。
- */
-export const OBSTACLES: readonly CircleObstacle[] = [
-  { id: 'bumper-center', kind: 'bumper', x: BOARD_WIDTH / 2, y: 385, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
-  { id: 'bumper-left', kind: 'bumper', x: 90, y: 655, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
-  { id: 'bumper-right', kind: 'bumper', x: 390, y: 655, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
-
-  // 1段目。隣の段とxを半ピッチずらす千鳥配置の基準になる。
-  { id: 'peg-row-1-1', kind: 'peg', x: 70, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-1-2', kind: 'peg', x: 155, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-1-3', kind: 'peg', x: 240, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-1-4', kind: 'peg', x: 325, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-1-5', kind: 'peg', x: 410, y: 130, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-
-  { id: 'peg-row-2-1', kind: 'peg', x: 112.5, y: 210, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-2-2', kind: 'peg', x: 197.5, y: 210, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-2-3', kind: 'peg', x: 282.5, y: 210, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-2-4', kind: 'peg', x: 367.5, y: 210, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-
-  { id: 'peg-row-3-1', kind: 'peg', x: 70, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-3-2', kind: 'peg', x: 155, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-3-3', kind: 'peg', x: 240, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-3-4', kind: 'peg', x: 325, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-3-5', kind: 'peg', x: 410, y: 280, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-
-  // 3段目と4段目の間は広めに取り、中央バンパーがピンの壁を作らないようにする。
-  { id: 'peg-row-4-1', kind: 'peg', x: 112.5, y: 480, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-4-2', kind: 'peg', x: 197.5, y: 480, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-4-3', kind: 'peg', x: 282.5, y: 480, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-4-4', kind: 'peg', x: 367.5, y: 480, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-
-  { id: 'peg-row-5-1', kind: 'peg', x: 70, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-5-2', kind: 'peg', x: 155, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-5-3', kind: 'peg', x: 240, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-5-4', kind: 'peg', x: 325, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-5-5', kind: 'peg', x: 410, y: 555, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-
-  { id: 'peg-row-7-1', kind: 'peg', x: 155, y: 735, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-7-2', kind: 'peg', x: 240, y: 735, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-7-3', kind: 'peg', x: 325, y: 735, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-
-  { id: 'peg-row-8-1', kind: 'peg', x: 70, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-8-2', kind: 'peg', x: 155, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-8-3', kind: 'peg', x: 240, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-8-4', kind: 'peg', x: 325, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-row-8-5', kind: 'peg', x: 410, y: 820, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
-]
-
-// --- 壁 --------------------------------------------------------------------
-
-/** 外壁の厚み。板の外側に半分はみ出させて配置し、高速なボールがすり抜けないようにする */
-const WALL_THICKNESS = 30
-/** 射出口から盤面へ導く上部の斜め壁の厚み・長さ */
-const GUIDE_WALL_THICKNESS = 16
-const GUIDE_WALL_LENGTH = 180
-/** 上部斜め壁の傾き（ラジアン）。左右対称に内向きへ倒す */
-const GUIDE_WALL_ANGLE = 0.45
-const WALL_RESTITUTION = 0.65
-
-export const WALLS: readonly WallSegment[] = [
-  // 左右の外壁: 中心を盤面の端(x=0 / x=BOARD_WIDTH)に置き、厚みの半分を外側にはみ出させる
-  { id: 'wall-left', x: 0, y: BOARD_HEIGHT / 2, width: WALL_THICKNESS, height: BOARD_HEIGHT, angle: 0, restitution: WALL_RESTITUTION },
-  { id: 'wall-right', x: BOARD_WIDTH, y: BOARD_HEIGHT / 2, width: WALL_THICKNESS, height: BOARD_HEIGHT, angle: 0, restitution: WALL_RESTITUTION },
-  // 上壁も同様に、中心を y=0 に置いて半分を外側にはみ出させる
-  { id: 'wall-top', x: BOARD_WIDTH / 2, y: 0, width: BOARD_WIDTH, height: WALL_THICKNESS, angle: 0, restitution: WALL_RESTITUTION },
-  // 射出口(LAUNCH)から出たボールを盤面中央側へ導く斜め壁。左右対称に内向きへ倒す
-  { id: 'wall-guide-left', x: 110, y: 105, width: GUIDE_WALL_LENGTH, height: GUIDE_WALL_THICKNESS, angle: -GUIDE_WALL_ANGLE, restitution: WALL_RESTITUTION },
-  { id: 'wall-guide-right', x: BOARD_WIDTH - 110, y: 105, width: GUIDE_WALL_LENGTH, height: GUIDE_WALL_THICKNESS, angle: GUIDE_WALL_ANGLE, restitution: WALL_RESTITUTION },
-  // 盤面の底。得点ゾーンで止まるための床がないとボールが盤外へ落ち続けてしまう。
-  // 左右・上壁と同じく中心を盤面の端(y=BOARD_HEIGHT)に置き、厚みの半分を外側にはみ出させる
-  { id: 'wall-bottom', x: BOARD_WIDTH / 2, y: BOARD_HEIGHT, width: BOARD_WIDTH, height: WALL_THICKNESS, angle: 0, restitution: WALL_RESTITUTION },
-]
-
-/** 隅ですり抜けさせるボールの逃がし先。真下・外壁から離れる向きへ寄せる。 */
-export type CornerEscapeZone = {
-  readonly x: number
-  readonly y: number
-  readonly radius: number
-  readonly toX: number
-  readonly toY: number
-}
-
-/**
- * wall-guide-left/right（斜め壁）とwall-left/wall-right（外壁）が挟む隅。
- * 2直線が浅い角度で交わるため、半径24pxのボールがちょうど両方の面に同時接触できる
- * 一点（外壁側と斜め壁側から受ける力が打ち消し合い、静止摩擦なしでも動けなくなる点）
- * が幾何学的に必ず存在する。壁の形状を変えて塞ごうとすると、新しく増やした面がまた
- * 別の一点で既存の面と交わってしまい、隙間そのものをなくすことができなかった
- * （角度・厚み・丸ピン・継ぎ足し壁など複数のアプローチを多数の初期位置・速度で検証済み）。
- * 実測でこの一点は座標(38.8, 104)付近（左右対称にBOARD_WIDTH-38.8, 104）に必ず収束する
- * ため、壁の見た目は変えず、この一点だけ「すり抜け」させて盤面中央側へ逃がす。
- * usePinballEngine.ts と pinballSimulation.ts の停滞ナッジ処理から参照する。
- */
-export const CORNER_ESCAPE_ZONES: readonly CornerEscapeZone[] = [
-  { x: 38.8, y: 104, radius: 14, toX: 55, toY: 170 },
-  { x: BOARD_WIDTH - 38.8, y: 104, radius: 14, toX: BOARD_WIDTH - 55, toY: 170 },
-]
-
-/** (x,y) がCORNER_ESCAPE_ZONESのいずれかに入っていれば、そのゾーンを返す。 */
-export function findCornerEscapeZone(x: number, y: number): CornerEscapeZone | null {
-  for (const zone of CORNER_ESCAPE_ZONES) {
-    if (Math.hypot(x - zone.x, y - zone.y) <= zone.radius) return zone
-  }
-  return null
-}
-
-// --- 得点ゾーンの仕切り ------------------------------------------------------
-
-/**
- * 得点ゾーンどうしを仕切る壁。SCORE_ZONES の境界（内側の4本。両端の外壁は wall-left/right が兼ねる）
- * から導出し、ゾーンの得点や幅をここに書き写さない。
+ * 得点ゾーンどうしを仕切る壁。SCORE_ZONES の境界（内側の4本。両端の外壁はテーマ別の
+ * 外壁が兼ねる）から導出し、ゾーンの得点や幅をここに書き写さない。
  * ZONE_TOP から盤面下端までの高さを持ち、ボールが誤って隣のゾーンへ転がり込むのを防ぐ。
+ * ゴール判定と同じく盤面幅から機械的に決まるので、全テーマ共通のまま持つ。
  */
 export const ZONE_DIVIDERS: readonly WallSegment[] = SCORE_ZONES.slice(1).map((zone, index) => ({
   id: `zone-divider-${index}`,
@@ -217,21 +114,27 @@ export const ZONE_DIVIDERS: readonly WallSegment[] = SCORE_ZONES.slice(1).map((z
   restitution: WALL_RESTITUTION,
 }))
 
-// --- 射出パラメータ ----------------------------------------------------------
-
 /**
- * 射出パラメータ。毎回同じ軌道にならないよう位置と初速に揺らぎを持たせる。
- * y は上壁（厚みぶん盤面内側は約 WALL_THICKNESS/2）より十分下に置く。
+ * (x,y) がテーマの CornerEscapeZone のいずれかに入っていれば、そのゾーンを返す。
+ * どの隅がすり抜け対象になるかは壁の配置（テーマ別のBoardConfig）に依存するため、
+ * 対象ゾーンの一覧を引数で受け取る。usePinballEngine.ts と pinballSimulation.ts の
+ * 停滞ナッジ処理から参照する。
  */
-export const LAUNCH = {
-  x: BOARD_WIDTH / 2,
-  y: 70,
-  jitterX: 30,
-  minVx: -5,
-  maxVx: 5,
-  minVy: 6,
-  maxVy: 10,
+export function findCornerEscapeZone(
+  zones: readonly CornerEscapeZone[],
+  x: number,
+  y: number,
+): CornerEscapeZone | null {
+  for (const zone of zones) {
+    if (Math.hypot(x - zone.x, y - zone.y) <= zone.radius) return zone
+  }
+  return null
 }
+
+// --- 射出タイミング ----------------------------------------------------------
+// 「いつ何球射出するか」は遊びかた（モード）のルールであり、盤面レイアウトではないため
+// テーマに関わらず共通のまま持つ。射出位置・初速の範囲（どこから出るか）はテーマ別の
+// BoardConfig（launch）が持つ。
 
 /**
  * 3球を少しずつ時間差で射出するための遅延(ms)。
@@ -255,9 +158,10 @@ export function launchDelaysMs(mode: PinballMode, ballCount: number): number[] {
 
 /**
  * モードごとの壁。全射出モードは得点ゾーンを通過したボールをそのまま画面外へ
- * 落として消すため、床(wall-bottom)を置かない。
+ * 落として消すため、床(wall-bottom)を置かない。どの壁がテーマの外壁一式かは
+ * BoardConfig（walls）が持つため、対象を引数で受け取る。
  */
-export function wallsForMode(mode: PinballMode): readonly WallSegment[] {
-  if (mode === 'normal') return WALLS
-  return WALLS.filter((wall) => wall.id !== 'wall-bottom')
+export function wallsForMode(walls: readonly WallSegment[], mode: PinballMode): readonly WallSegment[] {
+  if (mode === 'normal') return walls
+  return walls.filter((wall) => wall.id !== 'wall-bottom')
 }

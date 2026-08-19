@@ -3,8 +3,6 @@ import * as Matter from 'matter-js'
 import {
   BALL_RADIUS,
   BOARD_WIDTH,
-  LAUNCH,
-  OBSTACLES,
   SCORE_ZONES,
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
@@ -14,6 +12,7 @@ import {
   zoneAtX,
   type ScoreZone,
 } from './boardLayout'
+import type { BoardConfig } from './boardConfigs'
 import {
   BALL_DENSITY,
   BALL_FRICTION,
@@ -41,7 +40,6 @@ import {
 } from './pinballPhysics'
 import { createToyRuntime } from './toyRuntime'
 import type { ToyBall, ToyRuntime } from './toyRuntime'
-import { TOYS } from './toyLayout'
 import type { PinballMode } from './types'
 
 const { Engine, Bodies, Body, Composite, Events } = Matter
@@ -51,11 +49,13 @@ export type PinballEngineOptions = {
   flagIds: readonly string[]
   /** 遊びかた。壁の構成・射出間隔・終了判定がモードごとに変わる */
   mode: PinballMode
+  /** 選択中テーマの盤面設定（ピン・バンパー・壁・おもちゃ・射出口の配置）。テーマ切替時に作り直す */
+  boardConfig: BoardConfig
   /** プレイの世代。値が変わったら物理世界を作り直して最初から射出する（「もういちど」用） */
   runId: number
   /** 1球の得点が確定したとき（同じ ballIndex では必ず一度だけ呼ぶ） */
   onBallScored: (ballIndex: number, zone: ScoreZone) => void
-  /** バンパー／ピンにボールが当たったとき（演出用）。obstacleId は OBSTACLES の id */
+  /** バンパー／ピンにボールが当たったとき（演出用）。obstacleId は boardConfig.obstacles の id */
   onObstacleHit: (obstacleId: string) => void
   /** 1球が射出されたとき（効果音用） */
   onBallLaunched: (ballIndex: number) => void
@@ -146,6 +146,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
     activeRunRef.current = runToken
 
     const mode = options.mode
+    const boardConfig = options.boardConfig
 
     // ballCount は flagIdsKey（=このeffectの依存）から求める。
     // options.flagIds.length を直接使うと react-hooks/exhaustive-deps が
@@ -157,7 +158,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
 
     // --- 静的な壁（外壁・ガイド壁・ゾーン仕切り）。壁の構成はモードで変える -------
     // （全射出モードは得点ゾーン通過後のボールをそのまま盤外へ落として消すため、床を置かない）
-    const wallBodies = [...wallsForMode(mode), ...ZONE_DIVIDERS].map((wall) =>
+    const wallBodies = [...wallsForMode(boardConfig.walls, mode), ...ZONE_DIVIDERS].map((wall) =>
       Bodies.rectangle(wall.x, wall.y, wall.width, wall.height, {
         isStatic: true,
         angle: wall.angle,
@@ -167,7 +168,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
     )
 
     // --- 静的な障害物（バンパー・ピン）。label に id を入れて衝突時に識別する ---
-    const obstacleBodies = OBSTACLES.map((obstacle) =>
+    const obstacleBodies = boardConfig.obstacles.map((obstacle) =>
       Bodies.circle(obstacle.x, obstacle.y, obstacle.radius, {
         isStatic: true,
         restitution: obstacle.restitution,
@@ -175,7 +176,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
         label: obstacle.id,
       }),
     )
-    const obstacleIds = new Set(OBSTACLES.map((obstacle) => obstacle.id))
+    const obstacleIds = new Set(boardConfig.obstacles.map((obstacle) => obstacle.id))
 
     // --- 得点ゾーンのセンサー。label にゾーンidを入れる ---------------------
     const zoneSensors = SCORE_ZONES.map((zone) =>
@@ -193,7 +194,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
 
     // おもちゃの物理Bodyとランタイムを同じ世界へ登録する。ランタイムの種類分岐は
     // createToyRuntimeに閉じ込め、エンジン側は共通インターフェースだけを扱う。
-    const toyRuntimes = TOYS.map(createToyRuntime)
+    const toyRuntimes = boardConfig.toys.map(createToyRuntime)
     const toyRuntimeMap = toyRuntimesRef.current
     toyRuntimeMap.clear()
     for (const runtime of toyRuntimes) {
@@ -205,7 +206,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
     const ballBodies: Matter.Body[] = []
     for (let i = 0; i < ballCount; i += 1) {
       ballBodies.push(
-        Bodies.circle(LAUNCH.x, LAUNCH.y, BALL_RADIUS, {
+        Bodies.circle(boardConfig.launch.x, boardConfig.launch.y, BALL_RADIUS, {
           restitution: BALL_RESTITUTION,
           friction: BALL_FRICTION,
           frictionAir: BALL_FRICTION_AIR,
@@ -246,11 +247,11 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
       const timeoutId = setTimeout(() => {
         if (activeRunRef.current !== runToken) return
         const body = ballBodies[ballIndex]
-        const jitter = (Math.random() * 2 - 1) * LAUNCH.jitterX
-        Body.setPosition(body, { x: LAUNCH.x + jitter, y: LAUNCH.y })
+        const jitter = (Math.random() * 2 - 1) * boardConfig.launch.jitterX
+        Body.setPosition(body, { x: boardConfig.launch.x + jitter, y: boardConfig.launch.y })
         Body.setVelocity(body, {
-          x: LAUNCH.minVx + Math.random() * (LAUNCH.maxVx - LAUNCH.minVx),
-          y: LAUNCH.minVy + Math.random() * (LAUNCH.maxVy - LAUNCH.minVy),
+          x: boardConfig.launch.minVx + Math.random() * (boardConfig.launch.maxVx - boardConfig.launch.minVx),
+          y: boardConfig.launch.minVy + Math.random() * (boardConfig.launch.maxVy - boardConfig.launch.minVy),
         })
         Composite.add(engine.world, body)
         launched[ballIndex] = true
@@ -406,7 +407,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
             if (stallSince[ballIndex] === null) {
               stallSince[ballIndex] = now
             } else if (now - stallSince[ballIndex]! >= STALL_DURATION_MS) {
-              const escapeZone = findCornerEscapeZone(body.position.x, body.position.y)
+              const escapeZone = findCornerEscapeZone(boardConfig.cornerEscapeZones, body.position.x, body.position.y)
               if (escapeZone) {
                 // 射出ガイド壁と外壁が挟む隅は、ボールが両面に同時接触して動けなくなる
                 // 幾何学的な一点を持つ（boardLayout.ts の CORNER_ESCAPE_ZONES 参照）。
@@ -508,7 +509,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
       Composite.clear(engine.world, false)
       Engine.clear(engine)
     }
-  }, [options.runId, options.mode, flagIdsKey])
+  }, [options.runId, options.mode, options.boardConfig, flagIdsKey])
 
   return handle
 }

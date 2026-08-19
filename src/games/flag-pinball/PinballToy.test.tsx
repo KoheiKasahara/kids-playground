@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import PinballToy from './PinballToy'
 import { normalTheme } from './themes/normalTheme'
-import { TOYS } from './toyLayout'
+import { normalBoard } from './boardConfigs'
 
-const toy = TOYS[0]
+const toy = normalBoard.toys[0]
 
 if (!toy) {
   throw new Error('flag-pinball: テスト対象のおもちゃがありません')
