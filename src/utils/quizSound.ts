@@ -224,6 +224,17 @@ export function playPinballLauncherSound(): void {
   playTone(ctx, 640, now + 0.025, 0.09, 0.06, 'sine')
 }
 
+/** ジャンプ台の「ドュン↑」。押し上げおもちゃより勢いのある3音の駆け上がりで、ロケット発射の印象にする。 */
+export function playPinballJumppadSound(): void {
+  if (!canPlayPinballToySound()) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 220, now, 0.05, 0.07, 'triangle')
+  playTone(ctx, 440, now + 0.03, 0.06, 0.07, 'triangle')
+  playTone(ctx, 760, now + 0.06, 0.09, 0.06, 'sine')
+}
+
 /** 得点ゾーンの得点。1000点にいちばん近いほど高く華やかな音になる */
 export function playPinballScoreSound(score: number): void {
   if (!soundEnabled) return

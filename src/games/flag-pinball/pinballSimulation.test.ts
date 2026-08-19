@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_FLAGS_LAUNCH_INTERVAL_MS, launchDelaysMs, SCORE_ZONES } from './boardLayout'
+import { spaceBoard } from './boardConfigs'
 import { PINBALL_FLAG_IDS } from './data/pinballFlags'
 import { SIMULATION_BALL_COUNT, STEP_MS } from './pinballPhysics'
 import { simulatePinballRun } from './pinballSimulation'
@@ -71,6 +72,67 @@ describe('pinball fixed-step play-time simulation', () => {
     for (const result of results) {
       expect(result.scoredZoneIds).toHaveLength(SIMULATION_BALL_COUNT)
       expect(result.scoredZoneIds).toHaveLength(result.scoreSteps.length)
+      expect(result.scoredZoneIds.every((zoneId) => knownZoneIds.has(zoneId))).toBe(true)
+    }
+  })
+})
+
+describe('pinball 宇宙盤面（spaceBoard）のシミュレーション', () => {
+  it('おもちゃをタップしない32個のシード付き試行が、安全タイマーに頼らず全球得点確定する', () => {
+    const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: spaceBoard }),
+    )
+    const seconds = results.map((result) => result.durationSeconds).sort((a, b) => a - b)
+    const median = (seconds[TRIAL_COUNT / 2 - 1] + seconds[TRIAL_COUNT / 2]) / 2
+    const min = seconds[0]
+    const max = seconds[seconds.length - 1]
+    const mean = seconds.reduce((sum, value) => sum + value, 0) / seconds.length
+
+    console.info(
+      `space board simulation (${TRIAL_COUNT} trials): min=${min.toFixed(3)}s median=${median.toFixed(3)}s mean=${mean.toFixed(3)}s max=${max.toFixed(3)}s`,
+    )
+
+    expect(results.every((result) => result.completed)).toBe(true)
+    expect(results.every((result) => !result.usedSafetyTimeout)).toBe(true)
+    // 宇宙盤面はジャンプ台の上下移動ぶん通常盤面より多少長くなってよいが、
+    // 極端に長時間ボールが残る盤面にはしない（目安の10〜20秒に対して十分な余裕を持たせた上限）。
+    expect(min).toBeGreaterThanOrEqual(3)
+    expect(median).toBeGreaterThanOrEqual(7)
+    expect(median).toBeLessThan(25)
+    expect(max).toBeLessThan(40)
+  })
+
+  it('おもちゃを100ms間隔で連打しても、安全タイマーなしで全試行が完了する', () => {
+    const results = Array.from({ length: RAPID_TAP_TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, {
+        toyTapIntervalMs: RAPID_TAP_INTERVAL_MS,
+        boardConfig: spaceBoard,
+      }),
+    )
+    const seconds = results.map((result) => result.durationSeconds).sort((a, b) => a - b)
+    const max = seconds[seconds.length - 1]
+
+    expect(results.every((result) => result.completed)).toBe(true)
+    expect(results.every((result) => !result.usedSafetyTimeout)).toBe(true)
+    expect(results.every((result) => result.steps * STEP_MS === result.durationMs)).toBe(true)
+    expect(max).toBeLessThan(40)
+  })
+
+  it('3球が時間差射出のあいだ同時に盤面上へ存在する（射出間隔は通常テーマと共通のため）', () => {
+    const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: spaceBoard }),
+    )
+    expect(results.every((result) => result.maxConcurrentBalls > 1)).toBe(true)
+  })
+
+  it('scoredZoneIdsが球数と一致し、すべて既知のゾーンIDになる', () => {
+    const knownZoneIds = new Set(SCORE_ZONES.map((zone) => zone.id))
+    const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: spaceBoard }),
+    )
+
+    for (const result of results) {
+      expect(result.scoredZoneIds).toHaveLength(SIMULATION_BALL_COUNT)
       expect(result.scoredZoneIds.every((zoneId) => knownZoneIds.has(zoneId))).toBe(true)
     }
   })

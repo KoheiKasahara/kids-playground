@@ -18,6 +18,17 @@ function renderOceanToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'jumppad') {
+    // Phase B時点では海の盤面にジャンプ台は置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、簡素な泡が弾けるパッドにしておく。
+    return (
+      <span className={styles.oceanJumppadMark}>
+        <span className={styles.oceanJumppadPad} />
+        <span className={styles.oceanJumppadRing} />
+      </span>
+    )
+  }
+
   return (
     <span className={styles.oceanLauncherMark}>
       <span className={styles.oceanWhaleSpout}>

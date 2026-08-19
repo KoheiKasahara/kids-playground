@@ -65,7 +65,9 @@
 }
 
 .spaceToy[data-toy-kind='launcher']::before,
-.spaceToy[data-toy-kind='launcher']::after {
+.spaceToy[data-toy-kind='launcher']::after,
+.spaceToy[data-toy-kind='jumppad']::before,
+.spaceToy[data-toy-kind='jumppad']::after {
   display: none;
   content: none;
 }
@@ -276,6 +278,101 @@
   transform: translateX(-50%);
 }
 
+.spaceJumppadMark {
+  position: absolute;
+  inset: 4%;
+  display: block;
+  pointer-events: none;
+}
+
+.spaceJumppadPlume,
+.spaceJumppadPlumeCore,
+.spaceJumppadPad,
+.spaceJumppadRing,
+.spaceJumppadHatch {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* 発射パッドの噴射炎。常時は控えめに見せ、ボールが実際に触れて発射した瞬間に大きく伸びる
+   （見た目が「触れると飛びそう」と分かるよう待機中も少しだけ炎を覗かせておく）。 */
+.spaceJumppadPlume {
+  left: 50%;
+  top: 6%;
+  width: 34%;
+  height: 62%;
+  border-radius: 50% 50% 60% 60% / 30% 30% 70% 70%;
+  background: linear-gradient(0deg, #fffbd0 0%, #ffd45e 30%, #ff8a47 62%, rgba(255, 112, 82, 0) 100%);
+  opacity: calc(0.22 + 0.78 * var(--toy-pulse));
+  transform: translateX(-50%) scaleY(calc(0.3 + 0.85 * var(--toy-pulse)));
+  transform-origin: bottom center;
+  filter: drop-shadow(0 -2px 4px rgba(255, 149, 74, 0.6));
+  z-index: 1;
+}
+
+.spaceJumppadPlumeCore {
+  left: 50%;
+  bottom: 0;
+  width: 52%;
+  height: 70%;
+  border-radius: 50% 50% 58% 58% / 26% 26% 74% 74%;
+  background: linear-gradient(0deg, #ffffff 0%, #fff2a4 42%, #ffad4d 100%);
+  opacity: 0.85;
+  transform: translateX(-50%) scaleY(calc(0.4 + 0.6 * var(--toy-pulse)));
+  transform-origin: bottom center;
+}
+
+/* 発射パッド本体は円盤状。上に載っているだけでも「ここに当たると飛びそう」と
+   分かるよう、外周に光るリングを常に見せる。 */
+.spaceJumppadPad {
+  left: 50%;
+  bottom: 4%;
+  width: 96%;
+  height: 42%;
+  border: 2px solid rgba(255, 216, 137, 0.85);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f3e9ff, #7d6ac2 62%, #402f78 100%);
+  box-shadow: inset 0 -3px 0 rgba(39, 30, 82, 0.4), 0 1px 4px rgba(8, 10, 42, 0.4);
+  transform: translateX(-50%) translateY(calc(6% * var(--toy-pulse))) scaleX(calc(1 + 0.05 * var(--toy-pulse)));
+  transform-origin: center bottom;
+  z-index: 2;
+}
+
+.spaceJumppadRing {
+  left: 50%;
+  top: 12%;
+  width: 66%;
+  height: 66%;
+  border: 2px solid rgba(255, 216, 137, 0.75);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255, 216, 137, 0.16);
+  opacity: calc(0.55 + 0.45 * var(--toy-pulse));
+  transform: translate(-50%, -50%) scale(calc(1 + 0.1 * var(--toy-pulse)));
+}
+
+.spaceJumppadHatch {
+  left: 50%;
+  top: 28%;
+  width: 30%;
+  height: 30%;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 40%;
+  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.28) 0 2px, transparent 2px 6px);
+  transform: translate(-50%, -50%);
+}
+
+.spaceToy[data-toy-kind='jumppad'][data-toy-active='true'] .spaceJumppadPlume {
+  animation: spaceRocketFlameFlicker 220ms ease-out;
+}
+
+.spaceToy[data-toy-kind='jumppad'][data-toy-active='true'] .spaceJumppadPad {
+  box-shadow:
+    inset 0 -3px 0 rgba(39, 30, 82, 0.4),
+    0 0 0 2px rgba(255, 216, 137, 0.32),
+    0 0 0 4px rgba(255, 216, 137, 0.12),
+    0 1px 7px rgba(255, 216, 137, 0.55);
+}
+
 .spaceToy[data-toy-kind='spinner'][data-toy-active='true'] .spaceSpinnerPanel {
   animation: spaceSatellitePanelFlash 320ms ease-out;
 }
@@ -333,7 +430,8 @@
   }
 
   .spaceSpinnerPanel,
-  .spaceLauncherFlame {
+  .spaceLauncherFlame,
+  .spaceJumppadPlume {
     animation: none;
   }
 }

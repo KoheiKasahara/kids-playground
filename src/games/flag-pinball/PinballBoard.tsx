@@ -19,6 +19,7 @@ import PinballToy from './PinballToy'
 import { usePinballTheme } from './themeStore'
 import {
   playPinballBumperSound,
+  playPinballJumppadSound,
   playPinballLauncherSound,
   playPinballLaunchSound,
   playPinballScoreSound,
@@ -244,6 +245,8 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
               onActivate={(toyId) => {
                 if (toy.kind === 'spinner') {
                   playPinballSpinnerSound()
+                } else if (toy.kind === 'jumppad') {
+                  playPinballJumppadSound()
                 } else {
                   playPinballLauncherSound()
                 }

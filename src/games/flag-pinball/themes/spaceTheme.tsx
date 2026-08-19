@@ -16,6 +16,20 @@ function renderSpaceToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'jumppad') {
+    return (
+      <span className={styles.spaceJumppadMark}>
+        <span className={styles.spaceJumppadPlume}>
+          <span className={styles.spaceJumppadPlumeCore} />
+        </span>
+        <span className={styles.spaceJumppadPad}>
+          <span className={styles.spaceJumppadRing} />
+          <span className={styles.spaceJumppadHatch} />
+        </span>
+      </span>
+    )
+  }
+
   return (
     <span className={styles.spaceLauncherMark}>
       <span className={styles.spaceLauncherFlame}>
