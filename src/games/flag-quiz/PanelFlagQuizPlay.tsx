@@ -249,7 +249,7 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
   }, [answered, state.index, openedPanels, isCorrect])
 
   return (
-    <div className={styles.page}>
+    <main className={styles.page}>
       <div className={styles.header}>
         <SpeechToggle />
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
@@ -337,6 +337,6 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
           onNext={handleNext}
         />
       )}
-    </div>
+    </main>
   )
 }

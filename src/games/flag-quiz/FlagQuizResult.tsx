@@ -69,7 +69,7 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
   const hasScore = typeof score === 'number' && typeof maxScore === 'number'
 
   return (
-    <div className={styles.page}>
+    <main className={styles.page}>
       <h1 className={styles.title}>けっか</h1>
       <p className={styles.modeLabel}>
         {MODE_LABEL[mode]} ・ {LEVEL_LABEL[level]}
@@ -105,6 +105,6 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
           ホームへ
         </BigButton>
       </div>
-    </div>
+    </main>
   )
 }

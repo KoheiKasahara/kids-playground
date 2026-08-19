@@ -121,7 +121,7 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
     .join(' ')
 
   return (
-    <div className={pageClassName}>
+    <main className={pageClassName}>
       <div className={styles.header}>
         <SpeechToggle />
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
@@ -199,6 +199,6 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
           onNext={handleNext}
         />
       )}
-    </div>
+    </main>
   )
 }

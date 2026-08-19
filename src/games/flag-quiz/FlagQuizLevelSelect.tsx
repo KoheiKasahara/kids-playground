@@ -14,7 +14,7 @@ export default function FlagQuizLevelSelect({ mode }: FlagQuizLevelSelectProps) 
   const navigate = useNavigate()
 
   return (
-    <div className={styles.page}>
+    <main className={styles.page}>
       <h1 className={styles.title}>むずかしさを えらんでね</h1>
       <p className={styles.modeLabel}>{MODE_LABEL[mode]}</p>
       <div className={styles.actions}>
@@ -33,6 +33,6 @@ export default function FlagQuizLevelSelect({ mode }: FlagQuizLevelSelectProps) 
           もどる
         </BigButton>
       </div>
-    </div>
+    </main>
   )
 }

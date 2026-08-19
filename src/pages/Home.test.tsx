@@ -12,23 +12,23 @@ describe('Home', () => {
       </MemoryRouter>,
     )
     expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'こっきクイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'こっきピンボール' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'こっきドミノ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'おやさいクイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'くだものクイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'さんすうクイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'いろまぜクイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '都道府県クイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'せかい旅行クイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'にほん旅行クイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'こっきクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'こっきピンボール' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'こっきドミノ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'おやさいクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'くだものクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'さんすうクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'いろまぜクイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '都道府県クイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'せかい旅行クイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'にほん旅行クイズ' })).toBeInTheDocument()
   })
 
   test('「都道府県クイズ」を押すと開始画面に遷移する', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    await user.click(screen.getByRole('button', { name: '都道府県クイズ' }))
+    await user.click(screen.getByRole('link', { name: '都道府県クイズ' }))
     expect(screen.getByRole('heading', { name: '都道府県クイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /かたちを みて/ })).toBeInTheDocument()
   })
@@ -40,7 +40,7 @@ describe('Home', () => {
         <App />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: 'こっきクイズ' }))
+    await user.click(screen.getByRole('link', { name: 'こっきクイズ' }))
     expect(screen.getByRole('heading', { name: 'こっきクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'こっきを みて こたえる' })).toBeInTheDocument()
   })
@@ -52,7 +52,7 @@ describe('Home', () => {
         <App />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: 'はたらくくるまクイズ' }))
+    await user.click(screen.getByRole('link', { name: 'はたらくくるまクイズ' }))
     expect(screen.getByRole('heading', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /しゃしんを みて こたえる/ })).toBeInTheDocument()
   })
@@ -64,7 +64,7 @@ describe('Home', () => {
         <App />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: 'さんすうクイズ' }))
+    await user.click(screen.getByRole('link', { name: 'さんすうクイズ' }))
     expect(screen.getByRole('heading', { name: 'さんすうクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /たしざん/ })).toBeInTheDocument()
   })
@@ -72,14 +72,14 @@ describe('Home', () => {
   test('「せかい旅行クイズ」を押すと遅延読込した開始画面に遷移する', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    await user.click(screen.getByRole('button', { name: 'せかい旅行クイズ' }))
+    await user.click(screen.getByRole('link', { name: 'せかい旅行クイズ' }))
     expect(await screen.findByRole('heading', { name: 'せかい旅行クイズ' })).toBeInTheDocument()
   })
 
   test('「いろまぜクイズ」を押すと開始画面に遷移する', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    await user.click(screen.getByRole('button', { name: 'いろまぜクイズ' }))
+    await user.click(screen.getByRole('link', { name: 'いろまぜクイズ' }))
     expect(screen.getByRole('heading', { name: 'いろまぜクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'はじめる' })).toBeInTheDocument()
   })
@@ -87,7 +87,7 @@ describe('Home', () => {
   test('「こっきピンボール」を押すと遅延読込したボール選択画面に遷移する', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    await user.click(screen.getByRole('button', { name: 'こっきピンボール' }))
+    await user.click(screen.getByRole('link', { name: 'こっきピンボール' }))
     expect(await screen.findByRole('heading', { name: 'こっきピンボール' })).toBeInTheDocument()
     expect(screen.getByText('ボールを 3こ えらんでね！')).toBeInTheDocument()
   })
@@ -95,7 +95,7 @@ describe('Home', () => {
   test('「にほん旅行クイズ」を押すと遅延読込した開始画面に遷移する', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    await user.click(screen.getByRole('button', { name: 'にほん旅行クイズ' }))
+    await user.click(screen.getByRole('link', { name: 'にほん旅行クイズ' }))
     expect(await screen.findByRole('heading', { name: 'にほん旅行クイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'たびに しゅっぱつ！' })).toBeInTheDocument()
   })
@@ -103,7 +103,7 @@ describe('Home', () => {
   test('「こっきドミノ」を押すと遅延読込した国選択画面に遷移する', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    await user.click(screen.getByRole('button', { name: 'こっきドミノ' }))
+    await user.click(screen.getByRole('link', { name: 'こっきドミノ' }))
     expect(await screen.findByRole('heading', { name: 'こっきドミノ' })).toBeInTheDocument()
     expect(screen.getByText('どの こっきに する？')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'にほん' })).toBeInTheDocument()
