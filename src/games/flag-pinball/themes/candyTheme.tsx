@@ -18,6 +18,17 @@ function renderCandyToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'jumppad') {
+    // Phase B時点ではおかしの盤面にジャンプ台は置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、簡素なグミのパッドにしておく。
+    return (
+      <span className={styles.candyJumppadMark}>
+        <span className={styles.candyJumppadPad} />
+        <span className={styles.candyJumppadRing} />
+      </span>
+    )
+  }
+
   return (
     <span className={styles.candyLauncherMark}>
       <span className={styles.candyPopcornBurst}>

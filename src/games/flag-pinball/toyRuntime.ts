@@ -1,4 +1,5 @@
 import type * as Matter from 'matter-js'
+import { createJumppadToy } from './jumppadToy'
 import { createLauncherToy } from './launcherToy'
 import type { ToyPlacement } from './toyLayout'
 import { createSpinnerToy } from './spinnerToy'
@@ -40,6 +41,8 @@ export function createToyRuntime(placement: ToyPlacement): ToyRuntime {
       return createSpinnerToy(placement)
     case 'launcher':
       return createLauncherToy(placement)
+    case 'jumppad':
+      return createJumppadToy(placement)
     default: {
       const unexpectedKind: never = placement.kind
       throw new Error(`flag-pinball: 未対応のおもちゃ種別です: ${unexpectedKind}`)

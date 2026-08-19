@@ -17,6 +17,17 @@ function renderNormalToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'jumppad') {
+    // Phase B時点ではノーマルの盤面にジャンプ台は置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、押し出しおもちゃと似た簡素な絵にしておく。
+    return (
+      <span className={styles.normalJumppadMark}>
+        <span className={styles.normalJumppadPad} />
+        <span className={styles.normalJumppadRing} />
+      </span>
+    )
+  }
+
   return (
     <span className={styles.normalLauncherMark}>
       <span className={styles.normalLauncherBase} />

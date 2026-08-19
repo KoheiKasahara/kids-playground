@@ -1,4 +1,4 @@
-export type ToyKind = 'spinner' | 'launcher'
+export type ToyKind = 'spinner' | 'launcher' | 'jumppad'
 
 /**
  * おもちゃ1個ぶんの配置データ。テーマ別のBoardConfig（boardConfigs/）が種類・個数・座標を持ち、
