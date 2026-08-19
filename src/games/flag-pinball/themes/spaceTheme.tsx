@@ -41,6 +41,17 @@ function renderSpaceToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'hammer') {
+    // Phase D時点では宇宙の盤面にハンマーは置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、簡素な棒＋ヘッドにしておく。
+    return (
+      <span className={styles.spaceHammerMark}>
+        <span className={styles.spaceHammerHandle} />
+        <span className={styles.spaceHammerHead} />
+      </span>
+    )
+  }
+
   return (
     <span className={styles.spaceLauncherMark}>
       <span className={styles.spaceLauncherFlame}>

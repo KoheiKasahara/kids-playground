@@ -86,7 +86,8 @@
  * シーソーは丸いパッドではなく横長の板なので、spinnerと同じ理由で共通の円形背景・枠を外す。
  * 見た目はテーマ側のrenderToyがDOM要素として描き、回転は`.toyVisual`のrotateだけで行う。
  */
-.toyVisual[data-toy-kind='seesaw'] {
+.toyVisual[data-toy-kind='seesaw'],
+.toyVisual[data-toy-kind='hammer'] {
   border: 0;
   border-radius: 0;
   background: none;

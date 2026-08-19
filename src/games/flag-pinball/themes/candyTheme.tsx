@@ -40,6 +40,23 @@ function renderCandyToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'hammer') {
+    // おかしテーマ専用のハンマーtoy。ロリポップ状の頭を持つキャンディハンマーが、
+    // placement中心（＝物理的な支点）を軸に左右へスイングする。全体の回転は
+    // 共通CSS(`.toyVisual`)のrotate(var(--toy-spin))だけで行うため、ここでは
+    // 内側の要素へ個別の回転を持たせない（描画の中心・回転角とMatter Bodyを一致させる）。
+    return (
+      <span className={styles.candyHammerMark}>
+        <span className={styles.candyHammerHandle} />
+        <span className={styles.candyHammerGrip} />
+        <span className={styles.candyHammerHead}>
+          <span className={styles.candyHammerHeadSwirl} />
+          <span className={styles.candyHammerHeadShine} />
+        </span>
+      </span>
+    )
+  }
+
   return (
     <span className={styles.candyLauncherMark}>
       <span className={styles.candyPopcornBurst}>
