@@ -30,6 +30,17 @@ function renderSpaceToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'seesaw') {
+    // Phase C時点では宇宙の盤面にシーソーは置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、簡素な板にしておく。
+    return (
+      <span className={styles.spaceSeesawMark}>
+        <span className={styles.spaceSeesawPivot} />
+        <span className={styles.spaceSeesawPlank} />
+      </span>
+    )
+  }
+
   return (
     <span className={styles.spaceLauncherMark}>
       <span className={styles.spaceLauncherFlame}>

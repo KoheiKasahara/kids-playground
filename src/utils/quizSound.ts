@@ -235,6 +235,16 @@ export function playPinballJumppadSound(): void {
   playTone(ctx, 760, now + 0.06, 0.09, 0.06, 'sine')
 }
 
+/** シーソーの「ギィ、コトン」。木の板が傾く低めの2音で、回転・打ち上げ系とは違う質感にする。 */
+export function playPinballSeesawSound(): void {
+  if (!canPlayPinballToySound()) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 260, now, 0.07, 0.06, 'triangle')
+  playTone(ctx, 180, now + 0.05, 0.1, 0.07, 'sine')
+}
+
 /** 得点ゾーンの得点。1000点にいちばん近いほど高く華やかな音になる */
 export function playPinballScoreSound(score: number): void {
   if (!soundEnabled) return

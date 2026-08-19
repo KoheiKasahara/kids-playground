@@ -29,6 +29,17 @@ function renderCandyToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'seesaw') {
+    // Phase C時点ではおかしの盤面にシーソーは置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、簡素な板にしておく。
+    return (
+      <span className={styles.candySeesawMark}>
+        <span className={styles.candySeesawPivot} />
+        <span className={styles.candySeesawPlank} />
+      </span>
+    )
+  }
+
   return (
     <span className={styles.candyLauncherMark}>
       <span className={styles.candyPopcornBurst}>

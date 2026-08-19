@@ -82,6 +82,17 @@
   height: 100%;
 }
 
+/*
+ * シーソーは丸いパッドではなく横長の板なので、spinnerと同じ理由で共通の円形背景・枠を外す。
+ * 見た目はテーマ側のrenderToyがDOM要素として描き、回転は`.toyVisual`のrotateだけで行う。
+ */
+.toyVisual[data-toy-kind='seesaw'] {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
 .toyVisual[data-toy-kind='launcher'] {
   background: var(--pinball-toy-launcher-bg, radial-gradient(circle at 35% 30%, #d8f8ff, #73c9e8 62%, #398eb7 100%));
 }
