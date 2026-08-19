@@ -2,9 +2,7 @@ import * as Matter from 'matter-js'
 import {
   BALL_RADIUS,
   BOARD_WIDTH,
-  LAUNCH,
   LAUNCH_DELAYS_MS,
-  OBSTACLES,
   SCORE_ZONES,
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
@@ -12,6 +10,7 @@ import {
   zoneAtX,
   wallsForMode,
 } from './boardLayout'
+import { normalBoard, type BoardConfig } from './boardConfigs'
 import {
   BALL_DENSITY,
   BALL_FRICTION,
@@ -32,7 +31,6 @@ import {
   ZONE_SENSOR_HEIGHT,
   ZONE_SENSOR_Y,
 } from './pinballPhysics'
-import { TOYS } from './toyLayout'
 import { createToyRuntime } from './toyRuntime'
 import type { ToyBall } from './toyRuntime'
 import type { PinballMode } from './types'
@@ -67,6 +65,8 @@ export type PinballSimulationOptions = {
   mode?: PinballMode
   /** おもちゃを全てタップする間隔(ms)。nullまたは省略時はタップしない */
   toyTapIntervalMs?: number | null
+  /** 使う盤面設定。既定は通常テーマ（normalBoard）で、従来の測定値と対応する */
+  boardConfig?: BoardConfig
 }
 
 function createSeededRandom(seed: number): () => number {
@@ -96,6 +96,7 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
   const mode = options?.mode ?? 'normal'
   const delaysMs = options?.launchDelaysMs ?? LAUNCH_DELAYS_MS
   const toyTapIntervalMs = options?.toyTapIntervalMs ?? null
+  const boardConfig = options?.boardConfig ?? normalBoard
 
   if (toyTapIntervalMs !== null && (!Number.isFinite(toyTapIntervalMs) || toyTapIntervalMs <= 0)) {
     throw new Error('flag-pinball: toyTapIntervalMs は正の有限値またはnullで指定してください')
@@ -104,7 +105,7 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
   const random = createSeededRandom(seed)
   const engine = Engine.create({ gravity: { ...GRAVITY } })
 
-  const wallBodies = [...wallsForMode(mode), ...ZONE_DIVIDERS].map((wall) =>
+  const wallBodies = [...wallsForMode(boardConfig.walls, mode), ...ZONE_DIVIDERS].map((wall) =>
     Bodies.rectangle(wall.x, wall.y, wall.width, wall.height, {
       isStatic: true,
       angle: wall.angle,
@@ -112,7 +113,7 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
       friction: WALL_FRICTION,
     }),
   )
-  const obstacleBodies = OBSTACLES.map((obstacle) =>
+  const obstacleBodies = boardConfig.obstacles.map((obstacle) =>
     Bodies.circle(obstacle.x, obstacle.y, obstacle.radius, {
       isStatic: true,
       restitution: obstacle.restitution,
@@ -133,13 +134,13 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
 
   // おもちゃのBodyも実機と同じ物理世界へ加える。タップしない測定でも障害物として
   // 残るため、画面側とヘッドレス測定の盤面構成を一致させる。
-  const toyRuntimes = TOYS.map(createToyRuntime)
+  const toyRuntimes = boardConfig.toys.map(createToyRuntime)
   Composite.add(engine.world, toyRuntimes.flatMap((runtime) => runtime.bodies))
 
   const ballBodies: Matter.Body[] = []
   for (let i = 0; i < ballCount; i += 1) {
     ballBodies.push(
-      Bodies.circle(LAUNCH.x, LAUNCH.y, BALL_RADIUS, {
+      Bodies.circle(boardConfig.launch.x, boardConfig.launch.y, BALL_RADIUS, {
         restitution: BALL_RESTITUTION,
         friction: BALL_FRICTION,
         frictionAir: BALL_FRICTION_AIR,
@@ -196,12 +197,12 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
       if (launched[ballIndex] || physicsStep < launchSteps[ballIndex]) continue
       const body = ballBodies[ballIndex]
       Body.setPosition(body, {
-        x: LAUNCH.x + (random() * 2 - 1) * LAUNCH.jitterX,
-        y: LAUNCH.y,
+        x: boardConfig.launch.x + (random() * 2 - 1) * boardConfig.launch.jitterX,
+        y: boardConfig.launch.y,
       })
       Body.setVelocity(body, {
-        x: LAUNCH.minVx + random() * (LAUNCH.maxVx - LAUNCH.minVx),
-        y: LAUNCH.minVy + random() * (LAUNCH.maxVy - LAUNCH.minVy),
+        x: boardConfig.launch.minVx + random() * (boardConfig.launch.maxVx - boardConfig.launch.minVx),
+        y: boardConfig.launch.minVy + random() * (boardConfig.launch.maxVy - boardConfig.launch.minVy),
       })
       Composite.add(engine.world, body)
       launched[ballIndex] = true
@@ -228,7 +229,7 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
         if (stallSinceMs[ballIndex] === null) {
           stallSinceMs[ballIndex] = nowMs
         } else if (nowMs - stallSinceMs[ballIndex]! >= STALL_DURATION_MS) {
-          const escapeZone = findCornerEscapeZone(body.position.x, body.position.y)
+          const escapeZone = findCornerEscapeZone(boardConfig.cornerEscapeZones, body.position.x, body.position.y)
           if (escapeZone) {
             // 射出ガイド壁と外壁が挟む隅（CORNER_ESCAPE_ZONES）は通常のナッジでは
             // 脱出できないため、その一点だけ通り抜けさせる。

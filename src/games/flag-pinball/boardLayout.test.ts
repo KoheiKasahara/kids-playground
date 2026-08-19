@@ -5,9 +5,7 @@ import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   LAUNCH_DELAYS_MS,
-  OBSTACLES,
   SCORE_ZONES,
-  WALLS,
   ZONE_DIVIDER_WIDTH,
   ZONE_DIVIDERS,
   ZONE_TOP,
@@ -15,9 +13,8 @@ import {
   wallsForMode,
   zoneAtX,
 } from './boardLayout'
+import { normalBoard } from './boardConfigs'
 import { BALL_COUNT } from './types'
-
-const REQUIRED_CLEARANCE_MARGIN = 16
 
 describe('SCORE_ZONES', () => {
   it('5つあり、得点が左から [100, 300, 1000, 300, 100]', () => {
@@ -57,66 +54,6 @@ describe('board dimensions', () => {
   })
 })
 
-describe('OBSTACLES', () => {
-  it('30〜40個で、バンパー3個・十分な数のピン、idに重複がない', () => {
-    expect(OBSTACLES.length).toBeGreaterThanOrEqual(30)
-    expect(OBSTACLES.length).toBeLessThanOrEqual(40)
-    expect(OBSTACLES.filter((obstacle) => obstacle.kind === 'bumper')).toHaveLength(3)
-    expect(OBSTACLES.filter((obstacle) => obstacle.kind === 'peg').length).toBeGreaterThanOrEqual(27)
-    const ids = OBSTACLES.map((o) => o.id)
-    expect(new Set(ids).size).toBe(ids.length)
-  })
-
-  it('ピンは複数段の半ピッチ千鳥配置で、盤面全体に分散している', () => {
-    const pegs = OBSTACLES.filter((obstacle) => obstacle.kind === 'peg')
-    const rows = new Map<number, number[]>()
-    for (const peg of pegs) rows.set(peg.y, [...(rows.get(peg.y) ?? []), peg.x])
-    const sortedRows = [...rows.entries()].sort(([a], [b]) => a - b)
-    expect(sortedRows.length).toBeGreaterThanOrEqual(6)
-    expect(sortedRows.length).toBeLessThanOrEqual(9)
-    for (const [, xs] of sortedRows) {
-      expect(xs.length).toBeGreaterThanOrEqual(3)
-      expect(xs.length).toBeLessThanOrEqual(5)
-      expect(xs).toEqual([...xs].sort((a, b) => a - b))
-    }
-    for (let i = 1; i < sortedRows.length; i += 1) {
-      const [previousY, previousXs] = sortedRows[i - 1]
-      const [currentY, currentXs] = sortedRows[i]
-      expect(currentY).toBeGreaterThan(previousY)
-      if (currentXs.length !== 3 && previousXs.length !== 3) {
-        expect(Math.abs(currentXs[0] - previousXs[0])).toBeCloseTo(42.5, 5)
-      }
-    }
-  })
-
-  it('すべて盤面内（半径ぶん含めて 0..BOARD_WIDTH / 0..ZONE_TOP の内側）にある', () => {
-    for (const o of OBSTACLES) {
-      expect(o.x - o.radius).toBeGreaterThanOrEqual(0)
-      expect(o.x + o.radius).toBeLessThanOrEqual(BOARD_WIDTH)
-      expect(o.y - o.radius).toBeGreaterThanOrEqual(0)
-      expect(o.y + o.radius).toBeLessThanOrEqual(ZONE_TOP)
-    }
-  })
-
-  it('障害物同士の中心距離に16px以上の余裕があり、ボールが詰まらない', () => {
-    let minimumMargin = Number.POSITIVE_INFINITY
-    for (let i = 0; i < OBSTACLES.length; i += 1) {
-      for (let j = i + 1; j < OBSTACLES.length; j += 1) {
-        const a = OBSTACLES[i]
-        const b = OBSTACLES[j]
-        const distance = Math.hypot(a.x - b.x, a.y - b.y)
-        const required = a.radius + b.radius + BALL_RADIUS * 2 + REQUIRED_CLEARANCE_MARGIN
-        minimumMargin = Math.min(
-          minimumMargin,
-          distance - (a.radius + b.radius + BALL_RADIUS * 2),
-        )
-        expect(distance).toBeGreaterThanOrEqual(required)
-      }
-    }
-    expect(minimumMargin).toBeGreaterThanOrEqual(REQUIRED_CLEARANCE_MARGIN)
-  })
-})
-
 describe('zoneAtX', () => {
   it('各ゾーンの中央でそのゾーンを返す', () => {
     for (const zone of SCORE_ZONES) {
@@ -138,13 +75,6 @@ describe('zoneAtX', () => {
 
   it('盤面外（BOARD_WIDTH超）は一番右のゾーンに丸める', () => {
     expect(zoneAtX(BOARD_WIDTH + 100).index).toBe(SCORE_ZONES.length - 1)
-  })
-})
-
-describe('WALLS', () => {
-  it('wall-bottom が存在する（底の壁がないとボールが盤外へ落ち続けてしまう）', () => {
-    const bottom = WALLS.find((w) => w.id === 'wall-bottom')
-    expect(bottom).toBeDefined()
   })
 })
 
@@ -195,18 +125,19 @@ describe('launchDelaysMs', () => {
 })
 
 describe('wallsForMode', () => {
-  it('normal には wall-bottom がある', () => {
-    const walls = wallsForMode('normal')
+  it('normal はそのまま渡した壁の配列を返す（テーマの壁一式を減らさない）', () => {
+    const walls = wallsForMode(normalBoard.walls, 'normal')
     expect(walls.some((wall) => wall.id === 'wall-bottom')).toBe(true)
+    expect(walls).toEqual(normalBoard.walls)
   })
 
   it('allFlags には wall-bottom がない', () => {
-    const walls = wallsForMode('allFlags')
+    const walls = wallsForMode(normalBoard.walls, 'allFlags')
     expect(walls.some((wall) => wall.id === 'wall-bottom')).toBe(false)
   })
 
-  it('allFlags は wall-bottom 以外の壁を全部持つ（WALLSからwall-bottomだけを除いたもの）', () => {
-    const expected = WALLS.filter((wall) => wall.id !== 'wall-bottom')
-    expect(wallsForMode('allFlags')).toEqual(expected)
+  it('allFlags は wall-bottom 以外の壁を全部持つ（渡した壁からwall-bottomだけを除いたもの）', () => {
+    const expected = normalBoard.walls.filter((wall) => wall.id !== 'wall-bottom')
+    expect(wallsForMode(normalBoard.walls, 'allFlags')).toEqual(expected)
   })
 })

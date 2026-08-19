@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  OBSTACLES,
   SCORE_ZONES,
   ZONE_DIVIDERS,
   ZONE_TOP,
@@ -10,13 +9,13 @@ import {
   wallsForMode,
   type ScoreZone,
 } from './boardLayout'
+import { getBoardConfig } from './boardConfigs'
 import { findPinballFlag } from './data/pinballFlags'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { useBoardScale } from './useBoardScale'
 import { usePinballEngine } from './usePinballEngine'
 import type { PinballMode } from './types'
 import PinballToy from './PinballToy'
-import { TOYS } from './toyLayout'
 import { usePinballTheme } from './themeStore'
 import {
   playPinballBumperSound,
@@ -55,10 +54,13 @@ type ScorePop = {
 export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFinished }: PinballBoardProps) {
   const { containerRef, scale, width, height } = useBoardScale()
   const theme = usePinballTheme()
+  // 選択中テーマの盤面設定（ピン・バンパー・壁・おもちゃ・射出口）。テーマIDだけを二重管理せず、
+  // 既存のテーマ状態(usePinballTheme)からそのまま対応する盤面設定を引く。
+  const boardConfig = getBoardConfig(theme.id)
 
   // 壁の見た目もモードで変える（全射出モードでは床(wall-bottom)の見た目も消す）。
   // usePinballEngine 側の物理壁と同じ関数から導出することで、見た目と当たり判定がずれない。
-  const walls = wallsForMode(mode)
+  const walls = wallsForMode(boardConfig.walls, mode)
 
   // flagIdsは選択画面（PINBALL_FLAG_IDSの範囲）から渡ってくる前提。
   // 解決できないidが来るのはデータ不整合なので、pinballFlags.tsと同じ方針で早期に気付けるようthrowする。
@@ -121,6 +123,7 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
   const { registerBall, registerToy, activateToy } = usePinballEngine({
     flagIds,
     mode,
+    boardConfig,
     runId,
     onBallLaunched: () => {
       playPinballLaunchSound()
@@ -185,7 +188,7 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
             />
           ))}
 
-          {OBSTACLES.map((obstacle) => (
+          {boardConfig.obstacles.map((obstacle) => (
             <div
               key={obstacle.id}
               ref={(el) => {
@@ -232,7 +235,7 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
           ))}
 
           {/* おもちゃはボールより先に描き、国旗ボールを隠さないようにする。 */}
-          {TOYS.map((toy) => (
+          {boardConfig.toys.map((toy) => (
             <PinballToy
               key={toy.id}
               toy={toy}
