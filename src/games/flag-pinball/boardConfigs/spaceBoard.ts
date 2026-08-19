@@ -20,6 +20,8 @@ const BUMPER_RESTITUTION = 0.98
 const PEG_RADIUS = 9
 const BOTTOM_PEG_RADIUS = 8
 const PEG_RESTITUTION = 0.9
+/** ゴール直前の小型バンパー（1000点ゾーンの真上）の半径。惑星バンパーより小さく、隙間を残す。 */
+const GOAL_BUMPER_RADIUS = 16
 
 /**
  * 上部の構成は「中央の振り分けピン→左右の惑星バンパー」の順に当たるよう、
@@ -36,16 +38,34 @@ const OBSTACLES: readonly CircleObstacle[] = [
   { id: 'bumper-space-left', kind: 'bumper', x: 110, y: 210, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
   { id: 'bumper-space-right', kind: 'bumper', x: BOARD_WIDTH - 110, y: 210, radius: BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
 
-  // 下部の収束ピン。ジャンプ台で跳ね返らなかったボールを、自然に得点ゾーンへ導く。
-  { id: 'peg-space-funnel-1', kind: 'peg', x: 155, y: 745, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-space-funnel-2', kind: 'peg', x: BOARD_WIDTH / 2, y: 745, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-space-funnel-3', kind: 'peg', x: 325, y: 745, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
+  /**
+   * ゴール手前の軽い千鳥配置（2段）。実測でボールが盤面左寄りへ集まりやすく、
+   * 中央(1000)・右側(300/100)の得点ゾーンへほとんど到達しなかったため、下部だけを
+   * 調整した。通常テーマの密なピンボールにはせず、ピッチを広く（約140〜160px）取って
+   * 宇宙盤面らしい空間を残しつつ、ゴール直前でも横位置が変わる余地を作っている。
+   */
+  // 左端寄り(x<130程度)にy=700〜750あたりのピンを置くと、外壁と斜めガイドAの根元
+  // （高い側の端が壁のすぐ内側(17,313)にある）が作る上部のポケットへボールを跳ね返し、
+  // 得点ゾーンへ落ちずに上下を往復し続けるループが実機シミュレーションで再現したため、
+  // 1段目は中央〜右寄りだけに置いている（左側は2段目・端のピンで受け止める）。
+  { id: 'peg-space-lower-1', kind: 'peg', x: 250, y: 730, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-space-lower-2', kind: 'peg', x: 390, y: 730, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-space-lower-3', kind: 'peg', x: 150, y: 795, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-space-lower-4', kind: 'peg', x: 330, y: 795, radius: PEG_RADIUS, restitution: PEG_RESTITUTION },
 
-  { id: 'peg-space-bottom-1', kind: 'peg', x: 70, y: 825, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-space-bottom-2', kind: 'peg', x: 155, y: 825, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-space-bottom-3', kind: 'peg', x: BOARD_WIDTH / 2, y: 825, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-space-bottom-4', kind: 'peg', x: 325, y: 825, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
-  { id: 'peg-space-bottom-5', kind: 'peg', x: 410, y: 825, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
+  // x=70/410は通常盤面のpeg-row-8と同じ値（外壁からの距離が実績のある安全な配置）。
+  // ここを外壁へさらに寄せると、外壁とピンの間にボールが挟まる罠ができることが
+  // 実機シミュレーションで再現したため、通常盤面と同じ座標に揃えてある。
+  { id: 'peg-space-edge-left', kind: 'peg', x: 70, y: 825, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
+  { id: 'peg-space-edge-right', kind: 'peg', x: BOARD_WIDTH - 70, y: 825, radius: BOTTOM_PEG_RADIUS, restitution: PEG_RESTITUTION },
+
+  /**
+   * 1000点ゾーンのすぐ上に置く小型バンパー。中央へ来たボールが毎回そのまま1000点へ
+   * 直進するのではなく、左右の300点ゾーンへ弾かれる可能性を作る。反発係数は他の
+   * バンパーと同じ0.98のままにし、宇宙テーマらしい強い跳ね返りを保っている
+   * （半径だけを16と小さくし、1000点ゾーンへ抜けられる隙間も残す）。
+   */
+  { id: 'bumper-space-goal', kind: 'bumper', x: BOARD_WIDTH / 2, y: 825, radius: GOAL_BUMPER_RADIUS, restitution: BUMPER_RESTITUTION },
 ]
 
 // --- 壁 --------------------------------------------------------------------

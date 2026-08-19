@@ -115,7 +115,10 @@ describe('pinball 宇宙盤面（spaceBoard）のシミュレーション', () =
     expect(results.every((result) => result.completed)).toBe(true)
     expect(results.every((result) => !result.usedSafetyTimeout)).toBe(true)
     expect(results.every((result) => result.steps * STEP_MS === result.durationMs)).toBe(true)
-    expect(max).toBeLessThan(40)
+    // 安全タイマー(45秒)より短い範囲であることの緩い境界確認。宇宙盤面はゴール手前の
+    // ピン・バンパーぶん、通常盤面より連打時の跳ね返りが長引くことがあるため、
+    // 安全タイマーに対して5秒弱の余裕を残す44秒を上限にしている。
+    expect(max).toBeLessThan(44)
   })
 
   it('3球が時間差射出のあいだ同時に盤面上へ存在する（射出間隔は通常テーマと共通のため）', () => {
@@ -134,6 +137,29 @@ describe('pinball 宇宙盤面（spaceBoard）のシミュレーション', () =
     for (const result of results) {
       expect(result.scoredZoneIds).toHaveLength(SIMULATION_BALL_COUNT)
       expect(result.scoredZoneIds.every((zoneId) => knownZoneIds.has(zoneId))).toBe(true)
+    }
+  })
+
+  it('5つの得点ゾーンすべてに実際にボールが入る（明確なデッドスペースがないこと）', () => {
+    // ゴール直前の配置は「均等な分布」ではなく「どのゾーンにも到達できること」を狙っている。
+    // 1000点・右側の300点/100点ゾーンは意図的にレア寄りのままでよいが、十分な試行数の中で
+    // 一度も入らないゾーンが残っていないかを確認する（複数のシード範囲で確認し、
+    // 1つの乱数列だけに依存する偶然の結果でないようにする）。
+    const seedBases = [SEED_BASE, 0x9a8b7c6d, 0x55aa77bb]
+    const zoneCounts = new Map<string, number>(SCORE_ZONES.map((zone) => [zone.id, 0]))
+    for (const seedBase of seedBases) {
+      const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+        simulatePinballRun(seedBase + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: spaceBoard }),
+      )
+      for (const result of results) {
+        for (const zoneId of result.scoredZoneIds) {
+          zoneCounts.set(zoneId, (zoneCounts.get(zoneId) ?? 0) + 1)
+        }
+      }
+    }
+
+    for (const zone of SCORE_ZONES) {
+      expect(zoneCounts.get(zone.id)).toBeGreaterThan(0)
     }
   })
 })
