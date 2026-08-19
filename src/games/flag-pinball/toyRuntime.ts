@@ -5,6 +5,7 @@ import { createLauncherToy } from './launcherToy'
 import { createSeesawToy } from './seesawToy'
 import type { ToyPlacement } from './toyLayout'
 import { createSpinnerToy } from './spinnerToy'
+import { createWindToy } from './windToy'
 
 /** 物理更新のたびにおもちゃへ渡す、盤面上でまだ有効なボール */
 export type ToyBall = { readonly ballIndex: number; readonly body: Matter.Body }
@@ -49,6 +50,8 @@ export function createToyRuntime(placement: ToyPlacement): ToyRuntime {
       return createSeesawToy(placement)
     case 'hammer':
       return createHammerToy(placement)
+    case 'wind':
+      return createWindToy(placement)
     default: {
       const unexpectedKind: never = placement.kind
       throw new Error(`flag-pinball: 未対応のおもちゃ種別です: ${unexpectedKind}`)

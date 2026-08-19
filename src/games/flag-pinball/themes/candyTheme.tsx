@@ -40,6 +40,18 @@ function renderCandyToy(kind: ToyKind): ReactNode {
     )
   }
 
+  if (kind === 'wind') {
+    // Phase E時点ではおかしの盤面に風toyは置かれないが、テーマ定義としては
+    // 全おもちゃ種別の見た目を返す必要があるため、簡素な矢印3本にしておく。
+    return (
+      <span className={styles.candyWindMark}>
+        <span className={styles.candyWindArrow} />
+        <span className={styles.candyWindArrow} />
+        <span className={styles.candyWindArrow} />
+      </span>
+    )
+  }
+
   if (kind === 'hammer') {
     // おかしテーマ専用のハンマーtoy。ロリポップ状の頭を持つキャンディハンマーが、
     // placement中心（＝物理的な支点）を軸に左右へスイングする。全体の回転は

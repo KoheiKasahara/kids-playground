@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { PinballThemeId } from '../themes/types'
-import { BOARD_CONFIGS, candyBoard, getBoardConfig, normalBoard, oceanBoard, spaceBoard } from './index'
+import { BOARD_CONFIGS, candyBoard, getBoardConfig, normalBoard, oceanBoard, skyBoard, spaceBoard } from './index'
 
-const THEME_IDS: readonly PinballThemeId[] = ['normal', 'space', 'ocean', 'candy']
+const THEME_IDS: readonly PinballThemeId[] = ['normal', 'space', 'ocean', 'candy', 'sky']
 
 describe('BOARD_CONFIGS', () => {
-  it('4テーマすべてに盤面設定が存在する', () => {
+  it('5テーマすべてに盤面設定が存在する', () => {
     for (const themeId of THEME_IDS) {
       expect(BOARD_CONFIGS[themeId]).toBeDefined()
     }
@@ -17,6 +17,7 @@ describe('BOARD_CONFIGS', () => {
     expect(getBoardConfig('space')).toBe(spaceBoard)
     expect(getBoardConfig('ocean')).toBe(oceanBoard)
     expect(getBoardConfig('candy')).toBe(candyBoard)
+    expect(getBoardConfig('sky')).toBe(skyBoard)
   })
 
   it('不明なテーマIDを渡すと既定盤面へ握りつぶさずthrowする', () => {
@@ -45,8 +46,17 @@ describe('BOARD_CONFIGS', () => {
     expect(candyBoard.toys).not.toEqual(normalBoard.toys)
   })
 
+  it('Phase Eで空も専用盤面になっており、通常盤面とは異なる配置を持つ', () => {
+    // 空盤面は「広い空間」を優先し、宇宙・海・おかしと違って専用の斜めガイド壁や
+    // 短いガイド板を追加していない（壁一式は通常盤面と同じ6枚のまま）。それでも
+    // obstacles・toysは通常盤面とはっきり異なるため、盤面設定全体としては別物になる。
+    expect(skyBoard).not.toEqual(normalBoard)
+    expect(skyBoard.obstacles).not.toEqual(normalBoard.obstacles)
+    expect(skyBoard.toys).not.toEqual(normalBoard.toys)
+  })
+
   it('テーマ設定同士は内容が同じでも同一のmutableオブジェクトを共有していない', () => {
-    const configs = [normalBoard, spaceBoard, oceanBoard, candyBoard]
+    const configs = [normalBoard, spaceBoard, oceanBoard, candyBoard, skyBoard]
     for (let i = 0; i < configs.length; i += 1) {
       for (let j = i + 1; j < configs.length; j += 1) {
         expect(configs[i]).not.toBe(configs[j])

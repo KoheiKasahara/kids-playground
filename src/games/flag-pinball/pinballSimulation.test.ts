@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_FLAGS_LAUNCH_INTERVAL_MS, launchDelaysMs, SCORE_ZONES } from './boardLayout'
-import { candyBoard, oceanBoard, spaceBoard } from './boardConfigs'
+import { candyBoard, oceanBoard, skyBoard, spaceBoard } from './boardConfigs'
 import { PINBALL_FLAG_IDS } from './data/pinballFlags'
 import { SIMULATION_BALL_COUNT, STEP_MS } from './pinballPhysics'
 import { simulatePinballRun } from './pinballSimulation'
@@ -325,6 +325,95 @@ describe('pinball おかし盤面（candyBoard）のシミュレーション', (
         }
       }
     }
+
+    for (const zone of SCORE_ZONES) {
+      expect(zoneCounts.get(zone.id)).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('pinball 空盤面（skyBoard）のシミュレーション', () => {
+  it('おもちゃをタップしない32個のシード付き試行が、安全タイマーに頼らず全球得点確定する', () => {
+    const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: skyBoard }),
+    )
+    const seconds = results.map((result) => result.durationSeconds).sort((a, b) => a - b)
+    const median = (seconds[TRIAL_COUNT / 2 - 1] + seconds[TRIAL_COUNT / 2]) / 2
+    const min = seconds[0]
+    const max = seconds[seconds.length - 1]
+    const mean = seconds.reduce((sum, value) => sum + value, 0) / seconds.length
+
+    console.info(
+      `sky board simulation (${TRIAL_COUNT} trials): min=${min.toFixed(3)}s median=${median.toFixed(3)}s mean=${mean.toFixed(3)}s max=${max.toFixed(3)}s`,
+    )
+
+    expect(results.every((result) => result.completed)).toBe(true)
+    expect(results.every((result) => !result.usedSafetyTimeout)).toBe(true)
+    // 空テーマは広い空間・風による滞空感を狙っているため他テーマよりやや長くなってよいが、
+    // 目安の10〜20秒に対して十分な余裕を持たせた上限にする（数秒での直落ち・永久滞空を防ぐ）。
+    expect(min).toBeGreaterThanOrEqual(3)
+    expect(median).toBeGreaterThanOrEqual(7)
+    expect(median).toBeLessThan(25)
+    expect(max).toBeLessThan(40)
+  })
+
+  it('おもちゃを100ms間隔で連打しても、安全タイマーなしで全試行が完了する', () => {
+    const results = Array.from({ length: RAPID_TAP_TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, {
+        toyTapIntervalMs: RAPID_TAP_INTERVAL_MS,
+        boardConfig: skyBoard,
+      }),
+    )
+    const seconds = results.map((result) => result.durationSeconds).sort((a, b) => a - b)
+    const max = seconds[seconds.length - 1]
+
+    expect(results.every((result) => result.completed)).toBe(true)
+    expect(results.every((result) => !result.usedSafetyTimeout)).toBe(true)
+    expect(results.every((result) => result.steps * STEP_MS === result.durationMs)).toBe(true)
+    // 安全タイマー(45秒)より短い範囲であることの緩い境界確認。
+    expect(max).toBeLessThan(44)
+  })
+
+  it('3球が時間差射出のあいだ同時に盤面上へ存在する（射出間隔は通常テーマと共通のため）', () => {
+    const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: skyBoard }),
+    )
+    expect(results.every((result) => result.maxConcurrentBalls > 1)).toBe(true)
+  })
+
+  it('scoredZoneIdsが球数と一致し、すべて既知のゾーンIDになる', () => {
+    const knownZoneIds = new Set(SCORE_ZONES.map((zone) => zone.id))
+    const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      simulatePinballRun(SEED_BASE + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: skyBoard }),
+    )
+
+    for (const result of results) {
+      expect(result.scoredZoneIds).toHaveLength(SIMULATION_BALL_COUNT)
+      expect(result.scoredZoneIds.every((zoneId) => knownZoneIds.has(zoneId))).toBe(true)
+    }
+  })
+
+  it('5つの得点ゾーンすべてに実際にボールが入る（風の向きが一方へ偏りすぎていないこと）', () => {
+    // 1000点ゾーンは意図的にレア寄りのままでよいが、十分な試行数の中で一度も入らない
+    // ゾーンが残っていないかを確認する（複数のシード範囲で確認し、1つの乱数列だけに
+    // 依存する偶然の結果でないようにする）。
+    const seedBases = [SEED_BASE, 0x9a8b7c6d, 0x55aa77bb]
+    const zoneCounts = new Map<string, number>(SCORE_ZONES.map((zone) => [zone.id, 0]))
+    for (const seedBase of seedBases) {
+      const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+        simulatePinballRun(seedBase + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: skyBoard }),
+      )
+      for (const result of results) {
+        for (const zoneId of result.scoredZoneIds) {
+          zoneCounts.set(zoneId, (zoneCounts.get(zoneId) ?? 0) + 1)
+        }
+      }
+    }
+
+    console.info(
+      'sky board zone distribution:',
+      SCORE_ZONES.map((zone) => `${zone.id}(${zone.score})=${zoneCounts.get(zone.id)}`).join(' '),
+    )
 
     for (const zone of SCORE_ZONES) {
       expect(zoneCounts.get(zone.id)).toBeGreaterThan(0)
