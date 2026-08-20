@@ -26,6 +26,7 @@ const games: GameCard[] = [
   { id: 'prefecture-quiz', title: '都道府県クイズ', emoji: '🗾', path: '/games/prefecture-quiz' },
   { id: 'world-travel-quiz', title: 'せかい旅行クイズ', emoji: '✈️', path: '/games/world-travel-quiz' },
   { id: 'japan-travel-quiz', title: 'にほん旅行クイズ', emoji: '🗾', path: '/games/japan-travel-quiz' },
+  { id: 'earth-globe', title: 'ちきゅうぎ', emoji: '🌍', path: '/games/earth-globe' },
 ]
 
 export default function Home() {
