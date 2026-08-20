@@ -29,6 +29,30 @@ export type ZoomLevel = 0 | 1 | 2 | 3
 export const MIN_ZOOM_LEVEL: ZoomLevel = 0
 export const MAX_ZOOM_LEVEL: ZoomLevel = 3
 
+/** three-globeの地球半径と同じワールド単位。ラベルの投影にも使う。 */
+export const GLOBE_RADIUS = 100
+
+export type GlobeVector3 = {
+  x: number
+  y: number
+  z: number
+}
+
+export type GlobeProjectedPoint = {
+  /** 地球儀コンテナ左上を原点とするCSSピクセル座標。 */
+  x: number
+  y: number
+  /** Three.jsのNDC深度。-1に近いほど手前。 */
+  depth: number
+}
+
+export type GlobeCameraUpdate = {
+  cameraPosition: GlobeVector3
+  viewportWidth: number
+  viewportHeight: number
+  projectPoint: (point: GlobeVector3) => GlobeProjectedPoint | null
+}
+
 /**
  * 3Dエンジンを React から操作するためのフック契約。
  * `useDominoEngine`（src/games/domino-flag）と同じ「div を registerContainer に
@@ -51,6 +75,8 @@ export type UseGlobeEngineOptions = {
   onCountrySelect: (countryId: string | null) => void
   /** prefers-reduced-motion のとき true。true の間はカメラ・ハイライトのアニメーションを即時化する。 */
   reducedMotion: boolean
+  /** HTMLラベルオーバーレイへカメラ位置と投影口を渡す。 */
+  onCameraUpdate?: (update: GlobeCameraUpdate) => void
 }
 
 export type UseGlobeEngineHandle = {

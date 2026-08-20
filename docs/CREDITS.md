@@ -16,7 +16,8 @@
 「ちきゅうぎ」（`src/games/earth-globe/`）の3D地球儀・国ポリゴン描画には
 [three-globe](https://github.com/vasturiano/three-globe) npmパッケージ（**2.45.2**）を使用しています。
 three.js上に国境ポリゴンを球面表示するためのライブラリで、npm経由でビルド時にバンドルし、実行時のCDN通信は行いません。
-表示する国境データ・国旗・国名は前述の world-atlas / 既存の国マスタ（`src/games/flag-quiz/data/countries.ts`）をそのまま再利用しており、three-globe自体は地形データを持ちません。
+表示する国境データは前述の world-atlas、国旗は flag-icons、国名は既存105か国の国マスタを優先し、
+不足分を i18n-iso-countries の日本語名から生成しています。three-globe自体は地形データを持ちません。
 
 - プロジェクト: three-globe
 - リポジトリ: https://github.com/vasturiano/three-globe
@@ -119,14 +120,21 @@ SOFTWARE.
 
 ### 収録している国旗一覧
 
-`public/flags/` には、`src/games/flag-quiz/data/countries.ts` で使用する
-以下105か国分のSVGファイルを収録しています。
+`public/flags/` には、`src/games/flag-quiz/data/countries.ts` の105か国に加えて、
+「ちきゅうぎ」で使用する国を含む以下234ファイルのSVGを収録しています。
 
 ```
-jp kr cn th in ph vn id tr gb fr de it es ch se ru gr nl
-us ca mx br ar pe eg za ke ng au nz sg my mm kh np lk pk
-mn tw sa ae il ir kp qa kw jo lb kz bd pt be at no dk fi
-is ie pl cz hu ro ua hr rs lu mt mc va sk cu pa cr jm do
-gt cl co ve ec bo py uy ma tn dz et gh tz ug sn ci cm mg
-zw fj pg ws to bs sb vu fm mh
+ad ae af ag ai al am ao ar as at au aw ax az ba bb bd
+be bf bg bh bi bj bl bm bn bo br bs bt bw by bz ca cd
+cf cg ch ci ck cl cm cn co cr cu cv cw cy cz de dj dk
+dm do dz ec ee eg eh er es et fi fj fk fm fo fr ga gb
+gd ge gg gh gl gm gn gq gr gs gt gu gw gy hk hm hn hr
+ht hu id ie il im in io iq ir is it je jm jo jp ke kg
+kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu
+lv ly ma mc md me mf mg mh mk ml mm mn mo mp mr ms mt
+mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz
+om pa pe pf pg ph pk pl pm pn pr ps pt pw py qa ro rs
+ru rw sa sb sc sd se sg sh si sk sl sm sn so sr ss st
+sv sx sy sz tc td tf tg th tj tl tm tn to tr tt tw tz
+ua ug us uy uz va vc ve vg vi vn vu wf ws ye za zm zw
 ```

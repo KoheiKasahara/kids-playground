@@ -1,21 +1,13 @@
-import { countries } from '../../flag-quiz/data/countries'
 import type { GlobeCountry } from '../types'
-import { countryNumericIds } from './countryNumericIds'
+import { generatedGlobeCountries } from './globeCountries.generated'
 import { worldFeatures } from './worldFeatures'
 
 const worldFeatureIds = new Set(worldFeatures.map((worldFeature) => worldFeature.id))
 
-export const globeCountries: readonly GlobeCountry[] = countries.flatMap((country) => {
-  const numericId = countryNumericIds[country.id]
-  if (numericId === undefined || !worldFeatureIds.has(numericId)) return []
-
-  return [{
-    id: country.id,
-    nameJa: country.nameJa,
-    flag: country.flag,
-    numericId,
-  }]
-})
+// worldFeaturesは描画データ側で差し替わるため、実行時に対応するfeatureだけを採用する。
+export const globeCountries: readonly GlobeCountry[] = generatedGlobeCountries.filter(
+  (country) => worldFeatureIds.has(country.numericId),
+)
 
 export const globeCountryByNumericId: ReadonlyMap<number, GlobeCountry> = new Map(
   globeCountries.map((country) => [country.numericId, country]),

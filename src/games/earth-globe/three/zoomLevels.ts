@@ -10,10 +10,21 @@ const CAMERA_DISTANCE_BY_ZOOM: Readonly<Record<ZoomLevel, number>> = {
   3: 145,
 }
 
+const ROTATE_SPEED_BY_ZOOM: Readonly<Record<ZoomLevel, number>> = {
+  0: 1,
+  1: 0.76,
+  2: 0.48,
+  3: 0.28,
+}
+
 export const ZOOM_ANIMATION_DURATION_MS = 320
 
 export function cameraDistanceForZoom(level: ZoomLevel): number {
   return CAMERA_DISTANCE_BY_ZOOM[level]
+}
+
+export function rotateSpeedForZoom(level: ZoomLevel): number {
+  return ROTATE_SPEED_BY_ZOOM[level]
 }
 
 export function easeOutCubic(progress: number): number {

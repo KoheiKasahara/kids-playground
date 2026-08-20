@@ -6,10 +6,30 @@
 
 ## データ
 
-- 対応する国の一覧は `src/games/earth-globe/data/globeCountries.ts` の `globeCountries` を使う。
+- 対応する国の一覧は `src/games/earth-globe/data/globeCountries.ts` の `globeCountries` を使う。world-atlasの236 featureのうち、ISO 3166-1 numericを持ちISOコード・日本語名・国旗がそろう234件を対象にする（南極は国ではないため選択対象から外す）。
 - 国データは `id`、`nameJa`、`flag`、`numericId` を持つ。国旗は `import.meta.env.BASE_URL + country.flag` で表示する。
-- 地球の国境データは `src/games/earth-globe/data/worldFeatures.ts` の `worldFeatures` を使う。
+- 既存105か国の幼児向け表記（`にほん` / `みなみアフリカ` など）は `src/games/flag-quiz/data/countries.ts` を正とし、生成時に必ず優先する。不足分は `i18n-iso-countries` の日本語名を、正式国名接尾辞の除去・漢字のかな化・長さ上限で整形して使う（生成: `npm run build:earth-globe-countries`）。
+- 地球の国境データは `src/games/earth-globe/data/worldFeatures.ts` の `worldFeatures` を使う。ISOコードを持たない5つの特殊領域（Somaliland / Kosovo / N. Cyprus / Indian Ocean Ter. / Siachen Glacier）は負のid（-1〜-5）で収録し、陸地としては描画するが国データを持たないため選択されない。
+- 通常状態の陸地は国データの有無にかかわらず同じ色で描く。色が変わるのは選択中の国だけにして、「この国だけ色が違う」状態を作らない。
 - 国の選択状態とズーム段階は `EarthGlobePlay` が持ち、3Dエンジンへ型契約どおり渡す。
+
+## 地理データの簡略化と初期表示速度
+
+three-globeは `polygonsData()` に渡した単一ポリゴンごとに `ConicPolygonGeometry` を生成する。この生成コストは出力三角形数ではなく**1リングあたりの入力座標数に対して超線形**に効くため、world-atlas 50mをそのまま渡すと初期表示が長時間ブロックする。
+
+計測（同一環境でのA/B、`ConicPolygonGeometry` 生成のみ）:
+
+```text
+50m生データ    1,609ポリゴン / 99,289座標 / 最大リング4,894点 →  8,464ms
+簡略化データ      768ポリゴン / 37,921座標 / 最大リング1,707点 →  1,065ms  (約7.9倍)
+```
+
+そのため `npm run build:earth-globe-data`（`scripts/build-earth-globe-data.mjs`）で事前に簡略化し、生成済みJSONをリポジトリに含めて静的importする。実行時のTopoJSON変換は行わない。
+
+- 簡略化はTopoJSONの**arc単位**でDouglas-Peuckerを掛ける。arcは隣接国と共有されるため、arc単位で間引けば国境に隙間が生じない。
+- 閉じたarc（島や飛び地の輪）は始点と終点が同一で線分長が0になり、そのままでは全点が潰れて国が消える（アイスランド・ジャマイカ・レソトで発生）。始点から最遠の点で二分してから間引くことで防いでいる。
+- 描画負荷を下げるため、各国の面積最大のポリゴンは必ず残したうえで、小さすぎる島を落とす。どの国もポリゴンが0個にならないことを保証する。
+- 初期表示では海と大気だけを先に描画し、国ポリゴンは最初のフレームの後に投入する。`requestAnimationFrame` が発火しない環境（バックグラウンドタブなど）でも進むよう、タイマーによるフォールバックを併用し、二重投入しないようガードしている。
 
 ## 操作
 
@@ -32,11 +52,21 @@
 
 `100dvh` と safe-area用のデザイントークンを使い、320px程度の狭い画面でも操作ボタンが画面外へ出ないようにする。`prefers-reduced-motion` が有効な場合は画面側の遷移を止め、その状態を3Dエンジンにも渡す。
 
+## 国名ラベル
+
+- 初期状態はOFF。HTMLオーバーレイを使い、国名は `nameJa` で表示する。
+- 各国のアンカーは `worldFeatures` の最大ポリゴンの外周重心から初回だけ計算し、緯度経度を半径100の3D座標へ変換する。
+- カメラ側の半球だけを対象にし、Zoom 0/1 は面積順位のしきい値を8/18位で絞る。Zoom 2/3 は面積順位で候補を落とさず、投影位置を地域の優先度、面積順位を同地域内の優先度として使う。基本上限は6/10/16/22件で、実際の上限は `min(基本上限, max(6, floor(画面幅/48)+1))` として狭い画面ほど減らす。
+- 可視半球のしきい値はZoom 0/1/2/3で0.08/0.12/0.22/0.4とし、拡大時ほど地球の縁に近い国を除外する。Zoom 2/3の配置優先度には画面中心への近さ（最大300点）を加え、面積順位だけで端の大国が先行しないようにする。
+- 投影されたラベルは画面内へクランプしてから、重要度順に矩形を置く。既存矩形と4px以上重なる候補はスキップするため、画面端でも読める位置を確保できる。
+- 位置更新はReactのstateを使わずDOMの `left` / `top` を直接更新し、50ms間隔（約20fps）に間引く。`prefers-reduced-motion` 時もラベル移動アニメーションは行わない。
+
 ## 3D実装
 
 - `three`（生のAPI、React Three Fiberは使わない）と `three-globe`（球面上への国ポリゴン描画・大気グロー用、ライセンス等は `docs/CREDITS.md` 参照）を `src/games/earth-globe/three/useGlobeEngine.ts` で組み合わせる。カメラ・レンダラー・`OrbitControls`（回転のみ、`enableZoom=false`）は自前管理し、`domino-flag`（`useDominoEngine.ts`）と同じ「hookがThree.jsのライフサイクルを完結させ、`registerContainer`でDOM要素を受け取る」構成に揃えている。
 - 見た目はテクスチャ画像を使わず、海=単色スフィア（`globeMaterial()`）、陸=`worldFeatures`をthree-globeの`polygonsData`へ渡した国ポリゴンのcap色で表現する。国境線は`polygonStrokeColor`、大気は`showAtmosphere`。新規バイナリアセットは追加していない。
 - ズームは0〜3の4段階で、カメラ距離（地球半径100基準）を `three/zoomLevels.ts` の `cameraDistanceForZoom` (300 / 230 / 175 / 145) へ短いeaseOutアニメーションで遷移させる。＋/−連打時は実行中のアニメーションを都度キャンセルして目標を繋ぎ直す。
-- 国タップは、three-globe 2.x系に `onPolygonClick` 等の組み込みクリックハンドラが無いため、`THREE.Raycaster` を自前で使い、ヒットしたポリゴンMeshの `__data.data.id`（three-globeが`polygonsData`へ渡した元のGeoJSON featureの`id`＝world-atlasのISO numeric）から国を逆引きしている。ポリゴンは中心から地表までの円錐形状のため、画面中心付近では無関係な国の円錐頂点（地球中心）近くを誤って拾うことがあり、海球面と同程度の距離で交差したヒットだけを採用することで除外している。
+- 拡大するほど細かく位置合わせできるよう、`OrbitControls` の `rotateSpeed` をズーム段階に応じて 1.0 / 0.76 / 0.48 / 0.28 に変える（`rotateSpeedForZoom`）。ズーム遷移中はカメラ距離と同じeaseOutで補間し、感度が急変しないようにする。
+- 国タップは、three-globe 2.x系に `onPolygonClick` 等の組み込みクリックハンドラが無いため、`THREE.Raycaster` を自前で使い、ヒットしたポリゴンから国を逆引きしている。**three-globeの内部表現に触れる処理は `three/threeGlobeAdapter.ts` の1か所に隔離**し、アプリの他の場所へ内部構造の知識を漏らさない（three-globeを更新したときはこのファイルだけを確認すればよい。回帰検知用のユニットテストを置いている）。ポリゴンは中心から地表までの円錐形状のため、画面中心付近では無関係な国の円錐頂点（地球中心）近くを誤って拾うことがあり、海球面と同程度の距離で交差したヒットだけを採用することで除外している。
 - 選択中の国は `polygonCapColor` を明るい黄色系へ、`polygonAltitude` をわずかに高くして「浮いて見える」ハイライトにする。
 - ドラッグ中にページがスクロールしないよう、canvasに `touch-action: none` を設定している。
