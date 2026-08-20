@@ -1,4 +1,4 @@
-export type ToyKind = 'spinner' | 'launcher' | 'jumppad' | 'seesaw' | 'hammer' | 'wind'
+export type ToyKind = 'spinner' | 'launcher' | 'jumppad' | 'seesaw' | 'hammer' | 'wind' | 'car'
 
 /**
  * launcher（押し出しおもちゃ）を「潮流」寄りに振る舞わせるための任意設定。
@@ -40,6 +40,22 @@ export type WindConfig = {
 }
 
 /**
+ * 車toy（kind: 'car'）が左右に往復する範囲と速さを決める設定。
+ * くるまテーマ専用。車は物理的に実在するColliderを持つ「動く障害物」で、
+ * センサーでボールを操作するwindtoyとは違い、ボールと直接衝突して弾き飛ばす（carToy.ts参照）。
+ */
+export type CarConfig = {
+  /** 車の中心xが取りうる左端（この値を下回って進まない） */
+  readonly leftX: number
+  /** 車の中心xが取りうる右端（この値を上回って進まない） */
+  readonly rightX: number
+  /** 移動速度(px/step)。leftX・rightXの間を一定速度で往復する */
+  readonly speed: number
+  /** 最初の進行方向。1で右、-1で左 */
+  readonly initialDirection: 1 | -1
+}
+
+/**
  * おもちゃ1個ぶんの配置データ。テーマ別のBoardConfig（boardConfigs/）が種類・個数・座標を持ち、
  * このファイルには「配置データの形」だけを置く。
  */
@@ -59,4 +75,6 @@ export type ToyPlacement = {
   readonly launcherTide?: LauncherTideConfig
   /** kind: 'wind' のときは必須の設定。他のkindでは無視される */
   readonly wind?: WindConfig
+  /** kind: 'car' のときは必須の設定。他のkindでは無視される */
+  readonly car?: CarConfig
 }

@@ -1,4 +1,5 @@
 import { candyTheme } from './candyTheme'
+import { carTheme } from './carTheme'
 import { normalTheme } from './normalTheme'
 import { oceanTheme } from './oceanTheme'
 import { skyTheme } from './skyTheme'
@@ -11,6 +12,7 @@ export const PINBALL_THEMES: readonly PinballThemeDefinition[] = [
   oceanTheme,
   candyTheme,
   skyTheme,
+  carTheme,
 ]
 
 export const DEFAULT_PINBALL_THEME_ID: PinballThemeId = 'normal'

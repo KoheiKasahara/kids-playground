@@ -26,6 +26,7 @@
   --toy-spin: 0rad;
   --toy-pulse: 0;
   --toy-scale: 1;
+  --toy-offset-x: 0px;
   position: relative;
   display: block;
   flex: 0 0 auto;
@@ -35,7 +36,8 @@
   box-shadow:
     inset 0 0 0 3px rgba(255, 255, 255, 0.38),
     var(--shadow-sm);
-  transform: rotate(var(--toy-spin)) scale(calc(var(--toy-scale) * (1 + 0.12 * var(--toy-pulse))));
+  transform: translateX(var(--toy-offset-x)) rotate(var(--toy-spin))
+    scale(calc(var(--toy-scale) * (1 + 0.12 * var(--toy-pulse))));
   transform-origin: center;
   transition: filter 120ms ease;
   will-change: transform;
@@ -87,7 +89,8 @@
  * 見た目はテーマ側のrenderToyがDOM要素として描き、回転は`.toyVisual`のrotateだけで行う。
  */
 .toyVisual[data-toy-kind='seesaw'],
-.toyVisual[data-toy-kind='hammer'] {
+.toyVisual[data-toy-kind='hammer'],
+.toyVisual[data-toy-kind='car'] {
   border: 0;
   border-radius: 0;
   background: none;

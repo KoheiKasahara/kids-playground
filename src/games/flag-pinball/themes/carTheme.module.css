@@ -1,0 +1,456 @@
+.carBoard {
+  --pinball-board-bg:
+    radial-gradient(circle at 50% 6%, rgba(255, 214, 120, 0.28), rgba(255, 214, 120, 0) 40%),
+    linear-gradient(180deg, #dff0ff 0%, #f2f8e8 45%, #fff3df 100%);
+  --pinball-wall: rgba(90, 96, 112, 0.55);
+  --pinball-guide-wall: rgba(255, 158, 42, 0.7);
+  --pinball-divider: rgba(50, 54, 64, 0.18);
+  --pinball-bumper: radial-gradient(circle at 35% 28%, #fff0c2, #ff7b3f 62%, #d1481c 100%);
+  --pinball-bumper-highlight: rgba(255, 255, 255, 0.7);
+  --pinball-peg: radial-gradient(circle at 35% 28%, #cfe3ff, #5b8cff 70%, #2f57b8 100%);
+  --pinball-peg-highlight: rgba(255, 255, 255, 0.65);
+  --pinball-zone-bg: rgba(70, 110, 180, 0.08);
+  --pinball-zone-bg-300: rgba(70, 110, 180, 0.16);
+  --pinball-zone-bg-1000: linear-gradient(180deg, rgba(255, 140, 40, 0.32), rgba(255, 140, 40, 0.14));
+  --pinball-zone-border: rgba(50, 54, 64, 0.2);
+  --pinball-zone-text: #2c3f66;
+  --pinball-zone-text-1000: #b5501a;
+  --pinball-score-pop: #b5501a;
+}
+
+/*
+ * 「道路」の装飾。当たり判定を持たない純粋な見た目で、車toy（carToy.ts）が往復する
+ * y=460付近を横切る帯として、盤面の座標系（480×1000）にそのままpxで固定する
+ * （carBoard.tsの車の可動範囲・道路上の障害物配置と対応させるため、%ではなくpxで置く）。
+ * グレー系の帯 + 白い中央線だけの簡素な見た目にし、国旗ボールより目立たないよう
+ * 彩度・コントラストを抑えてある。
+ */
+.carBackdrop {
+  position: absolute;
+  left: 40px;
+  top: 400px;
+  width: 400px;
+  height: 120px;
+  pointer-events: none;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #8a8f9b 0%, #6c717d 50%, #575c68 100%);
+  box-shadow:
+    inset 0 6px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -6px 0 rgba(0, 0, 0, 0.16);
+  opacity: 0.82;
+}
+
+.carBackdrop::before {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 50%;
+  height: 6px;
+  content: '';
+  background-image: repeating-linear-gradient(90deg, rgba(255, 246, 216, 0.85) 0 26px, transparent 26px 46px);
+  transform: translateY(-50%);
+}
+
+.carToy {
+  --pinball-toy-bg: radial-gradient(circle at 35% 30%, #fff0c2, #ff7b3f 62%, #d1481c 100%);
+  --pinball-toy-launcher-bg: radial-gradient(circle at 35% 30%, #d8f0ff, #6fa8e0 62%, #395f9e 100%);
+  --pinball-toy-mark: transparent;
+  --pinball-toy-launcher-ring: transparent;
+  --pinball-toy-launcher-core: transparent;
+}
+
+.carToy[data-toy-kind='launcher']::before,
+.carToy[data-toy-kind='launcher']::after,
+.carToy[data-toy-kind='jumppad']::before,
+.carToy[data-toy-kind='jumppad']::after {
+  display: none;
+  content: none;
+}
+
+/* --- 車toy: デフォルメされたミニカー。 -------------------------------------- */
+/*
+ * carToy.tsの複合Collider（胴体: 幅83.3%×高さ28.3%・中心y=+8/120=56.7%、
+ * 屋根: 半径22/120=18.3%の円・中心y=-16/120=36.7%、いずれも120×120のtoy.radius*2基準）と
+ * ほぼ一致する比率で描き、見た目とColliderが大きくズレないようにしてある。
+ */
+.carMark {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.carShadow,
+.carBody,
+.carCabin,
+.carWindow,
+.carWheel,
+.carLight {
+  position: absolute;
+  pointer-events: none;
+}
+
+.carShadow {
+  left: 50%;
+  top: 78%;
+  width: 78%;
+  height: 14%;
+  border-radius: 50%;
+  background: rgba(30, 30, 30, 0.18);
+  transform: translate(-50%, -50%);
+}
+
+.carBody {
+  left: 50%;
+  top: 56.7%;
+  width: 83%;
+  height: 28%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 46%;
+  background: linear-gradient(160deg, #ff8a68 0%, #ef4b3d 58%, #c72f28 100%);
+  box-shadow: inset 0 -3px 0 rgba(140, 30, 20, 0.32), 0 1px 4px rgba(60, 20, 10, 0.3);
+  transform: translate(-50%, -50%);
+}
+
+.carCabin {
+  left: 50%;
+  top: 36.7%;
+  width: 37%;
+  height: 37%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: linear-gradient(160deg, #46628f 0%, #2a4066 100%);
+  transform: translate(-50%, -50%);
+}
+
+.carWindow {
+  left: 58%;
+  top: 36%;
+  width: 20%;
+  height: 20%;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #eaf6ff 0%, #a9d3f5 100%);
+  transform: translate(-50%, -50%);
+}
+
+.carWheel {
+  top: 74%;
+  width: 22%;
+  height: 22%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #6a7280, #2b2f38 70%);
+  transform: translate(-50%, -50%);
+  animation: carWheelSpin 700ms linear infinite;
+}
+
+.carWheel::before {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  width: 10%;
+  height: 76%;
+  content: '';
+  background: rgba(210, 216, 226, 0.8);
+  transform: translateX(-50%);
+}
+
+.carWheelRear {
+  left: 27%;
+}
+
+.carWheelFront {
+  left: 76%;
+}
+
+.carLight {
+  left: 90%;
+  top: 55%;
+  width: 10%;
+  height: 10%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #fff8d6, #ffcf5c 70%);
+  box-shadow: 0 0 4px rgba(255, 210, 90, 0.8);
+  transform: translate(-50%, -50%);
+}
+
+/* 進行方向に合わせて絵ごと左右反転する。物理Colliderには一切触れない見た目だけの反転。 */
+.carToy[data-toy-kind='car'][data-toy-facing='left'] .carMark {
+  transform: scaleX(-1);
+}
+
+.carToy[data-toy-kind='car'][data-toy-active='true'] .carBody {
+  filter: brightness(1.12) saturate(1.1);
+}
+
+@keyframes carWheelSpin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* --- 未使用kindの簡素な代替（Phase F時点ではくるま盤面に配置しない種類） --- */
+
+.carSpinnerMark {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.carSpinnerBlade {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--toy-blade-thickness);
+  height: var(--toy-blade-length);
+  border: 2px solid rgba(255, 255, 255, 0.78);
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.16);
+  transform-origin: center;
+}
+
+.carSpinnerBladeNorth {
+  background: #ff8a68;
+  border-radius: 55% 55% 12% 12%;
+  transform: translate(-50%, -100%);
+}
+
+.carSpinnerBladeEast {
+  width: var(--toy-blade-length);
+  height: var(--toy-blade-thickness);
+  background: #5b8cff;
+  border-radius: 12% 55% 55% 12%;
+  transform: translate(0, -50%);
+}
+
+.carSpinnerBladeSouth {
+  background: #ffcf5c;
+  border-radius: 12% 12% 55% 55%;
+  transform: translate(-50%, 0);
+}
+
+.carSpinnerBladeWest {
+  width: var(--toy-blade-length);
+  height: var(--toy-blade-thickness);
+  background: #46628f;
+  border-radius: 55% 12% 12% 55%;
+  transform: translate(-100%, -50%);
+}
+
+.carSpinnerHub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30%;
+  height: 30%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 35% 30%, #fff8d6, #ffcf5c 72%, #d1481c 100%);
+  box-shadow: 0 1px 3px rgba(90, 50, 20, 0.32);
+  transform: translate(-50%, -50%);
+}
+
+.carJumppadMark {
+  position: absolute;
+  inset: 10%;
+  display: block;
+  pointer-events: none;
+}
+
+.carJumppadPad,
+.carJumppadRing {
+  position: absolute;
+  pointer-events: none;
+}
+
+.carJumppadPad {
+  left: 50%;
+  bottom: 8%;
+  width: 90%;
+  height: 40%;
+  border: 2px solid rgba(255, 255, 255, 0.74);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #eef4ff, #8ea8eb 68%, #5871c4 100%);
+  transform: translateX(-50%);
+  transform-origin: center bottom;
+}
+
+.carJumppadRing {
+  left: 50%;
+  top: 12%;
+  width: 60%;
+  height: 60%;
+  border: 2px solid rgba(255, 158, 42, 0.75);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.carSeesawMark {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.carSeesawPivot,
+.carSeesawPlank {
+  position: absolute;
+  pointer-events: none;
+}
+
+.carSeesawPivot {
+  left: 50%;
+  bottom: 40%;
+  width: 24%;
+  height: 32%;
+  border-radius: 32% 32% 46% 46%;
+  background: #46628f;
+  transform: translateX(-50%) rotate(calc(-1 * var(--toy-spin)));
+  transform-origin: 50% 100%;
+}
+
+.carSeesawPlank {
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 15%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 40%;
+  background: #5b8cff;
+  transform: translate(-50%, -50%);
+}
+
+.carHammerMark {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.carHammerHandle,
+.carHammerHead {
+  position: absolute;
+  pointer-events: none;
+}
+
+.carHammerHandle {
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 18%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 40%;
+  background: #5b8cff;
+  transform: translate(-50%, -50%);
+}
+
+.carHammerHead {
+  left: 92%;
+  top: 50%;
+  width: 40%;
+  height: 40%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: #ff7b3f;
+  transform: translate(-50%, -50%);
+}
+
+.carWindMark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14%;
+  pointer-events: none;
+}
+
+.carWindArrow {
+  width: 56%;
+  height: 12%;
+  border-radius: var(--radius-round);
+  background: #5b8cff;
+  opacity: 0.7;
+}
+
+.carLauncherMark {
+  position: absolute;
+  inset: 10%;
+  display: block;
+  pointer-events: none;
+}
+
+.carLauncherBase,
+.carLauncherSpring,
+.carLauncherCap,
+.carLauncherPop {
+  position: absolute;
+  pointer-events: none;
+}
+
+.carLauncherBase {
+  left: 17%;
+  top: 63%;
+  width: 66%;
+  height: 25%;
+  border: 2px solid rgba(255, 255, 255, 0.74);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #eef4ff, #8ea8eb 68%, #5871c4 100%);
+  transform-origin: center bottom;
+}
+
+.carLauncherSpring {
+  left: 32%;
+  top: 20%;
+  width: 36%;
+  height: 57%;
+  border-right: 3px solid rgba(70, 98, 143, 0.9);
+  border-left: 3px solid rgba(70, 98, 143, 0.9);
+  border-radius: 50%;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 5px,
+    rgba(255, 255, 255, 0.9) 5px 8px,
+    transparent 8px 12px
+  );
+  transform-origin: center bottom;
+}
+
+.carLauncherCap {
+  left: 23%;
+  top: 10%;
+  width: 54%;
+  height: 23%;
+  border: 2px solid rgba(255, 255, 255, 0.86);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #fff7c9, #ffb347 68%, #e17b2e 100%);
+  transform-origin: center bottom;
+}
+
+.carLauncherPop {
+  left: 12%;
+  top: 5%;
+  width: 76%;
+  height: 76%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  opacity: 0.2;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carWheel {
+    animation: none;
+  }
+
+  .carSpinnerMark {
+    will-change: auto;
+  }
+}
