@@ -155,8 +155,11 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     }
 
     function cameraDistanceForViewport(level: ZoomLevel) {
-      const rect = container.getBoundingClientRect()
-      return cameraDistanceForZoom(level, rect.height > rect.width)
+      const rect = container?.getBoundingClientRect()
+      return cameraDistanceForZoom(
+        level,
+        (rect?.height ?? 0) > (rect?.width ?? Number.POSITIVE_INFINITY),
+      )
     }
 
     function updatePointOfView() {
