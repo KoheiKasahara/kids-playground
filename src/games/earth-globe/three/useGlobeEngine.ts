@@ -19,13 +19,14 @@ import {
   isGlobeBodyObject,
   polygonNumericIdFromObject,
 } from './threeGlobeAdapter'
+import { createGlobeBorderLines, disposeGlobeBorderLines } from './globeBorderLines'
+import { configureGlobeRotationControls } from './rotationControls'
 
 const BASE_GLOBE_COLOR = '#4dabf7'
 const LAND_COLOR = '#8ce99a'
 const SIDE_COLOR = '#69b97a'
 const SELECTED_LAND_COLOR = '#ffd43b'
 const SELECTED_SIDE_COLOR = '#f59f00'
-const BORDER_COLOR = '#173b75'
 // three-globeのpolygon strokeはWebGLの1物理解像度px固定のLineBasicMaterial。
 // DPRを1にそろえることで、高DPR画面でもCSS上の国境を1pxで安定して見せる。
 const RENDER_PIXEL_RATIO = 1
@@ -124,6 +125,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let renderer: THREE.WebGLRenderer | null = null
     let controls: OrbitControls | null = null
     let globe: ThreeGlobe | null = null
+    let borderLines: THREE.LineSegments | null = null
     let resizeObserver: ResizeObserver | null = null
     let hasWindowResizeListener = false
     let rafId: number | null = null
@@ -466,6 +468,12 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         globe = null
       }
 
+      if (borderLines !== null) {
+        disposeGlobeBorderLines(borderLines)
+        borderLines.removeFromParent()
+        borderLines = null
+      }
+
       if (renderer !== null) {
         const canvas = renderer.domElement
         try {
@@ -547,13 +555,16 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
           coordinates: number[]
         }
       ))
-      nextGlobe.polygonStrokeColor(() => BORDER_COLOR)
+      // 面ポリゴンは当たり判定用の簡略化データのまま維持し、線だけを別meshで滑らかにする。
+      nextGlobe.polygonStrokeColor(() => null)
       nextGlobe.polygonCapCurvatureResolution(3)
       nextGlobe.polygonsTransitionDuration(
         reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS,
       )
       updatePolygonAppearance()
       scene.add(nextGlobe)
+      borderLines = createGlobeBorderLines(initialOptions.features)
+      scene.add(borderLines)
 
       controls = new OrbitControls(camera, renderer.domElement)
       controls.target.set(0, 0, 0)
@@ -561,6 +572,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       controls.enablePan = false
       controls.enableRotate = true
       controls.rotateSpeed = rotateSpeedForZoom(initialOptions.zoomLevel)
+      configureGlobeRotationControls(controls)
       controls.enableDamping = !reducedMotion
       controls.dampingFactor = reducedMotion ? 1 : 0.22
       controls.touches.ONE = THREE.TOUCH.ROTATE
@@ -609,4 +621,3 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
 
   return handle
 }
-
