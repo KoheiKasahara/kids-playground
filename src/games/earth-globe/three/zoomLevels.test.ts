@@ -7,12 +7,12 @@ import {
   GLOBE_RADIUS,
   rotateSpeedForZoom,
 } from './zoomLevels'
-import { BASE_BORDER_RADIUS } from './globeBorderLines'
+import { BASE_BORDER_RADIUS, BASE_POLYGON_ALTITUDE } from './globeLayers'
 
 // 大気シェル(altitude 0.08)まで含めた、カメラが近づける限界の地球側の半径。
 const ATMOSPHERE_RADIUS = GLOBE_RADIUS * 1.08
 const DEPTH_BUFFER_BITS = 24
-const LAND_CAP_RADIUS = 100.8
+const LAND_CAP_RADIUS = GLOBE_RADIUS * (1 + BASE_POLYGON_ALTITUDE)
 
 /** 距離distanceにおける深度バッファの分解能(world unit)。 */
 function depthResolutionAt(distance: number): number {
