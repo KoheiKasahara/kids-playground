@@ -8,9 +8,16 @@ import worldTopology from 'world-atlas/countries-50m.json' with { type: 'json' }
 const minPoints = 40
 // 50mデータで形状を大きく崩さず、ベンチマークで生成時間を大幅に短縮できた値。
 const eps = 0.05
+// Douglas-Peuckerが残した折れ角を丸めるChaikin(角切り)の反復回数。
+const smoothingIterations = 2
+// 丸めたあとの輪郭から、見た目を変えずに冗長な点だけを間引くときの許容誤差。
+// 最大ズームでは画面1px≒0.03度なので、0.015度は0.5px相当までのずれに収まる。
+const smoothedEps = 0.015
 // 最大の島・飛び地は必ず残し、小さな島だけを描画対象から減らす。
 const areaThreshold = 0.05
-const coordinateDecimals = 4
+// 小数3桁(約110m)は最大ズームでも0.02px相当の誤差しかなく、角を丸めて増えた
+// 座標の出力サイズを抑えられる。
+const coordinateDecimals = 3
 // 0.5度に密度化すると球面の弦の沈み込みは 100 * (1 - cos(0.25°)) ≈ 0.001
 // world unit。three-conic-polygon-geometryの曲面グリッドに沿った三角形分割が
 // 長い輪郭辺でポリゴンを覆いきれず穴を残す問題にも対策する。実測では4度の
@@ -141,6 +148,70 @@ function simplifyClosedArc(arc, tolerance) {
   return simplified.length >= 4 ? simplified : arc
 }
 
+/**
+ * Chaikinの角切りを1回かける。各辺を1:3と3:1に内分した2点で置き換えるため、
+ * 折れ点が2つの緩い角に分かれ、繰り返すほど滑らかな曲線に近づく。
+ * arcは隣接国と共有されるため、arc単位で丸めれば国境に隙間は生じない。
+ * 開いたarcの端点は他のarcとの接続点なので固定する。
+ */
+function chaikinOnce(points, isClosed) {
+  const loop = isClosed ? points.slice(0, -1) : points
+  if (loop.length < 3) return points
+
+  const smoothed = []
+  if (!isClosed) smoothed.push(points[0])
+
+  const lastIndex = isClosed ? loop.length - 1 : loop.length - 2
+  for (let index = 0; index <= lastIndex; index += 1) {
+    const start = loop[index]
+    const end = loop[(index + 1) % loop.length]
+    smoothed.push([
+      start[0] * 0.75 + end[0] * 0.25,
+      start[1] * 0.75 + end[1] * 0.25,
+    ])
+    smoothed.push([
+      start[0] * 0.25 + end[0] * 0.75,
+      start[1] * 0.25 + end[1] * 0.75,
+    ])
+  }
+
+  if (isClosed) {
+    smoothed.push([...smoothed[0]])
+  } else {
+    smoothed.push(points[points.length - 1])
+  }
+
+  return smoothed
+}
+
+function crossesAntimeridian(arc) {
+  for (let index = 1; index < arc.length; index += 1) {
+    if (Math.abs(arc[index][0] - arc[index - 1][0]) > 180) return true
+  }
+
+  return false
+}
+
+function smoothArc(arc) {
+  const isClosed = samePoint(arc[0], arc[arc.length - 1])
+  if (arc.length < (isClosed ? 4 : 3)) return arc
+  // 日付変更線をまたぐ辺は経度が+180と-180で不連続になり、平均すると地球を一周する
+  // 点が生まれてポリゴンが全球を覆ってしまう。該当するarcは丸めずそのまま残す。
+  if (crossesAntimeridian(arc)) return arc
+
+  let smoothed = arc
+  for (let iteration = 0; iteration < smoothingIterations; iteration += 1) {
+    smoothed = chaikinOnce(smoothed, isClosed)
+  }
+
+  // 角切りは直線部分にも点を増やすので、見た目に影響しない範囲で間引き直す。
+  const thinned = isClosed
+    ? simplifyClosedArc(smoothed, smoothedEps)
+    : douglasPeucker(smoothed, smoothedEps)
+
+  return thinned.length >= (isClosed ? 4 : 2) ? thinned : smoothed
+}
+
 function simplifyArc(arc) {
   if (arc.length <= minPoints) return arc
 
@@ -149,7 +220,9 @@ function simplifyArc(arc) {
     ? simplifyClosedArc(arc, eps)
     : douglasPeucker(arc, eps)
 
-  return simplified.length >= 2 ? simplified : arc
+  // 折れ角を作るのは間引いたarcだけなので、丸めるのも間引いたarcだけにする。
+  // 小さな島の輪など元のまま残したarcは、点数も形も変えない。
+  return simplified.length >= 2 ? smoothArc(simplified) : arc
 }
 
 function splitLongEdges(arc) {
@@ -388,6 +461,10 @@ const serialized = [
 fs.writeFileSync(outputPath, serialized, 'utf8')
 
 console.log(`簡略化パラメータ: minPoints=${minPoints}, eps=${eps}, 面積閾値=${areaThreshold}`)
+console.log(
+  `角丸めパラメータ: Chaikin=${smoothingIterations}回, 再間引きeps=${smoothedEps}, `
+  + `座標小数=${coordinateDecimals}桁`,
+)
 console.log(
   `座標数: ${sourceStats.coordinateCount.toLocaleString()} -> `
   + `${simplifiedStats.coordinateCount.toLocaleString()} -> ${outputStats.coordinateCount.toLocaleString()}`,

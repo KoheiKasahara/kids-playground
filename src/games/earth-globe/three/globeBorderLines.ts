@@ -1,4 +1,7 @@
 import * as THREE from 'three'
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import type { GlobeFeature } from '../types'
 
 type Position = readonly [longitude: number, latitude: number]
@@ -10,8 +13,13 @@ type Polygon = readonly Ring[]
 export const BASE_BORDER_RADIUS = 100.81
 // 選択中の国だけは altitude=0.024（半径102.4）まで持ち上がるため、専用線を重ねる。
 export const SELECTED_BORDER_RADIUS = 102.41
-// 元のデータは0.5°以下まで密度化済み。描画線だけはさらに細かくして球面上の折れを目立たせない。
-export const MAX_BORDER_SEGMENT_DEGREES = 0.25
+// 元データは0.5°以下まで密度化済みで、球面の弦の沈み込みは
+// 100 * (1 - cos(0.25°)) ≈ 0.001 world unit（最大ズームでも0.01px未満）しかない。
+// これ以上細かく分割しても見た目は変わらず頂点数だけが増えるため、同じ0.5°に合わせる。
+export const MAX_BORDER_SEGMENT_DEGREES = 0.5
+// CSSピクセル単位の線幅。1デバイスピクセルの素の線と違い、DPRが変わっても太さが
+// 変わらず、端がアンチエイリアスされるため階段状のギザつきが出ない。
+export const BORDER_LINE_WIDTH = 1.3
 
 function normalizedLongitude(longitude: number): number {
   return ((longitude + 180) % 360 + 360) % 360 - 180
@@ -50,12 +58,12 @@ function polygonsOf(feature: GlobeFeature): readonly Polygon[] {
 
 /**
  * 国の当たり判定・面ポリゴンとは別に、滑らかな見た目用の国境線だけを生成する。
- * 1つのLineSegmentsにまとめ、countryごとのObject3D増加を避ける。
+ * 1つのLineSegments2にまとめ、countryごとのObject3D増加を避ける。
  */
 export function createGlobeBorderLines(
   features: readonly GlobeFeature[],
   radius = BASE_BORDER_RADIUS,
-): THREE.LineSegments {
+): LineSegments2 {
   const points: number[] = []
 
   for (const feature of features) {
@@ -91,17 +99,44 @@ export function createGlobeBorderLines(
     }
   }
 
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3))
-  const material = new THREE.LineBasicMaterial({
+  const geometry = new LineSegmentsGeometry()
+  geometry.setPositions(points)
+  geometry.computeBoundingSphere()
+  // 素のLineSegmentsはWebGLの仕様上つねに1デバイスピクセル幅で、DPRを2に
+  // 抑えたiPhoneでは細く霞む。板ポリゴンとして描くLineMaterialなら線幅を
+  // CSSピクセルで指定でき、端はレンダラーのMSAAで滑らかになる。
+  const material = new LineMaterial({
     color: '#173b75',
+    linewidth: BORDER_LINE_WIDTH,
+    worldUnits: false,
+    // alphaToCoverageは線分の継ぎ目でカバレッジが合成されず、1px程度の短い線分が
+    // 連なる地球全体表示では国境線が点線のように途切れて見える。MSAAだけを使う。
+    alphaToCoverage: false,
     // 線同士が深度バッファを塞がないようにする。depthTestは維持するため背面は地球に隠れる。
     depthWrite: false,
   })
-  return new THREE.LineSegments(geometry, material)
+  return new LineSegments2(geometry, material)
 }
 
-export function disposeGlobeBorderLines(borderLines: THREE.LineSegments): void {
+/**
+ * LineMaterialは線幅を画面解像度から逆算するため、描画サイズが変わるたびに伝える。
+ * 単位はCSSピクセル（devicePixelRatioを掛けない値）。
+ */
+export function setGlobeBorderLinesSize(
+  borderLines: LineSegments2,
+  width: number,
+  height: number,
+): void {
+  const materials = borderLines.material instanceof Array
+    ? borderLines.material
+    : [borderLines.material]
+
+  materials.forEach((material) => {
+    if (material instanceof LineMaterial) material.resolution.set(width, height)
+  })
+}
+
+export function disposeGlobeBorderLines(borderLines: LineSegments2): void {
   borderLines.geometry.dispose()
   const materials = borderLines.material instanceof Array
     ? borderLines.material

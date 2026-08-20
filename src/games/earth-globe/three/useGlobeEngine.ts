@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import ThreeGlobe from 'three-globe'
+import type { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type {
   GlobeCountry,
@@ -10,6 +11,8 @@ import type {
   ZoomLevel,
 } from '../types'
 import {
+  CAMERA_FAR,
+  CAMERA_NEAR,
   cameraDistanceForZoom,
   easeOutCubic,
   rotateSpeedForZoom,
@@ -24,6 +27,7 @@ import {
   createGlobeBorderLines,
   disposeGlobeBorderLines,
   SELECTED_BORDER_RADIUS,
+  setGlobeBorderLinesSize,
 } from './globeBorderLines'
 import { renderPixelRatioForDevice } from './renderQuality'
 import { configureGlobeRotationControls } from './rotationControls'
@@ -131,8 +135,10 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let renderer: THREE.WebGLRenderer | null = null
     let controls: OrbitControls | null = null
     let globe: ThreeGlobe | null = null
-    let borderLines: THREE.LineSegments | null = null
-    let selectedBorderLines: THREE.LineSegments | null = null
+    let borderLines: LineSegments2 | null = null
+    let selectedBorderLines: LineSegments2 | null = null
+    // 国境線の線幅計算に使う描画サイズ(CSSピクセル)。resizeのたびに更新する。
+    const borderLinesSize = new THREE.Vector2(1, 1)
     let resizeObserver: ResizeObserver | null = null
     let hasWindowResizeListener = false
     let rafId: number | null = null
@@ -310,6 +316,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         [selectedFeature],
         SELECTED_BORDER_RADIUS,
       )
+      setGlobeBorderLinesSize(selectedBorderLines, borderLinesSize.x, borderLinesSize.y)
       selectedBorderLines.renderOrder = 2
       scene.add(selectedBorderLines)
     }
@@ -439,6 +446,11 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height, false)
+      borderLinesSize.set(width, height)
+      if (borderLines !== null) setGlobeBorderLinesSize(borderLines, width, height)
+      if (selectedBorderLines !== null) {
+        setGlobeBorderLinesSize(selectedBorderLines, width, height)
+      }
       // 向きが変わった場合も、最小ズームだけはその画面比に合う表示範囲へ戻す。
       if (activeZoomLevel === 0) setCameraDistance(cameraDistanceForViewport(activeZoomLevel))
       updatePointOfView()
@@ -551,7 +563,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       scene = new THREE.Scene()
       scene.background = new THREE.Color('#e7f5ff')
 
-      camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000)
+      camera = new THREE.PerspectiveCamera(45, 1, CAMERA_NEAR, CAMERA_FAR)
       const latitude = THREE.MathUtils.degToRad(25)
       const longitude = THREE.MathUtils.degToRad(90 - 135)
       camera.position.set(
