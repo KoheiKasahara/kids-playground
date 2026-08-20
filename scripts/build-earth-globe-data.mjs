@@ -11,6 +11,9 @@ const eps = 0.05
 // 最大の島・飛び地は必ず残し、小さな島だけを描画対象から減らす。
 const areaThreshold = 0.05
 const coordinateDecimals = 4
+// Four degrees keeps the spherical chord sag at 100 * (1 - cos(2°)) ≈ 0.061
+// world units, well below the 0.8-unit altitude of the land polygons.
+const maxArcAngleDegrees = 4
 
 const outputPath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -65,6 +68,17 @@ function distanceFromLine(point, start, end) {
   return Math.abs(
     deltaY * pointX - deltaX * pointY + endX * startY - endY * startX,
   ) / denominator
+}
+
+function greatCircleAngleDegrees(start, end) {
+  const degreesToRadians = Math.PI / 180
+  const [startLongitude, startLatitude] = start.map((value) => value * degreesToRadians)
+  const [endLongitude, endLatitude] = end.map((value) => value * degreesToRadians)
+  const cosine = Math.sin(startLatitude) * Math.sin(endLatitude)
+    + Math.cos(startLatitude) * Math.cos(endLatitude)
+      * Math.cos(endLongitude - startLongitude)
+
+  return Math.acos(Math.min(1, Math.max(-1, cosine))) / degreesToRadians
 }
 
 function douglasPeucker(points, tolerance) {
@@ -135,13 +149,57 @@ function simplifyArc(arc) {
   return simplified.length >= 2 ? simplified : arc
 }
 
+function splitLongEdges(arc) {
+  if (arc.length <= 1) return { arc, splitEdgeCount: 0, insertedPointCount: 0 }
+
+  const splitArc = [arc[0]]
+  let splitEdgeCount = 0
+  let insertedPointCount = 0
+
+  for (let index = 1; index < arc.length; index += 1) {
+    const start = arc[index - 1]
+    const end = arc[index]
+    const angle = greatCircleAngleDegrees(start, end)
+    const segmentCount = Math.max(1, Math.ceil(angle / maxArcAngleDegrees))
+
+    if (segmentCount > 1) {
+      splitEdgeCount += 1
+      insertedPointCount += segmentCount - 1
+    }
+
+    for (let segmentIndex = 1; segmentIndex < segmentCount; segmentIndex += 1) {
+      const ratio = segmentIndex / segmentCount
+      splitArc.push([
+        start[0] + (end[0] - start[0]) * ratio,
+        start[1] + (end[1] - start[1]) * ratio,
+      ])
+    }
+
+    splitArc.push(end)
+  }
+
+  return { arc: splitArc, splitEdgeCount, insertedPointCount }
+}
+
 function simplifyTopology(topology) {
   const decodedArcs = decodeArcs(topology)
   const simplifiedArcs = decodedArcs.map(simplifyArc)
+  let splitEdgeCount = 0
+  let insertedPointCount = 0
+  const splitArcs = simplifiedArcs.map((arc) => {
+    const result = splitLongEdges(arc)
+    splitEdgeCount += result.splitEdgeCount
+    insertedPointCount += result.insertedPointCount
+    return result.arc
+  })
 
   return {
-    ...topology,
-    arcs: encodeArcs(simplifiedArcs, topology),
+    topology: {
+      ...topology,
+      arcs: encodeArcs(splitArcs, topology),
+    },
+    splitEdgeCount,
+    insertedPointCount,
   }
 }
 
@@ -301,7 +359,11 @@ function summarizeSource(collection) {
 
 const sourceCollection = feature(worldTopology, worldTopology.objects.countries)
 const sourceStats = summarizeSource(sourceCollection)
-const simplifiedTopology = simplifyTopology(worldTopology)
+const {
+  topology: simplifiedTopology,
+  splitEdgeCount,
+  insertedPointCount,
+} = simplifyTopology(worldTopology)
 const simplifiedCollection = feature(simplifiedTopology, simplifiedTopology.objects.countries)
 const cleanedRecords = cleanFeatures(simplifiedCollection)
 const simplifiedStats = summarizeRecords(cleanedRecords)
@@ -326,6 +388,9 @@ console.log(`簡略化パラメータ: minPoints=${minPoints}, eps=${eps}, 面�
 console.log(
   `座標数: ${sourceStats.coordinateCount.toLocaleString()} -> `
   + `${simplifiedStats.coordinateCount.toLocaleString()} -> ${outputStats.coordinateCount.toLocaleString()}`,
+)
+console.log(
+  `長辺再分割: ${splitEdgeCount}辺, 中間点追加=${insertedPointCount.toLocaleString()}点`,
 )
 console.log(
   `ポリゴン数: ${sourceStats.polygonCount.toLocaleString()} -> `

@@ -5,7 +5,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type {
   GlobeCountry,
   GlobeFeature,
-  GlobeVector3,
   UseGlobeEngineHandle,
   UseGlobeEngineOptions,
   ZoomLevel,
@@ -50,7 +49,6 @@ type GlobeEngine = {
   setZoom: (level: ZoomLevel) => void
   setSelectedCountry: (countryId: string | null) => void
   setReducedMotion: (reducedMotion: boolean) => void
-  notifyCameraUpdate: () => void
 }
 
 function numericIdOf(value: unknown): number | null {
@@ -131,8 +129,6 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let polygonDataLoadStarted = false
     let hasRenderedFirstFrame = false
     let released = false
-    let viewportWidth = 1
-    let viewportHeight = 1
     let reducedMotion = initialOptions.reducedMotion
     let selectedNumericId = initialOptions.selectedCountryId === null
       ? null
@@ -143,7 +139,6 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     const pointer = new THREE.Vector2()
     const cameraDirection = new THREE.Vector3()
     const origin = new THREE.Vector3()
-    const projectedPoint = new THREE.Vector3()
     let pointerStart: { pointerId: number; x: number; y: number } | null = null
 
     function setCameraDistance(distance: number) {
@@ -155,47 +150,8 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       controls.update()
     }
 
-    function notifyCameraUpdate() {
-      const currentCamera = camera
-      const onCameraUpdate = optionsRef.current.onCameraUpdate
-      if (currentCamera === null || onCameraUpdate === undefined) return
-
-      currentCamera.updateMatrixWorld()
-      const viewMatrix = currentCamera.matrixWorldInverse.clone()
-      const projectionMatrix = currentCamera.projectionMatrix.clone()
-      const width = viewportWidth
-      const height = viewportHeight
-      onCameraUpdate({
-        cameraPosition: {
-          x: currentCamera.position.x,
-          y: currentCamera.position.y,
-          z: currentCamera.position.z,
-        },
-        viewportWidth: width,
-        viewportHeight: height,
-        projectPoint(point: GlobeVector3) {
-          projectedPoint
-            .set(point.x, point.y, point.z)
-            .applyMatrix4(viewMatrix)
-            .applyMatrix4(projectionMatrix)
-          if (
-            !Number.isFinite(projectedPoint.x)
-            || !Number.isFinite(projectedPoint.y)
-            || !Number.isFinite(projectedPoint.z)
-          ) return null
-
-          return {
-            x: (projectedPoint.x + 1) * 0.5 * width,
-            y: (1 - projectedPoint.y) * 0.5 * height,
-            depth: projectedPoint.z,
-          }
-        },
-      })
-    }
-
     function updatePointOfView() {
       if (globe !== null && camera !== null) globe.setPointOfView(camera)
-      notifyCameraUpdate()
     }
 
     function updatePolygonAppearance() {
@@ -433,8 +389,6 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         Math.floor(rect.height || container.clientHeight || window.innerHeight || 1),
       )
 
-      viewportWidth = width
-      viewportHeight = height
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height, false)
@@ -616,7 +570,6 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         setZoom,
         setSelectedCountry,
         setReducedMotion,
-        notifyCameraUpdate,
       }
       rafId = window.requestAnimationFrame(tick)
       // 最初のtickが停止しても、一定時間後にはポリゴン生成を開始できるようにする。
@@ -639,10 +592,6 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
   useEffect(() => {
     engineRef.current?.setReducedMotion(options.reducedMotion)
   }, [options.reducedMotion])
-
-  useEffect(() => {
-    engineRef.current?.notifyCameraUpdate()
-  }, [options.onCameraUpdate])
 
   return handle
 }
