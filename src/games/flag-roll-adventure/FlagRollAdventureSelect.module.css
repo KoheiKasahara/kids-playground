@@ -128,6 +128,15 @@
   background: linear-gradient(180deg, rgba(255, 253, 247, 0), var(--color-background) 10px);
 }
 
+/* 横画面では開始・戻るを1段にし、コース選択に使える縦の余白を増やす。 */
+@media (orientation: landscape) {
+  .actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1.625fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
 @media (min-width: 560px) {
   .grid {
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));

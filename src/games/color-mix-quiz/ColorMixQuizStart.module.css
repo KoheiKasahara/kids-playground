@@ -3,4 +3,8 @@
 .title { font-size: clamp(32px, 9vw, var(--font-size-xlarge)); color: var(--color-primary-dark); }
 .description { max-width: 21em; font-size: var(--font-size-large); color: var(--color-text-muted); }
 .actions { width: 100%; margin-top: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); }
-@media (orientation: landscape) and (max-height: 560px) { .page { max-width: 760px; padding-block: var(--space-sm); } .hero { display: none; } .title { font-size: 28px; } .actions { display: grid; grid-template-columns: repeat(2, 1fr); } }
+
+/* 横画面では、主操作を戻るより少し広くして1段にまとめる。 */
+@media (orientation: landscape) { .actions { display: grid; grid-template-columns: minmax(0, 1.625fr) minmax(0, 1fr); align-items: stretch; } }
+
+@media (orientation: landscape) and (max-height: 560px) { .page { max-width: 760px; padding-block: var(--space-sm); } .hero { display: none; } .title { font-size: 28px; } }
