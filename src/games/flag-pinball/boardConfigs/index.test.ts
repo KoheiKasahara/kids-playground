@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { PinballThemeId } from '../themes/types'
-import { BOARD_CONFIGS, candyBoard, getBoardConfig, normalBoard, oceanBoard, skyBoard, spaceBoard } from './index'
+import { BOARD_CONFIGS, candyBoard, carBoard, getBoardConfig, normalBoard, oceanBoard, skyBoard, spaceBoard } from './index'
 
-const THEME_IDS: readonly PinballThemeId[] = ['normal', 'space', 'ocean', 'candy', 'sky']
+const THEME_IDS: readonly PinballThemeId[] = ['normal', 'space', 'ocean', 'candy', 'sky', 'car']
 
 describe('BOARD_CONFIGS', () => {
-  it('5テーマすべてに盤面設定が存在する', () => {
+  it('6テーマすべてに盤面設定が存在する', () => {
     for (const themeId of THEME_IDS) {
       expect(BOARD_CONFIGS[themeId]).toBeDefined()
     }
@@ -18,6 +18,7 @@ describe('BOARD_CONFIGS', () => {
     expect(getBoardConfig('ocean')).toBe(oceanBoard)
     expect(getBoardConfig('candy')).toBe(candyBoard)
     expect(getBoardConfig('sky')).toBe(skyBoard)
+    expect(getBoardConfig('car')).toBe(carBoard)
   })
 
   it('不明なテーマIDを渡すと既定盤面へ握りつぶさずthrowする', () => {
@@ -55,8 +56,15 @@ describe('BOARD_CONFIGS', () => {
     expect(skyBoard.toys).not.toEqual(normalBoard.toys)
   })
 
+  it('Phase Fでくるまも専用盤面になっており、通常盤面とは異なる配置を持つ', () => {
+    expect(carBoard).not.toEqual(normalBoard)
+    expect(carBoard.obstacles).not.toEqual(normalBoard.obstacles)
+    expect(carBoard.walls).not.toEqual(normalBoard.walls)
+    expect(carBoard.toys).not.toEqual(normalBoard.toys)
+  })
+
   it('テーマ設定同士は内容が同じでも同一のmutableオブジェクトを共有していない', () => {
-    const configs = [normalBoard, spaceBoard, oceanBoard, candyBoard, skyBoard]
+    const configs = [normalBoard, spaceBoard, oceanBoard, candyBoard, skyBoard, carBoard]
     for (let i = 0; i < configs.length; i += 1) {
       for (let j = i + 1; j < configs.length; j += 1) {
         expect(configs[i]).not.toBe(configs[j])

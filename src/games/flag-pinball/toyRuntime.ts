@@ -1,4 +1,5 @@
 import type * as Matter from 'matter-js'
+import { createCarToy } from './carToy'
 import { createHammerToy } from './hammerToy'
 import { createJumppadToy } from './jumppadToy'
 import { createLauncherToy } from './launcherToy'
@@ -23,6 +24,16 @@ export type ToyVisualState = {
   active: boolean
   /** 見た目と物理の両方へ同じ値を適用する倍率。通常は1 */
   scale: number
+  /**
+   * 横方向のずれ(px)。placement.xからの相対値。位置そのものが動くtoy（車toyなど）だけが
+   * 持ち、それ以外のtoyは書き込まない（読み取り側は未指定を0として扱う）。
+   */
+  offsetX?: number
+  /**
+   * 見た目の向き。左右反転する絵を持つtoy（車toyなど）だけが持ち、それ以外のtoyは
+   * 書き込まない（読み取り側は未指定を「反転なし」として扱う）。
+   */
+  facing?: 'left' | 'right'
 }
 
 export type ToyRuntime = {
@@ -52,6 +63,8 @@ export function createToyRuntime(placement: ToyPlacement): ToyRuntime {
       return createHammerToy(placement)
     case 'wind':
       return createWindToy(placement)
+    case 'car':
+      return createCarToy(placement)
     default: {
       const unexpectedKind: never = placement.kind
       throw new Error(`flag-pinball: 未対応のおもちゃ種別です: ${unexpectedKind}`)

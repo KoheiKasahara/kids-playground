@@ -356,6 +356,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
     let lastFrameTime: number | null = null
     let accumulator = 0
     const previousToyActive = new Map<string, boolean>()
+    const previousToyFacing = new Map<string, 'left' | 'right' | undefined>()
 
     function tick(now: number) {
       // cleanup後に紛れ込んだ呼び出しがあっても再スケジュールしない（cancelAnimationFrameとの二重防御）
@@ -487,10 +488,20 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
         el.style.setProperty('--toy-spin', `${visual.spinRad}rad`)
         el.style.setProperty('--toy-pulse', `${visual.pulse}`)
         el.style.setProperty('--toy-scale', `${visual.scale}`)
+        el.style.setProperty('--toy-offset-x', `${visual.offsetX ?? 0}px`)
         const previousActive = previousToyActive.get(runtime.placement.id)
         if (previousActive !== visual.active) {
           el.dataset.toyActive = visual.active ? 'true' : 'false'
           previousToyActive.set(runtime.placement.id, visual.active)
+        }
+        const previousFacing = previousToyFacing.get(runtime.placement.id)
+        if (previousFacing !== visual.facing) {
+          if (visual.facing) {
+            el.dataset.toyFacing = visual.facing
+          } else {
+            delete el.dataset.toyFacing
+          }
+          previousToyFacing.set(runtime.placement.id, visual.facing)
         }
       }
     }
