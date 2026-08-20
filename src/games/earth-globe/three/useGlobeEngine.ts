@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type {
   GlobeCountry,
   GlobeFeature,
+  GlobeVector3,
   UseGlobeEngineHandle,
   UseGlobeEngineOptions,
   ZoomLevel,
@@ -12,14 +13,17 @@ import type {
 import {
   cameraDistanceForZoom,
   easeOutCubic,
+  rotateSpeedForZoom,
   ZOOM_ANIMATION_DURATION_MS,
 } from './zoomLevels'
+import {
+  isGlobeBodyObject,
+  polygonNumericIdFromObject,
+} from './threeGlobeAdapter'
 
 const BASE_GLOBE_COLOR = '#4dabf7'
-const SUPPORTED_LAND_COLOR = '#8ce99a'
-const UNSUPPORTED_LAND_COLOR = '#b7d7b6'
-const SUPPORTED_SIDE_COLOR = '#69b97a'
-const UNSUPPORTED_SIDE_COLOR = '#94ba94'
+const LAND_COLOR = '#8ce99a'
+const SIDE_COLOR = '#69b97a'
 const SELECTED_LAND_COLOR = '#ffd43b'
 const SELECTED_SIDE_COLOR = '#f59f00'
 const BORDER_COLOR = '#1c3a8a'
@@ -27,27 +31,26 @@ const ATMOSPHERE_COLOR = '#74c0fc'
 const BASE_POLYGON_ALTITUDE = 0.008
 const SELECTED_POLYGON_ALTITUDE = 0.024
 const POLYGONS_TRANSITION_DURATION_MS = 260
+const POLYGON_DATA_FALLBACK_DELAY_MS = 250
 const POINTER_CLICK_DISTANCE_PX = 8
 // world units（地球半径100あたり）。cameraDistanceForZoom等と同じ単位系。
 const POLYGON_HIT_TOLERANCE = 2
 
 type PolygonDatum = GlobeFeature
 
-type ThreeGlobeObject = THREE.Object3D & {
-  __data?: unknown
-  __globeObjType?: string
-}
-
 type ZoomAnimation = {
   from: number
   to: number
   startedAt: number
+  fromRotateSpeed: number
+  toRotateSpeed: number
 }
 
 type GlobeEngine = {
   setZoom: (level: ZoomLevel) => void
   setSelectedCountry: (countryId: string | null) => void
   setReducedMotion: (reducedMotion: boolean) => void
+  notifyCameraUpdate: () => void
 }
 
 function numericIdOf(value: unknown): number | null {
@@ -55,41 +58,6 @@ function numericIdOf(value: unknown): number | null {
 
   const id = (value as { id?: unknown }).id
   return typeof id === 'number' && Number.isInteger(id) ? id : null
-}
-
-function globeObjectOf(object: THREE.Object3D): ThreeGlobeObject {
-  return object as ThreeGlobeObject
-}
-
-function polygonIdFromObject(object: THREE.Object3D): number | null {
-  let current: THREE.Object3D | null = object
-
-  while (current !== null) {
-    const candidate = globeObjectOf(current)
-    if (candidate.__globeObjType === 'polygon') {
-      // three-globeはシーングラフ上の__dataに、ポリゴンの内部レンダリング状態
-      // ({id: 内部管理用の文字列, coords, capColor, ...}) を持たせている。
-      // polygonsData() へ渡した元データ({id: numericId, geometry})は
-      // その中の __data.data に入っているため、そちらを見る必要がある。
-      const wrapper = candidate.__data as { data?: unknown } | undefined
-      return numericIdOf(wrapper?.data)
-    }
-    current = current.parent
-  }
-
-  return null
-}
-
-function globeObjectTypeOf(object: THREE.Object3D): string | null {
-  let current: THREE.Object3D | null = object
-
-  while (current !== null) {
-    const type = globeObjectOf(current).__globeObjType
-    if (type !== undefined) return type
-    current = current.parent
-  }
-
-  return null
 }
 
 function disposeGlobeTree(globe: ThreeGlobe) {
@@ -158,7 +126,13 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let resizeObserver: ResizeObserver | null = null
     let hasWindowResizeListener = false
     let rafId: number | null = null
+    let polygonLoadRafId: number | null = null
+    let polygonLoadTimerId: number | null = null
+    let polygonDataLoadStarted = false
+    let hasRenderedFirstFrame = false
     let released = false
+    let viewportWidth = 1
+    let viewportHeight = 1
     let reducedMotion = initialOptions.reducedMotion
     let selectedNumericId = initialOptions.selectedCountryId === null
       ? null
@@ -169,6 +143,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     const pointer = new THREE.Vector2()
     const cameraDirection = new THREE.Vector3()
     const origin = new THREE.Vector3()
+    const projectedPoint = new THREE.Vector3()
     let pointerStart: { pointerId: number; x: number; y: number } | null = null
 
     function setCameraDistance(distance: number) {
@@ -180,8 +155,47 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       controls.update()
     }
 
+    function notifyCameraUpdate() {
+      const currentCamera = camera
+      const onCameraUpdate = optionsRef.current.onCameraUpdate
+      if (currentCamera === null || onCameraUpdate === undefined) return
+
+      currentCamera.updateMatrixWorld()
+      const viewMatrix = currentCamera.matrixWorldInverse.clone()
+      const projectionMatrix = currentCamera.projectionMatrix.clone()
+      const width = viewportWidth
+      const height = viewportHeight
+      onCameraUpdate({
+        cameraPosition: {
+          x: currentCamera.position.x,
+          y: currentCamera.position.y,
+          z: currentCamera.position.z,
+        },
+        viewportWidth: width,
+        viewportHeight: height,
+        projectPoint(point: GlobeVector3) {
+          projectedPoint
+            .set(point.x, point.y, point.z)
+            .applyMatrix4(viewMatrix)
+            .applyMatrix4(projectionMatrix)
+          if (
+            !Number.isFinite(projectedPoint.x)
+            || !Number.isFinite(projectedPoint.y)
+            || !Number.isFinite(projectedPoint.z)
+          ) return null
+
+          return {
+            x: (projectedPoint.x + 1) * 0.5 * width,
+            y: (1 - projectedPoint.y) * 0.5 * height,
+            depth: projectedPoint.z,
+          }
+        },
+      })
+    }
+
     function updatePointOfView() {
       if (globe !== null && camera !== null) globe.setPointOfView(camera)
+      notifyCameraUpdate()
     }
 
     function updatePolygonAppearance() {
@@ -193,22 +207,76 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       globe.polygonCapColor((data: object) => {
         const id = numericIdOf(data)
         if (id === selectedNumericId) return SELECTED_LAND_COLOR
-        return countriesByNumericId.has(id ?? -1)
-          ? SUPPORTED_LAND_COLOR
-          : UNSUPPORTED_LAND_COLOR
+        return LAND_COLOR
       })
       globe.polygonSideColor((data: object) => {
         const id = numericIdOf(data)
         if (id === selectedNumericId) return SELECTED_SIDE_COLOR
-        return countriesByNumericId.has(id ?? -1)
-          ? SUPPORTED_SIDE_COLOR
-          : UNSUPPORTED_SIDE_COLOR
+        return SIDE_COLOR
       })
       globe.polygonAltitude((data: object) => (
         numericIdOf(data) === selectedNumericId
           ? SELECTED_POLYGON_ALTITUDE
           : BASE_POLYGON_ALTITUDE
       ))
+    }
+
+    function cancelPolygonDataSchedule() {
+      if (polygonLoadRafId !== null) {
+        window.cancelAnimationFrame(polygonLoadRafId)
+        polygonLoadRafId = null
+      }
+      if (polygonLoadTimerId !== null) {
+        window.clearTimeout(polygonLoadTimerId)
+        polygonLoadTimerId = null
+      }
+    }
+
+    function addPolygonData() {
+      if (
+        released ||
+        globe === null ||
+        polygonData.length === 0 ||
+        polygonDataLoadStarted
+      ) return
+
+      polygonDataLoadStarted = true
+      cancelPolygonDataSchedule()
+
+      const globeToPopulate = globe
+      // polygonsData()は呼ぶたびに全体のdigestを行うため、簡略化済みの768件を
+      // 細かく分割すると総時間が伸びやすい。初回描画後に一括投入して再計算を1回にする。
+      globeToPopulate.polygonsTransitionDuration(0)
+      globeToPopulate.polygonsData(polygonData)
+
+      if (released || globe !== globeToPopulate) return
+      // reduced-motionでも初回フレームを先に描画する遅延は維持し、段階的な演出は行わない。
+      globeToPopulate.polygonsTransitionDuration(
+        reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS,
+      )
+    }
+
+    function schedulePolygonDataFallback() {
+      if (
+        released ||
+        polygonData.length === 0 ||
+        polygonDataLoadStarted ||
+        polygonLoadTimerId !== null
+      ) return
+      polygonLoadTimerId = window.setTimeout(
+        addPolygonData,
+        POLYGON_DATA_FALLBACK_DELAY_MS,
+      )
+    }
+
+    function schedulePolygonDataAfterFirstFrame() {
+      if (
+        released ||
+        polygonData.length === 0 ||
+        polygonDataLoadStarted ||
+        polygonLoadRafId !== null
+      ) return
+      polygonLoadRafId = window.requestAnimationFrame(addPolygonData)
     }
 
     function setZoom(level: ZoomLevel) {
@@ -222,6 +290,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       ) {
         zoomAnimation = null
         setCameraDistance(targetDistance)
+        controls.rotateSpeed = rotateSpeedForZoom(level)
         updatePointOfView()
         return
       }
@@ -230,6 +299,8 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         from: currentDistance,
         to: targetDistance,
         startedAt: performance.now(),
+        fromRotateSpeed: controls.rotateSpeed,
+        toRotateSpeed: rotateSpeedForZoom(level),
       }
     }
 
@@ -250,8 +321,10 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
 
       if (nextReducedMotion && zoomAnimation !== null) {
         const targetDistance = zoomAnimation.to
+        const targetRotateSpeed = zoomAnimation.toRotateSpeed
         zoomAnimation = null
         setCameraDistance(targetDistance)
+        if (controls !== null) controls.rotateSpeed = targetRotateSpeed
         updatePointOfView()
       }
 
@@ -266,9 +339,17 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       setCameraDistance(
         zoomAnimation.from + (zoomAnimation.to - zoomAnimation.from) * easedProgress,
       )
+      // ズーム中に操作感が急変しないよう、カメラ距離と同じイージングで補間する。
+      if (controls !== null) {
+        controls.rotateSpeed = zoomAnimation.fromRotateSpeed
+          + (zoomAnimation.toRotateSpeed - zoomAnimation.fromRotateSpeed) * easedProgress
+      }
       updatePointOfView()
 
-      if (progress >= 1) zoomAnimation = null
+      if (progress >= 1) {
+        if (controls !== null) controls.rotateSpeed = zoomAnimation.toRotateSpeed
+        zoomAnimation = null
+      }
     }
 
     function selectCountryAt(event: PointerEvent) {
@@ -290,7 +371,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       let closestGlobeDistance = Number.POSITIVE_INFINITY
 
       for (const intersection of raycaster.intersectObject(globe, true)) {
-        const numericId = polygonIdFromObject(intersection.object)
+        const numericId = polygonNumericIdFromObject(intersection.object)
         if (numericId !== null) {
           if (closestPolygon === null || intersection.distance < closestPolygon.distance) {
             closestPolygon = { distance: intersection.distance, numericId }
@@ -298,7 +379,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
           continue
         }
 
-        if (globeObjectTypeOf(intersection.object) === 'globe') {
+        if (isGlobeBodyObject(intersection.object)) {
           closestGlobeDistance = Math.min(closestGlobeDistance, intersection.distance)
         }
       }
@@ -352,6 +433,8 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         Math.floor(rect.height || container.clientHeight || window.innerHeight || 1),
       )
 
+      viewportWidth = width
+      viewportHeight = height
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height, false)
@@ -366,6 +449,11 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       updateZoomAnimation(now)
       if (renderer !== null && scene !== null && camera !== null) {
         renderer.render(scene, camera)
+        if (!hasRenderedFirstFrame) {
+          hasRenderedFirstFrame = true
+          // 現在のフレームを表示する機会を確保してから、重いgeometry生成を始める。
+          schedulePolygonDataAfterFirstFrame()
+        }
       }
     }
 
@@ -378,6 +466,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         window.cancelAnimationFrame(rafId)
         rafId = null
       }
+      cancelPolygonDataSchedule()
 
       resizeObserver?.disconnect()
       resizeObserver = null
@@ -496,7 +585,6 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS,
       )
       updatePolygonAppearance()
-      nextGlobe.polygonsData(polygonData)
       scene.add(nextGlobe)
 
       controls = new OrbitControls(camera, renderer.domElement)
@@ -504,6 +592,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       controls.enableZoom = false
       controls.enablePan = false
       controls.enableRotate = true
+      controls.rotateSpeed = rotateSpeedForZoom(initialOptions.zoomLevel)
       controls.enableDamping = !reducedMotion
       controls.dampingFactor = reducedMotion ? 1 : 0.22
       controls.touches.ONE = THREE.TOUCH.ROTATE
@@ -527,8 +616,11 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         setZoom,
         setSelectedCountry,
         setReducedMotion,
+        notifyCameraUpdate,
       }
       rafId = window.requestAnimationFrame(tick)
+      // 最初のtickが停止しても、一定時間後にはポリゴン生成を開始できるようにする。
+      schedulePolygonDataFallback()
     } catch {
       release()
     }
@@ -547,6 +639,10 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
   useEffect(() => {
     engineRef.current?.setReducedMotion(options.reducedMotion)
   }, [options.reducedMotion])
+
+  useEffect(() => {
+    engineRef.current?.notifyCameraUpdate()
+  }, [options.onCameraUpdate])
 
   return handle
 }

@@ -22,12 +22,14 @@ export default function CountryCard({
       aria-label={`${country.nameJa}。タップすると とじます`}
       onClick={() => onCountrySelect(null)}
     >
-      <img
-        className={styles.flag}
-        src={import.meta.env.BASE_URL + country.flag}
-        alt=""
-        draggable={false}
-      />
+      <span className={styles.flagFrame}>
+        <img
+          className={styles.flag}
+          src={import.meta.env.BASE_URL + country.flag}
+          alt=""
+          draggable={false}
+        />
+      </span>
       <span className={styles.text}>
         <span className={styles.name}>{country.nameJa}</span>
         <span className={styles.hint}>タップで とじる</span>

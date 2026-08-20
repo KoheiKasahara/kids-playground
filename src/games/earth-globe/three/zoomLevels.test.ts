@@ -3,6 +3,7 @@ import {
   cameraDistanceForZoom,
   easeOutCubic,
   GLOBE_RADIUS,
+  rotateSpeedForZoom,
 } from './zoomLevels'
 
 describe('earth-globe zoom levels', () => {
@@ -12,6 +13,22 @@ describe('earth-globe zoom levels', () => {
     expect(cameraDistanceForZoom(1)).toBe(230)
     expect(cameraDistanceForZoom(2)).toBe(175)
     expect(cameraDistanceForZoom(3)).toBe(145)
+  })
+
+  it('uses progressively lower rotation sensitivity at closer zooms', () => {
+    const speeds = [
+      rotateSpeedForZoom(0),
+      rotateSpeedForZoom(1),
+      rotateSpeedForZoom(2),
+      rotateSpeedForZoom(3),
+    ]
+
+    expect(speeds.every((speed) => speed > 0)).toBe(true)
+    expect(speeds[0]).toBeGreaterThan(speeds[1])
+    expect(speeds[1]).toBeGreaterThan(speeds[2])
+    expect(speeds[2]).toBeGreaterThan(speeds[3])
+    expect(speeds[0]).toBe(1)
+    expect(speeds[3]).toBeLessThanOrEqual(0.3)
   })
 
   it('clamps and eases the animation progress', () => {
