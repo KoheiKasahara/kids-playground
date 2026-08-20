@@ -1,3 +1,4 @@
+import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import ConicPolygonGeometry from 'three-conic-polygon-geometry'
 import { worldFeatures } from './worldFeatures'
@@ -13,6 +14,9 @@ const maxArcAngleDegrees = 0.5
 const maxArcAngleTestToleranceDegrees = 0.005
 const degreesToRadians = Math.PI / 180
 const landRadius = 100
+// 最大のポリゴン(ロシア本土)でも球面積の約3%しか覆わない。日付変更線をまたぐ
+// リングの座標を平均するなどして経度が一周すると、capが全球を覆ってしまう。
+const maxCapSurfaceArea = 4 * Math.PI * landRadius ** 2 * 0.08
 
 const expectedIsoNumericIds = [
   4, 8, 10, 12, 16, 20, 24, 28, 31, 32, 36, 36, 40, 44, 48, 50, 51,
@@ -88,6 +92,41 @@ function inversePolar2Cartesian(x: number, y: number, z: number): Point {
   const normalizedLongitude = ((longitude + 180) % 360 + 360) % 360 - 180
 
   return [normalizedLongitude, latitude]
+}
+
+/**
+ * 三角形分割されたcapが球面上で実際に覆っている面積（world unit^2）。
+ * 経度が不連続な日付変更線付近では平面の面積が使えないため、こちらで判定する。
+ */
+function capSurfaceArea(polygon: PolygonCoordinates): number {
+  const geometry = new ConicPolygonGeometry(
+    polygon.map((ring) => ring.map(([longitude, latitude]) => [longitude, latitude])),
+    0,
+    landRadius,
+    false,
+    true,
+    false,
+    3,
+  )
+  const position = geometry.getAttribute('position')
+  const index = geometry.getIndex()
+  if (index === null) throw new Error('cap geometry is missing an index')
+
+  let area = 0
+  for (let offset = 0; offset < index.count; offset += 3) {
+    const [first, second, third] = [0, 1, 2].map((vertexOffset) => {
+      const vertexIndex = index.getX(offset + vertexOffset)
+      return new Vector3(
+        position.getX(vertexIndex),
+        position.getY(vertexIndex),
+        position.getZ(vertexIndex),
+      )
+    })
+    area += second.sub(first).cross(third.sub(first)).length() / 2
+  }
+
+  geometry.dispose()
+  return area
 }
 
 function capAreaInDegrees(polygon: PolygonCoordinates): number {
@@ -213,6 +252,24 @@ describe('worldFeatures', () => {
 
     expect(checkedPolygonCount).toBeGreaterThan(0)
     expect(maxMissingArea).toBeLessThan(0.1)
+  })
+
+  it('どのポリゴンのcapも地球全体を覆わない', { timeout: 30_000 }, () => {
+    // 日付変更線をまたぐリングは平面座標が不連続なため、平面面積のテストでは
+    // 検出できない。滑らか化などで経度を平均すると地球を一周する三角形ができる。
+    let maxSurfaceArea = 0
+
+    for (const worldFeature of worldFeatures) {
+      for (const polygon of polygonsOf(worldFeature)) {
+        const surfaceArea = capSurfaceArea(polygon)
+        maxSurfaceArea = Math.max(maxSurfaceArea, surfaceArea)
+
+        expect(surfaceArea, `feature ${worldFeature.id} のcapが広がりすぎている`)
+          .toBeLessThan(maxCapSurfaceArea)
+      }
+    }
+
+    expect(maxSurfaceArea).toBeGreaterThan(0)
   })
 
   it('座標数が元データより十分に少ない', () => {
