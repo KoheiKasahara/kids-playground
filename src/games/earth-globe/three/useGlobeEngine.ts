@@ -25,6 +25,7 @@ import {
   disposeGlobeBorderLines,
   SELECTED_BORDER_RADIUS,
 } from './globeBorderLines'
+import { renderPixelRatioForDevice } from './renderQuality'
 import { configureGlobeRotationControls } from './rotationControls'
 
 const BASE_GLOBE_COLOR = '#4dabf7'
@@ -32,9 +33,6 @@ const LAND_COLOR = '#8ce99a'
 const SIDE_COLOR = '#69b97a'
 const SELECTED_LAND_COLOR = '#ffd43b'
 const SELECTED_SIDE_COLOR = '#f59f00'
-// three-globeのpolygon strokeはWebGLの1物理解像度px固定のLineBasicMaterial。
-// DPRを1にそろえることで、高DPR画面でもCSS上の国境を1pxで安定して見せる。
-const RENDER_PIXEL_RATIO = 1
 const ATMOSPHERE_COLOR = '#74c0fc'
 const BASE_POLYGON_ALTITUDE = 0.008
 const SELECTED_POLYGON_ALTITUDE = 0.024
@@ -535,7 +533,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         antialias: true,
         powerPreference: 'high-performance',
       })
-      renderer.setPixelRatio(RENDER_PIXEL_RATIO)
+      renderer.setPixelRatio(renderPixelRatioForDevice(window.devicePixelRatio))
       renderer.outputColorSpace = THREE.SRGBColorSpace
 
       const canvas = renderer.domElement
