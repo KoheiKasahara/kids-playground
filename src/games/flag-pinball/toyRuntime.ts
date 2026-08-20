@@ -11,6 +11,9 @@ import { createWindToy } from './windToy'
 /** 物理更新のたびにおもちゃへ渡す、盤面上でまだ有効なボール */
 export type ToyBall = { readonly ballIndex: number; readonly body: Matter.Body }
 
+/** おもちゃの物理処理へ渡す乱数源。省略時は実機と同じ Math.random を使う。 */
+export type RandomSource = () => number
+
 /**
  * おもちゃの見た目の状態。エンジンはこの値だけを読んでDOMへ書き込み、
  * 実際の絵（風車・UFOなど）はテーマ側のCSSがこの値を使って描く。
@@ -49,14 +52,14 @@ export type ToyRuntime = {
 }
 
 /** placement.kind に応じたランタイムを作る。ここが唯一の分岐点 */
-export function createToyRuntime(placement: ToyPlacement): ToyRuntime {
+export function createToyRuntime(placement: ToyPlacement, random: RandomSource = Math.random): ToyRuntime {
   switch (placement.kind) {
     case 'spinner':
       return createSpinnerToy(placement)
     case 'launcher':
-      return createLauncherToy(placement)
+      return createLauncherToy(placement, random)
     case 'jumppad':
-      return createJumppadToy(placement)
+      return createJumppadToy(placement, random)
     case 'seesaw':
       return createSeesawToy(placement)
     case 'hammer':

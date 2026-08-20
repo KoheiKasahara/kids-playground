@@ -1,7 +1,7 @@
 import * as Matter from 'matter-js'
 import { MAX_SPEED, OBSTACLE_FRICTION } from './pinballPhysics'
 import type { ToyPlacement } from './toyLayout'
-import type { ToyRuntime, ToyVisualState } from './toyRuntime'
+import type { RandomSource, ToyRuntime, ToyVisualState } from './toyRuntime'
 
 const { Body, Bodies } = Matter
 
@@ -59,7 +59,7 @@ function createLauncherBody(placement: ToyPlacement): Matter.Body {
   })
 }
 
-function setLaunchVelocity(body: Matter.Body, placement: ToyPlacement): boolean {
+function setLaunchVelocity(body: Matter.Body, placement: ToyPlacement, random: RandomSource): boolean {
   const offsetX = body.position.x - placement.x
   const offsetY = body.position.y - placement.y
   const isWithinInfluenceRange = Math.hypot(offsetX, offsetY) <= LAUNCHER_INFLUENCE_RADIUS
@@ -85,15 +85,15 @@ function setLaunchVelocity(body: Matter.Body, placement: ToyPlacement): boolean 
   // （「潮に乗る」「潮を外れる」の両方が起こる余地を残すため、100%固定にはしない）。
   const randomHorizontalDirection =
     tide === undefined
-      ? Math.random() < 0.5
+      ? random() < 0.5
         ? -1
         : 1
-      : Math.random() < TIDE_BIAS_PROBABILITY
+      : random() < TIDE_BIAS_PROBABILITY
         ? tide.biasDirection
         : -tide.biasDirection
   const randomHorizontalSpeed =
     (RANDOM_HORIZONTAL_MIN_SPEED +
-      Math.random() * (RANDOM_HORIZONTAL_MAX_SPEED - RANDOM_HORIZONTAL_MIN_SPEED)) *
+      random() * (RANDOM_HORIZONTAL_MAX_SPEED - RANDOM_HORIZONTAL_MIN_SPEED)) *
     horizontalSpeedScale
   const horizontalVelocity = clamp(
     dampedHorizontalVelocity + randomHorizontalDirection * randomHorizontalSpeed,
@@ -112,7 +112,7 @@ function setLaunchVelocity(body: Matter.Body, placement: ToyPlacement): boolean 
   return true
 }
 
-export function createLauncherToy(placement: ToyPlacement): ToyRuntime {
+export function createLauncherToy(placement: ToyPlacement, random: RandomSource = Math.random): ToyRuntime {
   const launcherBody = createLauncherBody(placement)
   let armedUntil: number | null = null
   let lastPulseAt: number | null = null
@@ -160,7 +160,7 @@ export function createLauncherToy(placement: ToyPlacement): ToyRuntime {
           ) {
             continue
           }
-          if (setLaunchVelocity(ball.body, placement)) {
+          if (setLaunchVelocity(ball.body, placement, random)) {
             lastBallPhysicsActivationAt.set(ball.ballIndex, now)
           }
         }

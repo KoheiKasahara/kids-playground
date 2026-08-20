@@ -2,7 +2,7 @@ import * as Matter from 'matter-js'
 import { BALL_RADIUS } from './boardLayout'
 import { MAX_SPEED, OBSTACLE_FRICTION } from './pinballPhysics'
 import type { ToyPlacement } from './toyLayout'
-import type { ToyRuntime, ToyVisualState } from './toyRuntime'
+import type { RandomSource, ToyRuntime, ToyVisualState } from './toyRuntime'
 
 const { Body, Bodies } = Matter
 
@@ -57,7 +57,12 @@ function createJumppadBody(placement: ToyPlacement): Matter.Body {
 }
 
 /** ボールを打ち上げられれば true を返す。呼び出し側はこれを「発射した」判定に使う。 */
-function tryLaunch(body: Matter.Body, placement: ToyPlacement, influenceRadius: number): boolean {
+function tryLaunch(
+  body: Matter.Body,
+  placement: ToyPlacement,
+  influenceRadius: number,
+  random: RandomSource,
+): boolean {
   const offsetX = body.position.x - placement.x
   const offsetY = body.position.y - placement.y
   if (Math.hypot(offsetX, offsetY) > influenceRadius) return false
@@ -67,14 +72,14 @@ function tryLaunch(body: Matter.Body, placement: ToyPlacement, influenceRadius: 
   // ボールを寄せがちな場合にジャンプ台がその偏りへさらに加担してしまう
   // （実測で得点ゾーンの分布が大きく片側へ偏った）。ここでは左右をランダムに選び、
   // 盤面全体としてどちらの得点ゾーンにも届く可能性を残す。
-  const randomHorizontalDirection = Math.random() < 0.5 ? -1 : 1
+  const randomHorizontalDirection = random() < 0.5 ? -1 : 1
   const dampedHorizontalVelocity = clamp(
     body.velocity.x * HORIZONTAL_VELOCITY_RETENTION,
     -MAX_HORIZONTAL_SPEED,
     MAX_HORIZONTAL_SPEED,
   )
   const randomHorizontalSpeed =
-    RANDOM_HORIZONTAL_MIN_SPEED + Math.random() * (RANDOM_HORIZONTAL_MAX_SPEED - RANDOM_HORIZONTAL_MIN_SPEED)
+    RANDOM_HORIZONTAL_MIN_SPEED + random() * (RANDOM_HORIZONTAL_MAX_SPEED - RANDOM_HORIZONTAL_MIN_SPEED)
   const horizontalVelocity = clamp(
     dampedHorizontalVelocity + randomHorizontalDirection * randomHorizontalSpeed,
     -MAX_HORIZONTAL_SPEED,
@@ -92,7 +97,7 @@ function tryLaunch(body: Matter.Body, placement: ToyPlacement, influenceRadius: 
   return true
 }
 
-export function createJumppadToy(placement: ToyPlacement): ToyRuntime {
+export function createJumppadToy(placement: ToyPlacement, random: RandomSource = Math.random): ToyRuntime {
   const jumppadBody = createJumppadBody(placement)
   const influenceRadius = placement.radius + BALL_RADIUS + INFLUENCE_MARGIN
   const lastBallLaunchAt = new Map<number, number>()
@@ -119,7 +124,7 @@ export function createJumppadToy(placement: ToyPlacement): ToyRuntime {
       for (const ball of balls) {
         const lastLaunchAt = lastBallLaunchAt.get(ball.ballIndex)
         if (lastLaunchAt !== undefined && now - lastLaunchAt < BALL_COOLDOWN_MS) continue
-        if (tryLaunch(ball.body, placement, influenceRadius)) {
+        if (tryLaunch(ball.body, placement, influenceRadius, random)) {
           lastBallLaunchAt.set(ball.ballIndex, now)
           lastFireAt = now
         }
