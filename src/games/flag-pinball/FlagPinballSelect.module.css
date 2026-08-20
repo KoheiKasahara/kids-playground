@@ -240,6 +240,16 @@
   background: linear-gradient(180deg, rgba(255, 253, 247, 0) 0, var(--color-background) 10px);
 }
 
+/* 横画面では、選んだ国旗を見せる高さを優先して開始・戻るを1段にする。
+   主操作を少し広くしつつ、どちらも幼児向けの64pxタップ領域を維持する。 */
+@media (orientation: landscape) {
+  .actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1.625fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
 @media (min-width: 560px) {
   .grid {
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
