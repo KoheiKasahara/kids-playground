@@ -37,6 +37,12 @@ import {
 } from './globeLayers'
 import { renderPixelRatioForDevice } from './renderQuality'
 import { configureGlobeRotationControls } from './rotationControls'
+import {
+  BASE_SELECTED_BORDER_SCALE,
+  type BorderScaleAnimation,
+  POLYGONS_TRANSITION_DURATION_MS,
+  sampleBorderScaleAnimation,
+} from './selectionTransition'
 
 const BASE_GLOBE_COLOR = '#4dabf7'
 const LAND_COLOR = '#8ce99a'
@@ -44,7 +50,6 @@ const SIDE_COLOR = '#69b97a'
 const SELECTED_LAND_COLOR = '#ffd43b'
 const SELECTED_SIDE_COLOR = '#f59f00'
 const ATMOSPHERE_COLOR = '#74c0fc'
-const POLYGONS_TRANSITION_DURATION_MS = 260
 const POLYGON_DATA_FALLBACK_DELAY_MS = 250
 const POINTER_CLICK_DISTANCE_PX = 8
 // world units（地球半径100あたり）。cameraDistanceForZoom等と同じ単位系。
@@ -141,6 +146,9 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let globe: ThreeGlobe | null = null
     let borderLines: LineSegments2 | null = null
     let selectedBorderLines: LineSegments2 | null = null
+    let selectedBorderAnimation: BorderScaleAnimation | null = null
+    let departingBorderLines: LineSegments2 | null = null
+    let departingBorderAnimation: BorderScaleAnimation | null = null
     // 国境線の線幅計算に使う描画サイズ(CSSピクセル)。resizeのたびに更新する。
     const borderLinesSize = new THREE.Vector2(1, 1)
     let resizeObserver: ResizeObserver | null = null
@@ -300,16 +308,45 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       updateSelectedBorderLines()
     }
 
-    function disposeSelectedBorderLines() {
-      if (selectedBorderLines === null) return
+    function disposeBorderLines(lines: LineSegments2) {
+      disposeGlobeBorderLines(lines)
+      lines.removeFromParent()
+    }
 
-      disposeGlobeBorderLines(selectedBorderLines)
-      selectedBorderLines.removeFromParent()
-      selectedBorderLines = null
+    function disposeSelectionBorderLines() {
+      if (selectedBorderLines !== null) {
+        disposeBorderLines(selectedBorderLines)
+        selectedBorderLines = null
+      }
+      selectedBorderAnimation = null
+
+      if (departingBorderLines !== null) {
+        disposeBorderLines(departingBorderLines)
+        departingBorderLines = null
+      }
+      departingBorderAnimation = null
     }
 
     function updateSelectedBorderLines() {
-      disposeSelectedBorderLines()
+      const startedAt = performance.now()
+
+      // 連続タップ時は、1つ前の国の線もポリゴンと同じ時間で地表へ戻す。
+      if (departingBorderLines !== null) disposeBorderLines(departingBorderLines)
+      departingBorderLines = selectedBorderLines
+      departingBorderAnimation = departingBorderLines === null || reducedMotion
+        ? null
+        : {
+            fromScale: departingBorderLines.scale.x,
+            toScale: BASE_SELECTED_BORDER_SCALE,
+            startedAt,
+          }
+      selectedBorderLines = null
+      selectedBorderAnimation = null
+
+      if (departingBorderLines !== null && reducedMotion) {
+        disposeBorderLines(departingBorderLines)
+        departingBorderLines = null
+      }
 
       const selectedFeature = selectedNumericId === null
         ? undefined
@@ -320,9 +357,14 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         [selectedFeature],
         SELECTED_BORDER_RADIUS,
       )
+      const initialScale = reducedMotion ? 1 : BASE_SELECTED_BORDER_SCALE
+      selectedBorderLines.scale.setScalar(initialScale)
       setGlobeBorderLinesSize(selectedBorderLines, borderLinesSize.x, borderLinesSize.y)
       selectedBorderLines.renderOrder = 2
       scene.add(selectedBorderLines)
+      selectedBorderAnimation = reducedMotion
+        ? null
+        : { fromScale: initialScale, toScale: 1, startedAt }
     }
 
     function setReducedMotion(nextReducedMotion: boolean) {
@@ -342,7 +384,35 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         updatePointOfView()
       }
 
+      if (nextReducedMotion) {
+        if (selectedBorderLines !== null) selectedBorderLines.scale.setScalar(1)
+        selectedBorderAnimation = null
+        if (departingBorderLines !== null) {
+          disposeBorderLines(departingBorderLines)
+          departingBorderLines = null
+        }
+        departingBorderAnimation = null
+      }
+
       updatePolygonAppearance()
+    }
+
+    function updateSelectionBorderAnimations(now: number) {
+      if (selectedBorderLines !== null && selectedBorderAnimation !== null) {
+        const sample = sampleBorderScaleAnimation(selectedBorderAnimation, now)
+        selectedBorderLines.scale.setScalar(sample.scale)
+        if (sample.complete) selectedBorderAnimation = null
+      }
+
+      if (departingBorderLines !== null && departingBorderAnimation !== null) {
+        const sample = sampleBorderScaleAnimation(departingBorderAnimation, now)
+        departingBorderLines.scale.setScalar(sample.scale)
+        if (sample.complete) {
+          disposeBorderLines(departingBorderLines)
+          departingBorderLines = null
+          departingBorderAnimation = null
+        }
+      }
     }
 
     function updateZoomAnimation(now: number) {
@@ -455,6 +525,9 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       if (selectedBorderLines !== null) {
         setGlobeBorderLinesSize(selectedBorderLines, width, height)
       }
+      if (departingBorderLines !== null) {
+        setGlobeBorderLinesSize(departingBorderLines, width, height)
+      }
       // 向きが変わった場合も、最小ズームだけはその画面比に合う表示範囲へ戻す。
       if (activeZoomLevel === 0) setCameraDistance(cameraDistanceForViewport(activeZoomLevel))
       updatePointOfView()
@@ -466,6 +539,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
 
       if (controls !== null) controls.update()
       updateZoomAnimation(now)
+      updateSelectionBorderAnimations(now)
       if (renderer !== null && scene !== null && camera !== null) {
         renderer.render(scene, camera)
         if (!hasRenderedFirstFrame) {
@@ -521,7 +595,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         borderLines.removeFromParent()
         borderLines = null
       }
-      disposeSelectedBorderLines()
+      disposeSelectionBorderLines()
 
       if (renderer !== null) {
         const canvas = renderer.domElement
