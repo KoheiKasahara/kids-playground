@@ -19,7 +19,12 @@ import {
   isGlobeBodyObject,
   polygonNumericIdFromObject,
 } from './threeGlobeAdapter'
-import { createGlobeBorderLines, disposeGlobeBorderLines } from './globeBorderLines'
+import {
+  BASE_BORDER_RADIUS,
+  createGlobeBorderLines,
+  disposeGlobeBorderLines,
+  SELECTED_BORDER_RADIUS,
+} from './globeBorderLines'
 import { configureGlobeRotationControls } from './rotationControls'
 
 const BASE_GLOBE_COLOR = '#4dabf7'
@@ -115,6 +120,9 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     const countriesByNumericId = new Map<number, GlobeCountry>(
       initialOptions.countries.map((country) => [country.numericId, country]),
     )
+    const featuresByNumericId = new Map<number, GlobeFeature>(
+      initialOptions.features.map((feature) => [feature.id, feature]),
+    )
     const polygonData: PolygonDatum[] = initialOptions.features.map((feature) => ({
       id: feature.id,
       geometry: feature.geometry,
@@ -126,6 +134,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let controls: OrbitControls | null = null
     let globe: ThreeGlobe | null = null
     let borderLines: THREE.LineSegments | null = null
+    let selectedBorderLines: THREE.LineSegments | null = null
     let resizeObserver: ResizeObserver | null = null
     let hasWindowResizeListener = false
     let rafId: number | null = null
@@ -280,6 +289,31 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         ? null
         : countriesById.get(countryId)?.numericId ?? null
       updatePolygonAppearance()
+      updateSelectedBorderLines()
+    }
+
+    function disposeSelectedBorderLines() {
+      if (selectedBorderLines === null) return
+
+      disposeGlobeBorderLines(selectedBorderLines)
+      selectedBorderLines.removeFromParent()
+      selectedBorderLines = null
+    }
+
+    function updateSelectedBorderLines() {
+      disposeSelectedBorderLines()
+
+      const selectedFeature = selectedNumericId === null
+        ? undefined
+        : featuresByNumericId.get(selectedNumericId)
+      if (scene === null || selectedFeature === undefined) return
+
+      selectedBorderLines = createGlobeBorderLines(
+        [selectedFeature],
+        SELECTED_BORDER_RADIUS,
+      )
+      selectedBorderLines.renderOrder = 2
+      scene.add(selectedBorderLines)
     }
 
     function setReducedMotion(nextReducedMotion: boolean) {
@@ -473,6 +507,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         borderLines.removeFromParent()
         borderLines = null
       }
+      disposeSelectedBorderLines()
 
       if (renderer !== null) {
         const canvas = renderer.domElement
@@ -563,8 +598,10 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       )
       updatePolygonAppearance()
       scene.add(nextGlobe)
-      borderLines = createGlobeBorderLines(initialOptions.features)
+      borderLines = createGlobeBorderLines(initialOptions.features, BASE_BORDER_RADIUS)
+      borderLines.renderOrder = 1
       scene.add(borderLines)
+      updateSelectedBorderLines()
 
       controls = new OrbitControls(camera, renderer.domElement)
       controls.target.set(0, 0, 0)
