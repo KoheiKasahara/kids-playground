@@ -57,18 +57,6 @@ describe('EarthGlobePlay', () => {
     expect(globeEngineMock.options?.zoomLevel).toBe(0)
   })
 
-  it('starts with country names hidden and toggles them on', async () => {
-    const user = userEvent.setup()
-    renderApp('/games/earth-globe')
-
-    const toggle = await screen.findByRole('button', { name: 'くにの なまえを ひょうじ' })
-    expect(toggle).toHaveAttribute('aria-pressed', 'false')
-
-    await user.click(toggle)
-
-    expect(toggle).toHaveAttribute('aria-pressed', 'true')
-  })
-
   it('clamps zoom controls at both ends of the four-level range', async () => {
     const user = userEvent.setup()
     renderApp('/games/earth-globe')

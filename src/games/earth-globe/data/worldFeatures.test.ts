@@ -5,6 +5,11 @@ type Point = readonly [number, number]
 type Ring = readonly Point[]
 type PolygonCoordinates = readonly Ring[]
 
+// Keep this in sync with build-earth-globe-data.mjs: four degrees keeps the
+// spherical chord sag far below the 0.8-unit altitude of the land polygons.
+const maxArcAngleDegrees = 4
+const degreesToRadians = Math.PI / 180
+
 const expectedIsoNumericIds = [
   4, 8, 10, 12, 16, 20, 24, 28, 31, 32, 36, 36, 40, 44, 48, 50, 51,
   52, 56, 60, 64, 68, 70, 72, 76, 84, 86, 90, 92, 96, 100, 104, 108,
@@ -42,6 +47,16 @@ function totalCoordinateCount(): number {
       .reduce((polygonTotal, ring) => polygonTotal + ring.length, 0),
     0,
   )
+}
+
+function greatCircleAngleDegrees(start: Point, end: Point): number {
+  const [startLongitude, startLatitude] = start.map((value) => value * degreesToRadians)
+  const [endLongitude, endLatitude] = end.map((value) => value * degreesToRadians)
+  const cosine = Math.sin(startLatitude) * Math.sin(endLatitude)
+    + Math.cos(startLatitude) * Math.cos(endLatitude)
+      * Math.cos(endLongitude - startLongitude)
+
+  return Math.acos(Math.min(1, Math.max(-1, cosine))) / degreesToRadians
 }
 
 describe('worldFeatures', () => {
@@ -91,6 +106,19 @@ describe('worldFeatures', () => {
         for (const ring of polygon) {
           expect(ring.length).toBeGreaterThanOrEqual(4)
           expect(ring[0]).toEqual(ring[ring.length - 1])
+        }
+      }
+    }
+  })
+
+  it('全ての辺が設定した最大大円角以下になっている', () => {
+    for (const worldFeature of worldFeatures) {
+      for (const polygon of polygonsOf(worldFeature)) {
+        for (const ring of polygon) {
+          for (let index = 1; index < ring.length; index += 1) {
+            expect(greatCircleAngleDegrees(ring[index - 1], ring[index]))
+              .toBeLessThanOrEqual(maxArcAngleDegrees)
+          }
         }
       }
     }
