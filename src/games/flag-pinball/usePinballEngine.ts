@@ -194,7 +194,7 @@ export function usePinballEngine(options: PinballEngineOptions): PinballEngineHa
 
     // おもちゃの物理Bodyとランタイムを同じ世界へ登録する。ランタイムの種類分岐は
     // createToyRuntimeに閉じ込め、エンジン側は共通インターフェースだけを扱う。
-    const toyRuntimes = boardConfig.toys.map(createToyRuntime)
+    const toyRuntimes = boardConfig.toys.map((placement) => createToyRuntime(placement))
     const toyRuntimeMap = toyRuntimesRef.current
     toyRuntimeMap.clear()
     for (const runtime of toyRuntimes) {

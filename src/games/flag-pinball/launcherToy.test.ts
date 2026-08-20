@@ -77,9 +77,9 @@ function createBall(ballIndex: number, spec: BallSpec): ToyBall {
   return { ballIndex, body }
 }
 
-function createHarness(specs: readonly BallSpec[]): LauncherHarness {
+function createHarness(specs: readonly BallSpec[], random?: () => number): LauncherHarness {
   const engine = Engine.create({ gravity: { ...GRAVITY } })
-  const runtime = createLauncherToy(LAUNCHER_PLACEMENT)
+  const runtime = createLauncherToy(LAUNCHER_PLACEMENT, random)
   const balls = specs.map((spec, index) => createBall(index, spec))
   Composite.add(engine.world, [...runtime.bodies, ...balls.map((ball) => ball.body)])
   return { balls, engine, runtime }
@@ -303,6 +303,32 @@ describe('launcherToy の固定ステップ物理', () => {
 
     expect(ball.body.velocity.y).toBeLessThan(0)
     expect(speedOf(ball)).toBeLessThanOrEqual(MAX_SPEED)
+  })
+
+  it('注入された乱数源で左右の散らしを決める', () => {
+    let randomCalls = 0
+    const random = () => {
+      randomCalls += 1
+      return 0
+    }
+    const harness = createHarness(
+      [
+        {
+          x: LAUNCHER_PLACEMENT.x + IN_RANGE_OFFSET,
+          y: LAUNCHER_PLACEMENT.y + IN_RANGE_OFFSET,
+          velocity: { x: 0, y: 2 },
+        },
+      ],
+      random,
+    )
+    const ball = getOnlyBall(harness)
+
+    harness.runtime.activate(0)
+    harness.runtime.update(0, harness.balls)
+
+    expect(randomCalls).toBe(2)
+    expect(ball.body.velocity.x).toBeCloseTo(-0.8, 8)
+    expect(ball.body.velocity.y).toBeCloseTo(-11.5, 8)
   })
 
   it('作用範囲の外にあるボールの速度を変えない', () => {

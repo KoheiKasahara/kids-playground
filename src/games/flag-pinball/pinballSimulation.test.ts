@@ -51,7 +51,7 @@ describe('pinball fixed-step play-time simulation', () => {
     const max = seconds[seconds.length - 1]
     const mean = seconds.reduce((sum, value) => sum + value, 0) / seconds.length
 
-    // launcherToy.tsのMath.randomにより固定値にはできないため、成立性と緩い上限だけを検証する。
+    // launch/stall と各おもちゃへ同じ seeded random を渡すため、同じシードで再現できる。
     console.info(
       `pinball rapid toy taps (${RAPID_TAP_TRIAL_COUNT} trials, ${RAPID_TAP_INTERVAL_MS}ms): min=${min.toFixed(3)}s median=${median.toFixed(3)}s mean=${mean.toFixed(3)}s max=${max.toFixed(3)}s`,
     )
@@ -74,6 +74,18 @@ describe('pinball fixed-step play-time simulation', () => {
       expect(result.scoredZoneIds).toHaveLength(result.scoreSteps.length)
       expect(result.scoredZoneIds.every((zoneId) => knownZoneIds.has(zoneId))).toBe(true)
     }
+  })
+
+  it('おもちゃの乱数を含むシミュレーションも同じシードで再現する', () => {
+    const spaceOptions = { toyTapIntervalMs: RAPID_TAP_INTERVAL_MS, boardConfig: spaceBoard }
+    const firstSpaceRun = simulatePinballRun(SEED_BASE, spaceOptions)
+    const secondSpaceRun = simulatePinballRun(SEED_BASE, spaceOptions)
+    expect(secondSpaceRun).toEqual(firstSpaceRun)
+
+    const oceanOptions = { toyTapIntervalMs: RAPID_TAP_INTERVAL_MS, boardConfig: oceanBoard }
+    const firstOceanRun = simulatePinballRun(SEED_BASE, oceanOptions)
+    const secondOceanRun = simulatePinballRun(SEED_BASE, oceanOptions)
+    expect(secondOceanRun).toEqual(firstOceanRun)
   })
 })
 
@@ -158,8 +170,16 @@ describe('pinball 宇宙盤面（spaceBoard）のシミュレーション', () =
       }
     }
 
+    console.info(
+      'space board zone distribution:',
+      SCORE_ZONES.map((zone) => `${zone.id}(${zone.score})=${zoneCounts.get(zone.id) ?? 0}`).join(' '),
+    )
+
     for (const zone of SCORE_ZONES) {
-      expect(zoneCounts.get(zone.id)).toBeGreaterThan(0)
+      expect(
+        zoneCounts.get(zone.id),
+        `space board zone distribution: ${zone.id}(${zone.score})=${zoneCounts.get(zone.id) ?? 0}`,
+      ).toBeGreaterThan(0)
     }
   })
 })

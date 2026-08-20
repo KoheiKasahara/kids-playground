@@ -134,7 +134,7 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
 
   // おもちゃのBodyも実機と同じ物理世界へ加える。タップしない測定でも障害物として
   // 残るため、画面側とヘッドレス測定の盤面構成を一致させる。
-  const toyRuntimes = boardConfig.toys.map(createToyRuntime)
+  const toyRuntimes = boardConfig.toys.map((placement) => createToyRuntime(placement, random))
   Composite.add(engine.world, toyRuntimes.flatMap((runtime) => runtime.bodies))
 
   const ballBodies: Matter.Body[] = []
@@ -270,9 +270,8 @@ export function simulatePinballRun(seed: number, options?: PinballSimulationOpti
       for (const runtime of toyRuntimes) {
         runtime.activate(nowMs)
       }
-      // launcherToy.ts の散らしは Math.random を使うため、createSeededRandom を使う
-      // この測定でもタップありのシナリオは完全再現にならない。テストは固定値ではなく
-      // 十分に緩い上限で成立性だけを確認する。
+      // launch/stall と同じ seeded random を toy へも渡しているため、タップありの
+      // シナリオも固定シードから完全に再現できる。
       nextToyTapAtMs += toyTapIntervalMs
     }
     for (const runtime of toyRuntimes) {

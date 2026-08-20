@@ -51,9 +51,10 @@ function createBall(ballIndex: number, x: number, y: number, velocity = { x: 0, 
 
 function createHarness(
   ballSpecs: readonly { x: number; y: number; velocity?: { x: number; y: number } }[],
+  random?: () => number,
 ): JumppadHarness {
   const engine = Engine.create({ gravity: { ...GRAVITY } })
-  const runtime = createJumppadToy(JUMPPAD_PLACEMENT)
+  const runtime = createJumppadToy(JUMPPAD_PLACEMENT, random)
   const balls = ballSpecs.map((spec, index) => createBall(index, spec.x, spec.y, spec.velocity))
   Composite.add(engine.world, [...runtime.bodies, ...balls.map((ball) => ball.body)])
   return { balls, engine, runtime }
@@ -74,6 +75,24 @@ describe('jumppadToy の固定ステップ物理', () => {
 
     expect(ball.body.velocity.y).toBeLessThan(0)
     expect(speedOf(ball)).toBeLessThanOrEqual(MAX_SPEED)
+  })
+
+  it('注入された乱数源で左右の散らしを決める', () => {
+    let randomCalls = 0
+    const random = () => {
+      randomCalls += 1
+      return 0
+    }
+    const harness = createHarness(
+      [{ x: JUMPPAD_PLACEMENT.x, y: JUMPPAD_PLACEMENT.y + IN_RANGE_OFFSET, velocity: { x: 0, y: 2 } }],
+      random,
+    )
+
+    harness.runtime.update(0, harness.balls)
+
+    expect(randomCalls).toBe(2)
+    expect(harness.balls[0]?.body.velocity.x).toBeCloseTo(-3, 8)
+    expect(harness.balls[0]?.body.velocity.y).toBeCloseTo(-13, 8)
   })
 
   it('作用範囲の外にあるボールには作用しない', () => {
