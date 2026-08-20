@@ -11,6 +11,46 @@
 - Natural Earth の利用条件: [Public Domain](https://www.naturalearthdata.com/about/terms-of-use/)
 - 本アプリでの加工: TopoJSONを一度GeoJSON Featureへ展開し、Web Mercator投影・SVGパス化、国別bboxによる表示範囲調整と旅行ルート描画を行います。国境データ自体は変更していません。
 
+## 3D地球儀レンダリング (three-globe)
+
+「ちきゅうぎ」（`src/games/earth-globe/`）の3D地球儀・国ポリゴン描画には
+[three-globe](https://github.com/vasturiano/three-globe) npmパッケージ（**2.45.2**）を使用しています。
+three.js上に国境ポリゴンを球面表示するためのライブラリで、npm経由でビルド時にバンドルし、実行時のCDN通信は行いません。
+表示する国境データ・国旗・国名は前述の world-atlas / 既存の国マスタ（`src/games/flag-quiz/data/countries.ts`）をそのまま再利用しており、three-globe自体は地形データを持ちません。
+
+- プロジェクト: three-globe
+- リポジトリ: https://github.com/vasturiano/three-globe
+- 作者: Vasco Asturiano
+- ライセンス: MIT License
+
+### MIT License 全文
+
+```
+MIT License
+
+Copyright (c) 2019 Vasco Asturiano
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+（`node_modules/three-globe/LICENSE` の内容をそのまま転記しています。）
+
 ## 都道府県地図 (src/games/prefecture-quiz/data/prefectures.json)
 
 都道府県境界は、[smartnews-smri/japan-topography](https://github.com/smartnews-smri/japan-topography) の
