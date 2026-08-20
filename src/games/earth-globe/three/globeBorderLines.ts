@@ -3,16 +3,12 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import type { GlobeFeature } from '../types'
+import { BASE_BORDER_RADIUS } from './globeLayers'
 
 type Position = readonly [longitude: number, latitude: number]
 type Ring = readonly Position[]
 type Polygon = readonly Ring[]
 
-// three-globe の地球半径は100。通常の国ポリゴン上面は altitude=0.008 なので
-// 半径100.8となる。線はそのすぐ上だけを通し、外周で地表から浮いて見えないようにする。
-export const BASE_BORDER_RADIUS = 100.81
-// 選択中の国だけは altitude=0.024（半径102.4）まで持ち上がるため、専用線を重ねる。
-export const SELECTED_BORDER_RADIUS = 102.41
 // 元データは0.5°以下まで密度化済みで、球面の弦の沈み込みは
 // 100 * (1 - cos(0.25°)) ≈ 0.001 world unit（最大ズームでも0.01px未満）しかない。
 // これ以上細かく分割しても見た目は変わらず頂点数だけが増えるため、同じ0.5°に合わせる。

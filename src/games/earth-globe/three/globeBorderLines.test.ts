@@ -1,14 +1,13 @@
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { describe, expect, it } from 'vitest'
 import {
-  BASE_BORDER_RADIUS,
   BORDER_LINE_WIDTH,
   createGlobeBorderLines,
   disposeGlobeBorderLines,
   MAX_BORDER_SEGMENT_DEGREES,
-  SELECTED_BORDER_RADIUS,
   setGlobeBorderLinesSize,
 } from './globeBorderLines'
+import { BASE_BORDER_RADIUS, SELECTED_BORDER_RADIUS } from './globeLayers'
 import type { GlobeFeature } from '../types'
 
 const feature: GlobeFeature = {

@@ -23,12 +23,18 @@ import {
   polygonNumericIdFromObject,
 } from './threeGlobeAdapter'
 import {
-  BASE_BORDER_RADIUS,
   createGlobeBorderLines,
   disposeGlobeBorderLines,
-  SELECTED_BORDER_RADIUS,
   setGlobeBorderLinesSize,
 } from './globeBorderLines'
+import {
+  BASE_BORDER_RADIUS,
+  BASE_POLYGON_ALTITUDE,
+  GLOBE_CURVATURE_RESOLUTION_DEGREES,
+  POLYGON_CAP_CURVATURE_RESOLUTION_DEGREES,
+  SELECTED_BORDER_RADIUS,
+  SELECTED_POLYGON_ALTITUDE,
+} from './globeLayers'
 import { renderPixelRatioForDevice } from './renderQuality'
 import { configureGlobeRotationControls } from './rotationControls'
 
@@ -38,8 +44,6 @@ const SIDE_COLOR = '#69b97a'
 const SELECTED_LAND_COLOR = '#ffd43b'
 const SELECTED_SIDE_COLOR = '#f59f00'
 const ATMOSPHERE_COLOR = '#74c0fc'
-const BASE_POLYGON_ALTITUDE = 0.008
-const SELECTED_POLYGON_ALTITUDE = 0.024
 const POLYGONS_TRANSITION_DURATION_MS = 260
 const POLYGON_DATA_FALLBACK_DELAY_MS = 250
 const POINTER_CLICK_DISTANCE_PX = 8
@@ -590,7 +594,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         color: BASE_GLOBE_COLOR,
         shininess: 8,
       }))
-      nextGlobe.globeCurvatureResolution(5)
+      nextGlobe.globeCurvatureResolution(GLOBE_CURVATURE_RESOLUTION_DEGREES)
       nextGlobe.showAtmosphere(true)
       nextGlobe.atmosphereColor(ATMOSPHERE_COLOR)
       nextGlobe.atmosphereAltitude(0.08)
@@ -602,7 +606,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       ))
       // 面ポリゴンは当たり判定用の簡略化データのまま維持し、線だけを別meshで滑らかにする。
       nextGlobe.polygonStrokeColor(() => null)
-      nextGlobe.polygonCapCurvatureResolution(3)
+      nextGlobe.polygonCapCurvatureResolution(POLYGON_CAP_CURVATURE_RESOLUTION_DEGREES)
       nextGlobe.polygonsTransitionDuration(
         reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS,
       )
