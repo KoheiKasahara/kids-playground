@@ -10,6 +10,9 @@ const CAMERA_DISTANCE_BY_ZOOM: Readonly<Record<ZoomLevel, number>> = {
   3: 145,
 }
 
+// 縦画面の最小表示だけは、地球の左右の輪郭が見える距離まで引く。
+const PORTRAIT_MIN_CAMERA_DISTANCE = 400
+
 const ROTATE_SPEED_BY_ZOOM: Readonly<Record<ZoomLevel, number>> = {
   0: 1,
   1: 0.76,
@@ -19,8 +22,10 @@ const ROTATE_SPEED_BY_ZOOM: Readonly<Record<ZoomLevel, number>> = {
 
 export const ZOOM_ANIMATION_DURATION_MS = 320
 
-export function cameraDistanceForZoom(level: ZoomLevel): number {
-  return CAMERA_DISTANCE_BY_ZOOM[level]
+export function cameraDistanceForZoom(level: ZoomLevel, isPortrait = false): number {
+  return level === 0 && isPortrait
+    ? PORTRAIT_MIN_CAMERA_DISTANCE
+    : CAMERA_DISTANCE_BY_ZOOM[level]
 }
 
 export function rotateSpeedForZoom(level: ZoomLevel): number {

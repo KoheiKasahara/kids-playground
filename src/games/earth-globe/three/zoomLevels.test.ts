@@ -13,6 +13,14 @@ describe('earth-globe zoom levels', () => {
     expect(cameraDistanceForZoom(1)).toBe(230)
     expect(cameraDistanceForZoom(2)).toBe(175)
     expect(cameraDistanceForZoom(3)).toBe(145)
+    expect(cameraDistanceForZoom(0, true)).toBe(400)
+  })
+
+  it('changes only the minimum zoom distance for portrait screens', () => {
+    expect(cameraDistanceForZoom(0, true)).toBeGreaterThan(cameraDistanceForZoom(0))
+    expect(cameraDistanceForZoom(1, true)).toBe(cameraDistanceForZoom(1))
+    expect(cameraDistanceForZoom(2, true)).toBe(cameraDistanceForZoom(2))
+    expect(cameraDistanceForZoom(3, true)).toBe(cameraDistanceForZoom(3))
   })
 
   it('uses progressively lower rotation sensitivity at closer zooms', () => {

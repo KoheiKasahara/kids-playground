@@ -137,6 +137,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       ? null
       : countriesById.get(initialOptions.selectedCountryId)?.numericId ?? null
     let zoomAnimation: ZoomAnimation | null = null
+    let activeZoomLevel = initialOptions.zoomLevel
 
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
@@ -151,6 +152,14 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       if (cameraDirection.lengthSq() === 0) cameraDirection.set(0, 0, 1)
       camera.position.copy(controls.target).add(cameraDirection.normalize().multiplyScalar(distance))
       controls.update()
+    }
+
+    function cameraDistanceForViewport(level: ZoomLevel) {
+      const rect = container?.getBoundingClientRect()
+      return cameraDistanceForZoom(
+        level,
+        (rect?.height ?? 0) > (rect?.width ?? Number.POSITIVE_INFINITY),
+      )
     }
 
     function updatePointOfView() {
@@ -239,7 +248,8 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     }
 
     function setZoom(level: ZoomLevel) {
-      const targetDistance = cameraDistanceForZoom(level)
+      activeZoomLevel = level
+      const targetDistance = cameraDistanceForViewport(level)
       if (camera === null || controls === null) return
 
       const currentDistance = camera.position.distanceTo(controls.target)
@@ -395,6 +405,8 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height, false)
+      // 向きが変わった場合も、最小ズームだけはその画面比に合う表示範囲へ戻す。
+      if (activeZoomLevel === 0) setCameraDistance(cameraDistanceForViewport(activeZoomLevel))
       updatePointOfView()
     }
 
@@ -507,7 +519,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         Math.cos(latitude) * Math.sin(longitude),
       )
       camera.position.normalize().multiplyScalar(
-        cameraDistanceForZoom(initialOptions.zoomLevel),
+        cameraDistanceForViewport(initialOptions.zoomLevel),
       )
       camera.lookAt(origin)
 
@@ -553,7 +565,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       controls.dampingFactor = reducedMotion ? 1 : 0.22
       controls.touches.ONE = THREE.TOUCH.ROTATE
       controls.minDistance = cameraDistanceForZoom(3) - 10
-      controls.maxDistance = cameraDistanceForZoom(0) + 10
+      controls.maxDistance = cameraDistanceForZoom(0, true) + 10
       controls.update()
       controls.addEventListener('change', updatePointOfView)
 
