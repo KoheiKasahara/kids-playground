@@ -11,9 +11,12 @@ const eps = 0.05
 // 最大の島・飛び地は必ず残し、小さな島だけを描画対象から減らす。
 const areaThreshold = 0.05
 const coordinateDecimals = 4
-// Four degrees keeps the spherical chord sag at 100 * (1 - cos(2°)) ≈ 0.061
-// world units, well below the 0.8-unit altitude of the land polygons.
-const maxArcAngleDegrees = 4
+// 0.5度に密度化すると球面の弦の沈み込みは 100 * (1 - cos(0.25°)) ≈ 0.001
+// world unit。three-conic-polygon-geometryの曲面グリッドに沿った三角形分割が
+// 長い輪郭辺でポリゴンを覆いきれず穴を残す問題にも対策する。実測では4度の
+// 欠損合計2.267/最大0.429平方度が、0.5度で0.454/0.065平方度に減少した
+// （座標数37,950→42,323、生成時間1279→1306ms）。
+const maxArcAngleDegrees = 0.5
 
 const outputPath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
