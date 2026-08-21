@@ -1,0 +1,42 @@
+/*
+ * 位置決めはしない：どこに置くかはプレイ画面側のレイアウトが決める。
+ * ここではスティック自体の見た目とタップ範囲だけを持つ。
+ */
+.base {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(34vw, 148px);
+  height: min(34vw, 148px);
+  min-width: 120px;
+  min-height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow-md);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.knob {
+  width: 44%;
+  height: 44%;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ドラッグ中はtransformを毎フレーム書き換えるので遷移なし。指を離して中央へ
+   戻るときだけ、この修飾クラスでふわっと戻す。 */
+.knobResting {
+  transition: transform 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knobResting {
+    transition: none;
+  }
+}
