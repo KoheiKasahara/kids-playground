@@ -6,11 +6,15 @@ import {
   HORIZONTAL_DRAG_SCALE,
   MAX_VIEW_LATITUDE_DEGREES,
   VERTICAL_DRAG_SCALE,
+  VERTICAL_DRAG_SCALE_NEAR_POLE,
+  VERTICAL_SOFT_LIMIT_START_DEGREES,
 } from './rotationControls'
 
 type OrbitControlsInternals = OrbitControls & {
   _handleMouseDownRotate: (event: MouseEvent) => void
   _handleMouseMoveRotate: (event: MouseEvent) => void
+  _sphericalDelta: THREE.Spherical
+  state: number
 }
 
 function createControls() {
@@ -22,6 +26,29 @@ function createControls() {
   controls.enableDamping = false
   controls.update()
   return controls as OrbitControlsInternals
+}
+
+function createDampedControls() {
+  const controls = createControls()
+  controls.enableDamping = true
+  controls.dampingFactor = 0.22
+  return controls
+}
+
+function setPolarAngleDegrees(controls: OrbitControlsInternals, latitudeDegrees: number) {
+  const polarAngle = THREE.MathUtils.degToRad(90 - latitudeDegrees)
+  const camera = controls.object as THREE.PerspectiveCamera
+  camera.position.setFromSphericalCoords(300, polarAngle, 0)
+  controls.update()
+}
+
+function expectedVerticalDragScaleFor(latitudeDegrees: number): number {
+  const distanceFromEquator = Math.min(Math.abs(latitudeDegrees), MAX_VIEW_LATITUDE_DEGREES)
+  if (distanceFromEquator <= VERTICAL_SOFT_LIMIT_START_DEGREES) return VERTICAL_DRAG_SCALE
+
+  const softRange = MAX_VIEW_LATITUDE_DEGREES - VERTICAL_SOFT_LIMIT_START_DEGREES
+  const progress = (distanceFromEquator - VERTICAL_SOFT_LIMIT_START_DEGREES) / softRange
+  return THREE.MathUtils.lerp(VERTICAL_DRAG_SCALE, VERTICAL_DRAG_SCALE_NEAR_POLE, progress)
 }
 
 function rotateFromOrigin(controls: OrbitControlsInternals, x: number, y: number) {
@@ -69,5 +96,62 @@ describe('globe rotation controls', () => {
     expect(controls.getAzimuthalAngle()).not.toBeCloseTo(azimuthAtLimit)
 
     controls.dispose()
+  })
+
+  it('tapers vertical drag sensitivity down as latitude approaches the limit', () => {
+    const nearPoleLatitudeDegrees = 60
+
+    const standard = createControls()
+    const adjusted = createControls()
+    configureGlobeRotationControls(adjusted)
+
+    setPolarAngleDegrees(standard, nearPoleLatitudeDegrees)
+    setPolarAngleDegrees(adjusted, nearPoleLatitudeDegrees)
+    const polarBefore = adjusted.getPolarAngle()
+    expect(standard.getPolarAngle()).toBeCloseTo(polarBefore)
+
+    const standardResult = rotateFromOrigin(standard, 0, 3)
+    const adjustedResult = rotateFromOrigin(adjusted, 0, 3)
+
+    const expectedScale = expectedVerticalDragScaleFor(nearPoleLatitudeDegrees)
+    expect(expectedScale).toBeLessThan(VERTICAL_DRAG_SCALE)
+
+    const standardDeltaPolar = standardResult.polar - polarBefore
+    const adjustedDeltaPolar = adjustedResult.polar - polarBefore
+    expect(Math.abs(adjustedDeltaPolar / standardDeltaPolar)).toBeCloseTo(expectedScale, 2)
+
+    standard.dispose()
+    adjusted.dispose()
+  })
+
+  it('weakens damped inertia of vertical rotation near the pole compared to the equator', () => {
+    const nearPoleLatitudeDegrees = 60
+
+    const equatorControls = createDampedControls()
+    const nearPoleControls = createDampedControls()
+    configureGlobeRotationControls(equatorControls)
+    configureGlobeRotationControls(nearPoleControls)
+    setPolarAngleDegrees(nearPoleControls, nearPoleLatitudeDegrees)
+
+    const equatorPolarBefore = equatorControls.getPolarAngle()
+    const nearPolePolarBefore = nearPoleControls.getPolarAngle()
+
+    // ドラッグ入力を介さず、慣性のみが働く区間(state === NONE)を直接再現する。
+    equatorControls._sphericalDelta.phi = 0.05
+    nearPoleControls._sphericalDelta.phi = 0.05
+    equatorControls.update()
+    nearPoleControls.update()
+
+    const equatorChange = Math.abs(equatorControls.getPolarAngle() - equatorPolarBefore)
+    const nearPoleChange = Math.abs(nearPoleControls.getPolarAngle() - nearPolePolarBefore)
+
+    expect(nearPoleChange).toBeLessThan(equatorChange)
+    expect(nearPoleChange / equatorChange).toBeCloseTo(
+      expectedVerticalDragScaleFor(nearPoleLatitudeDegrees) / VERTICAL_DRAG_SCALE,
+      2,
+    )
+
+    equatorControls.dispose()
+    nearPoleControls.dispose()
   })
 })
