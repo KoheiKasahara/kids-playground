@@ -479,7 +479,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
           trackTexture(flagPanelBall.texture)
           flagBall = flagPanelBall.group
         } catch {
-          // TextureLoaderの同期的な失敗でも、盤面自体は遊べるようにする。
+          // 国旗テクスチャの生成が失敗しても、盤面自体は遊べるようにする。
           const fallbackMaterial = trackMaterial(
             new THREE.MeshLambertMaterial({ color: 0xff6b6b }),
           )

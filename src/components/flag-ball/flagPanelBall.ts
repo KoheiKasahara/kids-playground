@@ -22,6 +22,17 @@ export const FLAG_PANEL_FLAG_RADIUS_IN_RADII = 1.012
 export const FLAG_PANEL_SEGMENTS_X = 12
 export const FLAG_PANEL_SEGMENTS_Y = 9
 
+/**
+ * 国旗SVGを焼き込むキャンバスの大きさ。flag-icons の viewBox と同じ 640×480 にして、
+ * 比率を変えずに焼く。SVGはwidth/heightを持たないため、ブラウザ既定のラスタライズでは
+ * 200×150程度にしかならず、寄ったカメラでは粗く見えてしまう。
+ */
+export const FLAG_PANEL_TEXTURE_WIDTH = 640
+export const FLAG_PANEL_TEXTURE_HEIGHT = 480
+
+/** 画像が届くまでの下地。透明のままだと読み込み中のパネルが黒く見える。 */
+export const FLAG_PANEL_TEXTURE_BACKGROUND = '#ffffff'
+
 const FLAG_PANEL_SPHERE_SEGMENTS_X = 28
 const FLAG_PANEL_SPHERE_SEGMENTS_Y = 20
 const FLAG_PANEL_TEXTURE_REPEAT = 1
@@ -73,11 +84,10 @@ export type FlagPanelTextureOptions = {
   /** renderer の最大値が小さい端末では、その値まで異方性を下げる。 */
   readonly anisotropy?: number
   readonly maxAnisotropy?: number
-}
-
-/** TextureLoader と同じ最小形にし、テストではネットワークを使わず差し替える。 */
-export type FlagPanelTextureLoader = {
-  load: (url: string) => THREE.Texture
+  /** 既定は document のcanvas。テストや別環境から差し替えられる。 */
+  readonly createCanvas?: () => HTMLCanvasElement
+  /** 既定は new Image()。テストでネットワークへ出ないよう差し替えられる。 */
+  readonly createImage?: () => HTMLImageElement
 }
 
 export type FlagPanelBallResource = {
@@ -155,14 +165,51 @@ export function configureFlagPanelTexture(
   return texture
 }
 
-/** TextureLoader へ渡す前に設定を完成させ、同期的な読み込み失敗は呼び出し側へ伝える。 */
+/** jsdomのように2Dコンテキストを持たない環境でも、例外にせずテクスチャ生成を続ける。 */
+function get2dContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
+  try {
+    return canvas.getContext('2d')
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 国旗SVGを一度2Dキャンバスへ焼いてからTextureにする。
+ *
+ * SVGの `<img>` をそのままWebGLへ渡すと、Windows版Chrome(ANGLE/D3D11)などでは
+ * texImage2D が INVALID_VALUE を返してテクスチャが不完全になり、
+ * サンプリング結果が真っ黒になる（同じコードでもiOS/Androidでは表示される）。
+ * ラスタライズを挟めばどのブラウザでも同じようにアップロードでき、
+ * あわせて 640×480 で焼くことで既定ラスタライズより解像度も上がる。
+ */
 export function createFlagPanelTexture(
   flag: Pick<FlagBallData, 'flag'>,
-  options: FlagPanelTextureOptions & { readonly loader?: FlagPanelTextureLoader } = {},
-): THREE.Texture {
-  const textureLoader = options.loader ?? new THREE.TextureLoader()
-  const texture = textureLoader.load(getFlagPanelTextureUrl(flag, options.baseUrl))
-  return configureFlagPanelTexture(texture, getFlagPanelTextureConfig(flag, options))
+  options: FlagPanelTextureOptions = {},
+): THREE.CanvasTexture {
+  const canvas = (options.createCanvas ?? (() => document.createElement('canvas')))()
+  canvas.width = FLAG_PANEL_TEXTURE_WIDTH
+  canvas.height = FLAG_PANEL_TEXTURE_HEIGHT
+
+  const context = get2dContext(canvas)
+  if (context !== null) {
+    context.fillStyle = FLAG_PANEL_TEXTURE_BACKGROUND
+    context.fillRect(0, 0, canvas.width, canvas.height)
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  configureFlagPanelTexture(texture, getFlagPanelTextureConfig(flag, options))
+
+  const image = (options.createImage ?? (() => new Image()))()
+  image.addEventListener('load', () => {
+    if (context === null) return
+    // 転送先の矩形をviewBoxと同じにして、ベクタのまま640×480へ描き起こす。
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    texture.needsUpdate = true
+  })
+  image.src = getFlagPanelTextureUrl(flag, options.baseUrl)
+
+  return texture
 }
 
 export function createFlagPanelFlagMaterial(
@@ -276,7 +323,6 @@ function createPanelMeshes(
 }
 
 export type FlagPanelBallOptions = FlagPanelTextureOptions & {
-  readonly loader?: FlagPanelTextureLoader
   readonly ballRadius?: number
   readonly layout?: FlagPanelLayoutName
 }
@@ -333,7 +379,7 @@ export function createFlagPanelBallResource(
 
     return { group, texture, geometries, materials }
   } catch (error) {
-    // TextureLoader 後にジオメトリ生成が失敗しても、resource を返せないテクスチャを残さない。
+    // テクスチャ生成後にジオメトリ生成が失敗しても、返せないテクスチャを残さない。
     for (const geometry of geometries) geometry.dispose()
     for (const material of materials) material.dispose()
     texture.dispose()
