@@ -81,6 +81,16 @@ describe('FlagRollMazePlay', () => {
     expect(screen.getByTestId('virtual-stick')).toBeInTheDocument()
   })
 
+  it('センサーが使えない端末でもスティック操作へ案内して遊び続けられる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'スマホを かたむけて あそぶ' }))
+
+    expect(screen.getByText('ゆびで あそぼう')).toBeInTheDocument()
+    expect(screen.getByTestId('virtual-stick')).toBeInTheDocument()
+  })
+
   it('スティックを倒すとエンジンへTiltInputが渡る', () => {
     renderPlay()
     const stick = screen.getByTestId('virtual-stick')
