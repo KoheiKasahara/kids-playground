@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   BALL_SCREEN_DIAMETER_RATIO,
+  clampMazeZoomIndex,
+  DEFAULT_MAZE_ZOOM_INDEX,
+  followZoomScale,
+  MAX_MAZE_ZOOM_INDEX,
+  MAZE_ZOOM_SCALES,
+  mazeZoomScale,
+  MIN_MAZE_ZOOM_INDEX,
   CAMERA_ELEVATION_RAD,
   CAMERA_FOV,
   cameraSetupForFocus,
@@ -223,5 +230,87 @@ describe('followCameraFocus', () => {
         MAX_FOLLOW_LAG_IN_RADII * BALL_RADIUS + 1e-8,
       )
     }
+  })
+})
+
+describe('プレイ中のズーム段階', () => {
+  it('標準の段は距離を変えず、実機で決めたカメラ距離のままになる', () => {
+    expect(mazeZoomScale(DEFAULT_MAZE_ZOOM_INDEX)).toBe(1)
+  })
+
+  it('段が上がるほど寄る（距離が縮む）', () => {
+    for (let index = 1; index <= MAX_MAZE_ZOOM_INDEX; index += 1) {
+      expect(mazeZoomScale(index)).toBeLessThan(mazeZoomScale(index - 1))
+    }
+  })
+
+  it('範囲外や壊れた値でも選べる段に収まる', () => {
+    expect(clampMazeZoomIndex(-5)).toBe(MIN_MAZE_ZOOM_INDEX)
+    expect(clampMazeZoomIndex(99)).toBe(MAX_MAZE_ZOOM_INDEX)
+    expect(clampMazeZoomIndex(Number.NaN)).toBe(DEFAULT_MAZE_ZOOM_INDEX)
+    expect(clampMazeZoomIndex(1.4)).toBe(1)
+  })
+
+  it('1段あたりの変化が小さく、数回押して合わせられる', () => {
+    for (let index = 1; index < MAZE_ZOOM_SCALES.length; index += 1) {
+      const ratio = mazeZoomScale(index - 1) / mazeZoomScale(index)
+      expect(ratio).toBeGreaterThan(1.05)
+      expect(ratio).toBeLessThan(1.15)
+    }
+  })
+
+  it('一番引いても迷路全体（9マス）は見渡せない', () => {
+    const aspect = 390 / 780
+    const distance = computeMazeCameraDistance(aspect) * mazeZoomScale(MIN_MAZE_ZOOM_INDEX)
+    const cells = visibleCellsOnShortSide(distance, aspect)
+
+    expect(cells).toBeGreaterThan(visibleCellsOnShortSide(computeMazeCameraDistance(aspect), aspect))
+    expect(cells).toBeLessThan(6)
+  })
+
+  it('一番寄せてもボールが画面を占有しすぎない', () => {
+    const aspect = 390 / 780
+    const distance = computeMazeCameraDistance(aspect) * mazeZoomScale(MAX_MAZE_ZOOM_INDEX)
+    const ratio = ballScreenDiameterRatio(distance, aspect)
+
+    expect(ratio).toBeGreaterThan(BALL_SCREEN_DIAMETER_RATIO)
+    // 以前「存在感は十分」と確認した0.22を超えない。
+    expect(ratio).toBeLessThanOrEqual(0.22)
+  })
+
+  it('ズームは距離だけを変え、向きも仰角も変えない', () => {
+    const focus = { x: 2, z: -3 }
+    const near = cameraSetupForFocus(focus, 10 * mazeZoomScale(MAX_MAZE_ZOOM_INDEX))
+    const far = cameraSetupForFocus(focus, 10 * mazeZoomScale(MIN_MAZE_ZOOM_INDEX))
+    const elevation = (setup: ReturnType<typeof cameraSetupForFocus>) =>
+      Math.atan2(setup.position.y - setup.target.y, setup.position.z - setup.target.z)
+
+    expect(near.target).toEqual(far.target)
+    expect(elevation(near)).toBeCloseTo(elevation(far), 10)
+    expect(near.distance).toBeLessThan(far.distance)
+  })
+})
+
+describe('followZoomScale', () => {
+  it('目標の倍率へ滑らかに近づく', () => {
+    const first = followZoomScale(1, 0.84, 1 / 60)
+    const second = followZoomScale(first, 0.84, 1 / 60)
+
+    expect(first).toBeLessThan(1)
+    expect(first).toBeGreaterThan(0.84)
+    expect(second).toBeLessThan(first)
+  })
+
+  it('経過時間が同じならフレームレートに依存しない', () => {
+    const oneFrame = followZoomScale(1, 0.84, 0.5)
+    let many = 1
+    for (let index = 0; index < 30; index += 1) many = followZoomScale(many, 0.84, 0.5 / 30)
+
+    expect(many).toBeCloseTo(oneFrame, 10)
+  })
+
+  it('経過時間が0や不正でも現在値を保つ', () => {
+    expect(followZoomScale(1, 0.84, 0)).toBe(1)
+    expect(followZoomScale(1, 0.84, Number.NaN)).toBe(1)
   })
 })
