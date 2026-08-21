@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BALL_RADIUS,
+  CELL_SIZE_IN_RADII,
   clampSpeed,
+  FALL_OUT_Y,
+  FLOOR_THICKNESS,
   GRAVITY_MAGNITUDE,
+  GOAL_RADIUS,
   gravityFromTilt,
   MAX_BALL_SPEED,
   MAX_TILT_RAD,
+  visualTiltPivotOffset,
   visualTiltRotation,
+  WALL_HEIGHT,
   type PhysicsVector,
 } from './mazePhysics'
 import { NEUTRAL_TILT, type TiltInput } from './tiltInput'
@@ -30,6 +37,32 @@ function rotateByVisualTilt(tilt: TiltInput, vector: PhysicsVector): PhysicsVect
   }
 }
 
+/** 任意の回転をロドリゲスの公式で適用し、pivot補正の不変条件を検証する。 */
+function rotateByAxisAngle(
+  rotation: { axis: PhysicsVector; angle: number },
+  vector: PhysicsVector,
+): PhysicsVector {
+  const length = Math.hypot(rotation.axis.x, rotation.axis.y, rotation.axis.z)
+  const axis = {
+    x: rotation.axis.x / length,
+    y: rotation.axis.y / length,
+    z: rotation.axis.z / length,
+  }
+  const cross = {
+    x: axis.y * vector.z - axis.z * vector.y,
+    y: axis.z * vector.x - axis.x * vector.z,
+    z: axis.x * vector.y - axis.y * vector.x,
+  }
+  const dot = axis.x * vector.x + axis.y * vector.y + axis.z * vector.z
+  const cos = Math.cos(rotation.angle)
+  const sin = Math.sin(rotation.angle)
+  return {
+    x: vector.x * cos + cross.x * sin + axis.x * dot * (1 - cos),
+    y: vector.y * cos + cross.y * sin + axis.y * dot * (1 - cos),
+    z: vector.z * cos + cross.z * sin + axis.z * dot * (1 - cos),
+  }
+}
+
 /**
  * 傾けた盤面の最急降下方向（単位ベクトル）。
  * 高さは y = -(nx·x + nz·z)/ny なので、下り坂の向きは法線の水平成分 (nx, nz) と同じ。
@@ -40,6 +73,22 @@ function visualDownhillDirection(tilt: TiltInput): { x: number; z: number } {
   if (length === 0) return { x: 0, z: 0 }
   return { x: normal.x / length, z: normal.z / length }
 }
+
+describe('R基準のコース寸法', () => {
+  it('床は正の厚みを持ち、壁は球の直径より高い', () => {
+    expect(FLOOR_THICKNESS).toBeGreaterThan(0)
+    expect(WALL_HEIGHT).toBeGreaterThan(BALL_RADIUS * 2)
+  })
+
+  it('ゴール判定は球半径以上で1マスの半分未満に収まる', () => {
+    expect(GOAL_RADIUS).toBeGreaterThanOrEqual(BALL_RADIUS)
+    expect(GOAL_RADIUS).toBeLessThan((BALL_RADIUS * CELL_SIZE_IN_RADII) / 2)
+  })
+
+  it('落下判定の高さは盤面より十分下にある', () => {
+    expect(FALL_OUT_Y).toBeLessThan(-BALL_RADIUS)
+  })
+})
 
 describe('gravityFromTilt', () => {
   it('入力が無ければ真下を向く', () => {
@@ -129,6 +178,37 @@ describe('visualTiltRotation', () => {
     // 手前(+Z)へ転がす入力では、手前側の端が下がる。
     const nearSide = rotateByVisualTilt({ x: 0, y: 1 }, { x: 0, y: 0, z: 6.75 })
     expect(nearSide.y).toBeLessThan(0)
+  })
+})
+
+describe('visualTiltPivotOffset', () => {
+  it('回転後のpivotへ補正を足してもpivotが動かない', () => {
+    const rotation = visualTiltRotation({ x: 0.6, y: -0.8 })
+    const pivot = { x: 4.2, y: 0.9, z: -3.7 }
+    const rotated = rotateByAxisAngle(rotation, pivot)
+    const offset = visualTiltPivotOffset(rotation, pivot)
+
+    expect(rotated.x + offset.x).toBeCloseTo(pivot.x, 10)
+    expect(rotated.y + offset.y).toBeCloseTo(pivot.y, 10)
+    expect(rotated.z + offset.z).toBeCloseTo(pivot.z, 10)
+  })
+
+  it('角度が0なら補正量も0になる', () => {
+    expect(
+      visualTiltPivotOffset(
+        { axis: { x: 0, y: 1, z: 0 }, angle: 0 },
+        { x: 4, y: 2, z: -3 },
+      ),
+    ).toEqual({ x: 0, y: 0, z: 0 })
+  })
+
+  it('原点をpivotにしたときは従来の原点回転と同じく補正しない', () => {
+    const rotation = visualTiltRotation({ x: -0.7, y: 0.4 })
+    expect(visualTiltPivotOffset(rotation, { x: 0, y: 0, z: 0 })).toEqual({
+      x: 0,
+      y: 0,
+      z: 0,
+    })
   })
 })
 

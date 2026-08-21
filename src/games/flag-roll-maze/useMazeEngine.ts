@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
-import { createFlagSphereResource } from '../../components/flag-ball/flagSphere'
+import { createFlagPanelBallResource } from '../../components/flag-ball/flagPanelBall'
 import type { FlagBallData } from '../../components/flag-ball/flagBalls'
 import {
   BALL_RADIUS,
@@ -10,11 +10,18 @@ import {
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
+  visualTiltPivotOffset,
   visualTiltRotation,
   WALL_HEIGHT,
 } from './mazePhysics'
 import { createMazeStage, mazeStageBounds, type MazeStage } from './mazeStage'
-import { computeMazeCameraSetup } from './mazeCamera'
+import {
+  cameraSetupForFocus,
+  computeMazeCameraDistance,
+  desiredCameraFocus,
+  followCameraFocus,
+  type MazeCameraFocus,
+} from './mazeCamera'
 import {
   applyTiltToGravity,
   createMazeWorld,
@@ -59,7 +66,7 @@ export type MazeEngineOptions = {
   /** 値が変わったら物理世界を作り直す（もういちど / たすけて）。 */
   runId: number
   /** 現在選択されている国旗。idの変更時はボールの見た目も作り直す。 */
-  flag: Pick<FlagBallData, 'id' | 'flag' | 'ballPositionX'>
+  flag: Pick<FlagBallData, 'id' | 'flag'>
   /** ゴールに到達したとき一度だけ呼ぶ。 */
   onGoal: () => void
   /** 場外やスタックから自動復帰したとき呼ぶ。表示用で、ゲーム進行は止めない。 */
@@ -125,7 +132,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let camera: THREE.PerspectiveCamera | null = null
     let renderer: THREE.WebGLRenderer | null = null
     let boardGroup: THREE.Group | null = null
-    let ballMesh: THREE.Mesh | null = null
+    let ballMesh: THREE.Object3D | null = null
     let ballBody: ReturnType<typeof createMazeWorld>['ball'] | null = null
     let resizeObserver: ResizeObserver | null = null
     let detachViewportListeners: (() => void) | null = null
@@ -136,6 +143,8 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let accumulator = 0
     let currentTilt: TiltInput = { ...NEUTRAL_TILT }
     let stallTracker: StallTracker = createStallTracker()
+    let cameraFocus: MazeCameraFocus = { x: 0, z: 0 }
+    let cameraDistance = computeMazeCameraDistance(1)
 
     const geometries: THREE.BufferGeometry[] = []
     const materials: THREE.Material[] = []
@@ -223,10 +232,9 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         Math.floor(rect.height || container.clientHeight || window.innerHeight),
       )
       const aspect = width / height
-      const setup = computeMazeCameraSetup(bounds, aspect)
+      cameraDistance = computeMazeCameraDistance(aspect)
       camera.aspect = aspect
-      camera.position.set(setup.position.x, setup.position.y, setup.position.z)
-      camera.lookAt(setup.target.x, setup.target.y, setup.target.z)
+      applyCameraFocus()
       camera.updateProjectionMatrix()
       // 第3引数false: canvasへ幅高さのインラインstyleを書かせない。
       // 書かせると「canvasの実サイズ→コンテナの高さ」の依存が生まれ、
@@ -259,13 +267,29 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
 
     // 毎フレーム作り直さず使い回す。60fpsでのGC発生を避ける。
     const tiltAxis = new THREE.Vector3()
+    const cameraTarget = new THREE.Vector3()
 
-    /** 盤面と球をまとめて少しだけ傾け、どちらへ転がしているかを目で分かるようにする。 */
+    /** 距離はリサイズ時に決め、毎フレームは追従後の水平注視点だけを反映する。 */
+    function applyCameraFocus() {
+      if (!camera) return
+      const setup = cameraSetupForFocus(cameraFocus, cameraDistance)
+      camera.position.set(setup.position.x, setup.position.y, setup.position.z)
+      cameraTarget.set(setup.target.x, setup.target.y, setup.target.z)
+      camera.lookAt(cameraTarget)
+    }
+
+    /**
+     * 盤面と球をまとめて少しだけ傾け、どちらへ転がしているかを目で分かるようにする。
+     * 回転中心は原点ではなく物理ボールへ置き、追従カメラが盤面の端の揺れを拾わないようにする。
+     */
     function applyVisualTilt(tilt: TiltInput) {
-      if (!boardGroup) return
+      if (!boardGroup || !ballBody) return
       const { axis, angle } = visualTiltRotation(tilt)
       tiltAxis.set(axis.x, axis.y, axis.z).normalize()
       boardGroup.quaternion.setFromAxisAngle(tiltAxis, angle)
+      const pivot = ballBody.translation()
+      const offset = visualTiltPivotOffset({ axis, angle }, pivot)
+      boardGroup.position.set(offset.x, offset.y, offset.z)
     }
 
     function writeVisuals() {
@@ -276,11 +300,39 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       ballMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
     }
 
+    /** 生成・リセット・救出の直後は、カメラをボール位置へ飛び移らせず即座に合わせる。 */
+    function snapCameraFocusToBall() {
+      if (!ballBody) return
+      const position = ballBody.translation()
+      cameraFocus = { x: position.x, z: position.z }
+      applyCameraFocus()
+    }
+
+    /** 物理位置と水平速度だけで追従させ、高さの跳ねはカメラへ渡さない。 */
+    function updateCameraFocus(deltaSeconds: number) {
+      if (!ballBody) return
+      const position = ballBody.translation()
+      const velocity = ballBody.linvel()
+      const desired = desiredCameraFocus(
+        { x: position.x, z: position.z },
+        { x: velocity.x, z: velocity.z },
+        bounds,
+      )
+      cameraFocus = followCameraFocus(
+        cameraFocus,
+        desired,
+        { x: position.x, z: position.z },
+        deltaSeconds,
+      )
+      applyCameraFocus()
+    }
+
     function rescueToStart() {
       if (!ballBody) return
       resetBall(ballBody, stage.start)
       stallTracker = createStallTracker()
       writeVisuals()
+      snapCameraFocusToBall()
       optionsRef.current.onRescue?.()
     }
 
@@ -317,7 +369,6 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       const target = goalNotified ? NEUTRAL_TILT : targetTiltRef.current
       currentTilt = smoothTilt(currentTilt, target, deltaSeconds)
       if (world !== null) applyTiltToGravity(world, currentTilt)
-      applyVisualTilt(currentTilt)
 
       if (deltaMs > 0) stepPhysics(deltaMs)
       writeVisuals()
@@ -342,6 +393,10 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
           }
         }
       }
+
+      // 物理位置が確定してから、盤面のピボット補正とカメラ追従を同じ位置へ適用する。
+      applyVisualTilt(currentTilt)
+      updateCameraFocus(deltaSeconds)
 
       if (renderer && scene && camera) renderer.render(scene, camera)
     }
@@ -397,45 +452,58 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         }
 
         // ゴールは床から少しだけ浮かせた円盤にして、ボールが乗り上げないようにする。
+        // 判定半径そのものだと印が小さく見えるため、球半径の1/4だけ外へ広げる。
+        const markerRadius = GOAL_RADIUS + BALL_RADIUS * 0.25
         const goalMesh = new THREE.Mesh(
-          track(new THREE.CylinderGeometry(GOAL_RADIUS + 0.16, GOAL_RADIUS + 0.16, 0.06, 28)),
+          track(new THREE.CylinderGeometry(markerRadius, markerRadius, BALL_RADIUS * 0.1, 28)),
           trackMaterial(new THREE.MeshLambertMaterial({ color: 0xffc53d })),
         )
         goalMesh.position.set(stage.goal.x, 0.03, stage.goal.z)
         boardGroup.add(goalMesh)
 
         const startMesh = new THREE.Mesh(
-          track(new THREE.CylinderGeometry(GOAL_RADIUS + 0.16, GOAL_RADIUS + 0.16, 0.04, 28)),
+          track(new THREE.CylinderGeometry(markerRadius, markerRadius, BALL_RADIUS * 0.07, 28)),
           trackMaterial(new THREE.MeshLambertMaterial({ color: 0xa9e34b })),
         )
         startMesh.position.set(stage.start.x, 0.02, stage.start.z)
         boardGroup.add(startMesh)
 
-        let ballMaterial: THREE.MeshLambertMaterial
+        let flagBall: THREE.Object3D
         try {
-          const flagSphere = createFlagSphereResource(optionsRef.current.flag, {
+          const flagPanelBall = createFlagPanelBallResource(optionsRef.current.flag, {
+            ballRadius: BALL_RADIUS,
             maxAnisotropy: getRendererMaxAnisotropy(renderer),
           })
-          trackTexture(flagSphere.texture)
-          ballMaterial = trackMaterial(flagSphere.material)
+          for (const geometry of flagPanelBall.geometries) track(geometry)
+          for (const material of flagPanelBall.materials) trackMaterial(material)
+          trackTexture(flagPanelBall.texture)
+          flagBall = flagPanelBall.group
         } catch {
           // TextureLoaderの同期的な失敗でも、盤面自体は遊べるようにする。
-          ballMaterial = trackMaterial(
+          const fallbackMaterial = trackMaterial(
             new THREE.MeshLambertMaterial({ color: 0xff6b6b }),
           )
+          const fallbackGroup = new THREE.Group()
+          fallbackGroup.name = 'flag-panel-ball-fallback'
+          fallbackGroup.add(
+            new THREE.Mesh(
+              track(new THREE.SphereGeometry(BALL_RADIUS, 28, 20)),
+              fallbackMaterial,
+            ),
+          )
+          flagBall = fallbackGroup
         }
-        ballMesh = new THREE.Mesh(
-          track(new THREE.SphereGeometry(BALL_RADIUS, 28, 20)),
-          ballMaterial,
-        )
+        ballMesh = flagBall
         boardGroup.add(ballMesh)
 
         const mazeWorld = createMazeWorld(RAPIER, stage)
         world = mazeWorld.world
         ballBody = mazeWorld.ball
 
+        snapCameraFocusToBall()
         resizeRenderer()
         writeVisuals()
+        applyVisualTilt(currentTilt)
         rafId = requestAnimationFrame(tick)
 
         if (typeof ResizeObserver !== 'undefined') {
@@ -455,7 +523,9 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       if (ballBody === null) return
       resetBall(ballBody, stage.start)
       stallTracker = createStallTracker()
+      snapCameraFocusToBall()
       writeVisuals()
+      applyVisualTilt(currentTilt)
     }
 
     void initializeRapier()

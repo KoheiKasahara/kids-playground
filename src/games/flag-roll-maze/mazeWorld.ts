@@ -6,6 +6,7 @@ import {
   BALL_MASS,
   BALL_RADIUS,
   BALL_RESTITUTION,
+  BALL_SPAWN_CLEARANCE_IN_RADII,
   clampSpeed,
   FLOOR_FRICTION,
   FLOOR_THICKNESS,
@@ -35,7 +36,7 @@ export type MazeWorld = {
 
 /** ボールは盤面の少し上から置き、初期フレームで床へめり込まないようにする。 */
 export function ballSpawnPosition(start: MazePoint): PhysicsVector {
-  return { x: start.x, y: BALL_RADIUS + 0.02, z: start.z }
+  return { x: start.x, y: BALL_RADIUS * (1 + BALL_SPAWN_CLEARANCE_IN_RADII), z: start.z }
 }
 
 /**
