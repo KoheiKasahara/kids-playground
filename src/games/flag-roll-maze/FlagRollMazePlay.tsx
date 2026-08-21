@@ -11,6 +11,11 @@ import {
   supportsDeviceOrientation,
   type DeviceTiltCalibration,
 } from './deviceTilt'
+import {
+  lockCurrentScreenOrientation,
+  unlockScreenOrientation,
+  type OrientationController,
+} from './orientationLock'
 import styles from './FlagRollMazePlay.module.css'
 
 type MazeGameState = 'playing' | 'goal'
@@ -98,6 +103,7 @@ export default function FlagRollMazePlay() {
     calibrationRef.current = null
     setInputMode('gyro')
     setGyroMessage('スマホを かたむけて あそぼう')
+    void lockCurrentScreenOrientation(window.screen.orientation as unknown as OrientationController)
   }, [])
 
   useEffect(() => {
@@ -117,7 +123,7 @@ export default function FlagRollMazePlay() {
   }, [acceptsInput, inputMode, setTilt])
 
   useEffect(() => {
-    if (inputMode !== 'gyro') return
+    if (!acceptsInput || inputMode !== 'gyro') return
     const recalibrate = () => {
       calibrationRef.current = null
       setTilt({ x: 0, y: 0 })
@@ -127,8 +133,9 @@ export default function FlagRollMazePlay() {
     return () => {
       window.screen.orientation?.removeEventListener('change', recalibrate)
       window.removeEventListener('orientationchange', recalibrate)
+      unlockScreenOrientation(window.screen.orientation as unknown as OrientationController)
     }
-  }, [inputMode, setTilt])
+  }, [acceptsInput, inputMode, setTilt])
 
   // PCでも遊べるように矢印キー・WASDを同じTiltInputへ流し込む。
   useEffect(() => {
@@ -181,6 +188,10 @@ export default function FlagRollMazePlay() {
     setRescued(false)
     setGameState('playing')
     setRunId((current) => current + 1)
+    if (inputMode === 'gyro') {
+      calibrationRef.current = null
+      void lockCurrentScreenOrientation(window.screen.orientation as unknown as OrientationController)
+    }
   }
 
   return (
@@ -205,13 +216,20 @@ export default function FlagRollMazePlay() {
         <p className={styles.rescue} role="status" aria-live="polite">
           {rescued ? 'スタートに もどったよ' : ''}
         </p>
+
+        <p className={styles.keyboardHint}>
+          {gyroMessage || 'パソコンでは やじるしキー でも あそべます'}
+        </p>
       </div>
 
       <div className={styles.controls}>
-        {gameState === 'playing' && (
+        {gameState === 'playing' && inputMode === 'stick' && (
           <button type="button" className={styles.gyroButton} onClick={startGyro}>
             スマホを かたむけて あそぶ
           </button>
+        )}
+        {gameState === 'playing' && inputMode === 'gyro' && (
+          <p className={styles.gyroStatus}>📱 かたむけ操作中</p>
         )}
         <div className={styles.stickArea}>
           <VirtualStick onTiltChange={handleTiltChange} disabled={!acceptsInput} />
@@ -241,9 +259,6 @@ export default function FlagRollMazePlay() {
         </div>
       </div>
 
-      <p className={styles.keyboardHint}>
-        {gyroMessage || 'パソコンでは やじるしキー でも あそべます'}
-      </p>
     </main>
   )
 }
