@@ -90,6 +90,10 @@ export function gravityFromTilt(
 /**
  * 見た目の盤面を傾けるための回転軸と角度。
  * 重力と同じ方向・同じ向きだが、角度だけ VISUAL_TILT_RATIO で控えめにする。
+ *
+ * 盤面の下り坂の向きは「法線が倒れる向き」と同じになる
+ * （高さ y = -(nx·x + nz·z)/ny を最急降下すると向きは (nx, nz)）。
+ * したがって入力方向へ転がすには、法線を入力と同じ向きへ倒す必要がある。
  */
 export function visualTiltRotation(
   tilt: TiltInput,
@@ -102,9 +106,9 @@ export function visualTiltRotation(
   }
   const ux = tilt.x / length
   const uz = tilt.y / length
-  // 上向き(0,1,0)が -(ux, uz) 側へ倒れる回転軸。傾けた先が下り坂になる。
+  // 上向き(0,1,0)が (ux, uz) 側へ倒れる回転軸。傾けた先が下り坂になる。
   return {
-    axis: { x: -uz, y: 0, z: ux },
+    axis: { x: uz, y: 0, z: -ux },
     angle: Math.min(1, length) * maxTiltRad * ratio,
   }
 }

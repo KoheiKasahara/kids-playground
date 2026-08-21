@@ -6,8 +6,40 @@ import {
   MAX_BALL_SPEED,
   MAX_TILT_RAD,
   visualTiltRotation,
+  type PhysicsVector,
 } from './mazePhysics'
-import { NEUTRAL_TILT } from './tiltInput'
+import { NEUTRAL_TILT, type TiltInput } from './tiltInput'
+
+/** 回転軸と角度をロドリゲスの公式で適用する（Three.jsのsetFromAxisAngleと同じ回転）。 */
+function rotateByVisualTilt(tilt: TiltInput, vector: PhysicsVector): PhysicsVector {
+  const { axis, angle } = visualTiltRotation(tilt)
+  const length = Math.hypot(axis.x, axis.y, axis.z)
+  const a = { x: axis.x / length, y: axis.y / length, z: axis.z / length }
+  const cross = {
+    x: a.y * vector.z - a.z * vector.y,
+    y: a.z * vector.x - a.x * vector.z,
+    z: a.x * vector.y - a.y * vector.x,
+  }
+  const dot = a.x * vector.x + a.y * vector.y + a.z * vector.z
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  return {
+    x: vector.x * cos + cross.x * sin + a.x * dot * (1 - cos),
+    y: vector.y * cos + cross.y * sin + a.y * dot * (1 - cos),
+    z: vector.z * cos + cross.z * sin + a.z * dot * (1 - cos),
+  }
+}
+
+/**
+ * 傾けた盤面の最急降下方向（単位ベクトル）。
+ * 高さは y = -(nx·x + nz·z)/ny なので、下り坂の向きは法線の水平成分 (nx, nz) と同じ。
+ */
+function visualDownhillDirection(tilt: TiltInput): { x: number; z: number } {
+  const normal = rotateByVisualTilt(tilt, { x: 0, y: 1, z: 0 })
+  const length = Math.hypot(normal.x, normal.z)
+  if (length === 0) return { x: 0, z: 0 }
+  return { x: normal.x / length, z: normal.z / length }
+}
 
 describe('gravityFromTilt', () => {
   it('入力が無ければ真下を向く', () => {
@@ -63,27 +95,40 @@ describe('visualTiltRotation', () => {
     expect(visualTiltRotation({ x: 1, y: 0 }).angle).toBeLessThan(MAX_TILT_RAD)
   })
 
-  it('回転後の盤面法線が重力の水平成分と同じ向きへ倒れる', () => {
+  it('見た目の下り坂の向きが、ボールの転がる向きと一致する', () => {
+    for (const tilt of [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+      { x: 0.6, y: -0.8 },
+      { x: -0.5, y: 0.5 },
+    ]) {
+      const downhill = visualDownhillDirection(tilt)
+      const length = Math.hypot(tilt.x, tilt.y)
+      // 盤面が下がっていく向きと、重力で転がる向きが逆だと「上り坂へ転がる」ように見える。
+      expect(downhill.x).toBeCloseTo(tilt.x / length, 6)
+      expect(downhill.z).toBeCloseTo(tilt.y / length, 6)
+    }
+  })
+
+  it('重力の水平成分と見た目の下り坂が同じ向きを指す', () => {
     const tilt = { x: 0.6, y: -0.8 }
-    const { axis, angle } = visualTiltRotation(tilt)
-    const length = Math.hypot(axis.x, axis.y, axis.z)
-    const unitAxis = { x: axis.x / length, y: axis.y / length, z: axis.z / length }
-    // ロドリゲスの回転公式で(0,1,0)を回す。軸はY成分を持たないので単純化できる。
-    const up = { x: 0, y: 1, z: 0 }
-    const cross = {
-      x: unitAxis.y * up.z - unitAxis.z * up.y,
-      y: unitAxis.z * up.x - unitAxis.x * up.z,
-      z: unitAxis.x * up.y - unitAxis.y * up.x,
-    }
-    const rotated = {
-      x: up.x * Math.cos(angle) + cross.x * Math.sin(angle),
-      y: up.y * Math.cos(angle) + cross.y * Math.sin(angle),
-      z: up.z * Math.cos(angle) + cross.z * Math.sin(angle),
-    }
-    const tiltLength = Math.hypot(tilt.x, tilt.y)
-    expect(rotated.x).toBeCloseTo(-(tilt.x / tiltLength) * Math.sin(angle), 6)
-    expect(rotated.z).toBeCloseTo(-(tilt.y / tiltLength) * Math.sin(angle), 6)
-    expect(rotated.y).toBeGreaterThan(0)
+    const gravity = gravityFromTilt(tilt)
+    const gravityLength = Math.hypot(gravity.x, gravity.z)
+    const downhill = visualDownhillDirection(tilt)
+    expect(downhill.x).toBeCloseTo(gravity.x / gravityLength, 6)
+    expect(downhill.z).toBeCloseTo(gravity.z / gravityLength, 6)
+  })
+
+  it('盤面は、ボールが向かう側の端が下がる', () => {
+    // 奥(-Z)へ転がす入力では、奥側の端が下がって見える。
+    const rotated = rotateByVisualTilt({ x: 0, y: -1 }, { x: 0, y: 0, z: -6.75 })
+    expect(rotated.y).toBeLessThan(0)
+
+    // 手前(+Z)へ転がす入力では、手前側の端が下がる。
+    const nearSide = rotateByVisualTilt({ x: 0, y: 1 }, { x: 0, y: 0, z: 6.75 })
+    expect(nearSide.y).toBeLessThan(0)
   })
 })
 
