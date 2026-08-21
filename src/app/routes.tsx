@@ -118,8 +118,9 @@ export const routes: RouteObject[] = [
   { path: '/games/flag-pinball/play', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballPlay')) },
   { path: '/games/flag-pinball/result', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballResult')) },
   { path: '/games/domino-flag', element: lazyRoute(() => import('../games/domino-flag/DominoFlagPlay')) },
-  // こっきころころめいろも Three.js と Rapier(wasm) を含むため、開くときだけ読込む。
-  { path: '/games/flag-roll-maze', element: lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazePlay')) },
+  // 選択画面と、Three.js・Rapier(wasm)を使うプレイ画面を必要なときだけ読込む。
+  { path: '/games/flag-roll-maze', element: lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazeSelect')) },
+  { path: '/games/flag-roll-maze/play', element: lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazePlay')) },
   { path: '/games/earth-globe', element: lazyRoute(() => import('../games/earth-globe/EarthGlobePlay')) },
   { path: '/games/flag-roll-adventure', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventureSelect')) },
   { path: '/games/flag-roll-adventure/play', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventurePlay')) },

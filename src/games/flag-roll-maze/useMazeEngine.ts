@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
+import { createFlagSphereResource } from '../../components/flag-ball/flagSphere'
+import type { FlagBallData } from '../../components/flag-ball/flagBalls'
 import {
   BALL_RADIUS,
   FLOOR_THICKNESS,
@@ -39,9 +41,25 @@ function initializeRapier(): Promise<void> {
   return rapierInitPromise
 }
 
+/** WebGLモックや一部のコンテキストでは異方性上限を取得できないため、失敗時は省略する。 */
+function getRendererMaxAnisotropy(
+  renderer: THREE.WebGLRenderer,
+): number | undefined {
+  try {
+    const maximum = renderer.capabilities?.getMaxAnisotropy?.()
+    return typeof maximum === 'number' && Number.isFinite(maximum)
+      ? maximum
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export type MazeEngineOptions = {
   /** 値が変わったら物理世界を作り直す（もういちど / たすけて）。 */
   runId: number
+  /** 現在選択されている国旗。idの変更時はボールの見た目も作り直す。 */
+  flag: Pick<FlagBallData, 'id' | 'flag' | 'ballPositionX'>
   /** ゴールに到達したとき一度だけ呼ぶ。 */
   onGoal: () => void
   /** 場外やスタックから自動復帰したとき呼ぶ。表示用で、ゲーム進行は止めない。 */
@@ -121,6 +139,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
 
     const geometries: THREE.BufferGeometry[] = []
     const materials: THREE.Material[] = []
+    const textures: THREE.Texture[] = []
 
     const track = <T extends THREE.BufferGeometry>(geometry: T): T => {
       geometries.push(geometry)
@@ -129,6 +148,10 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     const trackMaterial = <T extends THREE.Material>(material: T): T => {
       materials.push(material)
       return material
+    }
+    const trackTexture = <T extends THREE.Texture>(texture: T): T => {
+      textures.push(texture)
+      return texture
     }
 
     // 関数宣言のresizeRendererは巻き上げ済み。release()より前に用意しておく。
@@ -153,8 +176,10 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
 
       for (const geometry of geometries) geometry.dispose()
       for (const material of materials) material.dispose()
+      for (const texture of textures) texture.dispose()
       geometries.length = 0
       materials.length = 0
+      textures.length = 0
 
       if (renderer !== null) {
         const canvas = renderer.domElement
@@ -386,9 +411,22 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         startMesh.position.set(stage.start.x, 0.02, stage.start.z)
         boardGroup.add(startMesh)
 
+        let ballMaterial: THREE.MeshLambertMaterial
+        try {
+          const flagSphere = createFlagSphereResource(optionsRef.current.flag, {
+            maxAnisotropy: getRendererMaxAnisotropy(renderer),
+          })
+          trackTexture(flagSphere.texture)
+          ballMaterial = trackMaterial(flagSphere.material)
+        } catch {
+          // TextureLoaderの同期的な失敗でも、盤面自体は遊べるようにする。
+          ballMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xff6b6b }),
+          )
+        }
         ballMesh = new THREE.Mesh(
           track(new THREE.SphereGeometry(BALL_RADIUS, 28, 20)),
-          trackMaterial(new THREE.MeshLambertMaterial({ color: 0xff6b6b })),
+          ballMaterial,
         )
         boardGroup.add(ballMesh)
 
@@ -430,7 +468,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       })
 
     return release
-  }, [options.runId])
+  }, [options.runId, options.flag.id])
 
   return handle
 }

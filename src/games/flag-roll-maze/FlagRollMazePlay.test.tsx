@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FlagRollMazePlay from './FlagRollMazePlay'
+import FlagRollMazeSelect from './FlagRollMazeSelect'
 import type { MazeEngineOptions } from './useMazeEngine'
 import type { TiltInput } from './tiltInput'
 
@@ -41,7 +42,9 @@ vi.mock('../../utils/quizSound', () => ({
 
 function renderPlay() {
   return render(
-    <MemoryRouter initialEntries={['/games/flag-roll-maze']}>
+    <MemoryRouter
+      initialEntries={[{ pathname: '/games/flag-roll-maze/play', state: { flagId: 'jp' } }]}
+    >
       <FlagRollMazePlay />
     </MemoryRouter>,
   )
@@ -79,6 +82,7 @@ describe('FlagRollMazePlay', () => {
     expect(screen.getByRole('heading', { name: 'こっきころころめいろ' })).toBeInTheDocument()
     expect(screen.getByText(/ゴールまで ボールを ころがそう/)).toBeInTheDocument()
     expect(screen.getByTestId('virtual-stick')).toBeInTheDocument()
+    expect(engineMock.options?.flag.id).toBe('jp')
   })
 
   it('センサーが使えない端末でもスティック操作へ案内して遊び続けられる', async () => {
@@ -176,6 +180,12 @@ describe('FlagRollMazePlay', () => {
     expect(screen.getByText('ゴール！ すごい！')).toHaveAttribute('aria-live', 'polite')
     expect(soundMock.playCorrectSound).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: 'もういちど' })).toBeInTheDocument()
+    expect(document.querySelector('img[src$="/jp.svg"]')).toHaveAttribute(
+      'src',
+      expect.stringContaining('/jp.svg'),
+    )
+    expect(screen.getByText('にほん')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'べつの こっき' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'スタートに もどる' })).toBeNull()
   })
 
@@ -227,5 +237,20 @@ describe('FlagRollMazePlay', () => {
     await user.click(screen.getByRole('button', { name: 'もどる' }))
 
     expect(navigateMock).toHaveBeenCalledWith('/')
+  })
+
+  it('stateなしでplayを直接開くと選択画面へ戻る', () => {
+    render(
+      <MemoryRouter initialEntries={['/games/flag-roll-maze/play']}>
+        <Routes>
+          <Route path="/games/flag-roll-maze/play" element={<FlagRollMazePlay />} />
+          <Route path="/games/flag-roll-maze" element={<FlagRollMazeSelect />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('heading', { name: 'こっきころころめいろ' })).toBeInTheDocument()
+    expect(screen.getByText('こっきを 1こ えらんでね！')).toBeInTheDocument()
+    expect(screen.queryByTestId('virtual-stick')).toBeNull()
   })
 })
