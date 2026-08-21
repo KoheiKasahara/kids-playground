@@ -82,6 +82,26 @@
   gap: var(--space-md);
 }
 
+.gyroButton {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-sm));
+  min-height: var(--tap-target-min);
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-radius: var(--radius-round);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  font: inherit;
+  font-weight: bold;
+  box-shadow: var(--shadow-md);
+}
+
+.gyroButton:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 .stickArea {
   flex: 0 0 auto;
 }
