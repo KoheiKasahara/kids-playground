@@ -6,12 +6,18 @@ import FlagRollMazePlay from './FlagRollMazePlay'
 import FlagRollMazeSelect from './FlagRollMazeSelect'
 import type { MazeEngineOptions } from './useMazeEngine'
 import type { TiltInput } from './tiltInput'
+import {
+  DEFAULT_MAZE_ZOOM_INDEX,
+  MAX_MAZE_ZOOM_INDEX,
+  MIN_MAZE_ZOOM_INDEX,
+} from './mazeCamera'
 
 // WebGLとRapierはjsdomで動かさず、エンジンへ渡った入力とコールバックだけを検証する。
 const engineMock = vi.hoisted(() => ({
   options: undefined as MazeEngineOptions | undefined,
   setTilt: vi.fn<(tilt: TiltInput) => void>(),
   resetBallToStart: vi.fn(),
+  setZoomIndex: vi.fn<(index: number) => void>(),
 }))
 const soundMock = vi.hoisted(() => ({
   primeAudio: vi.fn(),
@@ -31,6 +37,7 @@ vi.mock('./useMazeEngine', () => ({
       registerContainer: () => undefined,
       setTilt: engineMock.setTilt,
       resetBallToStart: engineMock.resetBallToStart,
+      setZoomIndex: engineMock.setZoomIndex,
     }
   },
 }))
@@ -252,5 +259,61 @@ describe('FlagRollMazePlay', () => {
     expect(screen.getByRole('heading', { name: 'こっきころころめいろ' })).toBeInTheDocument()
     expect(screen.getByText('こっきを 1こ えらんでね！')).toBeInTheDocument()
     expect(screen.queryByTestId('virtual-stick')).toBeNull()
+  })
+})
+
+describe('カメラのズーム操作', () => {
+  /** エンジンへ最後に渡された段。 */
+  function lastZoomIndex() {
+    const calls = engineMock.setZoomIndex.mock.calls
+    return calls[calls.length - 1]?.[0]
+  }
+
+  it('開始時は標準のズームでエンジンへ伝える', () => {
+    renderPlay()
+    expect(lastZoomIndex()).toBe(DEFAULT_MAZE_ZOOM_INDEX)
+  })
+
+  it('＋で寄り、−で引く', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'もっと ちかづく' }))
+    expect(lastZoomIndex()).toBe(DEFAULT_MAZE_ZOOM_INDEX + 1)
+
+    await user.click(screen.getByRole('button', { name: 'もっと はなれる' }))
+    await user.click(screen.getByRole('button', { name: 'もっと はなれる' }))
+    expect(lastZoomIndex()).toBe(DEFAULT_MAZE_ZOOM_INDEX - 1)
+  })
+
+  it('端まで来たらそれ以上押せない', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    const zoomIn = screen.getByRole('button', { name: 'もっと ちかづく' })
+    const zoomOut = screen.getByRole('button', { name: 'もっと はなれる' })
+
+    for (let step = 0; step < MAX_MAZE_ZOOM_INDEX - DEFAULT_MAZE_ZOOM_INDEX; step += 1) {
+      await user.click(zoomIn)
+    }
+    expect(lastZoomIndex()).toBe(MAX_MAZE_ZOOM_INDEX)
+    expect(zoomIn).toBeDisabled()
+
+    for (let step = 0; step < MAX_MAZE_ZOOM_INDEX - MIN_MAZE_ZOOM_INDEX; step += 1) {
+      await user.click(zoomOut)
+    }
+    expect(lastZoomIndex()).toBe(MIN_MAZE_ZOOM_INDEX)
+    expect(zoomOut).toBeDisabled()
+  })
+
+  it('「スタートに もどる」でズームの好みは戻さない', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'もっと ちかづく' }))
+    await user.click(screen.getByRole('button', { name: 'スタートに もどる' }))
+
+    // 詰まったときに押す救済操作なので、見え方の好みまで巻き戻さない。
+    expect(engineMock.resetBallToStart).toHaveBeenCalled()
+    expect(lastZoomIndex()).toBe(DEFAULT_MAZE_ZOOM_INDEX + 1)
   })
 })

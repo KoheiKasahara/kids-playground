@@ -6,6 +6,11 @@ import { playCorrectSound, primeAudio } from '../../utils/quizSound'
 import VirtualStick from './VirtualStick'
 import { parseMazePlayState } from './playState'
 import { useMazeEngine } from './useMazeEngine'
+import {
+  DEFAULT_MAZE_ZOOM_INDEX,
+  MAX_MAZE_ZOOM_INDEX,
+  MIN_MAZE_ZOOM_INDEX,
+} from './mazeCamera'
 import { isTiltKeyCode, tiltFromPressedKeys, type TiltInput } from './tiltInput'
 import {
   calibrateDeviceTilt,
@@ -56,6 +61,8 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
   const audioPrimedRef = useRef(false)
   const calibrationRef = useRef<DeviceTiltCalibration | null>(null)
   const [inputMode, setInputMode] = useState<'stick' | 'gyro'>('stick')
+  // 端末の大きさや持ち方で好みが分かれるので、遊びながら距離だけを選べるようにする。
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_MAZE_ZOOM_INDEX)
   const [gyroMessage, setGyroMessage] = useState('')
 
   const handleGoal = useCallback(() => {
@@ -70,7 +77,7 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
     rescueTimerRef.current = window.setTimeout(() => setRescued(false), 1600)
   }, [])
 
-  const { registerContainer, setTilt, resetBallToStart } = useMazeEngine({
+  const { registerContainer, setTilt, resetBallToStart, setZoomIndex: applyZoomIndex } = useMazeEngine({
     runId,
     flag,
     onGoal: handleGoal,
@@ -83,6 +90,11 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
     },
     [],
   )
+
+  // ズームはエンジンのカメラ距離だけに効く。物理も入力も再構築しない。
+  useEffect(() => {
+    applyZoomIndex(zoomIndex)
+  }, [applyZoomIndex, zoomIndex])
 
   // ゴール後はスティックもキーも受け付けず、その場で止まるようにする。
   const acceptsInput = gameState === 'playing'
@@ -217,7 +229,29 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
 
   return (
     <main className={styles.page}>
-      <div ref={registerContainer} className={styles.scene} aria-hidden="true" />
+      <div className={styles.scene}>
+        <div ref={registerContainer} className={styles.sceneCanvas} aria-hidden="true" />
+        <div className={styles.zoom}>
+          <button
+            type="button"
+            className={styles.zoomButton}
+            aria-label="もっと ちかづく"
+            onClick={() => setZoomIndex((index) => Math.min(MAX_MAZE_ZOOM_INDEX, index + 1))}
+            disabled={zoomIndex >= MAX_MAZE_ZOOM_INDEX}
+          >
+            <span aria-hidden="true">＋</span>
+          </button>
+          <button
+            type="button"
+            className={styles.zoomButton}
+            aria-label="もっと はなれる"
+            onClick={() => setZoomIndex((index) => Math.max(MIN_MAZE_ZOOM_INDEX, index - 1))}
+            disabled={zoomIndex <= MIN_MAZE_ZOOM_INDEX}
+          >
+            <span aria-hidden="true">−</span>
+          </button>
+        </div>
+      </div>
 
       <div className={styles.ui}>
         <h1 className={styles.title}>こっきころころめいろ</h1>

@@ -17,9 +17,13 @@ import {
 import { createMazeStage, mazeStageBounds, type MazeStage } from './mazeStage'
 import {
   cameraSetupForFocus,
+  clampMazeZoomIndex,
   computeMazeCameraDistance,
+  DEFAULT_MAZE_ZOOM_INDEX,
   desiredCameraFocus,
   followCameraFocus,
+  followZoomScale,
+  mazeZoomScale,
   type MazeCameraFocus,
 } from './mazeCamera'
 import {
@@ -83,6 +87,11 @@ export type MazeEngineHandle = {
   setTilt: (tilt: TiltInput) => void
   /** ボールだけをスタートへ戻す。物理世界は作り直さない。 */
   resetBallToStart: () => void
+  /**
+   * カメラとボールの距離だけを段階的に変える。
+   * 追従・向き・物理には一切触れないので、遊びの手触りは変わらない。
+   */
+  setZoomIndex: (index: number) => void
 }
 
 /**
@@ -102,6 +111,9 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
   const targetTiltRef = useRef<TiltInput>({ ...NEUTRAL_TILT })
   const resetActionRef = useRef<() => void>(() => undefined)
   const activeRunRef = useRef<symbol | null>(null)
+  // ズームは見た目の好みなので、React stateを介さず毎フレーム読むだけにする。
+  // refに持たせることで、runIdでシーンを作り直しても選んだ段が引き継がれる。
+  const zoomIndexRef = useRef(DEFAULT_MAZE_ZOOM_INDEX)
 
   const handle = useMemo<MazeEngineHandle>(
     () => ({
@@ -113,6 +125,9 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       },
       resetBallToStart: () => {
         resetActionRef.current()
+      },
+      setZoomIndex: (index) => {
+        zoomIndexRef.current = clampMazeZoomIndex(index)
       },
     }),
     [],
@@ -144,7 +159,9 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let currentTilt: TiltInput = { ...NEUTRAL_TILT }
     let stallTracker: StallTracker = createStallTracker()
     let cameraFocus: MazeCameraFocus = { x: 0, z: 0 }
-    let cameraDistance = computeMazeCameraDistance(1)
+    // 標準距離は画面比だけで決まる。ズームはそこへ掛ける倍率として持つ。
+    let cameraBaseDistance = computeMazeCameraDistance(1)
+    let cameraZoomScale = mazeZoomScale(zoomIndexRef.current)
 
     const geometries: THREE.BufferGeometry[] = []
     const materials: THREE.Material[] = []
@@ -232,7 +249,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         Math.floor(rect.height || container.clientHeight || window.innerHeight),
       )
       const aspect = width / height
-      cameraDistance = computeMazeCameraDistance(aspect)
+      cameraBaseDistance = computeMazeCameraDistance(aspect)
       camera.aspect = aspect
       applyCameraFocus()
       camera.updateProjectionMatrix()
@@ -269,10 +286,10 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     const tiltAxis = new THREE.Vector3()
     const cameraTarget = new THREE.Vector3()
 
-    /** 距離はリサイズ時に決め、毎フレームは追従後の水平注視点だけを反映する。 */
+    /** 標準距離はリサイズ時に決め、毎フレームは追従後の水平注視点とズーム倍率を反映する。 */
     function applyCameraFocus() {
       if (!camera) return
-      const setup = cameraSetupForFocus(cameraFocus, cameraDistance)
+      const setup = cameraSetupForFocus(cameraFocus, cameraBaseDistance * cameraZoomScale)
       camera.position.set(setup.position.x, setup.position.y, setup.position.z)
       cameraTarget.set(setup.target.x, setup.target.y, setup.target.z)
       camera.lookAt(cameraTarget)
@@ -306,6 +323,15 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       const position = ballBody.translation()
       cameraFocus = { x: position.x, z: position.z }
       applyCameraFocus()
+    }
+
+    /** 「＋ / −」で選ばれた段へ、距離を跳ねさせずに寄せる。 */
+    function updateCameraZoom(deltaSeconds: number) {
+      cameraZoomScale = followZoomScale(
+        cameraZoomScale,
+        mazeZoomScale(zoomIndexRef.current),
+        deltaSeconds,
+      )
     }
 
     /** 物理位置と水平速度だけで追従させ、高さの跳ねはカメラへ渡さない。 */
@@ -396,6 +422,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
 
       // 物理位置が確定してから、盤面のピボット補正とカメラ追従を同じ位置へ適用する。
       applyVisualTilt(currentTilt)
+      updateCameraZoom(deltaSeconds)
       updateCameraFocus(deltaSeconds)
 
       if (renderer && scene && camera) renderer.render(scene, camera)
@@ -500,6 +527,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         world = mazeWorld.world
         ballBody = mazeWorld.ball
 
+        cameraZoomScale = mazeZoomScale(zoomIndexRef.current)
         snapCameraFocusToBall()
         resizeRenderer()
         writeVisuals()

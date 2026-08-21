@@ -45,6 +45,28 @@ export const CAMERA_FOLLOW_LAMBDA = 5.0
 /** フレーム落ちや高速移動が続いてもボールから離れすぎないための上限。 */
 export const MAX_FOLLOW_LAG_IN_RADII = 3.0
 
+/**
+ * プレイ中の「＋ / −」で選べる、標準のカメラ距離へ掛ける倍率。
+ *
+ * 端末の大きさや持ち方で「もう少し先を見たい / もう少しボールを大きく見たい」の
+ * 好みが分かれるため、実機で決めた標準値（index 2 の 1.0）を真ん中にして、
+ * 前後2段ずつ用意する。index が大きいほど寄る（距離が縮む）。
+ *
+ * 一番引いても画面短辺に入るのは約4.6マスで、9×9の迷路全体は見渡せない。
+ * 一番寄せてもボールは画面短辺の約21%で、以前「存在感は十分」と確認した22%を
+ * 超えない。1段あたり8〜9%なので、数回押して好みの距離に合わせられる。
+ */
+export const MAZE_ZOOM_SCALES = [1.19, 1.09, 1, 0.92, 0.84] as const
+
+export const MIN_MAZE_ZOOM_INDEX = 0
+export const MAX_MAZE_ZOOM_INDEX = MAZE_ZOOM_SCALES.length - 1
+
+/** ゲーム開始時のズーム。実機で決めた標準のカメラ距離をそのまま使う。 */
+export const DEFAULT_MAZE_ZOOM_INDEX = 2
+
+/** ズームを切り替えたとき、距離が跳ねずに寄る・引く速さ（1/秒）。 */
+export const CAMERA_ZOOM_LAMBDA = 8
+
 export type MazeCameraBounds = {
   minX: number
   maxX: number
@@ -79,6 +101,34 @@ export type MazeCameraFocusOptions = {
   ballRadius?: number
   /** 歩ける範囲から外周を何ワールド単位ぶん除くか。既定は外周1マスぶん。 */
   inset?: number
+}
+
+/** 範囲外や壊れた値を渡されても、必ず選べる段のどれかに収める。 */
+export function clampMazeZoomIndex(index: number): number {
+  if (!Number.isFinite(index)) return DEFAULT_MAZE_ZOOM_INDEX
+  return Math.min(MAX_MAZE_ZOOM_INDEX, Math.max(MIN_MAZE_ZOOM_INDEX, Math.round(index)))
+}
+
+/** 段に対応する、標準のカメラ距離へ掛ける倍率。 */
+export function mazeZoomScale(index: number): number {
+  return MAZE_ZOOM_SCALES[clampMazeZoomIndex(index)]!
+}
+
+/**
+ * 現在の倍率を目標の倍率へ滑らかに寄せる。
+ * ボタンを押した瞬間に距離が飛ぶと画面が跳ねて見えるため、追従と同じ指数減衰で埋める。
+ */
+export function followZoomScale(
+  current: number,
+  target: number,
+  deltaSeconds: number,
+  lambda = CAMERA_ZOOM_LAMBDA,
+): number {
+  const safeCurrent = safePositive(current, 1)
+  const safeTarget = safePositive(target, 1)
+  const elapsed = Number.isFinite(deltaSeconds) ? Math.max(0, deltaSeconds) : 0
+  const factor = Math.min(1, Math.max(0, 1 - Math.exp(-safePositive(lambda, CAMERA_ZOOM_LAMBDA) * elapsed)))
+  return safeCurrent + (safeTarget - safeCurrent) * factor
 }
 
 export type MazeCameraFollowOptions = {
