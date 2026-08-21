@@ -60,5 +60,5 @@ export function getScreenOrientationAngle(): ScreenOrientationAngle {
 }
 
 export function supportsDeviceOrientation(): boolean {
-  return typeof window !== 'undefined' && 'DeviceOrientationEvent' in window
+  return typeof window !== 'undefined' && typeof window.DeviceOrientationEvent === 'function'
 }
