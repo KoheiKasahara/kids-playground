@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../app/App'
 
 describe('Home', () => {
-  test('ゲーム一覧に現在の12ゲームすべてが表示される', () => {
+  test('ゲーム一覧に現在の14ゲームすべてが表示される', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -15,6 +15,7 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: 'こっきクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'こっきピンボール' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'こっきドミノ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'こっきころころめいろ' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'おやさいクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'くだものクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
