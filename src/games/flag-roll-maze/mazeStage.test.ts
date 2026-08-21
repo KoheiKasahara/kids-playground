@@ -96,6 +96,11 @@ describe('Phase 1のステージ', () => {
     expect(CELL_SIZE).toBeGreaterThan(BALL_RADIUS * 2)
   })
 
+  it('大きなボールでも直角コーナー用の横余白を残す', () => {
+    // 直進中心から左右へ0.18以上ずれても壁へ食い込まない余白を残す。
+    expect(CELL_SIZE / 2 - BALL_RADIUS).toBeGreaterThanOrEqual(0.18)
+  })
+
   it('幼児が迷わないよう、行き止まりを作らない', () => {
     const rows = MAZE_STAGE_ROWS
     for (const [row, line] of rows.entries()) {

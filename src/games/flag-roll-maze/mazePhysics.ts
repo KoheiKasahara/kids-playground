@@ -27,8 +27,12 @@ export const MAX_PHYSICS_SUBSTEPS = 4
 /** タブ復帰時の巨大な時間跳躍を物理へ渡さない。 */
 export const MAX_FRAME_DELTA_MS = 100
 
-/** 通路幅に対して十分小さく、かつ壁の隙間へ入り込まない大きさ。 */
-export const BALL_RADIUS = 0.42
+/**
+ * 旗が画面で見えるよう従来の1.5倍にした半径。
+ * CELL_SIZE=1.65なら直径1.26に対して通路の横余白が合計0.39あり、
+ * 直角コーナーで少し軌道がずれても壁へ食い込みにくい。
+ */
+export const BALL_RADIUS = 0.63
 
 /** 密度ではなく質量を直接与え、盤面サイズを変えても手触りを固定する。 */
 export const BALL_MASS = 1
@@ -49,12 +53,14 @@ export const WALL_RESTITUTION = 0.02
 /** これ以上速くならない上限。壁抜けと「速すぎて操作できない」を同時に防ぐ。 */
 export const MAX_BALL_SPEED = 5.4
 
-/** 床の厚みと壁の高さ。壁は球の直径より高くして乗り越えられないようにする。 */
+/**
+ * 床の厚みと壁の高さ。壁は球の直径より0.14高く、最大傾斜でも乗り越えにくい。
+ */
 export const FLOOR_THICKNESS = 0.6
-export const WALL_HEIGHT = 1.1
+export const WALL_HEIGHT = 1.4
 
-/** ゴール中心からこの距離まで近づいたらクリアにする。 */
-export const GOAL_RADIUS = 0.55
+/** ゴール中心からこの距離まで近づいたらクリアにする。印も1マス内に収める。 */
+export const GOAL_RADIUS = 0.65
 
 /** 盤面より十分下。ここまで落ちたら場外とみなしてスタートへ戻す。 */
 export const FALL_OUT_Y = -6

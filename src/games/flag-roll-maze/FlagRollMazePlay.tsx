@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import FlagBall from '../../components/flag-ball/FlagBall'
+import { findFlagBall, type FlagBallData } from '../../components/flag-ball/flagBalls'
 import { playCorrectSound, primeAudio } from '../../utils/quizSound'
 import VirtualStick from './VirtualStick'
+import { parseMazePlayState } from './playState'
 import { useMazeEngine } from './useMazeEngine'
 import { isTiltKeyCode, tiltFromPressedKeys, type TiltInput } from './tiltInput'
 import {
@@ -21,13 +24,30 @@ import styles from './FlagRollMazePlay.module.css'
 type MazeGameState = 'playing' | 'goal'
 
 /**
- * こっきころころめいろ Phase 1のプレイ画面。
+ * こっきころころめいろのプレイ画面。
  *
  * 傾き入力の出どころ（スティック / 矢印キー）はここで束ね、
  * エンジンへは TiltInput だけを渡す。Phase 2でジャイロを足すときも、
- * ここに入力源をもう1つ増やすだけで済む。
+ * ジャイロも同じ入力型へ変換し、物理エンジンを入力端末から独立させている。
  */
 export default function FlagRollMazePlay() {
+  const location = useLocation()
+  const playState = parseMazePlayState(location.state)
+
+  if (!playState) {
+    return <Navigate to="/games/flag-roll-maze" replace />
+  }
+
+  const flag = findFlagBall(playState.flagId)
+  if (!flag) {
+    return <Navigate to="/games/flag-roll-maze" replace />
+  }
+
+  // stateが差し替わったときもエンジンの世界・入力を確実に初期化する。
+  return <MazeGame key={location.key} flag={flag} />
+}
+
+function MazeGame({ flag }: { flag: FlagBallData }) {
   const navigate = useNavigate()
   const [gameState, setGameState] = useState<MazeGameState>('playing')
   const [runId, setRunId] = useState(0)
@@ -52,6 +72,7 @@ export default function FlagRollMazePlay() {
 
   const { registerContainer, setTilt, resetBallToStart } = useMazeEngine({
     runId,
+    flag,
     onGoal: handleGoal,
     onRescue: handleRescue,
   })
@@ -208,9 +229,15 @@ export default function FlagRollMazePlay() {
               : 'スティックを うごかして、きいろの ゴールまで ボールを ころがそう！'}
           </p>
         ) : (
-          <p className={styles.result} role="status" aria-live="polite">
-            ゴール！ すごい！
-          </p>
+          <>
+            <p className={styles.result} role="status" aria-live="polite">
+              ゴール！ すごい！
+            </p>
+            <div className={styles.resultPanel} aria-label="ゴールした こっき">
+              <FlagBall flag={flag} size={72} />
+              <span className={styles.resultName}>{flag.nameJa}</span>
+            </div>
+          </>
         )}
 
         <p className={styles.rescue} role="status" aria-live="polite">
@@ -237,13 +264,22 @@ export default function FlagRollMazePlay() {
 
         <div className={styles.actions}>
           {gameState === 'goal' ? (
-            <button
-              type="button"
-              className={`${styles.button} ${styles.retry}`}
-              onClick={handleRetry}
-            >
-              もういちど
-            </button>
+            <>
+              <button
+                type="button"
+                className={`${styles.button} ${styles.retry}`}
+                onClick={handleRetry}
+              >
+                もういちど
+              </button>
+              <button
+                type="button"
+                className={styles.button}
+                onClick={() => navigate('/games/flag-roll-maze', { replace: true })}
+              >
+                べつの こっき
+              </button>
+            </>
           ) : (
             <button
               type="button"

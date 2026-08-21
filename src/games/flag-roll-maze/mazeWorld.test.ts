@@ -2,6 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   BALL_RADIUS,
+  GOAL_RADIUS,
   MAX_BALL_SPEED,
   PHYSICS_TIMESTEP,
   WALL_HEIGHT,
@@ -125,6 +126,12 @@ describe('createMazeWorld', () => {
     } finally {
       world.free()
     }
+  })
+
+  it('大きくしたボールに対して壁とゴールの余白を保つ', () => {
+    // 壁の高さに余裕を持たせ、球の乗り越えとゴール判定の取りこぼしを防ぐ。
+    expect(WALL_HEIGHT - BALL_RADIUS * 2).toBeGreaterThanOrEqual(0.1)
+    expect(GOAL_RADIUS).toBeGreaterThanOrEqual(BALL_RADIUS)
   })
 
   it('傾けていなければボールはその場に留まる', () => {
