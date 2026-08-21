@@ -18,6 +18,8 @@ import {
   FLAG_PANEL_HEIGHT_IN_RADII,
   FLAG_PANEL_LAYOUTS,
   FLAG_PANEL_MAX_ANISOTROPY,
+  FLAG_PANEL_TEXTURE_HEIGHT,
+  FLAG_PANEL_TEXTURE_WIDTH,
   FLAG_PANEL_SEGMENTS_X,
   FLAG_PANEL_SEGMENTS_Y,
   FLAG_PANEL_WIDTH_IN_RADII,
@@ -55,6 +57,45 @@ function uvBounds(geometry: THREE.BufferGeometry) {
     maxV = Math.max(maxV, uv.getY(index))
   }
   return { minU, maxU, minV, maxV }
+}
+
+/**
+ * 国旗SVGは 2Dキャンバスへ焼いてからTextureにするため、テストでは
+ * 実際に読み込まない偽のImageを渡し、要求されたURLだけを記録する。
+ */
+function stubTextureOptions() {
+  const requested: string[] = []
+  let onLoad: (() => void) | null = null
+  const image = {
+    addEventListener: (type: string, listener: () => void) => {
+      if (type === 'load') onLoad = listener
+    },
+    set src(value: string) {
+      requested.push(value)
+    },
+    get src() {
+      return requested[requested.length - 1] ?? ''
+    },
+  } as unknown as HTMLImageElement
+
+  // jsdomは2Dコンテキストを持たないので、呼ばれ方だけを見られる最小の偽物を渡す。
+  const context = {
+    fillStyle: '',
+    fillRect: vi.fn(),
+    drawImage: vi.fn(),
+  }
+  const canvas = document.createElement('canvas')
+  canvas.getContext = vi.fn(() => context) as unknown as HTMLCanvasElement['getContext']
+
+  return {
+    requested,
+    image,
+    canvas,
+    context,
+    /** 画像の読み込み完了を再現する。 */
+    finishLoading: () => onLoad?.(),
+    options: { createImage: () => image, createCanvas: () => canvas },
+  }
 }
 
 function layoutNormals(layout: FlagPanelLayoutName): THREE.Vector3[] {
@@ -118,10 +159,7 @@ describe('flag panel texture mapping', () => {
 
     const ids = ['jp', 'bd', 'kr', 'br', 'ca', 'gb', 'us']
     for (const id of ids) {
-      const texture = new THREE.Texture()
-      const resource = createFlagPanelBallResource(flag(id), {
-        loader: { load: vi.fn(() => texture) },
-      })
+      const resource = createFlagPanelBallResource(flag(id), stubTextureOptions().options)
       const flagPanels = panelMeshes(resource.group, 'flag-panel-flag-')
 
       expect(flagPanels).toHaveLength(4)
@@ -133,6 +171,7 @@ describe('flag panel texture mapping', () => {
           maxV: 1,
         })
       }
+      const texture = resource.texture
       expect(texture.repeat.x).toBe(1)
       expect(texture.repeat.y).toBe(1)
       expect(texture.offset.x).toBe(0)
@@ -179,17 +218,48 @@ describe('flag panel texture mapping', () => {
     texture.dispose()
   })
 
-  it('supports creating only a texture with a test loader', () => {
-    const texture = new THREE.Texture()
-    const load = vi.fn(() => texture)
+  it('rasterizes the flag onto a canvas instead of uploading the SVG element', () => {
+    // SVGの<img>を直接WebGLへ渡すとINVALID_VALUEになるブラウザがあり、
+    // パネルが真っ黒になる。必ずキャンバス経由にする。
+    const stub = stubTextureOptions()
+    const texture = createFlagPanelTexture(flag('kr'), {
+      baseUrl: '/app/',
+      ...stub.options,
+    })
 
-    expect(
-      createFlagPanelTexture(flag('kr'), {
-        baseUrl: '/app/',
-        loader: { load },
-      }),
-    ).toBe(texture)
-    expect(load).toHaveBeenCalledWith('/app/flags/kr.svg')
+    expect(texture).toBeInstanceOf(THREE.CanvasTexture)
+    expect(texture.image).toBeInstanceOf(HTMLCanvasElement)
+    expect(texture.image.width).toBe(FLAG_PANEL_TEXTURE_WIDTH)
+    expect(texture.image.height).toBe(FLAG_PANEL_TEXTURE_HEIGHT)
+    expect(stub.requested).toEqual(['/app/flags/kr.svg'])
+    texture.dispose()
+  })
+
+  it('redraws the canvas once the flag image finishes loading', () => {
+    const stub = stubTextureOptions()
+    const texture = createFlagPanelTexture(flag('jp'), stub.options)
+
+    // 読み込み前は白の下地だけ。ここが透明だとパネルが黒く見えてしまう。
+    expect(stub.context.fillRect).toHaveBeenCalledWith(
+      0,
+      0,
+      FLAG_PANEL_TEXTURE_WIDTH,
+      FLAG_PANEL_TEXTURE_HEIGHT,
+    )
+    expect(stub.context.drawImage).not.toHaveBeenCalled()
+
+    const versionBeforeLoad = texture.version
+    stub.finishLoading()
+
+    // viewBoxと同じ640×480へ焼き直し、GPUへ送り直す。
+    expect(stub.context.drawImage).toHaveBeenCalledWith(
+      stub.image,
+      0,
+      0,
+      FLAG_PANEL_TEXTURE_WIDTH,
+      FLAG_PANEL_TEXTURE_HEIGHT,
+    )
+    expect(texture.version).toBeGreaterThan(versionBeforeLoad)
     texture.dispose()
   })
 })
@@ -224,10 +294,7 @@ describe('flag panel geometry and resource lifecycle', () => {
   })
 
   it('creates a group with a neutral ball, border panels, and flag panels', () => {
-    const texture = new THREE.Texture()
-    const resource = createFlagPanelBallResource(flag('jp'), {
-      loader: { load: () => texture },
-    })
+    const resource = createFlagPanelBallResource(flag('jp'), stubTextureOptions().options)
 
     expect(resource.group).toBeInstanceOf(THREE.Group)
     expect(resource.group.name).toBe('flag-panel-ball')
@@ -250,18 +317,15 @@ describe('flag panel geometry and resource lifecycle', () => {
       (material): material is THREE.MeshLambertMaterial =>
         material instanceof THREE.MeshLambertMaterial && material.map !== null,
     )
-    expect(flagMaterial?.map).toBe(texture)
+    expect(flagMaterial?.map).toBe(resource.texture)
     disposeFlagPanelBallResource(resource)
   })
 
   it('disposes every geometry, material, and the shared texture together', () => {
-    const texture = new THREE.Texture()
-    const resource = createFlagPanelBallResource(flag('jp'), {
-      loader: { load: () => texture },
-    })
+    const resource = createFlagPanelBallResource(flag('jp'), stubTextureOptions().options)
     const geometryDisposes = resource.geometries.map((geometry) => vi.spyOn(geometry, 'dispose'))
     const materialDisposes = resource.materials.map((material) => vi.spyOn(material, 'dispose'))
-    const textureDispose = vi.spyOn(texture, 'dispose')
+    const textureDispose = vi.spyOn(resource.texture, 'dispose')
 
     disposeFlagPanelBallResource(resource)
 
