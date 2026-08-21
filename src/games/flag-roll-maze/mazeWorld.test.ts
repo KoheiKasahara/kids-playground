@@ -2,6 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   BALL_RADIUS,
+  BALL_SPAWN_CLEARANCE_IN_RADII,
   GOAL_RADIUS,
   MAX_BALL_SPEED,
   PHYSICS_TIMESTEP,
@@ -123,6 +124,10 @@ describe('createMazeWorld', () => {
       expect(ball.translation().x).toBeCloseTo(stage.start.x, 6)
       expect(ball.translation().z).toBeCloseTo(stage.start.z, 6)
       expect(spawn.y).toBeGreaterThanOrEqual(BALL_RADIUS)
+      expect(spawn.y).toBeCloseTo(
+        BALL_RADIUS * (1 + BALL_SPAWN_CLEARANCE_IN_RADII),
+        6,
+      )
     } finally {
       world.free()
     }

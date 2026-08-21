@@ -1,4 +1,9 @@
-import { FALL_OUT_Y, type PhysicsVector } from './mazePhysics'
+import {
+  BALL_RADIUS,
+  FALL_OUT_Y,
+  OUT_OF_BOUNDS_MARGIN_IN_RADII,
+  type PhysicsVector,
+} from './mazePhysics'
 
 /**
  * 「動けなくなって遊びが止まる」状態を検出するための、物理から独立した小さな判定。
@@ -31,7 +36,7 @@ export function hasFallenOut(
 ): boolean {
   if (position.y < fallOutY) return true
   // 盤面の外側へ大きく出た場合も、戻れる見込みがないので場外にする。
-  const margin = 1.5
+  const margin = BALL_RADIUS * OUT_OF_BOUNDS_MARGIN_IN_RADII
   return (
     position.x < bounds.minX - margin ||
     position.x > bounds.maxX + margin ||

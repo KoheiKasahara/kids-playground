@@ -29,10 +29,15 @@ export const MAX_FRAME_DELTA_MS = 100
 
 /**
  * 旗が画面で見えるよう従来の1.5倍にした半径。
- * CELL_SIZE=1.65なら直径1.26に対して通路の横余白が合計0.39あり、
- * 直角コーナーで少し軌道がずれても壁へ食い込みにくい。
+ * この値をコース寸法の基準単位 R とし、床・壁・通路をRの倍率で定義する。
  */
 export const BALL_RADIUS = 0.63
+
+/** 1マスを3Rにして、直径2Rのボールの左右へ片側0.5Rの余白を確保する。 */
+export const CELL_SIZE_IN_RADII = 3.0
+
+/** スポーン位置を0.03Rだけ浮かせ、初期フレームで球が床へめり込むのを防ぐ。 */
+export const BALL_SPAWN_CLEARANCE_IN_RADII = 0.03
 
 /** 密度ではなく質量を直接与え、盤面サイズを変えても手触りを固定する。 */
 export const BALL_MASS = 1
@@ -54,16 +59,21 @@ export const WALL_RESTITUTION = 0.02
 export const MAX_BALL_SPEED = 5.4
 
 /**
- * 床の厚みと壁の高さ。壁は球の直径より0.14高く、最大傾斜でも乗り越えにくい。
+ * 床は球半径に近い0.95Rの厚みを持たせ、盤面全体を連続して支えつつ床を抜けないようにする。
  */
-export const FLOOR_THICKNESS = 0.6
-export const WALL_HEIGHT = 1.4
+export const FLOOR_THICKNESS = BALL_RADIUS * 0.95
 
-/** ゴール中心からこの距離まで近づいたらクリアにする。印も1マス内に収める。 */
-export const GOAL_RADIUS = 0.65
+/** 壁は球の直径2Rより0.2R高い2.2Rとし、最大傾斜でも乗り越えられない高さを確保する。 */
+export const WALL_HEIGHT = BALL_RADIUS * 2.2
 
-/** 盤面より十分下。ここまで落ちたら場外とみなしてスタートへ戻す。 */
-export const FALL_OUT_Y = -6
+/** 球の中心が1.05R以内なら判定を取りこぼさず、1マスの半分1.5R未満に収めて隣へ広がらないようにする。 */
+export const GOAL_RADIUS = BALL_RADIUS * 1.05
+
+/** 盤面より9.5R下まで落ちた場合だけ場外とみなし、通常の跳ね返りで誤判定しない。 */
+export const FALL_OUT_Y = -BALL_RADIUS * 9.5
+
+/** 球の直径2Rを超える押し出しも許容し、外周への接触だけで場外扱いにせず戻れない位置だけを判定する。 */
+export const OUT_OF_BOUNDS_MARGIN_IN_RADII = 2.4
 
 export type PhysicsVector = { x: number; y: number; z: number }
 
@@ -116,6 +126,49 @@ export function visualTiltRotation(
   return {
     axis: { x: uz, y: 0, z: -ux },
     angle: Math.min(1, length) * maxTiltRad * ratio,
+  }
+}
+
+/**
+ * 見た目の傾きをpivot点まわりの回転にするための、Groupへ与える平行移動。
+ * 原点まわりに回すと盤の端にいるボールが上下へ大きく振れ、寄った追従カメラが
+ * 揺れてしまうため、回転中心をボールへ寄せる。Three.jsに依存しない純粋関数にする。
+ */
+export function visualTiltPivotOffset(
+  rotation: { axis: PhysicsVector; angle: number },
+  pivot: PhysicsVector,
+): PhysicsVector {
+  if (!Number.isFinite(rotation.angle) || rotation.angle === 0) {
+    return { x: 0, y: 0, z: 0 }
+  }
+
+  const axisLength = Math.hypot(rotation.axis.x, rotation.axis.y, rotation.axis.z)
+  if (axisLength === 0 || !Number.isFinite(axisLength)) {
+    return { x: 0, y: 0, z: 0 }
+  }
+
+  const axis = {
+    x: rotation.axis.x / axisLength,
+    y: rotation.axis.y / axisLength,
+    z: rotation.axis.z / axisLength,
+  }
+  const cross = {
+    x: axis.y * pivot.z - axis.z * pivot.y,
+    y: axis.z * pivot.x - axis.x * pivot.z,
+    z: axis.x * pivot.y - axis.y * pivot.x,
+  }
+  const dot = axis.x * pivot.x + axis.y * pivot.y + axis.z * pivot.z
+  const cos = Math.cos(rotation.angle)
+  const sin = Math.sin(rotation.angle)
+  const rotated = {
+    x: pivot.x * cos + cross.x * sin + axis.x * dot * (1 - cos),
+    y: pivot.y * cos + cross.y * sin + axis.y * dot * (1 - cos),
+    z: pivot.z * cos + cross.z * sin + axis.z * dot * (1 - cos),
+  }
+  return {
+    x: pivot.x - rotated.x,
+    y: pivot.y - rotated.y,
+    z: pivot.z - rotated.z,
   }
 }
 
