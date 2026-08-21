@@ -1,9 +1,15 @@
+/*
+ * 画面の高さは min-height ではなく height で固定する。
+ * min-height だと「3Dシーンの中身の高さ」がページを押し広げられるため、
+ * 縦→横に回したとき、縦画面ぶんの高さのまま横画面へ持ち越されてしまう。
+ */
 .page {
+  position: relative;
   box-sizing: border-box;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-md) + var(--safe-right))
     calc(var(--space-md) + var(--safe-bottom)) calc(var(--space-md) + var(--safe-left));
@@ -13,6 +19,7 @@
 }
 
 .scene {
+  position: relative;
   grid-row: 2;
   min-height: 0;
   width: 100%;
@@ -21,7 +28,8 @@
   overflow: hidden;
 }
 
-.scene canvas { display: block; width: 100%; height: 100%; }
+/* canvasは絶対配置にして、レイアウト（グリッドの行の高さ）へ一切影響させない。 */
+.scene canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 
 .ui {
   grid-row: 1;
@@ -68,7 +76,7 @@
   .scene { grid-column: 2; grid-row: 1; }
   .controls { display: contents; }
   .stickArea { grid-column: 1; grid-row: 1; align-self: end; }
-  .actions { grid-column: 3; grid-row: 1; align-self: center; }
+  .actions { grid-column: 3; grid-row: 1; align-self: end; }
   .gyroButton, .gyroStatus { grid-column: 3; grid-row: 1; align-self: start; justify-self: stretch; text-align: center; }
   .button { padding-inline: var(--space-md); }
 }

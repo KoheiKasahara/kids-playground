@@ -151,7 +151,9 @@ Phase 1のステージは行き止まりのない一本道の蛇行コースで�
 - **通知**: ゴール文言（「ゴール！ すごい！」）と場外復帰メッセージ（「スタートに もどったよ」）はいずれも`role="status"`と`aria-live="polite"`を付けています。
 - **タップ領域**: 操作ボタンは`min-height: var(--tap-target-min)`。バーチャルスティックは`min(34vw, 148px)`（最小120px）で、規約の主操作64px以上を満たします。
 - **`prefers-reduced-motion`**: バーチャルスティックのノブが指を離したあと中央へ戻る`transition`（`VirtualStick.module.css`）は`prefers-reduced-motion: reduce`で無効化されます。ボール自体の転がりはCSSアニメーションではなく物理演算そのもの（ゲームの本質的な動き）なので対象にしていません。全画面共通の`global.css`側の`prefers-reduced-motion`ルールもCSSの`transition`/`animation`を対象にしており、同じ扱いです。
-- **狭い縦画面・低い横画面**: `FlagRollMazePlay.module.css`は`max-height: 560px`で説明文とキーボードヒントを非表示にし見出しを縮小、`max-width: 360px`でボタンの余白とフォントを詰めます。3Dシーンとカメラは`ResizeObserver`（未対応環境では`window`の`resize`）で追従し、`computeMazeCameraSetup`がその時点のaspectから盤面全体が収まる距離を再計算します。
+- **画面の高さ**: `.page`は`min-height`ではなく`height: 100dvh`で、3Dシーンのcanvasは`position: absolute`で敷きます。あわせて`renderer.setSize(width, height, false)`（第3引数false）でcanvasへ幅・高さのインラインstyleを書かせず、**表示サイズはCSSだけが決め、レンダラは解像度を合わせるだけ**にしています。`min-height` + インラインstyleの組み合わせだと「canvasの高さ→シーン行の高さ→ページの高さ→測り直したcanvasの高さ」という循環ができ、縦画面で決まった高さが横画面へ持ち越されて、回転後に盤面や操作系が画面からはみ出していました。
+- **向きの切り替えへの追従**: 3Dシーンとカメラは`ResizeObserver`に加えて、`window`の`resize`／`orientationchange`、`screen.orientation`の`change`、`visualViewport`の`resize`からも測り直します。回転直後はまだ回転前のサイズを返す端末（特にiOS Safari）があるため、`sceneResize.ts`の`createResizeScheduler`が即時に1回、さらに0/120/320ms後にも測り直します。`computeMazeCameraSetup`がその時点のaspectから盤面全体が収まる距離を再計算するので、縦でも横でも盤面全体が見えたままです。
+- **狭い縦画面・低い横画面**: `orientation: landscape`かつ`max-height: 600px`では、スティック／3Dシーン／ボタンの横3カラムへ組み替え、説明文とキーボードヒントを隠して見出しを縮小します。`max-width: 360px`ではボタンの左右の余白を詰めます。
 - **バーチャルスティックの`aria-hidden`**: `VirtualStick`のルート要素は`aria-hidden="true"`です。矢印キー／WASDによるキーボード操作を別に用意しているポインタ専用の見た目のため、スクリーンリーダーには操作可能な要素として読み上げさせません。
 
 ## ファイル構成
@@ -166,6 +168,7 @@ Phase 1のステージは行き止まりのない一本道の蛇行コースで�
 | `mazeWorld.ts` | Rapierワールドの生成、重力の適用、ゴール判定、ボールのリセット、停滞時のナッジ |
 | `mazeRescue.ts` | 場外判定と停滞検知（物理から独立した小さな判定ロジック） |
 | `mazeCamera.ts` | 盤面全体が画角に収まる固定カメラの位置・距離を計算 |
+| `sceneResize.ts` | 画面の向きが変わった直後の測り直しスケジュール（即時＋遅延で複数回） |
 | `useMazeEngine.ts` | Three.jsとRapierをuseEffect内だけで動かす命令的エンジンhook。シーン構築、毎フレームの入力平滑化・物理ステップ・描画、リソース解放を担う |
 | `VirtualStick.tsx` | ポインタ操作のバーチャルスティックUI（見た目とドラッグ検出のみ） |
 | `FlagRollMazePlay.tsx` | プレイ画面。スティック／矢印キーの入力を束ねてエンジンへ渡し、ゴール・場外復帰のUI状態を管理する |
@@ -180,6 +183,7 @@ Phase 1のステージは行き止まりのない一本道の蛇行コースで�
 | `mazeWorld.test.ts` | Rapierワールドの生成（動的剛体がボール1個のみ）、静止・転がり・壁越え不可・速度上限・リセットの各挙動、経路をなぞる自動プレイでのゴール到達 |
 | `mazeRescue.test.ts` | 場外判定の境界（壁ぎわのわずかなはみ出しでは復帰させない）、停滞検知の積算・1回だけのナッジ・入力が無いときは救済しないこと |
 | `mazeCamera.test.ts` | 盤面中央を見る固定カメラであること、スマホ縦からPC横までの各アスペクト比で四隅と壁が画角に収まること、最大まで傾けても角が外れないこと、不正なaspectでも破綻しないこと |
+| `sceneResize.test.ts` | 測り直しが即時＋遅延ぶん実行されること、cancelで予約が止まること、連続呼び出しで予約が積み残らないこと |
 | `VirtualStick.test.tsx` | ポインタ操作から`TiltInput`への変換、デッドゾーン内での見た目のみの追従、指を離したときの`NEUTRAL_TILT`通知、`disabled`時の無反応 |
 | `FlagRollMazePlay.test.tsx` | スティック／矢印キーからエンジンへ`TiltInput`が渡ること、ゴール表示と効果音、ゴール後に入力を受け付けないこと、「スタートに もどる」と「もういちど」の違い、場外復帰の通知が一定時間で消えること |
 

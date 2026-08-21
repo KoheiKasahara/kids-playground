@@ -28,6 +28,7 @@ import {
   type StallTracker,
 } from './mazeRescue'
 import { NEUTRAL_TILT, smoothTilt, type TiltInput } from './tiltInput'
+import { createResizeScheduler } from './sceneResize'
 import type { World } from '@dimforge/rapier3d-compat'
 
 let rapierInitPromise: Promise<void> | null = null
@@ -109,7 +110,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let ballMesh: THREE.Mesh | null = null
     let ballBody: ReturnType<typeof createMazeWorld>['ball'] | null = null
     let resizeObserver: ResizeObserver | null = null
-    let hasWindowResizeListener = false
+    let detachViewportListeners: (() => void) | null = null
     let rafId: number | null = null
     let released = false
     let goalNotified = false
@@ -130,6 +131,9 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       return material
     }
 
+    // 関数宣言のresizeRendererは巻き上げ済み。release()より前に用意しておく。
+    const resizeScheduler = createResizeScheduler(() => resizeRenderer())
+
     function release() {
       if (released) return
       released = true
@@ -143,10 +147,9 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       }
       resizeObserver?.disconnect()
       resizeObserver = null
-      if (hasWindowResizeListener && typeof window !== 'undefined') {
-        window.removeEventListener('resize', resizeRenderer)
-        hasWindowResizeListener = false
-      }
+      resizeScheduler.cancel()
+      detachViewportListeners?.()
+      detachViewportListeners = null
 
       for (const geometry of geometries) geometry.dispose()
       for (const material of materials) material.dispose()
@@ -200,7 +203,33 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       camera.position.set(setup.position.x, setup.position.y, setup.position.z)
       camera.lookAt(setup.target.x, setup.target.y, setup.target.z)
       camera.updateProjectionMatrix()
-      renderer.setSize(width, height)
+      // 第3引数false: canvasへ幅高さのインラインstyleを書かせない。
+      // 書かせると「canvasの実サイズ→コンテナの高さ」の依存が生まれ、
+      // 画面を回しても縮まないレイアウトになってしまう。表示サイズはCSSに任せる。
+      renderer.setSize(width, height, false)
+    }
+
+    /**
+     * 画面の向きが変わるとdvhもcanvasの縦横比も変わる。
+     * ResizeObserverが拾えない環境や、回転直後に古い値を返す端末があるため、
+     * 向き・ビューポート系のイベントからも測り直す。
+     */
+    function attachViewportListeners() {
+      if (typeof window === 'undefined') return
+      const handleViewportChange = () => resizeScheduler.schedule()
+      const orientation = window.screen?.orientation
+
+      window.addEventListener('resize', handleViewportChange)
+      window.addEventListener('orientationchange', handleViewportChange)
+      orientation?.addEventListener?.('change', handleViewportChange)
+      window.visualViewport?.addEventListener('resize', handleViewportChange)
+
+      detachViewportListeners = () => {
+        window.removeEventListener('resize', handleViewportChange)
+        window.removeEventListener('orientationchange', handleViewportChange)
+        orientation?.removeEventListener?.('change', handleViewportChange)
+        window.visualViewport?.removeEventListener('resize', handleViewportChange)
+      }
     }
 
     // 毎フレーム作り直さず使い回す。60fpsでのGC発生を避ける。
@@ -374,10 +403,8 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         if (typeof ResizeObserver !== 'undefined') {
           resizeObserver = new ResizeObserver(resizeRenderer)
           resizeObserver.observe(container)
-        } else {
-          window.addEventListener('resize', resizeRenderer)
-          hasWindowResizeListener = true
         }
+        attachViewportListeners()
         return true
       } catch {
         release()
