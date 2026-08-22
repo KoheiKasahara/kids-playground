@@ -43,3 +43,11 @@ export const IMPULSE_POINT_Y = DOMINO_HEIGHT * 0.43
 
 /** 100〜250msの範囲で物理判定と補助判定をまとめ、毎フレームの計算を増やさない。 */
 export const INSPECTION_INTERVAL_MS = 160
+
+/**
+ * ビッグで静止した倒伏ドミノを明示的にsleepへ移す判定値。
+ * 傾き1.35rad（約77度）かつ速度の二乗が実測値未満なら、見た目の変化を残さず停止できる。
+ */
+export const SETTLE_SLEEP_TILT_RAD = 1.35
+export const SETTLE_SLEEP_LINEAR_SPEED_SQUARED_MAX = 0.02
+export const SETTLE_SLEEP_ANGULAR_SPEED_SQUARED_MAX = 0.06

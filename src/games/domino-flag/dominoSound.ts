@@ -27,7 +27,10 @@ export const DOMINO_SOUND_MAX_PENDING_COUNT = 6
 /** 完成表示を遅らせず、直前の倒伏音だけを聞かせるためのSE遅延。 */
 export const DOMINO_COMPLETE_SOUND_DELAY_MS = 200
 
-export type DominoTiltSource = readonly number[] | ((index: number) => number)
+export type DominoTiltSource =
+  | readonly number[]
+  | readonly boolean[]
+  | ((index: number) => number | boolean)
 
 export type DominoFallTracker = {
   /** 未発音ドミノの姿勢だけを読み、新しくしきい値を超えた個数を返す。 */
@@ -52,7 +55,11 @@ export function createDominoFallTracker(dominoCount: number): DominoFallTracker 
       for (let readIndex = 0; readIndex < unplayedIndices.length; readIndex += 1) {
         const dominoIndex = unplayedIndices[readIndex]!
         const tilt = typeof tilts === 'function' ? tilts(dominoIndex) : tilts[dominoIndex]
-        if (tilt !== undefined && Number.isFinite(tilt) && tilt >= FALL_SOUND_TILT_RAD) {
+        const hasFallen =
+          typeof tilt === 'boolean'
+            ? tilt
+            : tilt !== undefined && Number.isFinite(tilt) && tilt >= FALL_SOUND_TILT_RAD
+        if (hasFallen) {
           newFalls += 1
           continue
         }

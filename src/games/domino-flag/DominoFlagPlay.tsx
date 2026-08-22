@@ -9,9 +9,14 @@ import { useDominoEngine } from './useDominoEngine'
 
 type DominoGameState = 'select' | 'ready' | 'running' | 'complete'
 
-const COURSE_LABELS: Record<DominoCourseType, string> = {
-  normal: 'ふつう',
-  long: 'ロング',
+/**
+ * コース名だけでは幼児に違いが伝わらないため、短い説明を1行そえる。
+ * 説明を1つのコースだけに置くとボタンの高さがそろわないため、3つすべてに置く。
+ */
+const COURSE_LABELS: Record<DominoCourseType, { name: string; hint: string }> = {
+  normal: { name: 'ふつう', hint: 'みじかい' },
+  long: { name: 'ロング', hint: 'ながい' },
+  big: { name: 'ビッグ', hint: 'でっかい' },
 }
 
 export default function DominoFlagPlay() {
@@ -95,9 +100,16 @@ export default function DominoFlagPlay() {
                     courseType === type ? styles.courseButtonActive : '',
                   ].filter(Boolean).join(' ')}
                   aria-pressed={courseType === type}
+                  // 2行の表示をそのまま読み上げると名前と説明が続いてしまうため、区切って渡す。
+                  aria-label={`${COURSE_LABELS[type].name} ${COURSE_LABELS[type].hint}`}
                   onClick={() => handleSelectCourse(type)}
                 >
-                  {COURSE_LABELS[type]}
+                  <span className={styles.courseButtonName}>
+                    {COURSE_LABELS[type].name}
+                  </span>
+                  <span className={styles.courseButtonHint}>
+                    {COURSE_LABELS[type].hint}
+                  </span>
                 </button>
               ))}
             </div>
@@ -138,7 +150,7 @@ export default function DominoFlagPlay() {
                     {selectedFlag.nameJa}の こっき！
                   </p>
                   <p className={styles.courseStatus}>
-                    {COURSE_LABELS[courseType]} コース
+                    {COURSE_LABELS[courseType].name} コース
                   </p>
                 </>
               )}

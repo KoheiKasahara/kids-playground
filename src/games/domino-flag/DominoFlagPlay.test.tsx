@@ -120,14 +120,18 @@ describe('DominoFlagPlay', () => {
     renderPlay()
 
     const courseGroup = screen.getByRole('group', { name: 'コース' })
-    expect(within(courseGroup).getByRole('button', { name: 'ふつう' })).toHaveAttribute(
+    expect(within(courseGroup).getByRole('button', { name: 'ふつう みじかい' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
-    expect(within(courseGroup).getByRole('button', { name: 'ロング' })).toHaveAttribute(
+    expect(within(courseGroup).getByRole('button', { name: 'ロング ながい' })).toHaveAttribute(
       'aria-pressed',
       'false',
     )
+    expect(
+      within(courseGroup).getByRole('button', { name: 'ビッグ でっかい' }),
+    ).toHaveAttribute('aria-pressed', 'false')
+    expect(within(courseGroup).getAllByRole('button')).toHaveLength(3)
     expect(engineMock.options?.courseType).toBe('normal')
   })
 
@@ -135,13 +139,53 @@ describe('DominoFlagPlay', () => {
     const user = userEvent.setup()
     renderPlay()
 
-    await user.click(screen.getByRole('button', { name: 'ロング' }))
+    await user.click(screen.getByRole('button', { name: 'ロング ながい' }))
 
-    expect(screen.getByRole('button', { name: 'ロング' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'ロング ながい' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
     expect(engineMock.options?.courseType).toBe('long')
+  })
+
+  it('ビッグを選ぶとビッグだけが選択される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    const courseGroup = screen.getByRole('group', { name: 'コース' })
+    await user.click(
+      within(courseGroup).getByRole('button', { name: 'ビッグ でっかい' }),
+    )
+
+    expect(
+      within(courseGroup).getByRole('button', { name: 'ビッグ でっかい' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(within(courseGroup).getByRole('button', { name: 'ふつう みじかい' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(within(courseGroup).getByRole('button', { name: 'ロング ながい' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(engineMock.options?.courseType).toBe('big')
+  })
+
+  it('ビッグを含むコース切り替えでrunIdを進めて物理世界を作り直す', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    const courseGroup = screen.getByRole('group', { name: 'コース' })
+
+    expect(engineMock.options?.runId).toBe(0)
+    await user.click(
+      within(courseGroup).getByRole('button', { name: 'ビッグ でっかい' }),
+    )
+    expect(engineMock.options?.courseType).toBe('big')
+    expect(engineMock.options?.runId).toBe(1)
+
+    await user.click(within(courseGroup).getByRole('button', { name: 'ロング ながい' }))
+    expect(engineMock.options?.courseType).toBe('long')
+    expect(engineMock.options?.runId).toBe(2)
   })
 
   it('国旗を選んだready画面にコース名を表示する', async () => {
@@ -156,11 +200,11 @@ describe('DominoFlagPlay', () => {
   it('こっきをかえるで戻ってもコース選択を維持する', async () => {
     const user = userEvent.setup()
     renderPlay()
-    await user.click(screen.getByRole('button', { name: 'ロング' }))
+    await user.click(screen.getByRole('button', { name: 'ロング ながい' }))
     await chooseAmerica(user)
     await user.click(screen.getByRole('button', { name: 'こっきをかえる' }))
 
-    expect(screen.getByRole('button', { name: 'ロング' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'ロング ながい' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
@@ -170,10 +214,10 @@ describe('DominoFlagPlay', () => {
   it('ロング＋アメリカからふつう＋にほんへ切り替えると状態を初期化する', async () => {
     const user = userEvent.setup()
     renderPlay()
-    await user.click(screen.getByRole('button', { name: 'ロング' }))
+    await user.click(screen.getByRole('button', { name: 'ロング ながい' }))
     await chooseAmerica(user)
     await user.click(screen.getByRole('button', { name: 'こっきをかえる' }))
-    await user.click(screen.getByRole('button', { name: 'ふつう' }))
+    await user.click(screen.getByRole('button', { name: 'ふつう みじかい' }))
     await chooseFlag(user, 'にほん')
 
     expect(engineMock.options?.courseType).toBe('normal')

@@ -35,6 +35,11 @@ export const SHEPHERD_NUDGE_COOLDOWN_MS = 600
 export const SHEPHERD_STRENGTHS = [0.75, 1.05, 1.4] as const
 /** V字波面の停滞時に、一度に起こす経路ドミノ数の上限。 */
 export const SHEPHERD_STALL_MAX_NUDGES = 3
+/**
+ * 取り残し救出は1回の検査で8枚までに制限する。
+ * ビッグでは波面より遅い外周列が一斉にawakeになるのを避け、次の検査へ分散する。
+ */
+export const SHEPHERD_MAX_STUCK_NUDGES_PER_PASS = 8
 
 export function createShepherdMemory(): ShepherdMemory {
   return {
@@ -85,7 +90,10 @@ export function planShepherdNudges(
     return { plan: { nudges }, memory: nextMemory }
   }
 
-  const wavefront = Math.max(...fallenDominoes.map((domino) => domino.chainIndex))
+  let wavefront = Number.NEGATIVE_INFINITY
+  for (const domino of fallenDominoes) {
+    wavefront = Math.max(wavefront, domino.chainIndex)
+  }
   const fallenCount = fallenDominoes.length
   const progress =
     nextMemory.lastWavefront === null ||
@@ -128,16 +136,22 @@ export function planShepherdNudges(
     nextMemory.lastNudgeAt[domino.id] = nowMs
   }
 
-  // 波面より前の立ったドミノは、接触を取り逃した取り残しとして救出する。
-  for (const domino of dominoes) {
-    if (
-      !domino.fallen &&
-      domino.sleeping &&
-      domino.chainIndex < wavefront &&
-      nowMs - (nextMemory.standingSince[domino.id] ?? nowMs) >= SHEPHERD_STUCK_MS
-    ) {
-      addNudge(domino)
-    }
+  // 波面から最も遅れているものを優先し、1回の検査で押す枚数を上限までに分散する。
+  const stuckCandidates = dominoes
+    .filter(
+      (domino) =>
+        !domino.fallen &&
+        domino.sleeping &&
+        domino.chainIndex < wavefront &&
+        nowMs - (nextMemory.standingSince[domino.id] ?? nowMs) >= SHEPHERD_STUCK_MS,
+    )
+    .sort((left, right) => left.chainIndex - right.chainIndex)
+  let stuckNudgeCount = 0
+  for (const domino of stuckCandidates) {
+    if (stuckNudgeCount >= SHEPHERD_MAX_STUCK_NUDGES_PER_PASS) break
+    const nudgesBefore = nudges.length
+    addNudge(domino)
+    stuckNudgeCount += nudges.length - nudgesBefore
   }
 
   // 同じ列の進行も止まった場合は、波面の次の列をまとめて軽く押す。

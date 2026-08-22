@@ -69,10 +69,19 @@ function getChainIndex(placement: DominoPlacement): number {
 export function createDominoWorld(
   rapier: RapierModule,
   placements: DominoPlacement[] = createDominoPlacements(),
-  options: { groundSize?: number; ballSection?: DominoBallSection | null } = {},
+  options: {
+    groundSize?: number
+    ballSection?: DominoBallSection | null
+    solverIterations?: number | null
+  } = {},
 ): DominoWorld {
   const world = new rapier.World({ x: 0, y: GRAVITY_Y, z: 0 })
   world.timestep = PHYSICS_TIMESTEP
+  if (options.solverIterations !== undefined && options.solverIterations !== null) {
+    // 1,600個が同時にawakeになるビッグだけ反復回数を2へ下げると、実測で物理コストが約3割減り、
+    // 倒れ切る割合は100%を維持した。未指定時は既存モードのRapier既定値を変更しない。
+    world.integrationParameters.numSolverIterations = options.solverIterations
+  }
   const groundSize = options.groundSize ?? GROUND_SIZE
 
   // 親RigidBodyを持たないColliderは固定物として扱われるため、剛体数を173に保てる。
@@ -286,8 +295,23 @@ export function applyShepherdImpulse(
 
 /** Rapierの姿勢からローカルY軸が直立方向から何ラジアン傾いたかを返す。 */
 export function tiltOf(body: RigidBody): number {
-  const up = rotateLocalVector(body.rotation(), { x: 0, y: 1, z: 0 })
-  return Math.acos(Math.max(-1, Math.min(1, up.y)))
+  return Math.acos(Math.max(-1, Math.min(1, upYOf(body))))
+}
+
+function upYOf(body: RigidBody): number {
+  const { x, z } = body.rotation()
+  return 1 - 2 * (x * x + z * z)
+}
+
+/**
+ * tiltOfと同じ判定を、acosを使わずに行う。音・カメラなどの頻繁な比較では
+ * クォータニオンから直接求めた上向きベクトルのY成分だけを使い、1,600個分の計算量を抑える。
+ */
+export function isTiltAtLeast(body: RigidBody, radians: number): boolean {
+  if (!Number.isFinite(radians)) return false
+  if (radians <= 0) return true
+  if (radians > Math.PI) return false
+  return upYOf(body) <= Math.cos(radians)
 }
 
 /** 国旗面が貼られたローカル-Z軸をワールドへ変換したY成分を返す。 */

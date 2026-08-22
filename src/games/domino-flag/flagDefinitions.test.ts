@@ -13,6 +13,7 @@ import {
 import {
   FLAG_CELL_COLOR_BY_CHAR,
   FLAG_COLOR_HEX,
+  createMirroredIndexMap,
   createFlagGrid,
   dominoFlags,
   type DominoFlagId,
@@ -676,5 +677,115 @@ describe('dominoFlags', () => {
     )
     expect(argentinaYellowCells.length).toBeGreaterThan(0)
     expect(argentinaYellowCells.every(({ row }) => row >= 3 && row <= 6)).toBe(true)
+  })
+
+  it('50×32への拡大は半分ミラーの列・行対応を使う', () => {
+    const columnMap = createMirroredIndexMap(FLAG_COLS, 50)
+    const rowMap = createMirroredIndexMap(FLAG_ROWS, 32)
+    const expandedJapan = createFlagGrid('jp', { cols: 50, rows: 32 })
+
+    expect(columnMap.slice(0, 25)).toEqual([
+      0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7,
+      7, 7, 7,
+    ])
+    expect(rowMap.slice(0, 16)).toEqual([
+      0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4,
+    ])
+    for (let col = 0; col < 25; col += 1) {
+      expect(columnMap[col]).toBe(FLAG_COLS - 1 - columnMap[49 - col]!)
+    }
+    for (let row = 0; row < 16; row += 1) {
+      expect(rowMap[row]).toBe(FLAG_ROWS - 1 - rowMap[31 - row]!)
+    }
+    for (const row of expandedJapan) {
+      for (let col = 0; col < 25; col += 1) {
+        expect(row[col]).toBe(row[49 - col])
+      }
+    }
+  })
+
+  it('50×32への拡大でも上下の帯順を反転させない', () => {
+    for (const id of ['de', 'id'] as const) {
+      const source = createFlagGrid(id)
+      const expanded = createFlagGrid(id, { cols: 50, rows: 32 })
+
+      expect(expanded[0]![0]).toBe(source[0]![0])
+      expect(expanded[31]![0]).toBe(source[9]![0])
+      expect(expanded[0]![0]).not.toBe(expanded[31]![0])
+    }
+  })
+
+  it('50×32への拡大は各ソース軸に3または4列・行を割り当てる', () => {
+    const countValues = (values: number[]): number[] => {
+      const counts = new Map<number, number>()
+      for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1)
+      return [...new Set(counts.values())]
+    }
+
+    expect(countValues(createMirroredIndexMap(FLAG_COLS, 50))).toEqual([3, 4])
+    expect(countValues(createMirroredIndexMap(FLAG_ROWS, 32))).toEqual([3, 4])
+  })
+
+  it('dominoFlags全40件で50×32の各行が半分ミラー拡大と完全一致する', () => {
+    const columnMap = createMirroredIndexMap(FLAG_COLS, 50)
+    const rowMap = createMirroredIndexMap(FLAG_ROWS, 32)
+
+    for (const definition of dominoFlags) {
+      const source = createFlagGrid(definition.id)
+      const expanded = createFlagGrid(definition.id, { cols: 50, rows: 32 })
+
+      for (let row = 0; row < 32; row += 1) {
+        expect(expanded[row]).toEqual(
+          columnMap.map((col) => source[rowMap[row]!]![col]!),
+        )
+      }
+    }
+  })
+
+  it('dominoFlags全40件で拡大後の色集合がソースと一致する', () => {
+    for (const definition of dominoFlags) {
+      expect(new Set(createFlagGrid(definition.id, { cols: 50, rows: 32 }).flat())).toEqual(
+        new Set(createFlagGrid(definition.id).flat()),
+      )
+    }
+  })
+
+  it('左右対称なソースは50×32拡大後も左右対称になる', () => {
+    let symmetricCount = 0
+    for (const definition of dominoFlags) {
+      const source = createFlagGrid(definition.id)
+      const isSymmetric = source.every((row) =>
+        row.every((color, col) => color === row[FLAG_COLS - 1 - col]),
+      )
+      if (!isSymmetric) continue
+      symmetricCount += 1
+
+      const expanded = createFlagGrid(definition.id, { cols: 50, rows: 32 })
+      expect(expanded.every((row) =>
+        row.every((color, col) => color === row[49 - col]),
+      )).toBe(true)
+    }
+    expect(symmetricCount).toBeGreaterThan(0)
+  })
+
+  it('全40件の色面積比は量子化の安全網として7%以内に収まる', () => {
+    for (const definition of dominoFlags) {
+      const source = createFlagGrid(definition.id)
+      const expanded = createFlagGrid(definition.id, { cols: 50, rows: 32 })
+      const colors = new Set(source.flat())
+
+      for (const color of colors) {
+        const sourceRatio = source.flat().filter((cell) => cell === color).length / 160
+        const expandedRatio = expanded.flat().filter((cell) => cell === color).length / 1600
+        expect(Math.abs(sourceRatio - expandedRatio), `${definition.id}:${color}`).toBeLessThanOrEqual(
+          0.07,
+        )
+      }
+    }
+  })
+
+  it('指定サイズの列数・行数が奇数なら明示的にthrowする', () => {
+    expect(() => createFlagGrid('jp', { cols: 49, rows: 32 })).toThrow()
+    expect(() => createFlagGrid('jp', { cols: 50, rows: 31 })).toThrow()
   })
 })

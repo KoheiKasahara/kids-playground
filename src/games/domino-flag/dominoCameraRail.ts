@@ -5,7 +5,14 @@ import {
   cameraDistanceOf,
   computeCameraSetup,
 } from './dominoCamera'
-import { LINE_COUNT } from './dominoLayout'
+import {
+  FLAG_COLS,
+  FLAG_PITCH_X,
+  getLayoutBounds,
+  LINE_COUNT,
+  type DominoPlacement,
+  type FlagLayoutSpec,
+} from './dominoLayout'
 
 export type RailVec3 = { x: number; y: number; z: number }
 
@@ -18,6 +25,30 @@ export type CameraRailAnchor = {
 
 export type CameraRailPose = { target: RailVec3; distance: number }
 
+/** ビッグ開始時に見せる国旗の行数。導線から国旗へ視線が移るきっかけだけを寄り構図へ含める。 */
+export const BIG_NEAR_FLAG_ROW_COUNT = 4
+
+// ふつうモードと同じ導線の見え方にするため、寄りカメラのX幅をふつうの国旗半幅に制限する。
+export const BIG_NEAR_HALF_WIDTH = (FLAG_COLS / 2) * FLAG_PITCH_X
+
+/**
+ * ビッグの寄りカメラ用境界を求める純粋関数。
+ * アームの外側や国旗の奥行き全体を除外し、エンジンとテストが同じ条件で構図を検証できるようにする。
+ */
+export function bigNearCameraBounds(
+  placements: DominoPlacement[],
+  layout: FlagLayoutSpec,
+): ReturnType<typeof getLayoutBounds> {
+  const nearFlagRows = Math.min(BIG_NEAR_FLAG_ROW_COUNT, layout.rows)
+  return getLayoutBounds(
+    placements.filter(
+      (placement) =>
+        Math.abs(placement.x) <= BIG_NEAR_HALF_WIDTH &&
+        (placement.kind !== 'flag' || (placement.row ?? 0) < nearFlagRows),
+    ),
+  )
+}
+
 export type CameraRailBuildOptions = {
   reducedMotion?: boolean
   /** reduced-motion時に使うロングコース全体の俯瞰ポーズ。 */
@@ -26,6 +57,12 @@ export type CameraRailBuildOptions = {
   approachDistance?: number
   /** 道中と共有直線を含むカメラ進行度の対象数。 */
   cameraProgressCount?: number
+}
+
+export type BigCameraRailBuildOptions = {
+  reducedMotion?: boolean
+  /** テストと将来の演出調整で補間の細かさを差し替えられる。 */
+  transitionCount?: number
 }
 
 /** 道中の中心線を少し先まで画面中央に置く距離。 */
@@ -47,8 +84,9 @@ export const CAMERA_BLEND_APPROACH_COUNT = 8
 export function wideCameraPoseFor(
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number },
   aspect: number,
+  flagRows?: number,
 ): CameraRailPose {
-  const setup = computeCameraSetup(bounds, aspect)
+  const setup = computeCameraSetup(bounds, aspect, flagRows)
   return {
     target: { ...setup.target },
     distance: cameraDistanceOf(setup),
@@ -73,6 +111,9 @@ export const CAMERA_LAMBDA = 3.2
 
 /** 完成判定より手前の倒れ始めをカメラ進行度へ反映する傾き。 */
 export const CAMERA_PROGRESS_TILT_RAD = 0.35
+
+/** 導線から国旗全体へ2.5秒かけて引く。連鎖の詰まりがあっても全体を見失わないための時間下限。 */
+export const BIG_CAMERA_PULLOUT_MS = 2_500
 
 const REDUCED_WIDE_DISTANCE = APPROACH_CAMERA_DISTANCE * 2.5
 
@@ -253,6 +294,39 @@ export function buildLongCameraRail(
     ...anchor,
     target: cloneVec3(anchor.target),
   }))
+}
+
+/**
+ * ビッグ専用の引きカメラレールを、寄り姿勢と全体姿勢だけから構築する純粋関数。
+ * 実際の進行度はエンジン側で連鎖と経過時間の大きい方を渡し、ここでは滑らかな姿勢補間だけを担う。
+ */
+export function buildBigCameraRail(
+  nearPose: CameraRailPose,
+  widePose: CameraRailPose,
+  options: BigCameraRailBuildOptions = {},
+): CameraRailAnchor[] {
+  const transitionCount = Number.isInteger(options.transitionCount)
+    ? Math.max(2, options.transitionCount!)
+    : 9
+  const near = clonePose(nearPose)
+  const wide = clonePose(widePose)
+
+  if (options.reducedMotion === true) {
+    return [
+      { progress: 0, target: cloneVec3(wide.target), distance: wide.distance },
+      { progress: 1, target: cloneVec3(wide.target), distance: wide.distance },
+    ]
+  }
+
+  return Array.from({ length: transitionCount }, (_, index) => {
+    const linearProgress = index / (transitionCount - 1)
+    const pose = blendPose(near, wide, easeWithCappedSlope(linearProgress))
+    return {
+      progress: linearProgress,
+      target: cloneVec3(pose.target),
+      distance: pose.distance,
+    }
+  })
 }
 
 /** レールのアンカー間を線形補間し、範囲外の進行度は端に丸める。 */

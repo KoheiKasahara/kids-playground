@@ -15,6 +15,11 @@ export const TIMEOUT_RATIO = 0.8
 export const HARD_TIMEOUT_MS = 25_000
 /** 道中を含むロングコースが落ち着くまで待つ上限時間。 */
 export const LONG_HARD_TIMEOUT_MS = 45_000
+/**
+ * ビッグは1,600個のドミノが落ち着くまで実測で8〜11秒かかるため、
+ * 一時的な物理負荷や端の列の遅れを吸収できる35秒を上限にする。
+ */
+export const BIG_HARD_TIMEOUT_MS = 35_000
 
 export function isFallen(state: DominoRuntimeState): boolean {
   return state.tilt >= FALLEN_TILT_RAD

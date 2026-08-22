@@ -57,14 +57,21 @@
   width: min(100%, 360px);
   margin-top: var(--space-sm);
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-sm);
   pointer-events: auto;
 }
 
 .courseButton {
+  /* 3列になっても文字幅でグリッドが押し広げられないようにする。 */
+  min-width: 0;
   min-height: 56px;
-  padding: var(--space-xs) var(--space-sm);
+  padding: var(--space-xs);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   border: 3px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text);
@@ -73,8 +80,21 @@
   font-family: inherit;
   font-size: var(--font-size-base);
   font-weight: 700;
+  line-height: 1.15;
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.courseButtonName {
+  font-size: var(--font-size-base);
+}
+
+/* 説明はコース名より一段小さくし、幅の狭い3列でも1行に収める。 */
+.courseButtonHint {
+  font-size: 0.62em;
+  font-weight: 700;
+  opacity: 0.85;
+  white-space: nowrap;
 }
 
 .courseButtonActive {

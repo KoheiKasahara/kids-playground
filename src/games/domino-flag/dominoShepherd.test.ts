@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SHEPHERD_MAX_NUDGES,
+  SHEPHERD_MAX_STUCK_NUDGES_PER_PASS,
   SHEPHERD_STALL_MAX_NUDGES,
   createShepherdMemory,
   planShepherdNudges,
@@ -108,6 +109,24 @@ describe('planShepherdNudges', () => {
     const result = planShepherdNudges(dominos, first.memory, 600)
 
     expect(result.plan.nudges.map((nudge) => nudge.id)).toEqual(['line-0'])
+  })
+
+  it('取り残し救出は一回の検査で押す枚数を上限に制限する', () => {
+    const dominos = [
+      domino('wavefront', 100, true),
+      ...Array.from({ length: SHEPHERD_MAX_STUCK_NUDGES_PER_PASS + 4 }, (_, index) =>
+        domino(`stuck-${index}`, index, false),
+      ),
+    ]
+    const first = planShepherdNudges(dominos, createShepherdMemory(), 0)
+    const result = planShepherdNudges(dominos, first.memory, 600)
+
+    expect(result.plan.nudges).toHaveLength(SHEPHERD_MAX_STUCK_NUDGES_PER_PASS)
+    expect(result.plan.nudges.map((nudge) => nudge.id)).toEqual(
+      Array.from({ length: SHEPHERD_MAX_STUCK_NUDGES_PER_PASS }, (_, index) =>
+        `stuck-${index}`,
+      ),
+    )
   })
 
   it('回転中でsleepしていないドミノは押さない', () => {

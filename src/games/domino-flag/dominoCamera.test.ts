@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
+import { createBigCourse } from './dominoCourse'
 import { createDominoPlacements, getLayoutBounds } from './dominoLayout'
 import { computeCameraSetup } from './dominoCamera'
 
@@ -14,6 +15,29 @@ function expectCornersInFrustum(aspect: number) {
 
   for (const x of [bounds.minX, bounds.maxX]) {
     for (const z of [bounds.minZ, bounds.maxZ]) {
+      const ndc = new THREE.Vector3(x, 0, z).project(camera)
+      expect(Math.abs(ndc.x)).toBeLessThan(1)
+      expect(Math.abs(ndc.y)).toBeLessThan(1)
+      expect(ndc.z).toBeGreaterThan(-1)
+      expect(ndc.z).toBeLessThan(1)
+    }
+  }
+}
+
+function expectBigFlagCornersInFrustum(aspect: number) {
+  const course = createBigCourse('jp')
+  const setup = computeCameraSetup(course.flagCameraBounds, aspect, course.flagLayout.rows)
+  const camera = new THREE.PerspectiveCamera(setup.fov, aspect, 0.1, 1_000)
+  camera.position.set(setup.position.x, setup.position.y, setup.position.z)
+  camera.lookAt(setup.target.x, setup.target.y, setup.target.z)
+  camera.updateProjectionMatrix()
+  camera.updateMatrixWorld(true)
+
+  const flagBounds = getLayoutBounds(
+    course.placements.filter((placement) => placement.kind === 'flag'),
+  )
+  for (const x of [flagBounds.minX, flagBounds.maxX]) {
+    for (const z of [flagBounds.minZ, flagBounds.maxZ]) {
       const ndc = new THREE.Vector3(x, 0, z).project(camera)
       expect(Math.abs(ndc.x)).toBeLessThan(1)
       expect(Math.abs(ndc.y)).toBeLessThan(1)
@@ -56,5 +80,13 @@ describe('computeCameraSetup', () => {
 
     expect(setup.position.z).toBeGreaterThan(setup.target.z)
     expect(setup.position.y).toBeGreaterThan(setup.target.y)
+  })
+
+  it('bigは縦画面でも50×32国旗の四隅を収める', () => {
+    expectBigFlagCornersInFrustum(390 / 780)
+  })
+
+  it('bigは横画面でも50×32国旗の四隅を収める', () => {
+    expectBigFlagCornersInFrustum(844 / 390)
   })
 })

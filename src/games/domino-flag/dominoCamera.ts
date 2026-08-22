@@ -32,12 +32,13 @@ export function cameraDistanceOf(setup: CameraSetup): number {
 export function computeCameraSetup(
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number },
   aspect: number,
+  flagRows = FLAG_ROWS,
 ): CameraSetup {
   const safeAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 1
   const target = {
     x: (bounds.minX + bounds.maxX) / 2,
     // 最大Z側は旗エリアなので、全体の中心ではなく旗の中心付近を見る。
-    z: bounds.maxZ - ((FLAG_ROWS - 1) * FLAG_PITCH_Z + DOMINO_DEPTH) / 2,
+    z: bounds.maxZ - ((flagRows - 1) * FLAG_PITCH_Z + DOMINO_DEPTH) / 2,
     y: CAMERA_TARGET_Y,
   }
 

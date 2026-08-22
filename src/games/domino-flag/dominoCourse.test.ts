@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { HARD_TIMEOUT_MS } from './dominoCompletion'
+import { BIG_HARD_TIMEOUT_MS, HARD_TIMEOUT_MS } from './dominoCompletion'
 import {
+  BIG_FLAG_LAYOUT,
   LINE_PITCH_Z,
   createDominoPlacements,
   getLayoutBounds,
   type DominoPlacement,
 } from './dominoLayout'
-import { createDominoCourse } from './dominoCourse'
+import { createBigCourse, createDominoCourse, type DominoCourse } from './dominoCourse'
 import { GROUND_SIZE } from './dominoPhysics'
 import { dominoFlags } from './flagDefinitions'
 
@@ -31,6 +32,52 @@ function withoutChainIndex(placement: DominoPlacement) {
 }
 
 describe('createDominoCourse', () => {
+  it('bigは全配置の50×32国旗と短い導線だけを持つ', () => {
+    const course = createBigCourse('jp')
+    const flags = course.placements.filter((placement) => placement.kind === 'flag')
+
+    expect(course.type).toBe('big')
+    expect(course.flagLayout).toEqual(BIG_FLAG_LAYOUT)
+    expect(flags).toHaveLength(50 * 32)
+    expect(course.startId).toBe('line-0')
+    expect(course.approachCount).toBe(0)
+    expect(course.approachPath).toEqual([])
+    expect(course.cameraApproachPath).toEqual([])
+    expect(course.ballSection).toBeNull()
+    expect(course.cameraProgressCount).toBe(0)
+    expect(course.solverIterations).toBe(2)
+    expect(course.settleSleepEnabled).toBe(true)
+    expect(course.cameraMode).toBe('bigPullout')
+    expect(course.hardTimeoutMs).toBe(BIG_HARD_TIMEOUT_MS)
+    expect(course.groundSize).toBeGreaterThanOrEqual(80)
+  })
+
+  it('bigのSTARTから国旗までの導線はふつうと同じ長さになる', () => {
+    // Issue #142の「導線はふつうと同程度に短い」を、行数が増えても保つための回帰テスト。
+    // 国旗が奥へ広がるぶん扇状分岐と直線も一緒に下がるため、両者の差は変わらないはず。
+    const approachLengthOf = (course: DominoCourse): number => {
+      const start = course.placements.find((placement) => placement.id === course.startId)
+      const firstFlagRow = course.placements.filter(
+        (placement) => placement.kind === 'flag' && placement.row === 0,
+      )
+      if (!start || firstFlagRow.length === 0) throw new Error('導線の基準が見つかりません')
+      return firstFlagRow[0]!.z - start.z
+    }
+
+    expect(approachLengthOf(createBigCourse('jp'))).toBeCloseTo(
+      approachLengthOf(createDominoCourse('normal', 'jp')),
+      10,
+    )
+  })
+
+  it('bigはlayoutを差し替えてサイズ比較できる', () => {
+    const layout = { cols: 32, rows: 24 } as const
+    const course = createBigCourse('jp', layout)
+    expect(course.flagLayout).toEqual({ ...layout, chainGroupWeight: 2 })
+    expect(course.placements.filter((placement) => placement.kind === 'flag')).toHaveLength(
+      layout.cols * layout.rows,
+    )
+  })
   it('normalは全20か国で既存createDominoPlacementsと完全一致する', () => {
     for (const flag of dominoFlags) {
       const course = createDominoCourse('normal', flag.id)
