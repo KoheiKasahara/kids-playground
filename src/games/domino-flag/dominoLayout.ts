@@ -19,6 +19,24 @@ export const DOMINO_DEPTH = 0.14
 export const FLAG_COLS = 16
 export const FLAG_ROWS = 10
 
+export type FlagLayoutSpec = {
+  cols: number
+  rows: number
+  /** 扇状分岐の1グループあたりのchainIndex重み。省略時は通常値の1。 */
+  chainGroupWeight?: number
+}
+
+export const NORMAL_FLAG_LAYOUT: FlagLayoutSpec = {
+  cols: FLAG_COLS,
+  rows: FLAG_ROWS,
+  chainGroupWeight: 1,
+}
+export const BIG_FLAG_LAYOUT: FlagLayoutSpec = {
+  cols: 50,
+  rows: 32,
+  chainGroupWeight: 2,
+}
+
 /** 国旗の横幅を日本国旗の比率へ近づける、列方向のドミノ間隔。 */
 export const FLAG_PITCH_X = 0.66
 /** 国旗の縦幅を日本国旗の比率へ近づける、行方向のドミノ間隔。 */
@@ -78,34 +96,92 @@ const FAN_CONNECTOR_OFFSET_X = 0.25
 /** アームをフィーダー中心から0.28内側へ置き、spurへ向かう余白を作る。 */
 const FAN_ARM_INSET_X = 0.28
 /** 片側8列を2列ずつ担当する4グループ（左右合わせて8フィーダー）。 */
-const FAN_SPUR_GROUP_COUNT = FLAG_COLS / 4
+function validateLayout(layout: FlagLayoutSpec): void {
+  if (
+    !Number.isInteger(layout.cols) ||
+    layout.cols < FLAG_COLS ||
+    layout.cols % 2 !== 0
+  ) {
+    throw new Error(`国旗レイアウトの列数は16以上の偶数である必要があります: ${layout.cols}`)
+  }
+  if (
+    !Number.isInteger(layout.rows) ||
+    layout.rows < FLAG_ROWS ||
+    layout.rows % 2 !== 0
+  ) {
+    throw new Error(`国旗レイアウトの行数は10以上の偶数である必要があります: ${layout.rows}`)
+  }
+  if (
+    layout.chainGroupWeight !== undefined &&
+    (!Number.isInteger(layout.chainGroupWeight) || layout.chainGroupWeight <= 0)
+  ) {
+    throw new Error(
+      `chainIndexのグループ重みは正の整数である必要があります: ${layout.chainGroupWeight}`,
+    )
+  }
+}
+
+function chainGroupWeight(layout: FlagLayoutSpec): number {
+  return layout.chainGroupWeight ?? 1
+}
+
+/** 行数が増えても、通常モードの扇状分岐と国旗の相対間隔を保つためのZ移動量。 */
+function layoutZOffset(layout: FlagLayoutSpec): number {
+  return -((layout.rows - FLAG_ROWS) / 2) * FLAG_PITCH_Z
+}
+
+function flagZ0(layout: FlagLayoutSpec): number {
+  return FLAG_Z0 + layoutZOffset(layout)
+}
+
+function feederZ(layout: FlagLayoutSpec): number {
+  return FEEDER_Z + layoutZOffset(layout)
+}
+
+function fanZ(baseZ: number, layout: FlagLayoutSpec): number {
+  return baseZ + layoutZOffset(layout)
+}
+
+function fanSpurGroupCount(cols: number): number {
+  return Math.ceil(cols / 4)
+}
 /** 直線12個の後に根1個と曲線4段を置いた、左右共通の最終曲線の到達順位。 */
 const FAN_BRANCH_BASE_CHAIN_INDEX = LINE_COUNT + 4
 
-function flagX(col: number): number {
-  return (col - (FLAG_COLS - 1) / 2) * FLAG_PITCH_X
+function flagX(col: number, cols = FLAG_COLS): number {
+  return (col - (cols - 1) / 2) * FLAG_PITCH_X
 }
 
 /** フィーダーが担当する隣接2列を、中央側から外側へ向かう順で返す。 */
-function feederColumns(side: -1 | 1, group: number): [number, number] {
+export function feederColumns(
+  side: -1 | 1,
+  group: number,
+  cols = FLAG_COLS,
+): number[] {
+  const groupCount = fanSpurGroupCount(cols)
+  if (group < 0 || group >= groupCount) {
+    throw new Error(`扇状分岐のグループ番号が範囲外です: ${group}`)
+  }
+
+  const halfCols = cols / 2
   const firstCol =
-    side < 0
-      ? FLAG_COLS / 2 - 2 - group * 2
-      : FLAG_COLS / 2 + group * 2
+    side < 0 ? halfCols - 2 - group * 2 : halfCols + group * 2
+  if (side < 0 && firstCol < 0) return [0]
+  if (side > 0 && firstCol + 1 >= cols) return [cols - 1]
   return [firstCol, firstCol + 1]
 }
 
-function feederX(side: -1 | 1, group: number): number {
-  const [firstCol, secondCol] = feederColumns(side, group)
-  return (flagX(firstCol) + flagX(secondCol)) / 2
+function feederX(side: -1 | 1, group: number, cols: number): number {
+  const columns = feederColumns(side, group, cols)
+  return columns.reduce((sum, col) => sum + flagX(col, cols), 0) / columns.length
 }
 
-function createLinePlacements(): DominoPlacement[] {
+function createLinePlacements(layout: FlagLayoutSpec): DominoPlacement[] {
   return Array.from({ length: LINE_COUNT }, (_, index) => ({
     id: `line-${index}`,
     kind: 'line' as const,
     x: 0,
-    z: LINE_END_Z - (LINE_COUNT - 1 - index) * LINE_PITCH_Z,
+    z: fanZ(LINE_END_Z, layout) - (LINE_COUNT - 1 - index) * LINE_PITCH_Z,
     width: DOMINO_WIDTH,
     yaw: 0,
     chainIndex: index,
@@ -135,9 +211,12 @@ function createBranch(
  * 左右それぞれの曲線の後ろに通常ピッチの横向きアームを置き、
  * 最終フィーダーはすべてyaw 0として国旗の正面向きと接触を保つ。
  */
-function createFanPlacements(): DominoPlacement[] {
+function createFanPlacements(layout: FlagLayoutSpec): DominoPlacement[] {
+  const layoutFeederZ = feederZ(layout)
+  const groupCount = fanSpurGroupCount(layout.cols)
+  const groupWeight = chainGroupWeight(layout)
   const placements: DominoPlacement[] = [
-    createBranch('fan-root', 0, FAN_ROOT_Z, LINE_COUNT, 0),
+    createBranch('fan-root', 0, fanZ(FAN_ROOT_Z, layout), LINE_COUNT, 0),
   ]
 
   for (const side of [-1, 1] as const) {
@@ -153,50 +232,50 @@ function createFanPlacements(): DominoPlacement[] {
         createBranch(
           `fan-${sideName}-curve-${index}`,
           side * FAN_CURVE_X[index],
-          FAN_CURVE_Z[index],
+          fanZ(FAN_CURVE_Z[index], layout),
           curveChainIndexes[index],
           side * FAN_CURVE_YAWS[index],
         ),
       )
     }
 
-    const centralTargetX = feederX(side, 0)
+    const centralTargetX = feederX(side, 0, layout.cols)
     placements.push(
       createBranch(
         `fan-${sideName}-central-spur`,
         centralTargetX,
-        FAN_CENTRAL_SPUR_Z,
+        fanZ(FAN_CENTRAL_SPUR_Z, layout),
         FAN_BRANCH_BASE_CHAIN_INDEX,
         side * (Math.PI / 4),
       ),
       createBranch(
         `fan-${sideName}-feeder-0`,
         centralTargetX,
-        FEEDER_Z,
+        layoutFeederZ,
         FAN_BRANCH_BASE_CHAIN_INDEX,
         0,
       ),
     )
 
     // 最初のアームはcurve-3を兼ね、以降のアームは0.66ピッチで並べる。
-    for (let group = 1; group < FAN_SPUR_GROUP_COUNT; group += 1) {
-      const targetX = feederX(side, group)
-      const armChainIndex = FAN_BRANCH_BASE_CHAIN_INDEX + group
+    for (let group = 1; group < groupCount; group += 1) {
+      const targetX = feederX(side, group, layout.cols)
+      const armChainIndex = FAN_BRANCH_BASE_CHAIN_INDEX + group * groupWeight
       const armX = targetX - side * FAN_ARM_INSET_X
-      const spur = { x: targetX, z: FAN_OUTER_SPUR_Z }
+      const spur = { x: targetX, z: fanZ(FAN_OUTER_SPUR_Z, layout) }
       const connector = {
         x: targetX + side * FAN_CONNECTOR_OFFSET_X,
-        z: FAN_OUTER_CONNECTOR_Z,
+        z: fanZ(FAN_OUTER_CONNECTOR_Z, layout),
       }
 
       if (group > 1) {
         const previousArmX =
-          feederX(side, group - 1) - side * FAN_ARM_INSET_X
+          feederX(side, group - 1, layout.cols) - side * FAN_ARM_INSET_X
         placements.push(
           createBranch(
             `fan-${sideName}-arm-gap-${group - 2}`,
-            previousArmX + side * 0.66,
-            FAN_ARM_Z,
+            previousArmX + side * FLAG_PITCH_X,
+            fanZ(FAN_ARM_Z, layout),
             armChainIndex,
             side * (Math.PI / 2),
           ),
@@ -207,7 +286,7 @@ function createFanPlacements(): DominoPlacement[] {
           createBranch(
             `fan-${sideName}-arm-${group}`,
             armX,
-            FAN_ARM_Z,
+            fanZ(FAN_ARM_Z, layout),
             armChainIndex,
             side * (Math.PI / 2),
           ),
@@ -232,7 +311,7 @@ function createFanPlacements(): DominoPlacement[] {
         createBranch(
           `fan-${sideName}-feeder-${group}`,
           targetX,
-          FEEDER_Z,
+          layoutFeederZ,
           armChainIndex,
           0,
         ),
@@ -243,26 +322,34 @@ function createFanPlacements(): DominoPlacement[] {
   return placements
 }
 
-function feederEntryRank(col: number): number {
-  for (let group = 0; group < FAN_SPUR_GROUP_COUNT; group += 1) {
+export function feederEntryRank(col: number, cols = FLAG_COLS): number {
+  for (let group = 0; group < fanSpurGroupCount(cols); group += 1) {
     for (const side of [-1, 1] as const) {
-      if (feederColumns(side, group).includes(col)) return group
+      if (feederColumns(side, group, cols).includes(col)) return group
     }
   }
   throw new Error(`国旗列${col}のフィーダーがありません`)
 }
 
-function createFlagPlacements(grid: FlagCellColor[][]): DominoPlacement[] {
+function createFlagPlacements(
+  grid: FlagCellColor[][],
+  layout: FlagLayoutSpec,
+): DominoPlacement[] {
+  const layoutFlagZ0 = flagZ0(layout)
+  const groupWeight = chainGroupWeight(layout)
   return grid.flatMap((row, rowIndex) =>
     row.map((color, col) => ({
       id: `flag-${rowIndex}-${col}`,
       kind: 'flag' as const,
-      x: flagX(col),
-      z: FLAG_Z0 + rowIndex * FLAG_PITCH_Z,
+      x: flagX(col, layout.cols),
+      z: layoutFlagZ0 + rowIndex * FLAG_PITCH_Z,
       width: DOMINO_WIDTH,
       yaw: 0,
       // V字に広がる経路の順位。フィーダーまでの距離に行方向の深さを加える。
-      chainIndex: FAN_BRANCH_BASE_CHAIN_INDEX + feederEntryRank(col) + rowIndex,
+      chainIndex:
+        FAN_BRANCH_BASE_CHAIN_INDEX +
+        feederEntryRank(col, layout.cols) * groupWeight +
+        rowIndex,
       color,
       row: rowIndex,
       col,
@@ -271,11 +358,18 @@ function createFlagPlacements(grid: FlagCellColor[][]): DominoPlacement[] {
 }
 
 /** 直線 → 扇状分岐 → 16×10の国旗、という全ドミノ配置を作る。 */
-export function createDominoPlacements(flagId: DominoFlagId = 'jp'): DominoPlacement[] {
+export function createDominoPlacements(
+  flagId: DominoFlagId = 'jp',
+  layout: FlagLayoutSpec = NORMAL_FLAG_LAYOUT,
+): DominoPlacement[] {
+  validateLayout(layout)
   return [
-    ...createLinePlacements(),
-    ...createFanPlacements(),
-    ...createFlagPlacements(createFlagGrid(flagId)),
+    ...createLinePlacements(layout),
+    ...createFanPlacements(layout),
+    ...createFlagPlacements(
+      createFlagGrid(flagId, { cols: layout.cols, rows: layout.rows }),
+      layout,
+    ),
   ]
 }
 

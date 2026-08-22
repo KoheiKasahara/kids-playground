@@ -8,6 +8,11 @@ export type FlagCellColor =
   | 'orange'
   | 'lightBlue'
 
+export type FlagGridSize = {
+  cols: number
+  rows: number
+}
+
 /**
  * ドミノが倒れたときに見える国旗面で使う、共通の8色。
  * lightBlueはアルゼンチンの水色専用で、通常のblue（濃紺寄り）では
@@ -934,7 +939,80 @@ function convertFlagRows(id: DominoFlagId, rows: readonly string[]): FlagCellCol
 }
 
 /** R/W/B/K/Y/G/Oの行データを、配置生成と描画が使う10行×16列の色IDへ変換する。 */
-export function createFlagGrid(id: string): FlagCellColor[][] {
+/**
+ * 偶数の軸を、片側を整数比率で割り当ててから反対側へミラーする。
+ * 単純な最近傍補間では左右端のセル幅がずれるため、対称な国旗の形を保つ。
+ */
+export function createMirroredIndexMap(
+  sourceLength: number,
+  targetLength: number,
+): number[] {
+  if (
+    !Number.isInteger(sourceLength) ||
+    sourceLength <= 0 ||
+    sourceLength % 2 !== 0
+  ) {
+    throw new Error(`ソース軸の長さは正の偶数である必要があります: ${sourceLength}`)
+  }
+  if (
+    !Number.isInteger(targetLength) ||
+    targetLength <= 0 ||
+    targetLength % 2 !== 0
+  ) {
+    throw new Error(`出力軸の長さは正の偶数である必要があります: ${targetLength}`)
+  }
+  if (targetLength < sourceLength) {
+    throw new Error(
+      `出力軸はソース軸以上の長さである必要があります: ${sourceLength} -> ${targetLength}`,
+    )
+  }
+
+  const sourceHalf = sourceLength / 2
+  const targetHalf = targetLength / 2
+  const leftHalf = Array.from({ length: targetHalf }, (_, index) =>
+    Math.floor(((index + 1) * sourceHalf - 1) / targetHalf),
+  )
+
+  return Array.from({ length: targetLength }, (_, index) => {
+    if (index < targetHalf) return leftHalf[index]!
+    return sourceLength - 1 - leftHalf[targetLength - 1 - index]!
+  })
+}
+
+/**
+ * 既存の16×10グリッドを、色の対応だけで指定サイズへ拡大する純粋関数。
+ * 国ごとの分岐を持たせず、同じ変換で全ての国旗を扱うための共通処理にする。
+ */
+export function resizeFlagGrid(
+  sourceGrid: readonly (readonly FlagCellColor[])[],
+  size: FlagGridSize,
+): FlagCellColor[][] {
+  if (sourceGrid.length === 0 || sourceGrid[0]!.length === 0) {
+    throw new Error('ソース国旗グリッドが空です')
+  }
+
+  const sourceRows = sourceGrid.length
+  const sourceCols = sourceGrid[0]!.length
+  if (sourceGrid.some((row) => row.length !== sourceCols)) {
+    throw new Error('ソース国旗グリッドの行長がそろっていません')
+  }
+
+  const rowMap = createMirroredIndexMap(sourceRows, size.rows)
+  const colMap = createMirroredIndexMap(sourceCols, size.cols)
+
+  const resizedGrid = rowMap.map((sourceRow) =>
+    colMap.map((sourceCol) => sourceGrid[sourceRow]![sourceCol]!),
+  )
+  return resizedGrid
+}
+
+/** R/W/B/K/Y/G/Oの行データを、指定サイズの色IDグリッドへ変換する。 */
+export function createFlagGrid(
+  id: string,
+  size?: FlagGridSize,
+): FlagCellColor[][] {
   const definition = getDominoFlagDefinition(id)
-  return convertFlagRows(definition.id, definition.rows)
+  const sourceGrid = convertFlagRows(definition.id, definition.rows)
+  if (size === undefined) return sourceGrid
+  return resizeFlagGrid(sourceGrid, size)
 }
