@@ -246,6 +246,16 @@ for (const definition of MAZE_STAGES) {
           )
         }
         for (const spinner of stage.gimmicks.spinners) {
+          const isAthleticFinalApproach =
+            stage.id === 'athletic' &&
+            spinner.id === 'spinner-athletic-final' &&
+            checkpoint === stage.checkpoints.at(-1)
+          if (isAthleticFinalApproach) {
+            // 最終CPは回転棒の直前に置き、失敗時も大砲からやり直さず再挑戦できるようにする。
+            // 掃引円内でも既存のSpinnerTrapTrackerが押し出し・復帰を担うため、この配置だけは意図的に許す。
+            expect(checkpoint.z).toBeLessThan(spinner.center.z)
+            continue
+          }
           expect(horizontalDistance(checkpoint, spinner.center)).toBeGreaterThanOrEqual(
             spinner.sweepRadius + BALL_RADIUS - EPSILON,
           )

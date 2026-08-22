@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BALL_RADIUS, FALL_OUT_Y, HOLE_FALL_Y } from './mazePhysics'
 import { createMazeStageById } from './mazeStages'
 import {
+  CHECKPOINT_RADIUS,
   checkpointPosition,
   createCheckpointTracker,
   createSpinnerTrapTracker,
@@ -82,6 +83,39 @@ describe('チェックポイント追跡', () => {
     expect(
       checkpointPosition({ index: stage.checkpoints.length }, stage.checkpoints, fallback),
     ).toEqual(fallback)
+  })
+
+  it('checkpointごとのradiusを使い、未指定なら既定半径のままにする', () => {
+    const wideCheckpoints = [
+      { x: 0, y: 6, z: 0 },
+      { x: 3, y: 3, z: 0, radius: 2.8 },
+    ]
+    expect(
+      updateCheckpointTracker(
+        createCheckpointTracker(),
+        { x: 0.25, y: -100, z: 0 },
+        wideCheckpoints,
+      ).index,
+    ).toBe(1)
+
+    const defaultRadiusCheckpoints = [
+      { x: 0, z: 0 },
+      { x: 3, z: 0 },
+    ]
+    expect(
+      updateCheckpointTracker(
+        createCheckpointTracker(),
+        { x: 3 - CHECKPOINT_RADIUS - 0.01, y: 0, z: 0 },
+        defaultRadiusCheckpoints,
+      ).index,
+    ).toBe(0)
+    expect(
+      updateCheckpointTracker(
+        createCheckpointTracker(),
+        { x: 3 - CHECKPOINT_RADIUS, y: 0, z: 0 },
+        defaultRadiusCheckpoints,
+      ).index,
+    ).toBe(1)
   })
 
   it('落下後の復帰位置は全ての穴のマス矩形からボール半径以上離れる', () => {

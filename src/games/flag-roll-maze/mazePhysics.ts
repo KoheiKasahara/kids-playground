@@ -68,6 +68,70 @@ export const MAX_BALL_SPEED = 5.4
  */
 export const FLOOR_THICKNESS = BALL_RADIUS * 0.95
 
+/** 高台の柵は球が抜けない厚みにしつつ、通路を必要以上に狭めない細さにする。 */
+export const TERRAIN_RAIL_THICKNESS = BALL_RADIUS * 0.2
+/** 高台と段差の横から落ちないよう、既定の柵は球半径より少し高くする。 */
+export const TERRAIN_SLAB_RAIL_HEIGHT = 0.9
+/** すべり台は薄すぎて抜けず、重すぎて段差にならない厚みにする。 */
+export const TERRAIN_RAMP_THICKNESS = 0.5
+/** すべり台の柵は視界を遮らず、横へ飛び出すことだけを防ぐ高さにする。 */
+export const TERRAIN_RAMP_RAIL_HEIGHT = 0.7
+
+/** 車は道路の両脇へ十分な通り道を残せる横幅にし、X方向へだけ往復させる。 */
+export const CAR_WIDTH = 2.4
+/** 車体はボールが乗り越えにくく、それでいて道路を見渡せる低さにする。 */
+export const CAR_BODY_HEIGHT = 0.78
+/** 車間の空きをボール直径より広く保てる奥行きにする。 */
+export const CAR_DEPTH = 1.3
+/** 車体の角を丸め、動く直角の壁へ引っかかる感触を抑える。 */
+export const CAR_BODY_ROUND = 0.22
+/** 屋根は円柱にして、真上から落ちたボールが平らな面で静止しないようにする。 */
+export const CAR_CABIN_RADIUS = 0.42
+/** 動く車に接しても貼り付かず、横へ押し出される摩擦にする。 */
+export const CAR_FRICTION = 0.25
+/** 軽く弾く手応えを残しつつ、幼児向けに吹き飛ばしすぎない反発にする。 */
+export const CAR_RESTITUTION = 0.35
+
+/** ジャンプ床は既存の床から目立たせつつ、通行を妨げない薄さにする。 */
+export const JUMP_PAD_TOP = 0.12
+/** 床の縁へ少し触れただけでも発射でき、中心を正確に狙わせない余白にする。 */
+export const JUMP_PAD_MARGIN = 0.25
+/** ハードルを越えながら着地帯へ収まる上向きの発射速度にする。 */
+export const JUMP_PAD_UP_SPEED = 5.6
+/** コース進行方向へ必ず運び、横だけのジャンプにならないようにする。 */
+export const JUMP_PAD_FORWARD_SPEED = 2.4
+/** 横速度を少し残しつつ、子どもの操作を進行方向へ補正する割合にする。 */
+export const JUMP_PAD_SIDE_RETENTION = 0.3
+/** 横へ飛びすぎて通路外へ寄らないよう、発射後の横速度を制限する。 */
+export const JUMP_PAD_MAX_SIDE_SPEED = 1.2
+/** 発射直後の合成速度だけは、通常の上限より少し高く許可する。 */
+export const JUMP_PAD_SPEED_CAP = 6.6
+/** 高速のまま走り続けず、ハードルを越えた直後には通常の操作感へ戻す時間にする。 */
+export const JUMP_PAD_SPEED_CAP_MS = 350
+/** 落ちてきたらすぐ再挑戦できるよう、同じ床の連続発火を短時間だけ抑える。 */
+export const JUMP_PAD_COOLDOWN_MS = 420
+/** すでに上昇中のボールへ二重に打ち上げ速度を加えないしきい値にする。 */
+export const JUMP_PAD_ALREADY_RISING = JUMP_PAD_UP_SPEED * 0.5
+
+/** 大砲の砲室と発射位置を一致させ、捕捉後に不自然な位置補正を見せない高さにする。 */
+export const CANNON_MUZZLE_Y = 1.0
+/** 行き止まりへ入った子が細かく中心を狙わなくても捕捉される、十分に広い水平半径にする。 */
+export const CANNON_CAPTURE_RADIUS = 1.55
+/** 大きく跳ねて通過中のボールまで吸い込まないよう、捕捉対象の高さを抑える。 */
+export const CANNON_CAPTURE_MAX_Y = 1.9
+/** 砲室へ入ったことを見せつつ、待たせすぎない演出時間にする。 */
+export const CANNON_HOLD_MS = 340
+/** 万一砲室へ収まり切らなくても必ず発射して、永久に詰まる状態を作らない保険にする。 */
+export const CANNON_CAPTURE_TIMEOUT_MS = 1200
+/** 発射直後に同じ大砲へ再捕捉されず、着地点まで安全に進める待ち時間にする。 */
+export const CANNON_COOLDOWN_MS = 1500
+/** 大砲の発射速度を通常の上限で削らないため、飛行中だけ許す上限にする。 */
+export const CANNON_LAUNCH_SPEED_CAP = 8.6
+/** 尾根を越えて着地するまでだけ高速を許し、その後は従来の操作感へ戻す時間にする。 */
+export const CANNON_LAUNCH_WINDOW_MS = 1200
+/** 捕捉中は砲室中心へ少しずつ寄せ、急な位置移動で見た目が飛ばないようにする。 */
+export const CANNON_SETTLE_LERP = 0.35
+
 /** 壁は球の直径2Rより0.2R高い2.2Rとし、最大傾斜でも乗り越えられない高さを確保する。 */
 export const WALL_HEIGHT = BALL_RADIUS * 2.2
 
@@ -107,6 +171,7 @@ export const SPINNER_THICKNESS = 0.26
 export const SPINNER_HEIGHT = 1.15
 export const SPINNER_FRICTION = 0.2
 export const SPINNER_RESTITUTION = 0.15
+
 
 /** バンパー。直径0.92。2マス幅の部屋の中央に置いても、両脇に1.43の通り道が残る。 */
 export const BUMPER_RADIUS = 0.46

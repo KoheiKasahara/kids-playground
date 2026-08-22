@@ -42,6 +42,12 @@ export const MAX_LOOK_AHEAD_IN_RADII = 2.4
 /** カメラがボールへ追いつく指数減衰の強さ（1/秒）。 */
 export const CAMERA_FOLLOW_LAMBDA = 5.0
 
+/** 高さは跳ねや段差で画面が揺れないよう、水平追従よりゆっくり寄せる。 */
+export const CAMERA_ELEVATION_FOLLOW_LAMBDA = 2.6
+
+/** 大砲の発射中だけ弾道を見失わないよう、水平追従を一時的に強める。 */
+export const CAMERA_LAUNCH_FOLLOW_LAMBDA = 8.0
+
 /** フレーム落ちや高速移動が続いてもボールから離れすぎないための上限。 */
 export const MAX_FOLLOW_LAG_IN_RADII = 3.0
 
@@ -289,18 +295,42 @@ export function followCameraFocus(
 }
 
 /**
+ * 注視点の高さを指数減衰でボールへ寄せる。
+ * 水平より遅い既定値にして、ジャンプや段差ごとの上下動で画面が揺れないようにする。
+ */
+export function followCameraElevation(
+  currentY: number,
+  ballY: number,
+  deltaSeconds: number,
+  lambda = CAMERA_ELEVATION_FOLLOW_LAMBDA,
+): number {
+  const safeCurrentY = Number.isFinite(currentY) ? currentY : BALL_RADIUS
+  const safeBallY = Number.isFinite(ballY) ? ballY : BALL_RADIUS
+  const elapsed = Number.isFinite(deltaSeconds) ? Math.max(0, deltaSeconds) : 0
+  const factor = Math.min(
+    1,
+    Math.max(
+      0,
+      1 - Math.exp(-safePositive(lambda, CAMERA_ELEVATION_FOLLOW_LAMBDA) * elapsed),
+    ),
+  )
+  return safeCurrentY + (safeBallY - safeCurrentY) * factor
+}
+
+/**
  * 水平位置から固定の仰角・FOVでカメラの位置と注視点を作る。
- * 高さはボールの跳ねに影響されないよう、常にBALL_RADIUSへ固定する。
+ * targetYを省略した既存呼び出しは、従来どおりBALL_RADIUSを注視する。
  */
 export function cameraSetupForFocus(
   focus: MazeCameraFocus,
   distance: number,
+  targetY = BALL_RADIUS,
 ): MazeCameraSetup {
   const safeFocusValue = safeFocus(focus)
   const safeDistance = safePositive(distance, MIN_CAMERA_DISTANCE)
   const target = {
     x: safeFocusValue.x,
-    y: BALL_RADIUS,
+    y: Number.isFinite(targetY) ? targetY : BALL_RADIUS,
     z: safeFocusValue.z,
   }
   const sinElevation = Math.sin(CAMERA_ELEVATION_RAD)

@@ -57,4 +57,18 @@ describe('mazeStars', () => {
     expect(result.tracker).toBe(tracker)
     expect(collectedStarCount(result.tracker)).toBe(0)
   })
+
+  it('高さを持つ星も、従来どおり水平距離だけで取得する', () => {
+    const elevatedStars: readonly MazeStar[] = [
+      { id: 'high-star', center: { x: 0, y: 6, z: 0 } },
+    ]
+
+    const result = updateStarTracker(
+      createStarTracker(),
+      { x: 0, z: 0 },
+      elevatedStars,
+    )
+
+    expect(result.collectedIds).toEqual(['high-star'])
+  })
 })

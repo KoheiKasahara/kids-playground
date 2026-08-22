@@ -45,6 +45,8 @@ export const RESPAWN_GRACE_MS = 350
 export const RESPAWN_SETTLE_MS = 500
 
 export type CheckpointTracker = { index: number }
+type MazeCheckpoint = MazePoint & { y?: number; radius?: number }
+type MazeRespawnPoint = MazePoint & { y?: number }
 
 export function createCheckpointTracker(): CheckpointTracker {
   return { index: 0 }
@@ -54,7 +56,7 @@ export function createCheckpointTracker(): CheckpointTracker {
 export function updateCheckpointTracker(
   tracker: CheckpointTracker,
   position: PhysicsVector,
-  checkpoints: readonly MazePoint[],
+  checkpoints: readonly MazeCheckpoint[],
 ): CheckpointTracker {
   let index = tracker.index
   while (index + 1 < checkpoints.length) {
@@ -64,7 +66,7 @@ export function updateCheckpointTracker(
       position.x - next.x,
       position.z - next.z,
     )
-    if (horizontalDistance > CHECKPOINT_RADIUS) break
+    if (horizontalDistance > (next.radius ?? CHECKPOINT_RADIUS)) break
     index += 1
   }
   return { index }
@@ -73,9 +75,9 @@ export function updateCheckpointTracker(
 /** 有効な通過記録がなければ、呼び出し側が用意した安全な復帰先を使う。 */
 export function checkpointPosition(
   tracker: CheckpointTracker,
-  checkpoints: readonly MazePoint[],
-  fallback: MazePoint,
-): MazePoint {
+  checkpoints: readonly MazeCheckpoint[],
+  fallback: MazeRespawnPoint,
+): MazeRespawnPoint {
   return checkpoints[tracker.index] ?? fallback
 }
 

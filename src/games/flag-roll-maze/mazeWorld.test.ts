@@ -3,11 +3,14 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import {
   BALL_RADIUS,
   BALL_SPAWN_CLEARANCE_IN_RADII,
+  CANNON_LAUNCH_SPEED_CAP,
+  CANNON_SETTLE_LERP,
   GOAL_CUP_DEPTH,
   GOAL_CUP_FLOOR_Y,
   GOAL_RADIUS,
   GOAL_REACHED_MAX_Y,
   HOLE_FALL_Y,
+  JUMP_PAD_COOLDOWN_MS,
   MAX_BALL_SPEED,
   PHYSICS_TIMESTEP,
   WALL_HEIGHT,
@@ -22,13 +25,17 @@ import {
 import { createMazeStageById, MAZE_STAGE_ROWS, MAZE_STAGES } from './mazeStages'
 import {
   applyBumperKicks,
+  applyJumpPadLaunches,
   applyTiltToGravity,
   advanceSpinners,
+  advanceCars,
   ballSpawnPosition,
   createMazeWorld,
+  fireCannon,
   isGoalReached,
   limitBallSpeed,
   resetBall,
+  settleBallIntoCannon,
   settleBallInGoalCup,
   pushBallOutOfSpinner,
 } from './mazeWorld'
@@ -212,18 +219,24 @@ describe('createMazeWorld', () => {
     await RAPIER.init()
   })
 
-  it('床矩形とギミックを含めても剛体・コライダー数を抑える', () => {
+  it('床矩形・terrain・ギミックを含めても剛体・コライダー数を抑える', () => {
     for (const definition of MAZE_STAGES) {
       const stage = createMazeStageById(definition.id)
       const { world } = createMazeWorld(RAPIER, stage)
       try {
-        // バンパーは固定Colliderだけなので、動く剛体はボールと回転棒だけになる。
-        expect(world.bodies.len()).toBe(1 + stage.gimmicks.spinners.length)
+        // バンパーは固定Colliderだけなので、動く剛体はボール・回転棒・車だけになる。
+        expect(world.bodies.len()).toBe(
+          1 + stage.gimmicks.spinners.length + stage.gimmicks.cars.length,
+        )
         expect(world.colliders.len()).toBe(
           stage.floors.length +
             stage.walls.length +
+            stage.terrain.boxes.length +
+            stage.terrain.bars.length +
             stage.gimmicks.spinners.length +
             stage.gimmicks.bumpers.length +
+            stage.gimmicks.cars.length * 2 +
+            stage.gimmicks.jumpPads.length +
             2,
         )
         console.log(
@@ -233,11 +246,184 @@ describe('createMazeWorld', () => {
           world.colliders.len(),
         )
         expect(world.bodies.len()).toBeLessThanOrEqual(6)
-        expect(world.colliders.len()).toBeLessThanOrEqual(80)
+        // 29行のアスレチックだけは高台・安全柵を足すため、既存面より多くなる。
+        expect(world.colliders.len()).toBeLessThanOrEqual(
+          stage.id === 'athletic' ? 120 : 80,
+        )
       } finally {
         world.free()
       }
     }
+  })
+
+  it('アスレチックのterrainを固定Colliderにし、既存ステージはterrainを持たない', () => {
+    const athletic = createMazeStageById('athletic')
+    const { world: athleticWorld, cars: athleticCars } = createMazeWorld(RAPIER, athletic)
+    try {
+      expect(athletic.terrain.boxes.length).toBeGreaterThan(0)
+      expect(athletic.terrain.bars.length).toBeGreaterThan(0)
+      expect(athleticCars).toHaveLength(2)
+      expect(athleticCars.every(({ body }) => body.isKinematic())).toBe(true)
+      expect(athletic.gimmicks.jumpPads).toHaveLength(1)
+      expect(athletic.gimmicks.cannons).toHaveLength(1)
+      // 大砲は捕捉で位置を収めるので、到達不能になる専用Colliderは置かない。
+      expect(athleticWorld.colliders.len()).toBe(
+        athletic.floors.length +
+          athletic.walls.length +
+          athletic.terrain.boxes.length +
+          athletic.terrain.bars.length +
+          athletic.gimmicks.spinners.length +
+          athletic.gimmicks.cars.length * 2 +
+          athletic.gimmicks.jumpPads.length +
+          2,
+      )
+    } finally {
+      athleticWorld.free()
+    }
+
+    const kantan = createMazeStageById('kantan')
+    const { world: kantanWorld, cars: kantanCars } = createMazeWorld(RAPIER, kantan)
+    try {
+      expect(kantan.terrain).toEqual({ boxes: [], bars: [] })
+      expect(kantanCars).toHaveLength(0)
+      expect(kantan.gimmicks.jumpPads).toHaveLength(0)
+      expect(kantan.gimmicks.cannons).toHaveLength(0)
+      expect(kantanWorld.colliders.len()).toBe(
+        kantan.floors.length + kantan.walls.length + 2,
+      )
+    } finally {
+      kantanWorld.free()
+    }
+  })
+
+  it('ジャンプ床はクールダウン中に二重発火せず、時間後には再び発火できる', () => {
+    const stage = createMazeStageById('athletic')
+    const { world, ball } = createMazeWorld(RAPIER, stage)
+    const jumpPad = stage.gimmicks.jumpPads[0]!
+    const cooldowns = new Map<string, number>()
+    try {
+      ball.setTranslation(
+        {
+          x: jumpPad.center.x,
+          y: jumpPad.top + BALL_RADIUS,
+          z: jumpPad.center.z,
+        },
+        true,
+      )
+      ball.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      expect(
+        applyJumpPadLaunches(ball, stage.gimmicks.jumpPads, cooldowns, 1000),
+      ).toEqual([jumpPad.id])
+
+      // 同じ接触状態を再現しても、短いクールダウン中は速度を上書きしない。
+      ball.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      expect(
+        applyJumpPadLaunches(
+          ball,
+          stage.gimmicks.jumpPads,
+          cooldowns,
+          1000 + JUMP_PAD_COOLDOWN_MS - 1,
+        ),
+      ).toEqual([])
+
+      expect(
+        applyJumpPadLaunches(
+          ball,
+          stage.gimmicks.jumpPads,
+          cooldowns,
+          1000 + JUMP_PAD_COOLDOWN_MS,
+        ),
+      ).toEqual([jumpPad.id])
+    } finally {
+      world.free()
+    }
+  })
+
+  it('大砲は砲室へ寄せて速度を止め、発射速度は一時上限内で保つ', () => {
+    const stage = createMazeStageById('athletic')
+    const { world, ball } = createMazeWorld(RAPIER, stage)
+    const cannon = stage.gimmicks.cannons[0]!
+    const before = {
+      x: cannon.center.x + 1.2,
+      y: cannon.muzzleY + 0.5,
+      z: cannon.center.z - 0.8,
+    }
+    try {
+      ball.setTranslation(before, true)
+      ball.setLinvel({ x: 2, y: -1, z: 3 }, true)
+      ball.setAngvel({ x: 1, y: 2, z: 3 }, true)
+      settleBallIntoCannon(ball, cannon)
+
+      const settled = ball.translation()
+      expect(settled.x).toBeCloseTo(
+        before.x + (cannon.center.x - before.x) * CANNON_SETTLE_LERP,
+        6,
+      )
+      expect(settled.y).toBeCloseTo(
+        before.y + (cannon.muzzleY - before.y) * CANNON_SETTLE_LERP,
+        6,
+      )
+      expect(settled.z).toBeCloseTo(
+        before.z + (cannon.center.z - before.z) * CANNON_SETTLE_LERP,
+        6,
+      )
+      expect(ball.linvel()).toEqual({ x: 0, y: 0, z: 0 })
+      expect(ball.angvel()).toEqual({ x: 0, y: 0, z: 0 })
+
+      fireCannon(ball, cannon)
+      const fired = ball.linvel()
+      expect(Math.hypot(fired.x, fired.y, fired.z)).toBeLessThanOrEqual(
+        CANNON_LAUNCH_SPEED_CAP,
+      )
+      // 大砲用の速度窓を渡せば、通常上限5.4より速い発射速度を削らない。
+      expect(limitBallSpeed(ball, CANNON_LAUNCH_SPEED_CAP)).toBe(false)
+      expect(ball.linvel()).toEqual(fired)
+    } finally {
+      world.free()
+    }
+  })
+
+  it('車を長時間進めても、kinematic bodyは指定したX可動域を超えない', () => {
+    const stage = createMazeStageById('athletic')
+    const { world, cars } = createMazeWorld(RAPIER, stage)
+    try {
+      world.gravity = { x: 0, y: 0, z: 0 }
+      for (let step = 0; step <= 2400; step += 1) {
+        advanceCars(cars, step * 0.05)
+        world.step()
+        for (const { gimmick, body } of cars) {
+          const position = body.translation()
+          expect(position.x).toBeGreaterThanOrEqual(
+            gimmick.center.x - gimmick.amplitude - 1e-6,
+          )
+          expect(position.x).toBeLessThanOrEqual(
+            gimmick.center.x + gimmick.amplitude + 1e-6,
+          )
+        }
+      }
+    } finally {
+      world.free()
+    }
+  })
+
+  it('道路の壁側と2台の車間に、ボール直径より広い空きを保つ', () => {
+    const stage = createMazeStageById('athletic')
+    const road = stage.terrain.boxes.find(({ id }) => id === 'athletic-road')
+    const near = stage.gimmicks.cars.find(({ id }) => id === 'car-athletic-near')
+    const far = stage.gimmicks.cars.find(({ id }) => id === 'car-athletic-far')
+    expect(road).toBeDefined()
+    expect(near).toBeDefined()
+    expect(far).toBeDefined()
+    if (road === undefined || near === undefined || far === undefined) return
+
+    // 道路端は外壁の内面と同じ位置なので、車を端まで寄せた値で挟まりを防ぐ。
+    const wallClearance = road.width / 2 - near.amplitude - near.halfWidth
+    const carGap =
+      Math.abs(far.center.z - near.center.z) - near.halfDepth - far.halfDepth
+    expect(wallClearance).toBeCloseTo(2.305, 6)
+    expect(carGap).toBeCloseTo(2.102, 6)
+    expect(wallClearance).toBeGreaterThan(BALL_RADIUS * 2)
+    expect(carGap).toBeGreaterThan(BALL_RADIUS * 2)
   })
 
   it('ボールはSTARTの真上に置かれ、床へめり込まない', () => {
@@ -252,6 +438,50 @@ describe('createMazeWorld', () => {
         BALL_RADIUS * (1 + BALL_SPAWN_CLEARANCE_IN_RADII),
         6,
       )
+    } finally {
+      world.free()
+    }
+  })
+
+  it('高台のSTARTでは、その天面からスポーンの余白を取る', () => {
+    const stage = createMazeStageById('athletic')
+    const { world, ball } = createMazeWorld(RAPIER, stage)
+    try {
+      const spawn = ballSpawnPosition(stage.start)
+      expect(spawn.y).toBeCloseTo(
+        6.0 + BALL_RADIUS * (1 + BALL_SPAWN_CLEARANCE_IN_RADII),
+        6,
+      )
+      expect(ball.translation().y).toBeCloseTo(spawn.y, 6)
+    } finally {
+      world.free()
+    }
+  })
+
+  it('アスレチックは前へ倒し続けると段差を降り、すべり台の出口まで進める', () => {
+    const stage = createMazeStageById('athletic')
+    const { world, ball } = createMazeWorld(RAPIER, stage)
+    const slideExit = cellToWorld(6, 11.5, stage.columnCount, stage.rowCount)
+    try {
+      applyTiltToGravity(world, { x: 0, y: 1 })
+      let minimumY = Number.POSITIVE_INFINITY
+      let reachedSlideExit = false
+
+      for (let step = 0; step < 2400; step += 1) {
+        world.step()
+        limitBallSpeed(ball)
+        const position = ball.translation()
+        minimumY = Math.min(minimumY, position.y)
+        if (position.z >= slideExit.z) {
+          reachedSlideExit = true
+          break
+        }
+      }
+
+      // 軌道の完全一致ではなく、高台から地面へ降りて出口まで進めることだけを保証する。
+      expect(minimumY).toBeLessThan(2)
+      expect(reachedSlideExit).toBe(true)
+      expect(hasFallenOut(ball.translation(), mazeStageBounds(stage))).toBe(false)
     } finally {
       world.free()
     }
