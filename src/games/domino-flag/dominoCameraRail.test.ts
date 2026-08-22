@@ -21,8 +21,14 @@ import {
 } from './dominoCameraRail'
 
 const FRAME_MARGIN = 0.85
-const RAIL_MOVEMENT_LIMIT = 70
-const LONG_CAMERA_FAR = 150
+/**
+ * 今回の拡張で道中(cameraApproachPath)がおよそ2倍の長さになり、終盤の
+ * 国旗カメラへの移行(進行度に対して固定枚数ぶんのCAMERA_BLEND_APPROACH_COUNT)が
+ * 相対的に狭い進行度幅へ同じ距離を収めることになった。実際に連鎖が完走するまでの
+ * 経過時間も道中の長さに応じて伸びるため、進行度あたりの速さの上限も同程度に広げる。
+ */
+const RAIL_MOVEMENT_LIMIT = 150
+const LONG_CAMERA_FAR = 400
 // アンカー区間の内部のピークを取りこぼさないよう、進行度を4000分割して測る。
 const RAIL_SAMPLE_COUNT = 4000
 

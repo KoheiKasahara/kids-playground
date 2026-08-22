@@ -13,8 +13,12 @@ export const COMPLETE_RATIO = 0.92
 export const TIMEOUT_RATIO = 0.8
 /** 25秒を超えて動き続ける場合の上限時間。 */
 export const HARD_TIMEOUT_MS = 25_000
-/** 道中を含むロングコースが落ち着くまで待つ上限時間。 */
-export const LONG_HARD_TIMEOUT_MS = 45_000
+/**
+ * 道中を含むロングコースが落ち着くまで待つ上限時間。
+ * 上り坂・シーソー・下り坂の追加で道中が伸びた分、実測の自然完走が
+ * 揺らぎ込みで最大約28秒かかるようになったため、余裕を持って55秒にする。
+ */
+export const LONG_HARD_TIMEOUT_MS = 55_000
 /**
  * ビッグは1,600個のドミノが落ち着くまで実測で8〜11秒かかるため、
  * 一時的な物理負荷や端の列の遅れを吸収できる35秒を上限にする。

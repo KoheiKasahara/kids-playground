@@ -55,8 +55,20 @@ import {
   ballRailProgress,
   getBallRailPieces,
   getBallStairSteps,
+  type DominoBallSection,
 } from './dominoBall'
 import { getStairPlatforms } from './dominoStairs'
+import {
+  SEESAW_ASSIST_DELAY_MS,
+  SEESAW_MAX_TILT_RAD,
+  SEESAW_PLANK_HALF_LENGTH,
+  SEESAW_PLANK_THICKNESS,
+  SEESAW_PLANK_WIDTH,
+  advanceSeesawState,
+  createSeesawRuntimeState,
+  seesawPlankRotation,
+  type SeesawRuntimeState,
+} from './dominoSeesaw'
 import {
   createShepherdMemory,
   planShepherdNudges,
@@ -76,8 +88,8 @@ import type { World } from '@dimforge/rapier3d-compat'
 
 let rapierInitPromise: Promise<void> | null = null
 
-// 144×144の地面全体をロングの俯瞰から描画するための値。通常モードは100のままにする。
-const LONG_CAMERA_FAR = 150
+// 350×350の地面全体をロングの俯瞰から描画するための値。通常モードは100のままにする。
+const LONG_CAMERA_FAR = 400
 /**
  * ビッグの縦画面では、国旗の幅約33ユニットを水平視野へ収めるため距離が約80必要になる。
  * 地面端までの距離も含めて十分な余裕を持たせ、引きのカメラでfar面を横切らない220にする。
@@ -176,9 +188,13 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     let ballGeometry: THREE.SphereGeometry | null = null
     let ballMaterial: THREE.MeshLambertMaterial | null = null
     let ballMesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshLambertMaterial> | null = null
+    let secondBallMesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshLambertMaterial> | null = null
     let railFloorMaterial: THREE.MeshLambertMaterial | null = null
     let railWallMaterial: THREE.MeshLambertMaterial | null = null
     let stairPlatformMaterial: THREE.MeshLambertMaterial | null = null
+    let seesawGeometry: THREE.BoxGeometry | null = null
+    let seesawMaterial: THREE.MeshLambertMaterial | null = null
+    let seesawMesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshLambertMaterial> | null = null
     const railGeometries: THREE.BoxGeometry[] = []
     const railMeshes: THREE.Mesh[] = []
     let resizeObserver: ResizeObserver | null = null
@@ -206,6 +222,11 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     let smoothedDistance = 0
     let shepherdMemory: ShepherdMemory = createShepherdMemory()
     let dominoBall: ReturnType<typeof createDominoWorld>['ball'] = null
+    let secondDominoBall: ReturnType<typeof createDominoWorld>['secondBall'] = null
+    let dominoSeesaw: ReturnType<typeof createDominoWorld>['seesaw'] = null
+    let seesawState: SeesawRuntimeState = createSeesawRuntimeState()
+    let seesawTippedAt: number | null = null
+    let seesawAssistApplied = false
     let bigCameraProgressEntries: RenderDominoBodyEntry[] = []
     const soundController = createDominoSoundController({
       dominoCount: placements.length,
@@ -265,6 +286,8 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       railFloorMaterial?.dispose()
       railWallMaterial?.dispose()
       stairPlatformMaterial?.dispose()
+      seesawGeometry?.dispose()
+      seesawMaterial?.dispose()
       for (const geometry of railGeometries) geometry.dispose()
 
       if (renderer !== null) {
@@ -292,12 +315,18 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       ballGeometry = null
       ballMaterial = null
       ballMesh = null
+      secondBallMesh = null
       railFloorMaterial = null
       railWallMaterial = null
       stairPlatformMaterial = null
+      seesawGeometry = null
+      seesawMaterial = null
+      seesawMesh = null
       railGeometries.length = 0
       railMeshes.length = 0
       dominoBall = null
+      secondDominoBall = null
+      dominoSeesaw = null
       scene?.clear()
       scene = null
       camera = null
@@ -383,20 +412,28 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         cameraFrontier += 1
       }
       let cameraProgressIndex = cameraFrontier
-      if (course.ballSection !== null && dominoBall !== null) {
-        const trigger = bodiesById.get(course.ballSection.triggerDominoId)
-        const receiver = bodiesById.get(course.ballSection.receiverDominoId)
+      // 既存Phase 6のボールと、今回追加したシーソー行きのボールを同じ式で扱う。
+      // 両方とも「トリガーが倒れてからレシーバーが倒れるまでの間、道中のドミノが
+      // 存在しない区間」を演出用レールの絶対位置へ差し替え、レシーバー後は
+      // 物理ドミノ側の進行度へ不足分(virtualCount)を加算し続ける。
+      const ballLegs: readonly [DominoBallSection | null, typeof dominoBall][] = [
+        [course.ballSection, dominoBall],
+        [course.seesawBallSection, secondDominoBall],
+      ]
+      for (const [section, ball] of ballLegs) {
+        if (section === null || ball === null) continue
+        const trigger = bodiesById.get(section.triggerDominoId)
+        const receiver = bodiesById.get(section.receiverDominoId)
         const triggerHasFallen =
           trigger !== undefined && isTiltAtLeast(trigger.body, CAMERA_PROGRESS_TILT_RAD)
         const receiverHasFallen =
           receiver !== undefined && isTiltAtLeast(receiver.body, CAMERA_PROGRESS_TILT_RAD)
-        const virtualCount = course.ballSection.replacedApproachIndexes.length
-        const ballStartProgress = course.ballSection.replacedApproachIndexes[0] ?? 0
+        const virtualCount = section.replacedApproachIndexes.length
+        const ballStartProgress = section.replacedApproachIndexes[0] ?? 0
         if (triggerHasFallen && !receiverHasFallen) {
-          const position = dominoBall.body.translation()
+          const position = ball.body.translation()
           // カメラ位置は常に演出用レールから算出する。球の進行度はレール内の補間にだけ使う。
-          cameraProgressIndex =
-            ballStartProgress + ballRailProgress(course.ballSection, position) * virtualCount
+          cameraProgressIndex = ballStartProgress + ballRailProgress(section, position) * virtualCount
         } else if (receiverHasFallen) {
           // 物理ドミノには存在しないボール区間ぶんを、出口後の進行度へ加算する。
           cameraProgressIndex += virtualCount
@@ -490,6 +527,38 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         ballMesh.position.set(translation.x, translation.y, translation.z)
         ballMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
       }
+      if (secondDominoBall !== null && secondBallMesh !== null) {
+        const translation = secondDominoBall.body.translation()
+        const rotation = secondDominoBall.body.rotation()
+        secondBallMesh.position.set(translation.x, translation.y, translation.z)
+        secondBallMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+      }
+      if (dominoSeesaw !== null && seesawMesh !== null) {
+        const translation = dominoSeesaw.body.translation()
+        const rotation = dominoSeesaw.body.rotation()
+        seesawMesh.position.set(translation.x, translation.y, translation.z)
+        seesawMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+      }
+    }
+
+    /**
+     * シーソーの目標角度を球の位置から求め、seesawToy.tsと同じ「一定速度で近づける」方式で
+     * kinematic剛体の次姿勢を設定する。物理ステップの前に呼び、Rapierが姿勢差分から
+     * 一方向の力積(球やドミノを押す分だけ)を計算できるようにする。
+     */
+    function updateSeesaw(deltaSeconds: number) {
+      if (dominoSeesaw === null || secondDominoBall === null) return
+      if (seesawState.settled) return
+      const ballPosition = secondDominoBall.body.translation()
+      seesawState = advanceSeesawState(seesawState, dominoSeesaw.section, ballPosition, deltaSeconds)
+      dominoSeesaw.body.setNextKinematicRotation(
+        seesawPlankRotation(dominoSeesaw.section.yaw, seesawState.tiltRad),
+      )
+      if (seesawState.justSettled) {
+        // kinematicのままだと接触したドミノがsleepできず起き続けるため、
+        // 動かなくなった板を完全な固定物へ切り替える。
+        dominoSeesaw.body.setBodyType(RAPIER.RigidBodyType.Fixed, true)
+      }
     }
 
     function beginStart() {
@@ -514,6 +583,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       world.forEachActiveRigidBody((body) => {
         // ボールはコースをまたいで再利用されるため、条件にかかわらずsleep対象から除外する。
         if (dominoBall !== null && body.handle === dominoBall.body.handle) return
+        if (secondDominoBall !== null && body.handle === secondDominoBall.body.handle) return
         if (!body.isDynamic()) return
 
         const linearVelocity = body.linvel()
@@ -560,19 +630,37 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       if (completeNotified) return
 
       const receiverDominoId = course.ballSection?.receiverDominoId ?? null
+      const seesawReceiverDominoId = course.seesawBallSection?.receiverDominoId ?? null
       const shepherd = planShepherdNudges(
         bodies.map((entry, index) => ({
           id: entry.placement.id,
           chainIndex: entry.chainIndex,
           fallen: isFallen(states[index]!),
           sleeping: states[index]!.sleeping,
-          // 後段の先頭ドミノは球の到達でのみ倒れるべきで、停滞救出の対象にはしない。
-          nudgeDisabled: entry.placement.id === receiverDominoId,
+          // 後段の先頭ドミノは球(またはシーソー)の到達でのみ倒れるべきで、停滞救出の対象にはしない。
+          nudgeDisabled:
+            entry.placement.id === receiverDominoId ||
+            entry.placement.id === seesawReceiverDominoId,
         })),
         shepherdMemory,
         now,
       )
       shepherdMemory = shepherd.memory
+
+      // シーソーの保険処理: 板がほぼ最大角に達したのに叩かれるはずのドミノが倒れなければ、
+      // 一度だけ軽く後押しする。見た目上は「シーソーが叩いた直後の一押し」程度に収める。
+      if (course.seesawSection !== null && !seesawAssistApplied) {
+        const strikeEntry = bodiesById.get(course.seesawSection.strikeDominoId)
+        if (strikeEntry && !isFallen({ tilt: tiltOf(strikeEntry.body), sleeping: strikeEntry.body.isSleeping() })) {
+          if (seesawTippedAt === null && Math.abs(seesawState.tiltRad) >= SEESAW_MAX_TILT_RAD * 0.85) {
+            seesawTippedAt = now
+          }
+          if (seesawTippedAt !== null && now - seesawTippedAt > SEESAW_ASSIST_DELAY_MS) {
+            applyShepherdImpulse(strikeEntry.body, 1.6, strikeEntry.placement.chainYaw)
+            seesawAssistApplied = true
+          }
+        }
+      }
       for (const nudge of shepherd.plan.nudges) {
         const entry = bodiesById.get(nudge.id)
         if (entry) {
@@ -596,6 +684,8 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
           accumulator += deltaMs / 1000
           let substeps = 0
           while (accumulator >= PHYSICS_TIMESTEP && substeps < MAX_PHYSICS_SUBSTEPS) {
+            // kinematic姿勢は次のstepへ反映されるため、必ずworld.stepの直前に設定する。
+            updateSeesaw(PHYSICS_TIMESTEP)
             world.step()
             accumulator -= PHYSICS_TIMESTEP
             substeps += 1
@@ -704,71 +794,95 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         if (flagMesh.instanceColor) flagMesh.instanceColor.needsUpdate = true
         scene.add(dominoMesh, flagMesh)
 
-        if (course.ballSection !== null) {
+        if (course.ballSection !== null || course.seesawBallSection !== null) {
           ballGeometry = new THREE.SphereGeometry(BALL_RADIUS, 24, 16)
           ballMaterial = new THREE.MeshLambertMaterial({ color: 0xff8a3d })
-          ballMesh = new THREE.Mesh(ballGeometry, ballMaterial)
-          scene.add(ballMesh)
-
           railFloorMaterial = new THREE.MeshLambertMaterial({ color: 0x5b7891 })
           railWallMaterial = new THREE.MeshLambertMaterial({ color: 0x7e9db5 })
-          for (const piece of getBallRailPieces(course.ballSection)) {
-            const floorGeometry = new THREE.BoxGeometry(
-              BALL_RAIL_WIDTH,
-              BALL_RAIL_THICKNESS,
-              piece.length + 0.14,
-            )
-            railGeometries.push(floorGeometry)
-            const floor = new THREE.Mesh(floorGeometry, railFloorMaterial)
-            floor.position.set(
-              piece.center.x,
-              piece.center.y - BALL_RAIL_THICKNESS / 2,
-              piece.center.z,
-            )
-            const halfYaw = piece.yaw / 2
-            const halfPitch = piece.pitch / 2
-            floor.quaternion.set(
-              Math.cos(halfYaw) * Math.sin(halfPitch),
-              Math.sin(halfYaw) * Math.cos(halfPitch),
-              -Math.sin(halfYaw) * Math.sin(halfPitch),
-              Math.cos(halfYaw) * Math.cos(halfPitch),
-            )
-            railMeshes.push(floor)
-            scene.add(floor)
 
-            const sideX = Math.cos(piece.yaw) * (BALL_RAIL_WIDTH / 2 - BALL_RAIL_WALL_THICKNESS / 2)
-            const sideZ = -Math.sin(piece.yaw) * (BALL_RAIL_WIDTH / 2 - BALL_RAIL_WALL_THICKNESS / 2)
-            for (const side of [-1, 1] as const) {
-              const wallGeometry = new THREE.BoxGeometry(
-                BALL_RAIL_WALL_THICKNESS,
-                BALL_RAIL_WALL_HEIGHT,
+          // 既存Phase 6のボールと、シーソー行きの2個目のボールで同じ見た目を共有する。
+          const addBallRailVisuals = (section: DominoBallSection) => {
+            for (const piece of getBallRailPieces(section)) {
+              const floorGeometry = new THREE.BoxGeometry(
+                BALL_RAIL_WIDTH,
+                BALL_RAIL_THICKNESS,
                 piece.length + 0.14,
               )
-              railGeometries.push(wallGeometry)
-              const wall = new THREE.Mesh(wallGeometry, railWallMaterial)
-              wall.position.set(
-                piece.center.x + side * sideX,
-                piece.surfaceY + BALL_RAIL_WALL_HEIGHT / 2,
-                piece.center.z + side * sideZ,
+              railGeometries.push(floorGeometry)
+              const floor = new THREE.Mesh(floorGeometry, railFloorMaterial!)
+              floor.position.set(
+                piece.center.x,
+                piece.center.y - BALL_RAIL_THICKNESS / 2,
+                piece.center.z,
               )
-              wall.rotation.y = piece.yaw
-              railMeshes.push(wall)
-              scene.add(wall)
+              const halfYaw = piece.yaw / 2
+              const halfPitch = piece.pitch / 2
+              floor.quaternion.set(
+                Math.cos(halfYaw) * Math.sin(halfPitch),
+                Math.sin(halfYaw) * Math.cos(halfPitch),
+                -Math.sin(halfYaw) * Math.sin(halfPitch),
+                Math.cos(halfYaw) * Math.cos(halfPitch),
+              )
+              railMeshes.push(floor)
+              scene!.add(floor)
+
+              const sideX =
+                Math.cos(piece.yaw) * (BALL_RAIL_WIDTH / 2 - BALL_RAIL_WALL_THICKNESS / 2)
+              const sideZ =
+                -Math.sin(piece.yaw) * (BALL_RAIL_WIDTH / 2 - BALL_RAIL_WALL_THICKNESS / 2)
+              for (const side of [-1, 1] as const) {
+                const wallGeometry = new THREE.BoxGeometry(
+                  BALL_RAIL_WALL_THICKNESS,
+                  BALL_RAIL_WALL_HEIGHT,
+                  piece.length + 0.14,
+                )
+                railGeometries.push(wallGeometry)
+                const wall = new THREE.Mesh(wallGeometry, railWallMaterial!)
+                wall.position.set(
+                  piece.center.x + side * sideX,
+                  piece.surfaceY + BALL_RAIL_WALL_HEIGHT / 2,
+                  piece.center.z + side * sideZ,
+                )
+                wall.rotation.y = piece.yaw
+                railMeshes.push(wall)
+                scene!.add(wall)
+              }
+            }
+
+            // スタート台が足場から浮いて見えないよう、トリガー側に表示専用の短い連結段を並べる。
+            for (const step of getBallStairSteps(section)) {
+              const stepGeometry = new THREE.BoxGeometry(step.width, step.height, step.depth)
+              railGeometries.push(stepGeometry)
+              const stepMesh = new THREE.Mesh(stepGeometry, railFloorMaterial!)
+              stepMesh.position.set(step.center.x, step.center.y, step.center.z)
+              stepMesh.rotation.y = step.yaw
+              railMeshes.push(stepMesh)
+              scene!.add(stepMesh)
             }
           }
 
-          // スタート台が足場から浮いて見えないよう、トリガー側に表示専用の短い連結段を並べる。
-          for (const step of getBallStairSteps(course.ballSection)) {
-            const stepGeometry = new THREE.BoxGeometry(step.width, step.height, step.depth)
-            railGeometries.push(stepGeometry)
-            const stepMesh = new THREE.Mesh(stepGeometry, railFloorMaterial)
-            stepMesh.position.set(step.center.x, step.center.y, step.center.z)
-            stepMesh.rotation.y = step.yaw
-            railMeshes.push(stepMesh)
-            scene.add(stepMesh)
+          if (course.ballSection !== null) {
+            ballMesh = new THREE.Mesh(ballGeometry, ballMaterial)
+            scene.add(ballMesh)
+            addBallRailVisuals(course.ballSection)
+          }
+          if (course.seesawBallSection !== null) {
+            secondBallMesh = new THREE.Mesh(ballGeometry, ballMaterial)
+            scene.add(secondBallMesh)
+            addBallRailVisuals(course.seesawBallSection)
+          }
+          if (course.seesawSection !== null) {
+            seesawGeometry = new THREE.BoxGeometry(
+              SEESAW_PLANK_WIDTH,
+              SEESAW_PLANK_THICKNESS,
+              SEESAW_PLANK_HALF_LENGTH * 2,
+            )
+            seesawMaterial = new THREE.MeshLambertMaterial({ color: 0xd9822b })
+            seesawMesh = new THREE.Mesh(seesawGeometry, seesawMaterial)
+            scene.add(seesawMesh)
           }
 
-          // トリガーへ向けて道中のドミノ自身が登る、実際に支える階段。
+          // トリガーへ向けて道中のドミノ自身が登る、実際に支える階段(2つ目の坂・下り坂も含む)。
           stairPlatformMaterial = new THREE.MeshLambertMaterial({ color: 0xc9a06b })
           for (const platform of getStairPlatforms(placements)) {
             const platformGeometry = new THREE.BoxGeometry(
@@ -788,10 +902,14 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         const dominoWorld = createDominoWorld(RAPIER, placements, {
           groundSize: course.groundSize,
           ballSection: course.ballSection,
+          secondBallSection: course.seesawBallSection,
+          seesawSection: course.seesawSection,
           solverIterations: course.solverIterations,
         })
         world = dominoWorld.world
         dominoBall = dominoWorld.ball
+        secondDominoBall = dominoWorld.secondBall
+        dominoSeesaw = dominoWorld.seesaw
         let flagBodyIndex = 0
         for (const entry of dominoWorld.bodies) {
           const renderEntry: RenderDominoBodyEntry = {
