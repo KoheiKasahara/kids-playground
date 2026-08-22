@@ -28,6 +28,12 @@ export type CameraRailBuildOptions = {
   cameraProgressCount?: number
 }
 
+export type BigCameraRailBuildOptions = {
+  reducedMotion?: boolean
+  /** テストと将来の演出調整で補間の細かさを差し替えられる。 */
+  transitionCount?: number
+}
+
 /** 道中の中心線を少し先まで画面中央に置く距離。 */
 export const LOOK_AHEAD = 2.0
 
@@ -47,8 +53,9 @@ export const CAMERA_BLEND_APPROACH_COUNT = 8
 export function wideCameraPoseFor(
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number },
   aspect: number,
+  flagRows?: number,
 ): CameraRailPose {
-  const setup = computeCameraSetup(bounds, aspect)
+  const setup = computeCameraSetup(bounds, aspect, flagRows)
   return {
     target: { ...setup.target },
     distance: cameraDistanceOf(setup),
@@ -73,6 +80,9 @@ export const CAMERA_LAMBDA = 3.2
 
 /** 完成判定より手前の倒れ始めをカメラ進行度へ反映する傾き。 */
 export const CAMERA_PROGRESS_TILT_RAD = 0.35
+
+/** 導線から国旗全体へ2.5秒かけて引く。連鎖の詰まりがあっても全体を見失わないための時間下限。 */
+export const BIG_CAMERA_PULLOUT_MS = 2_500
 
 const REDUCED_WIDE_DISTANCE = APPROACH_CAMERA_DISTANCE * 2.5
 
@@ -253,6 +263,39 @@ export function buildLongCameraRail(
     ...anchor,
     target: cloneVec3(anchor.target),
   }))
+}
+
+/**
+ * ビッグ専用の引きカメラレールを、寄り姿勢と全体姿勢だけから構築する純粋関数。
+ * 実際の進行度はエンジン側で連鎖と経過時間の大きい方を渡し、ここでは滑らかな姿勢補間だけを担う。
+ */
+export function buildBigCameraRail(
+  nearPose: CameraRailPose,
+  widePose: CameraRailPose,
+  options: BigCameraRailBuildOptions = {},
+): CameraRailAnchor[] {
+  const transitionCount = Number.isInteger(options.transitionCount)
+    ? Math.max(2, options.transitionCount!)
+    : 9
+  const near = clonePose(nearPose)
+  const wide = clonePose(widePose)
+
+  if (options.reducedMotion === true) {
+    return [
+      { progress: 0, target: cloneVec3(wide.target), distance: wide.distance },
+      { progress: 1, target: cloneVec3(wide.target), distance: wide.distance },
+    ]
+  }
+
+  return Array.from({ length: transitionCount }, (_, index) => {
+    const linearProgress = index / (transitionCount - 1)
+    const pose = blendPose(near, wide, easeWithCappedSlope(linearProgress))
+    return {
+      progress: linearProgress,
+      target: cloneVec3(pose.target),
+      distance: pose.distance,
+    }
+  })
 }
 
 /** レールのアンカー間を線形補間し、範囲外の進行度は端に丸める。 */

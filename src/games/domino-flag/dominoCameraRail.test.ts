@@ -1,13 +1,14 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { CAMERA_FOV, cameraDistanceOf, computeCameraSetup } from './dominoCamera'
-import { createDominoCourse } from './dominoCourse'
-import { getLayoutBounds } from './dominoLayout'
+import { createBigCourse, createDominoCourse } from './dominoCourse'
+import { FLAG_COLS, FLAG_PITCH_X, getLayoutBounds } from './dominoLayout'
 import {
   advanceRailProgress,
   APPROACH_CAMERA_DISTANCE,
   APPROACH_MIN_HALF_WIDTH,
   approachCameraDistanceFor,
+  buildBigCameraRail,
   buildLongCameraRail,
   CAMERA_BLEND_APPROACH_COUNT,
   CAMERA_PROGRESS_TILT_RAD,
@@ -435,5 +436,78 @@ describe('dominoCameraRail', () => {
     )
     expect(minimumMargin).toBeGreaterThanOrEqual(-1e-8)
     expect(maximumGroundCornerDistance).toBeLessThan(LONG_CAMERA_FAR)
+  })
+
+  it('bigのカメラレールは寄りから引きへ単調に遷移する', () => {
+    const nearPose = { target: { x: 0, y: 0.32, z: -5 }, distance: 20 }
+    const widePose = { target: { x: 0, y: 0.32, z: 0 }, distance: 80 }
+    const rail = buildBigCameraRail(nearPose, widePose)
+
+    expect(sampleCameraRail(rail, 0)).toEqual(nearPose)
+    expect(sampleCameraRail(rail, 1)).toEqual(widePose)
+    let previousDistance = nearPose.distance
+    for (let index = 1; index <= 100; index += 1) {
+      const pose = sampleCameraRail(rail, index / 100)
+      expect(pose.distance).toBeGreaterThanOrEqual(previousDistance)
+      previousDistance = pose.distance
+    }
+  })
+
+  it('bigの実配置でも縦横画面の距離が寄りから単調に増える', () => {
+    const course = createBigCourse('jp')
+    const normalCourse = createDominoCourse('normal', 'jp')
+    // ビッグ開始時にふつうと同じ導線の見え方にするため、寄り側のX幅をふつうの国旗半幅に合わせる。
+    const nearHalfWidth = (FLAG_COLS / 2) * FLAG_PITCH_X
+    for (const aspect of [390 / 780, 844 / 390]) {
+      const nearBounds = getLayoutBounds(
+        course.placements.filter(
+          (placement) =>
+            Math.abs(placement.x) <= nearHalfWidth &&
+            (placement.kind !== 'flag' || (placement.row ?? 0) < 4),
+        ),
+      )
+      const nearSetup = computeCameraSetup(nearBounds, aspect, 4)
+      const wideSetup = computeCameraSetup(
+        course.flagCameraBounds,
+        aspect,
+        course.flagLayout.rows,
+      )
+      const normalSetup = computeCameraSetup(
+        normalCourse.flagCameraBounds,
+        aspect,
+        normalCourse.flagLayout.rows,
+      )
+      const nearDistance = cameraDistanceOf(nearSetup)
+      const wideDistance = cameraDistanceOf(wideSetup)
+      const normalDistance = cameraDistanceOf(normalSetup)
+      console.log(
+        `[big-camera-distance] aspect=${aspect.toFixed(6)} normal=${normalDistance.toFixed(6)} near=${nearDistance.toFixed(6)} wide=${wideDistance.toFixed(6)}`,
+      )
+
+      if (aspect < 1) {
+        // 縦画面では開始時の寄りを明確にし、ふつうの構図から大きく外れないことを保証する。
+        expect(nearDistance).toBeLessThanOrEqual(wideDistance * 0.6)
+        expect(nearDistance).toBeLessThanOrEqual(normalDistance * 1.5)
+      } else {
+        expect(nearDistance).toBeLessThan(wideDistance)
+      }
+
+      const rail = buildBigCameraRail(
+        {
+          target: nearSetup.target,
+          distance: nearDistance,
+        },
+        {
+          target: wideSetup.target,
+          distance: wideDistance,
+        },
+      )
+      let previousDistance = sampleCameraRail(rail, 0).distance
+      for (let index = 1; index <= 100; index += 1) {
+        const distance = sampleCameraRail(rail, index / 100).distance
+        expect(distance).toBeGreaterThanOrEqual(previousDistance)
+        previousDistance = distance
+      }
+    }
   })
 })

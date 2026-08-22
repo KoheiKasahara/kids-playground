@@ -1,13 +1,20 @@
 import type { DominoFlagId } from './flagDefinitions'
 import {
+  BIG_FLAG_LAYOUT,
   DOMINO_WIDTH,
   LINE_COUNT,
   LINE_PITCH_Z,
+  NORMAL_FLAG_LAYOUT,
   createDominoPlacements,
   getLayoutBounds,
+  type FlagLayoutSpec,
   type DominoPlacement,
 } from './dominoLayout'
-import { HARD_TIMEOUT_MS, LONG_HARD_TIMEOUT_MS } from './dominoCompletion'
+import {
+  BIG_HARD_TIMEOUT_MS,
+  HARD_TIMEOUT_MS,
+  LONG_HARD_TIMEOUT_MS,
+} from './dominoCompletion'
 import { GROUND_SIZE } from './dominoPhysics'
 import {
   createDominoBallSection,
@@ -16,10 +23,18 @@ import {
 } from './dominoBall'
 import { STAIR_STEP_COUNT, STAIR_STEP_RISE, STAIR_TOP_BASE_Y } from './dominoStairs'
 
-export type DominoCourseType = 'normal' | 'long'
+export type DominoCourseType = 'normal' | 'long' | 'big'
+export type DominoCameraMode = 'fixed' | 'longRail' | 'bigPullout'
 
 export type DominoCourse = {
   type: DominoCourseType
+  /** コースごとの国旗サイズ。ビッグのカメラ計算と配置検証で共有する。 */
+  flagLayout: FlagLayoutSpec
+  /** nullならRapierの既定値を使い、既存モードの物理パラメータに触れない。 */
+  solverIterations: number | null
+  /** 大量の静止剛体を明示的にsleepさせるのはビッグだけに限定する。 */
+  settleSleepEnabled: boolean
+  cameraMode: DominoCameraMode
   placements: DominoPlacement[]
   /** 最初に押すドミノのid。normalはline-0、longは道中の先頭。 */
   startId: string
@@ -68,6 +83,14 @@ const APPROACH_COUNT = APPROACH_SEGMENTS.reduce(
 const APPROACH_PITCH = LINE_PITCH_Z + 0.12
 // 広い俯瞰カメラでも道中側の地面の切れ目が画面に入らないよう、144まで余裕を持たせる。
 const LONG_GROUND_SIZE = 144
+
+/**
+ * ビッグの配置はX方向が最大約±16.5、Z方向が約-14.7〜+10.9になる。
+ * 端から2ユニットの余白を計算した必要サイズは約38.0だが、引きのカメラと
+ * 地面端の見切れを避けるため、固定Collider 1枚のまま80を下限にする。
+ */
+const BIG_GROUND_MIN_SIZE = 80
+const BIG_GROUND_MARGIN = 2
 
 type PathPoint = { x: number; z: number; yaw: number }
 
@@ -158,6 +181,10 @@ function createNormalCourse(flagId: DominoFlagId): DominoCourse {
   const placements = createDominoPlacements(flagId)
   return {
     type: 'normal',
+    flagLayout: NORMAL_FLAG_LAYOUT,
+    solverIterations: null,
+    settleSleepEnabled: false,
+    cameraMode: 'fixed',
     placements,
     startId: 'line-0',
     groundSize: GROUND_SIZE,
@@ -215,6 +242,10 @@ function createLongCourse(flagId: DominoFlagId): DominoCourse {
 
   return {
     type: 'long',
+    flagLayout: NORMAL_FLAG_LAYOUT,
+    solverIterations: null,
+    settleSleepEnabled: false,
+    cameraMode: 'longRail',
     placements,
     startId: 'approach-0',
     groundSize: LONG_GROUND_SIZE,
@@ -234,10 +265,61 @@ function createLongCourse(flagId: DominoFlagId): DominoCourse {
   }
 }
 
+function groundSizeForBigCourse(placements: DominoPlacement[]): number {
+  const bounds = getLayoutBounds(placements)
+  const maximumDistanceFromCenter = Math.max(
+    Math.abs(bounds.minX),
+    Math.abs(bounds.maxX),
+    Math.abs(bounds.minZ),
+    Math.abs(bounds.maxZ),
+  )
+  return Math.max(
+    BIG_GROUND_MIN_SIZE,
+    Math.ceil((maximumDistanceFromCenter + BIG_GROUND_MARGIN) * 2),
+  )
+}
+
+/**
+ * ビッグは通常コースと同じ短い導線から、そのまま拡大国旗へ接続する。
+ * layoutを差し替えられるようにし、サイズ比較用の物理テストでも同じ生成経路を使う。
+ */
+export function createBigCourse(
+  flagId: DominoFlagId,
+  layout: FlagLayoutSpec = BIG_FLAG_LAYOUT,
+): DominoCourse {
+  const bigLayout: FlagLayoutSpec =
+    layout.chainGroupWeight === undefined
+      ? {
+          ...layout,
+          // サイズ比較用layoutで省略されても、ビッグの連鎖見積りは常に重み2にする。
+          chainGroupWeight: BIG_FLAG_LAYOUT.chainGroupWeight,
+        }
+      : layout
+  const placements = createDominoPlacements(flagId, bigLayout)
+  return {
+    type: 'big',
+    flagLayout: bigLayout,
+    solverIterations: 2,
+    settleSleepEnabled: true,
+    cameraMode: 'bigPullout',
+    placements,
+    startId: 'line-0',
+    groundSize: groundSizeForBigCourse(placements),
+    hardTimeoutMs: BIG_HARD_TIMEOUT_MS,
+    flagCameraBounds: getLayoutBounds(placements),
+    approachCount: 0,
+    cameraProgressCount: 0,
+    approachPath: [],
+    cameraApproachPath: [],
+    ballSection: null,
+  }
+}
+
 export function createDominoCourse(
   type: DominoCourseType,
   flagId: DominoFlagId,
 ): DominoCourse {
   if (type === 'normal') return createNormalCourse(flagId)
+  if (type === 'big') return createBigCourse(flagId)
   return createLongCourse(flagId)
 }
