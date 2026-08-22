@@ -58,20 +58,42 @@ function distance(a: { x: number; z: number }, b: { x: number; z: number }) {
   return Math.hypot(a.x - b.x, a.z - b.z)
 }
 
+export type DominoBallSectionOptions = {
+  /** このドミノが倒れて球を押し始める。道中インデックス。 */
+  triggerIndex?: number
+  /** レール開始点として使う、トリガー直後の道中インデックス。 */
+  startIndex?: number
+  /** 坂を分割する道中インデックスの列。 */
+  railIndexes?: readonly number[]
+  /** 坂を下った球が最初に当てる、後段の先頭ドミノの道中インデックス。 */
+  receiverIndex?: number
+  /** 坂の出口サーフェスの高さ(地面基準)。既定は既存Phase 6と同じ0.04。 */
+  exitSurfaceY?: number
+  /** 出口とreceiverIndexの許容距離。既定は既存Phase 6と同じ1。 */
+  maxReceiverGap?: number
+}
+
 /**
  * 既存の180度折り返し15枚を、14枚の緩いCuboid坂とガイド壁へ置き換える。
  * 前後のドミノ位置・向きはそのまま残すため、ロング全体の経路は作り直さない。
  * triggerBaseYは、階段区間でトリガードミノ自身がすでに登っている高さ(地面基準)。
+ * options未指定時は既存Phase 6(トリガー14→球→レシーバー30)と完全に同じ結果になる。
  */
 export function createDominoBallSection(
   approachPath: readonly { x: number; z: number; yaw: number }[],
   triggerBaseY = 0,
+  options: DominoBallSectionOptions = {},
 ): DominoBallSection {
-  const trigger = pointAt(approachPath, 14)
-  const startPoint = pointAt(approachPath, 15)
-  const receiver = pointAt(approachPath, 30)
-  // 折り返し中の各ドミノ位置を使い、坂を細かく分割してカーブと勾配のカクつきを減らす。
-  const railIndexes = Array.from({ length: 14 }, (_, i) => 16 + i)
+  const triggerIndex = options.triggerIndex ?? 14
+  const startIndex = options.startIndex ?? triggerIndex + 1
+  const railIndexes = options.railIndexes ?? Array.from({ length: 14 }, (_, i) => 16 + i)
+  const receiverIndex = options.receiverIndex ?? 30
+  const exitSurfaceY = options.exitSurfaceY ?? BALL_EXIT_SURFACE_Y
+  const maxReceiverGap = options.maxReceiverGap ?? 1
+
+  const trigger = pointAt(approachPath, triggerIndex)
+  const startPoint = pointAt(approachPath, startIndex)
+  const receiver = pointAt(approachPath, receiverIndex)
   // 最初の坂を少し前から始め、前段ドミノが坂の垂直な端で止まらないようにする。
   const railPoints = [
     {
@@ -96,7 +118,7 @@ export function createDominoBallSection(
     consumedLength += segmentLength
     const endRatio = consumedLength / totalLength
     const surfaceY = (ratio: number) =>
-      startSurfaceY + (BALL_EXIT_SURFACE_Y - startSurfaceY) * ratio
+      startSurfaceY + (exitSurfaceY - startSurfaceY) * ratio
     return {
       start: { x: start.x, y: surfaceY(startRatio), z: start.z },
       end: { x: point.x, y: surfaceY(endRatio), z: point.z },
@@ -107,15 +129,20 @@ export function createDominoBallSection(
   if (Math.abs(trigger.yaw - startPoint.yaw) > (20 * Math.PI) / 180) {
     throw new Error('ボール区間の始点が前段ドミノの向きとつながっていません')
   }
-  // 出口は後段ドミノの直前に置き、球が複数枚を直接なぎ倒さないようにする。
-  if (distance(railPoints.at(-1)!, receiver) > 1) {
+  // 出口は後段ドミノ(またはシーソー受け側)の近くに置き、球が離れすぎないようにする。
+  if (distance(railPoints.at(-1)!, receiver) > maxReceiverGap) {
     throw new Error('ボール区間の出口が後段ドミノから離れすぎています')
   }
 
   return {
-    triggerDominoId: 'approach-14',
-    receiverDominoId: 'approach-30',
-    replacedApproachIndexes: Array.from({ length: 15 }, (_, index) => index + 15),
+    triggerDominoId: `approach-${triggerIndex}`,
+    receiverDominoId: `approach-${receiverIndex}`,
+    // startIndexからreceiverIndexの手前まで全て置き換える。railIndexesが尽きた後に
+    // 隙間(シーソー等の別ギミックの物理空間)を残したい場合、receiverIndexを離しておけばよい。
+    replacedApproachIndexes: Array.from(
+      { length: receiverIndex - startIndex },
+      (_, index) => startIndex + index,
+    ),
     start: {
       // 前段の倒伏中に直接接触する位置。坂端とは干渉しないよう元の1枚ぶんより少し前へ置く。
       x: startPoint.x + Math.sin(startPoint.yaw) * 0.4,

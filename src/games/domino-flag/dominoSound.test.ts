@@ -173,9 +173,9 @@ describe('dominoSound', () => {
     expect(played.intensity).toBe(0.7)
   })
 
-  test('ボール区間を含むロング240枚でも同時倒伏の間引きと残数を維持する', () => {
+  test('ボール区間を含むロング277枚でも同時倒伏の間引きと残数を維持する', () => {
     const dominoCount = createDominoCourse('long', 'jp').placements.length
-    expect(dominoCount).toBe(240)
+    expect(dominoCount).toBe(277)
 
     const tracker = createDominoFallTracker(dominoCount)
     const allFallen = createTilts(dominoCount, dominoCount)

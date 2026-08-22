@@ -12,9 +12,14 @@ import {
 } from './dominoWorld'
 import { createShepherdMemory, planShepherdNudges } from './dominoShepherd'
 import type { DominoPlacement } from './dominoLayout'
+import {
+  advanceSeesawState,
+  createSeesawRuntimeState,
+  seesawPlankRotation,
+} from './dominoSeesaw'
 
-// ボール区間を挟んだ後も、国旗160枚がsleepへ収束するところまで確認する。
-const SIMULATION_STEPS = 3_400
+// ボール区間・シーソー区間を挟んだ後も、国旗160枚がsleepへ収束するところまで確認する。
+const SIMULATION_STEPS = 8_500
 const FLAG_COUNT = 160
 const POSITION_JITTER = 0.005
 const YAW_JITTER_RAD = (0.5 * Math.PI) / 180
@@ -48,6 +53,8 @@ function runLongChainSimulation(
   const dominoWorld = createDominoWorld(RAPIER, placements, {
     groundSize: course.groundSize,
     ballSection: course.ballSection,
+    secondBallSection: course.seesawBallSection,
+    seesawSection: course.seesawSection,
   })
   const first = dominoWorld.bodiesById.get(course.startId)
   if (!first) throw new Error('approach-0が見つかりません')
@@ -64,21 +71,40 @@ function runLongChainSimulation(
   let stepsToAllFlags: number | null = null
   let stepsToCompletion: number | null = null
   let sleepingCountAtCompletion: number | null = null
+  let seesawState = createSeesawRuntimeState()
 
   try {
     for (let step = 1; step <= SIMULATION_STEPS; step += 1) {
+      if (dominoWorld.seesaw !== null && dominoWorld.secondBall !== null && !seesawState.settled) {
+        seesawState = advanceSeesawState(
+          seesawState,
+          dominoWorld.seesaw.section,
+          dominoWorld.secondBall.body.translation(),
+          PHYSICS_TIMESTEP,
+        )
+        dominoWorld.seesaw.body.setNextKinematicRotation(
+          seesawPlankRotation(dominoWorld.seesaw.section.yaw, seesawState.tiltRad),
+        )
+        if (seesawState.justSettled) {
+          // kinematicのままだと接触したドミノがsleepできず起き続けるため、実機と同じく固定物へ切り替える。
+          dominoWorld.seesaw.body.setBodyType(RAPIER.RigidBodyType.Fixed, true)
+        }
+      }
       dominoWorld.world.step()
       const elapsedMs = step * PHYSICS_TIMESTEP * 1000
 
       if (withShepherd && elapsedMs >= nextInspectionMs) {
         const receiverDominoId = course.ballSection?.receiverDominoId ?? null
+        const seesawReceiverDominoId = course.seesawBallSection?.receiverDominoId ?? null
         const shepherd = planShepherdNudges(
           dominoWorld.bodies.map((entry) => ({
             id: entry.placement.id,
             chainIndex: entry.chainIndex,
             fallen: isEntryFallen(entry),
             sleeping: entry.body.isSleeping(),
-            nudgeDisabled: entry.placement.id === receiverDominoId,
+            nudgeDisabled:
+              entry.placement.id === receiverDominoId ||
+              entry.placement.id === seesawReceiverDominoId,
           })),
           shepherdMemory,
           elapsedMs,

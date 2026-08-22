@@ -44,6 +44,8 @@ describe('createDominoCourse', () => {
     expect(course.approachPath).toEqual([])
     expect(course.cameraApproachPath).toEqual([])
     expect(course.ballSection).toBeNull()
+    expect(course.seesawBallSection).toBeNull()
+    expect(course.seesawSection).toBeNull()
     expect(course.cameraProgressCount).toBe(0)
     expect(course.solverIterations).toBe(2)
     expect(course.settleSleepEnabled).toBe(true)
@@ -107,6 +109,8 @@ describe('createDominoCourse', () => {
     expect(normal.approachPath).toHaveLength(0)
     expect(normal.cameraApproachPath).toHaveLength(0)
     expect(normal.ballSection).toBeNull()
+    expect(normal.seesawBallSection).toBeNull()
+    expect(normal.seesawSection).toBeNull()
     expect(normal.startId).toBe('line-0')
     expect(normal.groundSize).toBe(GROUND_SIZE)
     expect(normal.hardTimeoutMs).toBe(HARD_TIMEOUT_MS)
@@ -138,25 +142,45 @@ describe('createDominoCourse', () => {
     const ball = course.ballSection
 
     expect(ball).not.toBeNull()
-    expect(approach.length).toBe(29)
-    expect(new Set(ids).size).toBe(approach.length)
-    expect(ids).toEqual([
-      ...Array.from({ length: 15 }, (_, index) => `approach-${index}`),
-      ...Array.from({ length: 14 }, (_, index) => `approach-${index + 30}`),
-    ])
     expect(ball!.replacedApproachIndexes).toEqual(
       Array.from({ length: 15 }, (_, index) => index + 15),
     )
     expect(ball!.triggerDominoId).toBe('approach-14')
     expect(ball!.receiverDominoId).toBe('approach-30')
     expect(ball!.railSegments).toHaveLength(14)
-    expect(course.cameraApproachPath).toHaveLength(44)
     expect(last.x).toBeCloseTo(0)
     expect(last.z).toBeCloseTo(lineZero.z - LINE_PITCH_Z)
     expect(last.yaw).toBeCloseTo(0)
     expect(last.chainYaw).toBe(last.yaw)
     expect(distance(last, lineZero)).toBeCloseTo(LINE_PITCH_Z)
     expect(course.startId).toBe('approach-0')
+    expect(new Set(ids).size).toBe(approach.length)
+  })
+
+  it('ロングは2つ目の坂の折り返し9枚もシーソー行きのボールへ置き換える', () => {
+    const course = createDominoCourse('long', 'jp')
+    const approach = course.placements.slice(0, course.approachCount)
+    const ids = approach.map((placement) => placement.id)
+    const seesawBall = course.seesawBallSection
+    const seesaw = course.seesawSection
+
+    expect(seesawBall).not.toBeNull()
+    expect(seesaw).not.toBeNull()
+    expect(seesawBall!.replacedApproachIndexes).toEqual(
+      Array.from({ length: 9 }, (_, index) => index + 58),
+    )
+    expect(seesawBall!.triggerDominoId).toBe('approach-57')
+    expect(seesawBall!.receiverDominoId).toBe('approach-67')
+    expect(seesawBall!.railSegments).toHaveLength(7)
+    expect(seesaw!.strikeDominoId).toBe('approach-67')
+    // 既存Phase 6の15枚と、2つ目の坂の9枚を合わせて24枚が物理ドミノから消え、
+    // 全体の道中(raw 0〜89=90枚)から66枚が実体のドミノとして残る。
+    expect(course.cameraApproachPath).toHaveLength(90)
+    expect(approach.length).toBe(course.cameraApproachPath.length - 15 - 9)
+    expect(ids).toContain('approach-57')
+    expect(ids).toContain('approach-67')
+    expect(ids).not.toContain('approach-58')
+    expect(ids).not.toContain('approach-66')
   })
 
   it('残る道中の旋回、自己干渉、通常コース干渉、地面内を満たす', () => {
