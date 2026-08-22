@@ -56,7 +56,7 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
   const navigate = useNavigate()
   const [gameState, setGameState] = useState<MazeGameState>('playing')
   const [runId, setRunId] = useState(0)
-  const [rescued, setRescued] = useState(false)
+  const [rescueMessage, setRescueMessage] = useState('')
   const rescueTimerRef = useRef<number | null>(null)
   const audioPrimedRef = useRef(false)
   const calibrationRef = useRef<DeviceTiltCalibration | null>(null)
@@ -71,10 +71,10 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
   }, [])
 
   // 場外復帰は一瞬だけ知らせる。ゲームは止めず、遊びの流れを切らない。
-  const handleRescue = useCallback(() => {
-    setRescued(true)
+  const handleRescue = useCallback((reason?: 'hole' | 'outOfBounds' | 'stuck') => {
+    setRescueMessage(reason === 'hole' ? 'あなに おちた！ もどるよ' : 'スタートに もどったよ')
     if (rescueTimerRef.current !== null) window.clearTimeout(rescueTimerRef.current)
-    rescueTimerRef.current = window.setTimeout(() => setRescued(false), 1600)
+    rescueTimerRef.current = window.setTimeout(() => setRescueMessage(''), 1600)
   }, [])
 
   const { registerContainer, setTilt, resetBallToStart, setZoomIndex: applyZoomIndex } = useMazeEngine({
@@ -218,7 +218,7 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
   const handleRetry = () => {
     primeAudio()
     setTilt({ x: 0, y: 0 })
-    setRescued(false)
+    setRescueMessage('')
     setGameState('playing')
     setRunId((current) => current + 1)
     if (inputMode === 'gyro') {
@@ -275,7 +275,7 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
         )}
 
         <p className={styles.rescue} role="status" aria-live="polite">
-          {rescued ? 'スタートに もどったよ' : ''}
+          {rescueMessage}
         </p>
 
         <p className={styles.keyboardHint}>
