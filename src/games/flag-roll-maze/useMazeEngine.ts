@@ -17,7 +17,8 @@ import {
   WALL_HEIGHT,
 } from './mazePhysics'
 import { CELL_SIZE } from './mazeGrid'
-import { createMazeStage, mazeStageBounds, type MazeStage } from './mazeStage'
+import { mazeStageBounds, type MazeStage } from './mazeStage'
+import { createMazeStageById } from './mazeStages'
 import {
   cameraSetupForFocus,
   clampMazeZoomIndex,
@@ -89,6 +90,8 @@ export type MazeEngineOptions = {
   runId: number
   /** 現在選択されている国旗。idの変更時はボールの見た目も作り直す。 */
   flag: Pick<FlagBallData, 'id' | 'flag'>
+  /** 遊ぶステージ。変わったら物理世界とThree.jsシーンを作り直す。 */
+  stageId: string
   /** ゴールに到達したとき一度だけ呼ぶ。 */
   onGoal: () => void
   /** 場外やスタックから自動復帰したとき呼ぶ。表示用で、ゲーム進行は止めない。 */
@@ -157,7 +160,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     // 前のrunの傾きを持ち越さない。作り直した直後は必ず止まった状態から始める。
     targetTiltRef.current = { ...NEUTRAL_TILT }
 
-    const stage: MazeStage = createMazeStage()
+    const stage: MazeStage = createMazeStageById(options.stageId)
     const bounds = mazeStageBounds(stage)
 
     let world: World | null = null
@@ -835,7 +838,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       })
 
     return release
-  }, [options.runId, options.flag.id])
+  }, [options.runId, options.flag.id, options.stageId])
 
   return handle
 }

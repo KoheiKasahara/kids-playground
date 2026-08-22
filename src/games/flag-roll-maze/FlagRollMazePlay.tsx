@@ -6,6 +6,7 @@ import { playCorrectSound, primeAudio } from '../../utils/quizSound'
 import VirtualStick from './VirtualStick'
 import { parseMazePlayState } from './playState'
 import { useMazeEngine } from './useMazeEngine'
+import { findMazeStageDefinition, nextMazeStageId } from './mazeStages'
 import {
   DEFAULT_MAZE_ZOOM_INDEX,
   MAX_MAZE_ZOOM_INDEX,
@@ -49,13 +50,14 @@ export default function FlagRollMazePlay() {
   }
 
   // stateが差し替わったときもエンジンの世界・入力を確実に初期化する。
-  return <MazeGame key={location.key} flag={flag} />
+  return <MazeGame key={location.key} flag={flag} initialStageId={playState.stageId} />
 }
 
-function MazeGame({ flag }: { flag: FlagBallData }) {
+function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId: string }) {
   const navigate = useNavigate()
   const [gameState, setGameState] = useState<MazeGameState>('playing')
   const [runId, setRunId] = useState(0)
+  const [stageId, setStageId] = useState(initialStageId)
   const [rescueMessage, setRescueMessage] = useState('')
   const rescueTimerRef = useRef<number | null>(null)
   const audioPrimedRef = useRef(false)
@@ -64,6 +66,8 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
   // 端末の大きさや持ち方で好みが分かれるので、遊びながら距離だけを選べるようにする。
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_MAZE_ZOOM_INDEX)
   const [gyroMessage, setGyroMessage] = useState('')
+  const stageDefinition = findMazeStageDefinition(stageId)
+  const followingStageId = nextMazeStageId(stageId)
 
   const handleGoal = useCallback(() => {
     setGameState('goal')
@@ -80,6 +84,7 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
   const { registerContainer, setTilt, resetBallToStart, setZoomIndex: applyZoomIndex } = useMazeEngine({
     runId,
     flag,
+    stageId,
     onGoal: handleGoal,
     onRescue: handleRescue,
   })
@@ -214,17 +219,26 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
     resetBallToStart()
   }
 
-  /** ゴール後の「もういちど」。物理世界ごと作り直して最初の状態に揃える。 */
-  const handleRetry = () => {
+  /** 同じステージのやり直しと次のステージへの移動を、同じ新しい開始状態へそろえる。 */
+  const restartRun = useCallback((nextStageId: string) => {
     primeAudio()
     setTilt({ x: 0, y: 0 })
     setRescueMessage('')
     setGameState('playing')
+    setStageId(nextStageId)
     setRunId((current) => current + 1)
     if (inputMode === 'gyro') {
       calibrationRef.current = null
       void lockCurrentScreenOrientation(window.screen.orientation as unknown as OrientationController)
     }
+  }, [inputMode, setTilt])
+
+  /** ゴール後の「もういちど」。物理世界ごと作り直して最初の状態に揃える。 */
+  const handleRetry = () => restartRun(stageId)
+
+  const handleNextStage = () => {
+    if (followingStageId === null) return
+    restartRun(followingStageId)
   }
 
   return (
@@ -255,6 +269,11 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
 
       <div className={styles.ui}>
         <h1 className={styles.title}>こっきころころめいろ</h1>
+        {stageDefinition !== null && (
+          <p className={styles.stageBadge}>
+            {stageDefinition.emoji} {stageDefinition.nameJa}
+          </p>
+        )}
 
         {gameState === 'playing' ? (
           <p className={styles.instruction}>
@@ -299,6 +318,15 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
         <div className={styles.actions}>
           {gameState === 'goal' ? (
             <>
+              {followingStageId !== null && (
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.nextStage}`}
+                  onClick={handleNextStage}
+                >
+                  つぎの ステージ
+                </button>
+              )}
               <button
                 type="button"
                 className={`${styles.button} ${styles.retry}`}
@@ -311,7 +339,7 @@ function MazeGame({ flag }: { flag: FlagBallData }) {
                 className={styles.button}
                 onClick={() => navigate('/games/flag-roll-maze', { replace: true })}
               >
-                べつの こっき
+                えらびなおす
               </button>
             </>
           ) : (

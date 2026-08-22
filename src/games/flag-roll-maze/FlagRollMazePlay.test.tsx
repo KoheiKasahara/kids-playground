@@ -11,6 +11,7 @@ import {
   MAX_MAZE_ZOOM_INDEX,
   MIN_MAZE_ZOOM_INDEX,
 } from './mazeCamera'
+import { DEFAULT_MAZE_STAGE_ID, nextMazeStageId } from './mazeStages'
 
 // WebGLとRapierはjsdomで動かさず、エンジンへ渡った入力とコールバックだけを検証する。
 const engineMock = vi.hoisted(() => ({
@@ -47,10 +48,10 @@ vi.mock('../../utils/quizSound', () => ({
   playCorrectSound: soundMock.playCorrectSound,
 }))
 
-function renderPlay() {
+function renderPlay(stageId = DEFAULT_MAZE_STAGE_ID) {
   return render(
     <MemoryRouter
-      initialEntries={[{ pathname: '/games/flag-roll-maze/play', state: { flagId: 'jp' } }]}
+      initialEntries={[{ pathname: '/games/flag-roll-maze/play', state: { flagId: 'jp', stageId } }]}
     >
       <FlagRollMazePlay />
     </MemoryRouter>,
@@ -90,6 +91,15 @@ describe('FlagRollMazePlay', () => {
     expect(screen.getByText(/ゴールまで ボールを ころがそう/)).toBeInTheDocument()
     expect(screen.getByTestId('virtual-stick')).toBeInTheDocument()
     expect(engineMock.options?.flag.id).toBe('jp')
+    expect(engineMock.options?.stageId).toBe(DEFAULT_MAZE_STAGE_ID)
+    expect(screen.getByText('🟢 かんたん')).toBeInTheDocument()
+  })
+
+  it('遷移stateで選んだstageIdをエンジンへ渡す', () => {
+    renderPlay('ponpon')
+
+    expect(engineMock.options?.stageId).toBe('ponpon')
+    expect(screen.getByText('🔴 ぽんぽん')).toBeInTheDocument()
   })
 
   it('センサーが使えない端末でもスティック操作へ案内して遊び続けられる', async () => {
@@ -175,6 +185,7 @@ describe('FlagRollMazePlay', () => {
     expect(lastTilt()).toEqual({ x: 0, y: 0 })
     // 世界は作り直さないので、待たずにそのまま続けられる。
     expect(engineMock.options!.runId).toBe(0)
+    expect(engineMock.options!.stageId).toBe(DEFAULT_MAZE_STAGE_ID)
   })
 
   it('ゴールすると結果を知らせ、音を鳴らし、もういちどを出す', () => {
@@ -192,7 +203,8 @@ describe('FlagRollMazePlay', () => {
       expect.stringContaining('/jp.svg'),
     )
     expect(screen.getByText('にほん')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'べつの こっき' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'つぎの ステージ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'えらびなおす' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'スタートに もどる' })).toBeNull()
   })
 
@@ -217,6 +229,7 @@ describe('FlagRollMazePlay', () => {
     await user.click(screen.getByRole('button', { name: 'もういちど' }))
 
     expect(engineMock.options!.runId).toBe(1)
+    expect(engineMock.options!.stageId).toBe(DEFAULT_MAZE_STAGE_ID)
     expect(screen.getByText(/ゴールまで ボールを ころがそう/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'スタートに もどる' })).toBeInTheDocument()
   })
@@ -235,6 +248,27 @@ describe('FlagRollMazePlay', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('つぎのステージでstageIdを進め、物理世界を作り直す', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    const nextStage = nextMazeStageId(DEFAULT_MAZE_STAGE_ID)
+    expect(nextStage).not.toBeNull()
+    act(() => engineMock.options!.onGoal())
+
+    await user.click(screen.getByRole('button', { name: 'つぎの ステージ' }))
+
+    expect(engineMock.options!.stageId).toBe(nextStage)
+    expect(engineMock.options!.runId).toBe(1)
+    expect(screen.getByRole('button', { name: 'スタートに もどる' })).toBeInTheDocument()
+  })
+
+  it('最後のぼうけんステージではつぎのステージを出さない', () => {
+    renderPlay('adventure')
+    act(() => engineMock.options!.onGoal())
+
+    expect(screen.queryByRole('button', { name: 'つぎの ステージ' })).toBeNull()
   })
 
   it('穴に落ちたときは専用の復帰メッセージを知らせる', () => {
@@ -290,6 +324,34 @@ describe('FlagRollMazePlay', () => {
     )
 
     expect(screen.getByRole('heading', { name: 'こっきころころめいろ' })).toBeInTheDocument()
+    expect(screen.getByText('こっきを 1こ えらんでね！')).toBeInTheDocument()
+    expect(screen.queryByTestId('virtual-stick')).toBeNull()
+  })
+
+  it('stageIdが無い古いstateでは選択画面へ戻る', () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/games/flag-roll-maze/play', state: { flagId: 'jp' } }]}>
+        <Routes>
+          <Route path="/games/flag-roll-maze/play" element={<FlagRollMazePlay />} />
+          <Route path="/games/flag-roll-maze" element={<FlagRollMazeSelect />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('こっきを 1こ えらんでね！')).toBeInTheDocument()
+    expect(screen.queryByTestId('virtual-stick')).toBeNull()
+  })
+
+  it('未知のstageIdでは選択画面へ戻る', () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/games/flag-roll-maze/play', state: { flagId: 'jp', stageId: 'unknown-stage' } }]}>
+        <Routes>
+          <Route path="/games/flag-roll-maze/play" element={<FlagRollMazePlay />} />
+          <Route path="/games/flag-roll-maze" element={<FlagRollMazeSelect />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
     expect(screen.getByText('こっきを 1こ えらんでね！')).toBeInTheDocument()
     expect(screen.queryByTestId('virtual-stick')).toBeNull()
   })

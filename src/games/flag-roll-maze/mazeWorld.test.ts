@@ -10,14 +10,13 @@ import {
   WALL_HEIGHT,
 } from './mazePhysics'
 import {
-  createMazeStage,
   findMazePath,
   mazeStageBounds,
-  MAZE_STAGE_ROWS,
   CELL_SIZE,
   cellToWorld,
   type MazePoint,
 } from './mazeStage'
+import { createMazeStageById, MAZE_STAGE_ROWS, MAZE_STAGES } from './mazeStages'
 import {
   applyBumperKicks,
   applyTiltToGravity,
@@ -65,7 +64,7 @@ function pathIndexNearPoint(waypoints: readonly MazePoint[], point: MazePoint): 
 
 /** 上部スピナーへ南向きに進み、棒を実際に通過させるオートプレイ用の経路を作る。 */
 function pathThroughTopSpinner(waypoints: readonly MazePoint[]): MazePoint[] {
-  const stage = createMazeStage()
+  const stage = createMazeStageById('adventure')
   const spinner = stage.gimmicks.spinners.find(({ id }) => id === 'spinner-top')
   if (spinner === undefined) return [...waypoints]
 
@@ -94,7 +93,7 @@ type SimulationResult = {
  * 実際に遊んだときと同じ物理条件でクリアできるかを確かめる。
  */
 function autoPlay(waypoints: MazePoint[]): SimulationResult {
-  const stage = createMazeStage()
+  const stage = createMazeStageById('adventure')
   const bounds = mazeStageBounds(stage)
   const { world, ball, spinners } = createMazeWorld(RAPIER, stage)
   const bumperCooldowns = new Map<string, number>()
@@ -210,32 +209,35 @@ describe('createMazeWorld', () => {
   })
 
   it('床矩形とギミックを含めても剛体・コライダー数を抑える', () => {
-    const stage = createMazeStage()
-    const { world } = createMazeWorld(RAPIER, stage)
-    try {
-      // バンパーは固定Colliderだけなので、動く剛体はボールと回転棒だけになる。
-      expect(world.bodies.len()).toBe(1 + stage.gimmicks.spinners.length)
-      expect(world.colliders.len()).toBe(
-        stage.floors.length +
-          stage.walls.length +
-          stage.gimmicks.spinners.length +
-          stage.gimmicks.bumpers.length +
-          1,
-      )
-      console.log(
-        '迷路ワールドの剛体数・コライダー数',
-        world.bodies.len(),
-        world.colliders.len(),
-      )
-      expect(world.bodies.len()).toBeLessThanOrEqual(4)
-      expect(world.colliders.len()).toBeLessThanOrEqual(40)
-    } finally {
-      world.free()
+    for (const definition of MAZE_STAGES) {
+      const stage = createMazeStageById(definition.id)
+      const { world } = createMazeWorld(RAPIER, stage)
+      try {
+        // バンパーは固定Colliderだけなので、動く剛体はボールと回転棒だけになる。
+        expect(world.bodies.len()).toBe(1 + stage.gimmicks.spinners.length)
+        expect(world.colliders.len()).toBe(
+          stage.floors.length +
+            stage.walls.length +
+            stage.gimmicks.spinners.length +
+            stage.gimmicks.bumpers.length +
+            1,
+        )
+        console.log(
+          '迷路ワールドのステージ別剛体数・コライダー数',
+          stage.id,
+          world.bodies.len(),
+          world.colliders.len(),
+        )
+        expect(world.bodies.len()).toBeLessThanOrEqual(6)
+        expect(world.colliders.len()).toBeLessThanOrEqual(80)
+      } finally {
+        world.free()
+      }
     }
   })
 
   it('ボールはSTARTの真上に置かれ、床へめり込まない', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       const spawn = ballSpawnPosition(stage.start)
@@ -258,7 +260,7 @@ describe('createMazeWorld', () => {
   })
 
   it('傾けていなければボールはその場に留まる', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       applyTiltToGravity(world, { x: 0, y: 0 })
@@ -272,7 +274,7 @@ describe('createMazeWorld', () => {
   })
 
   it('傾けた向きへ転がり出す', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       // STARTからは+X方向の通路が伸びている。
@@ -287,7 +289,7 @@ describe('createMazeWorld', () => {
   })
 
   it('壁に当たっても盤面の外へ出ない', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const bounds = mazeStageBounds(stage)
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
@@ -305,7 +307,7 @@ describe('createMazeWorld', () => {
   })
 
   it('速度上限を超えたら抑える', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       ball.setLinvel({ x: 40, y: 0, z: 0 }, true)
@@ -319,7 +321,7 @@ describe('createMazeWorld', () => {
   })
 
   it('resetBallでSTARTへ戻り、勢いも消える', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       applyTiltToGravity(world, { x: 1, y: 0 })
@@ -338,7 +340,7 @@ describe('createMazeWorld', () => {
   })
 
   it('縦通路の列7を下向きの重力だけで転がっても穴に落ちない', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       const laneTopPoint = cellToWorld(
@@ -379,7 +381,7 @@ describe('createMazeWorld', () => {
   })
 
   it('回転棒を進めると静止ボールが押され、速度上限も守る', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball, spinners } = createMazeWorld(RAPIER, stage)
     try {
       const spinner = spinners[0]!
@@ -427,7 +429,7 @@ describe('createMazeWorld', () => {
   })
 
   it('回転棒の中心から外向きの水平速度を与える', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       const spinner = stage.gimmicks.spinners[0]!
@@ -455,7 +457,7 @@ describe('createMazeWorld', () => {
   })
 
   it('バンパーへ転がしたボールを外向きへ弾き、速度上限も守る', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       const bumper = stage.gimmicks.bumpers[0]!
@@ -490,7 +492,7 @@ describe('createMazeWorld', () => {
   })
 
   it('穴の下まで落ちたボールをチェックポイントへ戻し、直後の再落下を防ぐ', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       const hole = stage.holes[0]!
@@ -531,7 +533,7 @@ describe('createMazeWorld', () => {
   })
 
   it('回転棒の掃引範囲で長時間動かしてもボールを盤外へ出さない', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const bounds = mazeStageBounds(stage)
     const { world, ball, spinners } = createMazeWorld(RAPIER, stage)
     try {
@@ -588,12 +590,12 @@ describe('スティック操作だけでゴールできる', () => {
 
 describe('isGoalReached', () => {
   it('ゴール中心の真上なら高さに関わらず判定する', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     expect(isGoalReached({ x: stage.goal.x, y: 3, z: stage.goal.z }, stage.goal)).toBe(true)
   })
 
   it('離れていれば判定しない', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     expect(isGoalReached({ x: stage.goal.x + 2, y: 0, z: stage.goal.z }, stage.goal))
       .toBe(false)
   })

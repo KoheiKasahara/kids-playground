@@ -89,6 +89,7 @@
 }
 
 .title { margin: 0; color: var(--color-primary-dark); font-size: clamp(24px, 6vw, var(--font-size-xlarge)); text-shadow: 0 2px 0 var(--color-surface); }
+.stageBadge { display: inline-flex; align-items: center; gap: 4px; margin: var(--space-xs) 0 0; padding: 3px 10px; border: 2px solid color-mix(in srgb, var(--color-primary) 45%, white); border-radius: var(--radius-round); background: color-mix(in srgb, var(--color-surface) 90%, transparent); color: var(--color-primary-dark); font-size: clamp(14px, 3.8vw, 17px); font-weight: 900; line-height: 1.2; box-shadow: var(--shadow-sm); }
 .instruction, .result, .rescue, .keyboardHint { margin: var(--space-xs) 0 0; color: var(--color-text-muted); font-size: clamp(14px, 3.8vw, var(--font-size-base)); text-shadow: 0 1px 0 var(--color-surface); }
 .result { color: var(--color-success-dark); font-size: clamp(22px, 6vw, var(--font-size-large)); font-weight: bold; }
 .rescue { min-height: 1.35em; color: var(--color-accent-dark); }
@@ -132,6 +133,7 @@
 .stickArea { grid-column: 1; grid-row: 2; }
 .actions { grid-column: 2; grid-row: 2; display: flex; flex-direction: column; gap: var(--space-sm); }
 .button { min-height: var(--tap-target-min); padding: var(--space-sm) var(--space-lg); border: none; border-radius: var(--radius-round); background: var(--color-surface); color: var(--color-primary-dark); font: inherit; font-size: clamp(16px, 4.2vw, var(--font-size-base)); font-weight: bold; box-shadow: var(--shadow-md); }
+.nextStage { background: var(--color-primary); color: var(--color-text-on-primary); }
 .retry { background: var(--color-success); color: var(--color-text-on-primary); }
 .rescueButton { background: var(--color-accent); color: var(--color-text-on-primary); }
 
@@ -148,7 +150,7 @@
   .button { padding-inline: var(--space-md); }
 }
 
-/* 低い横画面で3つのゴール操作が画面外へ出たり、盤面へ重なったりしないよう詰める。 */
+/* 低い横画面で4つのゴール操作が画面外へ出たり、盤面へ重なったりしないよう詰める。 */
 @media (orientation: landscape) and (max-height: 480px) {
   .page { gap: var(--space-xs); }
   .resultPanel { gap: var(--space-xs); padding: 2px 9px 2px 4px; }
@@ -157,7 +159,9 @@
   .actions { gap: 4px; }
   .zoom { right: var(--space-xs); bottom: var(--space-xs); }
   .zoomButton { width: 44px; height: 44px; font-size: 24px; }
-  .button { min-height: 46px; padding-block: 4px; font-size: 15px; }
+  .button { min-height: 46px; padding: 4px 6px; font-size: 15px; }
 }
 
-@media (max-width: 360px) { .button { padding-inline: var(--space-md); } }
+@media (max-width: 360px) {
+  .button { min-height: 44px; padding: 4px 6px; font-size: 14px; }
+}

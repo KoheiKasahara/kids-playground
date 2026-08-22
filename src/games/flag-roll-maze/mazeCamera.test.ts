@@ -20,9 +20,10 @@ import {
   MIN_VISIBLE_CELLS_ON_SHORT_SIDE,
 } from './mazeCamera'
 import { BALL_RADIUS, MAX_BALL_SPEED } from './mazePhysics'
-import { CELL_SIZE, createMazeStage, mazeStageBounds } from './mazeStage'
+import { CELL_SIZE, mazeStageBounds } from './mazeStage'
+import { createMazeStageById } from './mazeStages'
 
-const stageBounds = mazeStageBounds(createMazeStage())
+const stageBounds = mazeStageBounds(createMazeStageById('adventure'))
 
 function safeAspect(aspect: number): number {
   return Number.isFinite(aspect) && aspect > 0 ? aspect : 1

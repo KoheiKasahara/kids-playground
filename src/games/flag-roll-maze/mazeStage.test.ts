@@ -8,9 +8,9 @@ import {
   createMazeStage,
   findMazePath,
   isMazeSolvable,
-  MAZE_STAGE_ROWS,
   mazeStageBounds,
 } from './mazeStage'
+import { createMazeStageById, MAZE_STAGE_ROWS } from './mazeStages'
 
 describe('cellToWorld', () => {
   it('グリッドの中心がワールド原点になる', () => {
@@ -71,7 +71,7 @@ describe('buildFloorRects', () => {
 })
 
 describe('createMazeStage', () => {
-  const stage = createMazeStage()
+  const stage = createMazeStageById('adventure')
 
   it('グリッドの大きさから盤面サイズが決まる', () => {
     expect(stage.boardWidth).toBeCloseTo(stage.columnCount * CELL_SIZE, 6)
@@ -188,7 +188,7 @@ describe('既定ステージ', () => {
   })
 
   it('ステージの穴が指定された2マスにある', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     expect(stage.holes).toHaveLength(3)
     expect(stage.holes.map((hole) => hole.center)).toEqual([
       cellToWorld(6, 4, 11, 11),
@@ -198,7 +198,7 @@ describe('既定ステージ', () => {
   })
 
   it('チェックポイントの先頭がSTARTと同じ位置になる', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     expect(stage.checkpoints[0]).toEqual(stage.start)
     expect(stage.rows[7]?.[6]).not.toBe('O')
     expect(stage.checkpoints[2]).toEqual(cellToWorld(6, 7, 11, 11))
