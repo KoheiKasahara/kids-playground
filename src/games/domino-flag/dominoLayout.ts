@@ -3,6 +3,7 @@ import {
   type DominoFlagId,
   type FlagCellColor,
 } from './flagDefinitions'
+import { createBigFlagGrid } from './bigFlagRenderer'
 export type { FlagCellColor } from './flagDefinitions'
 
 /**
@@ -367,7 +368,9 @@ export function createDominoPlacements(
     ...createLinePlacements(layout),
     ...createFanPlacements(layout),
     ...createFlagPlacements(
-      createFlagGrid(flagId, { cols: layout.cols, rows: layout.rows }),
+      layout.cols === FLAG_COLS && layout.rows === FLAG_ROWS
+        ? createFlagGrid(flagId)
+        : createBigFlagGrid(flagId, { cols: layout.cols, rows: layout.rows }),
       layout,
     ),
   ]
