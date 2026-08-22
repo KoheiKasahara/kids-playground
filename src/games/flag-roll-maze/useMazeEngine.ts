@@ -1082,6 +1082,8 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         const slides = stage.terrain.boxes.filter((box) => box.style === 'slide')
         if (slides.length > 0) {
           // 三角形を斜面と同じ向きへ寝かせ、初めて遊ぶ子にも下りる方向を伝える。
+          // ConeGeometryは半径に対して高さを十分小さくすると、XZ平面に寝た薄い三角の板になる。
+          // radialSegments=3の最初の頂点は+Z側に来るので、回さないままで進行方向(+z)を指す。
           const slideArrowGeometry = track(new THREE.ConeGeometry(CELL_SIZE * 0.14, 0.08, 3))
           const slideArrowMaterial = trackMaterial(
             new THREE.MeshLambertMaterial({ color: 0xfff9db }),
@@ -1093,7 +1095,6 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
             for (const localZ of [-slide.depth * 0.22, 0, slide.depth * 0.22]) {
               const arrow = new THREE.Mesh(slideArrowGeometry, slideArrowMaterial)
               arrow.position.set(0, slide.height / 2 + 0.04, localZ)
-              arrow.rotation.y = Math.PI
               arrowGroup.add(arrow)
             }
             boardGroup.add(arrowGroup)
