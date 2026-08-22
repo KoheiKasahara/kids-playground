@@ -225,7 +225,7 @@ describe('FlagRollMazePlay', () => {
     vi.useFakeTimers()
     try {
       renderPlay()
-      act(() => engineMock.options!.onRescue!())
+      act(() => engineMock.options!.onRescue!('outOfBounds'))
       expect(screen.getByText('スタートに もどったよ')).toBeInTheDocument()
 
       act(() => {
@@ -235,6 +235,39 @@ describe('FlagRollMazePlay', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('穴に落ちたときは専用の復帰メッセージを知らせる', () => {
+    vi.useFakeTimers()
+    try {
+      renderPlay()
+      act(() => engineMock.options!.onRescue!('hole'))
+      expect(screen.getByText('あなに おちた！ もどるよ')).toBeInTheDocument()
+
+      act(() => {
+        vi.advanceTimersByTime(2000)
+      })
+      expect(screen.queryByText('あなに おちた！ もどるよ')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('復帰理由が省略されてもスタートへ戻ったと知らせる', () => {
+    vi.useFakeTimers()
+    try {
+      renderPlay()
+      act(() => engineMock.options!.onRescue!())
+      expect(screen.getByText('スタートに もどったよ')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('スタックからの復帰もスタートへ戻ったと知らせる', () => {
+    renderPlay()
+    act(() => engineMock.options!.onRescue!('stuck'))
+    expect(screen.getByText('スタートに もどったよ')).toBeInTheDocument()
   })
 
   it('「もどる」でホームへ戻れる', async () => {

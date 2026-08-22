@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BALL_RADIUS } from './mazePhysics'
 import {
+  buildFloorRects,
   buildWallRects,
   CELL_SIZE,
   cellToWorld,
@@ -40,6 +41,35 @@ describe('buildWallRects', () => {
   })
 })
 
+describe('buildFloorRects', () => {
+  it('穴のマスを床に含めず、新グリッドでは7枚にまとめる', () => {
+    const floors = buildFloorRects(MAZE_STAGE_ROWS)
+
+    expect(floors).toHaveLength(4)
+    for (const [row, line] of MAZE_STAGE_ROWS.entries()) {
+      for (let column = 0; column < line.length; column += 1) {
+        const point = cellToWorld(column, row, line.length, MAZE_STAGE_ROWS.length)
+        const covered = floors.filter(
+          (floor) =>
+            Math.abs(point.x - floor.x) <= floor.width / 2 &&
+            Math.abs(point.z - floor.z) <= floor.depth / 2,
+        )
+        expect(covered).toHaveLength(line[column] === 'O' ? 0 : 1)
+      }
+    }
+  })
+
+  it('床の総面積が穴を除く全マスの面積と一致する', () => {
+    const floors = buildFloorRects(MAZE_STAGE_ROWS)
+    const openCellCount = MAZE_STAGE_ROWS.reduce(
+      (count, line) => count + [...line].filter((cell) => cell !== 'O').length,
+      0,
+    )
+    const floorArea = floors.reduce((area, floor) => area + floor.width * floor.depth, 0)
+    expect(floorArea).toBeCloseTo(openCellCount * CELL_SIZE ** 2, 8)
+  })
+})
+
 describe('createMazeStage', () => {
   const stage = createMazeStage()
 
@@ -74,7 +104,7 @@ describe('createMazeStage', () => {
   })
 })
 
-describe('Phase 1のステージ', () => {
+describe('既定ステージ', () => {
   it('外周がすべて壁で囲まれている', () => {
     const rows = MAZE_STAGE_ROWS
     const lastRow = rows.length - 1
@@ -105,13 +135,13 @@ describe('Phase 1のステージ', () => {
     const rows = MAZE_STAGE_ROWS
     for (const [row, line] of rows.entries()) {
       for (let column = 0; column < line.length; column += 1) {
-        if (line[column] === '#') continue
+        if (line[column] === '#' || line[column] === 'O') continue
         const openNeighbours = [
           rows[row]?.[column + 1],
           rows[row]?.[column - 1],
           rows[row + 1]?.[column],
           rows[row - 1]?.[column],
-        ].filter((cell) => cell !== undefined && cell !== '#').length
+        ].filter((cell) => cell !== undefined && cell !== '#' && cell !== 'O').length
         // START/GOALだけが端点になり、それ以外は必ず通り抜けられる。
         const isEndpoint = line[column] === 'S' || line[column] === 'G'
         expect(openNeighbours).toBeGreaterThanOrEqual(isEndpoint ? 1 : 2)
@@ -123,6 +153,55 @@ describe('Phase 1のステージ', () => {
     const path = findMazePath(MAZE_STAGE_ROWS)
     expect(path).not.toBeNull()
     expect(path!.length).toBeGreaterThanOrEqual(16)
+  })
+
+  it('新しい11×11グリッドが穴を避けて解ける', () => {
+    expect(MAZE_STAGE_ROWS).toEqual([
+      '###########',
+      '#S........#',
+      '#.........#',
+      '#.........#',
+      '######O.###',
+      '######O.###',
+      '######O.###',
+      '#.........#',
+      '#G........#',
+      '#.........#',
+      '###########',
+    ])
+    expect(isMazeSolvable(MAZE_STAGE_ROWS)).toBe(true)
+  })
+
+  it('穴を通る経路を最短経路として返さない', () => {
+    const path = findMazePath(MAZE_STAGE_ROWS)
+    expect(path).not.toBeNull()
+    const holes = new Set(
+        [
+          cellToWorld(6, 4, 11, 11),
+          cellToWorld(6, 5, 11, 11),
+          cellToWorld(6, 6, 11, 11),
+        ].map(
+        (point) => `${point.x},${point.z}`,
+      ),
+    )
+    expect(path!.every((point) => !holes.has(`${point.x},${point.z}`))).toBe(true)
+  })
+
+  it('ステージの穴が指定された2マスにある', () => {
+    const stage = createMazeStage()
+    expect(stage.holes).toHaveLength(3)
+    expect(stage.holes.map((hole) => hole.center)).toEqual([
+      cellToWorld(6, 4, 11, 11),
+      cellToWorld(6, 5, 11, 11),
+      cellToWorld(6, 6, 11, 11),
+    ])
+  })
+
+  it('チェックポイントの先頭がSTARTと同じ位置になる', () => {
+    const stage = createMazeStage()
+    expect(stage.checkpoints[0]).toEqual(stage.start)
+    expect(stage.rows[7]?.[6]).not.toBe('O')
+    expect(stage.checkpoints[2]).toEqual(cellToWorld(6, 7, 11, 11))
   })
 })
 

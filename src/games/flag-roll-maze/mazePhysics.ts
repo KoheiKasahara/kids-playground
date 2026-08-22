@@ -75,6 +75,36 @@ export const FALL_OUT_Y = -BALL_RADIUS * 9.5
 /** 球の直径2Rを超える押し出しも許容し、外周への接触だけで場外扱いにせず戻れない位置だけを判定する。 */
 export const OUT_OF_BOUNDS_MARGIN_IN_RADII = 2.4
 
+/**
+ * 回転棒の長さ。3マス幅(5.67)の部屋に置くと、棒が通路と垂直になったときでも
+ * 壁ぎわに片側1.63の退避レーンが残り、直径1.26のボールが必ず脇を抜けられる。
+ * 塞ぎ切らないことで「当たっても楽しいが、詰まって進めなくなることはない」状態にする。
+ */
+export const SPINNER_LENGTH = 2.4
+export const SPINNER_THICKNESS = 0.26
+/** ボール直径1.26を確実に押せる高さ。低いと乗り越えられる。 */
+export const SPINNER_HEIGHT = 1.15
+export const SPINNER_FRICTION = 0.2
+export const SPINNER_RESTITUTION = 0.15
+
+/** バンパー。直径0.92。2マス幅の部屋の中央に置いても、両脇に1.43の通り道が残る。 */
+export const BUMPER_RADIUS = 0.46
+export const BUMPER_HEIGHT = 0.9
+export const BUMPER_FRICTION = 0.1
+/** コライダー自体の反発。実際の「ポン！」は下の追加インパルスで作る。 */
+export const BUMPER_RESTITUTION = 0.6
+/** 触れた瞬間に外向きへ加える速度変化(質量1なのでそのままΔv)。強すぎると操作不能になる。 */
+export const BUMPER_KICK_IMPULSE = 2.4
+/** 同じバンパーが連打で暴発しないための間隔。 */
+export const BUMPER_COOLDOWN_MS = 260
+/** キック判定はコライダー接触より少しだけ広く取り、低速で触れても必ず弾く。 */
+export const BUMPER_KICK_MARGIN = 0.04
+
+/** 床面より下のここまで落ちたら「穴に落ちた」とみなす。0.5秒程度で判定が出る深さ。 */
+export const HOLE_FALL_Y = -BALL_RADIUS * 1.8
+/** 穴の底に見える暗い面の高さ。判定より十分下に置き、ボールが到達する前に復帰させる。 */
+export const HOLE_PIT_BOTTOM_Y = -BALL_RADIUS * 4.2
+
 export type PhysicsVector = { x: number; y: number; z: number }
 
 /**

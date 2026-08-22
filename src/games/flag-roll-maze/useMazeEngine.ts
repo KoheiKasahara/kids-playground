@@ -5,8 +5,10 @@ import { createFlagPanelBallResource } from '../../components/flag-ball/flagPane
 import type { FlagBallData } from '../../components/flag-ball/flagBalls'
 import {
   BALL_RADIUS,
+  BUMPER_HEIGHT,
   FLOOR_THICKNESS,
   GOAL_RADIUS,
+  HOLE_PIT_BOTTOM_Y,
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
@@ -14,6 +16,7 @@ import {
   visualTiltRotation,
   WALL_HEIGHT,
 } from './mazePhysics'
+import { CELL_SIZE } from './mazeGrid'
 import { createMazeStage, mazeStageBounds, type MazeStage } from './mazeStage'
 import {
   cameraSetupForFocus,
@@ -28,21 +31,36 @@ import {
 } from './mazeCamera'
 import {
   applyTiltToGravity,
+  applyBumperKicks,
+  advanceSpinners,
   createMazeWorld,
   isGoalReached,
   limitBallSpeed,
   nudgeBall,
+  pushBallOutOfSpinner,
   resetBall,
 } from './mazeWorld'
 import {
+  checkpointPosition,
+  createCheckpointTracker,
+  createSpinnerTrapTracker,
   createStallTracker,
+  hasFallenBelowFloor,
   hasFallenOut,
+  RESPAWN_GRACE_MS,
+  RESPAWN_SETTLE_MS,
+  updateSpinnerTrapTracker,
+  updateCheckpointTracker,
   updateStallTracker,
+  type CheckpointTracker,
+  type SpinnerTrapTracker,
   type StallTracker,
 } from './mazeRescue'
+import type { BumperCooldowns } from './mazeGimmicks'
 import { NEUTRAL_TILT, smoothTilt, type TiltInput } from './tiltInput'
 import { createResizeScheduler } from './sceneResize'
-import type { World } from '@dimforge/rapier3d-compat'
+import { playPinballBumperSound } from '../../utils/quizSound'
+import type { RigidBody, World } from '@dimforge/rapier3d-compat'
 
 let rapierInitPromise: Promise<void> | null = null
 
@@ -74,7 +92,7 @@ export type MazeEngineOptions = {
   /** ゴールに到達したとき一度だけ呼ぶ。 */
   onGoal: () => void
   /** 場外やスタックから自動復帰したとき呼ぶ。表示用で、ゲーム進行は止めない。 */
-  onRescue?: () => void
+  onRescue?: (reason?: 'hole' | 'outOfBounds' | 'stuck') => void
 }
 
 export type MazeEngineHandle = {
@@ -149,6 +167,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let boardGroup: THREE.Group | null = null
     let ballMesh: THREE.Object3D | null = null
     let ballBody: ReturnType<typeof createMazeWorld>['ball'] | null = null
+    let spinners: ReturnType<typeof createMazeWorld>['spinners'] = []
     let resizeObserver: ResizeObserver | null = null
     let detachViewportListeners: (() => void) | null = null
     let rafId: number | null = null
@@ -156,8 +175,16 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let goalNotified = false
     let lastFrameTime: number | null = null
     let accumulator = 0
+    // 回転棒はフレーム時刻ではなく物理ステップ数から進め、処理落ちでも回転が飛ばないようにする。
+    let physicsElapsedSeconds = 0
     let currentTilt: TiltInput = { ...NEUTRAL_TILT }
     let stallTracker: StallTracker = createStallTracker()
+    let checkpointTracker: CheckpointTracker = createCheckpointTracker()
+    let spinnerTrapTracker: SpinnerTrapTracker = createSpinnerTrapTracker()
+    let respawnGraceRemainingMs = 0
+    let respawnSettleRemainingMs = 0
+    // クールダウンをrun内に閉じ込め、もういちどで前の衝突履歴を持ち越さない。
+    const bumperCooldowns: BumperCooldowns = new Map()
     let cameraFocus: MazeCameraFocus = { x: 0, z: 0 }
     // 標準距離は画面比だけで決まる。ズームはそこへ掛ける倍率として持つ。
     let cameraBaseDistance = computeMazeCameraDistance(1)
@@ -166,6 +193,10 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     const geometries: THREE.BufferGeometry[] = []
     const materials: THREE.Material[] = []
     const textures: THREE.Texture[] = []
+    const spinnerVisuals: { body: RigidBody; mesh: THREE.Mesh }[] = []
+    const bumperVisuals = new Map<string, THREE.Group>()
+    const bumperPopStartedAtMs = new Map<string, number>()
+    let prefersReducedMotion = false
 
     const track = <T extends THREE.BufferGeometry>(geometry: T): T => {
       geometries.push(geometry)
@@ -229,6 +260,10 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       boardGroup = null
       ballMesh = null
       ballBody = null
+      spinners = []
+      spinnerVisuals.length = 0
+      bumperVisuals.clear()
+      bumperPopStartedAtMs.clear()
 
       if (world !== null) {
         world.free()
@@ -309,12 +344,39 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       boardGroup.position.set(offset.x, offset.y, offset.z)
     }
 
-    function writeVisuals() {
-      if (!ballMesh || !ballBody) return
-      const translation = ballBody.translation()
-      const rotation = ballBody.rotation()
-      ballMesh.position.set(translation.x, translation.y, translation.z)
-      ballMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+    function updateBumperPops(nowMs: number) {
+      for (const [id, startedAtMs] of bumperPopStartedAtMs) {
+        const group = bumperVisuals.get(id)
+        if (!group) {
+          bumperPopStartedAtMs.delete(id)
+          continue
+        }
+        const progress = Math.min(1, Math.max(0, (nowMs - startedAtMs) / 220))
+        if (progress >= 1) {
+          group.scale.setScalar(1)
+          bumperPopStartedAtMs.delete(id)
+          continue
+        }
+        group.scale.setScalar(1 + 0.25 * Math.sin(Math.PI * progress))
+      }
+    }
+
+    function writeVisuals(nowMs?: number) {
+      if (ballMesh && ballBody) {
+        const translation = ballBody.translation()
+        const rotation = ballBody.rotation()
+        ballMesh.position.set(translation.x, translation.y, translation.z)
+        ballMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+      }
+
+      // 回転棒はRapierのkinematic bodyを正本にし、見た目だけが遅れないよう毎フレーム同期する。
+      for (const { body, mesh } of spinnerVisuals) {
+        const translation = body.translation()
+        const rotation = body.rotation()
+        mesh.position.set(translation.x, translation.y, translation.z)
+        mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+      }
+      if (nowMs !== undefined) updateBumperPops(nowMs)
     }
 
     /** 生成・リセット・救出の直後は、カメラをボール位置へ飛び移らせず即座に合わせる。 */
@@ -353,20 +415,37 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       applyCameraFocus()
     }
 
-    function rescueToStart() {
+    function rescueToCheckpoint(reason: 'hole' | 'outOfBounds' | 'stuck') {
       if (!ballBody) return
-      resetBall(ballBody, stage.start)
+      const point = checkpointPosition(
+        checkpointTracker,
+        stage.checkpoints,
+        stage.start,
+      )
+      resetBall(ballBody, point)
       stallTracker = createStallTracker()
+      spinnerTrapTracker = createSpinnerTrapTracker()
+      respawnGraceRemainingMs = RESPAWN_GRACE_MS
+      respawnSettleRemainingMs = RESPAWN_SETTLE_MS
       writeVisuals()
       snapCameraFocusToBall()
-      optionsRef.current.onRescue?.()
+      optionsRef.current.onRescue?.(reason)
     }
 
-    function stepPhysics(deltaMs: number) {
+    function startBumperPops(kickedIds: readonly string[], nowMs: number) {
+      if (prefersReducedMotion) return
+      for (const id of kickedIds) {
+        if (bumperVisuals.has(id)) bumperPopStartedAtMs.set(id, nowMs)
+      }
+    }
+
+    function stepPhysics(deltaMs: number, nowMs: number) {
       if (world === null || ballBody === null) return
       accumulator += deltaMs / 1000
       let substeps = 0
       while (accumulator >= PHYSICS_TIMESTEP && substeps < MAX_PHYSICS_SUBSTEPS) {
+        physicsElapsedSeconds += PHYSICS_TIMESTEP
+        advanceSpinners(spinners, physicsElapsedSeconds)
         world.step()
         accumulator -= PHYSICS_TIMESTEP
         substeps += 1
@@ -376,6 +455,17 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         accumulator = 0
       }
       limitBallSpeed(ballBody)
+      const kickedIds = applyBumperKicks(
+        ballBody,
+        stage.gimmicks.bumpers,
+        bumperCooldowns,
+        nowMs,
+      )
+      limitBallSpeed(ballBody)
+      if (kickedIds.length > 0) {
+        playPinballBumperSound()
+        startBumperPops(kickedIds, nowMs)
+      }
     }
 
     function tick(now: number) {
@@ -391,31 +481,80 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       }
 
       const deltaSeconds = deltaMs / 1000
+      respawnGraceRemainingMs = Math.max(0, respawnGraceRemainingMs - deltaMs)
       // ゴール後は入力を無視し、その場でゆっくり止まるようにする。
       const target = goalNotified ? NEUTRAL_TILT : targetTiltRef.current
       currentTilt = smoothTilt(currentTilt, target, deltaSeconds)
       if (world !== null) applyTiltToGravity(world, currentTilt)
 
-      if (deltaMs > 0) stepPhysics(deltaMs)
-      writeVisuals()
+      const settlingAfterRespawn = respawnSettleRemainingMs > 0
+      if (deltaMs > 0) stepPhysics(deltaMs, now)
+      if (settlingAfterRespawn && ballBody !== null) {
+        // 重力と入力はそのままにし、復帰直後だけボールの動きを毎フレーム打ち消す。
+        ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true)
+        ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true)
+      }
+      respawnSettleRemainingMs = Math.max(0, respawnSettleRemainingMs - deltaMs)
+      writeVisuals(now)
 
       if (ballBody !== null) {
         const position = ballBody.translation()
-        if (hasFallenOut(position, bounds)) {
-          rescueToStart()
-        } else if (!goalNotified) {
-          const velocity = ballBody.linvel()
-          const stall = updateStallTracker(stallTracker, {
-            speed: Math.hypot(velocity.x, velocity.y, velocity.z),
-            tiltMagnitude: Math.hypot(currentTilt.x, currentTilt.y),
-            deltaMs,
-          })
-          stallTracker = stall.tracker
-          if (stall.nudge) nudgeBall(ballBody, currentTilt)
+        let rescueReason: 'hole' | 'outOfBounds' | null = null
+        if (respawnGraceRemainingMs <= 0) {
+          if (hasFallenBelowFloor(position)) {
+            rescueReason = 'hole'
+          } else if (hasFallenOut(position, bounds)) {
+            rescueReason = 'outOfBounds'
+          }
+        }
 
-          if (isGoalReached(position, stage.goal)) {
-            goalNotified = true
-            optionsRef.current.onGoal()
+        if (rescueReason !== null) {
+          rescueToCheckpoint(rescueReason)
+        } else if (!goalNotified) {
+          checkpointTracker = updateCheckpointTracker(
+            checkpointTracker,
+            position,
+            stage.checkpoints,
+          )
+
+          if (
+            !settlingAfterRespawn &&
+            respawnSettleRemainingMs <= 0 &&
+            respawnGraceRemainingMs <= 0
+          ) {
+            const spinnerTrap = updateSpinnerTrapTracker(
+              spinnerTrapTracker,
+              position,
+              stage.gimmicks.spinners,
+              deltaMs,
+            )
+            spinnerTrapTracker = spinnerTrap.tracker
+            if (spinnerTrap.escapeFrom !== null) {
+              pushBallOutOfSpinner(ballBody, spinnerTrap.escapeFrom)
+              limitBallSpeed(ballBody)
+            }
+
+            if (spinnerTrap.rescue) {
+              rescueToCheckpoint('stuck')
+            } else {
+              const velocity = ballBody.linvel()
+              const stall = updateStallTracker(stallTracker, {
+                speed: Math.hypot(velocity.x, velocity.y, velocity.z),
+                tiltMagnitude: Math.hypot(currentTilt.x, currentTilt.y),
+                deltaMs,
+              })
+              stallTracker = stall.tracker
+              if (stall.rescue) {
+                rescueToCheckpoint('stuck')
+              } else {
+                if (stall.nudge) nudgeBall(ballBody, currentTilt)
+
+                if (isGoalReached(position, stage.goal)) {
+                  goalNotified = true
+                  optionsRef.current.onGoal()
+                }
+              }
+            }
           }
         }
       }
@@ -444,6 +583,15 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         renderer.domElement.setAttribute('aria-hidden', 'true')
         container.appendChild(renderer.domElement)
 
+        try {
+          prefersReducedMotion =
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        } catch {
+          // matchMediaがないテスト環境や古いブラウザでは通常の演出を使う。
+          prefersReducedMotion = false
+        }
+
         scene = new THREE.Scene()
         scene.background = new THREE.Color('#dff1ff')
         camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200)
@@ -457,14 +605,17 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         boardGroup = new THREE.Group()
         scene.add(boardGroup)
 
-        const floorMesh = new THREE.Mesh(
-          track(
-            new THREE.BoxGeometry(stage.boardWidth, FLOOR_THICKNESS, stage.boardDepth),
-          ),
-          trackMaterial(new THREE.MeshLambertMaterial({ color: 0xfaf0d8 })),
+        const floorMaterial = trackMaterial(
+          new THREE.MeshLambertMaterial({ color: 0xfaf0d8 }),
         )
-        floorMesh.position.y = -FLOOR_THICKNESS / 2
-        boardGroup.add(floorMesh)
+        for (const floor of stage.floors) {
+          const floorMesh = new THREE.Mesh(
+            track(new THREE.BoxGeometry(floor.width, FLOOR_THICKNESS, floor.depth)),
+            floorMaterial,
+          )
+          floorMesh.position.set(floor.x, -FLOOR_THICKNESS / 2, floor.z)
+          boardGroup.add(floorMesh)
+        }
 
         const wallMaterial = trackMaterial(
           new THREE.MeshLambertMaterial({ color: 0x67b3e8 }),
@@ -476,6 +627,31 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
           )
           wallMesh.position.set(wall.x, WALL_HEIGHT / 2, wall.z)
           boardGroup.add(wallMesh)
+        }
+
+        const holeRingMaterial = trackMaterial(
+          new THREE.MeshLambertMaterial({ color: 0xff8787 }),
+        )
+        const holePitMaterial = trackMaterial(
+          new THREE.MeshLambertMaterial({ color: 0x27374d }),
+        )
+        for (const hole of stage.holes) {
+          const ring = new THREE.Mesh(
+            track(
+              new THREE.TorusGeometry(CELL_SIZE * 0.44, CELL_SIZE * 0.05, 8, 24),
+            ),
+            holeRingMaterial,
+          )
+          ring.rotation.x = -Math.PI / 2
+          ring.position.set(hole.center.x, 0.03, hole.center.z)
+          boardGroup.add(ring)
+
+          const pit = new THREE.Mesh(
+            track(new THREE.BoxGeometry(hole.size, 0.1, hole.size)),
+            holePitMaterial,
+          )
+          pit.position.set(hole.center.x, HOLE_PIT_BOTTOM_Y, hole.center.z)
+          boardGroup.add(pit)
         }
 
         // ゴールは床から少しだけ浮かせた円盤にして、ボールが乗り上げないようにする。
@@ -526,6 +702,95 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         const mazeWorld = createMazeWorld(RAPIER, stage)
         world = mazeWorld.world
         ballBody = mazeWorld.ball
+        spinners = mazeWorld.spinners
+
+        const spinnerMaterial = trackMaterial(
+          new THREE.MeshLambertMaterial({ color: 0xf76707 }),
+        )
+        const spinnerEndMaterial = trackMaterial(
+          new THREE.MeshLambertMaterial({ color: 0xffd43b }),
+        )
+        for (const spinner of spinners) {
+          const spinnerMesh = new THREE.Mesh(
+            track(
+              new THREE.BoxGeometry(
+                spinner.gimmick.length,
+                spinner.gimmick.height,
+                spinner.gimmick.thickness,
+              ),
+            ),
+            spinnerMaterial,
+          )
+          const endGeometry = track(
+            new THREE.SphereGeometry(spinner.gimmick.thickness * 0.9, 12, 8),
+          )
+          for (const x of [-spinner.gimmick.length / 2, spinner.gimmick.length / 2]) {
+            const end = new THREE.Mesh(endGeometry, spinnerEndMaterial)
+            end.position.x = x
+            spinnerMesh.add(end)
+          }
+          boardGroup.add(spinnerMesh)
+          spinnerVisuals.push({ body: spinner.body, mesh: spinnerMesh })
+        }
+
+        const bumperBodyMaterial = trackMaterial(
+          new THREE.MeshLambertMaterial({ color: 0xff5fa2 }),
+        )
+        const bumperBaseMaterial = trackMaterial(
+          new THREE.MeshLambertMaterial({ color: 0xffd43b }),
+        )
+        const bumperTopMaterial = trackMaterial(
+          new THREE.MeshLambertMaterial({ color: 0xfff3bf }),
+        )
+        for (const bumper of stage.gimmicks.bumpers) {
+          const bumperGroup = new THREE.Group()
+          bumperGroup.position.set(bumper.center.x, 0, bumper.center.z)
+
+          const bodyMesh = new THREE.Mesh(
+            track(
+              new THREE.CylinderGeometry(
+                bumper.radius,
+                bumper.radius * 0.92,
+                BUMPER_HEIGHT,
+                20,
+              ),
+            ),
+            bumperBodyMaterial,
+          )
+          bodyMesh.position.y = BUMPER_HEIGHT / 2
+          bumperGroup.add(bodyMesh)
+
+          const baseMesh = new THREE.Mesh(
+            track(
+              new THREE.CylinderGeometry(
+                bumper.radius * 1.45,
+                bumper.radius * 1.45,
+                0.06,
+                20,
+              ),
+            ),
+            bumperBaseMaterial,
+          )
+          baseMesh.position.y = 0.03
+          bumperGroup.add(baseMesh)
+
+          const topMesh = new THREE.Mesh(
+            track(
+              new THREE.CylinderGeometry(
+                bumper.radius * 0.55,
+                bumper.radius * 0.55,
+                0.06,
+                16,
+              ),
+            ),
+            bumperTopMaterial,
+          )
+          topMesh.position.y = BUMPER_HEIGHT + 0.03
+          bumperGroup.add(topMesh)
+
+          boardGroup.add(bumperGroup)
+          bumperVisuals.set(bumper.id, bumperGroup)
+        }
 
         cameraZoomScale = mazeZoomScale(zoomIndexRef.current)
         snapCameraFocusToBall()
@@ -549,8 +814,12 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     resetActionRef.current = () => {
       if (activeRunRef.current !== runToken) return
       if (ballBody === null) return
+      checkpointTracker = createCheckpointTracker()
       resetBall(ballBody, stage.start)
       stallTracker = createStallTracker()
+      spinnerTrapTracker = createSpinnerTrapTracker()
+      respawnGraceRemainingMs = RESPAWN_GRACE_MS
+      respawnSettleRemainingMs = RESPAWN_SETTLE_MS
       snapCameraFocusToBall()
       writeVisuals()
       applyVisualTilt(currentTilt)
