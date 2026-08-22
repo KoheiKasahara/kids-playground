@@ -2,13 +2,15 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { CAMERA_FOV, cameraDistanceOf, computeCameraSetup } from './dominoCamera'
 import { createBigCourse, createDominoCourse } from './dominoCourse'
-import { FLAG_COLS, FLAG_PITCH_X, getLayoutBounds } from './dominoLayout'
+import { getLayoutBounds } from './dominoLayout'
 import {
   advanceRailProgress,
   APPROACH_CAMERA_DISTANCE,
   APPROACH_MIN_HALF_WIDTH,
   approachCameraDistanceFor,
   buildBigCameraRail,
+  BIG_NEAR_FLAG_ROW_COUNT,
+  bigNearCameraBounds,
   buildLongCameraRail,
   CAMERA_BLEND_APPROACH_COUNT,
   CAMERA_PROGRESS_TILT_RAD,
@@ -456,17 +458,13 @@ describe('dominoCameraRail', () => {
   it('bigの実配置でも縦横画面の距離が寄りから単調に増える', () => {
     const course = createBigCourse('jp')
     const normalCourse = createDominoCourse('normal', 'jp')
-    // ビッグ開始時にふつうと同じ導線の見え方にするため、寄り側のX幅をふつうの国旗半幅に合わせる。
-    const nearHalfWidth = (FLAG_COLS / 2) * FLAG_PITCH_X
     for (const aspect of [390 / 780, 844 / 390]) {
-      const nearBounds = getLayoutBounds(
-        course.placements.filter(
-          (placement) =>
-            Math.abs(placement.x) <= nearHalfWidth &&
-            (placement.kind !== 'flag' || (placement.row ?? 0) < 4),
-        ),
+      const nearBounds = bigNearCameraBounds(course.placements, course.flagLayout)
+      const nearSetup = computeCameraSetup(
+        nearBounds,
+        aspect,
+        BIG_NEAR_FLAG_ROW_COUNT,
       )
-      const nearSetup = computeCameraSetup(nearBounds, aspect, 4)
       const wideSetup = computeCameraSetup(
         course.flagCameraBounds,
         aspect,

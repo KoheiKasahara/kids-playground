@@ -7,7 +7,7 @@ import {
   getLayoutBounds,
   type DominoPlacement,
 } from './dominoLayout'
-import { createBigCourse, createDominoCourse } from './dominoCourse'
+import { createBigCourse, createDominoCourse, type DominoCourse } from './dominoCourse'
 import { GROUND_SIZE } from './dominoPhysics'
 import { dominoFlags } from './flagDefinitions'
 
@@ -50,6 +50,24 @@ describe('createDominoCourse', () => {
     expect(course.cameraMode).toBe('bigPullout')
     expect(course.hardTimeoutMs).toBe(BIG_HARD_TIMEOUT_MS)
     expect(course.groundSize).toBeGreaterThanOrEqual(80)
+  })
+
+  it('bigのSTARTから国旗までの導線はふつうと同じ長さになる', () => {
+    // Issue #142の「導線はふつうと同程度に短い」を、行数が増えても保つための回帰テスト。
+    // 国旗が奥へ広がるぶん扇状分岐と直線も一緒に下がるため、両者の差は変わらないはず。
+    const approachLengthOf = (course: DominoCourse): number => {
+      const start = course.placements.find((placement) => placement.id === course.startId)
+      const firstFlagRow = course.placements.filter(
+        (placement) => placement.kind === 'flag' && placement.row === 0,
+      )
+      if (!start || firstFlagRow.length === 0) throw new Error('導線の基準が見つかりません')
+      return firstFlagRow[0]!.z - start.z
+    }
+
+    expect(approachLengthOf(createBigCourse('jp'))).toBeCloseTo(
+      approachLengthOf(createDominoCourse('normal', 'jp')),
+      10,
+    )
   })
 
   it('bigはlayoutを差し替えてサイズ比較できる', () => {

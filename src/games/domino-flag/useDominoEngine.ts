@@ -6,8 +6,6 @@ import { FLAG_COLOR_HEX, type DominoFlagId } from './flagDefinitions'
 import {
   DOMINO_DEPTH,
   DOMINO_HEIGHT,
-  FLAG_COLS,
-  FLAG_PITCH_X,
   getLayoutBounds,
   LINE_COUNT,
 } from './dominoLayout'
@@ -17,6 +15,8 @@ import {
   advanceRailProgress,
   approachCameraDistanceFor,
   BIG_CAMERA_PULLOUT_MS,
+  BIG_NEAR_FLAG_ROW_COUNT,
+  bigNearCameraBounds,
   buildBigCameraRail,
   buildLongCameraRail,
   CAMERA_LAMBDA,
@@ -83,9 +83,6 @@ const LONG_CAMERA_FAR = 150
  * 地面端までの距離も含めて十分な余裕を持たせ、引きのカメラでfar面を横切らない220にする。
  */
 const BIG_CAMERA_FAR = 220
-const BIG_NEAR_FLAG_ROW_COUNT = 4
-// ビッグ開始時もふつうと同じ導線の見え方にするため、寄りカメラの幅はふつうの国旗半幅に制限する。
-const BIG_NEAR_HALF_WIDTH = (FLAG_COLS / 2) * FLAG_PITCH_X
 
 /** Rapierのwasm初期化をモジュール内で一度だけ実行し、再入場時に共有する。 */
 function initializeRapier(): Promise<void> {
@@ -159,13 +156,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     const placements = course.placements
     const layoutBounds = course.flagCameraBounds
     const bigNearFlagRows = Math.min(BIG_NEAR_FLAG_ROW_COUNT, course.flagLayout.rows)
-    const bigNearBounds = getLayoutBounds(
-      placements.filter(
-        (placement) =>
-          Math.abs(placement.x) <= BIG_NEAR_HALF_WIDTH &&
-          (placement.kind !== 'flag' || (placement.row ?? 0) < bigNearFlagRows),
-      ),
-    )
+    const bigNearBounds = bigNearCameraBounds(placements, course.flagLayout)
     const flagPlacements = placements.filter((placement) => placement.kind === 'flag')
     const bodies: RenderDominoBodyEntry[] = []
     const bodiesById = new Map<string, DominoBodyEntry>()

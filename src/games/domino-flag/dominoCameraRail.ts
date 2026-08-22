@@ -5,7 +5,14 @@ import {
   cameraDistanceOf,
   computeCameraSetup,
 } from './dominoCamera'
-import { LINE_COUNT } from './dominoLayout'
+import {
+  FLAG_COLS,
+  FLAG_PITCH_X,
+  getLayoutBounds,
+  LINE_COUNT,
+  type DominoPlacement,
+  type FlagLayoutSpec,
+} from './dominoLayout'
 
 export type RailVec3 = { x: number; y: number; z: number }
 
@@ -17,6 +24,30 @@ export type CameraRailAnchor = {
 }
 
 export type CameraRailPose = { target: RailVec3; distance: number }
+
+/** ビッグ開始時に見せる国旗の行数。導線から国旗へ視線が移るきっかけだけを寄り構図へ含める。 */
+export const BIG_NEAR_FLAG_ROW_COUNT = 4
+
+// ふつうモードと同じ導線の見え方にするため、寄りカメラのX幅をふつうの国旗半幅に制限する。
+export const BIG_NEAR_HALF_WIDTH = (FLAG_COLS / 2) * FLAG_PITCH_X
+
+/**
+ * ビッグの寄りカメラ用境界を求める純粋関数。
+ * アームの外側や国旗の奥行き全体を除外し、エンジンとテストが同じ条件で構図を検証できるようにする。
+ */
+export function bigNearCameraBounds(
+  placements: DominoPlacement[],
+  layout: FlagLayoutSpec,
+): ReturnType<typeof getLayoutBounds> {
+  const nearFlagRows = Math.min(BIG_NEAR_FLAG_ROW_COUNT, layout.rows)
+  return getLayoutBounds(
+    placements.filter(
+      (placement) =>
+        Math.abs(placement.x) <= BIG_NEAR_HALF_WIDTH &&
+        (placement.kind !== 'flag' || (placement.row ?? 0) < nearFlagRows),
+    ),
+  )
+}
 
 export type CameraRailBuildOptions = {
   reducedMotion?: boolean
