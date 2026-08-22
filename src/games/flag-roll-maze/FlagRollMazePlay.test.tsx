@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FlagRollMazePlay from './FlagRollMazePlay'
 import FlagRollMazeSelect from './FlagRollMazeSelect'
 import type { MazeEngineOptions } from './useMazeEngine'
@@ -25,6 +25,24 @@ const soundMock = vi.hoisted(() => ({
   playCorrectSound: vi.fn(),
 }))
 const navigateMock = vi.hoisted(() => vi.fn())
+const originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
+
+function stubMatchMedia(reducedMotion: boolean) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn((query: string) => ({
+      matches: reducedMotion,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => true),
+    })),
+  })
+}
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
@@ -77,12 +95,21 @@ const lastTilt = () => engineMock.setTilt.mock.calls.at(-1)?.[0]
 
 describe('FlagRollMazePlay', () => {
   beforeEach(() => {
+    stubMatchMedia(false)
     engineMock.options = undefined
     engineMock.setTilt.mockClear()
     engineMock.resetBallToStart.mockClear()
     soundMock.primeAudio.mockClear()
     soundMock.playCorrectSound.mockClear()
     navigateMock.mockClear()
+  })
+
+  afterEach(() => {
+    if (originalMatchMediaDescriptor) {
+      Object.defineProperty(window, 'matchMedia', originalMatchMediaDescriptor)
+    } else {
+      delete (window as unknown as Record<string, unknown>).matchMedia
+    }
   })
 
   it('最初は遊び方の説明とスティックが出ている', () => {
@@ -93,6 +120,19 @@ describe('FlagRollMazePlay', () => {
     expect(engineMock.options?.flag.id).toBe('jp')
     expect(engineMock.options?.stageId).toBe(DEFAULT_MAZE_STAGE_ID)
     expect(screen.getByText('🟢 かんたん')).toBeInTheDocument()
+  })
+
+  it('⭐を取るとHUDの表示が増える', () => {
+    renderPlay()
+
+    const starHud = screen.getByRole('status', { name: 'あつめた ⭐' })
+    expect(starHud).toHaveTextContent('⭐ 0 / 3')
+
+    act(() => {
+      engineMock.options?.onStarCollected?.(1, 3)
+    })
+
+    expect(starHud).toHaveTextContent('⭐ 1 / 3')
   })
 
   it('遷移stateで選んだstageIdをエンジンへ渡す', () => {
@@ -188,24 +228,59 @@ describe('FlagRollMazePlay', () => {
     expect(engineMock.options!.stageId).toBe(DEFAULT_MAZE_STAGE_ID)
   })
 
-  it('ゴールすると結果を知らせ、音を鳴らし、もういちどを出す', () => {
+  it('ゴールすると結果を知らせ、もういちどを出す', () => {
     renderPlay()
     expect(engineMock.options).toBeDefined()
 
+    act(() => engineMock.options?.onStarCollected?.(2, 3))
     act(() => engineMock.options!.onGoal())
 
     // 結果と復帰通知で読み上げ領域が2つあるため、結果側の文言で確かめる。
     expect(screen.getByText('ゴール！ すごい！')).toHaveAttribute('aria-live', 'polite')
-    expect(soundMock.playCorrectSound).toHaveBeenCalledTimes(1)
+    // ゴールSEはエンジンが鳴らすため、プレイ画面では鳴らさない。
+    expect(soundMock.playCorrectSound).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'もういちど' })).toBeInTheDocument()
     expect(document.querySelector('img[src$="/jp.svg"]')).toHaveAttribute(
       'src',
       expect.stringContaining('/jp.svg'),
     )
     expect(screen.getByText('にほん')).toBeInTheDocument()
+    expect(screen.getByText('🟢 かんたん')).toBeInTheDocument()
+    expect(screen.getByText('⭐ 2 / 3')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'つぎの ステージ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'えらびなおす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'こっきを かえる' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'スタートに もどる' })).toBeNull()
+  })
+
+  it('星を1つも取らずにゴールしてもクリアできる', () => {
+    renderPlay()
+
+    act(() => engineMock.options!.onGoal())
+
+    expect(screen.getByText('ゴール！ すごい！')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もういちど' })).toBeInTheDocument()
+  })
+
+  it('ゴール後だけ小さな演出を描画する', () => {
+    renderPlay()
+    expect(screen.queryByTestId('maze-goal-burst')).toBeNull()
+
+    act(() => engineMock.options!.onGoal())
+
+    const burst = screen.getByTestId('maze-goal-burst')
+    expect(burst).toHaveAttribute('aria-hidden', 'true')
+    expect(burst.querySelectorAll('span')).toHaveLength(12)
+  })
+
+  it('動きを減らす設定では演出を出さず、結果表示だけを残す', () => {
+    stubMatchMedia(true)
+    renderPlay()
+
+    act(() => engineMock.options!.onGoal())
+
+    expect(screen.queryByTestId('maze-goal-burst')).toBeNull()
+    expect(screen.getByText('ゴール！ すごい！')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もういちど' })).toBeInTheDocument()
   })
 
   it('ゴール後はスティックもキーも受け付けない', () => {
@@ -224,12 +299,14 @@ describe('FlagRollMazePlay', () => {
   it('「もういちど」で物理世界を作り直して最初から遊べる', async () => {
     const user = userEvent.setup()
     renderPlay()
+    act(() => engineMock.options?.onStarCollected?.(2, 3))
     act(() => engineMock.options!.onGoal())
 
     await user.click(screen.getByRole('button', { name: 'もういちど' }))
 
     expect(engineMock.options!.runId).toBe(1)
     expect(engineMock.options!.stageId).toBe(DEFAULT_MAZE_STAGE_ID)
+    expect(screen.getByRole('status', { name: 'あつめた ⭐' })).toHaveTextContent('⭐ 0 / 3')
     expect(screen.getByText(/ゴールまで ボールを ころがそう/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'スタートに もどる' })).toBeInTheDocument()
   })
@@ -255,12 +332,14 @@ describe('FlagRollMazePlay', () => {
     renderPlay()
     const nextStage = nextMazeStageId(DEFAULT_MAZE_STAGE_ID)
     expect(nextStage).not.toBeNull()
+    act(() => engineMock.options?.onStarCollected?.(1, 3))
     act(() => engineMock.options!.onGoal())
 
     await user.click(screen.getByRole('button', { name: 'つぎの ステージ' }))
 
     expect(engineMock.options!.stageId).toBe(nextStage)
     expect(engineMock.options!.runId).toBe(1)
+    expect(screen.getByRole('status', { name: 'あつめた ⭐' })).toHaveTextContent('⭐ 0 / 3')
     expect(screen.getByRole('button', { name: 'スタートに もどる' })).toBeInTheDocument()
   })
 
@@ -269,6 +348,18 @@ describe('FlagRollMazePlay', () => {
     act(() => engineMock.options!.onGoal())
 
     expect(screen.queryByRole('button', { name: 'つぎの ステージ' })).toBeNull()
+    expect(screen.getByText('ぜんぶ クリア！')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もういちど' })).toBeInTheDocument()
+  })
+
+  it('「こっきを かえる」でこっき選択へ戻る', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    act(() => engineMock.options!.onGoal())
+
+    await user.click(screen.getByRole('button', { name: 'こっきを かえる' }))
+
+    expect(navigateMock).toHaveBeenCalledWith('/games/flag-roll-maze', { replace: true })
   })
 
   it('穴に落ちたときは専用の復帰メッセージを知らせる', () => {

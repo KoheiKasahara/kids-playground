@@ -97,6 +97,24 @@ describe('createMazeStage', () => {
     }
   })
 
+  it('starCellsをワールド座標へ変換し、配列順のIDを付ける', () => {
+    const customStage = createMazeStage(MAZE_STAGE_ROWS, {
+      starCells: [
+        { column: 2, row: 1 },
+        { column: 3, row: 2 },
+      ],
+    })
+
+    expect(customStage.stars).toEqual([
+      { id: 'star-1', center: cellToWorld(2, 1, 11, 11) },
+      { id: 'star-2', center: cellToWorld(3, 2, 11, 11) },
+    ])
+  })
+
+  it('starCellsを省略したステージは星を持たない', () => {
+    expect(createMazeStage(MAZE_STAGE_ROWS).stars).toEqual([])
+  })
+
   it('盤面境界がカメラ用に左右対称になる', () => {
     const bounds = mazeStageBounds(stage)
     expect(bounds.maxX).toBeCloseTo(-bounds.minX, 6)

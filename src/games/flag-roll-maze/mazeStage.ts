@@ -1,5 +1,6 @@
 import { CELL_SIZE, cellToWorld } from './mazeGrid'
 import type { MazePoint } from './mazeGrid'
+import type { MazeStar } from './mazeStars'
 import {
   resolveGimmicks,
   type CellCoordinate,
@@ -54,6 +55,8 @@ export type MazeStage = {
   holes: MazeHole[]
   gimmicks: MazeGimmicks
   checkpoints: MazePoint[]
+  /** ⭐はクリア条件ではなく、1つも取らなくてもGOALへ入れる寄り道の収集要素。 */
+  stars: MazeStar[]
   start: MazePoint
   goal: MazePoint
 }
@@ -208,6 +211,7 @@ export function createMazeStage(
     nameJa?: string
     gimmicks?: readonly GimmickPlacement[]
     checkpointCells?: readonly CellCoordinate[]
+    starCells?: readonly CellCoordinate[]
   } = {},
 ): MazeStage {
   const rowCount = rows.length
@@ -223,6 +227,10 @@ export function createMazeStage(
   const checkpoints = requestedCheckpointCells.map((cell) =>
     cellToWorld(cell.column, cell.row, columnCount, rowCount),
   )
+  const stars = (options.starCells ?? []).map((cell, index) => ({
+    id: `star-${index + 1}`,
+    center: cellToWorld(cell.column, cell.row, columnCount, rowCount),
+  }))
   // 復帰処理が常に安全な起点を持てるよう、外部指定でも先頭をSTARTに保証する。
   if (!samePoint(checkpoints[0], start)) checkpoints.unshift(start)
 
@@ -243,6 +251,7 @@ export function createMazeStage(
       rowCount,
     ),
     checkpoints,
+    stars,
     start,
     goal,
   }

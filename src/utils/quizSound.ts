@@ -372,3 +372,61 @@ export function playDominoCompleteSound(): void {
   // 最後のC6だけ薄く重ね、短い成功感を足す。
   playTone(ctx, 2093, now + 0.34, 0.42, 0.08, 'sine')
 }
+
+// --- こっきころころめいろ専用の効果音 ---
+
+/** 壁に当たった「コツ」。衝突判定側で間引くため、ここではクールダウンを持たせない。 */
+export function playMazeWallHitSound(intensity: number): void {
+  if (!soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+
+  const safeIntensity = Number.isFinite(intensity)
+    ? Math.min(1, Math.max(0, intensity))
+    : 0
+  // 240〜360Hz帯で毎回少しだけ高さを変え、同じ壁への連続接触を単調に聞かせない。
+  const frequency = 240 + Math.random() * 120
+  const volume = 0.018 + safeIntensity * 0.032
+  playDominoClick(ctx, frequency, ctx.currentTime, 0.045, volume, 'triangle')
+}
+
+/** 星を取った「キラッ」。集めた順にペンタトニックを一段ずつ上がる2音にする。 */
+export function playMazeStarSound(collectedIndex: number): void {
+  if (!soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+
+  const safeIndex = Number.isFinite(collectedIndex)
+    ? Math.min(
+        PENTATONIC_STEPS.length - 1,
+        Math.max(0, Math.trunc(collectedIndex)),
+      )
+    : 0
+  const nextIndex = Math.min(safeIndex + 1, PENTATONIC_STEPS.length - 1)
+  const firstSemitones = PENTATONIC_STEPS[safeIndex]!
+  const secondSemitones = PENTATONIC_STEPS[nextIndex]! + (safeIndex === nextIndex ? 12 : 0)
+  const baseFrequency = 523.25 // C5
+  const now = ctx.currentTime
+  playTone(ctx, baseFrequency * 2 ** (firstSemitones / 12), now, 0.09, 0.07, 'sine')
+  playTone(
+    ctx,
+    baseFrequency * 2 ** (secondSemitones / 12),
+    now + 0.05,
+    0.1,
+    0.06,
+    'sine',
+  )
+}
+
+/** ゴールの「できた！」。C5からC6までを0.1秒間隔で短く駆け上がる。 */
+export function playMazeGoalSound(): void {
+  if (!soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+
+  const now = ctx.currentTime
+  const frequencies = [523.25, 659.25, 783.99, 1046.5] // C5→E5→G5→C6
+  frequencies.forEach((frequency, index) => {
+    playTone(ctx, frequency, now + index * 0.1, 0.28, 0.16, 'triangle')
+  })
+}

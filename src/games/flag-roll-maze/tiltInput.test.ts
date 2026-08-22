@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyTiltDeadzone,
+  applyTiltResponseCurve,
   clampTiltMagnitude,
   isTiltKeyCode,
   NEUTRAL_TILT,
   smoothTilt,
+  TILT_RESPONSE_EXPONENT,
   TILT_DEADZONE,
   tiltFromPressedKeys,
   tiltFromStickOffset,
@@ -42,6 +44,34 @@ describe('applyTiltDeadzone', () => {
   it('デッドゾーンを掛けても方向は変わらない', () => {
     const tilt = applyTiltDeadzone({ x: 0.6, y: 0.8 })
     expect(tilt.y / tilt.x).toBeCloseTo(0.8 / 0.6, 6)
+  })
+})
+
+describe('applyTiltResponseCurve', () => {
+  it('大きさ0は中立を返す', () => {
+    expect(applyTiltResponseCurve({ x: 0, y: 0 })).toEqual(NEUTRAL_TILT)
+  })
+
+  it('大きさ1は1のまま最大入力へ届く', () => {
+    expect(magnitudeOf(applyTiltResponseCurve({ x: 0, y: 1 }))).toBeCloseTo(1, 6)
+  })
+
+  it('中間値は線形入力より小さくなる', () => {
+    const curved = applyTiltResponseCurve({ x: 0.5, y: 0 })
+
+    expect(curved.x).toBeCloseTo(0.5 ** TILT_RESPONSE_EXPONENT, 6)
+    expect(curved.x).toBeLessThan(0.5)
+  })
+
+  it('方向を保ったまま大きさだけを変える', () => {
+    const curved = applyTiltResponseCurve({ x: 0.3, y: 0.4 })
+
+    expect(curved.y / curved.x).toBeCloseTo(0.4 / 0.3, 6)
+  })
+
+  it('非有限値は中立を返す', () => {
+    expect(applyTiltResponseCurve({ x: Number.NaN, y: 0 })).toEqual(NEUTRAL_TILT)
+    expect(applyTiltResponseCurve({ x: Number.POSITIVE_INFINITY, y: 0 })).toEqual(NEUTRAL_TILT)
   })
 })
 

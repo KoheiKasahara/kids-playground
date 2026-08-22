@@ -92,12 +92,18 @@ describe('quizSound', () => {
       playIncorrectSound,
       playDominoTickSound,
       playDominoCompleteSound,
+      playMazeWallHitSound,
+      playMazeStarSound,
+      playMazeGoalSound,
     } = await import('./quizSound')
 
     expect(() => playCorrectSound()).not.toThrow()
     expect(() => playIncorrectSound()).not.toThrow()
     expect(() => playDominoTickSound(0.5)).not.toThrow()
     expect(() => playDominoCompleteSound()).not.toThrow()
+    expect(() => playMazeWallHitSound(0.5)).not.toThrow()
+    expect(() => playMazeStarSound(0)).not.toThrow()
+    expect(() => playMazeGoalSound()).not.toThrow()
     expect(instances).toHaveLength(0)
   })
 
@@ -192,6 +198,9 @@ describe('quizSound', () => {
       playCorrectSound,
       playDominoTickSound,
       playDominoCompleteSound,
+      playMazeWallHitSound,
+      playMazeStarSound,
+      playMazeGoalSound,
       setSoundEnabled,
       isSoundEnabled,
     } = await import('./quizSound')
@@ -204,6 +213,9 @@ describe('quizSound', () => {
     playCorrectSound()
     playDominoTickSound(1)
     playDominoCompleteSound()
+    playMazeWallHitSound(1)
+    playMazeStarSound(0)
+    playMazeGoalSound()
 
     expect(instances).toHaveLength(0)
   })
@@ -217,6 +229,24 @@ describe('quizSound', () => {
     playDominoCompleteSound()
 
     expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(7)
+  })
+
+  test('こっきころころめいろの壁・星・ゴール音は規定本数だけ鳴らす', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const {
+      playMazeWallHitSound,
+      playMazeStarSound,
+      playMazeGoalSound,
+    } = await import('./quizSound')
+
+    playMazeWallHitSound(0.5)
+    playMazeStarSound(0)
+    playMazeGoalSound()
+
+    expect(instances).toHaveLength(1)
+    // 壁1音、星2音、ゴール4音。連続衝突用の壁音もオシレーターを増やしすぎない。
     expect(instances[0].createOscillator).toHaveBeenCalledTimes(7)
   })
 

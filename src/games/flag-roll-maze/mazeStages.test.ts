@@ -34,6 +34,19 @@ describe('ステージカタログ', () => {
     }
   })
 
+  it('各ステージに星を3個ずつ置き、クリア条件とは別に管理する', () => {
+    for (const definition of MAZE_STAGES) {
+      const stage = createMazeStageById(definition.id)
+      expect(definition.starCells).toHaveLength(3)
+      expect(stage.stars).toHaveLength(3)
+      expect(stage.stars.map((star) => star.id)).toEqual([
+        'star-1',
+        'star-2',
+        'star-3',
+      ])
+    }
+  })
+
   it('各ステージの最短経路は短すぎず、遊びとして曲がる余地がある', () => {
     for (const stage of MAZE_STAGES) {
       const path = findMazePath(stage.rows)

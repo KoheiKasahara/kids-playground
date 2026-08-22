@@ -33,6 +33,11 @@ export const MAX_FRAME_DELTA_MS = 100
  */
 export const BALL_RADIUS = 0.63
 
+/** 星の見た目の大きさ。ボールより明らかに小さく、通り道を塞がない。 */
+export const STAR_VISUAL_RADIUS = BALL_RADIUS * 0.42
+/** 星を浮かせる高さ。ボールの中心と同じ高さにして、転がって当たれば必ず取れる。 */
+export const STAR_HOVER_Y = BALL_RADIUS
+
 /** 1マスを3Rにして、直径2Rのボールの左右へ片側0.5Rの余白を確保する。 */
 export const CELL_SIZE_IN_RADII = 3.0
 
