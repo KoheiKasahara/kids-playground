@@ -12,6 +12,8 @@ import {
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
+  STAR_HOVER_Y,
+  STAR_VISUAL_RADIUS,
   visualTiltPivotOffset,
   visualTiltRotation,
   WALL_HEIGHT,
@@ -38,9 +40,22 @@ import {
   isGoalReached,
   limitBallSpeed,
   nudgeBall,
+  popBallAtGoal,
   pushBallOutOfSpinner,
   resetBall,
 } from './mazeWorld'
+import {
+  createImpactTracker,
+  updateImpactTracker,
+  type ImpactTracker,
+} from './mazeImpact'
+import {
+  collectedStarCount,
+  createStarTracker,
+  isStarCollected,
+  updateStarTracker,
+  type StarTracker,
+} from './mazeStars'
 import {
   checkpointPosition,
   createCheckpointTracker,
@@ -60,7 +75,12 @@ import {
 import type { BumperCooldowns } from './mazeGimmicks'
 import { NEUTRAL_TILT, smoothTilt, type TiltInput } from './tiltInput'
 import { createResizeScheduler } from './sceneResize'
-import { playPinballBumperSound } from '../../utils/quizSound'
+import {
+  playMazeGoalSound,
+  playMazeStarSound,
+  playMazeWallHitSound,
+  playPinballBumperSound,
+} from '../../utils/quizSound'
 import type { RigidBody, World } from '@dimforge/rapier3d-compat'
 
 let rapierInitPromise: Promise<void> | null = null
@@ -96,6 +116,11 @@ export type MazeEngineOptions = {
   onGoal: () => void
   /** 場外やスタックから自動復帰したとき呼ぶ。表示用で、ゲーム進行は止めない。 */
   onRescue?: (reason?: 'hole' | 'outOfBounds' | 'stuck') => void
+  /**
+   * ⭐を取ったとき、そのrunでの累計取得数を渡す。
+   * 1ステージ3個までしか呼ばれないので、React state更新の頻度は問題にならない。
+   */
+  onStarCollected?: (collectedCount: number, totalCount: number) => void
 }
 
 export type MazeEngineHandle = {
@@ -188,6 +213,8 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let respawnSettleRemainingMs = 0
     // クールダウンをrun内に閉じ込め、もういちどで前の衝突履歴を持ち越さない。
     const bumperCooldowns: BumperCooldowns = new Map()
+    let impactTracker: ImpactTracker = createImpactTracker()
+    let starTracker: StarTracker = createStarTracker()
     let cameraFocus: MazeCameraFocus = { x: 0, z: 0 }
     // 標準距離は画面比だけで決まる。ズームはそこへ掛ける倍率として持つ。
     let cameraBaseDistance = computeMazeCameraDistance(1)
@@ -199,6 +226,8 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     const spinnerVisuals: { body: RigidBody; mesh: THREE.Mesh }[] = []
     const bumperVisuals = new Map<string, THREE.Group>()
     const bumperPopStartedAtMs = new Map<string, number>()
+    const starVisuals: { id: string; mesh: THREE.Mesh }[] = []
+    const starPopStartedAtMs = new Map<string, number>()
     let prefersReducedMotion = false
 
     const track = <T extends THREE.BufferGeometry>(geometry: T): T => {
@@ -267,6 +296,11 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       spinnerVisuals.length = 0
       bumperVisuals.clear()
       bumperPopStartedAtMs.clear()
+      starVisuals.length = 0
+      starPopStartedAtMs.clear()
+      bumperCooldowns.clear()
+      impactTracker = createImpactTracker()
+      starTracker = createStarTracker()
 
       if (world !== null) {
         world.free()
@@ -364,6 +398,60 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       }
     }
 
+    function updateStarVisuals(nowMs?: number) {
+      for (let index = 0; index < starVisuals.length; index += 1) {
+        const visual = starVisuals[index]
+        if (visual === undefined) continue
+        if (isStarCollected(starTracker, visual.id) || starPopStartedAtMs.has(visual.id)) {
+          continue
+        }
+
+        // 復帰直後など時刻を持たない描画では、回している途中の角度をそのまま残す。
+        // ここで0へ戻すと、場外復帰のたびに星の向きが跳ねて見えてしまう。
+        if (nowMs === undefined) continue
+        if (prefersReducedMotion) {
+          visual.mesh.rotation.set(0, 0, 0)
+          visual.mesh.position.y = STAR_HOVER_Y
+          continue
+        }
+
+        const phase = index * 1.7
+        visual.mesh.rotation.y = nowMs * 0.001 + phase
+        visual.mesh.rotation.x = Math.sin(nowMs * 0.0007 + phase) * 0.12
+        visual.mesh.position.y = STAR_HOVER_Y + Math.sin(nowMs * 0.003 + phase) * 0.08
+      }
+    }
+
+    function updateStarPops(nowMs: number) {
+      for (const [id, startedAtMs] of starPopStartedAtMs) {
+        let mesh: THREE.Mesh | undefined
+        for (const visual of starVisuals) {
+          if (visual.id === id) {
+            mesh = visual.mesh
+            break
+          }
+        }
+        if (mesh === undefined) {
+          starPopStartedAtMs.delete(id)
+          continue
+        }
+
+        const progress = Math.min(1, Math.max(0, (nowMs - startedAtMs) / 260))
+        if (progress >= 1 || prefersReducedMotion) {
+          mesh.scale.setScalar(0)
+          mesh.visible = false
+          starPopStartedAtMs.delete(id)
+          continue
+        }
+
+        mesh.visible = true
+        const scale = progress < 0.5
+          ? 1 + 0.8 * (progress * 2)
+          : 1.8 * ((1 - progress) * 2)
+        mesh.scale.setScalar(scale)
+      }
+    }
+
     function writeVisuals(nowMs?: number) {
       if (ballMesh && ballBody) {
         const translation = ballBody.translation()
@@ -379,7 +467,11 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         mesh.position.set(translation.x, translation.y, translation.z)
         mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
       }
-      if (nowMs !== undefined) updateBumperPops(nowMs)
+      updateStarVisuals(nowMs)
+      if (nowMs !== undefined) {
+        updateBumperPops(nowMs)
+        updateStarPops(nowMs)
+      }
     }
 
     /** 生成・リセット・救出の直後は、カメラをボール位置へ飛び移らせず即座に合わせる。 */
@@ -426,6 +518,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         stage.start,
       )
       resetBall(ballBody, point)
+      // チェックポイント復帰で星まで消すと、落ちるたびに集め直しになって幼児がつらいため、星の状態は残す。
       stallTracker = createStallTracker()
       spinnerTrapTracker = createSpinnerTrapTracker()
       respawnGraceRemainingMs = RESPAWN_GRACE_MS
@@ -442,8 +535,27 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       }
     }
 
+    function startStarPops(collectedIds: readonly string[], nowMs: number) {
+      for (const id of collectedIds) {
+        const visual = starVisuals.find(({ id: visualId }) => visualId === id)
+        if (visual === undefined) continue
+
+        if (prefersReducedMotion) {
+          visual.mesh.scale.setScalar(0)
+          visual.mesh.visible = false
+        } else {
+          visual.mesh.scale.setScalar(1)
+          visual.mesh.visible = true
+          starPopStartedAtMs.set(id, nowMs)
+        }
+      }
+    }
+
     function stepPhysics(deltaMs: number, nowMs: number) {
       if (world === null || ballBody === null) return
+      // linvel()は呼ぶたびに値を作るため、衝突判定用の速さは1回の取得から求める。
+      const velocityBefore = ballBody.linvel()
+      const speedBefore = Math.hypot(velocityBefore.x, velocityBefore.z)
       accumulator += deltaMs / 1000
       let substeps = 0
       while (accumulator >= PHYSICS_TIMESTEP && substeps < MAX_PHYSICS_SUBSTEPS) {
@@ -453,6 +565,14 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         accumulator -= PHYSICS_TIMESTEP
         substeps += 1
       }
+      const velocityAfter = ballBody.linvel()
+      const speedAfter = Math.hypot(velocityAfter.x, velocityAfter.z)
+      const impact = updateImpactTracker(impactTracker, {
+        speedBefore,
+        speedAfter,
+        nowMs,
+      })
+      impactTracker = impact.tracker
       // 追いつけないほど遅れたら、溜まった時間を捨てて次のフレームから作り直す。
       if (substeps >= MAX_PHYSICS_SUBSTEPS && accumulator >= PHYSICS_TIMESTEP) {
         accumulator = 0
@@ -468,6 +588,17 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       if (kickedIds.length > 0) {
         playPinballBumperSound()
         startBumperPops(kickedIds, nowMs)
+      } else if (
+        impact.intensity !== null &&
+        !goalNotified &&
+        respawnGraceRemainingMs <= 0 &&
+        respawnSettleRemainingMs <= 0 &&
+        deltaMs > 0
+      ) {
+        // ゴール後は静かにし、復帰直後は無敵・静止時間中の接触音を出さない。
+        // deltaMsが0のフレームも、同じ時刻の衝突を重ねて鳴らさない。
+        // バンパーがキックしたフレームは専用音を優先し、壁衝突音を重ねない。
+        playMazeWallHitSound(impact.intensity)
       }
     }
 
@@ -552,8 +683,25 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
               } else {
                 if (stall.nudge) nudgeBall(ballBody, currentTilt)
 
+                const starUpdate = updateStarTracker(starTracker, position, stage.stars)
+                starTracker = starUpdate.tracker
+                if (starUpdate.collectedIds.length > 0) {
+                  const totalCollected = collectedStarCount(starTracker)
+                  startStarPops(starUpdate.collectedIds, now)
+                  for (let index = 0; index < starUpdate.collectedIds.length; index += 1) {
+                    playMazeStarSound(
+                      totalCollected - starUpdate.collectedIds.length + index,
+                    )
+                  }
+                  // 同じフレームに複数個取っても、React側への通知は1回にまとめる。
+                  optionsRef.current.onStarCollected?.(totalCollected, stage.stars.length)
+                }
+
+                // ⭐はクリア条件ではないため、残していても従来どおりゴール判定だけでクリアする。
                 if (isGoalReached(position, stage.goal)) {
                   goalNotified = true
+                  playMazeGoalSound()
+                  if (!prefersReducedMotion) popBallAtGoal(ballBody)
                   optionsRef.current.onGoal()
                 }
               }
@@ -673,6 +821,18 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         )
         startMesh.position.set(stage.start.x, 0.02, stage.start.z)
         boardGroup.add(startMesh)
+
+        // 星は同じ形状とマテリアルを共有し、盤面と一緒に傾いて通り道を塞がないようにする。
+        const starGeometry = track(new THREE.OctahedronGeometry(STAR_VISUAL_RADIUS, 0))
+        const starMaterial = trackMaterial(
+          new THREE.MeshLambertMaterial({ color: 0xffd43b }),
+        )
+        for (const star of stage.stars) {
+          const starMesh = new THREE.Mesh(starGeometry, starMaterial)
+          starMesh.position.set(star.center.x, STAR_HOVER_Y, star.center.z)
+          boardGroup.add(starMesh)
+          starVisuals.push({ id: star.id, mesh: starMesh })
+        }
 
         let flagBall: THREE.Object3D
         try {
@@ -817,7 +977,19 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     resetActionRef.current = () => {
       if (activeRunRef.current !== runToken) return
       if (ballBody === null) return
+      goalNotified = false
       checkpointTracker = createCheckpointTracker()
+      starTracker = createStarTracker()
+      starPopStartedAtMs.clear()
+      for (const { mesh } of starVisuals) {
+        mesh.visible = true
+        mesh.scale.setScalar(1)
+        mesh.rotation.set(0, 0, 0)
+        mesh.position.y = STAR_HOVER_Y
+      }
+      optionsRef.current.onStarCollected?.(0, stage.stars.length)
+      impactTracker = createImpactTracker()
+      bumperCooldowns.clear()
       resetBall(ballBody, stage.start)
       stallTracker = createStallTracker()
       spinnerTrapTracker = createSpinnerTrapTracker()

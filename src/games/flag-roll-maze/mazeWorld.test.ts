@@ -25,6 +25,7 @@ import {
   createMazeWorld,
   isGoalReached,
   limitBallSpeed,
+  popBallAtGoal,
   resetBall,
   pushBallOutOfSpinner,
 } from './mazeWorld'
@@ -598,5 +599,26 @@ describe('isGoalReached', () => {
     const stage = createMazeStageById('adventure')
     expect(isGoalReached({ x: stage.goal.x + 2, y: 0, z: stage.goal.z }, stage.goal))
       .toBe(false)
+  })
+})
+
+describe('popBallAtGoal', () => {
+  beforeAll(async () => {
+    await RAPIER.init()
+  })
+
+  it('上向きへ跳ね、水平の勢いを小さくする', () => {
+    const stage = createMazeStageById('adventure')
+    const { world, ball } = createMazeWorld(RAPIER, stage)
+    try {
+      ball.setLinvel({ x: 2.4, y: -0.5, z: -1.8 }, true)
+      popBallAtGoal(ball)
+
+      const velocity = ball.linvel()
+      expect(velocity.y).toBeGreaterThan(0)
+      expect(Math.hypot(velocity.x, velocity.z)).toBeLessThan(Math.hypot(2.4, -1.8))
+    } finally {
+      world.free()
+    }
   })
 })

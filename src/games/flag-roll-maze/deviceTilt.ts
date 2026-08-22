@@ -1,5 +1,6 @@
 import {
   applyTiltDeadzone,
+  applyTiltResponseCurve,
   clampTiltMagnitude,
   NEUTRAL_TILT,
   type TiltInput,
@@ -8,9 +9,10 @@ import {
 export type DeviceOrientationReading = { beta: number; gamma: number }
 export type ScreenOrientationAngle = 0 | 90 | 180 | 270
 
-/** 小さな手ぶれを吸収しつつ、子どもが少し傾ければ十分に動く設定。 */
-export const DEVICE_TILT_RANGE_DEGREES = 18
-export const DEVICE_TILT_DEADZONE = 0.1
+/** 最大入力まで少し多く傾ける必要を作り、中間の細かい方向修正をしやすくする。 */
+export const DEVICE_TILT_RANGE_DEGREES = 22
+/** 約3.1°ぶんの手ぶれと持ち替え時のドリフトを吸収し、止めたときに動かないようにする。 */
+export const DEVICE_TILT_DEADZONE = 0.14
 
 /** DeviceOrientation の軸を、現在見えている画面の右・下方向へ揃える。 */
 export function deviceOrientationToScreenTilt(
@@ -51,7 +53,10 @@ export function deviceTiltToInput(
     x: (screenTilt.x - calibration.x) / DEVICE_TILT_RANGE_DEGREES,
     y: (screenTilt.y - calibration.y) / DEVICE_TILT_RANGE_DEGREES,
   })
-  return applyTiltDeadzone(normalized, DEVICE_TILT_DEADZONE)
+  // デッドゾーンで手ぶれを除いてからカーブを掛け、小さな有効入力だけを穏やかにする。
+  return applyTiltResponseCurve(
+    applyTiltDeadzone(normalized, DEVICE_TILT_DEADZONE),
+  )
 }
 
 export function getScreenOrientationAngle(): ScreenOrientationAngle {

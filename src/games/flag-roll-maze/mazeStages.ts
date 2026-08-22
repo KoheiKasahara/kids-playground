@@ -13,6 +13,7 @@ export type MazeStageDefinition = {
   rows: readonly string[]
   gimmicks: readonly GimmickPlacement[]
   checkpointCells: readonly CellCoordinate[]
+  starCells: readonly CellCoordinate[]
 }
 
 /**
@@ -37,6 +38,13 @@ const KANTAN_STAGE_CHECKPOINT_CELLS: readonly CellCoordinate[] = [
   { column: 6, row: 3 },  // 最初の右下がりを抜けた所
   { column: 2, row: 5 },  // 左へ曲がったあと
   { column: 4, row: 7 },  // GOALへ向かう最後の横道
+]
+
+/** 星はメインルート上と少し先の寄り道に分け、集めなくてもGOALへ進める位置に置く。 */
+const KANTAN_STAGE_STAR_CELLS: readonly CellCoordinate[] = [
+  { column: 4, row: 2 }, // 最初の横道のメインルート上
+  { column: 2, row: 4 }, // 左へ曲がった先の少し寄り道
+  { column: 3, row: 7 }, // GOALへ向かう最後の道の途中
 ]
 
 /**
@@ -73,6 +81,13 @@ const KURUKURU_STAGE_CHECKPOINT_CELLS: readonly CellCoordinate[] = [
   { column: 5, row: 7 },  // 下辺の内周レーン
 ]
 
+/** 星はリングの主な通り道と左右の回り道へ分け、取ると少しだけ遠回りになる。 */
+const KURUKURU_STAGE_STAR_CELLS: readonly CellCoordinate[] = [
+  { column: 8, row: 2 }, // 右上のメインルート上
+  { column: 2, row: 6 }, // 左回りへ寄る小さな寄り道
+  { column: 9, row: 7 }, // GOALへ向かう右下の道
+]
+
 /**
  * 左上の短い入口から大きな部屋へ出て、右下のGOALまで斜めに横切るコース。
  * バンパーは壁から離して散らし、跳ねても部屋の中で立て直せるようにする。
@@ -105,6 +120,13 @@ const PONPON_STAGE_CHECKPOINT_CELLS: readonly CellCoordinate[] = [
   { column: 9, row: 7 },  // GOAL手前
 ]
 
+/** 星は大部屋へ入る道と対角線の途中に置き、集めると少しだけ進路を外れる。 */
+const PONPON_STAGE_STAR_CELLS: readonly CellCoordinate[] = [
+  { column: 2, row: 2 }, // 入口から大部屋へ出るメインルート上
+  { column: 1, row: 5 }, // 左端へ寄る寄り道
+  { column: 11, row: 3 }, // 大部屋右上の少し寄り道
+]
+
 /**
  * 上から下へ降り、中央だけ2マス幅にした橋を通ってGOALへ向かうコース。
  * 穴は道の両側へまとめ、細い1マス道へ追い込まれないようにする。
@@ -132,6 +154,13 @@ const ANAANA_STAGE_CHECKPOINT_CELLS: readonly CellCoordinate[] = [
   { column: 4, row: 5 },  // 最初の穴を抜け、橋へ入る前
   { column: 4, row: 8 },  // 2マス幅の橋を抜けた直後
   { column: 5, row: 11 }, // 最後の両側の穴を抜けた所
+]
+
+/** 星は穴を避ける主通路と上下の寄り道へ置き、星を取らなくても橋を渡れるようにする。 */
+const ANAANA_STAGE_STAR_CELLS: readonly CellCoordinate[] = [
+  { column: 6, row: 1 }, // START近くのメインルート上
+  { column: 5, row: 5 }, // 橋へ向かう途中の少し寄り道
+  { column: 3, row: 11 }, // GOAL手前の左側へ寄る道
 ]
 
 /**
@@ -173,6 +202,13 @@ const ADVENTURE_STAGE_CHECKPOINT_CELLS: readonly CellCoordinate[] = [
   { column: 5.0, row: 8.6 },  // ゴール手前の回転棒へ挑む前
 ]
 
+/** 星は上下の部屋の主通路と端の寄り道へ分け、全部集めなくてもGOALへ行けるようにする。 */
+const ADVENTURE_STAGE_STAR_CELLS: readonly CellCoordinate[] = [
+  { column: 2, row: 3 }, // 上の部屋のメインルート上
+  { column: 9, row: 2 }, // 右上へ寄る寄り道
+  { column: 8, row: 9 }, // 下の部屋のGOAL前の道
+]
+
 export const MAZE_STAGES: readonly MazeStageDefinition[] = [
   {
     id: 'kantan',
@@ -182,6 +218,7 @@ export const MAZE_STAGES: readonly MazeStageDefinition[] = [
     rows: KANTAN_STAGE_ROWS,
     gimmicks: [],
     checkpointCells: KANTAN_STAGE_CHECKPOINT_CELLS,
+    starCells: KANTAN_STAGE_STAR_CELLS,
   },
   {
     id: 'kurukuru',
@@ -191,6 +228,7 @@ export const MAZE_STAGES: readonly MazeStageDefinition[] = [
     rows: KURUKURU_STAGE_ROWS,
     gimmicks: KURUKURU_STAGE_GIMMICKS,
     checkpointCells: KURUKURU_STAGE_CHECKPOINT_CELLS,
+    starCells: KURUKURU_STAGE_STAR_CELLS,
   },
   {
     id: 'ponpon',
@@ -200,6 +238,7 @@ export const MAZE_STAGES: readonly MazeStageDefinition[] = [
     rows: PONPON_STAGE_ROWS,
     gimmicks: PONPON_STAGE_GIMMICKS,
     checkpointCells: PONPON_STAGE_CHECKPOINT_CELLS,
+    starCells: PONPON_STAGE_STAR_CELLS,
   },
   {
     id: 'anaana',
@@ -209,6 +248,7 @@ export const MAZE_STAGES: readonly MazeStageDefinition[] = [
     rows: ANAANA_STAGE_ROWS,
     gimmicks: [],
     checkpointCells: ANAANA_STAGE_CHECKPOINT_CELLS,
+    starCells: ANAANA_STAGE_STAR_CELLS,
   },
   {
     id: 'adventure',
@@ -218,6 +258,7 @@ export const MAZE_STAGES: readonly MazeStageDefinition[] = [
     rows: ADVENTURE_STAGE_ROWS,
     gimmicks: ADVENTURE_STAGE_GIMMICKS,
     checkpointCells: ADVENTURE_STAGE_CHECKPOINT_CELLS,
+    starCells: ADVENTURE_STAGE_STAR_CELLS,
   },
 ]
 
@@ -250,6 +291,7 @@ export function createMazeStageById(id: string): MazeStage {
     nameJa: definition.nameJa,
     gimmicks: definition.gimmicks,
     checkpointCells: definition.checkpointCells,
+    starCells: definition.starCells,
   })
 }
 

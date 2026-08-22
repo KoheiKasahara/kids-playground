@@ -1,0 +1,63 @@
+.burst {
+  position: absolute;
+  inset: 8%;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.piece {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  color: var(--burst-color);
+  font-size: clamp(12px, 3vw, 17px);
+  line-height: 1;
+  opacity: 0;
+  text-shadow: 0 1px 2px rgb(255 255 255 / 70%);
+  animation-name: mazeGoalBurst;
+  animation-duration: 1.05s;
+  animation-delay: var(--burst-delay);
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes mazeGoalBurst {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(0.25) rotate(0deg);
+  }
+
+  16% {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1) rotate(0deg);
+  }
+
+  52% {
+    opacity: 1;
+    transform: translate3d(
+        calc(-50% + var(--burst-mid-x)),
+        calc(-50% + var(--burst-mid-y)),
+        0
+      )
+      scale(1) rotate(18deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(
+        calc(-50% + var(--burst-end-x)),
+        calc(-50% + var(--burst-end-y)),
+        0
+      )
+      scale(0.7) rotate(var(--burst-end-rotation));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piece {
+    animation: none;
+    opacity: 0;
+  }
+}

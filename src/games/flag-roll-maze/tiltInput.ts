@@ -46,6 +46,26 @@ export function applyTiltDeadzone(tilt: TiltInput, deadzone = TILT_DEADZONE): Ti
   return { x: tilt.x * ratio, y: tilt.y * ratio }
 }
 
+/** 小さな傾きをより穏やかに、大きな傾きは最大まで届かせるための指数。1.0で従来どおり線形。 */
+export const TILT_RESPONSE_EXPONENT = 1.35
+
+/** 方向は保ったまま、入力の大きさだけを m -> m^exponent へ写す。 */
+export function applyTiltResponseCurve(
+  tilt: TiltInput,
+  exponent = TILT_RESPONSE_EXPONENT,
+): TiltInput {
+  const magnitude = Math.hypot(tilt.x, tilt.y)
+  if (magnitude === 0) return { ...NEUTRAL_TILT }
+  if (!Number.isFinite(magnitude) || !Number.isFinite(exponent)) {
+    return { ...NEUTRAL_TILT }
+  }
+
+  const clampedMagnitude = Math.min(1, magnitude)
+  const curvedMagnitude = clampedMagnitude ** exponent
+  const ratio = curvedMagnitude / magnitude
+  return { x: tilt.x * ratio, y: tilt.y * ratio }
+}
+
 /**
  * スティックの中心からのドラッグ量（px）を TiltInput へ変換する。
  * `radius` を超えて引いても 1 で頭打ちにし、指がノブから外れても操作が続くようにする。

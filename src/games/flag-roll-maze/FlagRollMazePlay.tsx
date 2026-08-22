@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { findFlagBall, type FlagBallData } from '../../components/flag-ball/flagBalls'
-import { playCorrectSound, primeAudio } from '../../utils/quizSound'
+import { primeAudio } from '../../utils/quizSound'
 import VirtualStick from './VirtualStick'
 import { parseMazePlayState } from './playState'
 import { useMazeEngine } from './useMazeEngine'
 import { findMazeStageDefinition, nextMazeStageId } from './mazeStages'
+import MazeGoalBurst from './MazeGoalBurst'
 import {
   DEFAULT_MAZE_ZOOM_INDEX,
   MAX_MAZE_ZOOM_INDEX,
@@ -58,6 +59,7 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
   const [gameState, setGameState] = useState<MazeGameState>('playing')
   const [runId, setRunId] = useState(0)
   const [stageId, setStageId] = useState(initialStageId)
+  const [starCount, setStarCount] = useState(0)
   const [rescueMessage, setRescueMessage] = useState('')
   const rescueTimerRef = useRef<number | null>(null)
   const audioPrimedRef = useRef(false)
@@ -68,10 +70,15 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
   const [gyroMessage, setGyroMessage] = useState('')
   const stageDefinition = findMazeStageDefinition(stageId)
   const followingStageId = nextMazeStageId(stageId)
+  const starTotalCount = stageDefinition?.starCells.length ?? 0
 
   const handleGoal = useCallback(() => {
     setGameState('goal')
-    playCorrectSound()
+  }, [])
+
+  // エンジンから届いた、このrunでの星の累計だけをHUDへ反映する。
+  const handleStarCollected = useCallback((collectedCount: number) => {
+    setStarCount(collectedCount)
   }, [])
 
   // 場外復帰は一瞬だけ知らせる。ゲームは止めず、遊びの流れを切らない。
@@ -87,6 +94,7 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
     stageId,
     onGoal: handleGoal,
     onRescue: handleRescue,
+    onStarCollected: handleStarCollected,
   })
 
   useEffect(
@@ -225,6 +233,7 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
     setTilt({ x: 0, y: 0 })
     setRescueMessage('')
     setGameState('playing')
+    setStarCount(0)
     setStageId(nextStageId)
     setRunId((current) => current + 1)
     if (inputMode === 'gyro') {
@@ -245,6 +254,17 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
     <main className={styles.page}>
       <div className={styles.scene}>
         <div ref={registerContainer} className={styles.sceneCanvas} aria-hidden="true" />
+        {gameState === 'playing' && starTotalCount > 0 && (
+          <div
+            className={styles.starHud}
+            role="status"
+            aria-live="polite"
+            aria-label="あつめた ⭐"
+          >
+            ⭐ {starCount} / {starTotalCount}
+          </div>
+        )}
+        {gameState === 'goal' && <MazeGoalBurst />}
         <div className={styles.zoom}>
           <button
             type="button"
@@ -269,7 +289,7 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
 
       <div className={styles.ui}>
         <h1 className={styles.title}>こっきころころめいろ</h1>
-        {stageDefinition !== null && (
+        {gameState === 'playing' && stageDefinition !== null && (
           <p className={styles.stageBadge}>
             {stageDefinition.emoji} {stageDefinition.nameJa}
           </p>
@@ -288,7 +308,17 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
             </p>
             <div className={styles.resultPanel} aria-label="ゴールした こっき">
               <FlagBall flag={flag} size={72} />
-              <span className={styles.resultName}>{flag.nameJa}</span>
+              <div className={styles.resultDetails}>
+                <span className={styles.resultName}>{flag.nameJa}</span>
+                <div className={styles.resultMeta}>
+                  {stageDefinition !== null && (
+                    <span>
+                      {stageDefinition.emoji} {stageDefinition.nameJa}
+                    </span>
+                  )}
+                  {starTotalCount > 0 && <span>⭐ {starCount} / {starTotalCount}</span>}
+                </div>
+              </div>
             </div>
           </>
         )}
@@ -327,6 +357,7 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
                   つぎの ステージ
                 </button>
               )}
+              {followingStageId === null && <p className={styles.allClear}>ぜんぶ クリア！</p>}
               <button
                 type="button"
                 className={`${styles.button} ${styles.retry}`}
@@ -339,7 +370,7 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
                 className={styles.button}
                 onClick={() => navigate('/games/flag-roll-maze', { replace: true })}
               >
-                えらびなおす
+                こっきを かえる
               </button>
             </>
           ) : (

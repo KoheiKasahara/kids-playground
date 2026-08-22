@@ -34,6 +34,24 @@
 /* canvasは絶対配置にして、レイアウト（グリッドの行の高さ）へ一切影響させない。 */
 .scene canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 
+/* 星は盤面の左上へ重ね、操作説明やボタンの高さを増やさない。 */
+.starHud {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  z-index: 1;
+  padding: 4px 10px;
+  border: 2px solid color-mix(in srgb, var(--color-primary-dark) 38%, transparent);
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-primary-dark);
+  font-size: clamp(14px, 3.6vw, 18px);
+  font-weight: 900;
+  line-height: 1.1;
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+
 /*
  * ズームはシーンの右下へ重ねる。縦画面では下のスティック・ボタン列より上、
  * 横画面では中央カラムの中に収まるので、既存の操作系と重ならない。
@@ -109,12 +127,14 @@
   pointer-events: none;
 }
 
+.resultDetails { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 2px; }
 .resultName {
   color: var(--color-primary-dark);
   font-size: clamp(18px, 4.5vw, 24px);
   font-weight: 800;
   white-space: nowrap;
 }
+.resultMeta { display: flex; gap: var(--space-xs); flex-wrap: wrap; justify-content: center; color: var(--color-text-muted); font-size: clamp(13px, 3vw, 15px); font-weight: 700; line-height: 1.2; }
 
 .controls {
   grid-row: 3;
@@ -136,6 +156,7 @@
 .nextStage { background: var(--color-primary); color: var(--color-text-on-primary); }
 .retry { background: var(--color-success); color: var(--color-text-on-primary); }
 .rescueButton { background: var(--color-accent); color: var(--color-text-on-primary); }
+.allClear { margin: 0; color: var(--color-success-dark); font-size: 14px; font-weight: 900; line-height: 1.2; text-align: center; }
 
 @media (orientation: landscape) and (max-height: 600px) {
   .page { grid-template-columns: minmax(104px, .72fr) minmax(0, 2fr) minmax(104px, .72fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-sm); padding-top: calc(var(--space-xs) + var(--safe-top)); padding-bottom: calc(var(--space-xs) + var(--safe-bottom)); }
@@ -148,6 +169,12 @@
   .actions { grid-column: 3; grid-row: 1; align-self: end; }
   .gyroButton, .gyroStatus { grid-column: 3; grid-row: 1; align-self: start; justify-self: stretch; text-align: center; }
   .button { padding-inline: var(--space-md); }
+  /*
+   * 横画面では .ui が盤面の上中央へ絶対配置されるため、左上に置くと
+   * 幅の狭い端末（667x375など）でタイトルと重なる。ズームが右下なので、
+   * 空いている左下へ移して、どの横幅でも重ならないようにする。
+   */
+  .starHud { top: auto; bottom: var(--space-sm); left: var(--space-sm); padding: 3px 8px; font-size: 14px; }
 }
 
 /* 低い横画面で4つのゴール操作が画面外へ出たり、盤面へ重なったりしないよう詰める。 */
@@ -156,12 +183,18 @@
   .resultPanel { gap: var(--space-xs); padding: 2px 9px 2px 4px; }
   .resultPanel > :first-child { transform: scale(0.72); transform-origin: center; margin: -10px; }
   .resultName { font-size: 17px; }
+  .resultMeta { font-size: 12px; }
+  .allClear { font-size: 12px; }
   .actions { gap: 4px; }
   .zoom { right: var(--space-xs); bottom: var(--space-xs); }
   .zoomButton { width: 44px; height: 44px; font-size: 24px; }
   .button { min-height: 46px; padding: 4px 6px; font-size: 15px; }
+  /* ズームも左右の余白へ詰まるので、星も同じだけ寄せて盤面の隅をそろえる。 */
+  .starHud { bottom: var(--space-xs); left: var(--space-xs); padding: 2px 6px; font-size: 14px; }
 }
 
 @media (max-width: 360px) {
   .button { min-height: 44px; padding: 4px 6px; font-size: 14px; }
+  .starHud { padding: 3px 8px; font-size: 14px; }
+  .resultMeta { font-size: 13px; }
 }

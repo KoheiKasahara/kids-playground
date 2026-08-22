@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { BALL_RADIUS } from './mazePhysics'
+import { BALL_RADIUS, GOAL_RADIUS } from './mazePhysics'
 import { CELL_SIZE, cellToWorld } from './mazeGrid'
 import { findMazePath, type MazeStage } from './mazeStage'
 import { createMazeStageById, MAZE_STAGE_ROWS, MAZE_STAGES } from './mazeStages'
+import { STAR_PICKUP_RADIUS } from './mazeStars'
 
 const EPSILON = 1e-9
 
@@ -270,6 +271,52 @@ for (const definition of MAZE_STAGES) {
           )
         }
       }
+    })
+
+    it('星が壁・穴からボール半径以上離れている', () => {
+      const blocked = blockedCellRects(rows, stage)
+      for (const star of stage.stars) {
+        for (const rect of blocked) {
+          expect(distanceToRect(star.center, rect)).toBeGreaterThanOrEqual(
+            BALL_RADIUS - EPSILON,
+          )
+        }
+      }
+    })
+
+    it('星がバンパー・回転棒の掃引円と重ならない', () => {
+      for (const star of stage.stars) {
+        for (const spinner of stage.gimmicks.spinners) {
+          expect(horizontalDistance(star.center, spinner.center)).toBeGreaterThanOrEqual(
+            spinner.sweepRadius + BALL_RADIUS - EPSILON,
+          )
+        }
+        for (const bumper of stage.gimmicks.bumpers) {
+          expect(horizontalDistance(star.center, bumper.center)).toBeGreaterThanOrEqual(
+            bumper.radius + BALL_RADIUS - EPSILON,
+          )
+        }
+      }
+    })
+
+    it('星がSTARTとGOALに重ならない', () => {
+      for (const star of stage.stars) {
+        expect(horizontalDistance(star.center, stage.start)).toBeGreaterThanOrEqual(
+          STAR_PICKUP_RADIUS + BALL_RADIUS - EPSILON,
+        )
+        expect(horizontalDistance(star.center, stage.goal)).toBeGreaterThanOrEqual(
+          STAR_PICKUP_RADIUS + GOAL_RADIUS - EPSILON,
+        )
+      }
+    })
+
+    it('星を1つも取らなくてもSTARTからGOALへ到達できる', () => {
+      // 星は寄り道の収集要素であり、1つも取らなくてもクリアできることをデータで保証する。
+      expect(findMazePath(definition.rows)).not.toBeNull()
+    })
+
+    it('各ステージに星が3個ある', () => {
+      expect(stage.stars).toHaveLength(3)
     })
   })
 }

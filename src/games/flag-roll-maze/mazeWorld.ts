@@ -212,6 +212,15 @@ export function isGoalReached(
   return Math.hypot(position.x - goal.x, position.z - goal.z) <= radius
 }
 
+/** ゴールした合図の小さなジャンプ。水平の勢いは残さず、その場で軽く跳ねるだけにする。 */
+export function popBallAtGoal(ball: RigidBody, strength = 2.6): void {
+  const velocity = ball.linvel()
+  ball.setLinvel(
+    { x: velocity.x * 0.3, y: strength, z: velocity.z * 0.3 },
+    true,
+  )
+}
+
 /** ボールをスタートへ戻し、勢いも完全に消す。リトライと場外復帰の両方で使う。 */
 export function resetBall(ball: RigidBody, start: MazePoint): void {
   const spawn = ballSpawnPosition(start)
