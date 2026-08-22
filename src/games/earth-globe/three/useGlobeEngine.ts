@@ -34,13 +34,16 @@ import {
   POLYGON_CAP_CURVATURE_RESOLUTION_DEGREES,
   SELECTED_BORDER_RADIUS,
   SELECTED_POLYGON_ALTITUDE,
+  SELECTED_POLYGON_POP_ALTITUDE,
+  SELECTED_POLYGON_POP_BORDER_RADIUS,
 } from './globeLayers'
 import { renderPixelRatioForDevice } from './renderQuality'
 import { configureGlobeRotationControls } from './rotationControls'
 import {
-  BASE_SELECTED_BORDER_SCALE,
   type BorderScaleAnimation,
   POLYGONS_TRANSITION_DURATION_MS,
+  SELECTION_POP_RISE_DURATION_MS,
+  SELECTION_POP_SETTLE_DURATION_MS,
   sampleBorderScaleAnimation,
 } from './selectionTransition'
 
@@ -67,7 +70,7 @@ type ZoomAnimation = {
 
 type GlobeEngine = {
   setZoom: (level: ZoomLevel) => void
-  setSelectedCountry: (countryId: string | null) => void
+  setSelectedCountry: (countryId: string | null, selectionFeedbackKey: number) => void
   setReducedMotion: (reducedMotion: boolean) => void
 }
 
@@ -147,6 +150,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let borderLines: LineSegments2 | null = null
     let selectedBorderLines: LineSegments2 | null = null
     let selectedBorderAnimation: BorderScaleAnimation | null = null
+    let selectedBorderRadius = SELECTED_BORDER_RADIUS
     let departingBorderLines: LineSegments2 | null = null
     let departingBorderAnimation: BorderScaleAnimation | null = null
     // 国境線の線幅計算に使う描画サイズ(CSSピクセル)。resizeのたびに更新する。
@@ -156,6 +160,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let rafId: number | null = null
     let polygonLoadRafId: number | null = null
     let polygonLoadTimerId: number | null = null
+    let selectionPopTimerId: number | null = null
     let polygonDataLoadStarted = false
     let hasRenderedFirstFrame = false
     let released = false
@@ -163,6 +168,9 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let selectedNumericId = initialOptions.selectedCountryId === null
       ? null
       : countriesById.get(initialOptions.selectedCountryId)?.numericId ?? null
+    let selectedPolygonAltitude = SELECTED_POLYGON_ALTITUDE
+    let lastSelectionFeedbackKey = initialOptions.selectionFeedbackKey
+    let selectionPopVersion = 0
     let zoomAnimation: ZoomAnimation | null = null
     let activeZoomLevel = initialOptions.zoomLevel
 
@@ -193,12 +201,24 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       if (globe !== null && camera !== null) globe.setPointOfView(camera)
     }
 
-    function updatePolygonAppearance() {
+    function updatePolygonAltitude(transitionDurationMs: number) {
       if (globe === null) return
 
       globe.polygonsTransitionDuration(
-        reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS,
+        reducedMotion ? 0 : transitionDurationMs,
       )
+      // 高度アクセサの差し替えは、タップ直後と収束時の2回だけ行う。
+      // requestAnimationFrameごとにgeometryを作り直さないため、地球儀の描画負荷を増やさない。
+      globe.polygonAltitude((data: object) => (
+        numericIdOf(data) === selectedNumericId
+          ? selectedPolygonAltitude
+          : BASE_POLYGON_ALTITUDE
+      ))
+    }
+
+    function updatePolygonAppearance(transitionDurationMs = POLYGONS_TRANSITION_DURATION_MS) {
+      if (globe === null) return
+
       globe.polygonCapColor((data: object) => {
         const id = numericIdOf(data)
         if (id === selectedNumericId) return SELECTED_LAND_COLOR
@@ -209,11 +229,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         if (id === selectedNumericId) return SELECTED_SIDE_COLOR
         return SIDE_COLOR
       })
-      globe.polygonAltitude((data: object) => (
-        numericIdOf(data) === selectedNumericId
-          ? SELECTED_POLYGON_ALTITUDE
-          : BASE_POLYGON_ALTITUDE
-      ))
+      updatePolygonAltitude(transitionDurationMs)
     }
 
     function cancelPolygonDataSchedule() {
@@ -300,12 +316,56 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       }
     }
 
-    function setSelectedCountry(countryId: string | null) {
+    function cancelSelectionPop() {
+      selectionPopVersion += 1
+      if (selectionPopTimerId !== null) {
+        window.clearTimeout(selectionPopTimerId)
+        selectionPopTimerId = null
+      }
+    }
+
+    function settleSelectedBorderLines() {
+      if (selectedBorderLines === null) return
+
+      const targetScale = SELECTED_BORDER_RADIUS / selectedBorderRadius
+      selectedBorderAnimation = {
+        fromScale: selectedBorderLines.scale.x,
+        toScale: targetScale,
+        startedAt: performance.now(),
+        durationMs: SELECTION_POP_SETTLE_DURATION_MS,
+      }
+    }
+
+    function scheduleSelectionPopSettle() {
+      const popVersion = selectionPopVersion
+      selectionPopTimerId = window.setTimeout(() => {
+        selectionPopTimerId = null
+        if (released || popVersion !== selectionPopVersion || selectedNumericId === null) return
+
+        selectedPolygonAltitude = SELECTED_POLYGON_ALTITUDE
+        updatePolygonAltitude(SELECTION_POP_SETTLE_DURATION_MS)
+        settleSelectedBorderLines()
+      }, SELECTION_POP_RISE_DURATION_MS)
+    }
+
+    function setSelectedCountry(countryId: string | null, selectionFeedbackKey: number) {
+      const shouldPop = !reducedMotion
+        && countryId !== null
+        && selectionFeedbackKey !== lastSelectionFeedbackKey
+      lastSelectionFeedbackKey = selectionFeedbackKey
+      cancelSelectionPop()
+
       selectedNumericId = countryId === null
         ? null
         : countriesById.get(countryId)?.numericId ?? null
-      updatePolygonAppearance()
-      updateSelectedBorderLines()
+      selectedPolygonAltitude = shouldPop
+        ? SELECTED_POLYGON_POP_ALTITUDE
+        : SELECTED_POLYGON_ALTITUDE
+      updatePolygonAppearance(
+        shouldPop ? SELECTION_POP_RISE_DURATION_MS : POLYGONS_TRANSITION_DURATION_MS,
+      )
+      updateSelectedBorderLines(shouldPop)
+      if (shouldPop) scheduleSelectionPopSettle()
     }
 
     function disposeBorderLines(lines: LineSegments2) {
@@ -327,7 +387,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       departingBorderAnimation = null
     }
 
-    function updateSelectedBorderLines() {
+    function updateSelectedBorderLines(shouldPop: boolean) {
       const startedAt = performance.now()
 
       // 連続タップ時は、1つ前の国の線もポリゴンと同じ時間で地表へ戻す。
@@ -337,8 +397,9 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         ? null
         : {
             fromScale: departingBorderLines.scale.x,
-            toScale: BASE_SELECTED_BORDER_SCALE,
+            toScale: BASE_BORDER_RADIUS / selectedBorderRadius,
             startedAt,
+            durationMs: POLYGONS_TRANSITION_DURATION_MS,
           }
       selectedBorderLines = null
       selectedBorderAnimation = null
@@ -351,20 +412,33 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       const selectedFeature = selectedNumericId === null
         ? undefined
         : featuresByNumericId.get(selectedNumericId)
-      if (scene === null || selectedFeature === undefined) return
+      if (scene === null || selectedFeature === undefined) {
+        selectedBorderRadius = SELECTED_BORDER_RADIUS
+        return
+      }
 
+      selectedBorderRadius = shouldPop
+        ? SELECTED_POLYGON_POP_BORDER_RADIUS
+        : SELECTED_BORDER_RADIUS
       selectedBorderLines = createGlobeBorderLines(
         [selectedFeature],
-        SELECTED_BORDER_RADIUS,
+        selectedBorderRadius,
       )
-      const initialScale = reducedMotion ? 1 : BASE_SELECTED_BORDER_SCALE
+      const initialScale = reducedMotion ? 1 : BASE_BORDER_RADIUS / selectedBorderRadius
       selectedBorderLines.scale.setScalar(initialScale)
       setGlobeBorderLinesSize(selectedBorderLines, borderLinesSize.x, borderLinesSize.y)
       selectedBorderLines.renderOrder = 2
       scene.add(selectedBorderLines)
       selectedBorderAnimation = reducedMotion
         ? null
-        : { fromScale: initialScale, toScale: 1, startedAt }
+        : {
+            fromScale: initialScale,
+            toScale: 1,
+            startedAt,
+            durationMs: shouldPop
+              ? SELECTION_POP_RISE_DURATION_MS
+              : POLYGONS_TRANSITION_DURATION_MS,
+          }
     }
 
     function setReducedMotion(nextReducedMotion: boolean) {
@@ -385,7 +459,13 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       }
 
       if (nextReducedMotion) {
-        if (selectedBorderLines !== null) selectedBorderLines.scale.setScalar(1)
+        cancelSelectionPop()
+        selectedPolygonAltitude = SELECTED_POLYGON_ALTITUDE
+        if (selectedBorderLines !== null) {
+          selectedBorderLines.scale.setScalar(
+            SELECTED_BORDER_RADIUS / selectedBorderRadius,
+          )
+        }
         selectedBorderAnimation = null
         if (departingBorderLines !== null) {
           disposeBorderLines(departingBorderLines)
@@ -560,6 +640,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         rafId = null
       }
       cancelPolygonDataSchedule()
+      cancelSelectionPop()
 
       resizeObserver?.disconnect()
       resizeObserver = null
@@ -689,7 +770,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       borderLines = createGlobeBorderLines(initialOptions.features, BASE_BORDER_RADIUS)
       borderLines.renderOrder = 1
       scene.add(borderLines)
-      updateSelectedBorderLines()
+      updateSelectedBorderLines(false)
 
       controls = new OrbitControls(camera, renderer.domElement)
       controls.target.set(0, 0, 0)
@@ -737,8 +818,11 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
   }, [options.zoomLevel])
 
   useEffect(() => {
-    engineRef.current?.setSelectedCountry(options.selectedCountryId)
-  }, [options.selectedCountryId])
+    engineRef.current?.setSelectedCountry(
+      options.selectedCountryId,
+      options.selectionFeedbackKey,
+    )
+  }, [options.selectedCountryId, options.selectionFeedbackKey])
 
   useEffect(() => {
     engineRef.current?.setReducedMotion(options.reducedMotion)

@@ -125,6 +125,21 @@ describe('quizSound', () => {
     expect(oscillator.frequency.value).toBeLessThanOrEqual(1000)
   })
 
+  test('playGlobeCountrySelectSound は短い上行2音を鳴らし、クールダウン内では重ねない', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playGlobeCountrySelectSound } = await import('./quizSound')
+
+    playGlobeCountrySelectSound()
+    playGlobeCountrySelectSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(2)
+    const first = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    const second = instances[0].createOscillator.mock.results[1].value as MockOscillatorNode
+    expect(second.frequency.value).toBeGreaterThan(first.frequency.value)
+  })
+
   test('playPanelRevealSound は step が進むほど周波数が高くなる', async () => {
     ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
     vi.resetModules()

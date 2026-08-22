@@ -49,7 +49,10 @@ describe('EarthGlobePlay', () => {
   it('opens from the earth-globe route with the main controls', async () => {
     renderApp('/games/earth-globe')
 
-    expect(await screen.findByRole('heading', { name: 'ちきゅうぎ' })).toBeInTheDocument()
+    // three.js と世界地図データを含む lazy route は、初回のモジュール評価だけ
+    // 標準の1秒をわずかに超えることがある。
+    expect(await screen.findByRole('heading', { name: 'ちきゅうぎ' }, { timeout: 3_000 }))
+      .toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もっと ちかづく' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'もっと はなれる' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'ぜんたいに もどる' })).toBeInTheDocument()
@@ -94,6 +97,21 @@ describe('EarthGlobePlay', () => {
       'src',
       expect.stringContaining('flags/jp.svg'),
     )
+  })
+
+  it('replays selection feedback when the same country is tapped again', async () => {
+    renderApp('/games/earth-globe')
+    await screen.findByRole('heading', { name: 'ちきゅうぎ' })
+
+    act(() => {
+      globeEngineMock.options?.onCountrySelect('jp')
+    })
+    expect(globeEngineMock.options?.selectionFeedbackKey).toBe(1)
+
+    act(() => {
+      globeEngineMock.options?.onCountrySelect('jp')
+    })
+    expect(globeEngineMock.options?.selectionFeedbackKey).toBe(2)
   })
 
   it('returns home from the viewer', async () => {

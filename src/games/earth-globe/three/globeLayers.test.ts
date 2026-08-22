@@ -6,6 +6,8 @@ import {
   POLYGON_CAP_CURVATURE_RESOLUTION_DEGREES,
   SELECTED_BORDER_RADIUS,
   SELECTED_POLYGON_ALTITUDE,
+  SELECTED_POLYGON_POP_ALTITUDE,
+  SELECTED_POLYGON_POP_BORDER_RADIUS,
 } from './globeLayers'
 import { cameraDistanceForZoom, GLOBE_RADIUS } from './zoomLevels'
 
@@ -35,6 +37,12 @@ describe('earth-globe layers', () => {
     expect(BASE_BORDER_RADIUS).toBeGreaterThan(landCapRadius)
     expect(selectedCapRadius).toBeGreaterThan(BASE_BORDER_RADIUS)
     expect(SELECTED_BORDER_RADIUS).toBeGreaterThan(selectedCapRadius)
+  })
+
+  it('uses a restrained pop height above the settled selected height', () => {
+    expect(SELECTED_POLYGON_POP_ALTITUDE).toBeGreaterThan(SELECTED_POLYGON_ALTITUDE)
+    expect(SELECTED_POLYGON_POP_BORDER_RADIUS).toBeGreaterThan(SELECTED_BORDER_RADIUS)
+    expect(SELECTED_POLYGON_POP_ALTITUDE - SELECTED_POLYGON_ALTITUDE).toBeLessThan(0.01)
   })
 
   it('keeps the land cap above the sea even where both are tessellated', () => {
