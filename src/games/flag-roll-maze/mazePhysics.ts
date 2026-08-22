@@ -71,8 +71,24 @@ export const FLOOR_THICKNESS = BALL_RADIUS * 0.95
 /** 壁は球の直径2Rより0.2R高い2.2Rとし、最大傾斜でも乗り越えられない高さを確保する。 */
 export const WALL_HEIGHT = BALL_RADIUS * 2.2
 
-/** 球の中心が1.05R以内なら判定を取りこぼさず、1マスの半分1.5R未満に収めて隣へ広がらないようにする。 */
-export const GOAL_RADIUS = BALL_RADIUS * 1.05
+/**
+ * ゴールは実物の穴のように深く落とさず、球の約28%だけ低い浅いカップにする。
+ * 国旗面の大半が盤面より上に残るため、カップイン後も主役のボールを見失わない。
+ */
+export const GOAL_CUP_DEPTH = BALL_RADIUS * 0.28
+/** カップ底の半径。球が少し転がり込んで止まれる広さを持たせる。 */
+export const GOAL_CUP_RADIUS = BALL_RADIUS * 1.18
+/** 床面から見えるカップの縁。1マスの半分(1.5R)を越えず、隣の通路へ広がらない。 */
+export const GOAL_CUP_RIM_RADIUS = BALL_RADIUS * 1.4
+/** カップ底の上面の高さ。通常の床面は0。 */
+export const GOAL_CUP_FLOOR_Y = -GOAL_CUP_DEPTH
+/**
+ * ボールが浅いカップへ実際に沈み始めてからゴールにする高さ。
+ * 入り口の縁を横切っただけで結果を出さず、カップインと判定を一致させる。
+ */
+export const GOAL_REACHED_MAX_Y = BALL_RADIUS - GOAL_CUP_DEPTH * 0.5
+/** カップ底に乗った球を取りこぼさない、球半径ぶんの中心判定。 */
+export const GOAL_RADIUS = BALL_RADIUS
 
 /** 盤面より9.5R下まで落ちた場合だけ場外とみなし、通常の跳ね返りで誤判定しない。 */
 export const FALL_OUT_Y = -BALL_RADIUS * 9.5

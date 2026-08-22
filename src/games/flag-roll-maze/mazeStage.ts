@@ -116,8 +116,9 @@ type FloorRun = {
 }
 
 /**
- * 穴以外のマスを行ごとの連続区間にし、同じ列範囲が上下に続くときだけ縦にもまとめる。
+ * 穴とゴールカップ以外のマスを行ごとの連続区間にし、同じ列範囲が上下に続くときだけ縦にもまとめる。
  * 壁の下にも床を残すことで、床の切れ目でボールが引っ掛からないようにする。
+ * Gのマスは専用の浅い円形カップを置くため、通常の平らな床から除く。
  */
 export function buildFloorRects(
   rows: readonly string[],
@@ -130,7 +131,7 @@ export function buildFloorRects(
   for (const [row, line] of rows.entries()) {
     let runStart: number | null = null
     for (let column = 0; column <= columnCount; column += 1) {
-      const isFloor = column < columnCount && line[column] !== 'O'
+      const isFloor = column < columnCount && line[column] !== 'O' && line[column] !== 'G'
       if (isFloor && runStart === null) {
         runStart = column
         continue

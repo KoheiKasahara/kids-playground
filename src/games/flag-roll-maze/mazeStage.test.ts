@@ -42,10 +42,10 @@ describe('buildWallRects', () => {
 })
 
 describe('buildFloorRects', () => {
-  it('穴のマスを床に含めず、新グリッドでは7枚にまとめる', () => {
+  it('穴とゴールカップのマスを通常の床に含めない', () => {
     const floors = buildFloorRects(MAZE_STAGE_ROWS)
 
-    expect(floors).toHaveLength(4)
+    expect(floors).toHaveLength(7)
     for (const [row, line] of MAZE_STAGE_ROWS.entries()) {
       for (let column = 0; column < line.length; column += 1) {
         const point = cellToWorld(column, row, line.length, MAZE_STAGE_ROWS.length)
@@ -54,15 +54,15 @@ describe('buildFloorRects', () => {
             Math.abs(point.x - floor.x) <= floor.width / 2 &&
             Math.abs(point.z - floor.z) <= floor.depth / 2,
         )
-        expect(covered).toHaveLength(line[column] === 'O' ? 0 : 1)
+        expect(covered).toHaveLength(line[column] === 'O' || line[column] === 'G' ? 0 : 1)
       }
     }
   })
 
-  it('床の総面積が穴を除く全マスの面積と一致する', () => {
+  it('床の総面積が穴とゴールカップを除く全マスの面積と一致する', () => {
     const floors = buildFloorRects(MAZE_STAGE_ROWS)
     const openCellCount = MAZE_STAGE_ROWS.reduce(
-      (count, line) => count + [...line].filter((cell) => cell !== 'O').length,
+      (count, line) => count + [...line].filter((cell) => cell !== 'O' && cell !== 'G').length,
       0,
     )
     const floorArea = floors.reduce((area, floor) => area + floor.width * floor.depth, 0)

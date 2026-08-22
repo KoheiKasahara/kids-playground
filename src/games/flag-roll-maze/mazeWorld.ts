@@ -13,7 +13,10 @@ import {
   clampSpeed,
   FLOOR_FRICTION,
   FLOOR_THICKNESS,
+  GOAL_CUP_FLOOR_Y,
+  GOAL_CUP_RADIUS,
   GOAL_RADIUS,
+  GOAL_REACHED_MAX_Y,
   gravityFromTilt,
   MAX_BALL_SPEED,
   PHYSICS_TIMESTEP,
@@ -77,6 +80,19 @@ export function createMazeWorld(rapier: RapierModule, stage: MazeStage): MazeWor
         .setRestitution(WALL_RESTITUTION),
     )
   }
+
+  // Gマスは通常床から抜いて、球がわずかに沈む浅い円形のカップ底を置く。
+  // 深い穴や段差にはせず、国旗が見えたまま自然に「カップイン」できる深さにする。
+  world.createCollider(
+    rapier.ColliderDesc.cylinder(FLOOR_THICKNESS / 2, GOAL_CUP_RADIUS)
+      .setTranslation(
+        stage.goal.x,
+        GOAL_CUP_FLOOR_Y - FLOOR_THICKNESS / 2,
+        stage.goal.z,
+      )
+      .setFriction(FLOOR_FRICTION)
+      .setRestitution(WALL_RESTITUTION),
+  )
 
   for (const wall of stage.walls) {
     world.createCollider(
@@ -203,20 +219,35 @@ export function limitBallSpeed(ball: RigidBody, maxSpeed = MAX_BALL_SPEED): bool
   return true
 }
 
-/** ゴール中心との水平距離だけで判定する。高さは跳ねても判定を落とさないよう無視する。 */
+/**
+ * 浅いカップの中心付近かつ、球がカップ底へ沈み始めた高さで判定する。
+ * 見た目ではまだ縁にいる段階で結果表示へ切り替わることを防ぐ。
+ */
 export function isGoalReached(
   position: PhysicsVector,
   goal: MazePoint,
   radius = GOAL_RADIUS,
+  maxY = GOAL_REACHED_MAX_Y,
 ): boolean {
-  return Math.hypot(position.x - goal.x, position.z - goal.z) <= radius
+  return (
+    Math.hypot(position.x - goal.x, position.z - goal.z) <= radius &&
+    position.y <= maxY
+  )
 }
 
-/** ゴールした合図の小さなジャンプ。水平の勢いは残さず、その場で軽く跳ねるだけにする。 */
-export function popBallAtGoal(ball: RigidBody, strength = 2.6): void {
+/**
+ * カップイン後の残った横方向の勢いだけを止める。
+ * 従来のジャンプ演出は使わず、国旗ボールを浅いカップ内に安定して見せ続ける。
+ */
+export function settleBallInGoalCup(ball: RigidBody): void {
   const velocity = ball.linvel()
   ball.setLinvel(
-    { x: velocity.x * 0.3, y: strength, z: velocity.z * 0.3 },
+    { x: 0, y: Math.min(velocity.y, 0), z: 0 },
+    true,
+  )
+  const angularVelocity = ball.angvel()
+  ball.setAngvel(
+    { x: angularVelocity.x * 0.12, y: angularVelocity.y * 0.12, z: angularVelocity.z * 0.12 },
     true,
   )
 }

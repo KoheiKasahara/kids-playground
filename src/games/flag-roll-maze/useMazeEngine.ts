@@ -7,6 +7,9 @@ import {
   BALL_RADIUS,
   BUMPER_HEIGHT,
   FLOOR_THICKNESS,
+  GOAL_CUP_FLOOR_Y,
+  GOAL_CUP_RADIUS,
+  GOAL_CUP_RIM_RADIUS,
   GOAL_RADIUS,
   HOLE_PIT_BOTTOM_Y,
   MAX_FRAME_DELTA_MS,
@@ -40,9 +43,9 @@ import {
   isGoalReached,
   limitBallSpeed,
   nudgeBall,
-  popBallAtGoal,
   pushBallOutOfSpinner,
   resetBall,
+  settleBallInGoalCup,
 } from './mazeWorld'
 import {
   createImpactTracker,
@@ -701,7 +704,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
                 if (isGoalReached(position, stage.goal)) {
                   goalNotified = true
                   playMazeGoalSound()
-                  if (!prefersReducedMotion) popBallAtGoal(ballBody)
+                  settleBallInGoalCup(ballBody)
                   optionsRef.current.onGoal()
                 }
               }
@@ -805,15 +808,37 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
           boardGroup.add(pit)
         }
 
-        // ゴールは床から少しだけ浮かせた円盤にして、ボールが乗り上げないようにする。
-        // 判定半径そのものだと印が小さく見えるため、球半径の1/4だけ外へ広げる。
-        const markerRadius = GOAL_RADIUS + BALL_RADIUS * 0.25
-        const goalMesh = new THREE.Mesh(
-          track(new THREE.CylinderGeometry(markerRadius, markerRadius, BALL_RADIUS * 0.1, 28)),
+        // ゴールは、底が少しだけ低いゴルフカップ風の受け皿。
+        // 深い穴にしないことで、カップイン後も国旗ボールを十分に見せられる。
+        const goalCupBottom = new THREE.Mesh(
+          track(new THREE.CylinderGeometry(GOAL_CUP_RADIUS, GOAL_CUP_RADIUS, BALL_RADIUS * 0.04, 32)),
+          trackMaterial(new THREE.MeshLambertMaterial({ color: 0x315a72 })),
+        )
+        goalCupBottom.position.set(stage.goal.x, GOAL_CUP_FLOOR_Y + BALL_RADIUS * 0.02, stage.goal.z)
+        boardGroup.add(goalCupBottom)
+
+        const goalCupRim = new THREE.Mesh(
+          track(new THREE.TorusGeometry(
+            (GOAL_CUP_RADIUS + GOAL_CUP_RIM_RADIUS) / 2,
+            (GOAL_CUP_RIM_RADIUS - GOAL_CUP_RADIUS) / 2,
+            8,
+            32,
+          )),
           trackMaterial(new THREE.MeshLambertMaterial({ color: 0xffc53d })),
         )
-        goalMesh.position.set(stage.goal.x, 0.03, stage.goal.z)
-        boardGroup.add(goalMesh)
+        goalCupRim.rotation.x = -Math.PI / 2
+        goalCupRim.position.set(stage.goal.x, BALL_RADIUS * 0.045, stage.goal.z)
+        boardGroup.add(goalCupRim)
+
+        const goalCupLip = new THREE.Mesh(
+          track(new THREE.TorusGeometry(GOAL_CUP_RADIUS, BALL_RADIUS * 0.045, 8, 32)),
+          trackMaterial(new THREE.MeshLambertMaterial({ color: 0xfff9db })),
+        )
+        goalCupLip.rotation.x = -Math.PI / 2
+        goalCupLip.position.set(stage.goal.x, BALL_RADIUS * 0.055, stage.goal.z)
+        boardGroup.add(goalCupLip)
+
+        const markerRadius = GOAL_RADIUS + BALL_RADIUS * 0.25
 
         const startMesh = new THREE.Mesh(
           track(new THREE.CylinderGeometry(markerRadius, markerRadius, BALL_RADIUS * 0.07, 28)),

@@ -3,7 +3,10 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import {
   BALL_RADIUS,
   BALL_SPAWN_CLEARANCE_IN_RADII,
+  GOAL_CUP_DEPTH,
+  GOAL_CUP_FLOOR_Y,
   GOAL_RADIUS,
+  GOAL_REACHED_MAX_Y,
   HOLE_FALL_Y,
   MAX_BALL_SPEED,
   PHYSICS_TIMESTEP,
@@ -25,8 +28,8 @@ import {
   createMazeWorld,
   isGoalReached,
   limitBallSpeed,
-  popBallAtGoal,
   resetBall,
+  settleBallInGoalCup,
   pushBallOutOfSpinner,
 } from './mazeWorld'
 import { hasFallenBelowFloor, hasFallenOut } from './mazeRescue'
@@ -221,7 +224,7 @@ describe('createMazeWorld', () => {
             stage.walls.length +
             stage.gimmicks.spinners.length +
             stage.gimmicks.bumpers.length +
-            1,
+            2,
         )
         console.log(
           '迷路ワールドのステージ別剛体数・コライダー数',
@@ -254,10 +257,38 @@ describe('createMazeWorld', () => {
     }
   })
 
-  it('大きくしたボールに対して壁とゴールの余白を保つ', () => {
+  it('大きくしたボールに対して壁と浅いゴールカップの余白を保つ', () => {
     // 壁の高さに余裕を持たせ、球の乗り越えとゴール判定の取りこぼしを防ぐ。
     expect(WALL_HEIGHT - BALL_RADIUS * 2).toBeGreaterThanOrEqual(0.1)
     expect(GOAL_RADIUS).toBeGreaterThanOrEqual(BALL_RADIUS)
+    expect(GOAL_CUP_DEPTH).toBeLessThan(BALL_RADIUS * 0.5)
+    expect(GOAL_CUP_FLOOR_Y).toBeLessThan(0)
+  })
+
+  it('ゴールへ入ったボールは浅いカップ底で止まり、国旗が見える高さに残る', () => {
+    const stage = createMazeStageById('adventure')
+    const { world, ball } = createMazeWorld(RAPIER, stage)
+    try {
+      ball.setTranslation(
+        { x: stage.goal.x, y: BALL_RADIUS * 1.8, z: stage.goal.z },
+        true,
+      )
+      ball.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      applyTiltToGravity(world, { x: 0, y: 0 })
+      for (let step = 0; step < 240; step += 1) world.step()
+
+      const settled = ball.translation()
+      expect(settled.y).toBeCloseTo(BALL_RADIUS + GOAL_CUP_FLOOR_Y, 2)
+      expect(settled.y).toBeGreaterThan(BALL_RADIUS * 0.5)
+      expect(isGoalReached(settled, stage.goal)).toBe(true)
+
+      for (let step = 0; step < 120; step += 1) world.step()
+      const still = ball.translation()
+      expect(Math.abs(still.y - settled.y)).toBeLessThan(0.02)
+      expect(Math.hypot(still.x - stage.goal.x, still.z - stage.goal.z)).toBeLessThan(0.02)
+    } finally {
+      world.free()
+    }
   })
 
   it('傾けていなければボールはその場に留まる', () => {
@@ -590,9 +621,14 @@ describe('スティック操作だけでゴールできる', () => {
 })
 
 describe('isGoalReached', () => {
-  it('ゴール中心の真上なら高さに関わらず判定する', () => {
+  it('カップ底まで入ったゴール中心のボールを判定する', () => {
     const stage = createMazeStageById('adventure')
-    expect(isGoalReached({ x: stage.goal.x, y: 3, z: stage.goal.z }, stage.goal)).toBe(true)
+    expect(isGoalReached({ x: stage.goal.x, y: GOAL_REACHED_MAX_Y, z: stage.goal.z }, stage.goal)).toBe(true)
+  })
+
+  it('カップの縁を横切っただけでは判定しない', () => {
+    const stage = createMazeStageById('adventure')
+    expect(isGoalReached({ x: stage.goal.x, y: BALL_RADIUS, z: stage.goal.z }, stage.goal)).toBe(false)
   })
 
   it('離れていれば判定しない', () => {
@@ -602,21 +638,21 @@ describe('isGoalReached', () => {
   })
 })
 
-describe('popBallAtGoal', () => {
+describe('settleBallInGoalCup', () => {
   beforeAll(async () => {
     await RAPIER.init()
   })
 
-  it('上向きへ跳ね、水平の勢いを小さくする', () => {
+  it('上向きへ跳ねさせず、水平の勢いを止める', () => {
     const stage = createMazeStageById('adventure')
     const { world, ball } = createMazeWorld(RAPIER, stage)
     try {
       ball.setLinvel({ x: 2.4, y: -0.5, z: -1.8 }, true)
-      popBallAtGoal(ball)
+      settleBallInGoalCup(ball)
 
       const velocity = ball.linvel()
-      expect(velocity.y).toBeGreaterThan(0)
-      expect(Math.hypot(velocity.x, velocity.z)).toBeLessThan(Math.hypot(2.4, -1.8))
+      expect(velocity.y).toBeLessThanOrEqual(0)
+      expect(Math.hypot(velocity.x, velocity.z)).toBe(0)
     } finally {
       world.free()
     }
