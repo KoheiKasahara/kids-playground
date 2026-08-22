@@ -121,6 +121,30 @@ export function playPanelOpenSound(): void {
   playTone(ctx, 740, now, 0.13, 0.12, 'triangle')
 }
 
+/** 国選択音の連続再生を抑える短い間隔。連打でも操作感は残しつつ、音の濁りを避ける。 */
+const GLOBE_COUNTRY_SELECT_SOUND_MIN_INTERVAL_MS = 100
+let lastGlobeCountrySelectSoundAt: number | null = null
+
+/**
+ * 地球儀で国を選んだときの、丸く短い「ぷるん♪」。
+ * 小さな上行2音を重ねずに並べ、クリック音や正解音より控えめな手触りにする。
+ */
+export function playGlobeCountrySelectSound(): void {
+  if (!soundEnabled) return
+  const wallClockNow = Date.now()
+  if (
+    lastGlobeCountrySelectSoundAt !== null
+    && wallClockNow - lastGlobeCountrySelectSoundAt < GLOBE_COUNTRY_SELECT_SOUND_MIN_INTERVAL_MS
+  ) return
+  lastGlobeCountrySelectSoundAt = wallClockNow
+
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 520, now, 0.09, 0.07, 'triangle')
+  playTone(ctx, 680, now + 0.045, 0.12, 0.06, 'sine')
+}
+
 /** メジャーペンタトニックスケール（ド・レ・ミ・ソ・ラ）の半音オフセット。黒鍵を含まないので不協和になりにくい */
 const PENTATONIC_STEPS = [0, 2, 4, 7, 9]
 /** playPanelRevealSound の基準周波数（D5） */

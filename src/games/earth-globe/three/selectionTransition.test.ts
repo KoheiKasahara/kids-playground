@@ -11,6 +11,7 @@ function risingAnimation(): BorderScaleAnimation {
     fromScale: BASE_SELECTED_BORDER_SCALE,
     toScale: 1,
     startedAt: 1_000,
+    durationMs: POLYGONS_TRANSITION_DURATION_MS,
   }
 }
 
@@ -49,6 +50,7 @@ describe('globe selection transition', () => {
       fromScale: 1,
       toScale: BASE_SELECTED_BORDER_SCALE,
       startedAt: 2_000,
+      durationMs: POLYGONS_TRANSITION_DURATION_MS,
     }
 
     expect(sampleBorderScaleAnimation(

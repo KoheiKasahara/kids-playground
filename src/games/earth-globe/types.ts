@@ -47,6 +47,11 @@ export type UseGlobeEngineOptions = {
   zoomLevel: ZoomLevel
   /** 現在選択中の国（alpha-2）。null は未選択。変化したらハイライト表示を更新する。 */
   selectedCountryId: string | null
+  /**
+   * 国をタップするたびに増えるフィードバック用の連番。
+   * 同じ国を続けてタップした場合も、選択中の国をもう一度軽く浮かせられるようにする。
+   */
+  selectionFeedbackKey: number
   /** 地球上の国がタップされたら alpha-2 コードで通知する。海・国境データ外のタップは null。 */
   onCountrySelect: (countryId: string | null) => void
   /** prefers-reduced-motion のとき true。true の間はカメラ・ハイライトのアニメーションを即時化する。 */

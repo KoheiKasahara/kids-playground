@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { globeCountries } from './data/globeCountries'
 import { worldFeatures } from './data/worldFeatures'
@@ -9,19 +9,31 @@ import CountryCard from './ui/CountryCard'
 import ZoomControls from './ui/ZoomControls'
 import { useReducedMotion } from './useReducedMotion'
 import { zoomIn, zoomOut } from './zoomState'
+import { playGlobeCountrySelectSound } from '../../utils/quizSound'
 
 export default function EarthGlobePlay() {
   const navigate = useNavigate()
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(MIN_ZOOM_LEVEL)
   const [selectedCountryId, setSelectedCountryId] = useState<string | null>(null)
+  const [selectionFeedbackKey, setSelectionFeedbackKey] = useState(0)
   const reducedMotion = useReducedMotion()
+
+  const handleGlobeCountrySelect = useCallback((countryId: string | null) => {
+    setSelectedCountryId(countryId)
+    if (countryId === null) return
+
+    // pointerup のユーザー操作中に鳴らすことで、iOS Safari でも Web Audio の再生を許可する。
+    playGlobeCountrySelectSound()
+    setSelectionFeedbackKey((key) => key + 1)
+  }, [])
 
   const { registerContainer } = useGlobeEngine({
     countries: globeCountries,
     features: worldFeatures,
     zoomLevel,
     selectedCountryId,
-    onCountrySelect: setSelectedCountryId,
+    selectionFeedbackKey,
+    onCountrySelect: handleGlobeCountrySelect,
     reducedMotion,
   })
 

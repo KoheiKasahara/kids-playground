@@ -15,6 +15,11 @@ import { GLOBE_RADIUS } from './zoomLevels'
 export const BASE_POLYGON_ALTITUDE = 0.002
 /** 選択中の国だけは、はっきり浮き上がって見える高さにする。 */
 export const SELECTED_POLYGON_ALTITUDE = 0.024
+/**
+ * タップ直後だけ使う、選択状態より少しだけ高い高さ。
+ * 最終高度との差を 0.6 world unit（地球半径100あたり）に抑え、過度なバウンド感を避ける。
+ */
+export const SELECTED_POLYGON_POP_ALTITUDE = 0.03
 
 /** 海の球体の曲面分割（度）。粗いほど球が多角形に近づき、内側へ沈み込む。 */
 export const GLOBE_CURVATURE_RESOLUTION_DEGREES = 5
@@ -33,3 +38,4 @@ function borderRadiusFor(altitude: number): number {
 
 export const BASE_BORDER_RADIUS = borderRadiusFor(BASE_POLYGON_ALTITUDE)
 export const SELECTED_BORDER_RADIUS = borderRadiusFor(SELECTED_POLYGON_ALTITUDE)
+export const SELECTED_POLYGON_POP_BORDER_RADIUS = borderRadiusFor(SELECTED_POLYGON_POP_ALTITUDE)
