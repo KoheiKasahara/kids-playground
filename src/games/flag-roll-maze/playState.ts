@@ -1,21 +1,28 @@
 import { FLAG_BALL_IDS } from '../../components/flag-ball/flagBalls'
+import { isMazeStageId } from './mazeStages'
 
-/** プレイ画面へ渡す、選んだ国旗1件だけの遷移state。 */
-export type MazePlayState = { flagId: string }
+/** プレイ画面へ渡す、選んだ国旗とステージ1件ずつの遷移state。 */
+export type MazePlayState = { flagId: string; stageId: string }
 
 function isKnownFlagId(value: unknown): value is string {
   return typeof value === 'string' && FLAG_BALL_IDS.includes(value)
 }
 
 /**
- * location.state はURLの代わりに使う一時データなので、flagIdだけを受け付ける。
- * 余分な値や未知の国旗を通さず、壊れた直リンクは選択画面へ戻せるようにする。
+ * location.state はURLの代わりに使う一時データなので、国旗とステージだけを受け付ける。
+ * 余分な値や未知の選択肢を通さず、壊れた直リンクは選択画面へ戻せるようにする。
  */
 function isExactFlagState(value: unknown): value is MazePlayState {
   if (typeof value !== 'object' || value === null) return false
   const state = value as Record<string, unknown>
   const keys = Object.keys(state)
-  return keys.length === 1 && keys[0] === 'flagId' && isKnownFlagId(state.flagId)
+  return (
+    keys.length === 2 &&
+    keys.includes('flagId') &&
+    keys.includes('stageId') &&
+    isKnownFlagId(state.flagId) &&
+    isMazeStageId(state.stageId)
+  )
 }
 
 /** `/games/flag-roll-maze/play` のlocation.stateを検証する型ガード。 */

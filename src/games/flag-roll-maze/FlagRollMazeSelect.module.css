@@ -1,4 +1,4 @@
-/* 75個の国旗をスクロールして選べるようにし、操作バーだけはstickyで常に見えるようにする。 */
+/* たくさんの選択肢をスクロールして選べるようにし、操作バーだけは常に見えるようにする。 */
 .page {
   max-width: var(--content-max-width);
   min-height: 100vh;
@@ -43,6 +43,17 @@
   padding-bottom: var(--space-md);
 }
 
+/* 文字を読む前でも絵文字と大きな面で選べる、ステージ用のカード一覧。 */
+.stageGrid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  align-content: start;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-md);
+}
+
 .cell {
   min-width: 64px;
   min-height: 132px;
@@ -60,7 +71,30 @@
   transition: transform 0.12s ease, border-color 0.12s ease;
 }
 
+.stageCell {
+  position: relative;
+  min-height: 96px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  border: 3px solid transparent;
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-primary-dark);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+}
+
 .cell:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.stageCell:focus-visible {
   outline: 4px solid var(--color-accent);
   outline-offset: 3px;
 }
@@ -81,6 +115,27 @@
   line-break: strict;
 }
 
+.stageEmoji {
+  grid-row: 1 / -1;
+  font-size: 48px;
+  line-height: 1;
+}
+
+.stageName {
+  align-self: end;
+  font-size: 21px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.stageHint {
+  align-self: start;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
 /* 1つだけ選べることを枠とチェックの両方で伝え、aria-pressedとも一致させる。 */
 .selected {
   border-color: var(--color-primary);
@@ -88,10 +143,30 @@
   animation: selectPop 180ms ease-out;
 }
 
+.stageCell.selected {
+  background-color: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+}
+
 .check {
   position: absolute;
   top: -6px;
   right: -6px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background-color: var(--color-success);
+  color: var(--color-text-on-primary);
+  font-size: 16px;
+  font-weight: 900;
+  box-shadow: var(--shadow-sm);
+}
+
+.stageCheck {
+  position: absolute;
+  top: 7px;
+  right: 7px;
   width: 26px;
   height: 26px;
   display: grid;
@@ -112,7 +187,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .selected,
-  .cell {
+  .cell,
+  .stageCell {
     animation: none;
     transition: none;
   }
@@ -135,6 +211,10 @@
     grid-template-columns: minmax(0, 1.625fr) minmax(0, 1fr);
     align-items: stretch;
   }
+
+  .stageGrid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
 }
 
 @media (min-width: 560px) {
@@ -151,7 +231,8 @@
     overflow: hidden;
   }
 
-  .grid {
+  .grid,
+  .stageGrid {
     min-height: 96px;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -185,5 +266,35 @@
 
   .header {
     margin-bottom: var(--space-sm);
+  }
+
+  .stageGrid {
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  }
+
+  .stageCell {
+    min-height: 76px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    justify-items: center;
+    align-content: center;
+    gap: 2px;
+    padding: var(--space-xs);
+    text-align: center;
+  }
+
+  .stageEmoji {
+    grid-row: auto;
+    font-size: 32px;
+  }
+
+  .stageName {
+    align-self: auto;
+    font-size: 16px;
+  }
+
+  .stageHint {
+    align-self: auto;
+    font-size: 12px;
   }
 }

@@ -58,45 +58,6 @@ export type MazeStage = {
   goal: MazePoint
 }
 
-/**
- * 上下を3マス幅の部屋にし、中央の2マス幅の縦通路でつないだ11×11のステージ。
- * 壁の下にも床を置く一方、Oのマスだけは床を抜いて落下を分かりやすくする。
- */
-const STAGE_ROWS = [
-  '###########',
-  '#S........#',
-  '#.........#',
-  '#.........#',
-  '######O.###',
-  '######O.###',
-  '######O.###',
-  '#.........#',
-  '#G........#',
-  '#.........#',
-  '###########',
-] as const
-
-/** 既定ステージのギミックはセル座標で管理し、グリッドの大きさに合わせて解決する。 */
-const STAGE_GIMMICKS: readonly GimmickPlacement[] = [
-  // 下の縦通路(列7)へ降りる導線の真上に置き、普通に進むと必ず棒に出会うようにする。
-  // 南側には1.9の退避レーンが残るので、避けたい子は部屋の下側を回れば通れる。
-  { kind: 'spinner', id: 'spinner-top', cell: { column: 7.0, row: 1.85 }, angularSpeed: 1.0, initialAngle: 0 },
-  // ゴール手前の最後の関門。少し遅くして、終盤でも落ち着いて抜けられるようにする。
-  { kind: 'spinner', id: 'spinner-goal', cell: { column: 2.5, row: 8.0 }, angularSpeed: -0.85, initialAngle: Math.PI / 2 },
-  // 下の部屋。ボールは列6付近から入って左のゴールへ向かうので、その道すじへ散らして置く。
-  { kind: 'bumper', id: 'bumper-a', cell: { column: 7.5, row: 8.0 } },
-  { kind: 'bumper', id: 'bumper-b', cell: { column: 5.6, row: 7.6 } },
-  { kind: 'bumper', id: 'bumper-c', cell: { column: 4.2, row: 8.4 } },
-]
-
-/** 復帰先はスタートから順に並べ、穴やギミックの直前で再開しないようにする。 */
-const STAGE_CHECKPOINT_CELLS = [
-  { column: 1, row: 1 },      // START
-  { column: 7, row: 3 },      // 穴のある縦通路へ入る直前
-  { column: 6, row: 7 },      // 穴を抜けて下の部屋へ入った直後
-  { column: 5.0, row: 8.6 },  // ゴール手前の回転棒へ挑む前
-] as const
-
 /** グリッドの列・行番号が指定した点と一致するかを比較する。 */
 function samePoint(a: MazePoint | undefined, b: MazePoint): boolean {
   return a?.x === b.x && a.z === b.z
@@ -241,7 +202,7 @@ function findHoles(rows: readonly string[]): MazeHole[] {
 
 /** 文字グリッドから遊べる形のステージを組み立てる。 */
 export function createMazeStage(
-  rows: readonly string[] = STAGE_ROWS,
+  rows: readonly string[],
   options: {
     id?: string
     nameJa?: string
@@ -258,7 +219,7 @@ export function createMazeStage(
 
   const start = findCell(rows, 'S')
   const goal = findCell(rows, 'G')
-  const requestedCheckpointCells = options.checkpointCells ?? STAGE_CHECKPOINT_CELLS
+  const requestedCheckpointCells = options.checkpointCells ?? []
   const checkpoints = requestedCheckpointCells.map((cell) =>
     cellToWorld(cell.column, cell.row, columnCount, rowCount),
   )
@@ -277,7 +238,7 @@ export function createMazeStage(
     floors: buildFloorRects(rows),
     holes: findHoles(rows),
     gimmicks: resolveGimmicks(
-      options.gimmicks ?? STAGE_GIMMICKS,
+      options.gimmicks ?? [],
       columnCount,
       rowCount,
     ),
@@ -362,6 +323,3 @@ export function findMazePath(
 export function isMazeSolvable(rows: readonly string[]): boolean {
   return findMazePath(rows) !== null
 }
-
-/** Phase 4で遊ぶ唯一のステージ。 */
-export const MAZE_STAGE_ROWS = STAGE_ROWS

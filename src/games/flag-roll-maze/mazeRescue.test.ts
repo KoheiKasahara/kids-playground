@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BALL_RADIUS, FALL_OUT_Y, HOLE_FALL_Y } from './mazePhysics'
-import { createMazeStage } from './mazeStage'
+import { createMazeStageById } from './mazeStages'
 import {
   checkpointPosition,
   createCheckpointTracker,
@@ -41,7 +41,7 @@ describe('hasFallenBelowFloor', () => {
 
 describe('チェックポイント追跡', () => {
   it('実ステージのチェックポイントを前進方向にだけ追跡する', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     expect(stage.checkpoints[0]).toEqual(stage.start)
 
     let tracker = createCheckpointTracker()
@@ -69,7 +69,7 @@ describe('チェックポイント追跡', () => {
   })
 
   it('次のチェックポイントへ近づかなければ進まず、無効な復帰先はフォールバックする', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
     const fallback = { x: 123, z: -456 }
 
     expect(
@@ -85,7 +85,7 @@ describe('チェックポイント追跡', () => {
   })
 
   it('落下後の復帰位置は全ての穴のマス矩形からボール半径以上離れる', () => {
-    const stage = createMazeStage()
+    const stage = createMazeStageById('adventure')
 
     for (let index = 0; index < stage.checkpoints.length; index += 1) {
       const respawn = checkpointPosition(
@@ -203,7 +203,7 @@ describe('updateStallTracker', () => {
 })
 
 describe('updateSpinnerTrapTracker', () => {
-  const stage = createMazeStage()
+  const stage = createMazeStageById('adventure')
   const spinner = stage.gimmicks.spinners[0]!
   const otherSpinner = stage.gimmicks.spinners[1]!
   const spinnerPosition = {
