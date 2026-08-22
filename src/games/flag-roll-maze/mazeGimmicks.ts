@@ -5,6 +5,13 @@ import {
   BUMPER_KICK_MARGIN,
   BUMPER_RADIUS,
   BALL_RADIUS,
+  CAR_BODY_HEIGHT,
+  CAR_CABIN_RADIUS,
+  CAR_DEPTH,
+  CAR_WIDTH,
+  CANNON_CAPTURE_RADIUS,
+  CANNON_MUZZLE_Y,
+  JUMP_PAD_TOP,
   SPINNER_HEIGHT,
   SPINNER_LENGTH,
   SPINNER_THICKNESS,
@@ -34,7 +41,47 @@ export type BumperPlacement = {
   radius?: number
 }
 
-export type GimmickPlacement = SpinnerPlacement | BumperPlacement
+export type CarPlacement = {
+  kind: 'car'
+  id: string
+  /** 往復移動の中心セル。 */
+  cell: CellCoordinate
+  /** 中心からの片側振れ幅（ワールド単位）。 */
+  amplitude: number
+  /** 往復中の一定速度（ワールド単位/秒）。 */
+  speed: number
+  /** 複数台が同じ動きに見えないよう開始位相をずらす。 */
+  phaseOffsetSeconds?: number
+  /** 1で+Xへ、-1で-Xへ動き始める。 */
+  initialDirection: 1 | -1
+}
+
+export type JumpPadPlacement = {
+  kind: 'jumpPad'
+  id: string
+  /** 通路幅いっぱいへ置くための中心セル。 */
+  cell: CellCoordinate
+  widthCells: number
+  depthCells: number
+}
+
+export type CannonPlacement = {
+  kind: 'cannon'
+  id: string
+  /** 砲身の付け根と捕捉位置を同じセルで管理し、コース上の行き止まりへ置きやすくする。 */
+  cell: CellCoordinate
+  /** +z を0とする発射仰角と水平方向。 */
+  elevationRad: number
+  headingRad: number
+  speed: number
+}
+
+export type GimmickPlacement =
+  | SpinnerPlacement
+  | BumperPlacement
+  | CarPlacement
+  | JumpPadPlacement
+  | CannonPlacement
 
 export type SpinnerGimmick = {
   id: string
@@ -55,11 +102,46 @@ export type BumperGimmick = {
   height: number
 }
 
+export type CarGimmick = {
+  id: string
+  /** 車体の中心。物理・描画・往復計算で同じ高さを基準にする。 */
+  center: PhysicsVector
+  amplitude: number
+  speed: number
+  phaseOffsetSeconds: number
+  initialDirection: 1 | -1
+  halfWidth: number
+  halfHeight: number
+  halfDepth: number
+  cabinRadius: number
+}
+
+export type JumpPadGimmick = {
+  id: string
+  center: MazePoint
+  halfWidth: number
+  halfDepth: number
+  top: number
+}
+
+export type CannonGimmick = {
+  id: string
+  center: MazePoint
+  muzzleY: number
+  elevationRad: number
+  headingRad: number
+  speed: number
+  captureRadius: number
+}
+
 export type MazeHole = { center: MazePoint; size: number }
 
 export type MazeGimmicks = {
   spinners: SpinnerGimmick[]
   bumpers: BumperGimmick[]
+  cars: CarGimmick[]
+  jumpPads: JumpPadGimmick[]
+  cannons: CannonGimmick[]
 }
 
 /** 経過時間から角度を直接求め、フレーム数による誤差を蓄積させない。 */
@@ -131,6 +213,9 @@ export function resolveGimmicks(
 ): MazeGimmicks {
   const spinners: SpinnerGimmick[] = []
   const bumpers: BumperGimmick[] = []
+  const cars: CarGimmick[] = []
+  const jumpPads: JumpPadGimmick[] = []
+  const cannons: CannonGimmick[] = []
 
   for (const placement of placements) {
     const center = cellToWorld(
@@ -157,6 +242,47 @@ export function resolveGimmicks(
       continue
     }
 
+    if (placement.kind === 'car') {
+      cars.push({
+        id: placement.id,
+        // 車体の下面を道路へ接地させ、子Colliderの相対位置を単純に保つ。
+        center: { x: center.x, y: CAR_BODY_HEIGHT / 2, z: center.z },
+        amplitude: placement.amplitude,
+        speed: placement.speed,
+        phaseOffsetSeconds: placement.phaseOffsetSeconds ?? 0,
+        initialDirection: placement.initialDirection,
+        halfWidth: CAR_WIDTH / 2,
+        halfHeight: CAR_BODY_HEIGHT / 2,
+        halfDepth: CAR_DEPTH / 2,
+        cabinRadius: CAR_CABIN_RADIUS,
+      })
+      continue
+    }
+
+    if (placement.kind === 'jumpPad') {
+      jumpPads.push({
+        id: placement.id,
+        center,
+        halfWidth: (placement.widthCells * cellSize) / 2,
+        halfDepth: (placement.depthCells * cellSize) / 2,
+        top: JUMP_PAD_TOP,
+      })
+      continue
+    }
+
+    if (placement.kind === 'cannon') {
+      cannons.push({
+        id: placement.id,
+        center,
+        muzzleY: CANNON_MUZZLE_Y,
+        elevationRad: placement.elevationRad,
+        headingRad: placement.headingRad,
+        speed: placement.speed,
+        captureRadius: CANNON_CAPTURE_RADIUS,
+      })
+      continue
+    }
+
     bumpers.push({
       id: placement.id,
       center,
@@ -165,5 +291,5 @@ export function resolveGimmicks(
     })
   }
 
-  return { spinners, bumpers }
+  return { spinners, bumpers, cars, jumpPads, cannons }
 }

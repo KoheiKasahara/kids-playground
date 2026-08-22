@@ -104,6 +104,29 @@ describe('FlagRollMazeSelect', () => {
     })
   })
 
+  it('アスレチックを選んでプレイへ進める', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <FlagRollMazeSelect />
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'にほん' }))
+    await user.click(screen.getByRole('button', { name: 'つぎへ' }))
+    const athletic = MAZE_STAGES.find((stage) => stage.id === 'athletic')
+    expect(athletic).toBeDefined()
+    if (athletic === undefined) return
+
+    expect(screen.getByText('アスレチック')).toBeInTheDocument()
+    await user.click(stageButton(athletic))
+    await user.click(screen.getByRole('button', { name: 'スタート！' }))
+
+    expect(navigateMock).toHaveBeenCalledWith('/games/flag-roll-maze/play', {
+      state: { flagId: 'jp', stageId: 'athletic' },
+    })
+  })
+
   it('こっきをかえるで国旗の選択を保ったまま前の手順へ戻る', async () => {
     const user = userEvent.setup()
     render(

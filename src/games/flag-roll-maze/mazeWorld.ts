@@ -10,6 +10,14 @@ import {
   BUMPER_FRICTION,
   BUMPER_HEIGHT,
   BUMPER_RESTITUTION,
+  CAR_BODY_HEIGHT,
+  CAR_BODY_ROUND,
+  CAR_CABIN_RADIUS,
+  CAR_DEPTH,
+  CAR_FRICTION,
+  CAR_RESTITUTION,
+  CAR_WIDTH,
+  CANNON_SETTLE_LERP,
   clampSpeed,
   FLOOR_FRICTION,
   FLOOR_THICKNESS,
@@ -18,6 +26,7 @@ import {
   GOAL_RADIUS,
   GOAL_REACHED_MAX_Y,
   gravityFromTilt,
+  JUMP_PAD_COOLDOWN_MS,
   MAX_BALL_SPEED,
   PHYSICS_TIMESTEP,
   SPINNER_FRICTION,
@@ -34,8 +43,14 @@ import {
   spinnerAngleAt,
   type BumperCooldowns,
   type BumperGimmick,
+  type CannonGimmick,
+  type CarGimmick,
+  type JumpPadGimmick,
   type SpinnerGimmick,
 } from './mazeGimmicks'
+import { carXAt } from './mazeCarToy'
+import { cannonChamberPosition, cannonLaunchVelocity } from './mazeCannon'
+import { jumpPadLaunch } from './mazeJumpPad'
 import type { MazePoint, MazeStage } from './mazeStage'
 import type { TiltInput } from './tiltInput'
 
@@ -51,11 +66,17 @@ export type MazeWorld = {
   stage: MazeStage
   /** 回転棒のkinematic body。配列順をギミック配列と揃え、描画側が対応付けやすくする。 */
   spinners: { gimmick: SpinnerGimmick; body: RigidBody }[]
+  /** 車のkinematic body。位置を物理の正本にし、見た目はここへ毎フレーム同期する。 */
+  cars: { gimmick: CarGimmick; body: RigidBody }[]
 }
 
-/** ボールは盤面の少し上から置き、初期フレームで床へめり込まないようにする。 */
-export function ballSpawnPosition(start: MazePoint): PhysicsVector {
-  return { x: start.x, y: BALL_RADIUS * (1 + BALL_SPAWN_CLEARANCE_IN_RADII), z: start.z }
+/** ボールはSTARTの地形上面から少し上へ置き、初期フレームで床へめり込まないようにする。 */
+export function ballSpawnPosition(start: MazeStage['start']): PhysicsVector {
+  return {
+    x: start.x,
+    y: (start.y ?? 0) + BALL_RADIUS * (1 + BALL_SPAWN_CLEARANCE_IN_RADII),
+    z: start.z,
+  }
 }
 
 /**
@@ -103,6 +124,49 @@ export function createMazeWorld(rapier: RapierModule, stage: MazeStage): MazeWor
     )
   }
 
+  // terrainは親RigidBodyを持たない固定Colliderにし、既存の床・壁と同じ安定した手触りにする。
+  for (const box of stage.terrain.boxes) {
+    world.createCollider(
+      rapier.ColliderDesc.cuboid(box.width / 2, box.height / 2, box.depth / 2)
+        .setTranslation(box.x, box.y, box.z)
+        .setRotation(quaternionAroundX(box.rotationX))
+        // 柵やガードは引っかかりにくくし、天面は従来の床と同じ転がりやすさを保つ。
+        .setFriction(box.style === 'guard' ? WALL_FRICTION : FLOOR_FRICTION)
+        .setRestitution(WALL_RESTITUTION),
+    )
+  }
+
+  for (const bar of stage.terrain.bars) {
+    // Rapierの円柱はY軸方向なので、Z軸まわりに90°回してX軸方向の丸棒にする。
+    world.createCollider(
+      rapier.ColliderDesc.cylinder(bar.length / 2, bar.radius)
+        .setTranslation(bar.x, bar.y, bar.z)
+        .setRotation(quaternionAroundZ(Math.PI / 2))
+        .setFriction(WALL_FRICTION)
+        .setRestitution(WALL_RESTITUTION),
+    )
+  }
+
+  for (const jumpPad of stage.gimmicks.jumpPads) {
+    // 通路を横切る固定Colliderにし、上面だけを既定の床より0.12だけ高くする。
+    world.createCollider(
+      rapier.ColliderDesc.cuboid(
+        jumpPad.halfWidth,
+        jumpPad.top / 2,
+        jumpPad.halfDepth,
+      )
+        .setTranslation(jumpPad.center.x, jumpPad.top / 2, jumpPad.center.z)
+        .setFriction(FLOOR_FRICTION)
+        .setRestitution(WALL_RESTITUTION),
+    )
+  }
+
+  // 大砲は専用のColliderを持たない。
+  // 砲室に壁を足すと、進入側に置けばボールが捕捉半径へ入る前に止まってしまい、
+  // 発射側に置けば撃ち出したボールが自分の壁へ激突する。どちらも詰みになる。
+  // 行き止まりは既にコース側の尾根(athletic-cannon-ridge)が作っており、
+  // ボールはそこへ着く前に捕捉半径へ入るので、素通りは構造的に起こらない。
+
   const spinners: MazeWorld['spinners'] = []
   for (const gimmick of stage.gimmicks.spinners) {
     const body = world.createRigidBody(
@@ -121,6 +185,43 @@ export function createMazeWorld(rapier: RapierModule, stage: MazeStage): MazeWor
       body,
     )
     spinners.push({ gimmick, body })
+  }
+
+  const cars: MazeWorld['cars'] = []
+  for (const gimmick of stage.gimmicks.cars) {
+    const body = world.createRigidBody(
+      rapier.RigidBodyDesc.kinematicPositionBased().setTranslation(
+        carXAt(gimmick, 0),
+        gimmick.center.y,
+        gimmick.center.z,
+      ),
+    )
+    world.createCollider(
+      rapier.ColliderDesc.roundCuboid(
+        CAR_WIDTH / 2 - CAR_BODY_ROUND,
+        CAR_BODY_HEIGHT / 2 - CAR_BODY_ROUND,
+        CAR_DEPTH / 2 - CAR_BODY_ROUND,
+        CAR_BODY_ROUND,
+      )
+        .setFriction(CAR_FRICTION)
+        .setRestitution(CAR_RESTITUTION),
+      body,
+    )
+    // 屋根を円柱にして平らな天面をなくす。flag-pinball/carToy.tsで得た知見どおり、
+    // 真上から落ちたボールが車の上で静止せず、自然に横へ転がり落ちるようにする。
+    world.createCollider(
+      rapier.ColliderDesc.cylinder(CAR_WIDTH * 0.28, CAR_CABIN_RADIUS)
+        .setTranslation(
+          0,
+          CAR_BODY_HEIGHT / 2 + CAR_CABIN_RADIUS * 0.55,
+          0,
+        )
+        .setRotation(quaternionAroundZ(Math.PI / 2))
+        .setFriction(CAR_FRICTION)
+        .setRestitution(CAR_RESTITUTION),
+      body,
+    )
+    cars.push({ gimmick, body })
   }
 
   for (const bumper of stage.gimmicks.bumpers) {
@@ -152,7 +253,7 @@ export function createMazeWorld(rapier: RapierModule, stage: MazeStage): MazeWor
     ball,
   )
 
-  return { world, ball, stage, spinners }
+  return { world, ball, stage, spinners, cars }
 }
 
 /** Y軸まわりの回転だけを扱うため、Rapierの型に依存しないリテラルで作る。 */
@@ -161,6 +262,26 @@ function quaternionAroundY(angle: number): { x: number; y: number; z: number; w:
     x: 0,
     y: Math.sin(angle / 2),
     z: 0,
+    w: Math.cos(angle / 2),
+  }
+}
+
+/** X軸まわりの回転を、Rapierの型に依存しないリテラルで作る。 */
+function quaternionAroundX(angle: number): { x: number; y: number; z: number; w: number } {
+  return {
+    x: Math.sin(angle / 2),
+    y: 0,
+    z: 0,
+    w: Math.cos(angle / 2),
+  }
+}
+
+/** Z軸まわりの回転を、Rapierの型に依存しないリテラルで作る。 */
+function quaternionAroundZ(angle: number): { x: number; y: number; z: number; w: number } {
+  return {
+    x: 0,
+    y: 0,
+    z: Math.sin(angle / 2),
     w: Math.cos(angle / 2),
   }
 }
@@ -177,6 +298,24 @@ export function advanceSpinners(
     body.setNextKinematicRotation(
       quaternionAroundY(spinnerAngleAt(gimmick, elapsedSeconds)),
     )
+  }
+}
+
+/**
+ * 物理ステップ直前に、絶対時刻で決めた車の次位置を渡す。
+ * kinematicPositionBasedはRapierが現在位置との差から速度を求めるため、
+ * flag-pinball/carToy.tsのBody.setVelocityと同じく衝突解決へ車の移動速度が伝わる。
+ */
+export function advanceCars(
+  cars: MazeWorld['cars'],
+  elapsedSeconds: number,
+): void {
+  for (const { gimmick, body } of cars) {
+    body.setNextKinematicTranslation({
+      x: carXAt(gimmick, elapsedSeconds),
+      y: gimmick.center.y,
+      z: gimmick.center.z,
+    })
   }
 }
 
@@ -204,6 +343,60 @@ export function applyBumperKicks(
   }
 
   return kicked
+}
+
+/**
+ * ジャンプ床が返した発射速度をボールへ直接書き込み、同じ床での連続発火は短く抑える。
+ * 失敗して手前へ落ちてもすぐ再挑戦できるよう、バンパーと同じMap型に短い420msを渡す。
+ */
+export function applyJumpPadLaunches(
+  ball: RigidBody,
+  jumpPads: readonly JumpPadGimmick[],
+  cooldowns: BumperCooldowns,
+  nowMs: number,
+): string[] {
+  const launched: string[] = []
+  const position = ball.translation()
+  const velocity = ball.linvel()
+
+  for (const jumpPad of jumpPads) {
+    if (!canKickBumper(cooldowns, jumpPad.id, nowMs, JUMP_PAD_COOLDOWN_MS)) {
+      continue
+    }
+    const launch = jumpPadLaunch(position, velocity, jumpPad)
+    if (launch === null) continue
+
+    ball.setLinvel(launch, true)
+    markBumperKicked(cooldowns, jumpPad.id, nowMs)
+    launched.push(jumpPad.id)
+  }
+
+  return launched
+}
+
+/**
+ * 捕捉中は砲室中心へ少しずつ寄せながら速度を止め、大砲内部でボールが暴れるのを防ぐ。
+ */
+export function settleBallIntoCannon(ball: RigidBody, cannon: CannonGimmick): void {
+  const current = ball.translation()
+  const chamber = cannonChamberPosition(cannon)
+  ball.setTranslation(
+    {
+      x: current.x + (chamber.x - current.x) * CANNON_SETTLE_LERP,
+      y: current.y + (chamber.y - current.y) * CANNON_SETTLE_LERP,
+      z: current.z + (chamber.z - current.z) * CANNON_SETTLE_LERP,
+    },
+    true,
+  )
+  ball.setLinvel({ x: 0, y: 0, z: 0 }, true)
+  ball.setAngvel({ x: 0, y: 0, z: 0 }, true)
+}
+
+/** 砲室中心から速度を直接指定して発射し、物理ステップ幅で飛距離が変わらないようにする。 */
+export function fireCannon(ball: RigidBody, cannon: CannonGimmick): void {
+  ball.setTranslation(cannonChamberPosition(cannon), true)
+  ball.setLinvel(cannonLaunchVelocity(cannon), true)
+  ball.setAngvel({ x: 0, y: 0, z: 0 }, true)
 }
 
 /** 傾き入力を重力へ反映する。盤面コライダーは動かさない。 */
@@ -253,7 +446,7 @@ export function settleBallInGoalCup(ball: RigidBody): void {
 }
 
 /** ボールをスタートへ戻し、勢いも完全に消す。リトライと場外復帰の両方で使う。 */
-export function resetBall(ball: RigidBody, start: MazePoint): void {
+export function resetBall(ball: RigidBody, start: MazeStage['start']): void {
   const spawn = ballSpawnPosition(start)
   ball.setTranslation(spawn, true)
   ball.setLinvel({ x: 0, y: 0, z: 0 }, true)

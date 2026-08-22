@@ -1,6 +1,7 @@
 import { CELL_SIZE, cellToWorld } from './mazeGrid'
 import type { MazePoint } from './mazeGrid'
 import type { MazeStar } from './mazeStars'
+import { resolveTerrain, type MazeTerrain, type TerrainPlacement } from './mazeTerrain'
 import {
   resolveGimmicks,
   type CellCoordinate,
@@ -53,11 +54,12 @@ export type MazeStage = {
   walls: MazeWallRect[]
   floors: MazeFloorRect[]
   holes: MazeHole[]
+  terrain: MazeTerrain
   gimmicks: MazeGimmicks
-  checkpoints: MazePoint[]
+  checkpoints: (MazePoint & { y?: number; radius?: number })[]
   /** ⭐はクリア条件ではなく、1つも取らなくてもGOALへ入れる寄り道の収集要素。 */
   stars: MazeStar[]
-  start: MazePoint
+  start: MazePoint & { y?: number }
   goal: MazePoint
 }
 
@@ -210,9 +212,11 @@ export function createMazeStage(
   options: {
     id?: string
     nameJa?: string
+    startY?: number
+    terrain?: readonly TerrainPlacement[]
     gimmicks?: readonly GimmickPlacement[]
-    checkpointCells?: readonly CellCoordinate[]
-    starCells?: readonly CellCoordinate[]
+    checkpointCells?: readonly (CellCoordinate & { y?: number; radius?: number })[]
+    starCells?: readonly (CellCoordinate & { y?: number })[]
   } = {},
 ): MazeStage {
   const rowCount = rows.length
@@ -221,17 +225,27 @@ export function createMazeStage(
   if (rows.some((line) => line.length !== columnCount)) {
     throw new Error('迷路の各行の長さが揃っていません')
   }
-
-  const start = findCell(rows, 'S')
+  const startCell = findCell(rows, 'S')
+  const start = options.startY === undefined
+    ? startCell
+    : { ...startCell, y: options.startY }
   const goal = findCell(rows, 'G')
   const requestedCheckpointCells = options.checkpointCells ?? []
-  const checkpoints = requestedCheckpointCells.map((cell) =>
-    cellToWorld(cell.column, cell.row, columnCount, rowCount),
-  )
-  const stars = (options.starCells ?? []).map((cell, index) => ({
-    id: `star-${index + 1}`,
-    center: cellToWorld(cell.column, cell.row, columnCount, rowCount),
-  }))
+  const checkpoints: MazeStage['checkpoints'] = requestedCheckpointCells.map((cell) => {
+    const point = cellToWorld(cell.column, cell.row, columnCount, rowCount)
+    return {
+      ...point,
+      ...(cell.y === undefined ? {} : { y: cell.y }),
+      ...(cell.radius === undefined ? {} : { radius: cell.radius }),
+    }
+  })
+  const stars: MazeStar[] = (options.starCells ?? []).map((cell, index) => {
+    const center = cellToWorld(cell.column, cell.row, columnCount, rowCount)
+    return {
+      id: `star-${index + 1}`,
+      center: cell.y === undefined ? center : { ...center, y: cell.y },
+    }
+  })
   // 復帰処理が常に安全な起点を持てるよう、外部指定でも先頭をSTARTに保証する。
   if (!samePoint(checkpoints[0], start)) checkpoints.unshift(start)
 
@@ -246,6 +260,7 @@ export function createMazeStage(
     walls: buildWallRects(rows),
     floors: buildFloorRects(rows),
     holes: findHoles(rows),
+    terrain: resolveTerrain(options.terrain ?? [], columnCount, rowCount),
     gimmicks: resolveGimmicks(
       options.gimmicks ?? [],
       columnCount,

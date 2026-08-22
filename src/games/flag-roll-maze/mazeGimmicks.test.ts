@@ -3,6 +3,13 @@ import {
   BUMPER_COOLDOWN_MS,
   BUMPER_KICK_IMPULSE,
   BUMPER_RADIUS,
+  CAR_BODY_HEIGHT,
+  CAR_CABIN_RADIUS,
+  CAR_DEPTH,
+  CAR_WIDTH,
+  CANNON_CAPTURE_RADIUS,
+  CANNON_MUZZLE_Y,
+  JUMP_PAD_TOP,
   SPINNER_HEIGHT,
   SPINNER_LENGTH,
   SPINNER_THICKNESS,
@@ -88,6 +95,30 @@ describe('resolveGimmicks', () => {
           cell: { column: 1.5, row: 0.5 },
           radius: 0.5,
         },
+        {
+          kind: 'car',
+          id: 'car-test',
+          cell: { column: 2, row: 1.75 },
+          amplitude: 3,
+          speed: 1.5,
+          phaseOffsetSeconds: 0.4,
+          initialDirection: -1,
+        },
+        {
+          kind: 'jumpPad',
+          id: 'jump-pad-test',
+          cell: { column: 3.5, row: 1.5 },
+          widthCells: 2,
+          depthCells: 0.5,
+        },
+        {
+          kind: 'cannon',
+          id: 'cannon-test',
+          cell: { column: 2.5, row: 1.5 },
+          elevationRad: 0.7,
+          headingRad: 0,
+          speed: 7.6,
+        },
       ],
       5,
       3,
@@ -102,5 +133,33 @@ describe('resolveGimmicks', () => {
     )
     expect(gimmicks.bumpers[0]!.center).toEqual({ x: -1, z: -1 })
     expect(gimmicks.bumpers[0]!.radius).toBe(0.5)
+    expect(gimmicks.cars[0]).toEqual({
+      id: 'car-test',
+      center: { x: 0, y: CAR_BODY_HEIGHT / 2, z: 1.5 },
+      amplitude: 3,
+      speed: 1.5,
+      phaseOffsetSeconds: 0.4,
+      initialDirection: -1,
+      halfWidth: CAR_WIDTH / 2,
+      halfHeight: CAR_BODY_HEIGHT / 2,
+      halfDepth: CAR_DEPTH / 2,
+      cabinRadius: CAR_CABIN_RADIUS,
+    })
+    expect(gimmicks.jumpPads[0]).toEqual({
+      id: 'jump-pad-test',
+      center: { x: 3, z: 1 },
+      halfWidth: 2,
+      halfDepth: 0.5,
+      top: JUMP_PAD_TOP,
+    })
+    expect(gimmicks.cannons[0]).toEqual({
+      id: 'cannon-test',
+      center: { x: 1, z: 1 },
+      muzzleY: CANNON_MUZZLE_Y,
+      elevationRad: 0.7,
+      headingRad: 0,
+      speed: 7.6,
+      captureRadius: CANNON_CAPTURE_RADIUS,
+    })
   })
 })

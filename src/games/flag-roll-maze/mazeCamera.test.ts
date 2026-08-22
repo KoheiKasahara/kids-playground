@@ -8,11 +8,14 @@ import {
   MAZE_ZOOM_SCALES,
   mazeZoomScale,
   MIN_MAZE_ZOOM_INDEX,
+  CAMERA_ELEVATION_FOLLOW_LAMBDA,
   CAMERA_ELEVATION_RAD,
   CAMERA_FOV,
+  CAMERA_LAUNCH_FOLLOW_LAMBDA,
   cameraSetupForFocus,
   computeMazeCameraDistance,
   desiredCameraFocus,
+  followCameraElevation,
   followCameraFocus,
   LOOK_AHEAD_SECONDS,
   MAX_FOLLOW_LAG_IN_RADII,
@@ -112,6 +115,15 @@ describe('cameraSetupForFocus', () => {
     expect(Math.atan2(-direction(first).y, -direction(first).z)).toBeCloseTo(
       CAMERA_ELEVATION_RAD,
       10,
+    )
+  })
+
+  it('高さを省略したときは従来どおりBALL_RADIUSを注視する', () => {
+    const focus = { x: 1.5, z: -2.25 }
+    const distance = 7.2
+
+    expect(cameraSetupForFocus(focus, distance)).toEqual(
+      cameraSetupForFocus(focus, distance, BALL_RADIUS),
     )
   })
 })
@@ -230,6 +242,32 @@ describe('followCameraFocus', () => {
       expect(Math.hypot(focus.x - ball.x, focus.z - ball.z)).toBeLessThanOrEqual(
         MAX_FOLLOW_LAG_IN_RADII * BALL_RADIUS + 1e-8,
       )
+    }
+  })
+})
+
+describe('followCameraElevation', () => {
+  it('高さを滑らかに目標へ収束させ、発射中はより速く追従できる', () => {
+    const first = followCameraElevation(BALL_RADIUS, 5, 0.1)
+    const second = followCameraElevation(first, 5, 0.1)
+    const launch = followCameraElevation(
+      BALL_RADIUS,
+      5,
+      0.1,
+      CAMERA_LAUNCH_FOLLOW_LAMBDA,
+    )
+
+    expect(first).toBeGreaterThan(BALL_RADIUS)
+    expect(second).toBeGreaterThan(first)
+    expect(second).toBeLessThan(5)
+    expect(launch).toBeGreaterThan(first)
+    expect(CAMERA_ELEVATION_FOLLOW_LAMBDA).toBeLessThan(5)
+  })
+
+  it('不正な高さ・経過時間・追従速度でも有限な高さを返す', () => {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const next = followCameraElevation(value, value, value, value)
+      expect(Number.isFinite(next)).toBe(true)
     }
   })
 })

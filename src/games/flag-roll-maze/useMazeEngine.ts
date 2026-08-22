@@ -1,18 +1,29 @@
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { createFlagPanelBallResource } from '../../components/flag-ball/flagPanelBall'
 import type { FlagBallData } from '../../components/flag-ball/flagBalls'
 import {
   BALL_RADIUS,
   BUMPER_HEIGHT,
+  CAR_BODY_HEIGHT,
+  CAR_BODY_ROUND,
+  CAR_CABIN_RADIUS,
+  CAR_DEPTH,
+  CAR_WIDTH,
+  CANNON_LAUNCH_SPEED_CAP,
+  CANNON_LAUNCH_WINDOW_MS,
   FLOOR_THICKNESS,
   GOAL_CUP_FLOOR_Y,
   GOAL_CUP_RADIUS,
   GOAL_CUP_RIM_RADIUS,
   GOAL_RADIUS,
   HOLE_PIT_BOTTOM_Y,
+  JUMP_PAD_SPEED_CAP,
+  JUMP_PAD_SPEED_CAP_MS,
   MAX_FRAME_DELTA_MS,
+  MAX_BALL_SPEED,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
   STAR_HOVER_Y,
@@ -24,12 +35,18 @@ import {
 import { CELL_SIZE } from './mazeGrid'
 import { mazeStageBounds, type MazeStage } from './mazeStage'
 import { createMazeStageById } from './mazeStages'
+import type { TerrainStyle } from './mazeTerrain'
+import { carXAt } from './mazeCarToy'
+import { createCannonState, updateCannon, type CannonState } from './mazeCannon'
 import {
+  CAMERA_ELEVATION_FOLLOW_LAMBDA,
+  CAMERA_LAUNCH_FOLLOW_LAMBDA,
   cameraSetupForFocus,
   clampMazeZoomIndex,
   computeMazeCameraDistance,
   DEFAULT_MAZE_ZOOM_INDEX,
   desiredCameraFocus,
+  followCameraElevation,
   followCameraFocus,
   followZoomScale,
   mazeZoomScale,
@@ -38,13 +55,17 @@ import {
 import {
   applyTiltToGravity,
   applyBumperKicks,
+  applyJumpPadLaunches,
+  advanceCars,
   advanceSpinners,
   createMazeWorld,
+  fireCannon,
   isGoalReached,
   limitBallSpeed,
   nudgeBall,
   pushBallOutOfSpinner,
   resetBall,
+  settleBallIntoCannon,
   settleBallInGoalCup,
 } from './mazeWorld'
 import {
@@ -83,6 +104,8 @@ import {
   playMazeStarSound,
   playMazeWallHitSound,
   playPinballBumperSound,
+  playPinballJumppadSound,
+  playPinballLaunchSound,
 } from '../../utils/quizSound'
 import type { RigidBody, World } from '@dimforge/rapier3d-compat'
 
@@ -199,6 +222,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let ballMesh: THREE.Object3D | null = null
     let ballBody: ReturnType<typeof createMazeWorld>['ball'] | null = null
     let spinners: ReturnType<typeof createMazeWorld>['spinners'] = []
+    let cars: ReturnType<typeof createMazeWorld>['cars'] = []
     let resizeObserver: ResizeObserver | null = null
     let detachViewportListeners: (() => void) | null = null
     let rafId: number | null = null
@@ -208,6 +232,11 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let accumulator = 0
     // 回転棒はフレーム時刻ではなく物理ステップ数から進め、処理落ちでも回転が飛ばないようにする。
     let physicsElapsedSeconds = 0
+    // 車だけはリトライ時に見た目の初期位相へ戻し、既存の回転棒の時刻は止めない。
+    let carPhaseBaseSeconds = 0
+    // ジャンプ床の発射直後だけ上限を緩める。既存ステージは窓を開かないため常に従来値のまま。
+    let speedCapValue = MAX_BALL_SPEED
+    let speedCapUntilMs = 0
     let currentTilt: TiltInput = { ...NEUTRAL_TILT }
     let stallTracker: StallTracker = createStallTracker()
     let checkpointTracker: CheckpointTracker = createCheckpointTracker()
@@ -216,9 +245,15 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     let respawnSettleRemainingMs = 0
     // クールダウンをrun内に閉じ込め、もういちどで前の衝突履歴を持ち越さない。
     const bumperCooldowns: BumperCooldowns = new Map()
+    const jumpPadCooldowns: BumperCooldowns = new Map()
+    const cannonStates = new Map<string, CannonState>(
+      stage.gimmicks.cannons.map((cannon) => [cannon.id, createCannonState()]),
+    )
     let impactTracker: ImpactTracker = createImpactTracker()
     let starTracker: StarTracker = createStarTracker()
     let cameraFocus: MazeCameraFocus = { x: 0, z: 0 }
+    let cameraFocusY = BALL_RADIUS
+    let cameraFollowBoostUntilMs = 0
     // 標準距離は画面比だけで決まる。ズームはそこへ掛ける倍率として持つ。
     let cameraBaseDistance = computeMazeCameraDistance(1)
     let cameraZoomScale = mazeZoomScale(zoomIndexRef.current)
@@ -227,9 +262,24 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     const materials: THREE.Material[] = []
     const textures: THREE.Texture[] = []
     const spinnerVisuals: { body: RigidBody; mesh: THREE.Mesh }[] = []
+    const carVisuals: { body: RigidBody; mesh: THREE.Group }[] = []
     const bumperVisuals = new Map<string, THREE.Group>()
     const bumperPopStartedAtMs = new Map<string, number>()
-    const starVisuals: { id: string; mesh: THREE.Mesh }[] = []
+    const jumpPadVisuals = new Map<string, THREE.Group>()
+    const jumpPadPopStartedAtMs = new Map<string, number>()
+    const cannonVisuals = new Map<
+      string,
+      {
+        barrel: THREE.Group
+        ring: THREE.Mesh
+        smoke: THREE.Mesh[]
+        smokeMaterial: THREE.MeshLambertMaterial
+        direction: THREE.Vector3
+        muzzle: THREE.Vector3
+      }
+    >()
+    const cannonFireStartedAtMs = new Map<string, number>()
+    const starVisuals: { id: string; mesh: THREE.Mesh; hoverY: number }[] = []
     const starPopStartedAtMs = new Map<string, number>()
     let prefersReducedMotion = false
 
@@ -244,6 +294,20 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     const trackTexture = <T extends THREE.Texture>(texture: T): T => {
       textures.push(texture)
       return texture
+    }
+
+    function currentSpeedCap(nowMs: number): number {
+      return nowMs < speedCapUntilMs ? speedCapValue : MAX_BALL_SPEED
+    }
+
+    function openSpeedCapWindow(cap: number, durationMs: number, nowMs: number): void {
+      speedCapValue = cap
+      speedCapUntilMs = nowMs + durationMs
+    }
+
+    function closeSpeedCapWindow(): void {
+      speedCapValue = MAX_BALL_SPEED
+      speedCapUntilMs = 0
     }
 
     // 関数宣言のresizeRendererは巻き上げ済み。release()より前に用意しておく。
@@ -296,12 +360,22 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       ballMesh = null
       ballBody = null
       spinners = []
+      cars = []
       spinnerVisuals.length = 0
+      carVisuals.length = 0
       bumperVisuals.clear()
       bumperPopStartedAtMs.clear()
+      jumpPadVisuals.clear()
+      jumpPadPopStartedAtMs.clear()
+      cannonVisuals.clear()
+      cannonFireStartedAtMs.clear()
       starVisuals.length = 0
       starPopStartedAtMs.clear()
       bumperCooldowns.clear()
+      jumpPadCooldowns.clear()
+      cannonStates.clear()
+      closeSpeedCapWindow()
+      cameraFollowBoostUntilMs = 0
       impactTracker = createImpactTracker()
       starTracker = createStarTracker()
 
@@ -361,10 +435,14 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
     const tiltAxis = new THREE.Vector3()
     const cameraTarget = new THREE.Vector3()
 
-    /** 標準距離はリサイズ時に決め、毎フレームは追従後の水平注視点とズーム倍率を反映する。 */
+    /** 標準距離はリサイズ時に決め、毎フレームは追従後の注視点とズーム倍率を反映する。 */
     function applyCameraFocus() {
       if (!camera) return
-      const setup = cameraSetupForFocus(cameraFocus, cameraBaseDistance * cameraZoomScale)
+      const setup = cameraSetupForFocus(
+        cameraFocus,
+        cameraBaseDistance * cameraZoomScale,
+        cameraFocusY,
+      )
       camera.position.set(setup.position.x, setup.position.y, setup.position.z)
       cameraTarget.set(setup.target.x, setup.target.y, setup.target.z)
       camera.lookAt(cameraTarget)
@@ -401,6 +479,94 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       }
     }
 
+    function updateJumpPadPops(nowMs: number) {
+      for (const [id, startedAtMs] of jumpPadPopStartedAtMs) {
+        const group = jumpPadVisuals.get(id)
+        if (!group) {
+          jumpPadPopStartedAtMs.delete(id)
+          continue
+        }
+        const progress = Math.min(1, Math.max(0, (nowMs - startedAtMs) / 220))
+        if (progress >= 1 || prefersReducedMotion) {
+          group.scale.set(1, 1, 1)
+          jumpPadPopStartedAtMs.delete(id)
+          continue
+        }
+        // 横に広げず縦だけ弾ませ、床の上へ押し上げる力を直感的に伝える。
+        group.scale.set(1, 1 + 0.28 * Math.sin(Math.PI * progress), 1)
+      }
+    }
+
+    function updateCannonVisuals(nowMs: number) {
+      for (const [id, visual] of cannonVisuals) {
+        const state = cannonStates.get(id)
+        visual.ring.scale.setScalar(state?.phase === 'capturing' ? 1.12 : 1)
+
+        const startedAtMs = cannonFireStartedAtMs.get(id)
+        if (startedAtMs === undefined) continue
+
+        const recoilProgress = Math.min(1, Math.max(0, (nowMs - startedAtMs) / 220))
+        const recoil = 0.22 * Math.sin(Math.PI * recoilProgress)
+        visual.barrel.position.set(
+          -visual.direction.x * recoil,
+          -visual.direction.y * recoil,
+          -visual.direction.z * recoil,
+        )
+        visual.ring.position.copy(visual.muzzle).addScaledVector(visual.direction, -recoil)
+
+        const smokeProgress = Math.min(1, Math.max(0, (nowMs - startedAtMs) / 450))
+        if (smokeProgress >= 1) {
+          visual.barrel.position.set(0, 0, 0)
+          visual.ring.position.copy(visual.muzzle)
+          visual.smokeMaterial.opacity = 0
+          for (const smoke of visual.smoke) {
+            smoke.visible = false
+            smoke.scale.setScalar(1)
+          }
+          cannonFireStartedAtMs.delete(id)
+          continue
+        }
+
+        if (prefersReducedMotion) {
+          visual.smokeMaterial.opacity = 0
+          for (const smoke of visual.smoke) smoke.visible = false
+          continue
+        }
+
+        // 煙は発射方向へ広がりながら薄くし、弾道を隠さず「打ち出した」ことだけを伝える。
+        visual.smokeMaterial.opacity = 0.6 * (1 - smokeProgress)
+        for (const [index, smoke] of visual.smoke.entries()) {
+          const spread = (index - 1) * 0.13
+          smoke.visible = true
+          smoke.position.set(
+            visual.muzzle.x + visual.direction.x * (0.18 + smokeProgress * 0.52) + spread,
+            visual.muzzle.y + visual.direction.y * (0.18 + smokeProgress * 0.52) + index * 0.06,
+            visual.muzzle.z + visual.direction.z * (0.18 + smokeProgress * 0.52),
+          )
+          smoke.scale.setScalar(0.55 + smokeProgress * (0.65 + index * 0.12))
+        }
+      }
+    }
+
+    function resetCannons(): void {
+      cannonStates.clear()
+      cameraFollowBoostUntilMs = 0
+      for (const cannon of stage.gimmicks.cannons) {
+        cannonStates.set(cannon.id, createCannonState())
+      }
+      cannonFireStartedAtMs.clear()
+      for (const visual of cannonVisuals.values()) {
+        visual.barrel.position.set(0, 0, 0)
+        visual.ring.position.copy(visual.muzzle)
+        visual.ring.scale.setScalar(1)
+        visual.smokeMaterial.opacity = 0
+        for (const smoke of visual.smoke) {
+          smoke.visible = false
+          smoke.scale.setScalar(1)
+        }
+      }
+    }
+
     function updateStarVisuals(nowMs?: number) {
       for (let index = 0; index < starVisuals.length; index += 1) {
         const visual = starVisuals[index]
@@ -414,14 +580,14 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         if (nowMs === undefined) continue
         if (prefersReducedMotion) {
           visual.mesh.rotation.set(0, 0, 0)
-          visual.mesh.position.y = STAR_HOVER_Y
+          visual.mesh.position.y = visual.hoverY
           continue
         }
 
         const phase = index * 1.7
         visual.mesh.rotation.y = nowMs * 0.001 + phase
         visual.mesh.rotation.x = Math.sin(nowMs * 0.0007 + phase) * 0.12
-        visual.mesh.position.y = STAR_HOVER_Y + Math.sin(nowMs * 0.003 + phase) * 0.08
+        visual.mesh.position.y = visual.hoverY + Math.sin(nowMs * 0.003 + phase) * 0.08
       }
     }
 
@@ -470,18 +636,28 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         mesh.position.set(translation.x, translation.y, translation.z)
         mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
       }
+      // 車もkinematic bodyを正本にするため、React stateを使わず毎フレーム同じ位置へ同期する。
+      for (const { body, mesh } of carVisuals) {
+        const translation = body.translation()
+        const rotation = body.rotation()
+        mesh.position.set(translation.x, translation.y, translation.z)
+        mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+      }
       updateStarVisuals(nowMs)
       if (nowMs !== undefined) {
         updateBumperPops(nowMs)
+        updateJumpPadPops(nowMs)
+        updateCannonVisuals(nowMs)
         updateStarPops(nowMs)
       }
     }
 
-    /** 生成・リセット・救出の直後は、カメラをボール位置へ飛び移らせず即座に合わせる。 */
+    /** 生成・リセット・救出の直後は、カメラをボール位置へ即座に合わせる。 */
     function snapCameraFocusToBall() {
       if (!ballBody) return
       const position = ballBody.translation()
       cameraFocus = { x: position.x, z: position.z }
+      cameraFocusY = position.y
       applyCameraFocus()
     }
 
@@ -494,8 +670,8 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       )
     }
 
-    /** 物理位置と水平速度だけで追従させ、高さの跳ねはカメラへ渡さない。 */
-    function updateCameraFocus(deltaSeconds: number) {
+    /** 水平と高さを別々に追従させ、ジャンプ中も画面が跳ねすぎないようにする。 */
+    function updateCameraFocus(deltaSeconds: number, nowMs: number) {
       if (!ballBody) return
       const position = ballBody.translation()
       const velocity = ballBody.linvel()
@@ -504,11 +680,22 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         { x: velocity.x, z: velocity.z },
         bounds,
       )
+      const launchFollowing = nowMs < cameraFollowBoostUntilMs
       cameraFocus = followCameraFocus(
         cameraFocus,
         desired,
         { x: position.x, z: position.z },
         deltaSeconds,
+        launchFollowing
+          ? { followLambda: CAMERA_LAUNCH_FOLLOW_LAMBDA }
+          : undefined,
+      )
+      // 高さは既定2.6を水平5.0より遅くし、跳ねや段差でカメラが揺れないようにする。
+      cameraFocusY = followCameraElevation(
+        cameraFocusY,
+        position.y,
+        deltaSeconds,
+        launchFollowing ? 4.5 : CAMERA_ELEVATION_FOLLOW_LAMBDA,
       )
       applyCameraFocus()
     }
@@ -520,6 +707,8 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         stage.checkpoints,
         stage.start,
       )
+      closeSpeedCapWindow()
+      resetCannons()
       resetBall(ballBody, point)
       // チェックポイント復帰で星まで消すと、落ちるたびに集め直しになって幼児がつらいため、星の状態は残す。
       stallTracker = createStallTracker()
@@ -536,6 +725,53 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       for (const id of kickedIds) {
         if (bumperVisuals.has(id)) bumperPopStartedAtMs.set(id, nowMs)
       }
+    }
+
+    function startJumpPadPops(launchedIds: readonly string[], nowMs: number) {
+      if (prefersReducedMotion) return
+      for (const id of launchedIds) {
+        if (jumpPadVisuals.has(id)) jumpPadPopStartedAtMs.set(id, nowMs)
+      }
+    }
+
+    function startCannonFireVisual(cannonId: string, nowMs: number): void {
+      const visual = cannonVisuals.get(cannonId)
+      if (visual === undefined) return
+      cannonFireStartedAtMs.set(cannonId, nowMs)
+      visual.smokeMaterial.opacity = 0.6
+      for (const smoke of visual.smoke) smoke.visible = !prefersReducedMotion
+    }
+
+    /**
+     * 大砲の捕捉・発射はフレームごとに状態を進める。
+     * hold中は後段の救出・停滞判定を止めるため、呼び出し元へ明示的に返す。
+     */
+    function updateCannons(nowMs: number): boolean {
+      if (ballBody === null) return false
+      let holding = false
+
+      for (const cannon of stage.gimmicks.cannons) {
+        const currentState = cannonStates.get(cannon.id) ?? createCannonState()
+        const result = updateCannon(currentState, ballBody.translation(), cannon, nowMs)
+        cannonStates.set(cannon.id, result.state)
+
+        if (result.hold) {
+          settleBallIntoCannon(ballBody, cannon)
+          holding = true
+        }
+        if (result.action === 'fire') {
+          fireCannon(ballBody, cannon)
+          openSpeedCapWindow(CANNON_LAUNCH_SPEED_CAP, CANNON_LAUNCH_WINDOW_MS, nowMs)
+          // 発射中だけ追従を強め、速い弾道でもカメラを瞬間移動させずに見せる。
+          cameraFollowBoostUntilMs = nowMs + CANNON_LAUNCH_WINDOW_MS
+          // 窓を開いてから制限し、通常上限5.4で大砲の発射速度を削らないようにする。
+          limitBallSpeed(ballBody, currentSpeedCap(nowMs))
+          playPinballLaunchSound()
+          startCannonFireVisual(cannon.id, nowMs)
+        }
+      }
+
+      return holding
     }
 
     function startStarPops(collectedIds: readonly string[], nowMs: number) {
@@ -564,6 +800,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       while (accumulator >= PHYSICS_TIMESTEP && substeps < MAX_PHYSICS_SUBSTEPS) {
         physicsElapsedSeconds += PHYSICS_TIMESTEP
         advanceSpinners(spinners, physicsElapsedSeconds)
+        advanceCars(cars, physicsElapsedSeconds - carPhaseBaseSeconds)
         world.step()
         accumulator -= PHYSICS_TIMESTEP
         substeps += 1
@@ -580,18 +817,33 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       if (substeps >= MAX_PHYSICS_SUBSTEPS && accumulator >= PHYSICS_TIMESTEP) {
         accumulator = 0
       }
-      limitBallSpeed(ballBody)
+      limitBallSpeed(ballBody, currentSpeedCap(nowMs))
       const kickedIds = applyBumperKicks(
         ballBody,
         stage.gimmicks.bumpers,
         bumperCooldowns,
         nowMs,
       )
-      limitBallSpeed(ballBody)
+      const launchedIds = applyJumpPadLaunches(
+        ballBody,
+        stage.gimmicks.jumpPads,
+        jumpPadCooldowns,
+        nowMs,
+      )
+      if (launchedIds.length > 0) {
+        openSpeedCapWindow(JUMP_PAD_SPEED_CAP, JUMP_PAD_SPEED_CAP_MS, nowMs)
+        playPinballJumppadSound()
+        startJumpPadPops(launchedIds, nowMs)
+      }
+      // 発射の後に窓を開いてから制限し、5.4へ即座に削らないようにする。
+      limitBallSpeed(ballBody, currentSpeedCap(nowMs))
       if (kickedIds.length > 0) {
         playPinballBumperSound()
         startBumperPops(kickedIds, nowMs)
-      } else if (
+      }
+      if (
+        kickedIds.length === 0 &&
+        launchedIds.length === 0 &&
         impact.intensity !== null &&
         !goalNotified &&
         respawnGraceRemainingMs <= 0 &&
@@ -626,6 +878,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
 
       const settlingAfterRespawn = respawnSettleRemainingMs > 0
       if (deltaMs > 0) stepPhysics(deltaMs, now)
+      const cannonHolding = updateCannons(now)
       if (settlingAfterRespawn && ballBody !== null) {
         // 重力と入力はそのままにし、復帰直後だけボールの動きを毎フレーム打ち消す。
         ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true)
@@ -634,7 +887,9 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       respawnSettleRemainingMs = Math.max(0, respawnSettleRemainingMs - deltaMs)
       writeVisuals(now)
 
-      if (ballBody !== null) {
+      // 捕捉中は位置と速度を大砲側で管理する。ここで救出・停滞・星・ゴールまで動かすと、
+      // 静止させた演出を「詰み」と誤判定して復帰させてしまうため、復帰直後と同じく止める。
+      if (ballBody !== null && !cannonHolding) {
         const position = ballBody.translation()
         let rescueReason: 'hole' | 'outOfBounds' | null = null
         if (respawnGraceRemainingMs <= 0) {
@@ -716,7 +971,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       // 物理位置が確定してから、盤面のピボット補正とカメラ追従を同じ位置へ適用する。
       applyVisualTilt(currentTilt)
       updateCameraZoom(deltaSeconds)
-      updateCameraFocus(deltaSeconds)
+      updateCameraFocus(deltaSeconds, now)
 
       if (renderer && scene && camera) renderer.render(scene, camera)
     }
@@ -783,6 +1038,236 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
           boardGroup.add(wallMesh)
         }
 
+        // 地形はstyleごとに1つだけマテリアルを持ち、段差が増えてもGPUリソースを増やしすぎない。
+        const terrainMaterials = new Map<TerrainStyle, THREE.MeshLambertMaterial>()
+        const terrainMaterialFor = (style: TerrainStyle): THREE.MeshLambertMaterial => {
+          const existing = terrainMaterials.get(style)
+          if (existing) return existing
+
+          let color = 0xf7d9a0
+          if (style === 'step') color = 0xf3c98b
+           if (style === 'slide') color = 0x4dc4f5
+           if (style === 'guard') color = 0xffb84d
+           if (style === 'road') color = 0x6c717d
+           if (style === 'roadMarking') color = 0xfff9db
+          const material = trackMaterial(new THREE.MeshLambertMaterial({ color }))
+          terrainMaterials.set(style, material)
+          return material
+        }
+        for (const box of stage.terrain.boxes) {
+          const terrainMesh = new THREE.Mesh(
+            track(new THREE.BoxGeometry(box.width, box.height, box.depth)),
+            terrainMaterialFor(box.style),
+          )
+          terrainMesh.position.set(box.x, box.y, box.z)
+          terrainMesh.rotation.x = box.rotationX
+          boardGroup.add(terrainMesh)
+        }
+
+        if (stage.terrain.bars.length > 0) {
+          const roundedBarMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xffd43b }),
+          )
+          for (const bar of stage.terrain.bars) {
+            const barMesh = new THREE.Mesh(
+              track(new THREE.CylinderGeometry(bar.radius, bar.radius, bar.length, 16)),
+              roundedBarMaterial,
+            )
+            barMesh.position.set(bar.x, bar.y, bar.z)
+            barMesh.rotation.z = Math.PI / 2
+            boardGroup.add(barMesh)
+          }
+        }
+
+        const slides = stage.terrain.boxes.filter((box) => box.style === 'slide')
+        if (slides.length > 0) {
+          // 三角形を斜面と同じ向きへ寝かせ、初めて遊ぶ子にも下りる方向を伝える。
+          const slideArrowGeometry = track(new THREE.ConeGeometry(CELL_SIZE * 0.14, 0.08, 3))
+          const slideArrowMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xfff9db }),
+          )
+          for (const slide of slides) {
+            const arrowGroup = new THREE.Group()
+            arrowGroup.position.set(slide.x, slide.y, slide.z)
+            arrowGroup.rotation.x = slide.rotationX
+            for (const localZ of [-slide.depth * 0.22, 0, slide.depth * 0.22]) {
+              const arrow = new THREE.Mesh(slideArrowGeometry, slideArrowMaterial)
+              arrow.position.set(0, slide.height / 2 + 0.04, localZ)
+              arrow.rotation.y = Math.PI
+              arrowGroup.add(arrow)
+            }
+            boardGroup.add(arrowGroup)
+          }
+        }
+
+        const hurdle = stage.terrain.boxes.find(
+          ({ id }) => id === 'athletic-hurdle',
+        )
+        if (hurdle !== undefined) {
+          // 物理の幅や高さを増やさず、白い縞だけで「跳ぶ壁」を遠くからも見分けられるようにする。
+          const stripeHeight = 0.4
+          const hurdleStripeGeometry = track(
+            new THREE.BoxGeometry(hurdle.width * 0.13, stripeHeight, 0.03),
+          )
+          const hurdleStripeMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xfff9db }),
+          )
+          const stripeY = hurdle.y + hurdle.height / 2 - stripeHeight / 2 - 0.03
+          for (const z of [
+            hurdle.z - hurdle.depth / 2 - 0.016,
+            hurdle.z + hurdle.depth / 2 + 0.016,
+          ]) {
+            for (const x of [-hurdle.width * 0.32, 0, hurdle.width * 0.32]) {
+              const stripe = new THREE.Mesh(hurdleStripeGeometry, hurdleStripeMaterial)
+              stripe.position.set(hurdle.x + x, stripeY, z)
+              boardGroup.add(stripe)
+            }
+          }
+        }
+
+        if (stage.gimmicks.jumpPads.length > 0) {
+          const jumpPadArrowGeometry = track(
+            new THREE.ConeGeometry(CELL_SIZE * 0.13, 0.1, 3),
+          )
+          const jumpPadSpringGeometry = track(
+            new THREE.TorusGeometry(CELL_SIZE * 0.13, 0.035, 8, 16),
+          )
+          const jumpPadMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xa9e34b }),
+          )
+          const jumpPadEdgeMaterial = trackMaterial(
+            new THREE.LineBasicMaterial({ color: 0xff922b }),
+          )
+          const jumpPadArrowMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xfff9db }),
+          )
+          const jumpPadSpringMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xffd43b }),
+          )
+          for (const jumpPad of stage.gimmicks.jumpPads) {
+            const jumpPadGroup = new THREE.Group()
+            jumpPadGroup.position.set(jumpPad.center.x, 0, jumpPad.center.z)
+
+            const padGeometry = track(
+              new THREE.BoxGeometry(
+                jumpPad.halfWidth * 2,
+                jumpPad.top,
+                jumpPad.halfDepth * 2,
+              ),
+            )
+            const padMesh = new THREE.Mesh(padGeometry, jumpPadMaterial)
+            padMesh.position.y = jumpPad.top / 2
+            jumpPadGroup.add(padMesh)
+
+            const edgeMesh = new THREE.LineSegments(
+              track(new THREE.EdgesGeometry(padGeometry)),
+              jumpPadEdgeMaterial,
+            )
+            edgeMesh.position.y = jumpPad.top / 2
+            jumpPadGroup.add(edgeMesh)
+
+            for (const x of [
+              -jumpPad.halfWidth * 0.45,
+              0,
+              jumpPad.halfWidth * 0.45,
+            ]) {
+              const arrow = new THREE.Mesh(jumpPadArrowGeometry, jumpPadArrowMaterial)
+              arrow.position.set(x, jumpPad.top + 0.07, 0)
+              jumpPadGroup.add(arrow)
+            }
+
+            for (const y of [-0.035, -0.085, -0.135]) {
+              const spring = new THREE.Mesh(jumpPadSpringGeometry, jumpPadSpringMaterial)
+              spring.position.y = y
+              spring.rotation.x = Math.PI / 2
+              jumpPadGroup.add(spring)
+            }
+
+            boardGroup.add(jumpPadGroup)
+            jumpPadVisuals.set(jumpPad.id, jumpPadGroup)
+          }
+        }
+
+        if (stage.gimmicks.cannons.length > 0) {
+          const cannonBarrelGeometry = track(
+            new THREE.CylinderGeometry(0.34, 0.34, 1.5, 16),
+          )
+          const cannonBaseGeometry = track(
+            new THREE.CylinderGeometry(0.48, 0.62, 0.36, 16),
+          )
+          const cannonRingGeometry = track(
+            new THREE.TorusGeometry(0.37, 0.06, 8, 20),
+          )
+          const cannonSmokeGeometry = track(new THREE.SphereGeometry(0.18, 12, 10))
+          const cannonBarrelMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0x495057 }),
+          )
+          const cannonBaseMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0x868e96 }),
+          )
+          const cannonRingMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xffd43b }),
+          )
+          const cannonSmokeMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({
+              color: 0xf8f9fa,
+              transparent: true,
+              opacity: 0,
+              depthWrite: false,
+            }),
+          )
+
+          for (const cannon of stage.gimmicks.cannons) {
+            const cannonGroup = new THREE.Group()
+            cannonGroup.position.set(cannon.center.x, 0, cannon.center.z)
+
+            const base = new THREE.Mesh(cannonBaseGeometry, cannonBaseMaterial)
+            base.position.y = 0.18
+            cannonGroup.add(base)
+
+            const barrelGroup = new THREE.Group()
+            const barrel = new THREE.Mesh(cannonBarrelGeometry, cannonBarrelMaterial)
+            const barrelCenterY = cannon.muzzleY * 0.66
+            barrel.position.y = barrelCenterY
+            // 円柱の軸を+zへ向ける仰角として扱い、設計どおりの回転量で砲身を立ち上げる。
+            barrel.rotation.x = -(Math.PI / 2 - cannon.elevationRad)
+            barrelGroup.add(barrel)
+            cannonGroup.add(barrelGroup)
+
+            const direction = new THREE.Vector3(
+              Math.cos(cannon.elevationRad) * Math.sin(cannon.headingRad),
+              Math.sin(cannon.elevationRad),
+              Math.cos(cannon.elevationRad) * Math.cos(cannon.headingRad),
+            ).normalize()
+            const muzzle = new THREE.Vector3(0, barrelCenterY, 0).addScaledVector(
+              direction,
+              0.78,
+            )
+            const ring = new THREE.Mesh(cannonRingGeometry, cannonRingMaterial)
+            ring.position.copy(muzzle)
+            ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction)
+            cannonGroup.add(ring)
+
+            const smoke: THREE.Mesh[] = []
+            for (let index = 0; index < 3; index += 1) {
+              const puff = new THREE.Mesh(cannonSmokeGeometry, cannonSmokeMaterial)
+              puff.visible = false
+              cannonGroup.add(puff)
+              smoke.push(puff)
+            }
+
+            boardGroup.add(cannonGroup)
+            cannonVisuals.set(cannon.id, {
+              barrel: barrelGroup,
+              ring,
+              smoke,
+              smokeMaterial: cannonSmokeMaterial,
+              direction,
+              muzzle,
+            })
+          }
+        }
+
         const holeRingMaterial = trackMaterial(
           new THREE.MeshLambertMaterial({ color: 0xff8787 }),
         )
@@ -844,7 +1329,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
           track(new THREE.CylinderGeometry(markerRadius, markerRadius, BALL_RADIUS * 0.07, 28)),
           trackMaterial(new THREE.MeshLambertMaterial({ color: 0xa9e34b })),
         )
-        startMesh.position.set(stage.start.x, 0.02, stage.start.z)
+        startMesh.position.set(stage.start.x, (stage.start.y ?? 0) + 0.02, stage.start.z)
         boardGroup.add(startMesh)
 
         // 星は同じ形状とマテリアルを共有し、盤面と一緒に傾いて通り道を塞がないようにする。
@@ -854,9 +1339,10 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         )
         for (const star of stage.stars) {
           const starMesh = new THREE.Mesh(starGeometry, starMaterial)
-          starMesh.position.set(star.center.x, STAR_HOVER_Y, star.center.z)
+          const hoverY = (star.center.y ?? 0) + STAR_HOVER_Y
+          starMesh.position.set(star.center.x, hoverY, star.center.z)
           boardGroup.add(starMesh)
-          starVisuals.push({ id: star.id, mesh: starMesh })
+          starVisuals.push({ id: star.id, mesh: starMesh, hoverY })
         }
 
         let flagBall: THREE.Object3D
@@ -891,6 +1377,84 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         world = mazeWorld.world
         ballBody = mazeWorld.ball
         spinners = mazeWorld.spinners
+        cars = mazeWorld.cars
+
+        if (cars.length > 0) {
+          // 車ごとにGeometryやMaterialを増やさず、同じ道路を走る全車で共有する。
+          const carBodyGeometry = track(
+            new RoundedBoxGeometry(
+              CAR_WIDTH,
+              CAR_BODY_HEIGHT,
+              CAR_DEPTH,
+              4,
+              CAR_BODY_ROUND,
+            ),
+          )
+          const carEdgeGeometry = track(new THREE.EdgesGeometry(carBodyGeometry))
+          const carCabinGeometry = track(
+            new THREE.CylinderGeometry(
+              CAR_CABIN_RADIUS,
+              CAR_CABIN_RADIUS,
+              CAR_WIDTH * 0.56,
+              16,
+            ),
+          )
+          const carWheelGeometry = track(
+            new THREE.CylinderGeometry(
+              CAR_BODY_HEIGHT * 0.24,
+              CAR_BODY_HEIGHT * 0.24,
+              CAR_DEPTH * 0.18,
+              12,
+            ),
+          )
+          const carLightGeometry = track(
+            new THREE.SphereGeometry(CAR_BODY_HEIGHT * 0.13, 12, 8),
+          )
+          const carBodyMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xff7b3f }),
+          )
+          const carEdgeMaterial = trackMaterial(
+            new THREE.LineBasicMaterial({ color: 0xd1481c }),
+          )
+          const carCabinMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xffe3bf }),
+          )
+          const carWheelMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0x343a40 }),
+          )
+          const carLightMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0xffd43b }),
+          )
+
+          for (const car of cars) {
+            const carMesh = new THREE.Group()
+            const bodyMesh = new THREE.Mesh(carBodyGeometry, carBodyMaterial)
+            carMesh.add(bodyMesh)
+            carMesh.add(new THREE.LineSegments(carEdgeGeometry, carEdgeMaterial))
+
+            const cabinMesh = new THREE.Mesh(carCabinGeometry, carCabinMaterial)
+            cabinMesh.position.y =
+              CAR_BODY_HEIGHT / 2 + CAR_CABIN_RADIUS * 0.55
+            cabinMesh.rotation.z = Math.PI / 2
+            carMesh.add(cabinMesh)
+
+            for (const x of [-CAR_WIDTH * 0.31, CAR_WIDTH * 0.31]) {
+              for (const z of [-CAR_DEPTH * 0.34, CAR_DEPTH * 0.34]) {
+                const wheel = new THREE.Mesh(carWheelGeometry, carWheelMaterial)
+                wheel.position.set(x, -CAR_BODY_HEIGHT * 0.34, z)
+                wheel.rotation.x = Math.PI / 2
+                carMesh.add(wheel)
+              }
+            }
+
+            const light = new THREE.Mesh(carLightGeometry, carLightMaterial)
+            light.position.set(0, CAR_BODY_HEIGHT / 2 + CAR_CABIN_RADIUS * 1.45, 0)
+            carMesh.add(light)
+
+            boardGroup.add(carMesh)
+            carVisuals.push({ body: car.body, mesh: carMesh })
+          }
+        }
 
         const spinnerMaterial = trackMaterial(
           new THREE.MeshLambertMaterial({ color: 0xf76707 }),
@@ -1006,16 +1570,35 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       checkpointTracker = createCheckpointTracker()
       starTracker = createStarTracker()
       starPopStartedAtMs.clear()
-      for (const { mesh } of starVisuals) {
+      for (const { mesh, hoverY } of starVisuals) {
         mesh.visible = true
         mesh.scale.setScalar(1)
         mesh.rotation.set(0, 0, 0)
-        mesh.position.y = STAR_HOVER_Y
+        mesh.position.y = hoverY
       }
       optionsRef.current.onStarCollected?.(0, stage.stars.length)
       impactTracker = createImpactTracker()
       bumperCooldowns.clear()
+      jumpPadCooldowns.clear()
+      jumpPadPopStartedAtMs.clear()
+      for (const group of jumpPadVisuals.values()) group.scale.set(1, 1, 1)
+      closeSpeedCapWindow()
+      resetCannons()
       resetBall(ballBody, stage.start)
+      // 物理時刻は回転棒のために維持し、車だけをelapsed 0の初期位相へ戻す。
+      carPhaseBaseSeconds = physicsElapsedSeconds
+      for (const { gimmick, body } of cars) {
+        // 次の物理stepを待たず、リトライを押した瞬間の描画も初期位置へ揃える。
+        body.setTranslation(
+          {
+            x: carXAt(gimmick, 0),
+            y: gimmick.center.y,
+            z: gimmick.center.z,
+          },
+          true,
+        )
+      }
+      advanceCars(cars, 0)
       stallTracker = createStallTracker()
       spinnerTrapTracker = createSpinnerTrapTracker()
       respawnGraceRemainingMs = RESPAWN_GRACE_MS

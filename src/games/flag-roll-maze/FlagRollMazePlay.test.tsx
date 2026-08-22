@@ -311,6 +311,22 @@ describe('FlagRollMazePlay', () => {
     expect(screen.getByRole('button', { name: 'スタートに もどる' })).toBeInTheDocument()
   })
 
+  it('アスレチックの「もういちど」は新しいrunでギミックの状態を初期化する', async () => {
+    const user = userEvent.setup()
+    renderPlay('athletic')
+    const firstRun = engineMock.options
+    expect(firstRun?.stageId).toBe('athletic')
+    expect(firstRun?.runId).toBe(0)
+
+    act(() => engineMock.options!.onGoal())
+    await user.click(screen.getByRole('button', { name: 'もういちど' }))
+
+    // runIdが変わるためuseMazeEngineのeffectが作り直され、大砲・ジャンプ床・車のrun内状態も持ち越さない。
+    expect(engineMock.options).not.toBe(firstRun)
+    expect(engineMock.options!.stageId).toBe('athletic')
+    expect(engineMock.options!.runId).toBe(1)
+  })
+
   it('場外から復帰したことを知らせ、しばらくすると消える', () => {
     vi.useFakeTimers()
     try {
@@ -343,8 +359,8 @@ describe('FlagRollMazePlay', () => {
     expect(screen.getByRole('button', { name: 'スタートに もどる' })).toBeInTheDocument()
   })
 
-  it('最後のぼうけんステージではつぎのステージを出さない', () => {
-    renderPlay('adventure')
+  it('最後のアスレチックステージではつぎのステージを出さない', () => {
+    renderPlay('athletic')
     act(() => engineMock.options!.onGoal())
 
     expect(screen.queryByRole('button', { name: 'つぎの ステージ' })).toBeNull()

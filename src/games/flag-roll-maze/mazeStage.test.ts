@@ -115,6 +115,31 @@ describe('createMazeStage', () => {
     expect(createMazeStage(MAZE_STAGE_ROWS).stars).toEqual([])
   })
 
+  it('START・checkpoint・星へ指定した高さとcheckpoint半径を保つ', () => {
+    const rows = [
+      '#####',
+      '#S.G#',
+      '#####',
+    ]
+    const elevated = createMazeStage(rows, {
+      startY: 4,
+      checkpointCells: [
+        { column: 1, row: 1, y: 4 },
+        { column: 2, row: 1, y: 2, radius: 2.5 },
+      ],
+      starCells: [{ column: 2, row: 1, y: 2 }],
+    })
+
+    expect(elevated.start).toEqual({ ...cellToWorld(1, 1, 5, 3), y: 4 })
+    expect(elevated.checkpoints).toEqual([
+      { ...cellToWorld(1, 1, 5, 3), y: 4 },
+      { ...cellToWorld(2, 1, 5, 3), y: 2, radius: 2.5 },
+    ])
+    expect(elevated.stars).toEqual([
+      { id: 'star-1', center: { ...cellToWorld(2, 1, 5, 3), y: 2 } },
+    ])
+  })
+
   it('盤面境界がカメラ用に左右対称になる', () => {
     const bounds = mazeStageBounds(stage)
     expect(bounds.maxX).toBeCloseTo(-bounds.minX, 6)

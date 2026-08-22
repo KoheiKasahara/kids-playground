@@ -1,7 +1,8 @@
 import { BALL_RADIUS } from './mazePhysics'
 import { type MazePoint } from './mazeGrid'
 
-export type MazeStar = { id: string; center: MazePoint }
+/** 高台の星も同じ水平判定で扱えるよう、高さだけ任意で持たせる。 */
+export type MazeStar = { id: string; center: MazePoint & { y?: number } }
 
 /** ボール中心がこの水平距離まで近づいたら取得。球半径+星の見た目半径ぶん。 */
 export const STAR_PICKUP_RADIUS = BALL_RADIUS * 1.4
