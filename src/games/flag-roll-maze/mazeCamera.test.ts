@@ -238,6 +238,17 @@ describe('プレイ中のズーム段階', () => {
     expect(mazeZoomScale(DEFAULT_MAZE_ZOOM_INDEX)).toBe(1)
   })
 
+  it('既存の前後2段に加え、さらに前後2段ずつ選べる', () => {
+    expect(MAZE_ZOOM_SCALES).toEqual([
+      1.39, 1.29,
+      // Phase 4実装時点のズーム段階。ここを基準に前後2段を追加する。
+      1.19, 1.09, 1, 0.92, 0.84,
+      0.77, 0.71,
+    ])
+    expect(DEFAULT_MAZE_ZOOM_INDEX - MIN_MAZE_ZOOM_INDEX).toBe(4)
+    expect(MAX_MAZE_ZOOM_INDEX - DEFAULT_MAZE_ZOOM_INDEX).toBe(4)
+  })
+
   it('段が上がるほど寄る（距離が縮む）', () => {
     for (let index = 1; index <= MAX_MAZE_ZOOM_INDEX; index += 1) {
       expect(mazeZoomScale(index)).toBeLessThan(mazeZoomScale(index - 1))
@@ -274,8 +285,8 @@ describe('プレイ中のズーム段階', () => {
     const ratio = ballScreenDiameterRatio(distance, aspect)
 
     expect(ratio).toBeGreaterThan(BALL_SCREEN_DIAMETER_RATIO)
-    // 以前「存在感は十分」と確認した0.22を超えない。
-    expect(ratio).toBeLessThanOrEqual(0.22)
+    // 国旗は大きく見えるが、画面の4分の1を占有しない。
+    expect(ratio).toBeLessThan(0.25)
   })
 
   it('ズームは距離だけを変え、向きも仰角も変えない', () => {
