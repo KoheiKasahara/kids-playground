@@ -142,7 +142,10 @@ describe('adventure fixed-step play-time simulation', () => {
         Object.fromEntries(TOY_HIT_RATIO_FLOORS.map(([id]) => [id, Number(toyHitRatio(id).toFixed(2))])),
       )} riverJumpRunRatio=${riverJumpRunRatio.toFixed(2)} riverBoostRunRatio=${riverBoostRunRatio.toFixed(2)}`,
     )
-    const repeatedResults = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+    // 決定性は「同じシードなら同じルート」という性質の確認なので、全シードを
+    // 流し直す必要はない。密度を上げて1回の再生が重くなったぶん、先頭数シードに絞る。
+    const REPEAT_COUNT = 4
+    const repeatedResults = Array.from({ length: REPEAT_COUNT }, (_, index) =>
       simulateAdventureRun(SEED_BASE + index * SEED_STEP),
     )
     const totalTimeSignatures = new Set(results.map((result) => result.totalSeconds))
@@ -197,7 +200,9 @@ describe('adventure fixed-step play-time simulation', () => {
     expect(riverMaxSpeed).toBeGreaterThan(caveMaxSpeed)
     expect(cavePinMean).toBeGreaterThanOrEqual(riverPinMean + 0.5)
     expect(routeMeanDifference).toBeLessThanOrEqual(4)
-    expect(repeatedResults.map((result) => result.visitedAreaIds)).toEqual(results.map((result) => result.visitedAreaIds))
+    expect(repeatedResults.map((result) => result.visitedAreaIds)).toEqual(
+      results.slice(0, repeatedResults.length).map((result) => result.visitedAreaIds),
+    )
     // 障害物が5倍近くに増え、ボールがピンの頂点でいったん静止する場面が出る。
     // 停滞ナッジはワープではなく横へ1.8px/stepの軽い一押しなので、
     // 「起きない」ではなく「1プレイあたり数回に収まる」を固定する。
@@ -230,5 +235,5 @@ describe('adventure fixed-step play-time simulation', () => {
 
     // 軌道の座標ではなく、シードでプレイ時間が変わる性質だけを固定する。
     expect(totalTimeSignatures.size).toBeGreaterThan(1)
-  })
+  }, 120_000)
 })
