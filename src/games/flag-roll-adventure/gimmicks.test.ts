@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { CANNON_MUZZLE_OFFSET } from './adventurePhysics'
 import {
   canRecaptureCannon,
   calculateZoneEffects,
@@ -28,7 +29,8 @@ describe('gimmick pure logic', () => {
 
   it('大砲の砲口と射出速度を求め、速度をMAX_SPEED以下へクランプする', () => {
     const cannon = { x: 120, y: 240, angle: -Math.PI / 2, power: 20 }
-    expect(getCannonMuzzlePosition(cannon)).toEqual({ x: 120, y: 198 })
+    // 砲口の距離は定数側の調整で変わるため、値を直書きせず定数から導く。
+    expect(getCannonMuzzlePosition(cannon)).toEqual({ x: 120, y: 240 - CANNON_MUZZLE_OFFSET })
     expect(getCannonLaunchVelocity(cannon).x).toBeCloseTo(0)
     expect(getCannonLaunchVelocity(cannon).y).toBeCloseTo(-14)
     const diagonal = getLaunchVelocity(Math.PI / 4, 20)

@@ -216,6 +216,139 @@
   box-shadow: inset 0 -5px 0 rgba(117, 34, 64, 0.24), 0 0 16px rgba(255, 180, 211, 0.95);
 }
 
+/* Toyは物理Bodyと同じ中心・半径で描き、spinnerのtransformだけをエンジンが直接更新する。 */
+.toy {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  transform-origin: center;
+  will-change: transform;
+  transition: filter 120ms ease, box-shadow 120ms ease;
+}
+
+.toySpinner {
+  display: grid;
+  place-items: center;
+}
+
+.spinnerBlade,
+.spinnerBlade::before {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  width: 18%;
+  height: 84%;
+  border-radius: 999px;
+  content: '';
+  transform: translateX(-50%);
+}
+
+.spinnerBlade::before {
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.spinnerHub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24%;
+  height: 24%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.68), var(--shadow-sm);
+}
+
+.themeSky .toySpinner {
+  filter: drop-shadow(0 2px 2px rgba(36, 118, 169, 0.35));
+}
+
+.themeSky .spinnerBlade,
+.themeSky .spinnerBlade::before {
+  background: linear-gradient(90deg, #ffffff, #d8f3ff 58%, #79bddd);
+  border: 2px solid #3f91c0;
+}
+
+.themeSky .spinnerHub {
+  background: #428fbd;
+}
+
+.themeCave .toySpinner {
+  filter: drop-shadow(0 3px 2px rgba(45, 35, 62, 0.45));
+}
+
+.themeCave .spinnerBlade,
+.themeCave .spinnerBlade::before {
+  border: 2px solid #4b465c;
+  background: linear-gradient(135deg, #c3bdce, #71687f 62%, #4b465c);
+  border-radius: 38% 62% 44% 56%;
+}
+
+.themeCave .spinnerHub {
+  background: #514b65;
+}
+
+.themeRiver .toySpinner {
+  border: 5px solid #80543c;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 3px rgba(255, 224, 168, 0.5), var(--shadow-sm);
+}
+
+.themeRiver .spinnerBlade,
+.themeRiver .spinnerBlade::before {
+  background: linear-gradient(90deg, #a8f0ed, #37aeb8 65%, #167887);
+  border: 2px solid #176e7e;
+}
+
+.themeRiver .spinnerHub {
+  background: #80543c;
+}
+
+.toy.spinnerHit {
+  filter: brightness(1.5) saturate(1.2);
+  box-shadow: 0 0 18px rgba(255, 245, 166, 0.85);
+}
+
+.toyLifter {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.lifterIcon {
+  display: block;
+  font-size: 1.6em;
+  line-height: 1;
+  filter: drop-shadow(0 2px 2px rgba(48, 39, 70, 0.32));
+}
+
+.themeForest .toyLifter {
+  border: 4px solid #8f4f55;
+  background: radial-gradient(circle at 50% 22%, #ffdbe0, #ed7889 58%, #b83d58);
+  box-shadow: inset 0 -7px 0 rgba(117, 34, 64, 0.2), var(--shadow-sm);
+}
+
+.themeCloud .toyLifter {
+  border: 4px solid #9389c0;
+  background: radial-gradient(circle at 35% 28%, #ffffff, #ded8fa 60%, #aaa2d2);
+  box-shadow: inset 0 -5px 0 rgba(105, 94, 155, 0.16), var(--shadow-sm);
+}
+
+.themeRiver .toyLifter {
+  border: 4px solid #167887;
+  background: radial-gradient(circle at 38% 25%, #e9fffc, #55d0cf 62%, #238f9e);
+  box-shadow: inset 0 -5px 0 rgba(22, 120, 135, 0.22), var(--shadow-sm);
+}
+
+.toy.lifterFired {
+  filter: brightness(1.45) saturate(1.2);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.85);
+}
+
 .boostLane {
   position: absolute;
   z-index: 0;
@@ -450,7 +583,8 @@
 
   .cannon,
   .jumpPad,
-  .boostLane {
+  .boostLane,
+  .toy {
     transition: none;
     animation: none;
   }

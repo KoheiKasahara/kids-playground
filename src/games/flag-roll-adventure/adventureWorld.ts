@@ -20,11 +20,19 @@ import {
 } from './adventurePhysics'
 import { AREAS, findArea, START_AREA_ID } from './data/areas'
 import { areaGroundRects, cupBottomRect, cupSensorRect, type AdventureRect } from './adventureGeometry'
-import type { AreaCup, AreaExit, AreaJumpPad, AreaPin, AreaZone } from './types'
+import { createAdventureToyRuntimes, type AdventureToyRuntime } from './adventureToys'
+import type { AreaCup, AreaExit, AreaJumpPad, AreaPin, AreaToy, AreaZone } from './types'
 
 export type AdventureZoneEntry = {
   areaId: string
   zone: AreaZone
+  body: Matter.Body
+}
+
+export type AdventureToyEntry = {
+  areaId: string
+  toy: AreaToy
+  runtime: AdventureToyRuntime
   body: Matter.Body
 }
 
@@ -38,6 +46,9 @@ export type AdventureWorld = {
   exitByLabel: Map<string, { areaId: string; exit: AreaExit }>
   cupByLabel: Map<string, { areaId: string; cup: AreaCup }>
   zoneByLabel: Map<string, AdventureZoneEntry>
+  toyRuntimes: readonly AdventureToyRuntime[]
+  toyRuntimeByAreaId: ReadonlyMap<string, readonly AdventureToyRuntime[]>
+  toyByLabel: Map<string, AdventureToyEntry>
 }
 
 function worldPoint(areaId: string, x: number, y: number) {
@@ -220,7 +231,23 @@ export function createAdventureWorld(random: () => number): AdventureWorld {
   const cupByLabel = new Map<string, { areaId: string; cup: AreaCup }>()
   const portalFloors = AREAS.flatMap((area) => createPortalFloorBodies(area))
   const cupBodies = AREAS.flatMap((area) => createCupBodies(area, cupByLabel))
-  const staticBodies = [...outerWalls, ...wallBodies, ...pinBodies, ...jumpBodies, ...portalFloors, ...cupBodies]
+  const { bodies: toyBodies, runtimes: toyRuntimes, runtimeByAreaId: toyRuntimeByAreaId } =
+    createAdventureToyRuntimes(random)
+  const toyByLabel = new Map<string, AdventureToyEntry>()
+  for (const runtime of toyRuntimes) {
+    for (const body of runtime.bodies) {
+      toyByLabel.set(body.label, { areaId: runtime.areaId, toy: runtime.toy, runtime, body })
+    }
+  }
+  const staticBodies = [
+    ...outerWalls,
+    ...wallBodies,
+    ...pinBodies,
+    ...jumpBodies,
+    ...toyBodies,
+    ...portalFloors,
+    ...cupBodies,
+  ]
   const solidBodies = staticBodies.filter((body) => !body.isSensor)
   Matter.Composite.add(
     engine.world,
@@ -245,5 +272,17 @@ export function createAdventureWorld(random: () => number): AdventureWorld {
   })
   Matter.Composite.add(engine.world, ballBody)
 
-  return { engine, ballBody, solidBodies, pinByLabel, jumpByLabel, exitByLabel, cupByLabel, zoneByLabel }
+  return {
+    engine,
+    ballBody,
+    solidBodies,
+    pinByLabel,
+    jumpByLabel,
+    exitByLabel,
+    cupByLabel,
+    zoneByLabel,
+    toyRuntimes,
+    toyRuntimeByAreaId,
+    toyByLabel,
+  }
 }

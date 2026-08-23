@@ -40,6 +40,33 @@ export type AreaJumpPad = {
 
 export type AreaObject = AreaWall | AreaPin | AreaJumpPad
 
+/** 常時回転する羽根。触れたボールを接線方向へ弾く。テーマ側でプロペラ／回転岩／水車に見せる。 */
+export type AreaSpinner = {
+  kind: 'spinner'
+  id: string
+  x: number
+  y: number
+  /** 羽根の長さの半分 */
+  radius: number
+  /** 角速度(rad/step)。符号が回転方向 */
+  angularVelocity: number
+}
+
+/** 触れると上方向へ打ち上げるバネ。タップ不要で常時作動する。 */
+export type AreaLifter = {
+  kind: 'lifter'
+  id: string
+  x: number
+  y: number
+  radius: number
+  /** 上向き初速(px/step) */
+  upSpeed: number
+  /** 同じボールを連続で打ち上げないための待ち時間(ms)。省略時は既定値 */
+  cooldownMs?: number
+}
+
+export type AreaToy = AreaSpinner | AreaLifter
+
 /** ボールを一時捕獲して指定方向へ射出するセンサー円。 */
 export type AreaCannon = {
   kind: 'cannon'
@@ -123,6 +150,7 @@ export type AdventureArea = {
   /** ワールド上の原点。配列位置から計算せず、分岐したエリアの配置を明示する。 */
   origin: { x: number; y: number }
   objects: readonly AreaObject[]
+  toys?: readonly AreaToy[]
   zones?: readonly AreaZone[]
   entries: readonly AreaEntry[]
   exits: readonly AreaExit[]

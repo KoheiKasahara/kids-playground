@@ -45,6 +45,9 @@ export type AdventureSimulationResult = {
   readonly pinHitCount: number
   readonly pinHitCountByArea: Readonly<Record<string, number>>
   readonly pinHitCountById: Readonly<Record<string, number>>
+  readonly spinnerHitCountById: Readonly<Record<string, number>>
+  readonly lifterFireCountById: Readonly<Record<string, number>>
+  readonly objectContactCountByArea: Readonly<Record<string, number>>
   readonly maxAirborneSeconds: number
   readonly maxAirborneSecondsByArea: Readonly<Record<string, number>>
   readonly maxContactlessDropPx: number
@@ -123,6 +126,8 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
     exitByLabel,
     cupByLabel,
     zoneByLabel,
+    toyRuntimes,
+    toyByLabel,
   } = createAdventureWorld(random)
   const zoneWorldGeometry = [...zoneByLabel.values()].map((entry) => ({
     zone: entry.zone,
@@ -136,6 +141,9 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
   const stallNudgeCountByArea = new Map(AREAS.map((area) => [area.id, 0]))
   const pinHitCountByArea = new Map(AREAS.map((area) => [area.id, 0]))
   const pinHitCountById = new Map<string, number>()
+  const spinnerHitCountById = new Map<string, number>()
+  const lifterFireCountById = new Map<string, number>()
+  const objectContactCountByArea = new Map(AREAS.map((area) => [area.id, 0]))
   const maxAirborneMsByArea = new Map(AREAS.map((area) => [area.id, 0]))
   const visitedAreaIds: string[] = [START_AREA_ID]
   let currentAreaId = START_AREA_ID
@@ -303,6 +311,19 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
     jumpCountById.set(entry.jump.id, (jumpCountById.get(entry.jump.id) ?? 0) + 1)
   }
 
+  function updateAdventureToys() {
+    for (const runtime of toyRuntimes) {
+      const ballForToy = motion === 'running' && runtime.areaId === currentAreaId ? ballBody : null
+      const event = runtime.update(elapsedMs, ballForToy)
+      if (!event) continue
+      if (event.kind === 'spinner-hit') {
+        spinnerHitCountById.set(event.id, (spinnerHitCountById.get(event.id) ?? 0) + 1)
+      } else {
+        lifterFireCountById.set(event.id, (lifterFireCountById.get(event.id) ?? 0) + 1)
+      }
+    }
+  }
+
   function addDwellUntil(nowMs: number) {
     const previous = dwellMsByArea.get(currentAreaId) ?? 0
     dwellMsByArea.set(currentAreaId, previous + Math.max(0, nowMs - areaEnteredAtMs))
@@ -416,6 +437,19 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
       const ballIsB = pair.bodyB.label === 'adventure-ball'
       if (!ballIsA && !ballIsB) continue
       const other = ballIsA ? pair.bodyB : pair.bodyA
+      const pin = pinByLabel.get(other.label)
+      const toy = toyByLabel.get(other.label)
+      const wallAreaId = other.label.startsWith('wall:') ? other.label.split(':')[1] : undefined
+      const objectAreaId = pin?.areaId ?? toy?.areaId ?? wallAreaId
+      if (objectAreaId) {
+        objectContactCountByArea.set(
+          objectAreaId,
+          (objectContactCountByArea.get(objectAreaId) ?? 0) + 1,
+        )
+      }
+      if (toy?.toy.kind === 'spinner') {
+        spinnerHitCountById.set(toy.toy.id, (spinnerHitCountById.get(toy.toy.id) ?? 0) + 1)
+      }
       const exit = exitByLabel.get(other.label)
       if (exit) {
         startExitTransition(exit, false)
@@ -448,7 +482,6 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
         continue
       }
 
-      const pin = pinByLabel.get(other.label)
       if (pin) {
         pinHitCount += 1
         pinHitCountByArea.set(pin.areaId, (pinHitCountByArea.get(pin.areaId) ?? 0) + 1)
@@ -607,6 +640,8 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
 
     if (loopMotion === 'goal') break
 
+    // 動的Toyを先に進め、同じ固定ステップ内の角度・速度をEngine.updateへ渡す。
+    updateAdventureToys()
     Engine.update(engine, STEP_MS)
     // collisionStartのコールバックがEngine.update中にmotionを変えるため、状態を再取得する。
     const motionAfterPhysics = motion as Motion
@@ -650,6 +685,9 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
     AREAS.map((area) => [area.id, pinHitCountByArea.get(area.id) ?? 0]),
   )
   const pinHitCountByIdRecord = Object.fromEntries(pinHitCountById)
+  const spinnerHitCountByIdRecord = Object.fromEntries(spinnerHitCountById)
+  const lifterFireCountByIdRecord = Object.fromEntries(lifterFireCountById)
+  const objectContactCountByAreaRecord = Object.fromEntries(objectContactCountByArea)
   const maxAirborneSecondsByArea = Object.fromEntries(
     AREAS.map((area) => [area.id, (maxAirborneMsByArea.get(area.id) ?? 0) / 1000]),
   )
@@ -664,6 +702,9 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
     pinHitCount,
     pinHitCountByArea: pinHitCountByAreaRecord,
     pinHitCountById: pinHitCountByIdRecord,
+    spinnerHitCountById: spinnerHitCountByIdRecord,
+    lifterFireCountById: lifterFireCountByIdRecord,
+    objectContactCountByArea: objectContactCountByAreaRecord,
     maxAirborneSeconds: maxAirborneMs / 1000,
     maxAirborneSecondsByArea,
     maxContactlessDropPx,
