@@ -10,6 +10,17 @@ type Paint = (x: number, y: number) => FlagCellColor
 
 const FLAG_ASPECT = 8 / 5
 const SAMPLE_OFFSETS = [-1 / 3, 0, 1 / 3] as const
+const SOUTH_AFRICA_Y_SEGMENTS: readonly [Point, Point][] = [
+  [[0.47, 0.5], [1, 0.5]],
+  [[0.08, 0.17], [0.47, 0.5]],
+  [[0.08, 0.83], [0.47, 0.5]],
+]
+const SOUTH_AFRICA_YELLOW_TRIANGLE: readonly Point[] = [[0, 0.08], [0, 0.92], [0.4, 0.5]]
+const SOUTH_AFRICA_BLACK_TRIANGLE: readonly Point[] = [[0, 0.15], [0, 0.85], [0.33, 0.5]]
+const BRAZIL_WHITE_BAND: readonly Point[] = [[0.32, 0.62], [0.5, 0.57], [0.68, 0.43]]
+const US_CANTON_WIDTH = 0.4
+const US_CANTON_HEIGHT = 7 / 13
+const US_STAR_COLUMNS = [6, 5, 6, 5, 6] as const
 
 function scenePoint(x: number, y: number): Point {
   return [(x - 0.5) * FLAG_ASPECT, y - 0.5]
@@ -22,6 +33,35 @@ function distanceToSegment(point: Point, start: Point, end: Point): number {
   if (lengthSquared === 0) return Math.hypot(point[0] - start[0], point[1] - start[1])
   const ratio = Math.max(0, Math.min(1, ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / lengthSquared))
   return Math.hypot(point[0] - (start[0] + dx * ratio), point[1] - (start[1] + dy * ratio))
+}
+
+/**
+ * 国旗の形状は、ラスタライズ前の正規化座標(0〜1)で表現する。
+ * scenePointは横幅のアスペクト比を含むため、旗の構成線そのものを
+ * 比較するときはこのヘルパーで正規化座標をそのまま測る。
+ */
+function normalizedDistanceToSegment(
+  x: number,
+  y: number,
+  start: Point,
+  end: Point,
+): number {
+  return distanceToSegment([x, y], start, end)
+}
+
+function normalizedDistanceToPolyline(
+  x: number,
+  y: number,
+  points: readonly Point[],
+): number {
+  let distance = Number.POSITIVE_INFINITY
+  for (let index = 1; index < points.length; index += 1) {
+    distance = Math.min(
+      distance,
+      normalizedDistanceToSegment(x, y, points[index - 1]!, points[index]!),
+    )
+  }
+  return distance
 }
 
 function inPolygon(x: number, y: number, points: readonly Point[]): boolean {
@@ -107,18 +147,125 @@ function mapleLeaf(x: number, y: number): boolean {
   ])
 }
 
+function jamaica(x: number, y: number): FlagCellColor {
+  // The saltire divides the field into green top/bottom triangles and black
+  // hoist/fly triangles.  Comparing normalized distances keeps the four
+  // triangles correct even though the rendered flag is 8:5 rather than square.
+  const distanceFromCenterX = Math.abs(x - 0.5)
+  const distanceFromCenterY = Math.abs(y - 0.5)
+  const saltireWidth = 0.075
+  if (Math.abs(distanceFromCenterX - distanceFromCenterY) <= saltireWidth) {
+    return 'yellow'
+  }
+  return distanceFromCenterY > distanceFromCenterX ? 'green' : 'black'
+}
+
+function southAfricaYDistance(x: number, y: number): number {
+  // South Africa's green Y opens toward the hoist and its stem runs to the
+  // fly.  The black triangle is layered separately below, so the arms can be
+  // described with three reusable center-lines instead of cell coordinates.
+  return Math.min(
+    ...SOUTH_AFRICA_Y_SEGMENTS.map(([start, end]) => normalizedDistanceToSegment(x, y, start, end)),
+  )
+}
+
 function southAfrica(x: number, y: number): FlagCellColor {
+  const base: FlagCellColor = y < 0.5 ? 'red' : 'blue'
+  const yDistance = southAfricaYDistance(x, y)
+  const yCoreWidth = 0.095
+  const yOuterWidth = 0.145
+  let color: FlagCellColor = yDistance <= yOuterWidth
+    ? yDistance <= yCoreWidth ? 'green' : 'white'
+    : base
+
+  // Layer the hoist triangle over the Y.  Separate, similarly shaped polygons
+  // keep a stable gold border without extending the black point too far into
+  // the green stem.
+  if (inPolygon(x, y, SOUTH_AFRICA_YELLOW_TRIANGLE)) color = 'yellow'
+  if (inPolygon(x, y, SOUTH_AFRICA_BLACK_TRIANGLE)) color = 'black'
+  return color
+}
+
+function brazilWhiteBand(x: number, y: number): boolean {
+  // A short polyline is enough for the identifying white band.  It is kept
+  // slightly above the mathematical centre so the blue disc remains visible
+  // through the middle row of the domino mosaic.
+  return normalizedDistanceToPolyline(x, y, BRAZIL_WHITE_BAND) <= 0.035
+}
+
+function koreanTrigram(
+  x: number,
+  y: number,
+  centerX: number,
+  centerY: number,
+  angle: number,
+  broken: readonly boolean[],
+): boolean {
+  const dx = x - centerX
+  const dy = y - centerY
+  const along = dx * Math.cos(angle) + dy * Math.sin(angle)
+  const across = -dx * Math.sin(angle) + dy * Math.cos(angle)
+  // Each bar must remain at least one full cell thick after 3×3 sampling on a
+  // 50×32 grid.  Thinner vector-perfect bars collapse into checker noise.
+  const barThickness = 0.045
+  const barGap = 0.035
+  const barHalfLength = 0.105
+  for (let index = 0; index < 3; index += 1) {
+    const barCenter = (index - 1) * (barThickness + barGap)
+    if (Math.abs(across - barCenter) > barThickness / 2 || Math.abs(along) > barHalfLength) {
+      continue
+    }
+    if (broken[index] && Math.abs(along) < 0.032) return false
+    return true
+  }
+  return false
+}
+
+function koreaTaegeuk(x: number, y: number): FlagCellColor {
   const point = scenePoint(x, y)
-  const diagonal = 0.13
-  const left = -0.8
-  const middle = 0.15
-  const inY = point[0] <= middle && Math.abs(point[1]) <= Math.max(0.12, 0.5 - (point[0] - left) * 0.45)
-  if (inY) return 'green'
-  const inYellowBorder = point[0] < 0.05 && Math.abs(point[1]) <= 0.5 - (point[0] - left) * 0.36 + diagonal
-  if (inYellowBorder) return 'yellow'
-  if (point[0] < -0.35 && Math.abs(point[1]) < 0.5 - (point[0] + 0.8) * 0.5) return 'black'
-  if (Math.abs(point[1] - (0.13 + point[0] * 0.35)) < 0.065 || Math.abs(point[1] - (-0.13 - point[0] * 0.35)) < 0.065) return 'white'
-  return y < 0.5 ? 'red' : 'blue'
+  const center = scenePoint(0.5, 0.5)
+  const radius = 0.24
+  const distance = Math.hypot(point[0] - center[0], point[1] - center[1])
+  if (distance > radius) return 'white'
+
+  // Red occupies the upper lobe and curls down on the left; the complementary
+  // blue lobe curls up on the right.  This gives the Taegeuk its S-shaped
+  // division instead of a flat horizontal split.
+  const boundary = -0.09 * Math.sin(Math.PI * (point[0] - center[0]) / radius)
+  return point[1] - center[1] < boundary ? 'red' : 'blue'
+}
+
+function indiaChakra(x: number, y: number): boolean {
+  const point = scenePoint(x, y)
+  const center = scenePoint(0.5, 0.5)
+  const dx = point[0] - center[0]
+  const dy = point[1] - center[1]
+  const radius = Math.hypot(dx, dy)
+  const outerRadius = 0.15
+  const innerRadius = 0.108
+  if (radius >= innerRadius && radius <= outerRadius) return true
+  if (radius <= 0.025) return true
+  if (radius > innerRadius) return false
+
+  // Twelve broad spokes survive the 50×32 rasterization while leaving enough
+  // white between them to read as a wheel rather than a blue blob.
+  const angle = Math.atan2(dy, dx)
+  const sector = (Math.PI * 2) / 12
+  const wrapped = ((angle + sector / 2) % sector + sector) % sector - sector / 2
+  return Math.abs(wrapped) <= 0.075
+}
+
+function usStar(x: number, y: number): boolean {
+  if (x >= US_CANTON_WIDTH || y >= US_CANTON_HEIGHT) return false
+  const rowHeight = US_CANTON_HEIGHT / US_STAR_COLUMNS.length
+  const row = Math.min(US_STAR_COLUMNS.length - 1, Math.floor(y / rowHeight))
+  const columnCount = US_STAR_COLUMNS[row]!
+  const spacing = US_CANTON_WIDTH / (columnCount + 1)
+  const column = Math.round(x / spacing) - 1
+  if (column < 0 || column >= columnCount) return false
+  const centerX = (column + 1) * spacing
+  const centerY = (row + 0.5) * rowHeight
+  return inPolygon(x, y, starPoints(centerX, centerY, 0.021, 0.009))
 }
 
 function paintFlag(id: DominoFlagId, x: number, y: number): FlagCellColor {
@@ -147,7 +294,10 @@ function paintFlag(id: DominoFlagId, x: number, y: number): FlagCellColor {
     case 'gb': return unionJack(x, y)
     case 'br': {
       if (Math.abs(x - 0.5) / 0.36 + Math.abs(y - 0.5) / 0.43 <= 1) {
-        return inCircle(x, y, 0.5, 0.5, 0.255) ? 'blue' : 'yellow'
+        if (inCircle(x, y, 0.5, 0.5, 0.255)) {
+          return brazilWhiteBand(x, y) ? 'white' : 'blue'
+        }
+        return 'yellow'
       }
       return 'green'
     }
@@ -161,12 +311,7 @@ function paintFlag(id: DominoFlagId, x: number, y: number): FlagCellColor {
     case 'in': {
       const band = horizontalBands(['orange', 'white', 'green'])(x, y)
       if (band !== 'white') return band
-      const point = scenePoint(x, y)
-      const center = scenePoint(0.5, 0.5)
-      const radius = Math.hypot(point[0] - center[0], point[1] - center[1])
-      if (radius >= 0.105 && radius <= 0.13) return 'blue'
-      const angle = Math.atan2(point[1] - center[1], point[0] - center[0])
-      return radius <= 0.13 && Math.abs(Math.sin(angle * 12)) < 0.17 ? 'blue' : 'white'
+      return indiaChakra(x, y) ? 'blue' : 'white'
     }
     case 'tr': {
       const outer = inCircle(x, y, 0.41, 0.5, 0.255)
@@ -185,10 +330,7 @@ function paintFlag(id: DominoFlagId, x: number, y: number): FlagCellColor {
       return x >= 0.135 && x <= 0.205 || y >= 0.21 && y <= 0.35 ? 'white' : 'blue'
     }
     case 'jm': {
-      const point = scenePoint(x, y)
-      const onCross = distanceToSegment(point, [-0.8, -0.5], [0.8, 0.5]) < 0.11 || distanceToSegment(point, [0.8, -0.5], [-0.8, 0.5]) < 0.11
-      if (onCross) return 'yellow'
-      return y < 0.5 ? 'green' : 'black'
+      return jamaica(x, y)
     }
     case 'cz': return inPolygon(x, y, [[0, 0], [0, 1], [0.5, 0.5]]) ? 'blue' : y < 0.5 ? 'white' : 'red'
     case 'mk': {
@@ -213,26 +355,19 @@ function paintFlag(id: DominoFlagId, x: number, y: number): FlagCellColor {
     }
     case 'us': {
       const stripe = Math.floor(y * 13) % 2 === 0 ? 'red' : 'white'
-      if (x > 0.42 || y > 0.54) return stripe
-      const column = Math.floor(x / 0.052)
-      const row = Math.floor(y / 0.09)
-      const starX = (column + (row % 2) * 0.5) * 0.052 + 0.028
-      const starY = row * 0.09 + 0.045
-      return inPolygon(x, y, starPoints(starX, starY, 0.018)) ? 'white' : 'blue'
+      if (x >= US_CANTON_WIDTH || y >= US_CANTON_HEIGHT) return stripe
+      return usStar(x, y) ? 'white' : 'blue'
     }
     case 'kr': {
-      const point = scenePoint(x, y)
-      const center = scenePoint(0.5, 0.5)
-      const distance = Math.hypot(point[0] - center[0], point[1] - center[1])
-      if (distance < 0.22) return point[1] < center[1] ? 'red' : 'blue'
-      const trigrams: readonly [number, number, number][] = [[0.28, 0.28, -0.55], [0.72, 0.28, 0.55], [0.28, 0.72, 0.55], [0.72, 0.72, -0.55]]
-      return trigrams.some(([cx, cy, angle]) => {
-        const dx = x - cx
-        const dy = y - cy
-        const localX = dx * Math.cos(angle) + dy * Math.sin(angle)
-        const localY = -dx * Math.sin(angle) + dy * Math.cos(angle)
-        return Math.abs(localX) < 0.065 && Math.abs(localY) < 0.12 && Math.abs((localY + 0.12) % 0.08 - 0.04) > 0.01
-      }) ? 'black' : 'white'
+      const taegeuk = koreaTaegeuk(x, y)
+      if (taegeuk !== 'white') return taegeuk
+      const trigrams: readonly [number, number, number, readonly boolean[]][] = [
+        [0.24, 0.23, -0.55, [false, false, false]],
+        [0.76, 0.23, 0.55, [true, false, true]],
+        [0.24, 0.77, 0.55, [false, true, false]],
+        [0.76, 0.77, -0.55, [true, true, true]],
+      ]
+      return trigrams.some(([cx, cy, angle, broken]) => koreanTrigram(x, y, cx, cy, angle, broken)) ? 'black' : 'white'
     }
   }
 }
