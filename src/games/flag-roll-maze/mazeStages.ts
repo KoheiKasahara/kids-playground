@@ -644,7 +644,9 @@ const ATHLETIC_STAGE_CHECKPOINT_CELLS: readonly (CellCoordinate & {
 
 /** 高台と地面で真上に重ならない寄り道へ、3つの星を置く。 */
 const ATHLETIC_STAGE_STAR_CELLS: readonly (CellCoordinate & { y?: number })[] = [
-  { column: 3.2, row: 6.6, y: 3.0 },
+  // テラスの左寄り。漏斗(athletic-funnel-left)は行6.5から始まるので、
+  // それより手前へ置かないと星がガードの内側へ埋まって見えなくなる。
+  { column: 3.2, row: 6.0, y: 3.0 },
   { column: 3.0, row: 13.7, y: 0 },
   { column: 8.6, row: 22.7, y: 0 },
 ]

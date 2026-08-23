@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { BALL_RADIUS, GOAL_RADIUS } from './mazePhysics'
+import {
+  BALL_RADIUS,
+  GOAL_RADIUS,
+  STAR_HOVER_Y,
+  STAR_VISUAL_RADIUS,
+} from './mazePhysics'
 import { CELL_SIZE, cellToWorld } from './mazeGrid'
 import { findMazePath, type MazeStage } from './mazeStage'
 import { createMazeStageById, MAZE_STAGE_ROWS, MAZE_STAGES } from './mazeStages'
@@ -123,6 +128,34 @@ for (const definition of MAZE_STAGES) {
   describe(`${definition.id}の配置安全性`, () => {
     const stage = createMazeStageById(definition.id)
     const rows = definition.rows
+
+    it('星が地形の中へ埋まらず、浮いている姿が見える', () => {
+      // 星は当たり判定を持たない見た目だけの収集物なので、地形の内側に置いても
+      // エラーにならずに「見えない・取りに行けない星」になってしまう。
+      // 実際にアスレチックの1個目が漏斗のガードへ丸ごと埋まっていたため、
+      // 全ステージ共通の配置ゲートとして固定する。
+      for (const star of stage.stars) {
+        const center = {
+          x: star.center.x,
+          y: (star.center.y ?? 0) + STAR_HOVER_Y,
+          z: star.center.z,
+        }
+        for (const box of stage.terrain.boxes) {
+          // 斜面は傾いた箱なので軸平行の比較では判定できない。すべり台の上に星は置かない方針。
+          if (box.rotationX !== 0) continue
+          const insideX =
+            Math.abs(center.x - box.x) < box.width / 2 + STAR_VISUAL_RADIUS
+          const insideY =
+            Math.abs(center.y - box.y) < box.height / 2 + STAR_VISUAL_RADIUS
+          const insideZ =
+            Math.abs(center.z - box.z) < box.depth / 2 + STAR_VISUAL_RADIUS
+          expect(
+            insideX && insideY && insideZ,
+            `${star.id} が地形 ${box.id} の中に埋まっている`,
+          ).toBe(false)
+        }
+      }
+    })
 
     it('回転棒の掃引円が壁マスへ食い込まない', () => {
       for (const spinner of stage.gimmicks.spinners) {
