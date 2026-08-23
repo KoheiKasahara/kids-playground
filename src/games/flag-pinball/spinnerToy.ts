@@ -1,10 +1,8 @@
-import * as Matter from 'matter-js'
 import { BALL_RADIUS } from './boardLayout'
 import { MAX_ANGULAR_VELOCITY, MAX_SPEED, OBSTACLE_FRICTION, STEP_MS } from './pinballPhysics'
+import { createSpinnerCore } from '../shared/toys/spinnerCore'
 import type { ToyRuntime, ToyVisualState } from './toyRuntime'
 import type { ToyPlacement } from './toyLayout'
-
-const { Body, Bodies } = Matter
 
 /** 1回のタップで回転を発動する時間を、ボールがあとから当たる余裕を持てる長さにする。 */
 export const SPINNER_ACTIVE_DURATION_MS = 2600
@@ -30,19 +28,8 @@ const SPINNER_NUDGE_COOLDOWN_MS = 200
 const PASSIVE_SPIN_DURATION_MS = 420
 /** 非回転時の角速度を十分小さくし、接触したボールを弾き飛ばさないようにする。 */
 const PASSIVE_SPIN_MAX_ANGULAR_VELOCITY = 0.022
-/**
- * 羽根を細くして十字の隙間を残し、直径48pxのボールが周囲へ抜けられるようにする。
- * 長さ（= placement.radius * 2）と同じ比率（元の13/74 ≒ 17.57%）を保って太さも一緒に
- * 大きくし、「長いだけで細い羽根」にならないようにする。
- */
+/** 羽根を細くして十字の隙間を残し、直径48pxのボールが周囲へ抜けられるようにする。 */
 const BLADE_THICKNESS = 15.6
-/**
- * 角を丸めて接触時の急な引っ掛かりを減らす。厚さの半分に固定し、羽根の短辺（先端・両端）を
- * 完全な半円にする。半分未満だと先端に平らな帯が残り、無回転時（一度もタップされていない間）
- * にボールがその上でちょうど静止してしまう罠になる（1.2倍化でこの帯が広がり、実際にスタック
- * する試行が発生したため、平らな帯そのものをなくす形で対処した）。
- */
-const BLADE_CHAMFER_RADIUS = BLADE_THICKNESS / 2
 /** 既存の障害物・得点ゾーン・ball-N と衝突せず、盤面側の特殊処理を発火させない名前にする。 */
 const SPINNER_BODY_LABEL = 'toy-spinner-blade'
 
@@ -50,67 +37,26 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
-function speedOf(body: Matter.Body): number {
+function speedOf(body: { velocity: { x: number; y: number } }): number {
   return Math.hypot(body.velocity.x, body.velocity.y)
 }
 
-function setCappedVelocity(body: Matter.Body): void {
-  const speed = speedOf(body)
-  if (speed <= SPINNER_BALL_SPEED_CAP) return
-
-  const factor = SPINNER_BALL_SPEED_CAP / speed
-  Body.setVelocity(body, {
-    x: body.velocity.x * factor,
-    y: body.velocity.y * factor,
-  })
-}
-
-function createSpinnerBody(placement: ToyPlacement): Matter.Body {
-  const bladeLength = placement.radius * 2
-  const bladeOptions = {
-    chamfer: { radius: BLADE_CHAMFER_RADIUS },
-    friction: OBSTACLE_FRICTION,
-    label: SPINNER_BODY_LABEL,
-    restitution: 0.55,
-  }
-  const horizontalBlade = Bodies.rectangle(
-    placement.x,
-    placement.y,
-    bladeLength,
-    BLADE_THICKNESS,
-    bladeOptions,
-  )
-  const verticalBlade = Bodies.rectangle(
-    placement.x,
-    placement.y,
-    BLADE_THICKNESS,
-    bladeLength,
-    bladeOptions,
-  )
-  const body = Body.create({
-    isStatic: true,
-    label: SPINNER_BODY_LABEL,
-    parts: [horizontalBlade, verticalBlade],
-  })
-
-  // Body.create({ isStatic: true }) はデフォルトの摩擦・反発を上書きするため、
-  // 盤上の障害物と同じ軽い摩擦へ戻し、羽根の角速度が接線速度として伝わるようにする。
-  for (const part of body.parts) {
-    part.friction = OBSTACLE_FRICTION
-    part.frictionStatic = OBSTACLE_FRICTION
-    part.restitution = 0.55
-    part.label = SPINNER_BODY_LABEL
-  }
-  body.friction = OBSTACLE_FRICTION
-  body.frictionStatic = OBSTACLE_FRICTION
-  body.restitution = 0.55
-
-  return body
-}
-
 export function createSpinnerToy(placement: ToyPlacement): ToyRuntime {
-  const spinnerBody = createSpinnerBody(placement)
-  const influenceRadius = placement.radius + BALL_RADIUS + SPINNER_INFLUENCE_MARGIN
+  const spinnerCore = createSpinnerCore({
+    x: placement.x,
+    y: placement.y,
+    radius: placement.radius,
+    bladeThickness: BLADE_THICKNESS,
+    friction: OBSTACLE_FRICTION,
+    restitution: 0.55,
+    label: SPINNER_BODY_LABEL,
+    ballSpeedCap: SPINNER_BALL_SPEED_CAP,
+    influenceMargin: SPINNER_INFLUENCE_MARGIN,
+    ballRadius: BALL_RADIUS,
+    stepMs: STEP_MS,
+  })
+  const insideBallIndices = new Set<number>()
+  const lastNudgeAt = new Map<number, number>()
   let activeUntil: number | null = null
   let passiveUntil: number | null = null
   let passiveStartedAt: number | null = null
@@ -118,10 +64,8 @@ export function createSpinnerToy(placement: ToyPlacement): ToyRuntime {
   let lastUpdateAt: number | null = null
   let lastPulseAt: number | null = null
   let passiveRotationVelocity = 0
-  const insideBallIndices = new Set<number>()
-  const lastNudgeAt = new Map<number, number>()
   const visual: ToyVisualState = {
-    spinRad: spinnerBody.angle,
+    spinRad: spinnerCore.angle,
     pulse: 0,
     active: false,
     scale: 1,
@@ -129,7 +73,7 @@ export function createSpinnerToy(placement: ToyPlacement): ToyRuntime {
 
   return {
     placement,
-    bodies: [spinnerBody],
+    bodies: [spinnerCore.body],
     activate(now) {
       // 現在時刻からの効果時間を上限にするため、連打しても発動時間や角速度が無制限に積み上がらない。
       activeUntil = Math.max(activeUntil ?? -Infinity, now + SPINNER_ACTIVE_DURATION_MS)
@@ -144,9 +88,7 @@ export function createSpinnerToy(placement: ToyPlacement): ToyRuntime {
       lastUpdateAt = now
 
       const isActive = activeUntil !== null && now < activeUntil
-      if (!isActive && activeUntil !== null) {
-        activeUntil = null
-      }
+      if (!isActive && activeUntil !== null) activeUntil = null
 
       const currentInsideBallIndices = new Set<number>()
       for (const ball of balls) {
@@ -154,14 +96,11 @@ export function createSpinnerToy(placement: ToyPlacement): ToyRuntime {
           ball.body.position.x - placement.x,
           ball.body.position.y - placement.y,
         )
-        if (distance > influenceRadius) continue
+        if (distance > spinnerCore.influenceRadius) continue
 
         currentInsideBallIndices.add(ball.ballIndex)
         // 新しく触れた瞬間だけでなく、止まりかけたボールが乗ったままでも毎フレーム
-        // 発火させる。そうしないと「乗ったまま静止」を一度も抜け出せず、羽根が
-        // 完全に止まったまま止まったボールを支え続けてしまう（1.2倍化で発覚した罠）。
-        // 触れ続けている間はpassiveStartedAtを毎回nowへ揃えるため減衰が進まず、
-        // 離れた瞬間から通常どおりPASSIVE_SPIN_DURATION_MSぶん減衰する。
+        // 発火させる。そうしないと「乗ったまま静止」を抜け出せない。
         const isNewContact = !insideBallIndices.has(ball.ballIndex)
         const isStalledContact = speedOf(ball.body) < SPINNER_STALL_SPEED_THRESHOLD
         if (!isActive && (isNewContact || isStalledContact)) {
@@ -174,8 +113,7 @@ export function createSpinnerToy(placement: ToyPlacement): ToyRuntime {
       for (const ballIndex of currentInsideBallIndices) insideBallIndices.add(ballIndex)
 
       if (isActive && activeUntil !== null) {
-        // 残り時間だけで角速度を決めるので、再タップは必ず角速度を上限へ戻し、
-        // 決して減速させない。
+        // 残り時間だけで角速度を決めるので、再タップは必ず角速度を上限へ戻し、決して減速させない。
         const remaining = activeUntil - now
         rotationVelocity =
           SPINNER_MAX_ANGULAR_VELOCITY * clamp(remaining / SPINNER_SPIN_DOWN_MS, 0, 1)
@@ -192,49 +130,32 @@ export function createSpinnerToy(placement: ToyPlacement): ToyRuntime {
         passiveStartedAt = null
       }
 
-      if (rotationVelocity !== 0 && dt !== 0) {
-        const nextAngle = spinnerBody.angle + rotationVelocity * (dt / STEP_MS)
-        Body.setAngle(spinnerBody, nextAngle)
-      }
-      // 静的BodyはEngine.updateの積分対象外だが、衝突計算はanglePrevとの差を速度として使う。
-      Body.setAngularVelocity(spinnerBody, rotationVelocity)
+      spinnerCore.advance(dt, rotationVelocity)
 
       for (const ball of balls) {
         const distance = Math.hypot(
           ball.body.position.x - placement.x,
           ball.body.position.y - placement.y,
         )
-        if (distance > influenceRadius) continue
+        if (distance > spinnerCore.influenceRadius) continue
 
-        if (rotationVelocity !== 0) {
-          setCappedVelocity(ball.body)
-        }
+        if (rotationVelocity !== 0) spinnerCore.capBallSpeed(ball.body)
         if (!isActive || speedOf(ball.body) >= SPINNER_STALL_SPEED_THRESHOLD) continue
 
         const lastNudge = lastNudgeAt.get(ball.ballIndex) ?? -Infinity
         if (now - lastNudge < SPINNER_NUDGE_COOLDOWN_MS) continue
-
-        const offsetX = ball.body.position.x - placement.x
-        const offsetY = ball.body.position.y - placement.y
-        const distanceForTangent = Math.hypot(offsetX, offsetY)
-        const tangent =
-          distanceForTangent < 0.001
-            ? { x: 1, y: 0 }
-            : { x: -offsetY / distanceForTangent, y: offsetX / distanceForTangent }
-        Body.setVelocity(ball.body, {
-          x: tangent.x * SPINNER_NUDGE_SPEED,
-          y: tangent.y * SPINNER_NUDGE_SPEED,
-        })
-        lastNudgeAt.set(ball.ballIndex, now)
+        if (spinnerCore.nudgeIfStalled(ball.body, SPINNER_STALL_SPEED_THRESHOLD, SPINNER_NUDGE_SPEED)) {
+          lastNudgeAt.set(ball.ballIndex, now)
+        }
       }
 
       const pulseElapsed = lastPulseAt === null ? PULSE_DURATION_MS : Math.max(0, now - lastPulseAt)
       visual.pulse = 1 - clamp(pulseElapsed / PULSE_DURATION_MS, 0, 1)
       visual.active = isActive
-      visual.spinRad = spinnerBody.angle
+      visual.spinRad = spinnerCore.angle
     },
     readVisualState() {
-      visual.spinRad = spinnerBody.angle
+      visual.spinRad = spinnerCore.angle
       return visual
     },
   }

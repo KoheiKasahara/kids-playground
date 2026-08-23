@@ -69,6 +69,8 @@ export type AdventureEngineHandle = {
   registerBallVisual: (el: HTMLElement | null) => void
   /** 全エリアを含むworldのDOM要素を登録するrefコールバック。カメラtransformを直接書き込む。 */
   registerWorld: (el: HTMLElement | null) => void
+  /** Toyの見た目を登録し、spinnerの回転transformを物理フレームごとに直接書き込む。 */
+  registerToy: (key: string, el: HTMLElement | null) => void
 }
 
 type ExitEntry = { areaId: string; exit: AreaExit }
@@ -85,6 +87,10 @@ function worldPoint(areaId: string, x: number, y: number) {
   const area = findArea(areaId)
   if (!area) throw new Error(`flag-roll-adventure: 不明なエリアidです: ${areaId}`)
   return { x: area.origin.x + x, y: area.origin.y + y }
+}
+
+function toyElementKey(areaId: string, toyId: string): string {
+  return `${areaId}:${toyId}`
 }
 
 function clampLinearVelocity(velocity: LinearVelocity): LinearVelocity {
@@ -112,6 +118,7 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
   const ballElementRef = useRef<HTMLElement | null>(null)
   const ballVisualElementRef = useRef<HTMLElement | null>(null)
   const worldElementRef = useRef<HTMLElement | null>(null)
+  const toyElementsRef = useRef<Map<string, HTMLElement | null>>(new Map())
 
   const handle = useMemo<AdventureEngineHandle>(
     () => ({
@@ -123,6 +130,10 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
       },
       registerWorld: (el) => {
         worldElementRef.current = el
+      },
+      registerToy: (key, el) => {
+        if (el) toyElementsRef.current.set(key, el)
+        else toyElementsRef.current.delete(key)
       },
     }),
     [],
@@ -149,6 +160,8 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
       exitByLabel,
       cupByLabel,
       zoneByLabel,
+      toyRuntimes,
+      toyByLabel,
     } = createAdventureWorld(Math.random)
     const zoneWorldGeometry = [...zoneByLabel.values()].map((entry) => ({
       zone: entry.zone,
@@ -164,6 +177,7 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
     let motion: 'running' | 'exiting' | 'moving' | 'cannon' | 'cup-in' | 'goal' = 'running'
     let currentCamera = cameraPositionForArea(START_AREA_ID)
     let areaEnteredAt = performance.now()
+    let physicsTime = areaEnteredAt
     let stallSince: number | null = null
     let exitLatched = false
     let exitTransition: {
@@ -214,6 +228,24 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
       element.classList.remove(stageStyles.ballSwallow, stageStyles.ballEmerge)
       if (kind === 'swallow') element.classList.add(stageStyles.ballSwallow)
       if (kind === 'emerge') element.classList.add(stageStyles.ballEmerge)
+    }
+
+    function writeAdventureToyVisuals() {
+      for (const runtime of toyRuntimes) {
+        if (runtime.toy.kind !== 'spinner') continue
+        const element = toyElementsRef.current.get(toyElementKey(runtime.areaId, runtime.toy.id))
+        if (!element) continue
+        element.style.transform = `rotate(${runtime.readVisual().spinRad}rad)`
+      }
+    }
+
+    function updateAdventureToys(now: number) {
+      for (const runtime of toyRuntimes) {
+        const ballForToy = motion === 'running' && runtime.areaId === currentAreaId ? ballBody : null
+        const event = runtime.update(now, ballForToy)
+        if (event) optionsRef.current.onGimmick?.({ kind: event.kind, id: event.id })
+      }
+      writeAdventureToyVisuals()
     }
 
     function updateZoneEffects() {
@@ -441,6 +473,11 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
         if (!ballIsA && !ballIsB) continue
         const other = ballIsA ? pair.bodyB : pair.bodyA
 
+        const toy = toyByLabel.get(other.label)
+        if (toy?.toy.kind === 'spinner') {
+          optionsRef.current.onGimmick?.({ kind: 'spinner-hit', id: toy.toy.id })
+        }
+
         const exit = exitByLabel.get(other.label)
         if (exit) {
           handleExit(exit, now)
@@ -649,6 +686,8 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
 
       let substeps = 0
       while ((motion === 'running' || motion === 'cup-in') && accumulator >= STEP_MS && substeps < MAX_SUBSTEPS) {
+        physicsTime += STEP_MS
+        updateAdventureToys(physicsTime)
         Engine.update(engine, STEP_MS)
         accumulator -= STEP_MS
         substeps += 1
@@ -678,6 +717,7 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
     setBallVisualMotion('normal')
     writeCamera(currentCamera)
     writeBall()
+    writeAdventureToyVisuals()
     optionsRef.current.onBallLaunched?.()
     rafId = requestAnimationFrame(tick)
 

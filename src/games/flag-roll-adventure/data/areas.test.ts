@@ -13,12 +13,21 @@ import {
   EXIT_WIDTH,
   MAX_SPEED,
   PORTAL_FLOOR_HEIGHT,
+  SPINNER_BLADE_THICKNESS,
 } from '../adventurePhysics'
 import { areaGroundRects, cupBottomRect, cupFrontLipRect, cupSensorRect, cupWellRect, worldSize } from '../adventureGeometry'
 import { AREAS, findArea, START_AREA_ID } from './areas'
+import type { AreaToy } from '../types'
 
-function objectExtents(object: (typeof AREAS)[number]['objects'][number]) {
+type AreaObstacle = (typeof AREAS)[number]['objects'][number] | AreaToy
+
+function objectExtents(object: AreaObstacle) {
   if (object.kind === 'pin') return { x: object.radius, y: object.radius }
+  if (object.kind === 'spinner') {
+    const outerRadius = object.radius + SPINNER_BLADE_THICKNESS / 2
+    return { x: outerRadius, y: outerRadius }
+  }
+  if (object.kind === 'lifter') return { x: object.radius, y: object.radius }
   const halfWidth = object.width / 2
   const halfHeight = object.height / 2
   const cosine = Math.abs(Math.cos(object.angle))
@@ -27,6 +36,46 @@ function objectExtents(object: (typeof AREAS)[number]['objects'][number]) {
     x: cosine * halfWidth + sine * halfHeight,
     y: sine * halfWidth + cosine * halfHeight,
   }
+}
+
+function circleRadius(object: AreaObstacle): number | null {
+  if (object.kind === 'pin' || object.kind === 'lifter') return object.radius
+  if (object.kind === 'spinner') return object.radius + SPINNER_BLADE_THICKNESS / 2
+  return null
+}
+
+function pointToObbDistance(pointX: number, pointY: number, wall: AreaObstacle): number {
+  if (wall.kind === 'pin' || wall.kind === 'lifter' || wall.kind === 'spinner') return Number.POSITIVE_INFINITY
+  const cosine = Math.cos(wall.angle)
+  const sine = Math.sin(wall.angle)
+  const deltaX = pointX - wall.x
+  const deltaY = pointY - wall.y
+  const localX = cosine * deltaX + sine * deltaY
+  const localY = -sine * deltaX + cosine * deltaY
+  const nearestX = Math.max(-wall.width / 2, Math.min(wall.width / 2, localX))
+  const nearestY = Math.max(-wall.height / 2, Math.min(wall.height / 2, localY))
+  return Math.hypot(localX - nearestX, localY - nearestY)
+}
+
+/** 円と回転矩形は点からOBBまでの厳密距離、矩形どうしだけは既存のAABB近似を使う。 */
+function obstacleClearance(first: AreaObstacle, second: AreaObstacle): number {
+  const firstRadius = circleRadius(first)
+  const secondRadius = circleRadius(second)
+  if (firstRadius !== null && secondRadius !== null) {
+    return Math.hypot(first.x - second.x, first.y - second.y) - firstRadius - secondRadius
+  }
+  if (firstRadius !== null) return pointToObbDistance(first.x, first.y, second) - firstRadius
+  if (secondRadius !== null) return pointToObbDistance(second.x, second.y, first) - secondRadius
+
+  const firstExtents = objectExtents(first)
+  const secondExtents = objectExtents(second)
+  const gapX = Math.max(0, Math.abs(first.x - second.x) - firstExtents.x - secondExtents.x)
+  const gapY = Math.max(0, Math.abs(first.y - second.y) - firstExtents.y - secondExtents.y)
+  return Math.hypot(gapX, gapY)
+}
+
+function areaObstacles(area: (typeof AREAS)[number]): readonly AreaObstacle[] {
+  return [...area.objects, ...(area.toys ?? [])]
 }
 
 function segmentIntersectsRect(
@@ -286,20 +335,14 @@ describe('area data', () => {
     expect(settledBallTop).toBeGreaterThanOrEqual(front.top)
     expect(CUP_FRONT_LIP_TOP_OFFSET).toBeGreaterThanOrEqual(CUP_SENSOR_INSET)
 
-    const lowerLeft = cupArea.objects.find((object) => object.id === 'goal-funnel-lower-left')
-    const lowerRight = cupArea.objects.find((object) => object.id === 'goal-funnel-lower-right')
-    expect(lowerLeft?.kind).toBe('wall')
-    expect(lowerRight?.kind).toBe('wall')
-    if (!lowerLeft || !lowerRight || lowerLeft.kind !== 'wall' || lowerRight.kind !== 'wall') return
-    const lowerLeftInnerEdge = lowerLeft.x + objectExtents(lowerLeft).x
-    const lowerRightInnerEdge = lowerRight.x - objectExtents(lowerRight).x
-    expect(cup.x - CUP_INNER_WIDTH / 2).toBeGreaterThanOrEqual(lowerLeftInnerEdge)
-    expect(cup.x + CUP_INNER_WIDTH / 2).toBeLessThanOrEqual(lowerRightInnerEdge)
+    // 下段ファネルは床スロープとのポケットを作るため撤去し、下段ピン列でカップへ導く。
+    expect(cupArea.objects.some((object) => object.id === 'goal-funnel-lower-left')).toBe(false)
+    expect(cupArea.objects.some((object) => object.id === 'goal-funnel-lower-right')).toBe(false)
   })
 
   it('全オブジェクトが回転後もエリア矩形の中に収まる', () => {
     for (const area of AREAS) {
-      for (const object of area.objects) {
+      for (const object of areaObstacles(area)) {
         const extents = objectExtents(object)
         expect(object.x - extents.x).toBeGreaterThanOrEqual(0)
         expect(object.x + extents.x).toBeLessThanOrEqual(AREA_WIDTH)
@@ -311,10 +354,8 @@ describe('area data', () => {
 
   it('各エリアの上端AREA_ENTRY_CLEARANCEには障害物を置かない', () => {
     for (const area of AREAS) {
-      for (const object of area.objects) {
-        const minY = object.kind === 'pin'
-          ? object.y - object.radius
-          : object.y - objectExtents(object).y
+      for (const object of areaObstacles(area)) {
+        const minY = object.y - objectExtents(object).y
         expect(minY).toBeGreaterThanOrEqual(AREA_ENTRY_CLEARANCE)
       }
     }
@@ -395,25 +436,34 @@ describe('area data', () => {
 
   it('障害物どうしはボール直径＋16px以上の最小余白を持つ', () => {
     const requiredClearance = BALL_RADIUS * 2 + 16
+    const violations: string[] = []
     for (const area of AREAS) {
-      for (let firstIndex = 0; firstIndex < area.objects.length; firstIndex += 1) {
-        const first = area.objects[firstIndex]
+      const obstacles = areaObstacles(area)
+      for (let firstIndex = 0; firstIndex < obstacles.length; firstIndex += 1) {
+        const first = obstacles[firstIndex]
         if (!first) continue
-        for (let secondIndex = firstIndex + 1; secondIndex < area.objects.length; secondIndex += 1) {
-          const second = area.objects[secondIndex]
+        for (let secondIndex = firstIndex + 1; secondIndex < obstacles.length; secondIndex += 1) {
+          const second = obstacles[secondIndex]
           if (!second) continue
-          const firstExtents = objectExtents(first)
-          const secondExtents = objectExtents(second)
+          if (first.kind === 'pin' && second.kind === 'pin') {
+            // 円どうしは中心距離−半径和が厳密な最小すき間で、斜めのAABBより過剰に厳しくならない。
+            const surfaceClearance = Math.hypot(first.x - second.x, first.y - second.y) - first.radius - second.radius
+            if (surfaceClearance < requiredClearance) {
+              violations.push(`${area.id}:${first.id}/${second.id} clearance=${surfaceClearance}`)
+            }
+            continue
+          }
           // 壁は長い矩形なので、円形の外接半径だけで判定すると、上下に離れた
           // 斜面まで「重なった」と誤判定する。回転後のAABB間隔を使い、
           // ボール直径＋16pxの通路が実際に残ることを保守的に確認する。
-          const gapX = Math.max(0, Math.abs(first.x - second.x) - firstExtents.x - secondExtents.x)
-          const gapY = Math.max(0, Math.abs(first.y - second.y) - firstExtents.y - secondExtents.y)
-          const surfaceClearance = Math.hypot(gapX, gapY)
-          expect(surfaceClearance, `${area.id}:${first.id}/${second.id}`).toBeGreaterThanOrEqual(requiredClearance)
+          const surfaceClearance = obstacleClearance(first, second)
+          if (surfaceClearance < requiredClearance) {
+            violations.push(`${area.id}:${first.id}/${second.id} clearance=${surfaceClearance}`)
+          }
         }
       }
     }
+    expect(violations).toEqual([])
   })
 
   it('cave cannon launches upward', () => {

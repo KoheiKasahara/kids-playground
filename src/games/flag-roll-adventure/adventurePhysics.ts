@@ -142,7 +142,7 @@ export const CAVE_ROCK_MIDDLE_LEFT_RESTITUTION = 0.55
 /** 洞窟上段の共通導線へ置く大砲の装填室。分岐前の球を確実に受ける。 */
 export const CAVE_CANNON_APPROACH_X = AREA_WIDTH / 2
 export const CAVE_CANNON_APPROACH_Y = 230
-export const CAVE_CANNON_APPROACH_RADIUS = 40
+export const CAVE_CANNON_APPROACH_RADIUS = 56
 /** 上段砲の射出後に戻る帯を受け、次の岩ピンへ渡す着地ピン。 */
 export const CAVE_CANNON_LANDING_X = 150
 export const CAVE_CANNON_LANDING_Y = 265
@@ -256,6 +256,34 @@ export const MAX_SPEED = 14
 /** 国旗の模様が読めなくなるほど回転しないための角速度上限(rad/step)。 */
 export const MAX_ANGULAR_VELOCITY = 0.22
 
+/** 冒険側の羽根をピンより少し太くし、触れたことが見た目にも分かるサイズにする(px)。 */
+export const SPINNER_BLADE_THICKNESS = 16
+/** MAX_SPEEDの約8割に抑え、回転Toyでボールをコース外へ飛ばしにくくする(px/step)。 */
+export const SPINNER_BALL_SPEED_CAP = 11
+/** 羽根の反発を壁より強め、回転方向への接線速度を感じやすくする。 */
+export const SPINNER_RESTITUTION = 0.6
+/** ピンボール側と同じ停滞判定にし、止まりかけた球だけを軽く動かす(px/step)。 */
+export const SPINNER_STALL_SPEED = 0.35
+/** 次の接触を生むための小さな一押しに留め、瞬間的なワープに見せない(px/step)。 */
+export const SPINNER_NUDGE_SPEED = 2.4
+/** 同じボールを連続して押さず、回転Toyの周囲で速度が積み上がるのを防ぐ(ms)。 */
+export const SPINNER_NUDGE_COOLDOWN_MS = 200
+
+/** ピンボール側より少し長い待ち時間にし、同じ場所での無限バウンドを防ぐ(ms)。 */
+export const LIFTER_COOLDOWN_MS = 900
+/** 上向き速度の直接設定に加える反発を控えめにし、落下コースへ戻しやすくする。 */
+export const LIFTER_RESTITUTION = 0.5
+/** 横方向の散らしを強くしすぎず、エリアの外壁へ届く前に次の接触を作る上限(px/step)。 */
+export const LIFTER_MAX_HORIZONTAL_SPEED = 5.5
+/** 真上へ固定せず左右どちらかへ見える最小の散らし(px/step)。 */
+export const LIFTER_RANDOM_HORIZONTAL_MIN = 1.6
+/** シード差による変化を残しつつ、横移動が主役になりすぎない最大の散らし(px/step)。 */
+export const LIFTER_RANDOM_HORIZONTAL_MAX = 3.4
+/** 直前の横速度を少しだけ残し、接触前の流れを完全には消さない割合。 */
+export const LIFTER_HORIZONTAL_RETENTION = 0.3
+/** MAX_SPEEDより少し下にし、打ち上げ直後の速度が過大にならないようにする(px/step)。 */
+export const LIFTER_SPEED_CAP = 12
+
 /** 大砲へ入ったボールを子どもが見てから射出できる中間の溜め時間(ms)。 */
 export const CANNON_HOLD_MS = 520
 /** 大砲は重力から離れた動きを見せつつ、速度上限まで余裕を残す初期値(px/step)。 */
@@ -265,7 +293,7 @@ export const CAVE_CANNON_POWER = 8
 /** 大砲の捕獲円。砲身の見た目と入口の狙いやすさを両立する半径(px)。 */
 export const CANNON_SENSOR_RADIUS = 30
 /** 射出直後に捕獲センサーへ戻らないよう、センサー半径より外へ出す距離(px)。 */
-export const CANNON_MUZZLE_OFFSET = 42
+export const CANNON_MUZZLE_OFFSET = 64
 /** 射出直後の同じ大砲への再捕獲を防ぐ待ち時間(ms)。 */
 export const CANNON_RECAPTURE_COOLDOWN_MS = 700
 /** ジャンプ台は大砲より低く跳ね、コースの流れを読みやすく保つ初期値(px/step)。 */

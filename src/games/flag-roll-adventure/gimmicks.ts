@@ -34,7 +34,7 @@ export type ZoneEffectResult = {
 }
 
 export type AdventureGimmickEvent = {
-  kind: 'cannon-capture' | 'cannon-fire' | 'jump' | 'boost'
+  kind: 'cannon-capture' | 'cannon-fire' | 'jump' | 'boost' | 'spinner-hit' | 'lifter-fire'
   id: string
 }
 

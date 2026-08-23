@@ -52,6 +52,10 @@ function gimmickElementKey(kind: string, id: string): string {
   return `${kind}:${id}`
 }
 
+function toyElementKey(areaId: string, toyId: string): string {
+  return `${areaId}:${toyId}`
+}
+
 function gimmickClassName(event: AdventureGimmickEvent): string {
   switch (event.kind) {
     case 'cannon-capture':
@@ -62,6 +66,10 @@ function gimmickClassName(event: AdventureGimmickEvent): string {
       return styles.jumpHit
     case 'boost':
       return styles.boostActive
+    case 'spinner-hit':
+      return styles.spinnerHit
+    case 'lifter-fire':
+      return styles.lifterFired
   }
 }
 
@@ -118,7 +126,7 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
     pinTimeoutsRef.current.set(pinId, timeoutId)
   }, [])
 
-  const { registerBall, registerBallVisual, registerWorld } = useAdventureEngine({
+  const { registerBall, registerBallVisual, registerWorld, registerToy } = useAdventureEngine({
     runId,
     onAreaEnter,
     onGoal,
@@ -134,6 +142,8 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
       if (event.kind === 'cannon-fire') playPinballLauncherSound()
       if (event.kind === 'jump') playPinballBumperSound()
       if (event.kind === 'boost') playPinballSpinnerSound()
+      if (event.kind === 'spinner-hit') playPinballSpinnerSound()
+      if (event.kind === 'lifter-fire') playPinballBumperSound()
     },
   })
 
@@ -220,6 +230,56 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
                         }}
                       >
                         <span className={styles.floatDots}>· · ·</span>
+                      </div>
+                    )
+                  })}
+
+                  {(area.toys ?? []).map((toy) => {
+                    const key = toyElementKey(area.id, toy.id)
+                    const gimmickKey = gimmickElementKey(toy.kind, toy.id)
+                    if (toy.kind === 'spinner') {
+                      return (
+                        <div
+                          key={toy.id}
+                          ref={(element) => {
+                            gimmickElementsRef.current.set(gimmickKey, element)
+                            // 既存の画面テストではToy未対応のHookモックも使うため、登録関数がない場合は描画だけ続ける。
+                            registerToy?.(key, element)
+                          }}
+                          className={[styles.toy, styles.toySpinner].join(' ')}
+                          data-toy-id={toy.id}
+                          data-toy-kind={toy.kind}
+                          style={{
+                            left: toy.x - toy.radius,
+                            top: toy.y - toy.radius,
+                            width: toy.radius * 2,
+                            height: toy.radius * 2,
+                          }}
+                        >
+                          <span className={styles.spinnerBlade} />
+                          <span className={styles.spinnerHub} />
+                        </div>
+                      )
+                    }
+                    return (
+                      <div
+                        key={toy.id}
+                        ref={(element) => {
+                          gimmickElementsRef.current.set(gimmickKey, element)
+                        }}
+                        className={[styles.toy, styles.toyLifter].join(' ')}
+                        data-toy-id={toy.id}
+                        data-toy-kind={toy.kind}
+                        style={{
+                          left: toy.x - toy.radius,
+                          top: toy.y - toy.radius,
+                          width: toy.radius * 2,
+                          height: toy.radius * 2,
+                        }}
+                      >
+                        <span className={styles.lifterIcon} aria-hidden="true">
+                          {area.theme === 'forest' ? '🍄' : area.theme === 'river' ? '💦' : '☁️'}
+                        </span>
                       </div>
                     )
                   })}
