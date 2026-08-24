@@ -52,6 +52,8 @@ export const goalArea: AdventureArea = {
   id: 'goal',
   nameJa: 'ゴール',
   theme: 'goal',
+  // カップ付近を通り過ぎにくくし、ゴール演出まで自然に減速できる値にする。
+  gravityScale: 0.95,
   origin: { x: AREA_COLUMN_STEP, y: 4 * AREA_HEIGHT },
   entries: [{ id: 'goal-entry', kind: 'pipe', x: AREA_WIDTH / 2, y: ENTRY_Y }],
   objects: gridObjects,

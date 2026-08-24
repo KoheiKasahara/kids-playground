@@ -61,6 +61,8 @@ export const cloudArea: AdventureArea = {
   id: 'cloud',
   nameJa: 'くも',
   theme: 'cloud',
+  // 高反発ピンとリフターへ当たる時間を残すため、強化後の基準値から少しだけ抑える。
+  gravityScale: 0.96,
   origin: { x: AREA_COLUMN_STEP, y: 3 * AREA_HEIGHT },
   entries: [
     {

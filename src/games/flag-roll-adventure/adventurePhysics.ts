@@ -209,9 +209,10 @@ export const STEP_MS = 1000 / 60
 
 /**
  * ピンボールの0.55より弱い重力。
- * ボールを速く落とすよりも、斜面やピンに当たる様子を子どもが見守れる時間を優先する。
+ * 長い縦コースで待ち時間が出ないよう、従来の0.35から少しだけ強める。
+ * エリアごとの細かな違いは AdventureArea.gravityScale で調整する。
  */
-export const GRAVITY = { x: 0, y: 0.35 } as const
+export const GRAVITY = { x: 0, y: 0.39 } as const
 
 /**
  * スタート時の位置と初速の揺らぎ。

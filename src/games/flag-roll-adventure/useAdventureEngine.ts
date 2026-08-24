@@ -30,7 +30,7 @@ import {
   STALL_SPEED_THRESHOLD,
   STEP_MS,
 } from './adventurePhysics'
-import { findArea, pickExitForBallX, resolveExitTarget, START_AREA_ID } from './data/areas'
+import { findArea, gravityYForArea, pickExitForBallX, resolveExitTarget, START_AREA_ID } from './data/areas'
 import { createAdventureWorld, type AdventureZoneEntry } from './adventureWorld'
 import {
   canRecaptureCannon,
@@ -174,6 +174,10 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
     if (ballElement) ballElement.style.visibility = 'visible'
 
     let currentAreaId = START_AREA_ID
+    const applyAreaGravity = (areaId: string) => {
+      engine.gravity.y = gravityYForArea(areaId)
+    }
+    applyAreaGravity(currentAreaId)
     let motion: 'running' | 'exiting' | 'moving' | 'cannon' | 'cup-in' | 'goal' = 'running'
     let currentCamera = cameraPositionForArea(START_AREA_ID)
     let areaEnteredAt = performance.now()
@@ -540,6 +544,7 @@ export function useAdventureEngine(options: AdventureEngineOptions): AdventureEn
         if (activeRunRef.current !== runToken) return
         settleTimeout = null
         currentAreaId = pending.nextAreaId
+        applyAreaGravity(currentAreaId)
         motion = 'running'
         cameraTransition = null
         exitLatched = false
