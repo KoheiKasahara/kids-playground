@@ -1,0 +1,172 @@
+/*
+ * スマホ縦画面を基本にした1画面レイアウト。
+ * 上から ヘッダ / 盤面（残りの高さを全部使う） / ひとこと / パーツ置き場 / 操作ボタン。
+ * 盤面だけが可変で、パーツ置き場とボタンは常に画面内へ残す（盤面を邪魔しないよう、
+ * 盤面自身が useBoardScale で余った領域に収まるまで縮む）。
+ */
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding:
+    calc(var(--space-sm) + var(--safe-top))
+    calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom))
+    calc(var(--space-sm) + var(--safe-left));
+  background-color: var(--color-background);
+  /* 盤面の高さ計算が縦スクロールで狂わないよう、この画面は縦に伸ばさない */
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.header {
+  width: 100%;
+  max-width: var(--content-max-width);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* 終了操作は主操作から離し、誤操作しにくい左上へ置く */
+.quit {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-md);
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-round);
+  color: var(--color-text-muted);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.title {
+  flex: 1;
+  text-align: center;
+  font-size: 19px;
+  /* 折り返して2行になるとヘッダが盤面の高さを削るため、1行に収める */
+  white-space: nowrap;
+}
+
+/*
+ * 盤面と、その操作まわり（ひとこと・パーツ置き場・ボタン）のまとまり。
+ * 縦画面では上下に積む。低い横画面では左右に並べ替えて、盤面の高さを確保する。
+ */
+.body {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: var(--content-max-width);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.side {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.status {
+  min-height: 28px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.status[data-cleared='true'] {
+  color: var(--color-success-dark);
+  font-size: 20px;
+}
+
+.controls {
+  width: 100%;
+  max-width: var(--content-max-width);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+
+.dropButton {
+  flex: 1;
+  max-width: 320px;
+  /* 「ぜんぶ けす」と横に並べても1行に収まるよう、左右の余白を詰める */
+  padding-left: var(--space-md);
+  padding-right: var(--space-md);
+  white-space: nowrap;
+}
+
+/* 補助操作。主操作（ボールをおとす）より小さくして押し間違えを減らす */
+.clearButton {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-md);
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-round);
+  color: var(--color-text-muted);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/*
+ * 指についてくるパーツの分身。ポインタ座標（画面基準）へ置くので position: fixed。
+ * 中の長方形は PartShape が中心からの相対で置くため、この要素自体は大きさを持たない。
+ */
+.dragPreview {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* 低い横画面では、ヘッダと文言を詰めて盤面の高さを確保する */
+@media (max-height: 560px) {
+  .title {
+    font-size: 17px;
+  }
+
+  .status {
+    min-height: 20px;
+    font-size: 14px;
+  }
+}
+
+/*
+ * 低い横画面（スマホを横に持った場合など）。
+ * 縦積みのままだと、パーツ置き場とボタンだけで高さを使い切って盤面がほとんど
+ * 潰れてしまうため、盤面を左・操作まわりを右に並べ替えて高さを盤面へ回す。
+ */
+@media (max-height: 560px) and (orientation: landscape) {
+  .body {
+    flex-direction: row;
+    /* 盤面の計測領域(.fit)へ行の高さをそのまま渡す。center のままだと
+       高さが内容依存になり、盤面が高さを測れずに拡縮できない。 */
+    align-items: stretch;
+    max-width: none;
+    gap: var(--space-md);
+  }
+
+  .side {
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: center;
+    align-self: stretch;
+  }
+
+  .controls {
+    max-width: 340px;
+  }
+}

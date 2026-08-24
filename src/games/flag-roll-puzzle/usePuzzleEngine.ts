@@ -1,0 +1,217 @@
+import { useEffect, useMemo, useRef } from 'react'
+import * as Matter from 'matter-js'
+import {
+  BALL_RADIUS,
+  BALL_START,
+  BOARD_HEIGHT,
+  BOARD_WIDTH,
+  WALL_THICKNESS,
+} from './boardLayout'
+import { cellCenter } from './grid'
+import { isInGoalArea } from './goal'
+import { partDefinition } from './partTypes'
+import type { PlacedPart } from './placement'
+import {
+  BALL_DENSITY,
+  BALL_FRICTION,
+  BALL_FRICTION_AIR,
+  BALL_RESTITUTION,
+  GRAVITY,
+  MAX_ANGULAR_VELOCITY,
+  MAX_FRAME_DELTA_MS,
+  MAX_SPEED,
+  MAX_SUBSTEPS,
+  STEP_MS,
+  WALL_FRICTION,
+  WALL_RESTITUTION,
+} from './puzzlePhysics'
+
+const { Engine, Bodies, Body, Composite } = Matter
+
+const DEG_TO_RAD = Math.PI / 180
+
+export type PuzzleEngineOptions = {
+  /** 盤面に置かれているパーツ。実行開始時のスナップショットから物理Bodyを作る */
+  parts: readonly PlacedPart[]
+  /** 実行中か。false のあいだボールは開始位置で静止し、物理世界は作らない */
+  running: boolean
+  /** 「ボールをおとす」ごとに増える世代。値が変わったら世界を作り直す */
+  runId: number
+  /** ボールがゴール領域へ入ったとき（1回の実行につき最大1度だけ呼ぶ） */
+  onGoal: () => void
+}
+
+export type PuzzleEngineHandle = {
+  /** 国旗ボールのDOM要素を登録する ref コールバック（参照は安定している） */
+  registerBall: (el: HTMLElement | null) => void
+}
+
+/** 盤面の外周壁（左・右・床）。盤面の外側に置き、見た目には出さない */
+function wallBodies(): Matter.Body[] {
+  const half = WALL_THICKNESS / 2
+  const options = {
+    isStatic: true,
+    restitution: WALL_RESTITUTION,
+    friction: WALL_FRICTION,
+    label: 'wall',
+  }
+  return [
+    Bodies.rectangle(-half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
+    Bodies.rectangle(BOARD_WIDTH + half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
+    Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + half, BOARD_WIDTH + WALL_THICKNESS * 2, WALL_THICKNESS, options),
+  ]
+}
+
+/**
+ * 置かれたパーツ1つぶんの静的Body。パーツ定義のセグメントをそのまま長方形にする。
+ * ここにパーツ種類ごとの分岐がないため、新しいパーツはpartTypes.tsへ定義を足すだけで動く。
+ */
+function partBodies(part: PlacedPart): Matter.Body[] {
+  const definition = partDefinition(part.typeId)
+  const center = cellCenter(part.cell)
+  return definition.segments.map((segment, index) =>
+    Bodies.rectangle(
+      center.x + segment.offsetX,
+      center.y + segment.offsetY,
+      segment.width,
+      segment.height,
+      {
+        isStatic: true,
+        angle: segment.angleDeg * DEG_TO_RAD,
+        restitution: definition.restitution,
+        friction: definition.friction,
+        label: `${part.id}-${index}`,
+      },
+    ),
+  )
+}
+
+/**
+ * matter-js の Engine だけをヘッドレスで動かす（Matter.Render は使わない）。
+ * 描画は毎フレーム、国旗ボールのDOM要素へ直接 transform を書き込む方式にして、
+ * Reactの再レンダーを物理演算のフレームから切り離す。
+ *
+ * Reactが持つのは「どのマスに何を置いたか」と「編集中か実行中か」だけで、
+ * 物理Bodyはこのフックの中だけに閉じている。Phase 2で編集モードと実行モードを
+ * 行き来させるときも、Reactの状態と物理世界が絡まないようにするための分担。
+ */
+export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandle {
+  // onGoal は呼び出し側の再レンダーのたびに新しい関数になりうる。これを物理世界を作る
+  // useEffect の依存に入れると毎レンダーで世界が作り直されてしまうため、refから最新値を読む。
+  const optionsRef = useRef(options)
+  useEffect(() => {
+    optionsRef.current = options
+  })
+
+  const ballElementRef = useRef<HTMLElement | null>(null)
+  const handle = useMemo<PuzzleEngineHandle>(
+    () => ({
+      registerBall: (el: HTMLElement | null) => {
+        ballElementRef.current = el
+      },
+    }),
+    [],
+  )
+
+  const { running, runId } = options
+
+  // 編集中は開始位置に静止させる。実行中の書き込みと同じ形式で書くことで、
+  // 「静止中の見た目」と「実行中の見た目」が同じ経路になる。
+  useEffect(() => {
+    if (running) return
+    const el = ballElementRef.current
+    if (!el) return
+    el.style.transform = `translate(${BALL_START.x - BALL_RADIUS}px, ${BALL_START.y - BALL_RADIUS}px)`
+  }, [running, runId])
+
+  useEffect(() => {
+    if (!running) return
+
+    // 実行開始時点の配置をスナップショットとして読む。実行中はパーツを触れない仕様のため、
+    // これを依存配列に入れて世界を作り直す必要はない（runIdが実行の世代を表す）。
+    const parts = optionsRef.current.parts
+
+    const engine = Engine.create({ gravity: { ...GRAVITY } })
+    const ball = Bodies.circle(BALL_START.x, BALL_START.y, BALL_RADIUS, {
+      restitution: BALL_RESTITUTION,
+      friction: BALL_FRICTION,
+      frictionAir: BALL_FRICTION_AIR,
+      density: BALL_DENSITY,
+      label: 'ball',
+    })
+    Composite.add(engine.world, [...wallBodies(), ...parts.flatMap(partBodies), ball])
+
+    let rafId: number | null = null
+    let lastFrameTime: number | null = null
+    let accumulator = 0
+    let reachedGoal = false
+    let stopped = false
+
+    const writeBallTransform = () => {
+      const el = ballElementRef.current
+      if (!el) return
+      const x = ball.position.x - BALL_RADIUS
+      const y = ball.position.y - BALL_RADIUS
+      el.style.transform = `translate(${x}px, ${y}px) rotate(${ball.angle}rad)`
+    }
+
+    const tick = (now: number) => {
+      if (stopped) return
+      rafId = requestAnimationFrame(tick)
+      if (lastFrameTime === null) {
+        lastFrameTime = now
+        return
+      }
+      accumulator += Math.min(now - lastFrameTime, MAX_FRAME_DELTA_MS)
+      lastFrameTime = now
+
+      let substeps = 0
+      while (accumulator >= STEP_MS && substeps < MAX_SUBSTEPS) {
+        Engine.update(engine, STEP_MS)
+        accumulator -= STEP_MS
+        substeps += 1
+      }
+      // 上限に達したぶんの端数は捨てる（復帰直後に何フレームも急いで追いつかないように）
+      if (substeps >= MAX_SUBSTEPS) accumulator = 0
+
+      // 速度クランプ。薄い板をすり抜けたり、国旗が読めないほど回るのを防ぐ
+      const speed = Math.hypot(ball.velocity.x, ball.velocity.y)
+      if (speed > MAX_SPEED) {
+        const factor = MAX_SPEED / speed
+        Body.setVelocity(ball, { x: ball.velocity.x * factor, y: ball.velocity.y * factor })
+      }
+      if (Math.abs(ball.angularVelocity) > MAX_ANGULAR_VELOCITY) {
+        Body.setAngularVelocity(ball, Math.sign(ball.angularVelocity) * MAX_ANGULAR_VELOCITY)
+      }
+
+      writeBallTransform()
+
+      if (!reachedGoal && isInGoalArea(ball.position.x, ball.position.y)) {
+        reachedGoal = true
+        // ゴールしたボールはその場で止め、どこへ入ったのかが見えるようにする。
+        // 以降は動かすものがないので、更新ループも止めてしまう
+        // （物理世界そのものは、編集へ戻る／もう一度落とすときに作り直す）。
+        Body.setStatic(ball, true)
+        writeBallTransform()
+        stopped = true
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId)
+          rafId = null
+        }
+        optionsRef.current.onGoal()
+      }
+    }
+
+    writeBallTransform()
+    rafId = requestAnimationFrame(tick)
+
+    return () => {
+      stopped = true
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      Composite.clear(engine.world, false)
+      Engine.clear(engine)
+    }
+  }, [running, runId])
+
+  return handle
+}
