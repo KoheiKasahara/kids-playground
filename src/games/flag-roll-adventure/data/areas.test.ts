@@ -16,7 +16,7 @@ import {
   SPINNER_BLADE_THICKNESS,
 } from '../adventurePhysics'
 import { areaGroundRects, cupBottomRect, cupFrontLipRect, cupSensorRect, cupWellRect, worldSize } from '../adventureGeometry'
-import { AREAS, findArea, START_AREA_ID } from './areas'
+import { AREAS, findArea, gravityYForArea, START_AREA_ID } from './areas'
 import type { AreaToy } from '../types'
 
 type AreaObstacle = (typeof AREAS)[number]['objects'][number] | AreaToy
@@ -77,6 +77,17 @@ function obstacleClearance(first: AreaObstacle, second: AreaObstacle): number {
 function areaObstacles(area: (typeof AREAS)[number]): readonly AreaObstacle[] {
   return [...area.objects, ...(area.toys ?? [])]
 }
+
+describe('area gravity settings', () => {
+  it('各エリアで重力係数を持ち、密なピンやゴールだけ控えめにできる', () => {
+    expect(AREAS.every((area) => area.gravityScale !== undefined)).toBe(true)
+    expect(AREAS.every((area) => (area.gravityScale ?? 0) >= 0.9)).toBe(true)
+    expect(AREAS.every((area) => (area.gravityScale ?? Infinity) <= 1.1)).toBe(true)
+    expect(gravityYForArea('river')).toBeGreaterThan(gravityYForArea('sky'))
+    expect(gravityYForArea('cloud')).toBeLessThan(gravityYForArea('sky'))
+    expect(gravityYForArea('goal')).toBeLessThan(gravityYForArea('sky'))
+  })
+})
 
 function segmentIntersectsRect(
   start: { x: number; y: number },

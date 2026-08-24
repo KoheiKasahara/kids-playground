@@ -75,6 +75,8 @@ export const caveArea: AdventureArea = {
   id: 'cave',
   nameJa: 'どうくつ',
   theme: 'cave',
+  // 大砲の着地後にもピン・回転岩へ絡めるよう、従来に近い重力を維持する。
+  gravityScale: 0.9,
   origin: { x: 0, y: 2 * AREA_HEIGHT },
   entries: [{ id: 'cave-entry', kind: 'tunnel', x: AREA_WIDTH / 2, y: ENTRY_Y }],
   objects: gridObjects,

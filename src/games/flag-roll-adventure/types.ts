@@ -147,6 +147,11 @@ export type AdventureArea = {
   /** 子どもに見せるエリア名（例: 「そら」） */
   nameJa: string
   theme: AreaTheme
+  /**
+   * 基準重力に掛ける係数。省略時は1。
+   * 密なピンやゴール付近など、エリア固有のテンポだけを小さく調整できるようにする。
+   */
+  gravityScale?: number
   /** ワールド上の原点。配列位置から計算せず、分岐したエリアの配置を明示する。 */
   origin: { x: number; y: number }
   objects: readonly AreaObject[]

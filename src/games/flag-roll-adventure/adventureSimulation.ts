@@ -23,7 +23,7 @@ import {
   STALL_SPEED_THRESHOLD,
   STEP_MS,
 } from './adventurePhysics'
-import { AREAS, findArea, pickExitForBallX, resolveExitTarget, START_AREA_ID } from './data/areas'
+import { AREAS, findArea, gravityYForArea, pickExitForBallX, resolveExitTarget, START_AREA_ID } from './data/areas'
 import { createAdventureWorld, type AdventureZoneEntry } from './adventureWorld'
 import {
   canRecaptureCannon,
@@ -147,6 +147,10 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
   const maxAirborneMsByArea = new Map(AREAS.map((area) => [area.id, 0]))
   const visitedAreaIds: string[] = [START_AREA_ID]
   let currentAreaId = START_AREA_ID
+  const applyAreaGravity = (areaId: string) => {
+    engine.gravity.y = gravityYForArea(areaId)
+  }
+  applyAreaGravity(currentAreaId)
   let motion: Motion = 'running'
   let pendingExit: PendingExit | null = null
   let pendingMove: PendingMove | null = null
@@ -616,6 +620,7 @@ export function simulateAdventureRun(seed: number): AdventureSimulationResult {
       if (move && elapsedMs - move.startedAtMs >= CAMERA_TRANSITION_MS + CAMERA_SETTLE_MS) {
         const pending = move
         currentAreaId = pending.nextAreaId
+        applyAreaGravity(currentAreaId)
         visitedAreaIds.push(currentAreaId)
         areaEnteredAtMs = elapsedMs
         motion = 'running'

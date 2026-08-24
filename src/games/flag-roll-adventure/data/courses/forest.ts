@@ -62,6 +62,7 @@ export const forestArea: AdventureArea = {
   id: 'forest',
   nameJa: 'もり',
   theme: 'forest',
+  gravityScale: 1,
   origin: { x: AREA_COLUMN_STEP, y: AREA_HEIGHT },
   entries: [{ id: 'forest-entry', kind: 'hole', x: AREA_WIDTH / 2, y: ENTRY_Y }],
   objects: gridObjects,

@@ -1,4 +1,5 @@
 import type { AdventureArea, AreaEntry, AreaExit } from '../types'
+import { GRAVITY } from '../adventurePhysics'
 import { caveArea } from './courses/cave'
 import { cloudArea } from './courses/cloud'
 import { forestArea } from './courses/forest'
@@ -17,6 +18,11 @@ const areaById = new Map(AREAS.map((area) => [area.id, area]))
 /** idからエリアを引く。未知のidはデータ不整合を呼び出し側で扱えるようundefinedを返す。 */
 export function findArea(id: string): AdventureArea | undefined {
   return areaById.get(id)
+}
+
+/** 現在エリアの物理重力。未設定のエリアは基準重力を使い、旧データとも互換にする。 */
+export function gravityYForArea(areaId: string): number {
+  return GRAVITY.y * (findArea(areaId)?.gravityScale ?? 1)
 }
 
 /** ボールのローカルx座標に応じて、開口内を優先し、それ以外は中心が最も近い出口を選ぶ。 */

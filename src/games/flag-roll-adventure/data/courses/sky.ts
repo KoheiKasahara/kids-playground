@@ -69,6 +69,7 @@ export const skyArea: AdventureArea = {
   id: 'sky',
   nameJa: 'そら',
   theme: 'sky',
+  gravityScale: 1,
   origin: { x: AREA_COLUMN_STEP, y: 0 },
   entries: [{ id: 'sky-entry', kind: 'hole', x: AREA_WIDTH / 2, y: ENTRY_Y }],
   objects: gridObjects,

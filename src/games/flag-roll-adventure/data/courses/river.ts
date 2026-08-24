@@ -53,6 +53,8 @@ export const riverArea: AdventureArea = {
   id: 'river',
   nameJa: 'かわ',
   theme: 'river',
+  // 長い流れを主役にするエリアだけ、基準よりわずかに強くして待ち時間を減らす。
+  gravityScale: 1.03,
   origin: { x: 2 * AREA_COLUMN_STEP, y: 2 * AREA_HEIGHT },
   entries: [{ id: 'river-entry', kind: 'hole', x: AREA_WIDTH / 2, y: ENTRY_Y }],
   objects: gridObjects,
