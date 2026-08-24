@@ -121,6 +121,8 @@ export const routes: RouteObject[] = [
   // 選択画面と、Three.js・Rapier(wasm)を使うプレイ画面を必要なときだけ読込む。
   { path: '/games/flag-roll-maze', element: lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazeSelect')) },
   { path: '/games/flag-roll-maze/play', element: lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazePlay')) },
+  // こっきコロコロパズルも物理エンジン(matter-js)を含むため、開くときだけ読込む。
+  { path: '/games/flag-roll-puzzle', element: lazyRoute(() => import('../games/flag-roll-puzzle/FlagRollPuzzlePlay')) },
   { path: '/games/earth-globe', element: lazyRoute(() => import('../games/earth-globe/EarthGlobePlay')) },
   { path: '/games/flag-roll-adventure', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventureSelect')) },
   { path: '/games/flag-roll-adventure/play', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventurePlay')) },

@@ -1,0 +1,86 @@
+import { cellKey, isInsideGrid, type GridCell, type Point } from './grid'
+import { partDefinition, type PartTypeId } from './partTypes'
+
+/** 盤面に置かれたパーツ。位置はマス単位（アンカーセル）だけで持つ */
+export type PlacedPart = {
+  readonly id: string
+  readonly typeId: PartTypeId
+  readonly cell: GridCell
+}
+
+/** パーツがそのアンカーセルに置かれたときに占有する、絶対座標のマス一覧 */
+export function occupiedCells(typeId: PartTypeId, anchor: GridCell): GridCell[] {
+  return partDefinition(typeId).cells.map((offset) => ({
+    col: anchor.col + offset.col,
+    row: anchor.row + offset.row,
+  }))
+}
+
+/** 置かれている全パーツが占有しているマスのキー集合 */
+export function occupiedCellKeys(parts: readonly PlacedPart[]): Set<string> {
+  const keys = new Set<string>()
+  for (const part of parts) {
+    for (const cell of occupiedCells(part.typeId, part.cell)) {
+      keys.add(cellKey(cell))
+    }
+  }
+  return keys
+}
+
+/** 占有マスがすべてグリッドの内側に収まるか（ボード外への配置を拒否する） */
+export function isInsideBoard(typeId: PartTypeId, anchor: GridCell): boolean {
+  return occupiedCells(typeId, anchor).every(isInsideGrid)
+}
+
+/** 既に置かれているパーツと1マスでも重なるか */
+export function overlapsExistingPart(
+  parts: readonly PlacedPart[],
+  typeId: PartTypeId,
+  anchor: GridCell,
+): boolean {
+  const taken = occupiedCellKeys(parts)
+  return occupiedCells(typeId, anchor).some((cell) => taken.has(cellKey(cell)))
+}
+
+/** そのマスへ置けるか。ボード外と、既存パーツとの重なりの両方を弾く */
+export function canPlacePart(
+  parts: readonly PlacedPart[],
+  typeId: PartTypeId,
+  anchor: GridCell,
+): boolean {
+  return isInsideBoard(typeId, anchor) && !overlapsExistingPart(parts, typeId, anchor)
+}
+
+/**
+ * パーツを1つ追加した新しい配列を返す。置けない位置なら null を返し、
+ * 呼び出し側が「元の場所へ戻す」挙動を選べるようにする（例外にはしない）。
+ */
+export function placePart(
+  parts: readonly PlacedPart[],
+  typeId: PartTypeId,
+  anchor: GridCell,
+  id: string,
+): PlacedPart[] | null {
+  if (!canPlacePart(parts, typeId, anchor)) return null
+  return [...parts, { id, typeId, cell: anchor }]
+}
+
+/**
+ * 画面上のポインタ座標を盤面の論理座標へ変換する。
+ * 盤面は transform-origin: top left の scale() で拡縮しているため、
+ * 矩形の左上が論理原点、倍率が scale にそのまま対応する。
+ */
+export function boardPointFromClient(
+  clientX: number,
+  clientY: number,
+  boardRect: { readonly left: number; readonly top: number },
+  scale: number,
+): Point {
+  // scale は useBoardScale が計測前に返す 1 を下回らない想定だが、
+  // 0 が渡っても NaN / Infinity を盤面座標へ持ち込まないようにする。
+  if (scale <= 0) return { x: 0, y: 0 }
+  return {
+    x: (clientX - boardRect.left) / scale,
+    y: (clientY - boardRect.top) / scale,
+  }
+}
