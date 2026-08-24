@@ -76,5 +76,40 @@ export const GOAL_AREA = {
   height: GOAL_HEIGHT,
 } as const
 
+/**
+ * ゴールの右端に置く小さなスロープ（受け皿のふち）。
+ *
+ * ゴールへ入ったボールはその場で止めず物理挙動を続けるため、何も無いと
+ * 転がってゴールの外へ出てしまう。そこで、ゴールの右端から右下へ下る
+ * 板を1枚置いて“ふち”にする。
+ *
+ * 向きに意味がある。ゴール側（左）が高く、外側（右）へ下っているので、
+ * - 外から左へ勢いよく転がってきたボールは、坂を駆け上がってゴールへ入れる
+ * - ゴールの中で遅くなったボールは、左側の段差を越えられずに中で止まる
+ * という「入りやすく、出にくい」受け皿になる。
+ *
+ * 位置は「左上端がゴールの右端(x)、右下端が床(y)に接する」ように決める。
+ */
+const GOAL_RAMP_ANGLE_RAD = (30 * Math.PI) / 180
+const GOAL_RAMP_LENGTH = 28
+const GOAL_RAMP_THICKNESS = 8
+
+export const GOAL_RAMP = {
+  /** 中心の論理座標。描画も物理Bodyもこの中心＋角度で置く */
+  x: GOAL_AREA.x + GOAL_AREA.width + (GOAL_RAMP_LENGTH / 2) * Math.cos(GOAL_RAMP_ANGLE_RAD),
+  y:
+    BOARD_HEIGHT -
+    (GOAL_RAMP_LENGTH / 2) * Math.sin(GOAL_RAMP_ANGLE_RAD) -
+    (GOAL_RAMP_THICKNESS / 2) * Math.cos(GOAL_RAMP_ANGLE_RAD),
+  length: GOAL_RAMP_LENGTH,
+  thickness: GOAL_RAMP_THICKNESS,
+  angleDeg: 30,
+} as const
+
+/** ゴール側（左端）の高さ。床から何px盛り上がっているか */
+export const GOAL_RAMP_PEAK =
+  (GOAL_RAMP_LENGTH / 2) * Math.sin(GOAL_RAMP_ANGLE_RAD) +
+  (GOAL_RAMP_THICKNESS / 2) * Math.cos(GOAL_RAMP_ANGLE_RAD)
+
 /** 盤外へ逸脱させないための外周壁の厚み。壁は盤面の外側に置く */
 export const WALL_THICKNESS = 40

@@ -7,7 +7,9 @@ import {
   occupiedCellKeys,
   occupiedCells,
   overlapsExistingPart,
+  partAtCell,
   placePart,
+  removePart,
   type PlacedPart,
 } from './placement'
 
@@ -69,6 +71,26 @@ describe('placement', () => {
     const parts = [plankAt(1, 1)]
     expect(placePart(parts, 'plank', { col: 1, row: 1 }, 'part-new')).toBeNull()
     expect(placePart(parts, 'plank', { col: -1, row: 1 }, 'part-new')).toBeNull()
+  })
+
+  test('マスにあるパーツを引ける（盤面のパーツを選ぶときに使う）', () => {
+    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    expect(partAtCell(parts, { col: 1, row: 1 })?.id).toBe('part-a')
+    expect(partAtCell(parts, { col: 3, row: 4 })?.id).toBe('part-b')
+    expect(partAtCell(parts, { col: 2, row: 2 })).toBeNull()
+    expect(partAtCell([], { col: 1, row: 1 })).toBeNull()
+  })
+
+  test('removePart は指定した1つだけを外し、元の配列は変えない', () => {
+    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    const removed = removePart(parts, 'part-a')
+    expect(removed.map((part) => part.id)).toEqual(['part-b'])
+    expect(parts).toHaveLength(2)
+  })
+
+  test('removePart に無いidを渡しても、残りは変わらない', () => {
+    const parts = [plankAt(1, 1, 'part-a')]
+    expect(removePart(parts, 'part-x').map((part) => part.id)).toEqual(['part-a'])
   })
 
   test('ポインタ座標を、盤面の拡縮を打ち消して論理座標へ戻す', () => {

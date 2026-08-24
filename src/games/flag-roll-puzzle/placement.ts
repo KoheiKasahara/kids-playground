@@ -65,6 +65,22 @@ export function placePart(
   return [...parts, { id, typeId, cell: anchor }]
 }
 
+/** そのマスを占有しているパーツ。無ければ null（盤面のパーツを選ぶときに使う） */
+export function partAtCell(parts: readonly PlacedPart[], cell: GridCell): PlacedPart | null {
+  const key = cellKey(cell)
+  for (const part of parts) {
+    if (occupiedCells(part.typeId, part.cell).some((occupied) => cellKey(occupied) === key)) {
+      return part
+    }
+  }
+  return null
+}
+
+/** パーツを1つ外した新しい配列を返す。見つからない場合は同じ内容の配列を返す */
+export function removePart(parts: readonly PlacedPart[], id: string): PlacedPart[] {
+  return parts.filter((part) => part.id !== id)
+}
+
 /**
  * 画面上のポインタ座標を盤面の論理座標へ変換する。
  * 盤面は transform-origin: top left の scale() で拡縮しているため、

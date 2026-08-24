@@ -5,6 +5,7 @@ import {
   BALL_START,
   BOARD_HEIGHT,
   BOARD_WIDTH,
+  GOAL_RAMP,
   WALL_THICKNESS,
 } from './boardLayout'
 import { cellCenter } from './grid'
@@ -46,7 +47,10 @@ export type PuzzleEngineHandle = {
   registerBall: (el: HTMLElement | null) => void
 }
 
-/** 盤面の外周壁（左・右・床）。盤面の外側に置き、見た目には出さない */
+/**
+ * 盤面の外周壁（左・右・床）と、ゴールの右端の低い縁。
+ * 外周壁は盤面の外側に置き、見た目には出さない。
+ */
 function wallBodies(): Matter.Body[] {
   const half = WALL_THICKNESS / 2
   const options = {
@@ -59,6 +63,12 @@ function wallBodies(): Matter.Body[] {
     Bodies.rectangle(-half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH + half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + half, BOARD_WIDTH + WALL_THICKNESS * 2, WALL_THICKNESS, options),
+    // ゴールの受け皿のふち（斜めのスロープ）。向きの意味は boardLayout.ts の GOAL_RAMP 参照
+    Bodies.rectangle(GOAL_RAMP.x, GOAL_RAMP.y, GOAL_RAMP.length, GOAL_RAMP.thickness, {
+      ...options,
+      angle: GOAL_RAMP.angleDeg * DEG_TO_RAD,
+      label: 'goal-ramp',
+    }),
   ]
 }
 
@@ -186,18 +196,11 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
 
       writeBallTransform()
 
+      // ゴール判定。入った瞬間に一度だけ通知し、ボールはそのまま転がし続ける
+      // （その場で固定すると動きが不自然に途切れるため）。reachedGoal は
+      // この実行(runId)のあいだ保たれるので、ゴール内で出入りしても再通知はしない。
       if (!reachedGoal && isInGoalArea(ball.position.x, ball.position.y)) {
         reachedGoal = true
-        // ゴールしたボールはその場で止め、どこへ入ったのかが見えるようにする。
-        // 以降は動かすものがないので、更新ループも止めてしまう
-        // （物理世界そのものは、編集へ戻る／もう一度落とすときに作り直す）。
-        Body.setStatic(ball, true)
-        writeBallTransform()
-        stopped = true
-        if (rafId !== null) {
-          cancelAnimationFrame(rafId)
-          rafId = null
-        }
         optionsRef.current.onGoal()
       }
     }

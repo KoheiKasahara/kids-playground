@@ -3,8 +3,11 @@ import styles from './PartShape.module.css'
 
 type PartShapeProps = {
   typeId: PartTypeId
-  /** 見た目の状態。置いたパーツ・ドラッグ中の分身・置ける位置の下書き で色を変える */
-  variant?: 'placed' | 'dragging' | 'ghost'
+  /**
+   * 見た目の状態。置いたパーツ・選んでいるパーツ・ドラッグ中の分身・
+   * 置ける位置の下書き で色を変える。
+   */
+  variant?: 'placed' | 'selected' | 'dragging' | 'ghost'
 }
 
 /**

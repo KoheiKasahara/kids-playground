@@ -8,12 +8,15 @@ import PartTray from './PartTray'
 import PuzzleBoard from './PuzzleBoard'
 import { nearestCell, sameCell, type GridCell } from './grid'
 import type { PartTypeId } from './partTypes'
-import { boardPointFromClient, canPlacePart } from './placement'
+import { boardPointFromClient, canPlacePart, partAtCell } from './placement'
 import {
   clearAll,
+  clearPartSelection,
   createPuzzleState,
   reachGoal,
+  removeSelectedPart,
   returnBall,
+  selectPart,
   startRun,
   tryPlacePart,
 } from './puzzleState'
@@ -133,6 +136,7 @@ export default function FlagRollPuzzlePlay() {
     // jsdom や一部の組込みブラウザは Pointer Capture を持たないことがある。
     event.currentTarget.setPointerCapture?.(event.pointerId)
     dragStartPointRef.current = { x: event.clientX, y: event.clientY }
+    setState((current) => clearPartSelection(current))
     setDrag({ typeId, x: event.clientX, y: event.clientY, moved: false })
   }
 
@@ -171,13 +175,42 @@ export default function FlagRollPuzzlePlay() {
     if (Date.now() - dragEndedAtRef.current < CLICK_AFTER_DRAG_IGNORE_MS) return
     if (state.phase !== 'edit') return
     primeAudio()
+    // パーツ置き場の選択と、盤面のパーツの選択は同時に持たない（操作の対象を1つに保つ）
+    setState((current) => clearPartSelection(current))
     setSelectedTypeId((current) => (current === typeId ? null : typeId))
   }
 
-  /** 盤面のタップ。パーツを選んでいるときだけ、そのマスへ置く */
+  /**
+   * 盤面のタップ。
+   * パーツ置き場でパーツを選んでいるときは、そのマスへ置く。
+   * 何も選んでいないときは、タップしたマスにあるパーツを「選ぶ」
+   * （選んだパーツは「けす」で1つだけ外せる。Phase 2の移動・回転も同じ選択を使う想定）。
+   */
   const handleBoardPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (state.phase !== 'edit' || !selectedTypeId || drag) return
-    place(selectedTypeId, cellFromClient(event.clientX, event.clientY))
+    if (state.phase !== 'edit' || drag) return
+    const cell = cellFromClient(event.clientX, event.clientY)
+    if (!cell) return
+
+    // すでにパーツがあるマスを押したら、置こうとするのではなく、そのパーツを選ぶ。
+    // 幼児がパーツ置き場を選んだまま置いたパーツを押しても「置けない」と言われず、
+    // そのまま消す操作へ進める（消すのは「けす」を押したときだけなので、誤って消えない）。
+    const part = partAtCell(state.parts, cell)
+    if (part) {
+      setSelectedTypeId(null)
+      setState((current) => selectPart(current, part.id))
+      return
+    }
+    if (selectedTypeId) {
+      place(selectedTypeId, cell)
+      return
+    }
+    setState((current) => clearPartSelection(current))
+  }
+
+  /** 選んでいるパーツを1つだけ消す */
+  const handleRemoveSelectedPart = () => {
+    setState((current) => removeSelectedPart(current))
+    playPanelOpenSound()
   }
 
   const handleDrop = () => {
@@ -198,7 +231,11 @@ export default function FlagRollPuzzlePlay() {
   }
 
   const editing = state.phase === 'edit'
-  const status = message || (state.phase === 'cleared' ? 'ゴール！ すごい！' : editing ? EDIT_HINT : 'ころころ ころがってるよ！')
+  const partSelected = state.selectedPartId !== null
+  // パーツを選んでいるあいだは、同じ行に出る「えらんだ いたを けす」がそのまま案内になるため
+  // ひとことは出さない（同じことを2つ並べて書かない）。
+  const editHint = partSelected ? '' : EDIT_HINT
+  const status = message || (state.phase === 'cleared' ? 'ゴール！ すごい！' : editing ? editHint : 'ころころ ころがってるよ！')
 
   return (
     <main className={styles.page}>
@@ -212,6 +249,7 @@ export default function FlagRollPuzzlePlay() {
       <div className={styles.body}>
         <PuzzleBoard
           parts={state.parts}
+          selectedPartId={state.selectedPartId}
           flag={BALL_FLAG}
           ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
           highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
@@ -230,9 +268,20 @@ export default function FlagRollPuzzlePlay() {
           縦画面では盤面の下に積み、低い横画面では盤面の横へ回す（.body の row 切替）。
         */}
         <div className={styles.side}>
-          <p className={styles.status} role="status" aria-live="polite" data-cleared={state.phase === 'cleared'}>
-            {status}
-          </p>
+          {/*
+            ひとことと「けす」を同じ行に置き、選択中でも行の高さが変わらないようにする
+            （盤面の高さが選択のたびに動くと、置いたパーツの位置が見た目で動いてしまう）。
+          */}
+          <div className={styles.statusRow}>
+            <p className={styles.status} role="status" aria-live="polite" data-cleared={state.phase === 'cleared'}>
+              {status}
+            </p>
+            {partSelected ? (
+              <button type="button" className={styles.removeButton} onClick={handleRemoveSelectedPart}>
+                えらんだ いたを けす
+              </button>
+            ) : null}
+          </div>
 
           <PartTray
             selectedTypeId={selectedTypeId}

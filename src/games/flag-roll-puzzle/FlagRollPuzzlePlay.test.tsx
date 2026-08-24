@@ -77,17 +77,91 @@ describe('こっきコロコロパズル', () => {
     expect(placedParts()[0]).toHaveAttribute('data-part-type', 'slopeLeft')
   })
 
-  test('同じマスへ重ねて置こうとしても増えず、置けないことを伝える', async () => {
+  test('同じマスへドラッグして重ねようとしても増えず、置けないことを伝える', async () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('よこいた'))
     fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
     expect(placedParts()).toHaveLength(1)
 
-    await user.click(trayPart('みぎへ'))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    const part = trayPart('みぎへ')
+    fireEvent.pointerDown(part, { pointerId: 1, clientX: 0, clientY: 0 })
+    fireEvent.pointerMove(part, { pointerId: 1, ...cellPoint(2, 3) })
+    // 置けない場所なので下書きも出ない
+    expect(screen.queryByTestId('puzzle-ghost')).not.toBeInTheDocument()
+    fireEvent.pointerUp(part, { pointerId: 1, ...cellPoint(2, 3) })
+
     expect(placedParts()).toHaveLength(1)
     expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+  })
+
+  test('置いたパーツをタップすると選ばれ、「けす」でそのパーツだけ消える', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    await user.click(trayPart('みぎへ'))
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(4, 5))
+    expect(placedParts()).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+
+    // よこいたを置いたマスをタップして選ぶ
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    expect(screen.getByTestId('puzzle-selection')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(placedParts().filter((part) => part.dataset.selected === 'true')).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'えらんだ いたを けす' }))
+    expect(placedParts()).toHaveLength(1)
+    // 残るのは選んでいなかった「みぎへ」のほう
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'slopeRight')
+    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('puzzle-selection')).not.toBeInTheDocument()
+  })
+
+  test('選んだパーツをもう一度タップする・別の場所をタップすると選択が解ける', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    // 何もないマスをタップしたら選択は解ける（パーツは消えない）
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(0, 0))
+    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(placedParts()).toHaveLength(1)
+  })
+
+  test('パーツ置き場を選び直すと、盤面の選択は解ける', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+
+    await user.click(trayPart('ひだりへ'))
+    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(trayPart('ひだりへ')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('「ボールをおとす」を押すと盤面の選択は解け、実行中は「けす」を出さない', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('puzzle-selection')).not.toBeInTheDocument()
   })
 
   test('ボードの外（スタート帯・ゴール帯）へは置けない', async () => {
@@ -125,6 +199,21 @@ describe('こっきコロコロパズル', () => {
     expect(engineMock.options?.running).toBe(false)
     expect(placedParts()).toHaveLength(1)
     expect(trayPart('よこいた')).toBeEnabled()
+  })
+
+  test('ゴール通知が重ねて届いても、成功の状態は1回ぶんしか変わらない', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+
+    act(() => engineMock.options?.onGoal())
+    expect(screen.getByRole('status')).toHaveTextContent('ゴール！ すごい！')
+    // 物理エンジン側は1回の実行につき一度しか呼ばない契約だが、状態側も冪等にしてある
+    act(() => engineMock.options?.onGoal())
+    expect(screen.getByRole('status')).toHaveTextContent('ゴール！ すごい！')
+    expect(screen.getByRole('button', { name: 'ボールを もどす' })).toBeEnabled()
+    // ゴールしてもボールは止めないので、物理世界はそのまま動かし続ける
+    expect(engineMock.options?.running).toBe(true)
   })
 
   test('「ぜんぶ けす」でパーツを外して最初からやり直せる', async () => {

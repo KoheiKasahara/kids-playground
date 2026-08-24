@@ -1,12 +1,21 @@
 import { describe, expect, test } from 'vitest'
 import {
   clearAll,
+  clearPartSelection,
   createPuzzleState,
   reachGoal,
+  removeSelectedPart,
   returnBall,
+  selectPart,
   startRun,
   tryPlacePart,
 } from './puzzleState'
+
+/** 板を2枚置いた編集中の状態 */
+function stateWithTwoParts() {
+  const first = tryPlacePart(createPuzzleState(), 'plank', { col: 1, row: 1 })!
+  return tryPlacePart(first, 'slopeLeft', { col: 3, row: 4 })!
+}
 
 describe('puzzleState', () => {
   test('最初は編集中で、パーツは何も置かれていない', () => {
@@ -66,10 +75,57 @@ describe('puzzleState', () => {
     expect(returned.parts).toHaveLength(1)
   })
 
+  test('盤面のパーツを選べる。同じパーツをもう一度選ぶと解除される', () => {
+    const state = stateWithTwoParts()
+    const [first, second] = state.parts
+    expect(state.selectedPartId).toBeNull()
+
+    const selected = selectPart(state, first.id)
+    expect(selected.selectedPartId).toBe(first.id)
+    expect(selectPart(selected, first.id).selectedPartId).toBeNull()
+    expect(selectPart(selected, second.id).selectedPartId).toBe(second.id)
+  })
+
+  test('存在しないパーツや、実行中の選択は受け付けない', () => {
+    const state = stateWithTwoParts()
+    expect(selectPart(state, 'part-none')).toBe(state)
+    const running = startRun(state)
+    expect(selectPart(running, state.parts[0].id)).toBe(running)
+  })
+
+  test('選んだパーツを1つだけ消せる。ほかのパーツは残る', () => {
+    const state = stateWithTwoParts()
+    const [first, second] = state.parts
+    const removed = removeSelectedPart(selectPart(state, first.id))
+    expect(removed.parts.map((part) => part.id)).toEqual([second.id])
+    expect(removed.selectedPartId).toBeNull()
+  })
+
+  test('何も選んでいなければ、消す操作は何も起こさない', () => {
+    const state = stateWithTwoParts()
+    expect(removeSelectedPart(state)).toBe(state)
+    expect(clearPartSelection(state)).toBe(state)
+  })
+
+  test('実行中は選んでいたパーツを消せない', () => {
+    const selected = selectPart(stateWithTwoParts(), 'part-1')
+    const running = startRun(selected)
+    // 実行へ移る時点で選択は解ける（実行中に消す対象が残らないようにする）
+    expect(running.selectedPartId).toBeNull()
+    expect(removeSelectedPart(running)).toBe(running)
+  })
+
+  test('新しくパーツを置くと、それまでの選択は解ける', () => {
+    const selected = selectPart(stateWithTwoParts(), 'part-1')
+    const placed = tryPlacePart(selected, 'plank', { col: 5, row: 6 })!
+    expect(placed.selectedPartId).toBeNull()
+  })
+
   test('「ぜんぶけす」は、パーツを全部外して編集へ戻す', () => {
     const placed = tryPlacePart(createPuzzleState(), 'plank', { col: 1, row: 1 })!
     const cleared = clearAll(startRun(placed))
     expect(cleared.phase).toBe('edit')
     expect(cleared.parts).toEqual([])
+    expect(cleared.selectedPartId).toBeNull()
   })
 })
