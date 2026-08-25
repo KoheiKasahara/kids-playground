@@ -12,6 +12,16 @@ import {
   worldConnectorForRailPiece,
   worldRailPathPoint,
 } from './railModel'
+import {
+  createInitialRailTrainMotion,
+  getOccupiedRailPieceIds,
+  sampleRailTrainCars,
+  sampleRailTrainPose,
+  startRailTrain,
+  updateRailTrainMotion,
+  type RailTrainMotion,
+  type RailTrainStatus,
+} from './railTrainModel'
 
 const WORLD_SIZE = 50
 const WORLD_HALF_SIZE = WORLD_SIZE / 2
@@ -31,11 +41,16 @@ export type RailBuilderEngineOptions = {
   onPiecesChange: (pieces: RailPiece[]) => void
   onSelectPiece: (pieceId: string | null) => void
   onZoomChange?: (zoom: number) => void
+  lockedPieceIds?: ReadonlySet<string>
+  onTrainStatusChange?: (status: RailTrainStatus) => void
+  onTrainOccupiedIdsChange?: (pieceIds: string[]) => void
 }
 
 export type RailBuilderEngineHandle = {
   registerContainer: (element: HTMLDivElement | null) => void
   getCameraTarget: () => RailVec3
+  startTrain: () => void
+  focusTrain: () => void
 }
 
 type PointerPosition = {
@@ -115,6 +130,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
   const cameraTargetRef = useRef<RailVec3>({ x: 0, y: 0, z: 0 })
   const syncSceneRef = useRef<((pieces: readonly RailPiece[], selectedPieceId: string | null) => void) | null>(null)
   const syncZoomRef = useRef<((zoom: number) => void) | null>(null)
+  const startTrainRef = useRef<(() => void) | null>(null)
+  const focusTrainRef = useRef<(() => void) | null>(null)
 
   const registerContainer = useCallback((element: HTMLDivElement | null) => {
     containerRef.current = element
@@ -122,9 +139,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
   const getCameraTarget = useCallback((): RailVec3 => ({ ...cameraTargetRef.current }), [])
 
+  const startTrain = useCallback(() => {
+    startTrainRef.current?.()
+  }, [])
+
+  const focusTrain = useCallback(() => {
+    focusTrainRef.current?.()
+  }, [])
+
   const handle = useMemo<RailBuilderEngineHandle>(
-    () => ({ registerContainer, getCameraTarget }),
-    [getCameraTarget, registerContainer],
+    () => ({ registerContainer, getCameraTarget, startTrain, focusTrain }),
+    [focusTrain, getCameraTarget, registerContainer, startTrain],
   )
 
   useEffect(() => {
@@ -153,6 +178,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const selectionRings = new Map<string, THREE.Mesh>()
     const marker = new THREE.Group()
     marker.name = 'snap-marker'
+    const trainRoot = new THREE.Group()
+    trainRoot.name = 'toy-train'
+    const trainCars: THREE.Group[] = []
     const sharedGeometries = new Set<THREE.BufferGeometry>()
     const sharedMaterials = new Set<THREE.Material>()
 
@@ -162,6 +190,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const connectorGeometry = new THREE.CylinderGeometry(0.27, 0.27, 0.18, 16)
     const selectionRingGeometry = new THREE.RingGeometry(0.72, 0.82, 32)
     const markerGeometry = new THREE.RingGeometry(0.35, 0.48, 24)
+    const trainBodyGeometry = new THREE.BoxGeometry(2.15, 0.78, 0.92)
+    const trainFrontGeometry = new THREE.BoxGeometry(0.25, 0.82, 0.94)
+    const trainRoofGeometry = new THREE.BoxGeometry(2.28, 0.16, 1.02)
+    const trainWindowGeometry = new THREE.BoxGeometry(0.42, 0.28, 0.04)
+    const trainFrontWindowGeometry = new THREE.BoxGeometry(0.04, 0.28, 0.54)
+    const trainDoorGeometry = new THREE.BoxGeometry(0.36, 0.57, 0.035)
+    const trainWheelGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.13, 16)
+    const trainCouplerGeometry = new THREE.BoxGeometry(0.34, 0.16, 0.16)
     ;[
       railGeometry,
       baseGeometry,
@@ -169,6 +205,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       connectorGeometry,
       selectionRingGeometry,
       markerGeometry,
+      trainBodyGeometry,
+      trainFrontGeometry,
+      trainRoofGeometry,
+      trainWindowGeometry,
+      trainFrontWindowGeometry,
+      trainDoorGeometry,
+      trainWheelGeometry,
+      trainCouplerGeometry,
     ].forEach((geometry) => sharedGeometries.add(geometry))
 
     const railMaterial = new THREE.MeshStandardMaterial({ color: '#6b7280', roughness: 0.48, metalness: 0.3 })
@@ -187,6 +231,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       opacity: 0.94,
       side: THREE.DoubleSide,
     })
+    const trainBodyMaterial = new THREE.MeshStandardMaterial({ color: '#f97316', roughness: 0.58 })
+    const trainFrontMaterial = new THREE.MeshStandardMaterial({ color: '#ea580c', roughness: 0.55 })
+    const trainRoofMaterial = new THREE.MeshStandardMaterial({ color: '#facc15', roughness: 0.7 })
+    const trainWindowMaterial = new THREE.MeshStandardMaterial({ color: '#67e8f9', roughness: 0.24, metalness: 0.12 })
+    const trainDoorMaterial = new THREE.MeshStandardMaterial({ color: '#fef3c7', roughness: 0.68 })
+    const trainWheelMaterial = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.85 })
+    const trainCouplerMaterial = new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.8 })
     ;[
       railMaterial,
       baseMaterial,
@@ -194,6 +245,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       connectorMaterial,
       selectionMaterial,
       markerMaterial,
+      trainBodyMaterial,
+      trainFrontMaterial,
+      trainRoofMaterial,
+      trainWindowMaterial,
+      trainDoorMaterial,
+      trainWheelMaterial,
+      trainCouplerMaterial,
     ].forEach((material) => sharedMaterials.add(material))
 
     const groundGeometry = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE)
@@ -218,6 +276,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     let drag: DragState | null = null
     let pinchStartDistance = 0
     let pinchStartZoom = activeZoom
+    let trainPieces: readonly RailPiece[] = optionsRef.current.pieces
+    let trainMotion: RailTrainMotion | null = createInitialRailTrainMotion(trainPieces)
+    let lastTrainStatus: RailTrainStatus | null = null
+    let lastOccupiedKey = ''
+    let lastFrameTime = typeof performance === 'undefined' ? 0 : performance.now()
 
     function updateCamera() {
       if (camera === null) return
@@ -298,6 +361,107 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }
     }
 
+    function makeTrainCar(index: number): THREE.Group {
+      const group = new THREE.Group()
+      group.name = index === 0 ? 'train-lead-car' : `train-car-${index + 1}`
+
+      const body = new THREE.Mesh(trainBodyGeometry, trainBodyMaterial)
+      body.position.y = 0.84
+      group.add(body)
+
+      const front = new THREE.Mesh(trainFrontGeometry, trainFrontMaterial)
+      front.position.set(1.1, 0.86, 0)
+      group.add(front)
+
+      const roof = new THREE.Mesh(trainRoofGeometry, trainRoofMaterial)
+      roof.position.y = 1.31
+      group.add(roof)
+
+      for (const side of [-1, 1]) {
+        for (const x of [-0.52, 0.18]) {
+          const window = new THREE.Mesh(trainWindowGeometry, trainWindowMaterial)
+          window.position.set(x, 1.02, side * 0.48)
+          group.add(window)
+        }
+        const door = new THREE.Mesh(trainDoorGeometry, trainDoorMaterial)
+        door.position.set(-0.78, 0.72, side * 0.49)
+        group.add(door)
+      }
+
+      const frontWindow = new THREE.Mesh(trainFrontWindowGeometry, trainWindowMaterial)
+      frontWindow.position.set(1.23, 1.04, 0)
+      group.add(frontWindow)
+
+      for (const x of [-0.67, 0.67]) {
+        for (const side of [-1, 1]) {
+          const wheel = new THREE.Mesh(trainWheelGeometry, trainWheelMaterial)
+          wheel.position.set(x, 0.34, side * 0.5)
+          wheel.rotation.x = Math.PI / 2
+          group.add(wheel)
+        }
+      }
+
+      const coupler = new THREE.Mesh(trainCouplerGeometry, trainCouplerMaterial)
+      coupler.position.set(-1.25, 0.62, 0)
+      group.add(coupler)
+      trainRoot.add(group)
+      trainCars.push(group)
+      return group
+    }
+
+    for (let index = 0; index < 2; index += 1) makeTrainCar(index)
+
+    function updateTrainVisuals() {
+      if (trainMotion === null) {
+        trainRoot.visible = false
+        return
+      }
+      const poses = sampleRailTrainCars(trainPieces, trainMotion.cursor, trainCars.length)
+      trainRoot.visible = poses.length > 0
+      for (const [index, car] of trainCars.entries()) {
+        const pose = poses[index]
+        if (pose === undefined) {
+          car.visible = false
+          continue
+        }
+        car.visible = true
+        car.position.set(pose.position.x, pose.position.y, pose.position.z)
+        car.rotation.y = Math.atan2(-pose.forward.z, pose.forward.x)
+      }
+    }
+
+    function reportTrainState() {
+      const status = trainMotion?.status ?? 'ready'
+      if (status !== lastTrainStatus) {
+        lastTrainStatus = status
+        optionsRef.current.onTrainStatusChange?.(status)
+      }
+      const occupied = trainMotion === null
+        ? []
+        : getOccupiedRailPieceIds(trainPieces, trainMotion.cursor, trainCars.length)
+      const occupiedKey = occupied.join('\u0000')
+      if (occupiedKey !== lastOccupiedKey) {
+        lastOccupiedKey = occupiedKey
+        optionsRef.current.onTrainOccupiedIdsChange?.(occupied)
+      }
+    }
+
+    function startTrainNow() {
+      if (trainMotion === null) trainMotion = createInitialRailTrainMotion(trainPieces)
+      if (trainMotion !== null) trainMotion = startRailTrain(trainMotion)
+      updateTrainVisuals()
+      reportTrainState()
+    }
+
+    function focusTrainNow() {
+      if (trainMotion === null) return
+      const pose = sampleRailTrainPose(trainPieces, trainMotion.cursor)
+      if (pose !== null) setCameraTarget(pose.position)
+    }
+
+    startTrainRef.current = startTrainNow
+    focusTrainRef.current = focusTrainNow
+
     function makePieceObject(piece: RailPiece): THREE.Group {
       const group = new THREE.Group()
       group.name = `rail-${piece.id}`
@@ -366,6 +530,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     }
 
     function syncPieces(pieces: readonly RailPiece[], selectedPieceId: string | null) {
+      trainPieces = pieces
+      if (trainMotion === null && pieces.length > 0) trainMotion = createInitialRailTrainMotion(pieces)
       const incomingIds = new Set(pieces.map((piece) => piece.id))
       for (const [pieceId, object] of pieceObjects) {
         if (incomingIds.has(pieceId)) continue
@@ -384,6 +550,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         object.rotation.y = piece.rotationY
       }
       updateSelection(selectedPieceId)
+      updateTrainVisuals()
+      reportTrainState()
     }
 
     function moveDragObject(piece: RailPiece) {
@@ -460,6 +628,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const selectedPieceId = pickPiece(event)
       optionsRef.current.onSelectPiece(selectedPieceId)
       if (selectedPieceId !== null) {
+        if (optionsRef.current.lockedPieceIds?.has(selectedPieceId)) {
+          mode = 'none'
+          drag = null
+          return
+        }
         const sourcePieces = optionsRef.current.pieces
         const sourcePiece = sourcePieces.find((piece) => piece.id === selectedPieceId)
         const ground = intersectGround(event)
@@ -607,6 +780,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       grid.position.y = 0.01
       scene.add(grid)
       scene.add(railRoot)
+      scene.add(trainRoot)
       const markerMesh = new THREE.Mesh(markerGeometry, markerMaterial)
       markerMesh.rotation.x = -Math.PI / 2
       markerMesh.position.y = 0.02
@@ -637,6 +811,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
       const render = () => {
         if (released || renderer === null || scene === null || camera === null) return
+        const now = typeof performance === 'undefined' ? lastFrameTime : performance.now()
+        const delta = lastFrameTime <= 0 ? 0 : Math.min(0.1, Math.max(0, (now - lastFrameTime) / 1000))
+        lastFrameTime = now
+        if (trainMotion !== null && delta > 0) {
+          trainMotion = updateRailTrainMotion(trainMotion, trainPieces, delta)
+          updateTrainVisuals()
+          reportTrainState()
+        }
         renderer.render(scene, camera)
         rafId = window.requestAnimationFrame(render)
       }
@@ -657,6 +839,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       released = true
       syncSceneRef.current = null
       syncZoomRef.current = null
+      startTrainRef.current = null
+      focusTrainRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)
       resizeObserver?.disconnect()
       if (resizeObserver === null) window.removeEventListener('resize', resize)

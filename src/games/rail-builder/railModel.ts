@@ -333,6 +333,17 @@ export function worldRailPathPoint(piece: RailPiece, t: number): RailVec3 {
   return worldPointForRailPiece(piece, sampleRailPath(piece.path, t))
 }
 
+/** パスの実距離。曲線も弦長ではなく、列車が走る弧の長さを返す。 */
+export function railPathLength(path: RailPath): number {
+  if (path.kind === 'straight') return Math.max(0, path.length)
+  return Math.max(0, path.radius) * Math.abs(path.angle)
+}
+
+/** パス上の接線をワールド座標へ変換する。 */
+export function worldRailPathTangent(piece: RailPiece, t: number): RailVec3 {
+  return worldDirectionForRailPiece(piece, sampleRailPathTangent(piece.path, t))
+}
+
 export function distanceBetweenRailPoints(a: RailVec3, b: RailVec3): number {
   return length(subtract(a, b))
 }
