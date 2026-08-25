@@ -5,8 +5,11 @@ import {
   BALL_START,
   BOARD_HEIGHT,
   BOARD_WIDTH,
+  GOAL_AREA,
   GOAL_EXIT_WALL,
   WALL_THICKNESS,
+  goalBoundaryWallsForArea,
+  type GoalArea,
 } from './boardLayout'
 import { cellCenter } from './grid'
 import { createStopObservation, observeBallStop } from './ballStopDetection'
@@ -14,6 +17,7 @@ import { isInGoalArea } from './goal'
 import { partDefinition } from './partTypes'
 import { bumperBoostVelocity } from './bumperPhysics'
 import type { PlacedPart } from './placement'
+import type { PuzzleBallSnapshot, PuzzleBallState } from './puzzleState'
 import {
   BALL_DENSITY,
   BALL_FRICTION,
@@ -31,47 +35,43 @@ import {
 } from './puzzlePhysics'
 
 const { Engine, Bodies, Body, Composite, Events } = Matter
-
 const DEG_TO_RAD = Math.PI / 180
 
 export type PuzzleEngineOptions = {
-  /** 盤面に置かれているパーツ。実行開始時のスナップショットから物理Bodyを作る */
   parts: readonly PlacedPart[]
-  /** 実行中か。false のあいだボールは開始位置で静止し、物理世界は作らない */
+  /** stage条件に基づく全ボール。旧呼び出し互換のため省略時はBALL_START相当を使う。 */
+  balls?: readonly PuzzleBallState[]
+  goalArea?: GoalArea
   running: boolean
-  /** 「ボールをおとす」ごとに増える世代。値が変わったら世界を作り直す */
   runId: number
-  /** ボールがゴール領域へ入ったとき（1回の実行につき最大1度だけ呼ぶ） */
-  onGoal: () => void
-  /** ゴール以外で一定時間動かなかったとき。編集状態へ戻す */
-  onStopped: () => void
+  onGoal: (ballId?: string, snapshots?: readonly PuzzleBallSnapshot[]) => void
+  onStopped: (ballId?: string, snapshots?: readonly PuzzleBallSnapshot[]) => void
 }
 
 export type PuzzleEngineHandle = {
-  /** 国旗ボールのDOM要素を登録する ref コールバック（参照は安定している） */
-  registerBall: (el: HTMLElement | null) => void
+  registerBall: (ballId: string | HTMLElement, el?: HTMLElement | null) => void
 }
 
-/**
- * 盤面の外周壁とゴール出口の壁。
- * どちらも見えない位置に置き、ゴールへ入ったボールだけは出口側から戻れないようにする。
- */
-export function createGoalExitWallBody(): Matter.Body {
-  return Bodies.rectangle(
-    GOAL_EXIT_WALL.x,
-    GOAL_EXIT_WALL.y,
-    GOAL_EXIT_WALL.width,
-    GOAL_EXIT_WALL.height,
-    {
-      isStatic: true,
-      restitution: WALL_RESTITUTION,
-      friction: WALL_FRICTION,
-      label: 'goal-wall',
-    },
+/** ステージのゴール右境界へ置く薄い出口壁（旧default APIも維持）。 */
+export function createGoalExitWallBody(goalArea: GoalArea = GOAL_AREA): Matter.Body {
+  const wall = goalBoundaryWallsForArea(goalArea).find(
+    (candidate) => candidate.x > goalArea.x + goalArea.width / 2,
   )
+  const definition = wall ?? GOAL_EXIT_WALL
+  return createGoalBoundaryWallBody(definition)
 }
 
-function wallBodies(): Matter.Body[] {
+/** ゴールの左右境界に置く4px壁。盤面外周と共有する側には呼び出さない。 */
+export function createGoalBoundaryWallBody(definition: GoalArea): Matter.Body {
+  return Bodies.rectangle(definition.x, definition.y, definition.width, definition.height, {
+    isStatic: true,
+    restitution: WALL_RESTITUTION,
+    friction: WALL_FRICTION,
+    label: 'goal-wall',
+  })
+}
+
+function wallBodies(goalArea: GoalArea): Matter.Body[] {
   const half = WALL_THICKNESS / 2
   const options = {
     isStatic: true,
@@ -79,20 +79,15 @@ function wallBodies(): Matter.Body[] {
     friction: WALL_FRICTION,
     label: 'wall',
   }
+  const goalWalls = goalBoundaryWallsForArea(goalArea)
   return [
     Bodies.rectangle(-half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH + half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + half, BOARD_WIDTH + WALL_THICKNESS * 2, WALL_THICKNESS, options),
-    // 左端と床は外周壁を共用する。右端だけを追加してゴール帯をコの字に囲む。
-    // GOAL_EXIT_WALL の左面は見た目のゴール境界と同じX座標で、上端もゴール上端に揃う。
-    createGoalExitWallBody(),
+    ...goalWalls.map(createGoalBoundaryWallBody),
   ]
 }
 
-/**
- * 置かれたパーツ1つぶんの静的Body。パーツ定義のセグメントをそのままBodyにする。
- * ここにパーツ種類ごとの分岐がないため、新しいパーツはpartTypes.tsへ定義を足すだけで動く。
- */
 function partBodies(part: PlacedPart): Matter.Body[] {
   const definition = partDefinition(part.typeId)
   const center = cellCenter(part.cell)
@@ -111,28 +106,59 @@ function partBodies(part: PlacedPart): Matter.Body[] {
   })
 }
 
+type RuntimeBall = {
+  readonly id: string
+  readonly body: Matter.Body
+  status: PuzzleBallSnapshot['status']
+  stopObservation: ReturnType<typeof createStopObservation>
+  stopped: boolean
+  reachedGoal: boolean
+}
+
+function defaultBall(): PuzzleBallState {
+  // Importing the stage definition here would make the fallback less obvious in tests;
+  // the actual game always passes its stage balls.
+  return {
+    id: 'ball-a',
+    flagId: 'jp',
+    startPosition: BALL_START,
+    position: BALL_START,
+    status: 'moving',
+  }
+}
+
+function snapshotFor(runtimeBalls: readonly RuntimeBall[]): PuzzleBallSnapshot[] {
+  return runtimeBalls.map(({ id, body, status, reachedGoal }) => ({
+    id,
+    position: { x: body.position.x, y: body.position.y },
+    status: reachedGoal ? 'goal' : status,
+  }))
+}
+
+function writeBallTransform(element: HTMLElement | null, body: Matter.Body) {
+  if (!element) return
+  element.style.transform = `translate(${body.position.x - BALL_RADIUS}px, ${body.position.y - BALL_RADIUS}px) rotate(${body.angle}rad)`
+}
+
 /**
- * matter-js の Engine だけをヘッドレスで動かす（Matter.Render は使わない）。
- * 描画は毎フレーム、国旗ボールのDOM要素へ直接 transform を書き込む方式にして、
- * Reactの再レンダーを物理演算のフレームから切り離す。
- *
- * Reactが持つのは「どのマスに何を置いたか」と「編集中か実行中か」だけで、
- * 物理Bodyはこのフックの中だけに閉じている。Phase 2で編集モードと実行モードを
- * 行き来させるときも、Reactの状態と物理世界が絡まないようにするための分担。
+ * 1つのMatter worldにstageの全ボールを登録する。Bodyはhook内のMapだけで管理し、
+ * React stateには一意id・位置・状態のスナップショットだけを返す。
  */
 export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandle {
-  // onGoal は呼び出し側の再レンダーのたびに新しい関数になりうる。これを物理世界を作る
-  // useEffect の依存に入れると毎レンダーで世界が作り直されてしまうため、refから最新値を読む。
   const optionsRef = useRef(options)
   useEffect(() => {
     optionsRef.current = options
   })
 
-  const ballElementRef = useRef<HTMLElement | null>(null)
+  const elementsRef = useRef(new Map<string, HTMLElement>())
   const handle = useMemo<PuzzleEngineHandle>(
     () => ({
-      registerBall: (el: HTMLElement | null) => {
-        ballElementRef.current = el
+      registerBall: (ballId, el) => {
+        // Phase 4 の単一ボール呼び出し(registerBall(element))も受け付ける。
+        const id = typeof ballId === 'string' ? ballId : 'ball-a'
+        const element = typeof ballId === 'string' ? el : ballId
+        if (element) elementsRef.current.set(id, element)
+        else elementsRef.current.delete(id)
       },
     }),
     [],
@@ -140,32 +166,49 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
 
   const { running, runId } = options
 
-  // 編集中は開始位置に静止させる。途中停止後も、次の再挑戦はここから始める。
+  // 編集中・停止後は、最後に保存した位置（returnBall後は各startPosition）を描く。
   useEffect(() => {
     if (running) return
-    const el = ballElementRef.current
-    if (!el) return
-    el.style.transform = `translate(${BALL_START.x - BALL_RADIUS}px, ${BALL_START.y - BALL_RADIUS}px)`
-  }, [running, runId])
+    for (const ball of optionsRef.current.balls ?? [defaultBall()]) {
+      const element = elementsRef.current.get(ball.id)
+      if (!element) continue
+      element.style.transform = `translate(${ball.position.x - BALL_RADIUS}px, ${ball.position.y - BALL_RADIUS}px)`
+    }
+  }, [running, runId, options.balls])
 
   useEffect(() => {
     if (!running) return
 
-    // 実行開始時点の配置をスナップショットとして読む。実行中はパーツを触れない仕様のため、
-    // これを依存配列に入れて世界を作り直す必要はない（runIdが実行の世代を表す）。
-    const parts = optionsRef.current.parts
-
+    const current = optionsRef.current
+    const balls = current.balls?.length ? current.balls : [defaultBall()]
+    const goalArea = current.goalArea ?? GOAL_AREA
     const engine = Engine.create({ gravity: { ...GRAVITY } })
-    const ball = Bodies.circle(BALL_START.x, BALL_START.y, BALL_RADIUS, {
-      restitution: BALL_RESTITUTION,
-      friction: BALL_FRICTION,
-      frictionAir: BALL_FRICTION_AIR,
-      density: BALL_DENSITY,
-      label: 'ball',
+    const runtimeBalls: RuntimeBall[] = balls.map((ball) => {
+      const shouldRemainGoal = ball.status === 'goal'
+      const body = Bodies.circle(ball.position.x, ball.position.y, BALL_RADIUS, {
+        isStatic: shouldRemainGoal,
+        restitution: BALL_RESTITUTION,
+        friction: BALL_FRICTION,
+        frictionAir: BALL_FRICTION_AIR,
+        density: BALL_DENSITY,
+        label: `ball:${ball.id}`,
+      })
+      return {
+        id: ball.id,
+        body,
+        status: shouldRemainGoal ? 'goal' : 'moving',
+        stopObservation: createStopObservation(),
+        stopped: false,
+        reachedGoal: shouldRemainGoal,
+      }
     })
-    Composite.add(engine.world, [...wallBodies(), ...parts.flatMap(partBodies), ball])
+    Composite.add(engine.world, [
+      ...wallBodies(goalArea),
+      ...current.parts.flatMap(partBodies),
+      ...runtimeBalls.map(({ body }) => body),
+    ])
 
-    const lastBumperHitAt = new Map<number, number>()
+    const lastBumperHitAt = new Map<string, number>()
     const handleCollisionStart = (collision: Matter.IEventCollision<Matter.Engine>) => {
       for (const pair of collision.pairs) {
         const bumper = pair.bodyA.label.startsWith('bumper:')
@@ -173,12 +216,17 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
           : pair.bodyB.label.startsWith('bumper:')
             ? pair.bodyB
             : null
-        const hitBall = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB.label === 'ball' ? pair.bodyB : null
+        const hitBall = pair.bodyA.label.startsWith('ball:')
+          ? pair.bodyA
+          : pair.bodyB.label.startsWith('ball:')
+            ? pair.bodyB
+            : null
         if (!bumper || !hitBall) continue
 
         const now = performance.now()
-        if (now - (lastBumperHitAt.get(bumper.id) ?? -Infinity) < BUMPER_HIT_COOLDOWN_MS) continue
-        lastBumperHitAt.set(bumper.id, now)
+        const cooldownKey = `${bumper.id}:${hitBall.id}`
+        if (now - (lastBumperHitAt.get(cooldownKey) ?? -Infinity) < BUMPER_HIT_COOLDOWN_MS) continue
+        lastBumperHitAt.set(cooldownKey, now)
         Body.setVelocity(hitBall, bumperBoostVelocity(hitBall.position, bumper.position, hitBall.velocity))
       }
     }
@@ -187,16 +235,10 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     let rafId: number | null = null
     let lastFrameTime: number | null = null
     let accumulator = 0
-    let reachedGoal = false
     let stopped = false
-    let stopObservation = createStopObservation()
 
-    const writeBallTransform = () => {
-      const el = ballElementRef.current
-      if (!el) return
-      const x = ball.position.x - BALL_RADIUS
-      const y = ball.position.y - BALL_RADIUS
-      el.style.transform = `translate(${x}px, ${y}px) rotate(${ball.angle}rad)`
+    const writeAllTransforms = () => {
+      for (const runtime of runtimeBalls) writeBallTransform(elementsRef.current.get(runtime.id) ?? null, runtime.body)
     }
 
     const tick = (now: number) => {
@@ -215,48 +257,55 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
         accumulator -= STEP_MS
         substeps += 1
       }
-      // 上限に達したぶんの端数は捨てる（復帰直後に何フレームも急いで追いつかないように）
       if (substeps >= MAX_SUBSTEPS) accumulator = 0
 
-      // 速度クランプ。薄い板をすり抜けたり、国旗が読めないほど回るのを防ぐ
-      const speed = Math.hypot(ball.velocity.x, ball.velocity.y)
-      if (speed > MAX_SPEED) {
-        const factor = MAX_SPEED / speed
-        Body.setVelocity(ball, { x: ball.velocity.x * factor, y: ball.velocity.y * factor })
-      }
-      if (Math.abs(ball.angularVelocity) > MAX_ANGULAR_VELOCITY) {
-        Body.setAngularVelocity(ball, Math.sign(ball.angularVelocity) * MAX_ANGULAR_VELOCITY)
-      }
+      for (const runtime of runtimeBalls) {
+        if (runtime.body.isStatic) {
+          writeBallTransform(elementsRef.current.get(runtime.id) ?? null, runtime.body)
+          continue
+        }
 
-      writeBallTransform()
+        const speedBeforeClamp = Math.hypot(runtime.body.velocity.x, runtime.body.velocity.y)
+        if (speedBeforeClamp > MAX_SPEED) {
+          const factor = MAX_SPEED / speedBeforeClamp
+          Body.setVelocity(runtime.body, {
+            x: runtime.body.velocity.x * factor,
+            y: runtime.body.velocity.y * factor,
+          })
+        }
+        if (Math.abs(runtime.body.angularVelocity) > MAX_ANGULAR_VELOCITY) {
+          Body.setAngularVelocity(runtime.body, Math.sign(runtime.body.angularVelocity) * MAX_ANGULAR_VELOCITY)
+        }
+        const speed = Math.hypot(runtime.body.velocity.x, runtime.body.velocity.y)
+        writeBallTransform(elementsRef.current.get(runtime.id) ?? null, runtime.body)
 
-      // ゴール判定。入った瞬間に一度だけ通知し、ボールはそのまま転がし続ける
-      // （その場で固定すると動きが不自然に途切れるため）。reachedGoal は
-      // この実行(runId)のあいだ保たれるので、ゴール内で出入りしても再通知はしない。
-      if (!reachedGoal && isInGoalArea(ball.position.x, ball.position.y)) {
-        reachedGoal = true
-        optionsRef.current.onGoal()
-      }
+        if (!runtime.reachedGoal && isInGoalArea(runtime.body.position.x, runtime.body.position.y, goalArea)) {
+          runtime.reachedGoal = true
+          runtime.status = 'goal'
+          optionsRef.current.onGoal(runtime.id, snapshotFor(runtimeBalls))
+        }
 
-      // ゴール後は Phase 1 の「受け皿で自然に転がる」動きを維持するため停止判定しない。
-      const stopResult = observeBallStop(
-        stopObservation,
-        { x: ball.position.x, y: ball.position.y, speed },
-        now,
-        reachedGoal || isInGoalArea(ball.position.x, ball.position.y),
-      )
-      stopObservation = stopResult.observation
-      if (stopResult.stopped) {
-        stopped = true
-        Body.setVelocity(ball, { x: 0, y: 0 })
-        Body.setAngularVelocity(ball, 0)
-        Body.setStatic(ball, true)
-        writeBallTransform()
-        optionsRef.current.onStopped()
+        // ゴール後は自然に転がし続ける。停止判定は未ゴール球だけに適用する。
+        const stopResult = observeBallStop(
+          runtime.stopObservation,
+          { x: runtime.body.position.x, y: runtime.body.position.y, speed },
+          now,
+          runtime.reachedGoal,
+        )
+        runtime.stopObservation = stopResult.observation
+        if (stopResult.stopped) {
+          runtime.stopped = true
+          runtime.status = 'stopped'
+          Body.setVelocity(runtime.body, { x: 0, y: 0 })
+          Body.setAngularVelocity(runtime.body, 0)
+          Body.setStatic(runtime.body, true)
+          writeBallTransform(elementsRef.current.get(runtime.id) ?? null, runtime.body)
+          optionsRef.current.onStopped(runtime.id, snapshotFor(runtimeBalls))
+        }
       }
     }
 
-    writeBallTransform()
+    writeAllTransforms()
     rafId = requestAnimationFrame(tick)
 
     return () => {

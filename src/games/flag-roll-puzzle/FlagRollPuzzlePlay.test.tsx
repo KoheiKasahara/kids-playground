@@ -27,6 +27,20 @@ async function renderGame() {
     </MemoryRouter>,
   )
   await screen.findByRole('heading', { name: 'こっきコロコロパズル' })
+  // Phase 5では最初にステージを選ぶ。既存の盤面操作テストは、従来どおり
+  // easyを選んだ状態から始める。
+  const easyStage = await screen.findByTestId('puzzle-stage-easy')
+  fireEvent.click(easyStage)
+  await screen.findByTestId('puzzle-board')
+}
+
+async function renderStageSelect() {
+  render(
+    <MemoryRouter initialEntries={['/games/flag-roll-puzzle']}>
+      <App />
+    </MemoryRouter>,
+  )
+  await screen.findByRole('heading', { name: 'どのステージで あそぶ？' })
 }
 
 /**
@@ -64,6 +78,80 @@ function dragBoardPart(from: [number, number], to: [number, number]) {
 }
 
 describe('こっきコロコロパズル', () => {
+  test('開始前に3ステージを選べ、選択すると盤面へ進む', async () => {
+    const user = userEvent.setup()
+    await renderStageSelect()
+    expect(screen.getByRole('button', { name: 'かんたん' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ふつう' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'むずかしい' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ふつう' }))
+    expect(screen.getByTestId('puzzle-board')).toBeInTheDocument()
+    expect(screen.getAllByTestId('puzzle-ball')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'バンパー' })).not.toBeInTheDocument()
+  })
+
+  test('むずかしいは2球を同じ国旗で表示し、1回の落下で同時に開始する', async () => {
+    const user = userEvent.setup()
+    await renderStageSelect()
+    await user.click(screen.getByRole('button', { name: 'むずかしい' }))
+    const balls = screen.getAllByTestId('puzzle-ball')
+    expect(balls).toHaveLength(2)
+    expect(new Set(balls.map((ball) => ball.getAttribute('data-ball-id'))).size).toBe(2)
+    expect(new Set(balls.map((ball) => ball.getAttribute('data-flag-id'))).size).toBe(1)
+
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    expect(engineMock.options?.running).toBe(true)
+    expect(engineMock.options?.balls).toHaveLength(2)
+    expect(engineMock.options?.balls?.every((ball) => ball.status === 'moving')).toBe(true)
+  })
+
+  test('むずかしいは1球ゴールでは未クリア、2球目でクリアになる', async () => {
+    const user = userEvent.setup()
+    await renderStageSelect()
+    await user.click(screen.getByRole('button', { name: 'むずかしい' }))
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+
+    act(() => engineMock.options?.onGoal?.('ball-a'))
+    expect(screen.getByTestId('puzzle-board').querySelector('[data-cleared="true"]')).not.toBeInTheDocument()
+    act(() => engineMock.options?.onGoal?.('ball-b'))
+    expect(screen.getByTestId('puzzle-board').querySelector('[data-cleared="true"]')).toBeInTheDocument()
+    expect(screen.getAllByTestId('puzzle-ball').map((ball) => ball.getAttribute('data-status'))).toEqual(['goal', 'goal'])
+  })
+
+  test('2球が同じactでゴール通知されても最後は成功表示になる', async () => {
+    const user = userEvent.setup()
+    await renderStageSelect()
+    await user.click(screen.getByRole('button', { name: 'むずかしい' }))
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+
+    act(() => {
+      engineMock.options?.onGoal?.('ball-a')
+      engineMock.options?.onGoal?.('ball-b')
+    })
+
+    expect(screen.getByRole('status')).toHaveTextContent('ゴール！ すごい！')
+    expect(screen.getByRole('status')).not.toHaveTextContent('あと 1こ！')
+  })
+
+  test('むずかしいで両方止まった後、ゴール済みを動かさず未ゴールだけ再開する', async () => {
+    const user = userEvent.setup()
+    await renderStageSelect()
+    await user.click(screen.getByRole('button', { name: 'むずかしい' }))
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+
+    act(() => engineMock.options?.onGoal?.('ball-a'))
+    act(() => engineMock.options?.onStopped?.('ball-b'))
+    expect(screen.getByRole('button', { name: 'ボールを おとす！' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    expect(engineMock.options?.balls?.find((ball) => ball.id === 'ball-a')?.status).toBe('goal')
+    expect(engineMock.options?.balls?.find((ball) => ball.id === 'ball-b')?.status).toBe('moving')
+
+    act(() => engineMock.options?.onGoal?.('ball-b'))
+    expect(screen.getByRole('status')).toHaveTextContent('ゴール！ すごい！')
+    expect(screen.getByRole('status')).not.toHaveTextContent('あと 1こ！')
+  })
+
   test('横画面では盤面と操作パネルを2ペインにし、縦スクロール一覧から左へドラッグして置ける', async () => {
     let matches = true
     let onChange: (() => void) | undefined

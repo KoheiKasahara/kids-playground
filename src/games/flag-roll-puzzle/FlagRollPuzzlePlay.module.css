@@ -46,10 +46,35 @@
 
 .title {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
   text-align: center;
   font-size: 19px;
+  text-overflow: ellipsis;
   /* 折り返して2行になるとヘッダが盤面の高さを削るため、1行に収める */
   white-space: nowrap;
+}
+
+.stageButton {
+  flex: 0 0 auto;
+  min-height: 44px;
+  max-width: 118px;
+  padding: 3px 8px;
+  overflow: hidden;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  color: var(--color-primary-dark);
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stageButton:disabled {
+  cursor: default;
+  opacity: 0.7;
 }
 
 /* 現在の国旗を常に見せ、編集時だけそのまま選び直しの入口にする。 */

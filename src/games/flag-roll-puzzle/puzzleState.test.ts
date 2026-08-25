@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import {
   clearAll,
+  changeStage,
   clearPartSelection,
   createPuzzleState,
   reachGoal,
+  markBallGoal,
+  markBallStopped,
   removeSelectedPart,
   returnBall,
   rotateSelectedPart,
@@ -200,5 +203,74 @@ describe('puzzleState', () => {
     expect(cleared.phase).toBe('edit')
     expect(cleared.parts).toEqual([])
     expect(cleared.selectedPartId).toBeNull()
+  })
+
+  test('むずかしいは2球を一意IDと個別状態で持ち、1球だけではクリアしない', () => {
+    const state = createPuzzleState('hard', 'fr')
+    expect(state.balls.map((ball) => ball.id)).toEqual(['ball-a', 'ball-b'])
+    expect(state.balls.every((ball) => ball.flagId === 'fr')).toBe(true)
+
+    const running = startRun(state)
+    const firstGoal = markBallGoal(running, 'ball-a', [
+      { id: 'ball-a', position: { x: 120, y: 820 }, status: 'goal' },
+      { id: 'ball-b', position: { x: 270, y: 200 }, status: 'moving' },
+    ])
+    expect(firstGoal.phase).toBe('running')
+    expect(firstGoal.balls.find((ball) => ball.id === 'ball-a')?.status).toBe('goal')
+    expect(firstGoal.balls.find((ball) => ball.id === 'ball-b')?.status).toBe('moving')
+  })
+
+  test('2球ともゴールしたときだけclearedになる', () => {
+    const running = startRun(createPuzzleState('hard'))
+    const first = markBallGoal(running, 'ball-a')
+    const cleared = markBallGoal(first, 'ball-b')
+    expect(cleared.phase).toBe('cleared')
+    expect(cleared.balls.every((ball) => ball.status === 'goal')).toBe(true)
+  })
+
+  test('片方停止・片方移動中はrunning、両方停止またはゴール+停止でstoppedになる', () => {
+    const running = startRun(createPuzzleState('hard'))
+    const oneStopped = markBallStopped(running, 'ball-a')
+    expect(oneStopped.phase).toBe('running')
+    const bothStopped = markBallStopped(oneStopped, 'ball-b')
+    expect(bothStopped.phase).toBe('stopped')
+
+    const goalThenStop = markBallStopped(markBallGoal(running, 'ball-a'), 'ball-b')
+    expect(goalThenStop.phase).toBe('stopped')
+  })
+
+  test('再開時はゴール済みを動かさず、未ゴール停止球だけを動かす', () => {
+    const running = startRun(createPuzzleState('hard'))
+    const stopped = markBallStopped(markBallGoal(running, 'ball-a'), 'ball-b')
+    const resumed = startRun(stopped)
+    expect(resumed.balls.find((ball) => ball.id === 'ball-a')?.status).toBe('goal')
+    expect(resumed.balls.find((ball) => ball.id === 'ball-b')?.status).toBe('moving')
+  })
+
+  test('もどす・ぜんぶけすは全ボールを各スタートへ戻し、国旗とステージを維持する', () => {
+    const placed = tryPlacePart(createPuzzleState('hard', 'us'), 'plank', { col: 1, row: 1 })!
+    const running = startRun(placed)
+    const progressed = markBallGoal(running, 'ball-a')
+    const returned = returnBall(progressed)
+    expect(returned.stageId).toBe('hard')
+    expect(returned.parts).toHaveLength(1)
+    expect(returned.balls.every((ball) => ball.flagId === 'us' && ball.status === 'ready')).toBe(true)
+    expect(returned.balls.map((ball) => ball.position.x)).toEqual([90, 270])
+
+    const cleared = clearAll(startRun(returned))
+    expect(cleared.stageId).toBe('hard')
+    expect(cleared.parts).toEqual([])
+    expect(cleared.balls).toHaveLength(2)
+  })
+
+  test('ステージ切り替えは進行とパーツを初期化して国旗を引き継ぐ', () => {
+    const hard = createPuzzleState('hard', 'de')
+    const changed = changeStage(hard, 'normal')
+    expect(changed.stageId).toBe('normal')
+    expect(changed.balls).toHaveLength(1)
+    expect(changed.balls[0].flagId).toBe('de')
+    expect(changed.balls[0].status).toBe('ready')
+    expect(changed.parts).toEqual([])
+    expect(changed.phase).toBe('edit')
   })
 })

@@ -42,6 +42,14 @@ export const GRID_BOTTOM = GRID_TOP + GRID_HEIGHT
 /** ゴール帯の高さ */
 export const GOAL_HEIGHT = 68
 
+/** ステージごとに変えられるゴール帯。論理座標は盤面座標で持つ。 */
+export type GoalArea = {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+
 export const BOARD_WIDTH = GRID_LEFT + GRID_WIDTH
 export const BOARD_HEIGHT = GRID_BOTTOM + GOAL_HEIGHT
 
@@ -69,7 +77,7 @@ export const BALL_START = {
  * 真下から外した位置に置くことで、最小構成でもパーツを置く意味が生まれる。
  * 一方で失敗の概念は作らないため、外れたボールは床に残るだけにしてある。
  */
-export const GOAL_AREA = {
+export const GOAL_AREA: GoalArea = {
   x: GRID_LEFT,
   y: GRID_BOTTOM,
   width: CELL_SIZE * 2,
@@ -97,6 +105,38 @@ export const GOAL_EXIT_WALL = {
   width: GOAL_EXIT_WALL_THICKNESS,
   height: GOAL_AREA.height,
 } as const
+
+/**
+ * ステージ固有ゴールの左右境界壁。盤面の外周と共有する側は追加しない。
+ * 壁の中心を返すため、ゴール内側の面は常にゴール境界へ一致する。
+ */
+export function goalBoundaryWallsForArea(goalArea: GoalArea): GoalArea[] {
+  const walls: GoalArea[] = []
+  if (goalArea.x > GRID_LEFT) {
+    walls.push({
+      x: goalArea.x - GOAL_EXIT_WALL_THICKNESS / 2,
+      y: goalArea.y + goalArea.height / 2,
+      width: GOAL_EXIT_WALL_THICKNESS,
+      height: goalArea.height,
+    })
+  }
+  if (goalArea.x + goalArea.width < BOARD_WIDTH) {
+    walls.push({
+      x: goalArea.x + goalArea.width + GOAL_EXIT_WALL_THICKNESS / 2,
+      y: goalArea.y + goalArea.height / 2,
+      width: GOAL_EXIT_WALL_THICKNESS,
+      height: goalArea.height,
+    })
+  }
+  return walls
+}
+
+/** 旧API互換の右側出口壁。右端ゴールではnullになる。 */
+export function goalExitWallForArea(goalArea: GoalArea): GoalArea | null {
+  return goalBoundaryWallsForArea(goalArea).find(
+    (wall) => wall.x > goalArea.x + goalArea.width / 2,
+  ) ?? null
+}
 
 /** 盤外へ逸脱させないための外周壁の厚み。壁は盤面の外側に置く */
 export const WALL_THICKNESS = 40

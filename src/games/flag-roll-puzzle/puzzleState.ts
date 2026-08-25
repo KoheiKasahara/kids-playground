@@ -1,38 +1,75 @@
-import type { GridCell } from './grid'
+import type { GoalArea } from './boardLayout'
+import type { GridCell, Point } from './grid'
 import { nextRotationType, type PartTypeId } from './partTypes'
 import { movePart, placePart, removePart, rotatePart, type PlacedPart } from './placement'
+import {
+  DEFAULT_PUZZLE_STAGE_ID,
+  puzzleStage,
+  type PuzzleStageId,
+} from './puzzleStages'
 
-/**
- * ゲームの進行状態。
- * - edit    : パーツを置ける。ボールは開始位置で静止している
- * - running : 物理シミュレーション中。パーツは触れない
- * - stopped : 途中で止まった。ボールを開始位置へ戻して、パーツを編集できる
- * - cleared : ゴールに入った。ゴール内では物理をそのまま継続する
- */
+/** ゲーム全体の進行状態。ゴール後も物理は継続するため cleared は表示上の状態だけを表す。 */
 export type PuzzlePhase = 'edit' | 'running' | 'stopped' | 'cleared'
 
+export type PuzzleBallStatus = 'ready' | 'moving' | 'stopped' | 'goal'
+
+/** React stateへ保存するボール情報。Matter Bodyはここへ入れず、物理フック内で管理する。 */
+export type PuzzleBallState = {
+  readonly id: string
+  readonly flagId: string
+  readonly startPosition: Point
+  readonly position: Point
+  readonly status: PuzzleBallStatus
+}
+
+/** 物理フックから状態更新へ渡す、全ボールの現在値スナップショット。 */
+export type PuzzleBallSnapshot = {
+  readonly id: string
+  readonly position: Point
+  readonly status: PuzzleBallStatus
+}
+
 export type PuzzleState = {
+  readonly stageId: PuzzleStageId
+  readonly goalArea: GoalArea
   readonly phase: PuzzlePhase
+  readonly balls: readonly PuzzleBallState[]
   readonly parts: readonly PlacedPart[]
-  /**
-   * 盤面でいま選んでいるパーツのid。選んでいなければ null。
-   * Phase 1では「選んだ1枚だけ消す」ためだけに使うが、Phase 2で足す移動・回転も
-   * 「まず選ぶ → 選んだものを操作する」という同じ流れになるため、選択状態は
-   * 画面のローカルな状態ではなくゲームの状態として持たせてある。
-   */
+  /** 盤面でいま選んでいるパーツのid。選んでいなければ null。 */
   readonly selectedPartId: string | null
-  /**
-   * 物理世界の世代。「ボールをおとす」たびに増やす。
-   * エンジン側はこの値の変化を見て世界を作り直すので、前回の実行の速度や
-   * 位置が次の実行へ持ち越されないことを構造で保証できる。
-   */
+  /** 物理世界の世代。「ボールをおとす」たびに増やす。 */
   readonly runId: number
-  /** パーツIDの採番用。React の key と物理Bodyのラベルに使う */
+  /** パーツIDの採番用。Reactのkeyと物理Bodyのラベルに使う。 */
   readonly nextPartNumber: number
 }
 
-export function createPuzzleState(): PuzzleState {
-  return { phase: 'edit', parts: [], selectedPartId: null, runId: 0, nextPartNumber: 1 }
+const DEFAULT_FLAG_ID = 'jp'
+
+function initialBalls(stageId: PuzzleStageId, flagId: string): PuzzleBallState[] {
+  return puzzleStage(stageId).balls.map((ball) => ({
+    id: ball.id,
+    flagId: ball.flagId ?? flagId,
+    startPosition: { ...ball.startPosition },
+    position: { ...ball.startPosition },
+    status: 'ready',
+  }))
+}
+
+export function createPuzzleState(
+  stageId: PuzzleStageId = DEFAULT_PUZZLE_STAGE_ID,
+  flagId = DEFAULT_FLAG_ID,
+): PuzzleState {
+  const stage = puzzleStage(stageId)
+  return {
+    stageId: stage.id,
+    goalArea: stage.goalArea,
+    phase: 'edit',
+    balls: initialBalls(stage.id, flagId),
+    parts: [...(stage.fixedParts ?? [])],
+    selectedPartId: null,
+    runId: 0,
+    nextPartNumber: 1,
+  }
 }
 
 /** パーツを編集できる2つの状態。停止中も通常の編集操作を再利用する。 */
@@ -40,96 +77,182 @@ export function isEditingPhase(phase: PuzzlePhase): boolean {
   return phase === 'edit' || phase === 'stopped'
 }
 
-/**
- * パーツを1つ置く。編集中でない、または置けない位置のときは null を返す
- * （呼び出し側が「置けなかった」ことを子どもへ伝えられるようにする）。
- */
+function stageAllowsPart(state: PuzzleState, typeId: PartTypeId): boolean {
+  const stage = puzzleStage(state.stageId)
+  if (!stage.availablePartTypeIds.includes(typeId)) return false
+  const limit = stage.partLimits?.[typeId]
+  if (limit === undefined) return true
+  return state.parts.filter((part) => part.typeId === typeId).length < limit
+}
+
+/** パーツを1つ置く。ステージの使用可能種類・個数もここで守る。 */
 export function tryPlacePart(
   state: PuzzleState,
   typeId: PartTypeId,
   cell: GridCell,
 ): PuzzleState | null {
-  if (!isEditingPhase(state.phase)) return null
+  if (!isEditingPhase(state.phase) || !stageAllowsPart(state, typeId)) return null
   const parts = placePart(state.parts, typeId, cell, `part-${state.nextPartNumber}`)
   if (!parts) return null
-  // 新しく置いたら、それまで選んでいたパーツの選択は解く（消す対象を取り違えないため）
   return { ...state, parts, selectedPartId: null, nextPartNumber: state.nextPartNumber + 1 }
 }
 
-/**
- * 置いてあるパーツを別のマスへ動かす。編集中で、動かせる位置のときだけ。
- * 動かせない位置なら null を返し、呼び出し側が「元の場所へ戻す」挙動を選べるようにする。
- * idは変えないので、選んでいたパーツはそのまま選ばれたまま移動する。
- */
-export function tryMovePart(
-  state: PuzzleState,
-  partId: string,
-  cell: GridCell,
-): PuzzleState | null {
+export function tryMovePart(state: PuzzleState, partId: string, cell: GridCell): PuzzleState | null {
   if (!isEditingPhase(state.phase)) return null
   const parts = movePart(state.parts, partId, cell)
   if (!parts) return null
   return { ...state, parts }
 }
 
-/**
- * 盤面のパーツを選ぶ。編集中のときだけ受け付ける。
- * 同じパーツをもう一度選んだら選択を解く（タップだけで選び直せるようにする）。
- */
 export function selectPart(state: PuzzleState, partId: string): PuzzleState {
   if (!isEditingPhase(state.phase)) return state
   if (!state.parts.some((part) => part.id === partId)) return state
   return { ...state, selectedPartId: state.selectedPartId === partId ? null : partId }
 }
 
-/** 選択を解く。何も選んでいなければ状態を変えない */
 export function clearPartSelection(state: PuzzleState): PuzzleState {
   if (state.selectedPartId === null) return state
   return { ...state, selectedPartId: null }
 }
 
-/** 選んでいるパーツを1つだけ外す。編集中で、かつ選んでいるときだけ */
 export function removeSelectedPart(state: PuzzleState): PuzzleState {
   if (!isEditingPhase(state.phase) || state.selectedPartId === null) return state
   return { ...state, parts: removePart(state.parts, state.selectedPartId), selectedPartId: null }
 }
 
-/** 選んでいるパーツを次の固定角度へ回す。置けない向きは現在のままにする。 */
 export function rotateSelectedPart(state: PuzzleState): PuzzleState {
   if (!isEditingPhase(state.phase) || state.selectedPartId === null) return state
   const current = state.parts.find((part) => part.id === state.selectedPartId)
   if (!current) return state
   const nextTypeId = nextRotationType(current.typeId)
+  // 回転後の向き（例: longPlankVertical）はtrayに並ばない専用IDでも、
+  // 既に置けるパーツからの派生なのでステージ制限を再適用しない。
   if (!nextTypeId) return state
   const parts = rotatePart(state.parts, current.id, nextTypeId)
   return parts ? { ...state, parts } : state
 }
 
-/** 「ボールをおとす」。毎回、開始位置から実行へ移る */
+function snapshotsById(snapshots: readonly PuzzleBallSnapshot[] | undefined): Map<string, PuzzleBallSnapshot> {
+  return new Map((snapshots ?? []).map((snapshot) => [snapshot.id, snapshot]))
+}
+
+function updateBallSnapshots(
+  balls: readonly PuzzleBallState[],
+  snapshots: readonly PuzzleBallSnapshot[] | undefined,
+): PuzzleBallState[] {
+  const byId = snapshotsById(snapshots)
+  return balls.map((ball) => {
+    const snapshot = byId.get(ball.id)
+    if (!snapshot) return ball
+    return { ...ball, position: { ...snapshot.position } }
+  })
+}
+
+function phaseAfterBallChange(balls: readonly PuzzleBallState[]): PuzzlePhase {
+  if (balls.every((ball) => ball.status === 'goal')) return 'cleared'
+  if (balls.some((ball) => ball.status === 'moving')) return 'running'
+  if (balls.some((ball) => ball.status === 'ready')) return 'edit'
+  return 'stopped'
+}
+
+/** 物理側から全ボールの位置だけを同期する。状態(status)はイベント関数で更新する。 */
+export function syncBallSnapshots(
+  state: PuzzleState,
+  snapshots: readonly PuzzleBallSnapshot[],
+): PuzzleState {
+  return { ...state, balls: updateBallSnapshots(state.balls, snapshots) }
+}
+
+/** 「ボールをおとす」。未ゴールのready/stoppedボールだけを同時に動かす。 */
 export function startRun(state: PuzzleState): PuzzleState {
   if (!isEditingPhase(state.phase)) return state
-  return { ...state, phase: 'running', selectedPartId: null, runId: state.runId + 1 }
+  const balls = state.balls.map((ball) =>
+    ball.status === 'goal' ? ball : { ...ball, status: 'moving' as const },
+  )
+  return {
+    ...state,
+    phase: balls.every((ball) => ball.status === 'goal') ? 'cleared' : 'running',
+    balls,
+    selectedPartId: null,
+    runId: state.runId + 1,
+  }
 }
 
-/** 実行中に途中停止した。ボールは開始位置へ戻し、置いたパーツだけ残す。 */
-export function stopRun(state: PuzzleState): PuzzleState {
+/** 個別ボールがゴールへ入った。全ボール到達時だけ全体をclearedにする。 */
+export function markBallGoal(
+  state: PuzzleState,
+  ballId: string,
+  snapshots?: readonly PuzzleBallSnapshot[],
+): PuzzleState {
+  if (state.phase !== 'running' && state.phase !== 'cleared') return state
+  if (!state.balls.some((ball) => ball.id === ballId)) return state
+  const synced = updateBallSnapshots(state.balls, snapshots)
+  const balls = synced.map((ball) =>
+    ball.id === ballId ? { ...ball, status: 'goal' as const } : ball,
+  )
+  return { ...state, balls, phase: phaseAfterBallChange(balls) }
+}
+
+/** 個別ボールが途中停止した。ほかのボールが動いている間はrunningを維持する。 */
+export function markBallStopped(
+  state: PuzzleState,
+  ballId: string,
+  snapshots?: readonly PuzzleBallSnapshot[],
+): PuzzleState {
   if (state.phase !== 'running') return state
-  return { ...state, phase: 'stopped' }
+  if (!state.balls.some((ball) => ball.id === ballId)) return state
+  const synced = updateBallSnapshots(state.balls, snapshots)
+  const balls = synced.map((ball) =>
+    ball.id === ballId && ball.status !== 'goal' ? { ...ball, status: 'stopped' as const } : ball,
+  )
+  return { ...state, balls, phase: phaseAfterBallChange(balls) }
 }
 
-/** ゴール到達。実行中のときだけクリアへ移る（同じ実行で二重に呼ばれても増えない） */
-export function reachGoal(state: PuzzleState): PuzzleState {
-  if (state.phase !== 'running') return state
-  return { ...state, phase: 'cleared' }
+/** 既存の単一ボール用呼び出しとの互換。複数球では最初の未ゴール球を対象にする。 */
+export function reachGoal(
+  state: PuzzleState,
+  ballId?: string,
+  snapshots?: readonly PuzzleBallSnapshot[],
+): PuzzleState {
+  const targetId = ballId ?? state.balls.find((ball) => ball.status !== 'goal')?.id
+  return targetId ? markBallGoal(state, targetId, snapshots) : state
 }
 
-/** 「ボールをもどす」。置いたパーツはそのままに、ボールだけ開始位置へ戻す */
+/** 既存の単一ボール用呼び出しとの互換。イベントが個別化されたらmarkBallStoppedを使う。 */
+export function stopRun(
+  state: PuzzleState,
+  ballId?: string,
+  snapshots?: readonly PuzzleBallSnapshot[],
+): PuzzleState {
+  if (ballId) return markBallStopped(state, ballId, snapshots)
+  const targetId = state.balls.find((ball) => ball.status === 'moving')?.id
+  return targetId ? markBallStopped(state, targetId, snapshots) : state
+}
+
+/** 各ボールをそれぞれのスタート位置へ戻す。パーツと国旗は維持する。 */
 export function returnBall(state: PuzzleState): PuzzleState {
-  if (state.phase === 'edit') return state
-  return { ...state, phase: 'edit', selectedPartId: null }
+  if (state.phase === 'edit' && state.balls.every((ball) => ball.status === 'ready')) return state
+  return {
+    ...state,
+    phase: 'edit',
+    balls: state.balls.map((ball) => ({ ...ball, position: { ...ball.startPosition }, status: 'ready' })),
+    selectedPartId: null,
+  }
 }
 
-/** 「ぜんぶ けす」。パーツを全部外し、ボールも開始位置へ戻す */
+/** パーツを全部外し、複数ボール状態も初期化する。ステージと国旗は維持する。 */
 export function clearAll(state: PuzzleState): PuzzleState {
-  return { ...state, phase: 'edit', parts: [], selectedPartId: null }
+  const reset = returnBall({ ...state, phase: 'stopped' })
+  return { ...reset, parts: [], selectedPartId: null, nextPartNumber: 1 }
+}
+
+/** ステージを選び直したときの初期化。現在選択中の国旗は各ボールへ引き継ぐ。 */
+export function changeStage(state: PuzzleState, stageId: PuzzleStageId): PuzzleState {
+  const selectedFlagId = state.balls[0]?.flagId ?? DEFAULT_FLAG_ID
+  return createPuzzleState(stageId, selectedFlagId)
+}
+
+/** 現在選択中の国旗を全ボールへ反映する。内部はボールごとのflagIdを維持する。 */
+export function setSelectedFlag(state: PuzzleState, flagId: string): PuzzleState {
+  return { ...state, balls: state.balls.map((ball) => ({ ...ball, flagId })) }
 }

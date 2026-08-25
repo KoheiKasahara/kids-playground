@@ -43,6 +43,33 @@
   border-bottom: 2px dashed rgba(73, 80, 87, 0.25);
 }
 
+/* 複数ボールでも開始位置を見失わないための小さな目印。ボールの下に描く。 */
+.startMarker {
+  position: absolute;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  margin-top: -22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(76, 110, 245, 0.42);
+  border-radius: 50%;
+  color: rgba(38, 78, 145, 0.7);
+  font-size: 13px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.startMarker span {
+  position: absolute;
+  top: -17px;
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.76);
+}
+
 /*
  * マス目の補助線。線そのものは背景のグラデーションで描く（マスの数だけ
  * 要素を作らないので、行数・列数を増やしても描画コストが変わらない）。
@@ -156,6 +183,7 @@
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 2;
   will-change: transform;
 }
 
