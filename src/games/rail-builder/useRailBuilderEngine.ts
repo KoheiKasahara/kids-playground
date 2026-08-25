@@ -16,10 +16,12 @@ import {
 const WORLD_SIZE = 50
 const WORLD_HALF_SIZE = WORLD_SIZE / 2
 const PAN_LIMIT = 15
-const MIN_ZOOM = 0.72
-const MAX_ZOOM = 1.75
+export const ZOOM_STEP = 0.14
+// 元のズーム範囲(0.72〜1.75)の上下に、+/-ボタン3段階ぶんずつ広げる
+export const MIN_ZOOM = 0.72 - ZOOM_STEP * 3
+export const MAX_ZOOM = 1.75 + ZOOM_STEP * 3
 const DEFAULT_ZOOM = 1
-const BASE_VIEW_HEIGHT = 15
+const BASE_VIEW_SIZE = 15
 const POINTER_MOVE_THRESHOLD = 6
 
 export type RailBuilderEngineOptions = {
@@ -223,8 +225,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const width = Math.max(1, rect.width)
       const height = Math.max(1, rect.height)
       const aspect = width / height
-      const viewHeight = BASE_VIEW_HEIGHT / activeZoom
-      const viewWidth = viewHeight * aspect
+      const viewSize = BASE_VIEW_SIZE / activeZoom
+      // 縦横どちらの向きでも見え方の拡大率が揃うよう、短い辺の方をviewSizeに固定する。
+      const viewWidth = aspect >= 1 ? viewSize * aspect : viewSize
+      const viewHeight = aspect >= 1 ? viewSize : viewSize / aspect
       camera.left = -viewWidth / 2
       camera.right = viewWidth / 2
       camera.top = viewHeight / 2
