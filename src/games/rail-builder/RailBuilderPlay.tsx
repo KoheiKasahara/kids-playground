@@ -76,8 +76,12 @@ export default function RailBuilderPlay() {
   })))
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>('rail-1')
   const [zoom, setZoom] = useState(1)
+  const [trainStatus, setTrainStatus] = useState<'ready' | 'running' | 'waiting'>('ready')
+  const [occupiedRailIds, setOccupiedRailIds] = useState<string[]>([])
 
   const selectedPiece = pieces.find((piece) => piece.id === selectedPieceId)
+  const occupiedRailIdSet = useMemo(() => new Set(occupiedRailIds), [occupiedRailIds])
+  const selectedPieceIsOccupied = selectedPieceId !== null && occupiedRailIdSet.has(selectedPieceId)
 
   const handlePiecesChange = useCallback((nextPieces: RailPiece[]) => {
     setPieces(nextPieces)
@@ -87,13 +91,16 @@ export default function RailBuilderPlay() {
     setSelectedPieceId(pieceId)
   }, [])
 
-  const { registerContainer, getCameraTarget } = useRailBuilderEngine({
+  const { registerContainer, getCameraTarget, startTrain, focusTrain } = useRailBuilderEngine({
     pieces,
     selectedPieceId,
     zoom,
     onPiecesChange: handlePiecesChange,
     onSelectPiece: handleSelectPiece,
     onZoomChange: setZoom,
+    lockedPieceIds: occupiedRailIdSet,
+    onTrainStatusChange: setTrainStatus,
+    onTrainOccupiedIdsChange: setOccupiedRailIds,
   })
 
   const addPiece = useCallback((kind: RailPieceKind) => {
@@ -107,24 +114,31 @@ export default function RailBuilderPlay() {
   }, [getCameraTarget, pieces])
 
   const rotateSelected = useCallback(() => {
-    if (selectedPieceId === null) return
+    if (selectedPieceId === null || occupiedRailIdSet.has(selectedPieceId)) return
     setPieces((current) => rotateRailPiece(current, selectedPieceId))
-  }, [selectedPieceId])
+  }, [occupiedRailIdSet, selectedPieceId])
 
   const deleteSelected = useCallback(() => {
-    if (selectedPieceId === null) return
+    if (selectedPieceId === null || occupiedRailIdSet.has(selectedPieceId)) return
     setPieces((current) => deleteRailPiece(current, selectedPieceId))
     setSelectedPieceId(null)
-  }, [selectedPieceId])
+  }, [occupiedRailIdSet, selectedPieceId])
 
   const zoomOut = useCallback(() => setZoom((value) => Math.max(MIN_ZOOM, value - ZOOM_STEP)), [])
   const zoomIn = useCallback(() => setZoom((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP)), [])
 
-  const hint = useMemo(() => (
-    selectedPiece === undefined
-      ? 'せんろを えらんで うごかそう'
-      : 'せんろを つかんで つなげよう'
-  ), [selectedPiece])
+  const hint = useMemo(() => {
+    if (selectedPieceIsOccupied) return 'でんしゃが のっている せんろは そのままだよ'
+    if (trainStatus === 'waiting') return 'まってるよ。せんろを つないで すすもう'
+    if (selectedPiece === undefined) return 'せんろを えらんで うごかそう'
+    return 'せんろを つかんで つなげよう'
+  }, [selectedPiece, selectedPieceIsOccupied, trainStatus])
+
+  const launchLabel = trainStatus === 'ready'
+    ? 'しゅっぱつ'
+    : trainStatus === 'waiting'
+      ? 'すすむ'
+      : 'はしってるよ'
 
   return (
     <main className={styles.page}>
@@ -153,6 +167,22 @@ export default function RailBuilderPlay() {
           <button type="button" className={styles.iconButton} onClick={zoomIn} aria-label="おおきく みる">＋</button>
         </div>
 
+        <div className={styles.trainControls} aria-label="でんしゃの そうさ">
+          <button
+            type="button"
+            className={styles.launchButton}
+            onClick={startTrain}
+            disabled={trainStatus === 'running'}
+            aria-label={launchLabel}
+          >
+            <span aria-hidden="true">🚂</span>
+            <span>{launchLabel}</span>
+          </button>
+          <button type="button" className={styles.focusButton} onClick={focusTrain}>
+            でんしゃを みる
+          </button>
+        </div>
+
         <section className={styles.tray} aria-label="せんろを えらぶ">
           <div className={styles.trayTools}>
             <button type="button" className={styles.toolButton} onClick={() => addPiece('straight')} aria-label="ちょくせんを ついか">
@@ -163,16 +193,16 @@ export default function RailBuilderPlay() {
               <RailPreview kind="curve" />
               <span>カーブ</span>
             </button>
-            <button type="button" className={styles.toolButton} onClick={rotateSelected} disabled={selectedPiece === undefined} aria-label="せんろを 90ど まわす">
+            <button type="button" className={styles.toolButton} onClick={rotateSelected} disabled={selectedPiece === undefined || selectedPieceIsOccupied} aria-label="せんろを 90ど まわす">
               <span className={styles.actionIcon} aria-hidden="true">↻</span>
               <span>まわす</span>
             </button>
-            <button type="button" className={`${styles.toolButton} ${styles.deleteButton}`} onClick={deleteSelected} disabled={selectedPiece === undefined} aria-label="せんろを けす">
+            <button type="button" className={`${styles.toolButton} ${styles.deleteButton}`} onClick={deleteSelected} disabled={selectedPiece === undefined || selectedPieceIsOccupied} aria-label="せんろを けす">
               <span className={styles.actionIcon} aria-hidden="true">×</span>
               <span>けす</span>
             </button>
           </div>
-          <p className={styles.trayHint}>つなぎめを ちかづけると ぴったり！</p>
+          <p className={styles.trayHint}>{selectedPieceIsOccupied ? 'でんしゃが いる あいだは せんろを うごかせないよ' : 'つなぎめを ちかづけると ぴったり！'}</p>
         </section>
       </div>
     </main>
