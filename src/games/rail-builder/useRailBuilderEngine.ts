@@ -517,7 +517,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         if (ground === null) return
         const delta = subtract(panLastGround, ground)
         setCameraTarget(add(cameraTarget, delta))
-        panLastGround = ground
+        // カメラ移動範囲の端でクランプされた場合、生のraycast結果をそのまま
+        // 次回の基準にすると実際のカメラ位置とズレてがたつくため、
+        // クランプ後のカメラで再計算した地面座標を基準にする。
+        panLastGround = intersectGround(event) ?? ground
       }
       void previous
     }
