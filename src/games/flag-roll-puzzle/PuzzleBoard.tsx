@@ -7,7 +7,6 @@ import {
   BOARD_WIDTH,
   CELL_SIZE,
   GOAL_AREA,
-  GOAL_RAMP,
   GRID_BOTTOM,
   GRID_HEIGHT,
   GRID_LEFT,
@@ -165,19 +164,6 @@ export default function PuzzleBoard({
           >
             ゴール
           </div>
-          {/* ゴールの受け皿のふち。物理Body（usePuzzleEngine）と同じ中心・大きさ・角度で描く */}
-          <div
-            className={styles.goalRamp}
-            aria-hidden="true"
-            style={{
-              left: GOAL_RAMP.x - GOAL_RAMP.length / 2,
-              top: GOAL_RAMP.y - GOAL_RAMP.thickness / 2,
-              width: GOAL_RAMP.length,
-              height: GOAL_RAMP.thickness,
-              transform: `rotate(${GOAL_RAMP.angleDeg}deg)`,
-            }}
-          />
-
           {/*
             usePuzzleEngine は「盤面の原点(0,0)を基準にした transform: translate(x, y)」を
             この要素へ直接書き込む。FlagBall 自体は選択画面などの単体表示でも成立するよう
