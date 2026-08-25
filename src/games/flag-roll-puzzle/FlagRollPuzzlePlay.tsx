@@ -27,6 +27,7 @@ import {
   isEditingPhase,
 } from './puzzleState'
 import { useBoardScale } from './useBoardScale'
+import { useLandscapeLayout } from './useLandscapeLayout'
 import { usePuzzleEngine } from './usePuzzleEngine'
 import styles from './FlagRollPuzzlePlay.module.css'
 
@@ -79,6 +80,7 @@ export default function FlagRollPuzzlePlay() {
   const [message, setMessage] = useState('')
 
   const { containerRef, scale, width, height } = useBoardScale()
+  const isLandscapeLayout = useLandscapeLayout()
   const boardRef = useRef<HTMLDivElement | null>(null)
   const dragStartPointRef = useRef<{ x: number; y: number } | null>(null)
   // ドラッグして置いた直後にも click は飛んでくる。その click で「選択」まで
@@ -160,9 +162,10 @@ export default function FlagRollPuzzlePlay() {
   /** ドラッグを開始する。掴んだ相手（置き場のパーツ／盤面のパーツ）だけが違う */
   const startDrag = (next: DragState, event: PointerEvent<Element>) => {
     primeAudio()
-    // jsdom や一部の組込みブラウザは Pointer Capture を持たないことがある。
-    // 置き場は横スワイプをブラウザ標準のスクロールへ渡すため、Captureしない。
-    if (next.source === 'board') event.currentTarget.setPointerCapture?.(event.pointerId)
+    // PartTray 側でスクロールかドラッグかを判定した後にだけここへ来る。
+    // Captureを取ってペイン境界を越えても pointerup を受け取り、右側のカードから
+    // 左側盤面まで長くドラッグしてもプレビューとドロップが途切れないようにする。
+    event.currentTarget.setPointerCapture?.(event.pointerId)
     dragStartPointRef.current = { x: event.clientX, y: event.clientY }
     setDrag(next)
   }
@@ -336,49 +339,66 @@ export default function FlagRollPuzzlePlay() {
           : 'ころころ ころがってるよ！')
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-layout={isLandscapeLayout ? 'landscape' : 'portrait'}>
       <header className={styles.header}>
         <button type="button" className={styles.quit} onClick={() => navigate('/')}>
           やめる
         </button>
         <h1 className={styles.title}>こっきコロコロパズル</h1>
-        <button
-          type="button"
-          className={styles.flagButton}
-          aria-label={`こっきを かえる（${ballFlag.nameJa}）`}
-          disabled={!editing}
-          onClick={() => setIsFlagPickerOpen(true)}
-        >
-          <span className={styles.flagButtonLabel}>こっき</span>
-          <FlagBall flag={ballFlag} size={28} />
-        </button>
+        {!isLandscapeLayout ? (
+          <button
+            type="button"
+            className={[styles.flagButton, styles.headerFlagButton].join(' ')}
+            aria-label={`こっきを かえる（${ballFlag.nameJa}）`}
+            disabled={!editing}
+            onClick={() => setIsFlagPickerOpen(true)}
+          >
+            <span className={styles.flagButtonLabel}>こっき</span>
+            <FlagBall flag={ballFlag} size={28} />
+          </button>
+        ) : null}
       </header>
 
-      <div className={styles.body}>
-        <PuzzleBoard
-          parts={state.parts}
-          selectedPartId={state.selectedPartId}
-          flag={ballFlag}
-          ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
-          draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
-          highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
-          cleared={state.phase === 'cleared'}
-          containerRef={containerRef}
-          boardRef={boardRef}
-          scale={scale}
-          width={width}
-          height={height}
-          registerBall={registerBall}
-          onPointerDown={handleBoardPointerDown}
-          onPointerMove={handleDragMove}
-          onPointerUp={handleDragEnd}
-        />
+      <div className={styles.body} data-testid="puzzle-layout">
+        <div className={styles.boardPane} data-testid="puzzle-board-pane">
+          <PuzzleBoard
+            parts={state.parts}
+            selectedPartId={state.selectedPartId}
+            flag={ballFlag}
+            ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
+            draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
+            highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
+            cleared={state.phase === 'cleared'}
+            containerRef={containerRef}
+            boardRef={boardRef}
+            scale={scale}
+            width={width}
+            height={height}
+            registerBall={registerBall}
+            onPointerDown={handleBoardPointerDown}
+            onPointerMove={handleDragMove}
+            onPointerUp={handleDragEnd}
+          />
+        </div>
 
         {/*
           ひとこと・パーツ置き場・操作ボタンのまとまり。
           縦画面では盤面の下に積み、低い横画面では盤面の横へ回す（.body の row 切替）。
         */}
-        <div className={styles.side}>
+        <aside className={styles.side} aria-label="そうさパネル" data-testid="puzzle-control-pane">
+          {isLandscapeLayout ? (
+            <button
+              type="button"
+              className={[styles.flagButton, styles.panelFlagButton].join(' ')}
+              aria-label={`こっきを かえる（${ballFlag.nameJa}）`}
+              disabled={!editing}
+              onClick={() => setIsFlagPickerOpen(true)}
+            >
+              <span className={styles.flagButtonLabel}>こっき</span>
+              <FlagBall flag={ballFlag} size={28} />
+              <span className={styles.panelFlagName}>{ballFlag.nameJa}</span>
+            </button>
+          ) : null}
           {/*
             ひとことと「けす」を同じ行に置き、選択中でも行の高さが変わらないようにする
             （盤面の高さが選択のたびに動くと、置いたパーツの位置が見た目で動いてしまう）。
@@ -404,6 +424,7 @@ export default function FlagRollPuzzlePlay() {
           <PartTray
             selectedTypeId={selectedTypeId}
             disabled={!editing}
+            isLandscapeLayout={isLandscapeLayout}
             onPartPointerDown={handlePartPointerDown}
             onPartPointerMove={handleDragMove}
             onPartPointerUp={handleDragEnd}
@@ -424,7 +445,7 @@ export default function FlagRollPuzzlePlay() {
               ぜんぶ けす
             </button>
           </div>
-        </div>
+        </aside>
       </div>
 
       {/* 指についてくるパーツの分身。盤面と同じ倍率で見せて、置いたときの大きさを想像しやすくする */}

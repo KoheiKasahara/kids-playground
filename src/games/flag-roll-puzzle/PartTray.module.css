@@ -39,6 +39,37 @@
   scroll-snap-align: start;
 }
 
+/* 横画面では右ペインの高さを一覧に使い、2列で見つけやすくする。 */
+.tray[data-layout='landscape'] {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: var(--space-sm);
+  min-height: 0;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-block: contain;
+  scroll-snap-type: block proximity;
+}
+
+.tray[data-layout='landscape'] .part {
+  width: 100%;
+  min-width: 0;
+  min-height: 78px;
+  touch-action: pan-y;
+  scroll-snap-align: start;
+}
+
+.tray[data-layout='landscape'] .preview {
+  transform: translateX(var(--preview-offset-x, 0)) scale(min(var(--preview-scale, 1.1), 1));
+}
+
+.tray[data-layout='landscape'] .label {
+  font-size: 14px;
+}
+
 .part[aria-pressed='true'] {
   border-color: var(--color-primary);
   background-color: #e7f5ff;
