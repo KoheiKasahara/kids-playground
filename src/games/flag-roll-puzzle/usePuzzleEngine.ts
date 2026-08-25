@@ -5,7 +5,6 @@ import {
   BALL_START,
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  GOAL_RAMP,
   WALL_THICKNESS,
 } from './boardLayout'
 import { cellCenter } from './grid'
@@ -51,7 +50,7 @@ export type PuzzleEngineHandle = {
 }
 
 /**
- * 盤面の外周壁（左・右・床）と、ゴールの右端の低い縁。
+ * 盤面の外周壁（左・右・床）。
  * 外周壁は盤面の外側に置き、見た目には出さない。
  */
 function wallBodies(): Matter.Body[] {
@@ -66,12 +65,6 @@ function wallBodies(): Matter.Body[] {
     Bodies.rectangle(-half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH + half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + half, BOARD_WIDTH + WALL_THICKNESS * 2, WALL_THICKNESS, options),
-    // ゴールの受け皿のふち（斜めのスロープ）。向きの意味は boardLayout.ts の GOAL_RAMP 参照
-    Bodies.rectangle(GOAL_RAMP.x, GOAL_RAMP.y, GOAL_RAMP.length, GOAL_RAMP.thickness, {
-      ...options,
-      angle: GOAL_RAMP.angleDeg * DEG_TO_RAD,
-      label: 'goal-ramp',
-    }),
   ]
 }
 
