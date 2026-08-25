@@ -31,3 +31,9 @@ export const MAX_SUBSTEPS = 5
 export const MAX_SPEED = 16
 /** 最大角速度(rad/step)。国旗の模様が読めなくなるほど速く回らないようにする */
 export const MAX_ANGULAR_VELOCITY = 0.25
+
+/** 途中停止は、速度と位置変化の両方がこの値以下のときだけ観察する */
+export const STOP_SPEED_THRESHOLD = 0.12
+export const STOP_POSITION_DELTA = 0.8
+/** 一瞬の低速では編集へ戻さないための継続時間 */
+export const STOP_DURATION_MS = 900
