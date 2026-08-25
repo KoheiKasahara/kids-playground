@@ -1,4 +1,5 @@
-import { cellKey, isInsideGrid, type GridCell, type Point } from './grid'
+import { BALL_RADIUS } from './boardLayout'
+import { cellCenter, cellKey, isInsideGrid, type GridCell, type Point } from './grid'
 import { partDefinition, type PartTypeId } from './partTypes'
 
 /** 盤面に置かれたパーツ。位置はマス単位（アンカーセル）だけで持つ */
@@ -7,6 +8,9 @@ export type PlacedPart = {
   readonly typeId: PartTypeId
   readonly cell: GridCell
 }
+
+/** 編集中に保持しているボールの中心。null は開始位置にいる状態を表す。 */
+export type ParkedBallPosition = Point | null
 
 /** パーツがそのアンカーセルに置かれたときに占有する、絶対座標のマス一覧 */
 export function occupiedCells(typeId: PartTypeId, anchor: GridCell): GridCell[] {
@@ -42,13 +46,47 @@ export function overlapsExistingPart(
   return occupiedCells(typeId, anchor).some((cell) => taken.has(cellKey(cell)))
 }
 
+/**
+ * パーツの実際の板（回転した長方形）とボールが重なっているか。
+ * マス単位の大きい禁止領域にはせず、各セグメントへ円を当てることで、
+ * 停止したボールのすぐ下に板を足して続きを作れる余地を残す。
+ */
+export function overlapsParkedBall(
+  typeId: PartTypeId,
+  anchor: GridCell,
+  ballPosition: ParkedBallPosition,
+): boolean {
+  if (ballPosition === null) return false
+  const definition = partDefinition(typeId)
+  const center = cellCenter(anchor)
+  // 触れているだけなら自然な再開の邪魔をしない。明確な食い込みだけを拒否する。
+  const protectedRadius = BALL_RADIUS - 1
+
+  return definition.segments.some((segment) => {
+    const angle = (segment.angleDeg * Math.PI) / 180
+    const dx = ballPosition.x - (center.x + segment.offsetX)
+    const dy = ballPosition.y - (center.y + segment.offsetY)
+    // 円の中心を板のローカル座標へ戻し、最も近い点との距離を測る。
+    const localX = dx * Math.cos(angle) + dy * Math.sin(angle)
+    const localY = -dx * Math.sin(angle) + dy * Math.cos(angle)
+    const nearestX = Math.max(-segment.width / 2, Math.min(segment.width / 2, localX))
+    const nearestY = Math.max(-segment.height / 2, Math.min(segment.height / 2, localY))
+    return (localX - nearestX) ** 2 + (localY - nearestY) ** 2 < protectedRadius ** 2
+  })
+}
+
 /** そのマスへ置けるか。ボード外と、既存パーツとの重なりの両方を弾く */
 export function canPlacePart(
   parts: readonly PlacedPart[],
   typeId: PartTypeId,
   anchor: GridCell,
+  ballPosition: ParkedBallPosition = null,
 ): boolean {
-  return isInsideBoard(typeId, anchor) && !overlapsExistingPart(parts, typeId, anchor)
+  return (
+    isInsideBoard(typeId, anchor) &&
+    !overlapsExistingPart(parts, typeId, anchor) &&
+    !overlapsParkedBall(typeId, anchor, ballPosition)
+  )
 }
 
 /**
@@ -60,8 +98,9 @@ export function placePart(
   typeId: PartTypeId,
   anchor: GridCell,
   id: string,
+  ballPosition: ParkedBallPosition = null,
 ): PlacedPart[] | null {
-  if (!canPlacePart(parts, typeId, anchor)) return null
+  if (!canPlacePart(parts, typeId, anchor, ballPosition)) return null
   return [...parts, { id, typeId, cell: anchor }]
 }
 
@@ -89,10 +128,11 @@ export function canMovePart(
   parts: readonly PlacedPart[],
   partId: string,
   anchor: GridCell,
+  ballPosition: ParkedBallPosition = null,
 ): boolean {
   const target = parts.find((part) => part.id === partId)
   if (!target) return false
-  return canPlacePart(removePart(parts, partId), target.typeId, anchor)
+  return canPlacePart(removePart(parts, partId), target.typeId, anchor, ballPosition)
 }
 
 /**
@@ -104,9 +144,36 @@ export function movePart(
   parts: readonly PlacedPart[],
   partId: string,
   anchor: GridCell,
+  ballPosition: ParkedBallPosition = null,
 ): PlacedPart[] | null {
-  if (!canMovePart(parts, partId, anchor)) return null
+  if (!canMovePart(parts, partId, anchor, ballPosition)) return null
   return parts.map((part) => (part.id === partId ? { ...part, cell: anchor } : part))
+}
+
+/**
+ * 選んだパーツの向きだけを変えられるか。移動と同じ配置判定を通すため、
+ * 後から複数マスのパーツが増えても重なり・盤外を安全に拒否できる。
+ */
+export function canRotatePart(
+  parts: readonly PlacedPart[],
+  partId: string,
+  nextTypeId: PartTypeId,
+  ballPosition: ParkedBallPosition = null,
+): boolean {
+  const target = parts.find((part) => part.id === partId)
+  if (!target) return false
+  return canPlacePart(removePart(parts, partId), nextTypeId, target.cell, ballPosition)
+}
+
+/** 向きを変えた新しい配列。置けない向きなら null を返して元の向きを保つ。 */
+export function rotatePart(
+  parts: readonly PlacedPart[],
+  partId: string,
+  nextTypeId: PartTypeId,
+  ballPosition: ParkedBallPosition = null,
+): PlacedPart[] | null {
+  if (!canRotatePart(parts, partId, nextTypeId, ballPosition)) return null
+  return parts.map((part) => (part.id === partId ? { ...part, typeId: nextTypeId } : part))
 }
 
 /**
