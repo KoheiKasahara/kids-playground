@@ -78,6 +78,9 @@ export default function FlagRollPuzzlePlay() {
   const [drag, setDrag] = useState<DragState | null>(null)
   const [ghostCell, setGhostCell] = useState<GridCell | null>(null)
   const [message, setMessage] = useState('')
+  const [justPlacedPartId, setJustPlacedPartId] = useState<string | null>(null)
+  const [rotatingPartId, setRotatingPartId] = useState<string | null>(null)
+  const [invalidDrop, setInvalidDrop] = useState(false)
 
   const { containerRef, scale, width, height } = useBoardScale()
   const isLandscapeLayout = useLandscapeLayout()
@@ -88,12 +91,27 @@ export default function FlagRollPuzzlePlay() {
   // （真偽値で覚えると、click が飛ばない環境で値が残り、次のタップを食べてしまう）。
   const dragEndedAtRef = useRef(0)
   const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const goalHandledRef = useRef(false)
 
   useEffect(() => {
     return () => {
       if (messageTimeoutRef.current !== null) clearTimeout(messageTimeoutRef.current)
+      if (feedbackTimeoutRef.current !== null) clearTimeout(feedbackTimeoutRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!justPlacedPartId) return
+    const timer = setTimeout(() => setJustPlacedPartId(null), 260)
+    return () => clearTimeout(timer)
+  }, [justPlacedPartId])
+
+  useEffect(() => {
+    if (!rotatingPartId) return
+    const timer = setTimeout(() => setRotatingPartId(null), 260)
+    return () => clearTimeout(timer)
+  }, [rotatingPartId])
 
   const showMessage = useCallback((text: string) => {
     if (messageTimeoutRef.current !== null) clearTimeout(messageTimeoutRef.current)
@@ -101,9 +119,19 @@ export default function FlagRollPuzzlePlay() {
     messageTimeoutRef.current = setTimeout(() => setMessage(''), MESSAGE_DURATION_MS)
   }, [])
 
+  const flashInvalidDrop = useCallback(() => {
+    setInvalidDrop(true)
+    if (feedbackTimeoutRef.current !== null) clearTimeout(feedbackTimeoutRef.current)
+    feedbackTimeoutRef.current = setTimeout(() => setInvalidDrop(false), 240)
+  }, [])
+
   const handleGoal = useCallback(() => {
-    setState((current) => reachGoal(current))
+    // Matter.js の衝突通知はゴール内で複数回起こり得る。state更新関数の再実行にも
+    // 影響されないrefで最初の1回を確実に弾き、物理シミュレーション自体は続ける。
+    if (goalHandledRef.current) return
+    goalHandledRef.current = true
     playCorrectSound()
+    setState((current) => reachGoal(current))
   }, [])
 
   const handleStopped = useCallback(() => {
@@ -137,12 +165,14 @@ export default function FlagRollPuzzlePlay() {
       const next = tryPlacePart(state, typeId, cell)
       if (!next) {
         showMessage('ここには おけないよ')
+        flashInvalidDrop()
         return
       }
       setState(next)
+      setJustPlacedPartId(next.parts.at(-1)?.id ?? null)
       playPanelOpenSound()
     },
-    [state, showMessage],
+    [state, showMessage, flashInvalidDrop],
   )
 
   /** 置いてあるパーツを別のマスへ動かす。動かせなければ元の場所のままにする */
@@ -151,12 +181,13 @@ export default function FlagRollPuzzlePlay() {
       const next = cell ? tryMovePart(state, partId, cell) : null
       if (!next) {
         showMessage('ここには おけないよ')
+        flashInvalidDrop()
         return
       }
       setState(next)
       playPanelOpenSound()
     },
-    [state, showMessage],
+    [state, showMessage, flashInvalidDrop],
   )
 
   /** ドラッグを開始する。掴んだ相手（置き場のパーツ／盤面のパーツ）だけが違う */
@@ -289,9 +320,11 @@ export default function FlagRollPuzzlePlay() {
     // （停止中のボールに食い込む向きなどは、現在の向きをそのまま残す。）
     if (rotateSelectedPart(state) === state) {
       showMessage('ここでは まわせないよ')
+      flashInvalidDrop()
       return
     }
     setState((current) => rotateSelectedPart(current))
+    setRotatingPartId(state.selectedPartId)
     playPanelOpenSound()
   }
 
@@ -299,10 +332,12 @@ export default function FlagRollPuzzlePlay() {
     primeAudio()
     setSelectedTypeId(null)
     setGhostCell(null)
+    goalHandledRef.current = false
     setState((current) => startRun(current))
   }
 
   const handleReturnBall = () => {
+    goalHandledRef.current = false
     setState((current) => returnBall(current))
   }
 
@@ -369,6 +404,9 @@ export default function FlagRollPuzzlePlay() {
             draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
             highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
             cleared={state.phase === 'cleared'}
+            justPlacedPartId={justPlacedPartId}
+            rotatingPartId={rotatingPartId}
+            invalidDrop={invalidDrop}
             containerRef={containerRef}
             boardRef={boardRef}
             scale={scale}
