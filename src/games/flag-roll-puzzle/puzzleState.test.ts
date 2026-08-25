@@ -71,22 +71,20 @@ describe('puzzleState', () => {
     expect(reachGoal(createPuzzleState()).phase).toBe('edit')
   })
 
-  test('途中停止では位置を保って編集へ戻り、同じ位置から再実行できる', () => {
+  test('途中停止ではパーツを残して編集へ戻り、開始位置から再実行できる', () => {
     const running = startRun(stateWithTwoParts())
-    const stopped = stopRun(running, { x: 130, y: 260 })
+    const stopped = stopRun(running)
     expect(stopped.phase).toBe('stopped')
-    expect(stopped.ballPosition).toEqual({ x: 130, y: 260 })
     // 停止中は既存の編集操作を使える
     expect(tryPlacePart(stopped, 'plank', { col: 5, row: 6 })).not.toBeNull()
     const resumed = startRun(stopped)
     expect(resumed.phase).toBe('running')
-    expect(resumed.ballPosition).toEqual({ x: 130, y: 260 })
     expect(resumed.runId).toBe(running.runId + 1)
   })
 
   test('ゴール済み状態を途中停止へは移さない', () => {
     const cleared = reachGoal(startRun(createPuzzleState()))
-    expect(stopRun(cleared, { x: 20, y: 20 })).toBe(cleared)
+    expect(stopRun(cleared)).toBe(cleared)
   })
 
   test('「ボールをもどす」は、置いたパーツを残したまま編集へ戻す', () => {
@@ -188,6 +186,5 @@ describe('puzzleState', () => {
     expect(cleared.phase).toBe('edit')
     expect(cleared.parts).toEqual([])
     expect(cleared.selectedPartId).toBeNull()
-    expect(cleared.ballPosition).toBeNull()
   })
 })

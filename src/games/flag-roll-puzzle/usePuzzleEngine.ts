@@ -5,7 +5,6 @@ import {
   BALL_START,
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  GOAL_RAMP,
   WALL_THICKNESS,
 } from './boardLayout'
 import { cellCenter } from './grid'
@@ -27,7 +26,6 @@ import {
   WALL_FRICTION,
   WALL_RESTITUTION,
 } from './puzzlePhysics'
-import type { ParkedBallPosition } from './placement'
 
 const { Engine, Bodies, Body, Composite } = Matter
 
@@ -40,12 +38,10 @@ export type PuzzleEngineOptions = {
   running: boolean
   /** 「ボールをおとす」ごとに増える世代。値が変わったら世界を作り直す */
   runId: number
-  /** null なら開始位置、途中停止後ならその位置から物理Bodyを作る */
-  ballPosition: ParkedBallPosition
   /** ボールがゴール領域へ入ったとき（1回の実行につき最大1度だけ呼ぶ） */
   onGoal: () => void
-  /** ゴール以外で一定時間動かなかったとき。位置は編集状態へ渡す */
-  onStopped: (position: { readonly x: number; readonly y: number }) => void
+  /** ゴール以外で一定時間動かなかったとき。編集状態へ戻す */
+  onStopped: () => void
 }
 
 export type PuzzleEngineHandle = {
@@ -54,7 +50,7 @@ export type PuzzleEngineHandle = {
 }
 
 /**
- * 盤面の外周壁（左・右・床）と、ゴールの右端の低い縁。
+ * 盤面の外周壁（左・右・床）。
  * 外周壁は盤面の外側に置き、見た目には出さない。
  */
 function wallBodies(): Matter.Body[] {
@@ -69,12 +65,6 @@ function wallBodies(): Matter.Body[] {
     Bodies.rectangle(-half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH + half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + half, BOARD_WIDTH + WALL_THICKNESS * 2, WALL_THICKNESS, options),
-    // ゴールの受け皿のふち（斜めのスロープ）。向きの意味は boardLayout.ts の GOAL_RAMP 参照
-    Bodies.rectangle(GOAL_RAMP.x, GOAL_RAMP.y, GOAL_RAMP.length, GOAL_RAMP.thickness, {
-      ...options,
-      angle: GOAL_RAMP.angleDeg * DEG_TO_RAD,
-      label: 'goal-ramp',
-    }),
   ]
 }
 
@@ -129,16 +119,15 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     [],
   )
 
-  const { running, runId, ballPosition } = options
+  const { running, runId } = options
 
-  // 編集中は開始位置、または途中停止位置に静止させる。
+  // 編集中は開始位置に静止させる。途中停止後も、次の再挑戦はここから始める。
   useEffect(() => {
     if (running) return
     const el = ballElementRef.current
     if (!el) return
-    const position = ballPosition ?? BALL_START
-    el.style.transform = `translate(${position.x - BALL_RADIUS}px, ${position.y - BALL_RADIUS}px)`
-  }, [running, runId, ballPosition])
+    el.style.transform = `translate(${BALL_START.x - BALL_RADIUS}px, ${BALL_START.y - BALL_RADIUS}px)`
+  }, [running, runId])
 
   useEffect(() => {
     if (!running) return
@@ -148,8 +137,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     const parts = optionsRef.current.parts
 
     const engine = Engine.create({ gravity: { ...GRAVITY } })
-    const initialPosition = optionsRef.current.ballPosition ?? BALL_START
-    const ball = Bodies.circle(initialPosition.x, initialPosition.y, BALL_RADIUS, {
+    const ball = Bodies.circle(BALL_START.x, BALL_START.y, BALL_RADIUS, {
       restitution: BALL_RESTITUTION,
       friction: BALL_FRICTION,
       frictionAir: BALL_FRICTION_AIR,
@@ -226,7 +214,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
         Body.setAngularVelocity(ball, 0)
         Body.setStatic(ball, true)
         writeBallTransform()
-        optionsRef.current.onStopped({ x: ball.position.x, y: ball.position.y })
+        optionsRef.current.onStopped()
       }
     }
 
