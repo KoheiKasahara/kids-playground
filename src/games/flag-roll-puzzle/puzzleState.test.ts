@@ -6,8 +6,10 @@ import {
   reachGoal,
   removeSelectedPart,
   returnBall,
+  rotateSelectedPart,
   selectPart,
   startRun,
+  stopRun,
   tryMovePart,
   tryPlacePart,
 } from './puzzleState'
@@ -67,6 +69,24 @@ describe('puzzleState', () => {
     // 同じ実行で二度呼ばれても状態は変わらない
     expect(reachGoal(cleared)).toBe(cleared)
     expect(reachGoal(createPuzzleState()).phase).toBe('edit')
+  })
+
+  test('途中停止では位置を保って編集へ戻り、同じ位置から再実行できる', () => {
+    const running = startRun(stateWithTwoParts())
+    const stopped = stopRun(running, { x: 130, y: 260 })
+    expect(stopped.phase).toBe('stopped')
+    expect(stopped.ballPosition).toEqual({ x: 130, y: 260 })
+    // 停止中は既存の編集操作を使える
+    expect(tryPlacePart(stopped, 'plank', { col: 5, row: 6 })).not.toBeNull()
+    const resumed = startRun(stopped)
+    expect(resumed.phase).toBe('running')
+    expect(resumed.ballPosition).toEqual({ x: 130, y: 260 })
+    expect(resumed.runId).toBe(running.runId + 1)
+  })
+
+  test('ゴール済み状態を途中停止へは移さない', () => {
+    const cleared = reachGoal(startRun(createPuzzleState()))
+    expect(stopRun(cleared, { x: 20, y: 20 })).toBe(cleared)
   })
 
   test('「ボールをもどす」は、置いたパーツを残したまま編集へ戻す', () => {
@@ -140,6 +160,16 @@ describe('puzzleState', () => {
     expect(moved!.selectedPartId).toBe(first.id)
   })
 
+  test('選んでいるパーツは固定された3方向を循環して回せる', () => {
+    const selected = selectPart(tryPlacePart(createPuzzleState(), 'plank', { col: 2, row: 3 })!, 'part-1')
+    const left = rotateSelectedPart(selected)
+    const right = rotateSelectedPart(left)
+    const horizontal = rotateSelectedPart(right)
+    expect(left.parts[0].typeId).toBe('slopeLeft')
+    expect(right.parts[0].typeId).toBe('slopeRight')
+    expect(horizontal.parts[0].typeId).toBe('plank')
+  })
+
   test('実行中はパーツを動かせない', () => {
     const state = stateWithTwoParts()
     const running = startRun(state)
@@ -158,5 +188,6 @@ describe('puzzleState', () => {
     expect(cleared.phase).toBe('edit')
     expect(cleared.parts).toEqual([])
     expect(cleared.selectedPartId).toBeNull()
+    expect(cleared.ballPosition).toBeNull()
   })
 })
