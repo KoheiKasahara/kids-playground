@@ -32,6 +32,9 @@ type PuzzleBoardProps = {
   highlightGrid: boolean
   /** ゴール済みか。ゴールを光らせる */
   cleared: boolean
+  justPlacedPartId: string | null
+  rotatingPartId: string | null
+  invalidDrop: boolean
   /** 拡縮の計測対象（盤面を置く領域） */
   containerRef: RefObject<HTMLDivElement | null>
   /** 論理座標の盤面そのもの。ドラッグ位置の逆変換で矩形を測るのに使う */
@@ -72,6 +75,9 @@ export default function PuzzleBoard({
   ghost,
   highlightGrid,
   cleared,
+  justPlacedPartId,
+  rotatingPartId,
+  invalidDrop,
   containerRef,
   boardRef,
   scale,
@@ -125,6 +131,8 @@ export default function PuzzleBoard({
                 data-cell={`${part.cell.col},${part.cell.row}`}
                 data-selected={selected ? 'true' : 'false'}
                 data-dragging={part.id === draggingPartId ? 'true' : 'false'}
+                data-placed={part.id === justPlacedPartId ? 'true' : 'false'}
+                data-rotating={part.id === rotatingPartId ? 'true' : 'false'}
               >
                 <PartShape typeId={part.typeId} variant={selected ? 'selected' : 'placed'} />
               </div>
@@ -164,6 +172,7 @@ export default function PuzzleBoard({
           >
             ゴール
           </div>
+          {invalidDrop ? <div className={styles.gentleHint} aria-hidden="true" /> : null}
           {/*
             usePuzzleEngine は「盤面の原点(0,0)を基準にした transform: translate(x, y)」を
             この要素へ直接書き込む。FlagBall 自体は選択画面などの単体表示でも成立するよう

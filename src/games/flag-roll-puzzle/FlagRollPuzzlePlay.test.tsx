@@ -158,6 +158,18 @@ describe('こっきコロコロパズル', () => {
     expect(screen.getByTestId('puzzle-ball')).toHaveAttribute('data-flag-id', 'us')
   })
 
+  test('ゴールの成功状態は一度だけ確定し、ボールはもどす操作まで残る', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    act(() => engineMock.options?.onGoal())
+    act(() => engineMock.options?.onGoal())
+
+    expect(screen.getByRole('status')).toHaveTextContent('ゴール！ すごい！')
+    expect(screen.getByTestId('puzzle-board').querySelector('[data-cleared="true"]')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ボールを もどす' })).toBeEnabled()
+  })
+
   test('長い板の置き場プレビューだけは縮小し、盤面用の実寸とは分ける', async () => {
     await renderGame()
     expect(trayPart('ながい いた').querySelector('[data-preview-scale]')).toHaveAttribute('data-preview-scale', '0.5')
