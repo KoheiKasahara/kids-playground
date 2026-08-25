@@ -40,13 +40,23 @@ export type RailTrainCursor = {
 
 export type TrainCursor = RailTrainCursor
 
-export type RailTrainStatus = 'ready' | 'running' | 'waiting'
+export type RailTrainStatus =
+  | 'ready'
+  | 'running'
+  | 'waiting'
+  | 'approachingStation'
+  | 'stoppedAtStation'
+  | 'departing'
 export type TrainStatus = RailTrainStatus
 
 export type RailTrainMotion = {
   cursor: RailTrainCursor
   speed: number
   status: RailTrainStatus
+  /** 直前に停車した駅。駅pieceを抜けるまで次の駅探索から除外する。 */
+  stationServicedId?: string
+  /** stoppedAtStationの経過時間（秒）。 */
+  stationStopElapsed?: number
 }
 
 export type TrainMotion = RailTrainMotion
@@ -308,6 +318,70 @@ export function distanceToRailTrainDeadEnd(
 export const forwardDistanceToDeadEnd = distanceToRailTrainDeadEnd
 export const railTrainDistanceToDeadEnd = distanceToRailTrainDeadEnd
 
+export type RailTrainStationTarget = {
+  stationId: string
+  /** 現在のカーソルから駅のホーム中央までの経路距離。 */
+  distance: number
+}
+
+/**
+ * 現在の進行方向で最初に見つかる駅のホーム中央までを接続順に探索する。
+ * 駅の中央を過ぎた後は同じpieceを次の駅として再検出しない。
+ * ignoredStationIdは停車直後の駅をpieceから抜けるまで除外するために使う。
+ */
+export function findNextRailTrainStation(
+  pieces: readonly RailPiece[],
+  cursor: RailTrainCursor,
+  ignoredStationId?: string,
+): RailTrainStationTarget | null {
+  let current = cursorWithDistance(cursor, pieces)
+  let total = 0
+  const seen = new Set<string>()
+
+  for (let iteration = 0; iteration < DEFAULT_ITERATION_GUARD; iteration += 1) {
+    const resolved = validPiece(pieces, current.pieceId)
+    if (resolved === null) return null
+    const state = `${resolved.piece.id}:${current.direction}`
+    if (seen.has(state)) return null
+    seen.add(state)
+
+    current.distance = clampDistance(current.distance, resolved.length)
+    const stationCenter = resolved.length / 2
+    if (
+      resolved.piece.kind === 'station'
+      && resolved.piece.id !== ignoredStationId
+      && current.distance < stationCenter - EPSILON
+    ) {
+      return { stationId: resolved.piece.id, distance: total + stationCenter - current.distance }
+    }
+
+    total += Math.max(0, resolved.length - current.distance)
+    const connection = findConnection(pieces, resolved.piece, exitConnector(current.direction))
+    if (connection === null) return null
+    const next = validPiece(pieces, connection.piece.id)
+    if (next === null) return null
+    current = {
+      pieceId: next.piece.id,
+      direction: directionLeavingConnector(connection.connectorId),
+      distance: 0,
+    }
+  }
+  return null
+}
+
+export const nextRailTrainStation = findNextRailTrainStation
+
+/** 駅がなければInfinityを返す距離専用の純粋関数。 */
+export function distanceToRailTrainStation(
+  pieces: readonly RailPiece[],
+  cursor: RailTrainCursor,
+  ignoredStationId?: string,
+): number {
+  return findNextRailTrainStation(pieces, cursor, ignoredStationId)?.distance ?? Infinity
+}
+
+export const distanceToNextRailTrainStation = distanceToRailTrainStation
+
 /** カーソルから先頭車・後続車のカーソルを線路上で求める。 */
 export function railTrainCarCursors(
   pieces: readonly RailPiece[],
@@ -385,8 +459,14 @@ export function createInitialRailTrainMotion(
 export const createInitialTrainMotion = createInitialRailTrainMotion
 export const makeInitialRailTrainMotion = createInitialRailTrainMotion
 
+export const TRAIN_STATION_STOP_DURATION = 1.5
+export const TRAIN_STATION_APPROACH_DISTANCE = 4.5
+
 /** 発車・再開。待機中でもカーソルはそのまま保持する。 */
 export function startRailTrain(motion: RailTrainMotion): RailTrainMotion {
+  if (motion.status !== 'ready' && motion.status !== 'waiting') {
+    return { ...motion, cursor: copyCursor(motion.cursor), speed: Math.max(0, motion.speed) }
+  }
   return { ...motion, cursor: copyCursor(motion.cursor), speed: Math.max(0, motion.speed), status: 'running' }
 }
 
@@ -399,19 +479,47 @@ export function updateRailTrainMotion(
   pieces: readonly RailPiece[],
   deltaSeconds: number,
 ): RailTrainMotion {
-  if (motion.status !== 'running') {
-    return { ...motion, cursor: copyCursor(motion.cursor), speed: Math.max(0, motion.speed) }
-  }
   // 実際のRAFはengine側で0.1秒程度に制限するが、純粋関数として
   // 大きめのテスト刻みを渡しても安全に停止位置へ着けるようにする。
   const delta = finite(deltaSeconds) ? Math.min(1, Math.max(0, deltaSeconds)) : 0
+  if (motion.status === 'ready' || motion.status === 'waiting') {
+    return { ...motion, cursor: copyCursor(motion.cursor), speed: 0 }
+  }
+  if (motion.status === 'stoppedAtStation') {
+    const elapsed = Math.max(0, motion.stationStopElapsed ?? 0) + delta
+    if (elapsed + EPSILON < TRAIN_STATION_STOP_DURATION) {
+      return {
+        ...motion,
+        cursor: copyCursor(motion.cursor),
+        speed: 0,
+        stationStopElapsed: elapsed,
+      }
+    }
+    // 停車時間を満たしたら、次のフレームから自然に加速する。
+    return {
+      ...motion,
+      cursor: copyCursor(motion.cursor),
+      speed: 0,
+      status: 'departing',
+      stationStopElapsed: elapsed,
+    }
+  }
   if (delta <= EPSILON) return { ...motion, cursor: copyCursor(motion.cursor) }
 
   const cursor = cursorWithDistance(motion.cursor, pieces)
+  let stationServicedId = motion.stationServicedId
+  // 駅pieceを抜けたら同じ駅を再び探索対象に戻す。ループでは次周に再停車できる。
+  if (stationServicedId !== undefined && cursor.pieceId !== stationServicedId) {
+    stationServicedId = undefined
+  }
   const forwardDistance = distanceToRailTrainDeadEnd(pieces, cursor)
-  const available = finite(forwardDistance)
+  const deadEndAvailable = finite(forwardDistance)
     ? Math.max(0, forwardDistance - TRAIN_END_STOP_MARGIN)
     : Infinity
+  const nextStation = findNextRailTrainStation(pieces, cursor, stationServicedId)
+  const stationDistance = nextStation?.distance ?? Infinity
+  const stationIsBeforeDeadEnd = stationDistance < deadEndAvailable - EPSILON
+  const available = stationIsBeforeDeadEnd ? stationDistance : deadEndAvailable
   const currentSpeed = finite(motion.speed) ? Math.max(0, motion.speed) : 0
   const brakingTarget = finite(available)
     ? Math.sqrt(Math.max(0, 2 * TRAIN_DECELERATION * available))
@@ -433,10 +541,43 @@ export function updateRailTrainMotion(
     && nextForwardDistance <= TRAIN_END_STOP_MARGIN + 1e-5
     && (nextSpeed <= 0.03 || reachedReservedStop)
 
+  if (stationIsBeforeDeadEnd && reachedReservedStop && nextStation !== null) {
+    return {
+      cursor: nextCursor,
+      speed: 0,
+      status: 'stoppedAtStation',
+      stationServicedId: nextStation.stationId,
+      stationStopElapsed: 0,
+    }
+  }
+
+  if (atStop) {
+    return {
+      cursor: nextCursor,
+      speed: 0,
+      status: 'waiting',
+      stationServicedId,
+    }
+  }
+
+  const wasDeparting = motion.status === 'departing'
+  const hasLeftServicedStation = wasDeparting
+    && stationServicedId !== undefined
+    && nextCursor.pieceId !== stationServicedId
+  const nextStatus: RailTrainStatus = hasLeftServicedStation
+    ? 'running'
+    : stationIsBeforeDeadEnd
+      && (stationDistance <= TRAIN_STATION_APPROACH_DISTANCE || motion.status === 'approachingStation')
+      ? 'approachingStation'
+      : wasDeparting
+        ? 'departing'
+        : 'running'
+
   return {
     cursor: nextCursor,
-    speed: atStop ? 0 : nextSpeed,
-    status: atStop ? 'waiting' : 'running',
+    speed: nextSpeed,
+    status: nextStatus,
+    stationServicedId: hasLeftServicedStation ? undefined : stationServicedId,
   }
 }
 

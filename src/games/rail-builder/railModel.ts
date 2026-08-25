@@ -13,7 +13,18 @@ export type RailVec3 = {
   z: number
 }
 
-export type RailPieceKind = 'straight' | 'curve'
+/**
+ * 線路パーツの種類。施設も「線路を含むpiece」として扱うことで、
+ * 配置・接続・列車のPath追従をPhase 1/2から共有する。
+ */
+export type RailPieceKind =
+  | 'straight'
+  | 'short-straight'
+  | 'curve'
+  | 'slope'
+  | 'bridge'
+  | 'station'
+  | 'tunnel'
 export type CurveDirection = 'left' | 'right'
 export type RailConnectorId = 'a' | 'b'
 
@@ -30,6 +41,11 @@ export type RailConnector = {
 export type StraightPath = {
   kind: 'straight'
   length: number
+  /** パス端点の高さ。未指定は従来どおり地面(y=0)。 */
+  startHeight?: number
+  endHeight?: number
+  /** 坂の高さ補間。smoothstepは端点で水平な接線になる。 */
+  elevationCurve?: 'linear' | 'smoothstep'
 }
 
 export type CurvePath = {
@@ -86,6 +102,12 @@ export type SnapOptions = {
 }
 
 export const STRAIGHT_LENGTH = 5
+export const SHORT_STRAIGHT_LENGTH = 3
+export const SLOPE_LENGTH = 7
+export const ELEVATED_LENGTH = 6.5
+export const STATION_LENGTH = 7
+export const TUNNEL_LENGTH = 7
+export const ELEVATED_HEIGHT = 2
 export const CURVE_RADIUS = 4
 export const CURVE_ANGLE = Math.PI / 2
 export const DEFAULT_SNAP_DISTANCE = 1.15
@@ -93,6 +115,7 @@ export const DEFAULT_SNAP_HEIGHT = 0.35
 export const DEFAULT_SNAP_ANGLE = (58 * Math.PI) / 180
 
 const EPSILON = 1e-8
+const pathLengthCache = new WeakMap<RailPath, number>()
 
 const ZERO: RailVec3 = { x: 0, y: 0, z: 0 }
 
@@ -208,17 +231,38 @@ function normalizeAngle(angle: number): number {
 }
 
 function angleBetween(a: RailVec3, b: RailVec3): number {
-  const aa = normalize(vec(a.x, 0, a.z))
-  const bb = normalize(vec(b.x, 0, b.z))
+  // コネクタの接線は現時点では端点を水平にそろえるが、判定は3Dで行う。
+  // 将来、垂直方向の接続点を追加してもXZだけで誤接続しないようにする。
+  const aa = normalize(a)
+  const bb = normalize(b)
   if (length(aa) <= EPSILON || length(bb) <= EPSILON) return Math.PI
-  return Math.acos(Math.min(1, Math.max(-1, aa.x * bb.x + aa.z * bb.z)))
+  return Math.acos(Math.min(1, Math.max(-1, aa.x * bb.x + aa.y * bb.y + aa.z * bb.z)))
+}
+
+function pathHeight(path: StraightPath, t: number): number {
+  const start = Number.isFinite(path.startHeight) ? (path.startHeight ?? 0) : 0
+  const end = Number.isFinite(path.endHeight) ? (path.endHeight ?? start) : start
+  const clampedT = Math.min(1, Math.max(0, t))
+  if (path.elevationCurve !== 'smoothstep') {
+    return start + (end - start) * clampedT
+  }
+  const smoothT = clampedT * clampedT * (3 - 2 * clampedT)
+  return start + (end - start) * smoothT
+}
+
+function pathHeightDerivative(path: StraightPath, t: number): number {
+  const start = Number.isFinite(path.startHeight) ? (path.startHeight ?? 0) : 0
+  const end = Number.isFinite(path.endHeight) ? (path.endHeight ?? start) : start
+  const clampedT = Math.min(1, Math.max(0, t))
+  if (path.elevationCurve !== 'smoothstep') return end - start
+  return (end - start) * 6 * clampedT * (1 - clampedT)
 }
 
 /** Pathの0..1サンプル。曲線は端点と接線がコネクタと一致する。 */
 export function sampleRailPath(path: RailPath, t: number): RailVec3 {
   const clampedT = Math.min(1, Math.max(0, t))
   if (path.kind === 'straight') {
-    return vec((clampedT - 0.5) * path.length, 0, 0)
+    return vec((clampedT - 0.5) * path.length, pathHeight(path, clampedT), 0)
   }
 
   const theta = clampedT * path.angle
@@ -234,7 +278,10 @@ export function sampleRailPath(path: RailPath, t: number): RailVec3 {
 /** パス上の進行方向（単位ベクトル）。将来の電車の経路追従にも利用できる。 */
 export function sampleRailPathTangent(path: RailPath, t: number): RailVec3 {
   const clampedT = Math.min(1, Math.max(0, t))
-  if (path.kind === 'straight') return vec(1, 0, 0)
+  if (path.kind === 'straight') {
+    const horizontalLength = Math.max(EPSILON, Math.abs(path.length))
+    return cleanVec(normalize(vec(1, pathHeightDerivative(path, clampedT) / horizontalLength, 0)))
+  }
 
   const theta = clampedT * path.angle
   const sign = path.direction === 'left' ? 1 : -1
@@ -247,9 +294,13 @@ export function sampleRailPathTangent(path: RailPath, t: number): RailVec3 {
 
 function makeConnectors(path: RailPath): [RailConnector, RailConnector] {
   if (path.kind === 'straight') {
+    const start = sampleRailPath(path, 0)
+    const end = sampleRailPath(path, 1)
+    const startTangent = sampleRailPathTangent(path, 0)
+    const endTangent = sampleRailPathTangent(path, 1)
     return [
-      connector('a', vec(-path.length / 2, 0, 0), vec(-1, 0, 0)),
-      connector('b', vec(path.length / 2, 0, 0), vec(1, 0, 0)),
+      connector('a', start, scale(startTangent, -1)),
+      connector('b', end, endTangent),
     ]
   }
 
@@ -272,12 +323,33 @@ export function createRailPiece(
 ): RailPiece {
   const path: RailPath = kind === 'straight'
     ? { kind: 'straight', length: STRAIGHT_LENGTH }
-    : {
-      kind: 'curve',
-      radius: CURVE_RADIUS,
-      angle: CURVE_ANGLE,
-      direction: curveDirection,
-    }
+    : kind === 'short-straight'
+      ? { kind: 'straight', length: SHORT_STRAIGHT_LENGTH }
+      : kind === 'slope'
+        ? {
+          kind: 'straight',
+          length: SLOPE_LENGTH,
+          startHeight: 0,
+          endHeight: ELEVATED_HEIGHT,
+          elevationCurve: 'smoothstep',
+        }
+        : kind === 'bridge'
+          ? {
+            kind: 'straight',
+            length: ELEVATED_LENGTH,
+            startHeight: ELEVATED_HEIGHT,
+            endHeight: ELEVATED_HEIGHT,
+          }
+          : kind === 'station'
+            ? { kind: 'straight', length: STATION_LENGTH }
+            : kind === 'tunnel'
+              ? { kind: 'straight', length: TUNNEL_LENGTH }
+              : {
+                kind: 'curve',
+                radius: CURVE_RADIUS,
+                angle: CURVE_ANGLE,
+                direction: curveDirection,
+              }
   const [connectorA, connectorB] = makeConnectors(path)
   return {
     id,
@@ -335,7 +407,28 @@ export function worldRailPathPoint(piece: RailPiece, t: number): RailVec3 {
 
 /** パスの実距離。曲線も弦長ではなく、列車が走る弧の長さを返す。 */
 export function railPathLength(path: RailPath): number {
-  if (path.kind === 'straight') return Math.max(0, path.length)
+  if (path.kind === 'straight') {
+    const horizontalLength = Math.max(0, path.length)
+    const start = path.startHeight ?? 0
+    const end = path.endHeight ?? start
+    if (Math.abs(end - start) <= EPSILON || horizontalLength <= EPSILON) return horizontalLength
+
+    const cached = pathLengthCache.get(path)
+    if (cached !== undefined) return cached
+
+    // 坂は高さ補間が非線形なので、固定分割した弦長で実長を近似する。
+    // Pathオブジェクト単位でキャッシュし、列車走行中の毎フレーム再計算を避ける。
+    const segments = 32
+    let total = 0
+    let previous = sampleRailPath(path, 0)
+    for (let index = 1; index <= segments; index += 1) {
+      const next = sampleRailPath(path, index / segments)
+      total += length(subtract(next, previous))
+      previous = next
+    }
+    pathLengthCache.set(path, total)
+    return total
+  }
   return Math.max(0, path.radius) * Math.abs(path.angle)
 }
 
@@ -351,7 +444,8 @@ export function distanceBetweenRailPoints(a: RailVec3, b: RailVec3): number {
 export function clampRailPosition(position: RailVec3, min = -25, max = 25): RailVec3 {
   return {
     x: Math.min(max, Math.max(min, position.x)),
-    y: Math.min(2, Math.max(-2, position.y)),
+    // 高架の標準高さ(2)に加えて、配置の余裕を少し確保する。
+    y: Math.min(ELEVATED_HEIGHT + 3, Math.max(-2, position.y)),
     z: Math.min(max, Math.max(min, position.z)),
   }
 }
@@ -444,6 +538,75 @@ export function findRailSnapCandidate(
 }
 
 export const findSnapCandidate = findRailSnapCandidate
+
+export type SnapNearMiss = {
+  movingPieceId: string
+  movingConnectorId: RailConnectorId
+  targetPieceId: string
+  targetConnectorId: RailConnectorId
+  /** 3D位置距離。 */
+  distance: number
+  /** XZ平面だけで見た距離。 */
+  horizontalDistance: number
+  heightDifference: number
+  angleDifference: number
+}
+
+/**
+ * XZでは接続点が近いのに、高さまたは3D向きが合わず接続できない
+ * 「惜しい」候補を返す。自由配置をエラー扱いしないため、距離が
+ * snap閾値より少し外側(35%以内)の候補だけを対象にする。
+ */
+export function findRailSnapNearMiss(
+  movingPiece: RailPiece,
+  targets: readonly RailPiece[],
+  movingConnectorId?: RailConnectorId,
+  options?: SnapOptions,
+): SnapNearMiss | null {
+  const thresholds = optionsWithDefaults(options)
+  const movingConnectorIds = movingConnectorId === undefined
+    ? (['a', 'b'] as RailConnectorId[])
+    : [movingConnectorId]
+  const nearDistance = thresholds.maxDistance * 1.35
+  let best: SnapNearMiss | null = null
+
+  for (const targetPiece of targets) {
+    if (targetPiece.id === movingPiece.id) continue
+    for (const targetConnectorId of ['a', 'b'] as RailConnectorId[]) {
+      if (targetPiece.connections?.[targetConnectorId] !== undefined) continue
+      const targetWorld = worldConnectorForRailPiece(targetPiece, targetConnectorId)
+      for (const currentMovingId of movingConnectorIds) {
+        if (movingPiece.connections?.[currentMovingId] !== undefined) continue
+        const currentMoving = worldConnectorForRailPiece(movingPiece, currentMovingId)
+        const dx = currentMoving.position.x - targetWorld.position.x
+        const dz = currentMoving.position.z - targetWorld.position.z
+        const horizontalDistance = Math.hypot(dx, dz)
+        if (horizontalDistance > nearDistance) continue
+        const distance = distanceBetweenRailPoints(currentMoving.position, targetWorld.position)
+        const heightDifference = Math.abs(currentMoving.position.y - targetWorld.position.y)
+        const angleDifference = angleBetween(currentMoving.outward, scale(targetWorld.outward, -1))
+        const isValid = distance <= thresholds.maxDistance
+          && heightDifference <= thresholds.maxHeightDifference
+          && angleDifference <= thresholds.maxAngleDifference
+        if (isValid) continue
+        if (best !== null && horizontalDistance >= best.horizontalDistance) continue
+        best = {
+          movingPieceId: movingPiece.id,
+          movingConnectorId: currentMovingId,
+          targetPieceId: targetPiece.id,
+          targetConnectorId,
+          distance,
+          horizontalDistance,
+          heightDifference,
+          angleDifference,
+        }
+      }
+    }
+  }
+  return best
+}
+
+export const findSnapNearMiss = findRailSnapNearMiss
 
 function piecesMap(pieces: readonly RailPiece[]): Map<string, RailPiece> {
   return new Map(pieces.map((piece) => [piece.id, piece]))
