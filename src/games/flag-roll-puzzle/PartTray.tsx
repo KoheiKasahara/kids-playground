@@ -8,6 +8,8 @@ type PartTrayProps = {
   selectedTypeId: PartTypeId | null
   /** 置ける状態か。実行中は操作させない */
   disabled: boolean
+  /** 横画面の右ペインでは縦スクロール、左向きドラッグで盤面へ出す */
+  isLandscapeLayout: boolean
   onPartPointerDown: (typeId: PartTypeId, event: PointerEvent<HTMLButtonElement>) => void
   onPartPointerMove: (event: PointerEvent<HTMLButtonElement>) => void
   onPartPointerUp: (event: PointerEvent<HTMLButtonElement>) => void
@@ -25,6 +27,7 @@ type PartTrayProps = {
 export default function PartTray({
   selectedTypeId,
   disabled,
+  isLandscapeLayout,
   onPartPointerDown,
   onPartPointerMove,
   onPartPointerUp,
@@ -58,9 +61,11 @@ export default function PartTray({
       const dy = event.clientY - gesture.startY
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return
 
-      // 横方向が優勢なら、Pointer Captureを取らず CSS の pan-x に任せる。
-      // 少し斜めでも盤面へ持ち出す意図が明確なときだけ配置ドラッグを始める。
-      if (Math.abs(dx) > Math.abs(dy)) {
+      const scrolling = isLandscapeLayout ? Math.abs(dy) > Math.abs(dx) || dx >= 0 : Math.abs(dx) > Math.abs(dy)
+      // 縦画面は横スワイプ、横画面の右ペインは縦スワイプをブラウザ標準の
+      // スクロールへ渡す。横画面では左向きだけを「盤面へ持ち出す」と解釈するので、
+      // 一覧をスクロールしながら誤ってパーツを置かない。
+      if (scrolling) {
         gesture.mode = 'scroll'
         return
       }
@@ -90,7 +95,12 @@ export default function PartTray({
   }
 
   return (
-    <section className={styles.tray} aria-label="パーツおきば" data-testid="part-tray">
+    <section
+      className={styles.tray}
+      aria-label="パーツおきば"
+      data-testid="part-tray"
+      data-layout={isLandscapeLayout ? 'landscape' : 'portrait'}
+    >
       {TRAY_PART_DEFINITIONS.map((definition) => (
         <button
           key={definition.id}

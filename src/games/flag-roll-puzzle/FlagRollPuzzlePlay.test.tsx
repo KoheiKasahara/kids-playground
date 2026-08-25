@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
 import { CELL_SIZE, GRID_TOP } from './boardLayout'
@@ -43,6 +43,10 @@ function cellPoint(col: number, row: number) {
 const trayPart = (name: string) => screen.getByRole('button', { name })
 const placedParts = () => screen.queryAllByTestId('puzzle-part')
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 /** 盤面のマスをタップする（押して、動かさずに離す） */
 function tapBoard(col: number, row: number) {
   const board = screen.getByTestId('puzzle-board')
@@ -60,6 +64,46 @@ function dragBoardPart(from: [number, number], to: [number, number]) {
 }
 
 describe('こっきコロコロパズル', () => {
+  test('横画面では盤面と操作パネルを2ペインにし、縦スクロール一覧から左へドラッグして置ける', async () => {
+    let matches = true
+    let onChange: (() => void) | undefined
+    vi.stubGlobal('matchMedia', () => ({
+      get matches() { return matches },
+      addEventListener: (_event: string, listener: () => void) => { onChange = listener },
+      removeEventListener: () => { onChange = undefined },
+    }))
+
+    await renderGame()
+    expect(document.querySelector('main')).toHaveAttribute('data-layout', 'landscape')
+    expect(screen.getByTestId('puzzle-board-pane')).toBeInTheDocument()
+    expect(screen.getByTestId('puzzle-control-pane')).toBeInTheDocument()
+    expect(screen.getByTestId('part-tray')).toHaveAttribute('data-layout', 'landscape')
+    expect(screen.getByRole('button', { name: 'こっきを かえる（にほん）' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ボールを おとす！' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'ぜんぶ けす' })).toBeEnabled()
+
+    const part = trayPart('よこいた')
+    // 右ペイン内の上下移動は一覧スクロール扱いで、パーツは置かない。
+    fireEvent.pointerDown(part, { pointerId: 1, clientX: 300, clientY: 220 })
+    fireEvent.pointerMove(part, { pointerId: 1, clientX: 280, clientY: 300 })
+    fireEvent.pointerUp(part, { pointerId: 1, clientX: 280, clientY: 300 })
+    expect(placedParts()).toHaveLength(0)
+
+    // 右から左への移動は盤面へ持ち出すドラッグとして扱い、座標は盤面のグリッドへ吸着する。
+    fireEvent.pointerDown(part, { pointerId: 2, clientX: 320, clientY: 300 })
+    fireEvent.pointerMove(part, { pointerId: 2, clientX: 180, clientY: 300 })
+    fireEvent.pointerUp(part, { pointerId: 2, clientX: 180, clientY: 300 })
+    expect(placedParts()).toHaveLength(1)
+    expect(placedParts()[0]).toHaveAttribute('data-cell', '3,3')
+
+    // 向きを戻しても状態は初期化せず、縦画面用の一覧へ切り替わる。
+    matches = false
+    act(() => onChange?.())
+    expect(document.querySelector('main')).toHaveAttribute('data-layout', 'portrait')
+    expect(screen.getByTestId('part-tray')).toHaveAttribute('data-layout', 'portrait')
+    expect(placedParts()[0]).toHaveAttribute('data-cell', '3,3')
+  })
+
   test('パーツ置き場に既存板とPhase 3の追加パーツが並び、「ボールをおとす」が押せる', async () => {
     await renderGame()
     expect(trayPart('よこいた')).toBeEnabled()

@@ -84,6 +84,17 @@
   color: var(--color-primary-dark);
 }
 
+/* 右ペインに出す国旗変更。縦画面では従来どおりヘッダ側だけを見せる。 */
+.panelFlagButton {
+  display: none;
+}
+
+.panelFlagName {
+  color: var(--color-primary-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /*
  * 盤面と、その操作まわり（ひとこと・パーツ置き場・ボタン）のまとまり。
  * 縦画面では上下に積む。低い横画面では左右に並べ替えて、盤面の高さを確保する。
@@ -97,6 +108,14 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-sm);
+}
+
+.boardPane {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
 }
 
 .side {
@@ -236,23 +255,95 @@
  * 潰れてしまうため、盤面を左・操作まわりを右に並べ替えて高さを盤面へ回す。
  */
 @media (max-height: 560px) and (orientation: landscape) {
+  .page {
+    gap: 4px;
+    padding-top: calc(4px + var(--safe-top));
+    padding-bottom: calc(4px + var(--safe-bottom));
+  }
+
+  .header {
+    min-height: 36px;
+  }
+
+  .quit {
+    min-height: 36px;
+    padding: 4px 10px;
+    font-size: 14px;
+  }
+
+  .title {
+    font-size: 16px;
+  }
+
+  .headerFlagButton {
+    display: none;
+  }
+
   .body {
-    flex-direction: row;
-    /* 盤面の計測領域(.fit)へ行の高さをそのまま渡す。center のままだと
-       高さが内容依存になり、盤面が高さを測れずに拡縮できない。 */
+    /* 左は盤面を優先した約68%、右は操作に必要な約32%。両ペインとも min-width: 0
+       にして、カードや長い文字が盤面の計測領域を押し縮めないようにする。 */
+    display: grid;
+    grid-template-columns: minmax(0, 68fr) minmax(220px, 32fr);
     align-items: stretch;
     max-width: none;
-    gap: var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .boardPane {
+    width: auto;
+    min-width: 0;
   }
 
   .side {
     width: auto;
-    flex: 0 0 auto;
-    justify-content: center;
+    min-width: 0;
+    min-height: 0;
+    align-items: stretch;
     align-self: stretch;
+    gap: 4px;
+  }
+
+  .panelFlagButton {
+    display: flex;
+    align-self: flex-start;
+    min-height: 36px;
+  }
+
+  .statusRow {
+    min-height: 28px;
+    justify-content: flex-start;
+    gap: 4px;
+  }
+
+  .status {
+    overflow: hidden;
+    font-size: 13px;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .removeButton,
+  .rotateButton {
+    min-height: 34px;
+    padding: 3px 8px;
+    font-size: 13px;
   }
 
   .controls {
-    max-width: 340px;
+    flex: 0 0 auto;
+    max-width: none;
+    gap: var(--space-sm);
+  }
+
+  .dropButton {
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  .clearButton {
+    min-height: 40px;
+    padding: 3px 8px;
+    font-size: 14px;
   }
 }
