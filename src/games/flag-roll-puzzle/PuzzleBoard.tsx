@@ -15,7 +15,7 @@ import {
 import type { PuzzleBallState } from './puzzleState'
 import { cellCenter, type GridCell } from './grid'
 import PartShape from './PartShape'
-import type { PartTypeId } from './partTypes'
+import { isSpinnerPart, type PartTypeId } from './partTypes'
 import { occupiedCells, type PlacedPart } from './placement'
 import styles from './PuzzleBoard.module.css'
 
@@ -39,6 +39,7 @@ type PuzzleBoardProps = {
   width: number
   height: number
   registerBall: (ballId: string, el: HTMLElement | null) => void
+  registerPartElement: (partId: string, el: HTMLElement | null) => void
   onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void
   onPointerMove?: (event: PointerEvent<HTMLDivElement>) => void
   onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void
@@ -74,6 +75,7 @@ export default function PuzzleBoard({
   width,
   height,
   registerBall,
+  registerPartElement,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -128,7 +130,17 @@ export default function PuzzleBoard({
                 data-placed={part.id === justPlacedPartId ? 'true' : 'false'}
                 data-rotating={part.id === rotatingPartId ? 'true' : 'false'}
               >
-                <PartShape typeId={part.typeId} variant={selected ? 'selected' : 'placed'} />
+                {isSpinnerPart(part.typeId) ? (
+                  <span
+                    ref={(element) => registerPartElement(part.id, element)}
+                    className={styles.spinnerVisual}
+                    aria-hidden="true"
+                  >
+                    <PartShape typeId={part.typeId} variant={selected ? 'selected' : 'placed'} />
+                  </span>
+                ) : (
+                  <PartShape typeId={part.typeId} variant={selected ? 'selected' : 'placed'} />
+                )}
               </div>
             )
           })}

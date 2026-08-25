@@ -7,6 +7,7 @@ import {
   isRotatablePart,
   partDefinition,
   type PartDefinition,
+  type PartTypeId,
 } from './partTypes'
 
 /** 回転させた長方形の外接矩形の半分の大きさ（中心からの張り出し量） */
@@ -33,10 +34,10 @@ function occupiedBounds(definition: PartDefinition) {
 }
 
 describe('partTypes', () => {
-  test('置き場には基本板とPhase 3の4系統を出し、回転後の向きは出さない', () => {
+  test('置き場には残ったパーツとキャノン・Spinnerの基本向きを出す', () => {
     expect(TRAY_PART_DEFINITIONS.map((definition) => definition.id)).toEqual([
-      'plank', 'slopeLeft', 'slopeRight', 'curveLeft', 'curveRight',
-      'bumper', 'guideLeft', 'guideRight', 'longPlank',
+      'slopeLeft', 'slopeRight', 'curveLeft', 'curveRight',
+      'bumper', 'guideLeft', 'guideRight', 'cannon', 'spinner',
     ])
   })
 
@@ -66,8 +67,7 @@ describe('partTypes', () => {
     }
   })
 
-  test('横板は水平、斜め板は左右で逆向きに傾いている', () => {
-    expect(partDefinition('plank').segments[0].angleDeg).toBe(0)
+  test('斜め板は左右で逆向きに傾いている', () => {
     const left = partDefinition('slopeLeft').segments[0].angleDeg
     const right = partDefinition('slopeRight').segments[0].angleDeg
     expect(left).toBeLessThan(0)
@@ -87,18 +87,24 @@ describe('partTypes', () => {
   test('バンパーは円形で通常板より明確に高い反発係数を持ち、回転しない', () => {
     const bumper = partDefinition('bumper')
     expect(bumper.segments[0].kind).toBe('circle')
-    expect(bumper.restitution).toBeGreaterThan(partDefinition('plank').restitution)
+    expect(bumper.restitution).toBeGreaterThan(partDefinition('slopeLeft').restitution)
     expect(bumper.restitution).toBeGreaterThanOrEqual(0.95)
     expect(nextRotationType('bumper')).toBeNull()
     expect(isRotatablePart('bumper')).toBe(false)
   })
 
-  test('長い板は2マスを占有し、回転すると縦の2マスへ切り替わる', () => {
-    expect(partDefinition('longPlank').cells).toEqual([{ col: 0, row: 0 }, { col: 1, row: 0 }])
-    expect(partDefinition('longPlankVertical').cells).toEqual([{ col: 0, row: 0 }, { col: 0, row: 1 }])
-    expect(nextRotationType('longPlank')).toBe('longPlankVertical')
-    expect(partDefinition('longPlank').previewScale).toBeLessThan(1)
-    expect(partDefinition('longPlank').segments[0].width).toBe(114)
+  test('キャノンは8方向を循環し、Spinnerはユーザー回転しない', () => {
+    const cannonDirections = [
+      'cannon', 'cannonDownRight', 'cannonDown', 'cannonDownLeft',
+      'cannonLeft', 'cannonUpLeft', 'cannonUp', 'cannonUpRight',
+    ] as const
+    let current: PartTypeId = cannonDirections[0]
+    for (const expected of cannonDirections.slice(1)) {
+      current = nextRotationType(current)!
+      expect(current).toBe(expected)
+    }
+    expect(nextRotationType(current)).toBe('cannon')
+    expect(isRotatablePart('spinner')).toBe(false)
   })
 
   test('未知のパーツ種類は例外にする（データ不整合に早く気付くため）', () => {

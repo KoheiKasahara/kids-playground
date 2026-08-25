@@ -17,25 +17,25 @@ import {
   type PlacedPart,
 } from './placement'
 
-const plankAt = (col: number, row: number, id = `part-${col}-${row}`): PlacedPart => ({
+const partAt = (col: number, row: number, id = `part-${col}-${row}`): PlacedPart => ({
   id,
-  typeId: 'plank',
+  typeId: 'slopeLeft',
   cell: { col, row },
 })
 
 describe('placement', () => {
   test('1マスのパーツは、そのアンカーセルだけを占有する', () => {
-    expect(occupiedCells('plank', { col: 2, row: 3 })).toEqual([{ col: 2, row: 3 }])
+    expect(occupiedCells('slopeLeft', { col: 2, row: 3 })).toEqual([{ col: 2, row: 3 }])
     expect(occupiedCells('slopeLeft', { col: 0, row: 0 })).toEqual([{ col: 0, row: 0 }])
   })
 
-  test('長い板は向きに応じた2マスを占有する', () => {
-    expect(occupiedCells('longPlank', { col: 2, row: 3 })).toEqual([{ col: 2, row: 3 }, { col: 3, row: 3 }])
-    expect(occupiedCells('longPlankVertical', { col: 2, row: 3 })).toEqual([{ col: 2, row: 3 }, { col: 2, row: 4 }])
+  test('キャノンとSpinnerも1マスだけを占有する', () => {
+    expect(occupiedCells('cannon', { col: 2, row: 3 })).toEqual([{ col: 2, row: 3 }])
+    expect(occupiedCells('spinner', { col: 2, row: 3 })).toEqual([{ col: 2, row: 3 }])
   })
 
   test('置かれた全パーツの占有マスを集計できる', () => {
-    const keys = occupiedCellKeys([plankAt(0, 0), plankAt(1, 2)])
+    const keys = occupiedCellKeys([partAt(0, 0), partAt(1, 2)])
     expect(keys.size).toBe(2)
     expect(keys.has('0,0')).toBe(true)
     expect(keys.has('1,2')).toBe(true)
@@ -43,43 +43,39 @@ describe('placement', () => {
   })
 
   test('ボード（グリッド）の外へは置けない', () => {
-    expect(isInsideBoard('plank', { col: 0, row: 0 })).toBe(true)
-    expect(isInsideBoard('plank', { col: GRID_COLS - 1, row: GRID_ROWS - 1 })).toBe(true)
-    expect(isInsideBoard('plank', { col: -1, row: 0 })).toBe(false)
-    expect(isInsideBoard('plank', { col: GRID_COLS, row: 0 })).toBe(false)
+    expect(isInsideBoard('slopeLeft', { col: 0, row: 0 })).toBe(true)
+    expect(isInsideBoard('slopeLeft', { col: GRID_COLS - 1, row: GRID_ROWS - 1 })).toBe(true)
+    expect(isInsideBoard('slopeLeft', { col: -1, row: 0 })).toBe(false)
+    expect(isInsideBoard('slopeLeft', { col: GRID_COLS, row: 0 })).toBe(false)
     // スタート帯（row: -1）とゴール帯（row: GRID_ROWS）はグリッドの外なので置けない
-    expect(isInsideBoard('plank', { col: 0, row: -1 })).toBe(false)
-    expect(isInsideBoard('plank', { col: 0, row: GRID_ROWS })).toBe(false)
-    expect(isInsideBoard('longPlank', { col: GRID_COLS - 2, row: 0 })).toBe(true)
-    expect(isInsideBoard('longPlank', { col: GRID_COLS - 1, row: 0 })).toBe(false)
-    expect(isInsideBoard('longPlankVertical', { col: 0, row: GRID_ROWS - 1 })).toBe(false)
+    expect(isInsideBoard('slopeLeft', { col: 0, row: -1 })).toBe(false)
+    expect(isInsideBoard('slopeLeft', { col: 0, row: GRID_ROWS })).toBe(false)
   })
 
   test('既に置かれたパーツと重なる位置かを判定できる', () => {
-    const parts = [plankAt(1, 1)]
-    expect(overlapsExistingPart(parts, 'plank', { col: 1, row: 1 })).toBe(true)
+    const parts = [partAt(1, 1)]
+    expect(overlapsExistingPart(parts, 'slopeLeft', { col: 1, row: 1 })).toBe(true)
     // 種類が違っても、同じマスを使うなら重なりとして弾く
     expect(overlapsExistingPart(parts, 'slopeRight', { col: 1, row: 1 })).toBe(true)
-    expect(overlapsExistingPart(parts, 'plank', { col: 1, row: 2 })).toBe(false)
+    expect(overlapsExistingPart(parts, 'slopeLeft', { col: 1, row: 2 })).toBe(false)
   })
 
-  test('長い板は占有するどちらのマスでも重なりを拒否する', () => {
-    const parts: PlacedPart[] = [{ id: 'long', typeId: 'longPlank', cell: { col: 2, row: 3 } }]
-    expect(overlapsExistingPart(parts, 'plank', { col: 2, row: 3 })).toBe(true)
-    expect(overlapsExistingPart(parts, 'plank', { col: 3, row: 3 })).toBe(true)
-    expect(overlapsExistingPart(parts, 'plank', { col: 4, row: 3 })).toBe(false)
-    expect(partAtCell(parts, { col: 3, row: 3 })?.id).toBe('long')
+  test('1マスパーツは同じセルだけ重なりを拒否する', () => {
+    const parts: PlacedPart[] = [{ id: 'cannon', typeId: 'cannon', cell: { col: 2, row: 3 } }]
+    expect(overlapsExistingPart(parts, 'slopeLeft', { col: 2, row: 3 })).toBe(true)
+    expect(overlapsExistingPart(parts, 'slopeLeft', { col: 3, row: 3 })).toBe(false)
+    expect(partAtCell(parts, { col: 2, row: 3 })?.id).toBe('cannon')
   })
 
   test('canPlacePart は ボード外 と 重なり の両方を弾く', () => {
-    const parts = [plankAt(1, 1)]
-    expect(canPlacePart(parts, 'plank', { col: 2, row: 1 })).toBe(true)
-    expect(canPlacePart(parts, 'plank', { col: 1, row: 1 })).toBe(false)
-    expect(canPlacePart(parts, 'plank', { col: GRID_COLS, row: 1 })).toBe(false)
+    const parts = [partAt(1, 1)]
+    expect(canPlacePart(parts, 'slopeLeft', { col: 2, row: 1 })).toBe(true)
+    expect(canPlacePart(parts, 'slopeLeft', { col: 1, row: 1 })).toBe(false)
+    expect(canPlacePart(parts, 'slopeLeft', { col: GRID_COLS, row: 1 })).toBe(false)
   })
 
   test('placePart は置けたときだけ新しい配列を返し、元の配列は変えない', () => {
-    const parts = [plankAt(1, 1)]
+    const parts = [partAt(1, 1)]
     const placed = placePart(parts, 'slopeLeft', { col: 2, row: 1 }, 'part-new')
     expect(placed).not.toBeNull()
     expect(placed).toHaveLength(2)
@@ -88,13 +84,13 @@ describe('placement', () => {
   })
 
   test('placePart は重なる位置・ボード外では null を返す（元の場所へ戻す挙動に使う）', () => {
-    const parts = [plankAt(1, 1)]
-    expect(placePart(parts, 'plank', { col: 1, row: 1 }, 'part-new')).toBeNull()
-    expect(placePart(parts, 'plank', { col: -1, row: 1 }, 'part-new')).toBeNull()
+    const parts = [partAt(1, 1)]
+    expect(placePart(parts, 'slopeLeft', { col: 1, row: 1 }, 'part-new')).toBeNull()
+    expect(placePart(parts, 'slopeLeft', { col: -1, row: 1 }, 'part-new')).toBeNull()
   })
 
   test('マスにあるパーツを引ける（盤面のパーツを選ぶときに使う）', () => {
-    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    const parts = [partAt(1, 1, 'part-a'), partAt(3, 4, 'part-b')]
     expect(partAtCell(parts, { col: 1, row: 1 })?.id).toBe('part-a')
     expect(partAtCell(parts, { col: 3, row: 4 })?.id).toBe('part-b')
     expect(partAtCell(parts, { col: 2, row: 2 })).toBeNull()
@@ -102,26 +98,26 @@ describe('placement', () => {
   })
 
   test('removePart は指定した1つだけを外し、元の配列は変えない', () => {
-    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    const parts = [partAt(1, 1, 'part-a'), partAt(3, 4, 'part-b')]
     const removed = removePart(parts, 'part-a')
     expect(removed.map((part) => part.id)).toEqual(['part-b'])
     expect(parts).toHaveLength(2)
   })
 
   test('removePart に無いidを渡しても、残りは変わらない', () => {
-    const parts = [plankAt(1, 1, 'part-a')]
+    const parts = [partAt(1, 1, 'part-a')]
     expect(removePart(parts, 'part-x').map((part) => part.id)).toEqual(['part-a'])
   })
 
   test('置いたパーツは、空いているマスへ動かせる', () => {
-    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    const parts = [partAt(1, 1, 'part-a'), partAt(3, 4, 'part-b')]
     expect(canMovePart(parts, 'part-a', { col: 2, row: 2 })).toBe(true)
     // 自分自身とは重なりとみなさない（同じ場所へ戻す操作も許す）
     expect(canMovePart(parts, 'part-a', { col: 1, row: 1 })).toBe(true)
   })
 
   test('ほかのパーツの上・ボードの外へは動かせない', () => {
-    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    const parts = [partAt(1, 1, 'part-a'), partAt(3, 4, 'part-b')]
     expect(canMovePart(parts, 'part-a', { col: 3, row: 4 })).toBe(false)
     expect(canMovePart(parts, 'part-a', { col: -1, row: 1 })).toBe(false)
     expect(canMovePart(parts, 'part-a', { col: GRID_COLS, row: 1 })).toBe(false)
@@ -131,7 +127,7 @@ describe('placement', () => {
   })
 
   test('movePart は id と並び順を保ったまま位置だけ変える', () => {
-    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    const parts = [partAt(1, 1, 'part-a'), partAt(3, 4, 'part-b')]
     const moved = movePart(parts, 'part-a', { col: 5, row: 6 })
     expect(moved).not.toBeNull()
     expect(moved!.map((part) => part.id)).toEqual(['part-a', 'part-b'])
@@ -142,28 +138,27 @@ describe('placement', () => {
   })
 
   test('movePart は動かせない位置では null を返す（元の場所へ戻す挙動に使う）', () => {
-    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    const parts = [partAt(1, 1, 'part-a'), partAt(3, 4, 'part-b')]
     expect(movePart(parts, 'part-a', { col: 3, row: 4 })).toBeNull()
     expect(movePart(parts, 'part-a', { col: -1, row: 0 })).toBeNull()
   })
 
   test('回転できるときは、idとセルを保つ', () => {
-    const parts = [plankAt(2, 3, 'part-a')]
+    const parts = [partAt(2, 3, 'part-a')]
     expect(canRotatePart(parts, 'part-a', 'slopeLeft')).toBe(true)
     const rotated = rotatePart(parts, 'part-a', 'slopeLeft')
     expect(rotated).toEqual([{ id: 'part-a', typeId: 'slopeLeft', cell: { col: 2, row: 3 } }])
   })
 
-  test('長い板は回転後に重なる・ボード外へ出ると回せない', () => {
-    const atBottom: PlacedPart[] = [{ id: 'long', typeId: 'longPlank', cell: { col: 2, row: GRID_ROWS - 1 } }]
-    expect(canRotatePart(atBottom, 'long', 'longPlankVertical')).toBe(false)
-
+  test('キャノンは同じマスで回転でき、占有セルが塞がれていれば回せない', () => {
+    const atCell: PlacedPart[] = [{ id: 'cannon', typeId: 'cannon', cell: { col: 2, row: GRID_ROWS - 1 } }]
+    expect(canRotatePart(atCell, 'cannon', 'cannonDownRight')).toBe(true)
     const blocked: PlacedPart[] = [
-      { id: 'long', typeId: 'longPlank', cell: { col: 2, row: 3 } },
-      plankAt(2, 4, 'blocker'),
+      { id: 'cannon', typeId: 'cannon', cell: { col: 2, row: 3 } },
+      partAt(2, 3, 'blocker'),
     ]
-    expect(canRotatePart(blocked, 'long', 'longPlankVertical')).toBe(false)
-    expect(rotatePart(blocked, 'long', 'longPlankVertical')).toBeNull()
+    expect(canRotatePart(blocked, 'cannon', 'cannonDownRight')).toBe(false)
+    expect(rotatePart(blocked, 'cannon', 'cannonDownRight')).toBeNull()
   })
 
   test('ポインタ座標を、盤面の拡縮を打ち消して論理座標へ戻す', () => {

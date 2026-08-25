@@ -19,7 +19,7 @@ import {
 
 /** 板を2枚置いた編集中の状態 */
 function stateWithTwoParts() {
-  const first = tryPlacePart(createPuzzleState(), 'plank', { col: 1, row: 1 })!
+  const first = tryPlacePart(createPuzzleState(), 'slopeLeft', { col: 1, row: 1 })!
   return tryPlacePart(first, 'slopeLeft', { col: 3, row: 4 })!
 }
 
@@ -32,7 +32,7 @@ describe('puzzleState', () => {
   })
 
   test('編集中はパーツを置ける。IDは重複しない', () => {
-    const first = tryPlacePart(createPuzzleState(), 'plank', { col: 1, row: 1 })
+    const first = tryPlacePart(createPuzzleState(), 'slopeLeft', { col: 1, row: 1 })
     expect(first).not.toBeNull()
     const second = tryPlacePart(first!, 'slopeLeft', { col: 2, row: 1 })
     expect(second).not.toBeNull()
@@ -41,19 +41,19 @@ describe('puzzleState', () => {
   })
 
   test('同じマスへは2つ置けない', () => {
-    const placed = tryPlacePart(createPuzzleState(), 'plank', { col: 1, row: 1 })!
+    const placed = tryPlacePart(createPuzzleState(), 'slopeLeft', { col: 1, row: 1 })!
     expect(tryPlacePart(placed, 'slopeRight', { col: 1, row: 1 })).toBeNull()
     expect(placed.parts).toHaveLength(1)
   })
 
   test('ボードの外へは置けない', () => {
-    expect(tryPlacePart(createPuzzleState(), 'plank', { col: -1, row: 1 })).toBeNull()
+    expect(tryPlacePart(createPuzzleState(), 'slopeLeft', { col: -1, row: 1 })).toBeNull()
   })
 
   test('実行中はパーツを置けない（配置と実行を混ぜない）', () => {
-    const running = startRun(tryPlacePart(createPuzzleState(), 'plank', { col: 1, row: 1 })!)
+    const running = startRun(tryPlacePart(createPuzzleState(), 'slopeLeft', { col: 1, row: 1 })!)
     expect(running.phase).toBe('running')
-    expect(tryPlacePart(running, 'plank', { col: 2, row: 2 })).toBeNull()
+    expect(tryPlacePart(running, 'slopeLeft', { col: 2, row: 2 })).toBeNull()
   })
 
   test('「ボールをおとす」で実行へ移り、実行の世代(runId)が進む', () => {
@@ -79,7 +79,7 @@ describe('puzzleState', () => {
     const stopped = stopRun(running)
     expect(stopped.phase).toBe('stopped')
     // 停止中は既存の編集操作を使える
-    expect(tryPlacePart(stopped, 'plank', { col: 5, row: 6 })).not.toBeNull()
+    expect(tryPlacePart(stopped, 'slopeLeft', { col: 5, row: 6 })).not.toBeNull()
     const resumed = startRun(stopped)
     expect(resumed.phase).toBe('running')
     expect(resumed.runId).toBe(running.runId + 1)
@@ -90,11 +90,11 @@ describe('puzzleState', () => {
     const curve = tryPlacePart(stopped, 'curveLeft', { col: 1, row: 2 })!
     const bumper = tryPlacePart(curve, 'bumper', { col: 3, row: 2 })!
     const guide = tryPlacePart(bumper, 'guideRight', { col: 5, row: 2 })!
-    const long = tryPlacePart(guide, 'longPlank', { col: 2, row: 4 })!
-    const rotated = rotateSelectedPart(selectPart(long, 'part-4'))
+    const cannon = tryPlacePart(guide, 'cannon', { col: 2, row: 4 })!
+    const rotated = rotateSelectedPart(selectPart(cannon, 'part-4'))
 
     expect(rotated.parts.map((part) => part.typeId)).toEqual([
-      'curveLeft', 'bumper', 'guideRight', 'longPlankVertical',
+      'curveLeft', 'bumper', 'guideRight', 'cannonDownRight',
     ])
     expect(startRun(rotated).phase).toBe('running')
   })
@@ -105,7 +105,7 @@ describe('puzzleState', () => {
   })
 
   test('「ボールをもどす」は、置いたパーツを残したまま編集へ戻す', () => {
-    const placed = tryPlacePart(createPuzzleState(), 'plank', { col: 1, row: 1 })!
+    const placed = tryPlacePart(createPuzzleState(), 'slopeLeft', { col: 1, row: 1 })!
     const returned = returnBall(reachGoal(startRun(placed)))
     expect(returned.phase).toBe('edit')
     expect(returned.parts).toHaveLength(1)
@@ -175,14 +175,13 @@ describe('puzzleState', () => {
     expect(moved!.selectedPartId).toBe(first.id)
   })
 
-  test('選んでいるパーツは固定された3方向を循環して回せる', () => {
-    const selected = selectPart(tryPlacePart(createPuzzleState(), 'plank', { col: 2, row: 3 })!, 'part-1')
+  test('選んでいる斜め板は左右2方向を循環して回せる', () => {
+    const selected = selectPart(tryPlacePart(createPuzzleState(), 'slopeLeft', { col: 2, row: 3 })!, 'part-1')
     const left = rotateSelectedPart(selected)
     const right = rotateSelectedPart(left)
-    const horizontal = rotateSelectedPart(right)
-    expect(left.parts[0].typeId).toBe('slopeLeft')
-    expect(right.parts[0].typeId).toBe('slopeRight')
-    expect(horizontal.parts[0].typeId).toBe('plank')
+    expect(left.parts[0].typeId).toBe('slopeRight')
+    expect(right.parts[0].typeId).toBe('slopeLeft')
+    expect(rotateSelectedPart(right).parts[0].typeId).toBe('slopeRight')
   })
 
   test('実行中はパーツを動かせない', () => {
@@ -193,12 +192,12 @@ describe('puzzleState', () => {
 
   test('新しくパーツを置くと、それまでの選択は解ける', () => {
     const selected = selectPart(stateWithTwoParts(), 'part-1')
-    const placed = tryPlacePart(selected, 'plank', { col: 5, row: 6 })!
+    const placed = tryPlacePart(selected, 'slopeLeft', { col: 5, row: 6 })!
     expect(placed.selectedPartId).toBeNull()
   })
 
   test('「ぜんぶけす」は、パーツを全部外して編集へ戻す', () => {
-    const placed = tryPlacePart(createPuzzleState(), 'plank', { col: 1, row: 1 })!
+    const placed = tryPlacePart(createPuzzleState(), 'slopeLeft', { col: 1, row: 1 })!
     const cleared = clearAll(startRun(placed))
     expect(cleared.phase).toBe('edit')
     expect(cleared.parts).toEqual([])
@@ -248,7 +247,7 @@ describe('puzzleState', () => {
   })
 
   test('もどす・ぜんぶけすは全ボールを各スタートへ戻し、国旗とステージを維持する', () => {
-    const placed = tryPlacePart(createPuzzleState('hard', 'us'), 'plank', { col: 1, row: 1 })!
+    const placed = tryPlacePart(createPuzzleState('hard', 'us'), 'slopeLeft', { col: 1, row: 1 })!
     const running = startRun(placed)
     const progressed = markBallGoal(running, 'ball-a')
     const returned = returnBall(progressed)
