@@ -8,6 +8,7 @@ import {
   returnBall,
   selectPart,
   startRun,
+  tryMovePart,
   tryPlacePart,
 } from './puzzleState'
 
@@ -113,6 +114,36 @@ describe('puzzleState', () => {
     // 実行へ移る時点で選択は解ける（実行中に消す対象が残らないようにする）
     expect(running.selectedPartId).toBeNull()
     expect(removeSelectedPart(running)).toBe(running)
+  })
+
+  test('置いたパーツを別のマスへ動かせる。数もidも変わらない', () => {
+    const state = stateWithTwoParts()
+    const [first] = state.parts
+    const moved = tryMovePart(state, first.id, { col: 5, row: 6 })
+    expect(moved).not.toBeNull()
+    expect(moved!.parts).toHaveLength(2)
+    expect(moved!.parts[0].id).toBe(first.id)
+    expect(moved!.parts[0].cell).toEqual({ col: 5, row: 6 })
+  })
+
+  test('動かせない位置（ほかのパーツの上・ボードの外）は null を返す', () => {
+    const state = stateWithTwoParts()
+    const [first, second] = state.parts
+    expect(tryMovePart(state, first.id, second.cell)).toBeNull()
+    expect(tryMovePart(state, first.id, { col: -1, row: 0 })).toBeNull()
+  })
+
+  test('選んでいるパーツを動かしても、選択はそのパーツに付いていく', () => {
+    const state = stateWithTwoParts()
+    const [first] = state.parts
+    const moved = tryMovePart(selectPart(state, first.id), first.id, { col: 5, row: 6 })
+    expect(moved!.selectedPartId).toBe(first.id)
+  })
+
+  test('実行中はパーツを動かせない', () => {
+    const state = stateWithTwoParts()
+    const running = startRun(state)
+    expect(tryMovePart(running, state.parts[0].id, { col: 5, row: 6 })).toBeNull()
   })
 
   test('新しくパーツを置くと、それまでの選択は解ける', () => {

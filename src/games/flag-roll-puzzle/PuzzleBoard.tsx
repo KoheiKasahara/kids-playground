@@ -24,6 +24,8 @@ type PuzzleBoardProps = {
   parts: readonly PlacedPart[]
   /** 盤面で選んでいるパーツのid。選択枠を出す対象 */
   selectedPartId: string | null
+  /** いま指でつまんで動かしているパーツのid。元の場所を薄く見せる */
+  draggingPartId: string | null
   flag: FlagBallData
   /** いま置こうとしている場所の下書き。置けない位置のときは null */
   ghost: { readonly typeId: PartTypeId; readonly cell: GridCell } | null
@@ -40,6 +42,8 @@ type PuzzleBoardProps = {
   height: number
   registerBall: (el: HTMLElement | null) => void
   onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void
+  onPointerMove?: (event: PointerEvent<HTMLDivElement>) => void
+  onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void
 }
 
 /** 選択枠の位置と大きさ。パーツが占有する全マスをちょうど囲む */
@@ -64,6 +68,7 @@ function selectionRingStyle(part: PlacedPart) {
 export default function PuzzleBoard({
   parts,
   selectedPartId,
+  draggingPartId,
   flag,
   ghost,
   highlightGrid,
@@ -75,6 +80,8 @@ export default function PuzzleBoard({
   height,
   registerBall,
   onPointerDown,
+  onPointerMove,
+  onPointerUp,
 }: PuzzleBoardProps) {
   const selectedPart = parts.find((part) => part.id === selectedPartId) ?? null
   return (
@@ -85,6 +92,8 @@ export default function PuzzleBoard({
           className={styles.logical}
           style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT, transform: `scale(${scale})` }}
           onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
           data-testid="puzzle-board"
         >
           <div className={styles.startZone} aria-hidden="true" />
@@ -114,7 +123,9 @@ export default function PuzzleBoard({
                 aria-hidden="true"
                 data-testid="puzzle-part"
                 data-part-type={part.typeId}
+                data-cell={`${part.cell.col},${part.cell.row}`}
                 data-selected={selected ? 'true' : 'false'}
+                data-dragging={part.id === draggingPartId ? 'true' : 'false'}
               >
                 <PartShape typeId={part.typeId} variant={selected ? 'selected' : 'placed'} />
               </div>
@@ -125,7 +136,7 @@ export default function PuzzleBoard({
             選んでいるパーツを囲む枠。占有マス全体を囲むので、Phase 3で
             2〜3マスを使う長い板が増えても同じ描画で正しい範囲を示せる。
           */}
-          {selectedPart ? (
+          {selectedPart && selectedPart.id !== draggingPartId ? (
             <div
               className={styles.selectionRing}
               aria-hidden="true"

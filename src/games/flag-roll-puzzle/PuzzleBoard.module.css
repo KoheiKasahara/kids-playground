@@ -70,6 +70,14 @@
   height: 0;
 }
 
+/*
+ * 指でつまんで動かしている最中のパーツ。元の場所は薄く残し、
+ * 「今どこから動かしているのか」が分かるようにする（本体は指について動く）。
+ */
+.partSlot[data-dragging='true'] {
+  opacity: 0.3;
+}
+
 /* ゴール帯（盤面下部）。ゴール以外は床 */
 .goalBand {
   position: absolute;
