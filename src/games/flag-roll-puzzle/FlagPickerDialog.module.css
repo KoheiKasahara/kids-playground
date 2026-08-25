@@ -47,6 +47,46 @@
   cursor: pointer;
 }
 
+/* むずかしいの2球ぶん。どちらへ選ぶかをタブで切り替えてから下の一覧をタップする */
+.ballTabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md) 0;
+}
+
+.ballTab {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 3px solid transparent;
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.ballTab:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.ballTabActive {
+  border-color: var(--color-primary);
+  background-color: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+}
+
+.ballTabLabel {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-primary-dark);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));

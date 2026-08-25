@@ -21,14 +21,13 @@
 /** 1マスの1辺（論理px）。パーツの大きさとドラッグの吸着間隔の基準になる */
 export const CELL_SIZE = 60
 /** 配置グリッドの列数。盤面の幅はこの値から決まる */
-export const GRID_COLS = 6
+export const GRID_COLS = 8
 /**
  * 配置グリッドの行数。
  * 増やすほどコースは長くなるが、そのぶんスマホ縦画面では1マスが小さくなり
  * （盤面全体が画面の高さに合わせて縮むため）指で狙いにくくなる。
- * 8行は、iPhone相当の縦画面で1マスが50px前後を保てる上限として選んだ。
  */
-export const GRID_ROWS = 8
+export const GRID_ROWS = 10
 
 /** グリッドの左端x。今は盤面の左端と同じだが、意味が違うので別の名前で持つ */
 export const GRID_LEFT = 0

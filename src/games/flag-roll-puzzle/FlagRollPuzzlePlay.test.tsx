@@ -106,24 +106,30 @@ describe('こっきコロコロパズル', () => {
     expect(engineMock.options?.balls?.every((ball) => ball.status === 'moving')).toBe(true)
   })
 
-  test('むずかしいはボールごとに別々の国旗を選べる', async () => {
+  test('むずかしいも、かんたん・ふつうと同じ1つのボタンから2球ぶん国旗を選べる', async () => {
     const user = userEvent.setup()
     await renderStageSelect()
     await user.click(screen.getByRole('button', { name: 'むずかしい' }))
 
-    await user.click(screen.getByRole('button', { name: 'Aの こっきを かえる（にほん）' }))
-    expect(screen.getByRole('dialog', { name: 'Aの こっきを えらぶ' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'フランス' }))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'こっきを かえる（A: にほん／B: にほん）' }))
+    expect(screen.getByRole('dialog', { name: 'こっきを えらぶ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Aの こっきを えらぶ（にほん）' })).toHaveAttribute('aria-pressed', 'true')
 
-    await user.click(screen.getByRole('button', { name: 'Bの こっきを かえる（にほん）' }))
+    // Aを選ぶと、続けてBを選べるようタブが自動で切り替わる。
+    await user.click(screen.getByRole('button', { name: 'フランス' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bの こっきを えらぶ（にほん）' })).toHaveAttribute('aria-pressed', 'true')
+
     await user.click(screen.getByRole('button', { name: 'アメリカ' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'こっきえらびを とじる' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     const balls = screen.getAllByTestId('puzzle-ball')
     expect(balls.find((ball) => ball.getAttribute('data-ball-id') === 'ball-a')).toHaveAttribute('data-flag-id', 'fr')
     expect(balls.find((ball) => ball.getAttribute('data-ball-id') === 'ball-b')).toHaveAttribute('data-flag-id', 'us')
-    expect(screen.getByRole('button', { name: 'Aの こっきを かえる（フランス）' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Bの こっきを かえる（アメリカ）' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'こっきを かえる（A: フランス／B: アメリカ）' })).toBeInTheDocument()
   })
 
   test('むずかしいは1球ゴールでは未クリア、2球目でクリアになる', async () => {

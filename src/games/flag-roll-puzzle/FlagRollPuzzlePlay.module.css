@@ -109,6 +109,13 @@
   color: var(--color-primary-dark);
 }
 
+/* ボールが2個のときは国旗ボールを2個並べて見せる（1個なら1個だけ並ぶ） */
+.flagButtonBalls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 /* 右ペインに出す国旗変更。縦画面では従来どおりヘッダ側だけを見せる。 */
 .panelFlagButton {
   display: none;
@@ -118,15 +125,6 @@
   color: var(--color-primary-dark);
   font-size: 13px;
   font-weight: 700;
-}
-
-/* ボールが2個以上のとき、ボールごとに国旗を選べるようにボタンを横に並べる */
-.multiFlagRow {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
 }
 
 /*
