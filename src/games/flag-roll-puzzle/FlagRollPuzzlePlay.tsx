@@ -108,16 +108,15 @@ export default function FlagRollPuzzlePlay() {
     playCorrectSound()
   }, [])
 
-  const handleStopped = useCallback((position: { readonly x: number; readonly y: number }) => {
-    setState((current) => stopRun(current, position))
+  const handleStopped = useCallback(() => {
+    setState((current) => stopRun(current))
   }, [])
 
   const { registerBall } = usePuzzleEngine({
     parts: state.parts,
-    // ゴール後は自然に転がり続ける。途中停止では世界を止めて、同じ位置で編集へ戻る。
+    // ゴール後は自然に転がり続ける。途中停止では世界を止め、開始位置へ戻して編集へ戻る。
     running: state.phase === 'running' || state.phase === 'cleared',
     runId: state.runId,
-    ballPosition: state.ballPosition,
     onGoal: handleGoal,
     onStopped: handleStopped,
   })
@@ -194,8 +193,8 @@ export default function FlagRollPuzzlePlay() {
     const placeable =
       cell !== null &&
       (drag.source === 'tray'
-        ? canPlacePart(state.parts, drag.typeId, cell, state.ballPosition)
-        : canMovePart(state.parts, drag.partId!, cell, state.ballPosition))
+        ? canPlacePart(state.parts, drag.typeId, cell)
+        : canMovePart(state.parts, drag.partId!, cell))
     const nextGhost = placeable ? cell : null
     setGhostCell((current) => {
       if (current === null && nextGhost === null) return current
