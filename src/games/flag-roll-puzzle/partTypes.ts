@@ -105,3 +105,20 @@ export function partDefinition(id: PartTypeId): PartDefinition {
   if (!definition) throw new Error(`flag-roll-puzzle: 不明なパーツ種類です: ${id}`)
   return definition
 }
+
+/**
+ * 選んだ板を回すときの次の向き。Phase 1の3種類はいずれも1マスを使うため、
+ * 種類IDを循環させるだけで「よこ → 左上がり → 右上がり」が表せる。
+ *
+ * Phase 3で複数マスの板を足す場合も、この対応表へ利用可能な向きだけを追加すれば
+ * placement.ts の占有判定をそのまま再利用できる。
+ */
+const NEXT_ROTATION_TYPE: Readonly<Record<PartTypeId, PartTypeId>> = {
+  plank: 'slopeLeft',
+  slopeLeft: 'slopeRight',
+  slopeRight: 'plank',
+}
+
+export function nextRotationType(id: PartTypeId): PartTypeId {
+  return NEXT_ROTATION_TYPE[id]
+}

@@ -9,6 +9,7 @@ import {
   WALL_THICKNESS,
 } from './boardLayout'
 import { cellCenter } from './grid'
+import { createStopObservation, observeBallStop } from './ballStopDetection'
 import { isInGoalArea } from './goal'
 import { partDefinition } from './partTypes'
 import type { PlacedPart } from './placement'
@@ -26,6 +27,7 @@ import {
   WALL_FRICTION,
   WALL_RESTITUTION,
 } from './puzzlePhysics'
+import type { ParkedBallPosition } from './placement'
 
 const { Engine, Bodies, Body, Composite } = Matter
 
@@ -38,8 +40,12 @@ export type PuzzleEngineOptions = {
   running: boolean
   /** 「ボールをおとす」ごとに増える世代。値が変わったら世界を作り直す */
   runId: number
+  /** null なら開始位置、途中停止後ならその位置から物理Bodyを作る */
+  ballPosition: ParkedBallPosition
   /** ボールがゴール領域へ入ったとき（1回の実行につき最大1度だけ呼ぶ） */
   onGoal: () => void
+  /** ゴール以外で一定時間動かなかったとき。位置は編集状態へ渡す */
+  onStopped: (position: { readonly x: number; readonly y: number }) => void
 }
 
 export type PuzzleEngineHandle = {
@@ -123,16 +129,16 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     [],
   )
 
-  const { running, runId } = options
+  const { running, runId, ballPosition } = options
 
-  // 編集中は開始位置に静止させる。実行中の書き込みと同じ形式で書くことで、
-  // 「静止中の見た目」と「実行中の見た目」が同じ経路になる。
+  // 編集中は開始位置、または途中停止位置に静止させる。
   useEffect(() => {
     if (running) return
     const el = ballElementRef.current
     if (!el) return
-    el.style.transform = `translate(${BALL_START.x - BALL_RADIUS}px, ${BALL_START.y - BALL_RADIUS}px)`
-  }, [running, runId])
+    const position = ballPosition ?? BALL_START
+    el.style.transform = `translate(${position.x - BALL_RADIUS}px, ${position.y - BALL_RADIUS}px)`
+  }, [running, runId, ballPosition])
 
   useEffect(() => {
     if (!running) return
@@ -142,7 +148,8 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     const parts = optionsRef.current.parts
 
     const engine = Engine.create({ gravity: { ...GRAVITY } })
-    const ball = Bodies.circle(BALL_START.x, BALL_START.y, BALL_RADIUS, {
+    const initialPosition = optionsRef.current.ballPosition ?? BALL_START
+    const ball = Bodies.circle(initialPosition.x, initialPosition.y, BALL_RADIUS, {
       restitution: BALL_RESTITUTION,
       friction: BALL_FRICTION,
       frictionAir: BALL_FRICTION_AIR,
@@ -156,6 +163,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     let accumulator = 0
     let reachedGoal = false
     let stopped = false
+    let stopObservation = createStopObservation()
 
     const writeBallTransform = () => {
       const el = ballElementRef.current
@@ -202,6 +210,23 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       if (!reachedGoal && isInGoalArea(ball.position.x, ball.position.y)) {
         reachedGoal = true
         optionsRef.current.onGoal()
+      }
+
+      // ゴール後は Phase 1 の「受け皿で自然に転がる」動きを維持するため停止判定しない。
+      const stopResult = observeBallStop(
+        stopObservation,
+        { x: ball.position.x, y: ball.position.y, speed },
+        now,
+        reachedGoal || isInGoalArea(ball.position.x, ball.position.y),
+      )
+      stopObservation = stopResult.observation
+      if (stopResult.stopped) {
+        stopped = true
+        Body.setVelocity(ball, { x: 0, y: 0 })
+        Body.setAngularVelocity(ball, 0)
+        Body.setStatic(ball, true)
+        writeBallTransform()
+        optionsRef.current.onStopped({ x: ball.position.x, y: ball.position.y })
       }
     }
 

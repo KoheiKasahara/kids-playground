@@ -114,6 +114,26 @@
   cursor: pointer;
 }
 
+.partActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* 回転は削除より先に置き、選んだ板をまず直す流れを作る */
+.rotateButton {
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-md);
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-round);
+  color: var(--color-primary-dark);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .removeButton:hover {
   background-color: var(--color-primary-dark);
 }

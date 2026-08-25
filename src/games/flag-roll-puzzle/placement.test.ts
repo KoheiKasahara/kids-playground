@@ -4,14 +4,17 @@ import {
   boardPointFromClient,
   canMovePart,
   canPlacePart,
+  canRotatePart,
   isInsideBoard,
   occupiedCellKeys,
   occupiedCells,
   movePart,
+  overlapsParkedBall,
   overlapsExistingPart,
   partAtCell,
   placePart,
   removePart,
+  rotatePart,
   type PlacedPart,
 } from './placement'
 
@@ -127,6 +130,22 @@ describe('placement', () => {
     const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
     expect(movePart(parts, 'part-a', { col: 3, row: 4 })).toBeNull()
     expect(movePart(parts, 'part-a', { col: -1, row: 0 })).toBeNull()
+  })
+
+  test('停止中ボールの中心へ板を食い込ませる配置・移動・回転は拒否する', () => {
+    const ball = { x: 150, y: 282 } // col: 2, row: 3 の中心
+    const parts = [plankAt(1, 1, 'part-a')]
+    expect(overlapsParkedBall('plank', { col: 2, row: 3 }, ball)).toBe(true)
+    expect(canPlacePart(parts, 'plank', { col: 2, row: 3 }, ball)).toBe(false)
+    expect(canMovePart(parts, 'part-a', { col: 2, row: 3 }, ball)).toBe(false)
+    expect(canRotatePart([{ ...plankAt(2, 3, 'part-a') }], 'part-a', 'slopeLeft', ball)).toBe(false)
+  })
+
+  test('ボールに触れていない位置なら回転でき、idとセルを保つ', () => {
+    const parts = [plankAt(2, 3, 'part-a')]
+    expect(canRotatePart(parts, 'part-a', 'slopeLeft', { x: 30, y: 100 })).toBe(true)
+    const rotated = rotatePart(parts, 'part-a', 'slopeLeft', { x: 30, y: 100 })
+    expect(rotated).toEqual([{ id: 'part-a', typeId: 'slopeLeft', cell: { col: 2, row: 3 } }])
   })
 
   test('ポインタ座標を、盤面の拡縮を打ち消して論理座標へ戻す', () => {

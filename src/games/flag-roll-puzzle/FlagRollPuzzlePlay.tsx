@@ -16,10 +16,13 @@ import {
   reachGoal,
   removeSelectedPart,
   returnBall,
+  rotateSelectedPart,
   selectPart,
   startRun,
+  stopRun,
   tryMovePart,
   tryPlacePart,
+  isEditingPhase,
 } from './puzzleState'
 import { useBoardScale } from './useBoardScale'
 import { usePuzzleEngine } from './usePuzzleEngine'
@@ -105,13 +108,18 @@ export default function FlagRollPuzzlePlay() {
     playCorrectSound()
   }, [])
 
+  const handleStopped = useCallback((position: { readonly x: number; readonly y: number }) => {
+    setState((current) => stopRun(current, position))
+  }, [])
+
   const { registerBall } = usePuzzleEngine({
     parts: state.parts,
-    // ゴール後もボールをその位置に見せたままにするため、cleared のあいだも物理世界は保つ。
-    // 編集へ戻ったときにだけ世界を捨てて、ボールを開始位置へ戻す。
-    running: state.phase !== 'edit',
+    // ゴール後は自然に転がり続ける。途中停止では世界を止めて、同じ位置で編集へ戻る。
+    running: state.phase === 'running' || state.phase === 'cleared',
     runId: state.runId,
+    ballPosition: state.ballPosition,
     onGoal: handleGoal,
+    onStopped: handleStopped,
   })
 
   /** 画面上のポインタ位置を、盤面のマスへ変換する */
@@ -186,8 +194,8 @@ export default function FlagRollPuzzlePlay() {
     const placeable =
       cell !== null &&
       (drag.source === 'tray'
-        ? canPlacePart(state.parts, drag.typeId, cell)
-        : canMovePart(state.parts, drag.partId!, cell))
+        ? canPlacePart(state.parts, drag.typeId, cell, state.ballPosition)
+        : canMovePart(state.parts, drag.partId!, cell, state.ballPosition))
     const nextGhost = placeable ? cell : null
     setGhostCell((current) => {
       if (current === null && nextGhost === null) return current
@@ -222,7 +230,7 @@ export default function FlagRollPuzzlePlay() {
   }
 
   const handlePartPointerDown = (typeId: PartTypeId, event: PointerEvent<HTMLButtonElement>) => {
-    if (state.phase !== 'edit') return
+    if (!isEditingPhase(state.phase)) return
     setState((current) => clearPartSelection(current))
     startDrag({ source: 'tray', typeId, x: event.clientX, y: event.clientY, moved: false }, event)
   }
@@ -230,7 +238,7 @@ export default function FlagRollPuzzlePlay() {
   /** パーツ置き場のタップ。選んでから盤面をタップして置く操作の入口 */
   const handlePartClick = (typeId: PartTypeId) => {
     if (Date.now() - dragEndedAtRef.current < CLICK_AFTER_DRAG_IGNORE_MS) return
-    if (state.phase !== 'edit') return
+    if (!isEditingPhase(state.phase)) return
     primeAudio()
     // パーツ置き場の選択と、盤面のパーツの選択は同時に持たない（操作の対象を1つに保つ）
     setState((current) => clearPartSelection(current))
@@ -247,7 +255,7 @@ export default function FlagRollPuzzlePlay() {
    * 置いたパーツを押しても「置けない」と言われず、そのまま動かす／消す操作へ進めるため。
    */
   const handleBoardPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (state.phase !== 'edit' || drag) return
+    if (!isEditingPhase(state.phase) || drag) return
     const cell = cellFromClient(event.clientX, event.clientY)
     if (!cell) return
 
@@ -273,6 +281,17 @@ export default function FlagRollPuzzlePlay() {
     playPanelOpenSound()
   }
 
+  const handleRotateSelectedPart = () => {
+    // UI側で可否を先に見て、Reactのstate更新関数を副作用のないままに保つ。
+    // （停止中のボールに食い込む向きなどは、現在の向きをそのまま残す。）
+    if (rotateSelectedPart(state) === state) {
+      showMessage('ここでは まわせないよ')
+      return
+    }
+    setState((current) => rotateSelectedPart(current))
+    playPanelOpenSound()
+  }
+
   const handleDrop = () => {
     primeAudio()
     setSelectedTypeId(null)
@@ -290,12 +309,20 @@ export default function FlagRollPuzzlePlay() {
     setState((current) => clearAll(current))
   }
 
-  const editing = state.phase === 'edit'
+  const editing = isEditingPhase(state.phase)
   const partSelected = state.selectedPartId !== null
   // パーツを選んでいるあいだは、同じ行に出る「えらんだ いたを けす」がそのまま案内になるため
   // ひとことは出さない（同じことを2つ並べて書かない）。
   const editHint = partSelected ? '' : EDIT_HINT
-  const status = message || (state.phase === 'cleared' ? 'ゴール！ すごい！' : editing ? editHint : 'ころころ ころがってるよ！')
+  const status =
+    message ||
+    (state.phase === 'cleared'
+      ? 'ゴール！ すごい！'
+      : state.phase === 'stopped'
+        ? 'つづきを つくろう！'
+        : editing
+          ? editHint
+          : 'ころころ ころがってるよ！')
 
   return (
     <main className={styles.page}>
@@ -340,9 +367,14 @@ export default function FlagRollPuzzlePlay() {
               {status}
             </p>
             {partSelected ? (
-              <button type="button" className={styles.removeButton} onClick={handleRemoveSelectedPart}>
-                えらんだ いたを けす
-              </button>
+              <div className={styles.partActions}>
+                <button type="button" className={styles.rotateButton} onClick={handleRotateSelectedPart}>
+                  まわす
+                </button>
+                <button type="button" className={styles.removeButton} onClick={handleRemoveSelectedPart}>
+                  えらんだ いたを けす
+                </button>
+              </div>
             ) : null}
           </div>
 
