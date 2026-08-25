@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import FlagBall from '../../components/flag-ball/FlagBall'
 import { findFlagBall, type FlagBallData } from '../../components/flag-ball/flagBalls'
 import { playCorrectSound, playPanelOpenSound, primeAudio } from '../../utils/quizSound'
+import FlagPickerDialog from './FlagPickerDialog'
 import PartShape from './PartShape'
 import PartTray from './PartTray'
 import PuzzleBoard from './PuzzleBoard'
@@ -28,23 +30,15 @@ import { useBoardScale } from './useBoardScale'
 import { usePuzzleEngine } from './usePuzzleEngine'
 import styles from './FlagRollPuzzlePlay.module.css'
 
-/**
- * Phase 1で使う国旗ボール。
- * 国旗を選ぶ画面はこのPhaseの目的（配置 → 落とす → ゴール のループを作る）から外れるため、
- * 共通の国旗ボールデータから1つを固定で使う。選べるようにするときは、
- * こっきドミノやこっきピンボールと同じ選択画面の作りをここへ足せばよい。
- */
-const BALL_FLAG_ID = 'jp'
+const INITIAL_BALL_FLAG_ID = 'jp'
 
 /**
- * 使う国旗ボール。未知のidはデータ不整合なので、flagBalls.ts と同じ方針で
- * （画面を描き始める前に）早期に throw する。
+ * 現在は1個ぶんの設定だけを持つ。ボール生成と描画がこの設定を受け取る分担にしておくと、
+ * Phase 5で複数ボールになったときは、ここを「ボールごとの設定一覧」へ拡張できる。
  */
-const BALL_FLAG = ((): FlagBallData => {
-  const flag = findFlagBall(BALL_FLAG_ID)
-  if (!flag) throw new Error(`flag-roll-puzzle: 不明な国旗ボールです: ${BALL_FLAG_ID}`)
-  return flag
-})()
+type BallConfig = {
+  readonly flagId: string
+}
 
 /** 置けなかったときなどの案内を出しておく時間(ms) */
 const MESSAGE_DURATION_MS = 1600
@@ -77,6 +71,8 @@ const EDIT_HINT = 'いたを おいて、ゴールまで はこぼう！'
 export default function FlagRollPuzzlePlay() {
   const navigate = useNavigate()
   const [state, setState] = useState(createPuzzleState)
+  const [ballConfig, setBallConfig] = useState<BallConfig>({ flagId: INITIAL_BALL_FLAG_ID })
+  const [isFlagPickerOpen, setIsFlagPickerOpen] = useState(false)
   const [selectedTypeId, setSelectedTypeId] = useState<PartTypeId | null>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [ghostCell, setGhostCell] = useState<GridCell | null>(null)
@@ -313,6 +309,16 @@ export default function FlagRollPuzzlePlay() {
     setState((current) => clearAll(current))
   }
 
+  const handleFlagSelect = (flagId: string) => {
+    setBallConfig({ flagId })
+    setIsFlagPickerOpen(false)
+    playPanelOpenSound()
+  }
+
+  // flagBallsからしか選べないため通常は必ず見つかる。データ不整合時もゲームを操作不能に
+  // しないよう、初期国旗へ戻して描画を続ける。
+  const ballFlag: FlagBallData = findFlagBall(ballConfig.flagId) ?? findFlagBall(INITIAL_BALL_FLAG_ID)!
+
   const editing = isEditingPhase(state.phase)
   const partSelected = state.selectedPartId !== null
   const selectedPart = state.parts.find((part) => part.id === state.selectedPartId) ?? null
@@ -336,13 +342,23 @@ export default function FlagRollPuzzlePlay() {
           やめる
         </button>
         <h1 className={styles.title}>こっきコロコロパズル</h1>
+        <button
+          type="button"
+          className={styles.flagButton}
+          aria-label={`こっきを かえる（${ballFlag.nameJa}）`}
+          disabled={!editing}
+          onClick={() => setIsFlagPickerOpen(true)}
+        >
+          <span className={styles.flagButtonLabel}>こっき</span>
+          <FlagBall flag={ballFlag} size={28} />
+        </button>
       </header>
 
       <div className={styles.body}>
         <PuzzleBoard
           parts={state.parts}
           selectedPartId={state.selectedPartId}
-          flag={BALL_FLAG}
+          flag={ballFlag}
           ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
           draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
           highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
@@ -420,6 +436,14 @@ export default function FlagRollPuzzlePlay() {
         >
           <PartShape typeId={drag.typeId} variant="dragging" />
         </div>
+      ) : null}
+
+      {isFlagPickerOpen ? (
+        <FlagPickerDialog
+          selectedFlagId={ballConfig.flagId}
+          onSelect={handleFlagSelect}
+          onClose={() => setIsFlagPickerOpen(false)}
+        />
       ) : null}
     </main>
   )

@@ -74,6 +74,46 @@ describe('こっきコロコロパズル', () => {
     expect(screen.getByRole('button', { name: 'ボールを おとす！' })).toBeEnabled()
   })
 
+  test('国旗ボールは日本を初期値にし、国旗一覧から1タップで選び直せる', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    expect(screen.getByTestId('puzzle-ball')).toHaveAttribute('data-flag-id', 'jp')
+
+    await user.click(screen.getByRole('button', { name: 'こっきを かえる（にほん）' }))
+    expect(screen.getByRole('dialog', { name: 'こっきを えらぶ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'フランス' })).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'フランス' }))
+    expect(screen.queryByRole('dialog', { name: 'こっきを えらぶ' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('puzzle-ball')).toHaveAttribute('data-flag-id', 'fr')
+    expect(screen.getByRole('button', { name: 'こっきを かえる（フランス）' })).toBeInTheDocument()
+  })
+
+  test('選んだ国旗はボールをもどす・ぜんぶけす・途中停止・ゴール後にも維持される', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(screen.getByRole('button', { name: 'こっきを かえる（にほん）' }))
+    await user.click(screen.getByRole('button', { name: 'アメリカ' }))
+    expect(screen.getByTestId('puzzle-ball')).toHaveAttribute('data-flag-id', 'us')
+
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    expect(screen.getByRole('button', { name: 'こっきを かえる（アメリカ）' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'ボールを もどす' }))
+    expect(screen.getByTestId('puzzle-ball')).toHaveAttribute('data-flag-id', 'us')
+
+    await user.click(screen.getByRole('button', { name: 'ぜんぶ けす' }))
+    expect(screen.getByTestId('puzzle-ball')).toHaveAttribute('data-flag-id', 'us')
+
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    act(() => engineMock.options?.onStopped())
+    expect(screen.getByTestId('puzzle-ball')).toHaveAttribute('data-flag-id', 'us')
+
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    act(() => engineMock.options?.onGoal())
+    await user.click(screen.getByRole('button', { name: 'ボールを もどす' }))
+    expect(screen.getByTestId('puzzle-ball')).toHaveAttribute('data-flag-id', 'us')
+  })
+
   test('長い板の置き場プレビューだけは縮小し、盤面用の実寸とは分ける', async () => {
     await renderGame()
     expect(trayPart('ながい いた').querySelector('[data-preview-scale]')).toHaveAttribute('data-preview-scale', '0.5')

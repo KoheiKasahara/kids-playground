@@ -52,6 +52,38 @@
   white-space: nowrap;
 }
 
+/* 現在の国旗を常に見せ、編集時だけそのまま選び直しの入口にする。 */
+.flagButton {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-round);
+  background-color: var(--color-surface);
+  cursor: pointer;
+}
+
+.flagButton:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.flagButton:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.flagButtonLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+}
+
 /*
  * 盤面と、その操作まわり（ひとこと・パーツ置き場・ボタン）のまとまり。
  * 縦画面では上下に積む。低い横画面では左右に並べ替えて、盤面の高さを確保する。

@@ -170,7 +170,7 @@ export default function PuzzleBoard({
             position: relative を既定にしているため、絶対配置はこの盤面側のラッパーが持つ
             （こっきピンボールの PinballBoard と同じ分担）。
           */}
-          <div ref={registerBall} className={styles.ballSlot} aria-hidden="true">
+          <div ref={registerBall} className={styles.ballSlot} aria-hidden="true" data-testid="puzzle-ball" data-flag-id={flag.id}>
             <FlagBall flag={flag} size={BALL_RADIUS * 2} />
           </div>
         </div>
