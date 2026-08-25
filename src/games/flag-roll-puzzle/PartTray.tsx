@@ -1,4 +1,4 @@
-import type { PointerEvent } from 'react'
+import { useRef, type CSSProperties, type PointerEvent } from 'react'
 import PartShape from './PartShape'
 import { TRAY_PART_DEFINITIONS, type PartTypeId } from './partTypes'
 import styles from './PartTray.module.css'
@@ -30,8 +30,67 @@ export default function PartTray({
   onPartPointerUp,
   onPartClick,
 }: PartTrayProps) {
+  const gestureRef = useRef<{
+    pointerId: number
+    typeId: PartTypeId
+    startX: number
+    startY: number
+    mode: 'pending' | 'scroll' | 'drag'
+  } | null>(null)
+  const suppressClickRef = useRef(false)
+
+  const handlePointerDown = (typeId: PartTypeId, event: PointerEvent<HTMLButtonElement>) => {
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      typeId,
+      startX: event.clientX,
+      startY: event.clientY,
+      mode: 'pending',
+    }
+  }
+
+  const handlePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const gesture = gestureRef.current
+    if (!gesture || gesture.pointerId !== event.pointerId) return
+
+    if (gesture.mode === 'pending') {
+      const dx = event.clientX - gesture.startX
+      const dy = event.clientY - gesture.startY
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return
+
+      // 横方向が優勢なら、Pointer Captureを取らず CSS の pan-x に任せる。
+      // 少し斜めでも盤面へ持ち出す意図が明確なときだけ配置ドラッグを始める。
+      if (Math.abs(dx) > Math.abs(dy)) {
+        gesture.mode = 'scroll'
+        return
+      }
+
+      gesture.mode = 'drag'
+      onPartPointerDown(gesture.typeId, event)
+      return
+    }
+
+    if (gesture.mode === 'drag') onPartPointerMove(event)
+  }
+
+  const handlePointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+    const gesture = gestureRef.current
+    if (!gesture || gesture.pointerId !== event.pointerId) return
+    if (gesture.mode === 'drag') onPartPointerUp(event)
+    if (gesture.mode === 'scroll') suppressClickRef.current = true
+    gestureRef.current = null
+  }
+
+  const handleClick = (typeId: PartTypeId) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
+    onPartClick(typeId)
+  }
+
   return (
-    <section className={styles.tray} aria-label="パーツおきば">
+    <section className={styles.tray} aria-label="パーツおきば" data-testid="part-tray">
       {TRAY_PART_DEFINITIONS.map((definition) => (
         <button
           key={definition.id}
@@ -40,12 +99,21 @@ export default function PartTray({
           data-part-type={definition.id}
           aria-pressed={selectedTypeId === definition.id}
           disabled={disabled}
-          onPointerDown={(event) => onPartPointerDown(definition.id, event)}
-          onPointerMove={onPartPointerMove}
-          onPointerUp={onPartPointerUp}
-          onClick={() => onPartClick(definition.id)}
+          onPointerDown={(event) => handlePointerDown(definition.id, event)}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={() => { gestureRef.current = null }}
+          onClick={() => handleClick(definition.id)}
         >
-          <span className={styles.preview} aria-hidden="true">
+          <span
+            className={styles.preview}
+            aria-hidden="true"
+            data-preview-scale={definition.previewScale ?? 1.1}
+            style={{
+              '--preview-scale': definition.previewScale ?? 1.1,
+              '--preview-offset-x': `${definition.previewOffsetX ?? 0}px`,
+            } as CSSProperties}
+          >
             <PartShape typeId={definition.id} />
           </span>
           <span className={styles.label}>{definition.label}</span>

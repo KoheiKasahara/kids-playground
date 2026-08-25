@@ -5,18 +5,22 @@ import {
   BALL_START,
   BOARD_HEIGHT,
   BOARD_WIDTH,
+  GOAL_AREA,
+  GOAL_EXIT_WALL_X,
   WALL_THICKNESS,
 } from './boardLayout'
 import { cellCenter } from './grid'
 import { createStopObservation, observeBallStop } from './ballStopDetection'
 import { isInGoalArea } from './goal'
 import { partDefinition } from './partTypes'
+import { bumperBoostVelocity } from './bumperPhysics'
 import type { PlacedPart } from './placement'
 import {
   BALL_DENSITY,
   BALL_FRICTION,
   BALL_FRICTION_AIR,
   BALL_RESTITUTION,
+  BUMPER_HIT_COOLDOWN_MS,
   GRAVITY,
   MAX_ANGULAR_VELOCITY,
   MAX_FRAME_DELTA_MS,
@@ -27,7 +31,7 @@ import {
   WALL_RESTITUTION,
 } from './puzzlePhysics'
 
-const { Engine, Bodies, Body, Composite } = Matter
+const { Engine, Bodies, Body, Composite, Events } = Matter
 
 const DEG_TO_RAD = Math.PI / 180
 
@@ -50,8 +54,8 @@ export type PuzzleEngineHandle = {
 }
 
 /**
- * 盤面の外周壁（左・右・床）。
- * 外周壁は盤面の外側に置き、見た目には出さない。
+ * 盤面の外周壁とゴール出口の壁。
+ * どちらも見えない位置に置き、ゴールへ入ったボールだけは出口側から戻れないようにする。
  */
 function wallBodies(): Matter.Body[] {
   const half = WALL_THICKNESS / 2
@@ -65,31 +69,37 @@ function wallBodies(): Matter.Body[] {
     Bodies.rectangle(-half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH + half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + half, BOARD_WIDTH + WALL_THICKNESS * 2, WALL_THICKNESS, options),
+    // 左端と床は外周壁を共用する。右端だけを追加してゴール帯をコの字に囲む。
+    Bodies.rectangle(
+      GOAL_EXIT_WALL_X + half,
+      GOAL_AREA.y + GOAL_AREA.height / 2,
+      WALL_THICKNESS,
+      GOAL_AREA.height,
+      { ...options, label: 'goal-wall' },
+    ),
   ]
 }
 
 /**
- * 置かれたパーツ1つぶんの静的Body。パーツ定義のセグメントをそのまま長方形にする。
+ * 置かれたパーツ1つぶんの静的Body。パーツ定義のセグメントをそのままBodyにする。
  * ここにパーツ種類ごとの分岐がないため、新しいパーツはpartTypes.tsへ定義を足すだけで動く。
  */
 function partBodies(part: PlacedPart): Matter.Body[] {
   const definition = partDefinition(part.typeId)
   const center = cellCenter(part.cell)
-  return definition.segments.map((segment, index) =>
-    Bodies.rectangle(
-      center.x + segment.offsetX,
-      center.y + segment.offsetY,
-      segment.width,
-      segment.height,
-      {
-        isStatic: true,
-        angle: segment.angleDeg * DEG_TO_RAD,
-        restitution: definition.restitution,
-        friction: definition.friction,
-        label: `${part.id}-${index}`,
-      },
-    ),
-  )
+  return definition.segments.map((segment, index) => {
+    const options = {
+      isStatic: true,
+      angle: segment.angleDeg * DEG_TO_RAD,
+      restitution: definition.restitution,
+      friction: definition.friction,
+      label: segment.kind === 'circle' ? `bumper:${part.id}:${index}` : `${part.id}-${index}`,
+    }
+    if (segment.kind === 'circle') {
+      return Bodies.circle(center.x + segment.offsetX, center.y + segment.offsetY, segment.width / 2, options)
+    }
+    return Bodies.rectangle(center.x + segment.offsetX, center.y + segment.offsetY, segment.width, segment.height, options)
+  })
 }
 
 /**
@@ -145,6 +155,25 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       label: 'ball',
     })
     Composite.add(engine.world, [...wallBodies(), ...parts.flatMap(partBodies), ball])
+
+    const lastBumperHitAt = new Map<number, number>()
+    const handleCollisionStart = (collision: Matter.IEventCollision<Matter.Engine>) => {
+      for (const pair of collision.pairs) {
+        const bumper = pair.bodyA.label.startsWith('bumper:')
+          ? pair.bodyA
+          : pair.bodyB.label.startsWith('bumper:')
+            ? pair.bodyB
+            : null
+        const hitBall = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB.label === 'ball' ? pair.bodyB : null
+        if (!bumper || !hitBall) continue
+
+        const now = performance.now()
+        if (now - (lastBumperHitAt.get(bumper.id) ?? -Infinity) < BUMPER_HIT_COOLDOWN_MS) continue
+        lastBumperHitAt.set(bumper.id, now)
+        Body.setVelocity(hitBall, bumperBoostVelocity(hitBall.position, bumper.position, hitBall.velocity))
+      }
+    }
+    Events.on(engine, 'collisionStart', handleCollisionStart)
 
     let rafId: number | null = null
     let lastFrameTime: number | null = null
@@ -224,6 +253,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     return () => {
       stopped = true
       if (rafId !== null) cancelAnimationFrame(rafId)
+      Events.off(engine, 'collisionStart', handleCollisionStart)
       Composite.clear(engine.world, false)
       Engine.clear(engine)
     }

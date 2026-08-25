@@ -5,6 +5,7 @@ import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   GOAL_AREA,
+  GOAL_EXIT_WALL_X,
   GRID_BOTTOM,
 } from './boardLayout'
 import { isInGoalArea } from './goal'
@@ -35,5 +36,7 @@ describe('goal', () => {
     expect(BALL_START.x).toBeLessThanOrEqual(BOARD_WIDTH)
     expect(GOAL_AREA.y).toBe(GRID_BOTTOM)
     expect(GOAL_AREA.y + GOAL_AREA.height).toBe(BOARD_HEIGHT)
+    expect(GOAL_EXIT_WALL_X).toBe(GOAL_AREA.x + GOAL_AREA.width)
+    expect(GOAL_EXIT_WALL_X).toBeLessThan(BOARD_WIDTH)
   })
 })

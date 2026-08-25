@@ -67,11 +67,45 @@ describe('こっきコロコロパズル', () => {
     expect(trayPart('みぎへ')).toBeEnabled()
     expect(trayPart('カーブ ひだり')).toBeEnabled()
     expect(trayPart('カーブ みぎ')).toBeEnabled()
-    expect(trayPart('バインいた')).toBeEnabled()
+    expect(trayPart('バンパー')).toBeEnabled()
     expect(trayPart('ひだりへ おす')).toBeEnabled()
     expect(trayPart('みぎへ おす')).toBeEnabled()
     expect(trayPart('ながい いた')).toBeEnabled()
     expect(screen.getByRole('button', { name: 'ボールを おとす！' })).toBeEnabled()
+  })
+
+  test('長い板の置き場プレビューだけは縮小し、盤面用の実寸とは分ける', async () => {
+    await renderGame()
+    expect(trayPart('ながい いた').querySelector('[data-preview-scale]')).toHaveAttribute('data-preview-scale', '0.5')
+  })
+
+  test('置き場の横スワイプは配置ドラッグを始めず、続けて盤面方向へはドラッグできる', async () => {
+    await renderGame()
+    const part = trayPart('ひだりへ')
+    fireEvent.pointerDown(part, { pointerId: 1, clientX: 100, clientY: 100 })
+    fireEvent.pointerMove(part, { pointerId: 1, clientX: 140, clientY: 101 })
+    fireEvent.pointerUp(part, { pointerId: 1, clientX: 140, clientY: 101 })
+    fireEvent.click(part)
+    expect(screen.queryByTestId('puzzle-ghost')).not.toBeInTheDocument()
+    expect(part).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.pointerDown(part, { pointerId: 2, clientX: 0, clientY: 0 })
+    fireEvent.pointerMove(part, { pointerId: 2, ...cellPoint(1, 2) })
+    expect(screen.getByTestId('puzzle-ghost')).toBeInTheDocument()
+    fireEvent.pointerUp(part, { pointerId: 2, ...cellPoint(1, 2) })
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'slopeLeft')
+  })
+
+  test('バンパーは配置・選択・削除でき、選択中にも回転操作を出さない', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('バンパー'))
+    tapBoard(2, 3)
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'bumper')
+    tapBoard(2, 3)
+    expect(screen.queryByRole('button', { name: 'まわす' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'えらんだ いたを けす' }))
+    expect(placedParts()).toHaveLength(0)
   })
 
   test('長い板は2マス目を含めて配置・選択・回転できる', async () => {

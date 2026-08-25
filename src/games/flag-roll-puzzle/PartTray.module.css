@@ -15,7 +15,7 @@
 
 /*
  * パーツ1つ。幼児がスマホの指で掴めるよう、主操作の目安(64px)より大きく取る。
- * touch-action: none でドラッグ中にページがスクロールしないようにする。
+ * 横方向は置き場の自然なスクロールを優先し、盤面方向への移動だけをドラッグにする。
  */
 .part {
   position: relative;
@@ -35,7 +35,7 @@
   font-size: 16px;
   font-weight: 700;
   cursor: grab;
-  touch-action: none;
+  touch-action: pan-x;
   scroll-snap-align: start;
 }
 
@@ -49,12 +49,12 @@
   cursor: default;
 }
 
-/* 見本。盤面の1マス(60px)と同じ形を、少し大きめに見せる */
+/* 見本。盤面の1マス(60px)と同じ形を、必要なものだけ置き場内で縮小して見せる */
 .preview {
   position: relative;
   width: 60px;
   height: 60px;
-  transform: scale(1.1);
+  transform: translateX(var(--preview-offset-x, 0)) scale(var(--preview-scale, 1.1));
 }
 
 .label {

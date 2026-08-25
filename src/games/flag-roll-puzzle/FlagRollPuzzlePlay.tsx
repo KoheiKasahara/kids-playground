@@ -7,7 +7,7 @@ import PartShape from './PartShape'
 import PartTray from './PartTray'
 import PuzzleBoard from './PuzzleBoard'
 import { nearestCell, sameCell, type GridCell } from './grid'
-import type { PartTypeId } from './partTypes'
+import { isRotatablePart, type PartTypeId } from './partTypes'
 import { boardPointFromClient, canMovePart, canPlacePart, partAtCell } from './placement'
 import {
   clearAll,
@@ -165,7 +165,8 @@ export default function FlagRollPuzzlePlay() {
   const startDrag = (next: DragState, event: PointerEvent<Element>) => {
     primeAudio()
     // jsdom や一部の組込みブラウザは Pointer Capture を持たないことがある。
-    event.currentTarget.setPointerCapture?.(event.pointerId)
+    // 置き場は横スワイプをブラウザ標準のスクロールへ渡すため、Captureしない。
+    if (next.source === 'board') event.currentTarget.setPointerCapture?.(event.pointerId)
     dragStartPointRef.current = { x: event.clientX, y: event.clientY }
     setDrag(next)
   }
@@ -231,7 +232,11 @@ export default function FlagRollPuzzlePlay() {
   const handlePartPointerDown = (typeId: PartTypeId, event: PointerEvent<HTMLButtonElement>) => {
     if (!isEditingPhase(state.phase)) return
     setState((current) => clearPartSelection(current))
-    startDrag({ source: 'tray', typeId, x: event.clientX, y: event.clientY, moved: false }, event)
+    // PartTray が盤面方向への移動だと判定してから呼ぶ。ここではすでにドラッグ開始済みなので、
+    // 最初の移動地点でも分身とグリッド下書きをすぐ表示する。
+    startDrag({ source: 'tray', typeId, x: event.clientX, y: event.clientY, moved: true }, event)
+    const cell = cellFromClient(event.clientX, event.clientY)
+    setGhostCell(cell && canPlacePart(state.parts, typeId, cell) ? cell : null)
   }
 
   /** パーツ置き場のタップ。選んでから盤面をタップして置く操作の入口 */
@@ -310,6 +315,7 @@ export default function FlagRollPuzzlePlay() {
 
   const editing = isEditingPhase(state.phase)
   const partSelected = state.selectedPartId !== null
+  const selectedPart = state.parts.find((part) => part.id === state.selectedPartId) ?? null
   // パーツを選んでいるあいだは、同じ行に出る「えらんだ いたを けす」がそのまま案内になるため
   // ひとことは出さない（同じことを2つ並べて書かない）。
   const editHint = partSelected ? '' : EDIT_HINT
@@ -367,9 +373,11 @@ export default function FlagRollPuzzlePlay() {
             </p>
             {partSelected ? (
               <div className={styles.partActions}>
-                <button type="button" className={styles.rotateButton} onClick={handleRotateSelectedPart}>
-                  まわす
-                </button>
+                {selectedPart && isRotatablePart(selectedPart.typeId) ? (
+                  <button type="button" className={styles.rotateButton} onClick={handleRotateSelectedPart}>
+                    まわす
+                  </button>
+                ) : null}
                 <button type="button" className={styles.removeButton} onClick={handleRemoveSelectedPart}>
                   えらんだ いたを けす
                 </button>

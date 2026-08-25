@@ -4,6 +4,7 @@ import {
   PART_DEFINITIONS,
   TRAY_PART_DEFINITIONS,
   nextRotationType,
+  isRotatablePart,
   partDefinition,
   type PartDefinition,
 } from './partTypes'
@@ -35,7 +36,7 @@ describe('partTypes', () => {
   test('置き場には基本板とPhase 3の4系統を出し、回転後の向きは出さない', () => {
     expect(TRAY_PART_DEFINITIONS.map((definition) => definition.id)).toEqual([
       'plank', 'slopeLeft', 'slopeRight', 'curveLeft', 'curveRight',
-      'bounceBoard', 'guideLeft', 'guideRight', 'longPlank',
+      'bumper', 'guideLeft', 'guideRight', 'longPlank',
     ])
   })
 
@@ -83,16 +84,21 @@ describe('partTypes', () => {
     expect(nextRotationType('curveLeft270')).toBe('curveLeft')
   })
 
-  test('バイン板は通常板より明確に高い反発係数で、速度上限と組み合わせて使う', () => {
-    expect(partDefinition('bounceBoard').restitution).toBeGreaterThan(partDefinition('plank').restitution)
-    expect(partDefinition('bounceBoard').restitution).toBeLessThan(1)
-    expect(nextRotationType('bounceBoard')).toBe('bounceBoardVertical')
+  test('バンパーは円形で通常板より明確に高い反発係数を持ち、回転しない', () => {
+    const bumper = partDefinition('bumper')
+    expect(bumper.segments[0].kind).toBe('circle')
+    expect(bumper.restitution).toBeGreaterThan(partDefinition('plank').restitution)
+    expect(bumper.restitution).toBeGreaterThanOrEqual(0.95)
+    expect(nextRotationType('bumper')).toBeNull()
+    expect(isRotatablePart('bumper')).toBe(false)
   })
 
   test('長い板は2マスを占有し、回転すると縦の2マスへ切り替わる', () => {
     expect(partDefinition('longPlank').cells).toEqual([{ col: 0, row: 0 }, { col: 1, row: 0 }])
     expect(partDefinition('longPlankVertical').cells).toEqual([{ col: 0, row: 0 }, { col: 0, row: 1 }])
     expect(nextRotationType('longPlank')).toBe('longPlankVertical')
+    expect(partDefinition('longPlank').previewScale).toBeLessThan(1)
+    expect(partDefinition('longPlank').segments[0].width).toBe(114)
   })
 
   test('未知のパーツ種類は例外にする（データ不整合に早く気付くため）', () => {

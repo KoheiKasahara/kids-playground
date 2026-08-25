@@ -85,13 +85,13 @@ describe('puzzleState', () => {
   test('途中停止後もPhase 3のパーツを追加・回転してから再開できる', () => {
     const stopped = stopRun(startRun(createPuzzleState()))
     const curve = tryPlacePart(stopped, 'curveLeft', { col: 1, row: 2 })!
-    const bounce = tryPlacePart(curve, 'bounceBoard', { col: 3, row: 2 })!
-    const guide = tryPlacePart(bounce, 'guideRight', { col: 5, row: 2 })!
+    const bumper = tryPlacePart(curve, 'bumper', { col: 3, row: 2 })!
+    const guide = tryPlacePart(bumper, 'guideRight', { col: 5, row: 2 })!
     const long = tryPlacePart(guide, 'longPlank', { col: 2, row: 4 })!
     const rotated = rotateSelectedPart(selectPart(long, 'part-4'))
 
     expect(rotated.parts.map((part) => part.typeId)).toEqual([
-      'curveLeft', 'bounceBoard', 'guideRight', 'longPlankVertical',
+      'curveLeft', 'bumper', 'guideRight', 'longPlankVertical',
     ])
     expect(startRun(rotated).phase).toBe('running')
   })

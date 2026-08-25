@@ -76,5 +76,11 @@ export const GOAL_AREA = {
   height: GOAL_HEIGHT,
 } as const
 
+/**
+ * ゴールの出口側（右端）。物理側ではこの直後に見えない縦壁を置き、
+ * ゴールへ入ったボールが通常の床エリアへ戻らないようにする。
+ */
+export const GOAL_EXIT_WALL_X = GOAL_AREA.x + GOAL_AREA.width
+
 /** 盤外へ逸脱させないための外周壁の厚み。壁は盤面の外側に置く */
 export const WALL_THICKNESS = 40
