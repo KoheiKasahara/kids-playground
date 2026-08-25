@@ -60,12 +60,32 @@ function dragBoardPart(from: [number, number], to: [number, number]) {
 }
 
 describe('こっきコロコロパズル', () => {
-  test('パーツ置き場に Phase 1の3種類が並び、「ボールをおとす」が押せる', async () => {
+  test('パーツ置き場に既存板とPhase 3の追加パーツが並び、「ボールをおとす」が押せる', async () => {
     await renderGame()
     expect(trayPart('よこいた')).toBeEnabled()
     expect(trayPart('ひだりへ')).toBeEnabled()
     expect(trayPart('みぎへ')).toBeEnabled()
+    expect(trayPart('カーブ ひだり')).toBeEnabled()
+    expect(trayPart('カーブ みぎ')).toBeEnabled()
+    expect(trayPart('バインいた')).toBeEnabled()
+    expect(trayPart('ひだりへ おす')).toBeEnabled()
+    expect(trayPart('みぎへ おす')).toBeEnabled()
+    expect(trayPart('ながい いた')).toBeEnabled()
     expect(screen.getByRole('button', { name: 'ボールを おとす！' })).toBeEnabled()
+  })
+
+  test('長い板は2マス目を含めて配置・選択・回転できる', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('ながい いた'))
+    tapBoard(2, 3)
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'longPlank')
+
+    // 2マス目を押しても同じパーツを選べる
+    tapBoard(3, 3)
+    expect(screen.getByRole('button', { name: 'まわす' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'longPlankVertical')
   })
 
   test('パーツを選んで盤面をタップすると、そのマスへ置ける', async () => {

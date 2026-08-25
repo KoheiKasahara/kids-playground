@@ -29,6 +29,11 @@ describe('placement', () => {
     expect(occupiedCells('slopeLeft', { col: 0, row: 0 })).toEqual([{ col: 0, row: 0 }])
   })
 
+  test('長い板は向きに応じた2マスを占有する', () => {
+    expect(occupiedCells('longPlank', { col: 2, row: 3 })).toEqual([{ col: 2, row: 3 }, { col: 3, row: 3 }])
+    expect(occupiedCells('longPlankVertical', { col: 2, row: 3 })).toEqual([{ col: 2, row: 3 }, { col: 2, row: 4 }])
+  })
+
   test('置かれた全パーツの占有マスを集計できる', () => {
     const keys = occupiedCellKeys([plankAt(0, 0), plankAt(1, 2)])
     expect(keys.size).toBe(2)
@@ -45,6 +50,9 @@ describe('placement', () => {
     // スタート帯（row: -1）とゴール帯（row: GRID_ROWS）はグリッドの外なので置けない
     expect(isInsideBoard('plank', { col: 0, row: -1 })).toBe(false)
     expect(isInsideBoard('plank', { col: 0, row: GRID_ROWS })).toBe(false)
+    expect(isInsideBoard('longPlank', { col: GRID_COLS - 2, row: 0 })).toBe(true)
+    expect(isInsideBoard('longPlank', { col: GRID_COLS - 1, row: 0 })).toBe(false)
+    expect(isInsideBoard('longPlankVertical', { col: 0, row: GRID_ROWS - 1 })).toBe(false)
   })
 
   test('既に置かれたパーツと重なる位置かを判定できる', () => {
@@ -53,6 +61,14 @@ describe('placement', () => {
     // 種類が違っても、同じマスを使うなら重なりとして弾く
     expect(overlapsExistingPart(parts, 'slopeRight', { col: 1, row: 1 })).toBe(true)
     expect(overlapsExistingPart(parts, 'plank', { col: 1, row: 2 })).toBe(false)
+  })
+
+  test('長い板は占有するどちらのマスでも重なりを拒否する', () => {
+    const parts: PlacedPart[] = [{ id: 'long', typeId: 'longPlank', cell: { col: 2, row: 3 } }]
+    expect(overlapsExistingPart(parts, 'plank', { col: 2, row: 3 })).toBe(true)
+    expect(overlapsExistingPart(parts, 'plank', { col: 3, row: 3 })).toBe(true)
+    expect(overlapsExistingPart(parts, 'plank', { col: 4, row: 3 })).toBe(false)
+    expect(partAtCell(parts, { col: 3, row: 3 })?.id).toBe('long')
   })
 
   test('canPlacePart は ボード外 と 重なり の両方を弾く', () => {
@@ -136,6 +152,18 @@ describe('placement', () => {
     expect(canRotatePart(parts, 'part-a', 'slopeLeft')).toBe(true)
     const rotated = rotatePart(parts, 'part-a', 'slopeLeft')
     expect(rotated).toEqual([{ id: 'part-a', typeId: 'slopeLeft', cell: { col: 2, row: 3 } }])
+  })
+
+  test('長い板は回転後に重なる・ボード外へ出ると回せない', () => {
+    const atBottom: PlacedPart[] = [{ id: 'long', typeId: 'longPlank', cell: { col: 2, row: GRID_ROWS - 1 } }]
+    expect(canRotatePart(atBottom, 'long', 'longPlankVertical')).toBe(false)
+
+    const blocked: PlacedPart[] = [
+      { id: 'long', typeId: 'longPlank', cell: { col: 2, row: 3 } },
+      plankAt(2, 4, 'blocker'),
+    ]
+    expect(canRotatePart(blocked, 'long', 'longPlankVertical')).toBe(false)
+    expect(rotatePart(blocked, 'long', 'longPlankVertical')).toBeNull()
   })
 
   test('ポインタ座標を、盤面の拡縮を打ち消して論理座標へ戻す', () => {

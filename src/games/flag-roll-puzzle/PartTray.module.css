@@ -1,12 +1,16 @@
 .tray {
   display: flex;
-  justify-content: center;
-  gap: var(--space-md);
+  justify-content: flex-start;
+  gap: var(--space-sm);
   width: 100%;
   padding: var(--space-sm) var(--space-sm);
   background-color: var(--color-surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  scrollbar-width: thin;
 }
 
 /*
@@ -32,6 +36,7 @@
   font-weight: 700;
   cursor: grab;
   touch-action: none;
+  scroll-snap-align: start;
 }
 
 .part[aria-pressed='true'] {
