@@ -193,7 +193,12 @@ export function markBallGoal(
   return { ...state, balls, phase: phaseAfterBallChange(balls) }
 }
 
-/** 個別ボールが途中停止した。ほかのボールが動いている間はrunningを維持する。 */
+/**
+ * 個別ボールが途中停止した。ほかのボールが動いている間はrunningを維持する。
+ * ゴールできなかったボールは、止まった場所ではなく開始位置へ戻す。
+ * 止まった場所のまま再度「ボールをおとす」を押しても、床の上で静止したボールが
+ * また静止するだけで何も起きないため。
+ */
 export function markBallStopped(
   state: PuzzleState,
   ballId: string,
@@ -203,7 +208,9 @@ export function markBallStopped(
   if (!state.balls.some((ball) => ball.id === ballId)) return state
   const synced = updateBallSnapshots(state.balls, snapshots)
   const balls = synced.map((ball) =>
-    ball.id === ballId && ball.status !== 'goal' ? { ...ball, status: 'stopped' as const } : ball,
+    ball.id === ballId && ball.status !== 'goal'
+      ? { ...ball, position: { ...ball.startPosition }, status: 'stopped' as const }
+      : ball,
   )
   return { ...state, balls, phase: phaseAfterBallChange(balls) }
 }
