@@ -9,7 +9,7 @@ import {
   type RailVec3,
 } from './railModel'
 import styles from './RailBuilderPlay.module.css'
-import { useRailBuilderEngine } from './useRailBuilderEngine'
+import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, useRailBuilderEngine } from './useRailBuilderEngine'
 
 const INITIAL_PIECES: RailPiece[] = [
   createRailPiece('straight', 'rail-1', { x: -1, y: 0, z: 0 }),
@@ -117,8 +117,8 @@ export default function RailBuilderPlay() {
     setSelectedPieceId(null)
   }, [selectedPieceId])
 
-  const zoomOut = useCallback(() => setZoom((value) => Math.max(0.72, value - 0.14)), [])
-  const zoomIn = useCallback(() => setZoom((value) => Math.min(1.75, value + 0.14)), [])
+  const zoomOut = useCallback(() => setZoom((value) => Math.max(MIN_ZOOM, value - ZOOM_STEP)), [])
+  const zoomIn = useCallback(() => setZoom((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP)), [])
 
   const hint = useMemo(() => (
     selectedPiece === undefined
