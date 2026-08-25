@@ -318,6 +318,28 @@ describe('こっきコロコロパズル', () => {
     expect(engineMock.options?.running).toBe(true)
   })
 
+  test('途中停止したら編集へ戻り、板を回して同じ位置から再開できる', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    tapBoard(2, 3)
+    tapBoard(2, 3)
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+
+    act(() => engineMock.options?.onStopped({ x: 150, y: 400 }))
+    expect(screen.getByRole('status')).toHaveTextContent('つづきを つくろう！')
+    expect(engineMock.options?.running).toBe(false)
+    expect(engineMock.options?.ballPosition).toEqual({ x: 150, y: 400 })
+    expect(trayPart('よこいた')).toBeEnabled()
+
+    tapBoard(2, 3)
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'slopeLeft')
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    expect(engineMock.options?.running).toBe(true)
+    expect(engineMock.options?.ballPosition).toEqual({ x: 150, y: 400 })
+  })
+
   test('「ぜんぶ けす」でパーツを外して最初からやり直せる', async () => {
     const user = userEvent.setup()
     await renderGame()
