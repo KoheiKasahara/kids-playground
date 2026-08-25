@@ -5,8 +5,7 @@ import {
   BALL_START,
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  GOAL_AREA,
-  GOAL_EXIT_WALL_X,
+  GOAL_EXIT_WALL,
   WALL_THICKNESS,
 } from './boardLayout'
 import { cellCenter } from './grid'
@@ -57,6 +56,21 @@ export type PuzzleEngineHandle = {
  * 盤面の外周壁とゴール出口の壁。
  * どちらも見えない位置に置き、ゴールへ入ったボールだけは出口側から戻れないようにする。
  */
+export function createGoalExitWallBody(): Matter.Body {
+  return Bodies.rectangle(
+    GOAL_EXIT_WALL.x,
+    GOAL_EXIT_WALL.y,
+    GOAL_EXIT_WALL.width,
+    GOAL_EXIT_WALL.height,
+    {
+      isStatic: true,
+      restitution: WALL_RESTITUTION,
+      friction: WALL_FRICTION,
+      label: 'goal-wall',
+    },
+  )
+}
+
 function wallBodies(): Matter.Body[] {
   const half = WALL_THICKNESS / 2
   const options = {
@@ -70,13 +84,8 @@ function wallBodies(): Matter.Body[] {
     Bodies.rectangle(BOARD_WIDTH + half, BOARD_HEIGHT / 2, WALL_THICKNESS, BOARD_HEIGHT * 2, options),
     Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + half, BOARD_WIDTH + WALL_THICKNESS * 2, WALL_THICKNESS, options),
     // 左端と床は外周壁を共用する。右端だけを追加してゴール帯をコの字に囲む。
-    Bodies.rectangle(
-      GOAL_EXIT_WALL_X + half,
-      GOAL_AREA.y + GOAL_AREA.height / 2,
-      WALL_THICKNESS,
-      GOAL_AREA.height,
-      { ...options, label: 'goal-wall' },
-    ),
+    // GOAL_EXIT_WALL の左面は見た目のゴール境界と同じX座標で、上端もゴール上端に揃う。
+    createGoalExitWallBody(),
   ]
 }
 
