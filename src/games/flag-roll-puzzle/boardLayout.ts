@@ -82,5 +82,21 @@ export const GOAL_AREA = {
  */
 export const GOAL_EXIT_WALL_X = GOAL_AREA.x + GOAL_AREA.width
 
+/**
+ * ゴール出口を塞ぐ見えない縦壁。
+ *
+ * CSS のゴール右端線（3px）と見た目の差が出ないよう 4px に留め、壁の左面を
+ * GOAL_EXIT_WALL_X へぴったり揃える。つまり、プレイエリア側（左側）へは
+ * まったく食い込ませない。ボールは最大16px/stepに制限しているため、この厚みでも
+ * 1ステップで壁を通り抜けない。
+ */
+export const GOAL_EXIT_WALL_THICKNESS = 4
+export const GOAL_EXIT_WALL = {
+  x: GOAL_EXIT_WALL_X + GOAL_EXIT_WALL_THICKNESS / 2,
+  y: GOAL_AREA.y + GOAL_AREA.height / 2,
+  width: GOAL_EXIT_WALL_THICKNESS,
+  height: GOAL_AREA.height,
+} as const
+
 /** 盤外へ逸脱させないための外周壁の厚み。壁は盤面の外側に置く */
 export const WALL_THICKNESS = 40
