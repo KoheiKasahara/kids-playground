@@ -1,0 +1,301 @@
+.page {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: #cfeef3;
+  isolation: isolate;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+.scene:active {
+  cursor: grabbing;
+}
+
+.scene canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right)) calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  pointer-events: none;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  width: min(100%, 600px);
+  margin: 0 auto;
+  pointer-events: none;
+}
+
+.backButton,
+.iconButton,
+.toolButton {
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  border: 2px solid rgba(54, 72, 88, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.91);
+  color: var(--color-text);
+  box-shadow: 0 3px 10px rgba(42, 65, 74, 0.16);
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--color-primary-dark);
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.backButton > span:first-child {
+  margin-top: -3px;
+  font-size: 31px;
+  line-height: 0.7;
+}
+
+.titleBlock {
+  min-width: 0;
+  padding-inline: var(--space-xs);
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.title {
+  color: #245b72;
+  font-size: clamp(24px, 6vw, 38px);
+  line-height: 1.1;
+}
+
+.instruction {
+  margin-top: 4px;
+  color: #365a63;
+  font-size: clamp(14px, 3.6vw, 18px);
+  font-weight: 700;
+}
+
+.backButton:active,
+.iconButton:active,
+.toolButton:active {
+  transform: scale(0.94);
+  box-shadow: 0 1px 4px rgba(42, 65, 74, 0.12);
+}
+
+.backButton:focus-visible,
+.iconButton:focus-visible,
+.toolButton:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.toolButton:disabled {
+  opacity: 0.43;
+  cursor: not-allowed;
+}
+
+.zoomControls {
+  position: absolute;
+  top: calc(76px + var(--safe-top));
+  right: calc(var(--space-sm) + var(--safe-right));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  pointer-events: none;
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: var(--tap-target-min);
+  padding: 0;
+  color: #245b72;
+  font-size: 31px;
+  line-height: 1;
+}
+
+.tray {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: var(--space-sm) max(var(--space-sm), var(--safe-right)) calc(var(--space-sm) + var(--safe-bottom)) max(var(--space-sm), var(--safe-left));
+  border-top: 2px solid rgba(64, 108, 91, 0.18);
+  border-radius: 20px 20px 0 0;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 -6px 20px rgba(59, 94, 87, 0.13);
+  pointer-events: auto;
+}
+
+.trayTools {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-xs);
+  width: min(100%, 640px);
+  margin: 0 auto;
+}
+
+.toolButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 66px;
+  padding: 5px 4px;
+  font-size: clamp(12px, 3.2vw, 16px);
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.deleteButton {
+  color: #b42318;
+}
+
+.actionIcon {
+  display: inline-block;
+  font-size: 29px;
+  line-height: 0.8;
+}
+
+.preview {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 35px;
+  flex: 0 0 30px;
+  transform: rotate(-10deg);
+}
+
+.previewRail {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 4px;
+  border-radius: 3px;
+  background: #697784;
+}
+
+.previewRail:first-child {
+  left: 5px;
+}
+
+.previewRail:nth-child(2) {
+  right: 5px;
+}
+
+.previewSleeper {
+  position: absolute;
+  left: 1px;
+  width: 28px;
+  height: 4px;
+  border-radius: 2px;
+  background: #b45309;
+}
+
+.previewSleeper:nth-child(3) {
+  top: 9px;
+}
+
+.previewSleeper:nth-child(4) {
+  bottom: 8px;
+}
+
+.curvePreview {
+  transform: rotate(-24deg) skewY(-15deg);
+}
+
+.curvePreview .previewRail:first-child {
+  left: 4px;
+  border-radius: 80% 0 0 20%;
+  transform: rotate(-25deg) translateY(2px);
+}
+
+.curvePreview .previewRail:nth-child(2) {
+  right: 3px;
+  border-radius: 0 80% 20% 0;
+  transform: rotate(-25deg) translateY(-1px);
+}
+
+.trayHint {
+  margin-top: 4px;
+  color: #54706e;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .header {
+    max-width: 520px;
+  }
+
+  .title {
+    font-size: 25px;
+  }
+
+  .instruction {
+    margin-top: 0;
+    font-size: 13px;
+  }
+
+  .zoomControls {
+    top: calc(48px + var(--safe-top));
+  }
+
+  .tray {
+    padding-top: 5px;
+  }
+
+  .toolButton {
+    min-height: 52px;
+  }
+
+  .trayHint {
+    display: none;
+  }
+}
+
+@media (min-width: 760px) {
+  .tray {
+    right: auto;
+    left: 50%;
+    width: min(640px, calc(100% - 32px));
+    transform: translateX(-50%);
+    border-radius: 20px 20px 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backButton,
+  .iconButton,
+  .toolButton {
+    transition: none;
+  }
+}
+

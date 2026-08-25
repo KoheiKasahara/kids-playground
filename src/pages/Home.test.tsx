@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../app/App'
 
 describe('Home', () => {
-  test('ゲーム一覧に現在の15ゲームすべてが表示される', () => {
+  test('ゲーム一覧に現在の16ゲームすべてが表示される', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -25,6 +25,9 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: '都道府県クイズ' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'せかい旅行クイズ' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'にほん旅行クイズ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'ちきゅうぎ' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '3Dせんろづくり' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(16)
   })
 
   test('「都道府県クイズ」を押すと開始画面に遷移する', async () => {
@@ -121,5 +124,13 @@ describe('Home', () => {
     expect(screen.getByRole('button', { name: 'フランス' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'アメリカ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'イギリス' })).toBeInTheDocument()
+  })
+
+  test('「3Dせんろづくり」を押すと遅延読込した線路画面に遷移する', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await user.click(screen.getByRole('link', { name: '3Dせんろづくり' }))
+    expect(await screen.findByRole('heading', { name: /3Dせんろづくり/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ちょくせんを ついか' })).toBeInTheDocument()
   })
 })
