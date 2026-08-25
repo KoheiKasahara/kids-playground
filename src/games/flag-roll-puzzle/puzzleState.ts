@@ -1,18 +1,15 @@
 import type { GridCell } from './grid'
-import type { PartTypeId } from './partTypes'
-import { movePart, placePart, removePart, type PlacedPart } from './placement'
+import { nextRotationType, type PartTypeId } from './partTypes'
+import { movePart, placePart, removePart, rotatePart, type ParkedBallPosition, type PlacedPart } from './placement'
 
 /**
  * ゲームの進行状態。
  * - edit    : パーツを置ける。ボールは開始位置で静止している
  * - running : 物理シミュレーション中。パーツは触れない
- * - cleared : ゴールに入った。ボールはゴールで止まっている
- *
- * Phase 2で追加する「途中停止して、その位置のまま編集へ戻る」は、
- * ここに stopped のような状態を足し、ボールの位置を状態へ持たせる形で拡張する。
- * 今はまだその情報を持たない（使わない仕組みを先に作らない）。
+ * - stopped : 途中で止まった。位置を保って、そこからパーツを編集できる
+ * - cleared : ゴールに入った。ゴール内では物理をそのまま継続する
  */
-export type PuzzlePhase = 'edit' | 'running' | 'cleared'
+export type PuzzlePhase = 'edit' | 'running' | 'stopped' | 'cleared'
 
 export type PuzzleState = {
   readonly phase: PuzzlePhase
@@ -24,6 +21,8 @@ export type PuzzleState = {
    * 画面のローカルな状態ではなくゲームの状態として持たせてある。
    */
   readonly selectedPartId: string | null
+  /** stopped のときのボール中心。null は開始位置から始める状態 */
+  readonly ballPosition: ParkedBallPosition
   /**
    * 物理世界の世代。「ボールをおとす」たびに増やす。
    * エンジン側はこの値の変化を見て世界を作り直すので、前回の実行の速度や
@@ -35,7 +34,12 @@ export type PuzzleState = {
 }
 
 export function createPuzzleState(): PuzzleState {
-  return { phase: 'edit', parts: [], selectedPartId: null, runId: 0, nextPartNumber: 1 }
+  return { phase: 'edit', parts: [], selectedPartId: null, ballPosition: null, runId: 0, nextPartNumber: 1 }
+}
+
+/** パーツを編集できる2つの状態。停止中も通常の編集操作を再利用する。 */
+export function isEditingPhase(phase: PuzzlePhase): boolean {
+  return phase === 'edit' || phase === 'stopped'
 }
 
 /**
@@ -47,8 +51,8 @@ export function tryPlacePart(
   typeId: PartTypeId,
   cell: GridCell,
 ): PuzzleState | null {
-  if (state.phase !== 'edit') return null
-  const parts = placePart(state.parts, typeId, cell, `part-${state.nextPartNumber}`)
+  if (!isEditingPhase(state.phase)) return null
+  const parts = placePart(state.parts, typeId, cell, `part-${state.nextPartNumber}`, state.ballPosition)
   if (!parts) return null
   // 新しく置いたら、それまで選んでいたパーツの選択は解く（消す対象を取り違えないため）
   return { ...state, parts, selectedPartId: null, nextPartNumber: state.nextPartNumber + 1 }
@@ -64,8 +68,8 @@ export function tryMovePart(
   partId: string,
   cell: GridCell,
 ): PuzzleState | null {
-  if (state.phase !== 'edit') return null
-  const parts = movePart(state.parts, partId, cell)
+  if (!isEditingPhase(state.phase)) return null
+  const parts = movePart(state.parts, partId, cell, state.ballPosition)
   if (!parts) return null
   return { ...state, parts }
 }
@@ -75,7 +79,7 @@ export function tryMovePart(
  * 同じパーツをもう一度選んだら選択を解く（タップだけで選び直せるようにする）。
  */
 export function selectPart(state: PuzzleState, partId: string): PuzzleState {
-  if (state.phase !== 'edit') return state
+  if (!isEditingPhase(state.phase)) return state
   if (!state.parts.some((part) => part.id === partId)) return state
   return { ...state, selectedPartId: state.selectedPartId === partId ? null : partId }
 }
@@ -88,14 +92,29 @@ export function clearPartSelection(state: PuzzleState): PuzzleState {
 
 /** 選んでいるパーツを1つだけ外す。編集中で、かつ選んでいるときだけ */
 export function removeSelectedPart(state: PuzzleState): PuzzleState {
-  if (state.phase !== 'edit' || state.selectedPartId === null) return state
+  if (!isEditingPhase(state.phase) || state.selectedPartId === null) return state
   return { ...state, parts: removePart(state.parts, state.selectedPartId), selectedPartId: null }
 }
 
-/** 「ボールをおとす」。編集中のときだけ実行へ移る */
+/** 選んでいるパーツを次の固定角度へ回す。置けない向きは現在のままにする。 */
+export function rotateSelectedPart(state: PuzzleState): PuzzleState {
+  if (!isEditingPhase(state.phase) || state.selectedPartId === null) return state
+  const current = state.parts.find((part) => part.id === state.selectedPartId)
+  if (!current) return state
+  const parts = rotatePart(state.parts, current.id, nextRotationType(current.typeId), state.ballPosition)
+  return parts ? { ...state, parts } : state
+}
+
+/** 「ボールをおとす」。開始位置、または途中停止位置から実行へ移る */
 export function startRun(state: PuzzleState): PuzzleState {
-  if (state.phase !== 'edit') return state
+  if (!isEditingPhase(state.phase)) return state
   return { ...state, phase: 'running', selectedPartId: null, runId: state.runId + 1 }
+}
+
+/** 実行中に途中停止した。物理エンジンから受け取った位置をそのまま保持する。 */
+export function stopRun(state: PuzzleState, ballPosition: Exclude<ParkedBallPosition, null>): PuzzleState {
+  if (state.phase !== 'running') return state
+  return { ...state, phase: 'stopped', ballPosition }
 }
 
 /** ゴール到達。実行中のときだけクリアへ移る（同じ実行で二重に呼ばれても増えない） */
@@ -107,10 +126,10 @@ export function reachGoal(state: PuzzleState): PuzzleState {
 /** 「ボールをもどす」。置いたパーツはそのままに、ボールだけ開始位置へ戻す */
 export function returnBall(state: PuzzleState): PuzzleState {
   if (state.phase === 'edit') return state
-  return { ...state, phase: 'edit' }
+  return { ...state, phase: 'edit', ballPosition: null, selectedPartId: null }
 }
 
 /** 「ぜんぶ けす」。パーツを全部外し、ボールも開始位置へ戻す */
 export function clearAll(state: PuzzleState): PuzzleState {
-  return { ...state, phase: 'edit', parts: [], selectedPartId: null }
+  return { ...state, phase: 'edit', parts: [], selectedPartId: null, ballPosition: null }
 }
