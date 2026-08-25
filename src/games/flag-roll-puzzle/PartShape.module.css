@@ -19,16 +19,24 @@
     0 2px 4px rgba(33, 37, 41, 0.25);
 }
 
-/* 役割を文字に頼らず見分けられる色。曲線=水色、バイン=紫しま、方向転換=緑。 */
+/* 役割を文字に頼らず見分けられる色。曲線=水色、バンパー=ピンクの円、方向転換=緑。 */
 .curve.placed,
 .curve.dragging { background-color: #15aabf; }
 .curve.selected { background-color: #0b7285; }
 .curve.ghost { background-color: rgba(21, 170, 191, 0.35); }
 
-.bounce.placed,
-.bounce.dragging { background: repeating-linear-gradient(135deg, #845ef7 0 7px, #b197fc 7px 14px); }
-.bounce.selected { background: repeating-linear-gradient(135deg, #6741d9 0 7px, #9775fa 7px 14px); }
-.bounce.ghost { background: repeating-linear-gradient(135deg, rgba(132, 94, 247, 0.35) 0 7px, rgba(177, 151, 252, 0.35) 7px 14px); }
+.bumper {
+  border: 4px solid #e64980;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.bumper.placed,
+.bumper.dragging {
+  background: radial-gradient(circle, #fff0f6 0 27%, #f783ac 29% 54%, #e64980 56% 100%);
+  box-shadow: inset 0 0 0 3px #fff0f6, 0 2px 5px rgba(134, 46, 92, 0.35);
+}
+.bumper.selected { background: radial-gradient(circle, #fff0f6 0 27%, #f06595 29% 54%, #c2255c 56% 100%); }
+.bumper.ghost { background: radial-gradient(circle, rgba(255, 240, 246, 0.4) 0 27%, rgba(247, 131, 172, 0.4) 29% 54%, rgba(230, 73, 128, 0.4) 56% 100%); }
 
 .guide.placed,
 .guide.dragging { background-color: #40c057; }

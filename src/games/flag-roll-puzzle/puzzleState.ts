@@ -99,7 +99,9 @@ export function rotateSelectedPart(state: PuzzleState): PuzzleState {
   if (!isEditingPhase(state.phase) || state.selectedPartId === null) return state
   const current = state.parts.find((part) => part.id === state.selectedPartId)
   if (!current) return state
-  const parts = rotatePart(state.parts, current.id, nextRotationType(current.typeId))
+  const nextTypeId = nextRotationType(current.typeId)
+  if (!nextTypeId) return state
+  const parts = rotatePart(state.parts, current.id, nextTypeId)
   return parts ? { ...state, parts } : state
 }
 

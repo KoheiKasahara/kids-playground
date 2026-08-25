@@ -29,6 +29,8 @@ export const MAX_SUBSTEPS = 5
 
 /** ボールの最大速度(px/step)。薄い板を1ステップで飛び越えるのを防ぐ */
 export const MAX_SPEED = 16
+/** 同じバンパーへの接触が短時間に続いたときの追加押し出し抑制(ms) */
+export const BUMPER_HIT_COOLDOWN_MS = 120
 /** 最大角速度(rad/step)。国旗の模様が読めなくなるほど速く回らないようにする */
 export const MAX_ANGULAR_VELOCITY = 0.25
 

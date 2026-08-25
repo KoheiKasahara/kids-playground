@@ -13,8 +13,7 @@ export type PartTypeId =
   | 'curveRight90'
   | 'curveRight180'
   | 'curveRight270'
-  | 'bounceBoard'
-  | 'bounceBoardVertical'
+  | 'bumper'
   | 'guideLeft'
   | 'guideRight'
   | 'longPlank'
@@ -28,10 +27,12 @@ export type PartSegment = {
   readonly height: number
   /** 時計回りが正。CSS rotate / Matter.js の angle と同じ画面座標系 */
   readonly angleDeg: number
+  /** 円形の物理Bodyとして扱うセグメント。見た目は width / height の円で描画する。 */
+  readonly kind?: 'circle'
 }
 
 /** 木の板以外も、役割を文字に頼らず見分けられるようにするための見た目の種類。 */
-export type PartAppearance = 'wood' | 'curve' | 'bounce' | 'guide'
+export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide'
 
 export type PartDefinition = {
   readonly id: PartTypeId
@@ -45,6 +46,9 @@ export type PartDefinition = {
   readonly segments: readonly PartSegment[]
   readonly restitution: number
   readonly friction: number
+  /** 置き場だけで使う縮小率。盤面の描画・物理・占有マスには一切影響しない。 */
+  readonly previewScale?: number
+  readonly previewOffsetX?: number
 }
 
 const SINGLE_CELL: readonly GridCell[] = [{ col: 0, row: 0 }]
@@ -129,15 +133,10 @@ export const PART_DEFINITIONS: readonly PartDefinition[] = [
   curveDefinition('curveRight270', 'カーブ みぎ', CURVE_RIGHT_SEGMENTS, 3),
 
   {
-    id: 'bounceBoard', label: 'バインいた', inTray: true, appearance: 'bounce', cells: SINGLE_CELL,
-    segments: [{ offsetX: 0, offsetY: 0, width: PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 0 }],
-    // ボール(0.28)との合成でも通常板との差が見え、MAX_SPEEDで上限も保たれる値。
-    restitution: 0.82, friction: 0.025,
-  },
-  {
-    id: 'bounceBoardVertical', label: 'バインいた', inTray: false, appearance: 'bounce', cells: SINGLE_CELL,
-    segments: [{ offsetX: 0, offsetY: 0, width: PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 90 }],
-    restitution: 0.82, friction: 0.025,
+    id: 'bumper', label: 'バンパー', inTray: true, appearance: 'bumper', cells: SINGLE_CELL,
+    // 円形Bodyなので、どの方向から当たっても自然に外向きへ弾ける。
+    segments: [{ offsetX: 0, offsetY: 0, width: 42, height: 42, angleDeg: 0, kind: 'circle' }],
+    restitution: 0.98, friction: 0.01,
   },
 
   {
@@ -162,7 +161,7 @@ export const PART_DEFINITIONS: readonly PartDefinition[] = [
   {
     id: 'longPlank', label: 'ながい いた', inTray: true, appearance: 'wood', cells: HORIZONTAL_TWO_CELLS,
     segments: [{ offsetX: 30, offsetY: 0, width: LONG_PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 0 }],
-    restitution: 0.2, friction: 0.04,
+    restitution: 0.2, friction: 0.04, previewScale: 0.5, previewOffsetX: -15,
   },
   {
     id: 'longPlankVertical', label: 'ながい いた', inTray: false, appearance: 'wood', cells: VERTICAL_TWO_CELLS,
@@ -183,15 +182,18 @@ export function partDefinition(id: PartTypeId): PartDefinition {
 }
 
 /** パーツごとに意味のある固定向きだけを循環する。 */
-const NEXT_ROTATION_TYPE: Readonly<Record<PartTypeId, PartTypeId>> = {
+const NEXT_ROTATION_TYPE: Readonly<Partial<Record<PartTypeId, PartTypeId>>> = {
   plank: 'slopeLeft', slopeLeft: 'slopeRight', slopeRight: 'plank',
   curveLeft: 'curveLeft90', curveLeft90: 'curveLeft180', curveLeft180: 'curveLeft270', curveLeft270: 'curveLeft',
   curveRight: 'curveRight90', curveRight90: 'curveRight180', curveRight180: 'curveRight270', curveRight270: 'curveRight',
-  bounceBoard: 'bounceBoardVertical', bounceBoardVertical: 'bounceBoard',
   guideLeft: 'guideRight', guideRight: 'guideLeft',
   longPlank: 'longPlankVertical', longPlankVertical: 'longPlank',
 }
 
-export function nextRotationType(id: PartTypeId): PartTypeId {
-  return NEXT_ROTATION_TYPE[id]
+export function nextRotationType(id: PartTypeId): PartTypeId | null {
+  return NEXT_ROTATION_TYPE[id] ?? null
+}
+
+export function isRotatablePart(id: PartTypeId): boolean {
+  return NEXT_ROTATION_TYPE[id] !== undefined
 }
