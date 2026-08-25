@@ -1,5 +1,6 @@
 import {
   BALL_START,
+  CELL_SIZE,
   GRID_BOTTOM,
   GOAL_AREA,
   GOAL_HEIGHT,
@@ -49,10 +50,11 @@ const normalGoal: GoalArea = {
   height: GOAL_HEIGHT,
 }
 
+// むずかしいは、ふつうの2球ぶんの難しさに加えて、ゴール自体も左右半マスずつ狭くする。
 const hardGoal: GoalArea = {
-  x: 90,
+  x: 90 + CELL_SIZE / 2,
   y: GRID_BOTTOM,
-  width: 180,
+  width: 180 - CELL_SIZE,
   height: GOAL_HEIGHT,
 }
 
