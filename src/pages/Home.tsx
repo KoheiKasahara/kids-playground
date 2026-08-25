@@ -29,6 +29,7 @@ const games: GameCard[] = [
   { id: 'world-travel-quiz', title: 'せかい旅行クイズ', emoji: '✈️', path: '/games/world-travel-quiz' },
   { id: 'japan-travel-quiz', title: 'にほん旅行クイズ', emoji: '🗾', path: '/games/japan-travel-quiz' },
   { id: 'earth-globe', title: 'ちきゅうぎ', emoji: '🌍', path: '/games/earth-globe' },
+  { id: 'rail-builder', title: '3Dせんろづくり', emoji: '🚂', path: '/games/rail-builder' },
 ]
 
 export default function Home() {
