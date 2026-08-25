@@ -1,6 +1,6 @@
 import type { PointerEvent } from 'react'
 import PartShape from './PartShape'
-import { PART_DEFINITIONS, type PartTypeId } from './partTypes'
+import { TRAY_PART_DEFINITIONS, type PartTypeId } from './partTypes'
 import styles from './PartTray.module.css'
 
 type PartTrayProps = {
@@ -32,7 +32,7 @@ export default function PartTray({
 }: PartTrayProps) {
   return (
     <section className={styles.tray} aria-label="パーツおきば">
-      {PART_DEFINITIONS.map((definition) => (
+      {TRAY_PART_DEFINITIONS.map((definition) => (
         <button
           key={definition.id}
           type="button"

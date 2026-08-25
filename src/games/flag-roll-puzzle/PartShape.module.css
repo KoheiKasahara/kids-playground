@@ -19,6 +19,22 @@
     0 2px 4px rgba(33, 37, 41, 0.25);
 }
 
+/* 役割を文字に頼らず見分けられる色。曲線=水色、バイン=紫しま、方向転換=緑。 */
+.curve.placed,
+.curve.dragging { background-color: #15aabf; }
+.curve.selected { background-color: #0b7285; }
+.curve.ghost { background-color: rgba(21, 170, 191, 0.35); }
+
+.bounce.placed,
+.bounce.dragging { background: repeating-linear-gradient(135deg, #845ef7 0 7px, #b197fc 7px 14px); }
+.bounce.selected { background: repeating-linear-gradient(135deg, #6741d9 0 7px, #9775fa 7px 14px); }
+.bounce.ghost { background: repeating-linear-gradient(135deg, rgba(132, 94, 247, 0.35) 0 7px, rgba(177, 151, 252, 0.35) 7px 14px); }
+
+.guide.placed,
+.guide.dragging { background-color: #40c057; }
+.guide.selected { background-color: #2b8a3e; }
+.guide.ghost { background-color: rgba(64, 192, 87, 0.35); }
+
 /*
  * 選んでいるパーツ。消す対象を取り違えないよう、色を変えたうえで
  * PuzzleBoard 側の選択枠と合わせて示す。

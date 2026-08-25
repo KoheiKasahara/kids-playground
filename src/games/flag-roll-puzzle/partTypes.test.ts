@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import { CELL_SIZE } from './boardLayout'
-import { PART_DEFINITIONS, partDefinition, type PartDefinition } from './partTypes'
+import {
+  PART_DEFINITIONS,
+  TRAY_PART_DEFINITIONS,
+  nextRotationType,
+  partDefinition,
+  type PartDefinition,
+} from './partTypes'
 
 /** 回転させた長方形の外接矩形の半分の大きさ（中心からの張り出し量） */
 function rotatedHalfExtents(width: number, height: number, angleDeg: number) {
@@ -26,8 +32,11 @@ function occupiedBounds(definition: PartDefinition) {
 }
 
 describe('partTypes', () => {
-  test('Phase 1のパーツは 横板・斜め板2種 の3つ', () => {
-    expect(PART_DEFINITIONS.map((definition) => definition.id)).toEqual(['plank', 'slopeLeft', 'slopeRight'])
+  test('置き場には基本板とPhase 3の4系統を出し、回転後の向きは出さない', () => {
+    expect(TRAY_PART_DEFINITIONS.map((definition) => definition.id)).toEqual([
+      'plank', 'slopeLeft', 'slopeRight', 'curveLeft', 'curveRight',
+      'bounceBoard', 'guideLeft', 'guideRight', 'longPlank',
+    ])
   })
 
   test('種類IDが重複しない', () => {
@@ -63,6 +72,27 @@ describe('partTypes', () => {
     expect(left).toBeLessThan(0)
     expect(right).toBeGreaterThan(0)
     expect(left).toBe(-right)
+  })
+
+  test('カーブは複数の短い板で近似し、左右とも4方向へ回せる', () => {
+    expect(partDefinition('curveLeft').segments).toHaveLength(3)
+    expect(partDefinition('curveRight').segments).toHaveLength(3)
+    expect(nextRotationType('curveLeft')).toBe('curveLeft90')
+    expect(nextRotationType('curveLeft90')).toBe('curveLeft180')
+    expect(nextRotationType('curveLeft180')).toBe('curveLeft270')
+    expect(nextRotationType('curveLeft270')).toBe('curveLeft')
+  })
+
+  test('バイン板は通常板より明確に高い反発係数で、速度上限と組み合わせて使う', () => {
+    expect(partDefinition('bounceBoard').restitution).toBeGreaterThan(partDefinition('plank').restitution)
+    expect(partDefinition('bounceBoard').restitution).toBeLessThan(1)
+    expect(nextRotationType('bounceBoard')).toBe('bounceBoardVertical')
+  })
+
+  test('長い板は2マスを占有し、回転すると縦の2マスへ切り替わる', () => {
+    expect(partDefinition('longPlank').cells).toEqual([{ col: 0, row: 0 }, { col: 1, row: 0 }])
+    expect(partDefinition('longPlankVertical').cells).toEqual([{ col: 0, row: 0 }, { col: 0, row: 1 }])
+    expect(nextRotationType('longPlank')).toBe('longPlankVertical')
   })
 
   test('未知のパーツ種類は例外にする（データ不整合に早く気付くため）', () => {

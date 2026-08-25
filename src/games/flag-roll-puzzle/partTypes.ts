@@ -1,122 +1,195 @@
 import type { GridCell } from './grid'
 
-/**
- * パーツの種類。Phase 1は横板と斜め板2種だけに絞る。
- * 名前は「見た目の向き」ではなく「ボールがどちらへ滑るか」で付けてある
- * （slopeLeft は ／ の形で、乗ったボールは左へ滑り落ちる）。
- * 幼児が選ぶときに知りたいのは形の名前ではなく結果なので、表示ラベルも同じ考え方にする。
- */
-export type PartTypeId = 'plank' | 'slopeLeft' | 'slopeRight'
+/** 盤面へ保存する向きまで含めたパーツ種類。置き場にはこのうち基本向きだけを出す。 */
+export type PartTypeId =
+  | 'plank'
+  | 'slopeLeft'
+  | 'slopeRight'
+  | 'curveLeft'
+  | 'curveLeft90'
+  | 'curveLeft180'
+  | 'curveLeft270'
+  | 'curveRight'
+  | 'curveRight90'
+  | 'curveRight180'
+  | 'curveRight270'
+  | 'bounceBoard'
+  | 'bounceBoardVertical'
+  | 'guideLeft'
+  | 'guideRight'
+  | 'longPlank'
+  | 'longPlankVertical'
 
-/**
- * パーツを構成する長方形。アンカーセルの中心を原点とした相対位置(px)で表す。
- *
- * 描画（div + rotate）と物理Body（Matter.Bodies.rectangle）を、どちらもこの
- * 同じ定義から作る。見た目と当たり判定が構造的にずれないうえ、新しいパーツを
- * 足すときも「セグメントの並びを書く」だけで済み、盤面やエンジン側に
- * パーツ種類ごとの分岐が増えない。
- *
- * Phase 3で予定しているカーブのように長方形の集合で表しにくいパーツが来たら、
- * セグメントを細かく分けて近似するか、そのときに描画専用の情報を足す。
- * 今は使わない仕組みを先に作らない。
- */
+/** パーツを構成する長方形。アンカーセルの中心を原点とした相対位置(px)で表す。 */
 export type PartSegment = {
-  /** アンカーセル中心からのずれ(px) */
   readonly offsetX: number
   readonly offsetY: number
   readonly width: number
   readonly height: number
-  /** 角度(度)。時計回りが正（画面座標系。CSS rotate / matter-js の angle と同じ向き） */
+  /** 時計回りが正。CSS rotate / Matter.js の angle と同じ画面座標系 */
   readonly angleDeg: number
 }
 
+/** 木の板以外も、役割を文字に頼らず見分けられるようにするための見た目の種類。 */
+export type PartAppearance = 'wood' | 'curve' | 'bounce' | 'guide'
+
 export type PartDefinition = {
   readonly id: PartTypeId
-  /** パーツ置き場に出す短い名前 */
   readonly label: string
-  /**
-   * アンカーセルからの相対で、このパーツが占有するマス。
-   * Phase 1は全パーツが1マスだが、2〜3マスを使う長い板（Phase 3）を足すときは
-   * ここへオフセットを増やすだけで重なり判定に反映される。
-   */
+  /** パーツ置き場へ出す基本向きか。回転後の向きは盤面専用にする。 */
+  readonly inTray: boolean
+  readonly appearance: PartAppearance
+  /** アンカーセルからの相対で占有するマス */
   readonly cells: readonly GridCell[]
+  /** 描画と物理Bodyで共通に使う形 */
   readonly segments: readonly PartSegment[]
-  /** 物理係数。板ごとに弾み方を変えられるよう、パーツ定義側に持たせる */
   readonly restitution: number
   readonly friction: number
 }
 
-/** 1マスぶんのパーツが占有するマス（アンカーセルそのもの） */
 const SINGLE_CELL: readonly GridCell[] = [{ col: 0, row: 0 }]
+const HORIZONTAL_TWO_CELLS: readonly GridCell[] = [{ col: 0, row: 0 }, { col: 1, row: 0 }]
+const VERTICAL_TWO_CELLS: readonly GridCell[] = [{ col: 0, row: 0 }, { col: 0, row: 1 }]
 
-/** 板の厚み。薄すぎるとボールがすり抜け、厚すぎるとマスが埋まって見える */
 const PLANK_THICKNESS = 12
-/** 横板の長さ。マス(60)より少し短くし、隣り合わせに置いても線がつながって見えないようにする */
 const PLANK_LENGTH = 54
-/**
- * 斜め板の角度。ボールが確実に滑り出し（摩擦係数より tan が大きい角度）、
- * かつ真下へ落ちるだけにならない中間として30度を選んだ。
- */
 const SLOPE_ANGLE_DEG = 30
-/**
- * 斜め板の長さ。回転させたあとの外接矩形が1マス(60)に収まる最大に近い長さにしてある
- * （30度なら 62/2*cos30 + 12/2*sin30 ≒ 29.9 ≦ 30）。横板と横幅がほぼそろい、
- * 隣どうしに置いても見た目が重ならない。partTypes.test.ts がこの収まりを検証する。
- */
 const SLOPE_LENGTH = 62
+const LONG_PLANK_LENGTH = 114
+
+/** 一つの曲線を3枚の短い板で近似する。完全な円弧より、滑らかに向きが変わることを優先する。 */
+const CURVE_LEFT_SEGMENTS: readonly PartSegment[] = [
+  // 隣り合う板の端を重ね、ボールが継ぎ目へ落ちない連続したレールにしている。
+  { offsetX: 16.5, offsetY: -16, width: 23.4, height: 10, angleDeg: -50 },
+  { offsetX: 1, offsetY: 0.5, width: 21.9, height: 10, angleDeg: -43 },
+  { offsetX: -15.5, offsetY: 13, width: 19.7, height: 10, angleDeg: -30 },
+]
+
+const CURVE_RIGHT_SEGMENTS: readonly PartSegment[] = CURVE_LEFT_SEGMENTS.map((segment) => ({
+  ...segment,
+  offsetX: -segment.offsetX,
+  angleDeg: -segment.angleDeg,
+}))
+
+/** セグメントの集合を90度単位で回す。曲線の見た目と物理形状を必ず同じ向きへ回す。 */
+function rotateSegments(segments: readonly PartSegment[], quarterTurns: number): readonly PartSegment[] {
+  const turns = ((quarterTurns % 4) + 4) % 4
+  return segments.map((segment) => {
+    let { offsetX, offsetY } = segment
+    for (let turn = 0; turn < turns; turn += 1) {
+      ;[offsetX, offsetY] = [-offsetY, offsetX]
+    }
+    return { ...segment, offsetX, offsetY, angleDeg: segment.angleDeg + turns * 90 }
+  })
+}
+
+function curveDefinition(
+  id: PartTypeId,
+  label: string,
+  segments: readonly PartSegment[],
+  quarterTurns: number,
+  inTray = false,
+): PartDefinition {
+  return {
+    id,
+    label,
+    inTray,
+    appearance: 'curve',
+    cells: SINGLE_CELL,
+    segments: rotateSegments(segments, quarterTurns),
+    restitution: 0.16,
+    friction: 0.025,
+  }
+}
 
 export const PART_DEFINITIONS: readonly PartDefinition[] = [
   {
-    id: 'plank',
-    label: 'よこいた',
-    cells: SINGLE_CELL,
+    id: 'plank', label: 'よこいた', inTray: true, appearance: 'wood', cells: SINGLE_CELL,
     segments: [{ offsetX: 0, offsetY: 0, width: PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 0 }],
-    restitution: 0.2,
-    friction: 0.04,
+    restitution: 0.2, friction: 0.04,
   },
   {
-    id: 'slopeLeft',
-    label: 'ひだりへ',
-    cells: SINGLE_CELL,
-    // ／ の形。右端が上がるので、乗ったボールは左へ滑る
+    id: 'slopeLeft', label: 'ひだりへ', inTray: true, appearance: 'wood', cells: SINGLE_CELL,
     segments: [{ offsetX: 0, offsetY: 0, width: SLOPE_LENGTH, height: PLANK_THICKNESS, angleDeg: -SLOPE_ANGLE_DEG }],
-    restitution: 0.2,
-    friction: 0.03,
+    restitution: 0.2, friction: 0.03,
   },
   {
-    id: 'slopeRight',
-    label: 'みぎへ',
-    cells: SINGLE_CELL,
-    // ＼ の形。右端が下がるので、乗ったボールは右へ滑る
+    id: 'slopeRight', label: 'みぎへ', inTray: true, appearance: 'wood', cells: SINGLE_CELL,
     segments: [{ offsetX: 0, offsetY: 0, width: SLOPE_LENGTH, height: PLANK_THICKNESS, angleDeg: SLOPE_ANGLE_DEG }],
-    restitution: 0.2,
-    friction: 0.03,
+    restitution: 0.2, friction: 0.03,
+  },
+
+  curveDefinition('curveLeft', 'カーブ ひだり', CURVE_LEFT_SEGMENTS, 0, true),
+  curveDefinition('curveLeft90', 'カーブ ひだり', CURVE_LEFT_SEGMENTS, 1),
+  curveDefinition('curveLeft180', 'カーブ ひだり', CURVE_LEFT_SEGMENTS, 2),
+  curveDefinition('curveLeft270', 'カーブ ひだり', CURVE_LEFT_SEGMENTS, 3),
+  curveDefinition('curveRight', 'カーブ みぎ', CURVE_RIGHT_SEGMENTS, 0, true),
+  curveDefinition('curveRight90', 'カーブ みぎ', CURVE_RIGHT_SEGMENTS, 1),
+  curveDefinition('curveRight180', 'カーブ みぎ', CURVE_RIGHT_SEGMENTS, 2),
+  curveDefinition('curveRight270', 'カーブ みぎ', CURVE_RIGHT_SEGMENTS, 3),
+
+  {
+    id: 'bounceBoard', label: 'バインいた', inTray: true, appearance: 'bounce', cells: SINGLE_CELL,
+    segments: [{ offsetX: 0, offsetY: 0, width: PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 0 }],
+    // ボール(0.28)との合成でも通常板との差が見え、MAX_SPEEDで上限も保たれる値。
+    restitution: 0.82, friction: 0.025,
+  },
+  {
+    id: 'bounceBoardVertical', label: 'バインいた', inTray: false, appearance: 'bounce', cells: SINGLE_CELL,
+    segments: [{ offsetX: 0, offsetY: 0, width: PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 90 }],
+    restitution: 0.82, friction: 0.025,
+  },
+
+  {
+    id: 'guideLeft', label: 'ひだりへ おす', inTray: true, appearance: 'guide',
+    // 「<」の矢印形。上側の斜面で受けて左へ流し、既存の長い斜め板とは役割を分ける。
+    segments: [
+      { offsetX: 8, offsetY: -12, width: 34, height: 10, angleDeg: -42 },
+      { offsetX: 8, offsetY: 12, width: 34, height: 10, angleDeg: 42 },
+    ],
+    cells: SINGLE_CELL, restitution: 0.3, friction: 0.02,
+  },
+  {
+    id: 'guideRight', label: 'みぎへ おす', inTray: true, appearance: 'guide',
+    // 「>」の矢印形。guideLeftの180度回転と同じ形なので、回転操作でも相互に切り替わる。
+    segments: [
+      { offsetX: -8, offsetY: -12, width: 34, height: 10, angleDeg: 42 },
+      { offsetX: -8, offsetY: 12, width: 34, height: 10, angleDeg: -42 },
+    ],
+    cells: SINGLE_CELL, restitution: 0.3, friction: 0.02,
+  },
+
+  {
+    id: 'longPlank', label: 'ながい いた', inTray: true, appearance: 'wood', cells: HORIZONTAL_TWO_CELLS,
+    segments: [{ offsetX: 30, offsetY: 0, width: LONG_PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 0 }],
+    restitution: 0.2, friction: 0.04,
+  },
+  {
+    id: 'longPlankVertical', label: 'ながい いた', inTray: false, appearance: 'wood', cells: VERTICAL_TWO_CELLS,
+    segments: [{ offsetX: 0, offsetY: 30, width: LONG_PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 90 }],
+    restitution: 0.2, friction: 0.04,
   },
 ]
 
+/** 実際のパーツ置き場へ出すのは、各パーツの基本向きだけ。 */
+export const TRAY_PART_DEFINITIONS = PART_DEFINITIONS.filter((definition) => definition.inTray)
+
 const definitionsById = new Map(PART_DEFINITIONS.map((definition) => [definition.id, definition]))
 
-/**
- * 種類IDからパーツ定義を引く。
- * 未知のIDはデータ不整合なので、国旗ボール(flagBalls.ts)と同じ方針で早期に throw する。
- */
 export function partDefinition(id: PartTypeId): PartDefinition {
   const definition = definitionsById.get(id)
   if (!definition) throw new Error(`flag-roll-puzzle: 不明なパーツ種類です: ${id}`)
   return definition
 }
 
-/**
- * 選んだ板を回すときの次の向き。Phase 1の3種類はいずれも1マスを使うため、
- * 種類IDを循環させるだけで「よこ → 左上がり → 右上がり」が表せる。
- *
- * Phase 3で複数マスの板を足す場合も、この対応表へ利用可能な向きだけを追加すれば
- * placement.ts の占有判定をそのまま再利用できる。
- */
+/** パーツごとに意味のある固定向きだけを循環する。 */
 const NEXT_ROTATION_TYPE: Readonly<Record<PartTypeId, PartTypeId>> = {
-  plank: 'slopeLeft',
-  slopeLeft: 'slopeRight',
-  slopeRight: 'plank',
+  plank: 'slopeLeft', slopeLeft: 'slopeRight', slopeRight: 'plank',
+  curveLeft: 'curveLeft90', curveLeft90: 'curveLeft180', curveLeft180: 'curveLeft270', curveLeft270: 'curveLeft',
+  curveRight: 'curveRight90', curveRight90: 'curveRight180', curveRight180: 'curveRight270', curveRight270: 'curveRight',
+  bounceBoard: 'bounceBoardVertical', bounceBoardVertical: 'bounceBoard',
+  guideLeft: 'guideRight', guideRight: 'guideLeft',
+  longPlank: 'longPlankVertical', longPlankVertical: 'longPlank',
 }
 
 export function nextRotationType(id: PartTypeId): PartTypeId {
