@@ -10,6 +10,7 @@ type PartTrayProps = {
   disabled: boolean
   /** 横画面の右ペインでは縦スクロール、左向きドラッグで盤面へ出す */
   isLandscapeLayout: boolean
+  availablePartTypeIds?: readonly PartTypeId[]
   onPartPointerDown: (typeId: PartTypeId, event: PointerEvent<HTMLButtonElement>) => void
   onPartPointerMove: (event: PointerEvent<HTMLButtonElement>) => void
   onPartPointerUp: (event: PointerEvent<HTMLButtonElement>) => void
@@ -28,6 +29,7 @@ export default function PartTray({
   selectedTypeId,
   disabled,
   isLandscapeLayout,
+  availablePartTypeIds,
   onPartPointerDown,
   onPartPointerMove,
   onPartPointerUp,
@@ -101,7 +103,7 @@ export default function PartTray({
       data-testid="part-tray"
       data-layout={isLandscapeLayout ? 'landscape' : 'portrait'}
     >
-      {TRAY_PART_DEFINITIONS.map((definition) => (
+      {TRAY_PART_DEFINITIONS.filter((definition) => availablePartTypeIds?.includes(definition.id) ?? true).map((definition) => (
         <button
           key={definition.id}
           type="button"

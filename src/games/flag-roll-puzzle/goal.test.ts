@@ -10,6 +10,8 @@ import {
   GOAL_EXIT_WALL_THICKNESS,
   GOAL_EXIT_WALL_X,
   GRID_BOTTOM,
+  goalBoundaryWallsForArea,
+  goalExitWallForArea,
 } from './boardLayout'
 import { isInGoalArea } from './goal'
 import { createGoalExitWallBody } from './usePuzzleEngine'
@@ -54,6 +56,54 @@ describe('goal', () => {
     // ゴール上端より上には伸ばさず、入口は開放する。
     expect(GOAL_EXIT_WALL.y - GOAL_EXIT_WALL.height / 2).toBe(GOAL_AREA.y)
     expect(GOAL_EXIT_WALL.y + GOAL_EXIT_WALL.height / 2).toBe(GOAL_AREA.y + GOAL_AREA.height)
+  })
+
+  test('ステージ固有ゴールの範囲で判定と出口壁を組み立てられる', () => {
+    const stageGoal = { x: 240, y: GRID_BOTTOM, width: 120, height: GOAL_AREA.height }
+    expect(isInGoalArea(300, GRID_BOTTOM + 20, stageGoal)).toBe(true)
+    expect(isInGoalArea(200, GRID_BOTTOM + 20, stageGoal)).toBe(false)
+    expect(goalExitWallForArea(stageGoal)).toBeNull()
+    const centerGoal = { x: 90, y: GRID_BOTTOM, width: 180, height: GOAL_AREA.height }
+    expect(goalExitWallForArea(centerGoal)?.x).toBe(272)
+  })
+
+  test('ゴールの左右境界のうち外周と共有しない側へだけ4px壁を置く', () => {
+    const easy = { x: 0, y: GRID_BOTTOM, width: 180, height: GOAL_AREA.height }
+    const normal = { x: 240, y: GRID_BOTTOM, width: 120, height: GOAL_AREA.height }
+    const hard = { x: 90, y: GRID_BOTTOM, width: 180, height: GOAL_AREA.height }
+    expect(goalBoundaryWallsForArea(easy).map((wall) => wall.x)).toEqual([182])
+    expect(goalBoundaryWallsForArea(normal).map((wall) => wall.x)).toEqual([238])
+    expect(goalBoundaryWallsForArea(hard).map((wall) => wall.x)).toEqual([88, 272])
+    expect(goalBoundaryWallsForArea(hard).every((wall) => wall.y - wall.height / 2 === GRID_BOTTOM)).toBe(true)
+  })
+
+  test('normalの左壁とhardの左右壁は、ゴール内部のボールを押し出さない', () => {
+    const cases = [
+      { goal: { x: 240, y: GRID_BOTTOM, width: 120, height: GOAL_AREA.height }, side: 'left' as const },
+      { goal: { x: 90, y: GRID_BOTTOM, width: 180, height: GOAL_AREA.height }, side: 'left' as const },
+      { goal: { x: 90, y: GRID_BOTTOM, width: 180, height: GOAL_AREA.height }, side: 'right' as const },
+    ]
+
+    for (const { goal, side } of cases) {
+      const wall = goalBoundaryWallsForArea(goal).find((candidate) =>
+        side === 'left' ? candidate.x < goal.x : candidate.x > goal.x + goal.width / 2,
+      )!
+      const engine = Matter.Engine.create({ gravity: { x: 0, y: 0 } })
+      const centerY = goal.y + goal.height / 2
+      const centerX = side === 'left'
+        ? goal.x + BALL_RADIUS + 1
+        : goal.x + goal.width - BALL_RADIUS - 1
+      const ball = Matter.Bodies.circle(centerX, centerY, BALL_RADIUS, { restitution: BALL_RESTITUTION })
+      Matter.Composite.add(engine.world, [
+        Matter.Bodies.rectangle(wall.x, wall.y, wall.width, wall.height, { isStatic: true }),
+        ball,
+      ])
+      Matter.Body.setVelocity(ball, { x: side === 'left' ? -16 : 16, y: 0 })
+      for (let index = 0; index < 12; index += 1) Matter.Engine.update(engine, STEP_MS)
+
+      if (side === 'left') expect(ball.position.x).toBeGreaterThanOrEqual(goal.x + BALL_RADIUS - 1)
+      else expect(ball.position.x).toBeLessThanOrEqual(goal.x + goal.width - BALL_RADIUS + 1)
+    }
   })
 
   test('薄い出口壁でもゴール内から右へ戻るボールをすり抜けさせない', () => {

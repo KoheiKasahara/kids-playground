@@ -8,38 +8,35 @@ import FlagPickerDialog from './FlagPickerDialog'
 import PartShape from './PartShape'
 import PartTray from './PartTray'
 import PuzzleBoard from './PuzzleBoard'
+import PuzzleStageSelect from './PuzzleStageSelect'
 import { nearestCell, sameCell, type GridCell } from './grid'
 import { isRotatablePart, type PartTypeId } from './partTypes'
 import { boardPointFromClient, canMovePart, canPlacePart, partAtCell } from './placement'
 import {
   clearAll,
+  changeStage,
   clearPartSelection,
   createPuzzleState,
-  reachGoal,
+  markBallGoal,
+  markBallStopped,
   removeSelectedPart,
   returnBall,
   rotateSelectedPart,
   selectPart,
   startRun,
-  stopRun,
   tryMovePart,
   tryPlacePart,
   isEditingPhase,
+  setSelectedFlag,
 } from './puzzleState'
+import { puzzleStage, type PuzzleStageId } from './puzzleStages'
+import type { PuzzleBallSnapshot } from './puzzleState'
 import { useBoardScale } from './useBoardScale'
 import { useLandscapeLayout } from './useLandscapeLayout'
 import { usePuzzleEngine } from './usePuzzleEngine'
 import styles from './FlagRollPuzzlePlay.module.css'
 
 const INITIAL_BALL_FLAG_ID = 'jp'
-
-/**
- * 現在は1個ぶんの設定だけを持つ。ボール生成と描画がこの設定を受け取る分担にしておくと、
- * Phase 5で複数ボールになったときは、ここを「ボールごとの設定一覧」へ拡張できる。
- */
-type BallConfig = {
-  readonly flagId: string
-}
 
 /** 置けなかったときなどの案内を出しておく時間(ms) */
 const MESSAGE_DURATION_MS = 1600
@@ -72,7 +69,8 @@ const EDIT_HINT = 'いたを おいて、ゴールまで はこぼう！'
 export default function FlagRollPuzzlePlay() {
   const navigate = useNavigate()
   const [state, setState] = useState(createPuzzleState)
-  const [ballConfig, setBallConfig] = useState<BallConfig>({ flagId: INITIAL_BALL_FLAG_ID })
+  /** null はステージ選択画面。ステージを選ぶと同じroute内でプレイ画面へ進む。 */
+  const [selectedStageId, setSelectedStageId] = useState<PuzzleStageId | null>(null)
   const [isFlagPickerOpen, setIsFlagPickerOpen] = useState(false)
   const [selectedTypeId, setSelectedTypeId] = useState<PartTypeId | null>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -92,7 +90,7 @@ export default function FlagRollPuzzlePlay() {
   const dragEndedAtRef = useRef(0)
   const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const goalHandledRef = useRef(false)
+  const goalHandledRef = useRef(new Set<string>())
 
   useEffect(() => {
     return () => {
@@ -125,21 +123,33 @@ export default function FlagRollPuzzlePlay() {
     feedbackTimeoutRef.current = setTimeout(() => setInvalidDrop(false), 240)
   }, [])
 
-  const handleGoal = useCallback(() => {
-    // Matter.js の衝突通知はゴール内で複数回起こり得る。state更新関数の再実行にも
-    // 影響されないrefで最初の1回を確実に弾き、物理シミュレーション自体は続ける。
-    if (goalHandledRef.current) return
-    goalHandledRef.current = true
-    playCorrectSound()
-    setState((current) => reachGoal(current))
-  }, [])
+  const handleGoal = useCallback((ballId?: string, snapshots?: readonly PuzzleBallSnapshot[]) => {
+    const targetId = ballId ?? 'ball-a'
+    // Matter.jsの通知はゴール内で複数回届き得るため、ボール単位で冪等にする。
+    if (goalHandledRef.current.has(targetId)) return
+    goalHandledRef.current.add(targetId)
+    // 同一tickで2球の通知が連続しても、React stateの古いclosureではなく
+    // 通知済みSetの同期的なsizeで最終球を判定する。
+    const allBallsReached = goalHandledRef.current.size >= state.balls.length
+    if (!allBallsReached) {
+      showMessage('あと 1こ！')
+    } else {
+      setMessage('')
+      playCorrectSound()
+    }
+    setState((current) => markBallGoal(current, targetId, snapshots))
+  }, [showMessage, state.balls])
 
-  const handleStopped = useCallback(() => {
-    setState((current) => stopRun(current))
-  }, [])
+  const handleStopped = useCallback((ballId?: string, snapshots?: readonly PuzzleBallSnapshot[]) => {
+    const targetId = ballId ?? state.balls.find((ball) => ball.status === 'moving')?.id
+    if (!targetId) return
+    setState((current) => markBallStopped(current, targetId, snapshots))
+  }, [state.balls])
 
   const { registerBall } = usePuzzleEngine({
     parts: state.parts,
+    balls: state.balls,
+    goalArea: state.goalArea,
     // ゴール後は自然に転がり続ける。途中停止では世界を止め、開始位置へ戻して編集へ戻る。
     running: state.phase === 'running' || state.phase === 'cleared',
     runId: state.runId,
@@ -332,30 +342,43 @@ export default function FlagRollPuzzlePlay() {
     primeAudio()
     setSelectedTypeId(null)
     setGhostCell(null)
-    goalHandledRef.current = false
+    // 再開時は、すでにゴールしたボールを成功判定から外さない。
+    // 初回run・両停止runではこの一覧が空なので、同じ処理で開始できる。
+    const reachedBallIds = state.balls
+      .filter((ball) => ball.status === 'goal')
+      .map((ball) => ball.id)
+    goalHandledRef.current.clear()
+    for (const ballId of reachedBallIds) goalHandledRef.current.add(ballId)
     setState((current) => startRun(current))
   }
 
   const handleReturnBall = () => {
-    goalHandledRef.current = false
+    goalHandledRef.current.clear()
     setState((current) => returnBall(current))
   }
 
   const handleClearAll = () => {
     setSelectedTypeId(null)
     setGhostCell(null)
+    goalHandledRef.current.clear()
     setState((current) => clearAll(current))
   }
 
   const handleFlagSelect = (flagId: string) => {
-    setBallConfig({ flagId })
+    setState((current) => setSelectedFlag(current, flagId))
     setIsFlagPickerOpen(false)
     playPanelOpenSound()
   }
 
   // flagBallsからしか選べないため通常は必ず見つかる。データ不整合時もゲームを操作不能に
   // しないよう、初期国旗へ戻して描画を続ける。
-  const ballFlag: FlagBallData = findFlagBall(ballConfig.flagId) ?? findFlagBall(INITIAL_BALL_FLAG_ID)!
+  const selectedFlagId = state.balls[0]?.flagId ?? INITIAL_BALL_FLAG_ID
+  const ballFlag: FlagBallData = findFlagBall(selectedFlagId) ?? findFlagBall(INITIAL_BALL_FLAG_ID)!
+  const stage = puzzleStage(state.stageId)
+  const boardBalls = state.balls.map((ball) => ({
+    ...ball,
+    flag: findFlagBall(ball.flagId) ?? ballFlag,
+  }))
 
   const editing = isEditingPhase(state.phase)
   const partSelected = state.selectedPartId !== null
@@ -373,6 +396,18 @@ export default function FlagRollPuzzlePlay() {
           ? editHint
           : 'ころころ ころがってるよ！')
 
+  const handleSelectStage = (stageId: PuzzleStageId) => {
+    goalHandledRef.current.clear()
+    setState((current) => changeStage(current, stageId))
+    setSelectedStageId(stageId)
+    setSelectedTypeId(null)
+    setGhostCell(null)
+  }
+
+  if (selectedStageId === null) {
+    return <PuzzleStageSelect onSelect={handleSelectStage} />
+  }
+
   return (
     <main className={styles.page} data-layout={isLandscapeLayout ? 'landscape' : 'portrait'}>
       <header className={styles.header}>
@@ -380,6 +415,15 @@ export default function FlagRollPuzzlePlay() {
           やめる
         </button>
         <h1 className={styles.title}>こっきコロコロパズル</h1>
+        <button
+          type="button"
+          className={styles.stageButton}
+          aria-label="ステージを えらびなおす"
+          disabled={!editing}
+          onClick={() => setSelectedStageId(null)}
+        >
+          {stage.emoji} {stage.nameJa}
+        </button>
         {!isLandscapeLayout ? (
           <button
             type="button"
@@ -399,7 +443,8 @@ export default function FlagRollPuzzlePlay() {
           <PuzzleBoard
             parts={state.parts}
             selectedPartId={state.selectedPartId}
-            flag={ballFlag}
+            balls={boardBalls}
+            goalArea={state.goalArea}
             ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
             draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
             highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
@@ -463,6 +508,7 @@ export default function FlagRollPuzzlePlay() {
             selectedTypeId={selectedTypeId}
             disabled={!editing}
             isLandscapeLayout={isLandscapeLayout}
+            availablePartTypeIds={stage.availablePartTypeIds}
             onPartPointerDown={handlePartPointerDown}
             onPartPointerMove={handleDragMove}
             onPartPointerUp={handleDragEnd}
@@ -499,7 +545,7 @@ export default function FlagRollPuzzlePlay() {
 
       {isFlagPickerOpen ? (
         <FlagPickerDialog
-          selectedFlagId={ballConfig.flagId}
+          selectedFlagId={selectedFlagId}
           onSelect={handleFlagSelect}
           onClose={() => setIsFlagPickerOpen(false)}
         />

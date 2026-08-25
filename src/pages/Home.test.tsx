@@ -107,6 +107,7 @@ describe('Home', () => {
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     await user.click(screen.getByRole('link', { name: 'こっきコロコロパズル' }))
     expect(await screen.findByRole('heading', { name: 'こっきコロコロパズル' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'かんたん' }))
     expect(screen.getByRole('button', { name: 'ボールを おとす！' })).toBeInTheDocument()
   })
 
