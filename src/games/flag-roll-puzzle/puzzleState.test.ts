@@ -238,6 +238,28 @@ describe('puzzleState', () => {
     expect(goalThenStop.phase).toBe('stopped')
   })
 
+  test('2球が別々に停止したとき、先に停止した球もスタート位置へ戻る', () => {
+    const running = startRun(createPuzzleState('hard'))
+    const startA = running.balls.find((ball) => ball.id === 'ball-a')!.startPosition
+    const startB = running.balls.find((ball) => ball.id === 'ball-b')!.startPosition
+
+    // ball-aが先に停止。この時点のスナップショットはball-bがまだ動いている座標を含む。
+    const oneStopped = markBallStopped(running, 'ball-a', [
+      { id: 'ball-a', position: { x: 400, y: 500 }, status: 'stopped' },
+      { id: 'ball-b', position: { x: 300, y: 260 }, status: 'moving' },
+    ])
+    expect(oneStopped.balls.find((ball) => ball.id === 'ball-a')?.position).toEqual(startA)
+
+    // ball-bが後で停止。物理Bodyは静止したball-aの停止地点をそのまま報告し続けるため、
+    // そのスナップショットでball-aのスタート復帰位置を上書きしてはいけない。
+    const bothStopped = markBallStopped(oneStopped, 'ball-b', [
+      { id: 'ball-a', position: { x: 400, y: 500 }, status: 'stopped' },
+      { id: 'ball-b', position: { x: 320, y: 540 }, status: 'stopped' },
+    ])
+    expect(bothStopped.balls.find((ball) => ball.id === 'ball-a')?.position).toEqual(startA)
+    expect(bothStopped.balls.find((ball) => ball.id === 'ball-b')?.position).toEqual(startB)
+  })
+
   test('再開時はゴール済みを動かさず、未ゴール停止球だけを動かす', () => {
     const running = startRun(createPuzzleState('hard'))
     const stopped = markBallStopped(markBallGoal(running, 'ball-a'), 'ball-b')

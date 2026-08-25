@@ -142,6 +142,10 @@ function updateBallSnapshots(
 ): PuzzleBallState[] {
   const byId = snapshotsById(snapshots)
   return balls.map((ball) => {
+    // 停止済み球はスタート位置へ戻した表示位置を確定させている。他球のイベントで
+    // 再同期すると、物理Body側に残る停止地点の座標で上書きされ、
+    // スタートへ戻ったはずの球が元の停止地点に見えてしまう。
+    if (ball.status === 'stopped') return ball
     const snapshot = byId.get(ball.id)
     if (!snapshot) return ball
     return { ...ball, position: { ...snapshot.position } }
