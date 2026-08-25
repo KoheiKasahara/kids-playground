@@ -8,7 +8,7 @@ import PartTray from './PartTray'
 import PuzzleBoard from './PuzzleBoard'
 import { nearestCell, sameCell, type GridCell } from './grid'
 import type { PartTypeId } from './partTypes'
-import { boardPointFromClient, canPlacePart, partAtCell } from './placement'
+import { boardPointFromClient, canMovePart, canPlacePart, partAtCell } from './placement'
 import {
   clearAll,
   clearPartSelection,
@@ -18,6 +18,7 @@ import {
   returnBall,
   selectPart,
   startRun,
+  tryMovePart,
   tryPlacePart,
 } from './puzzleState'
 import { useBoardScale } from './useBoardScale'
@@ -51,8 +52,17 @@ const DRAG_THRESHOLD_PX = 8
 /** ドラッグ終了の直後に飛んでくる click を、タップ選択と取り違えないための猶予(ms) */
 const CLICK_AFTER_DRAG_IGNORE_MS = 300
 
+/**
+ * ドラッグ中の状態。パーツ置き場から出すときと、置いたパーツを動かすときで
+ * 掴んだ相手だけが違い、あとの流れ（指についてくる分身・吸着先の下書き・
+ * 離した場所へ置く／戻す）は同じなので、1つの型にまとめて同じ手順で扱う。
+ */
 type DragState = {
+  /** tray: パーツ置き場から出す / board: 置いてあるパーツを動かす */
+  readonly source: 'tray' | 'board'
   readonly typeId: PartTypeId
+  /** source が board のとき、動かしているパーツのid */
+  readonly partId?: string
   /** 画面上のポインタ位置。指についてくる分身の表示に使う */
   readonly x: number
   readonly y: number
@@ -130,17 +140,34 @@ export default function FlagRollPuzzlePlay() {
     [state, showMessage],
   )
 
-  const handlePartPointerDown = (typeId: PartTypeId, event: PointerEvent<HTMLButtonElement>) => {
-    if (state.phase !== 'edit') return
+  /** 置いてあるパーツを別のマスへ動かす。動かせなければ元の場所のままにする */
+  const move = useCallback(
+    (partId: string, cell: GridCell | null) => {
+      const next = cell ? tryMovePart(state, partId, cell) : null
+      if (!next) {
+        showMessage('ここには おけないよ')
+        return
+      }
+      setState(next)
+      playPanelOpenSound()
+    },
+    [state, showMessage],
+  )
+
+  /** ドラッグを開始する。掴んだ相手（置き場のパーツ／盤面のパーツ）だけが違う */
+  const startDrag = (next: DragState, event: PointerEvent<Element>) => {
     primeAudio()
     // jsdom や一部の組込みブラウザは Pointer Capture を持たないことがある。
     event.currentTarget.setPointerCapture?.(event.pointerId)
     dragStartPointRef.current = { x: event.clientX, y: event.clientY }
-    setState((current) => clearPartSelection(current))
-    setDrag({ typeId, x: event.clientX, y: event.clientY, moved: false })
+    setDrag(next)
   }
 
-  const handlePartPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+  /**
+   * ドラッグ中の移動。置ける（動かせる）場所だけ下書きを出す。
+   * 置けない場所では何も出さないことが、そのまま「ここには置けない」の合図になる。
+   */
+  const handleDragMove = (event: PointerEvent<Element>) => {
     const start = dragStartPointRef.current
     if (!drag || !start) return
     const moved =
@@ -148,10 +175,20 @@ export default function FlagRollPuzzlePlay() {
     setDrag({ ...drag, x: event.clientX, y: event.clientY, moved })
     if (!moved) return
 
-    // 置ける場所だけ下書きを出す。置けない場所では何も出さないことが
-    // そのまま「ここには置けない」の合図になる。
+    // 実際に動き始めた瞬間、掴んだものと違うパーツの選択は解く。
+    // 「けす」が、今つまんでいるものとは別のパーツを指したままにならないようにする。
+    if (!drag.moved && drag.source === 'board' && drag.partId) {
+      const partId = drag.partId
+      setState((current) => (current.selectedPartId === partId ? current : clearPartSelection(current)))
+    }
+
     const cell = cellFromClient(event.clientX, event.clientY)
-    const nextGhost = cell && canPlacePart(state.parts, drag.typeId, cell) ? cell : null
+    const placeable =
+      cell !== null &&
+      (drag.source === 'tray'
+        ? canPlacePart(state.parts, drag.typeId, cell)
+        : canMovePart(state.parts, drag.partId!, cell))
+    const nextGhost = placeable ? cell : null
     setGhostCell((current) => {
       if (current === null && nextGhost === null) return current
       if (current && nextGhost && sameCell(current, nextGhost)) return current
@@ -159,15 +196,35 @@ export default function FlagRollPuzzlePlay() {
     })
   }
 
-  const handlePartPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+  /** ドラッグの終了。動かしていなければタップとして扱う */
+  const handleDragEnd = (event: PointerEvent<Element>) => {
     const active = drag
     setDrag(null)
     setGhostCell(null)
     dragStartPointRef.current = null
-    // 動かしていなければタップ。選択は click 側で扱う（キーボード操作と同じ経路にするため）
-    if (!active?.moved) return
+    if (!active) return
+
+    if (!active.moved) {
+      // 盤面のパーツをタップしただけ＝「選ぶ」。置き場のパーツのタップ選択は
+      // click 側で扱う（キーボード操作と同じ経路にするため）。
+      if (active.source === 'board' && active.partId) {
+        setSelectedTypeId(null)
+        const partId = active.partId
+        setState((current) => selectPart(current, partId))
+      }
+      return
+    }
+
     dragEndedAtRef.current = Date.now()
-    place(active.typeId, cellFromClient(event.clientX, event.clientY))
+    const cell = cellFromClient(event.clientX, event.clientY)
+    if (active.source === 'tray') place(active.typeId, cell)
+    else move(active.partId!, cell)
+  }
+
+  const handlePartPointerDown = (typeId: PartTypeId, event: PointerEvent<HTMLButtonElement>) => {
+    if (state.phase !== 'edit') return
+    setState((current) => clearPartSelection(current))
+    startDrag({ source: 'tray', typeId, x: event.clientX, y: event.clientY, moved: false }, event)
   }
 
   /** パーツ置き場のタップ。選んでから盤面をタップして置く操作の入口 */
@@ -181,23 +238,26 @@ export default function FlagRollPuzzlePlay() {
   }
 
   /**
-   * 盤面のタップ。
-   * パーツ置き場でパーツを選んでいるときは、そのマスへ置く。
-   * 何も選んでいないときは、タップしたマスにあるパーツを「選ぶ」
-   * （選んだパーツは「けす」で1つだけ外せる。Phase 2の移動・回転も同じ選択を使う想定）。
+   * 盤面を押したとき。
+   * - すでにパーツがあるマス: そのパーツを掴む（そのまま指を動かせば移動、離せば選択）
+   * - パーツ置き場で選んでいるとき: そのマスへ置く
+   * - どちらでもないとき: 選択を解く
+   *
+   * パーツのあるマスで「置く」より「掴む」を優先しているのは、幼児が置き場を選んだまま
+   * 置いたパーツを押しても「置けない」と言われず、そのまま動かす／消す操作へ進めるため。
    */
   const handleBoardPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (state.phase !== 'edit' || drag) return
     const cell = cellFromClient(event.clientX, event.clientY)
     if (!cell) return
 
-    // すでにパーツがあるマスを押したら、置こうとするのではなく、そのパーツを選ぶ。
-    // 幼児がパーツ置き場を選んだまま置いたパーツを押しても「置けない」と言われず、
-    // そのまま消す操作へ進める（消すのは「けす」を押したときだけなので、誤って消えない）。
     const part = partAtCell(state.parts, cell)
     if (part) {
       setSelectedTypeId(null)
-      setState((current) => selectPart(current, part.id))
+      startDrag(
+        { source: 'board', typeId: part.typeId, partId: part.id, x: event.clientX, y: event.clientY, moved: false },
+        event,
+      )
       return
     }
     if (selectedTypeId) {
@@ -252,6 +312,7 @@ export default function FlagRollPuzzlePlay() {
           selectedPartId={state.selectedPartId}
           flag={BALL_FLAG}
           ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
+          draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
           highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
           cleared={state.phase === 'cleared'}
           containerRef={containerRef}
@@ -261,6 +322,8 @@ export default function FlagRollPuzzlePlay() {
           height={height}
           registerBall={registerBall}
           onPointerDown={handleBoardPointerDown}
+          onPointerMove={handleDragMove}
+          onPointerUp={handleDragEnd}
         />
 
         {/*
@@ -287,8 +350,8 @@ export default function FlagRollPuzzlePlay() {
             selectedTypeId={selectedTypeId}
             disabled={!editing}
             onPartPointerDown={handlePartPointerDown}
-            onPartPointerMove={handlePartPointerMove}
-            onPartPointerUp={handlePartPointerUp}
+            onPartPointerMove={handleDragMove}
+            onPartPointerUp={handleDragEnd}
             onPartClick={handlePartClick}
           />
 

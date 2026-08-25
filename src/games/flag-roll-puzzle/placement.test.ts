@@ -2,10 +2,12 @@ import { describe, expect, test } from 'vitest'
 import { GRID_COLS, GRID_ROWS } from './boardLayout'
 import {
   boardPointFromClient,
+  canMovePart,
   canPlacePart,
   isInsideBoard,
   occupiedCellKeys,
   occupiedCells,
+  movePart,
   overlapsExistingPart,
   partAtCell,
   placePart,
@@ -91,6 +93,40 @@ describe('placement', () => {
   test('removePart に無いidを渡しても、残りは変わらない', () => {
     const parts = [plankAt(1, 1, 'part-a')]
     expect(removePart(parts, 'part-x').map((part) => part.id)).toEqual(['part-a'])
+  })
+
+  test('置いたパーツは、空いているマスへ動かせる', () => {
+    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    expect(canMovePart(parts, 'part-a', { col: 2, row: 2 })).toBe(true)
+    // 自分自身とは重なりとみなさない（同じ場所へ戻す操作も許す）
+    expect(canMovePart(parts, 'part-a', { col: 1, row: 1 })).toBe(true)
+  })
+
+  test('ほかのパーツの上・ボードの外へは動かせない', () => {
+    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    expect(canMovePart(parts, 'part-a', { col: 3, row: 4 })).toBe(false)
+    expect(canMovePart(parts, 'part-a', { col: -1, row: 1 })).toBe(false)
+    expect(canMovePart(parts, 'part-a', { col: GRID_COLS, row: 1 })).toBe(false)
+    expect(canMovePart(parts, 'part-a', { col: 1, row: GRID_ROWS })).toBe(false)
+    // 知らないidは動かせない
+    expect(canMovePart(parts, 'part-x', { col: 2, row: 2 })).toBe(false)
+  })
+
+  test('movePart は id と並び順を保ったまま位置だけ変える', () => {
+    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    const moved = movePart(parts, 'part-a', { col: 5, row: 6 })
+    expect(moved).not.toBeNull()
+    expect(moved!.map((part) => part.id)).toEqual(['part-a', 'part-b'])
+    expect(moved![0].cell).toEqual({ col: 5, row: 6 })
+    expect(moved![1].cell).toEqual({ col: 3, row: 4 })
+    // 元の配列は変わらない
+    expect(parts[0].cell).toEqual({ col: 1, row: 1 })
+  })
+
+  test('movePart は動かせない位置では null を返す（元の場所へ戻す挙動に使う）', () => {
+    const parts = [plankAt(1, 1, 'part-a'), plankAt(3, 4, 'part-b')]
+    expect(movePart(parts, 'part-a', { col: 3, row: 4 })).toBeNull()
+    expect(movePart(parts, 'part-a', { col: -1, row: 0 })).toBeNull()
   })
 
   test('ポインタ座標を、盤面の拡縮を打ち消して論理座標へ戻す', () => {

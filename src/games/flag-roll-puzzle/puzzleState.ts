@@ -1,6 +1,6 @@
 import type { GridCell } from './grid'
 import type { PartTypeId } from './partTypes'
-import { placePart, removePart, type PlacedPart } from './placement'
+import { movePart, placePart, removePart, type PlacedPart } from './placement'
 
 /**
  * ゲームの進行状態。
@@ -52,6 +52,22 @@ export function tryPlacePart(
   if (!parts) return null
   // 新しく置いたら、それまで選んでいたパーツの選択は解く（消す対象を取り違えないため）
   return { ...state, parts, selectedPartId: null, nextPartNumber: state.nextPartNumber + 1 }
+}
+
+/**
+ * 置いてあるパーツを別のマスへ動かす。編集中で、動かせる位置のときだけ。
+ * 動かせない位置なら null を返し、呼び出し側が「元の場所へ戻す」挙動を選べるようにする。
+ * idは変えないので、選んでいたパーツはそのまま選ばれたまま移動する。
+ */
+export function tryMovePart(
+  state: PuzzleState,
+  partId: string,
+  cell: GridCell,
+): PuzzleState | null {
+  if (state.phase !== 'edit') return null
+  const parts = movePart(state.parts, partId, cell)
+  if (!parts) return null
+  return { ...state, parts }
 }
 
 /**

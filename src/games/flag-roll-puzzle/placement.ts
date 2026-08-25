@@ -82,6 +82,34 @@ export function removePart(parts: readonly PlacedPart[], id: string): PlacedPart
 }
 
 /**
+ * 置いてあるパーツを別のマスへ動かせるか。
+ * 自分自身とは当然重なるので、判定からは自分を除く（同じ場所へ戻す操作も許す）。
+ */
+export function canMovePart(
+  parts: readonly PlacedPart[],
+  partId: string,
+  anchor: GridCell,
+): boolean {
+  const target = parts.find((part) => part.id === partId)
+  if (!target) return false
+  return canPlacePart(removePart(parts, partId), target.typeId, anchor)
+}
+
+/**
+ * パーツを別のマスへ動かした新しい配列を返す。動かせない位置なら null を返し、
+ * 呼び出し側が「元の場所へ戻す」挙動を選べるようにする（配置と同じ約束）。
+ * 並び順とidは変えないので、選択状態やReactのkeyはそのまま保たれる。
+ */
+export function movePart(
+  parts: readonly PlacedPart[],
+  partId: string,
+  anchor: GridCell,
+): PlacedPart[] | null {
+  if (!canMovePart(parts, partId, anchor)) return null
+  return parts.map((part) => (part.id === partId ? { ...part, cell: anchor } : part))
+}
+
+/**
  * 画面上のポインタ座標を盤面の論理座標へ変換する。
  * 盤面は transform-origin: top left の scale() で拡縮しているため、
  * 矩形の左上が論理原点、倍率が scale にそのまま対応する。

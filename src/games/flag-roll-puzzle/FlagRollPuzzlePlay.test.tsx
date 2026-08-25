@@ -43,6 +43,22 @@ function cellPoint(col: number, row: number) {
 const trayPart = (name: string) => screen.getByRole('button', { name })
 const placedParts = () => screen.queryAllByTestId('puzzle-part')
 
+/** 盤面のマスをタップする（押して、動かさずに離す） */
+function tapBoard(col: number, row: number) {
+  const board = screen.getByTestId('puzzle-board')
+  const point = cellPoint(col, row)
+  fireEvent.pointerDown(board, { pointerId: 1, ...point })
+  fireEvent.pointerUp(board, { pointerId: 1, ...point })
+}
+
+/** 盤面のパーツを、別のマスまでドラッグする */
+function dragBoardPart(from: [number, number], to: [number, number]) {
+  const board = screen.getByTestId('puzzle-board')
+  fireEvent.pointerDown(board, { pointerId: 1, ...cellPoint(...from) })
+  fireEvent.pointerMove(board, { pointerId: 1, ...cellPoint(...to) })
+  fireEvent.pointerUp(board, { pointerId: 1, ...cellPoint(...to) })
+}
+
 describe('こっきコロコロパズル', () => {
   test('パーツ置き場に Phase 1の3種類が並び、「ボールをおとす」が押せる', async () => {
     await renderGame()
@@ -58,7 +74,7 @@ describe('こっきコロコロパズル', () => {
     await user.click(trayPart('よこいた'))
     expect(trayPart('よこいた')).toHaveAttribute('aria-pressed', 'true')
 
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
     expect(placedParts()).toHaveLength(1)
     expect(placedParts()[0]).toHaveAttribute('data-part-type', 'plank')
   })
@@ -81,7 +97,7 @@ describe('こっきコロコロパズル', () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('よこいた'))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
     expect(placedParts()).toHaveLength(1)
 
     const part = trayPart('みぎへ')
@@ -99,14 +115,14 @@ describe('こっきコロコロパズル', () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('よこいた'))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
     await user.click(trayPart('みぎへ'))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(4, 5))
+    tapBoard(4, 5)
     expect(placedParts()).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
 
     // よこいたを置いたマスをタップして選ぶ
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
     expect(screen.getByTestId('puzzle-selection')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
     expect(placedParts().filter((part) => part.dataset.selected === 'true')).toHaveLength(1)
@@ -119,21 +135,107 @@ describe('こっきコロコロパズル', () => {
     expect(screen.queryByTestId('puzzle-selection')).not.toBeInTheDocument()
   })
 
+  test('置いたパーツをドラッグすると、離したマスへ動く', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    tapBoard(2, 3)
+    expect(placedParts()[0]).toHaveAttribute('data-cell', '2,3')
+
+    dragBoardPart([2, 3], [4, 5])
+    // 増えずに、同じパーツが移動している
+    expect(placedParts()).toHaveLength(1)
+    expect(placedParts()[0]).toHaveAttribute('data-cell', '4,5')
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'plank')
+  })
+
+  test('ほかのパーツの上へ動かそうとしても動かず、元の場所に残る', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    tapBoard(2, 3)
+    tapBoard(4, 5)
+    expect(placedParts()).toHaveLength(2)
+
+    dragBoardPart([2, 3], [4, 5])
+    expect(placedParts()).toHaveLength(2)
+    expect(placedParts().map((part) => part.dataset.cell)).toEqual(['2,3', '4,5'])
+    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+  })
+
+  test('ボードの外へ動かそうとしても動かず、元の場所に残る', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    tapBoard(2, 3)
+
+    const board = screen.getByTestId('puzzle-board')
+    fireEvent.pointerDown(board, { pointerId: 1, ...cellPoint(2, 3) })
+    // スタート帯（グリッドの外）まで動かして離す
+    fireEvent.pointerMove(board, { pointerId: 1, clientX: 180, clientY: GRID_TOP - 20 })
+    fireEvent.pointerUp(board, { pointerId: 1, clientX: 180, clientY: GRID_TOP - 20 })
+
+    expect(placedParts()).toHaveLength(1)
+    expect(placedParts()[0]).toHaveAttribute('data-cell', '2,3')
+    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+  })
+
+  test('選んでいるパーツを動かしても、選択はそのパーツに付いていく', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    tapBoard(2, 3)
+    tapBoard(2, 3)
+    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+
+    dragBoardPart([2, 3], [4, 5])
+    expect(placedParts()[0]).toHaveAttribute('data-cell', '4,5')
+    expect(placedParts()[0]).toHaveAttribute('data-selected', 'true')
+    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+  })
+
+  test('別のパーツを動かし始めると、前の選択は解ける', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    tapBoard(2, 3)
+    tapBoard(4, 5)
+    // (2,3) のパーツを選んでおく
+    tapBoard(2, 3)
+    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+
+    // 選んでいないほう (4,5) を動かす
+    dragBoardPart([4, 5], [1, 6])
+    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(placedParts().map((part) => part.dataset.cell)).toEqual(['2,3', '1,6'])
+  })
+
+  test('実行中は盤面のパーツを動かせない', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('よこいた'))
+    tapBoard(2, 3)
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+
+    dragBoardPart([2, 3], [4, 5])
+    expect(placedParts()[0]).toHaveAttribute('data-cell', '2,3')
+  })
+
   test('選んだパーツをもう一度タップする・別の場所をタップすると選択が解ける', async () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('よこいた'))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
 
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
     expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
     expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
 
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
     expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
     // 何もないマスをタップしたら選択は解ける（パーツは消えない）
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(0, 0))
+    tapBoard(0, 0)
     expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
     expect(placedParts()).toHaveLength(1)
   })
@@ -142,8 +244,8 @@ describe('こっきコロコロパズル', () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('よこいた'))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
+    tapBoard(2, 3)
     expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
 
     await user.click(trayPart('ひだりへ'))
@@ -155,8 +257,8 @@ describe('こっきコロコロパズル', () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('よこいた'))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
+    tapBoard(2, 3)
     expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
@@ -189,7 +291,7 @@ describe('こっきコロコロパズル', () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('よこいた'))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
+    tapBoard(2, 3)
     await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
 
     act(() => engineMock.options?.onGoal())
@@ -220,8 +322,8 @@ describe('こっきコロコロパズル', () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('よこいた'))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(2, 3))
-    fireEvent.pointerDown(screen.getByTestId('puzzle-board'), cellPoint(4, 5))
+    tapBoard(2, 3)
+    tapBoard(4, 5)
     expect(placedParts()).toHaveLength(2)
 
     await user.click(screen.getByRole('button', { name: 'ぜんぶ けす' }))
