@@ -125,7 +125,7 @@ export function rotateSelectedPart(state: PuzzleState): PuzzleState {
   const current = state.parts.find((part) => part.id === state.selectedPartId)
   if (!current) return state
   const nextTypeId = nextRotationType(current.typeId)
-  // 回転後の向き（例: longPlankVertical）はtrayに並ばない専用IDでも、
+  // 回転後の向き（例: cannonDownRight）はtrayに並ばない専用IDでも、
   // 既に置けるパーツからの派生なのでステージ制限を再適用しない。
   if (!nextTypeId) return state
   const parts = rotatePart(state.parts, current.id, nextTypeId)

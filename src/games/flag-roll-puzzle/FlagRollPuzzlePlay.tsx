@@ -146,7 +146,7 @@ export default function FlagRollPuzzlePlay() {
     setState((current) => markBallStopped(current, targetId, snapshots))
   }, [state.balls])
 
-  const { registerBall } = usePuzzleEngine({
+  const { registerBall, registerPartElement = () => {} } = usePuzzleEngine({
     parts: state.parts,
     balls: state.balls,
     goalArea: state.goalArea,
@@ -458,6 +458,7 @@ export default function FlagRollPuzzlePlay() {
             width={width}
             height={height}
             registerBall={registerBall}
+            registerPartElement={registerPartElement}
             onPointerDown={handleBoardPointerDown}
             onPointerMove={handleDragMove}
             onPointerUp={handleDragEnd}

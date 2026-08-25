@@ -97,6 +97,19 @@
   height: 0;
 }
 
+/* Spinnerだけは物理Bodyの実角度を内側へ書き込む。外側partSlotの配置pop/選択演出とは分離する。 */
+.spinnerVisual {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  display: block;
+  transform: rotate(var(--spinner-angle, 0rad));
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
 /*
  * 指でつまんで動かしている最中のパーツ。元の場所は薄く残し、
  * 「今どこから動かしているのか」が分かるようにする（本体は指について動く）。

@@ -26,7 +26,7 @@ export default function PartShape({ typeId, variant = 'placed' }: PartShapeProps
       {definition.segments.map((segment, index) => (
         <span
           key={index}
-          className={`${styles.segment} ${styles[variant]} ${styles[definition.appearance]}`}
+          className={`${styles.segment} ${styles[variant]} ${styles[definition.appearance]} ${segment.role ? styles[segment.role] : ''}`}
           style={{
             width: segment.width,
             height: segment.height,

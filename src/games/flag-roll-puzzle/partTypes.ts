@@ -2,7 +2,6 @@ import type { GridCell } from './grid'
 
 /** 盤面へ保存する向きまで含めたパーツ種類。置き場にはこのうち基本向きだけを出す。 */
 export type PartTypeId =
-  | 'plank'
   | 'slopeLeft'
   | 'slopeRight'
   | 'curveLeft'
@@ -16,8 +15,16 @@ export type PartTypeId =
   | 'bumper'
   | 'guideLeft'
   | 'guideRight'
-  | 'longPlank'
-  | 'longPlankVertical'
+  /** 右向きが基本向き。残りの7方向は盤面上の回転専用ID。 */
+  | 'cannon'
+  | 'cannonDownRight'
+  | 'cannonDown'
+  | 'cannonDownLeft'
+  | 'cannonLeft'
+  | 'cannonUpLeft'
+  | 'cannonUp'
+  | 'cannonUpRight'
+  | 'spinner'
 
 /** パーツを構成する長方形。アンカーセルの中心を原点とした相対位置(px)で表す。 */
 export type PartSegment = {
@@ -29,10 +36,12 @@ export type PartSegment = {
   readonly angleDeg: number
   /** 円形の物理Bodyとして扱うセグメント。見た目は width / height の円で描画する。 */
   readonly kind?: 'circle'
+  /** 特殊パーツの見た目を構成する役割。物理形状は専用ファクトリで作る。 */
+  readonly role?: 'chamber' | 'barrel' | 'muzzle' | 'blade'
 }
 
 /** 木の板以外も、役割を文字に頼らず見分けられるようにするための見た目の種類。 */
-export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide'
+export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide' | 'cannon' | 'spinner'
 
 export type PartDefinition = {
   readonly id: PartTypeId
@@ -52,14 +61,10 @@ export type PartDefinition = {
 }
 
 const SINGLE_CELL: readonly GridCell[] = [{ col: 0, row: 0 }]
-const HORIZONTAL_TWO_CELLS: readonly GridCell[] = [{ col: 0, row: 0 }, { col: 1, row: 0 }]
-const VERTICAL_TWO_CELLS: readonly GridCell[] = [{ col: 0, row: 0 }, { col: 0, row: 1 }]
 
-const PLANK_THICKNESS = 12
-const PLANK_LENGTH = 54
+const RAIL_THICKNESS = 12
 const SLOPE_ANGLE_DEG = 30
 const SLOPE_LENGTH = 62
-const LONG_PLANK_LENGTH = 114
 
 /** 一つの曲線を3枚の短い板で近似する。完全な円弧より、滑らかに向きが変わることを優先する。 */
 const CURVE_LEFT_SEGMENTS: readonly PartSegment[] = [
@@ -74,6 +79,81 @@ const CURVE_RIGHT_SEGMENTS: readonly PartSegment[] = CURVE_LEFT_SEGMENTS.map((se
   offsetX: -segment.offsetX,
   angleDeg: -segment.angleDeg,
 }))
+
+/** キャノンは右向きを基本向きとし、回転後は盤面専用の向きIDとして保存する。 */
+export const CANNON_TYPE_IDS = [
+  'cannon',
+  'cannonDownRight',
+  'cannonDown',
+  'cannonDownLeft',
+  'cannonLeft',
+  'cannonUpLeft',
+  'cannonUp',
+  'cannonUpRight',
+] as const
+
+export const CANNON_DIRECTION_ANGLES: Readonly<Record<(typeof CANNON_TYPE_IDS)[number], number>> = {
+  cannon: 0,
+  cannonDownRight: 45,
+  cannonDown: 90,
+  cannonDownLeft: 135,
+  cannonLeft: 180,
+  cannonUpLeft: 225,
+  cannonUp: 270,
+  cannonUpRight: 315,
+}
+
+/** 任意の角度でセグメントを回し、キャノンの見た目と向きを一致させる。 */
+function rotateSegmentsByAngle(segments: readonly PartSegment[], angleDeg: number): readonly PartSegment[] {
+  const angle = angleDeg * Math.PI / 180
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  return segments.map((segment) => ({
+    ...segment,
+    offsetX: segment.offsetX * cos - segment.offsetY * sin,
+    offsetY: segment.offsetX * sin + segment.offsetY * cos,
+    angleDeg: segment.angleDeg + angleDeg,
+  }))
+}
+
+const CANNON_SEGMENTS: readonly PartSegment[] = [
+  { offsetX: -8, offsetY: 0, width: 18, height: 18, angleDeg: 0, kind: 'circle', role: 'chamber' },
+  { offsetX: 9, offsetY: 0, width: 28, height: 10, angleDeg: 0, role: 'barrel' },
+  { offsetX: 25, offsetY: 0, width: 8, height: 14, angleDeg: 0, kind: 'circle', role: 'muzzle' },
+]
+
+function cannonDefinition(
+  id: (typeof CANNON_TYPE_IDS)[number],
+  angleDeg: number,
+  inTray = false,
+): PartDefinition {
+  const directionName: Readonly<Record<(typeof CANNON_TYPE_IDS)[number], string>> = {
+    cannon: 'みぎ',
+    cannonDownRight: 'みぎした',
+    cannonDown: 'した',
+    cannonDownLeft: 'ひだりした',
+    cannonLeft: 'ひだり',
+    cannonUpLeft: 'ひだりうえ',
+    cannonUp: 'うえ',
+    cannonUpRight: 'みぎうえ',
+  }
+  return {
+    id,
+    label: `たいほう ${directionName[id]}`,
+    inTray,
+    appearance: 'cannon',
+    cells: SINGLE_CELL,
+    segments: rotateSegmentsByAngle(CANNON_SEGMENTS, angleDeg),
+    restitution: 0.2,
+    friction: 0.02,
+  }
+}
+
+const SPINNER_SEGMENTS: readonly PartSegment[] = [
+  { offsetX: 0, offsetY: 0, width: 48, height: 10, angleDeg: 0, role: 'blade' },
+  { offsetX: 0, offsetY: 0, width: 10, height: 48, angleDeg: 0, role: 'blade' },
+  { offsetX: 0, offsetY: 0, width: 16, height: 16, angleDeg: 0, kind: 'circle', role: 'chamber' },
+]
 
 /** セグメントの集合を90度単位で回す。曲線の見た目と物理形状を必ず同じ向きへ回す。 */
 function rotateSegments(segments: readonly PartSegment[], quarterTurns: number): readonly PartSegment[] {
@@ -108,18 +188,13 @@ function curveDefinition(
 
 export const PART_DEFINITIONS: readonly PartDefinition[] = [
   {
-    id: 'plank', label: 'よこいた', inTray: true, appearance: 'wood', cells: SINGLE_CELL,
-    segments: [{ offsetX: 0, offsetY: 0, width: PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 0 }],
-    restitution: 0.2, friction: 0.04,
-  },
-  {
     id: 'slopeLeft', label: 'ひだりへ', inTray: true, appearance: 'wood', cells: SINGLE_CELL,
-    segments: [{ offsetX: 0, offsetY: 0, width: SLOPE_LENGTH, height: PLANK_THICKNESS, angleDeg: -SLOPE_ANGLE_DEG }],
+    segments: [{ offsetX: 0, offsetY: 0, width: SLOPE_LENGTH, height: RAIL_THICKNESS, angleDeg: -SLOPE_ANGLE_DEG }],
     restitution: 0.2, friction: 0.03,
   },
   {
     id: 'slopeRight', label: 'みぎへ', inTray: true, appearance: 'wood', cells: SINGLE_CELL,
-    segments: [{ offsetX: 0, offsetY: 0, width: SLOPE_LENGTH, height: PLANK_THICKNESS, angleDeg: SLOPE_ANGLE_DEG }],
+    segments: [{ offsetX: 0, offsetY: 0, width: SLOPE_LENGTH, height: RAIL_THICKNESS, angleDeg: SLOPE_ANGLE_DEG }],
     restitution: 0.2, friction: 0.03,
   },
 
@@ -158,15 +233,19 @@ export const PART_DEFINITIONS: readonly PartDefinition[] = [
     cells: SINGLE_CELL, restitution: 0.3, friction: 0.02,
   },
 
+  cannonDefinition('cannon', 0, true),
+  cannonDefinition('cannonDownRight', 45),
+  cannonDefinition('cannonDown', 90),
+  cannonDefinition('cannonDownLeft', 135),
+  cannonDefinition('cannonLeft', 180),
+  cannonDefinition('cannonUpLeft', 225),
+  cannonDefinition('cannonUp', 270),
+  cannonDefinition('cannonUpRight', 315),
+
   {
-    id: 'longPlank', label: 'ながい いた', inTray: true, appearance: 'wood', cells: HORIZONTAL_TWO_CELLS,
-    segments: [{ offsetX: 30, offsetY: 0, width: LONG_PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 0 }],
-    restitution: 0.2, friction: 0.04, previewScale: 0.5, previewOffsetX: -15,
-  },
-  {
-    id: 'longPlankVertical', label: 'ながい いた', inTray: false, appearance: 'wood', cells: VERTICAL_TWO_CELLS,
-    segments: [{ offsetX: 0, offsetY: 30, width: LONG_PLANK_LENGTH, height: PLANK_THICKNESS, angleDeg: 90 }],
-    restitution: 0.2, friction: 0.04,
+    id: 'spinner', label: 'かいてんばん', inTray: true, appearance: 'spinner', cells: SINGLE_CELL,
+    segments: SPINNER_SEGMENTS,
+    restitution: 0.55, friction: 0.03,
   },
 ]
 
@@ -183,11 +262,18 @@ export function partDefinition(id: PartTypeId): PartDefinition {
 
 /** パーツごとに意味のある固定向きだけを循環する。 */
 const NEXT_ROTATION_TYPE: Readonly<Partial<Record<PartTypeId, PartTypeId>>> = {
-  plank: 'slopeLeft', slopeLeft: 'slopeRight', slopeRight: 'plank',
+  slopeLeft: 'slopeRight', slopeRight: 'slopeLeft',
   curveLeft: 'curveLeft90', curveLeft90: 'curveLeft180', curveLeft180: 'curveLeft270', curveLeft270: 'curveLeft',
   curveRight: 'curveRight90', curveRight90: 'curveRight180', curveRight180: 'curveRight270', curveRight270: 'curveRight',
   guideLeft: 'guideRight', guideRight: 'guideLeft',
-  longPlank: 'longPlankVertical', longPlankVertical: 'longPlank',
+  cannon: 'cannonDownRight',
+  cannonDownRight: 'cannonDown',
+  cannonDown: 'cannonDownLeft',
+  cannonDownLeft: 'cannonLeft',
+  cannonLeft: 'cannonUpLeft',
+  cannonUpLeft: 'cannonUp',
+  cannonUp: 'cannonUpRight',
+  cannonUpRight: 'cannon',
 }
 
 export function nextRotationType(id: PartTypeId): PartTypeId | null {
@@ -196,4 +282,12 @@ export function nextRotationType(id: PartTypeId): PartTypeId | null {
 
 export function isRotatablePart(id: PartTypeId): boolean {
   return NEXT_ROTATION_TYPE[id] !== undefined
+}
+
+export function isCannonPart(id: PartTypeId): id is (typeof CANNON_TYPE_IDS)[number] {
+  return (CANNON_TYPE_IDS as readonly string[]).includes(id)
+}
+
+export function isSpinnerPart(id: PartTypeId): id is 'spinner' {
+  return id === 'spinner'
 }
