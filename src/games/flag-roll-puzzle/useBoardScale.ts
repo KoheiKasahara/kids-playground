@@ -1,12 +1,13 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useState } from 'react'
 import { BOARD_HEIGHT, BOARD_WIDTH } from './boardLayout'
 
 /** PCで巨大化しすぎないための上限倍率 */
 const MAX_SCALE = 1.4
 
 export type BoardScale = {
-  /** 盤面を置く領域（計測対象）に付ける ref */
-  containerRef: RefObject<HTMLDivElement | null>
+  /** 盤面を置く領域（計測対象）に付ける ref。DOMへ実際に付いたタイミングを
+   * 検知できるよう、RefObjectではなくコールバック関数にしてある。 */
+  containerRef: (node: HTMLDivElement | null) => void
   scale: number
   /** 実際に占める大きさ(px)。盤面の外枠に使う */
   width: number
@@ -32,12 +33,14 @@ export function computeBoardScale(availableWidth: number, availableHeight: numbe
  * （boardPointFromClient）も同じ scale を使う。
  */
 export function useBoardScale(): BoardScale {
-  const containerRef = useRef<HTMLDivElement | null>(null)
+  // ステージ選択画面から盤面へ切り替わるまでは、この要素はまだDOMに無い。
+  // useRefだとDOMへ付いた瞬間を検知できず計測できないため、stateで持って
+  // ノードが変わるたびに（＝実際に付いたタイミングで）effectを再実行する。
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [scale, setScale] = useState(1)
 
   // 等倍で1フレーム描いてから縮む、というガタつきを避けるためペイント前に測る。
   useLayoutEffect(() => {
-    const container = containerRef.current
     if (!container) return
 
     const measure = () => {
@@ -53,6 +56,10 @@ export function useBoardScale(): BoardScale {
     const observer = new ResizeObserver(measure)
     observer.observe(container)
     return () => observer.disconnect()
+  }, [container])
+
+  const containerRef = useCallback((node: HTMLDivElement | null) => {
+    setContainer(node)
   }, [])
 
   return {

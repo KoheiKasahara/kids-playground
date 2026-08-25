@@ -108,3 +108,8 @@ export function puzzleStage(stageId: PuzzleStageId = DEFAULT_PUZZLE_STAGE_ID): P
 export function isPuzzleStageId(value: string): value is PuzzleStageId {
   return PUZZLE_STAGES.some((stage) => stage.id === value)
 }
+
+/** ボールidを開始位置マーカーや国旗ボタンに出す短い目印（A/B）へ変換する。 */
+export function ballLetter(ballId: string): string {
+  return ballId === 'ball-a' ? 'A' : 'B'
+}
