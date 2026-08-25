@@ -27,9 +27,9 @@ import {
   tryMovePart,
   tryPlacePart,
   isEditingPhase,
-  setSelectedFlag,
+  setBallFlag,
 } from './puzzleState'
-import { puzzleStage, type PuzzleStageId } from './puzzleStages'
+import { ballLetter, puzzleStage, type PuzzleStageId } from './puzzleStages'
 import type { PuzzleBallSnapshot } from './puzzleState'
 import { useBoardScale } from './useBoardScale'
 import { useLandscapeLayout } from './useLandscapeLayout'
@@ -71,7 +71,8 @@ export default function FlagRollPuzzlePlay() {
   const [state, setState] = useState(createPuzzleState)
   /** null はステージ選択画面。ステージを選ぶと同じroute内でプレイ画面へ進む。 */
   const [selectedStageId, setSelectedStageId] = useState<PuzzleStageId | null>(null)
-  const [isFlagPickerOpen, setIsFlagPickerOpen] = useState(false)
+  /** 国旗選びダイアログで、今どのボールの国旗を選んでいるか。閉じているときはnull。 */
+  const [flagPickerBallId, setFlagPickerBallId] = useState<string | null>(null)
   const [selectedTypeId, setSelectedTypeId] = useState<PartTypeId | null>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [ghostCell, setGhostCell] = useState<GridCell | null>(null)
@@ -365,20 +366,23 @@ export default function FlagRollPuzzlePlay() {
   }
 
   const handleFlagSelect = (flagId: string) => {
-    setState((current) => setSelectedFlag(current, flagId))
-    setIsFlagPickerOpen(false)
+    const ballId = flagPickerBallId
+    if (!ballId) return
+    setState((current) => setBallFlag(current, ballId, flagId))
+    setFlagPickerBallId(null)
     playPanelOpenSound()
   }
 
+  const defaultFlag: FlagBallData = findFlagBall(INITIAL_BALL_FLAG_ID)!
+  const stage = puzzleStage(state.stageId)
   // flagBallsからしか選べないため通常は必ず見つかる。データ不整合時もゲームを操作不能に
   // しないよう、初期国旗へ戻して描画を続ける。
-  const selectedFlagId = state.balls[0]?.flagId ?? INITIAL_BALL_FLAG_ID
-  const ballFlag: FlagBallData = findFlagBall(selectedFlagId) ?? findFlagBall(INITIAL_BALL_FLAG_ID)!
-  const stage = puzzleStage(state.stageId)
   const boardBalls = state.balls.map((ball) => ({
     ...ball,
-    flag: findFlagBall(ball.flagId) ?? ballFlag,
+    flag: findFlagBall(ball.flagId) ?? defaultFlag,
   }))
+  const hasMultipleBalls = boardBalls.length > 1
+  const flagPickerBall = boardBalls.find((ball) => ball.id === flagPickerBallId) ?? null
 
   const editing = isEditingPhase(state.phase)
   const partSelected = state.selectedPartId !== null
@@ -424,16 +428,16 @@ export default function FlagRollPuzzlePlay() {
         >
           {stage.emoji} {stage.nameJa}
         </button>
-        {!isLandscapeLayout ? (
+        {!isLandscapeLayout && !hasMultipleBalls ? (
           <button
             type="button"
             className={[styles.flagButton, styles.headerFlagButton].join(' ')}
-            aria-label={`こっきを かえる（${ballFlag.nameJa}）`}
+            aria-label={`こっきを かえる（${boardBalls[0].flag.nameJa}）`}
             disabled={!editing}
-            onClick={() => setIsFlagPickerOpen(true)}
+            onClick={() => setFlagPickerBallId(boardBalls[0].id)}
           >
             <span className={styles.flagButtonLabel}>こっき</span>
-            <FlagBall flag={ballFlag} size={28} />
+            <FlagBall flag={boardBalls[0].flag} size={28} />
           </button>
         ) : null}
       </header>
@@ -470,18 +474,35 @@ export default function FlagRollPuzzlePlay() {
           縦画面では盤面の下に積み、低い横画面では盤面の横へ回す（.body の row 切替）。
         */}
         <aside className={styles.side} aria-label="そうさパネル" data-testid="puzzle-control-pane">
-          {isLandscapeLayout ? (
+          {isLandscapeLayout && !hasMultipleBalls ? (
             <button
               type="button"
               className={[styles.flagButton, styles.panelFlagButton].join(' ')}
-              aria-label={`こっきを かえる（${ballFlag.nameJa}）`}
+              aria-label={`こっきを かえる（${boardBalls[0].flag.nameJa}）`}
               disabled={!editing}
-              onClick={() => setIsFlagPickerOpen(true)}
+              onClick={() => setFlagPickerBallId(boardBalls[0].id)}
             >
               <span className={styles.flagButtonLabel}>こっき</span>
-              <FlagBall flag={ballFlag} size={28} />
-              <span className={styles.panelFlagName}>{ballFlag.nameJa}</span>
+              <FlagBall flag={boardBalls[0].flag} size={28} />
+              <span className={styles.panelFlagName}>{boardBalls[0].flag.nameJa}</span>
             </button>
+          ) : null}
+          {hasMultipleBalls ? (
+            <div className={styles.multiFlagRow} role="group" aria-label="こっき">
+              {boardBalls.map((ball) => (
+                <button
+                  key={ball.id}
+                  type="button"
+                  className={styles.flagButton}
+                  aria-label={`${ballLetter(ball.id)}の こっきを かえる（${ball.flag.nameJa}）`}
+                  disabled={!editing}
+                  onClick={() => setFlagPickerBallId(ball.id)}
+                >
+                  <span className={styles.flagButtonLabel}>{ballLetter(ball.id)}</span>
+                  <FlagBall flag={ball.flag} size={28} />
+                </button>
+              ))}
+            </div>
           ) : null}
           {/*
             ひとことと「けす」を同じ行に置き、選択中でも行の高さが変わらないようにする
@@ -544,11 +565,13 @@ export default function FlagRollPuzzlePlay() {
         </div>
       ) : null}
 
-      {isFlagPickerOpen ? (
+      {flagPickerBall ? (
         <FlagPickerDialog
-          selectedFlagId={selectedFlagId}
+          selectedFlagId={flagPickerBall.flagId}
+          title={hasMultipleBalls ? `${ballLetter(flagPickerBall.id)}の こっきを えらぼう！` : undefined}
+          ariaLabel={hasMultipleBalls ? `${ballLetter(flagPickerBall.id)}の こっきを えらぶ` : undefined}
           onSelect={handleFlagSelect}
-          onClose={() => setIsFlagPickerOpen(false)}
+          onClose={() => setFlagPickerBallId(null)}
         />
       ) : null}
     </main>

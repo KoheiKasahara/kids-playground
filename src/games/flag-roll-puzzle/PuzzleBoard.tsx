@@ -17,6 +17,7 @@ import { cellCenter, type GridCell } from './grid'
 import PartShape from './PartShape'
 import { isSpinnerPart, type PartTypeId } from './partTypes'
 import { occupiedCells, type PlacedPart } from './placement'
+import { ballLetter } from './puzzleStages'
 import styles from './PuzzleBoard.module.css'
 
 type PuzzleBallView = PuzzleBallState & { readonly flag: FlagBallData }
@@ -33,7 +34,7 @@ type PuzzleBoardProps = {
   justPlacedPartId: string | null
   rotatingPartId: string | null
   invalidDrop: boolean
-  containerRef: RefObject<HTMLDivElement | null>
+  containerRef: (node: HTMLDivElement | null) => void
   boardRef: RefObject<HTMLDivElement | null>
   scale: number
   width: number
@@ -102,7 +103,7 @@ export default function PuzzleBoard({
               data-start-ball-id={ball.id}
               style={{ left: ball.startPosition.x, top: ball.startPosition.y }}
             >
-              <span>{ball.id === 'ball-a' ? 'A' : 'B'}</span>
+              <span>{ballLetter(ball.id)}</span>
             </div>
           ))}
 

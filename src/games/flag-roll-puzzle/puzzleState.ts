@@ -252,7 +252,10 @@ export function changeStage(state: PuzzleState, stageId: PuzzleStageId): PuzzleS
   return createPuzzleState(stageId, selectedFlagId)
 }
 
-/** 現在選択中の国旗を全ボールへ反映する。内部はボールごとのflagIdを維持する。 */
-export function setSelectedFlag(state: PuzzleState, flagId: string): PuzzleState {
-  return { ...state, balls: state.balls.map((ball) => ({ ...ball, flagId })) }
+/** 指定したボール1つだけの国旗を差し替える。他のボールの国旗はそのまま。 */
+export function setBallFlag(state: PuzzleState, ballId: string, flagId: string): PuzzleState {
+  return {
+    ...state,
+    balls: state.balls.map((ball) => (ball.id === ballId ? { ...ball, flagId } : ball)),
+  }
 }

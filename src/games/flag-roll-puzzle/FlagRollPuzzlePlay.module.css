@@ -120,6 +120,15 @@
   font-weight: 700;
 }
 
+/* ボールが2個以上のとき、ボールごとに国旗を選べるようにボタンを横に並べる */
+.multiFlagRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
 /*
  * 盤面と、その操作まわり（ひとこと・パーツ置き場・ボタン）のまとまり。
  * 縦画面では上下に積む。低い横画面では左右に並べ替えて、盤面の高さを確保する。
