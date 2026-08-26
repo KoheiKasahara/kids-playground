@@ -181,11 +181,60 @@ export type CelestialBody = {
   ring?: RingSpec
 }
 
+/**
+ * 特徴スポットのタップ対象。球面上の点(surface)か、輪(ring)のどちらか。
+ * 「将来なんでも置けるように」という抽象化はしない。実際に必要な2種類だけを持つ。
+ */
+export type FeatureSpotTarget =
+  | {
+      kind: 'surface'
+      /** Phase 2 の模様と同じ経緯度(度)。texture上の位置と3D位置はここで一致する。 */
+      lonDeg: number
+      latDeg: number
+    }
+  | {
+      kind: 'ring'
+      /** マーカーを置く輪の半径(天体半径に対する比)。 */
+      radiusRatio: number
+      /** マーカーを置く輪の中心角(度)。0=+X方向、+Z方向へ向かって増える(tiltGroupローカル)。 */
+      angleDeg: number
+      /** ハイライトする輪のセグメント(`RingSegment.id`)。輪全体を光らせるときに使う。 */
+      highlightSegmentIds?: readonly string[]
+      /** セグメントで表せない帯(カッシーニ間隙など)を直接指定する。 */
+      highlightRadiusBand?: { innerRatio: number; outerRatio: number }
+    }
+
+export type FeatureSpot = {
+  id: string
+  /** 幼児向けのひらがな/カタカナ表記。説明カードに大きく出す。 */
+  displayName: string
+  /** displayName のままでは読み上げが不自然な場合だけ持つ。省略時は displayName を読む。 */
+  spokenName?: string
+  /** 4〜5歳向けの短い説明。原則1〜2文。 */
+  description: string
+  target: FeatureSpotTarget
+  /**
+   * 画面上の当たり判定半径(CSSピクセル)。見た目のマーカー(直径15px前後)よりずっと大きくして、
+   * 幼児が指で押しても必ず反応するようにする。見た目と当たり判定は意図的に分離している。
+   */
+  hitRadiusPx: number
+  /** 選択時のマーカー・ハイライトの色。 */
+  accentColor: string
+}
+
 export type UsePlanetEngineOptions = {
   /** 表示中の天体。変わったら3Dオブジェクトを作り替える。 */
   body: CelestialBody
   /** 現在のズーム段階。変化したらカメラ距離を短いアニメーションで遷移させる。 */
   zoomLevel: ZoomLevel
+  /** 表示中の天体の特徴スポット。body と対応するものを渡す。 */
+  spots: readonly FeatureSpot[]
+  /** 選択中のスポットid。null で選択なし。 */
+  selectedSpotId: string | null
+  /** 同じスポットを再タップしたときにも選択演出をやり直すためのカウンタ(earth-globeと同じ方式)。 */
+  selectionFeedbackKey: number
+  /** キャンバス上の軽いタップでスポットが選ばれたときに呼ぶ。何も無い場所をタップしたら null。 */
+  onSpotSelect: (spotId: string | null) => void
 }
 
 export type UsePlanetEngineHandle = {

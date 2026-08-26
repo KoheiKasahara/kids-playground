@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type {
   CelestialBody,
   CelestialBodyId,
+  FeatureSpot,
   RingSpec,
   UsePlanetEngineHandle,
   UsePlanetEngineOptions,
@@ -19,6 +20,7 @@ import {
   viewRadiusOf,
   ZOOM_ANIMATION_DURATION_MS,
 } from './planetCamera'
+import { surfaceDirection } from './planetCoords'
 import { createSurfaceMaps, type SurfaceMaps } from './planetSurface'
 import { axialTiltRotationZ, createRingMeshes, createRingSegmentTexture } from './planetRing'
 import {
@@ -29,6 +31,68 @@ import {
 } from './planetLighting'
 import { createStarField, disposeStarField } from './starField'
 import { renderPixelRatioForDevice } from './renderQuality'
+import {
+  exceedsTapMovement,
+  isRingPointVisible,
+  isSurfacePointVisible,
+  ndcToScreen,
+  pickNearestSpot,
+  POINTER_TAP_MOVE_PX,
+  type SpotHitCandidate,
+} from './spotPicking'
+import {
+  createMarkerTexture,
+  createPulseTexture,
+  createRingHighlightMeshes,
+  MARKER_RADIUS_RATIO,
+  resolveRingHighlightBands,
+  RING_HIGHLIGHT_COLOR,
+  RING_HIGHLIGHT_MAX_OPACITY,
+  ringSpotLocalPosition,
+  surfaceSpotLocalPosition,
+} from './spotMarkers'
+
+/** 特徴スポットのマーカー・パルスの既定色(未選択時)。選択時だけ`spot.accentColor`に切り替える。 */
+const DEFAULT_MARKER_COLOR = '#ffffff'
+/** マーカーの「呼吸」の周期(秒)。点滅ではなくゆっくりした不透明度の揺らぎにする。 */
+const MARKER_BREATH_PERIOD_SECONDS = 2.4
+/** マーカーの表示/非表示が切り替わるときの不透明度の追従の速さ(小さいほど素早く追従する)。 */
+const SPOT_OPACITY_SMOOTHING_SECONDS = 0.15
+/** 選択パルスの再生時間(ms)。 */
+const PULSE_DURATION_MS = 620
+/** 選択パルスが広がる最終スケール(基準直径の何倍か)。 */
+const PULSE_MAX_SCALE = 2.4
+/** 選択パルスの開始不透明度。 */
+const PULSE_START_OPACITY = 0.9
+/** 輪ハイライトのフェードイン/フェードアウト時間(ms)。 */
+const RING_HIGHLIGHT_FADE_IN_MS = 200
+const RING_HIGHLIGHT_FADE_OUT_MS = 180
+
+type RingHighlightAnimation = { from: number; to: number; startedAt: number; durationMs: number }
+
+/**
+ * 特徴スポット1つぶんの3Dオブジェクトと状態。
+ * `normalized`は正規化空間(楕円体を単位球にした空間)での位置。surfaceは自転前の単位ベクトル
+ * (spinGroupの現在の自転角ぶんだけ毎frame回してから可視判定に使う)、ringはtiltGroupローカルの
+ * 位置を`(r, r*(1-f), r)`で割った値(輪は自転しないため毎frame回す必要がない)。
+ */
+type SpotVisual = {
+  spot: FeatureSpot
+  normalized: THREE.Vector3
+  marker: THREE.Sprite | null
+  pulse: THREE.Sprite | null
+  ringHighlights: THREE.Mesh[]
+  /** マーカー直径(world unit)。選択時のスケール計算の基準にする。 */
+  baseDiameter: number
+  /** 今フレーム、天体に遮られず見えているか(タップ候補・当たり判定に使う)。 */
+  visible: boolean
+  /** visibleの切り替わりを滑らかにするための現在の表示強度(0..1)。 */
+  displayOpacity: number
+  selected: boolean
+  pulseStartedAt: number | null
+  ringHighlightOpacity: number
+  ringHighlightAnimation: RingHighlightAnimation | null
+}
 
 type ZoomAnimation = {
   from: number
@@ -39,6 +103,7 @@ type ZoomAnimation = {
 type PlanetEngine = {
   setBody: (body: CelestialBody) => void
   setZoom: (level: ZoomLevel) => void
+  setSelectedSpot: (spotId: string | null, restartPulse: boolean) => void
 }
 
 function degToRad(degrees: number): number {
@@ -96,6 +161,19 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     let spinGroup: THREE.Group | null = null
     let sphereMesh: THREE.Mesh | null = null
     let ringMeshes: THREE.Mesh[] = []
+
+    // マーカー・パルスのテクスチャはeffectスコープで1回だけ生成する。モジュールスコープに
+    // キャッシュしてdisposeすると、再マウント時に破棄済みテクスチャを使ってしまうため。
+    let markerTexture: THREE.CanvasTexture | null = null
+    let pulseTexture: THREE.CanvasTexture | null = null
+    let spotVisuals: SpotVisual[] = []
+    // 可視判定・タップ判定で毎frame使い回すVector3(newを避ける)。
+    const spotCameraNormalized = new THREE.Vector3()
+    const spotRotatedPoint = new THREE.Vector3()
+    const spotMarkerWorldPosition = new THREE.Vector3()
+    const SPOT_Y_AXIS = new THREE.Vector3(0, 1, 0)
+    let pointerStart: { pointerId: number; x: number; y: number; moved: boolean } | null = null
+    let activePointerCount = 0
 
     let lights: PlanetLights | null = null
     let starField: THREE.Points | null = null
@@ -178,6 +256,23 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     }
 
     function disposeCurrentBody() {
+      for (const spotVisual of spotVisuals) {
+        if (spotVisual.marker !== null) {
+          spotVisual.marker.material.dispose()
+          spotVisual.marker.removeFromParent()
+        }
+        if (spotVisual.pulse !== null) {
+          spotVisual.pulse.material.dispose()
+          spotVisual.pulse.removeFromParent()
+        }
+        for (const mesh of spotVisual.ringHighlights) {
+          mesh.geometry.dispose()
+          ;(mesh.material as THREE.Material).dispose()
+          mesh.removeFromParent()
+        }
+      }
+      spotVisuals = []
+
       if (sphereMesh !== null) {
         const material = sphereMesh.material as THREE.MeshStandardMaterial
         // map/bumpMapはsurfaceCacheが保持し続けるため、ここではmaterial自体だけを破棄する。
@@ -252,6 +347,311 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       spinGroup = nextSpinGroup
       sphereMesh = mesh
       ringMeshes = nextRingMeshes
+
+      // spotsはbodyから一意に決まるため専用のeffectは作らない。optionsRef同期effectは
+      // このeffectより先に宣言されているため、この時点でoptionsRef.current.spotsは必ず最新。
+      buildSpots(optionsRef.current.spots, body)
+    }
+
+    /** 天体1つぶんの特徴スポットの3Dオブジェクトを作る。marker/pulseはSprite(常にカメラを向く)。 */
+    function buildSpots(spots: readonly FeatureSpot[], body: CelestialBody) {
+      if (spinGroup === null || tiltGroup === null) return
+
+      const markerDiameter = body.radius * MARKER_RADIUS_RATIO * 2
+      const nextSpotVisuals: SpotVisual[] = []
+
+      for (const spot of spots) {
+        const target = spot.target
+        let normalized: THREE.Vector3
+        let localPosition: { x: number; y: number; z: number }
+        let parent: THREE.Group
+        let ringHighlights: THREE.Mesh[] = []
+
+        if (target.kind === 'surface') {
+          const direction = surfaceDirection(target.lonDeg, target.latDeg)
+          normalized = new THREE.Vector3(direction.x, direction.y, direction.z)
+          localPosition = surfaceSpotLocalPosition(body, target)
+          parent = spinGroup
+        } else {
+          localPosition = ringSpotLocalPosition(body, target)
+          normalized = new THREE.Vector3(localPosition.x / body.radius, 0, localPosition.z / body.radius)
+          parent = tiltGroup
+          const bands = resolveRingHighlightBands(body, target)
+          ringHighlights = createRingHighlightMeshes(body, bands, RING_HIGHLIGHT_COLOR)
+          for (const mesh of ringHighlights) tiltGroup.add(mesh)
+        }
+
+        const marker = markerTexture === null ? null : new THREE.Sprite(new THREE.SpriteMaterial({
+          map: markerTexture,
+          color: DEFAULT_MARKER_COLOR,
+          transparent: true,
+          depthWrite: false,
+          depthTest: false,
+          opacity: 0,
+        }))
+        if (marker !== null) {
+          marker.position.set(localPosition.x, localPosition.y, localPosition.z)
+          marker.scale.set(markerDiameter, markerDiameter, 1)
+          marker.renderOrder = 5
+          marker.visible = false
+          parent.add(marker)
+        }
+
+        const pulse = pulseTexture === null ? null : new THREE.Sprite(new THREE.SpriteMaterial({
+          map: pulseTexture,
+          color: spot.accentColor,
+          transparent: true,
+          depthWrite: false,
+          depthTest: false,
+          opacity: 0,
+        }))
+        if (pulse !== null) {
+          pulse.position.set(localPosition.x, localPosition.y, localPosition.z)
+          pulse.scale.set(markerDiameter, markerDiameter, 1)
+          pulse.renderOrder = 5
+          pulse.visible = false
+          parent.add(pulse)
+        }
+
+        nextSpotVisuals.push({
+          spot,
+          normalized,
+          marker,
+          pulse,
+          ringHighlights,
+          baseDiameter: markerDiameter,
+          visible: false,
+          displayOpacity: 0,
+          selected: false,
+          pulseStartedAt: null,
+          ringHighlightOpacity: 0,
+          ringHighlightAnimation: null,
+        })
+      }
+
+      spotVisuals = nextSpotVisuals
+    }
+
+    function startRingHighlightFade(spotVisual: SpotVisual, toOpacity: number, durationMs: number) {
+      if (spotVisual.ringHighlights.length === 0) return
+
+      if (reducedMotion) {
+        spotVisual.ringHighlightOpacity = toOpacity
+        spotVisual.ringHighlightAnimation = null
+        for (const mesh of spotVisual.ringHighlights) {
+          mesh.visible = toOpacity > 0
+          ;(mesh.material as THREE.MeshBasicMaterial).opacity = toOpacity
+        }
+        return
+      }
+
+      for (const mesh of spotVisual.ringHighlights) mesh.visible = true
+      spotVisual.ringHighlightAnimation = {
+        from: spotVisual.ringHighlightOpacity,
+        to: toOpacity,
+        startedAt: performance.now(),
+        durationMs,
+      }
+    }
+
+    /** 選択状態を反映する。天体切り替え直後は全スポットが未選択(selected:false)で作り直されるため、
+     *  選択解除・輪ハイライトを消す処理を別途呼ぶ必要はない。 */
+    function setSelectedSpot(spotId: string | null, restartPulse: boolean) {
+      for (const spotVisual of spotVisuals) {
+        const isSelected = spotVisual.spot.id === spotId
+        const wasSelected = spotVisual.selected
+        spotVisual.selected = isSelected
+
+        if (isSelected && !wasSelected) {
+          startRingHighlightFade(spotVisual, RING_HIGHLIGHT_MAX_OPACITY, RING_HIGHLIGHT_FADE_IN_MS)
+        } else if (!isSelected && wasSelected) {
+          spotVisual.pulseStartedAt = null
+          if (spotVisual.pulse !== null) spotVisual.pulse.visible = false
+          startRingHighlightFade(spotVisual, 0, RING_HIGHLIGHT_FADE_OUT_MS)
+        }
+
+        if (isSelected && restartPulse && !reducedMotion) {
+          spotVisual.pulseStartedAt = performance.now()
+          if (spotVisual.pulse !== null) spotVisual.pulse.visible = true
+        }
+      }
+    }
+
+    function applyPulseAnimation(spotVisual: SpotVisual, now: number) {
+      if (spotVisual.pulse === null) return
+
+      if (spotVisual.pulseStartedAt === null) {
+        spotVisual.pulse.visible = false
+        return
+      }
+
+      const progress = Math.min(1, (now - spotVisual.pulseStartedAt) / PULSE_DURATION_MS)
+      const eased = easeOutCubic(progress)
+      const scale = spotVisual.baseDiameter * (1 + (PULSE_MAX_SCALE - 1) * eased)
+
+      spotVisual.pulse.visible = true
+      spotVisual.pulse.scale.set(scale, scale, 1)
+      spotVisual.pulse.material.color.set(spotVisual.spot.accentColor)
+      spotVisual.pulse.material.opacity = PULSE_START_OPACITY * (1 - eased) * spotVisual.displayOpacity
+
+      if (progress >= 1) {
+        spotVisual.pulseStartedAt = null
+        spotVisual.pulse.visible = false
+      }
+    }
+
+    function applyMarkerAppearance(spotVisual: SpotVisual, now: number) {
+      if (spotVisual.marker === null) return
+
+      const breathing = reducedMotion
+        ? 0.52
+        : 0.52 + Math.sin((now / 1000) * ((Math.PI * 2) / MARKER_BREATH_PERIOD_SECONDS)) * 0.1
+      const baseOpacity = spotVisual.selected ? 1 : breathing
+      const scaleMultiplier = spotVisual.selected ? 1.5 : 1
+      const color = spotVisual.selected ? spotVisual.spot.accentColor : DEFAULT_MARKER_COLOR
+
+      const opacity = baseOpacity * spotVisual.displayOpacity
+      const scale = spotVisual.baseDiameter * scaleMultiplier
+
+      spotVisual.marker.visible = opacity > 0.004
+      spotVisual.marker.material.opacity = opacity
+      spotVisual.marker.material.color.set(color)
+      spotVisual.marker.scale.set(scale, scale, 1)
+
+      applyPulseAnimation(spotVisual, now)
+    }
+
+    function applyRingHighlightAnimation(spotVisual: SpotVisual, now: number) {
+      if (spotVisual.ringHighlights.length === 0) return
+
+      const animation = spotVisual.ringHighlightAnimation
+      if (animation !== null) {
+        const progress = Math.min(1, (now - animation.startedAt) / animation.durationMs)
+        spotVisual.ringHighlightOpacity = animation.from + (animation.to - animation.from) * progress
+        if (progress >= 1) spotVisual.ringHighlightAnimation = null
+      }
+
+      const opacity = spotVisual.ringHighlightOpacity
+      for (const mesh of spotVisual.ringHighlights) {
+        const material = mesh.material as THREE.MeshBasicMaterial
+        material.opacity = opacity
+        if (opacity > 0.001) {
+          mesh.visible = true
+        } else if (spotVisual.ringHighlightAnimation === null) {
+          mesh.visible = false
+        }
+      }
+    }
+
+    /**
+     * 特徴スポットの可視判定・見た目を毎frame更新する。可視判定は正規化空間(楕円体→単位球)で行う
+     * (§1参照)。カメラ位置をtiltGroupローカルへ変換してから(r, r*(1-f), r)で割ることで、
+     * 扁平した天体でも単位球に対する厳密な遮蔽判定がそのまま使える。
+     */
+    function updateSpotVisuals(now: number, dt: number) {
+      if (spotVisuals.length === 0) return
+      if (camera === null || tiltGroup === null || spinGroup === null || currentBody === null) return
+
+      const flattening = currentBody.flattening ?? 0
+      const radius = currentBody.radius
+
+      // tiltGroup自体は姿勢を変えない(祖先もbodyRoot=原点固定)ため実質1回で済むはずだが、
+      // render()より前に呼ぶこの位置では最新のmatrixWorldが未計算な場合があるため明示的に更新する。
+      tiltGroup.updateWorldMatrix(true, false)
+      spotCameraNormalized.copy(camera.position)
+      tiltGroup.worldToLocal(spotCameraNormalized)
+      spotCameraNormalized.set(
+        spotCameraNormalized.x / radius,
+        spotCameraNormalized.y / (radius * (1 - flattening)),
+        spotCameraNormalized.z / radius,
+      )
+
+      const spinY = spinGroup.rotation.y
+      const smoothing = reducedMotion ? 1 : 1 - Math.exp(-dt / SPOT_OPACITY_SMOOTHING_SECONDS)
+
+      for (const spotVisual of spotVisuals) {
+        let visible: boolean
+        if (spotVisual.spot.target.kind === 'surface') {
+          spotRotatedPoint.copy(spotVisual.normalized).applyAxisAngle(SPOT_Y_AXIS, spinY)
+          visible = isSurfacePointVisible(spotCameraNormalized, spotRotatedPoint)
+        } else {
+          visible = isRingPointVisible(spotCameraNormalized, spotVisual.normalized)
+        }
+        spotVisual.visible = visible
+
+        const targetOpacity = visible ? 1 : 0
+        spotVisual.displayOpacity += (targetOpacity - spotVisual.displayOpacity) * smoothing
+        if (Math.abs(spotVisual.displayOpacity - targetOpacity) < 0.003) {
+          spotVisual.displayOpacity = targetOpacity
+        }
+
+        applyMarkerAppearance(spotVisual, now)
+        applyRingHighlightAnimation(spotVisual, now)
+      }
+    }
+
+    /** キャンバス上のタップ位置から、最も近い(見えている)スポットを選ぶ。Raycasterは使わない
+     *  (マーカーはSpriteで見た目が小さく、ピンポイント判定になってしまうため。幼児向けには
+     *  「画面上の距離」で判定するほうが確実に押せる)。 */
+    function selectSpotAt(event: PointerEvent) {
+      if (camera === null || renderer === null) return
+
+      const rect = renderer.domElement.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return
+
+      const pointerX = event.clientX - rect.left
+      const pointerY = event.clientY - rect.top
+
+      const candidates: SpotHitCandidate[] = []
+      for (const spotVisual of spotVisuals) {
+        if (!spotVisual.visible || spotVisual.marker === null) continue
+
+        spotMarkerWorldPosition.setFromMatrixPosition(spotVisual.marker.matrixWorld)
+        spotMarkerWorldPosition.project(camera)
+        // カメラの後ろ側に回り込んだ点(NDCのzが範囲外になる)は候補にしない。
+        if (spotMarkerWorldPosition.z > 1 || spotMarkerWorldPosition.z < -1) continue
+
+        const screen = ndcToScreen(spotMarkerWorldPosition.x, spotMarkerWorldPosition.y, rect.width, rect.height)
+        candidates.push({ id: spotVisual.spot.id, x: screen.x, y: screen.y, hitRadiusPx: spotVisual.spot.hitRadiusPx })
+      }
+
+      optionsRef.current.onSpotSelect(pickNearestSpot(candidates, pointerX, pointerY))
+    }
+
+    function handleSpotPointerDown(event: PointerEvent) {
+      activePointerCount += 1
+      if (!event.isPrimary || event.button !== 0) return
+      // 2本目以降の指が触れたら、回転操作とみなしてタップ判定をやめる。
+      if (activePointerCount > 1) {
+        pointerStart = null
+        return
+      }
+      pointerStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false }
+    }
+
+    function handleSpotPointerMove(event: PointerEvent) {
+      if (pointerStart === null || pointerStart.pointerId !== event.pointerId || pointerStart.moved) return
+      // 指が元の位置へ戻ってきても回転操作として扱う(離した位置との距離だけを見る方式より誤タップに強い)。
+      if (exceedsTapMovement(event.clientX - pointerStart.x, event.clientY - pointerStart.y, POINTER_TAP_MOVE_PX)) {
+        pointerStart.moved = true
+      }
+    }
+
+    function handleSpotPointerUp(event: PointerEvent) {
+      activePointerCount = Math.max(0, activePointerCount - 1)
+      const start = pointerStart
+      if (start === null || start.pointerId !== event.pointerId) return
+      pointerStart = null
+      if (!start.moved) selectSpotAt(event)
+    }
+
+    function handleSpotPointerCancel(event: PointerEvent) {
+      activePointerCount = Math.max(0, activePointerCount - 1)
+      if (pointerStart !== null && pointerStart.pointerId === event.pointerId) pointerStart = null
+    }
+
+    function handleSpotPointerLeave(event: PointerEvent) {
+      if (pointerStart !== null && pointerStart.pointerId === event.pointerId) pointerStart = null
     }
 
     function setBody(body: CelestialBody) {
@@ -344,6 +744,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       if (!reducedMotion && spinGroup !== null && currentBody !== null) {
         spinGroup.rotation.y += currentBody.spinSpeed * dt
       }
+      updateSpotVisuals(now, dt)
       updateZoomAnimation(now)
 
       if (renderer !== null && scene !== null && camera !== null) {
@@ -368,12 +769,26 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         hasWindowResizeListener = false
       }
 
+      if (renderer !== null) {
+        const canvas = renderer.domElement
+        canvas.removeEventListener('pointerdown', handleSpotPointerDown)
+        canvas.removeEventListener('pointermove', handleSpotPointerMove)
+        canvas.removeEventListener('pointerup', handleSpotPointerUp)
+        canvas.removeEventListener('pointercancel', handleSpotPointerCancel)
+        canvas.removeEventListener('pointerleave', handleSpotPointerLeave)
+      }
+
       controls?.dispose()
       controls = null
 
       disposeCurrentBody()
       sphereGeometry?.dispose()
       sphereGeometry = null
+
+      markerTexture?.dispose()
+      markerTexture = null
+      pulseTexture?.dispose()
+      pulseTexture = null
 
       // ここでようやくキャッシュ済みテクスチャも破棄する(天体切り替え中は保持し続けた)。
       for (const maps of surfaceCache.values()) {
@@ -435,7 +850,16 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       canvas.style.display = 'block'
       canvas.style.width = '100%'
       canvas.style.height = '100%'
+      canvas.addEventListener('pointerdown', handleSpotPointerDown)
+      canvas.addEventListener('pointermove', handleSpotPointerMove)
+      canvas.addEventListener('pointerup', handleSpotPointerUp)
+      canvas.addEventListener('pointercancel', handleSpotPointerCancel)
+      canvas.addEventListener('pointerleave', handleSpotPointerLeave)
       container.appendChild(canvas)
+
+      // マーカー・パルスのテクスチャは天体を問わず共通のため、ここで1回だけ生成する。
+      markerTexture = createMarkerTexture()
+      pulseTexture = createPulseTexture()
 
       // 背景は透明のままにし、CSS側の宇宙背景(グラデーション)を透かして見せる。星はWebGL側に置く。
       scene = new THREE.Scene()
@@ -470,7 +894,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       controls.minPolarAngle = degToRad(22)
       controls.maxPolarAngle = degToRad(158)
 
-      engineRef.current = { setBody, setZoom }
+      engineRef.current = { setBody, setZoom, setSelectedSpot }
 
       setBody(initialOptions.body)
       resizeRenderer()
@@ -498,6 +922,16 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
   useEffect(() => {
     engineRef.current?.setZoom(options.zoomLevel)
   }, [options.zoomLevel])
+
+  // selectionFeedbackKeyが実際に変化したときだけパルスをやり直す(同じ値のまま別の理由で
+  // このeffectが再実行されても、選択演出を無駄に再生しないようにする)。
+  const previousSelectionFeedbackKeyRef = useRef(options.selectionFeedbackKey)
+  useEffect(() => {
+    const restartPulse = options.selectedSpotId !== null
+      && options.selectionFeedbackKey !== previousSelectionFeedbackKeyRef.current
+    previousSelectionFeedbackKeyRef.current = options.selectionFeedbackKey
+    engineRef.current?.setSelectedSpot(options.selectedSpotId, restartPulse)
+  }, [options.selectedSpotId, options.selectionFeedbackKey])
 
   return handle
 }

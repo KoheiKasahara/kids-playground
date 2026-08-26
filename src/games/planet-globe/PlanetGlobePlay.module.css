@@ -105,6 +105,18 @@
   outline-offset: 3px;
 }
 
+/*
+ * よみあげトグルの置き場所(stage右上)。左上「もどる」・中央上ヘッダー・右下ズームの
+ * どれとも重ならない、唯一の空きスペース。SpeechToggle自身の position を上書きするのではなく
+ * 別要素で包むことで、CSS Modules同士のカスケード順に依存しないようにする。
+ */
+.speechToggleSlot {
+  position: absolute;
+  top: calc(var(--space-sm) + var(--safe-top));
+  right: calc(var(--space-sm) + var(--safe-right));
+  z-index: 2;
+}
+
 @media (max-width: 360px) {
   .instruction {
     font-size: 14px;
