@@ -4,6 +4,8 @@ import {
   MAX_RAIL_FLEET_SIZE,
   addRailFleetTrain,
   createInitialRailFleet,
+  moveRailFleetTrainTo,
+  removeRailFleetTrain,
   setRailFleetTrainRunning,
   updateRailFleet,
   type RailFleetTrain,
@@ -166,5 +168,90 @@ describe('railFleetModel', () => {
     const updated = updateRailFleet(fleet, [lower, upper], 0.1)
     expect(updated.every((train) => !train.blocked)).toBe(true)
     expect(updated.every((train) => train.motion.speed > 0)).toBe(true)
+  })
+
+  it('spawns exactly one train by default', () => {
+    const pieces = [createRailPiece('straight', 'rail-1'), createRailPiece('straight', 'rail-2')]
+    expect(createInitialRailFleet(pieces)).toHaveLength(1)
+  })
+
+  it('prefers a visible ground track over a tunnel, but still spawns when only a tunnel exists', () => {
+    const tunnel = createRailPiece('tunnel', 'tunnel')
+    const straight = createRailPiece('straight', 'straight', { x: 20, y: 0, z: 20 })
+    const preferred = createInitialRailFleet([tunnel, straight], 1)
+    expect(preferred).toHaveLength(1)
+    expect(preferred[0]?.motion.cursor.pieceId).toBe('straight')
+
+    const tunnelOnly = createInitialRailFleet([tunnel], 1)
+    expect(tunnelOnly).toHaveLength(1)
+    expect(tunnelOnly[0]?.motion.cursor.pieceId).toBe('tunnel')
+  })
+
+  it('removeRailFleetTrain keeps at least one train and reuses a freed id when adding again', () => {
+    const pieces = [
+      createRailPiece('straight', 'rail-1'),
+      createRailPiece('straight', 'rail-2'),
+      createRailPiece('straight', 'rail-3'),
+    ]
+    let fleet = createInitialRailFleet(pieces, 3)
+    expect(fleet).toHaveLength(3)
+
+    // 中間の1台(train-2)を消す。
+    fleet = removeRailFleetTrain(fleet, 'train-2')
+    expect(fleet.map((train) => train.id)).toEqual(['train-1', 'train-3'])
+
+    // 追加すると、空いたtrain-2のidを再利用し、衝突しない。
+    fleet = addRailFleetTrain(fleet, pieces)
+    expect(fleet.map((train) => train.id).sort()).toEqual(['train-1', 'train-2', 'train-3'])
+    expect(new Set(fleet.map((train) => train.id)).size).toBe(3)
+
+    // 最低1台は必ず残る。未知のidを渡しても内容は変わらない。
+    const single = removeRailFleetTrain([fleet[0]!])
+    expect(single).toHaveLength(1)
+    expect(single[0]?.id).toBe(fleet[0]!.id)
+    expect(removeRailFleetTrain(fleet, 'unknown-id').map((train) => train.id)).toEqual(
+      fleet.map((train) => train.id),
+    )
+  })
+
+  it('moveRailFleetTrainTo replaces the cursor, stops the train, and clears station state', () => {
+    const first = createRailPiece('straight', 'first')
+    const second = createRailPiece('straight', 'second', { x: 6, y: 0, z: 0 })
+    const moving: RailFleetTrain = {
+      id: 'train-1',
+      label: '1',
+      appearance: { color: '#f97316', frontColor: '#ea580c', roofColor: '#facc15' },
+      wantsToRun: true,
+      blocked: true,
+      motion: {
+        cursor: { pieceId: first.id, direction: 'a-to-b', distance: 2 },
+        speed: 3,
+        status: 'running',
+        stationServicedId: 'some-station',
+        stationStopElapsed: 0.4,
+      },
+    }
+    const other: RailFleetTrain = {
+      id: 'train-2',
+      label: '2',
+      appearance: { color: '#0ea5e9', frontColor: '#0284c7', roofColor: '#e0f2fe' },
+      wantsToRun: true,
+      blocked: false,
+      motion: { cursor: { pieceId: second.id, direction: 'a-to-b', distance: 0.5 }, speed: 2, status: 'running' },
+    }
+    const newCursor = { pieceId: second.id, direction: 'a-to-b' as const, distance: 1 }
+    const moved = moveRailFleetTrainTo([moving, other], 'train-1', newCursor)
+
+    expect(moved[0]?.motion).toEqual({ cursor: newCursor, speed: 0, status: 'ready' })
+    expect(moved[0]?.motion.cursor).not.toBe(newCursor)
+    expect(moved[0]?.wantsToRun).toBe(false)
+    expect(moved[0]?.blocked).toBe(false)
+
+    // 他の列車はクローンのみで内容は変わらない。
+    expect(moved[1]).toEqual(other)
+    expect(moved[1]).not.toBe(other)
+
+    // 存在しないidならクローンだけを返す。
+    expect(moveRailFleetTrainTo([moving, other], 'missing', newCursor)).toEqual([moving, other])
   })
 })

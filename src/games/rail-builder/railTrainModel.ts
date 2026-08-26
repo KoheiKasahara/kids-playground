@@ -587,6 +587,142 @@ export function occupiedRailPieceIds(
 export const getOccupiedRailPieceIds = occupiedRailPieceIds
 export const occupiedRailIds = occupiedRailPieceIds
 
+export type NearestRailTrainCursor = {
+  cursor: RailTrainCursor
+  /** 与えた点と、レール上の最寄り点との3D距離。 */
+  distance: number
+}
+
+export type NearestRailTrainCursorOptions = {
+  /** これより遠いときは null。既定 8。 */
+  maxDistance?: number
+  /** 進行方向の維持に使う参照ベクトル。接線との内積が負なら逆向きのdirectionを返す。 */
+  preferForward?: RailVec3
+}
+
+const NEAREST_CURSOR_MAX_DISTANCE = 8
+const NEAREST_CURSOR_SAMPLES = 48
+const NEAREST_CURSOR_REFINE_PASSES = 4
+
+function pointDistance(a: RailVec3, b: RailVec3): number {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
+}
+
+/** pieceが走行に使う正方向のroute一覧。分岐・車庫の副線もドラッグ配置の対象にする。 */
+function forwardRailTrainDirectionsForPiece(piece: RailPiece): RailTrainDirection[] {
+  const directions: RailTrainDirection[] = ['a-to-b']
+  if (piece.kind === 'branch' && piece.branchPath !== undefined) directions.push('a-to-c')
+  if (piece.kind === 'depot' && piece.secondaryPath !== undefined) directions.push('c-to-d')
+  return directions
+}
+
+/**
+ * pathを粗くサンプリングしてから、最寄りサンプルの前後だけを数回細分し、
+ * 与えた点に最も近いtとその3D距離を求める。壊れたPathでも安全にnullを返す。
+ */
+function nearestParameterOnPath(
+  piece: RailPiece,
+  path: RailPath,
+  point: RailVec3,
+): { t: number; distance: number } | null {
+  try {
+    let bestT = 0
+    let bestDistance = Infinity
+    for (let index = 0; index <= NEAREST_CURSOR_SAMPLES; index += 1) {
+      const t = index / NEAREST_CURSOR_SAMPLES
+      const distance = pointDistance(worldRailPathPoint(piece, t, path), point)
+      if (distance < bestDistance) {
+        bestDistance = distance
+        bestT = t
+      }
+    }
+
+    let step = 1 / NEAREST_CURSOR_SAMPLES
+    for (let pass = 0; pass < NEAREST_CURSOR_REFINE_PASSES; pass += 1) {
+      const nextStep = step / 3
+      if (nextStep <= EPSILON) break
+      for (let index = -1; index <= 1; index += 1) {
+        if (index === 0) continue
+        const t = Math.min(1, Math.max(0, bestT + nextStep * index))
+        const distance = pointDistance(worldRailPathPoint(piece, t, path), point)
+        if (distance < bestDistance) {
+          bestDistance = distance
+          bestT = t
+        }
+      }
+      step = nextStep
+    }
+
+    return { t: bestT, distance: bestDistance }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 3D空間の任意の点から、レール上の最寄りカーソルを求める純粋関数。
+ * 電車をドラッグして線路上へ配置する操作の当たり判定に使う。
+ */
+export function findNearestRailTrainCursor(
+  pieces: readonly RailPiece[],
+  point: RailVec3,
+  options?: NearestRailTrainCursorOptions,
+): NearestRailTrainCursor | null {
+  const maxDistance = options?.maxDistance !== undefined && finite(options.maxDistance)
+    ? Math.max(0, options.maxDistance)
+    : NEAREST_CURSOR_MAX_DISTANCE
+
+  let best: {
+    piece: RailPiece
+    path: RailPath
+    canonicalDirection: RailTrainDirection
+    length: number
+    t: number
+    spatialDistance: number
+  } | null = null
+
+  for (const piece of pieces) {
+    for (const direction of forwardRailTrainDirectionsForPiece(piece)) {
+      const resolved = validPiece(pieces, piece.id, direction)
+      if (resolved === null) continue
+      const nearest = nearestParameterOnPath(resolved.piece, resolved.path, point)
+      if (nearest === null || nearest.distance > maxDistance + EPSILON) continue
+      if (best !== null && nearest.distance >= best.spatialDistance) continue
+      best = {
+        piece: resolved.piece,
+        path: resolved.path,
+        canonicalDirection: direction,
+        length: resolved.length,
+        t: nearest.t,
+        spatialDistance: nearest.distance,
+      }
+    }
+  }
+
+  if (best === null) return null
+
+  let direction = best.canonicalDirection
+  if (options?.preferForward !== undefined) {
+    const tangent = worldRailPathTangent(best.piece, best.t, best.path)
+    const dot = tangent.x * options.preferForward.x
+      + tangent.y * options.preferForward.y
+      + tangent.z * options.preferForward.z
+    if (dot < 0) direction = oppositeRailTrainDirection(direction)
+  }
+
+  // distanceは進行方向の入口コネクタから測る。正方向のときはt*length、
+  // preferForwardで逆向きになったときは端から測り直す。
+  const forwardDistance = clampDistance(best.t * best.length, best.length)
+  const distance = direction === best.canonicalDirection
+    ? forwardDistance
+    : best.length - forwardDistance
+
+  return {
+    cursor: { pieceId: best.piece.id, direction, distance },
+    distance: best.spatialDistance,
+  }
+}
+
 /** 最初に走れるpieceを選び、後続車が載るぶん入口から離した初期カーソルを作る。 */
 export function createInitialRailTrainMotion(
   pieces: readonly RailPiece[],

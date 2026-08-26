@@ -9,6 +9,7 @@ import {
   distanceToRailTrainDeadEnd,
   distanceToRailTrainStation,
   findNextRailTrainStation,
+  findNearestRailTrainCursor,
   getOccupiedRailPieceIds,
   sampleRailTrainCars,
   sampleRailTrainPose,
@@ -21,6 +22,8 @@ import {
   railPathLength,
   sampleRailPath,
   toggleRailBranch,
+  worldConnectorForRailPiece,
+  worldRailPathPoint,
   type RailPiece,
 } from './railModel'
 import type { RailTrainMotion } from './railTrainModel'
@@ -430,5 +433,100 @@ describe('railTrainModel', () => {
       { pieceId: overpass.id, direction: 'a-to-b', distance: 2 },
       10,
     )).toBeNull()
+  })
+
+  it('runs the depot second track along c-to-d and samples its offset position', () => {
+    const depot = createRailPiece('depot', 'depot')
+    const secondaryLength = railPathLength(depot.secondaryPath!)
+    const cursor = advanceRailTrainCursor([depot], {
+      pieceId: depot.id,
+      direction: 'c-to-d',
+      distance: 0,
+    }, secondaryLength / 2)
+    expect(cursor).toEqual({ pieceId: depot.id, direction: 'c-to-d', distance: secondaryLength / 2 })
+    const pose = sampleRailTrainPose([depot], cursor)
+    const local = sampleRailPath(depot.secondaryPath!, 0.5)
+    expect(pose?.position.x).toBeCloseTo(local.x)
+    expect(pose?.position.z).toBeCloseTo(local.z)
+  })
+
+  it('crosses between the depot d connector and an attached straight in both directions', () => {
+    const depot = createRailPiece('depot', 'depot')
+    const worldD = worldConnectorForRailPiece(depot, 'd')
+    // tailの'a'がぴったりworldDへ重なる位置に置く(tailの'a'ローカルはx=-2.5)。
+    const tail = createRailPiece('straight', 'tail', {
+      x: worldD.position.x + 2.5,
+      y: worldD.position.y,
+      z: worldD.position.z,
+    })
+    const connected = connectRailPieces([depot, tail], tail.id, 'a', depot.id, 'd')
+    const secondaryLength = railPathLength(depot.secondaryPath!)
+    const tailLength = railPathLength(tail.path)
+
+    const crossedOnto = advanceRailTrainCursor(connected, {
+      pieceId: depot.id,
+      direction: 'c-to-d',
+      distance: secondaryLength - 0.5,
+    }, 1)
+    expect(crossedOnto.pieceId).toBe(tail.id)
+    expect(crossedOnto.direction).toBe('a-to-b')
+
+    const crossedBack = advanceRailTrainCursor(connected, {
+      pieceId: tail.id,
+      direction: 'b-to-a',
+      distance: tailLength - 0.5,
+    }, 1)
+    expect(crossedBack.pieceId).toBe(depot.id)
+    expect(crossedBack.direction).toBe('d-to-c')
+  })
+
+  describe('findNearestRailTrainCursor', () => {
+    it('finds the cursor and rail-space distance for the nearest piece', () => {
+      const first = createRailPiece('straight', 'first')
+      const second = createRailPiece('straight', 'second', { x: 5.8, y: 0, z: 0 })
+      const pieces = connectRailPieces([first, second], 'second', 'a', 'first', 'b')
+      const secondPiece = pieces.find((piece) => piece.id === 'second')!
+      const onPath = worldRailPathPoint(secondPiece, 0.5)
+      const nudged = { x: onPath.x, y: onPath.y, z: onPath.z + 0.2 }
+
+      const found = findNearestRailTrainCursor(pieces, nudged)
+      expect(found).not.toBeNull()
+      if (found === null) return
+      expect(found.cursor.pieceId).toBe('second')
+      expect(found.cursor.direction).toBe('a-to-b')
+      expect(found.distance).toBeCloseTo(0.2, 1)
+      const pose = sampleRailTrainPose(pieces, found.cursor)
+      expect(pose?.position.x).toBeCloseTo(onPath.x, 1)
+      expect(pose?.position.z).toBeCloseTo(onPath.z, 1)
+    })
+
+    it('returns null beyond maxDistance and for an empty layout', () => {
+      const piece = createRailPiece('straight', 'lone')
+      expect(findNearestRailTrainCursor([piece], { x: 0, y: 0, z: 50 })).toBeNull()
+      expect(findNearestRailTrainCursor([piece], { x: 0, y: 0, z: 3 }, { maxDistance: 1 })).toBeNull()
+      expect(findNearestRailTrainCursor([], { x: 0, y: 0, z: 0 })).toBeNull()
+    })
+
+    it('reverses direction when preferForward opposes the tangent, without moving the physical point', () => {
+      const piece = createRailPiece('straight', 'straight')
+      const midpoint = worldRailPathPoint(piece, 0.5)
+      const forward = findNearestRailTrainCursor([piece], midpoint, { preferForward: { x: 1, y: 0, z: 0 } })
+      const backward = findNearestRailTrainCursor([piece], midpoint, { preferForward: { x: -1, y: 0, z: 0 } })
+      expect(forward?.cursor.direction).toBe('a-to-b')
+      expect(backward?.cursor.direction).toBe('b-to-a')
+      const forwardPose = sampleRailTrainPose([piece], forward!.cursor)
+      const backwardPose = sampleRailTrainPose([piece], backward!.cursor)
+      expect(backwardPose?.position.x).toBeCloseTo(forwardPose!.position.x, 3)
+      expect(backwardPose?.position.z).toBeCloseTo(forwardPose!.position.z, 3)
+    })
+
+    it('finds a cursor on the depot second track', () => {
+      const depot = createRailPiece('depot', 'depot')
+      const midpoint = worldRailPathPoint(depot, 0.5, depot.secondaryPath)
+      const found = findNearestRailTrainCursor([depot], midpoint)
+      expect(found?.cursor.pieceId).toBe(depot.id)
+      expect(found?.cursor.direction).toBe('c-to-d')
+      expect(found?.distance).toBeCloseTo(0, 3)
+    })
   })
 })
