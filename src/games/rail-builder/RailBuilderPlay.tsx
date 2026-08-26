@@ -105,7 +105,7 @@ export default function RailBuilderPlay() {
     position: { ...piece.position },
     connections: { ...piece.connections },
   })))
-  const [selectedPieceId, setSelectedPieceId] = useState<string | null>('rail-1')
+  const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const [fleetSummaries, setFleetSummaries] = useState<RailFleetTrainSummary[]>(INITIAL_FLEET_SUMMARIES)
   const [occupiedRailIds, setOccupiedRailIds] = useState<string[]>([])
@@ -183,7 +183,7 @@ export default function RailBuilderPlay() {
     if (trainStatus === 'approachingStation') return 'えきに ちかづいているよ'
     if (trainStatus === 'departing') return 'えきから しゅっぱつしたよ'
     if (trainStatus === 'waiting') return 'まってるよ。せんろを つないで すすもう'
-    if (selectedPiece === undefined) return 'せんろも でんしゃも ゆびで うごかせるよ'
+    if (selectedPiece === undefined) return 'でんしゃも せんろも うごかせるよ'
     return 'せんろを つかんで つなげよう'
   }, [fleetSummaries, selectedPiece, selectedPieceIsOccupied])
 

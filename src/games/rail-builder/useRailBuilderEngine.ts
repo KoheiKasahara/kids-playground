@@ -278,6 +278,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const stationPulseTargets = new Map<string, THREE.Object3D>()
     const marker = new THREE.Group()
     marker.name = 'snap-marker'
+    marker.visible = false // 起動直後は原点にリングを出さない（setMarker() が呼ばれるまで非表示）
     let snapGlow: THREE.Mesh | null = null
     const trainRoot = new THREE.Group()
     trainRoot.name = 'toy-train-fleet'
@@ -321,11 +322,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const houseBodyGeometry = new RoundedBoxGeometry(2.4, 1.45, 2.1, 2, 0.18)
     const houseRoofGeometry = new THREE.ConeGeometry(1.7, 0.85, 4)
     const houseWindowGeometry = new THREE.BoxGeometry(0.36, 0.42, 0.05)
-    // 車庫パーツ(depot)の建物。屋根は薄く壁は低めにして、上方からの
-    // カメラでも車庫の中の電車が見えるようにする。両端は開けたまま。
-    const depotBodyGeometry = new THREE.BoxGeometry(DEPOT_LENGTH - 0.6, 1.7, 0.2) // 側壁
-    const depotRoofGeometry = new THREE.BoxGeometry(DEPOT_LENGTH, 0.3, DEPOT_TRACK_SPACING + 2.0) // 屋根
-    const depotDoorGeometry = new THREE.BoxGeometry(0.18, 2.05, 0.18) // 四隅の柱
+    // 車庫パーツ(depot)の建物。屋根は中央部だけ・壁は腰高にして、
+    // 斜め上から見下ろすカメラでも車庫の中の線路と電車が見えるようにする。
+    const depotRoofLength = DEPOT_LENGTH * 0.62 // 屋根はx方向の中央部のみ。両端は大きく開ける
+    const depotRoofDepth = DEPOT_TRACK_SPACING + 1.2
+    const depotBodyGeometry = new THREE.BoxGeometry(depotRoofLength, 0.6, 0.2) // 側壁(腰高)
+    const depotRoofGeometry = new THREE.BoxGeometry(depotRoofLength, 0.26, depotRoofDepth) // 屋根
+    const depotDoorGeometry = new THREE.BoxGeometry(0.18, 2.06, 0.18) // 屋根を支える柱
     ;[
       railGeometry,
       baseGeometry,
@@ -1078,13 +1081,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }
 
       if (localPiece.kind === 'depot') {
-        // +X方向が線路の向き。両端は開けたまま(扉なし)にして、
-        // 電車が両方向から出入りでき、中の電車も見えるようにする。
-        const wallHeight = 1.7
-        const wallZ = (DEPOT_TRACK_SPACING + 1.9) / 2
-        const pillarHeight = 2.05
-        const pillarX = DEPOT_LENGTH / 2 - 0.4
-        addMesh(depotRoofGeometry, depotRoofMaterial, { x: 0, y: 2.05, z: 0 })
+        // +X方向が線路の向き。屋根は中央部だけ・壁は腰高にして、
+        // 上から見ても車庫の中の線路と電車が見えるようにする。
+        const wallHeight = 0.6
+        const wallZ = depotRoofDepth / 2 - 0.1
+        const pillarHeight = 2.06
+        const pillarX = depotRoofLength / 2 - 0.25
+        addMesh(depotRoofGeometry, depotRoofMaterial, { x: 0, y: 2.06, z: 0 })
         for (const side of [-1, 1]) {
           addMesh(depotBodyGeometry, depotBodyMaterial, { x: 0, y: wallHeight / 2, z: side * wallZ })
           for (const x of [-pillarX, pillarX]) {
