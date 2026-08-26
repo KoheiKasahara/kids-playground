@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import {
+  applyRailLoopClosure,
   clampRailPosition,
   connectRailPieces,
   disconnectRailPiece,
+  findRailLoopClosureCandidate,
   findRailSnapNearMiss,
   findRailSnapCandidate,
   type RailConnectorId,
@@ -780,6 +782,54 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       updateZoom(pinchStartZoom * (distance / pinchStartDistance))
     }
 
+    let loopClosureFlashTimeout: number | null = null
+
+    function flashLoopClosureSuccess(position: RailVec3) {
+      if (loopClosureFlashTimeout !== null) {
+        window.clearTimeout(loopClosureFlashTimeout)
+        loopClosureFlashTimeout = null
+      }
+      marker.visible = true
+      markerMaterial.color.set('#86efac')
+      marker.position.set(position.x, position.y + 0.38, position.z)
+      loopClosureFlashTimeout = window.setTimeout(() => {
+        marker.visible = false
+        loopClosureFlashTimeout = null
+      }, 360)
+    }
+
+    /**
+     * 通常接続が成立した直後、今つないだpieceのもう片方の空き端点が
+     * 「ループとして閉じられそうか」だけを追加でチェックする。
+     * 通常のsnap判定・connectRailPiecesの挙動そのものは変えない、
+     * あくまでその後段の任意の一手として発動する。
+     */
+    function tryCloseLoopAfterConnect(
+      layout: RailPiece[],
+      normalCandidate: SnapCandidate | null,
+      draggedPieceId: string,
+    ): RailPiece[] {
+      if (normalCandidate === null) return layout
+      const draggedPiece = layout.find((piece) => piece.id === draggedPieceId)
+      if (draggedPiece === undefined) return layout
+      const looseConnectorId: RailConnectorId = normalCandidate.movingConnectorId === 'a' ? 'b' : 'a'
+      if (draggedPiece.connections[looseConnectorId] !== undefined) return layout
+
+      const targets = layout.filter((piece) => piece.id !== draggedPieceId)
+      const loopCandidate = findRailLoopClosureCandidate(
+        draggedPiece,
+        looseConnectorId,
+        targets,
+        normalCandidate.targetPieceId,
+      )
+      if (loopCandidate === null) return layout
+
+      const closedLayout = applyRailLoopClosure(layout, loopCandidate)
+      const flashPoint = worldConnectorForRailPiece(draggedPiece, looseConnectorId).position
+      flashLoopClosureSuccess(flashPoint)
+      return closedLayout
+    }
+
     function finishDrag() {
       const currentDrag = drag
       drag = null
@@ -799,7 +849,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           }
           : piece
       ))
-      const nextLayout = currentDrag.candidate === null
+      const connectedLayout = currentDrag.candidate === null
         ? movedLayout
         : connectRailPieces(
           movedLayout,
@@ -809,6 +859,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           currentDrag.candidate.targetConnectorId,
           currentDrag.candidate.transform,
         )
+      const nextLayout = tryCloseLoopAfterConnect(connectedLayout, currentDrag.candidate, currentDrag.pieceId)
       optionsRef.current.onPiecesChange(nextLayout)
     }
 
@@ -1046,6 +1097,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       startTrainRef.current = null
       focusTrainRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)
+      if (loopClosureFlashTimeout !== null) window.clearTimeout(loopClosureFlashTimeout)
       resizeObserver?.disconnect()
       if (resizeObserver === null) window.removeEventListener('resize', resize)
       window.removeEventListener('orientationchange', resize)

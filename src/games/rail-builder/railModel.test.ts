@@ -3,13 +3,18 @@ import {
   DEFAULT_SNAP_ANGLE,
   ELEVATED_HEIGHT,
   ELEVATED_LENGTH,
+  LOOP_CLOSURE_MAX_ANGLE_DIFFERENCE,
+  LOOP_CLOSURE_MAX_DISTANCE,
+  LOOP_CLOSURE_MAX_HEIGHT_DIFFERENCE,
   SHORT_STRAIGHT_LENGTH,
   SLOPE_LENGTH,
+  applyRailLoopClosure,
   areRailConnectionsSymmetric,
   connectRailPieces,
   createRailPiece,
   deleteRailPiece,
   disconnectRailPiece,
+  findRailLoopClosureCandidate,
   findRailSnapCandidate,
   findRailSnapNearMiss,
   moveRailPiece,
@@ -19,8 +24,25 @@ import {
   worldConnectorForRailPiece,
   type RailPiece,
 } from './railModel'
+import { distanceToRailTrainDeadEnd } from './railTrainModel'
 
 const origin = { x: 0, y: 0, z: 0 }
+
+/** targets内でanchorとfarPieceだけをつなぎ、他は動かさない最小の「既存チェーン」を作る。 */
+function anchorFarPiece(
+  farPiece: RailPiece,
+  farAnchorConnectorId: 'a' | 'b',
+): { anchorId: string; targets: RailPiece[] } {
+  const anchor = createRailPiece('straight', 'anchor', { x: 999, y: 0, z: 999 })
+  const connected = connectRailPieces(
+    [farPiece, anchor],
+    'anchor',
+    'a',
+    farPiece.id,
+    farAnchorConnectorId,
+  )
+  return { anchorId: 'anchor', targets: connected }
+}
 
 describe('railModel', () => {
   it('creates straight connectors and samples its path', () => {
@@ -238,5 +260,205 @@ describe('railModel', () => {
 
   it('does not allow a snap angle wider than the configured tolerance', () => {
     expect(DEFAULT_SNAP_ANGLE).toBeCloseTo((58 * Math.PI) / 180)
+  })
+
+  describe('loop closure assist', () => {
+    it('connects a slightly offset endpoint that is out of normal snap range', () => {
+      const fixedPiece = createRailPiece('straight', 'fixed', origin)
+      // 通常しきい値(1.15)の外、ループ用しきい値の内側になる距離だけ離す。
+      const farPiece = createRailPiece('straight', 'far', { x: 6.6, y: 0, z: 0 })
+      const { anchorId, targets } = anchorFarPiece(farPiece, 'b')
+
+      expect(findRailSnapCandidate(farPiece, targets, 'a')).toBeNull()
+
+      const candidate = findRailLoopClosureCandidate(fixedPiece, 'b', targets, anchorId)
+      expect(candidate).not.toBeNull()
+      if (candidate === null) return
+      expect(candidate.movingPieceId).toBe('far')
+      expect(candidate.distance).toBeGreaterThan(1.15)
+      expect(candidate.distance).toBeLessThanOrEqual(LOOP_CLOSURE_MAX_DISTANCE)
+
+      const closed = applyRailLoopClosure([fixedPiece, ...targets], candidate)
+      expect(areRailConnectionsSymmetric(closed)).toBe(true)
+      const closedFixed = closed.find((piece) => piece.id === 'fixed')
+      const closedFar = closed.find((piece) => piece.id === 'far')
+      expect(closedFixed?.connections.b).toEqual({ pieceId: 'far', connectorId: 'a' })
+      expect(closedFar?.connections.a).toEqual({ pieceId: 'fixed', connectorId: 'b' })
+      const fixedConnector = worldConnectorForRailPiece(closedFixed!, 'b')
+      const farConnector = worldConnectorForRailPiece(closedFar!, 'a')
+      expect(farConnector.position.x).toBeCloseTo(fixedConnector.position.x, 5)
+      expect(farConnector.position.z).toBeCloseTo(fixedConnector.position.z, 5)
+    })
+
+    it('rejects endpoints that are too far away', () => {
+      const fixedPiece = createRailPiece('straight', 'fixed', origin)
+      const farPiece = createRailPiece('straight', 'far', { x: 12, y: 0, z: 0 })
+      const { anchorId, targets } = anchorFarPiece(farPiece, 'b')
+      expect(findRailLoopClosureCandidate(fixedPiece, 'b', targets, anchorId)).toBeNull()
+    })
+
+    it('rejects endpoints facing the wrong direction', () => {
+      const fixedPiece = createRailPiece('straight', 'fixed', origin)
+      // 通常しきい値付近の距離だが、90度ずれた向き。
+      const farPiece = createRailPiece('straight', 'far', { x: 4.2, y: 0, z: 2 }, Math.PI / 2)
+      const { anchorId, targets } = anchorFarPiece(farPiece, 'b')
+      expect(findRailLoopClosureCandidate(fixedPiece, 'b', targets, anchorId)).toBeNull()
+    })
+
+    it('rejects endpoints facing directly opposite (reversed) direction', () => {
+      const fixedPiece = createRailPiece('straight', 'fixed', origin)
+      const farPiece = createRailPiece('straight', 'far', { x: 4.2, y: 0, z: 0 }, Math.PI)
+      const { anchorId, targets } = anchorFarPiece(farPiece, 'b')
+      expect(findRailLoopClosureCandidate(fixedPiece, 'b', targets, anchorId)).toBeNull()
+    })
+
+    it('rejects endpoints with a large height difference', () => {
+      const fixedPiece = createRailPiece('straight', 'fixed', origin)
+      const farPiece = createRailPiece('straight', 'far', { x: 6.6, y: 1.4, z: 0 })
+      const { anchorId, targets } = anchorFarPiece(farPiece, 'b')
+      expect(LOOP_CLOSURE_MAX_HEIGHT_DIFFERENCE).toBeLessThan(1.4)
+      expect(findRailLoopClosureCandidate(fixedPiece, 'b', targets, anchorId)).toBeNull()
+    })
+
+    it('does not connect to an unrelated endpoint that is not part of the same chain', () => {
+      const fixedPiece = createRailPiece('straight', 'fixed', origin)
+      const farPiece = createRailPiece('straight', 'far', { x: 6.6, y: 0, z: 0 })
+      // farPieceが接続されているのはunrelatedAnchorだけで、fixedPiece側の
+      // 継ぎ目とは無関係な、閉路を作らない組み合わせ。
+      const unrelatedAnchor = createRailPiece('straight', 'unrelated-anchor', { x: 999, y: 0, z: 999 })
+      const connected = connectRailPieces([farPiece, unrelatedAnchor], 'unrelated-anchor', 'a', 'far', 'b')
+      expect(findRailLoopClosureCandidate(fixedPiece, 'b', connected, 'some-other-piece-not-in-chain')).toBeNull()
+    })
+
+    it('keeps normal, well-aligned connections unaffected (loop closure is not needed)', () => {
+      const fixedPiece = createRailPiece('straight', 'fixed', origin)
+      const farPiece = createRailPiece('straight', 'far', { x: 5.05, y: 0, z: 0 })
+      // 通常しきい値で十分つながる距離では、findRailSnapCandidate側で解決できる。
+      expect(findRailSnapCandidate(farPiece, [fixedPiece], 'a')).not.toBeNull()
+    })
+
+    it('spreads a small accumulated gap over the last few pieces to close a big loop, and the train can lap it', () => {
+      const p1 = createRailPiece('curve', 'p1', origin, 0, 'left')
+      let layout: RailPiece[] = [p1]
+      for (const id of ['p2', 'p3', 'p4']) {
+        const previousId = layout[layout.length - 1]!.id
+        const draft = createRailPiece('curve', id, origin, 0, 'left')
+        layout = connectRailPieces([...layout, draft], id, 'a', previousId, 'b')
+      }
+
+      // 摂動なしなら4つの90度カーブがちょうど1周して閉じることを確認する。
+      const openStart = worldConnectorForRailPiece(layout.find((p) => p.id === 'p1')!, 'a')
+      const openEnd = worldConnectorForRailPiece(layout.find((p) => p.id === 'p4')!, 'b')
+      expect(openEnd.position.x).toBeCloseTo(openStart.position.x, 5)
+      expect(openEnd.position.z).toBeCloseTo(openStart.position.z, 5)
+
+      // p4だけを、通常のsnapでは届かない程度に少しだけずらす
+      // （現実には複数パーツの誤差が積み重なって生じるズレを1箇所に凝縮して再現）。
+      const originalP4 = layout.find((p) => p.id === 'p4')!
+      const originalP1 = layout.find((p) => p.id === 'p1')!
+      const originalP2 = layout.find((p) => p.id === 'p2')!
+      const originalP3 = layout.find((p) => p.id === 'p3')!
+      const perturbedP4: RailPiece = {
+        ...originalP4,
+        position: {
+          x: originalP4.position.x + 1.8,
+          y: originalP4.position.y,
+          z: originalP4.position.z + 0.8,
+        },
+        rotationY: originalP4.rotationY + (8 * Math.PI) / 180,
+      }
+      const perturbedLayout = layout.map((piece) => (piece.id === 'p4' ? perturbedP4 : piece))
+      const targets = perturbedLayout.filter((piece) => piece.id !== 'p4')
+
+      expect(findRailSnapCandidate(perturbedP4, targets, 'b')).toBeNull()
+
+      const candidate = findRailLoopClosureCandidate(perturbedP4, 'b', targets, 'p3')
+      expect(candidate).not.toBeNull()
+      if (candidate === null) return
+      expect(candidate.movingPieceId).toBe('p1')
+
+      const closed = applyRailLoopClosure(perturbedLayout, candidate)
+      expect(areRailConnectionsSymmetric(closed)).toBe(true)
+
+      const closedP4 = closed.find((piece) => piece.id === 'p4')!
+      const closedP1 = closed.find((piece) => piece.id === 'p1')!
+      const closedP2 = closed.find((piece) => piece.id === 'p2')!
+      const closedP3 = closed.find((piece) => piece.id === 'p3')!
+
+      // 閉じた継ぎ目はぴったり一致する（隙間ゼロ）。
+      const p4Open = worldConnectorForRailPiece(closedP4, 'b')
+      const p1Open = worldConnectorForRailPiece(closedP1, 'a')
+      expect(p4Open.position.x).toBeCloseTo(p1Open.position.x, 5)
+      expect(p4Open.position.z).toBeCloseTo(p1Open.position.z, 5)
+      expect(p4Open.outward.x).toBeCloseTo(-p1Open.outward.x, 5)
+      expect(p4Open.outward.z).toBeCloseTo(-p1Open.outward.z, 5)
+
+      // p4(ドラッグ確定済みの側)はそのままの位置を保つ。
+      expect(closedP4.position).toEqual(perturbedP4.position)
+      expect(closedP4.rotationY).toBe(perturbedP4.rotationY)
+
+      // 補正はp1だけに集中せず、p2・p3にも分散し、かつ奥ほど小さい。
+      const rotationChange = (piece: RailPiece, original: RailPiece) => Math.abs(piece.rotationY - original.rotationY)
+      const p1Change = rotationChange(closedP1, originalP1)
+      const p2Change = rotationChange(closedP2, originalP2)
+      const p3Change = rotationChange(closedP3, originalP3)
+      expect(p1Change).toBeGreaterThan(0)
+      expect(p2Change).toBeGreaterThan(0)
+      expect(p3Change).toBeGreaterThan(0)
+      expect(p2Change).toBeLessThan(p1Change)
+      expect(p3Change).toBeLessThan(p2Change)
+      // 補正量そのものが安全上限の角度以内に収まっている。
+      expect(p1Change).toBeLessThanOrEqual(LOOP_CLOSURE_MAX_ANGLE_DIFFERENCE)
+
+      // 走行Pathは閉路として扱われる（行き止まりまでの距離が無限大）。
+      expect(distanceToRailTrainDeadEnd(closed, { pieceId: 'p1', direction: 'a-to-b', distance: 0 })).toBe(Infinity)
+      expect(distanceToRailTrainDeadEnd(closed, { pieceId: 'p3', direction: 'b-to-a', distance: 1 })).toBe(Infinity)
+    })
+
+    it('does not touch facility pieces near the closing end (station/tunnel/bridge/slope are skipped)', () => {
+      // p1 - station - p3 という並び（station.bとp3.aが接続済み）で、
+      // p3.bがp1.aへループを閉じようとしている状況を、接続グラフだけ
+      // 手で配線して再現する（stationの実際の位置は補正対象外なので任意でよい）。
+      const p1: RailPiece = {
+        ...createRailPiece('straight', 'p1', origin),
+        connections: { b: { pieceId: 'station', connectorId: 'a' } },
+      }
+      const originalStation: RailPiece = {
+        ...createRailPiece('station', 'station', { x: 40, y: 0, z: 40 }),
+        connections: {
+          a: { pieceId: 'p1', connectorId: 'b' },
+          b: { pieceId: 'p3', connectorId: 'a' },
+        },
+      }
+      // rotationY=0・position=(-5,0,0)は、p3.bがp1.aへ隙間ゼロで一致する位置。
+      const originalP3: RailPiece = {
+        ...createRailPiece('straight', 'p3', { x: -5, y: 0, z: 0 }),
+        connections: { a: { pieceId: 'station', connectorId: 'b' } },
+      }
+      const perturbedP3: RailPiece = {
+        ...originalP3,
+        position: {
+          x: originalP3.position.x + 1.6,
+          y: originalP3.position.y,
+          z: originalP3.position.z + 0.6,
+        },
+        rotationY: originalP3.rotationY + (10 * Math.PI) / 180,
+      }
+      const targets = [p1, originalStation]
+
+      expect(findRailSnapCandidate(perturbedP3, targets, 'b')).toBeNull()
+
+      const candidate = findRailLoopClosureCandidate(perturbedP3, 'b', targets, 'station')
+      expect(candidate).not.toBeNull()
+      if (candidate === null) return
+      // 施設(station)自身がループを閉じる相手側になることはない。
+      expect(candidate.movingPieceId).not.toBe('station')
+      expect(candidate.movingPieceId).toBe('p1')
+
+      const closed = applyRailLoopClosure([...targets, perturbedP3], candidate)
+      const closedStation = closed.find((piece) => piece.id === 'station')!
+      expect(closedStation.position).toEqual(originalStation.position)
+      expect(closedStation.rotationY).toBe(originalStation.rotationY)
+    })
   })
 })
