@@ -4,6 +4,7 @@ import {
   createRailPiece,
   deleteRailPiece,
   rotateRailPiece,
+  snapAndConnectRailPiece,
   toggleRailBranch,
   type RailPiece,
   type RailPieceKind,
@@ -19,16 +20,25 @@ import styles from './RailBuilderPlay.module.css'
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, useRailBuilderEngine } from './useRailBuilderEngine'
 import { primeAudio } from '../../utils/quizSound'
 
-const INITIAL_PIECES: RailPiece[] = [
-  // 3本の発着線は車庫の扉から伸びる。初期2本と追加1本が重ならず、
+function createInitialRailPieces(): RailPiece[] {
+  // しゃこ(depot)が1番線・2番線の平行2線を持つ。rail-2とrail-3は
+  // それぞれの延長として置き、あらかじめ接続した状態で始める。
   // curveは従来どおり自由に動かせるスターターpieceとして残す。
-  createRailPiece('straight', 'rail-1', { x: -1, y: 0, z: -1.05 }),
-  createRailPiece('straight', 'rail-2', { x: -1, y: 0, z: 0 }),
-  createRailPiece('straight', 'rail-3', { x: -1, y: 0, z: 1.05 }),
-  createRailPiece('curve', 'rail-4', { x: 7, y: 0, z: 1 }, 0, 'left'),
-]
+  let pieces: RailPiece[] = [
+    createRailPiece('depot', 'rail-1', { x: -6, y: 0, z: 0 }),
+    createRailPiece('straight', 'rail-2', { x: 0, y: 0, z: -1.2 }),
+    createRailPiece('straight', 'rail-3', { x: 0, y: 0, z: 1.2 }),
+    createRailPiece('curve', 'rail-4', { x: 7, y: 0, z: 1 }, 0, 'left'),
+  ]
+  // 接続に失敗しても落とさず、そのまま未接続の並びとして返す。
+  pieces = snapAndConnectRailPiece(pieces, 'rail-2')
+  pieces = snapAndConnectRailPiece(pieces, 'rail-3')
+  return pieces
+}
 
-const INITIAL_FLEET_SUMMARIES: RailFleetTrainSummary[] = [0, 1].map((index) => ({
+const INITIAL_PIECES: RailPiece[] = createInitialRailPieces()
+
+const INITIAL_FLEET_SUMMARIES: RailFleetTrainSummary[] = [0].map((index) => ({
   id: `train-${index + 1}`,
   label: `${index + 1}`,
   color: RAIL_TRAIN_APPEARANCES[index]!.color,
@@ -93,7 +103,7 @@ export default function RailBuilderPlay() {
   const [pieces, setPieces] = useState<RailPiece[]>(() => INITIAL_PIECES.map((piece) => ({
     ...piece,
     position: { ...piece.position },
-    connections: {},
+    connections: { ...piece.connections },
   })))
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>('rail-1')
   const [zoom, setZoom] = useState(1)
@@ -113,7 +123,7 @@ export default function RailBuilderPlay() {
     setSelectedPieceId(pieceId)
   }, [])
 
-  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, focusTrain, focusDepot } = useRailBuilderEngine({
+  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, focusTrain, focusDepot } = useRailBuilderEngine({
     pieces,
     selectedPieceId,
     zoom,
@@ -173,7 +183,7 @@ export default function RailBuilderPlay() {
     if (trainStatus === 'approachingStation') return 'えきに ちかづいているよ'
     if (trainStatus === 'departing') return 'えきから しゅっぱつしたよ'
     if (trainStatus === 'waiting') return 'まってるよ。せんろを つないで すすもう'
-    if (selectedPiece === undefined) return 'せんろを えらんで うごかそう'
+    if (selectedPiece === undefined) return 'せんろも でんしゃも ゆびで うごかせるよ'
     return 'せんろを つかんで つなげよう'
   }, [fleetSummaries, selectedPiece, selectedPieceIsOccupied])
 
@@ -228,11 +238,24 @@ export default function RailBuilderPlay() {
               </div>
             ))}
           </div>
-          {fleetSummaries.length < MAX_RAIL_FLEET_SIZE && (
-            <button type="button" className={styles.addTrainButton} onClick={addTrain} aria-label="しゃこから でんしゃを ついか">
-              <span aria-hidden="true">＋🚃</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className={styles.addTrainButton}
+            onClick={addTrain}
+            disabled={fleetSummaries.length >= MAX_RAIL_FLEET_SIZE}
+            aria-label="しゃこから でんしゃを ついか"
+          >
+            <span aria-hidden="true">＋🚃</span>
+          </button>
+          <button
+            type="button"
+            className={styles.removeTrainButton}
+            onClick={() => removeTrain()}
+            disabled={fleetSummaries.length <= 1}
+            aria-label="でんしゃを へらす"
+          >
+            <span aria-hidden="true">−🚃</span>
+          </button>
           <button type="button" className={styles.depotButton} onClick={focusDepot} aria-label="しゃこを みる">
             <span aria-hidden="true">🏠</span>
           </button>
@@ -293,6 +316,10 @@ export default function RailBuilderPlay() {
             <button type="button" className={styles.toolButton} onClick={() => addPiece('tunnel')} aria-label="トンネルを ついか">
               <RailPreview kind="tunnel" />
               <span>トンネル</span>
+            </button>
+            <button type="button" className={styles.toolButton} onClick={() => addPiece('depot')} aria-label="しゃこを ついか">
+              <RailPreview kind="depot" />
+              <span>しゃこ</span>
             </button>
             <button type="button" className={styles.toolButton} onClick={rotateSelected} disabled={selectedPiece === undefined || selectedPieceIsOccupied} aria-label="せんろを 90ど まわす">
               <span className={styles.actionIcon} aria-hidden="true">↻</span>
