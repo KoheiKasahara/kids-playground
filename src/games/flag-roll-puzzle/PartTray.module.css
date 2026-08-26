@@ -20,8 +20,8 @@
 .part {
   position: relative;
   flex: 0 0 auto;
-  width: 96px;
-  min-height: 96px;
+  width: 82px;
+  min-height: 82px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -32,7 +32,7 @@
   border: 3px solid transparent;
   border-radius: var(--radius-md);
   color: var(--color-text);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   cursor: grab;
   touch-action: pan-x;
@@ -57,7 +57,7 @@
 .tray[data-layout='landscape'] .part {
   width: 100%;
   min-width: 0;
-  min-height: 78px;
+  min-height: 66px;
   touch-action: pan-y;
   scroll-snap-align: start;
 }
@@ -83,8 +83,8 @@
 /* 見本。盤面の1マス(60px)と同じ形を、必要なものだけ置き場内で縮小して見せる */
 .preview {
   position: relative;
-  width: 60px;
-  height: 60px;
+  width: 52px;
+  height: 52px;
   transform: translateX(var(--preview-offset-x, 0)) scale(var(--preview-scale, 1.1));
 }
 
@@ -94,8 +94,8 @@
 
 @media (max-width: 360px) {
   .part {
-    width: 88px;
-    min-height: 88px;
-    font-size: 15px;
+    width: 74px;
+    min-height: 74px;
+    font-size: 13px;
   }
 }

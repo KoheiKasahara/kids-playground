@@ -59,8 +59,8 @@ describe('goal', () => {
   })
 
   test('ステージ固有ゴールの範囲で判定と出口壁を組み立てられる', () => {
-    const stageGoal = { x: 240, y: GRID_BOTTOM, width: 120, height: GOAL_AREA.height }
-    expect(isInGoalArea(300, GRID_BOTTOM + 20, stageGoal)).toBe(true)
+    const stageGoal = { x: BOARD_WIDTH - 120, y: GRID_BOTTOM, width: 120, height: GOAL_AREA.height }
+    expect(isInGoalArea(BOARD_WIDTH - 60, GRID_BOTTOM + 20, stageGoal)).toBe(true)
     expect(isInGoalArea(200, GRID_BOTTOM + 20, stageGoal)).toBe(false)
     expect(goalExitWallForArea(stageGoal)).toBeNull()
     const centerGoal = { x: 90, y: GRID_BOTTOM, width: 180, height: GOAL_AREA.height }
@@ -69,10 +69,10 @@ describe('goal', () => {
 
   test('ゴールの左右境界のうち外周と共有しない側へだけ4px壁を置く', () => {
     const easy = { x: 0, y: GRID_BOTTOM, width: 180, height: GOAL_AREA.height }
-    const normal = { x: 240, y: GRID_BOTTOM, width: 120, height: GOAL_AREA.height }
+    const normal = { x: BOARD_WIDTH - 120, y: GRID_BOTTOM, width: 120, height: GOAL_AREA.height }
     const hard = { x: 90, y: GRID_BOTTOM, width: 180, height: GOAL_AREA.height }
     expect(goalBoundaryWallsForArea(easy).map((wall) => wall.x)).toEqual([182])
-    expect(goalBoundaryWallsForArea(normal).map((wall) => wall.x)).toEqual([238])
+    expect(goalBoundaryWallsForArea(normal).map((wall) => wall.x)).toEqual([BOARD_WIDTH - 120 - GOAL_EXIT_WALL_THICKNESS / 2])
     expect(goalBoundaryWallsForArea(hard).map((wall) => wall.x)).toEqual([88, 272])
     expect(goalBoundaryWallsForArea(hard).every((wall) => wall.y - wall.height / 2 === GRID_BOTTOM)).toBe(true)
   })
