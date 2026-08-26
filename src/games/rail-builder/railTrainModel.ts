@@ -1,6 +1,7 @@
 import {
   railPathLength,
   type RailConnectorId,
+  type RailPath,
   type RailPiece,
   type RailVec3,
   worldRailPathPoint,
@@ -27,8 +28,14 @@ export const TRAIN_VEHICLE_COUNT = TRAIN_CAR_COUNT
 
 const EPSILON = 1e-7
 const DEFAULT_ITERATION_GUARD = 512
+/**
+ * React側では線路配列のidentityが編集時だけ変わるため、piece検索を配列ごと
+ * cacheしておく。走行中に毎frame・各列車ごと全線路をfindしないための索引。
+ */
+const railPieceLookupCache = new WeakMap<readonly RailPiece[], ReadonlyMap<string, RailPiece>>()
 
-export type RailTrainDirection = 'a-to-b' | 'b-to-a'
+/** directionはbranch進入時に確定した今回のroute lockも兼ねる。 */
+export type RailTrainDirection = 'a-to-b' | 'b-to-a' | 'a-to-c' | 'c-to-a'
 export type TrainDirection = RailTrainDirection
 
 export type RailTrainCursor = {
@@ -43,6 +50,7 @@ export type TrainCursor = RailTrainCursor
 export type RailTrainStatus =
   | 'ready'
   | 'running'
+  | 'paused'
   | 'waiting'
   | 'approachingStation'
   | 'stoppedAtStation'
@@ -73,6 +81,7 @@ export type TrainPose = RailTrainPose
 
 type ValidPiece = {
   piece: RailPiece
+  path: RailPath
   length: number
 }
 
@@ -88,13 +97,39 @@ function copyCursor(cursor: RailTrainCursor): RailTrainCursor {
   return { ...cursor }
 }
 
-function validPiece(pieces: readonly RailPiece[], pieceId: string): ValidPiece | null {
-  const piece = pieces.find((candidate) => candidate.id === pieceId)
+function railPieceForId(pieces: readonly RailPiece[], pieceId: string): RailPiece | undefined {
+  let lookup = railPieceLookupCache.get(pieces)
+  if (lookup === undefined) {
+    lookup = new Map(pieces.map((piece) => [piece.id, piece]))
+    railPieceLookupCache.set(pieces, lookup)
+  }
+  return lookup.get(pieceId)
+}
+
+/** cursorのrouteに対応するPath。A-CはbranchPath、それ以外は従来path。 */
+export function railPathForTrainDirection(
+  piece: RailPiece,
+  direction: RailTrainDirection,
+): RailPath | null {
+  if (direction === 'a-to-c' || direction === 'c-to-a') {
+    return piece.kind === 'branch' && piece.branchPath !== undefined ? piece.branchPath : null
+  }
+  return piece.path
+}
+
+function validPiece(
+  pieces: readonly RailPiece[],
+  pieceId: string,
+  direction: RailTrainDirection = 'a-to-b',
+): ValidPiece | null {
+  const piece = railPieceForId(pieces, pieceId)
   if (piece === undefined || piece.path === undefined) return null
+  const path = railPathForTrainDirection(piece, direction)
+  if (path === null) return null
   try {
-    const length = railPathLength(piece.path)
+    const length = railPathLength(path)
     if (!finite(length) || length < 0) return null
-    return { piece, length }
+    return { piece, path, length }
   } catch {
     return null
   }
@@ -106,19 +141,41 @@ function clampDistance(distance: number, length: number): number {
 }
 
 function entryConnector(direction: RailTrainDirection): RailConnectorId {
-  return direction === 'a-to-b' ? 'a' : 'b'
+  if (direction === 'a-to-b' || direction === 'a-to-c') return 'a'
+  return direction === 'b-to-a' ? 'b' : 'c'
 }
 
 function exitConnector(direction: RailTrainDirection): RailConnectorId {
-  return direction === 'a-to-b' ? 'b' : 'a'
+  if (direction === 'a-to-b') return 'b'
+  if (direction === 'a-to-c') return 'c'
+  return 'a'
 }
 
-function directionLeavingConnector(connectorId: RailConnectorId): RailTrainDirection {
-  return connectorId === 'a' ? 'a-to-b' : 'b-to-a'
+function oppositeRailTrainDirection(direction: RailTrainDirection): RailTrainDirection {
+  if (direction === 'a-to-b') return 'b-to-a'
+  if (direction === 'b-to-a') return 'a-to-b'
+  if (direction === 'a-to-c') return 'c-to-a'
+  return 'a-to-c'
 }
 
-function directionArrivingAtConnector(connectorId: RailConnectorId): RailTrainDirection {
-  return connectorId === 'a' ? 'b-to-a' : 'a-to-b'
+/** 接続先へ入る瞬間にbranchDirectionを読み、列車固有のrouteを確定する。 */
+function directionLeavingConnector(
+  piece: RailPiece,
+  connectorId: RailConnectorId,
+): RailTrainDirection {
+  if (connectorId === 'a') {
+    return piece.kind === 'branch' && piece.branchDirection === 'c' ? 'a-to-c' : 'a-to-b'
+  }
+  return connectorId === 'c' ? 'c-to-a' : 'b-to-a'
+}
+
+function directionArrivingAtConnector(
+  piece: RailPiece,
+  connectorId: RailConnectorId,
+): RailTrainDirection {
+  if (connectorId === 'b') return 'a-to-b'
+  if (connectorId === 'c') return 'a-to-c'
+  return piece.kind === 'branch' && piece.branchDirection === 'c' ? 'c-to-a' : 'b-to-a'
 }
 
 function findConnection(
@@ -128,17 +185,27 @@ function findConnection(
 ): { piece: RailPiece; connectorId: RailConnectorId } | null {
   const connection = piece.connections?.[connectorId]
   if (connection === undefined || typeof connection.pieceId !== 'string') return null
-  if (connection.connectorId !== 'a' && connection.connectorId !== 'b') return null
-  const nextPiece = pieces.find((candidate) => candidate.id === connection.pieceId)
+  if (
+    connection.connectorId !== 'a'
+    && connection.connectorId !== 'b'
+    && connection.connectorId !== 'c'
+  ) return null
+  const nextPiece = railPieceForId(pieces, connection.pieceId)
+  if (connection.connectorId === 'c' && nextPiece?.kind !== 'branch') return null
   return nextPiece === undefined ? null : { piece: nextPiece, connectorId: connection.connectorId }
 }
 
 function cursorWithDistance(cursor: RailTrainCursor, pieces: readonly RailPiece[]): RailTrainCursor {
-  const resolved = validPiece(pieces, cursor.pieceId)
+  const direction = cursor.direction === 'b-to-a'
+    || cursor.direction === 'a-to-c'
+    || cursor.direction === 'c-to-a'
+    ? cursor.direction
+    : 'a-to-b'
+  const resolved = validPiece(pieces, cursor.pieceId, direction)
   if (resolved === null) return copyCursor(cursor)
   return {
     pieceId: cursor.pieceId,
-    direction: cursor.direction === 'b-to-a' ? 'b-to-a' : 'a-to-b',
+    direction,
     distance: clampDistance(cursor.distance, resolved.length),
   }
 }
@@ -148,11 +215,13 @@ export function railTrainCursorT(
   pieces: readonly RailPiece[],
   cursor: RailTrainCursor,
 ): number | null {
-  const resolved = validPiece(pieces, cursor.pieceId)
+  const resolved = validPiece(pieces, cursor.pieceId, cursor.direction)
   if (resolved === null || resolved.length <= EPSILON) return resolved === null ? null : 0
   const normalized = cursorWithDistance(cursor, pieces)
   const fraction = normalized.distance / resolved.length
-  return normalized.direction === 'a-to-b' ? fraction : 1 - fraction
+  return normalized.direction === 'a-to-b' || normalized.direction === 'a-to-c'
+    ? fraction
+    : 1 - fraction
 }
 
 /** カーソルを線路上のワールド姿勢へ変換する。 */
@@ -160,15 +229,15 @@ export function sampleRailTrainPose(
   pieces: readonly RailPiece[],
   cursor: RailTrainCursor,
 ): RailTrainPose | null {
-  const resolved = validPiece(pieces, cursor.pieceId)
+  const resolved = validPiece(pieces, cursor.pieceId, cursor.direction)
   if (resolved === null) return null
   const normalized = cursorWithDistance(cursor, pieces)
   const t = railTrainCursorT(pieces, normalized)
   if (t === null || !finite(t)) return null
   try {
-    const position = worldRailPathPoint(resolved.piece, t)
-    const tangent = worldRailPathTangent(resolved.piece, t)
-    const forward = normalized.direction === 'a-to-b'
+    const position = worldRailPathPoint(resolved.piece, t, resolved.path)
+    const tangent = worldRailPathTangent(resolved.piece, t, resolved.path)
+    const forward = normalized.direction === 'a-to-b' || normalized.direction === 'a-to-c'
       ? tangent
       : { x: -tangent.x, y: -tangent.y, z: -tangent.z }
     return {
@@ -196,7 +265,7 @@ export function advanceRailTrainCursor(
   if (remaining <= EPSILON) return current
 
   for (let iteration = 0; iteration < DEFAULT_ITERATION_GUARD; iteration += 1) {
-    const resolved = validPiece(pieces, current.pieceId)
+    const resolved = validPiece(pieces, current.pieceId, current.direction)
     if (resolved === null) return current
     current.distance = clampDistance(current.distance, resolved.length)
     const toExit = Math.max(0, resolved.length - current.distance)
@@ -214,14 +283,15 @@ export function advanceRailTrainCursor(
       current.distance = resolved.length
       return current
     }
-    const next = validPiece(pieces, connection.piece.id)
+    const nextDirection = directionLeavingConnector(connection.piece, connection.connectorId)
+    const next = validPiece(pieces, connection.piece.id, nextDirection)
     if (next === null) {
       current.distance = resolved.length
       return current
     }
     current = {
       pieceId: next.piece.id,
-      direction: directionLeavingConnector(connection.connectorId),
+      direction: nextDirection,
       distance: 0,
     }
     if (remaining <= EPSILON) return current
@@ -245,7 +315,7 @@ export function retreatRailTrainCursor(
   if (remaining <= EPSILON) return current
 
   for (let iteration = 0; iteration < DEFAULT_ITERATION_GUARD; iteration += 1) {
-    const resolved = validPiece(pieces, current.pieceId)
+    const resolved = validPiece(pieces, current.pieceId, current.direction)
     if (resolved === null) return current
     current.distance = clampDistance(current.distance, resolved.length)
     const toEntry = current.distance
@@ -263,14 +333,15 @@ export function retreatRailTrainCursor(
       current.distance = 0
       return current
     }
-    const previous = validPiece(pieces, connection.piece.id)
+    const previousDirection = directionArrivingAtConnector(connection.piece, connection.connectorId)
+    const previous = validPiece(pieces, connection.piece.id, previousDirection)
     if (previous === null) {
       current.distance = 0
       return current
     }
     current = {
       pieceId: previous.piece.id,
-      direction: directionArrivingAtConnector(connection.connectorId),
+      direction: previousDirection,
       distance: previous.length,
     }
     if (remaining <= EPSILON) return current
@@ -292,7 +363,7 @@ export function distanceToRailTrainDeadEnd(
   const seen = new Set<string>()
 
   for (let iteration = 0; iteration < DEFAULT_ITERATION_GUARD; iteration += 1) {
-    const resolved = validPiece(pieces, current.pieceId)
+    const resolved = validPiece(pieces, current.pieceId, current.direction)
     if (resolved === null) return total
     const state = `${resolved.piece.id}:${current.direction}`
     if (seen.has(state)) return Infinity
@@ -302,11 +373,12 @@ export function distanceToRailTrainDeadEnd(
     total += Math.max(0, resolved.length - current.distance)
     const connection = findConnection(pieces, resolved.piece, exitConnector(current.direction))
     if (connection === null) return total
-    const next = validPiece(pieces, connection.piece.id)
+    const nextDirection = directionLeavingConnector(connection.piece, connection.connectorId)
+    const next = validPiece(pieces, connection.piece.id, nextDirection)
     if (next === null) return total
     current = {
       pieceId: next.piece.id,
-      direction: directionLeavingConnector(connection.connectorId),
+      direction: nextDirection,
       distance: 0,
     }
   }
@@ -317,6 +389,58 @@ export function distanceToRailTrainDeadEnd(
 
 export const forwardDistanceToDeadEnd = distanceToRailTrainDeadEnd
 export const railTrainDistanceToDeadEnd = distanceToRailTrainDeadEnd
+
+/**
+ * followerから選択済みrouteを前方へたどり、同じPath上にいるleaderまでの
+ * 経路距離を返す。逆方向列車も同じPath座標へ換算するため、B-B/A-A接続で
+ * 正面接近する場合を検知できる。空間距離は使わず、立体交差では誤停止しない。
+ */
+export function distanceAheadToRailTrainCursor(
+  pieces: readonly RailPiece[],
+  follower: RailTrainCursor,
+  leader: RailTrainCursor,
+  maxDistance = 12,
+): number | null {
+  let current = cursorWithDistance(follower, pieces)
+  const target = cursorWithDistance(leader, pieces)
+  let total = 0
+  const limit = finite(maxDistance) ? Math.max(0, maxDistance) : 0
+  const seen = new Set<string>()
+
+  for (let iteration = 0; iteration < DEFAULT_ITERATION_GUARD; iteration += 1) {
+    const resolved = validPiece(pieces, current.pieceId, current.direction)
+    if (resolved === null || total > limit + EPSILON) return null
+
+    if (target.pieceId === current.pieceId) {
+      const targetDistanceInCurrentDirection = target.direction === current.direction
+        ? target.distance
+        : target.direction === oppositeRailTrainDirection(current.direction)
+          ? resolved.length - target.distance
+          : null
+      const aheadOnPiece = targetDistanceInCurrentDirection === null
+        ? -Infinity
+        : targetDistanceInCurrentDirection - current.distance
+      if (aheadOnPiece >= -EPSILON && total + Math.max(0, aheadOnPiece) <= limit + EPSILON) {
+        return total + Math.max(0, aheadOnPiece)
+      }
+    }
+
+    const state = `${current.pieceId}:${current.direction}`
+    if (seen.has(state)) return null
+    seen.add(state)
+    total += Math.max(0, resolved.length - current.distance)
+    if (total > limit + EPSILON) return null
+    const connection = findConnection(pieces, resolved.piece, exitConnector(current.direction))
+    if (connection === null) return null
+    const nextDirection = directionLeavingConnector(connection.piece, connection.connectorId)
+    const next = validPiece(pieces, connection.piece.id, nextDirection)
+    if (next === null) return null
+    current = { pieceId: next.piece.id, direction: nextDirection, distance: 0 }
+  }
+  return null
+}
+
+export const forwardRailDistanceBetweenCursors = distanceAheadToRailTrainCursor
 
 export type RailTrainStationTarget = {
   stationId: string
@@ -339,7 +463,7 @@ export function findNextRailTrainStation(
   const seen = new Set<string>()
 
   for (let iteration = 0; iteration < DEFAULT_ITERATION_GUARD; iteration += 1) {
-    const resolved = validPiece(pieces, current.pieceId)
+    const resolved = validPiece(pieces, current.pieceId, current.direction)
     if (resolved === null) return null
     const state = `${resolved.piece.id}:${current.direction}`
     if (seen.has(state)) return null
@@ -358,11 +482,12 @@ export function findNextRailTrainStation(
     total += Math.max(0, resolved.length - current.distance)
     const connection = findConnection(pieces, resolved.piece, exitConnector(current.direction))
     if (connection === null) return null
-    const next = validPiece(pieces, connection.piece.id)
+    const nextDirection = directionLeavingConnector(connection.piece, connection.connectorId)
+    const next = validPiece(pieces, connection.piece.id, nextDirection)
     if (next === null) return null
     current = {
       pieceId: next.piece.id,
-      direction: directionLeavingConnector(connection.connectorId),
+      direction: nextDirection,
       distance: 0,
     }
   }
@@ -423,7 +548,7 @@ export function occupiedRailPieceIds(
 ): string[] {
   const occupied = new Set<string>()
   for (const carCursor of railTrainCarCursors(pieces, cursor, carCount, spacing)) {
-    if (validPiece(pieces, carCursor.pieceId) !== null) occupied.add(carCursor.pieceId)
+    if (validPiece(pieces, carCursor.pieceId, carCursor.direction) !== null) occupied.add(carCursor.pieceId)
   }
   return [...occupied]
 }
@@ -436,19 +561,27 @@ export function createInitialRailTrainMotion(
   pieces: readonly RailPiece[],
   preferredPieceId = 'rail-1',
 ): RailTrainMotion | null {
-  const preferred = validPiece(pieces, preferredPieceId)
+  const directionForPiece = (piece: RailPiece): RailTrainDirection => (
+    piece.kind === 'branch' && piece.branchDirection === 'c' ? 'a-to-c' : 'a-to-b'
+  )
+  const preferredPiece = railPieceForId(pieces, preferredPieceId)
+  const preferredDirection = preferredPiece === undefined ? 'a-to-b' : directionForPiece(preferredPiece)
+  const preferred = validPiece(pieces, preferredPieceId, preferredDirection)
   const resolved = preferred ?? pieces
-    .map((piece) => validPiece(pieces, piece.id))
+    .map((piece) => validPiece(pieces, piece.id, directionForPiece(piece)))
     .find((candidate): candidate is ValidPiece => candidate !== null)
   if (resolved === undefined || resolved === null) return null
+  const direction = directionForPiece(resolved.piece)
+  const selectedPath = railPathForTrainDirection(resolved.piece, direction)
+  const selectedLength = selectedPath === null ? resolved.length : railPathLength(selectedPath)
   const startDistance = Math.min(
-    Math.max(0, resolved.length - TRAIN_END_STOP_MARGIN),
+    Math.max(0, selectedLength - TRAIN_END_STOP_MARGIN),
     Math.max(0, TRAIN_CAR_SPACING * (TRAIN_CAR_COUNT - 1) + 0.35),
   )
   return {
     cursor: {
       pieceId: resolved.piece.id,
-      direction: 'a-to-b',
+      direction,
       distance: startDistance,
     },
     speed: 0,
@@ -464,7 +597,7 @@ export const TRAIN_STATION_APPROACH_DISTANCE = 4.5
 
 /** 発車・再開。待機中でもカーソルはそのまま保持する。 */
 export function startRailTrain(motion: RailTrainMotion): RailTrainMotion {
-  if (motion.status !== 'ready' && motion.status !== 'waiting') {
+  if (motion.status !== 'ready' && motion.status !== 'waiting' && motion.status !== 'paused') {
     return { ...motion, cursor: copyCursor(motion.cursor), speed: Math.max(0, motion.speed) }
   }
   return { ...motion, cursor: copyCursor(motion.cursor), speed: Math.max(0, motion.speed), status: 'running' }
@@ -472,6 +605,13 @@ export function startRailTrain(motion: RailTrainMotion): RailTrainMotion {
 
 export const restartRailTrain = startRailTrain
 export const startTrainMotion = startRailTrain
+
+/** 個別停止。cursorと駅サービス情報は保持する。 */
+export function pauseRailTrain(motion: RailTrainMotion): RailTrainMotion {
+  return { ...motion, cursor: copyCursor(motion.cursor), speed: 0, status: 'paused' }
+}
+
+export const stopRailTrain = pauseRailTrain
 
 /** 毎フレームの完全に管理された加減速更新。物理エンジンは使わない。 */
 export function updateRailTrainMotion(
@@ -482,7 +622,7 @@ export function updateRailTrainMotion(
   // 実際のRAFはengine側で0.1秒程度に制限するが、純粋関数として
   // 大きめのテスト刻みを渡しても安全に停止位置へ着けるようにする。
   const delta = finite(deltaSeconds) ? Math.min(1, Math.max(0, deltaSeconds)) : 0
-  if (motion.status === 'ready' || motion.status === 'waiting') {
+  if (motion.status === 'ready' || motion.status === 'waiting' || motion.status === 'paused') {
     return { ...motion, cursor: copyCursor(motion.cursor), speed: 0 }
   }
   if (motion.status === 'stoppedAtStation') {

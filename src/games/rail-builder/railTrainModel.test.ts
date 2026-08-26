@@ -4,9 +4,12 @@ import {
   TRAIN_END_STOP_MARGIN,
   TRAIN_STATION_STOP_DURATION,
   advanceRailTrainCursor,
+  createInitialRailTrainMotion,
+  distanceAheadToRailTrainCursor,
   distanceToRailTrainDeadEnd,
   distanceToRailTrainStation,
   findNextRailTrainStation,
+  getOccupiedRailPieceIds,
   sampleRailTrainCars,
   sampleRailTrainPose,
   startRailTrain,
@@ -17,11 +20,78 @@ import {
   createRailPiece,
   railPathLength,
   sampleRailPath,
+  toggleRailBranch,
   type RailPiece,
 } from './railModel'
 import type { RailTrainMotion } from './railTrainModel'
 
 describe('railTrainModel', () => {
+  function makeBranchLayout(branchDirection: 'b' | 'c') {
+    const branch = { ...createRailPiece('branch', 'branch'), branchDirection }
+    const incoming = createRailPiece('straight', 'incoming')
+    const tailB = createRailPiece('straight', 'tail-b')
+    const tailC = createRailPiece('straight', 'tail-c')
+    let layout = connectRailPieces([branch, incoming], incoming.id, 'b', branch.id, 'a')
+    layout = connectRailPieces([...layout, tailB], tailB.id, 'a', branch.id, 'b')
+    return connectRailPieces([...layout, tailC], tailC.id, 'a', branch.id, 'c')
+  }
+
+  it('locks the selected branch route on entry and ignores a switch during passage', () => {
+    const routeB = makeBranchLayout('b')
+    const incoming = routeB.find((piece) => piece.id === 'incoming')!
+    const enteredB = advanceRailTrainCursor(routeB, {
+      pieceId: incoming.id,
+      direction: 'a-to-b',
+      distance: railPathLength(incoming.path) - 0.2,
+    }, 0.5)
+    expect(enteredB.pieceId).toBe('branch')
+    expect(enteredB.direction).toBe('a-to-b')
+
+    const switchedWhilePassing = toggleRailBranch(routeB, 'branch')
+    const branch = switchedWhilePassing.find((piece) => piece.id === 'branch')!
+    const exitedLockedRoute = advanceRailTrainCursor(
+      switchedWhilePassing,
+      enteredB,
+      railPathLength(branch.path),
+    )
+    expect(exitedLockedRoute.pieceId).toBe('tail-b')
+
+    const routeC = makeBranchLayout('c')
+    const incomingC = routeC.find((piece) => piece.id === 'incoming')!
+    const enteredC = advanceRailTrainCursor(routeC, {
+      pieceId: incomingC.id,
+      direction: 'a-to-b',
+      distance: railPathLength(incomingC.path) - 0.2,
+    }, 0.5)
+    expect(enteredC).toMatchObject({ pieceId: 'branch', direction: 'a-to-c' })
+    const branchC = routeC.find((piece) => piece.id === 'branch')!
+    const cPose = sampleRailTrainPose(routeC, {
+      ...enteredC,
+      distance: railPathLength(branchC.branchPath!) / 2,
+    })
+    expect(cPose?.position.z).toBeGreaterThan(0)
+    const exitedC = advanceRailTrainCursor(routeC, enteredC, railPathLength(branchC.branchPath!))
+    expect(exitedC.pieceId).toBe('tail-c')
+
+    // 先頭がbranchを出た直後も、後続車が残っている間はUI側で
+    // occupiedとして扱い、route切替を禁止できる。
+    const branchB = routeB.find((piece) => piece.id === 'branch')!
+    const leavingBranch = advanceRailTrainCursor(routeB, {
+      pieceId: branchB.id,
+      direction: 'b-to-a',
+      distance: railPathLength(branchB.path) - 0.2,
+    }, 0.5)
+    expect(leavingBranch.pieceId).toBe('incoming')
+    expect(getOccupiedRailPieceIds(routeB, leavingBranch)).toContain(branchB.id)
+  })
+
+  it('starts a train placed directly on a branch along its selected route', () => {
+    const branch = { ...createRailPiece('branch', 'branch'), branchDirection: 'c' as const }
+    const motion = createInitialRailTrainMotion([branch], branch.id)
+    expect(motion?.cursor.direction).toBe('a-to-c')
+    expect(motion?.cursor.distance).toBeLessThanOrEqual(railPathLength(branch.branchPath!))
+  })
+
   it('samples straight position and tangent in travel direction', () => {
     const piece = createRailPiece('straight', 'straight', { x: 3, y: 0, z: 4 }, Math.PI / 2)
     const pose = sampleRailTrainPose([piece], {
@@ -85,6 +155,24 @@ describe('railTrainModel', () => {
       distance: 4.5,
     }, 1)
     expect(cursor).toEqual({ pieceId: 'second', direction: 'a-to-b', distance: 0.5 })
+  })
+
+  it('keeps the existing straight-curve-straight route continuous', () => {
+    const first = createRailPiece('straight', 'first')
+    const curve = createRailPiece('curve', 'curve')
+    const last = createRailPiece('straight', 'last')
+    let connected = connectRailPieces([first, curve], curve.id, 'a', first.id, 'b')
+    connected = connectRailPieces([...connected, last], last.id, 'a', curve.id, 'b')
+
+    const cursor = advanceRailTrainCursor(connected, {
+      pieceId: first.id,
+      direction: 'a-to-b',
+      distance: 1,
+    }, railPathLength(first.path) - 1 + railPathLength(curve.path) + 0.75)
+    expect(cursor).toEqual({ pieceId: last.id, direction: 'a-to-b', distance: 0.75 })
+    const pose = sampleRailTrainPose(connected, cursor)
+    expect(pose?.position.x).toBeTypeOf('number')
+    expect(pose?.forward.x).toBeTypeOf('number')
   })
 
   it('stops before a dead end without overshooting the margin', () => {
@@ -264,5 +352,83 @@ describe('railTrainModel', () => {
       direction: 'a-to-b',
       distance: 1,
     })).toBeCloseTo(4)
+  })
+
+  it('runs a closed curve loop for several laps without stopping or jumping at the boundary', () => {
+    let loop: RailPiece[] = [createRailPiece('curve', 'p1')]
+    for (const id of ['p2', 'p3', 'p4']) {
+      const previous = loop[loop.length - 1]!
+      loop = connectRailPieces([...loop, createRailPiece('curve', id)], id, 'a', previous.id, 'b')
+    }
+    loop = loop.map((piece) => {
+      if (piece.id === 'p1') {
+        return { ...piece, connections: { ...piece.connections, a: { pieceId: 'p4', connectorId: 'b' } } }
+      }
+      if (piece.id === 'p4') {
+        return { ...piece, connections: { ...piece.connections, b: { pieceId: 'p1', connectorId: 'a' } } }
+      }
+      return piece
+    })
+
+    const lastPiece = loop.find((piece) => piece.id === 'p4')!
+    expect(distanceAheadToRailTrainCursor(
+      loop,
+      { pieceId: lastPiece.id, direction: 'a-to-b', distance: railPathLength(lastPiece.path) - 0.25 },
+      { pieceId: 'p1', direction: 'a-to-b', distance: 0.35 },
+      2,
+    )).toBeCloseTo(0.6)
+
+    let motion: RailTrainMotion = {
+      cursor: { pieceId: 'p1', direction: 'a-to-b', distance: 0.2 },
+      speed: 0,
+      status: 'running',
+    }
+    let previousPose = sampleRailTrainPose(loop, motion.cursor)!
+    let pieceChanges = 0
+    let maximumJump = 0
+    for (let tick = 0; tick < 900; tick += 1) {
+      const previousPieceId = motion.cursor.pieceId
+      motion = updateRailTrainMotion(motion, loop, 0.05)
+      const pose = sampleRailTrainPose(loop, motion.cursor)!
+      maximumJump = Math.max(maximumJump, Math.hypot(
+        pose.position.x - previousPose.position.x,
+        pose.position.y - previousPose.position.y,
+        pose.position.z - previousPose.position.z,
+      ))
+      if (motion.cursor.pieceId !== previousPieceId) pieceChanges += 1
+      expect(motion.status).not.toBe('waiting')
+      previousPose = pose
+    }
+    expect(pieceChanges).toBeGreaterThan(8)
+    expect(maximumJump).toBeLessThan(0.3)
+    expect(motion.speed).toBeGreaterThan(0)
+  })
+
+  it('measures same-route and opposing leaders, not a nearby disconnected track', () => {
+    const first = createRailPiece('straight', 'first')
+    const second = createRailPiece('straight', 'second')
+    const connected = connectRailPieces([first, second], second.id, 'a', first.id, 'b')
+    expect(distanceAheadToRailTrainCursor(
+      connected,
+      { pieceId: first.id, direction: 'a-to-b', distance: 4 },
+      { pieceId: second.id, direction: 'a-to-b', distance: 1 },
+      10,
+    )).toBeCloseTo(2)
+
+    const headOn = connectRailPieces([first, second], second.id, 'b', first.id, 'b')
+    expect(distanceAheadToRailTrainCursor(
+      headOn,
+      { pieceId: first.id, direction: 'a-to-b', distance: 4 },
+      { pieceId: second.id, direction: 'a-to-b', distance: 4 },
+      10,
+    )).toBeCloseTo(2)
+
+    const overpass = createRailPiece('bridge', 'overpass', { x: 0, y: 0, z: 0 }, Math.PI / 2)
+    expect(distanceAheadToRailTrainCursor(
+      [first, overpass],
+      { pieceId: first.id, direction: 'a-to-b', distance: 2 },
+      { pieceId: overpass.id, direction: 'a-to-b', distance: 2 },
+      10,
+    )).toBeNull()
   })
 })

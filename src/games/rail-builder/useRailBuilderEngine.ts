@@ -9,6 +9,7 @@ import {
   findRailLoopClosureCandidate,
   findRailSnapNearMiss,
   findRailSnapCandidate,
+  getRailConnectorIds,
   type RailConnectorId,
   type RailPiece,
   type RailVec3,
@@ -18,15 +19,20 @@ import {
   worldRailPathPoint,
 } from './railModel'
 import {
-  createInitialRailTrainMotion,
-  getOccupiedRailPieceIds,
   sampleRailTrainCars,
   sampleRailTrainPose,
-  startRailTrain,
-  updateRailTrainMotion,
-  type RailTrainMotion,
   type RailTrainStatus,
 } from './railTrainModel'
+import {
+  addRailFleetTrain,
+  createInitialRailFleet,
+  occupiedRailFleetPieceIds,
+  setRailFleetTrainRunning,
+  summarizeRailFleet,
+  updateRailFleet,
+  type RailFleetTrain,
+  type RailFleetTrainSummary,
+} from './railFleetModel'
 import {
   getRailBuilderDevicePixelRatio,
   getRailBuilderShadowMapSize,
@@ -45,7 +51,7 @@ import {
 
 const WORLD_SIZE = 50
 const WORLD_HALF_SIZE = WORLD_SIZE / 2
-const PAN_LIMIT = 15
+const PAN_LIMIT = WORLD_HALF_SIZE - 4
 export const ZOOM_STEP = 0.14
 // 元のズーム範囲(0.72〜1.75)の上下に、+/-ボタン3段階ぶんずつ広げる
 export const MIN_ZOOM = 0.72 - ZOOM_STEP * 3
@@ -53,6 +59,8 @@ export const MAX_ZOOM = 1.75 + ZOOM_STEP * 3
 const DEFAULT_ZOOM = 1
 const BASE_VIEW_SIZE = 15
 const POINTER_MOVE_THRESHOLD = 6
+// 初期3本の発着線A端(x=-3.5)へ扉がつながる車庫位置。
+const DEPOT_POSITION: RailVec3 = { x: -5.65, y: 0, z: 0 }
 
 export type RailBuilderEngineOptions = {
   pieces: readonly RailPiece[]
@@ -63,6 +71,7 @@ export type RailBuilderEngineOptions = {
   onZoomChange?: (zoom: number) => void
   lockedPieceIds?: ReadonlySet<string>
   onTrainStatusChange?: (status: RailTrainStatus) => void
+  onFleetChange?: (trains: RailFleetTrainSummary[]) => void
   onTrainOccupiedIdsChange?: (pieceIds: string[]) => void
   /** レール専用音量。共有 quizSound の global 設定を変更せずに切り替える。 */
   soundEnabled?: boolean
@@ -71,8 +80,11 @@ export type RailBuilderEngineOptions = {
 export type RailBuilderEngineHandle = {
   registerContainer: (element: HTMLDivElement | null) => void
   getCameraTarget: () => RailVec3
-  startTrain: () => void
-  focusTrain: () => void
+  startTrain: (trainId: string) => void
+  pauseTrain: (trainId: string) => void
+  addTrain: () => void
+  focusTrain: (trainId: string) => void
+  focusDepot: () => void
 }
 
 type PointerPosition = {
@@ -91,6 +103,20 @@ type DragState = {
   moved: boolean
   candidate: SnapCandidate | null
   nearMiss: SnapNearMiss | null
+}
+
+type TrainVisualRuntime = {
+  root: THREE.Group
+  cars: THREE.Group[]
+  wheelPivots: THREE.Object3D[][]
+  bodyMaterial: THREE.MeshStandardMaterial
+  frontMaterial: THREE.MeshStandardMaterial
+  roofMaterial: THREE.MeshStandardMaterial
+}
+
+type BranchRouteVisual = {
+  b: THREE.InstancedMesh
+  c: THREE.InstancedMesh
 }
 
 function clampZoom(value: number): number {
@@ -153,8 +179,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
   const cameraTargetRef = useRef<RailVec3>({ x: 0, y: 0, z: 0 })
   const syncSceneRef = useRef<((pieces: readonly RailPiece[], selectedPieceId: string | null) => void) | null>(null)
   const syncZoomRef = useRef<((zoom: number) => void) | null>(null)
-  const startTrainRef = useRef<(() => void) | null>(null)
-  const focusTrainRef = useRef<(() => void) | null>(null)
+  const startTrainRef = useRef<((trainId: string) => void) | null>(null)
+  const pauseTrainRef = useRef<((trainId: string) => void) | null>(null)
+  const addTrainRef = useRef<(() => void) | null>(null)
+  const focusTrainRef = useRef<((trainId: string) => void) | null>(null)
+  const focusDepotRef = useRef<(() => void) | null>(null)
 
   const registerContainer = useCallback((element: HTMLDivElement | null) => {
     containerRef.current = element
@@ -162,17 +191,29 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
   const getCameraTarget = useCallback((): RailVec3 => ({ ...cameraTargetRef.current }), [])
 
-  const startTrain = useCallback(() => {
-    startTrainRef.current?.()
+  const startTrain = useCallback((trainId: string) => {
+    startTrainRef.current?.(trainId)
   }, [])
 
-  const focusTrain = useCallback(() => {
-    focusTrainRef.current?.()
+  const pauseTrain = useCallback((trainId: string) => {
+    pauseTrainRef.current?.(trainId)
+  }, [])
+
+  const addTrain = useCallback(() => {
+    addTrainRef.current?.()
+  }, [])
+
+  const focusTrain = useCallback((trainId: string) => {
+    focusTrainRef.current?.(trainId)
+  }, [])
+
+  const focusDepot = useCallback(() => {
+    focusDepotRef.current?.()
   }, [])
 
   const handle = useMemo<RailBuilderEngineHandle>(
-    () => ({ registerContainer, getCameraTarget, startTrain, focusTrain }),
-    [focusTrain, getCameraTarget, registerContainer, startTrain],
+    () => ({ registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, focusTrain, focusDepot }),
+    [addTrain, focusDepot, focusTrain, getCameraTarget, pauseTrain, registerContainer, startTrain],
   )
 
   useEffect(() => {
@@ -207,9 +248,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     marker.name = 'snap-marker'
     let snapGlow: THREE.Mesh | null = null
     const trainRoot = new THREE.Group()
-    trainRoot.name = 'toy-train'
-    const trainCars: THREE.Group[] = []
-    const trainWheelPivots: THREE.Object3D[][] = []
+    trainRoot.name = 'toy-train-fleet'
+    const trainVisuals = new Map<string, TrainVisualRuntime>()
+    const branchRouteVisuals = new Map<string, BranchRouteVisual>()
     const sharedGeometries = new Set<THREE.BufferGeometry>()
     const sharedMaterials = new Set<THREE.Material>()
 
@@ -248,6 +289,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const houseBodyGeometry = new RoundedBoxGeometry(2.4, 1.45, 2.1, 2, 0.18)
     const houseRoofGeometry = new THREE.ConeGeometry(1.7, 0.85, 4)
     const houseWindowGeometry = new THREE.BoxGeometry(0.36, 0.42, 0.05)
+    const depotBodyGeometry = new RoundedBoxGeometry(4.2, 1.65, 3.1, 2, 0.18)
+    const depotRoofGeometry = new RoundedBoxGeometry(4.55, 0.28, 3.45, 2, 0.12)
+    const depotDoorGeometry = new RoundedBoxGeometry(0.82, 1.32, 0.12, 2, 0.08)
     ;[
       railGeometry,
       baseGeometry,
@@ -284,12 +328,27 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       houseBodyGeometry,
       houseRoofGeometry,
       houseWindowGeometry,
+      depotBodyGeometry,
+      depotRoofGeometry,
+      depotDoorGeometry,
     ].forEach((geometry) => sharedGeometries.add(geometry))
 
     const railMaterial = new THREE.MeshStandardMaterial({
       color: RAIL_VISUAL_CONFIG.palette.rail,
       roughness: RAIL_VISUAL_CONFIG.roughness,
       metalness: RAIL_VISUAL_CONFIG.metalness,
+    })
+    const branchSelectedRailMaterial = new THREE.MeshStandardMaterial({
+      color: '#fde047',
+      emissive: '#f59e0b',
+      emissiveIntensity: 0.42,
+      roughness: 0.48,
+      metalness: 0.08,
+    })
+    const branchDimRailMaterial = new THREE.MeshStandardMaterial({
+      color: '#64748b',
+      roughness: 0.72,
+      metalness: 0.04,
     })
     const baseMaterial = new THREE.MeshStandardMaterial({
       color: RAIL_VISUAL_CONFIG.palette.base,
@@ -349,6 +408,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const tunnelInnerMaterial = new THREE.MeshStandardMaterial({ color: '#6366f1', roughness: 0.86 })
     ;[
       railMaterial,
+      branchSelectedRailMaterial,
+      branchDimRailMaterial,
       baseMaterial,
       sleeperMaterial,
       connectorMaterial,
@@ -385,6 +446,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const houseBodyPaleMaterial = new THREE.MeshStandardMaterial({ color: '#f4c96b', roughness: 0.8 })
     const houseRoofMaterial = new THREE.MeshStandardMaterial({ color: '#d96b63', roughness: 0.82 })
     const houseWindowMaterial = new THREE.MeshStandardMaterial({ color: '#75d4e6', roughness: 0.4, metalness: 0.08 })
+    const depotBodyMaterial = new THREE.MeshStandardMaterial({ color: '#f8cf78', roughness: 0.76 })
+    const depotRoofMaterial = new THREE.MeshStandardMaterial({ color: '#ef6b73', roughness: 0.66 })
+    const depotDoorMaterial = new THREE.MeshStandardMaterial({ color: '#486a78', roughness: 0.72 })
     sharedGeometries.add(groundGeometry)
     ;[
       groundMaterial,
@@ -397,6 +461,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       houseBodyPaleMaterial,
       houseRoofMaterial,
       houseWindowMaterial,
+      depotBodyMaterial,
+      depotRoofMaterial,
+      depotDoorMaterial,
     ].forEach((material) => sharedMaterials.add(material))
 
     const raycaster = new THREE.Raycaster()
@@ -429,9 +496,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     let pinchStartDistance = 0
     let pinchStartZoom = activeZoom
     let trainPieces: readonly RailPiece[] = optionsRef.current.pieces
-    let trainMotion: RailTrainMotion | null = createInitialRailTrainMotion(trainPieces)
-    let lastTrainStatus: RailTrainStatus | null = null
+    let fleet: RailFleetTrain[] = createInitialRailFleet(trainPieces, 2)
+    const lastTrainStatuses = new Map<string, RailTrainStatus>()
+    let lastFleetKey = ''
     let lastOccupiedKey = ''
+    let followedTrainId: string | null = null
     let lastFrameTime = typeof performance === 'undefined' ? 0 : performance.now()
     const trainSound: RailTrainSoundController = createRailTrainSoundController(
       optionsRef.current.soundEnabled ?? true,
@@ -523,17 +592,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }
     }
 
-    function makeTrainCar(index: number): THREE.Group {
+    function makeTrainCar(runtime: TrainVisualRuntime, trainId: string, index: number): THREE.Group {
       const group = new THREE.Group()
-      group.name = index === 0 ? 'train-lead-car' : `train-car-${index + 1}`
+      group.name = index === 0 ? `${trainId}-lead-car` : `${trainId}-car-${index + 1}`
 
-      const body = new THREE.Mesh(trainBodyGeometry, trainBodyMaterial)
+      const body = new THREE.Mesh(trainBodyGeometry, runtime.bodyMaterial)
       body.position.y = 0.84
       body.castShadow = true
       body.receiveShadow = true
       group.add(body)
 
-      const front = new THREE.Mesh(trainFrontGeometry, trainFrontMaterial)
+      const front = new THREE.Mesh(trainFrontGeometry, runtime.frontMaterial)
       front.position.set(1.06, 0.85, 0)
       front.castShadow = true
       group.add(front)
@@ -542,7 +611,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       skirt.position.set(-0.03, 0.44, 0)
       group.add(skirt)
 
-      const roof = new THREE.Mesh(trainRoofGeometry, trainRoofMaterial)
+      const roof = new THREE.Mesh(trainRoofGeometry, runtime.roofMaterial)
       roof.position.y = 1.31
       roof.castShadow = true
       group.add(roof)
@@ -589,48 +658,81 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         coupler.position.set(x, 0.62, 0)
         group.add(coupler)
       }
-      trainRoot.add(group)
-      trainCars.push(group)
-      trainWheelPivots.push(wheelPivots)
+      runtime.root.add(group)
+      runtime.cars.push(group)
+      runtime.wheelPivots.push(wheelPivots)
       return group
     }
 
-    for (let index = 0; index < 2; index += 1) makeTrainCar(index)
+    function ensureTrainVisuals() {
+      const fleetIds = new Set(fleet.map((train) => train.id))
+      for (const [trainId, runtime] of trainVisuals) {
+        if (fleetIds.has(trainId)) continue
+        trainRoot.remove(runtime.root)
+        trainVisuals.delete(trainId)
+      }
+      for (const train of fleet) {
+        if (trainVisuals.has(train.id)) continue
+        const bodyMaterial = trainBodyMaterial.clone()
+        bodyMaterial.color.set(train.appearance.color)
+        const frontMaterial = trainFrontMaterial.clone()
+        frontMaterial.color.set(train.appearance.frontColor)
+        const roofMaterial = trainRoofMaterial.clone()
+        roofMaterial.color.set(train.appearance.roofColor)
+        sharedMaterials.add(bodyMaterial)
+        sharedMaterials.add(frontMaterial)
+        sharedMaterials.add(roofMaterial)
+        const runtime: TrainVisualRuntime = {
+          root: new THREE.Group(),
+          cars: [],
+          wheelPivots: [],
+          bodyMaterial,
+          frontMaterial,
+          roofMaterial,
+        }
+        runtime.root.name = train.id
+        trainRoot.add(runtime.root)
+        trainVisuals.set(train.id, runtime)
+        for (let index = 0; index < 2; index += 1) makeTrainCar(runtime, train.id, index)
+      }
+    }
 
     function updateTrainVisuals(delta = 0) {
-      if (trainMotion === null) {
-        trainRoot.visible = false
-        return
-      }
-      const poses = sampleRailTrainCars(trainPieces, trainMotion.cursor, trainCars.length)
-      trainRoot.visible = poses.length > 0
-      const leadPiece = trainPieces.find((piece) => piece.id === trainMotion?.cursor.pieceId)
-      trainLightMaterial.emissiveIntensity = leadPiece?.kind === 'tunnel' ? 1.15 : 0.7
-      const wheelRotation = trainMotion.speed > 0.015 && delta > 0
-        ? (trainMotion.speed * delta) / 0.22
-        : 0
-      for (const [index, car] of trainCars.entries()) {
-        const pose = poses[index]
-        if (pose === undefined) {
-          car.visible = false
-          continue
+      ensureTrainVisuals()
+      trainRoot.visible = fleet.length > 0
+      let anyTrainInTunnel = false
+      for (const train of fleet) {
+        const runtime = trainVisuals.get(train.id)
+        if (runtime === undefined) continue
+        const poses = sampleRailTrainCars(trainPieces, train.motion.cursor, runtime.cars.length)
+        runtime.root.visible = poses.length > 0
+        const leadPiece = trainPieces.find((piece) => piece.id === train.motion.cursor.pieceId)
+        if (leadPiece?.kind === 'tunnel') anyTrainInTunnel = true
+        const wheelRotation = train.motion.speed > 0.015 && delta > 0
+          ? (train.motion.speed * delta) / 0.22
+          : 0
+        for (const [index, car] of runtime.cars.entries()) {
+          const pose = poses[index]
+          if (pose === undefined) {
+            car.visible = false
+            continue
+          }
+          car.visible = true
+          car.position.set(pose.position.x, pose.position.y, pose.position.z)
+          trainForwardVector.set(pose.forward.x, pose.forward.y, pose.forward.z).normalize()
+          // yawとpitchだけに分解し、坂や分岐でも車体へrollを混ぜない。
+          const yaw = Math.atan2(-trainForwardVector.z, trainForwardVector.x)
+          const horizontalLength = Math.hypot(trainForwardVector.x, trainForwardVector.z)
+          const pitch = Math.atan2(trainForwardVector.y, horizontalLength)
+          trainYawQuaternion.setFromAxisAngle(trainYawAxis, yaw)
+          trainPitchQuaternion.setFromAxisAngle(trainPitchAxis, pitch)
+          car.quaternion.copy(trainYawQuaternion).multiply(trainPitchQuaternion)
+          if (wheelRotation > 0) {
+            for (const wheel of runtime.wheelPivots[index] ?? []) wheel.rotation.z -= wheelRotation
+          }
         }
-        car.visible = true
-        car.position.set(pose.position.x, pose.position.y, pose.position.z)
-        trainForwardVector.set(pose.forward.x, pose.forward.y, pose.forward.z).normalize()
-        // yawとpitchだけで車体を経路接線へ合わせる。+Xから直接
-        // setFromUnitVectorsすると、yaw+pitchの組み合わせによって
-        // rollが混ざり得るため、玩具車両が横倒しにならないよう分解する。
-        const yaw = Math.atan2(-trainForwardVector.z, trainForwardVector.x)
-        const horizontalLength = Math.hypot(trainForwardVector.x, trainForwardVector.z)
-        const pitch = Math.atan2(trainForwardVector.y, horizontalLength)
-        trainYawQuaternion.setFromAxisAngle(trainYawAxis, yaw)
-        trainPitchQuaternion.setFromAxisAngle(trainPitchAxis, pitch)
-        car.quaternion.copy(trainYawQuaternion).multiply(trainPitchQuaternion)
-        if (wheelRotation > 0) {
-          for (const wheel of trainWheelPivots[index] ?? []) wheel.rotation.z -= wheelRotation
-        }
       }
+      trainLightMaterial.emissiveIntensity = anyTrainInTunnel ? 1.15 : 0.7
     }
 
     function triggerStationPulse(pieceId: string | null) {
@@ -683,24 +785,31 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     }
 
     function reportTrainState() {
-      const status = trainMotion?.status ?? 'ready'
-      if (status !== lastTrainStatus) {
-        const previousStatus = lastTrainStatus
-        lastTrainStatus = status
-        optionsRef.current.onTrainStatusChange?.(status)
+      for (const train of fleet) {
+        const status = train.motion.status
+        const previousStatus = lastTrainStatuses.get(train.id) ?? null
+        if (status === previousStatus) continue
+        lastTrainStatuses.set(train.id, status)
+        if (train === fleet[0]) optionsRef.current.onTrainStatusChange?.(status)
         const enabled = optionsRef.current.soundEnabled ?? true
-        if (status === 'running' && (previousStatus === 'ready' || previousStatus === 'waiting')) {
+        if (status === 'running' && (previousStatus === 'ready' || previousStatus === 'waiting' || previousStatus === 'paused')) {
           playRailDepartureSound(enabled)
         } else if (status === 'stoppedAtStation') {
           playRailStationStopSound(enabled)
-          triggerStationPulse(trainMotion?.cursor.pieceId ?? null)
+          triggerStationPulse(train.motion.cursor.pieceId)
         } else if (status === 'departing' && previousStatus === 'stoppedAtStation') {
           playRailStationDepartureSound(enabled)
         }
       }
-      const occupied = trainMotion === null
-        ? []
-        : getOccupiedRailPieceIds(trainPieces, trainMotion.cursor, trainCars.length)
+      const summaries = summarizeRailFleet(fleet)
+      const fleetKey = summaries
+        .map((train) => `${train.id}:${train.status}:${train.wantsToRun ? 1 : 0}:${train.blocked ? 1 : 0}`)
+        .join('|')
+      if (fleetKey !== lastFleetKey) {
+        lastFleetKey = fleetKey
+        optionsRef.current.onFleetChange?.(summaries)
+      }
+      const occupied = occupiedRailFleetPieceIds(fleet, trainPieces)
       const occupiedKey = occupied.join('\u0000')
       if (occupiedKey !== lastOccupiedKey) {
         lastOccupiedKey = occupiedKey
@@ -708,22 +817,43 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }
     }
 
-    function startTrainNow() {
+    function startTrainNow(trainId: string) {
       if (optionsRef.current.soundEnabled ?? true) primeAudio()
-      if (trainMotion === null) trainMotion = createInitialRailTrainMotion(trainPieces)
-      if (trainMotion !== null) trainMotion = startRailTrain(trainMotion)
+      fleet = setRailFleetTrainRunning(fleet, trainId, true)
       updateTrainVisuals()
       reportTrainState()
     }
 
-    function focusTrainNow() {
-      if (trainMotion === null) return
-      const pose = sampleRailTrainPose(trainPieces, trainMotion.cursor)
+    function pauseTrainNow(trainId: string) {
+      fleet = setRailFleetTrainRunning(fleet, trainId, false)
+      updateTrainVisuals()
+      reportTrainState()
+    }
+
+    function addTrainNow() {
+      fleet = addRailFleetTrain(fleet, trainPieces)
+      updateTrainVisuals()
+      reportTrainState()
+    }
+
+    function focusTrainNow(trainId: string) {
+      const train = fleet.find((candidate) => candidate.id === trainId)
+      if (train === undefined) return
+      followedTrainId = trainId
+      const pose = sampleRailTrainPose(trainPieces, train.motion.cursor)
       if (pose !== null) setCameraTarget(pose.position)
     }
 
+    function focusDepotNow() {
+      followedTrainId = null
+      setCameraTarget(DEPOT_POSITION)
+    }
+
     startTrainRef.current = startTrainNow
+    pauseTrainRef.current = pauseTrainNow
+    addTrainRef.current = addTrainNow
     focusTrainRef.current = focusTrainNow
+    focusDepotRef.current = focusDepotNow
 
     function addPieceFacilityDetails(group: THREE.Group, localPiece: RailPiece) {
       const pieceId = localPiece.id
@@ -881,7 +1011,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       group.name = `rail-${piece.id}`
       group.userData.pieceId = piece.id
 
-      const segmentCount = piece.kind === 'curve'
+      const segmentCount = piece.kind === 'curve' || piece.kind === 'branch'
         ? 12
         : piece.kind === 'slope'
           ? 16
@@ -891,7 +1021,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const sleeperEvery = piece.kind === 'curve' || piece.kind === 'slope' ? 2 : 1
       const localPiece = { ...piece, position: vec3(0, 0, 0), rotationY: 0 }
       const baseInstances = new THREE.InstancedMesh(baseGeometry, baseMaterial, segmentCount)
-      const railInstances = new THREE.InstancedMesh(railGeometry, railMaterial, segmentCount * 2)
+      const mainRailMaterial = piece.kind === 'branch'
+        ? piece.branchDirection === 'c' ? branchDimRailMaterial : branchSelectedRailMaterial
+        : railMaterial
+      const railInstances = new THREE.InstancedMesh(railGeometry, mainRailMaterial, segmentCount * 2)
       const sleeperCount = Math.ceil(segmentCount / sleeperEvery)
       const sleeperInstances = new THREE.InstancedMesh(sleeperGeometry, sleeperMaterial, sleeperCount)
       for (const instances of [baseInstances, railInstances, sleeperInstances]) {
@@ -957,8 +1090,75 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       sleeperInstances.computeBoundingSphere()
       group.add(baseInstances, railInstances, sleeperInstances)
 
+      if (piece.kind === 'branch' && piece.branchPath !== undefined) {
+        const branchSegmentCount = 12
+        const branchBases = new THREE.InstancedMesh(baseGeometry, baseMaterial, branchSegmentCount)
+        const branchRails = new THREE.InstancedMesh(
+          railGeometry,
+          piece.branchDirection === 'c' ? branchSelectedRailMaterial : branchDimRailMaterial,
+          branchSegmentCount * 2,
+        )
+        const branchSleepers = new THREE.InstancedMesh(sleeperGeometry, sleeperMaterial, branchSegmentCount)
+        for (const instances of [branchBases, branchRails, branchSleepers]) {
+          instances.userData.pieceId = piece.id
+          instances.instanceMatrix.setUsage(THREE.StaticDrawUsage)
+          instances.receiveShadow = true
+        }
+        let branchRailIndex = 0
+        for (let index = 0; index < branchSegmentCount; index += 1) {
+          const t0 = index / branchSegmentCount
+          const t1 = (index + 1) / branchSegmentCount
+          // localPieceはposition/rotationが0で、group側へworld transformを
+          // 一度だけ適用する。副Pathを明示し、二重変換を避ける。
+          const p0 = worldRailPathPoint(localPiece, t0, piece.branchPath)
+          const p1 = worldRailPathPoint(localPiece, t1, piece.branchPath)
+          const midpoint = vec3((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2)
+          const tangent = vec3(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z)
+          const tangentLength = Math.hypot(tangent.x, tangent.y, tangent.z) || 1
+          segmentTangentVector.set(tangent.x, tangent.y, tangent.z).normalize()
+          instanceQuaternion.setFromUnitVectors(trainBaseForward, segmentTangentVector)
+          instancePosition.set(midpoint.x, midpoint.y, midpoint.z)
+
+          instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
+          instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
+          instanceDummy.position.set(0, 0.1, 0)
+          instanceDummy.quaternion.identity()
+          instanceDummy.scale.setScalar(1)
+          instanceDummy.updateMatrix()
+          instanceMatrix.multiply(instanceDummy.matrix)
+          branchBases.setMatrixAt(index, instanceMatrix)
+
+          for (const side of [-1, 1]) {
+            instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
+            instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
+            instanceDummy.position.set(0, 0.34, (RAIL_VISUAL_CONFIG.gauge / 2) * side)
+            instanceDummy.quaternion.identity()
+            instanceDummy.scale.setScalar(1)
+            instanceDummy.updateMatrix()
+            instanceMatrix.multiply(instanceDummy.matrix)
+            branchRails.setMatrixAt(branchRailIndex, instanceMatrix)
+            branchRailIndex += 1
+          }
+
+          instanceScale.setScalar(1)
+          instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
+          instanceDummy.position.set(0, 0.2, 0)
+          instanceDummy.quaternion.identity()
+          instanceDummy.scale.setScalar(1)
+          instanceDummy.updateMatrix()
+          instanceMatrix.multiply(instanceDummy.matrix)
+          branchSleepers.setMatrixAt(index, instanceMatrix)
+        }
+        for (const instances of [branchBases, branchRails, branchSleepers]) {
+          instances.instanceMatrix.needsUpdate = true
+          instances.computeBoundingSphere()
+        }
+        group.add(branchBases, branchRails, branchSleepers)
+        branchRouteVisuals.set(piece.id, { b: railInstances, c: branchRails })
+      }
+
       const capsForPiece: Partial<Record<RailConnectorId, THREE.Mesh>> = {}
-      for (const connectorId of ['a', 'b'] as RailConnectorId[]) {
+      for (const connectorId of getRailConnectorIds(piece)) {
         const connector = worldConnectorForRailPiece(localPiece, connectorId)
         const cap = new THREE.Mesh(connectorGeometry, connectorMaterial)
         cap.position.set(connector.position.x, connector.position.y + 0.25, connector.position.z)
@@ -984,7 +1184,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
     function syncPieces(pieces: readonly RailPiece[], selectedPieceId: string | null) {
       trainPieces = pieces
-      if (trainMotion === null && pieces.length > 0) trainMotion = createInitialRailTrainMotion(pieces)
+      if (fleet.length === 0 && pieces.length > 0) fleet = createInitialRailFleet(pieces, 2)
       const incomingIds = new Set(pieces.map((piece) => piece.id))
       for (const [pieceId, object] of pieceObjects) {
         if (incomingIds.has(pieceId)) continue
@@ -992,6 +1192,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         pieceObjects.delete(pieceId)
         selectionRings.delete(pieceId)
         connectorCaps.delete(pieceId)
+        branchRouteVisuals.delete(pieceId)
         stationPulseTargets.delete(pieceId)
       }
       for (const piece of pieces) {
@@ -1005,10 +1206,16 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         object.rotation.y = piece.rotationY
         const caps = connectorCaps.get(piece.id)
         if (caps !== undefined) {
-          for (const connectorId of ['a', 'b'] as RailConnectorId[]) {
+          for (const connectorId of getRailConnectorIds(piece)) {
             const cap = caps[connectorId]
             if (cap !== undefined) cap.visible = piece.connections[connectorId] === undefined
           }
+        }
+        const branchRoutes = branchRouteVisuals.get(piece.id)
+        if (branchRoutes !== undefined) {
+          const selected = piece.branchDirection === 'c' ? 'c' : 'b'
+          branchRoutes.b.material = selected === 'b' ? branchSelectedRailMaterial : branchDimRailMaterial
+          branchRoutes.c.material = selected === 'c' ? branchSelectedRailMaterial : branchDimRailMaterial
         }
       }
       updateSelection(selectedPieceId)
@@ -1057,6 +1264,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       if (normalCandidate === null) return layout
       const draggedPiece = layout.find((piece) => piece.id === draggedPieceId)
       if (draggedPiece === undefined) return layout
+      const normalTarget = layout.find((piece) => piece.id === normalCandidate.targetPieceId)
+      if (draggedPiece.kind === 'branch' || normalTarget?.kind === 'branch') return layout
       const looseConnectorId: RailConnectorId = normalCandidate.movingConnectorId === 'a' ? 'b' : 'a'
       if (draggedPiece.connections[looseConnectorId] !== undefined) return layout
 
@@ -1070,6 +1279,20 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       if (loopCandidate === null) return layout
 
       const closedLayout = applyRailLoopClosure(layout, loopCandidate)
+      const lockedPieceIds = optionsRef.current.lockedPieceIds
+      if (lockedPieceIds !== undefined) {
+        const movedLockedPiece = [...lockedPieceIds].some((pieceId) => {
+          const before = layout.find((piece) => piece.id === pieceId)
+          const after = closedLayout.find((piece) => piece.id === pieceId)
+          if (before === undefined || after === undefined) return false
+          return Math.abs(before.position.x - after.position.x) > 1e-7
+            || Math.abs(before.position.y - after.position.y) > 1e-7
+            || Math.abs(before.position.z - after.position.z) > 1e-7
+            || Math.abs(before.rotationY - after.rotationY) > 1e-7
+        })
+        // 通常接続は維持し、列車がいるchainへ分散補正だけをかけない。
+        if (movedLockedPiece) return layout
+      }
       // triggerSnapGlowはtrainPiecesからtargetPieceIdの現在位置を引くため、
       // syncPieces()を待たずにここで先に反映しておく（targetPieceIdは
       // 今まさにドラッグで動いたdraggedPiece自身なので、古い位置のままだと
@@ -1161,6 +1384,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           mode = 'rail'
         }
       } else {
+        followedTrainId = null
         mode = 'pan'
         panLastGround = intersectGround(event)
       }
@@ -1347,6 +1571,25 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         }
         dioramaRoot.add(group)
       })
+
+      const depot = new THREE.Group()
+      depot.name = 'toy-train-depot'
+      depot.position.set(DEPOT_POSITION.x, DEPOT_POSITION.y, DEPOT_POSITION.z)
+      const depotBody = new THREE.Mesh(depotBodyGeometry, depotBodyMaterial)
+      depotBody.position.y = 0.83
+      depotBody.castShadow = true
+      depotBody.receiveShadow = true
+      const depotRoof = new THREE.Mesh(depotRoofGeometry, depotRoofMaterial)
+      depotRoof.position.y = 1.82
+      depotRoof.castShadow = true
+      for (const z of [-1.05, 0, 1.05]) {
+        const depotDoor = new THREE.Mesh(depotDoorGeometry, depotDoorMaterial)
+        depotDoor.position.set(2.13, 0.7, z)
+        depotDoor.rotation.y = Math.PI / 2
+        depot.add(depotDoor)
+      }
+      depot.add(depotBody, depotRoof)
+      dioramaRoot.add(depot)
     }
 
     try {
@@ -1429,17 +1672,35 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         const now = typeof performance === 'undefined' ? lastFrameTime : performance.now()
         const delta = lastFrameTime <= 0 ? 0 : Math.min(0.1, Math.max(0, (now - lastFrameTime) / 1000))
         lastFrameTime = now
-        if (trainMotion !== null && delta > 0) {
-          trainMotion = updateRailTrainMotion(trainMotion, trainPieces, delta)
+        if (fleet.length > 0 && delta > 0) {
+          fleet = updateRailFleet(fleet, trainPieces, delta)
           updateTrainVisuals(delta)
           reportTrainState()
         }
+        if (followedTrainId !== null && delta > 0) {
+          const followed = fleet.find((train) => train.id === followedTrainId)
+          const pose = followed === undefined ? null : sampleRailTrainPose(trainPieces, followed.motion.cursor)
+          if (pose !== null) {
+            const alpha = 1 - Math.exp(-delta * 7)
+            setCameraTarget({
+              x: cameraTarget.x + (pose.position.x - cameraTarget.x) * alpha,
+              y: 0,
+              z: cameraTarget.z + (pose.position.z - cameraTarget.z) * alpha,
+            })
+          }
+        }
         updateFeedbackAnimations(delta)
         trainSound.setEnabled(optionsRef.current.soundEnabled ?? true)
-        const leadPiece = trainPieces.find((piece) => piece.id === trainMotion?.cursor.pieceId)
+        const representative = fleet.find((train) => train.id === followedTrainId)
+          ?? fleet.find((train) => train.wantsToRun)
+          ?? fleet[0]
+        const leadPiece = trainPieces.find((piece) => piece.id === representative?.motion.cursor.pieceId)
+        const soundStatus = representative?.motion.status === 'paused'
+          ? 'ready'
+          : representative?.motion.status ?? 'ready'
         trainSound.update(
-          trainMotion?.speed ?? 0,
-          trainMotion?.status ?? 'ready',
+          representative?.motion.speed ?? 0,
+          soundStatus,
           leadPiece?.kind === 'tunnel',
         )
         renderer.render(scene, camera)
@@ -1463,7 +1724,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       syncSceneRef.current = null
       syncZoomRef.current = null
       startTrainRef.current = null
+      pauseTrainRef.current = null
+      addTrainRef.current = null
       focusTrainRef.current = null
+      focusDepotRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)
       resizeObserver?.disconnect()
       if (resizeObserver === null) window.removeEventListener('resize', resize)
