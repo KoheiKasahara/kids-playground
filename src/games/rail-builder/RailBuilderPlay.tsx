@@ -8,6 +8,7 @@ import {
   type RailPieceKind,
   type RailVec3,
 } from './railModel'
+import type { RailTrainStatus } from './railTrainModel'
 import styles from './RailBuilderPlay.module.css'
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, useRailBuilderEngine } from './useRailBuilderEngine'
 
@@ -58,7 +59,7 @@ function nextPieceId(pieces: readonly RailPiece[]): string {
 
 function RailPreview({ kind }: { kind: RailPieceKind }) {
   return (
-    <span className={`${styles.preview} ${kind === 'curve' ? styles.curvePreview : ''}`} aria-hidden="true">
+    <span className={`${styles.preview} ${styles[`${kind}Preview` as keyof typeof styles] ?? ''}`} aria-hidden="true">
       <span className={styles.previewRail} />
       <span className={styles.previewRail} />
       <span className={styles.previewSleeper} />
@@ -76,7 +77,7 @@ export default function RailBuilderPlay() {
   })))
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>('rail-1')
   const [zoom, setZoom] = useState(1)
-  const [trainStatus, setTrainStatus] = useState<'ready' | 'running' | 'waiting'>('ready')
+  const [trainStatus, setTrainStatus] = useState<RailTrainStatus>('ready')
   const [occupiedRailIds, setOccupiedRailIds] = useState<string[]>([])
 
   const selectedPiece = pieces.find((piece) => piece.id === selectedPieceId)
@@ -129,11 +130,18 @@ export default function RailBuilderPlay() {
 
   const hint = useMemo(() => {
     if (selectedPieceIsOccupied) return 'でんしゃが のっている せんろは そのままだよ'
+    if (trainStatus === 'stoppedAtStation') return 'えきで ひとやすみ。すぐ しゅっぱつするよ'
+    if (trainStatus === 'approachingStation') return 'えきに ちかづいているよ'
+    if (trainStatus === 'departing') return 'えきから しゅっぱつしたよ'
     if (trainStatus === 'waiting') return 'まってるよ。せんろを つないで すすもう'
     if (selectedPiece === undefined) return 'せんろを えらんで うごかそう'
     return 'せんろを つかんで つなげよう'
   }, [selectedPiece, selectedPieceIsOccupied, trainStatus])
 
+  const trainIsBusy = trainStatus === 'running'
+    || trainStatus === 'approachingStation'
+    || trainStatus === 'stoppedAtStation'
+    || trainStatus === 'departing'
   const launchLabel = trainStatus === 'ready'
     ? 'しゅっぱつ'
     : trainStatus === 'waiting'
@@ -172,7 +180,7 @@ export default function RailBuilderPlay() {
             type="button"
             className={styles.launchButton}
             onClick={startTrain}
-            disabled={trainStatus === 'running'}
+            disabled={trainIsBusy}
             aria-label={launchLabel}
           >
             <span aria-hidden="true">🚂</span>
@@ -192,6 +200,26 @@ export default function RailBuilderPlay() {
             <button type="button" className={styles.toolButton} onClick={() => addPiece('curve')} aria-label="カーブを ついか">
               <RailPreview kind="curve" />
               <span>カーブ</span>
+            </button>
+            <button type="button" className={styles.toolButton} onClick={() => addPiece('short-straight')} aria-label="みじかい せんろを ついか">
+              <RailPreview kind="short-straight" />
+              <span>みじかい</span>
+            </button>
+            <button type="button" className={styles.toolButton} onClick={() => addPiece('slope')} aria-label="さかみちを ついか">
+              <RailPreview kind="slope" />
+              <span>さか</span>
+            </button>
+            <button type="button" className={styles.toolButton} onClick={() => addPiece('bridge')} aria-label="はしを ついか">
+              <RailPreview kind="bridge" />
+              <span>はし</span>
+            </button>
+            <button type="button" className={styles.toolButton} onClick={() => addPiece('station')} aria-label="えきを ついか">
+              <RailPreview kind="station" />
+              <span>えき</span>
+            </button>
+            <button type="button" className={styles.toolButton} onClick={() => addPiece('tunnel')} aria-label="トンネルを ついか">
+              <RailPreview kind="tunnel" />
+              <span>トンネル</span>
             </button>
             <button type="button" className={styles.toolButton} onClick={rotateSelected} disabled={selectedPiece === undefined || selectedPieceIsOccupied} aria-label="せんろを 90ど まわす">
               <span className={styles.actionIcon} aria-hidden="true">↻</span>

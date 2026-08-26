@@ -4,10 +4,12 @@ import {
   clampRailPosition,
   connectRailPieces,
   disconnectRailPiece,
+  findRailSnapNearMiss,
   findRailSnapCandidate,
   type RailConnectorId,
   type RailPiece,
   type RailVec3,
+  type SnapNearMiss,
   type SnapCandidate,
   worldConnectorForRailPiece,
   worldRailPathPoint,
@@ -68,6 +70,7 @@ type DragState = {
   startY: number
   moved: boolean
   candidate: SnapCandidate | null
+  nearMiss: SnapNearMiss | null
 }
 
 function clampZoom(value: number): number {
@@ -198,6 +201,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainDoorGeometry = new THREE.BoxGeometry(0.36, 0.57, 0.035)
     const trainWheelGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.13, 16)
     const trainCouplerGeometry = new THREE.BoxGeometry(0.34, 0.16, 0.16)
+    const bridgeBeamGeometry = new THREE.BoxGeometry(1, 0.26, 0.38)
+    const bridgeSupportGeometry = new THREE.BoxGeometry(0.42, 1, 0.42)
+    const bridgeGuardGeometry = new THREE.BoxGeometry(1, 0.16, 0.13)
+    const stationPlatformGeometry = new THREE.BoxGeometry(1, 0.28, 1.12)
+    const stationRoofGeometry = new THREE.BoxGeometry(1, 0.22, 3.2)
+    const stationColumnGeometry = new THREE.BoxGeometry(0.2, 1, 0.2)
+    const stationSignGeometry = new THREE.BoxGeometry(0.86, 0.58, 0.14)
+    const stationBenchGeometry = new THREE.BoxGeometry(0.78, 0.18, 0.25)
+    const tunnelTopGeometry = new THREE.BoxGeometry(1, 0.34, 2.75)
+    const tunnelWallGeometry = new THREE.BoxGeometry(1, 1.25, 0.26)
+    const tunnelRingGeometry = new THREE.TorusGeometry(1.4, 0.13, 8, 18)
     ;[
       railGeometry,
       baseGeometry,
@@ -213,6 +227,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       trainDoorGeometry,
       trainWheelGeometry,
       trainCouplerGeometry,
+      bridgeBeamGeometry,
+      bridgeSupportGeometry,
+      bridgeGuardGeometry,
+      stationPlatformGeometry,
+      stationRoofGeometry,
+      stationColumnGeometry,
+      stationSignGeometry,
+      stationBenchGeometry,
+      tunnelTopGeometry,
+      tunnelWallGeometry,
+      tunnelRingGeometry,
     ].forEach((geometry) => sharedGeometries.add(geometry))
 
     const railMaterial = new THREE.MeshStandardMaterial({ color: '#6b7280', roughness: 0.48, metalness: 0.3 })
@@ -238,6 +263,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainDoorMaterial = new THREE.MeshStandardMaterial({ color: '#fef3c7', roughness: 0.68 })
     const trainWheelMaterial = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.85 })
     const trainCouplerMaterial = new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.8 })
+    const bridgeMaterial = new THREE.MeshStandardMaterial({ color: '#b77945', roughness: 0.82 })
+    const bridgeGuardMaterial = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.64 })
+    const stationPlatformMaterial = new THREE.MeshStandardMaterial({ color: '#f4c96b', roughness: 0.76 })
+    const stationRoofMaterial = new THREE.MeshStandardMaterial({ color: '#ef6b73', roughness: 0.64 })
+    const stationColumnMaterial = new THREE.MeshStandardMaterial({ color: '#eab308', roughness: 0.7 })
+    const stationSignMaterial = new THREE.MeshStandardMaterial({ color: '#38bdf8', roughness: 0.54 })
+    const stationBenchMaterial = new THREE.MeshStandardMaterial({ color: '#b45309', roughness: 0.8 })
+    const tunnelMaterial = new THREE.MeshStandardMaterial({ color: '#818cf8', roughness: 0.8 })
+    const tunnelInnerMaterial = new THREE.MeshStandardMaterial({ color: '#6366f1', roughness: 0.86 })
     ;[
       railMaterial,
       baseMaterial,
@@ -252,6 +286,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       trainDoorMaterial,
       trainWheelMaterial,
       trainCouplerMaterial,
+      bridgeMaterial,
+      bridgeGuardMaterial,
+      stationPlatformMaterial,
+      stationRoofMaterial,
+      stationColumnMaterial,
+      stationSignMaterial,
+      stationBenchMaterial,
+      tunnelMaterial,
+      tunnelInnerMaterial,
     ].forEach((material) => sharedMaterials.add(material))
 
     const groundGeometry = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE)
@@ -269,6 +312,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       cameraTargetRef.current.z,
     )
     const cameraOffset = new THREE.Vector3(18, 23, 20)
+    const trainForwardVector = new THREE.Vector3()
+    const trainBaseForward = new THREE.Vector3(1, 0, 0)
+    const segmentTangentVector = new THREE.Vector3()
+    const trainYawAxis = new THREE.Vector3(0, 1, 0)
+    const trainPitchAxis = new THREE.Vector3(0, 0, 1)
+    const trainYawQuaternion = new THREE.Quaternion()
+    const trainPitchQuaternion = new THREE.Quaternion()
     const pointers = new Map<number, PointerPosition>()
     let activeZoom = clampZoom(optionsRef.current.zoom || DEFAULT_ZOOM)
     let mode: 'none' | 'pan' | 'rail' | 'pinch' = 'none'
@@ -346,13 +396,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       return null
     }
 
-    function setMarker(candidate: SnapCandidate | null) {
-      marker.visible = candidate !== null
-      if (candidate === null) return
-      const targetPiece = optionsRef.current.pieces.find((piece) => piece.id === candidate.targetPieceId)
+    function setMarker(feedback: SnapCandidate | SnapNearMiss | null) {
+      marker.visible = feedback !== null
+      markerMaterial.color.set(feedback === null || 'transform' in feedback ? '#fef08a' : '#fb7185')
+      if (feedback === null) return
+      const targetPiece = optionsRef.current.pieces.find((piece) => piece.id === feedback.targetPieceId)
       if (targetPiece === undefined) return
-      const target = worldConnectorForRailPiece(targetPiece, candidate.targetConnectorId)
-      marker.position.set(target.position.x, 0.31, target.position.z)
+      const target = worldConnectorForRailPiece(targetPiece, feedback.targetConnectorId)
+      marker.position.set(target.position.x, target.position.y + 0.38, target.position.z)
     }
 
     function updateSelection(selectedPieceId: string | null) {
@@ -426,7 +477,16 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         }
         car.visible = true
         car.position.set(pose.position.x, pose.position.y, pose.position.z)
-        car.rotation.y = Math.atan2(-pose.forward.z, pose.forward.x)
+        trainForwardVector.set(pose.forward.x, pose.forward.y, pose.forward.z).normalize()
+        // yawとpitchだけで車体を経路接線へ合わせる。+Xから直接
+        // setFromUnitVectorsすると、yaw+pitchの組み合わせによって
+        // rollが混ざり得るため、玩具車両が横倒しにならないよう分解する。
+        const yaw = Math.atan2(-trainForwardVector.z, trainForwardVector.x)
+        const horizontalLength = Math.hypot(trainForwardVector.x, trainForwardVector.z)
+        const pitch = Math.atan2(trainForwardVector.y, horizontalLength)
+        trainYawQuaternion.setFromAxisAngle(trainYawAxis, yaw)
+        trainPitchQuaternion.setFromAxisAngle(trainPitchAxis, pitch)
+        car.quaternion.copy(trainYawQuaternion).multiply(trainPitchQuaternion)
       }
     }
 
@@ -462,66 +522,207 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     startTrainRef.current = startTrainNow
     focusTrainRef.current = focusTrainNow
 
+    function addPieceFacilityDetails(group: THREE.Group, localPiece: RailPiece) {
+      const pieceId = localPiece.id
+      const addMesh = (
+        geometry: THREE.BufferGeometry,
+        material: THREE.Material,
+        position: RailVec3,
+        scale?: RailVec3,
+        rotation?: RailVec3,
+      ) => {
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.position.set(position.x, position.y, position.z)
+        if (scale !== undefined) mesh.scale.set(scale.x, scale.y, scale.z)
+        if (rotation !== undefined) mesh.rotation.set(rotation.x, rotation.y, rotation.z)
+        mesh.userData.pieceId = pieceId
+        group.add(mesh)
+        return mesh
+      }
+
+      const addOrientedPathMesh = (
+        geometry: THREE.BufferGeometry,
+        material: THREE.Material,
+        t0: number,
+        t1: number,
+        localY: number,
+        localZ: number,
+      ) => {
+        const p0 = worldRailPathPoint(localPiece, t0)
+        const p1 = worldRailPathPoint(localPiece, t1)
+        const midpoint = vec3((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2)
+        const tangent = vec3(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z)
+        const tangentLength = Math.hypot(tangent.x, tangent.y, tangent.z) || 1
+        const segment = new THREE.Group()
+        segment.position.set(midpoint.x, midpoint.y, midpoint.z)
+        segmentTangentVector.set(tangent.x, tangent.y, tangent.z).normalize()
+        segment.quaternion.setFromUnitVectors(trainBaseForward, segmentTangentVector)
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.position.set(0, localY, localZ)
+        mesh.scale.x = Math.max(0.4, tangentLength)
+        mesh.userData.pieceId = pieceId
+        segment.add(mesh)
+        group.add(segment)
+      }
+
+      if (localPiece.kind === 'bridge') {
+        const segmentCount = 4
+        for (let index = 0; index < segmentCount; index += 1) {
+          const t0 = index / segmentCount
+          const t1 = (index + 1) / segmentCount
+          addOrientedPathMesh(bridgeBeamGeometry, bridgeMaterial, t0, t1, -0.36, 0)
+          addOrientedPathMesh(bridgeGuardGeometry, bridgeGuardMaterial, t0, t1, 0.82, -0.72)
+          addOrientedPathMesh(bridgeGuardGeometry, bridgeGuardMaterial, t0, t1, 0.82, 0.72)
+        }
+        for (const t of [0.18, 0.5, 0.82]) {
+          const point = worldRailPathPoint(localPiece, t)
+          const supportHeight = Math.max(0.75, point.y)
+          addMesh(
+            bridgeSupportGeometry,
+            bridgeMaterial,
+            { x: point.x, y: supportHeight / 2 - 0.02, z: point.z },
+            { x: 1, y: supportHeight, z: 1 },
+          )
+        }
+      }
+
+      if (localPiece.kind === 'station') {
+        const stationCenter = worldRailPathPoint(localPiece, 0.5)
+        const stationLength = localPiece.path.kind === 'straight' ? localPiece.path.length : 7
+        for (const side of [-1, 1]) {
+          addMesh(
+            stationPlatformGeometry,
+            stationPlatformMaterial,
+            { x: stationCenter.x, y: stationCenter.y + 0.18, z: stationCenter.z + side * 1.12 },
+            { x: stationLength * 0.92, y: 1, z: 1 },
+          )
+        }
+        addMesh(
+          stationRoofGeometry,
+          stationRoofMaterial,
+          { x: stationCenter.x, y: stationCenter.y + 2.45, z: stationCenter.z },
+          { x: stationLength * 0.9, y: 1, z: 1 },
+        )
+        for (const x of [-2.35, 2.35]) {
+          for (const z of [-1.18, 1.18]) {
+            addMesh(
+              stationColumnGeometry,
+              stationColumnMaterial,
+              { x: stationCenter.x + x, y: stationCenter.y + 1.22, z: stationCenter.z + z },
+              { x: 1, y: 2.44, z: 1 },
+            )
+          }
+        }
+        addMesh(
+          stationSignGeometry,
+          stationSignMaterial,
+          { x: stationCenter.x, y: stationCenter.y + 2.12, z: stationCenter.z + 1.54 },
+        )
+        addMesh(
+          stationBenchGeometry,
+          stationBenchMaterial,
+          { x: stationCenter.x, y: stationCenter.y + 0.56, z: stationCenter.z + 1.12 },
+          { x: 1, y: 1, z: 1 },
+        )
+      }
+
+      if (localPiece.kind === 'tunnel' && localPiece.path.kind === 'straight') {
+        const tunnelLength = localPiece.path.length
+        // 上部は中央を開けた2本の屋根梁にして、上方カメラからも
+        // トンネル内部と列車を見失いにくくする。
+        for (const side of [-1, 1]) {
+          addMesh(
+            tunnelTopGeometry,
+            tunnelMaterial,
+            { x: 0, y: 1.62, z: side * 0.9 },
+            { x: tunnelLength, y: 1, z: 0.22 },
+          )
+        }
+        for (const side of [-1, 1]) {
+          addMesh(
+            tunnelWallGeometry,
+            tunnelInnerMaterial,
+            { x: 0, y: 0.78, z: side * 1.26 },
+            { x: tunnelLength, y: 1, z: 1 },
+          )
+        }
+        for (const x of [-tunnelLength / 2, tunnelLength / 2]) {
+          addMesh(
+            tunnelRingGeometry,
+            tunnelMaterial,
+            { x, y: 1.0, z: 0 },
+            { x: 1, y: 1, z: 1 },
+            { x: 0, y: Math.PI / 2, z: 0 },
+          )
+        }
+      }
+    }
+
     function makePieceObject(piece: RailPiece): THREE.Group {
       const group = new THREE.Group()
       group.name = `rail-${piece.id}`
       group.userData.pieceId = piece.id
 
-      const segmentCount = piece.path.kind === 'straight' ? 1 : 12
-      const sleeperEvery = piece.path.kind === 'straight' ? 1 : 2
+      const segmentCount = piece.kind === 'curve'
+        ? 12
+        : piece.kind === 'slope'
+          ? 16
+          : piece.kind === 'bridge' || piece.kind === 'station' || piece.kind === 'tunnel'
+            ? 8
+            : 1
+      const sleeperEvery = piece.kind === 'curve' || piece.kind === 'slope' ? 2 : 1
       const localPiece = { ...piece, position: vec3(0, 0, 0), rotationY: 0 }
       for (let i = 0; i < segmentCount; i += 1) {
         const t0 = i / segmentCount
         const t1 = (i + 1) / segmentCount
         const p0 = worldRailPathPoint(localPiece, t0)
         const p1 = worldRailPathPoint(localPiece, t1)
-        const midpoint = vec3((p0.x + p1.x) / 2, 0.2, (p0.z + p1.z) / 2)
-        const tangent = vec3(p1.x - p0.x, 0, p1.z - p0.z)
-        const tangentLength = Math.hypot(tangent.x, tangent.z) || 1
-        const tx = tangent.x / tangentLength
-        const tz = tangent.z / tangentLength
-        const heading = Math.atan2(-tz, tx)
+        const midpoint = vec3((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2)
+        const tangent = vec3(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z)
+        const tangentLength = Math.hypot(tangent.x, tangent.y, tangent.z) || 1
+        segmentTangentVector.set(tangent.x, tangent.y, tangent.z).normalize()
+        const segment = new THREE.Group()
+        segment.position.set(midpoint.x, midpoint.y, midpoint.z)
+        segment.quaternion.setFromUnitVectors(trainBaseForward, segmentTangentVector)
 
         const base = new THREE.Mesh(baseGeometry, baseMaterial)
-        base.position.set(midpoint.x, 0.1, midpoint.z)
+        base.position.y = 0.1
         base.scale.x = Math.max(0.55, tangentLength)
-        base.rotation.y = heading
         base.userData.pieceId = piece.id
-        group.add(base)
+        segment.add(base)
 
-        const offsetX = -tz * 0.46
-        const offsetZ = tx * 0.46
         for (const side of [-1, 1]) {
           const rail = new THREE.Mesh(railGeometry, railMaterial)
-          rail.position.set(midpoint.x + offsetX * side, 0.34, midpoint.z + offsetZ * side)
+          rail.position.set(0, 0.34, 0.46 * side)
           rail.scale.x = Math.max(0.55, tangentLength)
-          rail.rotation.y = heading
           rail.userData.pieceId = piece.id
-          group.add(rail)
+          segment.add(rail)
         }
 
         if (i % sleeperEvery === 0) {
           const sleeper = new THREE.Mesh(sleeperGeometry, sleeperMaterial)
-          sleeper.position.set((p0.x + p1.x) / 2, 0.2, (p0.z + p1.z) / 2)
-          sleeper.rotation.y = heading
+          sleeper.position.y = 0.2
           sleeper.userData.pieceId = piece.id
-          group.add(sleeper)
+          segment.add(sleeper)
         }
+        group.add(segment)
       }
 
       for (const connectorId of ['a', 'b'] as RailConnectorId[]) {
         const connector = worldConnectorForRailPiece(localPiece, connectorId)
         const cap = new THREE.Mesh(connectorGeometry, connectorMaterial)
-        cap.position.set(connector.position.x, 0.25, connector.position.z)
+        cap.position.set(connector.position.x, connector.position.y + 0.25, connector.position.z)
         cap.userData.pieceId = piece.id
         group.add(cap)
       }
+
+      addPieceFacilityDetails(group, localPiece)
 
       const selectionRing = new THREE.Mesh(selectionRingGeometry, selectionMaterial)
       selectionRing.name = 'selection-ring'
       selectionRing.rotation.x = -Math.PI / 2
       const ringCenter = worldRailPathPoint(localPiece, 0.5)
-      selectionRing.position.set(ringCenter.x, 0.43, ringCenter.z)
+      selectionRing.position.set(ringCenter.x, ringCenter.y + 0.43, ringCenter.z)
       selectionRing.visible = piece.id === optionsRef.current.selectedPieceId
       selectionRing.userData.pieceId = piece.id
       group.add(selectionRing)
@@ -649,6 +850,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
             startY: event.clientY,
             moved: false,
             candidate: null,
+            nearMiss: null,
           }
           mode = 'rail'
         }
@@ -676,16 +878,18 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         if (ground === null) return
         const rawPosition = clampRailPosition(subtract(ground, drag.offset), -WORLD_HALF_SIZE + 4, WORLD_HALF_SIZE - 4)
         const rawPiece: RailPiece = { ...drag.currentPiece, position: rawPosition }
-        const candidate = findRailSnapCandidate(
-          rawPiece,
-          drag.layout.filter((piece) => piece.id !== drag?.pieceId),
-        )
+        const snapTargets = drag.layout.filter((piece) => piece.id !== drag?.pieceId)
+        const candidate = findRailSnapCandidate(rawPiece, snapTargets)
+        const nearMiss = candidate === null
+          ? findRailSnapNearMiss(rawPiece, snapTargets)
+          : null
         drag.candidate = candidate
+        drag.nearMiss = nearMiss
         drag.currentPiece = candidate === null
           ? rawPiece
           : { ...rawPiece, position: { ...candidate.transform.position }, rotationY: candidate.transform.rotationY }
         moveDragObject(drag.currentPiece)
-        setMarker(candidate)
+        setMarker(candidate ?? nearMiss)
         return
       }
 

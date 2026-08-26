@@ -1,16 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_SNAP_ANGLE,
+  ELEVATED_HEIGHT,
+  ELEVATED_LENGTH,
+  SHORT_STRAIGHT_LENGTH,
+  SLOPE_LENGTH,
   areRailConnectionsSymmetric,
   connectRailPieces,
   createRailPiece,
   deleteRailPiece,
   disconnectRailPiece,
   findRailSnapCandidate,
+  findRailSnapNearMiss,
   moveRailPiece,
+  railPathLength,
   sampleRailPath,
   sampleRailPathTangent,
   worldConnectorForRailPiece,
+  type RailPiece,
 } from './railModel'
 
 const origin = { x: 0, y: 0, z: 0 }
@@ -25,6 +32,28 @@ describe('railModel', () => {
     expect(sampleRailPath(piece.path, 0.5)).toEqual({ x: 0, y: 0, z: 0 })
     expect(sampleRailPath(piece.path, 1)).toEqual({ x: 2.5, y: 0, z: 0 })
     expect(sampleRailPathTangent(piece.path, 0.5)).toEqual({ x: 1, y: 0, z: 0 })
+  })
+
+  it('creates short, slope, and elevated pieces with 3D path endpoints', () => {
+    const short = createRailPiece('short-straight', 'short', origin)
+    expect(short.path.kind).toBe('straight')
+    if (short.path.kind === 'straight') expect(short.path.length).toBe(SHORT_STRAIGHT_LENGTH)
+
+    const slope = createRailPiece('slope', 'slope', origin)
+    expect(sampleRailPath(slope.path, 0).y).toBeCloseTo(0)
+    expect(sampleRailPath(slope.path, 1).y).toBeCloseTo(ELEVATED_HEIGHT)
+    expect(sampleRailPath(slope.path, 0.5).y).toBeGreaterThan(0)
+    expect(sampleRailPathTangent(slope.path, 0).y).toBeCloseTo(0)
+    expect(sampleRailPathTangent(slope.path, 1).y).toBeCloseTo(0)
+    expect(sampleRailPathTangent(slope.path, 0.5).y).toBeGreaterThan(0)
+    expect(slope.connectorA.localPosition.y).toBeCloseTo(0)
+    expect(slope.connectorB.localPosition.y).toBeCloseTo(ELEVATED_HEIGHT)
+    expect(railPathLength(slope.path)).toBeGreaterThan(SLOPE_LENGTH)
+
+    const bridge = createRailPiece('bridge', 'bridge', origin)
+    expect(bridge.connectorA.localPosition.y).toBeCloseTo(ELEVATED_HEIGHT)
+    expect(bridge.connectorB.localPosition.y).toBeCloseTo(ELEVATED_HEIGHT)
+    if (bridge.path.kind === 'straight') expect(bridge.path.length).toBe(ELEVATED_LENGTH)
   })
 
   it('creates a quarter curve whose endpoint tangents match outward directions', () => {
@@ -59,6 +88,73 @@ describe('railModel', () => {
     // A quarter turn makes the closest connector face sideways rather than opposite.
     const wrongAngle = createRailPiece('straight', 'angle', { x: 2.5, y: 0, z: -2.5 }, Math.PI / 2)
     expect(findRailSnapCandidate(wrongAngle, [target])).toBeNull()
+  })
+
+  it('connects ground to slope and rejects an elevated endpoint at ground height', () => {
+    const ground = createRailPiece('straight', 'ground', origin)
+    const slope = createRailPiece('slope', 'slope', { x: 6, y: 0, z: 0 })
+    const groundToSlope = findRailSnapCandidate(slope, [ground])
+    expect(groundToSlope?.movingConnectorId).toBe('a')
+    expect(groundToSlope?.heightDifference).toBeCloseTo(0)
+
+    const bridge = createRailPiece('bridge', 'bridge', { x: 6, y: 0, z: 0 })
+    expect(findRailSnapCandidate(bridge, [ground])).toBeNull()
+    expect(findRailSnapNearMiss(bridge, [ground])?.heightDifference).toBeCloseTo(ELEVATED_HEIGHT)
+  })
+
+  it('builds a ground-slope-bridge-downslope-ground network with matching heights', () => {
+    const ground = createRailPiece('straight', 'ground', origin)
+    const slope = createRailPiece('slope', 'slope', { x: 6, y: 0, z: 0 })
+    const bridge = createRailPiece('bridge', 'bridge', { x: 12.75, y: 0, z: 0 })
+    // 180度回した坂はB端が高架側、A端が地上側になる。
+    const secondSlope = createRailPiece('slope', 'second-slope', { x: 19.5, y: 0, z: 0 }, Math.PI)
+    const finalGround = createRailPiece('straight', 'final-ground', { x: 25.5, y: 0, z: 0 })
+
+    const connectMoving = (
+      pieces: RailPiece[],
+      moving: RailPiece,
+      targetPieceId: string,
+      targetConnectorId: 'a' | 'b',
+    ) => {
+      const candidate = findRailSnapCandidate(moving, pieces, undefined)
+      expect(candidate).not.toBeNull()
+      if (candidate === null) return pieces
+      expect(candidate.targetPieceId).toBe(targetPieceId)
+      expect(candidate.targetConnectorId).toBe(targetConnectorId)
+      return connectRailPieces(
+        [...pieces, moving],
+        moving.id,
+        candidate.movingConnectorId,
+        targetPieceId,
+        targetConnectorId,
+        candidate.transform,
+      )
+    }
+
+    const withSlope = connectMoving([ground], slope, ground.id, 'b')
+    const withBridge = connectMoving(withSlope, bridge, slope.id, 'b')
+    const withSecondSlope = connectMoving(withBridge, secondSlope, bridge.id, 'b')
+    const network = connectMoving(withSecondSlope, finalGround, secondSlope.id, 'a')
+
+    expect(areRailConnectionsSymmetric(network)).toBe(true)
+    const connections: Array<['ground' | 'slope' | 'bridge' | 'second-slope' | 'final-ground', 'a' | 'b', string, 'a' | 'b']> = [
+      ['ground', 'b', 'slope', 'a'],
+      ['slope', 'b', 'bridge', 'a'],
+      ['bridge', 'b', 'second-slope', 'b'],
+      ['second-slope', 'a', 'final-ground', 'a'],
+    ]
+    for (const [pieceId, connectorId, otherPieceId, otherConnectorId] of connections) {
+      const piece = network.find((candidate) => candidate.id === pieceId)
+      const other = network.find((candidate) => candidate.id === otherPieceId)
+      expect(piece?.connections[connectorId]).toEqual({ pieceId: otherPieceId, connectorId: otherConnectorId })
+      expect(other?.connections[otherConnectorId]).toEqual({ pieceId, connectorId })
+      if (piece === undefined || other === undefined) continue
+      const point = worldConnectorForRailPiece(piece, connectorId).position
+      const otherPoint = worldConnectorForRailPiece(other, otherConnectorId).position
+      expect(point.x).toBeCloseTo(otherPoint.x, 5)
+      expect(point.y).toBeCloseTo(otherPoint.y, 5)
+      expect(point.z).toBeCloseTo(otherPoint.z, 5)
+    }
   })
 
   it('finds a natural snap and aligns connector positions and outward directions', () => {
