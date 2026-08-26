@@ -320,4 +320,62 @@ describe('quizSound', () => {
 
     expect(instances).toHaveLength(0)
   })
+
+  test('レールの4種類のone-shotは規定本数だけ鳴る', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const {
+      playRailSnapSound,
+      playRailDepartureSound,
+      playRailStationStopSound,
+      playRailStationDepartureSound,
+    } = await import('./quizSound')
+
+    playRailSnapSound()
+    playRailDepartureSound()
+    playRailStationStopSound()
+    playRailStationDepartureSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(7)
+  })
+
+  test('レール走行音は1組だけ生成し、停止・disposeできる', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { createRailTrainSoundController } = await import('./quizSound')
+
+    const controller = createRailTrainSoundController()
+    controller.update(1.2, 'running')
+    controller.update(2.4, 'running')
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(1)
+    expect(instances[0].createGain).toHaveBeenCalledTimes(1)
+    controller.update(0, 'stoppedAtStation')
+    const gainNode = instances[0].createGain.mock.results[0].value as MockGainNode
+    const stopRampCount = gainNode.gain.linearRampToValueAtTime.mock.calls.length
+    const stopRamp = gainNode.gain.linearRampToValueAtTime.mock.lastCall
+    expect(stopRamp?.[0]).toBe(0)
+    controller.update(0, 'stoppedAtStation')
+    expect(gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledTimes(stopRampCount)
+    controller.dispose()
+    expect((instances[0].createOscillator.mock.results[0].value as MockOscillatorNode).stop).toHaveBeenCalledTimes(1)
+    expect(() => controller.update(1, 'running')).not.toThrow()
+  })
+
+  test('レール音もAudioContext非対応環境では例外を投げない', async () => {
+    ;(window as unknown as { AudioContext?: unknown }).AudioContext = undefined
+    vi.resetModules()
+    const {
+      playRailSnapSound,
+      playRailDepartureSound,
+      createRailTrainSoundController,
+    } = await import('./quizSound')
+
+    const controller = createRailTrainSoundController()
+    expect(() => playRailSnapSound()).not.toThrow()
+    expect(() => playRailDepartureSound()).not.toThrow()
+    expect(() => controller.update(1, 'running')).not.toThrow()
+    expect(() => controller.dispose()).not.toThrow()
+  })
 })

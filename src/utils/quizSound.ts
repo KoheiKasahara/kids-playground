@@ -32,7 +32,11 @@ function getAudioContext(): AudioContext | undefined {
   const Ctor = getAudioContextConstructor()
   if (!Ctor) return undefined
   if (!sharedContext) {
-    sharedContext = new Ctor()
+    try {
+      sharedContext = new Ctor()
+    } catch {
+      return undefined
+    }
   }
   if (sharedContext.state === 'suspended') {
     // クリックなどのユーザー操作中に呼ばれるため resume() は許可される想定だが、
@@ -430,3 +434,167 @@ export function playMazeGoalSound(): void {
     playTone(ctx, frequency, now + index * 0.1, 0.28, 0.16, 'triangle')
   })
 }
+
+// --- 3Dせんろづくり専用の効果音 ----------------------------------------------
+
+/** レールの接続が確定したときの、短く明るいクリック。 */
+export function playRailSnapSound(enabled = true): void {
+  if (!enabled || !soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  playTone(ctx, 920, ctx.currentTime, 0.075, 0.045, 'triangle')
+}
+
+/** 電車が通常走行を始めるときの小さな発車音。 */
+export function playRailDepartureSound(enabled = true): void {
+  if (!enabled || !soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 260, now, 0.13, 0.045, 'triangle')
+  playTone(ctx, 390, now + 0.08, 0.17, 0.04, 'sine')
+}
+
+/** 駅に停車したときの柔らかな到着音。 */
+export function playRailStationStopSound(enabled = true): void {
+  if (!enabled || !soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 660, now, 0.16, 0.04, 'sine')
+  playTone(ctx, 520, now + 0.11, 0.2, 0.035, 'sine')
+}
+
+/** 駅から再発車するときの短い上行音。 */
+export function playRailStationDepartureSound(enabled = true): void {
+  if (!enabled || !soundEnabled) return
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 420, now, 0.12, 0.04, 'triangle')
+  playTone(ctx, 620, now + 0.085, 0.16, 0.035, 'sine')
+}
+
+// 呼び出し側で役割を読みやすくする別名（音色・実装は上の共有関数と同じ）。
+export const playRailSnapClickSound = playRailSnapSound
+export const playRailStartSound = playRailDepartureSound
+export const playRailStationArrivalSound = playRailStationStopSound
+
+export type RailTrainSoundStatus =
+  | 'ready'
+  | 'running'
+  | 'waiting'
+  | 'approachingStation'
+  | 'stoppedAtStation'
+  | 'departing'
+
+export type RailTrainSoundController = {
+  /** RAFから毎フレーム呼ぶ。オーディオノードは走行開始時にだけ遅延生成する。 */
+  update: (speed: number, status: RailTrainSoundStatus, inTunnel?: boolean) => void
+  setEnabled: (enabled: boolean) => void
+  dispose: () => void
+}
+
+/**
+ * 電車の走行音を1組のノードだけで管理する。
+ * ready/waiting/stoppedAtStation ではゲインを0にし、running系だけ速度へ追従させる。
+ */
+export function createRailTrainSoundController(initialEnabled = true): RailTrainSoundController {
+  let enabled = initialEnabled
+  let oscillator: OscillatorNode | undefined
+  let gain: GainNode | undefined
+  let disposed = false
+  let targetGain = 0
+
+  const setGain = (value: number, now: number) => {
+    if (gain === undefined) return
+    const safeValue = Math.min(0.045, Math.max(0, value))
+    // engineはRAFごとにupdate/setEnabledを呼ぶため、同じ目標値を再予約しない。
+    if (Math.abs(safeValue - targetGain) < 0.0005) return
+    targetGain = safeValue
+    const parameter = gain.gain as AudioParam & {
+      cancelScheduledValues?: (time: number) => void
+      setTargetAtTime?: (nextValue: number, startTime: number, timeConstant: number) => void
+    }
+    parameter.cancelScheduledValues?.(now)
+    if (parameter.setTargetAtTime !== undefined) {
+      parameter.setTargetAtTime(safeValue, now, 0.045)
+    } else if (parameter.linearRampToValueAtTime !== undefined) {
+      parameter.linearRampToValueAtTime(safeValue, now + 0.045)
+    } else {
+      parameter.value = safeValue
+    }
+  }
+
+  const ensureNodes = (): AudioContext | undefined => {
+    if (disposed || !enabled || !soundEnabled) return undefined
+    const ctx = getAudioContext()
+    if (!ctx) return undefined
+    if (oscillator === undefined || gain === undefined) {
+      oscillator = ctx.createOscillator()
+      gain = ctx.createGain()
+      oscillator.type = 'triangle'
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      gain.gain.setValueAtTime(0, ctx.currentTime)
+      oscillator.start(ctx.currentTime)
+    }
+    return ctx
+  }
+
+  return {
+    update(speed, status, inTunnel = false) {
+      if (disposed) return
+      const isMoving = status === 'running'
+        || status === 'approachingStation'
+        || status === 'departing'
+      const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0
+      if (!isMoving || safeSpeed <= 0.015) {
+        if (gain !== undefined) {
+          const ctx = getAudioContext()
+          if (ctx !== undefined) setGain(0, ctx.currentTime)
+        }
+        return
+      }
+      const ctx = isMoving && safeSpeed > 0.015 ? ensureNodes() : undefined
+      if (ctx === undefined || gain === undefined || oscillator === undefined) {
+        if (gain !== undefined && !soundEnabled) setGain(0, getAudioContext()?.currentTime ?? 0)
+        return
+      }
+      const now = ctx.currentTime
+      const tunnelFactor = inTunnel ? 0.86 : 1
+      const frequency = (92 + Math.min(220, safeSpeed * 28)) * (inTunnel ? 0.9 : 1)
+      const frequencyParameter = oscillator.frequency as AudioParam & {
+        setTargetAtTime?: (nextValue: number, startTime: number, timeConstant: number) => void
+      }
+      if (frequencyParameter.setTargetAtTime !== undefined) {
+        frequencyParameter.setTargetAtTime(frequency, now, 0.06)
+      } else {
+        frequencyParameter.value = frequency
+      }
+      setGain(Math.min(0.04, (0.008 + safeSpeed * 0.006) * tunnelFactor), now)
+    },
+    setEnabled(nextEnabled) {
+      if (enabled === nextEnabled) return
+      enabled = nextEnabled
+      if (!enabled && gain !== undefined) {
+        setGain(0, getAudioContext()?.currentTime ?? 0)
+      }
+    },
+    dispose() {
+      if (disposed) return
+      disposed = true
+      if (gain !== undefined) {
+        try { gain.disconnect() } catch { /* Web Audioモックや解放済みノード */ }
+      }
+      if (oscillator !== undefined) {
+        try { oscillator.stop() } catch { /* 既に停止済み */ }
+        try { oscillator.disconnect() } catch { /* Web Audioモックや解放済みノード */ }
+      }
+      gain = undefined
+      oscillator = undefined
+    },
+  }
+}
+
+export const createRailSoundController = createRailTrainSoundController
