@@ -1,4 +1,4 @@
-import type { RailPiece } from './railModel'
+import type { RailPiece, RailPieceKind } from './railModel'
 import {
   TRAIN_CAR_COUNT,
   TRAIN_CAR_SPACING,
@@ -9,6 +9,7 @@ import {
   pauseRailTrain,
   startRailTrain,
   updateRailTrainMotion,
+  type RailTrainCursor,
   type RailTrainMotion,
   type RailTrainStatus,
 } from './railTrainModel'
@@ -54,6 +55,27 @@ function cloneMotion(motion: RailTrainMotion): RailTrainMotion {
   return { ...motion, cursor: { ...motion.cursor } }
 }
 
+/**
+ * スポーン候補の優先度。トンネルの中や車庫の奥から列車が始まると、
+ * 初期表示で電車が見えず子どもが戸惑うため、見える平地の線路を優先する。
+ * 同じ優先度内は従来どおりpiecesの並び順を保つ。
+ */
+function spawnPriority(kind: RailPieceKind): number {
+  if (kind === 'depot') return 1
+  if (kind === 'tunnel') return 2
+  return 0
+}
+
+function spawnOrderedPieces(pieces: readonly RailPiece[]): RailPiece[] {
+  return pieces
+    .map((piece, index) => ({ piece, index }))
+    .sort((a, b) => {
+      const priorityDelta = spawnPriority(a.piece.kind) - spawnPriority(b.piece.kind)
+      return priorityDelta !== 0 ? priorityDelta : a.index - b.index
+    })
+    .map((entry) => entry.piece)
+}
+
 function safeSpawnMotion(
   pieces: readonly RailPiece[],
   trains: readonly RailFleetTrain[],
@@ -62,7 +84,7 @@ function safeSpawnMotion(
   for (const train of trains) {
     for (const pieceId of getOccupiedRailPieceIds(pieces, train.motion.cursor)) used.add(pieceId)
   }
-  for (const piece of pieces) {
+  for (const piece of spawnOrderedPieces(pieces)) {
     if (used.has(piece.id)) continue
     const motion = createInitialRailTrainMotion(pieces, piece.id)
     if (motion === null || motion.cursor.pieceId !== piece.id) continue
@@ -88,14 +110,22 @@ function safeSpawnMotion(
   return null
 }
 
+/** 既存idと衝突しない最小のtrain-N番号を探す。途中の1台を消して追加してもidが衝突しない。 */
+function nextFreeFleetIndex(existing: readonly RailFleetTrain[]): number {
+  const usedIds = new Set(existing.map((train) => train.id))
+  let index = 0
+  while (usedIds.has(`train-${index + 1}`)) index += 1
+  return index
+}
+
 function makeFleetTrain(
   pieces: readonly RailPiece[],
-  index: number,
   existing: readonly RailFleetTrain[],
 ): RailFleetTrain | null {
   const motion = safeSpawnMotion(pieces, existing)
   if (motion === null) return null
 
+  const index = nextFreeFleetIndex(existing)
   const appearance = RAIL_TRAIN_APPEARANCES[index % RAIL_TRAIN_APPEARANCES.length]!
   return {
     id: `train-${index + 1}`,
@@ -109,12 +139,12 @@ function makeFleetTrain(
 
 export function createInitialRailFleet(
   pieces: readonly RailPiece[],
-  count = 2,
+  count = 1,
 ): RailFleetTrain[] {
   const result: RailFleetTrain[] = []
   const targetCount = Math.min(MAX_RAIL_FLEET_SIZE, Math.max(0, Math.floor(count)))
   for (let index = 0; index < targetCount; index += 1) {
-    const train = makeFleetTrain(pieces, index, result)
+    const train = makeFleetTrain(pieces, result)
     if (train !== null) result.push(train)
   }
   return result
@@ -126,7 +156,7 @@ export function addRailFleetTrain(
 ): RailFleetTrain[] {
   const cloned = trains.map((train) => ({ ...train, appearance: { ...train.appearance }, motion: cloneMotion(train.motion) }))
   if (cloned.length >= MAX_RAIL_FLEET_SIZE) return cloned
-  const next = makeFleetTrain(pieces, cloned.length, cloned)
+  const next = makeFleetTrain(pieces, cloned)
   return next === null ? cloned : [...cloned, next]
 }
 
@@ -222,6 +252,41 @@ export function updateRailFleet(
       wantsToRun: nextMotion.status !== 'waiting',
       blocked: false,
       motion: nextMotion,
+    }
+  })
+}
+
+/** 電車を1台減らす。trainId未指定なら最後の1台。最低1台は必ず残す。 */
+export function removeRailFleetTrain(
+  trains: readonly RailFleetTrain[],
+  trainId?: string,
+): RailFleetTrain[] {
+  const cloned = trains.map((train) => ({ ...train, appearance: { ...train.appearance }, motion: cloneMotion(train.motion) }))
+  if (cloned.length <= 1) return cloned
+  const targetId = trainId ?? cloned[cloned.length - 1]?.id
+  if (targetId === undefined || !cloned.some((train) => train.id === targetId)) return cloned
+  return cloned.filter((train) => train.id !== targetId)
+}
+
+/** ドラッグで電車を線路上へ置き直す。停止状態にして駅の状態もリセットする。 */
+export function moveRailFleetTrainTo(
+  trains: readonly RailFleetTrain[],
+  trainId: string,
+  cursor: RailTrainCursor,
+): RailFleetTrain[] {
+  return trains.map((train) => {
+    const motion = cloneMotion(train.motion)
+    if (train.id !== trainId) return { ...train, appearance: { ...train.appearance }, motion }
+    return {
+      ...train,
+      appearance: { ...train.appearance },
+      wantsToRun: false,
+      blocked: false,
+      motion: {
+        cursor: { ...cursor },
+        speed: 0,
+        status: 'ready',
+      },
     }
   })
 }

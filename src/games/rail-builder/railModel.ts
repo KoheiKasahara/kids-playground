@@ -26,8 +26,9 @@ export type RailPieceKind =
   | 'station'
   | 'tunnel'
   | 'branch'
+  | 'depot'
 export type CurveDirection = 'left' | 'right'
-export type RailConnectorId = 'a' | 'b' | 'c'
+export type RailConnectorId = 'a' | 'b' | 'c' | 'd'
 export type RailBranchDirection = 'b' | 'c'
 
 export type RailConnector = {
@@ -83,9 +84,13 @@ export type RailPiece = {
   connectorB: RailConnector
   /** 3つ目の接続点。branchだけが持つ。 */
   connectorC?: RailConnector
+  /** 4つ目の接続点。depotの2番線(C-D)だけが持つ。 */
+  connectorD?: RailConnector
   path: RailPath
   /** A-Cを結ぶ副Path。branchだけが持つ。 */
   branchPath?: RailPath
+  /** C-Dを結ぶ2番線Path。depotだけが持つ。 */
+  secondaryPath?: RailPath
   /** Aから進入した列車が今回選ぶ出口。 */
   branchDirection?: RailBranchDirection
   connections: RailConnections
@@ -125,6 +130,8 @@ export const STATION_LENGTH = 7
 export const TUNNEL_LENGTH = 7
 export const BRANCH_LENGTH = 6
 export const BRANCH_SPREAD = 3
+export const DEPOT_LENGTH = 7
+export const DEPOT_TRACK_SPACING = 2.4
 export const ELEVATED_HEIGHT = 2
 export const CURVE_RADIUS = 4
 export const CURVE_ANGLE = Math.PI / 2
@@ -246,8 +253,10 @@ function clonePiece(piece: RailPiece): RailPiece {
     connectorA: cloneConnector(piece.connectorA),
     connectorB: cloneConnector(piece.connectorB),
     connectorC: piece.connectorC === undefined ? undefined : cloneConnector(piece.connectorC),
+    connectorD: piece.connectorD === undefined ? undefined : cloneConnector(piece.connectorD),
     path: clonePath(piece.path),
     branchPath: piece.branchPath === undefined ? undefined : clonePath(piece.branchPath),
+    secondaryPath: piece.secondaryPath === undefined ? undefined : clonePath(piece.secondaryPath),
     connections: { ...piece.connections },
   }
 }
@@ -269,7 +278,8 @@ function connector(
 function connectorFor(piece: RailPiece, connectorId: RailConnectorId): RailConnector {
   if (connectorId === 'a') return piece.connectorA
   if (connectorId === 'b') return piece.connectorB
-  if (piece.connectorC !== undefined) return piece.connectorC
+  if (connectorId === 'c' && piece.connectorC !== undefined) return piece.connectorC
+  if (connectorId === 'd' && piece.connectorD !== undefined) return piece.connectorD
   // 壊れた外部データでも描画ループを落とさない。通常の呼び出しは
   // getRailConnectorIdsで存在する端点だけを列挙するため、ここには来ない。
   return piece.connectorB
@@ -426,12 +436,21 @@ export function createRailPiece(
               ? { kind: 'straight', length: TUNNEL_LENGTH }
               : kind === 'branch'
                 ? { kind: 'straight', length: BRANCH_LENGTH }
-                : {
-                  kind: 'curve',
-                  radius: CURVE_RADIUS,
-                  angle: CURVE_ANGLE,
-                  direction: curveDirection,
-                }
+                : kind === 'depot'
+                  ? {
+                    // 直線をquadraticで表す。straight型はローカルz=0固定で
+                    // 横オフセット(1番線)を表現できないため。
+                    kind: 'quadratic',
+                    start: { x: -DEPOT_LENGTH / 2, y: 0, z: -DEPOT_TRACK_SPACING / 2 },
+                    control: { x: 0, y: 0, z: -DEPOT_TRACK_SPACING / 2 },
+                    end: { x: DEPOT_LENGTH / 2, y: 0, z: -DEPOT_TRACK_SPACING / 2 },
+                  }
+                  : {
+                    kind: 'curve',
+                    radius: CURVE_RADIUS,
+                    angle: CURVE_ANGLE,
+                    direction: curveDirection,
+                  }
   const [connectorA, connectorB] = makeConnectors(path)
   const branchPath: RailPath | undefined = kind === 'branch'
     ? {
@@ -448,6 +467,29 @@ export function createRailPiece(
       sampleRailPath(branchPath, 1),
       sampleRailPathTangent(branchPath, 1),
     )
+  // depotの2番線(C-D)。1番線と平行で、向きは1番線と同じくA(C)側が外向き。
+  const secondaryPath: RailPath | undefined = kind === 'depot'
+    ? {
+      kind: 'quadratic',
+      start: { x: -DEPOT_LENGTH / 2, y: 0, z: DEPOT_TRACK_SPACING / 2 },
+      control: { x: 0, y: 0, z: DEPOT_TRACK_SPACING / 2 },
+      end: { x: DEPOT_LENGTH / 2, y: 0, z: DEPOT_TRACK_SPACING / 2 },
+    }
+    : undefined
+  const depotConnectorC = secondaryPath === undefined
+    ? undefined
+    : connector(
+      'c',
+      sampleRailPath(secondaryPath, 0),
+      scale(sampleRailPathTangent(secondaryPath, 0), -1),
+    )
+  const depotConnectorD = secondaryPath === undefined
+    ? undefined
+    : connector(
+      'd',
+      sampleRailPath(secondaryPath, 1),
+      sampleRailPathTangent(secondaryPath, 1),
+    )
   return {
     id,
     kind,
@@ -455,9 +497,11 @@ export function createRailPiece(
     rotationY,
     connectorA,
     connectorB,
-    connectorC,
+    connectorC: connectorC ?? depotConnectorC,
+    connectorD: depotConnectorD,
     path,
     branchPath,
+    secondaryPath,
     branchDirection: kind === 'branch' ? 'b' : undefined,
     connections: {},
   }
@@ -477,11 +521,13 @@ export function getRailConnectors(piece: RailPiece): RailConnector[] {
   return getRailConnectorIds(piece).map((connectorId) => cloneConnector(connectorFor(piece, connectorId)))
 }
 
-/** pieceが実際に持つ端点だけを返す。3端対応処理の列挙元は必ずこれを使う。 */
+/** pieceが実際に持つ端点だけを返す。3端・4端対応処理の列挙元は必ずこれを使う。 */
 export function getRailConnectorIds(piece: RailPiece): RailConnectorId[] {
-  return piece.kind === 'branch' && piece.connectorC !== undefined
-    ? ['a', 'b', 'c']
-    : ['a', 'b']
+  if (piece.kind === 'branch' && piece.connectorC !== undefined) return ['a', 'b', 'c']
+  if (piece.kind === 'depot' && piece.connectorC !== undefined && piece.connectorD !== undefined) {
+    return ['a', 'b', 'c', 'd']
+  }
+  return ['a', 'b']
 }
 
 /** 分岐の選択出口だけを反転する純粋関数。通常線路は同一内容のcloneを返す。 */
@@ -1001,15 +1047,24 @@ export function findRailLoopClosureCandidate(
   options?: LoopClosureOptions,
 ): SnapCandidate | null {
   const thresholds = loopClosureOptionsWithDefaults(options)
-  // PR #203の分散補正は2端pieceの直列チェーン専用。分岐では候補探索をしない。
-  if (fixedPiece.kind === 'branch' || fixedConnectorId === 'c') return null
+  // PR #203の分散補正は2端pieceの直列チェーン専用。分岐・車庫では候補探索をしない。
+  if (
+    fixedPiece.kind === 'branch'
+    || fixedPiece.kind === 'depot'
+    || fixedConnectorId === 'c'
+    || fixedConnectorId === 'd'
+  ) return null
   if (fixedPiece.connections[fixedConnectorId] !== undefined) return null
   const fixedWorld = worldConnectorForRailPiece(fixedPiece, fixedConnectorId)
 
   let best: SnapCandidate | null = null
   for (const farPiece of targets) {
     if (farPiece.id === fixedPiece.id) continue
-    if (farPiece.kind === 'branch' || LOOP_CLOSURE_FACILITY_KINDS.has(farPiece.kind)) continue
+    if (
+      farPiece.kind === 'branch'
+      || farPiece.kind === 'depot'
+      || LOOP_CLOSURE_FACILITY_KINDS.has(farPiece.kind)
+    ) continue
     for (const farConnectorId of getRailConnectorIds(farPiece)) {
       if (farPiece.connections[farConnectorId] !== undefined) continue
       const farWorld = worldConnectorForRailPiece(farPiece, farConnectorId)
@@ -1077,7 +1132,12 @@ function collectLoopClosureChain(
 
   while (currentId !== undefined && chain.length < Math.max(1, maxCount)) {
     const piece = map.get(currentId)
-    if (piece === undefined || piece.kind === 'branch' || visited.has(piece.id)) break
+    if (
+      piece === undefined
+      || piece.kind === 'branch'
+      || piece.kind === 'depot'
+      || visited.has(piece.id)
+    ) break
     visited.add(piece.id)
     chain.push({ piece, towardFixedConnectorId })
 
@@ -1162,8 +1222,12 @@ export function applyRailLoopClosure(
   if (
     movingPiece?.kind === 'branch'
     || targetPiece?.kind === 'branch'
+    || movingPiece?.kind === 'depot'
+    || targetPiece?.kind === 'depot'
     || candidate.movingConnectorId === 'c'
     || candidate.targetConnectorId === 'c'
+    || candidate.movingConnectorId === 'd'
+    || candidate.targetConnectorId === 'd'
   ) return pieces.map(clonePiece)
   const chain = collectLoopClosureChain(
     pieces,

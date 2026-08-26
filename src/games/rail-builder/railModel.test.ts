@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_SNAP_ANGLE,
+  DEPOT_TRACK_SPACING,
   ELEVATED_HEIGHT,
   ELEVATED_LENGTH,
   LOOP_CLOSURE_MAX_ANGLE_DIFFERENCE,
@@ -62,6 +63,84 @@ describe('branch rail model', () => {
     const endpoint = sampleRailPath(branch.branchPath!, 1)
     expect(endpoint).toEqual(branch.connectorC?.localPosition)
     expect(railPathLength(branch.branchPath!)).toBeGreaterThan(railPathLength(branch.path))
+  })
+})
+
+describe('depot rail model', () => {
+  it('has four connectors on two parallel tracks, and clone/rotate/world transforms keep connector d intact', () => {
+    const depot = createRailPiece('depot', 'depot', origin)
+    expect(getRailConnectorIds(depot)).toEqual(['a', 'b', 'c', 'd'])
+    expect(depot.connectorC).toBeDefined()
+    expect(depot.connectorD).toBeDefined()
+    expect(depot.secondaryPath).toBeDefined()
+    expect(depot.branchPath).toBeUndefined()
+    expect(depot.branchDirection).toBeUndefined()
+
+    // 1番線(path)と2番線(secondaryPath)はDEPOT_TRACK_SPACINGだけ離れた平行線。
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      const primary = sampleRailPath(depot.path, t)
+      const secondary = sampleRailPath(depot.secondaryPath!, t)
+      expect(secondary.x).toBeCloseTo(primary.x)
+      expect(secondary.y).toBeCloseTo(primary.y)
+      expect(secondary.z - primary.z).toBeCloseTo(DEPOT_TRACK_SPACING)
+    }
+
+    // clone(rotateRailPiece経由)・回転・world変換を経てもconnectorDが壊れない。
+    const rotated = createRailPiece('depot', 'depot-r', { x: 5, y: 0, z: -2 }, Math.PI / 4)
+    const spun = moveRailPiece([rotated], rotated.id, { position: { x: 8, y: 0, z: 3 } })
+    const spunDepot = spun.find((piece) => piece.id === rotated.id)!
+    expect(spunDepot.connectorD).toBeDefined()
+    const worldD = worldConnectorForRailPiece(spunDepot, 'd')
+    expect(Number.isFinite(worldD.position.x)).toBe(true)
+    expect(Number.isFinite(worldD.position.z)).toBe(true)
+    expect(Math.hypot(worldD.outward.x, worldD.outward.z)).toBeCloseTo(1)
+  })
+
+  it('lets another piece snap-connect to the depot d endpoint', () => {
+    const depot = createRailPiece('depot', 'depot', origin)
+    const worldD = worldConnectorForRailPiece(depot, 'd')
+    // tailの'a'がぴったりworldDへ重なる位置に置く(tailの'a'ローカルはx=-2.5)。
+    const tail = createRailPiece('straight', 'tail', {
+      x: worldD.position.x + 2.5,
+      y: worldD.position.y,
+      z: worldD.position.z,
+    })
+    const candidate = findRailSnapCandidate(tail, [depot])
+    expect(candidate).not.toBeNull()
+    if (candidate === null) return
+    expect(candidate.targetConnectorId).toBe('d')
+
+    const connected = connectRailPieces(
+      [depot, tail],
+      tail.id,
+      candidate.movingConnectorId,
+      depot.id,
+      'd',
+      candidate.transform,
+    )
+    expect(areRailConnectionsSymmetric(connected)).toBe(true)
+    expect(connected.find((piece) => piece.id === depot.id)?.connections.d).toEqual({
+      pieceId: tail.id,
+      connectorId: candidate.movingConnectorId,
+    })
+  })
+
+  it('excludes depot pieces and connector d from loop closure auto-correction', () => {
+    const fixedPiece = createRailPiece('straight', 'fixed', origin)
+    // 通常しきい値の外、ループ用しきい値の内側になる距離だけ離す(branchのテストと同じ考え方)。
+    // depot.aのローカルzオフセット(-DEPOT_TRACK_SPACING/2)を、position.zで打ち消してある。
+    const farDepot = createRailPiece('depot', 'far', { x: 7.6, y: 0, z: DEPOT_TRACK_SPACING / 2 })
+    const { anchorId, targets } = anchorFarPiece(farDepot, 'b')
+
+    expect(findRailSnapCandidate(farDepot, targets, 'a')).toBeNull()
+    // depot自体は、通常なら候補になり得る距離・向きでもループ閉鎖の相手にならない。
+    expect(findRailLoopClosureCandidate(fixedPiece, 'b', targets, anchorId)).toBeNull()
+
+    // depot自身の端点(a/d)を固定側にした場合も、常に候補探索そのものをしない。
+    const depotFixed = createRailPiece('depot', 'depot-fixed', origin)
+    const other = createRailPiece('straight', 'other', { x: 10, y: 0, z: -DEPOT_TRACK_SPACING / 2 })
+    expect(findRailLoopClosureCandidate(depotFixed, 'd', [other], 'other')).toBeNull()
+    expect(findRailLoopClosureCandidate(depotFixed, 'a', [other], 'other')).toBeNull()
   })
 })
 

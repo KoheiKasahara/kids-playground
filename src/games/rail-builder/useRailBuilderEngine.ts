@@ -5,12 +5,15 @@ import {
   applyRailLoopClosure,
   clampRailPosition,
   connectRailPieces,
+  DEPOT_LENGTH,
+  DEPOT_TRACK_SPACING,
   disconnectRailPiece,
   findRailLoopClosureCandidate,
   findRailSnapNearMiss,
   findRailSnapCandidate,
   getRailConnectorIds,
   type RailConnectorId,
+  type RailPath,
   type RailPiece,
   type RailVec3,
   type SnapNearMiss,
@@ -19,14 +22,18 @@ import {
   worldRailPathPoint,
 } from './railModel'
 import {
+  findNearestRailTrainCursor,
   sampleRailTrainCars,
   sampleRailTrainPose,
+  type RailTrainCursor,
   type RailTrainStatus,
 } from './railTrainModel'
 import {
   addRailFleetTrain,
   createInitialRailFleet,
+  moveRailFleetTrainTo,
   occupiedRailFleetPieceIds,
+  removeRailFleetTrain,
   setRailFleetTrainRunning,
   summarizeRailFleet,
   updateRailFleet,
@@ -59,8 +66,8 @@ export const MAX_ZOOM = 1.75 + ZOOM_STEP * 3
 const DEFAULT_ZOOM = 1
 const BASE_VIEW_SIZE = 15
 const POINTER_MOVE_THRESHOLD = 6
-// 初期3本の発着線A端(x=-3.5)へ扉がつながる車庫位置。
-const DEPOT_POSITION: RailVec3 = { x: -5.65, y: 0, z: 0 }
+// ドラッグで電車を線路上へ置き直すときの当たり判定の許容距離。
+const TRAIN_DRAG_MAX_DISTANCE = 8
 
 export type RailBuilderEngineOptions = {
   pieces: readonly RailPiece[]
@@ -83,6 +90,7 @@ export type RailBuilderEngineHandle = {
   startTrain: (trainId: string) => void
   pauseTrain: (trainId: string) => void
   addTrain: () => void
+  removeTrain: (trainId?: string) => void
   focusTrain: (trainId: string) => void
   focusDepot: () => void
 }
@@ -103,6 +111,15 @@ type DragState = {
   moved: boolean
   candidate: SnapCandidate | null
   nearMiss: SnapNearMiss | null
+}
+
+type TrainDragState = {
+  pointerId: number
+  trainId: string
+  /** 掴んだ瞬間にいたpiece。置いた先が違う場合だけスナップ音を鳴らす。 */
+  startPieceId: string
+  lastCursor: RailTrainCursor
+  lastForward: RailVec3 | null
 }
 
 type TrainVisualRuntime = {
@@ -149,6 +166,16 @@ function pieceIdFromObject(object: THREE.Object3D): string | null {
   return null
 }
 
+function trainIdFromObject(object: THREE.Object3D): string | null {
+  let current: THREE.Object3D | null = object
+  while (current !== null) {
+    const trainId = current.userData.trainId
+    if (typeof trainId === 'string') return trainId
+    current = current.parent
+  }
+  return null
+}
+
 function disposeObjectTree(root: THREE.Object3D, sharedGeometries: Set<THREE.BufferGeometry>, sharedMaterials: Set<THREE.Material>) {
   root.traverse((object) => {
     const renderObject = object as THREE.Object3D & {
@@ -182,6 +209,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
   const startTrainRef = useRef<((trainId: string) => void) | null>(null)
   const pauseTrainRef = useRef<((trainId: string) => void) | null>(null)
   const addTrainRef = useRef<(() => void) | null>(null)
+  const removeTrainRef = useRef<((trainId?: string) => void) | null>(null)
   const focusTrainRef = useRef<((trainId: string) => void) | null>(null)
   const focusDepotRef = useRef<(() => void) | null>(null)
 
@@ -203,6 +231,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     addTrainRef.current?.()
   }, [])
 
+  const removeTrain = useCallback((trainId?: string) => {
+    removeTrainRef.current?.(trainId)
+  }, [])
+
   const focusTrain = useCallback((trainId: string) => {
     focusTrainRef.current?.(trainId)
   }, [])
@@ -212,8 +244,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
   }, [])
 
   const handle = useMemo<RailBuilderEngineHandle>(
-    () => ({ registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, focusTrain, focusDepot }),
-    [addTrain, focusDepot, focusTrain, getCameraTarget, pauseTrain, registerContainer, startTrain],
+    () => ({ registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, focusTrain, focusDepot }),
+    [addTrain, focusDepot, focusTrain, getCameraTarget, pauseTrain, registerContainer, removeTrain, startTrain],
   )
 
   useEffect(() => {
@@ -246,6 +278,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const stationPulseTargets = new Map<string, THREE.Object3D>()
     const marker = new THREE.Group()
     marker.name = 'snap-marker'
+    marker.visible = false // 起動直後は原点にリングを出さない（setMarker() が呼ばれるまで非表示）
     let snapGlow: THREE.Mesh | null = null
     const trainRoot = new THREE.Group()
     trainRoot.name = 'toy-train-fleet'
@@ -289,9 +322,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const houseBodyGeometry = new RoundedBoxGeometry(2.4, 1.45, 2.1, 2, 0.18)
     const houseRoofGeometry = new THREE.ConeGeometry(1.7, 0.85, 4)
     const houseWindowGeometry = new THREE.BoxGeometry(0.36, 0.42, 0.05)
-    const depotBodyGeometry = new RoundedBoxGeometry(4.2, 1.65, 3.1, 2, 0.18)
-    const depotRoofGeometry = new RoundedBoxGeometry(4.55, 0.28, 3.45, 2, 0.12)
-    const depotDoorGeometry = new RoundedBoxGeometry(0.82, 1.32, 0.12, 2, 0.08)
+    // 車庫パーツ(depot)の建物。屋根は中央部だけ・壁は腰高にして、
+    // 斜め上から見下ろすカメラでも車庫の中の線路と電車が見えるようにする。
+    const depotRoofLength = DEPOT_LENGTH * 0.62 // 屋根はx方向の中央部のみ。両端は大きく開ける
+    const depotRoofDepth = DEPOT_TRACK_SPACING + 1.2
+    const depotBodyGeometry = new THREE.BoxGeometry(depotRoofLength, 0.6, 0.2) // 側壁(腰高)
+    const depotRoofGeometry = new THREE.BoxGeometry(depotRoofLength, 0.26, depotRoofDepth) // 屋根
+    const depotDoorGeometry = new THREE.BoxGeometry(0.18, 2.06, 0.18) // 屋根を支える柱
     ;[
       railGeometry,
       baseGeometry,
@@ -446,9 +483,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const houseBodyPaleMaterial = new THREE.MeshStandardMaterial({ color: '#f4c96b', roughness: 0.8 })
     const houseRoofMaterial = new THREE.MeshStandardMaterial({ color: '#d96b63', roughness: 0.82 })
     const houseWindowMaterial = new THREE.MeshStandardMaterial({ color: '#75d4e6', roughness: 0.4, metalness: 0.08 })
-    const depotBodyMaterial = new THREE.MeshStandardMaterial({ color: '#f8cf78', roughness: 0.76 })
-    const depotRoofMaterial = new THREE.MeshStandardMaterial({ color: '#ef6b73', roughness: 0.66 })
-    const depotDoorMaterial = new THREE.MeshStandardMaterial({ color: '#486a78', roughness: 0.72 })
+    const depotBodyMaterial = new THREE.MeshStandardMaterial({ color: '#f8cf78', roughness: 0.76 }) // 壁
+    const depotRoofMaterial = new THREE.MeshStandardMaterial({ color: '#ef6b73', roughness: 0.66 }) // 屋根
+    const depotDoorMaterial = new THREE.MeshStandardMaterial({ color: '#486a78', roughness: 0.72 }) // 柱
     sharedGeometries.add(groundGeometry)
     ;[
       groundMaterial,
@@ -490,13 +527,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const instanceDummy = new THREE.Object3D()
     const pointers = new Map<number, PointerPosition>()
     let activeZoom = clampZoom(optionsRef.current.zoom || DEFAULT_ZOOM)
-    let mode: 'none' | 'pan' | 'rail' | 'pinch' = 'none'
+    let mode: 'none' | 'pan' | 'rail' | 'pinch' | 'train' = 'none'
     let panLastGround: RailVec3 | null = null
     let drag: DragState | null = null
+    let trainDrag: TrainDragState | null = null
     let pinchStartDistance = 0
     let pinchStartZoom = activeZoom
     let trainPieces: readonly RailPiece[] = optionsRef.current.pieces
-    let fleet: RailFleetTrain[] = createInitialRailFleet(trainPieces, 2)
+    let fleet: RailFleetTrain[] = createInitialRailFleet(trainPieces, 1)
     const lastTrainStatuses = new Map<string, RailTrainStatus>()
     let lastFleetKey = ''
     let lastOccupiedKey = ''
@@ -576,6 +614,18 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       return null
     }
 
+    function pickTrain(event: PointerEvent): string | null {
+      if (camera === null || scene === null) return null
+      getPointerNdc(event)
+      raycaster.setFromCamera(pointer, camera)
+      const intersections = raycaster.intersectObjects(trainRoot.children, true)
+      for (const intersection of intersections) {
+        const trainId = trainIdFromObject(intersection.object)
+        if (trainId !== null) return trainId
+      }
+      return null
+    }
+
     function setMarker(feedback: SnapCandidate | SnapNearMiss | null) {
       marker.visible = feedback !== null
       markerMaterial.color.set(feedback === null || 'transform' in feedback ? '#fef08a' : '#fb7185')
@@ -595,6 +645,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     function makeTrainCar(runtime: TrainVisualRuntime, trainId: string, index: number): THREE.Group {
       const group = new THREE.Group()
       group.name = index === 0 ? `${trainId}-lead-car` : `${trainId}-car-${index + 1}`
+      group.userData.trainId = trainId
 
       const body = new THREE.Mesh(trainBodyGeometry, runtime.bodyMaterial)
       body.position.y = 0.84
@@ -691,6 +742,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           roofMaterial,
         }
         runtime.root.name = train.id
+        runtime.root.userData.trainId = train.id
         trainRoot.add(runtime.root)
         trainVisuals.set(train.id, runtime)
         for (let index = 0; index < 2; index += 1) makeTrainCar(runtime, train.id, index)
@@ -844,14 +896,36 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       if (pose !== null) setCameraTarget(pose.position)
     }
 
+    function removeTrainNow(trainId?: string) {
+      const before = fleet
+      fleet = removeRailFleetTrain(fleet, trainId)
+      // 消えたtrainのcloned material(runtime生成時にsharedMaterialsへ登録済み)を
+      // ここで解放しないと、消して増やしてを繰り返すたびリークする。
+      const remainingIds = new Set(fleet.map((train) => train.id))
+      for (const removedTrain of before) {
+        if (remainingIds.has(removedTrain.id)) continue
+        const runtime = trainVisuals.get(removedTrain.id)
+        if (runtime === undefined) continue
+        for (const material of [runtime.bodyMaterial, runtime.frontMaterial, runtime.roofMaterial]) {
+          sharedMaterials.delete(material)
+          material.dispose()
+        }
+      }
+      updateTrainVisuals()
+      reportTrainState()
+    }
+
     function focusDepotNow() {
       followedTrainId = null
-      setCameraTarget(DEPOT_POSITION)
+      const pieces = optionsRef.current.pieces
+      const depotPiece = pieces.find((piece) => piece.kind === 'depot')
+      setCameraTarget(depotPiece?.position ?? pieces[0]?.position ?? vec3(0, 0, 0))
     }
 
     startTrainRef.current = startTrainNow
     pauseTrainRef.current = pauseTrainNow
     addTrainRef.current = addTrainNow
+    removeTrainRef.current = removeTrainNow
     focusTrainRef.current = focusTrainNow
     focusDepotRef.current = focusDepotNow
 
@@ -875,6 +949,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           || geometry === stationRoofGeometry
           || geometry === tunnelTopGeometry
           || geometry === tunnelRingGeometry
+          || geometry === depotRoofGeometry
         group.add(mesh)
         return mesh
       }
@@ -1004,44 +1079,54 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           )
         }
       }
+
+      if (localPiece.kind === 'depot') {
+        // +X方向が線路の向き。屋根は中央部だけ・壁は腰高にして、
+        // 上から見ても車庫の中の線路と電車が見えるようにする。
+        const wallHeight = 0.6
+        const wallZ = depotRoofDepth / 2 - 0.1
+        const pillarHeight = 2.06
+        const pillarX = depotRoofLength / 2 - 0.25
+        addMesh(depotRoofGeometry, depotRoofMaterial, { x: 0, y: 2.06, z: 0 })
+        for (const side of [-1, 1]) {
+          addMesh(depotBodyGeometry, depotBodyMaterial, { x: 0, y: wallHeight / 2, z: side * wallZ })
+          for (const x of [-pillarX, pillarX]) {
+            addMesh(depotDoorGeometry, depotDoorMaterial, { x, y: pillarHeight / 2, z: side * wallZ })
+          }
+        }
+      }
     }
 
-    function makePieceObject(piece: RailPiece): THREE.Group {
-      const group = new THREE.Group()
-      group.name = `rail-${piece.id}`
-      group.userData.pieceId = piece.id
-
-      const segmentCount = piece.kind === 'curve' || piece.kind === 'branch'
-        ? 12
-        : piece.kind === 'slope'
-          ? 16
-          : piece.kind === 'bridge' || piece.kind === 'station' || piece.kind === 'tunnel'
-            ? 8
-            : 1
-      const sleeperEvery = piece.kind === 'curve' || piece.kind === 'slope' ? 2 : 1
-      const localPiece = { ...piece, position: vec3(0, 0, 0), rotationY: 0 }
+    /**
+     * 1本のpathからbase/rail/sleeperのInstancedMeshを組み立てる。
+     * 本線・branchの副線(A-C)・depotの2番線(C-D)で共通の手順。
+     * localPieceはposition/rotationが0で、group側へworld transformを
+     * 一度だけ適用する。pathを省略すると本線(localPiece.path)を使う。
+     */
+    function buildRailPathInstances(
+      localPiece: RailPiece,
+      path: RailPath | undefined,
+      segmentCount: number,
+      pieceId: string,
+      pathRailMaterial: THREE.Material,
+      sleeperEvery: number,
+    ): { base: THREE.InstancedMesh; rail: THREE.InstancedMesh; sleeper: THREE.InstancedMesh } {
       const baseInstances = new THREE.InstancedMesh(baseGeometry, baseMaterial, segmentCount)
-      const mainRailMaterial = piece.kind === 'branch'
-        ? piece.branchDirection === 'c' ? branchDimRailMaterial : branchSelectedRailMaterial
-        : railMaterial
-      const railInstances = new THREE.InstancedMesh(railGeometry, mainRailMaterial, segmentCount * 2)
+      const railInstances = new THREE.InstancedMesh(railGeometry, pathRailMaterial, segmentCount * 2)
       const sleeperCount = Math.ceil(segmentCount / sleeperEvery)
       const sleeperInstances = new THREE.InstancedMesh(sleeperGeometry, sleeperMaterial, sleeperCount)
       for (const instances of [baseInstances, railInstances, sleeperInstances]) {
-        instances.userData.pieceId = piece.id
+        instances.userData.pieceId = pieceId
         instances.instanceMatrix.setUsage(THREE.StaticDrawUsage)
         instances.receiveShadow = true
       }
-      baseInstances.name = 'rail-bases'
-      railInstances.name = 'rail-pairs'
-      sleeperInstances.name = 'rail-sleepers'
       let railInstanceIndex = 0
       let sleeperInstanceIndex = 0
       for (let i = 0; i < segmentCount; i += 1) {
         const t0 = i / segmentCount
         const t1 = (i + 1) / segmentCount
-        const p0 = worldRailPathPoint(localPiece, t0)
-        const p1 = worldRailPathPoint(localPiece, t1)
+        const p0 = worldRailPathPoint(localPiece, t0, path)
+        const p1 = worldRailPathPoint(localPiece, t1, path)
         const midpoint = vec3((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2)
         const tangent = vec3(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z)
         const tangentLength = Math.hypot(tangent.x, tangent.y, tangent.z) || 1
@@ -1088,73 +1173,66 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       baseInstances.computeBoundingSphere()
       railInstances.computeBoundingSphere()
       sleeperInstances.computeBoundingSphere()
+      return { base: baseInstances, rail: railInstances, sleeper: sleeperInstances }
+    }
+
+    function makePieceObject(piece: RailPiece): THREE.Group {
+      const group = new THREE.Group()
+      group.name = `rail-${piece.id}`
+      group.userData.pieceId = piece.id
+
+      const segmentCount = piece.kind === 'curve' || piece.kind === 'branch'
+        ? 12
+        : piece.kind === 'slope'
+          ? 16
+          : piece.kind === 'bridge' || piece.kind === 'station' || piece.kind === 'tunnel'
+            ? 8
+            : 1
+      const sleeperEvery = piece.kind === 'curve' || piece.kind === 'slope' ? 2 : 1
+      const localPiece = { ...piece, position: vec3(0, 0, 0), rotationY: 0 }
+      const mainRailMaterial = piece.kind === 'branch'
+        ? piece.branchDirection === 'c' ? branchDimRailMaterial : branchSelectedRailMaterial
+        : railMaterial
+      const { base: baseInstances, rail: railInstances, sleeper: sleeperInstances } = buildRailPathInstances(
+        localPiece,
+        undefined,
+        segmentCount,
+        piece.id,
+        mainRailMaterial,
+        sleeperEvery,
+      )
+      baseInstances.name = 'rail-bases'
+      railInstances.name = 'rail-pairs'
+      sleeperInstances.name = 'rail-sleepers'
       group.add(baseInstances, railInstances, sleeperInstances)
 
       if (piece.kind === 'branch' && piece.branchPath !== undefined) {
         const branchSegmentCount = 12
-        const branchBases = new THREE.InstancedMesh(baseGeometry, baseMaterial, branchSegmentCount)
-        const branchRails = new THREE.InstancedMesh(
-          railGeometry,
-          piece.branchDirection === 'c' ? branchSelectedRailMaterial : branchDimRailMaterial,
-          branchSegmentCount * 2,
+        const branchRailMaterial = piece.branchDirection === 'c' ? branchSelectedRailMaterial : branchDimRailMaterial
+        const { base: branchBases, rail: branchRails, sleeper: branchSleepers } = buildRailPathInstances(
+          localPiece,
+          piece.branchPath,
+          branchSegmentCount,
+          piece.id,
+          branchRailMaterial,
+          1,
         )
-        const branchSleepers = new THREE.InstancedMesh(sleeperGeometry, sleeperMaterial, branchSegmentCount)
-        for (const instances of [branchBases, branchRails, branchSleepers]) {
-          instances.userData.pieceId = piece.id
-          instances.instanceMatrix.setUsage(THREE.StaticDrawUsage)
-          instances.receiveShadow = true
-        }
-        let branchRailIndex = 0
-        for (let index = 0; index < branchSegmentCount; index += 1) {
-          const t0 = index / branchSegmentCount
-          const t1 = (index + 1) / branchSegmentCount
-          // localPieceはposition/rotationが0で、group側へworld transformを
-          // 一度だけ適用する。副Pathを明示し、二重変換を避ける。
-          const p0 = worldRailPathPoint(localPiece, t0, piece.branchPath)
-          const p1 = worldRailPathPoint(localPiece, t1, piece.branchPath)
-          const midpoint = vec3((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2)
-          const tangent = vec3(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z)
-          const tangentLength = Math.hypot(tangent.x, tangent.y, tangent.z) || 1
-          segmentTangentVector.set(tangent.x, tangent.y, tangent.z).normalize()
-          instanceQuaternion.setFromUnitVectors(trainBaseForward, segmentTangentVector)
-          instancePosition.set(midpoint.x, midpoint.y, midpoint.z)
-
-          instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
-          instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
-          instanceDummy.position.set(0, 0.1, 0)
-          instanceDummy.quaternion.identity()
-          instanceDummy.scale.setScalar(1)
-          instanceDummy.updateMatrix()
-          instanceMatrix.multiply(instanceDummy.matrix)
-          branchBases.setMatrixAt(index, instanceMatrix)
-
-          for (const side of [-1, 1]) {
-            instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
-            instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
-            instanceDummy.position.set(0, 0.34, (RAIL_VISUAL_CONFIG.gauge / 2) * side)
-            instanceDummy.quaternion.identity()
-            instanceDummy.scale.setScalar(1)
-            instanceDummy.updateMatrix()
-            instanceMatrix.multiply(instanceDummy.matrix)
-            branchRails.setMatrixAt(branchRailIndex, instanceMatrix)
-            branchRailIndex += 1
-          }
-
-          instanceScale.setScalar(1)
-          instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
-          instanceDummy.position.set(0, 0.2, 0)
-          instanceDummy.quaternion.identity()
-          instanceDummy.scale.setScalar(1)
-          instanceDummy.updateMatrix()
-          instanceMatrix.multiply(instanceDummy.matrix)
-          branchSleepers.setMatrixAt(index, instanceMatrix)
-        }
-        for (const instances of [branchBases, branchRails, branchSleepers]) {
-          instances.instanceMatrix.needsUpdate = true
-          instances.computeBoundingSphere()
-        }
         group.add(branchBases, branchRails, branchSleepers)
         branchRouteVisuals.set(piece.id, { b: railInstances, c: branchRails })
+      }
+
+      if (piece.kind === 'depot' && piece.secondaryPath !== undefined) {
+        // 2番線は選択・非選択の色分けをせず、branchRouteVisualsにも登録しない。
+        const depotSecondarySegmentCount = 8
+        const { base: depotSecondaryBases, rail: depotSecondaryRails, sleeper: depotSecondarySleepers } = buildRailPathInstances(
+          localPiece,
+          piece.secondaryPath,
+          depotSecondarySegmentCount,
+          piece.id,
+          railMaterial,
+          1,
+        )
+        group.add(depotSecondaryBases, depotSecondaryRails, depotSecondarySleepers)
       }
 
       const capsForPiece: Partial<Record<RailConnectorId, THREE.Mesh>> = {}
@@ -1173,7 +1251,16 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const selectionRing = new THREE.Mesh(selectionRingGeometry, selectionMaterial)
       selectionRing.name = 'selection-ring'
       selectionRing.rotation.x = -Math.PI / 2
-      const ringCenter = worldRailPathPoint(localPiece, 0.5)
+      let ringCenter = worldRailPathPoint(localPiece, 0.5)
+      if (piece.kind === 'depot' && piece.secondaryPath !== undefined) {
+        // 1番線と2番線の中点に置く。1番線だけだと車庫の片側に寄って見える。
+        const secondaryRingCenter = worldRailPathPoint(localPiece, 0.5, piece.secondaryPath)
+        ringCenter = vec3(
+          (ringCenter.x + secondaryRingCenter.x) / 2,
+          (ringCenter.y + secondaryRingCenter.y) / 2,
+          (ringCenter.z + secondaryRingCenter.z) / 2,
+        )
+      }
       selectionRing.position.set(ringCenter.x, ringCenter.y + 0.43, ringCenter.z)
       selectionRing.visible = piece.id === optionsRef.current.selectedPieceId
       selectionRing.userData.pieceId = piece.id
@@ -1184,7 +1271,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
     function syncPieces(pieces: readonly RailPiece[], selectedPieceId: string | null) {
       trainPieces = pieces
-      if (fleet.length === 0 && pieces.length > 0) fleet = createInitialRailFleet(pieces, 2)
+      if (fleet.length === 0 && pieces.length > 0) fleet = createInitialRailFleet(pieces, 1)
       const incomingIds = new Set(pieces.map((piece) => piece.id))
       for (const [pieceId, object] of pieceObjects) {
         if (incomingIds.has(pieceId)) continue
@@ -1237,7 +1324,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       pinchStartZoom = activeZoom
       mode = 'pinch'
       drag = null
+      trainDrag = null
       setMarker(null)
+      // syncPieces()の末尾でreportTrainState()も呼ばれ、掴んでいた電車の
+      // 状態(停止のまま)がonFleetChangeへ反映される。
       syncPieces(optionsRef.current.pieces, optionsRef.current.selectedPieceId)
     }
 
@@ -1340,6 +1430,16 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       optionsRef.current.onPiecesChange(nextLayout)
     }
 
+    function finishTrainDrag() {
+      const currentDrag = trainDrag
+      trainDrag = null
+      if (currentDrag === null) return
+      if (currentDrag.lastCursor.pieceId !== currentDrag.startPieceId) {
+        playRailSnapSound(optionsRef.current.soundEnabled ?? true)
+      }
+      reportTrainState()
+    }
+
     function handlePointerDown(event: PointerEvent) {
       if (event.button !== 0) return
       event.preventDefault()
@@ -1353,6 +1453,29 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       if (pointers.size >= 2) {
         startPinch()
         return
+      }
+
+      const grabbedTrainId = pickTrain(event)
+      if (grabbedTrainId !== null) {
+        const grabbedTrain = fleet.find((candidate) => candidate.id === grabbedTrainId)
+        if (grabbedTrain !== undefined) {
+          followedTrainId = null
+          optionsRef.current.onSelectPiece(null)
+          const grabbedForward = sampleRailTrainPose(trainPieces, grabbedTrain.motion.cursor)?.forward ?? null
+          trainDrag = {
+            pointerId: event.pointerId,
+            trainId: grabbedTrainId,
+            startPieceId: grabbedTrain.motion.cursor.pieceId,
+            lastCursor: { ...grabbedTrain.motion.cursor },
+            lastForward: grabbedForward,
+          }
+          mode = 'train'
+          drag = null
+          fleet = setRailFleetTrainRunning(fleet, grabbedTrainId, false)
+          updateTrainVisuals()
+          reportTrainState()
+          return
+        }
       }
 
       const selectedPieceId = pickPiece(event)
@@ -1396,6 +1519,24 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
       if (pointers.size >= 2 || mode === 'pinch') {
         updatePinch()
+        return
+      }
+
+      if (mode === 'train' && trainDrag?.pointerId === event.pointerId) {
+        const ground = intersectGround(event)
+        if (ground !== null) {
+          const nearest = findNearestRailTrainCursor(trainPieces, ground, {
+            maxDistance: TRAIN_DRAG_MAX_DISTANCE,
+            preferForward: trainDrag.lastForward ?? undefined,
+          })
+          // 見つからないときは直前の位置を保つ。電車が消えたり地面に
+          // 落ちたりしないよう、fleet/lastCursorはどちらも据え置く。
+          if (nearest !== null) {
+            fleet = moveRailFleetTrainTo(fleet, trainDrag.trainId, nearest.cursor)
+            trainDrag.lastCursor = { ...nearest.cursor }
+            updateTrainVisuals()
+          }
+        }
         return
       }
 
@@ -1445,6 +1586,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }
       if (pointers.size >= 2) return
       if (mode === 'rail' && drag?.pointerId === event.pointerId) finishDrag()
+      if (mode === 'train' && trainDrag?.pointerId === event.pointerId) finishTrainDrag()
       if (pointers.size === 0) {
         mode = 'none'
         panLastGround = null
@@ -1457,6 +1599,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         drag = null
         setMarker(null)
         syncPieces(optionsRef.current.pieces, optionsRef.current.selectedPieceId)
+      }
+      if (trainDrag?.pointerId === event.pointerId) {
+        trainDrag = null
+        reportTrainState()
       }
       if (pointers.size === 0) {
         mode = 'none'
@@ -1571,25 +1717,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         }
         dioramaRoot.add(group)
       })
-
-      const depot = new THREE.Group()
-      depot.name = 'toy-train-depot'
-      depot.position.set(DEPOT_POSITION.x, DEPOT_POSITION.y, DEPOT_POSITION.z)
-      const depotBody = new THREE.Mesh(depotBodyGeometry, depotBodyMaterial)
-      depotBody.position.y = 0.83
-      depotBody.castShadow = true
-      depotBody.receiveShadow = true
-      const depotRoof = new THREE.Mesh(depotRoofGeometry, depotRoofMaterial)
-      depotRoof.position.y = 1.82
-      depotRoof.castShadow = true
-      for (const z of [-1.05, 0, 1.05]) {
-        const depotDoor = new THREE.Mesh(depotDoorGeometry, depotDoorMaterial)
-        depotDoor.position.set(2.13, 0.7, z)
-        depotDoor.rotation.y = Math.PI / 2
-        depot.add(depotDoor)
-      }
-      depot.add(depotBody, depotRoof)
-      dioramaRoot.add(depot)
     }
 
     try {
@@ -1726,6 +1853,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       startTrainRef.current = null
       pauseTrainRef.current = null
       addTrainRef.current = null
+      removeTrainRef.current = null
       focusTrainRef.current = null
       focusDepotRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)
