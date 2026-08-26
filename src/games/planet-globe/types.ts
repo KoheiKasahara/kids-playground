@@ -6,6 +6,8 @@
  * `earth-globe` と異なり、国境ポリゴンや当たり判定用のフィーチャは持たない。
  * 天体ごとの見た目・大きさ・輪の有無はすべて `CelestialBody` の値として表現し、
  * 画面・3Dエンジンに `if (id === 'saturn')` のような天体別の分岐を書かない。
+ * 唯一の例外は `SurfaceSpec` の `style: 'rocky' | 'gas'` という判別可能ユニオンで、
+ * 岩石天体とガス惑星は生成アルゴリズムが本質的に別物なので「2つの生成器」として扱う。
  */
 
 export type CelestialBodyId = 'moon' | 'mars' | 'jupiter' | 'saturn'
@@ -15,34 +17,139 @@ export type ZoomLevel = 0 | 1 | 2 | 3
 export const MIN_ZOOM_LEVEL: ZoomLevel = 0
 export const MAX_ZOOM_LEVEL: ZoomLevel = 3
 
-/** 緯度方向のグラデーションの1点。at は 0=北極 / 1=南極。木星・土星の縞、火星の極冠をこれで表す。 */
-export type SurfaceBand = { at: number; color: string }
+/** 緯度方向の色プロファイルの1点。latDeg は +90(北極) → -90(南極) の降順で並べる。 */
+export type LatitudeStop = { latDeg: number; color: string }
 
-/** クレーター・地表のまだら模様。seed から決定的に配置する。 */
-export type SurfaceSpeckles = {
-  count: number
-  /** テクスチャ高さに対する比 */
-  minRadius: number
-  maxRadius: number
+/**
+ * 表面のアルベド模様(月の海、火星の暗色域・オリンポス山・マリネリス峡谷など)。
+ * Phase 3の特徴スポットは、この id と経緯度をそのまま使えるようにしておく
+ * (今回はタップ判定を実装しないが、座標の持ち方だけは先に揃えておく)。
+ */
+export type SurfacePatch = {
+  id: string
+  lonDeg: number
+  latDeg: number
+  /** 経度方向・緯度方向の半径(度) */
+  lonRadiusDeg: number
+  latRadiusDeg: number
+  rotationDeg?: number
   color: string
-  /** クレーターの明るい縁。省略時は縁を描かない。 */
-  rimColor?: string
   opacity: number
+  /** 0=くっきり 1=ふんわり。楕円の縁のぼけ具合。 */
+  softness: number
+  /** バンプマップへの寄与。省略時は凹凸なし。center>0 で盛り上がり、<0 でくぼみ。-1..1 */
+  relief?: number
+}
+
+export type SurfaceCrater = {
+  id?: string
+  lonDeg: number
+  latDeg: number
+  radiusDeg: number
+  /** バンプの深さ 0..1 */
+  depth: number
+  /** ティコのような光条。省略時は描かない。 */
+  rays?: { count: number; lengthDeg: number; color: string; opacity: number }
+}
+
+/** seedから決定的に散らす小クレーター群。 */
+export type ScatteredCraters = {
+  count: number
+  minRadiusDeg: number
+  maxRadiusDeg: number
+  /** この緯度(絶対値)より極側には置かない。極付近のUV歪みを避ける。 */
+  latLimitDeg: number
+  depth: number
   seed: number
 }
 
-export type SurfaceSpec = {
-  baseColor: string
-  bands?: readonly SurfaceBand[]
-  speckles?: SurfaceSpeckles
+/** 極冠。縁はseedから決めた凹凸を持たせ、帯状のベタ塗りにしない。 */
+export type PolarCaps = {
+  northEdgeLatDeg: number
+  southEdgeLatDeg: number
+  color: string
+  /** 縁の揺らぎ(度) */
+  raggednessDeg: number
+  seed: number
 }
 
-/** 土星の輪のような、天体に付随する円盤。内外の半径は天体半径に対する比で持つ。 */
-export type RingSpec = {
+export type SurfaceNoise = {
+  seed: number
+  octaves: number
+  /** X方向の格子数(整数)。タイル周期になる。 */
+  periodX: number
+  /** Y方向の周波数。periodXと同程度にすると等方に見える。 */
+  frequencyY: number
+  /** 明暗の強さ 0..1 */
+  amount: number
+  /**
+   * fbmの出力を0.5を中心に何倍へ広げるか(省略時は1=そのまま)。
+   * fbmは各オクターブの平均のため値が0.5付近へ集まりやすく、そのまま使うと
+   * 地表が「のっぺりしたプラスチック」に見える。1より大きくすると明暗がはっきりする。
+   */
+  contrast?: number
+  lightColor: string
+  darkColor: string
+}
+
+export type RockySurfaceSpec = {
+  style: 'rocky'
+  baseColor: string
+  latitudeStops: readonly LatitudeStop[]
+  noise: SurfaceNoise
+  patches: readonly SurfacePatch[]
+  craters: readonly SurfaceCrater[]
+  scatteredCraters: ScatteredCraters
+  polarCaps?: PolarCaps
+}
+
+/** ガス惑星の渦・斑点(大赤斑、白斑、大赤斑まわりの淡い"くぼみ")。 */
+export type GasSpot = {
+  id: string
+  lonDeg: number
+  latDeg: number
+  lonRadiusDeg: number
+  latRadiusDeg: number
+  rotationDeg?: number
+  /** 中心→外周の色。半径比at(0..1)付き。最後は必ずopacity 0にして帯へ溶け込ませる。 */
+  stops: readonly { at: number; color: string; opacity: number }[]
+  /** 渦の輪郭線。省略時は描かない。 */
+  swirl?: { turns: number; color: string; opacity: number; width: number }
+}
+
+export type GasSurfaceSpec = {
+  style: 'gas'
+  baseColor: string
+  /** 帯の色。latDeg降順。境界は滑らかに補間するが、stopを密に置くことで縞として見せる。 */
+  belts: readonly LatitudeStop[]
+  /** 帯を波打たせる歪み。X方向に引き伸ばしたfbmで緯度をずらす。 */
+  turbulence: { seed: number; octaves: number; periodX: number; frequencyY: number; amplitudeDeg: number }
+  /** 細かなむら。明暗のみ。 */
+  mottle: { seed: number; octaves: number; periodX: number; frequencyY: number; amount: number }
+  spots: readonly GasSpot[]
+}
+
+export type SurfaceSpec = RockySurfaceSpec | GasSurfaceSpec
+
+/** 輪の1本の帯(＝1枚のRingGeometry)。 */
+export type RingSegment = {
+  id: string
   innerRadiusRatio: number
   outerRadiusRatio: number
-  /** 内(0)から外(1)へ向かう帯。すき間は opacity を下げて表現する。 */
+  /** 内(0)→外(1)。すき間はopacityを落として表現する。 */
   bands: readonly { at: number; color: string; opacity: number }[]
+  /** 細いリングレットの濃淡。alphaを周期的に揺らす。 */
+  ringlets?: { seed: number; count: number; amount: number }
+}
+
+export type RingSpec = { segments: readonly RingSegment[] }
+
+/** 天体ごとのライティング補正。すべて既定値からの上書き。 */
+export type LightingSpec = {
+  keyIntensity: number
+  ambientIntensity: number
+  hemisphereIntensity: number
+  fillIntensity: number
 }
 
 export type CelestialBody = {
@@ -53,19 +160,24 @@ export type CelestialBody = {
   previewBackground: string
   /** 表示用の球の半径(world unit)。実際の天体の大きさ比ではなく、画面での見やすさで決める。 */
   radius: number
+  /** 極方向の潰れ(0..0.15)。ガス惑星の扁平を表す。省略時0。 */
+  flattening?: number
   /** 自転軸の傾き(度)。輪の傾きにも使う。 */
   axialTiltDegrees: number
   /** 初期の自転角(ラジアン)。天体を切り替えるたびにこの角度へ戻す。 */
   initialRotationY: number
-  /** ゆっくりした自転(ラジアン/秒)。prefers-reduced-motion のときは止める。 */
+  /** ゆっくりした自転(ラジアン/秒)。prefers-reduced-motionのときは止める。 */
   spinSpeed: number
   surface: SurfaceSpec
-  material: { roughness: number }
+  material: { roughness: number; bumpScale?: number }
+  lighting: LightingSpec
   /**
-   * ズーム段階ごとのカメラ距離を「天体（輪を含む）がちょうど画面に収まる距離の何倍か」で持つ。
+   * ズーム段階ごとのカメラ距離を「天体(輪を含む)がちょうど画面に収まる距離の何倍か」で持つ。
    * 絶対距離ではなく倍率にすることで、縦画面・横画面のどちらでも天体全体が切れずに収まる。
    */
   zoom: { outMargin: number; inMargin: number }
+  /** 既定視点を上書きしたい天体だけ持つ(土星は輪をよく開かせる)。 */
+  viewDirection?: { x: number; y: number; z: number }
   ring?: RingSpec
 }
 
@@ -77,6 +189,6 @@ export type UsePlanetEngineOptions = {
 }
 
 export type UsePlanetEngineHandle = {
-  /** 3D描画先の div を登録する ref コールバック（null で解除）。 */
+  /** 3D描画先のdivを登録するrefコールバック(nullで解除)。 */
   registerContainer: (element: HTMLDivElement | null) => void
 }

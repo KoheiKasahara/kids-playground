@@ -1,5 +1,6 @@
 import type { CelestialBody, ZoomLevel } from '../types'
 import { MAX_ZOOM_LEVEL } from '../types'
+import { ringOuterRadiusRatio } from './planetRing'
 
 export const CAMERA_FOV_DEGREES = 40
 export const CAMERA_NEAR = 10
@@ -10,10 +11,10 @@ function degToRad(degrees: number): number {
   return (degrees * Math.PI) / 180
 }
 
-/** 天体を画面に収めるのに必要な半径。輪を持つ天体は輪の外周まで含める。 */
+/** 天体を画面に収めるのに必要な半径。輪を持つ天体は輪の最外周のセグメントまで含める。 */
 export function viewRadiusOf(body: CelestialBody): number {
   if (body.ring === undefined) return body.radius
-  return body.radius * body.ring.outerRadiusRatio
+  return body.radius * ringOuterRadiusRatio(body.ring)
 }
 
 /**
@@ -61,3 +62,11 @@ export function easeOutCubic(progress: number): number {
  * この視点で輪が潰れないことは `planetRing.test.ts` の回帰テストで保証する。
  */
 export const DEFAULT_VIEW_DIRECTION = { x: 0.32, y: 0.3, z: 0.9 } as const
+
+/**
+ * 天体ごとの視点方向。`body.viewDirection` を持つ天体(土星など、輪をより開いて
+ * 見せたい天体)だけそれを使い、それ以外は `DEFAULT_VIEW_DIRECTION` を使う。
+ */
+export function viewDirectionOf(body: CelestialBody): { x: number; y: number; z: number } {
+  return body.viewDirection ?? DEFAULT_VIEW_DIRECTION
+}
