@@ -35,7 +35,7 @@ const DEFAULT_ITERATION_GUARD = 512
 const railPieceLookupCache = new WeakMap<readonly RailPiece[], ReadonlyMap<string, RailPiece>>()
 
 /** directionはbranch進入時に確定した今回のroute lockも兼ねる。 */
-export type RailTrainDirection = 'a-to-b' | 'b-to-a' | 'a-to-c' | 'c-to-a'
+export type RailTrainDirection = 'a-to-b' | 'b-to-a' | 'a-to-c' | 'c-to-a' | 'c-to-d' | 'd-to-c'
 export type TrainDirection = RailTrainDirection
 
 export type RailTrainCursor = {
@@ -106,13 +106,16 @@ function railPieceForId(pieces: readonly RailPiece[], pieceId: string): RailPiec
   return lookup.get(pieceId)
 }
 
-/** cursorのrouteに対応するPath。A-CはbranchPath、それ以外は従来path。 */
+/** cursorのrouteに対応するPath。A-CはbranchPath、C-DはsecondaryPath、それ以外は従来path。 */
 export function railPathForTrainDirection(
   piece: RailPiece,
   direction: RailTrainDirection,
 ): RailPath | null {
   if (direction === 'a-to-c' || direction === 'c-to-a') {
     return piece.kind === 'branch' && piece.branchPath !== undefined ? piece.branchPath : null
+  }
+  if (direction === 'c-to-d' || direction === 'd-to-c') {
+    return piece.kind === 'depot' && piece.secondaryPath !== undefined ? piece.secondaryPath : null
   }
   return piece.path
 }
@@ -142,12 +145,16 @@ function clampDistance(distance: number, length: number): number {
 
 function entryConnector(direction: RailTrainDirection): RailConnectorId {
   if (direction === 'a-to-b' || direction === 'a-to-c') return 'a'
+  if (direction === 'c-to-d') return 'c'
+  if (direction === 'd-to-c') return 'd'
   return direction === 'b-to-a' ? 'b' : 'c'
 }
 
 function exitConnector(direction: RailTrainDirection): RailConnectorId {
   if (direction === 'a-to-b') return 'b'
   if (direction === 'a-to-c') return 'c'
+  if (direction === 'c-to-d') return 'd'
+  if (direction === 'd-to-c') return 'c'
   return 'a'
 }
 
@@ -155,7 +162,9 @@ function oppositeRailTrainDirection(direction: RailTrainDirection): RailTrainDir
   if (direction === 'a-to-b') return 'b-to-a'
   if (direction === 'b-to-a') return 'a-to-b'
   if (direction === 'a-to-c') return 'c-to-a'
-  return 'a-to-c'
+  if (direction === 'c-to-a') return 'a-to-c'
+  if (direction === 'c-to-d') return 'd-to-c'
+  return 'c-to-d'
 }
 
 /** 接続先へ入る瞬間にbranchDirectionを読み、列車固有のrouteを確定する。 */
@@ -163,6 +172,12 @@ function directionLeavingConnector(
   piece: RailPiece,
   connectorId: RailConnectorId,
 ): RailTrainDirection {
+  if (piece.kind === 'depot') {
+    if (connectorId === 'a') return 'a-to-b'
+    if (connectorId === 'b') return 'b-to-a'
+    if (connectorId === 'c') return 'c-to-d'
+    if (connectorId === 'd') return 'd-to-c'
+  }
   if (connectorId === 'a') {
     return piece.kind === 'branch' && piece.branchDirection === 'c' ? 'a-to-c' : 'a-to-b'
   }
@@ -173,6 +188,12 @@ function directionArrivingAtConnector(
   piece: RailPiece,
   connectorId: RailConnectorId,
 ): RailTrainDirection {
+  if (piece.kind === 'depot') {
+    if (connectorId === 'b') return 'a-to-b'
+    if (connectorId === 'a') return 'b-to-a'
+    if (connectorId === 'd') return 'c-to-d'
+    if (connectorId === 'c') return 'd-to-c'
+  }
   if (connectorId === 'b') return 'a-to-b'
   if (connectorId === 'c') return 'a-to-c'
   return piece.kind === 'branch' && piece.branchDirection === 'c' ? 'c-to-a' : 'b-to-a'
@@ -189,9 +210,17 @@ function findConnection(
     connection.connectorId !== 'a'
     && connection.connectorId !== 'b'
     && connection.connectorId !== 'c'
+    && connection.connectorId !== 'd'
   ) return null
   const nextPiece = railPieceForId(pieces, connection.pieceId)
-  if (connection.connectorId === 'c' && nextPiece?.kind !== 'branch') return null
+  // 'c' はbranchの副線入口またはdepotの2番線入口としてだけ有効。
+  // 'd' はdepotの2番線出口としてだけ有効。壊れたデータは安全に弾く。
+  if (
+    connection.connectorId === 'c'
+    && nextPiece?.kind !== 'branch'
+    && nextPiece?.kind !== 'depot'
+  ) return null
+  if (connection.connectorId === 'd' && nextPiece?.kind !== 'depot') return null
   return nextPiece === undefined ? null : { piece: nextPiece, connectorId: connection.connectorId }
 }
 
@@ -199,6 +228,8 @@ function cursorWithDistance(cursor: RailTrainCursor, pieces: readonly RailPiece[
   const direction = cursor.direction === 'b-to-a'
     || cursor.direction === 'a-to-c'
     || cursor.direction === 'c-to-a'
+    || cursor.direction === 'c-to-d'
+    || cursor.direction === 'd-to-c'
     ? cursor.direction
     : 'a-to-b'
   const resolved = validPiece(pieces, cursor.pieceId, direction)
@@ -219,7 +250,7 @@ export function railTrainCursorT(
   if (resolved === null || resolved.length <= EPSILON) return resolved === null ? null : 0
   const normalized = cursorWithDistance(cursor, pieces)
   const fraction = normalized.distance / resolved.length
-  return normalized.direction === 'a-to-b' || normalized.direction === 'a-to-c'
+  return normalized.direction === 'a-to-b' || normalized.direction === 'a-to-c' || normalized.direction === 'c-to-d'
     ? fraction
     : 1 - fraction
 }
@@ -237,7 +268,7 @@ export function sampleRailTrainPose(
   try {
     const position = worldRailPathPoint(resolved.piece, t, resolved.path)
     const tangent = worldRailPathTangent(resolved.piece, t, resolved.path)
-    const forward = normalized.direction === 'a-to-b' || normalized.direction === 'a-to-c'
+    const forward = normalized.direction === 'a-to-b' || normalized.direction === 'a-to-c' || normalized.direction === 'c-to-d'
       ? tangent
       : { x: -tangent.x, y: -tangent.y, z: -tangent.z }
     return {
