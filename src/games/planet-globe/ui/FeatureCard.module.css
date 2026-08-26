@@ -1,0 +1,80 @@
+/* earth-globe の CountryCard と同じデザイン言語(左下カード・幅の考え方)にそろえる。 */
+.card {
+  position: absolute;
+  left: calc(var(--space-md) + var(--safe-left));
+  bottom: calc(var(--space-md) + var(--safe-bottom));
+  z-index: 2;
+  box-sizing: border-box;
+  width: min(280px, calc(100% - var(--tap-target-min) - var(--space-xl) - var(--space-md)));
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  border: 3px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.card:active {
+  transform: scale(0.97);
+  box-shadow: var(--shadow-sm);
+}
+
+.name {
+  overflow-wrap: anywhere;
+  color: var(--color-primary-dark);
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.description {
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: clamp(14px, 3.6vw, 15px);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.hint {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.card:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 360px) {
+  .card {
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .name {
+    font-size: 20px;
+  }
+
+  .description {
+    font-size: 13px;
+  }
+
+  .hint {
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

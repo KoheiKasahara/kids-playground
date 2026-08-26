@@ -29,3 +29,20 @@ export function latToV(latDeg: number): number {
 export function rotationYFacing(u: number): number {
   return Math.PI / 2 - 2 * Math.PI * u
 }
+
+/**
+ * 経緯度 → 天体ローカル(spinGroup基準)の単位方向ベクトル。
+ * `THREE.SphereGeometry(1,64,48)`の実頂点・実UVに対して最大誤差8e-8(float32の丸めのみ)で一致する式を
+ * `lonToU`/`latToV`と同じ変換から導いてあるため、Phase 2がtextureへ描いた模様の位置と必ず同じ点を指す。
+ * `rotationYFacing`と整合しており、`surfaceDirection(lon, lat)`を`rotationYFacing(lonToU(lon))`だけ
+ * Y軸まわりに回すと+Zを向く。three(THREE.Vector3)には依存させず、プレーンなオブジェクトを返す。
+ */
+export function surfaceDirection(lonDeg: number, latDeg: number): { x: number; y: number; z: number } {
+  const phi = lonToU(lonDeg) * 2 * Math.PI
+  const theta = latToV(latDeg) * Math.PI
+  return {
+    x: -Math.cos(phi) * Math.sin(theta),
+    y: Math.cos(theta),
+    z: Math.sin(phi) * Math.sin(theta),
+  }
+}

@@ -149,6 +149,31 @@ export function playGlobeCountrySelectSound(): void {
   playTone(ctx, 680, now + 0.045, 0.12, 0.06, 'sine')
 }
 
+/** 特徴スポット選択音の連打を抑える最小間隔。 */
+const PLANET_SPOT_SELECT_SOUND_MIN_INTERVAL_MS = 120
+let lastPlanetSpotSelectSoundAt: number | null = null
+
+/**
+ * わくせいぎで特徴スポットを見つけたときの、軽い「キラッ」。
+ * 正解音のような達成感は出さず(クイズではないため)、音量も控えめにする。特徴ごとに音は変えない。
+ */
+export function playPlanetSpotSelectSound(): void {
+  if (!soundEnabled) return
+  const wallClockNow = Date.now()
+  if (
+    lastPlanetSpotSelectSoundAt !== null
+    && wallClockNow - lastPlanetSpotSelectSoundAt < PLANET_SPOT_SELECT_SOUND_MIN_INTERVAL_MS
+  ) return
+  lastPlanetSpotSelectSoundAt = wallClockNow
+
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 784, now, 0.09, 0.05, 'sine') // G5
+  playTone(ctx, 1046.5, now + 0.06, 0.09, 0.05, 'sine') // C6
+  playTone(ctx, 1568, now + 0.12, 0.1, 0.045, 'sine') // G6
+}
+
 /** メジャーペンタトニックスケール（ド・レ・ミ・ソ・ラ）の半音オフセット。黒鍵を含まないので不協和になりにくい */
 const PENTATONIC_STEPS = [0, 2, 4, 7, 9]
 /** playPanelRevealSound の基準周波数（D5） */

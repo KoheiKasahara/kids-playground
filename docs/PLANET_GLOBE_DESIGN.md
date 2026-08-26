@@ -4,14 +4,14 @@
 
 4〜5歳の子どもが、クイズを解くのではなく、月・火星・木星・土星をさわって回しながら「天体ごとに見た目がちがう」ことに興味を持つためのミニゲームです。画面を開くとすぐに天体を操作でき、下部のボタンで別の天体へ切り替えられます。
 
-Phase 1のゴールは見た目の作り込みではなく、操作・天体切り替え・データ構造・3D表示基盤をきれいに成立させることでした。Phase 2（本書が対象）では、そのデータ駆動構造を保ったまま4天体の見た目を高品質化しました。特徴スポットのタップ、クイズ、大赤斑やカッシーニ間隙より先の精密表現はPhase 3以降に残します。
+Phase 1のゴールは見た目の作り込みではなく、操作・天体切り替え・データ構造・3D表示基盤をきれいに成立させることでした。Phase 2では、そのデータ駆動構造を保ったまま4天体の見た目を高品質化しました。Phase 3（本書が対象）では、天体上の「特徴スポット」をタップすると説明カードが出て、よみあげと軽い効果音で応える遊びを足しました。クイズ・スコア・図鑑・天体追加はPhase 4以降に残します。
 
 ## データ
 
 - 4天体（つき・かせい・もくせい・どせい）の定義は `src/games/planet-globe/data/celestialBodies.ts` の `celestialBodies` を使う。表示順は `moon, mars, jupiter, saturn` で固定する。
 - 各天体は `CelestialBody`（`src/games/planet-globe/types.ts`）として、表示半径・扁平・自転軸の傾き・自転速度・表面模様・素材・ライティング・ズーム倍率・視点上書き・（土星のみ）輪を1つのオブジェクトにまとめて持つ。
 - **天体ごとの `if (id === 'saturn')` のような分岐は画面にも3Dエンジンにも書かない。** 唯一の例外は `SurfaceSpec` の `style: 'rocky' | 'gas'` という判別可能ユニオンで、岩石天体(月・火星)とガス惑星(木星・土星)は生成アルゴリズムが本質的に別物なので「2つの生成器」として実装している。輪の有無は `body.ring` が定義されているかどうかで決まる。
-- 表面の模様(月の海・クレーター・火星の暗色域や極冠・木星土星の帯や大赤斑)はすべて経度・緯度(度)で定義する。Phase 3で特徴のタップ判定を足すときも、この経緯度と`id`をそのまま使える。
+- 表面の模様(月の海・クレーター・火星の暗色域や極冠・木星土星の帯や大赤斑)はすべて経度・緯度(度)で定義する。Phase 3の特徴スポット(後述)のタップ判定も、この経緯度と`id`をそのまま使っている。
 - 天体の選択状態とズーム段階は `PlanetGlobePlay` が持ち、3Dエンジンへ `UsePlanetEngineOptions` として渡す。
 
 ## 操作
@@ -73,7 +73,7 @@ Phase 1のゴールは見た目の作り込みではなく、操作・天体切�
 - `latToV(latDeg)`: 緯度(+90..-90) → テクスチャV(0..1)。北極(+90)がv=0(Canvasの上端)。
 - `rotationYFacing(u)`: テクスチャU上の点をカメラ正面(+Z)へ向けるための`spinGroup.rotation.y`。`SphereGeometry(phiStart=0)`ではu=0が-X、u=0.25が+Zを向くため`θ = π/2 - 2πu`。
 
-`celestialBodies.ts`の`initialRotationY`は、この式を使って「その天体の特徴的な地形が最初から見える経度」から逆算して書く(生の数値をハードコードしない)。Phase 3で「特徴の3D位置」を求めるときも、この式が唯一の正本になる。
+`celestialBodies.ts`の`initialRotationY`は、この式を使って「その天体の特徴的な地形が最初から見える経度」から逆算して書く(生の数値をハードコードしない)。Phase 3の特徴スポット(後述)の3D位置も、`surfaceDirection`としてこの式から導いている。
 
 ## テクスチャ
 
@@ -124,12 +124,48 @@ Phase 1のゴールは見た目の作り込みではなく、操作・天体切�
 - ポリゴン: 球は`SphereGeometry(1,64,48)`のまま、輪は最大4セグメント×192分割、星は`Points`520点。ポストプロセス・独自ShaderMaterialは使わない。
 - 天体1つあたりの表示物は球1つ(＋土星のみ輪セグメント数枚)で、`three-globe`のような国境ポリゴンやRaycasterによる当たり判定は持たない。
 
-## Phase 3以降へ残したもの
+## 特徴スポット(Phase 3)
+
+天体上の「特徴スポット」(月の海・クレーター、火星のオリンポス山・マリネリス峡谷・極冠、木星の大赤斑・縞、土星の輪・輪のすきま、など)をタップすると、説明カードが出てよみあげと軽い効果音で応える。
+
+### データ
+
+- `src/games/planet-globe/data/featureSpots.ts`の`featureSpotsByBodyId`に、天体ごとの`FeatureSpot[]`を持つ(`types.ts`)。`id`・`displayName`・`description`(1〜2文の短文)・`target`(球面`surface`か輪`ring`)・当たり判定半径`hitRadiusPx`・`accentColor`を1件ずつ持つ。
+- `target.kind === 'surface'`の`lonDeg`/`latDeg`は、**Phase 2の`celestialBodies.ts`の模様(`patches`/`craters`/`spots`)と同じ値をそのまま使う**。これにより「textureに描かれた模様の位置」と「タップ判定の3D位置」が`three/planetCoords.ts`の変換式1本を経由して常に一致する(`featureSpots.test.ts`が両者の一致を回帰テストしている)。
+- `target.kind === 'ring'`は、輪の半径比(`radiusRatio`)と中心角(`angleDeg`)でマーカー位置を、`highlightSegmentIds`(`RingSegment.id`)または`highlightRadiusBand`で光らせる帯を指定する。
+
+### 3D位置と可視判定
+
+- `three/planetCoords.ts`に`surfaceDirection(lonDeg, latDeg)`を追加した。`lonToU`/`latToV`と同じ変換式から導いた、天体ローカル(spinGroup基準)の単位方向ベクトルで、`THREE.SphereGeometry(1,64,48)`の実頂点・実UVと最大誤差8e-8(float32の丸めのみ)で一致する。three(`THREE.Vector3`)には依存させず、プレーンなオブジェクトを返す。
+- マーカーの実座標は`three/spotMarkers.ts`の`surfaceSpotLocalPosition`/`ringSpotLocalPosition`が持つ。球面スポットは`surfaceDirection`の単位ベクトルへ、扁平(Y方向のみ)と表面から浮かせる分(`MARKER_SURFACE_OFFSET_RATIO`)を反映した半径をかけて求める。
+- 可視判定(天体本体に隠れていないか)は「楕円体を単位球にした正規化空間」で行う(`three/spotPicking.ts`)。tiltGroupローカルへ変換したカメラ位置を`(r, r*(1-f), r)`で割ると、扁平した天体でも単位球に対する遮蔽判定の式がそのまま正しく使える(アフィン変換は直線・交差関係を保つため)。
+  - 球面: 単位球上の点pがカメラcから見える条件は`dot(p, c) > 1`(厳密解)。`SURFACE_VISIBILITY_MARGIN`を足し、輪郭ぎりぎりの押しにくい点を拾わないようにする。
+  - 輪: カメラと点を結ぶ線分が単位球と交わるか(＝原点への最短距離が`1 + margin`未満か)で、天体本体に隠れているかを判定する。
+- `usePlanetEngine.ts`は`tick`の中で、天体ごとに1回だけ正規化したカメラ位置を求め、各スポットの可視状態→表示強度(フェード)→マーカー/パルス/輪ハイライトの見た目、の順に毎frame更新する。
+
+### 当たり判定
+
+- 見た目のマーカー(直径はごく小さい)と当たり判定は意図的に分離している。`hitRadiusPx`(30px以上)は幼児が指で押しても反応する大きさに広げてあり、見た目は控えめなまま押しやすさを確保する。
+- タップ判定はRaycasterを使わず、「見えているマーカーをカメラで画面座標へ投影し、ポインタ位置との画面上の距離が近いものを選ぶ」方式にした(`three/spotPicking.ts`の`pickNearestSpot`)。マーカーがSprite(小さい板)であるため、Raycasterによるピンポイント判定より画面距離判定のほうが幼児には確実に押せる。
+- ドラッグ(天体回転)とタップの判別は、pointerdownからの移動量が閾値(`POINTER_TAP_MOVE_PX`)を一度でも超えたら「動いた」と記録し続ける方式にした。指が元の位置へ戻ってきても回転操作として扱うため、離した位置との距離だけを見る方式より誤タップに強い。2本目以降の指が触れたときはタップ判定自体をやめる(マルチタッチは常に回転操作)。
+
+### 輪ハイライト(土星)
+
+- `resolveRingHighlightBands`が、`highlightSegmentIds`(`body.ring.segments`から半径比を引く)と`highlightRadiusBand`(直接指定、カッシーニ間隙など帯だけのすき間用)を1つの帯リストへ解決する。
+- 帯ごとに`RingGeometry`を1枚作り、赤道面へ寝かせてtiltGroup直下に置く。加算合成(`AdditiveBlending`)・最大不透明度0.22程度に抑え、輪の模様が消える単色べた塗りにしないようにしている。選択時にフェードイン、解除時にフェードアウトしてから非表示にする。
+
+### 説明UI・よみあげ・効果音
+
+- `ui/FeatureCard.tsx`は`earth-globe`の`CountryCard`と同じデザイン言語(画面左下・カード全体がボタン・タップで閉じる)にそろえた。
+- よみあげは既存の`useQuestionSpeech`をそのまま使う(`${spot.spokenName ?? spot.displayName}。${spot.description}`)。よみあげON/OFF・スポット切り替え・画面離脱への追従はhook側の保証に乗るだけで済む。
+- 選択時の効果音は`src/utils/quizSound.ts`の`playPlanetSpotSelectSound`(軽い「キラッ」、正解音のような達成感は出さない)。
+
+## Phase 4以降へ残したもの
 
 `earth-globe`から引き継がなかった仕組みと、その理由:
 
 - **three-globe / 国境ポリゴン / world-atlas国データ**: わくせいぎは国や地形の当たり判定を必要とせず、球＋輪という単純な形状で十分なため採用しない。
-- **RaycasterによるタップNode選択**: Phase 2までは天体上のタップ対象(特徴スポット)が無いため不要。ただし`SurfacePatch`・`SurfaceCrater`・`GasSpot`はすべて経度・緯度(度)と安定した`id`を持つデータとして定義してあるので、Phase 3で「クレーターや大赤斑をタップすると説明が出る」機能を足すときは、そのままタップ対象として使える。
+- **RaycasterによるタップNode選択**: マーカーがSpriteで見た目が小さく、ピンポイント判定になってしまうため、Phase 3では「画面上の距離」で判定する方式(上記)を採用し、Raycasterは使っていない。
 - **OrbitControlsの内部APIへの介入（`earth-globe/three/rotationControls.ts`相当）**: earth-globeはズーム段階に応じて回転速度を細かく変える演出のために内部実装へ踏み込んでいたが、素の`rotateSpeed`固定値で十分と判断し、内部APIには触れていない。
 
-このほか、次のような作り込みは意図的に本Phaseの範囲外にしている: 天体上の特徴スポットのタップ・クイズ・音声読み上げ、水星・金星・天王星・海王星などの追加天体、ポストプロセス・カスタムシェーダーによる質感表現のさらなる作り込み。
+このほか、次のような作り込みは意図的に本Phaseの範囲外にしている: 特徴スポットを使ったクイズ・スコア・図鑑化、水星・金星・天王星・海王星などの追加天体、ポストプロセス・カスタムシェーダーによる質感表現のさらなる作り込み。

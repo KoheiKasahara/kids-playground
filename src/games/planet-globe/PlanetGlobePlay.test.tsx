@@ -1,9 +1,12 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UsePlanetEngineOptions } from './types'
 import App from '../../app/App'
+import { resetSpeechEnabledCache } from '../../speech'
+import { installSpeechSynthesisMock, uninstallSpeechSynthesisMock } from '../../test/speechSynthesisMock'
+import type { SpeechSynthesisMock } from '../../test/speechSynthesisMock'
 
 const planetEngineMock = vi.hoisted(() => ({
   options: undefined as UsePlanetEngineOptions | undefined,
@@ -139,5 +142,121 @@ describe('PlanetGlobePlay', () => {
     await user.click(await screen.findByRole('button', { name: 'もどる' }))
 
     expect(await screen.findByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
+  })
+
+  it('passes the correct feature spots for each body to the engine', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /わくせいぎ/ })
+
+    expect(planetEngineMock.options?.spots.map((spot) => spot.id)).toEqual(
+      expect.arrayContaining(['moon-mare', 'moon-crater', 'moon-far-side']),
+    )
+
+    await user.click(screen.getByRole('button', { name: 'もくせい' }))
+    expect(planetEngineMock.options?.spots.map((spot) => spot.id)).toEqual(
+      expect.arrayContaining(['jupiter-great-red-spot', 'jupiter-belts', 'jupiter-gas']),
+    )
+  })
+
+  it('shows the feature card with name and description when the engine selects a spot', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /わくせいぎ/ })
+
+    await user.click(screen.getByRole('button', { name: 'もくせい' }))
+    act(() => {
+      planetEngineMock.options?.onSpotSelect('jupiter-great-red-spot')
+    })
+
+    expect(screen.getByText('だいせきはん')).toBeInTheDocument()
+    expect(
+      screen.getByText('もくせいに ある、とても おおきな あらしだよ。ちきゅうより おおきいんだ。'),
+    ).toBeInTheDocument()
+  })
+
+  it('closes the card when it is tapped', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /わくせいぎ/ })
+
+    act(() => {
+      planetEngineMock.options?.onSpotSelect('moon-mare')
+    })
+    const card = await screen.findByRole('button', { name: /つきの うみ/ })
+
+    await user.click(card)
+    expect(screen.queryByText('つきの うみ')).not.toBeInTheDocument()
+  })
+
+  it('clears the selection and hides the card when switching bodies', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /わくせいぎ/ })
+
+    act(() => {
+      planetEngineMock.options?.onSpotSelect('moon-mare')
+    })
+    expect(screen.getByText('つきの うみ')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'かせい' }))
+    expect(screen.queryByText('つきの うみ')).not.toBeInTheDocument()
+    expect(planetEngineMock.options?.selectedSpotId).toBeNull()
+  })
+
+  it('hides the card when the engine reports no spot selected', async () => {
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /わくせいぎ/ })
+
+    act(() => {
+      planetEngineMock.options?.onSpotSelect('moon-crater')
+    })
+    expect(screen.getByText('クレーター')).toBeInTheDocument()
+
+    act(() => {
+      planetEngineMock.options?.onSpotSelect(null)
+    })
+    expect(screen.queryByText('クレーター')).not.toBeInTheDocument()
+  })
+})
+
+describe('PlanetGlobePlay のよみあげ挙動', () => {
+  let mock: SpeechSynthesisMock
+
+  beforeEach(() => {
+    localStorage.clear()
+    resetSpeechEnabledCache()
+    mock = installSpeechSynthesisMock()
+  })
+
+  afterEach(() => {
+    uninstallSpeechSynthesisMock()
+  })
+
+  it('よみあげONのとき、スポット選択で特徴名＋説明が読み上げられる', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /わくせいぎ/ })
+
+    await user.click(screen.getByRole('button', { name: /よみあげ/ }))
+
+    act(() => {
+      planetEngineMock.options?.onSpotSelect('moon-mare')
+    })
+
+    expect(mock.spoken).toEqual([
+      'つきの うみ。くろく みえる たいらな ところだよ。うみと よばれるけど、みずは ないんだ。',
+    ])
+  })
+
+  it('よみあげOFF(既定)のときは、スポットを選んでも読み上げられない', async () => {
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /わくせいぎ/ })
+
+    act(() => {
+      planetEngineMock.options?.onSpotSelect('moon-mare')
+    })
+
+    expect(mock.spoken).toEqual([])
   })
 })
