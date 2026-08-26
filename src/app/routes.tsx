@@ -124,6 +124,7 @@ export const routes: RouteObject[] = [
   // こっきコロコロパズルも物理エンジン(matter-js)を含むため、開くときだけ読込む。
   { path: '/games/flag-roll-puzzle', element: lazyRoute(() => import('../games/flag-roll-puzzle/FlagRollPuzzlePlay')) },
   { path: '/games/earth-globe', element: lazyRoute(() => import('../games/earth-globe/EarthGlobePlay')) },
+  { path: '/games/planet-globe', element: lazyRoute(() => import('../games/planet-globe/PlanetGlobePlay')) },
   { path: '/games/rail-builder', element: lazyRoute(() => import('../games/rail-builder/RailBuilderPlay')) },
   { path: '/games/flag-roll-adventure', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventureSelect')) },
   { path: '/games/flag-roll-adventure/play', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventurePlay')) },

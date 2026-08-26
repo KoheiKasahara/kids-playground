@@ -1,0 +1,141 @@
+.page {
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-background);
+}
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  /* 宇宙らしい濃紺のグラデーションに、小さな星を radial-gradient で点描する(画像は使わない)。 */
+  background-color: #0b1130;
+  background-image:
+    radial-gradient(1.6px 1.6px at 12% 22%, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(1.4px 1.4px at 78% 14%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.8px 1.8px at 32% 68%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1.2px 1.2px at 58% 42%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 88% 76%, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(1.3px 1.3px at 6% 82%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.6px 1.6px at 46% 8%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.3px 1.3px at 68% 90%, rgba(255, 255, 255, 0.6), transparent),
+    linear-gradient(160deg, #171f4d 0%, #0b1130 55%, #05071a 100%);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.scene canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.header {
+  position: absolute;
+  /*
+   * 「もどる」は左上に固定で置くため、タイトル・説明文はその高さのぶんだけ下げる。
+   * 横方向のpaddingだけで避けようとすると、320px幅では説明文を置く幅が足りず
+   * 「もどる」の下に文字が潜り込んで読めなくなる。天体は画面中央に余白付きで
+   * 収まるため、上端の空を少し使っても天体の見え方には影響しない。
+   */
+  top: calc(var(--space-sm) + var(--safe-top) + var(--tap-target-min));
+  left: 0;
+  right: 0;
+  z-index: 1;
+  width: min(100%, 520px);
+  margin: 0 auto;
+  padding-inline: var(--space-md);
+  box-sizing: border-box;
+  text-align: center;
+  pointer-events: none;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-text-on-primary);
+  font-size: clamp(28px, 8vw, var(--font-size-xlarge));
+  line-height: 1.15;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.instruction {
+  margin: var(--space-xs) 0 0;
+  color: var(--color-text-on-primary);
+  font-size: clamp(16px, 4.6vw, var(--font-size-base));
+  font-weight: 700;
+  line-height: 1.25;
+  opacity: 0.92;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.home {
+  position: absolute;
+  top: calc(var(--space-sm) + var(--safe-top));
+  left: calc(var(--space-sm) + var(--safe-left));
+  z-index: 2;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: var(--space-xs) var(--space-sm);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.home:active {
+  transform: scale(0.95);
+  box-shadow: none;
+}
+
+.home:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 360px) {
+  .instruction {
+    font-size: 14px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  /* 低い横画面では上端の余白が少ないため、「もどる」の右横に回り込ませて高さを節約する。 */
+  .header {
+    top: calc(var(--space-sm) + var(--safe-top));
+    padding-inline: calc(var(--tap-target-min) + var(--space-md));
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .instruction {
+    margin-top: 0;
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home {
+    transition: none;
+  }
+}
