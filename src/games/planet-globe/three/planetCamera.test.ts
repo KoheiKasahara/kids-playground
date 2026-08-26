@@ -3,10 +3,13 @@ import { celestialBodies } from '../data/celestialBodies'
 import {
   CAMERA_FOV_DEGREES,
   cameraDistanceForZoom,
+  DEFAULT_VIEW_DIRECTION,
   easeOutCubic,
   fitDistance,
+  viewDirectionOf,
   viewRadiusOf,
 } from './planetCamera'
+import { ringOuterRadiusRatio } from './planetRing'
 import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL, type ZoomLevel } from '../types'
 
 const PORTRAIT_ASPECT = 0.46
@@ -50,6 +53,32 @@ describe('cameraDistanceForZoom', () => {
       }
     },
   )
+})
+
+describe('viewDirectionOf', () => {
+  it('viewDirectionを持たない天体は既定視点を返す', () => {
+    const moon = celestialBodies.find((body) => body.id === 'moon')
+    expect(moon).toBeDefined()
+    if (moon === undefined) return
+    expect(viewDirectionOf(moon)).toEqual(DEFAULT_VIEW_DIRECTION)
+  })
+
+  it('viewDirectionを持つ天体はそれを返す(既定値を上書きする)', () => {
+    const saturn = celestialBodies.find((body) => body.id === 'saturn')
+    expect(saturn).toBeDefined()
+    if (saturn === undefined || saturn.viewDirection === undefined) return
+    expect(viewDirectionOf(saturn)).toEqual(saturn.viewDirection)
+    expect(viewDirectionOf(saturn)).not.toEqual(DEFAULT_VIEW_DIRECTION)
+  })
+})
+
+describe('viewRadiusOf', () => {
+  it('輪を持つ天体は輪の最外周セグメントまでを視野半径に含める', () => {
+    const saturn = celestialBodies.find((body) => body.id === 'saturn')
+    expect(saturn).toBeDefined()
+    if (saturn === undefined || saturn.ring === undefined) return
+    expect(viewRadiusOf(saturn)).toBeCloseTo(saturn.radius * ringOuterRadiusRatio(saturn.ring))
+  })
 })
 
 describe('easeOutCubic', () => {

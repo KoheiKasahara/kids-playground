@@ -3,6 +3,8 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type {
   CelestialBody,
+  CelestialBodyId,
+  RingSpec,
   UsePlanetEngineHandle,
   UsePlanetEngineOptions,
   ZoomLevel,
@@ -12,12 +14,20 @@ import {
   CAMERA_FOV_DEGREES,
   CAMERA_NEAR,
   cameraDistanceForZoom,
-  DEFAULT_VIEW_DIRECTION,
   easeOutCubic,
+  viewDirectionOf,
+  viewRadiusOf,
   ZOOM_ANIMATION_DURATION_MS,
 } from './planetCamera'
-import { createSurfaceTexture } from './planetSurface'
-import { axialTiltRotationZ, createRingMesh } from './planetRing'
+import { createSurfaceMaps, type SurfaceMaps } from './planetSurface'
+import { axialTiltRotationZ, createRingMeshes, createRingSegmentTexture } from './planetRing'
+import {
+  applyLighting,
+  configureKeyLightShadow,
+  createPlanetLights,
+  type PlanetLights,
+} from './planetLighting'
+import { createStarField, disposeStarField } from './starField'
 import { renderPixelRatioForDevice } from './renderQuality'
 
 type ZoomAnimation = {
@@ -30,7 +40,6 @@ type PlanetEngine = {
   setBody: (body: CelestialBody) => void
   setZoom: (level: ZoomLevel) => void
 }
-
 
 function degToRad(degrees: number): number {
   return (degrees * Math.PI) / 180
@@ -86,7 +95,10 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     let tiltGroup: THREE.Group | null = null
     let spinGroup: THREE.Group | null = null
     let sphereMesh: THREE.Mesh | null = null
-    let ringMesh: THREE.Mesh | null = null
+    let ringMeshes: THREE.Mesh[] = []
+
+    let lights: PlanetLights | null = null
+    let starField: THREE.Points | null = null
 
     let currentBody: CelestialBody | null = null
     let activeZoomLevel: ZoomLevel = initialOptions.zoomLevel
@@ -97,6 +109,35 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     let rafId: number | null = null
     let lastFrameTime: number | null = null
     let released = false
+
+    // 表面テクスチャと輪テクスチャは天体ID単位でキャッシュし、天体を何度切り替えても
+    // 1天体につき1回しかCanvas 2Dのピクセルループを走らせない(生成コストの主因のため)。
+    const surfaceCache = new Map<CelestialBodyId, SurfaceMaps>()
+    const ringTextureCache = new Map<CelestialBodyId, (THREE.CanvasTexture | null)[]>()
+
+    function getOrCreateSurfaceMaps(body: CelestialBody): SurfaceMaps {
+      const cached = surfaceCache.get(body.id)
+      if (cached !== undefined) return cached
+
+      const maps = createSurfaceMaps(body.surface)
+      const maxAnisotropy = renderer?.capabilities.getMaxAnisotropy() ?? 1
+      if (maps.map !== null) maps.map.anisotropy = maxAnisotropy
+      if (maps.bumpMap !== null) maps.bumpMap.anisotropy = maxAnisotropy
+      surfaceCache.set(body.id, maps)
+      return maps
+    }
+
+    function getOrCreateRingTextures(
+      body: CelestialBody,
+      ring: RingSpec,
+    ): (THREE.CanvasTexture | null)[] {
+      const cached = ringTextureCache.get(body.id)
+      if (cached !== undefined) return cached
+
+      const textures = ring.segments.map((segment) => createRingSegmentTexture(segment))
+      ringTextureCache.set(body.id, textures)
+      return textures
+    }
 
     function aspectOfContainer(): number {
       const rect = container.getBoundingClientRect()
@@ -113,19 +154,16 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     }
 
     /**
-     * カメラの向きを既定視点へ戻す（距離は保つ）。
+     * カメラの向きを既定視点(天体ごとに`viewDirectionOf`で決まる)へ戻す(距離は保つ)。
      * 天体を切り替えるたびに呼び、直前の天体をどれだけ回していても
-     * 新しい天体が必ず見やすい角度（土星なら輪が開いた角度）で現れるようにする。
+     * 新しい天体が必ず見やすい角度(土星なら輪が開いた角度)で現れるようにする。
      */
     function resetCameraOrientation() {
-      if (camera === null || controls === null) return
+      if (camera === null || controls === null || currentBody === null) return
 
       const distance = camera.position.distanceTo(controls.target)
-      const direction = new THREE.Vector3(
-        DEFAULT_VIEW_DIRECTION.x,
-        DEFAULT_VIEW_DIRECTION.y,
-        DEFAULT_VIEW_DIRECTION.z,
-      ).normalize()
+      const view = viewDirectionOf(currentBody)
+      const direction = new THREE.Vector3(view.x, view.y, view.z).normalize()
       camera.position.copy(controls.target).add(direction.multiplyScalar(distance))
       controls.update()
     }
@@ -142,19 +180,19 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     function disposeCurrentBody() {
       if (sphereMesh !== null) {
         const material = sphereMesh.material as THREE.MeshStandardMaterial
-        material.map?.dispose()
+        // map/bumpMapはsurfaceCacheが保持し続けるため、ここではmaterial自体だけを破棄する。
         material.dispose()
         sphereMesh.removeFromParent()
         sphereMesh = null
       }
-      if (ringMesh !== null) {
+      for (const ringMesh of ringMeshes) {
         const material = ringMesh.material as THREE.MeshStandardMaterial
-        material.map?.dispose()
+        // 輪のテクスチャもringTextureCacheが保持し続けるため、ここではdisposeしない。
         material.dispose()
         ringMesh.geometry.dispose()
         ringMesh.removeFromParent()
-        ringMesh = null
       }
+      ringMeshes = []
       if (spinGroup !== null) {
         spinGroup.removeFromParent()
         spinGroup = null
@@ -174,28 +212,38 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       const nextSpinGroup = new THREE.Group()
       nextSpinGroup.rotation.y = body.initialRotationY
 
-      const texture = createSurfaceTexture(body.surface)
+      const maps = getOrCreateSurfaceMaps(body)
       const material = new THREE.MeshStandardMaterial({
         roughness: body.material.roughness,
         metalness: 0,
       })
-      if (texture !== null) {
-        material.map = texture
+      if (maps.map !== null) {
+        material.map = maps.map
       } else {
         // Canvas 2Dが使えない環境でも球が透明にならないよう、地色で塗る。
         material.color = new THREE.Color(body.surface.baseColor)
       }
+      if (maps.bumpMap !== null) {
+        material.bumpMap = maps.bumpMap
+        material.bumpScale = body.material.bumpScale ?? 0
+      }
 
       const mesh = new THREE.Mesh(sphereGeometry, material)
-      mesh.scale.setScalar(body.radius)
+      // 極方向の潰れ(ガス惑星の扁平)はY軸(極軸)だけを縮めて表現する。
+      mesh.scale.set(body.radius, body.radius * (1 - (body.flattening ?? 0)), body.radius)
+      // 土星本体の影が輪に落ちるよう、球は影を落とす側にする(輪からの影は受けない)。
+      mesh.castShadow = true
+      mesh.receiveShadow = false
       nextSpinGroup.add(mesh)
       nextTiltGroup.add(nextSpinGroup)
 
-      let nextRingMesh: THREE.Mesh | null = null
+      let nextRingMeshes: THREE.Mesh[] = []
       if (body.ring !== undefined) {
-        nextRingMesh = createRingMesh(body, body.ring)
+        const ring = body.ring
+        const textures = getOrCreateRingTextures(body, ring)
+        nextRingMeshes = createRingMeshes(body, ring, (_segment, index) => textures[index] ?? null)
         // 輪は自転させないため spinGroup ではなく tiltGroup 直下に置く。
-        nextTiltGroup.add(nextRingMesh)
+        for (const ringMesh of nextRingMeshes) nextTiltGroup.add(ringMesh)
       }
 
       bodyRoot.add(nextTiltGroup)
@@ -203,7 +251,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       tiltGroup = nextTiltGroup
       spinGroup = nextSpinGroup
       sphereMesh = mesh
-      ringMesh = nextRingMesh
+      ringMeshes = nextRingMeshes
     }
 
     function setBody(body: CelestialBody) {
@@ -215,6 +263,14 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       disposeCurrentBody()
       currentBody = body
       buildBody(body)
+
+      if (lights !== null) {
+        applyLighting(lights, body.lighting)
+        // 影は輪を持つ天体(土星)だけで有効化する。本体の影が輪に落ちる立体感が目的で、
+        // 輪の無い天体では影を計算する意味が薄い分、コストだけ払わないようにする。
+        configureKeyLightShadow(lights.key, viewRadiusOf(body), body.ring !== undefined)
+      }
+
       updateControlsDistanceLimits(body)
       resetCameraOrientation()
       // 初回だけは「遠くから寄ってくる」演出にならないよう即座に合わせ、
@@ -319,6 +375,24 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       sphereGeometry?.dispose()
       sphereGeometry = null
 
+      // ここでようやくキャッシュ済みテクスチャも破棄する(天体切り替え中は保持し続けた)。
+      for (const maps of surfaceCache.values()) {
+        maps.map?.dispose()
+        maps.bumpMap?.dispose()
+      }
+      surfaceCache.clear()
+      for (const textures of ringTextureCache.values()) {
+        for (const texture of textures) texture?.dispose()
+      }
+      ringTextureCache.clear()
+
+      if (starField !== null) {
+        starField.removeFromParent()
+        disposeStarField(starField)
+        starField = null
+      }
+      lights = null
+
       if (renderer !== null) {
         const canvas = renderer.domElement
         try {
@@ -350,6 +424,9 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       renderer.setClearAlpha(0)
       renderer.outputColorSpace = THREE.SRGBColorSpace
       renderer.setPixelRatio(renderPixelRatioForDevice(window.devicePixelRatio))
+      // 土星本体の影を輪に落とすためにシャドウマップを有効化する。柔らかい影のPCFSoftShadowMapを使う。
+      renderer.shadowMap.enabled = true
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
       const canvas = renderer.domElement
       canvas.setAttribute('aria-hidden', 'true')
@@ -360,20 +437,19 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       canvas.style.height = '100%'
       container.appendChild(canvas)
 
-      // 背景は透明のままにし、CSS側の宇宙背景(星の点描)を透かして見せる。
+      // 背景は透明のままにし、CSS側の宇宙背景(グラデーション)を透かして見せる。星はWebGL側に置く。
       scene = new THREE.Scene()
 
       camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, 1, CAMERA_NEAR, CAMERA_FAR)
       camera.position.set(0, 0, 1)
       camera.lookAt(0, 0, 0)
 
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.55)
-      const keyLight = new THREE.DirectionalLight(0xfff4e2, 1.45)
-      keyLight.position.set(-0.55, 0.45, 1).normalize().multiplyScalar(300)
-      // 暗部が真っ黒に沈まないよう、キー光の反対側から弱い補助光を当てる。
-      const fillLight = new THREE.DirectionalLight(0xa9c0ff, 0.32)
-      fillLight.position.set(0.7, -0.25, -0.6).normalize().multiplyScalar(300)
-      scene.add(ambientLight, keyLight, fillLight)
+      // ライトは天体切り替えのたびに作り直さず、ここで1回だけ作って強度だけを差し替える。
+      lights = createPlanetLights()
+      scene.add(...lights.all)
+
+      starField = createStarField(renderer.getPixelRatio())
+      scene.add(starField)
 
       bodyRoot = new THREE.Group()
       scene.add(bodyRoot)
