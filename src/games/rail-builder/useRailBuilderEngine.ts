@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
+  applyRailLoopClosure,
   clampRailPosition,
   connectRailPieces,
   disconnectRailPiece,
+  findRailLoopClosureCandidate,
   findRailSnapNearMiss,
   findRailSnapCandidate,
   type RailConnectorId,
@@ -1039,6 +1041,45 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       updateZoom(pinchStartZoom * (distance / pinchStartDistance))
     }
 
+    /**
+     * 通常接続が成立した直後、今つないだpieceのもう片方の空き端点が
+     * 「ループとして閉じられそうか」だけを追加でチェックする。
+     * 通常のsnap判定・connectRailPiecesの挙動そのものは変えない、
+     * あくまでその後段の任意の一手として発動する。
+     * 成立した場合の見た目・音のフィードバックは、通常接続と同じ
+     * triggerSnapGlow/playRailSnapSoundをそのまま流用する。
+     */
+    function tryCloseLoopAfterConnect(
+      layout: RailPiece[],
+      normalCandidate: SnapCandidate | null,
+      draggedPieceId: string,
+    ): RailPiece[] {
+      if (normalCandidate === null) return layout
+      const draggedPiece = layout.find((piece) => piece.id === draggedPieceId)
+      if (draggedPiece === undefined) return layout
+      const looseConnectorId: RailConnectorId = normalCandidate.movingConnectorId === 'a' ? 'b' : 'a'
+      if (draggedPiece.connections[looseConnectorId] !== undefined) return layout
+
+      const targets = layout.filter((piece) => piece.id !== draggedPieceId)
+      const loopCandidate = findRailLoopClosureCandidate(
+        draggedPiece,
+        looseConnectorId,
+        targets,
+        normalCandidate.targetPieceId,
+      )
+      if (loopCandidate === null) return layout
+
+      const closedLayout = applyRailLoopClosure(layout, loopCandidate)
+      // triggerSnapGlowはtrainPiecesからtargetPieceIdの現在位置を引くため、
+      // syncPieces()を待たずにここで先に反映しておく（targetPieceIdは
+      // 今まさにドラッグで動いたdraggedPiece自身なので、古い位置のままだと
+      // 光る場所がずれてしまう）。
+      trainPieces = closedLayout
+      triggerSnapGlow(loopCandidate)
+      playRailSnapSound(optionsRef.current.soundEnabled ?? true)
+      return closedLayout
+    }
+
     function finishDrag() {
       const currentDrag = drag
       drag = null
@@ -1058,7 +1099,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           }
           : piece
       ))
-      const nextLayout = currentDrag.candidate === null
+      const connectedLayout = currentDrag.candidate === null
         ? movedLayout
         : connectRailPieces(
           movedLayout,
@@ -1072,6 +1113,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         triggerSnapGlow(currentDrag.candidate)
         playRailSnapSound(optionsRef.current.soundEnabled ?? true)
       }
+      const nextLayout = tryCloseLoopAfterConnect(connectedLayout, currentDrag.candidate, currentDrag.pieceId)
       optionsRef.current.onPiecesChange(nextLayout)
     }
 

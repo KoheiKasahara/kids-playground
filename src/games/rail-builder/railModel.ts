@@ -114,8 +114,38 @@ export const DEFAULT_SNAP_DISTANCE = 1.15
 export const DEFAULT_SNAP_HEIGHT = 0.35
 export const DEFAULT_SNAP_ANGLE = (58 * Math.PI) / 180
 
+/**
+ * ループ閉鎖の補助（通常のsnapでは成立しない終端同士を、玩具として
+ * 許容できる範囲でだけ自動でつなげる）に使うしきい値。
+ * 通常のDEFAULT_SNAP_*より少し広いが、明らかに離れた/向きが違う
+ * 線路まで吸着しないよう、いずれも通常の2倍未満に収めている。
+ */
+export const LOOP_CLOSURE_MAX_DISTANCE = DEFAULT_SNAP_DISTANCE * 1.85
+export const LOOP_CLOSURE_MAX_HEIGHT_DIFFERENCE = DEFAULT_SNAP_HEIGHT * 1.6
+export const LOOP_CLOSURE_MAX_ANGLE_DIFFERENCE = (78 * Math.PI) / 180
+/** 終端付近で補正を分散する対象の最大パーツ数（今つないだ側を含む）。 */
+export const LOOP_CLOSURE_MAX_CHAIN_PIECES = 4
+/**
+ * 分散補正の配分。先頭が今回閉じる側にいちばん近いパーツ、
+ * 以降は奥のパーツほど補正量が小さくなるよう逓減させる。
+ * 合計が1未満なので、末尾で触れない一番奥の継ぎ目にはごくわずかな
+ * 残差しか出ない。
+ */
+export const LOOP_CLOSURE_TAPER_WEIGHTS: readonly number[] = [0.55, 0.3, 0.15]
+
 const EPSILON = 1e-8
 const pathLengthCache = new WeakMap<RailPath, number>()
+
+/**
+ * 駅・トンネル・橋・坂道は高低差や向きに強い意味を持つため、
+ * ループ閉鎖の自動補正では動かさない（通常の線路側だけで吸収する）。
+ */
+const LOOP_CLOSURE_FACILITY_KINDS: ReadonlySet<RailPieceKind> = new Set([
+  'station',
+  'tunnel',
+  'bridge',
+  'slope',
+])
 
 const ZERO: RailVec3 = { x: 0, y: 0, z: 0 }
 
@@ -788,3 +818,262 @@ export function areRailConnectionsSymmetric(pieces: readonly RailPiece[]): boole
 }
 
 export const hasSymmetricConnections = areRailConnectionsSymmetric
+
+/*
+ * ループ閉鎖の補助（loop closure assist）
+ * ------------------------------------------------------------
+ * 通常のfindRailSnapCandidateは変更しない。ここでは、通常接続が
+ * 成立しなかった端点だけを対象に、もう少し広い許容範囲で
+ * 「閉じられそうなループ」を探し、見つかった場合だけ終端付近の
+ * 数パーツへわずかな位置・向きの補正を分散して自然につなげる。
+ *
+ * 安全のため、以下をすべて満たす場合だけ候補として採用する。
+ * - 距離・高さ・向きがLOOP_CLOSURE_MAX_*以内
+ * - つなごうとしている相手が、今回固定された側の線路グラフから
+ *   実際にたどり着ける（＝この接続が本当に閉路を作る）
+ * - 相手側の先頭パーツが駅・トンネル・橋・坂道ではない
+ * - 実際に必要な補正量（回転・並進）もLOOP_CLOSURE_MAX_*以内
+ */
+
+export type LoopClosureOptions = {
+  maxDistance?: number
+  maxHeightDifference?: number
+  maxAngleDifference?: number
+  maxChainPieces?: number
+}
+
+function loopClosureOptionsWithDefaults(options?: LoopClosureOptions) {
+  return {
+    maxDistance: options?.maxDistance ?? LOOP_CLOSURE_MAX_DISTANCE,
+    maxHeightDifference: options?.maxHeightDifference ?? LOOP_CLOSURE_MAX_HEIGHT_DIFFERENCE,
+    maxAngleDifference: options?.maxAngleDifference ?? LOOP_CLOSURE_MAX_ANGLE_DIFFERENCE,
+    maxChainPieces: options?.maxChainPieces ?? LOOP_CLOSURE_MAX_CHAIN_PIECES,
+  }
+}
+
+/** pieces内のconnectionsだけをたどり、fromからtoへ到達できるか調べる。 */
+function isRailPieceReachable(
+  pieces: readonly RailPiece[],
+  fromPieceId: string,
+  toPieceId: string,
+): boolean {
+  if (fromPieceId === toPieceId) return true
+  const map = piecesMap(pieces)
+  if (!map.has(fromPieceId)) return false
+  const visited = new Set<string>([fromPieceId])
+  const queue: string[] = [fromPieceId]
+  let guard = 0
+  while (queue.length > 0 && guard < 256) {
+    guard += 1
+    const currentId = queue.shift()
+    if (currentId === undefined) break
+    const piece = map.get(currentId)
+    if (piece === undefined) continue
+    for (const connectorId of ['a', 'b'] as RailConnectorId[]) {
+      const connection = piece.connections[connectorId]
+      if (connection === undefined) continue
+      if (connection.pieceId === toPieceId) return true
+      if (visited.has(connection.pieceId)) continue
+      visited.add(connection.pieceId)
+      queue.push(connection.pieceId)
+    }
+  }
+  return false
+}
+
+/**
+ * 通常のfindRailSnapCandidateが失敗した場合に呼ぶ補助探索。
+ *
+ * fixedPiece/fixedConnectorId は、今まさに通常接続で位置が確定した
+ * 側の「まだ空いている」端点。targetsの中から、それへ閉じられそうな
+ * 別の空き端点を探す。見つけた相手（moving側）は、fixedPieceへ
+ * ぴったりつながる位置までtransformで動かす想定で返す
+ * （実際の分散補正はapplyRailLoopClosureが行う）。
+ */
+export function findRailLoopClosureCandidate(
+  fixedPiece: RailPiece,
+  fixedConnectorId: RailConnectorId,
+  targets: readonly RailPiece[],
+  anchorPieceId: string,
+  options?: LoopClosureOptions,
+): SnapCandidate | null {
+  const thresholds = loopClosureOptionsWithDefaults(options)
+  if (fixedPiece.connections[fixedConnectorId] !== undefined) return null
+  const fixedWorld = worldConnectorForRailPiece(fixedPiece, fixedConnectorId)
+
+  let best: SnapCandidate | null = null
+  for (const farPiece of targets) {
+    if (farPiece.id === fixedPiece.id) continue
+    if (LOOP_CLOSURE_FACILITY_KINDS.has(farPiece.kind)) continue
+    for (const farConnectorId of ['a', 'b'] as RailConnectorId[]) {
+      if (farPiece.connections[farConnectorId] !== undefined) continue
+      const farWorld = worldConnectorForRailPiece(farPiece, farConnectorId)
+      const distance = distanceBetweenRailPoints(fixedWorld.position, farWorld.position)
+      const heightDifference = Math.abs(fixedWorld.position.y - farWorld.position.y)
+      const angleDifference = angleBetween(fixedWorld.outward, scale(farWorld.outward, -1))
+      if (
+        distance > thresholds.maxDistance
+        || heightDifference > thresholds.maxHeightDifference
+        || angleDifference > thresholds.maxAngleDifference
+      ) continue
+      if (best !== null && distance >= best.distance) continue
+      // 無関係な線路同士を誤ってつながないよう、今回の接続で本当に
+      // 閉路になる（＝相手が既存の接続グラフでanchor側へたどり着ける）
+      // 場合だけを対象にする。
+      if (!isRailPieceReachable(targets, anchorPieceId, farPiece.id)) continue
+
+      const exactTransform = snapTransformForConnectors(farPiece, farConnectorId, fixedPiece, fixedConnectorId)
+      const rotationDelta = Math.abs(normalizeAngle(exactTransform.rotationY - farPiece.rotationY))
+      const translationDelta = distanceBetweenRailPoints(exactTransform.position, farPiece.position)
+      // 補正量そのものにも上限を設け、無理な配置は閉じない。
+      if (rotationDelta > thresholds.maxAngleDifference || translationDelta > thresholds.maxDistance) continue
+
+      best = {
+        movingPieceId: farPiece.id,
+        movingConnectorId: farConnectorId,
+        targetPieceId: fixedPiece.id,
+        targetConnectorId: fixedConnectorId,
+        transform: exactTransform,
+        distance,
+        heightDifference,
+        angleDifference,
+      }
+    }
+  }
+  return best
+}
+
+export const findLoopClosureCandidate = findRailLoopClosureCandidate
+
+type LoopClosureChainEntry = {
+  piece: RailPiece
+  /** このpieceの中で、固定側（今回閉じる継ぎ目に近い側）を向くコネクタ。 */
+  towardFixedConnectorId: RailConnectorId
+}
+
+/**
+ * candidate.movingPieceId から、駅・トンネル・橋・坂道に当たるか
+ * 上限数に達するまで、既存の接続をたどって「補正を分散する対象」の
+ * パーツ列を集める。先頭が今回閉じる側にいちばん近いパーツになる。
+ */
+function collectLoopClosureChain(
+  pieces: readonly RailPiece[],
+  startPieceId: string,
+  startConnectorId: RailConnectorId,
+  maxCount: number,
+  /** 固定側のpiece（今回の接続相手）。分散対象には含めない。 */
+  excludePieceId: string,
+): LoopClosureChainEntry[] {
+  const map = piecesMap(pieces)
+  const chain: LoopClosureChainEntry[] = []
+  const visited = new Set<string>([excludePieceId])
+  let currentId: string | undefined = startPieceId
+  let towardFixedConnectorId: RailConnectorId = startConnectorId
+
+  while (currentId !== undefined && chain.length < Math.max(1, maxCount)) {
+    const piece = map.get(currentId)
+    if (piece === undefined || visited.has(piece.id)) break
+    visited.add(piece.id)
+    chain.push({ piece, towardFixedConnectorId })
+
+    const outgoingConnectorId: RailConnectorId = towardFixedConnectorId === 'a' ? 'b' : 'a'
+    const connection = piece.connections[outgoingConnectorId]
+    if (connection === undefined) break
+    const nextPiece = map.get(connection.pieceId)
+    // 固定側のpieceや、施設パーツより先へは分散させない。
+    if (
+      nextPiece === undefined
+      || nextPiece.id === excludePieceId
+      || LOOP_CLOSURE_FACILITY_KINDS.has(nextPiece.kind)
+    ) break
+    currentId = nextPiece.id
+    towardFixedConnectorId = connection.connectorId
+  }
+  return chain
+}
+
+/**
+ * chain[0]（今回ぴったり接続するパーツ）はexactTransformで確定させ、
+ * chain[1]以降にはLOOP_CLOSURE_TAPER_WEIGHTSに従って回転の一部だけを
+ * 少しずつ適用する。各パーツの位置は、直前（すでに補正済み）のパーツと
+ * 継ぎ目が離れないよう、そのつどコネクタ位置から再計算する。
+ */
+function computeLoopClosureCorrections(
+  chain: readonly LoopClosureChainEntry[],
+  exactTransform: RailTransform,
+): Map<string, RailTransform> {
+  const corrections = new Map<string, RailTransform>()
+  if (chain.length <= 1) return corrections
+  const first = chain[0]
+  if (first === undefined) return corrections
+
+  let previousPiece: RailPiece = {
+    ...first.piece,
+    position: cloneVec(exactTransform.position),
+    rotationY: exactTransform.rotationY,
+  }
+  let previousTowardFixedConnectorId = first.towardFixedConnectorId
+
+  for (let index = 1; index < chain.length; index += 1) {
+    const entry = chain[index]
+    const weight = LOOP_CLOSURE_TAPER_WEIGHTS[index - 1] ?? 0
+    if (weight <= 0) break
+
+    const linkConnectorId = entry.towardFixedConnectorId
+    const previousOutgoingConnectorId: RailConnectorId = previousTowardFixedConnectorId === 'a' ? 'b' : 'a'
+    const idealTransform = snapTransformForConnectors(
+      entry.piece,
+      linkConnectorId,
+      previousPiece,
+      previousOutgoingConnectorId,
+    )
+    const idealDelta = normalizeAngle(idealTransform.rotationY - entry.piece.rotationY)
+    const appliedRotationY = entry.piece.rotationY + weight * idealDelta
+    const localConnector = connectorFor(entry.piece, linkConnectorId)
+    const rotatedLocal = rotateY(localConnector.localPosition, appliedRotationY)
+    const targetWorldPosition = worldConnectorForRailPiece(previousPiece, previousOutgoingConnectorId).position
+    const appliedPosition = subtract(targetWorldPosition, rotatedLocal)
+
+    corrections.set(entry.piece.id, { position: appliedPosition, rotationY: appliedRotationY })
+    previousPiece = { ...entry.piece, position: appliedPosition, rotationY: appliedRotationY }
+    previousTowardFixedConnectorId = linkConnectorId
+  }
+  return corrections
+}
+
+/**
+ * findRailLoopClosureCandidateで見つけた候補を実際に反映する。
+ * candidate.movingPieceId側の終端付近（最大でLOOP_CLOSURE_MAX_CHAIN_PIECES
+ * パーツ）へ補正を分散しつつ、通常のconnectRailPiecesと同じ形で
+ * connections（track graph）も正式につなぐ。電車の走行Pathは
+ * connectionsだけを見て組み立てられるため、これで自動的に閉路になる。
+ */
+export function applyRailLoopClosure(
+  pieces: readonly RailPiece[],
+  candidate: SnapCandidate,
+): RailPiece[] {
+  const chain = collectLoopClosureChain(
+    pieces,
+    candidate.movingPieceId,
+    candidate.movingConnectorId,
+    LOOP_CLOSURE_MAX_CHAIN_PIECES,
+    candidate.targetPieceId,
+  )
+  const connected = connectRailPieces(
+    pieces,
+    candidate.movingPieceId,
+    candidate.movingConnectorId,
+    candidate.targetPieceId,
+    candidate.targetConnectorId,
+    candidate.transform,
+  )
+  const corrections = computeLoopClosureCorrections(chain, candidate.transform)
+  if (corrections.size === 0) return connected
+  return connected.map((piece) => {
+    const correction = corrections.get(piece.id)
+    if (correction === undefined) return piece
+    return { ...clonePiece(piece), position: cloneVec(correction.position), rotationY: correction.rotationY }
+  })
+}
+
+export const applyLoopClosure = applyRailLoopClosure
