@@ -11,6 +11,7 @@ import {
 import type { RailTrainStatus } from './railTrainModel'
 import styles from './RailBuilderPlay.module.css'
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, useRailBuilderEngine } from './useRailBuilderEngine'
+import { primeAudio } from '../../utils/quizSound'
 
 const INITIAL_PIECES: RailPiece[] = [
   createRailPiece('straight', 'rail-1', { x: -1, y: 0, z: 0 }),
@@ -79,6 +80,7 @@ export default function RailBuilderPlay() {
   const [zoom, setZoom] = useState(1)
   const [trainStatus, setTrainStatus] = useState<RailTrainStatus>('ready')
   const [occupiedRailIds, setOccupiedRailIds] = useState<string[]>([])
+  const [soundEnabled, setSoundEnabled] = useState(true)
 
   const selectedPiece = pieces.find((piece) => piece.id === selectedPieceId)
   const occupiedRailIdSet = useMemo(() => new Set(occupiedRailIds), [occupiedRailIds])
@@ -102,6 +104,7 @@ export default function RailBuilderPlay() {
     lockedPieceIds: occupiedRailIdSet,
     onTrainStatusChange: setTrainStatus,
     onTrainOccupiedIdsChange: setOccupiedRailIds,
+    soundEnabled,
   })
 
   const addPiece = useCallback((kind: RailPieceKind) => {
@@ -127,6 +130,13 @@ export default function RailBuilderPlay() {
 
   const zoomOut = useCallback(() => setZoom((value) => Math.max(MIN_ZOOM, value - ZOOM_STEP)), [])
   const zoomIn = useCallback(() => setZoom((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP)), [])
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((current) => {
+      const next = !current
+      if (next) primeAudio()
+      return next
+    })
+  }, [])
 
   const hint = useMemo(() => {
     if (selectedPieceIsOccupied) return 'でんしゃが のっている せんろは そのままだよ'
@@ -188,6 +198,15 @@ export default function RailBuilderPlay() {
           </button>
           <button type="button" className={styles.focusButton} onClick={focusTrain}>
             でんしゃを みる
+          </button>
+          <button
+            type="button"
+            className={styles.soundButton}
+            onClick={toggleSound}
+            aria-pressed={soundEnabled}
+            aria-label={soundEnabled ? 'おとを けす' : 'おとを つける'}
+          >
+            <span aria-hidden="true">{soundEnabled ? '🔊' : '🔇'}</span>
           </button>
         </div>
 

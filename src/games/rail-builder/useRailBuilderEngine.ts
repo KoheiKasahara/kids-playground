@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
   applyRailLoopClosure,
   clampRailPosition,
@@ -26,6 +27,21 @@ import {
   type RailTrainMotion,
   type RailTrainStatus,
 } from './railTrainModel'
+import {
+  getRailBuilderDevicePixelRatio,
+  getRailBuilderShadowMapSize,
+  RAIL_VISUAL_CONFIG,
+  shouldReduceRailBuilderMotion,
+} from './railBuilderVisuals'
+import {
+  createRailTrainSoundController,
+  playRailDepartureSound,
+  playRailSnapSound,
+  playRailStationDepartureSound,
+  playRailStationStopSound,
+  primeAudio,
+  type RailTrainSoundController,
+} from '../../utils/quizSound'
 
 const WORLD_SIZE = 50
 const WORLD_HALF_SIZE = WORLD_SIZE / 2
@@ -48,6 +64,8 @@ export type RailBuilderEngineOptions = {
   lockedPieceIds?: ReadonlySet<string>
   onTrainStatusChange?: (status: RailTrainStatus) => void
   onTrainOccupiedIdsChange?: (pieceIds: string[]) => void
+  /** レール専用音量。共有 quizSound の global 設定を変更せずに切り替える。 */
+  soundEnabled?: boolean
 }
 
 export type RailBuilderEngineHandle = {
@@ -179,13 +197,19 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
     const railRoot = new THREE.Group()
     railRoot.name = 'rail-pieces'
+    const dioramaRoot = new THREE.Group()
+    dioramaRoot.name = 'diorama-root'
     const pieceObjects = new Map<string, THREE.Group>()
     const selectionRings = new Map<string, THREE.Mesh>()
+    const connectorCaps = new Map<string, Partial<Record<RailConnectorId, THREE.Mesh>>>()
+    const stationPulseTargets = new Map<string, THREE.Object3D>()
     const marker = new THREE.Group()
     marker.name = 'snap-marker'
+    let snapGlow: THREE.Mesh | null = null
     const trainRoot = new THREE.Group()
     trainRoot.name = 'toy-train'
     const trainCars: THREE.Group[] = []
+    const trainWheelPivots: THREE.Object3D[][] = []
     const sharedGeometries = new Set<THREE.BufferGeometry>()
     const sharedMaterials = new Set<THREE.Material>()
 
@@ -195,25 +219,35 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const connectorGeometry = new THREE.CylinderGeometry(0.27, 0.27, 0.18, 16)
     const selectionRingGeometry = new THREE.RingGeometry(0.72, 0.82, 32)
     const markerGeometry = new THREE.RingGeometry(0.35, 0.48, 24)
-    const trainBodyGeometry = new THREE.BoxGeometry(2.15, 0.78, 0.92)
-    const trainFrontGeometry = new THREE.BoxGeometry(0.25, 0.82, 0.94)
-    const trainRoofGeometry = new THREE.BoxGeometry(2.28, 0.16, 1.02)
+    const trainBodyGeometry = new RoundedBoxGeometry(2.15, 0.78, 0.92, 2, 0.14)
+    const trainFrontGeometry = new RoundedBoxGeometry(0.3, 0.7, 0.88, 2, 0.12)
+    const trainRoofGeometry = new RoundedBoxGeometry(2.22, 0.16, 1.0, 2, 0.06)
+    const trainSkirtGeometry = new RoundedBoxGeometry(1.7, 0.2, 0.84, 2, 0.07)
     const trainWindowGeometry = new THREE.BoxGeometry(0.42, 0.28, 0.04)
     const trainFrontWindowGeometry = new THREE.BoxGeometry(0.04, 0.28, 0.54)
     const trainDoorGeometry = new THREE.BoxGeometry(0.36, 0.57, 0.035)
+    const trainDoorFrameGeometry = new THREE.BoxGeometry(0.44, 0.65, 0.022)
     const trainWheelGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.13, 16)
     const trainCouplerGeometry = new THREE.BoxGeometry(0.34, 0.16, 0.16)
+    const trainLightGeometry = new THREE.SphereGeometry(0.09, 8, 6)
     const bridgeBeamGeometry = new THREE.BoxGeometry(1, 0.26, 0.38)
     const bridgeSupportGeometry = new THREE.BoxGeometry(0.42, 1, 0.42)
     const bridgeGuardGeometry = new THREE.BoxGeometry(1, 0.16, 0.13)
-    const stationPlatformGeometry = new THREE.BoxGeometry(1, 0.28, 1.12)
-    const stationRoofGeometry = new THREE.BoxGeometry(1, 0.22, 3.2)
+    const stationPlatformGeometry = new RoundedBoxGeometry(1, 0.28, 1.12, 2, 0.08)
+    const stationRoofGeometry = new RoundedBoxGeometry(1, 0.22, 3.2, 2, 0.08)
     const stationColumnGeometry = new THREE.BoxGeometry(0.2, 1, 0.2)
     const stationSignGeometry = new THREE.BoxGeometry(0.86, 0.58, 0.14)
     const stationBenchGeometry = new THREE.BoxGeometry(0.78, 0.18, 0.25)
+    const stationClockGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.08, 16)
     const tunnelTopGeometry = new THREE.BoxGeometry(1, 0.34, 2.75)
     const tunnelWallGeometry = new THREE.BoxGeometry(1, 1.25, 0.26)
     const tunnelRingGeometry = new THREE.TorusGeometry(1.4, 0.13, 8, 18)
+    const treeTrunkGeometry = new THREE.CylinderGeometry(0.18, 0.24, 1.45, 8)
+    const treeFoliageGeometry = new RoundedBoxGeometry(1.35, 1.55, 1.35, 2, 0.42)
+    const shrubGeometry = new THREE.SphereGeometry(0.58, 8, 6)
+    const houseBodyGeometry = new RoundedBoxGeometry(2.4, 1.45, 2.1, 2, 0.18)
+    const houseRoofGeometry = new THREE.ConeGeometry(1.7, 0.85, 4)
+    const houseWindowGeometry = new THREE.BoxGeometry(0.36, 0.42, 0.05)
     ;[
       railGeometry,
       baseGeometry,
@@ -224,11 +258,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       trainBodyGeometry,
       trainFrontGeometry,
       trainRoofGeometry,
+      trainSkirtGeometry,
       trainWindowGeometry,
       trainFrontWindowGeometry,
       trainDoorGeometry,
+      trainDoorFrameGeometry,
       trainWheelGeometry,
       trainCouplerGeometry,
+      trainLightGeometry,
       bridgeBeamGeometry,
       bridgeSupportGeometry,
       bridgeGuardGeometry,
@@ -237,15 +274,35 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       stationColumnGeometry,
       stationSignGeometry,
       stationBenchGeometry,
+      stationClockGeometry,
       tunnelTopGeometry,
       tunnelWallGeometry,
       tunnelRingGeometry,
+      treeTrunkGeometry,
+      treeFoliageGeometry,
+      shrubGeometry,
+      houseBodyGeometry,
+      houseRoofGeometry,
+      houseWindowGeometry,
     ].forEach((geometry) => sharedGeometries.add(geometry))
 
-    const railMaterial = new THREE.MeshStandardMaterial({ color: '#6b7280', roughness: 0.48, metalness: 0.3 })
-    const baseMaterial = new THREE.MeshStandardMaterial({ color: '#eab308', roughness: 0.72 })
-    const sleeperMaterial = new THREE.MeshStandardMaterial({ color: '#b45309', roughness: 0.88 })
-    const connectorMaterial = new THREE.MeshStandardMaterial({ color: '#fb923c', roughness: 0.6 })
+    const railMaterial = new THREE.MeshStandardMaterial({
+      color: RAIL_VISUAL_CONFIG.palette.rail,
+      roughness: RAIL_VISUAL_CONFIG.roughness,
+      metalness: RAIL_VISUAL_CONFIG.metalness,
+    })
+    const baseMaterial = new THREE.MeshStandardMaterial({
+      color: RAIL_VISUAL_CONFIG.palette.base,
+      roughness: RAIL_VISUAL_CONFIG.roughness,
+    })
+    const sleeperMaterial = new THREE.MeshStandardMaterial({
+      color: RAIL_VISUAL_CONFIG.palette.sleeper,
+      roughness: RAIL_VISUAL_CONFIG.roughness,
+    })
+    const connectorMaterial = new THREE.MeshStandardMaterial({
+      color: RAIL_VISUAL_CONFIG.palette.connector,
+      roughness: RAIL_VISUAL_CONFIG.roughness,
+    })
     const selectionMaterial = new THREE.MeshBasicMaterial({
       color: '#38bdf8',
       transparent: true,
@@ -258,6 +315,16 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       opacity: 0.94,
       side: THREE.DoubleSide,
     })
+    const snapMaterial = new THREE.MeshBasicMaterial({
+      color: '#fb923c',
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
+    })
+    snapGlow = new THREE.Mesh(markerGeometry, snapMaterial)
+    snapGlow.name = 'snap-glow'
+    snapGlow.rotation.x = -Math.PI / 2
+    snapGlow.visible = false
     const trainBodyMaterial = new THREE.MeshStandardMaterial({ color: '#f97316', roughness: 0.58 })
     const trainFrontMaterial = new THREE.MeshStandardMaterial({ color: '#ea580c', roughness: 0.55 })
     const trainRoofMaterial = new THREE.MeshStandardMaterial({ color: '#facc15', roughness: 0.7 })
@@ -265,6 +332,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainDoorMaterial = new THREE.MeshStandardMaterial({ color: '#fef3c7', roughness: 0.68 })
     const trainWheelMaterial = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.85 })
     const trainCouplerMaterial = new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.8 })
+    const trainLightMaterial = new THREE.MeshStandardMaterial({
+      color: '#fff7ae',
+      emissive: '#facc15',
+      emissiveIntensity: 0.7,
+      roughness: 0.3,
+    })
     const bridgeMaterial = new THREE.MeshStandardMaterial({ color: '#b77945', roughness: 0.82 })
     const bridgeGuardMaterial = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.64 })
     const stationPlatformMaterial = new THREE.MeshStandardMaterial({ color: '#f4c96b', roughness: 0.76 })
@@ -281,9 +354,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       connectorMaterial,
       selectionMaterial,
       markerMaterial,
+      snapMaterial,
       trainBodyMaterial,
       trainFrontMaterial,
       trainRoofMaterial,
+      trainLightMaterial,
       trainWindowMaterial,
       trainDoorMaterial,
       trainWheelMaterial,
@@ -299,10 +374,30 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       tunnelInnerMaterial,
     ].forEach((material) => sharedMaterials.add(material))
 
-    const groundGeometry = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE)
+    const groundGeometry = new THREE.BoxGeometry(WORLD_SIZE, 0.48, WORLD_SIZE)
     const groundMaterial = new THREE.MeshStandardMaterial({ color: '#9bd18b', roughness: 0.9 })
+    const groundEdgeMaterial = new THREE.MeshStandardMaterial({ color: '#82b875', roughness: 0.94 })
+    const treeTrunkMaterial = new THREE.MeshStandardMaterial({ color: '#9a633d', roughness: 0.9 })
+    const treeFoliageMaterial = new THREE.MeshStandardMaterial({ color: '#4f9d62', roughness: 0.84 })
+    const shrubMaterial = new THREE.MeshStandardMaterial({ color: '#72b86a', roughness: 0.88 })
+    const houseBodyMaterial = new THREE.MeshStandardMaterial({ color: '#f3b56b', roughness: 0.8 })
+    const houseBodyAccentMaterial = new THREE.MeshStandardMaterial({ color: '#ef9d7a', roughness: 0.8 })
+    const houseBodyPaleMaterial = new THREE.MeshStandardMaterial({ color: '#f4c96b', roughness: 0.8 })
+    const houseRoofMaterial = new THREE.MeshStandardMaterial({ color: '#d96b63', roughness: 0.82 })
+    const houseWindowMaterial = new THREE.MeshStandardMaterial({ color: '#75d4e6', roughness: 0.4, metalness: 0.08 })
     sharedGeometries.add(groundGeometry)
-    sharedMaterials.add(groundMaterial)
+    ;[
+      groundMaterial,
+      groundEdgeMaterial,
+      treeTrunkMaterial,
+      treeFoliageMaterial,
+      shrubMaterial,
+      houseBodyMaterial,
+      houseBodyAccentMaterial,
+      houseBodyPaleMaterial,
+      houseRoofMaterial,
+      houseWindowMaterial,
+    ].forEach((material) => sharedMaterials.add(material))
 
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
@@ -321,6 +416,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainPitchAxis = new THREE.Vector3(0, 0, 1)
     const trainYawQuaternion = new THREE.Quaternion()
     const trainPitchQuaternion = new THREE.Quaternion()
+    const instanceMatrix = new THREE.Matrix4()
+    const instanceQuaternion = new THREE.Quaternion()
+    const instanceScale = new THREE.Vector3()
+    const instancePosition = new THREE.Vector3()
+    const instanceDummy = new THREE.Object3D()
     const pointers = new Map<number, PointerPosition>()
     let activeZoom = clampZoom(optionsRef.current.zoom || DEFAULT_ZOOM)
     let mode: 'none' | 'pan' | 'rail' | 'pinch' = 'none'
@@ -333,6 +433,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     let lastTrainStatus: RailTrainStatus | null = null
     let lastOccupiedKey = ''
     let lastFrameTime = typeof performance === 'undefined' ? 0 : performance.now()
+    const trainSound: RailTrainSoundController = createRailTrainSoundController(
+      optionsRef.current.soundEnabled ?? true,
+    )
+    let snapGlowElapsed = Number.POSITIVE_INFINITY
+    let stationPulseElapsed = Number.POSITIVE_INFINITY
+    let stationPulsePieceId: string | null = null
+    const reducedMotion = typeof window.matchMedia === 'function'
+      ? shouldReduceRailBuilderMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+      : false
 
     function updateCamera() {
       if (camera === null) return
@@ -420,14 +529,22 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
       const body = new THREE.Mesh(trainBodyGeometry, trainBodyMaterial)
       body.position.y = 0.84
+      body.castShadow = true
+      body.receiveShadow = true
       group.add(body)
 
       const front = new THREE.Mesh(trainFrontGeometry, trainFrontMaterial)
-      front.position.set(1.1, 0.86, 0)
+      front.position.set(1.06, 0.85, 0)
+      front.castShadow = true
       group.add(front)
+
+      const skirt = new THREE.Mesh(trainSkirtGeometry, trainCouplerMaterial)
+      skirt.position.set(-0.03, 0.44, 0)
+      group.add(skirt)
 
       const roof = new THREE.Mesh(trainRoofGeometry, trainRoofMaterial)
       roof.position.y = 1.31
+      roof.castShadow = true
       group.add(roof)
 
       for (const side of [-1, 1]) {
@@ -436,8 +553,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           window.position.set(x, 1.02, side * 0.48)
           group.add(window)
         }
+        const doorFrame = new THREE.Mesh(trainDoorFrameGeometry, trainCouplerMaterial)
+        doorFrame.position.set(-0.78, 0.72, side * 0.495)
+        group.add(doorFrame)
         const door = new THREE.Mesh(trainDoorGeometry, trainDoorMaterial)
-        door.position.set(-0.78, 0.72, side * 0.49)
+        door.position.set(-0.78, 0.72, side * 0.51)
         group.add(door)
       }
 
@@ -445,32 +565,50 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       frontWindow.position.set(1.23, 1.04, 0)
       group.add(frontWindow)
 
+      for (const side of [-1, 1]) {
+        const headlight = new THREE.Mesh(trainLightGeometry, trainLightMaterial)
+        headlight.position.set(1.24, 0.8, side * 0.27)
+        group.add(headlight)
+      }
+
+      const wheelPivots: THREE.Object3D[] = []
       for (const x of [-0.67, 0.67]) {
         for (const side of [-1, 1]) {
+          const pivot = new THREE.Object3D()
+          pivot.position.set(x, 0.34, side * 0.5)
           const wheel = new THREE.Mesh(trainWheelGeometry, trainWheelMaterial)
-          wheel.position.set(x, 0.34, side * 0.5)
           wheel.rotation.x = Math.PI / 2
-          group.add(wheel)
+          pivot.add(wheel)
+          group.add(pivot)
+          wheelPivots.push(pivot)
         }
       }
 
-      const coupler = new THREE.Mesh(trainCouplerGeometry, trainCouplerMaterial)
-      coupler.position.set(-1.25, 0.62, 0)
-      group.add(coupler)
+      for (const x of [-1.25, 1.25]) {
+        const coupler = new THREE.Mesh(trainCouplerGeometry, trainCouplerMaterial)
+        coupler.position.set(x, 0.62, 0)
+        group.add(coupler)
+      }
       trainRoot.add(group)
       trainCars.push(group)
+      trainWheelPivots.push(wheelPivots)
       return group
     }
 
     for (let index = 0; index < 2; index += 1) makeTrainCar(index)
 
-    function updateTrainVisuals() {
+    function updateTrainVisuals(delta = 0) {
       if (trainMotion === null) {
         trainRoot.visible = false
         return
       }
       const poses = sampleRailTrainCars(trainPieces, trainMotion.cursor, trainCars.length)
       trainRoot.visible = poses.length > 0
+      const leadPiece = trainPieces.find((piece) => piece.id === trainMotion?.cursor.pieceId)
+      trainLightMaterial.emissiveIntensity = leadPiece?.kind === 'tunnel' ? 1.15 : 0.7
+      const wheelRotation = trainMotion.speed > 0.015 && delta > 0
+        ? (trainMotion.speed * delta) / 0.22
+        : 0
       for (const [index, car] of trainCars.entries()) {
         const pose = poses[index]
         if (pose === undefined) {
@@ -489,14 +627,76 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         trainYawQuaternion.setFromAxisAngle(trainYawAxis, yaw)
         trainPitchQuaternion.setFromAxisAngle(trainPitchAxis, pitch)
         car.quaternion.copy(trainYawQuaternion).multiply(trainPitchQuaternion)
+        if (wheelRotation > 0) {
+          for (const wheel of trainWheelPivots[index] ?? []) wheel.rotation.z -= wheelRotation
+        }
+      }
+    }
+
+    function triggerStationPulse(pieceId: string | null) {
+      if (reducedMotion || pieceId === null) return
+      stationPulsePieceId = pieceId
+      stationPulseElapsed = 0
+      const target = stationPulseTargets.get(pieceId)
+      if (target !== undefined) target.scale.setScalar(1)
+    }
+
+    function triggerSnapGlow(candidate: SnapCandidate) {
+      const glow = snapGlow
+      if (glow === null) return
+      const targetPiece = trainPieces.find((piece) => piece.id === candidate.targetPieceId)
+      if (targetPiece === undefined) return
+      const target = worldConnectorForRailPiece(targetPiece, candidate.targetConnectorId)
+      glow.position.set(target.position.x, target.position.y + 0.06, target.position.z)
+      glow.visible = true
+      glow.scale.setScalar(reducedMotion ? 0.8 : 0.55)
+      snapMaterial.opacity = 0.9
+      snapGlowElapsed = 0
+    }
+
+    function updateFeedbackAnimations(delta: number) {
+      const glow = snapGlow
+      if (glow?.visible === true) {
+        snapGlowElapsed += delta
+        // reduced-motionでは拡大を止めるが、短い表示時間は確保する。
+        const progress = Math.min(1, snapGlowElapsed / (reducedMotion ? 0.18 : 0.38))
+        if (progress >= 1) {
+          glow.visible = false
+        } else if (!reducedMotion) {
+          glow.scale.setScalar(0.55 + progress * 0.95)
+          snapMaterial.opacity = 0.9 * (1 - progress)
+        }
+      }
+      if (stationPulsePieceId !== null) {
+        stationPulseElapsed += delta
+        const progress = Math.min(1, stationPulseElapsed / 0.52)
+        const target = stationPulseTargets.get(stationPulsePieceId)
+        if (target === undefined || progress >= 1) {
+          target?.scale.setScalar(1)
+          stationPulsePieceId = null
+          stationPulseElapsed = Number.POSITIVE_INFINITY
+        } else {
+          const pulse = Math.sin(progress * Math.PI)
+          target.scale.setScalar(1 + pulse * 0.08)
+        }
       }
     }
 
     function reportTrainState() {
       const status = trainMotion?.status ?? 'ready'
       if (status !== lastTrainStatus) {
+        const previousStatus = lastTrainStatus
         lastTrainStatus = status
         optionsRef.current.onTrainStatusChange?.(status)
+        const enabled = optionsRef.current.soundEnabled ?? true
+        if (status === 'running' && (previousStatus === 'ready' || previousStatus === 'waiting')) {
+          playRailDepartureSound(enabled)
+        } else if (status === 'stoppedAtStation') {
+          playRailStationStopSound(enabled)
+          triggerStationPulse(trainMotion?.cursor.pieceId ?? null)
+        } else if (status === 'departing' && previousStatus === 'stoppedAtStation') {
+          playRailStationDepartureSound(enabled)
+        }
       }
       const occupied = trainMotion === null
         ? []
@@ -509,6 +709,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     }
 
     function startTrainNow() {
+      if (optionsRef.current.soundEnabled ?? true) primeAudio()
       if (trainMotion === null) trainMotion = createInitialRailTrainMotion(trainPieces)
       if (trainMotion !== null) trainMotion = startRailTrain(trainMotion)
       updateTrainVisuals()
@@ -538,6 +739,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         if (scale !== undefined) mesh.scale.set(scale.x, scale.y, scale.z)
         if (rotation !== undefined) mesh.rotation.set(rotation.x, rotation.y, rotation.z)
         mesh.userData.pieceId = pieceId
+        mesh.receiveShadow = true
+        mesh.castShadow = geometry === bridgeBeamGeometry
+          || geometry === bridgeSupportGeometry
+          || geometry === stationRoofGeometry
+          || geometry === tunnelTopGeometry
+          || geometry === tunnelRingGeometry
         group.add(mesh)
         return mesh
       }
@@ -615,7 +822,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
             )
           }
         }
-        addMesh(
+        const sign = addMesh(
           stationSignGeometry,
           stationSignMaterial,
           { x: stationCenter.x, y: stationCenter.y + 2.12, z: stationCenter.z + 1.54 },
@@ -626,6 +833,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           { x: stationCenter.x, y: stationCenter.y + 0.56, z: stationCenter.z + 1.12 },
           { x: 1, y: 1, z: 1 },
         )
+        const clock = addMesh(
+          stationClockGeometry,
+          stationSignMaterial,
+          { x: stationCenter.x, y: stationCenter.y + 1.65, z: stationCenter.z + 1.56 },
+          { x: 1, y: 1, z: 1 },
+          { x: Math.PI / 2, y: 0, z: 0 },
+        )
+        sign.castShadow = true
+        stationPulseTargets.set(pieceId, clock)
       }
 
       if (localPiece.kind === 'tunnel' && localPiece.path.kind === 'straight') {
@@ -674,6 +890,20 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
             : 1
       const sleeperEvery = piece.kind === 'curve' || piece.kind === 'slope' ? 2 : 1
       const localPiece = { ...piece, position: vec3(0, 0, 0), rotationY: 0 }
+      const baseInstances = new THREE.InstancedMesh(baseGeometry, baseMaterial, segmentCount)
+      const railInstances = new THREE.InstancedMesh(railGeometry, railMaterial, segmentCount * 2)
+      const sleeperCount = Math.ceil(segmentCount / sleeperEvery)
+      const sleeperInstances = new THREE.InstancedMesh(sleeperGeometry, sleeperMaterial, sleeperCount)
+      for (const instances of [baseInstances, railInstances, sleeperInstances]) {
+        instances.userData.pieceId = piece.id
+        instances.instanceMatrix.setUsage(THREE.StaticDrawUsage)
+        instances.receiveShadow = true
+      }
+      baseInstances.name = 'rail-bases'
+      railInstances.name = 'rail-pairs'
+      sleeperInstances.name = 'rail-sleepers'
+      let railInstanceIndex = 0
+      let sleeperInstanceIndex = 0
       for (let i = 0; i < segmentCount; i += 1) {
         const t0 = i / segmentCount
         const t1 = (i + 1) / segmentCount
@@ -683,40 +913,60 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         const tangent = vec3(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z)
         const tangentLength = Math.hypot(tangent.x, tangent.y, tangent.z) || 1
         segmentTangentVector.set(tangent.x, tangent.y, tangent.z).normalize()
-        const segment = new THREE.Group()
-        segment.position.set(midpoint.x, midpoint.y, midpoint.z)
-        segment.quaternion.setFromUnitVectors(trainBaseForward, segmentTangentVector)
+        instanceQuaternion.setFromUnitVectors(trainBaseForward, segmentTangentVector)
+        instancePosition.set(midpoint.x, midpoint.y, midpoint.z)
 
-        const base = new THREE.Mesh(baseGeometry, baseMaterial)
-        base.position.y = 0.1
-        base.scale.x = Math.max(0.55, tangentLength)
-        base.userData.pieceId = piece.id
-        segment.add(base)
+        instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
+        instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
+        instanceDummy.position.set(0, 0.1, 0)
+        instanceDummy.quaternion.identity()
+        instanceDummy.scale.setScalar(1)
+        instanceDummy.updateMatrix()
+        instanceMatrix.multiply(instanceDummy.matrix)
+        baseInstances.setMatrixAt(i, instanceMatrix)
 
         for (const side of [-1, 1]) {
-          const rail = new THREE.Mesh(railGeometry, railMaterial)
-          rail.position.set(0, 0.34, 0.46 * side)
-          rail.scale.x = Math.max(0.55, tangentLength)
-          rail.userData.pieceId = piece.id
-          segment.add(rail)
+          instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
+          instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
+          instanceDummy.position.set(0, 0.34, (RAIL_VISUAL_CONFIG.gauge / 2) * side)
+          instanceDummy.quaternion.identity()
+          instanceDummy.scale.setScalar(1)
+          instanceDummy.updateMatrix()
+          instanceMatrix.multiply(instanceDummy.matrix)
+          railInstances.setMatrixAt(railInstanceIndex, instanceMatrix)
+          railInstanceIndex += 1
         }
 
         if (i % sleeperEvery === 0) {
-          const sleeper = new THREE.Mesh(sleeperGeometry, sleeperMaterial)
-          sleeper.position.y = 0.2
-          sleeper.userData.pieceId = piece.id
-          segment.add(sleeper)
+          instanceScale.setScalar(1)
+          instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
+          instanceDummy.position.set(0, 0.2, 0)
+          instanceDummy.quaternion.identity()
+          instanceDummy.scale.setScalar(1)
+          instanceDummy.updateMatrix()
+          instanceMatrix.multiply(instanceDummy.matrix)
+          sleeperInstances.setMatrixAt(sleeperInstanceIndex, instanceMatrix)
+          sleeperInstanceIndex += 1
         }
-        group.add(segment)
       }
+      baseInstances.instanceMatrix.needsUpdate = true
+      railInstances.instanceMatrix.needsUpdate = true
+      sleeperInstances.instanceMatrix.needsUpdate = true
+      baseInstances.computeBoundingSphere()
+      railInstances.computeBoundingSphere()
+      sleeperInstances.computeBoundingSphere()
+      group.add(baseInstances, railInstances, sleeperInstances)
 
+      const capsForPiece: Partial<Record<RailConnectorId, THREE.Mesh>> = {}
       for (const connectorId of ['a', 'b'] as RailConnectorId[]) {
         const connector = worldConnectorForRailPiece(localPiece, connectorId)
         const cap = new THREE.Mesh(connectorGeometry, connectorMaterial)
         cap.position.set(connector.position.x, connector.position.y + 0.25, connector.position.z)
         cap.userData.pieceId = piece.id
         group.add(cap)
+        capsForPiece[connectorId] = cap
       }
+      connectorCaps.set(piece.id, capsForPiece)
 
       addPieceFacilityDetails(group, localPiece)
 
@@ -741,6 +991,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         railRoot.remove(object)
         pieceObjects.delete(pieceId)
         selectionRings.delete(pieceId)
+        connectorCaps.delete(pieceId)
+        stationPulseTargets.delete(pieceId)
       }
       for (const piece of pieces) {
         let object = pieceObjects.get(piece.id)
@@ -751,6 +1003,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         }
         object.position.set(piece.position.x, piece.position.y, piece.position.z)
         object.rotation.y = piece.rotationY
+        const caps = connectorCaps.get(piece.id)
+        if (caps !== undefined) {
+          for (const connectorId of ['a', 'b'] as RailConnectorId[]) {
+            const cap = caps[connectorId]
+            if (cap !== undefined) cap.visible = piece.connections[connectorId] === undefined
+          }
+        }
       }
       updateSelection(selectedPieceId)
       updateTrainVisuals()
@@ -782,27 +1041,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       updateZoom(pinchStartZoom * (distance / pinchStartDistance))
     }
 
-    let loopClosureFlashTimeout: number | null = null
-
-    function flashLoopClosureSuccess(position: RailVec3) {
-      if (loopClosureFlashTimeout !== null) {
-        window.clearTimeout(loopClosureFlashTimeout)
-        loopClosureFlashTimeout = null
-      }
-      marker.visible = true
-      markerMaterial.color.set('#86efac')
-      marker.position.set(position.x, position.y + 0.38, position.z)
-      loopClosureFlashTimeout = window.setTimeout(() => {
-        marker.visible = false
-        loopClosureFlashTimeout = null
-      }, 360)
-    }
-
     /**
      * 通常接続が成立した直後、今つないだpieceのもう片方の空き端点が
      * 「ループとして閉じられそうか」だけを追加でチェックする。
      * 通常のsnap判定・connectRailPiecesの挙動そのものは変えない、
      * あくまでその後段の任意の一手として発動する。
+     * 成立した場合の見た目・音のフィードバックは、通常接続と同じ
+     * triggerSnapGlow/playRailSnapSoundをそのまま流用する。
      */
     function tryCloseLoopAfterConnect(
       layout: RailPiece[],
@@ -825,8 +1070,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       if (loopCandidate === null) return layout
 
       const closedLayout = applyRailLoopClosure(layout, loopCandidate)
-      const flashPoint = worldConnectorForRailPiece(draggedPiece, looseConnectorId).position
-      flashLoopClosureSuccess(flashPoint)
+      // triggerSnapGlowはtrainPiecesからtargetPieceIdの現在位置を引くため、
+      // syncPieces()を待たずにここで先に反映しておく（targetPieceIdは
+      // 今まさにドラッグで動いたdraggedPiece自身なので、古い位置のままだと
+      // 光る場所がずれてしまう）。
+      trainPieces = closedLayout
+      triggerSnapGlow(loopCandidate)
+      playRailSnapSound(optionsRef.current.soundEnabled ?? true)
       return closedLayout
     }
 
@@ -859,6 +1109,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           currentDrag.candidate.targetConnectorId,
           currentDrag.candidate.transform,
         )
+      if (currentDrag.candidate !== null) {
+        triggerSnapGlow(currentDrag.candidate)
+        playRailSnapSound(optionsRef.current.soundEnabled ?? true)
+      }
       const nextLayout = tryCloseLoopAfterConnect(connectedLayout, currentDrag.candidate, currentDrag.pieceId)
       optionsRef.current.onPiecesChange(nextLayout)
     }
@@ -866,6 +1120,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     function handlePointerDown(event: PointerEvent) {
       if (event.button !== 0) return
       event.preventDefault()
+      if (optionsRef.current.soundEnabled ?? true) primeAudio()
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
       try {
         host.setPointerCapture(event.pointerId)
@@ -999,27 +1254,119 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const rect = host.getBoundingClientRect()
       const width = Math.max(1, Math.round(rect.width))
       const height = Math.max(1, Math.round(rect.height))
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+      renderer.setPixelRatio(getRailBuilderDevicePixelRatio(window.devicePixelRatio || 1, width, height))
       renderer.setSize(width, height, false)
       updateCamera()
+    }
+
+    function addDioramaDecorations() {
+      const treePositions = [
+        { x: -22, y: 0.72, z: -21, scale: 1.05 },
+        { x: -19, y: 0.72, z: 21, scale: 0.9 },
+        { x: 21, y: 0.72, z: -20, scale: 1.12 },
+        { x: 23, y: 0.72, z: 20, scale: 0.9 },
+        { x: -22, y: 0.72, z: 8, scale: 0.84 },
+        { x: 22, y: 0.72, z: 8, scale: 0.88 },
+        { x: -8, y: 0.72, z: 22, scale: 0.82 },
+        { x: 9, y: 0.72, z: -22, scale: 0.86 },
+      ]
+      const trunks = new THREE.InstancedMesh(treeTrunkGeometry, treeTrunkMaterial, treePositions.length)
+      const foliage = new THREE.InstancedMesh(treeFoliageGeometry, treeFoliageMaterial, treePositions.length)
+      for (const instances of [trunks, foliage]) {
+        instances.instanceMatrix.setUsage(THREE.StaticDrawUsage)
+        instances.castShadow = true
+        instances.receiveShadow = true
+      }
+      treePositions.forEach((tree, index) => {
+        instanceDummy.position.set(tree.x, tree.y, tree.z)
+        instanceDummy.rotation.set(0, (index % 3) * 0.45, 0)
+        instanceDummy.scale.set(tree.scale, tree.scale, tree.scale)
+        instanceDummy.updateMatrix()
+        trunks.setMatrixAt(index, instanceDummy.matrix)
+        instanceDummy.position.y += 1.1 * tree.scale
+        instanceDummy.scale.setScalar(tree.scale * 1.05)
+        instanceDummy.updateMatrix()
+        foliage.setMatrixAt(index, instanceDummy.matrix)
+      })
+      trunks.instanceMatrix.needsUpdate = true
+      foliage.instanceMatrix.needsUpdate = true
+      trunks.computeBoundingSphere()
+      foliage.computeBoundingSphere()
+      dioramaRoot.add(trunks, foliage)
+
+      const shrubPositions = [
+        { x: -21, z: -12 },
+        { x: -20, z: -7 },
+        { x: -21, z: 14 },
+        { x: -13, z: 22 },
+        { x: 14, z: 22 },
+        { x: 20, z: 13 },
+        { x: 20, z: -13 },
+        { x: 14, z: -21 },
+      ]
+      const shrubs = new THREE.InstancedMesh(shrubGeometry, shrubMaterial, shrubPositions.length)
+      shrubs.instanceMatrix.setUsage(THREE.StaticDrawUsage)
+      shrubs.castShadow = true
+      shrubs.receiveShadow = true
+      shrubPositions.forEach((shrub, index) => {
+        instanceDummy.position.set(shrub.x, 0.47 + (index % 2) * 0.05, shrub.z)
+        instanceDummy.rotation.set(0, index * 0.7, 0)
+        instanceDummy.scale.set(1 + (index % 3) * 0.12, 0.75 + (index % 2) * 0.12, 1 + (index % 3) * 0.12)
+        instanceDummy.updateMatrix()
+        shrubs.setMatrixAt(index, instanceDummy.matrix)
+      })
+      shrubs.instanceMatrix.needsUpdate = true
+      shrubs.computeBoundingSphere()
+      dioramaRoot.add(shrubs)
+
+      const houses = [
+        { x: -18, z: -16, rotation: 0.35 },
+        { x: 17, z: 16, rotation: -0.4 },
+        { x: -16, z: 17, rotation: 0.15 },
+      ]
+      houses.forEach((house, index) => {
+        const group = new THREE.Group()
+        group.name = `diorama-house-${index + 1}`
+        group.position.set(house.x, 0, house.z)
+        group.rotation.y = house.rotation
+        const bodyMaterials = [houseBodyMaterial, houseBodyAccentMaterial, houseBodyPaleMaterial]
+        const body = new THREE.Mesh(houseBodyGeometry, bodyMaterials[index % bodyMaterials.length])
+        body.position.y = 0.73
+        body.castShadow = true
+        body.receiveShadow = true
+        group.add(body)
+        const roof = new THREE.Mesh(houseRoofGeometry, houseRoofMaterial)
+        roof.position.y = 1.88
+        roof.rotation.y = Math.PI / 4
+        roof.castShadow = true
+        group.add(roof)
+        for (const side of [-1, 1]) {
+          const window = new THREE.Mesh(houseWindowGeometry, houseWindowMaterial)
+          window.position.set(0.62, 0.9, side * 1.07)
+          group.add(window)
+        }
+        dioramaRoot.add(group)
+      })
     }
 
     try {
       scene = new THREE.Scene()
       scene.background = new THREE.Color('#cfeef3')
+      scene.fog = new THREE.Fog('#cfeef3', 38, 78)
       camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100)
       camera.position.copy(cameraTarget).add(cameraOffset)
       camera.lookAt(cameraTarget)
 
       renderer = new THREE.WebGLRenderer({
-        antialias: (window.devicePixelRatio || 1) < 2,
+        antialias: (window.devicePixelRatio || 1) < 1.75,
         alpha: false,
         powerPreference: 'high-performance',
       })
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+      renderer.setPixelRatio(getRailBuilderDevicePixelRatio(window.devicePixelRatio || 1, host.clientWidth, host.clientHeight))
       renderer.setClearColor('#cfeef3')
       renderer.outputColorSpace = THREE.SRGBColorSpace
-      renderer.shadowMap.enabled = false
+      renderer.shadowMap.enabled = true
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap
       renderer.domElement.setAttribute('aria-hidden', 'true')
       renderer.domElement.style.display = 'block'
       renderer.domElement.style.width = '100%'
@@ -1028,12 +1375,16 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
       const ground = new THREE.Mesh(groundGeometry, groundMaterial)
       ground.name = 'toy-mat'
-      ground.rotation.x = -Math.PI / 2
-      ground.position.y = -0.08
-      scene.add(ground)
-      const grid = new THREE.GridHelper(WORLD_SIZE, 25, '#80b981', '#a9d39d')
-      grid.position.y = 0.01
-      scene.add(grid)
+      ground.position.y = -0.25
+      ground.receiveShadow = true
+      const groundEdge = new THREE.Mesh(groundGeometry, groundEdgeMaterial)
+      groundEdge.name = 'toy-mat-edge'
+      groundEdge.position.y = -0.42
+      groundEdge.scale.set(1.018, 0.72, 1.018)
+      groundEdge.receiveShadow = true
+      dioramaRoot.add(groundEdge, ground)
+      addDioramaDecorations()
+      scene.add(dioramaRoot)
       scene.add(railRoot)
       scene.add(trainRoot)
       const markerMesh = new THREE.Mesh(markerGeometry, markerMaterial)
@@ -1041,9 +1392,18 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       markerMesh.position.y = 0.02
       marker.add(markerMesh)
       scene.add(marker)
+      if (snapGlow !== null) scene.add(snapGlow)
       scene.add(new THREE.HemisphereLight('#fff7d6', '#4f7c56', 1.8))
       const directional = new THREE.DirectionalLight('#fff8e7', 2.1)
       directional.position.set(8, 18, 10)
+      directional.castShadow = true
+      directional.shadow.mapSize.set(getRailBuilderShadowMapSize(host.clientWidth, host.clientHeight), getRailBuilderShadowMapSize(host.clientWidth, host.clientHeight))
+      directional.shadow.camera.left = -28
+      directional.shadow.camera.right = 28
+      directional.shadow.camera.top = 28
+      directional.shadow.camera.bottom = -28
+      directional.shadow.camera.near = 1
+      directional.shadow.camera.far = 70
       scene.add(directional)
       resize()
       syncPieces(optionsRef.current.pieces, optionsRef.current.selectedPieceId)
@@ -1071,9 +1431,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         lastFrameTime = now
         if (trainMotion !== null && delta > 0) {
           trainMotion = updateRailTrainMotion(trainMotion, trainPieces, delta)
-          updateTrainVisuals()
+          updateTrainVisuals(delta)
           reportTrainState()
         }
+        updateFeedbackAnimations(delta)
+        trainSound.setEnabled(optionsRef.current.soundEnabled ?? true)
+        const leadPiece = trainPieces.find((piece) => piece.id === trainMotion?.cursor.pieceId)
+        trainSound.update(
+          trainMotion?.speed ?? 0,
+          trainMotion?.status ?? 'ready',
+          leadPiece?.kind === 'tunnel',
+        )
         renderer.render(scene, camera)
         rafId = window.requestAnimationFrame(render)
       }
@@ -1097,7 +1465,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       startTrainRef.current = null
       focusTrainRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)
-      if (loopClosureFlashTimeout !== null) window.clearTimeout(loopClosureFlashTimeout)
       resizeObserver?.disconnect()
       if (resizeObserver === null) window.removeEventListener('resize', resize)
       window.removeEventListener('orientationchange', resize)
@@ -1107,6 +1474,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       host.removeEventListener('pointercancel', handlePointerCancel)
       host.removeEventListener('wheel', handleWheel)
       host.removeEventListener('contextmenu', handleContextMenu)
+      trainSound.dispose()
       if (scene !== null) {
         scene.remove(railRoot)
         // GridHelperなどの非共有資源はツリー走査で一度だけ回収する。
