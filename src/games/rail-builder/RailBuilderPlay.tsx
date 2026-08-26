@@ -4,19 +4,38 @@ import {
   createRailPiece,
   deleteRailPiece,
   rotateRailPiece,
+  toggleRailBranch,
   type RailPiece,
   type RailPieceKind,
   type RailVec3,
 } from './railModel'
 import type { RailTrainStatus } from './railTrainModel'
+import {
+  MAX_RAIL_FLEET_SIZE,
+  RAIL_TRAIN_APPEARANCES,
+  type RailFleetTrainSummary,
+} from './railFleetModel'
 import styles from './RailBuilderPlay.module.css'
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, useRailBuilderEngine } from './useRailBuilderEngine'
 import { primeAudio } from '../../utils/quizSound'
 
 const INITIAL_PIECES: RailPiece[] = [
-  createRailPiece('straight', 'rail-1', { x: -1, y: 0, z: 0 }),
-  createRailPiece('curve', 'rail-2', { x: 7, y: 0, z: 1 }, 0, 'left'),
+  // 3本の発着線は車庫の扉から伸びる。初期2本と追加1本が重ならず、
+  // curveは従来どおり自由に動かせるスターターpieceとして残す。
+  createRailPiece('straight', 'rail-1', { x: -1, y: 0, z: -1.05 }),
+  createRailPiece('straight', 'rail-2', { x: -1, y: 0, z: 0 }),
+  createRailPiece('straight', 'rail-3', { x: -1, y: 0, z: 1.05 }),
+  createRailPiece('curve', 'rail-4', { x: 7, y: 0, z: 1 }, 0, 'left'),
 ]
+
+const INITIAL_FLEET_SUMMARIES: RailFleetTrainSummary[] = [0, 1].map((index) => ({
+  id: `train-${index + 1}`,
+  label: `${index + 1}`,
+  color: RAIL_TRAIN_APPEARANCES[index]!.color,
+  status: 'ready',
+  wantsToRun: false,
+  blocked: false,
+}))
 
 const SPAWN_OFFSETS: RailVec3[] = [
   { x: 0, y: 0, z: 0 },
@@ -78,7 +97,7 @@ export default function RailBuilderPlay() {
   })))
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>('rail-1')
   const [zoom, setZoom] = useState(1)
-  const [trainStatus, setTrainStatus] = useState<RailTrainStatus>('ready')
+  const [fleetSummaries, setFleetSummaries] = useState<RailFleetTrainSummary[]>(INITIAL_FLEET_SUMMARIES)
   const [occupiedRailIds, setOccupiedRailIds] = useState<string[]>([])
   const [soundEnabled, setSoundEnabled] = useState(true)
 
@@ -94,7 +113,7 @@ export default function RailBuilderPlay() {
     setSelectedPieceId(pieceId)
   }, [])
 
-  const { registerContainer, getCameraTarget, startTrain, focusTrain } = useRailBuilderEngine({
+  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, focusTrain, focusDepot } = useRailBuilderEngine({
     pieces,
     selectedPieceId,
     zoom,
@@ -102,7 +121,7 @@ export default function RailBuilderPlay() {
     onSelectPiece: handleSelectPiece,
     onZoomChange: setZoom,
     lockedPieceIds: occupiedRailIdSet,
-    onTrainStatusChange: setTrainStatus,
+    onFleetChange: setFleetSummaries,
     onTrainOccupiedIdsChange: setOccupiedRailIds,
     soundEnabled,
   })
@@ -128,6 +147,13 @@ export default function RailBuilderPlay() {
     setSelectedPieceId(null)
   }, [occupiedRailIdSet, selectedPieceId])
 
+  const toggleSelectedBranch = useCallback(() => {
+    // 先頭車だけでなく後続車もbranchを抜けるまでrouteを固定する。
+    // occupiedは編成全体のpiece unionなので、通過中の車体が折れない。
+    if (selectedPieceId === null || occupiedRailIdSet.has(selectedPieceId)) return
+    setPieces((current) => toggleRailBranch(current, selectedPieceId))
+  }, [occupiedRailIdSet, selectedPieceId])
+
   const zoomOut = useCallback(() => setZoom((value) => Math.max(MIN_ZOOM, value - ZOOM_STEP)), [])
   const zoomIn = useCallback(() => setZoom((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP)), [])
   const toggleSound = useCallback(() => {
@@ -140,23 +166,16 @@ export default function RailBuilderPlay() {
 
   const hint = useMemo(() => {
     if (selectedPieceIsOccupied) return 'でんしゃが のっている せんろは そのままだよ'
+    if (selectedPiece?.kind === 'branch') return 'ひかっている ほうへ すすむよ。ポイントを きりかえよう'
+    if (fleetSummaries.some((train) => train.blocked)) return 'まえが あくまで ゆっくり まつよ'
+    const trainStatus: RailTrainStatus = fleetSummaries[0]?.status ?? 'ready'
     if (trainStatus === 'stoppedAtStation') return 'えきで ひとやすみ。すぐ しゅっぱつするよ'
     if (trainStatus === 'approachingStation') return 'えきに ちかづいているよ'
     if (trainStatus === 'departing') return 'えきから しゅっぱつしたよ'
     if (trainStatus === 'waiting') return 'まってるよ。せんろを つないで すすもう'
     if (selectedPiece === undefined) return 'せんろを えらんで うごかそう'
     return 'せんろを つかんで つなげよう'
-  }, [selectedPiece, selectedPieceIsOccupied, trainStatus])
-
-  const trainIsBusy = trainStatus === 'running'
-    || trainStatus === 'approachingStation'
-    || trainStatus === 'stoppedAtStation'
-    || trainStatus === 'departing'
-  const launchLabel = trainStatus === 'ready'
-    ? 'しゅっぱつ'
-    : trainStatus === 'waiting'
-      ? 'すすむ'
-      : 'はしってるよ'
+  }, [fleetSummaries, selectedPiece, selectedPieceIsOccupied])
 
   return (
     <main className={styles.page}>
@@ -186,18 +205,36 @@ export default function RailBuilderPlay() {
         </div>
 
         <div className={styles.trainControls} aria-label="でんしゃの そうさ">
-          <button
-            type="button"
-            className={styles.launchButton}
-            onClick={startTrain}
-            disabled={trainIsBusy}
-            aria-label={launchLabel}
-          >
-            <span aria-hidden="true">🚂</span>
-            <span>{launchLabel}</span>
-          </button>
-          <button type="button" className={styles.focusButton} onClick={focusTrain}>
-            でんしゃを みる
+          <div className={styles.trainList}>
+            {fleetSummaries.map((train) => (
+              <div className={styles.trainItem} key={train.id}>
+                <button
+                  type="button"
+                  className={styles.trainFocusButton}
+                  onClick={() => focusTrain(train.id)}
+                  aria-label={`でんしゃ ${train.label}を みる`}
+                >
+                  <span className={styles.trainColor} style={{ backgroundColor: train.color }} aria-hidden="true" />
+                  <span aria-hidden="true">🚃{train.label}</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.trainToggleButton}
+                  onClick={() => (train.wantsToRun ? pauseTrain(train.id) : startTrain(train.id))}
+                  aria-label={train.wantsToRun ? `でんしゃ ${train.label}を とめる` : `でんしゃ ${train.label}を はしらせる`}
+                >
+                  <span aria-hidden="true">{train.wantsToRun ? '⏸' : '▶'}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+          {fleetSummaries.length < MAX_RAIL_FLEET_SIZE && (
+            <button type="button" className={styles.addTrainButton} onClick={addTrain} aria-label="しゃこから でんしゃを ついか">
+              <span aria-hidden="true">＋🚃</span>
+            </button>
+          )}
+          <button type="button" className={styles.depotButton} onClick={focusDepot} aria-label="しゃこを みる">
+            <span aria-hidden="true">🏠</span>
           </button>
           <button
             type="button"
@@ -210,6 +247,19 @@ export default function RailBuilderPlay() {
           </button>
         </div>
 
+        {selectedPiece?.kind === 'branch' && (
+          <button
+            type="button"
+            className={styles.branchQuickButton}
+            onClick={toggleSelectedBranch}
+            disabled={selectedPieceIsOccupied}
+            aria-label="ポイントを きりかえる"
+          >
+            <span className={styles.actionIcon} aria-hidden="true">⑂</span>
+            <span>ポイント</span>
+          </button>
+        )}
+
         <section className={styles.tray} aria-label="せんろを えらぶ">
           <div className={styles.trayTools}>
             <button type="button" className={styles.toolButton} onClick={() => addPiece('straight')} aria-label="ちょくせんを ついか">
@@ -219,6 +269,10 @@ export default function RailBuilderPlay() {
             <button type="button" className={styles.toolButton} onClick={() => addPiece('curve')} aria-label="カーブを ついか">
               <RailPreview kind="curve" />
               <span>カーブ</span>
+            </button>
+            <button type="button" className={styles.toolButton} onClick={() => addPiece('branch')} aria-label="ぶんきを ついか">
+              <RailPreview kind="branch" />
+              <span>ぶんき</span>
             </button>
             <button type="button" className={styles.toolButton} onClick={() => addPiece('short-straight')} aria-label="みじかい せんろを ついか">
               <RailPreview kind="short-straight" />

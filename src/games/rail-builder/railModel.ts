@@ -25,8 +25,10 @@ export type RailPieceKind =
   | 'bridge'
   | 'station'
   | 'tunnel'
+  | 'branch'
 export type CurveDirection = 'left' | 'right'
-export type RailConnectorId = 'a' | 'b'
+export type RailConnectorId = 'a' | 'b' | 'c'
+export type RailBranchDirection = 'b' | 'c'
 
 export type RailConnector = {
   id: RailConnectorId
@@ -55,7 +57,15 @@ export type CurvePath = {
   direction: CurveDirection
 }
 
-export type RailPath = StraightPath | CurvePath
+/** 分岐レールの副線にだけ使う、端点と接線が明示された軽量Bezier。 */
+export type QuadraticPath = {
+  kind: 'quadratic'
+  start: RailVec3
+  control: RailVec3
+  end: RailVec3
+}
+
+export type RailPath = StraightPath | CurvePath | QuadraticPath
 
 export type RailConnection = {
   pieceId: string
@@ -71,7 +81,13 @@ export type RailPiece = {
   rotationY: number
   connectorA: RailConnector
   connectorB: RailConnector
+  /** 3つ目の接続点。branchだけが持つ。 */
+  connectorC?: RailConnector
   path: RailPath
+  /** A-Cを結ぶ副Path。branchだけが持つ。 */
+  branchPath?: RailPath
+  /** Aから進入した列車が今回選ぶ出口。 */
+  branchDirection?: RailBranchDirection
   connections: RailConnections
 }
 
@@ -107,6 +123,8 @@ export const SLOPE_LENGTH = 7
 export const ELEVATED_LENGTH = 6.5
 export const STATION_LENGTH = 7
 export const TUNNEL_LENGTH = 7
+export const BRANCH_LENGTH = 6
+export const BRANCH_SPREAD = 3
 export const ELEVATED_HEIGHT = 2
 export const CURVE_RADIUS = 4
 export const CURVE_ANGLE = Math.PI / 2
@@ -210,6 +228,14 @@ function cloneConnector(connector: RailConnector): RailConnector {
 }
 
 function clonePath(path: RailPath): RailPath {
+  if (path.kind === 'quadratic') {
+    return {
+      ...path,
+      start: cloneVec(path.start),
+      control: cloneVec(path.control),
+      end: cloneVec(path.end),
+    }
+  }
   return { ...path }
 }
 
@@ -219,7 +245,9 @@ function clonePiece(piece: RailPiece): RailPiece {
     position: cloneVec(piece.position),
     connectorA: cloneConnector(piece.connectorA),
     connectorB: cloneConnector(piece.connectorB),
+    connectorC: piece.connectorC === undefined ? undefined : cloneConnector(piece.connectorC),
     path: clonePath(piece.path),
+    branchPath: piece.branchPath === undefined ? undefined : clonePath(piece.branchPath),
     connections: { ...piece.connections },
   }
 }
@@ -239,7 +267,12 @@ function connector(
 }
 
 function connectorFor(piece: RailPiece, connectorId: RailConnectorId): RailConnector {
-  return connectorId === 'a' ? piece.connectorA : piece.connectorB
+  if (connectorId === 'a') return piece.connectorA
+  if (connectorId === 'b') return piece.connectorB
+  if (piece.connectorC !== undefined) return piece.connectorC
+  // 壊れた外部データでも描画ループを落とさない。通常の呼び出しは
+  // getRailConnectorIdsで存在する端点だけを列挙するため、ここには来ない。
+  return piece.connectorB
 }
 
 function setConnection(
@@ -295,6 +328,15 @@ export function sampleRailPath(path: RailPath, t: number): RailVec3 {
     return vec((clampedT - 0.5) * path.length, pathHeight(path, clampedT), 0)
   }
 
+  if (path.kind === 'quadratic') {
+    const inverse = 1 - clampedT
+    return cleanVec(vec(
+      inverse * inverse * path.start.x + 2 * inverse * clampedT * path.control.x + clampedT * clampedT * path.end.x,
+      inverse * inverse * path.start.y + 2 * inverse * clampedT * path.control.y + clampedT * clampedT * path.end.y,
+      inverse * inverse * path.start.z + 2 * inverse * clampedT * path.control.z + clampedT * clampedT * path.end.z,
+    ))
+  }
+
   const theta = clampedT * path.angle
   const sign = path.direction === 'left' ? 1 : -1
   // left: (0,-R) -> (R,0), tangent +X -> +Z.
@@ -311,6 +353,14 @@ export function sampleRailPathTangent(path: RailPath, t: number): RailVec3 {
   if (path.kind === 'straight') {
     const horizontalLength = Math.max(EPSILON, Math.abs(path.length))
     return cleanVec(normalize(vec(1, pathHeightDerivative(path, clampedT) / horizontalLength, 0)))
+  }
+  if (path.kind === 'quadratic') {
+    const inverse = 1 - clampedT
+    return cleanVec(normalize(vec(
+      2 * inverse * (path.control.x - path.start.x) + 2 * clampedT * (path.end.x - path.control.x),
+      2 * inverse * (path.control.y - path.start.y) + 2 * clampedT * (path.end.y - path.control.y),
+      2 * inverse * (path.control.z - path.start.z) + 2 * clampedT * (path.end.z - path.control.z),
+    )))
   }
 
   const theta = clampedT * path.angle
@@ -374,13 +424,30 @@ export function createRailPiece(
             ? { kind: 'straight', length: STATION_LENGTH }
             : kind === 'tunnel'
               ? { kind: 'straight', length: TUNNEL_LENGTH }
-              : {
-                kind: 'curve',
-                radius: CURVE_RADIUS,
-                angle: CURVE_ANGLE,
-                direction: curveDirection,
-              }
+              : kind === 'branch'
+                ? { kind: 'straight', length: BRANCH_LENGTH }
+                : {
+                  kind: 'curve',
+                  radius: CURVE_RADIUS,
+                  angle: CURVE_ANGLE,
+                  direction: curveDirection,
+                }
   const [connectorA, connectorB] = makeConnectors(path)
+  const branchPath: RailPath | undefined = kind === 'branch'
+    ? {
+      kind: 'quadratic',
+      start: { x: -BRANCH_LENGTH / 2, y: 0, z: 0 },
+      control: { x: 0, y: 0, z: 0 },
+      end: { x: BRANCH_LENGTH / 2, y: 0, z: BRANCH_SPREAD },
+    }
+    : undefined
+  const connectorC = branchPath === undefined
+    ? undefined
+    : connector(
+      'c',
+      sampleRailPath(branchPath, 1),
+      sampleRailPathTangent(branchPath, 1),
+    )
   return {
     id,
     kind,
@@ -388,7 +455,10 @@ export function createRailPiece(
     rotationY,
     connectorA,
     connectorB,
+    connectorC,
     path,
+    branchPath,
+    branchDirection: kind === 'branch' ? 'b' : undefined,
     connections: {},
   }
 }
@@ -404,7 +474,27 @@ export function getRailConnector(
 }
 
 export function getRailConnectors(piece: RailPiece): RailConnector[] {
-  return [cloneConnector(piece.connectorA), cloneConnector(piece.connectorB)]
+  return getRailConnectorIds(piece).map((connectorId) => cloneConnector(connectorFor(piece, connectorId)))
+}
+
+/** pieceが実際に持つ端点だけを返す。3端対応処理の列挙元は必ずこれを使う。 */
+export function getRailConnectorIds(piece: RailPiece): RailConnectorId[] {
+  return piece.kind === 'branch' && piece.connectorC !== undefined
+    ? ['a', 'b', 'c']
+    : ['a', 'b']
+}
+
+/** 分岐の選択出口だけを反転する純粋関数。通常線路は同一内容のcloneを返す。 */
+export function toggleRailBranch(
+  pieces: readonly RailPiece[],
+  pieceId: string,
+): RailPiece[] {
+  return pieces.map((piece) => {
+    const next = clonePiece(piece)
+    if (piece.id !== pieceId || piece.kind !== 'branch') return next
+    next.branchDirection = piece.branchDirection === 'c' ? 'b' : 'c'
+    return next
+  })
 }
 
 export function worldPointForRailPiece(piece: RailPiece, localPoint: RailVec3): RailVec3 {
@@ -431,8 +521,8 @@ export function worldConnectorForRailPiece(
 
 export const worldConnector = worldConnectorForRailPiece
 
-export function worldRailPathPoint(piece: RailPiece, t: number): RailVec3 {
-  return worldPointForRailPiece(piece, sampleRailPath(piece.path, t))
+export function worldRailPathPoint(piece: RailPiece, t: number, path: RailPath = piece.path): RailVec3 {
+  return worldPointForRailPiece(piece, sampleRailPath(path, t))
 }
 
 /** パスの実距離。曲線も弦長ではなく、列車が走る弧の長さを返す。 */
@@ -459,12 +549,25 @@ export function railPathLength(path: RailPath): number {
     pathLengthCache.set(path, total)
     return total
   }
-  return Math.max(0, path.radius) * Math.abs(path.angle)
+  if (path.kind === 'curve') return Math.max(0, path.radius) * Math.abs(path.angle)
+
+  const cached = pathLengthCache.get(path)
+  if (cached !== undefined) return cached
+  const segments = 32
+  let total = 0
+  let previous = sampleRailPath(path, 0)
+  for (let index = 1; index <= segments; index += 1) {
+    const next = sampleRailPath(path, index / segments)
+    total += length(subtract(next, previous))
+    previous = next
+  }
+  pathLengthCache.set(path, total)
+  return total
 }
 
 /** パス上の接線をワールド座標へ変換する。 */
-export function worldRailPathTangent(piece: RailPiece, t: number): RailVec3 {
-  return worldDirectionForRailPiece(piece, sampleRailPathTangent(piece.path, t))
+export function worldRailPathTangent(piece: RailPiece, t: number, path: RailPath = piece.path): RailVec3 {
+  return worldDirectionForRailPiece(piece, sampleRailPathTangent(path, t))
 }
 
 export function distanceBetweenRailPoints(a: RailVec3, b: RailVec3): number {
@@ -521,7 +624,7 @@ export function findRailSnapCandidate(
 ): SnapCandidate | null {
   const thresholds = optionsWithDefaults(options)
   const movingConnectorIds = movingConnectorId === undefined
-    ? (['a', 'b'] as RailConnectorId[])
+    ? getRailConnectorIds(movingPiece)
     : [movingConnectorId]
   const movingWorld = new Map<RailConnectorId, WorldRailConnector>()
   for (const id of movingConnectorIds) movingWorld.set(id, worldConnectorForRailPiece(movingPiece, id))
@@ -529,7 +632,7 @@ export function findRailSnapCandidate(
   let best: SnapCandidate | null = null
   for (const targetPiece of targets) {
     if (targetPiece.id === movingPiece.id) continue
-    for (const targetConnectorId of ['a', 'b'] as RailConnectorId[]) {
+    for (const targetConnectorId of getRailConnectorIds(targetPiece)) {
       if (targetPiece.connections[targetConnectorId] !== undefined) continue
       const targetWorld = worldConnectorForRailPiece(targetPiece, targetConnectorId)
       for (const currentMovingId of movingConnectorIds) {
@@ -595,14 +698,14 @@ export function findRailSnapNearMiss(
 ): SnapNearMiss | null {
   const thresholds = optionsWithDefaults(options)
   const movingConnectorIds = movingConnectorId === undefined
-    ? (['a', 'b'] as RailConnectorId[])
+    ? getRailConnectorIds(movingPiece)
     : [movingConnectorId]
   const nearDistance = thresholds.maxDistance * 1.35
   let best: SnapNearMiss | null = null
 
   for (const targetPiece of targets) {
     if (targetPiece.id === movingPiece.id) continue
-    for (const targetConnectorId of ['a', 'b'] as RailConnectorId[]) {
+    for (const targetConnectorId of getRailConnectorIds(targetPiece)) {
       if (targetPiece.connections?.[targetConnectorId] !== undefined) continue
       const targetWorld = worldConnectorForRailPiece(targetPiece, targetConnectorId)
       for (const currentMovingId of movingConnectorIds) {
@@ -673,7 +776,7 @@ export function disconnectRailPiece(
   const piece = pieces.find((candidate) => candidate.id === pieceId)
   if (piece === undefined) return pieces.map(clonePiece)
   let next = pieces.map(clonePiece)
-  for (const connectorId of ['a', 'b'] as RailConnectorId[]) {
+  for (const connectorId of getRailConnectorIds(piece)) {
     next = disconnectRailConnection(next, pieceId, connectorId)
   }
   return next
@@ -801,7 +904,7 @@ export const removeRailPiece = deleteRailPiece
 export function areRailConnectionsSymmetric(pieces: readonly RailPiece[]): boolean {
   const map = piecesMap(pieces)
   for (const piece of pieces) {
-    for (const connectorId of ['a', 'b'] as RailConnectorId[]) {
+    for (const connectorId of getRailConnectorIds(piece)) {
       const connection = piece.connections[connectorId]
       if (connection === undefined) continue
       const target = map.get(connection.pieceId)
@@ -869,7 +972,7 @@ function isRailPieceReachable(
     if (currentId === undefined) break
     const piece = map.get(currentId)
     if (piece === undefined) continue
-    for (const connectorId of ['a', 'b'] as RailConnectorId[]) {
+    for (const connectorId of getRailConnectorIds(piece)) {
       const connection = piece.connections[connectorId]
       if (connection === undefined) continue
       if (connection.pieceId === toPieceId) return true
@@ -898,14 +1001,16 @@ export function findRailLoopClosureCandidate(
   options?: LoopClosureOptions,
 ): SnapCandidate | null {
   const thresholds = loopClosureOptionsWithDefaults(options)
+  // PR #203の分散補正は2端pieceの直列チェーン専用。分岐では候補探索をしない。
+  if (fixedPiece.kind === 'branch' || fixedConnectorId === 'c') return null
   if (fixedPiece.connections[fixedConnectorId] !== undefined) return null
   const fixedWorld = worldConnectorForRailPiece(fixedPiece, fixedConnectorId)
 
   let best: SnapCandidate | null = null
   for (const farPiece of targets) {
     if (farPiece.id === fixedPiece.id) continue
-    if (LOOP_CLOSURE_FACILITY_KINDS.has(farPiece.kind)) continue
-    for (const farConnectorId of ['a', 'b'] as RailConnectorId[]) {
+    if (farPiece.kind === 'branch' || LOOP_CLOSURE_FACILITY_KINDS.has(farPiece.kind)) continue
+    for (const farConnectorId of getRailConnectorIds(farPiece)) {
       if (farPiece.connections[farConnectorId] !== undefined) continue
       const farWorld = worldConnectorForRailPiece(farPiece, farConnectorId)
       const distance = distanceBetweenRailPoints(fixedWorld.position, farWorld.position)
@@ -972,7 +1077,7 @@ function collectLoopClosureChain(
 
   while (currentId !== undefined && chain.length < Math.max(1, maxCount)) {
     const piece = map.get(currentId)
-    if (piece === undefined || visited.has(piece.id)) break
+    if (piece === undefined || piece.kind === 'branch' || visited.has(piece.id)) break
     visited.add(piece.id)
     chain.push({ piece, towardFixedConnectorId })
 
@@ -1052,6 +1157,14 @@ export function applyRailLoopClosure(
   pieces: readonly RailPiece[],
   candidate: SnapCandidate,
 ): RailPiece[] {
+  const movingPiece = pieces.find((piece) => piece.id === candidate.movingPieceId)
+  const targetPiece = pieces.find((piece) => piece.id === candidate.targetPieceId)
+  if (
+    movingPiece?.kind === 'branch'
+    || targetPiece?.kind === 'branch'
+    || candidate.movingConnectorId === 'c'
+    || candidate.targetConnectorId === 'c'
+  ) return pieces.map(clonePiece)
   const chain = collectLoopClosureChain(
     pieces,
     candidate.movingPieceId,

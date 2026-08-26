@@ -17,16 +17,53 @@ import {
   findRailLoopClosureCandidate,
   findRailSnapCandidate,
   findRailSnapNearMiss,
+  getRailConnectorIds,
   moveRailPiece,
   railPathLength,
   sampleRailPath,
   sampleRailPathTangent,
+  toggleRailBranch,
   worldConnectorForRailPiece,
   type RailPiece,
 } from './railModel'
 import { distanceToRailTrainDeadEnd } from './railTrainModel'
 
 const origin = { x: 0, y: 0, z: 0 }
+
+describe('branch rail model', () => {
+  it('has three connectors, snaps connector c, keeps links symmetric, and toggles purely', () => {
+    const branch = createRailPiece('branch', 'branch', origin)
+    expect(getRailConnectorIds(branch)).toEqual(['a', 'b', 'c'])
+    expect(branch.connectorC).toBeDefined()
+    expect(branch.branchPath).toBeDefined()
+    expect(branch.branchDirection).toBe('b')
+
+    const tail = createRailPiece('straight', 'tail', { x: 20, y: 0, z: 20 })
+    const connected = connectRailPieces([branch, tail], tail.id, 'a', branch.id, 'c')
+    expect(areRailConnectionsSymmetric(connected)).toBe(true)
+    expect(connected.find((piece) => piece.id === branch.id)?.connections.c).toEqual({
+      pieceId: tail.id,
+      connectorId: 'a',
+    })
+
+    const detached = disconnectRailPiece(connected, tail.id)
+    const detachedTail = detached.find((piece) => piece.id === tail.id)!
+    const detachedBranch = detached.find((piece) => piece.id === branch.id)!
+    expect(findRailSnapCandidate(detachedTail, [detachedBranch], 'a')?.targetConnectorId).toBe('c')
+
+    const toggled = toggleRailBranch(connected, branch.id)
+    expect(toggled.find((piece) => piece.id === branch.id)?.branchDirection).toBe('c')
+    expect(connected.find((piece) => piece.id === branch.id)?.branchDirection).toBe('b')
+    expect(toggleRailBranch(toggled, branch.id).find((piece) => piece.id === branch.id)?.branchDirection).toBe('b')
+  })
+
+  it('keeps the branch path endpoint and connector c aligned', () => {
+    const branch = createRailPiece('branch', 'branch', origin)
+    const endpoint = sampleRailPath(branch.branchPath!, 1)
+    expect(endpoint).toEqual(branch.connectorC?.localPosition)
+    expect(railPathLength(branch.branchPath!)).toBeGreaterThan(railPathLength(branch.path))
+  })
+})
 
 /** targets内でanchorとfarPieceだけをつなぎ、他は動かさない最小の「既存チェーン」を作る。 */
 function anchorFarPiece(
