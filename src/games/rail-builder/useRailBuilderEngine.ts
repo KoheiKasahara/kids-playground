@@ -35,10 +35,12 @@ import {
   occupiedRailFleetPieceIds,
   removeRailFleetTrain,
   setRailFleetTrainRunning,
+  setRailFleetTrainType,
   summarizeRailFleet,
   updateRailFleet,
   type RailFleetTrain,
   type RailFleetTrainSummary,
+  type TrainType,
 } from './railFleetModel'
 import {
   getRailBuilderDevicePixelRatio,
@@ -105,6 +107,8 @@ export type RailBuilderEngineHandle = {
   removeTrain: (trainId?: string) => void
   focusTrain: (trainId: string) => void
   focusDepot: () => void
+  /** Phase 3の車両選択UIから、既存列車の見た目(trainType)だけを差し替えるためのAPI。 */
+  setTrainType: (trainId: string, trainType: TrainType) => void
 }
 
 type PointerPosition = {
@@ -224,6 +228,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
   const removeTrainRef = useRef<((trainId?: string) => void) | null>(null)
   const focusTrainRef = useRef<((trainId: string) => void) | null>(null)
   const focusDepotRef = useRef<(() => void) | null>(null)
+  const setTrainTypeRef = useRef<((trainId: string, trainType: TrainType) => void) | null>(null)
 
   const registerContainer = useCallback((element: HTMLDivElement | null) => {
     containerRef.current = element
@@ -255,9 +260,33 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     focusDepotRef.current?.()
   }, [])
 
+  const setTrainType = useCallback((trainId: string, trainType: TrainType) => {
+    setTrainTypeRef.current?.(trainId, trainType)
+  }, [])
+
   const handle = useMemo<RailBuilderEngineHandle>(
-    () => ({ registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, focusTrain, focusDepot }),
-    [addTrain, focusDepot, focusTrain, getCameraTarget, pauseTrain, registerContainer, removeTrain, startTrain],
+    () => ({
+      registerContainer,
+      getCameraTarget,
+      startTrain,
+      pauseTrain,
+      addTrain,
+      removeTrain,
+      focusTrain,
+      focusDepot,
+      setTrainType,
+    }),
+    [
+      addTrain,
+      focusDepot,
+      focusTrain,
+      getCameraTarget,
+      pauseTrain,
+      registerContainer,
+      removeTrain,
+      setTrainType,
+      startTrain,
+    ],
   )
 
   useEffect(() => {
@@ -963,6 +992,20 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       reportTrainState()
     }
 
+    /** Phase 3の車両選択UI向け。走行状態(cursor/speed/status)には触れず、見た目だけ差し替える。 */
+    function setTrainTypeNow(trainId: string, trainType: TrainType) {
+      fleet = setRailFleetTrainType(fleet, trainId, trainType)
+      const updatedTrain = fleet.find((train) => train.id === trainId)
+      const runtime = updatedTrain === undefined ? undefined : trainVisuals.get(trainId)
+      if (updatedTrain !== undefined && runtime !== undefined) {
+        runtime.bodyMaterial.color.set(updatedTrain.appearance.color)
+        runtime.frontMaterial.color.set(updatedTrain.appearance.frontColor)
+        runtime.roofMaterial.color.set(updatedTrain.appearance.roofColor)
+      }
+      updateTrainVisuals()
+      reportTrainState()
+    }
+
     function focusTrainNow(trainId: string) {
       const train = fleet.find((candidate) => candidate.id === trainId)
       if (train === undefined) return
@@ -1003,6 +1046,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     removeTrainRef.current = removeTrainNow
     focusTrainRef.current = focusTrainNow
     focusDepotRef.current = focusDepotNow
+    setTrainTypeRef.current = setTrainTypeNow
 
     function addPieceFacilityDetails(group: THREE.Group, localPiece: RailPiece) {
       const pieceId = localPiece.id
@@ -1936,6 +1980,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       removeTrainRef.current = null
       focusTrainRef.current = null
       focusDepotRef.current = null
+      setTrainTypeRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)
       resizeObserver?.disconnect()
       if (resizeObserver === null) window.removeEventListener('resize', resize)

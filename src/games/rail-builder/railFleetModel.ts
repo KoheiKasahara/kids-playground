@@ -25,15 +25,64 @@ export type RailTrainAppearance = {
   roofColor: string
 }
 
+/** 車両タイプ別に切り替わる見た目パラメータ。走行ロジックは一切参照しない。 */
+export type TrainVisualConfig = RailTrainAppearance
+
 export const RAIL_TRAIN_APPEARANCES: readonly RailTrainAppearance[] = [
   { color: '#f97316', frontColor: '#ea580c', roofColor: '#facc15' },
   { color: '#0ea5e9', frontColor: '#0284c7', roofColor: '#e0f2fe' },
   { color: '#a855f7', frontColor: '#9333ea', roofColor: '#f5d0fe' },
 ]
 
+/**
+ * 列車の車両タイプ。走行ロジック(railTrainModel/railFleetModel の更新処理)は
+ * このtypeを一切分岐条件に使わない。参照するのは見た目を組み立てる側だけにする。
+ * 新しい車両タイプを増やすときはこのunionとTRAIN_TYPE_VISUAL_CONFIGSに
+ * 追加するだけで済むようにする。
+ */
+export type TrainType = 'basic' | 'e5' | 'e6' | 'n700s' | 'doctorYellow'
+
+export const TRAIN_TYPES: readonly TrainType[] = ['basic', 'e5', 'e6', 'n700s', 'doctorYellow']
+
+export const DEFAULT_TRAIN_TYPE: TrainType = 'basic'
+
+export function isTrainType(value: unknown): value is TrainType {
+  return typeof value === 'string' && (TRAIN_TYPES as readonly string[]).includes(value)
+}
+
+/** 未指定・不正な値は既存のオリジナル車両(basic)へ安全にフォールバックする。 */
+export function resolveTrainType(value: unknown): TrainType {
+  return isTrainType(value) ? value : DEFAULT_TRAIN_TYPE
+}
+
+/**
+ * Phase 1では新型車両の完成デザインは作らず、色だけを変えた仮設定に留める。
+ * 先頭車/中間車の形状差などはPhase 2以降でここに追加していく想定。
+ */
+const TRAIN_TYPE_VISUAL_CONFIGS: Record<Exclude<TrainType, 'basic'>, TrainVisualConfig> = {
+  e5: { color: '#1c7a4d', frontColor: '#0f5132', roofColor: '#f8fafc' },
+  e6: { color: '#be123c', frontColor: '#881337', roofColor: '#fecdd3' },
+  n700s: { color: '#e2e8f0', frontColor: '#cbd5f5', roofColor: '#1d4ed8' },
+  doctorYellow: { color: '#fbbf24', frontColor: '#f59e0b', roofColor: '#e5e7eb' },
+}
+
+/**
+ * 車両タイプと編成内インデックスから見た目設定を求める。basicは既存どおり
+ * インデックス順の色ローテーションを保ち、複数列車の見分けやすさを変えない。
+ */
+export function resolveTrainVisualConfig(trainType: TrainType, fleetIndex: number): TrainVisualConfig {
+  if (trainType === 'basic') {
+    const index = Number.isFinite(fleetIndex) ? Math.max(0, Math.floor(fleetIndex)) : 0
+    return RAIL_TRAIN_APPEARANCES[index % RAIL_TRAIN_APPEARANCES.length]!
+  }
+  return TRAIN_TYPE_VISUAL_CONFIGS[trainType]
+}
+
 export type RailFleetTrain = {
   id: string
   label: string
+  /** 走行ロジックからは参照しない、見た目専用の車両タイプ。 */
+  trainType: TrainType
   appearance: RailTrainAppearance
   motion: RailTrainMotion
   /** ユーザーが発車状態にしたか。blockedや駅停車とは独立。 */
@@ -45,6 +94,7 @@ export type RailFleetTrain = {
 export type RailFleetTrainSummary = {
   id: string
   label: string
+  trainType: TrainType
   color: string
   status: RailTrainStatus
   wantsToRun: boolean
@@ -118,18 +168,28 @@ function nextFreeFleetIndex(existing: readonly RailFleetTrain[]): number {
   return index
 }
 
+/** `train-N` のNから0始まりのインデックスを復元する。basicの色ローテーションをid基準で安定させる。 */
+function fleetIndexFromId(trainId: string): number {
+  const match = /^train-(\d+)$/.exec(trainId)
+  if (match === null) return 0
+  const parsed = Number.parseInt(match[1]!, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed - 1 : 0
+}
+
 function makeFleetTrain(
   pieces: readonly RailPiece[],
   existing: readonly RailFleetTrain[],
+  trainType: TrainType = DEFAULT_TRAIN_TYPE,
 ): RailFleetTrain | null {
   const motion = safeSpawnMotion(pieces, existing)
   if (motion === null) return null
 
   const index = nextFreeFleetIndex(existing)
-  const appearance = RAIL_TRAIN_APPEARANCES[index % RAIL_TRAIN_APPEARANCES.length]!
+  const appearance = resolveTrainVisualConfig(trainType, index)
   return {
     id: `train-${index + 1}`,
     label: `${index + 1}`,
+    trainType,
     appearance: { ...appearance },
     motion,
     wantsToRun: false,
@@ -140,11 +200,12 @@ function makeFleetTrain(
 export function createInitialRailFleet(
   pieces: readonly RailPiece[],
   count = 1,
+  trainTypes?: readonly TrainType[],
 ): RailFleetTrain[] {
   const result: RailFleetTrain[] = []
   const targetCount = Math.min(MAX_RAIL_FLEET_SIZE, Math.max(0, Math.floor(count)))
   for (let index = 0; index < targetCount; index += 1) {
-    const train = makeFleetTrain(pieces, result)
+    const train = makeFleetTrain(pieces, result, trainTypes?.[index] ?? DEFAULT_TRAIN_TYPE)
     if (train !== null) result.push(train)
   }
   return result
@@ -153,11 +214,33 @@ export function createInitialRailFleet(
 export function addRailFleetTrain(
   trains: readonly RailFleetTrain[],
   pieces: readonly RailPiece[],
+  trainType: TrainType = DEFAULT_TRAIN_TYPE,
 ): RailFleetTrain[] {
   const cloned = trains.map((train) => ({ ...train, appearance: { ...train.appearance }, motion: cloneMotion(train.motion) }))
   if (cloned.length >= MAX_RAIL_FLEET_SIZE) return cloned
-  const next = makeFleetTrain(pieces, cloned)
+  const next = makeFleetTrain(pieces, cloned, trainType)
   return next === null ? cloned : [...cloned, next]
+}
+
+/**
+ * 指定した列車の車両タイプ(見た目)だけを差し替える。Phase 3の車両選択UIから
+ * 呼ばれる想定のAPI。cursor・speed・statusなど走行状態は一切変更しない。
+ */
+export function setRailFleetTrainType(
+  trains: readonly RailFleetTrain[],
+  trainId: string,
+  trainType: TrainType,
+): RailFleetTrain[] {
+  return trains.map((train) => {
+    const motion = cloneMotion(train.motion)
+    if (train.id !== trainId) return { ...train, appearance: { ...train.appearance }, motion }
+    return {
+      ...train,
+      trainType,
+      appearance: { ...resolveTrainVisualConfig(trainType, fleetIndexFromId(train.id)) },
+      motion,
+    }
+  })
 }
 
 export function setRailFleetTrainRunning(
@@ -306,6 +389,7 @@ export function summarizeRailFleet(trains: readonly RailFleetTrain[]): RailFleet
   return trains.map((train) => ({
     id: train.id,
     label: train.label,
+    trainType: train.trainType,
     color: train.appearance.color,
     status: train.motion.status,
     wantsToRun: train.wantsToRun,

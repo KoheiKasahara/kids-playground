@@ -12,6 +12,7 @@ import {
 } from './railModel'
 import type { RailTrainStatus } from './railTrainModel'
 import {
+  DEFAULT_TRAIN_TYPE,
   MAX_RAIL_FLEET_SIZE,
   RAIL_TRAIN_APPEARANCES,
   type RailFleetTrainSummary,
@@ -47,6 +48,7 @@ const INITIAL_PIECES: RailPiece[] = createInitialRailPieces()
 const INITIAL_FLEET_SUMMARIES: RailFleetTrainSummary[] = [0].map((index) => ({
   id: `train-${index + 1}`,
   label: `${index + 1}`,
+  trainType: DEFAULT_TRAIN_TYPE,
   color: RAIL_TRAIN_APPEARANCES[index]!.color,
   status: 'ready',
   wantsToRun: false,
