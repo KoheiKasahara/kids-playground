@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { connectRailPieces, createRailPiece, railPathLength, type RailPiece } from './railModel'
 import {
+  DEFAULT_TRAIN_TYPE,
   MAX_RAIL_FLEET_SIZE,
+  RAIL_TRAIN_APPEARANCES,
+  TRAIN_TYPES,
   addRailFleetTrain,
   createInitialRailFleet,
+  isTrainType,
   moveRailFleetTrainTo,
   removeRailFleetTrain,
+  resolveTrainType,
+  resolveTrainVisualConfig,
   setRailFleetTrainRunning,
+  setRailFleetTrainType,
+  summarizeRailFleet,
   updateRailFleet,
   type RailFleetTrain,
 } from './railFleetModel'
@@ -220,6 +228,7 @@ describe('railFleetModel', () => {
     const moving: RailFleetTrain = {
       id: 'train-1',
       label: '1',
+      trainType: 'basic',
       appearance: { color: '#f97316', frontColor: '#ea580c', roofColor: '#facc15' },
       wantsToRun: true,
       blocked: true,
@@ -234,6 +243,7 @@ describe('railFleetModel', () => {
     const other: RailFleetTrain = {
       id: 'train-2',
       label: '2',
+      trainType: 'basic',
       appearance: { color: '#0ea5e9', frontColor: '#0284c7', roofColor: '#e0f2fe' },
       wantsToRun: true,
       blocked: false,
@@ -253,5 +263,79 @@ describe('railFleetModel', () => {
 
     // 存在しないidならクローンだけを返す。
     expect(moveRailFleetTrainTo([moving, other], 'missing', newCursor)).toEqual([moving, other])
+  })
+})
+
+describe('train type foundation', () => {
+  it('falls back unknown or missing values to the original basic train', () => {
+    expect(resolveTrainType(undefined)).toBe('basic')
+    expect(resolveTrainType(null)).toBe('basic')
+    expect(resolveTrainType('shinkansen-does-not-exist')).toBe('basic')
+    expect(resolveTrainType('e5')).toBe('e5')
+    expect(isTrainType('doctorYellow')).toBe(true)
+    expect(isTrainType('e999')).toBe(false)
+    expect(DEFAULT_TRAIN_TYPE).toBe('basic')
+  })
+
+  it('creates every train as basic by default, matching the existing appearance rotation', () => {
+    const pieces = [
+      createRailPiece('straight', 'rail-1'),
+      createRailPiece('straight', 'rail-2'),
+      createRailPiece('straight', 'rail-3'),
+    ]
+    const fleet = createInitialRailFleet(pieces, 3)
+    expect(fleet.every((train) => train.trainType === 'basic')).toBe(true)
+    expect(fleet.map((train) => train.appearance)).toEqual(RAIL_TRAIN_APPEARANCES)
+
+    const added = addRailFleetTrain(removeRailFleetTrain(fleet, 'train-1'), pieces)
+    expect(added.find((train) => train.id === 'train-1')?.trainType).toBe('basic')
+  })
+
+  it('lets independent trains hold different train types at once', () => {
+    const pieces = [
+      createRailPiece('straight', 'rail-1'),
+      createRailPiece('straight', 'rail-2'),
+      createRailPiece('straight', 'rail-3'),
+    ]
+    let fleet = createInitialRailFleet(pieces, 1)
+    fleet = addRailFleetTrain(fleet, pieces, 'e5')
+    fleet = addRailFleetTrain(fleet, pieces, 'doctorYellow')
+    expect(fleet.map((train) => train.trainType)).toEqual(['basic', 'e5', 'doctorYellow'])
+    // 型ごとに見た目が変わり、同じ値へ収束しない。
+    expect(new Set(fleet.map((train) => train.appearance.color)).size).toBe(3)
+
+    // すべてのタイプが走行ロジックの安全な間隔チェックへ同じように参加する。
+    const running = fleet.map((train) => ({ ...train, wantsToRun: true }))
+    const updated = updateRailFleet(running, pieces, 0.1)
+    expect(updated).toHaveLength(3)
+    expect(updated.every((train) => Number.isFinite(train.motion.cursor.distance))).toBe(true)
+  })
+
+  it('setRailFleetTrainType swaps only the target train appearance and preserves motion', () => {
+    const pieces = [createRailPiece('straight', 'rail-1'), createRailPiece('straight', 'rail-2')]
+    const fleet = createInitialRailFleet(pieces, 2)
+    const before = fleet.map((train) => ({ ...train.motion }))
+
+    const changed = setRailFleetTrainType(fleet, 'train-1', 'n700s')
+    expect(changed[0]?.trainType).toBe('n700s')
+    expect(changed[0]?.appearance).toEqual(resolveTrainVisualConfig('n700s', 0))
+    expect(changed[0]?.motion).toEqual(before[0])
+    // 対象外の列車はtrainTypeも見た目もmotionも変わらない。
+    expect(changed[1]?.trainType).toBe('basic')
+    expect(changed[1]).toEqual(fleet[1])
+
+    // 未知のidを渡してもクローンのみで内容は変わらない。
+    expect(setRailFleetTrainType(fleet, 'missing', 'e6')).toEqual(fleet)
+  })
+
+  it('every registered train type produces a valid appearance and survives a fleet summary round trip', () => {
+    const pieces = [createRailPiece('straight', 'rail-1')]
+    let fleet = createInitialRailFleet(pieces, 1)
+    for (const trainType of TRAIN_TYPES) {
+      fleet = setRailFleetTrainType(fleet, 'train-1', trainType)
+      expect(fleet[0]?.appearance.color).toMatch(/^#[0-9a-f]{6}$/i)
+    }
+    const summaries = summarizeRailFleet(fleet)
+    expect(summaries[0]?.trainType).toBe(fleet[0]?.trainType)
   })
 })
