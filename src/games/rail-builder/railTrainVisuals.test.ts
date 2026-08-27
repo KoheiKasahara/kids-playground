@@ -40,6 +40,28 @@ describe('railTrainVisuals', () => {
     expect(middle.sideWindowXs).toEqual(lead.sideWindowXs)
   })
 
+  it('keeps E5 proportions and detail placements deliberately slender', () => {
+    const e5 = resolveTrainVisualProfile('e5')
+    const lead = e5.lead
+
+    expect(lead.bodyLength / lead.bodyHeight).toBeGreaterThan(3)
+    expect(lead.bodyHeight).toBeLessThan(0.62)
+    expect(lead.bodyWidth).toBeLessThan(0.9)
+    expect(lead.noseBaseX).toBeLessThan(lead.bodyCenterX + lead.bodyLength / 2)
+    expect(lead.noseTipX - lead.noseBaseX).toBeGreaterThan(1)
+    expect(lead.noseTipWidth).toBeLessThan(lead.noseBaseWidth)
+    expect(lead.noseTipWidth).toBeGreaterThan(0.3)
+    expect(lead.sideWindowWidth).toBeLessThan(0.3)
+    expect(lead.sideWindowHeight).toBeLessThan(0.2)
+    expect(lead.sideWindowXs[1]! - lead.sideWindowXs[0]!).toBeGreaterThan(0.4)
+    expect(lead.frontWindowWidth).toBeLessThan(0.4)
+    expect(lead.frontWindowX).toBeGreaterThan(0.4)
+    expect(e5.bodyColor).toMatch(/^#f/i)
+    expect(e5.roofColor).toMatch(/^#(?:2|3)/i)
+    expect(e5.accent.height).toBeLessThan(0.1)
+    expect(lead.couplerPositions).toEqual([-1.25, 1.25])
+  })
+
   it('gives each new train a dedicated silhouette, nose, and color treatment', () => {
     const profiles = TRAIN_TYPES.map((trainType) => resolveTrainVisualProfile(trainType))
     expect(new Set(profiles.map((profile) => profile.silhouette)).size).toBe(TRAIN_TYPES.length)

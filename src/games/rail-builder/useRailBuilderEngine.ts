@@ -157,6 +157,13 @@ type SpecialTrainVisualDefinition = {
   sideWindowGeometry: THREE.BufferGeometry
   cockpitWindowGeometry: THREE.BufferGeometry
   accentGeometry: THREE.BufferGeometry
+  /** Optional E5-only low-cost details; future train types can opt in as needed. */
+  splitNoseColor?: boolean
+  sideCockpitWindows?: boolean
+  underfloorGeometry?: THREE.BufferGeometry
+  bogieGeometry?: THREE.BufferGeometry
+  gangwayGeometry?: THREE.BufferGeometry
+  wheelGeometry?: THREE.BufferGeometry
   roofFeatureGeometry?: THREE.BufferGeometry
 }
 
@@ -247,6 +254,28 @@ function noseSectionRing(section: NoseSection, style: NoseStyle): readonly [numb
   const cornerWidth = Math.min(0.08, halfWidth * 0.3)
   const verticalRange = Math.max(0.01, section.top - section.bottom)
   const cornerHeight = Math.min(0.07, verticalRange * 0.28)
+  if (style === 'e5-wide-wedge') {
+    // E5 uses a softly rounded 12-point cross-section rather than a triangular
+    // wedge.  The slightly proud top centre gives the roof a gentle crown while
+    // the broad shoulder points keep the side silhouette full for most of the
+    // nose length.
+    const topCrown = Math.min(0.018, verticalRange * 0.06)
+    const lowerCrown = Math.min(0.012, verticalRange * 0.04)
+    return [
+      [-halfWidth * 0.68, section.top - cornerHeight * 0.4],
+      [-halfWidth * 0.32, section.top],
+      [0, section.top + topCrown],
+      [halfWidth * 0.32, section.top],
+      [halfWidth * 0.68, section.top - cornerHeight * 0.4],
+      [halfWidth, section.top - cornerHeight * 1.25],
+      [halfWidth, section.bottom + cornerHeight * 1.15],
+      [halfWidth * 0.7, section.bottom],
+      [0, section.bottom - lowerCrown],
+      [-halfWidth * 0.7, section.bottom],
+      [-halfWidth, section.bottom + cornerHeight * 1.15],
+      [-halfWidth, section.top - cornerHeight * 1.25],
+    ]
+  }
   if (style === 'e6-spear') {
     // E6は細い中央稜線を作り、E5の幅広wedgeとは別の断面にする。
     const ridgeHalfWidth = Math.min(0.07, halfWidth * 0.22)
@@ -295,7 +324,11 @@ function noseSectionRing(section: NoseSection, style: NoseStyle): readonly [numb
 }
 
 /** 複数断面の低ポリゴンnose。geometryはeffect初期化時にだけ生成する。 */
-function createNoseGeometry(sections: readonly NoseSection[], style: NoseStyle): THREE.BufferGeometry {
+function createNoseGeometry(
+  sections: readonly NoseSection[],
+  style: NoseStyle,
+  splitE5Color = false,
+): THREE.BufferGeometry {
   const positions: number[] = []
   const rings = sections.map((section) => noseSectionRing(section, style))
   const sectionSize = rings[0]?.length ?? 0
@@ -308,12 +341,17 @@ function createNoseGeometry(sections: readonly NoseSection[], style: NoseStyle):
   }
 
   const indices: number[] = []
+  const upperIndices: number[] = []
+  const lowerIndices: number[] = []
   for (let sectionIndex = 0; sectionIndex < rings.length - 1; sectionIndex += 1) {
     const currentOffset = sectionIndex * sectionSize
     const nextOffset = (sectionIndex + 1) * sectionSize
     for (let pointIndex = 0; pointIndex < sectionSize; pointIndex += 1) {
       const nextPointIndex = (pointIndex + 1) % sectionSize
-      indices.push(
+      const targetIndices = splitE5Color
+        ? (pointIndex <= 4 || pointIndex === sectionSize - 1 ? upperIndices : lowerIndices)
+        : indices
+      targetIndices.push(
         currentOffset + pointIndex,
         currentOffset + nextPointIndex,
         nextOffset + pointIndex,
@@ -331,20 +369,34 @@ function createNoseGeometry(sections: readonly NoseSection[], style: NoseStyle):
     positions.push(section.x, (section.top + section.bottom) / 2, 0)
     for (let pointIndex = 0; pointIndex < sectionSize; pointIndex += 1) {
       const nextPointIndex = (pointIndex + 1) % sectionSize
-      indices.push(centerIndex, offset + (sectionIndex === 0 ? nextPointIndex : pointIndex), offset + (sectionIndex === 0 ? pointIndex : nextPointIndex))
+      const targetIndices = splitE5Color
+        ? (pointIndex <= 4 || pointIndex === sectionSize - 1 ? upperIndices : lowerIndices)
+        : indices
+      targetIndices.push(
+        centerIndex,
+        offset + (sectionIndex === 0 ? nextPointIndex : pointIndex),
+        offset + (sectionIndex === 0 ? pointIndex : nextPointIndex),
+      )
     }
   }
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setIndex(indices)
+  const geometryIndices = splitE5Color ? upperIndices.concat(lowerIndices) : indices
+  geometry.setIndex(geometryIndices)
+  if (splitE5Color) {
+    // Keep E5's green upper / light lower split to two draw groups, even though
+    // the low-poly loft has many individual surface strips.
+    geometry.addGroup(0, upperIndices.length, 0)
+    geometry.addGroup(upperIndices.length, lowerIndices.length, 1)
+  }
   geometry.computeVertexNormals()
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()
   return geometry
 }
 
-/** E5先頭車の低い扁平ノーズ。effect初期化時に一度だけ作り、全E5編成で共有する。 */
+/** E5先頭車の7断面・12頂点リングの流線形ノーズ。 */
 function createE5NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
   return createNoseGeometry([
     {
@@ -354,10 +406,34 @@ function createE5NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeome
       width: profile.noseBaseWidth,
     },
     {
-      x: profile.noseBaseX + profile.noseLength * 0.42,
-      top: profile.noseBaseTopY - 0.06,
-      bottom: profile.noseBaseBottomY + 0.03,
-      width: profile.noseBaseWidth * 0.92,
+      x: profile.noseBaseX + profile.noseLength * 0.16,
+      top: profile.noseBaseTopY + 0.01,
+      bottom: profile.noseBaseBottomY,
+      width: profile.noseBaseWidth,
+    },
+    {
+      x: profile.noseBaseX + profile.noseLength * 0.34,
+      top: profile.noseBaseTopY - 0.005,
+      bottom: profile.noseBaseBottomY + 0.01,
+      width: profile.noseBaseWidth * 0.98,
+    },
+    {
+      x: profile.noseBaseX + profile.noseLength * 0.53,
+      top: profile.noseBaseTopY - 0.035,
+      bottom: profile.noseBaseBottomY + 0.025,
+      width: profile.noseBaseWidth * 0.91,
+    },
+    {
+      x: profile.noseBaseX + profile.noseLength * 0.7,
+      top: profile.noseBaseTopY - 0.08,
+      bottom: profile.noseBaseBottomY + 0.06,
+      width: profile.noseBaseWidth * 0.8,
+    },
+    {
+      x: profile.noseBaseX + profile.noseLength * 0.86,
+      top: profile.noseBaseTopY - 0.13,
+      bottom: profile.noseBaseBottomY + 0.11,
+      width: profile.noseBaseWidth * 0.64,
     },
     {
       x: profile.noseTipX,
@@ -365,7 +441,50 @@ function createE5NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeome
       bottom: profile.noseTipBottomY,
       width: profile.noseTipWidth,
     },
+  ], 'e5-wide-wedge', true)
+}
+
+/** Shared low-poly rounded loft used by the E5 body and future train variants. */
+function createE5BodyGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
+  const halfLength = profile.bodyLength / 2
+  return createNoseGeometry([
+    { x: -halfLength, top: profile.bodyHeight / 2, bottom: -profile.bodyHeight / 2, width: profile.bodyWidth },
+    { x: -halfLength * 0.72, top: profile.bodyHeight / 2, bottom: -profile.bodyHeight / 2, width: profile.bodyWidth },
+    { x: halfLength * 0.72, top: profile.bodyHeight / 2, bottom: -profile.bodyHeight / 2, width: profile.bodyWidth },
+    { x: halfLength, top: profile.bodyHeight / 2, bottom: -profile.bodyHeight / 2, width: profile.bodyWidth },
   ], 'e5-wide-wedge')
+}
+
+/** A shallow side window with a rearward-sloping top edge, used on E5 only. */
+function createSlantedWindowGeometry(width: number, height: number, depth: number, topOffset: number): THREE.BufferGeometry {
+  const halfWidth = width / 2
+  const halfHeight = height / 2
+  const halfDepth = depth / 2
+  const positions = [
+    -halfWidth, -halfHeight, halfDepth,
+    halfWidth, -halfHeight, halfDepth,
+    halfWidth + topOffset, halfHeight, halfDepth,
+    -halfWidth + topOffset, halfHeight, halfDepth,
+    -halfWidth, -halfHeight, -halfDepth,
+    halfWidth, -halfHeight, -halfDepth,
+    halfWidth + topOffset, halfHeight, -halfDepth,
+    -halfWidth + topOffset, halfHeight, -halfDepth,
+  ]
+  const indices = [
+    0, 1, 2, 0, 2, 3,
+    5, 4, 7, 5, 7, 6,
+    0, 4, 5, 0, 5, 1,
+    1, 5, 6, 1, 6, 2,
+    2, 6, 7, 2, 7, 3,
+    3, 7, 4, 3, 4, 0,
+  ]
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
 }
 
 function createE6NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
@@ -573,20 +692,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainLightGeometry = new THREE.SphereGeometry(0.09, 8, 6)
     const e5Profile = resolveTrainVisualProfile('e5')
     const e5NoseGeometry = createE5NoseGeometry(e5Profile.lead)
-    const e5LeadBodyGeometry = new RoundedBoxGeometry(
-      e5Profile.lead.bodyLength,
-      e5Profile.lead.bodyHeight,
-      e5Profile.lead.bodyWidth,
-      2,
-      0.14,
-    )
-    const e5MiddleBodyGeometry = new RoundedBoxGeometry(
-      e5Profile.middle.bodyLength,
-      e5Profile.middle.bodyHeight,
-      e5Profile.middle.bodyWidth,
-      2,
-      0.14,
-    )
+    const e5LeadBodyGeometry = createE5BodyGeometry(e5Profile.lead)
+    const e5MiddleBodyGeometry = createE5BodyGeometry(e5Profile.middle)
     const e5LeadRoofGeometry = new RoundedBoxGeometry(
       e5Profile.lead.roofLength,
       e5Profile.lead.roofHeight,
@@ -606,8 +713,19 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       e5Profile.window.sideHeight,
       0.04,
     )
-    const e5CockpitWindowGeometry = new THREE.BoxGeometry(0.04, 0.23, 0.5)
+    const e5CockpitWindowGeometry = createSlantedWindowGeometry(
+      e5Profile.lead.frontWindowWidth,
+      0.2,
+      0.04,
+      -0.1,
+    )
     const e5AccentGeometry = new THREE.BoxGeometry(1, e5Profile.accent.height, 0.04)
+    // E5-only details remain shared for the effect lifetime.  They are shallow
+    // rounded blocks so the underframe reads clearly without a mesh per bolt.
+    const e5UnderfloorGeometry = new RoundedBoxGeometry(1.42, 0.14, 0.7, 1, 0.04)
+    const e5BogieGeometry = new RoundedBoxGeometry(0.5, 0.14, 0.64, 1, 0.04)
+    const e5GangwayGeometry = new RoundedBoxGeometry(0.16, 0.28, 0.48, 1, 0.035)
+    const e5WheelGeometry = new THREE.CylinderGeometry(0.16, 0.16, 0.11, 12)
     const e6Profile = resolveTrainVisualProfile('e6')
     const e6NoseGeometry = createE6NoseGeometry(e6Profile.lead)
     const e6LeadBodyGeometry = new RoundedBoxGeometry(
@@ -775,6 +893,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       e5SideWindowGeometry,
       e5CockpitWindowGeometry,
       e5AccentGeometry,
+      e5UnderfloorGeometry,
+      e5BogieGeometry,
+      e5GangwayGeometry,
+      e5WheelGeometry,
       e6NoseGeometry,
       e6LeadBodyGeometry,
       e6MiddleBodyGeometry,
@@ -882,9 +1004,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainBodyMaterial = new THREE.MeshStandardMaterial({ color: '#f97316', roughness: 0.58 })
     const trainFrontMaterial = new THREE.MeshStandardMaterial({ color: '#ea580c', roughness: 0.55 })
     const trainRoofMaterial = new THREE.MeshStandardMaterial({ color: '#facc15', roughness: 0.7 })
-    const e5BodyMaterial = new THREE.MeshStandardMaterial({ color: '#168c8f', roughness: 0.58 })
-    const e5FrontMaterial = new THREE.MeshStandardMaterial({ color: '#0e6672', roughness: 0.5 })
-    const e5RoofMaterial = new THREE.MeshStandardMaterial({ color: '#f8f4ea', roughness: 0.7 })
+    const e5BodyMaterial = new THREE.MeshStandardMaterial({ color: e5Profile.bodyColor, roughness: 0.58 })
+    const e5FrontMaterial = new THREE.MeshStandardMaterial({ color: e5Profile.frontColor, roughness: 0.5 })
+    const e5RoofMaterial = new THREE.MeshStandardMaterial({ color: e5Profile.roofColor, roughness: 0.7 })
     const trainWindowMaterial = new THREE.MeshStandardMaterial({ color: '#67e8f9', roughness: 0.24, metalness: 0.12 })
     const trainDoorMaterial = new THREE.MeshStandardMaterial({ color: '#fef3c7', roughness: 0.68 })
     const trainWheelMaterial = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.85 })
@@ -990,6 +1112,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         sideWindowGeometry: e5SideWindowGeometry,
         cockpitWindowGeometry: e5CockpitWindowGeometry,
         accentGeometry: e5AccentGeometry,
+        splitNoseColor: true,
+        sideCockpitWindows: true,
+        underfloorGeometry: e5UnderfloorGeometry,
+        bogieGeometry: e5BogieGeometry,
+        gangwayGeometry: e5GangwayGeometry,
+        wheelGeometry: e5WheelGeometry,
       }],
       ['e6', {
         profile: e6Profile,
@@ -1339,7 +1467,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       if (isLead) {
         // ノーズ形状の座標はgeometry内へ焼き込み済み。ここではoffsetを加えず、
         // 先頭車だけへ一つの共有nose meshを追加する。
-        const nose = new THREE.Mesh(definition.noseGeometry, runtime.frontMaterial)
+        const noseMaterial: THREE.Material | THREE.Material[] = definition.splitNoseColor
+          ? [runtime.frontMaterial, runtime.bodyMaterial]
+          : runtime.frontMaterial
+        const nose = new THREE.Mesh(definition.noseGeometry, noseMaterial)
         nose.castShadow = true
         nose.receiveShadow = true
         group.add(nose)
@@ -1354,6 +1485,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       roof.position.set(profile.roofCenterX, profile.roofCenterY, 0)
       roof.castShadow = true
       group.add(roof)
+
+      if (definition.underfloorGeometry !== undefined && definition.bogieGeometry !== undefined) {
+        const underfloor = new THREE.Mesh(definition.underfloorGeometry, trainCouplerMaterial)
+        underfloor.position.set(profile.bodyCenterX, 0.4, 0)
+        group.add(underfloor)
+        for (const x of [-0.63, 0.63]) {
+          const bogie = new THREE.Mesh(definition.bogieGeometry, trainCouplerMaterial)
+          bogie.position.set(profile.bodyCenterX + x, 0.31, 0)
+          group.add(bogie)
+        }
+      }
 
       const accentMaterial = runtime.accentMaterial
       if (accentMaterial !== null && profile.accentLength > 0) {
@@ -1371,7 +1513,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           window.position.set(x, profile.sideWindowY, side * (profile.bodyWidth / 2 + 0.014))
           group.add(window)
         }
-        const doorX = profile.bodyCenterX - 0.4
+        const doorX = runtime.trainType === 'e5'
+          ? profile.bodyCenterX - profile.bodyLength * 0.34
+          : profile.bodyCenterX - 0.4
         const doorFrame = new THREE.Mesh(trainDoorFrameGeometry, trainCouplerMaterial)
         doorFrame.position.set(doorX, 0.72, side * (profile.bodyWidth / 2 + 0.02))
         group.add(doorFrame)
@@ -1381,10 +1525,24 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }
 
       if (profile.hasFrontWindow) {
-        const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
-        // ノーズの先端ではなく、肩の根元寄りに置く運転台窓。
-        cockpitWindow.position.set(profile.frontWindowX, profile.frontWindowY, 0)
-        group.add(cockpitWindow)
+        if (definition.sideCockpitWindows) {
+          // E5の運転台窓は正面板ではなく、ノーズ肩に沿う左右の細長い
+          // サイド窓。共通geometryを反転配置してメッシュ数を抑える。
+          for (const side of [-1, 1]) {
+            const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
+            cockpitWindow.position.set(
+              profile.frontWindowX,
+              profile.frontWindowY,
+              side * (profile.bodyWidth / 2 + 0.014),
+            )
+            group.add(cockpitWindow)
+          }
+        } else {
+          // ノーズの先端ではなく、肩の根元寄りに置く運転台窓。
+          const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
+          cockpitWindow.position.set(profile.frontWindowX, profile.frontWindowY, 0)
+          group.add(cockpitWindow)
+        }
       }
 
       if (profile.hasHeadlights) {
@@ -1403,11 +1561,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }
 
       const wheelPivots: THREE.Object3D[] = []
+      const wheelGeometry = definition.wheelGeometry ?? trainWheelGeometry
+      const wheelHalfWidth = definition.wheelGeometry === undefined ? 0.5 : 0.39
       for (const x of [-0.67, 0.67]) {
         for (const side of [-1, 1]) {
           const pivot = new THREE.Object3D()
-          pivot.position.set(x, 0.34, side * 0.5)
-          const wheel = new THREE.Mesh(trainWheelGeometry, trainWheelMaterial)
+          const wheelX = definition.wheelGeometry === undefined ? x : profile.bodyCenterX + x
+          pivot.position.set(wheelX, 0.34, side * wheelHalfWidth)
+          const wheel = new THREE.Mesh(wheelGeometry, trainWheelMaterial)
           wheel.rotation.x = Math.PI / 2
           pivot.add(wheel)
           group.add(pivot)
@@ -1419,6 +1580,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         const coupler = new THREE.Mesh(trainCouplerGeometry, trainCouplerMaterial)
         coupler.position.set(x, 0.62, 0)
         group.add(coupler)
+        if (definition.gangwayGeometry !== undefined && (!isLead || x < 0)) {
+          const gangway = new THREE.Mesh(definition.gangwayGeometry, trainCouplerMaterial)
+          // Adjacent cars each own half of the bellows. Pull each half toward
+          // its car so the two meshes meet instead of occupying the same plane.
+          gangway.position.set(x - Math.sign(x) * 0.08, 0.63, 0)
+          group.add(gangway)
+        }
       }
       runtime.root.add(group)
       runtime.cars.push(group)
