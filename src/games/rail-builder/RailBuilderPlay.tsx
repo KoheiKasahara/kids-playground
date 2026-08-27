@@ -19,6 +19,7 @@ import {
   type TrainType,
 } from './railFleetModel'
 import TrainTypePicker from './TrainTypePicker'
+import RailPartIcon from './RailPartIcon'
 import styles from './RailBuilderPlay.module.css'
 import {
   MAX_ZOOM,
@@ -103,11 +104,8 @@ function nextPieceId(pieces: readonly RailPiece[]): string {
 
 function RailPreview({ kind }: { kind: RailPieceKind }) {
   return (
-    <span className={`${styles.preview} ${styles[`${kind}Preview` as keyof typeof styles] ?? ''}`} aria-hidden="true">
-      <span className={styles.previewRail} />
-      <span className={styles.previewRail} />
-      <span className={styles.previewSleeper} />
-      <span className={styles.previewSleeper} />
+    <span className={styles.icon} aria-hidden="true">
+      <RailPartIcon kind={kind} />
     </span>
   )
 }
