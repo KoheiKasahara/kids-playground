@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createCloudTexture,
   createSurfaceMaps,
   layoutScatteredCraters,
   polarCapEdgeLatDeg,
@@ -159,6 +160,13 @@ describe('createSurfaceMaps', () => {
   it('jsdom(2Dコンテキストが無い環境)では例外を投げずnullを返す(gas)', () => {
     expect(() => createSurfaceMaps(gasSurface)).not.toThrow()
     expect(createSurfaceMaps(gasSurface)).toEqual({ map: null, bumpMap: null })
+  })
+})
+
+describe('createCloudTexture', () => {
+  it('jsdom(2Dコンテキストが無い環境)でも例外を投げない', () => {
+    expect(() => createCloudTexture([])).not.toThrow()
+    expect(createCloudTexture([])).toBeNull()
   })
 })
 
