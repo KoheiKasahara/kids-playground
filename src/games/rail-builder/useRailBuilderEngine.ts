@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 30332)
+Total output lines: 2933
+
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
@@ -400,31 +403,60 @@ function createNoseGeometry(
   return geometry
 }
 
-/** E5先頭車の14断面・12頂点リングの連続ロフトシェル。 */
+/** E5先頭車の19断面・12頂点リングの連続ロフトシェル。 */
 function createE5LeadShellGeometry(): THREE.BufferGeometry {
   return createNoseGeometry(E5_LEAD_SHELL_SECTIONS, 'e5-wide-wedge', true)
 }
 
-function interpolateE5ShellTop(x: number): number {
+function interpolateE5ShellSection(x: number): Pick<TrainShellSection, 'top' | 'bottom' | 'width'> {
   const first = E5_LEAD_SHELL_SECTIONS[0]!
   const last = E5_LEAD_SHELL_SECTIONS[E5_LEAD_SHELL_SECTIONS.length - 1]!
-  if (x <= first.x) return first.top
-  if (x >= last.x) return last.top
+  if (x <= first.x) return first
+  if (x >= last.x) return last
   for (let index = 1; index < E5_LEAD_SHELL_SECTIONS.length; index += 1) {
     const previous = E5_LEAD_SHELL_SECTIONS[index - 1]!
     const current = E5_LEAD_SHELL_SECTIONS[index]!
     if (x <= current.x) {
       const span = current.x - previous.x
       const amount = span <= 0 ? 0 : (x - previous.x) / span
-      return previous.top + (current.top - previous.top) * amount
+      return {
+        top: previous.top + (current.top - previous.top) * amount,
+        bottom: previous.bottom + (current.bottom - previous.bottom) * amount,
+        width: previous.width + (current.width - previous.width) * amount,
+      }
     }
   }
-  return last.top
+  return last
 }
 
 /**
- * Low-poly windshield ribbon laid over the integrated E5 shell.  Each station
- * follows the shell crown and narrows toward the nose, so the glass reads as
+ * Estimate the top surface of the 12-point E5 ring at a lateral offset. The
+ * windshield uses the same three crown/shoulder breakpoints as the shell so
+ * its outer vertices sit just proud of the curved surface instead of hovering
+ * as a flat plate.
+ */
+function interpolateE5ShellTopAtLateral(section: Pick<TrainShellSection, 'top' | 'bottom' | 'width'>, z: number): number {
+  const halfWidth = Math.max(0.001, section.width / 2)
+  const normalizedOffset = Math.min(1, Math.abs(z) / halfWidth)
+  const verticalRange = Math.max(0.01, section.top - section.bottom)
+  const cornerHeight = Math.min(0.07, verticalRange * 0.28)
+  const topCrown = Math.min(0.018, verticalRange * 0.06)
+  if (normalizedOffset <= 0.32) {
+    const amount = normalizedOffset / 0.32
+    return section.top + topCrown * (1 - amount)
+  }
+  if (normalizedOffset <= 0.68) {
+    const amount = (normalizedOffset - 0.32) / 0.36
+    return section.top - cornerHeight * 0.4 * amount
+  }
+  const amount = (normalizedOffset - 0.68) / 0.32
+  return section.top - cornerHeight * (0.4 + 0.85 * amount)
+}
+
+/**
+ * Low-poly windshield ribbon laid over the integrated E5 shell. Each station
+ * has outer shoulder vertices plus a modest centre crown, following the same
+ * curved ring as the shell. It narrows toward the nose, so the glass reads as
  * part of the sloped roof rather than as a black box attached to the front.
  */
 function createE5FrontWindshieldGeometry(
@@ -433,26 +465,48 @@ function createE5FrontWindshieldGeometry(
   const positions: number[] = []
   const indices: number[] = []
   const shellClearance = 0.016
+  const pointsPerStation = 5
 
   for (const section of sections) {
     const halfWidth = section.width / 2
-    const y = interpolateE5ShellTop(section.x) + shellClearance
+    const shellSection = interpolateE5ShellSection(section.x)
+    const shoulderHalfWidth = halfWidth * 0.98
+    const innerHalfWidth = halfWidth * 0.46
     positions.push(
-      section.x, y, -halfWidth,
-      section.x, y, halfWidth,
+      section.x,
+      interpolateE5ShellTopAtLateral(shellSection, -shoulderHalfWidth) + shellClearance,
+      -shoulderHalfWidth,
+      section.x,
+      interpolateE5ShellTopAtLateral(shellSection, -innerHalfWidth) + shellClearance + 0.004,
+      -innerHalfWidth,
+      section.x,
+      interpolateE5ShellTopAtLateral(shellSection, 0) + shellClearance + 0.012,
+      0,
+      section.x,
+      interpolateE5ShellTopAtLateral(shellSection, innerHalfWidth) + shellClearance + 0.004,
+      innerHalfWidth,
+      section.x,
+      interpolateE5ShellTopAtLateral(shellSection, shoulderHalfWidth) + shellClearance,
+      shoulderHalfWidth,
     )
   }
 
   for (let index = 0; index < sections.length - 1; index += 1) {
-    const current = index * 2
-    const next = current + 2
+    const current = index * pointsPerStation
+    const next = current + pointsPerStation
     // Windshield outward normal faces the nose and sky (+x/+y).  Keep the
     // panel double-sided at the material level as a safeguard for reverse
     // viewpoints on the small toy scene.
-    indices.push(
-      current, current + 1, next,
-      next, current + 1, next + 1,
-    )
+    for (let pointIndex = 0; pointIndex < pointsPerStation - 1; pointIndex += 1) {
+      indices.push(
+        current + pointIndex,
+        current + pointIndex + 1,
+        next + pointIndex,
+        next + pointIndex,
+        current + pointIndex + 1,
+        next + pointIndex + 1,
+      )
+    }
   }
 
   const geometry = new THREE.BufferGeometry()
@@ -1453,48 +1507,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         group.add(door)
       }
 
-      const frontWindow = new THREE.Mesh(trainFrontWindowGeometry, trainWindowMaterial)
-      frontWindow.position.set(1.23, 1.04, 0)
-      group.add(frontWindow)
-
-      for (const side of [-1, 1]) {
-        const headlight = new THREE.Mesh(trainLightGeometry, trainLightMaterial)
-        headlight.position.set(1.24, 0.8, side * 0.27)
-        group.add(headlight)
-      }
-
-      const wheelPivots: THREE.Object3D[] = []
-      for (const x of [-0.67, 0.67]) {
-        for (const side of [-1, 1]) {
-          const pivot = new THREE.Object3D()
-          pivot.position.set(x, 0.34, side * 0.5)
-          const wheel = new THREE.Mesh(trainWheelGeometry, trainWheelMaterial)
-          wheel.rotation.x = Math.PI / 2
-          pivot.add(wheel)
-          group.add(pivot)
-          wheelPivots.push(pivot)
-        }
-      }
-
-      for (const x of [-1.25, 1.25]) {
-        const coupler = new THREE.Mesh(trainCouplerGeometry, trainCouplerMaterial)
-        coupler.position.set(x, 0.62, 0)
-        group.add(coupler)
-      }
-      runtime.root.add(group)
-      runtime.cars.push(group)
-      runtime.wheelPivots.push(wheelPivots)
-      return group
-    }
-
-    function makeSpecialTrainCar(
-      runtime: TrainVisualRuntime,
-      trainId: string,
-      index: number,
-      definition: SpecialTrainVisualDefinition,
-    ): THREE.Group {
-      const isLead = index === 0
-      const profile = getTrainCarVisualProfile(runtime.trainType, isLead ? 'lead' : 'middle')
+      const frontWindow = new THREE.Mesh(trainFrontWindowGeometry, trainWind…332 tokens truncated…Profile(runtime.trainType, isLead ? 'lead' : 'middle')
       const group = new THREE.Group()
       group.name = isLead ? `${trainId}-lead-car` : `${trainId}-car-${index + 1}`
       group.userData.trainId = trainId
