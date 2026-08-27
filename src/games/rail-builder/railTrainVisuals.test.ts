@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { TRAIN_TYPES } from './railFleetModel'
 import {
+  E5_LEAD_SHELL_SECTIONS,
   TRAIN_VISUAL_PROFILES,
   getTrainCarVisualProfile,
+  getE5LeadShellAccentBand,
   resolveTrainVisualProfile,
 } from './railTrainVisuals'
 
@@ -60,6 +62,33 @@ describe('railTrainVisuals', () => {
     expect(e5.roofColor).toMatch(/^#(?:2|3)/i)
     expect(e5.accent.height).toBeLessThan(0.1)
     expect(lead.couplerPositions).toEqual([-1.25, 1.25])
+  })
+
+  it('defines one continuous E5 lead shell from the cabin rear to the long nose tip', () => {
+    expect(E5_LEAD_SHELL_SECTIONS).toHaveLength(12)
+    expect(E5_LEAD_SHELL_SECTIONS[0]).toEqual({ x: -1.04, top: 1.22, bottom: 0.49, width: 0.88 })
+    expect(E5_LEAD_SHELL_SECTIONS.at(-1)).toEqual({ x: 1.34, top: 0.82, bottom: 0.64, width: 0.42 })
+
+    for (let index = 1; index < E5_LEAD_SHELL_SECTIONS.length; index += 1) {
+      const previous = E5_LEAD_SHELL_SECTIONS[index - 1]!
+      const current = E5_LEAD_SHELL_SECTIONS[index]!
+      expect(current.x).toBeGreaterThan(previous.x)
+      expect(current.bottom).toBeGreaterThanOrEqual(previous.bottom)
+      expect(current.top).toBeLessThanOrEqual(previous.top)
+      expect(current.width).toBeLessThanOrEqual(previous.width)
+      expect(current.width / 2).toBeLessThanOrEqual(0.5)
+      expect(current.top).toBeLessThanOrEqual(1.39)
+    }
+
+    const e5 = resolveTrainVisualProfile('e5')
+    let previousBandHeight = Number.POSITIVE_INFINITY
+    for (const section of E5_LEAD_SHELL_SECTIONS) {
+      const band = getE5LeadShellAccentBand(section, e5.accent.height, e5.accent.y)
+      expect(band.lowerY).toBeGreaterThanOrEqual(band.sideLower - 1e-7)
+      expect(band.upperY).toBeLessThanOrEqual(band.sideUpper + 1e-7)
+      expect(band.height).toBeLessThanOrEqual(previousBandHeight + 1e-7)
+      previousBandHeight = band.height
+    }
   })
 
   it('gives each new train a dedicated silhouette, nose, and color treatment', () => {

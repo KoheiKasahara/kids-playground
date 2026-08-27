@@ -49,9 +49,12 @@ import {
   shouldReduceRailBuilderMotion,
 } from './railBuilderVisuals'
 import {
+  E5_LEAD_SHELL_SECTIONS,
   getTrainCarVisualProfile,
+  getE5LeadShellAccentBand,
   resolveTrainVisualProfile,
   type TrainCarVisualProfile,
+  type TrainShellSection,
   type TrainVisualProfile,
 } from './railTrainVisuals'
 import {
@@ -149,7 +152,7 @@ type TrainVisualRuntime = {
 
 type SpecialTrainVisualDefinition = {
   profile: TrainVisualProfile
-  noseGeometry: THREE.BufferGeometry
+  noseGeometry?: THREE.BufferGeometry
   leadBodyGeometry: THREE.BufferGeometry
   middleBodyGeometry: THREE.BufferGeometry
   leadRoofGeometry: THREE.BufferGeometry
@@ -157,8 +160,12 @@ type SpecialTrainVisualDefinition = {
   sideWindowGeometry: THREE.BufferGeometry
   cockpitWindowGeometry: THREE.BufferGeometry
   accentGeometry: THREE.BufferGeometry
+  /** Optional accent ribbon following an integrated lead shell's side width. */
+  leadAccentGeometry?: THREE.BufferGeometry
   /** Optional E5-only low-cost details; future train types can opt in as needed. */
   splitNoseColor?: boolean
+  /** Lead body geometry already includes the nose and must be rendered as one shell. */
+  integratedLeadShell?: boolean
   sideCockpitWindows?: boolean
   underfloorGeometry?: THREE.BufferGeometry
   bogieGeometry?: THREE.BufferGeometry
@@ -240,12 +247,7 @@ function disposeObjectTree(root: THREE.Object3D, sharedGeometries: Set<THREE.Buf
   })
 }
 
-type NoseSection = {
-  x: number
-  top: number
-  bottom: number
-  width: number
-}
+type NoseSection = TrainShellSection
 
 type NoseStyle = TrainCarVisualProfile['noseStyle']
 
@@ -396,52 +398,69 @@ function createNoseGeometry(
   return geometry
 }
 
-/** E5先頭車の7断面・12頂点リングの流線形ノーズ。 */
-function createE5NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
-  return createNoseGeometry([
-    {
-      x: profile.noseBaseX,
-      top: profile.noseBaseTopY,
-      bottom: profile.noseBaseBottomY,
-      width: profile.noseBaseWidth,
-    },
-    {
-      x: profile.noseBaseX + profile.noseLength * 0.16,
-      top: profile.noseBaseTopY + 0.01,
-      bottom: profile.noseBaseBottomY,
-      width: profile.noseBaseWidth,
-    },
-    {
-      x: profile.noseBaseX + profile.noseLength * 0.34,
-      top: profile.noseBaseTopY - 0.005,
-      bottom: profile.noseBaseBottomY + 0.01,
-      width: profile.noseBaseWidth * 0.98,
-    },
-    {
-      x: profile.noseBaseX + profile.noseLength * 0.53,
-      top: profile.noseBaseTopY - 0.035,
-      bottom: profile.noseBaseBottomY + 0.025,
-      width: profile.noseBaseWidth * 0.91,
-    },
-    {
-      x: profile.noseBaseX + profile.noseLength * 0.7,
-      top: profile.noseBaseTopY - 0.08,
-      bottom: profile.noseBaseBottomY + 0.06,
-      width: profile.noseBaseWidth * 0.8,
-    },
-    {
-      x: profile.noseBaseX + profile.noseLength * 0.86,
-      top: profile.noseBaseTopY - 0.13,
-      bottom: profile.noseBaseBottomY + 0.11,
-      width: profile.noseBaseWidth * 0.64,
-    },
-    {
-      x: profile.noseTipX,
-      top: profile.noseTipTopY,
-      bottom: profile.noseTipBottomY,
-      width: profile.noseTipWidth,
-    },
-  ], 'e5-wide-wedge', true)
+/** E5先頭車の12断面・12頂点リングの連続ロフトシェル。 */
+function createE5LeadShellGeometry(): THREE.BufferGeometry {
+  return createNoseGeometry(E5_LEAD_SHELL_SECTIONS, 'e5-wide-wedge', true)
+}
+
+/** E5先頭シェルの断面幅と上下端に沿う、両側面の薄いピンク帯。 */
+function createE5LeadAccentGeometry(height: number, centerY: number): THREE.BufferGeometry {
+  const positions: number[] = []
+  const indices: number[] = []
+  const sectionSize = 4
+  const shellInset = 0.002
+  const stripDepth = 0.03
+
+  for (const side of [-1, 1]) {
+    for (const section of E5_LEAD_SHELL_SECTIONS) {
+      const band = getE5LeadShellAccentBand(section, height, centerY)
+      const innerZ = side * (section.width / 2 + shellInset)
+      const outerZ = side * (section.width / 2 + shellInset + stripDepth)
+      positions.push(
+        section.x, band.lowerY, innerZ,
+        section.x, band.upperY, innerZ,
+        section.x, band.upperY, outerZ,
+        section.x, band.lowerY, outerZ,
+      )
+    }
+
+    const sideOffset = side === -1 ? 0 : E5_LEAD_SHELL_SECTIONS.length * sectionSize
+    for (let sectionIndex = 0; sectionIndex < E5_LEAD_SHELL_SECTIONS.length - 1; sectionIndex += 1) {
+      const current = sideOffset + sectionIndex * sectionSize
+      const next = current + sectionSize
+      // Keep the visible outer face wound away from the shell so the default
+      // FrontSide material renders both side strips from outside.
+      const outerFace = side === 1
+        ? [current + 3, next + 3, next + 2, current + 3, next + 2, current + 2]
+        : [current + 2, next + 2, next + 3, current + 2, next + 3, current + 3]
+      const innerFace = side === 1
+        ? [current, next + 1, next, current, current + 1, next + 1]
+        : [current, next, next + 1, current, next + 1, current + 1]
+      indices.push(...outerFace, ...innerFace)
+      indices.push(
+        current,
+        current + 3,
+        next + 3,
+        current,
+        next + 3,
+        next,
+        current + 1,
+        next + 1,
+        next + 2,
+        current + 1,
+        next + 2,
+        current + 2,
+      )
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
 }
 
 /** Shared low-poly rounded loft used by the E5 body and future train variants. */
@@ -691,8 +710,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainCouplerGeometry = new THREE.BoxGeometry(0.34, 0.16, 0.16)
     const trainLightGeometry = new THREE.SphereGeometry(0.09, 8, 6)
     const e5Profile = resolveTrainVisualProfile('e5')
-    const e5NoseGeometry = createE5NoseGeometry(e5Profile.lead)
-    const e5LeadBodyGeometry = createE5BodyGeometry(e5Profile.lead)
+    const e5LeadBodyGeometry = createE5LeadShellGeometry()
     const e5MiddleBodyGeometry = createE5BodyGeometry(e5Profile.middle)
     const e5LeadRoofGeometry = new RoundedBoxGeometry(
       e5Profile.lead.roofLength,
@@ -720,6 +738,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       -0.1,
     )
     const e5AccentGeometry = new THREE.BoxGeometry(1, e5Profile.accent.height, 0.04)
+    const e5LeadAccentGeometry = createE5LeadAccentGeometry(e5Profile.accent.height, e5Profile.accent.y)
     // E5-only details remain shared for the effect lifetime.  They are shallow
     // rounded blocks so the underframe reads clearly without a mesh per bolt.
     const e5UnderfloorGeometry = new RoundedBoxGeometry(1.42, 0.14, 0.7, 1, 0.04)
@@ -885,7 +904,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       trainWheelGeometry,
       trainCouplerGeometry,
       trainLightGeometry,
-      e5NoseGeometry,
       e5LeadBodyGeometry,
       e5MiddleBodyGeometry,
       e5LeadRoofGeometry,
@@ -893,6 +911,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       e5SideWindowGeometry,
       e5CockpitWindowGeometry,
       e5AccentGeometry,
+      e5LeadAccentGeometry,
       e5UnderfloorGeometry,
       e5BogieGeometry,
       e5GangwayGeometry,
@@ -1104,7 +1123,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const specialTrainVisualDefinitions: ReadonlyMap<Exclude<TrainType, 'basic'>, SpecialTrainVisualDefinition> = new Map([
       ['e5', {
         profile: e5Profile,
-        noseGeometry: e5NoseGeometry,
         leadBodyGeometry: e5LeadBodyGeometry,
         middleBodyGeometry: e5MiddleBodyGeometry,
         leadRoofGeometry: e5LeadRoofGeometry,
@@ -1112,7 +1130,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         sideWindowGeometry: e5SideWindowGeometry,
         cockpitWindowGeometry: e5CockpitWindowGeometry,
         accentGeometry: e5AccentGeometry,
-        splitNoseColor: true,
+        leadAccentGeometry: e5LeadAccentGeometry,
+        integratedLeadShell: true,
         sideCockpitWindows: true,
         underfloorGeometry: e5UnderfloorGeometry,
         bogieGeometry: e5BogieGeometry,
@@ -1458,13 +1477,18 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
       const bodyGeometry = isLead ? definition.leadBodyGeometry : definition.middleBodyGeometry
       const roofGeometry = isLead ? definition.leadRoofGeometry : definition.middleRoofGeometry
-      const body = new THREE.Mesh(bodyGeometry, runtime.bodyMaterial)
-      body.position.set(profile.bodyCenterX, profile.bodyCenterY, 0)
+      const bodyMaterial: THREE.Material | THREE.Material[] = isLead && definition.integratedLeadShell
+        ? [runtime.frontMaterial, runtime.bodyMaterial]
+        : runtime.bodyMaterial
+      const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
+      if (!isLead || !definition.integratedLeadShell) {
+        body.position.set(profile.bodyCenterX, profile.bodyCenterY, 0)
+      }
       body.castShadow = true
       body.receiveShadow = true
       group.add(body)
 
-      if (isLead) {
+      if (isLead && !definition.integratedLeadShell && definition.noseGeometry !== undefined) {
         // ノーズ形状の座標はgeometry内へ焼き込み済み。ここではoffsetを加えず、
         // 先頭車だけへ一つの共有nose meshを追加する。
         const noseMaterial: THREE.Material | THREE.Material[] = definition.splitNoseColor
@@ -1481,10 +1505,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       skirt.scale.x = profile.bodyLength / 1.7
       group.add(skirt)
 
-      const roof = new THREE.Mesh(roofGeometry, runtime.roofMaterial)
-      roof.position.set(profile.roofCenterX, profile.roofCenterY, 0)
-      roof.castShadow = true
-      group.add(roof)
+      if (!isLead || !definition.integratedLeadShell) {
+        const roof = new THREE.Mesh(roofGeometry, runtime.roofMaterial)
+        roof.position.set(profile.roofCenterX, profile.roofCenterY, 0)
+        roof.castShadow = true
+        group.add(roof)
+      }
 
       if (definition.underfloorGeometry !== undefined && definition.bogieGeometry !== undefined) {
         const underfloor = new THREE.Mesh(definition.underfloorGeometry, trainCouplerMaterial)
@@ -1499,18 +1525,26 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
       const accentMaterial = runtime.accentMaterial
       if (accentMaterial !== null && profile.accentLength > 0) {
-        for (const side of [-1, 1]) {
-          const accent = new THREE.Mesh(definition.accentGeometry, accentMaterial)
-          accent.position.set(profile.bodyCenterX, profile.accentY, side * (profile.bodyWidth / 2 + 0.012))
-          accent.scale.x = profile.accentLength
+        if (isLead && definition.integratedLeadShell && definition.leadAccentGeometry !== undefined) {
+          // The integrated E5 shell narrows toward the tip, so the belt follows
+          // each shell section instead of floating at the cabin width.
+          const accent = new THREE.Mesh(definition.leadAccentGeometry, accentMaterial)
           group.add(accent)
+        } else {
+          for (const side of [-1, 1]) {
+            const accent = new THREE.Mesh(definition.accentGeometry, accentMaterial)
+            accent.position.set(profile.bodyCenterX, profile.accentY, side * (profile.bodyWidth / 2 + 0.012))
+            accent.scale.x = profile.accentLength
+            group.add(accent)
+          }
         }
       }
 
       for (const side of [-1, 1]) {
         for (const x of profile.sideWindowXs) {
           const window = new THREE.Mesh(definition.sideWindowGeometry, runtime.windowMaterial)
-          window.position.set(x, profile.sideWindowY, side * (profile.bodyWidth / 2 + 0.014))
+          const sideOffset = isLead && definition.integratedLeadShell ? 0.008 : 0.014
+          window.position.set(x, profile.sideWindowY, side * (profile.bodyWidth / 2 + sideOffset))
           group.add(window)
         }
         const doorX = runtime.trainType === 'e5'
@@ -1530,10 +1564,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           // サイド窓。共通geometryを反転配置してメッシュ数を抑える。
           for (const side of [-1, 1]) {
             const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
+            // Follow the E5 shell's shallow side taper; mirror the lean on
+            // the opposite side so both cockpit windows stay on the shell.
+            cockpitWindow.rotation.y = side * 0.1
             cockpitWindow.position.set(
               profile.frontWindowX,
               profile.frontWindowY,
-              side * (profile.bodyWidth / 2 + 0.014),
+              side * (profile.bodyWidth / 2 + (definition.integratedLeadShell ? 0.008 : 0.014)),
             )
             group.add(cockpitWindow)
           }
