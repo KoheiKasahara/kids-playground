@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   createCloudTexture,
   createSurfaceMaps,
+  drawNaturalEarthLandmasses,
   layoutScatteredCraters,
   polarCapEdgeLatDeg,
   sampleLatitudeColor,
   withAlpha,
 } from './planetSurface'
-import type { GasSurfaceSpec, LatitudeStop, RockySurfaceSpec, ScatteredCraters } from '../types'
+import type { GasSurfaceSpec, LandmassSpec, LatitudeStop, RockySurfaceSpec, ScatteredCraters } from '../types'
 
 describe('withAlpha', () => {
   it('16進カラーとアルファから rgba() 文字列を作る', () => {
@@ -203,5 +204,33 @@ describe('polarCapEdgeLatDeg', () => {
 
   it('raggednessDeg が0なら縁は完全な緯線になる', () => {
     expect(polarCapEdgeLatDeg(edgeLatDeg, 0, phases, 37)).toBeCloseTo(edgeLatDeg, 10)
+  })
+})
+
+describe('drawNaturalEarthLandmasses', () => {
+  // jsdomのCanvasは2Dコンテキストを返さないため(createSurfaceMapsテスト参照)、
+  // world-atlasのGeoJSON変換だけを対象に、パス生成メソッドを持つ最小限のスタブで検証する。
+  function createStubContext(): CanvasRenderingContext2D {
+    return {
+      beginPath: () => {},
+      moveTo: () => {},
+      lineTo: () => {},
+      closePath: () => {},
+      save: () => {},
+      restore: () => {},
+      fill: () => {},
+      stroke: () => {},
+    } as unknown as CanvasRenderingContext2D
+  }
+
+  const spec: LandmassSpec = {
+    source: 'natural-earth-110m',
+    color: '#6f9655',
+    coastColor: '#315a43',
+    opacity: 0.98,
+  }
+
+  it('world-atlasのland-110mが持つ座標を例外なく描画できる', () => {
+    expect(() => drawNaturalEarthLandmasses(createStubContext(), spec)).not.toThrow()
   })
 })
