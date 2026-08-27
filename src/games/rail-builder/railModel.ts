@@ -914,6 +914,56 @@ export function connectRailPieces(
 
 export const connectPieces = connectRailPieces
 
+export type ConnectRemainingEndpointsResult = {
+  pieces: RailPiece[]
+  connected: SnapCandidate[]
+}
+
+/**
+ * すでにどこかへ接続されたpieceについて、残りの空き端点だけを対象に
+ * 通常のsnapしきい値で追加接続を試す。
+ *
+ * findRailSnapCandidateは全端点の組み合わせから最も近い1組しか選ばない
+ * ため、2つの既存パーツの間に挟むようにpieceを配置した場合、片方の
+ * 端点しかつながらないことがある。この関数はmovingPiece自身の位置・
+ * 向きを一切動かさず（すでに確定した接続の見た目を崩さないため）、
+ * 残りの空き端点だけを個別に判定し、見つかった分だけその場で
+ * つなぐ。
+ */
+export function connectRailPieceRemainingEndpoints(
+  pieces: readonly RailPiece[],
+  movingPieceId: string,
+  options?: SnapOptions,
+): ConnectRemainingEndpointsResult {
+  let current: RailPiece[] = pieces.map(clonePiece)
+  const connected: SnapCandidate[] = []
+  let movingPiece = current.find((piece) => piece.id === movingPieceId)
+  if (movingPiece === undefined) return { pieces: current, connected }
+
+  const remainingConnectorIds = getRailConnectorIds(movingPiece).filter(
+    (connectorId) => movingPiece?.connections[connectorId] === undefined,
+  )
+  for (const looseConnectorId of remainingConnectorIds) {
+    const targets = current.filter((piece) => piece.id !== movingPieceId)
+    const candidate = findRailSnapCandidate(movingPiece, targets, looseConnectorId, options)
+    if (candidate === null) continue
+    current = connectRailPieces(
+      current,
+      movingPieceId,
+      looseConnectorId,
+      candidate.targetPieceId,
+      candidate.targetConnectorId,
+      { position: movingPiece.position, rotationY: movingPiece.rotationY },
+    )
+    connected.push(candidate)
+    movingPiece = current.find((piece) => piece.id === movingPieceId)
+    if (movingPiece === undefined) return { pieces: current, connected }
+  }
+  return { pieces: current, connected }
+}
+
+export const connectRemainingEndpoints = connectRailPieceRemainingEndpoints
+
 /** 候補を計算して接続。候補がなければ切断済みのレイアウトを返す。 */
 export function snapAndConnectRailPiece(
   pieces: readonly RailPiece[],
