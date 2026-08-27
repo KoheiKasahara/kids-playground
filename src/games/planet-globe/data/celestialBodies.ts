@@ -189,7 +189,6 @@ export const celestialBodies: readonly CelestialBody[] = [
     lighting: { keyIntensity: 2.4, ambientIntensity: 0.18, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
     visual: {
-      atmosphere: { color: '#bfe5ff', opacity: 0.2, scale: 1.045 },
       clouds: {
         opacity: 0.58,
         // 雲のスポットと常に一致するよう、地表と同じ自転速度で回す。
@@ -226,19 +225,13 @@ export const celestialBodies: readonly CelestialBody[] = [
         darkColor: '#154a7d',
       },
       patches: [
-        // 大陸(既存「ちきゅうぎ」の国境ポリゴンは使わず、大陸単位の塗り分けだけで表す)。
-        { id: 'continent-asia', lonDeg: 100, latDeg: 45, lonRadiusDeg: 38, latRadiusDeg: 28, color: '#6b8f4e', opacity: 0.92, softness: 0.35 },
-        { id: 'continent-africa', lonDeg: 20, latDeg: 5, lonRadiusDeg: 20, latRadiusDeg: 30, color: '#a98c53', opacity: 0.9, softness: 0.3 },
-        { id: 'continent-europe', lonDeg: 15, latDeg: 50, lonRadiusDeg: 14, latRadiusDeg: 12, color: '#7c9a5c', opacity: 0.88, softness: 0.35 },
-        { id: 'continent-north-america', lonDeg: -100, latDeg: 45, lonRadiusDeg: 26, latRadiusDeg: 26, color: '#6f8f52', opacity: 0.9, softness: 0.35 },
-        { id: 'continent-south-america', lonDeg: -60, latDeg: -15, lonRadiusDeg: 14, latRadiusDeg: 26, color: '#5f8a4a', opacity: 0.9, softness: 0.3 },
-        { id: 'continent-oceania', lonDeg: 135, latDeg: -25, lonRadiusDeg: 14, latRadiusDeg: 10, color: '#b08a4f', opacity: 0.9, softness: 0.3 },
-        // 南極大陸は白い陸地として、極冠より少し手前の緯度から明るい色で示す。
-        { id: 'continent-antarctica', lonDeg: 0, latDeg: -82, lonRadiusDeg: 170, latRadiusDeg: 9, color: '#eef3f6', opacity: 0.9, softness: 0.3 },
       ],
       craters: [],
       scatteredCraters: { count: 0, minRadiusDeg: 0.4, maxRadiusDeg: 0.4, latLimitDeg: 0, depth: 0, seed: 1 },
-      // 国境線は持たず、北極・南極を示す白い極冠だけを置く。
+      // Natural Earth 110mの海岸線をCanvasテクスチャへ一度だけ焼き込み、国境線は描かない。
+      // https://github.com/topojson/world-atlas (ISC) / Natural Earth (public domain)
+      landmasses: { source: 'natural-earth-110m', color: '#6f9655', coastColor: '#315a43', opacity: 0.98, relief: 0.28 },
+      // 北極・南極を示す白い極冠だけを置く。
       polarCaps: { northEdgeLatDeg: 80, southEdgeLatDeg: -78, color: '#f5f8fa', raggednessDeg: 5, seed: 302 },
     },
   },

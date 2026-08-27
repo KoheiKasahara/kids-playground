@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { RingSpec, SurfacePatch, SurfaceSpec } from '../types'
-import { withAlpha } from './planetSurface'
+import { drawNaturalEarthLandmasses, withAlpha } from './planetSurface'
 
 /**
  * 太陽系全体表示(Phase 6)専用の軽量な見た目生成。
@@ -70,9 +70,14 @@ export function createOverviewSurfaceTexture(surface: SurfaceSpec): THREE.Canvas
     paintLatitudeGradient(ctx, surface.belts, OVERVIEW_TEXTURE_WIDTH, OVERVIEW_TEXTURE_HEIGHT)
   } else {
     paintLatitudeGradient(ctx, surface.latitudeStops, OVERVIEW_TEXTURE_WIDTH, OVERVIEW_TEXTURE_HEIGHT)
-    // パッチが多い天体(火星など)でも小さなCanvasなので負荷は軽い。目立つ地形だけ乗せれば十分なため、
-    // 数が多い場合は前から6件に絞る(データ側の並びは主要な地形ほど先に書かれている)。
-    for (const patch of surface.patches.slice(0, 6)) paintPatch(ctx, patch, OVERVIEW_TEXTURE_WIDTH, OVERVIEW_TEXTURE_HEIGHT)
+    if (surface.landmasses !== undefined) {
+      // 個別観察と同じ海岸線を小さなテクスチャにも使い、全体表示で地球だけ青い球へ戻らないようにする。
+      drawNaturalEarthLandmasses(ctx, surface.landmasses, OVERVIEW_TEXTURE_WIDTH, OVERVIEW_TEXTURE_HEIGHT)
+    } else {
+      // パッチが多い天体(火星など)でも小さなCanvasなので負荷は軽い。目立つ地形だけ乗せれば十分なため、
+      // 数が多い場合は前から6件に絞る(データ側の並びは主要な地形ほど先に書かれている)。
+      for (const patch of surface.patches.slice(0, 6)) paintPatch(ctx, patch, OVERVIEW_TEXTURE_WIDTH, OVERVIEW_TEXTURE_HEIGHT)
+    }
   }
 
   const texture = new THREE.CanvasTexture(canvas)
