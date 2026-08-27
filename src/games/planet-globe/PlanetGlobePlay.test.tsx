@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UsePlanetEngineOptions } from './types'
+import type { UsePlanetEngineOptions, UseSolarSystemOverviewEngineOptions } from './types'
 import App from '../../app/App'
 import { resetSpeechEnabledCache } from '../../speech'
 import { installSpeechSynthesisMock, uninstallSpeechSynthesisMock } from '../../test/speechSynthesisMock'
@@ -15,6 +15,17 @@ const planetEngineMock = vi.hoisted(() => ({
 vi.mock('./three/usePlanetEngine', () => ({
   usePlanetEngine: (options: UsePlanetEngineOptions) => {
     planetEngineMock.options = options
+    return { registerContainer: () => undefined }
+  },
+}))
+
+const overviewEngineMock = vi.hoisted(() => ({
+  options: undefined as UseSolarSystemOverviewEngineOptions | undefined,
+}))
+
+vi.mock('./three/useSolarSystemOverviewEngine', () => ({
+  useSolarSystemOverviewEngine: (options: UseSolarSystemOverviewEngineOptions) => {
+    overviewEngineMock.options = options
     return { registerContainer: () => undefined }
   },
 }))
@@ -46,6 +57,7 @@ beforeEach(() => {
 
 afterEach(() => {
   planetEngineMock.options = undefined
+  overviewEngineMock.options = undefined
 })
 
 describe('PlanetGlobePlay', () => {
@@ -253,6 +265,99 @@ describe('PlanetGlobePlay', () => {
     await user.click(screen.getByRole('button', { name: 'めいおうせい' }))
     expect(planetEngineMock.options?.body.id).toBe('pluto')
     expect(planetEngineMock.options?.body.kind).toBe('dwarf-planet')
+  })
+})
+
+describe('PlanetGlobePlay の全体表示モード(Phase 6)', () => {
+  it('既定では個別観察モードで開き、モード切替ボタンが表示される', async () => {
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    expect(screen.getByRole('button', { name: /ひとつずつ/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /ぜんぶみる/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'つき' })).toBeInTheDocument()
+    expect(overviewEngineMock.options).toBeUndefined()
+  })
+
+  it('「ぜんぶみる」へ切り替えると全体表示エンジンへ太陽・8惑星・冥王星が渡り、個別観察のUIは消える', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶみる/ }))
+
+    expect(screen.getByRole('button', { name: /ぜんぶみる/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: 'つき' })).not.toBeInTheDocument()
+    expect(overviewEngineMock.options?.bodies.map((body) => body.id)).toEqual([
+      'sun',
+      'mercury',
+      'venus',
+      'earth',
+      'mars',
+      'jupiter',
+      'saturn',
+      'uranus',
+      'neptune',
+      'pluto',
+    ])
+    expect(overviewEngineMock.options?.moon?.id).toBe('moon')
+    expect(overviewEngineMock.options?.playing).toBe(true)
+  })
+
+  it('全体表示で天体がタップされると、その天体の個別観察へ切り替わる(ズーム・説明カードもリセットされる)', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶみる/ }))
+    act(() => {
+      overviewEngineMock.options?.onSelectBody('mars')
+    })
+
+    expect(screen.getByRole('button', { name: /ひとつずつ/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(planetEngineMock.options?.body.id).toBe('mars')
+    expect(planetEngineMock.options?.zoomLevel).toBe(0)
+    expect(screen.getByRole('button', { name: 'かせい' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('全体表示で地球がタップされても「ちきゅうぎ」へは遷移せず、たいようけい内の地球個別観察になる', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶみる/ }))
+    act(() => {
+      overviewEngineMock.options?.onSelectBody('earth')
+    })
+
+    expect(await screen.findByRole('heading', { name: /たいようけい/ })).toBeInTheDocument()
+    expect(planetEngineMock.options?.body.id).toBe('earth')
+  })
+
+  it('「うごかす/とめる」で全体表示エンジンへ渡すplayingが切り替わる', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶみる/ }))
+    expect(overviewEngineMock.options?.playing).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: /とめる/ }))
+    expect(overviewEngineMock.options?.playing).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: /うごかす/ }))
+    expect(overviewEngineMock.options?.playing).toBe(true)
+  })
+
+  it('全体表示モードでも「もどる」でホームへ戻れる', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶみる/ }))
+    await user.click(screen.getByRole('button', { name: 'もどる' }))
+
+    expect(await screen.findByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
   })
 })
 

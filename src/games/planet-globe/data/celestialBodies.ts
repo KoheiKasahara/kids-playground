@@ -83,6 +83,9 @@ export const celestialBodies: readonly CelestialBody[] = [
   {
     id: 'mercury',
     kind: 'planet',
+    // Phase 6: 太陽系全体表示での軌道。半径は太陽からの並び順が伝わる圧縮値、
+    // 角速度は「47.1 / radius」(内側ほど速く回る、の簡易近似)で揃える。
+    orbit: { radius: 90, angularSpeed: 0.5233 },
     displayName: 'すいせい',
     previewBackground:
       'radial-gradient(circle at 34% 30%, #cbb79a 0%, #a08a72 45%, #7a6754 78%, #5a4a3a 100%)',
@@ -127,6 +130,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   {
     id: 'venus',
     kind: 'planet',
+    orbit: { radius: 130, angularSpeed: 0.3623 },
     displayName: 'きんせい',
     previewBackground:
       'radial-gradient(circle at 34% 30%, #fdf3d2 0%, #f2dfae 45%, #e7cf92 78%, #c9a869 100%)',
@@ -172,6 +176,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   {
     id: 'earth',
     kind: 'planet',
+    orbit: { radius: 170, angularSpeed: 0.2771 },
     displayName: 'ちきゅう',
     previewBackground:
       'radial-gradient(circle at 34% 30%, #eef3f6 0%, #4f83ad 30%, #1f5f9e 55%, #6b8f4e 78%, #154a7d 100%)',
@@ -316,6 +321,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   {
     id: 'mars',
     kind: 'planet',
+    orbit: { radius: 210, angularSpeed: 0.2243 },
     displayName: 'かせい',
     previewBackground:
       'radial-gradient(circle at 34% 30%, #e6a06c 0%, #c1622f 45%, #93401f 78%, #f2efe6 100%)',
@@ -383,6 +389,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   {
     id: 'jupiter',
     kind: 'planet',
+    orbit: { radius: 255, angularSpeed: 0.1847 },
     displayName: 'もくせい',
     previewBackground:
       'linear-gradient(#efe4c6 0%, #8f6242 16%, #f0e4cc 32%, #8a5c3e 48%, #f2e7cf 62%, #9e7c5c 78%, #dfcdae 100%)',
@@ -495,6 +502,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   {
     id: 'saturn',
     kind: 'planet',
+    orbit: { radius: 300, angularSpeed: 0.157 },
     displayName: 'どせい',
     previewBackground:
       'linear-gradient(#eddcb0 0%, #d3c095 22%, #f0e2b8 42%, #cabb90 60%, #e6d5a8 78%, #9aa3ad 100%)',
@@ -592,6 +600,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   {
     id: 'uranus',
     kind: 'planet',
+    orbit: { radius: 345, angularSpeed: 0.1365 },
     displayName: 'てんのうせい',
     previewBackground:
       'radial-gradient(circle at 34% 30%, #d3f3ec 0%, #c3ece4 45%, #a9d9d2 78%, #7fc0b7 100%)',
@@ -651,6 +660,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   {
     id: 'neptune',
     kind: 'planet',
+    orbit: { radius: 390, angularSpeed: 0.1208 },
     displayName: 'かいおうせい',
     previewBackground:
       'radial-gradient(circle at 34% 30%, #6f95e8 0%, #3a6fe0 40%, #2c56b8 70%, #16265c 100%)',
@@ -708,6 +718,8 @@ export const celestialBodies: readonly CelestialBody[] = [
   {
     id: 'pluto',
     kind: 'dwarf-planet',
+    // 海王星(390)よりずっと大きい間隔をあけ、8惑星の等間隔な並びに紛れないようにする。
+    orbit: { radius: 480, angularSpeed: 0.0981 },
     displayName: 'めいおうせい',
     previewBackground:
       'radial-gradient(circle at 34% 30%, #f5ead4 0%, #cdbba0 40%, #a89577 70%, #5f4f3c 100%)',
@@ -770,3 +782,12 @@ export function celestialBodyById(id: CelestialBodyId): CelestialBody {
 }
 
 export const DEFAULT_CELESTIAL_BODY_ID: CelestialBodyId = 'moon'
+
+/**
+ * Phase 6の太陽系全体表示で描く天体(太陽・8惑星・冥王星)。`celestialBodies`と同じ
+ * 太陽から外側への順序を保ったまま、`orbit`を持たない月だけを取り除く
+ * (月は地球の衛星として全体表示側で別扱いにするため、ここには含めない)。
+ */
+export const solarSystemOverviewBodies: readonly CelestialBody[] = celestialBodies.filter(
+  (body) => body.id !== 'moon',
+)

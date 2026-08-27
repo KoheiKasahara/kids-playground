@@ -237,7 +237,24 @@ export type CelestialBody = {
   ring?: RingSpec
   /** 既存の表面・輪に軽量な補助レイヤーを足すための任意設定。 */
   visual?: BodyVisualSpec
+  /**
+   * 太陽系全体表示(Phase 6)での軌道配置。太陽・月は持たない(太陽は中心に固定、
+   * 月は地球の衛星として別枠で描くため)。実際の距離比・周期比ではなく、
+   * スマホ縦画面で並び順と公転の関係が見やすいよう圧縮した値。
+   */
+  orbit?: OrbitSpec
 }
+
+/** 太陽系全体表示(Phase 6)での1天体ぶんの軌道。 */
+export type OrbitSpec = {
+  /** 太陽(原点)からの軌道半径(world unit)。実距離比ではなく見やすさで決める。 */
+  radius: number
+  /** 公転の角速度(ラジアン/秒)。内側の惑星ほど大きい値にする。 */
+  angularSpeed: number
+}
+
+/** 「たいようけい」内の2つの遊び方。個別観察と太陽系全体表示を切り替える。 */
+export type SolarSystemMode = 'single' | 'overview'
 
 /**
  * 特徴スポットのタップ対象。球面上の点(surface)か、輪(ring)のどちらか。
@@ -296,6 +313,22 @@ export type UsePlanetEngineOptions = {
 }
 
 export type UsePlanetEngineHandle = {
+  /** 3D描画先のdivを登録するrefコールバック(nullで解除)。 */
+  registerContainer: (element: HTMLDivElement | null) => void
+}
+
+export type UseSolarSystemOverviewEngineOptions = {
+  /** 太陽・8惑星・冥王星(太陽から外側への順)。月は含めない。 */
+  bodies: readonly CelestialBody[]
+  /** 地球の付近に小さく描く衛星。省略時は月を描かない。 */
+  moon?: CelestialBody
+  /** 公転を進めるか。falseなら現在の配置のまま静止する。 */
+  playing: boolean
+  /** 天体がタップされたときに呼ぶ。個別観察へ切り替える入口として使う。 */
+  onSelectBody: (id: CelestialBodyId) => void
+}
+
+export type UseSolarSystemOverviewEngineHandle = {
   /** 3D描画先のdivを登録するrefコールバック(nullで解除)。 */
   registerContainer: (element: HTMLDivElement | null) => void
 }

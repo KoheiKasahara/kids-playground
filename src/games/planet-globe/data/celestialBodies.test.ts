@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { celestialBodies, celestialBodyById, DEFAULT_CELESTIAL_BODY_ID } from './celestialBodies'
+import { celestialBodies, celestialBodyById, DEFAULT_CELESTIAL_BODY_ID, solarSystemOverviewBodies } from './celestialBodies'
 import type { CelestialBodyId } from '../types'
 
 /** '#rrggbb' のおおよその明るさ(0..255)。色の濃淡を比べるテストでだけ使う。 */
@@ -116,6 +116,71 @@ describe('celestialBodies', () => {
       }
     }
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('Phase 6: 太陽系全体表示の軌道データ(orbit)', () => {
+  const ORDERED_PLANET_IDS: CelestialBodyId[] = [
+    'mercury',
+    'venus',
+    'earth',
+    'mars',
+    'jupiter',
+    'saturn',
+    'uranus',
+    'neptune',
+  ]
+
+  it('太陽・月はorbitを持たず、8惑星と冥王星は持つ', () => {
+    expect(celestialBodyById('sun').orbit).toBeUndefined()
+    expect(celestialBodyById('moon').orbit).toBeUndefined()
+    for (const id of [...ORDERED_PLANET_IDS, 'pluto'] as const) {
+      expect(celestialBodyById(id).orbit).toBeDefined()
+    }
+  })
+
+  it('8惑星のorbit.radiusが太陽からの並び順どおりに単調増加する', () => {
+    const radii = ORDERED_PLANET_IDS.map((id) => celestialBodyById(id).orbit?.radius ?? 0)
+    for (let i = 1; i < radii.length; i += 1) {
+      expect(radii[i]).toBeGreaterThan(radii[i - 1])
+    }
+  })
+
+  it('冥王星のorbit.radiusは海王星より外側で、8惑星どうしの平均間隔よりずっと大きい間隔をあける', () => {
+    const radii = ORDERED_PLANET_IDS.map((id) => celestialBodyById(id).orbit?.radius ?? 0)
+    const gaps = radii.slice(1).map((radius, i) => radius - radii[i])
+    const averagePlanetGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length
+
+    const neptuneRadius = celestialBodyById('neptune').orbit?.radius ?? 0
+    const plutoRadius = celestialBodyById('pluto').orbit?.radius ?? 0
+    expect(plutoRadius).toBeGreaterThan(neptuneRadius)
+    expect(plutoRadius - neptuneRadius).toBeGreaterThan(averagePlanetGap * 1.5)
+  })
+
+  it('orbit.angularSpeedは内側の惑星ほど大きい(外側ほど遅く回る)', () => {
+    const speeds = ORDERED_PLANET_IDS.map((id) => celestialBodyById(id).orbit?.angularSpeed ?? 0)
+    for (let i = 1; i < speeds.length; i += 1) {
+      expect(speeds[i]).toBeLessThan(speeds[i - 1])
+    }
+    const plutoSpeed = celestialBodyById('pluto').orbit?.angularSpeed ?? 0
+    expect(plutoSpeed).toBeLessThan(speeds[speeds.length - 1])
+  })
+})
+
+describe('solarSystemOverviewBodies', () => {
+  it('月を除いた太陽・8惑星・冥王星を、celestialBodiesと同じ太陽からの並び順で持つ', () => {
+    expect(solarSystemOverviewBodies.map((body) => body.id)).toEqual([
+      'sun',
+      'mercury',
+      'venus',
+      'earth',
+      'mars',
+      'jupiter',
+      'saturn',
+      'uranus',
+      'neptune',
+      'pluto',
+    ])
   })
 })
 
