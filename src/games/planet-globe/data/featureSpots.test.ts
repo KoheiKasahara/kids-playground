@@ -145,6 +145,44 @@ describe('featureSpotsByBodyId', () => {
       expect(target.lonDeg).toBe(mare.lonDeg)
       expect(target.latDeg).toBe(mare.latDeg)
     })
+
+    it('追加7天体の見た目に結びつく代表スポットも、描画データと同じ経緯度を使う', () => {
+      const pairs = [
+        ['sun', 'sun-sunspot', 'sunspot-a'],
+        ['mercury', 'mercury-caloris', 'caloris-basin'],
+        ['venus', 'venus-clouds', 'venus-cloud-band'],
+        ['neptune', 'neptune-storm', 'great-dark-spot'],
+        ['neptune', 'neptune-winds', 'neptune-bright-cloud'],
+        ['pluto', 'pluto-tombaugh', 'tombaugh-regio-west'],
+        ['pluto', 'pluto-sputnik', 'sputnik-planitia'],
+      ] as const
+
+      for (const [bodyId, featureSpotId, visualId] of pairs) {
+        const body = celestialBodyById(bodyId)
+        const target = surfaceTargetOf(spotById(featureSpotId))
+        if (body.surface.style === 'gas') {
+          const visual = body.surface.spots.find((spot) => spot.id === visualId)
+          expect(visual, `${visualId} がない`).toBeDefined()
+          expect(target.lonDeg).toBe(visual?.lonDeg)
+          expect(target.latDeg).toBe(visual?.latDeg)
+        } else {
+          const visual = body.surface.patches.find((patch) => patch.id === visualId)
+          expect(visual, `${visualId} がない`).toBeDefined()
+          expect(target.lonDeg).toBe(visual?.lonDeg)
+          expect(target.latDeg).toBe(visual?.latDeg)
+        }
+      }
+    })
+
+    it('地球の雲スポットは別レイヤーの雲パッチと同じ経緯度を使う', () => {
+      const earth = celestialBodyById('earth')
+      const cloud = earth.visual?.clouds?.patches.find((patch) => patch.id === 'earth-cloud-layer-a')
+      const target = surfaceTargetOf(spotById('earth-clouds'))
+      expect(cloud).toBeDefined()
+      expect(target.lonDeg).toBe(cloud?.lonDeg)
+      expect(target.latDeg).toBe(cloud?.latDeg)
+      expect(earth.visual?.clouds?.spinSpeed).toBe(earth.spinSpeed)
+    })
   })
 
   it('featureSpotsByBodyIdは11天体すべてのキーを持つ', () => {

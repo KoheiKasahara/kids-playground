@@ -288,6 +288,12 @@ describe('sun(Phase 4)', () => {
     const sunspots = sun.surface.spots.filter((spot) => spot.id.startsWith('sunspot-'))
     expect(sunspots.length).toBeGreaterThanOrEqual(2)
   })
+
+  it('恒星らしい発光の縁(halo)を持ち、過剰な後処理に頼らない', () => {
+    expect(sun.visual?.halo).toEqual(expect.objectContaining({ color: expect.any(String) }))
+    expect(sun.visual?.halo?.opacity).toBeGreaterThan(0)
+    expect(sun.visual?.halo?.scale).toBeGreaterThan(2)
+  })
 })
 
 describe('mercury(Phase 4)', () => {
@@ -348,6 +354,14 @@ describe('earth(Phase 4)', () => {
     expect(earth.surface.polarCaps?.northEdgeLatDeg).toBeGreaterThan(0)
     expect(earth.surface.polarCaps?.southEdgeLatDeg).toBeLessThan(0)
   })
+
+  it('国境を持ち込まず、地表と座標がそろった雲と薄い大気を持つ', () => {
+    expect(earth.visual?.clouds?.patches.length).toBeGreaterThanOrEqual(3)
+    expect(earth.visual?.clouds?.spinSpeed).toBe(earth.spinSpeed)
+    expect(earth.visual?.atmosphere?.scale).toBeGreaterThan(1)
+    if (earth.surface.style !== 'rocky') throw new Error('unreachable')
+    expect(earth.surface.patches.some((patch) => patch.id.includes('border'))).toBe(false)
+  })
 })
 
 describe('uranus(Phase 4)', () => {
@@ -395,5 +409,12 @@ describe('pluto(Phase 4)', () => {
     if (pluto.surface.style !== 'rocky') throw new Error('unreachable')
     expect(pluto.surface.patches.length).toBeGreaterThanOrEqual(3)
     expect(pluto.surface.patches.some((patch) => patch.id.startsWith('tombaugh-regio'))).toBe(true)
+  })
+
+  it('トンボー地域の左右と下向きの先端を持ち、ハート形を読めるようにする', () => {
+    if (pluto.surface.style !== 'rocky') throw new Error('unreachable')
+    expect(pluto.surface.patches.some((patch) => patch.id === 'tombaugh-regio-west')).toBe(true)
+    expect(pluto.surface.patches.some((patch) => patch.id === 'tombaugh-regio-east')).toBe(true)
+    expect(pluto.surface.patches.some((patch) => patch.id === 'tombaugh-regio-tip')).toBe(true)
   })
 })

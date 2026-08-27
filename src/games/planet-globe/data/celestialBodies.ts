@@ -34,6 +34,8 @@ export const celestialBodies: readonly CelestialBody[] = [
     // 恒星は影のできる側面でも真っ暗にならないよう、ambient/fillを他天体よりだいぶ高くする。
     lighting: { keyIntensity: 2.0, ambientIntensity: 0.55, hemisphereIntensity: 0.4, fillIntensity: 0.42 },
     zoom: { outMargin: 1.15, inMargin: 0.6 },
+    // 表面テクスチャと別の、非常に薄い発光の縁。Bloomやparticleを使わず恒星感を足す。
+    visual: { halo: { color: '#ffba4c', opacity: 0.42, scale: 2.8 } },
     surface: {
       style: 'gas',
       baseColor: '#ffcf5e',
@@ -181,6 +183,22 @@ export const celestialBodies: readonly CelestialBody[] = [
     material: { roughness: 0.9, bumpScale: 0.6 },
     lighting: { keyIntensity: 2.4, ambientIntensity: 0.18, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
+    visual: {
+      atmosphere: { color: '#bfe5ff', opacity: 0.2, scale: 1.045 },
+      clouds: {
+        opacity: 0.58,
+        // 雲のスポットと常に一致するよう、地表と同じ自転速度で回す。
+        // 別メッシュによる奥行きは保ちつつ、回転後にマーカーだけずれないことを優先する。
+        spinSpeed: 0.035,
+        patches: [
+          { id: 'earth-cloud-layer-a', lonDeg: -30, latDeg: 20, lonRadiusDeg: 28, latRadiusDeg: 8, color: '#ffffff', opacity: 0.52, softness: 0.78 },
+          { id: 'earth-cloud-layer-b', lonDeg: 60, latDeg: -30, lonRadiusDeg: 32, latRadiusDeg: 9, color: '#ffffff', opacity: 0.46, softness: 0.8 },
+          { id: 'earth-cloud-layer-c', lonDeg: 160, latDeg: 5, lonRadiusDeg: 25, latRadiusDeg: 7, color: '#ffffff', opacity: 0.5, softness: 0.75 },
+          { id: 'earth-cloud-layer-d', lonDeg: 105, latDeg: 55, lonRadiusDeg: 26, latRadiusDeg: 6, color: '#ffffff', opacity: 0.38, softness: 0.82 },
+          { id: 'earth-cloud-layer-e', lonDeg: -120, latDeg: -35, lonRadiusDeg: 24, latRadiusDeg: 7, color: '#ffffff', opacity: 0.42, softness: 0.8 },
+        ],
+      },
+    },
     surface: {
       style: 'rocky',
       baseColor: '#1f5f9e',
@@ -212,10 +230,6 @@ export const celestialBodies: readonly CelestialBody[] = [
         { id: 'continent-oceania', lonDeg: 135, latDeg: -25, lonRadiusDeg: 14, latRadiusDeg: 10, color: '#b08a4f', opacity: 0.9, softness: 0.3 },
         // 南極大陸は白い陸地として、極冠より少し手前の緯度から明るい色で示す。
         { id: 'continent-antarctica', lonDeg: 0, latDeg: -82, lonRadiusDeg: 170, latRadiusDeg: 9, color: '#eef3f6', opacity: 0.9, softness: 0.3 },
-        // 簡易的な雲レイヤー(Phase 5で専用メッシュへ仕上げるまでの間、薄い白パッチで代用する)。
-        { id: 'cloud-wisp-a', lonDeg: -30, latDeg: 20, lonRadiusDeg: 22, latRadiusDeg: 8, color: '#ffffff', opacity: 0.22, softness: 0.7 },
-        { id: 'cloud-wisp-b', lonDeg: 60, latDeg: -30, lonRadiusDeg: 26, latRadiusDeg: 9, color: '#ffffff', opacity: 0.18, softness: 0.75 },
-        { id: 'cloud-wisp-c', lonDeg: 160, latDeg: 5, lonRadiusDeg: 20, latRadiusDeg: 7, color: '#ffffff', opacity: 0.2, softness: 0.7 },
       ],
       craters: [],
       scatteredCraters: { count: 0, minRadiusDeg: 0.4, maxRadiusDeg: 0.4, latLimitDeg: 0, depth: 0, seed: 1 },
@@ -727,9 +741,11 @@ export const celestialBodies: readonly CelestialBody[] = [
         darkColor: '#5f4f3c',
       },
       patches: [
-        // トンボー地域(ハート形の明るい地形)。2つの楕円を重ねてハートの左右のふくらみを表す。
+        // トンボー地域(ハート形の明るい地形)。左右のふくらみと下向きの先端を重ねて、
+        // 小さな球でもハートだと分かる輪郭にする。
         { id: 'tombaugh-regio-west', lonDeg: 20, latDeg: -5, lonRadiusDeg: 16, latRadiusDeg: 14, color: '#f2e6cf', opacity: 0.85, softness: 0.4 },
         { id: 'tombaugh-regio-east', lonDeg: 40, latDeg: -10, lonRadiusDeg: 14, latRadiusDeg: 12, color: '#f5ead4', opacity: 0.85, softness: 0.4 },
+        { id: 'tombaugh-regio-tip', lonDeg: 31, latDeg: -19, lonRadiusDeg: 8, latRadiusDeg: 13, rotationDeg: 2, color: '#f5ead4', opacity: 0.78, softness: 0.46 },
         // スプートニク平原。トンボー地域の中でもひときわ明るい、なめらかな氷の平原。
         { id: 'sputnik-planitia', lonDeg: 30, latDeg: -8, lonRadiusDeg: 10, latRadiusDeg: 8, color: '#fbf3e2', opacity: 0.9, softness: 0.3, relief: -0.2 },
         // 暗い地形(トンボー地域との対比)。
