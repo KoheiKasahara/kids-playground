@@ -387,10 +387,19 @@ export function useSolarSystemOverviewEngine(
     }
 
     function updateControlsLimits() {
-      if (controls === null) return
+      if (controls === null || camera === null) return
       const aspect = aspectOfContainer()
       controls.minDistance = fitDistance(INNER_FIT_RADIUS, aspect, OVERVIEW_FOV_DEGREES) * 0.7
       controls.maxDistance = fitDistance(outerViewRadius, aspect, OVERVIEW_FOV_DEGREES) * 1.35
+
+      // 縦長画面(横方向のFOVが狭い)ではmaxDistanceが共通のCAMERA_FARを超えることがあり、
+      // 太陽・惑星がカメラの far クリップ面の外に出て消えてしまう。実際に必要な距離まで
+      // farを広げて必ず収める(狭くはしない = 個別観察側の精度をここで落とさない)。
+      const requiredFar = controls.maxDistance + outerViewRadius * 1.5
+      if (requiredFar > camera.far) {
+        camera.far = requiredFar
+        camera.updateProjectionMatrix()
+      }
     }
 
     function resizeRenderer() {
