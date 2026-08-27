@@ -1,5 +1,12 @@
+/*
+ * よみあげトグルと並べて画面端(右上)に小さく置くため、横並びのセグメントではなく
+ * 縦積みにして幅を抑える(Issue #233: 天体観察を圧迫しない配置への変更)。
+ * 天体表示を邪魔しない代わりに高さ方向を使うが、ボタン自体の大きさ・文字サイズは
+ * 幼児のタップ領域として十分な水準を保つ。
+ */
 .group {
   display: flex;
+  flex-direction: column;
   gap: var(--space-xs);
   padding: 4px;
   border-radius: var(--radius-lg);
@@ -9,14 +16,14 @@
 }
 
 .button {
-  min-height: 44px;
-  padding: var(--space-xs) var(--space-md);
+  min-height: 40px;
+  padding: var(--space-xs) var(--space-sm);
   border: 3px solid transparent;
   border-radius: var(--radius-md);
   color: var(--color-text-on-primary);
   background: transparent;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -39,8 +46,17 @@
 
 @media (max-width: 360px) {
   .button {
-    padding: var(--space-xs) var(--space-sm);
-    font-size: 13px;
+    padding: 4px var(--space-xs);
+    font-size: 12px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  /* 低い横画面では右上の固定UI領域(よみあげ+モード切替)の高さを抑える。 */
+  .button {
+    min-height: 30px;
+    padding: 2px var(--space-xs);
+    font-size: 12px;
   }
 }
 
