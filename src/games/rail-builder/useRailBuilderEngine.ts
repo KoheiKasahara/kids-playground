@@ -77,11 +77,6 @@ const POINTER_MOVE_THRESHOLD = 6
 // ドラッグで電車を線路上へ置き直すときの当たり判定の許容距離。
 const TRAIN_DRAG_MAX_DISTANCE = 8
 
-export type RailBuilderSelectionAnchor = {
-  x: number
-  y: number
-}
-
 export type RailBuilderEngineOptions = {
   pieces: readonly RailPiece[]
   selectedPieceId: string | null
@@ -95,11 +90,6 @@ export type RailBuilderEngineOptions = {
   onTrainStatusChange?: (status: RailTrainStatus) => void
   onFleetChange?: (trains: RailFleetTrainSummary[]) => void
   onTrainOccupiedIdsChange?: (pieceIds: string[]) => void
-  /**
-   * 選択中のパーツ/電車の画面上の位置(px)。フローティングUIの土台位置に使う。
-   * 何も選択していない・画面外にいる場合はnull。
-   */
-  onSelectionAnchorChange?: (anchor: RailBuilderSelectionAnchor | null) => void
   /** レール専用音量。共有 quizSound の global 設定を変更せずに切り替える。 */
   soundEnabled?: boolean
 }
@@ -1118,7 +1108,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainYawQuaternion = new THREE.Quaternion()
     const trainPitchQuaternion = new THREE.Quaternion()
     const selectionAnchorVector = new THREE.Vector3()
-    let lastReportedAnchor: RailBuilderSelectionAnchor | null = null
     const instanceMatrix = new THREE.Matrix4()
     const instanceQuaternion = new THREE.Quaternion()
     const instanceScale = new THREE.Vector3()
@@ -1252,49 +1241,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       leadCar.getWorldPosition(selectionAnchorVector)
       trainSelectionRing.position.set(selectionAnchorVector.x, selectionAnchorVector.y + 0.12, selectionAnchorVector.z)
       trainSelectionRing.visible = true
-    }
-
-    /** 選択中のパーツ/電車のワールド座標を画面px座標へ射影する。フローティングUIの基準位置。 */
-    function computeSelectionAnchor(): RailBuilderSelectionAnchor | null {
-      if (camera === null) return null
-      const selectedPieceId = optionsRef.current.selectedPieceId
-      const selectedTrainId = optionsRef.current.selectedTrainId
-      let hasWorldPoint = false
-      if (selectedPieceId !== null) {
-        const ring = selectionRings.get(selectedPieceId)
-        if (ring !== undefined) {
-          ring.getWorldPosition(selectionAnchorVector)
-          hasWorldPoint = true
-        }
-      } else if (selectedTrainId !== null) {
-        const runtime = trainVisuals.get(selectedTrainId)
-        const leadCar = runtime?.cars[0]
-        if (leadCar !== undefined && leadCar.visible) {
-          leadCar.getWorldPosition(selectionAnchorVector)
-          hasWorldPoint = true
-        }
-      }
-      if (!hasWorldPoint) return null
-      const projected = selectionAnchorVector.clone().project(camera)
-      if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) return null
-      const rect = host.getBoundingClientRect()
-      return {
-        x: (projected.x * 0.5 + 0.5) * rect.width,
-        y: (-projected.y * 0.5 + 0.5) * rect.height,
-      }
-    }
-
-    function reportSelectionAnchor() {
-      const anchor = computeSelectionAnchor()
-      const rounded = anchor === null ? null : { x: Math.round(anchor.x), y: Math.round(anchor.y) }
-      const changed = rounded === null
-        ? lastReportedAnchor !== null
-        : lastReportedAnchor === null
-          || Math.abs(lastReportedAnchor.x - rounded.x) >= 1
-          || Math.abs(lastReportedAnchor.y - rounded.y) >= 1
-      if (!changed) return
-      lastReportedAnchor = rounded
-      optionsRef.current.onSelectionAnchorChange?.(rounded)
     }
 
     function makeBasicTrainCar(runtime: TrainVisualRuntime, trainId: string, index: number): THREE.Group {
@@ -2635,7 +2581,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           leadPiece?.kind === 'tunnel',
         )
         updateTrainSelectionRing(optionsRef.current.selectedTrainId)
-        reportSelectionAnchor()
         renderer.render(scene, camera)
         rafId = window.requestAnimationFrame(render)
       }
