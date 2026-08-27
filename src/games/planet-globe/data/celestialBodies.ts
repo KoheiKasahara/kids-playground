@@ -2,17 +2,230 @@ import type { CelestialBody, CelestialBodyId } from '../types'
 import { lonToU, rotationYFacing } from '../three/planetCoords'
 
 /**
- * 4天体の見た目・大きさ・輪をまとめて表現するデータ。
+ * 11天体の見た目・大きさ・輪をまとめて表現するデータ。
  * `three/usePlanetEngine.ts` はこの配列の値だけを読んで3Dオブジェクトを組み立てる。
  * 天体が増えても、ここへ1件足すだけで済むようにする(画面・エンジン側に分岐を作らない)。
  *
  * 表面の模様(海、クレーター、極冠、大赤斑など)はすべて経度・緯度(度)で定義する。
  * ピクセルへの変換は `three/planetCoords.ts` と `three/planetSurface.ts` に一本化してあるため、
  * ここでは実際の天体地図に近い値をそのまま書けばよい。
+ *
+ * 表示順は太陽から外側へ向かう実際の並び(太陽・水星・金星・地球・月・火星・木星・土星・天王星・海王星・冥王星)。
+ * 月だけは衛星として地球の直後に置く。
+ *
+ * Phase 4で追加した7天体(太陽・水星・金星・地球・天王星・海王星・冥王星)も、Phase 1〜3と同じ
+ * `SurfaceSpec`(rocky/gas)の2生成器だけで表現している。太陽・金星・天王星・海王星は`gas`スタイルを、
+ * 水星・地球・冥王星は`rocky`スタイルを流用し、天体ごとの新しい生成器・新しい画面分岐は追加していない。
+ * 太陽の発光感だけは`material.emissive`という新しい任意フィールドで表現する(データだけの拡張)。
  */
 export const celestialBodies: readonly CelestialBody[] = [
   {
+    id: 'sun',
+    kind: 'star',
+    displayName: 'たいよう',
+    previewBackground:
+      'radial-gradient(circle at 34% 30%, #fff6d0 0%, #ffcf5e 35%, #ffb347 68%, #d97f1f 100%)',
+    radius: 72,
+    axialTiltDegrees: 7.25,
+    // sunspot-aがやや正面に見える面を初期表示にする。
+    initialRotationY: rotationYFacing(lonToU(0)) - 0.1,
+    spinSpeed: 0.02,
+    material: { roughness: 1, emissive: '#ffdd88', emissiveIntensity: 0.4 },
+    // 恒星は影のできる側面でも真っ暗にならないよう、ambient/fillを他天体よりだいぶ高くする。
+    lighting: { keyIntensity: 2.0, ambientIntensity: 0.55, hemisphereIntensity: 0.4, fillIntensity: 0.42 },
+    zoom: { outMargin: 1.15, inMargin: 0.6 },
+    surface: {
+      style: 'gas',
+      baseColor: '#ffcf5e',
+      // 木星のような帯ではなく、緯度による色差を弱くして「表面全体が光っている」印象にする。
+      belts: [
+        { latDeg: 90, color: '#ffb347' },
+        { latDeg: 60, color: '#ffd27a' },
+        { latDeg: 30, color: '#fff1b8' },
+        { latDeg: 0, color: '#fff6d0' },
+        { latDeg: -30, color: '#fff1b8' },
+        { latDeg: -60, color: '#ffd27a' },
+        { latDeg: -90, color: '#ffb347' },
+      ],
+      // 周波数を高くして、縞ではなく粒状の対流(粒状斑)らしいむらに見せる。
+      turbulence: { seed: 71, octaves: 4, periodX: 8, frequencyY: 42, amplitudeDeg: 2 },
+      mottle: { seed: 83, octaves: 5, periodX: 14, frequencyY: 34, amount: 0.22 },
+      spots: [
+        {
+          id: 'sunspot-a',
+          lonDeg: 20,
+          latDeg: 12,
+          lonRadiusDeg: 5,
+          latRadiusDeg: 3,
+          stops: [
+            { at: 0, color: '#7a3b12', opacity: 0.55 },
+            { at: 0.6, color: '#c9701f', opacity: 0.35 },
+            { at: 1, color: '#ffcf5e', opacity: 0 },
+          ],
+        },
+        {
+          id: 'sunspot-b',
+          lonDeg: -55,
+          latDeg: -18,
+          lonRadiusDeg: 4,
+          latRadiusDeg: 2.6,
+          stops: [
+            { at: 0, color: '#7a3b12', opacity: 0.5 },
+            { at: 0.6, color: '#c9701f', opacity: 0.3 },
+            { at: 1, color: '#ffcf5e', opacity: 0 },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: 'mercury',
+    kind: 'planet',
+    displayName: 'すいせい',
+    previewBackground:
+      'radial-gradient(circle at 34% 30%, #cbb79a 0%, #a08a72 45%, #7a6754 78%, #5a4a3a 100%)',
+    radius: 44,
+    axialTiltDegrees: 0.03,
+    initialRotationY: rotationYFacing(lonToU(0)),
+    spinSpeed: 0.02,
+    material: { roughness: 1, bumpScale: 2.0 },
+    lighting: { keyIntensity: 2.6, ambientIntensity: 0.14, hemisphereIntensity: 0.26, fillIntensity: 0.18 },
+    zoom: { outMargin: 1.15, inMargin: 0.58 },
+    surface: {
+      style: 'rocky',
+      baseColor: '#a08a72',
+      // 月より茶色寄りにして、並べたときに一目で違う天体だと分かるようにする。
+      latitudeStops: [
+        { latDeg: 90, color: '#ab9678' },
+        { latDeg: 0, color: '#a08a72' },
+        { latDeg: -90, color: '#8f7a62' },
+      ],
+      noise: {
+        seed: 133,
+        octaves: 5,
+        periodX: 8,
+        frequencyY: 4,
+        amount: 0.4,
+        contrast: 1.7,
+        lightColor: '#c9b79c',
+        darkColor: '#5a4a3a',
+      },
+      patches: [
+        // カロリス盆地。巨大な衝突で明るいエジェクタが広がった地形として、薄い明色パッチで表す。
+        { id: 'caloris-basin', lonDeg: 165, latDeg: 30, lonRadiusDeg: 18, latRadiusDeg: 16, color: '#c7b79f', opacity: 0.5, softness: 0.55, relief: 0.3 },
+      ],
+      craters: [
+        { id: 'mercury-crater-a', lonDeg: -30, latDeg: 10, radiusDeg: 3.4, depth: 0.85, rays: { count: 12, lengthDeg: 24, color: '#dccdb0', opacity: 0.22 } },
+        { id: 'mercury-crater-b', lonDeg: 60, latDeg: -35, radiusDeg: 2.6, depth: 0.75 },
+        { id: 'mercury-crater-c', lonDeg: -95, latDeg: -12, radiusDeg: 4.0, depth: 0.7 },
+      ],
+      scatteredCraters: { count: 260, minRadiusDeg: 0.4, maxRadiusDeg: 2.6, latLimitDeg: 80, depth: 0.66, seed: 205 },
+    },
+  },
+  {
+    id: 'venus',
+    kind: 'planet',
+    displayName: 'きんせい',
+    previewBackground:
+      'radial-gradient(circle at 34% 30%, #fdf3d2 0%, #f2dfae 45%, #e7cf92 78%, #c9a869 100%)',
+    radius: 50,
+    axialTiltDegrees: 2.6,
+    initialRotationY: rotationYFacing(lonToU(0)),
+    // 金星は実際に他の惑星と逆向きに自転している。値だけで表現でき、特別な分岐は不要。
+    spinSpeed: -0.02,
+    material: { roughness: 1 },
+    lighting: { keyIntensity: 2.3, ambientIntensity: 0.22, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
+    zoom: { outMargin: 1.15, inMargin: 0.58 },
+    surface: {
+      style: 'gas',
+      baseColor: '#f2dfae',
+      // 木星ほどコントラストを付けず、地表を隠す厚い雲そのものが主役に見えるようにする。
+      belts: [
+        { latDeg: 90, color: '#e7cf92' },
+        { latDeg: 60, color: '#f1e0ac' },
+        { latDeg: 30, color: '#f7ecc4' },
+        { latDeg: 0, color: '#fdf3d2' },
+        { latDeg: -30, color: '#f7ecc4' },
+        { latDeg: -60, color: '#f1e0ac' },
+        { latDeg: -90, color: '#e7cf92' },
+      ],
+      // 大きな振幅のturbulenceで、雲がうねりながら地表を覆う印象を強める。
+      turbulence: { seed: 51, octaves: 5, periodX: 8, frequencyY: 22, amplitudeDeg: 6 },
+      mottle: { seed: 59, octaves: 5, periodX: 12, frequencyY: 30, amount: 0.14 },
+      spots: [
+        {
+          id: 'venus-cloud-band',
+          lonDeg: 0,
+          latDeg: 10,
+          lonRadiusDeg: 40,
+          latRadiusDeg: 6,
+          stops: [
+            { at: 0, color: '#c9a869', opacity: 0.35 },
+            { at: 1, color: '#c9a869', opacity: 0 },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: 'earth',
+    kind: 'planet',
+    displayName: 'ちきゅう',
+    previewBackground:
+      'radial-gradient(circle at 34% 30%, #eef3f6 0%, #4f83ad 30%, #1f5f9e 55%, #6b8f4e 78%, #154a7d 100%)',
+    radius: 50,
+    axialTiltDegrees: 23.4,
+    // アジア・アフリカ・ヨーロッパがまとまって見える面を初期表示にする。
+    initialRotationY: rotationYFacing(lonToU(20)),
+    spinSpeed: 0.035,
+    material: { roughness: 0.9, bumpScale: 0.6 },
+    lighting: { keyIntensity: 2.4, ambientIntensity: 0.18, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
+    zoom: { outMargin: 1.15, inMargin: 0.58 },
+    surface: {
+      style: 'rocky',
+      baseColor: '#1f5f9e',
+      latitudeStops: [
+        { latDeg: 90, color: '#eef3f6' },
+        { latDeg: 70, color: '#4f83ad' },
+        { latDeg: 0, color: '#1f5f9e' },
+        { latDeg: -70, color: '#4f83ad' },
+        { latDeg: -90, color: '#eef3f6' },
+      ],
+      noise: {
+        seed: 301,
+        octaves: 4,
+        periodX: 8,
+        frequencyY: 4,
+        // 海は陸に比べて模様を弱くし、ノイズだらけの海面にしない。
+        amount: 0.12,
+        contrast: 1.2,
+        lightColor: '#3f7fb0',
+        darkColor: '#154a7d',
+      },
+      patches: [
+        // 大陸(既存「ちきゅうぎ」の国境ポリゴンは使わず、大陸単位の塗り分けだけで表す)。
+        { id: 'continent-asia', lonDeg: 100, latDeg: 45, lonRadiusDeg: 38, latRadiusDeg: 28, color: '#6b8f4e', opacity: 0.92, softness: 0.35 },
+        { id: 'continent-africa', lonDeg: 20, latDeg: 5, lonRadiusDeg: 20, latRadiusDeg: 30, color: '#a98c53', opacity: 0.9, softness: 0.3 },
+        { id: 'continent-europe', lonDeg: 15, latDeg: 50, lonRadiusDeg: 14, latRadiusDeg: 12, color: '#7c9a5c', opacity: 0.88, softness: 0.35 },
+        { id: 'continent-north-america', lonDeg: -100, latDeg: 45, lonRadiusDeg: 26, latRadiusDeg: 26, color: '#6f8f52', opacity: 0.9, softness: 0.35 },
+        { id: 'continent-south-america', lonDeg: -60, latDeg: -15, lonRadiusDeg: 14, latRadiusDeg: 26, color: '#5f8a4a', opacity: 0.9, softness: 0.3 },
+        { id: 'continent-oceania', lonDeg: 135, latDeg: -25, lonRadiusDeg: 14, latRadiusDeg: 10, color: '#b08a4f', opacity: 0.9, softness: 0.3 },
+        // 南極大陸は白い陸地として、極冠より少し手前の緯度から明るい色で示す。
+        { id: 'continent-antarctica', lonDeg: 0, latDeg: -82, lonRadiusDeg: 170, latRadiusDeg: 9, color: '#eef3f6', opacity: 0.9, softness: 0.3 },
+        // 簡易的な雲レイヤー(Phase 5で専用メッシュへ仕上げるまでの間、薄い白パッチで代用する)。
+        { id: 'cloud-wisp-a', lonDeg: -30, latDeg: 20, lonRadiusDeg: 22, latRadiusDeg: 8, color: '#ffffff', opacity: 0.22, softness: 0.7 },
+        { id: 'cloud-wisp-b', lonDeg: 60, latDeg: -30, lonRadiusDeg: 26, latRadiusDeg: 9, color: '#ffffff', opacity: 0.18, softness: 0.75 },
+        { id: 'cloud-wisp-c', lonDeg: 160, latDeg: 5, lonRadiusDeg: 20, latRadiusDeg: 7, color: '#ffffff', opacity: 0.2, softness: 0.7 },
+      ],
+      craters: [],
+      scatteredCraters: { count: 0, minRadiusDeg: 0.4, maxRadiusDeg: 0.4, latLimitDeg: 0, depth: 0, seed: 1 },
+      // 国境線は持たず、北極・南極を示す白い極冠だけを置く。
+      polarCaps: { northEdgeLatDeg: 80, southEdgeLatDeg: -78, color: '#f5f8fa', raggednessDeg: 5, seed: 302 },
+    },
+  },
+  {
     id: 'moon',
+    kind: 'moon',
     displayName: 'つき',
     previewBackground:
       'radial-gradient(circle at 34% 30%, #d8d6cd 0%, #a19f97 45%, #7c7a74 78%, #5f5d58 100%)',
@@ -88,6 +301,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   },
   {
     id: 'mars',
+    kind: 'planet',
     displayName: 'かせい',
     previewBackground:
       'radial-gradient(circle at 34% 30%, #e6a06c 0%, #c1622f 45%, #93401f 78%, #f2efe6 100%)',
@@ -154,6 +368,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   },
   {
     id: 'jupiter',
+    kind: 'planet',
     displayName: 'もくせい',
     previewBackground:
       'linear-gradient(#efe4c6 0%, #8f6242 16%, #f0e4cc 32%, #8a5c3e 48%, #f2e7cf 62%, #9e7c5c 78%, #dfcdae 100%)',
@@ -265,6 +480,7 @@ export const celestialBodies: readonly CelestialBody[] = [
   },
   {
     id: 'saturn',
+    kind: 'planet',
     displayName: 'どせい',
     previewBackground:
       'linear-gradient(#eddcb0 0%, #d3c095 22%, #f0e2b8 42%, #cabb90 60%, #e6d5a8 78%, #9aa3ad 100%)',
@@ -357,6 +573,173 @@ export const celestialBodies: readonly CelestialBody[] = [
           ],
         },
       ],
+    },
+  },
+  {
+    id: 'uranus',
+    kind: 'planet',
+    displayName: 'てんのうせい',
+    previewBackground:
+      'radial-gradient(circle at 34% 30%, #d3f3ec 0%, #c3ece4 45%, #a9d9d2 78%, #7fc0b7 100%)',
+    radius: 58,
+    flattening: 0.02,
+    // 横倒しに近い自転軸。他の惑星と回転軸の向きがはっきり違って見える(値だけで表現でき、
+    // tiltGroupの回転式や画面側に天王星専用の分岐は要らない)。
+    axialTiltDegrees: 97.77,
+    initialRotationY: rotationYFacing(lonToU(0)),
+    spinSpeed: 0.03,
+    material: { roughness: 1 },
+    lighting: { keyIntensity: 2.3, ambientIntensity: 0.22, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
+    zoom: { outMargin: 1.15, inMargin: 0.6 },
+    surface: {
+      style: 'gas',
+      baseColor: '#c3ece4',
+      // 木星・海王星よりコントラストの弱い、のっぺりした青緑の大気。
+      belts: [
+        { latDeg: 90, color: '#a9d9d2' },
+        { latDeg: 45, color: '#c3ece4' },
+        { latDeg: 0, color: '#d3f3ec' },
+        { latDeg: -45, color: '#c3ece4' },
+        { latDeg: -90, color: '#a9d9d2' },
+      ],
+      turbulence: { seed: 97, octaves: 3, periodX: 8, frequencyY: 16, amplitudeDeg: 1.5 },
+      mottle: { seed: 101, octaves: 3, periodX: 10, frequencyY: 20, amount: 0.08 },
+      spots: [
+        {
+          id: 'uranus-storm',
+          lonDeg: 40,
+          latDeg: 20,
+          lonRadiusDeg: 8,
+          latRadiusDeg: 4,
+          stops: [
+            { at: 0, color: '#8fcdc3', opacity: 0.35 },
+            { at: 1, color: '#8fcdc3', opacity: 0 },
+          ],
+        },
+      ],
+    },
+    // 既存の輪(RingSpec)構造をそのまま流用した簡易表示。土星よりずっと細く淡い1本だけにする。
+    ring: {
+      segments: [
+        {
+          id: 'epsilon-ring',
+          innerRadiusRatio: 1.5,
+          outerRadiusRatio: 1.62,
+          bands: [
+            { at: 0, color: '#cfe3e0', opacity: 0 },
+            { at: 0.5, color: '#cfe3e0', opacity: 0.35 },
+            { at: 1, color: '#cfe3e0', opacity: 0 },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: 'neptune',
+    kind: 'planet',
+    displayName: 'かいおうせい',
+    previewBackground:
+      'radial-gradient(circle at 34% 30%, #6f95e8 0%, #3a6fe0 40%, #2c56b8 70%, #16265c 100%)',
+    radius: 56,
+    flattening: 0.02,
+    axialTiltDegrees: 28.3,
+    // 大暗斑が正面付近に見える面を初期表示にする。
+    initialRotationY: rotationYFacing(lonToU(-20)),
+    spinSpeed: 0.04,
+    material: { roughness: 1 },
+    lighting: { keyIntensity: 2.3, ambientIntensity: 0.22, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
+    zoom: { outMargin: 1.15, inMargin: 0.6 },
+    surface: {
+      style: 'gas',
+      baseColor: '#3a6fe0',
+      // 天王星より濃い青にし、turbulence・mottleも強めて「活動的」な差を付ける。
+      belts: [
+        { latDeg: 90, color: '#20408f' },
+        { latDeg: 45, color: '#2c56b8' },
+        { latDeg: 0, color: '#3a6fe0' },
+        { latDeg: -45, color: '#2c56b8' },
+        { latDeg: -90, color: '#20408f' },
+      ],
+      turbulence: { seed: 113, octaves: 4, periodX: 8, frequencyY: 24, amplitudeDeg: 3 },
+      mottle: { seed: 127, octaves: 4, periodX: 10, frequencyY: 26, amount: 0.14 },
+      spots: [
+        {
+          // 大暗斑(Great Dark Spot)。
+          id: 'great-dark-spot',
+          lonDeg: -20,
+          latDeg: -22,
+          lonRadiusDeg: 10,
+          latRadiusDeg: 6,
+          stops: [
+            { at: 0, color: '#13245c', opacity: 0.75 },
+            { at: 0.6, color: '#1c3373', opacity: 0.4 },
+            { at: 1, color: '#3a6fe0', opacity: 0 },
+          ],
+          swirl: { turns: 1.6, color: '#0b1840', opacity: 0.3, width: 1.2 },
+        },
+        {
+          id: 'neptune-bright-cloud',
+          lonDeg: 60,
+          latDeg: 10,
+          lonRadiusDeg: 14,
+          latRadiusDeg: 3,
+          stops: [
+            { at: 0, color: '#eaf2ff', opacity: 0.5 },
+            { at: 1, color: '#eaf2ff', opacity: 0 },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: 'pluto',
+    kind: 'dwarf-planet',
+    displayName: 'めいおうせい',
+    previewBackground:
+      'radial-gradient(circle at 34% 30%, #f5ead4 0%, #cdbba0 40%, #a89577 70%, #5f4f3c 100%)',
+    radius: 34,
+    axialTiltDegrees: 57,
+    // トンボー地域(ハート形に見える明るい地形)が正面に見える面を初期表示にする。
+    initialRotationY: rotationYFacing(lonToU(30)),
+    spinSpeed: 0.025,
+    material: { roughness: 1, bumpScale: 1.4 },
+    lighting: { keyIntensity: 2.3, ambientIntensity: 0.12, hemisphereIntensity: 0.24, fillIntensity: 0.16 },
+    zoom: { outMargin: 1.15, inMargin: 0.58 },
+    surface: {
+      style: 'rocky',
+      baseColor: '#b7a58c',
+      // 白・茶・灰色が入り混じった、まだらな準惑星の地表。
+      latitudeStops: [
+        { latDeg: 90, color: '#e8ddc9' },
+        { latDeg: 30, color: '#cdbba0' },
+        { latDeg: 0, color: '#b7a58c' },
+        { latDeg: -30, color: '#a89577' },
+        { latDeg: -90, color: '#8f7c62' },
+      ],
+      noise: {
+        seed: 411,
+        octaves: 5,
+        periodX: 8,
+        frequencyY: 5,
+        amount: 0.42,
+        contrast: 1.6,
+        lightColor: '#eee2cc',
+        darkColor: '#5f4f3c',
+      },
+      patches: [
+        // トンボー地域(ハート形の明るい地形)。2つの楕円を重ねてハートの左右のふくらみを表す。
+        { id: 'tombaugh-regio-west', lonDeg: 20, latDeg: -5, lonRadiusDeg: 16, latRadiusDeg: 14, color: '#f2e6cf', opacity: 0.85, softness: 0.4 },
+        { id: 'tombaugh-regio-east', lonDeg: 40, latDeg: -10, lonRadiusDeg: 14, latRadiusDeg: 12, color: '#f5ead4', opacity: 0.85, softness: 0.4 },
+        // スプートニク平原。トンボー地域の中でもひときわ明るい、なめらかな氷の平原。
+        { id: 'sputnik-planitia', lonDeg: 30, latDeg: -8, lonRadiusDeg: 10, latRadiusDeg: 8, color: '#fbf3e2', opacity: 0.9, softness: 0.3, relief: -0.2 },
+        // 暗い地形(トンボー地域との対比)。
+        { id: 'dark-terrain', lonDeg: -120, latDeg: 0, lonRadiusDeg: 30, latRadiusDeg: 14, color: '#4a3d2e', opacity: 0.65, softness: 0.5 },
+        // 氷の山。
+        { id: 'icy-mountains', lonDeg: 15, latDeg: -20, lonRadiusDeg: 5, latRadiusDeg: 4, color: '#e4d8bf', opacity: 0.6, softness: 0.3, relief: 0.7 },
+      ],
+      craters: [{ id: 'pluto-crater-a', lonDeg: -60, latDeg: 30, radiusDeg: 2.4, depth: 0.5 }],
+      scatteredCraters: { count: 60, minRadiusDeg: 0.4, maxRadiusDeg: 1.8, latLimitDeg: 70, depth: 0.35, seed: 410 },
+      polarCaps: { northEdgeLatDeg: 82, southEdgeLatDeg: -80, color: '#f7f1e2', raggednessDeg: 6, seed: 412 },
     },
   },
 ] as const

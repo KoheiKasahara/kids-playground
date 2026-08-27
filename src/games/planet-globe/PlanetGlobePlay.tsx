@@ -58,7 +58,7 @@ export default function PlanetGlobePlay() {
 
         <header className={styles.header}>
           <h1 className={styles.title}>
-            <span aria-hidden="true">🪐</span> わくせいぎ
+            <span aria-hidden="true">🪐</span> たいようけい
           </h1>
           <p className={styles.instruction}>ひかる ところを さわってみよう</p>
         </header>

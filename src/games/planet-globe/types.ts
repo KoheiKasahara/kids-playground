@@ -10,7 +10,24 @@
  * 岩石天体とガス惑星は生成アルゴリズムが本質的に別物なので「2つの生成器」として扱う。
  */
 
-export type CelestialBodyId = 'moon' | 'mars' | 'jupiter' | 'saturn'
+export type CelestialBodyId =
+  | 'sun'
+  | 'mercury'
+  | 'venus'
+  | 'earth'
+  | 'moon'
+  | 'mars'
+  | 'jupiter'
+  | 'saturn'
+  | 'uranus'
+  | 'neptune'
+  | 'pluto'
+
+/**
+ * 天体の分類。「全部わくせい」として扱わず、恒星・衛星・準惑星を惑星と区別する
+ * (Phase 4で太陽・冥王星を追加するにあたり、説明・データ上の正しさを保つために導入する)。
+ */
+export type CelestialBodyKind = 'star' | 'planet' | 'moon' | 'dwarf-planet'
 
 /** 有限4段階のズーム。0=天体全体がゆったり見える, 3=表面に寄った状態。 */
 export type ZoomLevel = 0 | 1 | 2 | 3
@@ -154,6 +171,8 @@ export type LightingSpec = {
 
 export type CelestialBody = {
   id: CelestialBodyId
+  /** 恒星・惑星・衛星・準惑星の別。説明・グルーピングで「全部わくせい」と扱わないための分類。 */
+  kind: CelestialBodyKind
   /** 幼児向けのひらがな表記 */
   displayName: string
   /** 選択UIのプレビュー円に使うCSS背景。3D表示と同系色にして文字なしでも見分けられるようにする。 */
@@ -166,10 +185,20 @@ export type CelestialBody = {
   axialTiltDegrees: number
   /** 初期の自転角(ラジアン)。天体を切り替えるたびにこの角度へ戻す。 */
   initialRotationY: number
-  /** ゆっくりした自転(ラジアン/秒)。prefers-reduced-motionのときは止める。 */
+  /** ゆっくりした自転(ラジアン/秒)。prefers-reduced-motionのときは止める。負の値で逆回転(金星)を表せる。 */
   spinSpeed: number
   surface: SurfaceSpec
-  material: { roughness: number; bumpScale?: number }
+  material: {
+    roughness: number
+    bumpScale?: number
+    /**
+     * 自己発光色。太陽だけが持つ。恒星は光源に照らされる側面と影側面を持つ通常の天体と違い、
+     * 影側でも真っ暗にならないようにするための最小限の表現(Phase 5で表面模様とあわせて仕上げる)。
+     */
+    emissive?: string
+    /** emissiveの強さ。省略時1。 */
+    emissiveIntensity?: number
+  }
   lighting: LightingSpec
   /**
    * ズーム段階ごとのカメラ距離を「天体(輪を含む)がちょうど画面に収まる距離の何倍か」で持つ。
