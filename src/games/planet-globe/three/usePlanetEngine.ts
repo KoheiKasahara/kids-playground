@@ -24,6 +24,12 @@ import { surfaceDirection } from './planetCoords'
 import { createCloudTexture, createSurfaceMaps, type SurfaceMaps } from './planetSurface'
 import { axialTiltRotationZ, createRingMeshes, createRingSegmentTexture } from './planetRing'
 import {
+  createFlareTexture,
+  createSunSurfaceMaterial,
+  DEFAULT_SUN_FLARES,
+  updateSunSurfaceMaterial,
+} from './sunVisual'
+import {
   applyLighting,
   configureKeyLightShadow,
   createPlanetLights,
@@ -198,6 +204,13 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     let visualMaterials: THREE.Material[] = []
     let haloTexture: THREE.CanvasTexture | null = null
 
+    // 太陽(kind: 'star')だけが持つ、毎frame動かす必要がある参照。所有権(dispose対象)は
+    // visualObjects/visualMaterialsが持つため、ここは「今フレーム何を動かすか」を指すだけ。
+    let sunMaterial: THREE.ShaderMaterial | null = null
+    let sunFlareTexture: THREE.CanvasTexture | null = null
+    let sunHaloRuntime: { sprite: THREE.Sprite; baseOpacity: number; baseScale: number } | null = null
+    let sunFlareRuntimes: { sprite: THREE.Sprite; phase: number; baseOpacity: number; baseScale: number }[] = []
+
     // マーカー・パルスのテクスチャはeffectスコープで1回だけ生成する。モジュールスコープに
     // キャッシュしてdisposeすると、再マウント時に破棄済みテクスチャを使ってしまうため。
     let markerTexture: THREE.CanvasTexture | null = null
@@ -321,8 +334,9 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       spotVisuals = []
 
       if (sphereMesh !== null) {
-        const material = sphereMesh.material as THREE.MeshStandardMaterial
+        // 通常はMeshStandardMaterial、太陽(kind:'star')はShaderMaterial。
         // map/bumpMapはsurfaceCacheが保持し続けるため、ここではmaterial自体だけを破棄する。
+        const material = sphereMesh.material as THREE.Material
         material.dispose()
         sphereMesh.removeFromParent()
         sphereMesh = null
@@ -342,6 +356,11 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       cloudSpinGroup = null
       haloTexture?.dispose()
       haloTexture = null
+      sunFlareTexture?.dispose()
+      sunFlareTexture = null
+      sunMaterial = null
+      sunHaloRuntime = null
+      sunFlareRuntimes = []
       if (spinGroup !== null) {
         spinGroup.removeFromParent()
         spinGroup = null
@@ -362,23 +381,41 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       nextSpinGroup.rotation.y = body.initialRotationY
 
       const maps = getOrCreateSurfaceMaps(body)
-      const material = new THREE.MeshStandardMaterial({
-        roughness: body.material.roughness,
-        metalness: 0,
-      })
-      if (maps.map !== null) {
-        material.map = maps.map
+      const isSun = body.kind === 'star'
+
+      let material: THREE.Material
+      if (isSun && maps.map !== null) {
+        // 恒星は光源に照らされる/されないの陰影を持たせず、自分で光っている見た目にする。
+        // ベースの帯+黒点テクスチャ(maps.map)はそのまま使い、その上へ流れるノイズと
+        // Fresnel状の縁発光だけをシェーダーで重ねる(three/sunVisual.ts参照)。
+        const sunMat = createSunSurfaceMaterial({
+          map: maps.map,
+          hotColor: body.material.emissive ?? '#fff3c4',
+          flowStrength: body.material.emissiveIntensity ?? 0.5,
+          rimColor: body.visual?.halo?.color ?? body.material.emissive ?? '#ffba4c',
+        })
+        sunMaterial = sunMat
+        material = sunMat
       } else {
-        // Canvas 2Dが使えない環境でも球が透明にならないよう、地色で塗る。
-        material.color = new THREE.Color(body.surface.baseColor)
-      }
-      if (maps.bumpMap !== null) {
-        material.bumpMap = maps.bumpMap
-        material.bumpScale = body.material.bumpScale ?? 0
-      }
-      if (body.material.emissive !== undefined) {
-        material.emissive = new THREE.Color(body.material.emissive)
-        material.emissiveIntensity = body.material.emissiveIntensity ?? 1
+        const standardMaterial = new THREE.MeshStandardMaterial({
+          roughness: body.material.roughness,
+          metalness: 0,
+        })
+        if (maps.map !== null) {
+          standardMaterial.map = maps.map
+        } else {
+          // Canvas 2Dが使えない環境でも球が透明にならないよう、地色で塗る。
+          standardMaterial.color = new THREE.Color(body.surface.baseColor)
+        }
+        if (maps.bumpMap !== null) {
+          standardMaterial.bumpMap = maps.bumpMap
+          standardMaterial.bumpScale = body.material.bumpScale ?? 0
+        }
+        if (body.material.emissive !== undefined) {
+          standardMaterial.emissive = new THREE.Color(body.material.emissive)
+          standardMaterial.emissiveIntensity = body.material.emissiveIntensity ?? 1
+        }
+        material = standardMaterial
       }
 
       const mesh = new THREE.Mesh(sphereGeometry, material)
@@ -452,6 +489,42 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
           nextTiltGroup.add(halo)
           visualObjects.push(halo)
           visualMaterials.push(haloMaterial)
+          if (isSun) {
+            sunHaloRuntime = { sprite: halo, baseOpacity: visual.halo.opacity, baseScale: haloDiameter }
+          }
+        }
+      }
+
+      // プロミネンス風の小さなフレア(既定3枚)。パーティクルではなく固定枚数のSpriteを
+      // spinGroupの子にして自転と一緒に動かし、tick()内で不透明度・大きさだけを揺らす。
+      if (isSun) {
+        const flareColor = visual?.halo?.color ?? body.material.emissive ?? '#ff8a3d'
+        sunFlareTexture = createFlareTexture(flareColor)
+        if (sunFlareTexture !== null) {
+          const flareRuntimes: typeof sunFlareRuntimes = []
+          for (const flare of DEFAULT_SUN_FLARES) {
+            const flareMaterial = new THREE.SpriteMaterial({
+              map: sunFlareTexture,
+              color: flareColor,
+              transparent: true,
+              opacity: 0.5,
+              depthWrite: false,
+              depthTest: false,
+              blending: THREE.AdditiveBlending,
+            })
+            const direction = surfaceDirection(flare.lonDeg, flare.latDeg)
+            const distance = body.radius * 1.05
+            const flareSprite = new THREE.Sprite(flareMaterial)
+            flareSprite.position.set(direction.x * distance, direction.y * distance, direction.z * distance)
+            const baseScale = body.radius * 0.62
+            flareSprite.scale.set(baseScale, baseScale, 1)
+            flareSprite.renderOrder = 3
+            nextSpinGroup.add(flareSprite)
+            visualObjects.push(flareSprite)
+            visualMaterials.push(flareMaterial)
+            flareRuntimes.push({ sprite: flareSprite, phase: flare.phase, baseOpacity: 0.5, baseScale })
+          }
+          sunFlareRuntimes = flareRuntimes
         }
       }
 
@@ -831,6 +904,34 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       if (progress >= 1) zoomAnimation = null
     }
 
+    /**
+     * 太陽の表面シェーダー・ハロ・フレアの時間変化をまとめて進める。呼び出し側(tick)は
+     * reducedMotionのときはそもそも呼ばないため、ここでは分岐しない
+     * (uTimeが0のまま止まった1コマ、halo/flareが初期値のままになり、静止表示として成立する)。
+     */
+    function updateSunAnimation(now: number) {
+      const t = now / 1000
+
+      if (sunMaterial !== null) updateSunSurfaceMaterial(sunMaterial, t)
+
+      if (sunHaloRuntime !== null) {
+        const scalePulse = 1 + 0.06 * Math.sin(t * 0.5)
+        const opacityPulse = 1 + 0.12 * Math.sin(t * 0.5)
+        const scale = sunHaloRuntime.baseScale * scalePulse
+        sunHaloRuntime.sprite.scale.set(scale, scale, 1)
+        ;(sunHaloRuntime.sprite.material as THREE.SpriteMaterial).opacity =
+          sunHaloRuntime.baseOpacity * Math.min(1, opacityPulse)
+      }
+
+      for (const flare of sunFlareRuntimes) {
+        const scalePulse = 1 + 0.18 * Math.sin(t * 0.7 + flare.phase)
+        const opacityPulse = 0.6 + 0.4 * Math.sin(t * 0.7 + flare.phase)
+        const scale = flare.baseScale * scalePulse
+        flare.sprite.scale.set(scale, scale, 1)
+        ;(flare.sprite.material as THREE.SpriteMaterial).opacity = flare.baseOpacity * Math.max(0.15, opacityPulse)
+      }
+    }
+
     function resizeRenderer() {
       if (renderer === null || camera === null) return
 
@@ -870,6 +971,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       if (!reducedMotion && cloudSpinGroup !== null && currentBody?.visual?.clouds !== undefined) {
         cloudSpinGroup.rotation.y += currentBody.visual.clouds.spinSpeed * dt
       }
+      if (!reducedMotion) updateSunAnimation(now)
       updateSpotVisuals(now, dt)
       updateZoomAnimation(now)
 
