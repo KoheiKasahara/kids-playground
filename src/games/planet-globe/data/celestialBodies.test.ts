@@ -30,8 +30,30 @@ function averageAdjacentLuminanceDelta(stops: readonly { color: string }[]): num
 }
 
 describe('celestialBodies', () => {
-  it('4天体が moon, mars, jupiter, saturn の順で存在する', () => {
-    expect(celestialBodies.map((body) => body.id)).toEqual(['moon', 'mars', 'jupiter', 'saturn'])
+  it('11天体が太陽から外側へ向かう順(月は地球の直後)で存在する', () => {
+    expect(celestialBodies.map((body) => body.id)).toEqual([
+      'sun',
+      'mercury',
+      'venus',
+      'earth',
+      'moon',
+      'mars',
+      'jupiter',
+      'saturn',
+      'uranus',
+      'neptune',
+      'pluto',
+    ])
+  })
+
+  it('太陽=star、月=moon、冥王星=dwarf-planet、それ以外=planetに分類される', () => {
+    const kindById = new Map(celestialBodies.map((body) => [body.id, body.kind]))
+    expect(kindById.get('sun')).toBe('star')
+    expect(kindById.get('moon')).toBe('moon')
+    expect(kindById.get('pluto')).toBe('dwarf-planet')
+    for (const id of ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'] as const) {
+      expect(kindById.get(id)).toBe('planet')
+    }
   })
 
   it('id と displayName が重複しない', () => {
@@ -74,11 +96,11 @@ describe('celestialBodies', () => {
     }
   })
 
-  it('輪を持つのは土星だけ', () => {
+  it('輪を持つのは土星と天王星だけ', () => {
     const ringBodyIds: CelestialBodyId[] = celestialBodies
       .filter((body) => body.ring !== undefined)
       .map((body) => body.id)
-    expect(ringBodyIds).toEqual(['saturn'])
+    expect(ringBodyIds).toEqual(['saturn', 'uranus'])
   })
 
   it('全patches/craters/spotsのidがゲーム内で一意である(Phase 3でキーに使えること)', () => {
@@ -245,5 +267,133 @@ describe('saturn', () => {
     const jupiterDelta = averageAdjacentLuminanceDelta(jupiter.surface.belts)
     const saturnDelta = averageAdjacentLuminanceDelta(saturn.surface.belts)
     expect(saturnDelta).toBeLessThan(jupiterDelta)
+  })
+})
+
+describe('sun(Phase 4)', () => {
+  const sun = celestialBodyById('sun')
+
+  it('kindがstarで、surfaceはgasスタイルである(専用の生成器を追加していない)', () => {
+    expect(sun.kind).toBe('star')
+    expect(sun.surface.style).toBe('gas')
+  })
+
+  it('単なる黄色い球にしないためのemissiveを持つ', () => {
+    expect(sun.material.emissive).toBeDefined()
+    expect(sun.material.emissiveIntensity).toBeGreaterThan(0)
+  })
+
+  it('sunspotが2件以上あり、地色より明確に暗い', () => {
+    if (sun.surface.style !== 'gas') throw new Error('unreachable')
+    const sunspots = sun.surface.spots.filter((spot) => spot.id.startsWith('sunspot-'))
+    expect(sunspots.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('mercury(Phase 4)', () => {
+  const mercury = celestialBodyById('mercury')
+  const moon = celestialBodyById('moon')
+
+  it('surfaceはrockyスタイルで、月とは異なる地色である(見分けが付くこと)', () => {
+    expect(mercury.surface.style).toBe('rocky')
+    if (mercury.surface.style !== 'rocky' || moon.surface.style !== 'rocky') throw new Error('unreachable')
+    expect(mercury.surface.baseColor).not.toBe(moon.surface.baseColor)
+  })
+
+  it('caloris-basinパッチを持つ', () => {
+    if (mercury.surface.style !== 'rocky') throw new Error('unreachable')
+    expect(mercury.surface.patches.some((patch) => patch.id === 'caloris-basin')).toBe(true)
+  })
+})
+
+describe('venus(Phase 4)', () => {
+  const venus = celestialBodyById('venus')
+
+  it('surfaceはgasスタイルである(雲が主役の見た目を流用生成器で表す)', () => {
+    expect(venus.surface.style).toBe('gas')
+  })
+
+  it('逆向きの自転(負のspinSpeed)を持つ', () => {
+    expect(venus.spinSpeed).toBeLessThan(0)
+  })
+})
+
+describe('earth(Phase 4)', () => {
+  const earth = celestialBodyById('earth')
+
+  it('kindがplanetで、surfaceはrockyスタイルである', () => {
+    expect(earth.kind).toBe('planet')
+    expect(earth.surface.style).toBe('rocky')
+  })
+
+  it('7大陸ぶんのpatchesを持つ', () => {
+    if (earth.surface.style !== 'rocky') throw new Error('unreachable')
+    const continentIds = earth.surface.patches
+      .map((patch) => patch.id)
+      .filter((id) => id.startsWith('continent-'))
+    expect(continentIds).toEqual([
+      'continent-asia',
+      'continent-africa',
+      'continent-europe',
+      'continent-north-america',
+      'continent-south-america',
+      'continent-oceania',
+      'continent-antarctica',
+    ])
+  })
+
+  it('国境線データは持たず、極冠を北極・南極として持つ', () => {
+    if (earth.surface.style !== 'rocky') throw new Error('unreachable')
+    expect(earth.surface.polarCaps).toBeDefined()
+    expect(earth.surface.polarCaps?.northEdgeLatDeg).toBeGreaterThan(0)
+    expect(earth.surface.polarCaps?.southEdgeLatDeg).toBeLessThan(0)
+  })
+})
+
+describe('uranus(Phase 4)', () => {
+  const uranus = celestialBodyById('uranus')
+
+  it('自転軸が90度近く傾いており、他の全惑星よりはっきり大きい', () => {
+    const others = celestialBodies.filter((body) => body.id !== 'uranus' && body.kind === 'planet')
+    for (const other of others) {
+      expect(uranus.axialTiltDegrees).toBeGreaterThan(other.axialTiltDegrees + 30)
+    }
+    expect(uranus.axialTiltDegrees).toBeGreaterThan(80)
+  })
+
+  it('既存のRingSpec構造を流用した簡易リングを持つ', () => {
+    expect(uranus.ring).toBeDefined()
+    expect(uranus.ring?.segments.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('neptune(Phase 4)', () => {
+  const neptune = celestialBodyById('neptune')
+  const uranus = celestialBodyById('uranus')
+
+  it('surfaceはgasスタイルで、天王星より濃い青の地色を持つ(色違い球で終わらせない)', () => {
+    expect(neptune.surface.style).toBe('gas')
+    if (neptune.surface.style !== 'gas' || uranus.surface.style !== 'gas') throw new Error('unreachable')
+    expect(relativeLuma(neptune.surface.baseColor)).toBeLessThan(relativeLuma(uranus.surface.baseColor))
+  })
+
+  it('great-dark-spotを持つ', () => {
+    if (neptune.surface.style !== 'gas') throw new Error('unreachable')
+    expect(neptune.surface.spots.some((spot) => spot.id === 'great-dark-spot')).toBe(true)
+  })
+})
+
+describe('pluto(Phase 4)', () => {
+  const pluto = celestialBodyById('pluto')
+
+  it('kindがdwarf-planetである(惑星として扱わない)', () => {
+    expect(pluto.kind).toBe('dwarf-planet')
+  })
+
+  it('surfaceはrockyスタイルで、単色にならないよう複数のpatchesを持つ', () => {
+    expect(pluto.surface.style).toBe('rocky')
+    if (pluto.surface.style !== 'rocky') throw new Error('unreachable')
+    expect(pluto.surface.patches.length).toBeGreaterThanOrEqual(3)
+    expect(pluto.surface.patches.some((patch) => patch.id.startsWith('tombaugh-regio'))).toBe(true)
   })
 })

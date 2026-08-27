@@ -12,7 +12,7 @@ function spotById(id: string): FeatureSpot {
 }
 
 describe('featureSpotsByBodyId', () => {
-  it('4天体すべてに2個以上のスポットがある', () => {
+  it('全天体に2個以上のスポットがある', () => {
     for (const body of celestialBodies) {
       expect(featureSpotsFor(body.id).length).toBeGreaterThanOrEqual(2)
     }
@@ -147,10 +147,48 @@ describe('featureSpotsByBodyId', () => {
     })
   })
 
-  it('featureSpotsByBodyIdは4天体すべてのキーを持つ', () => {
-    const ids: CelestialBodyId[] = ['moon', 'mars', 'jupiter', 'saturn']
+  it('featureSpotsByBodyIdは11天体すべてのキーを持つ', () => {
+    const ids: CelestialBodyId[] = [
+      'sun',
+      'mercury',
+      'venus',
+      'earth',
+      'moon',
+      'mars',
+      'jupiter',
+      'saturn',
+      'uranus',
+      'neptune',
+      'pluto',
+    ]
     for (const id of ids) {
       expect(featureSpotsByBodyId[id]).toBeDefined()
+      expect(featureSpotsByBodyId[id].length).toBeGreaterThanOrEqual(2)
+    }
+  })
+
+  it('地球だけは他天体より特徴スポットが多い(大陸・海・極・大気をあつかうため)', () => {
+    const earthCount = featureSpotsFor('earth').length
+    for (const body of celestialBodies) {
+      if (body.id === 'earth') continue
+      expect(earthCount).toBeGreaterThan(featureSpotsFor(body.id).length)
+    }
+  })
+
+  it('地球の大陸・海のスポットは、幼児が一点を正確に押さなくても反応する大きめのhitRadiusPxを持つ', () => {
+    for (const id of ['continent-asia', 'ocean-pacific', 'continent-africa'] as const) {
+      expect(spotById(id).hitRadiusPx).toBeGreaterThanOrEqual(44)
+    }
+  })
+
+  it('天王星のリングスポットはbody.ringのセグメントを指す', () => {
+    const uranus = celestialBodyById('uranus')
+    const segmentIds = new Set((uranus.ring?.segments ?? []).map((segment) => segment.id))
+    for (const spot of featureSpotsFor('uranus')) {
+      if (spot.target.kind !== 'ring') continue
+      for (const id of spot.target.highlightSegmentIds ?? []) {
+        expect(segmentIds.has(id)).toBe(true)
+      }
     }
   })
 })

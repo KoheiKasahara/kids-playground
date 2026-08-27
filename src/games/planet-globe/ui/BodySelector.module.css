@@ -1,3 +1,9 @@
+/*
+ * 4天体のときは横一列を均等分割していたが、11天体では同じ方式だとボタンが
+ * 幼児のタップ領域として小さくなりすぎる。行を増やして縦のスペースを圧迫するよりも、
+ * ボタンの大きさを保ったまま横スクロールにするほうが、既存の(縦画面の低い横向きも含む)
+ * レイアウト予算を崩さずに済む。天体数が増えても1行の高さは変わらない。
+ */
 .bar {
   flex: 0 0 auto;
   width: 100%;
@@ -8,11 +14,15 @@
     calc(var(--space-sm) + var(--safe-left));
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
 }
 
 .button {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 0 0 auto;
+  width: clamp(72px, 21vw, 92px);
   min-height: var(--tap-target-min);
   display: flex;
   flex-direction: column;
@@ -27,6 +37,7 @@
   font-family: inherit;
   font-weight: 700;
   cursor: pointer;
+  scroll-snap-align: start;
   transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
 }
 

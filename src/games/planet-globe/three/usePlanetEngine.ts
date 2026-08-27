@@ -322,6 +322,10 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         material.bumpMap = maps.bumpMap
         material.bumpScale = body.material.bumpScale ?? 0
       }
+      if (body.material.emissive !== undefined) {
+        material.emissive = new THREE.Color(body.material.emissive)
+        material.emissiveIntensity = body.material.emissiveIntensity ?? 1
+      }
 
       const mesh = new THREE.Mesh(sphereGeometry, material)
       // 極方向の潰れ(ガス惑星の扁平)はY軸(極軸)だけを縮めて表現する。
