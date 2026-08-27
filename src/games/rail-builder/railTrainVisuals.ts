@@ -1,0 +1,569 @@
+import type { TrainType } from './railFleetModel'
+
+/** 編成内での車両の役割。先頭車だけがE5のロングノーズを持つ。 */
+export type TrainCarRole = 'lead' | 'middle'
+
+export type TrainCarVisualProfile = {
+  role: TrainCarRole
+  /** 外形の意図をテストやThree.js factoryから参照するための名前。 */
+  silhouette:
+    | 'basic-rounded'
+    | 'e5-rounded-shoulder'
+    | 'e5-low-nose'
+    | 'e6-sharp-shoulder'
+    | 'e6-spear-nose'
+    | 'n700s-rounded-shoulder'
+    | 'n700s-winged-nose'
+    | 'doctor-yellow-thick-shoulder'
+    | 'doctor-yellow-duck-nose'
+  noseStyle: 'basic-box' | 'e5-wide-wedge' | 'e6-spear' | 'n700s-winged' | 'doctor-yellow-duck'
+  bodyLength: number
+  bodyHeight: number
+  bodyWidth: number
+  bodyCenterX: number
+  bodyCenterY: number
+  roofLength: number
+  roofHeight: number
+  roofWidth: number
+  roofCenterX: number
+  roofCenterY: number
+  /** ノーズを持たない車両では0。 */
+  noseLength: number
+  noseBaseX: number
+  noseTipX: number
+  noseBaseWidth: number
+  noseTipWidth: number
+  noseBaseBottomY: number
+  noseBaseTopY: number
+  noseTipBottomY: number
+  noseTipTopY: number
+  accentLength: number
+  accentHeight: number
+  accentY: number
+  sideWindowXs: readonly number[]
+  sideWindowY: number
+  sideWindowWidth: number
+  sideWindowHeight: number
+  frontWindowX: number
+  frontWindowY: number
+  frontWindowWidth: number
+  headlightX: number
+  headlightY: number
+  headlightZ: number
+  hasFrontWindow: boolean
+  hasHeadlights: boolean
+  /** 車体の中心から測ったカプラー位置。 */
+  couplerPositions: readonly number[]
+}
+
+export type TrainVisualProfile = {
+  trainType: TrainType
+  silhouette:
+    | 'basic-rounded'
+    | 'e5-rounded-shoulder'
+    | 'e6-sharp-shoulder'
+    | 'n700s-rounded-shoulder'
+    | 'doctor-yellow-thick-shoulder'
+  bodyColor: string
+  frontColor: string
+  roofColor: string
+  /** 上端・半幅・車体前後端の設計上限を明示する。 */
+  bodyWidth: number
+  bodyHeight: number
+  noseLength: number
+  frontExtent: number
+  rearExtent: number
+  maxHalfWidth: number
+  /** E5の側面帯、または各タイプのアクセント色。 */
+  accent: {
+    color: string
+    height: number
+    y: number
+  }
+  window: {
+    color: string
+    sideXs: readonly number[]
+    sideWidth: number
+    sideHeight: number
+  }
+  lead: TrainCarVisualProfile
+  middle: TrainCarVisualProfile
+}
+
+const BASIC_SIDE_WINDOW_XS = [-0.52, 0.18] as const
+const BASIC_COUPLER_POSITIONS = [-1.25, 1.25] as const
+
+/**
+ * 既存basicの車体寸法を記録したプロファイル。engine側ではbasic専用の従来
+ * factoryを通るため、この値を変更してもbasicの見た目を意図せず変えない。
+ */
+const BASIC_LEAD: TrainCarVisualProfile = {
+  role: 'lead',
+  silhouette: 'basic-rounded',
+  noseStyle: 'basic-box',
+  bodyLength: 2.15,
+  bodyHeight: 0.78,
+  bodyWidth: 0.92,
+  bodyCenterX: 0,
+  bodyCenterY: 0.84,
+  roofLength: 2.22,
+  roofHeight: 0.16,
+  roofWidth: 1,
+  roofCenterX: 0,
+  roofCenterY: 1.31,
+  noseLength: 0.3,
+  noseBaseX: 1.06,
+  noseTipX: 1.21,
+  noseBaseWidth: 0.88,
+  noseTipWidth: 0.88,
+  noseBaseBottomY: 0.5,
+  noseBaseTopY: 1.2,
+  noseTipBottomY: 0.5,
+  noseTipTopY: 1.2,
+  accentLength: 0,
+  accentHeight: 0,
+  accentY: 0,
+  sideWindowXs: BASIC_SIDE_WINDOW_XS,
+  sideWindowY: 1.02,
+  sideWindowWidth: 0.42,
+  sideWindowHeight: 0.28,
+  frontWindowX: 1.23,
+  frontWindowY: 1.04,
+  frontWindowWidth: 0.54,
+  headlightX: 1.24,
+  headlightY: 0.8,
+  headlightZ: 0.27,
+  hasFrontWindow: true,
+  hasHeadlights: true,
+  couplerPositions: BASIC_COUPLER_POSITIONS,
+}
+
+const BASIC_MIDDLE: TrainCarVisualProfile = {
+  ...BASIC_LEAD,
+  role: 'middle',
+  hasFrontWindow: false,
+  hasHeadlights: false,
+}
+
+const E5_LEAD: TrainCarVisualProfile = {
+  role: 'lead',
+  silhouette: 'e5-low-nose',
+  noseStyle: 'e5-wide-wedge',
+  // body rear is about -1.03 and the roof top is about 1.26.
+  bodyLength: 1.74,
+  bodyHeight: 0.64,
+  bodyWidth: 0.9,
+  bodyCenterX: -0.16,
+  bodyCenterY: 0.78,
+  roofLength: 1.78,
+  roofHeight: 0.14,
+  roofWidth: 0.9,
+  roofCenterX: -0.15,
+  roofCenterY: 1.19,
+  // The nose is low, broad at its shoulder, and tapers only at the tip.
+  noseLength: 1.02,
+  // body front is around 0.71; the wedge begins around x=0.32 and runs to 1.34.
+  noseBaseX: 0.32,
+  noseTipX: 1.34,
+  noseBaseWidth: 0.9,
+  noseTipWidth: 0.54,
+  noseBaseBottomY: 0.48,
+  noseBaseTopY: 1.04,
+  noseTipBottomY: 0.62,
+  noseTipTopY: 0.84,
+  accentLength: 1.44,
+  accentHeight: 0.1,
+  accentY: 0.8,
+  sideWindowXs: [-0.58, 0.03],
+  sideWindowY: 0.97,
+  sideWindowWidth: 0.38,
+  sideWindowHeight: 0.22,
+  frontWindowX: 0.57,
+  frontWindowY: 0.92,
+  frontWindowWidth: 0.5,
+  headlightX: 1.24,
+  headlightY: 0.69,
+  headlightZ: 0.19,
+  hasFrontWindow: true,
+  hasHeadlights: true,
+  couplerPositions: BASIC_COUPLER_POSITIONS,
+}
+
+const E5_MIDDLE: TrainCarVisualProfile = {
+  role: 'middle',
+  silhouette: 'e5-rounded-shoulder',
+  noseStyle: 'e5-wide-wedge',
+  bodyLength: 1.92,
+  bodyHeight: 0.64,
+  bodyWidth: 0.9,
+  bodyCenterX: 0,
+  bodyCenterY: 0.78,
+  roofLength: 1.94,
+  roofHeight: 0.14,
+  roofWidth: 0.9,
+  roofCenterX: 0,
+  roofCenterY: 1.19,
+  noseLength: 0,
+  noseBaseX: 0,
+  noseTipX: 0,
+  noseBaseWidth: 0,
+  noseTipWidth: 0,
+  noseBaseBottomY: 0,
+  noseBaseTopY: 0,
+  noseTipBottomY: 0,
+  noseTipTopY: 0,
+  accentLength: 1.62,
+  accentHeight: 0.1,
+  accentY: 0.8,
+  sideWindowXs: [-0.58, 0.03],
+  sideWindowY: 0.97,
+  sideWindowWidth: 0.38,
+  sideWindowHeight: 0.22,
+  frontWindowX: 0,
+  frontWindowY: 0,
+  frontWindowWidth: 0,
+  headlightX: 0,
+  headlightY: 0,
+  headlightZ: 0,
+  hasFrontWindow: false,
+  hasHeadlights: false,
+  couplerPositions: BASIC_COUPLER_POSITIONS,
+}
+
+const E6_LEAD: TrainCarVisualProfile = {
+  role: 'lead',
+  silhouette: 'e6-spear-nose',
+  noseStyle: 'e6-spear',
+  bodyLength: 1.78,
+  bodyHeight: 0.58,
+  bodyWidth: 0.82,
+  bodyCenterX: -0.12,
+  bodyCenterY: 0.75,
+  roofLength: 1.82,
+  roofHeight: 0.13,
+  roofWidth: 0.82,
+  roofCenterX: -0.12,
+  roofCenterY: 1.14,
+  noseLength: 1.1,
+  noseBaseX: 0.24,
+  noseTipX: 1.34,
+  noseBaseWidth: 0.82,
+  noseTipWidth: 0.18,
+  noseBaseBottomY: 0.48,
+  noseBaseTopY: 0.98,
+  noseTipBottomY: 0.66,
+  noseTipTopY: 0.82,
+  accentLength: 1.46,
+  accentHeight: 0.055,
+  accentY: 0.73,
+  sideWindowXs: [-0.55, 0.04],
+  sideWindowY: 0.94,
+  sideWindowWidth: 0.48,
+  sideWindowHeight: 0.18,
+  frontWindowX: 0.62,
+  frontWindowY: 0.87,
+  frontWindowWidth: 0.36,
+  headlightX: 1.24,
+  headlightY: 0.7,
+  headlightZ: 0.12,
+  hasFrontWindow: true,
+  hasHeadlights: true,
+  couplerPositions: BASIC_COUPLER_POSITIONS,
+}
+
+const E6_MIDDLE: TrainCarVisualProfile = {
+  ...E6_LEAD,
+  role: 'middle',
+  silhouette: 'e6-sharp-shoulder',
+  bodyLength: 1.92,
+  bodyCenterX: 0,
+  roofLength: 1.94,
+  roofCenterX: 0,
+  noseLength: 0,
+  noseBaseX: 0,
+  noseTipX: 0,
+  noseBaseWidth: 0,
+  noseTipWidth: 0,
+  noseBaseBottomY: 0,
+  noseBaseTopY: 0,
+  noseTipBottomY: 0,
+  noseTipTopY: 0,
+  frontWindowX: 0,
+  frontWindowY: 0,
+  frontWindowWidth: 0,
+  headlightX: 0,
+  headlightY: 0,
+  headlightZ: 0,
+  hasFrontWindow: false,
+  hasHeadlights: false,
+}
+
+const N700S_LEAD: TrainCarVisualProfile = {
+  role: 'lead',
+  silhouette: 'n700s-winged-nose',
+  noseStyle: 'n700s-winged',
+  bodyLength: 1.82,
+  bodyHeight: 0.6,
+  bodyWidth: 0.88,
+  bodyCenterX: -0.08,
+  bodyCenterY: 0.77,
+  roofLength: 1.86,
+  roofHeight: 0.14,
+  roofWidth: 0.88,
+  roofCenterX: -0.08,
+  roofCenterY: 1.18,
+  noseLength: 0.78,
+  noseBaseX: 0.52,
+  noseTipX: 1.3,
+  noseBaseWidth: 0.82,
+  noseTipWidth: 0.38,
+  noseBaseBottomY: 0.5,
+  noseBaseTopY: 1.02,
+  noseTipBottomY: 0.62,
+  noseTipTopY: 0.84,
+  accentLength: 1.55,
+  accentHeight: 0.1,
+  accentY: 0.77,
+  sideWindowXs: [-0.56, 0.08, 0.58],
+  sideWindowY: 0.97,
+  sideWindowWidth: 0.4,
+  sideWindowHeight: 0.2,
+  frontWindowX: 0.84,
+  frontWindowY: 0.9,
+  frontWindowWidth: 0.42,
+  headlightX: 1.22,
+  headlightY: 0.7,
+  headlightZ: 0.16,
+  hasFrontWindow: true,
+  hasHeadlights: true,
+  couplerPositions: BASIC_COUPLER_POSITIONS,
+}
+
+const N700S_MIDDLE: TrainCarVisualProfile = {
+  ...N700S_LEAD,
+  role: 'middle',
+  silhouette: 'n700s-rounded-shoulder',
+  bodyLength: 1.94,
+  bodyCenterX: 0,
+  roofLength: 1.97,
+  roofCenterX: 0,
+  noseLength: 0,
+  noseBaseX: 0,
+  noseTipX: 0,
+  noseBaseWidth: 0,
+  noseTipWidth: 0,
+  noseBaseBottomY: 0,
+  noseBaseTopY: 0,
+  noseTipBottomY: 0,
+  noseTipTopY: 0,
+  frontWindowX: 0,
+  frontWindowY: 0,
+  frontWindowWidth: 0,
+  headlightX: 0,
+  headlightY: 0,
+  headlightZ: 0,
+  hasFrontWindow: false,
+  hasHeadlights: false,
+}
+
+const DOCTOR_YELLOW_LEAD: TrainCarVisualProfile = {
+  role: 'lead',
+  silhouette: 'doctor-yellow-duck-nose',
+  noseStyle: 'doctor-yellow-duck',
+  bodyLength: 1.8,
+  bodyHeight: 0.7,
+  bodyWidth: 0.94,
+  bodyCenterX: -0.14,
+  bodyCenterY: 0.78,
+  roofLength: 1.86,
+  roofHeight: 0.14,
+  roofWidth: 0.94,
+  roofCenterX: -0.14,
+  roofCenterY: 1.2,
+  noseLength: 1.05,
+  noseBaseX: 0.27,
+  noseTipX: 1.32,
+  noseBaseWidth: 0.94,
+  noseTipWidth: 0.34,
+  noseBaseBottomY: 0.45,
+  noseBaseTopY: 1.06,
+  noseTipBottomY: 0.56,
+  noseTipTopY: 0.83,
+  accentLength: 1.52,
+  accentHeight: 0.11,
+  accentY: 0.78,
+  sideWindowXs: [-0.52],
+  sideWindowY: 0.99,
+  sideWindowWidth: 0.46,
+  sideWindowHeight: 0.23,
+  frontWindowX: 0.55,
+  frontWindowY: 0.93,
+  frontWindowWidth: 0.44,
+  headlightX: 1.22,
+  headlightY: 0.69,
+  headlightZ: 0.16,
+  hasFrontWindow: true,
+  hasHeadlights: true,
+  couplerPositions: BASIC_COUPLER_POSITIONS,
+}
+
+const DOCTOR_YELLOW_MIDDLE: TrainCarVisualProfile = {
+  ...DOCTOR_YELLOW_LEAD,
+  role: 'middle',
+  silhouette: 'doctor-yellow-thick-shoulder',
+  bodyLength: 1.96,
+  bodyCenterX: 0,
+  roofLength: 1.98,
+  roofCenterX: 0,
+  noseLength: 0,
+  noseBaseX: 0,
+  noseTipX: 0,
+  noseBaseWidth: 0,
+  noseTipWidth: 0,
+  noseBaseBottomY: 0,
+  noseBaseTopY: 0,
+  noseTipBottomY: 0,
+  noseTipTopY: 0,
+  frontWindowX: 0,
+  frontWindowY: 0,
+  frontWindowWidth: 0,
+  headlightX: 0,
+  headlightY: 0,
+  headlightZ: 0,
+  hasFrontWindow: false,
+  hasHeadlights: false,
+}
+
+const E5_PROFILE: TrainVisualProfile = {
+  trainType: 'e5',
+  silhouette: 'e5-rounded-shoulder',
+  bodyColor: '#168c8f',
+  frontColor: '#0e6672',
+  roofColor: '#f8f4ea',
+  bodyWidth: 0.9,
+  bodyHeight: 0.64,
+  noseLength: E5_LEAD.noseLength,
+  frontExtent: E5_LEAD.noseTipX,
+  rearExtent: -1.03,
+  maxHalfWidth: 0.45,
+  accent: { color: '#ec5a93', height: 0.1, y: 0.8 },
+  window: {
+    color: '#173246',
+    sideXs: E5_LEAD.sideWindowXs,
+    sideWidth: E5_LEAD.sideWindowWidth,
+    sideHeight: E5_LEAD.sideWindowHeight,
+  },
+  lead: E5_LEAD,
+  middle: E5_MIDDLE,
+}
+
+const E6_PROFILE: TrainVisualProfile = {
+  trainType: 'e6',
+  silhouette: 'e6-sharp-shoulder',
+  bodyColor: '#c93645',
+  frontColor: '#8d2432',
+  roofColor: '#f2eee4',
+  bodyWidth: 0.82,
+  bodyHeight: 0.58,
+  noseLength: E6_LEAD.noseLength,
+  frontExtent: E6_LEAD.noseTipX,
+  rearExtent: -1.03,
+  maxHalfWidth: 0.41,
+  accent: { color: '#b8bdc4', height: 0.055, y: 0.73 },
+  window: {
+    color: '#142f4a',
+    sideXs: E6_LEAD.sideWindowXs,
+    sideWidth: E6_LEAD.sideWindowWidth,
+    sideHeight: E6_LEAD.sideWindowHeight,
+  },
+  lead: E6_LEAD,
+  middle: E6_MIDDLE,
+}
+
+const N700S_PROFILE: TrainVisualProfile = {
+  trainType: 'n700s',
+  silhouette: 'n700s-rounded-shoulder',
+  bodyColor: '#e5e8ea',
+  frontColor: '#c1c8d0',
+  roofColor: '#f4f6f5',
+  bodyWidth: 0.88,
+  bodyHeight: 0.6,
+  noseLength: N700S_LEAD.noseLength,
+  frontExtent: N700S_LEAD.noseTipX,
+  rearExtent: -1.01,
+  maxHalfWidth: 0.44,
+  accent: { color: '#2e64cb', height: 0.1, y: 0.77 },
+  window: {
+    color: '#173b63',
+    sideXs: N700S_LEAD.sideWindowXs,
+    sideWidth: N700S_LEAD.sideWindowWidth,
+    sideHeight: N700S_LEAD.sideWindowHeight,
+  },
+  lead: N700S_LEAD,
+  middle: N700S_MIDDLE,
+}
+
+const DOCTOR_YELLOW_PROFILE: TrainVisualProfile = {
+  trainType: 'doctorYellow',
+  silhouette: 'doctor-yellow-thick-shoulder',
+  bodyColor: '#f5c928',
+  frontColor: '#dba315',
+  roofColor: '#f3e5a3',
+  bodyWidth: 0.94,
+  bodyHeight: 0.7,
+  noseLength: DOCTOR_YELLOW_LEAD.noseLength,
+  frontExtent: DOCTOR_YELLOW_LEAD.noseTipX,
+  rearExtent: -1.04,
+  maxHalfWidth: 0.47,
+  accent: { color: '#19457a', height: 0.11, y: 0.78 },
+  window: {
+    color: '#294f77',
+    sideXs: DOCTOR_YELLOW_LEAD.sideWindowXs,
+    sideWidth: DOCTOR_YELLOW_LEAD.sideWindowWidth,
+    sideHeight: DOCTOR_YELLOW_LEAD.sideWindowHeight,
+  },
+  lead: DOCTOR_YELLOW_LEAD,
+  middle: DOCTOR_YELLOW_MIDDLE,
+}
+
+/** 全TrainTypeを一つの表で検査できる見た目定義。走行ロジックは参照しない。 */
+export const TRAIN_VISUAL_PROFILES: Readonly<Record<TrainType, TrainVisualProfile>> = {
+  basic: {
+    trainType: 'basic',
+    silhouette: 'basic-rounded',
+    bodyColor: '#f97316',
+    frontColor: '#ea580c',
+    roofColor: '#facc15',
+    bodyWidth: BASIC_LEAD.bodyWidth,
+    bodyHeight: BASIC_LEAD.bodyHeight,
+    noseLength: BASIC_LEAD.noseLength,
+    frontExtent: 1.23,
+    rearExtent: -1.075,
+    maxHalfWidth: 0.5,
+    accent: { color: '#facc15', height: 0, y: 0 },
+    window: {
+      color: '#67e8f9',
+      sideXs: BASIC_SIDE_WINDOW_XS,
+      sideWidth: 0.42,
+      sideHeight: 0.28,
+    },
+    lead: BASIC_LEAD,
+    middle: BASIC_MIDDLE,
+  },
+  e5: E5_PROFILE,
+  e6: E6_PROFILE,
+  n700s: N700S_PROFILE,
+  doctorYellow: DOCTOR_YELLOW_PROFILE,
+}
+
+export function resolveTrainVisualProfile(trainType: TrainType): TrainVisualProfile {
+  return TRAIN_VISUAL_PROFILES[trainType] ?? TRAIN_VISUAL_PROFILES.basic
+}
+
+export function getTrainCarVisualProfile(
+  trainType: TrainType,
+  role: TrainCarRole,
+): TrainCarVisualProfile {
+  const profile = resolveTrainVisualProfile(trainType)
+  return role === 'lead' ? profile.lead : profile.middle
+}

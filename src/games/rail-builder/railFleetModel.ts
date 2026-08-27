@@ -56,14 +56,14 @@ export function resolveTrainType(value: unknown): TrainType {
 }
 
 /**
- * Phase 1では新型車両の完成デザインは作らず、色だけを変えた仮設定に留める。
- * 先頭車/中間車の形状差などはPhase 2以降でここに追加していく想定。
+ * 車両タイプ単位で共有する外装の基調色。詳細な車体シルエットや窓・帯は
+ * railTrainVisuals.ts の描画プロファイルが担当し、走行状態からは分離する。
  */
 const TRAIN_TYPE_VISUAL_CONFIGS: Record<Exclude<TrainType, 'basic'>, TrainVisualConfig> = {
-  e5: { color: '#1c7a4d', frontColor: '#0f5132', roofColor: '#f8fafc' },
-  e6: { color: '#be123c', frontColor: '#881337', roofColor: '#fecdd3' },
-  n700s: { color: '#e2e8f0', frontColor: '#cbd5f5', roofColor: '#1d4ed8' },
-  doctorYellow: { color: '#fbbf24', frontColor: '#f59e0b', roofColor: '#e5e7eb' },
+  e5: { color: '#168c8f', frontColor: '#0e6672', roofColor: '#f8f4ea' },
+  e6: { color: '#c93645', frontColor: '#8d2432', roofColor: '#f2eee4' },
+  n700s: { color: '#e5e8ea', frontColor: '#c1c8d0', roofColor: '#f4f6f5' },
+  doctorYellow: { color: '#f5c928', frontColor: '#dba315', roofColor: '#f3e5a3' },
 }
 
 /**
