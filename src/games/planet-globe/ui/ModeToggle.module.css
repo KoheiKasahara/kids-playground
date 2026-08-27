@@ -1,12 +1,7 @@
-/*
- * よみあげトグルと並べて画面端(右上)に小さく置くため、横並びのセグメントではなく
- * 縦積みにして幅を抑える(Issue #233: 天体観察を圧迫しない配置への変更)。
- * 天体表示を邪魔しない代わりに高さ方向を使うが、ボタン自体の大きさ・文字サイズは
- * 幼児のタップ領域として十分な水準を保つ。
- */
+/* 縦画面では横並びにして、タイトルを惑星から離せる上部の余白を確保する。 */
 .group {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: var(--space-xs);
   padding: 4px;
   border-radius: var(--radius-lg);
@@ -52,7 +47,11 @@
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
-  /* 低い横画面では右上の固定UI領域(よみあげ+モード切替)の高さを抑える。 */
+  /* 低い横画面では横幅を優先して縦積みに戻す。 */
+  .group {
+    flex-direction: column;
+  }
+
   .button {
     min-height: 30px;
     padding: 2px var(--space-xs);
