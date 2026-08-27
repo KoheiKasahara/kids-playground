@@ -36,18 +36,29 @@
   height: 100%;
 }
 
-.header {
+/*
+ * ヘッダー(タイトル・説明文)とモード切替ボタンを縦に並べる土台。
+ * 「もどる」は左上に固定で置くため、その高さのぶんだけ下げる。横方向のpaddingだけで
+ * 避けようとすると、320px幅では説明文を置く幅が足りず「もどる」の下に文字が潜り込んで
+ * 読めなくなる。天体は画面中央に余白付きで収まるため、上端の空を少し使っても
+ * 天体の見え方には影響しない。フレックスの縦積みにすることで、説明文の行数が
+ * 変わっても(モードごとに文言が変わる)モード切替ボタンの位置がハードコードした
+ * オフセットとずれない。
+ */
+.topBar {
   position: absolute;
-  /*
-   * 「もどる」は左上に固定で置くため、タイトル・説明文はその高さのぶんだけ下げる。
-   * 横方向のpaddingだけで避けようとすると、320px幅では説明文を置く幅が足りず
-   * 「もどる」の下に文字が潜り込んで読めなくなる。天体は画面中央に余白付きで
-   * 収まるため、上端の空を少し使っても天体の見え方には影響しない。
-   */
   top: calc(var(--space-sm) + var(--safe-top) + var(--tap-target-min));
   left: 0;
   right: 0;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  pointer-events: none;
+}
+
+.header {
   width: min(100%, 520px);
   margin: 0 auto;
   padding-inline: var(--space-md);
@@ -125,8 +136,12 @@
 
 @media (orientation: landscape) and (max-height: 560px) {
   /* 低い横画面では上端の余白が少ないため、「もどる」の右横に回り込ませて高さを節約する。 */
-  .header {
+  .topBar {
     top: calc(var(--space-sm) + var(--safe-top));
+    gap: 2px;
+  }
+
+  .header {
     padding-inline: calc(var(--tap-target-min) + var(--space-md));
   }
 
