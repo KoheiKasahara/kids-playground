@@ -175,6 +175,49 @@ function toBumpTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
 
 export type SurfaceMaps = { map: THREE.CanvasTexture | null; bumpMap: THREE.CanvasTexture | null }
 
+/** 雲レイヤーは地表テクスチャより小さく保つ。白い雲だけのため1024pxは必要ない。 */
+const CLOUD_TEXTURE_WIDTH = 512
+const CLOUD_TEXTURE_HEIGHT = 256
+
+/**
+ * 経緯度で定義した雲パッチだけを透明Canvasへ描く。
+ * 地表と同じ座標系なので、雲の配置を天体データ上で一緒に管理できる。画像assetや
+ * 常時実行shaderを増やさず、地球の雲を別レイヤーとして動かすための軽いテクスチャ。
+ */
+export function createCloudTexture(patches: readonly SurfacePatch[]): THREE.CanvasTexture | null {
+  const canvas = document.createElement('canvas')
+  canvas.width = CLOUD_TEXTURE_WIDTH
+  canvas.height = CLOUD_TEXTURE_HEIGHT
+  const ctx = get2dContext(canvas)
+  if (ctx === null) return null
+
+  for (const patch of patches) {
+    const radiusXPx = (patch.lonRadiusDeg / 360) * CLOUD_TEXTURE_WIDTH
+    const radiusYPx = (patch.latRadiusDeg / 180) * CLOUD_TEXTURE_HEIGHT
+    const centerYPx = ((90 - patch.latDeg) / 180) * CLOUD_TEXTURE_HEIGHT
+
+    forEachWrappedLon(patch.lonDeg, patch.lonRadiusDeg, (lonDeg) => {
+      const centerXPx = ((lonDeg + 180) / 360) * CLOUD_TEXTURE_WIDTH
+      fillEllipseGradient(ctx, centerXPx, centerYPx, radiusXPx, radiusYPx, patch.rotationDeg, (c) => {
+        const gradient = c.createRadialGradient(0, 0, 0, 0, 0, 1)
+        const innerStop = THREE.MathUtils.clamp(1 - patch.softness, 0, 0.98)
+        gradient.addColorStop(0, withAlpha(patch.color, patch.opacity))
+        gradient.addColorStop(innerStop, withAlpha(patch.color, patch.opacity))
+        gradient.addColorStop(1, withAlpha(patch.color, 0))
+        c.fillStyle = gradient
+        c.beginPath()
+        c.arc(0, 0, 1, 0, Math.PI * 2)
+        c.fill()
+      })
+    })
+  }
+
+  const texture = toColorTexture(canvas)
+  texture.minFilter = THREE.LinearFilter
+  texture.magFilter = THREE.LinearFilter
+  return texture
+}
+
 // ---------------------------------------------------------------------------
 // 岩石天体(rocky): 月・火星
 // ---------------------------------------------------------------------------
