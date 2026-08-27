@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 30332)
-Total output lines: 2933
-
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
@@ -1507,7 +1504,48 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         group.add(door)
       }
 
-      const frontWindow = new THREE.Mesh(trainFrontWindowGeometry, trainWind…332 tokens truncated…Profile(runtime.trainType, isLead ? 'lead' : 'middle')
+      const frontWindow = new THREE.Mesh(trainFrontWindowGeometry, trainWindowMaterial)
+      frontWindow.position.set(1.23, 1.04, 0)
+      group.add(frontWindow)
+
+      for (const side of [-1, 1]) {
+        const headlight = new THREE.Mesh(trainLightGeometry, trainLightMaterial)
+        headlight.position.set(1.24, 0.8, side * 0.27)
+        group.add(headlight)
+      }
+
+      const wheelPivots: THREE.Object3D[] = []
+      for (const x of [-0.67, 0.67]) {
+        for (const side of [-1, 1]) {
+          const pivot = new THREE.Object3D()
+          pivot.position.set(x, 0.34, side * 0.5)
+          const wheel = new THREE.Mesh(trainWheelGeometry, trainWheelMaterial)
+          wheel.rotation.x = Math.PI / 2
+          pivot.add(wheel)
+          group.add(pivot)
+          wheelPivots.push(pivot)
+        }
+      }
+
+      for (const x of [-1.25, 1.25]) {
+        const coupler = new THREE.Mesh(trainCouplerGeometry, trainCouplerMaterial)
+        coupler.position.set(x, 0.62, 0)
+        group.add(coupler)
+      }
+      runtime.root.add(group)
+      runtime.cars.push(group)
+      runtime.wheelPivots.push(wheelPivots)
+      return group
+    }
+
+    function makeSpecialTrainCar(
+      runtime: TrainVisualRuntime,
+      trainId: string,
+      index: number,
+      definition: SpecialTrainVisualDefinition,
+    ): THREE.Group {
+      const isLead = index === 0
+      const profile = getTrainCarVisualProfile(runtime.trainType, isLead ? 'lead' : 'middle')
       const group = new THREE.Group()
       group.name = isLead ? `${trainId}-lead-car` : `${trainId}-car-${index + 1}`
       group.userData.trainId = trainId
