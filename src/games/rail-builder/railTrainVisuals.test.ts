@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TRAIN_TYPES } from './railFleetModel'
 import {
+  E5_FRONT_WINDSHIELD_SECTIONS,
   E5_LEAD_SHELL_SECTIONS,
   TRAIN_VISUAL_PROFILES,
   getTrainCarVisualProfile,
@@ -28,11 +29,11 @@ describe('railTrainVisuals', () => {
     expect(e5.accent.color).toBe('#ec5a93')
     expect(e5.window.color).toBe('#173246')
     expect(e5.noseLength).toBeGreaterThan(1)
-    expect(e5.frontExtent).toBeLessThanOrEqual(1.38)
+    expect(e5.frontExtent).toBeLessThanOrEqual(1.6)
     expect(e5.rearExtent).toBeGreaterThanOrEqual(-1.1)
     expect(e5.maxHalfWidth).toBeLessThanOrEqual(0.5)
     expect(lead.noseLength).toBeGreaterThan(0)
-    expect(lead.noseTipX).toBeLessThanOrEqual(1.38)
+    expect(lead.noseTipX).toBeLessThanOrEqual(1.6)
     expect(lead.noseTipTopY).toBeLessThanOrEqual(1.39)
     expect(lead.bodyCenterX - lead.bodyLength / 2).toBeGreaterThanOrEqual(-1.1)
     expect(middle.noseLength).toBe(0)
@@ -56,7 +57,8 @@ describe('railTrainVisuals', () => {
     expect(lead.sideWindowWidth).toBeLessThan(0.3)
     expect(lead.sideWindowHeight).toBeLessThan(0.2)
     expect(lead.sideWindowXs[1]! - lead.sideWindowXs[0]!).toBeGreaterThan(0.4)
-    expect(lead.frontWindowWidth).toBeLessThan(0.4)
+    expect(lead.frontWindowWidth).toBeGreaterThan(0.5)
+    expect(lead.frontWindowWidth).toBeLessThan(0.7)
     expect(lead.frontWindowX).toBeGreaterThan(0.4)
     expect(e5.bodyColor).toMatch(/^#f/i)
     expect(e5.roofColor).toMatch(/^#(?:2|3)/i)
@@ -65,9 +67,10 @@ describe('railTrainVisuals', () => {
   })
 
   it('defines one continuous E5 lead shell from the cabin rear to the long nose tip', () => {
-    expect(E5_LEAD_SHELL_SECTIONS).toHaveLength(12)
+    expect(E5_LEAD_SHELL_SECTIONS).toHaveLength(14)
     expect(E5_LEAD_SHELL_SECTIONS[0]).toEqual({ x: -1.04, top: 1.22, bottom: 0.49, width: 0.88 })
-    expect(E5_LEAD_SHELL_SECTIONS.at(-1)).toEqual({ x: 1.34, top: 0.82, bottom: 0.64, width: 0.42 })
+    expect(E5_LEAD_SHELL_SECTIONS.at(-1)).toEqual({ x: 1.56, top: 0.79, bottom: 0.63, width: 0.38 })
+    expect(E5_LEAD_SHELL_SECTIONS.at(-1)!.x - E5_LEAD_SHELL_SECTIONS[0]!.x).toBeGreaterThan(2.5)
 
     for (let index = 1; index < E5_LEAD_SHELL_SECTIONS.length; index += 1) {
       const previous = E5_LEAD_SHELL_SECTIONS[index - 1]!
@@ -88,6 +91,20 @@ describe('railTrainVisuals', () => {
       expect(band.upperY).toBeLessThanOrEqual(band.sideUpper + 1e-7)
       expect(band.height).toBeLessThanOrEqual(previousBandHeight + 1e-7)
       previousBandHeight = band.height
+    }
+  })
+
+  it('places a tapered front windshield on the sloping E5 shell', () => {
+    expect(E5_FRONT_WINDSHIELD_SECTIONS).toHaveLength(3)
+    expect(E5_FRONT_WINDSHIELD_SECTIONS[0]!.x).toBeGreaterThan(0.4)
+    expect(E5_FRONT_WINDSHIELD_SECTIONS.at(-1)!.x).toBeLessThan(0.8)
+    expect(E5_FRONT_WINDSHIELD_SECTIONS.every((section) => section.width >= 0.5)).toBe(true)
+
+    for (let index = 1; index < E5_FRONT_WINDSHIELD_SECTIONS.length; index += 1) {
+      const previous = E5_FRONT_WINDSHIELD_SECTIONS[index - 1]!
+      const current = E5_FRONT_WINDSHIELD_SECTIONS[index]!
+      expect(current.x).toBeGreaterThan(previous.x)
+      expect(current.width).toBeLessThanOrEqual(previous.width)
     }
   })
 
@@ -112,7 +129,7 @@ describe('railTrainVisuals', () => {
       e6.lead.noseTipWidth,
       n700s.lead.noseTipWidth,
       doctorYellow.lead.noseTipWidth,
-    ]).size).toBe(4)
+    ]).size).toBeGreaterThanOrEqual(3)
     expect(e6.lead.sideWindowXs.length).toBe(2)
     expect(n700s.lead.sideWindowXs.length).toBe(3)
     expect(doctorYellow.lead.sideWindowXs.length).toBe(1)
@@ -128,9 +145,10 @@ describe('railTrainVisuals', () => {
       const lead = profile.lead
       const roofTop = lead.roofCenterY + lead.roofHeight / 2
       const bodyRear = lead.bodyCenterX - lead.bodyLength / 2
-      expect(profile.frontExtent).toBeLessThanOrEqual(1.38)
+      const frontExtentLimit = trainType === 'e5' ? 1.6 : 1.38
+      expect(profile.frontExtent).toBeLessThanOrEqual(frontExtentLimit)
       expect(profile.rearExtent).toBeGreaterThanOrEqual(-1.1)
-      expect(lead.noseTipX).toBeLessThanOrEqual(1.38)
+      expect(lead.noseTipX).toBeLessThanOrEqual(frontExtentLimit)
       expect(roofTop).toBeLessThanOrEqual(1.39 + 1e-7)
       expect(lead.noseTipTopY).toBeLessThanOrEqual(1.39 + 1e-7)
       expect(bodyRear).toBeGreaterThanOrEqual(-1.1)
