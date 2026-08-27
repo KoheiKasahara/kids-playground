@@ -37,17 +37,34 @@ type NaturalEarthLandGeometry =
   | { type: 'Polygon'; coordinates: GeoPolygon }
   | { type: 'MultiPolygon'; coordinates: readonly GeoPolygon[] }
 
+type NaturalEarthLandFeature = { type: 'Feature'; geometry: NaturalEarthLandGeometry }
+type NaturalEarthLandFeatureOrCollection =
+  | NaturalEarthLandFeature
+  | { type: 'FeatureCollection'; features: readonly NaturalEarthLandFeature[] }
+
 /**
  * Natural Earth 110mの物理的な陸地形状。world-atlasはISC、元データのNatural Earthは
  * public domainであり、国境を含まない海岸線だけを使う。TopoJSON→GeoJSON変換はモジュール
  * 初期化時の一度だけで、アニメーション中にデータを処理しない。
+ *
+ * world-atlasのland-110mはobjects.landがGeometryCollectionのため、topojson-clientの
+ * feature()はFeature(.geometryを持つ)ではなくFeatureCollection(.featuresを持つ)を返す。
+ * .geometryを直接読むと常にundefinedになりCanvas描画時に例外を投げるため、
+ * FeatureCollectionの場合は全featureの座標を1つのMultiPolygonへまとめる。
  */
-const naturalEarthLandGeometry = (
-  feature(
+const naturalEarthLandGeometry: NaturalEarthLandGeometry = ((): NaturalEarthLandGeometry => {
+  const result = feature(
     naturalEarthLandTopology,
     (naturalEarthLandTopology as { objects: { land: unknown } }).objects.land,
-  ) as unknown as { geometry: NaturalEarthLandGeometry }
-).geometry
+  ) as unknown as NaturalEarthLandFeatureOrCollection
+
+  if (result.type === 'Feature') return result.geometry
+
+  return {
+    type: 'MultiPolygon',
+    coordinates: result.features.flatMap((landFeature) => polygonsOfLandGeometry(landFeature.geometry)),
+  }
+})()
 
 /** '#rrggbb' を [r, g, b](0..255)へ分解する。 */
 function hexToRgb(hexColor: string): [number, number, number] {
