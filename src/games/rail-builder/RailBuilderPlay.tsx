@@ -16,7 +16,9 @@ import {
   MAX_RAIL_FLEET_SIZE,
   RAIL_TRAIN_APPEARANCES,
   type RailFleetTrainSummary,
+  type TrainType,
 } from './railFleetModel'
+import TrainTypePicker from './TrainTypePicker'
 import styles from './RailBuilderPlay.module.css'
 import {
   MAX_ZOOM,
@@ -152,6 +154,9 @@ export default function RailBuilderPlay() {
   const [fleetSummaries, setFleetSummaries] = useState<RailFleetTrainSummary[]>(INITIAL_FLEET_SUMMARIES)
   const [occupiedRailIds, setOccupiedRailIds] = useState<string[]>([])
   const [soundEnabled, setSoundEnabled] = useState(true)
+  // 'add'=でんしゃを追加するときの新規デザイン選択、'change'=配置済みでんしゃのデザイン変更。
+  // 必要なときだけ出すパネルなので、常設UIは増やさない。
+  const [trainPickerMode, setTrainPickerMode] = useState<'add' | 'change' | null>(null)
 
   const selectedPiece = pieces.find((piece) => piece.id === selectedPieceId)
   const selectedTrain = fleetSummaries.find((train) => train.id === selectedTrainId)
@@ -170,7 +175,7 @@ export default function RailBuilderPlay() {
     setSelectedTrainId(trainId)
   }, [])
 
-  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, focusDepot } = useRailBuilderEngine({
+  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, focusDepot, setTrainType } = useRailBuilderEngine({
     pieces,
     selectedPieceId,
     selectedTrainId,
@@ -236,9 +241,26 @@ export default function RailBuilderPlay() {
     }
   }, [allTrainsRunning, fleetSummaries, pauseTrain, startTrain])
 
-  const addFleetTrain = useCallback(() => {
-    addTrain()
-  }, [addTrain])
+  const openAddTrainPicker = useCallback(() => {
+    setTrainPickerMode('add')
+  }, [])
+
+  const openChangeTrainTypePicker = useCallback(() => {
+    setTrainPickerMode('change')
+  }, [])
+
+  const closeTrainPicker = useCallback(() => {
+    setTrainPickerMode(null)
+  }, [])
+
+  const handleTrainTypeSelect = useCallback((trainType: TrainType) => {
+    if (trainPickerMode === 'add') {
+      addTrain(trainType)
+    } else if (trainPickerMode === 'change' && selectedTrainId !== null) {
+      setTrainType(selectedTrainId, trainType)
+    }
+    setTrainPickerMode(null)
+  }, [addTrain, selectedTrainId, setTrainType, trainPickerMode])
 
   const removeFleetTrain = useCallback(() => {
     // removeTrain()は常に最後尾の編成を消す。選択中の電車が消える場合は
@@ -314,7 +336,7 @@ export default function RailBuilderPlay() {
               <button
                 type="button"
                 className={styles.trainCountButton}
-                onClick={addFleetTrain}
+                onClick={openAddTrainPicker}
                 disabled={fleetSummaries.length >= MAX_RAIL_FLEET_SIZE}
                 aria-label="でんしゃを ふやす"
               >
@@ -443,9 +465,28 @@ export default function RailBuilderPlay() {
               <span aria-hidden="true">{selectedTrain.wantsToRun ? '■' : '▶'}</span>
               <span>{selectedTrain.wantsToRun ? 'とまる' : 'はしる'}</span>
             </button>
+            <button
+              type="button"
+              className={styles.trainDesignButton}
+              onClick={openChangeTrainTypePicker}
+              aria-label={`でんしゃ ${selectedTrain.label}の みためを かえる`}
+            >
+              <span aria-hidden="true">🎨</span>
+              <span>みため</span>
+            </button>
           </div>
         )}
       </div>
+
+      {trainPickerMode !== null && (trainPickerMode === 'add' || selectedTrain !== undefined) && (
+        <TrainTypePicker
+          title={trainPickerMode === 'add' ? 'あたらしい でんしゃを えらぼう' : 'でんしゃの みためを かえよう'}
+          ariaLabel="でんしゃの みためを えらぶ"
+          selectedType={trainPickerMode === 'change' ? selectedTrain?.trainType ?? null : null}
+          onSelect={handleTrainTypeSelect}
+          onClose={closeTrainPicker}
+        />
+      )}
     </main>
   )
 }

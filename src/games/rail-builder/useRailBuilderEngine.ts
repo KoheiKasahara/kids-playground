@@ -109,7 +109,7 @@ export type RailBuilderEngineHandle = {
   getCameraTarget: () => RailVec3
   startTrain: (trainId: string) => void
   pauseTrain: (trainId: string) => void
-  addTrain: () => void
+  addTrain: (trainType?: TrainType) => void
   removeTrain: (trainId?: string) => void
   focusTrain: (trainId: string) => void
   focusDepot: () => void
@@ -460,7 +460,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
   const syncZoomRef = useRef<((zoom: number) => void) | null>(null)
   const startTrainRef = useRef<((trainId: string) => void) | null>(null)
   const pauseTrainRef = useRef<((trainId: string) => void) | null>(null)
-  const addTrainRef = useRef<(() => void) | null>(null)
+  const addTrainRef = useRef<((trainType?: TrainType) => void) | null>(null)
   const removeTrainRef = useRef<((trainId?: string) => void) | null>(null)
   const focusTrainRef = useRef<((trainId: string) => void) | null>(null)
   const focusDepotRef = useRef<(() => void) | null>(null)
@@ -480,8 +480,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     pauseTrainRef.current?.(trainId)
   }, [])
 
-  const addTrain = useCallback(() => {
-    addTrainRef.current?.()
+  const addTrain = useCallback((trainType?: TrainType) => {
+    addTrainRef.current?.(trainType)
   }, [])
 
   const removeTrain = useCallback((trainId?: string) => {
@@ -1647,8 +1647,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         }
       }
       const summaries = summarizeRailFleet(fleet)
+      // trainTypeもキーに含める。見た目だけの変更(Phase 3の車両選択UIから)でも
+      // 走行状態(status/wantsToRun/blocked)が変わらずonFleetChangeが素通りしないようにする。
       const fleetKey = summaries
-        .map((train) => `${train.id}:${train.status}:${train.wantsToRun ? 1 : 0}:${train.blocked ? 1 : 0}`)
+        .map((train) => `${train.id}:${train.trainType}:${train.status}:${train.wantsToRun ? 1 : 0}:${train.blocked ? 1 : 0}`)
         .join('|')
       if (fleetKey !== lastFleetKey) {
         lastFleetKey = fleetKey
@@ -1675,8 +1677,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       reportTrainState()
     }
 
-    function addTrainNow() {
-      fleet = addRailFleetTrain(fleet, trainPieces)
+    function addTrainNow(trainType?: TrainType) {
+      fleet = addRailFleetTrain(fleet, trainPieces, trainType)
       updateTrainVisuals()
       reportTrainState()
     }
