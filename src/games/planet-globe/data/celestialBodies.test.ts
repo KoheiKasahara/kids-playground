@@ -82,11 +82,14 @@ describe('celestialBodies', () => {
     }
   })
 
-  it('全天体がlightingを持ち、主光がほかのどの光よりも強い', () => {
+  it('惑星は暗部を作りすぎない観察用lightingを持つ', () => {
     for (const body of celestialBodies) {
-      expect(body.lighting.keyIntensity).toBeGreaterThan(body.lighting.ambientIntensity)
-      expect(body.lighting.keyIntensity).toBeGreaterThan(body.lighting.hemisphereIntensity)
-      expect(body.lighting.keyIntensity).toBeGreaterThan(body.lighting.fillIntensity)
+      expect(body.lighting.keyIntensity).toBeGreaterThan(0)
+      if (body.kind !== 'planet') continue
+
+      expect(body.lighting.ambientIntensity).toBeGreaterThan(body.lighting.keyIntensity * 0.75)
+      expect(body.lighting.hemisphereIntensity + body.lighting.fillIntensity)
+        .toBeGreaterThan(body.lighting.keyIntensity * 0.9)
     }
   })
 

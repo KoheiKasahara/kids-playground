@@ -107,7 +107,8 @@ export const celestialBodies: readonly CelestialBody[] = [
     initialRotationY: rotationYFacing(lonToU(0)),
     spinSpeed: 0.02,
     material: { roughness: 1, bumpScale: 2.0 },
-    lighting: { keyIntensity: 2.6, ambientIntensity: 0.14, hemisphereIntensity: 0.26, fillIntensity: 0.18 },
+    // 学習用に全面の模様を読める明るさを確保し、外周だけの弱い陰影で球体感を残す。
+    lighting: { keyIntensity: 1.05, ambientIntensity: 0.8, hemisphereIntensity: 0.5, fillIntensity: 0.46 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
     surface: {
       style: 'rocky',
@@ -153,7 +154,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     // 金星は実際に他の惑星と逆向きに自転している。値だけで表現でき、特別な分岐は不要。
     spinSpeed: -0.02,
     material: { roughness: 1 },
-    lighting: { keyIntensity: 2.3, ambientIntensity: 0.22, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
+    lighting: { keyIntensity: 1, ambientIntensity: 0.8, hemisphereIntensity: 0.5, fillIntensity: 0.46 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
     surface: {
       style: 'gas',
@@ -199,7 +200,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     initialRotationY: rotationYFacing(lonToU(20)),
     spinSpeed: 0.035,
     material: { roughness: 0.9, bumpScale: 0.6 },
-    lighting: { keyIntensity: 2.4, ambientIntensity: 0.18, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
+    lighting: { keyIntensity: 1, ambientIntensity: 0.86, hemisphereIntensity: 0.54, fillIntensity: 0.5 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
     visual: {
       clouds: {
@@ -338,7 +339,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     initialRotationY: rotationYFacing(lonToU(-85)),
     spinSpeed: 0.035,
     material: { roughness: 0.95, bumpScale: 1.5 },
-    lighting: { keyIntensity: 2.5, ambientIntensity: 0.16, hemisphereIntensity: 0.28, fillIntensity: 0.2 },
+    lighting: { keyIntensity: 1.05, ambientIntensity: 0.82, hemisphereIntensity: 0.52, fillIntensity: 0.48 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
     surface: {
       style: 'rocky',
@@ -406,7 +407,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     initialRotationY: rotationYFacing(lonToU(0)) - 0.1,
     spinSpeed: 0.045,
     material: { roughness: 1 },
-    lighting: { keyIntensity: 2.2, ambientIntensity: 0.24, hemisphereIntensity: 0.34, fillIntensity: 0.26 },
+    lighting: { keyIntensity: 0.98, ambientIntensity: 0.86, hemisphereIntensity: 0.56, fillIntensity: 0.5 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
     surface: {
       style: 'gas',
@@ -518,7 +519,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     initialRotationY: rotationYFacing(lonToU(0)),
     spinSpeed: 0.04,
     material: { roughness: 1 },
-    lighting: { keyIntensity: 2.5, ambientIntensity: 0.2, hemisphereIntensity: 0.22, fillIntensity: 0.14 },
+    lighting: { keyIntensity: 1, ambientIntensity: 0.82, hemisphereIntensity: 0.52, fillIntensity: 0.48 },
     // 輪をよく開いて見せるための視点上書き。
     viewDirection: { x: 0.3, y: 0.52, z: 0.8 },
     zoom: { outMargin: 1.08, inMargin: 0.62 },
@@ -618,7 +619,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     initialRotationY: rotationYFacing(lonToU(0)),
     spinSpeed: 0.03,
     material: { roughness: 1 },
-    lighting: { keyIntensity: 2.3, ambientIntensity: 0.22, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
+    lighting: { keyIntensity: 0.98, ambientIntensity: 0.86, hemisphereIntensity: 0.56, fillIntensity: 0.5 },
     zoom: { outMargin: 1.15, inMargin: 0.6 },
     surface: {
       style: 'gas',
@@ -677,7 +678,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     initialRotationY: rotationYFacing(lonToU(-20)),
     spinSpeed: 0.04,
     material: { roughness: 1 },
-    lighting: { keyIntensity: 2.3, ambientIntensity: 0.22, hemisphereIntensity: 0.3, fillIntensity: 0.22 },
+    lighting: { keyIntensity: 0.98, ambientIntensity: 0.86, hemisphereIntensity: 0.56, fillIntensity: 0.5 },
     zoom: { outMargin: 1.15, inMargin: 0.6 },
     surface: {
       style: 'gas',

@@ -4,23 +4,22 @@ import type { LightingSpec } from '../types'
 /**
  * 主光・補助光の向き(天体中心から見た方向、正規化前)。
  *
- * 真正面(0,0,1)に近いほど陰影が消えて平面的に見え、月のクレーターのバンプも
- * ほとんど起伏として読めなくなる。逆に真横に寄せすぎると暗部が広がりすぎて
- * 幼児には見づらい。左斜め前からのやや浅い角度にして、
- * 「はっきりした明暗の境目」と「表面の8割弱が見える明るさ」を両立させる。
- * 土星ではこの角度が、本体の影を輪の横側(カメラから見える位置)へ落とす役目も持つ。
+ * 学習用の観察画面では、正確な昼夜境界より表面模様の読みやすさを優先する。
+ * 主光・補助光ともカメラ側に寄せ、画面中央から外周へ向かってだけ緩やかに暗くなる
+ * 方向にする。これにより、大陸や縞を暗部で失わずに球体感を残せる。
+ * 土星ではこの角度でも、本体の影を輪の横側へごく弱く落とせる。
  */
-export const KEY_LIGHT_DIRECTION = { x: -0.72, y: 0.34, z: 0.56 } as const
-export const FILL_LIGHT_DIRECTION = { x: 0.74, y: -0.16, z: -0.58 } as const
+export const KEY_LIGHT_DIRECTION = { x: -0.48, y: 0.3, z: 0.82 } as const
+export const FILL_LIGHT_DIRECTION = { x: 0.48, y: -0.12, z: 0.72 } as const
 /** ライトの位置(天体中心からの距離)。影カメラのnear/farをこの値を基準に決める。 */
 export const KEY_LIGHT_DISTANCE = 400
 
 /** 天体データが `lighting` を省略できないようにするため、既定値そのものは公開しない(全天体が明示指定する)。 */
 export const DEFAULT_LIGHTING: LightingSpec = {
-  keyIntensity: 2.4,
-  ambientIntensity: 0.16,
-  hemisphereIntensity: 0.3,
-  fillIntensity: 0.22,
+  keyIntensity: 1,
+  ambientIntensity: 0.82,
+  hemisphereIntensity: 0.52,
+  fillIntensity: 0.46,
 }
 
 export type PlanetLights = {

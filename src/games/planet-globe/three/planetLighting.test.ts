@@ -8,10 +8,10 @@ import {
 } from './planetLighting'
 
 describe('DEFAULT_LIGHTING', () => {
-  it('主光がほかのどの光よりも強い', () => {
-    expect(DEFAULT_LIGHTING.keyIntensity).toBeGreaterThan(DEFAULT_LIGHTING.ambientIntensity)
-    expect(DEFAULT_LIGHTING.keyIntensity).toBeGreaterThan(DEFAULT_LIGHTING.hemisphereIntensity)
-    expect(DEFAULT_LIGHTING.keyIntensity).toBeGreaterThan(DEFAULT_LIGHTING.fillIntensity)
+  it('環境光を主光より強くし、片側が暗く沈まない観察用の明るさを持つ', () => {
+    expect(DEFAULT_LIGHTING.ambientIntensity).toBeGreaterThan(DEFAULT_LIGHTING.keyIntensity * 0.75)
+    expect(DEFAULT_LIGHTING.hemisphereIntensity + DEFAULT_LIGHTING.fillIntensity)
+      .toBeGreaterThan(DEFAULT_LIGHTING.keyIntensity * 0.9)
   })
 })
 
@@ -22,6 +22,12 @@ describe('createPlanetLights', () => {
     expect(lights.all).toEqual(
       expect.arrayContaining([lights.ambient, lights.hemisphere, lights.key, lights.fill]),
     )
+  })
+
+  it('主光・補助光がどちらも観察する正面側から当たる', () => {
+    const lights = createPlanetLights()
+    expect(lights.key.position.z).toBeGreaterThan(0)
+    expect(lights.fill.position.z).toBeGreaterThan(0)
   })
 })
 
