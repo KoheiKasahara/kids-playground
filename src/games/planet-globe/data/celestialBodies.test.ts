@@ -389,7 +389,7 @@ describe('venus(Phase 4)', () => {
   })
 })
 
-describe('earth(Phase 4)', () => {
+describe('earth(地球の見た目)', () => {
   const earth = celestialBodyById('earth')
 
   it('kindがplanetで、surfaceはrockyスタイルである', () => {
@@ -397,20 +397,15 @@ describe('earth(Phase 4)', () => {
     expect(earth.surface.style).toBe('rocky')
   })
 
-  it('7大陸ぶんのpatchesを持つ', () => {
+  it('Natural Earth由来の海岸線を使い、楕円の大陸パッチに戻らない', () => {
     if (earth.surface.style !== 'rocky') throw new Error('unreachable')
-    const continentIds = earth.surface.patches
-      .map((patch) => patch.id)
-      .filter((id) => id.startsWith('continent-'))
-    expect(continentIds).toEqual([
-      'continent-asia',
-      'continent-africa',
-      'continent-europe',
-      'continent-north-america',
-      'continent-south-america',
-      'continent-oceania',
-      'continent-antarctica',
-    ])
+    expect(earth.surface.landmasses).toMatchObject({
+      source: 'natural-earth-110m',
+      color: expect.any(String),
+      coastColor: expect.any(String),
+      relief: expect.any(Number),
+    })
+    expect(earth.surface.patches.some((patch) => patch.id.startsWith('continent-'))).toBe(false)
   })
 
   it('国境線データは持たず、極冠を北極・南極として持つ', () => {
@@ -420,10 +415,10 @@ describe('earth(Phase 4)', () => {
     expect(earth.surface.polarCaps?.southEdgeLatDeg).toBeLessThan(0)
   })
 
-  it('国境を持ち込まず、地表と座標がそろった雲と薄い大気を持つ', () => {
+  it('国境を持ち込まず、地表と座標がそろった雲を持ち、外周膜を持たない', () => {
     expect(earth.visual?.clouds?.patches.length).toBeGreaterThanOrEqual(3)
     expect(earth.visual?.clouds?.spinSpeed).toBe(earth.spinSpeed)
-    expect(earth.visual?.atmosphere?.scale).toBeGreaterThan(1)
+    expect(earth.visual?.atmosphere).toBeUndefined()
     if (earth.surface.style !== 'rocky') throw new Error('unreachable')
     expect(earth.surface.patches.some((patch) => patch.id.includes('border'))).toBe(false)
   })

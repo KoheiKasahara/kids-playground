@@ -90,6 +90,20 @@ export type PolarCaps = {
   seed: number
 }
 
+/**
+ * 自然な海岸線を持つ陸地レイヤー。現在はNatural Earth由来の世界陸地データだけを
+ * 使う。テクスチャ生成時に一度だけCanvasへ焼き込むため、描画ループでGeoJSONを
+ * 扱わず、幼児向けの見やすい地球とスマホ負荷を両立する。
+ */
+export type LandmassSpec = {
+  source: 'natural-earth-110m'
+  color: string
+  coastColor: string
+  opacity: number
+  /** バンプマップへの寄与。省略時は凹凸なし。 */
+  relief?: number
+}
+
 export type SurfaceNoise = {
   seed: number
   octaves: number
@@ -118,6 +132,7 @@ export type RockySurfaceSpec = {
   craters: readonly SurfaceCrater[]
   scatteredCraters: ScatteredCraters
   polarCaps?: PolarCaps
+  landmasses?: LandmassSpec
 }
 
 /** ガス惑星の渦・斑点(大赤斑、白斑、大赤斑まわりの淡い"くぼみ")。 */

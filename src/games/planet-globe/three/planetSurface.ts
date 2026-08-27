@@ -1,7 +1,10 @@
 import * as THREE from 'three'
+import { feature } from 'topojson-client'
+import naturalEarthLandTopology from 'world-atlas/land-110m.json'
 import type {
   GasSpot,
   GasSurfaceSpec,
+  LandmassSpec,
   LatitudeStop,
   PolarCaps,
   RockySurfaceSpec,
@@ -27,6 +30,24 @@ export const SURFACE_TEXTURE_HEIGHT = 512
  * どちらの半径換算にも使え、クレーターのような円形の模様が(赤道付近では)真円になる。
  */
 const DEG_TO_PX = SURFACE_TEXTURE_WIDTH / 360
+
+type GeoPoint = readonly [number, number]
+type GeoPolygon = readonly GeoPoint[][]
+type NaturalEarthLandGeometry =
+  | { type: 'Polygon'; coordinates: GeoPolygon }
+  | { type: 'MultiPolygon'; coordinates: readonly GeoPolygon[] }
+
+/**
+ * Natural Earth 110mの物理的な陸地形状。world-atlasはISC、元データのNatural Earthは
+ * public domainであり、国境を含まない海岸線だけを使う。TopoJSON→GeoJSON変換はモジュール
+ * 初期化時の一度だけで、アニメーション中にデータを処理しない。
+ */
+const naturalEarthLandGeometry = (
+  feature(
+    naturalEarthLandTopology,
+    (naturalEarthLandTopology as { objects: { land: unknown } }).objects.land,
+  ) as unknown as { geometry: NaturalEarthLandGeometry }
+).geometry
 
 /** '#rrggbb' を [r, g, b](0..255)へ分解する。 */
 function hexToRgb(hexColor: string): [number, number, number] {
@@ -299,6 +320,92 @@ function drawPatch(ctx: CanvasRenderingContext2D, patch: SurfacePatch): void {
   })
 }
 
+function polygonsOfLandGeometry(geometry: NaturalEarthLandGeometry): readonly GeoPolygon[] {
+  return geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+}
+
+/**
+ * 日付変更線をまたぐ輪郭をCanvas上で連続なx座標へ展開する。
+ * 複製して描くことで、テクスチャの左右端でも陸地が半分欠けずにつながる。
+ */
+function traceWrappedLandRing(
+  ctx: CanvasRenderingContext2D,
+  ring: readonly GeoPoint[],
+  xShiftDeg: number,
+  width: number,
+  height: number,
+): void {
+  if (ring.length === 0) return
+
+  let previousLon = ring[0][0]
+  let longitudeOffset = xShiftDeg
+  ctx.moveTo(((previousLon + longitudeOffset + 180) / 360) * width, ((90 - ring[0][1]) / 180) * height)
+
+  for (let index = 1; index < ring.length; index += 1) {
+    const [lonDeg, latDeg] = ring[index]
+    const difference = lonDeg - previousLon
+    if (difference > 180) longitudeOffset -= 360
+    if (difference < -180) longitudeOffset += 360
+    ctx.lineTo(((lonDeg + longitudeOffset + 180) / 360) * width, ((90 - latDeg) / 180) * height)
+    previousLon = lonDeg
+  }
+  ctx.closePath()
+}
+
+/** Natural Earthの海岸線を塗る。塗り・縁取りを1回ずつにまとめ、国境線は描かない。 */
+export function drawNaturalEarthLandmasses(
+  ctx: CanvasRenderingContext2D,
+  spec: LandmassSpec,
+  width = SURFACE_TEXTURE_WIDTH,
+  height = SURFACE_TEXTURE_HEIGHT,
+): void {
+  if (spec.source !== 'natural-earth-110m') return
+
+  const polygons = polygonsOfLandGeometry(naturalEarthLandGeometry)
+  ctx.beginPath()
+  // 日付変更線をまたぐ土地だけに必要な複製だが、全ての形を3回描いても
+  // Canvas生成は初回のみで、画面負荷を増やさず実装を安定させられる。
+  for (const xShiftDeg of [-360, 0, 360]) {
+    for (const polygon of polygons) {
+      for (const ring of polygon) traceWrappedLandRing(ctx, ring, xShiftDeg, width, height)
+    }
+  }
+
+  ctx.save()
+  ctx.globalAlpha = spec.opacity
+  ctx.fillStyle = spec.color
+  // evenoddなら湖などの内側リングを正しく海として残せる。
+  ctx.fill('evenodd')
+  ctx.restore()
+
+  ctx.save()
+  ctx.globalAlpha = Math.min(0.78, spec.opacity)
+  ctx.strokeStyle = spec.coastColor
+  ctx.lineWidth = Math.max(0.65, width / 760)
+  ctx.lineJoin = 'round'
+  ctx.stroke()
+  ctx.restore()
+}
+
+/** 大陸を低いバンプとして重ね、外周膜なしでも海と陸の立体感を残す。 */
+function drawNaturalEarthLandRelief(ctx: CanvasRenderingContext2D, spec: LandmassSpec): void {
+  if (spec.relief === undefined || spec.relief <= 0) return
+
+  const polygons = polygonsOfLandGeometry(naturalEarthLandGeometry)
+  ctx.beginPath()
+  for (const xShiftDeg of [-360, 0, 360]) {
+    for (const polygon of polygons) {
+      for (const ring of polygon) {
+        traceWrappedLandRing(ctx, ring, xShiftDeg, SURFACE_TEXTURE_WIDTH, SURFACE_TEXTURE_HEIGHT)
+      }
+    }
+  }
+
+  const gray = Math.round(128 + Math.min(1, spec.relief) * 72)
+  ctx.fillStyle = `rgb(${gray}, ${gray}, ${gray})`
+  ctx.fill('evenodd')
+}
+
 /** 極冠の縁のうねり。経度の周期関数の和にすることで、経度-180/180の継ぎ目でも必ず連続になる。 */
 const POLAR_EDGE_LOBES = [3, 5, 8] as const
 
@@ -568,6 +675,7 @@ function createRockySurfaceMaps(surface: RockySurfaceSpec): SurfaceMaps {
 
   // --- 色マップ ---
   paintRockyColorBase(colorCtx, surface)
+  if (surface.landmasses !== undefined) drawNaturalEarthLandmasses(colorCtx, surface.landmasses)
   for (const patch of surface.patches) drawPatch(colorCtx, patch)
   if (surface.polarCaps !== undefined) drawPolarCaps(colorCtx, surface.polarCaps)
   for (const crater of surface.craters) drawNamedCraterColor(colorCtx, crater)
@@ -577,6 +685,7 @@ function createRockySurfaceMaps(surface: RockySurfaceSpec): SurfaceMaps {
 
   // --- バンプマップ ---
   paintRockyBumpBase(bumpCtx, surface)
+  if (surface.landmasses !== undefined) drawNaturalEarthLandRelief(bumpCtx, surface.landmasses)
   for (const patch of surface.patches) drawPatchReliefBump(bumpCtx, patch)
   for (const crater of surface.craters) {
     const radiusPx = crater.radiusDeg * DEG_TO_PX
