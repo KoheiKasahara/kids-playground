@@ -72,24 +72,27 @@ export default function PlanetGlobePlay() {
           />
         )}
 
-        <div className={styles.topBar}>
-          <header className={styles.header}>
-            <h1 className={styles.title}>
-              <span aria-hidden="true">🪐</span> たいようけい
-            </h1>
-            <p className={styles.instruction}>
-              {mode === 'single' ? SINGLE_MODE_INSTRUCTION : OVERVIEW_MODE_INSTRUCTION}
-            </p>
-          </header>
-          <ModeToggle mode={mode} onChange={setMode} />
-        </div>
+        <header className={styles.header}>
+          <h1 className={styles.title}>
+            <span aria-hidden="true">🪐</span> たいようけい
+          </h1>
+          <p className={styles.instruction}>
+            {mode === 'single' ? SINGLE_MODE_INSTRUCTION : OVERVIEW_MODE_INSTRUCTION}
+          </p>
+        </header>
 
         <button type="button" className={styles.home} onClick={() => navigate('/')}>
           もどる
         </button>
 
-        <div className={styles.speechToggleSlot}>
+        {/*
+         * よみあげトグルとモード切替は、天体表示・3Dシーンのズームやリサイズと無関係に
+         * 常に同じ画面位置へ固定表示したいので、stage内の他要素とはまとめて
+         * 独立した固定UI領域(position: fixed)に置く。
+         */}
+        <div className={styles.topRightSlot}>
           <SpeechToggle />
+          <ModeToggle mode={mode} onChange={setMode} />
         </div>
       </div>
 

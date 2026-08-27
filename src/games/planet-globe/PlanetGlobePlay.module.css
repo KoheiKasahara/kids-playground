@@ -37,31 +37,26 @@
 }
 
 /*
- * ヘッダー(タイトル・説明文)とモード切替ボタンを縦に並べる土台。
- * 「もどる」は左上に固定で置くため、その高さのぶんだけ下げる。横方向のpaddingだけで
- * 避けようとすると、320px幅では説明文を置く幅が足りず「もどる」の下に文字が潜り込んで
- * 読めなくなる。天体は画面中央に余白付きで収まるため、上端の空を少し使っても
- * 天体の見え方には影響しない。フレックスの縦積みにすることで、説明文の行数が
- * 変わっても(モードごとに文言が変わる)モード切替ボタンの位置がハードコードした
- * オフセットとずれない。
+ * タイトル・説明文だけの土台。「もどる」は左上に固定で置くため、その高さのぶんだけ下げる。
+ * 横方向のpaddingだけで避けようとすると、320px幅では説明文を置く幅が足りず「もどる」の下に
+ * 文字が潜り込んで読めなくなる。天体は画面中央に余白付きで収まるため、上端の空を少し
+ * 使っても天体の見え方には影響しない。
+ * 「ひとつずつ/ぜんぶみる」はここには含めず、`.topRightSlot`へ独立させている
+ * (天体観察を圧迫しないコンパクトな配置にするため。Issue #233参照)。
  */
-.topBar {
+.header {
   position: absolute;
   top: calc(var(--space-sm) + var(--safe-top) + var(--tap-target-min));
   left: 0;
   right: 0;
   z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-sm);
-  pointer-events: none;
-}
-
-.header {
   width: min(100%, 520px);
   margin: 0 auto;
-  padding-inline: var(--space-md);
+  /*
+   * 右側だけ`.topRightSlot`(よみあげ+モード切替の縦積み)の幅ぶん多めに空け、
+   * 狭い画面でタイトル・説明文がそのUIの下に潜り込まないようにする。
+   */
+  padding-inline: var(--space-md) calc(var(--space-md) + var(--safe-right) + 132px);
   box-sizing: border-box;
   text-align: center;
   pointer-events: none;
@@ -117,15 +112,35 @@
 }
 
 /*
- * よみあげトグルの置き場所(stage右上)。左上「もどる」・中央上ヘッダー・右下ズームの
- * どれとも重ならない、唯一の空きスペース。SpeechToggle自身の position を上書きするのではなく
- * 別要素で包むことで、CSS Modules同士のカスケード順に依存しないようにする。
+ * よみあげトグルとモード切替をまとめた右上の固定UI領域。左上「もどる」・中央上ヘッダー・
+ * 右下ズームのどれとも重ならない、唯一の空きスペース。
+ * `position: fixed`にして、3Dシーンのcanvasを内包する`.stage`(overflow: hidden、
+ * リサイズ監視あり)の外側・ビューポート基準で常に同じ位置に描画されるようにする。
+ * こうすることで、全体表示のズーム操作(OrbitControls)やcanvasのリサイズに伴う
+ * レイアウト変動の影響を受けず、切替UIが消えたり位置がずれたりしない
+ * (Issue #233: ズーム操作で切替UIの表示が不安定になる不具合の対策)。
+ * SpeechToggle自身の position を上書きするのではなく別要素で包むことで、
+ * CSS Modules同士のカスケード順に依存しないようにする。
  */
-.speechToggleSlot {
-  position: absolute;
+.topRightSlot {
+  position: fixed;
   top: calc(var(--space-sm) + var(--safe-top));
   right: calc(var(--space-sm) + var(--safe-right));
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-xs);
+}
+
+/*
+ * SpeechToggleは他画面のヘッダ内でインライン表示される想定のmargin-rightを持つため、
+ * ここでは右端がそろわなくなってしまう。SpeechToggle自身のクラスを直接上書きすると
+ * CSS Modules同士のカスケード順に依存してしまうため、要素セレクタを組み合わせて
+ * 詳細度で確実に上書きする。
+ */
+.topRightSlot > button {
+  margin-right: 0;
 }
 
 @media (max-width: 360px) {
@@ -135,13 +150,12 @@
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
-  /* 低い横画面では上端の余白が少ないため、「もどる」の右横に回り込ませて高さを節約する。 */
-  .topBar {
-    top: calc(var(--space-sm) + var(--safe-top));
-    gap: 2px;
-  }
-
+  /*
+   * 低い横画面では上端の余白が少ないため、ヘッダーを「もどる」・右上の固定UI領域と
+   * 同じ高さまで引き上げ、左右のpaddingで両方の幅を避ける。
+   */
   .header {
+    top: calc(var(--space-sm) + var(--safe-top));
     padding-inline: calc(var(--tap-target-min) + var(--space-md));
   }
 
