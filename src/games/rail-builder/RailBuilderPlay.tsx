@@ -17,7 +17,13 @@ import {
   type RailFleetTrainSummary,
 } from './railFleetModel'
 import styles from './RailBuilderPlay.module.css'
-import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, useRailBuilderEngine } from './useRailBuilderEngine'
+import {
+  MAX_ZOOM,
+  MIN_ZOOM,
+  ZOOM_STEP,
+  useRailBuilderEngine,
+  type RailBuilderSelectionAnchor,
+} from './useRailBuilderEngine'
 import { primeAudio } from '../../utils/quizSound'
 
 function createInitialRailPieces(): RailPiece[] {
@@ -56,6 +62,38 @@ const SPAWN_OFFSETS: RailVec3[] = [
   { x: 6, y: 0, z: 6 },
   { x: -6, y: 0, z: -6 },
 ]
+
+// フローティング操作パネルが画面端で大きくはみ出さないための余白(px)。
+// 右側はカメラズームの＋/−が常時のっているため、それより広めに空ける。
+const FLOATING_PANEL_MARGIN_LEFT = 96
+const FLOATING_PANEL_MARGIN_RIGHT = 168
+const FLOATING_PANEL_MIN_TOP = 132
+const FLOATING_PANEL_BOTTOM_MARGIN = 176
+
+type FloatingPlacement = RailBuilderSelectionAnchor & { align: 'left' | 'center' | 'right' }
+
+/**
+ * 選択中パーツ/電車のフローティング操作パネルの位置を決める。
+ * 右端に寄っているときは右ぞろえ(左へ伸ばす)にして、常時表示のズーム＋/−と
+ * 重なりにくくする。左端では逆に左ぞろえにして画面外へはみ出させない。
+ */
+function getFloatingPlacement(anchor: RailBuilderSelectionAnchor | null): FloatingPlacement | null {
+  if (anchor === null || typeof window === 'undefined') return anchor === null ? null : { ...anchor, align: 'center' }
+  const maxX = Math.max(FLOATING_PANEL_MARGIN_LEFT, window.innerWidth - FLOATING_PANEL_MARGIN_RIGHT)
+  const y = Math.min(
+    Math.max(FLOATING_PANEL_MIN_TOP, window.innerHeight - FLOATING_PANEL_BOTTOM_MARGIN),
+    Math.max(FLOATING_PANEL_MIN_TOP, anchor.y),
+  )
+  if (anchor.x > maxX) return { x: maxX, y, align: 'right' }
+  if (anchor.x < FLOATING_PANEL_MARGIN_LEFT) return { x: FLOATING_PANEL_MARGIN_LEFT, y, align: 'left' }
+  return { x: anchor.x, y, align: 'center' }
+}
+
+const ALIGN_CLASS_NAMES: Record<FloatingPlacement['align'], string> = {
+  left: styles.alignLeft,
+  center: styles.alignCenter,
+  right: styles.alignRight,
+}
 
 function nextSpawnPosition(pieces: readonly RailPiece[], cameraTarget: RailVec3): RailVec3 {
   for (const offset of SPAWN_OFFSETS) {
@@ -106,12 +144,15 @@ export default function RailBuilderPlay() {
     connections: { ...piece.connections },
   })))
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null)
+  const [selectedTrainId, setSelectedTrainId] = useState<string | null>(null)
+  const [selectionAnchor, setSelectionAnchor] = useState<RailBuilderSelectionAnchor | null>(null)
   const [zoom, setZoom] = useState(1)
   const [fleetSummaries, setFleetSummaries] = useState<RailFleetTrainSummary[]>(INITIAL_FLEET_SUMMARIES)
   const [occupiedRailIds, setOccupiedRailIds] = useState<string[]>([])
   const [soundEnabled, setSoundEnabled] = useState(true)
 
   const selectedPiece = pieces.find((piece) => piece.id === selectedPieceId)
+  const selectedTrain = fleetSummaries.find((train) => train.id === selectedTrainId)
   const occupiedRailIdSet = useMemo(() => new Set(occupiedRailIds), [occupiedRailIds])
   const selectedPieceIsOccupied = selectedPieceId !== null && occupiedRailIdSet.has(selectedPieceId)
 
@@ -123,16 +164,23 @@ export default function RailBuilderPlay() {
     setSelectedPieceId(pieceId)
   }, [])
 
-  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, focusTrain, focusDepot } = useRailBuilderEngine({
+  const handleSelectTrain = useCallback((trainId: string | null) => {
+    setSelectedTrainId(trainId)
+  }, [])
+
+  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, focusDepot } = useRailBuilderEngine({
     pieces,
     selectedPieceId,
+    selectedTrainId,
     zoom,
     onPiecesChange: handlePiecesChange,
     onSelectPiece: handleSelectPiece,
+    onSelectTrain: handleSelectTrain,
     onZoomChange: setZoom,
     lockedPieceIds: occupiedRailIdSet,
     onFleetChange: setFleetSummaries,
     onTrainOccupiedIdsChange: setOccupiedRailIds,
+    onSelectionAnchorChange: setSelectionAnchor,
     soundEnabled,
   })
 
@@ -144,6 +192,7 @@ export default function RailBuilderPlay() {
     )
     setPieces((current) => [...current, piece])
     setSelectedPieceId(piece.id)
+    setSelectedTrainId(null)
   }, [getCameraTarget, pieces])
 
   const rotateSelected = useCallback(() => {
@@ -174,18 +223,47 @@ export default function RailBuilderPlay() {
     })
   }, [])
 
+  const allTrainsRunning = fleetSummaries.length > 0 && fleetSummaries.every((train) => train.wantsToRun)
+  const toggleAllTrains = useCallback(() => {
+    if (allTrainsRunning) {
+      for (const train of fleetSummaries) pauseTrain(train.id)
+    } else {
+      for (const train of fleetSummaries) {
+        if (!train.wantsToRun) startTrain(train.id)
+      }
+    }
+  }, [allTrainsRunning, fleetSummaries, pauseTrain, startTrain])
+
+  const addFleetTrain = useCallback(() => {
+    addTrain()
+  }, [addTrain])
+
+  const removeFleetTrain = useCallback(() => {
+    // removeTrain()は常に最後尾の編成を消す。選択中の電車が消える場合は
+    // 実IDが再利用されて古い選択が復活しないよう先に選択を外す。
+    const targetId = fleetSummaries[fleetSummaries.length - 1]?.id
+    if (targetId !== undefined && targetId === selectedTrainId) {
+      setSelectedTrainId(null)
+    }
+    removeTrain()
+  }, [fleetSummaries, removeTrain, selectedTrainId])
+
   const hint = useMemo(() => {
     if (selectedPieceIsOccupied) return 'でんしゃが のっている せんろは そのままだよ'
     if (selectedPiece?.kind === 'branch') return 'ひかっている ほうへ すすむよ。ポイントを きりかえよう'
+    if (selectedPiece !== undefined) return 'つなぎめを ちかづけると ぴったり！'
+    if (selectedTrain !== undefined) return 'はしる／とまる で うんてん してみよう'
     if (fleetSummaries.some((train) => train.blocked)) return 'まえが あくまで ゆっくり まつよ'
     const trainStatus: RailTrainStatus = fleetSummaries[0]?.status ?? 'ready'
     if (trainStatus === 'stoppedAtStation') return 'えきで ひとやすみ。すぐ しゅっぱつするよ'
     if (trainStatus === 'approachingStation') return 'えきに ちかづいているよ'
     if (trainStatus === 'departing') return 'えきから しゅっぱつしたよ'
     if (trainStatus === 'waiting') return 'まってるよ。せんろを つないで すすもう'
-    if (selectedPiece === undefined) return 'でんしゃも せんろも うごかせるよ'
-    return 'せんろを つかんで つなげよう'
-  }, [fleetSummaries, selectedPiece, selectedPieceIsOccupied])
+    return 'でんしゃも せんろも うごかせるよ。ゆびで ひっぱってね'
+  }, [fleetSummaries, selectedPiece, selectedPieceIsOccupied, selectedTrain])
+
+  const pieceFloatingPlacement = selectedPiece !== undefined ? getFloatingPlacement(selectionAnchor) : null
+  const trainFloatingPlacement = selectedTrain !== undefined ? getFloatingPlacement(selectionAnchor) : null
 
   return (
     <main className={styles.page}>
@@ -199,89 +277,70 @@ export default function RailBuilderPlay() {
 
       <div className={styles.overlay}>
         <header className={styles.header}>
-          <button type="button" className={styles.backButton} onClick={() => navigate('/')} aria-label="ホームへ もどる">
-            <span aria-hidden="true">‹</span>
-            <span>もどる</span>
-          </button>
-          <div className={styles.titleBlock}>
+          <div className={styles.headerRow}>
+            <button type="button" className={styles.backButton} onClick={() => navigate('/')} aria-label="ホームへ もどる">
+              <span aria-hidden="true">‹</span>
+              <span>もどる</span>
+            </button>
             <h1 className={styles.title}><span aria-hidden="true">🚂</span> 3Dせんろづくり</h1>
-            <p id="rail-builder-help" className={styles.instruction}>{hint}。ゆびで ひっぱってね</p>
+            <button
+              type="button"
+              className={styles.soundButton}
+              onClick={toggleSound}
+              aria-pressed={soundEnabled}
+              aria-label={soundEnabled ? 'おとを けす' : 'おとを つける'}
+            >
+              <span aria-hidden="true">{soundEnabled ? '🔊' : '🔇'}</span>
+            </button>
+          </div>
+
+          <div className={styles.trainControls} aria-label="でんしゃの そうさ">
+            <div className={styles.trainCountGroup}>
+              <button
+                type="button"
+                className={styles.trainCountButton}
+                onClick={removeFleetTrain}
+                disabled={fleetSummaries.length <= 1}
+                aria-label="でんしゃを へらす"
+              >
+                <span aria-hidden="true">−</span>
+              </button>
+              <span className={styles.trainCountLabel} aria-label={`でんしゃ ${fleetSummaries.length}りょうへんせい`}>
+                <span aria-hidden="true">🚃</span>
+                {fleetSummaries.length}
+              </span>
+              <button
+                type="button"
+                className={styles.trainCountButton}
+                onClick={addFleetTrain}
+                disabled={fleetSummaries.length >= MAX_RAIL_FLEET_SIZE}
+                aria-label="でんしゃを ふやす"
+              >
+                <span aria-hidden="true">＋</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              className={styles.bulkRunButton}
+              onClick={toggleAllTrains}
+              aria-pressed={allTrainsRunning}
+              aria-label={allTrainsRunning ? 'ぜんぶの でんしゃを とめる' : 'ぜんぶの でんしゃを うごかす'}
+            >
+              <span aria-hidden="true">{allTrainsRunning ? '■' : '▶'}</span>
+              <span>{allTrainsRunning ? 'ぜんぶとめる' : 'ぜんぶうごかす'}</span>
+            </button>
+            <button type="button" className={styles.depotButton} onClick={focusDepot} aria-label="しゃこを みる">
+              <span aria-hidden="true">🏠</span>
+            </button>
           </div>
         </header>
 
-        <div className={styles.zoomControls} aria-label="カメラのズーム">
-          <button type="button" className={styles.iconButton} onClick={zoomOut} aria-label="ちいさく みる">−</button>
-          <button type="button" className={styles.iconButton} onClick={zoomIn} aria-label="おおきく みる">＋</button>
-        </div>
-
-        <div className={styles.trainControls} aria-label="でんしゃの そうさ">
-          <div className={styles.trainList}>
-            {fleetSummaries.map((train) => (
-              <div className={styles.trainItem} key={train.id}>
-                <button
-                  type="button"
-                  className={styles.trainFocusButton}
-                  onClick={() => focusTrain(train.id)}
-                  aria-label={`でんしゃ ${train.label}を みる`}
-                >
-                  <span className={styles.trainColor} style={{ backgroundColor: train.color }} aria-hidden="true" />
-                  <span aria-hidden="true">🚃{train.label}</span>
-                </button>
-                <button
-                  type="button"
-                  className={styles.trainToggleButton}
-                  onClick={() => (train.wantsToRun ? pauseTrain(train.id) : startTrain(train.id))}
-                  aria-label={train.wantsToRun ? `でんしゃ ${train.label}を とめる` : `でんしゃ ${train.label}を はしらせる`}
-                >
-                  <span aria-hidden="true">{train.wantsToRun ? '⏸' : '▶'}</span>
-                </button>
-              </div>
-            ))}
+        <div className={styles.stage}>
+          <div className={styles.zoomControls} aria-label="カメラのズーム">
+            <button type="button" className={styles.iconButton} onClick={zoomOut} aria-label="ちいさく みる">−</button>
+            <button type="button" className={styles.iconButton} onClick={zoomIn} aria-label="おおきく みる">＋</button>
           </div>
-          <button
-            type="button"
-            className={styles.addTrainButton}
-            onClick={addTrain}
-            disabled={fleetSummaries.length >= MAX_RAIL_FLEET_SIZE}
-            aria-label="しゃこから でんしゃを ついか"
-          >
-            <span aria-hidden="true">＋🚃</span>
-          </button>
-          <button
-            type="button"
-            className={styles.removeTrainButton}
-            onClick={() => removeTrain()}
-            disabled={fleetSummaries.length <= 1}
-            aria-label="でんしゃを へらす"
-          >
-            <span aria-hidden="true">−🚃</span>
-          </button>
-          <button type="button" className={styles.depotButton} onClick={focusDepot} aria-label="しゃこを みる">
-            <span aria-hidden="true">🏠</span>
-          </button>
-          <button
-            type="button"
-            className={styles.soundButton}
-            onClick={toggleSound}
-            aria-pressed={soundEnabled}
-            aria-label={soundEnabled ? 'おとを けす' : 'おとを つける'}
-          >
-            <span aria-hidden="true">{soundEnabled ? '🔊' : '🔇'}</span>
-          </button>
         </div>
-
-        {selectedPiece?.kind === 'branch' && (
-          <button
-            type="button"
-            className={styles.branchQuickButton}
-            onClick={toggleSelectedBranch}
-            disabled={selectedPieceIsOccupied}
-            aria-label="ポイントを きりかえる"
-          >
-            <span className={styles.actionIcon} aria-hidden="true">⑂</span>
-            <span>ポイント</span>
-          </button>
-        )}
 
         <section className={styles.tray} aria-label="せんろを えらぶ">
           <div className={styles.trayTools}>
@@ -321,17 +380,69 @@ export default function RailBuilderPlay() {
               <RailPreview kind="depot" />
               <span>しゃこ</span>
             </button>
-            <button type="button" className={styles.toolButton} onClick={rotateSelected} disabled={selectedPiece === undefined || selectedPieceIsOccupied} aria-label="せんろを 90ど まわす">
+          </div>
+          <p id="rail-builder-help" className={styles.trayHint}>{hint}</p>
+        </section>
+      </div>
+
+      <div className={styles.floatingLayer} aria-hidden={pieceFloatingPlacement === null && trainFloatingPlacement === null}>
+        {selectedPiece !== undefined && pieceFloatingPlacement !== null && (
+          <div
+            className={`${styles.pieceActionPanel} ${ALIGN_CLASS_NAMES[pieceFloatingPlacement.align]}`}
+            style={{ left: pieceFloatingPlacement.x, top: pieceFloatingPlacement.y }}
+          >
+            {selectedPiece.kind === 'branch' && (
+              <button
+                type="button"
+                className={styles.branchActionButton}
+                onClick={toggleSelectedBranch}
+                disabled={selectedPieceIsOccupied}
+                aria-label="ポイントを きりかえる"
+              >
+                <span className={styles.actionIcon} aria-hidden="true">⑂</span>
+                <span>ポイント</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className={styles.rotateActionButton}
+              onClick={rotateSelected}
+              disabled={selectedPieceIsOccupied}
+              aria-label="せんろを 90ど まわす"
+            >
               <span className={styles.actionIcon} aria-hidden="true">↻</span>
               <span>まわす</span>
             </button>
-            <button type="button" className={`${styles.toolButton} ${styles.deleteButton}`} onClick={deleteSelected} disabled={selectedPiece === undefined || selectedPieceIsOccupied} aria-label="せんろを けす">
+            <button
+              type="button"
+              className={styles.deleteActionButton}
+              onClick={deleteSelected}
+              disabled={selectedPieceIsOccupied}
+              aria-label="せんろを けす"
+            >
               <span className={styles.actionIcon} aria-hidden="true">×</span>
               <span>けす</span>
             </button>
           </div>
-          <p className={styles.trayHint}>{selectedPieceIsOccupied ? 'でんしゃが いる あいだは せんろを うごかせないよ' : 'つなぎめを ちかづけると ぴったり！'}</p>
-        </section>
+        )}
+
+        {selectedTrain !== undefined && trainFloatingPlacement !== null && (
+          <div
+            className={`${styles.trainActionPanel} ${ALIGN_CLASS_NAMES[trainFloatingPlacement.align]}`}
+            style={{ left: trainFloatingPlacement.x, top: trainFloatingPlacement.y }}
+          >
+            <span className={styles.trainActionColor} style={{ backgroundColor: selectedTrain.color }} aria-hidden="true" />
+            <button
+              type="button"
+              className={styles.trainActionButton}
+              onClick={() => (selectedTrain.wantsToRun ? pauseTrain(selectedTrain.id) : startTrain(selectedTrain.id))}
+              aria-label={selectedTrain.wantsToRun ? `でんしゃ ${selectedTrain.label}を とめる` : `でんしゃ ${selectedTrain.label}を はしらせる`}
+            >
+              <span aria-hidden="true">{selectedTrain.wantsToRun ? '■' : '▶'}</span>
+              <span>{selectedTrain.wantsToRun ? 'とまる' : 'はしる'}</span>
+            </button>
+          </div>
+        )}
       </div>
     </main>
   )

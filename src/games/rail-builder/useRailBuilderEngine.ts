@@ -69,17 +69,29 @@ const POINTER_MOVE_THRESHOLD = 6
 // ドラッグで電車を線路上へ置き直すときの当たり判定の許容距離。
 const TRAIN_DRAG_MAX_DISTANCE = 8
 
+export type RailBuilderSelectionAnchor = {
+  x: number
+  y: number
+}
+
 export type RailBuilderEngineOptions = {
   pieces: readonly RailPiece[]
   selectedPieceId: string | null
+  selectedTrainId: string | null
   zoom: number
   onPiecesChange: (pieces: RailPiece[]) => void
   onSelectPiece: (pieceId: string | null) => void
+  onSelectTrain: (trainId: string | null) => void
   onZoomChange?: (zoom: number) => void
   lockedPieceIds?: ReadonlySet<string>
   onTrainStatusChange?: (status: RailTrainStatus) => void
   onFleetChange?: (trains: RailFleetTrainSummary[]) => void
   onTrainOccupiedIdsChange?: (pieceIds: string[]) => void
+  /**
+   * 選択中のパーツ/電車の画面上の位置(px)。フローティングUIの土台位置に使う。
+   * 何も選択していない・画面外にいる場合はnull。
+   */
+  onSelectionAnchorChange?: (anchor: RailBuilderSelectionAnchor | null) => void
   /** レール専用音量。共有 quizSound の global 設定を変更せずに切り替える。 */
   soundEnabled?: boolean
 }
@@ -421,6 +433,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     snapGlow.name = 'snap-glow'
     snapGlow.rotation.x = -Math.PI / 2
     snapGlow.visible = false
+    // 選択中の電車がいるときだけ光る輪。パーツのselectionRingsと同じ見た目を流用する。
+    const trainSelectionRing = new THREE.Mesh(selectionRingGeometry, selectionMaterial)
+    trainSelectionRing.name = 'train-selection-ring'
+    trainSelectionRing.rotation.x = -Math.PI / 2
+    trainSelectionRing.visible = false
     const trainBodyMaterial = new THREE.MeshStandardMaterial({ color: '#f97316', roughness: 0.58 })
     const trainFrontMaterial = new THREE.MeshStandardMaterial({ color: '#ea580c', roughness: 0.55 })
     const trainRoofMaterial = new THREE.MeshStandardMaterial({ color: '#facc15', roughness: 0.7 })
@@ -520,6 +537,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainPitchAxis = new THREE.Vector3(0, 0, 1)
     const trainYawQuaternion = new THREE.Quaternion()
     const trainPitchQuaternion = new THREE.Quaternion()
+    const selectionAnchorVector = new THREE.Vector3()
+    let lastReportedAnchor: RailBuilderSelectionAnchor | null = null
     const instanceMatrix = new THREE.Matrix4()
     const instanceQuaternion = new THREE.Quaternion()
     const instanceScale = new THREE.Vector3()
@@ -640,6 +659,62 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       for (const [pieceId, ring] of selectionRings) {
         ring.visible = pieceId === selectedPieceId
       }
+    }
+
+    /** 選択中の電車の下に光る輪を出す。走行中も追従できるよう毎フレーム呼ぶ。 */
+    function updateTrainSelectionRing(selectedTrainId: string | null) {
+      const runtime = selectedTrainId === null ? undefined : trainVisuals.get(selectedTrainId)
+      const leadCar = runtime?.cars[0]
+      if (leadCar === undefined || !leadCar.visible) {
+        trainSelectionRing.visible = false
+        return
+      }
+      leadCar.getWorldPosition(selectionAnchorVector)
+      trainSelectionRing.position.set(selectionAnchorVector.x, selectionAnchorVector.y + 0.12, selectionAnchorVector.z)
+      trainSelectionRing.visible = true
+    }
+
+    /** 選択中のパーツ/電車のワールド座標を画面px座標へ射影する。フローティングUIの基準位置。 */
+    function computeSelectionAnchor(): RailBuilderSelectionAnchor | null {
+      if (camera === null) return null
+      const selectedPieceId = optionsRef.current.selectedPieceId
+      const selectedTrainId = optionsRef.current.selectedTrainId
+      let hasWorldPoint = false
+      if (selectedPieceId !== null) {
+        const ring = selectionRings.get(selectedPieceId)
+        if (ring !== undefined) {
+          ring.getWorldPosition(selectionAnchorVector)
+          hasWorldPoint = true
+        }
+      } else if (selectedTrainId !== null) {
+        const runtime = trainVisuals.get(selectedTrainId)
+        const leadCar = runtime?.cars[0]
+        if (leadCar !== undefined && leadCar.visible) {
+          leadCar.getWorldPosition(selectionAnchorVector)
+          hasWorldPoint = true
+        }
+      }
+      if (!hasWorldPoint) return null
+      const projected = selectionAnchorVector.clone().project(camera)
+      if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) return null
+      const rect = host.getBoundingClientRect()
+      return {
+        x: (projected.x * 0.5 + 0.5) * rect.width,
+        y: (-projected.y * 0.5 + 0.5) * rect.height,
+      }
+    }
+
+    function reportSelectionAnchor() {
+      const anchor = computeSelectionAnchor()
+      const rounded = anchor === null ? null : { x: Math.round(anchor.x), y: Math.round(anchor.y) }
+      const changed = rounded === null
+        ? lastReportedAnchor !== null
+        : lastReportedAnchor === null
+          || Math.abs(lastReportedAnchor.x - rounded.x) >= 1
+          || Math.abs(lastReportedAnchor.y - rounded.y) >= 1
+      if (!changed) return
+      lastReportedAnchor = rounded
+      optionsRef.current.onSelectionAnchorChange?.(rounded)
     }
 
     function makeTrainCar(runtime: TrainVisualRuntime, trainId: string, index: number): THREE.Group {
@@ -1461,6 +1536,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         if (grabbedTrain !== undefined) {
           followedTrainId = null
           optionsRef.current.onSelectPiece(null)
+          optionsRef.current.onSelectTrain(grabbedTrainId)
           const grabbedForward = sampleRailTrainPose(trainPieces, grabbedTrain.motion.cursor)?.forward ?? null
           trainDrag = {
             pointerId: event.pointerId,
@@ -1478,6 +1554,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         }
       }
 
+      optionsRef.current.onSelectTrain(null)
       const selectedPieceId = pickPiece(event)
       optionsRef.current.onSelectPiece(selectedPieceId)
       if (selectedPieceId !== null) {
@@ -1762,6 +1839,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       markerMesh.position.y = 0.02
       marker.add(markerMesh)
       scene.add(marker)
+      scene.add(trainSelectionRing)
       if (snapGlow !== null) scene.add(snapGlow)
       scene.add(new THREE.HemisphereLight('#fff7d6', '#4f7c56', 1.8))
       const directional = new THREE.DirectionalLight('#fff8e7', 2.1)
@@ -1830,6 +1908,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           soundStatus,
           leadPiece?.kind === 'tunnel',
         )
+        updateTrainSelectionRing(optionsRef.current.selectedTrainId)
+        reportSelectionAnchor()
         renderer.render(scene, camera)
         rafId = window.requestAnimationFrame(render)
       }
