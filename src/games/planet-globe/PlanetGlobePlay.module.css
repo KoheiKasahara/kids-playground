@@ -14,6 +14,12 @@
   min-height: 0;
   overflow: hidden;
   /*
+   * `.topRightSlot`(よみあげ+モード切替を縦積みにした高さ: 28px + 4px(gap) + 92px)。
+   * `.header`がこの下に来るよう`--top-right-slot-height`として持たせておく
+   * (値を変えるときはこの1箇所を直せば`.header`側のtop計算も追従する)。
+   */
+  --top-right-slot-height: 124px;
+  /*
    * 宇宙らしい濃紺のグラデーション。星はここに点描せず、WebGL側の`three/starField.ts`に置く
    * (カメラの向きに応じて動く星と、CSSの静止した星が混ざると不自然なため)。
    */
@@ -37,26 +43,23 @@
 }
 
 /*
- * タイトル・説明文だけの土台。「もどる」は左上に固定で置くため、その高さのぶんだけ下げる。
- * 横方向のpaddingだけで避けようとすると、320px幅では説明文を置く幅が足りず「もどる」の下に
- * 文字が潜り込んで読めなくなる。天体は画面中央に余白付きで収まるため、上端の空を少し
- * 使っても天体の見え方には影響しない。
- * 「ひとつずつ/ぜんぶみる」はここには含めず、`.topRightSlot`へ独立させている
- * (天体観察を圧迫しないコンパクトな配置にするため。Issue #233参照)。
+ * タイトル・説明文だけの土台。縦画面では`.topRightSlot`(よみあげ+モード切替)の
+ * 真下まで下げて横方向で重ならないようにする(横方向のpaddingで避けようとすると、
+ * 「たいようけい」というタイトル自体が入りきらず不格好な位置で折り返されてしまうため)。
+ * 「もどる」の高さぶんだけを避ければ済んでいた以前と比べると下端が少し下がるが、
+ * それでも「ひとつずつ/ぜんぶみる」を天体表示の中央から追い出せていることに変わりはない
+ * (Issue #233参照)。横画面では横幅に余裕があるぶん、下の`@media`でヘッダーの高さを
+ * 「もどる」と同じ位置まで戻し、左右のpaddingで避ける形にする。
  */
 .header {
   position: absolute;
-  top: calc(var(--space-sm) + var(--safe-top) + var(--tap-target-min));
+  top: calc(var(--space-sm) + var(--safe-top) + var(--top-right-slot-height) + var(--space-sm));
   left: 0;
   right: 0;
   z-index: 1;
   width: min(100%, 520px);
   margin: 0 auto;
-  /*
-   * 右側だけ`.topRightSlot`(よみあげ+モード切替の縦積み)の幅ぶん多めに空け、
-   * 狭い画面でタイトル・説明文がそのUIの下に潜り込まないようにする。
-   */
-  padding-inline: var(--space-md) calc(var(--space-md) + var(--safe-right) + 132px);
+  padding-inline: var(--space-md);
   box-sizing: border-box;
   text-align: center;
   pointer-events: none;

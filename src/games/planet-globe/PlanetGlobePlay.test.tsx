@@ -279,6 +279,22 @@ describe('PlanetGlobePlay の全体表示モード(Phase 6)', () => {
     expect(overviewEngineMock.options).toBeUndefined()
   })
 
+  it('モード切替はよみあげトグルと同じ固定UI領域にあり、どちらのモードでもよみあげトグルと同時に操作できる(Issue #233)', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    // 個別観察モードでも全体表示モードでも、モード切替とよみあげトグルが同時に存在し続ける
+    // (天体観察の邪魔にならない位置へ移した`.topRightSlot`が、モード切替でアンマウントされないことの確認)。
+    expect(screen.getByRole('button', { name: /ひとつずつ/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /よみあげ/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶみる/ }))
+
+    expect(screen.getByRole('button', { name: /ぜんぶみる/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /よみあげ/ })).toBeInTheDocument()
+  })
+
   it('「ぜんぶみる」へ切り替えると全体表示エンジンへ太陽・8惑星・冥王星が渡り、個別観察のUIは消える', async () => {
     const user = userEvent.setup()
     renderApp('/games/planet-globe')
