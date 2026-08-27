@@ -49,7 +49,7 @@ export default function SingleBodyStage({
 
   return (
     <>
-      <div ref={registerContainer} className={styles.scene} aria-hidden="true" />
+      <div ref={registerContainer} className={`${styles.scene} ${styles.singleScene}`} aria-hidden="true" />
 
       <FeatureCard spot={selectedSpot} onClose={() => onSpotSelect(null)} />
 
