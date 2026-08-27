@@ -486,20 +486,18 @@
   text-align: center;
 }
 
-/* 選択時だけ出るフローティング操作。画面全体に重ねるが、パネル自体だけがタップを受ける。 */
-.floatingLayer {
+/* 選択時操作はステージ左下に固定する。選択物や接続点の真上を避け、
+   下部パーツパレットの直前に収めることでドラッグ中の視認性を優先する。 */
+.contextPanel {
   position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-}
-
-.pieceActionPanel,
-.trainActionPanel {
-  position: absolute;
+  bottom: var(--space-xs);
+  left: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 6px;
+  max-width: calc(100% - 4px);
+  overflow-x: auto;
   padding: 6px;
   border: 2px solid rgba(54, 72, 88, 0.16);
   border-radius: 999px;
@@ -507,20 +505,6 @@
   box-shadow: 0 6px 16px rgba(42, 65, 74, 0.24);
   pointer-events: auto;
   touch-action: manipulation;
-}
-
-/* 選択位置が画面端に寄っているときは中央ぞろえをやめ、内側へ伸ばしてはみ出しや
-   常時表示のズームボタンとの重なりを減らす。 */
-.alignCenter {
-  transform: translate(-50%, calc(-100% - 16px));
-}
-
-.alignLeft {
-  transform: translate(0, calc(-100% - 16px));
-}
-
-.alignRight {
-  transform: translate(-100%, calc(-100% - 16px));
 }
 
 .rotateActionButton,
