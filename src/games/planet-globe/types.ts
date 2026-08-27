@@ -161,6 +161,33 @@ export type RingSegment = {
 
 export type RingSpec = { segments: readonly RingSegment[] }
 
+/**
+ * 表面とは別に薄く重ねる雲。独立した薄い球として重ねることで、静止した
+ * テクスチャを貼っただけではない地球らしい奥行きを出す。
+ * `patches` は地表と同じ経緯度座標系を使うため、追加の座標変換を持ち込まない。
+ */
+export type CloudLayerSpec = {
+  patches: readonly SurfacePatch[]
+  opacity: number
+  /** ラジアン/秒。スポットと見た目を一致させるため、通常は地表と同じ値にする。 */
+  spinSpeed: number
+}
+
+/** 天体ごとの低負荷な見た目の重ね。必要な天体だけ指定する。 */
+export type AtmosphereSpec = {
+  color: string
+  opacity: number
+  /** 球半径に対する拡大率。1.0より少し大きくする。 */
+  scale: number
+}
+
+export type BodyVisualSpec = {
+  /** 太陽の周囲へ、発光がなだらかに薄れる1枚のスプライトを重ねる。 */
+  halo?: { color: string; opacity: number; scale: number }
+  atmosphere?: AtmosphereSpec
+  clouds?: CloudLayerSpec
+}
+
 /** 天体ごとのライティング補正。すべて既定値からの上書き。 */
 export type LightingSpec = {
   keyIntensity: number
@@ -208,6 +235,8 @@ export type CelestialBody = {
   /** 既定視点を上書きしたい天体だけ持つ(土星は輪をよく開かせる)。 */
   viewDirection?: { x: number; y: number; z: number }
   ring?: RingSpec
+  /** 既存の表面・輪に軽量な補助レイヤーを足すための任意設定。 */
+  visual?: BodyVisualSpec
 }
 
 /**
