@@ -49,6 +49,12 @@ import {
   shouldReduceRailBuilderMotion,
 } from './railBuilderVisuals'
 import {
+  getTrainCarVisualProfile,
+  resolveTrainVisualProfile,
+  type TrainCarVisualProfile,
+  type TrainVisualProfile,
+} from './railTrainVisuals'
+import {
   createRailTrainSoundController,
   playRailDepartureSound,
   playRailSnapSound,
@@ -142,9 +148,35 @@ type TrainVisualRuntime = {
   root: THREE.Group
   cars: THREE.Group[]
   wheelPivots: THREE.Object3D[][]
+  trainType: TrainType
   bodyMaterial: THREE.MeshStandardMaterial
   frontMaterial: THREE.MeshStandardMaterial
   roofMaterial: THREE.MeshStandardMaterial
+  windowMaterial: THREE.MeshStandardMaterial
+  accentMaterial: THREE.MeshStandardMaterial | null
+  roofFeatureMaterial: THREE.MeshStandardMaterial | null
+}
+
+type SpecialTrainVisualDefinition = {
+  profile: TrainVisualProfile
+  noseGeometry: THREE.BufferGeometry
+  leadBodyGeometry: THREE.BufferGeometry
+  middleBodyGeometry: THREE.BufferGeometry
+  leadRoofGeometry: THREE.BufferGeometry
+  middleRoofGeometry: THREE.BufferGeometry
+  sideWindowGeometry: THREE.BufferGeometry
+  cockpitWindowGeometry: THREE.BufferGeometry
+  accentGeometry: THREE.BufferGeometry
+  roofFeatureGeometry?: THREE.BufferGeometry
+}
+
+type SpecialTrainVisualMaterials = {
+  bodyMaterial: THREE.MeshStandardMaterial
+  frontMaterial: THREE.MeshStandardMaterial
+  roofMaterial: THREE.MeshStandardMaterial
+  windowMaterial: THREE.MeshStandardMaterial
+  accentMaterial: THREE.MeshStandardMaterial
+  roofFeatureMaterial?: THREE.MeshStandardMaterial
 }
 
 type BranchRouteVisual = {
@@ -209,6 +241,210 @@ function disposeObjectTree(root: THREE.Object3D, sharedGeometries: Set<THREE.Buf
       renderObject.material.dispose()
     }
   })
+}
+
+type NoseSection = {
+  x: number
+  top: number
+  bottom: number
+  width: number
+}
+
+type NoseStyle = TrainCarVisualProfile['noseStyle']
+
+function noseSectionRing(section: NoseSection, style: NoseStyle): readonly [number, number][] {
+  const halfWidth = section.width / 2
+  const cornerWidth = Math.min(0.08, halfWidth * 0.3)
+  const verticalRange = Math.max(0.01, section.top - section.bottom)
+  const cornerHeight = Math.min(0.07, verticalRange * 0.28)
+  if (style === 'e6-spear') {
+    // E6は細い中央稜線を作り、E5の幅広wedgeとは別の断面にする。
+    const ridgeHalfWidth = Math.min(0.07, halfWidth * 0.22)
+    const ridgeHeight = Math.min(0.07, verticalRange * 0.2)
+    return [
+      [-halfWidth + cornerWidth, section.top],
+      [-ridgeHalfWidth, section.top + ridgeHeight],
+      [ridgeHalfWidth, section.top + ridgeHeight],
+      [halfWidth - cornerWidth, section.top],
+      [halfWidth, section.top - cornerHeight],
+      [halfWidth, section.bottom + cornerHeight],
+      [halfWidth - cornerWidth, section.bottom],
+      [-halfWidth + cornerWidth, section.bottom],
+      [-halfWidth, section.bottom + cornerHeight],
+      [-halfWidth, section.top - cornerHeight],
+    ]
+  }
+  if (style === 'n700s-winged') {
+    // N700Sは中ほどだけ左右へ張り出す二枚翼状の上縁にする。
+    const wingOffset = halfWidth * 0.58
+    const wingLift = Math.min(0.055, verticalRange * 0.2)
+    return [
+      [-halfWidth + cornerWidth, section.top],
+      [-wingOffset, section.top + wingLift],
+      [0, section.top + wingLift * 0.2],
+      [wingOffset, section.top + wingLift],
+      [halfWidth - cornerWidth, section.top],
+      [halfWidth, section.top - cornerHeight],
+      [halfWidth, section.bottom + cornerHeight],
+      [halfWidth - cornerWidth, section.bottom],
+      [-halfWidth + cornerWidth, section.bottom],
+      [-halfWidth, section.bottom + cornerHeight],
+      [-halfWidth, section.top - cornerHeight],
+    ]
+  }
+  return [
+    [-halfWidth + cornerWidth, section.top],
+    [halfWidth - cornerWidth, section.top],
+    [halfWidth, section.top - cornerHeight],
+    [halfWidth, section.bottom + cornerHeight],
+    [halfWidth - cornerWidth, section.bottom],
+    [-halfWidth + cornerWidth, section.bottom],
+    [-halfWidth, section.bottom + cornerHeight],
+    [-halfWidth, section.top - cornerHeight],
+  ]
+}
+
+/** 複数断面の低ポリゴンnose。geometryはeffect初期化時にだけ生成する。 */
+function createNoseGeometry(sections: readonly NoseSection[], style: NoseStyle): THREE.BufferGeometry {
+  const positions: number[] = []
+  const rings = sections.map((section) => noseSectionRing(section, style))
+  const sectionSize = rings[0]?.length ?? 0
+  if (sectionSize === 0) return new THREE.BufferGeometry()
+  for (const [sectionIndex, ring] of rings.entries()) {
+    const section = sections[sectionIndex]!
+    // All styles intentionally keep the same small ring count; there are no
+    // per-frame tessellation or high-segment objects in the render loop.
+    for (const [z, y] of ring) positions.push(section.x, y, z)
+  }
+
+  const indices: number[] = []
+  for (let sectionIndex = 0; sectionIndex < rings.length - 1; sectionIndex += 1) {
+    const currentOffset = sectionIndex * sectionSize
+    const nextOffset = (sectionIndex + 1) * sectionSize
+    for (let pointIndex = 0; pointIndex < sectionSize; pointIndex += 1) {
+      const nextPointIndex = (pointIndex + 1) % sectionSize
+      indices.push(
+        currentOffset + pointIndex,
+        currentOffset + nextPointIndex,
+        nextOffset + pointIndex,
+        currentOffset + nextPointIndex,
+        nextOffset + nextPointIndex,
+        nextOffset + pointIndex,
+      )
+    }
+  }
+  // End caps keep the tapered nose closed without adding a high segment count.
+  for (const sectionIndex of [0, rings.length - 1]) {
+    const offset = sectionIndex * sectionSize
+    const centerIndex = positions.length / 3
+    const section = sections[sectionIndex]!
+    positions.push(section.x, (section.top + section.bottom) / 2, 0)
+    for (let pointIndex = 0; pointIndex < sectionSize; pointIndex += 1) {
+      const nextPointIndex = (pointIndex + 1) % sectionSize
+      indices.push(centerIndex, offset + (sectionIndex === 0 ? nextPointIndex : pointIndex), offset + (sectionIndex === 0 ? pointIndex : nextPointIndex))
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
+}
+
+/** E5先頭車の低い扁平ノーズ。effect初期化時に一度だけ作り、全E5編成で共有する。 */
+function createE5NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
+  return createNoseGeometry([
+    {
+      x: profile.noseBaseX,
+      top: profile.noseBaseTopY,
+      bottom: profile.noseBaseBottomY,
+      width: profile.noseBaseWidth,
+    },
+    {
+      x: profile.noseBaseX + profile.noseLength * 0.42,
+      top: profile.noseBaseTopY - 0.06,
+      bottom: profile.noseBaseBottomY + 0.03,
+      width: profile.noseBaseWidth * 0.92,
+    },
+    {
+      x: profile.noseTipX,
+      top: profile.noseTipTopY,
+      bottom: profile.noseTipBottomY,
+      width: profile.noseTipWidth,
+    },
+  ], 'e5-wide-wedge')
+}
+
+function createE6NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
+  return createNoseGeometry([
+    {
+      x: profile.noseBaseX,
+      top: profile.noseBaseTopY,
+      bottom: profile.noseBaseBottomY,
+      width: profile.noseBaseWidth,
+    },
+    {
+      x: profile.noseBaseX + profile.noseLength * 0.34,
+      top: profile.noseBaseTopY - 0.02,
+      bottom: profile.noseBaseBottomY + 0.04,
+      width: profile.noseBaseWidth * 0.78,
+    },
+    {
+      x: profile.noseTipX,
+      top: profile.noseTipTopY,
+      bottom: profile.noseTipBottomY,
+      width: profile.noseTipWidth,
+    },
+  ], 'e6-spear')
+}
+
+function createN700SNoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
+  return createNoseGeometry([
+    {
+      x: profile.noseBaseX,
+      top: profile.noseBaseTopY,
+      bottom: profile.noseBaseBottomY,
+      width: profile.noseBaseWidth,
+    },
+    {
+      x: profile.noseBaseX + profile.noseLength * 0.32,
+      top: profile.noseBaseTopY - 0.04,
+      bottom: profile.noseBaseBottomY + 0.02,
+      width: profile.bodyWidth,
+    },
+    {
+      x: profile.noseTipX,
+      top: profile.noseTipTopY,
+      bottom: profile.noseTipBottomY,
+      width: profile.noseTipWidth,
+    },
+  ], 'n700s-winged')
+}
+
+function createDoctorYellowNoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
+  return createNoseGeometry([
+    {
+      x: profile.noseBaseX,
+      top: profile.noseBaseTopY,
+      bottom: profile.noseBaseBottomY,
+      width: profile.noseBaseWidth,
+    },
+    {
+      x: profile.noseBaseX + profile.noseLength * 0.28,
+      top: profile.noseBaseTopY + 0.05,
+      bottom: profile.noseBaseBottomY + 0.01,
+      width: profile.noseBaseWidth,
+    },
+    {
+      x: profile.noseTipX,
+      top: profile.noseTipTopY,
+      bottom: profile.noseTipBottomY,
+      width: profile.noseTipWidth,
+    },
+  ], 'doctor-yellow-duck')
 }
 
 /** Three.jsの線路シーンとポインター操作を管理する命令的hook。 */
@@ -345,6 +581,159 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainWheelGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.13, 16)
     const trainCouplerGeometry = new THREE.BoxGeometry(0.34, 0.16, 0.16)
     const trainLightGeometry = new THREE.SphereGeometry(0.09, 8, 6)
+    const e5Profile = resolveTrainVisualProfile('e5')
+    const e5NoseGeometry = createE5NoseGeometry(e5Profile.lead)
+    const e5LeadBodyGeometry = new RoundedBoxGeometry(
+      e5Profile.lead.bodyLength,
+      e5Profile.lead.bodyHeight,
+      e5Profile.lead.bodyWidth,
+      2,
+      0.14,
+    )
+    const e5MiddleBodyGeometry = new RoundedBoxGeometry(
+      e5Profile.middle.bodyLength,
+      e5Profile.middle.bodyHeight,
+      e5Profile.middle.bodyWidth,
+      2,
+      0.14,
+    )
+    const e5LeadRoofGeometry = new RoundedBoxGeometry(
+      e5Profile.lead.roofLength,
+      e5Profile.lead.roofHeight,
+      e5Profile.lead.roofWidth,
+      2,
+      0.06,
+    )
+    const e5MiddleRoofGeometry = new RoundedBoxGeometry(
+      e5Profile.middle.roofLength,
+      e5Profile.middle.roofHeight,
+      e5Profile.middle.roofWidth,
+      2,
+      0.06,
+    )
+    const e5SideWindowGeometry = new THREE.BoxGeometry(
+      e5Profile.window.sideWidth,
+      e5Profile.window.sideHeight,
+      0.04,
+    )
+    const e5CockpitWindowGeometry = new THREE.BoxGeometry(0.04, 0.23, 0.5)
+    const e5AccentGeometry = new THREE.BoxGeometry(1, e5Profile.accent.height, 0.04)
+    const e6Profile = resolveTrainVisualProfile('e6')
+    const e6NoseGeometry = createE6NoseGeometry(e6Profile.lead)
+    const e6LeadBodyGeometry = new RoundedBoxGeometry(
+      e6Profile.lead.bodyLength,
+      e6Profile.lead.bodyHeight,
+      e6Profile.lead.bodyWidth,
+      2,
+      0.12,
+    )
+    const e6MiddleBodyGeometry = new RoundedBoxGeometry(
+      e6Profile.middle.bodyLength,
+      e6Profile.middle.bodyHeight,
+      e6Profile.middle.bodyWidth,
+      2,
+      0.12,
+    )
+    const e6LeadRoofGeometry = new RoundedBoxGeometry(
+      e6Profile.lead.roofLength,
+      e6Profile.lead.roofHeight,
+      e6Profile.lead.roofWidth,
+      2,
+      0.05,
+    )
+    const e6MiddleRoofGeometry = new RoundedBoxGeometry(
+      e6Profile.middle.roofLength,
+      e6Profile.middle.roofHeight,
+      e6Profile.middle.roofWidth,
+      2,
+      0.05,
+    )
+    const e6SideWindowGeometry = new THREE.BoxGeometry(
+      e6Profile.window.sideWidth,
+      e6Profile.window.sideHeight,
+      0.04,
+    )
+    const e6CockpitWindowGeometry = new THREE.BoxGeometry(0.04, 0.2, e6Profile.lead.frontWindowWidth)
+    const e6AccentGeometry = new THREE.BoxGeometry(1, e6Profile.accent.height, 0.035)
+    const n700sProfile = resolveTrainVisualProfile('n700s')
+    const n700sNoseGeometry = createN700SNoseGeometry(n700sProfile.lead)
+    const n700sLeadBodyGeometry = new RoundedBoxGeometry(
+      n700sProfile.lead.bodyLength,
+      n700sProfile.lead.bodyHeight,
+      n700sProfile.lead.bodyWidth,
+      2,
+      0.14,
+    )
+    const n700sMiddleBodyGeometry = new RoundedBoxGeometry(
+      n700sProfile.middle.bodyLength,
+      n700sProfile.middle.bodyHeight,
+      n700sProfile.middle.bodyWidth,
+      2,
+      0.14,
+    )
+    const n700sLeadRoofGeometry = new RoundedBoxGeometry(
+      n700sProfile.lead.roofLength,
+      n700sProfile.lead.roofHeight,
+      n700sProfile.lead.roofWidth,
+      2,
+      0.06,
+    )
+    const n700sMiddleRoofGeometry = new RoundedBoxGeometry(
+      n700sProfile.middle.roofLength,
+      n700sProfile.middle.roofHeight,
+      n700sProfile.middle.roofWidth,
+      2,
+      0.06,
+    )
+    const n700sSideWindowGeometry = new THREE.BoxGeometry(
+      n700sProfile.window.sideWidth,
+      n700sProfile.window.sideHeight,
+      0.04,
+    )
+    const n700sCockpitWindowGeometry = new THREE.BoxGeometry(0.04, 0.22, n700sProfile.lead.frontWindowWidth)
+    const n700sAccentGeometry = new THREE.BoxGeometry(1, n700sProfile.accent.height, 0.04)
+    const doctorYellowProfile = resolveTrainVisualProfile('doctorYellow')
+    const doctorYellowNoseGeometry = createDoctorYellowNoseGeometry(doctorYellowProfile.lead)
+    const doctorYellowLeadBodyGeometry = new RoundedBoxGeometry(
+      doctorYellowProfile.lead.bodyLength,
+      doctorYellowProfile.lead.bodyHeight,
+      doctorYellowProfile.lead.bodyWidth,
+      2,
+      0.16,
+    )
+    const doctorYellowMiddleBodyGeometry = new RoundedBoxGeometry(
+      doctorYellowProfile.middle.bodyLength,
+      doctorYellowProfile.middle.bodyHeight,
+      doctorYellowProfile.middle.bodyWidth,
+      2,
+      0.16,
+    )
+    const doctorYellowLeadRoofGeometry = new RoundedBoxGeometry(
+      doctorYellowProfile.lead.roofLength,
+      doctorYellowProfile.lead.roofHeight,
+      doctorYellowProfile.lead.roofWidth,
+      2,
+      0.07,
+    )
+    const doctorYellowMiddleRoofGeometry = new RoundedBoxGeometry(
+      doctorYellowProfile.middle.roofLength,
+      doctorYellowProfile.middle.roofHeight,
+      doctorYellowProfile.middle.roofWidth,
+      2,
+      0.07,
+    )
+    const doctorYellowSideWindowGeometry = new THREE.BoxGeometry(
+      doctorYellowProfile.window.sideWidth,
+      doctorYellowProfile.window.sideHeight,
+      0.04,
+    )
+    const doctorYellowCockpitWindowGeometry = new THREE.BoxGeometry(
+      0.04,
+      0.24,
+      doctorYellowProfile.lead.frontWindowWidth,
+    )
+    const doctorYellowAccentGeometry = new THREE.BoxGeometry(1, doctorYellowProfile.accent.height, 0.04)
+    const doctorYellowInspectionBoxGeometry = new RoundedBoxGeometry(0.48, 0.1, 0.36, 2, 0.04)
     const bridgeBeamGeometry = new THREE.BoxGeometry(1, 0.26, 0.38)
     const bridgeSupportGeometry = new THREE.BoxGeometry(0.42, 1, 0.42)
     const bridgeGuardGeometry = new THREE.BoxGeometry(1, 0.16, 0.13)
@@ -388,6 +777,39 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       trainWheelGeometry,
       trainCouplerGeometry,
       trainLightGeometry,
+      e5NoseGeometry,
+      e5LeadBodyGeometry,
+      e5MiddleBodyGeometry,
+      e5LeadRoofGeometry,
+      e5MiddleRoofGeometry,
+      e5SideWindowGeometry,
+      e5CockpitWindowGeometry,
+      e5AccentGeometry,
+      e6NoseGeometry,
+      e6LeadBodyGeometry,
+      e6MiddleBodyGeometry,
+      e6LeadRoofGeometry,
+      e6MiddleRoofGeometry,
+      e6SideWindowGeometry,
+      e6CockpitWindowGeometry,
+      e6AccentGeometry,
+      n700sNoseGeometry,
+      n700sLeadBodyGeometry,
+      n700sMiddleBodyGeometry,
+      n700sLeadRoofGeometry,
+      n700sMiddleRoofGeometry,
+      n700sSideWindowGeometry,
+      n700sCockpitWindowGeometry,
+      n700sAccentGeometry,
+      doctorYellowNoseGeometry,
+      doctorYellowLeadBodyGeometry,
+      doctorYellowMiddleBodyGeometry,
+      doctorYellowLeadRoofGeometry,
+      doctorYellowMiddleRoofGeometry,
+      doctorYellowSideWindowGeometry,
+      doctorYellowCockpitWindowGeometry,
+      doctorYellowAccentGeometry,
+      doctorYellowInspectionBoxGeometry,
       bridgeBeamGeometry,
       bridgeSupportGeometry,
       bridgeGuardGeometry,
@@ -470,6 +892,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainBodyMaterial = new THREE.MeshStandardMaterial({ color: '#f97316', roughness: 0.58 })
     const trainFrontMaterial = new THREE.MeshStandardMaterial({ color: '#ea580c', roughness: 0.55 })
     const trainRoofMaterial = new THREE.MeshStandardMaterial({ color: '#facc15', roughness: 0.7 })
+    const e5BodyMaterial = new THREE.MeshStandardMaterial({ color: '#168c8f', roughness: 0.58 })
+    const e5FrontMaterial = new THREE.MeshStandardMaterial({ color: '#0e6672', roughness: 0.5 })
+    const e5RoofMaterial = new THREE.MeshStandardMaterial({ color: '#f8f4ea', roughness: 0.7 })
     const trainWindowMaterial = new THREE.MeshStandardMaterial({ color: '#67e8f9', roughness: 0.24, metalness: 0.12 })
     const trainDoorMaterial = new THREE.MeshStandardMaterial({ color: '#fef3c7', roughness: 0.68 })
     const trainWheelMaterial = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.85 })
@@ -480,6 +905,32 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       emissiveIntensity: 0.7,
       roughness: 0.3,
     })
+    // E5の外装色は編成間で共有する。type変更で車両を再構築しても、
+    // render中に新規materialを増やさず、effect終了時に確実に解放できる。
+    const e5AccentMaterial = new THREE.MeshStandardMaterial({
+      color: e5Profile.accent.color,
+      roughness: 0.52,
+    })
+    const e5WindowMaterial = new THREE.MeshStandardMaterial({
+      color: e5Profile.window.color,
+      roughness: 0.28,
+      metalness: 0.08,
+    })
+    const e6BodyMaterial = new THREE.MeshStandardMaterial({ color: e6Profile.bodyColor, roughness: 0.58 })
+    const e6FrontMaterial = new THREE.MeshStandardMaterial({ color: e6Profile.frontColor, roughness: 0.5 })
+    const e6RoofMaterial = new THREE.MeshStandardMaterial({ color: e6Profile.roofColor, roughness: 0.7 })
+    const e6AccentMaterial = new THREE.MeshStandardMaterial({ color: e6Profile.accent.color, roughness: 0.48, metalness: 0.28 })
+    const e6WindowMaterial = new THREE.MeshStandardMaterial({ color: e6Profile.window.color, roughness: 0.25, metalness: 0.12 })
+    const n700sBodyMaterial = new THREE.MeshStandardMaterial({ color: n700sProfile.bodyColor, roughness: 0.6 })
+    const n700sFrontMaterial = new THREE.MeshStandardMaterial({ color: n700sProfile.frontColor, roughness: 0.52 })
+    const n700sRoofMaterial = new THREE.MeshStandardMaterial({ color: n700sProfile.roofColor, roughness: 0.7 })
+    const n700sAccentMaterial = new THREE.MeshStandardMaterial({ color: n700sProfile.accent.color, roughness: 0.48 })
+    const n700sWindowMaterial = new THREE.MeshStandardMaterial({ color: n700sProfile.window.color, roughness: 0.26, metalness: 0.12 })
+    const doctorYellowBodyMaterial = new THREE.MeshStandardMaterial({ color: doctorYellowProfile.bodyColor, roughness: 0.58 })
+    const doctorYellowFrontMaterial = new THREE.MeshStandardMaterial({ color: doctorYellowProfile.frontColor, roughness: 0.5 })
+    const doctorYellowRoofMaterial = new THREE.MeshStandardMaterial({ color: doctorYellowProfile.roofColor, roughness: 0.7 })
+    const doctorYellowAccentMaterial = new THREE.MeshStandardMaterial({ color: doctorYellowProfile.accent.color, roughness: 0.46 })
+    const doctorYellowWindowMaterial = new THREE.MeshStandardMaterial({ color: doctorYellowProfile.window.color, roughness: 0.27, metalness: 0.1 })
     const bridgeMaterial = new THREE.MeshStandardMaterial({ color: '#b77945', roughness: 0.82 })
     const bridgeGuardMaterial = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.64 })
     const stationPlatformMaterial = new THREE.MeshStandardMaterial({ color: '#f4c96b', roughness: 0.76 })
@@ -502,11 +953,31 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       trainBodyMaterial,
       trainFrontMaterial,
       trainRoofMaterial,
+      e5BodyMaterial,
+      e5FrontMaterial,
+      e5RoofMaterial,
       trainLightMaterial,
       trainWindowMaterial,
       trainDoorMaterial,
       trainWheelMaterial,
       trainCouplerMaterial,
+      e5AccentMaterial,
+      e5WindowMaterial,
+      e6BodyMaterial,
+      e6FrontMaterial,
+      e6RoofMaterial,
+      e6AccentMaterial,
+      e6WindowMaterial,
+      n700sBodyMaterial,
+      n700sFrontMaterial,
+      n700sRoofMaterial,
+      n700sAccentMaterial,
+      n700sWindowMaterial,
+      doctorYellowBodyMaterial,
+      doctorYellowFrontMaterial,
+      doctorYellowRoofMaterial,
+      doctorYellowAccentMaterial,
+      doctorYellowWindowMaterial,
       bridgeMaterial,
       bridgeGuardMaterial,
       stationPlatformMaterial,
@@ -517,6 +988,86 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       tunnelMaterial,
       tunnelInnerMaterial,
     ].forEach((material) => sharedMaterials.add(material))
+
+    const specialTrainVisualDefinitions: ReadonlyMap<Exclude<TrainType, 'basic'>, SpecialTrainVisualDefinition> = new Map([
+      ['e5', {
+        profile: e5Profile,
+        noseGeometry: e5NoseGeometry,
+        leadBodyGeometry: e5LeadBodyGeometry,
+        middleBodyGeometry: e5MiddleBodyGeometry,
+        leadRoofGeometry: e5LeadRoofGeometry,
+        middleRoofGeometry: e5MiddleRoofGeometry,
+        sideWindowGeometry: e5SideWindowGeometry,
+        cockpitWindowGeometry: e5CockpitWindowGeometry,
+        accentGeometry: e5AccentGeometry,
+      }],
+      ['e6', {
+        profile: e6Profile,
+        noseGeometry: e6NoseGeometry,
+        leadBodyGeometry: e6LeadBodyGeometry,
+        middleBodyGeometry: e6MiddleBodyGeometry,
+        leadRoofGeometry: e6LeadRoofGeometry,
+        middleRoofGeometry: e6MiddleRoofGeometry,
+        sideWindowGeometry: e6SideWindowGeometry,
+        cockpitWindowGeometry: e6CockpitWindowGeometry,
+        accentGeometry: e6AccentGeometry,
+      }],
+      ['n700s', {
+        profile: n700sProfile,
+        noseGeometry: n700sNoseGeometry,
+        leadBodyGeometry: n700sLeadBodyGeometry,
+        middleBodyGeometry: n700sMiddleBodyGeometry,
+        leadRoofGeometry: n700sLeadRoofGeometry,
+        middleRoofGeometry: n700sMiddleRoofGeometry,
+        sideWindowGeometry: n700sSideWindowGeometry,
+        cockpitWindowGeometry: n700sCockpitWindowGeometry,
+        accentGeometry: n700sAccentGeometry,
+      }],
+      ['doctorYellow', {
+        profile: doctorYellowProfile,
+        noseGeometry: doctorYellowNoseGeometry,
+        leadBodyGeometry: doctorYellowLeadBodyGeometry,
+        middleBodyGeometry: doctorYellowMiddleBodyGeometry,
+        leadRoofGeometry: doctorYellowLeadRoofGeometry,
+        middleRoofGeometry: doctorYellowMiddleRoofGeometry,
+        sideWindowGeometry: doctorYellowSideWindowGeometry,
+        cockpitWindowGeometry: doctorYellowCockpitWindowGeometry,
+        accentGeometry: doctorYellowAccentGeometry,
+        roofFeatureGeometry: doctorYellowInspectionBoxGeometry,
+      }],
+    ])
+
+    const specialTrainVisualMaterials: ReadonlyMap<Exclude<TrainType, 'basic'>, SpecialTrainVisualMaterials> = new Map([
+      ['e5', {
+        bodyMaterial: e5BodyMaterial,
+        frontMaterial: e5FrontMaterial,
+        roofMaterial: e5RoofMaterial,
+        windowMaterial: e5WindowMaterial,
+        accentMaterial: e5AccentMaterial,
+      }],
+      ['e6', {
+        bodyMaterial: e6BodyMaterial,
+        frontMaterial: e6FrontMaterial,
+        roofMaterial: e6RoofMaterial,
+        windowMaterial: e6WindowMaterial,
+        accentMaterial: e6AccentMaterial,
+      }],
+      ['n700s', {
+        bodyMaterial: n700sBodyMaterial,
+        frontMaterial: n700sFrontMaterial,
+        roofMaterial: n700sRoofMaterial,
+        windowMaterial: n700sWindowMaterial,
+        accentMaterial: n700sAccentMaterial,
+      }],
+      ['doctorYellow', {
+        bodyMaterial: doctorYellowBodyMaterial,
+        frontMaterial: doctorYellowFrontMaterial,
+        roofMaterial: doctorYellowRoofMaterial,
+        windowMaterial: doctorYellowWindowMaterial,
+        accentMaterial: doctorYellowAccentMaterial,
+        roofFeatureMaterial: doctorYellowAccentMaterial,
+      }],
+    ])
 
     const groundGeometry = new THREE.BoxGeometry(WORLD_SIZE, 0.48, WORLD_SIZE)
     const groundMaterial = new THREE.MeshStandardMaterial({ color: '#9bd18b', roughness: 0.9 })
@@ -746,7 +1297,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       optionsRef.current.onSelectionAnchorChange?.(rounded)
     }
 
-    function makeTrainCar(runtime: TrainVisualRuntime, trainId: string, index: number): THREE.Group {
+    function makeBasicTrainCar(runtime: TrainVisualRuntime, trainId: string, index: number): THREE.Group {
       const group = new THREE.Group()
       group.name = index === 0 ? `${trainId}-lead-car` : `${trainId}-car-${index + 1}`
       group.userData.trainId = trainId
@@ -819,37 +1370,175 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       return group
     }
 
+    function makeSpecialTrainCar(
+      runtime: TrainVisualRuntime,
+      trainId: string,
+      index: number,
+      definition: SpecialTrainVisualDefinition,
+    ): THREE.Group {
+      const isLead = index === 0
+      const profile = getTrainCarVisualProfile(runtime.trainType, isLead ? 'lead' : 'middle')
+      const group = new THREE.Group()
+      group.name = isLead ? `${trainId}-lead-car` : `${trainId}-car-${index + 1}`
+      group.userData.trainId = trainId
+
+      const bodyGeometry = isLead ? definition.leadBodyGeometry : definition.middleBodyGeometry
+      const roofGeometry = isLead ? definition.leadRoofGeometry : definition.middleRoofGeometry
+      const body = new THREE.Mesh(bodyGeometry, runtime.bodyMaterial)
+      body.position.set(profile.bodyCenterX, profile.bodyCenterY, 0)
+      body.castShadow = true
+      body.receiveShadow = true
+      group.add(body)
+
+      if (isLead) {
+        // ノーズ形状の座標はgeometry内へ焼き込み済み。ここではoffsetを加えず、
+        // 先頭車だけへ一つの共有nose meshを追加する。
+        const nose = new THREE.Mesh(definition.noseGeometry, runtime.frontMaterial)
+        nose.castShadow = true
+        nose.receiveShadow = true
+        group.add(nose)
+      }
+
+      const skirt = new THREE.Mesh(trainSkirtGeometry, trainCouplerMaterial)
+      skirt.position.set(profile.bodyCenterX, 0.43, 0)
+      skirt.scale.x = profile.bodyLength / 1.7
+      group.add(skirt)
+
+      const roof = new THREE.Mesh(roofGeometry, runtime.roofMaterial)
+      roof.position.set(profile.roofCenterX, profile.roofCenterY, 0)
+      roof.castShadow = true
+      group.add(roof)
+
+      const accentMaterial = runtime.accentMaterial
+      if (accentMaterial !== null && profile.accentLength > 0) {
+        for (const side of [-1, 1]) {
+          const accent = new THREE.Mesh(definition.accentGeometry, accentMaterial)
+          accent.position.set(profile.bodyCenterX, profile.accentY, side * (profile.bodyWidth / 2 + 0.012))
+          accent.scale.x = profile.accentLength
+          group.add(accent)
+        }
+      }
+
+      for (const side of [-1, 1]) {
+        for (const x of profile.sideWindowXs) {
+          const window = new THREE.Mesh(definition.sideWindowGeometry, runtime.windowMaterial)
+          window.position.set(x, profile.sideWindowY, side * (profile.bodyWidth / 2 + 0.014))
+          group.add(window)
+        }
+        const doorX = profile.bodyCenterX - 0.4
+        const doorFrame = new THREE.Mesh(trainDoorFrameGeometry, trainCouplerMaterial)
+        doorFrame.position.set(doorX, 0.72, side * (profile.bodyWidth / 2 + 0.02))
+        group.add(doorFrame)
+        const door = new THREE.Mesh(trainDoorGeometry, trainDoorMaterial)
+        door.position.set(doorX, 0.72, side * (profile.bodyWidth / 2 + 0.03))
+        group.add(door)
+      }
+
+      if (profile.hasFrontWindow) {
+        const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
+        // ノーズの先端ではなく、肩の根元寄りに置く運転台窓。
+        cockpitWindow.position.set(profile.frontWindowX, profile.frontWindowY, 0)
+        group.add(cockpitWindow)
+      }
+
+      if (profile.hasHeadlights) {
+        for (const side of [-1, 1]) {
+          const headlight = new THREE.Mesh(trainLightGeometry, trainLightMaterial)
+          headlight.position.set(profile.headlightX, profile.headlightY, side * profile.headlightZ)
+          group.add(headlight)
+        }
+      }
+
+      if (isLead && definition.roofFeatureGeometry !== undefined && runtime.roofFeatureMaterial !== null) {
+        // 検測箱は低く一個だけ。車体の上端制約を越えない位置に置く。
+        const feature = new THREE.Mesh(definition.roofFeatureGeometry, runtime.roofFeatureMaterial)
+        feature.position.set(profile.roofCenterX - 0.1, profile.roofCenterY + profile.roofHeight / 2 + 0.05, 0)
+        group.add(feature)
+      }
+
+      const wheelPivots: THREE.Object3D[] = []
+      for (const x of [-0.67, 0.67]) {
+        for (const side of [-1, 1]) {
+          const pivot = new THREE.Object3D()
+          pivot.position.set(x, 0.34, side * 0.5)
+          const wheel = new THREE.Mesh(trainWheelGeometry, trainWheelMaterial)
+          wheel.rotation.x = Math.PI / 2
+          pivot.add(wheel)
+          group.add(pivot)
+          wheelPivots.push(pivot)
+        }
+      }
+
+      for (const x of profile.couplerPositions) {
+        const coupler = new THREE.Mesh(trainCouplerGeometry, trainCouplerMaterial)
+        coupler.position.set(x, 0.62, 0)
+        group.add(coupler)
+      }
+      runtime.root.add(group)
+      runtime.cars.push(group)
+      runtime.wheelPivots.push(wheelPivots)
+      return group
+    }
+
+    function makeTrainCar(runtime: TrainVisualRuntime, trainId: string, index: number): THREE.Group {
+      if (runtime.trainType === 'basic') return makeBasicTrainCar(runtime, trainId, index)
+      const definition = specialTrainVisualDefinitions.get(runtime.trainType)
+      return definition === undefined
+        ? makeBasicTrainCar(runtime, trainId, index)
+        : makeSpecialTrainCar(runtime, trainId, index, definition)
+    }
+
+    function createTrainVisualRuntime(train: RailFleetTrain): TrainVisualRuntime {
+      const specialMaterials = train.trainType === 'basic'
+        ? undefined
+        : specialTrainVisualMaterials.get(train.trainType)
+      // basicだけは既存の列車ごとの色ローテーションを保つためcloneする。
+      // 新型の固定色はeffect内で一度作ったtype共有materialを再利用する。
+      const bodyMaterial = specialMaterials?.bodyMaterial ?? trainBodyMaterial.clone()
+      const frontMaterial = specialMaterials?.frontMaterial ?? trainFrontMaterial.clone()
+      const roofMaterial = specialMaterials?.roofMaterial ?? trainRoofMaterial.clone()
+      if (specialMaterials === undefined) {
+        bodyMaterial.color.set(train.appearance.color)
+        frontMaterial.color.set(train.appearance.frontColor)
+        roofMaterial.color.set(train.appearance.roofColor)
+      }
+      const runtime: TrainVisualRuntime = {
+        root: new THREE.Group(),
+        cars: [],
+        wheelPivots: [],
+        trainType: train.trainType,
+        bodyMaterial,
+        frontMaterial,
+        roofMaterial,
+        windowMaterial: specialMaterials?.windowMaterial ?? trainWindowMaterial,
+        accentMaterial: specialMaterials?.accentMaterial ?? null,
+        roofFeatureMaterial: specialMaterials?.roofFeatureMaterial ?? null,
+      }
+      runtime.root.name = train.id
+      runtime.root.userData.trainId = train.id
+      for (let index = 0; index < 2; index += 1) makeTrainCar(runtime, train.id, index)
+      trainRoot.add(runtime.root)
+      return runtime
+    }
+
+    function disposeTrainVisualRuntime(runtime: TrainVisualRuntime) {
+      trainRoot.remove(runtime.root)
+      // 車体固有のbasic clone materialだけが非共有として解放される。
+      // E5の共有material/geometryはeffectのcleanupで一度だけ解放する。
+      disposeObjectTree(runtime.root, sharedGeometries, sharedMaterials)
+    }
+
     function ensureTrainVisuals() {
-      const fleetIds = new Set(fleet.map((train) => train.id))
       for (const [trainId, runtime] of trainVisuals) {
-        if (fleetIds.has(trainId)) continue
-        trainRoot.remove(runtime.root)
+        const train = fleet.find((candidate) => candidate.id === trainId)
+        if (train !== undefined && runtime.trainType === train.trainType) continue
+        disposeTrainVisualRuntime(runtime)
         trainVisuals.delete(trainId)
       }
       for (const train of fleet) {
         if (trainVisuals.has(train.id)) continue
-        const bodyMaterial = trainBodyMaterial.clone()
-        bodyMaterial.color.set(train.appearance.color)
-        const frontMaterial = trainFrontMaterial.clone()
-        frontMaterial.color.set(train.appearance.frontColor)
-        const roofMaterial = trainRoofMaterial.clone()
-        roofMaterial.color.set(train.appearance.roofColor)
-        sharedMaterials.add(bodyMaterial)
-        sharedMaterials.add(frontMaterial)
-        sharedMaterials.add(roofMaterial)
-        const runtime: TrainVisualRuntime = {
-          root: new THREE.Group(),
-          cars: [],
-          wheelPivots: [],
-          bodyMaterial,
-          frontMaterial,
-          roofMaterial,
-        }
-        runtime.root.name = train.id
-        runtime.root.userData.trainId = train.id
-        trainRoot.add(runtime.root)
+        const runtime = createTrainVisualRuntime(train)
         trainVisuals.set(train.id, runtime)
-        for (let index = 0; index < 2; index += 1) makeTrainCar(runtime, train.id, index)
       }
     }
 
@@ -995,13 +1684,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     /** Phase 3の車両選択UI向け。走行状態(cursor/speed/status)には触れず、見た目だけ差し替える。 */
     function setTrainTypeNow(trainId: string, trainType: TrainType) {
       fleet = setRailFleetTrainType(fleet, trainId, trainType)
-      const updatedTrain = fleet.find((train) => train.id === trainId)
-      const runtime = updatedTrain === undefined ? undefined : trainVisuals.get(trainId)
-      if (updatedTrain !== undefined && runtime !== undefined) {
-        runtime.bodyMaterial.color.set(updatedTrain.appearance.color)
-        runtime.frontMaterial.color.set(updatedTrain.appearance.frontColor)
-        runtime.roofMaterial.color.set(updatedTrain.appearance.roofColor)
-      }
+      // trainType差分はensureTrainVisualsがruntimeごと再構築する。
+      // E5のtype共有materialを直接変更すると、他のE5編成まで色が変わるため触れない。
       updateTrainVisuals()
       reportTrainState()
     }
@@ -1017,17 +1701,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     function removeTrainNow(trainId?: string) {
       const before = fleet
       fleet = removeRailFleetTrain(fleet, trainId)
-      // 消えたtrainのcloned material(runtime生成時にsharedMaterialsへ登録済み)を
-      // ここで解放しないと、消して増やしてを繰り返すたびリークする。
       const remainingIds = new Set(fleet.map((train) => train.id))
       for (const removedTrain of before) {
         if (remainingIds.has(removedTrain.id)) continue
         const runtime = trainVisuals.get(removedTrain.id)
         if (runtime === undefined) continue
-        for (const material of [runtime.bodyMaterial, runtime.frontMaterial, runtime.roofMaterial]) {
-          sharedMaterials.delete(material)
-          material.dispose()
-        }
+        disposeTrainVisualRuntime(runtime)
+        trainVisuals.delete(removedTrain.id)
       }
       updateTrainVisuals()
       reportTrainState()
