@@ -67,24 +67,34 @@ export type TrainShellSection = {
   width: number
 }
 
-/** E5先頭車の後端から低く長い鼻先までをつなぐ連続14断面。 */
+/** E5先頭車の後端から低く長い鼻先までをつなぐ連続19断面。
+ *
+ * x方向は一定ピッチに揃え、屋根の終わりからコックピット、鼻先へ
+ * 高さ・幅が少しずつ変わるようにする。前半を完全に平らにしないことで、
+ * 玩具らしい丸みを保ちながら、屋根から鼻先へ一続きに見える輪郭になる。
+ */
 export const E5_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
   { x: -1.04, top: 1.22, bottom: 0.49, width: 0.88 },
-  { x: -0.72, top: 1.22, bottom: 0.49, width: 0.88 },
-  { x: -0.32, top: 1.22, bottom: 0.49, width: 0.88 },
-  { x: 0.08, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: -0.89, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: -0.74, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: -0.59, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: -0.44, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: -0.29, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: -0.14, top: 1.22, bottom: 0.49, width: 0.88 },
   // The taper starts just ahead of the cabin instead of leaving a round
   // block at the front of the body.
-  { x: 0.24, top: 1.22, bottom: 0.49, width: 0.879 },
-  { x: 0.40, top: 1.215, bottom: 0.494, width: 0.875 },
-  { x: 0.56, top: 1.19, bottom: 0.50, width: 0.86 },
-  { x: 0.74, top: 1.13, bottom: 0.515, width: 0.82 },
-  { x: 0.92, top: 1.04, bottom: 0.54, width: 0.75 },
-  { x: 1.10, top: 0.95, bottom: 0.565, width: 0.67 },
-  { x: 1.25, top: 0.87, bottom: 0.59, width: 0.58 },
-  { x: 1.38, top: 0.81, bottom: 0.615, width: 0.49 },
-  { x: 1.48, top: 0.80, bottom: 0.63, width: 0.41 },
-  { x: 1.56, top: 0.79, bottom: 0.63, width: 0.38 },
+  { x: 0.01, top: 1.219, bottom: 0.491, width: 0.878 },
+  { x: 0.16, top: 1.216, bottom: 0.494, width: 0.874 },
+  { x: 0.31, top: 1.210, bottom: 0.498, width: 0.866 },
+  { x: 0.46, top: 1.198, bottom: 0.503, width: 0.854 },
+  { x: 0.61, top: 1.180, bottom: 0.510, width: 0.840 },
+  { x: 0.76, top: 1.155, bottom: 0.520, width: 0.800 },
+  { x: 0.91, top: 1.120, bottom: 0.533, width: 0.750 },
+  { x: 1.06, top: 1.075, bottom: 0.549, width: 0.690 },
+  { x: 1.21, top: 1.020, bottom: 0.568, width: 0.620 },
+  { x: 1.36, top: 0.950, bottom: 0.590, width: 0.540 },
+  { x: 1.51, top: 0.860, bottom: 0.614, width: 0.450 },
+  { x: 1.66, top: 0.770, bottom: 0.630, width: 0.360 },
 ] as const
 
 export type TrainWindshieldSection = {
@@ -95,14 +105,18 @@ export type TrainWindshieldSection = {
 }
 
 /**
- * Three low-poly stations for the E5 front windshield.  The y coordinate is
- * derived from the shell top in the Three.js factory, keeping the glass on
- * the sloping roof-to-nose surface when the shell is tuned.
+ * Four low-poly stations for the E5 front windshield. The y coordinate and
+ * outer shoulder vertices are derived from the shell ring in the Three.js
+ * factory, keeping the glass on the sloping roof-to-nose surface when the
+ * shell is tuned.
  */
 export const E5_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSection[] = [
-  { x: 0.43, width: 0.64 },
-  { x: 0.58, width: 0.62 },
-  { x: 0.74, width: 0.56 },
+  // A slightly wider rear station lets the glass meet both shell shoulders;
+  // it then tapers toward the low nose instead of reading as a top plate.
+  { x: 0.34, width: 0.64 },
+  { x: 0.43, width: 0.68 },
+  { x: 0.62, width: 0.62 },
+  { x: 0.84, width: 0.53 },
 ] as const
 
 export type TrainShellAccentBand = {
@@ -251,16 +265,16 @@ const E5_LEAD: TrainCarVisualProfile = {
   roofCenterX: -0.12,
   roofCenterY: 1.15,
   // The nose is long, broad through the shoulder, and narrows progressively.
-  noseLength: 1.36,
+  noseLength: 1.46,
   // The loft starts just ahead of the shoulder and runs to the rounded tip.
   noseBaseX: 0.20,
-  noseTipX: 1.56,
+  noseTipX: 1.66,
   noseBaseWidth: 0.88,
-  noseTipWidth: 0.38,
+  noseTipWidth: 0.36,
   noseBaseBottomY: 0.47,
   noseBaseTopY: 1.06,
   noseTipBottomY: 0.63,
-  noseTipTopY: 0.79,
+  noseTipTopY: 0.77,
   accentLength: 1.92,
   accentHeight: 0.07,
   accentY: 0.8,
@@ -269,8 +283,8 @@ const E5_LEAD: TrainCarVisualProfile = {
   sideWindowWidth: 0.26,
   sideWindowHeight: 0.16,
   frontWindowX: 0.58,
-  frontWindowY: 1.2,
-  frontWindowWidth: 0.62,
+  frontWindowY: 1.19,
+  frontWindowWidth: 0.68,
   headlightX: 1.24,
   headlightY: 0.69,
   headlightZ: 0.19,
