@@ -21,7 +21,7 @@ import {
   ZOOM_ANIMATION_DURATION_MS,
 } from './planetCamera'
 import { surfaceDirection } from './planetCoords'
-import { createSurfaceMaps, type SurfaceMaps } from './planetSurface'
+import { createCloudTexture, createSurfaceMaps, type SurfaceMaps } from './planetSurface'
 import { axialTiltRotationZ, createRingMeshes, createRingSegmentTexture } from './planetRing'
 import {
   applyLighting,
@@ -119,6 +119,38 @@ function getReducedMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 }
 
+/** 太陽の周囲へ重ねる、低負荷な放射状の発光テクスチャ。 */
+function createHaloTexture(color: string): THREE.CanvasTexture | null {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 256
+  let context: CanvasRenderingContext2D | null
+  try {
+    context = canvas.getContext('2d')
+  } catch {
+    return null
+  }
+  if (context === null) return null
+
+  const rgb = new THREE.Color(color)
+  const [r, g, b] = [
+    Math.round(rgb.r * 255),
+    Math.round(rgb.g * 255),
+    Math.round(rgb.b * 255),
+  ]
+  const gradient = context.createRadialGradient(128, 128, 56, 128, 128, 128)
+  gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.28)`)
+  gradient.addColorStop(0.52, `rgba(${r}, ${g}, ${b}, 0.16)`)
+  gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`)
+  context.fillStyle = gradient
+  context.fillRect(0, 0, 256, 256)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
+}
+
 /** Three.jsのシーンと操作系をhookのライフサイクル内で完結させる。天体ごとの分岐は書かず、bodyの値だけを読む。 */
 export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngineHandle {
   const optionsRef = useRef(options)
@@ -159,8 +191,12 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
 
     let tiltGroup: THREE.Group | null = null
     let spinGroup: THREE.Group | null = null
+    let cloudSpinGroup: THREE.Group | null = null
     let sphereMesh: THREE.Mesh | null = null
     let ringMeshes: THREE.Mesh[] = []
+    let visualObjects: THREE.Object3D[] = []
+    let visualMaterials: THREE.Material[] = []
+    let haloTexture: THREE.CanvasTexture | null = null
 
     // マーカー・パルスのテクスチャはeffectスコープで1回だけ生成する。モジュールスコープに
     // キャッシュしてdisposeすると、再マウント時に破棄済みテクスチャを使ってしまうため。
@@ -192,6 +228,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     // 1天体につき1回しかCanvas 2Dのピクセルループを走らせない(生成コストの主因のため)。
     const surfaceCache = new Map<CelestialBodyId, SurfaceMaps>()
     const ringTextureCache = new Map<CelestialBodyId, (THREE.CanvasTexture | null)[]>()
+    const cloudTextureCache = new Map<CelestialBodyId, THREE.CanvasTexture | null>()
 
     function getOrCreateSurfaceMaps(body: CelestialBody): SurfaceMaps {
       const cached = surfaceCache.get(body.id)
@@ -215,6 +252,16 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       const textures = ring.segments.map((segment) => createRingSegmentTexture(segment))
       ringTextureCache.set(body.id, textures)
       return textures
+    }
+
+    function getOrCreateCloudTexture(body: CelestialBody): THREE.CanvasTexture | null {
+      const cached = cloudTextureCache.get(body.id)
+      if (cached !== undefined) return cached
+      const texture = body.visual?.clouds === undefined ? null : createCloudTexture(body.visual.clouds.patches)
+      const maxAnisotropy = renderer?.capabilities.getMaxAnisotropy() ?? 1
+      if (texture !== null) texture.anisotropy = maxAnisotropy
+      cloudTextureCache.set(body.id, texture)
+      return texture
     }
 
     function aspectOfContainer(): number {
@@ -288,6 +335,13 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         ringMesh.removeFromParent()
       }
       ringMeshes = []
+      for (const material of visualMaterials) material.dispose()
+      visualMaterials = []
+      for (const object of visualObjects) object.removeFromParent()
+      visualObjects = []
+      cloudSpinGroup = null
+      haloTexture?.dispose()
+      haloTexture = null
       if (spinGroup !== null) {
         spinGroup.removeFromParent()
         spinGroup = null
@@ -335,6 +389,71 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       mesh.receiveShadow = false
       nextSpinGroup.add(mesh)
       nextTiltGroup.add(nextSpinGroup)
+
+      const visual = body.visual
+      if (visual?.clouds !== undefined) {
+        const texture = getOrCreateCloudTexture(body)
+        const cloudMaterial = new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          opacity: visual.clouds.opacity,
+          depthWrite: false,
+        })
+        const cloudMesh = new THREE.Mesh(sphereGeometry, cloudMaterial)
+        const cloudScale = body.radius * 1.014
+        cloudMesh.scale.set(cloudScale, cloudScale * (1 - (body.flattening ?? 0)), cloudScale)
+        cloudMesh.renderOrder = 1
+        const nextCloudSpinGroup = new THREE.Group()
+        nextCloudSpinGroup.rotation.y = body.initialRotationY
+        nextCloudSpinGroup.add(cloudMesh)
+        nextTiltGroup.add(nextCloudSpinGroup)
+        cloudSpinGroup = nextCloudSpinGroup
+        visualObjects.push(cloudMesh, nextCloudSpinGroup)
+        visualMaterials.push(cloudMaterial)
+      }
+
+      if (visual?.atmosphere !== undefined) {
+        const atmosphereMaterial = new THREE.MeshBasicMaterial({
+          color: visual.atmosphere.color,
+          transparent: true,
+          opacity: visual.atmosphere.opacity,
+          side: THREE.BackSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+        const atmosphere = new THREE.Mesh(sphereGeometry, atmosphereMaterial)
+        const atmosphereScale = body.radius * visual.atmosphere.scale
+        atmosphere.scale.set(
+          atmosphereScale,
+          atmosphereScale * (1 - (body.flattening ?? 0)),
+          atmosphereScale,
+        )
+        atmosphere.renderOrder = 2
+        nextTiltGroup.add(atmosphere)
+        visualObjects.push(atmosphere)
+        visualMaterials.push(atmosphereMaterial)
+      }
+
+      if (visual?.halo !== undefined) {
+        haloTexture = createHaloTexture(visual.halo.color)
+        if (haloTexture !== null) {
+          const haloMaterial = new THREE.SpriteMaterial({
+            map: haloTexture,
+            color: visual.halo.color,
+            transparent: true,
+            opacity: visual.halo.opacity,
+            depthWrite: false,
+            depthTest: false,
+          })
+          const halo = new THREE.Sprite(haloMaterial)
+          const haloDiameter = body.radius * visual.halo.scale
+          halo.scale.set(haloDiameter, haloDiameter, 1)
+          halo.renderOrder = -1
+          nextTiltGroup.add(halo)
+          visualObjects.push(halo)
+          visualMaterials.push(haloMaterial)
+        }
+      }
 
       let nextRingMeshes: THREE.Mesh[] = []
       if (body.ring !== undefined) {
@@ -748,6 +867,9 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       if (!reducedMotion && spinGroup !== null && currentBody !== null) {
         spinGroup.rotation.y += currentBody.spinSpeed * dt
       }
+      if (!reducedMotion && cloudSpinGroup !== null && currentBody?.visual?.clouds !== undefined) {
+        cloudSpinGroup.rotation.y += currentBody.visual.clouds.spinSpeed * dt
+      }
       updateSpotVisuals(now, dt)
       updateZoomAnimation(now)
 
@@ -804,6 +926,8 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         for (const texture of textures) texture?.dispose()
       }
       ringTextureCache.clear()
+      for (const texture of cloudTextureCache.values()) texture?.dispose()
+      cloudTextureCache.clear()
 
       if (starField !== null) {
         starField.removeFromParent()
