@@ -129,12 +129,20 @@ export const ELEVATED_LENGTH = 6.5
 export const STATION_LENGTH = 7
 export const TUNNEL_LENGTH = 7
 export const BRANCH_LENGTH = 6
-export const BRANCH_SPREAD = 3
+export const CURVE_RADIUS = 4
+export const CURVE_ANGLE = Math.PI / 2
+/**
+ * 分岐先(A-C)の見た目上の広がり幅。ここをCURVE_RADIUSと同じ値にし、
+ * 下のbranchPathの制御点もそれに合わせて置くことで、分岐の出口(C)は
+ * カーブパーツ1個分（半径CURVE_RADIUS、角度CURVE_ANGLE=90°）と全く同じ
+ * 位置・向きになる。これにより「分岐の先にカーブを自然に3個つなぐと
+ * ぴったり輪になる」という、カーブパーツだけでループを組む場合と同じ
+ * 感覚で分岐後もつなげられる。
+ */
+export const BRANCH_SPREAD = CURVE_RADIUS
 export const DEPOT_LENGTH = 7
 export const DEPOT_TRACK_SPACING = 2.4
 export const ELEVATED_HEIGHT = 2
-export const CURVE_RADIUS = 4
-export const CURVE_ANGLE = Math.PI / 2
 export const DEFAULT_SNAP_DISTANCE = 1.15
 export const DEFAULT_SNAP_HEIGHT = 0.35
 export const DEFAULT_SNAP_ANGLE = (58 * Math.PI) / 180
@@ -454,10 +462,15 @@ export function createRailPiece(
   const [connectorA, connectorB] = makeConnectors(path)
   const branchPath: RailPath | undefined = kind === 'branch'
     ? {
+      // 制御点のxを終点と揃えることで、出口(t=1)の接線がちょうど90°
+      // （カーブパーツと同じCURVE_ANGLE）になる。始点(t=0)側は
+      // 制御点のzを0にそろえて本線と同じ+X方向の接線にしている。
+      // 終点までの変位(dx, dz)もCURVE_RADIUSにそろえているため、
+      // 分岐の出口はカーブパーツ1個分とぴったり同じ位置・向きになる。
       kind: 'quadratic',
       start: { x: -BRANCH_LENGTH / 2, y: 0, z: 0 },
-      control: { x: 0, y: 0, z: 0 },
-      end: { x: BRANCH_LENGTH / 2, y: 0, z: BRANCH_SPREAD },
+      control: { x: -BRANCH_LENGTH / 2 + BRANCH_SPREAD, y: 0, z: 0 },
+      end: { x: -BRANCH_LENGTH / 2 + BRANCH_SPREAD, y: 0, z: BRANCH_SPREAD },
     }
     : undefined
   const connectorC = branchPath === undefined
