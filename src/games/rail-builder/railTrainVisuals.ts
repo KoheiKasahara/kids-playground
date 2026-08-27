@@ -67,20 +67,42 @@ export type TrainShellSection = {
   width: number
 }
 
-/** E5先頭車の後端から低く長い鼻先までをつなぐ連続12断面。 */
+/** E5先頭車の後端から低く長い鼻先までをつなぐ連続14断面。 */
 export const E5_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
   { x: -1.04, top: 1.22, bottom: 0.49, width: 0.88 },
   { x: -0.72, top: 1.22, bottom: 0.49, width: 0.88 },
   { x: -0.32, top: 1.22, bottom: 0.49, width: 0.88 },
   { x: 0.08, top: 1.22, bottom: 0.49, width: 0.88 },
-  { x: 0.32, top: 1.22, bottom: 0.49, width: 0.88 },
-  { x: 0.45, top: 1.21, bottom: 0.495, width: 0.875 },
-  { x: 0.6, top: 1.18, bottom: 0.5, width: 0.87 },
-  { x: 0.78, top: 1.1, bottom: 0.52, width: 0.83 },
-  { x: 0.96, top: 0.99, bottom: 0.55, width: 0.74 },
-  { x: 1.12, top: 0.9, bottom: 0.59, width: 0.62 },
-  { x: 1.25, top: 0.84, bottom: 0.62, width: 0.5 },
-  { x: 1.34, top: 0.82, bottom: 0.64, width: 0.42 },
+  // The taper starts just ahead of the cabin instead of leaving a round
+  // block at the front of the body.
+  { x: 0.24, top: 1.22, bottom: 0.49, width: 0.879 },
+  { x: 0.40, top: 1.215, bottom: 0.494, width: 0.875 },
+  { x: 0.56, top: 1.19, bottom: 0.50, width: 0.86 },
+  { x: 0.74, top: 1.13, bottom: 0.515, width: 0.82 },
+  { x: 0.92, top: 1.04, bottom: 0.54, width: 0.75 },
+  { x: 1.10, top: 0.95, bottom: 0.565, width: 0.67 },
+  { x: 1.25, top: 0.87, bottom: 0.59, width: 0.58 },
+  { x: 1.38, top: 0.81, bottom: 0.615, width: 0.49 },
+  { x: 1.48, top: 0.80, bottom: 0.63, width: 0.41 },
+  { x: 1.56, top: 0.79, bottom: 0.63, width: 0.38 },
+] as const
+
+export type TrainWindshieldSection = {
+  /** Longitudinal position on the integrated E5 shell. */
+  x: number
+  /** Total lateral width of the glass panel. */
+  width: number
+}
+
+/**
+ * Three low-poly stations for the E5 front windshield.  The y coordinate is
+ * derived from the shell top in the Three.js factory, keeping the glass on
+ * the sloping roof-to-nose surface when the shell is tuned.
+ */
+export const E5_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSection[] = [
+  { x: 0.43, width: 0.64 },
+  { x: 0.58, width: 0.62 },
+  { x: 0.74, width: 0.56 },
 ] as const
 
 export type TrainShellAccentBand = {
@@ -216,12 +238,12 @@ const E5_LEAD: TrainCarVisualProfile = {
   role: 'lead',
   silhouette: 'e5-low-nose',
   noseStyle: 'e5-wide-wedge',
-  // body rear is about -1.04 and the roof top is about 1.25.
+  // body rear remains about -1.04 while the integrated shell extends forward.
   // Keep the body low and long inside the shared toy-train envelope.
-  bodyLength: 1.8,
+  bodyLength: 1.98,
   bodyHeight: 0.58,
   bodyWidth: 0.88,
-  bodyCenterX: -0.14,
+  bodyCenterX: -0.05,
   bodyCenterY: 0.78,
   roofLength: 1.84,
   roofHeight: 0.14,
@@ -229,16 +251,16 @@ const E5_LEAD: TrainCarVisualProfile = {
   roofCenterX: -0.12,
   roofCenterY: 1.15,
   // The nose is long, broad through the shoulder, and narrows progressively.
-  noseLength: 1.12,
-  // body front is around 0.76; the loft starts behind the shoulder and runs to 1.34.
-  noseBaseX: 0.22,
-  noseTipX: 1.34,
+  noseLength: 1.36,
+  // The loft starts just ahead of the shoulder and runs to the rounded tip.
+  noseBaseX: 0.20,
+  noseTipX: 1.56,
   noseBaseWidth: 0.88,
-  noseTipWidth: 0.42,
+  noseTipWidth: 0.38,
   noseBaseBottomY: 0.47,
   noseBaseTopY: 1.06,
-  noseTipBottomY: 0.64,
-  noseTipTopY: 0.82,
+  noseTipBottomY: 0.63,
+  noseTipTopY: 0.79,
   accentLength: 1.92,
   accentHeight: 0.07,
   accentY: 0.8,
@@ -247,8 +269,8 @@ const E5_LEAD: TrainCarVisualProfile = {
   sideWindowWidth: 0.26,
   sideWindowHeight: 0.16,
   frontWindowX: 0.58,
-  frontWindowY: 0.94,
-  frontWindowWidth: 0.3,
+  frontWindowY: 1.2,
+  frontWindowWidth: 0.62,
   headlightX: 1.24,
   headlightY: 0.69,
   headlightZ: 0.19,

@@ -49,6 +49,7 @@ import {
   shouldReduceRailBuilderMotion,
 } from './railBuilderVisuals'
 import {
+  E5_FRONT_WINDSHIELD_SECTIONS,
   E5_LEAD_SHELL_SECTIONS,
   getTrainCarVisualProfile,
   getE5LeadShellAccentBand,
@@ -56,6 +57,7 @@ import {
   type TrainCarVisualProfile,
   type TrainShellSection,
   type TrainVisualProfile,
+  type TrainWindshieldSection,
 } from './railTrainVisuals'
 import {
   createRailTrainSoundController,
@@ -398,9 +400,68 @@ function createNoseGeometry(
   return geometry
 }
 
-/** E5先頭車の12断面・12頂点リングの連続ロフトシェル。 */
+/** E5先頭車の14断面・12頂点リングの連続ロフトシェル。 */
 function createE5LeadShellGeometry(): THREE.BufferGeometry {
   return createNoseGeometry(E5_LEAD_SHELL_SECTIONS, 'e5-wide-wedge', true)
+}
+
+function interpolateE5ShellTop(x: number): number {
+  const first = E5_LEAD_SHELL_SECTIONS[0]!
+  const last = E5_LEAD_SHELL_SECTIONS[E5_LEAD_SHELL_SECTIONS.length - 1]!
+  if (x <= first.x) return first.top
+  if (x >= last.x) return last.top
+  for (let index = 1; index < E5_LEAD_SHELL_SECTIONS.length; index += 1) {
+    const previous = E5_LEAD_SHELL_SECTIONS[index - 1]!
+    const current = E5_LEAD_SHELL_SECTIONS[index]!
+    if (x <= current.x) {
+      const span = current.x - previous.x
+      const amount = span <= 0 ? 0 : (x - previous.x) / span
+      return previous.top + (current.top - previous.top) * amount
+    }
+  }
+  return last.top
+}
+
+/**
+ * Low-poly windshield ribbon laid over the integrated E5 shell.  Each station
+ * follows the shell crown and narrows toward the nose, so the glass reads as
+ * part of the sloped roof rather than as a black box attached to the front.
+ */
+function createE5FrontWindshieldGeometry(
+  sections: readonly TrainWindshieldSection[] = E5_FRONT_WINDSHIELD_SECTIONS,
+): THREE.BufferGeometry {
+  const positions: number[] = []
+  const indices: number[] = []
+  const shellClearance = 0.016
+
+  for (const section of sections) {
+    const halfWidth = section.width / 2
+    const y = interpolateE5ShellTop(section.x) + shellClearance
+    positions.push(
+      section.x, y, -halfWidth,
+      section.x, y, halfWidth,
+    )
+  }
+
+  for (let index = 0; index < sections.length - 1; index += 1) {
+    const current = index * 2
+    const next = current + 2
+    // Windshield outward normal faces the nose and sky (+x/+y).  Keep the
+    // panel double-sided at the material level as a safeguard for reverse
+    // viewpoints on the small toy scene.
+    indices.push(
+      current, current + 1, next,
+      next, current + 1, next + 1,
+    )
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
 }
 
 /** E5先頭シェルの断面幅と上下端に沿う、両側面の薄いピンク帯。 */
@@ -472,38 +533,6 @@ function createE5BodyGeometry(profile: TrainCarVisualProfile): THREE.BufferGeome
     { x: halfLength * 0.72, top: profile.bodyHeight / 2, bottom: -profile.bodyHeight / 2, width: profile.bodyWidth },
     { x: halfLength, top: profile.bodyHeight / 2, bottom: -profile.bodyHeight / 2, width: profile.bodyWidth },
   ], 'e5-wide-wedge')
-}
-
-/** A shallow side window with a rearward-sloping top edge, used on E5 only. */
-function createSlantedWindowGeometry(width: number, height: number, depth: number, topOffset: number): THREE.BufferGeometry {
-  const halfWidth = width / 2
-  const halfHeight = height / 2
-  const halfDepth = depth / 2
-  const positions = [
-    -halfWidth, -halfHeight, halfDepth,
-    halfWidth, -halfHeight, halfDepth,
-    halfWidth + topOffset, halfHeight, halfDepth,
-    -halfWidth + topOffset, halfHeight, halfDepth,
-    -halfWidth, -halfHeight, -halfDepth,
-    halfWidth, -halfHeight, -halfDepth,
-    halfWidth + topOffset, halfHeight, -halfDepth,
-    -halfWidth + topOffset, halfHeight, -halfDepth,
-  ]
-  const indices = [
-    0, 1, 2, 0, 2, 3,
-    5, 4, 7, 5, 7, 6,
-    0, 4, 5, 0, 5, 1,
-    1, 5, 6, 1, 6, 2,
-    2, 6, 7, 2, 7, 3,
-    3, 7, 4, 3, 4, 0,
-  ]
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-  geometry.computeBoundingBox()
-  geometry.computeBoundingSphere()
-  return geometry
 }
 
 function createE6NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
@@ -731,12 +760,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       e5Profile.window.sideHeight,
       0.04,
     )
-    const e5CockpitWindowGeometry = createSlantedWindowGeometry(
-      e5Profile.lead.frontWindowWidth,
-      0.2,
-      0.04,
-      -0.1,
-    )
+    const e5CockpitWindowGeometry = createE5FrontWindshieldGeometry()
     const e5AccentGeometry = new THREE.BoxGeometry(1, e5Profile.accent.height, 0.04)
     const e5LeadAccentGeometry = createE5LeadAccentGeometry(e5Profile.accent.height, e5Profile.accent.y)
     // E5-only details remain shared for the effect lifetime.  They are shallow
@@ -1046,6 +1070,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       color: e5Profile.window.color,
       roughness: 0.28,
       metalness: 0.08,
+      side: THREE.DoubleSide,
     })
     const e6BodyMaterial = new THREE.MeshStandardMaterial({ color: e6Profile.bodyColor, roughness: 0.58 })
     const e6FrontMaterial = new THREE.MeshStandardMaterial({ color: e6Profile.frontColor, roughness: 0.5 })
@@ -1132,7 +1157,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         accentGeometry: e5AccentGeometry,
         leadAccentGeometry: e5LeadAccentGeometry,
         integratedLeadShell: true,
-        sideCockpitWindows: true,
         underfloorGeometry: e5UnderfloorGeometry,
         bogieGeometry: e5BogieGeometry,
         gangwayGeometry: e5GangwayGeometry,
@@ -1560,12 +1584,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
       if (profile.hasFrontWindow) {
         if (definition.sideCockpitWindows) {
-          // E5の運転台窓は正面板ではなく、ノーズ肩に沿う左右の細長い
-          // サイド窓。共通geometryを反転配置してメッシュ数を抑える。
+          // 非統合シェル向けの左右窓。共通geometryを反転配置して
+          // メッシュ数を抑える。
           for (const side of [-1, 1]) {
             const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
-            // Follow the E5 shell's shallow side taper; mirror the lean on
-            // the opposite side so both cockpit windows stay on the shell.
             cockpitWindow.rotation.y = side * 0.1
             cockpitWindow.position.set(
               profile.frontWindowX,
@@ -1574,6 +1596,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
             )
             group.add(cockpitWindow)
           }
+        } else if (definition.integratedLeadShell) {
+          // The E5 windshield geometry is already expressed in the integrated
+          // shell's local coordinates and follows its roof-to-nose slope.
+          const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
+          group.add(cockpitWindow)
         } else {
           // ノーズの先端ではなく、肩の根元寄りに置く運転台窓。
           const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
