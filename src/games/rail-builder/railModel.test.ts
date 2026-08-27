@@ -9,8 +9,10 @@ import {
   LOOP_CLOSURE_MAX_HEIGHT_DIFFERENCE,
   SHORT_STRAIGHT_LENGTH,
   SLOPE_LENGTH,
+  STRAIGHT_LENGTH,
   applyRailLoopClosure,
   areRailConnectionsSymmetric,
+  connectRailPieceRemainingEndpoints,
   connectRailPieces,
   createRailPiece,
   deleteRailPiece,
@@ -376,6 +378,63 @@ describe('railModel', () => {
 
   it('does not allow a snap angle wider than the configured tolerance', () => {
     expect(DEFAULT_SNAP_ANGLE).toBeCloseTo((58 * Math.PI) / 180)
+  })
+
+  describe('connecting remaining endpoints after a normal snap', () => {
+    it('connects both ends when a piece is dropped exactly between two free-standing neighbors', () => {
+      const left = createRailPiece('straight', 'left', origin)
+      const right = createRailPiece('straight', 'right', { x: STRAIGHT_LENGTH * 2, y: 0, z: 0 })
+      const middle = createRailPiece('straight', 'middle', { x: STRAIGHT_LENGTH, y: 0, z: 0 })
+
+      // findRailSnapCandidateは全端点の組み合わせから最も近い1組しか選ばないため、
+      // 両端がぴったり合っていてもこの時点ではまだ片方しかつながらない。
+      const candidate = findRailSnapCandidate(middle, [left, right])
+      expect(candidate).not.toBeNull()
+      if (candidate === null) return
+      const onlyOneConnected = connectRailPieces(
+        [left, right, middle],
+        'middle',
+        candidate.movingConnectorId,
+        candidate.targetPieceId,
+        candidate.targetConnectorId,
+        candidate.transform,
+      )
+      const middleAfterPrimary = onlyOneConnected.find((piece) => piece.id === 'middle')!
+      const looseConnectorIds = getRailConnectorIds(middleAfterPrimary).filter(
+        (id) => middleAfterPrimary.connections[id] === undefined,
+      )
+      expect(looseConnectorIds).toHaveLength(1)
+
+      const { pieces: fullyConnected, connected } = connectRailPieceRemainingEndpoints(onlyOneConnected, 'middle')
+      expect(connected).toHaveLength(1)
+      expect(areRailConnectionsSymmetric(fullyConnected)).toBe(true)
+      const middleFinal = fullyConnected.find((piece) => piece.id === 'middle')!
+      expect(middleFinal.connections.a).toBeDefined()
+      expect(middleFinal.connections.b).toBeDefined()
+      const leftFinal = fullyConnected.find((piece) => piece.id === 'left')!
+      const rightFinal = fullyConnected.find((piece) => piece.id === 'right')!
+      expect(leftFinal.connections.b).toEqual({ pieceId: 'middle', connectorId: 'a' })
+      expect(rightFinal.connections.a).toEqual({ pieceId: 'middle', connectorId: 'b' })
+      // 追加接続では、すでに確定した位置・向きを動かさない。
+      expect(middleFinal.position).toEqual(middleAfterPrimary.position)
+      expect(middleFinal.rotationY).toBe(middleAfterPrimary.rotationY)
+    })
+
+    it('does nothing when no free connector is left, or the piece is missing', () => {
+      const target = createRailPiece('straight', 'target', origin)
+      const moving = createRailPiece('straight', 'moving', { x: 5.8, y: 0, z: 0 })
+      const connected = connectRailPieces([target, moving], 'moving', 'a', 'target', 'b')
+
+      const { pieces: unchanged, connected: none } = connectRailPieceRemainingEndpoints(connected, 'moving')
+      expect(none).toHaveLength(0)
+      expect(unchanged.find((piece) => piece.id === 'moving')?.position).toEqual(
+        connected.find((piece) => piece.id === 'moving')?.position,
+      )
+
+      const { pieces: sameLayout, connected: stillNone } = connectRailPieceRemainingEndpoints(connected, 'missing')
+      expect(stillNone).toHaveLength(0)
+      expect(sameLayout).toEqual(connected)
+    })
   })
 
   describe('loop closure assist', () => {

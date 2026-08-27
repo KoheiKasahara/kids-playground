@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import {
   applyRailLoopClosure,
   clampRailPosition,
+  connectRailPieceRemainingEndpoints,
   connectRailPieces,
   DEPOT_LENGTH,
   DEPOT_TRACK_SPACING,
@@ -2456,7 +2457,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         triggerSnapGlow(currentDrag.candidate)
         playRailSnapSound(optionsRef.current.soundEnabled ?? true)
       }
-      const nextLayout = tryCloseLoopAfterConnect(connectedLayout, currentDrag.candidate, currentDrag.pieceId)
+      const secondaryResult = currentDrag.candidate === null
+        ? { pieces: connectedLayout, connected: [] }
+        : connectRailPieceRemainingEndpoints(connectedLayout, currentDrag.pieceId)
+      for (const secondaryCandidate of secondaryResult.connected) {
+        triggerSnapGlow(secondaryCandidate)
+        playRailSnapSound(optionsRef.current.soundEnabled ?? true)
+      }
+      const nextLayout = tryCloseLoopAfterConnect(secondaryResult.pieces, currentDrag.candidate, currentDrag.pieceId)
       optionsRef.current.onPiecesChange(nextLayout)
     }
 
