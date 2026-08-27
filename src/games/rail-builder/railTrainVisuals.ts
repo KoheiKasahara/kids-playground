@@ -56,6 +56,72 @@ export type TrainCarVisualProfile = {
   couplerPositions: readonly number[]
 }
 
+/**
+ * E5先頭車の外装ロフト断面。x/y/zの座標系は車両ローカルで、zは全幅。
+ * 断面列を純粋データとして公開し、外形制約をThree.jsなしで検証できるようにする。
+ */
+export type TrainShellSection = {
+  x: number
+  top: number
+  bottom: number
+  width: number
+}
+
+/** E5先頭車の後端から低く長い鼻先までをつなぐ連続12断面。 */
+export const E5_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
+  { x: -1.04, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: -0.72, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: -0.32, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: 0.08, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: 0.32, top: 1.22, bottom: 0.49, width: 0.88 },
+  { x: 0.45, top: 1.21, bottom: 0.495, width: 0.875 },
+  { x: 0.6, top: 1.18, bottom: 0.5, width: 0.87 },
+  { x: 0.78, top: 1.1, bottom: 0.52, width: 0.83 },
+  { x: 0.96, top: 0.99, bottom: 0.55, width: 0.74 },
+  { x: 1.12, top: 0.9, bottom: 0.59, width: 0.62 },
+  { x: 1.25, top: 0.84, bottom: 0.62, width: 0.5 },
+  { x: 1.34, top: 0.82, bottom: 0.64, width: 0.42 },
+] as const
+
+export type TrainShellAccentBand = {
+  sideLower: number
+  sideUpper: number
+  lowerY: number
+  upperY: number
+  centerY: number
+  height: number
+}
+
+/**
+ * E5の12点リングで側面に当たる垂直域。帯と外装で同じcornerHeight式を
+ * 共有するための小さな純粋helper。リングの斜め角部へ帯を置かない。
+ */
+export function getE5LeadShellAccentBand(
+  section: TrainShellSection,
+  requestedHeight: number,
+  requestedCenterY: number,
+): TrainShellAccentBand {
+  const verticalRange = Math.max(0.01, section.top - section.bottom)
+  const cornerHeight = Math.min(0.07, verticalRange * 0.28)
+  const sideUpper = section.top - cornerHeight * 1.25
+  const sideLower = section.bottom + cornerHeight * 1.15
+  const sideRange = Math.max(0, sideUpper - sideLower)
+  // Leave a little clearance from the curved ring corners. The requested
+  // height is allowed to shrink toward the tapered nose.
+  const height = Math.min(Math.max(0, requestedHeight), sideRange * 0.76)
+  const centerY = sideRange === 0
+    ? (sideLower + sideUpper) / 2
+    : Math.min(sideUpper - height / 2, Math.max(sideLower + height / 2, requestedCenterY))
+  return {
+    sideLower,
+    sideUpper,
+    lowerY: centerY - height / 2,
+    upperY: centerY + height / 2,
+    centerY,
+    height,
+  }
+}
+
 export type TrainVisualProfile = {
   trainType: TrainType
   silhouette:
