@@ -172,6 +172,8 @@ type SpecialTrainVisualDefinition = {
   accentGeometry: THREE.BufferGeometry
   /** Optional accent ribbon following an integrated lead shell's side width. */
   leadAccentGeometry?: THREE.BufferGeometry
+  /** Optional center mullion following an integrated front windshield. */
+  windshieldDividerGeometry?: THREE.BufferGeometry
   /** Optional E5-only low-cost details; future train types can opt in as needed. */
   splitShellColor?: boolean
   /** Lead body geometry already includes the nose and must be rendered as one shell. */
@@ -470,6 +472,23 @@ function interpolateShellTopAtLateral(
   const normalizedOffset = Math.min(1, Math.abs(z) / halfWidth)
   const verticalRange = Math.max(0.01, section.top - section.bottom)
   const cornerHeight = Math.min(0.07, verticalRange * 0.28)
+  if (style === 'n700s-winged') {
+    // Match the N700S ring's rounded wing crown: the shoulder peaks sit
+    // above the centre ridge, then fall gently into the side corner.
+    const wingOffset = 0.58
+    const wingLift = Math.min(0.055, verticalRange * 0.2)
+    const centerCrown = wingLift * 0.2
+    if (normalizedOffset <= wingOffset) {
+      const amount = normalizedOffset / wingOffset
+      return section.top + centerCrown + (wingLift - centerCrown) * amount
+    }
+    if (normalizedOffset <= 0.83) {
+      const amount = (normalizedOffset - wingOffset) / 0.25
+      return section.top + wingLift * (1 - amount)
+    }
+    const amount = (normalizedOffset - 0.83) / 0.17
+    return section.top - cornerHeight * amount
+  }
   const topCrown = style === 'doctor-yellow-duck'
     ? Math.min(0.015, verticalRange * 0.05)
     : Math.min(0.018, verticalRange * 0.06)
@@ -537,6 +556,47 @@ function createFrontWindshieldGeometry(
         next + pointIndex + 1,
       )
     }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
+}
+
+/**
+ * A narrow center mullion for broad integrated windshields. Keeping it as one
+ * shared ribbon follows the shell at the same stations as the glass while
+ * avoiding per-car line objects and preserving the mobile-friendly mesh cost.
+ */
+function createFrontWindshieldDividerGeometry(
+  shellSections: readonly TrainShellSection[],
+  sections: readonly TrainWindshieldSection[],
+  style: NoseStyle,
+): THREE.BufferGeometry {
+  const positions: number[] = []
+  const indices: number[] = []
+  const shellClearance = 0.036
+  const dividerHalfWidth = 0.018
+
+  for (const section of sections) {
+    const shellSection = interpolateShellSection(shellSections, section.x)
+    const y = interpolateShellTopAtLateral(shellSection, 0, style) + shellClearance
+    positions.push(
+      section.x, y, -dividerHalfWidth,
+      section.x, y, dividerHalfWidth,
+    )
+  }
+
+  for (let index = 0; index < sections.length - 1; index += 1) {
+    const current = index * 2
+    const next = current + 2
+    // Windshield top faces point toward +y so the shared FrontSide material
+    // remains visible from the toy camera's elevated viewpoint.
+    indices.push(current, current + 1, next, current + 1, next + 1, next)
   }
 
   const geometry = new THREE.BufferGeometry()
@@ -644,29 +704,6 @@ function createE6NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeome
       width: profile.noseTipWidth,
     },
   ], 'e6-spear')
-}
-
-function createN700SNoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
-  return createNoseGeometry([
-    {
-      x: profile.noseBaseX,
-      top: profile.noseBaseTopY,
-      bottom: profile.noseBaseBottomY,
-      width: profile.noseBaseWidth,
-    },
-    {
-      x: profile.noseBaseX + profile.noseLength * 0.32,
-      top: profile.noseBaseTopY - 0.04,
-      bottom: profile.noseBaseBottomY + 0.02,
-      width: profile.bodyWidth,
-    },
-    {
-      x: profile.noseTipX,
-      top: profile.noseTipTopY,
-      bottom: profile.noseTipBottomY,
-      width: profile.noseTipWidth,
-    },
-  ], 'n700s-winged')
 }
 
 type StandardTrainGeometry = Pick<
@@ -961,21 +998,47 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       accentDepth: 0.035,
     })
     const n700sProfile = resolveTrainSpec('n700s')
-    const n700sNoseGeometry = createN700SNoseGeometry(n700sProfile.lead)
-    const {
-      leadBodyGeometry: n700sLeadBodyGeometry,
-      middleBodyGeometry: n700sMiddleBodyGeometry,
-      leadRoofGeometry: n700sLeadRoofGeometry,
-      middleRoofGeometry: n700sMiddleRoofGeometry,
-      sideWindowGeometry: n700sSideWindowGeometry,
-      cockpitWindowGeometry: n700sCockpitWindowGeometry,
-      accentGeometry: n700sAccentGeometry,
-    } = createStandardTrainGeometry(n700sProfile, {
+    const n700sLeadShellSections = n700sProfile.leadShellSections!
+    const n700sFrontWindshieldSections = n700sProfile.frontWindshieldSections!
+    const n700sStandardGeometry = createStandardTrainGeometry(n700sProfile, {
       bodyBevelSize: 0.14,
       roofBevelSize: 0.06,
       cockpitWindowHeight: 0.22,
       accentDepth: 0.04,
     })
+    // The lead shell is the full roof-to-nose loft. Standard geometry still
+    // supplies the middle car and shared fallback parts without a new render
+    // branch or per-frame allocations.
+    const n700sBoxLeadBodyGeometry = n700sStandardGeometry.leadBodyGeometry
+    const n700sLeadBodyGeometry = createNoseGeometry(n700sLeadShellSections, 'n700s-winged')
+    const n700sMiddleBodyGeometry = n700sStandardGeometry.middleBodyGeometry
+    const n700sLeadRoofGeometry = n700sStandardGeometry.leadRoofGeometry
+    const n700sMiddleRoofGeometry = n700sStandardGeometry.middleRoofGeometry
+    const n700sSideWindowGeometry = n700sStandardGeometry.sideWindowGeometry
+    const n700sCockpitWindowGeometry = createFrontWindshieldGeometry(
+      n700sLeadShellSections,
+      n700sFrontWindshieldSections,
+      'n700s-winged',
+    )
+    const n700sWindshieldDividerGeometry = createFrontWindshieldDividerGeometry(
+      n700sLeadShellSections,
+      n700sFrontWindshieldSections,
+      'n700s-winged',
+    )
+    const n700sAccentGeometry = n700sStandardGeometry.accentGeometry
+    const n700sLeadAccentGeometry = createLeadShellAccentGeometry(
+      n700sLeadShellSections,
+      n700sProfile.accent.height,
+      n700sProfile.accent.y,
+    )
+    const n700sGangwaySpec = n700sProfile.gangway!
+    const n700sGangwayGeometry = new RoundedBoxGeometry(
+      n700sGangwaySpec.length,
+      n700sGangwaySpec.height,
+      n700sGangwaySpec.width,
+      1,
+      0.035,
+    )
     const doctorYellowProfile = resolveTrainSpec('doctorYellow')
     const doctorYellowLeadShellSections = doctorYellowProfile.leadShellSections!
     const doctorYellowFrontWindshieldSections = doctorYellowProfile.frontWindshieldSections!
@@ -1082,14 +1145,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       e6SideWindowGeometry,
       e6CockpitWindowGeometry,
       e6AccentGeometry,
-      n700sNoseGeometry,
+      n700sBoxLeadBodyGeometry,
       n700sLeadBodyGeometry,
       n700sMiddleBodyGeometry,
       n700sLeadRoofGeometry,
       n700sMiddleRoofGeometry,
       n700sSideWindowGeometry,
       n700sCockpitWindowGeometry,
+      n700sWindshieldDividerGeometry,
       n700sAccentGeometry,
+      n700sLeadAccentGeometry,
+      n700sGangwayGeometry,
       doctorYellowLeadBodyGeometry,
       doctorYellowBoxLeadBodyGeometry,
       doctorYellowMiddleBodyGeometry,
@@ -1343,7 +1409,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }],
       ['n700s', {
         spec: n700sProfile,
-        noseGeometry: n700sNoseGeometry,
         leadBodyGeometry: n700sLeadBodyGeometry,
         middleBodyGeometry: n700sMiddleBodyGeometry,
         leadRoofGeometry: n700sLeadRoofGeometry,
@@ -1351,6 +1416,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         sideWindowGeometry: n700sSideWindowGeometry,
         cockpitWindowGeometry: n700sCockpitWindowGeometry,
         accentGeometry: n700sAccentGeometry,
+        leadAccentGeometry: n700sLeadAccentGeometry,
+        windshieldDividerGeometry: n700sProfile.windshieldCenterDivider
+          ? n700sWindshieldDividerGeometry
+          : undefined,
+        integratedLeadShell: true,
+        underfloorGeometry: e5UnderfloorGeometry,
+        bogieGeometry: e5BogieGeometry,
+        gangwayGeometry: n700sGangwayGeometry,
+        wheelGeometry: e5WheelGeometry,
       }],
       ['doctorYellow', {
         spec: doctorYellowProfile,
@@ -1769,8 +1843,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       for (const side of [-1, 1]) {
         for (const x of profile.sideWindowXs) {
           const window = new THREE.Mesh(definition.sideWindowGeometry, runtime.windowMaterial)
-          const sideOffset = usesLeadVisual && definition.integratedLeadShell ? 0.008 : 0.014
-          window.position.set(x, profile.sideWindowY, side * (profile.bodyWidth / 2 + sideOffset))
+          const integratedShellSections = usesLeadVisual && definition.integratedLeadShell
+            ? definition.spec.leadShellSections
+            : undefined
+          const shellHalfWidth = integratedShellSections === undefined
+            ? profile.bodyWidth / 2
+            : interpolateShellSection(integratedShellSections, x).width / 2
+          const sideOffset = integratedShellSections === undefined ? 0.014 : 0.008
+          window.position.set(x, profile.sideWindowY, side * (shellHalfWidth + sideOffset))
           contentGroup.add(window)
         }
         const doorX = profile.doorX
@@ -1797,8 +1877,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
             contentGroup.add(cockpitWindow)
           }
         } else if (definition.integratedLeadShell) {
-          // The E5 windshield geometry is already expressed in the integrated
-          // shell's local coordinates and follows its roof-to-nose slope.
+          // Integrated lead windshields are expressed in the shell's local
+          // coordinates and follow its roof-to-nose slope.
           const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
           contentGroup.add(cockpitWindow)
         } else {
@@ -1807,6 +1887,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           cockpitWindow.position.set(profile.frontWindowX, profile.frontWindowY, 0)
           contentGroup.add(cockpitWindow)
         }
+      }
+
+      if (
+        usesLeadVisual
+        && profile.hasFrontWindow
+        && definition.windshieldDividerGeometry !== undefined
+      ) {
+        // A single shared raised strip makes the wide N700S glass read as two
+        // sloped driver panes without introducing per-station mesh objects.
+        const divider = new THREE.Mesh(definition.windshieldDividerGeometry, trainCouplerMaterial)
+        contentGroup.add(divider)
       }
 
       if (profile.hasHeadlights) {

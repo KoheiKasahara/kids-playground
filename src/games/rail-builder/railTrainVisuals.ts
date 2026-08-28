@@ -13,13 +13,13 @@ const DOCTOR_YELLOW_THREE_CAR_FORMATION = THREE_CAR_FORMATION
 
 /**
  * 車種ごとの表示編成。編成は走行ロジックではなく TrainSpec に属する。
- * Issue #248ではまずE5だけを3両化し、既存車種は2両を維持する。
+ * 先頭車を両端へ反転再利用する車種は3両編成として表現する。
  */
 const TRAIN_FORMATIONS: Readonly<Record<TrainType, readonly TrainCarRole[]>> = {
   basic: TWO_CAR_FORMATION,
   e5: E5_THREE_CAR_FORMATION,
   e6: TWO_CAR_FORMATION,
-  n700s: TWO_CAR_FORMATION,
+  n700s: THREE_CAR_FORMATION,
   doctorYellow: DOCTOR_YELLOW_THREE_CAR_FORMATION,
 }
 
@@ -169,14 +169,14 @@ export const E5_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
 ] as const
 
 export type TrainWindshieldSection = {
-  /** Longitudinal position on the integrated E5 shell. */
+  /** Longitudinal position on the integrated lead shell. */
   x: number
   /** Total lateral width of the glass panel. */
   width: number
 }
 
 /**
- * Four low-poly stations for the E5 front windshield. The y coordinate and
+ * Low-poly stations for an integrated front windshield. The y coordinate and
  * outer shoulder vertices are derived from the shell ring in the Three.js
  * factory, keeping the glass on the sloping roof-to-nose surface when the
  * shell is tuned.
@@ -224,6 +224,53 @@ export const DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSe
   { x: 0.80, width: 0.58 },
   { x: 1.00, width: 0.48 },
 ] as const
+
+/** N700S先頭車の、屋根から丸い短鼻へ続く低ポリゴンシェル断面。 */
+export const N700S_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
+  { x: -1.04, top: 1.28, bottom: 0.48, width: 0.95 },
+  { x: -0.94, top: 1.28, bottom: 0.48, width: 0.95 },
+  { x: -0.84, top: 1.28, bottom: 0.48, width: 0.95 },
+  { x: -0.74, top: 1.28, bottom: 0.48, width: 0.95 },
+  { x: -0.64, top: 1.28, bottom: 0.48, width: 0.95 },
+  { x: -0.54, top: 1.28, bottom: 0.48, width: 0.95 },
+  { x: -0.44, top: 1.28, bottom: 0.48, width: 0.95 },
+  { x: -0.34, top: 1.28, bottom: 0.48, width: 0.95 },
+  { x: -0.24, top: 1.28, bottom: 0.48, width: 0.95 },
+  { x: -0.14, top: 1.255, bottom: 0.49, width: 0.92 },
+  { x: -0.04, top: 1.230, bottom: 0.50, width: 0.89 },
+  { x: 0.06, top: 1.205, bottom: 0.51, width: 0.86 },
+  { x: 0.16, top: 1.180, bottom: 0.52, width: 0.83 },
+  { x: 0.26, top: 1.155, bottom: 0.53, width: 0.80 },
+  { x: 0.36, top: 1.130, bottom: 0.54, width: 0.77 },
+  { x: 0.46, top: 1.105, bottom: 0.55, width: 0.74 },
+  { x: 0.56, top: 1.080, bottom: 0.56, width: 0.71 },
+  { x: 0.66, top: 1.055, bottom: 0.57, width: 0.68 },
+  { x: 0.76, top: 1.030, bottom: 0.58, width: 0.65 },
+  { x: 0.86, top: 1.005, bottom: 0.59, width: 0.62 },
+  { x: 0.96, top: 0.980, bottom: 0.60, width: 0.59 },
+  { x: 1.06, top: 0.955, bottom: 0.61, width: 0.56 },
+  { x: 1.16, top: 0.930, bottom: 0.62, width: 0.53 },
+  { x: 1.26, top: 0.905, bottom: 0.63, width: 0.50 },
+  { x: 1.36, top: 0.880, bottom: 0.64, width: 0.48 },
+] as const
+
+/** N700Sの幅広い斜面フロントガラス。中央稜線とdividerが左右分割感を作る。 */
+export const N700S_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSection[] = [
+  { x: 0.16, width: 0.76 },
+  { x: 0.30, width: 0.77 },
+  { x: 0.52, width: 0.66 },
+  { x: 0.76, width: 0.57 },
+  { x: 1.00, width: 0.50 },
+] as const
+
+/** N700S専用の軽量な車両間幌。隣接車両の半分ずつで一つの接続に見せる。 */
+export const N700S_GANGWAY_SPEC: TrainGangwaySpec = {
+  length: 0.24,
+  height: 0.46,
+  width: 0.62,
+  centerY: 0.76,
+  positionOffset: 0.12,
+} as const
 
 export type TrainShellAccentBand = {
   sideLower: number
@@ -315,6 +362,8 @@ export type TrainSpec = {
   leadShellSections?: readonly TrainShellSection[]
   /** 先頭車シェルに沿わせるフロントガラスの断面列。 */
   frontWindshieldSections?: readonly TrainWindshieldSection[]
+  /** フロントガラス中央の低コストな縦桟を追加する車種。 */
+  windshieldCenterDivider?: boolean
   lead: TrainCarVisualProfile
   middle: TrainCarVisualProfile
 }
@@ -544,39 +593,39 @@ const N700S_LEAD: TrainCarVisualProfile = {
   role: 'lead',
   silhouette: 'n700s-winged-nose',
   noseStyle: 'n700s-winged',
-  bodyLength: 1.82,
-  bodyHeight: 0.6,
-  bodyWidth: 0.88,
-  bodyCenterX: -0.08,
-  bodyCenterY: 0.77,
-  roofLength: 1.86,
+  bodyLength: 1.90,
+  bodyHeight: 0.62,
+  bodyWidth: 0.95,
+  bodyCenterX: -0.09,
+  bodyCenterY: 0.79,
+  roofLength: 1.92,
   roofHeight: 0.14,
-  roofWidth: 0.88,
-  roofCenterX: -0.08,
-  roofCenterY: 1.18,
-  noseLength: 0.78,
-  noseBaseX: 0.52,
-  noseTipX: 1.3,
-  noseBaseWidth: 0.82,
-  noseTipWidth: 0.38,
-  noseBaseBottomY: 0.5,
-  noseBaseTopY: 1.02,
-  noseTipBottomY: 0.62,
-  noseTipTopY: 0.84,
-  accentLength: 1.55,
-  accentHeight: 0.1,
-  accentY: 0.77,
-  sideWindowXs: [-0.56, 0.08, 0.58],
-  sideWindowY: 0.97,
-  sideWindowWidth: 0.4,
-  sideWindowHeight: 0.2,
-  frontWindowX: 0.84,
-  frontWindowY: 0.9,
-  frontWindowWidth: 0.42,
-  doorX: -0.48,
-  headlightX: 1.22,
-  headlightY: 0.7,
-  headlightZ: 0.16,
+  roofWidth: 0.95,
+  roofCenterX: -0.09,
+  roofCenterY: 1.21,
+  noseLength: 1.20,
+  noseBaseX: 0.16,
+  noseTipX: 1.36,
+  noseBaseWidth: 0.83,
+  noseTipWidth: 0.48,
+  noseBaseBottomY: 0.52,
+  noseBaseTopY: 1.18,
+  noseTipBottomY: 0.64,
+  noseTipTopY: 0.88,
+  accentLength: 1.68,
+  accentHeight: 0.09,
+  accentY: 0.80,
+  sideWindowXs: [-0.28, 0.28],
+  sideWindowY: 1.00,
+  sideWindowWidth: 0.30,
+  sideWindowHeight: 0.18,
+  frontWindowX: 0.52,
+  frontWindowY: 1.1,
+  frontWindowWidth: 0.78,
+  doorX: -0.76,
+  headlightX: 1.25,
+  headlightY: 0.70,
+  headlightZ: 0.2,
   hasFrontWindow: true,
   hasHeadlights: true,
   couplerPositions: BASIC_COUPLER_POSITIONS,
@@ -586,10 +635,15 @@ const N700S_MIDDLE: TrainCarVisualProfile = {
   ...N700S_LEAD,
   role: 'middle',
   silhouette: 'n700s-rounded-shoulder',
-  bodyLength: 1.94,
+  bodyLength: 1.96,
+  bodyWidth: 0.95,
+  bodyHeight: 0.62,
+  bodyCenterY: 0.79,
   bodyCenterX: 0,
-  roofLength: 1.97,
+  roofLength: 1.98,
+  roofWidth: 0.95,
   roofCenterX: 0,
+  roofCenterY: 1.21,
   noseLength: 0,
   noseBaseX: 0,
   noseTipX: 0,
@@ -602,7 +656,11 @@ const N700S_MIDDLE: TrainCarVisualProfile = {
   frontWindowX: 0,
   frontWindowY: 0,
   frontWindowWidth: 0,
-  doorX: -0.4,
+  sideWindowXs: [-0.34, 0.10, 0.54],
+  sideWindowY: 1.00,
+  sideWindowWidth: 0.30,
+  sideWindowHeight: 0.18,
+  doorX: -0.72,
   headlightX: 0,
   headlightY: 0,
   headlightZ: 0,
@@ -746,23 +804,27 @@ const E6_PROFILE: TrainSpec = {
 const N700S_PROFILE: TrainSpec = {
   trainType: 'n700s',
   silhouette: 'n700s-rounded-shoulder',
-  bodyColor: '#e5e8ea',
-  frontColor: '#c1c8d0',
-  roofColor: '#f4f6f5',
-  bodyWidth: 0.88,
-  bodyHeight: 0.6,
+  bodyColor: '#f8faf9',
+  frontColor: '#edf1f2',
+  roofColor: '#ffffff',
+  bodyWidth: 0.95,
+  bodyHeight: 0.62,
   noseLength: N700S_LEAD.noseLength,
   frontExtent: N700S_LEAD.noseTipX,
-  rearExtent: -1.01,
-  maxHalfWidth: 0.44,
-  accent: { color: '#2e64cb', height: 0.1, y: 0.77 },
+  rearExtent: -1.04,
+  maxHalfWidth: 0.475,
+  accent: { color: '#2e64cb', height: 0.09, y: 0.80 },
   window: {
     color: '#173b63',
     sideXs: N700S_LEAD.sideWindowXs,
     sideWidth: N700S_LEAD.sideWindowWidth,
     sideHeight: N700S_LEAD.sideWindowHeight,
   },
-  formation: TWO_CAR_FORMATION,
+  formation: THREE_CAR_FORMATION,
+  gangway: N700S_GANGWAY_SPEC,
+  leadShellSections: N700S_LEAD_SHELL_SECTIONS,
+  frontWindshieldSections: N700S_FRONT_WINDSHIELD_SECTIONS,
+  windshieldCenterDivider: true,
   lead: N700S_LEAD,
   middle: N700S_MIDDLE,
 }
