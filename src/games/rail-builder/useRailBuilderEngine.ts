@@ -9,6 +9,7 @@ import {
   DEPOT_LENGTH,
   DEPOT_TRACK_SPACING,
   disconnectRailPiece,
+  distanceFromPointToRailPieceVisual,
   findRailLoopClosureCandidate,
   findRailSnapNearMiss,
   findRailSnapCandidate,
@@ -84,6 +85,10 @@ const BASE_VIEW_SIZE = 15
 const POINTER_MOVE_THRESHOLD = 6
 // ドラッグで電車を線路上へ置き直すときの当たり判定の許容距離。
 const TRAIN_DRAG_MAX_DISTANCE = 8
+// 配置済み線路パーツの掴み判定(Raycast専用の透明ヒット領域)を、実際の描画(baseGeometry)
+// より広げる倍率・厚み。見た目のgeometryは変えず、Raycastの当たり判定だけを拡張する。
+const RAIL_HIT_AREA_WIDTH_SCALE = 1.8
+const RAIL_HIT_AREA_HEIGHT = 0.6
 
 export type RailBuilderEngineOptions = {
   pieces: readonly RailPiece[]
@@ -875,6 +880,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const sleeperGeometry = new THREE.BoxGeometry(1.65, 0.16, 0.58)
     const connectorGeometry = new THREE.CylinderGeometry(0.27, 0.27, 0.18, 16)
     const selectionRingGeometry = new THREE.RingGeometry(0.72, 0.82, 32)
+    // 掴み判定専用(非表示)。baseGeometryと同じ配置に、より広い当たり判定を敷く。
+    const railHitAreaGeometry = new THREE.BoxGeometry(1.05, RAIL_HIT_AREA_HEIGHT, 0.9 * RAIL_HIT_AREA_WIDTH_SCALE)
     const markerGeometry = new THREE.RingGeometry(0.35, 0.48, 24)
     const trainBodyGeometry = new RoundedBoxGeometry(2.15, 0.78, 0.92, 2, 0.14)
     const trainFrontGeometry = new RoundedBoxGeometry(0.3, 0.7, 0.88, 2, 0.12)
@@ -1042,6 +1049,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       sleeperGeometry,
       connectorGeometry,
       selectionRingGeometry,
+      railHitAreaGeometry,
       markerGeometry,
       trainBodyGeometry,
       trainFrontGeometry,
@@ -1145,6 +1153,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       color: RAIL_VISUAL_CONFIG.palette.connector,
       roughness: RAIL_VISUAL_CONFIG.roughness,
     })
+    // 掴み判定専用。visible=falseで描画コストゼロのままRaycast対象にはなる。
+    const railHitAreaMaterial = new THREE.MeshBasicMaterial({ visible: false })
     const selectionMaterial = new THREE.MeshBasicMaterial({
       color: '#38bdf8',
       transparent: true,
@@ -1259,6 +1269,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       baseMaterial,
       sleeperMaterial,
       connectorMaterial,
+      railHitAreaMaterial,
       selectionMaterial,
       markerMaterial,
       snapMaterial,
@@ -1528,11 +1539,30 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       getPointerNdc(event)
       raycaster.setFromCamera(pointer, camera)
       const intersections = raycaster.intersectObjects(railRoot.children, true)
+      const seenPieceIds = new Set<string>()
+      const candidates: { pieceId: string; point: RailVec3 }[] = []
       for (const intersection of intersections) {
         const pieceId = pieceIdFromObject(intersection.object)
-        if (pieceId !== null) return pieceId
+        if (pieceId === null || seenPieceIds.has(pieceId)) continue
+        seenPieceIds.add(pieceId)
+        candidates.push({ pieceId, point: vec3(intersection.point.x, intersection.point.y, intersection.point.z) })
       }
-      return null
+      if (candidates.length <= 1) return candidates[0]?.pieceId ?? null
+
+      // 掴み判定を広げたぶん、密集した配置では複数パーツのヒット領域が重なりうる。
+      // その場合は、Raycastの交差点から実際に見えている線路形状に最も近いパーツを選ぶ。
+      let bestPieceId = candidates[0]!.pieceId
+      let bestDistance = Number.POSITIVE_INFINITY
+      for (const candidate of candidates) {
+        const piece = optionsRef.current.pieces.find((current) => current.id === candidate.pieceId)
+        if (piece === undefined) continue
+        const distance = distanceFromPointToRailPieceVisual(candidate.point, piece)
+        if (distance < bestDistance) {
+          bestDistance = distance
+          bestPieceId = candidate.pieceId
+        }
+      }
+      return bestPieceId
     }
 
     function pickTrain(event: PointerEvent): string | null {
@@ -2279,12 +2309,20 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       pieceId: string,
       pathRailMaterial: THREE.Material,
       sleeperEvery: number,
-    ): { base: THREE.InstancedMesh; rail: THREE.InstancedMesh; sleeper: THREE.InstancedMesh } {
+    ): {
+      base: THREE.InstancedMesh
+      rail: THREE.InstancedMesh
+      sleeper: THREE.InstancedMesh
+      hitArea: THREE.InstancedMesh
+    } {
       const baseInstances = new THREE.InstancedMesh(baseGeometry, baseMaterial, segmentCount)
       const railInstances = new THREE.InstancedMesh(railGeometry, pathRailMaterial, segmentCount * 2)
       const sleeperCount = Math.ceil(segmentCount / sleeperEvery)
       const sleeperInstances = new THREE.InstancedMesh(sleeperGeometry, sleeperMaterial, sleeperCount)
-      for (const instances of [baseInstances, railInstances, sleeperInstances]) {
+      // 掴み判定用。baseと同じ配置に、より広いgeometryをRaycast専用(非表示)で重ねる。
+      const hitAreaInstances = new THREE.InstancedMesh(railHitAreaGeometry, railHitAreaMaterial, segmentCount)
+      hitAreaInstances.visible = false
+      for (const instances of [baseInstances, railInstances, sleeperInstances, hitAreaInstances]) {
         instances.userData.pieceId = pieceId
         instances.instanceMatrix.setUsage(THREE.StaticDrawUsage)
         instances.receiveShadow = true
@@ -2311,6 +2349,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         instanceDummy.updateMatrix()
         instanceMatrix.multiply(instanceDummy.matrix)
         baseInstances.setMatrixAt(i, instanceMatrix)
+
+        instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
+        instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
+        instanceDummy.position.set(0, 0.1, 0)
+        instanceDummy.quaternion.identity()
+        instanceDummy.scale.setScalar(1)
+        instanceDummy.updateMatrix()
+        instanceMatrix.multiply(instanceDummy.matrix)
+        hitAreaInstances.setMatrixAt(i, instanceMatrix)
 
         for (const side of [-1, 1]) {
           instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
@@ -2339,10 +2386,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       baseInstances.instanceMatrix.needsUpdate = true
       railInstances.instanceMatrix.needsUpdate = true
       sleeperInstances.instanceMatrix.needsUpdate = true
+      hitAreaInstances.instanceMatrix.needsUpdate = true
       baseInstances.computeBoundingSphere()
       railInstances.computeBoundingSphere()
       sleeperInstances.computeBoundingSphere()
-      return { base: baseInstances, rail: railInstances, sleeper: sleeperInstances }
+      hitAreaInstances.computeBoundingSphere()
+      return { base: baseInstances, rail: railInstances, sleeper: sleeperInstances, hitArea: hitAreaInstances }
     }
 
     function makePieceObject(piece: RailPiece): THREE.Group {
@@ -2364,7 +2413,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const mainRailMaterial = piece.kind === 'branch'
         ? piece.branchDirection === 'c' ? branchDimRailMaterial : branchSelectedRailMaterial
         : railMaterial
-      const { base: baseInstances, rail: railInstances, sleeper: sleeperInstances } = buildRailPathInstances(
+      const { base: baseInstances, rail: railInstances, sleeper: sleeperInstances, hitArea: hitAreaInstances } = buildRailPathInstances(
         localPiece,
         undefined,
         segmentCount,
@@ -2375,12 +2424,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       baseInstances.name = 'rail-bases'
       railInstances.name = 'rail-pairs'
       sleeperInstances.name = 'rail-sleepers'
-      group.add(baseInstances, railInstances, sleeperInstances)
+      hitAreaInstances.name = 'rail-hit-area'
+      group.add(baseInstances, railInstances, sleeperInstances, hitAreaInstances)
 
       if (piece.kind === 'branch' && piece.branchPath !== undefined) {
         const branchSegmentCount = 12
         const branchRailMaterial = piece.branchDirection === 'c' ? branchSelectedRailMaterial : branchDimRailMaterial
-        const { base: branchBases, rail: branchRails, sleeper: branchSleepers } = buildRailPathInstances(
+        const { base: branchBases, rail: branchRails, sleeper: branchSleepers, hitArea: branchHitArea } = buildRailPathInstances(
           localPiece,
           piece.branchPath,
           branchSegmentCount,
@@ -2388,14 +2438,20 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           branchRailMaterial,
           1,
         )
-        group.add(branchBases, branchRails, branchSleepers)
+        branchHitArea.name = 'rail-hit-area'
+        group.add(branchBases, branchRails, branchSleepers, branchHitArea)
         branchRouteVisuals.set(piece.id, { b: railInstances, c: branchRails })
       }
 
       if (piece.kind === 'depot' && piece.secondaryPath !== undefined) {
         // 2番線は選択・非選択の色分けをせず、branchRouteVisualsにも登録しない。
         const depotSecondarySegmentCount = 8
-        const { base: depotSecondaryBases, rail: depotSecondaryRails, sleeper: depotSecondarySleepers } = buildRailPathInstances(
+        const {
+          base: depotSecondaryBases,
+          rail: depotSecondaryRails,
+          sleeper: depotSecondarySleepers,
+          hitArea: depotSecondaryHitArea,
+        } = buildRailPathInstances(
           localPiece,
           piece.secondaryPath,
           depotSecondarySegmentCount,
@@ -2403,7 +2459,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           railMaterial,
           1,
         )
-        group.add(depotSecondaryBases, depotSecondaryRails, depotSecondarySleepers)
+        depotSecondaryHitArea.name = 'rail-hit-area'
+        group.add(depotSecondaryBases, depotSecondaryRails, depotSecondarySleepers, depotSecondaryHitArea)
       }
 
       const capsForPiece: Partial<Record<RailConnectorId, THREE.Mesh>> = {}

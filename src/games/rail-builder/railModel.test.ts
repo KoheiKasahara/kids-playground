@@ -24,6 +24,7 @@ import {
   deleteRailPiece,
   disconnectRailPiece,
   distanceBetweenRailPoints,
+  distanceFromPointToRailPieceVisual,
   findRailLoopClosureCandidate,
   findRailSnapCandidate,
   findRailSnapNearMiss,
@@ -35,6 +36,7 @@ import {
   sampleRailPathTangent,
   toggleRailBranch,
   worldConnectorForRailPiece,
+  worldRailPathPoint,
   worldRailPieceVisualCenter,
   type RailBranchSide,
   type RailConnectorId,
@@ -433,6 +435,55 @@ describe('railModel', () => {
 
   it('does not allow a snap angle wider than the configured tolerance', () => {
     expect(DEFAULT_SNAP_ANGLE).toBeCloseTo((58 * Math.PI) / 180)
+  })
+
+  describe('distance from a point to a piece\'s visible rail path (issue #288: widened hit-area tie-break)', () => {
+    it('is (near) zero for a point that sits exactly on the piece path', () => {
+      const straight = createRailPiece('straight', 'straight', origin)
+      const onPath = worldRailPathPoint(straight, 0.5)
+
+      expect(distanceFromPointToRailPieceVisual(onPath, straight)).toBeCloseTo(0, 5)
+    })
+
+    it('prefers the piece whose real (unwidened) geometry is closer, not just whichever hit-area was raycast first', () => {
+      const left = createRailPiece('straight', 'left', origin)
+      const right = createRailPiece('straight', 'right', { x: STRAIGHT_LENGTH, y: 0, z: 0 })
+      // 右のパーツの線路寄りの点。ヒット領域を広げたことで左パーツのヒット領域にも
+      // 入り得るが、実際の線路形状までの距離はrightの方が近い。
+      const pointNearRight = worldRailPathPoint(right, 0.1)
+
+      const distanceToLeft = distanceFromPointToRailPieceVisual(pointNearRight, left)
+      const distanceToRight = distanceFromPointToRailPieceVisual(pointNearRight, right)
+
+      expect(distanceToRight).toBeLessThan(distanceToLeft)
+    })
+
+    it('follows the curved path rather than a straight-line bounding box', () => {
+      const curve = createRailPiece('curve', 'curve', origin, 0, 'left')
+      const pointOnArc = worldRailPathPoint(curve, 0.5)
+
+      // カーブの弧の途中(張り出し部分)は始点・終点を結ぶ直線からは離れているが、
+      // 実際のカーブ形状上の点なので距離はほぼ0になる。
+      expect(distanceFromPointToRailPieceVisual(pointOnArc, curve)).toBeCloseTo(0, 5)
+    })
+
+    it('also considers the branch path, not just the main line', () => {
+      const branch = createRailPiece('branch', 'branch', origin)
+      const onBranchPath = branch.branchPath === undefined ? null : worldRailPathPoint(branch, 0.5, branch.branchPath)
+
+      expect(onBranchPath).not.toBeNull()
+      expect(distanceFromPointToRailPieceVisual(onBranchPath!, branch)).toBeCloseTo(0, 5)
+    })
+
+    it('also considers the depot secondary track, not just the main line', () => {
+      const depot = createRailPiece('depot', 'depot', origin)
+      const onSecondaryPath = depot.secondaryPath === undefined
+        ? null
+        : worldRailPathPoint(depot, 0.5, depot.secondaryPath)
+
+      expect(onSecondaryPath).not.toBeNull()
+      expect(distanceFromPointToRailPieceVisual(onSecondaryPath!, depot)).toBeCloseTo(0, 5)
+    })
   })
 
   describe('connecting remaining endpoints after a normal snap', () => {
