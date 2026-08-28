@@ -72,6 +72,7 @@ https://kids.kasapg.com/
 - `.github/workflows/ci.yml` は push / pull request のたびに lint・test・`build`を実行し、`main` ブランチへのpush時のみ GitHub Pages へ自動デプロイします。
 - リポジトリ側の設定として、**Settings → Pages → Source を「GitHub Actions」に設定する**必要があります（この設定がないとデプロイが反映されません）。
 - ルーティングには `BrowserRouter` を採用しています。各ゲームは `https://kids.kasapg.com/games/<game-id>` という固有のパスURLを持ち、検索エンジンにインデックスされます。GitHub Pagesは静的ホスティングでサーバー側ルーティングを持たないため、ビルド時（`src/build/staticRoutePages.ts`）にゲームごとの静的HTMLファイル（`games/<slug>/index.html` と `games/<slug>.html`）と、それより深い階層のURL向けのSPAフォールバックとして `404.html` を生成しています。これにより `/games/flag-quiz` の直接アクセスやリロードは実体のHTMLとして200で返り、`/games/flag-quiz/flag-to-name/hard/play` のような深いURLは `404.html`（中身は `index.html` と同じ）が返ってクライアント側ルーティングで正しい画面を描画します。オンライン中のページ遷移はService Workerの `navigateFallback` が引き続きカバーします。旧`HashRouter`時代のブックマーク（`#/games/flag-quiz` のような形）は `src/app/legacyHashRedirect.ts` により新しいパスURLへ自動的に書き換えられます。
+- ページごとのSEOメタ情報（title・description・canonical・OGP・Twitterカード）は `src/games/gameCatalog.ts` の各ゲームエントリーが持つ `seo`（`headline`/`description`）を単一情報源としています。`seo` は必須項目のため、新しいゲームを `GAME_CATALOG` に追加するときに書き忘れると型エラーになります。SPA遷移中は `src/seo/SeoManager.tsx` が `useLocation()` の変化を検知して `document` のメタタグを更新し、ビルド時は `src/build/staticRoutePages.ts` が同じ文言をゲームごとの静的HTMLへ焼き込みます（`/games/<slug>` 配下のサブURLはすべて、そのゲームのルートURLへcanonicalが正規化されます）。URLの組み立ては `src/seo/siteMeta.ts` の `absoluteUrl` に集約しています。
 
 ## PWA
 
@@ -95,6 +96,11 @@ src/
 │  └─ legacyHashRedirect.ts # 旧HashRouter URL（#/games/...）をパスURLへ書き換える互換処理
 ├─ build/
 │  └─ staticRoutePages.ts   # ビルド時にゲームごとの静的HTMLと404.htmlを生成するViteプラグイン
+├─ seo/
+│  ├─ siteMeta.ts           # SITE_ORIGIN/SITE_NAMEとURL組み立て(absoluteUrl)の単一情報源
+│  ├─ pageSeo.ts             # pathnameからPageSeo(title/description/canonicalなど)を解決する純粋関数
+│  ├─ applyDocumentSeo.ts    # PageSeoをdocumentのmeta/linkタグへupsertする(タグを増やさない)
+│  └─ SeoManager.tsx         # SPA遷移のたびにapplyDocumentSeoを呼ぶ、描画物を持たないコンポーネント
 ├─ pages/
 │  └─ Home.tsx        # ホーム（ゲーム選択）画面
 ├─ games/
