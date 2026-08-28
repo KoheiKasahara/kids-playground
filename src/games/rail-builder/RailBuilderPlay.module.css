@@ -1,4 +1,8 @@
 .page {
+  /* もどる/音/− /🚃n/＋/▶ を同じ大きさの操作セルとして扱うための一辺。
+     --tap-target-min(64px)より一段小さいが、幼児でも押しやすい大きさを保ちつつ
+     縦画面での上部UIの占有高さを抑える。 */
+  --rb-cell: 56px;
   position: relative;
   width: 100%;
   height: 100vh;
@@ -46,7 +50,7 @@
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-xs);
   width: min(100%, 620px);
   margin: 0 auto;
 }
@@ -82,15 +86,16 @@
   justify-content: center;
   flex: 0 0 auto;
   gap: 2px;
+  min-height: var(--rb-cell);
   padding: var(--space-xs) var(--space-sm);
   color: var(--color-primary-dark);
-  font-size: 15px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
 .backButton > span:first-child {
   margin-top: -3px;
-  font-size: 28px;
+  font-size: 24px;
   line-height: 0.7;
 }
 
@@ -100,7 +105,7 @@
   margin: 0;
   overflow: hidden;
   color: #245b72;
-  font-size: clamp(18px, 5.4vw, 32px);
+  font-size: clamp(17px, 5vw, 30px);
   line-height: 1.1;
   text-align: center;
   text-overflow: ellipsis;
@@ -152,10 +157,11 @@
   justify-content: center;
   flex-wrap: nowrap;
   gap: var(--space-xs);
-  width: 100%;
-  padding: 4px;
+  width: auto;
+  margin: 0 auto;
+  padding: var(--space-xs);
   border: 2px solid rgba(54, 72, 88, 0.12);
-  border-radius: 16px;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.84);
   box-shadow: 0 3px 12px rgba(42, 65, 74, 0.13);
   pointer-events: auto;
@@ -164,57 +170,49 @@
 .trainCountGroup {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
   padding: 2px;
-  border-radius: 12px;
+  border-radius: 16px;
   background: rgba(225, 242, 247, 0.9);
 }
 
+/* − / 🚃n / ＋ / ▶ は同じ操作セルとして、高さ・幅・角丸・余白・中央揃え・
+   タップ領域を揃える。文字量ではなくセル単位で見えるようにするための共有ルール。 */
 .trainCountButton,
-.depotButton {
-  min-width: var(--tap-target-min);
-  min-height: var(--tap-target-min);
+.trainCountLabel,
+.bulkRunButton {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: var(--rb-cell);
+  height: var(--rb-cell);
+  padding: 0;
   border: 0;
-  border-radius: 10px;
+  border-radius: 14px;
+  font-family: inherit;
+  font-weight: 900;
+  touch-action: manipulation;
+}
+
+.trainCountButton {
   background: #fff;
   color: #245b72;
-  font-family: inherit;
   font-size: 19px;
-  font-weight: 900;
   cursor: pointer;
-  touch-action: manipulation;
 }
 
 .trainCountLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  min-width: 30px;
-  padding: 0 4px;
   color: #245b72;
   font-size: clamp(15px, 3.6vw, 18px);
-  font-weight: 900;
-  text-align: center;
 }
 
 .bulkRunButton {
-  display: inline-flex;
-  flex: 1 1 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: var(--tap-target-min);
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 12px;
   background: #16a34a;
   color: #fff;
-  font-family: inherit;
-  font-size: clamp(13px, 3.4vw, 16px);
-  font-weight: 900;
-  white-space: nowrap;
+  font-size: 24px;
   cursor: pointer;
-  touch-action: manipulation;
 }
 
 .bulkRunButton[aria-pressed='true'] {
@@ -223,20 +221,17 @@
 
 .soundButton,
 .bulkRunButton,
-.trainCountButton,
-.depotButton {
+.trainCountButton {
   pointer-events: auto;
 }
 
 .trainCountButton:active,
-.bulkRunButton:active,
-.depotButton:active {
+.bulkRunButton:active {
   transform: scale(0.95);
 }
 
 .trainCountButton:focus-visible,
 .bulkRunButton:focus-visible,
-.depotButton:focus-visible,
 .soundButton:focus-visible {
   outline: 4px solid var(--color-accent);
   outline-offset: 2px;
@@ -251,15 +246,15 @@
   display: inline-grid;
   flex: 0 0 auto;
   place-items: center;
-  width: var(--tap-target-min);
-  min-height: var(--tap-target-min);
+  width: var(--rb-cell);
+  min-height: var(--rb-cell);
   padding: 0;
   border: 2px solid rgba(54, 72, 88, 0.14);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.93);
   color: #245b72;
   box-shadow: 0 3px 10px rgba(42, 65, 74, 0.16);
-  font-size: 20px;
+  font-size: 19px;
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -281,7 +276,9 @@
 .tray {
   flex: 0 0 auto;
   margin: 0 calc(-1 * (var(--space-sm) + var(--safe-right))) calc(-1 * (var(--space-sm) + var(--safe-bottom))) calc(-1 * (var(--space-sm) + var(--safe-left)));
-  padding: var(--space-sm) max(var(--space-sm), var(--safe-right)) calc(var(--space-sm) + var(--safe-bottom)) max(var(--space-sm), var(--safe-left));
+  /* 線路エリアを広く見せるため上下の余白を切り詰める。下端はホームインジケータ等の
+     safe-area分だけを基本とし、safe-areaが0の環境でも4px(--space-xs)は必ず残す。 */
+  padding: var(--space-xs) max(var(--space-sm), var(--safe-right)) max(var(--safe-bottom), var(--space-xs)) max(var(--space-sm), var(--safe-left));
   border-top: 2px solid rgba(64, 108, 91, 0.18);
   border-radius: 20px 20px 0 0;
   background: rgba(255, 255, 255, 0.9);
@@ -307,13 +304,13 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-height: 74px;
-  min-width: 90px;
+  gap: 2px;
+  min-height: 62px;
+  min-width: 84px;
   /* ラベルが長いパーツ(みぎぶんき/ひだりぶんき)でも文字がはみ出さないよう、
-     90pxを下限に内容ぶんだけ広がれるようにする。並びは横スクロールのまま。 */
+     84pxを下限に内容ぶんだけ広がれるようにする。並びは横スクロールのまま。 */
   flex: 0 0 auto;
-  padding: 6px 8px 5px;
+  padding: 4px 8px;
   font-size: clamp(11px, 3vw, 14px);
   line-height: 1.05;
   white-space: nowrap;
@@ -330,8 +327,8 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 38px;
+  width: 36px;
+  height: 32px;
 }
 
 .icon svg {
@@ -341,7 +338,7 @@
 }
 
 .trayHint {
-  margin-top: 4px;
+  margin: 2px 0 0;
   color: #54706e;
   font-size: 12px;
   text-align: center;
