@@ -126,10 +126,14 @@ export type SnapOptions = {
 export const RAIL_UNIT_LENGTH = 5
 export const STRAIGHT_LENGTH = RAIL_UNIT_LENGTH
 export const SHORT_STRAIGHT_LENGTH = RAIL_UNIT_LENGTH / 2
-export const SLOPE_LENGTH = 7
-export const ELEVATED_LENGTH = 6.5
-export const STATION_LENGTH = 7
-export const TUNNEL_LENGTH = 7
+/** 坂道は高さ ELEVATED_HEIGHT を緩やかに上るため基準ユニット2つ分。 */
+export const SLOPE_LENGTH = RAIL_UNIT_LENGTH * 2
+/** 橋は「高さ ELEVATED_HEIGHT の直線」。基準ユニット1つ分。 */
+export const ELEVATED_LENGTH = RAIL_UNIT_LENGTH
+/** 駅は3両編成がホーム内に収まるよう基準ユニット2つ分。 */
+export const STATION_LENGTH = RAIL_UNIT_LENGTH * 2
+/** トンネルは「屋根の付いた直線」。基準ユニット1つ分。 */
+export const TUNNEL_LENGTH = RAIL_UNIT_LENGTH
 export const BRANCH_LENGTH = RAIL_UNIT_LENGTH
 export const CURVE_RADIUS = RAIL_UNIT_LENGTH
 export const CURVE_ANGLE = Math.PI / 2

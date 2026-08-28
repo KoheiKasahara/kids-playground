@@ -20,6 +20,7 @@ import {
 import {
   connectRailPieces,
   createRailPiece,
+  ELEVATED_HEIGHT,
   railPathLength,
   sampleRailPath,
   toggleRailBranch,
@@ -647,5 +648,222 @@ describe('running a train around a branch-inclusive loop (issue #251)', () => {
     }
     expect(visitedPieceIds).toEqual(new Set(['branch1', 'curve1', 'straight3', 'curve2', 'branch2']))
     expect(motion.cursor.pieceId).toBe('branch2')
+  })
+})
+
+/**
+ * Issue #253: 駅・トンネル・橋・坂道を含むオーバルでも列車が行き止まりに
+ * 当たらず走り続け、駅で正しく停発車できることの回帰テスト。
+ * ループの組み方はrailModel.test.tsのfacility connectivity spec (issue #253)
+ * と同じ（connectRailPiecesの連鎖のみ、手動position調整なし）。
+ */
+describe('running a train through facility loops (issue #253)', () => {
+  const origin = { x: 0, y: 0, z: 0 }
+
+  /** station(10)を上辺に含む9ピースのオーバル（代表ループ1、閉路済み）。 */
+  function buildStationOvalLoop(): RailPiece[] {
+    let pieces: RailPiece[] = [createRailPiece('station', 'station', origin)]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: 'a' | 'b',
+      targetId: string,
+      targetConnectorId: 'a' | 'b',
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('straight', 'straight1'))
+    connect('straight1', 'a', 'station', 'b')
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'straight1', 'b')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'curve1', 'b')
+    add(createRailPiece('straight', 'straight2'))
+    connect('straight2', 'a', 'curve2', 'b')
+    add(createRailPiece('straight', 'straight3'))
+    connect('straight3', 'a', 'straight2', 'b')
+    add(createRailPiece('straight', 'straight4'))
+    connect('straight4', 'a', 'straight3', 'b')
+    add(createRailPiece('curve', 'curve3', origin, 0, 'right'))
+    connect('curve3', 'a', 'straight4', 'b')
+    add(createRailPiece('curve', 'curve4', origin, 0, 'right'))
+    connect('curve4', 'a', 'curve3', 'b')
+    pieces = connectRailPieces(pieces, 'curve4', 'b', 'station', 'a')
+    return pieces
+  }
+
+  /** tunnel(5)を上辺に含む8ピースのオーバル（代表ループ2、閉路済み）。 */
+  function buildTunnelOvalLoop(): RailPiece[] {
+    let pieces: RailPiece[] = [createRailPiece('tunnel', 'tunnel', origin)]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: 'a' | 'b',
+      targetId: string,
+      targetConnectorId: 'a' | 'b',
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('straight', 'straight1'))
+    connect('straight1', 'a', 'tunnel', 'b')
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'straight1', 'b')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'curve1', 'b')
+    add(createRailPiece('straight', 'straight2'))
+    connect('straight2', 'a', 'curve2', 'b')
+    add(createRailPiece('straight', 'straight3'))
+    connect('straight3', 'a', 'straight2', 'b')
+    add(createRailPiece('curve', 'curve3', origin, 0, 'right'))
+    connect('curve3', 'a', 'straight3', 'b')
+    add(createRailPiece('curve', 'curve4', origin, 0, 'right'))
+    connect('curve4', 'a', 'curve3', 'b')
+    pieces = connectRailPieces(pieces, 'curve4', 'b', 'tunnel', 'a')
+    return pieces
+  }
+
+  /**
+   * slope(上り)→bridge→slope(下り、B端で接続=180°反転)を上辺、curveR×2、
+   * straight×5を下辺、curveR×2で閉じる12ピースの高低差オーバル
+   * （代表ループ3、閉路済み）。
+   */
+  function buildElevatedOvalLoop(): RailPiece[] {
+    let pieces: RailPiece[] = [createRailPiece('slope', 'slope1', origin)]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: 'a' | 'b',
+      targetId: string,
+      targetConnectorId: 'a' | 'b',
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('bridge', 'bridge'))
+    connect('bridge', 'a', 'slope1', 'b')
+    add(createRailPiece('slope', 'slope2'))
+    connect('slope2', 'b', 'bridge', 'b')
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'slope2', 'a')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'curve1', 'b')
+    for (const id of ['straight1', 'straight2', 'straight3', 'straight4', 'straight5']) {
+      add(createRailPiece('straight', id))
+    }
+    connect('straight1', 'a', 'curve2', 'b')
+    connect('straight2', 'a', 'straight1', 'b')
+    connect('straight3', 'a', 'straight2', 'b')
+    connect('straight4', 'a', 'straight3', 'b')
+    connect('straight5', 'a', 'straight4', 'b')
+    add(createRailPiece('curve', 'curve3', origin, 0, 'right'))
+    connect('curve3', 'a', 'straight5', 'b')
+    add(createRailPiece('curve', 'curve4', origin, 0, 'right'))
+    connect('curve4', 'a', 'curve3', 'b')
+    pieces = connectRailPieces(pieces, 'curve4', 'b', 'slope1', 'a')
+    return pieces
+  }
+
+  it('drives a station-inclusive loop: stops at the platform center, waits out the dwell, departs, and re-stops on the next lap', () => {
+    const loop = buildStationOvalLoop()
+    const station = loop.find((piece) => piece.id === 'station')!
+    const stationCenter = railPathLength(station.path) / 2
+
+    let motion: RailTrainMotion = {
+      cursor: { pieceId: 'straight2', direction: 'a-to-b', distance: 0.2 },
+      speed: 0,
+      status: 'running',
+    }
+    let prevStatus = motion.status
+    let stopEntries = 0
+    let firstStopDistance: number | null = null
+    let sawDeparting = false
+    let clearedServicedAfterLeavingStation = false
+    let sawWaiting = false
+
+    for (let tick = 0; tick < 4000 && stopEntries < 2; tick += 1) {
+      motion = updateRailTrainMotion(motion, loop, 0.1)
+      if (motion.status === 'waiting') sawWaiting = true
+      if (motion.status === 'stoppedAtStation' && prevStatus !== 'stoppedAtStation') {
+        stopEntries += 1
+        if (stopEntries === 1) firstStopDistance = motion.cursor.distance
+      }
+      if (motion.status === 'departing') sawDeparting = true
+      if (sawDeparting && motion.cursor.pieceId !== 'station' && motion.stationServicedId === undefined) {
+        clearedServicedAfterLeavingStation = true
+      }
+      prevStatus = motion.status
+    }
+
+    // 1回目の停車はホーム中央（TRAIN_STATION_STOP_DURATION経過後、departing→runningへ復帰）。
+    expect(firstStopDistance).toBeCloseTo(stationCenter, 3)
+    expect(sawDeparting).toBe(true)
+    // 駅pieceを抜けたらstationServicedIdがクリアされる。
+    expect(clearedServicedAfterLeavingStation).toBe(true)
+    // ループなので1周後に同じ駅で再停車できる。
+    expect(stopEntries).toBe(2)
+    // 全ティックでwaitingにならない（行き止まり誤判定なし）。
+    expect(sawWaiting).toBe(false)
+  })
+
+  it('runs a tunnel-inclusive loop for 1200 ticks without ever hitting a dead end', () => {
+    const loop = buildTunnelOvalLoop()
+    let motion: RailTrainMotion = {
+      cursor: { pieceId: 'tunnel', direction: 'a-to-b', distance: 0.2 },
+      speed: 0,
+      status: 'running',
+    }
+    let previousPieceId = motion.cursor.pieceId
+    let pieceChanges = 0
+    for (let tick = 0; tick < 1200; tick += 1) {
+      motion = updateRailTrainMotion(motion, loop, 0.05)
+      expect(motion.status).not.toBe('waiting')
+      if (motion.cursor.pieceId !== previousPieceId) {
+        pieceChanges += 1
+        previousPieceId = motion.cursor.pieceId
+      }
+    }
+    // このオーバルは8ピース。8回以上ピースが変われば1周以上した証拠。
+    expect(pieceChanges).toBeGreaterThan(8)
+    expect(motion.speed).toBeGreaterThan(0)
+  })
+
+  it('keeps height in bounds, avoids height jumps and reversal, and flips pitch sign on the bridge/slope loop', () => {
+    const loop = buildElevatedOvalLoop()
+    let motion: RailTrainMotion = {
+      cursor: { pieceId: 'slope1', direction: 'a-to-b', distance: 0.2 },
+      speed: 0,
+      status: 'running',
+    }
+    let previousPose = sampleRailTrainPose(loop, motion.cursor)!
+    let minY = Infinity
+    let maxY = -Infinity
+    let maxHeightJump = 0
+    let minForwardDot = Infinity
+    let sawUpPitch = false
+    let sawDownPitch = false
+
+    for (let tick = 0; tick < 1200; tick += 1) {
+      motion = updateRailTrainMotion(motion, loop, 0.05)
+      expect(motion.status).not.toBe('waiting')
+      const pose = sampleRailTrainPose(loop, motion.cursor)!
+      minY = Math.min(minY, pose.position.y)
+      maxY = Math.max(maxY, pose.position.y)
+      maxHeightJump = Math.max(maxHeightJump, Math.abs(pose.position.y - previousPose.position.y))
+      const stepX = pose.position.x - previousPose.position.x
+      const stepZ = pose.position.z - previousPose.position.z
+      // 進行方向(前ティックのforward)への内積が負でなければ逆走していない。
+      if (Math.hypot(stepX, stepZ) > 1e-6) {
+        const forwardDot = stepX * previousPose.forward.x + stepZ * previousPose.forward.z
+        minForwardDot = Math.min(minForwardDot, forwardDot)
+      }
+      if (pose.forward.y > 0.05) sawUpPitch = true
+      if (pose.forward.y < -0.05) sawDownPitch = true
+      previousPose = pose
+    }
+
+    expect(minY).toBeGreaterThanOrEqual(-1e-6)
+    expect(maxY).toBeLessThanOrEqual(ELEVATED_HEIGHT + 1e-6)
+    // 1ティック0.05秒でのジャンプが実際に計測して妥当な閾値(0.1)未満。
+    expect(maxHeightJump).toBeLessThan(0.1)
+    expect(minForwardDot).toBeGreaterThanOrEqual(-1e-6)
+    // 坂の上り/下りでpitch(forward.y)の符号が反転する。
+    expect(sawUpPitch).toBe(true)
+    expect(sawDownPitch).toBe(true)
   })
 })

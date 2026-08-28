@@ -13,6 +13,7 @@ import {
   findRailSnapNearMiss,
   findRailSnapCandidate,
   getRailConnectorIds,
+  STATION_LENGTH,
   type RailConnectorId,
   type RailPath,
   type RailPiece,
@@ -2051,7 +2052,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
       if (localPiece.kind === 'station') {
         const stationCenter = worldRailPathPoint(localPiece, 0.5)
-        const stationLength = localPiece.path.kind === 'straight' ? localPiece.path.length : 7
+        const stationLength = localPiece.path.kind === 'straight' ? localPiece.path.length : STATION_LENGTH
         for (const side of [-1, 1]) {
           addMesh(
             stationPlatformGeometry,
@@ -2066,7 +2067,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           { x: stationCenter.x, y: stationCenter.y + 2.45, z: stationCenter.z },
           { x: stationLength * 0.9, y: 1, z: 1 },
         )
-        for (const x of [-2.35, 2.35]) {
+        // 柱は屋根(stationLength * 0.9)の端から0.8内側に立てる。
+        const stationColumnX = stationLength * 0.45 - 0.8
+        for (const x of [-stationColumnX, stationColumnX]) {
           for (const z of [-1.18, 1.18]) {
             addMesh(
               stationColumnGeometry,
@@ -2233,10 +2236,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const segmentCount = piece.kind === 'curve' || piece.kind === 'branch'
         ? 12
         : piece.kind === 'slope'
-          ? 16
-          : piece.kind === 'bridge' || piece.kind === 'station' || piece.kind === 'tunnel'
-            ? 8
-            : 1
+          ? 24
+          : piece.kind === 'station'
+            ? 12
+            : piece.kind === 'bridge' || piece.kind === 'tunnel'
+              ? 6
+              : 1
       const sleeperEvery = piece.kind === 'curve' || piece.kind === 'slope' ? 2 : 1
       const localPiece = { ...piece, position: vec3(0, 0, 0), rotationY: 0 }
       const mainRailMaterial = piece.kind === 'branch'

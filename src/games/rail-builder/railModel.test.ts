@@ -13,7 +13,9 @@ import {
   RAIL_UNIT_LENGTH,
   SHORT_STRAIGHT_LENGTH,
   SLOPE_LENGTH,
+  STATION_LENGTH,
   STRAIGHT_LENGTH,
+  TUNNEL_LENGTH,
   applyRailLoopClosure,
   areRailConnectionsSymmetric,
   connectRailPieceRemainingEndpoints,
@@ -238,23 +240,23 @@ describe('railModel', () => {
 
   it('connects ground to slope and rejects an elevated endpoint at ground height', () => {
     const ground = createRailPiece('straight', 'ground', origin)
-    const slope = createRailPiece('slope', 'slope', { x: 6, y: 0, z: 0 })
+    const slope = createRailPiece('slope', 'slope', { x: 7.5, y: 0, z: 0 })
     const groundToSlope = findRailSnapCandidate(slope, [ground])
     expect(groundToSlope?.movingConnectorId).toBe('a')
     expect(groundToSlope?.heightDifference).toBeCloseTo(0)
 
-    const bridge = createRailPiece('bridge', 'bridge', { x: 6, y: 0, z: 0 })
+    const bridge = createRailPiece('bridge', 'bridge', { x: 5, y: 0, z: 0 })
     expect(findRailSnapCandidate(bridge, [ground])).toBeNull()
     expect(findRailSnapNearMiss(bridge, [ground])?.heightDifference).toBeCloseTo(ELEVATED_HEIGHT)
   })
 
   it('builds a ground-slope-bridge-downslope-ground network with matching heights', () => {
     const ground = createRailPiece('straight', 'ground', origin)
-    const slope = createRailPiece('slope', 'slope', { x: 6, y: 0, z: 0 })
-    const bridge = createRailPiece('bridge', 'bridge', { x: 12.75, y: 0, z: 0 })
+    const slope = createRailPiece('slope', 'slope', { x: 7.5, y: 0, z: 0 })
+    const bridge = createRailPiece('bridge', 'bridge', { x: 15, y: 0, z: 0 })
     // 180度回した坂はB端が高架側、A端が地上側になる。
-    const secondSlope = createRailPiece('slope', 'second-slope', { x: 19.5, y: 0, z: 0 }, Math.PI)
-    const finalGround = createRailPiece('straight', 'final-ground', { x: 25.5, y: 0, z: 0 })
+    const secondSlope = createRailPiece('slope', 'second-slope', { x: 22.5, y: 0, z: 0 }, Math.PI)
+    const finalGround = createRailPiece('straight', 'final-ground', { x: 30, y: 0, z: 0 })
 
     const connectMoving = (
       pieces: RailPiece[],
@@ -928,5 +930,386 @@ describe('rail junction connectivity spec (issue #251)', () => {
       + curve2B.outward.y * branch2C.outward.y
       + curve2B.outward.z * branch2C.outward.z
     expect(outwardDot).toBeCloseTo(-1, 9)
+  })
+})
+
+/**
+ * Issue #253: 駅・トンネル・橋・坂道の長さをRAIL_UNIT_LENGTH基準に規格化した
+ * ことの回帰テスト群。4施設すべてが直線n本ぶんの水平変位と等価になり、
+ * 補助ロジックなしでオーバルループに組み込めることを検証する。
+ */
+describe('facility connectivity spec (issue #253)', () => {
+  /** connectionsグラフだけをBFSし、到達ノード数と辺数（重複カウント÷2）を返す。 */
+  function graphComponent(pieces: readonly RailPiece[], startId: string) {
+    const map = new Map(pieces.map((piece) => [piece.id, piece]))
+    const visited = new Set<string>([startId])
+    const queue: string[] = [startId]
+    let endpointCount = 0
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+      if (currentId === undefined) break
+      const piece = map.get(currentId)
+      if (piece === undefined) continue
+      for (const connectorId of getRailConnectorIds(piece)) {
+        const connection = piece.connections[connectorId]
+        if (connection === undefined) continue
+        endpointCount += 1
+        if (!visited.has(connection.pieceId)) {
+          visited.add(connection.pieceId)
+          queue.push(connection.pieceId)
+        }
+      }
+    }
+    return { nodeCount: visited.size, edgeCount: endpointCount / 2 }
+  }
+
+  function vecDeltaXZ(a: RailPiece['connectorA']['localPosition'], b: RailPiece['connectorA']['localPosition']) {
+    return { x: a.x - b.x, z: a.z - b.z }
+  }
+
+  it('keeps STATION/TUNNEL/ELEVATED/SLOPE lengths as exact RAIL_UNIT_LENGTH multiples', () => {
+    expect(STATION_LENGTH).toBe(RAIL_UNIT_LENGTH * 2)
+    expect(TUNNEL_LENGTH).toBe(RAIL_UNIT_LENGTH)
+    expect(ELEVATED_LENGTH).toBe(RAIL_UNIT_LENGTH)
+    expect(SLOPE_LENGTH).toBe(RAIL_UNIT_LENGTH * 2)
+    for (const length of [STATION_LENGTH, TUNNEL_LENGTH, ELEVATED_LENGTH, SLOPE_LENGTH]) {
+      expect(length % RAIL_UNIT_LENGTH).toBe(0)
+    }
+  })
+
+  it('places station/tunnel/bridge/slope connectors at the spec\'d local endpoints', () => {
+    const station = createRailPiece('station', 'station', origin)
+    expect(station.connectorA.localPosition).toEqual({ x: -5, y: 0, z: 0 })
+    expect(station.connectorA.outward).toEqual({ x: -1, y: 0, z: 0 })
+    expect(station.connectorB.localPosition).toEqual({ x: 5, y: 0, z: 0 })
+    expect(station.connectorB.outward).toEqual({ x: 1, y: 0, z: 0 })
+
+    const tunnel = createRailPiece('tunnel', 'tunnel', origin)
+    expect(tunnel.connectorA.localPosition).toEqual({ x: -2.5, y: 0, z: 0 })
+    expect(tunnel.connectorA.outward).toEqual({ x: -1, y: 0, z: 0 })
+    expect(tunnel.connectorB.localPosition).toEqual({ x: 2.5, y: 0, z: 0 })
+    expect(tunnel.connectorB.outward).toEqual({ x: 1, y: 0, z: 0 })
+
+    const bridge = createRailPiece('bridge', 'bridge', origin)
+    expect(bridge.connectorA.localPosition).toEqual({ x: -2.5, y: ELEVATED_HEIGHT, z: 0 })
+    expect(bridge.connectorA.outward).toEqual({ x: -1, y: 0, z: 0 })
+    expect(bridge.connectorB.localPosition).toEqual({ x: 2.5, y: ELEVATED_HEIGHT, z: 0 })
+    expect(bridge.connectorB.outward).toEqual({ x: 1, y: 0, z: 0 })
+
+    const slope = createRailPiece('slope', 'slope', origin)
+    expect(slope.connectorA.localPosition).toEqual({ x: -5, y: 0, z: 0 })
+    expect(slope.connectorA.outward).toEqual({ x: -1, y: 0, z: 0 })
+    expect(slope.connectorB.localPosition).toEqual({ x: 5, y: ELEVATED_HEIGHT, z: 0 })
+    expect(slope.connectorB.outward).toEqual({ x: 1, y: 0, z: 0 })
+    // smoothstepの端点接線は水平（outward.yが0）。
+    expect(slope.connectorA.outward.y).toBe(0)
+  })
+
+  it('keeps each facility path\'s start/end sample equal to its connector local positions', () => {
+    for (const kind of ['station', 'tunnel', 'bridge', 'slope'] as const) {
+      const piece = createRailPiece(kind, kind, origin)
+      expect(sampleRailPath(piece.path, 0)).toEqual(piece.connectorA.localPosition)
+      expect(sampleRailPath(piece.path, 1)).toEqual(piece.connectorB.localPosition)
+    }
+  })
+
+  it('keeps every facility\'s connector world pose on the 0.5 grid across 0/90/180/270°', () => {
+    const rotations = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
+    // 事前に手計算済みの期待値（rotateYの規約: +Xを回すと-Z側へ進む）。半径5の駅・坂道用。
+    const expectedHalf5 = [
+      { a: [-5, 0], aOut: [-1, 0], b: [5, 0], bOut: [1, 0] },
+      { a: [0, 5], aOut: [0, 1], b: [0, -5], bOut: [0, -1] },
+      { a: [5, 0], aOut: [1, 0], b: [-5, 0], bOut: [-1, 0] },
+      { a: [0, -5], aOut: [0, -1], b: [0, 5], bOut: [0, 1] },
+    ] as const
+    // 半径2.5のトンネル・橋用。
+    const expectedHalf2_5 = [
+      { a: [-2.5, 0], aOut: [-1, 0], b: [2.5, 0], bOut: [1, 0] },
+      { a: [0, 2.5], aOut: [0, 1], b: [0, -2.5], bOut: [0, -1] },
+      { a: [2.5, 0], aOut: [1, 0], b: [-2.5, 0], bOut: [-1, 0] },
+      { a: [0, -2.5], aOut: [0, -1], b: [0, 2.5], bOut: [0, 1] },
+    ] as const
+
+    function expectXZ(actual: { x: number; y: number; z: number }, expected: readonly [number, number]) {
+      expect(actual.x).toBeCloseTo(expected[0], 9)
+      expect(actual.z).toBeCloseTo(expected[1], 9)
+    }
+
+    rotations.forEach((rotationY, index) => {
+      const station = createRailPiece('station', `station-${index}`, origin, rotationY)
+      expectXZ(worldConnectorForRailPiece(station, 'a').position, expectedHalf5[index].a)
+      expect(worldConnectorForRailPiece(station, 'a').position.y).toBe(0)
+      expectXZ(worldConnectorForRailPiece(station, 'a').outward, expectedHalf5[index].aOut)
+      expectXZ(worldConnectorForRailPiece(station, 'b').position, expectedHalf5[index].b)
+      expect(worldConnectorForRailPiece(station, 'b').position.y).toBe(0)
+      expectXZ(worldConnectorForRailPiece(station, 'b').outward, expectedHalf5[index].bOut)
+
+      const tunnel = createRailPiece('tunnel', `tunnel-${index}`, origin, rotationY)
+      expectXZ(worldConnectorForRailPiece(tunnel, 'a').position, expectedHalf2_5[index].a)
+      expect(worldConnectorForRailPiece(tunnel, 'a').position.y).toBe(0)
+      expectXZ(worldConnectorForRailPiece(tunnel, 'b').position, expectedHalf2_5[index].b)
+      expect(worldConnectorForRailPiece(tunnel, 'b').position.y).toBe(0)
+
+      const bridge = createRailPiece('bridge', `bridge-${index}`, origin, rotationY)
+      expectXZ(worldConnectorForRailPiece(bridge, 'a').position, expectedHalf2_5[index].a)
+      expect(worldConnectorForRailPiece(bridge, 'a').position.y).toBeCloseTo(ELEVATED_HEIGHT)
+      expectXZ(worldConnectorForRailPiece(bridge, 'b').position, expectedHalf2_5[index].b)
+      expect(worldConnectorForRailPiece(bridge, 'b').position.y).toBeCloseTo(ELEVATED_HEIGHT)
+
+      const slope = createRailPiece('slope', `slope-${index}`, origin, rotationY)
+      expectXZ(worldConnectorForRailPiece(slope, 'a').position, expectedHalf5[index].a)
+      expect(worldConnectorForRailPiece(slope, 'a').position.y).toBeCloseTo(0)
+      expectXZ(worldConnectorForRailPiece(slope, 'b').position, expectedHalf5[index].b)
+      expect(worldConnectorForRailPiece(slope, 'b').position.y).toBeCloseTo(ELEVATED_HEIGHT)
+    })
+  })
+
+  it('matches straight-line horizontal displacement: station/slope = 2 straights, tunnel/bridge = 1 straight', () => {
+    const straight = createRailPiece('straight', 'straight-ref', origin)
+    const straightDelta = vecDeltaXZ(straight.connectorB.localPosition, straight.connectorA.localPosition)
+
+    const station = createRailPiece('station', 'station', origin)
+    const stationDelta = vecDeltaXZ(station.connectorB.localPosition, station.connectorA.localPosition)
+    expect(stationDelta.x).toBeCloseTo(straightDelta.x * 2, 9)
+    expect(stationDelta.z).toBeCloseTo(straightDelta.z * 2, 9)
+
+    const slope = createRailPiece('slope', 'slope', origin)
+    const slopeDelta = vecDeltaXZ(slope.connectorB.localPosition, slope.connectorA.localPosition)
+    expect(slopeDelta.x).toBeCloseTo(straightDelta.x * 2, 9)
+    expect(slopeDelta.z).toBeCloseTo(straightDelta.z * 2, 9)
+
+    const tunnel = createRailPiece('tunnel', 'tunnel', origin)
+    const tunnelDelta = vecDeltaXZ(tunnel.connectorB.localPosition, tunnel.connectorA.localPosition)
+    expect(tunnelDelta.x).toBeCloseTo(straightDelta.x, 9)
+    expect(tunnelDelta.z).toBeCloseTo(straightDelta.z, 9)
+
+    const bridge = createRailPiece('bridge', 'bridge', origin)
+    const bridgeDelta = vecDeltaXZ(bridge.connectorB.localPosition, bridge.connectorA.localPosition)
+    expect(bridgeDelta.x).toBeCloseTo(straightDelta.x, 9)
+    expect(bridgeDelta.z).toBeCloseTo(straightDelta.z, 9)
+  })
+
+  it('keeps the slope\'s average gradient at 0.2 and peak smoothstep gradient under 0.3', () => {
+    const slope = createRailPiece('slope', 'slope', origin)
+    const averageGradient = ELEVATED_HEIGHT / SLOPE_LENGTH
+    expect(averageGradient).toBeCloseTo(0.2, 9)
+
+    // 実長(曲線長)は水平長より少し長いだけで、ほぼ水平長どおり。
+    const actualLength = railPathLength(slope.path)
+    expect(actualLength).toBeGreaterThan(SLOPE_LENGTH)
+    expect(actualLength).toBeLessThan(10.3)
+
+    // smoothstepの最大勾配は平均勾配の1.5倍（t=0.5で最大）。
+    const peakGradient = averageGradient * 1.5
+    expect(peakGradient).toBeLessThan(0.3 + 1e-9)
+    const expectedPeakTangentY = peakGradient / Math.sqrt(1 + peakGradient * peakGradient)
+    expect(sampleRailPathTangent(slope.path, 0.5).y).toBeCloseTo(expectedPeakTangentY, 3)
+    // 端点の接線は水平（他パーツと同じ接続角度で繋がる）。
+    expect(sampleRailPathTangent(slope.path, 0).y).toBe(0)
+    expect(sampleRailPathTangent(slope.path, 1).y).toBe(0)
+  })
+
+  /**
+   * station(10) → straight → curveR×2 → straight×3 → curveR×2 → station.A
+   * という、駅を上辺に含むオーバル（代表ループ1）。上下の直線区間はどちらも15
+   * （station10+straight5、またはstraight5×3）で一致する。最後の継ぎ目
+   * （curve4.b→station.a）はまだ接続しない状態で返す。
+   */
+  function buildStationOvalLoop(): RailPiece[] {
+    let pieces: RailPiece[] = [createRailPiece('station', 'station', origin)]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: RailConnectorId,
+      targetId: string,
+      targetConnectorId: RailConnectorId,
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('straight', 'straight1'))
+    connect('straight1', 'a', 'station', 'b')
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'straight1', 'b')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'curve1', 'b')
+    add(createRailPiece('straight', 'straight2'))
+    connect('straight2', 'a', 'curve2', 'b')
+    add(createRailPiece('straight', 'straight3'))
+    connect('straight3', 'a', 'straight2', 'b')
+    add(createRailPiece('straight', 'straight4'))
+    connect('straight4', 'a', 'straight3', 'b')
+    add(createRailPiece('curve', 'curve3', origin, 0, 'right'))
+    connect('curve3', 'a', 'straight4', 'b')
+    add(createRailPiece('curve', 'curve4', origin, 0, 'right'))
+    connect('curve4', 'a', 'curve3', 'b')
+
+    return pieces
+  }
+
+  /**
+   * tunnel(5) → straight → curveR×2 → straight×2 → curveR×2 → tunnel.A
+   * という、トンネルを上辺に含むオーバル（代表ループ2）。上下の直線区間は
+   * どちらも10（tunnel5+straight5、またはstraight5×2）で一致する。
+   */
+  function buildTunnelOvalLoop(): RailPiece[] {
+    let pieces: RailPiece[] = [createRailPiece('tunnel', 'tunnel', origin)]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: RailConnectorId,
+      targetId: string,
+      targetConnectorId: RailConnectorId,
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('straight', 'straight1'))
+    connect('straight1', 'a', 'tunnel', 'b')
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'straight1', 'b')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'curve1', 'b')
+    add(createRailPiece('straight', 'straight2'))
+    connect('straight2', 'a', 'curve2', 'b')
+    add(createRailPiece('straight', 'straight3'))
+    connect('straight3', 'a', 'straight2', 'b')
+    add(createRailPiece('curve', 'curve3', origin, 0, 'right'))
+    connect('curve3', 'a', 'straight3', 'b')
+    add(createRailPiece('curve', 'curve4', origin, 0, 'right'))
+    connect('curve4', 'a', 'curve3', 'b')
+
+    return pieces
+  }
+
+  /**
+   * slope(上り10)→bridge(5)→slope(下り、B端で接続=180°反転)を上辺(=25)、
+   * curveR×2で下へ、straight×5(=25)を下辺、curveR×2で先頭(slope1.A)へ
+   * 戻る高低差ループ（代表ループ3）。橋脚・坂の姿勢は接続時に自動で
+   * 解決される（transformを一切渡さない）。最後の継ぎ目
+   * （curve4.b→slope1.a）はまだ接続しない状態で返す。
+   */
+  function buildElevatedOvalLoop(): RailPiece[] {
+    let pieces: RailPiece[] = [createRailPiece('slope', 'slope1', origin)]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: RailConnectorId,
+      targetId: string,
+      targetConnectorId: RailConnectorId,
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('bridge', 'bridge'))
+    connect('bridge', 'a', 'slope1', 'b')
+    // slope2.bをbridge.bへ繋ぐと、slope2は自動で180°回った姿勢になり、
+    // slope2.a側が地上へ戻る出口になる（手動のposition/rotation指定なし）。
+    add(createRailPiece('slope', 'slope2'))
+    connect('slope2', 'b', 'bridge', 'b')
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'slope2', 'a')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'curve1', 'b')
+    for (const id of ['straight1', 'straight2', 'straight3', 'straight4', 'straight5']) {
+      add(createRailPiece('straight', id))
+    }
+    connect('straight1', 'a', 'curve2', 'b')
+    connect('straight2', 'a', 'straight1', 'b')
+    connect('straight3', 'a', 'straight2', 'b')
+    connect('straight4', 'a', 'straight3', 'b')
+    connect('straight5', 'a', 'straight4', 'b')
+    add(createRailPiece('curve', 'curve3', origin, 0, 'right'))
+    connect('curve3', 'a', 'straight5', 'b')
+    add(createRailPiece('curve', 'curve4', origin, 0, 'right'))
+    connect('curve4', 'a', 'curve3', 'b')
+
+    return pieces
+  }
+
+  it('closes a station-inclusive oval exactly, before the final joint is ever connected (representative loop 1)', () => {
+    const beforeClosing = buildStationOvalLoop()
+    const curve4 = beforeClosing.find((piece) => piece.id === 'curve4')!
+    const station = beforeClosing.find((piece) => piece.id === 'station')!
+    const curve4B = worldConnectorForRailPiece(curve4, 'b')
+    const stationA = worldConnectorForRailPiece(station, 'a')
+
+    expect(distanceBetweenRailPoints(curve4B.position, stationA.position)).toBeLessThan(1e-6)
+    expect(Math.abs(curve4B.position.y - stationA.position.y)).toBeLessThan(1e-9)
+    const outwardDot = curve4B.outward.x * stationA.outward.x
+      + curve4B.outward.y * stationA.outward.y
+      + curve4B.outward.z * stationA.outward.z
+    expect(outwardDot).toBeCloseTo(-1, 9)
+
+    const snapCandidate = findRailSnapCandidate(curve4, beforeClosing, 'b')
+    expect(snapCandidate).not.toBeNull()
+    expect(snapCandidate?.targetPieceId).toBe('station')
+    expect(snapCandidate?.targetConnectorId).toBe('a')
+    expect(snapCandidate?.distance).toBeLessThan(1e-6)
+
+    const closed = connectRailPieces(beforeClosing, 'curve4', 'b', 'station', 'a')
+    expect(areRailConnectionsSymmetric(closed)).toBe(true)
+    const component = graphComponent(closed, 'station')
+    expect(component.nodeCount).toBe(9)
+    expect(component.edgeCount).toBe(9)
+  })
+
+  it('closes a tunnel-inclusive oval exactly, before the final joint is ever connected (representative loop 2)', () => {
+    const beforeClosing = buildTunnelOvalLoop()
+    const curve4 = beforeClosing.find((piece) => piece.id === 'curve4')!
+    const tunnel = beforeClosing.find((piece) => piece.id === 'tunnel')!
+    const curve4B = worldConnectorForRailPiece(curve4, 'b')
+    const tunnelA = worldConnectorForRailPiece(tunnel, 'a')
+
+    expect(distanceBetweenRailPoints(curve4B.position, tunnelA.position)).toBeLessThan(1e-6)
+    expect(Math.abs(curve4B.position.y - tunnelA.position.y)).toBeLessThan(1e-9)
+    const outwardDot = curve4B.outward.x * tunnelA.outward.x
+      + curve4B.outward.y * tunnelA.outward.y
+      + curve4B.outward.z * tunnelA.outward.z
+    expect(outwardDot).toBeCloseTo(-1, 9)
+
+    const snapCandidate = findRailSnapCandidate(curve4, beforeClosing, 'b')
+    expect(snapCandidate).not.toBeNull()
+    expect(snapCandidate?.targetPieceId).toBe('tunnel')
+    expect(snapCandidate?.targetConnectorId).toBe('a')
+    expect(snapCandidate?.distance).toBeLessThan(1e-6)
+
+    const closed = connectRailPieces(beforeClosing, 'curve4', 'b', 'tunnel', 'a')
+    expect(areRailConnectionsSymmetric(closed)).toBe(true)
+    const component = graphComponent(closed, 'tunnel')
+    expect(component.nodeCount).toBe(8)
+    expect(component.edgeCount).toBe(8)
+  })
+
+  it('closes an elevated (bridge+slope) oval exactly at ordinary snap thresholds, before the final joint is ever connected (representative loop 3)', () => {
+    const beforeClosing = buildElevatedOvalLoop()
+    const curve4 = beforeClosing.find((piece) => piece.id === 'curve4')!
+    const slope1 = beforeClosing.find((piece) => piece.id === 'slope1')!
+    const curve4B = worldConnectorForRailPiece(curve4, 'b')
+    const slope1A = worldConnectorForRailPiece(slope1, 'a')
+
+    expect(distanceBetweenRailPoints(curve4B.position, slope1A.position)).toBeLessThan(1e-6)
+    expect(Math.abs(curve4B.position.y - slope1A.position.y)).toBeLessThan(1e-9)
+    const outwardDot = curve4B.outward.x * slope1A.outward.x
+      + curve4B.outward.y * slope1A.outward.y
+      + curve4B.outward.z * slope1A.outward.z
+    expect(outwardDot).toBeCloseTo(-1, 9)
+
+    // 通常のsnapしきい値（デフォルト）で候補が見つかる＝ループ閉鎖補助に頼っていない。
+    const snapCandidate = findRailSnapCandidate(curve4, beforeClosing, 'b')
+    expect(snapCandidate).not.toBeNull()
+    expect(snapCandidate?.targetPieceId).toBe('slope1')
+    expect(snapCandidate?.targetConnectorId).toBe('a')
+    expect(snapCandidate?.distance).toBeLessThan(1e-6)
+
+    const closed = connectRailPieces(beforeClosing, 'curve4', 'b', 'slope1', 'a')
+    expect(areRailConnectionsSymmetric(closed)).toBe(true)
+    const component = graphComponent(closed, 'slope1')
+    expect(component.nodeCount).toBe(12)
+    expect(component.edgeCount).toBe(12)
+
+    // 高架区間のworld yが 0→2→2→0 と往復し、地上に戻る。
+    const bridge = closed.find((piece) => piece.id === 'bridge')!
+    const slope2 = closed.find((piece) => piece.id === 'slope2')!
+    expect(worldConnectorForRailPiece(slope1, 'a').position.y).toBeCloseTo(0)
+    expect(worldConnectorForRailPiece(slope1, 'b').position.y).toBeCloseTo(ELEVATED_HEIGHT)
+    expect(worldConnectorForRailPiece(bridge, 'a').position.y).toBeCloseTo(ELEVATED_HEIGHT)
+    expect(worldConnectorForRailPiece(bridge, 'b').position.y).toBeCloseTo(ELEVATED_HEIGHT)
+    expect(worldConnectorForRailPiece(slope2, 'b').position.y).toBeCloseTo(ELEVATED_HEIGHT)
+    expect(worldConnectorForRailPiece(slope2, 'a').position.y).toBeCloseTo(0)
   })
 })
