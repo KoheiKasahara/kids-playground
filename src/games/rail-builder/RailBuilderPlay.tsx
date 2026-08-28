@@ -6,6 +6,7 @@ import {
   rotateRailPiece,
   snapAndConnectRailPiece,
   toggleRailBranch,
+  type RailBranchSide,
   type RailPiece,
   type RailPieceKind,
   type RailVec3,
@@ -102,10 +103,10 @@ function nextPieceId(pieces: readonly RailPiece[]): string {
   return `rail-${index}`
 }
 
-function RailPreview({ kind }: { kind: RailPieceKind }) {
+function RailPreview({ kind, branchSide }: { kind: RailPieceKind; branchSide?: RailBranchSide }) {
   return (
     <span className={styles.icon} aria-hidden="true">
-      <RailPartIcon kind={kind} />
+      <RailPartIcon kind={kind} branchSide={branchSide} />
     </span>
   )
 }
@@ -162,11 +163,14 @@ export default function RailBuilderPlay() {
     soundEnabled,
   })
 
-  const addPiece = useCallback((kind: RailPieceKind) => {
+  const addPiece = useCallback((kind: RailPieceKind, branchSide?: RailBranchSide) => {
     const piece = createRailPiece(
       kind,
       nextPieceId(pieces),
       nextSpawnPosition(pieces, getCameraTarget()),
+      0,
+      'left',
+      branchSide,
     )
     setPieces((current) => [...current, piece])
     setSelection({ kind: 'piece', id: piece.id })
@@ -408,9 +412,23 @@ export default function RailBuilderPlay() {
               <RailPreview kind="curve" />
               <span>カーブ</span>
             </button>
-            <button type="button" className={styles.toolButton} onClick={() => addPiece('branch')} aria-label="ぶんきを ついか">
-              <RailPreview kind="branch" />
-              <span>ぶんき</span>
+            <button
+              type="button"
+              className={styles.toolButton}
+              onClick={() => addPiece('branch', 'right')}
+              aria-label="みぎに わかれる ぶんきを ついか"
+            >
+              <RailPreview kind="branch" branchSide="right" />
+              <span>みぎぶんき</span>
+            </button>
+            <button
+              type="button"
+              className={styles.toolButton}
+              onClick={() => addPiece('branch', 'left')}
+              aria-label="ひだりに わかれる ぶんきを ついか"
+            >
+              <RailPreview kind="branch" branchSide="left" />
+              <span>ひだりぶんき</span>
             </button>
             <button type="button" className={styles.toolButton} onClick={() => addPiece('short-straight')} aria-label="みじかい せんろを ついか">
               <RailPreview kind="short-straight" />

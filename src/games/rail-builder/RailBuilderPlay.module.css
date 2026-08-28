@@ -310,8 +310,10 @@
   gap: 3px;
   min-height: 74px;
   min-width: 90px;
-  flex: 0 0 90px;
-  padding: 6px 4px 5px;
+  /* ラベルが長いパーツ(みぎぶんき/ひだりぶんき)でも文字がはみ出さないよう、
+     90pxを下限に内容ぶんだけ広がれるようにする。並びは横スクロールのまま。 */
+  flex: 0 0 auto;
+  padding: 6px 8px 5px;
   font-size: clamp(11px, 3vw, 14px);
   line-height: 1.05;
   white-space: nowrap;
