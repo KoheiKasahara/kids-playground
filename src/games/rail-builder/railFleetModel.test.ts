@@ -53,9 +53,9 @@ function runningTrain(train: RailFleetTrain, pieceId: string, distance: number):
 describe('railFleetModel', () => {
   it('creates two independent trains, pauses one, and caps additions at three', () => {
     const pieces = [
-      createRailPiece('straight', 'rail-1'),
-      createRailPiece('straight', 'rail-2'),
-      createRailPiece('straight', 'rail-3'),
+      createRailPiece('station', 'rail-1'),
+      createRailPiece('station', 'rail-2'),
+      createRailPiece('station', 'rail-3'),
     ]
     let fleet = createInitialRailFleet(pieces, 2)
     expect(fleet).toHaveLength(2)
@@ -125,7 +125,7 @@ describe('railFleetModel', () => {
     expect(blocked[1]?.blocked).toBe(false)
 
     const opened = blocked.map((train, index) => index === 1
-      ? runningTrain(train, 'p2', 3)
+      ? runningTrain(train, 'p3', 3)
       : train)
     const resumed = updateRailFleet(opened, loop, 0.2)
     expect(resumed[0]?.blocked).toBe(false)

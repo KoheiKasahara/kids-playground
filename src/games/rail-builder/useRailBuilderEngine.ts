@@ -52,9 +52,12 @@ import {
 import {
   E5_FRONT_WINDSHIELD_SECTIONS,
   E5_LEAD_SHELL_SECTIONS,
+  getTrainCarVisualYaw,
   getTrainCarVisualProfile,
+  getTrainFormationRoles,
   getE5LeadShellAccentBand,
   resolveTrainVisualProfile,
+  type TrainCarRole,
   type TrainCarVisualProfile,
   type TrainShellSection,
   type TrainVisualProfile,
@@ -1542,29 +1545,37 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     function makeSpecialTrainCar(
       runtime: TrainVisualRuntime,
       trainId: string,
-      index: number,
+      role: TrainCarRole,
       definition: SpecialTrainVisualDefinition,
     ): THREE.Group {
-      const isLead = index === 0
-      const profile = getTrainCarVisualProfile(runtime.trainType, isLead ? 'lead' : 'middle')
-      const group = new THREE.Group()
-      group.name = isLead ? `${trainId}-lead-car` : `${trainId}-car-${index + 1}`
-      group.userData.trainId = trainId
+      const usesLeadVisual = role !== 'middle'
+      const profile = getTrainCarVisualProfile(runtime.trainType, role)
+      // poseGroupはPathのposition/quaternionだけを受け持つ。rearの反転は
+      // contentGroup内だけで行い、法線・カリング・走行方向へ影響させない。
+      const poseGroup = new THREE.Group()
+      poseGroup.name = `${trainId}-${role}-car`
+      poseGroup.userData.trainId = trainId
+      poseGroup.userData.formationRole = role
+      const contentGroup = new THREE.Group()
+      contentGroup.name = `${trainId}-${role}-visual`
+      contentGroup.rotation.y = getTrainCarVisualYaw(role)
+      contentGroup.userData.formationRole = role
+      poseGroup.add(contentGroup)
 
-      const bodyGeometry = isLead ? definition.leadBodyGeometry : definition.middleBodyGeometry
-      const roofGeometry = isLead ? definition.leadRoofGeometry : definition.middleRoofGeometry
-      const bodyMaterial: THREE.Material | THREE.Material[] = isLead && definition.integratedLeadShell
+      const bodyGeometry = usesLeadVisual ? definition.leadBodyGeometry : definition.middleBodyGeometry
+      const roofGeometry = usesLeadVisual ? definition.leadRoofGeometry : definition.middleRoofGeometry
+      const bodyMaterial: THREE.Material | THREE.Material[] = usesLeadVisual && definition.integratedLeadShell
         ? [runtime.frontMaterial, runtime.bodyMaterial]
         : runtime.bodyMaterial
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
-      if (!isLead || !definition.integratedLeadShell) {
+      if (!usesLeadVisual || !definition.integratedLeadShell) {
         body.position.set(profile.bodyCenterX, profile.bodyCenterY, 0)
       }
       body.castShadow = true
       body.receiveShadow = true
-      group.add(body)
+      contentGroup.add(body)
 
-      if (isLead && !definition.integratedLeadShell && definition.noseGeometry !== undefined) {
+      if (usesLeadVisual && !definition.integratedLeadShell && definition.noseGeometry !== undefined) {
         // ノーズ形状の座標はgeometry内へ焼き込み済み。ここではoffsetを加えず、
         // 先頭車だけへ一つの共有nose meshを追加する。
         const noseMaterial: THREE.Material | THREE.Material[] = definition.splitNoseColor
@@ -1573,45 +1584,45 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         const nose = new THREE.Mesh(definition.noseGeometry, noseMaterial)
         nose.castShadow = true
         nose.receiveShadow = true
-        group.add(nose)
+        contentGroup.add(nose)
       }
 
       const skirt = new THREE.Mesh(trainSkirtGeometry, trainCouplerMaterial)
       skirt.position.set(profile.bodyCenterX, 0.43, 0)
       skirt.scale.x = profile.bodyLength / 1.7
-      group.add(skirt)
+      contentGroup.add(skirt)
 
-      if (!isLead || !definition.integratedLeadShell) {
+      if (!usesLeadVisual || !definition.integratedLeadShell) {
         const roof = new THREE.Mesh(roofGeometry, runtime.roofMaterial)
         roof.position.set(profile.roofCenterX, profile.roofCenterY, 0)
         roof.castShadow = true
-        group.add(roof)
+        contentGroup.add(roof)
       }
 
       if (definition.underfloorGeometry !== undefined && definition.bogieGeometry !== undefined) {
         const underfloor = new THREE.Mesh(definition.underfloorGeometry, trainCouplerMaterial)
         underfloor.position.set(profile.bodyCenterX, 0.4, 0)
-        group.add(underfloor)
+        contentGroup.add(underfloor)
         for (const x of [-0.63, 0.63]) {
           const bogie = new THREE.Mesh(definition.bogieGeometry, trainCouplerMaterial)
           bogie.position.set(profile.bodyCenterX + x, 0.31, 0)
-          group.add(bogie)
+          contentGroup.add(bogie)
         }
       }
 
       const accentMaterial = runtime.accentMaterial
       if (accentMaterial !== null && profile.accentLength > 0) {
-        if (isLead && definition.integratedLeadShell && definition.leadAccentGeometry !== undefined) {
+        if (usesLeadVisual && definition.integratedLeadShell && definition.leadAccentGeometry !== undefined) {
           // The integrated E5 shell narrows toward the tip, so the belt follows
           // each shell section instead of floating at the cabin width.
           const accent = new THREE.Mesh(definition.leadAccentGeometry, accentMaterial)
-          group.add(accent)
+          contentGroup.add(accent)
         } else {
           for (const side of [-1, 1]) {
             const accent = new THREE.Mesh(definition.accentGeometry, accentMaterial)
             accent.position.set(profile.bodyCenterX, profile.accentY, side * (profile.bodyWidth / 2 + 0.012))
             accent.scale.x = profile.accentLength
-            group.add(accent)
+            contentGroup.add(accent)
           }
         }
       }
@@ -1619,19 +1630,19 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       for (const side of [-1, 1]) {
         for (const x of profile.sideWindowXs) {
           const window = new THREE.Mesh(definition.sideWindowGeometry, runtime.windowMaterial)
-          const sideOffset = isLead && definition.integratedLeadShell ? 0.008 : 0.014
+          const sideOffset = usesLeadVisual && definition.integratedLeadShell ? 0.008 : 0.014
           window.position.set(x, profile.sideWindowY, side * (profile.bodyWidth / 2 + sideOffset))
-          group.add(window)
+          contentGroup.add(window)
         }
         const doorX = runtime.trainType === 'e5'
           ? profile.bodyCenterX - profile.bodyLength * 0.34
           : profile.bodyCenterX - 0.4
         const doorFrame = new THREE.Mesh(trainDoorFrameGeometry, trainCouplerMaterial)
         doorFrame.position.set(doorX, 0.72, side * (profile.bodyWidth / 2 + 0.02))
-        group.add(doorFrame)
+        contentGroup.add(doorFrame)
         const door = new THREE.Mesh(trainDoorGeometry, trainDoorMaterial)
         door.position.set(doorX, 0.72, side * (profile.bodyWidth / 2 + 0.03))
-        group.add(door)
+        contentGroup.add(door)
       }
 
       if (profile.hasFrontWindow) {
@@ -1646,18 +1657,18 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
               profile.frontWindowY,
               side * (profile.bodyWidth / 2 + (definition.integratedLeadShell ? 0.008 : 0.014)),
             )
-            group.add(cockpitWindow)
+            contentGroup.add(cockpitWindow)
           }
         } else if (definition.integratedLeadShell) {
           // The E5 windshield geometry is already expressed in the integrated
           // shell's local coordinates and follows its roof-to-nose slope.
           const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
-          group.add(cockpitWindow)
+          contentGroup.add(cockpitWindow)
         } else {
           // ノーズの先端ではなく、肩の根元寄りに置く運転台窓。
           const cockpitWindow = new THREE.Mesh(definition.cockpitWindowGeometry, runtime.windowMaterial)
           cockpitWindow.position.set(profile.frontWindowX, profile.frontWindowY, 0)
-          group.add(cockpitWindow)
+          contentGroup.add(cockpitWindow)
         }
       }
 
@@ -1665,15 +1676,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         for (const side of [-1, 1]) {
           const headlight = new THREE.Mesh(trainLightGeometry, trainLightMaterial)
           headlight.position.set(profile.headlightX, profile.headlightY, side * profile.headlightZ)
-          group.add(headlight)
+          contentGroup.add(headlight)
         }
       }
 
-      if (isLead && definition.roofFeatureGeometry !== undefined && runtime.roofFeatureMaterial !== null) {
+      if (usesLeadVisual && definition.roofFeatureGeometry !== undefined && runtime.roofFeatureMaterial !== null) {
         // 検測箱は低く一個だけ。車体の上端制約を越えない位置に置く。
         const feature = new THREE.Mesh(definition.roofFeatureGeometry, runtime.roofFeatureMaterial)
         feature.position.set(profile.roofCenterX - 0.1, profile.roofCenterY + profile.roofHeight / 2 + 0.05, 0)
-        group.add(feature)
+        contentGroup.add(feature)
       }
 
       const wheelPivots: THREE.Object3D[] = []
@@ -1687,7 +1698,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           const wheel = new THREE.Mesh(wheelGeometry, trainWheelMaterial)
           wheel.rotation.x = Math.PI / 2
           pivot.add(wheel)
-          group.add(pivot)
+          contentGroup.add(pivot)
           wheelPivots.push(pivot)
         }
       }
@@ -1695,27 +1706,32 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       for (const x of profile.couplerPositions) {
         const coupler = new THREE.Mesh(trainCouplerGeometry, trainCouplerMaterial)
         coupler.position.set(x, 0.62, 0)
-        group.add(coupler)
-        if (definition.gangwayGeometry !== undefined && (!isLead || x < 0)) {
+        contentGroup.add(coupler)
+        if (definition.gangwayGeometry !== undefined && (role === 'middle' || x < 0)) {
           const gangway = new THREE.Mesh(definition.gangwayGeometry, trainCouplerMaterial)
           // Adjacent cars each own half of the bellows. Pull each half toward
           // its car so the two meshes meet instead of occupying the same plane.
           gangway.position.set(x - Math.sign(x) * 0.08, 0.63, 0)
-          group.add(gangway)
+          contentGroup.add(gangway)
         }
       }
-      runtime.root.add(group)
-      runtime.cars.push(group)
+      runtime.root.add(poseGroup)
+      runtime.cars.push(poseGroup)
       runtime.wheelPivots.push(wheelPivots)
-      return group
+      return poseGroup
     }
 
-    function makeTrainCar(runtime: TrainVisualRuntime, trainId: string, index: number): THREE.Group {
+    function makeTrainCar(
+      runtime: TrainVisualRuntime,
+      trainId: string,
+      index: number,
+      role: TrainCarRole,
+    ): THREE.Group {
       if (runtime.trainType === 'basic') return makeBasicTrainCar(runtime, trainId, index)
       const definition = specialTrainVisualDefinitions.get(runtime.trainType)
       return definition === undefined
         ? makeBasicTrainCar(runtime, trainId, index)
-        : makeSpecialTrainCar(runtime, trainId, index, definition)
+        : makeSpecialTrainCar(runtime, trainId, role, definition)
     }
 
     function createTrainVisualRuntime(train: RailFleetTrain): TrainVisualRuntime {
@@ -1746,7 +1762,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }
       runtime.root.name = train.id
       runtime.root.userData.trainId = train.id
-      for (let index = 0; index < 2; index += 1) makeTrainCar(runtime, train.id, index)
+      for (const [index, role] of getTrainFormationRoles(train.trainType).entries()) {
+        makeTrainCar(runtime, train.id, index, role)
+      }
       trainRoot.add(runtime.root)
       return runtime
     }

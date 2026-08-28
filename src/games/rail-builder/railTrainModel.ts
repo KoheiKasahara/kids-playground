@@ -17,7 +17,9 @@ export const TRAIN_DECELERATION = 3.8
 export const TRAIN_END_STOP_MARGIN = 1.45
 // 車体(約2.15)とカプラーが重ならない、スマホでも見分けやすい間隔。
 export const TRAIN_CAR_SPACING = 2.5
-export const TRAIN_CAR_COUNT = 2
+// 車種ごとの表示両数ではなく、配置・占有判定・列車間隔で予約する最大編成両数。
+// 現在はE5の「先頭 + 中間 + 最後尾」に合わせ、2両車種にも安全側で適用する。
+export const TRAIN_CAR_COUNT = 3
 
 // 名前から意味が分かりやすい別名も公開しておく。
 export const MAX_TRAIN_SPEED = TRAIN_MAX_SPEED

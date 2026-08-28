@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  TRAIN_CAR_COUNT,
   TRAIN_CAR_SPACING,
   TRAIN_END_STOP_MARGIN,
   TRAIN_STATION_STOP_DURATION,
@@ -301,7 +302,7 @@ describe('railTrainModel', () => {
     expect(moved.cursor.distance).toBeGreaterThan(waiting.cursor.distance)
   })
 
-  it('retreats followers across a connection and curves', () => {
+  it('samples the reserved three-car formation across a connection and curve', () => {
     const first = createRailPiece('straight', 'first')
     const second = createRailPiece('curve', 'second', { x: 5.8, y: 0, z: 0 })
     const connected = connectRailPieces([first, second], 'second', 'a', 'first', 'b')
@@ -310,10 +311,14 @@ describe('railTrainModel', () => {
       direction: 'a-to-b',
       distance: 1,
     })
-    expect(poses).toHaveLength(2)
+    expect(TRAIN_CAR_COUNT).toBe(3)
+    expect(poses).toHaveLength(TRAIN_CAR_COUNT)
     expect(poses[0]?.cursor.pieceId).toBe(second.id)
     expect(poses[1]?.cursor.pieceId).toBe(first.id)
     expect(poses[1]?.cursor.distance).toBeCloseTo(railPathLength(first.path) - (TRAIN_CAR_SPACING - 1), 5)
+    expect(poses[2]?.cursor.pieceId).toBe(first.id)
+    expect(poses[2]?.cursor.distance).toBeCloseTo(railPathLength(first.path) - (TRAIN_CAR_SPACING * 2 - 1), 5)
+    expect(poses[0]?.forward).not.toEqual(poses[1]?.forward)
   })
 
   it('treats a closed oriented topology as a loop and malformed links safely', () => {
