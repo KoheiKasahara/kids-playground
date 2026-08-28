@@ -73,6 +73,7 @@ https://kids.kasapg.com/
 - リポジトリ側の設定として、**Settings → Pages → Source を「GitHub Actions」に設定する**必要があります（この設定がないとデプロイが反映されません）。
 - ルーティングには `BrowserRouter` を採用しています。各ゲームは `https://kids.kasapg.com/games/<game-id>` という固有のパスURLを持ち、検索エンジンにインデックスされます。GitHub Pagesは静的ホスティングでサーバー側ルーティングを持たないため、ビルド時（`src/build/staticRoutePages.ts`）にゲームごとの静的HTMLファイル（`games/<slug>/index.html` と `games/<slug>.html`）と、それより深い階層のURL向けのSPAフォールバックとして `404.html` を生成しています。これにより `/games/flag-quiz` の直接アクセスやリロードは実体のHTMLとして200で返り、`/games/flag-quiz/flag-to-name/hard/play` のような深いURLは `404.html`（中身は `index.html` と同じ）が返ってクライアント側ルーティングで正しい画面を描画します。オンライン中のページ遷移はService Workerの `navigateFallback` が引き続きカバーします。旧`HashRouter`時代のブックマーク（`#/games/flag-quiz` のような形）は `src/app/legacyHashRedirect.ts` により新しいパスURLへ自動的に書き換えられます。
 - ページごとのSEOメタ情報（title・description・canonical・OGP・Twitterカード）は `src/games/gameCatalog.ts` の各ゲームエントリーが持つ `seo`（`headline`/`description`）を単一情報源としています。`seo` は必須項目のため、新しいゲームを `GAME_CATALOG` に追加するときに書き忘れると型エラーになります。SPA遷移中は `src/seo/SeoManager.tsx` が `useLocation()` の変化を検知して `document` のメタタグを更新し、ビルド時は `src/build/staticRoutePages.ts` が同じ文言をゲームごとの静的HTMLへ焼き込みます（`/games/<slug>` 配下のサブURLはすべて、そのゲームのルートURLへcanonicalが正規化されます）。URLの組み立ては `src/seo/siteMeta.ts` の `absoluteUrl` に集約しています。
+- `sitemap.xml` は `src/build/sitemap.ts` がビルド時に `GAME_CATALOG` と `buildGameSeo` のcanonicalから生成し、`dist/sitemap.xml` として出力します。canonicalと同じ関数からURLを取るため両者は必ず一致し、ゲーム追加時の更新漏れも起きません。実際の更新日を継続的に保守できないため `lastmod` は出力していません。`public/robots.txt` は `https://kids.kasapg.com/sitemap.xml` を案内しつつ、`Disallow` は置かずすべての公開ページのクロールを許可しています。
 
 ## PWA
 
@@ -95,7 +96,8 @@ src/
 │  ├─ routes.tsx            # ルート定義
 │  └─ legacyHashRedirect.ts # 旧HashRouter URL（#/games/...）をパスURLへ書き換える互換処理
 ├─ build/
-│  └─ staticRoutePages.ts   # ビルド時にゲームごとの静的HTMLと404.htmlを生成するViteプラグイン
+│  ├─ staticRoutePages.ts   # ビルド時にゲームごとの静的HTMLと404.htmlを生成するViteプラグイン
+│  └─ sitemap.ts            # ビルド時にpageSeo由来のURLからsitemap.xmlを生成するViteプラグイン
 ├─ seo/
 │  ├─ siteMeta.ts           # SITE_ORIGIN/SITE_NAMEとURL組み立て(absoluteUrl)の単一情報源
 │  ├─ pageSeo.ts             # pathnameからPageSeo(title/description/canonicalなど)を解決する純粋関数

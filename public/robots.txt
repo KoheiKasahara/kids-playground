@@ -1,4 +1,8 @@
+# https://kids.kasapg.com/robots.txt
+# 公開ページはすべてクロールを許可する。SPA/PWAの描画にはJS/CSS/画像の取得が必須のため、
+# Disallow は一切置かない（ブロックするとレンダリング結果を正しく評価してもらえない）。
 User-agent: *
 Allow: /
 
+# sitemap.xml はビルド時に src/build/sitemap.ts が生成する（gameCatalogが単一情報源）。
 Sitemap: https://kids.kasapg.com/sitemap.xml

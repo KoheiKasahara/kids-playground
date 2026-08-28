@@ -3,8 +3,22 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../app/App'
+import { GAME_CATALOG, gameRoutePath } from '../games/gameCatalog'
 
 describe('Home', () => {
+  // JSのonClickだけに依存させず、クローラが辿れる通常リンクであることを守るための監査テスト。
+  test('全ゲームカードが<a href="/games/<slug>">の通常リンクとして出力される', () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    )
+    for (const game of GAME_CATALOG) {
+      const link = screen.getByRole('link', { name: game.title })
+      expect(link.getAttribute('href')).toBe(gameRoutePath(game.slug))
+    }
+  })
+
   test('ゲーム一覧に現在の17ゲームすべてが表示される', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
