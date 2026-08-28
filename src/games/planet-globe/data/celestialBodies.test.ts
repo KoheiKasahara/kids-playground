@@ -357,10 +357,14 @@ describe('sun(Phase 4)', () => {
     expect(sunspots.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('恒星らしい発光の縁(halo)を持ち、過剰な後処理に頼らない', () => {
-    expect(sun.visual?.halo).toEqual(expect.objectContaining({ color: expect.any(String) }))
-    expect(sun.visual?.halo?.opacity).toBeGreaterThan(0)
-    expect(sun.visual?.halo?.scale).toBeGreaterThan(2)
+  it('外側のhalo/atmosphereを持たず、表面の発光と粒状模様を使う', () => {
+    expect(sun.visual).toBeUndefined()
+    expect(sun.visual?.atmosphere).toBeUndefined()
+    expect(sun.material.emissive).toBeDefined()
+    if (sun.surface.style !== 'gas') throw new Error('unreachable')
+    expect(sun.surface.turbulence).toBeDefined()
+    expect(sun.surface.mottle).toBeDefined()
+    expect(sun.surface.spots.length).toBeGreaterThanOrEqual(2)
   })
 })
 

@@ -6,17 +6,19 @@ import * as THREE from 'three'
  * 他の天体はすべて`MeshStandardMaterial`(光源に照らされる通常の天体)だが、恒星は
  * 「自分で光っていて、影になる面がない」見た目のほうが太陽らしい。そこで太陽の球面だけ
  * 光源に依存しないShaderMaterialへ差し替え、既存の表面テクスチャ(帯+黒点)の上へ
- * 低コストな流れるノイズとFresnel状の縁発光を重ねる。
+ * 低コストな流れるノイズ、細かな粒状感、Fresnel状の縁発光を重ねる。
  *
- * ノイズはfbmではなく1回のvalue noiseを2つの速度でずらし合成するだけ(uTimeで動かす)。
- * オクターブを増やさず、Canvas側の黒点・帯模様(`celestialBodies.ts`のsurface)は
- * そのまま活かすことで、シェーダーの計算量を抑えたまま「表面が流れて動く」印象を作る。
+ * ノイズはfbmではなく、速度の異なる大きめの流れ2つと細かな粒状信号1つだけを
+ * value noiseで合成する(uTimeで動かす)。Canvas側の黒点・帯模様
+ * (`celestialBodies.ts`のsurface)はそのまま活かし、シェーダーの計算量を抑えたまま
+ * 「表面が流れて動く」印象を作る。
  */
 
-/** 対流の谷(暗い赤橙)と山(明るい黄白)。天体データではなくここに固定する
+/** 対流の谷(明るい橙)と山(明るい黄白)。天体データではなくここに固定する
  *  (恒星は太陽1つしかなく、他天体へ流用する予定もないため)。 */
-const SUN_COOL_COLOR = '#c1440e'
+const SUN_COOL_COLOR = '#ef8b28'
 const SUN_HOT_COLOR_FALLBACK = '#fff3c4'
+const SUN_RIM_COLOR_FALLBACK = '#ffb347'
 
 const SUN_VERTEX_SHADER = `
 varying vec2 vUv;
@@ -74,12 +76,23 @@ void main() {
   vec3 flowColor = mix(uCoolColor, uHotColor, t);
   vec3 color = mix(base, flowColor, uFlowStrength);
 
+  // 3つ目のvalue noiseは細かな粒状信号だけに使い、表面へ軽いセル感を足す。
+  // 明るい側へ少しだけ寄せることで、暗い赤いランダムノイズにはしない。
+  vec2 granulationUv = vUv * vec2(48.0, 28.0) + vec2(uTime * 0.026, -uTime * 0.015);
+  float granulation = valueNoise(granulationUv);
+  float fineCells = smoothstep(0.36, 0.82, granulation);
+  color = mix(color, uHotColor, fineCells * 0.08);
+
+  // 大きな流れと細粒の重なりをしきい値にし、いくつかの自然な明るい領域を作る。
+  float brightRegions = smoothstep(0.68, 0.84, flow) * smoothstep(0.46, 0.74, granulation);
+  color = mix(color, uHotColor, brightRegions * 0.12);
+
   // ゆっくりした全体の明滅("呼吸")。点滅ではなく緩やかな正弦波1つだけ。
   color *= 1.0 + 0.06 * sin(uTime * 0.6);
 
-  // Fresnel状の縁発光。光源を使わず法線と視線方向だけで求まるため追加の光源コストがない。
+  // Fresnel状の縁発光。球の内側だけへ控えめに加え、外側の霧には見せない。
   float fresnel = pow(1.0 - clamp(dot(normalize(vNormal), normalize(vViewDir)), 0.0, 1.0), 2.0);
-  color += uRimColor * fresnel * 0.85;
+  color += uRimColor * fresnel * 0.28;
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>
@@ -106,7 +119,7 @@ export function createSunSurfaceMaterial(params: SunSurfaceMaterialParams): THRE
       uCoolColor: { value: new THREE.Color(SUN_COOL_COLOR) },
       uHotColor: { value: new THREE.Color(params.hotColor || SUN_HOT_COLOR_FALLBACK) },
       uFlowStrength: { value: params.flowStrength },
-      uRimColor: { value: new THREE.Color(params.rimColor) },
+      uRimColor: { value: new THREE.Color(params.rimColor || SUN_RIM_COLOR_FALLBACK) },
     },
   })
 }
@@ -114,68 +127,4 @@ export function createSunSurfaceMaterial(params: SunSurfaceMaterialParams): THRE
 /** uTimeを進める。reduced-motionのときは呼び出し側がそもそも呼ばず、初期値0の静止した1コマのままにする。 */
 export function updateSunSurfaceMaterial(material: THREE.ShaderMaterial, elapsedSeconds: number): void {
   material.uniforms.uTime.value = elapsedSeconds
-}
-
-// ---------------------------------------------------------------------------
-// プロミネンス風の小さなフレア(Sprite)。パーティクルではなく固定数(既定3枚)の
-// 静的テクスチャを、ゆっくり不透明度・大きさが呼吸するように揺らすだけ。
-// ---------------------------------------------------------------------------
-
-export type SunFlareSpec = {
-  lonDeg: number
-  latDeg: number
-  /** 呼吸の位相(ラジアン)。フレアごとにずらして同時に脈動しないようにする。 */
-  phase: number
-}
-
-/** 黒点(sunspot-a/b)と重ならない位置に散らした既定のフレア配置。 */
-export const DEFAULT_SUN_FLARES: readonly SunFlareSpec[] = [
-  { lonDeg: 150, latDeg: -30, phase: 0 },
-  { lonDeg: -115, latDeg: 38, phase: 2.05 },
-  { lonDeg: 95, latDeg: -55, phase: 4.1 },
-]
-
-const FLARE_TEXTURE_SIZE = 96
-
-/** jsdomのように2Dコンテキストを持たない環境でも、例外にせずテクスチャ生成を続ける。 */
-function get2dContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
-  try {
-    return canvas.getContext('2d')
-  } catch {
-    return null
-  }
-}
-
-/** 縦に伸びた雫状の加算発光テクスチャ。プロミネンスらしい「舌」のシルエットにする。 */
-export function createFlareTexture(color: string): THREE.CanvasTexture | null {
-  const canvas = document.createElement('canvas')
-  canvas.width = FLARE_TEXTURE_SIZE
-  canvas.height = FLARE_TEXTURE_SIZE
-  const ctx = get2dContext(canvas)
-  if (ctx === null) return null
-
-  const rgb = new THREE.Color(color)
-  const r = Math.round(rgb.r * 255)
-  const g = Math.round(rgb.g * 255)
-  const b = Math.round(rgb.b * 255)
-  const cx = FLARE_TEXTURE_SIZE / 2
-  const cy = FLARE_TEXTURE_SIZE * 0.6
-
-  ctx.save()
-  ctx.translate(cx, cy)
-  ctx.scale(0.55, 1)
-  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, FLARE_TEXTURE_SIZE * 0.5)
-  gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.85)`)
-  gradient.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, 0.4)`)
-  gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`)
-  ctx.fillStyle = gradient
-  ctx.beginPath()
-  ctx.arc(0, 0, FLARE_TEXTURE_SIZE * 0.5, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.needsUpdate = true
-  return texture
 }

@@ -197,8 +197,6 @@ export type AtmosphereSpec = {
 }
 
 export type BodyVisualSpec = {
-  /** 太陽の周囲へ、発光がなだらかに薄れる1枚のスプライトを重ねる。 */
-  halo?: { color: string; opacity: number; scale: number }
   atmosphere?: AtmosphereSpec
   clouds?: CloudLayerSpec
 }

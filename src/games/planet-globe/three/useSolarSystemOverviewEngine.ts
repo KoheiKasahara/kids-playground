@@ -20,7 +20,6 @@ import {
 } from './spotPicking'
 import {
   boostThinRingForOverview,
-  createOverviewHaloTexture,
   createOverviewLabelTexture,
   createOverviewSurfaceTexture,
 } from './overviewVisual'
@@ -247,35 +246,13 @@ export function useSolarSystemOverviewEngine(
     function buildSun(body: CelestialBody, sceneRoot: THREE.Group) {
       const overviewRadius = body.radius * OVERVIEW_RADIUS_SCALE
 
-      // mesh自体はoverviewRadiusぶんscaleするため、halo・ラベルはscaleが1のsunRootへ
-      // 付ける(meshの子にすると、halo/ラベルのscaleがoverviewRadius倍され巨大になる)。
+      // mesh自体はoverviewRadiusぶんscaleするため、ラベルはscaleが1のsunRootへ
+      // 付ける(meshの子にすると、ラベルのscaleがoverviewRadius倍され巨大になる)。
       const sunRoot = new THREE.Group()
       sceneRoot.add(sunRoot)
 
       const mesh = createBodyMesh(body, overviewRadius)
       sunRoot.add(mesh)
-
-      const halo = body.visual?.halo
-      if (halo !== undefined) {
-        const haloTexture = createOverviewHaloTexture(halo.color)
-        if (haloTexture !== null) {
-          disposableTextures.push(haloTexture)
-          const haloMaterial = new THREE.SpriteMaterial({
-            map: haloTexture,
-            color: halo.color,
-            transparent: true,
-            opacity: halo.opacity,
-            depthWrite: false,
-            depthTest: false,
-          })
-          disposableMaterials.push(haloMaterial)
-          const haloSprite = new THREE.Sprite(haloMaterial)
-          const haloDiameter = overviewRadius * halo.scale
-          haloSprite.scale.set(haloDiameter, haloDiameter, 1)
-          haloSprite.renderOrder = -1
-          sunRoot.add(haloSprite)
-        }
-      }
 
       const label = buildLabel(body.displayName, overviewRadius)
       if (label !== null) sunRoot.add(label)
