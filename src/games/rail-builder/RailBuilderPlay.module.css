@@ -457,35 +457,6 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-@media (orientation: landscape) and (max-height: 560px) {
-  .header {
-    width: min(100%, 520px);
-  }
-
-  .title {
-    font-size: 22px;
-  }
-
-  .tray {
-    padding-top: 5px;
-  }
-
-  .toolButton {
-    flex-direction: row;
-    gap: 5px;
-    min-height: 52px;
-  }
-
-  .icon {
-    width: 30px;
-    height: 26px;
-  }
-
-  .trayHint {
-    display: none;
-  }
-}
-
 @media (min-width: 760px) {
   .header {
     width: min(100%, 680px);
@@ -495,6 +466,161 @@
     margin-right: 0;
     margin-left: 0;
     border-radius: 20px;
+  }
+}
+
+/* この横画面ブロックは (min-width: 760px) と同時にマッチしうる(例: 844x390のスマホ横)。
+   同一詳細度では後勝ちなので、横画面専用指定(.headerの幅100%化や.trayのマージン0化)が
+   確実に効くよう、このブロックは必ず (min-width: 760px) より後ろに置くこと。
+   縦画面 390x844 は (min-width: 760px) にマッチしないため、この並び順の影響を受けない。 */
+@media (orientation: landscape) and (max-height: 560px) {
+  /* L2: もどる/音/−/🚃n/＋/▶ の操作セルを48pxに統一する(幼児のタップ領域の下限)。
+     縦画面の56pxはこのブロックの外側なので変わらない。 */
+  .page {
+    --rb-cell: 48px;
+  }
+
+  /* L1: headerRowをdisplay:contentsで消し、backButton/title/trainControls/soundButtonを
+     .headerの直接の子にしてorderで並べ替える。縦2段(headerRow+trainControls)だったヘッダを
+     横1段にまとめ、3D表示に使える縦方向の余白を確保するのが最大の狙い。 */
+  .header {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    margin: 0;
+  }
+
+  .headerRow {
+    display: contents;
+  }
+
+  .backButton {
+    order: 1;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .title {
+    order: 2;
+    font-size: clamp(15px, 3.2vw, 20px);
+  }
+
+  .trainControls {
+    /* L3: 電車操作ピルはヘッダ1段の右寄りに収まるコンパクトなピルに縮める。
+       半透明背景は残すので視認性は保ちつつ、3Dシーンへの重なりを避ける。
+       padding/border-widthも締めて、48pxの操作セル込みでもヘッダ全体の実高を
+       抑える(タップ領域48pxそのものは変えない)。 */
+    order: 3;
+    margin: 0;
+    padding: 2px;
+    border-width: 1px;
+    border-radius: 15px;
+    gap: 4px;
+  }
+
+  .trainCountGroup {
+    gap: 4px;
+    padding: 2px;
+  }
+
+  .trainCountLabel {
+    font-size: 16px;
+  }
+
+  .bulkRunButton {
+    font-size: 21px;
+  }
+
+  .trainCountButton {
+    font-size: 18px;
+  }
+
+  .soundButton {
+    order: 4;
+    font-size: 17px;
+  }
+
+  /* L4: overlayの余白を圧縮する。下パディングは0にしてtrayを画面下端まで寄せ、
+     safe-bottomの吸収はtray側(padding-bottom: max(safe-bottom, 2px))に任せる。 */
+  .overlay {
+    gap: 4px;
+    padding: max(4px, var(--safe-top)) calc(var(--space-xs) + var(--safe-right)) 0 calc(var(--space-xs) + var(--safe-left));
+  }
+
+  /* L5: ズームUIはヘッダ1段化で空いた右端の縦中央に寄せる。 */
+  .zoomControls {
+    top: 50%;
+    right: 0;
+    gap: 6px;
+    transform: translateY(-50%);
+  }
+
+  .iconButton {
+    width: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    font-size: 26px;
+  }
+
+  /* L6: 下部パーツパレットを薄型化する。横スクロール(overflow-x/touch-action)は
+     .trayTools側の宣言(ブロック外)をそのまま使うため、ここでは打ち消さない。
+     パーツは10種すべて残し、タップ領域は48px未満にしない。
+     margin-right/bottom/leftは.overlayのpadding-bottom: 0に合わせて明示し直す。
+     ブロック外側の負マージンはpadding-bottom: var(--space-sm)+safe-bottomを
+     打ち消す値のままなので、ここで上書きしないとtrayが画面外にはみ出す。 */
+  .tray {
+    margin-right: calc(-1 * (var(--space-xs) + var(--safe-right)));
+    margin-bottom: 0;
+    margin-left: calc(-1 * (var(--space-xs) + var(--safe-left)));
+    padding-top: 3px;
+    padding-bottom: max(var(--safe-bottom), 2px);
+    border-radius: 16px 16px 0 0;
+  }
+
+  .trayTools {
+    gap: 5px;
+    padding-bottom: 0;
+  }
+
+  .toolButton {
+    flex-direction: row;
+    gap: 5px;
+    min-height: 48px;
+    min-width: 78px;
+    padding: 3px 8px;
+    font-size: clamp(11px, 2.4vw, 13px);
+  }
+
+  .icon {
+    width: 28px;
+    height: 24px;
+  }
+
+  .trayHint {
+    display: none;
+  }
+
+  /* L7: 選択時の操作パネルも同様に薄型化する。 */
+  .contextPanel {
+    bottom: 4px;
+    gap: 5px;
+    padding: 4px;
+  }
+
+  .rotateActionButton,
+  .branchActionButton,
+  .deleteActionButton,
+  .trainActionButton,
+  .trainDesignButton {
+    min-height: 48px;
+    min-width: 48px;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+
+  .actionIcon {
+    font-size: 20px;
   }
 }
 
