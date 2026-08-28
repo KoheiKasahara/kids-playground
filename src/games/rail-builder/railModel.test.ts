@@ -36,10 +36,16 @@ import {
   toggleRailBranch,
   worldConnectorForRailPiece,
   worldRailPieceVisualCenter,
+  type RailBranchSide,
   type RailConnectorId,
   type RailPiece,
 } from './railModel'
-import { distanceToRailTrainDeadEnd } from './railTrainModel'
+import {
+  advanceRailTrainCursor,
+  distanceToRailTrainDeadEnd,
+  sampleRailTrainPose,
+  type RailTrainCursor,
+} from './railTrainModel'
 
 const origin = { x: 0, y: 0, z: 0 }
 
@@ -971,6 +977,452 @@ describe('rail junction connectivity spec (issue #251)', () => {
       + curve2B.outward.y * branch2C.outward.y
       + curve2B.outward.z * branch2C.outward.z
     expect(outwardDot).toBeCloseTo(-1, 9)
+  })
+})
+
+/**
+ * Issue #254: 左右反転した分岐パーツ。
+ *
+ * 左右差はローカルZ符号だけで表し、connector / branchPath / Mesh / 列車走行は
+ * 既存の共通処理を通る。ここでは「見た目が増えた」ではなく、
+ * 左右分岐2個で副線バイパスが本当に閉じて列車が周回できることを検証する。
+ */
+describe('mirrored branch spec (issue #254)', () => {
+  function makeBranch(id: string, branchSide: RailBranchSide, rotationY = 0): RailPiece {
+    return createRailPiece('branch', id, origin, rotationY, 'left', branchSide)
+  }
+
+  /** connectionsグラフだけをBFSし、到達ノード数と辺数（重複カウント÷2）を返す。 */
+  function graphComponent(pieces: readonly RailPiece[], startId: string) {
+    const map = new Map(pieces.map((piece) => [piece.id, piece]))
+    const visited = new Set<string>([startId])
+    const queue: string[] = [startId]
+    let endpointCount = 0
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+      if (currentId === undefined) break
+      const piece = map.get(currentId)
+      if (piece === undefined) continue
+      for (const connectorId of getRailConnectorIds(piece)) {
+        const connection = piece.connections[connectorId]
+        if (connection === undefined) continue
+        endpointCount += 1
+        if (!visited.has(connection.pieceId)) {
+          visited.add(connection.pieceId)
+          queue.push(connection.pieceId)
+        }
+      }
+    }
+    return { nodeCount: visited.size, edgeCount: endpointCount / 2 }
+  }
+
+  /**
+   * 左右分岐を1個ずつ使った、副線バイパス付きの周回レイアウト（代表パターン）。
+   *
+   *   本線 : branch1(A→B) → 直線2本 → branch2(B→A)
+   *   副線 : branch1.C → カーブ2つ → branch2.C
+   *   折返し: branch2.A → カーブ2・直線4・カーブ2 → branch1.A
+   *
+   * 使うパーツはパーツ置場から出せるもの（直線・'left'カーブ・左右分岐）だけ。
+   *
+   * branch2 は左分岐を180°向けて置くので、Cが branch1.C と同じ側(+Z)へ出る。
+   * 返り値では最後の2継ぎ目（副線の閉じ目・折返しの閉じ目）をあえて未接続に
+   * したまま返し、「置いただけでぴったり合っている」ことを検証できるようにする。
+   */
+  function buildLeftRightBypassCircuit(): RailPiece[] {
+    let pieces: RailPiece[] = [makeBranch('branch1', 'right')]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: RailConnectorId,
+      targetId: string,
+      targetConnectorId: RailConnectorId,
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('straight', 'main1'))
+    connect('main1', 'a', 'branch1', 'b')
+    add(createRailPiece('straight', 'main2'))
+    connect('main2', 'a', 'main1', 'b')
+    // 左分岐をB側から本線につなぐ＝180°向いた合流側の分岐になる。
+    add(makeBranch('branch2', 'left'))
+    connect('branch2', 'b', 'main2', 'b')
+
+    // カーブはパーツ置場が出すのと同じ'left'だけを使い、逆向きに曲げたい
+    // ところではB側から入れる（実画面で組める形とそろえる）。
+    add(createRailPiece('curve', 'siding1', origin, 0, 'left'))
+    connect('siding1', 'b', 'branch1', 'c')
+    add(createRailPiece('curve', 'siding2', origin, 0, 'left'))
+    connect('siding2', 'b', 'siding1', 'a')
+
+    add(createRailPiece('curve', 'return1', origin, 0, 'left'))
+    connect('return1', 'b', 'branch2', 'a')
+    add(createRailPiece('curve', 'return2', origin, 0, 'left'))
+    connect('return2', 'b', 'return1', 'a')
+    add(createRailPiece('straight', 'return3'))
+    connect('return3', 'a', 'return2', 'a')
+    let previousId = 'return3'
+    for (const id of ['return4', 'return5', 'return6']) {
+      add(createRailPiece('straight', id))
+      connect(id, 'a', previousId, 'b')
+      previousId = id
+    }
+    add(createRailPiece('curve', 'return7', origin, 0, 'left'))
+    connect('return7', 'b', previousId, 'b')
+    add(createRailPiece('curve', 'return8', origin, 0, 'left'))
+    connect('return8', 'b', 'return7', 'a')
+
+    return pieces
+  }
+
+  /** 未接続の2端点が、隙間・向きのズレなく重なっていることを確かめる。 */
+  function expectJointIsExact(
+    pieces: readonly RailPiece[],
+    aPieceId: string,
+    aConnectorId: RailConnectorId,
+    bPieceId: string,
+    bConnectorId: RailConnectorId,
+  ) {
+    const first = worldConnectorForRailPiece(pieces.find((piece) => piece.id === aPieceId)!, aConnectorId)
+    const second = worldConnectorForRailPiece(pieces.find((piece) => piece.id === bPieceId)!, bConnectorId)
+    expect(distanceBetweenRailPoints(first.position, second.position)).toBeLessThan(1e-9)
+    expect(Math.abs(first.position.y - second.position.y)).toBeLessThan(1e-9)
+    const outwardDot = first.outward.x * second.outward.x
+      + first.outward.y * second.outward.y
+      + first.outward.z * second.outward.z
+    expect(outwardDot).toBeCloseTo(-1, 9)
+  }
+
+  it('keeps the pre-existing branch unchanged and defaults to the right side', () => {
+    const legacy = createRailPiece('branch', 'legacy', origin)
+    expect(legacy.branchSide).toBe('right')
+    expect(legacy.connectorC?.localPosition).toEqual({ x: 2.5, y: 0, z: 5 })
+    expect(legacy.connectorC?.outward).toEqual({ x: 0, y: 0, z: 1 })
+    expect(legacy.branchDirection).toBe('b')
+    expect(getRailConnectorIds(legacy)).toEqual(['a', 'b', 'c'])
+    // 明示指定した右分岐は、従来の分岐とまったく同じ形になる。
+    expect(makeBranch('explicit-right', 'right').connectorC).toEqual(legacy.connectorC)
+  })
+
+  it('mirrors connector C only, and keeps the A/B main line on the shared spec', () => {
+    const right = makeBranch('right', 'right')
+    const left = makeBranch('left', 'left')
+    const straight = createRailPiece('straight', 'straight-ref', origin)
+
+    for (const branch of [right, left]) {
+      // 本線A-Bは直線パーツと同じ接続規格（位置・向き・高さ）のまま。
+      expect(branch.connectorA.localPosition).toEqual(straight.connectorA.localPosition)
+      expect(branch.connectorA.outward).toEqual(straight.connectorA.outward)
+      expect(branch.connectorA.heading).toBe(straight.connectorA.heading)
+      expect(branch.connectorB.localPosition).toEqual(straight.connectorB.localPosition)
+      expect(branch.connectorB.outward).toEqual(straight.connectorB.outward)
+      expect(branch.connectorB.heading).toBe(straight.connectorB.heading)
+      expect(railPathLength(branch.path)).toBeCloseTo(BRANCH_LENGTH, 12)
+    }
+
+    expect(left.branchSide).toBe('left')
+    expect(left.connectorC?.localPosition).toEqual({ x: 2.5, y: 0, z: -5 })
+    expect(left.connectorC?.outward).toEqual({ x: 0, y: 0, z: -1 })
+    // headingは符号反転（+Z: -π/2 ⇔ -Z: +π/2）。高さは両方とも地面。
+    expect(left.connectorC?.heading).toBeCloseTo(-(right.connectorC?.heading ?? 0), 12)
+    expect(left.connectorC?.localPosition.y).toBe(0)
+    expect(right.connectorC?.localPosition.y).toBe(0)
+  })
+
+  it('keeps left and right branch paths exact mirror images over the whole path', () => {
+    const right = makeBranch('right', 'right')
+    const left = makeBranch('left', 'left')
+    for (let index = 0; index <= 24; index += 1) {
+      const t = index / 24
+      const rightMain = sampleRailPath(right.path, t)
+      const leftMain = sampleRailPath(left.path, t)
+      // 本線側は反転しない（＝左右で完全に同じ）。
+      expect(leftMain).toEqual(rightMain)
+
+      const rightBranch = sampleRailPath(right.branchPath!, t)
+      const leftBranch = sampleRailPath(left.branchPath!, t)
+      expect(leftBranch.x).toBeCloseTo(rightBranch.x, 12)
+      expect(leftBranch.y).toBeCloseTo(rightBranch.y, 12)
+      expect(leftBranch.z).toBeCloseTo(-rightBranch.z, 12)
+
+      const rightTangent = sampleRailPathTangent(right.branchPath!, t)
+      const leftTangent = sampleRailPathTangent(left.branchPath!, t)
+      expect(leftTangent.x).toBeCloseTo(rightTangent.x, 12)
+      expect(leftTangent.z).toBeCloseTo(-rightTangent.z, 12)
+    }
+    // 副線の走行距離は左右で同じ。
+    expect(railPathLength(left.branchPath!)).toBeCloseTo(railPathLength(right.branchPath!), 12)
+    // branchPathの終端とconnector Cは左右とも一致している（Pathが正本）。
+    expect(sampleRailPath(left.branchPath!, 1)).toEqual(left.connectorC?.localPosition)
+    expect(sampleRailPath(right.branchPath!, 1)).toEqual(right.connectorC?.localPosition)
+  })
+
+  it('matches one curve piece on both sides: right→curve left, left→curve right', () => {
+    // 分岐のAへ直接カーブを1個つないだ状況を作り、そのカーブのBが
+    // 分岐のCと厳密に一致することを左右それぞれで確かめる。
+    const cases: { branchSide: RailBranchSide; curveDirection: 'left' | 'right' }[] = [
+      { branchSide: 'right', curveDirection: 'left' },
+      { branchSide: 'left', curveDirection: 'right' },
+    ]
+    for (const { branchSide, curveDirection } of cases) {
+      const anchorForBranch = createRailPiece('straight', 'anchor-branch')
+      const branch = makeBranch(`branch-${branchSide}`, branchSide)
+      const anchoredBranch = connectRailPieces([anchorForBranch, branch], branch.id, 'a', anchorForBranch.id, 'b')
+        .find((piece) => piece.id === branch.id)!
+
+      const anchorForCurve = createRailPiece('straight', 'anchor-curve')
+      const curve = createRailPiece('curve', 'curve', origin, 0, curveDirection)
+      const anchoredCurve = connectRailPieces([anchorForCurve, curve], curve.id, 'a', anchorForCurve.id, 'b')
+        .find((piece) => piece.id === curve.id)!
+
+      const branchC = worldConnectorForRailPiece(anchoredBranch, 'c')
+      const curveB = worldConnectorForRailPiece(anchoredCurve, 'b')
+      expect(distanceBetweenRailPoints(branchC.position, curveB.position)).toBeLessThan(1e-9)
+      expect(curveB.outward.x).toBeCloseTo(branchC.outward.x, 9)
+      expect(curveB.outward.y).toBeCloseTo(branchC.outward.y, 9)
+      expect(curveB.outward.z).toBeCloseTo(branchC.outward.z, 9)
+    }
+  })
+
+  it('keeps the mirrored branch\'s connector world pose on the 0.5 grid at y=0 across 0/90/180/270°', () => {
+    const rotations = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
+    // 右分岐の期待値（issue #251のテストと同じ表）をZだけ反転したもの。
+    const expectedLeftBranch = [
+      { a: [-2.5, 0], aOut: [-1, 0], c: [2.5, -5], cOut: [0, -1] },
+      { a: [0, 2.5], aOut: [0, 1], c: [-5, -2.5], cOut: [-1, 0] },
+      { a: [2.5, 0], aOut: [1, 0], c: [-2.5, 5], cOut: [0, 1] },
+      { a: [0, -2.5], aOut: [0, -1], c: [5, 2.5], cOut: [1, 0] },
+    ] as const
+
+    function expectXZ(actual: { x: number; y: number; z: number }, expected: readonly [number, number]) {
+      expect(actual.y).toBe(0)
+      expect(actual.x).toBeCloseTo(expected[0], 9)
+      expect(actual.z).toBeCloseTo(expected[1], 9)
+    }
+
+    rotations.forEach((rotationY, index) => {
+      const left = makeBranch(`left-${index}`, 'left', rotationY)
+      expectXZ(worldConnectorForRailPiece(left, 'a').position, expectedLeftBranch[index].a)
+      expectXZ(worldConnectorForRailPiece(left, 'a').outward, expectedLeftBranch[index].aOut)
+      expectXZ(worldConnectorForRailPiece(left, 'c').position, expectedLeftBranch[index].c)
+      expectXZ(worldConnectorForRailPiece(left, 'c').outward, expectedLeftBranch[index].cOut)
+
+      // 左右分岐は同じ回転角でもワールド上でZ鏡像の関係になる。
+      const right = makeBranch(`right-${index}`, 'right', rotationY)
+      const leftC = worldConnectorForRailPiece(left, 'c')
+      const rightC = worldConnectorForRailPiece(right, 'c')
+      const mirroredRotation = -rotationY
+      const mirroredRight = makeBranch(`mirror-${index}`, 'right', mirroredRotation)
+      const mirroredRightC = worldConnectorForRailPiece(mirroredRight, 'c')
+      expect(leftC.position.x).toBeCloseTo(mirroredRightC.position.x, 9)
+      expect(leftC.position.z).toBeCloseTo(-mirroredRightC.position.z, 9)
+      expect(rightC.position.y).toBe(0)
+    })
+  })
+
+  describe('ordinary snapping works on both branch sides', () => {
+    /**
+     * targetのconnectorへ、わざと少しずらして置いたmovingが通常のsnap
+     * しきい値で吸着し、接続後は端点が完全一致することを確かめる。
+     * 分岐だけの特別な補正は使わない（findRailSnapCandidateそのもの）。
+     */
+    function expectOrdinarySnap(
+      moving: RailPiece,
+      movingConnectorId: RailConnectorId,
+      target: RailPiece,
+      targetConnectorId: RailConnectorId,
+    ) {
+      const placed = connectRailPieces([target, moving], moving.id, movingConnectorId, target.id, targetConnectorId)
+        .find((piece) => piece.id === moving.id)!
+      const jittered: RailPiece = {
+        ...placed,
+        connections: {},
+        position: { x: placed.position.x + 0.32, y: 0, z: placed.position.z - 0.26 },
+        rotationY: placed.rotationY + (3 * Math.PI) / 180,
+      }
+
+      const candidate = findRailSnapCandidate(jittered, [target])
+      expect(candidate).not.toBeNull()
+      expect(candidate?.movingConnectorId).toBe(movingConnectorId)
+      expect(candidate?.targetPieceId).toBe(target.id)
+      expect(candidate?.targetConnectorId).toBe(targetConnectorId)
+
+      const connected = connectRailPieces(
+        [target, jittered],
+        moving.id,
+        movingConnectorId,
+        target.id,
+        targetConnectorId,
+        candidate!.transform,
+      )
+      expect(areRailConnectionsSymmetric(connected)).toBe(true)
+      expectJointIsExact(connected, moving.id, movingConnectorId, target.id, targetConnectorId)
+    }
+
+    const branchSides: RailBranchSide[] = ['right', 'left']
+    const branchConnectors: RailConnectorId[] = ['a', 'b', 'c']
+
+    for (const branchSide of branchSides) {
+      it(`snaps a straight to every connector of the ${branchSide} branch`, () => {
+        for (const connectorId of branchConnectors) {
+          expectOrdinarySnap(
+            createRailPiece('straight', 'straight'),
+            'a',
+            makeBranch('branch', branchSide),
+            connectorId,
+          )
+        }
+      })
+
+      it(`snaps a curve to every connector of the ${branchSide} branch`, () => {
+        for (const connectorId of branchConnectors) {
+          expectOrdinarySnap(
+            createRailPiece('curve', 'curve', origin, 0, 'left'),
+            'a',
+            makeBranch('branch', branchSide),
+            connectorId,
+          )
+        }
+      })
+    }
+
+    it('snaps a left branch to a right branch on both the main and the diverging side', () => {
+      // 本線側どうし（B-B合流）と副線側どうし（C-C）の両方。
+      expectOrdinarySnap(makeBranch('left', 'left'), 'b', makeBranch('right', 'right'), 'b')
+      expectOrdinarySnap(makeBranch('left', 'left'), 'c', makeBranch('right', 'right'), 'c')
+      expectOrdinarySnap(makeBranch('left', 'left'), 'a', makeBranch('right', 'right'), 'b')
+    })
+  })
+
+  it('needs the mirrored side: a same-side branch would send C to the opposite side of the main line', () => {
+    // 本線へB側からつないだとき、左分岐のCはbranch1.Cと同じ+Z側、
+    // 右分岐のCは-Z側（本線をまたぐ側）に出る。これが左右反転版を追加する理由。
+    const main = createRailPiece('straight', 'main')
+    const mirrored = connectRailPieces([main, makeBranch('mirrored', 'left')], 'mirrored', 'b', 'main', 'b')
+      .find((piece) => piece.id === 'mirrored')!
+    const sameSide = connectRailPieces([main, makeBranch('same', 'right')], 'same', 'b', 'main', 'b')
+      .find((piece) => piece.id === 'same')!
+    expect(worldConnectorForRailPiece(mirrored, 'c').position.z).toBeCloseTo(5, 9)
+    expect(worldConnectorForRailPiece(sameSide, 'c').position.z).toBeCloseTo(-5, 9)
+  })
+
+  it('closes the left+right bypass circuit exactly, before the final joints are ever connected', () => {
+    const beforeClosing = buildLeftRightBypassCircuit()
+
+    // 副線の閉じ目（siding2.A ↔ branch2.C）と折返しの閉じ目（return8.A ↔ branch1.A）。
+    expectJointIsExact(beforeClosing, 'siding2', 'a', 'branch2', 'c')
+    expectJointIsExact(beforeClosing, 'return8', 'a', 'branch1', 'a')
+
+    // どちらも通常のsnapしきい値でそのまま吸着できる（手動調整なし）。
+    const sidingCandidate = findRailSnapCandidate(
+      beforeClosing.find((piece) => piece.id === 'siding2')!,
+      beforeClosing,
+      'a',
+    )
+    expect(sidingCandidate?.targetPieceId).toBe('branch2')
+    expect(sidingCandidate?.targetConnectorId).toBe('c')
+    expect(sidingCandidate?.distance).toBeLessThan(1e-9)
+
+    const returnCandidate = findRailSnapCandidate(
+      beforeClosing.find((piece) => piece.id === 'return8')!,
+      beforeClosing,
+      'a',
+    )
+    expect(returnCandidate?.targetPieceId).toBe('branch1')
+    expect(returnCandidate?.targetConnectorId).toBe('a')
+    expect(returnCandidate?.distance).toBeLessThan(1e-9)
+
+    let closed = connectRailPieces(beforeClosing, 'siding2', 'a', 'branch2', 'c')
+    closed = connectRailPieces(closed, 'return8', 'a', 'branch1', 'a')
+    expect(areRailConnectionsSymmetric(closed)).toBe(true)
+
+    const component = graphComponent(closed, 'branch1')
+    // 14ピース・15辺 ＝ 独立した閉路が2つ（本線ループと副線ループ）。
+    expect(component.nodeCount).toBe(14)
+    expect(component.edgeCount).toBe(15)
+    // 空き端点は残らない。
+    for (const piece of closed) {
+      for (const connectorId of getRailConnectorIds(piece)) {
+        expect(piece.connections[connectorId]).toBeDefined()
+      }
+    }
+  })
+
+  describe('a train laps the bypass circuit through either route', () => {
+    function closedCircuit(): RailPiece[] {
+      let closed = connectRailPieces(buildLeftRightBypassCircuit(), 'siding2', 'a', 'branch2', 'c')
+      closed = connectRailPieces(closed, 'return8', 'a', 'branch1', 'a')
+      return closed
+    }
+
+    /** 小刻みに走らせて、通ったpieceと周回数、位置の連続性を集める。 */
+    function runLaps(pieces: readonly RailPiece[], start: RailTrainCursor, totalDistance: number) {
+      const step = 0.25
+      const visited = new Set<string>([start.pieceId])
+      let cursor = start
+      let previousPosition = sampleRailTrainPose(pieces, cursor)?.position ?? null
+      let laps = 0
+      let maxJump = 0
+      for (let travelled = 0; travelled < totalDistance; travelled += step) {
+        const next = advanceRailTrainCursor(pieces, cursor, step)
+        const pose = sampleRailTrainPose(pieces, next)
+        expect(pose).not.toBeNull()
+        if (pose !== null && previousPosition !== null) {
+          maxJump = Math.max(maxJump, distanceBetweenRailPoints(pose.position, previousPosition))
+        }
+        if (next.pieceId === 'branch1' && cursor.pieceId !== 'branch1') laps += 1
+        visited.add(next.pieceId)
+        previousPosition = pose?.position ?? previousPosition
+        cursor = next
+      }
+      return { visited, laps, maxJump, cursor }
+    }
+
+    it('runs the diverging route and keeps circulating without a dead end', () => {
+      // branchDirection='c' ＝ 副線側を選択した状態。
+      const pieces = toggleRailBranch(closedCircuit(), 'branch1')
+      expect(pieces.find((piece) => piece.id === 'branch1')?.branchDirection).toBe('c')
+      expect(distanceToRailTrainDeadEnd(pieces, { pieceId: 'branch1', direction: 'a-to-c', distance: 0 }))
+        .toBe(Infinity)
+
+      const { visited, laps, maxJump } = runLaps(
+        pieces,
+        { pieceId: 'branch1', direction: 'a-to-c', distance: 0 },
+        260,
+      )
+      // 副線・合流側の左分岐・折返しを通り、本線の直線2本は通らない。
+      expect(visited.has('siding1')).toBe(true)
+      expect(visited.has('siding2')).toBe(true)
+      expect(visited.has('branch2')).toBe(true)
+      expect(visited.has('return4')).toBe(true)
+      expect(visited.has('main1')).toBe(false)
+      expect(visited.has('main2')).toBe(false)
+      // 行き止まりにならず2周以上まわり続ける。
+      expect(laps).toBeGreaterThanOrEqual(2)
+      // 継ぎ目で瞬間移動しない。副線のquadraticは弧長パラメータが厳密には
+      // 一定でないぶん1ステップの移動量が少し揺れるので、上限は1ステップの
+      // 2倍（＝パーツ長5に対して十分小さい）で見る。
+      expect(maxJump).toBeLessThan(0.5)
+    })
+
+    it('runs the main route with the same logic when the point is switched back', () => {
+      const pieces = closedCircuit()
+      expect(pieces.find((piece) => piece.id === 'branch1')?.branchDirection).toBe('b')
+      expect(distanceToRailTrainDeadEnd(pieces, { pieceId: 'branch1', direction: 'a-to-b', distance: 0 }))
+        .toBe(Infinity)
+
+      const { visited, laps, maxJump } = runLaps(
+        pieces,
+        { pieceId: 'branch1', direction: 'a-to-b', distance: 0 },
+        260,
+      )
+      expect(visited.has('main1')).toBe(true)
+      expect(visited.has('main2')).toBe(true)
+      expect(visited.has('branch2')).toBe(true)
+      expect(visited.has('siding1')).toBe(false)
+      expect(visited.has('siding2')).toBe(false)
+      expect(laps).toBeGreaterThanOrEqual(2)
+      expect(maxJump).toBeLessThan(0.5)
+    })
   })
 })
 

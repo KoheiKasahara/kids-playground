@@ -1,4 +1,4 @@
-import type { RailPieceKind } from './railModel'
+import { DEFAULT_BRANCH_SIDE, type RailBranchSide, type RailPieceKind } from './railModel'
 
 /**
  * パーツ選択トレイ専用のアイコン。実ゲームの3Dモデルとは完全に独立していて、
@@ -21,9 +21,11 @@ const ARCH_RIM_COLOR = '#c7d2fe'
 
 type RailPartIconProps = {
   kind: RailPieceKind
+  /** branchのときだけ意味を持つ。副線が分かれる側。 */
+  branchSide?: RailBranchSide
 }
 
-export default function RailPartIcon({ kind }: RailPartIconProps) {
+export default function RailPartIcon({ kind, branchSide = DEFAULT_BRANCH_SIDE }: RailPartIconProps) {
   switch (kind) {
     case 'straight':
       return (
@@ -58,15 +60,20 @@ export default function RailPartIcon({ kind }: RailPartIconProps) {
         </svg>
       )
 
+    // 分岐は「本線はまっすぐ、副線だけが片側へ分かれる」形にして、
+    // 左右反転版と形そのもので見分けられるようにする(Issue #254)。
+    // 図形データは1つだけ持ち、'left' では横方向に鏡像変換するだけ。
     case 'branch':
       return (
         <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-          <line x1="26" y1="62" x2="26" y2="42" stroke={RAIL_COLOR} strokeWidth="6" strokeLinecap="round" />
-          <line x1="38" y1="62" x2="38" y2="42" stroke={RAIL_COLOR} strokeWidth="6" strokeLinecap="round" />
-          <line x1="20" y1="52" x2="44" y2="52" stroke={SLEEPER_COLOR} strokeWidth="6" strokeLinecap="round" />
-          <path d="M32,42 Q18,28 9,8" fill="none" stroke={RAIL_COLOR} strokeWidth="7" strokeLinecap="round" />
-          <path d="M32,42 Q47,28 57,8" fill="none" stroke={BRANCH_COLOR} strokeWidth="7" strokeLinecap="round" />
-          <circle cx="32" cy="42" r="5.5" fill={BRANCH_COLOR} />
+          <g transform={branchSide === 'left' ? 'translate(64,0) scale(-1,1)' : undefined}>
+            <line x1="26" y1="62" x2="26" y2="46" stroke={RAIL_COLOR} strokeWidth="6" strokeLinecap="round" />
+            <line x1="38" y1="62" x2="38" y2="46" stroke={RAIL_COLOR} strokeWidth="6" strokeLinecap="round" />
+            <line x1="20" y1="56" x2="44" y2="56" stroke={SLEEPER_COLOR} strokeWidth="6" strokeLinecap="round" />
+            <path d="M32,48 L32,6" fill="none" stroke={RAIL_COLOR} strokeWidth="7" strokeLinecap="round" />
+            <path d="M32,48 Q34,26 58,12" fill="none" stroke={BRANCH_COLOR} strokeWidth="7" strokeLinecap="round" />
+            <circle cx="32" cy="48" r="5.5" fill={BRANCH_COLOR} />
+          </g>
         </svg>
       )
 

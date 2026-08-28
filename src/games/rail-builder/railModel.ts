@@ -31,6 +31,20 @@ export type CurveDirection = 'left' | 'right'
 export type RailConnectorId = 'a' | 'b' | 'c' | 'd'
 export type RailBranchDirection = 'b' | 'c'
 
+/**
+ * 分岐の副線(A-C)がどちら側へ分かれるか（Issue #254）。
+ *
+ * 本線A→Bへ進む列車から見た左右で表す（実物の右分岐器／左分岐器と同じ
+ * 言い方）。ローカル座標では 'right' が +Z 側、'left' が -Z 側。
+ * 既存の分岐は 'right'（DEFAULT_BRANCH_SIDE）で、値・見た目とも変わらない。
+ *
+ * 注意: CurveDirection は俯瞰カメラから見た画面上の左右という別基準の
+ * 命名なので、符号の対応が逆になる。分岐出口Cは
+ * 'right' → CurveDirection 'left' のカーブ1個ぶん、
+ * 'left'  → CurveDirection 'right' のカーブ1個ぶん、と一致する。
+ */
+export type RailBranchSide = 'right' | 'left'
+
 export type RailConnector = {
   id: RailConnectorId
   /** 線路のローカル座標。端点の中心位置。 */
@@ -93,6 +107,8 @@ export type RailPiece = {
   secondaryPath?: RailPath
   /** Aから進入した列車が今回選ぶ出口。 */
   branchDirection?: RailBranchDirection
+  /** 副線(A-C)が分かれる側。branchだけが持つ。 */
+  branchSide?: RailBranchSide
   connections: RailConnections
 }
 
@@ -144,8 +160,12 @@ export const CURVE_ANGLE = Math.PI / 2
  * A→Cの変位がカーブパーツ1個分のA→B変位（半径CURVE_RADIUS、角度CURVE_ANGLE=90°）
  * と完全に一致する。つまり分岐のCは「分岐のAにカーブを1個つないだときの
  * カーブのB」と厳密に同じ位置・向きになる。
+ * 左右反転版(RailBranchSide)はこの広がりをZ方向へ符号反転するだけなので、
+ * 反転側でも同じ関係（対応するCurveDirectionのカーブ1個ぶん）が保たれる。
  */
 export const BRANCH_SPREAD = CURVE_RADIUS
+/** 既存分岐（Issue #254以前から置ける分岐）の副線side。 */
+export const DEFAULT_BRANCH_SIDE: RailBranchSide = 'right'
 export const DEPOT_LENGTH = 7
 export const DEPOT_TRACK_SPACING = 2.4
 export const ELEVATED_HEIGHT = 2
@@ -424,6 +444,7 @@ export function createRailPiece(
   position: RailVec3 = ZERO,
   rotationY = 0,
   curveDirection: CurveDirection = 'left',
+  branchSide: RailBranchSide = DEFAULT_BRANCH_SIDE,
 ): RailPiece {
   const path: RailPath = kind === 'straight'
     ? { kind: 'straight', length: STRAIGHT_LENGTH }
@@ -469,11 +490,13 @@ export function createRailPiece(
   const branchPath: RailPath | undefined = kind === 'branch'
     ? (() => {
       const branchStart = sampleRailPath(path, 0) // 本線Aと同じ点
-      // control の x を end と揃えることで出口(t=1)の接線がちょうど +Z（CURVE_ANGLE 相当）になる。
+      // control の x を end と揃えることで出口(t=1)の接線がちょうど ±Z（CURVE_ANGLE 相当）になる。
       // start 側は z を揃えることで本線と同じ +X の接線になる。
-      // start→end の変位を (BRANCH_SPREAD, 0, BRANCH_SPREAD) にそろえてあるので、
+      // start→end の変位を (BRANCH_SPREAD, 0, ±BRANCH_SPREAD) にそろえてあるので、
       // 分岐の出口Cは「Aにカーブを1個つないだときのカーブのB」と厳密に同じ位置・向きになる。
-      const branchEnd = add(branchStart, vec(BRANCH_SPREAD, 0, BRANCH_SPREAD))
+      // 左右差はこのZ符号だけ。以降のconnector生成・Mesh・列車走行は共通処理を通る。
+      const sideSign = branchSide === 'left' ? -1 : 1
+      const branchEnd = add(branchStart, vec(BRANCH_SPREAD, 0, BRANCH_SPREAD * sideSign))
       const branchControl = vec(branchEnd.x, 0, branchStart.z)
       return {
         kind: 'quadratic' as const,
@@ -526,6 +549,7 @@ export function createRailPiece(
     branchPath,
     secondaryPath,
     branchDirection: kind === 'branch' ? 'b' : undefined,
+    branchSide: kind === 'branch' ? branchSide : undefined,
     connections: {},
   }
 }
