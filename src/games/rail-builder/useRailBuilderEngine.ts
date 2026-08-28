@@ -51,6 +51,7 @@ import {
   shouldReduceRailBuilderMotion,
 } from './railBuilderVisuals'
 import {
+  E5_GANGWAY_SPEC,
   E5_FRONT_WINDSHIELD_SECTIONS,
   E5_LEAD_SHELL_SECTIONS,
   getTrainCarVisualYaw,
@@ -811,10 +812,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       2,
       0.06,
     )
-    const e5SideWindowGeometry = new THREE.BoxGeometry(
+    const e5SideWindowGeometry = new RoundedBoxGeometry(
       e5Profile.window.sideWidth,
       e5Profile.window.sideHeight,
       0.04,
+      1,
+      0.008,
     )
     const e5CockpitWindowGeometry = createE5FrontWindshieldGeometry()
     const e5AccentGeometry = new THREE.BoxGeometry(1, e5Profile.accent.height, 0.04)
@@ -823,7 +826,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     // rounded blocks so the underframe reads clearly without a mesh per bolt.
     const e5UnderfloorGeometry = new RoundedBoxGeometry(1.42, 0.14, 0.7, 1, 0.04)
     const e5BogieGeometry = new RoundedBoxGeometry(0.5, 0.14, 0.64, 1, 0.04)
-    const e5GangwayGeometry = new RoundedBoxGeometry(0.16, 0.28, 0.48, 1, 0.035)
+    const e5GangwayGeometry = new RoundedBoxGeometry(
+      E5_GANGWAY_SPEC.length,
+      E5_GANGWAY_SPEC.height,
+      E5_GANGWAY_SPEC.width,
+      1,
+      0.035,
+    )
     const e5WheelGeometry = new THREE.CylinderGeometry(0.16, 0.16, 0.11, 12)
     const e6Profile = resolveTrainVisualProfile('e6')
     const e6NoseGeometry = createE6NoseGeometry(e6Profile.lead)
@@ -1712,7 +1721,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           const gangway = new THREE.Mesh(definition.gangwayGeometry, trainCouplerMaterial)
           // Adjacent cars each own half of the bellows. Pull each half toward
           // its car so the two meshes meet instead of occupying the same plane.
-          gangway.position.set(x - Math.sign(x) * 0.08, 0.63, 0)
+          gangway.position.set(
+            x - Math.sign(x) * E5_GANGWAY_SPEC.positionOffset,
+            E5_GANGWAY_SPEC.centerY,
+            0,
+          )
           contentGroup.add(gangway)
         }
       }
