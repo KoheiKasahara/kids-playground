@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { TRAIN_TYPES, type TrainType } from './railFleetModel'
-import { resolveTrainVisualProfile } from './railTrainVisuals'
+import { resolveTrainSpec } from './railTrainVisuals'
 import styles from './TrainTypePicker.module.css'
 
 export type TrainTypePickerProps = {
@@ -26,7 +26,7 @@ type IconStyle = CSSProperties & {
  * 車両名のテキストは一切出さず、色とノーズ形状だけで見分けられるようにする。
  */
 function TrainTypeIcon({ trainType }: { trainType: TrainType }) {
-  const profile = resolveTrainVisualProfile(trainType)
+  const profile = resolveTrainSpec(trainType)
   const windowCount = profile.window.sideXs.length
   const noseClassName = styles[profile.lead.noseStyle] ?? ''
   const iconStyle: IconStyle = {
