@@ -122,22 +122,24 @@ export type SnapOptions = {
   maxAngleDifference?: number
 }
 
-export const STRAIGHT_LENGTH = 5
-export const SHORT_STRAIGHT_LENGTH = 3
+/** 主要線路パーツ（直線・短い直線・カーブ・分岐）が共有する基準ユニット長。 */
+export const RAIL_UNIT_LENGTH = 5
+export const STRAIGHT_LENGTH = RAIL_UNIT_LENGTH
+export const SHORT_STRAIGHT_LENGTH = RAIL_UNIT_LENGTH / 2
 export const SLOPE_LENGTH = 7
 export const ELEVATED_LENGTH = 6.5
 export const STATION_LENGTH = 7
 export const TUNNEL_LENGTH = 7
-export const BRANCH_LENGTH = 6
-export const CURVE_RADIUS = 4
+export const BRANCH_LENGTH = RAIL_UNIT_LENGTH
+export const CURVE_RADIUS = RAIL_UNIT_LENGTH
 export const CURVE_ANGLE = Math.PI / 2
 /**
- * 分岐先(A-C)の見た目上の広がり幅。ここをCURVE_RADIUSと同じ値にし、
- * 下のbranchPathの制御点もそれに合わせて置くことで、分岐の出口(C)は
- * カーブパーツ1個分（半径CURVE_RADIUS、角度CURVE_ANGLE=90°）と全く同じ
- * 位置・向きになる。これにより「分岐の先にカーブを自然に3個つなぐと
- * ぴったり輪になる」という、カーブパーツだけでループを組む場合と同じ
- * 感覚で分岐後もつなげられる。
+ * 分岐先(A-C)の見た目上の広がり幅。ここをCURVE_RADIUSと同じ値にすることで、
+ * 分岐は「本線(A-B、直線パーツと同じA→B変位)」と「副線(A-C)」がAを共有した
+ * 形になる。副線側はbranchPathの制御点をこの値に合わせて置くことで、
+ * A→Cの変位がカーブパーツ1個分のA→B変位（半径CURVE_RADIUS、角度CURVE_ANGLE=90°）
+ * と完全に一致する。つまり分岐のCは「分岐のAにカーブを1個つないだときの
+ * カーブのB」と厳密に同じ位置・向きになる。
  */
 export const BRANCH_SPREAD = CURVE_RADIUS
 export const DEPOT_LENGTH = 7
@@ -461,17 +463,21 @@ export function createRailPiece(
                   }
   const [connectorA, connectorB] = makeConnectors(path)
   const branchPath: RailPath | undefined = kind === 'branch'
-    ? {
-      // 制御点のxを終点と揃えることで、出口(t=1)の接線がちょうど90°
-      // （カーブパーツと同じCURVE_ANGLE）になる。始点(t=0)側は
-      // 制御点のzを0にそろえて本線と同じ+X方向の接線にしている。
-      // 終点までの変位(dx, dz)もCURVE_RADIUSにそろえているため、
-      // 分岐の出口はカーブパーツ1個分とぴったり同じ位置・向きになる。
-      kind: 'quadratic',
-      start: { x: -BRANCH_LENGTH / 2, y: 0, z: 0 },
-      control: { x: -BRANCH_LENGTH / 2 + BRANCH_SPREAD, y: 0, z: 0 },
-      end: { x: -BRANCH_LENGTH / 2 + BRANCH_SPREAD, y: 0, z: BRANCH_SPREAD },
-    }
+    ? (() => {
+      const branchStart = sampleRailPath(path, 0) // 本線Aと同じ点
+      // control の x を end と揃えることで出口(t=1)の接線がちょうど +Z（CURVE_ANGLE 相当）になる。
+      // start 側は z を揃えることで本線と同じ +X の接線になる。
+      // start→end の変位を (BRANCH_SPREAD, 0, BRANCH_SPREAD) にそろえてあるので、
+      // 分岐の出口Cは「Aにカーブを1個つないだときのカーブのB」と厳密に同じ位置・向きになる。
+      const branchEnd = add(branchStart, vec(BRANCH_SPREAD, 0, BRANCH_SPREAD))
+      const branchControl = vec(branchEnd.x, 0, branchStart.z)
+      return {
+        kind: 'quadratic' as const,
+        start: branchStart,
+        control: branchControl,
+        end: branchEnd,
+      }
+    })()
     : undefined
   const connectorC = branchPath === undefined
     ? undefined

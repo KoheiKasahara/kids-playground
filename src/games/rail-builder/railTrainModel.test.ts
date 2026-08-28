@@ -530,3 +530,117 @@ describe('railTrainModel', () => {
     })
   })
 })
+
+/**
+ * Issue #251: 分岐を含むループでも列車が行き止まりに当たらず周回できることの回帰テスト。
+ */
+describe('running a train around a branch-inclusive loop (issue #251)', () => {
+  const origin = { x: 0, y: 0, z: 0 }
+
+  /** 代表ループ2（branch(A-B) + straight + curve×2 + straight×2 + curve×2）。 */
+  function buildBranchOvalLoop(): RailPiece[] {
+    let pieces: RailPiece[] = [{ ...createRailPiece('branch', 'branch', origin), branchDirection: 'b' as const }]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: 'a' | 'b',
+      targetId: string,
+      targetConnectorId: 'a' | 'b',
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('straight', 'straight1'))
+    connect('straight1', 'a', 'branch', 'b')
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'straight1', 'b')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'curve1', 'b')
+    add(createRailPiece('straight', 'straight2'))
+    connect('straight2', 'a', 'curve2', 'b')
+    add(createRailPiece('straight', 'straight3'))
+    connect('straight3', 'a', 'straight2', 'b')
+    add(createRailPiece('curve', 'curve3', origin, 0, 'right'))
+    connect('curve3', 'a', 'straight3', 'b')
+    add(createRailPiece('curve', 'curve4', origin, 0, 'right'))
+    connect('curve4', 'a', 'curve3', 'b')
+    pieces = connectRailPieces(pieces, 'curve4', 'b', 'branch', 'a')
+    return pieces
+  }
+
+  /**
+   * 代表ループ1（branch1(A-B)→straight→straight→branch2(A-B)を本線、
+   * branch1.C→curve→straight→curve→branch2.Cを副線とする、分岐2個の
+   * バイパスループ）。railModel.test.tsのbuildBranchBypassLoopと同じ組み方。
+   */
+  function buildBranchBypassLoop(): RailPiece[] {
+    let pieces: RailPiece[] = [{ ...createRailPiece('branch', 'branch1', origin), branchDirection: 'c' as const }]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: 'a' | 'b',
+      targetId: string,
+      targetConnectorId: 'a' | 'b' | 'c',
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('straight', 'straight1'))
+    connect('straight1', 'a', 'branch1', 'b')
+    add(createRailPiece('straight', 'straight2'))
+    connect('straight2', 'a', 'straight1', 'b')
+    add(createRailPiece('branch', 'branch2'))
+    connect('branch2', 'a', 'straight2', 'b')
+
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'branch1', 'c')
+    add(createRailPiece('straight', 'straight3'))
+    connect('straight3', 'a', 'curve1', 'b')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'straight3', 'b')
+    pieces = connectRailPieces(pieces, 'curve2', 'b', 'branch2', 'c')
+    return pieces
+  }
+
+  it('laps a branch oval (route A-B) for more than one full circuit without ever hitting a dead end', () => {
+    const loop = buildBranchOvalLoop()
+    let motion: RailTrainMotion = {
+      cursor: { pieceId: 'branch', direction: 'a-to-b', distance: 0.2 },
+      speed: 0,
+      status: 'running',
+    }
+    let previousPieceId = motion.cursor.pieceId
+    let pieceChanges = 0
+    for (let tick = 0; tick < 1200; tick += 1) {
+      motion = updateRailTrainMotion(motion, loop, 0.05)
+      expect(motion.status).not.toBe('waiting')
+      if (motion.cursor.pieceId !== previousPieceId) {
+        pieceChanges += 1
+        previousPieceId = motion.cursor.pieceId
+      }
+    }
+    // このオーバルは8ピース。8回以上ピースが変われば1周以上した証拠。
+    expect(pieceChanges).toBeGreaterThan(8)
+    expect(motion.speed).toBeGreaterThan(0)
+  })
+
+  it('drives branch1\'s A-C bypass route (branchDirection=c) all the way to branch2 without hitting a dead end', () => {
+    // このループは分岐1個ぶんの主経路（A-B）だけで組んだ代表ループ2とは異なり、
+    // 分岐2個をバイパスとして組む代表ループ1を使う。branch1.A/branch2.Bは
+    // 外部に開放されたまま（本テストのスコープ外）なので、無限に周回はしない。
+    // ここでは「branchDirection='c'を選んだときにA→Cの副線側へ正しく進み、
+    // バイパスの終端（curve1→straight3→curve2）を行き止まりに当たらず
+    // 通過してbranch2まで到達できる」ことだけを検証する。
+    const loop = buildBranchBypassLoop()
+    let motion: RailTrainMotion = {
+      cursor: { pieceId: 'branch1', direction: 'a-to-c', distance: 0.2 },
+      speed: 0,
+      status: 'running',
+    }
+    const visitedPieceIds = new Set<string>([motion.cursor.pieceId])
+    for (let tick = 0; tick < 400; tick += 1) {
+      motion = updateRailTrainMotion(motion, loop, 0.05)
+      expect(motion.status).not.toBe('waiting')
+      visitedPieceIds.add(motion.cursor.pieceId)
+      if (motion.cursor.pieceId === 'branch2') break
+    }
+    expect(visitedPieceIds).toEqual(new Set(['branch1', 'curve1', 'straight3', 'curve2', 'branch2']))
+    expect(motion.cursor.pieceId).toBe('branch2')
+  })
+})

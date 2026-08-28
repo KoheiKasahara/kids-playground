@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BRANCH_LENGTH,
+  BRANCH_SPREAD,
+  CURVE_RADIUS,
   DEFAULT_SNAP_ANGLE,
   DEPOT_TRACK_SPACING,
   ELEVATED_HEIGHT,
@@ -7,6 +10,7 @@ import {
   LOOP_CLOSURE_MAX_ANGLE_DIFFERENCE,
   LOOP_CLOSURE_MAX_DISTANCE,
   LOOP_CLOSURE_MAX_HEIGHT_DIFFERENCE,
+  RAIL_UNIT_LENGTH,
   SHORT_STRAIGHT_LENGTH,
   SLOPE_LENGTH,
   STRAIGHT_LENGTH,
@@ -17,6 +21,7 @@ import {
   createRailPiece,
   deleteRailPiece,
   disconnectRailPiece,
+  distanceBetweenRailPoints,
   findRailLoopClosureCandidate,
   findRailSnapCandidate,
   findRailSnapNearMiss,
@@ -27,6 +32,7 @@ import {
   sampleRailPathTangent,
   toggleRailBranch,
   worldConnectorForRailPiece,
+  type RailConnectorId,
   type RailPiece,
 } from './railModel'
 import { distanceToRailTrainDeadEnd } from './railTrainModel'
@@ -635,5 +641,292 @@ describe('railModel', () => {
       expect(closedStation.position).toEqual(originalStation.position)
       expect(closedStation.rotationY).toBe(originalStation.rotationY)
     })
+  })
+})
+
+/**
+ * Issue #251: 分岐を含む主要線路パーツ（直線・短い直線・カーブ・分岐）の
+ * 接続規格（RAIL_UNIT_LENGTH=5基準）を固定するための回帰テスト群。
+ */
+describe('rail junction connectivity spec (issue #251)', () => {
+  function vecDelta(a: RailPiece['connectorA']['localPosition'], b: RailPiece['connectorA']['localPosition']) {
+    return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }
+  }
+
+  /** connectionsグラフだけをBFSし、到達ノード数と辺数（重複カウント÷2）を返す。 */
+  function graphComponent(pieces: readonly RailPiece[], startId: string) {
+    const map = new Map(pieces.map((piece) => [piece.id, piece]))
+    const visited = new Set<string>([startId])
+    const queue: string[] = [startId]
+    let endpointCount = 0
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+      if (currentId === undefined) break
+      const piece = map.get(currentId)
+      if (piece === undefined) continue
+      for (const connectorId of getRailConnectorIds(piece)) {
+        const connection = piece.connections[connectorId]
+        if (connection === undefined) continue
+        endpointCount += 1
+        if (!visited.has(connection.pieceId)) {
+          visited.add(connection.pieceId)
+          queue.push(connection.pieceId)
+        }
+      }
+    }
+    return { nodeCount: visited.size, edgeCount: endpointCount / 2 }
+  }
+
+  /**
+   * branch1(A-B)→straight→straight→branch2(A-B) を本線、
+   * branch1.C→curve→straight→curve を副線として組み立てる（最後の
+   * curve.Bとbranch2.Cはまだ接続しない状態で返す＝代表ループ1）。
+   */
+  function buildBranchBypassLoop(branch1RotationY = 0): RailPiece[] {
+    let pieces: RailPiece[] = [createRailPiece('branch', 'branch1', origin, branch1RotationY)]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: RailConnectorId,
+      targetId: string,
+      targetConnectorId: RailConnectorId,
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('straight', 'straight1'))
+    connect('straight1', 'a', 'branch1', 'b')
+    add(createRailPiece('straight', 'straight2'))
+    connect('straight2', 'a', 'straight1', 'b')
+    add(createRailPiece('branch', 'branch2'))
+    connect('branch2', 'a', 'straight2', 'b')
+
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'branch1', 'c')
+    add(createRailPiece('straight', 'straight3'))
+    connect('straight3', 'a', 'curve1', 'b')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'straight3', 'b')
+
+    return pieces
+  }
+
+  /**
+   * branch(A-B)を含むオーバル（直線+カーブ2+直線2+カーブ2）を組み立てる
+   * （最後のcurve.Bとbranch.Aはまだ接続しない状態で返す＝代表ループ2）。
+   */
+  function buildBranchOvalLoop(): RailPiece[] {
+    let pieces: RailPiece[] = [createRailPiece('branch', 'branch', origin)]
+    const add = (piece: RailPiece) => { pieces = [...pieces, piece] }
+    const connect = (
+      movingId: string,
+      movingConnectorId: RailConnectorId,
+      targetId: string,
+      targetConnectorId: RailConnectorId,
+    ) => { pieces = connectRailPieces(pieces, movingId, movingConnectorId, targetId, targetConnectorId) }
+
+    add(createRailPiece('straight', 'straight1'))
+    connect('straight1', 'a', 'branch', 'b')
+    add(createRailPiece('curve', 'curve1', origin, 0, 'right'))
+    connect('curve1', 'a', 'straight1', 'b')
+    add(createRailPiece('curve', 'curve2', origin, 0, 'right'))
+    connect('curve2', 'a', 'curve1', 'b')
+    add(createRailPiece('straight', 'straight2'))
+    connect('straight2', 'a', 'curve2', 'b')
+    add(createRailPiece('straight', 'straight3'))
+    connect('straight3', 'a', 'straight2', 'b')
+    add(createRailPiece('curve', 'curve3', origin, 0, 'right'))
+    connect('curve3', 'a', 'straight3', 'b')
+    add(createRailPiece('curve', 'curve4', origin, 0, 'right'))
+    connect('curve4', 'a', 'curve3', 'b')
+
+    return pieces
+  }
+
+  it('keeps STRAIGHT/SHORT_STRAIGHT/BRANCH/CURVE tied to the shared RAIL_UNIT_LENGTH', () => {
+    expect(STRAIGHT_LENGTH).toBe(RAIL_UNIT_LENGTH)
+    expect(BRANCH_LENGTH).toBe(RAIL_UNIT_LENGTH)
+    expect(SHORT_STRAIGHT_LENGTH * 2).toBe(RAIL_UNIT_LENGTH)
+    expect(CURVE_RADIUS).toBe(RAIL_UNIT_LENGTH)
+    expect(BRANCH_SPREAD).toBe(CURVE_RADIUS)
+  })
+
+  it('places straight/short-straight/curve/branch connectors at the spec\'d local endpoints', () => {
+    const straight = createRailPiece('straight', 'straight', origin)
+    expect(straight.connectorA.localPosition).toEqual({ x: -2.5, y: 0, z: 0 })
+    expect(straight.connectorA.outward).toEqual({ x: -1, y: 0, z: 0 })
+    expect(straight.connectorB.localPosition).toEqual({ x: 2.5, y: 0, z: 0 })
+    expect(straight.connectorB.outward).toEqual({ x: 1, y: 0, z: 0 })
+
+    const shortStraight = createRailPiece('short-straight', 'short-straight', origin)
+    expect(shortStraight.connectorA.localPosition).toEqual({ x: -1.25, y: 0, z: 0 })
+    expect(shortStraight.connectorA.outward).toEqual({ x: -1, y: 0, z: 0 })
+    expect(shortStraight.connectorB.localPosition).toEqual({ x: 1.25, y: 0, z: 0 })
+    expect(shortStraight.connectorB.outward).toEqual({ x: 1, y: 0, z: 0 })
+
+    const curveLeft = createRailPiece('curve', 'curve-left', origin, 0, 'left')
+    expect(curveLeft.connectorA.localPosition).toEqual({ x: 0, y: 0, z: -5 })
+    expect(curveLeft.connectorA.outward).toEqual({ x: -1, y: 0, z: 0 })
+    expect(curveLeft.connectorB.localPosition).toEqual({ x: 5, y: 0, z: 0 })
+    expect(curveLeft.connectorB.outward).toEqual({ x: 0, y: 0, z: 1 })
+
+    const curveRight = createRailPiece('curve', 'curve-right', origin, 0, 'right')
+    expect(curveRight.connectorA.localPosition).toEqual({ x: 0, y: 0, z: -5 })
+    expect(curveRight.connectorA.outward).toEqual({ x: 1, y: 0, z: 0 })
+    expect(curveRight.connectorB.localPosition).toEqual({ x: -5, y: 0, z: 0 })
+    expect(curveRight.connectorB.outward).toEqual({ x: 0, y: 0, z: 1 })
+
+    const branch = createRailPiece('branch', 'branch', origin)
+    expect(branch.connectorA.localPosition).toEqual({ x: -2.5, y: 0, z: 0 })
+    expect(branch.connectorA.outward).toEqual({ x: -1, y: 0, z: 0 })
+    expect(branch.connectorB.localPosition).toEqual({ x: 2.5, y: 0, z: 0 })
+    expect(branch.connectorB.outward).toEqual({ x: 1, y: 0, z: 0 })
+    expect(branch.connectorC?.localPosition).toEqual({ x: 2.5, y: 0, z: 5 })
+    expect(branch.connectorC?.outward).toEqual({ x: 0, y: 0, z: 1 })
+  })
+
+  it('keeps every major piece\'s connector world pose on the 0.5 grid at y=0 across 0/90/180/270°', () => {
+    const rotations = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
+    // 事前に手計算済みの期待値（rotateYの規約: +Xを回すと-Z側へ進む）。
+    const expectedStraight = [
+      { a: [-2.5, 0], aOut: [-1, 0], b: [2.5, 0], bOut: [1, 0] },
+      { a: [0, 2.5], aOut: [0, 1], b: [0, -2.5], bOut: [0, -1] },
+      { a: [2.5, 0], aOut: [1, 0], b: [-2.5, 0], bOut: [-1, 0] },
+      { a: [0, -2.5], aOut: [0, -1], b: [0, 2.5], bOut: [0, 1] },
+    ] as const
+    const expectedCurveLeft = [
+      { a: [0, -5], aOut: [-1, 0], b: [5, 0], bOut: [0, 1] },
+      { a: [-5, 0], aOut: [0, 1], b: [0, -5], bOut: [1, 0] },
+      { a: [0, 5], aOut: [1, 0], b: [-5, 0], bOut: [0, -1] },
+      { a: [5, 0], aOut: [0, -1], b: [0, 5], bOut: [-1, 0] },
+    ] as const
+    const expectedBranch = [
+      { a: [-2.5, 0], aOut: [-1, 0], c: [2.5, 5], cOut: [0, 1] },
+      { a: [0, 2.5], aOut: [0, 1], c: [5, -2.5], cOut: [1, 0] },
+      { a: [2.5, 0], aOut: [1, 0], c: [-2.5, -5], cOut: [0, -1] },
+      { a: [0, -2.5], aOut: [0, -1], c: [-5, 2.5], cOut: [-1, 0] },
+    ] as const
+
+    function expectXZ(actual: { x: number; y: number; z: number }, expected: readonly [number, number]) {
+      expect(actual.y).toBe(0)
+      expect(actual.x).toBeCloseTo(expected[0], 9)
+      expect(actual.z).toBeCloseTo(expected[1], 9)
+    }
+
+    rotations.forEach((rotationY, index) => {
+      const straight = createRailPiece('straight', `straight-${index}`, origin, rotationY)
+      expectXZ(worldConnectorForRailPiece(straight, 'a').position, expectedStraight[index].a)
+      expectXZ(worldConnectorForRailPiece(straight, 'a').outward, expectedStraight[index].aOut)
+      expectXZ(worldConnectorForRailPiece(straight, 'b').position, expectedStraight[index].b)
+      expectXZ(worldConnectorForRailPiece(straight, 'b').outward, expectedStraight[index].bOut)
+
+      const curve = createRailPiece('curve', `curve-${index}`, origin, rotationY, 'left')
+      expectXZ(worldConnectorForRailPiece(curve, 'a').position, expectedCurveLeft[index].a)
+      expectXZ(worldConnectorForRailPiece(curve, 'a').outward, expectedCurveLeft[index].aOut)
+      expectXZ(worldConnectorForRailPiece(curve, 'b').position, expectedCurveLeft[index].b)
+      expectXZ(worldConnectorForRailPiece(curve, 'b').outward, expectedCurveLeft[index].bOut)
+
+      const branch = createRailPiece('branch', `branch-${index}`, origin, rotationY)
+      expectXZ(worldConnectorForRailPiece(branch, 'a').position, expectedBranch[index].a)
+      expectXZ(worldConnectorForRailPiece(branch, 'a').outward, expectedBranch[index].aOut)
+      expectXZ(worldConnectorForRailPiece(branch, 'c').position, expectedBranch[index].c)
+      expectXZ(worldConnectorForRailPiece(branch, 'c').outward, expectedBranch[index].cOut)
+    })
+  })
+
+  it('branch = straight ∪ curve sharing entry A: A→B matches straight, and A→C matches a curve fed the same way', () => {
+    const branch = createRailPiece('branch', 'branch', origin)
+    const straight = createRailPiece('straight', 'straight-ref', origin)
+    expect(vecDelta(branch.connectorB.localPosition, branch.connectorA.localPosition))
+      .toEqual(vecDelta(straight.connectorB.localPosition, straight.connectorA.localPosition))
+
+    // branch.Aは「外から見た入口」の姿勢を持つ。合同な2本のアンカー(straight)
+    // へ、それぞれbranchとcurveのAをconnectRailPiecesで同じようにつなぐと、
+    // 両方のAはワールド上でまったく同じ位置・向きになる
+    // （＝branchのAに直接カーブを置いたときと同じ状況を作れる）。
+    const anchorForBranch = createRailPiece('straight', 'anchor-for-branch')
+    const anchoredBranch = connectRailPieces([anchorForBranch, branch], branch.id, 'a', anchorForBranch.id, 'b')
+      .find((piece) => piece.id === branch.id)!
+
+    const anchorForCurve = createRailPiece('straight', 'anchor-for-curve')
+    const curve = createRailPiece('curve', 'curve', origin, 0, 'left')
+    const anchoredCurve = connectRailPieces([anchorForCurve, curve], curve.id, 'a', anchorForCurve.id, 'b')
+      .find((piece) => piece.id === curve.id)!
+
+    const branchC = worldConnectorForRailPiece(anchoredBranch, 'c')
+    const curveB = worldConnectorForRailPiece(anchoredCurve, 'b')
+    expect(distanceBetweenRailPoints(branchC.position, curveB.position)).toBeLessThan(1e-9)
+    expect(curveB.outward.x).toBeCloseTo(branchC.outward.x, 9)
+    expect(curveB.outward.y).toBeCloseTo(branchC.outward.y, 9)
+    expect(curveB.outward.z).toBeCloseTo(branchC.outward.z, 9)
+  })
+
+  it('closes the two-branch bypass loop exactly, before the final joint is ever connected (representative loop 1)', () => {
+    const beforeClosing = buildBranchBypassLoop()
+    const curve2 = beforeClosing.find((piece) => piece.id === 'curve2')!
+    const branch2 = beforeClosing.find((piece) => piece.id === 'branch2')!
+    const curve2B = worldConnectorForRailPiece(curve2, 'b')
+    const branch2C = worldConnectorForRailPiece(branch2, 'c')
+
+    expect(distanceBetweenRailPoints(curve2B.position, branch2C.position)).toBeLessThan(1e-6)
+    expect(Math.abs(curve2B.position.y - branch2C.position.y)).toBeLessThan(1e-9)
+    const outwardDot = curve2B.outward.x * branch2C.outward.x
+      + curve2B.outward.y * branch2C.outward.y
+      + curve2B.outward.z * branch2C.outward.z
+    expect(outwardDot).toBeCloseTo(-1, 9)
+
+    const snapCandidate = findRailSnapCandidate(curve2, beforeClosing, 'b')
+    expect(snapCandidate).not.toBeNull()
+    expect(snapCandidate?.targetPieceId).toBe('branch2')
+    expect(snapCandidate?.targetConnectorId).toBe('c')
+    expect(snapCandidate?.distance).toBeLessThan(1e-6)
+
+    const closed = connectRailPieces(beforeClosing, 'curve2', 'b', 'branch2', 'c')
+    expect(areRailConnectionsSymmetric(closed)).toBe(true)
+    const component = graphComponent(closed, 'branch1')
+    // 7ピース・7辺（ノード数と同じ）＝閉路がちょうど1つ含まれる。
+    expect(component.nodeCount).toBe(7)
+    expect(component.edgeCount).toBe(7)
+  })
+
+  it('closes a single-branch oval loop exactly, before the final joint is ever connected (representative loop 2)', () => {
+    const beforeClosing = buildBranchOvalLoop()
+    const curve4 = beforeClosing.find((piece) => piece.id === 'curve4')!
+    const branch = beforeClosing.find((piece) => piece.id === 'branch')!
+    const curve4B = worldConnectorForRailPiece(curve4, 'b')
+    const branchA = worldConnectorForRailPiece(branch, 'a')
+
+    expect(distanceBetweenRailPoints(curve4B.position, branchA.position)).toBeLessThan(1e-6)
+    expect(Math.abs(curve4B.position.y - branchA.position.y)).toBeLessThan(1e-9)
+    const outwardDot = curve4B.outward.x * branchA.outward.x
+      + curve4B.outward.y * branchA.outward.y
+      + curve4B.outward.z * branchA.outward.z
+    expect(outwardDot).toBeCloseTo(-1, 9)
+
+    const snapCandidate = findRailSnapCandidate(curve4, beforeClosing, 'b')
+    expect(snapCandidate).not.toBeNull()
+    expect(snapCandidate?.targetPieceId).toBe('branch')
+    expect(snapCandidate?.targetConnectorId).toBe('a')
+    expect(snapCandidate?.distance).toBeLessThan(1e-6)
+
+    const closed = connectRailPieces(beforeClosing, 'curve4', 'b', 'branch', 'a')
+    expect(areRailConnectionsSymmetric(closed)).toBe(true)
+    const component = graphComponent(closed, 'branch')
+    // 8ピース・8辺（ノード数と同じ）＝閉路がちょうど1つ含まれる。
+    expect(component.nodeCount).toBe(8)
+    expect(component.edgeCount).toBe(8)
+  })
+
+  it('still closes the two-branch bypass loop exactly when the starting branch begins rotated 90°', () => {
+    const beforeClosing = buildBranchBypassLoop(Math.PI / 2)
+    const curve2 = beforeClosing.find((piece) => piece.id === 'curve2')!
+    const branch2 = beforeClosing.find((piece) => piece.id === 'branch2')!
+    const curve2B = worldConnectorForRailPiece(curve2, 'b')
+    const branch2C = worldConnectorForRailPiece(branch2, 'c')
+
+    expect(distanceBetweenRailPoints(curve2B.position, branch2C.position)).toBeLessThan(1e-6)
+    expect(Math.abs(curve2B.position.y - branch2C.position.y)).toBeLessThan(1e-9)
+    const outwardDot = curve2B.outward.x * branch2C.outward.x
+      + curve2B.outward.y * branch2C.outward.y
+      + curve2B.outward.z * branch2C.outward.z
+    expect(outwardDot).toBeCloseTo(-1, 9)
   })
 })
