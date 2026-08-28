@@ -43,8 +43,8 @@ docs/                          # 設計、運用、素材クレジット
 - `:level` は `easy` / `normal` / `hard` のみを受け付ける。
 - URLパラメータは型ガードで検証し、不正値は同じモードの設定画面へ `replace` で戻す。
 - 結果のように画面遷移stateが必要なURLへ直接アクセスされた場合は、ゲーム開始画面へ安全に戻す。
-- GitHub Pagesでの直接リロードを成立させるため、アプリは `HashRouter` を維持する。
-- 新規ゲーム追加時はホームのカード、ルート定義、ルートを通すComponent Testを同時に追加する。
+- アプリは `BrowserRouter` を採用しており、各ゲームは `/games/<game-id>` の固有パスURLを持つ。GitHub Pagesは静的ホスティングでサーバー側ルーティングを持たないため、ビルド時（`src/build/staticRoutePages.ts`）にゲームごとの静的HTMLと、より深いURL向けのSPAフォールバックとして `404.html` を生成することで、直接アクセスやリロードが404にならないようにしている。
+- 新規ゲーム追加時は `src/games/gameCatalog.ts` にエントリを追加する（ホームのカードと固有URLの静的ページ生成が同時に揃う）。あわせてルート定義とルートを通すComponent Testを同時に追加する。
 
 ## 4. 子ども向けUIとアクセシビリティ
 
