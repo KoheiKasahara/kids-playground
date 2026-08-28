@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   boostThinRingForOverview,
-  createOverviewHaloTexture,
   createOverviewLabelTexture,
   createOverviewSurfaceTexture,
 } from './overviewVisual'
@@ -53,13 +52,6 @@ describe('createOverviewSurfaceTexture', () => {
     expect(createOverviewSurfaceTexture(earth.surface)).toBeNull()
     expect(() => createOverviewSurfaceTexture(jupiter.surface)).not.toThrow()
     expect(createOverviewSurfaceTexture(jupiter.surface)).toBeNull()
-  })
-})
-
-describe('createOverviewHaloTexture', () => {
-  it('jsdomでは例外を投げずnullを返す', () => {
-    expect(() => createOverviewHaloTexture('#ffba4c')).not.toThrow()
-    expect(createOverviewHaloTexture('#ffba4c')).toBeNull()
   })
 })
 

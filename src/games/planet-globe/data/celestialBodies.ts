@@ -40,15 +40,6 @@ export const celestialBodies: readonly CelestialBody[] = [
     // フォールバックが同じ値を読むため維持する)。
     lighting: { keyIntensity: 2.0, ambientIntensity: 0.55, hemisphereIntensity: 0.4, fillIntensity: 0.42 },
     zoom: { outMargin: 1.15, inMargin: 0.6 },
-    visual: {
-      // 表面テクスチャと別の、非常に薄い発光の縁。Bloomやparticleを使わず恒星感を足す。
-      halo: { color: '#ffba4c', opacity: 0.46, scale: 3.1 },
-      // 半透明の1枚膜によるコロナ。既存の`visual.atmosphere`(usePlanetEngine.tsに汎用的に
-      // 実装済みだが、これまでどの天体も指定していなかった経路)をそのまま流用するだけで、
-      // 新しいメッシュ生成コードを増やさずに済む。
-      // scaleを広めにして、球のすぐ外側が濃い輪に見えないよう外側へなだらかに薄まるようにする。
-      atmosphere: { color: '#ffa25a', opacity: 0.16, scale: 1.22 },
-    },
     surface: {
       style: 'gas',
       baseColor: '#ffcf5e',

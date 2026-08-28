@@ -86,32 +86,6 @@ export function createOverviewSurfaceTexture(surface: SurfaceSpec): THREE.Canvas
   return texture
 }
 
-/** 太陽の周囲へ重ねる、低負荷な放射状の発光テクスチャ(individual viewのcreateHaloTextureを全体表示向けに縮小)。 */
-export function createOverviewHaloTexture(color: string): THREE.CanvasTexture | null {
-  const size = 128
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = get2dContext(canvas)
-  if (ctx === null) return null
-
-  const rgb = new THREE.Color(color)
-  const r = Math.round(rgb.r * 255)
-  const g = Math.round(rgb.g * 255)
-  const b = Math.round(rgb.b * 255)
-  const gradient = ctx.createRadialGradient(size / 2, size / 2, size * 0.22, size / 2, size / 2, size / 2)
-  gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`)
-  gradient.addColorStop(0.55, `rgba(${r}, ${g}, ${b}, 0.16)`)
-  gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`)
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, size, size)
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.needsUpdate = true
-  return texture
-}
-
 /**
  * 土星のように複数セグメントの帯が既に太い輪は、全体表示の縮小スケールでもリングらしさが
  * 残るためそのまま使う。天王星のような細く淡い1本だけの輪は縮小するとほぼ見えなくなり、
