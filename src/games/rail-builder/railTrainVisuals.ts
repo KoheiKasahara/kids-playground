@@ -89,6 +89,21 @@ export type TrainShellSection = {
   width: number
 }
 
+/**
+ * E5の車両間に見せる簡易幌の共有寸法。
+ *
+ * 走行中に車両間の姿勢が変わっても、各車両の端面から中央の境界までを
+ * 半分ずつ受け持つ。Three.js側のgeometry生成と配置を同じ純粋データから
+ * 組み立てることで、直線・カーブの両方で接続の意図を保ちやすくする。
+ */
+export const E5_GANGWAY_SPEC = {
+  length: 0.24,
+  height: 0.46,
+  width: 0.58,
+  centerY: 0.76,
+  positionOffset: 0.12,
+} as const
+
 /** E5先頭車の後端から低く長い鼻先までをつなぐ連続19断面。
  *
  * x方向は一定ピッチに揃え、屋根の終わりからコックピット、鼻先へ
@@ -105,17 +120,20 @@ export const E5_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
   { x: -0.14, top: 1.22, bottom: 0.49, width: 0.88 },
   // The taper starts just ahead of the cabin instead of leaving a round
   // block at the front of the body.
-  { x: 0.01, top: 1.219, bottom: 0.491, width: 0.878 },
-  { x: 0.16, top: 1.216, bottom: 0.494, width: 0.874 },
-  { x: 0.31, top: 1.210, bottom: 0.498, width: 0.866 },
-  { x: 0.46, top: 1.198, bottom: 0.503, width: 0.854 },
-  { x: 0.61, top: 1.180, bottom: 0.510, width: 0.840 },
-  { x: 0.76, top: 1.155, bottom: 0.520, width: 0.800 },
-  { x: 0.91, top: 1.120, bottom: 0.533, width: 0.750 },
-  { x: 1.06, top: 1.075, bottom: 0.549, width: 0.690 },
-  { x: 1.21, top: 1.020, bottom: 0.568, width: 0.620 },
-  { x: 1.36, top: 0.950, bottom: 0.590, width: 0.540 },
-  { x: 1.51, top: 0.860, bottom: 0.614, width: 0.450 },
+  // The shoulder-to-nose slope now changes at a steadier rate.  This keeps
+  // the cabin roof, cockpit and nose reading as one continuous toy shell
+  // from a three-quarter view, without changing the established envelope.
+  { x: 0.01, top: 1.218, bottom: 0.491, width: 0.878 },
+  { x: 0.16, top: 1.213, bottom: 0.494, width: 0.874 },
+  { x: 0.31, top: 1.204, bottom: 0.498, width: 0.866 },
+  { x: 0.46, top: 1.190, bottom: 0.503, width: 0.852 },
+  { x: 0.61, top: 1.171, bottom: 0.510, width: 0.830 },
+  { x: 0.76, top: 1.146, bottom: 0.520, width: 0.798 },
+  { x: 0.91, top: 1.114, bottom: 0.533, width: 0.755 },
+  { x: 1.06, top: 1.074, bottom: 0.549, width: 0.700 },
+  { x: 1.21, top: 1.024, bottom: 0.568, width: 0.632 },
+  { x: 1.36, top: 0.955, bottom: 0.590, width: 0.552 },
+  { x: 1.51, top: 0.860, bottom: 0.614, width: 0.457 },
   { x: 1.66, top: 0.770, bottom: 0.630, width: 0.360 },
 ] as const
 
@@ -135,10 +153,10 @@ export type TrainWindshieldSection = {
 export const E5_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSection[] = [
   // A slightly wider rear station lets the glass meet both shell shoulders;
   // it then tapers toward the low nose instead of reading as a top plate.
-  { x: 0.34, width: 0.64 },
-  { x: 0.43, width: 0.68 },
-  { x: 0.62, width: 0.62 },
-  { x: 0.84, width: 0.53 },
+  { x: 0.34, width: 0.68 },
+  { x: 0.43, width: 0.72 },
+  { x: 0.62, width: 0.66 },
+  { x: 0.84, width: 0.57 },
 ] as const
 
 export type TrainShellAccentBand = {
@@ -341,8 +359,11 @@ const E5_MIDDLE: TrainCarVisualProfile = {
   accentLength: 1.82,
   accentHeight: 0.07,
   accentY: 0.8,
-  sideWindowXs: [-0.32, 0.18],
+  // The longer middle car gets a third, compact window.  Lead/rear keep the
+  // two-window arrangement so the cockpit area remains visually distinct.
+  sideWindowXs: [-0.38, 0.04, 0.46],
   sideWindowY: 0.97,
+  // E5 side windows use one shared BufferGeometry for all three cars.
   sideWindowWidth: 0.26,
   sideWindowHeight: 0.16,
   frontWindowX: 0,

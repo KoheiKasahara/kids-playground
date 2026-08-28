@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TRAIN_TYPES } from './railFleetModel'
 import {
+  E5_GANGWAY_SPEC,
   E5_FRONT_WINDSHIELD_SECTIONS,
   E5_LEAD_SHELL_SECTIONS,
   TRAIN_VISUAL_PROFILES,
@@ -47,7 +48,11 @@ describe('railTrainVisuals', () => {
     expect(middle.hasFrontWindow).toBe(false)
     expect(middle.hasHeadlights).toBe(false)
     expect(middle.bodyWidth).toBe(lead.bodyWidth)
-    expect(middle.sideWindowXs).toEqual(lead.sideWindowXs)
+    expect(lead.sideWindowXs).toHaveLength(2)
+    expect(middle.sideWindowXs).toHaveLength(3)
+    expect(middle.sideWindowXs[0]!).toBeGreaterThan(-middle.bodyLength / 2)
+    expect(middle.sideWindowXs.at(-1)!).toBeLessThan(middle.bodyLength / 2)
+    expect(middle.sideWindowWidth).toBeLessThanOrEqual(lead.sideWindowWidth)
   })
 
   it('uses a three-car E5 formation with the lead shell facing outward at both ends', () => {
@@ -188,6 +193,18 @@ describe('railTrainVisuals', () => {
       expect(current.width).toBeLessThan(shellWidth)
       expect(current.width).toBeGreaterThanOrEqual(shellWidth * 0.65)
     }
+  })
+
+  it('keeps the E5 gangway as a lightweight half-span connection', () => {
+    expect(E5_GANGWAY_SPEC.length).toBeGreaterThan(0.2)
+    expect(E5_GANGWAY_SPEC.length).toBeLessThan(0.3)
+    expect(E5_GANGWAY_SPEC.height).toBeGreaterThanOrEqual(0.44)
+    expect(E5_GANGWAY_SPEC.height).toBeLessThanOrEqual(0.48)
+    expect(E5_GANGWAY_SPEC.width).toBeGreaterThanOrEqual(0.56)
+    expect(E5_GANGWAY_SPEC.width).toBeLessThanOrEqual(0.6)
+    expect(E5_GANGWAY_SPEC.centerY).toBeGreaterThanOrEqual(0.75)
+    expect(E5_GANGWAY_SPEC.centerY).toBeLessThanOrEqual(0.78)
+    expect(E5_GANGWAY_SPEC.positionOffset).toBeCloseTo(E5_GANGWAY_SPEC.length / 2, 8)
   })
 
   it('gives each new train a dedicated silhouette, nose, and color treatment', () => {

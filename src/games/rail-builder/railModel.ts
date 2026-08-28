@@ -594,6 +594,50 @@ export function worldRailPathPoint(piece: RailPiece, t: number, path: RailPath =
   return worldPointForRailPiece(piece, sampleRailPath(path, t))
 }
 
+/**
+ * 描画される線路全体のローカル中心。
+ *
+ * 直線系の原点は中心にある一方、カーブは入口側に、分岐は主線の中心に
+ * 原点が置かれている。配置済みパーツを回すときはこの中心を固定し、
+ * ユーザーから見てパーツがその場で回るようにする。
+ */
+export function localRailPieceVisualCenter(piece: RailPiece): RailVec3 {
+  const paths = [piece.path, piece.branchPath, piece.secondaryPath].filter(
+    (path): path is RailPath => path !== undefined,
+  )
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  let minZ = Number.POSITIVE_INFINITY
+  let maxZ = Number.NEGATIVE_INFINITY
+
+  // Curve / quadratic の途中の張り出しも含めるため、端点だけではなく
+  // 実際の描画と同じ path を一定間隔でサンプルする。
+  for (const path of paths) {
+    for (let index = 0; index <= 24; index += 1) {
+      const point = sampleRailPath(path, index / 24)
+      minX = Math.min(minX, point.x)
+      maxX = Math.max(maxX, point.x)
+      minY = Math.min(minY, point.y)
+      maxY = Math.max(maxY, point.y)
+      minZ = Math.min(minZ, point.z)
+      maxZ = Math.max(maxZ, point.z)
+    }
+  }
+
+  return vec(
+    (minX + maxX) / 2,
+    (minY + maxY) / 2,
+    (minZ + maxZ) / 2,
+  )
+}
+
+/** 描画上のパーツ中心をワールド座標で返す。 */
+export function worldRailPieceVisualCenter(piece: RailPiece): RailVec3 {
+  return worldPointForRailPiece(piece, localRailPieceVisualCenter(piece))
+}
+
 /** パスの実距離。曲線も弦長ではなく、列車が走る弧の長さを返す。 */
 export function railPathLength(path: RailPath): number {
   if (path.kind === 'straight') {
@@ -881,7 +925,16 @@ export function rotateRailPiece(
 ): RailPiece[] {
   const piece = pieces.find((candidate) => candidate.id === pieceId)
   if (piece === undefined) return pieces.map(clonePiece)
-  return moveRailPiece(pieces, pieceId, { rotationY: piece.rotationY + angle })
+  const rotationY = piece.rotationY + angle
+  const localCenter = localRailPieceVisualCenter(piece)
+  const beforeCenterOffset = rotateY(localCenter, piece.rotationY)
+  const afterCenterOffset = rotateY(localCenter, rotationY)
+
+  // position は描画Groupの原点。非対称パーツでは原点固定だけだと
+  // 見た目の中心が公転してしまうため、回転前後の中心オフセット差だけ
+  // Group位置を補正して、ワールド上のパーツ中心を固定する。
+  const position = add(piece.position, subtract(beforeCenterOffset, afterCenterOffset))
+  return moveRailPiece(pieces, pieceId, { position, rotationY })
 }
 
 export const rotatePiece = rotateRailPiece
