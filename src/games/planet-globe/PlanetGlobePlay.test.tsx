@@ -21,12 +21,14 @@ vi.mock('./three/usePlanetEngine', () => ({
 
 const overviewEngineMock = vi.hoisted(() => ({
   options: undefined as UseSolarSystemOverviewEngineOptions | undefined,
+  zoomIn: vi.fn(),
+  zoomOut: vi.fn(),
 }))
 
 vi.mock('./three/useSolarSystemOverviewEngine', () => ({
   useSolarSystemOverviewEngine: (options: UseSolarSystemOverviewEngineOptions) => {
     overviewEngineMock.options = options
-    return { registerContainer: () => undefined }
+    return { registerContainer: () => undefined, zoomIn: overviewEngineMock.zoomIn, zoomOut: overviewEngineMock.zoomOut }
   },
 }))
 
@@ -58,6 +60,8 @@ beforeEach(() => {
 afterEach(() => {
   planetEngineMock.options = undefined
   overviewEngineMock.options = undefined
+  overviewEngineMock.zoomIn.mockReset()
+  overviewEngineMock.zoomOut.mockReset()
 })
 
 describe('PlanetGlobePlay', () => {
@@ -363,6 +367,27 @@ describe('PlanetGlobePlay の全体表示モード(Phase 6)', () => {
 
     await user.click(screen.getByRole('button', { name: /うごかす/ }))
     expect(overviewEngineMock.options?.playing).toBe(true)
+  })
+
+  it('全体表示でも個別観察と同じズームUIを表示し、操作を全体表示エンジンへ渡す', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶみる/ }))
+    const zoomInButton = screen.getByRole('button', { name: 'もっと ちかづく' })
+    const zoomOutButton = screen.getByRole('button', { name: 'もっと はなれる' })
+
+    expect(zoomOutButton).toBeDisabled()
+    await user.click(zoomInButton)
+    expect(overviewEngineMock.zoomIn).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      overviewEngineMock.options?.onZoomAvailabilityChange({ canZoomIn: true, canZoomOut: true })
+    })
+    expect(zoomOutButton).toBeEnabled()
+    await user.click(zoomOutButton)
+    expect(overviewEngineMock.zoomOut).toHaveBeenCalledTimes(1)
   })
 
   it('全体表示モードでも「もどる」でホームへ戻れる', async () => {

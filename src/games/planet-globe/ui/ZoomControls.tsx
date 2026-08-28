@@ -1,14 +1,14 @@
-import type { ZoomLevel } from '../types'
-import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL } from '../types'
 import styles from './ZoomControls.module.css'
 
 type ZoomControlsProps = {
-  zoomLevel: ZoomLevel
+  canZoomIn: boolean
+  canZoomOut: boolean
   onZoomIn: () => void
   onZoomOut: () => void
 }
 
-export default function ZoomControls({ zoomLevel, onZoomIn, onZoomOut }: ZoomControlsProps) {
+/** 個別観察・全体表示で共通に使う、右下のカメラズーム操作。 */
+export default function ZoomControls({ canZoomIn, canZoomOut, onZoomIn, onZoomOut }: ZoomControlsProps) {
   return (
     <div className={styles.controls}>
       <button
@@ -16,7 +16,7 @@ export default function ZoomControls({ zoomLevel, onZoomIn, onZoomOut }: ZoomCon
         className={styles.button}
         aria-label="もっと ちかづく"
         onClick={onZoomIn}
-        disabled={zoomLevel >= MAX_ZOOM_LEVEL}
+        disabled={!canZoomIn}
       >
         <span aria-hidden="true">＋</span>
       </button>
@@ -25,7 +25,7 @@ export default function ZoomControls({ zoomLevel, onZoomIn, onZoomOut }: ZoomCon
         className={styles.button}
         aria-label="もっと はなれる"
         onClick={onZoomOut}
-        disabled={zoomLevel <= MIN_ZOOM_LEVEL}
+        disabled={!canZoomOut}
       >
         <span aria-hidden="true">−</span>
       </button>

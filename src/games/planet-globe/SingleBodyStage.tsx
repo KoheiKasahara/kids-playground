@@ -54,7 +54,8 @@ export default function SingleBodyStage({
       <FeatureCard spot={selectedSpot} onClose={() => onSpotSelect(null)} />
 
       <ZoomControls
-        zoomLevel={zoomLevel}
+        canZoomIn={zoomLevel < MAX_ZOOM_LEVEL}
+        canZoomOut={zoomLevel > MIN_ZOOM_LEVEL}
         onZoomIn={() => onZoomChange(Math.min(MAX_ZOOM_LEVEL, zoomLevel + 1) as ZoomLevel)}
         onZoomOut={() => onZoomChange(Math.max(MIN_ZOOM_LEVEL, zoomLevel - 1) as ZoomLevel)}
       />

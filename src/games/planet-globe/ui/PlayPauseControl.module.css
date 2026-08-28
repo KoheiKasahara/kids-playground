@@ -6,6 +6,14 @@
   pointer-events: auto;
 }
 
+/* ±の2ボタン(高さ2個+間隔)の上に、さらに小さな間隔を空けて置く。 */
+.aboveZoomControls {
+  bottom: calc(
+    var(--space-md) + var(--tap-target-min) + var(--tap-target-min)
+    + var(--space-sm) + var(--space-sm)
+  );
+}
+
 .button {
   min-width: var(--tap-target-min);
   min-height: var(--tap-target-min);

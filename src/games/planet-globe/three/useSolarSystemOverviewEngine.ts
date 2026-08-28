@@ -43,6 +43,8 @@ const OVERVIEW_VIEW_DIRECTION = { x: 0.52, y: 0.62, z: 0.94 } as const
 const OUTER_VIEW_MARGIN = 1.2
 /** 内惑星へ寄れる最短距離を決めるための仮想半径(水星と地球の軌道の中間程度)。 */
 const INNER_FIT_RADIUS = 150
+/** +/−ボタン1回で変えるカメラ距離の比率。 */
+const BUTTON_ZOOM_RATIO = 0.76
 
 const ORBIT_LINE_SEGMENTS = 96
 const ORBIT_LINE_COLOR = '#93a5df'
@@ -78,6 +80,8 @@ type InteractiveBody = {
 
 type Engine = {
   setPlaying: (playing: boolean) => void
+  zoomIn: () => void
+  zoomOut: () => void
 }
 
 export function useSolarSystemOverviewEngine(
@@ -95,7 +99,18 @@ export function useSolarSystemOverviewEngine(
     containerRef.current = element
   }, [])
 
-  const handle = useMemo<UseSolarSystemOverviewEngineHandle>(() => ({ registerContainer }), [registerContainer])
+  const zoomIn = useCallback(() => {
+    engineRef.current?.zoomIn()
+  }, [])
+
+  const zoomOut = useCallback(() => {
+    engineRef.current?.zoomOut()
+  }, [])
+
+  const handle = useMemo<UseSolarSystemOverviewEngineHandle>(
+    () => ({ registerContainer, zoomIn, zoomOut }),
+    [registerContainer, zoomIn, zoomOut],
+  )
 
   useEffect(() => {
     const containerElement = containerRef.current
@@ -142,6 +157,7 @@ export function useSolarSystemOverviewEngine(
     let rafId: number | null = null
     let lastFrameTime: number | null = null
     let released = false
+    let previousZoomAvailability: { canZoomIn: boolean; canZoomOut: boolean } | null = null
 
     function aspectOfContainer(): number {
       const rect = container.getBoundingClientRect()
@@ -402,6 +418,39 @@ export function useSolarSystemOverviewEngine(
       }
     }
 
+    function notifyZoomAvailability() {
+      if (camera === null || controls === null) return
+      const distance = camera.position.distanceTo(controls.target)
+      // 浮動小数点のわずかな誤差でボタンの有効/無効がちらつかないよう余裕を持たせる。
+      const epsilon = Math.max(0.01, (controls.maxDistance - controls.minDistance) * 0.001)
+      const availability = {
+        canZoomIn: distance > controls.minDistance + epsilon,
+        canZoomOut: distance < controls.maxDistance - epsilon,
+      }
+      if (
+        previousZoomAvailability?.canZoomIn === availability.canZoomIn
+        && previousZoomAvailability.canZoomOut === availability.canZoomOut
+      ) return
+      previousZoomAvailability = availability
+      optionsRef.current.onZoomAvailabilityChange(availability)
+    }
+
+    function zoomBy(ratio: number) {
+      if (camera === null || controls === null) return
+      const currentDistance = camera.position.distanceTo(controls.target)
+      const nextDistance = THREE.MathUtils.clamp(
+        currentDistance * ratio,
+        controls.minDistance,
+        controls.maxDistance,
+      )
+      if (nextDistance !== currentDistance) {
+        const direction = camera.position.clone().sub(controls.target).normalize()
+        camera.position.copy(controls.target).add(direction.multiplyScalar(nextDistance))
+        controls.update()
+      }
+      notifyZoomAvailability()
+    }
+
     function resizeRenderer() {
       if (renderer === null || camera === null) return
       const rect = container.getBoundingClientRect()
@@ -424,6 +473,7 @@ export function useSolarSystemOverviewEngine(
           controls.update()
         }
       }
+      notifyZoomAvailability()
     }
 
     function setPlaying(next: boolean) {
@@ -481,6 +531,7 @@ export function useSolarSystemOverviewEngine(
         canvas.removeEventListener('pointerleave', handlePointerLeave)
       }
 
+      controls?.removeEventListener('change', notifyZoomAvailability)
       controls?.dispose()
       controls = null
 
@@ -584,8 +635,13 @@ export function useSolarSystemOverviewEngine(
       controls.maxPolarAngle = degToRad(82)
       updateControlsLimits()
       controls.update()
+      controls.addEventListener('change', notifyZoomAvailability)
 
-      engineRef.current = { setPlaying }
+      engineRef.current = {
+        setPlaying,
+        zoomIn: () => zoomBy(BUTTON_ZOOM_RATIO),
+        zoomOut: () => zoomBy(1 / BUTTON_ZOOM_RATIO),
+      }
 
       resizeRenderer()
 

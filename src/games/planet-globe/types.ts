@@ -341,9 +341,15 @@ export type UseSolarSystemOverviewEngineOptions = {
   playing: boolean
   /** 天体がタップされたときに呼ぶ。個別観察へ切り替える入口として使う。 */
   onSelectBody: (id: CelestialBodyId) => void
+  /** カメラ距離が両端に達したかをUIへ伝える。 */
+  onZoomAvailabilityChange: (availability: { canZoomIn: boolean; canZoomOut: boolean }) => void
 }
 
 export type UseSolarSystemOverviewEngineHandle = {
   /** 3D描画先のdivを登録するrefコールバック(nullで解除)。 */
   registerContainer: (element: HTMLDivElement | null) => void
+  /** 一覧表示のカメラを一段階近づける。 */
+  zoomIn: () => void
+  /** 一覧表示のカメラを一段階離す。 */
+  zoomOut: () => void
 }
