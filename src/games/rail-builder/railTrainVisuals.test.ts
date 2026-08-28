@@ -4,6 +4,9 @@ import {
   E5_GANGWAY_SPEC,
   E5_FRONT_WINDSHIELD_SECTIONS,
   E5_LEAD_SHELL_SECTIONS,
+  DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS,
+  DOCTOR_YELLOW_GANGWAY_SPEC,
+  DOCTOR_YELLOW_LEAD_SHELL_SECTIONS,
   TRAIN_SPECS,
   TRAIN_VISUAL_PROFILES,
   getTrainCarVisualYaw,
@@ -247,7 +250,7 @@ describe('railTrainVisuals', () => {
     ]).size).toBeGreaterThanOrEqual(3)
     expect(e6.lead.sideWindowXs.length).toBe(2)
     expect(n700s.lead.sideWindowXs.length).toBe(3)
-    expect(doctorYellow.lead.sideWindowXs.length).toBe(1)
+    expect(doctorYellow.lead.sideWindowXs.length).toBe(2)
     expect(e6.accent.color).toBe('#b8bdc4')
     expect(n700s.accent.color).toBe('#2e64cb')
     expect(doctorYellow.accent.color).toBe('#19457a')
@@ -264,9 +267,77 @@ describe('railTrainVisuals', () => {
     expect(doctorYellow.accent.color).toBe('#19457a')
     expect(doctorYellow.lead.bodyHeight).toBeGreaterThan(0.65)
     expect(doctorYellow.lead.noseLength).toBeGreaterThan(1)
-    expect(doctorYellow.lead.sideWindowXs).toHaveLength(1)
+    expect(doctorYellow.lead.sideWindowXs).toHaveLength(2)
     expect(doctorYellow.middle.noseLength).toBe(0)
-    expect(doctorYellow.middle.sideWindowXs).toHaveLength(1)
+    expect(doctorYellow.middle.sideWindowXs).toHaveLength(3)
+    expect(doctorYellow.gangway).toEqual(DOCTOR_YELLOW_GANGWAY_SPEC)
+    expect(doctorYellow.leadShellSections).toEqual(DOCTOR_YELLOW_LEAD_SHELL_SECTIONS)
+    expect(doctorYellow.frontWindshieldSections).toEqual(DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS)
+  })
+
+  it('defines Doctor Yellow as a continuous, smoothly tapered lead shell', () => {
+    expect(DOCTOR_YELLOW_LEAD_SHELL_SECTIONS.length).toBeGreaterThanOrEqual(14)
+    expect(DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[0]!.x).toBe(-1.04)
+    expect(DOCTOR_YELLOW_LEAD_SHELL_SECTIONS.at(-1)!.x).toBe(1.36)
+    expect(DOCTOR_YELLOW_LEAD_SHELL_SECTIONS.at(-1)!.x - DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[0]!.x).toBeGreaterThan(2.3)
+    for (let index = 1; index < DOCTOR_YELLOW_LEAD_SHELL_SECTIONS.length; index += 1) {
+      const previous = DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[index - 1]!
+      const current = DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[index]!
+      expect(current.x).toBeGreaterThan(previous.x)
+      expect(current.top).toBeLessThanOrEqual(previous.top)
+      expect(current.bottom).toBeGreaterThanOrEqual(previous.bottom)
+      expect(current.width).toBeLessThanOrEqual(previous.width)
+      expect(current.width / 2).toBeLessThanOrEqual(0.5)
+      expect(current.top).toBeLessThanOrEqual(1.39)
+    }
+    const xSteps = DOCTOR_YELLOW_LEAD_SHELL_SECTIONS.slice(1).map((section, index) => section.x - DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[index]!.x)
+    expect(Math.max(...xSteps) - Math.min(...xSteps)).toBeLessThan(1e-6)
+    const topSteps = DOCTOR_YELLOW_LEAD_SHELL_SECTIONS.slice(1).map((section, index) => DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[index]!.top - section.top)
+    const widthSteps = DOCTOR_YELLOW_LEAD_SHELL_SECTIONS.slice(1).map((section, index) => DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[index]!.width - section.width)
+    expect(Math.max(...topSteps)).toBeLessThanOrEqual(0.12)
+    expect(Math.max(...widthSteps)).toBeLessThanOrEqual(0.1)
+    for (let index = 1; index < topSteps.length; index += 1) {
+      expect(Math.abs(topSteps[index]! - topSteps[index - 1]!)).toBeLessThanOrEqual(0.04)
+      expect(Math.abs(widthSteps[index]! - widthSteps[index - 1]!)).toBeLessThanOrEqual(0.04)
+    }
+  })
+
+  it('keeps Doctor Yellow windshield stations inside the lead shell envelope', () => {
+    expect(DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS.length).toBeGreaterThanOrEqual(4)
+    expect(DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS[0]!.x).toBeGreaterThan(0.2)
+    expect(DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS.at(-1)!.x).toBeLessThan(1.1)
+    for (let index = 1; index < DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS.length; index += 1) {
+      const previous = DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS[index - 1]!
+      const current = DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS[index]!
+      expect(current.x).toBeGreaterThan(previous.x)
+      if (index > 1) expect(current.width).toBeLessThan(previous.width)
+      let shellWidth = DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[0]!.width
+      for (let shellIndex = 1; shellIndex < DOCTOR_YELLOW_LEAD_SHELL_SECTIONS.length; shellIndex += 1) {
+        const shellPrevious = DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[shellIndex - 1]!
+        const shellCurrent = DOCTOR_YELLOW_LEAD_SHELL_SECTIONS[shellIndex]!
+        if (current.x <= shellCurrent.x) {
+          const amount = (current.x - shellPrevious.x) / (shellCurrent.x - shellPrevious.x)
+          shellWidth = shellPrevious.width + (shellCurrent.width - shellPrevious.width) * amount
+          break
+        }
+      }
+      expect(current.width).toBeLessThan(shellWidth)
+      expect(current.width).toBeGreaterThanOrEqual(shellWidth * 0.65)
+    }
+  })
+
+  it('keeps Doctor Yellow doors clear of side windows on every car', () => {
+    const doctorYellow = resolveTrainSpec('doctorYellow')
+    // trainDoorFrameGeometry is 0.44 wide in the shared renderer; leave the
+    // full frame plus a window half-width between the visual centers.
+    const doorFrameHalfWidth = 0.22
+    for (const profile of [doctorYellow.lead, doctorYellow.middle]) {
+      for (const windowX of profile.sideWindowXs) {
+        expect(Math.abs(windowX - profile.doorX)).toBeGreaterThanOrEqual(
+          doorFrameHalfWidth + profile.sideWindowWidth / 2,
+        )
+      }
+    }
   })
 
   it('keeps every profile inside the shared toy-train envelope', () => {

@@ -51,12 +51,10 @@ import {
   shouldReduceRailBuilderMotion,
 } from './railBuilderVisuals'
 import {
-  E5_FRONT_WINDSHIELD_SECTIONS,
-  E5_LEAD_SHELL_SECTIONS,
   getTrainCarVisualYaw,
   getTrainCarVisualProfile,
   getTrainFormationRoles,
-  getE5LeadShellAccentBand,
+  getLeadShellAccentBand,
   resolveTrainSpec,
   type TrainCarRole,
   type TrainCarVisualProfile,
@@ -170,7 +168,7 @@ type SpecialTrainVisualDefinition = {
   /** Optional accent ribbon following an integrated lead shell's side width. */
   leadAccentGeometry?: THREE.BufferGeometry
   /** Optional E5-only low-cost details; future train types can opt in as needed. */
-  splitNoseColor?: boolean
+  splitShellColor?: boolean
   /** Lead body geometry already includes the nose and must be rendered as one shell. */
   integratedLeadShell?: boolean
   sideCockpitWindows?: boolean
@@ -320,6 +318,28 @@ function noseSectionRing(section: NoseSection, style: NoseStyle): readonly [numb
       [-halfWidth, section.top - cornerHeight],
     ]
   }
+  if (style === 'doctor-yellow-duck') {
+    // A broad, softly crowned shoulder makes the yellow train feel chunky
+    // and toy-like while keeping the lower side almost vertical.  It is a
+    // distinct profile from E5's narrow wedge, but uses the same lightweight
+    // ring topology for predictable normals and draw cost.
+    const topCrown = Math.min(0.015, verticalRange * 0.05)
+    const lowerCrown = Math.min(0.01, verticalRange * 0.035)
+    return [
+      [-halfWidth * 0.68, section.top - cornerHeight * 0.38],
+      [-halfWidth * 0.34, section.top],
+      [0, section.top + topCrown],
+      [halfWidth * 0.34, section.top],
+      [halfWidth * 0.68, section.top - cornerHeight * 0.38],
+      [halfWidth, section.top - cornerHeight * 1.18],
+      [halfWidth, section.bottom + cornerHeight * 1.12],
+      [halfWidth * 0.72, section.bottom],
+      [0, section.bottom - lowerCrown],
+      [-halfWidth * 0.72, section.bottom],
+      [-halfWidth, section.bottom + cornerHeight * 1.12],
+      [-halfWidth, section.top - cornerHeight * 1.18],
+    ]
+  }
   return [
     [-halfWidth + cornerWidth, section.top],
     [halfWidth - cornerWidth, section.top],
@@ -332,11 +352,11 @@ function noseSectionRing(section: NoseSection, style: NoseStyle): readonly [numb
   ]
 }
 
-/** 複数断面の低ポリゴンnose。geometryはeffect初期化時にだけ生成する。 */
+/** 複数断面の低ポリゴンnose/shell。geometryはeffect初期化時にだけ生成する。 */
 function createNoseGeometry(
   sections: readonly NoseSection[],
   style: NoseStyle,
-  splitE5Color = false,
+  splitShellColor = false,
 ): THREE.BufferGeometry {
   const positions: number[] = []
   const rings = sections.map((section) => noseSectionRing(section, style))
@@ -357,7 +377,7 @@ function createNoseGeometry(
     const nextOffset = (sectionIndex + 1) * sectionSize
     for (let pointIndex = 0; pointIndex < sectionSize; pointIndex += 1) {
       const nextPointIndex = (pointIndex + 1) % sectionSize
-      const targetIndices = splitE5Color
+      const targetIndices = splitShellColor
         ? (pointIndex <= 4 || pointIndex === sectionSize - 1 ? upperIndices : lowerIndices)
         : indices
       targetIndices.push(
@@ -378,7 +398,7 @@ function createNoseGeometry(
     positions.push(section.x, (section.top + section.bottom) / 2, 0)
     for (let pointIndex = 0; pointIndex < sectionSize; pointIndex += 1) {
       const nextPointIndex = (pointIndex + 1) % sectionSize
-      const targetIndices = splitE5Color
+      const targetIndices = splitShellColor
         ? (pointIndex <= 4 || pointIndex === sectionSize - 1 ? upperIndices : lowerIndices)
         : indices
       targetIndices.push(
@@ -391,10 +411,10 @@ function createNoseGeometry(
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  const geometryIndices = splitE5Color ? upperIndices.concat(lowerIndices) : indices
+  const geometryIndices = splitShellColor ? upperIndices.concat(lowerIndices) : indices
   geometry.setIndex(geometryIndices)
-  if (splitE5Color) {
-    // Keep E5's green upper / light lower split to two draw groups, even though
+  if (splitShellColor) {
+    // Keep the upper/lower shell color split to two draw groups, even though
     // the low-poly loft has many individual surface strips.
     geometry.addGroup(0, upperIndices.length, 0)
     geometry.addGroup(upperIndices.length, lowerIndices.length, 1)
@@ -405,19 +425,18 @@ function createNoseGeometry(
   return geometry
 }
 
-/** E5先頭車の19断面・12頂点リングの連続ロフトシェル。 */
-function createE5LeadShellGeometry(): THREE.BufferGeometry {
-  return createNoseGeometry(E5_LEAD_SHELL_SECTIONS, 'e5-wide-wedge', true)
-}
-
-function interpolateE5ShellSection(x: number): Pick<TrainShellSection, 'top' | 'bottom' | 'width'> {
-  const first = E5_LEAD_SHELL_SECTIONS[0]!
-  const last = E5_LEAD_SHELL_SECTIONS[E5_LEAD_SHELL_SECTIONS.length - 1]!
+/** 任意の先頭シェル断面列を、ロフト上の座標へ補間する。 */
+function interpolateShellSection(
+  sections: readonly TrainShellSection[],
+  x: number,
+): Pick<TrainShellSection, 'top' | 'bottom' | 'width'> {
+  const first = sections[0]!
+  const last = sections[sections.length - 1]!
   if (x <= first.x) return first
   if (x >= last.x) return last
-  for (let index = 1; index < E5_LEAD_SHELL_SECTIONS.length; index += 1) {
-    const previous = E5_LEAD_SHELL_SECTIONS[index - 1]!
-    const current = E5_LEAD_SHELL_SECTIONS[index]!
+  for (let index = 1; index < sections.length; index += 1) {
+    const previous = sections[index - 1]!
+    const current = sections[index]!
     if (x <= current.x) {
       const span = current.x - previous.x
       const amount = span <= 0 ? 0 : (x - previous.x) / span
@@ -432,17 +451,23 @@ function interpolateE5ShellSection(x: number): Pick<TrainShellSection, 'top' | '
 }
 
 /**
- * Estimate the top surface of the 12-point E5 ring at a lateral offset. The
- * windshield uses the same three crown/shoulder breakpoints as the shell so
- * its outer vertices sit just proud of the curved surface instead of hovering
- * as a flat plate.
+ * Estimate the top surface of a 12-point lead-shell ring at a lateral offset.
+ * The windshield uses the same crown/shoulder breakpoints as the shell so its
+ * outer vertices sit just proud of the curved surface instead of hovering as
+ * a flat plate.
  */
-function interpolateE5ShellTopAtLateral(section: Pick<TrainShellSection, 'top' | 'bottom' | 'width'>, z: number): number {
+function interpolateShellTopAtLateral(
+  section: Pick<TrainShellSection, 'top' | 'bottom' | 'width'>,
+  z: number,
+  style: NoseStyle,
+): number {
   const halfWidth = Math.max(0.001, section.width / 2)
   const normalizedOffset = Math.min(1, Math.abs(z) / halfWidth)
   const verticalRange = Math.max(0.01, section.top - section.bottom)
   const cornerHeight = Math.min(0.07, verticalRange * 0.28)
-  const topCrown = Math.min(0.018, verticalRange * 0.06)
+  const topCrown = style === 'doctor-yellow-duck'
+    ? Math.min(0.015, verticalRange * 0.05)
+    : Math.min(0.018, verticalRange * 0.06)
   if (normalizedOffset <= 0.32) {
     const amount = normalizedOffset / 0.32
     return section.top + topCrown * (1 - amount)
@@ -452,17 +477,15 @@ function interpolateE5ShellTopAtLateral(section: Pick<TrainShellSection, 'top' |
     return section.top - cornerHeight * 0.4 * amount
   }
   const amount = (normalizedOffset - 0.68) / 0.32
-  return section.top - cornerHeight * (0.4 + 0.85 * amount)
+  const outerCornerFactor = style === 'doctor-yellow-duck' ? 0.8 : 0.85
+  return section.top - cornerHeight * (0.4 + outerCornerFactor * amount)
 }
 
-/**
- * Low-poly windshield ribbon laid over the integrated E5 shell. Each station
- * has outer shoulder vertices plus a modest centre crown, following the same
- * curved ring as the shell. It narrows toward the nose, so the glass reads as
- * part of the sloped roof rather than as a black box attached to the front.
- */
-function createE5FrontWindshieldGeometry(
-  sections: readonly TrainWindshieldSection[] = E5_FRONT_WINDSHIELD_SECTIONS,
+/** シェル断面へ沿う低ポリゴンのフロントガラスリボン。 */
+function createFrontWindshieldGeometry(
+  shellSections: readonly TrainShellSection[],
+  sections: readonly TrainWindshieldSection[],
+  style: NoseStyle,
 ): THREE.BufferGeometry {
   const positions: number[] = []
   const indices: number[] = []
@@ -471,24 +494,24 @@ function createE5FrontWindshieldGeometry(
 
   for (const section of sections) {
     const halfWidth = section.width / 2
-    const shellSection = interpolateE5ShellSection(section.x)
+    const shellSection = interpolateShellSection(shellSections, section.x)
     const shoulderHalfWidth = halfWidth * 0.98
     const innerHalfWidth = halfWidth * 0.46
     positions.push(
       section.x,
-      interpolateE5ShellTopAtLateral(shellSection, -shoulderHalfWidth) + shellClearance,
+      interpolateShellTopAtLateral(shellSection, -shoulderHalfWidth, style) + shellClearance,
       -shoulderHalfWidth,
       section.x,
-      interpolateE5ShellTopAtLateral(shellSection, -innerHalfWidth) + shellClearance + 0.004,
+      interpolateShellTopAtLateral(shellSection, -innerHalfWidth, style) + shellClearance + 0.004,
       -innerHalfWidth,
       section.x,
-      interpolateE5ShellTopAtLateral(shellSection, 0) + shellClearance + 0.012,
+      interpolateShellTopAtLateral(shellSection, 0, style) + shellClearance + 0.012,
       0,
       section.x,
-      interpolateE5ShellTopAtLateral(shellSection, innerHalfWidth) + shellClearance + 0.004,
+      interpolateShellTopAtLateral(shellSection, innerHalfWidth, style) + shellClearance + 0.004,
       innerHalfWidth,
       section.x,
-      interpolateE5ShellTopAtLateral(shellSection, shoulderHalfWidth) + shellClearance,
+      interpolateShellTopAtLateral(shellSection, shoulderHalfWidth, style) + shellClearance,
       shoulderHalfWidth,
     )
   }
@@ -520,8 +543,12 @@ function createE5FrontWindshieldGeometry(
   return geometry
 }
 
-/** E5先頭シェルの断面幅と上下端に沿う、両側面の薄いピンク帯。 */
-function createE5LeadAccentGeometry(height: number, centerY: number): THREE.BufferGeometry {
+/** 先頭シェルの幅・側面域に追従する軽量なアクセント帯。 */
+function createLeadShellAccentGeometry(
+  shellSections: readonly TrainShellSection[],
+  height: number,
+  centerY: number,
+): THREE.BufferGeometry {
   const positions: number[] = []
   const indices: number[] = []
   const sectionSize = 4
@@ -529,8 +556,8 @@ function createE5LeadAccentGeometry(height: number, centerY: number): THREE.Buff
   const stripDepth = 0.03
 
   for (const side of [-1, 1]) {
-    for (const section of E5_LEAD_SHELL_SECTIONS) {
-      const band = getE5LeadShellAccentBand(section, height, centerY)
+    for (const section of shellSections) {
+      const band = getLeadShellAccentBand(section, height, centerY)
       const innerZ = side * (section.width / 2 + shellInset)
       const outerZ = side * (section.width / 2 + shellInset + stripDepth)
       positions.push(
@@ -541,8 +568,8 @@ function createE5LeadAccentGeometry(height: number, centerY: number): THREE.Buff
       )
     }
 
-    const sideOffset = side === -1 ? 0 : E5_LEAD_SHELL_SECTIONS.length * sectionSize
-    for (let sectionIndex = 0; sectionIndex < E5_LEAD_SHELL_SECTIONS.length - 1; sectionIndex += 1) {
+    const sideOffset = side === -1 ? 0 : shellSections.length * sectionSize
+    for (let sectionIndex = 0; sectionIndex < shellSections.length - 1; sectionIndex += 1) {
       const current = sideOffset + sectionIndex * sectionSize
       const next = current + sectionSize
       // Keep the visible outer face wound away from the shell so the default
@@ -635,29 +662,6 @@ function createN700SNoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGe
       width: profile.noseTipWidth,
     },
   ], 'n700s-winged')
-}
-
-function createDoctorYellowNoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
-  return createNoseGeometry([
-    {
-      x: profile.noseBaseX,
-      top: profile.noseBaseTopY,
-      bottom: profile.noseBaseBottomY,
-      width: profile.noseBaseWidth,
-    },
-    {
-      x: profile.noseBaseX + profile.noseLength * 0.28,
-      top: profile.noseBaseTopY + 0.05,
-      bottom: profile.noseBaseBottomY + 0.01,
-      width: profile.noseBaseWidth,
-    },
-    {
-      x: profile.noseTipX,
-      top: profile.noseTipTopY,
-      bottom: profile.noseTipBottomY,
-      width: profile.noseTipWidth,
-    },
-  ], 'doctor-yellow-duck')
 }
 
 type StandardTrainGeometry = Pick<
@@ -885,7 +889,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const trainLightGeometry = new THREE.SphereGeometry(0.09, 8, 6)
     const e5Profile = resolveTrainSpec('e5')
     const e5GangwaySpec = e5Profile.gangway!
-    const e5LeadBodyGeometry = createE5LeadShellGeometry()
+    const e5LeadShellSections = e5Profile.leadShellSections!
+    const e5FrontWindshieldSections = e5Profile.frontWindshieldSections!
+    const e5LeadBodyGeometry = createNoseGeometry(e5LeadShellSections, 'e5-wide-wedge', true)
     const e5MiddleBodyGeometry = createE5BodyGeometry(e5Profile.middle)
     const e5LeadRoofGeometry = new RoundedBoxGeometry(
       e5Profile.lead.roofLength,
@@ -908,9 +914,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       1,
       0.008,
     )
-    const e5CockpitWindowGeometry = createE5FrontWindshieldGeometry()
+    const e5CockpitWindowGeometry = createFrontWindshieldGeometry(
+      e5LeadShellSections,
+      e5FrontWindshieldSections,
+      'e5-wide-wedge',
+    )
     const e5AccentGeometry = new THREE.BoxGeometry(1, e5Profile.accent.height, 0.04)
-    const e5LeadAccentGeometry = createE5LeadAccentGeometry(e5Profile.accent.height, e5Profile.accent.y)
+    const e5LeadAccentGeometry = createLeadShellAccentGeometry(
+      e5LeadShellSections,
+      e5Profile.accent.height,
+      e5Profile.accent.y,
+    )
     // E5-only details remain shared for the effect lifetime.  They are shallow
     // rounded blocks so the underframe reads clearly without a mesh per bolt.
     const e5UnderfloorGeometry = new RoundedBoxGeometry(1.42, 0.14, 0.7, 1, 0.04)
@@ -956,21 +970,46 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       accentDepth: 0.04,
     })
     const doctorYellowProfile = resolveTrainSpec('doctorYellow')
-    const doctorYellowNoseGeometry = createDoctorYellowNoseGeometry(doctorYellowProfile.lead)
-    const {
-      leadBodyGeometry: doctorYellowLeadBodyGeometry,
-      middleBodyGeometry: doctorYellowMiddleBodyGeometry,
-      leadRoofGeometry: doctorYellowLeadRoofGeometry,
-      middleRoofGeometry: doctorYellowMiddleRoofGeometry,
-      sideWindowGeometry: doctorYellowSideWindowGeometry,
-      cockpitWindowGeometry: doctorYellowCockpitWindowGeometry,
-      accentGeometry: doctorYellowAccentGeometry,
-    } = createStandardTrainGeometry(doctorYellowProfile, {
+    const doctorYellowLeadShellSections = doctorYellowProfile.leadShellSections!
+    const doctorYellowFrontWindshieldSections = doctorYellowProfile.frontWindshieldSections!
+    const doctorYellowStandardGeometry = createStandardTrainGeometry(doctorYellowProfile, {
       bodyBevelSize: 0.16,
       roofBevelSize: 0.07,
       cockpitWindowHeight: 0.24,
       accentDepth: 0.04,
     })
+    const doctorYellowLeadShellGeometry = createNoseGeometry(
+      doctorYellowLeadShellSections,
+      'doctor-yellow-duck',
+    )
+    const doctorYellowCockpitWindowGeometry = createFrontWindshieldGeometry(
+      doctorYellowLeadShellSections,
+      doctorYellowFrontWindshieldSections,
+      'doctor-yellow-duck',
+    )
+    const doctorYellowLeadAccentGeometry = createLeadShellAccentGeometry(
+      doctorYellowLeadShellSections,
+      doctorYellowProfile.accent.height,
+      doctorYellowProfile.accent.y,
+    )
+    const doctorYellowGangwaySpec = doctorYellowProfile.gangway!
+    const doctorYellowGangwayGeometry = new RoundedBoxGeometry(
+      doctorYellowGangwaySpec.length,
+      doctorYellowGangwaySpec.height,
+      doctorYellowGangwaySpec.width,
+      1,
+      0.035,
+    )
+    // The generic factory still provides the middle-car pieces and the
+    // fallback lead roof. Keep its unused lead body in the shared disposal
+    // set because the visible lead is replaced by the loft shell below.
+    const doctorYellowBoxLeadBodyGeometry = doctorYellowStandardGeometry.leadBodyGeometry
+    const doctorYellowLeadBodyGeometry = doctorYellowLeadShellGeometry
+    const doctorYellowMiddleBodyGeometry = doctorYellowStandardGeometry.middleBodyGeometry
+    const doctorYellowLeadRoofGeometry = doctorYellowStandardGeometry.leadRoofGeometry
+    const doctorYellowMiddleRoofGeometry = doctorYellowStandardGeometry.middleRoofGeometry
+    const doctorYellowSideWindowGeometry = doctorYellowStandardGeometry.sideWindowGeometry
+    const doctorYellowAccentGeometry = doctorYellowStandardGeometry.accentGeometry
     const doctorYellowInspectionBoxGeometry = new RoundedBoxGeometry(0.48, 0.1, 0.36, 2, 0.04)
     const bridgeBeamGeometry = new THREE.BoxGeometry(1, 0.26, 0.38)
     const bridgeSupportGeometry = new THREE.BoxGeometry(0.42, 1, 0.42)
@@ -1043,14 +1082,16 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       n700sSideWindowGeometry,
       n700sCockpitWindowGeometry,
       n700sAccentGeometry,
-      doctorYellowNoseGeometry,
       doctorYellowLeadBodyGeometry,
+      doctorYellowBoxLeadBodyGeometry,
       doctorYellowMiddleBodyGeometry,
       doctorYellowLeadRoofGeometry,
       doctorYellowMiddleRoofGeometry,
       doctorYellowSideWindowGeometry,
       doctorYellowCockpitWindowGeometry,
       doctorYellowAccentGeometry,
+      doctorYellowLeadAccentGeometry,
+      doctorYellowGangwayGeometry,
       doctorYellowInspectionBoxGeometry,
       bridgeBeamGeometry,
       bridgeSupportGeometry,
@@ -1272,6 +1313,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         accentGeometry: e5AccentGeometry,
         leadAccentGeometry: e5LeadAccentGeometry,
         integratedLeadShell: true,
+        splitShellColor: true,
         underfloorGeometry: e5UnderfloorGeometry,
         bogieGeometry: e5BogieGeometry,
         gangwayGeometry: e5GangwayGeometry,
@@ -1301,7 +1343,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }],
       ['doctorYellow', {
         spec: doctorYellowProfile,
-        noseGeometry: doctorYellowNoseGeometry,
         leadBodyGeometry: doctorYellowLeadBodyGeometry,
         middleBodyGeometry: doctorYellowMiddleBodyGeometry,
         leadRoofGeometry: doctorYellowLeadRoofGeometry,
@@ -1309,6 +1350,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         sideWindowGeometry: doctorYellowSideWindowGeometry,
         cockpitWindowGeometry: doctorYellowCockpitWindowGeometry,
         accentGeometry: doctorYellowAccentGeometry,
+        leadAccentGeometry: doctorYellowLeadAccentGeometry,
+        integratedLeadShell: true,
+        underfloorGeometry: e5UnderfloorGeometry,
+        bogieGeometry: e5BogieGeometry,
+        gangwayGeometry: doctorYellowGangwayGeometry,
+        wheelGeometry: e5WheelGeometry,
         roofFeatureGeometry: doctorYellowInspectionBoxGeometry,
       }],
     ])
@@ -1624,7 +1671,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
       const bodyGeometry = usesLeadVisual ? definition.leadBodyGeometry : definition.middleBodyGeometry
       const roofGeometry = usesLeadVisual ? definition.leadRoofGeometry : definition.middleRoofGeometry
-      const bodyMaterial: THREE.Material | THREE.Material[] = usesLeadVisual && definition.integratedLeadShell
+      const bodyMaterial: THREE.Material | THREE.Material[] = usesLeadVisual
+        && definition.integratedLeadShell
+        && definition.splitShellColor
         ? [runtime.frontMaterial, runtime.bodyMaterial]
         : runtime.bodyMaterial
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
@@ -1638,7 +1687,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       if (usesLeadVisual && !definition.integratedLeadShell && definition.noseGeometry !== undefined) {
         // ノーズ形状の座標はgeometry内へ焼き込み済み。ここではoffsetを加えず、
         // 先頭車だけへ一つの共有nose meshを追加する。
-        const noseMaterial: THREE.Material | THREE.Material[] = definition.splitNoseColor
+        const noseMaterial: THREE.Material | THREE.Material[] = definition.splitShellColor
           ? [runtime.frontMaterial, runtime.bodyMaterial]
           : runtime.frontMaterial
         const nose = new THREE.Mesh(definition.noseGeometry, noseMaterial)
@@ -1739,9 +1788,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }
 
       if (usesLeadVisual && definition.roofFeatureGeometry !== undefined && runtime.roofFeatureMaterial !== null) {
-        // 検測箱は低く一個だけ。車体の上端制約を越えない位置に置く。
+        // 検測箱は低く一個だけ。連続シェルでは、その場の上面へ直接
+        // 接地させ、旧来の別体roofを前提にした隙間を残さない。
         const feature = new THREE.Mesh(definition.roofFeatureGeometry, runtime.roofFeatureMaterial)
-        feature.position.set(profile.roofCenterX - 0.1, profile.roofCenterY + profile.roofHeight / 2 + 0.05, 0)
+        const featureX = profile.roofCenterX - 0.1
+        const shellSections = definition.spec.leadShellSections
+        const roofSurfaceY = definition.integratedLeadShell && shellSections !== undefined
+          ? interpolateShellSection(shellSections, featureX).top
+          : profile.roofCenterY + profile.roofHeight / 2
+        feature.position.set(featureX, roofSurfaceY + 0.05, 0)
         contentGroup.add(feature)
       }
 

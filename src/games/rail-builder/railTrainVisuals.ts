@@ -121,6 +121,20 @@ export const E5_GANGWAY_SPEC: TrainGangwaySpec = {
   positionOffset: 0.12,
 } as const
 
+/**
+ * ドクターイエロー風編成で車両間に見せる軽量な幌。
+ *
+ * E5と同じ接続寸法系を使い、車種ごとの巨大な描画分岐を増やさずに
+ * 3両編成の連続感を揃える。寸法は玩具表示向けに少し太めにしている。
+ */
+export const DOCTOR_YELLOW_GANGWAY_SPEC: TrainGangwaySpec = {
+  length: 0.24,
+  height: 0.46,
+  width: 0.6,
+  centerY: 0.76,
+  positionOffset: 0.12,
+} as const
+
 /** E5先頭車の後端から低く長い鼻先までをつなぐ連続19断面。
  *
  * x方向は一定ピッチに揃え、屋根の終わりからコックピット、鼻先へ
@@ -176,6 +190,41 @@ export const E5_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSection[] = [
   { x: 0.84, width: 0.57 },
 ] as const
 
+/**
+ * ドクターイエロー風先頭車の連続ロフト断面。
+ *
+ * E5より厚い肩を残した923形風の玩具シルエットにしつつ、屋根から
+ * 運転席・鼻先までを一つの低ポリゴンシェルでつなぐ。xは一定ピッチで、
+ * 先頭の丸みを保ったままスマホ表示でも流線形が読める密度に抑える。
+ */
+export const DOCTOR_YELLOW_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
+  { x: -1.04, top: 1.23, bottom: 0.45, width: 0.94 },
+  { x: -0.88, top: 1.23, bottom: 0.45, width: 0.94 },
+  { x: -0.72, top: 1.23, bottom: 0.45, width: 0.94 },
+  { x: -0.56, top: 1.23, bottom: 0.45, width: 0.94 },
+  { x: -0.40, top: 1.23, bottom: 0.45, width: 0.94 },
+  { x: -0.24, top: 1.228, bottom: 0.452, width: 0.936 },
+  { x: -0.08, top: 1.224, bottom: 0.456, width: 0.928 },
+  { x: 0.08, top: 1.216, bottom: 0.462, width: 0.914 },
+  { x: 0.24, top: 1.204, bottom: 0.470, width: 0.892 },
+  { x: 0.40, top: 1.188, bottom: 0.480, width: 0.862 },
+  { x: 0.56, top: 1.166, bottom: 0.492, width: 0.824 },
+  { x: 0.72, top: 1.138, bottom: 0.506, width: 0.778 },
+  { x: 0.88, top: 1.105, bottom: 0.522, width: 0.724 },
+  { x: 1.04, top: 1.065, bottom: 0.540, width: 0.664 },
+  { x: 1.20, top: 0.985, bottom: 0.562, width: 0.574 },
+  { x: 1.36, top: 0.875, bottom: 0.590, width: 0.480 },
+] as const
+
+/** シェルの斜面へ沿わせる、正面からも読める暗色フロントガラス。 */
+export const DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSection[] = [
+  { x: 0.24, width: 0.66 },
+  { x: 0.38, width: 0.70 },
+  { x: 0.58, width: 0.66 },
+  { x: 0.80, width: 0.58 },
+  { x: 1.00, width: 0.48 },
+] as const
+
 export type TrainShellAccentBand = {
   sideLower: number
   sideUpper: number
@@ -186,10 +235,10 @@ export type TrainShellAccentBand = {
 }
 
 /**
- * E5の12点リングで側面に当たる垂直域。帯と外装で同じcornerHeight式を
+ * 12点リングで側面に当たる垂直域。帯と外装で同じcornerHeight式を
  * 共有するための小さな純粋helper。リングの斜め角部へ帯を置かない。
  */
-export function getE5LeadShellAccentBand(
+export function getLeadShellAccentBand(
   section: TrainShellSection,
   requestedHeight: number,
   requestedCenterY: number,
@@ -213,6 +262,15 @@ export function getE5LeadShellAccentBand(
     centerY,
     height,
   }
+}
+
+/** @deprecated E5専用名を維持する互換alias。 */
+export function getE5LeadShellAccentBand(
+  section: TrainShellSection,
+  requestedHeight: number,
+  requestedCenterY: number,
+): TrainShellAccentBand {
+  return getLeadShellAccentBand(section, requestedHeight, requestedCenterY)
 }
 
 /**
@@ -253,6 +311,10 @@ export type TrainSpec = {
   formation: readonly TrainCarRole[]
   /** 幌を使う車種だけ定義する。 */
   gangway?: TrainGangwaySpec
+  /** 先頭車の連続ロフトを使う車種だけ定義する。 */
+  leadShellSections?: readonly TrainShellSection[]
+  /** 先頭車シェルに沿わせるフロントガラスの断面列。 */
+  frontWindshieldSections?: readonly TrainWindshieldSection[]
   lead: TrainCarVisualProfile
   middle: TrainCarVisualProfile
 }
@@ -552,39 +614,44 @@ const DOCTOR_YELLOW_LEAD: TrainCarVisualProfile = {
   role: 'lead',
   silhouette: 'doctor-yellow-duck-nose',
   noseStyle: 'doctor-yellow-duck',
-  bodyLength: 1.8,
+  // The body envelope meets the rear of the integrated shell at -1.04.
+  bodyLength: 2.0,
   bodyHeight: 0.7,
   bodyWidth: 0.94,
-  bodyCenterX: -0.14,
+  bodyCenterX: -0.04,
   bodyCenterY: 0.78,
-  roofLength: 1.86,
+  roofLength: 2.0,
   roofHeight: 0.14,
   roofWidth: 0.94,
-  roofCenterX: -0.14,
+  roofCenterX: -0.04,
   roofCenterY: 1.2,
-  noseLength: 1.05,
-  noseBaseX: 0.27,
-  noseTipX: 1.32,
+  // A longer shoulder-to-tip run gives the yellow train a readable
+  // Shinkansen profile without exceeding the shared toy-train envelope.
+  noseLength: 1.12,
+  noseBaseX: 0.24,
+  noseTipX: 1.36,
   noseBaseWidth: 0.94,
-  noseTipWidth: 0.34,
+  noseTipWidth: 0.48,
   noseBaseBottomY: 0.45,
-  noseBaseTopY: 1.06,
-  noseTipBottomY: 0.56,
-  noseTipTopY: 0.83,
-  accentLength: 1.52,
-  accentHeight: 0.11,
+  noseBaseTopY: 1.204,
+  noseTipBottomY: 0.59,
+  noseTipTopY: 0.875,
+  accentLength: 2.0,
+  accentHeight: 0.09,
   accentY: 0.78,
-  sideWindowXs: [-0.52],
-  sideWindowY: 0.99,
-  sideWindowWidth: 0.46,
-  sideWindowHeight: 0.23,
-  frontWindowX: 0.55,
-  frontWindowY: 0.93,
-  frontWindowWidth: 0.44,
-  doorX: -0.54,
-  headlightX: 1.22,
+  // Two compact side windows preserve a distinct cockpit while bringing the
+  // lead car's information density closer to E5's.
+  sideWindowXs: [-0.30, 0.16],
+  sideWindowY: 0.98,
+  sideWindowWidth: 0.26,
+  sideWindowHeight: 0.17,
+  frontWindowX: 0.56,
+  frontWindowY: 1.14,
+  frontWindowWidth: 0.66,
+  doorX: -0.78,
+  headlightX: 1.2,
   headlightY: 0.69,
-  headlightZ: 0.16,
+  headlightZ: 0.15,
   hasFrontWindow: true,
   hasHeadlights: true,
   couplerPositions: BASIC_COUPLER_POSITIONS,
@@ -607,10 +674,16 @@ const DOCTOR_YELLOW_MIDDLE: TrainCarVisualProfile = {
   noseBaseTopY: 0,
   noseTipBottomY: 0,
   noseTipTopY: 0,
+  // The middle car has three evenly spaced compact windows using the same
+  // height/width as the lead, which keeps the whole formation coherent.
+  sideWindowXs: [-0.24, 0.14, 0.52],
+  sideWindowY: 0.98,
+  sideWindowWidth: 0.26,
+  sideWindowHeight: 0.17,
   frontWindowX: 0,
   frontWindowY: 0,
   frontWindowWidth: 0,
-  doorX: -0.4,
+  doorX: -0.72,
   headlightX: 0,
   headlightY: 0,
   headlightZ: 0,
@@ -640,6 +713,8 @@ const E5_PROFILE: TrainSpec = {
   },
   formation: E5_THREE_CAR_FORMATION,
   gangway: E5_GANGWAY_SPEC,
+  leadShellSections: E5_LEAD_SHELL_SECTIONS,
+  frontWindshieldSections: E5_FRONT_WINDSHIELD_SECTIONS,
   lead: E5_LEAD,
   middle: E5_MIDDLE,
 }
@@ -704,7 +779,7 @@ const DOCTOR_YELLOW_PROFILE: TrainSpec = {
   frontExtent: DOCTOR_YELLOW_LEAD.noseTipX,
   rearExtent: -1.04,
   maxHalfWidth: 0.47,
-  accent: { color: '#19457a', height: 0.11, y: 0.78 },
+  accent: { color: '#19457a', height: 0.09, y: 0.78 },
   window: {
     color: '#294f77',
     sideXs: DOCTOR_YELLOW_LEAD.sideWindowXs,
@@ -712,6 +787,9 @@ const DOCTOR_YELLOW_PROFILE: TrainSpec = {
     sideHeight: DOCTOR_YELLOW_LEAD.sideWindowHeight,
   },
   formation: DOCTOR_YELLOW_THREE_CAR_FORMATION,
+  gangway: DOCTOR_YELLOW_GANGWAY_SPEC,
+  leadShellSections: DOCTOR_YELLOW_LEAD_SHELL_SECTIONS,
+  frontWindshieldSections: DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS,
   lead: DOCTOR_YELLOW_LEAD,
   middle: DOCTOR_YELLOW_MIDDLE,
 }
