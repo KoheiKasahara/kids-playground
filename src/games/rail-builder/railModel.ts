@@ -662,6 +662,31 @@ export function worldRailPieceVisualCenter(piece: RailPiece): RailVec3 {
   return worldPointForRailPiece(piece, localRailPieceVisualCenter(piece))
 }
 
+const RAIL_PIECE_VISUAL_DISTANCE_SAMPLES = 12
+
+/**
+ * 点(Raycastの交差点など)から、パーツの実際に描画されている線路パス
+ * (本線・分岐・depotの2番線)までの最短距離を返す。
+ *
+ * 掴み判定のヒット領域を実描画より広げたことで、密集した配置では複数パーツの
+ * ヒット領域が重なることがある。その際に「実際に見えている線路形状」へ最も
+ * 近いパーツを優先して選ぶために使う。
+ */
+export function distanceFromPointToRailPieceVisual(point: RailVec3, piece: RailPiece): number {
+  const paths = [piece.path, piece.branchPath, piece.secondaryPath].filter(
+    (path): path is RailPath => path !== undefined,
+  )
+  let minDistance = Number.POSITIVE_INFINITY
+  for (const path of paths) {
+    for (let index = 0; index <= RAIL_PIECE_VISUAL_DISTANCE_SAMPLES; index += 1) {
+      const sample = worldRailPathPoint(piece, index / RAIL_PIECE_VISUAL_DISTANCE_SAMPLES, path)
+      const distance = distanceBetweenRailPoints(point, sample)
+      if (distance < minDistance) minDistance = distance
+    }
+  }
+  return minDistance
+}
+
 /** パスの実距離。曲線も弦長ではなく、列車が走る弧の長さを返す。 */
 export function railPathLength(path: RailPath): number {
   if (path.kind === 'straight') {
