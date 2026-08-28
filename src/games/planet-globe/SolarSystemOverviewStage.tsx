@@ -1,7 +1,9 @@
+import { useCallback, useState } from 'react'
 import { celestialBodyById, solarSystemOverviewBodies } from './data/celestialBodies'
 import type { CelestialBodyId } from './types'
 import { useSolarSystemOverviewEngine } from './three/useSolarSystemOverviewEngine'
 import PlayPauseControl from './ui/PlayPauseControl'
+import ZoomControls from './ui/ZoomControls'
 import styles from './PlanetGlobePlay.module.css'
 
 type SolarSystemOverviewStageProps = {
@@ -18,17 +20,33 @@ const moon = celestialBodyById('moon')
  * 全体表示のレンダーループが個別観察モード中も裏で動き続けないようにする。
  */
 export default function SolarSystemOverviewStage({ playing, onTogglePlaying, onSelectBody }: SolarSystemOverviewStageProps) {
-  const { registerContainer } = useSolarSystemOverviewEngine({
+  const [zoomAvailability, setZoomAvailability] = useState({ canZoomIn: true, canZoomOut: false })
+  const handleZoomAvailabilityChange = useCallback((availability: { canZoomIn: boolean; canZoomOut: boolean }) => {
+    setZoomAvailability((current) => (
+      current.canZoomIn === availability.canZoomIn && current.canZoomOut === availability.canZoomOut
+        ? current
+        : availability
+    ))
+  }, [])
+
+  const { registerContainer, zoomIn, zoomOut } = useSolarSystemOverviewEngine({
     bodies: solarSystemOverviewBodies,
     moon,
     playing,
     onSelectBody,
+    onZoomAvailabilityChange: handleZoomAvailabilityChange,
   })
 
   return (
     <>
       <div ref={registerContainer} className={styles.scene} aria-hidden="true" />
-      <PlayPauseControl playing={playing} onToggle={onTogglePlaying} />
+      <PlayPauseControl playing={playing} onToggle={onTogglePlaying} aboveZoomControls />
+      <ZoomControls
+        canZoomIn={zoomAvailability.canZoomIn}
+        canZoomOut={zoomAvailability.canZoomOut}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+      />
     </>
   )
 }
