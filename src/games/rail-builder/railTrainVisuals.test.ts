@@ -7,6 +7,9 @@ import {
   DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS,
   DOCTOR_YELLOW_GANGWAY_SPEC,
   DOCTOR_YELLOW_LEAD_SHELL_SECTIONS,
+  N700S_FRONT_WINDSHIELD_SECTIONS,
+  N700S_GANGWAY_SPEC,
+  N700S_LEAD_SHELL_SECTIONS,
   TRAIN_SPECS,
   TRAIN_VISUAL_PROFILES,
   getTrainCarVisualYaw,
@@ -71,14 +74,15 @@ describe('railTrainVisuals', () => {
     expect(middle.sideWindowWidth).toBeLessThanOrEqual(lead.sideWindowWidth)
   })
 
-  it('uses three-car formations for E5 and Doctor Yellow with lead shells facing outward at both ends', () => {
+  it('uses three-car formations for E5, N700S, and Doctor Yellow with lead shells facing outward at both ends', () => {
     expect(getTrainFormationRoles('e5')).toEqual(['lead', 'middle', 'rear'])
+    expect(getTrainFormationRoles('n700s')).toEqual(['lead', 'middle', 'rear'])
     expect(getTrainFormationRoles('doctorYellow')).toEqual(['lead', 'middle', 'rear'])
-    for (const trainType of TRAIN_TYPES.filter((candidate) => candidate !== 'e5' && candidate !== 'doctorYellow')) {
+    for (const trainType of TRAIN_TYPES.filter((candidate) => candidate !== 'e5' && candidate !== 'n700s' && candidate !== 'doctorYellow')) {
       expect(getTrainFormationRoles(trainType)).toEqual(['lead', 'middle'])
     }
 
-    for (const trainType of ['e5', 'doctorYellow'] as const) {
+    for (const trainType of ['e5', 'n700s', 'doctorYellow'] as const) {
       const lead = getTrainCarVisualProfile(trainType, 'lead')
       const rear = getTrainCarVisualProfile(trainType, 'rear')
       expect(rear).toBe(lead)
@@ -249,12 +253,70 @@ describe('railTrainVisuals', () => {
       doctorYellow.lead.noseTipWidth,
     ]).size).toBeGreaterThanOrEqual(3)
     expect(e6.lead.sideWindowXs.length).toBe(2)
-    expect(n700s.lead.sideWindowXs.length).toBe(3)
+    expect(n700s.lead.sideWindowXs.length).toBe(2)
     expect(doctorYellow.lead.sideWindowXs.length).toBe(2)
     expect(e6.accent.color).toBe('#b8bdc4')
     expect(n700s.accent.color).toBe('#2e64cb')
     expect(doctorYellow.accent.color).toBe('#19457a')
     expect(new Set([e5.bodyColor, e6.bodyColor, n700s.bodyColor, doctorYellow.bodyColor]).size).toBe(4)
+  })
+
+  it('defines N700S as a broad white three-car shell with connected windshield and gangway data', () => {
+    const n700s = resolveTrainSpec('n700s')
+    expect(n700s.formation).toEqual(['lead', 'middle', 'rear'])
+    expect(n700s.gangway).toEqual(N700S_GANGWAY_SPEC)
+    expect(n700s.leadShellSections).toEqual(N700S_LEAD_SHELL_SECTIONS)
+    expect(n700s.frontWindshieldSections).toEqual(N700S_FRONT_WINDSHIELD_SECTIONS)
+    expect(n700s.windshieldCenterDivider).toBe(true)
+    expect(n700s.bodyColor).toBe('#f8faf9')
+    expect(n700s.roofColor).toBe('#ffffff')
+    expect(n700s.lead.bodyWidth).toBeGreaterThanOrEqual(0.94)
+    expect(n700s.lead.bodyWidth).toBeLessThanOrEqual(0.96)
+    expect(n700s.lead.sideWindowXs).toHaveLength(2)
+    expect(n700s.middle.sideWindowXs).toHaveLength(3)
+    expect(n700s.lead.noseLength).toBeLessThan(resolveTrainSpec('e5').noseLength)
+    expect(N700S_LEAD_SHELL_SECTIONS.length).toBeGreaterThanOrEqual(16)
+    expect(N700S_LEAD_SHELL_SECTIONS[0]!.x).toBe(-1.04)
+    expect(N700S_LEAD_SHELL_SECTIONS.at(-1)!.x).toBeGreaterThanOrEqual(1.35)
+    expect(N700S_LEAD_SHELL_SECTIONS.at(-1)!.x).toBeLessThanOrEqual(1.38)
+
+    const xSteps = N700S_LEAD_SHELL_SECTIONS.slice(1).map((section, index) => section.x - N700S_LEAD_SHELL_SECTIONS[index]!.x)
+    expect(Math.max(...xSteps) - Math.min(...xSteps)).toBeLessThan(1e-6)
+    for (let index = 1; index < N700S_LEAD_SHELL_SECTIONS.length; index += 1) {
+      const previous = N700S_LEAD_SHELL_SECTIONS[index - 1]!
+      const current = N700S_LEAD_SHELL_SECTIONS[index]!
+      expect(current.x).toBeGreaterThan(previous.x)
+      expect(current.top).toBeLessThanOrEqual(previous.top)
+      expect(current.bottom).toBeGreaterThanOrEqual(previous.bottom)
+      expect(current.width).toBeLessThanOrEqual(previous.width)
+      expect(current.width / 2).toBeLessThanOrEqual(0.5)
+    }
+
+    const shellWidthAt = (x: number): number => {
+      for (let index = 1; index < N700S_LEAD_SHELL_SECTIONS.length; index += 1) {
+        const previous = N700S_LEAD_SHELL_SECTIONS[index - 1]!
+        const current = N700S_LEAD_SHELL_SECTIONS[index]!
+        if (x <= current.x) {
+          const amount = (x - previous.x) / (current.x - previous.x)
+          return previous.width + (current.width - previous.width) * amount
+        }
+      }
+      return N700S_LEAD_SHELL_SECTIONS.at(-1)!.width
+    }
+    for (const [index, section] of N700S_FRONT_WINDSHIELD_SECTIONS.entries()) {
+      expect(section.width).toBeLessThan(shellWidthAt(section.x))
+      expect(section.width).toBeGreaterThanOrEqual(shellWidthAt(section.x) * 0.65)
+      if (index > 1) expect(section.width).toBeLessThan(N700S_FRONT_WINDSHIELD_SECTIONS[index - 1]!.width)
+    }
+
+    const doorFrameHalfWidth = 0.22
+    for (const profile of [n700s.lead, n700s.middle]) {
+      for (const windowX of profile.sideWindowXs) {
+        expect(Math.abs(windowX - profile.doorX)).toBeGreaterThanOrEqual(
+          doorFrameHalfWidth + profile.sideWindowWidth / 2,
+        )
+      }
+    }
   })
 
   it('defines Doctor Yellow as a clearly distinct three-car visual spec', () => {
