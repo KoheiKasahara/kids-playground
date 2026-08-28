@@ -75,11 +75,11 @@ type RailBuilderSelection =
 
 function nextSpawnPosition(pieces: readonly RailPiece[], cameraTarget: RailVec3): RailVec3 {
   for (const offset of SPAWN_OFFSETS) {
-    // 線路全体が50x50の地面からはみ出さない範囲に、現在見ている場所を基準に出す。
+    // 線路全体が100x100の地面からはみ出さない範囲に、現在見ている場所を基準に出す。
     const candidate = {
-      x: Math.min(20, Math.max(-20, cameraTarget.x + offset.x)),
+      x: Math.min(40, Math.max(-40, cameraTarget.x + offset.x)),
       y: 0,
-      z: Math.min(20, Math.max(-20, cameraTarget.z + offset.z)),
+      z: Math.min(40, Math.max(-40, cameraTarget.z + offset.z)),
     }
     const isOpen = pieces.every((piece) => {
       const dx = piece.position.x - candidate.x
@@ -90,9 +90,9 @@ function nextSpawnPosition(pieces: readonly RailPiece[], cameraTarget: RailVec3)
   }
   const index = pieces.length
   return {
-    x: Math.min(20, Math.max(-20, cameraTarget.x + ((index % 4) - 1.5) * 5)),
+    x: Math.min(40, Math.max(-40, cameraTarget.x + ((index % 4) - 1.5) * 5)),
     y: 0,
-    z: Math.min(20, Math.max(-20, cameraTarget.z + Math.floor(index / 4) * 5)),
+    z: Math.min(40, Math.max(-40, cameraTarget.z + Math.floor(index / 4) * 5)),
   }
 }
 

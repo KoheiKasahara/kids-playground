@@ -73,12 +73,14 @@ import {
   type RailTrainSoundController,
 } from '../../utils/quizSound'
 
-const WORLD_SIZE = 50
+const WORLD_SIZE = 100
 const WORLD_HALF_SIZE = WORLD_SIZE / 2
 const PAN_LIMIT = WORLD_HALF_SIZE - 4
 export const ZOOM_STEP = 0.14
-// 元のズーム範囲(0.72〜1.75)の上下に、+/-ボタン3段階ぶんずつ広げる
-export const MIN_ZOOM = 0.72 - ZOOM_STEP * 3
+// 元のズーム範囲(0.72〜1.75)の上下に、+/-ボタンぶん広げる。
+// マップが縦横2倍になった分、いちばん引いたときに全体を見渡せるよう
+// 縮小側だけ広めに(4段階ぶん)確保する。
+export const MIN_ZOOM = 0.72 - ZOOM_STEP * 4
 export const MAX_ZOOM = 1.75 + ZOOM_STEP * 3
 const DEFAULT_ZOOM = 1
 const BASE_VIEW_SIZE = 15
@@ -2958,15 +2960,16 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     }
 
     function addDioramaDecorations() {
+      // マップが縦横2倍になった分、地面の端に沿うようx/zも2倍の位置に広げる。
       const treePositions = [
-        { x: -22, y: 0.72, z: -21, scale: 1.05 },
-        { x: -19, y: 0.72, z: 21, scale: 0.9 },
-        { x: 21, y: 0.72, z: -20, scale: 1.12 },
-        { x: 23, y: 0.72, z: 20, scale: 0.9 },
-        { x: -22, y: 0.72, z: 8, scale: 0.84 },
-        { x: 22, y: 0.72, z: 8, scale: 0.88 },
-        { x: -8, y: 0.72, z: 22, scale: 0.82 },
-        { x: 9, y: 0.72, z: -22, scale: 0.86 },
+        { x: -44, y: 0.72, z: -42, scale: 1.05 },
+        { x: -38, y: 0.72, z: 42, scale: 0.9 },
+        { x: 42, y: 0.72, z: -40, scale: 1.12 },
+        { x: 46, y: 0.72, z: 40, scale: 0.9 },
+        { x: -44, y: 0.72, z: 16, scale: 0.84 },
+        { x: 44, y: 0.72, z: 16, scale: 0.88 },
+        { x: -16, y: 0.72, z: 44, scale: 0.82 },
+        { x: 18, y: 0.72, z: -44, scale: 0.86 },
       ]
       const trunks = new THREE.InstancedMesh(treeTrunkGeometry, treeTrunkMaterial, treePositions.length)
       const foliage = new THREE.InstancedMesh(treeFoliageGeometry, treeFoliageMaterial, treePositions.length)
@@ -2993,14 +2996,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       dioramaRoot.add(trunks, foliage)
 
       const shrubPositions = [
-        { x: -21, z: -12 },
-        { x: -20, z: -7 },
-        { x: -21, z: 14 },
-        { x: -13, z: 22 },
-        { x: 14, z: 22 },
-        { x: 20, z: 13 },
-        { x: 20, z: -13 },
-        { x: 14, z: -21 },
+        { x: -42, z: -24 },
+        { x: -40, z: -14 },
+        { x: -42, z: 28 },
+        { x: -26, z: 44 },
+        { x: 28, z: 44 },
+        { x: 40, z: 26 },
+        { x: 40, z: -26 },
+        { x: 28, z: -42 },
       ]
       const shrubs = new THREE.InstancedMesh(shrubGeometry, shrubMaterial, shrubPositions.length)
       shrubs.instanceMatrix.setUsage(THREE.StaticDrawUsage)
@@ -3018,9 +3021,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       dioramaRoot.add(shrubs)
 
       const houses = [
-        { x: -18, z: -16, rotation: 0.35 },
-        { x: 17, z: 16, rotation: -0.4 },
-        { x: -16, z: 17, rotation: 0.15 },
+        { x: -36, z: -32, rotation: 0.35 },
+        { x: 34, z: 32, rotation: -0.4 },
+        { x: -32, z: 34, rotation: 0.15 },
       ]
       houses.forEach((house, index) => {
         const group = new THREE.Group()
@@ -3051,7 +3054,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       scene = new THREE.Scene()
       scene.background = new THREE.Color('#cfeef3')
       scene.fog = new THREE.Fog('#cfeef3', 38, 78)
-      camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100)
+      // マップが2倍に広がった分、遠くの端を見ているときにクリップされないよう far を広げる。
+      camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 220)
       camera.position.copy(cameraTarget).add(cameraOffset)
       camera.lookAt(cameraTarget)
 
@@ -3097,12 +3101,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       directional.position.set(8, 18, 10)
       directional.castShadow = true
       directional.shadow.mapSize.set(getRailBuilderShadowMapSize(host.clientWidth, host.clientHeight), getRailBuilderShadowMapSize(host.clientWidth, host.clientHeight))
-      directional.shadow.camera.left = -28
-      directional.shadow.camera.right = 28
-      directional.shadow.camera.top = 28
-      directional.shadow.camera.bottom = -28
+      // マップが2倍に広がった分、影の描画範囲(地面全体)も合わせて広げる。
+      directional.shadow.camera.left = -55
+      directional.shadow.camera.right = 55
+      directional.shadow.camera.top = 55
+      directional.shadow.camera.bottom = -55
       directional.shadow.camera.near = 1
-      directional.shadow.camera.far = 70
+      directional.shadow.camera.far = 120
       scene.add(directional)
       resize()
       syncPieces(optionsRef.current.pieces, optionsRef.current.selectedPieceId)
