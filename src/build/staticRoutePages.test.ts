@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { applyCanonicalUrl, findMissingCanonicalTags } from './staticRoutePages'
+import { applyCanonicalUrl, applyPageSeoToHtml, findMissingCanonicalTags, findMissingSeoTags } from './staticRoutePages'
+import { buildGameSeo } from '../seo/pageSeo'
+import { findGameBySlug } from '../games/gameCatalog'
 
 const BASE_HTML = `<!doctype html>
 <html lang="ja">
@@ -66,5 +70,55 @@ describe('findMissingCanonicalTags', () => {
   test('両方無ければ両方を名指しする', () => {
     const html = '<html><head><title>タイトル</title></head><body></body></html>'
     expect(findMissingCanonicalTags(html)).toEqual(['<link rel="canonical">', '<meta property="og:url">'])
+  })
+})
+
+// 実際の index.html に対して、ビルド時と同じロジック（applyPageSeoToHtml /
+// findMissingSeoTags）が正しく動くことを確認する。index.htmlの書式（属性の改行など）と
+// staticRoutePages.ts側の正規表現が一致しなくなった場合に、このテストが最初に気づける。
+const INDEX_HTML_PATH = path.resolve(__dirname, '../../index.html')
+const REAL_INDEX_HTML = readFileSync(INDEX_HTML_PATH, 'utf-8')
+
+describe('applyPageSeoToHtml（実際のindex.htmlに対して）', () => {
+  const planetGlobe = findGameBySlug('planet-globe')
+  if (!planetGlobe) {
+    throw new Error('planet-globe が gameCatalog に見つかりません')
+  }
+  const seo = buildGameSeo(planetGlobe)
+
+  test('title / description / canonical / og:* / twitter:* を書き換えられる', () => {
+    const result = applyPageSeoToHtml(REAL_INDEX_HTML, seo)
+
+    expect(result).toContain(`<title>${seo.title}</title>`)
+    expect(result).toContain(`name="description"\n      content="${seo.description}"`)
+    expect(result).toContain(`<link rel="canonical" href="${seo.canonicalUrl}" />`)
+    expect(result).toContain(`<meta property="og:title" content="${seo.title}" />`)
+    expect(result).toContain(`property="og:description"\n      content="${seo.description}"`)
+    expect(result).toContain(`<meta property="og:url" content="${seo.canonicalUrl}" />`)
+    expect(result).toContain(`<meta property="og:type" content="${seo.ogType}" />`)
+    expect(result).toContain(`<meta property="og:image" content="${seo.ogImageUrl}" />`)
+    expect(result).toContain(`<meta name="twitter:title" content="${seo.title}" />`)
+    expect(result).toContain(`name="twitter:description"\n      content="${seo.description}"`)
+  })
+
+  test('書き換え後、対象タグはそれぞれ1個しか無い', () => {
+    const result = applyPageSeoToHtml(REAL_INDEX_HTML, seo)
+
+    expect(result.match(/<title>/g)).toHaveLength(1)
+    expect(result.match(/<meta\s+name="description"/g)).toHaveLength(1)
+    expect(result.match(/<link\s+rel="canonical"/g)).toHaveLength(1)
+    expect(result.match(/<meta\s+property="og:title"/g)).toHaveLength(1)
+    expect(result.match(/<meta\s+property="og:description"/g)).toHaveLength(1)
+    expect(result.match(/<meta\s+property="og:url"/g)).toHaveLength(1)
+    expect(result.match(/<meta\s+property="og:type"/g)).toHaveLength(1)
+    expect(result.match(/<meta\s+property="og:image"/g)).toHaveLength(1)
+    expect(result.match(/<meta\s+name="twitter:title"/g)).toHaveLength(1)
+    expect(result.match(/<meta\s+name="twitter:description"/g)).toHaveLength(1)
+  })
+})
+
+describe('findMissingSeoTags（実際のindex.htmlに対して）', () => {
+  test('index.htmlの書式と正規表現が一致しており、欠けているタグが無い', () => {
+    expect(findMissingSeoTags(REAL_INDEX_HTML)).toEqual([])
   })
 })
