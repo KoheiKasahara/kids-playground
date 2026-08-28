@@ -801,6 +801,43 @@ describe('running a train through facility loops (issue #253)', () => {
     expect(sawWaiting).toBe(false)
   })
 
+  it('keeps every car of the 3-car train on the station piece while stopped (issue #253 platform fit)', () => {
+    const loop = buildStationOvalLoop()
+    const station = loop.find((piece) => piece.id === 'station')!
+    const stationLength = railPathLength(station.path)
+
+    let motion: RailTrainMotion = {
+      cursor: { pieceId: 'straight2', direction: 'a-to-b', distance: 0.2 },
+      speed: 0,
+      status: 'running',
+    }
+    for (let tick = 0; tick < 4000 && motion.status !== 'stoppedAtStation'; tick += 1) {
+      motion = updateRailTrainMotion(motion, loop, 0.1)
+    }
+    expect(motion.status).toBe('stoppedAtStation')
+
+    // 停車位置はホーム中央。ここが駅長の設計根拠（3両編成がホームに収まること）。
+    expect(motion.cursor.distance).toBeCloseTo(stationLength / 2, 3)
+    // 編成長（先頭車中心〜最後尾車中心）がホーム中央から入口までに収まる。
+    // 駅長7ではこの差が負（最後尾が駅の外）になっていた。
+    const carSpan = TRAIN_CAR_SPACING * (TRAIN_CAR_COUNT - 1)
+    expect(stationLength / 2 - carSpan).toBeGreaterThanOrEqual(0)
+    // 先頭車の前端もホーム内に収まる。
+    expect(stationLength / 2 + TRAIN_END_STOP_MARGIN).toBeLessThanOrEqual(stationLength)
+    // 実際に3両すべての中心が、駅のコネクタAとBの間（＝ホームの上）に収まる。
+    const entry = worldConnectorForRailPiece(station, 'a').position
+    const exit = worldConnectorForRailPiece(station, 'b').position
+    const axisX = (exit.x - entry.x) / stationLength
+    const axisZ = (exit.z - entry.z) / stationLength
+    const cars = sampleRailTrainCars(loop, motion.cursor)
+    expect(cars).toHaveLength(TRAIN_CAR_COUNT)
+    for (const car of cars) {
+      const alongPlatform = (car.position.x - entry.x) * axisX + (car.position.z - entry.z) * axisZ
+      expect(alongPlatform).toBeGreaterThanOrEqual(-1e-6)
+      expect(alongPlatform).toBeLessThanOrEqual(stationLength + 1e-6)
+    }
+  })
+
   it('runs a tunnel-inclusive loop for 1200 ticks without ever hitting a dead end', () => {
     const loop = buildTunnelOvalLoop()
     let motion: RailTrainMotion = {
