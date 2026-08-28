@@ -148,7 +148,7 @@ export default function RailBuilderPlay() {
     setSelection(trainId === null ? null : { kind: 'train', id: trainId })
   }, [])
 
-  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, focusDepot, setTrainType } = useRailBuilderEngine({
+  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, setTrainType } = useRailBuilderEngine({
     pieces,
     selectedPieceId,
     selectedTrainId,
@@ -320,12 +320,9 @@ export default function RailBuilderPlay() {
               onClick={toggleAllTrains}
               aria-pressed={allTrainsRunning}
               aria-label={allTrainsRunning ? 'ぜんぶの でんしゃを とめる' : 'ぜんぶの でんしゃを うごかす'}
+              title={allTrainsRunning ? 'ぜんぶとめる' : 'ぜんぶうごかす'}
             >
               <span aria-hidden="true">{allTrainsRunning ? '■' : '▶'}</span>
-              <span>{allTrainsRunning ? 'ぜんぶとめる' : 'ぜんぶうごかす'}</span>
-            </button>
-            <button type="button" className={styles.depotButton} onClick={focusDepot} aria-label="しゃこを みる">
-              <span aria-hidden="true">🏠</span>
             </button>
           </div>
         </header>
