@@ -3,7 +3,12 @@
  * 開かれた場合に、同じ画面のパス型URLへ書き換える。
  * 既存のブックマーク・ホーム画面ショートカットを壊さないための互換処理。
  */
-export function redirectLegacyHashUrl(win: Pick<Window, 'location' | 'history'> = window): string | null {
+type LegacyHashRedirectTarget = {
+  location: Pick<Location, 'hash'>
+  history: Pick<History, 'replaceState'>
+}
+
+export function redirectLegacyHashUrl(win: LegacyHashRedirectTarget = window): string | null {
   const { hash } = win.location
   if (!hash.startsWith('#/')) {
     return null

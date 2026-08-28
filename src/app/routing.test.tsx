@@ -119,4 +119,4 @@ describe('ブラウザの戻る・進む', () => {
     })
     expect(window.location.pathname).toBe('/')
   })
-}, 10000)
+})

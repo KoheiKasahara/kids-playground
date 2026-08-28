@@ -20,8 +20,8 @@ const BASE_HTML = `<!doctype html>
 describe('applyCanonicalUrl', () => {
   test('canonical と og:url を差し替える', () => {
     const result = applyCanonicalUrl(BASE_HTML, 'https://kids.kasapg.com/games/flag-pinball')
-    expect(result).toContain('<link rel="canonical" href="https://kids.kasapg.com/games/flag-pinball">')
-    expect(result).toContain('<meta property="og:url" content="https://kids.kasapg.com/games/flag-pinball">')
+    expect(result).toContain('<link rel="canonical" href="https://kids.kasapg.com/games/flag-pinball" />')
+    expect(result).toContain('<meta property="og:url" content="https://kids.kasapg.com/games/flag-pinball" />')
   })
 
   test('title / description / og:image は変わらない', () => {
