@@ -4,15 +4,28 @@ import {
   E5_GANGWAY_SPEC,
   E5_FRONT_WINDSHIELD_SECTIONS,
   E5_LEAD_SHELL_SECTIONS,
+  TRAIN_SPECS,
   TRAIN_VISUAL_PROFILES,
   getTrainCarVisualYaw,
   getTrainCarVisualProfile,
   getTrainFormationRoles,
   getE5LeadShellAccentBand,
+  resolveTrainSpec,
   resolveTrainVisualProfile,
 } from './railTrainVisuals'
 
 describe('railTrainVisuals', () => {
+  it('exposes E5 through the canonical TrainSpec table while retaining the legacy alias', () => {
+    const e5 = resolveTrainSpec('e5')
+    expect(e5).toBe(TRAIN_SPECS.e5)
+    expect(resolveTrainVisualProfile('e5')).toBe(e5)
+    expect(TRAIN_VISUAL_PROFILES.e5).toBe(e5)
+    expect(e5.formation).toEqual(['lead', 'middle', 'rear'])
+    expect(e5.gangway).toEqual(E5_GANGWAY_SPEC)
+    expect(e5.lead.doorX).toBeCloseTo(-0.7232, 8)
+    expect(e5.middle.doorX).toBeCloseTo(-0.6664, 8)
+  })
+
   it('keeps a complete visual profile for every registered train type', () => {
     for (const trainType of TRAIN_TYPES) {
       const profile = resolveTrainVisualProfile(trainType)

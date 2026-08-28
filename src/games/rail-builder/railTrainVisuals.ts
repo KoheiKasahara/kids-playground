@@ -10,11 +10,15 @@ const TWO_CAR_FORMATION: readonly TrainCarRole[] = ['lead', 'middle']
 const E5_THREE_CAR_FORMATION: readonly TrainCarRole[] = ['lead', 'middle', 'rear']
 
 /**
- * 車種ごとの表示編成。Issue #248ではまずE5だけを3両化し、既存車種は2両を維持する。
- * 車種を追加するときも、engine側の生成処理を変えずにこの定義を拡張できる。
+ * 車種ごとの表示編成。編成は走行ロジックではなく TrainSpec に属する。
+ * Issue #248ではまずE5だけを3両化し、既存車種は2両を維持する。
  */
-export function getTrainFormationRoles(trainType: TrainType): readonly TrainCarRole[] {
-  return trainType === 'e5' ? E5_THREE_CAR_FORMATION : TWO_CAR_FORMATION
+const TRAIN_FORMATIONS: Readonly<Record<TrainType, readonly TrainCarRole[]>> = {
+  basic: TWO_CAR_FORMATION,
+  e5: E5_THREE_CAR_FORMATION,
+  e6: TWO_CAR_FORMATION,
+  n700s: TWO_CAR_FORMATION,
+  doctorYellow: TWO_CAR_FORMATION,
 }
 
 /**
@@ -69,6 +73,8 @@ export type TrainCarVisualProfile = {
   frontWindowX: number
   frontWindowY: number
   frontWindowWidth: number
+  /** 車体側面のドア中心。車種ごとの配置差を engine に持たせない。 */
+  doorX: number
   headlightX: number
   headlightY: number
   headlightZ: number
@@ -89,6 +95,15 @@ export type TrainShellSection = {
   width: number
 }
 
+/** 編成間に表示する簡易幌の寸法と配置。 */
+export type TrainGangwaySpec = Readonly<{
+  length: number
+  height: number
+  width: number
+  centerY: number
+  positionOffset: number
+}>
+
 /**
  * E5の車両間に見せる簡易幌の共有寸法。
  *
@@ -96,7 +111,7 @@ export type TrainShellSection = {
  * 半分ずつ受け持つ。Three.js側のgeometry生成と配置を同じ純粋データから
  * 組み立てることで、直線・カーブの両方で接続の意図を保ちやすくする。
  */
-export const E5_GANGWAY_SPEC = {
+export const E5_GANGWAY_SPEC: TrainGangwaySpec = {
   length: 0.24,
   height: 0.46,
   width: 0.58,
@@ -198,7 +213,11 @@ export function getE5LeadShellAccentBand(
   }
 }
 
-export type TrainVisualProfile = {
+/**
+ * 車種の表示仕様。寸法・色・ディテール位置・編成を一つの純粋な定義へ
+ * 集約し、Three.js の生成処理や走行ロジックから分離する。
+ */
+export type TrainSpec = {
   trainType: TrainType
   silhouette:
     | 'basic-rounded'
@@ -228,9 +247,16 @@ export type TrainVisualProfile = {
     sideWidth: number
     sideHeight: number
   }
+  /** この spec を使う表示編成。rear は lead の外装を yaw 反転して再利用する。 */
+  formation: readonly TrainCarRole[]
+  /** 幌を使う車種だけ定義する。 */
+  gangway?: TrainGangwaySpec
   lead: TrainCarVisualProfile
   middle: TrainCarVisualProfile
 }
+
+/** @deprecated TrainSpec を使う。既存の呼び出し元との互換 alias。 */
+export type TrainVisualProfile = TrainSpec
 
 const BASIC_SIDE_WINDOW_XS = [-0.52, 0.18] as const
 const BASIC_COUPLER_POSITIONS = [-1.25, 1.25] as const
@@ -273,6 +299,7 @@ const BASIC_LEAD: TrainCarVisualProfile = {
   frontWindowX: 1.23,
   frontWindowY: 1.04,
   frontWindowWidth: 0.54,
+  doorX: -0.78,
   headlightX: 1.24,
   headlightY: 0.8,
   headlightZ: 0.27,
@@ -325,6 +352,7 @@ const E5_LEAD: TrainCarVisualProfile = {
   frontWindowX: 0.58,
   frontWindowY: 1.19,
   frontWindowWidth: 0.68,
+  doorX: -0.05 - 1.98 * 0.34,
   headlightX: 1.24,
   headlightY: 0.69,
   headlightZ: 0.19,
@@ -369,6 +397,7 @@ const E5_MIDDLE: TrainCarVisualProfile = {
   frontWindowX: 0,
   frontWindowY: 0,
   frontWindowWidth: 0,
+  doorX: -1.96 * 0.34,
   headlightX: 0,
   headlightY: 0,
   headlightZ: 0,
@@ -410,6 +439,7 @@ const E6_LEAD: TrainCarVisualProfile = {
   frontWindowX: 0.62,
   frontWindowY: 0.87,
   frontWindowWidth: 0.36,
+  doorX: -0.52,
   headlightX: 1.24,
   headlightY: 0.7,
   headlightZ: 0.12,
@@ -438,6 +468,7 @@ const E6_MIDDLE: TrainCarVisualProfile = {
   frontWindowX: 0,
   frontWindowY: 0,
   frontWindowWidth: 0,
+  doorX: -0.4,
   headlightX: 0,
   headlightY: 0,
   headlightZ: 0,
@@ -478,6 +509,7 @@ const N700S_LEAD: TrainCarVisualProfile = {
   frontWindowX: 0.84,
   frontWindowY: 0.9,
   frontWindowWidth: 0.42,
+  doorX: -0.48,
   headlightX: 1.22,
   headlightY: 0.7,
   headlightZ: 0.16,
@@ -506,6 +538,7 @@ const N700S_MIDDLE: TrainCarVisualProfile = {
   frontWindowX: 0,
   frontWindowY: 0,
   frontWindowWidth: 0,
+  doorX: -0.4,
   headlightX: 0,
   headlightY: 0,
   headlightZ: 0,
@@ -546,6 +579,7 @@ const DOCTOR_YELLOW_LEAD: TrainCarVisualProfile = {
   frontWindowX: 0.55,
   frontWindowY: 0.93,
   frontWindowWidth: 0.44,
+  doorX: -0.54,
   headlightX: 1.22,
   headlightY: 0.69,
   headlightZ: 0.16,
@@ -574,6 +608,7 @@ const DOCTOR_YELLOW_MIDDLE: TrainCarVisualProfile = {
   frontWindowX: 0,
   frontWindowY: 0,
   frontWindowWidth: 0,
+  doorX: -0.4,
   headlightX: 0,
   headlightY: 0,
   headlightZ: 0,
@@ -581,7 +616,7 @@ const DOCTOR_YELLOW_MIDDLE: TrainCarVisualProfile = {
   hasHeadlights: false,
 }
 
-const E5_PROFILE: TrainVisualProfile = {
+const E5_PROFILE: TrainSpec = {
   trainType: 'e5',
   silhouette: 'e5-rounded-shoulder',
   // Light lower body + green roof/nose is the characteristic E5 toy palette.
@@ -601,11 +636,13 @@ const E5_PROFILE: TrainVisualProfile = {
     sideWidth: E5_LEAD.sideWindowWidth,
     sideHeight: E5_LEAD.sideWindowHeight,
   },
+  formation: E5_THREE_CAR_FORMATION,
+  gangway: E5_GANGWAY_SPEC,
   lead: E5_LEAD,
   middle: E5_MIDDLE,
 }
 
-const E6_PROFILE: TrainVisualProfile = {
+const E6_PROFILE: TrainSpec = {
   trainType: 'e6',
   silhouette: 'e6-sharp-shoulder',
   bodyColor: '#c93645',
@@ -624,11 +661,12 @@ const E6_PROFILE: TrainVisualProfile = {
     sideWidth: E6_LEAD.sideWindowWidth,
     sideHeight: E6_LEAD.sideWindowHeight,
   },
+  formation: TWO_CAR_FORMATION,
   lead: E6_LEAD,
   middle: E6_MIDDLE,
 }
 
-const N700S_PROFILE: TrainVisualProfile = {
+const N700S_PROFILE: TrainSpec = {
   trainType: 'n700s',
   silhouette: 'n700s-rounded-shoulder',
   bodyColor: '#e5e8ea',
@@ -647,11 +685,12 @@ const N700S_PROFILE: TrainVisualProfile = {
     sideWidth: N700S_LEAD.sideWindowWidth,
     sideHeight: N700S_LEAD.sideWindowHeight,
   },
+  formation: TWO_CAR_FORMATION,
   lead: N700S_LEAD,
   middle: N700S_MIDDLE,
 }
 
-const DOCTOR_YELLOW_PROFILE: TrainVisualProfile = {
+const DOCTOR_YELLOW_PROFILE: TrainSpec = {
   trainType: 'doctorYellow',
   silhouette: 'doctor-yellow-thick-shoulder',
   bodyColor: '#f5c928',
@@ -670,12 +709,13 @@ const DOCTOR_YELLOW_PROFILE: TrainVisualProfile = {
     sideWidth: DOCTOR_YELLOW_LEAD.sideWindowWidth,
     sideHeight: DOCTOR_YELLOW_LEAD.sideWindowHeight,
   },
+  formation: TWO_CAR_FORMATION,
   lead: DOCTOR_YELLOW_LEAD,
   middle: DOCTOR_YELLOW_MIDDLE,
 }
 
-/** 全TrainTypeを一つの表で検査できる見た目定義。走行ロジックは参照しない。 */
-export const TRAIN_VISUAL_PROFILES: Readonly<Record<TrainType, TrainVisualProfile>> = {
+/** 全TrainTypeを一つの表で検査できる表示仕様。走行ロジックは参照しない。 */
+export const TRAIN_SPECS: Readonly<Record<TrainType, TrainSpec>> = {
   basic: {
     trainType: 'basic',
     silhouette: 'basic-rounded',
@@ -695,6 +735,7 @@ export const TRAIN_VISUAL_PROFILES: Readonly<Record<TrainType, TrainVisualProfil
       sideWidth: 0.42,
       sideHeight: 0.28,
     },
+    formation: TRAIN_FORMATIONS.basic,
     lead: BASIC_LEAD,
     middle: BASIC_MIDDLE,
   },
@@ -704,15 +745,27 @@ export const TRAIN_VISUAL_PROFILES: Readonly<Record<TrainType, TrainVisualProfil
   doctorYellow: DOCTOR_YELLOW_PROFILE,
 }
 
+/** @deprecated TrainSpec の正規表 `TRAIN_SPECS` を使う。 */
+export const TRAIN_VISUAL_PROFILES: Readonly<Record<TrainType, TrainVisualProfile>> = TRAIN_SPECS
+
+export function resolveTrainSpec(trainType: TrainType): TrainSpec {
+  return TRAIN_SPECS[trainType] ?? TRAIN_SPECS.basic
+}
+
+/** @deprecated `resolveTrainSpec` を使う。 */
 export function resolveTrainVisualProfile(trainType: TrainType): TrainVisualProfile {
-  return TRAIN_VISUAL_PROFILES[trainType] ?? TRAIN_VISUAL_PROFILES.basic
+  return resolveTrainSpec(trainType)
+}
+
+export function getTrainFormationRoles(trainType: TrainType): readonly TrainCarRole[] {
+  return resolveTrainSpec(trainType).formation
 }
 
 export function getTrainCarVisualProfile(
   trainType: TrainType,
   role: TrainCarRole,
 ): TrainCarVisualProfile {
-  const profile = resolveTrainVisualProfile(trainType)
+  const profile = resolveTrainSpec(trainType)
   // rearは先頭車と同じ外形・窓・鼻先を共有し、向きだけcontent側で反転する。
   return role === 'middle' ? profile.middle : profile.lead
 }
