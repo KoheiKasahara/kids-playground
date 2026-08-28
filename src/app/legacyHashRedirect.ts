@@ -19,7 +19,12 @@ export function redirectLegacyHashUrl(win: LegacyHashRedirectTarget = window): s
 
   // '//' で始まる場合はプロトコル相対URL（例: '#//evil.example'）となり、
   // history.replaceState に渡すと別オリジンへ誘導されうるため、何もしない。
-  if (target.startsWith('//')) {
+  // '\' で始まる場合（例: '#/\evil.example' → target '/\evil.example'）も、
+  // ブラウザがURL解決時に先頭の '\' を '/' へ正規化するため実質的に同じ
+  // プロトコル相対URLになり、replaceStateが例外(SecurityError)を投げて
+  // main.tsxのモジュール評価自体が止まりうる。そのため '/' の直後が
+  // '/' でも '\' でもないことまで確認する。
+  if (!/^\/(?![/\\])/.test(target)) {
     return null
   }
 

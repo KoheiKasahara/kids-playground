@@ -41,4 +41,23 @@ describe('gameCatalog', () => {
       expect(lastMatch.route.path).toBe(pagePath)
     }
   })
+
+  // 逆方向の不変条件: routes.tsx に /games/<game-id> のエントリールートが追加されたのに
+  // gameCatalog.ts への登録を忘れると、そのゲームは静的ページが生成されずGitHub Pagesで
+  // 404になる（Issue #258が防ごうとしている失敗そのもの）が、他のテストは緑のままになる。
+  // routes.tsx 側から見て、対応するカタログ登録が必ずあることを保証する。
+  test('routesの各ゲームエントリー(/games/<game-id>)がgameCatalogに登録されている', () => {
+    const gameEntryPathPattern = /^\/games\/[^/:*]+$/
+    const gameEntryPaths = routes
+      .map((route) => route.path)
+      .filter((routePath): routePath is string => typeof routePath === 'string')
+      .filter((routePath) => gameEntryPathPattern.test(routePath))
+
+    expect(gameEntryPaths.length).toBeGreaterThan(0)
+
+    for (const routePath of gameEntryPaths) {
+      const slug = routePath.replace('/games/', '')
+      expect(findGameBySlug(slug), `route ${routePath} に対応する gameCatalog エントリーがありません`).toBeDefined()
+    }
+  })
 })

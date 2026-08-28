@@ -37,6 +37,20 @@ describe('redirectLegacyHashUrl', () => {
     expect(result).toBeNull()
   })
 
+  test('#/\\evil.example のようなバックスラッシュ始まりも何もしない（ブラウザ正規化でプロトコル相対URLになるため）', () => {
+    const win = createFakeWindow('#/\\evil.example')
+    const result = redirectLegacyHashUrl(win)
+    expect(win.history.replaceState).not.toHaveBeenCalled()
+    expect(result).toBeNull()
+  })
+
+  test('#/games/flag-quiz のような通常のパスは引き続き許可される', () => {
+    const win = createFakeWindow('#/games/flag-quiz')
+    const result = redirectLegacyHashUrl(win)
+    expect(win.history.replaceState).toHaveBeenCalledWith(null, '', '/games/flag-quiz')
+    expect(result).toBe('/games/flag-quiz')
+  })
+
   test('クエリ付きのハッシュも保持される', () => {
     const win = createFakeWindow('#/games/prefecture-quiz/kanji/play?a=1')
     const result = redirectLegacyHashUrl(win)
