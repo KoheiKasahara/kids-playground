@@ -68,25 +68,28 @@ describe('railTrainVisuals', () => {
     expect(middle.sideWindowWidth).toBeLessThanOrEqual(lead.sideWindowWidth)
   })
 
-  it('uses a three-car E5 formation with the lead shell facing outward at both ends', () => {
+  it('uses three-car formations for E5 and Doctor Yellow with lead shells facing outward at both ends', () => {
     expect(getTrainFormationRoles('e5')).toEqual(['lead', 'middle', 'rear'])
-    for (const trainType of TRAIN_TYPES.filter((candidate) => candidate !== 'e5')) {
+    expect(getTrainFormationRoles('doctorYellow')).toEqual(['lead', 'middle', 'rear'])
+    for (const trainType of TRAIN_TYPES.filter((candidate) => candidate !== 'e5' && candidate !== 'doctorYellow')) {
       expect(getTrainFormationRoles(trainType)).toEqual(['lead', 'middle'])
     }
 
-    const lead = getTrainCarVisualProfile('e5', 'lead')
-    const rear = getTrainCarVisualProfile('e5', 'rear')
-    expect(rear).toBe(lead)
-    expect(rear).toMatchObject({
-      bodyLength: lead.bodyLength,
-      bodyHeight: lead.bodyHeight,
-      bodyWidth: lead.bodyWidth,
-      noseLength: lead.noseLength,
-      noseTipX: lead.noseTipX,
-      frontWindowWidth: lead.frontWindowWidth,
-      hasFrontWindow: true,
-      hasHeadlights: true,
-    })
+    for (const trainType of ['e5', 'doctorYellow'] as const) {
+      const lead = getTrainCarVisualProfile(trainType, 'lead')
+      const rear = getTrainCarVisualProfile(trainType, 'rear')
+      expect(rear).toBe(lead)
+      expect(rear).toMatchObject({
+        bodyLength: lead.bodyLength,
+        bodyHeight: lead.bodyHeight,
+        bodyWidth: lead.bodyWidth,
+        noseLength: lead.noseLength,
+        noseTipX: lead.noseTipX,
+        frontWindowWidth: lead.frontWindowWidth,
+        hasFrontWindow: true,
+        hasHeadlights: true,
+      })
+    }
     expect(getTrainCarVisualYaw('lead')).toBe(0)
     expect(getTrainCarVisualYaw('middle')).toBe(0)
     expect(getTrainCarVisualYaw('rear')).toBe(Math.PI)
@@ -249,6 +252,21 @@ describe('railTrainVisuals', () => {
     expect(n700s.accent.color).toBe('#2e64cb')
     expect(doctorYellow.accent.color).toBe('#19457a')
     expect(new Set([e5.bodyColor, e6.bodyColor, n700s.bodyColor, doctorYellow.bodyColor]).size).toBe(4)
+  })
+
+  it('defines Doctor Yellow as a clearly distinct three-car visual spec', () => {
+    const doctorYellow = resolveTrainSpec('doctorYellow')
+    expect(doctorYellow.formation).toEqual(['lead', 'middle', 'rear'])
+    expect(doctorYellow.silhouette).toBe('doctor-yellow-thick-shoulder')
+    expect(doctorYellow.lead.noseStyle).toBe('doctor-yellow-duck')
+    expect(doctorYellow.bodyColor).toBe('#f5c928')
+    expect(doctorYellow.roofColor).toBe('#f3e5a3')
+    expect(doctorYellow.accent.color).toBe('#19457a')
+    expect(doctorYellow.lead.bodyHeight).toBeGreaterThan(0.65)
+    expect(doctorYellow.lead.noseLength).toBeGreaterThan(1)
+    expect(doctorYellow.lead.sideWindowXs).toHaveLength(1)
+    expect(doctorYellow.middle.noseLength).toBe(0)
+    expect(doctorYellow.middle.sideWindowXs).toHaveLength(1)
   })
 
   it('keeps every profile inside the shared toy-train envelope', () => {

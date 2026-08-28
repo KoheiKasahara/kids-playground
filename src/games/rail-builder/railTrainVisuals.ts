@@ -7,7 +7,9 @@ import type { TrainType } from './railFleetModel'
 export type TrainCarRole = 'lead' | 'middle' | 'rear'
 
 const TWO_CAR_FORMATION: readonly TrainCarRole[] = ['lead', 'middle']
-const E5_THREE_CAR_FORMATION: readonly TrainCarRole[] = ['lead', 'middle', 'rear']
+const THREE_CAR_FORMATION: readonly TrainCarRole[] = ['lead', 'middle', 'rear']
+const E5_THREE_CAR_FORMATION = THREE_CAR_FORMATION
+const DOCTOR_YELLOW_THREE_CAR_FORMATION = THREE_CAR_FORMATION
 
 /**
  * 車種ごとの表示編成。編成は走行ロジックではなく TrainSpec に属する。
@@ -18,7 +20,7 @@ const TRAIN_FORMATIONS: Readonly<Record<TrainType, readonly TrainCarRole[]>> = {
   e5: E5_THREE_CAR_FORMATION,
   e6: TWO_CAR_FORMATION,
   n700s: TWO_CAR_FORMATION,
-  doctorYellow: TWO_CAR_FORMATION,
+  doctorYellow: DOCTOR_YELLOW_THREE_CAR_FORMATION,
 }
 
 /**
@@ -709,7 +711,7 @@ const DOCTOR_YELLOW_PROFILE: TrainSpec = {
     sideWidth: DOCTOR_YELLOW_LEAD.sideWindowWidth,
     sideHeight: DOCTOR_YELLOW_LEAD.sideWindowHeight,
   },
-  formation: TWO_CAR_FORMATION,
+  formation: DOCTOR_YELLOW_THREE_CAR_FORMATION,
   lead: DOCTOR_YELLOW_LEAD,
   middle: DOCTOR_YELLOW_MIDDLE,
 }
