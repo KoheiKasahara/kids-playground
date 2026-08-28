@@ -4,7 +4,9 @@ import {
   E5_FRONT_WINDSHIELD_SECTIONS,
   E5_LEAD_SHELL_SECTIONS,
   TRAIN_VISUAL_PROFILES,
+  getTrainCarVisualYaw,
   getTrainCarVisualProfile,
+  getTrainFormationRoles,
   getE5LeadShellAccentBand,
   resolveTrainVisualProfile,
 } from './railTrainVisuals'
@@ -46,6 +48,30 @@ describe('railTrainVisuals', () => {
     expect(middle.hasHeadlights).toBe(false)
     expect(middle.bodyWidth).toBe(lead.bodyWidth)
     expect(middle.sideWindowXs).toEqual(lead.sideWindowXs)
+  })
+
+  it('uses a three-car E5 formation with the lead shell facing outward at both ends', () => {
+    expect(getTrainFormationRoles('e5')).toEqual(['lead', 'middle', 'rear'])
+    for (const trainType of TRAIN_TYPES.filter((candidate) => candidate !== 'e5')) {
+      expect(getTrainFormationRoles(trainType)).toEqual(['lead', 'middle'])
+    }
+
+    const lead = getTrainCarVisualProfile('e5', 'lead')
+    const rear = getTrainCarVisualProfile('e5', 'rear')
+    expect(rear).toBe(lead)
+    expect(rear).toMatchObject({
+      bodyLength: lead.bodyLength,
+      bodyHeight: lead.bodyHeight,
+      bodyWidth: lead.bodyWidth,
+      noseLength: lead.noseLength,
+      noseTipX: lead.noseTipX,
+      frontWindowWidth: lead.frontWindowWidth,
+      hasFrontWindow: true,
+      hasHeadlights: true,
+    })
+    expect(getTrainCarVisualYaw('lead')).toBe(0)
+    expect(getTrainCarVisualYaw('middle')).toBe(0)
+    expect(getTrainCarVisualYaw('rear')).toBe(Math.PI)
   })
 
   it('keeps E5 proportions and detail placements deliberately slender', () => {

@@ -1,7 +1,29 @@
 import type { TrainType } from './railFleetModel'
 
-/** 編成内での車両の役割。先頭車だけがE5のロングノーズを持つ。 */
-export type TrainCarRole = 'lead' | 'middle'
+/**
+ * 編成内での車両の役割。
+ * rear は lead と同じ先頭車系の外装を、編成外側へ向けて再利用する。
+ */
+export type TrainCarRole = 'lead' | 'middle' | 'rear'
+
+const TWO_CAR_FORMATION: readonly TrainCarRole[] = ['lead', 'middle']
+const E5_THREE_CAR_FORMATION: readonly TrainCarRole[] = ['lead', 'middle', 'rear']
+
+/**
+ * 車種ごとの表示編成。Issue #248ではまずE5だけを3両化し、既存車種は2両を維持する。
+ * 車種を追加するときも、engine側の生成処理を変えずにこの定義を拡張できる。
+ */
+export function getTrainFormationRoles(trainType: TrainType): readonly TrainCarRole[] {
+  return trainType === 'e5' ? E5_THREE_CAR_FORMATION : TWO_CAR_FORMATION
+}
+
+/**
+ * Pathに沿う外側poseは全車両で同じ向きを保ち、最後尾の外装だけを安全に反転する。
+ * 負のscaleやBufferGeometryの反転を避けるための、表示content用yaw。
+ */
+export function getTrainCarVisualYaw(role: TrainCarRole): number {
+  return role === 'rear' ? Math.PI : 0
+}
 
 export type TrainCarVisualProfile = {
   role: TrainCarRole
@@ -670,5 +692,6 @@ export function getTrainCarVisualProfile(
   role: TrainCarRole,
 ): TrainCarVisualProfile {
   const profile = resolveTrainVisualProfile(trainType)
-  return role === 'lead' ? profile.lead : profile.middle
+  // rearは先頭車と同じ外形・窓・鼻先を共有し、向きだけcontent側で反転する。
+  return role === 'middle' ? profile.middle : profile.lead
 }
