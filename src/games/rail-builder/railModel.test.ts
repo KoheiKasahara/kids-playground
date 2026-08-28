@@ -30,10 +30,12 @@ import {
   getRailConnectorIds,
   moveRailPiece,
   railPathLength,
+  rotateRailPiece,
   sampleRailPath,
   sampleRailPathTangent,
   toggleRailBranch,
   worldConnectorForRailPiece,
+  worldRailPieceVisualCenter,
   type RailConnectorId,
   type RailPiece,
 } from './railModel'
@@ -382,6 +384,45 @@ describe('railModel', () => {
     expect(deleted).toHaveLength(1)
     expect(deleted[0]?.connections).toEqual({})
     expect(disconnectRailPiece(reconnected, 'unknown')).toEqual(reconnected)
+  })
+
+  it.each(['straight', 'short-straight', 'curve', 'branch'] as const)(
+    'rotates a %s in place by preserving its visible world center',
+    (kind) => {
+      const piece = createRailPiece(kind, `${kind}-piece`, { x: 11, y: 0, z: -7 }, Math.PI / 2)
+      const beforeCenter = worldRailPieceVisualCenter(piece)
+
+      const rotated = rotateRailPiece([piece], piece.id).find((candidate) => candidate.id === piece.id)!
+      const afterCenter = worldRailPieceVisualCenter(rotated)
+
+      expect(afterCenter.x).toBeCloseTo(beforeCenter.x, 10)
+      expect(afterCenter.z).toBeCloseTo(beforeCenter.z, 10)
+      expect(rotated.rotationY).toBeCloseTo(piece.rotationY + Math.PI / 2, 10)
+
+      // カーブ・分岐はローカル原点が中心ではないため、描画位置だけを補正する。
+      if (kind === 'curve' || kind === 'branch') {
+        expect(rotated.position).not.toEqual(piece.position)
+      } else {
+        expect(rotated.position).toEqual(piece.position)
+      }
+    },
+  )
+
+  it('rotates a connected curve in place while preserving the existing disconnect behavior', () => {
+    const target = createRailPiece('straight', 'target', origin)
+    const curve = createRailPiece('curve', 'curve', { x: 5, y: 0, z: 0 })
+    const connected = connectRailPieces([target, curve], curve.id, 'a', target.id, 'b')
+    const connectedCurve = connected.find((piece) => piece.id === curve.id)!
+    const beforeCenter = worldRailPieceVisualCenter(connectedCurve)
+
+    const rotated = rotateRailPiece(connected, curve.id)
+    const rotatedCurve = rotated.find((piece) => piece.id === curve.id)!
+
+    expect(worldRailPieceVisualCenter(rotatedCurve).x).toBeCloseTo(beforeCenter.x, 10)
+    expect(worldRailPieceVisualCenter(rotatedCurve).z).toBeCloseTo(beforeCenter.z, 10)
+    expect(rotatedCurve.connections).toEqual({})
+    expect(rotated.find((piece) => piece.id === target.id)?.connections).toEqual({})
+    expect(areRailConnectionsSymmetric(rotated)).toBe(true)
   })
 
   it('does not allow a snap angle wider than the configured tolerance', () => {
