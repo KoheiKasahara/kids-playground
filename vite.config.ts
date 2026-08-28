@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { staticRoutePages } from './src/build/staticRoutePages'
+import { sitemapFile } from './src/build/sitemap'
 
 // カスタムドメイン（https://kids.kasapg.com/）直下で公開するため base は常に '/'。
 const base = '/'
@@ -66,6 +67,7 @@ export default defineConfig({
     // VitePWAのcloseBundleより後に実行し、ここで生成する複製ページがprecache対象に
     // 二重で含まれないようにする（ナビゲーションはSWのnavigateFallbackが担う）。
     staticRoutePages(),
+    sitemapFile(),
   ],
   test: {
     environment: 'jsdom',
