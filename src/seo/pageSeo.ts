@@ -2,7 +2,7 @@
 // DOMやimport.meta.envに依存させないことで、SPA遷移時のSeoManagerだけでなく、
 // ビルド時（Node.js側）のsrc/build/staticRoutePages.tsからも同じロジックを共有できる。
 
-import { GAME_ROUTE_PREFIX, findGameBySlug, type GameCatalogEntry } from '../games/gameCatalog'
+import { GAME_ROUTE_PREFIX, findGameBySlug, gameRoutePath, type GameCatalogEntry } from '../games/gameCatalog'
 import { DEFAULT_OG_IMAGE_PATH, SITE_NAME, absoluteUrl } from './siteMeta'
 
 export type PageSeo = {
@@ -27,7 +27,7 @@ export function buildGameSeo(entry: GameCatalogEntry): PageSeo {
   return {
     title: `${entry.seo.headline} - ${SITE_NAME}`,
     description: entry.seo.description,
-    canonicalUrl: absoluteUrl(`${GAME_ROUTE_PREFIX}/${entry.slug}`),
+    canonicalUrl: absoluteUrl(gameRoutePath(entry.slug)),
     ogType: 'website',
     ogImageUrl: absoluteUrl(entry.seo.ogImage ?? DEFAULT_OG_IMAGE_PATH),
   }
@@ -37,7 +37,7 @@ export function buildGameSeo(entry: GameCatalogEntry): PageSeo {
 // '/games/planet-globe/play' や '/games/math-quiz/add/hard/play' のような
 // むずかしさ選択・プレイ・結果画面のURLも、同じゲームの状態違いでしかなく
 // 静的HTMLが生成されるのもゲームルートのみのため、ゲームルートのslugへ正規化する。
-const GAME_SLUG_PATTERN = /^\/games\/([^/]+)(?:\/.*)?$/
+const GAME_SLUG_PATTERN = new RegExp(`^${GAME_ROUTE_PREFIX}/([^/]+)(?:/.*)?$`)
 
 /**
  * pathname（クエリ・ハッシュを含まない想定だが、念のため取り除く）からページのSEO情報を解決する。
