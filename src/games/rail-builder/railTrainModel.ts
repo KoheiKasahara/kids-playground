@@ -49,6 +49,21 @@ export type RailTrainCursor = {
 
 export type TrainCursor = RailTrainCursor
 
+/**
+ * 先頭車が実際に通過したrouteの1区間。pieceIdだけでは同じpieceを
+ * ループで何度も通った順序や、分岐のA-B/A-Cを区別できないため、
+ * directionと区間へ入ったときの距離も一緒に保持する。
+ */
+export type RailTrainRouteHistoryEntry = {
+  pieceId: string
+  direction: RailTrainDirection
+  /** この区間へ入った時点の、入口connectorからの距離。 */
+  startDistance: number
+}
+
+export const TRAIN_ROUTE_HISTORY_MAX_ENTRIES = 128
+export const TRAIN_ROUTE_HISTORY_MAX_DISTANCE = 64
+
 export type RailTrainStatus =
   | 'ready'
   | 'running'
@@ -63,6 +78,12 @@ export type RailTrainMotion = {
   cursor: RailTrainCursor
   speed: number
   status: RailTrainStatus
+  /**
+   * 直近の先頭車route。cursorだけからは、分岐を逆向きに戻るときに
+   * 先頭車が実際に選んだ側を復元できないため、編成後続車の位置にも使う。
+   * 旧状態やテストの手組みmotionとの互換性のためoptionalだが、走行更新後は保持する。
+   */
+  routeHistory?: RailTrainRouteHistoryEntry[]
   /** 直前に停車した駅。駅pieceを抜けるまで次の駅探索から除外する。 */
   stationServicedId?: string
   /** stoppedAtStationの経過時間（秒）。 */
@@ -243,6 +264,114 @@ function cursorWithDistance(cursor: RailTrainCursor, pieces: readonly RailPiece[
   }
 }
 
+function copyRouteHistory(
+  history: readonly RailTrainRouteHistoryEntry[] | undefined,
+): RailTrainRouteHistoryEntry[] | undefined {
+  return history === undefined ? undefined : history.map((entry) => ({ ...entry }))
+}
+
+function sameRoutePosition(
+  a: Pick<RailTrainRouteHistoryEntry, 'pieceId' | 'direction'>,
+  b: Pick<RailTrainRouteHistoryEntry, 'pieceId' | 'direction'>,
+): boolean {
+  return a.pieceId === b.pieceId && a.direction === b.direction
+}
+
+function routeHistoryEntryIsUsable(
+  pieces: readonly RailPiece[],
+  entry: RailTrainRouteHistoryEntry,
+): boolean {
+  return finite(entry.startDistance)
+    && entry.startDistance >= -EPSILON
+    && validPiece(pieces, entry.pieceId, entry.direction) !== null
+}
+
+/**
+ * historyが現在のcursorに連続していなければ、そこを新しい配置起点として
+ * reseedする。線路編集でpiece自体が残っている場合は、保存したdirectionを
+ * そのまま使うので、現在のbranchDirection変更で過去routeが書き換わらない。
+ */
+function routeHistoryFromCursor(
+  pieces: readonly RailPiece[],
+  cursor: RailTrainCursor,
+  history: readonly RailTrainRouteHistoryEntry[] | undefined,
+): RailTrainRouteHistoryEntry[] {
+  const normalized = cursorWithDistance(cursor, pieces)
+  const usable = (history ?? []).filter((entry) => routeHistoryEntryIsUsable(pieces, entry))
+  const latest = usable[usable.length - 1]
+  if (
+    latest === undefined
+    || !sameRoutePosition(latest, normalized)
+    || normalized.distance + EPSILON < latest.startDistance
+  ) {
+    return [{
+      pieceId: normalized.pieceId,
+      direction: normalized.direction,
+      startDistance: normalized.distance,
+    }]
+  }
+  return usable
+}
+
+function routeHistoryDistanceBehind(
+  pieces: readonly RailPiece[],
+  cursor: RailTrainCursor,
+  history: readonly RailTrainRouteHistoryEntry[],
+): number {
+  const latest = history[history.length - 1]
+  if (latest === undefined || !sameRoutePosition(latest, cursor)) return 0
+  let total = Math.max(0, cursor.distance - latest.startDistance)
+  for (let index = history.length - 2; index >= 0; index -= 1) {
+    const entry = history[index]!
+    const resolved = validPiece(pieces, entry.pieceId, entry.direction)
+    if (resolved === null) continue
+    total += Math.max(0, resolved.length - clampDistance(entry.startDistance, resolved.length))
+  }
+  return total
+}
+
+/**
+ * 古い区間は捨てるが、最後尾車両が必要とする距離は必ず残す。距離上限は
+ * 通常の編成間隔より十分大きく、同じpieceを周回する履歴も順序を保ったまま
+ * boundedにする。
+ */
+function trimRouteHistory(
+  pieces: readonly RailPiece[],
+  cursor: RailTrainCursor,
+  history: readonly RailTrainRouteHistoryEntry[],
+): RailTrainRouteHistoryEntry[] {
+  let trimmed = history.map((entry) => ({ ...entry }))
+  const minimumRetainedDistance = TRAIN_CAR_SPACING * (TRAIN_CAR_COUNT - 1)
+  while (trimmed.length > 1) {
+    const overEntryLimit = trimmed.length > TRAIN_ROUTE_HISTORY_MAX_ENTRIES
+    const overDistanceLimit = routeHistoryDistanceBehind(pieces, cursor, trimmed)
+      > TRAIN_ROUTE_HISTORY_MAX_DISTANCE + EPSILON
+    if (!overEntryLimit && !overDistanceLimit) break
+    const candidate = trimmed.slice(1)
+    // A malformed/degenerate topology may not provide enough distance after a
+    // trim; retain the old entry in that case so the last car stays on route.
+    if (routeHistoryDistanceBehind(pieces, cursor, candidate) + EPSILON < minimumRetainedDistance) break
+    trimmed = candidate
+  }
+  return trimmed
+}
+
+function appendRouteHistoryEntry(
+  pieces: readonly RailPiece[],
+  cursor: RailTrainCursor,
+  history: readonly RailTrainRouteHistoryEntry[],
+): RailTrainRouteHistoryEntry[] {
+  // This function is called only after a real connector transition. Even when
+  // a loop re-enters the same piece in the same direction, retain a new
+  // occurrence instead of collapsing it by pieceId/direction.
+  const next = [...history, {
+    pieceId: cursor.pieceId,
+    direction: cursor.direction,
+    startDistance: cursor.distance,
+  }]
+  return trimRouteHistory(pieces, cursor, next)
+}
+
 /** カーソルの距離を、そのpieceのローカルパラメータへ変換する。 */
 export function railTrainCursorT(
   pieces: readonly RailPiece[],
@@ -288,18 +417,22 @@ export const sampleTrainPose = sampleRailTrainPose
 export const sampleRailTrainPath = sampleRailTrainPose
 
 /** 進行方向へ距離を進め、接続があれば次のpieceへ乗り移る。 */
-export function advanceRailTrainCursor(
+function advanceRailTrainCursorWithRouteHistory(
   pieces: readonly RailPiece[],
   cursor: RailTrainCursor,
   distance: number,
-): RailTrainCursor {
+  routeHistory?: readonly RailTrainRouteHistoryEntry[],
+): { cursor: RailTrainCursor; routeHistory: RailTrainRouteHistoryEntry[] } {
   let current = cursorWithDistance(cursor, pieces)
+  let history = routeHistoryFromCursor(pieces, current, routeHistory)
   let remaining = finite(distance) ? Math.max(0, distance) : 0
-  if (remaining <= EPSILON) return current
+  if (remaining <= EPSILON) {
+    return { cursor: current, routeHistory: trimRouteHistory(pieces, current, history) }
+  }
 
   for (let iteration = 0; iteration < DEFAULT_ITERATION_GUARD; iteration += 1) {
     const resolved = validPiece(pieces, current.pieceId, current.direction)
-    if (resolved === null) return current
+    if (resolved === null) return { cursor: current, routeHistory: history }
     current.distance = clampDistance(current.distance, resolved.length)
     const toExit = Math.max(0, resolved.length - current.distance)
     const connection = findConnection(pieces, resolved.piece, exitConnector(current.direction))
@@ -307,31 +440,44 @@ export function advanceRailTrainCursor(
     // 正規形にする。接続がなければ、そのpieceの端点で止める。
     if (remaining < toExit - EPSILON || connection === null) {
       current.distance = Math.min(resolved.length, current.distance + remaining)
-      if (connection === null) return current
-      if (remaining <= toExit + EPSILON) return current
+      if (connection === null) return { cursor: current, routeHistory: history }
+      if (remaining <= toExit + EPSILON) {
+        return { cursor: current, routeHistory: trimRouteHistory(pieces, current, history) }
+      }
     }
 
     remaining -= toExit
     if (connection === null) {
       current.distance = resolved.length
-      return current
+      return { cursor: current, routeHistory: history }
     }
     const nextDirection = directionLeavingConnector(connection.piece, connection.connectorId)
     const next = validPiece(pieces, connection.piece.id, nextDirection)
     if (next === null) {
       current.distance = resolved.length
-      return current
+      return { cursor: current, routeHistory: history }
     }
     current = {
       pieceId: next.piece.id,
       direction: nextDirection,
       distance: 0,
     }
-    if (remaining <= EPSILON) return current
+    // Record the exact transition selected by directionLeavingConnector. This
+    // is intentionally an ordered list: a pieceId map loses loop occurrences.
+    history = appendRouteHistoryEntry(pieces, current, history)
+    if (remaining <= EPSILON) return { cursor: current, routeHistory: history }
   }
 
   // 無限ループや壊れたトポロジーでも、描画ループを止めず現在位置を返す。
-  return current
+  return { cursor: current, routeHistory: history }
+}
+
+export function advanceRailTrainCursor(
+  pieces: readonly RailPiece[],
+  cursor: RailTrainCursor,
+  distance: number,
+): RailTrainCursor {
+  return advanceRailTrainCursorWithRouteHistory(pieces, cursor, distance).cursor
 }
 
 export const advanceTrainCursor = advanceRailTrainCursor
@@ -385,6 +531,74 @@ export function retreatRailTrainCursor(
 
 export const retreatTrainCursor = retreatRailTrainCursor
 export const backRailTrainCursor = retreatRailTrainCursor
+
+/**
+ * 先頭車のroute履歴を使って後続車を戻す。履歴にない古い距離だけは従来の
+ * topology探索へ渡すが、直近の分岐通過については現在のbranchDirectionを
+ * 参照しないため、先頭車と同じA-B/A-Cを確実に選べる。
+ */
+function retreatRailTrainCursorAlongHistory(
+  pieces: readonly RailPiece[],
+  cursor: RailTrainCursor,
+  distance: number,
+  routeHistory: readonly RailTrainRouteHistoryEntry[],
+): RailTrainCursor | null {
+  const current = cursorWithDistance(cursor, pieces)
+  const history = routeHistory.filter((entry) => routeHistoryEntryIsUsable(pieces, entry))
+  let index = history.length - 1
+  while (index >= 0 && !sameRoutePosition(history[index]!, current)) index -= 1
+  if (index < 0) return null
+
+  const latest = history[index]!
+  if (current.distance + EPSILON < latest.startDistance) return null
+  let remaining = finite(distance) ? Math.max(0, distance) : 0
+  const availableOnCurrent = Math.max(0, current.distance - latest.startDistance)
+  if (remaining < availableOnCurrent - EPSILON) {
+    return { ...current, distance: current.distance - remaining }
+  }
+  if (remaining <= availableOnCurrent + EPSILON) {
+    return { ...current, distance: latest.startDistance }
+  }
+  remaining -= availableOnCurrent
+
+  for (index -= 1; index >= 0; index -= 1) {
+    const entry = history[index]!
+    const resolved = validPiece(pieces, entry.pieceId, entry.direction)
+    if (resolved === null) return null
+    const startDistance = clampDistance(entry.startDistance, resolved.length)
+    const available = Math.max(0, resolved.length - startDistance)
+    if (remaining < available - EPSILON) {
+      return {
+        pieceId: entry.pieceId,
+        direction: entry.direction,
+        distance: resolved.length - remaining,
+      }
+    }
+    if (remaining <= available + EPSILON) {
+      return {
+        pieceId: entry.pieceId,
+        direction: entry.direction,
+        distance: resolved.length,
+      }
+    }
+    remaining -= available
+  }
+
+  // The requested spacing can exceed retained history (for example, a caller
+  // asks for more than the three-car formation). Continue safely from the
+  // oldest recorded position using the existing topology fallback.
+  const oldest = history[0]
+  if (oldest === undefined) return null
+  const oldestCursor: RailTrainCursor = {
+    pieceId: oldest.pieceId,
+    direction: oldest.direction,
+    distance: clampDistance(
+      oldest.startDistance,
+      validPiece(pieces, oldest.pieceId, oldest.direction)?.length ?? oldest.startDistance,
+    ),
+  }
+  return retreatRailTrainCursor(pieces, oldestCursor, remaining)
+}
 
 /** 現在位置から、接続をたどった最初の行き止まりまでの距離を返す。ループならInfinity。 */
 export function distanceToRailTrainDeadEnd(
@@ -546,11 +760,16 @@ export function railTrainCarCursors(
   cursor: RailTrainCursor,
   carCount = TRAIN_CAR_COUNT,
   spacing = TRAIN_CAR_SPACING,
+  routeHistory?: readonly RailTrainRouteHistoryEntry[],
 ): RailTrainCursor[] {
   const count = Math.max(1, Math.floor(carCount))
   const result: RailTrainCursor[] = []
   for (let index = 0; index < count; index += 1) {
-    result.push(retreatRailTrainCursor(pieces, cursor, Math.max(0, spacing) * index))
+    const distance = Math.max(0, spacing) * index
+    const fromHistory = routeHistory !== undefined && routeHistory.length > 0
+      ? retreatRailTrainCursorAlongHistory(pieces, cursor, distance, routeHistory)
+      : null
+    result.push(fromHistory ?? retreatRailTrainCursor(pieces, cursor, distance))
   }
   return result
 }
@@ -563,8 +782,9 @@ export function sampleRailTrainCars(
   cursor: RailTrainCursor,
   carCount = TRAIN_CAR_COUNT,
   spacing = TRAIN_CAR_SPACING,
+  routeHistory?: readonly RailTrainRouteHistoryEntry[],
 ): RailTrainPose[] {
-  return railTrainCarCursors(pieces, cursor, carCount, spacing)
+  return railTrainCarCursors(pieces, cursor, carCount, spacing, routeHistory)
     .map((carCursor) => sampleRailTrainPose(pieces, carCursor))
     .filter((pose): pose is RailTrainPose => pose !== null)
 }
@@ -578,9 +798,10 @@ export function occupiedRailPieceIds(
   cursor: RailTrainCursor,
   carCount = TRAIN_CAR_COUNT,
   spacing = TRAIN_CAR_SPACING,
+  routeHistory?: readonly RailTrainRouteHistoryEntry[],
 ): string[] {
   const occupied = new Set<string>()
-  for (const carCursor of railTrainCarCursors(pieces, cursor, carCount, spacing)) {
+  for (const carCursor of railTrainCarCursors(pieces, cursor, carCount, spacing, routeHistory)) {
     if (validPiece(pieces, carCursor.pieceId, carCursor.direction) !== null) occupied.add(carCursor.pieceId)
   }
   return [...occupied]
@@ -753,6 +974,11 @@ export function createInitialRailTrainMotion(
       direction,
       distance: startDistance,
     },
+    routeHistory: [{
+      pieceId: resolved.piece.id,
+      direction,
+      startDistance,
+    }],
     speed: 0,
     status: 'ready',
   }
@@ -767,9 +993,20 @@ export const TRAIN_STATION_APPROACH_DISTANCE = 4.5
 /** 発車・再開。待機中でもカーソルはそのまま保持する。 */
 export function startRailTrain(motion: RailTrainMotion): RailTrainMotion {
   if (motion.status !== 'ready' && motion.status !== 'waiting' && motion.status !== 'paused') {
-    return { ...motion, cursor: copyCursor(motion.cursor), speed: Math.max(0, motion.speed) }
+    return {
+      ...motion,
+      cursor: copyCursor(motion.cursor),
+      routeHistory: copyRouteHistory(motion.routeHistory),
+      speed: Math.max(0, motion.speed),
+    }
   }
-  return { ...motion, cursor: copyCursor(motion.cursor), speed: Math.max(0, motion.speed), status: 'running' }
+  return {
+    ...motion,
+    cursor: copyCursor(motion.cursor),
+    routeHistory: copyRouteHistory(motion.routeHistory),
+    speed: Math.max(0, motion.speed),
+    status: 'running',
+  }
 }
 
 export const restartRailTrain = startRailTrain
@@ -777,7 +1014,13 @@ export const startTrainMotion = startRailTrain
 
 /** 個別停止。cursorと駅サービス情報は保持する。 */
 export function pauseRailTrain(motion: RailTrainMotion): RailTrainMotion {
-  return { ...motion, cursor: copyCursor(motion.cursor), speed: 0, status: 'paused' }
+  return {
+    ...motion,
+    cursor: copyCursor(motion.cursor),
+    routeHistory: copyRouteHistory(motion.routeHistory),
+    speed: 0,
+    status: 'paused',
+  }
 }
 
 export const stopRailTrain = pauseRailTrain
@@ -792,7 +1035,12 @@ export function updateRailTrainMotion(
   // 大きめのテスト刻みを渡しても安全に停止位置へ着けるようにする。
   const delta = finite(deltaSeconds) ? Math.min(1, Math.max(0, deltaSeconds)) : 0
   if (motion.status === 'ready' || motion.status === 'waiting' || motion.status === 'paused') {
-    return { ...motion, cursor: copyCursor(motion.cursor), speed: 0 }
+    return {
+      ...motion,
+      cursor: copyCursor(motion.cursor),
+      routeHistory: copyRouteHistory(motion.routeHistory),
+      speed: 0,
+    }
   }
   if (motion.status === 'stoppedAtStation') {
     const elapsed = Math.max(0, motion.stationStopElapsed ?? 0) + delta
@@ -800,6 +1048,7 @@ export function updateRailTrainMotion(
       return {
         ...motion,
         cursor: copyCursor(motion.cursor),
+        routeHistory: copyRouteHistory(motion.routeHistory),
         speed: 0,
         stationStopElapsed: elapsed,
       }
@@ -808,14 +1057,22 @@ export function updateRailTrainMotion(
     return {
       ...motion,
       cursor: copyCursor(motion.cursor),
+      routeHistory: copyRouteHistory(motion.routeHistory),
       speed: 0,
       status: 'departing',
       stationStopElapsed: elapsed,
     }
   }
-  if (delta <= EPSILON) return { ...motion, cursor: copyCursor(motion.cursor) }
+  if (delta <= EPSILON) {
+    return {
+      ...motion,
+      cursor: copyCursor(motion.cursor),
+      routeHistory: copyRouteHistory(motion.routeHistory),
+    }
+  }
 
   const cursor = cursorWithDistance(motion.cursor, pieces)
+  const routeHistory = routeHistoryFromCursor(pieces, cursor, motion.routeHistory)
   let stationServicedId = motion.stationServicedId
   // 駅pieceを抜けたら同じ駅を再び探索対象に戻す。ループでは次周に再停車できる。
   if (stationServicedId !== undefined && cursor.pieceId !== stationServicedId) {
@@ -841,9 +1098,11 @@ export function updateRailTrainMotion(
     finite(available) ? available : Infinity,
     ((currentSpeed + nextSpeed) / 2) * delta,
   )
-  const nextCursor = travelled > EPSILON
-    ? advanceRailTrainCursor(pieces, cursor, travelled)
-    : cursor
+  const moved = travelled > EPSILON
+    ? advanceRailTrainCursorWithRouteHistory(pieces, cursor, travelled, routeHistory)
+    : { cursor, routeHistory: trimRouteHistory(pieces, cursor, routeHistory) }
+  const nextCursor = moved.cursor
+  const nextRouteHistory = moved.routeHistory
   const nextForwardDistance = distanceToRailTrainDeadEnd(pieces, nextCursor)
   const reachedReservedStop = finite(available) && travelled >= available - 1e-5
   const atStop = finite(nextForwardDistance)
@@ -853,6 +1112,7 @@ export function updateRailTrainMotion(
   if (stationIsBeforeDeadEnd && reachedReservedStop && nextStation !== null) {
     return {
       cursor: nextCursor,
+      routeHistory: nextRouteHistory,
       speed: 0,
       status: 'stoppedAtStation',
       stationServicedId: nextStation.stationId,
@@ -863,6 +1123,7 @@ export function updateRailTrainMotion(
   if (atStop) {
     return {
       cursor: nextCursor,
+      routeHistory: nextRouteHistory,
       speed: 0,
       status: 'waiting',
       stationServicedId,
@@ -884,6 +1145,7 @@ export function updateRailTrainMotion(
 
   return {
     cursor: nextCursor,
+    routeHistory: nextRouteHistory,
     speed: nextSpeed,
     status: nextStatus,
     stationServicedId: hasLeftServicedStation ? undefined : stationServicedId,
