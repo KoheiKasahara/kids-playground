@@ -9,9 +9,11 @@ import type { ReactElement } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import App from './App'
 
 // 動的importをこちらで完全に制御するため、rail-builder本体をスタブに差し替える。
 // resolveRailBuilderImport()を呼ぶまでimport()のPromiseは解決しない。
+// vi.mockはファイル先頭へ巻き上げられるため、上のAppのstatic importより先に効く。
 const deferred = vi.hoisted(() => {
   let resolve!: (module: { default: () => ReactElement }) => void
   const promise = new Promise<{ default: () => ReactElement }>((r) => {
@@ -21,10 +23,6 @@ const deferred = vi.hoisted(() => {
 })
 
 vi.mock('../games/rail-builder/RailBuilderPlay', () => deferred.promise)
-
-// vi.mockはファイル先頭へ巻き上げられるため、Appのimportはモック登録より後に書く必要はないが、
-// 可読性のため一連の流れとして最後に置く。
-const { default: App } = await import('./App')
 
 describe('lazyルートとGameIntroのSuspense同期(Issue #298)', () => {
   test('チャンク未解決の間はGameIntro単独状態にならず、解決後は本体と同時に現れる', async () => {
