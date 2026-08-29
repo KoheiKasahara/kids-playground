@@ -199,6 +199,11 @@
   clip-path: polygon(0 0, 52% 0, 100% 32%, 100% 68%, 52% 100%, 0 100%);
 }
 
+.e7w7-dignified {
+  /* A composed shoulder and reserved taper for the blue/white/gold card. */
+  clip-path: polygon(0 6%, 34% 0, 72% 9%, 100% 36%, 100% 64%, 72% 91%, 34% 100%, 0 94%);
+}
+
 @media (max-width: 380px) {
   .grid {
     grid-template-columns: repeat(2, 1fr);

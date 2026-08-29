@@ -40,9 +40,9 @@ export const RAIL_TRAIN_APPEARANCES: readonly RailTrainAppearance[] = [
  * 新しい車両タイプを増やすときはこのunionとTRAIN_TYPE_VISUAL_CONFIGSに
  * 追加するだけで済むようにする。
  */
-export type TrainType = 'basic' | 'e5' | 'e6' | 'n700s' | 'doctorYellow'
+export type TrainType = 'basic' | 'e5' | 'e6' | 'n700s' | 'doctorYellow' | 'e7w7'
 
-export const TRAIN_TYPES: readonly TrainType[] = ['basic', 'e5', 'e6', 'n700s', 'doctorYellow']
+export const TRAIN_TYPES: readonly TrainType[] = ['basic', 'e5', 'e6', 'n700s', 'doctorYellow', 'e7w7']
 
 export const DEFAULT_TRAIN_TYPE: TrainType = 'basic'
 
@@ -64,6 +64,7 @@ const TRAIN_TYPE_VISUAL_CONFIGS: Record<Exclude<TrainType, 'basic'>, TrainVisual
   e6: { color: '#c93645', frontColor: '#8d2432', roofColor: '#f2eee4' },
   n700s: { color: '#f8faf9', frontColor: '#edf1f2', roofColor: '#ffffff' },
   doctorYellow: { color: '#f5c928', frontColor: '#dba315', roofColor: '#f3e5a3' },
+  e7w7: { color: '#f7f8f4', frontColor: '#124578', roofColor: '#0d4b86' },
 }
 
 /**

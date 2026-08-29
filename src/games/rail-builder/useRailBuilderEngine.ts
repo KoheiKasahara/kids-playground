@@ -347,6 +347,27 @@ function noseSectionRing(section: NoseSection, style: NoseStyle): readonly [numb
       [-halfWidth, section.top - cornerHeight * 1.18],
     ]
   }
+  if (style === 'e7w7-dignified') {
+    // E7/W7 keeps a calm, nearly upright shoulder with a modest centre crown.
+    // The slightly asymmetric breakpoints distinguish its dignified nose from
+    // both E5's broad wedge and Doctor Yellow's chunky duck profile.
+    const topCrown = Math.min(0.02, verticalRange * 0.06)
+    const lowerCrown = Math.min(0.008, verticalRange * 0.028)
+    return [
+      [-halfWidth * 0.72, section.top - cornerHeight * 0.3],
+      [-halfWidth * 0.38, section.top + topCrown * 0.45],
+      [0, section.top + topCrown],
+      [halfWidth * 0.38, section.top + topCrown * 0.45],
+      [halfWidth * 0.72, section.top - cornerHeight * 0.3],
+      [halfWidth, section.top - cornerHeight * 1.05],
+      [halfWidth, section.bottom + cornerHeight * 1.25],
+      [halfWidth * 0.73, section.bottom],
+      [0, section.bottom - lowerCrown],
+      [-halfWidth * 0.73, section.bottom],
+      [-halfWidth, section.bottom + cornerHeight * 1.25],
+      [-halfWidth, section.top - cornerHeight * 1.05],
+    ]
+  }
   return [
     [-halfWidth + cornerWidth, section.top],
     [halfWidth - cornerWidth, section.top],
@@ -491,18 +512,25 @@ function interpolateShellTopAtLateral(
   }
   const topCrown = style === 'doctor-yellow-duck'
     ? Math.min(0.015, verticalRange * 0.05)
-    : Math.min(0.018, verticalRange * 0.06)
-  if (normalizedOffset <= 0.32) {
-    const amount = normalizedOffset / 0.32
+    : style === 'e7w7-dignified'
+      ? Math.min(0.02, verticalRange * 0.06)
+      : Math.min(0.018, verticalRange * 0.06)
+  const crownEnd = style === 'e7w7-dignified' ? 0.38 : 0.32
+  const shoulderEnd = style === 'e7w7-dignified' ? 0.72 : 0.68
+  // Preserve the established E5/Doctor Yellow windshield seating. E7/W7's
+  // calmer shoulder is the only profile that uses the shallower 0.3 drop.
+  const shoulderDrop = style === 'e7w7-dignified' ? 0.3 : 0.4
+  if (normalizedOffset <= crownEnd) {
+    const amount = normalizedOffset / crownEnd
     return section.top + topCrown * (1 - amount)
   }
-  if (normalizedOffset <= 0.68) {
-    const amount = (normalizedOffset - 0.32) / 0.36
-    return section.top - cornerHeight * 0.4 * amount
+  if (normalizedOffset <= shoulderEnd) {
+    const amount = (normalizedOffset - crownEnd) / (shoulderEnd - crownEnd)
+    return section.top - cornerHeight * shoulderDrop * amount
   }
-  const amount = (normalizedOffset - 0.68) / 0.32
-  const outerCornerFactor = style === 'doctor-yellow-duck' ? 0.8 : 0.85
-  return section.top - cornerHeight * (0.4 + outerCornerFactor * amount)
+  const amount = (normalizedOffset - shoulderEnd) / (1 - shoulderEnd)
+  const outerCornerFactor = style === 'doctor-yellow-duck' ? 0.8 : style === 'e7w7-dignified' ? 0.75 : 0.85
+  return section.top - cornerHeight * (shoulderDrop + outerCornerFactor * amount)
 }
 
 /** シェル断面へ沿う低ポリゴンのフロントガラスリボン。 */
@@ -1081,6 +1109,44 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const doctorYellowSideWindowGeometry = doctorYellowStandardGeometry.sideWindowGeometry
     const doctorYellowAccentGeometry = doctorYellowStandardGeometry.accentGeometry
     const doctorYellowInspectionBoxGeometry = new RoundedBoxGeometry(0.48, 0.1, 0.36, 2, 0.04)
+    const e7w7Profile = resolveTrainSpec('e7w7')
+    const e7w7LeadShellSections = e7w7Profile.leadShellSections!
+    const e7w7FrontWindshieldSections = e7w7Profile.frontWindshieldSections!
+    const e7w7StandardGeometry = createStandardTrainGeometry(e7w7Profile, {
+      bodyBevelSize: 0.14,
+      roofBevelSize: 0.06,
+      cockpitWindowHeight: 0.2,
+      accentDepth: 0.04,
+    })
+    const e7w7BoxLeadBodyGeometry = e7w7StandardGeometry.leadBodyGeometry
+    const e7w7LeadBodyGeometry = createNoseGeometry(
+      e7w7LeadShellSections,
+      'e7w7-dignified',
+      true,
+    )
+    const e7w7MiddleBodyGeometry = e7w7StandardGeometry.middleBodyGeometry
+    const e7w7LeadRoofGeometry = e7w7StandardGeometry.leadRoofGeometry
+    const e7w7MiddleRoofGeometry = e7w7StandardGeometry.middleRoofGeometry
+    const e7w7SideWindowGeometry = e7w7StandardGeometry.sideWindowGeometry
+    const e7w7CockpitWindowGeometry = createFrontWindshieldGeometry(
+      e7w7LeadShellSections,
+      e7w7FrontWindshieldSections,
+      'e7w7-dignified',
+    )
+    const e7w7WindshieldDividerGeometry = createFrontWindshieldDividerGeometry(
+      e7w7LeadShellSections,
+      e7w7FrontWindshieldSections,
+      'e7w7-dignified',
+    )
+    const e7w7AccentGeometry = e7w7StandardGeometry.accentGeometry
+    const e7w7LeadAccentGeometry = createLeadShellAccentGeometry(
+      e7w7LeadShellSections,
+      e7w7Profile.accent.height,
+      e7w7Profile.accent.y,
+    )
+    // E7/W7 shares the established E5 lightweight underframe, bogies, wheels,
+    // and gangway dimensions to keep the toy fleet's geometry budget stable.
+    const e7w7GangwayGeometry = e5GangwayGeometry
     const bridgeBeamGeometry = new THREE.BoxGeometry(1, 0.26, 0.38)
     const bridgeSupportGeometry = new THREE.BoxGeometry(0.42, 1, 0.42)
     const bridgeGuardGeometry = new THREE.BoxGeometry(1, 0.16, 0.13)
@@ -1167,6 +1233,16 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       doctorYellowLeadAccentGeometry,
       doctorYellowGangwayGeometry,
       doctorYellowInspectionBoxGeometry,
+      e7w7LeadBodyGeometry,
+      e7w7BoxLeadBodyGeometry,
+      e7w7MiddleBodyGeometry,
+      e7w7LeadRoofGeometry,
+      e7w7MiddleRoofGeometry,
+      e7w7SideWindowGeometry,
+      e7w7CockpitWindowGeometry,
+      e7w7WindshieldDividerGeometry,
+      e7w7AccentGeometry,
+      e7w7LeadAccentGeometry,
       bridgeBeamGeometry,
       bridgeSupportGeometry,
       bridgeGuardGeometry,
@@ -1319,6 +1395,21 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       windowRoughness: 0.27,
       windowMetalness: 0.1,
     })
+    const {
+      bodyMaterial: e7w7BodyMaterial,
+      frontMaterial: e7w7FrontMaterial,
+      roofMaterial: e7w7RoofMaterial,
+      accentMaterial: e7w7AccentMaterial,
+      windowMaterial: e7w7WindowMaterial,
+    } = createStandardTrainMaterials(e7w7Profile, {
+      bodyRoughness: 0.62,
+      frontRoughness: 0.48,
+      roofRoughness: 0.64,
+      accentRoughness: 0.44,
+      accentMetalness: 0.22,
+      windowRoughness: 0.25,
+      windowMetalness: 0.12,
+    })
     const bridgeMaterial = new THREE.MeshStandardMaterial({ color: '#b77945', roughness: 0.82 })
     const bridgeGuardMaterial = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.64 })
     const stationPlatformMaterial = new THREE.MeshStandardMaterial({ color: '#f4c96b', roughness: 0.76 })
@@ -1367,6 +1458,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       doctorYellowRoofMaterial,
       doctorYellowAccentMaterial,
       doctorYellowWindowMaterial,
+      e7w7BodyMaterial,
+      e7w7FrontMaterial,
+      e7w7RoofMaterial,
+      e7w7AccentMaterial,
+      e7w7WindowMaterial,
       bridgeMaterial,
       bridgeGuardMaterial,
       stationPlatformMaterial,
@@ -1443,6 +1539,26 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         wheelGeometry: e5WheelGeometry,
         roofFeatureGeometry: doctorYellowInspectionBoxGeometry,
       }],
+      ['e7w7', {
+        spec: e7w7Profile,
+        leadBodyGeometry: e7w7LeadBodyGeometry,
+        middleBodyGeometry: e7w7MiddleBodyGeometry,
+        leadRoofGeometry: e7w7LeadRoofGeometry,
+        middleRoofGeometry: e7w7MiddleRoofGeometry,
+        sideWindowGeometry: e7w7SideWindowGeometry,
+        cockpitWindowGeometry: e7w7CockpitWindowGeometry,
+        accentGeometry: e7w7AccentGeometry,
+        leadAccentGeometry: e7w7LeadAccentGeometry,
+        windshieldDividerGeometry: e7w7Profile.windshieldCenterDivider
+          ? e7w7WindshieldDividerGeometry
+          : undefined,
+        integratedLeadShell: true,
+        splitShellColor: true,
+        underfloorGeometry: e5UnderfloorGeometry,
+        bogieGeometry: e5BogieGeometry,
+        gangwayGeometry: e7w7GangwayGeometry,
+        wheelGeometry: e5WheelGeometry,
+      }],
     ])
 
     const specialTrainVisualMaterials: ReadonlyMap<Exclude<TrainType, 'basic'>, SpecialTrainVisualMaterials> = new Map([
@@ -1474,6 +1590,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         windowMaterial: doctorYellowWindowMaterial,
         accentMaterial: doctorYellowAccentMaterial,
         roofFeatureMaterial: doctorYellowAccentMaterial,
+      }],
+      ['e7w7', {
+        bodyMaterial: e7w7BodyMaterial,
+        frontMaterial: e7w7FrontMaterial,
+        roofMaterial: e7w7RoofMaterial,
+        windowMaterial: e7w7WindowMaterial,
+        accentMaterial: e7w7AccentMaterial,
       }],
     ])
 

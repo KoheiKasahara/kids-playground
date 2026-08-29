@@ -7,6 +7,9 @@ import {
   DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS,
   DOCTOR_YELLOW_GANGWAY_SPEC,
   DOCTOR_YELLOW_LEAD_SHELL_SECTIONS,
+  E7W7_FRONT_WINDSHIELD_SECTIONS,
+  E7W7_GANGWAY_SPEC,
+  E7W7_LEAD_SHELL_SECTIONS,
   N700S_FRONT_WINDSHIELD_SECTIONS,
   N700S_GANGWAY_SPEC,
   N700S_LEAD_SHELL_SECTIONS,
@@ -74,15 +77,16 @@ describe('railTrainVisuals', () => {
     expect(middle.sideWindowWidth).toBeLessThanOrEqual(lead.sideWindowWidth)
   })
 
-  it('uses three-car formations for E5, N700S, and Doctor Yellow with lead shells facing outward at both ends', () => {
+  it('uses three-car formations for E5, N700S, Doctor Yellow, and E7/W7 with lead shells facing outward at both ends', () => {
     expect(getTrainFormationRoles('e5')).toEqual(['lead', 'middle', 'rear'])
     expect(getTrainFormationRoles('n700s')).toEqual(['lead', 'middle', 'rear'])
     expect(getTrainFormationRoles('doctorYellow')).toEqual(['lead', 'middle', 'rear'])
-    for (const trainType of TRAIN_TYPES.filter((candidate) => candidate !== 'e5' && candidate !== 'n700s' && candidate !== 'doctorYellow')) {
+    expect(getTrainFormationRoles('e7w7')).toEqual(['lead', 'middle', 'rear'])
+    for (const trainType of TRAIN_TYPES.filter((candidate) => !['e5', 'n700s', 'doctorYellow', 'e7w7'].includes(candidate))) {
       expect(getTrainFormationRoles(trainType)).toEqual(['lead', 'middle'])
     }
 
-    for (const trainType of ['e5', 'n700s', 'doctorYellow'] as const) {
+    for (const trainType of ['e5', 'n700s', 'doctorYellow', 'e7w7'] as const) {
       const lead = getTrainCarVisualProfile(trainType, 'lead')
       const rear = getTrainCarVisualProfile(trainType, 'rear')
       expect(rear).toBe(lead)
@@ -385,6 +389,90 @@ describe('railTrainVisuals', () => {
       }
       expect(current.width).toBeLessThan(shellWidth)
       expect(current.width).toBeGreaterThanOrEqual(shellWidth * 0.65)
+    }
+  })
+
+  it('defines E7/W7 as a dignified white-blue-gold three-car shell', () => {
+    const e7w7 = resolveTrainSpec('e7w7')
+    const lead = e7w7.lead
+    expect(e7w7.formation).toEqual(['lead', 'middle', 'rear'])
+    expect(e7w7.silhouette).toBe('e7w7-dignified-shoulder')
+    expect(lead.noseStyle).toBe('e7w7-dignified')
+    expect(e7w7.bodyColor).toMatch(/^#f/i)
+    expect(e7w7.frontColor).toMatch(/^#1/i)
+    expect(e7w7.roofColor).toMatch(/^#0/i)
+    expect(e7w7.accent.color).toBe('#bd954e')
+    expect(e7w7.accent.height).toBeGreaterThanOrEqual(0.08)
+    expect(e7w7.accent.height).toBeLessThanOrEqual(0.1)
+    expect(e7w7.gangway).toEqual(E7W7_GANGWAY_SPEC)
+    expect(e7w7.leadShellSections).toEqual(E7W7_LEAD_SHELL_SECTIONS)
+    expect(e7w7.frontWindshieldSections).toEqual(E7W7_FRONT_WINDSHIELD_SECTIONS)
+    expect(e7w7.windshieldCenterDivider).toBe(true)
+    expect(lead.sideWindowXs).toHaveLength(2)
+    expect(e7w7.middle.sideWindowXs).toHaveLength(3)
+    for (const profile of [lead, e7w7.middle]) {
+      for (const windowX of profile.sideWindowXs) {
+        expect(Math.abs(windowX - profile.doorX)).toBeGreaterThanOrEqual(
+          0.22 + profile.sideWindowWidth / 2,
+        )
+      }
+    }
+  })
+
+  it('keeps the E7/W7 lead loft monotonic and smoothly tapered', () => {
+    expect(E7W7_LEAD_SHELL_SECTIONS.length).toBeGreaterThanOrEqual(16)
+    expect(E7W7_LEAD_SHELL_SECTIONS[0]!.x).toBe(-1.04)
+    expect(E7W7_LEAD_SHELL_SECTIONS.at(-1)!.x).toBeGreaterThanOrEqual(1.30)
+    expect(E7W7_LEAD_SHELL_SECTIONS.at(-1)!.x).toBeLessThanOrEqual(1.34)
+    expect(E7W7_LEAD_SHELL_SECTIONS.at(-1)!.width).toBeGreaterThanOrEqual(0.40)
+    expect(E7W7_LEAD_SHELL_SECTIONS.at(-1)!.width).toBeLessThanOrEqual(0.44)
+    expect(E7W7_LEAD_SHELL_SECTIONS.at(-1)!.top).toBeGreaterThanOrEqual(0.88)
+    expect(E7W7_LEAD_SHELL_SECTIONS.at(-1)!.top).toBeLessThanOrEqual(0.92)
+    expect(E7W7_LEAD_SHELL_SECTIONS.at(-1)!.bottom).toBeGreaterThanOrEqual(0.61)
+    expect(E7W7_LEAD_SHELL_SECTIONS.at(-1)!.bottom).toBeLessThanOrEqual(0.63)
+    const xSteps = E7W7_LEAD_SHELL_SECTIONS.slice(1).map((section, index) => section.x - E7W7_LEAD_SHELL_SECTIONS[index]!.x)
+    expect(Math.max(...xSteps) - Math.min(...xSteps)).toBeLessThan(1e-6)
+    const topSteps: number[] = []
+    const bottomSteps: number[] = []
+    const widthSteps: number[] = []
+    for (let index = 1; index < E7W7_LEAD_SHELL_SECTIONS.length; index += 1) {
+      const previous = E7W7_LEAD_SHELL_SECTIONS[index - 1]!
+      const current = E7W7_LEAD_SHELL_SECTIONS[index]!
+      expect(current.x).toBeGreaterThan(previous.x)
+      expect(current.top).toBeLessThanOrEqual(previous.top)
+      expect(current.bottom).toBeGreaterThanOrEqual(previous.bottom)
+      expect(current.width).toBeLessThanOrEqual(previous.width)
+      topSteps.push(previous.top - current.top)
+      bottomSteps.push(current.bottom - previous.bottom)
+      widthSteps.push(previous.width - current.width)
+    }
+    expect(Math.max(...topSteps)).toBeLessThanOrEqual(0.08)
+    expect(Math.max(...bottomSteps)).toBeLessThanOrEqual(0.03)
+    expect(Math.max(...widthSteps)).toBeLessThanOrEqual(0.1)
+    for (let index = 1; index < topSteps.length; index += 1) {
+      expect(Math.abs(topSteps[index]! - topSteps[index - 1]!)).toBeLessThanOrEqual(0.03)
+      expect(Math.abs(bottomSteps[index]! - bottomSteps[index - 1]!)).toBeLessThanOrEqual(0.02)
+      expect(Math.abs(widthSteps[index]! - widthSteps[index - 1]!)).toBeLessThanOrEqual(0.04)
+    }
+  })
+
+  it('keeps the broad E7/W7 windshield inside its shallower shell envelope', () => {
+    expect(E7W7_FRONT_WINDSHIELD_SECTIONS.length).toBeGreaterThanOrEqual(4)
+    const shellWidthAt = (x: number): number => {
+      for (let index = 1; index < E7W7_LEAD_SHELL_SECTIONS.length; index += 1) {
+        const previous = E7W7_LEAD_SHELL_SECTIONS[index - 1]!
+        const current = E7W7_LEAD_SHELL_SECTIONS[index]!
+        if (x <= current.x) {
+          const amount = (x - previous.x) / (current.x - previous.x)
+          return previous.width + (current.width - previous.width) * amount
+        }
+      }
+      return E7W7_LEAD_SHELL_SECTIONS.at(-1)!.width
+    }
+    for (const [index, section] of E7W7_FRONT_WINDSHIELD_SECTIONS.entries()) {
+      expect(section.width).toBeLessThan(shellWidthAt(section.x))
+      expect(section.width).toBeGreaterThanOrEqual(shellWidthAt(section.x) * 0.65)
+      if (index > 1) expect(section.width).toBeLessThan(E7W7_FRONT_WINDSHIELD_SECTIONS[index - 1]!.width)
     }
   })
 
