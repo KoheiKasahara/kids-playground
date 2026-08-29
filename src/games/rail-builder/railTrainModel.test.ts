@@ -3,6 +3,7 @@ import {
   TRAIN_CAR_COUNT,
   TRAIN_CAR_SPACING,
   TRAIN_END_STOP_MARGIN,
+  TRAIN_ROUTE_HISTORY_MAX_ENTRIES,
   TRAIN_STATION_STOP_DURATION,
   advanceRailTrainCursor,
   createInitialRailTrainMotion,
@@ -12,6 +13,7 @@ import {
   findNextRailTrainStation,
   findNearestRailTrainCursor,
   getOccupiedRailPieceIds,
+  pauseRailTrain,
   sampleRailTrainCars,
   sampleRailTrainPose,
   startRailTrain,
@@ -95,6 +97,87 @@ describe('railTrainModel', () => {
     const motion = createInitialRailTrainMotion([branch], branch.id)
     expect(motion?.cursor.direction).toBe('a-to-c')
     expect(motion?.cursor.distance).toBeLessThanOrEqual(railPathLength(branch.branchPath!))
+  })
+
+  it.each([
+    ['right', 'c-to-a', 'tail-c', 'c'],
+    ['left', 'c-to-a', 'tail-c', 'c'],
+    ['right', 'b-to-a', 'tail-b', 'b'],
+    ['left', 'b-to-a', 'tail-b', 'b'],
+  ] as const)('keeps the lead-selected reverse branch route for %s-side merges', (
+    branchSide,
+    expectedBranchDirection,
+    startTailId,
+    actualRoute,
+  ) => {
+    // The switch is deliberately opposite the route the lead actually takes.
+    // A cursor alone cannot tell c-to-a from b-to-a after the lead exits A.
+    const switchDirection = actualRoute === 'c' ? 'b' : 'c'
+    const branch = {
+      ...createRailPiece('branch', 'branch', { x: 0, y: 0, z: 0 }, 0, 'left', branchSide),
+      branchDirection: switchDirection as 'b' | 'c',
+    }
+    const incoming = createRailPiece('straight', 'incoming')
+    const tailB = createRailPiece('straight', 'tail-b')
+    const tailC = createRailPiece('straight', 'tail-c')
+    let pieces = connectRailPieces([branch, incoming], incoming.id, 'b', branch.id, 'a')
+    pieces = connectRailPieces([...pieces, tailB], tailB.id, 'a', branch.id, 'b')
+    pieces = connectRailPieces([...pieces, tailC], tailC.id, 'a', branch.id, 'c')
+
+    const tail = pieces.find((piece) => piece.id === startTailId)!
+    let motion: RailTrainMotion = {
+      cursor: {
+        pieceId: tail.id,
+        direction: 'b-to-a',
+        distance: railPathLength(tail.path) - 0.2,
+      },
+      speed: 4.2,
+      status: 'running',
+    }
+    for (let tick = 0; tick < 80 && motion.cursor.pieceId !== incoming.id; tick += 1) {
+      motion = updateRailTrainMotion(motion, pieces, 0.1)
+    }
+    expect(motion.cursor.pieceId).toBe(incoming.id)
+    expect(motion.routeHistory?.some((entry) => (
+      entry.pieceId === branch.id && entry.direction === expectedBranchDirection
+    ))).toBe(true)
+
+    const poses = sampleRailTrainCars(
+      pieces,
+      motion.cursor,
+      TRAIN_CAR_COUNT,
+      TRAIN_CAR_SPACING,
+      motion.routeHistory,
+    )
+    expect(poses[1]?.cursor).toMatchObject({ pieceId: branch.id, direction: expectedBranchDirection })
+    expect(poses[2]?.cursor).toMatchObject({ pieceId: branch.id, direction: expectedBranchDirection })
+    const branchPose = sampleRailTrainPose(pieces, poses[1]!.cursor)
+    if (actualRoute === 'c') {
+      if (branchSide === 'right') expect(branchPose?.position.z).toBeGreaterThan(0)
+      else expect(branchPose?.position.z).toBeLessThan(0)
+    } else {
+      expect(branchPose?.position.z).toBeCloseTo(0, 1)
+    }
+    expect(branchPose?.cursor.direction).toBe(expectedBranchDirection)
+    expect(getOccupiedRailPieceIds(
+      pieces,
+      motion.cursor,
+      TRAIN_CAR_COUNT,
+      TRAIN_CAR_SPACING,
+      motion.routeHistory,
+    )).toContain(branch.id)
+
+    const paused = pauseRailTrain(motion)
+    const resumed = startRailTrain(paused)
+    expect(resumed.routeHistory).toEqual(motion.routeHistory)
+    const resumedPoses = sampleRailTrainCars(
+      pieces,
+      resumed.cursor,
+      TRAIN_CAR_COUNT,
+      TRAIN_CAR_SPACING,
+      resumed.routeHistory,
+    )
+    expect(resumedPoses[1]?.cursor.direction).toBe(expectedBranchDirection)
   })
 
   it('samples straight position and tangent in travel direction', () => {
@@ -624,6 +707,7 @@ describe('running a train around a branch-inclusive loop (issue #251)', () => {
     // このオーバルは8ピース。8回以上ピースが変われば1周以上した証拠。
     expect(pieceChanges).toBeGreaterThan(8)
     expect(motion.speed).toBeGreaterThan(0)
+    expect(motion.routeHistory?.length).toBeLessThanOrEqual(TRAIN_ROUTE_HISTORY_MAX_ENTRIES)
   })
 
   it('drives branch1\'s A-C bypass route (branchDirection=c) all the way to branch2 without hitting a dead end', () => {
