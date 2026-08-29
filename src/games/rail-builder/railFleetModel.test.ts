@@ -234,6 +234,7 @@ describe('railFleetModel', () => {
       blocked: true,
       motion: {
         cursor: { pieceId: first.id, direction: 'a-to-b', distance: 2 },
+        routeHistory: [{ pieceId: first.id, direction: 'a-to-b', startDistance: 0 }],
         speed: 3,
         status: 'running',
         stationServicedId: 'some-station',
@@ -247,7 +248,12 @@ describe('railFleetModel', () => {
       appearance: { color: '#0ea5e9', frontColor: '#0284c7', roofColor: '#e0f2fe' },
       wantsToRun: true,
       blocked: false,
-      motion: { cursor: { pieceId: second.id, direction: 'a-to-b', distance: 0.5 }, speed: 2, status: 'running' },
+      motion: {
+        cursor: { pieceId: second.id, direction: 'a-to-b', distance: 0.5 },
+        routeHistory: [{ pieceId: second.id, direction: 'a-to-b', startDistance: 0 }],
+        speed: 2,
+        status: 'running',
+      },
     }
     const newCursor = { pieceId: second.id, direction: 'a-to-b' as const, distance: 1 }
     const moved = moveRailFleetTrainTo([moving, other], 'train-1', newCursor)
@@ -260,6 +266,7 @@ describe('railFleetModel', () => {
     // 他の列車はクローンのみで内容は変わらない。
     expect(moved[1]).toEqual(other)
     expect(moved[1]).not.toBe(other)
+    expect(moved[1]?.motion.routeHistory).not.toBe(other.motion.routeHistory)
 
     // 存在しないidならクローンだけを返す。
     expect(moveRailFleetTrainTo([moving, other], 'missing', newCursor)).toEqual([moving, other])
