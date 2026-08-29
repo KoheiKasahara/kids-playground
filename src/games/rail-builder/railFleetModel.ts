@@ -103,7 +103,13 @@ export type RailFleetTrainSummary = {
 }
 
 function cloneMotion(motion: RailTrainMotion): RailTrainMotion {
-  return { ...motion, cursor: { ...motion.cursor } }
+  return {
+    ...motion,
+    cursor: { ...motion.cursor },
+    ...(motion.routeHistory === undefined
+      ? {}
+      : { routeHistory: motion.routeHistory.map((entry) => ({ ...entry })) }),
+  }
 }
 
 /**
@@ -133,13 +139,25 @@ function safeSpawnMotion(
 ): RailTrainMotion | null {
   const used = new Set<string>()
   for (const train of trains) {
-    for (const pieceId of getOccupiedRailPieceIds(pieces, train.motion.cursor)) used.add(pieceId)
+    for (const pieceId of getOccupiedRailPieceIds(
+      pieces,
+      train.motion.cursor,
+      TRAIN_CAR_COUNT,
+      TRAIN_CAR_SPACING,
+      train.motion.routeHistory,
+    )) used.add(pieceId)
   }
   for (const piece of spawnOrderedPieces(pieces)) {
     if (used.has(piece.id)) continue
     const motion = createInitialRailTrainMotion(pieces, piece.id)
     if (motion === null || motion.cursor.pieceId !== piece.id) continue
-    const candidateOccupied = getOccupiedRailPieceIds(pieces, motion.cursor)
+    const candidateOccupied = getOccupiedRailPieceIds(
+      pieces,
+      motion.cursor,
+      TRAIN_CAR_COUNT,
+      TRAIN_CAR_SPACING,
+      motion.routeHistory,
+    )
     if (candidateOccupied.some((pieceId) => used.has(pieceId))) continue
 
     const tooClose = trains.some((train) => (
@@ -381,7 +399,13 @@ export function occupiedRailFleetPieceIds(
 ): string[] {
   const occupied = new Set<string>()
   for (const train of trains) {
-    for (const pieceId of getOccupiedRailPieceIds(pieces, train.motion.cursor)) occupied.add(pieceId)
+    for (const pieceId of getOccupiedRailPieceIds(
+      pieces,
+      train.motion.cursor,
+      TRAIN_CAR_COUNT,
+      TRAIN_CAR_SPACING,
+      train.motion.routeHistory,
+    )) occupied.add(pieceId)
   }
   return [...occupied].sort()
 }
