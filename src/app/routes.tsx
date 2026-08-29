@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType } from 'react'
+import { lazy, type ComponentType } from 'react'
 import { Navigate, type RouteObject } from 'react-router-dom'
 import Home from '../pages/Home'
 import FlagQuizStart from '../games/flag-quiz/FlagQuizStart'
@@ -30,9 +30,14 @@ import ColorMixQuizResult from '../games/color-mix-quiz/ColorMixQuizResult'
 // 50m世界地図やmatter-js(物理エンジン)など、特定ゲームだけが必要とする重い依存は
 // そのゲームを開くときだけ読込む。Vite PWAは生成されたchunkもprecacheするため、
 // 初回取得後は他のゲームと同様にオフラインで遊べる。
+//
+// Suspense境界はここではなくApp.tsxに1つだけ置く（各ルートで個別にfallback={null}の
+// Suspenseを持たせない）。GameIntroもその同じ境界の中に同居させることで、チャンク未解決の間は
+// ゲーム本体・GameIntroの両方が丸ごとfallbackに置き換わり、GameIntroだけが先に見える
+// 中間状態が構造的に発生しなくなる（詳細はApp.tsxのコメント、Issue #298を参照）。
 const lazyRoute = (loader: () => Promise<{ default: ComponentType }>) => {
   const Screen = lazy(loader)
-  return <Suspense fallback={null}><Screen /></Suspense>
+  return <Screen />
 }
 
 // さんすうクイズは4モード(add/sub/mul/div)ぶんの「むずかしさ選択・プレイ・結果」が
