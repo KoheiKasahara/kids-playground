@@ -178,6 +178,8 @@ type SpecialTrainVisualDefinition = {
   windshieldDividerGeometry?: THREE.BufferGeometry
   /** Optional E5-only low-cost details; future train types can opt in as needed. */
   splitShellColor?: boolean
+  /** Middle-car body can use the same upper/lower material split as its lead. */
+  splitMiddleShellColor?: boolean
   /** Lead body geometry already includes the nose and must be rendered as one shell. */
   integratedLeadShell?: boolean
   sideCockpitWindows?: boolean
@@ -294,19 +296,25 @@ function noseSectionRing(section: NoseSection, style: NoseStyle): readonly [numb
   }
   if (style === 'e6-spear') {
     // E6は細い中央稜線を作り、E5の幅広wedgeとは別の断面にする。
+    // 12点の順序は splitShellColor の upper/lower グループ分けと共有。
+    // 0..4 が上面、5..6 が右側、7..9 が底面、10..11 が左側となる
+    // 対称配置にして、左右の側面へ同じ色境界を出す。
     const ridgeHalfWidth = Math.min(0.07, halfWidth * 0.22)
     const ridgeHeight = Math.min(0.07, verticalRange * 0.2)
+    const lowerCrown = Math.min(0.01, verticalRange * 0.035)
     return [
-      [-halfWidth + cornerWidth, section.top],
+      [-halfWidth * 0.68, section.top - cornerHeight * 0.4],
+      [-halfWidth * 0.34, section.top],
       [-ridgeHalfWidth, section.top + ridgeHeight],
       [ridgeHalfWidth, section.top + ridgeHeight],
-      [halfWidth - cornerWidth, section.top],
-      [halfWidth, section.top - cornerHeight],
-      [halfWidth, section.bottom + cornerHeight],
-      [halfWidth - cornerWidth, section.bottom],
-      [-halfWidth + cornerWidth, section.bottom],
-      [-halfWidth, section.bottom + cornerHeight],
-      [-halfWidth, section.top - cornerHeight],
+      [halfWidth * 0.68, section.top - cornerHeight * 0.4],
+      [halfWidth, section.top - cornerHeight * 1.1],
+      [halfWidth, section.bottom + cornerHeight * 1.1],
+      [halfWidth * 0.70, section.bottom],
+      [0, section.bottom - lowerCrown],
+      [-halfWidth * 0.70, section.bottom],
+      [-halfWidth, section.bottom + cornerHeight * 1.1],
+      [-halfWidth, section.top - cornerHeight * 1.1],
     ]
   }
   if (style === 'n700s-winged') {
@@ -512,6 +520,28 @@ function interpolateShellTopAtLateral(
     const amount = (normalizedOffset - 0.83) / 0.17
     return section.top - cornerHeight * amount
   }
+  if (style === 'e6-spear') {
+    // The spear shell has a low central ridge followed by a sharp shoulder.
+    // These breakpoints mirror the 12-point ring above: a short flat ridge,
+    // a sloping inner top, a shoulder, and then the outer corner. Keep the
+    // windshield on that same surface instead of placing a flat plate over
+    // the nose.
+    const ridgeFraction = 0.22
+    const innerTopEnd = 0.34
+    const shoulderEnd = 0.68
+    const ridgeHeight = Math.min(0.07, verticalRange * 0.2)
+    if (normalizedOffset <= ridgeFraction) return section.top + ridgeHeight
+    if (normalizedOffset <= innerTopEnd) {
+      const amount = (normalizedOffset - ridgeFraction) / (innerTopEnd - ridgeFraction)
+      return section.top + ridgeHeight * (1 - amount)
+    }
+    if (normalizedOffset <= shoulderEnd) {
+      const amount = (normalizedOffset - innerTopEnd) / (shoulderEnd - innerTopEnd)
+      return section.top - cornerHeight * 0.4 * amount
+    }
+    const amount = (normalizedOffset - shoulderEnd) / (1 - shoulderEnd)
+    return section.top - cornerHeight * (0.4 + 0.7 * amount)
+  }
   const topCrown = style === 'doctor-yellow-duck'
     ? Math.min(0.015, verticalRange * 0.05)
     : style === 'e7w7-dignified'
@@ -711,29 +741,6 @@ function createE5BodyGeometry(profile: TrainCarVisualProfile): THREE.BufferGeome
     { x: halfLength * 0.72, top: profile.bodyHeight / 2, bottom: -profile.bodyHeight / 2, width: profile.bodyWidth },
     { x: halfLength, top: profile.bodyHeight / 2, bottom: -profile.bodyHeight / 2, width: profile.bodyWidth },
   ], 'e5-wide-wedge')
-}
-
-function createE6NoseGeometry(profile: TrainCarVisualProfile): THREE.BufferGeometry {
-  return createNoseGeometry([
-    {
-      x: profile.noseBaseX,
-      top: profile.noseBaseTopY,
-      bottom: profile.noseBaseBottomY,
-      width: profile.noseBaseWidth,
-    },
-    {
-      x: profile.noseBaseX + profile.noseLength * 0.34,
-      top: profile.noseBaseTopY - 0.02,
-      bottom: profile.noseBaseBottomY + 0.04,
-      width: profile.noseBaseWidth * 0.78,
-    },
-    {
-      x: profile.noseTipX,
-      top: profile.noseTipTopY,
-      bottom: profile.noseTipBottomY,
-      width: profile.noseTipWidth,
-    },
-  ], 'e6-spear')
 }
 
 type StandardTrainGeometry = Pick<
@@ -1012,21 +1019,57 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     )
     const e5WheelGeometry = new THREE.CylinderGeometry(0.16, 0.16, 0.11, 12)
     const e6Profile = resolveTrainSpec('e6')
-    const e6NoseGeometry = createE6NoseGeometry(e6Profile.lead)
+    const e6LeadShellSections = e6Profile.leadShellSections!
+    const e6FrontWindshieldSections = e6Profile.frontWindshieldSections!
+    const e6StandardGeometry = createStandardTrainGeometry(e6Profile, {
+      bodyBevelSize: 0.12,
+      roofBevelSize: 0.05,
+      cockpitWindowHeight: 0.22,
+      accentDepth: 0.04,
+    })
+    // E6 uses the same continuous shell approach as the other high-quality
+    // Shinkansen visuals. The middle body receives the same low-cost upper /
+    // lower color split so the three cars share one design language.
+    const e6LeadBodyGeometry = createNoseGeometry(
+      e6LeadShellSections,
+      'e6-spear',
+      true,
+    )
+    const e6MiddleBodyGeometry = createNoseGeometry([
+      { x: -e6Profile.middle.bodyLength / 2, top: e6Profile.middle.bodyHeight / 2, bottom: -e6Profile.middle.bodyHeight / 2, width: e6Profile.middle.bodyWidth },
+      { x: -e6Profile.middle.bodyLength * 0.34, top: e6Profile.middle.bodyHeight / 2, bottom: -e6Profile.middle.bodyHeight / 2, width: e6Profile.middle.bodyWidth },
+      { x: e6Profile.middle.bodyLength * 0.34, top: e6Profile.middle.bodyHeight / 2, bottom: -e6Profile.middle.bodyHeight / 2, width: e6Profile.middle.bodyWidth },
+      { x: e6Profile.middle.bodyLength / 2, top: e6Profile.middle.bodyHeight / 2, bottom: -e6Profile.middle.bodyHeight / 2, width: e6Profile.middle.bodyWidth },
+    ], 'e6-spear', true)
     const {
-      leadBodyGeometry: e6LeadBodyGeometry,
-      middleBodyGeometry: e6MiddleBodyGeometry,
       leadRoofGeometry: e6LeadRoofGeometry,
       middleRoofGeometry: e6MiddleRoofGeometry,
       sideWindowGeometry: e6SideWindowGeometry,
-      cockpitWindowGeometry: e6CockpitWindowGeometry,
       accentGeometry: e6AccentGeometry,
-    } = createStandardTrainGeometry(e6Profile, {
-      bodyBevelSize: 0.12,
-      roofBevelSize: 0.05,
-      cockpitWindowHeight: 0.2,
-      accentDepth: 0.035,
-    })
+    } = e6StandardGeometry
+    const e6CockpitWindowGeometry = createFrontWindshieldGeometry(
+      e6LeadShellSections,
+      e6FrontWindshieldSections,
+      'e6-spear',
+    )
+    const e6WindshieldDividerGeometry = createFrontWindshieldDividerGeometry(
+      e6LeadShellSections,
+      e6FrontWindshieldSections,
+      'e6-spear',
+    )
+    const e6LeadAccentGeometry = createLeadShellAccentGeometry(
+      e6LeadShellSections,
+      e6Profile.accent.height,
+      e6Profile.accent.y,
+    )
+    const e6GangwaySpec = e6Profile.gangway!
+    const e6GangwayGeometry = new RoundedBoxGeometry(
+      e6GangwaySpec.length,
+      e6GangwaySpec.height,
+      e6GangwaySpec.width,
+      1,
+      0.035,
+    )
     const n700sProfile = resolveTrainSpec('n700s')
     const n700sLeadShellSections = n700sProfile.leadShellSections!
     const n700sFrontWindshieldSections = n700sProfile.frontWindshieldSections!
@@ -1205,14 +1248,19 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       e5BogieGeometry,
       e5GangwayGeometry,
       e5WheelGeometry,
-      e6NoseGeometry,
       e6LeadBodyGeometry,
       e6MiddleBodyGeometry,
       e6LeadRoofGeometry,
       e6MiddleRoofGeometry,
       e6SideWindowGeometry,
       e6CockpitWindowGeometry,
+      e6WindshieldDividerGeometry,
       e6AccentGeometry,
+      e6LeadAccentGeometry,
+      e6GangwayGeometry,
+      e6StandardGeometry.leadBodyGeometry,
+      e6StandardGeometry.middleBodyGeometry,
+      e6StandardGeometry.cockpitWindowGeometry,
       n700sBoxLeadBodyGeometry,
       n700sLeadBodyGeometry,
       n700sMiddleBodyGeometry,
@@ -1496,7 +1544,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       }],
       ['e6', {
         spec: e6Profile,
-        noseGeometry: e6NoseGeometry,
         leadBodyGeometry: e6LeadBodyGeometry,
         middleBodyGeometry: e6MiddleBodyGeometry,
         leadRoofGeometry: e6LeadRoofGeometry,
@@ -1504,6 +1551,15 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         sideWindowGeometry: e6SideWindowGeometry,
         cockpitWindowGeometry: e6CockpitWindowGeometry,
         accentGeometry: e6AccentGeometry,
+        leadAccentGeometry: e6LeadAccentGeometry,
+        windshieldDividerGeometry: e6WindshieldDividerGeometry,
+        integratedLeadShell: true,
+        splitShellColor: true,
+        splitMiddleShellColor: true,
+        underfloorGeometry: e5UnderfloorGeometry,
+        bogieGeometry: e5BogieGeometry,
+        gangwayGeometry: e6GangwayGeometry,
+        wheelGeometry: e5WheelGeometry,
       }],
       ['n700s', {
         spec: n700sProfile,
@@ -1900,9 +1956,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
       const bodyGeometry = usesLeadVisual ? definition.leadBodyGeometry : definition.middleBodyGeometry
       const roofGeometry = usesLeadVisual ? definition.leadRoofGeometry : definition.middleRoofGeometry
-      const bodyMaterial: THREE.Material | THREE.Material[] = usesLeadVisual
-        && definition.integratedLeadShell
-        && definition.splitShellColor
+      const bodyMaterial: THREE.Material | THREE.Material[] = (
+        (usesLeadVisual && definition.integratedLeadShell && definition.splitShellColor)
+        || (!usesLeadVisual && definition.splitMiddleShellColor)
+      )
         ? [runtime.frontMaterial, runtime.bodyMaterial]
         : runtime.bodyMaterial
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial)

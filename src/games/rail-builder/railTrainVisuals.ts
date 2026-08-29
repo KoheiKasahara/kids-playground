@@ -19,7 +19,7 @@ const E7W7_THREE_CAR_FORMATION = THREE_CAR_FORMATION
 const TRAIN_FORMATIONS: Readonly<Record<TrainType, readonly TrainCarRole[]>> = {
   basic: TWO_CAR_FORMATION,
   e5: E5_THREE_CAR_FORMATION,
-  e6: TWO_CAR_FORMATION,
+  e6: THREE_CAR_FORMATION,
   n700s: THREE_CAR_FORMATION,
   doctorYellow: DOCTOR_YELLOW_THREE_CAR_FORMATION,
   e7w7: E7W7_THREE_CAR_FORMATION,
@@ -192,6 +192,57 @@ export const E5_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSection[] = [
   { x: 0.62, width: 0.66 },
   { x: 0.84, width: 0.57 },
 ] as const
+
+/**
+ * こまち風先頭車の連続ロフト断面。
+ *
+ * E5よりも車体幅を抑え、鼻を短くしながら、肩から鼻先までの変化を
+ * 充分な数の断面で連続させる。前半の低く細い肩と、後半の鋭い絞りを
+ * 同じリングでつなぐことで、正面・側面・斜め前のどこから見ても
+ * 単純な三角形に見えない立体的なこまち風シルエットにする。
+ */
+export const E6_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
+  { x: -1.04, top: 1.20, bottom: 0.49, width: 0.82 },
+  { x: -0.925714285714, top: 1.20, bottom: 0.49, width: 0.82 },
+  { x: -0.811428571429, top: 1.20, bottom: 0.49, width: 0.82 },
+  { x: -0.697142857143, top: 1.20, bottom: 0.49, width: 0.82 },
+  { x: -0.582857142857, top: 1.20, bottom: 0.49, width: 0.82 },
+  { x: -0.468571428571, top: 1.20, bottom: 0.49, width: 0.82 },
+  { x: -0.354285714286, top: 1.20, bottom: 0.49, width: 0.82 },
+  { x: -0.24, top: 1.20, bottom: 0.49, width: 0.82 },
+  { x: -0.125714285714, top: 1.199, bottom: 0.491, width: 0.819 },
+  { x: -0.011428571429, top: 1.196, bottom: 0.492, width: 0.816 },
+  { x: 0.102857142857, top: 1.191, bottom: 0.494, width: 0.810 },
+  { x: 0.217142857143, top: 1.184, bottom: 0.497, width: 0.800 },
+  { x: 0.331428571429, top: 1.174, bottom: 0.501, width: 0.788 },
+  { x: 0.445714285714, top: 1.161, bottom: 0.506, width: 0.772 },
+  { x: 0.56, top: 1.145, bottom: 0.512, width: 0.750 },
+  { x: 0.674285714286, top: 1.126, bottom: 0.519, width: 0.724 },
+  { x: 0.788571428571, top: 1.104, bottom: 0.527, width: 0.694 },
+  { x: 0.902857142857, top: 1.078, bottom: 0.536, width: 0.660 },
+  { x: 1.017142857143, top: 1.048, bottom: 0.546, width: 0.620 },
+  { x: 1.131428571429, top: 1.013, bottom: 0.558, width: 0.540 },
+  { x: 1.245714285714, top: 0.966, bottom: 0.576, width: 0.440 },
+  { x: 1.36, top: 0.90, bottom: 0.60, width: 0.34 },
+] as const
+
+/** こまち風のシャープな鼻筋に沿う、複数断面フロントガラス。 */
+export const E6_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSection[] = [
+  { x: 0.20, width: 0.60 },
+  { x: 0.33, width: 0.64 },
+  { x: 0.56, width: 0.58 },
+  { x: 0.79, width: 0.49 },
+  { x: 1.00, width: 0.44 },
+] as const
+
+/** こまち風3両編成向けの軽量な共通幌。 */
+export const E6_GANGWAY_SPEC: TrainGangwaySpec = {
+  length: 0.22,
+  height: 0.44,
+  width: 0.56,
+  centerY: 0.75,
+  positionOffset: 0.11,
+} as const
 
 /**
  * ドクターイエロー風先頭車の連続ロフト断面。
@@ -564,39 +615,43 @@ const E6_LEAD: TrainCarVisualProfile = {
   role: 'lead',
   silhouette: 'e6-spear-nose',
   noseStyle: 'e6-spear',
-  bodyLength: 1.78,
+  // Compact and low, with a shorter nose than E5 rather than a red-painted
+  // copy of the wide E5 envelope.
+  bodyLength: 1.94,
   bodyHeight: 0.58,
   bodyWidth: 0.82,
-  bodyCenterX: -0.12,
+  bodyCenterX: -0.05,
   bodyCenterY: 0.75,
-  roofLength: 1.82,
+  roofLength: 1.92,
   roofHeight: 0.13,
   roofWidth: 0.82,
-  roofCenterX: -0.12,
+  roofCenterX: -0.05,
   roofCenterY: 1.14,
-  noseLength: 1.1,
-  noseBaseX: 0.24,
-  noseTipX: 1.34,
+  noseLength: 1.20,
+  noseBaseX: 0.16,
+  noseTipX: 1.36,
   noseBaseWidth: 0.82,
-  noseTipWidth: 0.18,
-  noseBaseBottomY: 0.48,
-  noseBaseTopY: 0.98,
-  noseTipBottomY: 0.66,
-  noseTipTopY: 0.82,
-  accentLength: 1.46,
-  accentHeight: 0.055,
-  accentY: 0.73,
-  sideWindowXs: [-0.55, 0.04],
-  sideWindowY: 0.94,
-  sideWindowWidth: 0.48,
-  sideWindowHeight: 0.18,
-  frontWindowX: 0.62,
-  frontWindowY: 0.87,
-  frontWindowWidth: 0.36,
-  doorX: -0.52,
-  headlightX: 1.24,
-  headlightY: 0.7,
-  headlightZ: 0.12,
+  noseTipWidth: 0.34,
+  noseBaseBottomY: 0.49,
+  noseBaseTopY: 1.19,
+  noseTipBottomY: 0.60,
+  noseTipTopY: 0.90,
+  accentLength: 1.78,
+  accentHeight: 0.07,
+  accentY: 0.81,
+  // Two compact windows leave a full shared door frame at the rear of the
+  // cockpit while retaining the short, distinctive cabin proportion.
+  sideWindowXs: [-0.34, 0.16],
+  sideWindowY: 0.96,
+  sideWindowWidth: 0.25,
+  sideWindowHeight: 0.17,
+  frontWindowX: 0.54,
+  frontWindowY: 1.05,
+  frontWindowWidth: 0.60,
+  doorX: -0.76,
+  headlightX: 1.20,
+  headlightY: 0.69,
+  headlightZ: 0.15,
   hasFrontWindow: true,
   hasHeadlights: true,
   couplerPositions: BASIC_COUPLER_POSITIONS,
@@ -622,7 +677,11 @@ const E6_MIDDLE: TrainCarVisualProfile = {
   frontWindowX: 0,
   frontWindowY: 0,
   frontWindowWidth: 0,
-  doorX: -0.4,
+  sideWindowXs: [-0.34, 0.08, 0.50],
+  sideWindowY: 0.96,
+  sideWindowWidth: 0.25,
+  sideWindowHeight: 0.17,
+  doorX: -0.74,
   headlightX: 0,
   headlightY: 0,
   headlightZ: 0,
@@ -891,23 +950,29 @@ const E5_PROFILE: TrainSpec = {
 const E6_PROFILE: TrainSpec = {
   trainType: 'e6',
   silhouette: 'e6-sharp-shoulder',
-  bodyColor: '#c93645',
-  frontColor: '#8d2432',
-  roofColor: '#f2eee4',
+  // Red upper shell and roof over a warm white lower body keep the compact
+  // train immediately readable without making it a single-color block.
+  bodyColor: '#f3f1ed',
+  frontColor: '#c52d40',
+  roofColor: '#b52639',
   bodyWidth: 0.82,
   bodyHeight: 0.58,
   noseLength: E6_LEAD.noseLength,
   frontExtent: E6_LEAD.noseTipX,
   rearExtent: -1.03,
   maxHalfWidth: 0.41,
-  accent: { color: '#b8bdc4', height: 0.055, y: 0.73 },
+  accent: { color: '#d4d9df', height: 0.07, y: 0.81 },
   window: {
     color: '#142f4a',
     sideXs: E6_LEAD.sideWindowXs,
     sideWidth: E6_LEAD.sideWindowWidth,
     sideHeight: E6_LEAD.sideWindowHeight,
   },
-  formation: TWO_CAR_FORMATION,
+  formation: THREE_CAR_FORMATION,
+  gangway: E6_GANGWAY_SPEC,
+  leadShellSections: E6_LEAD_SHELL_SECTIONS,
+  frontWindshieldSections: E6_FRONT_WINDSHIELD_SECTIONS,
+  windshieldCenterDivider: true,
   lead: E6_LEAD,
   middle: E6_MIDDLE,
 }

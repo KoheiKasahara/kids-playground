@@ -76,6 +76,24 @@ describe('TrainTypePicker', () => {
     expect(onSelect).toHaveBeenCalledExactlyOnceWith('n700s')
   })
 
+  test('こまち風のカードを選択できる', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    render(
+      <TrainTypePicker
+        title="えらぼう"
+        ariaLabel="でんしゃの みためを えらぶ"
+        selectedType={null}
+        onSelect={onSelect}
+        onClose={() => {}}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'でんしゃの みため 3' }))
+
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('e6')
+  })
+
   test('6番目のカードを選ぶとE7/W7のtrainTypeが渡される', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()

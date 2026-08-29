@@ -4,6 +4,9 @@ import {
   E5_GANGWAY_SPEC,
   E5_FRONT_WINDSHIELD_SECTIONS,
   E5_LEAD_SHELL_SECTIONS,
+  E6_FRONT_WINDSHIELD_SECTIONS,
+  E6_GANGWAY_SPEC,
+  E6_LEAD_SHELL_SECTIONS,
   DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS,
   DOCTOR_YELLOW_GANGWAY_SPEC,
   DOCTOR_YELLOW_LEAD_SHELL_SECTIONS,
@@ -77,16 +80,17 @@ describe('railTrainVisuals', () => {
     expect(middle.sideWindowWidth).toBeLessThanOrEqual(lead.sideWindowWidth)
   })
 
-  it('uses three-car formations for E5, N700S, Doctor Yellow, and E7/W7 with lead shells facing outward at both ends', () => {
+  it('uses three-car formations for E5, E6, N700S, Doctor Yellow, and E7/W7 with lead shells facing outward at both ends', () => {
     expect(getTrainFormationRoles('e5')).toEqual(['lead', 'middle', 'rear'])
+    expect(getTrainFormationRoles('e6')).toEqual(['lead', 'middle', 'rear'])
     expect(getTrainFormationRoles('n700s')).toEqual(['lead', 'middle', 'rear'])
     expect(getTrainFormationRoles('doctorYellow')).toEqual(['lead', 'middle', 'rear'])
     expect(getTrainFormationRoles('e7w7')).toEqual(['lead', 'middle', 'rear'])
-    for (const trainType of TRAIN_TYPES.filter((candidate) => !['e5', 'n700s', 'doctorYellow', 'e7w7'].includes(candidate))) {
+    for (const trainType of TRAIN_TYPES.filter((candidate) => !['e5', 'e6', 'n700s', 'doctorYellow', 'e7w7'].includes(candidate))) {
       expect(getTrainFormationRoles(trainType)).toEqual(['lead', 'middle'])
     }
 
-    for (const trainType of ['e5', 'n700s', 'doctorYellow', 'e7w7'] as const) {
+    for (const trainType of ['e5', 'e6', 'n700s', 'doctorYellow', 'e7w7'] as const) {
       const lead = getTrainCarVisualProfile(trainType, 'lead')
       const rear = getTrainCarVisualProfile(trainType, 'rear')
       expect(rear).toBe(lead)
@@ -259,10 +263,91 @@ describe('railTrainVisuals', () => {
     expect(e6.lead.sideWindowXs.length).toBe(2)
     expect(n700s.lead.sideWindowXs.length).toBe(2)
     expect(doctorYellow.lead.sideWindowXs.length).toBe(2)
-    expect(e6.accent.color).toBe('#b8bdc4')
+    expect(e6.accent.color).toBe('#d4d9df')
     expect(n700s.accent.color).toBe('#2e64cb')
     expect(doctorYellow.accent.color).toBe('#19457a')
     expect(new Set([e5.bodyColor, e6.bodyColor, n700s.bodyColor, doctorYellow.bodyColor]).size).toBe(4)
+  })
+
+  it('defines E6 as a slender red-and-white three-car shell with a short spear nose', () => {
+    const e6 = resolveTrainSpec('e6')
+    const e5 = resolveTrainSpec('e5')
+    expect(e6.formation).toEqual(['lead', 'middle', 'rear'])
+    expect(e6.gangway).toEqual(E6_GANGWAY_SPEC)
+    expect(e6.leadShellSections).toEqual(E6_LEAD_SHELL_SECTIONS)
+    expect(e6.frontWindshieldSections).toEqual(E6_FRONT_WINDSHIELD_SECTIONS)
+    expect(e6.windshieldCenterDivider).toBe(true)
+    expect(e6.bodyColor).toMatch(/^#f/i)
+    expect(e6.frontColor).toMatch(/^#c/i)
+    expect(e6.roofColor).toMatch(/^#b/i)
+    expect(e6.lead.bodyWidth).toBeLessThan(e5.lead.bodyWidth)
+    expect(e6.lead.bodyHeight).toBeLessThan(0.62)
+    expect(e6.lead.noseLength).toBeLessThan(e5.lead.noseLength)
+    expect(e6.lead.noseLength).toBeGreaterThan(1.1)
+    expect(e6.lead.noseTipWidth).toBeLessThan(0.36)
+    expect(e6.lead.sideWindowXs).toHaveLength(2)
+    expect(e6.middle.sideWindowXs).toHaveLength(3)
+  })
+
+  it('keeps the E6 integrated shell and windshield smooth across all views', () => {
+    const e6 = resolveTrainSpec('e6')
+    const sections = E6_LEAD_SHELL_SECTIONS
+    expect(sections.length).toBeGreaterThanOrEqual(20)
+    expect(sections[0]!.x).toBe(-1.04)
+    expect(sections.at(-1)!.x).toBe(1.36)
+    expect(sections.at(-1)!.top).toBeCloseTo(0.9, 8)
+    expect(sections.at(-1)!.width).toBeCloseTo(0.34, 8)
+
+    const xSteps = sections.slice(1).map((section, index) => section.x - sections[index]!.x)
+    expect(Math.max(...xSteps) - Math.min(...xSteps)).toBeLessThan(1e-4)
+    for (let index = 1; index < sections.length; index += 1) {
+      const previous = sections[index - 1]!
+      const current = sections[index]!
+      expect(current.x).toBeGreaterThan(previous.x)
+      expect(current.top).toBeLessThanOrEqual(previous.top)
+      expect(current.bottom).toBeGreaterThanOrEqual(previous.bottom)
+      expect(current.width).toBeLessThanOrEqual(previous.width)
+      expect(previous.top - current.top).toBeLessThanOrEqual(0.08)
+      expect(current.bottom - previous.bottom).toBeLessThanOrEqual(0.03)
+      expect(previous.width - current.width).toBeLessThanOrEqual(0.1 + 1e-6)
+    }
+
+    const shellWidthAt = (x: number): number => {
+      for (let index = 1; index < sections.length; index += 1) {
+        const previous = sections[index - 1]!
+        const current = sections[index]!
+        if (x <= current.x) {
+          const amount = (x - previous.x) / (current.x - previous.x)
+          return previous.width + (current.width - previous.width) * amount
+        }
+      }
+      return sections.at(-1)!.width
+    }
+    for (const [index, section] of E6_FRONT_WINDSHIELD_SECTIONS.entries()) {
+      const shellWidth = shellWidthAt(section.x)
+      expect(section.width).toBeLessThan(shellWidth)
+      expect(section.width).toBeGreaterThanOrEqual(shellWidth * 0.65)
+      if (index > 1) expect(section.width).toBeLessThan(E6_FRONT_WINDSHIELD_SECTIONS[index - 1]!.width)
+    }
+
+    const doorFrameHalfWidth = 0.22
+    for (const profile of [e6.lead, e6.middle]) {
+      for (const windowX of profile.sideWindowXs) {
+        expect(Math.abs(windowX - profile.doorX)).toBeGreaterThanOrEqual(
+          doorFrameHalfWidth + profile.sideWindowWidth / 2,
+        )
+      }
+    }
+  })
+
+  it('keeps the E6 gangway compact and aligned to the shared three-car connection', () => {
+    expect(E6_GANGWAY_SPEC.length).toBeGreaterThanOrEqual(0.2)
+    expect(E6_GANGWAY_SPEC.length).toBeLessThan(0.3)
+    expect(E6_GANGWAY_SPEC.height).toBeGreaterThanOrEqual(0.42)
+    expect(E6_GANGWAY_SPEC.height).toBeLessThanOrEqual(0.46)
+    expect(E6_GANGWAY_SPEC.width).toBeGreaterThanOrEqual(0.54)
+    expect(E6_GANGWAY_SPEC.width).toBeLessThanOrEqual(0.58)
+    expect(E6_GANGWAY_SPEC.positionOffset).toBeCloseTo(E6_GANGWAY_SPEC.length / 2, 8)
   })
 
   it('defines N700S as a broad white three-car shell with connected windshield and gangway data', () => {
