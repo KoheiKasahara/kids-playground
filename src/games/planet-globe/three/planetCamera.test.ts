@@ -31,14 +31,26 @@ describe('fitDistance', () => {
 })
 
 describe('cameraDistanceForZoom', () => {
-  it('レベル0→3で単調に近づく', () => {
+  it('追加したズームアウト2段階を含め、レベル-2→3で単調に近づく', () => {
     const body = celestialBodies[0]
-    const levels: ZoomLevel[] = [0, 1, 2, 3]
+    const levels: ZoomLevel[] = [-2, -1, 0, 1, 2, 3]
     const distances = levels.map((level) => cameraDistanceForZoom(body, level, LANDSCAPE_ASPECT))
 
     for (let i = 1; i < distances.length; i += 1) {
       expect(distances[i]).toBeLessThan(distances[i - 1])
     }
+  })
+
+  it('既存の0〜3段階と最大ズーム距離を変えず、-2/-1だけを同じ比率で追加する', () => {
+    const body = celestialBodies[0]
+    const legacyRatio = (body.zoom.inMargin / body.zoom.outMargin) ** (1 / 3)
+    const distanceAtZero = cameraDistanceForZoom(body, 0, LANDSCAPE_ASPECT)
+    const distanceAtMax = cameraDistanceForZoom(body, MAX_ZOOM_LEVEL, LANDSCAPE_ASPECT)
+
+    expect(distanceAtZero).toBeCloseTo(fitDistance(viewRadiusOf(body), LANDSCAPE_ASPECT) * body.zoom.outMargin)
+    expect(distanceAtMax).toBeCloseTo(fitDistance(viewRadiusOf(body), LANDSCAPE_ASPECT) * body.zoom.inMargin)
+    expect(cameraDistanceForZoom(body, -1, LANDSCAPE_ASPECT) / distanceAtZero).toBeCloseTo(1 / legacyRatio)
+    expect(cameraDistanceForZoom(body, -2, LANDSCAPE_ASPECT) / distanceAtZero).toBeCloseTo(1 / legacyRatio ** 2)
   })
 
   it.each(celestialBodies)(
@@ -95,7 +107,7 @@ describe('easeOutCubic', () => {
     expect(easeOutCubic(1)).toBe(1)
   })
 
-  it('MAX_ZOOM_LEVELを使った補間比が0..1に収まる', () => {
+  it('既存のMAX_ZOOM_LEVELを使った補間比が0..1に収まる', () => {
     expect(MAX_ZOOM_LEVEL).toBe(3)
     expect(easeOutCubic(0.5)).toBeGreaterThan(0)
     expect(easeOutCubic(0.5)).toBeLessThan(1)

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { celestialBodies, celestialBodyById, DEFAULT_CELESTIAL_BODY_ID } from './data/celestialBodies'
 import { featureSpotsFor } from './data/featureSpots'
 import styles from './PlanetGlobePlay.module.css'
-import { MIN_ZOOM_LEVEL, type CelestialBodyId, type SolarSystemMode, type ZoomLevel } from './types'
+import { DEFAULT_ZOOM_LEVEL, type CelestialBodyId, type SolarSystemMode, type ZoomLevel } from './types'
 import SingleBodyStage from './SingleBodyStage'
 import SolarSystemOverviewStage from './SolarSystemOverviewStage'
 import BodySelector from './ui/BodySelector'
@@ -18,7 +18,7 @@ export default function PlanetGlobePlay() {
   const navigate = useNavigate()
   const [mode, setMode] = useState<SolarSystemMode>('single')
   const [bodyId, setBodyId] = useState<CelestialBodyId>(DEFAULT_CELESTIAL_BODY_ID)
-  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(MIN_ZOOM_LEVEL)
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(DEFAULT_ZOOM_LEVEL)
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null)
   const [selectionFeedbackKey, setSelectionFeedbackKey] = useState(0)
   const [overviewPlaying, setOverviewPlaying] = useState(true)
@@ -37,7 +37,7 @@ export default function PlanetGlobePlay() {
   const handleSelectBody = useCallback((id: CelestialBodyId) => {
     setBodyId(id)
     // 切り替え直後は必ず天体全体が見える状態に戻す。別天体の説明カードも残さない。
-    setZoomLevel(MIN_ZOOM_LEVEL)
+    setZoomLevel(DEFAULT_ZOOM_LEVEL)
     setSelectedSpotId(null)
   }, [])
 

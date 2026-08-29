@@ -125,14 +125,14 @@ describe('PlanetGlobePlay', () => {
     expect(screen.getByRole('button', { name: 'どせい' })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('clamps zoom controls at both ends of the four-level range', async () => {
+  it('既存の初期段階からズームアウト側へ2段階進め、両端でクランプする', async () => {
     const user = userEvent.setup()
     renderApp('/games/planet-globe')
 
     const zoomInButton = await screen.findByRole('button', { name: 'もっと ちかづく' })
     const zoomOutButton = screen.getByRole('button', { name: 'もっと はなれる' })
 
-    expect(zoomOutButton).toBeDisabled()
+    expect(zoomOutButton).toBeEnabled()
     expect(planetEngineMock.options?.zoomLevel).toBe(0)
 
     await user.click(zoomInButton)
@@ -147,6 +147,20 @@ describe('PlanetGlobePlay', () => {
 
     await user.click(zoomOutButton)
     expect(planetEngineMock.options?.zoomLevel).toBe(2)
+
+    await user.click(zoomOutButton)
+    await user.click(zoomOutButton)
+    expect(planetEngineMock.options?.zoomLevel).toBe(0)
+    await user.click(zoomOutButton)
+    expect(planetEngineMock.options?.zoomLevel).toBe(-1)
+    await user.click(zoomOutButton)
+    expect(planetEngineMock.options?.zoomLevel).toBe(-2)
+    expect(zoomOutButton).toBeDisabled()
+
+    await user.click(zoomOutButton)
+    expect(planetEngineMock.options?.zoomLevel).toBe(-2)
+    await user.click(zoomInButton)
+    expect(planetEngineMock.options?.zoomLevel).toBe(-1)
   })
 
   it('resets zoom to level 0 when switching to a different body', async () => {
@@ -160,7 +174,7 @@ describe('PlanetGlobePlay', () => {
 
     await user.click(screen.getByRole('button', { name: 'もくせい' }))
     expect(planetEngineMock.options?.zoomLevel).toBe(0)
-    expect(screen.getByRole('button', { name: 'もっと はなれる' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'もっと はなれる' })).toBeEnabled()
   })
 
   it('returns home from the viewer', async () => {
