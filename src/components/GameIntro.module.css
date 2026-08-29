@@ -1,0 +1,84 @@
+/*
+ * ゲームルートURLの<main>の直後（通常のドキュメントフロー）に置かれる、静かな補足情報カード。
+ * 各ゲームの<main>は height: 100dvh / min-height: 100dvh で組まれているため、このセクションは
+ * 常に最初のビューポートより下に来る。position: fixed/absolute は使わない
+ * （使うとゲーム画面に重なったりcanvasを圧迫したりしうるため、意図的に避けている）。
+ * display: none / visibility: hidden / 実質0サイズ化 / 画面外配置 / aria-hidden も使わない。
+ * 折りたたまれた場所（スクロールしないと見えない場所）にあるだけで、人間が実際に読める
+ * ことが必須（検索エンジン向けの本文であると同時に、保護者が読む実在のテキストのため）。
+ */
+
+.intro {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: var(--space-lg) calc(var(--space-lg) + var(--safe-right)) calc(var(--space-lg) + var(--safe-bottom))
+    calc(var(--space-lg) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  /* ゲーム本体のUIより一段落ち着いたトーンにするため、控えめな面色にする。 */
+  background-color: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  /*
+   * ページ背景（--color-background）の上に角ばった灰色の帯が乗ると、レイアウト崩れのように
+   * 見えてしまう。上端だけ角を丸めて境界線を引き、「ゲームの下に続く補足カード」だと
+   * 見た目でも分かるようにする（下端はページ末尾なので丸めない）。
+   */
+  border-top: 1px solid var(--color-border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.heading {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.summary {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.subHeading {
+  margin: var(--space-xs) 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.list {
+  margin: 0;
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: 15px;
+  line-height: 1.6;
+  text-align: left;
+  list-style: disc;
+}
+
+.link {
+  margin: var(--space-xs) 0 0;
+  font-size: 15px;
+}
+
+.link a {
+  display: inline-flex;
+  align-items: center;
+  /* 他の操作要素と同じタップ領域の目安を満たしつつ、リンクの見た目自体は控えめに保つ。 */
+  min-height: var(--tap-target-min);
+  color: var(--color-primary-dark);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.link a:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}

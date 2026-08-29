@@ -3,7 +3,8 @@
 // ビルド時（Node.js側）のsrc/build/staticRoutePages.tsからも同じロジックを共有できる。
 
 import { GAME_ROUTE_PREFIX, findGameBySlug, gameRoutePath, type GameCatalogEntry } from '../games/gameCatalog'
-import { DEFAULT_OG_IMAGE_PATH, SITE_NAME, absoluteUrl } from './siteMeta'
+import { DEFAULT_OG_IMAGE_PATH, SITE_DESCRIPTION, SITE_NAME, absoluteUrl } from './siteMeta'
+import { buildGameStructuredData, buildHomeStructuredData, type JsonLdDocument } from './structuredData'
 
 export type PageSeo = {
   title: string
@@ -12,24 +13,32 @@ export type PageSeo = {
   /** 'website' | 'article' 相当。幼児向けゲームのプレイページはすべて記事ではないため 'website' 固定。 */
   ogType: string
   ogImageUrl: string
+  /** このページに埋め込む構造化データ（JSON-LD）のグラフ。src/seo/structuredData.ts が組み立てる。 */
+  jsonLd: JsonLdDocument
 }
 
 export const HOME_SEO: PageSeo = {
   title: 'こどもミニゲーム｜国旗・宇宙・電車で遊べる幼児向け無料ゲーム',
-  description:
-    '国旗や都道府県のクイズ、太陽系や地球儀をさわる宇宙あそび、3Dの線路づくりやコロコロパズルなど、幼児向けのミニゲームを集めた無料サイトです。スマホ・タブレットのブラウザですぐ遊べます。',
+  description: SITE_DESCRIPTION,
   canonicalUrl: absoluteUrl('/'),
   ogType: 'website',
   ogImageUrl: absoluteUrl(DEFAULT_OG_IMAGE_PATH),
+  jsonLd: buildHomeStructuredData(),
 }
 
 export function buildGameSeo(entry: GameCatalogEntry): PageSeo {
+  // canonicalUrl/ogImageUrlはPageSeo自身とJSON-LD（WebApplication/BreadcrumbList）の
+  // 両方から参照される値のため、ここで1回だけ計算して使い回す
+  // （absoluteUrlの呼び出しをここと構造化データ側で二重に持たない）。
+  const canonicalUrl = absoluteUrl(gameRoutePath(entry.slug))
+  const ogImageUrl = absoluteUrl(entry.seo.ogImage ?? DEFAULT_OG_IMAGE_PATH)
   return {
     title: `${entry.seo.headline} - ${SITE_NAME}`,
     description: entry.seo.description,
-    canonicalUrl: absoluteUrl(gameRoutePath(entry.slug)),
+    canonicalUrl,
     ogType: 'website',
-    ogImageUrl: absoluteUrl(entry.seo.ogImage ?? DEFAULT_OG_IMAGE_PATH),
+    ogImageUrl,
+    jsonLd: buildGameStructuredData(entry, { url: canonicalUrl, imageUrl: ogImageUrl }),
   }
 }
 
@@ -37,6 +46,8 @@ export function buildGameSeo(entry: GameCatalogEntry): PageSeo {
 // '/games/planet-globe/play' や '/games/math-quiz/add/hard/play' のような
 // むずかしさ選択・プレイ・結果画面のURLも、同じゲームの状態違いでしかなく
 // 静的HTMLが生成されるのもゲームルートのみのため、ゲームルートのslugへ正規化する。
+// この正規化はJSON-LDにもそのまま効く。buildGameSeo(entry)が返すjsonLdはゲームルートの
+// canonicalUrlを使って組み立てられているため、深いURLでも常にゲームルートと同じグラフになる。
 const GAME_SLUG_PATTERN = new RegExp(`^${GAME_ROUTE_PREFIX}/([^/]+)(?:/.*)?$`)
 
 /**

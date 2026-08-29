@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { Plugin } from 'vite'
 import { GAME_CATALOG, gameRoutePath } from '../games/gameCatalog'
 import { resolvePageSeo, type PageSeo } from '../seo/pageSeo'
+import { serializeJsonLd } from '../seo/structuredData'
 
 // GitHub Pagesは静的ホスティングでサーバー側ルーティングを持たないため、
 // ビルド出力にゲームごとの実ファイルを用意しておかないと、
@@ -27,6 +28,9 @@ const OG_TYPE_META_PATTERN = /(<meta\s+property="og:type"\s+content=")[^"]*("\s*
 const OG_IMAGE_META_PATTERN = /(<meta\s+property="og:image"\s+content=")[^"]*("\s*\/?>)/
 const TWITTER_TITLE_META_PATTERN = /(<meta\s+name="twitter:title"\s+content=")[^"]*("\s*\/?>)/
 const TWITTER_DESCRIPTION_META_PATTERN = /(<meta\s+name="twitter:description"\s+content=")[^"]*("\s*\/?>)/
+// 既存のJSON-LD script（前回のビルド出力を入力にした場合など）をまるごと検出して置き換える。
+const JSON_LD_SCRIPT_PATTERN = /<script\s+type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/
+const HEAD_CLOSE_PATTERN = /<\/head>/
 
 // index.html のdescription/og:description/twitter:descriptionは、属性が改行して
 // 書かれている（`\s+`はデフォルトで改行にもマッチするため、このまま`\s+`で書けば
@@ -61,8 +65,33 @@ export function findMissingCanonicalTags(html: string): string[] {
 }
 
 /**
- * index.html を元に、ページ全体のSEO情報（title/description/canonical/OGP/Twitterカード）を
- * そのページ自身の値へ差し替える。canonical/og:urlの差し替えはapplyCanonicalUrlへ委譲する。
+ * index.html の中のJSON-LD scriptタグを、そのページ自身の構造化データへ差し替える。
+ * index.html（ビルドの入力）自体にはJSON-LDのプレースホルダを置いていない
+ * （src/build/staticRoutePages.ts のコメント・READMEを参照）ため、通常は
+ * 「既存タグが無い→</head>の直前に新規挿入」の経路を通る。ただし、このプラグインの
+ * 出力を再度入力にした場合（後述のテストや、dist/index.htmlの2回書き換えなど）は
+ * 既存のJSON-LDを壊さず1つに保つ必要があるため、「既にあれば丸ごと置き換え」も用意している。
+ * </head>もJSON-LD scriptも見つからない場合は何もしない（純粋関数として例外を投げない）。
+ */
+function applyJsonLdToHtml(html: string, seo: PageSeo): string {
+  // ペイロード文字列を置換関数の外で先に組み立てておき、String.replaceの第二引数には
+  // 必ず関数を渡す。ペイロード中に "$&" などの並びが含まれていても、replace特殊構文
+  // として解釈されることが構造的に無くなる（他のタグの置換と同じ方針）。
+  const scriptTag = `<script type="application/ld+json">${serializeJsonLd(seo.jsonLd)}</script>`
+
+  if (JSON_LD_SCRIPT_PATTERN.test(html)) {
+    return html.replace(JSON_LD_SCRIPT_PATTERN, () => scriptTag)
+  }
+  if (HEAD_CLOSE_PATTERN.test(html)) {
+    return html.replace(HEAD_CLOSE_PATTERN, () => `${scriptTag}\n  </head>`)
+  }
+  return html
+}
+
+/**
+ * index.html を元に、ページ全体のSEO情報（title/description/canonical/OGP/Twitterカード/JSON-LD）を
+ * そのページ自身の値へ差し替える。canonical/og:urlの差し替えはapplyCanonicalUrlへ、
+ * JSON-LDの差し替え・挿入はapplyJsonLdToHtmlへ委譲する。
  * 対象タグが見つからない場合はそのタグを変更せず素通りする（純粋関数として例外を投げない）。
  */
 export function applyPageSeoToHtml(html: string, seo: PageSeo): string {
@@ -86,6 +115,8 @@ export function applyPageSeoToHtml(html: string, seo: PageSeo): string {
       result = result.replace(pattern, (_match, before: string, after: string) => `${before}${value}${after}`)
     }
   }
+
+  result = applyJsonLdToHtml(result, seo)
 
   return result
 }
@@ -111,6 +142,12 @@ export function findMissingSeoTags(html: string): string[] {
     if (!pattern.test(html)) {
       missing.push(label)
     }
+  }
+  // </head> が無いと、既存のJSON-LD scriptも無い場合にapplyJsonLdToHtmlが
+  // 差し込み先を見つけられずJSON-LDが焼き込まれないまま出力されてしまうため、
+  // 他のタグと同じく欠落として検出する。
+  if (!HEAD_CLOSE_PATTERN.test(html)) {
+    missing.push('</head>')
   }
   return missing
 }
@@ -156,10 +193,18 @@ export function staticRoutePages(): Plugin {
         await writeFile(path.join(resolvedOutDir, 'games', `${entry.slug}.html`), pageHtml)
       }
 
+      // title/description/canonicalはもともとトップの値なのでこの書き換えは実質no-opだが、
+      // JSON-LDだけはindex.html（ビルドの入力）に書かれていないため、ここを通すことで
+      // トップと404フォールバックにも同じ経路でJSON-LDが焼き込まれる。
+      const homeHtml = applyPageSeoToHtml(indexHtml, resolvePageSeo('/'))
+      await writeFile(indexHtmlPath, homeHtml)
+
       // むずかしさ選択・プレイ・結果画面など、静的ページを持たないより深いURLへの
-      // 直接アクセスやリロードは、index.htmlと同内容の404.htmlをSPAフォールバックとして
-      // GitHub Pagesが返し、クライアント側のルーティングで正しい画面を描画する。
-      await writeFile(path.join(resolvedOutDir, '404.html'), indexHtml)
+      // 直接アクセスやリロードは、404.htmlをSPAフォールバックとしてGitHub Pagesが返し、
+      // クライアント側のルーティングで正しい画面を描画する。404.htmlは任意のURLに対して
+      // 返るページであり、canonicalも元からトップを指しているため、トップと同じ
+      // homeHtml（同じグラフのJSON-LDを含む）を書き出すのが整合的。
+      await writeFile(path.join(resolvedOutDir, '404.html'), homeHtml)
     },
   }
 }
