@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { matchRoutes } from 'react-router-dom'
-import { GAME_CATALOG, findGameBySlug, gameRoutePath } from './gameCatalog'
+import { GAME_CATALOG, GAME_CATEGORIES, findGameBySlug, gameRoutePath, type GameCategoryId } from './gameCatalog'
 import { routes } from '../app/routes'
 
 describe('gameCatalog', () => {
@@ -58,6 +58,40 @@ describe('gameCatalog', () => {
     for (const routePath of gameEntryPaths) {
       const slug = routePath.replace('/games/', '')
       expect(findGameBySlug(slug), `route ${routePath} に対応する gameCatalog エントリーがありません`).toBeDefined()
+    }
+  })
+
+  test('全ゲームのcategoryがGAME_CATEGORIESのキーのいずれかである', () => {
+    const categoryIds = Object.keys(GAME_CATEGORIES) as GameCategoryId[]
+    for (const game of GAME_CATALOG) {
+      expect(categoryIds).toContain(game.category)
+    }
+  })
+
+  test('GAME_CATEGORIESの各カテゴリが、少なくとも1つのゲームで使われている（死んだカテゴリが無い）', () => {
+    const usedCategories = new Set(GAME_CATALOG.map((game) => game.category))
+    for (const categoryId of Object.keys(GAME_CATEGORIES) as GameCategoryId[]) {
+      expect(usedCategories.has(categoryId), `category "${categoryId}" を使うゲームがありません`).toBe(true)
+    }
+  })
+
+  test('全ゲームのintro.howToPlayが2〜3件、各行が非空・trim済み・40文字以内', () => {
+    for (const game of GAME_CATALOG) {
+      const { howToPlay } = game.intro
+      expect(howToPlay.length, `${game.slug}: howToPlayの件数`).toBeGreaterThanOrEqual(2)
+      expect(howToPlay.length, `${game.slug}: howToPlayの件数`).toBeLessThanOrEqual(3)
+      for (const line of howToPlay) {
+        expect(line.length, `${game.slug}: "${line}"`).toBeGreaterThan(0)
+        expect(line, `${game.slug}: "${line}"`).toBe(line.trim())
+        expect(line.length, `${game.slug}: "${line}"`).toBeLessThanOrEqual(40)
+      }
+    }
+  })
+
+  test('全ゲームでintro.howToPlayの各行がゲーム内で重複しない', () => {
+    for (const game of GAME_CATALOG) {
+      const { howToPlay } = game.intro
+      expect(new Set(howToPlay).size, `${game.slug}: howToPlay内で重複がある`).toBe(howToPlay.length)
     }
   })
 })

@@ -122,3 +122,54 @@ describe('findMissingSeoTags（実際のindex.htmlに対して）', () => {
     expect(findMissingSeoTags(REAL_INDEX_HTML)).toEqual([])
   })
 })
+
+// JSON-LDはindex.html自体には存在せず、applyPageSeoToHtmlが</head>の直前へ挿入する。
+// dist/index.htmlの2回書き換え（staticRoutePages.tsのcloseBundle参照）を安全にするため、
+// 「挿入したあと、その出力へさらに別ページのSEOを適用しても1個のまま中身が切り替わる」
+// ことも合わせて確認する。
+describe('applyPageSeoToHtml（JSON-LD）', () => {
+  const planetGlobe = findGameBySlug('planet-globe')
+  if (!planetGlobe) {
+    throw new Error('planet-globe が gameCatalog に見つかりません')
+  }
+  const seo = buildGameSeo(planetGlobe)
+
+  test('ld+jsonのscriptがちょうど1個できて、中身がそのゲームのcanonicalと一致する', () => {
+    const result = applyPageSeoToHtml(REAL_INDEX_HTML, seo)
+    const matches = result.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
+    expect(matches).toHaveLength(1)
+
+    const inline = result.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)
+    expect(inline).not.toBeNull()
+    const parsed = JSON.parse(inline![1]!)
+    const webApp = parsed['@graph'].find((node: { '@type': string }) => node['@type'] === 'WebApplication')
+    expect(webApp.url).toBe(seo.canonicalUrl)
+  })
+
+  test('2回連続で適用しても（出力を入力に戻しても）scriptは1個のまま、2回目のデータに切り替わる', () => {
+    const firstPassHtml = applyPageSeoToHtml(REAL_INDEX_HTML, seo)
+
+    const railBuilder = findGameBySlug('rail-builder')
+    if (!railBuilder) {
+      throw new Error('rail-builder が gameCatalog に見つかりません')
+    }
+    const secondSeo = buildGameSeo(railBuilder)
+    const secondPassHtml = applyPageSeoToHtml(firstPassHtml, secondSeo)
+
+    const matches = secondPassHtml.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
+    expect(matches).toHaveLength(1)
+
+    const inline = secondPassHtml.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)
+    const parsed = JSON.parse(inline![1]!)
+    const webApp = parsed['@graph'].find((node: { '@type': string }) => node['@type'] === 'WebApplication')
+    expect(webApp.url).toBe(secondSeo.canonicalUrl)
+  })
+
+  test('</head>もld+jsonのscriptも無いHTMLは変更されない（例外を投げない）', () => {
+    // title/meta/canonicalなど、他のタグ置換の対象になりうるものを一切含まないHTMLで検証する
+    // （それらのタグを含めると、JSON-LDとは無関係にそちらの置換で内容が変わってしまうため）。
+    const html = '<html><body></body></html>'
+    expect(() => applyPageSeoToHtml(html, seo)).not.toThrow()
+    expect(applyPageSeoToHtml(html, seo)).toBe(html)
+  })
+})
