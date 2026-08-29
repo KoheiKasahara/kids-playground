@@ -3,18 +3,76 @@
 /** 線路・施設で共通に使う小さな玩具スケールの visual palette。 */
 export const RAIL_VISUAL_CONFIG = {
   gauge: 0.46,
-  baseHeight: 0.14,
-  sleeperHeight: 0.16,
-  railHeight: 0.16,
-  roughness: 0.78,
-  metalness: 0.18,
+  /** Shared path-relative Y layers. Path centerlines remain owned by railModel. */
+  baseCenterY: 0.1,
+  sleeperCenterY: 0.2,
+  railCenterY: 0.34,
+  baseLength: 1.04,
+  baseWidth: 0.94,
+  baseHeight: 0.16,
+  sleeperLength: 0.66,
+  sleeperWidth: 1.08,
+  sleeperHeight: 0.18,
+  sleeperSpacing: 1,
+  railLength: 1,
+  railWidth: 0.16,
+  railHeight: 0.18,
+  roughness: 0.72,
+  metalness: 0.24,
+  railRoughness: 0.58,
+  railMetalness: 0.28,
   palette: {
-    rail: '#6b7280',
+    rail: '#778496',
     base: '#eab308',
     sleeper: '#b45309',
     connector: '#fb923c',
   },
 } as const
+
+/**
+ * Station-only dressing metrics. These are intentionally separate from the
+ * canonical STATION_LENGTH and rail connector data in railModel so visual
+ * iteration cannot silently change placement or train routing.
+ */
+export const RAIL_STATION_VISUAL_CONFIG = {
+  platform: {
+    lengthRatio: 0.98,
+    depth: 1.16,
+    height: 0.34,
+    centerY: 0.2,
+    centerOffsetZ: 1.12,
+  },
+  safetyLine: {
+    lengthRatio: 0.94,
+    depth: 0.08,
+    height: 0.07,
+  },
+  roof: {
+    lengthRatio: 0.96,
+    depth: 3.4,
+    height: 0.26,
+    centerY: 2.5,
+  },
+  column: {
+    height: 2.48,
+    centerY: 1.24,
+    centerOffsetZ: 1.18,
+    endInset: 0.8,
+  },
+} as const
+
+/** Track-facing safety-line center, measured in station-local Z. */
+export function getRailStationSafetyLineCenterOffset(): number {
+  const { depth, centerOffsetZ } = RAIL_STATION_VISUAL_CONFIG.platform
+  return centerOffsetZ - depth / 2 + RAIL_STATION_VISUAL_CONFIG.safetyLine.depth / 2
+}
+
+/** Keep sleeper cadence independent from the path's rendering tessellation. */
+export function getRailSleeperCount(pathLength: number): number {
+  const safeLength = Number.isFinite(pathLength) ? Math.max(0, pathLength) : 0
+  const spacing = Math.max(0.25, RAIL_VISUAL_CONFIG.sleeperSpacing)
+  return Math.max(1, Math.ceil(safeLength / spacing))
+}
 
 /**
  * 端末の短辺に合わせた DPR 上限。

@@ -14,6 +14,7 @@ import {
   findRailSnapNearMiss,
   findRailSnapCandidate,
   getRailConnectorIds,
+  railPathLength,
   STATION_LENGTH,
   type RailConnectorId,
   type RailPath,
@@ -23,6 +24,7 @@ import {
   type SnapCandidate,
   worldConnectorForRailPiece,
   worldRailPathPoint,
+  worldRailPathTangent,
 } from './railModel'
 import {
   findNearestRailTrainCursor,
@@ -48,7 +50,10 @@ import {
 import {
   getRailBuilderDevicePixelRatio,
   getRailBuilderShadowMapSize,
+  getRailSleeperCount,
+  getRailStationSafetyLineCenterOffset,
   RAIL_VISUAL_CONFIG,
+  RAIL_STATION_VISUAL_CONFIG,
   shouldReduceRailBuilderMotion,
 } from './railBuilderVisuals'
 import {
@@ -949,9 +954,32 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const sharedGeometries = new Set<THREE.BufferGeometry>()
     const sharedMaterials = new Set<THREE.Material>()
 
-    const railGeometry = new THREE.BoxGeometry(1, 0.16, 0.14)
-    const baseGeometry = new THREE.BoxGeometry(1.05, 0.14, 0.9)
-    const sleeperGeometry = new THREE.BoxGeometry(1.65, 0.16, 0.58)
+    // Shared low-poly rounded meshes keep the toy materials readable without
+    // allocating a geometry for every path segment or piece. Their dimensions
+    // are visual-only; railModel remains the source of path/connectivity truth.
+    const railGeometry = new RoundedBoxGeometry(
+      RAIL_VISUAL_CONFIG.railLength,
+      RAIL_VISUAL_CONFIG.railHeight,
+      RAIL_VISUAL_CONFIG.railWidth,
+      1,
+      0.035,
+    )
+    const baseGeometry = new RoundedBoxGeometry(
+      RAIL_VISUAL_CONFIG.baseLength,
+      RAIL_VISUAL_CONFIG.baseHeight,
+      RAIL_VISUAL_CONFIG.baseWidth,
+      1,
+      0.05,
+    )
+    // Sleepers are short along local X and wide across local Z, matching the
+    // conventional cross-tie orientation used by the rails below.
+    const sleeperGeometry = new RoundedBoxGeometry(
+      RAIL_VISUAL_CONFIG.sleeperLength,
+      RAIL_VISUAL_CONFIG.sleeperHeight,
+      RAIL_VISUAL_CONFIG.sleeperWidth,
+      1,
+      0.04,
+    )
     const connectorGeometry = new THREE.CylinderGeometry(0.27, 0.27, 0.18, 16)
     const selectionRingGeometry = new THREE.RingGeometry(0.72, 0.82, 32)
     // 掴み判定専用(非表示)。baseGeometryと同じ配置に、より広い当たり判定を敷く。
@@ -1195,8 +1223,27 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const bridgeBeamGeometry = new THREE.BoxGeometry(1, 0.26, 0.38)
     const bridgeSupportGeometry = new THREE.BoxGeometry(0.42, 1, 0.42)
     const bridgeGuardGeometry = new THREE.BoxGeometry(1, 0.16, 0.13)
-    const stationPlatformGeometry = new RoundedBoxGeometry(1, 0.28, 1.12, 2, 0.08)
-    const stationRoofGeometry = new RoundedBoxGeometry(1, 0.22, 3.2, 2, 0.08)
+    const stationPlatformGeometry = new RoundedBoxGeometry(
+      1,
+      RAIL_STATION_VISUAL_CONFIG.platform.height,
+      RAIL_STATION_VISUAL_CONFIG.platform.depth,
+      2,
+      0.08,
+    )
+    const stationSafetyLineGeometry = new RoundedBoxGeometry(
+      1,
+      RAIL_STATION_VISUAL_CONFIG.safetyLine.height,
+      RAIL_STATION_VISUAL_CONFIG.safetyLine.depth,
+      1,
+      0.018,
+    )
+    const stationRoofGeometry = new RoundedBoxGeometry(
+      1,
+      RAIL_STATION_VISUAL_CONFIG.roof.height,
+      RAIL_STATION_VISUAL_CONFIG.roof.depth,
+      2,
+      0.08,
+    )
     const stationColumnGeometry = new THREE.BoxGeometry(0.2, 1, 0.2)
     const stationSignGeometry = new THREE.BoxGeometry(0.86, 0.58, 0.14)
     const stationBenchGeometry = new THREE.BoxGeometry(0.78, 0.18, 0.25)
@@ -1297,6 +1344,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       bridgeSupportGeometry,
       bridgeGuardGeometry,
       stationPlatformGeometry,
+      stationSafetyLineGeometry,
       stationRoofGeometry,
       stationColumnGeometry,
       stationSignGeometry,
@@ -1318,8 +1366,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
     const railMaterial = new THREE.MeshStandardMaterial({
       color: RAIL_VISUAL_CONFIG.palette.rail,
-      roughness: RAIL_VISUAL_CONFIG.roughness,
-      metalness: RAIL_VISUAL_CONFIG.metalness,
+      roughness: RAIL_VISUAL_CONFIG.railRoughness,
+      metalness: RAIL_VISUAL_CONFIG.railMetalness,
     })
     const branchSelectedRailMaterial = new THREE.MeshStandardMaterial({
       color: '#fde047',
@@ -1463,6 +1511,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const bridgeMaterial = new THREE.MeshStandardMaterial({ color: '#b77945', roughness: 0.82 })
     const bridgeGuardMaterial = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.64 })
     const stationPlatformMaterial = new THREE.MeshStandardMaterial({ color: '#f4c96b', roughness: 0.76 })
+    const stationSafetyLineMaterial = new THREE.MeshStandardMaterial({ color: '#fde047', roughness: 0.62 })
     const stationRoofMaterial = new THREE.MeshStandardMaterial({ color: '#ef6b73', roughness: 0.64 })
     const stationColumnMaterial = new THREE.MeshStandardMaterial({ color: '#eab308', roughness: 0.7 })
     const stationSignMaterial = new THREE.MeshStandardMaterial({ color: '#38bdf8', roughness: 0.54 })
@@ -1516,6 +1565,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       bridgeMaterial,
       bridgeGuardMaterial,
       stationPlatformMaterial,
+      stationSafetyLineMaterial,
       stationRoofMaterial,
       stationColumnMaterial,
       stationSignMaterial,
@@ -2473,33 +2523,47 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       if (localPiece.kind === 'station') {
         const stationCenter = worldRailPathPoint(localPiece, 0.5)
         const stationLength = localPiece.path.kind === 'straight' ? localPiece.path.length : STATION_LENGTH
+        const { platform, safetyLine, roof, column } = RAIL_STATION_VISUAL_CONFIG
+        const platformLength = stationLength * platform.lengthRatio
+        const safetyLineLength = stationLength * safetyLine.lengthRatio
+        const safetyLineOffsetZ = getRailStationSafetyLineCenterOffset()
         for (const side of [-1, 1]) {
           addMesh(
             stationPlatformGeometry,
             stationPlatformMaterial,
-            { x: stationCenter.x, y: stationCenter.y + 0.18, z: stationCenter.z + side * 1.12 },
-            { x: stationLength * 0.92, y: 1, z: 1 },
+            { x: stationCenter.x, y: stationCenter.y + platform.centerY, z: stationCenter.z + side * platform.centerOffsetZ },
+            { x: platformLength, y: 1, z: 1 },
+          )
+          addMesh(
+            stationSafetyLineGeometry,
+            stationSafetyLineMaterial,
+            {
+              x: stationCenter.x,
+              y: stationCenter.y + platform.centerY + platform.height / 2 + safetyLine.height / 2 - 0.006,
+              z: stationCenter.z + side * safetyLineOffsetZ,
+            },
+            { x: safetyLineLength, y: 1, z: 1 },
           )
         }
         addMesh(
           stationRoofGeometry,
           stationRoofMaterial,
-          { x: stationCenter.x, y: stationCenter.y + 2.45, z: stationCenter.z },
-          { x: stationLength * 0.9, y: 1, z: 1 },
+          { x: stationCenter.x, y: stationCenter.y + roof.centerY, z: stationCenter.z },
+          { x: stationLength * roof.lengthRatio, y: 1, z: 1 },
         )
-        // 柱は屋根(stationLength * 0.9)の端から0.8内側に立てる。
-        const stationColumnX = stationLength * 0.45 - 0.8
+        // Columns sit just inside the roof ends while preserving the open canopy.
+        const stationColumnX = stationLength * (roof.lengthRatio / 2) - column.endInset
         for (const x of [-stationColumnX, stationColumnX]) {
-          for (const z of [-1.18, 1.18]) {
+          for (const z of [-column.centerOffsetZ, column.centerOffsetZ]) {
             addMesh(
               stationColumnGeometry,
               stationColumnMaterial,
-              { x: stationCenter.x + x, y: stationCenter.y + 1.22, z: stationCenter.z + z },
-              { x: 1, y: 2.44, z: 1 },
+              { x: stationCenter.x + x, y: stationCenter.y + column.centerY, z: stationCenter.z + z },
+              { x: 1, y: column.height, z: 1 },
             )
           }
         }
-        const sign = addMesh(
+        addMesh(
           stationSignGeometry,
           stationSignMaterial,
           { x: stationCenter.x, y: stationCenter.y + 2.12, z: stationCenter.z + 1.54 },
@@ -2517,7 +2581,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           { x: 1, y: 1, z: 1 },
           { x: Math.PI / 2, y: 0, z: 0 },
         )
-        sign.castShadow = true
         stationPulseTargets.set(pieceId, clock)
       }
 
@@ -2581,7 +2644,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       segmentCount: number,
       pieceId: string,
       pathRailMaterial: THREE.Material,
-      sleeperEvery: number,
     ): {
       base: THREE.InstancedMesh
       rail: THREE.InstancedMesh
@@ -2590,7 +2652,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     } {
       const baseInstances = new THREE.InstancedMesh(baseGeometry, baseMaterial, segmentCount)
       const railInstances = new THREE.InstancedMesh(railGeometry, pathRailMaterial, segmentCount * 2)
-      const sleeperCount = Math.ceil(segmentCount / sleeperEvery)
+      const resolvedPath = path ?? localPiece.path
+      const pathLength = Math.max(0, railPathLength(resolvedPath))
+      const sleeperCount = getRailSleeperCount(pathLength)
       const sleeperInstances = new THREE.InstancedMesh(sleeperGeometry, sleeperMaterial, sleeperCount)
       // 掴み判定用。baseと同じ配置に、より広いgeometryをRaycast専用(非表示)で重ねる。
       const hitAreaInstances = new THREE.InstancedMesh(railHitAreaGeometry, railHitAreaMaterial, segmentCount)
@@ -2616,7 +2680,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
         instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
         instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
-        instanceDummy.position.set(0, 0.1, 0)
+        instanceDummy.position.set(0, RAIL_VISUAL_CONFIG.baseCenterY, 0)
         instanceDummy.quaternion.identity()
         instanceDummy.scale.setScalar(1)
         instanceDummy.updateMatrix()
@@ -2625,6 +2689,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
 
         instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
         instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
+        // Keep the transparent hitbox matrix aligned with the original base
+        // layer; its geometry and dimensions are intentionally independent of
+        // the visual polish metrics.
         instanceDummy.position.set(0, 0.1, 0)
         instanceDummy.quaternion.identity()
         instanceDummy.scale.setScalar(1)
@@ -2635,7 +2702,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         for (const side of [-1, 1]) {
           instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
           instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
-          instanceDummy.position.set(0, 0.34, (RAIL_VISUAL_CONFIG.gauge / 2) * side)
+          instanceDummy.position.set(0, RAIL_VISUAL_CONFIG.railCenterY, (RAIL_VISUAL_CONFIG.gauge / 2) * side)
           instanceDummy.quaternion.identity()
           instanceDummy.scale.setScalar(1)
           instanceDummy.updateMatrix()
@@ -2643,18 +2710,28 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           railInstances.setMatrixAt(railInstanceIndex, instanceMatrix)
           railInstanceIndex += 1
         }
+      }
 
-        if (i % sleeperEvery === 0) {
-          instanceScale.setScalar(1)
-          instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
-          instanceDummy.position.set(0, 0.2, 0)
-          instanceDummy.quaternion.identity()
-          instanceDummy.scale.setScalar(1)
-          instanceDummy.updateMatrix()
-          instanceMatrix.multiply(instanceDummy.matrix)
-          sleeperInstances.setMatrixAt(sleeperInstanceIndex, instanceMatrix)
-          sleeperInstanceIndex += 1
-        }
+      // Place ties at path-parameter midpoints rather than segment starts.
+      // This keeps connected pieces from stacking ties exactly on their shared
+      // connector while making cadence depend on real path length, not mesh
+      // tessellation chosen for curve/slope smoothness.
+      for (let index = 0; index < sleeperCount; index += 1) {
+        const t = (index + 0.5) / sleeperCount
+        const point = worldRailPathPoint(localPiece, t, resolvedPath)
+        const tangent = worldRailPathTangent(localPiece, t, resolvedPath)
+        segmentTangentVector.set(tangent.x, tangent.y, tangent.z).normalize()
+        instanceQuaternion.setFromUnitVectors(trainBaseForward, segmentTangentVector)
+        instancePosition.set(point.x, point.y, point.z)
+        instanceScale.setScalar(1)
+        instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
+        instanceDummy.position.set(0, RAIL_VISUAL_CONFIG.sleeperCenterY, 0)
+        instanceDummy.quaternion.identity()
+        instanceDummy.scale.setScalar(1)
+        instanceDummy.updateMatrix()
+        instanceMatrix.multiply(instanceDummy.matrix)
+        sleeperInstances.setMatrixAt(sleeperInstanceIndex, instanceMatrix)
+        sleeperInstanceIndex += 1
       }
       baseInstances.instanceMatrix.needsUpdate = true
       railInstances.instanceMatrix.needsUpdate = true
@@ -2681,7 +2758,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
             : piece.kind === 'bridge' || piece.kind === 'tunnel'
               ? 6
               : 1
-      const sleeperEvery = piece.kind === 'curve' || piece.kind === 'slope' ? 2 : 1
       const localPiece = { ...piece, position: vec3(0, 0, 0), rotationY: 0 }
       const mainRailMaterial = piece.kind === 'branch'
         ? piece.branchDirection === 'c' ? branchDimRailMaterial : branchSelectedRailMaterial
@@ -2692,7 +2768,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         segmentCount,
         piece.id,
         mainRailMaterial,
-        sleeperEvery,
       )
       baseInstances.name = 'rail-bases'
       railInstances.name = 'rail-pairs'
@@ -2709,7 +2784,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           branchSegmentCount,
           piece.id,
           branchRailMaterial,
-          1,
         )
         branchHitArea.name = 'rail-hit-area'
         group.add(branchBases, branchRails, branchSleepers, branchHitArea)
@@ -2730,7 +2804,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           depotSecondarySegmentCount,
           piece.id,
           railMaterial,
-          1,
         )
         depotSecondaryHitArea.name = 'rail-hit-area'
         group.add(depotSecondaryBases, depotSecondaryRails, depotSecondarySleepers, depotSecondaryHitArea)
