@@ -61,7 +61,7 @@ export function resolveTrainType(value: unknown): TrainType {
  */
 const TRAIN_TYPE_VISUAL_CONFIGS: Record<Exclude<TrainType, 'basic'>, TrainVisualConfig> = {
   e5: { color: '#168c8f', frontColor: '#0e6672', roofColor: '#f8f4ea' },
-  e6: { color: '#c93645', frontColor: '#8d2432', roofColor: '#f2eee4' },
+  e6: { color: '#f3f1ed', frontColor: '#c52d40', roofColor: '#b52639' },
   n700s: { color: '#f8faf9', frontColor: '#edf1f2', roofColor: '#ffffff' },
   doctorYellow: { color: '#f5c928', frontColor: '#dba315', roofColor: '#f3e5a3' },
   e7w7: { color: '#f7f8f4', frontColor: '#124578', roofColor: '#0d4b86' },
