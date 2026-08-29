@@ -10,6 +10,7 @@ const TWO_CAR_FORMATION: readonly TrainCarRole[] = ['lead', 'middle']
 const THREE_CAR_FORMATION: readonly TrainCarRole[] = ['lead', 'middle', 'rear']
 const E5_THREE_CAR_FORMATION = THREE_CAR_FORMATION
 const DOCTOR_YELLOW_THREE_CAR_FORMATION = THREE_CAR_FORMATION
+const E7W7_THREE_CAR_FORMATION = THREE_CAR_FORMATION
 
 /**
  * 車種ごとの表示編成。編成は走行ロジックではなく TrainSpec に属する。
@@ -21,6 +22,7 @@ const TRAIN_FORMATIONS: Readonly<Record<TrainType, readonly TrainCarRole[]>> = {
   e6: TWO_CAR_FORMATION,
   n700s: THREE_CAR_FORMATION,
   doctorYellow: DOCTOR_YELLOW_THREE_CAR_FORMATION,
+  e7w7: E7W7_THREE_CAR_FORMATION,
 }
 
 /**
@@ -44,7 +46,8 @@ export type TrainCarVisualProfile = {
     | 'n700s-winged-nose'
     | 'doctor-yellow-thick-shoulder'
     | 'doctor-yellow-duck-nose'
-  noseStyle: 'basic-box' | 'e5-wide-wedge' | 'e6-spear' | 'n700s-winged' | 'doctor-yellow-duck'
+    | 'e7w7-dignified-shoulder'
+  noseStyle: 'basic-box' | 'e5-wide-wedge' | 'e6-spear' | 'n700s-winged' | 'doctor-yellow-duck' | 'e7w7-dignified'
   bodyLength: number
   bodyHeight: number
   bodyWidth: number
@@ -225,6 +228,43 @@ export const DOCTOR_YELLOW_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSe
   { x: 1.00, width: 0.48 },
 ] as const
 
+/** E7/W7先頭車の、端正な肩から控えめな鼻先へ続く低ポリゴンシェル。 */
+export const E7W7_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
+  { x: -1.04, top: 1.27, bottom: 0.48, width: 0.94 },
+  { x: -0.922, top: 1.27, bottom: 0.48, width: 0.94 },
+  { x: -0.804, top: 1.27, bottom: 0.48, width: 0.94 },
+  { x: -0.686, top: 1.27, bottom: 0.48, width: 0.94 },
+  { x: -0.568, top: 1.27, bottom: 0.48, width: 0.94 },
+  { x: -0.45, top: 1.27, bottom: 0.48, width: 0.94 },
+  { x: -0.332, top: 1.269, bottom: 0.481, width: 0.938 },
+  { x: -0.214, top: 1.267, bottom: 0.483, width: 0.935 },
+  { x: -0.096, top: 1.263, bottom: 0.486, width: 0.931 },
+  { x: 0.022, top: 1.258, bottom: 0.490, width: 0.926 },
+  { x: 0.14, top: 1.251, bottom: 0.495, width: 0.919 },
+  { x: 0.258, top: 1.242, bottom: 0.501, width: 0.911 },
+  { x: 0.376, top: 1.231, bottom: 0.508, width: 0.901 },
+  { x: 0.494, top: 1.219, bottom: 0.516, width: 0.890 },
+  { x: 0.612, top: 1.205, bottom: 0.525, width: 0.878 },
+  { x: 0.73, top: 1.190, bottom: 0.535, width: 0.840 },
+  { x: 0.848, top: 1.150, bottom: 0.546, width: 0.780 },
+  { x: 0.966, top: 1.100, bottom: 0.558, width: 0.700 },
+  { x: 1.084, top: 1.040, bottom: 0.571, width: 0.610 },
+  { x: 1.202, top: 0.980, bottom: 0.592, width: 0.515 },
+  { x: 1.32, top: 0.90, bottom: 0.62, width: 0.42 },
+] as const
+
+/** E7/W7の横に広いが浅い台形のフロントガラス。 */
+export const E7W7_FRONT_WINDSHIELD_SECTIONS: readonly TrainWindshieldSection[] = [
+  { x: 0.24, width: 0.72 },
+  { x: 0.38, width: 0.80 },
+  { x: 0.58, width: 0.74 },
+  { x: 0.79, width: 0.63 },
+  { x: 0.98, width: 0.53 },
+] as const
+
+/** E5系の軽量な車両間幌寸法をE7/W7でも共有する。 */
+export const E7W7_GANGWAY_SPEC: TrainGangwaySpec = E5_GANGWAY_SPEC
+
 /** N700S先頭車の、屋根から丸い短鼻へ続く低ポリゴンシェル断面。 */
 export const N700S_LEAD_SHELL_SECTIONS: readonly TrainShellSection[] = [
   { x: -1.04, top: 1.28, bottom: 0.48, width: 0.95 },
@@ -332,6 +372,7 @@ export type TrainSpec = {
     | 'e6-sharp-shoulder'
     | 'n700s-rounded-shoulder'
     | 'doctor-yellow-thick-shoulder'
+    | 'e7w7-dignified-shoulder'
   bodyColor: string
   frontColor: string
   roofColor: string
@@ -749,6 +790,76 @@ const DOCTOR_YELLOW_MIDDLE: TrainCarVisualProfile = {
   hasHeadlights: false,
 }
 
+const E7W7_LEAD: TrainCarVisualProfile = {
+  role: 'lead',
+  silhouette: 'e7w7-dignified-shoulder',
+  noseStyle: 'e7w7-dignified',
+  bodyLength: 2.0,
+  bodyHeight: 0.6,
+  bodyWidth: 0.94,
+  bodyCenterX: -0.04,
+  bodyCenterY: 0.78,
+  roofLength: 2.0,
+  roofHeight: 0.14,
+  roofWidth: 0.94,
+  roofCenterX: -0.04,
+  roofCenterY: 1.20,
+  noseLength: 1.08,
+  noseBaseX: 0.24,
+  noseTipX: 1.32,
+  noseBaseWidth: 0.94,
+  noseTipWidth: 0.42,
+  noseBaseBottomY: 0.48,
+  noseBaseTopY: 1.24,
+  noseTipBottomY: 0.62,
+  noseTipTopY: 0.90,
+  accentLength: 1.98,
+  accentHeight: 0.09,
+  accentY: 0.79,
+  sideWindowXs: [-0.30, 0.18],
+  sideWindowY: 0.98,
+  sideWindowWidth: 0.26,
+  sideWindowHeight: 0.17,
+  frontWindowX: 0.54,
+  frontWindowY: 1.08,
+  frontWindowWidth: 0.74,
+  doorX: -0.76,
+  headlightX: 1.20,
+  headlightY: 0.69,
+  headlightZ: 0.16,
+  hasFrontWindow: true,
+  hasHeadlights: true,
+  couplerPositions: BASIC_COUPLER_POSITIONS,
+}
+
+const E7W7_MIDDLE: TrainCarVisualProfile = {
+  ...E7W7_LEAD,
+  role: 'middle',
+  bodyLength: 1.96,
+  bodyCenterX: 0,
+  roofLength: 1.98,
+  roofCenterX: 0,
+  noseLength: 0,
+  noseBaseX: 0,
+  noseTipX: 0,
+  noseBaseWidth: 0,
+  noseTipWidth: 0,
+  noseBaseBottomY: 0,
+  noseBaseTopY: 0,
+  noseTipBottomY: 0,
+  noseTipTopY: 0,
+  frontWindowX: 0,
+  frontWindowY: 0,
+  frontWindowWidth: 0,
+  sideWindowXs: [-0.28, 0.13, 0.54],
+  doorX: -0.72,
+  headlightX: 0,
+  headlightY: 0,
+  headlightZ: 0,
+  hasFrontWindow: false,
+  hasHeadlights: false,
+}
+
 const E5_PROFILE: TrainSpec = {
   trainType: 'e5',
   silhouette: 'e5-rounded-shoulder',
@@ -856,6 +967,34 @@ const DOCTOR_YELLOW_PROFILE: TrainSpec = {
   middle: DOCTOR_YELLOW_MIDDLE,
 }
 
+const E7W7_PROFILE: TrainSpec = {
+  trainType: 'e7w7',
+  silhouette: 'e7w7-dignified-shoulder',
+  bodyColor: '#f7f8f4',
+  frontColor: '#124578',
+  roofColor: '#0d4b86',
+  bodyWidth: 0.94,
+  bodyHeight: 0.6,
+  noseLength: E7W7_LEAD.noseLength,
+  frontExtent: E7W7_LEAD.noseTipX,
+  rearExtent: -1.04,
+  maxHalfWidth: 0.47,
+  accent: { color: '#bd954e', height: 0.09, y: 0.79 },
+  window: {
+    color: '#183b60',
+    sideXs: E7W7_LEAD.sideWindowXs,
+    sideWidth: E7W7_LEAD.sideWindowWidth,
+    sideHeight: E7W7_LEAD.sideWindowHeight,
+  },
+  formation: E7W7_THREE_CAR_FORMATION,
+  gangway: E7W7_GANGWAY_SPEC,
+  leadShellSections: E7W7_LEAD_SHELL_SECTIONS,
+  frontWindshieldSections: E7W7_FRONT_WINDSHIELD_SECTIONS,
+  windshieldCenterDivider: true,
+  lead: E7W7_LEAD,
+  middle: E7W7_MIDDLE,
+}
+
 /** 全TrainTypeを一つの表で検査できる表示仕様。走行ロジックは参照しない。 */
 export const TRAIN_SPECS: Readonly<Record<TrainType, TrainSpec>> = {
   basic: {
@@ -885,6 +1024,7 @@ export const TRAIN_SPECS: Readonly<Record<TrainType, TrainSpec>> = {
   e6: E6_PROFILE,
   n700s: N700S_PROFILE,
   doctorYellow: DOCTOR_YELLOW_PROFILE,
+  e7w7: E7W7_PROFILE,
 }
 
 /** @deprecated TrainSpec の正規表 `TRAIN_SPECS` を使う。 */

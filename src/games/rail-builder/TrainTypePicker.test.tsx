@@ -4,10 +4,10 @@ import { describe, expect, test, vi } from 'vitest'
 import { TRAIN_TYPES } from './railFleetModel'
 import TrainTypePicker from './TrainTypePicker'
 
-const FORBIDDEN_NAME_TEXTS = ['E5', 'E6', 'N700S', 'ドクターイエロー', 'はやぶさ', 'こまち', 'のぞみ', 'basic']
+const FORBIDDEN_NAME_TEXTS = ['E5', 'E6', 'N700S', 'E7', 'W7', 'E7/W7', 'ドクターイエロー', 'はやぶさ', 'こまち', 'のぞみ', 'basic']
 
 describe('TrainTypePicker', () => {
-  test('5種類の車両タイプすべてを選択できる', () => {
+  test('6種類の車両タイプすべてを選択できる', () => {
     render(
       <TrainTypePicker
         title="えらぼう"
@@ -20,7 +20,7 @@ describe('TrainTypePicker', () => {
 
     const options = screen.getAllByRole('button', { name: /でんしゃの みため \d/ })
     expect(options).toHaveLength(TRAIN_TYPES.length)
-    expect(options).toHaveLength(5)
+    expect(options).toHaveLength(6)
   })
 
   test('車両名・形式名のテキストを一切表示しない', () => {
@@ -76,6 +76,24 @@ describe('TrainTypePicker', () => {
     expect(onSelect).toHaveBeenCalledExactlyOnceWith('n700s')
   })
 
+  test('6番目のカードを選ぶとE7/W7のtrainTypeが渡される', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    render(
+      <TrainTypePicker
+        title="えらぼう"
+        ariaLabel="でんしゃの みためを えらぶ"
+        selectedType={null}
+        onSelect={onSelect}
+        onClose={() => {}}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'でんしゃの みため 6' }))
+
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('e7w7')
+  })
+
   test('選択中の車両タイプだけがaria-pressed=trueになる', () => {
     render(
       <TrainTypePicker
@@ -89,7 +107,7 @@ describe('TrainTypePicker', () => {
 
     const options = screen.getAllByRole('button', { name: /でんしゃの みため \d/ })
     const pressedStates = options.map((option) => option.getAttribute('aria-pressed'))
-    expect(pressedStates).toEqual(['false', 'false', 'false', 'true', 'false'])
+    expect(pressedStates).toEqual(['false', 'false', 'false', 'true', 'false', 'false'])
   })
 
   test('追加モード相当(selectedType=null)ではどれも強調されない', () => {
