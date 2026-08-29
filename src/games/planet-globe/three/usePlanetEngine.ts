@@ -10,6 +10,7 @@ import type {
   UsePlanetEngineOptions,
   ZoomLevel,
 } from '../types'
+import { MIN_ZOOM_LEVEL } from '../types'
 import {
   CAMERA_FAR,
   CAMERA_FOV_DEGREES,
@@ -272,9 +273,9 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       if (controls === null) return
 
       const aspect = aspectOfContainer()
-      // level3(最大ズーム)より寄れなくし、level0(全体表示)より離れられなくする。
+      // level3(最大ズーム)より寄れなくし、今回追加したlevel-2より離れられなくする。
       controls.minDistance = cameraDistanceForZoom(body, 3, aspect) * 0.85
-      controls.maxDistance = cameraDistanceForZoom(body, 0, aspect) * 1.2
+      controls.maxDistance = cameraDistanceForZoom(body, MIN_ZOOM_LEVEL, aspect) * 1.2
     }
 
     function disposeCurrentBody() {
