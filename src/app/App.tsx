@@ -2,12 +2,14 @@ import { useRoutes } from 'react-router-dom'
 import { routes } from './routes'
 import GameIntro from '../components/GameIntro'
 import PwaStatus from '../pwa/PwaStatus'
+import ScrollManager from './ScrollManager'
 import SeoManager from '../seo/SeoManager'
 
 export default function App() {
   const element = useRoutes(routes)
   return (
     <>
+      <ScrollManager />
       <SeoManager />
       {element}
       {/*
