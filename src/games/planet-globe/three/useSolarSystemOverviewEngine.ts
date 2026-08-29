@@ -44,6 +44,8 @@ const OUTER_VIEW_MARGIN = 1.2
 const INNER_FIT_RADIUS = 150
 /** +/−ボタン1回で変えるカメラ距離の比率。 */
 const BUTTON_ZOOM_RATIO = 0.76
+/** 既存の最遠距離の先へ、ボタン操作2回ぶんズームアウトできるようにする。 */
+const EXTRA_OVERVIEW_ZOOM_OUT_STEPS = 2
 
 const ORBIT_LINE_SEGMENTS = 96
 const ORBIT_LINE_COLOR = '#93a5df'
@@ -383,7 +385,9 @@ export function useSolarSystemOverviewEngine(
       if (controls === null || camera === null) return
       const aspect = aspectOfContainer()
       controls.minDistance = fitDistance(INNER_FIT_RADIUS, aspect, OVERVIEW_FOV_DEGREES) * 0.7
-      controls.maxDistance = fitDistance(outerViewRadius, aspect, OVERVIEW_FOV_DEGREES) * 1.35
+      controls.maxDistance = fitDistance(outerViewRadius, aspect, OVERVIEW_FOV_DEGREES)
+        * 1.35
+        * (1 / BUTTON_ZOOM_RATIO) ** EXTRA_OVERVIEW_ZOOM_OUT_STEPS
 
       // 縦長画面(横方向のFOVが狭い)ではmaxDistanceが共通のCAMERA_FARを超えることがあり、
       // 太陽・惑星がカメラの far クリップ面の外に出て消えてしまう。実際に必要な距離まで
