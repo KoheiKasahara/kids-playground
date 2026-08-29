@@ -35,7 +35,10 @@ export function fitDistance(
   return viewRadius / Math.sin(limitingFov / 2)
 }
 
-/** ズーム段階ごとのカメラ距離。outMargin→inMargin を等比で補間する。 */
+/**
+ * ズーム段階ごとのカメラ距離。既存の0→3は outMargin→inMargin を等比で補間し、
+ * -1/-2は同じ比率をズームアウト側へそのまま延長する。
+ */
 export function cameraDistanceForZoom(
   body: CelestialBody,
   level: ZoomLevel,
