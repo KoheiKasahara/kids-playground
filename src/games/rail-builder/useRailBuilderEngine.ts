@@ -2268,7 +2268,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       for (const train of fleet) {
         const runtime = trainVisuals.get(train.id)
         if (runtime === undefined) continue
-        const poses = sampleRailTrainCars(trainPieces, train.motion.cursor, runtime.cars.length)
+        const poses = sampleRailTrainCars(
+          trainPieces,
+          train.motion.cursor,
+          runtime.cars.length,
+          undefined,
+          train.motion.routeHistory,
+        )
         runtime.root.visible = poses.length > 0
         const leadPiece = trainPieces.find((piece) => piece.id === train.motion.cursor.pieceId)
         if (leadPiece?.kind === 'tunnel') anyTrainInTunnel = true
