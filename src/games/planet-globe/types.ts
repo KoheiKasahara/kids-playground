@@ -29,9 +29,14 @@ export type CelestialBodyId =
  */
 export type CelestialBodyKind = 'star' | 'planet' | 'moon' | 'dwarf-planet'
 
-/** 有限4段階のズーム。0=天体全体がゆったり見える, 3=表面に寄った状態。 */
-export type ZoomLevel = 0 | 1 | 2 | 3
-export const MIN_ZOOM_LEVEL: ZoomLevel = 0
+/**
+ * 有限6段階のズーム。既存の0〜3は維持し、-2/-1だけをズームアウト側へ追加する。
+ * 0=従来どおり天体全体がゆったり見える初期状態、3=表面に寄った状態。
+ */
+export type ZoomLevel = -2 | -1 | 0 | 1 | 2 | 3
+export const MIN_ZOOM_LEVEL: ZoomLevel = -2
+/** 天体を選んだ直後に使う、従来から変えない初期ズーム段階。 */
+export const DEFAULT_ZOOM_LEVEL: ZoomLevel = 0
 export const MAX_ZOOM_LEVEL: ZoomLevel = 3
 
 /** 緯度方向の色プロファイルの1点。latDeg は +90(北極) → -90(南極) の降順で並べる。 */
