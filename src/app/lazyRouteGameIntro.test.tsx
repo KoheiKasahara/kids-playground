@@ -5,6 +5,7 @@
 // 調査コメントではPlaywrightで実チャンクの取得を700ms遅延させ、開発サーバー上のDOMを
 // 20ms間隔でサンプリングして中間状態を実証した。ここでは同じ発生条件（Suspenseが
 // 解決するまでの間）をvi.mockで人為的に再現し、CIで決定的に検証できるユニットテストにする。
+import type { ReactElement } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
@@ -12,11 +13,11 @@ import { MemoryRouter } from 'react-router-dom'
 // 動的importをこちらで完全に制御するため、rail-builder本体をスタブに差し替える。
 // resolveRailBuilderImport()を呼ぶまでimport()のPromiseは解決しない。
 const deferred = vi.hoisted(() => {
-  let resolve!: (module: { default: () => JSX.Element }) => void
-  const promise = new Promise<{ default: () => JSX.Element }>((r) => {
+  let resolve!: (module: { default: () => ReactElement }) => void
+  const promise = new Promise<{ default: () => ReactElement }>((r) => {
     resolve = r
   })
-  return { promise, resolve: (mod: { default: () => JSX.Element }) => resolve(mod) }
+  return { promise, resolve: (mod: { default: () => ReactElement }) => resolve(mod) }
 })
 
 vi.mock('../games/rail-builder/RailBuilderPlay', () => deferred.promise)
