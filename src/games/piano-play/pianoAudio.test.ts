@@ -28,6 +28,7 @@ class MockOscillator extends MockNode {
 
 class MockBufferSource extends MockNode {
   buffer: AudioBuffer | null = null
+  playbackRate = new MockAudioParam()
   onended: (() => void) | null = null
   start = vi.fn()
   stop = vi.fn()
@@ -195,5 +196,54 @@ describe('PianoAudioEngine', () => {
     expect((fetch as ReturnType<typeof vi.fn>).mock.calls.map(([url]) => url)).toEqual(
       PIANO_SAMPLE_DEFINITIONS.map((sample) => sample.url),
     )
+  })
+
+  test('楽器選択は必要なアンカーだけを遅延読込し、次のvoiceから移調して鳴らす', async () => {
+    const engine = new PianoAudioEngine()
+    await engine.prepare()
+
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(13)
+    const switchPromise = engine.setInstrument('violin')
+    expect(engine.getInstrument()).toBe('violin')
+    expect(engine.getSampleLoadState('violin')).toBe('loading')
+    await switchPromise
+
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(18)
+    const handle = engine.startNote(PIANO_NOTES[1]) // C#4 は最寄りのC4から半音上げる。
+    expect(handle).not.toBeNull()
+    const source = contexts[0].createBufferSource.mock.results[0].value
+    expect(source.playbackRate.value).toBeCloseTo(2 ** (1 / 12))
+  })
+
+  test('楽器切替で既存voiceを止めず、失敗時もフォールバックを発音する', async () => {
+    const engine = new PianoAudioEngine()
+    await engine.prepare()
+    const first = engine.startNote(PIANO_NOTES[0])
+    const firstSource = contexts[0].createBufferSource.mock.results[0].value
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    await engine.setInstrument('flute')
+    const fallback = engine.startNote(PIANO_NOTES[4])
+
+    expect(first).not.toBeNull()
+    expect(fallback).not.toBeNull()
+    expect(firstSource.stop).not.toHaveBeenCalled()
+    expect(contexts[0].createOscillator).toHaveBeenCalledTimes(2)
+  })
+
+  test('失敗後の鍵盤連打では再試行せず、同じ楽器の再選択でだけ再試行する', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('offline'))
+    vi.stubGlobal('fetch', fetchMock)
+    const engine = new PianoAudioEngine()
+    await engine.prepare()
+    expect(fetchMock).toHaveBeenCalledTimes(13)
+
+    engine.startNote(PIANO_NOTES[0])
+    engine.startNote(PIANO_NOTES[1])
+    await Promise.resolve()
+    expect(fetchMock).toHaveBeenCalledTimes(13)
+
+    await engine.setInstrument('piano')
+    expect(fetchMock).toHaveBeenCalledTimes(26)
   })
 })

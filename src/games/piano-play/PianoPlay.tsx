@@ -5,6 +5,7 @@ import { PianoAudioEngine, type PianoVoiceHandle } from './pianoAudio'
 import type { PianoNote } from './notes'
 import { PIANO_SONGS, findPianoSong } from './pianoSongs'
 import { PianoSongPlayer } from './pianoSongPlayer'
+import { INSTRUMENT_SPECS, type InstrumentId } from './pianoSamples'
 import styles from './PianoPlay.module.css'
 
 type ActivePointer = { noteId: string; voice: PianoVoiceHandle | null }
@@ -30,6 +31,8 @@ export default function PianoPlay() {
   const [portraitMobile, setPortraitMobile] = useState(isMobilePortrait)
   const [selectedSongId, setSelectedSongId] = useState(PIANO_SONGS[0].id)
   const [playbackState, setPlaybackState] = useState<PlaybackState>('idle')
+  const [selectedInstrument, setSelectedInstrument] = useState<InstrumentId>('piano')
+  const [instrumentLoadState, setInstrumentLoadState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 
   const syncActiveNotes = useCallback(() => {
     const next = new Set(Array.from(activePointers.current.values(), (active) => active.noteId))
@@ -126,6 +129,17 @@ export default function PianoPlay() {
     setPlaybackState('stopped')
   }
 
+  const selectInstrument = (instrumentId: InstrumentId) => {
+    const engine = engineRef.current
+    if (!engine) return
+    // setInstrumentは現在のvoiceや自動演奏の予約を止めず、次の発音からだけ切り替える。
+    setSelectedInstrument(instrumentId)
+    setInstrumentLoadState('loading')
+    void engine.setInstrument(instrumentId).then(() => {
+      if (engine.getInstrument() === instrumentId) setInstrumentLoadState(engine.getSampleLoadState(instrumentId))
+    })
+  }
+
   const selectSong = (songId: string) => {
     songPlayerRef.current?.stop()
     setSelectedSongId(songId)
@@ -149,9 +163,14 @@ export default function PianoPlay() {
   }, [])
 
   useEffect(() => {
-    // 画面に入った時点で13音を先読みする。失敗時・読込中もstartNote側の短い合成音フォールバックで
+    // 画面に入った時点でピアノ13音を先読みする。失敗時・読込中もstartNote側の短い合成音フォールバックで
     // 無反応にはせず、ロード完了後は同じAPIから録音サンプルへ自動で切り替わる。
-    void engineRef.current?.prepare()
+    const engine = engineRef.current
+    if (!engine) return
+    setInstrumentLoadState('loading')
+    void engine.prepare().then(() => {
+      if (engine.getInstrument() === 'piano') setInstrumentLoadState(engine.getSampleLoadState('piano'))
+    })
   }, [])
 
   useEffect(() => {
@@ -189,6 +208,24 @@ export default function PianoPlay() {
             </h1>
             <p className={styles.instruction}>けんばんを おしてみよう！</p>
             <section className={styles.songControls} aria-label="きょくをえらんで じどうえんそう">
+              <div className={styles.instrumentPicker} role="group" aria-label="おとを えらぶ">
+                <span className={styles.instrumentLabel}>おとを えらぶ</span>
+                <div className={styles.instrumentButtons}>
+                  {INSTRUMENT_SPECS.map((instrument) => (
+                    <button
+                      key={instrument.id}
+                      type="button"
+                      className={`${styles.instrumentButton} ${selectedInstrument === instrument.id ? styles.instrumentButtonSelected : ''}`}
+                      aria-label={instrument.label}
+                      aria-pressed={selectedInstrument === instrument.id}
+                      onClick={() => selectInstrument(instrument.id)}
+                    >
+                      <span className={styles.instrumentIcon} aria-hidden="true">{instrument.icon}</span>
+                      <span>{instrument.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label className={styles.songPicker}>
                 <span>きょくを えらぶ</span>
                 <select value={selectedSongId} onChange={(event) => selectSong(event.target.value)}>
@@ -196,6 +233,9 @@ export default function PianoPlay() {
                 </select>
               </label>
               <p className={styles.selectedSong}>いまのきょく：{findPianoSong(selectedSongId)?.title}</p>
+              <p className={styles.instrumentStatus} aria-live="polite">
+                {instrumentLoadState === 'loading' ? 'おとの じゅんびちゅう…' : instrumentLoadState === 'failed' ? 'おとを きりかえられないため、かんたんな おとで ならします' : ''}
+              </p>
               <div className={styles.playButtons}>
                 <button type="button" className={styles.playButton} onClick={startSelectedSong}>▶ さいせい</button>
                 <button

@@ -1,5 +1,10 @@
 import type { PianoNote, PianoNoteId } from './notes'
-import { findPianoSample, PIANO_SAMPLE_DEFINITIONS } from './pianoSamples'
+import {
+  getInstrumentSpec,
+  type InstrumentId,
+  type ResolvedSample,
+  resolveInstrumentSample,
+} from './pianoSamples'
 
 type AudioContextConstructor = new () => AudioContext
 
@@ -22,7 +27,7 @@ type FallbackVoice = {
 }
 
 type PianoVoice = SampleVoice | FallbackVoice
-type SampleLoadState = 'idle' | 'loading' | 'ready' | 'failed'
+export type SampleLoadState = 'idle' | 'loading' | 'ready' | 'failed'
 
 export type PianoVoiceHandle = { readonly id: number }
 
@@ -47,10 +52,11 @@ function stopNode(node: AudioScheduledSourceNode, when: number): void {
 export class PianoAudioEngine {
   private context?: AudioContext
   private output?: GainNode
-  private readonly sampleBuffers = new Map<PianoNoteId, AudioBuffer>()
-  private sampleLoadState: SampleLoadState = 'idle'
-  private sampleLoadPromise?: Promise<void>
-  private sampleAbortController?: AbortController
+  private readonly sampleBuffers = new Map<InstrumentId, Map<PianoNoteId, AudioBuffer>>()
+  private readonly sampleLoadStates = new Map<InstrumentId, SampleLoadState>()
+  private readonly sampleLoadPromises = new Map<InstrumentId, Promise<void>>()
+  private readonly sampleAbortControllers = new Map<InstrumentId, AbortController>()
+  private selectedInstrument: InstrumentId = 'piano'
   /** iOSの最初のユーザー操作で、resume完了まで短い離鍵を保持するためのPromise。 */
   private resumePromise?: Promise<void>
   private nextVoiceId = 1
@@ -59,22 +65,51 @@ export class PianoAudioEngine {
   private disposed = false
 
   /**
-   * 画面表示時に13音を先読みする。AudioContextはここではresumeせず、iOSのユーザー操作制約を守る。
+   * 選択中の楽器の音源を先読みする。別の楽器はsetInstrument時に必要なアンカーだけ遅延取得する。
+   * AudioContextはここではresumeせず、iOSのユーザー操作制約を守る。
    * ロード前の最初の押下は、無反応にしないため既存の軽量な合成音で一度だけ発音する。
    */
-  prepare(): Promise<void> {
+  prepare(instrumentId: InstrumentId = this.selectedInstrument): Promise<void> {
     if (this.disposed) return Promise.resolve()
     const context = this.getOrCreateContext()
-    if (!context || this.sampleLoadState === 'ready' || this.sampleLoadState === 'failed') {
-      return this.sampleLoadPromise ?? Promise.resolve()
-    }
-    if (this.sampleLoadPromise) return this.sampleLoadPromise
+    if (!context) return Promise.resolve()
+    const state = this.sampleLoadStates.get(instrumentId) ?? 'idle'
+    if (state === 'ready' || state === 'failed') return Promise.resolve()
+    const existingPromise = this.sampleLoadPromises.get(instrumentId)
+    if (existingPromise) return existingPromise
 
-    this.sampleLoadState = 'loading'
+    this.sampleLoadStates.set(instrumentId, 'loading')
     const abortController = new AbortController()
-    this.sampleAbortController = abortController
-    this.sampleLoadPromise = this.loadSamples(context, abortController)
-    return this.sampleLoadPromise
+    this.sampleAbortControllers.set(instrumentId, abortController)
+    const loadingPromise = this.loadSamples(context, instrumentId, abortController)
+    const loadPromise = loadingPromise.finally(() => {
+      if (this.sampleLoadPromises.get(instrumentId) === loadPromise) this.sampleLoadPromises.delete(instrumentId)
+    })
+    this.sampleLoadPromises.set(instrumentId, loadPromise)
+    return loadPromise
+  }
+
+  getInstrument(): InstrumentId {
+    return this.selectedInstrument
+  }
+
+  getSampleLoadState(instrumentId: InstrumentId = this.selectedInstrument): SampleLoadState {
+    return this.sampleLoadStates.get(instrumentId) ?? 'idle'
+  }
+
+  /**
+   * 現在鳴っているvoiceは止めず、以後のstartNote/playNoteだけを新しい楽器にする。
+   * 返り値はUIが小さなロード表示を解除するためのもので、呼び出し側で待たなくてもよい。
+   */
+  setInstrument(instrumentId: InstrumentId): Promise<void> {
+    if (this.disposed) return Promise.resolve()
+    // 失敗後の再試行は明示的な楽器ボタン選択時だけ許可する。鍵盤の連打からは再試行しない。
+    if (this.getSampleLoadState(instrumentId) === 'failed') {
+      this.sampleLoadStates.set(instrumentId, 'idle')
+      this.sampleBuffers.delete(instrumentId)
+    }
+    this.selectedInstrument = instrumentId
+    return this.prepare(instrumentId)
   }
 
   private getOrCreateContext(): AudioContext | undefined {
@@ -121,26 +156,32 @@ export class PianoAudioEngine {
     this.ensureContextForPlayback()
   }
 
-  private async loadSamples(context: AudioContext, abortController: AbortController): Promise<void> {
+  private async loadSamples(
+    context: AudioContext,
+    instrumentId: InstrumentId,
+    abortController: AbortController,
+  ): Promise<void> {
+    const spec = getInstrumentSpec(instrumentId)
     try {
-      const decodedSamples = await Promise.all(PIANO_SAMPLE_DEFINITIONS.map(async (sample) => {
+      const decodedSamples = await Promise.all(spec.samples.map(async (sample) => {
         const response = await fetch(sample.url, { signal: abortController.signal })
-        if (!response.ok) throw new Error(`piano sample fetch failed: ${sample.noteId}`)
+        if (!response.ok) throw new Error(`${instrumentId} sample fetch failed: ${sample.noteId}`)
         const data = await response.arrayBuffer()
         const buffer = await context.decodeAudioData(data)
         return [sample.noteId, buffer] as const
       }))
 
       if (this.disposed) return
-      this.sampleBuffers.clear()
-      for (const [noteId, buffer] of decodedSamples) this.sampleBuffers.set(noteId, buffer)
-      this.sampleLoadState = 'ready'
+      this.sampleBuffers.set(instrumentId, new Map(decodedSamples))
+      this.sampleLoadStates.set(instrumentId, 'ready')
     } catch {
       if (this.disposed) return
-      this.sampleBuffers.clear()
-      this.sampleLoadState = 'failed'
+      this.sampleBuffers.delete(instrumentId)
+      this.sampleLoadStates.set(instrumentId, 'failed')
     } finally {
-      if (this.sampleAbortController === abortController) this.sampleAbortController = undefined
+      if (this.sampleAbortControllers.get(instrumentId) === abortController) {
+        this.sampleAbortControllers.delete(instrumentId)
+      }
     }
   }
 
@@ -154,12 +195,19 @@ export class PianoAudioEngine {
     return gain
   }
 
-  private startSampleVoice(context: AudioContext, note: PianoNote, buffer: AudioBuffer): PianoVoiceHandle {
+  private startSampleVoice(
+    context: AudioContext,
+    resolvedSample: ResolvedSample,
+    buffer: AudioBuffer,
+  ): PianoVoiceHandle {
     const id = this.nextVoiceId++
-    // 個別補正後、4鍵程度の和音でもクリップしにくい共通voice gainを掛ける。
-    const gain = this.createVoiceGain(context, (findPianoSample(note.id)?.gain ?? 1) * 0.75)
+    const spec = getInstrumentSpec(this.selectedInstrument)
+    // 楽器補正×録音補正の二層を通し、4鍵程度の和音でもクリップしにくい共通係数を掛ける。
+    const gain = this.createVoiceGain(context, spec.gain * resolvedSample.definition.gain * 0.75)
     const source = context.createBufferSource()
     source.buffer = buffer
+    // 実ブラウザのAudioBufferSourceNodeには必ずあるが、軽量テストdoubleでは省略されることがある。
+    if (source.playbackRate) source.playbackRate.value = resolvedSample.playbackRate
     source.connect(gain)
 
     const voice: SampleVoice = { id, kind: 'sample', gain, source, stopped: false, releasePending: false }
@@ -179,7 +227,7 @@ export class PianoAudioEngine {
 
   private startFallbackVoice(context: AudioContext, note: PianoNote): PianoVoiceHandle {
     const id = this.nextVoiceId++
-    const gain = this.createVoiceGain(context, 0.32)
+    const gain = this.createVoiceGain(context, getInstrumentSpec(this.selectedInstrument).gain * 0.32)
     const fundamental = context.createOscillator()
     const harmonic = context.createOscillator()
     const harmonicGain = context.createGain()
@@ -214,8 +262,14 @@ export class PianoAudioEngine {
 
     // prepare()との競合を1本化し、まだdecode中でも入力を無反応にしない。
     void this.prepare()
-    const sample = this.sampleLoadState === 'ready' ? this.sampleBuffers.get(note.id) : undefined
-    return sample ? this.startSampleVoice(context, note, sample) : this.startFallbackVoice(context, note)
+    const instrumentId = this.selectedInstrument
+    const resolvedSample = resolveInstrumentSample(instrumentId, note.id)
+    const sample = resolvedSample && this.getSampleLoadState(instrumentId) === 'ready'
+      ? this.sampleBuffers.get(instrumentId)?.get(resolvedSample.definition.noteId)
+      : undefined
+    return sample && resolvedSample
+      ? this.startSampleVoice(context, resolvedSample, sample)
+      : this.startFallbackVoice(context, note)
   }
 
   private releaseVoice(voice: PianoVoice, releaseSeconds: number): void {
@@ -277,8 +331,9 @@ export class PianoAudioEngine {
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
-    this.sampleAbortController?.abort()
-    this.sampleAbortController = undefined
+    for (const controller of this.sampleAbortControllers.values()) controller.abort()
+    this.sampleAbortControllers.clear()
+    this.sampleLoadPromises.clear()
     for (const timer of this.durationTimers) clearTimeout(timer)
     this.durationTimers.clear()
 
