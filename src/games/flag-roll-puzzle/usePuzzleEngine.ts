@@ -330,6 +330,23 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     const capturedCannonByBall = new Map<string, string>()
     let simulationTime = 0
 
+    const animateJumpRamp = (partId: string, typeId: string) => {
+      const element = elementsRef.current.get(`part:${partId}`)
+      if (!element || typeof element.animate !== 'function') return
+      const direction = typeId === 'jumpRampLeft' ? -1 : 1
+      // Bodyは静的なままにし、表示だけを「沈む → しなる → 戻る」と動かす。
+      // React stateを更新しないので、衝突中に盤面全体を再レンダーしない。
+      element.animate(
+        [
+          { transform: 'translate(0, 0) scale(1, 1)' },
+          { transform: `translate(${-direction}px, 3px) scale(0.96, 0.84)` },
+          { transform: `translate(${direction * 2}px, -2px) scale(1.04, 1.1)` },
+          { transform: 'translate(0, 0) scale(1, 1)' },
+        ],
+        { duration: 240, easing: 'cubic-bezier(.2,.8,.25,1)', fill: 'none' },
+      )
+    }
+
     const cannonStateFor = (ballId: string, cannonId: string): CannonCaptureState => {
       const key = cannonCaptureKey(ballId, cannonId)
       const existing = cannonStates.get(key)
@@ -366,7 +383,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
             ? pair.bodyB
             : null
         if (jumpRamp && hitBall) {
-          const typeId = jumpRamp.label.split(':')[1]
+          const [, typeId, partId] = jumpRamp.label.split(':')
           const cooldownKey = `${jumpRamp.id}:${hitBall.id}`
           if (
             isJumpRampPart(typeId)
@@ -376,6 +393,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
             if (nextVelocity) {
               lastJumpRampHitAt.set(cooldownKey, simulationTime)
               Body.setVelocity(hitBall, nextVelocity)
+              animateJumpRamp(partId, typeId)
             }
           }
         }

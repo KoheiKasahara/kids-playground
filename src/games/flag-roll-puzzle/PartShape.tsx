@@ -21,6 +21,32 @@ type PartShapeProps = {
  */
 export default function PartShape({ typeId, variant = 'placed' }: PartShapeProps) {
   const definition = partDefinition(typeId)
+  if (definition.appearance === 'jumpRamp') {
+    const [deck] = definition.segments
+    const styleFor = (offsetX: number, offsetY: number, width: number, height: number) => ({
+      width,
+      height,
+      transform: `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px) rotate(${deck.angleDeg}deg)`,
+    })
+    const directionClass = typeId === 'jumpRampRight' ? styles.jumpRampRight : styles.jumpRampLeft
+    const direction = typeId === 'jumpRampRight' ? 1 : -1
+    return (
+      <>
+        <span
+          className={`${styles.segment} ${styles[variant]} ${styles.jumpRamp} ${styles.jumpRampDeck} ${directionClass}`}
+          style={styleFor(deck.offsetX, deck.offsetY, deck.width, deck.height)}
+        />
+        <span
+          className={`${styles.segment} ${styles[variant]} ${styles.jumpRampBase}`}
+          style={styleFor(deck.offsetX - direction * 7, deck.offsetY + 17, 42, 10)}
+        />
+        <span
+          className={`${styles.segment} ${styles[variant]} ${styles.jumpRampSpring}`}
+          style={styleFor(deck.offsetX - direction * 12, deck.offsetY + 8, 14, 17)}
+        />
+      </>
+    )
+  }
   return (
     <>
       {definition.segments.map((segment, index) => (

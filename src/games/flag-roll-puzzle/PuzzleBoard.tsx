@@ -15,7 +15,7 @@ import {
 import type { PuzzleBallState } from './puzzleState'
 import { cellCenter, type GridCell } from './grid'
 import PartShape from './PartShape'
-import { isSpinnerPart, type PartTypeId } from './partTypes'
+import { isJumpRampPart, isSpinnerPart, type PartTypeId } from './partTypes'
 import { occupiedCells, type PlacedPart } from './placement'
 import { ballLetter } from './puzzleStages'
 import styles from './PuzzleBoard.module.css'
@@ -117,6 +117,7 @@ export default function PuzzleBoard({
           {parts.map((part) => {
             const center = cellCenter(part.cell)
             const selected = part.id === selectedPartId
+            const jumpRamp = isJumpRampPart(part.typeId)
             return (
               <div
                 key={part.id}
@@ -130,6 +131,8 @@ export default function PuzzleBoard({
                 data-dragging={part.id === draggingPartId ? 'true' : 'false'}
                 data-placed={part.id === justPlacedPartId ? 'true' : 'false'}
                 data-rotating={part.id === rotatingPartId ? 'true' : 'false'}
+                data-jump-ramp={jumpRamp ? 'true' : undefined}
+                ref={jumpRamp ? (element) => registerPartElement(part.id, element) : undefined}
               >
                 {isSpinnerPart(part.typeId) ? (
                   <span
