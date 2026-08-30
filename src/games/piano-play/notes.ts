@@ -32,26 +32,32 @@ export function midiToFrequency(midi: number): number {
 }
 
 /**
- * Phase 1で使う1オクターブの鍵盤。曲データから `C4` のようなIDで参照できるよう、
+ * 自由演奏と曲データで共有するC4〜C5の鍵盤。曲データから `C4` のようなIDで参照できるよう、
  * 表示順・音程・見た目を同じ定義へ集約する。
  */
 export const PIANO_NOTES: readonly PianoNote[] = (() => {
   let whiteKeyIndex = -1
 
-  return PITCHES.map((pitch) => {
+  const pitchesByOctave = [
+    { octave: 4, pitches: PITCHES },
+    // C5は次のオクターブの白鍵として、他のノートと同じ定義・発音経路に載せる。
+    { octave: 5, pitches: PITCHES.slice(0, 1) },
+  ] as const
+
+  return pitchesByOctave.flatMap(({ octave, pitches }) => pitches.map((pitch) => {
     const isBlack = pitch.name.includes('#')
     if (!isBlack) whiteKeyIndex += 1
 
     return {
-      id: `${pitch.name}4` as PianoNoteId,
+      id: `${pitch.name}${octave}` as PianoNoteId,
       pitchClass: pitch.name,
-      octave: 4,
-      frequency: midiToFrequency(60 + pitch.semitone),
+      octave,
+      frequency: midiToFrequency(12 * (octave + 1) + pitch.semitone),
       isBlack,
       whiteKeyIndex,
       label: pitch.label,
     }
-  })
+  }))
 })()
 
 export const WHITE_NOTES = PIANO_NOTES.filter((note) => !note.isBlack)
