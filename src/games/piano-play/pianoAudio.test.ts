@@ -109,6 +109,44 @@ describe('PianoAudioEngine', () => {
 
     vi.advanceTimersByTime(180)
     expect(sources[2].stop).toHaveBeenCalledTimes(1)
+    // 自動演奏は従来どおり200msのreleaseを使い、音価やフレーズ間隔を変えない。
+    expect(sources[2].stop.mock.calls.at(-1)?.[0]).toBeCloseTo(contexts[0].currentTime + 0.215)
+  })
+
+  test('短い離鍵は現在のattack途中Gainから35msでreleaseしてからsourceを止める', async () => {
+    const engine = new PianoAudioEngine()
+    await engine.prepare()
+    const handle = engine.startNote(PIANO_NOTES[0])
+    const source = contexts[0].createBufferSource.mock.results[0].value
+    const gain = contexts[0].createGain.mock.results[1].value as MockGain
+
+    contexts[0].currentTime = 1.003 // 6msのattack途中
+    engine.stopNote(handle!)
+
+    expect(gain.gain.cancelScheduledValues).toHaveBeenCalledWith(1.003)
+    const heldGain = gain.gain.setValueAtTime.mock.calls.at(-1)
+    expect(heldGain?.[0]).toBeGreaterThan(0.0001)
+    expect(heldGain?.[0]).toBeLessThan(0.1)
+    expect(heldGain?.[1]).toBe(1.003)
+    const releaseRamp = gain.gain.exponentialRampToValueAtTime.mock.calls.at(-1)
+    expect(releaseRamp?.[0]).toBe(0.0001)
+    expect(releaseRamp?.[1]).toBeCloseTo(1.038)
+    expect(source.stop.mock.calls[0][0]).toBeCloseTo(1.053)
+  })
+
+  test('同じ鍵の高速連打でも各voiceを一度だけ個別にreleaseする', async () => {
+    const engine = new PianoAudioEngine()
+    await engine.prepare()
+    const first = engine.startNote(PIANO_NOTES[0])
+    const second = engine.startNote(PIANO_NOTES[0])
+    const sources = contexts[0].createBufferSource.mock.results.map((result) => result.value)
+
+    engine.stopNote(first!)
+    engine.stopNote(first!)
+    engine.stopNote(second!)
+
+    expect(sources[0].stop).toHaveBeenCalledTimes(1)
+    expect(sources[1].stop).toHaveBeenCalledTimes(1)
   })
 
   test('初回resumeより短いタップでも、resume後に短い自然な発音を残す', async () => {
