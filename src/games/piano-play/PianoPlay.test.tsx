@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import PianoPlay from './PianoPlay'
@@ -41,24 +41,79 @@ class MockAudioContext {
 
 describe('PianoPlay', () => {
   const originalAudioContext = window.AudioContext
+  const originalMatchMedia = window.matchMedia
+  let portraitMobile = false
+  let dispatchMediaChange: (() => void) | undefined
 
   beforeEach(() => {
     contexts.length = 0
+    portraitMobile = false
+    dispatchMediaChange = undefined
     ;(window as unknown as { AudioContext: typeof MockAudioContext }).AudioContext = MockAudioContext
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn(() => ({
+        get matches() {
+          return portraitMobile
+        },
+        addEventListener: vi.fn((event: string, listener: EventListener) => {
+          if (event === 'change') dispatchMediaChange = () => listener(new Event('change'))
+        }),
+        removeEventListener: vi.fn(),
+      })),
+    })
   })
 
   afterEach(() => {
     window.AudioContext = originalAudioContext
+    Object.defineProperty(window, 'matchMedia', { configurable: true, value: originalMatchMedia })
     vi.restoreAllMocks()
   })
 
   const renderPiano = () => render(<MemoryRouter><PianoPlay /></MemoryRouter>)
 
-  test('白鍵7本と黒鍵5本を表示する', () => {
+  test('白鍵8本と黒鍵5本を表示する', () => {
     renderPiano()
-    expect(screen.getAllByRole('button').filter((button) => button.hasAttribute('data-note'))).toHaveLength(12)
+    expect(screen.getAllByRole('button').filter((button) => button.hasAttribute('data-note'))).toHaveLength(13)
     expect(screen.getByRole('button', { name: 'ド C4' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ド C5' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'C シャープ4' })).toBeInTheDocument()
+  })
+
+  test('C5も既存の鍵盤と同じ経路で発音・ハイライトできる', () => {
+    renderPiano()
+    const c5 = screen.getByRole('button', { name: 'ド C5' })
+    fireEvent.pointerDown(c5, { pointerId: 6 })
+
+    expect(contexts[0].createOscillator).toHaveBeenCalledTimes(2)
+    expect(c5).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.pointerUp(c5, { pointerId: 6 })
+    expect(c5).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('スマホ縦では横向き案内だけを表示する', () => {
+    portraitMobile = true
+    renderPiano()
+
+    expect(screen.getByRole('heading', { name: /よこにして/ })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'ピアノのけんばん' })).not.toBeInTheDocument()
+  })
+
+  test('向きの切替時に発音とハイライトを解除して通常鍵盤へ戻る', () => {
+    renderPiano()
+    const c4 = screen.getByRole('button', { name: 'ド C4' })
+    fireEvent.pointerDown(c4, { pointerId: 7 })
+
+    portraitMobile = true
+    act(() => dispatchMediaChange?.())
+    expect(screen.getByRole('heading', { name: /よこにして/ })).toBeInTheDocument()
+    const oscillators = contexts[0].createOscillator.mock.results.map((result) => result.value)
+    expect(oscillators.every((oscillator) => oscillator.stop.mock.calls.length === 1)).toBe(true)
+
+    portraitMobile = false
+    act(() => dispatchMediaChange?.())
+    expect(screen.getByRole('button', { name: 'ド C4' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('最初のpointerdownでAudioContextを開始し、pointerupで離鍵する', () => {
