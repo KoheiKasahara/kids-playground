@@ -72,6 +72,49 @@
   justify-content: center;
 }
 
+.orientationGuide {
+  align-self: center;
+  justify-self: center;
+  max-width: 320px;
+  padding: 28px 24px;
+  border: 3px solid #fdba74;
+  border-radius: 28px;
+  box-sizing: border-box;
+  color: #7c2d12;
+  background: rgb(255 255 255 / 78%);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.orientationIcon {
+  width: 66px;
+  height: 66px;
+  margin: 0 auto var(--space-sm);
+  display: grid;
+  place-items: center;
+  border: 3px solid #fb923c;
+  border-radius: 18px;
+  color: #ea580c;
+  background: #ffedd5;
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.orientationGuide h1 {
+  margin: 0;
+  font-size: clamp(27px, 8vw, 36px);
+  line-height: 1.25;
+}
+
+.orientationGuide p {
+  margin: var(--space-sm) 0 0;
+  color: #9a3412;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
 .pianoCase {
   width: min(100%, 760px);
   padding: 14px 10px 12px;
@@ -164,7 +207,7 @@
   position: absolute;
   z-index: 2;
   top: 0;
-  width: 10.5%;
+  width: 9.4%;
   height: 59%;
   padding: 0;
   transform: translateX(-50%);
@@ -219,6 +262,32 @@
 
   .brandDots {
     height: 12px;
+  }
+}
+
+@media (max-width: 767px) and (pointer: coarse) and (orientation: landscape) {
+  .page {
+    grid-template-columns: minmax(142px, 22%) minmax(0, 1fr);
+  }
+
+  .header {
+    padding-top: 56px;
+  }
+
+  .title {
+    font-size: clamp(21px, 4vw, 29px);
+  }
+
+  .instruction {
+    font-size: 14px;
+  }
+
+  .pianoCase {
+    width: 100%;
+  }
+
+  .keyboard {
+    height: min(78dvh, 340px);
   }
 }
 
