@@ -90,6 +90,82 @@ export const PIANO_SONGS: readonly PianoSong[] = [
       ['C4', 1], ['C4', 1], ['D4', 1], ['E4', 1], ['D4', 1.5], ['C4', 0.5], ['C4', 2],
     ],
   }),
+  defineSong({
+    id: 'london-bridge',
+    title: 'ロンドンばし',
+    tempoBpm: 116,
+    steps: [
+      ['C4', 1], ['D4', 1], ['E4', 1], ['D4', 1], ['C4', 1], ['D4', 1], ['E4', 2], ['rest', 0.5],
+      ['G4', 1], ['E4', 1], ['D4', 1], ['C4', 1], ['D4', 1], ['E4', 1], ['D4', 2], ['rest', 0.5],
+      ['C4', 1], ['D4', 1], ['E4', 1], ['D4', 1], ['C4', 1], ['D4', 1], ['E4', 2], ['rest', 0.5],
+      ['G4', 1], ['E4', 1], ['D4', 1], ['C4', 1], ['D4', 1], ['E4', 1], ['C4', 2],
+    ],
+  }),
+  defineSong({
+    id: 'kaeru-no-uta',
+    title: 'かえるのうた',
+    tempoBpm: 112,
+    steps: [
+      ['C4', 1], ['D4', 1], ['E4', 1], ['F4', 1], ['E4', 1], ['D4', 1], ['C4', 2], ['rest', 0.5],
+      ['E4', 1], ['F4', 1], ['G4', 1], ['A4', 1], ['G4', 1], ['F4', 1], ['E4', 2], ['rest', 0.5],
+      ['C4', 1], ['C4', 1], ['C4', 1], ['C4', 1], ['D4', 1], ['D4', 1], ['D4', 1], ['D4', 1],
+      ['E4', 1], ['E4', 1], ['F4', 1], ['F4', 1], ['E4', 1], ['D4', 1], ['C4', 2],
+    ],
+  }),
+  defineSong({
+    id: 'row-row-row-your-boat',
+    title: 'こげこげボート',
+    tempoBpm: 104,
+    steps: [
+      ['C4', 1], ['C4', 1], ['C4', 1.5], ['D4', 0.5], ['E4', 1], ['rest', 0.5],
+      ['E4', 1], ['D4', 0.5], ['E4', 0.5], ['F4', 1], ['G4', 2], ['rest', 0.5],
+      ['C5', 1], ['C5', 0.5], ['C5', 0.5], ['G4', 0.5], ['G4', 0.5], ['E4', 0.5], ['E4', 0.5], ['C4', 0.5], ['C4', 0.5], ['G4', 0.5], ['F4', 0.5], ['E4', 0.5], ['D4', 0.5], ['C4', 2],
+    ],
+  }),
+  defineSong({
+    id: 'old-macdonald-had-a-farm',
+    title: 'ゆかいな牧場',
+    tempoBpm: 108,
+    steps: [
+      ['C4', 1], ['C4', 1], ['C4', 1], ['G4', 1], ['A4', 1], ['A4', 1], ['G4', 2], ['rest', 0.5],
+      ['E4', 1], ['E4', 1], ['D4', 1], ['D4', 1], ['C4', 2], ['rest', 0.5],
+      ['G4', 1], ['G4', 1], ['F4', 1], ['F4', 1], ['E4', 1], ['E4', 1], ['D4', 2], ['rest', 0.5],
+      ['C4', 1], ['C4', 1], ['C4', 1], ['G4', 1], ['A4', 1], ['A4', 1], ['G4', 2],
+    ],
+  }),
+  defineSong({
+    id: 'chocho',
+    title: 'ちょうちょう',
+    tempoBpm: 112,
+    steps: [
+      ['G4', 1], ['E4', 1], ['E4', 1], ['F4', 1], ['D4', 1], ['D4', 1], ['C4', 2], ['rest', 0.5],
+      ['D4', 1], ['E4', 1], ['F4', 1], ['G4', 1], ['G4', 1], ['G4', 1], ['G4', 2], ['rest', 0.5],
+      ['G4', 1], ['E4', 1], ['E4', 1], ['F4', 1], ['D4', 1], ['D4', 1], ['C4', 2], ['rest', 0.5],
+      ['E4', 1], ['G4', 1], ['G4', 1], ['E4', 1], ['D4', 1], ['D4', 1], ['C4', 2],
+    ],
+  }),
+  defineSong({
+    id: 'jingle-bells',
+    title: 'ジングルベル',
+    tempoBpm: 126,
+    steps: [
+      ['E4', 1], ['E4', 1], ['E4', 2], ['E4', 1], ['E4', 1], ['E4', 2], ['rest', 0.5],
+      ['E4', 1], ['G4', 1], ['C4', 1.5], ['D4', 0.5], ['E4', 4], ['rest', 0.5],
+      ['F4', 1], ['F4', 1], ['F4', 1.5], ['F4', 0.5], ['F4', 1], ['E4', 1], ['E4', 1], ['E4', 0.5], ['E4', 0.5],
+      ['E4', 1], ['D4', 1], ['D4', 1], ['E4', 1], ['D4', 2], ['G4', 2],
+    ],
+  }),
+  defineSong({
+    id: 'happy-birthday',
+    title: 'ハッピーバースデー',
+    tempoBpm: 96,
+    steps: [
+      ['C4', 0.75], ['C4', 0.25], ['D4', 1], ['C4', 1], ['F4', 1], ['E4', 2], ['rest', 0.5],
+      ['C4', 0.75], ['C4', 0.25], ['D4', 1], ['C4', 1], ['G4', 1], ['F4', 2], ['rest', 0.5],
+      ['C4', 0.75], ['C4', 0.25], ['C5', 1], ['A4', 1], ['F4', 1], ['E4', 1], ['D4', 2], ['rest', 0.5],
+      ['A4', 0.75], ['A4', 0.25], ['G4', 1], ['F4', 1], ['G4', 1], ['F4', 2],
+    ],
+  }),
 ]
 
 export function findPianoSong(id: string): PianoSong | undefined {
@@ -103,10 +179,11 @@ export function validatePianoSong(song: PianoSong): string[] {
   if (!song.title) errors.push('曲名がありません')
   if (!Number.isFinite(song.tempoBpm) || song.tempoBpm <= 0) errors.push('テンポが不正です')
   if (!Number.isFinite(song.totalDurationMs) || song.totalDurationMs <= 0) errors.push('総再生時間が不正です')
+  if (song.timeline.length === 0) errors.push('音符データがありません')
 
   let previousEndMs = 0
   for (const item of song.timeline) {
-    if (!Number.isFinite(item.startMs) || item.startMs < previousEndMs) errors.push('開始タイミングが不正です')
+    if (!Number.isFinite(item.startMs) || item.startMs !== previousEndMs) errors.push('開始タイミングが不正です')
     if (!Number.isFinite(item.durationMs) || item.durationMs <= 0) errors.push('音価が不正です')
     if (item.kind === 'note' && !findPianoNote(item.noteId)) errors.push(`未定義の音符です: ${item.noteId}`)
     previousEndMs = item.startMs + item.durationMs

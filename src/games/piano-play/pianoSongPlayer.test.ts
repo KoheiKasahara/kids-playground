@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { PianoVoiceHandle } from './pianoAudio'
 import { PianoSongPlayer } from './pianoSongPlayer'
-import type { PianoSong } from './pianoSongs'
+import { PIANO_SONGS, type PianoSong } from './pianoSongs'
 
 const TEST_SONG: PianoSong = {
   id: 'test-song',
@@ -89,6 +89,36 @@ describe('PianoSongPlayer', () => {
     player.dispose()
     actTimers(1_000)
     expect(engine.playNote).toHaveBeenCalledTimes(3)
+  })
+
+  test.each(PIANO_SONGS)('$title はデータ駆動で最後まで再生し、全ノートをハイライトする', (song) => {
+    vi.useFakeTimers()
+    vi.spyOn(performance, 'now').mockImplementation(() => Date.now())
+    let voiceId = 0
+    const engine = {
+      activate: vi.fn(),
+      playNote: vi.fn(() => ({ id: ++voiceId }) satisfies PianoVoiceHandle),
+      stopNote: vi.fn(),
+    }
+    const callbacks = {
+      onNoteStart: vi.fn(),
+      onNoteEnd: vi.fn(),
+      onClearHighlights: vi.fn(),
+      onComplete: vi.fn(),
+    }
+    const player = new PianoSongPlayer(engine, callbacks)
+    const noteCount = song.timeline.filter((item) => item.kind === 'note').length
+
+    player.play(song)
+    actTimers(song.totalDurationMs + 2)
+
+    expect(engine.activate).toHaveBeenCalledTimes(1)
+    expect(engine.playNote).toHaveBeenCalledTimes(noteCount)
+    expect(callbacks.onNoteStart).toHaveBeenCalledTimes(noteCount)
+    expect(callbacks.onNoteEnd).toHaveBeenCalledTimes(noteCount)
+    expect(callbacks.onClearHighlights).toHaveBeenCalledTimes(1)
+    expect(callbacks.onComplete).toHaveBeenCalledTimes(1)
+    expect(player.isPlaying).toBe(false)
   })
 })
 

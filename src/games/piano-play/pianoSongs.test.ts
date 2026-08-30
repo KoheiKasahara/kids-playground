@@ -3,11 +3,18 @@ import { PIANO_NOTES } from './notes'
 import { PIANO_SONGS, validatePianoSong } from './pianoSongs'
 
 describe('PIANO_SONGS', () => {
-  test('Phase 2の初期3曲を一意なIDで登録する', () => {
+  test('Phase 3の10曲を一意なIDで登録する', () => {
     expect(PIANO_SONGS.map((song) => song.title)).toEqual([
       'きらきらぼし',
       'メリーさんのひつじ',
       'よろこびのうた',
+      'ロンドンばし',
+      'かえるのうた',
+      'こげこげボート',
+      'ゆかいな牧場',
+      'ちょうちょう',
+      'ジングルベル',
+      'ハッピーバースデー',
     ])
     expect(new Set(PIANO_SONGS.map((song) => song.id)).size).toBe(PIANO_SONGS.length)
   })
