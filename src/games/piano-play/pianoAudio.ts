@@ -8,10 +8,25 @@ import {
 
 type AudioContextConstructor = new () => AudioContext
 
+const ATTACK_START_GAIN = 0.0001
+const ATTACK_SECONDS = 0.006
+const MANUAL_KEY_RELEASE_SECONDS = 0.035
+const AUTOMATIC_NOTE_RELEASE_SECONDS = 0.2
+const MINIMUM_RELEASE_SECONDS = 0.02
+const SOURCE_STOP_TAIL_SECONDS = 0.015
+const FALLBACK_DECAY_END_GAIN = 0.1
+const FALLBACK_DECAY_SECONDS = 0.34
+
+type GainEnvelope = {
+  startedAt: number
+  targetGain: number
+}
+
 type SampleVoice = {
   id: number
   kind: 'sample'
   gain: GainNode
+  envelope: GainEnvelope
   source: AudioBufferSourceNode
   stopped: boolean
   releasePending: boolean
@@ -21,6 +36,7 @@ type FallbackVoice = {
   id: number
   kind: 'fallback'
   gain: GainNode
+  envelope: GainEnvelope
   oscillators: OscillatorNode[]
   stopped: boolean
   releasePending: boolean
@@ -185,14 +201,14 @@ export class PianoAudioEngine {
     }
   }
 
-  private createVoiceGain(context: AudioContext, targetGain: number): GainNode {
+  private createVoiceGain(context: AudioContext, targetGain: number): { gain: GainNode; envelope: GainEnvelope } {
     const gain = context.createGain()
     const now = context.currentTime
     gain.connect(this.output!)
-    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.setValueAtTime(ATTACK_START_GAIN, now)
     // 録音のアタックを保ちつつ開始時のクリックを防ぐ短いフェード。
-    gain.gain.exponentialRampToValueAtTime(targetGain, now + 0.006)
-    return gain
+    gain.gain.exponentialRampToValueAtTime(targetGain, now + ATTACK_SECONDS)
+    return { gain, envelope: { startedAt: now, targetGain } }
   }
 
   private startSampleVoice(
@@ -203,20 +219,28 @@ export class PianoAudioEngine {
     const id = this.nextVoiceId++
     const spec = getInstrumentSpec(this.selectedInstrument)
     // 楽器補正×録音補正の二層を通し、4鍵程度の和音でもクリップしにくい共通係数を掛ける。
-    const gain = this.createVoiceGain(context, spec.gain * resolvedSample.definition.gain * 0.75)
+    const voiceGain = this.createVoiceGain(context, spec.gain * resolvedSample.definition.gain * 0.75)
     const source = context.createBufferSource()
     source.buffer = buffer
     // 実ブラウザのAudioBufferSourceNodeには必ずあるが、軽量テストdoubleでは省略されることがある。
     if (source.playbackRate) source.playbackRate.value = resolvedSample.playbackRate
-    source.connect(gain)
+    source.connect(voiceGain.gain)
 
-    const voice: SampleVoice = { id, kind: 'sample', gain, source, stopped: false, releasePending: false }
+    const voice: SampleVoice = {
+      id,
+      kind: 'sample',
+      gain: voiceGain.gain,
+      envelope: voiceGain.envelope,
+      source,
+      stopped: false,
+      releasePending: false,
+    }
     this.voices.set(id, voice)
     source.onended = () => {
       if (this.voices.get(id) === voice) this.voices.delete(id)
       try {
         source.disconnect()
-        gain.disconnect()
+        voiceGain.gain.disconnect()
       } catch {
         // 接続解除に失敗しても次の発音を妨げない。
       }
@@ -227,7 +251,7 @@ export class PianoAudioEngine {
 
   private startFallbackVoice(context: AudioContext, note: PianoNote): PianoVoiceHandle {
     const id = this.nextVoiceId++
-    const gain = this.createVoiceGain(context, getInstrumentSpec(this.selectedInstrument).gain * 0.32)
+    const voiceGain = this.createVoiceGain(context, getInstrumentSpec(this.selectedInstrument).gain * 0.32)
     const fundamental = context.createOscillator()
     const harmonic = context.createOscillator()
     const harmonicGain = context.createGain()
@@ -237,14 +261,15 @@ export class PianoAudioEngine {
     harmonic.type = 'sine'
     harmonic.frequency.value = note.frequency * 2
     harmonicGain.gain.value = 0.16
-    fundamental.connect(gain)
+    fundamental.connect(voiceGain.gain)
     harmonic.connect(harmonicGain)
-    harmonicGain.connect(gain)
+    harmonicGain.connect(voiceGain.gain)
 
     const voice: FallbackVoice = {
       id,
       kind: 'fallback',
-      gain,
+      gain: voiceGain.gain,
+      envelope: voiceGain.envelope,
       oscillators: [fundamental, harmonic],
       stopped: false,
       releasePending: false,
@@ -252,7 +277,7 @@ export class PianoAudioEngine {
     this.voices.set(id, voice)
     for (const oscillator of voice.oscillators) oscillator.start(context.currentTime)
     // 読込中だけの代替音も、長押し時に鳴り続けすぎないよう従来どおり短く減衰させる。
-    gain.gain.exponentialRampToValueAtTime(0.1, context.currentTime + 0.34)
+    voiceGain.gain.gain.exponentialRampToValueAtTime(FALLBACK_DECAY_END_GAIN, context.currentTime + FALLBACK_DECAY_SECONDS)
     return { id }
   }
 
@@ -272,6 +297,23 @@ export class PianoAudioEngine {
       : this.startFallbackVoice(context, note)
   }
 
+  private gainAtRelease(voice: PianoVoice, time: number): number {
+    const { startedAt, targetGain } = voice.envelope
+    const attackEnd = startedAt + ATTACK_SECONDS
+    if (time <= startedAt) return ATTACK_START_GAIN
+    if (time < attackEnd) {
+      const progress = (time - startedAt) / ATTACK_SECONDS
+      return ATTACK_START_GAIN * (targetGain / ATTACK_START_GAIN) ** progress
+    }
+    if (voice.kind === 'fallback') {
+      const decayEnd = startedAt + FALLBACK_DECAY_SECONDS
+      if (time >= decayEnd) return FALLBACK_DECAY_END_GAIN
+      const progress = (time - attackEnd) / (decayEnd - attackEnd)
+      return targetGain * (FALLBACK_DECAY_END_GAIN / targetGain) ** progress
+    }
+    return targetGain
+  }
+
   private releaseVoice(voice: PianoVoice, releaseSeconds: number): void {
     const context = this.context
     if (!context || voice.stopped) return
@@ -279,7 +321,7 @@ export class PianoAudioEngine {
     this.voices.delete(voice.id)
 
     const now = context.currentTime
-    const release = Math.max(0.04, releaseSeconds)
+    const release = Math.max(MINIMUM_RELEASE_SECONDS, releaseSeconds)
     const gainParam = voice.gain.gain as AudioParam & {
       cancelAndHoldAtTime?: (cancelTime: number) => AudioParam
     }
@@ -287,15 +329,17 @@ export class PianoAudioEngine {
       gainParam.cancelAndHoldAtTime(now)
     } else {
       gainParam.cancelScheduledValues(now)
-      gainParam.setValueAtTime(Math.max(gainParam.value, 0.0001), now)
+      // AudioParam.value は予約済みのramp途中値を返さないブラウザがあるため、
+      // 短押しでも実際の包絡線位置を保持して段差を作らない。
+      gainParam.setValueAtTime(Math.max(this.gainAtRelease(voice, now), ATTACK_START_GAIN), now)
     }
-    gainParam.exponentialRampToValueAtTime(0.0001, now + release)
+    gainParam.exponentialRampToValueAtTime(ATTACK_START_GAIN, now + release)
 
-    if (voice.kind === 'sample') stopNode(voice.source, now + release + 0.025)
-    else for (const oscillator of voice.oscillators) stopNode(oscillator, now + release + 0.025)
+    if (voice.kind === 'sample') stopNode(voice.source, now + release + SOURCE_STOP_TAIL_SECONDS)
+    else for (const oscillator of voice.oscillators) stopNode(oscillator, now + release + SOURCE_STOP_TAIL_SECONDS)
   }
 
-  stopNote(handle: PianoVoiceHandle, releaseSeconds = 0.2): void {
+  stopNote(handle: PianoVoiceHandle, releaseSeconds = MANUAL_KEY_RELEASE_SECONDS): void {
     const voice = this.voices.get(handle.id)
     const context = this.context
     if (!voice || !context || voice.stopped || voice.releasePending) return
@@ -322,7 +366,8 @@ export class PianoAudioEngine {
     if (!handle) return null
     const timer = setTimeout(() => {
       this.durationTimers.delete(timer)
-      this.stopNote(handle)
+      // 自動演奏の音価・フレーズ間隔は従来のrelease長を保つ。
+      this.stopNote(handle, AUTOMATIC_NOTE_RELEASE_SECONDS)
     }, Math.max(40, durationMs))
     this.durationTimers.add(timer)
     return handle
