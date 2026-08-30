@@ -85,6 +85,13 @@ describe('PianoPlay', () => {
     expect(screen.getByRole('button', { name: 'C シャープ4' })).toBeInTheDocument()
   })
 
+  test('曲選択にはPhase 3の全10曲を表示する', () => {
+    renderPiano()
+
+    expect(screen.getAllByRole('option')).toHaveLength(PIANO_SONGS.length)
+    expect(screen.getByRole('option', { name: 'ハッピーバースデー' })).toBeInTheDocument()
+  })
+
   test('C5も既存の鍵盤と同じ経路で発音・ハイライトできる', () => {
     renderPiano()
     const c5 = screen.getByRole('button', { name: 'ド C5' })
