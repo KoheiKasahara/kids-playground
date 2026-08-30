@@ -34,10 +34,10 @@ function occupiedBounds(definition: PartDefinition) {
 }
 
 describe('partTypes', () => {
-  test('置き場には残ったパーツとキャノン・Spinnerの基本向きを出す', () => {
+  test('置き場には残ったパーツ、ジャンプ台、キャノン・Spinnerの基本向きを出す', () => {
     expect(TRAY_PART_DEFINITIONS.map((definition) => definition.id)).toEqual([
       'slopeLeft', 'slopeRight', 'curveLeft', 'curveRight',
-      'bumper', 'guideLeft', 'guideRight', 'cannon', 'spinner',
+      'bumper', 'guideLeft', 'guideRight', 'jumpRampRight', 'cannon', 'spinner',
     ])
   })
 
@@ -105,6 +105,17 @@ describe('partTypes', () => {
     }
     expect(nextRotationType(current)).toBe('cannon')
     expect(isRotatablePart('spinner')).toBe(false)
+  })
+
+  test('ジャンプ台は左右の向きを回転で切り替え、右向きは右上がりの斜面になる', () => {
+    const right = partDefinition('jumpRampRight')
+    const left = partDefinition('jumpRampLeft')
+    expect(right.inTray).toBe(true)
+    expect(left.inTray).toBe(false)
+    expect(right.segments[0].angleDeg).toBeLessThan(0)
+    expect(left.segments[0].angleDeg).toBeGreaterThan(0)
+    expect(nextRotationType('jumpRampRight')).toBe('jumpRampLeft')
+    expect(nextRotationType('jumpRampLeft')).toBe('jumpRampRight')
   })
 
   test('未知のパーツ種類は例外にする（データ不整合に早く気付くため）', () => {

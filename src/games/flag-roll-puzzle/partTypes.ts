@@ -15,6 +15,9 @@ export type PartTypeId =
   | 'bumper'
   | 'guideLeft'
   | 'guideRight'
+  /** 右向きが基本向き。反転した向きは盤面上の回転専用ID。 */
+  | 'jumpRampRight'
+  | 'jumpRampLeft'
   /** 右向きが基本向き。残りの7方向は盤面上の回転専用ID。 */
   | 'cannon'
   | 'cannonDownRight'
@@ -41,7 +44,7 @@ export type PartSegment = {
 }
 
 /** 木の板以外も、役割を文字に頼らず見分けられるようにするための見た目の種類。 */
-export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide' | 'cannon' | 'spinner'
+export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide' | 'jumpRamp' | 'cannon' | 'spinner'
 
 export type PartDefinition = {
   readonly id: PartTypeId
@@ -65,6 +68,9 @@ const SINGLE_CELL: readonly GridCell[] = [{ col: 0, row: 0 }]
 const RAIL_THICKNESS = 12
 const SLOPE_ANGLE_DEG = 30
 const SLOPE_LENGTH = 62
+const JUMP_RAMP_ANGLE_DEG = 24
+const JUMP_RAMP_LENGTH = 54
+const JUMP_RAMP_THICKNESS = 14
 
 /** 一つの曲線を3枚の短い板で近似する。完全な円弧より、滑らかに向きが変わることを優先する。 */
 const CURVE_LEFT_SEGMENTS: readonly PartSegment[] = [
@@ -233,6 +239,19 @@ export const PART_DEFINITIONS: readonly PartDefinition[] = [
     cells: SINGLE_CELL, restitution: 0.3, friction: 0.02,
   },
 
+  {
+    // 右へ走る球を上へ導く短い斜面。実際のジャンプ補正は usePuzzleEngine 側で
+    // 進入方向を確認してからだけ加えるため、逆走時に不自然な発射はしない。
+    id: 'jumpRampRight', label: 'ジャンプ台', inTray: true, appearance: 'jumpRamp', cells: SINGLE_CELL,
+    segments: [{ offsetX: 0, offsetY: 0, width: JUMP_RAMP_LENGTH, height: JUMP_RAMP_THICKNESS, angleDeg: -JUMP_RAMP_ANGLE_DEG }],
+    restitution: 0.25, friction: 0.015,
+  },
+  {
+    id: 'jumpRampLeft', label: 'ジャンプ台', inTray: false, appearance: 'jumpRamp', cells: SINGLE_CELL,
+    segments: [{ offsetX: 0, offsetY: 0, width: JUMP_RAMP_LENGTH, height: JUMP_RAMP_THICKNESS, angleDeg: JUMP_RAMP_ANGLE_DEG }],
+    restitution: 0.25, friction: 0.015,
+  },
+
   cannonDefinition('cannon', 0, true),
   cannonDefinition('cannonDownRight', 45),
   cannonDefinition('cannonDown', 90),
@@ -266,6 +285,7 @@ const NEXT_ROTATION_TYPE: Readonly<Partial<Record<PartTypeId, PartTypeId>>> = {
   curveLeft: 'curveLeft90', curveLeft90: 'curveLeft180', curveLeft180: 'curveLeft270', curveLeft270: 'curveLeft',
   curveRight: 'curveRight90', curveRight90: 'curveRight180', curveRight180: 'curveRight270', curveRight270: 'curveRight',
   guideLeft: 'guideRight', guideRight: 'guideLeft',
+  jumpRampRight: 'jumpRampLeft', jumpRampLeft: 'jumpRampRight',
   cannon: 'cannonDownRight',
   cannonDownRight: 'cannonDown',
   cannonDown: 'cannonDownLeft',
@@ -290,4 +310,8 @@ export function isCannonPart(id: PartTypeId): id is (typeof CANNON_TYPE_IDS)[num
 
 export function isSpinnerPart(id: PartTypeId): id is 'spinner' {
   return id === 'spinner'
+}
+
+export function isJumpRampPart(id: string): id is 'jumpRampRight' | 'jumpRampLeft' {
+  return id === 'jumpRampRight' || id === 'jumpRampLeft'
 }

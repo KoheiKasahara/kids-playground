@@ -22,6 +22,7 @@ describe('puzzleStages', () => {
     expect(normal.availablePartTypeIds).not.toContain('bumper')
     expect(easy.availablePartTypeIds).toContain('bumper')
     for (const stage of [easy, normal, hard]) {
+      expect(stage.availablePartTypeIds).toContain('jumpRampRight')
       expect(stage.availablePartTypeIds).toContain('cannon')
       expect(stage.availablePartTypeIds).toContain('spinner')
     }

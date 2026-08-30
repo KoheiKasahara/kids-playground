@@ -16,10 +16,12 @@ import { createStopObservation, observeBallStop } from './ballStopDetection'
 import { isInGoalArea } from './goal'
 import {
   isCannonPart,
+  isJumpRampPart,
   isSpinnerPart,
   partDefinition,
 } from './partTypes'
 import { bumperBoostVelocity } from './bumperPhysics'
+import { JUMP_RAMP_HIT_COOLDOWN_MS, jumpRampVelocity } from './jumpRampPhysics'
 import {
   advanceCannonCapture,
   beginCannonCapture,
@@ -120,7 +122,7 @@ function wallBodies(goalArea: GoalArea): Matter.Body[] {
   ]
 }
 
-function partBodies(part: PlacedPart): Matter.Body[] {
+export function createPuzzlePartBodies(part: PlacedPart): Matter.Body[] {
   // Cannonの見た目は専用センサーだけ、Spinnerの見た目と当たり判定は専用Coreだけを使う。
   // どちらも通常の板Bodyを作らないため、入口を塞いだりCSSだけが回ったりしない。
   if (isCannonPart(part.typeId) || isSpinnerPart(part.typeId)) return []
@@ -132,7 +134,11 @@ function partBodies(part: PlacedPart): Matter.Body[] {
       angle: segment.angleDeg * DEG_TO_RAD,
       restitution: definition.restitution,
       friction: definition.friction,
-      label: segment.kind === 'circle' ? `bumper:${part.id}:${index}` : `${part.id}-${index}`,
+      label: segment.kind === 'circle'
+        ? `bumper:${part.id}:${index}`
+        : isJumpRampPart(part.typeId)
+          ? `jump-ramp:${part.typeId}:${part.id}:${index}`
+          : `${part.id}-${index}`,
     }
     if (segment.kind === 'circle') {
       return Bodies.circle(center.x + segment.offsetX, center.y + segment.offsetY, segment.width / 2, options)
@@ -311,13 +317,14 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     const runtimeBallById = new Map(runtimeBalls.map((runtime) => [runtime.id, runtime]))
     Composite.add(engine.world, [
       ...wallBodies(goalArea),
-      ...current.parts.flatMap(partBodies),
+      ...current.parts.flatMap(createPuzzlePartBodies),
       ...cannonRuntimes.map((runtime) => runtime.sensor),
       ...spinnerRuntimes.map((runtime) => runtime.core.body),
       ...runtimeBalls.map(({ body }) => body),
     ])
 
     const lastBumperHitAt = new Map<string, number>()
+    const lastJumpRampHitAt = new Map<string, number>()
     const cannonStates = new Map<string, CannonCaptureState>()
     const cannonCaptureRecords = new Map<string, { readonly ballId: string; readonly cannonId: string }>()
     const capturedCannonByBall = new Map<string, string>()
@@ -350,6 +357,26 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
           if (now - (lastBumperHitAt.get(cooldownKey) ?? -Infinity) >= BUMPER_HIT_COOLDOWN_MS) {
             lastBumperHitAt.set(cooldownKey, now)
             Body.setVelocity(hitBall, bumperBoostVelocity(hitBall.position, bumper.position, hitBall.velocity))
+          }
+        }
+
+        const jumpRamp = pair.bodyA.label.startsWith('jump-ramp:')
+          ? pair.bodyA
+          : pair.bodyB.label.startsWith('jump-ramp:')
+            ? pair.bodyB
+            : null
+        if (jumpRamp && hitBall) {
+          const typeId = jumpRamp.label.split(':')[1]
+          const cooldownKey = `${jumpRamp.id}:${hitBall.id}`
+          if (
+            isJumpRampPart(typeId)
+            && simulationTime - (lastJumpRampHitAt.get(cooldownKey) ?? -Infinity) >= JUMP_RAMP_HIT_COOLDOWN_MS
+          ) {
+            const nextVelocity = jumpRampVelocity(typeId, hitBall.velocity)
+            if (nextVelocity) {
+              lastJumpRampHitAt.set(cooldownKey, simulationTime)
+              Body.setVelocity(hitBall, nextVelocity)
+            }
           }
         }
 
