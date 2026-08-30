@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import PianoKeyboard from './PianoKeyboard'
 import { PianoAudioEngine, type PianoVoiceHandle } from './pianoAudio'
 import type { PianoNote } from './notes'
+import { PIANO_SONGS, findPianoSong } from './pianoSongs'
+import { PianoSongPlayer } from './pianoSongPlayer'
 import styles from './PianoPlay.module.css'
 
 type ActivePointer = { noteId: string; voice: PianoVoiceHandle | null }
+type PlaybackState = 'idle' | 'playing' | 'stopped' | 'finished'
 
 const MOBILE_PORTRAIT_QUERY = '(max-width: 767px) and (pointer: coarse) and (orientation: portrait)'
 
@@ -21,16 +24,50 @@ export default function PianoPlay() {
   const activePointers = useRef(new Map<number, ActivePointer>())
   const feedbackTimers = useRef(new Set<ReturnType<typeof setTimeout>>())
   const keyboardFeedbackCounts = useRef(new Map<string, number>())
+  const automaticFeedbackCounts = useRef(new Map<string, number>())
+  const songPlayerRef = useRef<PianoSongPlayer | null>(null)
   const [activeNoteIds, setActiveNoteIds] = useState<ReadonlySet<string>>(new Set())
   const [portraitMobile, setPortraitMobile] = useState(isMobilePortrait)
+  const [selectedSongId, setSelectedSongId] = useState(PIANO_SONGS[0].id)
+  const [playbackState, setPlaybackState] = useState<PlaybackState>('idle')
 
-  const syncActiveNotes = () => {
+  const syncActiveNotes = useCallback(() => {
     const next = new Set(Array.from(activePointers.current.values(), (active) => active.noteId))
     for (const [noteId, count] of keyboardFeedbackCounts.current) {
       if (count > 0) next.add(noteId)
     }
+    for (const [noteId, count] of automaticFeedbackCounts.current) {
+      if (count > 0) next.add(noteId)
+    }
     setActiveNoteIds(next)
-  }
+  }, [])
+
+  useEffect(() => {
+    const engine = engineRef.current
+    if (!engine) return undefined
+    const player = new PianoSongPlayer(engine, {
+      onNoteStart: (noteId) => {
+        automaticFeedbackCounts.current.set(noteId, (automaticFeedbackCounts.current.get(noteId) ?? 0) + 1)
+        syncActiveNotes()
+      },
+      onNoteEnd: (noteId) => {
+        const remaining = (automaticFeedbackCounts.current.get(noteId) ?? 1) - 1
+        if (remaining > 0) automaticFeedbackCounts.current.set(noteId, remaining)
+        else automaticFeedbackCounts.current.delete(noteId)
+        syncActiveNotes()
+      },
+      onClearHighlights: () => {
+        automaticFeedbackCounts.current.clear()
+        syncActiveNotes()
+      },
+      onComplete: () => setPlaybackState('finished'),
+    })
+    songPlayerRef.current = player
+    return () => {
+      player.dispose()
+      if (songPlayerRef.current === player) songPlayerRef.current = null
+    }
+  }, [syncActiveNotes])
 
   const endPointer = useCallback((pointerId: number) => {
     const active = activePointers.current.get(pointerId)
@@ -38,7 +75,7 @@ export default function PianoPlay() {
     if (active.voice) engineRef.current?.stopNote(active.voice)
     activePointers.current.delete(pointerId)
     syncActiveNotes()
-  }, [])
+  }, [syncActiveNotes])
 
   const startPointer = (note: PianoNote, pointerId: number) => {
     endPointer(pointerId)
@@ -64,6 +101,8 @@ export default function PianoPlay() {
   }
 
   const clearActiveState = useCallback(() => {
+    songPlayerRef.current?.stop()
+    setPlaybackState('stopped')
     for (const active of activePointers.current.values()) {
       if (active.voice) engineRef.current?.stopNote(active.voice)
     }
@@ -71,19 +110,40 @@ export default function PianoPlay() {
     for (const timer of feedbackTimers.current) clearTimeout(timer)
     feedbackTimers.current.clear()
     keyboardFeedbackCounts.current.clear()
+    automaticFeedbackCounts.current.clear()
     setActiveNoteIds(new Set())
   }, [])
+
+  const startSelectedSong = () => {
+    const song = findPianoSong(selectedSongId)
+    if (!song) return
+    songPlayerRef.current?.play(song)
+    setPlaybackState('playing')
+  }
+
+  const stopSong = () => {
+    songPlayerRef.current?.stop()
+    setPlaybackState('stopped')
+  }
+
+  const selectSong = (songId: string) => {
+    songPlayerRef.current?.stop()
+    setSelectedSongId(songId)
+    setPlaybackState('stopped')
+  }
 
   useEffect(() => {
     const engine = engineRef.current
     const pointers = activePointers.current
     const timers = feedbackTimers.current
     const feedbackCounts = keyboardFeedbackCounts.current
+    const autoFeedbackCounts = automaticFeedbackCounts.current
     return () => {
       for (const timer of timers) clearTimeout(timer)
       timers.clear()
       pointers.clear()
       feedbackCounts.clear()
+      autoFeedbackCounts.clear()
       engine?.dispose()
     }
   }, [])
@@ -128,6 +188,29 @@ export default function PianoPlay() {
               <span aria-hidden="true">🎹</span> ピアノであそぼう
             </h1>
             <p className={styles.instruction}>けんばんを おしてみよう！</p>
+            <section className={styles.songControls} aria-label="きょくをえらんで じどうえんそう">
+              <label className={styles.songPicker}>
+                <span>きょくを えらぶ</span>
+                <select value={selectedSongId} onChange={(event) => selectSong(event.target.value)}>
+                  {PIANO_SONGS.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
+                </select>
+              </label>
+              <p className={styles.selectedSong}>いまのきょく：{findPianoSong(selectedSongId)?.title}</p>
+              <div className={styles.playButtons}>
+                <button type="button" className={styles.playButton} onClick={startSelectedSong}>▶ さいせい</button>
+                <button
+                  type="button"
+                  className={styles.stopButton}
+                  onClick={stopSong}
+                  disabled={playbackState !== 'playing'}
+                >
+                  ■ とめる
+                </button>
+              </div>
+              <p className={styles.playbackStatus} role="status">
+                {playbackState === 'playing' ? 'えんそうちゅう' : playbackState === 'finished' ? 'おわり' : 'じゅんびOK'}
+              </p>
+            </section>
           </header>
 
           <section className={styles.pianoArea} aria-label="自由演奏">

@@ -105,6 +105,14 @@ export class PianoAudioEngine {
     return context
   }
 
+  /**
+   * 再生ボタンの同期したユーザー操作中に呼び、後続の曲タイマーからのplayNoteでも
+   * iOS Safari / PWA のAudioContext制約に引っかかりにくくする。
+   */
+  activate(): void {
+    this.ensureContextForPlayback()
+  }
+
   private async loadSamples(context: AudioContext, abortController: AbortController): Promise<void> {
     try {
       const decodedSamples = await Promise.all(PIANO_SAMPLE_DEFINITIONS.map(async (sample) => {
