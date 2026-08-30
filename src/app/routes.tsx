@@ -146,6 +146,7 @@ export const routes: RouteObject[] = [
   { path: '/games/japan-travel-quiz', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizStart')) },
   { path: '/games/japan-travel-quiz/play', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizPlay')) },
   { path: '/games/japan-travel-quiz/result', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizResult')) },
+  { path: '/games/piano-play', element: lazyRoute(() => import('../games/piano-play/PianoPlay')) },
   ...MATH_QUIZ_MODES.flatMap((mode) => [
     {
       path: `/games/math-quiz/${MATH_QUIZ_MODE_PATH[mode]}`,
