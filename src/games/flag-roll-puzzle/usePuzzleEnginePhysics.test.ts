@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createCannonSensorBody, createPuzzleSpinnerBody } from './usePuzzleEngine'
+import { createCannonSensorBody, createPuzzlePartBodies, createPuzzleSpinnerBody } from './usePuzzleEngine'
 
 describe('flag-roll-puzzle の特殊パーツBody', () => {
   it('キャノンは置かれたidをラベルへ含む円形センサーだけを作る', () => {
@@ -24,5 +24,16 @@ describe('flag-roll-puzzle の特殊パーツBody', () => {
     expect(spinner.isSensor).toBe(false)
     expect(spinner.parts).toHaveLength(3)
   })
-})
 
+  it('ジャンプ台は配置したIDと向きを持つ静的な傾斜Bodyを作る', () => {
+    const bodies = createPuzzlePartBodies({
+      id: 'part-ramp',
+      typeId: 'jumpRampRight',
+      cell: { col: 2, row: 3 },
+    })
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0].isStatic).toBe(true)
+    expect(bodies[0].label).toBe('jump-ramp:jumpRampRight:part-ramp:0')
+    expect(bodies[0].angle).toBeLessThan(0)
+  })
+})
