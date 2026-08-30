@@ -102,6 +102,17 @@ describe('PianoPlay', () => {
     expect(screen.getByRole('button', { name: 'ピアノ' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  test('ヘッダーと操作欄は必要な情報だけを表示する', () => {
+    renderPiano()
+
+    expect(screen.getByRole('button', { name: /もどる/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /ピアノであそぼう/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /さいせい/ })).toBeInTheDocument()
+    expect(screen.queryByText('けんばんを おしてみよう！')).not.toBeInTheDocument()
+    expect(screen.queryByText(/いまのきょく：/)).not.toBeInTheDocument()
+    expect(screen.queryByText('じゅんびOK')).not.toBeInTheDocument()
+  })
+
   test('C5も既存の鍵盤と同じ経路で発音・ハイライトできる', () => {
     renderPiano()
     const c5 = screen.getByRole('button', { name: 'ド C5' })
@@ -209,7 +220,7 @@ describe('PianoPlay', () => {
 
     fireEvent.pointerUp(c4, { pointerId: 21 })
     expect(c4).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('status')).toHaveTextContent('じゅんびOK')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   test('自動演奏中の楽器切替で演奏を停止せず、次の音符へ適用する', () => {
@@ -236,7 +247,8 @@ describe('PianoPlay', () => {
 
     fireEvent.change(screen.getByLabelText('きょくを えらぶ'), { target: { value: 'mary-had-a-little-lamb' } })
     expect(c4).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByText('いまのきょく：メリーさんのひつじ')).toBeInTheDocument()
+    expect(screen.getByLabelText('きょくを えらぶ')).toHaveValue('mary-had-a-little-lamb')
+    expect(screen.queryByText(/いまのきょく：/)).not.toBeInTheDocument()
     act(() => vi.advanceTimersByTime(60_000))
     expect(contexts[0].createOscillator).toHaveBeenCalledTimes(oscillatorCallsBeforeChange)
   })
@@ -249,7 +261,7 @@ describe('PianoPlay', () => {
     fireEvent.click(play)
     act(() => vi.advanceTimersByTime(PIANO_SONGS[0].totalDurationMs + 2))
     expect(screen.getByRole('status')).toHaveTextContent('おわり')
-    expect(screen.getByRole('button', { name: /とめる/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /さいせい/ })).toBeInTheDocument()
 
     fireEvent.click(play)
     act(() => vi.advanceTimersByTime(0))
