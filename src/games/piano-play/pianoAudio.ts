@@ -9,6 +9,7 @@ type SampleVoice = {
   gain: GainNode
   source: AudioBufferSourceNode
   stopped: boolean
+  releasePending: boolean
 }
 
 type FallbackVoice = {
@@ -17,6 +18,7 @@ type FallbackVoice = {
   gain: GainNode
   oscillators: OscillatorNode[]
   stopped: boolean
+  releasePending: boolean
 }
 
 type PianoVoice = SampleVoice | FallbackVoice
@@ -49,6 +51,8 @@ export class PianoAudioEngine {
   private sampleLoadState: SampleLoadState = 'idle'
   private sampleLoadPromise?: Promise<void>
   private sampleAbortController?: AbortController
+  /** iOSの最初のユーザー操作で、resume完了まで短い離鍵を保持するためのPromise。 */
+  private resumePromise?: Promise<void>
   private nextVoiceId = 1
   private readonly voices = new Map<number, PianoVoice>()
   private readonly durationTimers = new Set<ReturnType<typeof setTimeout>>()
@@ -98,9 +102,13 @@ export class PianoAudioEngine {
     const context = this.getOrCreateContext()
     if (!context) return undefined
 
-    if (context.state === 'suspended') {
+    if (context.state !== 'running' && !this.resumePromise) {
       // startNoteはpointerdown/clickの同期処理から呼ばれるため、iOS Safariの解除条件を満たす。
-      void context.resume().catch(() => {})
+      const resumePromise = context.resume().catch(() => {})
+      this.resumePromise = resumePromise
+      void resumePromise.finally(() => {
+        if (this.resumePromise === resumePromise) this.resumePromise = undefined
+      })
     }
     return context
   }
@@ -154,7 +162,7 @@ export class PianoAudioEngine {
     source.buffer = buffer
     source.connect(gain)
 
-    const voice: SampleVoice = { id, kind: 'sample', gain, source, stopped: false }
+    const voice: SampleVoice = { id, kind: 'sample', gain, source, stopped: false, releasePending: false }
     this.voices.set(id, voice)
     source.onended = () => {
       if (this.voices.get(id) === voice) this.voices.delete(id)
@@ -185,7 +193,14 @@ export class PianoAudioEngine {
     harmonic.connect(harmonicGain)
     harmonicGain.connect(gain)
 
-    const voice: FallbackVoice = { id, kind: 'fallback', gain, oscillators: [fundamental, harmonic], stopped: false }
+    const voice: FallbackVoice = {
+      id,
+      kind: 'fallback',
+      gain,
+      oscillators: [fundamental, harmonic],
+      stopped: false,
+      releasePending: false,
+    }
     this.voices.set(id, voice)
     for (const oscillator of voice.oscillators) oscillator.start(context.currentTime)
     // 読込中だけの代替音も、長押し時に鳴り続けすぎないよう従来どおり短く減衰させる。
@@ -203,12 +218,11 @@ export class PianoAudioEngine {
     return sample ? this.startSampleVoice(context, note, sample) : this.startFallbackVoice(context, note)
   }
 
-  stopNote(handle: PianoVoiceHandle, releaseSeconds = 0.2): void {
-    const voice = this.voices.get(handle.id)
+  private releaseVoice(voice: PianoVoice, releaseSeconds: number): void {
     const context = this.context
-    if (!voice || !context || voice.stopped) return
+    if (!context || voice.stopped) return
     voice.stopped = true
-    this.voices.delete(handle.id)
+    this.voices.delete(voice.id)
 
     const now = context.currentTime
     const release = Math.max(0.04, releaseSeconds)
@@ -225,6 +239,27 @@ export class PianoAudioEngine {
 
     if (voice.kind === 'sample') stopNode(voice.source, now + release + 0.025)
     else for (const oscillator of voice.oscillators) stopNode(oscillator, now + release + 0.025)
+  }
+
+  stopNote(handle: PianoVoiceHandle, releaseSeconds = 0.2): void {
+    const voice = this.voices.get(handle.id)
+    const context = this.context
+    if (!voice || !context || voice.stopped || voice.releasePending) return
+
+    // 初回タップではSafariのresumeがpointerupより遅いことがある。この時点で止めると
+    // 音が一度も鳴らず「長押しだけ鳴る」状態になるため、resume直後に短い余韻を残す。
+    if (context.state !== 'running' && this.resumePromise) {
+      voice.releasePending = true
+      const minimumTapRelease = Math.max(releaseSeconds, 0.16)
+      void this.resumePromise.then(() => {
+        if (!this.disposed && this.voices.get(handle.id) === voice) {
+          this.releaseVoice(voice, minimumTapRelease)
+        }
+      })
+      return
+    }
+
+    this.releaseVoice(voice, releaseSeconds)
   }
 
   /** Phase 2の曲再生からも利用できる、長さ指定付きの発音口。 */
