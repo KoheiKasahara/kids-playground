@@ -38,7 +38,10 @@ class MockAudioContext {
   currentTime = 1
   state: AudioContextState = 'suspended'
   destination = new MockNode()
-  resume = vi.fn().mockResolvedValue(undefined)
+  resume = vi.fn(() => {
+    this.state = 'running'
+    return Promise.resolve()
+  })
   close = vi.fn().mockResolvedValue(undefined)
   createGain = vi.fn(() => new MockGain())
   createOscillator = vi.fn(() => new MockOscillator())
@@ -105,6 +108,25 @@ describe('PianoAudioEngine', () => {
 
     vi.advanceTimersByTime(180)
     expect(sources[2].stop).toHaveBeenCalledTimes(1)
+  })
+
+  test('初回resumeより短いタップでも、resume後に短い自然な発音を残す', async () => {
+    const engine = new PianoAudioEngine()
+    await engine.prepare()
+    let finishResume: (() => void) | undefined
+    contexts[0].state = 'suspended'
+    contexts[0].resume.mockImplementation(() => new Promise<void>((resolve) => {
+      finishResume = resolve
+    }))
+
+    const handle = engine.startNote(PIANO_NOTES[0])
+    const source = contexts[0].createBufferSource.mock.results[0].value
+    engine.stopNote(handle!)
+
+    expect(source.stop).not.toHaveBeenCalled()
+    finishResume?.()
+    await vi.waitFor(() => expect(source.stop).toHaveBeenCalledTimes(1))
+    expect(source.stop.mock.calls[0][0]).toBeGreaterThan(contexts[0].currentTime)
   })
 
   test('自然終了済みのsample voiceは他voiceを止めずに管理から外れる', async () => {

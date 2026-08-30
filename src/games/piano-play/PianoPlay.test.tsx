@@ -30,7 +30,10 @@ class MockAudioContext {
   currentTime = 1
   state: AudioContextState = 'suspended'
   destination = new MockNode()
-  resume = vi.fn().mockResolvedValue(undefined)
+  resume = vi.fn(() => {
+    this.state = 'running'
+    return Promise.resolve()
+  })
   close = vi.fn().mockResolvedValue(undefined)
   createGain = vi.fn(() => new MockGain())
   createOscillator = vi.fn(() => new MockOscillator())
