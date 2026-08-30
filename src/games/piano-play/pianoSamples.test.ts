@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import { PIANO_NOTES } from './notes'
-import { PIANO_SAMPLE_DEFINITIONS, findPianoSample } from './pianoSamples'
+import {
+  INSTRUMENT_SPECS,
+  PIANO_SAMPLE_DEFINITIONS,
+  findPianoSample,
+  resolveInstrumentSample,
+} from './pianoSamples'
 
 describe('piano sample mapping', () => {
   test('C4〜C5の13鍵すべてを個別の同音程サンプルへ対応付ける', () => {
@@ -22,5 +27,22 @@ describe('piano sample mapping', () => {
       'Piano.mf.Ab4.aiff',
       'Piano.mf.Bb4.aiff',
     ])
+  })
+
+  test('4楽器は公式アンカーだけを定義し、全13鍵を最近傍移調で解決する', () => {
+    expect(INSTRUMENT_SPECS.map((spec) => spec.id)).toEqual(['piano', 'violin', 'trumpet', 'flute', 'xylophone'])
+    expect(INSTRUMENT_SPECS.map((spec) => spec.samples.length)).toEqual([13, 5, 4, 4, 3])
+    expect(INSTRUMENT_SPECS.map((spec) => spec.maxPitchShift)).toEqual([0, 2, 2, 2, 3])
+    for (const instrument of INSTRUMENT_SPECS) {
+      for (const note of PIANO_NOTES) {
+        const resolved = resolveInstrumentSample(instrument.id, note.id)
+        expect(resolved).toBeDefined()
+        expect(resolved?.playbackRate).toBeGreaterThan(0)
+        expect(resolved?.definition.url).toMatch(/\.mp3$/)
+        expect(Math.abs(resolved?.pitchShiftSemitones ?? Infinity)).toBeLessThanOrEqual(instrument.maxPitchShift)
+      }
+    }
+    expect(resolveInstrumentSample('violin', 'C#4')?.definition.noteId).toBe('C4')
+    expect(resolveInstrumentSample('xylophone', 'D#4')?.definition.noteId).toBe('C4')
   })
 })

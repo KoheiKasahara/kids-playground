@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import PianoPlay from './PianoPlay'
@@ -88,8 +88,18 @@ describe('PianoPlay', () => {
   test('曲選択にはPhase 3の全10曲を表示する', () => {
     renderPiano()
 
-    expect(screen.getAllByRole('option')).toHaveLength(PIANO_SONGS.length)
+    expect(within(screen.getByLabelText('きょくを えらぶ')).getAllByRole('option')).toHaveLength(PIANO_SONGS.length)
     expect(screen.getByRole('option', { name: 'ハッピーバースデー' })).toBeInTheDocument()
+  })
+
+  test('5種類の楽器を選べる', () => {
+    renderPiano()
+
+    const instrumentGroup = screen.getByRole('group', { name: 'おとを えらぶ' })
+    expect(within(instrumentGroup).getAllByRole('button')).toHaveLength(5)
+    expect(screen.getByRole('button', { name: 'バイオリン' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '木琴' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ピアノ' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('C5も既存の鍵盤と同じ経路で発音・ハイライトできる', () => {
@@ -187,6 +197,18 @@ describe('PianoPlay', () => {
     fireEvent.pointerUp(c4, { pointerId: 21 })
     expect(c4).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('status')).toHaveTextContent('じゅんびOK')
+  })
+
+  test('自動演奏中の楽器切替で演奏を停止せず、次の音符へ適用する', () => {
+    vi.useFakeTimers()
+    renderPiano()
+
+    fireEvent.click(screen.getByRole('button', { name: /さいせい/ }))
+    act(() => vi.advanceTimersByTime(0))
+    fireEvent.click(screen.getByRole('button', { name: 'ラッパ' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('えんそうちゅう')
+    expect(screen.getByRole('button', { name: 'ラッパ' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('曲切り替えで旧曲の予約とハイライトを確実に取り消す', () => {
