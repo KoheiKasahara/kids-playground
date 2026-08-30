@@ -19,7 +19,7 @@
 
 ## 加工内容
 
-元のAIFFは、自然減衰後に長い無音区間を含む。各音を個別に、末尾の連続無音（-55 dB以下が0.7秒続く部分）のみ除去して、44.1 kHzステレオ・128 kbps CBR MP3に変換した。音程変更、正規化、ベロシティ層の合成は行っていない。
+元のAIFFは、発音前と自然減衰後に長い無音区間を含む。各音を個別に、先頭の連続無音（-60 dB以下が5 ms続く部分）と、末尾の連続無音（-55 dB以下が0.7秒続く部分）を除去して、44.1 kHzステレオ・128 kbps CBR MP3に変換した。演奏のアタック成分・音程・正規化・ベロシティ層の合成は変更していない。
 
 変換後の13音のピークには約12.5 dBの差があったため、再生時に各音をピーク約-6 dBFSへ近づける補正を適用する。補正値は `pianoSamples.ts` に明記し、共通voice gainとmaster gainで単音と和音の出力を抑えている。
 
@@ -27,7 +27,7 @@
 
 ```sh
 ffmpeg -i Piano.mf.C4.aiff \
-  -af 'silenceremove=stop_periods=1:stop_duration=0.7:stop_threshold=-55dB' \
+  -af 'silenceremove=start_periods=1:start_duration=0.005:start_threshold=-60dB:stop_periods=1:stop_duration=0.7:stop_threshold=-55dB' \
   -ar 44100 -ac 2 -codec:a libmp3lame -b:a 128k C4.mp3
 ```
 
