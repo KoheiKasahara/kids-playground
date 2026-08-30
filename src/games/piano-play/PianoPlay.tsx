@@ -190,9 +190,14 @@ export default function PianoPlay() {
 
   return (
     <main className={styles.page}>
-      <button type="button" className={styles.home} onClick={() => navigate('/')}>
-        もどる
-      </button>
+      <header className={styles.header}>
+        <button type="button" className={styles.home} onClick={() => navigate('/')}>
+          ← もどる
+        </button>
+        <h1 className={styles.title}>
+          <span aria-hidden="true">🎹</span> ピアノであそぼう
+        </h1>
+      </header>
 
       {portraitMobile ? (
         <section className={styles.orientationGuide} aria-label="横向きであそぶ案内">
@@ -201,58 +206,50 @@ export default function PianoPlay() {
           <p>スマホを よこむきにすると<br />おおきな けんばんで あそべるよ</p>
         </section>
       ) : (
-        <>
-          <header className={styles.header}>
-            <h1 className={styles.title}>
-              <span aria-hidden="true">🎹</span> ピアノであそぼう
-            </h1>
-            <p className={styles.instruction}>けんばんを おしてみよう！</p>
-            <section className={styles.songControls} aria-label="きょくをえらんで じどうえんそう">
-              <div className={styles.instrumentPicker} role="group" aria-label="おとを えらぶ">
-                <span className={styles.instrumentLabel}>おとを えらぶ</span>
-                <div className={styles.instrumentButtons}>
-                  {INSTRUMENT_SPECS.map((instrument) => (
-                    <button
-                      key={instrument.id}
-                      type="button"
-                      className={`${styles.instrumentButton} ${selectedInstrument === instrument.id ? styles.instrumentButtonSelected : ''}`}
-                      aria-label={instrument.label}
-                      aria-pressed={selectedInstrument === instrument.id}
-                      onClick={() => selectInstrument(instrument.id)}
-                    >
-                      <span className={styles.instrumentIcon} aria-hidden="true">{instrument.icon}</span>
-                      <span>{instrument.label}</span>
-                    </button>
-                  ))}
-                </div>
+        <div className={styles.playLayout}>
+          <section className={styles.songControls} aria-label="きょくをえらんで じどうえんそう">
+            <div className={styles.instrumentPicker} role="group" aria-label="おとを えらぶ">
+              <span className={styles.instrumentLabel}>おとを えらぶ</span>
+              <div className={styles.instrumentButtons}>
+                {INSTRUMENT_SPECS.map((instrument) => (
+                  <button
+                    key={instrument.id}
+                    type="button"
+                    className={`${styles.instrumentButton} ${selectedInstrument === instrument.id ? styles.instrumentButtonSelected : ''}`}
+                    aria-label={instrument.label}
+                    aria-pressed={selectedInstrument === instrument.id}
+                    onClick={() => selectInstrument(instrument.id)}
+                  >
+                    <span className={styles.instrumentIcon} aria-hidden="true">{instrument.icon}</span>
+                    <span>{instrument.label}</span>
+                  </button>
+                ))}
               </div>
-              <label className={styles.songPicker}>
-                <span>きょくを えらぶ</span>
-                <select value={selectedSongId} onChange={(event) => selectSong(event.target.value)}>
-                  {PIANO_SONGS.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
-                </select>
-              </label>
-              <p className={styles.selectedSong}>いまのきょく：{findPianoSong(selectedSongId)?.title}</p>
+            </div>
+            <label className={styles.songPicker}>
+              <span>きょくを えらぶ</span>
+              <select value={selectedSongId} onChange={(event) => selectSong(event.target.value)}>
+                {PIANO_SONGS.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
+              </select>
+            </label>
+            {instrumentLoadState !== 'ready' && (
               <p className={styles.instrumentStatus} aria-live="polite">
                 {instrumentLoadState === 'loading' ? 'おとの じゅんびちゅう…' : instrumentLoadState === 'failed' ? 'おとを きりかえられないため、かんたんな おとで ならします' : ''}
               </p>
-              <div className={styles.playButtons}>
-                <button type="button" className={styles.playButton} onClick={startSelectedSong}>▶ さいせい</button>
-                <button
-                  type="button"
-                  className={styles.stopButton}
-                  onClick={stopSong}
-                  disabled={playbackState !== 'playing'}
-                >
-                  ■ とめる
-                </button>
-              </div>
+            )}
+            <button
+              type="button"
+              className={`${styles.playButton} ${playbackState === 'playing' ? styles.stopButton : ''}`}
+              onClick={playbackState === 'playing' ? stopSong : startSelectedSong}
+            >
+              {playbackState === 'playing' ? '■ とめる' : '▶ さいせい'}
+            </button>
+            {(playbackState === 'playing' || playbackState === 'finished') && (
               <p className={styles.playbackStatus} role="status">
-                {playbackState === 'playing' ? 'えんそうちゅう' : playbackState === 'finished' ? 'おわり' : 'じゅんびOK'}
+                {playbackState === 'playing' ? 'えんそうちゅう' : 'おわり'}
               </p>
-            </section>
-          </header>
-
+            )}
+          </section>
           <section className={styles.pianoArea} aria-label="自由演奏">
             <div className={styles.pianoCase}>
               <div className={styles.brandDots} aria-hidden="true">
@@ -268,7 +265,7 @@ export default function PianoPlay() {
               />
             </div>
           </section>
-        </>
+        </div>
       )}
     </main>
   )
