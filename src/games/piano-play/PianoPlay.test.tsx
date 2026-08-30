@@ -154,6 +154,19 @@ describe('PianoPlay', () => {
     expect(oscillators.every((oscillator) => oscillator.stop.mock.calls.length === 1)).toBe(true)
   })
 
+  test('pointercancelとlostpointercaptureが重なってもvoiceを二重停止しない', () => {
+    renderPiano()
+    const key = screen.getByRole('button', { name: 'ド C4' })
+    fireEvent.pointerDown(key, { pointerId: 18 })
+
+    fireEvent.pointerCancel(key, { pointerId: 18 })
+    fireEvent.lostPointerCapture(key, { pointerId: 18 })
+
+    const oscillators = contexts[0].createOscillator.mock.results.map((result) => result.value)
+    expect(oscillators.every((oscillator) => oscillator.stop.mock.calls.length === 1)).toBe(true)
+    expect(key).toHaveAttribute('aria-pressed', 'false')
+  })
+
   test('同一鍵盤の連打と複数pointerを独立voiceで鳴らす', () => {
     renderPiano()
     const c = screen.getByRole('button', { name: 'ド C4' })
