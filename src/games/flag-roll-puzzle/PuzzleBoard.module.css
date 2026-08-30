@@ -126,6 +126,12 @@
   animation: rotate-pop 230ms ease-out;
 }
 
+/* 物理側で直接一度だけ発火する踏み切り演出の基準点。 */
+.partSlot[data-jump-ramp='true'] {
+  transform-origin: center;
+  will-change: transform;
+}
+
 /* ゴール帯（盤面下部）。ゴール以外は床 */
 .goalBand {
   position: absolute;
