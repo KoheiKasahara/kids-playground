@@ -89,6 +89,12 @@ export default function PianoPlay() {
   }, [])
 
   useEffect(() => {
+    // 画面に入った時点で13音を先読みする。失敗時・読込中もstartNote側の短い合成音フォールバックで
+    // 無反応にはせず、ロード完了後は同じAPIから録音サンプルへ自動で切り替わる。
+    void engineRef.current?.prepare()
+  }, [])
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia?.(MOBILE_PORTRAIT_QUERY)
     if (!mediaQuery) return undefined
 
