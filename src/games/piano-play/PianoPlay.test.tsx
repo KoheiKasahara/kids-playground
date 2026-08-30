@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import PianoPlay from './PianoPlay'
+import { PIANO_SONGS } from './pianoSongs'
 
 class MockAudioParam {
   value = 0
@@ -67,6 +68,7 @@ describe('PianoPlay', () => {
   afterEach(() => {
     window.AudioContext = originalAudioContext
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: originalMatchMedia })
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -156,6 +158,75 @@ describe('PianoPlay', () => {
     fireEvent.pointerDown(key, { pointerId: 4 })
     fireEvent.click(key, { detail: 1 })
     expect(contexts[0].createOscillator).toHaveBeenCalledTimes(4)
+  })
+
+  test('自動演奏中も手動演奏を重ねられ、停止しても手動ハイライトを消さない', () => {
+    vi.useFakeTimers()
+    renderPiano()
+    const c4 = screen.getByRole('button', { name: 'ド C4' })
+
+    fireEvent.click(screen.getByRole('button', { name: /さいせい/ }))
+    act(() => vi.advanceTimersByTime(0))
+    expect(c4).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent('えんそうちゅう')
+
+    fireEvent.pointerDown(c4, { pointerId: 21 })
+    fireEvent.click(screen.getByRole('button', { name: /とめる/ }))
+    expect(c4).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.pointerUp(c4, { pointerId: 21 })
+    expect(c4).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('status')).toHaveTextContent('じゅんびOK')
+  })
+
+  test('曲切り替えで旧曲の予約とハイライトを確実に取り消す', () => {
+    vi.useFakeTimers()
+    renderPiano()
+    const c4 = screen.getByRole('button', { name: 'ド C4' })
+
+    fireEvent.click(screen.getByRole('button', { name: /さいせい/ }))
+    act(() => vi.advanceTimersByTime(0))
+    expect(c4).toHaveAttribute('aria-pressed', 'true')
+    const oscillatorCallsBeforeChange = contexts[0].createOscillator.mock.calls.length
+
+    fireEvent.change(screen.getByLabelText('きょくを えらぶ'), { target: { value: 'mary-had-a-little-lamb' } })
+    expect(c4).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('いまのきょく：メリーさんのひつじ')).toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(60_000))
+    expect(contexts[0].createOscillator).toHaveBeenCalledTimes(oscillatorCallsBeforeChange)
+  })
+
+  test('自然終了後に再生中表示を残さず、再生ボタンで最初から再開できる', () => {
+    vi.useFakeTimers()
+    renderPiano()
+    const play = screen.getByRole('button', { name: /さいせい/ })
+
+    fireEvent.click(play)
+    act(() => vi.advanceTimersByTime(PIANO_SONGS[0].totalDurationMs + 2))
+    expect(screen.getByRole('status')).toHaveTextContent('おわり')
+    expect(screen.getByRole('button', { name: /とめる/ })).toBeDisabled()
+
+    fireEvent.click(play)
+    act(() => vi.advanceTimersByTime(0))
+    expect(screen.getByRole('status')).toHaveTextContent('えんそうちゅう')
+  })
+
+  test('自動演奏中に縦画面へ切り替えると停止し、横へ戻っても旧曲を再開しない', () => {
+    vi.useFakeTimers()
+    renderPiano()
+
+    fireEvent.click(screen.getByRole('button', { name: /さいせい/ }))
+    act(() => vi.advanceTimersByTime(0))
+    const oscillatorCallsBeforeOrientationChange = contexts[0].createOscillator.mock.calls.length
+    portraitMobile = true
+    act(() => dispatchMediaChange?.())
+    expect(screen.getByRole('heading', { name: /よこにして/ })).toBeInTheDocument()
+
+    act(() => vi.advanceTimersByTime(60_000))
+    expect(contexts[0].createOscillator).toHaveBeenCalledTimes(oscillatorCallsBeforeOrientationChange)
+    portraitMobile = false
+    act(() => dispatchMediaChange?.())
+    expect(screen.getByRole('button', { name: 'ド C4' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('画面離脱で発音中voiceを止めAudioContextを閉じる', () => {
