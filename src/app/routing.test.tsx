@@ -44,6 +44,16 @@ describe('直接アクセス（URL直入力を想定）', () => {
     expect(screen.getByRole('heading', { name: 'いろまぜクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'はじめる' })).toBeInTheDocument()
   })
+
+  test('/games/piano-play を直接開くとピアノの自由演奏画面が出る', async () => {
+    render(
+      <MemoryRouter initialEntries={['/games/piano-play']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('heading', { name: 'ピアノであそぼう' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'ピアノのけんばん' })).toBeInTheDocument()
+  })
 })
 
 describe('不正URL', () => {

@@ -316,6 +316,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'piano-play',
+    slug: 'piano-play',
+    title: 'ピアノであそぼう',
+    emoji: '🎹',
+    seo: {
+      headline: 'ピアノであそぼう｜大きな鍵盤で自由演奏',
+      description:
+        '大きな白鍵と黒鍵をタップして、自由に音を鳴らせる幼児向けのピアノあそびです。得点や失敗はなく、スマホ・タブレット・パソコンですぐに演奏を楽しめます。',
+    },
+    category: 'learning',
+    intro: {
+      howToPlay: [
+        'しろい けんばんも くろい けんばんも おせるよ',
+        'いくつかの けんばんを いっしょに おしてみよう',
+      ],
+    },
+  },
+  {
     id: 'earth-globe',
     slug: 'earth-globe',
     title: 'ちきゅうぎ',

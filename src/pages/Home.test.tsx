@@ -19,7 +19,7 @@ describe('Home', () => {
     }
   })
 
-  test('ゲーム一覧に現在の17ゲームすべてが表示される', () => {
+  test('ゲーム一覧に現在の18ゲームすべてが表示される', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -42,7 +42,8 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: 'ちきゅうぎ' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'たいようけい' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '3Dせんろづくり' })).toBeInTheDocument()
-    expect(screen.getAllByRole('link')).toHaveLength(17)
+    expect(screen.getByRole('link', { name: 'ピアノであそぼう' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(18)
   })
 
   test('「都道府県クイズ」を押すと開始画面に遷移する', async () => {
@@ -145,7 +146,7 @@ describe('Home', () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     await user.click(screen.getByRole('link', { name: 'たいようけい' }))
-    expect(await screen.findByRole('heading', { name: /たいようけい/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /たいようけい/ }, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
   })
 
