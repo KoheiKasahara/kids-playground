@@ -133,6 +133,9 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('gridcell', { name: 'スタート、1ぎょう 1れつ' })).toBeInTheDocument()
     expect(screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })).toBeInTheDocument()
     expect(screen.queryByText('ひろさを えらんでね')).not.toBeInTheDocument()
+    expect(screen.queryByText('くるまを えらんでね')).not.toBeInTheDocument()
+    expect(screen.queryByText('パーツを えらんでね')).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'ふつう 4×4' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'スタートを おく' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'ゴールを おく' })).not.toBeInTheDocument()
@@ -180,6 +183,7 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('button', { name: 'けす' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'まわす' }))
     expect(screen.getByRole('gridcell', { name: 'スタート、1ぎょう 1れつ' })).toHaveStyle('--rotation: 3')
+    expect(screen.queryByText('スタート', { selector: '.selectionTools span' })).not.toBeInTheDocument()
 
     const goal = screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })
     await user.click(goal)
