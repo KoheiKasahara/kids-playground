@@ -8,6 +8,7 @@ import {
   canExpandBoard,
   createBoard,
   expandBoard,
+  INITIAL_BOARD_SIZE,
   movePart,
   placePartAt,
   removePart,
@@ -44,6 +45,7 @@ export default function CarRoadBuilderPlay() {
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null)
   const [selectedKind, setSelectedKind] = useState<PartKind | null>(null)
   const [dragKind, setDragKind] = useState<PartKind | null>(null)
+  const [isBoardExpanded, setIsBoardExpanded] = useState(false)
   const [phase, setPhase] = useState<PlayPhase>('ready')
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('パーツを えらんで、みちを つなごう')
@@ -52,9 +54,21 @@ export default function CarRoadBuilderPlay() {
   const suppressClick = useRef(false)
   const running = phase === 'running'
 
-  const route = useMemo<CarRoute>(() => buildRoute(board), [board])
-  const selectedCell = board.cells.find((cell) => cell.id === selectedCellId)
-  const canExpand = canExpandBoard(board)
+  const displayBoard = useMemo<Board>(() => {
+    if (isBoardExpanded || (board.size.rows <= INITIAL_BOARD_SIZE.rows && board.size.cols <= INITIAL_BOARD_SIZE.cols)) return board
+    const size = {
+      rows: Math.min(board.size.rows, INITIAL_BOARD_SIZE.rows),
+      cols: Math.min(board.size.cols, INITIAL_BOARD_SIZE.cols),
+    }
+    return {
+      size,
+      cells: board.cells.filter((cell) => cell.row < size.rows && cell.col < size.cols),
+    }
+  }, [board, isBoardExpanded])
+  const route = useMemo<CarRoute>(() => buildRoute(displayBoard), [displayBoard])
+  const selectedCell = displayBoard.cells.find((cell) => cell.id === selectedCellId)
+  const hasExpandedBoardData = board.size.rows > INITIAL_BOARD_SIZE.rows || board.size.cols > INITIAL_BOARD_SIZE.cols
+  const canToggleBoard = isBoardExpanded || hasExpandedBoardData || canExpandBoard(board)
 
   // Every successful edit returns the play surface to a clean, editable
   // state. Keeping this in one helper also removes the cleared animation and
@@ -193,7 +207,7 @@ export default function CarRoadBuilderPlay() {
     if (next === board) return
     setBoard(next)
     resetAfterEdit()
-    setStatus('45ど まわしたよ')
+    setStatus('まわしたよ')
   }, [board, resetAfterEdit, running, selectedCellId])
 
   const deleteSelected = useCallback(() => {
@@ -232,12 +246,16 @@ export default function CarRoadBuilderPlay() {
   }, [route, running])
 
   const handleExpand = useCallback(() => {
-    if (running || !canExpand) return
-    const next = expandBoard(board)
-    setBoard(next)
-    resetAfterEdit()
+    if (running) return
+    if (isBoardExpanded) {
+      setIsBoardExpanded(false)
+      setStatus('もどしたよ')
+      return
+    }
+    if (canExpandBoard(board)) setBoard(expandBoard(board))
+    setIsBoardExpanded(true)
     setStatus('ひろがったよ！')
-  }, [board, canExpand, resetAfterEdit, running])
+  }, [board, isBoardExpanded, running])
 
   return (
     <main className={`${styles.page} ${phase === 'cleared' ? styles.cleared : ''}`} data-phase={phase}>
@@ -246,8 +264,8 @@ export default function CarRoadBuilderPlay() {
             <span aria-hidden="true">‹</span> もどる
           </button>
           <h1><span aria-hidden="true">🚗</span> くるまのみちづくり</h1>
-          <button type="button" className={styles.expandButton} onClick={handleExpand} disabled={!canExpand || running}>
-            ひろげる
+          <button type="button" className={styles.expandButton} onClick={handleExpand} disabled={!canToggleBoard || running}>
+            {isBoardExpanded ? 'もどす' : 'ひろげる'}
           </button>
         </header>
 
@@ -256,7 +274,7 @@ export default function CarRoadBuilderPlay() {
         <section className={styles.boardScroll} aria-label="みちのエリア">
           <div className={styles.boardSizer}>
             <CarRoadBoard
-              board={board}
+              board={displayBoard}
               selectedCellId={selectedCellId}
               running={running}
               onCellClick={handleCellClick}
@@ -273,7 +291,7 @@ export default function CarRoadBuilderPlay() {
         {selectedCell && selectedCell.kind && (
           <div className={styles.selectionTools} aria-label="えらんだパーツのそうさ">
             <span>{selectedCell.kind === 'straight' ? 'まっすぐ' : selectedCell.kind === 'curve' ? 'カーブ' : selectedCell.kind === 'start' ? 'スタート' : 'ゴール'}</span>
-            <button type="button" onClick={rotateSelected} disabled={running || selectedCell.kind === 'goal'} aria-label="45ど まわす">↻ 45°</button>
+            <button type="button" onClick={rotateSelected} disabled={running || selectedCell.kind === 'goal'} aria-label="まわす">↻ まわす</button>
             <button type="button" onClick={deleteSelected} disabled={running} aria-label="けす">けす</button>
           </div>
         )}

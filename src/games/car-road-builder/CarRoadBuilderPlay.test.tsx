@@ -25,7 +25,7 @@ describe('CarRoadBuilderPlay', () => {
     await user.click(screen.getByRole('button', { name: 'カーブを おく' }))
     await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 1れつ' }))
     expect(screen.getByRole('gridcell', { name: 'カーブ、1ぎょう 1れつ' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '45ど まわす' }))
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
     await user.click(screen.getByRole('button', { name: 'けす' }))
     expect(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 1れつ' })).toBeInTheDocument()
   })
@@ -37,8 +37,27 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('gridcell', { name: 'あきセル、5ぎょう 5れつ' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'しゅっぱつ' }))
     expect(screen.getByRole('button', { name: 'とめる' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'ひろげる' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'もどす' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'カーブを おく' })).toBeDisabled()
+  })
+
+  test('hides connection direction hints and toggles the expanded view without losing parts', async () => {
+    const user = userEvent.setup()
+    renderGame()
+
+    expect(screen.queryByText('E·W')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'ひろげる' }))
+    await user.click(screen.getByRole('button', { name: 'カーブを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、5ぎょう 5れつ' }))
+    expect(screen.getByRole('gridcell', { name: 'カーブ、5ぎょう 5れつ' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'もどす' }))
+    expect(screen.getByRole('gridcell', { name: 'あきセル、4ぎょう 4れつ' })).toBeInTheDocument()
+    expect(screen.queryByRole('gridcell', { name: 'カーブ、5ぎょう 5れつ' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ひろげる' }))
+    expect(screen.getByRole('gridcell', { name: 'カーブ、5ぎょう 5れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'まわす' })).toBeInTheDocument()
   })
 
   test('occupied palette target selects the part, then an empty tap moves it', async () => {
