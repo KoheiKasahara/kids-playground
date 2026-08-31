@@ -396,7 +396,7 @@ export default function FlagRollPuzzlePlay() {
   const editing = isEditingPhase(state.phase)
   const partSelected = state.selectedPartId !== null
   const selectedPart = state.parts.find((part) => part.id === state.selectedPartId) ?? null
-  // パーツを選んでいるあいだは、同じ行に出る「えらんだ いたを けす」がそのまま案内になるため
+  // パーツを選んでいるあいだは、同じ行に出る「けす」がそのまま案内になるため
   // ひとことは出さない（同じことを2つ並べて書かない）。
   const editHint = partSelected ? '' : EDIT_HINT
   const status =
@@ -524,7 +524,7 @@ export default function FlagRollPuzzlePlay() {
                     </button>
                   ) : null}
                   <button type="button" className={styles.removeButton} onClick={handleRemoveSelectedPart}>
-                    えらんだ いたを けす
+                    けす
                   </button>
                 </div>
               ) : null}
