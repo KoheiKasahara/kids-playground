@@ -368,6 +368,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'koma-battle',
+    slug: 'koma-battle',
+    title: 'コマバトル',
+    emoji: '🌀',
+    seo: {
+      headline: 'コマバトル｜3Dのコマをまわして対戦する',
+      description: '3Dの円形スタジアムでコマをまわして戦うあそびです。1こでも2こでもまわせて、勢いよくぶつかりあったコマが、だんだん失速してぐらつき、たおれるまでを物理シミュレーションで楽しめます。',
+    },
+    category: 'threeD',
+    intro: {
+      howToPlay: [
+        'コマを 1こか 2こ えらべるよ',
+        '「まわせ！」を おすと じどうで バトルするよ',
+        'さきに たおれたり とまったり したほうが まけだよ',
+      ],
+    },
+  },
+  {
     id: 'rail-builder',
     slug: 'rail-builder',
     title: '3Dせんろづくり',
