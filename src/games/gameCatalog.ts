@@ -385,6 +385,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'car-road-builder',
+    slug: 'car-road-builder',
+    title: 'くるまのみちづくり',
+    emoji: '🚗',
+    seo: {
+      headline: 'くるまのみちづくり｜道をつないで車を走らせる',
+      description: 'まっすぐな道やカーブをマス目に置いてつなぎ、くるまをスタートからゴールまで走らせる幼児向けの道づくりあそびです。',
+    },
+    category: 'learning',
+    intro: {
+      howToPlay: [
+        'パーツを えらんで ばんめんに おけるよ',
+        '45どずつ まわして みちの つなぎめを あわせよう',
+        '「しゅっぱつ」で くるまが はしるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

@@ -19,7 +19,7 @@ describe('Home', () => {
     }
   })
 
-  test('ゲーム一覧に現在の18ゲームすべてが表示される', () => {
+  test('ゲーム一覧に現在の19ゲームすべてが表示される', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -43,7 +43,8 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: 'たいようけい' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '3Dせんろづくり' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'ピアノであそぼう' })).toBeInTheDocument()
-    expect(screen.getAllByRole('link')).toHaveLength(18)
+    expect(screen.getByRole('link', { name: 'くるまのみちづくり' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(19)
   })
 
   test('「都道府県クイズ」を押すと開始画面に遷移する', async () => {
