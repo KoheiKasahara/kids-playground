@@ -1,0 +1,16 @@
+/*
+ * touch-action はここでは一切指定しない。ブラウザのページズーム抑制は
+ * src/styles/global.css（html要素）とsrc/app/preventBrowserPageZoom.tsで
+ * サイト全体に既に効いているため、ここに書くと祖先との積集合で各ゲームの既存
+ * touch-action（none / pan-x / pan-y 等）に予期せぬ影響が出てしまう（Issue #166）。
+ */
+.surface {
+  display: contents;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.surface img {
+  -webkit-user-drag: none;
+}
