@@ -32,8 +32,6 @@ export default function PianoPlay() {
   const [selectedSongId, setSelectedSongId] = useState(PIANO_SONGS[0].id)
   const [playbackState, setPlaybackState] = useState<PlaybackState>('idle')
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentId>('piano')
-  const [instrumentLoadState, setInstrumentLoadState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
-  const hasInstrumentStatus = instrumentLoadState === 'loading' || instrumentLoadState === 'failed'
   const hasPlaybackStatus = playbackState === 'playing' || playbackState === 'finished'
 
   const syncActiveNotes = useCallback(() => {
@@ -136,10 +134,7 @@ export default function PianoPlay() {
     if (!engine) return
     // setInstrumentは現在のvoiceや自動演奏の予約を止めず、次の発音からだけ切り替える。
     setSelectedInstrument(instrumentId)
-    setInstrumentLoadState('loading')
-    void engine.setInstrument(instrumentId).then(() => {
-      if (engine.getInstrument() === instrumentId) setInstrumentLoadState(engine.getSampleLoadState(instrumentId))
-    })
+    void engine.setInstrument(instrumentId)
   }
 
   const selectSong = (songId: string) => {
@@ -166,13 +161,10 @@ export default function PianoPlay() {
 
   useEffect(() => {
     // 画面に入った時点でピアノ13音を先読みする。失敗時・読込中もstartNote側の短い合成音フォールバックで
-    // 無反応にはせず、ロード完了後は同じAPIから録音サンプルへ自動で切り替わる。
+    // 無反応にはせず、ロード完了後は同じAPIから録音サンプルへ自動で切り替わる。ロード状態は画面に表示しない。
     const engine = engineRef.current
     if (!engine) return
-    setInstrumentLoadState('loading')
-    void engine.prepare().then(() => {
-      if (engine.getInstrument() === 'piano') setInstrumentLoadState(engine.getSampleLoadState('piano'))
-    })
+    void engine.prepare()
   }, [])
 
   useEffect(() => {
@@ -234,13 +226,6 @@ export default function PianoPlay() {
                 {PIANO_SONGS.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
               </select>
             </label>
-            <p
-              className={`${styles.instrumentStatus} ${hasInstrumentStatus ? '' : styles.statusPlaceholder}`}
-              aria-live="polite"
-              aria-hidden={!hasInstrumentStatus}
-            >
-              {instrumentLoadState === 'loading' ? 'おとの じゅんびちゅう…' : instrumentLoadState === 'failed' ? 'おとを きりかえられないため、かんたんな おとで ならします' : '\u00a0'}
-            </p>
             <button
               type="button"
               className={`${styles.playButton} ${playbackState === 'playing' ? styles.stopButton : ''}`}

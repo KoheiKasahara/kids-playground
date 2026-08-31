@@ -126,18 +126,6 @@
   font-weight: 800;
 }
 
-.instrumentStatus {
-  margin: 0;
-  block-size: 2.5em;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  color: #9a3412;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.25;
-}
-
 .playbackStatus {
   margin: 0;
   block-size: 1.25em;
@@ -483,12 +471,6 @@
     min-height: 34px;
     padding: 3px 18px 3px 5px;
     font-size: 12px;
-  }
-
-  .instrumentStatus {
-    block-size: 2.2em;
-    font-size: 10px;
-    line-height: 1.1;
   }
 
   .playButton {
