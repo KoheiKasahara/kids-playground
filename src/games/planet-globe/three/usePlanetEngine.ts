@@ -481,7 +481,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         })
-        const atmosphere = new THREE.Mesh(satelliteGeometry, atmosphereMaterial)
+        const atmosphere = new THREE.Mesh(bodyGeometry, atmosphereMaterial)
         const atmosphereScale = body.radius * visual.atmosphere.scale
         atmosphere.scale.set(
           atmosphereScale,
