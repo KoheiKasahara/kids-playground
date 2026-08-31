@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, DragEvent } from 'react'
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import CarRoadBoard from './CarRoadBoard'
 import PartPalette from './PartPalette'
 import {
+  canPlacePart,
   createBoard,
   INITIAL_BOARD_SIZE,
   MAX_BOARD_SIZE,
@@ -15,7 +16,7 @@ import {
   type Board,
   type BoardCell,
 } from './boardModel'
-import { createPlacedPart, isPartKind, PART_DEFINITIONS, type PartKind } from './partDefinitions'
+import { createPlacedPart, PART_DEFINITIONS, type PartKind } from './partDefinitions'
 import { directionAngle } from './direction'
 import { buildRoute, routeStatusLabel, sampleRouteProgress, type CarRoute } from './routeModel'
 import { playCorrectSound } from '../../utils/quizSound'
@@ -49,18 +50,38 @@ function prefersReducedMotion(): boolean {
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
+const DRAG_START_DISTANCE = 8
+
+type PaletteDragState = {
+  kind: PartKind
+  pointerId: number
+  startX: number
+  startY: number
+  active: boolean
+}
+
+type DropPreview = Readonly<{
+  kind: PartKind
+  clientX: number
+  clientY: number
+  cellId: string | null
+  valid: boolean
+}>
+
 export default function CarRoadBuilderPlay() {
   const navigate = useNavigate()
   const [board, setBoard] = useState<Board>(createDemoBoard)
   const [stageId, setStageId] = useState<StageId>('normal')
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null)
   const [selectedKind, setSelectedKind] = useState<PartKind | null>(null)
-  const [dragKind, setDragKind] = useState<PartKind | null>(null)
+  const [dropPreview, setDropPreview] = useState<DropPreview | null>(null)
   const [phase, setPhase] = useState<PlayPhase>('ready')
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('パーツを えらんで、みちを つなごう')
   const animationRef = useRef<number | null>(null)
   const dragFromCell = useRef<string | null>(null)
+  const paletteDrag = useRef<PaletteDragState | null>(null)
+  const boardRef = useRef<HTMLDivElement | null>(null)
   const suppressClick = useRef(false)
   const running = phase === 'running'
 
@@ -124,6 +145,86 @@ export default function CarRoadBuilderPlay() {
     setStatus('おいたよ。つなぎめを みてみよう')
   }, [board, resetAfterEdit])
 
+  const previewAt = useCallback((kind: PartKind, clientX: number, clientY: number): DropPreview => {
+    const boardElement = boardRef.current
+    const rect = boardElement?.getBoundingClientRect()
+    if (!rect || rect.width <= 0 || rect.height <= 0 || clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) {
+      return { kind, clientX, clientY, cellId: null, valid: false }
+    }
+
+    const col = Math.floor(((clientX - rect.left) / rect.width) * board.size.cols)
+    const row = Math.floor(((clientY - rect.top) / rect.height) * board.size.rows)
+    const cell = board.cells.find((candidate) => candidate.row === row && candidate.col === col)
+    return {
+      kind,
+      clientX,
+      clientY,
+      cellId: cell?.id ?? null,
+      valid: cell ? canPlacePart(board, cell.id, createPlacedPart(kind)) : false,
+    }
+  }, [board])
+
+  const handlePalettePointerDown = useCallback((kind: PartKind, event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (running) return
+    paletteDrag.current = {
+      kind,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+    }
+  }, [running])
+
+  const handlePalettePointerMove = useCallback((kind: PartKind, event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = paletteDrag.current
+    if (!drag || drag.kind !== kind || drag.pointerId !== event.pointerId) return
+
+    if (!drag.active) {
+      const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY)
+      if (distance < DRAG_START_DISTANCE) return
+      drag.active = true
+      setSelectedKind(null)
+      setSelectedCellId(null)
+      setStatus(`${PART_DEFINITIONS[kind].label}を つかんだよ。おく ばしょへ もっていこう`)
+    }
+
+    event.preventDefault()
+    setDropPreview(previewAt(kind, event.clientX, event.clientY))
+  }, [previewAt])
+
+  const finishPalettePointer = useCallback((kind: PartKind, event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
+    const drag = paletteDrag.current
+    if (!drag || drag.kind !== kind || drag.pointerId !== event.pointerId) return
+
+    if (drag.active) {
+      event.preventDefault()
+      const preview = cancelled ? null : previewAt(kind, event.clientX, event.clientY)
+      const target = preview?.cellId ? board.cells.find((cell) => cell.id === preview.cellId) : undefined
+      if (preview && target && preview.valid) place(target, kind)
+      else if (!cancelled) {
+        setSelectedCellId(null)
+        setStatus('そこには おけないよ')
+      }
+      if (!cancelled) {
+        // The pointerup on the source button can be followed by a synthetic
+        // click. Consume that click so a drag never becomes a second selection.
+        suppressClick.current = true
+        window.setTimeout(() => { suppressClick.current = false }, 0)
+      }
+    }
+
+    paletteDrag.current = null
+    setDropPreview(null)
+  }, [board, place, previewAt])
+
+  const handlePalettePointerUp = useCallback((kind: PartKind, event: ReactPointerEvent<HTMLButtonElement>) => {
+    finishPalettePointer(kind, event)
+  }, [finishPalettePointer])
+
+  const handlePalettePointerCancel = useCallback((kind: PartKind, event: ReactPointerEvent<HTMLButtonElement>) => {
+    finishPalettePointer(kind, event, true)
+  }, [finishPalettePointer])
+
   const handleCellClick = useCallback((cell: BoardCell) => {
     if (running) return
     if (suppressClick.current) {
@@ -159,8 +260,8 @@ export default function CarRoadBuilderPlay() {
   }, [board, place, resetAfterEdit, running, selectedCellId, selectedKind])
 
   const handleCellPointerDown = useCallback((cell: BoardCell) => {
-    if (!running && selectedKind === null && dragKind === null && cell.kind !== null) dragFromCell.current = cell.id
-  }, [dragKind, running, selectedKind])
+    if (!running && selectedKind === null && cell.kind !== null) dragFromCell.current = cell.id
+  }, [running, selectedKind])
 
   const handleCellPointerUp = useCallback((cell: BoardCell) => {
     if (running) return
@@ -180,21 +281,14 @@ export default function CarRoadBuilderPlay() {
       }
       return
     }
-    if (dragKind === null || selectedKind !== null) return
-    place(cell, dragKind)
-    setDragKind(null)
-  }, [board, dragKind, place, resetAfterEdit, running, selectedKind])
-
-  const handleCellDrop = useCallback((cell: BoardCell, event: DragEvent<HTMLButtonElement>) => {
-    if (running) return
-    const kind = event.dataTransfer?.getData('application/x-car-road-part') || event.dataTransfer?.getData('text/plain')
-    if (isPartKind(kind)) place(cell, kind)
-    setDragKind(null)
-  }, [place, running])
+  }, [board, resetAfterEdit, running])
 
   const selectKind = useCallback((kind: PartKind) => {
+    if (suppressClick.current) {
+      suppressClick.current = false
+      return
+    }
     setSelectedKind((current) => current === kind ? null : kind)
-    setDragKind(null)
     setStatus(`${PART_DEFINITIONS[kind].label}を おく ばしょを おしてね`)
   }, [])
 
@@ -249,7 +343,8 @@ export default function CarRoadBuilderPlay() {
     setBoard(createDemoBoard(STAGES[nextStageId].size))
     setSelectedCellId(null)
     setSelectedKind(null)
-    setDragKind(null)
+    paletteDrag.current = null
+    setDropPreview(null)
     setPhase('ready')
     setProgress(0)
     setStatus(`${STAGES[nextStageId].label}の ばんめんだよ。みちを つなごう`)
@@ -297,12 +392,13 @@ export default function CarRoadBuilderPlay() {
           <div className={styles.boardSizer}>
             <CarRoadBoard
               board={board}
+              boardRef={boardRef}
               selectedCellId={selectedCellId}
               running={running}
               onCellClick={handleCellClick}
               onCellPointerDown={handleCellPointerDown}
               onCellPointerUp={handleCellPointerUp}
-              onCellDrop={handleCellDrop}
+              dropPreview={dropPreview}
               carSample={carSample}
               carAtStart={carSample ? null : carAtStart}
               carAngle={route.startDirection ? directionAngle(route.startDirection) : 0}
@@ -320,10 +416,24 @@ export default function CarRoadBuilderPlay() {
 
         <PartPalette
           selectedKind={selectedKind}
+          draggingKind={dropPreview?.kind ?? null}
           disabled={running}
           onSelect={selectKind}
-          onDragStart={(kind) => setDragKind(kind)}
+          onPointerDown={handlePalettePointerDown}
+          onPointerMove={handlePalettePointerMove}
+          onPointerUp={handlePalettePointerUp}
+          onPointerCancel={handlePalettePointerCancel}
         />
+
+        {dropPreview && (
+          <span
+            className={styles.dragGhost}
+            style={{ left: dropPreview.clientX, top: Math.max(74, dropPreview.clientY - 12) }}
+            aria-hidden="true"
+          >
+            {PART_DEFINITIONS[dropPreview.kind].emoji}
+          </span>
+        )}
 
         <BigButton className={styles.startButton} variant="primary" onClick={toggleRunning} aria-label={running ? 'とめる' : 'しゅっぱつ'}>
           {running ? 'とめる' : 'しゅっぱつ'}
