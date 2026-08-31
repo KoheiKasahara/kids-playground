@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { connectionsForPart, createPlacedPart, PART_DEFINITIONS } from './partDefinitions'
+import { connectionsForPart, createDefaultPlacedPart, createPlacedPart, PART_DEFINITIONS } from './partDefinitions'
 
 describe('car road parts', () => {
   test('straight has four unique poses and curves have eight', () => {
@@ -7,6 +7,13 @@ describe('car road parts', () => {
     expect(PART_DEFINITIONS.curve.rotationSteps).toHaveLength(8)
     expect(PART_DEFINITIONS['gentle-curve'].rotationSteps).toHaveLength(8)
     expect(new Set(PART_DEFINITIONS.straight.rotationSteps.map((step) => connectionsForPart(createPlacedPart('straight', step)).join('-'))).size).toBe(4)
+  })
+
+  test('new straight placements default to a horizontal pose', () => {
+    const straight = createDefaultPlacedPart('straight')
+    expect(straight.rotationStep).toBe(2)
+    expect(connectionsForPart(straight)).toEqual(['E', 'W'])
+    expect(createPlacedPart('straight').rotationStep).toBe(0)
   })
 
   test('gentle curve exposes cardinal/diagonal ports for every 45-degree pose', () => {

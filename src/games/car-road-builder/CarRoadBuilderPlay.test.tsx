@@ -54,12 +54,8 @@ async function buildSimpleGoalRoute(user: ReturnType<typeof userEvent.setup>) {
   await user.click(straight)
 
   await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 2れつ' }))
-  await user.click(screen.getByRole('button', { name: 'まわす' }))
-  await user.click(screen.getByRole('button', { name: 'まわす' }))
 
   await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 3れつ' }))
-  await user.click(screen.getByRole('button', { name: 'まわす' }))
-  await user.click(screen.getByRole('button', { name: 'まわす' }))
 
   await user.click(screen.getByRole('button', { name: 'カーブを おく' }))
   await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 4れつ' }))
@@ -69,7 +65,12 @@ async function buildSimpleGoalRoute(user: ReturnType<typeof userEvent.setup>) {
 
   await user.click(straight)
   await user.click(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 4れつ' }))
+  await user.click(screen.getByRole('button', { name: 'まわす' }))
+  await user.click(screen.getByRole('button', { name: 'まわす' }))
+
   await user.click(screen.getByRole('gridcell', { name: 'あきセル、3ぎょう 4れつ' }))
+  await user.click(screen.getByRole('button', { name: 'まわす' }))
+  await user.click(screen.getByRole('button', { name: 'まわす' }))
 }
 
 function queueAnimationFrames() {
