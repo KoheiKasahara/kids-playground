@@ -96,6 +96,7 @@ describe('quizSound', () => {
       playMazeStarSound,
       playMazeGoalSound,
       playCarDepartureSound,
+      playCarGoalSound,
       createCarRoadSoundController,
     } = await import('./quizSound')
 
@@ -107,6 +108,7 @@ describe('quizSound', () => {
     expect(() => playMazeStarSound(0)).not.toThrow()
     expect(() => playMazeGoalSound()).not.toThrow()
     expect(() => playCarDepartureSound()).not.toThrow()
+    expect(() => playCarGoalSound()).not.toThrow()
     expect(() => createCarRoadSoundController().setRunning(true)).not.toThrow()
     expect(instances).toHaveLength(0)
   })
@@ -389,6 +391,18 @@ describe('quizSound', () => {
 
     controller.dispose()
     expect((instances[0].createOscillator.mock.results[2].value as MockOscillatorNode).stop).toHaveBeenCalledTimes(1)
+  })
+
+  test('くるまのゴール音は短い3音で、短時間の重複再生を抑える', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playCarGoalSound } = await import('./quizSound')
+
+    playCarGoalSound()
+    playCarGoalSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(3)
   })
 
   test('くるま用SEはAudio APIの失敗をゲーム側へ投げない', async () => {

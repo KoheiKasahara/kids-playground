@@ -18,7 +18,7 @@ import {
 import { createPlacedPart, PART_DEFINITIONS, type PartKind } from './partDefinitions'
 import { directionAngle } from './direction'
 import { buildRoute, routeStatusLabel, sampleRouteProgress, type CarRoute } from './routeModel'
-import { createCarRoadSoundController, playCarDepartureSound, playCorrectSound } from '../../utils/quizSound'
+import { createCarRoadSoundController, playCarDepartureSound, playCarGoalSound } from '../../utils/quizSound'
 import type { CarRoadSoundController } from '../../utils/quizSound'
 import type { VehicleId } from './vehicleDefinitions'
 import styles from './CarRoadBuilder.module.css'
@@ -31,10 +31,9 @@ function prefersReducedMotion(): boolean {
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-function playExistingGoalSoundSafely(): void {
+function playGoalSoundSafely(): void {
   try {
-    // 既存のゴール音はスコープ外のまま、音声APIの失敗だけをゲームから隔離する。
-    playCorrectSound()
+    playCarGoalSound()
   } catch {
     // 音が出せない環境でも、ゴール判定と編集操作は継続できる。
   }
@@ -92,9 +91,14 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
   const [phase, setPhase] = useState<PlayPhase>('ready')
   const [progress, setProgress] = useState(0)
   const [departureFeedback, setDepartureFeedback] = useState(false)
+  const [goalCelebrationId, setGoalCelebrationId] = useState<number | null>(null)
   const [status, setStatus] = useState('パーツを えらんで、みちを つなごう')
   const animationRef = useRef<number | null>(null)
   const departureFeedbackTimerRef = useRef<number | null>(null)
+  const goalCelebrationTimerRef = useRef<number | null>(null)
+  const runSequenceRef = useRef(0)
+  const activeRunIdRef = useRef<number | null>(null)
+  const completedRunIdRef = useRef<number | null>(null)
   const [soundController] = useState<CarRoadSoundController>(() => createCarRoadSoundController())
   const boardDrag = useRef<BoardDragState | null>(null)
   const paletteDrag = useRef<PaletteDragState | null>(null)
@@ -105,13 +109,50 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
   const route = useMemo<CarRoute>(() => buildRoute(board), [board])
   const selectedCell = board.cells.find((cell) => cell.id === selectedCellId)
 
+  const clearGoalCelebration = useCallback(() => {
+    if (goalCelebrationTimerRef.current !== null) {
+      window.clearTimeout(goalCelebrationTimerRef.current)
+      goalCelebrationTimerRef.current = null
+    }
+    setGoalCelebrationId(null)
+  }, [])
+
+  const beginRun = useCallback(() => {
+    const runId = runSequenceRef.current + 1
+    runSequenceRef.current = runId
+    activeRunIdRef.current = runId
+    completedRunIdRef.current = null
+    clearGoalCelebration()
+    return runId
+  }, [clearGoalCelebration])
+
+  const finishGoal = useCallback((runId: number) => {
+    if (activeRunIdRef.current !== runId || completedRunIdRef.current === runId) return
+    activeRunIdRef.current = null
+    completedRunIdRef.current = runId
+    setPhase('cleared')
+    setStatus('ゴールについたよ！')
+    setGoalCelebrationId(runId)
+    if (goalCelebrationTimerRef.current !== null) {
+      window.clearTimeout(goalCelebrationTimerRef.current)
+    }
+    goalCelebrationTimerRef.current = window.setTimeout(() => {
+      goalCelebrationTimerRef.current = null
+      setGoalCelebrationId((current) => current === runId ? null : current)
+    }, 950)
+    playGoalSoundSafely()
+  }, [])
+
   // Every successful edit returns the play surface to a clean, editable
   // state. Keeping this in one helper also removes the cleared animation and
   // puts the car back at the route's start on the next render.
   const resetAfterEdit = useCallback(() => {
+    activeRunIdRef.current = null
+    completedRunIdRef.current = null
     setPhase('ready')
     setProgress(0)
-  }, [])
+    clearGoalCelebration()
+  }, [clearGoalCelebration])
 
   const triggerDepartureFeedback = useCallback(() => {
     setDepartureFeedback(true)
@@ -134,6 +175,10 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
       window.clearTimeout(departureFeedbackTimerRef.current)
       departureFeedbackTimerRef.current = null
     }
+    if (goalCelebrationTimerRef.current !== null) {
+      window.clearTimeout(goalCelebrationTimerRef.current)
+      goalCelebrationTimerRef.current = null
+    }
     soundController.dispose()
   }, [soundController])
 
@@ -148,6 +193,8 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
       // the running phase. Keep this guard for defensive callers.
       return
     }
+    const runId = activeRunIdRef.current
+    if (runId === null) return
     const started = performance.now()
     const duration = Math.max(2600, route.totalLength * 850)
     const frame = (now: number) => {
@@ -155,9 +202,13 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
       setProgress(next)
       if (next < 1) animationRef.current = requestAnimationFrame(frame)
       else {
-        setPhase(route.reachedGoal ? 'cleared' : 'stopped')
-        setStatus(route.reachedGoal ? 'ゴールについたよ！' : routeStatusLabel(route))
-        if (route.reachedGoal) playExistingGoalSoundSafely()
+        animationRef.current = null
+        if (route.reachedGoal) finishGoal(runId)
+        else {
+          activeRunIdRef.current = null
+          setPhase('stopped')
+          setStatus(routeStatusLabel(route))
+        }
       }
     }
     animationRef.current = requestAnimationFrame(frame)
@@ -165,7 +216,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
       if (animationRef.current !== null) cancelAnimationFrame(animationRef.current)
       animationRef.current = null
     }
-  }, [route, running])
+  }, [finishGoal, route, running])
 
   const carSample = route.totalLength > 0
     ? sampleRouteProgress(route, phase === 'ready' ? 0 : progress)
@@ -425,14 +476,17 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
 
   const toggleRunning = useCallback(() => {
     if (running) {
+      activeRunIdRef.current = null
       setDepartureFeedback(false)
       setPhase('stopped')
       setStatus('とまったよ。なおして また しゅっぱつ！')
       return
     }
+    const runId = beginRun()
     triggerDepartureFeedback()
     setProgress(0)
     if (route.totalLength <= 0) {
+      activeRunIdRef.current = null
       setPhase('stopped')
       setStatus(routeStatusLabel(route))
       return
@@ -442,16 +496,19 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     playCarDepartureSound()
     if (prefersReducedMotion()) {
       setProgress(1)
-      setPhase(route.reachedGoal ? 'cleared' : 'stopped')
-      setStatus(route.reachedGoal ? 'ゴールについたよ！' : routeStatusLabel(route))
-      if (route.reachedGoal) playExistingGoalSoundSafely()
+      if (route.reachedGoal) finishGoal(runId)
+      else {
+        activeRunIdRef.current = null
+        setPhase('stopped')
+        setStatus(routeStatusLabel(route))
+      }
       return
     }
     setPhase('running')
     setSelectedKind(null)
     setSelectedCellId(null)
     setStatus(route.reachedGoal ? 'しゅっぱつ！ ゴールまで いくよ' : routeStatusLabel(route))
-  }, [route, running, triggerDepartureFeedback])
+  }, [beginRun, finishGoal, route, running, triggerDepartureFeedback])
 
   const handleVehicleSelect = useCallback((nextVehicleId: VehicleId) => {
     if (running || nextVehicleId === vehicleId) return
@@ -494,6 +551,8 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
               carAtStart={carSample ? null : carAtStart}
               carAngle={route.startDirection ? directionAngle(route.startDirection) : 0}
               vehicleId={vehicleId}
+              goalCelebrationKey={goalCelebrationId}
+              goalCell={route.reachedGoal ? route.segments[route.segments.length - 1] : null}
             />
           </div>
         </section>
