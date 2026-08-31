@@ -18,7 +18,7 @@
   transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 .pressed {
-  color: #ffffff;
+  color: var(--color-text-on-primary);
   background: var(--color-primary);
   border-color: var(--color-primary);
 }
@@ -40,7 +40,7 @@
     max-width: 44vw;
     padding: var(--space-xs) var(--space-sm);
     gap: 3px;
-    font-size: var(--font-size-sm);
+    font-size: 16px;
     white-space: nowrap;
   }
 }
