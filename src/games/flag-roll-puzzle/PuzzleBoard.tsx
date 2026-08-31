@@ -41,6 +41,7 @@ type PuzzleBoardProps = {
   height: number
   registerBall: (ballId: string, el: HTMLElement | null) => void
   registerPartElement: (partId: string, el: HTMLElement | null) => void
+  registerPartMotionElement: (partId: string, el: HTMLElement | null) => void
   onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void
   onPointerMove?: (event: PointerEvent<HTMLDivElement>) => void
   onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void
@@ -77,11 +78,13 @@ export default function PuzzleBoard({
   height,
   registerBall,
   registerPartElement,
+  registerPartMotionElement,
   onPointerDown,
   onPointerMove,
   onPointerUp,
 }: PuzzleBoardProps) {
   const selectedPart = parts.find((part) => part.id === selectedPartId) ?? null
+  const reachedGoal = balls.some((ball) => ball.status === 'goal')
   return (
     <div ref={containerRef} className={styles.fit}>
       <div className={styles.stage} style={{ width, height }}>
@@ -103,7 +106,8 @@ export default function PuzzleBoard({
               data-start-ball-id={ball.id}
               style={{ left: ball.startPosition.x, top: ball.startPosition.y }}
             >
-              <span>{ballLetter(ball.id)}</span>
+              <span className={styles.startMarkerLabel}>{ballLetter(ball.id)}</span>
+              <span className={styles.startMarkerArrow}>↓</span>
             </div>
           ))}
 
@@ -131,12 +135,13 @@ export default function PuzzleBoard({
                 data-dragging={part.id === draggingPartId ? 'true' : 'false'}
                 data-placed={part.id === justPlacedPartId ? 'true' : 'false'}
                 data-rotating={part.id === rotatingPartId ? 'true' : 'false'}
+                data-part-id={part.id}
                 data-jump-ramp={jumpRamp ? 'true' : undefined}
-                ref={jumpRamp ? (element) => registerPartElement(part.id, element) : undefined}
+                ref={(element) => registerPartElement(part.id, element)}
               >
                 {isSpinnerPart(part.typeId) ? (
                   <span
-                    ref={(element) => registerPartElement(part.id, element)}
+                    ref={(element) => registerPartMotionElement(part.id, element)}
                     className={styles.spinnerVisual}
                     aria-hidden="true"
                   >
@@ -163,10 +168,14 @@ export default function PuzzleBoard({
           <div
             className={styles.goal}
             data-cleared={cleared ? 'true' : 'false'}
+            data-reached={reachedGoal ? 'true' : 'false'}
             aria-hidden="true"
             style={{ left: goalArea.x, top: goalArea.y, width: goalArea.width, height: goalArea.height }}
           >
-            ゴール
+            <span className={styles.goalOpening} />
+            <span className={styles.goalIcon}>★</span>
+            <span className={styles.goalLabel}>ゴール</span>
+            <span className={styles.goalSparkles}>✦  ✧  ✦</span>
           </div>
           {invalidDrop ? <div className={styles.gentleHint} aria-hidden="true" /> : null}
 
@@ -184,7 +193,7 @@ export default function PuzzleBoard({
                 transform: `translate(${ball.position.x - BALL_RADIUS}px, ${ball.position.y - BALL_RADIUS}px)`,
               }}
             >
-              <FlagBall flag={ball.flag} size={BALL_RADIUS * 2} />
+              <FlagBall flag={ball.flag} size={BALL_RADIUS * 2} className={styles.ballVisual} />
             </div>
           ))}
         </div>

@@ -71,6 +71,8 @@ const PUZZLE_SPINNER_INFLUENCE_MARGIN = 8
 const PUZZLE_SPINNER_STALL_SPEED = 0.3
 const PUZZLE_SPINNER_NUDGE_SPEED = 2.2
 const PUZZLE_SPINNER_NUDGE_COOLDOWN_MS = 220
+/** 連続接触で画面がちらつかないよう、同じ球とパーツの反応を短く間引く。 */
+const PART_IMPACT_COOLDOWN_MS = 120
 
 export type PuzzleEngineOptions = {
   parts: readonly PlacedPart[]
@@ -86,6 +88,7 @@ export type PuzzleEngineOptions = {
 export type PuzzleEngineHandle = {
   registerBall: (ballId: string | HTMLElement, el?: HTMLElement | null) => void
   registerPartElement: (partId: string, el?: HTMLElement | null) => void
+  registerPartMotionElement: (partId: string, el?: HTMLElement | null) => void
 }
 
 /** ステージのゴール右境界へ置く薄い出口壁（旧default APIも維持）。 */
@@ -256,6 +259,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
   })
 
   const elementsRef = useRef(new Map<string, HTMLElement>())
+  const partMotionElementsRef = useRef(new Map<string, HTMLElement>())
   const handle = useMemo<PuzzleEngineHandle>(
     () => ({
       registerBall: (ballId, el) => {
@@ -268,6 +272,10 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       registerPartElement: (partId, el) => {
         if (el) elementsRef.current.set(`part:${partId}`, el)
         else elementsRef.current.delete(`part:${partId}`)
+      },
+      registerPartMotionElement: (partId, el) => {
+        if (el) partMotionElementsRef.current.set(`part-motion:${partId}`, el)
+        else partMotionElementsRef.current.delete(`part-motion:${partId}`)
       },
     }),
     [],
@@ -283,8 +291,8 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       if (!element) continue
       element.style.transform = `translate(${ball.position.x - BALL_RADIUS}px, ${ball.position.y - BALL_RADIUS}px)`
     }
-    for (const [key, element] of elementsRef.current) {
-      if (key.startsWith('part:')) element.style.setProperty('--spinner-angle', '0rad')
+    for (const [key, element] of partMotionElementsRef.current) {
+      if (key.startsWith('part-motion:')) element.style.setProperty('--spinner-angle', '0rad')
     }
   }, [running, runId, options.balls])
 
@@ -323,7 +331,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     const partBodyEntries = current.parts.flatMap((part) => {
       const direction = conveyorDirection(part.typeId)
       const conveyor = direction ? { partId: part.id, direction } : null
-      return createPuzzlePartBodies(part).map((body) => ({ body, conveyor }))
+      return createPuzzlePartBodies(part).map((body) => ({ body, conveyor, partId: part.id }))
     })
     const conveyorByBodyId = new Map<number, ConveyorRuntime>()
     for (const entry of partBodyEntries) {
@@ -331,6 +339,8 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     }
     const cannonByBodyId = new Map(cannonRuntimes.map((runtime) => [runtime.sensor.id, runtime]))
     const cannonByPartId = new Map(cannonRuntimes.map((runtime) => [runtime.part.id, runtime]))
+    const spinnerByBodyId = new Map(spinnerRuntimes.map((runtime) => [runtime.core.body.id, runtime]))
+    const partIdByBodyId = new Map(partBodyEntries.map((entry) => [entry.body.id, entry.partId]))
     const runtimeBallByBodyId = new Map(runtimeBalls.map((runtime) => [runtime.body.id, runtime]))
     const runtimeBallById = new Map(runtimeBalls.map((runtime) => [runtime.id, runtime]))
     Composite.add(engine.world, [
@@ -343,14 +353,53 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
 
     const lastBumperHitAt = new Map<string, number>()
     const lastJumpRampHitAt = new Map<string, number>()
+    const lastPartImpactAt = new Map<string, number>()
     const cannonStates = new Map<string, CannonCaptureState>()
     const cannonCaptureRecords = new Map<string, { readonly ballId: string; readonly cannonId: string }>()
     const capturedCannonByBall = new Map<string, string>()
     let simulationTime = 0
 
-    const animateJumpRamp = (partId: string, typeId: string) => {
+    const prefersReducedMotion = typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    const animatePartImpact = (partId: string, ballId: string) => {
+      const key = `${partId}:${ballId}`
+      if (simulationTime - (lastPartImpactAt.get(key) ?? -Infinity) < PART_IMPACT_COOLDOWN_MS) return
+      lastPartImpactAt.set(key, simulationTime)
+      if (prefersReducedMotion) return
+
       const element = elementsRef.current.get(`part:${partId}`)
       if (!element || typeof element.animate !== 'function') return
+      // CSSの常時アニメーションではなく、接触したパーツだけを短く弾ませる。
+      // fill:none で既存の配置・回転・選択状態のtransformへ戻す。
+      element.animate(
+        [
+          { transform: 'scale(1)' },
+          { transform: 'scale(0.95)' },
+          { transform: 'scale(1.045)' },
+          { transform: 'scale(1)' },
+        ],
+        { duration: 170, easing: 'cubic-bezier(.2,.8,.25,1)', fill: 'none' },
+      )
+
+      const ballVisual = elementsRef.current.get(ballId)?.firstElementChild
+      if (ballVisual && typeof ballVisual.animate === 'function') {
+        ballVisual.animate(
+          [
+            { transform: 'scale(1)' },
+            { transform: 'scale(0.96, 1.04)' },
+            { transform: 'scale(1.03, 0.98)' },
+            { transform: 'scale(1)' },
+          ],
+          { duration: 150, easing: 'cubic-bezier(.2,.8,.25,1)', fill: 'none' },
+        )
+      }
+    }
+
+    const animateJumpRamp = (partId: string, typeId: string) => {
+      const element = elementsRef.current.get(`part:${partId}`)
+      if (!element || typeof element.animate !== 'function' || prefersReducedMotion) return
       const direction = typeId === 'jumpRampLeft' ? -1 : 1
       // Bodyは静的なままにし、表示だけを「沈む → しなる → 戻る」と動かす。
       // React stateを更新しないので、衝突中に盤面全体を再レンダーしない。
@@ -386,6 +435,13 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
           : pair.bodyB.label.startsWith('ball:')
             ? pair.bodyB
             : null
+        const runtimeBall = hitBall ? runtimeBallByBodyId.get(hitBall.id) : null
+        const partId = partIdByBodyId.get(pair.bodyA.id)
+          ?? partIdByBodyId.get(pair.bodyB.id)
+          ?? cannonByBodyId.get(pair.bodyA.id)?.part.id
+          ?? cannonByBodyId.get(pair.bodyB.id)?.part.id
+          ?? spinnerByBodyId.get(pair.bodyA.id)?.partId
+          ?? spinnerByBodyId.get(pair.bodyB.id)?.partId
         if (bumper && hitBall) {
           const now = performance.now()
           const cooldownKey = `${bumper.id}:${hitBall.id}`
@@ -414,6 +470,12 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
               animateJumpRamp(partId, typeId)
             }
           }
+        }
+
+        // 通常パーツにも短い「ぽんっ」という視覚反応を付ける。ジャンプ台は
+        // 上の専用アニメーションを使うため二重に動かさない。
+        if (partId && hitBall && runtimeBall && !runtimeBall.body.isStatic && !runtimeBall.reachedGoal && !jumpRamp) {
+          animatePartImpact(partId, runtimeBall.id)
         }
 
         const cannonSensor = cannonByBodyId.get(pair.bodyA.id) ?? cannonByBodyId.get(pair.bodyB.id)
@@ -471,7 +533,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
 
     const writeSpinnerTransforms = () => {
       for (const runtime of spinnerRuntimes) {
-        const element = elementsRef.current.get(`part:${runtime.partId}`)
+        const element = partMotionElementsRef.current.get(`part-motion:${runtime.partId}`)
         element?.style.setProperty('--spinner-angle', `${runtime.core.angle}rad`)
       }
     }
@@ -631,7 +693,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
 
     writeAllTransforms()
     rafId = requestAnimationFrame(tick)
-    const registeredElements = elementsRef.current
+    const registeredPartMotionElements = partMotionElementsRef.current
 
     return () => {
       stopped = true
@@ -639,7 +701,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       Events.off(engine, 'collisionStart', handleCollisionStart)
       Events.off(engine, 'collisionActive', handleCollisionActive)
       for (const spinner of spinnerRuntimes) {
-        registeredElements.get(`part:${spinner.partId}`)?.style.setProperty('--spinner-angle', '0rad')
+        registeredPartMotionElements.get(`part-motion:${spinner.partId}`)?.style.setProperty('--spinner-angle', '0rad')
       }
       Composite.clear(engine.world, false)
       Engine.clear(engine)
