@@ -24,7 +24,6 @@ export default function PartPalette({ disabled = false, selectedKind = null, dra
 
   return (
     <div className={styles.palette} aria-label="パーツを えらぶ">
-      <p className={styles.paletteTitle}>パーツを えらんでね</p>
       <div className={styles.paletteScroll}>
         {ROAD_PART_KINDS.map((kind) => {
           const definition = PART_DEFINITIONS[kind]
