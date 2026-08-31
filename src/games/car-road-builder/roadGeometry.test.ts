@@ -43,4 +43,25 @@ describe('car road geometry', () => {
     expect(path.tangent(1).x).toBeGreaterThan(0)
     expect(path.tangent(1).y).toBeGreaterThan(0)
   })
+
+  test('crossroad geometry keeps opposite directions on separate straight paths', () => {
+    for (const step of [0, 1, 2, 3]) {
+      const part = createPlacedPart('crossroad', step)
+      const ports = connectionsForPart(part)
+      const defaultPath = getPathSpec(part)
+      expect(defaultPath.start).toEqual(portPoint(ports[0]!))
+      expect(defaultPath.end).toEqual(portPoint(ports[2]!))
+    }
+
+    const part = createPlacedPart('crossroad')
+    const northSouth = getPathSpec(part, 'N')
+    const eastWest = getPathSpec(part, 'E')
+
+    expect(northSouth.start).toEqual(portPoint('N'))
+    expect(northSouth.end).toEqual(portPoint('S'))
+    expect(northSouth.sample(0.5)).toEqual({ x: 0, y: 0 })
+    expect(eastWest.start).toEqual(portPoint('E'))
+    expect(eastWest.end).toEqual(portPoint('W'))
+    expect(eastWest.sample(0.5)).toEqual({ x: 0, y: 0 })
+  })
 })

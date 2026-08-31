@@ -18,6 +18,7 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite')
     expect(screen.getByRole('button', { name: 'カーブを おく' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ゆるいカーブを おく' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'じゅうじを おく' })).toBeInTheDocument()
   })
 
   test('palette tap then cell tap places a part, and selected controls rotate/remove it', async () => {
@@ -40,6 +41,18 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('gridcell', { name: 'ゆるいカーブ、1ぎょう 1れつ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ゆるいカーブを おく' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'まわす' })).toBeEnabled()
+  })
+
+  test('palette exposes and places the crossroad as its own part', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'じゅうじを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 1れつ' }))
+
+    const crossroad = screen.getByRole('gridcell', { name: 'じゅうじ、1ぎょう 1れつ' })
+    expect(crossroad).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'じゅうじを おく' })).toHaveAttribute('aria-pressed', 'true')
+    expect(crossroad.querySelectorAll('svg path')).toHaveLength(2)
   })
 
   test('expand appends a row and column, then running locks editing', async () => {

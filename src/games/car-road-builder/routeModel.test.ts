@@ -60,6 +60,51 @@ describe('car road route', () => {
     expect(route.stopReason).toBe('mismatch')
     expect(route.segments).toHaveLength(0)
   })
+
+  test.each([
+    ['N', 0, 1, 1, 1, 2, 1, 'N', 'S'],
+    ['S', 3, 1, 2, 1, 1, 1, 'S', 'N'],
+    ['E', 1, 3, 1, 2, 1, 1, 'E', 'W'],
+    ['W', 1, 0, 1, 1, 1, 2, 'W', 'E'],
+  ] as const)('crossroad travels straight from %s to its opposite', (_name, startRow, startCol, crossRow, crossCol, goalRow, goalCol, entryPort, exitPort) => {
+    const startDirection = entryPort === 'N' ? 4 : entryPort === 'S' ? 0 : entryPort === 'E' ? 6 : 2
+    let board = createInitialBoard()
+    board = placePartAt(board, startRow, startCol, createPlacedPart('start', startDirection))
+    board = placePartAt(board, crossRow, crossCol, createPlacedPart('crossroad', 0))
+    board = placePartAt(board, goalRow, goalCol, createPlacedPart('goal'))
+
+    const route = buildRoute(board)
+    expect(route.reachedGoal).toBe(true)
+    expect(route.segments.map((segment) => segment.kind)).toEqual(['start', 'crossroad', 'goal'])
+    expect(route.segments[1]).toMatchObject({ entryPort, exitPort })
+    expect(route.segments[1]!.path.sample(0.5)).toEqual({ x: 0, y: 0 })
+  })
+
+  test('crossroad can continue straight when its other pair is unconnected', () => {
+    let board = createInitialBoard()
+    board = placePartAt(board, 0, 1, createPlacedPart('start', 4))
+    board = placePartAt(board, 1, 1, createPlacedPart('crossroad'))
+    board = placePartAt(board, 2, 1, createPlacedPart('goal'))
+
+    const route = buildRoute(board)
+    expect(route.reachedGoal).toBe(true)
+    expect(route.segments[1]).toMatchObject({ entryPort: 'N', exitPort: 'S' })
+  })
+
+  test.each([
+    [0, 1, 1, 1, 2, 1, 2, 4, 3, 3],
+    [3, 1, 2, 1, 1, 1, 2, 0, 3, 3],
+    [1, 3, 1, 2, 1, 1, 0, 6, 0, 3],
+    [1, 0, 1, 1, 1, 2, 0, 2, 0, 3],
+  ] as const)('stops when the crossroad exit has no reciprocal connection', (startRow, startCol, crossRow, crossCol, blockedRow, blockedCol, blockedRotation, startRotation, goalRow, goalCol) => {
+    let board = createInitialBoard()
+    board = placePartAt(board, startRow, startCol, createPlacedPart('start', startRotation))
+    board = placePartAt(board, crossRow, crossCol, createPlacedPart('crossroad'))
+    board = placePartAt(board, blockedRow, blockedCol, createPlacedPart('straight', blockedRotation))
+    board = placePartAt(board, goalRow, goalCol, createPlacedPart('goal'))
+
+    expect(buildRoute(board).stopReason).toBe('mismatch')
+  })
 })
 
 function routePolylineFirst(route: ReturnType<typeof buildRoute>) {
