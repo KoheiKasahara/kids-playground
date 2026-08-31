@@ -93,3 +93,6 @@ export function pickNearestSpot(
 
   return nearestId
 }
+
+
+export type HitNamespace = 'spot' | 'satellite'

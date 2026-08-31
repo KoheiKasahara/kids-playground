@@ -1,4 +1,4 @@
-import type { CelestialBody, FeatureSpot, ZoomLevel } from './types'
+import type { CelestialBody, FeatureSpot, SatelliteSpec, ZoomLevel } from './types'
 import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL } from './types'
 import { usePlanetEngine } from './three/usePlanetEngine'
 import FeatureCard from './ui/FeatureCard'
@@ -11,8 +11,12 @@ type SingleBodyStageProps = {
   zoomLevel: ZoomLevel
   spots: readonly FeatureSpot[]
   selectedSpotId: string | null
+  selectedSatelliteId: string | null
   selectionFeedbackKey: number
   onSpotSelect: (spotId: string | null) => void
+  onSatelliteSelect: (satelliteId: string | null) => void
+  satellites: readonly SatelliteSpec[]
+  showSatellites: boolean
   onZoomChange: (level: ZoomLevel) => void
 }
 
@@ -27,11 +31,17 @@ export default function SingleBodyStage({
   zoomLevel,
   spots,
   selectedSpotId,
+  selectedSatelliteId,
   selectionFeedbackKey,
   onSpotSelect,
+  onSatelliteSelect,
+  satellites,
+  showSatellites,
   onZoomChange,
 }: SingleBodyStageProps) {
   const selectedSpot = spots.find((spot) => spot.id === selectedSpotId) ?? null
+  const selectedSatellite = satellites.find((satellite) => satellite.id === selectedSatelliteId) ?? null
+  const selectedItem = selectedSatellite ?? selectedSpot
 
   const { registerContainer } = usePlanetEngine({
     body,
@@ -40,18 +50,22 @@ export default function SingleBodyStage({
     selectedSpotId,
     selectionFeedbackKey,
     onSpotSelect,
+    satellites,
+    showSatellites,
+    selectedSatelliteId,
+    onSatelliteSelect,
   })
 
   useQuestionSpeech(
-    selectedSpot === null ? null : `${selectedSpot.spokenName ?? selectedSpot.displayName}。${selectedSpot.description}`,
-    `${body.id}:${selectedSpotId ?? 'none'}`,
+    selectedItem === null ? null : `${selectedItem.spokenName ?? selectedItem.displayName}。${selectedItem.description}`,
+    `${body.id}:${selectedItem?.displayName ?? 'none'}`,
   )
 
   return (
     <>
       <div ref={registerContainer} className={`${styles.scene} ${styles.singleScene}`} aria-hidden="true" />
 
-      <FeatureCard spot={selectedSpot} onClose={() => onSpotSelect(null)} />
+      <FeatureCard spot={selectedItem} onClose={() => { onSpotSelect(null); onSatelliteSelect(null) }} />
 
       <ZoomControls
         canZoomIn={zoomLevel < MAX_ZOOM_LEVEL}

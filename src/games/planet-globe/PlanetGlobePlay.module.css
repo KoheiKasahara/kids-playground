@@ -180,3 +180,11 @@
     transition: none;
   }
 }
+
+
+.satelliteToggleSlot {
+  position: absolute;
+  top: calc(var(--space-sm) + var(--safe-top) + var(--tap-target-min) + var(--space-xs));
+  left: calc(var(--space-sm) + var(--safe-left));
+  z-index: 2;
+}

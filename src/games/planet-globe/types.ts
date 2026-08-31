@@ -315,6 +315,36 @@ export type FeatureSpot = {
   accentColor: string
 }
 
+
+/** 個別観察で表示する、代表衛星1つぶんの軽量な定義。 */
+export type SatelliteAppearance = {
+  baseColor: string
+  accentColor: string
+  darkColor?: string
+  pattern: 'rocky' | 'icy' | 'banded' | 'atmosphere'
+  atmosphere?: { color: string; opacity: number; scale: number }
+  shape?: 'sphere' | 'irregular' | 'faceted'
+}
+
+export type SatelliteSpec = {
+  id: string
+  displayName: string
+  spokenName?: string
+  parentBodyId: CelestialBodyId
+  displayScale: number
+  orbitRadius: number
+  orbitSpeed: number
+  initialAngle: number
+  appearance: SatelliteAppearance
+  description: string
+  hitRadiusPx: number
+  shapeScale?: { x: number; y: number; z: number }
+  orbitInclination?: number
+  retrograde?: boolean
+  /** 冥王星とカロンの簡易共通重心表現に使うオフセット比率。 */
+  barycenter?: { parentOffsetRatio: number; satelliteOffsetRatio: number }
+}
+
 export type UsePlanetEngineOptions = {
   /** 表示中の天体。変わったら3Dオブジェクトを作り替える。 */
   body: CelestialBody
@@ -322,6 +352,14 @@ export type UsePlanetEngineOptions = {
   zoomLevel: ZoomLevel
   /** 表示中の天体の特徴スポット。body と対応するものを渡す。 */
   spots: readonly FeatureSpot[]
+  /** 対象天体の代表衛星。太陽系全体表示へは渡さない。 */
+  satellites?: readonly SatelliteSpec[]
+  /** 衛星表示の状態。個別観察でのみ使う。 */
+  showSatellites?: boolean
+  /** 衛星をタップしたときに呼ぶ。 */
+  onSatelliteSelect?: (satelliteId: string | null) => void
+  /** 衛星選択中のid。 */
+  selectedSatelliteId?: string | null
   /** 選択中のスポットid。null で選択なし。 */
   selectedSpotId: string | null
   /** 同じスポットを再タップしたときにも選択演出をやり直すためのカウンタ(earth-globeと同じ方式)。 */

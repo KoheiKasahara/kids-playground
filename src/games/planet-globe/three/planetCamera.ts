@@ -73,3 +73,36 @@ export const DEFAULT_VIEW_DIRECTION = { x: 0.32, y: 0.3, z: 0.9 } as const
 export function viewDirectionOf(body: CelestialBody): { x: number; y: number; z: number } {
   return body.viewDirection ?? DEFAULT_VIEW_DIRECTION
 }
+
+
+export type SatelliteFit = Pick<import('../types').SatelliteSpec, 'orbitRadius' | 'displayScale' | 'barycenter'>
+
+export function viewRadiusWithSatellites(
+  body: CelestialBody,
+  satellites: readonly SatelliteFit[] = [],
+  showSatellites = true,
+): number {
+  if (!showSatellites || satellites.length === 0) return viewRadiusOf(body)
+  let radius = viewRadiusOf(body)
+  for (const satellite of satellites) {
+    radius = Math.max(radius, satellite.orbitRadius + body.radius * satellite.displayScale)
+    const barycenterOffset = satellite.barycenter === undefined
+      ? 0
+      : body.radius * satellite.barycenter.parentOffsetRatio
+    radius = Math.max(radius, barycenterOffset + body.radius)
+  }
+  return radius
+}
+
+export function cameraDistanceForZoomWithSatellites(
+  body: CelestialBody,
+  level: ZoomLevel,
+  aspect: number,
+  satellites: readonly SatelliteFit[] = [],
+  showSatellites = true,
+): number {
+  const t = level / MAX_ZOOM_LEVEL
+  const { outMargin, inMargin } = body.zoom
+  const margin = outMargin * (inMargin / outMargin) ** t
+  return fitDistance(viewRadiusWithSatellites(body, satellites, showSatellites), aspect) * margin
+}

@@ -1,0 +1,21 @@
+.toggle {
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: var(--space-xs) var(--space-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  font-weight: 800;
+  cursor: pointer;
+}
+.toggle:active { transform: scale(0.96); }
+.toggle:focus-visible { outline: 4px solid var(--color-accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .toggle { transition: none; } }

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { celestialBodies, celestialBodyById, DEFAULT_CELESTIAL_BODY_ID } from './data/celestialBodies'
 import { featureSpotsFor } from './data/featureSpots'
+import { satellitesFor } from './data/satellites'
 import styles from './PlanetGlobePlay.module.css'
 import { DEFAULT_ZOOM_LEVEL, type CelestialBodyId, type SolarSystemMode, type ZoomLevel } from './types'
 import SingleBodyStage from './SingleBodyStage'
@@ -10,6 +11,7 @@ import BodySelector from './ui/BodySelector'
 import ModeToggle from './ui/ModeToggle'
 import { SpeechToggle } from '../../speech'
 import { playPlanetSpotSelectSound } from '../../utils/quizSound'
+import SatelliteToggle from './ui/SatelliteToggle'
 
 const SINGLE_MODE_INSTRUCTION = 'ひかる ところを さわってみよう'
 const OVERVIEW_MODE_INSTRUCTION = 'みやすいように おおきさや きょりを かえているよ'
@@ -20,16 +22,28 @@ export default function PlanetGlobePlay() {
   const [bodyId, setBodyId] = useState<CelestialBodyId>(DEFAULT_CELESTIAL_BODY_ID)
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(DEFAULT_ZOOM_LEVEL)
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null)
+  const [selectedSatelliteId, setSelectedSatelliteId] = useState<string | null>(null)
+  const [showSatellites, setShowSatellites] = useState(true)
   const [selectionFeedbackKey, setSelectionFeedbackKey] = useState(0)
   const [overviewPlaying, setOverviewPlaying] = useState(true)
   const body = celestialBodyById(bodyId)
   const spots = featureSpotsFor(bodyId)
+  const satellites = satellitesFor(bodyId)
 
   const handleSpotSelect = useCallback((spotId: string | null) => {
     setSelectedSpotId(spotId)
+    if (spotId !== null) setSelectedSatelliteId(null)
     if (spotId === null) return
 
     // pointerup のユーザー操作中に鳴らすことで、iOS Safari でも Web Audio の再生が許可される。
+    playPlanetSpotSelectSound()
+    setSelectionFeedbackKey((key) => key + 1)
+  }, [])
+
+  const handleSatelliteSelect = useCallback((satelliteId: string | null) => {
+    setSelectedSatelliteId(satelliteId)
+    if (satelliteId !== null) setSelectedSpotId(null)
+    if (satelliteId === null) return
     playPlanetSpotSelectSound()
     setSelectionFeedbackKey((key) => key + 1)
   }, [])
@@ -39,6 +53,8 @@ export default function PlanetGlobePlay() {
     // 切り替え直後は必ず天体全体が見える状態に戻す。別天体の説明カードも残さない。
     setZoomLevel(DEFAULT_ZOOM_LEVEL)
     setSelectedSpotId(null)
+    setSelectedSatelliteId(null)
+    setShowSatellites(true)
   }, [])
 
   // 全体表示で天体をタップしたときも、個別観察側の「切り替え直後は全体が見える」不変条件をそのまま使う。
@@ -60,8 +76,12 @@ export default function PlanetGlobePlay() {
             zoomLevel={zoomLevel}
             spots={spots}
             selectedSpotId={selectedSpotId}
+            selectedSatelliteId={selectedSatelliteId}
             selectionFeedbackKey={selectionFeedbackKey}
             onSpotSelect={handleSpotSelect}
+            onSatelliteSelect={handleSatelliteSelect}
+            satellites={satellites}
+            showSatellites={showSatellites}
             onZoomChange={setZoomLevel}
           />
         ) : (
@@ -84,6 +104,23 @@ export default function PlanetGlobePlay() {
         <button type="button" className={styles.home} onClick={() => navigate('/')}>
           もどる
         </button>
+        {mode === 'single' && satellites.length > 0 && (
+          <div className={styles.satelliteToggleSlot}>
+            <SatelliteToggle
+              pressed={showSatellites}
+              onToggle={() => {
+                setShowSatellites((visible) => {
+                  const nextVisible = !visible
+                  if (!nextVisible) {
+                    setSelectedSatelliteId(null)
+                    setSelectedSpotId(null)
+                  }
+                  return nextVisible
+                })
+              }}
+            />
+          </div>
+        )}
 
         {/*
          * よみあげトグルとモード切替は、天体表示・3Dシーンのズームやリサイズと無関係に
