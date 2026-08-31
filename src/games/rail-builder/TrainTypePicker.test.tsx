@@ -40,6 +40,56 @@ describe('TrainTypePicker', () => {
     }
   })
 
+  test('全車種がTrainSpec由来の軽量SVGサムネイルを持つ', () => {
+    const { container } = render(
+      <TrainTypePicker
+        title="えらぼう"
+        ariaLabel="でんしゃの みためを えらぶ"
+        selectedType={null}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    const thumbnails = [...container.querySelectorAll('svg[data-train-type]')]
+    expect(thumbnails).toHaveLength(TRAIN_TYPES.length)
+    expect(thumbnails.map((thumbnail) => thumbnail.getAttribute('data-train-type'))).toEqual([...TRAIN_TYPES])
+    for (const thumbnail of thumbnails) {
+      expect(thumbnail.getAttribute('data-silhouette')).toBeTruthy()
+      expect(thumbnail.getAttribute('data-nose-style')).toBeTruthy()
+      expect(Number(thumbnail.getAttribute('data-window-count'))).toBeGreaterThan(0)
+      expect(thumbnail.querySelector('path')).not.toBeNull()
+    }
+  })
+
+  test('車種ごとにノーズ形状と窓数の特徴をサムネイルへ反映する', () => {
+    const { container } = render(
+      <TrainTypePicker
+        title="えらぼう"
+        ariaLabel="でんしゃの みためを えらぶ"
+        selectedType={null}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    const e5 = container.querySelector('svg[data-train-type="e5"]')
+    const e6 = container.querySelector('svg[data-train-type="e6"]')
+    const doctorYellow = container.querySelector('svg[data-train-type="doctorYellow"]')
+    expect(e5).not.toBeNull()
+    expect(e6).not.toBeNull()
+    expect(doctorYellow).not.toBeNull()
+    expect(e5?.getAttribute('data-nose-style')).toBe('e5-wide-wedge')
+    expect(e6?.getAttribute('data-nose-style')).toBe('e6-spear')
+    expect(doctorYellow?.getAttribute('data-nose-style')).toBe('doctor-yellow-duck')
+    expect(e5?.getAttribute('data-window-count')).toBe('2')
+    expect(e6?.getAttribute('data-window-count')).toBe('2')
+    expect(doctorYellow?.getAttribute('data-window-count')).toBe('2')
+    expect(e5?.querySelectorAll('[class*="thumbnailAccent"]').length).toBeGreaterThan(0)
+    expect(e6?.querySelectorAll('[class*="thumbnailAccent"]').length).toBeGreaterThan(0)
+    expect(doctorYellow?.querySelectorAll('[class*="thumbnailAccent"]').length).toBeGreaterThan(0)
+  })
+
   test('タップした見た目のtrainTypeでonSelectが呼ばれる', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
