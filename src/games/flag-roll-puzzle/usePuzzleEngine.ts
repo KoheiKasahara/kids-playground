@@ -16,10 +16,12 @@ import { createStopObservation, observeBallStop } from './ballStopDetection'
 import { isInGoalArea } from './goal'
 import {
   isCannonPart,
+  isConveyorPart,
   isJumpRampPart,
   isSpinnerPart,
   partDefinition,
 } from './partTypes'
+import { conveyorDirection, conveyorVelocity, type ConveyorDirection } from './conveyorPhysics'
 import { bumperBoostVelocity } from './bumperPhysics'
 import { JUMP_RAMP_HIT_COOLDOWN_MS, jumpRampVelocity } from './jumpRampPhysics'
 import {
@@ -138,6 +140,8 @@ export function createPuzzlePartBodies(part: PlacedPart): Matter.Body[] {
         ? `bumper:${part.id}:${index}`
         : isJumpRampPart(part.typeId)
           ? `jump-ramp:${part.typeId}:${part.id}:${index}`
+          : isConveyorPart(part.typeId)
+            ? `conveyor:${part.id}:${index}`
           : `${part.id}-${index}`,
     }
     if (segment.kind === 'circle') {
@@ -159,6 +163,11 @@ type SpinnerRuntime = {
   readonly partId: string
   readonly core: SpinnerCore
   readonly lastNudgeAt: Map<string, number>
+}
+
+type ConveyorRuntime = {
+  readonly partId: string
+  readonly direction: ConveyorDirection
 }
 
 function cannonSensorBody(part: PlacedPart): CannonRuntime {
@@ -311,13 +320,22 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     const spinnerRuntimes = current.parts
       .filter((part) => isSpinnerPart(part.typeId))
       .map(spinnerRuntime)
+    const partBodyEntries = current.parts.flatMap((part) => {
+      const direction = conveyorDirection(part.typeId)
+      const conveyor = direction ? { partId: part.id, direction } : null
+      return createPuzzlePartBodies(part).map((body) => ({ body, conveyor }))
+    })
+    const conveyorByBodyId = new Map<number, ConveyorRuntime>()
+    for (const entry of partBodyEntries) {
+      if (entry.conveyor) conveyorByBodyId.set(entry.body.id, entry.conveyor)
+    }
     const cannonByBodyId = new Map(cannonRuntimes.map((runtime) => [runtime.sensor.id, runtime]))
     const cannonByPartId = new Map(cannonRuntimes.map((runtime) => [runtime.part.id, runtime]))
     const runtimeBallByBodyId = new Map(runtimeBalls.map((runtime) => [runtime.body.id, runtime]))
     const runtimeBallById = new Map(runtimeBalls.map((runtime) => [runtime.id, runtime]))
     Composite.add(engine.world, [
       ...wallBodies(goalArea),
-      ...current.parts.flatMap(createPuzzlePartBodies),
+      ...partBodyEntries.map(({ body }) => body),
       ...cannonRuntimes.map((runtime) => runtime.sensor),
       ...spinnerRuntimes.map((runtime) => runtime.core.body),
       ...runtimeBalls.map(({ body }) => body),
@@ -426,6 +444,21 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       }
     }
     Events.on(engine, 'collisionStart', handleCollisionStart)
+
+    const handleCollisionActive = (collision: Matter.IEventCollision<Matter.Engine>) => {
+      // 1つのベルトが複数セグメントでも、同じ球・同じベルトへ1stepに1回だけ補正する。
+      const activeContacts = new Map<string, { readonly ball: Matter.Body; readonly direction: ConveyorDirection }>()
+      for (const pair of collision.pairs) {
+        const conveyor = conveyorByBodyId.get(pair.bodyA.id) ?? conveyorByBodyId.get(pair.bodyB.id)
+        const ball = runtimeBallByBodyId.get(pair.bodyA.id) ?? runtimeBallByBodyId.get(pair.bodyB.id)
+        if (!conveyor || !ball || ball.body.isStatic || ball.reachedGoal) continue
+        activeContacts.set(`${ball.id}:${conveyor.partId}`, { ball: ball.body, direction: conveyor.direction })
+      }
+      for (const { ball, direction } of activeContacts.values()) {
+        Body.setVelocity(ball, conveyorVelocity(ball.velocity, direction))
+      }
+    }
+    Events.on(engine, 'collisionActive', handleCollisionActive)
 
     let rafId: number | null = null
     let lastFrameTime: number | null = null
@@ -604,6 +637,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       stopped = true
       if (rafId !== null) cancelAnimationFrame(rafId)
       Events.off(engine, 'collisionStart', handleCollisionStart)
+      Events.off(engine, 'collisionActive', handleCollisionActive)
       for (const spinner of spinnerRuntimes) {
         registeredElements.get(`part:${spinner.partId}`)?.style.setProperty('--spinner-angle', '0rad')
       }

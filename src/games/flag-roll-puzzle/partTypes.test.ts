@@ -37,7 +37,7 @@ describe('partTypes', () => {
   test('置き場には残ったパーツ、ジャンプ台、キャノン・Spinnerの基本向きを出す', () => {
     expect(TRAY_PART_DEFINITIONS.map((definition) => definition.id)).toEqual([
       'slopeLeft', 'slopeRight', 'curveLeft', 'curveRight',
-      'bumper', 'guideLeft', 'guideRight', 'jumpRampRight', 'cannon', 'spinner',
+      'bumper', 'guideLeft', 'guideRight', 'jumpRampRight', 'cannon', 'spinner', 'conveyorRight',
     ])
   })
 
@@ -116,6 +116,19 @@ describe('partTypes', () => {
     expect(left.segments[0].angleDeg).toBeGreaterThan(0)
     expect(nextRotationType('jumpRampRight')).toBe('jumpRampLeft')
     expect(nextRotationType('jumpRampLeft')).toBe('jumpRampRight')
+  })
+
+  test('ベルトコンベアは4方向へ回転し、基本向きだけ置き場に出る', () => {
+    expect(partDefinition('conveyorRight').appearance).toBe('conveyor')
+    expect(partDefinition('conveyorRight').inTray).toBe(true)
+    expect(partDefinition('conveyorDown').inTray).toBe(false)
+    expect(nextRotationType('conveyorRight')).toBe('conveyorDown')
+    expect(nextRotationType('conveyorDown')).toBe('conveyorLeft')
+    expect(nextRotationType('conveyorLeft')).toBe('conveyorUp')
+    expect(nextRotationType('conveyorUp')).toBe('conveyorRight')
+    expect(partDefinition('conveyorDown').segments[0].angleDeg).toBe(90)
+    expect(partDefinition('conveyorLeft').segments[0].angleDeg).toBe(180)
+    expect(partDefinition('conveyorUp').segments[0].angleDeg).toBe(270)
   })
 
   test('未知のパーツ種類は例外にする（データ不整合に早く気付くため）', () => {

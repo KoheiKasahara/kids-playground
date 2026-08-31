@@ -140,6 +140,47 @@
   box-sizing: border-box;
 }
 
+/* ベルトコンベアは縞と流れる矢印で、普通の板ではなく「動く床」と伝える。 */
+.conveyor.placed,
+.conveyor.dragging {
+  overflow: hidden;
+  border: 2px solid #1864ab;
+  box-sizing: border-box;
+  background: repeating-linear-gradient(90deg, #74c0fc 0 8px, #1971c2 8px 16px);
+  box-shadow: inset 0 -3px 0 rgba(8, 55, 99, 0.28), 0 2px 4px rgba(33, 37, 41, 0.25);
+}
+.conveyor.selected {
+  background: repeating-linear-gradient(90deg, #a5d8ff 0 8px, #1864ab 8px 16px);
+}
+.conveyor.ghost {
+  background: repeating-linear-gradient(90deg, rgba(116, 192, 252, 0.45) 0 8px, rgba(25, 113, 194, 0.45) 8px 16px);
+  box-shadow: none;
+}
+.conveyor::after {
+  content: '›  ›  ›';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e7f5ff;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 1px rgba(8, 55, 99, 0.65);
+  animation: conveyor-flow 800ms linear infinite;
+}
+
+@keyframes conveyor-flow {
+  from { transform: translateX(-5px); opacity: 0.72; }
+  50% { opacity: 1; }
+  to { transform: translateX(5px); opacity: 0.72; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conveyor::after { animation: none; }
+}
+
 /*
  * 選んでいるパーツ。消す対象を取り違えないよう、色を変えたうえで
  * PuzzleBoard 側の選択枠と合わせて示す。

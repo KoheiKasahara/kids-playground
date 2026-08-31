@@ -230,6 +230,7 @@ describe('こっきコロコロパズル', () => {
     expect(trayPart('みぎへ おす')).toBeEnabled()
     expect(trayPart('たいほう みぎ')).toBeEnabled()
     expect(trayPart('かいてんばん')).toBeEnabled()
+    expect(trayPart('ベルトコンベア')).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'よこいた' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'ながい いた' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ボールを おとす！' })).toBeEnabled()
@@ -331,6 +332,23 @@ describe('こっきコロコロパズル', () => {
     expect(screen.getByRole('button', { name: 'まわす' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'まわす' }))
     expect(placedParts()[0]).toHaveAttribute('data-part-type', 'cannonDownRight')
+  })
+
+  test('ベルトコンベアは配置・移動・4方向回転・削除ができる', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('ベルトコンベア'))
+    tapBoard(2, 3)
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'conveyorRight')
+    tapBoard(2, 3)
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'conveyorDown')
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'conveyorRight')
+    await user.click(screen.getByRole('button', { name: 'えらんだ いたを けす' }))
+    expect(placedParts()).toHaveLength(0)
   })
 
   test('パーツを選んで盤面をタップすると、そのマスへ置ける', async () => {
