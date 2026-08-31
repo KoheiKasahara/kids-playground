@@ -143,6 +143,7 @@ describe('こっきコロコロパズル', () => {
     expect(screen.getByTestId('puzzle-board').querySelector('[data-cleared="true"]')).not.toBeInTheDocument()
     act(() => engineMock.options?.onGoal?.('ball-b'))
     expect(screen.getByTestId('puzzle-board').querySelector('[data-cleared="true"]')).toBeInTheDocument()
+    expect(screen.getByTestId('puzzle-board').querySelector('[data-reached="true"]')).toBeInTheDocument()
     expect(screen.getAllByTestId('puzzle-ball').map((ball) => ball.getAttribute('data-status'))).toEqual(['goal', 'goal'])
   })
 
@@ -286,6 +287,22 @@ describe('こっきコロコロパズル', () => {
     expect(screen.getByRole('status')).toHaveTextContent('ゴール！ すごい！')
     expect(screen.getByTestId('puzzle-board').querySelector('[data-cleared="true"]')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ボールを もどす' })).toBeEnabled()
+  })
+
+  test('盤面の出発口とゴールの視覚状態がゲーム状態に追従する', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    const board = screen.getByTestId('puzzle-board')
+    expect(board.querySelector('[data-start-ball-id="ball-a"]')).toBeInTheDocument()
+    const goal = board.querySelector('[data-reached]')
+    expect(goal).toHaveAttribute('data-reached', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    act(() => engineMock.options?.onGoal())
+
+    expect(goal).toHaveAttribute('data-reached', 'true')
+    expect(goal).toHaveAttribute('data-cleared', 'true')
+    expect(screen.getByTestId('puzzle-ball').firstElementChild).toBeInTheDocument()
   })
 
   test('特殊パーツのプレビューはカード内に収まる', async () => {
