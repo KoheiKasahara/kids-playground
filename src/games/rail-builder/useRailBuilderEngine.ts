@@ -2731,8 +2731,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         instanceMatrix.multiply(instanceDummy.matrix)
         baseInstances.setMatrixAt(i, instanceMatrix)
 
-        instanceScale.set(Math.max(0.55, tangentLength), 1, 1)
-        instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
         // Keep the transparent hitbox matrix aligned with the original base
         // layer; its geometry and dimensions are intentionally independent of
         // the visual polish metrics. Only the local z scale varies by piece kind.
