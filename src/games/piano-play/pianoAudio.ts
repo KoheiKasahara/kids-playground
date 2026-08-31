@@ -78,6 +78,7 @@ export class PianoAudioEngine {
   private nextVoiceId = 1
   private readonly voices = new Map<number, PianoVoice>()
   private readonly durationTimers = new Set<ReturnType<typeof setTimeout>>()
+  private readonly voiceCleanupTimers = new Set<ReturnType<typeof setTimeout>>()
   private disposed = false
 
   /**
@@ -314,29 +315,40 @@ export class PianoAudioEngine {
     return targetGain
   }
 
+  private cleanupVoice(voice: PianoVoice): void {
+    if (this.voices.get(voice.id) === voice) this.voices.delete(voice.id)
+    try {
+      voice.gain.disconnect()
+      if (voice.kind === 'sample') voice.source.disconnect()
+      else for (const oscillator of voice.oscillators) oscillator.disconnect()
+    } catch {
+      // 解放済みノードでも、画面離脱や次の発音を妨げない。
+    }
+  }
+
   private releaseVoice(voice: PianoVoice, releaseSeconds: number): void {
     const context = this.context
     if (!context || voice.stopped) return
     voice.stopped = true
-    this.voices.delete(voice.id)
 
     const now = context.currentTime
     const release = Math.max(MINIMUM_RELEASE_SECONDS, releaseSeconds)
-    const gainParam = voice.gain.gain as AudioParam & {
-      cancelAndHoldAtTime?: (cancelTime: number) => AudioParam
-    }
-    if (typeof gainParam.cancelAndHoldAtTime === 'function') {
-      gainParam.cancelAndHoldAtTime(now)
-    } else {
-      gainParam.cancelScheduledValues(now)
-      // AudioParam.value は予約済みのramp途中値を返さないブラウザがあるため、
-      // 短押しでも実際の包絡線位置を保持して段差を作らない。
-      gainParam.setValueAtTime(Math.max(this.gainAtRelease(voice, now), ATTACK_START_GAIN), now)
-    }
+    const gainParam = voice.gain.gain
+    // cancelAndHoldAtTimeの実装差に依存せず、エンジンが予約したenvelopeから
+    // 現在値を再計算して保持する。これでattack途中の超短押しでも段差を作らない。
+    gainParam.cancelScheduledValues(now)
+    gainParam.setValueAtTime(Math.max(this.gainAtRelease(voice, now), ATTACK_START_GAIN), now)
     gainParam.exponentialRampToValueAtTime(ATTACK_START_GAIN, now + release)
 
     if (voice.kind === 'sample') stopNode(voice.source, now + release + SOURCE_STOP_TAIL_SECONDS)
-    else for (const oscillator of voice.oscillators) stopNode(oscillator, now + release + SOURCE_STOP_TAIL_SECONDS)
+    else {
+      const cleanupTimer = setTimeout(() => {
+        this.voiceCleanupTimers.delete(cleanupTimer)
+        this.cleanupVoice(voice)
+      }, (release + SOURCE_STOP_TAIL_SECONDS) * 1000)
+      this.voiceCleanupTimers.add(cleanupTimer)
+      for (const oscillator of voice.oscillators) stopNode(oscillator, now + release + SOURCE_STOP_TAIL_SECONDS)
+    }
   }
 
   stopNote(handle: PianoVoiceHandle, releaseSeconds = MANUAL_KEY_RELEASE_SECONDS): void {
@@ -381,6 +393,8 @@ export class PianoAudioEngine {
     this.sampleLoadPromises.clear()
     for (const timer of this.durationTimers) clearTimeout(timer)
     this.durationTimers.clear()
+    for (const timer of this.voiceCleanupTimers) clearTimeout(timer)
+    this.voiceCleanupTimers.clear()
 
     const now = this.context?.currentTime ?? 0
     for (const voice of this.voices.values()) {
