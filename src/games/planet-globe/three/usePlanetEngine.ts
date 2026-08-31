@@ -339,6 +339,9 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
 
     function disposeCurrentBody() {
       disposeSatellites()
+      // 衛星geometryもこのエンジンが所有し、body切替時に一緒に解放する。
+      satelliteGeometry?.dispose()
+      satelliteGeometry = null
       // 衛星テクスチャのキャッシュは個別観察エンジンが所有する。
       // 天体切り替え時に解放し、再訪問時だけ作り直す(毎renderでは生成しない)。
       for (const texture of satelliteTextureCache.values()) texture?.dispose()
@@ -522,11 +525,15 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     }
 
     function buildSatellites(satellites: readonly SatelliteSpec[], body: CelestialBody) {
-      if (satelliteSystemRoot === null || satelliteGeometry === null) return
-      const satelliteGeometryForBody = satelliteGeometry
+      if (satelliteSystemRoot === null) return
       activeSatellites = satellites
       activeShowSatellites = optionsRef.current.showSatellites ?? true
       satelliteSystemRoot.visible = activeShowSatellites && satellites.length > 0
+      if (satellites.length === 0) return
+      if (satelliteGeometry === null) {
+        satelliteGeometry = new THREE.SphereGeometry(1, 16, 10)
+      }
+      const satelliteGeometryForBody = satelliteGeometry
       for (const satellite of satellites) {
         const orbitPlaneGroup = new THREE.Group()
         // Charonの簡易連星表現だけは、PlutoのtiltGroupと同じ軌道面にそろえる。
@@ -565,7 +572,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         orbitPlaneGroup.add(orbitPivot)
         satelliteSystemRoot.add(orbitPlaneGroup)
         let atmosphere: THREE.Mesh | null = null
-        if (satellite.appearance.atmosphere !== undefined && satelliteGeometry !== null) {
+        if (satellite.appearance.atmosphere !== undefined) {
           const atmosphereSpec = satellite.appearance.atmosphere
           const atmosphereMaterial = new THREE.MeshBasicMaterial({
             color: atmosphereSpec.color,
@@ -1251,7 +1258,6 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       bodyRoot.add(satelliteSystemRoot)
 
       sphereGeometry = new THREE.SphereGeometry(1, 64, 48)
-      satelliteGeometry = new THREE.SphereGeometry(1, 16, 10)
 
       controls = new OrbitControls(camera, canvas)
       controls.target.set(0, 0, 0)
