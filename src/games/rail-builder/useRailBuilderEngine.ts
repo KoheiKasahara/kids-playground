@@ -77,6 +77,11 @@ import {
   primeAudio,
   type RailTrainSoundController,
 } from '../../utils/quizSound'
+import {
+  calculateRailCameraFit,
+  RAIL_CAMERA_CLIP_FAR,
+  RAIL_CAMERA_CLIP_NEAR,
+} from './railCameraFit'
 
 const WORLD_SIZE = 100
 const WORLD_HALF_SIZE = WORLD_SIZE / 2
@@ -89,6 +94,18 @@ export const MIN_ZOOM = 0.72 - ZOOM_STEP * 4
 export const MAX_ZOOM = 1.75 + ZOOM_STEP * 3
 const DEFAULT_ZOOM = 1
 const BASE_VIEW_SIZE = 15
+const CAMERA_OFFSET = { x: 18, y: 23, z: 20 } as const
+const CAMERA_OVERVIEW_TARGET = { x: 0, y: 0, z: 0 } as const
+const WORLD_MIN_HEIGHT = -0.5
+const WORLD_MAX_HEIGHT = 8
+const RAIL_CAMERA_BOUNDS = {
+  minX: -WORLD_HALF_SIZE,
+  maxX: WORLD_HALF_SIZE,
+  minY: WORLD_MIN_HEIGHT,
+  maxY: WORLD_MAX_HEIGHT,
+  minZ: -WORLD_HALF_SIZE,
+  maxZ: WORLD_HALF_SIZE,
+} as const
 const POINTER_MOVE_THRESHOLD = 6
 // ドラッグで電車を線路上へ置き直すときの当たり判定の許容距離。
 const TRAIN_DRAG_MAX_DISTANCE = 8
@@ -1748,7 +1765,6 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       cameraTargetRef.current.y,
       cameraTargetRef.current.z,
     )
-    const cameraOffset = new THREE.Vector3(18, 23, 20)
     const trainForwardVector = new THREE.Vector3()
     const trainBaseForward = new THREE.Vector3(1, 0, 0)
     const segmentTangentVector = new THREE.Vector3()
@@ -1793,7 +1809,21 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const width = Math.max(1, rect.width)
       const height = Math.max(1, rect.height)
       const aspect = width / height
-      const viewSize = BASE_VIEW_SIZE / activeZoom
+      const fit = calculateRailCameraFit({
+        bounds: RAIL_CAMERA_BOUNDS,
+        overviewTarget: CAMERA_OVERVIEW_TARGET,
+        target: { x: cameraTarget.x, y: cameraTarget.y, z: cameraTarget.z },
+        cameraOffset: CAMERA_OFFSET,
+        aspect,
+        baseViewSize: BASE_VIEW_SIZE,
+        minZoom: MIN_ZOOM,
+      })
+      // MIN_ZOOM は論理ズームとして維持し、全体表示に必要な場合だけ
+      // projection の zoom を一時的に広げる。中間/近景は従来の値を使う。
+      const projectionZoom = activeZoom <= MIN_ZOOM + Number.EPSILON
+        ? fit.overviewZoom
+        : activeZoom
+      const viewSize = BASE_VIEW_SIZE / projectionZoom
       // 縦横どちらの向きでも見え方の拡大率が揃うよう、短い辺の方をviewSizeに固定する。
       const viewWidth = aspect >= 1 ? viewSize * aspect : viewSize
       const viewHeight = aspect >= 1 ? viewSize : viewSize / aspect
@@ -1801,9 +1831,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       camera.right = viewWidth / 2
       camera.top = viewHeight / 2
       camera.bottom = -viewHeight / 2
-      camera.position.copy(cameraTarget).add(cameraOffset)
+      camera.position.set(fit.cameraPosition.x, fit.cameraPosition.y, fit.cameraPosition.z)
       camera.lookAt(cameraTarget)
       camera.updateProjectionMatrix()
+      if (scene !== null && scene.fog instanceof THREE.Fog) {
+        scene.fog.near = fit.fogNear
+        scene.fog.far = fit.fogFar
+      }
     }
 
     function updateZoom(nextZoom: number, notify = true) {
@@ -3314,8 +3348,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       scene.background = new THREE.Color('#cfeef3')
       scene.fog = new THREE.Fog('#cfeef3', 38, 78)
       // マップが2倍に広がった分、遠くの端を見ているときにクリップされないよう far を広げる。
-      camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 220)
-      camera.position.copy(cameraTarget).add(cameraOffset)
+      camera = new THREE.OrthographicCamera(-1, 1, 1, -1, RAIL_CAMERA_CLIP_NEAR, RAIL_CAMERA_CLIP_FAR)
       camera.lookAt(cameraTarget)
 
       renderer = new THREE.WebGLRenderer({
