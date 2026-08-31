@@ -142,6 +142,26 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.queryByRole('button', { name: 'ゴールを おく' })).not.toBeInTheDocument()
   })
 
+  test('renders each road palette item as a shared-geometry thumbnail', () => {
+    renderPlay()
+
+    const expected = [
+      ['まっすぐ', 1],
+      ['カーブ', 1],
+      ['ゆるいカーブ', 1],
+      ['じゅうじ', 2],
+      ['Xじ', 2],
+      ['ふたつカーブ', 2],
+    ] as const
+
+    for (const [label, pathCount] of expected) {
+      const button = screen.getByRole('button', { name: `${label}を おく` })
+      expect(button.querySelector('[data-testid="road-part-thumbnail"]')).toBeInTheDocument()
+      expect(button.querySelector('svg')).toBeInTheDocument()
+      expect(button.querySelectorAll('svg path')).toHaveLength(pathCount)
+    }
+  })
+
   test('renders the complete 5x5 board inside the selected play screen', () => {
     renderPlay('wide')
 

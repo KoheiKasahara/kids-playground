@@ -1,5 +1,6 @@
 import type { PointerEvent } from 'react'
-import { PART_DEFINITIONS, ROAD_PART_KINDS, type PartKind } from './partDefinitions'
+import { createDefaultPlacedPart, PART_DEFINITIONS, ROAD_PART_KINDS, type PartKind } from './partDefinitions'
+import RoadPartVisual from './RoadPartVisual'
 import styles from './CarRoadBuilder.module.css'
 
 export type PartPaletteProps = {
@@ -41,8 +42,10 @@ export default function PartPalette({ disabled = false, selectedKind = null, dra
               onPointerUp={(event) => onPointerUp?.(kind, event)}
               onPointerCancel={(event) => onPointerCancel?.(kind, event)}
             >
-              <span className={styles.paletteEmoji} aria-hidden="true">{definition.emoji}</span>
-              <span>{definition.label}</span>
+              <span className={styles.palettePreview} data-testid="road-part-thumbnail" aria-hidden="true">
+                <RoadPartVisual part={createDefaultPlacedPart(kind)} />
+              </span>
+              <span className={styles.paletteLabel}>{definition.label}</span>
             </button>
           )
         })}

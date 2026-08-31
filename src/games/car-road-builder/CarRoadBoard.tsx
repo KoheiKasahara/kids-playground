@@ -1,8 +1,8 @@
 import type { CSSProperties, PointerEvent, Ref } from 'react'
 import type { RouteSample } from './routeModel'
-import { connectionsForPart, createPlacedPart, PART_DEFINITIONS, type PartKind } from './partDefinitions'
+import { createPlacedPart, PART_DEFINITIONS, type PartKind } from './partDefinitions'
 import type { Board, BoardCell } from './boardModel'
-import { getPathSpec, pathSpecToSvgPath } from './roadGeometry'
+import RoadPartVisual from './RoadPartVisual'
 import CarVisual from './CarVisual'
 import CarRoadGoalBurst from './CarRoadGoalBurst'
 import type { VehicleId } from './vehicleDefinitions'
@@ -26,30 +26,6 @@ export type CarRoadBoardProps = {
   vehicleId?: VehicleId
   goalCelebrationKey?: number | null
   goalCell?: Readonly<{ row: number; col: number }> | null
-}
-
-function RoadPartVisual({ part }: { part: Readonly<{ kind: PartKind; rotationStep: number }> }) {
-  const connections = connectionsForPart(part)
-  const pathSpecs = part.kind === 'goal'
-    ? connections.map((direction) => getPathSpec(part, direction))
-    : part.kind === 'crossroad' || part.kind === 'xroad'
-      ? connections.slice(0, 2).map((direction) => getPathSpec(part, direction))
-      : part.kind === 'double-curve'
-        ? connections.filter((_direction, index) => index % 2 === 0).map((direction) => getPathSpec(part, direction))
-      : [getPathSpec(part)]
-
-  return (
-    <span className={`${styles.roadShape} ${pathSpecs.length > 0 ? styles.pathShape : ''}`} aria-hidden="true">
-      {pathSpecs.length > 0 && (
-        <svg className={styles.roadSvg} viewBox="-0.5 -0.5 1 1" aria-hidden="true">
-          {pathSpecs.map((spec, index) => <path key={index} d={pathSpecToSvgPath(spec)} />)}
-          {part.kind === 'goal' && <circle className={styles.roadHub} cx="0" cy="0" r=".16" />}
-        </svg>
-      )}
-      {part.kind === 'start' && <span className={styles.markerEmoji}>🚩</span>}
-      {part.kind === 'goal' && <span className={styles.markerEmoji}>🏁</span>}
-    </span>
-  )
 }
 
 function cellLabel(cell: BoardCell): string {
