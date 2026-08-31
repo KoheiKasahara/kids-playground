@@ -341,8 +341,8 @@ export type SatelliteSpec = {
   shapeScale?: { x: number; y: number; z: number }
   orbitInclination?: number
   retrograde?: boolean
-  /** 冥王星とカロンの簡易共通重心表現に使うオフセット比率。 */
-  barycenter?: { parentOffsetRatio: number; satelliteOffsetRatio: number }
+  /** 共通重心から見た親(冥王星)中心の距離。1.0を超えると親の外側へ置く。 */
+  parentOffsetRadiusRatio?: number
 }
 
 export type UsePlanetEngineOptions = {

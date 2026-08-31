@@ -17,6 +17,7 @@ import {
   CAMERA_FOV_DEGREES,
   CAMERA_NEAR,
   cameraDistanceForZoomWithSatellites,
+  parentOffsetRadiusForSatellite,
   easeOutCubic,
   viewDirectionOf,
   viewRadiusOf,
@@ -393,6 +394,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
 
     function buildBody(body: CelestialBody) {
       if (bodyRoot === null || sphereGeometry === null) return
+      const bodyGeometry = sphereGeometry
 
       const nextTiltGroup = new THREE.Group()
       nextTiltGroup.rotation.z = axialTiltRotationZ(body)
@@ -439,7 +441,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         material = standardMaterial
       }
 
-      const mesh = new THREE.Mesh(sphereGeometry, material)
+      const mesh = new THREE.Mesh(bodyGeometry, material)
       // 極方向の潰れ(ガス惑星の扁平)はY軸(極軸)だけを縮めて表現する。
       mesh.scale.set(body.radius, body.radius * (1 - (body.flattening ?? 0)), body.radius)
       // 土星本体の影が輪に落ちるよう、球は影を落とす側にする(輪からの影は受けない)。
@@ -457,7 +459,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
           opacity: visual.clouds.opacity,
           depthWrite: false,
         })
-        const cloudMesh = new THREE.Mesh(sphereGeometry, cloudMaterial)
+        const cloudMesh = new THREE.Mesh(bodyGeometry, cloudMaterial)
         const cloudScale = body.radius * 1.014
         cloudMesh.scale.set(cloudScale, cloudScale * (1 - (body.flattening ?? 0)), cloudScale)
         cloudMesh.renderOrder = 1
@@ -521,20 +523,21 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
 
     function buildSatellites(satellites: readonly SatelliteSpec[], body: CelestialBody) {
       if (satelliteSystemRoot === null || satelliteGeometry === null) return
+      const satelliteGeometryForBody = satelliteGeometry
       activeSatellites = satellites
       activeShowSatellites = optionsRef.current.showSatellites ?? true
       satelliteSystemRoot.visible = activeShowSatellites && satellites.length > 0
       for (const satellite of satellites) {
         const orbitPlaneGroup = new THREE.Group()
         // Charonの簡易連星表現だけは、PlutoのtiltGroupと同じ軌道面にそろえる。
-        orbitPlaneGroup.rotation.z = satellite.barycenter === undefined
+        orbitPlaneGroup.rotation.z = satellite.parentOffsetRadiusRatio === undefined
           ? (satellite.orbitInclination ?? 0)
           : axialTiltRotationZ(body)
         const orbitPivot = new THREE.Group()
         orbitPivot.rotation.y = satellite.initialAngle
         const texture = getOrCreateSatelliteTexture(satellite)
         const material = createSatelliteMaterial(satellite, texture)
-        const mesh = new THREE.Mesh(satelliteGeometry, material)
+        const mesh = new THREE.Mesh(satelliteGeometryForBody, material)
         const shape = satellite.shapeScale ?? { x: 1, y: 1, z: 1 }
         const radius = body.radius * satellite.displayScale
         mesh.scale.set(radius * shape.x, radius * shape.y, radius * shape.z)
@@ -571,9 +574,11 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
             side: THREE.BackSide,
             depthWrite: false,
           })
-          atmosphere = new THREE.Mesh(sphereGeometry, atmosphereMaterial)
+          atmosphere = new THREE.Mesh(satelliteGeometryForBody, atmosphereMaterial)
           const atmosphereRadius = radius * atmosphereSpec.scale
           atmosphere.scale.set(atmosphereRadius, atmosphereRadius, atmosphereRadius)
+          // 大気は衛星本体と同じ軌道位置に重ねる。
+          atmosphere.position.copy(mesh.position)
           orbitPivot.add(atmosphere)
         }
         satelliteVisuals.push({
@@ -848,7 +853,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         satelliteCameraNormalized.y / (radius * (1 - flattening)),
         satelliteCameraNormalized.z / radius,
       )
-      let barycenterVisual: SatelliteVisual | null = null
+      let parentOffsetVisual: SatelliteVisual | null = null
       for (const visual of satelliteVisuals) {
         const enabled = activeShowSatellites
         visual.orbitPlaneGroup.visible = enabled
@@ -867,12 +872,13 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
           visual.mesh.material as THREE.MeshStandardMaterial,
           visual.satellite.id === selectedSatelliteId,
         )
-        if (visual.satellite.barycenter !== undefined) barycenterVisual = visual
+        if (visual.satellite.parentOffsetRadiusRatio !== undefined) parentOffsetVisual = visual
       }
-      if (barycenterVisual !== null) {
-        barycenterVisual.mesh.getWorldPosition(satelliteWorldPosition)
+      if (parentOffsetVisual !== null) {
+        // Charonの反対側へPlutoを1.05Rほど動かし、共通重心が見えるようにする。
+        parentOffsetVisual.mesh.getWorldPosition(satelliteWorldPosition)
         const direction = satelliteWorldPosition.normalize()
-        const offset = radius * (barycenterVisual.satellite.barycenter?.parentOffsetRatio ?? 0)
+        const offset = parentOffsetRadiusForSatellite(body, parentOffsetVisual.satellite)
         tiltGroup.position.set(-direction.x * offset, -direction.y * offset, -direction.z * offset)
       }
     }
@@ -1102,7 +1108,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       }
       if (!reducedMotion) updateSunAnimation(now)
       updateSpotVisuals(now, dt)
-      updateSatelliteVisuals()
+      if (activeShowSatellites) updateSatelliteVisuals()
       updateZoomAnimation(now)
 
       if (renderer !== null && scene !== null && camera !== null) {

@@ -4,6 +4,8 @@ import { satellitesFor } from '../data/satellites'
 import {
   cameraDistanceForZoom,
   cameraDistanceForZoomWithSatellites,
+  fitDistance,
+  parentOffsetRadiusForSatellite,
   viewRadiusWithSatellites,
   viewRadiusOf,
 } from './planetCamera'
@@ -25,9 +27,28 @@ describe('planet camera satellite fit', () => {
       .toBeGreaterThan(cameraDistanceForZoom(body, 0, 390 / 844))
   })
 
-  test('Charon fit includes its Pluto-side barycenter offset', () => {
+  test('Charon uses a concrete outside-Pluto common-barycenter fit', () => {
     const body = celestialBodyById('pluto')
-    const satellites = satellitesFor('pluto')
-    expect(viewRadiusWithSatellites(body, satellites, true)).toBeGreaterThanOrEqual(body.radius)
+    const charon = satellitesFor('pluto')[0]
+    if (charon === undefined) throw new Error('Charon data missing')
+
+    const primaryOffset = parentOffsetRadiusForSatellite(body, charon)
+    const expectedRadius = Math.max(
+      viewRadiusOf(body),
+      charon.orbitRadius + body.radius * charon.displayScale,
+      primaryOffset + body.radius,
+    )
+    expect(charon.parentOffsetRadiusRatio).toBe(1.05)
+    expect(primaryOffset).toBeCloseTo(35.7)
+    expect(primaryOffset).toBeGreaterThan(body.radius)
+    expect(viewRadiusWithSatellites(body, [charon], true)).toBeCloseTo(expectedRadius)
+    expect(viewRadiusWithSatellites(body, [charon], true)).toBeCloseTo(73.32)
+
+    const aspect = 390 / 844
+    expect(cameraDistanceForZoomWithSatellites(body, 0, aspect, [charon], true))
+      .toBeCloseTo(fitDistance(expectedRadius, aspect) * body.zoom.outMargin)
+    expect(viewRadiusWithSatellites(body, [charon], false)).toBe(viewRadiusOf(body))
+    expect(cameraDistanceForZoomWithSatellites(body, 0, aspect, [charon], false))
+      .toBe(cameraDistanceForZoom(body, 0, aspect))
   })
 })

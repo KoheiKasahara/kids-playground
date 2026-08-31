@@ -456,3 +456,93 @@ describe('PlanetGlobePlay のよみあげ挙動', () => {
     expect(mock.spoken).toEqual([])
   })
 })
+
+
+describe('PlanetGlobePlay の衛星表示', () => {
+  it('対象天体だけにON既定のtoggleを表示し、OFFでengineと選択を更新する', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    expect(screen.queryByRole('button', { name: 'つきを みる' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'かせい' }))
+
+    const onButton = screen.getByRole('button', { name: 'つきを かくす' })
+    expect(onButton).toHaveAttribute('aria-pressed', 'true')
+    expect(planetEngineMock.options?.showSatellites).toBe(true)
+
+    act(() => {
+      planetEngineMock.options?.onSatelliteSelect?.('phobos')
+    })
+    expect(screen.getByText('フォボス')).toBeInTheDocument()
+    expect(planetEngineMock.options?.selectedSatelliteId).toBe('phobos')
+
+    await user.click(onButton)
+    const offButton = screen.getByRole('button', { name: 'つきも みる' })
+    expect(offButton).toHaveAttribute('aria-pressed', 'false')
+    expect(planetEngineMock.options?.showSatellites).toBe(false)
+    expect(planetEngineMock.options?.selectedSatelliteId).toBeNull()
+    expect(screen.queryByText('フォボス')).not.toBeInTheDocument()
+  })
+
+  it('衛星とspotの選択は一度に一方だけになり、body/mode切替とmoon/overviewでは衛星UIを出さない', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+
+    await user.click(screen.getByRole('button', { name: 'かせい' }))
+    act(() => {
+      planetEngineMock.options?.onSatelliteSelect?.('phobos')
+    })
+    expect(planetEngineMock.options?.selectedSpotId).toBeNull()
+
+    act(() => {
+      planetEngineMock.options?.onSpotSelect('mars-olympus-mons')
+    })
+    expect(planetEngineMock.options?.selectedSatelliteId).toBeNull()
+    expect(planetEngineMock.options?.selectedSpotId).toBe('mars-olympus-mons')
+
+    await user.click(screen.getByRole('button', { name: 'もくせい' }))
+    expect(planetEngineMock.options?.body.id).toBe('jupiter')
+    expect(screen.getByRole('button', { name: 'つきを かくす' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶみる/ }))
+    expect(screen.queryByRole('button', { name: 'つきを かくす' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'つきも みる' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /ひとつずつ/ }))
+    expect(screen.queryByRole('button', { name: 'つきも みる' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'つき' }))
+    expect(screen.queryByRole('button', { name: 'つきも みる' })).not.toBeInTheDocument()
+  })
+})
+
+describe('PlanetGlobePlay の衛星よみあげ', () => {
+  let speechMock: SpeechSynthesisMock
+
+  beforeEach(() => {
+    localStorage.clear()
+    resetSpeechEnabledCache()
+    speechMock = installSpeechSynthesisMock()
+  })
+
+  afterEach(() => {
+    uninstallSpeechSynthesisMock()
+  })
+
+  it('衛星を選ぶと既存のよみあげ経路で名前と説明を読む', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/planet-globe')
+    await screen.findByRole('heading', { name: /たいようけい/ })
+    await user.click(screen.getByRole('button', { name: /よみあげ/ }))
+    await user.click(screen.getByRole('button', { name: 'かせい' }))
+
+    act(() => {
+      planetEngineMock.options?.onSatelliteSelect?.('phobos')
+    })
+
+    expect(speechMock.spoken).toEqual([
+      'フォボス。かせいの ちいさな つきだよ。いびつな かたちを しているよ。',
+    ])
+  })
+})

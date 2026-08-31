@@ -15,7 +15,36 @@
   font-size: var(--font-size-base);
   font-weight: 800;
   cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.pressed {
+  color: #ffffff;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.off {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+}
+.icon {
+  flex: 0 0 auto;
+  line-height: 1;
 }
 .toggle:active { transform: scale(0.96); }
 .toggle:focus-visible { outline: 4px solid var(--color-accent); outline-offset: 3px; }
-@media (prefers-reduced-motion: reduce) { .toggle { transition: none; } }
+
+@media (max-width: 380px), (max-height: 560px) and (orientation: landscape) {
+  .toggle {
+    min-width: 0;
+    max-width: 44vw;
+    padding: var(--space-xs) var(--space-sm);
+    gap: 3px;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle { transition: none; }
+}

@@ -1,4 +1,4 @@
-import type { CelestialBody, ZoomLevel } from '../types'
+import type { CelestialBody, SatelliteSpec, ZoomLevel } from '../types'
 import { MAX_ZOOM_LEVEL } from '../types'
 import { ringOuterRadiusRatio } from './planetRing'
 
@@ -75,7 +75,15 @@ export function viewDirectionOf(body: CelestialBody): { x: number; y: number; z:
 }
 
 
-export type SatelliteFit = Pick<import('../types').SatelliteSpec, 'orbitRadius' | 'displayScale' | 'barycenter'>
+export type SatelliteFit = Pick<SatelliteSpec, 'orbitRadius' | 'displayScale' | 'parentOffsetRadiusRatio'>
+
+/** 共通重心表現で親天体を動かす距離。描画とカメラで同じ式を使う。 */
+export function parentOffsetRadiusForSatellite(
+  body: CelestialBody,
+  satellite: Pick<SatelliteSpec, 'parentOffsetRadiusRatio'>,
+): number {
+  return body.radius * (satellite.parentOffsetRadiusRatio ?? 0)
+}
 
 export function viewRadiusWithSatellites(
   body: CelestialBody,
@@ -86,10 +94,8 @@ export function viewRadiusWithSatellites(
   let radius = viewRadiusOf(body)
   for (const satellite of satellites) {
     radius = Math.max(radius, satellite.orbitRadius + body.radius * satellite.displayScale)
-    const barycenterOffset = satellite.barycenter === undefined
-      ? 0
-      : body.radius * satellite.barycenter.parentOffsetRatio
-    radius = Math.max(radius, barycenterOffset + body.radius)
+    const primaryOffset = parentOffsetRadiusForSatellite(body, satellite)
+    radius = Math.max(radius, primaryOffset + body.radius)
   }
   return radius
 }

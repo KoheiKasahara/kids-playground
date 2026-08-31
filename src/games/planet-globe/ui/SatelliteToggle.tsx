@@ -9,7 +9,7 @@ export default function SatelliteToggle({ pressed, onToggle }: SatelliteTogglePr
   return (
     <button
       type="button"
-      className={styles.toggle}
+      className={`${styles.toggle} ${pressed ? styles.pressed : styles.off}`}
       aria-pressed={pressed}
       aria-label={pressed ? 'つきを かくす' : 'つきも みる'}
       onClick={onToggle}
