@@ -3,6 +3,7 @@ import { STATION_LENGTH } from './railModel'
 import {
   getRailBuilderDevicePixelRatio,
   getRailBuilderShadowMapSize,
+  getRailHitAreaWidthScale,
   getRailSleeperCount,
   getRailStationSafetyLineCenterOffset,
   RAIL_STATION_VISUAL_CONFIG,
@@ -26,6 +27,18 @@ describe('railBuilderVisuals', () => {
     expect(shouldReduceRailBuilderMotion(true)).toBe(true)
     expect(shouldReduceRailBuilderMotion(false)).toBe(false)
     expect(shouldReduceRailBuilderMotion(undefined)).toBe(false)
+  })
+
+  test('hit area is wider for thin rail pieces without widening large facilities', () => {
+    expect(getRailHitAreaWidthScale('straight')).toBe(2.4)
+    expect(getRailHitAreaWidthScale('curve')).toBe(2.4)
+    expect(getRailHitAreaWidthScale('branch')).toBe(2.4)
+    expect(getRailHitAreaWidthScale('short-straight')).toBe(2.2)
+    expect(getRailHitAreaWidthScale('slope')).toBe(2.2)
+    expect(getRailHitAreaWidthScale('bridge')).toBe(2.0)
+    expect(getRailHitAreaWidthScale('station')).toBe(1.8)
+    expect(getRailHitAreaWidthScale('tunnel')).toBe(1.8)
+    expect(getRailHitAreaWidthScale('depot')).toBe(1.8)
   })
 
   test('rail visual layers keep ties between the base and rail', () => {
