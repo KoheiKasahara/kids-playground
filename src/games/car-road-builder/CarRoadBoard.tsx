@@ -40,7 +40,7 @@ export default function CarRoadBoard({ board, selectedCellId = null, running = f
           const pathSpecs = part
             ? part.kind === 'goal'
               ? connections.map((direction) => getPathSpec(part, direction))
-              : part.kind === 'crossroad'
+              : part.kind === 'crossroad' || part.kind === 'xroad'
                 ? connections.slice(0, 2).map((direction) => getPathSpec(part, direction))
               : [getPathSpec(part)]
             : []

@@ -63,7 +63,7 @@ function segmentFor(cell: BoardCell, part: PlacedPart, entryPort: Direction | nu
 
 function otherPort(part: PlacedPart, entryPort: Direction): Direction | null {
   const ports = connectionsForPart(part)
-  if (part.kind === 'crossroad') return oppositeDirection(entryPort)
+  if (part.kind === 'crossroad' || part.kind === 'xroad') return oppositeDirection(entryPort)
   return ports.find((port) => port !== entryPort) ?? null
 }
 
