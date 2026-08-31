@@ -502,6 +502,17 @@
   text-overflow: clip;
   white-space: nowrap;
 }
+.dropPreview {
+  /* The preview is a board overlay, not a CSS Grid item. Keeping it out of
+     the grid flow prevents a drag from creating implicit rows or columns. */
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: var(--road-cell);
+  height: var(--road-cell);
+  pointer-events: none;
+}
 .dropPreview .roadShape { opacity: .68; }
 .dropAllowed { background: rgba(255, 244, 168, .62); box-shadow: inset 0 0 0 5px rgba(239, 169, 21, .75); }
 .dropForbidden { background: rgba(255, 133, 120, .58); box-shadow: inset 0 0 0 5px rgba(196, 61, 50, .72); }
