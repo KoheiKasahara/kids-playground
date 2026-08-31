@@ -366,7 +366,7 @@
   inset: 0;
   display: grid;
   place-items: center;
-  overflow: hidden;
+  overflow: visible;
   pointer-events: none;
   color: #fbf4d8;
   font-size: clamp(20px, calc(var(--road-cell) * .58), 62px);
@@ -379,7 +379,7 @@
 .start .roadShape,
 .goal .roadShape { font-size: clamp(24px, calc(var(--road-cell) * .68), 68px); transform: none; }
 .pathShape { transform: none; }
-.roadSvg { display: block; width: 100%; height: 100%; overflow: hidden; }
+.roadSvg { display: block; width: 100%; height: 100%; overflow: visible; }
 .roadSvg path { fill: none; stroke: #fbf4d8; stroke-linecap: round; stroke-linejoin: round; stroke-width: .18; filter: drop-shadow(0 .025px 0 rgba(26,78,94,.3)); }
 .roadHub { fill: #fbf4d8; stroke: #397e98; stroke-width: .03; }
 .markerEmoji { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(18px, calc(var(--road-cell) * .44), 43px); line-height: 1; text-shadow: 0 2px 0 rgba(26,78,94,.22); }
@@ -439,14 +439,15 @@
 .paletteScroll { display: flex; gap: 6px; overflow-x: auto; padding: 1px 2px 3px; scroll-snap-type: x proximity; }
 .paletteItem {
   display: inline-flex;
-  flex: 0 0 78px;
+  flex: 0 0 82px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 56px;
-  padding: 2px 4px;
+  min-height: 72px;
+  gap: 3px;
+  padding: 4px;
   border: 2px solid rgba(23,98,121,.14);
-  border-radius: 12px;
+  border-radius: 13px;
   background: rgba(255,255,255,.9);
   color: #245d70;
   font: inherit;
@@ -463,18 +464,43 @@
 .paletteSelected { border-color: #efa915; background: #fff2bd; box-shadow: 0 0 0 3px rgba(239,169,21,.2); }
 .paletteDragging { border-color: #efa915; background: #fff2bd; box-shadow: 0 0 0 5px rgba(239,169,21,.28); transform: translateY(-2px) scale(1.04); }
 .paletteItem:disabled { cursor: not-allowed; opacity: .45; }
-.paletteEmoji { min-height: 26px; font-size: 24px; line-height: 1; }
 
-.dropPreview {
-  /* The preview is a board overlay, not a CSS Grid item. Keeping it out of
-     the grid flow prevents a drag from creating implicit rows or columns. */
-  position: absolute;
-  z-index: 4;
-  display: grid;
-  place-items: center;
-  width: var(--road-cell);
-  height: var(--road-cell);
-  pointer-events: none;
+.palettePreview {
+  position: relative;
+  display: block;
+  flex: 0 0 45px;
+  width: 58px;
+  height: 45px;
+  overflow: hidden;
+  border: 2px solid rgba(44, 112, 133, .28);
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255,255,255,.18) 0 1px, transparent 2px),
+    linear-gradient(135deg, #84c7dc 0%, #6aafc9 54%, #5c9db8 100%);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.28), inset 0 -2px 0 rgba(44,112,133,.16), 0 2px 0 rgba(26,78,94,.08);
+}
+
+.palettePreview .roadShape {
+  color: #fbf4d8;
+  text-shadow: 0 1px 0 rgba(26,78,94,.3);
+}
+
+.palettePreview .roadSvg path {
+  filter: drop-shadow(0 .025px 0 rgba(26,78,94,.4));
+}
+
+.paletteLabel {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: #245d70;
+  font-size: clamp(10px, 2.65vw, 13px);
+  font-weight: 900;
+  letter-spacing: -.03em;
+  line-height: 1.05;
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 .dropPreview .roadShape { opacity: .68; }
 .dropAllowed { background: rgba(255, 244, 168, .62); box-shadow: inset 0 0 0 5px rgba(239, 169, 21, .75); }
