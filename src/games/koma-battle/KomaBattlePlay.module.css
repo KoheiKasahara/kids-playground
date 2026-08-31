@@ -1,0 +1,217 @@
+/*
+ * 画面の高さは min-height ではなく height で固定する。
+ * min-height だと3Dシーンの中身がページを押し広げ、縦→横に回したときに
+ * 縦画面ぶんの高さが横画面へ持ち越されてしまう（既存の3Dゲームと同じ方針）。
+ */
+.page {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-md) + var(--safe-right))
+    calc(var(--space-md) + var(--safe-bottom)) calc(var(--space-md) + var(--safe-left));
+  background: var(--color-background);
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(18px, 5vw, 26px);
+  font-weight: 900;
+}
+
+.backLink {
+  padding: 8px 14px;
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  color: var(--color-primary-dark);
+  font-size: clamp(13px, 3.4vw, 16px);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.scene {
+  position: relative;
+  grid-row: 2;
+  min-height: 0;
+  width: 100%;
+  margin-top: var(--space-sm);
+  background: linear-gradient(160deg, #e7f5ff 0%, var(--color-background) 60%, #fff3bf 100%);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* canvasの入れ物はシーン全体に広げる。UIはこの上へ重ねる。 */
+.sceneCanvas { position: absolute; inset: 0; }
+
+/* canvasは絶対配置にして、グリッドの行の高さへ一切影響させない。 */
+.scene canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+/* 対戦中はコマの名前だけを小さく出す。毎フレーム更新するものは置かない。 */
+.komaLabels {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.komaLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-primary-dark);
+  font-size: clamp(12px, 3.2vw, 15px);
+  font-weight: 800;
+}
+
+.komaSwatch {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, #000 22%, transparent);
+  border-radius: 50%;
+}
+
+/* コマ選択は盤面全体を覆ってよい。タップ領域を大きく取る。 */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: color-mix(in srgb, var(--color-background) 74%, transparent);
+  text-align: center;
+}
+
+.overlayTitle {
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(22px, 7vw, 34px);
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.overlayNote {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: clamp(14px, 4vw, 18px);
+  font-weight: 700;
+}
+
+.countChoices {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 幼児が押しやすいよう、選択肢もボタンも十分な大きさにする。 */
+.countButton {
+  min-width: 116px;
+  min-height: 116px;
+  padding: var(--space-sm);
+  border: 4px solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-primary-dark);
+  font-size: clamp(15px, 4vw, 19px);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.countButtonSelected {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
+}
+
+.countEmoji {
+  display: block;
+  font-size: clamp(30px, 9vw, 42px);
+  line-height: 1.2;
+}
+
+.primaryButton {
+  min-width: min(280px, 78vw);
+  min-height: 68px;
+  padding: 0 var(--space-lg);
+  border: none;
+  border-radius: var(--radius-round);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: clamp(19px, 5.6vw, 26px);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.primaryButton:active { transform: scale(0.97); }
+
+.resultWinner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: 900;
+}
+
+.resultSwatch {
+  width: 28px;
+  height: 28px;
+  border: 3px solid color-mix(in srgb, #000 22%, transparent);
+  border-radius: 50%;
+}
+
+/*
+ * 結果は盤面を覆わず、下側のカードにまとめる。
+ * 倒れたコマ・場外に出たコマがそのまま見えるようにするため。
+ */
+.resultOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--space-md);
+  pointer-events: none;
+}
+
+.resultCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 420px;
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 18%);
+  text-align: center;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton:active { transform: none; }
+}

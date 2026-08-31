@@ -1,0 +1,281 @@
+/**
+ * Rapierの世界とコマの剛体を組み立てる。
+ *
+ * Hookとheadlessテストが完全に同じ世界を作れるよう、
+ * Three.jsにもDOMにも依存させていない。
+ * これにより「本当に物理で戦っているか」をvitestの中で実際に回して確認できる。
+ */
+
+import type { RigidBody, World } from '@dimforge/rapier3d-compat'
+import {
+  ANGULAR_DAMPING,
+  DISK_CENTER_Y,
+  DISK_FRICTION,
+  DISK_HALF_HEIGHT,
+  DISK_RADIUS,
+  DISK_RESTITUTION,
+  FLOOR_FRICTION,
+  FLOOR_RESTITUTION,
+  GRAVITY_Y,
+  KOMA_DENSITY,
+  LINEAR_DAMPING,
+  MAX_ANGULAR_SPEED,
+  MAX_LINEAR_SPEED,
+  PHYSICS_TIMESTEP,
+  SHAFT_CENTER_Y,
+  SHAFT_HALF_HEIGHT,
+  SHAFT_RADIUS,
+  START_INWARD_SPEED,
+  START_ORBIT_SPEED,
+  START_RADIUS,
+  START_SPIN_SPEED,
+  TIP_FRICTION,
+  TIP_RADIUS,
+  TIP_RESTITUTION,
+  WALL_FRICTION,
+  WALL_RESTITUTION,
+} from './komaPhysics'
+import {
+  bowlHeightAt,
+  createStadiumHeightfield,
+  createWallSegments,
+  HEIGHTFIELD_SEGMENTS,
+} from './komaStadium'
+import type { KomaSpec } from './komaSpecs'
+import {
+  clampedVector,
+  spinSpeedOf,
+  stabilizationTorque,
+  tiltAngleOf,
+  upVectorOf,
+  type Vector3,
+} from './komaSpin'
+
+/** Hookとheadlessテストが同じRapierコンストラクタを共有するための最小インターフェース。 */
+export type RapierModule = Pick<
+  typeof import('@dimforge/rapier3d-compat'),
+  'World' | 'RigidBodyDesc' | 'ColliderDesc'
+>
+
+export type KomaEntry = {
+  spec: KomaSpec
+  body: RigidBody
+  /** 低速時のふらつきの位相。コマごとにずらして同じ方向へ倒れないようにする。 */
+  wobblePhase: number
+}
+
+export type KomaBattleWorld = {
+  world: World
+  komas: KomaEntry[]
+}
+
+/** 開始位置。2個なら向かい合わせ、1個なら中心寄り。 */
+export function startPlacement(
+  index: number,
+  count: number,
+  /**
+   * すり鉢をどちら回りに周回させるか。2個対戦では逆向きにして、
+   * 半周ごとに正面ですれ違うようにする。
+   */
+  orbitDirection: 1 | -1 = 1,
+  /** 毎回まったく同じ試合にならないよう、開始角をずらす量[rad]。既定0で完全に決定的。 */
+  angleOffset = 0,
+): { position: Vector3; velocity: Vector3 } {
+  if (count <= 1) {
+    // 1個モードは相手がいないので、周回させず中央付近へ置く。
+    // 高速回転→失速→ぐらつき→停止までをそのまま観察できる配置。
+    const y = bowlHeightAt(0.35)
+    return {
+      position: { x: 0.35, y: y + 0.02, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    }
+  }
+  const angle = (index / count) * Math.PI * 2 + angleOffset
+  const x = Math.cos(angle) * START_RADIUS
+  const z = Math.sin(angle) * START_RADIUS
+  // 接線方向（周回）＋わずかな内向き。
+  const tangentX = -Math.sin(angle) * orbitDirection
+  const tangentZ = Math.cos(angle) * orbitDirection
+  return {
+    position: { x, y: bowlHeightAt(START_RADIUS) + 0.02, z },
+    velocity: {
+      x: tangentX * START_ORBIT_SPEED - Math.cos(angle) * START_INWARD_SPEED,
+      y: 0,
+      z: tangentZ * START_ORBIT_SPEED - Math.sin(angle) * START_INWARD_SPEED,
+    },
+  }
+}
+
+/**
+ * スタジアムとコマを作る。
+ *
+ * 固定物（すり鉢の高さ場・外周壁）は親RigidBodyを持たないColliderにしているため、
+ * 剛体はコマの数（最大2個）だけで済む。
+ */
+export function createKomaBattleWorld(
+  rapier: RapierModule,
+  specs: readonly KomaSpec[],
+  options: {
+    heightfieldSegments?: number
+    startAngleOffset?: number
+    /** コマごとの初速倍率。未指定なら全て1で完全に決定的になる（テスト用）。 */
+    spinScales?: readonly number[]
+  } = {},
+): KomaBattleWorld {
+  const world = new rapier.World({ x: 0, y: GRAVITY_Y, z: 0 })
+  world.timestep = PHYSICS_TIMESTEP
+
+  const field = createStadiumHeightfield(
+    options.heightfieldSegments ?? HEIGHTFIELD_SEGMENTS,
+  )
+  world.createCollider(
+    rapier.ColliderDesc.heightfield(field.segments, field.segments, field.heights, {
+      x: field.size,
+      y: 1,
+      z: field.size,
+    })
+      .setFriction(FLOOR_FRICTION)
+      .setRestitution(FLOOR_RESTITUTION),
+  )
+
+  for (const segment of createWallSegments()) {
+    world.createCollider(
+      rapier.ColliderDesc.cuboid(segment.halfWidth, segment.halfHeight, segment.halfDepth)
+        .setTranslation(segment.center.x, segment.center.y, segment.center.z)
+        .setRotation({
+          x: 0,
+          y: Math.sin(segment.yaw / 2),
+          z: 0,
+          w: Math.cos(segment.yaw / 2),
+        })
+        .setFriction(WALL_FRICTION)
+        .setRestitution(WALL_RESTITUTION),
+    )
+  }
+
+  const komas: KomaEntry[] = []
+  specs.forEach((spec, index) => {
+    // 自転の向きと周回の向きをそろえ、2個が必ず逆回りですれ違うようにする。
+    const placement = startPlacement(
+      index,
+      specs.length,
+      spec.spinDirection,
+      options.startAngleOffset ?? 0,
+    )
+    const body = world.createRigidBody(
+      rapier.RigidBodyDesc.dynamic()
+        .setTranslation(placement.position.x, placement.position.y, placement.position.z)
+        .setLinearDamping(LINEAR_DAMPING)
+        .setAngularDamping(ANGULAR_DAMPING)
+        // 高速で弾かれたコマが壁や床を1ステップで飛び越えないようにする。
+        .setCcdEnabled(true)
+        // 回転が止まるまで判定を続けたいので、途中でsleepさせない。
+        .setCanSleep(false),
+    )
+
+    // 先端。ほぼ点接触にして、床とのねじれ摩擦で自転が不自然に殺されないようにする。
+    world.createCollider(
+      rapier.ColliderDesc.ball(TIP_RADIUS)
+        .setTranslation(0, TIP_RADIUS, 0)
+        .setDensity(KOMA_DENSITY)
+        .setFriction(TIP_FRICTION)
+        .setRestitution(TIP_RESTITUTION),
+      body,
+    )
+    // 軸。傾いたコマ同士が円盤の下をすり抜けるのを防ぐ。
+    world.createCollider(
+      rapier.ColliderDesc.cylinder(SHAFT_HALF_HEIGHT, SHAFT_RADIUS)
+        .setTranslation(0, SHAFT_CENTER_Y, 0)
+        .setDensity(KOMA_DENSITY)
+        .setFriction(TIP_FRICTION)
+        .setRestitution(TIP_RESTITUTION),
+      body,
+    )
+    // 円盤部。相手とぶつかる本体で、慣性モーメントの大半もここが持つ。
+    world.createCollider(
+      rapier.ColliderDesc.cylinder(DISK_HALF_HEIGHT, DISK_RADIUS)
+        .setTranslation(0, DISK_CENTER_Y, 0)
+        .setDensity(KOMA_DENSITY)
+        .setFriction(DISK_FRICTION)
+        .setRestitution(DISK_RESTITUTION),
+      body,
+    )
+
+    body.setLinvel(placement.velocity, true)
+    const spinScale = options.spinScales?.[index] ?? 1
+    body.setAngvel(
+      { x: 0, y: START_SPIN_SPEED * spinScale * spec.spinDirection, z: 0 },
+      true,
+    )
+
+    komas.push({
+      spec,
+      body,
+      // 2個が同じ向きへ倒れないよう、位相をコマごとにずらす。
+      wobblePhase: (index * Math.PI * 2) / Math.max(1, specs.length),
+    })
+  })
+
+  return { world, komas }
+}
+
+/** 判定と描画の両方が使う、1体ぶんの観測値。 */
+export type KomaReading = {
+  position: Vector3
+  up: Vector3
+  tiltRad: number
+  spinSpeed: number
+  linearSpeed: number
+  radius: number
+}
+
+export function readKoma(entry: KomaEntry): KomaReading {
+  const translation = entry.body.translation()
+  const up = upVectorOf(entry.body.rotation())
+  const linear = entry.body.linvel()
+  const angular = entry.body.angvel()
+  return {
+    position: { x: translation.x, y: translation.y, z: translation.z },
+    up,
+    tiltRad: tiltAngleOf(up),
+    spinSpeed: spinSpeedOf(angular, up),
+    linearSpeed: Math.hypot(linear.x, linear.y, linear.z),
+    radius: Math.hypot(translation.x, translation.z),
+  }
+}
+
+/**
+ * 1物理ステップぶんの補正を加える。world.step()の直前に呼ぶ。
+ *
+ * ここで行うのは「トルクを足す」ことと「異常値を安全域へ丸める」ことだけで、
+ * 位置や姿勢を直接書き換えることはしない。
+ */
+export function applyKomaAssist(entry: KomaEntry, dt: number): void {
+  const body = entry.body
+  const up = upVectorOf(body.rotation())
+  const angular = body.angvel()
+  const spinSpeed = spinSpeedOf(angular, up)
+
+  const torque = stabilizationTorque({
+    up,
+    angularVelocity: angular,
+    spinSpeed,
+    wobblePhase: entry.wobblePhase,
+  })
+  body.applyTorqueImpulse(
+    { x: torque.x * dt, y: torque.y * dt, z: torque.z * dt },
+    true,
+  )
+}
+
+/**
+ * 速度が安全域を超えていれば丸める。world.step()の直後に呼ぶ。
+ * 「宇宙まで吹き飛ぶ」「NaNが伝播する」状態を常態化させないための最後の砦。
+ */
+export function clampKomaMotion(entry: KomaEntry): void {
+  const body = entry.body
+  const linear = clampedVector(body.linvel(), MAX_LINEAR_SPEED)
+  if (linear !== null) body.setLinvel(linear, true)
+  const angular = clampedVector(body.angvel(), MAX_ANGULAR_SPEED)
+  if (angular !== null) body.setAngvel(angular, true)
+}

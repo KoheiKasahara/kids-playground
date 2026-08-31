@@ -160,6 +160,10 @@ export const routes: RouteObject[] = [
   { path: '/games/japan-travel-quiz/play', element: playRoute(lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizPlay'))) },
   { path: '/games/japan-travel-quiz/result', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizResult')) },
   { path: '/games/piano-play', element: playRoute(lazyRoute(() => import('../games/piano-play/PianoPlay'))) },
+  // コマバトルはThree.js・Rapier(wasm)を含むため、開くときだけ読込む。
+  // コマ選択とバトル画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // KomaBattlePlay内でバトル側の描画だけを条件付きに包んでいる。
+  { path: '/games/koma-battle', element: lazyRoute(() => import('../games/koma-battle/KomaBattlePlay')) },
   ...MATH_QUIZ_MODES.flatMap((mode) => [
     {
       path: `/games/math-quiz/${MATH_QUIZ_MODE_PATH[mode]}`,
