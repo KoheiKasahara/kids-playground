@@ -185,7 +185,13 @@ describe('CarRoadBuilderPlay', () => {
 
     fireEvent.pointerDown(palette, pointerOptions(1, 20, 500))
     fireEvent.pointerMove(palette, pointerOptions(1, 50, 50))
-    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    const preview = screen.getByTestId('car-road-drop-preview')
+    expect(preview).toHaveAttribute('data-valid', 'true')
+    expect(preview).toHaveStyle({ left: 'calc(var(--road-cell) * 0)', top: 'calc(var(--road-cell) * 0)' })
+    expect(preview).not.toHaveStyle({ gridColumn: '1', gridRow: '1' })
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '4')
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-colcount', '4')
+    expect(screen.getAllByRole('gridcell')).toHaveLength(16)
     expect(screen.getByRole('status')).toHaveTextContent('カーブを つかんだよ')
 
     fireEvent.pointerUp(palette, pointerOptions(1, 50, 50))
@@ -221,6 +227,28 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('status')).toHaveTextContent('そこには おけないよ')
   })
 
+  test('clears palette and placed-part previews on drag cancel without changing board size', () => {
+    renderGame()
+    mockBoardRect()
+    const palette = screen.getByRole('button', { name: 'まっすぐを おく' })
+
+    fireEvent.pointerDown(palette, pointerOptions(5, 20, 500))
+    fireEvent.pointerMove(palette, pointerOptions(5, 50, 50))
+    expect(screen.getByTestId('car-road-drop-preview')).toBeInTheDocument()
+    fireEvent.pointerCancel(palette, pointerOptions(5, 50, 50))
+    expect(screen.queryByTestId('car-road-drop-preview')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell')).toHaveLength(16)
+
+    const source = screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })
+    fireEvent.pointerDown(source, pointerOptions(6, 150, 150))
+    fireEvent.pointerMove(source, pointerOptions(6, 350, 50))
+    expect(screen.getByTestId('car-road-drop-preview')).toBeInTheDocument()
+    fireEvent.pointerCancel(source, pointerOptions(6, 350, 50))
+    expect(screen.queryByTestId('car-road-drop-preview')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell')).toHaveLength(16)
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })).toBeInTheDocument()
+  })
+
   test('uses the current 5x5 board geometry for a palette drag to the edge', async () => {
     const user = userEvent.setup()
     renderGame()
@@ -230,7 +258,12 @@ describe('CarRoadBuilderPlay', () => {
 
     fireEvent.pointerDown(palette, pointerOptions(4, 20, 500))
     fireEvent.pointerMove(palette, pointerOptions(4, 360, 360))
-    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    const preview = screen.getByTestId('car-road-drop-preview')
+    expect(preview).toHaveAttribute('data-valid', 'true')
+    expect(preview).toHaveStyle({ left: 'calc(var(--road-cell) * 4)', top: 'calc(var(--road-cell) * 4)' })
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '5')
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-colcount', '5')
+    expect(screen.getAllByRole('gridcell')).toHaveLength(25)
     fireEvent.pointerUp(palette, pointerOptions(4, 360, 360))
     expect(screen.getByRole('gridcell', { name: 'Xじ、5ぎょう 5れつ' })).toBeInTheDocument()
   })
@@ -243,7 +276,10 @@ describe('CarRoadBuilderPlay', () => {
     fireEvent.pointerDown(source, pointerOptions(10, 150, 150))
     fireEvent.pointerMove(source, pointerOptions(10, 350, 50))
     expect(source).toHaveAttribute('aria-grabbed', 'true')
-    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    const preview = screen.getByTestId('car-road-drop-preview')
+    expect(preview).toHaveAttribute('data-valid', 'true')
+    expect(preview).toHaveStyle({ left: 'calc(var(--road-cell) * 3)', top: 'calc(var(--road-cell) * 0)' })
+    expect(screen.getAllByRole('gridcell')).toHaveLength(16)
     expect(screen.getByRole('status')).toHaveTextContent('まっすぐを つかんだよ')
 
     fireEvent.pointerUp(source, pointerOptions(10, 350, 50))

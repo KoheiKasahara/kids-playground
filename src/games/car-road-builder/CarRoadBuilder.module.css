@@ -397,12 +397,14 @@
 .paletteEmoji { min-height: 30px; font-size: 27px; line-height: 1; }
 
 .dropPreview {
-  position: relative;
+  /* The preview is a board overlay, not a CSS Grid item. Keeping it out of
+     the grid flow prevents a drag from creating implicit rows or columns. */
+  position: absolute;
   z-index: 4;
   display: grid;
   place-items: center;
-  min-width: var(--road-cell);
-  min-height: var(--road-cell);
+  width: var(--road-cell);
+  height: var(--road-cell);
   pointer-events: none;
 }
 .dropPreview .roadShape { opacity: .68; }

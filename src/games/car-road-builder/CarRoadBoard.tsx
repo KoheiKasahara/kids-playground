@@ -96,7 +96,11 @@ export default function CarRoadBoard({ board, boardRef, selectedCellId = null, d
               data-testid="car-road-drop-preview"
               data-valid={dropPreview.valid}
               className={`${styles.dropPreview} ${styles[dropPreview.kind]} ${dropPreview.valid ? styles.dropAllowed : styles.dropForbidden}`}
-              style={{ gridColumn: target.col + 1, gridRow: target.row + 1, '--rotation': dropPreview.rotationStep } as CSSProperties}
+              style={{
+                left: `calc(var(--road-cell) * ${target.col})`,
+                top: `calc(var(--road-cell) * ${target.row})`,
+                '--rotation': dropPreview.rotationStep,
+              } as CSSProperties}
               aria-hidden="true"
             >
               <RoadPartVisual part={createPlacedPart(dropPreview.kind, dropPreview.rotationStep)} />
