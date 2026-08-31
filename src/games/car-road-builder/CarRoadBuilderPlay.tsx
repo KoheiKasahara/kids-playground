@@ -15,7 +15,7 @@ import {
   type Board,
   type BoardCell,
 } from './boardModel'
-import { createPlacedPart, PART_DEFINITIONS, type PartKind } from './partDefinitions'
+import { createDefaultPlacedPart, createPlacedPart, PART_DEFINITIONS, type PartKind } from './partDefinitions'
 import { directionAngle } from './direction'
 import { buildRoute, routeStatusLabel, sampleRouteProgress, type CarRoute } from './routeModel'
 import { createCarRoadSoundController, playCarDepartureSound, playCarGoalSound } from '../../utils/quizSound'
@@ -226,7 +226,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     : null
 
   const place = useCallback((cell: BoardCell, kind: PartKind) => {
-    const next = placePartAt(board, cell.row, cell.col, createPlacedPart(kind))
+    const next = placePartAt(board, cell.row, cell.col, createDefaultPlacedPart(kind))
     if (next === board) {
       setStatus(kind === 'start' ? 'スタートは 1こ だけだよ' : kind === 'goal' ? 'ゴールは 1こ だけだよ' : 'そこには おけないよ')
       return
@@ -286,7 +286,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     }
 
     event.preventDefault()
-    setDropPreview(previewAt(createPlacedPart(kind), event.clientX, event.clientY))
+    setDropPreview(previewAt(createDefaultPlacedPart(kind), event.clientX, event.clientY))
   }, [previewAt])
 
   const finishPalettePointer = useCallback((kind: PartKind, event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
@@ -295,7 +295,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
 
     if (drag.active) {
       event.preventDefault()
-      const preview = cancelled ? null : previewAt(createPlacedPart(kind), event.clientX, event.clientY)
+      const preview = cancelled ? null : previewAt(createDefaultPlacedPart(kind), event.clientX, event.clientY)
       const target = preview?.cellId ? board.cells.find((cell) => cell.id === preview.cellId) : undefined
       if (preview && target && preview.valid) place(target, kind)
       else if (!cancelled) {
