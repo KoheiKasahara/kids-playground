@@ -126,6 +126,12 @@ function setPartAt(board: Board, cell: BoardCell, part: PlacedPart | null): Boar
   })
 }
 
+/** Clear a cell for an internal move operation without applying delete rules. */
+function clearPart(board: Board, target: string | CellCoordinate): Board {
+  const cell = resolveTarget(board, target)
+  return cell ? setPartAt(board, cell, null) : board
+}
+
 export function placePart(board: Board, target: string | CellCoordinate, part: PartPlacement): Board {
   const cell = resolveTarget(board, target)
   if (!cell || !canPlacePart(board, target, part)) return board
@@ -138,18 +144,27 @@ export function placePartAt(board: Board, row: number, col: number, part: PartPl
 
 export function removePart(board: Board, target: string | CellCoordinate): Board {
   const cell = resolveTarget(board, target)
-  return cell ? setPartAt(board, cell, null) : board
+  if (!cell || cell.kind === 'start' || cell.kind === 'goal') return board
+  return clearPart(board, target)
 }
 
 export const deletePart = removePart
+
+export function canMovePart(board: Board, from: string | CellCoordinate, to: string | CellCoordinate): boolean {
+  const source = resolveTarget(board, from)
+  const target = resolveTarget(board, to)
+  const part = source ? partFromCell(source) : null
+  if (!source || !target || !part || target.id === source.id || target.kind !== null) return false
+  return canPlacePart(clearPart(board, source.id), target, part)
+}
 
 /** Move a part while preserving the original cell IDs and orientation. */
 export function movePart(board: Board, from: string | CellCoordinate, to: string | CellCoordinate): Board {
   const source = resolveTarget(board, from)
   const target = resolveTarget(board, to)
   const part = source ? partFromCell(source) : null
-  if (!source || !target || !part || target.id === source.id || target.kind !== null || !canPlacePart(removePart(board, source.id), target, part)) return board
-  return setPartAt(removePart(board, source.id), target, part)
+  if (!source || !target || !part || !canMovePart(board, from, to)) return board
+  return setPartAt(clearPart(board, source.id), target, part)
 }
 
 export function rotatePart(board: Board, target: string | CellCoordinate, amount = 1): Board {

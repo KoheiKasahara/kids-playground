@@ -7,6 +7,7 @@ import PartPalette from './PartPalette'
 import VehiclePicker from './VehiclePicker'
 import {
   canPlacePart,
+  canMovePart,
   movePart,
   placePartAt,
   removePart,
@@ -195,14 +196,17 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     const col = Math.floor(((clientX - rect.left) / rect.width) * board.size.cols)
     const row = Math.floor(((clientY - rect.top) / rect.height) * board.size.rows)
     const cell = board.cells.find((candidate) => candidate.row === row && candidate.col === col)
-    const boardWithoutSource = sourceCellId ? removePart(board, sourceCellId) : board
     return {
       kind: part.kind,
       rotationStep: part.rotationStep,
       clientX,
       clientY,
       cellId: cell?.id ?? null,
-      valid: cell ? canPlacePart(boardWithoutSource, cell.id, createPlacedPart(part.kind, part.rotationStep)) : false,
+      valid: cell
+        ? sourceCellId
+          ? canMovePart(board, sourceCellId, cell.id)
+          : canPlacePart(board, cell.id, createPlacedPart(part.kind, part.rotationStep))
+        : false,
     }
   }, [board])
 
