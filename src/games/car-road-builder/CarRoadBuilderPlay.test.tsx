@@ -67,9 +67,13 @@ describe('CarRoadBuilderPlay', () => {
     const truck = screen.getByRole('button', { name: 'トラック' })
     expect([redCar, blueCar, bus, truck]).toHaveLength(4)
     expect(redCar).toHaveAttribute('aria-pressed', 'true')
+    expect(redCar.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-front-direction', 'E')
     expect(blueCar.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'blue-car')
+    expect(blueCar.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-front-direction', 'E')
     expect(bus.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'bus')
+    expect(bus.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-front-direction', 'E')
     expect(truck.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'truck')
+    expect(truck.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-front-direction', 'E')
 
     await user.click(bus)
     expect(bus).toHaveAttribute('aria-pressed', 'true')
