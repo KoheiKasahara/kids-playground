@@ -92,7 +92,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
   const [progress, setProgress] = useState(0)
   const [departureFeedback, setDepartureFeedback] = useState(false)
   const [goalCelebrationId, setGoalCelebrationId] = useState<number | null>(null)
-  const [status, setStatus] = useState('パーツを えらんで、みちを つなごう')
+  const [status, setStatus] = useState('')
   const animationRef = useRef<number | null>(null)
   const departureFeedbackTimerRef = useRef<number | null>(null)
   const goalCelebrationTimerRef = useRef<number | null>(null)
@@ -525,7 +525,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
           <h1><span aria-hidden="true">🚗</span> くるまのみちづくり</h1>
         </header>
 
-        <p className={styles.status} role="status" aria-live="polite">{status}</p>
+        {status && <p className={styles.status} role="status" aria-live="polite">{status}</p>}
 
         <VehiclePicker
           selectedVehicleId={vehicleId}
@@ -559,7 +559,6 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
 
         {selectedCell && selectedCell.kind && (
           <div className={styles.selectionTools} aria-label="えらんだパーツのそうさ">
-            <span>{PART_DEFINITIONS[selectedCell.kind].label}</span>
             <button type="button" onClick={rotateSelected} disabled={running} aria-label="まわす">↻ まわす</button>
             <button type="button" onClick={deleteSelected} disabled={running || selectedCell.kind === 'start' || selectedCell.kind === 'goal'} aria-label="けす">けす</button>
           </div>
