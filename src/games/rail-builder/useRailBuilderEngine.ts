@@ -54,6 +54,7 @@ import {
   getRailStationSafetyLineCenterOffset,
   RAIL_VISUAL_CONFIG,
   RAIL_STATION_VISUAL_CONFIG,
+  getRailHitAreaWidthScale,
   shouldReduceRailBuilderMotion,
 } from './railBuilderVisuals'
 import {
@@ -111,7 +112,9 @@ const POINTER_MOVE_THRESHOLD = 6
 const TRAIN_DRAG_MAX_DISTANCE = 8
 // 配置済み線路パーツの掴み判定(Raycast専用の透明ヒット領域)を、実際の描画(baseGeometry)
 // より広げる倍率・厚み。見た目のgeometryは変えず、Raycastの当たり判定だけを拡張する。
-const RAIL_HIT_AREA_WIDTH_SCALE = 1.8
+// 最大幅に合わせた共有geometryを作り、パーツ種別ごとにインスタンスのz倍率を
+// 下げる。見た目のgeometryには影響せず、raycast用の透明hit areaだけを広げる。
+const RAIL_HIT_AREA_MAX_WIDTH_SCALE = 2.4
 const RAIL_HIT_AREA_HEIGHT = 0.6
 
 export type RailBuilderEngineOptions = {
@@ -1000,7 +1003,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const connectorGeometry = new THREE.CylinderGeometry(0.27, 0.27, 0.18, 16)
     const selectionRingGeometry = new THREE.RingGeometry(0.72, 0.82, 32)
     // 掴み判定専用(非表示)。baseGeometryと同じ配置に、より広い当たり判定を敷く。
-    const railHitAreaGeometry = new THREE.BoxGeometry(1.05, RAIL_HIT_AREA_HEIGHT, 0.9 * RAIL_HIT_AREA_WIDTH_SCALE)
+    const railHitAreaGeometry = new THREE.BoxGeometry(1.05, RAIL_HIT_AREA_HEIGHT, 0.9 * RAIL_HIT_AREA_MAX_WIDTH_SCALE)
     const markerGeometry = new THREE.RingGeometry(0.35, 0.48, 24)
     const trainBodyGeometry = new RoundedBoxGeometry(2.15, 0.78, 0.92, 2, 0.14)
     const trainFrontGeometry = new RoundedBoxGeometry(0.3, 0.7, 0.88, 2, 0.12)
@@ -2696,6 +2699,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const pathLength = Math.max(0, railPathLength(resolvedPath))
       const sleeperCount = getRailSleeperCount(pathLength)
       const sleeperInstances = new THREE.InstancedMesh(sleeperGeometry, sleeperMaterial, sleeperCount)
+      const hitAreaWidthScale = getRailHitAreaWidthScale(localPiece.kind) / RAIL_HIT_AREA_MAX_WIDTH_SCALE
       // 掴み判定用。baseと同じ配置に、より広いgeometryをRaycast専用(非表示)で重ねる。
       const hitAreaInstances = new THREE.InstancedMesh(railHitAreaGeometry, railHitAreaMaterial, segmentCount)
       hitAreaInstances.visible = false
@@ -2731,7 +2735,9 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
         // Keep the transparent hitbox matrix aligned with the original base
         // layer; its geometry and dimensions are intentionally independent of
-        // the visual polish metrics.
+        // the visual polish metrics. Only the local z scale varies by piece kind.
+        instanceScale.set(Math.max(0.55, tangentLength), 1, hitAreaWidthScale)
+        instanceMatrix.compose(instancePosition, instanceQuaternion, instanceScale)
         instanceDummy.position.set(0, 0.1, 0)
         instanceDummy.quaternion.identity()
         instanceDummy.scale.setScalar(1)
