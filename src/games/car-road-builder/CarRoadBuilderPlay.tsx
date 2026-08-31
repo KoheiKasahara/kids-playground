@@ -20,7 +20,8 @@ import {
 import { createPlacedPart, PART_DEFINITIONS, type PartKind } from './partDefinitions'
 import { directionAngle } from './direction'
 import { buildRoute, routeStatusLabel, sampleRouteProgress, type CarRoute } from './routeModel'
-import { playCorrectSound } from '../../utils/quizSound'
+import { createCarRoadSoundController, playCarDepartureSound, playCorrectSound } from '../../utils/quizSound'
+import type { CarRoadSoundController } from '../../utils/quizSound'
 import type { VehicleId } from './vehicleDefinitions'
 import styles from './CarRoadBuilder.module.css'
 
@@ -50,6 +51,15 @@ type PlayPhase = 'ready' | 'running' | 'stopped' | 'cleared'
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function playExistingGoalSoundSafely(): void {
+  try {
+    // 既存のゴール音はスコープ外のまま、音声APIの失敗だけをゲームから隔離する。
+    playCorrectSound()
+  } catch {
+    // 音が出せない環境でも、ゴール判定と編集操作は継続できる。
+  }
 }
 
 const DRAG_START_DISTANCE = 8
@@ -90,8 +100,11 @@ export default function CarRoadBuilderPlay() {
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null)
   const [phase, setPhase] = useState<PlayPhase>('ready')
   const [progress, setProgress] = useState(0)
+  const [departureFeedback, setDepartureFeedback] = useState(false)
   const [status, setStatus] = useState('パーツを えらんで、みちを つなごう')
   const animationRef = useRef<number | null>(null)
+  const departureFeedbackTimerRef = useRef<number | null>(null)
+  const [soundController] = useState<CarRoadSoundController>(() => createCarRoadSoundController())
   const boardDrag = useRef<BoardDragState | null>(null)
   const paletteDrag = useRef<PaletteDragState | null>(null)
   const boardRef = useRef<HTMLDivElement | null>(null)
@@ -108,6 +121,30 @@ export default function CarRoadBuilderPlay() {
     setPhase('ready')
     setProgress(0)
   }, [])
+
+  const triggerDepartureFeedback = useCallback(() => {
+    setDepartureFeedback(true)
+    if (departureFeedbackTimerRef.current !== null) {
+      window.clearTimeout(departureFeedbackTimerRef.current)
+    }
+    departureFeedbackTimerRef.current = window.setTimeout(() => {
+      departureFeedbackTimerRef.current = null
+      setDepartureFeedback(false)
+    }, 260)
+  }, [])
+
+  useEffect(() => {
+    soundController.setRunning(running)
+    return () => soundController.setRunning(false)
+  }, [running, soundController])
+
+  useEffect(() => () => {
+    if (departureFeedbackTimerRef.current !== null) {
+      window.clearTimeout(departureFeedbackTimerRef.current)
+      departureFeedbackTimerRef.current = null
+    }
+    soundController.dispose()
+  }, [soundController])
 
   useEffect(() => {
     if (!running) {
@@ -129,7 +166,7 @@ export default function CarRoadBuilderPlay() {
       else {
         setPhase(route.reachedGoal ? 'cleared' : 'stopped')
         setStatus(route.reachedGoal ? 'ゴールについたよ！' : routeStatusLabel(route))
-        if (route.reachedGoal) playCorrectSound()
+        if (route.reachedGoal) playExistingGoalSoundSafely()
       }
     }
     animationRef.current = requestAnimationFrame(frame)
@@ -389,28 +426,33 @@ export default function CarRoadBuilderPlay() {
 
   const toggleRunning = useCallback(() => {
     if (running) {
+      setDepartureFeedback(false)
       setPhase('stopped')
       setStatus('とまったよ。なおして また しゅっぱつ！')
       return
     }
+    triggerDepartureFeedback()
     setProgress(0)
     if (route.totalLength <= 0) {
       setPhase('stopped')
       setStatus(routeStatusLabel(route))
       return
     }
+    // Keep this in the click handler so iOS Safari can use the user's gesture
+    // to create/resume AudioContext before the running effect starts.
+    playCarDepartureSound()
     if (prefersReducedMotion()) {
       setProgress(1)
       setPhase(route.reachedGoal ? 'cleared' : 'stopped')
       setStatus(route.reachedGoal ? 'ゴールについたよ！' : routeStatusLabel(route))
-      if (route.reachedGoal) playCorrectSound()
+      if (route.reachedGoal) playExistingGoalSoundSafely()
       return
     }
     setPhase('running')
     setSelectedKind(null)
     setSelectedCellId(null)
     setStatus(route.reachedGoal ? 'しゅっぱつ！ ゴールまで いくよ' : routeStatusLabel(route))
-  }, [route, running])
+  }, [route, running, triggerDepartureFeedback])
 
   const handleStageChange = useCallback((nextStageId: StageId) => {
     if (running) return
@@ -529,7 +571,7 @@ export default function CarRoadBuilderPlay() {
           </span>
         )}
 
-        <BigButton className={styles.startButton} variant="primary" onClick={toggleRunning} aria-label={running ? 'とめる' : 'しゅっぱつ'}>
+        <BigButton className={`${styles.startButton} ${departureFeedback ? styles.departureFeedback : ''}`} variant="primary" onClick={toggleRunning} aria-label={running ? 'とめる' : 'しゅっぱつ'}>
           {running ? 'とめる' : 'しゅっぱつ'}
         </BigButton>
     </main>

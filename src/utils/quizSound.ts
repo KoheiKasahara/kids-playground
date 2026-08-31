@@ -505,6 +505,29 @@ export const playRailSnapClickSound = playRailSnapSound
 export const playRailStartSound = playRailDepartureSound
 export const playRailStationArrivalSound = playRailStationStopSound
 
+/**
+ * くるまのみちづくりの出発音。
+ * 音声APIの不調がゲーム本体へ波及しないよう、車ゲーム側では安全な境界にする。
+ */
+const CAR_DEPARTURE_SOUND_MIN_INTERVAL_MS = 120
+let lastCarDepartureSoundAt: number | null = null
+
+export function playCarDepartureSound(): void {
+  if (!soundEnabled) return
+  const wallClockNow = Date.now()
+  if (
+    lastCarDepartureSoundAt !== null
+    && wallClockNow - lastCarDepartureSoundAt < CAR_DEPARTURE_SOUND_MIN_INTERVAL_MS
+  ) return
+  lastCarDepartureSoundAt = wallClockNow
+
+  try {
+    playRailDepartureSound()
+  } catch {
+    // 音を出せない環境でも、出発処理はそのまま続ける。
+  }
+}
+
 export type RailTrainSoundStatus =
   | 'ready'
   | 'running'
@@ -623,3 +646,33 @@ export function createRailTrainSoundController(initialEnabled = true): RailTrain
 }
 
 export const createRailSoundController = createRailTrainSoundController
+
+export type CarRoadSoundController = {
+  /** 走行中だけ音を有効にする。AudioNodeはcontroller内で1組だけ再利用する。 */
+  setRunning: (running: boolean) => void
+  dispose: () => void
+}
+
+/**
+ * くるまのみちづくり用の走行音adapter。
+ * 既存の走行音controllerを再利用し、ゲーム側が複雑な音声状態を持たないようにする。
+ */
+export function createCarRoadSoundController(initialEnabled = true): CarRoadSoundController {
+  const controller = createRailTrainSoundController(initialEnabled)
+  return {
+    setRunning(running) {
+      try {
+        controller.update(running ? 1 : 0, running ? 'running' : 'ready')
+      } catch {
+        // Web Audio実装が壊れていても、走行状態や画面操作を止めない。
+      }
+    },
+    dispose() {
+      try {
+        controller.dispose()
+      } catch {
+        // 解放処理の失敗も画面離脱を妨げない。
+      }
+    },
+  }
+}

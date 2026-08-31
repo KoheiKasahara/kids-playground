@@ -95,6 +95,8 @@ describe('quizSound', () => {
       playMazeWallHitSound,
       playMazeStarSound,
       playMazeGoalSound,
+      playCarDepartureSound,
+      createCarRoadSoundController,
     } = await import('./quizSound')
 
     expect(() => playCorrectSound()).not.toThrow()
@@ -104,6 +106,8 @@ describe('quizSound', () => {
     expect(() => playMazeWallHitSound(0.5)).not.toThrow()
     expect(() => playMazeStarSound(0)).not.toThrow()
     expect(() => playMazeGoalSound()).not.toThrow()
+    expect(() => playCarDepartureSound()).not.toThrow()
+    expect(() => createCarRoadSoundController().setRunning(true)).not.toThrow()
     expect(instances).toHaveLength(0)
   })
 
@@ -361,6 +365,49 @@ describe('quizSound', () => {
     controller.dispose()
     expect((instances[0].createOscillator.mock.results[0].value as MockOscillatorNode).stop).toHaveBeenCalledTimes(1)
     expect(() => controller.update(1, 'running')).not.toThrow()
+  })
+
+  test('くるまの出発音と走行音は、再走行しても音源を重ねず停止できる', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playCarDepartureSound, createCarRoadSoundController } = await import('./quizSound')
+
+    playCarDepartureSound()
+    playCarDepartureSound()
+    const controller = createCarRoadSoundController()
+    controller.setRunning(true)
+    controller.setRunning(true)
+    controller.setRunning(false)
+    controller.setRunning(true)
+
+    expect(instances).toHaveLength(1)
+    // 出発音2音 + 走行音1音。出発音はクールダウンで間引き、走行の再開では同じ音源を再利用する。
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(3)
+    expect(instances[0].createGain).toHaveBeenCalledTimes(3)
+    const drivingGain = instances[0].createGain.mock.results[2].value as MockGainNode
+    expect(drivingGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 0.045)
+
+    controller.dispose()
+    expect((instances[0].createOscillator.mock.results[2].value as MockOscillatorNode).stop).toHaveBeenCalledTimes(1)
+  })
+
+  test('くるま用SEはAudio APIの失敗をゲーム側へ投げない', async () => {
+    class BrokenAudioContext {
+      currentTime = 0
+      state = 'running' as const
+      destination = {}
+      createOscillator(): never { throw new Error('audio unavailable') }
+      createGain(): never { throw new Error('audio unavailable') }
+    }
+
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = BrokenAudioContext
+    vi.resetModules()
+    const { playCarDepartureSound, createCarRoadSoundController } = await import('./quizSound')
+    const controller = createCarRoadSoundController()
+
+    expect(() => playCarDepartureSound()).not.toThrow()
+    expect(() => controller.setRunning(true)).not.toThrow()
+    expect(() => controller.dispose()).not.toThrow()
   })
 
   test('レール音もAudioContext非対応環境では例外を投げない', async () => {
