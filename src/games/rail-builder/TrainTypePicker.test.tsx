@@ -57,8 +57,14 @@ describe('TrainTypePicker', () => {
     for (const thumbnail of thumbnails) {
       expect(thumbnail.getAttribute('data-silhouette')).toBeTruthy()
       expect(thumbnail.getAttribute('data-nose-style')).toBeTruthy()
+      expect(thumbnail).toHaveAttribute('data-thumbnail-quality', 'bezier-shell-v2')
       expect(Number(thumbnail.getAttribute('data-window-count'))).toBeGreaterThan(0)
-      expect(thumbnail.querySelector('path')).not.toBeNull()
+      expect(thumbnail.querySelector('[data-part="body"]')).toHaveAttribute('d', expect.stringContaining('C'))
+      expect(thumbnail.querySelector('[data-part="nose"]')).toHaveAttribute('d', expect.stringContaining('C'))
+      expect(thumbnail.querySelector('[data-part="roof"]')).toHaveAttribute('d', expect.stringContaining('C'))
+      expect(thumbnail.querySelector('[data-part="door"]')).toHaveAttribute('d', expect.stringContaining('C'))
+      expect(thumbnail.querySelector('[data-part="side-window"]')).toHaveAttribute('d', expect.stringContaining('C'))
+      expect(thumbnail.querySelectorAll('linearGradient')).toHaveLength(4)
     }
   })
 
