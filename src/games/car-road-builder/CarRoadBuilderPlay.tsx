@@ -60,8 +60,17 @@ type PaletteDragState = {
   active: boolean
 }
 
+type BoardDragState = {
+  cellId: string
+  pointerId: number
+  startX: number
+  startY: number
+  active: boolean
+}
+
 type DropPreview = Readonly<{
   kind: PartKind
+  rotationStep: number
   clientX: number
   clientY: number
   cellId: string | null
@@ -74,12 +83,13 @@ export default function CarRoadBuilderPlay() {
   const [stageId, setStageId] = useState<StageId>('normal')
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null)
   const [selectedKind, setSelectedKind] = useState<PartKind | null>(null)
+  const [draggingCellId, setDraggingCellId] = useState<string | null>(null)
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null)
   const [phase, setPhase] = useState<PlayPhase>('ready')
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('パーツを えらんで、みちを つなごう')
   const animationRef = useRef<number | null>(null)
-  const dragFromCell = useRef<string | null>(null)
+  const boardDrag = useRef<BoardDragState | null>(null)
   const paletteDrag = useRef<PaletteDragState | null>(null)
   const boardRef = useRef<HTMLDivElement | null>(null)
   const suppressClick = useRef(false)
@@ -145,22 +155,24 @@ export default function CarRoadBuilderPlay() {
     setStatus('おいたよ。つなぎめを みてみよう')
   }, [board, resetAfterEdit])
 
-  const previewAt = useCallback((kind: PartKind, clientX: number, clientY: number): DropPreview => {
+  const previewAt = useCallback((part: Readonly<{ kind: PartKind; rotationStep: number }>, clientX: number, clientY: number, sourceCellId?: string): DropPreview => {
     const boardElement = boardRef.current
     const rect = boardElement?.getBoundingClientRect()
     if (!rect || rect.width <= 0 || rect.height <= 0 || clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) {
-      return { kind, clientX, clientY, cellId: null, valid: false }
+      return { kind: part.kind, rotationStep: part.rotationStep, clientX, clientY, cellId: null, valid: false }
     }
 
     const col = Math.floor(((clientX - rect.left) / rect.width) * board.size.cols)
     const row = Math.floor(((clientY - rect.top) / rect.height) * board.size.rows)
     const cell = board.cells.find((candidate) => candidate.row === row && candidate.col === col)
+    const boardWithoutSource = sourceCellId ? removePart(board, sourceCellId) : board
     return {
-      kind,
+      kind: part.kind,
+      rotationStep: part.rotationStep,
       clientX,
       clientY,
       cellId: cell?.id ?? null,
-      valid: cell ? canPlacePart(board, cell.id, createPlacedPart(kind)) : false,
+      valid: cell ? canPlacePart(boardWithoutSource, cell.id, createPlacedPart(part.kind, part.rotationStep)) : false,
     }
   }, [board])
 
@@ -189,7 +201,7 @@ export default function CarRoadBuilderPlay() {
     }
 
     event.preventDefault()
-    setDropPreview(previewAt(kind, event.clientX, event.clientY))
+    setDropPreview(previewAt(createPlacedPart(kind), event.clientX, event.clientY))
   }, [previewAt])
 
   const finishPalettePointer = useCallback((kind: PartKind, event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
@@ -198,7 +210,7 @@ export default function CarRoadBuilderPlay() {
 
     if (drag.active) {
       event.preventDefault()
-      const preview = cancelled ? null : previewAt(kind, event.clientX, event.clientY)
+      const preview = cancelled ? null : previewAt(createPlacedPart(kind), event.clientX, event.clientY)
       const target = preview?.cellId ? board.cells.find((cell) => cell.id === preview.cellId) : undefined
       if (preview && target && preview.valid) place(target, kind)
       else if (!cancelled) {
@@ -259,29 +271,90 @@ export default function CarRoadBuilderPlay() {
     setSelectedCellId(cell.id)
   }, [board, place, resetAfterEdit, running, selectedCellId, selectedKind])
 
-  const handleCellPointerDown = useCallback((cell: BoardCell) => {
-    if (!running && selectedKind === null && cell.kind !== null) dragFromCell.current = cell.id
+  const handleCellPointerDown = useCallback((cell: BoardCell, event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (running || selectedKind !== null || cell.kind === null) return
+    if (event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0)) return
+    boardDrag.current = {
+      cellId: cell.id,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+    }
+    // Capture on the source cell so the board still receives the end of the
+    // gesture when the finger leaves that cell or the board entirely.
+    event.currentTarget.setPointerCapture?.(event.pointerId)
   }, [running, selectedKind])
 
-  const handleCellPointerUp = useCallback((cell: BoardCell) => {
-    if (running) return
-    const from = dragFromCell.current
-    if (from !== null) {
-      dragFromCell.current = null
-      if (from !== cell.id) {
-        const next = movePart(board, from, cell.id)
-        if (next === board) setStatus('そこには おけないよ')
-        else {
-          setBoard(next)
-          resetAfterEdit()
-          setSelectedCellId(cell.id)
-          setStatus('うごかしたよ')
-        }
-        suppressClick.current = true
-      }
-      return
+  const handleCellPointerMove = useCallback((_cell: BoardCell, event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = boardDrag.current
+    if (!drag || drag.pointerId !== event.pointerId || running) return
+    const source = board.cells.find((candidate) => candidate.id === drag.cellId)
+    if (!source?.kind) return
+
+    if (!drag.active) {
+      const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY)
+      if (distance < DRAG_START_DISTANCE) return
+      drag.active = true
+      setDraggingCellId(source.id)
+      setSelectedCellId(source.id)
+      setSelectedKind(null)
+      setStatus(`${PART_DEFINITIONS[source.kind].label}を つかんだよ。おく ばしょへ もっていこう`)
     }
-  }, [board, resetAfterEdit, running])
+
+    const part = createPlacedPart(source.kind, source.rotationStep)
+    event.preventDefault()
+    setDropPreview(previewAt(part, event.clientX, event.clientY, source.id))
+  }, [board, previewAt, running])
+
+  const finishBoardPointer = useCallback((_cell: BoardCell, event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
+    const drag = boardDrag.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    boardDrag.current = null
+    if (!drag.active) return
+
+    setDraggingCellId(null)
+    event.preventDefault()
+    const source = board.cells.find((candidate) => candidate.id === drag.cellId)
+    const preview = cancelled || !source?.kind ? null : previewAt(
+      createPlacedPart(source.kind, source.rotationStep),
+      event.clientX,
+      event.clientY,
+      source.id,
+    )
+    const target = preview?.cellId ? board.cells.find((candidate) => candidate.id === preview.cellId) : undefined
+    if (source && preview && target && preview.valid && target.id !== source.id) {
+      const next = movePart(board, source.id, target.id)
+      if (next !== board) {
+        setBoard(next)
+        resetAfterEdit()
+        setSelectedCellId(target.id)
+        setStatus('うごかしたよ')
+      }
+    } else if (!preview || !target || !preview.valid) {
+      setSelectedCellId(source?.id ?? null)
+      setStatus('そこには おけないよ')
+    } else {
+      // Returning to the origin is a successful no-op; do not rewrite board
+      // state or alter the part's orientation.
+      setSelectedCellId(source?.id ?? null)
+      setStatus('そのままだよ')
+    }
+    setDropPreview(null)
+    // Pointerup may be followed by a synthetic click on the source button.
+    suppressClick.current = true
+    window.setTimeout(() => { suppressClick.current = false }, 0)
+  }, [board, previewAt, resetAfterEdit])
+
+  const handleCellPointerUp = useCallback((cell: BoardCell, event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (running) return
+    finishBoardPointer(cell, event)
+  }, [finishBoardPointer, running])
+
+  const handleCellPointerCancel = useCallback((cell: BoardCell, event: ReactPointerEvent<HTMLButtonElement>) => {
+    finishBoardPointer(cell, event, true)
+  }, [finishBoardPointer])
 
   const selectKind = useCallback((kind: PartKind) => {
     if (suppressClick.current) {
@@ -343,6 +416,8 @@ export default function CarRoadBuilderPlay() {
     setBoard(createDemoBoard(STAGES[nextStageId].size))
     setSelectedCellId(null)
     setSelectedKind(null)
+    setDraggingCellId(null)
+    boardDrag.current = null
     paletteDrag.current = null
     setDropPreview(null)
     setPhase('ready')
@@ -394,10 +469,13 @@ export default function CarRoadBuilderPlay() {
               board={board}
               boardRef={boardRef}
               selectedCellId={selectedCellId}
+              draggingCellId={draggingCellId}
               running={running}
               onCellClick={handleCellClick}
               onCellPointerDown={handleCellPointerDown}
+              onCellPointerMove={handleCellPointerMove}
               onCellPointerUp={handleCellPointerUp}
+              onCellPointerCancel={handleCellPointerCancel}
               dropPreview={dropPreview}
               carSample={carSample}
               carAtStart={carSample ? null : carAtStart}

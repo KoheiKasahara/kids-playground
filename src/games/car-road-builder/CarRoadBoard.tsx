@@ -9,11 +9,14 @@ export type CarRoadBoardProps = {
   board: Board
   boardRef?: Ref<HTMLDivElement>
   selectedCellId?: string | null
+  draggingCellId?: string | null
   running?: boolean
   onCellClick?: (cell: BoardCell) => void
   onCellPointerDown?: (cell: BoardCell, event: PointerEvent<HTMLButtonElement>) => void
+  onCellPointerMove?: (cell: BoardCell, event: PointerEvent<HTMLButtonElement>) => void
   onCellPointerUp?: (cell: BoardCell, event: PointerEvent<HTMLButtonElement>) => void
-  dropPreview?: Readonly<{ kind: PartKind; cellId: string | null; valid: boolean }> | null
+  onCellPointerCancel?: (cell: BoardCell, event: PointerEvent<HTMLButtonElement>) => void
+  dropPreview?: Readonly<{ kind: PartKind; rotationStep: number; cellId: string | null; valid: boolean }> | null
   carSample?: RouteSample | null
   carAtStart?: Readonly<{ x: number; y: number }> | null
   carAngle?: number
@@ -46,7 +49,7 @@ function cellLabel(cell: BoardCell): string {
   return cell.kind ? `${PART_DEFINITIONS[cell.kind].label}、${location}` : `あきセル、${location}`
 }
 
-export default function CarRoadBoard({ board, boardRef, selectedCellId = null, running = false, onCellClick, onCellPointerDown, onCellPointerUp, dropPreview = null, carSample = null, carAtStart = null, carAngle = 0 }: CarRoadBoardProps) {
+export default function CarRoadBoard({ board, boardRef, selectedCellId = null, draggingCellId = null, running = false, onCellClick, onCellPointerDown, onCellPointerMove, onCellPointerUp, onCellPointerCancel, dropPreview = null, carSample = null, carAtStart = null, carAngle = 0 }: CarRoadBoardProps) {
   return (
     <div className={styles.boardFrame} data-testid="car-road-board" aria-label="みちの ばんめん">
       <div
@@ -69,11 +72,14 @@ export default function CarRoadBoard({ board, boardRef, selectedCellId = null, r
               aria-label={cellLabel(cell)}
               aria-selected={selectedCellId === cell.id}
               disabled={running}
-              className={`${styles.cell} ${cell.kind ? styles[cell.kind] : styles.empty} ${selectedCellId === cell.id ? styles.selected : ''}`}
+              className={`${styles.cell} ${cell.kind ? styles[cell.kind] : styles.empty} ${selectedCellId === cell.id ? styles.selected : ''} ${draggingCellId === cell.id ? styles.dragging : ''}`}
               style={partStyle}
+              aria-grabbed={draggingCellId === cell.id}
               onClick={() => onCellClick?.(cell)}
               onPointerDown={(event) => onCellPointerDown?.(cell, event)}
+              onPointerMove={(event) => onCellPointerMove?.(cell, event)}
               onPointerUp={(event) => onCellPointerUp?.(cell, event)}
+              onPointerCancel={(event) => onCellPointerCancel?.(cell, event)}
             >
               {part && <RoadPartVisual part={part} />}
             </button>
@@ -86,11 +92,11 @@ export default function CarRoadBoard({ board, boardRef, selectedCellId = null, r
             <span
               data-testid="car-road-drop-preview"
               data-valid={dropPreview.valid}
-              className={`${styles.dropPreview} ${dropPreview.valid ? styles.dropAllowed : styles.dropForbidden}`}
-              style={{ gridColumn: target.col + 1, gridRow: target.row + 1 }}
+              className={`${styles.dropPreview} ${styles[dropPreview.kind]} ${dropPreview.valid ? styles.dropAllowed : styles.dropForbidden}`}
+              style={{ gridColumn: target.col + 1, gridRow: target.row + 1, '--rotation': dropPreview.rotationStep } as CSSProperties}
               aria-hidden="true"
             >
-              <RoadPartVisual part={createPlacedPart(dropPreview.kind)} />
+              <RoadPartVisual part={createPlacedPart(dropPreview.kind, dropPreview.rotationStep)} />
             </span>
           )
         })()}
