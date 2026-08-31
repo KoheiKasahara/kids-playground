@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import type { PianoNote } from './notes'
 import type { PianoVoiceHandle } from './pianoAudio'
 import { PianoSongPlayer } from './pianoSongPlayer'
 import { PIANO_SONGS, type PianoSong } from './pianoSongs'
@@ -97,7 +98,11 @@ describe('PianoSongPlayer', () => {
     let voiceId = 0
     const engine = {
       activate: vi.fn(),
-      playNote: vi.fn(() => ({ id: ++voiceId }) satisfies PianoVoiceHandle),
+      playNote: vi.fn((note: PianoNote, durationMs: number) => {
+        void note
+        void durationMs
+        return { id: ++voiceId } satisfies PianoVoiceHandle
+      }),
       stopNote: vi.fn(),
     }
     const callbacks = {
@@ -114,6 +119,9 @@ describe('PianoSongPlayer', () => {
 
     expect(engine.activate).toHaveBeenCalledTimes(1)
     expect(engine.playNote).toHaveBeenCalledTimes(noteCount)
+    expect(engine.playNote.mock.calls.map(([note]) => note.id)).toEqual(
+      song.timeline.filter((item) => item.kind === 'note').map((item) => item.noteId),
+    )
     expect(callbacks.onNoteStart).toHaveBeenCalledTimes(noteCount)
     expect(callbacks.onNoteEnd).toHaveBeenCalledTimes(noteCount)
     expect(callbacks.onClearHighlights).toHaveBeenCalledTimes(1)

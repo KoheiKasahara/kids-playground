@@ -3,7 +3,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import PianoPlay from './PianoPlay'
 import styles from './PianoPlay.module.css'
-import { PIANO_SONGS } from './pianoSongs'
+import { PIANO_SONGS, findPianoSong } from './pianoSongs'
+import { PianoSongPlayer } from './pianoSongPlayer'
 
 class MockAudioParam {
   value = 0
@@ -91,6 +92,16 @@ describe('PianoPlay', () => {
 
     expect(within(screen.getByLabelText('きょくを えらぶ')).getAllByRole('option')).toHaveLength(PIANO_SONGS.length)
     expect(screen.getByRole('option', { name: 'ハッピーバースデー' })).toBeInTheDocument()
+  })
+
+  test.each(PIANO_SONGS.map((song) => song.id))('曲選択の%sはIDに対応する曲データを自動演奏へ渡す', (songId) => {
+    const play = vi.spyOn(PianoSongPlayer.prototype, 'play').mockImplementation(() => {})
+    renderPiano()
+
+    fireEvent.change(screen.getByLabelText('きょくを えらぶ'), { target: { value: songId } })
+    fireEvent.click(screen.getByRole('button', { name: /さいせい/ }))
+
+    expect(play).toHaveBeenCalledWith(findPianoSong(songId))
   })
 
   test('5種類の楽器を選べる', () => {
