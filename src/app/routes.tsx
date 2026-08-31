@@ -1,6 +1,7 @@
-import { lazy, type ComponentType } from 'react'
+import { lazy, type ComponentType, type ReactElement } from 'react'
 import { Navigate, type RouteObject } from 'react-router-dom'
 import Home from '../pages/Home'
+import GamePlaySurface from '../components/GamePlaySurface'
 import FlagQuizStart from '../games/flag-quiz/FlagQuizStart'
 import FlagQuizLevelSelect from '../games/flag-quiz/FlagQuizLevelSelect'
 import FlagQuizPlay from '../games/flag-quiz/FlagQuizPlay'
@@ -40,6 +41,12 @@ const lazyRoute = (loader: () => Promise<{ default: ComponentType }>) => {
   return <Screen />
 }
 
+// 実プレイ画面（長押しメニュー・文字選択・画像ドラッグを抑制したい範囲）だけをGamePlaySurfaceで
+// 包むための小さなヘルパー。開始画面・むずかしさ選択・結果画面には使わない（Issue #166）。
+// ステージ選択とプレイ画面が同一route内で切り替わるゲーム（flag-roll-puzzle・domino-flag）は
+// routeでは包まず、各コンポーネント内でプレイ側の描画だけを条件付きに包んでいる。
+const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePlaySurface>
+
 // さんすうクイズは4モード(add/sub/mul/div)ぶんの「むずかしさ選択・プレイ・結果」が
 // 完全に同型のため、直書きの繰り返しを避けて配列から組み立てる。
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
@@ -50,7 +57,7 @@ export const routes: RouteObject[] = [
   { path: '/games/flag-quiz/flag-to-name', element: <FlagQuizLevelSelect mode="flagToName" /> },
   {
     path: '/games/flag-quiz/flag-to-name/:level/play',
-    element: <FlagQuizPlay mode="flagToName" />,
+    element: playRoute(<FlagQuizPlay mode="flagToName" />),
   },
   {
     path: '/games/flag-quiz/flag-to-name/:level/result',
@@ -59,7 +66,7 @@ export const routes: RouteObject[] = [
   { path: '/games/flag-quiz/name-to-flag', element: <FlagQuizLevelSelect mode="nameToFlag" /> },
   {
     path: '/games/flag-quiz/name-to-flag/:level/play',
-    element: <FlagQuizPlay mode="nameToFlag" />,
+    element: playRoute(<FlagQuizPlay mode="nameToFlag" />),
   },
   {
     path: '/games/flag-quiz/name-to-flag/:level/result',
@@ -68,7 +75,7 @@ export const routes: RouteObject[] = [
   { path: '/games/flag-quiz/panel-flag', element: <FlagQuizLevelSelect mode="panelFlag" /> },
   {
     path: '/games/flag-quiz/panel-flag/:level/play',
-    element: <PanelFlagQuizPlay />,
+    element: playRoute(<PanelFlagQuizPlay />),
   },
   {
     path: '/games/flag-quiz/panel-flag/:level/result',
@@ -81,7 +88,7 @@ export const routes: RouteObject[] = [
   },
   {
     path: '/games/working-vehicle-quiz/photo-to-name/:level/play',
-    element: <WorkingVehicleQuizPlay mode="photoToName" />,
+    element: playRoute(<WorkingVehicleQuizPlay mode="photoToName" />),
   },
   {
     path: '/games/working-vehicle-quiz/photo-to-name/:level/result',
@@ -93,25 +100,25 @@ export const routes: RouteObject[] = [
   },
   {
     path: '/games/working-vehicle-quiz/name-to-photo/:level/play',
-    element: <WorkingVehicleQuizPlay mode="nameToPhoto" />,
+    element: playRoute(<WorkingVehicleQuizPlay mode="nameToPhoto" />),
   },
   {
     path: '/games/working-vehicle-quiz/name-to-photo/:level/result',
     element: <WorkingVehicleQuizResult mode="nameToPhoto" />,
   },
   { path: '/games/vegetable-quiz', element: <VegetableQuizStart /> },
-  { path: '/games/vegetable-quiz/image-to-name/play', element: <VegetableQuizPlay mode="imageToName" /> },
+  { path: '/games/vegetable-quiz/image-to-name/play', element: playRoute(<VegetableQuizPlay mode="imageToName" />) },
   { path: '/games/vegetable-quiz/image-to-name/result', element: <VegetableQuizResult mode="imageToName" /> },
-  { path: '/games/vegetable-quiz/name-to-image/play', element: <VegetableQuizPlay mode="nameToImage" /> },
+  { path: '/games/vegetable-quiz/name-to-image/play', element: playRoute(<VegetableQuizPlay mode="nameToImage" />) },
   { path: '/games/vegetable-quiz/name-to-image/result', element: <VegetableQuizResult mode="nameToImage" /> },
   { path: '/games/fruit-quiz', element: <FruitQuizStart /> },
-  { path: '/games/fruit-quiz/image-to-name/play', element: <FruitQuizPlay mode="imageToName" /> },
+  { path: '/games/fruit-quiz/image-to-name/play', element: playRoute(<FruitQuizPlay mode="imageToName" />) },
   { path: '/games/fruit-quiz/image-to-name/result', element: <FruitQuizResult mode="imageToName" /> },
-  { path: '/games/fruit-quiz/name-to-image/play', element: <FruitQuizPlay mode="nameToImage" /> },
+  { path: '/games/fruit-quiz/name-to-image/play', element: playRoute(<FruitQuizPlay mode="nameToImage" />) },
   { path: '/games/fruit-quiz/name-to-image/result', element: <FruitQuizResult mode="nameToImage" /> },
   { path: '/games/math-quiz', element: <MathQuizStart /> },
   { path: '/games/color-mix-quiz', element: <ColorMixQuizStart /> },
-  { path: '/games/color-mix-quiz/play', element: <ColorMixQuizPlay /> },
+  { path: '/games/color-mix-quiz/play', element: playRoute(<ColorMixQuizPlay />) },
   { path: '/games/color-mix-quiz/result', element: <ColorMixQuizResult /> },
   // Old difficulty URLs now begin the single colour-mix game directly.
   { path: '/games/color-mix-quiz/level', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
@@ -120,33 +127,37 @@ export const routes: RouteObject[] = [
   // こっきピンボールは物理エンジン(matter-js)を含み main chunk のサイズ警告を超えるため、
   // 旅行クイズの世界地図と同様に開くときだけ読込む。
   { path: '/games/flag-pinball', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballSelect')) },
-  { path: '/games/flag-pinball/play', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballPlay')) },
+  { path: '/games/flag-pinball/play', element: playRoute(lazyRoute(() => import('../games/flag-pinball/FlagPinballPlay'))) },
   { path: '/games/flag-pinball/result', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballResult')) },
+  // 国旗選択一覧とプレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // DominoFlagPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/domino-flag', element: lazyRoute(() => import('../games/domino-flag/DominoFlagPlay')) },
   // 選択画面と、Three.js・Rapier(wasm)を使うプレイ画面を必要なときだけ読込む。
   { path: '/games/flag-roll-maze', element: lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazeSelect')) },
-  { path: '/games/flag-roll-maze/play', element: lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazePlay')) },
+  { path: '/games/flag-roll-maze/play', element: playRoute(lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazePlay'))) },
   // こっきコロコロパズルも物理エンジン(matter-js)を含むため、開くときだけ読込む。
+  // 選択画面とプレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // FlagRollPuzzlePlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/flag-roll-puzzle', element: lazyRoute(() => import('../games/flag-roll-puzzle/FlagRollPuzzlePlay')) },
-  { path: '/games/earth-globe', element: lazyRoute(() => import('../games/earth-globe/EarthGlobePlay')) },
-  { path: '/games/planet-globe', element: lazyRoute(() => import('../games/planet-globe/PlanetGlobePlay')) },
-  { path: '/games/rail-builder', element: lazyRoute(() => import('../games/rail-builder/RailBuilderPlay')) },
+  { path: '/games/earth-globe', element: playRoute(lazyRoute(() => import('../games/earth-globe/EarthGlobePlay'))) },
+  { path: '/games/planet-globe', element: playRoute(lazyRoute(() => import('../games/planet-globe/PlanetGlobePlay'))) },
+  { path: '/games/rail-builder', element: playRoute(lazyRoute(() => import('../games/rail-builder/RailBuilderPlay'))) },
   { path: '/games/flag-roll-adventure', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventureSelect')) },
-  { path: '/games/flag-roll-adventure/play', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventurePlay')) },
+  { path: '/games/flag-roll-adventure/play', element: playRoute(lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventurePlay'))) },
   { path: '/games/flag-roll-adventure/goal', element: lazyRoute(() => import('../games/flag-roll-adventure/FlagRollAdventureGoal')) },
   { path: '/games/prefecture-quiz', element: <PrefectureQuizStart /> },
   { path: '/games/prefecture-quiz/puzzle', element: <PrefecturePuzzleStart /> },
-  { path: '/games/prefecture-quiz/puzzle/:region/play', element: <PrefecturePuzzlePlay /> },
-  { path: '/games/prefecture-quiz/:mode/play', element: <PrefectureQuizPlay /> },
+  { path: '/games/prefecture-quiz/puzzle/:region/play', element: playRoute(<PrefecturePuzzlePlay />) },
+  { path: '/games/prefecture-quiz/:mode/play', element: playRoute(<PrefectureQuizPlay />) },
   { path: '/games/prefecture-quiz/:mode/result', element: <PrefectureQuizResult /> },
   { path: '/games/world-travel-quiz', element: lazyRoute(() => import('../games/world-travel-quiz/WorldTravelQuizStart')) },
   { path: '/games/world-travel-quiz/:region/answer-mode', element: lazyRoute(() => import('../games/world-travel-quiz/WorldTravelAnswerModeSelect')) },
-  { path: '/games/world-travel-quiz/:region/:answerMode/play', element: lazyRoute(() => import('../games/world-travel-quiz/WorldTravelQuizPlay')) },
+  { path: '/games/world-travel-quiz/:region/:answerMode/play', element: playRoute(lazyRoute(() => import('../games/world-travel-quiz/WorldTravelQuizPlay'))) },
   { path: '/games/world-travel-quiz/:region/:answerMode/result', element: lazyRoute(() => import('../games/world-travel-quiz/WorldTravelQuizResult')) },
   { path: '/games/japan-travel-quiz', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizStart')) },
-  { path: '/games/japan-travel-quiz/play', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizPlay')) },
+  { path: '/games/japan-travel-quiz/play', element: playRoute(lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizPlay'))) },
   { path: '/games/japan-travel-quiz/result', element: lazyRoute(() => import('../games/japan-travel-quiz/JapanTravelQuizResult')) },
-  { path: '/games/piano-play', element: lazyRoute(() => import('../games/piano-play/PianoPlay')) },
+  { path: '/games/piano-play', element: playRoute(lazyRoute(() => import('../games/piano-play/PianoPlay'))) },
   ...MATH_QUIZ_MODES.flatMap((mode) => [
     {
       path: `/games/math-quiz/${MATH_QUIZ_MODE_PATH[mode]}`,
@@ -154,7 +165,7 @@ export const routes: RouteObject[] = [
     },
     {
       path: `/games/math-quiz/${MATH_QUIZ_MODE_PATH[mode]}/:level/play`,
-      element: <MathQuizPlay mode={mode} />,
+      element: playRoute(<MathQuizPlay mode={mode} />),
     },
     {
       path: `/games/math-quiz/${MATH_QUIZ_MODE_PATH[mode]}/:level/result`,

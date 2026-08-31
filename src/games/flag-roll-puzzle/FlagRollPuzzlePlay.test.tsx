@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
 import { CELL_SIZE, GRID_TOP } from './boardLayout'
 import type { PuzzleEngineOptions } from './usePuzzleEngine'
+import surfaceStyles from '../../components/GamePlaySurface.module.css'
 
 // 物理エンジン(matter-js)はjsdomでは動かさず、配置とゲーム進行の操作だけを検証する。
 // usePuzzleEngine を差し替え、ゴール到達は engineMock.options.onGoal() で直接起こす。
@@ -619,5 +620,19 @@ describe('こっきコロコロパズル', () => {
     await renderGame()
     await user.click(screen.getByRole('button', { name: 'やめる' }))
     expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
+  })
+})
+
+// 長押しメニュー・文字選択の抑制(Issue #166)は、ステージ選択画面では不要（むしろ通常のボタン
+// タップ操作を阻害しかねない）ため付けず、ステージを選んだ後の実プレイ画面だけに付ける。
+describe('こっきコロコロパズル: GamePlaySurfaceの適用範囲(Issue #166)', () => {
+  test('ステージ選択画面にはGamePlaySurfaceのclassが付かない', async () => {
+    await renderStageSelect()
+    expect(document.querySelector(`.${surfaceStyles.surface}`)).not.toBeInTheDocument()
+  })
+
+  test('ステージを選んだ実プレイ画面にはGamePlaySurfaceのclassが付く', async () => {
+    await renderGame()
+    expect(document.querySelector(`.${surfaceStyles.surface}`)).toBeInTheDocument()
   })
 })

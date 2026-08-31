@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../utils/quizSound'
 import { dominoFlags, type DominoFlagId } from './flagDefinitions'
 import DominoCompleteConfetti from './DominoCompleteConfetti'
@@ -73,7 +74,7 @@ export default function DominoFlagPlay() {
     setGameState('select')
   }
 
-  return (
+  const page = (
     <main className={styles.page}>
       <div ref={registerContainer} className={styles.scene} aria-hidden="true" />
       {gameState === 'complete' && flagId !== null && (
@@ -215,4 +216,8 @@ export default function DominoFlagPlay() {
       </button>
     </main>
   )
+
+  // 国旗選択一覧の状態には長押しメニュー・文字選択の抑制をかけず、
+  // 選択後（ready/running/complete）の実プレイ側だけをGamePlaySurfaceで包む（Issue #166）。
+  return gameState === 'select' ? page : <GamePlaySurface>{page}</GamePlaySurface>
 }

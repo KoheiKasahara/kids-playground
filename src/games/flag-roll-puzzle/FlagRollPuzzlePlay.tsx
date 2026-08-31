@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import GamePlaySurface from '../../components/GamePlaySurface'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { findFlagBall, type FlagBallData } from '../../components/flag-ball/flagBalls'
 import { playCorrectSound, playPanelOpenSound, primeAudio } from '../../utils/quizSound'
@@ -416,76 +417,29 @@ export default function FlagRollPuzzlePlay() {
     return <PuzzleStageSelect onSelect={handleSelectStage} />
   }
 
+  // ステージ選択後の実プレイ画面だけを長押しメニュー・文字選択の抑制対象にする
+  // （ステージ選択画面は上のearly returnで抜けているためここには来ない、Issue #166）。
   return (
-    <main className={styles.page} data-layout={isLandscapeLayout ? 'landscape' : 'portrait'}>
-      <header className={styles.header}>
-        <button type="button" className={styles.quit} onClick={() => navigate('/')}>
-          やめる
-        </button>
-        <h1 className={styles.title}>こっきコロコロパズル</h1>
-        <button
-          type="button"
-          className={styles.stageButton}
-          aria-label="ステージを えらびなおす"
-          disabled={!editing}
-          onClick={() => setSelectedStageId(null)}
-        >
-          {stage.emoji} {stage.nameJa}
-        </button>
-        {!isLandscapeLayout ? (
+    <GamePlaySurface>
+      <main className={styles.page} data-layout={isLandscapeLayout ? 'landscape' : 'portrait'}>
+        <header className={styles.header}>
+          <button type="button" className={styles.quit} onClick={() => navigate('/')}>
+            やめる
+          </button>
+          <h1 className={styles.title}>こっきコロコロパズル</h1>
           <button
             type="button"
-            className={[styles.flagButton, styles.headerFlagButton].join(' ')}
-            aria-label={`こっきを かえる（${flagButtonLabel}）`}
+            className={styles.stageButton}
+            aria-label="ステージを えらびなおす"
             disabled={!editing}
-            onClick={() => setFlagPickerOpen(true)}
+            onClick={() => setSelectedStageId(null)}
           >
-            <span className={styles.flagButtonLabel}>こっき</span>
-            <span className={styles.flagButtonBalls}>
-              {boardBalls.map((ball) => (
-                <FlagBall key={ball.id} flag={ball.flag} size={hasMultipleBalls ? 22 : 28} />
-              ))}
-            </span>
+            {stage.emoji} {stage.nameJa}
           </button>
-        ) : null}
-      </header>
-
-      <div className={styles.body} data-testid="puzzle-layout">
-        <div className={styles.boardPane} data-testid="puzzle-board-pane">
-          <PuzzleBoard
-            parts={state.parts}
-            selectedPartId={state.selectedPartId}
-            balls={boardBalls}
-            goalArea={state.goalArea}
-            ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
-            draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
-            highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
-            cleared={state.phase === 'cleared'}
-            justPlacedPartId={justPlacedPartId}
-            rotatingPartId={rotatingPartId}
-            invalidDrop={invalidDrop}
-            containerRef={containerRef}
-            boardRef={boardRef}
-            scale={scale}
-            width={width}
-            height={height}
-            registerBall={registerBall}
-            registerPartElement={registerPartElement}
-            onPointerDown={handleBoardPointerDown}
-            onPointerMove={handleDragMove}
-            onPointerUp={handleDragEnd}
-          />
-        </div>
-
-        {/*
-          ひとこと・パーツ置き場・操作ボタンのまとまり。
-          縦画面では盤面の下に積み、低い横画面では盤面の横へ回す（.body の row 切替）。
-        */}
-        <aside className={styles.side} aria-label="そうさパネル" data-testid="puzzle-control-pane">
-          {isLandscapeLayout ? (
+          {!isLandscapeLayout ? (
             <button
               type="button"
-              className={[styles.flagButton, styles.panelFlagButton].join(' ')}
+              className={[styles.flagButton, styles.headerFlagButton].join(' ')}
               aria-label={`こっきを かえる（${flagButtonLabel}）`}
               disabled={!editing}
               onClick={() => setFlagPickerOpen(true)}
@@ -496,77 +450,128 @@ export default function FlagRollPuzzlePlay() {
                   <FlagBall key={ball.id} flag={ball.flag} size={hasMultipleBalls ? 22 : 28} />
                 ))}
               </span>
-              <span className={styles.panelFlagName}>{flagButtonLabel}</span>
             </button>
           ) : null}
+        </header>
+
+        <div className={styles.body} data-testid="puzzle-layout">
+          <div className={styles.boardPane} data-testid="puzzle-board-pane">
+            <PuzzleBoard
+              parts={state.parts}
+              selectedPartId={state.selectedPartId}
+              balls={boardBalls}
+              goalArea={state.goalArea}
+              ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
+              draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
+              highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
+              cleared={state.phase === 'cleared'}
+              justPlacedPartId={justPlacedPartId}
+              rotatingPartId={rotatingPartId}
+              invalidDrop={invalidDrop}
+              containerRef={containerRef}
+              boardRef={boardRef}
+              scale={scale}
+              width={width}
+              height={height}
+              registerBall={registerBall}
+              registerPartElement={registerPartElement}
+              onPointerDown={handleBoardPointerDown}
+              onPointerMove={handleDragMove}
+              onPointerUp={handleDragEnd}
+            />
+          </div>
+
           {/*
-            ひとことと「けす」を同じ行に置き、選択中でも行の高さが変わらないようにする
-            （盤面の高さが選択のたびに動くと、置いたパーツの位置が見た目で動いてしまう）。
+            ひとこと・パーツ置き場・操作ボタンのまとまり。
+            縦画面では盤面の下に積み、低い横画面では盤面の横へ回す（.body の row 切替）。
           */}
-          <div className={styles.statusRow}>
-            <p className={styles.status} role="status" aria-live="polite" data-cleared={state.phase === 'cleared'}>
-              {status}
-            </p>
-            {partSelected ? (
-              <div className={styles.partActions}>
-                {selectedPart && isRotatablePart(selectedPart.typeId) ? (
-                  <button type="button" className={styles.rotateButton} onClick={handleRotateSelectedPart}>
-                    まわす
-                  </button>
-                ) : null}
-                <button type="button" className={styles.removeButton} onClick={handleRemoveSelectedPart}>
-                  えらんだ いたを けす
-                </button>
-              </div>
+          <aside className={styles.side} aria-label="そうさパネル" data-testid="puzzle-control-pane">
+            {isLandscapeLayout ? (
+              <button
+                type="button"
+                className={[styles.flagButton, styles.panelFlagButton].join(' ')}
+                aria-label={`こっきを かえる（${flagButtonLabel}）`}
+                disabled={!editing}
+                onClick={() => setFlagPickerOpen(true)}
+              >
+                <span className={styles.flagButtonLabel}>こっき</span>
+                <span className={styles.flagButtonBalls}>
+                  {boardBalls.map((ball) => (
+                    <FlagBall key={ball.id} flag={ball.flag} size={hasMultipleBalls ? 22 : 28} />
+                  ))}
+                </span>
+                <span className={styles.panelFlagName}>{flagButtonLabel}</span>
+              </button>
             ) : null}
-          </div>
+            {/*
+              ひとことと「けす」を同じ行に置き、選択中でも行の高さが変わらないようにする
+              （盤面の高さが選択のたびに動くと、置いたパーツの位置が見た目で動いてしまう）。
+            */}
+            <div className={styles.statusRow}>
+              <p className={styles.status} role="status" aria-live="polite" data-cleared={state.phase === 'cleared'}>
+                {status}
+              </p>
+              {partSelected ? (
+                <div className={styles.partActions}>
+                  {selectedPart && isRotatablePart(selectedPart.typeId) ? (
+                    <button type="button" className={styles.rotateButton} onClick={handleRotateSelectedPart}>
+                      まわす
+                    </button>
+                  ) : null}
+                  <button type="button" className={styles.removeButton} onClick={handleRemoveSelectedPart}>
+                    えらんだ いたを けす
+                  </button>
+                </div>
+              ) : null}
+            </div>
 
-          <PartTray
-            selectedTypeId={selectedTypeId}
-            disabled={!editing}
-            isLandscapeLayout={isLandscapeLayout}
-            availablePartTypeIds={stage.availablePartTypeIds}
-            onPartPointerDown={handlePartPointerDown}
-            onPartPointerMove={handleDragMove}
-            onPartPointerUp={handleDragEnd}
-            onPartClick={handlePartClick}
-          />
+            <PartTray
+              selectedTypeId={selectedTypeId}
+              disabled={!editing}
+              isLandscapeLayout={isLandscapeLayout}
+              availablePartTypeIds={stage.availablePartTypeIds}
+              onPartPointerDown={handlePartPointerDown}
+              onPartPointerMove={handleDragMove}
+              onPartPointerUp={handleDragEnd}
+              onPartClick={handlePartClick}
+            />
 
-          <div className={styles.controls}>
-            {editing ? (
-              <BigButton className={styles.dropButton} onClick={handleDrop}>
-                ボールを おとす！
-              </BigButton>
-            ) : (
-              <BigButton className={styles.dropButton} variant="secondary" onClick={handleReturnBall}>
-                ボールを もどす
-              </BigButton>
-            )}
-            <button type="button" className={styles.clearButton} onClick={handleClearAll}>
-              ぜんぶ けす
-            </button>
-          </div>
-        </aside>
-      </div>
-
-      {/* 指についてくるパーツの分身。盤面と同じ倍率で見せて、置いたときの大きさを想像しやすくする */}
-      {drag?.moved ? (
-        <div
-          className={styles.dragPreview}
-          style={{ left: drag.x, top: drag.y, transform: `scale(${scale})` }}
-          aria-hidden="true"
-        >
-          <PartShape typeId={drag.typeId} variant="dragging" />
+            <div className={styles.controls}>
+              {editing ? (
+                <BigButton className={styles.dropButton} onClick={handleDrop}>
+                  ボールを おとす！
+                </BigButton>
+              ) : (
+                <BigButton className={styles.dropButton} variant="secondary" onClick={handleReturnBall}>
+                  ボールを もどす
+                </BigButton>
+              )}
+              <button type="button" className={styles.clearButton} onClick={handleClearAll}>
+                ぜんぶ けす
+              </button>
+            </div>
+          </aside>
         </div>
-      ) : null}
 
-      {flagPickerOpen ? (
-        <FlagPickerDialog
-          balls={flagPickerBalls}
-          onSelect={handleFlagSelect}
-          onClose={() => setFlagPickerOpen(false)}
-        />
-      ) : null}
-    </main>
+        {/* 指についてくるパーツの分身。盤面と同じ倍率で見せて、置いたときの大きさを想像しやすくする */}
+        {drag?.moved ? (
+          <div
+            className={styles.dragPreview}
+            style={{ left: drag.x, top: drag.y, transform: `scale(${scale})` }}
+            aria-hidden="true"
+          >
+            <PartShape typeId={drag.typeId} variant="dragging" />
+          </div>
+        ) : null}
+
+        {flagPickerOpen ? (
+          <FlagPickerDialog
+            balls={flagPickerBalls}
+            onSelect={handleFlagSelect}
+            onClose={() => setFlagPickerOpen(false)}
+          />
+        ) : null}
+      </main>
+    </GamePlaySurface>
   )
 }

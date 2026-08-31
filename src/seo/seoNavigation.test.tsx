@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../app/App'
@@ -42,6 +42,17 @@ function expectSeoTags(seo: ReturnType<typeof buildGameSeo> | typeof HOME_SEO) {
   expect(document.head.querySelectorAll('meta[name="twitter:image"]')).toHaveLength(1)
 }
 
+/**
+ * SeoManagerのdocument書き換えはuseEffect（画面のコミット後に非同期で走るpassive effect）で
+ * 行われる。findByRoleで見えるDOMコミットのタイミングとpassive effectの発火タイミングは
+ * 本来ズレうるため（Issue #166でGamePlaySurfaceを1階層挟んだことで、CI環境の負荷次第では
+ * このズレが数msだが顕在化することがあった）、遷移直後の検証は即断せずwaitForで
+ * 追いつくのを待ってから確認する。
+ */
+async function expectSeoTagsEventually(seo: ReturnType<typeof buildGameSeo> | typeof HOME_SEO) {
+  await waitFor(() => expectSeoTags(seo))
+}
+
 describe('SPA遷移でのSEOメタ情報の切り替え', () => {
   test('トップ表示時はHOME_SEOの値になる', () => {
     render(
@@ -68,7 +79,7 @@ describe('SPA遷移でのSEOメタ情報の切り替え', () => {
 
     const planetGlobe = findGameBySlug('planet-globe')
     expect(planetGlobe).toBeDefined()
-    expectSeoTags(buildGameSeo(planetGlobe!))
+    await expectSeoTagsEventually(buildGameSeo(planetGlobe!))
   })
 
   test('さらに「3Dせんろづくり」へ遷移すると前ページ（たいようけい）の値が残らない', async () => {
@@ -83,7 +94,7 @@ describe('SPA遷移でのSEOメタ情報の切り替え', () => {
     const planetGlobe = findGameBySlug('planet-globe')
     expect(await screen.findByRole('heading', { name: /たいようけい/ })).toBeInTheDocument()
     const planetGlobeSeo = buildGameSeo(planetGlobe!)
-    expectSeoTags(planetGlobeSeo)
+    await expectSeoTagsEventually(planetGlobeSeo)
 
     // ゲーム画面の「もどる」ボタンでホームへ戻り、別のゲームへ遷移する。
     await user.click(screen.getByRole('button', { name: 'もどる' }))
@@ -93,7 +104,7 @@ describe('SPA遷移でのSEOメタ情報の切り替え', () => {
     const railBuilder = findGameBySlug('rail-builder')
     expect(railBuilder).toBeDefined()
     expect(await screen.findByRole('heading', { name: /3Dせんろづくり/ })).toBeInTheDocument()
-    expectSeoTags(buildGameSeo(railBuilder!))
+    await expectSeoTagsEventually(buildGameSeo(railBuilder!))
 
     // 前のページ（たいようけい）の文言が残っていないことも確認する。
     expect(document.title).not.toContain('たいようけい')
