@@ -298,3 +298,37 @@
     font-size: 12px;
   }
 }
+
+/*
+ * PCなど十分な横幅のある画面だけ、ステージ選択を横長パネルにする。
+ * min-height と pointer を組み合わせ、スマホ横（幅広でも高さが低く、タッチ操作）には
+ * このレイアウトを適用しない。スマホ側の既存指定は上書きしない。
+ */
+@media (min-width: 768px) and (min-height: 601px) and (pointer: fine) {
+  .page {
+    max-width: 960px;
+    min-height: auto;
+  }
+
+  .stageGrid {
+    flex: 0 0 auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-md);
+  }
+
+  .stageCell {
+    min-height: 112px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: var(--space-md);
+  }
+
+  .stageName,
+  .stageHint {
+    min-width: 0;
+  }
+
+  .actions {
+    width: min(100%, var(--content-max-width));
+    align-self: center;
+  }
+}
