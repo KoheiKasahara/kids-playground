@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createInitialBoard, placePartAt, removePart } from './boardModel'
+import { createInitialBoard, placePartAt } from './boardModel'
 import { createPlacedPart } from './partDefinitions'
 import { buildRoute } from './routeModel'
 
@@ -27,10 +27,14 @@ describe('car road route', () => {
     board = placePartAt(board, 0, 0, createPlacedPart('start', 0))
     board = placePartAt(board, 3, 3, createPlacedPart('goal'))
     expect(buildRoute(board).stopReason).toBe('edge')
-    board = placePartAt(removePart(board, { row: 0, col: 0 }), 0, 0, createPlacedPart('start', 2))
+    board = createInitialBoard()
+    board = placePartAt(board, 0, 0, createPlacedPart('start', 2))
+    board = placePartAt(board, 3, 3, createPlacedPart('goal'))
     board = placePartAt(board, 0, 1, createPlacedPart('straight', 0))
     expect(buildRoute(board).stopReason).toBe('mismatch')
-    board = placePartAt(removePart(board, { row: 0, col: 0 }), 0, 0, createPlacedPart('start', 7))
+    board = createInitialBoard()
+    board = placePartAt(board, 0, 0, createPlacedPart('start', 7))
+    board = placePartAt(board, 3, 3, createPlacedPart('goal'))
     expect(buildRoute(board).stopReason).toBe('edge')
   })
 

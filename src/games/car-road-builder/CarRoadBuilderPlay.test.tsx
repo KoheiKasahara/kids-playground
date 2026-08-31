@@ -150,6 +150,63 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })).toHaveStyle('--rotation: 1')
   })
 
+  test('moves start and goal to empty cells without duplicating them', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('gridcell', { name: 'スタート、1ぎょう 1れつ' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 2れつ' }))
+    expect(screen.getByRole('gridcell', { name: 'スタート、2ぎょう 2れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 1れつ' })).toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell', { name: /スタート/ })).toHaveLength(1)
+
+    await user.click(screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、3ぎょう 3れつ' }))
+    expect(screen.getByRole('gridcell', { name: 'ゴール、3ぎょう 3れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'あきセル、4ぎょう 4れつ' })).toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell', { name: /ゴール/ })).toHaveLength(1)
+  })
+
+  test('supports dragging start and goal to empty cells', () => {
+    renderPlay()
+    const board = mockBoardRect()
+    const start = screen.getByRole('gridcell', { name: 'スタート、1ぎょう 1れつ' })
+
+    fireEvent.pointerDown(start, pointerOptions(7, 50, 50))
+    fireEvent.pointerMove(start, pointerOptions(7, 150, 150))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    fireEvent.pointerUp(start, pointerOptions(7, 150, 150))
+
+    expect(screen.getByRole('gridcell', { name: 'スタート、2ぎょう 2れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 1れつ' })).toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell', { name: /スタート/ })).toHaveLength(1)
+
+    const goal = screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })
+    fireEvent.pointerDown(goal, pointerOptions(8, 350, 350))
+    fireEvent.pointerMove(goal, pointerOptions(8, 250, 250))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    fireEvent.pointerUp(goal, pointerOptions(8, 250, 250))
+
+    expect(screen.getByRole('gridcell', { name: 'ゴール、3ぎょう 3れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'あきセル、4ぎょう 4れつ' })).toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell', { name: /ゴール/ })).toHaveLength(1)
+    expect(board).toHaveAttribute('aria-rowcount', '4')
+    expect(board).toHaveAttribute('aria-colcount', '4')
+  })
+
+  test('does not let a marker move onto an occupied road cell', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'まっすぐを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 2れつ' }))
+    await user.click(screen.getByRole('gridcell', { name: 'スタート、1ぎょう 1れつ' }))
+    await user.click(screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' }))
+
+    expect(screen.getByRole('gridcell', { name: 'スタート、1ぎょう 1れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })).toBeInTheDocument()
+  })
+
   test('places road parts by tap and exposes rotate/delete controls', async () => {
     const user = userEvent.setup()
     renderPlay()
