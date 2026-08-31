@@ -29,7 +29,7 @@ function isPlayRoutePath(route: RouteObject & { path: string }): boolean {
   if (CONDITIONALLY_WRAPPED_PATHS.has(route.path)) return false
   if (elementType(route.element) === Navigate) return false
   if (route.path.endsWith('/play')) return true
-  return ['/games/earth-globe', '/games/planet-globe', '/games/rail-builder', '/games/car-road-builder', '/games/piano-play'].includes(route.path)
+  return ['/games/earth-globe', '/games/planet-globe', '/games/rail-builder', '/games/piano-play'].includes(route.path)
 }
 
 function elementTypeIsGamePlaySurface(element: RouteObject['element']): boolean {

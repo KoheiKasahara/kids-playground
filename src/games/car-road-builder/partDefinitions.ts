@@ -82,13 +82,19 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
     kind: 'goal',
     label: 'ゴール',
     emoji: '🏁',
-    // A goal accepts a car from every direction and does not rotate.
+    // A goal accepts a car from every direction. It may still be rotated in
+    // the editor so start/goal markers share the same move/rotate controls.
     baseConnections: DIRECTIONS,
-    rotationSteps: [0],
+    rotationSteps: ALL_ROTATIONS,
   },
 } as const
 
 export const PART_KINDS: readonly PartKind[] = ['start', 'straight', 'curve', 'gentle-curve', 'crossroad', 'xroad', 'goal']
+
+/** Start and goal are stage markers, not pieces offered by the palette. */
+export const ROAD_PART_KINDS: readonly Exclude<PartKind, 'start' | 'goal'>[] = [
+  'straight', 'curve', 'gentle-curve', 'crossroad', 'xroad',
+]
 
 export function getPartDefinition(kind: PartKind): PartDefinition {
   return PART_DEFINITIONS[kind]
@@ -103,7 +109,6 @@ export function allowedRotationSteps(kind: PartKind): readonly number[] {
 }
 
 export function normalizePartRotation(kind: PartKind, rotationStep: number): number {
-  if (kind === 'goal') return 0
   const normalized = normalizeRotationStep(rotationStep)
   if (kind === 'straight' || kind === 'crossroad') return normalized % 4
   if (kind === 'xroad') return normalized % 2 === 0 ? normalized : (normalized + 1) % 8

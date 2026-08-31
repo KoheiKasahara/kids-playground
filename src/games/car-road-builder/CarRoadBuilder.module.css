@@ -1,5 +1,4 @@
 .page {
-  --road-cell: clamp(64px, 20vw, 108px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -69,6 +68,47 @@
   font-size: clamp(15px, 4vw, 19px);
   font-weight: 800;
   text-align: center;
+}
+
+.stageSelectPage {
+  overflow: hidden;
+}
+
+.stageSelectContent {
+  display: flex;
+  flex: 1 1 auto;
+  width: min(100%, 520px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin: 0 auto;
+  padding: 16px 0 36px;
+}
+
+.stageSelectTitle {
+  margin: 0;
+  color: #176279;
+  font-size: clamp(22px, 6vw, 32px);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.stageSelectContent .stageOptions {
+  width: 100%;
+  gap: 12px;
+}
+
+.stageSelectContent .stageOption {
+  min-height: 112px;
+  padding: 10px;
+}
+
+.stageSelectContent .stageMiniBoard {
+  grid-template-columns: repeat(var(--stage-mini-cols), 9px);
+  grid-template-rows: repeat(var(--stage-mini-rows), 9px);
+  gap: 3px;
+  padding: 6px;
 }
 
 .stageSelector {
@@ -219,8 +259,9 @@
   flex: 1 1 auto;
   align-items: flex-start;
   justify-content: center;
+  width: 100%;
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
   padding: 2px 3px 7px;
   overscroll-behavior: contain;
 }
@@ -228,11 +269,16 @@
 .boardSizer {
   position: relative;
   flex: 0 0 auto;
-  width: max-content;
-  min-width: min(100%, 300px);
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
 }
 
 .boardFrame {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
   padding: 7px;
   border: 4px solid #70cbd0;
   border-radius: 22px;
@@ -250,6 +296,7 @@
 .board {
   position: relative;
   display: grid;
+  --road-cell: min(108px, calc((100vw - 56px) / var(--board-cols)));
   grid-template-columns: repeat(var(--board-cols), var(--road-cell));
   grid-template-rows: repeat(var(--board-rows), var(--road-cell));
   gap: 0;
@@ -262,8 +309,8 @@
   position: relative;
   display: grid;
   place-items: center;
-  min-width: var(--road-cell);
-  min-height: var(--road-cell);
+  width: var(--road-cell);
+  height: var(--road-cell);
   overflow: hidden;
   border: 0;
   border-radius: 0;
@@ -299,7 +346,7 @@
   overflow: hidden;
   pointer-events: none;
   color: #fbf4d8;
-  font-size: clamp(31px, 11vw, 62px);
+  font-size: clamp(20px, calc(var(--road-cell) * .58), 62px);
   font-weight: 900;
   line-height: 1;
   text-shadow: 0 2px 0 rgba(26, 78, 94, 0.3);
@@ -307,12 +354,12 @@
 }
 
 .start .roadShape,
-.goal .roadShape { font-size: clamp(35px, 13vw, 68px); transform: none; }
+.goal .roadShape { font-size: clamp(24px, calc(var(--road-cell) * .68), 68px); transform: none; }
 .pathShape { transform: none; }
 .roadSvg { display: block; width: 100%; height: 100%; overflow: hidden; }
 .roadSvg path { fill: none; stroke: #fbf4d8; stroke-linecap: round; stroke-linejoin: round; stroke-width: .18; filter: drop-shadow(0 .025px 0 rgba(26,78,94,.3)); }
 .roadHub { fill: #fbf4d8; stroke: #397e98; stroke-width: .03; }
-.markerEmoji { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(22px, 8vw, 43px); line-height: 1; text-shadow: 0 2px 0 rgba(26,78,94,.22); }
+.markerEmoji { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(18px, calc(var(--road-cell) * .44), 43px); line-height: 1; text-shadow: 0 2px 0 rgba(26,78,94,.22); }
 .car {
   position: absolute;
   z-index: 2;
