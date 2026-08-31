@@ -12,7 +12,6 @@ type VehiclePickerProps = Readonly<{
 export default function VehiclePicker({ selectedVehicleId, disabled = false, onSelect }: VehiclePickerProps) {
   return (
     <section className={styles.vehiclePicker} aria-label="くるまを えらぶ">
-      <p className={styles.vehiclePickerTitle}>くるまを えらんでね</p>
       <div className={styles.vehicleOptions} role="group" aria-label="くるま選択">
         {VEHICLE_DEFINITIONS.map((vehicle) => (
           <button
