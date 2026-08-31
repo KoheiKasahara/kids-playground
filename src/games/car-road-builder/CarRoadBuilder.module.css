@@ -14,7 +14,7 @@
 
 .header {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 6px;
   width: min(100%, 680px);
@@ -34,7 +34,6 @@
 }
 
 .backButton,
-.expandButton,
 .selectionTools button {
   min-height: 46px;
   border: 2px solid rgba(23, 98, 121, 0.14);
@@ -49,13 +48,11 @@
 
 .backButton { padding: 4px 9px; font-size: 14px; }
 .backButton span { font-size: 24px; vertical-align: -2px; }
-.expandButton { padding: 4px 11px; font-size: 15px; }
 .backButton:disabled,
-.expandButton:disabled,
 .selectionTools button:disabled { cursor: not-allowed; opacity: 0.42; }
 
 .backButton:focus-visible,
-.expandButton:focus-visible,
+.stageOption:focus-visible,
 .selectionTools button:focus-visible,
 .paletteItem:focus-visible,
 .cell:focus-visible,
@@ -72,6 +69,89 @@
   font-size: clamp(15px, 4vw, 19px);
   font-weight: 800;
   text-align: center;
+}
+
+.stageSelector {
+  flex: 0 0 auto;
+  width: min(100%, 520px);
+  margin: 0 auto;
+  padding: 4px 8px 6px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .62);
+}
+
+.stageTitle {
+  margin: 0 0 4px;
+  color: #286d7e;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.stageOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stageOption {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: 1fr 1fr;
+  column-gap: 8px;
+  align-items: center;
+  min-height: 62px;
+  padding: 5px 10px;
+  border: 3px solid rgba(23, 98, 121, .14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .92);
+  color: #245d70;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.stageOptionSelected {
+  border-color: #efa915;
+  background: #fff2bd;
+  box-shadow: 0 0 0 3px rgba(239, 169, 21, .2);
+}
+
+.stageOption:disabled { cursor: not-allowed; opacity: .48; }
+
+.stageMiniBoard {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1 / -1;
+  grid-template-columns: repeat(var(--stage-mini-cols), 7px);
+  grid-template-rows: repeat(var(--stage-mini-rows), 7px);
+  gap: 2px;
+  padding: 4px;
+  border: 2px solid #70cbd0;
+  border-radius: 8px;
+  background: #b9e7bc;
+}
+
+.stageMiniCell {
+  display: block;
+  border-radius: 2px;
+  background: #77b9d2;
+}
+
+.stageOptionLabel {
+  align-self: end;
+  font-size: clamp(16px, 4vw, 19px);
+  line-height: 1.1;
+  text-align: left;
+}
+
+.stageOptionSize {
+  align-self: start;
+  color: #5a8190;
+  font-size: 13px;
+  line-height: 1.1;
+  text-align: left;
 }
 
 .boardScroll {
