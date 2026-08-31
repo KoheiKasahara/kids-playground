@@ -114,14 +114,19 @@ describe('PianoPlay', () => {
     expect(screen.queryByText('じゅんびOK')).not.toBeInTheDocument()
   })
 
-  test('状態表示の予約領域を初期表示から維持し、状態変化で要素を入れ替えない', () => {
+  test('楽器準備メッセージを表示せず、再生状態の予約領域を維持する', () => {
     const { container } = renderPiano()
-    const instrumentStatus = container.querySelector(`.${styles.instrumentStatus}`)
     const playbackStatus = container.querySelector(`.${styles.playbackStatus}`)
+    const instrumentButtons = within(screen.getByRole('group', { name: 'おとを えらぶ' })).getAllByRole('button')
 
-    expect(instrumentStatus).toBeInTheDocument()
+    expect(screen.queryByText('おとの じゅんびちゅう…')).not.toBeInTheDocument()
     expect(playbackStatus).toBeInTheDocument()
     expect(playbackStatus).not.toHaveAttribute('role', 'status')
+
+    for (const instrumentButton of instrumentButtons) {
+      fireEvent.click(instrumentButton)
+      expect(screen.queryByText('おとの じゅんびちゅう…')).not.toBeInTheDocument()
+    }
 
     fireEvent.click(screen.getByRole('button', { name: /さいせい/ }))
     expect(container.querySelector(`.${styles.playbackStatus}`)).toBe(playbackStatus)
