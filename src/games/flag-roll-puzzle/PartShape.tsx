@@ -80,7 +80,7 @@ export default function PartShape({ typeId, variant = 'placed', motionRef }: Par
     const styleFor = (segment: typeof deck) => ({
       width: segment.width,
       height: segment.height,
-      transform: visualTransform(segment, definition.appearance),
+      transform: `translate(-50%, -50%) translate(${segment.offsetX}px, ${segment.offsetY}px) rotate(${segment.angleDeg}deg)`,
     })
     return (
       <>
@@ -110,7 +110,7 @@ export default function PartShape({ typeId, variant = 'placed', motionRef }: Par
           style={{
             width: segment.width,
             height: segment.height,
-            transform: `translate(-50%, -50%) translate(${segment.offsetX}px, ${segment.offsetY}px) rotate(${segment.angleDeg}deg)`,
+            transform: visualTransform(segment, definition.appearance),
           }}
         />
       ))}
