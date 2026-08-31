@@ -77,4 +77,24 @@ describe('car road geometry', () => {
     expect(northEastToSouthWest.end).toEqual(portPoint('SW'))
     expect(northEastToSouthWest.sample(0.5)).toEqual({ x: 0, y: 0 })
   })
+
+  test('double curve geometry renders two independent quadratic paths', () => {
+    const part = createPlacedPart('double-curve')
+    const northEast = getPathSpec(part, 'N')
+    const southWest = getPathSpec(part, 'S')
+
+    expect(northEast.segments[0]!.kind).toBe('quadratic')
+    expect(northEast.start).toEqual(portPoint('N'))
+    expect(northEast.end).toEqual(portPoint('E'))
+    expect(southWest.start).toEqual(portPoint('S'))
+    expect(southWest.end).toEqual(portPoint('W'))
+    expect(northEast.sample(0.5).x).toBeGreaterThan(0)
+    expect(northEast.sample(0.5).y).toBeLessThan(0)
+    expect(southWest.sample(0.5).x).toBeLessThan(0)
+    expect(southWest.sample(0.5).y).toBeGreaterThan(0)
+
+    const rotated = getPathSpec(createPlacedPart('double-curve', 2), 'E')
+    expect(rotated.start).toEqual(portPoint('E'))
+    expect(rotated.end).toEqual(portPoint('S'))
+  })
 })

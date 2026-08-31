@@ -1,5 +1,5 @@
 import { oppositeDirection, type Direction } from './direction'
-import { connectionsForPart, type PartKind, type PlacedPart } from './partDefinitions'
+import { connectionsForPart, exitPortForPart, type PartKind, type PlacedPart } from './partDefinitions'
 import { cellAt, findPartCell, getCellPart, neighborCell, type Board, type BoardCell } from './boardModel'
 import {
   getPathSpec,
@@ -62,9 +62,7 @@ function segmentFor(cell: BoardCell, part: PlacedPart, entryPort: Direction | nu
 }
 
 function otherPort(part: PlacedPart, entryPort: Direction): Direction | null {
-  const ports = connectionsForPart(part)
-  if (part.kind === 'crossroad' || part.kind === 'xroad') return oppositeDirection(entryPort)
-  return ports.find((port) => port !== entryPort) ?? null
+  return exitPortForPart(part, entryPort)
 }
 
 function routeResult(

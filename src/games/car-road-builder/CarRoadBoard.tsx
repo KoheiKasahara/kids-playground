@@ -34,6 +34,8 @@ function RoadPartVisual({ part }: { part: Readonly<{ kind: PartKind; rotationSte
     ? connections.map((direction) => getPathSpec(part, direction))
     : part.kind === 'crossroad' || part.kind === 'xroad'
       ? connections.slice(0, 2).map((direction) => getPathSpec(part, direction))
+      : part.kind === 'double-curve'
+        ? connections.filter((_direction, index) => index % 2 === 0).map((direction) => getPathSpec(part, direction))
       : [getPathSpec(part)]
 
   return (

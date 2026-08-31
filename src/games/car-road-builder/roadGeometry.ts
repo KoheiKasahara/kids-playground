@@ -1,5 +1,5 @@
 import { isCardinalDirection, oppositeDirection, type Direction } from './direction'
-import { connectionsForPart, type PartKind, type PlacedPart } from './partDefinitions'
+import { connectionsForPart, exitPortForPart, type PartKind, type PlacedPart } from './partDefinitions'
 
 export type Point = Readonly<{ x: number; y: number }>
 export type Vector = Point
@@ -196,17 +196,13 @@ export function createConnectorPath(start: Point, end: Point): PathSpec {
 function partPathBetweenPorts(kind: PartKind, from: Direction, to: Direction): PathSpec {
   const start = portPoint(from)
   const end = portPoint(to)
-  if (kind === 'curve' || kind === 'gentle-curve') {
+  if (kind === 'curve' || kind === 'gentle-curve' || kind === 'double-curve') {
     // A single quadratic keeps the tangent continuous through the bend. The
     // control point at the centre also makes all rotations use exactly the
     // same, shared geometry for drawing and driving.
     return createPathSpec(kind, [quadraticSegment(start, CELL_CENTER, end)])
   }
   return createPathSpec(kind, [lineSegment(start, end)])
-}
-
-function crossroadExit(entryPort: Direction): Direction {
-  return oppositeDirection(entryPort)
 }
 
 /**
@@ -223,9 +219,7 @@ export function getPathSpec(part: PlacedPart, entryPort?: Direction): PathSpec {
     return createConnectorPath(portPoint(port), CELL_CENTER)
   }
   const from = entryPort && ports.includes(entryPort) ? entryPort : ports[0]!
-  const to = part.kind === 'crossroad' || part.kind === 'xroad'
-    ? crossroadExit(from)
-    : ports.find((port) => port !== from) ?? ports[1] ?? from
+  const to = exitPortForPart(part, from) ?? from
   return partPathBetweenPorts(part.kind, from, to)
 }
 
