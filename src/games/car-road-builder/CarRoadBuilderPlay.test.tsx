@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import CarRoadBuilderPlay from './CarRoadBuilderPlay'
+import styles from './CarRoadBuilder.module.css'
 
 function renderGame() {
   return render(<MemoryRouter><CarRoadBuilderPlay /></MemoryRouter>)
@@ -361,6 +362,19 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('button', { name: 'カーブを おく' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'しゅっぱつ' })).toBeEnabled()
     expect(screen.getByLabelText('くるま')).toBeInTheDocument()
+  })
+
+  test('departure gives immediate visual feedback and starts without waiting for animation', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1)
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const user = userEvent.setup()
+    renderGame()
+
+    await user.click(screen.getByRole('button', { name: 'しゅっぱつ' }))
+
+    const stopButton = screen.getByRole('button', { name: 'とめる' })
+    expect(stopButton).toHaveClass(styles.departureFeedback)
+    expect(screen.getByRole('main')).toHaveAttribute('data-phase', 'running')
   })
 
   test('manual stop keeps the car at its current position', async () => {
