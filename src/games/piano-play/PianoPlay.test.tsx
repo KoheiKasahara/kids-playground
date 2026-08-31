@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import PianoPlay from './PianoPlay'
+import styles from './PianoPlay.module.css'
 import { PIANO_SONGS } from './pianoSongs'
 
 class MockAudioParam {
@@ -111,6 +112,24 @@ describe('PianoPlay', () => {
     expect(screen.queryByText('けんばんを おしてみよう！')).not.toBeInTheDocument()
     expect(screen.queryByText(/いまのきょく：/)).not.toBeInTheDocument()
     expect(screen.queryByText('じゅんびOK')).not.toBeInTheDocument()
+  })
+
+  test('状態表示の予約領域を初期表示から維持し、状態変化で要素を入れ替えない', () => {
+    const { container } = renderPiano()
+    const instrumentStatus = container.querySelector(`.${styles.instrumentStatus}`)
+    const playbackStatus = container.querySelector(`.${styles.playbackStatus}`)
+
+    expect(instrumentStatus).toBeInTheDocument()
+    expect(playbackStatus).toBeInTheDocument()
+    expect(playbackStatus).not.toHaveAttribute('role', 'status')
+
+    fireEvent.click(screen.getByRole('button', { name: /さいせい/ }))
+    expect(container.querySelector(`.${styles.playbackStatus}`)).toBe(playbackStatus)
+    expect(screen.getByRole('status')).toHaveTextContent('えんそうちゅう')
+
+    fireEvent.click(screen.getByRole('button', { name: /とめる/ }))
+    expect(container.querySelector(`.${styles.playbackStatus}`)).toBe(playbackStatus)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   test('C5も既存の鍵盤と同じ経路で発音・ハイライトできる', () => {
