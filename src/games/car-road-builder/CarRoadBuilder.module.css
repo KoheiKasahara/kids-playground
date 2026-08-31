@@ -293,6 +293,38 @@
   100% { box-shadow: 0 6px 0 rgba(39, 128, 145, 0.14), 0 10px 18px rgba(26, 93, 112, 0.12); }
 }
 
+.goalBurst {
+  position: absolute;
+  z-index: 5;
+  display: block;
+  width: var(--road-cell);
+  height: var(--road-cell);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.goalSpark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  color: var(--goal-spark-color);
+  font-size: clamp(14px, calc(var(--road-cell) * .22), 24px);
+  line-height: 1;
+  opacity: 0;
+  text-shadow: 0 1px 2px rgb(255 255 255 / 80%);
+  animation: goal-spark-burst 820ms cubic-bezier(.2, .8, .3, 1) var(--goal-spark-delay) both;
+}
+
+@keyframes goal-spark-burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.18) rotate(-18deg); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(0deg); }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--goal-spark-x)), calc(-50% + var(--goal-spark-y))) scale(.72) rotate(24deg);
+  }
+}
+
 .board {
   position: relative;
   display: grid;
@@ -509,4 +541,5 @@
   .departureFeedback { animation: none !important; }
   .car { transition: none !important; }
   .cleared .boardFrame { animation: none !important; }
+  .goalSpark { animation: none !important; opacity: 0; }
 }

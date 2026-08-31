@@ -528,6 +528,32 @@ export function playCarDepartureSound(): void {
   }
 }
 
+/** くるまがゴールしたときの短い上行成功音。 */
+const CAR_GOAL_SOUND_MIN_INTERVAL_MS = 180
+let lastCarGoalSoundAt: number | null = null
+
+export function playCarGoalSound(): void {
+  if (!soundEnabled) return
+
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const wallClockNow = Date.now()
+    if (
+      lastCarGoalSoundAt !== null
+      && wallClockNow - lastCarGoalSoundAt < CAR_GOAL_SOUND_MIN_INTERVAL_MS
+    ) return
+    lastCarGoalSoundAt = wallClockNow
+
+    const now = ctx.currentTime
+    playTone(ctx, 523.25, now, 0.18, 0.11, 'triangle')
+    playTone(ctx, 659.25, now + 0.07, 0.2, 0.11, 'triangle')
+    playTone(ctx, 1046.5, now + 0.15, 0.3, 0.12, 'sine')
+  } catch {
+    // 音声APIが使えなくてもゴール状態と演出は継続する。
+  }
+}
+
 export type RailTrainSoundStatus =
   | 'ready'
   | 'running'

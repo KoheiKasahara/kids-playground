@@ -4,6 +4,7 @@ import { connectionsForPart, createPlacedPart, PART_DEFINITIONS, type PartKind }
 import type { Board, BoardCell } from './boardModel'
 import { getPathSpec, pathSpecToSvgPath } from './roadGeometry'
 import CarVisual from './CarVisual'
+import CarRoadGoalBurst from './CarRoadGoalBurst'
 import type { VehicleId } from './vehicleDefinitions'
 import styles from './CarRoadBuilder.module.css'
 
@@ -23,6 +24,8 @@ export type CarRoadBoardProps = {
   carAtStart?: Readonly<{ x: number; y: number }> | null
   carAngle?: number
   vehicleId?: VehicleId
+  goalCelebrationKey?: number | null
+  goalCell?: Readonly<{ row: number; col: number }> | null
 }
 
 function RoadPartVisual({ part }: { part: Readonly<{ kind: PartKind; rotationStep: number }> }) {
@@ -52,7 +55,7 @@ function cellLabel(cell: BoardCell): string {
   return cell.kind ? `${PART_DEFINITIONS[cell.kind].label}、${location}` : `あきセル、${location}`
 }
 
-export default function CarRoadBoard({ board, boardRef, selectedCellId = null, draggingCellId = null, running = false, onCellClick, onCellPointerDown, onCellPointerMove, onCellPointerUp, onCellPointerCancel, dropPreview = null, carSample = null, carAtStart = null, carAngle = 0, vehicleId = 'red-car' }: CarRoadBoardProps) {
+export default function CarRoadBoard({ board, boardRef, selectedCellId = null, draggingCellId = null, running = false, onCellClick, onCellPointerDown, onCellPointerMove, onCellPointerUp, onCellPointerCancel, dropPreview = null, carSample = null, carAtStart = null, carAngle = 0, vehicleId = 'red-car', goalCelebrationKey = null, goalCell = null }: CarRoadBoardProps) {
   return (
     <div className={styles.boardFrame} data-testid="car-road-board" aria-label="みちの ばんめん">
       <div
@@ -107,6 +110,15 @@ export default function CarRoadBoard({ board, boardRef, selectedCellId = null, d
             </span>
           )
         })()}
+        {goalCelebrationKey !== null && goalCell && (
+          <CarRoadGoalBurst
+            key={goalCelebrationKey}
+            style={{
+              left: `calc(var(--road-cell) * ${goalCell.col})`,
+              top: `calc(var(--road-cell) * ${goalCell.row})`,
+            }}
+          />
+        )}
         {(carSample || carAtStart) && (
           <span
             className={styles.car}

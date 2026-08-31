@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import CarRoadBuilderPlay from './CarRoadBuilderPlay'
@@ -47,6 +47,45 @@ function mockBoardRect(size = 400) {
 
 function pointerOptions(pointerId: number, clientX: number, clientY: number, pointerType: 'touch' | 'mouse' = 'touch') {
   return { button: 0, clientX, clientY, isPrimary: true, pointerId, pointerType }
+}
+
+async function buildSimpleGoalRoute(user: ReturnType<typeof userEvent.setup>) {
+  const straight = screen.getByRole('button', { name: 'まっすぐを おく' })
+  await user.click(straight)
+
+  await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 2れつ' }))
+  await user.click(screen.getByRole('button', { name: 'まわす' }))
+  await user.click(screen.getByRole('button', { name: 'まわす' }))
+
+  await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 3れつ' }))
+  await user.click(screen.getByRole('button', { name: 'まわす' }))
+  await user.click(screen.getByRole('button', { name: 'まわす' }))
+
+  await user.click(screen.getByRole('button', { name: 'カーブを おく' }))
+  await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 4れつ' }))
+  for (let index = 0; index < 4; index += 1) {
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+  }
+
+  await user.click(straight)
+  await user.click(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 4れつ' }))
+  await user.click(screen.getByRole('gridcell', { name: 'あきセル、3ぎょう 4れつ' }))
+}
+
+function queueAnimationFrames() {
+  const callbacks: FrameRequestCallback[] = []
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    callbacks.push(callback)
+    return callbacks.length
+  })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+  return {
+    completeLatest() {
+      const callback = callbacks.at(-1)
+      if (!callback) throw new Error('expected a queued animation frame')
+      act(() => callback(performance.now() + 100_000))
+    },
+  }
 }
 
 describe('CarRoadBuilderStageSelect', () => {
@@ -314,5 +353,56 @@ describe('CarRoadBuilderPlay', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('そこには おけないよ')
     expect(screen.getAllByRole('gridcell')).toHaveLength(16)
+  })
+
+  test('shows one goal burst and allows repeated departures without losing the board or vehicle', async () => {
+    const user = userEvent.setup()
+    const frames = queueAnimationFrames()
+    renderPlay()
+    await buildSimpleGoalRoute(user)
+    await user.click(screen.getByRole('button', { name: 'トラック' }))
+
+    for (let run = 0; run < 3; run += 1) {
+      if (run === 1) await user.click(screen.getByRole('button', { name: 'バス' }))
+      await user.click(screen.getByRole('button', { name: 'しゅっぱつ' }))
+      frames.completeLatest()
+
+      expect(screen.getByRole('main')).toHaveAttribute('data-phase', 'cleared')
+      expect(screen.getByTestId('car-road-goal-burst')).toBeInTheDocument()
+      expect(screen.getAllByTestId('car-road-goal-burst')).toHaveLength(1)
+      expect(screen.getByRole('button', { name: 'しゅっぱつ' })).toBeEnabled()
+      expect(screen.getByRole('gridcell', { name: 'まっすぐ、1ぎょう 2れつ' })).toBeInTheDocument()
+      expect(screen.getByLabelText('くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', run === 0 ? 'truck' : 'bus')
+    }
+  })
+
+  test('does not duplicate the goal burst when the same completion frame is delivered twice', async () => {
+    const user = userEvent.setup()
+    const frames = queueAnimationFrames()
+    renderPlay()
+    await buildSimpleGoalRoute(user)
+    await user.click(screen.getByRole('button', { name: 'しゅっぱつ' }))
+
+    frames.completeLatest()
+    frames.completeLatest()
+
+    expect(screen.getAllByTestId('car-road-goal-burst')).toHaveLength(1)
+    expect(screen.getByRole('main')).toHaveAttribute('data-phase', 'cleared')
+  })
+
+  test('cleans the goal burst when leaving the play screen for a new stage', async () => {
+    const user = userEvent.setup()
+    const frames = queueAnimationFrames()
+    const view = renderPlay()
+    await buildSimpleGoalRoute(user)
+    await user.click(screen.getByRole('button', { name: 'しゅっぱつ' }))
+    frames.completeLatest()
+    expect(screen.getByTestId('car-road-goal-burst')).toBeInTheDocument()
+
+    view.unmount()
+    renderPlay('wide')
+
+    expect(screen.getByRole('main')).toHaveAttribute('data-stage-id', 'wide')
+    expect(screen.queryByTestId('car-road-goal-burst')).not.toBeInTheDocument()
   })
 })
