@@ -57,6 +57,41 @@ describe('CarRoadBuilderPlay', () => {
     expect(car.querySelectorAll('[data-testid="car-visual"] path')).toHaveLength(5)
   })
 
+  test('offers four visual vehicle choices and starts with the red car selected', async () => {
+    const user = userEvent.setup()
+    renderGame()
+
+    const redCar = screen.getByRole('button', { name: 'あかい くるま' })
+    const blueCar = screen.getByRole('button', { name: 'あおい くるま' })
+    const bus = screen.getByRole('button', { name: 'バス' })
+    const truck = screen.getByRole('button', { name: 'トラック' })
+    expect([redCar, blueCar, bus, truck]).toHaveLength(4)
+    expect(redCar).toHaveAttribute('aria-pressed', 'true')
+    expect(blueCar.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'blue-car')
+    expect(bus.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'bus')
+    expect(truck.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'truck')
+
+    await user.click(bus)
+    expect(bus).toHaveAttribute('aria-pressed', 'true')
+    expect(redCar).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByLabelText('くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'bus')
+  })
+
+  test('keeps vehicle selection available in normal play and locks it while running', async () => {
+    const user = userEvent.setup()
+    renderGame()
+
+    const truck = screen.getByRole('button', { name: 'トラック' })
+    await user.click(truck)
+    expect(truck).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'truck')
+
+    await user.click(screen.getByRole('button', { name: 'しゅっぱつ' }))
+    expect(screen.getByRole('button', { name: 'トラック' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'バス' })).toBeDisabled()
+    expect(screen.getByLabelText('くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'truck')
+  })
+
   test('palette tap then cell tap places a part, and selected controls rotate/remove it', async () => {
     const user = userEvent.setup()
     renderGame()
