@@ -154,6 +154,66 @@
   text-align: left;
 }
 
+.vehiclePicker {
+  flex: 0 0 auto;
+  width: min(100%, 680px);
+  margin: 0 auto;
+  padding: 4px 8px 6px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .62);
+}
+
+.vehiclePickerTitle {
+  margin: 0 0 4px;
+  color: #286d7e;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.vehicleOptions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.vehicleOption {
+  display: flex;
+  min-width: 0;
+  min-height: 78px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 3px;
+  border: 3px solid rgba(23, 98, 121, .14);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, .92);
+  color: #245d70;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.vehicleOptionSelected {
+  border-color: #efa915;
+  background: #fff2bd;
+  box-shadow: 0 0 0 3px rgba(239, 169, 21, .2);
+}
+
+.vehicleOption:disabled { cursor: not-allowed; opacity: .48; }
+
+.vehiclePreview {
+  display: grid;
+  width: min(100%, 84px);
+  height: 42px;
+  place-items: center;
+}
+
+.vehiclePreview .carSvg { width: 78px; height: 42px; }
+.vehicleOptionLabel { max-width: 100%; overflow: hidden; font-size: clamp(11px, 2.8vw, 14px); line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+
 .boardScroll {
   display: flex;
   flex: 1 1 auto;
@@ -269,8 +329,16 @@
 .carSvg { display: block; width: 100%; height: 100%; overflow: visible; }
 .carShadow { fill: rgba(26, 78, 94, .2); transform: translate(0, 1px); }
 .carBody { fill: #f26b55; stroke: #873b3b; stroke-width: 1.2; }
+.carBodyRed { fill: #f26b55; }
+.carBodyBlue { fill: #4c9ee8; stroke: #285c96; }
+.carBodyBus { fill: #f4be4f; stroke: #9b6b1c; }
+.carBodyTruck { fill: #7dc77d; stroke: #397447; }
+.truckCargo { fill: #4e9caa; stroke: #276673; stroke-width: 1.2; }
+.truckCargoDetail { fill: #bfe7e5; stroke: #397e86; stroke-width: .8; }
 .carRearWindow { fill: #b9e7ef; stroke: #3f7181; stroke-width: .8; }
 .carFrontWindshield { fill: #d9f6fa; stroke: #3f7181; stroke-width: .8; }
+.busWindow { fill: #d9f6fa; stroke: #3f7181; stroke-width: .7; }
+.busFrontWindow { fill: #f4fbff; stroke: #3f7181; stroke-width: .8; }
 .carCenterLine { fill: none; stroke: rgba(135, 59, 59, .55); stroke-width: .8; }
 .carWheel { fill: #284653; }
 .carHeadlight { fill: #fff4a8; stroke: #b9752d; stroke-width: .5; }

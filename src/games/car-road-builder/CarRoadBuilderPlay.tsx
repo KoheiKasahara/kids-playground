@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import CarRoadBoard from './CarRoadBoard'
 import PartPalette from './PartPalette'
+import VehiclePicker from './VehiclePicker'
 import {
   canPlacePart,
   createBoard,
@@ -20,6 +21,7 @@ import { createPlacedPart, PART_DEFINITIONS, type PartKind } from './partDefinit
 import { directionAngle } from './direction'
 import { buildRoute, routeStatusLabel, sampleRouteProgress, type CarRoute } from './routeModel'
 import { playCorrectSound } from '../../utils/quizSound'
+import type { VehicleId } from './vehicleDefinitions'
 import styles from './CarRoadBuilder.module.css'
 
 type StageId = 'normal' | 'wide'
@@ -81,6 +83,7 @@ export default function CarRoadBuilderPlay() {
   const navigate = useNavigate()
   const [board, setBoard] = useState<Board>(createDemoBoard)
   const [stageId, setStageId] = useState<StageId>('normal')
+  const [vehicleId, setVehicleId] = useState<VehicleId>('red-car')
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null)
   const [selectedKind, setSelectedKind] = useState<PartKind | null>(null)
   const [draggingCellId, setDraggingCellId] = useState<string | null>(null)
@@ -425,6 +428,12 @@ export default function CarRoadBuilderPlay() {
     setStatus(`${STAGES[nextStageId].label}の ばんめんだよ。みちを つなごう`)
   }, [running, stageId])
 
+  const handleVehicleSelect = useCallback((nextVehicleId: VehicleId) => {
+    if (running || nextVehicleId === vehicleId) return
+    setVehicleId(nextVehicleId)
+    setStatus('くるまを えらんだよ。しゅっぱつ してみよう')
+  }, [running, vehicleId])
+
   return (
     <main className={`${styles.page} ${phase === 'cleared' ? styles.cleared : ''}`} data-phase={phase}>
         <header className={styles.header}>
@@ -463,6 +472,12 @@ export default function CarRoadBuilderPlay() {
           </div>
         </section>
 
+        <VehiclePicker
+          selectedVehicleId={vehicleId}
+          disabled={running}
+          onSelect={handleVehicleSelect}
+        />
+
         <section className={styles.boardScroll} aria-label="みちのエリア">
           <div className={styles.boardSizer}>
             <CarRoadBoard
@@ -480,6 +495,7 @@ export default function CarRoadBuilderPlay() {
               carSample={carSample}
               carAtStart={carSample ? null : carAtStart}
               carAngle={route.startDirection ? directionAngle(route.startDirection) : 0}
+              vehicleId={vehicleId}
             />
           </div>
         </section>
