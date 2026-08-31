@@ -10,7 +10,16 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  /*
+   * manipulation は pan-x pan-y pinch-zoom 相当で、ブラウザのページピンチズームを
+   * 許可してしまう。pan-x pan-y にすると単指スクロールとダブルタップ拡大の抑制はそのままに、
+   * ブラウザのページピンチズームだけを止められる。子孫要素の touch-action（none / pan-x / pan-y等）
+   * は祖先との積集合で決まるため、ここを pan-x pan-y にしても既存の各ゲームのジェスチャー挙動は
+   * 一切変わらない（Issue #166）。
+   * iOS Safari（WebKit）はこれだけではページピンチズームを完全には止め切れないため、
+   * 別途 src/app/preventBrowserPageZoom.ts で gesture イベントも止めている。
+   */
+  touch-action: pan-x pan-y;
   overscroll-behavior: none;
 }
 
