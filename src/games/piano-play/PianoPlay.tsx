@@ -33,6 +33,8 @@ export default function PianoPlay() {
   const [playbackState, setPlaybackState] = useState<PlaybackState>('idle')
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentId>('piano')
   const [instrumentLoadState, setInstrumentLoadState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
+  const hasInstrumentStatus = instrumentLoadState === 'loading' || instrumentLoadState === 'failed'
+  const hasPlaybackStatus = playbackState === 'playing' || playbackState === 'finished'
 
   const syncActiveNotes = useCallback(() => {
     const next = new Set(Array.from(activePointers.current.values(), (active) => active.noteId))
@@ -232,11 +234,13 @@ export default function PianoPlay() {
                 {PIANO_SONGS.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
               </select>
             </label>
-            {instrumentLoadState !== 'ready' && (
-              <p className={styles.instrumentStatus} aria-live="polite">
-                {instrumentLoadState === 'loading' ? 'おとの じゅんびちゅう…' : instrumentLoadState === 'failed' ? 'おとを きりかえられないため、かんたんな おとで ならします' : ''}
-              </p>
-            )}
+            <p
+              className={`${styles.instrumentStatus} ${hasInstrumentStatus ? '' : styles.statusPlaceholder}`}
+              aria-live="polite"
+              aria-hidden={!hasInstrumentStatus}
+            >
+              {instrumentLoadState === 'loading' ? 'おとの じゅんびちゅう…' : instrumentLoadState === 'failed' ? 'おとを きりかえられないため、かんたんな おとで ならします' : '\u00a0'}
+            </p>
             <button
               type="button"
               className={`${styles.playButton} ${playbackState === 'playing' ? styles.stopButton : ''}`}
@@ -244,11 +248,13 @@ export default function PianoPlay() {
             >
               {playbackState === 'playing' ? '■ とめる' : '▶ さいせい'}
             </button>
-            {(playbackState === 'playing' || playbackState === 'finished') && (
-              <p className={styles.playbackStatus} role="status">
-                {playbackState === 'playing' ? 'えんそうちゅう' : 'おわり'}
-              </p>
-            )}
+            <p
+              className={`${styles.playbackStatus} ${hasPlaybackStatus ? '' : styles.statusPlaceholder}`}
+              role={hasPlaybackStatus ? 'status' : undefined}
+              aria-hidden={!hasPlaybackStatus}
+            >
+              {hasPlaybackStatus ? (playbackState === 'playing' ? 'えんそうちゅう' : 'おわり') : '\u00a0'}
+            </p>
           </section>
           <section className={styles.pianoArea} aria-label="自由演奏">
             <div className={styles.pianoCase}>
