@@ -154,7 +154,7 @@ export function movePart(board: Board, from: string | CellCoordinate, to: string
 
 export function rotatePart(board: Board, target: string | CellCoordinate, amount = 1): Board {
   const cell = resolveTarget(board, target)
-  if (!cell || cell.kind === null || cell.kind === 'goal') return board
+  if (!cell || cell.kind === null) return board
   const part = createPlacedPart(cell.kind, cell.rotationStep + amount)
   return setPartAt(board, cell, part)
 }

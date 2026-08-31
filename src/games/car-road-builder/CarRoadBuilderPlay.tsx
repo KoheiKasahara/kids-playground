@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import CarRoadBoard from './CarRoadBoard'
 import PartPalette from './PartPalette'
 import VehiclePicker from './VehiclePicker'
 import {
   canPlacePart,
-  createBoard,
-  INITIAL_BOARD_SIZE,
-  MAX_BOARD_SIZE,
   movePart,
   placePartAt,
   removePart,
@@ -24,27 +21,7 @@ import { createCarRoadSoundController, playCarDepartureSound, playCorrectSound }
 import type { CarRoadSoundController } from '../../utils/quizSound'
 import type { VehicleId } from './vehicleDefinitions'
 import styles from './CarRoadBuilder.module.css'
-
-type StageId = 'normal' | 'wide'
-
-const STAGES: Readonly<Record<StageId, Readonly<{
-  label: string
-  sizeLabel: string
-  size: Readonly<{ rows: number; cols: number }>
-}>>> = {
-  normal: { label: 'ふつう', sizeLabel: '4×4', size: INITIAL_BOARD_SIZE },
-  wide: { label: 'ひろい', sizeLabel: '5×5', size: MAX_BOARD_SIZE },
-}
-
-function createDemoBoard(size = INITIAL_BOARD_SIZE): Board {
-  let board = createBoard(size)
-  // A tiny ready-made road helps a child understand the play loop immediately;
-  // every part remains editable before departure.
-  board = placePartAt(board, 1, 0, createPlacedPart('start', 2))
-  board = placePartAt(board, 1, 1, createPlacedPart('straight', 2))
-  board = placePartAt(board, 1, 2, createPlacedPart('goal'))
-  return board
-}
+import { createStageBoard, type StageId } from './stageDefinitions'
 
 type PlayPhase = 'ready' | 'running' | 'stopped' | 'cleared'
 
@@ -89,10 +66,23 @@ type DropPreview = Readonly<{
   valid: boolean
 }>
 
-export default function CarRoadBuilderPlay() {
+type CarRoadBuilderPlayProps = Readonly<{
+  /** Optional prop keeps the component easy to exercise in isolated UI tests. */
+  stageId?: StageId
+}>
+
+type NavigationState = Readonly<{ stageId?: unknown }>
+
+function stageIdFromNavigationState(state: unknown): StageId | null {
+  const candidate = (state as NavigationState | null)?.stageId
+  return candidate === 'normal' || candidate === 'wide' ? candidate : null
+}
+
+export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps = {}) {
+  const location = useLocation()
   const navigate = useNavigate()
-  const [board, setBoard] = useState<Board>(createDemoBoard)
-  const [stageId, setStageId] = useState<StageId>('normal')
+  const activeStageId = stageId ?? stageIdFromNavigationState(location.state) ?? 'normal'
+  const [board, setBoard] = useState<Board>(() => createStageBoard(activeStageId))
   const [vehicleId, setVehicleId] = useState<VehicleId>('red-car')
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null)
   const [selectedKind, setSelectedKind] = useState<PartKind | null>(null)
@@ -416,6 +406,11 @@ export default function CarRoadBuilderPlay() {
 
   const deleteSelected = useCallback(() => {
     if (!selectedCellId || running) return
+    const selectedPart = board.cells.find((cell) => cell.id === selectedCellId)
+    if (selectedPart?.kind === 'start' || selectedPart?.kind === 'goal') {
+      setStatus('スタートと ゴールは けせないよ')
+      return
+    }
     const next = removePart(board, selectedCellId)
     if (next === board) return
     setBoard(next)
@@ -454,22 +449,6 @@ export default function CarRoadBuilderPlay() {
     setStatus(route.reachedGoal ? 'しゅっぱつ！ ゴールまで いくよ' : routeStatusLabel(route))
   }, [route, running, triggerDepartureFeedback])
 
-  const handleStageChange = useCallback((nextStageId: StageId) => {
-    if (running) return
-    if (nextStageId === stageId) return
-    setStageId(nextStageId)
-    setBoard(createDemoBoard(STAGES[nextStageId].size))
-    setSelectedCellId(null)
-    setSelectedKind(null)
-    setDraggingCellId(null)
-    boardDrag.current = null
-    paletteDrag.current = null
-    setDropPreview(null)
-    setPhase('ready')
-    setProgress(0)
-    setStatus(`${STAGES[nextStageId].label}の ばんめんだよ。みちを つなごう`)
-  }, [running, stageId])
-
   const handleVehicleSelect = useCallback((nextVehicleId: VehicleId) => {
     if (running || nextVehicleId === vehicleId) return
     setVehicleId(nextVehicleId)
@@ -477,42 +456,15 @@ export default function CarRoadBuilderPlay() {
   }, [running, vehicleId])
 
   return (
-    <main className={`${styles.page} ${phase === 'cleared' ? styles.cleared : ''}`} data-phase={phase}>
+    <main className={`${styles.page} ${phase === 'cleared' ? styles.cleared : ''}`} data-phase={phase} data-stage-id={activeStageId}>
         <header className={styles.header}>
-          <button type="button" className={styles.backButton} onClick={() => navigate('/')} disabled={running}>
+          <button type="button" className={styles.backButton} onClick={() => navigate('/games/car-road-builder')} disabled={running}>
             <span aria-hidden="true">‹</span> もどる
           </button>
           <h1><span aria-hidden="true">🚗</span> くるまのみちづくり</h1>
         </header>
 
         <p className={styles.status} role="status" aria-live="polite">{status}</p>
-
-        <section className={styles.stageSelector} aria-label="ステージのひろさ">
-          <p className={styles.stageTitle}>ひろさを えらんでね</p>
-          <div className={styles.stageOptions} role="group" aria-label="ステージ選択">
-            {(Object.entries(STAGES) as Array<[StageId, typeof STAGES[StageId]]>).map(([id, stage]) => (
-              <button
-                key={id}
-                type="button"
-                className={`${styles.stageOption} ${stageId === id ? styles.stageOptionSelected : ''}`}
-                aria-pressed={stageId === id}
-                aria-label={`${stage.label} ${stage.sizeLabel}`}
-                onClick={() => handleStageChange(id)}
-                disabled={running}
-              >
-                <span
-                  className={styles.stageMiniBoard}
-                  style={{ '--stage-mini-cols': stage.size.cols, '--stage-mini-rows': stage.size.rows } as CSSProperties}
-                  aria-hidden="true"
-                >
-                  {Array.from({ length: stage.size.rows * stage.size.cols }, (_, index) => <span key={index} className={styles.stageMiniCell} />)}
-                </span>
-                <span className={styles.stageOptionLabel}>{stage.label}</span>
-                <span className={styles.stageOptionSize}>{stage.sizeLabel}</span>
-              </button>
-            ))}
-          </div>
-        </section>
 
         <VehiclePicker
           selectedVehicleId={vehicleId}
@@ -545,8 +497,8 @@ export default function CarRoadBuilderPlay() {
         {selectedCell && selectedCell.kind && (
           <div className={styles.selectionTools} aria-label="えらんだパーツのそうさ">
             <span>{PART_DEFINITIONS[selectedCell.kind].label}</span>
-            <button type="button" onClick={rotateSelected} disabled={running || selectedCell.kind === 'goal'} aria-label="まわす">↻ まわす</button>
-            <button type="button" onClick={deleteSelected} disabled={running} aria-label="けす">けす</button>
+            <button type="button" onClick={rotateSelected} disabled={running} aria-label="まわす">↻ まわす</button>
+            <button type="button" onClick={deleteSelected} disabled={running || selectedCell.kind === 'start' || selectedCell.kind === 'goal'} aria-label="けす">けす</button>
           </div>
         )}
 

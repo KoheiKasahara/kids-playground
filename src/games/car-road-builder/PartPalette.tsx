@@ -1,5 +1,5 @@
 import type { PointerEvent } from 'react'
-import { PART_DEFINITIONS, PART_KINDS, type PartKind } from './partDefinitions'
+import { PART_DEFINITIONS, ROAD_PART_KINDS, type PartKind } from './partDefinitions'
 import styles from './CarRoadBuilder.module.css'
 
 export type PartPaletteProps = {
@@ -26,7 +26,7 @@ export default function PartPalette({ disabled = false, selectedKind = null, dra
     <div className={styles.palette} aria-label="パーツを えらぶ">
       <p className={styles.paletteTitle}>パーツを えらんでね</p>
       <div className={styles.paletteScroll}>
-        {PART_KINDS.map((kind) => {
+        {ROAD_PART_KINDS.map((kind) => {
           const definition = PART_DEFINITIONS[kind]
           return (
             <button
