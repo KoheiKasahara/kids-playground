@@ -354,7 +354,8 @@
 .cell.curve,
 .cell.gentle-curve,
 .cell.crossroad,
-.cell.xroad { background: #77b9d2; }
+.cell.xroad,
+.cell.double-curve { background: #77b9d2; }
 .cell.selected { box-shadow: inset 0 0 0 5px #f6b928, 0 0 0 3px rgba(246, 185, 40, 0.45); }
 .cell.dragging { opacity: .38; box-shadow: inset 0 0 0 5px #efa915, 0 0 0 4px rgba(239, 169, 21, .28); }
 .cell:disabled { cursor: not-allowed; }

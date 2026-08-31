@@ -264,6 +264,26 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 2れつ' })).toBeInTheDocument()
   })
 
+  test('shows, places, rotates and deletes the double curve palette part', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    const doubleCurve = screen.getByRole('button', { name: 'ふたつカーブを おく' })
+    expect(doubleCurve).toBeInTheDocument()
+    await user.click(doubleCurve)
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 2れつ' }))
+
+    const placed = screen.getByRole('gridcell', { name: 'ふたつカーブ、1ぎょう 2れつ' })
+    expect(placed).toBeInTheDocument()
+    expect(placed).toHaveStyle('--rotation: 0')
+    expect(placed.querySelectorAll('svg path')).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(screen.getByRole('gridcell', { name: 'ふたつカーブ、1ぎょう 2れつ' })).toHaveStyle('--rotation: 2')
+    await user.click(screen.getByRole('button', { name: 'けす' }))
+    expect(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 2れつ' })).toBeInTheDocument()
+  })
+
   test('palette drag keeps a 4x4 grid and places one part', () => {
     renderPlay()
     const board = mockBoardRect()

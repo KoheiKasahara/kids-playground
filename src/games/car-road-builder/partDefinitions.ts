@@ -5,7 +5,7 @@ import {
   type Direction,
 } from './direction'
 
-export type PartKind = 'start' | 'straight' | 'curve' | 'gentle-curve' | 'crossroad' | 'xroad' | 'goal'
+export type PartKind = 'start' | 'straight' | 'curve' | 'gentle-curve' | 'crossroad' | 'xroad' | 'double-curve' | 'goal'
 
 /** The only state needed to describe a placed road part. */
 export type PlacedPart = Readonly<{
@@ -78,6 +78,15 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
     // common rotate control at 90° increments, where the X shape is unchanged.
     rotationSteps: [0, 2, 4, 6],
   },
+  'double-curve': {
+    kind: 'double-curve',
+    label: 'ふたつカーブ',
+    emoji: ')(',
+    // Two independent 90-degree curves share a cell but never switch paths.
+    // The first pair is N-E and the second pair is S-W before rotation.
+    baseConnections: ['N', 'E', 'S', 'W'],
+    rotationSteps: [0, 2, 4, 6],
+  },
   goal: {
     kind: 'goal',
     label: 'ゴール',
@@ -89,11 +98,11 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
   },
 } as const
 
-export const PART_KINDS: readonly PartKind[] = ['start', 'straight', 'curve', 'gentle-curve', 'crossroad', 'xroad', 'goal']
+export const PART_KINDS: readonly PartKind[] = ['start', 'straight', 'curve', 'gentle-curve', 'crossroad', 'xroad', 'double-curve', 'goal']
 
 /** Start and goal are stage markers, not pieces offered by the palette. */
 export const ROAD_PART_KINDS: readonly Exclude<PartKind, 'start' | 'goal'>[] = [
-  'straight', 'curve', 'gentle-curve', 'crossroad', 'xroad',
+  'straight', 'curve', 'gentle-curve', 'crossroad', 'xroad', 'double-curve',
 ]
 
 export function getPartDefinition(kind: PartKind): PartDefinition {
@@ -111,7 +120,7 @@ export function allowedRotationSteps(kind: PartKind): readonly number[] {
 export function normalizePartRotation(kind: PartKind, rotationStep: number): number {
   const normalized = normalizeRotationStep(rotationStep)
   if (kind === 'straight' || kind === 'crossroad') return normalized % 4
-  if (kind === 'xroad') return normalized % 2 === 0 ? normalized : (normalized + 1) % 8
+  if (kind === 'xroad' || kind === 'double-curve') return normalized % 2 === 0 ? normalized : (normalized + 1) % 8
   return normalized
 }
 
@@ -138,6 +147,18 @@ export const portsForPart = connectionsForPart
 
 export function hasPartConnection(part: PlacedPart, direction: Direction): boolean {
   return connectionsForPart(part).includes(direction)
+}
+
+/** Return the port reached after entering a part from the given port. */
+export function exitPortForPart(part: PlacedPart, entryPort: Direction): Direction | null {
+  const ports = connectionsForPart(part)
+  if (!ports.includes(entryPort)) return null
+  if (part.kind === 'crossroad' || part.kind === 'xroad') return rotateDirection(entryPort, 4)
+  if (part.kind === 'double-curve') {
+    const index = ports.indexOf(entryPort)
+    return ports[index % 2 === 0 ? index + 1 : index - 1] ?? null
+  }
+  return ports.find((port) => port !== entryPort) ?? null
 }
 
 export function rotatePlacedPart(part: PlacedPart, amount = 1): PlacedPart {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { connectionsForPart, createDefaultPlacedPart, createPlacedPart, PART_DEFINITIONS } from './partDefinitions'
+import { connectionsForPart, createDefaultPlacedPart, createPlacedPart, exitPortForPart, PART_DEFINITIONS } from './partDefinitions'
 
 describe('car road parts', () => {
   test('straight has four unique poses and curves have eight', () => {
@@ -46,5 +46,21 @@ describe('car road parts', () => {
     }
     expect(createPlacedPart('xroad', 1).rotationStep).toBe(2)
     expect(createPlacedPart('xroad', 7).rotationStep).toBe(0)
+  })
+
+  test('double curve exposes two independent cardinal curve pairs', () => {
+    expect(PART_DEFINITIONS['double-curve'].rotationSteps).toEqual([0, 2, 4, 6])
+    const part = createPlacedPart('double-curve')
+    expect(connectionsForPart(part)).toEqual(['N', 'E', 'S', 'W'])
+    expect(exitPortForPart(part, 'N')).toBe('E')
+    expect(exitPortForPart(part, 'E')).toBe('N')
+    expect(exitPortForPart(part, 'S')).toBe('W')
+    expect(exitPortForPart(part, 'W')).toBe('S')
+
+    const rotated = createPlacedPart('double-curve', 2)
+    expect(connectionsForPart(rotated)).toEqual(['E', 'S', 'W', 'N'])
+    expect(exitPortForPart(rotated, 'E')).toBe('S')
+    expect(exitPortForPart(rotated, 'W')).toBe('N')
+    expect(createPlacedPart('double-curve', 1).rotationStep).toBe(2)
   })
 })

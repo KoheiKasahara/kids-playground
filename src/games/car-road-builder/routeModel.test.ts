@@ -157,6 +157,34 @@ describe('car road route', () => {
     expect(route.segments[1]).toMatchObject({ entryPort: 'NW', exitPort: 'SE' })
   })
 
+  test('double curve follows the entered curve pair and reaches a perpendicular goal', () => {
+    let board = createInitialBoard()
+    board = placePartAt(board, 1, 0, createPlacedPart('start', 2))
+    board = placePartAt(board, 1, 1, createPlacedPart('double-curve'))
+    board = placePartAt(board, 2, 1, createPlacedPart('goal'))
+
+    const route = buildRoute(board)
+    expect(route.reachedGoal).toBe(true)
+    expect(route.segments.map((segment) => segment.kind)).toEqual(['start', 'double-curve', 'goal'])
+    expect(route.segments[1]).toMatchObject({ entryPort: 'W', exitPort: 'S' })
+    expect(route.segments[1]!.path.start).toEqual({ x: -0.5, y: 0 })
+    expect(route.segments[1]!.path.end).toEqual({ x: 0, y: 0.5 })
+  })
+
+  test('double curve does not switch to its other curve when the entered pair is blocked', () => {
+    let board = createInitialBoard()
+    board = placePartAt(board, 1, 0, createPlacedPart('start', 2))
+    board = placePartAt(board, 1, 1, createPlacedPart('double-curve'))
+    // The other curve points north at the goal, but the entered W-S curve is
+    // blocked by the empty cell to the south and must not switch paths.
+    board = placePartAt(board, 0, 1, createPlacedPart('goal'))
+
+    const route = buildRoute(board)
+    expect(route.reachedGoal).toBe(false)
+    expect(route.stopReason).toBe('empty')
+    expect(route.segments[1]).toMatchObject({ entryPort: 'W', exitPort: 'S' })
+  })
+
   test.each([
     [0, 1, 1, 1, 2, 1, 2, 4, 3, 3],
     [3, 1, 2, 1, 1, 1, 2, 0, 3, 3],
