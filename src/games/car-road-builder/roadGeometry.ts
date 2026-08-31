@@ -196,7 +196,7 @@ export function createConnectorPath(start: Point, end: Point): PathSpec {
 function partPathBetweenPorts(kind: PartKind, from: Direction, to: Direction): PathSpec {
   const start = portPoint(from)
   const end = portPoint(to)
-  if (kind === 'curve') {
+  if (kind === 'curve' || kind === 'gentle-curve') {
     // A single quadratic keeps the tangent continuous through the bend. The
     // control point at the centre also makes all rotations use exactly the
     // same, shared geometry for drawing and driving.

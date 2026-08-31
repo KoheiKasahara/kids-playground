@@ -17,6 +17,7 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('button', { name: 'しゅっぱつ' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite')
     expect(screen.getByRole('button', { name: 'カーブを おく' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ゆるいカーブを おく' })).toBeInTheDocument()
   })
 
   test('palette tap then cell tap places a part, and selected controls rotate/remove it', async () => {
@@ -28,6 +29,17 @@ describe('CarRoadBuilderPlay', () => {
     await user.click(screen.getByRole('button', { name: 'まわす' }))
     await user.click(screen.getByRole('button', { name: 'けす' }))
     expect(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 1れつ' })).toBeInTheDocument()
+  })
+
+  test('palette exposes and places the gentle curve as its own part', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'ゆるいカーブを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 1れつ' }))
+
+    expect(screen.getByRole('gridcell', { name: 'ゆるいカーブ、1ぎょう 1れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ゆるいカーブを おく' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'まわす' })).toBeEnabled()
   })
 
   test('expand appends a row and column, then running locks editing', async () => {

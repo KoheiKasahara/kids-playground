@@ -16,7 +16,7 @@ import {
   type Board,
   type BoardCell,
 } from './boardModel'
-import { createPlacedPart, type PartKind } from './partDefinitions'
+import { createPlacedPart, isPartKind, PART_DEFINITIONS, type PartKind } from './partDefinitions'
 import { directionAngle } from './direction'
 import { buildRoute, routeStatusLabel, sampleRouteProgress, type CarRoute } from './routeModel'
 import { playCorrectSound } from '../../utils/quizSound'
@@ -191,14 +191,14 @@ export default function CarRoadBuilderPlay() {
   const handleCellDrop = useCallback((cell: BoardCell, event: DragEvent<HTMLButtonElement>) => {
     if (running) return
     const kind = event.dataTransfer?.getData('application/x-car-road-part') || event.dataTransfer?.getData('text/plain')
-    if (kind === 'start' || kind === 'straight' || kind === 'curve' || kind === 'goal') place(cell, kind)
+    if (isPartKind(kind)) place(cell, kind)
     setDragKind(null)
   }, [place, running])
 
   const selectKind = useCallback((kind: PartKind) => {
     setSelectedKind((current) => current === kind ? null : kind)
     setDragKind(null)
-    setStatus(`${kind === 'straight' ? 'まっすぐ' : kind === 'curve' ? 'カーブ' : kind === 'start' ? 'スタート' : 'ゴール'}を おく ばしょを おしてね`)
+    setStatus(`${PART_DEFINITIONS[kind].label}を おく ばしょを おしてね`)
   }, [])
 
   const rotateSelected = useCallback(() => {
@@ -290,7 +290,7 @@ export default function CarRoadBuilderPlay() {
 
         {selectedCell && selectedCell.kind && (
           <div className={styles.selectionTools} aria-label="えらんだパーツのそうさ">
-            <span>{selectedCell.kind === 'straight' ? 'まっすぐ' : selectedCell.kind === 'curve' ? 'カーブ' : selectedCell.kind === 'start' ? 'スタート' : 'ゴール'}</span>
+            <span>{PART_DEFINITIONS[selectedCell.kind].label}</span>
             <button type="button" onClick={rotateSelected} disabled={running || selectedCell.kind === 'goal'} aria-label="まわす">↻ まわす</button>
             <button type="button" onClick={deleteSelected} disabled={running} aria-label="けす">けす</button>
           </div>
