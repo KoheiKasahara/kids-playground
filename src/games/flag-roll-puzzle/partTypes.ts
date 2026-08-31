@@ -28,6 +28,11 @@ export type PartTypeId =
   | 'cannonUp'
   | 'cannonUpRight'
   | 'spinner'
+  /** 右向きが基本向き。残りの3方向は盤面上の回転専用ID。 */
+  | 'conveyorRight'
+  | 'conveyorDown'
+  | 'conveyorLeft'
+  | 'conveyorUp'
 
 /** パーツを構成する長方形。アンカーセルの中心を原点とした相対位置(px)で表す。 */
 export type PartSegment = {
@@ -44,7 +49,7 @@ export type PartSegment = {
 }
 
 /** 木の板以外も、役割を文字に頼らず見分けられるようにするための見た目の種類。 */
-export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide' | 'jumpRamp' | 'cannon' | 'spinner'
+export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide' | 'jumpRamp' | 'cannon' | 'spinner' | 'conveyor'
 
 export type PartDefinition = {
   readonly id: PartTypeId
@@ -71,6 +76,8 @@ const SLOPE_LENGTH = 62
 const JUMP_RAMP_ANGLE_DEG = 24
 const JUMP_RAMP_LENGTH = 54
 const JUMP_RAMP_THICKNESS = 14
+const CONVEYOR_LENGTH = 58
+const CONVEYOR_THICKNESS = 16
 
 /** 一つの曲線を3枚の短い板で近似する。完全な円弧より、滑らかに向きが変わることを優先する。 */
 const CURVE_LEFT_SEGMENTS: readonly PartSegment[] = [
@@ -160,6 +167,25 @@ const SPINNER_SEGMENTS: readonly PartSegment[] = [
   { offsetX: 0, offsetY: 0, width: 10, height: 48, angleDeg: 0, role: 'blade' },
   { offsetX: 0, offsetY: 0, width: 16, height: 16, angleDeg: 0, kind: 'circle', role: 'chamber' },
 ]
+
+export const CONVEYOR_TYPE_IDS = ['conveyorRight', 'conveyorDown', 'conveyorLeft', 'conveyorUp'] as const
+
+function conveyorDefinition(
+  id: (typeof CONVEYOR_TYPE_IDS)[number],
+  quarterTurns: number,
+  inTray = false,
+): PartDefinition {
+  return {
+    id,
+    label: 'ベルトコンベア',
+    inTray,
+    appearance: 'conveyor',
+    cells: SINGLE_CELL,
+    segments: rotateSegments([{ offsetX: 0, offsetY: 0, width: CONVEYOR_LENGTH, height: CONVEYOR_THICKNESS, angleDeg: 0 }], quarterTurns),
+    restitution: 0.2,
+    friction: 0.04,
+  }
+}
 
 /** セグメントの集合を90度単位で回す。曲線の見た目と物理形状を必ず同じ向きへ回す。 */
 function rotateSegments(segments: readonly PartSegment[], quarterTurns: number): readonly PartSegment[] {
@@ -266,6 +292,11 @@ export const PART_DEFINITIONS: readonly PartDefinition[] = [
     segments: SPINNER_SEGMENTS,
     restitution: 0.55, friction: 0.03,
   },
+
+  conveyorDefinition('conveyorRight', 0, true),
+  conveyorDefinition('conveyorDown', 1),
+  conveyorDefinition('conveyorLeft', 2),
+  conveyorDefinition('conveyorUp', 3),
 ]
 
 /** 実際のパーツ置き場へ出すのは、各パーツの基本向きだけ。 */
@@ -294,6 +325,10 @@ const NEXT_ROTATION_TYPE: Readonly<Partial<Record<PartTypeId, PartTypeId>>> = {
   cannonUpLeft: 'cannonUp',
   cannonUp: 'cannonUpRight',
   cannonUpRight: 'cannon',
+  conveyorRight: 'conveyorDown',
+  conveyorDown: 'conveyorLeft',
+  conveyorLeft: 'conveyorUp',
+  conveyorUp: 'conveyorRight',
 }
 
 export function nextRotationType(id: PartTypeId): PartTypeId | null {
@@ -314,4 +349,8 @@ export function isSpinnerPart(id: PartTypeId): id is 'spinner' {
 
 export function isJumpRampPart(id: string): id is 'jumpRampRight' | 'jumpRampLeft' {
   return id === 'jumpRampRight' || id === 'jumpRampLeft'
+}
+
+export function isConveyorPart(id: string): id is (typeof CONVEYOR_TYPE_IDS)[number] {
+  return (CONVEYOR_TYPE_IDS as readonly string[]).includes(id)
 }

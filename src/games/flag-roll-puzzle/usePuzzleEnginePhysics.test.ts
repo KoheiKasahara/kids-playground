@@ -36,4 +36,15 @@ describe('flag-roll-puzzle の特殊パーツBody', () => {
     expect(bodies[0].label).toBe('jump-ramp:jumpRampRight:part-ramp:0')
     expect(bodies[0].angle).toBeLessThan(0)
   })
+
+  it('ベルトコンベアは配置したIDをラベルへ含む静的なBodyを作る', () => {
+    const bodies = createPuzzlePartBodies({
+      id: 'part-conveyor',
+      typeId: 'conveyorRight',
+      cell: { col: 2, row: 3 },
+    })
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0].isStatic).toBe(true)
+    expect(bodies[0].label).toBe('conveyor:part-conveyor:0')
+  })
 })
