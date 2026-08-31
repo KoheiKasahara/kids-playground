@@ -240,8 +240,8 @@ export const PART_DEFINITIONS: readonly PartDefinition[] = [
   },
 
   {
-    // 右へ走る球を上へ導く短い斜面。実際のジャンプ補正は usePuzzleEngine 側で
-    // 進入方向を確認してからだけ加えるため、逆走時に不自然な発射はしない。
+    // ジャンプ台固有の向きへ球を飛ばす短い斜面。実際のジャンプ補正は
+    // usePuzzleEngine 側で接触方向にかかわらず適用し、台の向きを発射方向として優先する。
     id: 'jumpRampRight', label: 'ジャンプ台', inTray: true, appearance: 'jumpRamp', cells: SINGLE_CELL,
     segments: [{ offsetX: 0, offsetY: 0, width: JUMP_RAMP_LENGTH, height: JUMP_RAMP_THICKNESS, angleDeg: -JUMP_RAMP_ANGLE_DEG }],
     restitution: 0.25, friction: 0.015,
