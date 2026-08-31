@@ -1,21 +1,44 @@
-import type { CSSProperties, DragEvent, PointerEvent } from 'react'
+import type { CSSProperties, PointerEvent, Ref } from 'react'
 import type { RouteSample } from './routeModel'
-import { connectionsForPart, createPlacedPart, PART_DEFINITIONS } from './partDefinitions'
+import { connectionsForPart, createPlacedPart, PART_DEFINITIONS, type PartKind } from './partDefinitions'
 import type { Board, BoardCell } from './boardModel'
 import { getPathSpec, pathSpecToSvgPath } from './roadGeometry'
 import styles from './CarRoadBuilder.module.css'
 
 export type CarRoadBoardProps = {
   board: Board
+  boardRef?: Ref<HTMLDivElement>
   selectedCellId?: string | null
   running?: boolean
   onCellClick?: (cell: BoardCell) => void
   onCellPointerDown?: (cell: BoardCell, event: PointerEvent<HTMLButtonElement>) => void
   onCellPointerUp?: (cell: BoardCell, event: PointerEvent<HTMLButtonElement>) => void
-  onCellDrop?: (cell: BoardCell, event: DragEvent<HTMLButtonElement>) => void
+  dropPreview?: Readonly<{ kind: PartKind; cellId: string | null; valid: boolean }> | null
   carSample?: RouteSample | null
   carAtStart?: Readonly<{ x: number; y: number }> | null
   carAngle?: number
+}
+
+function RoadPartVisual({ part }: { part: Readonly<{ kind: PartKind; rotationStep: number }> }) {
+  const connections = connectionsForPart(part)
+  const pathSpecs = part.kind === 'goal'
+    ? connections.map((direction) => getPathSpec(part, direction))
+    : part.kind === 'crossroad' || part.kind === 'xroad'
+      ? connections.slice(0, 2).map((direction) => getPathSpec(part, direction))
+      : [getPathSpec(part)]
+
+  return (
+    <span className={`${styles.roadShape} ${pathSpecs.length > 0 ? styles.pathShape : ''}`} aria-hidden="true">
+      {pathSpecs.length > 0 && (
+        <svg className={styles.roadSvg} viewBox="-0.5 -0.5 1 1" aria-hidden="true">
+          {pathSpecs.map((spec, index) => <path key={index} d={pathSpecToSvgPath(spec)} />)}
+          {part.kind === 'goal' && <circle className={styles.roadHub} cx="0" cy="0" r=".16" />}
+        </svg>
+      )}
+      {part.kind === 'start' && <span className={styles.markerEmoji}>🚩</span>}
+      {part.kind === 'goal' && <span className={styles.markerEmoji}>🏁</span>}
+    </span>
+  )
 }
 
 function cellLabel(cell: BoardCell): string {
@@ -23,10 +46,11 @@ function cellLabel(cell: BoardCell): string {
   return cell.kind ? `${PART_DEFINITIONS[cell.kind].label}、${location}` : `あきセル、${location}`
 }
 
-export default function CarRoadBoard({ board, selectedCellId = null, running = false, onCellClick, onCellPointerDown, onCellPointerUp, onCellDrop, carSample = null, carAtStart = null, carAngle = 0 }: CarRoadBoardProps) {
+export default function CarRoadBoard({ board, boardRef, selectedCellId = null, running = false, onCellClick, onCellPointerDown, onCellPointerUp, dropPreview = null, carSample = null, carAtStart = null, carAngle = 0 }: CarRoadBoardProps) {
   return (
     <div className={styles.boardFrame} data-testid="car-road-board" aria-label="みちの ばんめん">
       <div
+        ref={boardRef}
         className={styles.board}
         style={{ '--board-cols': board.size.cols, '--board-rows': board.size.rows } as CSSProperties}
         role="grid"
@@ -35,15 +59,7 @@ export default function CarRoadBoard({ board, selectedCellId = null, running = f
       >
         {board.cells.map((cell) => {
           const partStyle = cell.kind ? ({ '--rotation': cell.rotationStep } as CSSProperties) : undefined
-          const connections = cell.kind ? connectionsForPart({ kind: cell.kind, rotationStep: cell.rotationStep }) : []
           const part = cell.kind ? createPlacedPart(cell.kind, cell.rotationStep) : null
-          const pathSpecs = part
-            ? part.kind === 'goal'
-              ? connections.map((direction) => getPathSpec(part, direction))
-              : part.kind === 'crossroad' || part.kind === 'xroad'
-                ? connections.slice(0, 2).map((direction) => getPathSpec(part, direction))
-              : [getPathSpec(part)]
-            : []
           return (
             <button
               key={cell.id}
@@ -58,22 +74,26 @@ export default function CarRoadBoard({ board, selectedCellId = null, running = f
               onClick={() => onCellClick?.(cell)}
               onPointerDown={(event) => onCellPointerDown?.(cell, event)}
               onPointerUp={(event) => onCellPointerUp?.(cell, event)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => { event.preventDefault(); onCellDrop?.(cell, event) }}
             >
-              <span className={`${styles.roadShape} ${pathSpecs.length > 0 ? styles.pathShape : ''}`} aria-hidden="true">
-                {pathSpecs.length > 0 && (
-                  <svg className={styles.roadSvg} viewBox="-0.5 -0.5 1 1" aria-hidden="true">
-                    {pathSpecs.map((spec, index) => <path key={index} d={pathSpecToSvgPath(spec)} />)}
-                    {cell.kind === 'goal' && <circle className={styles.roadHub} cx="0" cy="0" r=".16" />}
-                  </svg>
-                )}
-                {cell.kind === 'start' && <span className={styles.markerEmoji}>🚩</span>}
-                {cell.kind === 'goal' && <span className={styles.markerEmoji}>🏁</span>}
-              </span>
+              {part && <RoadPartVisual part={part} />}
             </button>
           )
         })}
+        {dropPreview?.cellId && (() => {
+          const target = board.cells.find((cell) => cell.id === dropPreview.cellId)
+          if (!target) return null
+          return (
+            <span
+              data-testid="car-road-drop-preview"
+              data-valid={dropPreview.valid}
+              className={`${styles.dropPreview} ${dropPreview.valid ? styles.dropAllowed : styles.dropForbidden}`}
+              style={{ gridColumn: target.col + 1, gridRow: target.row + 1 }}
+              aria-hidden="true"
+            >
+              <RoadPartVisual part={createPlacedPart(dropPreview.kind)} />
+            </span>
+          )
+        })()}
         {(carSample || carAtStart) && (
           <span
             className={styles.car}

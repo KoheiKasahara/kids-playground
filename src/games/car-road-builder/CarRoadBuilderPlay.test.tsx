@@ -1,11 +1,31 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import CarRoadBuilderPlay from './CarRoadBuilderPlay'
 
 function renderGame() {
   return render(<MemoryRouter><CarRoadBuilderPlay /></MemoryRouter>)
+}
+
+function mockBoardRect(size = 400) {
+  const board = screen.getByRole('grid')
+  vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({
+    bottom: size,
+    height: size,
+    left: 0,
+    right: size,
+    top: 0,
+    width: size,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  } as DOMRect)
+  return board
+}
+
+function pointerOptions(pointerId: number, clientX: number, clientY: number, pointerType: 'touch' | 'mouse' = 'touch') {
+  return { button: 0, clientX, clientY, isPrimary: true, pointerId, pointerType }
 }
 
 describe('CarRoadBuilderPlay', () => {
@@ -105,6 +125,64 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '4')
     expect(screen.getByRole('grid')).toHaveAttribute('aria-colcount', '4')
     expect(screen.getByRole('button', { name: 'ふつう 4×4' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('drags a palette part to an empty 4x4 cell with a visible valid preview', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    mockBoardRect()
+    const palette = screen.getByRole('button', { name: 'カーブを おく' })
+
+    fireEvent.pointerDown(palette, pointerOptions(1, 20, 500))
+    fireEvent.pointerMove(palette, pointerOptions(1, 50, 50))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent('カーブを つかんだよ')
+
+    fireEvent.pointerUp(palette, pointerOptions(1, 50, 50))
+    expect(screen.getByRole('gridcell', { name: 'カーブ、1ぎょう 1れつ' })).toBeInTheDocument()
+
+    // A drag completion must not leave the source button selected through a
+    // follow-up click event.
+    fireEvent.click(palette)
+    expect(palette).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    await user.click(screen.getByRole('button', { name: 'けす' }))
+    expect(screen.getByRole('gridcell', { name: 'あきセル、1ぎょう 1れつ' })).toBeInTheDocument()
+  })
+
+  test('does not place when a palette drag ends outside the board or on an occupied cell', () => {
+    renderGame()
+    mockBoardRect()
+    const palette = screen.getByRole('button', { name: 'まっすぐを おく' })
+
+    fireEvent.pointerDown(palette, pointerOptions(2, 20, 500))
+    fireEvent.pointerMove(palette, pointerOptions(2, 500, 500))
+    expect(screen.queryByTestId('car-road-drop-preview')).not.toBeInTheDocument()
+    fireEvent.pointerUp(palette, pointerOptions(2, 500, 500))
+    expect(screen.getByRole('status')).toHaveTextContent('そこには おけないよ')
+    expect(screen.queryByRole('gridcell', { name: 'まっすぐ、1ぎょう 1れつ' })).not.toBeInTheDocument()
+
+    fireEvent.pointerDown(palette, pointerOptions(3, 20, 500, 'mouse'))
+    fireEvent.pointerMove(palette, pointerOptions(3, 50, 150, 'mouse'))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'false')
+    fireEvent.pointerUp(palette, pointerOptions(3, 50, 150, 'mouse'))
+    expect(screen.getByRole('gridcell', { name: 'スタート、2ぎょう 1れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('そこには おけないよ')
+  })
+
+  test('uses the current 5x5 board geometry for a palette drag to the edge', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'ひろい 5×5' }))
+    mockBoardRect()
+    const palette = screen.getByRole('button', { name: 'Xじを おく' })
+
+    fireEvent.pointerDown(palette, pointerOptions(4, 20, 500))
+    fireEvent.pointerMove(palette, pointerOptions(4, 360, 360))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    fireEvent.pointerUp(palette, pointerOptions(4, 360, 360))
+    expect(screen.getByRole('gridcell', { name: 'Xじ、5ぎょう 5れつ' })).toBeInTheDocument()
   })
 
   test('wide stage keeps placement, rotation, deletion and start/goal controls working', async () => {
