@@ -33,6 +33,33 @@ describe('car road route', () => {
     board = placePartAt(removePart(board, { row: 0, col: 0 }), 0, 0, createPlacedPart('start', 7))
     expect(buildRoute(board).stopReason).toBe('edge')
   })
+
+  test('follows a gentle curve into a diagonal neighbour and reaches the goal', () => {
+    let board = createInitialBoard()
+    board = placePartAt(board, 1, 0, createPlacedPart('start', 2))
+    board = placePartAt(board, 1, 1, createPlacedPart('gentle-curve', 3))
+    board = placePartAt(board, 2, 2, createPlacedPart('goal'))
+
+    const route = buildRoute(board)
+    expect(route.reachedGoal).toBe(true)
+    expect(route.stopReason).toBe('goal')
+    expect(route.segments.map((segment) => segment.kind)).toEqual(['start', 'gentle-curve', 'goal'])
+    expect(route.segments[1]).toMatchObject({ entryPort: 'W', exitPort: 'SE' })
+    expect(route.segments[1]!.path.sample(0)).toEqual({ x: -0.5, y: 0 })
+    expect(route.segments[1]!.path.sample(1)).toEqual({ x: 0.5, y: 0.5 })
+  })
+
+  test('requires a reciprocal diagonal port before entering a gentle curve', () => {
+    let board = createInitialBoard()
+    board = placePartAt(board, 0, 0, createPlacedPart('start', 3))
+    board = placePartAt(board, 1, 1, createPlacedPart('gentle-curve', 0))
+    board = placePartAt(board, 3, 3, createPlacedPart('goal'))
+
+    const route = buildRoute(board)
+    expect(route.reachedGoal).toBe(false)
+    expect(route.stopReason).toBe('mismatch')
+    expect(route.segments).toHaveLength(0)
+  })
 })
 
 function routePolylineFirst(route: ReturnType<typeof buildRoute>) {

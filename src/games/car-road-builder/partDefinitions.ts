@@ -5,7 +5,7 @@ import {
   type Direction,
 } from './direction'
 
-export type PartKind = 'start' | 'straight' | 'curve' | 'goal'
+export type PartKind = 'start' | 'straight' | 'curve' | 'gentle-curve' | 'goal'
 
 /** The only state needed to describe a placed road part. */
 export type PlacedPart = Readonly<{
@@ -49,6 +49,15 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
     baseConnections: ['N', 'E'],
     rotationSteps: ALL_ROTATIONS,
   },
+  'gentle-curve': {
+    kind: 'gentle-curve',
+    label: 'ゆるいカーブ',
+    emoji: '⌢',
+    // N -> SE makes the travel direction turn smoothly by 45 degrees.
+    // Rotation exposes the equivalent cardinal/diagonal pair for every turn.
+    baseConnections: ['N', 'SE'],
+    rotationSteps: ALL_ROTATIONS,
+  },
   goal: {
     kind: 'goal',
     label: 'ゴール',
@@ -59,7 +68,7 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
   },
 } as const
 
-export const PART_KINDS: readonly PartKind[] = ['start', 'straight', 'curve', 'goal']
+export const PART_KINDS: readonly PartKind[] = ['start', 'straight', 'curve', 'gentle-curve', 'goal']
 
 export function getPartDefinition(kind: PartKind): PartDefinition {
   return PART_DEFINITIONS[kind]
