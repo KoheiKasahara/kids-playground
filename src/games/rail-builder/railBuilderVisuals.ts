@@ -1,6 +1,28 @@
+import type { RailPieceKind } from './railModel'
+
 /** Rail Builder の描画品質と短い演出で共有する副作用のない値。 */
 
 /** 線路・施設で共通に使う小さな玩具スケールの visual palette。 */
+/**
+ * Raycast専用の透明hit areaの横幅倍率。描画geometryには適用しない。
+ * 細く見えるパーツだけを広げ、施設の大きな外形は従来幅に留める。
+ */
+export const RAIL_HIT_AREA_WIDTH_SCALE_BY_KIND: Readonly<Record<RailPieceKind, number>> = {
+  straight: 2.4,
+  'short-straight': 2.2,
+  curve: 2.4,
+  branch: 2.4,
+  slope: 2.2,
+  bridge: 2.0,
+  station: 1.8,
+  tunnel: 1.8,
+  depot: 1.8,
+}
+
+export function getRailHitAreaWidthScale(kind: RailPieceKind): number {
+  return RAIL_HIT_AREA_WIDTH_SCALE_BY_KIND[kind]
+}
+
 export const RAIL_VISUAL_CONFIG = {
   gauge: 0.46,
   /** Shared path-relative Y layers. Path centerlines remain owned by railModel. */
