@@ -1,5 +1,28 @@
-import { partDefinition, type PartTypeId } from './partTypes'
+import { partDefinition, type PartAppearance, type PartSegment, type PartTypeId } from './partTypes'
 import styles from './PartShape.module.css'
+
+/**
+ * キャノンの太さは見た目だけを控えめに調整する。
+ * 物理Bodyは partTypes の寸法をそのまま使うため、挙動・当たり判定は変わらない。
+ */
+const CANNON_CHAMBER_SCALE = 1.05
+const CANNON_BARREL_THICKNESS_SCALE = 1.12
+const CANNON_MUZZLE_THICKNESS_SCALE = 1.08
+
+function visualTransform(segment: PartSegment, appearance: PartAppearance) {
+  const visualScale =
+    appearance !== 'cannon'
+      ? ''
+      : segment.role === 'barrel'
+        ? ` scaleY(${CANNON_BARREL_THICKNESS_SCALE})`
+        : segment.role === 'muzzle'
+          ? ` scaleY(${CANNON_MUZZLE_THICKNESS_SCALE})`
+          : segment.role === 'chamber'
+            ? ` scale(${CANNON_CHAMBER_SCALE})`
+            : ''
+
+  return `translate(-50%, -50%) translate(${segment.offsetX}px, ${segment.offsetY}px) rotate(${segment.angleDeg}deg)${visualScale}`
+}
 
 type PartShapeProps = {
   typeId: PartTypeId
@@ -87,7 +110,7 @@ export default function PartShape({ typeId, variant = 'placed', motionRef }: Par
           style={{
             width: segment.width,
             height: segment.height,
-            transform: `translate(-50%, -50%) translate(${segment.offsetX}px, ${segment.offsetY}px) rotate(${segment.angleDeg}deg)`,
+            transform: visualTransform(segment, definition.appearance),
           }}
         />
       ))}

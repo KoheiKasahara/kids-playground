@@ -336,7 +336,7 @@ describe('こっきコロコロパズル', () => {
     expect(placedParts()[0]).toHaveAttribute('data-part-type', 'bumper')
     tapBoard(2, 3)
     expect(screen.queryByRole('button', { name: 'まわす' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'えらんだ いたを けす' }))
+    await user.click(screen.getByRole('button', { name: 'けす' }))
     expect(placedParts()).toHaveLength(0)
   })
 
@@ -365,7 +365,7 @@ describe('こっきコロコロパズル', () => {
     await user.click(screen.getByRole('button', { name: 'まわす' }))
     await user.click(screen.getByRole('button', { name: 'まわす' }))
     expect(placedParts()[0]).toHaveAttribute('data-part-type', 'conveyorRight')
-    await user.click(screen.getByRole('button', { name: 'えらんだ いたを けす' }))
+    await user.click(screen.getByRole('button', { name: 'けす' }))
     expect(placedParts()).toHaveLength(0)
   })
 
@@ -378,11 +378,11 @@ describe('こっきコロコロパズル', () => {
 
     tapBoard(2, 3)
     expect(screen.queryByRole('button', { name: 'まわす' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
     dragBoardPart([2, 3], [4, 5])
     expect(placedParts()[0]).toHaveAttribute('data-cell', '4,5')
 
-    await user.click(screen.getByRole('button', { name: 'えらんだ いたを けす' }))
+    await user.click(screen.getByRole('button', { name: 'けす' }))
     expect(placedParts()).toHaveLength(0)
   })
 
@@ -437,19 +437,19 @@ describe('こっきコロコロパズル', () => {
     await user.click(trayPart('みぎへ'))
     tapBoard(4, 5)
     expect(placedParts()).toHaveLength(2)
-    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'けす' })).not.toBeInTheDocument()
 
     // ひだりへを置いたマスをタップして選ぶ
     tapBoard(2, 3)
     expect(screen.getByTestId('puzzle-selection')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
     expect(placedParts().filter((part) => part.dataset.selected === 'true')).toHaveLength(1)
 
-    await user.click(screen.getByRole('button', { name: 'えらんだ いたを けす' }))
+    await user.click(screen.getByRole('button', { name: 'けす' }))
     expect(placedParts()).toHaveLength(1)
     // 残るのは選んでいなかった「みぎへ」のほう
     expect(placedParts()[0]).toHaveAttribute('data-part-type', 'slopeRight')
-    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'けす' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('puzzle-selection')).not.toBeInTheDocument()
   })
 
@@ -504,12 +504,12 @@ describe('こっきコロコロパズル', () => {
     await user.click(trayPart('ひだりへ'))
     tapBoard(2, 3)
     tapBoard(2, 3)
-    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
 
     dragBoardPart([2, 3], [4, 5])
     expect(placedParts()[0]).toHaveAttribute('data-cell', '4,5')
     expect(placedParts()[0]).toHaveAttribute('data-selected', 'true')
-    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
   })
 
   test('別のパーツを動かし始めると、前の選択は解ける', async () => {
@@ -520,11 +520,11 @@ describe('こっきコロコロパズル', () => {
     tapBoard(4, 5)
     // (2,3) のパーツを選んでおく
     tapBoard(2, 3)
-    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
 
     // 選んでいないほう (4,5) を動かす
     dragBoardPart([4, 5], [1, 6])
-    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'けす' })).not.toBeInTheDocument()
     expect(placedParts().map((part) => part.dataset.cell)).toEqual(['2,3', '1,6'])
   })
 
@@ -546,15 +546,15 @@ describe('こっきコロコロパズル', () => {
     tapBoard(2, 3)
 
     tapBoard(2, 3)
-    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
     tapBoard(2, 3)
-    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'けす' })).not.toBeInTheDocument()
 
     tapBoard(2, 3)
-    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
     // 何もないマスをタップしたら選択は解ける（パーツは消えない）
     tapBoard(0, 0)
-    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'けす' })).not.toBeInTheDocument()
     expect(placedParts()).toHaveLength(1)
   })
 
@@ -564,10 +564,10 @@ describe('こっきコロコロパズル', () => {
     await user.click(trayPart('ひだりへ'))
     tapBoard(2, 3)
     tapBoard(2, 3)
-    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
 
     await user.click(trayPart('ひだりへ'))
-    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'けす' })).not.toBeInTheDocument()
     expect(trayPart('ひだりへ')).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -577,10 +577,10 @@ describe('こっきコロコロパズル', () => {
     await user.click(trayPart('ひだりへ'))
     tapBoard(2, 3)
     tapBoard(2, 3)
-    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
-    expect(screen.queryByRole('button', { name: 'えらんだ いたを けす' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'けす' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('puzzle-selection')).not.toBeInTheDocument()
   })
 
