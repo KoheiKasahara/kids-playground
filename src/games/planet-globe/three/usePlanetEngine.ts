@@ -322,11 +322,11 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
 
     function disposeSatellites() {
       for (const visual of satelliteVisuals) {
-        visual.mesh.material instanceof THREE.Material && visual.mesh.material.dispose()
-        visual.atmosphere?.material instanceof THREE.Material && visual.atmosphere.material.dispose()
+        if (visual.mesh.material instanceof THREE.Material) visual.mesh.material.dispose()
+        if (visual.atmosphere?.material instanceof THREE.Material) visual.atmosphere.material.dispose()
         visual.mesh.removeFromParent()
         visual.atmosphere?.removeFromParent()
-        visual.orbitLine.material instanceof THREE.Material && visual.orbitLine.material.dispose()
+        if (visual.orbitLine.material instanceof THREE.Material) visual.orbitLine.material.dispose()
         visual.orbitLine.geometry.dispose()
         visual.orbitLine.removeFromParent()
         visual.orbitPivot.removeFromParent()
