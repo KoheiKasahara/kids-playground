@@ -44,6 +44,40 @@ function RoadPartVisual({ part }: { part: Readonly<{ kind: PartKind; rotationSte
   )
 }
 
+/**
+ * Top-down car artwork with an explicit canonical heading.
+ *
+ * The nose points right (E) when the SVG is unrotated. The route sample uses
+ * the same screen-coordinate convention, so rotating this one visual by the
+ * sample tangent keeps the front aligned for every cardinal and diagonal
+ * direction without per-direction corrections.
+ */
+function CarVisual() {
+  return (
+    <svg
+      className={styles.carSvg}
+      data-testid="car-visual"
+      data-front-direction="E"
+      viewBox="-20 -13 40 26"
+      aria-hidden="true"
+    >
+      <path className={styles.carShadow} d="M-14-9 Q-18 0-14 9 Q-11 12-5 12 H9 Q15 12 18 5 L20 0 18-5 Q15-12 9-12 H-5 Q-11-12-14-9Z" />
+      <path className={styles.carBody} d="M-15-8 Q-12-10-8-10 H8 Q14-10 16-5 L19 0 16 5 Q14 10 8 10 H-8 Q-12 10-15 8 Q-18 0-15-8Z" />
+      <path className={styles.carRearWindow} d="M-9-6 H-2 V6 H-9 Q-11 0-9-6Z" />
+      <path className={styles.carFrontWindshield} d="M1-6 H7 Q10-6 12-3 L14 0 12 3 Q10 6 7 6 H1Z" />
+      <path className={styles.carCenterLine} d="M-1-6 V6" />
+      <rect className={styles.carWheel} x="-7" y="-11.5" width="5" height="3" rx="1.5" />
+      <rect className={styles.carWheel} x="7" y="-11.5" width="5" height="3" rx="1.5" />
+      <rect className={styles.carWheel} x="-7" y="8.5" width="5" height="3" rx="1.5" />
+      <rect className={styles.carWheel} x="7" y="8.5" width="5" height="3" rx="1.5" />
+      <circle className={styles.carHeadlight} cx="16" cy="-3.3" r="1.25" />
+      <circle className={styles.carHeadlight} cx="16" cy="3.3" r="1.25" />
+      <rect className={styles.carTailLight} x="-15.5" y="-4" width="1.7" height="2.6" rx=".7" />
+      <rect className={styles.carTailLight} x="-15.5" y="1.4" width="1.7" height="2.6" rx=".7" />
+    </svg>
+  )
+}
+
 function cellLabel(cell: BoardCell): string {
   const location = `${cell.row + 1}ぎょう ${cell.col + 1}れつ`
   return cell.kind ? `${PART_DEFINITIONS[cell.kind].label}、${location}` : `あきセル、${location}`
@@ -109,7 +143,9 @@ export default function CarRoadBoard({ board, boardRef, selectedCellId = null, d
               top: `${((carSample?.point.y ?? carAtStart?.y ?? 0) / board.size.rows) * 100}%`,
               '--car-angle': `${carSample ? Math.atan2(carSample.tangent.y, carSample.tangent.x) : carAngle}rad`,
             } as CSSProperties}
-          >🚗</span>
+          >
+            <CarVisual />
+          </span>
         )}
       </div>
     </div>
