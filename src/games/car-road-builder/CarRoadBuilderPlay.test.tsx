@@ -185,6 +185,89 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('gridcell', { name: 'Xじ、5ぎょう 5れつ' })).toBeInTheDocument()
   })
 
+  test('drags a placed road to an empty cell with a snapped preview and preserved rotation', () => {
+    renderGame()
+    const board = mockBoardRect()
+    const source = screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })
+
+    fireEvent.pointerDown(source, pointerOptions(10, 150, 150))
+    fireEvent.pointerMove(source, pointerOptions(10, 350, 50))
+    expect(source).toHaveAttribute('aria-grabbed', 'true')
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent('まっすぐを つかんだよ')
+
+    fireEvent.pointerUp(source, pointerOptions(10, 350, 50))
+    expect(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 2れつ' })).toBeInTheDocument()
+    const moved = screen.getByRole('gridcell', { name: 'まっすぐ、1ぎょう 4れつ' })
+    expect(moved).toHaveAttribute('aria-grabbed', 'false')
+    expect(moved).toHaveStyle('--rotation: 2')
+    expect(board).toBeInTheDocument()
+  })
+
+  test('rejects occupied and out-of-board drops without losing a placed part', () => {
+    renderGame()
+    mockBoardRect()
+    const source = screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })
+
+    fireEvent.pointerDown(source, pointerOptions(11, 150, 150))
+    fireEvent.pointerMove(source, pointerOptions(11, 250, 150))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'false')
+    fireEvent.pointerUp(source, pointerOptions(11, 250, 150))
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'ゴール、2ぎょう 3れつ' })).toBeInTheDocument()
+
+    fireEvent.pointerDown(source, pointerOptions(12, 150, 150))
+    fireEvent.pointerMove(source, pointerOptions(12, 500, 500))
+    expect(screen.queryByTestId('car-road-drop-preview')).not.toBeInTheDocument()
+    fireEvent.pointerUp(source, pointerOptions(12, 500, 500))
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('そこには おけないよ')
+  })
+
+  test('keeps a light tap as selection and treats a return to the origin as a no-op', () => {
+    renderGame()
+    mockBoardRect()
+    const source = screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })
+
+    fireEvent.pointerDown(source, pointerOptions(14, 150, 150))
+    fireEvent.pointerUp(source, pointerOptions(14, 150, 150))
+    fireEvent.click(source)
+    expect(source).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByTestId('car-road-drop-preview')).not.toBeInTheDocument()
+
+    fireEvent.pointerDown(source, pointerOptions(15, 150, 150))
+    fireEvent.pointerMove(source, pointerOptions(15, 180, 150))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    fireEvent.pointerUp(source, pointerOptions(15, 150, 150))
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })).toHaveStyle('--rotation: 2')
+    expect(screen.getByRole('status')).toHaveTextContent('そのままだよ')
+  })
+
+  test('supports moving to the edge on the 5x5 stage, then rotating and deleting', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'ひろい 5×5' }))
+    mockBoardRect(500)
+    const source = screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })
+
+    fireEvent.pointerDown(source, pointerOptions(13, 150, 150))
+    fireEvent.pointerMove(source, pointerOptions(13, 450, 450))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    fireEvent.pointerUp(source, pointerOptions(13, 450, 450))
+    expect(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 2れつ' })).toBeInTheDocument()
+    const moved = screen.getByRole('gridcell', { name: 'まっすぐ、5ぎょう 5れつ' })
+    expect(moved).toHaveStyle('--rotation: 2')
+
+    // Consume the click that a real pointerup can synthesize, then exercise
+    // the normal selected-part controls on the moved cell.
+    fireEvent.click(moved)
+    await user.click(moved)
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、5ぎょう 5れつ' })).toHaveStyle('--rotation: 3')
+    await user.click(screen.getByRole('button', { name: 'けす' }))
+    expect(screen.getByRole('gridcell', { name: 'あきセル、5ぎょう 5れつ' })).toBeInTheDocument()
+  })
+
   test('wide stage keeps placement, rotation, deletion and start/goal controls working', async () => {
     const user = userEvent.setup()
     renderGame()
