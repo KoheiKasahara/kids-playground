@@ -1,4 +1,4 @@
-import type { CelestialBody, ZoomLevel } from '../types'
+import type { CelestialBody, SatelliteSpec, ZoomLevel } from '../types'
 import { MAX_ZOOM_LEVEL } from '../types'
 import { ringOuterRadiusRatio } from './planetRing'
 
@@ -72,4 +72,43 @@ export const DEFAULT_VIEW_DIRECTION = { x: 0.32, y: 0.3, z: 0.9 } as const
  */
 export function viewDirectionOf(body: CelestialBody): { x: number; y: number; z: number } {
   return body.viewDirection ?? DEFAULT_VIEW_DIRECTION
+}
+
+
+export type SatelliteFit = Pick<SatelliteSpec, 'orbitRadius' | 'displayScale' | 'parentOffsetRadiusRatio'>
+
+/** 共通重心表現で親天体を動かす距離。描画とカメラで同じ式を使う。 */
+export function parentOffsetRadiusForSatellite(
+  body: CelestialBody,
+  satellite: Pick<SatelliteSpec, 'parentOffsetRadiusRatio'>,
+): number {
+  return body.radius * (satellite.parentOffsetRadiusRatio ?? 0)
+}
+
+export function viewRadiusWithSatellites(
+  body: CelestialBody,
+  satellites: readonly SatelliteFit[] = [],
+  showSatellites = true,
+): number {
+  if (!showSatellites || satellites.length === 0) return viewRadiusOf(body)
+  let radius = viewRadiusOf(body)
+  for (const satellite of satellites) {
+    radius = Math.max(radius, satellite.orbitRadius + body.radius * satellite.displayScale)
+    const primaryOffset = parentOffsetRadiusForSatellite(body, satellite)
+    radius = Math.max(radius, primaryOffset + body.radius)
+  }
+  return radius
+}
+
+export function cameraDistanceForZoomWithSatellites(
+  body: CelestialBody,
+  level: ZoomLevel,
+  aspect: number,
+  satellites: readonly SatelliteFit[] = [],
+  showSatellites = true,
+): number {
+  const t = level / MAX_ZOOM_LEVEL
+  const { outMargin, inMargin } = body.zoom
+  const margin = outMargin * (inMargin / outMargin) ** t
+  return fitDistance(viewRadiusWithSatellites(body, satellites, showSatellites), aspect) * margin
 }

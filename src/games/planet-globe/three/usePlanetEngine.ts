@@ -5,6 +5,7 @@ import type {
   CelestialBody,
   CelestialBodyId,
   FeatureSpot,
+  SatelliteSpec,
   RingSpec,
   UsePlanetEngineHandle,
   UsePlanetEngineOptions,
@@ -15,7 +16,8 @@ import {
   CAMERA_FAR,
   CAMERA_FOV_DEGREES,
   CAMERA_NEAR,
-  cameraDistanceForZoom,
+  cameraDistanceForZoomWithSatellites,
+  parentOffsetRadiusForSatellite,
   easeOutCubic,
   viewDirectionOf,
   viewRadiusOf,
@@ -56,6 +58,11 @@ import {
   ringSpotLocalPosition,
   surfaceSpotLocalPosition,
 } from './spotMarkers'
+import {
+  applySatelliteSelection,
+  createSatelliteMaterial,
+  createSatelliteTexture,
+} from './satelliteVisual'
 
 /** 特徴スポットのマーカー・パルスの既定色(未選択時)。選択時だけ`spot.accentColor`に切り替える。 */
 const DEFAULT_MARKER_COLOR = '#ffffff'
@@ -105,10 +112,22 @@ type ZoomAnimation = {
   startedAt: number
 }
 
+type SatelliteVisual = {
+  satellite: SatelliteSpec
+  orbitPlaneGroup: THREE.Group
+  orbitPivot: THREE.Group
+  mesh: THREE.Mesh
+  orbitLine: THREE.LineLoop
+  atmosphere: THREE.Mesh | null
+  visible: boolean
+}
+
 type PlanetEngine = {
   setBody: (body: CelestialBody) => void
   setZoom: (level: ZoomLevel) => void
   setSelectedSpot: (spotId: string | null, restartPulse: boolean) => void
+  setSatelliteOptions: (satellites: readonly SatelliteSpec[], show: boolean) => void
+  setSelectedSatellite: (satelliteId: string | null) => void
 }
 
 function degToRad(degrees: number): number {
@@ -161,6 +180,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     let bodyRoot: THREE.Group | null = null
     // 共有の球ジオメトリ。大きさは mesh.scale で表現するため、天体を切り替えても作り直さない。
     let sphereGeometry: THREE.SphereGeometry | null = null
+    let satelliteGeometry: THREE.SphereGeometry | null = null
 
     let tiltGroup: THREE.Group | null = null
     let spinGroup: THREE.Group | null = null
@@ -169,6 +189,11 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     let ringMeshes: THREE.Mesh[] = []
     let visualObjects: THREE.Object3D[] = []
     let visualMaterials: THREE.Material[] = []
+    let satelliteSystemRoot: THREE.Group | null = null
+    let satelliteVisuals: SatelliteVisual[] = []
+    let activeSatellites: readonly SatelliteSpec[] = initialOptions.satellites ?? []
+    let activeShowSatellites = initialOptions.showSatellites ?? true
+    let selectedSatelliteId: string | null = initialOptions.selectedSatelliteId ?? null
 
     // 太陽(kind: 'star')だけが持つ、毎frame動かす必要がある参照。所有権(dispose対象)は
     // sphereMeshが持つため、ここは「今フレーム何を動かすか」を指すだけ。
@@ -183,6 +208,10 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     const spotCameraNormalized = new THREE.Vector3()
     const spotRotatedPoint = new THREE.Vector3()
     const spotMarkerWorldPosition = new THREE.Vector3()
+    const satelliteWorldPosition = new THREE.Vector3()
+    const satelliteLocalPosition = new THREE.Vector3()
+    const satelliteCameraNormalized = new THREE.Vector3()
+    const satelliteNormalizedPoint = new THREE.Vector3()
     const SPOT_Y_AXIS = new THREE.Vector3(0, 1, 0)
     let pointerStart: { pointerId: number; x: number; y: number; moved: boolean } | null = null
     let activePointerCount = 0
@@ -205,6 +234,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     const surfaceCache = new Map<CelestialBodyId, SurfaceMaps>()
     const ringTextureCache = new Map<CelestialBodyId, (THREE.CanvasTexture | null)[]>()
     const cloudTextureCache = new Map<CelestialBodyId, THREE.CanvasTexture | null>()
+    const satelliteTextureCache = new Map<string, THREE.CanvasTexture | null>()
 
     function getOrCreateSurfaceMaps(body: CelestialBody): SurfaceMaps {
       const cached = surfaceCache.get(body.id)
@@ -274,11 +304,48 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
 
       const aspect = aspectOfContainer()
       // level3(最大ズーム)より寄れなくし、今回追加したlevel-2より離れられなくする。
-      controls.minDistance = cameraDistanceForZoom(body, 3, aspect) * 0.85
-      controls.maxDistance = cameraDistanceForZoom(body, MIN_ZOOM_LEVEL, aspect) * 1.2
+      controls.minDistance = cameraDistanceForZoomWithSatellites(
+        body,
+        3,
+        aspect,
+        activeSatellites,
+        activeShowSatellites,
+      ) * 0.85
+      controls.maxDistance = cameraDistanceForZoomWithSatellites(
+        body,
+        MIN_ZOOM_LEVEL,
+        aspect,
+        activeSatellites,
+        activeShowSatellites,
+      ) * 1.2
+    }
+
+    function disposeSatellites() {
+      for (const visual of satelliteVisuals) {
+        if (visual.mesh.material instanceof THREE.Material) visual.mesh.material.dispose()
+        if (visual.atmosphere?.material instanceof THREE.Material) visual.atmosphere.material.dispose()
+        visual.mesh.removeFromParent()
+        visual.atmosphere?.removeFromParent()
+        if (visual.orbitLine.material instanceof THREE.Material) visual.orbitLine.material.dispose()
+        visual.orbitLine.geometry.dispose()
+        visual.orbitLine.removeFromParent()
+        visual.orbitPivot.removeFromParent()
+        visual.orbitPlaneGroup.removeFromParent()
+      }
+      satelliteVisuals = []
+      if (satelliteSystemRoot !== null) satelliteSystemRoot.visible = false
+      if (tiltGroup !== null) tiltGroup.position.set(0, 0, 0)
     }
 
     function disposeCurrentBody() {
+      disposeSatellites()
+      // 衛星geometryもこのエンジンが所有し、body切替時に一緒に解放する。
+      satelliteGeometry?.dispose()
+      satelliteGeometry = null
+      // 衛星テクスチャのキャッシュは個別観察エンジンが所有する。
+      // 天体切り替え時に解放し、再訪問時だけ作り直す(毎renderでは生成しない)。
+      for (const texture of satelliteTextureCache.values()) texture?.dispose()
+      satelliteTextureCache.clear()
       for (const spotVisual of spotVisuals) {
         if (spotVisual.marker !== null) {
           spotVisual.marker.material.dispose()
@@ -330,6 +397,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
 
     function buildBody(body: CelestialBody) {
       if (bodyRoot === null || sphereGeometry === null) return
+      const bodyGeometry = sphereGeometry
 
       const nextTiltGroup = new THREE.Group()
       nextTiltGroup.rotation.z = axialTiltRotationZ(body)
@@ -376,7 +444,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         material = standardMaterial
       }
 
-      const mesh = new THREE.Mesh(sphereGeometry, material)
+      const mesh = new THREE.Mesh(bodyGeometry, material)
       // 極方向の潰れ(ガス惑星の扁平)はY軸(極軸)だけを縮めて表現する。
       mesh.scale.set(body.radius, body.radius * (1 - (body.flattening ?? 0)), body.radius)
       // 土星本体の影が輪に落ちるよう、球は影を落とす側にする(輪からの影は受けない)。
@@ -394,7 +462,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
           opacity: visual.clouds.opacity,
           depthWrite: false,
         })
-        const cloudMesh = new THREE.Mesh(sphereGeometry, cloudMaterial)
+        const cloudMesh = new THREE.Mesh(bodyGeometry, cloudMaterial)
         const cloudScale = body.radius * 1.014
         cloudMesh.scale.set(cloudScale, cloudScale * (1 - (body.flattening ?? 0)), cloudScale)
         cloudMesh.renderOrder = 1
@@ -416,7 +484,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         })
-        const atmosphere = new THREE.Mesh(sphereGeometry, atmosphereMaterial)
+        const atmosphere = new THREE.Mesh(bodyGeometry, atmosphereMaterial)
         const atmosphereScale = body.radius * visual.atmosphere.scale
         atmosphere.scale.set(
           atmosphereScale,
@@ -445,9 +513,92 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       sphereMesh = mesh
       ringMeshes = nextRingMeshes
 
-      // spotsはbodyから一意に決まるため専用のeffectは作らない。optionsRef同期effectは
-      // このeffectより先に宣言されているため、この時点でoptionsRef.current.spotsは必ず最新。
       buildSpots(optionsRef.current.spots, body)
+      buildSatellites(optionsRef.current.satellites ?? [], body)
+    }
+
+    function getOrCreateSatelliteTexture(satellite: SatelliteSpec): THREE.CanvasTexture | null {
+      if (satelliteTextureCache.has(satellite.id)) return satelliteTextureCache.get(satellite.id) ?? null
+      const texture = createSatelliteTexture(satellite)
+      satelliteTextureCache.set(satellite.id, texture)
+      return texture
+    }
+
+    function buildSatellites(satellites: readonly SatelliteSpec[], body: CelestialBody) {
+      if (satelliteSystemRoot === null) return
+      activeSatellites = satellites
+      activeShowSatellites = optionsRef.current.showSatellites ?? true
+      satelliteSystemRoot.visible = activeShowSatellites && satellites.length > 0
+      if (satellites.length === 0) return
+      if (satelliteGeometry === null) {
+        satelliteGeometry = new THREE.SphereGeometry(1, 16, 10)
+      }
+      const satelliteGeometryForBody = satelliteGeometry
+      for (const satellite of satellites) {
+        const orbitPlaneGroup = new THREE.Group()
+        // Charonの簡易連星表現だけは、PlutoのtiltGroupと同じ軌道面にそろえる。
+        orbitPlaneGroup.rotation.z = satellite.parentOffsetRadiusRatio === undefined
+          ? (satellite.orbitInclination ?? 0)
+          : axialTiltRotationZ(body)
+        const orbitPivot = new THREE.Group()
+        orbitPivot.rotation.y = satellite.initialAngle
+        const texture = getOrCreateSatelliteTexture(satellite)
+        const material = createSatelliteMaterial(satellite, texture)
+        const mesh = new THREE.Mesh(satelliteGeometryForBody, material)
+        const shape = satellite.shapeScale ?? { x: 1, y: 1, z: 1 }
+        const radius = body.radius * satellite.displayScale
+        mesh.scale.set(radius * shape.x, radius * shape.y, radius * shape.z)
+        mesh.position.set(satellite.orbitRadius, 0, 0)
+        mesh.castShadow = false
+        mesh.receiveShadow = true
+        orbitPivot.add(mesh)
+        const lineGeometry = new THREE.BufferGeometry()
+        const positions = new Float32Array(49 * 3)
+        for (let index = 0; index <= 48; index += 1) {
+          const angle = (index / 48) * Math.PI * 2
+          positions[index * 3] = Math.cos(angle) * satellite.orbitRadius
+          positions[index * 3 + 1] = 0
+          positions[index * 3 + 2] = Math.sin(angle) * satellite.orbitRadius
+        }
+        lineGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+        const lineMaterial = new THREE.LineBasicMaterial({
+          color: satellite.appearance.accentColor,
+          transparent: true,
+          opacity: 0.22,
+          depthWrite: false,
+        })
+        const orbitLine = new THREE.LineLoop(lineGeometry, lineMaterial)
+        orbitPlaneGroup.add(orbitLine)
+        orbitPlaneGroup.add(orbitPivot)
+        satelliteSystemRoot.add(orbitPlaneGroup)
+        let atmosphere: THREE.Mesh | null = null
+        if (satellite.appearance.atmosphere !== undefined) {
+          const atmosphereSpec = satellite.appearance.atmosphere
+          const atmosphereMaterial = new THREE.MeshBasicMaterial({
+            color: atmosphereSpec.color,
+            transparent: true,
+            opacity: atmosphereSpec.opacity,
+            side: THREE.BackSide,
+            depthWrite: false,
+          })
+          atmosphere = new THREE.Mesh(satelliteGeometryForBody, atmosphereMaterial)
+          const atmosphereRadius = radius * atmosphereSpec.scale
+          atmosphere.scale.set(atmosphereRadius, atmosphereRadius, atmosphereRadius)
+          // 大気は衛星本体と同じ軌道位置に重ねる。
+          atmosphere.position.copy(mesh.position)
+          orbitPivot.add(atmosphere)
+        }
+        satelliteVisuals.push({
+          satellite,
+          orbitPlaneGroup,
+          orbitPivot,
+          mesh,
+          orbitLine,
+          atmosphere,
+          visible: false,
+        })
+      }
+      updateSatelliteVisuals()
     }
 
     /** 天体1つぶんの特徴スポットの3Dオブジェクトを作る。marker/pulseはSprite(常にカメラを向く)。 */
@@ -687,6 +838,58 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       }
     }
 
+    function updateSatelliteVisuals() {
+      if (satelliteSystemRoot === null || camera === null || tiltGroup === null || currentBody === null) return
+      const body = currentBody
+      const radius = body.radius
+      if (!activeShowSatellites) {
+        tiltGroup.position.set(0, 0, 0)
+        for (const visual of satelliteVisuals) {
+          visual.orbitPlaneGroup.visible = false
+          visual.visible = false
+        }
+        return
+      }
+      const flattening = body.flattening ?? 0
+      tiltGroup.updateWorldMatrix(true, false)
+      satelliteSystemRoot.updateWorldMatrix(true, true)
+      satelliteCameraNormalized.copy(camera.position)
+      tiltGroup.worldToLocal(satelliteCameraNormalized)
+      satelliteCameraNormalized.set(
+        satelliteCameraNormalized.x / radius,
+        satelliteCameraNormalized.y / (radius * (1 - flattening)),
+        satelliteCameraNormalized.z / radius,
+      )
+      let parentOffsetVisual: SatelliteVisual | null = null
+      for (const visual of satelliteVisuals) {
+        const enabled = activeShowSatellites
+        visual.orbitPlaneGroup.visible = enabled
+        visual.visible = false
+        if (!enabled) continue
+        visual.mesh.getWorldPosition(satelliteWorldPosition)
+        satelliteLocalPosition.copy(satelliteWorldPosition)
+        tiltGroup.worldToLocal(satelliteLocalPosition)
+        satelliteNormalizedPoint.set(
+          satelliteLocalPosition.x / radius,
+          satelliteLocalPosition.y / (radius * (1 - flattening)),
+          satelliteLocalPosition.z / radius,
+        )
+        visual.visible = isRingPointVisible(satelliteCameraNormalized, satelliteNormalizedPoint)
+        applySatelliteSelection(
+          visual.mesh.material as THREE.MeshStandardMaterial,
+          visual.satellite.id === selectedSatelliteId,
+        )
+        if (visual.satellite.parentOffsetRadiusRatio !== undefined) parentOffsetVisual = visual
+      }
+      if (parentOffsetVisual !== null) {
+        // Charonの反対側へPlutoを1.05Rほど動かし、共通重心が見えるようにする。
+        parentOffsetVisual.mesh.getWorldPosition(satelliteWorldPosition)
+        const direction = satelliteWorldPosition.normalize()
+        const offset = parentOffsetRadiusForSatellite(body, parentOffsetVisual.satellite)
+        tiltGroup.position.set(-direction.x * offset, -direction.y * offset, -direction.z * offset)
+      }
+    }
+
     /** キャンバス上のタップ位置から、最も近い(見えている)スポットを選ぶ。Raycasterは使わない
      *  (マーカーはSpriteで見た目が小さく、ピンポイント判定になってしまうため。幼児向けには
      *  「画面上の距離」で判定するほうが確実に押せる)。 */
@@ -705,14 +908,35 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
 
         spotMarkerWorldPosition.setFromMatrixPosition(spotVisual.marker.matrixWorld)
         spotMarkerWorldPosition.project(camera)
-        // カメラの後ろ側に回り込んだ点(NDCのzが範囲外になる)は候補にしない。
         if (spotMarkerWorldPosition.z > 1 || spotMarkerWorldPosition.z < -1) continue
 
         const screen = ndcToScreen(spotMarkerWorldPosition.x, spotMarkerWorldPosition.y, rect.width, rect.height)
-        candidates.push({ id: spotVisual.spot.id, x: screen.x, y: screen.y, hitRadiusPx: spotVisual.spot.hitRadiusPx })
+        candidates.push({ id: `spot:${spotVisual.spot.id}`, x: screen.x, y: screen.y, hitRadiusPx: spotVisual.spot.hitRadiusPx })
+      }
+      if (activeShowSatellites) {
+        for (const satelliteVisual of satelliteVisuals) {
+          if (!satelliteVisual.visible) continue
+          satelliteWorldPosition.setFromMatrixPosition(satelliteVisual.mesh.matrixWorld)
+          satelliteWorldPosition.project(camera)
+          if (satelliteWorldPosition.z > 1 || satelliteWorldPosition.z < -1) continue
+          const screen = ndcToScreen(satelliteWorldPosition.x, satelliteWorldPosition.y, rect.width, rect.height)
+          candidates.push({
+            id: `satellite:${satelliteVisual.satellite.id}`,
+            x: screen.x,
+            y: screen.y,
+            hitRadiusPx: satelliteVisual.satellite.hitRadiusPx,
+          })
+        }
       }
 
-      optionsRef.current.onSpotSelect(pickNearestSpot(candidates, pointerX, pointerY))
+      const selected = pickNearestSpot(candidates, pointerX, pointerY)
+      if (selected?.startsWith('satellite:')) {
+        optionsRef.current.onSpotSelect(null)
+        optionsRef.current.onSatelliteSelect?.(selected.slice('satellite:'.length) || null)
+      } else {
+        optionsRef.current.onSatelliteSelect?.(null)
+        optionsRef.current.onSpotSelect(selected?.slice('spot:'.length) ?? null)
+      }
     }
 
     function handleSpotPointerDown(event: PointerEvent) {
@@ -751,6 +975,32 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       if (pointerStart !== null && pointerStart.pointerId === event.pointerId) pointerStart = null
     }
 
+    function setSatelliteOptions(satellites: readonly SatelliteSpec[], show: boolean) {
+      const idsChanged = satellites.length !== activeSatellites.length
+        || satellites.some((satellite, index) => satellite.id !== activeSatellites[index]?.id)
+      activeShowSatellites = show
+      activeSatellites = satellites
+      if (!show && tiltGroup !== null) tiltGroup.position.set(0, 0, 0)
+      if (idsChanged && currentBody !== null) {
+        disposeSatellites()
+        buildSatellites(satellites, currentBody)
+      } else if (satelliteSystemRoot !== null) {
+        satelliteSystemRoot.visible = show && satellites.length > 0
+        updateControlsDistanceLimits(currentBody ?? initialOptions.body)
+        setZoom(activeZoomLevel, true)
+      }
+    }
+
+    function setSelectedSatellite(satelliteId: string | null) {
+      selectedSatelliteId = satelliteId
+      for (const visual of satelliteVisuals) {
+        applySatelliteSelection(
+          visual.mesh.material as THREE.MeshStandardMaterial,
+          visual.satellite.id === satelliteId,
+        )
+      }
+    }
+
     function setBody(body: CelestialBody) {
       // 同じ天体への再設定は何もしない。React再レンダリング・StrictMode二重実行での作り直しを防ぐ。
       if (currentBody !== null && currentBody.id === body.id) return
@@ -758,6 +1008,9 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       const isFirstBody = currentBody === null
 
       disposeCurrentBody()
+      activeSatellites = optionsRef.current.satellites ?? []
+      activeShowSatellites = optionsRef.current.showSatellites ?? true
+      selectedSatelliteId = optionsRef.current.selectedSatelliteId ?? null
       currentBody = body
       buildBody(body)
 
@@ -779,7 +1032,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       activeZoomLevel = level
       if (camera === null || controls === null || currentBody === null) return
 
-      const targetDistance = cameraDistanceForZoom(currentBody, level, aspectOfContainer())
+      const targetDistance = cameraDistanceForZoomWithSatellites(currentBody, level, aspectOfContainer(), activeSatellites, activeShowSatellites)
       const currentDistance = camera.position.distanceTo(controls.target)
 
       if (immediate || reducedMotion || Math.abs(currentDistance - targetDistance) < 0.5) {
@@ -836,7 +1089,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
         updateControlsDistanceLimits(currentBody)
         // 向きが変わった直後は、実行中のズームアニメーションを打ち切って新しいaspectの距離へ即座に合わせる。
         zoomAnimation = null
-        setCameraDistance(cameraDistanceForZoom(currentBody, activeZoomLevel, width / height))
+        setCameraDistance(cameraDistanceForZoomWithSatellites(currentBody, activeZoomLevel, width / height, activeSatellites, activeShowSatellites))
       }
     }
 
@@ -854,8 +1107,15 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       if (!reducedMotion && cloudSpinGroup !== null && currentBody?.visual?.clouds !== undefined) {
         cloudSpinGroup.rotation.y += currentBody.visual.clouds.spinSpeed * dt
       }
+      if (!reducedMotion && activeShowSatellites) {
+        for (const visual of satelliteVisuals) {
+          const direction = visual.satellite.retrograde ? -1 : 1
+          visual.orbitPivot.rotation.y += direction * visual.satellite.orbitSpeed * dt
+        }
+      }
       if (!reducedMotion) updateSunAnimation(now)
       updateSpotVisuals(now, dt)
+      if (activeShowSatellites) updateSatelliteVisuals()
       updateZoomAnimation(now)
 
       if (renderer !== null && scene !== null && camera !== null) {
@@ -895,6 +1155,8 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       disposeCurrentBody()
       sphereGeometry?.dispose()
       sphereGeometry = null
+      satelliteGeometry?.dispose()
+      satelliteGeometry = null
 
       markerTexture?.dispose()
       markerTexture = null
@@ -913,6 +1175,8 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       ringTextureCache.clear()
       for (const texture of cloudTextureCache.values()) texture?.dispose()
       cloudTextureCache.clear()
+      for (const texture of satelliteTextureCache.values()) texture?.dispose()
+      satelliteTextureCache.clear()
 
       if (starField !== null) {
         starField.removeFromParent()
@@ -990,6 +1254,8 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
 
       bodyRoot = new THREE.Group()
       scene.add(bodyRoot)
+      satelliteSystemRoot = new THREE.Group()
+      bodyRoot.add(satelliteSystemRoot)
 
       sphereGeometry = new THREE.SphereGeometry(1, 64, 48)
 
@@ -1007,7 +1273,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       controls.minPolarAngle = degToRad(22)
       controls.maxPolarAngle = degToRad(158)
 
-      engineRef.current = { setBody, setZoom, setSelectedSpot }
+      engineRef.current = { setBody, setZoom, setSelectedSpot, setSatelliteOptions, setSelectedSatellite }
 
       setBody(initialOptions.body)
       resizeRenderer()
@@ -1045,6 +1311,15 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     previousSelectionFeedbackKeyRef.current = options.selectionFeedbackKey
     engineRef.current?.setSelectedSpot(options.selectedSpotId, restartPulse)
   }, [options.selectedSpotId, options.selectionFeedbackKey])
+
+
+  useEffect(() => {
+    engineRef.current?.setSatelliteOptions(options.satellites ?? [], options.showSatellites ?? true)
+  }, [options.satellites, options.showSatellites])
+
+  useEffect(() => {
+    engineRef.current?.setSelectedSatellite(options.selectedSatelliteId ?? null)
+  }, [options.selectedSatelliteId])
 
   return handle
 }

@@ -1,9 +1,11 @@
-import type { FeatureSpot } from '../types'
+import type { FeatureSpot, SatelliteSpec } from '../types'
 import styles from './FeatureCard.module.css'
 
+export type FeatureCardItem = Pick<FeatureSpot | SatelliteSpec, 'displayName' | 'spokenName' | 'description'>
+
 type FeatureCardProps = {
-  /** 選択中のスポット。nullなら何も描画しない(earth-globeのCountryCardと同じ方式)。 */
-  spot: FeatureSpot | null
+  /** 選択中の特徴スポット/衛星。nullなら何も描画しない。 */
+  spot: FeatureCardItem | null
   onClose: () => void
 }
 
