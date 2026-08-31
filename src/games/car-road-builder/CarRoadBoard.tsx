@@ -69,9 +69,6 @@ export default function CarRoadBoard({ board, selectedCellId = null, running = f
                 {cell.kind === 'start' && <span className={styles.markerEmoji}>🚩</span>}
                 {cell.kind === 'goal' && <span className={styles.markerEmoji}>🏁</span>}
               </span>
-              {cell.kind && cell.kind !== 'start' && cell.kind !== 'goal' && (
-                <span className={styles.portHint} aria-hidden="true">{connections.join('·')}</span>
-              )}
             </button>
           )
         })}
