@@ -119,6 +119,11 @@ export function createPlacedPart(kind: PartKind, rotationStep = 0): PlacedPart {
   return { kind, rotationStep: normalizePartRotation(kind, rotationStep) }
 }
 
+/** Default orientation used when a new part is created from the palette. */
+export function createDefaultPlacedPart(kind: PartKind): PlacedPart {
+  return createPlacedPart(kind, kind === 'straight' ? 2 : 0)
+}
+
 /** Derive ports every time; connections are never persisted on a placed part. */
 export function connectionsForPart(part: PlacedPart): readonly Direction[] {
   if (part.kind === 'goal') return DIRECTIONS
