@@ -92,7 +92,10 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
   const [progress, setProgress] = useState(0)
   const [departureFeedback, setDepartureFeedback] = useState(false)
   const [goalCelebrationId, setGoalCelebrationId] = useState<number | null>(null)
-  const [status, setStatus] = useState('')
+  // Status text used to be rendered below the title. Keep the existing
+  // feedback calls as no-ops so gameplay logic remains easy to follow while
+  // the compact play screen stays free of transient messages.
+  const setStatus = (message: string): void => { void message }
   const animationRef = useRef<number | null>(null)
   const departureFeedbackTimerRef = useRef<number | null>(null)
   const goalCelebrationTimerRef = useRef<number | null>(null)
@@ -524,8 +527,6 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
           </button>
           <h1><span aria-hidden="true">🚗</span> くるまのみちづくり</h1>
         </header>
-
-        {status && <p className={styles.status} role="status" aria-live="polite">{status}</p>}
 
         <VehiclePicker
           selectedVehicleId={vehicleId}

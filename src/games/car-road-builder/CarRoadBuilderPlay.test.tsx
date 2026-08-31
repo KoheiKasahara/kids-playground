@@ -355,7 +355,7 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.queryByTestId('car-road-drop-preview')).not.toBeInTheDocument()
     fireEvent.pointerUp(palette, pointerOptions(6, 500, 500))
 
-    expect(screen.getByRole('status')).toHaveTextContent('そこには おけないよ')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.getAllByRole('gridcell')).toHaveLength(16)
   })
 

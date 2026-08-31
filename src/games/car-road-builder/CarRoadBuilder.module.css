@@ -60,16 +60,6 @@
   outline-offset: 2px;
 }
 
-.status {
-  min-height: 1.2em;
-  margin: 0 auto;
-  padding: 0 8px;
-  color: #245d70;
-  font-size: clamp(15px, 4vw, 19px);
-  font-weight: 800;
-  text-align: center;
-}
-
 .stageSelectPage {
   overflow: hidden;
 }
