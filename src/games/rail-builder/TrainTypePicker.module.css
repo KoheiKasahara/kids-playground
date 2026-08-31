@@ -98,6 +98,9 @@
 
 .iconWrap {
   position: relative;
+  display: grid;
+  width: 100%;
+  place-items: center;
   line-height: 0;
 }
 
@@ -117,91 +120,84 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* 車両の側面シルエット。実車の詳細再現ではなく、色とノーズ形状だけで見分けられる簡易アイコン。 */
-.icon {
-  position: relative;
+/* TrainSpecの先頭車をカード向けに描く、静的SVGサムネイル。 */
+.thumbnail {
   display: block;
-  width: 92px;
-  height: 60px;
+  width: min(100%, 190px);
+  height: auto;
+  overflow: visible;
+  shape-rendering: geometricPrecision;
 }
 
-.iconRoof {
-  position: absolute;
-  top: 12px;
-  left: 14px;
-  right: 30px;
-  height: 9px;
-  border-radius: 6px 6px 0 0;
-  background: var(--train-roof);
+.thumbnailTrain {
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.iconBody {
-  position: absolute;
-  top: 20px;
-  bottom: 8px;
-  left: 8px;
-  right: 24px;
-  overflow: hidden;
-  border-radius: 10px 3px 3px 10px;
-  background: var(--train-body);
+.thumbnailShadow {
+  fill: rgba(44, 70, 85, 0.15);
 }
 
-.iconAccent {
-  position: absolute;
-  top: 45%;
-  left: 0;
-  right: 0;
-  height: 20%;
-  background: var(--train-accent);
+.thumbnailWheel {
+  fill: #34495e;
+  stroke: rgba(255, 255, 255, 0.65);
+  stroke-width: 1.1;
 }
 
-.iconWindows {
-  position: absolute;
-  top: 12%;
-  left: 12%;
-  display: flex;
-  gap: 5px;
+.thumbnailWheelHub {
+  fill: #b8c5cd;
 }
 
-.iconWindow {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  background: var(--train-window);
+.thumbnailChassis {
+  fill: #415466;
+  opacity: 0.92;
 }
 
-.iconNose {
-  position: absolute;
-  top: 18px;
-  bottom: 10px;
-  right: 4px;
-  width: 30px;
-  background: var(--train-nose);
+.thumbnailBody,
+.thumbnailNose,
+.thumbnailRoof {
+  stroke: rgba(31, 54, 69, 0.48);
+  stroke-width: 1.4;
 }
 
-.basic-box {
-  border-radius: 4px 12px 12px 4px;
+.thumbnailNose {
+  filter: brightness(0.94);
 }
 
-.e5-wide-wedge {
-  clip-path: polygon(0 8%, 68% 0, 100% 46%, 68% 100%, 0 92%);
+.thumbnailRoof {
+  stroke-width: 1.2;
 }
 
-.e6-spear {
-  clip-path: polygon(0 22%, 82% 34%, 100% 50%, 82% 66%, 0 78%);
+.thumbnailAccent {
+  opacity: 0.98;
 }
 
-.n700s-winged {
-  clip-path: polygon(0 4%, 58% 0, 100% 40%, 100% 60%, 58% 100%, 0 96%);
+.thumbnailWindow,
+.thumbnailWindshield {
+  stroke: rgba(219, 241, 247, 0.75);
+  stroke-width: 0.9;
 }
 
-.doctor-yellow-duck {
-  clip-path: polygon(0 0, 52% 0, 100% 32%, 100% 68%, 52% 100%, 0 100%);
+.thumbnailWindshield {
+  opacity: 0.98;
 }
 
-.e7w7-dignified {
-  /* A composed shoulder and reserved taper for the blue/white/gold card. */
-  clip-path: polygon(0 6%, 34% 0, 72% 9%, 100% 36%, 100% 64%, 72% 91%, 34% 100%, 0 94%);
+.thumbnailWindshieldDivider {
+  fill: none;
+  stroke: rgba(220, 240, 246, 0.72);
+  stroke-width: 1.2;
+}
+
+.thumbnailLight {
+  fill: #fff5b1;
+  stroke: #d89b32;
+  stroke-width: 0.8;
+}
+
+.thumbnailHighlight {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 1.6;
 }
 
 @media (max-width: 380px) {
