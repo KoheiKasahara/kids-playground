@@ -178,6 +178,76 @@
   box-sizing: border-box;
 }
 
+/* シーソーは支点を固定して、デッキだけを物理Bodyの角度へ合わせて回す。 */
+.seesawDeckMotion {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  display: block;
+  transform: rotate(var(--seesaw-angle, 0rad));
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.seesawDeck {
+  z-index: 3;
+  box-sizing: border-box;
+  border: 2px solid #9c5a00;
+  border-radius: 7px;
+}
+
+.seesawDeck.placed,
+.seesawDeck.dragging {
+  background: linear-gradient(180deg, #ffe08a 0%, #ffb703 52%, #e67700 100%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.62), inset 0 -3px 0 rgba(137, 70, 0, 0.28), 0 3px 5px rgba(106, 66, 0, 0.32);
+}
+
+.seesawDeck.selected {
+  background: linear-gradient(180deg, #fff0b3 0%, #fcc419 52%, #d9480f 100%);
+  border-color: #7f4b00;
+}
+
+.seesawDeck.ghost {
+  background: linear-gradient(180deg, rgba(255, 224, 138, 0.52), rgba(255, 183, 3, 0.4));
+  border: 2px dashed rgba(156, 90, 0, 0.68);
+  box-shadow: none;
+}
+
+.seesawSupport {
+  z-index: 1;
+  border-radius: 2px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: linear-gradient(135deg, #c084fc 0%, #8b5cf6 58%, #6d28d9 100%);
+  box-shadow: 0 3px 4px rgba(70, 33, 123, 0.3);
+}
+
+.seesawBase {
+  z-index: 0;
+  border: 2px solid #5b21b6;
+  border-radius: 5px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #a78bfa 0%, #7c3aed 100%);
+  box-shadow: 0 2px 3px rgba(70, 33, 123, 0.28);
+}
+
+.seesawPivot {
+  z-index: 4;
+  box-sizing: border-box;
+  border: 3px solid #7c3aed;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff9db 0 30%, #facc15 33% 58%, #7c3aed 61% 100%);
+  box-shadow: 0 2px 3px rgba(70, 33, 123, 0.28);
+}
+
+.seesawSupport.ghost,
+.seesawBase.ghost,
+.seesawPivot.ghost {
+  opacity: 0.45;
+  box-shadow: none;
+}
+
 /* ベルトコンベアは縞と流れる矢印で、普通の板ではなく「動く床」と伝える。 */
 .conveyor.placed,
 .conveyor.dragging {

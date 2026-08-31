@@ -33,6 +33,8 @@ export type PartTypeId =
   | 'conveyorDown'
   | 'conveyorLeft'
   | 'conveyorUp'
+  /** 中央支点で動くため、横向き固定の物理ギミック。 */
+  | 'seesaw'
 
 /** パーツを構成する長方形。アンカーセルの中心を原点とした相対位置(px)で表す。 */
 export type PartSegment = {
@@ -45,11 +47,11 @@ export type PartSegment = {
   /** 円形の物理Bodyとして扱うセグメント。見た目は width / height の円で描画する。 */
   readonly kind?: 'circle'
   /** 特殊パーツの見た目を構成する役割。物理形状は専用ファクトリで作る。 */
-  readonly role?: 'chamber' | 'barrel' | 'muzzle' | 'blade'
+  readonly role?: 'chamber' | 'barrel' | 'muzzle' | 'blade' | 'deck' | 'support' | 'base' | 'pivot'
 }
 
 /** 木の板以外も、役割を文字に頼らず見分けられるようにするための見た目の種類。 */
-export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide' | 'jumpRamp' | 'cannon' | 'spinner' | 'conveyor'
+export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide' | 'jumpRamp' | 'cannon' | 'spinner' | 'conveyor' | 'seesaw'
 
 export type PartDefinition = {
   readonly id: PartTypeId
@@ -78,6 +80,9 @@ const JUMP_RAMP_LENGTH = 54
 const JUMP_RAMP_THICKNESS = 14
 const CONVEYOR_LENGTH = 58
 const CONVEYOR_THICKNESS = 16
+/** 1マス内に収める、中央支点付きの横長デッキ。 */
+const SEESAW_LENGTH = 54
+const SEESAW_THICKNESS = 10
 
 /** 一つの曲線を3枚の短い板で近似する。完全な円弧より、滑らかに向きが変わることを優先する。 */
 const CURVE_LEFT_SEGMENTS: readonly PartSegment[] = [
@@ -186,6 +191,14 @@ function conveyorDefinition(
     friction: 0.04,
   }
 }
+
+const SEESAW_SEGMENTS: readonly PartSegment[] = [
+  { offsetX: 0, offsetY: 0, width: SEESAW_LENGTH, height: SEESAW_THICKNESS, angleDeg: 0, role: 'deck' },
+  // 支点はデッキの下に置き、ボールが乗るデッキと見た目が重なるようにする。
+  { offsetX: 0, offsetY: 10, width: 22, height: 20, angleDeg: 0, role: 'support' },
+  { offsetX: 0, offsetY: 22, width: 28, height: 6, angleDeg: 0, role: 'base' },
+  { offsetX: 0, offsetY: 0, width: 14, height: 14, angleDeg: 0, kind: 'circle', role: 'pivot' },
+]
 
 /** セグメントの集合を90度単位で回す。曲線の見た目と物理形状を必ず同じ向きへ回す。 */
 function rotateSegments(segments: readonly PartSegment[], quarterTurns: number): readonly PartSegment[] {
@@ -297,6 +310,12 @@ export const PART_DEFINITIONS: readonly PartDefinition[] = [
   conveyorDefinition('conveyorDown', 1),
   conveyorDefinition('conveyorLeft', 2),
   conveyorDefinition('conveyorUp', 3),
+
+  {
+    id: 'seesaw', label: 'シーソー', inTray: true, appearance: 'seesaw', cells: SINGLE_CELL,
+    segments: SEESAW_SEGMENTS,
+    restitution: 0.08, friction: 0.08,
+  },
 ]
 
 /** 実際のパーツ置き場へ出すのは、各パーツの基本向きだけ。 */
@@ -353,4 +372,8 @@ export function isJumpRampPart(id: string): id is 'jumpRampRight' | 'jumpRampLef
 
 export function isConveyorPart(id: string): id is (typeof CONVEYOR_TYPE_IDS)[number] {
   return (CONVEYOR_TYPE_IDS as readonly string[]).includes(id)
+}
+
+export function isSeesawPart(id: string): id is 'seesaw' {
+  return id === 'seesaw'
 }

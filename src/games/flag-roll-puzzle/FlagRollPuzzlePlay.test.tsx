@@ -232,6 +232,7 @@ describe('こっきコロコロパズル', () => {
     expect(trayPart('たいほう みぎ')).toBeEnabled()
     expect(trayPart('かいてんばん')).toBeEnabled()
     expect(trayPart('ベルトコンベア')).toBeEnabled()
+    expect(trayPart('シーソー')).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'よこいた' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'ながい いた' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ボールを おとす！' })).toBeEnabled()
@@ -364,6 +365,23 @@ describe('こっきコロコロパズル', () => {
     await user.click(screen.getByRole('button', { name: 'まわす' }))
     await user.click(screen.getByRole('button', { name: 'まわす' }))
     expect(placedParts()[0]).toHaveAttribute('data-part-type', 'conveyorRight')
+    await user.click(screen.getByRole('button', { name: 'えらんだ いたを けす' }))
+    expect(placedParts()).toHaveLength(0)
+  })
+
+  test('シーソーは配置・移動・削除ができ、縦向き回転は出さない', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('シーソー'))
+    tapBoard(2, 3)
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'seesaw')
+
+    tapBoard(2, 3)
+    expect(screen.queryByRole('button', { name: 'まわす' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'えらんだ いたを けす' })).toBeInTheDocument()
+    dragBoardPart([2, 3], [4, 5])
+    expect(placedParts()[0]).toHaveAttribute('data-cell', '4,5')
+
     await user.click(screen.getByRole('button', { name: 'えらんだ いたを けす' }))
     expect(placedParts()).toHaveLength(0)
   })

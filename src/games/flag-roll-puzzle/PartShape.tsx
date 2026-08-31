@@ -8,6 +8,8 @@ type PartShapeProps = {
    * 置ける位置の下書き で色を変える。
    */
   variant?: 'placed' | 'selected' | 'dragging' | 'ghost'
+  /** 実行中に物理Bodyの角度を書き込む対象。シーソーのデッキだけを回す。 */
+  motionRef?: (element: HTMLSpanElement | null) => void
 }
 
 /**
@@ -19,7 +21,7 @@ type PartShapeProps = {
  * 位置は「アンカーセルの中心」を原点とした相対配置。呼び出し側は、この部品を
  * 1マスぶんの大きさのボックスへ入れるだけでよい。
  */
-export default function PartShape({ typeId, variant = 'placed' }: PartShapeProps) {
+export default function PartShape({ typeId, variant = 'placed', motionRef }: PartShapeProps) {
   const definition = partDefinition(typeId)
   if (definition.appearance === 'jumpRamp') {
     const [deck] = definition.segments
@@ -47,6 +49,35 @@ export default function PartShape({ typeId, variant = 'placed' }: PartShapeProps
       </>
     )
   }
+
+  if (definition.appearance === 'seesaw') {
+    const deck = definition.segments.find((segment) => segment.role === 'deck')
+    if (!deck) return null
+    const staticSegments = definition.segments.filter((segment) => segment !== deck)
+    const styleFor = (segment: typeof deck) => ({
+      width: segment.width,
+      height: segment.height,
+      transform: `translate(-50%, -50%) translate(${segment.offsetX}px, ${segment.offsetY}px) rotate(${segment.angleDeg}deg)`,
+    })
+    return (
+      <>
+        {staticSegments.map((segment, index) => (
+          <span
+            key={`seesaw-static-${index}`}
+            className={`${styles.segment} ${styles[variant]} ${segment.role ? styles[segment.role] : ''}`}
+            style={styleFor(segment)}
+          />
+        ))}
+        <span ref={motionRef} className={styles.seesawDeckMotion}>
+          <span
+            className={`${styles.segment} ${styles[variant]} ${styles.seesawDeck}`}
+            style={styleFor(deck)}
+          />
+        </span>
+      </>
+    )
+  }
+
   return (
     <>
       {definition.segments.map((segment, index) => (

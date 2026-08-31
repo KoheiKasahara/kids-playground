@@ -34,10 +34,10 @@ function occupiedBounds(definition: PartDefinition) {
 }
 
 describe('partTypes', () => {
-  test('置き場には残ったパーツ、ジャンプ台、キャノン・Spinnerの基本向きを出す', () => {
+  test('置き場には残ったパーツ、ジャンプ台、キャノン・Spinner・シーソーの基本向きを出す', () => {
     expect(TRAY_PART_DEFINITIONS.map((definition) => definition.id)).toEqual([
       'slopeLeft', 'slopeRight', 'curveLeft', 'curveRight',
-      'bumper', 'guideLeft', 'guideRight', 'jumpRampRight', 'cannon', 'spinner', 'conveyorRight',
+      'bumper', 'guideLeft', 'guideRight', 'jumpRampRight', 'cannon', 'spinner', 'conveyorRight', 'seesaw',
     ])
   })
 
@@ -129,6 +129,16 @@ describe('partTypes', () => {
     expect(partDefinition('conveyorDown').segments[0].angleDeg).toBe(90)
     expect(partDefinition('conveyorLeft').segments[0].angleDeg).toBe(180)
     expect(partDefinition('conveyorUp').segments[0].angleDeg).toBe(270)
+  })
+
+  test('シーソーは横長のデッキと中央支点を持ち、回転対象外になる', () => {
+    const seesaw = partDefinition('seesaw')
+    expect(seesaw.appearance).toBe('seesaw')
+    expect(seesaw.inTray).toBe(true)
+    expect(seesaw.segments.some((segment) => segment.role === 'deck')).toBe(true)
+    expect(seesaw.segments.some((segment) => segment.role === 'pivot' && segment.kind === 'circle')).toBe(true)
+    expect(nextRotationType('seesaw')).toBeNull()
+    expect(isRotatablePart('seesaw')).toBe(false)
   })
 
   test('未知のパーツ種類は例外にする（データ不整合に早く気付くため）', () => {

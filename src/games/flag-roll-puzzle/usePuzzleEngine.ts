@@ -18,6 +18,7 @@ import {
   isCannonPart,
   isConveyorPart,
   isJumpRampPart,
+  isSeesawPart,
   isSpinnerPart,
   partDefinition,
 } from './partTypes'
@@ -41,6 +42,13 @@ import {
 import { createSpinnerCore, type SpinnerCore } from '../shared/toys/spinnerCore'
 import type { PlacedPart } from './placement'
 import type { PuzzleBallSnapshot, PuzzleBallState } from './puzzleState'
+import {
+  SEESAW_CONSTRAINT_DAMPING,
+  SEESAW_CONSTRAINT_STIFFNESS,
+  SEESAW_DENSITY,
+  SEESAW_FRICTION_AIR,
+  stabilizeSeesawBody,
+} from './seesawPhysics'
 import {
   BALL_DENSITY,
   BALL_FRICTION,
@@ -128,9 +136,9 @@ function wallBodies(goalArea: GoalArea): Matter.Body[] {
 }
 
 export function createPuzzlePartBodies(part: PlacedPart): Matter.Body[] {
-  // Cannonの見た目は専用センサーだけ、Spinnerの見た目と当たり判定は専用Coreだけを使う。
-  // どちらも通常の板Bodyを作らないため、入口を塞いだりCSSだけが回ったりしない。
-  if (isCannonPart(part.typeId) || isSpinnerPart(part.typeId)) return []
+  // Cannonの見た目は専用センサーだけ、Spinnerの見た目と当たり判定は専用Coreだけ、
+  // シーソーのデッキと支点は専用Runtimeだけを使う。通常の静的板Bodyを重ねない。
+  if (isCannonPart(part.typeId) || isSpinnerPart(part.typeId) || isSeesawPart(part.typeId)) return []
   const definition = partDefinition(part.typeId)
   const center = cellCenter(part.cell)
   return definition.segments.map((segment, index) => {
@@ -171,6 +179,52 @@ type SpinnerRuntime = {
 type ConveyorRuntime = {
   readonly partId: string
   readonly direction: ConveyorDirection
+}
+
+export type PuzzleSeesawRuntime = {
+  readonly partId: string
+  readonly body: Matter.Body
+  readonly constraint: Matter.Constraint
+  readonly pivot: Point
+}
+
+function seesawRuntime(part: PlacedPart): PuzzleSeesawRuntime {
+  const definition = partDefinition(part.typeId)
+  const deck = definition.segments.find((segment) => segment.role === 'deck')
+  if (!deck) throw new Error('flag-roll-puzzle: シーソーのデッキ定義がありません')
+
+  const pivot = cellCenter(part.cell)
+  const bodyPosition = {
+    x: pivot.x + deck.offsetX,
+    y: pivot.y + deck.offsetY,
+  }
+  const body = Bodies.rectangle(bodyPosition.x, bodyPosition.y, deck.width, deck.height, {
+    isStatic: false,
+    angle: deck.angleDeg * DEG_TO_RAD,
+    density: SEESAW_DENSITY,
+    friction: definition.friction,
+    frictionStatic: 0.2,
+    frictionAir: SEESAW_FRICTION_AIR,
+    restitution: definition.restitution,
+    label: `seesaw:${part.id}:deck`,
+  })
+  const constraint = Matter.Constraint.create({
+    bodyA: body,
+    // デッキの中心が支点。将来デッキの描画オフセットを変えても、支点位置を保てる。
+    pointA: { x: -deck.offsetX, y: -deck.offsetY },
+    pointB: pivot,
+    length: 0,
+    stiffness: SEESAW_CONSTRAINT_STIFFNESS,
+    damping: SEESAW_CONSTRAINT_DAMPING,
+    label: `seesaw-constraint:${part.id}`,
+  })
+  return { partId: part.id, body, constraint, pivot }
+}
+
+/** シーソーのデッキと中央支点Constraintをまとめて生成するテスト用ファクトリ。 */
+export function createPuzzleSeesawRuntime(part: PlacedPart): PuzzleSeesawRuntime {
+  if (!isSeesawPart(part.typeId)) throw new Error('flag-roll-puzzle: シーソー以外はシーソーRuntimeにできません')
+  return seesawRuntime(part)
 }
 
 function cannonSensorBody(part: PlacedPart): CannonRuntime {
@@ -292,7 +346,10 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       element.style.transform = `translate(${ball.position.x - BALL_RADIUS}px, ${ball.position.y - BALL_RADIUS}px)`
     }
     for (const [key, element] of partMotionElementsRef.current) {
-      if (key.startsWith('part-motion:')) element.style.setProperty('--spinner-angle', '0rad')
+      if (key.startsWith('part-motion:')) {
+        element.style.setProperty('--spinner-angle', '0rad')
+        element.style.setProperty('--seesaw-angle', '0rad')
+      }
     }
   }, [running, runId, options.balls])
 
@@ -328,11 +385,20 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     const spinnerRuntimes = current.parts
       .filter((part) => isSpinnerPart(part.typeId))
       .map(spinnerRuntime)
-    const partBodyEntries = current.parts.flatMap((part) => {
+    const seesawRuntimes = current.parts
+      .filter((part) => isSeesawPart(part.typeId))
+      .map(seesawRuntime)
+    const dynamicPartBodyEntries = seesawRuntimes.map((runtime) => ({
+      body: runtime.body,
+      conveyor: null,
+      partId: runtime.partId,
+    }))
+    const staticPartBodyEntries = current.parts.flatMap((part) => {
       const direction = conveyorDirection(part.typeId)
       const conveyor = direction ? { partId: part.id, direction } : null
       return createPuzzlePartBodies(part).map((body) => ({ body, conveyor, partId: part.id }))
     })
+    const partBodyEntries = [...dynamicPartBodyEntries, ...staticPartBodyEntries]
     const conveyorByBodyId = new Map<number, ConveyorRuntime>()
     for (const entry of partBodyEntries) {
       if (entry.conveyor) conveyorByBodyId.set(entry.body.id, entry.conveyor)
@@ -349,6 +415,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       ...cannonRuntimes.map((runtime) => runtime.sensor),
       ...spinnerRuntimes.map((runtime) => runtime.core.body),
       ...runtimeBalls.map(({ body }) => body),
+      ...seesawRuntimes.map((runtime) => runtime.constraint),
     ])
 
     const lastBumperHitAt = new Map<string, number>()
@@ -538,6 +605,17 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       }
     }
 
+    const writeSeesawTransforms = () => {
+      for (const runtime of seesawRuntimes) {
+        const element = partMotionElementsRef.current.get(`part-motion:${runtime.partId}`)
+        element?.style.setProperty('--seesaw-angle', `${runtime.body.angle}rad`)
+      }
+    }
+
+    const updateSeesaws = () => {
+      for (const runtime of seesawRuntimes) stabilizeSeesawBody(runtime.body, runtime.pivot)
+    }
+
     const holdCapturedBalls = () => {
       for (const [key, capture] of cannonCaptureRecords) {
         const state = cannonStates.get(key)
@@ -636,6 +714,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
         holdCapturedBalls()
         Engine.update(engine, STEP_MS)
         simulationTime += STEP_MS
+        updateSeesaws()
         updateCannonContactsAndFire()
         updateSpinners()
         accumulator -= STEP_MS
@@ -644,6 +723,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       if (substeps >= MAX_SUBSTEPS) accumulator = 0
 
       writeSpinnerTransforms()
+      writeSeesawTransforms()
 
       for (const runtime of runtimeBalls) {
         if (runtime.body.isStatic) {
@@ -702,6 +782,13 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       Events.off(engine, 'collisionActive', handleCollisionActive)
       for (const spinner of spinnerRuntimes) {
         registeredPartMotionElements.get(`part-motion:${spinner.partId}`)?.style.setProperty('--spinner-angle', '0rad')
+      }
+      for (const seesaw of seesawRuntimes) {
+        registeredPartMotionElements.get(`part-motion:${seesaw.partId}`)?.style.setProperty('--seesaw-angle', '0rad')
+        // Composite.clearでも全Constraintは消えるが、シーソー固有の参照を先に
+        // 明示的に外し、将来のcleanup経路変更で古い支点が残らないようにする。
+        Composite.remove(engine.world, seesaw.constraint)
+        Composite.remove(engine.world, seesaw.body)
       }
       Composite.clear(engine.world, false)
       Engine.clear(engine)
