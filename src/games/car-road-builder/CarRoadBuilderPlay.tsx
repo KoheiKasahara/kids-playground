@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { DragEvent } from 'react'
+import type { CSSProperties, DragEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import CarRoadBoard from './CarRoadBoard'
 import PartPalette from './PartPalette'
 import {
-  canExpandBoard,
   createBoard,
-  expandBoard,
   INITIAL_BOARD_SIZE,
+  MAX_BOARD_SIZE,
   movePart,
   placePartAt,
   removePart,
@@ -22,8 +21,19 @@ import { buildRoute, routeStatusLabel, sampleRouteProgress, type CarRoute } from
 import { playCorrectSound } from '../../utils/quizSound'
 import styles from './CarRoadBuilder.module.css'
 
-function createDemoBoard(): Board {
-  let board = createBoard()
+type StageId = 'normal' | 'wide'
+
+const STAGES: Readonly<Record<StageId, Readonly<{
+  label: string
+  sizeLabel: string
+  size: Readonly<{ rows: number; cols: number }>
+}>>> = {
+  normal: { label: 'ふつう', sizeLabel: '4×4', size: INITIAL_BOARD_SIZE },
+  wide: { label: 'ひろい', sizeLabel: '5×5', size: MAX_BOARD_SIZE },
+}
+
+function createDemoBoard(size = INITIAL_BOARD_SIZE): Board {
+  let board = createBoard(size)
   // A tiny ready-made road helps a child understand the play loop immediately;
   // every part remains editable before departure.
   board = placePartAt(board, 1, 0, createPlacedPart('start', 2))
@@ -42,10 +52,10 @@ function prefersReducedMotion(): boolean {
 export default function CarRoadBuilderPlay() {
   const navigate = useNavigate()
   const [board, setBoard] = useState<Board>(createDemoBoard)
+  const [stageId, setStageId] = useState<StageId>('normal')
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null)
   const [selectedKind, setSelectedKind] = useState<PartKind | null>(null)
   const [dragKind, setDragKind] = useState<PartKind | null>(null)
-  const [isBoardExpanded, setIsBoardExpanded] = useState(false)
   const [phase, setPhase] = useState<PlayPhase>('ready')
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('パーツを えらんで、みちを つなごう')
@@ -54,21 +64,8 @@ export default function CarRoadBuilderPlay() {
   const suppressClick = useRef(false)
   const running = phase === 'running'
 
-  const displayBoard = useMemo<Board>(() => {
-    if (isBoardExpanded || (board.size.rows <= INITIAL_BOARD_SIZE.rows && board.size.cols <= INITIAL_BOARD_SIZE.cols)) return board
-    const size = {
-      rows: Math.min(board.size.rows, INITIAL_BOARD_SIZE.rows),
-      cols: Math.min(board.size.cols, INITIAL_BOARD_SIZE.cols),
-    }
-    return {
-      size,
-      cells: board.cells.filter((cell) => cell.row < size.rows && cell.col < size.cols),
-    }
-  }, [board, isBoardExpanded])
-  const route = useMemo<CarRoute>(() => buildRoute(displayBoard), [displayBoard])
-  const selectedCell = displayBoard.cells.find((cell) => cell.id === selectedCellId)
-  const hasExpandedBoardData = board.size.rows > INITIAL_BOARD_SIZE.rows || board.size.cols > INITIAL_BOARD_SIZE.cols
-  const canToggleBoard = isBoardExpanded || hasExpandedBoardData || canExpandBoard(board)
+  const route = useMemo<CarRoute>(() => buildRoute(board), [board])
+  const selectedCell = board.cells.find((cell) => cell.id === selectedCellId)
 
   // Every successful edit returns the play surface to a clean, editable
   // state. Keeping this in one helper also removes the cleared animation and
@@ -245,17 +242,18 @@ export default function CarRoadBuilderPlay() {
     setStatus(route.reachedGoal ? 'しゅっぱつ！ ゴールまで いくよ' : routeStatusLabel(route))
   }, [route, running])
 
-  const handleExpand = useCallback(() => {
+  const handleStageChange = useCallback((nextStageId: StageId) => {
     if (running) return
-    if (isBoardExpanded) {
-      setIsBoardExpanded(false)
-      setStatus('もどしたよ')
-      return
-    }
-    if (canExpandBoard(board)) setBoard(expandBoard(board))
-    setIsBoardExpanded(true)
-    setStatus('ひろがったよ！')
-  }, [board, isBoardExpanded, running])
+    if (nextStageId === stageId) return
+    setStageId(nextStageId)
+    setBoard(createDemoBoard(STAGES[nextStageId].size))
+    setSelectedCellId(null)
+    setSelectedKind(null)
+    setDragKind(null)
+    setPhase('ready')
+    setProgress(0)
+    setStatus(`${STAGES[nextStageId].label}の ばんめんだよ。みちを つなごう`)
+  }, [running, stageId])
 
   return (
     <main className={`${styles.page} ${phase === 'cleared' ? styles.cleared : ''}`} data-phase={phase}>
@@ -264,17 +262,41 @@ export default function CarRoadBuilderPlay() {
             <span aria-hidden="true">‹</span> もどる
           </button>
           <h1><span aria-hidden="true">🚗</span> くるまのみちづくり</h1>
-          <button type="button" className={styles.expandButton} onClick={handleExpand} disabled={!canToggleBoard || running}>
-            {isBoardExpanded ? 'もどす' : 'ひろげる'}
-          </button>
         </header>
 
         <p className={styles.status} role="status" aria-live="polite">{status}</p>
 
+        <section className={styles.stageSelector} aria-label="ステージのひろさ">
+          <p className={styles.stageTitle}>ひろさを えらんでね</p>
+          <div className={styles.stageOptions} role="group" aria-label="ステージ選択">
+            {(Object.entries(STAGES) as Array<[StageId, typeof STAGES[StageId]]>).map(([id, stage]) => (
+              <button
+                key={id}
+                type="button"
+                className={`${styles.stageOption} ${stageId === id ? styles.stageOptionSelected : ''}`}
+                aria-pressed={stageId === id}
+                aria-label={`${stage.label} ${stage.sizeLabel}`}
+                onClick={() => handleStageChange(id)}
+                disabled={running}
+              >
+                <span
+                  className={styles.stageMiniBoard}
+                  style={{ '--stage-mini-cols': stage.size.cols, '--stage-mini-rows': stage.size.rows } as CSSProperties}
+                  aria-hidden="true"
+                >
+                  {Array.from({ length: stage.size.rows * stage.size.cols }, (_, index) => <span key={index} className={styles.stageMiniCell} />)}
+                </span>
+                <span className={styles.stageOptionLabel}>{stage.label}</span>
+                <span className={styles.stageOptionSize}>{stage.sizeLabel}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
         <section className={styles.boardScroll} aria-label="みちのエリア">
           <div className={styles.boardSizer}>
             <CarRoadBoard
-              board={displayBoard}
+              board={board}
               selectedCellId={selectedCellId}
               running={running}
               onCellClick={handleCellClick}

@@ -13,7 +13,12 @@ describe('CarRoadBuilderPlay', () => {
   test('renders child-friendly board, palette and departure controls', () => {
     renderGame()
     expect(screen.getByRole('heading', { name: /くるまのみちづくり/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'ひろげる' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'ふつう 4×4' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'ひろい 5×5' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'ふつう 4×4' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '4')
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-colcount', '4')
+    expect(screen.getAllByRole('gridcell')).toHaveLength(16)
     expect(screen.getByRole('button', { name: 'しゅっぱつ' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite')
     expect(screen.getByRole('button', { name: 'カーブを おく' })).toBeInTheDocument()
@@ -68,34 +73,54 @@ describe('CarRoadBuilderPlay', () => {
     expect(xroad.querySelectorAll('svg path')).toHaveLength(2)
   })
 
-  test('expand appends a row and column, then running locks editing', async () => {
+  test('switches from 4x4 to 5x5, then running locks stage selection', async () => {
     const user = userEvent.setup()
     renderGame()
-    await user.click(screen.getByRole('button', { name: 'ひろげる' }))
+    await user.click(screen.getByRole('button', { name: 'ひろい 5×5' }))
     expect(screen.getByRole('gridcell', { name: 'あきセル、5ぎょう 5れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '5')
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-colcount', '5')
+    expect(screen.getAllByRole('gridcell')).toHaveLength(25)
+    expect(screen.getByRole('button', { name: 'ひろい 5×5' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: 'しゅっぱつ' }))
     expect(screen.getByRole('button', { name: 'とめる' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'もどす' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'ふつう 4×4' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'ひろい 5×5' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'カーブを おく' })).toBeDisabled()
   })
 
-  test('hides connection direction hints and toggles the expanded view without losing parts', async () => {
+  test('switching from 5x5 back to 4x4 resets the previous placement state', async () => {
     const user = userEvent.setup()
     renderGame()
 
     expect(screen.queryByText('E·W')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'ひろげる' }))
+    await user.click(screen.getByRole('button', { name: 'ひろい 5×5' }))
     await user.click(screen.getByRole('button', { name: 'カーブを おく' }))
     await user.click(screen.getByRole('gridcell', { name: 'あきセル、5ぎょう 5れつ' }))
     expect(screen.getByRole('gridcell', { name: 'カーブ、5ぎょう 5れつ' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'もどす' }))
+    await user.click(screen.getByRole('button', { name: 'ふつう 4×4' }))
     expect(screen.getByRole('gridcell', { name: 'あきセル、4ぎょう 4れつ' })).toBeInTheDocument()
     expect(screen.queryByRole('gridcell', { name: 'カーブ、5ぎょう 5れつ' })).not.toBeInTheDocument()
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '4')
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-colcount', '4')
+    expect(screen.getByRole('button', { name: 'ふつう 4×4' })).toHaveAttribute('aria-pressed', 'true')
+  })
 
-    await user.click(screen.getByRole('button', { name: 'ひろげる' }))
-    expect(screen.getByRole('gridcell', { name: 'カーブ、5ぎょう 5れつ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'まわす' })).toBeInTheDocument()
+  test('wide stage keeps placement, rotation, deletion and start/goal controls working', async () => {
+    const user = userEvent.setup()
+    renderGame()
+
+    await user.click(screen.getByRole('button', { name: 'ひろい 5×5' }))
+    expect(screen.getByRole('gridcell', { name: 'スタート、2ぎょう 1れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'ゴール、2ぎょう 3れつ' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'カーブを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、5ぎょう 5れつ' }))
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(screen.getByRole('gridcell', { name: 'カーブ、5ぎょう 5れつ' })).toHaveStyle('--rotation: 1')
+    await user.click(screen.getByRole('button', { name: 'けす' }))
+    expect(screen.getByRole('gridcell', { name: 'あきセル、5ぎょう 5れつ' })).toBeInTheDocument()
   })
 
   test('occupied palette target selects the part, then an empty tap moves it', async () => {
