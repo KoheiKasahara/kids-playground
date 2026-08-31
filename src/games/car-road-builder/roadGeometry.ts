@@ -205,6 +205,10 @@ function partPathBetweenPorts(kind: PartKind, from: Direction, to: Direction): P
   return createPathSpec(kind, [lineSegment(start, end)])
 }
 
+function crossroadExit(entryPort: Direction): Direction {
+  return oppositeDirection(entryPort)
+}
+
 /**
  * Shared path specification used by both road rendering and route walking.
  * `entryPort` is the port on the current cell where the car arrived.
@@ -219,7 +223,9 @@ export function getPathSpec(part: PlacedPart, entryPort?: Direction): PathSpec {
     return createConnectorPath(portPoint(port), CELL_CENTER)
   }
   const from = entryPort && ports.includes(entryPort) ? entryPort : ports[0]!
-  const to = ports.find((port) => port !== from) ?? ports[1] ?? from
+  const to = part.kind === 'crossroad'
+    ? crossroadExit(from)
+    : ports.find((port) => port !== from) ?? ports[1] ?? from
   return partPathBetweenPorts(part.kind, from, to)
 }
 

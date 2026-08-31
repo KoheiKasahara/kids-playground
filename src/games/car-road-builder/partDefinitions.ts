@@ -5,7 +5,7 @@ import {
   type Direction,
 } from './direction'
 
-export type PartKind = 'start' | 'straight' | 'curve' | 'gentle-curve' | 'goal'
+export type PartKind = 'start' | 'straight' | 'curve' | 'gentle-curve' | 'crossroad' | 'goal'
 
 /** The only state needed to describe a placed road part. */
 export type PlacedPart = Readonly<{
@@ -58,6 +58,15 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
     baseConnections: ['N', 'SE'],
     rotationSteps: ALL_ROTATIONS,
   },
+  crossroad: {
+    kind: 'crossroad',
+    label: 'じゅうじ',
+    emoji: '╋',
+    // Two independent straight roads cross at the centre. The route walker
+    // pairs each entry with its opposite port instead of choosing a branch.
+    baseConnections: ['N', 'E', 'S', 'W'],
+    rotationSteps: [0, 1, 2, 3],
+  },
   goal: {
     kind: 'goal',
     label: 'ゴール',
@@ -68,7 +77,7 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
   },
 } as const
 
-export const PART_KINDS: readonly PartKind[] = ['start', 'straight', 'curve', 'gentle-curve', 'goal']
+export const PART_KINDS: readonly PartKind[] = ['start', 'straight', 'curve', 'gentle-curve', 'crossroad', 'goal']
 
 export function getPartDefinition(kind: PartKind): PartDefinition {
   return PART_DEFINITIONS[kind]
@@ -85,7 +94,7 @@ export function allowedRotationSteps(kind: PartKind): readonly number[] {
 export function normalizePartRotation(kind: PartKind, rotationStep: number): number {
   if (kind === 'goal') return 0
   const normalized = normalizeRotationStep(rotationStep)
-  if (kind === 'straight') return normalized % 4
+  if (kind === 'straight' || kind === 'crossroad') return normalized % 4
   return normalized
 }
 
@@ -97,6 +106,7 @@ export function createPlacedPart(kind: PartKind, rotationStep = 0): PlacedPart {
 export function connectionsForPart(part: PlacedPart): readonly Direction[] {
   if (part.kind === 'goal') return DIRECTIONS
   const definition = PART_DEFINITIONS[part.kind]
+  if (part.kind === 'crossroad') return definition.baseConnections
   return definition.baseConnections.map((direction) => rotateDirection(direction, part.rotationStep))
 }
 

@@ -22,4 +22,12 @@ describe('car road parts', () => {
     expect(connectionsForPart(createPlacedPart('goal', 5))).toEqual(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
     expect(createPlacedPart('goal', 5).rotationStep).toBe(0)
   })
+
+  test('crossroad exposes all cardinal ports and keeps them after rotation', () => {
+    expect(PART_DEFINITIONS.crossroad.rotationSteps).toEqual([0, 1, 2, 3])
+    expect(connectionsForPart(createPlacedPart('crossroad', 0))).toEqual(['N', 'E', 'S', 'W'])
+    for (const step of PART_DEFINITIONS.crossroad.rotationSteps) {
+      expect(new Set(connectionsForPart(createPlacedPart('crossroad', step)))).toEqual(new Set(['N', 'E', 'S', 'W']))
+    }
+  })
 })
