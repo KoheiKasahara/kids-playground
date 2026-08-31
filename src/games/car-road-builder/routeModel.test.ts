@@ -92,6 +92,68 @@ describe('car road route', () => {
   })
 
   test.each([
+    ['NW to SE', 0, 0, 3, 2, 2, 'NW', 'SE'],
+    ['SE to NW', 2, 2, 7, 0, 0, 'SE', 'NW'],
+    ['NE to SW', 0, 2, 5, 2, 0, 'NE', 'SW'],
+    ['SW to NE', 2, 0, 1, 0, 2, 'SW', 'NE'],
+  ] as const)('xroad travels diagonally straight from %s', (_name, startRow, startCol, startRotation, goalRow, goalCol, entryPort, exitPort) => {
+    const startDirection = startRotation
+    let board = createInitialBoard()
+    board = placePartAt(board, startRow, startCol, createPlacedPart('start', startDirection))
+    board = placePartAt(board, 1, 1, createPlacedPart('xroad'))
+    board = placePartAt(board, goalRow, goalCol, createPlacedPart('goal'))
+
+    const route = buildRoute(board)
+    expect(route.reachedGoal).toBe(true)
+    expect(route.segments.map((segment) => segment.kind)).toEqual(['start', 'xroad', 'goal'])
+    expect(route.segments[1]).toMatchObject({ entryPort, exitPort })
+    expect(route.segments[1]!.path.sample(0.5)).toEqual({ x: 0, y: 0 })
+  })
+
+  test('xroad can continue through a gentle curve without changing its diagonal pair', () => {
+    let board = createInitialBoard()
+    board = placePartAt(board, 0, 0, createPlacedPart('start', 3))
+    board = placePartAt(board, 1, 1, createPlacedPart('xroad'))
+    board = placePartAt(board, 2, 2, createPlacedPart('gentle-curve', 7))
+    board = placePartAt(board, 2, 3, createPlacedPart('goal'))
+
+    const route = buildRoute(board)
+    expect(route.reachedGoal).toBe(true)
+    expect(route.segments[1]).toMatchObject({ entryPort: 'NW', exitPort: 'SE' })
+    expect(route.segments[2]).toMatchObject({ entryPort: 'NW', exitPort: 'E' })
+  })
+
+  test.each([
+    ['NW', 0, 0, 3, 2, 2],
+    ['SE', 2, 2, 7, 0, 0],
+    ['NE', 0, 2, 5, 2, 0],
+    ['SW', 2, 0, 1, 0, 2],
+  ] as const)('xroad stops when its %s exit lacks a reciprocal port', (_entryPort, startRow, startCol, startRotation, blockedRow, blockedCol) => {
+    let board = createInitialBoard()
+    board = placePartAt(board, startRow, startCol, createPlacedPart('start', startRotation))
+    board = placePartAt(board, 1, 1, createPlacedPart('xroad'))
+    board = placePartAt(board, blockedRow, blockedCol, createPlacedPart('straight', 0))
+    board = placePartAt(board, 3, 3, createPlacedPart('goal'))
+
+    const route = buildRoute(board)
+    expect(route.stopReason).toBe('mismatch')
+    expect(route.segments[1]?.kind).toBe('xroad')
+  })
+
+  test('xroad does not switch to the other diagonal at the crossing', () => {
+    let board = createInitialBoard()
+    board = placePartAt(board, 0, 0, createPlacedPart('start', 3))
+    board = placePartAt(board, 1, 1, createPlacedPart('xroad'))
+    board = placePartAt(board, 2, 0, createPlacedPart('goal'))
+    board = placePartAt(board, 2, 2, createPlacedPart('straight', 0))
+
+    const route = buildRoute(board)
+    expect(route.reachedGoal).toBe(false)
+    expect(route.stopReason).toBe('mismatch')
+    expect(route.segments[1]).toMatchObject({ entryPort: 'NW', exitPort: 'SE' })
+  })
+
+  test.each([
     [0, 1, 1, 1, 2, 1, 2, 4, 3, 3],
     [3, 1, 2, 1, 1, 1, 2, 0, 3, 3],
     [1, 3, 1, 2, 1, 1, 0, 6, 0, 3],

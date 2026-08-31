@@ -223,7 +223,7 @@ export function getPathSpec(part: PlacedPart, entryPort?: Direction): PathSpec {
     return createConnectorPath(portPoint(port), CELL_CENTER)
   }
   const from = entryPort && ports.includes(entryPort) ? entryPort : ports[0]!
-  const to = part.kind === 'crossroad'
+  const to = part.kind === 'crossroad' || part.kind === 'xroad'
     ? crossroadExit(from)
     : ports.find((port) => port !== from) ?? ports[1] ?? from
   return partPathBetweenPorts(part.kind, from, to)

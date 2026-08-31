@@ -64,4 +64,17 @@ describe('car road geometry', () => {
     expect(eastWest.end).toEqual(portPoint('W'))
     expect(eastWest.sample(0.5)).toEqual({ x: 0, y: 0 })
   })
+
+  test('xroad geometry keeps the two diagonal directions on separate straight paths', () => {
+    const part = createPlacedPart('xroad')
+    const northWestToSouthEast = getPathSpec(part, 'NW')
+    const northEastToSouthWest = getPathSpec(part, 'NE')
+
+    expect(northWestToSouthEast.start).toEqual(portPoint('NW'))
+    expect(northWestToSouthEast.end).toEqual(portPoint('SE'))
+    expect(northWestToSouthEast.sample(0.5)).toEqual({ x: 0, y: 0 })
+    expect(northEastToSouthWest.start).toEqual(portPoint('NE'))
+    expect(northEastToSouthWest.end).toEqual(portPoint('SW'))
+    expect(northEastToSouthWest.sample(0.5)).toEqual({ x: 0, y: 0 })
+  })
 })

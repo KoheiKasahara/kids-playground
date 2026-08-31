@@ -5,7 +5,7 @@ import {
   type Direction,
 } from './direction'
 
-export type PartKind = 'start' | 'straight' | 'curve' | 'gentle-curve' | 'crossroad' | 'goal'
+export type PartKind = 'start' | 'straight' | 'curve' | 'gentle-curve' | 'crossroad' | 'xroad' | 'goal'
 
 /** The only state needed to describe a placed road part. */
 export type PlacedPart = Readonly<{
@@ -67,6 +67,17 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
     baseConnections: ['N', 'E', 'S', 'W'],
     rotationSteps: [0, 1, 2, 3],
   },
+  xroad: {
+    kind: 'xroad',
+    label: 'Xじ',
+    emoji: '╳',
+    // Two independent diagonal roads cross at the centre. The route walker
+    // pairs each entry with its opposite port instead of choosing a branch.
+    baseConnections: ['NE', 'SE', 'SW', 'NW'],
+    // A 45° turn would look like a different kind of intersection. Keep the
+    // common rotate control at 90° increments, where the X shape is unchanged.
+    rotationSteps: [0, 2, 4, 6],
+  },
   goal: {
     kind: 'goal',
     label: 'ゴール',
@@ -77,7 +88,7 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
   },
 } as const
 
-export const PART_KINDS: readonly PartKind[] = ['start', 'straight', 'curve', 'gentle-curve', 'crossroad', 'goal']
+export const PART_KINDS: readonly PartKind[] = ['start', 'straight', 'curve', 'gentle-curve', 'crossroad', 'xroad', 'goal']
 
 export function getPartDefinition(kind: PartKind): PartDefinition {
   return PART_DEFINITIONS[kind]
@@ -95,6 +106,7 @@ export function normalizePartRotation(kind: PartKind, rotationStep: number): num
   if (kind === 'goal') return 0
   const normalized = normalizeRotationStep(rotationStep)
   if (kind === 'straight' || kind === 'crossroad') return normalized % 4
+  if (kind === 'xroad') return normalized % 2 === 0 ? normalized : (normalized + 1) % 8
   return normalized
 }
 
@@ -106,7 +118,7 @@ export function createPlacedPart(kind: PartKind, rotationStep = 0): PlacedPart {
 export function connectionsForPart(part: PlacedPart): readonly Direction[] {
   if (part.kind === 'goal') return DIRECTIONS
   const definition = PART_DEFINITIONS[part.kind]
-  if (part.kind === 'crossroad') return definition.baseConnections
+  if (part.kind === 'crossroad' || part.kind === 'xroad') return definition.baseConnections
   return definition.baseConnections.map((direction) => rotateDirection(direction, part.rotationStep))
 }
 

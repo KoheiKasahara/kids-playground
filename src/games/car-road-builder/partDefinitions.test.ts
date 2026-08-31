@@ -30,4 +30,14 @@ describe('car road parts', () => {
       expect(new Set(connectionsForPart(createPlacedPart('crossroad', step)))).toEqual(new Set(['N', 'E', 'S', 'W']))
     }
   })
+
+  test('xroad exposes only diagonal ports and stays an independent part after rotation', () => {
+    expect(PART_DEFINITIONS.xroad.rotationSteps).toEqual([0, 2, 4, 6])
+    expect(connectionsForPart(createPlacedPart('xroad'))).toEqual(['NE', 'SE', 'SW', 'NW'])
+    for (const step of [0, 1, 2, 3, 4, 5, 6, 7]) {
+      expect(new Set(connectionsForPart(createPlacedPart('xroad', step)))).toEqual(new Set(['NE', 'SE', 'SW', 'NW']))
+    }
+    expect(createPlacedPart('xroad', 1).rotationStep).toBe(2)
+    expect(createPlacedPart('xroad', 7).rotationStep).toBe(0)
+  })
 })
