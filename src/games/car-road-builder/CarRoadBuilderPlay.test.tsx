@@ -47,6 +47,16 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('button', { name: 'Xじを おく' })).toBeInTheDocument()
   })
 
+  test('renders a clearly headed top-down car at the start', () => {
+    renderGame()
+
+    const car = screen.getByLabelText('くるま')
+    expect(car.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-front-direction', 'E')
+    expect(car).toHaveStyle('--car-angle: 0rad')
+    expect(car.querySelectorAll('circle')).toHaveLength(2)
+    expect(car.querySelectorAll('[data-testid="car-visual"] path')).toHaveLength(5)
+  })
+
   test('palette tap then cell tap places a part, and selected controls rotate/remove it', async () => {
     const user = userEvent.setup()
     renderGame()
