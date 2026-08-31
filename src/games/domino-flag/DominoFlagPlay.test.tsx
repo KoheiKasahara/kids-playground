@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DominoEngineOptions } from './useDominoEngine'
 import DominoFlagPlay from './DominoFlagPlay'
 import { dominoFlags } from './flagDefinitions'
+import surfaceStyles from '../../components/GamePlaySurface.module.css'
 
 const originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
 
@@ -395,5 +396,37 @@ describe('DominoFlagPlay', () => {
     await user.click(screen.getByRole('button', { name: 'もういちど' }))
 
     expect(screen.getByRole('status')).toHaveTextContent('アメリカの こっき！')
+  })
+})
+
+// 長押しメニュー・文字選択の抑制(Issue #166)は、国旗選択一覧では邪魔になる（一覧を長押しして
+// 見比べたい等）ため付けず、選んだ後（ready/running/complete）の実プレイ側だけに付ける。
+describe('DominoFlagPlay: GamePlaySurfaceの適用範囲(Issue #166)', () => {
+  it('国旗選択中(select)にはGamePlaySurfaceのclassが付かない', () => {
+    const { container } = renderPlay()
+    expect(container.querySelector(`.${surfaceStyles.surface}`)).not.toBeInTheDocument()
+  })
+
+  it('国旗を選んだ後(ready)にはGamePlaySurfaceのclassが付く', async () => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    await chooseAmerica(user)
+    expect(container.querySelector(`.${surfaceStyles.surface}`)).toBeInTheDocument()
+  })
+
+  it('スタート後(running)もGamePlaySurfaceのclassが付いたまま', async () => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    await chooseAmerica(user)
+    await user.click(screen.getByRole('button', { name: 'スタート！' }))
+    expect(container.querySelector(`.${surfaceStyles.surface}`)).toBeInTheDocument()
+  })
+
+  it('こっきをかえるで選択画面へ戻るとGamePlaySurfaceのclassが外れる', async () => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    await chooseAmerica(user)
+    await user.click(screen.getByRole('button', { name: 'こっきをかえる' }))
+    expect(container.querySelector(`.${surfaceStyles.surface}`)).not.toBeInTheDocument()
   })
 })
