@@ -390,6 +390,23 @@ describe('quizSound', () => {
     controller.dispose()
   })
 
+  test('コマバトルのブースト音は短い上行2音で、同一フレーム付近の重複だけ抑える', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { createKomaBattleSoundController } = await import('./quizSound')
+
+    const controller = createKomaBattleSoundController()
+    controller.playBoost()
+    controller.playBoost()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(2)
+    const first = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    const second = instances[0].createOscillator.mock.results[1].value as MockOscillatorNode
+    expect(second.frequency.value).toBeGreaterThan(first.frequency.value)
+    controller.dispose()
+  })
+
   test('コマバトルの結果音はdisposeで予約分も停止し、再戦へ持ち越さない', async () => {
     ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
     vi.resetModules()

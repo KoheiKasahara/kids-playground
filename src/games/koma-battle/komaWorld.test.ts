@@ -2,6 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   applyKomaAssist,
+  applyKomaBoost,
   applyKomaContactAssist,
   clampKomaMotion,
   createKomaBattleWorld,
@@ -14,6 +15,8 @@ import {
   DISK_FRICTION,
   DISK_RESTITUTION,
   KOMA_DENSITY,
+  KOMA_BOOST_MAX_SPIN_SPEED,
+  KOMA_BOOST_MIN_SPIN_SPEED,
   MAX_ANGULAR_SPEED,
   MAX_LINEAR_SPEED,
   PHYSICS_TIMESTEP,
@@ -294,6 +297,86 @@ describe('createKomaBattleWorld', () => {
       expect(body.angvel().y).toBeCloseTo(START_SPIN_SPEED * type.initialSpinScale, 6)
       world.world.free()
     }
+  })
+})
+
+describe('タップブースト', () => {
+  beforeAll(async () => {
+    await RAPIER.init()
+  })
+
+  it('4タイプすべてを同じルールで低速からすぐ安定回転へ戻す', () => {
+    for (const type of KOMA_TYPE_CONFIGS) {
+      const world = createKomaBattleWorld(
+        RAPIER,
+        komaSpecsForSelection([type.id], 1),
+      )
+      const koma = world.komas[0]!
+      koma.body.setAngvel({ x: 0, y: 4 * koma.spec.spinDirection, z: 0 }, true)
+      koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+
+      const result = applyKomaBoost(koma)
+
+      expect(Math.abs(result.spinAfter)).toBeGreaterThanOrEqual(KOMA_BOOST_MIN_SPIN_SPEED)
+      expect(Math.abs(result.spinAfter)).toBeLessThanOrEqual(KOMA_BOOST_MAX_SPIN_SPEED)
+      expect(Math.sign(result.spinAfter)).toBe(koma.spec.spinDirection)
+      expect(result.moveImpulseApplied).toBe(true)
+      world.world.free()
+    }
+  })
+
+  it('触った1体だけをブーストし、もう1体の速度は変えない', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
+    const [first, second] = world.komas
+    first!.body.setAngvel({ x: 0, y: 8, z: 0 }, true)
+    const secondAngularBefore = { ...second!.body.angvel() }
+    const secondLinearBefore = { ...second!.body.linvel() }
+
+    applyKomaBoost(first!)
+
+    expect(second!.body.angvel()).toEqual(secondAngularBefore)
+    expect(second!.body.linvel()).toEqual(secondLinearBefore)
+    world.world.free()
+  })
+
+  it('高速時と連打時も専用上限・全体上限を超えず有限値を保つ', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1))
+    const koma = world.komas[0]!
+    koma.body.setAngvel({ x: 0, y: 84 * koma.spec.spinDirection, z: 0 }, true)
+    koma.body.setLinvel({ x: 5, y: 0, z: 0 }, true)
+    expect(applyKomaBoost(koma).moveImpulseApplied).toBe(false)
+
+    for (let tap = 0; tap < 100; tap += 1) applyKomaBoost(koma)
+
+    const reading = readKoma(koma)
+    const angular = koma.body.angvel()
+    expect(Math.abs(reading.spinSpeed)).toBeLessThanOrEqual(KOMA_BOOST_MAX_SPIN_SPEED)
+    expect(Math.hypot(angular.x, angular.y, angular.z)).toBeLessThanOrEqual(MAX_ANGULAR_SPEED)
+    expect(reading.linearSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
+    expect([
+      reading.spinSpeed,
+      reading.linearSpeed,
+      reading.position.x,
+      reading.position.y,
+    ].every(Number.isFinite)).toBe(true)
+    world.world.free()
+  })
+
+  it('傾きかけた低速状態でもコマ自身の軸方向へ回転を戻す', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1))
+    const koma = world.komas[0]!
+    const angle = 0.55
+    koma.body.setRotation(
+      { x: Math.sin(angle / 2), y: 0, z: 0, w: Math.cos(angle / 2) },
+      true,
+    )
+    koma.body.setAngvel({ x: 0, y: 3, z: 0 }, true)
+
+    const result = applyKomaBoost(koma)
+
+    expect(Math.abs(result.spinAfter)).toBeGreaterThanOrEqual(KOMA_BOOST_MIN_SPIN_SPEED)
+    expect(Number.isFinite(result.spinAfter)).toBe(true)
+    world.world.free()
   })
 })
 

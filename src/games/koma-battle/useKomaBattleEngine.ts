@@ -54,6 +54,7 @@ import { komaCameraSetup } from './komaCamera'
 import type { KomaSpec } from './komaSpecs'
 import {
   applyKomaAssist,
+  applyKomaBoost,
   applyKomaContactAssist,
   clampKomaMotion,
   createKomaBattleWorld,
@@ -73,6 +74,7 @@ import {
   createKomaImpactThrottle,
   impactIntensityForRelativeSpeed,
 } from './komaImpact'
+import { findNearestKomaTapTarget } from './komaTapTarget'
 
 let rapierInitPromise: Promise<void> | null = null
 
@@ -119,6 +121,21 @@ const IMPACT_DURATION_MS = 260
 /** 物理Colliderの境界より少し外側で接触演出を拾う余裕。 */
 const IMPACT_CONTACT_MARGIN = 0.03
 
+// ---------------------------------------------------------------------------
+// 直接タップブースト。ゲーム上の待ち時間ではなく、同一入力の多重発火だけを防ぐ。
+// ---------------------------------------------------------------------------
+
+/** スマホでは見た目より十分広く、PCでは過剰に広がらない画面上のヒット半径[px]。 */
+const KOMA_TAP_HIT_RADIUS_MIN_PX = 44
+const KOMA_TAP_HIT_RADIUS_MAX_PX = 64
+/** 指を少し動かしてもタップとして扱うが、明確なスワイプは誤発火させない。 */
+const KOMA_TAP_MAX_MOVEMENT_PX = 24
+const KOMA_TAP_MAX_DURATION_MS = 700
+/** pointer/click重複や同一フレーム付近の多重入力だけをまとめる、ごく短いガード。 */
+const KOMA_TAP_DUPLICATE_GUARD_MS = 36
+/** タップ対象を示す発光リングの寿命。 */
+const BOOST_EFFECT_DURATION_MS = 380
+
 type ImpactSlot = {
   mesh: THREE.Mesh
   material: THREE.MeshBasicMaterial
@@ -131,6 +148,8 @@ type KomaVisual = {
   group: THREE.Group
   /** 毎フレーム、その時点の自転速度で回転演出を更新する。 */
   updateSpin: (spinSpeedAbs: number, dtMs: number) => void
+  /** タップ対象だけへ、使い回しの発光リングと短い光量変化を出す。 */
+  triggerBoost: () => void
   /** 決着後に勝者だけを少し強調する。物理Bodyの姿勢は変更しない。 */
   setOutcome: (isWinner: boolean | null) => void
 }
@@ -146,6 +165,7 @@ type KomaGeometrySet = {
   cap: THREE.SphereGeometry
   knob: THREE.SphereGeometry
   spinRing: THREE.RingGeometry
+  boostRing: THREE.RingGeometry
   diskHalfHeight: number
 }
 
@@ -189,6 +209,7 @@ export function useKomaBattleEngine(
     let renderer: THREE.WebGLRenderer | null = null
     let resizeObserver: ResizeObserver | null = null
     let detachViewportListeners: (() => void) | null = null
+    let detachPointerListeners: (() => void) | null = null
     let rafId: number | null = null
     let released = false
     let finished = false
@@ -239,6 +260,8 @@ export function useKomaBattleEngine(
       resizeObserver = null
       detachViewportListeners?.()
       detachViewportListeners = null
+      detachPointerListeners?.()
+      detachPointerListeners = null
 
       for (const geometry of geometries) geometry.dispose()
       for (const material of materials) material.dispose()
@@ -329,6 +352,117 @@ export function useKomaBattleEngine(
       }
     }
 
+    function attachPointerListeners() {
+      if (!renderer) return
+      const canvas = renderer.domElement
+      const pointerStarts = new Map<
+        number,
+        { x: number; y: number; at: number }
+      >()
+      const lastBoostAt = specs.map(() => Number.NEGATIVE_INFINITY)
+      const projectedCenter = new THREE.Vector3()
+      const bodyQuaternion = new THREE.Quaternion()
+
+      const onPointerDown = (event: PointerEvent) => {
+        if (finished || (event.pointerType === 'mouse' && event.button !== 0)) return
+        pointerStarts.set(event.pointerId, {
+          x: event.clientX,
+          y: event.clientY,
+          at: event.timeStamp,
+        })
+        try {
+          canvas.setPointerCapture(event.pointerId)
+        } catch {
+          // 古いSafari等でcaptureできなくても、canvas上の通常タップはそのまま扱える。
+        }
+      }
+
+      const forgetPointer = (event: PointerEvent) => {
+        pointerStarts.delete(event.pointerId)
+      }
+
+      const onPointerUp = (event: PointerEvent) => {
+        const start = pointerStarts.get(event.pointerId)
+        pointerStarts.delete(event.pointerId)
+        if (!start || finished || battle === null || camera === null) return
+        if (
+          Math.hypot(event.clientX - start.x, event.clientY - start.y) >
+            KOMA_TAP_MAX_MOVEMENT_PX ||
+          event.timeStamp - start.at > KOMA_TAP_MAX_DURATION_MS
+        ) {
+          return
+        }
+
+        const rect = canvas.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return
+        const activeBattle = battle
+        const activeCamera = camera
+        const targets = activeBattle.komas.flatMap((koma, index) => {
+          const translation = koma.body.translation()
+          const rotation = koma.body.rotation()
+          bodyQuaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+          projectedCenter
+            .set(0, DISK_CENTER_Y, 0)
+            .applyQuaternion(bodyQuaternion)
+          projectedCenter.set(
+            projectedCenter.x + translation.x,
+            projectedCenter.y + translation.y,
+            projectedCenter.z + translation.z,
+          ).project(activeCamera)
+          if (
+            !Number.isFinite(projectedCenter.x) ||
+            !Number.isFinite(projectedCenter.y) ||
+            projectedCenter.z < -1 ||
+            projectedCenter.z > 1
+          ) {
+            return []
+          }
+          return [{
+            index,
+            x: rect.left + ((projectedCenter.x + 1) / 2) * rect.width,
+            y: rect.top + ((1 - projectedCenter.y) / 2) * rect.height,
+          }]
+        })
+        const hitRadius = THREE.MathUtils.clamp(
+          rect.width * 0.135,
+          KOMA_TAP_HIT_RADIUS_MIN_PX,
+          KOMA_TAP_HIT_RADIUS_MAX_PX,
+        )
+        const targetIndex = findNearestKomaTapTarget(
+          { x: event.clientX, y: event.clientY },
+          targets,
+          hitRadius,
+        )
+        if (targetIndex === null) return
+
+        // ごく近い多重pointerイベントだけをまとめる。通常の連打には毎回反応する。
+        if (event.timeStamp - lastBoostAt[targetIndex]! < KOMA_TAP_DUPLICATE_GUARD_MS) return
+        lastBoostAt[targetIndex] = event.timeStamp
+        const target = activeBattle.komas[targetIndex]
+        const visual = komaVisuals[targetIndex]
+        if (!target || !visual) return
+
+        applyKomaBoost(target)
+        visual.triggerBoost()
+        soundController.playBoost()
+        // 次のanimation frameを待たず、タップイベント内で最初の1枚を即座に返す。
+        writeVisuals(0)
+        if (renderer && scene && camera) renderer.render(scene, camera)
+      }
+
+      canvas.addEventListener('pointerdown', onPointerDown)
+      canvas.addEventListener('pointerup', onPointerUp)
+      canvas.addEventListener('pointercancel', forgetPointer)
+      canvas.addEventListener('lostpointercapture', forgetPointer)
+      detachPointerListeners = () => {
+        pointerStarts.clear()
+        canvas.removeEventListener('pointerdown', onPointerDown)
+        canvas.removeEventListener('pointerup', onPointerUp)
+        canvas.removeEventListener('pointercancel', forgetPointer)
+        canvas.removeEventListener('lostpointercapture', forgetPointer)
+      }
+    }
+
     /**
      * コマの見た目Meshが使うgeometryをタイプごとに1組作る。
      * 同じタイプ同士ではセットを使い回し、タイプ数が増えても人数ぶんに増やさない。
@@ -388,6 +522,10 @@ export function useKomaBattleEngine(
         spinRing: track(
           new THREE.RingGeometry(diskRadius * 1.15, diskRadius * 1.42, 28),
         ),
+        // タップ時だけ一瞬広がるリング。常時描画せず、コマごとに1個を使い回す。
+        boostRing: track(
+          new THREE.RingGeometry(diskRadius * 1.18, diskRadius * 1.72, 32),
+        ),
         diskHalfHeight,
       }
     }
@@ -440,7 +578,18 @@ export function useKomaBattleEngine(
           blending: THREE.AdditiveBlending,
         }),
       )
+      const boostRingMaterial = trackMaterial(
+        new THREE.MeshBasicMaterial({
+          color: spec.accentColor,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        }),
+      )
       let outcomeEmphasis: 'winner' | 'loser' | null = null
+      let boostRemainingMs = 0
 
       const tip = new THREE.Mesh(geometrySet.tip, metalMaterial)
       tip.rotation.x = Math.PI
@@ -485,6 +634,13 @@ export function useKomaBattleEngine(
       spinRing.position.y = DISK_CENTER_Y
       group.add(spinRing)
 
+      const boostRing = new THREE.Mesh(geometrySet.boostRing, boostRingMaterial)
+      boostRing.rotation.x = -Math.PI / 2
+      boostRing.position.y = DISK_CENTER_Y + 0.025
+      boostRing.visible = false
+      boostRing.renderOrder = 4
+      group.add(boostRing)
+
       function updateSpin(spinSpeedAbs: number, dtMs: number) {
         const ratio = THREE.MathUtils.clamp(
           (spinSpeedAbs - SPIN_EFFECT_FLOOR_SPEED) / (SPIN_EFFECT_FULL_SPEED - SPIN_EFFECT_FLOOR_SPEED),
@@ -495,12 +651,33 @@ export function useKomaBattleEngine(
           0.72,
           ratio * 0.4 + (outcomeEmphasis === 'winner' ? 0.18 : 0),
         )
+        const boostRatio = Math.max(0, boostRemainingMs / BOOST_EFFECT_DURATION_MS)
         accentMaterial.emissiveIntensity = Math.max(
           ratio * 0.6,
+          boostRatio * 1.35,
           outcomeEmphasis === 'winner' ? 0.8 : outcomeEmphasis === 'loser' ? 0.05 : 0,
         )
         // リングは本体よりわずかに速く自転させ、残像のような「滑り」を出す。
         spinRing.rotation.y += (dtMs / 1000) * spinSpeedAbs * 0.5
+
+        if (boostRemainingMs > 0) {
+          boostRemainingMs = Math.max(0, boostRemainingMs - dtMs)
+          const progress = 1 - boostRemainingMs / BOOST_EFFECT_DURATION_MS
+          boostRing.visible = boostRemainingMs > 0
+          boostRingMaterial.opacity = (1 - progress) * 0.92
+          const scale = prefersReducedMotion ? 1.12 : 0.82 + progress * 0.78
+          boostRing.scale.setScalar(scale)
+        } else if (boostRing.visible) {
+          boostRing.visible = false
+          boostRingMaterial.opacity = 0
+        }
+      }
+
+      function triggerBoost() {
+        boostRemainingMs = BOOST_EFFECT_DURATION_MS
+        boostRing.visible = true
+        boostRing.scale.setScalar(prefersReducedMotion ? 1.12 : 0.82)
+        boostRingMaterial.opacity = 0.92
       }
 
       function setOutcome(isWinner: boolean | null) {
@@ -508,7 +685,7 @@ export function useKomaBattleEngine(
         group.scale.setScalar(isWinner === true ? 1.12 : isWinner === false ? 0.94 : 1)
       }
 
-      return { group, updateSpin, setOutcome }
+      return { group, updateSpin, triggerBoost, setOutcome }
     }
 
     /** すり鉢の見た目。物理の高さ場と同じ profile 関数から作る。 */
@@ -941,6 +1118,7 @@ export function useKomaBattleEngine(
         resizeObserver.observe(container)
       }
       attachViewportListeners()
+      attachPointerListeners()
       return true
     }
 

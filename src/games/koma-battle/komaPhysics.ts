@@ -150,6 +150,21 @@ export const MAX_LINEAR_SPEED = 9
 /** これを超える角速度は上限へ丸める。 */
 export const MAX_ANGULAR_SPEED = 90
 
+// ---------------------------------------------------------------------------
+// タップブースト
+// ---------------------------------------------------------------------------
+
+/** 低速のコマも、1回触れば安定回転へ戻ったと分かる最低自転速度[rad/s]。 */
+export const KOMA_BOOST_MIN_SPIN_SPEED = 58
+/** 中・高速域でもタップ直後の変化が出る、全タイプ共通の加算量[rad/s]。 */
+export const KOMA_BOOST_SPIN_INCREMENT = 16
+/** 連打しても通常の角速度安全弁へ張り付かない、ブースト専用の上限[rad/s]。 */
+export const KOMA_BOOST_MAX_SPIN_SPEED = 86
+/** 軌道へ小さな変化を出す共通impulse。タイプごとの専用倍率は持たせない。 */
+export const KOMA_BOOST_MOVE_IMPULSE = 0.065
+/** すでに十分速いときは移動impulseを足さず、連打による異常加速を防ぐ。 */
+export const KOMA_BOOST_MOVE_SPEED_LIMIT = 3.8
+
 /**
  * 1試合ごとの初速のばらつき（±の割合）。
  *
