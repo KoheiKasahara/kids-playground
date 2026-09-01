@@ -585,7 +585,7 @@ function buildWheels(hubColor: string, hubRadiusRatio: number) {
     const sportsWheel = config.body === 'sports'
 
     for (const wheel of attachments.wheels) {
-      // タイヤは1本ずつ独立に置く。位置はすべて attachment 由来で、車種ごとの分岐は無い。
+      // タイヤの中心位置は attachment 由来。スポーツカーだけリムの見た目を追加する。
       const tire = new THREE.Mesh(
         new THREE.CylinderGeometry(wheel.radius, wheel.radius, wheel.width, 24),
         tireMaterial,
