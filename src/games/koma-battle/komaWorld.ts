@@ -18,6 +18,11 @@ import {
   FLOOR_RESTITUTION,
   GRAVITY_Y,
   KOMA_DENSITY,
+  KOMA_CONTACT_MARGIN,
+  KOMA_KNOCKBACK_MAX_CLOSING_SPEED,
+  KOMA_KNOCKBACK_MAX_IMPULSE,
+  KOMA_KNOCKBACK_MIN_CLOSING_SPEED,
+  KOMA_KNOCKBACK_MIN_IMPULSE,
   LINEAR_DAMPING,
   MAX_ANGULAR_SPEED,
   MAX_LINEAR_SPEED,
@@ -33,7 +38,11 @@ import {
   TIP_RADIUS,
   TIP_RESTITUTION,
   WALL_FRICTION,
+  WALL_REDIRECT_MAX_IMPULSE,
+  WALL_REDIRECT_MIN_IMPULSE,
+  WALL_REDIRECT_MIN_OUTWARD_SPEED,
   WALL_RESTITUTION,
+  CONTACT_RELEASE_MARGIN,
 } from './komaPhysics'
 import {
   BUMPER_FRICTION,
@@ -45,6 +54,7 @@ import {
   HEIGHTFIELD_SEGMENTS,
   fieldHeightAt,
   getKomaField,
+  WALL_INNER_RADIUS,
   type KomaField,
   type KomaFieldId,
 } from './komaStadium'
@@ -74,6 +84,19 @@ export type KomaEntry = {
 export type KomaBattleWorld = {
   world: World
   komas: KomaEntry[]
+  /** 接触開始時だけ補正するための試合単位状態。世界の再生成で必ず初期化される。 */
+  contactAssist: KomaContactAssistState
+}
+
+export type KomaContactAssistState = {
+  activeKomaPair: boolean
+  activeWalls: Set<number>
+}
+
+export type KomaContactAssistResult = {
+  komaKnockbacks: number
+  wallRedirects: number
+  maxAppliedImpulse: number
 }
 
 /** 開始位置。2個なら向かい合わせ、1個なら中心寄り。 */
@@ -279,7 +302,131 @@ export function createKomaBattleWorld(
     })
   })
 
-  return { world, komas }
+  return {
+    world,
+    komas,
+    contactAssist: {
+      activeKomaPair: false,
+      activeWalls: new Set<number>(),
+    },
+  }
+}
+
+function finiteUnitOrNull(x: number, z: number): { x: number; z: number } | null {
+  const length = Math.hypot(x, z)
+  if (!Number.isFinite(length) || length < 1e-6) return null
+  return { x: x / length, z: z / length }
+}
+
+function scaledBetween(value: number, minimum: number, maximum: number): number {
+  if (!Number.isFinite(value) || maximum <= minimum) return 0
+  return Math.min(1, Math.max(0, (value - minimum) / (maximum - minimum)))
+}
+
+/**
+ * 接触開始時だけ、ゲーム向けの小さなimpulseを加える。
+ *
+ * Rapier本来の接触解決は残し、円盤同士には等大反対向きのimpulse、壁際には
+ * 中央向きのimpulseだけを足す。位置・姿勢は書き換えず、質量差もRapierへ任せる。
+ * `active=false` は決着後の補正停止に使い、状態も解除して再発火を防ぐ。
+ */
+export function applyKomaContactAssist(
+  battle: KomaBattleWorld,
+  active = true,
+): KomaContactAssistResult {
+  const result: KomaContactAssistResult = {
+    komaKnockbacks: 0,
+    wallRedirects: 0,
+    maxAppliedImpulse: 0,
+  }
+  const state = battle.contactAssist
+  if (!active) {
+    state.activeKomaPair = false
+    state.activeWalls.clear()
+    return result
+  }
+
+  if (battle.komas.length === 2) {
+    const [a, b] = battle.komas
+    const ta = a!.body.translation()
+    const tb = b!.body.translation()
+    const radiusA = DISK_RADIUS * a!.spec.type.visual.diskRadiusScale
+    const radiusB = DISK_RADIUS * b!.spec.type.visual.diskRadiusScale
+    const contactDistance = radiusA + radiusB + KOMA_CONTACT_MARGIN
+    const releaseDistance = contactDistance + CONTACT_RELEASE_MARGIN
+    const verticalContactDistance =
+      DISK_HALF_HEIGHT *
+        (a!.spec.type.visual.diskThicknessScale + b!.spec.type.visual.diskThicknessScale) +
+      0.08
+    const offsetX = tb.x - ta.x
+    const offsetZ = tb.z - ta.z
+    const distance = Math.hypot(offsetX, offsetZ)
+
+    if (distance > releaseDistance) state.activeKomaPair = false
+    if (
+      !state.activeKomaPair &&
+      distance <= contactDistance &&
+      Math.abs(tb.y - ta.y) <= verticalContactDistance
+    ) {
+      const normal = finiteUnitOrNull(offsetX, offsetZ)
+      const va = a!.body.linvel()
+      const vb = b!.body.linvel()
+      if (normal !== null) {
+        const closingSpeed = Math.max(
+          0,
+          -((vb.x - va.x) * normal.x + (vb.z - va.z) * normal.z),
+        )
+        if (closingSpeed >= KOMA_KNOCKBACK_MIN_CLOSING_SPEED) {
+          const intensity = scaledBetween(
+            closingSpeed,
+            KOMA_KNOCKBACK_MIN_CLOSING_SPEED,
+            KOMA_KNOCKBACK_MAX_CLOSING_SPEED,
+          )
+          const baseImpulse =
+            KOMA_KNOCKBACK_MIN_IMPULSE +
+            (KOMA_KNOCKBACK_MAX_IMPULSE - KOMA_KNOCKBACK_MIN_IMPULSE) *
+              Math.sqrt(intensity)
+          const typeScale = safeTypeScale(
+            (a!.spec.type.collisionImpulseScale + b!.spec.type.collisionImpulseScale) / 2,
+            0.85,
+            1.15,
+          )
+          const impulse = Math.min(KOMA_KNOCKBACK_MAX_IMPULSE, baseImpulse * typeScale)
+          a!.body.applyImpulse({ x: -normal.x * impulse, y: 0, z: -normal.z * impulse }, true)
+          b!.body.applyImpulse({ x: normal.x * impulse, y: 0, z: normal.z * impulse }, true)
+          state.activeKomaPair = true
+          result.komaKnockbacks = 1
+          result.maxAppliedImpulse = impulse
+        }
+      }
+    }
+  }
+
+  battle.komas.forEach((koma, index) => {
+    const translation = koma.body.translation()
+    const radius = Math.hypot(translation.x, translation.z)
+    const diskRadius = DISK_RADIUS * koma.spec.type.visual.diskRadiusScale
+    const contactRadius = WALL_INNER_RADIUS - diskRadius * 0.72
+    if (radius < contactRadius - CONTACT_RELEASE_MARGIN) state.activeWalls.delete(index)
+    if (state.activeWalls.has(index) || radius < contactRadius) return
+
+    const outward = finiteUnitOrNull(translation.x, translation.z)
+    if (outward === null) return
+    const velocity = koma.body.linvel()
+    const outwardSpeed = velocity.x * outward.x + velocity.z * outward.z
+    if (!Number.isFinite(outwardSpeed) || outwardSpeed < WALL_REDIRECT_MIN_OUTWARD_SPEED) return
+
+    const intensity = scaledBetween(outwardSpeed, WALL_REDIRECT_MIN_OUTWARD_SPEED, 4.5)
+    const impulse =
+      WALL_REDIRECT_MIN_IMPULSE +
+      (WALL_REDIRECT_MAX_IMPULSE - WALL_REDIRECT_MIN_IMPULSE) * Math.sqrt(intensity)
+    koma.body.applyImpulse({ x: -outward.x * impulse, y: 0, z: -outward.z * impulse }, true)
+    state.activeWalls.add(index)
+    result.wallRedirects += 1
+    result.maxAppliedImpulse = Math.max(result.maxAppliedImpulse, impulse)
+  })
+
+  return result
 }
 
 /** 判定と描画の両方が使う、1体ぶんの観測値。 */
