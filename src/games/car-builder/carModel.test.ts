@@ -82,7 +82,6 @@ describe('createCarModel（3Dモデル生成）', () => {
 
     for (const name of [
       'car-body-hull',
-      'car-body-cabin-shell',
       'car-sports-windshield',
       'car-sports-side-window-rear-left',
       'car-sports-side-window-front-left',
@@ -109,19 +108,17 @@ describe('createCarModel（3Dモデル生成）', () => {
     model.dispose()
   })
 
-  test('スポーツカーの主外殻はロフトGeometryと法線を持つ', () => {
+  test('スポーツカーはキャビンを別積みせず、全長一体のロフト外殻を持つ', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const body = layerOf(model.root, 'body')
     const hull = body.getObjectByName('car-body-hull')
-    const cabin = body.getObjectByName('car-body-cabin-shell')
 
-    for (const part of [hull, cabin]) {
-      expect(part).toBeInstanceOf(THREE.Mesh)
-      const mesh = part as THREE.Mesh
-      expect(mesh.geometry).not.toBeInstanceOf(THREE.BoxGeometry)
-      expect(mesh.geometry.getAttribute('position').count).toBeGreaterThan(50)
-      expect(mesh.geometry.getAttribute('normal')).toBeDefined()
-    }
+    expect(body.getObjectByName('car-body-cabin-shell')).toBeUndefined()
+    expect(hull).toBeInstanceOf(THREE.Mesh)
+    const mesh = hull as THREE.Mesh
+    expect(mesh.geometry).not.toBeInstanceOf(THREE.BoxGeometry)
+    expect(mesh.geometry.getAttribute('position').count).toBeGreaterThan(150)
+    expect(mesh.geometry.getAttribute('normal')).toBeDefined()
     model.dispose()
   })
 
