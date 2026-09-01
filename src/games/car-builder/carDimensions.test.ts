@@ -68,6 +68,13 @@ describe('computeCarDimensions（5ボディ）', () => {
     expect(dimensions.height).toBe(dimensions.roofTopY)
   })
 
+  test('スポーツカーの寸法は低くワイドで、キャビンが小さく設計されている', () => {
+    expect(dimensions.width / dimensions.length).toBeGreaterThan(0.4)
+    expect(dimensions.height / dimensions.length).toBeLessThan(0.3)
+    expect(dimensions.cabinLength).toBeLessThan(dimensions.length * 0.45)
+    expect(dimensions.cabinHeight).toBeLessThan(dimensions.hullHeight)
+  })
+
   test('トレッドは車幅とタイヤ厚から決まり、タイヤは車体の外側に出る', () => {
     expect(dimensions.track).toBeCloseTo(body.width + wheel.width - 0.16, 6)
     expect(dimensions.track / 2).toBeGreaterThan(body.width / 2)
