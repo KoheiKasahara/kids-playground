@@ -41,13 +41,29 @@ describe('car road board', () => {
     expect(cellAt(movedGoal, 3, 3)).toMatchObject({ kind: 'goal', rotationStep: 3 })
   })
 
-  test('rejects moving a marker onto an occupied cell without losing it', () => {
+  test('swaps a marker with an occupied road cell without losing either part', () => {
     let board = createInitialBoard()
-    board = placePart(board, { row: 0, col: 0 }, 'start')
-    board = placePart(board, { row: 0, col: 1 }, 'straight')
+    board = placePart(board, { row: 0, col: 0 }, createPlacedPart('start', 2))
+    board = placePart(board, { row: 0, col: 1 }, createPlacedPart('straight', 3))
 
-    expect(movePart(board, { row: 0, col: 0 }, { row: 0, col: 1 })).toBe(board)
-    expect(cellAt(board, 0, 0)?.kind).toBe('start')
+    const swapped = movePart(board, { row: 0, col: 0 }, { row: 0, col: 1 })
+
+    expect(cellAt(swapped, 0, 0)).toMatchObject({ kind: 'straight', rotationStep: 3 })
+    expect(cellAt(swapped, 0, 1)).toMatchObject({ kind: 'start', rotationStep: 2 })
+    expect(swapped.cells.filter((cell) => cell.kind !== null)).toHaveLength(2)
+  })
+
+  test('swaps start and goal while keeping one of each marker', () => {
+    let board = createInitialBoard()
+    board = placePart(board, { row: 0, col: 0 }, createPlacedPart('start', 5))
+    board = placePart(board, { row: 1, col: 1 }, createPlacedPart('goal', 3))
+
+    const swapped = movePart(board, { row: 0, col: 0 }, { row: 1, col: 1 })
+
+    expect(cellAt(swapped, 0, 0)).toMatchObject({ kind: 'goal', rotationStep: 3 })
+    expect(cellAt(swapped, 1, 1)).toMatchObject({ kind: 'start', rotationStep: 5 })
+    expect(swapped.cells.filter((cell) => cell.kind === 'start')).toHaveLength(1)
+    expect(swapped.cells.filter((cell) => cell.kind === 'goal')).toHaveLength(1)
   })
 
   test('moves a placed part without changing its orientation', () => {
@@ -60,14 +76,14 @@ describe('car road board', () => {
     expect(cellAt(moved, 4, 4)).toMatchObject({ kind: 'curve', rotationStep: 7 })
   })
 
-  test('rejects occupied and out-of-board move targets without changing the board', () => {
+  test('swaps occupied road cells and rejects out-of-board move targets', () => {
     let board = createInitialBoard()
     board = placePart(board, { row: 0, col: 0 }, createPlacedPart('straight', 2))
-    board = placePart(board, { row: 0, col: 1 }, 'curve')
+    board = placePart(board, { row: 0, col: 1 }, createPlacedPart('curve', 7))
 
-    expect(movePart(board, { row: 0, col: 0 }, { row: 0, col: 1 })).toBe(board)
+    const swapped = movePart(board, { row: 0, col: 0 }, { row: 0, col: 1 })
+    expect(cellAt(swapped, 0, 0)).toMatchObject({ kind: 'curve', rotationStep: 7 })
+    expect(cellAt(swapped, 0, 1)).toMatchObject({ kind: 'straight', rotationStep: 2 })
     expect(movePart(board, { row: 0, col: 0 }, { row: -1, col: 0 })).toBe(board)
-    expect(cellAt(board, 0, 0)).toMatchObject({ kind: 'straight', rotationStep: 2 })
-    expect(cellAt(board, 0, 1)?.kind).toBe('curve')
   })
 })

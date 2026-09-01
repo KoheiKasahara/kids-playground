@@ -276,6 +276,38 @@ describe('CarRoadBuilderPlay', () => {
     expect(board).toHaveAttribute('aria-colcount', '4')
   })
 
+  test('swaps start and goal with an occupied road cell when dragged', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'まっすぐを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 2れつ' }))
+    await user.click(screen.getByRole('button', { name: 'まっすぐを おく' }))
+
+    const board = mockBoardRect()
+    const start = screen.getByRole('gridcell', { name: 'スタート、1ぎょう 1れつ' })
+    fireEvent.pointerDown(start, pointerOptions(11, 50, 50))
+    fireEvent.pointerMove(start, pointerOptions(11, 150, 150))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    fireEvent.pointerUp(start, pointerOptions(11, 150, 150))
+
+    expect(screen.getByRole('gridcell', { name: 'スタート、2ぎょう 2れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、1ぎょう 1れつ' })).toBeInTheDocument()
+
+    const goal = screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })
+    fireEvent.pointerDown(goal, pointerOptions(12, 350, 350))
+    fireEvent.pointerMove(goal, pointerOptions(12, 50, 50))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    fireEvent.pointerUp(goal, pointerOptions(12, 50, 50))
+
+    expect(screen.getByRole('gridcell', { name: 'ゴール、1ぎょう 1れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、4ぎょう 4れつ' })).toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell', { name: /スタート|ゴール|まっすぐ/ })).toHaveLength(3)
+    expect(screen.getAllByRole('gridcell')).toHaveLength(16)
+    expect(board).toHaveAttribute('aria-rowcount', '4')
+    expect(board).toHaveAttribute('aria-colcount', '4')
+  })
+
   test('does not let a marker move onto an occupied road cell', async () => {
     const user = userEvent.setup()
     renderPlay()
@@ -374,6 +406,58 @@ describe('CarRoadBuilderPlay', () => {
     fireEvent.pointerUp(source, pointerOptions(3, 350, 50))
     expect(screen.getByRole('gridcell', { name: 'まっすぐ、1ぎょう 4れつ' })).toBeInTheDocument()
     expect(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 2れつ' })).toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell')).toHaveLength(16)
+    expect(board).toHaveAttribute('aria-rowcount', '4')
+    expect(board).toHaveAttribute('aria-colcount', '4')
+  })
+
+  test('swaps two dragged road parts while preserving their orientations and grid size', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'まっすぐを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 2れつ' }))
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+
+    await user.click(screen.getByRole('button', { name: 'カーブを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 3れつ' }))
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    await user.click(screen.getByRole('button', { name: 'カーブを おく' }))
+
+    const board = mockBoardRect()
+    const source = screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })
+    fireEvent.pointerDown(source, pointerOptions(9, 150, 150))
+    fireEvent.pointerMove(source, pointerOptions(9, 250, 150))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'true')
+    expect(screen.getAllByRole('gridcell')).toHaveLength(16)
+
+    fireEvent.pointerUp(source, pointerOptions(9, 250, 150))
+
+    expect(screen.getByRole('gridcell', { name: 'カーブ、2ぎょう 2れつ' })).toHaveStyle('--rotation: 2')
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 3れつ' })).toHaveStyle('--rotation: 3')
+    expect(screen.getAllByRole('gridcell', { name: /まっすぐ|カーブ/ })).toHaveLength(2)
+    expect(screen.getAllByRole('gridcell')).toHaveLength(16)
+    expect(board).toHaveAttribute('aria-rowcount', '4')
+    expect(board).toHaveAttribute('aria-colcount', '4')
+  })
+
+  test('does not swap when a new palette part is dragged onto an occupied cell', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await user.click(screen.getByRole('button', { name: 'まっすぐを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 2れつ' }))
+
+    const board = mockBoardRect()
+    const palette = screen.getByRole('button', { name: 'カーブを おく' })
+    fireEvent.pointerDown(palette, pointerOptions(10, 20, 500))
+    fireEvent.pointerMove(palette, pointerOptions(10, 150, 150))
+    expect(screen.getByTestId('car-road-drop-preview')).toHaveAttribute('data-valid', 'false')
+    fireEvent.pointerUp(palette, pointerOptions(10, 150, 150))
+
+    expect(screen.getByRole('gridcell', { name: 'まっすぐ、2ぎょう 2れつ' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 3れつ' })).toBeInTheDocument()
+    expect(screen.queryByRole('gridcell', { name: /カーブ/ })).not.toBeInTheDocument()
     expect(screen.getAllByRole('gridcell')).toHaveLength(16)
     expect(board).toHaveAttribute('aria-rowcount', '4')
     expect(board).toHaveAttribute('aria-colcount', '4')

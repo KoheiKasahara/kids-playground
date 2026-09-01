@@ -154,17 +154,21 @@ export function canMovePart(board: Board, from: string | CellCoordinate, to: str
   const source = resolveTarget(board, from)
   const target = resolveTarget(board, to)
   const part = source ? partFromCell(source) : null
-  if (!source || !target || !part || target.id === source.id || target.kind !== null) return false
+  if (!source || !target || !part || target.id === source.id) return false
+  if (target.kind !== null) return true
   return canPlacePart(clearPart(board, source.id), target, part)
 }
 
-/** Move a part while preserving the original cell IDs and orientation. */
+/** Move or swap a part while preserving each part's orientation and cell IDs. */
 export function movePart(board: Board, from: string | CellCoordinate, to: string | CellCoordinate): Board {
   const source = resolveTarget(board, from)
   const target = resolveTarget(board, to)
   const part = source ? partFromCell(source) : null
   if (!source || !target || !part || !canMovePart(board, from, to)) return board
-  return setPartAt(clearPart(board, source.id), target, part)
+  const targetPart = partFromCell(target)
+  const cleared = clearPart(board, source.id)
+  const moved = setPartAt(cleared, target, part)
+  return targetPart ? setPartAt(moved, source, targetPart) : moved
 }
 
 export function rotatePart(board: Board, target: string | CellCoordinate, amount = 1): Board {
