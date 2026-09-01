@@ -1,5 +1,4 @@
 import {
-  DIRECTIONS,
   normalizeRotationStep,
   rotateDirection,
   type Direction,
@@ -91,10 +90,10 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
     kind: 'goal',
     label: 'ゴール',
     emoji: '🏁',
-    // A goal accepts a car from every direction. It may still be rotated in
-    // the editor so start/goal markers share the same move/rotate controls.
-    baseConnections: DIRECTIONS,
-    rotationSteps: ALL_ROTATIONS,
+    // The goal has one entrance, just like the start. Its four editor poses
+    // are quarter turns so the visible gate and route check always agree.
+    baseConnections: ['N'],
+    rotationSteps: [0, 2, 4, 6],
   },
 } as const
 
@@ -120,8 +119,15 @@ export function allowedRotationSteps(kind: PartKind): readonly number[] {
 export function normalizePartRotation(kind: PartKind, rotationStep: number): number {
   const normalized = normalizeRotationStep(rotationStep)
   if (kind === 'straight' || kind === 'crossroad') return normalized % 4
-  if (kind === 'xroad' || kind === 'double-curve') return normalized % 2 === 0 ? normalized : (normalized + 1) % 8
+  if (kind === 'goal' || kind === 'xroad' || kind === 'double-curve') {
+    return normalized % 2 === 0 ? normalized : (normalized + 1) % 8
+  }
   return normalized
+}
+
+/** Number of internal 45° steps used by one editor rotation. */
+export function rotationStepIncrement(kind: PartKind): number {
+  return kind === 'goal' ? 2 : 1
 }
 
 export function createPlacedPart(kind: PartKind, rotationStep = 0): PlacedPart {
@@ -135,7 +141,6 @@ export function createDefaultPlacedPart(kind: PartKind): PlacedPart {
 
 /** Derive ports every time; connections are never persisted on a placed part. */
 export function connectionsForPart(part: PlacedPart): readonly Direction[] {
-  if (part.kind === 'goal') return DIRECTIONS
   const definition = PART_DEFINITIONS[part.kind]
   if (part.kind === 'crossroad' || part.kind === 'xroad') return definition.baseConnections
   return definition.baseConnections.map((direction) => rotateDirection(direction, part.rotationStep))
@@ -161,6 +166,6 @@ export function exitPortForPart(part: PlacedPart, entryPort: Direction): Directi
   return ports.find((port) => port !== entryPort) ?? null
 }
 
-export function rotatePlacedPart(part: PlacedPart, amount = 1): PlacedPart {
+export function rotatePlacedPart(part: PlacedPart, amount = rotationStepIncrement(part.kind)): PlacedPart {
   return createPlacedPart(part.kind, part.rotationStep + amount)
 }

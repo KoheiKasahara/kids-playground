@@ -237,7 +237,13 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('button', { name: 'まわす' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'けす' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'まわす' }))
-    expect(screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })).toHaveStyle('--rotation: 1')
+    expect(screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })).toHaveStyle('--rotation: 2')
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })).toHaveStyle('--rotation: 4')
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })).toHaveStyle('--rotation: 6')
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' })).toHaveStyle('--rotation: 0')
   })
 
   test('moves start and goal to empty cells without duplicating them', async () => {

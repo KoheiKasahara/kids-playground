@@ -450,15 +450,28 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 -2px 0 rgba(184, 117, 19, .16), 0 1px 0 rgba(255,255,255,.24);
 }
 .goal .roadTileSurface {
-  border-color: rgba(187, 94, 91, .28);
+  border-color: rgba(169, 79, 85, .34);
   background:
-    linear-gradient(145deg, rgba(255,255,255,.25) 0%, rgba(255,255,255,0) 45%),
-    linear-gradient(180deg, #ffc5b6 0%, #ffaba0 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 -2px 0 rgba(179, 76, 76, .15), 0 1px 0 rgba(255,255,255,.24);
+    linear-gradient(145deg, rgba(255,255,255,.3) 0%, rgba(255,255,255,0) 45%),
+    linear-gradient(180deg, #ffd0b8 0%, #f79a91 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.58), inset 0 -2px 0 rgba(169,79,85,.2), 0 1px 0 rgba(255,255,255,.25);
 }
 .roadSvg { position: relative; z-index: 1; display: block; width: 100%; height: 100%; overflow: visible; }
 .roadSvg path { fill: none; stroke: #fff6d9; stroke-linecap: round; stroke-linejoin: round; stroke-width: .18; filter: drop-shadow(0 .035px 0 rgba(26,78,94,.28)); shape-rendering: geometricPrecision; }
 .roadHub { fill: #fff6d9; stroke: #397e98; stroke-width: .03; filter: drop-shadow(0 .025px 0 rgba(26,78,94,.26)); }
+.roadSvg .goalRoadBase { stroke: #a94f55; stroke-width: .28; filter: drop-shadow(0 .035px 0 rgba(113,49,55,.34)); }
+.roadSvg .goalRoadStripe { stroke: #fff4d1; stroke-width: .13; filter: drop-shadow(0 .02px 0 rgba(113,49,55,.25)); }
+.goalTargetShadow { fill: rgba(113,49,55,.2); }
+.goalTarget { fill: #fff3cf; stroke: #a94f55; stroke-width: .035; filter: drop-shadow(0 .025px 0 rgba(113,49,55,.3)); }
+.goalTargetDot { fill: #a94f55; }
+.goalGate { transform-box: fill-box; transform-origin: center; }
+.goalGateShadow { fill: none; stroke: rgba(113,49,55,.28); stroke-width: .07; stroke-linecap: round; stroke-linejoin: round; }
+.goalPillar { fill: #fff3cf; stroke: #a94f55; stroke-width: .025; filter: drop-shadow(0 .025px 0 rgba(113,49,55,.3)); }
+.goalBanner { fill: #a94f55; stroke: #7d3f49; stroke-width: .025; }
+.goalCheckerLight { fill: #fff7dd; }
+.goalCheckerDark { fill: #26394d; }
+.goalFinishLine { fill: #fff7dd; stroke: #a94f55; stroke-width: .018; }
+.goalArrow { fill: none; stroke: #a94f55; stroke-width: .025; stroke-linecap: round; stroke-linejoin: round; }
 .markerEmoji { position: absolute; z-index: 2; inset: 0; display: grid; place-items: center; font-size: clamp(18px, calc(var(--road-cell) * .44), 43px); line-height: 1; filter: drop-shadow(0 1.5px 0 rgba(26,78,94,.2)); text-shadow: 0 1px 1px rgba(255,255,255,.38); }
 .car {
   position: absolute;

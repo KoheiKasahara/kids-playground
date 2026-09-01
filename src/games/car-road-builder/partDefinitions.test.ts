@@ -25,9 +25,16 @@ describe('car road parts', () => {
     ).size).toBe(8)
   })
 
-  test('goal accepts every direction while retaining its editor rotation', () => {
-    expect(connectionsForPart(createPlacedPart('goal', 5))).toEqual(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
-    expect(createPlacedPart('goal', 5).rotationStep).toBe(5)
+  test('goal exposes one cardinal entrance in four quarter-turn poses', () => {
+    expect(PART_DEFINITIONS.goal.rotationSteps).toEqual([0, 2, 4, 6])
+    expect(PART_DEFINITIONS.goal.rotationSteps.map((step) => connectionsForPart(createPlacedPart('goal', step)))).toEqual([
+      ['N'],
+      ['E'],
+      ['S'],
+      ['W'],
+    ])
+    expect(createPlacedPart('goal', 5).rotationStep).toBe(6)
+    expect(connectionsForPart(createPlacedPart('goal', 5))).toEqual(['W'])
   })
 
   test('crossroad exposes all cardinal ports and keeps them after rotation', () => {

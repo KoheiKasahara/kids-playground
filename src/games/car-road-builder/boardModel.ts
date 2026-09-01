@@ -1,5 +1,5 @@
 import { directionDelta, type Direction } from './direction'
-import { createPlacedPart, normalizePartRotation, type PartKind, type PlacedPart } from './partDefinitions'
+import { createPlacedPart, normalizePartRotation, rotatePlacedPart, type PartKind, type PlacedPart } from './partDefinitions'
 
 export type BoardSize = Readonly<{ rows: number; cols: number }>
 export type CellCoordinate = Readonly<{ row: number; col: number }>
@@ -171,10 +171,10 @@ export function movePart(board: Board, from: string | CellCoordinate, to: string
   return targetPart ? setPartAt(moved, source, targetPart) : moved
 }
 
-export function rotatePart(board: Board, target: string | CellCoordinate, amount = 1): Board {
+export function rotatePart(board: Board, target: string | CellCoordinate, amount?: number): Board {
   const cell = resolveTarget(board, target)
   if (!cell || cell.kind === null) return board
-  const part = createPlacedPart(cell.kind, cell.rotationStep + amount)
+  const part = rotatePlacedPart(createPlacedPart(cell.kind, cell.rotationStep), amount)
   return setPartAt(board, cell, part)
 }
 
