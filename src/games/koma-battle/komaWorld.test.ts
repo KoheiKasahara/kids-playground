@@ -19,7 +19,14 @@ import {
   START_RADIUS,
   START_SPIN_SPEED,
 } from './komaPhysics'
-import { BOWL_RADIUS, bowlHeightAt, OUT_RADIUS, WALL_INNER_RADIUS } from './komaStadium'
+import {
+  BOWL_RADIUS,
+  bowlHeightAt,
+  fieldHeightAt,
+  KOMA_FIELD_DEFINITIONS,
+  OUT_RADIUS,
+  WALL_INNER_RADIUS,
+} from './komaStadium'
 import {
   createKomaJudgeState,
   decideMatchOutcome,
@@ -196,6 +203,41 @@ describe('createKomaBattleWorld', () => {
     world.world.free()
   })
 
+  it('フィールドごとの固定Collider数を小さく保つ（bumperだけ3つ増える）', () => {
+    for (const field of KOMA_FIELD_DEFINITIONS) {
+      const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2), { fieldId: field.id })
+      expect(world.world.bodies.len()).toBe(2)
+      expect(world.world.colliders.len()).toBe(field.id === 'bumper' ? 34 : 31)
+      world.world.free()
+    }
+  })
+
+  it('bumperへ当たるとコマの進行方向が変わる', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'bumper' })
+    const koma = world.komas[0]!
+    const bumper = KOMA_FIELD_DEFINITIONS.find((field) => field.id === 'bumper')!.obstacles[0]!
+    const startX = bumper.x - 0.62
+    const startZ = bumper.z
+    koma.body.setTranslation(
+      { x: startX, y: fieldHeightAt('bumper', Math.hypot(startX, startZ)) + 0.02, z: startZ },
+      true,
+    )
+    koma.body.setLinvel({ x: 4, y: 0, z: 0 }, true)
+    let maxSideVelocity = 0
+    let maxSpeed = 0
+    for (let step = 0; step < 180; step += 1) {
+      applyKomaAssist(koma, PHYSICS_TIMESTEP)
+      world.world.step()
+      clampKomaMotion(koma)
+      const velocity = koma.body.linvel()
+      maxSideVelocity = Math.max(maxSideVelocity, Math.abs(velocity.z))
+      maxSpeed = Math.max(maxSpeed, Math.hypot(velocity.x, velocity.y, velocity.z))
+    }
+    expect(maxSideVelocity).toBeGreaterThan(0.02)
+    expect(maxSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
+    world.world.free()
+  })
+
   it('コマは開始時に自転しており、2個は互いに逆回りになる', () => {
     const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
     const [first, second] = world.komas
@@ -293,6 +335,18 @@ describe('コマ1個の一生（実際にRapierを回して確認する）', () 
       expect(result.sawFiniteAlways).toBe(true)
       expect(result.maxLinearSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
       expect(result.maxAngularSpeed).toBeLessThanOrEqual(MAX_ANGULAR_SPEED)
+      world.world.free()
+    }
+  })
+
+  it('3フィールドすべてで1個モードが有限値のまま完走する', () => {
+    for (const field of KOMA_FIELD_DEFINITIONS) {
+      const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: field.id })
+      const result = simulate(world, 18)
+      expect(result.outcome?.kind).toBe('soloFinished')
+      expect(result.sawFiniteAlways).toBe(true)
+      expect(result.maxLinearSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
+      expect(result.maxRadius).toBeLessThan(OUT_RADIUS)
       world.world.free()
     }
   })
@@ -421,6 +475,22 @@ describe('コマ2個の対戦（実際にRapierを回して確認する）', () 
 
         world.world.free()
       }
+    }
+  }, 60_000)
+
+  it('3フィールドすべてで2個対戦が完走し、bumper接触でも値が壊れない', () => {
+    for (const field of KOMA_FIELD_DEFINITIONS) {
+      const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2), {
+        fieldId: field.id,
+        spinScales: [1.07, 0.93],
+      })
+      const result = simulate(world, 18)
+      expect(result.outcome).not.toBeNull()
+      expect(result.sawFiniteAlways).toBe(true)
+      expect(result.maxLinearSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
+      expect(result.maxAngularSpeed).toBeLessThanOrEqual(MAX_ANGULAR_SPEED)
+      expect(result.maxRadius).toBeLessThan(OUT_RADIUS)
+      world.world.free()
     }
   }, 60_000)
 })

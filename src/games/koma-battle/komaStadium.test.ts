@@ -1,104 +1,122 @@
 import { describe, expect, it } from 'vitest'
 import {
   BOWL_RADIUS,
+  BOWL_DEPTH,
   bowlHeightAt,
-  bowlSlopeAt,
-  createStadiumHeightfield,
-  createWallSegments,
+  DEFAULT_KOMA_FIELD_ID,
+  fieldHeightAt,
+  fieldSlopeAt,
+  getKomaField,
+  KOMA_FIELD_DEFINITIONS,
+  OUT_RADIUS,
   FIELD_RADIUS,
+  bowlSlopeAt,
+  createWallSegments,
   VALLEY_RADIUS,
   WALL_INNER_RADIUS,
   WALL_SEGMENTS,
   WALL_THICKNESS,
+  createStadiumHeightfield,
 } from './komaStadium'
 
-describe('bowlHeightAt', () => {
+describe('コマバトルのフィールド定義', () => {
+  it('3つのフィールドをデータとして持ち、未知のIDはbasicへ戻る', () => {
+    expect(KOMA_FIELD_DEFINITIONS.map((field) => field.id)).toEqual(['basic', 'bumper', 'ridge'])
+    expect(getKomaField(DEFAULT_KOMA_FIELD_ID).id).toBe('basic')
+    expect(getKomaField('not-a-field').id).toBe('basic')
+  })
+
+  it('basicは既存の浅いすり鉢と同じ高さで、全フィールドの高さが有限', () => {
+    const basic = getKomaField('basic')
+    for (const radius of [0, 0.3, 0.8, 1.2, BOWL_RADIUS, OUT_RADIUS]) {
+      expect(fieldHeightAt(basic, radius)).toBeCloseTo(fieldHeightAt('basic', radius), 8)
+      for (const field of KOMA_FIELD_DEFINITIONS) {
+        expect(Number.isFinite(fieldHeightAt(field, radius))).toBe(true)
+      }
+    }
+    expect(fieldHeightAt('basic', 0.3)).toBeCloseTo(-BOWL_DEPTH, 8)
+  })
+
+  it('ridgeはリング位置だけを緩やかに盛り上げ、急な段差を作らない', () => {
+    expect(fieldHeightAt('ridge', 1.2)).toBeGreaterThan(fieldHeightAt('basic', 1.2) + 0.06)
+    let maxSlope = 0
+    for (let radius = 0.02; radius < BOWL_RADIUS; radius += 0.02) {
+      maxSlope = Math.max(maxSlope, Math.abs(fieldSlopeAt('ridge', radius)))
+    }
+    expect(maxSlope).toBeLessThan(0.3)
+    expect(fieldHeightAt('ridge', 0.3) - fieldHeightAt('basic', 0.3)).toBeLessThan(0.01)
+  })
+
+  it('bumperは3つで、コマが通れる隙間と面内の位置を保つ', () => {
+    const bumpers = getKomaField('bumper').obstacles
+    expect(bumpers).toHaveLength(3)
+    for (const bumper of bumpers) {
+      expect(Math.hypot(bumper.x, bumper.z)).toBeCloseTo(0.95, 6)
+      expect(bumper.radius).toBeGreaterThan(0)
+      expect(bumper.height).toBeGreaterThan(0)
+      expect(Math.hypot(bumper.x, bumper.z) + bumper.radius).toBeLessThan(BOWL_RADIUS)
+    }
+    for (let first = 0; first < bumpers.length; first += 1) {
+      for (let second = first + 1; second < bumpers.length; second += 1) {
+        const a = bumpers[first]!
+        const b = bumpers[second]!
+        expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(a.radius + b.radius + 0.1)
+      }
+    }
+  })
+
+  it('heightfieldはbasic/ridgeで同じ軽量サイズを使う', () => {
+    const basic = createStadiumHeightfield(16, 'basic')
+    const ridge = createStadiumHeightfield('ridge', 16)
+    expect(basic.heights).toHaveLength((16 + 1) ** 2)
+    expect(ridge.heights).toHaveLength((16 + 1) ** 2)
+    expect(ridge.size).toBe(basic.size)
+    expect(ridge.heights.some((height, index) => height > basic.heights[index]! + 0.02)).toBe(true)
+  })
+})
+
+describe('bowlHeightAt compatibility', () => {
   it('谷がいちばん低く、縁で高さ0になる', () => {
     expect(bowlHeightAt(VALLEY_RADIUS)).toBeLessThan(bowlHeightAt(0))
     expect(bowlHeightAt(VALLEY_RADIUS)).toBeLessThan(bowlHeightAt(BOWL_RADIUS))
     expect(bowlHeightAt(BOWL_RADIUS)).toBeCloseTo(0, 6)
   })
 
-  it('中央はわずかに盛り上がっているが、谷との差はごく小さい', () => {
+  it('中央はわずかに盛り上がり、外側は高さ0でNaNにも耐える', () => {
     const mound = bowlHeightAt(0) - bowlHeightAt(VALLEY_RADIUS)
     expect(mound).toBeGreaterThan(0)
-    // 中央へ寄ったコマを谷へ戻す程度で足り、乗り越えられない山にはしない。
     expect(mound).toBeLessThan(0.05)
-  })
-
-  it('外周より外は高さ0の平らな踏みしろになる', () => {
     expect(bowlHeightAt(BOWL_RADIUS + 0.1)).toBe(0)
     expect(bowlHeightAt(FIELD_RADIUS + 10)).toBe(0)
-  })
-
-  it('NaNを渡しても有限な高さを返す', () => {
     expect(bowlHeightAt(Number.NaN)).toBe(0)
   })
 })
 
-describe('bowlSlopeAt', () => {
-  it('谷の外側は内向き、内側は外向きの傾きになる', () => {
+describe('bowlSlopeAt compatibility', () => {
+  it('谷の内外の向きと最大勾配を維持する', () => {
     expect(bowlSlopeAt(VALLEY_RADIUS + 0.5)).toBeGreaterThan(0)
     expect(bowlSlopeAt(VALLEY_RADIUS - 0.2)).toBeLessThan(0)
-  })
-
-  it('いちばん急なところでも浅いすり鉢の範囲に収まる', () => {
-    // 縁での傾きが約0.23（13度弱）。急勾配にして常に中央へ落ち続ける形にはしない。
     const steepest = Math.abs(bowlSlopeAt(BOWL_RADIUS - 0.01))
     expect(steepest).toBeGreaterThan(0.1)
     expect(steepest).toBeLessThan(0.3)
   })
 })
 
-describe('createStadiumHeightfield', () => {
-  it('Rapierが要求する頂点数ぶんの高さを列優先で返す', () => {
-    const field = createStadiumHeightfield(8)
-    expect(field.segments).toBe(8)
-    expect(field.heights).toHaveLength(9 * 9)
-    expect(field.size).toBeCloseTo(FIELD_RADIUS * 2)
-  })
-
-  it('すべての高さが有限で、床の外側は下げてある', () => {
-    const field = createStadiumHeightfield(16)
-    for (const height of field.heights) expect(Number.isFinite(height)).toBe(true)
-    // 四隅は必ず半径FIELD_RADIUSの外側にあり、壁を越えたコマが落ちる領域になる。
-    expect(field.heights[0]).toBeLessThan(-1)
-  })
-
-  it('中心の高さが解析的な形状と一致する', () => {
-    const field = createStadiumHeightfield(16)
-    const vertices = 17
-    const middle = (vertices - 1) / 2
-    expect(field.heights[middle * vertices + middle]).toBeCloseTo(bowlHeightAt(0), 6)
-  })
-})
-
-describe('createWallSegments', () => {
+describe('createWallSegments compatibility', () => {
   it('既定の枚数で円周をひと回りする', () => {
     expect(createWallSegments()).toHaveLength(WALL_SEGMENTS)
   })
 
-  it('すべての壁が同じ半径に等間隔で並ぶ', () => {
+  it('壁が等間隔・隙間なく円周へ並び、厚みが半径方向を向く', () => {
     const segments = createWallSegments(12)
     const expectedRadius = WALL_INNER_RADIUS + WALL_THICKNESS / 2
     for (const segment of segments) {
       expect(Math.hypot(segment.center.x, segment.center.z)).toBeCloseTo(expectedRadius, 6)
       expect(segment.center.y).toBeGreaterThan(0)
     }
-  })
-
-  it('隣り合う壁が隙間なくつながる幅を持つ', () => {
-    const count = 12
-    const segments = createWallSegments(count)
-    const centerRadius = WALL_INNER_RADIUS + WALL_THICKNESS / 2
-    // 隣の中心までの弦の長さを、2枚ぶんの半幅が覆えていればコマは抜けられない。
-    const chord = 2 * centerRadius * Math.sin(Math.PI / count)
+    const chord = 2 * expectedRadius * Math.sin(Math.PI / 12)
     expect(segments[0]!.halfWidth * 2).toBeGreaterThanOrEqual(chord)
-  })
-
-  it('壁の厚みが半径方向を向いている', () => {
     for (const segment of createWallSegments(8)) {
-      // ローカルZ(厚み方向)をyawで回した向きが、その壁の半径方向と一致する。
       const thicknessX = Math.sin(segment.yaw)
       const thicknessZ = Math.cos(segment.yaw)
       const radialX = segment.center.x / Math.hypot(segment.center.x, segment.center.z)

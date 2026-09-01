@@ -36,10 +36,17 @@ import {
   WALL_RESTITUTION,
 } from './komaPhysics'
 import {
-  bowlHeightAt,
+  BUMPER_FRICTION,
+  BUMPER_RESTITUTION,
+  BUMPER_RADIUS,
+  BUMPER_HEIGHT,
   createStadiumHeightfield,
   createWallSegments,
   HEIGHTFIELD_SEGMENTS,
+  fieldHeightAt,
+  getKomaField,
+  type KomaField,
+  type KomaFieldId,
 } from './komaStadium'
 import type { KomaSpec } from './komaSpecs'
 import {
@@ -82,11 +89,13 @@ export function startPlacement(
   angleOffset = 0,
   /** タイプごとの周回速度倍率。内向き速度は固定して外周への逃走を防ぐ。 */
   orbitSpeedScale = 1,
+  field: KomaField | KomaFieldId | string = 'basic',
 ): { position: Vector3; velocity: Vector3 } {
+  const selectedField = getKomaField(field)
   if (count <= 1) {
     // 1個モードは相手がいないので、周回させず中央付近へ置く。
     // 高速回転→失速→ぐらつき→停止までをそのまま観察できる配置。
-    const y = bowlHeightAt(0.35)
+    const y = fieldHeightAt(selectedField, 0.35)
     return {
       position: { x: 0.35, y: y + 0.02, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
@@ -99,7 +108,7 @@ export function startPlacement(
   const tangentX = -Math.sin(angle) * orbitDirection
   const tangentZ = Math.cos(angle) * orbitDirection
   return {
-    position: { x, y: bowlHeightAt(START_RADIUS) + 0.02, z },
+    position: { x, y: fieldHeightAt(selectedField, START_RADIUS) + 0.02, z },
     velocity: {
       x: tangentX * START_ORBIT_SPEED * orbitSpeedScale - Math.cos(angle) * START_INWARD_SPEED,
       y: 0,
@@ -127,25 +136,32 @@ export function createKomaBattleWorld(
     startAngleOffset?: number
     /** コマごとの初速倍率。未指定なら全て1で完全に決定的になる（テスト用）。 */
     spinScales?: readonly number[]
+    /** フィールド定義のID（未知の値はbasicへ戻る）。 */
+    fieldId?: KomaFieldId | string
+    /** 定義オブジェクトを直接渡す場合の別名。テスト・headless利用にも便利。 */
+    field?: KomaField | KomaFieldId | string
   } = {},
 ): KomaBattleWorld {
   const world = new rapier.World({ x: 0, y: GRAVITY_Y, z: 0 })
   world.timestep = PHYSICS_TIMESTEP
 
-  const field = createStadiumHeightfield(
+  const selectedField = getKomaField(options.field ?? options.fieldId)
+
+  const heightfield = createStadiumHeightfield(
     options.heightfieldSegments ?? HEIGHTFIELD_SEGMENTS,
+    selectedField,
   )
   world.createCollider(
-    rapier.ColliderDesc.heightfield(field.segments, field.segments, field.heights, {
-      x: field.size,
+    rapier.ColliderDesc.heightfield(heightfield.segments, heightfield.segments, heightfield.heights, {
+      x: heightfield.size,
       y: 1,
-      z: field.size,
+      z: heightfield.size,
     })
       .setFriction(FLOOR_FRICTION)
       .setRestitution(FLOOR_RESTITUTION),
   )
 
-  for (const segment of createWallSegments()) {
+  for (const segment of createWallSegments(undefined, selectedField.wallHeight)) {
     world.createCollider(
       rapier.ColliderDesc.cuboid(segment.halfWidth, segment.halfHeight, segment.halfDepth)
         .setTranslation(segment.center.x, segment.center.y, segment.center.z)
@@ -157,6 +173,21 @@ export function createKomaBattleWorld(
         })
         .setFriction(WALL_FRICTION)
         .setRestitution(WALL_RESTITUTION),
+    )
+  }
+
+  // バンパーは固定Colliderだけ。動的な剛体を増やさず、少数の丸い障害物で
+  // 軌道だけを変える。床に埋め込むことで隙間に永久拘束されにくくする。
+  for (const obstacle of selectedField.obstacles) {
+    if (obstacle.type !== 'bumper') continue
+    const radius = Number.isFinite(obstacle.radius) ? Math.max(0.08, obstacle.radius) : BUMPER_RADIUS
+    const height = Number.isFinite(obstacle.height) ? Math.max(0.12, obstacle.height) : BUMPER_HEIGHT
+    const floorY = fieldHeightAt(selectedField, Math.hypot(obstacle.x, obstacle.z))
+    world.createCollider(
+      rapier.ColliderDesc.cylinder(height / 2, radius)
+        .setTranslation(obstacle.x, floorY + height / 2, obstacle.z)
+        .setFriction(BUMPER_FRICTION)
+        .setRestitution(BUMPER_RESTITUTION),
     )
   }
 
@@ -183,6 +214,7 @@ export function createKomaBattleWorld(
       spec.spinDirection,
       options.startAngleOffset ?? 0,
       orbitSpeedScale,
+      selectedField,
     )
     const body = world.createRigidBody(
       rapier.RigidBodyDesc.dynamic()

@@ -162,6 +162,112 @@
   font-weight: 900;
 }
 
+.fieldChoices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+  width: min(760px, 100%);
+}
+
+.fieldButton {
+  display: flex;
+  min-width: 0;
+  min-height: 154px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 9px;
+  border: 4px solid transparent;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  color: var(--color-primary-dark);
+  cursor: pointer;
+  flex-direction: column;
+}
+
+.fieldButtonSelected {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 18%, var(--color-surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+
+.fieldName {
+  font-size: clamp(15px, 3.8vw, 20px);
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.fieldDescription {
+  color: var(--color-text-muted);
+  font-size: clamp(11px, 2.7vw, 14px);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.fieldPreview {
+  position: relative;
+  display: block;
+  width: min(116px, 24vw);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 4px solid color-mix(in srgb, var(--color-primary-dark) 28%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, #fff8e8 0 48%, #e8d4aa 50% 62%, #8aa3ca 64% 100%);
+  box-shadow: inset 0 -7px 0 rgb(0 0 0 / 10%);
+}
+
+.fieldPreviewbowl, .fieldPreviewbumper, .fieldPreviewridge { isolation: isolate; }
+
+.previewBowl {
+  position: absolute;
+  inset: 18%;
+  border: 2px solid rgb(255 255 255 / 55%);
+  border-radius: 50%;
+}
+
+.previewCenter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 17%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #e0a85c;
+  transform: translate(-50%, -50%);
+}
+
+.previewRidge {
+  position: absolute;
+  inset: 27%;
+  border: 6px solid #e7a05c;
+  border-radius: 50%;
+  opacity: 0.9;
+}
+
+.previewBumper {
+  position: absolute;
+  width: 15%;
+  aspect-ratio: 1;
+  border: 2px solid rgb(0 0 0 / 16%);
+  border-radius: 50%;
+  background: #7d9fe2;
+  box-shadow: 0 2px 0 rgb(0 0 0 / 15%);
+  transform: translate(-50%, -50%);
+}
+
+.fieldChip {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  z-index: 1;
+  padding: 4px 10px;
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-primary-dark);
+  font-size: clamp(12px, 3.1vw, 15px);
+  font-weight: 900;
+}
+
 .playerBadge {
   width: 15px;
   height: 15px;
@@ -309,6 +415,9 @@
 }
 
 @media (max-width: 520px) {
+  .fieldChoices { grid-template-columns: repeat(3, minmax(124px, 1fr)); overflow-x: auto; }
+  .fieldButton { min-height: 136px; }
+  .fieldDescription { display: none; }
   .typePickers { grid-template-columns: 1fr; }
   .typeChoices { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .typeButton {

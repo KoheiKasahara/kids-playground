@@ -45,6 +45,29 @@ beforeEach(() => {
 })
 
 describe('KomaBattlePlay', () => {
+  it('最初はbasicが選ばれ、3つのフィールドカードから選べる', () => {
+    renderGame()
+    expect(screen.getByRole('button', { name: 'ベーシック' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'バンパー' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'リングの きふく' })).toBeInTheDocument()
+  })
+
+  it('選んだフィールドをエンジンへ渡し、再戦・コマ選び直しでも保持する', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'バンパー' }))
+    expect(screen.getByRole('button', { name: 'バンパー' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+    expect(engineMock.options?.fieldId).toBe('bumper')
+
+    finishWith({ kind: 'draw', reason: 'simultaneous' })
+    await user.click(screen.getByRole('button', { name: 'もういちど' }))
+    expect(engineMock.options?.fieldId).toBe('bumper')
+    finishWith({ kind: 'draw', reason: 'simultaneous' })
+    await user.click(screen.getByRole('button', { name: 'コマを えらびなおす' }))
+    expect(screen.getByRole('button', { name: 'バンパー' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('最初にコマの数を選ぶ画面が出る', () => {
     renderGame()
     expect(screen.getByRole('heading', { name: 'コマバトル' })).toBeInTheDocument()
