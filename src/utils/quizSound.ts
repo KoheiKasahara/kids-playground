@@ -897,6 +897,8 @@ export type RailTrainSoundStatus =
 export type RailTrainSoundController = {
   /** RAFから毎フレーム呼ぶ。オーディオノードは走行開始時にだけ遅延生成する。 */
   update: (speed: number, status: RailTrainSoundStatus, inTunnel?: boolean) => void
+  /** Optional shared profile hook used by the car-road adapter. */
+  setVehicleProfile: (profile: CarRoadSoundProfile) => void
   setEnabled: (enabled: boolean) => void
   dispose: () => void
 }
@@ -907,6 +909,14 @@ export type RailTrainSoundController = {
  */
 export function createRailTrainSoundController(initialEnabled = true): RailTrainSoundController {
   let enabled = initialEnabled
+  let profile: CarRoadSoundProfile = {
+    oscillatorType: 'triangle',
+    baseFrequency: 92,
+    speedFrequency: 28,
+    gainBase: 0.008,
+    gainSpeed: 0.006,
+    maxGain: 0.04,
+  }
   let oscillator: OscillatorNode | undefined
   let gain: GainNode | undefined
   let disposed = false
@@ -939,7 +949,7 @@ export function createRailTrainSoundController(initialEnabled = true): RailTrain
     if (oscillator === undefined || gain === undefined) {
       oscillator = ctx.createOscillator()
       gain = ctx.createGain()
-      oscillator.type = 'triangle'
+      oscillator.type = profile.oscillatorType
       oscillator.connect(gain)
       gain.connect(ctx.destination)
       gain.gain.setValueAtTime(0, ctx.currentTime)
@@ -969,7 +979,7 @@ export function createRailTrainSoundController(initialEnabled = true): RailTrain
       }
       const now = ctx.currentTime
       const tunnelFactor = inTunnel ? 0.86 : 1
-      const frequency = (92 + Math.min(220, safeSpeed * 28)) * (inTunnel ? 0.9 : 1)
+      const frequency = (profile.baseFrequency + Math.min(220, safeSpeed * profile.speedFrequency)) * (inTunnel ? 0.9 : 1)
       const frequencyParameter = oscillator.frequency as AudioParam & {
         setTargetAtTime?: (nextValue: number, startTime: number, timeConstant: number) => void
       }
@@ -978,7 +988,11 @@ export function createRailTrainSoundController(initialEnabled = true): RailTrain
       } else {
         frequencyParameter.value = frequency
       }
-      setGain(Math.min(0.04, (0.008 + safeSpeed * 0.006) * tunnelFactor), now)
+      setGain(Math.min(profile.maxGain, (profile.gainBase + safeSpeed * profile.gainSpeed) * tunnelFactor), now)
+    },
+    setVehicleProfile(nextProfile) {
+      profile = nextProfile
+      if (oscillator !== undefined) oscillator.type = profile.oscillatorType
     },
     setEnabled(nextEnabled) {
       if (enabled === nextEnabled) return
@@ -1008,7 +1022,31 @@ export const createRailSoundController = createRailTrainSoundController
 export type CarRoadSoundController = {
   /** 走行中だけ音を有効にする。AudioNodeはcontroller内で1組だけ再利用する。 */
   setRunning: (running: boolean) => void
+  /** 停止中に次回走行で使う車種の走行音プロファイルを選ぶ。 */
+  setVehicle: (vehicleId: CarRoadSoundVehicleId) => void
   dispose: () => void
+}
+
+export type CarRoadSoundVehicleId = 'car' | 'police-car' | 'bus' | 'bulldozer'
+
+type CarRoadSoundProfile = Readonly<{
+  oscillatorType: OscillatorType
+  baseFrequency: number
+  speedFrequency: number
+  gainBase: number
+  gainSpeed: number
+  maxGain: number
+}>
+
+/**
+ * 幼児向けに違いが聞き取りやすい、控えめな合成走行音の設定。
+ * 外部音源を使わず、既存の1つのオシレーターを車種ごとに調整する。
+ */
+const CAR_ROAD_SOUND_PROFILES: Record<CarRoadSoundVehicleId, CarRoadSoundProfile> = {
+  car: { oscillatorType: 'triangle', baseFrequency: 118, speedFrequency: 26, gainBase: 0.004, gainSpeed: 0.004, maxGain: 0.018 },
+  'police-car': { oscillatorType: 'sawtooth', baseFrequency: 145, speedFrequency: 30, gainBase: 0.004, gainSpeed: 0.0045, maxGain: 0.022 },
+  bus: { oscillatorType: 'triangle', baseFrequency: 82, speedFrequency: 20, gainBase: 0.004, gainSpeed: 0.004, maxGain: 0.021 },
+  bulldozer: { oscillatorType: 'square', baseFrequency: 62, speedFrequency: 15, gainBase: 0.0045, gainSpeed: 0.0045, maxGain: 0.024 },
 }
 
 /**
@@ -1017,13 +1055,20 @@ export type CarRoadSoundController = {
  */
 export function createCarRoadSoundController(initialEnabled = true): CarRoadSoundController {
   const controller = createRailTrainSoundController(initialEnabled)
+  let vehicleId: CarRoadSoundVehicleId = 'car'
   return {
     setRunning(running) {
       try {
+        const profile = CAR_ROAD_SOUND_PROFILES[vehicleId]
+        controller.setVehicleProfile(profile)
         controller.update(running ? 1 : 0, running ? 'running' : 'ready')
       } catch {
         // Web Audio実装が壊れていても、走行状態や画面操作を止めない。
       }
+    },
+    setVehicle(nextVehicleId) {
+      vehicleId = nextVehicleId
+      controller.setVehicleProfile(CAR_ROAD_SOUND_PROFILES[nextVehicleId])
     },
     dispose() {
       try {

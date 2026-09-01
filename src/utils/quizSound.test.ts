@@ -497,6 +497,29 @@ describe('quizSound', () => {
     expect((instances[0].createOscillator.mock.results[2].value as MockOscillatorNode).stop).toHaveBeenCalledTimes(1)
   })
 
+  test.each([
+    ['car', 'triangle', 144],
+    ['police-car', 'sawtooth', 175],
+    ['bus', 'triangle', 102],
+    ['bulldozer', 'square', 77],
+  ] as const)('車種 %s は専用の走行音プロファイルを使う', async (vehicleId, oscillatorType, expectedFrequency) => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { createCarRoadSoundController } = await import('./quizSound')
+    const controller = createCarRoadSoundController()
+
+    controller.setVehicle(vehicleId)
+    controller.setRunning(true)
+
+    expect(instances).toHaveLength(1)
+    const oscillator = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    expect(oscillator.type).toBe(oscillatorType)
+    expect(oscillator.frequency.value).toBe(expectedFrequency)
+
+    controller.setRunning(false)
+    controller.dispose()
+  })
+
   test('くるまのゴール音は短い3音で、短時間の重複再生を抑える', async () => {
     ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
     vi.resetModules()
