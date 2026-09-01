@@ -63,7 +63,7 @@ export const CAR_BODY_SPECS: Record<BodyType, CarBodySpec> = {
     length: 4.35,
     width: 2.02,
     hullHeight: 0.48,
-    cabinHeight: 0.28,
+    cabinHeight: 0.32,
     cabinLengthRatio: 0.44,
     cabinCenterRatio: -0.1,
     cabinWidthRatio: 0.82,
