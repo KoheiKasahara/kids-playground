@@ -225,6 +225,11 @@
   overscroll-behavior: contain;
 }
 
+/* ボディは5種類をスマホ縦画面でも1列に見せ、形の違いを比較しやすくする。 */
+.optionList[data-category='body'] {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .optionButton {
   display: flex;
   flex-direction: column;
@@ -264,9 +269,12 @@
 }
 
 .optionLabel {
+  max-width: 100%;
   font-size: 15px;
   font-weight: 700;
-  white-space: nowrap;
+  line-height: 1.1;
+  text-align: center;
+  white-space: normal;
 }
 
 @media (min-width: 760px) {

@@ -63,7 +63,7 @@ describe('初期表示', () => {
 
   test('初期CarConfigが3Dシーンへ渡される', () => {
     renderPlay()
-    expect(latestConfig()).toMatchObject({ body: 'normal', wheel: 'normal', color: 'red', rideHeight: 'normal' })
+    expect(latestConfig()).toMatchObject({ body: 'sports', wheel: 'normal', color: 'red', rideHeight: 'normal' })
   })
 })
 
@@ -77,9 +77,7 @@ describe('カテゴリ一覧と詳細選択の切り替え', () => {
     expect(screen.getByRole('heading', { name: 'カラー' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'あか' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'あお' })).toBeInTheDocument()
-    // 3D表示は出たまま。
     expect(screen.getByRole('application', { name: '3Dの くるま。ゆびで まわせるよ' })).toBeInTheDocument()
-    // カテゴリ一覧は隠れている。
     expect(screen.queryByRole('button', { name: 'タイヤを えらぶ' })).not.toBeInTheDocument()
   })
 
@@ -101,6 +99,47 @@ describe('カテゴリ一覧と詳細選択の切り替え', () => {
     await user.click(screen.getByRole('button', { name: 'ボディを えらぶ' }))
     expect(screen.getByRole('button', { name: 'ホームへ もどる' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' })).toBeInTheDocument()
+  })
+})
+
+describe('ボディ5種類の選択', () => {
+  test('5種類が視覚的なプレビュー付きで並び、選択直後にCarConfigへ反映される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'ボディを えらぶ' }))
+
+    for (const label of ['スポーツカー', 'SUV', 'バス', 'トラック', 'パトカー風']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    }
+
+    for (const [label, body] of [
+      ['スポーツカー', 'sports'],
+      ['SUV', 'suv'],
+      ['バス', 'bus'],
+      ['トラック', 'truck'],
+      ['パトカー風', 'police'],
+    ] as const) {
+      await user.click(screen.getByRole('button', { name: label }))
+      expect(latestConfig().body, label).toBe(body)
+    }
+  })
+
+  test('ボディを切り替えても他カテゴリの選択状態は維持される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'カラーを えらぶ' }))
+    await user.click(screen.getByRole('button', { name: 'きいろ' }))
+    await user.click(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' }))
+    await user.click(screen.getByRole('button', { name: 'タイヤを えらぶ' }))
+    await user.click(screen.getByRole('button', { name: 'おおきい' }))
+    await user.click(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' }))
+    await user.click(screen.getByRole('button', { name: 'ボディを えらぶ' }))
+    await user.click(screen.getByRole('button', { name: 'バス' }))
+
+    expect(latestConfig()).toMatchObject({ body: 'bus', wheel: 'big', color: 'yellow' })
+    expect(screen.getByRole('button', { name: 'バス' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -148,8 +187,6 @@ describe('カテゴリを移動しても選択状態が残る', () => {
 
     await user.click(screen.getByRole('button', { name: 'カラーを えらぶ' }))
     expect(screen.getByRole('button', { name: 'きいろ' })).toHaveAttribute('aria-pressed', 'true')
-
-    // 3D側にも、両方の選択を含むCarConfig全体が渡っている。
     expect(latestConfig()).toMatchObject({ color: 'yellow', wheel: 'big' })
   })
 
@@ -170,9 +207,10 @@ describe('カテゴリを移動しても選択状態が残る', () => {
 const CSS_SOURCE = readFileSync(path.join(__dirname, 'CarBuilderPlay.module.css'), 'utf-8')
 
 function ruleOf(source: string, selector: string): string {
-  const pattern = new RegExp(`\\${selector}\\s*\\{[^}]*\\}`)
+  const escapedSelector = selector.replace('.', '\\.')
+  const pattern = new RegExp(escapedSelector + '\\s*\\{[^}]*\\}')
   const match = source.match(pattern)
-  if (match === null) throw new Error(`ルールが見つかりません: ${selector}`)
+  if (match === null) throw new Error('ルールが見つかりません: ' + selector)
   return match[0]
 }
 
@@ -197,8 +235,13 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
   test('下部エリアの高さは一覧・詳細で共通の固定値（詳細へ入ってもレイアウトが跳ねない）', () => {
     expect(ruleOf(CSS_SOURCE, '.page')).toMatch(/--cb-panel-height:/)
     expect(ruleOf(CSS_SOURCE, '.panel')).toMatch(/height:\s*var\(--cb-panel-height\)/)
-    // 詳細側は下部エリアの中でスクロールし、外側の高さを変えない。
     expect(ruleOf(CSS_SOURCE, '.optionList')).toMatch(/overflow-y:\s*auto/)
+  })
+
+  test('ボディ5選択肢はスマホ幅でも横スクロールせず1行で比較できる', () => {
+    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='body'\]\s*\{[^}]*grid-template-columns:\s*repeat\(5,/)
+    expect(ruleOf(CSS_SOURCE, '.optionButton')).toMatch(/min-height:\s*64px/)
+    expect(ruleOf(CSS_SOURCE, '.optionLabel')).toMatch(/white-space:\s*normal/)
   })
 
   test('主要なタップ領域が小さすぎない（幼児向けに44px以上・カテゴリと選択肢は64px以上）', () => {
@@ -214,7 +257,6 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
     const marker = '@media (orientation: landscape) and (max-height: 560px)'
     const start = CSS_SOURCE.indexOf(marker)
     expect(start).toBeGreaterThan(-1)
-    // 幅広スマホ横画面は min-width: 760px にも当たるため、後勝ちになるよう後ろへ置く。
     expect(start).toBeGreaterThan(CSS_SOURCE.indexOf('@media (min-width: 760px)'))
     const block = CSS_SOURCE.slice(start)
     for (const height of block.matchAll(/min-height:\s*(\d+)px/g)) {

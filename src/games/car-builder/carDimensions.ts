@@ -14,15 +14,17 @@
 import type { BodyType, CarConfig, RideHeight, WheelType } from './carConfig'
 
 export type CarVec3 = { x: number; y: number; z: number }
+export type CarBodyStyle = 'sports' | 'suv' | 'bus' | 'truck' | 'police'
 
-/** ボディ種別ごとの素の寸法。ボディを増やすときはこの表に1行足すだけでよい。 */
+/** ボディ種別ごとの素の寸法と、ボディ形状を組み立てるための少量の基準値。 */
 export type CarBodySpec = {
   id: BodyType
+  style: CarBodyStyle
   /** 車体全長（Z方向）。 */
   length: number
   /** 車幅（X方向、タイヤを含まないボディ本体の幅）。 */
   width: number
-  /** 下段（ボンネット〜トランク）の高さ。 */
+  /** 下段（ボンネット〜荷台）の高さ。 */
   hullHeight: number
   /** 上段（キャビン）の高さ。 */
   cabinHeight: number
@@ -30,6 +32,10 @@ export type CarBodySpec = {
   cabinLengthRatio: number
   /** キャビン中心のZ位置 ÷ 全長（+で前寄り）。 */
   cabinCenterRatio: number
+  /** キャビン幅 ÷ 車幅。 */
+  cabinWidthRatio: number
+  /** 前端からボンネットとして見せる長さ ÷ 全長。 */
+  hoodLengthRatio: number
   /** ホイールベース ÷ 全長。 */
   wheelbaseRatio: number
   /** 素の最低地上高。実際の値はタイヤ半径と車高でクランプされる。 */
@@ -51,27 +57,75 @@ export type CarRideHeightSpec = {
 }
 
 export const CAR_BODY_SPECS: Record<BodyType, CarBodySpec> = {
-  normal: {
-    id: 'normal',
-    length: 3.6,
-    width: 1.7,
-    hullHeight: 0.62,
-    cabinHeight: 0.5,
-    cabinLengthRatio: 0.5,
-    cabinCenterRatio: -0.03,
-    wheelbaseRatio: 0.58,
-    baseGroundClearance: 0.18,
-  },
-  long: {
-    id: 'long',
-    length: 4.4,
-    width: 1.8,
-    hullHeight: 0.66,
-    cabinHeight: 0.72,
-    cabinLengthRatio: 0.6,
-    cabinCenterRatio: -0.08,
+  sports: {
+    id: 'sports',
+    style: 'sports',
+    length: 4.0,
+    width: 1.78,
+    hullHeight: 0.54,
+    cabinHeight: 0.42,
+    cabinLengthRatio: 0.46,
+    cabinCenterRatio: -0.12,
+    cabinWidthRatio: 0.84,
+    hoodLengthRatio: 0.27,
     wheelbaseRatio: 0.62,
+    baseGroundClearance: 0.16,
+  },
+  suv: {
+    id: 'suv',
+    style: 'suv',
+    length: 4.35,
+    width: 1.92,
+    hullHeight: 0.72,
+    cabinHeight: 0.6,
+    cabinLengthRatio: 0.56,
+    cabinCenterRatio: -0.04,
+    cabinWidthRatio: 0.9,
+    hoodLengthRatio: 0.3,
+    wheelbaseRatio: 0.61,
     baseGroundClearance: 0.2,
+  },
+  bus: {
+    id: 'bus',
+    style: 'bus',
+    length: 6.4,
+    width: 2.05,
+    hullHeight: 0.8,
+    cabinHeight: 0.88,
+    cabinLengthRatio: 0.8,
+    cabinCenterRatio: -0.02,
+    cabinWidthRatio: 0.92,
+    hoodLengthRatio: 0.02,
+    wheelbaseRatio: 0.78,
+    baseGroundClearance: 0.24,
+  },
+  truck: {
+    id: 'truck',
+    style: 'truck',
+    length: 5.35,
+    width: 2.0,
+    hullHeight: 0.76,
+    cabinHeight: 0.66,
+    cabinLengthRatio: 0.34,
+    cabinCenterRatio: 0.25,
+    cabinWidthRatio: 0.92,
+    hoodLengthRatio: 0.22,
+    wheelbaseRatio: 0.72,
+    baseGroundClearance: 0.22,
+  },
+  police: {
+    id: 'police',
+    style: 'police',
+    length: 4.4,
+    width: 1.84,
+    hullHeight: 0.62,
+    cabinHeight: 0.54,
+    cabinLengthRatio: 0.52,
+    cabinCenterRatio: -0.04,
+    cabinWidthRatio: 0.84,
+    hoodLengthRatio: 0.28,
+    wheelbaseRatio: 0.62,
+    baseGroundClearance: 0.18,
   },
 }
 
@@ -112,12 +166,6 @@ export type CarWheelAttachment = {
   end: 1 | -1
 }
 
-/**
- * パーツの取り付け基準面。
- * `size` はその面の大きさで、`width` が面の横方向、`extent` が面の縦方向を表す
- * （前後面: 横=車幅 / 縦=ボディ高さ、ルーフ: 横=車幅 / 縦=前後の奥行き、
- *   側面: 横=全長 / 縦=ボディ高さ）。パーツはこの2値に対する比率で自分の大きさを決める。
- */
 export type CarAttachment = {
   position: CarVec3
   /** 面の外向き法線。パーツはこの向きに合わせて置く。 */
@@ -142,7 +190,8 @@ export type CarAttachments = {
 
 export type CarDimensions = {
   bodyType: BodyType
-  /** 車体全長。 */
+  bodyStyle: CarBodyStyle
+  /** 車両全長。 */
   length: number
   /** 車幅（ボディ本体）。 */
   width: number
@@ -174,6 +223,13 @@ export type CarDimensions = {
   cabinLength: number
   /** キャビン中心のZ。 */
   cabinCenterZ: number
+  /** キャビンの幅。 */
+  cabinWidth: number
+  /** ボンネットとして見せる前方部分の長さ。 */
+  hoodLength: number
+  /** 前後のオーバーハング。 */
+  frontOverhang: number
+  rearOverhang: number
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -208,6 +264,7 @@ export function computeCarDimensions(config: CarConfig): CarDimensions {
 
   return {
     bodyType: body.id,
+    bodyStyle: body.style,
     length: body.length,
     width: body.width,
     height: roofTopY,
@@ -224,6 +281,10 @@ export function computeCarDimensions(config: CarConfig): CarDimensions {
     cabinHeight: body.cabinHeight,
     cabinLength: body.length * body.cabinLengthRatio,
     cabinCenterZ: body.length * body.cabinCenterRatio,
+    cabinWidth: body.width * body.cabinWidthRatio,
+    hoodLength: body.length * body.hoodLengthRatio,
+    frontOverhang: (body.length - body.length * body.wheelbaseRatio) / 2,
+    rearOverhang: (body.length - body.length * body.wheelbaseRatio) / 2,
   }
 }
 
@@ -268,7 +329,7 @@ export function computeCarAttachments(dimensions: CarDimensions): CarAttachments
     roof: {
       position: { x: 0, y: dimensions.roofTopY, z: dimensions.cabinCenterZ },
       normal: { x: 0, y: 1, z: 0 },
-      size: { width: dimensions.width * 0.86, extent: dimensions.cabinLength },
+      size: { width: dimensions.cabinWidth, extent: dimensions.cabinLength },
     },
     sideLeft: {
       position: { x: halfWidth, y: faceCenterY, z: 0 },

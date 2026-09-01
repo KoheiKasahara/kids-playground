@@ -12,8 +12,8 @@ import { CAR_DERIVED_CATEGORY_IDS, CAR_PART_BUILDERS, CAR_PART_CATEGORY_IDS } fr
 import { createCarModel } from './carModel'
 
 function layerOf(root: THREE.Object3D, category: string): THREE.Object3D {
-  const layer = root.children.find((child) => child.name === `car-layer-${category}`)
-  if (layer === undefined) throw new Error(`レイヤーが見つかりません: ${category}`)
+  const layer = root.children.find((child) => child.name === 'car-layer-' + category)
+  if (layer === undefined) throw new Error('レイヤーが見つかりません: ' + category)
   return layer
 }
 
@@ -32,7 +32,7 @@ describe('カテゴリと3D生成の対応（後続カテゴリ追加時の落�
     for (const category of CAR_PART_CATEGORY_IDS) {
       const builders = CAR_PART_BUILDERS[category] as Record<string, unknown>
       for (const option of CAR_CATEGORIES[category].options) {
-        expect(typeof builders[option.id], `${category}/${option.id}`).toBe('function')
+        expect(typeof builders[option.id], category + '/' + option.id).toBe('function')
       }
     }
   })
@@ -43,7 +43,7 @@ describe('createCarModel（3Dモデル生成）', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const names = model.root.children.map((child) => child.name)
     for (const category of CAR_PART_CATEGORY_IDS) {
-      expect(names).toContain(`car-layer-${category}`)
+      expect(names).toContain('car-layer-' + category)
     }
     model.dispose()
   })
@@ -56,6 +56,23 @@ describe('createCarModel（3Dモデル生成）', () => {
     expect(layerOf(model.root, 'decoration').children).toHaveLength(0)
     expect(layerOf(model.root, 'mark').children).toHaveLength(0)
     model.dispose()
+  })
+
+  test('ボディ5種類はそれぞれ複数の造形パーツを持ち、有限の範囲に収まる', () => {
+    for (const option of CAR_CATEGORIES.body.options) {
+      const config = selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id)
+      const model = createCarModel(config)
+      const body = layerOf(model.root, 'body').children[0]
+      if (body === undefined) throw new Error('ボディが生成されていません: ' + option.id)
+      const bounds = boundsOf(body)
+      expect(body.children.length, option.id).toBeGreaterThanOrEqual(3)
+      expect(bounds.min.y, option.id).toBeGreaterThanOrEqual(-0.01)
+      expect(
+        [bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z].every(Number.isFinite),
+        option.id,
+      ).toBe(true)
+      model.dispose()
+    }
   })
 
   test('タイヤは4輪が寸法どおりの位置に生成される', () => {
@@ -72,26 +89,28 @@ describe('createCarModel（3Dモデル生成）', () => {
     model.dispose()
   })
 
-  test('車全体が地面より上にあり、地面へ潜っていない', () => {
-    const model = createCarModel(DEFAULT_CAR_CONFIG)
-    const bounds = boundsOf(model.root)
-    expect(bounds.min.y).toBeGreaterThanOrEqual(-0.01)
-    model.dispose()
+  test('5種類すべてで車全体が地面より上にあり、地面へ潜っていない', () => {
+    for (const option of CAR_CATEGORIES.body.options) {
+      const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id))
+      const bounds = boundsOf(model.root)
+      expect(bounds.min.y, option.id).toBeGreaterThanOrEqual(-0.01)
+      model.dispose()
+    }
   })
 })
 
 describe('CarConfigの反映', () => {
-  test('屋根パーツはルーフ天面に乗り、宙に浮かない（ボディを変えても同じ）', () => {
-    for (const bodyType of ['normal', 'long'] as const) {
+  test('屋根パーツはルーフ天面に乗り、宙に浮かない（5ボディすべてで同じ）', () => {
+    for (const option of CAR_CATEGORIES.body.options) {
       const config = selectCarOption(
-        selectCarOption(DEFAULT_CAR_CONFIG, 'body', bodyType),
+        selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id),
         'roof',
         'carrier',
       )
       const model = createCarModel(config)
       const dimensions = computeCarDimensions(config)
       const bounds = boundsOf(layerOf(model.root, 'roof'))
-      expect(bounds.min.y, bodyType).toBeCloseTo(dimensions.roofTopY, 2)
+      expect(bounds.min.y, option.id).toBeCloseTo(dimensions.roofTopY, 2)
       model.dispose()
     }
   })
