@@ -179,18 +179,20 @@ function sportsWindshieldMesh(
   material: THREE.Material,
   name: string,
 ): THREE.Mesh {
-  const bottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.12
-  const topY = dimensions.roofTopY - 0.04
-  const bottomZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 - 0.02
-  const topZ = bottomZ - dimensions.cabinLength * 0.14
+  // ボンネットからルーフへ寝かせた一枚面。車体外殻の上にわずかに浮かせ、
+  // 赤いキャビンの塊を別パーツとして見せない。
+  const bottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.37
+  const topY = dimensions.roofTopY - 0.018
+  const bottomZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 - 0.08
+  const topZ = bottomZ - dimensions.cabinLength * 0.28
   const bottomHalfWidth = dimensions.cabinWidth * 0.43
   const topHalfWidth = dimensions.cabinWidth * 0.31
   const positions = [
     -bottomHalfWidth, bottomY, bottomZ,
-    0, bottomY + 0.015, bottomZ + 0.012,
+    0, bottomY + 0.022, bottomZ + 0.014,
     bottomHalfWidth, bottomY, bottomZ,
     -topHalfWidth, topY, topZ,
-    0, topY + 0.012, topZ + 0.012,
+    0, topY + 0.014, topZ + 0.012,
     topHalfWidth, topY, topZ,
   ]
   const geometry = new THREE.BufferGeometry()
@@ -331,45 +333,36 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
   const cabinHalf = dimensions.cabinLength / 2
   const cabinRear = dimensions.cabinCenterZ - cabinHalf
   const cabinFront = dimensions.cabinCenterZ + cabinHalf
-  const roofRear = cabinRear + 0.18
-  const roofFront = cabinFront - 0.22
+  const roofRear = cabinRear + dimensions.cabinLength * 0.2
+  const roofFront = cabinFront - dimensions.cabinLength * 0.28
   const hoodStart = half - dimensions.hoodLength
+  const hullTop = dimensions.hullTopY
+  const roofTop = dimensions.roofTopY
 
-  // 前後で幅と高さが連続的に変わる断面列。タイヤ付近だけ肩を張らせ、
-  // ボンネットとリアデッキへ向かって絞ることで一体成形の印象を作る。
+  // 下段とキャビンを別々に積まず、リアデッキからノーズまでの高さを一つの
+  // 連続した側面シルエットとして定義する。これが「上に載ったキャビン」を
+  // 消し、ボンネット→フロントガラス→ルーフ→リアを一体に見せる中心部分。
   group.add(
     loftMesh(
       [
         { z: -half, width: dimensions.width * 0.72, topWidth: dimensions.width * 0.58, bottomY: floor, topY: floor + dimensions.hullHeight * 0.36 },
-        { z: -half + 0.18, width: dimensions.width * 0.9, topWidth: dimensions.width * 0.76, bottomY: floor, topY: floor + dimensions.hullHeight * 0.6 },
-        { z: -dimensions.wheelbase / 2 - 0.22, width: dimensions.width * 1.01, topWidth: dimensions.width * 0.84, bottomY: floor, topY: floor + dimensions.hullHeight * 0.87 },
-        { z: -dimensions.wheelbase / 2 + 0.24, width: dimensions.width * 1.04, topWidth: dimensions.width * 0.9, bottomY: floor, topY: floor + dimensions.hullHeight * 0.98 },
-        { z: cabinRear + dimensions.cabinLength * 0.55, width: dimensions.width, topWidth: dimensions.width * 0.9, bottomY: floor, topY: dimensions.hullTopY },
-        { z: cabinFront, width: dimensions.width, topWidth: dimensions.width * 0.9, bottomY: floor, topY: dimensions.hullTopY },
-        { z: hoodStart, width: dimensions.width * 0.98, topWidth: dimensions.width * 0.88, bottomY: floor, topY: floor + dimensions.hullHeight * 0.96 },
-        { z: dimensions.wheelbase / 2 - 0.22, width: dimensions.width * 1.04, topWidth: dimensions.width * 0.86, bottomY: floor, topY: floor + dimensions.hullHeight * 0.87 },
-        { z: dimensions.wheelbase / 2 + 0.2, width: dimensions.width * 1.01, topWidth: dimensions.width * 0.8, bottomY: floor, topY: floor + dimensions.hullHeight * 0.62 },
-        { z: half - 0.18, width: dimensions.width * 0.84, topWidth: dimensions.width * 0.68, bottomY: floor, topY: floor + dimensions.hullHeight * 0.38 },
-        { z: half, width: dimensions.width * 0.66, topWidth: dimensions.width * 0.52, bottomY: floor, topY: floor + dimensions.hullHeight * 0.22 },
+        { z: -half + 0.18, width: dimensions.width * 0.9, topWidth: dimensions.width * 0.73, bottomY: floor, topY: floor + dimensions.hullHeight * 0.54 },
+        { z: -half + 0.42, width: dimensions.width * 0.99, topWidth: dimensions.width * 0.8, bottomY: floor, topY: floor + dimensions.hullHeight * 0.7 },
+        { z: cabinRear - 0.04, width: dimensions.width * 1.02, topWidth: dimensions.width * 0.84, bottomY: floor, topY: floor + dimensions.hullHeight * 0.83 },
+        { z: roofRear - 0.2, width: dimensions.width * 0.99, topWidth: dimensions.cabinWidth * 0.88, bottomY: floor, topY: hullTop + dimensions.cabinHeight * 0.72 },
+        { z: roofRear, width: dimensions.width * 0.97, topWidth: dimensions.cabinWidth * 0.82, bottomY: floor, topY: roofTop - dimensions.cabinHeight * 0.16 },
+        { z: dimensions.cabinCenterZ - dimensions.cabinLength * 0.22, width: dimensions.width * 0.96, topWidth: dimensions.cabinWidth * 0.78, bottomY: floor, topY: roofTop - 0.012 },
+        { z: dimensions.cabinCenterZ + dimensions.cabinLength * 0.08, width: dimensions.width * 0.95, topWidth: dimensions.cabinWidth * 0.76, bottomY: floor, topY: roofTop },
+        { z: roofFront, width: dimensions.width * 0.96, topWidth: dimensions.cabinWidth * 0.72, bottomY: floor, topY: roofTop - dimensions.cabinHeight * 0.08 },
+        { z: cabinFront + 0.14, width: dimensions.width * 0.98, topWidth: dimensions.width * 0.82, bottomY: floor, topY: hullTop + dimensions.cabinHeight * 0.58 },
+        { z: hoodStart, width: dimensions.width * 0.99, topWidth: dimensions.width * 0.86, bottomY: floor, topY: hullTop - 0.02 },
+        { z: dimensions.wheelbase / 2 + 0.18, width: dimensions.width * 1.03, topWidth: dimensions.width * 0.84, bottomY: floor, topY: floor + dimensions.hullHeight * 0.82 },
+        { z: half - 0.3, width: dimensions.width * 0.91, topWidth: dimensions.width * 0.72, bottomY: floor, topY: floor + dimensions.hullHeight * 0.52 },
+        { z: half - 0.1, width: dimensions.width * 0.78, topWidth: dimensions.width * 0.62, bottomY: floor, topY: floor + dimensions.hullHeight * 0.32 },
+        { z: half, width: dimensions.width * 0.62, topWidth: dimensions.width * 0.48, bottomY: floor, topY: floor + dimensions.hullHeight * 0.18 },
       ],
       bodyMaterial,
       'car-body-hull',
-    ),
-  )
-
-  // ルーフの前後端を断面ごとにずらし、寝たフロントガラスからリアデッキまでを
-  // なだらかなファストバック風のシルエットとしてつなぐ。
-  group.add(
-    loftMesh(
-      [
-        { z: cabinRear, width: dimensions.cabinWidth * 0.9, topWidth: dimensions.cabinWidth * 0.62, bottomY: dimensions.hullTopY - 0.018, topY: dimensions.roofTopY - 0.06, topZOffset: 0.18 },
-        { z: cabinRear + 0.2, width: dimensions.cabinWidth * 0.98, topWidth: dimensions.cabinWidth * 0.76, bottomY: dimensions.hullTopY - 0.018, topY: dimensions.roofTopY, topZOffset: 0.12 },
-        { z: dimensions.cabinCenterZ - 0.25, width: dimensions.cabinWidth, topWidth: dimensions.cabinWidth * 0.78, bottomY: dimensions.hullTopY - 0.018, topY: dimensions.roofTopY, topZOffset: 0.04 },
-        { z: dimensions.cabinCenterZ + 0.35, width: dimensions.cabinWidth * 0.98, topWidth: dimensions.cabinWidth * 0.74, bottomY: dimensions.hullTopY - 0.018, topY: dimensions.roofTopY, topZOffset: -0.05 },
-        { z: cabinFront, width: dimensions.cabinWidth * 0.88, topWidth: dimensions.cabinWidth * 0.58, bottomY: dimensions.hullTopY - 0.018, topY: dimensions.roofTopY - 0.08, topZOffset: -0.22 },
-      ],
-      bodyMaterial,
-      'car-body-cabin-shell',
     ),
   )
 
@@ -428,7 +421,7 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
     group.add(arch)
   }
 
-  const grilleY = floor + dimensions.hullHeight * 0.42
+  const grilleY = floor + dimensions.hullHeight * 0.33
   const grille = box(
     { x: dimensions.width * 0.52, y: dimensions.hullHeight * 0.16, z: 0.07 },
     { x: 0, y: grilleY, z: half + 0.045 },
@@ -441,17 +434,17 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
   for (const offset of [-1, 0, 1]) {
     group.add(
       box(
-        { x: dimensions.width * 0.44, y: 0.018, z: 0.082 },
+        { x: dimensions.width * 0.36, y: 0.014, z: 0.074 },
         { x: 0, y: grilleY + offset * grilleSlatY, z: half + 0.085 },
-        trimMaterial,
+        grilleMaterial,
       ),
     )
   }
 
   const splitter = box(
-    { x: dimensions.width * 0.84, y: 0.06, z: 0.1 },
-    { x: 0, y: floor + dimensions.hullHeight * 0.12, z: half + 0.07 },
-    trimMaterial,
+    { x: dimensions.width * 0.68, y: 0.035, z: 0.07 },
+    { x: 0, y: floor + dimensions.hullHeight * 0.1, z: half + 0.055 },
+    bodyMaterial,
   )
   splitter.name = 'car-sports-front-splitter'
   group.add(splitter)
@@ -738,20 +731,23 @@ function buildWheels(hubColor: string, hubRadiusRatio: number) {
 type FrontLightShape = 'box' | 'round'
 
 function buildFront(shape: FrontLightShape) {
-  return ({ attachments }: CarPartContext): THREE.Object3D => {
+  return ({ attachments, config }: CarPartContext): THREE.Object3D => {
     const front = attachments.front
     const group = new THREE.Group()
     group.name = 'car-front'
     const lightMaterial = standard('#fff3c4', 0.2, 0.1)
-    const bumperMaterial = standard(CHROME_COLOR, 0.35, 0.35)
+    const sports = config.body === 'sports'
+    const bumperMaterial = sports
+      ? standard('#1d2730', 0.3, 0.12)
+      : standard(CHROME_COLOR, 0.35, 0.35)
 
-    const lightSize = front.size.extent * 0.34
-    const lightDepth = 0.1
+    const lightSize = front.size.extent * (sports ? 0.27 : 0.34)
+    const lightDepth = sports ? 0.065 : 0.1
     for (const side of [1, -1]) {
       const center = offsetFrom(front, lightDepth / 2)
       const position = {
-        x: center.x + side * front.size.width * 0.32,
-        y: center.y + front.size.extent * 0.16,
+        x: center.x + side * front.size.width * (sports ? 0.35 : 0.32),
+        y: center.y + front.size.extent * (sports ? 0.12 : 0.16),
         z: center.z,
       }
       if (shape === 'round') {
@@ -760,15 +756,15 @@ function buildFront(shape: FrontLightShape) {
         light.castShadow = true
         group.add(light)
       } else {
-        group.add(box({ x: lightSize * 1.3, y: lightSize * 0.7, z: lightDepth }, position, lightMaterial))
+        group.add(box({ x: lightSize * (sports ? 1.7 : 1.3), y: lightSize * (sports ? 0.46 : 0.7), z: lightDepth }, position, lightMaterial))
       }
     }
 
-    const bumperCenter = offsetFrom(front, 0.05)
+    const bumperCenter = offsetFrom(front, sports ? 0.025 : 0.05)
     group.add(
       box(
-        { x: front.size.width * 0.92, y: front.size.extent * 0.18, z: 0.12 },
-        { x: bumperCenter.x, y: bumperCenter.y - front.size.extent * 0.34, z: bumperCenter.z },
+        { x: front.size.width * (sports ? 0.62 : 0.92), y: front.size.extent * (sports ? 0.12 : 0.18), z: sports ? 0.07 : 0.12 },
+        { x: bumperCenter.x, y: bumperCenter.y - front.size.extent * (sports ? 0.38 : 0.34), z: bumperCenter.z },
         bumperMaterial,
       ),
     )
