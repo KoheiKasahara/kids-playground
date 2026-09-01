@@ -1,4 +1,4 @@
-import { resolveTrainSpec, type TrainCarVisualProfile } from './railTrainVisuals'
+import { resolveTrainSpec, type TrainCarVisualProfile, type TrainShellSection } from './railTrainVisuals'
 import type { TrainType } from './railFleetModel'
 import styles from './TrainTypePicker.module.css'
 
@@ -40,85 +40,97 @@ function getCoordinateMapper(profile: TrainCarVisualProfile): CoordinateMapper {
   return { mapX, mapY }
 }
 
-function createBodyPath(profile: TrainCarVisualProfile, mapX: (value: number) => number, mapY: (value: number) => number): string {
+function getBasicShellSections(profile: TrainCarVisualProfile): readonly TrainShellSection[] {
   const bodyLeft = profile.bodyCenterX - profile.bodyLength / 2
   const bodyRight = profile.bodyCenterX + profile.bodyLength / 2
   const bodyTop = profile.bodyCenterY + profile.bodyHeight / 2
   const bodyBottom = profile.bodyCenterY - profile.bodyHeight / 2
-  const bodyFrontX = profile.noseLength > 0 ? profile.noseBaseX : bodyRight
-  const bodyFrontTop = profile.noseLength > 0 ? profile.noseBaseTopY : bodyTop
-  const bodyFrontBottom = profile.noseLength > 0 ? profile.noseBaseBottomY : bodyBottom
-  const rearRadius = Math.min(0.16, profile.bodyLength * 0.09)
-  const frontBlend = Math.min(0.32, Math.max(0.12, (bodyFrontX - bodyLeft) * 0.18))
+  const roofTop = profile.roofCenterY + profile.roofHeight / 2
+
+  // Basic has no TrainShellSection table because its 3D renderer still uses
+  // the original toy-car primitives. Build the same single side shell here:
+  // the small crown is a paint/contour change inside the body, not a roof
+  // object placed on top of it.
+  return [
+    { x: bodyLeft, top: bodyTop - 0.02, bottom: bodyBottom + 0.04, width: profile.bodyWidth },
+    { x: bodyLeft + 0.12, top: roofTop - 0.02, bottom: bodyBottom, width: profile.bodyWidth },
+    { x: bodyRight - 0.22, top: roofTop - 0.02, bottom: bodyBottom, width: profile.bodyWidth },
+    { x: bodyRight - 0.04, top: bodyTop + 0.01, bottom: bodyBottom + 0.02, width: profile.bodyWidth },
+    { x: profile.noseTipX, top: profile.noseTipTopY, bottom: profile.noseTipBottomY, width: profile.noseTipWidth },
+  ]
+}
+
+function createCubicProfilePath(
+  points: readonly { x: number; y: number }[],
+  mapX: (value: number) => number,
+  mapY: (value: number) => number,
+  move = true,
+): string {
+  if (points.length === 0) return ''
+  const commands = move ? [`M ${mapX(points[0]!.x)} ${mapY(points[0]!.y)}`] : []
+  const tension = 1 / 6
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const previous = points[index - 1] ?? points[index]!
+    const current = points[index]!
+    const next = points[index + 1]!
+    const afterNext = points[index + 2] ?? next
+    const segmentLength = next.x - current.x
+    const control1 = {
+      // Keep the longitudinal coordinate inside this segment. The basic toy
+      // train has intentionally uneven stations, so a raw Catmull-Rom x
+      // tangent could briefly bend backwards at the first shoulder.
+      x: current.x + segmentLength / 3,
+      y: current.y + (next.y - previous.y) * tension,
+    }
+    const control2 = {
+      x: next.x - segmentLength / 3,
+      y: next.y - (afterNext.y - current.y) * tension,
+    }
+    commands.push(
+      `C ${mapX(control1.x)} ${mapY(control1.y)}, ${mapX(control2.x)} ${mapY(control2.y)}, ${mapX(next.x)} ${mapY(next.y)}`,
+    )
+  }
+
+  return commands.join(' ')
+}
+
+function createIntegratedShellPath(
+  sections: readonly TrainShellSection[],
+  mapX: (value: number) => number,
+  mapY: (value: number) => number,
+): string {
+  const first = sections[0]!
+  const last = sections[sections.length - 1]!
+  const topPoints = sections.map(({ x, top }) => ({ x, y: top }))
+  const bottomPoints = [...sections].reverse().map(({ x, bottom }) => ({ x, y: bottom }))
+  const frontCap = Math.min(0.07, Math.max(0.025, (last.top - last.bottom) * 0.12))
+  const rearCap = Math.min(0.1, Math.max(0.04, (first.top - first.bottom) * 0.12))
 
   return [
-    `M ${mapX(bodyLeft + rearRadius)} ${mapY(bodyTop)}`,
-    `C ${mapX(bodyLeft + profile.bodyLength * 0.22)} ${mapY(bodyTop)}, ${mapX(bodyFrontX - frontBlend * 1.5)} ${mapY(bodyTop)}, ${mapX(bodyFrontX - frontBlend)} ${mapY(bodyFrontTop)}`,
-    `C ${mapX(bodyFrontX - frontBlend * 0.42)} ${mapY(bodyFrontTop)}, ${mapX(bodyFrontX - frontBlend * 0.08)} ${mapY(bodyFrontTop)}, ${mapX(bodyFrontX)} ${mapY(bodyFrontTop)}`,
-    `C ${mapX(bodyFrontX + frontBlend * 0.08)} ${mapY(bodyFrontTop - 0.01)}, ${mapX(bodyFrontX + frontBlend * 0.08)} ${mapY(bodyFrontBottom + 0.01)}, ${mapX(bodyFrontX)} ${mapY(bodyFrontBottom)}`,
-    `C ${mapX(bodyFrontX - frontBlend * 0.45)} ${mapY(bodyFrontBottom)}, ${mapX(bodyLeft + profile.bodyLength * 0.22)} ${mapY(bodyBottom)}, ${mapX(bodyLeft + rearRadius)} ${mapY(bodyBottom)}`,
-    `C ${mapX(bodyLeft + rearRadius * 0.3)} ${mapY(bodyBottom)}, ${mapX(bodyLeft)} ${mapY(bodyBottom - rearRadius * 0.45)}, ${mapX(bodyLeft)} ${mapY(bodyBottom - rearRadius)}`,
-    `C ${mapX(bodyLeft)} ${mapY(bodyTop + rearRadius)}, ${mapX(bodyLeft + rearRadius * 0.3)} ${mapY(bodyTop)}, ${mapX(bodyLeft + rearRadius)} ${mapY(bodyTop)}`,
+    createCubicProfilePath(topPoints, mapX, mapY),
+    `C ${mapX(last.x + frontCap)} ${mapY(last.top - frontCap * 0.2)}, ${mapX(last.x + frontCap)} ${mapY(last.bottom + frontCap * 0.2)}, ${mapX(last.x)} ${mapY(last.bottom)}`,
+    createCubicProfilePath(bottomPoints, mapX, mapY, false),
+    `C ${mapX(first.x - rearCap)} ${mapY(first.bottom + rearCap * 0.25)}, ${mapX(first.x - rearCap)} ${mapY(first.top - rearCap * 0.25)}, ${mapX(first.x)} ${mapY(first.top)}`,
     'Z',
   ].join(' ')
 }
 
-function createNosePath(profile: TrainCarVisualProfile, mapX: (value: number) => number, mapY: (value: number) => number): string | null {
-  if (profile.noseLength <= 0) return null
+function sampleShellTop(sections: readonly TrainShellSection[], x: number): number {
+  const first = sections[0]!
+  const last = sections[sections.length - 1]!
+  if (x <= first.x) return first.top
+  if (x >= last.x) return last.top
 
-  const baseX = profile.noseBaseX
-  const tipX = profile.noseTipX
-  const length = Math.max(0.1, tipX - baseX)
-  const baseTop = profile.noseBaseTopY
-  const baseBottom = profile.noseBaseBottomY
-  const tipTop = profile.noseTipTopY
-  const tipBottom = profile.noseTipBottomY
-
-  const curveTightness = profile.noseStyle === 'doctor-yellow-duck'
-    ? 0.6
-    : profile.noseStyle === 'n700s-winged'
-      ? 0.32
-      : profile.noseStyle === 'e6-spear'
-        ? 0.42
-        : profile.noseStyle === 'e7w7-dignified'
-          ? 0.5
-          : 0.44
-  const noseHeight = Math.max(0.08, baseTop - tipTop)
-  const lowerRise = Math.max(0.04, tipBottom - baseBottom)
-  const upperShoulderX = baseX + length * 0.16
-  const upperMidX = baseX + length * curveTightness
-  const lowerMidX = baseX + length * Math.min(0.78, curveTightness + 0.16)
-  const upperShoulderY = baseTop - noseHeight * (profile.noseStyle === 'e6-spear' ? 0.03 : 0.015)
-  const upperMidY = baseTop - noseHeight * (profile.noseStyle === 'n700s-winged' ? 0.38 : 0.5)
-  const lowerMidY = baseBottom + lowerRise * (profile.noseStyle === 'doctor-yellow-duck' ? 0.42 : 0.55)
-  const lowerShoulderX = baseX + length * 0.2
-
-  return [
-    `M ${mapX(baseX)} ${mapY(baseTop)}`,
-    `C ${mapX(upperShoulderX)} ${mapY(baseTop)}, ${mapX(upperShoulderX + length * 0.1)} ${mapY(upperShoulderY)}, ${mapX(upperMidX)} ${mapY(upperMidY)}`,
-    `C ${mapX(upperMidX + length * 0.18)} ${mapY(upperMidY - noseHeight * 0.14)}, ${mapX(tipX - length * 0.08)} ${mapY(tipTop + noseHeight * 0.04)}, ${mapX(tipX)} ${mapY(tipTop)}`,
-    `C ${mapX(tipX + length * 0.018)} ${mapY(tipTop + 0.025)}, ${mapX(tipX + length * 0.018)} ${mapY(tipBottom - 0.025)}, ${mapX(tipX)} ${mapY(tipBottom)}`,
-    `C ${mapX(tipX - length * 0.08)} ${mapY(tipBottom + lowerRise * 0.04)}, ${mapX(lowerMidX)} ${mapY(lowerMidY + lowerRise * 0.2)}, ${mapX(lowerMidX)} ${mapY(lowerMidY)}`,
-    `C ${mapX(lowerMidX - length * 0.2)} ${mapY(lowerMidY - lowerRise * 0.08)}, ${mapX(lowerShoulderX)} ${mapY(baseBottom)}, ${mapX(baseX)} ${mapY(baseBottom)}`,
-    'Z',
-  ].join(' ')
-}
-
-function createRoofPath(profile: TrainCarVisualProfile, mapX: (value: number) => number, mapY: (value: number) => number): string {
-  const left = profile.roofCenterX - profile.roofLength / 2
-  const right = profile.roofCenterX + profile.roofLength / 2
-  const top = profile.roofCenterY + profile.roofHeight / 2
-  const bottom = profile.roofCenterY - profile.roofHeight / 2
-  const shoulder = Math.min(0.2, profile.roofLength * 0.13)
-
-  return [
-    `M ${mapX(left)} ${mapY(bottom)}`,
-    `C ${mapX(left + shoulder * 0.18)} ${mapY(top - 0.015)}, ${mapX(left + shoulder * 0.58)} ${mapY(top)}, ${mapX(left + shoulder)} ${mapY(top)}`,
-    `C ${mapX(left + profile.roofLength * 0.32)} ${mapY(top + 0.012)}, ${mapX(right - profile.roofLength * 0.32)} ${mapY(top + 0.012)}, ${mapX(right - shoulder)} ${mapY(top)}`,
-    `C ${mapX(right - shoulder * 0.42)} ${mapY(top)}, ${mapX(right - shoulder * 0.12)} ${mapY(top - 0.015)}, ${mapX(right)} ${mapY(bottom)}`,
-    `C ${mapX(right - shoulder * 0.2)} ${mapY(bottom - 0.012)}, ${mapX(left + shoulder * 0.2)} ${mapY(bottom - 0.012)}, ${mapX(left)} ${mapY(bottom)}`,
-    'Z',
-  ].join(' ')
+  for (let index = 1; index < sections.length; index += 1) {
+    const previous = sections[index - 1]!
+    const current = sections[index]!
+    if (x <= current.x) {
+      const amount = (x - previous.x) / Math.max(0.001, current.x - previous.x)
+      return previous.top + (current.top - previous.top) * amount
+    }
+  }
+  return last.top
 }
 
 function createAccentPath(profile: TrainCarVisualProfile, mapX: (value: number) => number, mapY: (value: number) => number): string | null {
@@ -162,17 +174,23 @@ function createSideWindowPath(
   ].join(' ')
 }
 
-function createWindshieldPath(profile: TrainCarVisualProfile, mapX: (value: number) => number, mapY: (value: number) => number): string | null {
+function createWindshieldPath(
+  profile: TrainCarVisualProfile,
+  shellSections: readonly TrainShellSection[] | undefined,
+  mapX: (value: number) => number,
+  mapY: (value: number) => number,
+): string | null {
   if (!profile.hasFrontWindow || profile.noseLength <= 0) return null
 
   const startX = Math.min(profile.frontWindowX - 0.1, profile.noseTipX - 0.34)
   const endX = Math.min(profile.noseTipX - 0.05, startX + Math.max(0.26, profile.noseLength * 0.34))
-  const centerY = profile.frontWindowY
   const height = clamp(0.1 + profile.frontWindowWidth * 0.12, 0.14, 0.21)
-  const topStart = centerY + height * 0.46
-  const topEnd = centerY + height * 0.18
-  const bottomEnd = centerY - height * 0.55
-  const bottomStart = centerY - height * 0.68
+  const shellTopStart = shellSections === undefined ? profile.frontWindowY + height * 0.46 : sampleShellTop(shellSections, startX) - 0.025
+  const shellTopEnd = shellSections === undefined ? profile.frontWindowY + height * 0.18 : sampleShellTop(shellSections, endX) - 0.025
+  const topStart = shellTopStart
+  const topEnd = shellTopEnd
+  const bottomEnd = shellSections === undefined ? profile.frontWindowY - height * 0.55 : topEnd - height * 0.82
+  const bottomStart = shellSections === undefined ? profile.frontWindowY - height * 0.68 : topStart - height * 0.9
 
   const corner = Math.min(0.05, (endX - startX) * 0.18, height * 0.22)
 
@@ -218,6 +236,10 @@ function mixHexColors(first: string, second: string, amount: number): string {
   return `#${firstRgb.map((value, index) => Math.round(value + (secondRgb[index] - value) * ratio).toString(16).padStart(2, '0')).join('')}`
 }
 
+function usesUpperShellPaint(trainType: TrainType): boolean {
+  return trainType === 'e5' || trainType === 'e6' || trainType === 'e7w7'
+}
+
 /**
  * 3Dの先頭車TrainSpecを、カード内で軽く描画できる側面ミニチュアへ落とし込む。
  * Three.jsやCanvasは使わず、車種追加時も既存TrainSpecを参照するだけで済む。
@@ -226,19 +248,18 @@ export default function TrainThumbnail({ trainType }: TrainThumbnailProps) {
   const spec = resolveTrainSpec(trainType)
   const profile = spec.lead
   const { mapX, mapY } = getCoordinateMapper(profile)
+  const shellSections = spec.leadShellSections ?? getBasicShellSections(profile)
   const paintIds = {
-    body: `train-thumbnail-${trainType}-body`,
-    nose: `train-thumbnail-${trainType}-nose`,
-    roof: `train-thumbnail-${trainType}-roof`,
+    shell: `train-thumbnail-${trainType}-shell`,
     window: `train-thumbnail-${trainType}-window`,
   }
-  const nosePath = createNosePath(profile, mapX, mapY)
+  const shellPath = createIntegratedShellPath(shellSections, mapX, mapY)
   const accentPath = createAccentPath(profile, mapX, mapY)
-  const windshieldPath = createWindshieldPath(profile, mapX, mapY)
+  const windshieldPath = createWindshieldPath(profile, shellSections, mapX, mapY)
   const bodyLeft = profile.bodyCenterX - profile.bodyLength / 2
   const bodyRight = profile.bodyCenterX + profile.bodyLength / 2
   const wheelXs = [bodyLeft + profile.bodyLength * 0.27, bodyRight - profile.bodyLength * 0.22]
-  const bodyTop = profile.bodyCenterY + profile.bodyHeight / 2
+  const highlightPoints = shellSections.slice(0, Math.max(2, Math.ceil(shellSections.length * 0.62))).map(({ x, top }) => ({ x, y: top - 0.035 }))
 
   return (
     <svg
@@ -250,22 +271,28 @@ export default function TrainThumbnail({ trainType }: TrainThumbnailProps) {
       data-silhouette={spec.silhouette}
       data-nose-style={profile.noseStyle}
       data-window-count={profile.sideWindowXs.length}
-      data-thumbnail-quality="bezier-shell-v2"
+      data-thumbnail-quality="integrated-shell-v3"
+      data-roof-treatment="integrated-paint"
     >
       <defs>
-        <linearGradient id={paintIds.body} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={mixHexColors(spec.bodyColor, '#ffffff', 0.28)} />
-          <stop offset="46%" stopColor={spec.bodyColor} />
+        <linearGradient id={paintIds.shell} x1="0" y1="0" x2="0" y2="1">
+          {trainType === 'basic' ? (
+            <>
+              <stop offset="0%" stopColor={mixHexColors(spec.roofColor, '#ffffff', 0.2)} />
+              <stop offset="28%" stopColor={spec.roofColor} />
+              <stop offset="47%" stopColor={mixHexColors(spec.roofColor, spec.bodyColor, 0.5)} />
+            </>
+          ) : usesUpperShellPaint(trainType) ? (
+            <>
+              <stop offset="0%" stopColor={mixHexColors(spec.frontColor, '#ffffff', 0.2)} />
+              <stop offset="31%" stopColor={spec.frontColor} />
+              <stop offset="47%" stopColor={mixHexColors(spec.frontColor, spec.bodyColor, 0.5)} />
+            </>
+          ) : (
+            <stop offset="0%" stopColor={mixHexColors(spec.bodyColor, '#ffffff', 0.28)} />
+          )}
+          <stop offset="60%" stopColor={spec.bodyColor} />
           <stop offset="100%" stopColor={mixHexColors(spec.bodyColor, '#183247', 0.18)} />
-        </linearGradient>
-        <linearGradient id={paintIds.nose} x1="0" y1="0" x2="0.12" y2="1">
-          <stop offset="0%" stopColor={mixHexColors(spec.frontColor, '#ffffff', 0.2)} />
-          <stop offset="55%" stopColor={spec.frontColor} />
-          <stop offset="100%" stopColor={mixHexColors(spec.frontColor, '#183247', 0.16)} />
-        </linearGradient>
-        <linearGradient id={paintIds.roof} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={mixHexColors(spec.roofColor, '#ffffff', 0.2)} />
-          <stop offset="100%" stopColor={mixHexColors(spec.roofColor, '#183247', 0.16)} />
         </linearGradient>
         <linearGradient id={paintIds.window} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={mixHexColors(spec.window.color, '#9deaf2', 0.24)} />
@@ -281,9 +308,7 @@ export default function TrainThumbnail({ trainType }: TrainThumbnailProps) {
           </g>
         ))}
         <path className={styles.thumbnailChassis} d={createChassisPath(profile, mapX, mapY)} />
-        <path data-part="body" className={styles.thumbnailBody} d={createBodyPath(profile, mapX, mapY)} fill={`url(#${paintIds.body})`} />
-        {nosePath !== null && <path data-part="nose" className={styles.thumbnailNose} d={nosePath} fill={`url(#${paintIds.nose})`} />}
-        <path data-part="roof" className={styles.thumbnailRoof} d={createRoofPath(profile, mapX, mapY)} fill={`url(#${paintIds.roof})`} />
+        <path data-part="integrated-shell" className={styles.thumbnailShell} d={shellPath} fill={`url(#${paintIds.shell})`} />
         {accentPath !== null && <path data-part="accent" className={styles.thumbnailAccent} d={accentPath} fill={spec.accent.color} />}
         <path data-part="door" className={styles.thumbnailDoor} d={createDoorPath(profile, mapX, mapY)} />
         {profile.sideWindowXs.map((windowX) => (
@@ -312,7 +337,7 @@ export default function TrainThumbnail({ trainType }: TrainThumbnailProps) {
         )}
         <path
           className={styles.thumbnailHighlight}
-          d={`M ${mapX(bodyLeft + 0.12)} ${mapY(bodyTop - 0.04)} C ${mapX(bodyLeft + profile.bodyLength * 0.32)} ${mapY(bodyTop - 0.075)}, ${mapX(Math.min(bodyRight - 0.18, bodyLeft + profile.bodyLength * 0.54))} ${mapY(bodyTop - 0.075)}, ${mapX(Math.min(bodyRight - 0.1, bodyLeft + profile.bodyLength * 0.62))} ${mapY(bodyTop - 0.04)}`}
+          d={createCubicProfilePath(highlightPoints, mapX, mapY)}
         />
       </g>
     </svg>

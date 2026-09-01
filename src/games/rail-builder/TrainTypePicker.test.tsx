@@ -57,14 +57,17 @@ describe('TrainTypePicker', () => {
     for (const thumbnail of thumbnails) {
       expect(thumbnail.getAttribute('data-silhouette')).toBeTruthy()
       expect(thumbnail.getAttribute('data-nose-style')).toBeTruthy()
-      expect(thumbnail).toHaveAttribute('data-thumbnail-quality', 'bezier-shell-v2')
+      expect(thumbnail).toHaveAttribute('data-thumbnail-quality', 'integrated-shell-v3')
+      expect(thumbnail).toHaveAttribute('data-roof-treatment', 'integrated-paint')
       expect(Number(thumbnail.getAttribute('data-window-count'))).toBeGreaterThan(0)
-      expect(thumbnail.querySelector('[data-part="body"]')).toHaveAttribute('d', expect.stringContaining('C'))
-      expect(thumbnail.querySelector('[data-part="nose"]')).toHaveAttribute('d', expect.stringContaining('C'))
-      expect(thumbnail.querySelector('[data-part="roof"]')).toHaveAttribute('d', expect.stringContaining('C'))
+      const shell = thumbnail.querySelector('[data-part="integrated-shell"]')
+      expect(shell).toHaveAttribute('d', expect.stringContaining('C'))
+      expect(thumbnail.querySelector('[data-part="body"]')).toBeNull()
+      expect(thumbnail.querySelector('[data-part="nose"]')).toBeNull()
+      expect(thumbnail.querySelector('[data-part="roof"]')).toBeNull()
       expect(thumbnail.querySelector('[data-part="door"]')).toHaveAttribute('d', expect.stringContaining('C'))
       expect(thumbnail.querySelector('[data-part="side-window"]')).toHaveAttribute('d', expect.stringContaining('C'))
-      expect(thumbnail.querySelectorAll('linearGradient')).toHaveLength(4)
+      expect(thumbnail.querySelectorAll('linearGradient')).toHaveLength(2)
     }
   })
 

@@ -153,21 +153,10 @@
   opacity: 0.92;
 }
 
-.thumbnailBody,
-.thumbnailNose,
-.thumbnailRoof {
+.thumbnailShell {
   stroke: rgba(27, 51, 67, 0.5);
   stroke-width: 1.25;
   vector-effect: non-scaling-stroke;
-}
-
-.thumbnailNose {
-  stroke: rgba(27, 51, 67, 0.58);
-}
-
-.thumbnailRoof {
-  stroke: rgba(27, 51, 67, 0.42);
-  stroke-width: 1.1;
 }
 
 .thumbnailDoor {
