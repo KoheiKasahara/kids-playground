@@ -69,8 +69,8 @@ export default function KomaBattlePlay() {
     <main className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>コマバトル</h1>
-        <Link to="/" className={styles.backLink}>
-          ホームへ
+        <Link to="/" className={styles.backLink} aria-label="もどる">
+          もどる
         </Link>
       </header>
 

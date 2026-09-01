@@ -328,8 +328,8 @@ describe('KomaBattlePlay', () => {
     expect(engineMock.options?.komaCount).toBe(1)
   })
 
-  it('ホームへ戻るリンクがある', () => {
+  it('選択画面からホームへ戻る「もどる」リンクがある', () => {
     renderGame()
-    expect(screen.getByRole('link', { name: 'ホームへ' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: 'もどる' })).toHaveAttribute('href', '/')
   })
 })
