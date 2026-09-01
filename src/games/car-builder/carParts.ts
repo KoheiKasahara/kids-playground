@@ -616,16 +616,10 @@ function buildWheels(hubColor: string, hubRadiusRatio: number) {
         rimRing.castShadow = true
 
         const centerCap = new THREE.Mesh(
-          new THREE.CylinderGeometry(
-            wheel.radius * 0.17,
-            wheel.radius * 0.17,
-            wheel.width * 1.12,
-            12,
-          ),
+          new THREE.SphereGeometry(wheel.radius * 0.17, 12, 8),
           hubMaterial,
         )
         centerCap.name = `car-sports-center-cap-${wheel.id}`
-        centerCap.rotation.z = Math.PI / 2
         centerCap.position.copy(tire.position)
         centerCap.castShadow = true
         group.add(tire, hub, rimRing, centerCap)
