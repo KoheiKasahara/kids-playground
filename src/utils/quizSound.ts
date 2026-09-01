@@ -71,6 +71,8 @@ const KOMA_SPIN_SOUND_MAX_GAIN = 0.03
 const KOMA_IMPACT_SOUND_COOLDOWN_MS = 85
 /** 場外/転倒/停止音の近接再生をまとめるクールダウン[ms]。 */
 const KOMA_DEFEAT_SOUND_COOLDOWN_MS = 140
+/** 同一フレーム付近の多重入力で短音が重なりすぎないための技術的な間隔[ms]。 */
+const KOMA_BOOST_SOUND_COOLDOWN_MS = 40
 
 type KomaBattleTone = {
   oscillator: OscillatorNode
@@ -176,6 +178,20 @@ function playKomaBattleDefeatSound(
   }
 }
 
+/** タップしたコマが元気になった瞬間を伝える、短い上行音。 */
+function playKomaBattleBoostSound(activeTones: Set<KomaBattleTone>): void {
+  if (!soundEnabled) return
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+    playTrackedKomaTone(ctx, 520, now, 0.075, 0.065, 'triangle', activeTones)
+    playTrackedKomaTone(ctx, 780, now + 0.035, 0.11, 0.055, 'sine', activeTones)
+  } catch {
+    // 音声APIの不調でタップブーストを止めない。
+  }
+}
+
 export type KomaBattleSoundController = {
   /** 回転音のノードを1組だけ作る。実際の音量/音程はupdateSpinで追従する。 */
   startSpin: () => void
@@ -185,6 +201,8 @@ export type KomaBattleSoundController = {
   stopSpin: () => void
   /** コマ同士/バンパー/壁の代表衝突音を鳴らす。 */
   playImpact: (kind: KomaBattleImpactSoundKind, intensity: number) => void
+  /** 触ったコマへブーストが入ったことを知らせる短い音。 */
+  playBoost: () => void
   /** 場外・転倒・停止の代表音を鳴らす。 */
   playDefeat: (reason: KomaBattleDefeatReason) => void
   /** 勝利/引き分けをrun中1回だけ鳴らす。 */
@@ -209,6 +227,7 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
   let spinRequested = false
   let lastSpinGain = 0
   let lastImpactAt: number | null = null
+  let lastBoostAt: number | null = null
   let lastDefeatAt: number | null = null
   let resultPlayed = false
   const activeTones = new Set<KomaBattleTone>()
@@ -278,6 +297,13 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
       ) return
       lastImpactAt = wallClockNow
       playKomaBattleImpactSound(kind, intensity, activeTones)
+    },
+    playBoost() {
+      if (disposed || !soundEnabled) return
+      const wallClockNow = Date.now()
+      if (lastBoostAt !== null && wallClockNow - lastBoostAt < KOMA_BOOST_SOUND_COOLDOWN_MS) return
+      lastBoostAt = wallClockNow
+      playKomaBattleBoostSound(activeTones)
     },
     playDefeat(reason) {
       if (disposed || !soundEnabled) return

@@ -19,6 +19,11 @@ import {
   GRAVITY_Y,
   KOMA_DENSITY,
   KOMA_CONTACT_MARGIN,
+  KOMA_BOOST_MAX_SPIN_SPEED,
+  KOMA_BOOST_MIN_SPIN_SPEED,
+  KOMA_BOOST_MOVE_IMPULSE,
+  KOMA_BOOST_MOVE_SPEED_LIMIT,
+  KOMA_BOOST_SPIN_INCREMENT,
   KOMA_KNOCKBACK_MAX_CLOSING_SPEED,
   KOMA_KNOCKBACK_MAX_IMPULSE,
   KOMA_KNOCKBACK_MIN_CLOSING_SPEED,
@@ -481,6 +486,83 @@ export function applyKomaAssist(entry: KomaEntry, dt: number): void {
     },
     true,
   )
+}
+
+export type KomaBoostResult = {
+  spinBefore: number
+  spinAfter: number
+  moveImpulseApplied: boolean
+}
+
+/**
+ * 触った1体だけを、全タイプ共通のルールで一時的に元気にする。
+ *
+ * 自転はコマ自身の軸方向へ直接回復させ、低速時ほど変化を大きく見せる。
+ * 移動は現在の進行方向（ほぼ停止中は中央方向）へ小さなimpulseを1回だけ加える。
+ * どちらも専用上限と既存の全体上限を通し、連打で速度が積み上がり続けないようにする。
+ */
+export function applyKomaBoost(entry: KomaEntry): KomaBoostResult {
+  const body = entry.body
+  const rawAngular = body.angvel()
+  const angular =
+    Number.isFinite(rawAngular.x) &&
+    Number.isFinite(rawAngular.y) &&
+    Number.isFinite(rawAngular.z)
+      ? rawAngular
+      : { x: 0, y: 0, z: 0 }
+  const up = upVectorOf(body.rotation())
+  const finiteUp =
+    Number.isFinite(up.x) && Number.isFinite(up.y) && Number.isFinite(up.z)
+      ? up
+      : { x: 0, y: 1, z: 0 }
+  const spinBefore = spinSpeedOf(angular, finiteUp)
+  const directedSpin = spinBefore * entry.spec.spinDirection
+  const boostedMagnitude = Math.min(
+    KOMA_BOOST_MAX_SPIN_SPEED,
+    Math.max(KOMA_BOOST_MIN_SPIN_SPEED, directedSpin + KOMA_BOOST_SPIN_INCREMENT),
+  )
+  const targetSpin = boostedMagnitude * entry.spec.spinDirection
+  const spinDelta = targetSpin - spinBefore
+  const nextAngular = {
+    x: angular.x + finiteUp.x * spinDelta,
+    y: angular.y + finiteUp.y * spinDelta,
+    z: angular.z + finiteUp.z * spinDelta,
+  }
+  body.setAngvel(clampedVector(nextAngular, MAX_ANGULAR_SPEED) ?? nextAngular, true)
+
+  const rawLinear = body.linvel()
+  const linear =
+    Number.isFinite(rawLinear.x) &&
+    Number.isFinite(rawLinear.y) &&
+    Number.isFinite(rawLinear.z)
+      ? rawLinear
+      : { x: 0, y: 0, z: 0 }
+  if (linear !== rawLinear) body.setLinvel(linear, true)
+  const horizontalSpeed = Math.hypot(linear.x, linear.z)
+  let moveImpulseApplied = false
+  if (horizontalSpeed < KOMA_BOOST_MOVE_SPEED_LIMIT) {
+    const position = body.translation()
+    const direction =
+      finiteUnitOrNull(linear.x, linear.z) ??
+      finiteUnitOrNull(-position.x, -position.z) ??
+      { x: entry.spec.spinDirection, z: 0 }
+    body.applyImpulse(
+      {
+        x: direction.x * KOMA_BOOST_MOVE_IMPULSE,
+        y: 0,
+        z: direction.z * KOMA_BOOST_MOVE_IMPULSE,
+      },
+      true,
+    )
+    moveImpulseApplied = true
+  }
+
+  clampKomaMotion(entry)
+  return {
+    spinBefore,
+    spinAfter: spinSpeedOf(body.angvel(), finiteUp),
+    moveImpulseApplied,
+  }
 }
 
 /**
