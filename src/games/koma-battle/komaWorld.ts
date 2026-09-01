@@ -24,6 +24,7 @@ import {
   KOMA_BOOST_MOVE_IMPULSE,
   KOMA_BOOST_MOVE_SPEED_LIMIT,
   KOMA_BOOST_SPIN_INCREMENT,
+  KOMA_BELT_FORCE,
   KOMA_KNOCKBACK_MAX_CLOSING_SPEED,
   KOMA_KNOCKBACK_MAX_IMPULSE,
   KOMA_KNOCKBACK_MIN_CLOSING_SPEED,
@@ -59,6 +60,7 @@ import {
   HEIGHTFIELD_SEGMENTS,
   fieldHeightAt,
   getKomaField,
+  isKomaWithinBelt,
   WALL_INNER_RADIUS,
   WALL_SEGMENTS,
   wallGapSegmentIndices,
@@ -489,6 +491,29 @@ export function applyKomaAssist(entry: KomaEntry, dt: number): void {
     },
     true,
   )
+}
+
+/**
+ * ベルト（動く床）エリア内にいるコマへ、毎ステップ弱い力を進行方向へ加える。
+ *
+ * 状態を持たない位置判定だけなので、境界を何度も出入りしても多重加算されない。
+ * applyImpulseへ渡すのは`力[N] * dt`なので、質量が重いタイプほど速度変化が小さく、
+ * 軽いタイプほど大きくなる（既存の質量差がそのまま活きる）。
+ * world.step()の直前、applyKomaAssistと同じタイミングで呼ぶ。
+ */
+export function applyKomaFieldBelts(entry: KomaEntry, field: KomaField, dt: number): void {
+  if (field.belts.length === 0) return
+  const body = entry.body
+  const translation = body.translation()
+  for (const belt of field.belts) {
+    if (!isKomaWithinBelt(belt, translation.x, translation.z)) continue
+    const strength = Number.isFinite(belt.strength) && belt.strength > 0 ? belt.strength : 1
+    const impulse = KOMA_BELT_FORCE * strength * dt
+    body.applyImpulse(
+      { x: Math.cos(belt.angle) * impulse, y: 0, z: Math.sin(belt.angle) * impulse },
+      true,
+    )
+  }
 }
 
 export type KomaBoostResult = {

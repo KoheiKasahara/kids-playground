@@ -295,6 +295,11 @@ function FieldPreview({ field }: { field: KomaField }) {
           ))
         : null}
       {field.shape === 'ridge' ? <span className={styles.previewRidge} /> : null}
+      {field.shape === 'belt' ? (
+        <span className={styles.previewBelt} aria-hidden="true">
+          ➡️➡️➡️
+        </span>
+      ) : null}
       <span className={styles.previewCenter} />
     </span>
   )

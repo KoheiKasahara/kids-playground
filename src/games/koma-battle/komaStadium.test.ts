@@ -8,6 +8,7 @@ import {
   fieldHeightAt,
   fieldSlopeAt,
   getKomaField,
+  isKomaWithinBelt,
   KOMA_FIELD_DEFINITIONS,
   OUT_RADIUS,
   FIELD_RADIUS,
@@ -20,11 +21,17 @@ import {
   createStadiumHeightfield,
   wallGapMarkers,
   wallGapSegmentIndices,
+  type KomaFieldBelt,
 } from './komaStadium'
 
 describe('コマバトルのフィールド定義', () => {
-  it('3つのフィールドをデータとして持ち、未知のIDはbasicへ戻る', () => {
-    expect(KOMA_FIELD_DEFINITIONS.map((field) => field.id)).toEqual(['basic', 'bumper', 'ridge'])
+  it('4つのフィールドをデータとして持ち、未知のIDはbasicへ戻る', () => {
+    expect(KOMA_FIELD_DEFINITIONS.map((field) => field.id)).toEqual([
+      'basic',
+      'bumper',
+      'ridge',
+      'belt',
+    ])
     expect(getKomaField(DEFAULT_KOMA_FIELD_ID).id).toBe('basic')
     expect(getKomaField('not-a-field').id).toBe('basic')
   })
@@ -75,6 +82,58 @@ describe('コマバトルのフィールド定義', () => {
     expect(ridge.heights).toHaveLength((16 + 1) ** 2)
     expect(ridge.size).toBe(basic.size)
     expect(ridge.heights.some((height, index) => height > basic.heights[index]! + 0.02)).toBe(true)
+  })
+})
+
+describe('動く床（ベルト）のフィールドデータ', () => {
+  it('belt以外のフィールドはベルトを持たない', () => {
+    for (const field of KOMA_FIELD_DEFINITIONS) {
+      if (field.id === 'belt') continue
+      expect(field.belts).toHaveLength(0)
+    }
+  })
+
+  it('beltフィールドはちょうど1本のベルトを持ち、壁からは十分離れている', () => {
+    const belts = getKomaField('belt').belts
+    expect(belts).toHaveLength(1)
+    const belt = belts[0]!
+    expect(belt.halfLength).toBeGreaterThan(0)
+    expect(belt.halfWidth).toBeGreaterThan(0)
+    // ベルトの端（中心から最も遠い角）が外周壁より内側に収まっている。
+    // 「床に乗っただけで場外へ一直線に押し出される」配置を避けるための確認。
+    const farthestCorner = Math.hypot(belt.halfLength, belt.halfWidth)
+    expect(farthestCorner).toBeLessThan(WALL_INNER_RADIUS - 1)
+  })
+
+  it('beltフィールドの床の高さはbasicと同じ（地形は変えず、ベルトだけを足す）', () => {
+    for (const radius of [0, VALLEY_RADIUS, 0.6, 1.2, BOWL_RADIUS]) {
+      expect(fieldHeightAt('belt', radius)).toBeCloseTo(fieldHeightAt('basic', radius), 8)
+    }
+  })
+})
+
+describe('isKomaWithinBelt', () => {
+  const belt: KomaFieldBelt = { x: 0, z: 0, angle: 0, halfLength: 0.8, halfWidth: 0.3, strength: 1 }
+
+  it('矩形の内側と外側を正しく判定する', () => {
+    expect(isKomaWithinBelt(belt, 0, 0)).toBe(true)
+    expect(isKomaWithinBelt(belt, 0.79, 0.29)).toBe(true)
+    expect(isKomaWithinBelt(belt, 0.81, 0)).toBe(false)
+    expect(isKomaWithinBelt(belt, 0, 0.31)).toBe(false)
+  })
+
+  it('ベルトの中心をずらしても、その位置を基準に判定する', () => {
+    const shifted: KomaFieldBelt = { ...belt, x: 1, z: -1 }
+    expect(isKomaWithinBelt(shifted, 1, -1)).toBe(true)
+    expect(isKomaWithinBelt(shifted, 0, 0)).toBe(false)
+  })
+
+  it('angleぶん回転した向きの矩形として判定する', () => {
+    const rotated: KomaFieldBelt = { ...belt, angle: Math.PI / 2 }
+    // 90度回転しているので、元のローカルX方向（world Z方向）に長い矩形になる。
+    expect(isKomaWithinBelt(rotated, 0, 0.79)).toBe(true)
+    expect(isKomaWithinBelt(rotated, 0.29, 0)).toBe(true)
+    expect(isKomaWithinBelt(rotated, 0.81, 0)).toBe(false)
   })
 })
 

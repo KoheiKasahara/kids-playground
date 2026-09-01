@@ -51,6 +51,7 @@ import {
   WALL_THICKNESS,
   wallGapMarkers,
   wallGapSegmentIndices,
+  type KomaFieldBelt,
   type KomaFieldId,
 } from './komaStadium'
 import { komaCameraSetup } from './komaCamera'
@@ -59,6 +60,7 @@ import {
   applyKomaAssist,
   applyKomaBoost,
   applyKomaContactAssist,
+  applyKomaFieldBelts,
   clampKomaMotion,
   createKomaBattleWorld,
   readKoma,
@@ -125,6 +127,18 @@ const IMPACT_DURATION_MS = 260
 const IMPACT_CONTACT_MARGIN = 0.03
 
 // ---------------------------------------------------------------------------
+// 動く床（ベルト）演出。矢印メッシュを少数だけ流し、文字なしで向きを伝える。
+// ---------------------------------------------------------------------------
+
+/** ベルト1本あたりに流す矢印の数。少数固定なので毎フレームの更新コストは無視できる。 */
+const BELT_ARROW_COUNT = 3
+/** 矢印が流れる見た目上の速さ[m/s]。物理のforceとは独立した演出用の値。 */
+const BELT_ARROW_SPEED = 0.85
+/** 床面との重なりを避ける、ごくわずかな浮き。 */
+const BELT_SURFACE_LIFT = 0.006
+const BELT_ARROW_LIFT = 0.011
+
+// ---------------------------------------------------------------------------
 // 直接タップブースト。ゲーム上の待ち時間ではなく、同一入力の多重発火だけを防ぐ。
 // ---------------------------------------------------------------------------
 
@@ -145,6 +159,14 @@ type ImpactSlot = {
   remainingMs: number
   maxOpacity: number
   startScale: number
+}
+
+/** ベルト上を流れる矢印1個ぶん。geometryは共有し、Meshの位置だけを毎フレーム進める。 */
+type BeltArrow = {
+  mesh: THREE.Mesh
+  belt: KomaFieldBelt
+  /** ベルトのローカルX（進行方向）上の位置。halfLengthを超えたら反対側へ折り返す。 */
+  localX: number
 }
 
 type KomaVisual = {
@@ -233,6 +255,7 @@ export function useKomaBattleEngine(
     const komaVisuals: KomaVisual[] = []
     const shadowBlobs: THREE.Mesh[] = []
     const impactPool: ImpactSlot[] = []
+    const beltArrows: BeltArrow[] = []
     const geometries: THREE.BufferGeometry[] = []
     const materials: THREE.Material[] = []
 
@@ -273,6 +296,7 @@ export function useKomaBattleEngine(
       komaVisuals.length = 0
       shadowBlobs.length = 0
       impactPool.length = 0
+      beltArrows.length = 0
 
       if (renderer !== null) {
         const canvas = renderer.domElement
@@ -821,6 +845,87 @@ export function useKomaBattleEngine(
         }
       }
 
+      // 動く床（ベルト）。専用のColliderは持たず見た目だけの表現。
+      // 床面はフィールドの高さ関数に沿わせた帯Meshで作り、その上を少数の矢印Meshが
+      // 一定間隔で流れることで、文字なしでも「この向きへ押される」と伝える。
+      for (const belt of selectedField.belts) {
+        const anchor = new THREE.Group()
+        anchor.position.set(belt.x, 0, belt.z)
+        // ローカルX（矢印が指す向き）を belt.angle の向きへ合わせる回転。
+        anchor.rotation.y = -belt.angle
+        group.add(anchor)
+
+        const surfaceSegments = 14
+        const surfacePositions: number[] = []
+        const surfaceIndices: number[] = []
+        for (let index = 0; index <= surfaceSegments; index += 1) {
+          const t = index / surfaceSegments
+          const localX = -belt.halfLength + t * belt.halfLength * 2
+          const height = fieldHeightAt(selectedField, Math.abs(localX)) + BELT_SURFACE_LIFT
+          surfacePositions.push(localX, height, -belt.halfWidth, localX, height, belt.halfWidth)
+          if (index < surfaceSegments) {
+            const a = index * 2
+            surfaceIndices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3)
+          }
+        }
+        const surfaceGeometry = track(new THREE.BufferGeometry())
+        surfaceGeometry.setAttribute(
+          'position',
+          new THREE.Float32BufferAttribute(surfacePositions, 3),
+        )
+        surfaceGeometry.setIndex(surfaceIndices)
+        surfaceGeometry.computeVertexNormals()
+        const surfaceMaterial = trackMaterial(
+          new THREE.MeshStandardMaterial({
+            color: selectedField.theme.wall,
+            roughness: 0.7,
+            metalness: 0.08,
+            side: THREE.DoubleSide,
+          }),
+        )
+        anchor.add(new THREE.Mesh(surfaceGeometry, surfaceMaterial))
+
+        const arrowLength = Math.min(0.26, belt.halfWidth * 1.5)
+        const arrowWidth = Math.min(0.22, belt.halfWidth * 1.3)
+        const arrowGeometry = track(new THREE.BufferGeometry())
+        arrowGeometry.setAttribute(
+          'position',
+          new THREE.Float32BufferAttribute(
+            [
+              arrowLength / 2, 0, 0,
+              -arrowLength / 2, 0, arrowWidth / 2,
+              -arrowLength / 2, 0, -arrowWidth / 2,
+            ],
+            3,
+          ),
+        )
+        arrowGeometry.setIndex([0, 1, 2])
+        arrowGeometry.computeVertexNormals()
+        const arrowMaterial = trackMaterial(
+          new THREE.MeshStandardMaterial({
+            color: selectedField.theme.accent,
+            roughness: 0.4,
+            metalness: 0.05,
+            side: THREE.DoubleSide,
+            emissive: new THREE.Color(selectedField.theme.accent),
+            emissiveIntensity: 0.35,
+          }),
+        )
+        const beltLength = belt.halfLength * 2
+        for (let arrowIndex = 0; arrowIndex < BELT_ARROW_COUNT; arrowIndex += 1) {
+          const localX =
+            -belt.halfLength + ((arrowIndex + 0.5) / BELT_ARROW_COUNT) * beltLength
+          const mesh = new THREE.Mesh(arrowGeometry, arrowMaterial)
+          mesh.position.set(
+            localX,
+            fieldHeightAt(selectedField, Math.abs(localX)) + BELT_ARROW_LIFT,
+            0,
+          )
+          anchor.add(mesh)
+          beltArrows.push({ mesh, belt, localX })
+        }
+      }
+
       return group
     }
 
@@ -999,6 +1104,21 @@ export function useKomaBattleEngine(
         }
       })
       updateImpactEffects(dtMs)
+      updateBeltArrows(dtMs)
+    }
+
+    /** 矢印の流れる位置だけを進める。新規オブジェクトは作らず、既存Meshを動かすだけ。 */
+    function updateBeltArrows(dtMs: number) {
+      if (beltArrows.length === 0) return
+      const step = (BELT_ARROW_SPEED * dtMs) / 1000
+      for (const arrow of beltArrows) {
+        const span = arrow.belt.halfLength * 2
+        let nextX = arrow.localX + step
+        if (nextX > arrow.belt.halfLength) nextX -= span
+        arrow.localX = nextX
+        arrow.mesh.position.x = nextX
+        arrow.mesh.position.y = fieldHeightAt(selectedField, Math.abs(nextX)) + BELT_ARROW_LIFT
+      }
     }
 
     function stepPhysics(deltaMs: number) {
@@ -1009,7 +1129,10 @@ export function useKomaBattleEngine(
       let substeps = 0
       while (accumulator >= stepMs && substeps < MAX_PHYSICS_SUBSTEPS) {
         for (const koma of battle.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
-        // 決着前だけ接触開始時の追加反発を適用する。決着後のsettle中は自然に倒れ切らせる。
+        // 決着前だけ接触開始時の追加反発とベルトの力を適用する。決着後のsettle中は自然に倒れ切らせる。
+        if (!finished) {
+          for (const koma of battle.komas) applyKomaFieldBelts(koma, selectedField, PHYSICS_TIMESTEP)
+        }
         applyKomaContactAssist(battle, !finished)
         battle.world.step()
         for (const koma of battle.komas) clampKomaMotion(koma)
