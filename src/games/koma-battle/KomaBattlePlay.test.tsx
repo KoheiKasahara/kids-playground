@@ -85,6 +85,14 @@ describe('KomaBattlePlay', () => {
     expect(screen.getByRole('button', { name: 'まわせ！' })).toBeInTheDocument()
   })
 
+  it('ヘッダーは左に戻る導線、中央にタイトルを置く', () => {
+    renderGame()
+    const header = screen.getByRole('banner')
+
+    expect(header.firstElementChild).toHaveAttribute('aria-label', 'もどる')
+    expect(header.querySelector('h1')).toHaveTextContent('コマバトル')
+  })
+
   it('まわせ！を押すと、操作イベント中に音声を準備して開始音を1回鳴らす', async () => {
     const user = userEvent.setup()
     renderGame()
