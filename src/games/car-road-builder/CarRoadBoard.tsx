@@ -5,7 +5,7 @@ import type { Board, BoardCell } from './boardModel'
 import RoadPartVisual from './RoadPartVisual'
 import CarVisual from './CarVisual'
 import CarRoadGoalBurst from './CarRoadGoalBurst'
-import type { VehicleId } from './vehicleDefinitions'
+import { getVehicleDefinition, type VehicleId } from './vehicleDefinitions'
 import styles from './CarRoadBuilder.module.css'
 
 export type CarRoadBoardProps = {
@@ -33,7 +33,9 @@ function cellLabel(cell: BoardCell): string {
   return cell.kind ? `${PART_DEFINITIONS[cell.kind].label}、${location}` : `あきセル、${location}`
 }
 
-export default function CarRoadBoard({ board, boardRef, selectedCellId = null, draggingCellId = null, running = false, onCellClick, onCellPointerDown, onCellPointerMove, onCellPointerUp, onCellPointerCancel, dropPreview = null, carSample = null, carAtStart = null, carAngle = 0, vehicleId = 'red-car', goalCelebrationKey = null, goalCell = null }: CarRoadBoardProps) {
+export default function CarRoadBoard({ board, boardRef, selectedCellId = null, draggingCellId = null, running = false, onCellClick, onCellPointerDown, onCellPointerMove, onCellPointerUp, onCellPointerCancel, dropPreview = null, carSample = null, carAtStart = null, carAngle = 0, vehicleId = 'car', goalCelebrationKey = null, goalCell = null }: CarRoadBoardProps) {
+  const vehicle = getVehicleDefinition(vehicleId)
+
   return (
     <div className={styles.boardFrame} data-testid="car-road-board" aria-label="みちの ばんめん">
       <div
@@ -99,8 +101,9 @@ export default function CarRoadBoard({ board, boardRef, selectedCellId = null, d
         )}
         {(carSample || carAtStart) && (
           <span
-            className={styles.car}
-            aria-label="くるま"
+            className={`${styles.car} ${styles[vehicle.displayClassName]}`}
+            data-vehicle-id={vehicle.id}
+            aria-label="ばんめんの くるま"
             style={{
               left: `${((carSample?.point.x ?? carAtStart?.x ?? 0) / board.size.cols) * 100}%`,
               top: `${((carSample?.point.y ?? carAtStart?.y ?? 0) / board.size.rows) * 100}%`,

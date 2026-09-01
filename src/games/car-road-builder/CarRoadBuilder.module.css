@@ -388,31 +388,51 @@
   z-index: 2;
   display: grid;
   place-items: center;
-  width: calc(var(--road-cell) * .42);
-  height: calc(var(--road-cell) * .28);
-  margin: calc(var(--road-cell) * -.14) calc(var(--road-cell) * -.21);
+  width: calc(var(--road-cell) * .44);
+  height: calc(var(--road-cell) * .29);
+  margin: calc(var(--road-cell) * -.145) calc(var(--road-cell) * -.22);
   line-height: 1;
   pointer-events: none;
   transform: translate(0, 0) rotate(var(--car-angle, 0rad));
 }
 
+.carDisplayStandard { width: calc(var(--road-cell) * .44); height: calc(var(--road-cell) * .29); margin: calc(var(--road-cell) * -.145) calc(var(--road-cell) * -.22); }
+.carDisplayPolice { width: calc(var(--road-cell) * .46); height: calc(var(--road-cell) * .31); margin: calc(var(--road-cell) * -.155) calc(var(--road-cell) * -.23); }
+.carDisplayBus { width: calc(var(--road-cell) * .56); height: calc(var(--road-cell) * .31); margin: calc(var(--road-cell) * -.155) calc(var(--road-cell) * -.28); }
+.carDisplayBulldozer { width: calc(var(--road-cell) * .5); height: calc(var(--road-cell) * .34); margin: calc(var(--road-cell) * -.17) calc(var(--road-cell) * -.25); }
+
 .carSvg { display: block; width: 100%; height: 100%; overflow: visible; }
 .carShadow { fill: rgba(26, 78, 94, .2); transform: translate(0, 1px); }
-.carBody { fill: #f26b55; stroke: #873b3b; stroke-width: 1.2; }
-.carBodyRed { fill: #f26b55; }
-.carBodyBlue { fill: #4c9ee8; stroke: #285c96; }
+.carBody { stroke-width: 1.2; }
+.carBodyCar { fill: #f26b55; stroke: #873b3b; }
+.carBodyPolice { fill: #fafcff; stroke: #364b60; }
 .carBodyBus { fill: #f4be4f; stroke: #9b6b1c; }
-.carBodyTruck { fill: #7dc77d; stroke: #397447; }
-.truckCargo { fill: #4e9caa; stroke: #276673; stroke-width: 1.2; }
-.truckCargoDetail { fill: #bfe7e5; stroke: #397e86; stroke-width: .8; }
+.carBodyBulldozer { fill: #f4b72f; stroke: #9a6419; }
+.policeBlackPanel { fill: #26394d; }
+.policeFrontWindow { fill: #d9f6fa; stroke: #3f7181; stroke-width: .8; }
+.policeStripe { fill: #26394d; }
+.policeLightBase { fill: #273a4b; stroke: #152331; stroke-width: .7; }
+.policeLightRed { fill: #ff4b55; stroke: #a82436; stroke-width: .3; }
+.policeLightBlue { fill: #55c9ff; stroke: #1c79aa; stroke-width: .3; }
 .carRearWindow { fill: #b9e7ef; stroke: #3f7181; stroke-width: .8; }
 .carFrontWindshield { fill: #d9f6fa; stroke: #3f7181; stroke-width: .8; }
+.busRoofBand { fill: #ffe28a; opacity: .72; }
 .busWindow { fill: #d9f6fa; stroke: #3f7181; stroke-width: .7; }
 .busFrontWindow { fill: #f4fbff; stroke: #3f7181; stroke-width: .8; }
+.busRoofDetail { fill: none; stroke: #d4972e; stroke-width: .55; stroke-dasharray: 1.3 1.1; }
 .carCenterLine { fill: none; stroke: rgba(135, 59, 59, .55); stroke-width: .8; }
 .carWheel { fill: #284653; }
 .carHeadlight { fill: #fff4a8; stroke: #b9752d; stroke-width: .5; }
 .carTailLight { fill: #a72d3d; }
+.bulldozerBladeShadow { fill: rgba(26, 78, 94, .2); transform: translate(0, 1px); }
+.bulldozerBlade { fill: #f5c542; stroke: #9a6419; stroke-width: 1.1; }
+.bulldozerBladeEdge { fill: none; stroke: #ffe895; stroke-width: 1.1; }
+.bulldozerBladeArm { fill: none; stroke: #9a6419; stroke-width: 1.5; stroke-linecap: round; }
+.bulldozerTrack { fill: #3c4b4e; stroke: #263437; stroke-width: .7; }
+.bulldozerTrackInner { fill: none; stroke: #93a2a0; stroke-width: .8; stroke-linecap: round; stroke-dasharray: 1.8 1.2; }
+.bulldozerCabin { fill: #e79b20; stroke: #9a6419; stroke-width: .8; }
+.bulldozerWindow { fill: #b8e7ec; stroke: #3f7181; stroke-width: .7; }
+.bulldozerLight { fill: #fff0a0; stroke: #b9752d; stroke-width: .5; }
 
 .selectionTools {
   display: flex;

@@ -83,7 +83,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
   const navigate = useNavigate()
   const activeStageId = stageId ?? stageIdFromNavigationState(location.state) ?? 'normal'
   const [board, setBoard] = useState<Board>(() => createStageBoard(activeStageId))
-  const [vehicleId, setVehicleId] = useState<VehicleId>('red-car')
+  const [vehicleId, setVehicleId] = useState<VehicleId>('car')
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null)
   const [selectedKind, setSelectedKind] = useState<PartKind | null>(null)
   const [draggingCellId, setDraggingCellId] = useState<string | null>(null)
