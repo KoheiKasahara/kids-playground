@@ -42,28 +42,33 @@ export default function RoadPartVisual({ part }: RoadPartVisualProps) {
             : pathSpecs.map((spec, index) => <path key={index} d={pathSpecToSvgPath(spec)} />)}
           {part.kind === 'goal' && (
             <>
-              <circle className={styles.goalTargetShadow} cx="0" cy="0" r=".18" />
-              <circle className={styles.goalTarget} cx="0" cy="0" r=".145" />
-              <circle className={styles.goalTargetDot} cx="0" cy="0" r=".045" />
+              <g className={styles.goalGate} data-testid="goal-gate" transform={`rotate(${part.rotationStep * 45})`}>
+                {/* The lane remains visible from the one connected edge to the centre. */}
+                <rect className={styles.goalPillarShadow} x="-.4" y="-.31" width=".1" height=".57" rx=".03" />
+                <rect className={styles.goalPillarShadow} x=".3" y="-.31" width=".1" height=".57" rx=".03" />
+                <rect className={styles.goalPillar} data-goal-pillar="left" x="-.375" y="-.32" width=".07" height=".55" rx=".02" />
+                <rect className={styles.goalPillar} data-goal-pillar="right" x=".305" y="-.32" width=".07" height=".55" rx=".02" />
+                <circle className={styles.goalPillarCap} cx="-.34" cy=".23" r=".045" />
+                <circle className={styles.goalPillarCap} cx=".34" cy=".23" r=".045" />
+                <rect className={styles.goalBannerFrame} x="-.4" y="-.48" width=".8" height=".21" rx=".035" />
+                {Array.from({ length: 16 }, (_, index) => {
+                  const column = index % 8
+                  const row = Math.floor(index / 8)
+                  return (
+                    <rect
+                      key={index}
+                      className={index % 2 === row % 2 ? styles.goalCheckerLight : styles.goalCheckerDark}
+                      data-goal-checker="true"
+                      x={-.37 + column * .0925}
+                      y={-.46 + row * .085}
+                      width=".0925"
+                      height=".085"
+                    />
+                  )
+                })}
+                <rect className={styles.goalBannerHighlight} x="-.35" y="-.452" width=".7" height=".014" rx=".007" />
+              </g>
             </>
-          )}
-          {part.kind === 'goal' && (
-            <g className={styles.goalGate} data-testid="goal-gate" transform={`rotate(${part.rotationStep * 45})`}>
-              <path className={styles.goalGateShadow} d="M-.36-.07V-.35H.36V-.07" />
-              <rect className={styles.goalPillar} x="-.4" y="-.35" width=".09" height=".29" rx=".025" />
-              <rect className={styles.goalPillar} x=".31" y="-.35" width=".09" height=".29" rx=".025" />
-              <rect className={styles.goalBanner} x="-.34" y="-.47" width=".68" height=".12" rx=".025" />
-              {Array.from({ length: 16 }, (_, index) => {
-                const column = index % 8
-                const row = Math.floor(index / 8)
-                return <rect key={index} className={index % 2 === row % 2 ? styles.goalCheckerLight : styles.goalCheckerDark} x={-.32 + column * .08} y={-.455 + row * .055} width=".08" height=".055" />
-              })}
-              <rect className={styles.goalFinishLine} x="-.24" y="-.13" width=".48" height=".09" rx=".012" />
-              {Array.from({ length: 8 }, (_, index) => (
-                <rect key={index} className={index % 2 === 0 ? styles.goalCheckerLight : styles.goalCheckerDark} x={-.24 + index * .06} y="-.13" width=".06" height=".09" />
-              ))}
-              <path className={styles.goalArrow} d="M-.12-.205H.12M.08-.235L.12-.205.08-.175" />
-            </g>
           )}
         </svg>
       )}
