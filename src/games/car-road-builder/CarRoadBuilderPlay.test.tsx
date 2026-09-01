@@ -186,12 +186,30 @@ describe('CarRoadBuilderPlay', () => {
     const user = userEvent.setup()
     renderPlay()
 
-    const truck = screen.getByRole('button', { name: 'トラック' })
-    await user.click(truck)
+    const bulldozer = screen.getByRole('button', { name: 'ブルドーザー' })
+    await user.click(bulldozer)
 
-    expect(truck).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByLabelText('くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'truck')
-    expect(screen.getByLabelText('くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-front-direction', 'E')
+    expect(bulldozer).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('ばんめんの くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', 'bulldozer')
+    expect(screen.getByLabelText('ばんめんの くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-front-direction', 'E')
+    expect(screen.getByLabelText('ばんめんの くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-front-feature', 'blade')
+  })
+
+  test('shows the four named vehicle choices with matching thumbnails', () => {
+    renderPlay()
+
+    for (const [label, vehicleId, feature] of [
+      ['くるま', 'car', 'rounded-body'],
+      ['パトカー', 'police-car', 'siren-bar'],
+      ['バス', 'bus', 'long-body'],
+      ['ブルドーザー', 'bulldozer', 'blade'],
+    ] as const) {
+      const option = screen.getByRole('button', { name: label })
+      expect(option).toHaveAttribute('data-vehicle-id', vehicleId)
+      expect(option.querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-front-feature', feature)
+    }
+
+    expect(screen.getByRole('button', { name: 'くるま' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('keeps start and goal movable/rotatable but not deletable', async () => {
@@ -405,7 +423,7 @@ describe('CarRoadBuilderPlay', () => {
     const frames = queueAnimationFrames()
     renderPlay()
     await buildSimpleGoalRoute(user)
-    await user.click(screen.getByRole('button', { name: 'トラック' }))
+    await user.click(screen.getByRole('button', { name: 'ブルドーザー' }))
 
     for (let run = 0; run < 3; run += 1) {
       if (run === 1) await user.click(screen.getByRole('button', { name: 'バス' }))
@@ -417,7 +435,7 @@ describe('CarRoadBuilderPlay', () => {
       expect(screen.getAllByTestId('car-road-goal-burst')).toHaveLength(1)
       expect(screen.getByRole('button', { name: 'しゅっぱつ' })).toBeEnabled()
       expect(screen.getByRole('gridcell', { name: 'まっすぐ、1ぎょう 2れつ' })).toBeInTheDocument()
-      expect(screen.getByLabelText('くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', run === 0 ? 'truck' : 'bus')
+      expect(screen.getByLabelText('ばんめんの くるま').querySelector('[data-testid="car-visual"]')).toHaveAttribute('data-vehicle-id', run === 0 ? 'bulldozer' : 'bus')
     }
   })
 

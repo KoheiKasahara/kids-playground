@@ -1,16 +1,38 @@
-export type VehicleId = 'red-car' | 'blue-car' | 'bus' | 'truck'
+export type VehicleId = 'car' | 'police-car' | 'bus' | 'bulldozer'
 
 export type VehicleDefinition = Readonly<{
   id: VehicleId
   label: string
   bodyClassName: string
+  /** Board-only wrapper size; route coordinates remain unchanged. */
+  displayClassName: string
 }>
 
 export const VEHICLE_DEFINITIONS: ReadonlyArray<VehicleDefinition> = [
-  { id: 'red-car', label: 'あかい くるま', bodyClassName: 'carBodyRed' },
-  { id: 'blue-car', label: 'あおい くるま', bodyClassName: 'carBodyBlue' },
-  { id: 'bus', label: 'バス', bodyClassName: 'carBodyBus' },
-  { id: 'truck', label: 'トラック', bodyClassName: 'carBodyTruck' },
+  {
+    id: 'car',
+    label: 'くるま',
+    bodyClassName: 'carBodyCar',
+    displayClassName: 'carDisplayStandard',
+  },
+  {
+    id: 'police-car',
+    label: 'パトカー',
+    bodyClassName: 'carBodyPolice',
+    displayClassName: 'carDisplayPolice',
+  },
+  {
+    id: 'bus',
+    label: 'バス',
+    bodyClassName: 'carBodyBus',
+    displayClassName: 'carDisplayBus',
+  },
+  {
+    id: 'bulldozer',
+    label: 'ブルドーザー',
+    bodyClassName: 'carBodyBulldozer',
+    displayClassName: 'carDisplayBulldozer',
+  },
 ]
 
 export function getVehicleDefinition(id: VehicleId): VehicleDefinition {
