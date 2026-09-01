@@ -52,6 +52,48 @@ function box(
   return mesh
 }
 
+type CarVertex = readonly [number, number, number]
+
+function quadMesh(
+  vertices: readonly CarVertex[],
+  material: THREE.Material,
+  name: string,
+): THREE.Mesh {
+  const positions: number[] = []
+  for (const vertex of vertices) positions.push(vertex[0], vertex[1], vertex[2])
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex([0, 1, 2, 0, 2, 3])
+  geometry.computeVertexNormals()
+
+  const mesh = new THREE.Mesh(geometry, material)
+  mesh.name = name
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  return mesh
+}
+
+function sideWindowMesh(
+  points: readonly ProfilePoint[],
+  x: number,
+  material: THREE.Material,
+  name: string,
+): THREE.Mesh {
+  const shape = new THREE.Shape()
+  const first = points[0]
+  if (first === undefined) throw new Error('サイドウィンドウのプロファイルが空です')
+  shape.moveTo(first[0], first[1])
+  for (const point of points.slice(1)) shape.lineTo(point[0], point[1])
+  shape.closePath()
+
+  const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), material)
+  mesh.name = name
+  mesh.rotation.y = -Math.PI / 2
+  mesh.position.x = x
+  return mesh
+}
+
 /**
  * 車体側面の輪郭を押し出したMesh。
  * x方向へ押し出してからY軸回転することで、点列の横軸を車のZ方向として扱う。
@@ -157,49 +199,174 @@ function addBumpers(group: THREE.Group, dimensions: CarDimensions, material: THR
   )
 }
 
-function buildSportsBody({ dimensions, color }: CarPartContext): THREE.Object3D {
+function buildSportsBody({ dimensions, attachments, color }: CarPartContext): THREE.Object3D {
   const group = createBodyGroup()
-  const bodyMaterial = standard(color, 0.36)
-  const glassMaterial = standard(GLASS_COLOR, 0.14, 0.12)
-  const trimMaterial = standard(CHROME_COLOR, 0.32, 0.35)
+  const bodyMaterial = standard(color, 0.34)
+  const glassMaterial = new THREE.MeshStandardMaterial({
+    color: GLASS_COLOR,
+    roughness: 0.12,
+    metalness: 0.14,
+    side: THREE.DoubleSide,
+  })
+  const trimMaterial = standard(CHROME_COLOR, 0.28, 0.42)
+  const grilleMaterial = standard('#202b36', 0.3, 0.18)
+  const archMaterial = standard('#8b3038', 0.42, 0.12)
   const half = dimensions.length / 2
   const floor = dimensions.bodyFloorY
-  const hoodEnd = half - dimensions.hoodLength
+  const hoodStart = half - dimensions.hoodLength
+  const cabinHalf = dimensions.cabinLength / 2
+  const cabinRear = dimensions.cabinCenterZ - cabinHalf
+  const cabinFront = dimensions.cabinCenterZ + cabinHalf
+  const roofRear = dimensions.cabinCenterZ - cabinHalf * 0.82
+  const roofFront = dimensions.cabinCenterZ + cabinHalf * 0.72
 
-  // 低く長い鼻先と、後ろへ寄った流線型キャビンで「速そう」を出す。
+  // 低いノーズ、後方へ寄ったキャビン、なだらかなリアデッキを一体の輪郭として組み立てる。
   group.add(
     profileMesh(
       [
         [-half, floor],
         [half, floor],
-        [half, floor + dimensions.hullHeight * 0.52],
-        [hoodEnd, floor + dimensions.hullHeight],
-        [-half * 0.55, floor + dimensions.hullHeight * 0.92],
-        [-half, floor + dimensions.hullHeight * 0.55],
+        [half, floor + dimensions.hullHeight * 0.38],
+        [half - 0.1, floor + dimensions.hullHeight * 0.58],
+        [hoodStart, floor + dimensions.hullHeight],
+        [cabinRear + 0.1, floor + dimensions.hullHeight * 0.94],
+        [-half + 0.22, floor + dimensions.hullHeight * 0.82],
+        [-half, floor + dimensions.hullHeight * 0.5],
       ],
       dimensions.width,
       bodyMaterial,
       'car-body-hull',
     ),
   )
-  addCabin(group, dimensions, bodyMaterial, glassMaterial, 0.72, 0.82)
+
+  // キャビンの外殻とガラスを分離し、側面の窓形状を車体の輪郭に沿わせる。
   group.add(
-    box(
-      { x: dimensions.width * 0.78, y: 0.08, z: dimensions.hoodLength * 0.72 },
-      { x: 0, y: dimensions.hullTopY + 0.03, z: half - dimensions.hoodLength * 0.46 },
-      trimMaterial,
-    ),
-    box(
-      { x: dimensions.width * 1.03, y: 0.1, z: dimensions.length * 0.7 },
-      { x: 0, y: floor + 0.12, z: -dimensions.length * 0.02 },
+    profileMesh(
+      cabinProfile(dimensions, 0.72, 0.82),
+      dimensions.cabinWidth,
       bodyMaterial,
-    ),
-    box(
-      { x: dimensions.width * 0.64, y: 0.08, z: 0.12 },
-      { x: 0, y: dimensions.roofTopY + 0.03, z: -half * 0.77 },
-      bodyMaterial,
+      'car-body-cabin-shell',
     ),
   )
+
+  const sideBottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.13
+  const sideTopY = dimensions.roofTopY - dimensions.cabinHeight * 0.1
+  const pillarZ = dimensions.cabinCenterZ - cabinHalf * 0.05
+  for (const side of [1, -1] as const) {
+    const sideName = side === 1 ? 'left' : 'right'
+    const sideX = side * (dimensions.cabinWidth / 2 + 0.016)
+    group.add(
+      sideWindowMesh(
+        [
+          [cabinRear + 0.12, sideBottomY],
+          [pillarZ - 0.08, sideBottomY],
+          [pillarZ - 0.16, sideTopY],
+          [roofRear + 0.04, sideTopY - 0.03],
+        ],
+        sideX,
+        glassMaterial,
+        `car-sports-side-window-rear-${sideName}`,
+      ),
+      sideWindowMesh(
+        [
+          [pillarZ + 0.08, sideBottomY],
+          [cabinFront - 0.12, sideBottomY],
+          [roofFront - 0.03, sideTopY + 0.01],
+          [pillarZ + 0.16, sideTopY],
+        ],
+        sideX,
+        glassMaterial,
+        `car-sports-side-window-front-${sideName}`,
+      ),
+    )
+  }
+
+  const windshieldBottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.14
+  const windshieldTopY = dimensions.roofTopY - 0.045
+  const windshieldBottomZ = cabinFront - 0.12
+  const windshieldTopZ = roofFront - 0.03
+  const windshieldHalfWidth = dimensions.cabinWidth * 0.36
+  group.add(
+    quadMesh(
+      [
+        [-windshieldHalfWidth, windshieldBottomY, windshieldBottomZ],
+        [windshieldHalfWidth, windshieldBottomY, windshieldBottomZ],
+        [windshieldHalfWidth, windshieldTopY, windshieldTopZ],
+        [-windshieldHalfWidth, windshieldTopY, windshieldTopZ],
+      ],
+      glassMaterial,
+      'car-sports-windshield',
+    ),
+  )
+
+  // フェンダー上部だけを細いアーチで縁取り、タイヤとボディの境界を読み取りやすくする。
+  for (const wheel of attachments.wheels) {
+    const arch = new THREE.Mesh(
+      new THREE.TorusGeometry(wheel.radius * 1.08, 0.035, 8, 24, Math.PI),
+      archMaterial,
+    )
+    arch.name = `car-sports-wheel-arch-${wheel.id}`
+    arch.rotation.y = Math.PI / 2
+    arch.position.set(wheel.position.x, wheel.position.y, wheel.position.z)
+    arch.castShadow = true
+    arch.receiveShadow = true
+    group.add(arch)
+  }
+
+  const grilleY = floor + dimensions.hullHeight * 0.42
+  const grille = box(
+    { x: dimensions.width * 0.52, y: dimensions.hullHeight * 0.16, z: 0.07 },
+    { x: 0, y: grilleY, z: half + 0.045 },
+    grilleMaterial,
+  )
+  grille.name = 'car-sports-front-grille'
+  group.add(grille)
+
+  const grilleSlatY = dimensions.hullHeight * 0.065
+  for (const offset of [-1, 0, 1]) {
+    group.add(
+      box(
+        { x: dimensions.width * 0.44, y: 0.018, z: 0.082 },
+        { x: 0, y: grilleY + offset * grilleSlatY, z: half + 0.085 },
+        trimMaterial,
+      ),
+    )
+  }
+
+  const splitter = box(
+    { x: dimensions.width * 0.84, y: 0.06, z: 0.1 },
+    { x: 0, y: floor + dimensions.hullHeight * 0.12, z: half + 0.07 },
+    trimMaterial,
+  )
+  splitter.name = 'car-sports-front-splitter'
+  group.add(splitter)
+
+  // ボンネットの中央ラインとリアデッキの薄い面で、単純な箱の集合に見えない抑揚を足す。
+  group.add(
+    box(
+      { x: 0.055, y: 0.028, z: dimensions.hoodLength * 0.76 },
+      { x: 0, y: dimensions.hullTopY + 0.025, z: half - dimensions.hoodLength * 0.42 },
+      trimMaterial,
+    ),
+  )
+  const rearDeck = box(
+    { x: dimensions.width * 0.58, y: 0.045, z: 0.18 },
+    { x: 0, y: dimensions.hullTopY - 0.025, z: -half * 0.68 },
+    trimMaterial,
+  )
+  rearDeck.name = 'car-sports-rear-deck'
+  group.add(rearDeck)
+
+  for (const side of [1, -1] as const) {
+    group.add(
+      box(
+        { x: 0.08, y: 0.11, z: dimensions.length * 0.64 },
+        { x: side * (dimensions.width / 2 + 0.012), y: floor + 0.12, z: -0.06 },
+        trimMaterial,
+      ),
+    )
+  }
+
   addBumpers(group, dimensions, trimMaterial)
   return group
 }
@@ -410,11 +577,12 @@ const BODY_BUILDERS: Record<BodyType, CarPartBuilder> = {
 }
 
 function buildWheels(hubColor: string, hubRadiusRatio: number) {
-  return ({ attachments }: CarPartContext): THREE.Object3D => {
+  return ({ attachments, config }: CarPartContext): THREE.Object3D => {
     const group = new THREE.Group()
     group.name = 'car-wheels'
     const tireMaterial = standard(TIRE_COLOR, 0.85, 0)
     const hubMaterial = standard(hubColor, 0.35, 0.2)
+    const sportsWheel = config.body === 'sports'
 
     for (const wheel of attachments.wheels) {
       // タイヤは1本ずつ独立に置く。位置はすべて attachment 由来で、車種ごとの分岐は無い。
@@ -436,7 +604,34 @@ function buildWheels(hubColor: string, hubRadiusRatio: number) {
       )
       hub.rotation.z = Math.PI / 2
       hub.position.copy(tire.position)
-      group.add(tire, hub)
+
+      if (sportsWheel) {
+        const rimRing = new THREE.Mesh(
+          new THREE.TorusGeometry(wheel.radius * 0.58, wheel.radius * 0.055, 8, 20),
+          hubMaterial,
+        )
+        rimRing.name = `car-sports-rim-ring-${wheel.id}`
+        rimRing.rotation.y = Math.PI / 2
+        rimRing.position.copy(tire.position)
+        rimRing.castShadow = true
+
+        const centerCap = new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            wheel.radius * 0.17,
+            wheel.radius * 0.17,
+            wheel.width * 1.12,
+            12,
+          ),
+          hubMaterial,
+        )
+        centerCap.name = `car-sports-center-cap-${wheel.id}`
+        centerCap.rotation.z = Math.PI / 2
+        centerCap.position.copy(tire.position)
+        centerCap.castShadow = true
+        group.add(tire, hub, rimRing, centerCap)
+      } else {
+        group.add(tire, hub)
+      }
     }
     return group
   }
