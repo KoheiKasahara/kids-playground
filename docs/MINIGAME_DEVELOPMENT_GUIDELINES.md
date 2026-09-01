@@ -105,11 +105,33 @@ docs/                          # 設計、運用、素材クレジット
 4. 全モードの表示、回答、進行、結果、再挑戦をComponent Testで確認する。
 5. 不正URL、stateなし結果URL、ホームと主要ルートのフォールバックを確認する。
 6. 画像の視認性、向き、容量、人物・ナンバー・ロゴを目視確認する。
-7. `lint`、`test`、`build`、`build:pages` を実行する。
+7. `lint`、`build`、`build:pages` に加えて、対象ゲームを変更した場合は `npm run test:game -- <game-id>` を、それ以外は `npm run test:quick`（最低限）または `npm run verify` を実行する。テストコマンドの使い分けは9章を参照する。
 8. ビルドされたService Workerのprecacheに新素材が含まれ、Workbox警告がないことを確認する。
-9. 既存ゲームのテストを含む全テストが通ることを確認する。
+9. PRを出す前に `npm test`（全テスト）が通ることを確認する。
 
-## 9. 文書更新とレビュー・チェックリスト
+## 9. テストコマンドの使い分け（Vitest projects）
+
+Vitest は `unit`（node environment）/ `dom`（jsdom environment）/ `slow`（node environment、長時間の物理シミュレーション等）の3つの project に分かれています（Issue #434 Phase 1）。DOMを必要としないテストを軽量な `unit` project で実行することで、テスト内容・件数を変えずに実行時間を短縮しています。
+
+新しいテストファイルを追加するときは、`document` / `window` / `localStorage` などDOM APIやReact Testing Libraryの `render` を使うかどうかで置き場所を判断してください。
+
+- `.test.tsx`（Reactコンポーネントの描画テスト）→ 通常は `dom` 対象（`vite.config.ts` の `include` に自動で入る）。
+- `.test.ts` でDOM APIに触れない → 何もしなくても `unit` 対象になる。
+- `.test.ts` でも `document` / `window` / `canvas` 等に触れる → `vite.config.ts` の `domDependentTestTsFiles` に追記して `dom` project へ明示的に回す。
+- 1テストあたり2秒を超えるような完走物理シミュレーション（`domino-flag` の長距離ドミノ等）を新設する場合は `slowTestFiles` への追記を検討する。件数が多いだけの通常のユニットテストは `slow` に入れない。
+
+| 状況 | 実行するコマンド | 内容 |
+|---|---|---|
+| 通常の全体確認・PRを出す前 | `npm test`（= `npm run test:full`） | 全project・全テストを実行する（**意味は変更していません**） |
+| 対象ゲームを変更した | `npm run test:game -- <game-id>`（例: `npm run test:game -- koma-battle`） | そのゲームに関わるテストファイルを unit/dom/slow の区別なくすべて実行する。重いシミュレーションを持つゲーム（例: `domino-flag`）でも `slow` を含めて実行される |
+| 素早く確認したいとき | `npm run test:quick` | `unit` + `dom`（DOMを必要としないテストは軽量なnode environmentで実行）。`slow` は含まない |
+| 大きな変更後・リリース前のフル確認 | `npm run test:full`（`npm run verify:full`） | `slow` を含む全テストを実行する |
+| 型だけ確認したい | `npm run typecheck` | `tsc -b` のみ実行する |
+| lint・型・quickテスト・buildをまとめて確認 | `npm run verify` | PR前のひととおりの確認に使う |
+
+`npm test` は今まで通り全テストを実行します。CI・ローカルとも `npm test` の意味は変えていません。
+
+## 10. 文書更新とレビュー・チェックリスト
 
 新規ゲームまたは重要仕様の変更時は、README、概要設計、セットアップ、ゲーム基本設計、クレジットを必要な範囲で更新します。
 
@@ -122,4 +144,5 @@ docs/                          # 設計、運用、素材クレジット
 - [ ] 狭い縦画面と低い横画面を確認した
 - [ ] PWAとGitHub Pagesのbase pathを確認した
 - [ ] Unit / Component Testと4つの検証コマンドを完了した
+- [ ] 対象ゲームについて `npm run test:game -- <game-id>` を実行した
 - [ ] 既存ゲームの互換性と不要な共通化がないことをレビューした
