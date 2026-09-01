@@ -12,7 +12,9 @@ import {
 import { KOMA_TYPE_CONFIGS, komaSpecsForCount, komaSpecsForSelection } from './komaSpecs'
 import {
   DISK_FRICTION,
+  DISK_RADIUS,
   DISK_RESTITUTION,
+  KOMA_CONTACT_MARGIN,
   KOMA_DENSITY,
   MAX_ANGULAR_SPEED,
   MAX_LINEAR_SPEED,
@@ -122,7 +124,12 @@ function simulate(
         readings[0]!.position.x - readings[1]!.position.x,
         readings[0]!.position.z - readings[1]!.position.z,
       )
-      const near = gap < 0.62
+      const near =
+        gap <=
+        DISK_RADIUS *
+          (world.komas[0]!.spec.type.visual.diskRadiusScale +
+            world.komas[1]!.spec.type.visual.diskRadiusScale) +
+          KOMA_CONTACT_MARGIN
       if (near && !touching) contacts += 1
       touching = near
     }
@@ -437,6 +444,36 @@ describe('コマ2個の対戦（実際にRapierを回して確認する）', () 
     expect(strong.repeated.komaKnockbacks).toBe(0)
     weak.world.world.free()
     strong.world.world.free()
+  })
+
+  it('強い正面衝突では中央付近から両方のコマが外周壁際まで弾かれる', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
+    const [first, second] = world.komas
+    const startRadius = 0.29
+    const startY = fieldHeightAt('basic', startRadius) + 0.02
+    first!.body.setTranslation({ x: -startRadius, y: startY, z: 0 }, true)
+    second!.body.setTranslation({ x: startRadius, y: startY, z: 0 }, true)
+    first!.body.setLinvel({ x: 2.4, y: 0, z: 0 }, true)
+    second!.body.setLinvel({ x: -2.4, y: 0, z: 0 }, true)
+
+    const initialAssist = applyKomaContactAssist(world)
+    expect(initialAssist.komaKnockbacks).toBe(1)
+    const maxRadii = [startRadius, startRadius]
+    for (let step = 0; step < Math.round(2.5 / PHYSICS_TIMESTEP); step += 1) {
+      for (const koma of world.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
+      applyKomaContactAssist(world)
+      world.world.step()
+      for (const [index, koma] of world.komas.entries()) {
+        clampKomaMotion(koma)
+        maxRadii[index] = Math.max(maxRadii[index]!, readKoma(koma).radius)
+      }
+    }
+
+    for (const maxRadius of maxRadii) {
+      expect(maxRadius).toBeGreaterThan(WALL_INNER_RADIUS - 0.3)
+      expect(maxRadius).toBeLessThan(OUT_RADIUS)
+    }
+    world.world.free()
   })
 
   it('いったん離れた後の再衝突では追加impulseを再び1回だけ適用する', () => {
