@@ -4,6 +4,7 @@ import {
   BOWL_DEPTH,
   bowlHeightAt,
   DEFAULT_KOMA_FIELD_ID,
+  DEFAULT_WALL_GAPS,
   fieldHeightAt,
   fieldSlopeAt,
   getKomaField,
@@ -17,6 +18,8 @@ import {
   WALL_SEGMENTS,
   WALL_THICKNESS,
   createStadiumHeightfield,
+  wallGapMarkers,
+  wallGapSegmentIndices,
 } from './komaStadium'
 
 describe('コマバトルのフィールド定義', () => {
@@ -72,6 +75,62 @@ describe('コマバトルのフィールド定義', () => {
     expect(ridge.heights).toHaveLength((16 + 1) ** 2)
     expect(ridge.size).toBe(basic.size)
     expect(ridge.heights.some((height, index) => height > basic.heights[index]! + 0.02)).toBe(true)
+  })
+})
+
+describe('外周壁の開口（場外ポイント）', () => {
+  it('全フィールドが同じ既定の開口配置を持ち、全周を壁で埋め尽くさない', () => {
+    for (const field of KOMA_FIELD_DEFINITIONS) {
+      expect(field.wallGaps).toEqual(DEFAULT_WALL_GAPS)
+    }
+    expect(DEFAULT_WALL_GAPS.count).toBeGreaterThanOrEqual(2)
+    expect(DEFAULT_WALL_GAPS.count).toBeLessThanOrEqual(4)
+  })
+
+  it('開口は東西南北（角度0/90/180/270度）を避け、指定した数だけ均等に配置される', () => {
+    const indices = wallGapSegmentIndices(DEFAULT_WALL_GAPS, WALL_SEGMENTS)
+    expect(indices.size).toBe(DEFAULT_WALL_GAPS.count * DEFAULT_WALL_GAPS.widthSegments)
+    const cardinalIndices = [0, WALL_SEGMENTS / 4, WALL_SEGMENTS / 2, (WALL_SEGMENTS * 3) / 4]
+    for (const cardinal of cardinalIndices) {
+      expect(indices.has(cardinal)).toBe(false)
+    }
+  })
+
+  it('開口設定が無ければ何も取り除かない', () => {
+    expect(wallGapSegmentIndices(null, WALL_SEGMENTS).size).toBe(0)
+    expect(wallGapSegmentIndices(undefined, WALL_SEGMENTS).size).toBe(0)
+  })
+
+  it('createWallSegmentsへ開口を渡すと、その番号の壁だけが無くなり残りは隙間なく並ぶ', () => {
+    const gapIndices = wallGapSegmentIndices(DEFAULT_WALL_GAPS, WALL_SEGMENTS)
+    const withoutGaps = createWallSegments(WALL_SEGMENTS)
+    const withGaps = createWallSegments(WALL_SEGMENTS, undefined, gapIndices)
+
+    expect(withGaps).toHaveLength(withoutGaps.length - gapIndices.size)
+    for (const segment of withGaps) {
+      expect(gapIndices.has(segment.index)).toBe(false)
+    }
+    // 壁が残っている場所は開口の影響を受けず、既存と同じ半径・向きのまま。
+    const keptIndex = withGaps[0]!.index
+    const original = withoutGaps.find((segment) => segment.index === keptIndex)!
+    expect(withGaps[0]!.center).toEqual(original.center)
+    expect(withGaps[0]!.yaw).toBeCloseTo(original.yaw, 10)
+  })
+
+  it('wallGapMarkersは壁を取り除いた場所だけに、壁と同じ角度公式でマーカーを置く', () => {
+    const gapIndices = wallGapSegmentIndices(DEFAULT_WALL_GAPS, WALL_SEGMENTS)
+    const markers = wallGapMarkers(gapIndices, WALL_SEGMENTS)
+    expect(markers).toHaveLength(gapIndices.size)
+    for (const marker of markers) {
+      expect(marker.angle).toBeCloseTo((marker.index / WALL_SEGMENTS) * Math.PI * 2, 10)
+    }
+    // 壁セグメントとマーカーで、24セグメントぶんをちょうど分け合う（重複も欠落もない）。
+    const wallIndices = new Set(
+      createWallSegments(WALL_SEGMENTS, undefined, gapIndices).map((segment) => segment.index),
+    )
+    const markerIndices = new Set(markers.map((marker) => marker.index))
+    expect(wallIndices.size + markerIndices.size).toBe(WALL_SEGMENTS)
+    for (const index of wallIndices) expect(markerIndices.has(index)).toBe(false)
   })
 })
 

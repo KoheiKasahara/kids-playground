@@ -60,6 +60,8 @@ import {
   fieldHeightAt,
   getKomaField,
   WALL_INNER_RADIUS,
+  WALL_SEGMENTS,
+  wallGapSegmentIndices,
   type KomaField,
   type KomaFieldId,
 } from './komaStadium'
@@ -189,7 +191,8 @@ export function createKomaBattleWorld(
       .setRestitution(FLOOR_RESTITUTION),
   )
 
-  for (const segment of createWallSegments(undefined, selectedField.wallHeight)) {
+  const wallGapIndices = wallGapSegmentIndices(selectedField.wallGaps, WALL_SEGMENTS)
+  for (const segment of createWallSegments(undefined, selectedField.wallHeight, wallGapIndices)) {
     world.createCollider(
       rapier.ColliderDesc.cuboid(segment.halfWidth, segment.halfHeight, segment.halfDepth)
         .setTranslation(segment.center.x, segment.center.y, segment.center.z)
