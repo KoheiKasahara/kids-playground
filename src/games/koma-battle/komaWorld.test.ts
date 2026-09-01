@@ -2,6 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   applyKomaAssist,
+  applyKomaContactAssist,
   clampKomaMotion,
   createKomaBattleWorld,
   readKoma,
@@ -57,6 +58,8 @@ function simulate(
   maxRadius: number
   endRadius: number
   contacts: number
+  knockbacks: number
+  wallRedirects: number
 } {
   const steps = Math.round(seconds / PHYSICS_TIMESTEP)
   const stepMs = PHYSICS_TIMESTEP * 1000
@@ -74,9 +77,14 @@ function simulate(
   let endRadius = 0
   let contacts = 0
   let touching = false
+  let knockbacks = 0
+  let wallRedirects = 0
 
   for (let step = 0; step < steps; step += 1) {
     for (const koma of world.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
+    const assist = applyKomaContactAssist(world, outcome === null)
+    knockbacks += assist.komaKnockbacks
+    wallRedirects += assist.wallRedirects
     world.world.step()
     for (const koma of world.komas) clampKomaMotion(koma)
     elapsedMs += stepMs
@@ -109,7 +117,7 @@ function simulate(
       minSpinAtEnd = Math.min(minSpinAtEnd, Math.abs(reading.spinSpeed))
     }
 
-    if (readings.length === 2) {
+    if (outcome === null && readings.length === 2) {
       const gap = Math.hypot(
         readings[0]!.position.x - readings[1]!.position.x,
         readings[0]!.position.z - readings[1]!.position.z,
@@ -145,6 +153,8 @@ function simulate(
     maxRadius,
     endRadius,
     contacts,
+    knockbacks,
+    wallRedirects,
   }
 }
 
@@ -394,8 +404,92 @@ describe('コマ2個の対戦（実際にRapierを回して確認する）', () 
       const result = simulate(world, 30)
       // 1試合の中で必ず複数回ぶつかる。
       expect(result.contacts).toBeGreaterThanOrEqual(2)
+      expect(result.knockbacks).toBeGreaterThanOrEqual(1)
       world.world.free()
     }
+  })
+
+  it('強い衝突ほど大きく弾き、接触中は追加impulseを多重発火しない', () => {
+    function runContact(speed: number) {
+      const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
+      const [first, second] = world.komas
+      first!.body.setTranslation({ x: -0.29, y: 0.02, z: 0 }, true)
+      second!.body.setTranslation({ x: 0.29, y: 0.02, z: 0 }, true)
+      first!.body.setLinvel({ x: speed, y: 0, z: 0 }, true)
+      second!.body.setLinvel({ x: -speed, y: 0, z: 0 }, true)
+
+      const before = first!.body.linvel().x
+      const firstResult = applyKomaContactAssist(world)
+      const delta = before - first!.body.linvel().x
+      const repeated = applyKomaContactAssist(world)
+      return { world, firstResult, repeated, delta }
+    }
+
+    const weak = runContact(0.3)
+    const strong = runContact(2.2)
+    expect(weak.firstResult.komaKnockbacks).toBe(1)
+    expect(strong.firstResult.komaKnockbacks).toBe(1)
+    expect(strong.delta).toBeGreaterThan(weak.delta)
+    expect(strong.firstResult.maxAppliedImpulse).toBeGreaterThan(
+      weak.firstResult.maxAppliedImpulse,
+    )
+    expect(weak.repeated.komaKnockbacks).toBe(0)
+    expect(strong.repeated.komaKnockbacks).toBe(0)
+    weak.world.world.free()
+    strong.world.world.free()
+  })
+
+  it('いったん離れた後の再衝突では追加impulseを再び1回だけ適用する', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
+    const [first, second] = world.komas
+    first!.body.setTranslation({ x: -0.29, y: 0.02, z: 0 }, true)
+    second!.body.setTranslation({ x: 0.29, y: 0.02, z: 0 }, true)
+    first!.body.setLinvel({ x: 1, y: 0, z: 0 }, true)
+    second!.body.setLinvel({ x: -1, y: 0, z: 0 }, true)
+    expect(applyKomaContactAssist(world).komaKnockbacks).toBe(1)
+
+    first!.body.setTranslation({ x: -0.8, y: 0.02, z: 0 }, true)
+    second!.body.setTranslation({ x: 0.8, y: 0.02, z: 0 }, true)
+    applyKomaContactAssist(world)
+    first!.body.setTranslation({ x: -0.29, y: 0.02, z: 0 }, true)
+    second!.body.setTranslation({ x: 0.29, y: 0.02, z: 0 }, true)
+    first!.body.setLinvel({ x: 1, y: 0, z: 0 }, true)
+    second!.body.setLinvel({ x: -1, y: 0, z: 0 }, true)
+    expect(applyKomaContactAssist(world).komaKnockbacks).toBe(1)
+    expect(applyKomaContactAssist(world).komaKnockbacks).toBe(0)
+    world.world.free()
+  })
+
+  it('壁接触開始時だけ中央へ戻すimpulseを与え、決着後は補正しない', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1))
+    const koma = world.komas[0]!
+    koma.body.setTranslation({ x: WALL_INNER_RADIUS - 0.15, y: 0.02, z: 0 }, true)
+    koma.body.setLinvel({ x: 3, y: 0, z: 1 }, true)
+    const before = koma.body.linvel().x
+    const first = applyKomaContactAssist(world)
+    expect(first.wallRedirects).toBe(1)
+    expect(koma.body.linvel().x).toBeLessThan(before)
+    expect(applyKomaContactAssist(world).wallRedirects).toBe(0)
+
+    const velocityBeforeFinish = koma.body.linvel()
+    expect(applyKomaContactAssist(world, false)).toEqual({
+      komaKnockbacks: 0,
+      wallRedirects: 0,
+      maxAppliedImpulse: 0,
+    })
+    expect(koma.body.linvel()).toEqual(velocityBeforeFinish)
+    world.world.free()
+  })
+
+  it('再戦用に世界を作り直すと接触状態も初期化される', () => {
+    const firstRun = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
+    firstRun.contactAssist.activeKomaPair = true
+    firstRun.contactAssist.activeWalls.add(0)
+    const replay = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
+    expect(replay.contactAssist.activeKomaPair).toBe(false)
+    expect(replay.contactAssist.activeWalls.size).toBe(0)
+    firstRun.world.free()
+    replay.world.free()
   })
 
   it('外周付近まで使って戦い、最後は内側へ寄ってくる', () => {

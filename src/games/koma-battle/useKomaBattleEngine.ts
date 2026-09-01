@@ -54,6 +54,7 @@ import { komaCameraSetup } from './komaCamera'
 import type { KomaSpec } from './komaSpecs'
 import {
   applyKomaAssist,
+  applyKomaContactAssist,
   clampKomaMotion,
   createKomaBattleWorld,
   readKoma,
@@ -791,6 +792,8 @@ export function useKomaBattleEngine(
       let substeps = 0
       while (accumulator >= stepMs && substeps < MAX_PHYSICS_SUBSTEPS) {
         for (const koma of battle.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
+        // 決着前だけ接触開始時の追加反発を適用する。決着後のsettle中は自然に倒れ切らせる。
+        applyKomaContactAssist(battle, !finished)
         battle.world.step()
         for (const koma of battle.komas) clampKomaMotion(koma)
         checkImpacts()
