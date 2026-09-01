@@ -15,6 +15,13 @@ const engineMock = vi.hoisted(() => ({
   mountCount: 0,
 }))
 
+const soundMock = vi.hoisted(() => ({
+  primeAudio: vi.fn(),
+  playKomaBattleStartSound: vi.fn(),
+}))
+
+vi.mock('../../utils/quizSound', () => soundMock)
+
 vi.mock('./useKomaBattleEngine', () => ({
   useKomaBattleEngine: (options: KomaBattleEngineOptions) => {
     engineMock.options = options
@@ -42,6 +49,8 @@ beforeEach(() => {
   engineMock.options = undefined
   engineMock.mountCount = 0
   engineMock.registerContainer.mockClear()
+  soundMock.primeAudio.mockClear()
+  soundMock.playKomaBattleStartSound.mockClear()
 })
 
 describe('KomaBattlePlay', () => {
@@ -74,6 +83,29 @@ describe('KomaBattlePlay', () => {
     expect(screen.getByRole('button', { name: /1こで まわす/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /2こで たいせん/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'まわせ！' })).toBeInTheDocument()
+  })
+
+  it('まわせ！を押すと、操作イベント中に音声を準備して開始音を1回鳴らす', async () => {
+    const user = userEvent.setup()
+    renderGame()
+
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+
+    expect(soundMock.primeAudio).toHaveBeenCalledTimes(1)
+    expect(soundMock.playKomaBattleStartSound).toHaveBeenCalledTimes(1)
+  })
+
+  it('もういちどでも開始音を鳴らし、古い結果を残さない', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+    finishWith({ kind: 'win', winnerIndex: 0, loserIndex: 1, reason: 'stopped' })
+
+    await user.click(screen.getByRole('button', { name: 'もういちど' }))
+
+    expect(soundMock.primeAudio).toHaveBeenCalledTimes(2)
+    expect(soundMock.playKomaBattleStartSound).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('button', { name: 'もういちど' })).not.toBeInTheDocument()
   })
 
   it('2個モードで開始でき、コマ2個ぶんの表示になる', async () => {
@@ -152,6 +184,8 @@ describe('KomaBattlePlay', () => {
     // 勝者名はコマ一覧にも出るため、結果表示の中だけを見る。
     const result = within(screen.getByRole('status'))
     expect(result.getByRole('heading', { name: 'かち！' })).toBeInTheDocument()
+    expect(result.getAllByText('✦')).toHaveLength(3)
+    expect(result.getAllByText('✧')).toHaveLength(3)
     expect(result.getByText('あおコマ')).toBeInTheDocument()
     expect(result.getByText(/あかコマが たおれたよ/)).toBeInTheDocument()
   })

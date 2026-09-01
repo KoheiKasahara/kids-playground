@@ -58,6 +58,304 @@ export function primeAudio(): void {
   getAudioContext()
 }
 
+export type KomaBattleImpactSoundKind = 'koma' | 'bumper' | 'wall'
+type KomaBattleDefeatReason = 'toppled' | 'stopped' | 'outOfArena'
+
+/** コマバトル専用の、速度連動回転音の上限。 */
+const KOMA_SPIN_SOUND_MAX_SPEED = 75
+/** 回転音が小さすぎて聞こえなくならないための下限ゲイン。 */
+const KOMA_SPIN_SOUND_MIN_GAIN = 0.003
+/** 回転音が大きくなりすぎないための最大ゲイン。 */
+const KOMA_SPIN_SOUND_MAX_GAIN = 0.03
+/** 連続接触の音をまとめる全体クールダウン[ms]。 */
+const KOMA_IMPACT_SOUND_COOLDOWN_MS = 85
+/** 場外/転倒/停止音の近接再生をまとめるクールダウン[ms]。 */
+const KOMA_DEFEAT_SOUND_COOLDOWN_MS = 140
+
+type KomaBattleTone = {
+  oscillator: OscillatorNode
+  gain: GainNode
+}
+
+function setSmoothedAudioParam(
+  parameter: AudioParam,
+  value: number,
+  now: number,
+  timeConstant: number,
+): void {
+  const targetParameter = parameter as AudioParam & {
+    cancelScheduledValues?: (time: number) => void
+    setTargetAtTime?: (nextValue: number, startTime: number, nextTimeConstant: number) => void
+  }
+  targetParameter.cancelScheduledValues?.(now)
+  if (targetParameter.setTargetAtTime !== undefined) {
+    targetParameter.setTargetAtTime(value, now, timeConstant)
+  } else if (targetParameter.linearRampToValueAtTime !== undefined) {
+    targetParameter.linearRampToValueAtTime(value, now + timeConstant)
+  } else {
+    targetParameter.value = value
+  }
+}
+
+/** 「まわせ！」を押した瞬間の短い上行音。AudioContextは共有utilityから取得する。 */
+export function playKomaBattleStartSound(): void {
+  if (!soundEnabled) return
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+    playTone(ctx, 280, now, 0.1, 0.11, 'triangle')
+    playTone(ctx, 560, now + 0.055, 0.16, 0.12, 'sine')
+  } catch {
+    // 音声APIの不調で試合開始を止めない。
+  }
+}
+
+function playKomaBattleImpactSound(
+  kind: KomaBattleImpactSoundKind,
+  intensity: number,
+  activeTones: Set<KomaBattleTone>,
+): void {
+  if (!soundEnabled) return
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const safeIntensity = Number.isFinite(intensity)
+      ? Math.min(1, Math.max(0, intensity))
+      : 0
+    const baseFrequency = kind === 'bumper' ? 360 : kind === 'wall' ? 230 : 155
+    const frequency = baseFrequency + safeIntensity * (kind === 'koma' ? 45 : 85)
+    const volume = Math.min(0.085, 0.024 + safeIntensity * 0.061)
+    const duration = kind === 'koma' ? 0.11 : 0.08
+    playTrackedKomaTone(
+      ctx,
+      frequency,
+      ctx.currentTime,
+      duration,
+      volume,
+      'triangle',
+      activeTones,
+    )
+    // 強いコマ同士の衝突だけ、短い高音を薄く重ねて「ガツン」を伝える。
+    if (kind === 'koma' && safeIntensity >= 0.66) {
+      playTrackedKomaTone(
+        ctx,
+        frequency * 2.15,
+        ctx.currentTime + 0.006,
+        0.065,
+        volume * 0.34,
+        'sine',
+        activeTones,
+      )
+    }
+  } catch {
+    // 音を出せない環境でも物理と演出は継続する。
+  }
+}
+
+function playKomaBattleDefeatSound(
+  reason: KomaBattleDefeatReason,
+  activeTones: Set<KomaBattleTone>,
+): void {
+  if (!soundEnabled) return
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+    if (reason === 'outOfArena') {
+      playTrackedKomaTone(ctx, 250, now, 0.1, 0.1, 'triangle', activeTones)
+      playTrackedKomaTone(ctx, 145, now + 0.06, 0.18, 0.09, 'sine', activeTones)
+      return
+    }
+    const first = reason === 'toppled' ? 230 : 190
+    const second = reason === 'toppled' ? 135 : 120
+    playTrackedKomaTone(ctx, first, now, 0.09, 0.08, 'triangle', activeTones)
+    playTrackedKomaTone(ctx, second, now + 0.055, 0.15, 0.07, 'sine', activeTones)
+  } catch {
+    // 音声APIの不調で勝敗判定を止めない。
+  }
+}
+
+export type KomaBattleSoundController = {
+  /** 回転音のノードを1組だけ作る。実際の音量/音程はupdateSpinで追従する。 */
+  startSpin: () => void
+  /** 回転速度[rad/s]へ滑らかに追従させる。AudioNodeは追加生成しない。 */
+  updateSpin: (spinSpeed: number) => void
+  /** 回転音をフェードアウトする。ノードはrun終了時のdisposeまで再利用する。 */
+  stopSpin: () => void
+  /** コマ同士/バンパー/壁の代表衝突音を鳴らす。 */
+  playImpact: (kind: KomaBattleImpactSoundKind, intensity: number) => void
+  /** 場外・転倒・停止の代表音を鳴らす。 */
+  playDefeat: (reason: KomaBattleDefeatReason) => void
+  /** 勝利/引き分けをrun中1回だけ鳴らす。 */
+  playVictory: () => void
+  playDraw: () => void
+  /** タブが隠れている間は回転音を無音にし、復帰後のupdateで戻す。 */
+  setSuspended: (suspended: boolean) => void
+  /** 予約済みの回転音とAudioNodeを破棄する。 */
+  dispose: () => void
+}
+
+/**
+ * コマバトル1試合ぶんの音声状態を束ねる。
+ * 回転音は発音中ずっとoscillator/gainを作り直さず、速度に応じてAudioParamだけを更新する。
+ */
+export function createKomaBattleSoundController(): KomaBattleSoundController {
+  let oscillator: OscillatorNode | undefined
+  let gain: GainNode | undefined
+  let spinContext: AudioContext | undefined
+  let disposed = false
+  let suspended = false
+  let spinRequested = false
+  let lastSpinGain = 0
+  let lastImpactAt: number | null = null
+  let lastDefeatAt: number | null = null
+  let resultPlayed = false
+  const activeTones = new Set<KomaBattleTone>()
+
+  function ensureSpinNodes(): AudioContext | undefined {
+    if (disposed || !soundEnabled) return undefined
+    const ctx = getAudioContext()
+    if (!ctx) return undefined
+    if (oscillator === undefined || gain === undefined) {
+      oscillator = ctx.createOscillator()
+      gain = ctx.createGain()
+      spinContext = ctx
+      oscillator.type = 'triangle'
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      gain.gain.setValueAtTime(0, ctx.currentTime)
+      oscillator.start(ctx.currentTime)
+    }
+    return ctx
+  }
+
+  function setSpinGain(value: number, now: number): void {
+    if (gain === undefined) return
+    const safeValue = Math.min(KOMA_SPIN_SOUND_MAX_GAIN, Math.max(0, value))
+    if (Math.abs(safeValue - lastSpinGain) < 0.0005) return
+    lastSpinGain = safeValue
+    setSmoothedAudioParam(gain.gain, safeValue, now, 0.055)
+  }
+
+  function stopSpin(): void {
+    spinRequested = false
+    if (gain === undefined) return
+    const ctx = spinContext ?? getAudioContext()
+    if (ctx) setSpinGain(0, ctx.currentTime)
+  }
+
+  return {
+    startSpin() {
+      if (disposed) return
+      spinRequested = true
+    },
+    updateSpin(spinSpeed) {
+      if (disposed || !spinRequested) return
+      if (suspended || !soundEnabled) {
+        // グローバルの音量設定が途中でOFFになっても、既に鳴っている回転音を残さない。
+        if (gain !== undefined && spinContext !== undefined) {
+          setSpinGain(0, spinContext.currentTime)
+        }
+        return
+      }
+      const speed = Number.isFinite(spinSpeed) ? Math.max(0, spinSpeed) : 0
+      const ctx = ensureSpinNodes()
+      if (!ctx || oscillator === undefined) return
+      const ratio = Math.min(1, speed / KOMA_SPIN_SOUND_MAX_SPEED)
+      const now = ctx.currentTime
+      const frequency = 78 + ratio * 94
+      setSmoothedAudioParam(oscillator.frequency, frequency, now, 0.07)
+      setSpinGain(speed <= 0.5 ? 0 : KOMA_SPIN_SOUND_MIN_GAIN + ratio * 0.024, now)
+    },
+    stopSpin,
+    playImpact(kind, intensity) {
+      if (disposed || !soundEnabled) return
+      const wallClockNow = Date.now()
+      if (
+        lastImpactAt !== null
+        && wallClockNow - lastImpactAt < KOMA_IMPACT_SOUND_COOLDOWN_MS
+      ) return
+      lastImpactAt = wallClockNow
+      playKomaBattleImpactSound(kind, intensity, activeTones)
+    },
+    playDefeat(reason) {
+      if (disposed || !soundEnabled) return
+      const wallClockNow = Date.now()
+      if (lastDefeatAt !== null && wallClockNow - lastDefeatAt < KOMA_DEFEAT_SOUND_COOLDOWN_MS) return
+      lastDefeatAt = wallClockNow
+      playKomaBattleDefeatSound(reason, activeTones)
+    },
+    playVictory() {
+      if (disposed || !soundEnabled || resultPlayed) return
+      resultPlayed = true
+      try {
+        const ctx = getAudioContext()
+        if (!ctx) return
+        const now = ctx.currentTime
+        ;[523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
+          playTrackedKomaTone(
+            ctx,
+            frequency,
+            now + index * 0.09,
+            0.24,
+            0.14,
+            'triangle',
+            activeTones,
+          )
+        })
+      } catch {
+        // 音声APIの不調で再戦操作を妨げない。
+      }
+    },
+    playDraw() {
+      if (disposed || !soundEnabled || resultPlayed) return
+      resultPlayed = true
+      try {
+        const ctx = getAudioContext()
+        if (!ctx) return
+        const now = ctx.currentTime
+        playTrackedKomaTone(ctx, 440, now, 0.13, 0.09, 'sine', activeTones)
+        playTrackedKomaTone(ctx, 440, now + 0.14, 0.18, 0.08, 'sine', activeTones)
+      } catch {
+        // 音声APIの不調で再戦操作を妨げない。
+      }
+    },
+    setSuspended(nextSuspended) {
+      suspended = nextSuspended
+      if (suspended) {
+        if (gain !== undefined) {
+          // 隠れている間にgetAudioContext()を呼ぶと、既にsuspendedでも
+          // resumeを試みてしまうため、このrunで保持しているContextだけを使う。
+          const ctx = spinContext
+          if (ctx) setSpinGain(0, ctx.currentTime)
+        }
+      }
+    },
+    dispose() {
+      if (disposed) return
+      stopSpin()
+      disposed = true
+      if (gain !== undefined) {
+        try { gain.disconnect() } catch { /* 解放済み/テスト用ノード */ }
+      }
+      if (oscillator !== undefined) {
+        try { oscillator.stop() } catch { /* 既に停止済み */ }
+        try { oscillator.disconnect() } catch { /* 解放済み/テスト用ノード */ }
+      }
+      for (const tone of activeTones) {
+        try { tone.oscillator.stop() } catch { /* 既に停止済み/再生済み */ }
+        try { tone.gain.disconnect() } catch { /* 解放済み/テスト用ノード */ }
+        try { tone.oscillator.disconnect() } catch { /* 解放済み/テスト用ノード */ }
+      }
+      activeTones.clear()
+      gain = undefined
+      oscillator = undefined
+      spinContext = undefined
+    },
+  }
+}
+
 function playTone(
   ctx: AudioContext,
   frequency: number,
@@ -66,6 +364,19 @@ function playTone(
   volume: number,
   type: OscillatorType,
 ): void {
+  const tone = createToneNodes(ctx, frequency, startTime, duration, volume, type)
+  tone.oscillator.start(startTime)
+  tone.oscillator.stop(startTime + duration)
+}
+
+function createToneNodes(
+  ctx: AudioContext,
+  frequency: number,
+  startTime: number,
+  duration: number,
+  volume: number,
+  type: OscillatorType,
+): KomaBattleTone {
   const oscillator = ctx.createOscillator()
   const gain = ctx.createGain()
   oscillator.type = type
@@ -75,8 +386,29 @@ function playTone(
   gain.gain.linearRampToValueAtTime(0, startTime + duration)
   oscillator.connect(gain)
   gain.connect(ctx.destination)
-  oscillator.start(startTime)
-  oscillator.stop(startTime + duration)
+  return { oscillator, gain }
+}
+
+/** コマバトルの予約音をrun単位で追跡し、再戦時に途中停止できるようにする。 */
+function playTrackedKomaTone(
+  ctx: AudioContext,
+  frequency: number,
+  startTime: number,
+  duration: number,
+  volume: number,
+  type: OscillatorType,
+  activeTones: Set<KomaBattleTone>,
+): void {
+  const tone = createToneNodes(ctx, frequency, startTime, duration, volume, type)
+  activeTones.add(tone)
+  const cleanup = () => {
+    activeTones.delete(tone)
+    try { tone.gain.disconnect() } catch { /* 再戦時に先に解放済み */ }
+    try { tone.oscillator.disconnect() } catch { /* 再戦時に先に解放済み */ }
+  }
+  tone.oscillator.onended = cleanup
+  tone.oscillator.start(startTime)
+  tone.oscillator.stop(startTime + duration)
 }
 
 /** せいかい音「ピンポーン」: 高いラ→低いミ の2音チャイム */

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import GamePlaySurface from '../../components/GamePlaySurface'
+import { playKomaBattleStartSound, primeAudio } from '../../utils/quizSound'
 import {
   KOMA_TYPE_CONFIGS,
   komaSpecsForSelection,
@@ -51,6 +52,9 @@ export default function KomaBattlePlay() {
   )
 
   const startBattle = useCallback(() => {
+    // iOSでも「まわせ！」の直後からSEを鳴らせるよう、操作イベント中に準備する。
+    primeAudio()
+    playKomaBattleStartSound()
     setOutcome(null)
     setPhase('battling')
     setRunId((current) => current + 1)
@@ -247,7 +251,17 @@ function KomaBattleScene({
       </div>
 
       {outcome !== null ? (
-        <div className={styles.resultOverlay} role="status">
+        <div className={styles.resultOverlay} role="status" aria-live="polite">
+          {outcome.kind === 'win' ? (
+            <div className={styles.resultSparkles} aria-hidden="true">
+              <span>✦</span>
+              <span>✧</span>
+              <span>✦</span>
+              <span>✧</span>
+              <span>✦</span>
+              <span>✧</span>
+            </div>
+          ) : null}
           <div className={styles.resultCard}>
             <ResultMessage outcome={outcome} specs={specs} />
             <button type="button" className={styles.primaryButton} onClick={onRematch}>
@@ -296,7 +310,10 @@ function ResultMessage({
   if (outcome.kind === 'soloFinished') {
     return (
       <>
-        <h2 className={styles.overlayTitle}>おしまい！</h2>
+        <div className={styles.resultHeadline}>
+          <span className={styles.resultIcon} aria-hidden="true">🌀</span>
+          <h2 className={styles.overlayTitle}>おしまい！</h2>
+        </div>
         <p className={styles.overlayNote}>{soloMessage(outcome.reason)}</p>
       </>
     )
@@ -305,7 +322,10 @@ function ResultMessage({
   if (outcome.kind === 'draw') {
     return (
       <>
-        <h2 className={styles.overlayTitle}>ひきわけ！</h2>
+        <div className={styles.resultHeadline}>
+          <span className={styles.resultIcon} aria-hidden="true">🤝</span>
+          <h2 className={styles.overlayTitle}>ひきわけ！</h2>
+        </div>
         <p className={styles.overlayNote}>
           {outcome.reason === 'timeLimit'
             ? 'どちらも さいごまで まわっていたよ'
@@ -319,7 +339,10 @@ function ResultMessage({
   const loser = specs[outcome.loserIndex]
   return (
     <>
-      <h2 className={styles.overlayTitle}>かち！</h2>
+      <div className={styles.resultHeadline}>
+        <span className={styles.resultIcon} aria-hidden="true">🏆</span>
+        <h2 className={styles.overlayTitle}>かち！</h2>
+      </div>
       <p className={styles.resultWinner}>
         <span
           className={styles.resultSwatch}
