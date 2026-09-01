@@ -23,6 +23,7 @@ export default function RoadPartVisual({ part }: RoadPartVisualProps) {
 
   return (
     <span className={`${styles.roadShape} ${pathSpecs.length > 0 ? styles.pathShape : ''}`} data-testid="car-road-part-visual" aria-hidden="true">
+      <span className={styles.roadTileSurface} data-testid="road-tile-surface" aria-hidden="true" />
       {pathSpecs.length > 0 && (
         <svg className={styles.roadSvg} viewBox="-0.5 -0.5 1 1" aria-hidden="true">
           {pathSpecs.map((spec, index) => <path key={index} d={pathSpecToSvgPath(spec)} />)}

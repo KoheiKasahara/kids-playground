@@ -162,6 +162,14 @@ describe('CarRoadBuilderPlay', () => {
     }
   })
 
+  test('uses the same raised tile surface for board markers and palette thumbnails', () => {
+    renderPlay()
+
+    expect(screen.getByRole('gridcell', { name: 'スタート、1ぎょう 1れつ' }).querySelector('[data-testid="road-tile-surface"]')).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'ゴール、4ぎょう 4れつ' }).querySelector('[data-testid="road-tile-surface"]')).toBeInTheDocument()
+    expect(screen.getAllByTestId('road-tile-surface')).toHaveLength(8)
+  })
+
   test('renders the complete 5x5 board inside the selected play screen', () => {
     renderPlay('wide')
 
