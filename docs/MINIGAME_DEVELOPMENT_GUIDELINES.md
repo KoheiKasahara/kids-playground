@@ -131,6 +131,19 @@ Vitest は `unit`（node environment）/ `dom`（jsdom environment）/ `slow`（
 
 `npm test` は今まで通り全テストを実行します。CI・ローカルとも `npm test` の意味は変えていません。
 
+### 9-1. CI / Nightly の役割分担（Issue #434 Phase 2）
+
+PR / main の通常CI（`.github/workflows/ci.yml`）は `npm run test:quick` を実行し、`slow` を含む全件は Nightly（`.github/workflows/nightly.yml`、毎日 03:00 JST 実行）と手動の `workflow_dispatch` で `npm run test:full` として実行します。
+
+| 実行タイミング | 実行コマンド | 目的 |
+|---|---|---|
+| PR / main CI | `test:quick` | 通常開発のフィードバックを速くする（`slow` は含まない） |
+| Nightly（毎日 03:00 JST） | `test:full` | 通常CIから外した `slow` を含む全件の回帰確認 |
+| 手動実行（Actions の workflow_dispatch） | `test:full` | 大きな変更前後や Nightly 失敗の再確認 |
+| ローカル `npm test` | `test:full` と同じ全件 | 変更なし。うっかり全件が回らなくなる事故を防ぐため、CI 側だけが `test:quick` を明示的に呼ぶ |
+
+Nightly が失敗した場合は、既に main に入っている回帰である可能性が高いため放置せず、翌営業日の優先タスクとして原因を確認してください。
+
 ## 10. 文書更新とレビュー・チェックリスト
 
 新規ゲームまたは重要仕様の変更時は、README、概要設計、セットアップ、ゲーム基本設計、クレジットを必要な範囲で更新します。

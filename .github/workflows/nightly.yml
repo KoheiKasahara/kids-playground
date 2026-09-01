@@ -1,0 +1,39 @@
+name: Nightly Full Test
+
+on:
+  schedule:
+    # 03:00 JST (UTC 18:00) — 通常CI（test:quick）から外した slow テストを含む全件を毎日確認する。
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test (full, including slow)
+        run: npm run test:full
+
+      - name: Build
+        run: npm run build
