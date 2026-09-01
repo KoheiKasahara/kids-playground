@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import {
+  createKomaBattleSoundController,
+  type KomaBattleImpactSoundKind,
+} from '../../utils/quizSound'
+import {
   DISK_CENTER_Y,
   DISK_HALF_HEIGHT,
   DISK_RADIUS,
@@ -9,7 +13,6 @@ import {
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
   SHAFT_RADIUS,
-  START_ORBIT_SPEED,
   START_SPIN_VARIANCE,
 } from './komaPhysics'
 
@@ -65,6 +68,10 @@ import {
   type KomaJudgeState,
   type MatchOutcome,
 } from './komaOutcome'
+import {
+  createKomaImpactThrottle,
+  impactIntensityForRelativeSpeed,
+} from './komaImpact'
 
 let rapierInitPromise: Promise<void> | null = null
 
@@ -108,21 +115,23 @@ const SPIN_EFFECT_FLOOR_SPEED = STOP_SPIN_SPEED
 const IMPACT_POOL_SIZE = 3
 /** 1回の衝突エフェクトの寿命[ms]。 */
 const IMPACT_DURATION_MS = 260
-/** 円盤どうしの中心間距離がこれを下回ったら「接触」とみなす。 */
-const IMPACT_CONTACT_DISTANCE = DISK_RADIUS * 2 * 1.05
-/** これより弱い相対速度の接触は演出を出さない（かすった程度では光らせない）。 */
-const IMPACT_MIN_RELATIVE_SPEED = START_ORBIT_SPEED * 0.7
+/** 物理Colliderの境界より少し外側で接触演出を拾う余裕。 */
+const IMPACT_CONTACT_MARGIN = 0.03
 
 type ImpactSlot = {
   mesh: THREE.Mesh
   material: THREE.MeshBasicMaterial
   remainingMs: number
+  maxOpacity: number
+  startScale: number
 }
 
 type KomaVisual = {
   group: THREE.Group
   /** 毎フレーム、その時点の自転速度で回転演出を更新する。 */
   updateSpin: (spinSpeedAbs: number, dtMs: number) => void
+  /** 決着後に勝者だけを少し強調する。物理Bodyの姿勢は変更しない。 */
+  setOutcome: (isWinner: boolean | null) => void
 }
 
 /** 見た目Meshで使い回すgeometry一式。コマごとに寸法は同じなので、色違いのMaterialだけを分ける。 */
@@ -187,9 +196,14 @@ export function useKomaBattleEngine(
     let accumulator = 0
     let elapsedMs = 0
     let judgeStates: KomaJudgeState[] = specs.map(() => createKomaJudgeState())
-    /** 直前ステップで2個の円盤が接触していたか。衝突演出を「接触し始めた瞬間」だけ出すために使う。 */
-    let wasInContact = false
     let impactCursor = 0
+    const activeImpactContacts = new Set<string>()
+    const impactThrottle = createKomaImpactThrottle()
+    const soundController = createKomaBattleSoundController()
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     const komaVisuals: KomaVisual[] = []
     const shadowBlobs: THREE.Mesh[] = []
@@ -211,6 +225,10 @@ export function useKomaBattleEngine(
       released = true
 
       if (activeRunRef.current === runToken) activeRunRef.current = null
+
+      soundController.dispose()
+      impactThrottle.reset()
+      activeImpactContacts.clear()
 
       if (rafId !== null) {
         cancelAnimationFrame(rafId)
@@ -296,12 +314,17 @@ export function useKomaBattleEngine(
       window.addEventListener('orientationchange', handleViewportChange)
       orientation?.addEventListener?.('change', handleViewportChange)
       window.visualViewport?.addEventListener('resize', handleViewportChange)
+      const handleVisibilityChange = () => {
+        soundController.setSuspended(document.visibilityState === 'hidden')
+      }
+      document.addEventListener('visibilitychange', handleVisibilityChange)
 
       detachViewportListeners = () => {
         window.removeEventListener('resize', handleViewportChange)
         window.removeEventListener('orientationchange', handleViewportChange)
         orientation?.removeEventListener?.('change', handleViewportChange)
         window.visualViewport?.removeEventListener('resize', handleViewportChange)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
       }
     }
 
@@ -416,6 +439,7 @@ export function useKomaBattleEngine(
           blending: THREE.AdditiveBlending,
         }),
       )
+      let outcomeEmphasis: 'winner' | 'loser' | null = null
 
       const tip = new THREE.Mesh(geometrySet.tip, metalMaterial)
       tip.rotation.x = Math.PI
@@ -466,13 +490,24 @@ export function useKomaBattleEngine(
           0,
           1,
         )
-        spinRingMaterial.opacity = ratio * 0.4
-        accentMaterial.emissiveIntensity = ratio * 0.6
+        spinRingMaterial.opacity = Math.min(
+          0.72,
+          ratio * 0.4 + (outcomeEmphasis === 'winner' ? 0.18 : 0),
+        )
+        accentMaterial.emissiveIntensity = Math.max(
+          ratio * 0.6,
+          outcomeEmphasis === 'winner' ? 0.8 : outcomeEmphasis === 'loser' ? 0.05 : 0,
+        )
         // リングは本体よりわずかに速く自転させ、残像のような「滑り」を出す。
         spinRing.rotation.y += (dtMs / 1000) * spinSpeedAbs * 0.5
       }
 
-      return { group, updateSpin }
+      function setOutcome(isWinner: boolean | null) {
+        outcomeEmphasis = isWinner === null ? null : isWinner ? 'winner' : 'loser'
+        group.scale.setScalar(isWinner === true ? 1.12 : isWinner === false ? 0.94 : 1)
+      }
+
+      return { group, updateSpin, setOutcome }
     }
 
     /** すり鉢の見た目。物理の高さ場と同じ profile 関数から作る。 */
@@ -595,19 +630,27 @@ export function useKomaBattleEngine(
         mesh.scale.setScalar(0.001)
         mesh.renderOrder = 3
         scene.add(mesh)
-        impactPool.push({ mesh, material, remainingMs: 0 })
+        impactPool.push({ mesh, material, remainingMs: 0, maxOpacity: 0, startScale: 0 })
       }
     }
 
     /** 強い衝突の瞬間だけ、プールから1枠を借りて光らせる。 */
-    function triggerImpactEffect(position: { x: number; y: number; z: number }) {
+    function triggerImpactEffect(
+      position: { x: number; y: number; z: number },
+      intensity: number,
+      kind: KomaBattleImpactSoundKind,
+    ) {
       if (impactPool.length === 0) return
       const slot = impactPool[impactCursor]!
       impactCursor = (impactCursor + 1) % impactPool.length
       slot.mesh.position.set(position.x, position.y, position.z)
       slot.mesh.visible = true
-      slot.mesh.scale.setScalar(0.3)
-      slot.material.opacity = 0.85
+      const safeIntensity = Math.min(1, Math.max(0, intensity))
+      slot.startScale = 0.22 + safeIntensity * (kind === 'koma' ? 0.42 : 0.3)
+      slot.mesh.scale.setScalar(slot.startScale)
+      slot.material.color.set(kind === 'bumper' ? 0x9be7ff : kind === 'wall' ? 0xffd48a : 0xfff0c2)
+      slot.maxOpacity = 0.25 + safeIntensity * 0.6
+      slot.material.opacity = slot.maxOpacity
       slot.remainingMs = IMPACT_DURATION_MS
     }
 
@@ -619,39 +662,102 @@ export function useKomaBattleEngine(
         if (slot.remainingMs <= 0) {
           slot.mesh.visible = false
           slot.material.opacity = 0
+          slot.maxOpacity = 0
+          slot.startScale = 0
           continue
         }
         const t = 1 - slot.remainingMs / IMPACT_DURATION_MS
-        slot.mesh.scale.setScalar(0.3 + t * 0.5)
-        slot.material.opacity = 0.85 * (1 - t)
+        slot.mesh.scale.setScalar(slot.startScale + t * 0.5)
+        slot.material.opacity = slot.maxOpacity * (1 - t)
       }
     }
 
     /**
-     * 2個の円盤が接触し始めた瞬間だけを拾い、相対速度が十分速ければ衝突演出を出す。
-     * world.step()の直後に呼ぶ。1個モードでは何もしない。
+     * 物理ステップ直後の接触を「接触開始」へまとめ、強度に応じて音とリングを出す。
+     * 同一Body/障害物ペアと全体の両方にthrottleをかけるため、接触中の連打を防ぐ。
      */
     function checkImpacts() {
-      if (battle === null || battle.komas.length !== 2) return
-      const [a, b] = battle.komas
-      const ta = a!.body.translation()
-      const tb = b!.body.translation()
-      const distance = Math.hypot(ta.x - tb.x, ta.z - tb.z)
-      const inContact = distance < IMPACT_CONTACT_DISTANCE
+      if (battle === null) return
 
-      if (inContact && !wasInContact) {
+      function inspectContact(
+        key: string,
+        inContact: boolean,
+        relativeSpeed: number,
+        position: { x: number; y: number; z: number },
+        kind: KomaBattleImpactSoundKind,
+      ) {
+        if (!inContact) {
+          activeImpactContacts.delete(key)
+          return
+        }
+        if (activeImpactContacts.has(key)) return
+        activeImpactContacts.add(key)
+
+        const intensity = impactIntensityForRelativeSpeed(relativeSpeed)
+        if (intensity <= 0 || !impactThrottle.tryEmit(key, elapsedMs)) return
+        if (!prefersReducedMotion) triggerImpactEffect(position, intensity, kind)
+        soundController.playImpact(kind, intensity)
+      }
+
+      if (battle.komas.length === 2) {
+        const [a, b] = battle.komas
+        const ta = a!.body.translation()
+        const tb = b!.body.translation()
+        const radiusA = DISK_RADIUS * a!.spec.type.visual.diskRadiusScale
+        const radiusB = DISK_RADIUS * b!.spec.type.visual.diskRadiusScale
+        const inContact =
+          Math.hypot(ta.x - tb.x, ta.z - tb.z) <= radiusA + radiusB + IMPACT_CONTACT_MARGIN
         const va = a!.body.linvel()
         const vb = b!.body.linvel()
-        const relativeSpeed = Math.hypot(va.x - vb.x, va.y - vb.y, va.z - vb.z)
-        if (relativeSpeed >= IMPACT_MIN_RELATIVE_SPEED) {
-          triggerImpactEffect({
+        inspectContact(
+          'koma:0-1',
+          inContact,
+          Math.hypot(va.x - vb.x, va.y - vb.y, va.z - vb.z),
+          {
             x: (ta.x + tb.x) / 2,
             y: Math.max(ta.y, tb.y) + DISK_CENTER_Y,
             z: (ta.z + tb.z) / 2,
-          })
-        }
+          },
+          'koma',
+        )
       }
-      wasInContact = inContact
+
+      battle.komas.forEach((koma, komaIndex) => {
+        const translation = koma.body.translation()
+        const reading = readKoma(koma)
+        const diskRadius = DISK_RADIUS * koma.spec.type.visual.diskRadiusScale
+        selectedField.obstacles.forEach((obstacle, obstacleIndex) => {
+          const distance = Math.hypot(
+            translation.x - obstacle.x,
+            translation.z - obstacle.z,
+          )
+          const inContact = distance <= diskRadius + obstacle.radius + IMPACT_CONTACT_MARGIN
+          const velocity = koma.body.linvel()
+          const rimSpeed = Math.abs(reading.spinSpeed) * diskRadius * 0.05
+          inspectContact(
+            `bumper:${komaIndex}:${obstacleIndex}`,
+            inContact,
+            Math.hypot(velocity.x, velocity.y, velocity.z) + rimSpeed,
+            {
+              x: (translation.x + obstacle.x) / 2,
+              y: translation.y + DISK_CENTER_Y,
+              z: (translation.z + obstacle.z) / 2,
+            },
+            obstacle.type === 'bumper' ? 'bumper' : 'wall',
+          )
+        })
+
+        const wallContact = reading.radius >= WALL_INNER_RADIUS - diskRadius * 0.8
+        const wallVelocity = koma.body.linvel()
+        inspectContact(
+          `wall:${komaIndex}`,
+          wallContact,
+          Math.hypot(wallVelocity.x, wallVelocity.y, wallVelocity.z) +
+            Math.abs(reading.spinSpeed) * diskRadius * 0.04,
+          { x: translation.x, y: translation.y + DISK_CENTER_Y, z: translation.z },
+          'wall',
+        )
+      })
     }
 
     function writeVisuals(dtMs: number) {
@@ -693,8 +799,9 @@ export function useKomaBattleEngine(
         elapsedMs += stepMs
 
         if (!finished) {
+          const previousJudgeStates = judgeStates
           const readings = battle.komas.map(readKoma)
-          judgeStates = judgeStates.map((state, index) =>
+          judgeStates = previousJudgeStates.map((state, index) =>
             updateKomaJudge(
               state,
               { ...readings[index]!, y: readings[index]!.position.y },
@@ -702,11 +809,27 @@ export function useKomaBattleEngine(
               elapsedMs,
             ),
           )
+          judgeStates.forEach((state, index) => {
+            const previous = previousJudgeStates[index]
+            if (previous?.defeatReason === null && state.defeatReason !== null) {
+              soundController.playDefeat(state.defeatReason)
+            }
+          })
           const outcome = decideMatchOutcome(judgeStates, elapsedMs)
           if (outcome !== null) {
             finished = true
             // 決着後もしばらく物理を続け、倒れ切るところまで見せる。
             settleRemainingMs = SETTLE_AFTER_FINISH_MS
+            soundController.stopSpin()
+            if (outcome.kind === 'win') {
+              komaVisuals.forEach((visual, index) => visual.setOutcome(index === outcome.winnerIndex))
+              soundController.playVictory()
+            } else if (outcome.kind === 'draw') {
+              soundController.playDraw()
+            } else {
+              // 通常はjudgeの確定直前に鳴っているが、時間上限による終了でも音を保証する。
+              soundController.playDefeat(outcome.reason)
+            }
             // React stateへ触れるのはここだけ。1試合につき1回。
             optionsRef.current.onFinished(outcome)
           }
@@ -805,6 +928,7 @@ export function useKomaBattleEngine(
       }
 
       resizeRenderer()
+      soundController.startSpin()
       writeVisuals(0)
       renderer.render(scene, camera)
       rafId = requestAnimationFrame(tick)

@@ -98,6 +98,8 @@ describe('quizSound', () => {
       playCarDepartureSound,
       playCarGoalSound,
       createCarRoadSoundController,
+      playKomaBattleStartSound,
+      createKomaBattleSoundController,
     } = await import('./quizSound')
 
     expect(() => playCorrectSound()).not.toThrow()
@@ -110,6 +112,8 @@ describe('quizSound', () => {
     expect(() => playCarDepartureSound()).not.toThrow()
     expect(() => playCarGoalSound()).not.toThrow()
     expect(() => createCarRoadSoundController().setRunning(true)).not.toThrow()
+    expect(() => playKomaBattleStartSound()).not.toThrow()
+    expect(() => createKomaBattleSoundController().updateSpin(70)).not.toThrow()
     expect(instances).toHaveLength(0)
   })
 
@@ -325,6 +329,106 @@ describe('quizSound', () => {
     playPinballTotalSound()
 
     expect(instances).toHaveLength(0)
+  })
+
+  test('コマバトルの開始音は低音から高音へ2音で鳴る', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playKomaBattleStartSound } = await import('./quizSound')
+
+    playKomaBattleStartSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(2)
+    const first = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    const second = instances[0].createOscillator.mock.results[1].value as MockOscillatorNode
+    expect(second.frequency.value).toBeGreaterThan(first.frequency.value)
+  })
+
+  test('コマバトルの回転音は1組のノードを速度更新で再利用し、停止・disposeできる', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { createKomaBattleSoundController } = await import('./quizSound')
+
+    const controller = createKomaBattleSoundController()
+    controller.startSpin()
+    controller.updateSpin(75)
+    controller.updateSpin(24)
+    controller.setSuspended(true)
+    controller.updateSpin(75)
+    controller.setSuspended(false)
+    controller.updateSpin(12)
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(1)
+    expect(instances[0].createGain).toHaveBeenCalledTimes(1)
+    const oscillator = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    expect(oscillator.frequency.value).toBeGreaterThan(78)
+
+    controller.stopSpin()
+    controller.dispose()
+    controller.dispose()
+    controller.updateSpin(75)
+    expect(oscillator.stop).toHaveBeenCalledTimes(1)
+  })
+
+  test('コマバトルの衝突音は強いコマ衝突だけ薄い高音を重ね、結果音を1回に抑える', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { createKomaBattleSoundController } = await import('./quizSound')
+
+    const controller = createKomaBattleSoundController()
+    controller.playImpact('koma', 1)
+    controller.playImpact('koma', 1)
+
+    expect(instances).toHaveLength(1)
+    // 強い衝突は本体音+薄い高音、直後の2回目はcooldownで抑制する。
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(2)
+    controller.playVictory()
+    controller.playVictory()
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(6)
+    controller.dispose()
+  })
+
+  test('コマバトルの結果音はdisposeで予約分も停止し、再戦へ持ち越さない', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { createKomaBattleSoundController } = await import('./quizSound')
+
+    const controller = createKomaBattleSoundController()
+    controller.playVictory()
+    const resultTones = instances[0].createOscillator.mock.results.map(
+      (result) => result.value as MockOscillatorNode,
+    )
+
+    controller.dispose()
+
+    expect(resultTones).toHaveLength(4)
+    // 1回目は終了時刻の予約、2回目はdisposeによる途中停止。
+    resultTones.forEach((tone) => expect(tone.stop).toHaveBeenCalledTimes(2))
+    controller.playVictory()
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(4)
+  })
+
+  test('コマバトルの場外・転倒・停止をそれぞれ下降音で聞き分けられる', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { createKomaBattleSoundController } = await import('./quizSound')
+
+    const outController = createKomaBattleSoundController()
+    const toppledController = createKomaBattleSoundController()
+    const stoppedController = createKomaBattleSoundController()
+    outController.playDefeat('outOfArena')
+    toppledController.playDefeat('toppled')
+    stoppedController.playDefeat('stopped')
+
+    const frequencies = instances[0].createOscillator.mock.results.map(
+      (result) => (result.value as MockOscillatorNode).frequency.value,
+    )
+    expect(frequencies).toEqual([250, 145, 230, 135, 190, 120])
+    outController.dispose()
+    toppledController.dispose()
+    stoppedController.dispose()
   })
 
   test('レールの4種類のone-shotは規定本数だけ鳴る', async () => {
