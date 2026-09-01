@@ -68,10 +68,10 @@ export default function KomaBattlePlay() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>コマバトル</h1>
         <Link to="/" className={styles.backLink} aria-label="もどる">
           もどる
         </Link>
+        <h1 className={styles.title}>コマバトル</h1>
       </header>
 
       {phase === 'select' ? (
