@@ -72,9 +72,35 @@ export const DISK_RESTITUTION = 0.6
 export const FLOOR_FRICTION = 0.015
 export const FLOOR_RESTITUTION = 0.05
 
-/** 外周壁。跳ね返りを弱くして、壁際でいつまでも跳ね回らないようにする。 */
-export const WALL_FRICTION = 0.25
-export const WALL_RESTITUTION = 0.2
+/**
+ * 外周壁。Rapierの反射を少し強め、接触開始時の内向き補正と合わせて
+ * 壁沿いの安定軌道からフィールド内へ戻りやすくする。
+ */
+export const WALL_FRICTION = 0.22
+export const WALL_RESTITUTION = 0.38
+
+// ---------------------------------------------------------------------------
+// バトル向け接触補正
+// ---------------------------------------------------------------------------
+
+/** 円盤Colliderより少し外側から接触開始を拾う余裕。 */
+export const KOMA_CONTACT_MARGIN = 0.035
+/** この接近速度未満は、寄りかかっただけの弱い接触として追加反発を与えない。 */
+export const KOMA_KNOCKBACK_MIN_CLOSING_SPEED = 0.35
+/** この接近速度で追加反発が上限へ到達する。 */
+export const KOMA_KNOCKBACK_MAX_CLOSING_SPEED = 4.8
+/** 弱い衝突でも見た目に分かる、1体ずつへ与える最小impulse。 */
+export const KOMA_KNOCKBACK_MIN_IMPULSE = 0.035
+/** 強い衝突で追加するimpulseの上限。速度安全弁より十分小さく保つ。 */
+export const KOMA_KNOCKBACK_MAX_IMPULSE = 0.22
+
+/** 壁へ向かう速度がこれ未満なら、静かな接触として中央向き補正を行わない。 */
+export const WALL_REDIRECT_MIN_OUTWARD_SPEED = 0.35
+/** 壁接触時に与える中央向きimpulseの範囲。接触開始時の1回だけ適用する。 */
+export const WALL_REDIRECT_MIN_IMPULSE = 0.045
+export const WALL_REDIRECT_MAX_IMPULSE = 0.1
+/** 接触境界付近の微振動で再発火しないよう、解除側にヒステリシスを持たせる。 */
+export const CONTACT_RELEASE_MARGIN = 0.025
 
 /**
  * 回転の減衰。回転エネルギーの低下はこの指数減衰が主役で、
