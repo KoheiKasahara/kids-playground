@@ -37,12 +37,15 @@ function createSpinScales(count: number): number[] {
 }
 import {
   BOWL_RADIUS,
-  bowlHeightAt,
+  BUMPER_HEIGHT,
+  BUMPER_RADIUS,
   createWallSegments,
   FIELD_RADIUS,
-  WALL_HEIGHT,
+  fieldHeightAt,
+  getKomaField,
   WALL_INNER_RADIUS,
   WALL_THICKNESS,
+  type KomaFieldId,
 } from './komaStadium'
 import { komaCameraSetup } from './komaCamera'
 import type { KomaSpec } from './komaSpecs'
@@ -78,6 +81,8 @@ export type KomaBattleEngineOptions = {
   komaCount: number
   /** 選択画面で決めたコマ。エンジン側で既定値へ差し替えない。 */
   specs: readonly KomaSpec[]
+  /** 選択中のフィールド。世界と見た目は同じ定義を読む。 */
+  fieldId?: KomaFieldId
   /** 決着したときに一度だけ呼ばれる。 */
   onFinished: (outcome: MatchOutcome) => void
 }
@@ -166,6 +171,7 @@ export function useKomaBattleEngine(
     activeRunRef.current = runToken
 
     const specs = options.specs
+    const selectedField = getKomaField(options.fieldId)
 
     let battle: KomaBattleWorld | null = null
     let scene: THREE.Scene | null = null
@@ -473,12 +479,12 @@ export function useKomaBattleEngine(
     function createStadiumMesh(): THREE.Group {
       const group = new THREE.Group()
 
-      // 断面をbowlHeightAtから作り、回転させてすり鉢にする。
+      // フィールド定義と同じ高さ関数から断面を作り、回転させてすり鉢にする。
       const profile: THREE.Vector2[] = []
       const steps = 28
       for (let index = 0; index <= steps; index += 1) {
         const radius = (index / steps) * BOWL_RADIUS
-        profile.push(new THREE.Vector2(radius, bowlHeightAt(radius)))
+        profile.push(new THREE.Vector2(radius, fieldHeightAt(selectedField, radius)))
       }
       // 縁から外側の平らな踏みしろまで続ける。
       profile.push(new THREE.Vector2(FIELD_RADIUS, 0))
@@ -488,7 +494,7 @@ export function useKomaBattleEngine(
         track(new THREE.LatheGeometry(profile, 48)),
         trackMaterial(
           new THREE.MeshStandardMaterial({
-            color: 0xf2e4c8,
+            color: selectedField.theme.floor,
             roughness: 0.65,
             metalness: 0.02,
             side: THREE.DoubleSide,
@@ -501,19 +507,19 @@ export function useKomaBattleEngine(
       const centerMark = new THREE.Mesh(
         track(new THREE.RingGeometry(0.26, 0.34, 32)),
         trackMaterial(
-          new THREE.MeshBasicMaterial({ color: 0xe0c9a0, side: THREE.DoubleSide }),
+          new THREE.MeshBasicMaterial({ color: selectedField.theme.accent, side: THREE.DoubleSide }),
         ),
       )
       centerMark.rotation.x = -Math.PI / 2
-      centerMark.position.y = bowlHeightAt(0.3) + 0.005
+      centerMark.position.y = fieldHeightAt(selectedField, 0.3) + 0.005
       group.add(centerMark)
 
       // 外周壁。物理と同じ配置・寸法のcuboidを並べる。
       const wallMaterial = trackMaterial(
-        new THREE.MeshStandardMaterial({ color: 0x5a7fb5, roughness: 0.55, metalness: 0.05 }),
+        new THREE.MeshStandardMaterial({ color: selectedField.theme.wall, roughness: 0.55, metalness: 0.05 }),
       )
       const wallGeometry = track(new THREE.BoxGeometry(1, 1, 1))
-      for (const segment of createWallSegments()) {
+      for (const segment of createWallSegments(undefined, selectedField.wallHeight)) {
         const wall = new THREE.Mesh(wallGeometry, wallMaterial)
         wall.position.set(segment.center.x, segment.center.y, segment.center.z)
         wall.rotation.y = segment.yaw
@@ -527,12 +533,40 @@ export function useKomaBattleEngine(
           new THREE.TorusGeometry(WALL_INNER_RADIUS + WALL_THICKNESS / 2, 0.035, 8, 48),
         ),
         trackMaterial(
-          new THREE.MeshStandardMaterial({ color: 0x3c5f92, roughness: 0.4, metalness: 0.35 }),
+          new THREE.MeshStandardMaterial({ color: selectedField.theme.rim, roughness: 0.4, metalness: 0.35 }),
         ),
       )
       rim.rotation.x = Math.PI / 2
-      rim.position.y = WALL_HEIGHT
+      rim.position.y = selectedField.wallHeight
       group.add(rim)
+
+      // バンパーは共有geometry/materialで描く。物理側も同じ位置・寸法の固定Colliderを持つが、
+      // 見た目のMeshへColliderを付けることはしない（再戦時の重複と負荷を防ぐ）。
+      if (selectedField.obstacles.length > 0) {
+        const bumperMaterial = trackMaterial(
+          new THREE.MeshStandardMaterial({
+            color: selectedField.theme.accent,
+            roughness: 0.38,
+            metalness: 0.08,
+          }),
+        )
+        const bumperGeometry = track(new THREE.CylinderGeometry(BUMPER_RADIUS, BUMPER_RADIUS, BUMPER_HEIGHT, 20))
+        const bumperCapGeometry = track(new THREE.SphereGeometry(BUMPER_RADIUS * 0.73, 16, 8))
+        for (const obstacle of selectedField.obstacles) {
+          if (obstacle.type !== 'bumper') continue
+          const radius = Number.isFinite(obstacle.radius) ? Math.max(0.08, obstacle.radius) : BUMPER_RADIUS
+          const height = Number.isFinite(obstacle.height) ? Math.max(0.12, obstacle.height) : BUMPER_HEIGHT
+          const floorY = fieldHeightAt(selectedField, Math.hypot(obstacle.x, obstacle.z))
+          const bumper = new THREE.Mesh(bumperGeometry, bumperMaterial)
+          bumper.scale.set(radius / BUMPER_RADIUS, height / BUMPER_HEIGHT, radius / BUMPER_RADIUS)
+          bumper.position.set(obstacle.x, floorY + height / 2, obstacle.z)
+          group.add(bumper)
+          const cap = new THREE.Mesh(bumperCapGeometry, bumperMaterial)
+          cap.scale.setScalar(radius / BUMPER_RADIUS)
+          cap.position.set(obstacle.x, floorY + height + 0.02, obstacle.z)
+          group.add(cap)
+        }
+      }
 
       return group
     }
@@ -637,7 +671,7 @@ export function useKomaBattleEngine(
         const blob = shadowBlobs[index]
         if (blob) {
           const radius = Math.hypot(translation.x, translation.z)
-          blob.position.set(translation.x, bowlHeightAt(radius) + 0.004, translation.z)
+          blob.position.set(translation.x, fieldHeightAt(selectedField, radius) + 0.004, translation.z)
         }
       })
       updateImpactEffects(dtMs)
@@ -739,6 +773,7 @@ export function useKomaBattleEngine(
         // 毎回まったく同じ試合にならないよう、開始角を散らす。
         startAngleOffset: Math.random() * Math.PI * 2,
         spinScales: createSpinScales(specs.length),
+        field: selectedField,
       })
 
       const shadowGeometry = track(new THREE.CircleGeometry(DISK_RADIUS * 1.35, 20))
@@ -794,7 +829,7 @@ export function useKomaBattleEngine(
       })
 
     return release
-  }, [options.runId, options.komaCount, options.specs])
+  }, [options.runId, options.komaCount, options.specs, options.fieldId])
 
   return handle
 }

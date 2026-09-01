@@ -9,6 +9,13 @@ import {
 } from './komaSpecs'
 import { useKomaBattleEngine } from './useKomaBattleEngine'
 import type { KomaDefeatReason, MatchOutcome } from './komaOutcome'
+import {
+  DEFAULT_KOMA_FIELD_ID,
+  getKomaField,
+  KOMA_FIELD_DEFINITIONS,
+  type KomaField,
+  type KomaFieldId,
+} from './komaStadium'
 import styles from './KomaBattlePlay.module.css'
 
 type Phase = 'select' | 'battling' | 'finished'
@@ -29,6 +36,7 @@ function soloMessage(reason: KomaDefeatReason): string {
 export default function KomaBattlePlay() {
   const [phase, setPhase] = useState<Phase>('select')
   const [komaCount, setKomaCount] = useState(2)
+  const [fieldId, setFieldId] = useState<KomaFieldId>(DEFAULT_KOMA_FIELD_ID)
   // プレイヤー枠ごとに選ぶ。再戦ではこの値をそのまま使い、明示的な変更まで保持する。
   const [selectedTypes, setSelectedTypes] = useState<[KomaTypeId, KomaTypeId]>([
     'balance',
@@ -65,6 +73,26 @@ export default function KomaBattlePlay() {
       {phase === 'select' ? (
         <div className={styles.scene}>
           <div className={styles.overlay}>
+            <h2 className={styles.overlayTitle}>ばしょを えらんでね</h2>
+            <div className={styles.fieldChoices} role="group" aria-label="フィールドをえらぶ">
+              {KOMA_FIELD_DEFINITIONS.map((field) => {
+                const isSelected = fieldId === field.id
+                return (
+                  <button
+                    key={field.id}
+                    type="button"
+                    className={`${styles.fieldButton} ${isSelected ? styles.fieldButtonSelected : ''}`}
+                    aria-label={field.name}
+                    aria-pressed={isSelected}
+                    onClick={() => setFieldId(field.id)}
+                  >
+                    <FieldPreview field={field} />
+                    <span className={styles.fieldName}>{field.name}</span>
+                    <span className={styles.fieldDescription}>{field.description}</span>
+                  </button>
+                )
+              })}
+            </div>
             <h2 className={styles.overlayTitle}>コマを えらんでね</h2>
             <div className={styles.countChoices}>
               {[1, 2].map((count) => (
@@ -146,6 +174,7 @@ export default function KomaBattlePlay() {
             runId={runId}
             komaCount={komaCount}
             specs={specs}
+            fieldId={fieldId}
             outcome={outcome}
             onFinished={(result) => {
               setOutcome(result)
@@ -164,6 +193,7 @@ type SceneProps = {
   runId: number
   komaCount: number
   specs: KomaSpec[]
+  fieldId: KomaFieldId
   outcome: MatchOutcome | null
   onFinished: (outcome: MatchOutcome) => void
   onRematch: () => void
@@ -180,6 +210,7 @@ function KomaBattleScene({
   runId,
   komaCount,
   specs,
+  fieldId,
   outcome,
   onFinished,
   onRematch,
@@ -189,12 +220,17 @@ function KomaBattleScene({
     runId,
     komaCount,
     specs,
+    fieldId,
     onFinished,
   })
 
   return (
     <div className={styles.scene}>
       <div className={styles.sceneCanvas} ref={registerContainer} />
+
+      <span className={styles.fieldChip} aria-label={`フィールド ${getKomaField(fieldId).name}`}>
+        {getKomaField(fieldId).icon} {getKomaField(fieldId).name}
+      </span>
 
       <div className={styles.komaLabels}>
         {specs.map((spec) => (
@@ -224,6 +260,29 @@ function KomaBattleScene({
         </div>
       ) : null}
     </div>
+  )
+}
+
+/** 文字を読めなくても地形の違いが分かる、軽量なCSSプレビュー。 */
+function FieldPreview({ field }: { field: KomaField }) {
+  return (
+    <span className={`${styles.fieldPreview} ${styles[`fieldPreview${field.shape}`]}`} aria-hidden="true">
+      <span className={styles.previewBowl} />
+      {field.shape === 'bumper'
+        ? field.obstacles.map((obstacle, index) => (
+            <span
+              key={index}
+              className={styles.previewBumper}
+              style={{
+                left: `${50 + (obstacle.x / 1.2) * 28}%`,
+                top: `${50 + (obstacle.z / 1.2) * 28}%`,
+              }}
+            />
+          ))
+        : null}
+      {field.shape === 'ridge' ? <span className={styles.previewRidge} /> : null}
+      <span className={styles.previewCenter} />
+    </span>
   )
 }
 
