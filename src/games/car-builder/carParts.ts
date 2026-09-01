@@ -1,7 +1,7 @@
 /**
  * カテゴリごとの3Dパーツ生成関数と、その登録表。
  *
- * どの生成関数も、座標は必ず \`CarDimensions\` / \`CarAttachments\` から計算する。
+ * どの生成関数も、座標は必ず `CarDimensions` / `CarAttachments` から計算する。
  * タイヤ・フロント・屋根・飾り・マークの座標へボディ種別を持ち込まないこと。
  */
 import * as THREE from 'three'
@@ -84,7 +84,7 @@ function profileMesh(
   return mesh
 }
 
-/** 取り付け面から法線方向へ \`distance\` だけ離した位置を返す。 */
+/** 取り付け面から法線方向へ `distance` だけ離した位置を返す。 */
 function offsetFrom(attachment: CarAttachment, distance: number): THREE.Vector3 {
   return new THREE.Vector3(
     attachment.position.x + attachment.normal.x * distance,

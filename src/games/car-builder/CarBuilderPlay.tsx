@@ -17,7 +17,7 @@ import styles from './CarBuilderPlay.module.css'
 
 function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; className: string }) {
   if (preview.kind === 'color') {
-    return <span className={className + ' ' + styles.colorChip} style={{ backgroundColor: preview.hex }} aria-hidden="true" />
+    return <span className={`${className} ${styles.colorChip}`} style={{ backgroundColor: preview.hex }} aria-hidden="true" />
   }
   return (
     <span className={className} aria-hidden="true">

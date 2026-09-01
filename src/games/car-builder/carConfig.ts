@@ -3,8 +3,8 @@
  *
  * このファイルはUI・3D生成・テストが共通で参照する単一情報源であり、three.jsに依存しない。
  * 後続Issueで各カテゴリの本実装を足すときは、
- *   1. ここの \`CarOptionIdMap\` に選択肢IDを足す（またはカテゴリを1行足す）
- *   2. \`CAR_CATEGORIES\` に選択肢の表示定義を足す
+ *   1. ここの `CarOptionIdMap` に選択肢IDを足す（またはカテゴリを1行足す）
+ *   2. `CAR_CATEGORIES` に選択肢の表示定義を足す
  *   3. 見た目を持つカテゴリなら carParts.ts の登録表に生成関数を足す
  * の3か所だけで完結する。カテゴリごとの巨大な条件分岐をUIや3D側に増やさないための構造。
  */
@@ -162,7 +162,7 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
 
 /**
  * 画面に並べる順。Issue #401 の8カテゴリの並びをそのまま持つ。
- * \`CAR_CATEGORIES\` の全キーを重複なく含むことは carConfig.test.ts で保証する。
+ * `CAR_CATEGORIES` の全キーを重複なく含むことは carConfig.test.ts で保証する。
  */
 export const CAR_CATEGORY_ORDER: readonly CarCategoryId[] = [
   'body',
