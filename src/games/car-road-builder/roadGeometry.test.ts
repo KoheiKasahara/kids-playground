@@ -25,6 +25,16 @@ describe('car road geometry', () => {
     expect(goal.sample(1)).toEqual({ x: 0, y: 0 })
   })
 
+  test('rotated goals expose one matching cardinal edge', () => {
+    for (const [rotation, direction] of [[0, 'N'], [2, 'E'], [4, 'S'], [6, 'W']] as const) {
+      const part = createPlacedPart('goal', rotation)
+      const path = getPathSpec(part)
+      expect(connectionsForPart(part)).toEqual([direction])
+      expect(path.sample(0)).toEqual(portPoint(direction))
+      expect(path.sample(1)).toEqual({ x: 0, y: 0 })
+    }
+  })
+
   test('curve uses one smooth quadratic and exposes endpoint tangents', () => {
     const path = getPathSpec(createPlacedPart('curve', 0))
     expect(path.segments).toHaveLength(1)

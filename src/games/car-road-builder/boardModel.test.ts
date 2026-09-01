@@ -27,7 +27,7 @@ describe('car road board', () => {
   test('keeps start and goal when deletion is requested, while allowing them to move', () => {
     let board = createInitialBoard({ rows: 5, cols: 5 })
     board = placePart(board, { row: 0, col: 0 }, createPlacedPart('start', 2))
-    board = placePart(board, { row: 4, col: 4 }, createPlacedPart('goal', 3))
+    board = placePart(board, { row: 4, col: 4 }, createPlacedPart('goal', 2))
 
     expect(removePart(board, { row: 0, col: 0 })).toBe(board)
     expect(removePart(board, { row: 4, col: 4 })).toBe(board)
@@ -38,7 +38,7 @@ describe('car road board', () => {
 
     const movedGoal = movePart(movedStart, { row: 4, col: 4 }, { row: 3, col: 3 })
     expect(cellAt(movedGoal, 4, 4)?.kind).toBeNull()
-    expect(cellAt(movedGoal, 3, 3)).toMatchObject({ kind: 'goal', rotationStep: 3 })
+    expect(cellAt(movedGoal, 3, 3)).toMatchObject({ kind: 'goal', rotationStep: 2 })
   })
 
   test('swaps a marker with an occupied road cell without losing either part', () => {
@@ -56,11 +56,11 @@ describe('car road board', () => {
   test('swaps start and goal while keeping one of each marker', () => {
     let board = createInitialBoard()
     board = placePart(board, { row: 0, col: 0 }, createPlacedPart('start', 5))
-    board = placePart(board, { row: 1, col: 1 }, createPlacedPart('goal', 3))
+    board = placePart(board, { row: 1, col: 1 }, createPlacedPart('goal', 2))
 
     const swapped = movePart(board, { row: 0, col: 0 }, { row: 1, col: 1 })
 
-    expect(cellAt(swapped, 0, 0)).toMatchObject({ kind: 'goal', rotationStep: 3 })
+    expect(cellAt(swapped, 0, 0)).toMatchObject({ kind: 'goal', rotationStep: 2 })
     expect(cellAt(swapped, 1, 1)).toMatchObject({ kind: 'start', rotationStep: 5 })
     expect(swapped.cells.filter((cell) => cell.kind === 'start')).toHaveLength(1)
     expect(swapped.cells.filter((cell) => cell.kind === 'goal')).toHaveLength(1)

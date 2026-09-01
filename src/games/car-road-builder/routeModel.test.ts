@@ -1,13 +1,20 @@
 import { describe, expect, test } from 'vitest'
 import { createInitialBoard, placePartAt } from './boardModel'
 import { createPlacedPart } from './partDefinitions'
+import { oppositeDirection } from './direction'
 import { buildRoute } from './routeModel'
 
-function lineBoard(exitRotation = 2) {
+const GOAL_ROTATION_BY_ENTRY: Readonly<Record<'N' | 'E' | 'S' | 'W', number>> = { N: 0, E: 2, S: 4, W: 6 }
+
+function goalForEntry(direction: 'N' | 'E' | 'S' | 'W') {
+  return createPlacedPart('goal', GOAL_ROTATION_BY_ENTRY[direction])
+}
+
+function lineBoard(exitRotation = 2, goalRotation = 6) {
   let board = createInitialBoard()
   board = placePartAt(board, 1, 0, createPlacedPart('start', exitRotation))
   board = placePartAt(board, 1, 1, createPlacedPart('straight', 2))
-  board = placePartAt(board, 1, 2, createPlacedPart('goal'))
+  board = placePartAt(board, 1, 2, createPlacedPart('goal', goalRotation))
   return board
 }
 
@@ -20,6 +27,15 @@ describe('car road route', () => {
     expect(route.startPose).toEqual({ cellId: 'cell-1-0', row: 1, col: 0 })
     expect(route.segments[0]!.path.sample(0)).toEqual({ x: 0, y: 0 })
     expect(routePolylineFirst(route)).toEqual({ x: 0.5, y: 1.5 })
+  })
+
+  test('only the goal entrance selected by rotation can clear the route', () => {
+    expect(buildRoute(lineBoard(2, 6)).stopReason).toBe('goal')
+    for (const wrongRotation of [0, 2, 4]) {
+      const route = buildRoute(lineBoard(2, wrongRotation))
+      expect(route.reachedGoal).toBe(false)
+      expect(route.stopReason).toBe('mismatch')
+    }
   })
 
   test('stops at empty, mismatch and edge instead of warping', () => {
@@ -38,19 +54,21 @@ describe('car road route', () => {
     expect(buildRoute(board).stopReason).toBe('edge')
   })
 
-  test('follows a gentle curve into a diagonal neighbour and reaches the goal', () => {
+  test('follows gentle curves into a cardinal goal entrance', () => {
     let board = createInitialBoard()
     board = placePartAt(board, 1, 0, createPlacedPart('start', 2))
     board = placePartAt(board, 1, 1, createPlacedPart('gentle-curve', 3))
-    board = placePartAt(board, 2, 2, createPlacedPart('goal'))
+    board = placePartAt(board, 2, 2, createPlacedPart('gentle-curve', 7))
+    board = placePartAt(board, 2, 3, goalForEntry('W'))
 
     const route = buildRoute(board)
     expect(route.reachedGoal).toBe(true)
     expect(route.stopReason).toBe('goal')
-    expect(route.segments.map((segment) => segment.kind)).toEqual(['start', 'gentle-curve', 'goal'])
+    expect(route.segments.map((segment) => segment.kind)).toEqual(['start', 'gentle-curve', 'gentle-curve', 'goal'])
     expect(route.segments[1]).toMatchObject({ entryPort: 'W', exitPort: 'SE' })
     expect(route.segments[1]!.path.sample(0)).toEqual({ x: -0.5, y: 0 })
     expect(route.segments[1]!.path.sample(1)).toEqual({ x: 0.5, y: 0.5 })
+    expect(route.segments[2]).toMatchObject({ entryPort: 'NW', exitPort: 'E' })
   })
 
   test('requires a reciprocal diagonal port before entering a gentle curve', () => {
@@ -75,7 +93,7 @@ describe('car road route', () => {
     let board = createInitialBoard()
     board = placePartAt(board, startRow, startCol, createPlacedPart('start', startDirection))
     board = placePartAt(board, crossRow, crossCol, createPlacedPart('crossroad', 0))
-    board = placePartAt(board, goalRow, goalCol, createPlacedPart('goal'))
+    board = placePartAt(board, goalRow, goalCol, goalForEntry(oppositeDirection(exitPort) as 'N' | 'E' | 'S' | 'W'))
 
     const route = buildRoute(board)
     expect(route.reachedGoal).toBe(true)
@@ -88,7 +106,7 @@ describe('car road route', () => {
     let board = createInitialBoard()
     board = placePartAt(board, 0, 1, createPlacedPart('start', 4))
     board = placePartAt(board, 1, 1, createPlacedPart('crossroad'))
-    board = placePartAt(board, 2, 1, createPlacedPart('goal'))
+    board = placePartAt(board, 2, 1, goalForEntry('N'))
 
     const route = buildRoute(board)
     expect(route.reachedGoal).toBe(true)
@@ -96,22 +114,24 @@ describe('car road route', () => {
   })
 
   test.each([
-    ['NW to SE', 0, 0, 3, 2, 2, 'NW', 'SE'],
-    ['SE to NW', 2, 2, 7, 0, 0, 'SE', 'NW'],
-    ['NE to SW', 0, 2, 5, 2, 0, 'NE', 'SW'],
-    ['SW to NE', 2, 0, 1, 0, 2, 'SW', 'NE'],
-  ] as const)('xroad travels diagonally straight from %s', (_name, startRow, startCol, startRotation, goalRow, goalCol, entryPort, exitPort) => {
+    ['NW to SE', 1, 1, 3, 3, 3, 7, 3, 4, 'NW', 'SE', 'NW', 'E', 'W'],
+    ['SE to NW', 3, 3, 7, 1, 1, 3, 1, 0, 'SE', 'NW', 'SE', 'W', 'E'],
+    ['NE to SW', 1, 3, 5, 3, 1, 1, 4, 1, 'NE', 'SW', 'NE', 'S', 'N'],
+    ['SW to NE', 3, 1, 1, 1, 3, 5, 0, 3, 'SW', 'NE', 'SW', 'N', 'S'],
+  ] as const)('xroad continues through a diagonal bend into the goal from %s', (_name, startRow, startCol, startRotation, turnRow, turnCol, turnRotation, finalGoalRow, finalGoalCol, entryPort, exitPort, gentleEntry, gentleExit, finalGoalEntry) => {
     const startDirection = startRotation
-    let board = createInitialBoard()
+    let board = createInitialBoard({ rows: 5, cols: 5 })
     board = placePartAt(board, startRow, startCol, createPlacedPart('start', startDirection))
-    board = placePartAt(board, 1, 1, createPlacedPart('xroad'))
-    board = placePartAt(board, goalRow, goalCol, createPlacedPart('goal'))
+    board = placePartAt(board, 2, 2, createPlacedPart('xroad'))
+    board = placePartAt(board, turnRow, turnCol, createPlacedPart('gentle-curve', turnRotation))
+    board = placePartAt(board, finalGoalRow, finalGoalCol, goalForEntry(finalGoalEntry))
 
     const route = buildRoute(board)
     expect(route.reachedGoal).toBe(true)
-    expect(route.segments.map((segment) => segment.kind)).toEqual(['start', 'xroad', 'goal'])
+    expect(route.segments.map((segment) => segment.kind)).toEqual(['start', 'xroad', 'gentle-curve', 'goal'])
     expect(route.segments[1]).toMatchObject({ entryPort, exitPort })
     expect(route.segments[1]!.path.sample(0.5)).toEqual({ x: 0, y: 0 })
+    expect(route.segments[2]).toMatchObject({ entryPort: gentleEntry, exitPort: gentleExit })
   })
 
   test('xroad can continue through a gentle curve without changing its diagonal pair', () => {
@@ -119,7 +139,7 @@ describe('car road route', () => {
     board = placePartAt(board, 0, 0, createPlacedPart('start', 3))
     board = placePartAt(board, 1, 1, createPlacedPart('xroad'))
     board = placePartAt(board, 2, 2, createPlacedPart('gentle-curve', 7))
-    board = placePartAt(board, 2, 3, createPlacedPart('goal'))
+    board = placePartAt(board, 2, 3, goalForEntry('W'))
 
     const route = buildRoute(board)
     expect(route.reachedGoal).toBe(true)
