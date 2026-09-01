@@ -75,6 +75,40 @@ describe('createCarModel（3Dモデル生成）', () => {
     }
   })
 
+  test('スポーツカーは窓・前面・フェンダーの専用造形を持つ', () => {
+    const model = createCarModel(DEFAULT_CAR_CONFIG)
+    const body = layerOf(model.root, 'body')
+    const wheel = layerOf(model.root, 'wheel')
+
+    for (const name of [
+      'car-body-hull',
+      'car-body-cabin-shell',
+      'car-sports-windshield',
+      'car-sports-side-window-rear-left',
+      'car-sports-side-window-front-left',
+      'car-sports-side-window-rear-right',
+      'car-sports-side-window-front-right',
+      'car-sports-front-grille',
+      'car-sports-front-splitter',
+      'car-sports-rear-deck',
+      'car-sports-wheel-arch-frontLeft',
+      'car-sports-wheel-arch-frontRight',
+      'car-sports-wheel-arch-rearLeft',
+      'car-sports-wheel-arch-rearRight',
+    ]) {
+      expect(body.getObjectByName(name), name).toBeDefined()
+    }
+
+    expect(wheel.getObjectByName('car-sports-rim-ring-frontLeft')).toBeDefined()
+    expect(wheel.getObjectByName('car-sports-center-cap-frontLeft')).toBeDefined()
+
+    const suv = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'suv'))
+    expect(layerOf(suv.root, 'body').getObjectByName('car-sports-windshield')).toBeUndefined()
+    expect(layerOf(suv.root, 'wheel').getObjectByName('car-sports-rim-ring-frontLeft')).toBeUndefined()
+    suv.dispose()
+    model.dispose()
+  })
+
   test('タイヤは4輪が寸法どおりの位置に生成される', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
