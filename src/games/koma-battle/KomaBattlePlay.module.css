@@ -89,6 +89,15 @@
   border-radius: 50%;
 }
 
+.komaTypeLabel {
+  padding: 2px 6px;
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-text-muted);
+  font-size: 0.8em;
+  font-weight: 800;
+}
+
 /* コマ選択は盤面全体を覆ってよい。タップ領域を大きく取る。 */
 .overlay {
   position: absolute;
@@ -97,11 +106,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--space-md);
   padding: var(--space-md);
   background: color-mix(in srgb, var(--color-background) 74%, transparent);
   text-align: center;
+  overflow-y: auto;
 }
 
 .overlayTitle {
@@ -124,6 +134,88 @@
   gap: var(--space-md);
   flex-wrap: wrap;
   justify-content: center;
+}
+
+.typePickers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+  width: min(760px, 100%);
+}
+
+.typePicker {
+  min-width: 0;
+  padding: 8px;
+  border: 2px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+}
+
+.typePickerTitle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: var(--color-primary-dark);
+  font-size: clamp(13px, 3.6vw, 17px);
+  font-weight: 900;
+}
+
+.playerBadge {
+  width: 15px;
+  height: 15px;
+  border: 2px solid color-mix(in srgb, #000 22%, transparent);
+  border-radius: 50%;
+}
+
+.typeChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.typeButton {
+  display: flex;
+  min-height: 90px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border: 3px solid transparent;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-background) 82%, var(--color-surface));
+  color: var(--color-primary-dark);
+  cursor: pointer;
+  flex-direction: column;
+}
+
+.typeButtonSelected {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 24%, transparent);
+}
+
+.typeIcon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.typeName {
+  font-size: clamp(13px, 3.3vw, 16px);
+  font-weight: 900;
+}
+
+.typeDescription {
+  color: var(--color-text-muted);
+  font-size: clamp(10px, 2.6vw, 12px);
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 /* 幼児が押しやすいよう、選択肢もボタンも十分な大きさにする。 */
@@ -214,4 +306,23 @@
 
 @media (prefers-reduced-motion: reduce) {
   .primaryButton:active { transform: none; }
+}
+
+@media (max-width: 520px) {
+  .typePickers { grid-template-columns: 1fr; }
+  .typeChoices { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .typeButton {
+    min-height: 74px;
+    padding: 5px 2px;
+  }
+  .typeIcon {
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+  }
+  .typeDescription { display: none; }
+  .countButton {
+    min-height: 82px;
+    min-width: 112px;
+  }
 }
