@@ -87,18 +87,21 @@ export const WALL_RESTITUTION = 0.38
 export const KOMA_CONTACT_MARGIN = 0.035
 /** この接近速度未満は、寄りかかっただけの弱い接触として追加反発を与えない。 */
 export const KOMA_KNOCKBACK_MIN_CLOSING_SPEED = 0.35
-/** この接近速度で追加反発が上限へ到達する。 */
-export const KOMA_KNOCKBACK_MAX_CLOSING_SPEED = 4.8
+/** この接近速度で追加反発が上限へ到達する。通常の正面衝突でも上限近くまで使う。 */
+export const KOMA_KNOCKBACK_MAX_CLOSING_SPEED = 4.2
 /** 弱い衝突でも見た目に分かる、1体ずつへ与える最小impulse。 */
-export const KOMA_KNOCKBACK_MIN_IMPULSE = 0.035
-/** 強い衝突で追加するimpulseの上限。速度安全弁より十分小さく保つ。 */
-export const KOMA_KNOCKBACK_MAX_IMPULSE = 0.22
+export const KOMA_KNOCKBACK_MIN_IMPULSE = 0.12
+/**
+ * 強い衝突で追加するimpulseの上限。
+ * 標準コマを中央付近から外周壁際まで弾ける強さにしつつ、既存の速度安全弁で保護する。
+ */
+export const KOMA_KNOCKBACK_MAX_IMPULSE = 1.45
 
 /** 壁へ向かう速度がこれ未満なら、静かな接触として中央向き補正を行わない。 */
 export const WALL_REDIRECT_MIN_OUTWARD_SPEED = 0.35
 /** 壁接触時に与える中央向きimpulseの範囲。接触開始時の1回だけ適用する。 */
-export const WALL_REDIRECT_MIN_IMPULSE = 0.045
-export const WALL_REDIRECT_MAX_IMPULSE = 0.1
+export const WALL_REDIRECT_MIN_IMPULSE = 0.12
+export const WALL_REDIRECT_MAX_IMPULSE = 0.35
 /** 接触境界付近の微振動で再発火しないよう、解除側にヒステリシスを持たせる。 */
 export const CONTACT_RELEASE_MARGIN = 0.025
 
