@@ -45,7 +45,8 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: 'ピアノであそぼう' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'くるまのみちづくり' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'コマバトル' })).toBeInTheDocument()
-    expect(screen.getAllByRole('link')).toHaveLength(20)
+    expect(screen.getByRole('link', { name: '3Dクルマづくり' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(21)
   })
 
   test('「都道府県クイズ」を押すと開始画面に遷移する', async () => {
