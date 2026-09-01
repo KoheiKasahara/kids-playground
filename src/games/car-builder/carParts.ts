@@ -409,11 +409,6 @@ const BODY_BUILDERS: Record<BodyType, CarPartBuilder> = {
   police: buildPoliceBody,
 }
 
-/** 選んだボディIDに対応する形状ビルダーを引く。後続カテゴリはこの分岐を持たない。 */
-function buildBody(context: CarPartContext): THREE.Object3D {
-  return BODY_BUILDERS[context.config.body](context)
-}
-
 function buildWheels(hubColor: string, hubRadiusRatio: number) {
   return ({ attachments }: CarPartContext): THREE.Object3D => {
     const group = new THREE.Group()
