@@ -1,0 +1,103 @@
+import { describe, expect, test } from 'vitest'
+import {
+  CAR_CATEGORIES,
+  CAR_CATEGORY_ORDER,
+  DEFAULT_CAR_CONFIG,
+  carCategoryOrder,
+  currentCarOption,
+  findCarOption,
+  resolveCarColor,
+  selectCarOption,
+  type CarCategoryId,
+} from './carConfig'
+
+describe('カテゴリのカタログ', () => {
+  test('Issue #401 の8カテゴリが定義されている', () => {
+    expect(CAR_CATEGORY_ORDER).toEqual([
+      'body',
+      'wheel',
+      'color',
+      'front',
+      'roof',
+      'decoration',
+      'mark',
+      'rideHeight',
+    ])
+  })
+
+  test('表示順がCAR_CATEGORIESの全キーを重複なく含む（カテゴリを足したら並び順にも入る）', () => {
+    const definedIds = Object.keys(CAR_CATEGORIES) as CarCategoryId[]
+    expect([...CAR_CATEGORY_ORDER].sort()).toEqual([...definedIds].sort())
+    expect(new Set(CAR_CATEGORY_ORDER).size).toBe(CAR_CATEGORY_ORDER.length)
+  })
+
+  test('各カテゴリはラベル・アイコン・読み上げ文と1件以上の選択肢を持つ', () => {
+    for (const category of carCategoryOrder()) {
+      expect(category.label.length, category.id).toBeGreaterThan(0)
+      expect(category.emoji.length, category.id).toBeGreaterThan(0)
+      expect(category.ariaLabel.length, category.id).toBeGreaterThan(0)
+      expect(category.options.length, category.id).toBeGreaterThanOrEqual(1)
+    }
+  })
+
+  test('選択肢IDはカテゴリ内で一意で、ラベルも空でない', () => {
+    for (const category of carCategoryOrder()) {
+      const ids = category.options.map((option) => option.id)
+      expect(new Set(ids).size, category.id).toBe(ids.length)
+      for (const option of category.options) {
+        expect(option.label.length, `${category.id}/${option.id}`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  test('リアルタイム反映を確かめられるよう、複数の選択肢を持つカテゴリがある', () => {
+    const multi = carCategoryOrder().filter((category) => category.options.length >= 2)
+    expect(multi.length).toBeGreaterThanOrEqual(3)
+  })
+
+  test('初期CarConfigの各値がカタログに実在する', () => {
+    for (const categoryId of CAR_CATEGORY_ORDER) {
+      expect(findCarOption(categoryId, DEFAULT_CAR_CONFIG[categoryId]), categoryId).toBeDefined()
+    }
+  })
+})
+
+describe('selectCarOption', () => {
+  test('指定したカテゴリだけを更新し、他カテゴリの選択は保たれる', () => {
+    const afterColor = selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'blue')
+    const afterWheel = selectCarOption(afterColor, 'wheel', 'big')
+
+    expect(afterWheel.color).toBe('blue')
+    expect(afterWheel.wheel).toBe('big')
+    expect(afterWheel.body).toBe(DEFAULT_CAR_CONFIG.body)
+    expect(afterWheel.rideHeight).toBe(DEFAULT_CAR_CONFIG.rideHeight)
+  })
+
+  test('元のCarConfigを書き換えない（新しいオブジェクトを返す）', () => {
+    const next = selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'yellow')
+    expect(DEFAULT_CAR_CONFIG.color).toBe('red')
+    expect(next).not.toBe(DEFAULT_CAR_CONFIG)
+  })
+
+  test('同じ値を選び直したときは同じ参照を返す（無駄な再描画・再生成をしない）', () => {
+    expect(selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'red')).toBe(DEFAULT_CAR_CONFIG)
+  })
+
+  test('カタログに無い選択肢IDは無視して現状を保つ', () => {
+    expect(selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'rainbow')).toBe(DEFAULT_CAR_CONFIG)
+  })
+})
+
+describe('表示用の値の解決', () => {
+  test('currentCarOptionが現在の選択肢定義を返す', () => {
+    const config = selectCarOption(DEFAULT_CAR_CONFIG, 'rideHeight', 'high')
+    expect(currentCarOption(config, 'rideHeight').label).toBe('たかい')
+  })
+
+  test('resolveCarColorが色IDから実際の塗り色(hex)を返す', () => {
+    expect(resolveCarColor(DEFAULT_CAR_CONFIG)).toMatch(/^#[0-9a-f]{6}$/i)
+    expect(resolveCarColor(selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'blue'))).not.toBe(
+      resolveCarColor(DEFAULT_CAR_CONFIG),
+    )
+  })
+})

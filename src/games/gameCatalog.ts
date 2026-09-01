@@ -421,6 +421,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'car-builder',
+    slug: 'car-builder',
+    title: '3Dクルマづくり',
+    emoji: '🚙',
+    seo: {
+      headline: '3Dクルマづくり｜自分だけの車をつくる',
+      description:
+        'ボディ・タイヤ・カラー・やねなど8つのカテゴリをえらんで、3Dのくるまを自由につくれるあそびです。えらんだしゅんかんに車の見た目が変わり、指でまわして見られます。',
+    },
+    category: 'threeD',
+    intro: {
+      howToPlay: [
+        'ゆびで ドラッグすると くるまが まわるよ',
+        'したの 8つの ボタンから えらべるよ',
+        'えらんだ しゅんかん くるまが かわるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
