@@ -173,6 +173,10 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     return () => soundController.setRunning(false)
   }, [running, soundController])
 
+  useEffect(() => {
+    soundController.setVehicle(vehicleId)
+  }, [soundController, vehicleId])
+
   useEffect(() => () => {
     if (departureFeedbackTimerRef.current !== null) {
       window.clearTimeout(departureFeedbackTimerRef.current)
