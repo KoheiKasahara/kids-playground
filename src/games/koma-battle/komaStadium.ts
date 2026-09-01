@@ -44,7 +44,7 @@ export const OUT_RADIUS = 2.72
  * ゲーム本体へフィールド名ごとの条件分岐を足さずに済む。Phase 4では固定障害物
  * だけを扱い、動的な剛体は追加しない。
  */
-export type KomaFieldId = 'basic' | 'bumper' | 'ridge'
+export type KomaFieldId = 'basic' | 'bumper' | 'ridge' | 'belt'
 
 export type KomaFieldRidge = {
   radius: number
@@ -58,6 +58,44 @@ export type KomaFieldObstacle = {
   z: number
   radius: number
   height: number
+}
+
+/**
+ * 動く床（ベルト）1枚ぶんのデータ。
+ *
+ * 物理は「エリア内にいるコマへ毎ステップ弱いimpulseを進行方向へ足すだけ」の
+ * 軽量な方式にするため、専用のRigidBodyやColliderは持たない。
+ * エリアは軸並行の矩形をangleぶん回転させただけの単純な形にして、判定を安く保つ。
+ */
+export type KomaFieldBelt = {
+  /** エリア中心の座標。 */
+  x: number
+  z: number
+  /** コマを押す向き[rad]。見た目の矢印もこの向きへ流れる。 */
+  angle: number
+  /** 進行方向（angle方向）の半長。 */
+  halfLength: number
+  /** 進行方向と直交する向きの半幅。 */
+  halfWidth: number
+  /** 基準の力（KOMA_BELT_FORCE）に掛ける倍率。既定1。 */
+  strength: number
+}
+
+/**
+ * 点がベルトの矩形エリア内にあるか。
+ *
+ * ベルトのangleぶん回転させたローカル座標系（X=進行方向）へ変換してから
+ * 軸並行の矩形判定をするだけで、毎ステップ・コマごとに呼んでも軽い。
+ * 状態を持たないので、境界を何度も出入りしても多重に力が積み上がることはない。
+ */
+export function isKomaWithinBelt(belt: KomaFieldBelt, x: number, z: number): boolean {
+  const dx = x - belt.x
+  const dz = z - belt.z
+  const cos = Math.cos(belt.angle)
+  const sin = Math.sin(belt.angle)
+  const localX = dx * cos + dz * sin
+  const localZ = -dx * sin + dz * cos
+  return Math.abs(localX) <= belt.halfLength && Math.abs(localZ) <= belt.halfWidth
 }
 
 /**
@@ -138,11 +176,12 @@ export type KomaField = {
   name: string
   description: string
   icon: string
-  shape: 'bowl' | 'bumper' | 'ridge'
+  shape: 'bowl' | 'bumper' | 'ridge' | 'belt'
   bowlDepth: number
   valleyRadius: number
   ridges: readonly KomaFieldRidge[]
   obstacles: readonly KomaFieldObstacle[]
+  belts: readonly KomaFieldBelt[]
   wallHeight: number
   /** 場外判定の共通境界。Phase 4では全フィールドで同じ値を使う。 */
   outRadius: number
@@ -158,6 +197,7 @@ export type KomaField = {
 
 const NO_RIDGES: readonly KomaFieldRidge[] = []
 const NO_OBSTACLES: readonly KomaFieldObstacle[] = []
+const NO_BELTS: readonly KomaFieldBelt[] = []
 
 /** フィールド定義の正本。順番は選択UIの表示順を兼ねる。 */
 export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
@@ -171,6 +211,7 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     valleyRadius: VALLEY_RADIUS,
     ridges: NO_RIDGES,
     obstacles: NO_OBSTACLES,
+    belts: NO_BELTS,
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,
     wallGaps: DEFAULT_WALL_GAPS,
@@ -190,6 +231,7 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
       { type: 'bumper', x: Math.cos((5 * Math.PI) / 6) * 0.95, z: Math.sin((5 * Math.PI) / 6) * 0.95, radius: BUMPER_RADIUS, height: BUMPER_HEIGHT },
       { type: 'bumper', x: Math.cos((3 * Math.PI) / 2) * 0.95, z: Math.sin((3 * Math.PI) / 2) * 0.95, radius: BUMPER_RADIUS, height: BUMPER_HEIGHT },
     ],
+    belts: NO_BELTS,
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,
     wallGaps: DEFAULT_WALL_GAPS,
@@ -206,10 +248,33 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     // 幅広く低いGaussianの盛り上がり。最大勾配は約0.20で、コマが引っかからない。
     ridges: [{ radius: 1.2, height: 0.075, width: 0.4 }],
     obstacles: NO_OBSTACLES,
+    belts: NO_BELTS,
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,
     wallGaps: DEFAULT_WALL_GAPS,
     theme: { floor: 0xe7e7cf, rim: 0x568a82, wall: 0x5f9c91, accent: 0xf1a15b },
+  },
+  {
+    id: 'belt',
+    name: 'ながれる ゆか',
+    description: 'のると ぐいっと おされる',
+    icon: '➡️',
+    shape: 'belt',
+    bowlDepth: BOWL_DEPTH,
+    valleyRadius: VALLEY_RADIUS,
+    ridges: NO_RIDGES,
+    obstacles: NO_OBSTACLES,
+    belts: [
+      // 谷(VALLEY_RADIUS)のすぐ外側までを覆う、中央を横切る一本のベルト。
+      // 谷に沿って回り続けるだけの軌道を+X方向へ押し出し、反対側から来た
+      // もう1個と再接近しやすくする。壁からは十分離れているので、
+      // ベルトの力だけで場外へ一直線に押し出されることはない。
+      { x: 0, z: 0, angle: 0, halfLength: 0.85, halfWidth: 0.34, strength: 1 },
+    ],
+    wallHeight: WALL_HEIGHT,
+    outRadius: OUT_RADIUS,
+    wallGaps: DEFAULT_WALL_GAPS,
+    theme: { floor: 0xe3ece8, rim: 0x3c6f78, wall: 0x4f8fa0, accent: 0xffb24e },
   },
 ]
 

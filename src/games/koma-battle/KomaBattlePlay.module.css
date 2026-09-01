@@ -238,7 +238,7 @@
   box-shadow: inset 0 -7px 0 rgb(0 0 0 / 10%);
 }
 
-.fieldPreviewbowl, .fieldPreviewbumper, .fieldPreviewridge { isolation: isolate; }
+.fieldPreviewbowl, .fieldPreviewbumper, .fieldPreviewridge, .fieldPreviewbelt { isolation: isolate; }
 
 .previewBowl {
   position: absolute;
@@ -264,6 +264,16 @@
   border: 6px solid #e7a05c;
   border-radius: 50%;
   opacity: 0.9;
+}
+
+.previewBelt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(10px, 3vw, 14px);
+  letter-spacing: -1px;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 60%));
 }
 
 .previewBumper {
