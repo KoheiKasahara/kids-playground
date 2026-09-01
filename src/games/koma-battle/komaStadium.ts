@@ -60,6 +60,73 @@ export type KomaFieldObstacle = {
   height: number
 }
 
+/**
+ * 外周壁の開口部（場外ポイント）の配置。
+ *
+ * `createWallSegments` が作る円周上のcuboid列のうち、どのセグメントを
+ * 「壁なし区間」にするかを、角度の生の値ではなくセグメント番号で表す。
+ * 角度で直接指定すると境界付近の丸め誤差でセグメント数が意図せずずれるため、
+ * 壁と同じ離散単位（セグメント）で数えたほうが安全で読みやすい。
+ */
+export type KomaWallGapConfig = {
+  /** 開口部の数。等間隔に配置する。 */
+  count: number
+  /** 1か所あたりの開口の幅（壁セグメント何枚ぶんか）。 */
+  widthSegments: number
+  /** 最初の開口を置く基準セグメント番号。既存テストが前提とする東西南北（角度0/90/180/270度）を避けるために使う。 */
+  offsetSegments: number
+}
+
+/**
+ * ベーシックフィールドで使う既定の開口配置。
+ *
+ * WALL_SEGMENTSが24のとき、45度・135度・225度・315度を中心に
+ * 2セグメント（約30度）ぶんの開口を4か所作る。0/90/180/270度（東西南北）は
+ * 既存の壁際挙動テストが前提にしているため避けている。
+ * 24セグメント中8セグメントを開口にするので、外周の2/3は壁が残る。
+ */
+export const DEFAULT_WALL_GAPS: KomaWallGapConfig = {
+  count: 4,
+  widthSegments: 2,
+  offsetSegments: 3,
+}
+
+const EMPTY_GAP_INDICES: ReadonlySet<number> = new Set()
+
+/**
+ * 開口配置から、壁を作らないセグメント番号の集合を求める。
+ * `createWallSegments` と `useKomaBattleEngine` の見た目メッシュが同じ集合を読むことで、
+ * 物理の開口と見た目の開口が常に一致する。
+ */
+export function wallGapSegmentIndices(
+  gaps: KomaWallGapConfig | null | undefined,
+  totalSegments: number = WALL_SEGMENTS,
+): ReadonlySet<number> {
+  if (
+    !gaps ||
+    !Number.isFinite(totalSegments) ||
+    totalSegments <= 0 ||
+    !Number.isFinite(gaps.count) ||
+    gaps.count <= 0 ||
+    !Number.isFinite(gaps.widthSegments) ||
+    gaps.widthSegments <= 0
+  ) {
+    return EMPTY_GAP_INDICES
+  }
+  const indices = new Set<number>()
+  const spacing = totalSegments / gaps.count
+  const offset = Number.isFinite(gaps.offsetSegments) ? gaps.offsetSegments : 0
+  for (let gapIndex = 0; gapIndex < gaps.count; gapIndex += 1) {
+    const center = offset + gapIndex * spacing
+    for (let width = 0; width < gaps.widthSegments; width += 1) {
+      const raw = Math.round(center + width)
+      const wrapped = ((raw % totalSegments) + totalSegments) % totalSegments
+      indices.add(wrapped)
+    }
+  }
+  return indices
+}
+
 /** バンパーの共通物理・見た目設定。少数固定配置で扱う。 */
 export const BUMPER_RADIUS = 0.22
 export const BUMPER_HEIGHT = 0.3
@@ -79,6 +146,8 @@ export type KomaField = {
   wallHeight: number
   /** 場外判定の共通境界。Phase 4では全フィールドで同じ値を使う。 */
   outRadius: number
+  /** 外周壁の開口配置。nullなら全周を壁で囲む（Phase 4以前と同じ）。 */
+  wallGaps: KomaWallGapConfig | null
   theme: {
     floor: number
     rim: number
@@ -104,6 +173,7 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     obstacles: NO_OBSTACLES,
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,
+    wallGaps: DEFAULT_WALL_GAPS,
     theme: { floor: 0xf2e4c8, rim: 0x3c5f92, wall: 0x5a7fb5, accent: 0xe0c9a0 },
   },
   {
@@ -122,6 +192,7 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     ],
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,
+    wallGaps: DEFAULT_WALL_GAPS,
     theme: { floor: 0xf4dfc3, rim: 0x935b84, wall: 0x7e6ab0, accent: 0xff9a76 },
   },
   {
@@ -137,6 +208,7 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     obstacles: NO_OBSTACLES,
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,
+    wallGaps: DEFAULT_WALL_GAPS,
     theme: { floor: 0xe7e7cf, rim: 0x568a82, wall: 0x5f9c91, accent: 0xf1a15b },
   },
 ]
@@ -272,6 +344,10 @@ export function createStadiumHeightfield(
 }
 
 export type WallSegment = {
+  /** 円周上の通し番号。開口の見た目（縞模様の床マーカーなど）を同じ番号で揃えるために使う。 */
+  index: number
+  /** 中心の角度[rad]。 */
+  angle: number
   /** 壁の中心座標。yは縁の高さ(0)から壁の高さの半分だけ上。 */
   center: { x: number; y: number; z: number }
   /** Y軸まわりの回転。壁の面が円の接線を向く。 */
@@ -284,18 +360,26 @@ export type WallSegment = {
 /**
  * 外周壁を、円周上に並べた少数のcuboidで作る。
  * 高さ場に急な壁を立てると接触が暴れやすいため、壁だけは平らな箱に分けている。
+ *
+ * `gapSegmentIndices` に含まれる番号は壁を作らず、配列から丸ごと省く。
+ * 物理Collider・見た目Meshの両方がこの結果をそのまま読むので、
+ * 「見た目は開口しているのに透明な壁が残る」状態にならない。
  */
 export function createWallSegments(
   count: number = WALL_SEGMENTS,
   wallHeight: number = WALL_HEIGHT,
+  gapSegmentIndices: ReadonlySet<number> = EMPTY_GAP_INDICES,
 ): WallSegment[] {
   const segments: WallSegment[] = []
   const centerRadius = WALL_INNER_RADIUS + WALL_THICKNESS / 2
   // 隣同士に隙間ができないよう、1枚の幅は弦の長さより少しだけ広く取る。
   const halfWidth = Math.tan(Math.PI / count) * centerRadius + WALL_THICKNESS / 2
   for (let index = 0; index < count; index += 1) {
+    if (gapSegmentIndices.has(index)) continue
     const angle = (index / count) * Math.PI * 2
     segments.push({
+      index,
+      angle,
       center: {
         x: Math.cos(angle) * centerRadius,
         y: wallHeight / 2,
@@ -309,4 +393,27 @@ export function createWallSegments(
     })
   }
   return segments
+}
+
+export type WallGapMarker = {
+  /** `createWallSegments` と同じ通し番号。壁が無い箇所。 */
+  index: number
+  /** 中心の角度[rad]。壁があった場合と同じ計算式で揃えている。 */
+  angle: number
+}
+
+/**
+ * 壁を作らなかったセグメントの角度だけを取り出す。
+ * 見た目側が「壁の代わりに床の注意表示を置く」ときの位置合わせに使う。
+ */
+export function wallGapMarkers(
+  gapSegmentIndices: ReadonlySet<number>,
+  count: number = WALL_SEGMENTS,
+): WallGapMarker[] {
+  const markers: WallGapMarker[] = []
+  for (let index = 0; index < count; index += 1) {
+    if (!gapSegmentIndices.has(index)) continue
+    markers.push({ index, angle: (index / count) * Math.PI * 2 })
+  }
+  return markers
 }

@@ -47,7 +47,10 @@ import {
   fieldHeightAt,
   getKomaField,
   WALL_INNER_RADIUS,
+  WALL_SEGMENTS,
   WALL_THICKNESS,
+  wallGapMarkers,
+  wallGapSegmentIndices,
   type KomaFieldId,
 } from './komaStadium'
 import { komaCameraSetup } from './komaCamera'
@@ -727,31 +730,68 @@ export function useKomaBattleEngine(
       centerMark.position.y = fieldHeightAt(selectedField, 0.3) + 0.005
       group.add(centerMark)
 
-      // 外周壁。物理と同じ配置・寸法のcuboidを並べる。
+      // 外周壁。物理と同じ配置・寸法のcuboidを並べる。開口部（wallGaps）は物理と同じ
+      // セグメント番号を読むので、見た目だけ開口して物理壁が残る/その逆は起きない。
       const wallMaterial = trackMaterial(
         new THREE.MeshStandardMaterial({ color: selectedField.theme.wall, roughness: 0.55, metalness: 0.05 }),
       )
+      const rimMaterial = trackMaterial(
+        new THREE.MeshStandardMaterial({ color: selectedField.theme.rim, roughness: 0.4, metalness: 0.35 }),
+      )
       const wallGeometry = track(new THREE.BoxGeometry(1, 1, 1))
-      for (const segment of createWallSegments(undefined, selectedField.wallHeight)) {
+      const wallGapIndices = wallGapSegmentIndices(selectedField.wallGaps, WALL_SEGMENTS)
+      const wallSegments = createWallSegments(undefined, selectedField.wallHeight, wallGapIndices)
+      for (const segment of wallSegments) {
         const wall = new THREE.Mesh(wallGeometry, wallMaterial)
         wall.position.set(segment.center.x, segment.center.y, segment.center.z)
         wall.rotation.y = segment.yaw
         wall.scale.set(segment.halfWidth * 2, segment.halfHeight * 2, segment.halfDepth * 2)
         group.add(wall)
+
+        // 壁の上端の縁取り。壁が無いセグメントには置かないので、開口部だけ
+        // 縁取りが途切れ、そこが安全な壁でないことが上から見ても分かる。
+        const rimCap = new THREE.Mesh(wallGeometry, rimMaterial)
+        rimCap.position.set(
+          segment.center.x,
+          selectedField.wallHeight + 0.02,
+          segment.center.z,
+        )
+        rimCap.rotation.y = segment.yaw
+        rimCap.scale.set(segment.halfWidth * 2.05, 0.05, segment.halfDepth * 2.6)
+        group.add(rimCap)
       }
 
-      // 壁の上端の縁取り。ほんのり金属風にして、スタジアムの輪郭をはっきりさせる。
-      const rim = new THREE.Mesh(
-        track(
-          new THREE.TorusGeometry(WALL_INNER_RADIUS + WALL_THICKNESS / 2, 0.035, 8, 48),
-        ),
-        trackMaterial(
-          new THREE.MeshStandardMaterial({ color: selectedField.theme.rim, roughness: 0.4, metalness: 0.35 }),
-        ),
+      // 開口部の床マーカー。壁の代わりに、注意色の縞模様を床へ直接敷く。
+      // 「ここから落ちそう」を文字なしで伝えるための唯一の説明手段なので、
+      // 物理の開口（wallGapIndices）と必ず同じ位置・同じ幅にしてある。
+      // フィールドのテーマ色に合わせず、注意色そのもの（黄×黒）で揃える。
+      // テーマのaccent色は床の色と近く馴染んでしまうフィールドがあり、
+      // 「危険」だと伝える役目は薄い色より確実な警戒色を優先する。
+      const hazardAccentMaterial = trackMaterial(
+        new THREE.MeshStandardMaterial({ color: 0xffcc33, roughness: 0.45, metalness: 0.05 }),
       )
-      rim.rotation.x = Math.PI / 2
-      rim.position.y = selectedField.wallHeight
-      group.add(rim)
+      const hazardDarkMaterial = trackMaterial(
+        new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.8, metalness: 0.1 }),
+      )
+      const hazardRadialSpan = FIELD_RADIUS - WALL_INNER_RADIUS
+      const hazardRadius = (WALL_INNER_RADIUS + FIELD_RADIUS) / 2
+      const hazardHalfWidth = wallSegments[0]?.halfWidth ?? Math.tan(Math.PI / WALL_SEGMENTS) * hazardRadius
+      for (const marker of wallGapMarkers(wallGapIndices, WALL_SEGMENTS)) {
+        const stripe = new THREE.Mesh(
+          wallGeometry,
+          marker.index % 2 === 0 ? hazardAccentMaterial : hazardDarkMaterial,
+        )
+        // 段差として少し盛り上がった縁石に見せる。壁の代わりに「ここで区切れている」と分かる高さ。
+        const stripeHeight = 0.03
+        stripe.position.set(
+          Math.cos(marker.angle) * hazardRadius,
+          fieldHeightAt(selectedField, hazardRadius) + stripeHeight / 2,
+          Math.sin(marker.angle) * hazardRadius,
+        )
+        stripe.rotation.y = Math.PI / 2 - marker.angle
+        stripe.scale.set(hazardHalfWidth * 1.9, stripeHeight, hazardRadialSpan + WALL_THICKNESS)
+        group.add(stripe)
+      }
 
       // バンパーは共有geometry/materialで描く。物理側も同じ位置・寸法の固定Colliderを持つが、
       // 見た目のMeshへColliderを付けることはしない（再戦時の重複と負荷を防ぐ）。

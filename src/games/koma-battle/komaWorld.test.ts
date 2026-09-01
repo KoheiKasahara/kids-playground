@@ -32,10 +32,12 @@ import {
   KOMA_FIELD_DEFINITIONS,
   OUT_RADIUS,
   WALL_INNER_RADIUS,
+  WALL_SEGMENTS,
 } from './komaStadium'
 import {
   createKomaJudgeState,
   decideMatchOutcome,
+  START_GRACE_MS,
   updateKomaJudge,
   type KomaJudgeState,
   type MatchOutcome,
@@ -223,11 +225,12 @@ describe('createKomaBattleWorld', () => {
     world.world.free()
   })
 
-  it('フィールドごとの固定Collider数を小さく保つ（bumperだけ3つ増える）', () => {
+  it('フィールドごとの固定Collider数を小さく保つ（bumperだけ3つ増え、開口ぶん壁が減る）', () => {
     for (const field of KOMA_FIELD_DEFINITIONS) {
       const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2), { fieldId: field.id })
       expect(world.world.bodies.len()).toBe(2)
-      expect(world.world.colliders.len()).toBe(field.id === 'bumper' ? 34 : 31)
+      // 場外ポイント（開口）ぶんだけ壁Colliderが既定の24枚から減っている。
+      expect(world.world.colliders.len()).toBe(field.id === 'bumper' ? 26 : 23)
       world.world.free()
     }
   })
@@ -651,6 +654,71 @@ describe('コマ2個の対戦（実際にRapierを回して確認する）', () 
     world.world.free()
   })
 
+  it('開口部（場外ポイント）を狙って強く弾くと、壁に止められず場外まで飛び出す', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'basic' })
+    const koma = world.komas[0]!
+    // basicの既定開口（DEFAULT_WALL_GAPS）はセグメント3・4を含む＝角度45〜60度の間が開いている。
+    // その中心付近を狙う。
+    const gapAngle = (3.5 / WALL_SEGMENTS) * Math.PI * 2
+    const startRadius = WALL_INNER_RADIUS - 0.2
+    koma.body.setTranslation(
+      {
+        x: Math.cos(gapAngle) * startRadius,
+        y: fieldHeightAt('basic', startRadius) + 0.02,
+        z: Math.sin(gapAngle) * startRadius,
+      },
+      true,
+    )
+    koma.body.setLinvel({ x: Math.cos(gapAngle) * 8, y: 0, z: Math.sin(gapAngle) * 8 }, true)
+
+    let maxRadius = 0
+    let judgeState = createKomaJudgeState()
+    let elapsedMs = 5000
+    const stepMs = PHYSICS_TIMESTEP * 1000
+    for (let step = 0; step < 240; step += 1) {
+      applyKomaAssist(koma, PHYSICS_TIMESTEP)
+      world.world.step()
+      clampKomaMotion(koma)
+      elapsedMs += stepMs
+      const reading = readKoma(koma)
+      maxRadius = Math.max(maxRadius, reading.radius)
+      judgeState = updateKomaJudge(
+        judgeState,
+        { ...reading, y: reading.position.y },
+        stepMs,
+        elapsedMs,
+      )
+      if (judgeState.defeatReason !== null) break
+    }
+
+    // 既存の場外判定（isOutOfArena・updateKomaJudge）をそのまま使って場外が成立する。
+    expect(maxRadius).toBeGreaterThanOrEqual(OUT_RADIUS)
+    expect(judgeState.defeatReason).toBe('outOfArena')
+    world.world.free()
+  })
+
+  it('壁が残っている向きへ同じ強さで弾いても、壁に止められて場外にならない', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'basic' })
+    const koma = world.komas[0]!
+    // 角度0度（セグメント0）はDEFAULT_WALL_GAPSの対象外＝壁が残る向き。
+    const startRadius = WALL_INNER_RADIUS - 0.9
+    koma.body.setTranslation(
+      { x: startRadius, y: fieldHeightAt('basic', startRadius) + 0.02, z: 0 },
+      true,
+    )
+    koma.body.setLinvel({ x: 8, y: 0, z: 0 }, true)
+
+    let maxRadius = 0
+    for (let step = 0; step < 240; step += 1) {
+      applyKomaAssist(koma, PHYSICS_TIMESTEP)
+      world.world.step()
+      clampKomaMotion(koma)
+      maxRadius = Math.max(maxRadius, readKoma(koma).radius)
+    }
+    expect(maxRadius).toBeLessThan(OUT_RADIUS)
+    world.world.free()
+  })
+
   it('勝敗がつく場合、勝ったコマと負けたコマが必ず異なる', () => {
     const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2), {
       spinScales: [1.07, 0.93],
@@ -676,15 +744,22 @@ describe('コマ2個の対戦（実際にRapierを回して確認する）', () 
           },
         )
         const result = simulate(world, 30)
+        const outcome = result.outcome!
+        // 場外で決着した場合は、既存の「壁の外へ勝手に抜けない」「4秒未満では終わらない」という
+        // 前提そのものが今回の変更で意図的に崩れる（それがIssue #425の狙い）。
+        // 場外以外の決着では、既存どおりのテンポと境界を引き続き守る。
+        const isFieldOut = outcome.kind === 'win' && outcome.reason === 'outOfArena'
 
         expect(result.outcome).not.toBeNull()
-        expect(['win', 'draw']).toContain(result.outcome!.kind)
-        expect(result.outcomeAtMs).toBeGreaterThan(4000)
+        expect(['win', 'draw']).toContain(outcome.kind)
+        expect(result.outcomeAtMs).toBeGreaterThan(isFieldOut ? START_GRACE_MS : 4000)
         expect(result.outcomeAtMs).toBeLessThan(25000)
         expect(result.sawFiniteAlways).toBe(true)
-        expect(result.maxLinearSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
-        expect(result.maxAngularSpeed).toBeLessThanOrEqual(MAX_ANGULAR_SPEED)
-        expect(result.maxRadius).toBeLessThan(OUT_RADIUS)
+        // 場外後は壁の外を自由落下し続けるため、丸め誤差ぶん(浮動小数点の再正規化)だけ
+        // クランプ値をわずかに超えて観測されることがある。安全弁自体は既存のまま。
+        expect(result.maxLinearSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED + 1e-4)
+        expect(result.maxAngularSpeed).toBeLessThanOrEqual(MAX_ANGULAR_SPEED + 1e-4)
+        if (!isFieldOut) expect(result.maxRadius).toBeLessThan(OUT_RADIUS)
         expect(result.contacts).toBeGreaterThanOrEqual(1)
 
         world.world.free()
