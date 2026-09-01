@@ -64,6 +64,32 @@ describe('KomaBattlePlay', () => {
     expect(screen.getByText('あおコマ')).toBeInTheDocument()
   })
 
+  it('2個それぞれのタイプ選択をエンジンへ渡す', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: /2こで たいせん/ }))
+    await user.click(screen.getByRole('button', { name: 'あかコマ アタック' }))
+    await user.click(screen.getByRole('button', { name: 'あおコマ ディフェンス' }))
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+
+    expect(engineMock.options?.specs.map((spec) => spec.typeId)).toEqual(['attack', 'defense'])
+    expect(engineMock.options?.specs.map((spec) => spec.slotId)).toEqual(['player1', 'player2'])
+    expect(screen.getByText('アタック')).toBeInTheDocument()
+    expect(screen.getByText('ディフェンス')).toBeInTheDocument()
+  })
+
+  it('同じタイプを2個選んでも対戦を開始できる', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: /2こで たいせん/ }))
+    await user.click(screen.getByRole('button', { name: 'あかコマ スタミナ' }))
+    await user.click(screen.getByRole('button', { name: 'あおコマ スタミナ' }))
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+
+    expect(engineMock.options?.specs.map((spec) => spec.typeId)).toEqual(['stamina', 'stamina'])
+    expect(screen.getAllByText('スタミナ')).toHaveLength(2)
+  })
+
   it('1個モードで開始でき、コマ1個だけになる', async () => {
     const user = userEvent.setup()
     renderGame()
@@ -73,6 +99,17 @@ describe('KomaBattlePlay', () => {
     expect(engineMock.options?.komaCount).toBe(1)
     expect(screen.getByText('あかコマ')).toBeInTheDocument()
     expect(screen.queryByText('あおコマ')).not.toBeInTheDocument()
+  })
+
+  it('1個モードでも選んだタイプをエンジンへ渡す', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: /1こで まわす/ }))
+    await user.click(screen.getByRole('button', { name: 'あかコマ スタミナ' }))
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+
+    expect(engineMock.options?.komaCount).toBe(1)
+    expect(engineMock.options?.specs.map((spec) => spec.typeId)).toEqual(['stamina'])
   })
 
   it('対戦中は結果を表示しない', async () => {
@@ -139,6 +176,58 @@ describe('KomaBattlePlay', () => {
     expect(screen.queryByRole('button', { name: 'もういちど' })).not.toBeInTheDocument()
     // runIdが変わることでエンジンが世界を作り直す（前回のBodyを残さない）。
     expect(engineMock.options!.runId).toBeGreaterThan(firstRunId)
+  })
+
+  it('もういちどではタイプ選択を保持する', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: /2こで たいせん/ }))
+    await user.click(screen.getByRole('button', { name: 'あかコマ アタック' }))
+    await user.click(screen.getByRole('button', { name: 'あおコマ ディフェンス' }))
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+
+    finishWith({ kind: 'draw', reason: 'simultaneous' })
+    await user.click(screen.getByRole('button', { name: 'もういちど' }))
+
+    expect(engineMock.options?.specs.map((spec) => spec.typeId)).toEqual(['attack', 'defense'])
+  })
+
+  it('コマを選びなおしてもタイプ選択状態を保持する', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: /2こで たいせん/ }))
+    await user.click(screen.getByRole('button', { name: 'あかコマ アタック' }))
+    await user.click(screen.getByRole('button', { name: 'あおコマ ディフェンス' }))
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+
+    finishWith({ kind: 'draw', reason: 'simultaneous' })
+    await user.click(screen.getByRole('button', { name: 'コマを えらびなおす' }))
+
+    expect(screen.getByRole('button', { name: 'あかコマ アタック' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getByRole('button', { name: 'あおコマ ディフェンス' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  it('コマを選びなおしたあと別タイプへ変更して再開できる', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'あかコマ アタック' }))
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+    finishWith({ kind: 'draw', reason: 'simultaneous' })
+    await user.click(screen.getByRole('button', { name: 'コマを えらびなおす' }))
+
+    await user.click(screen.getByRole('button', { name: 'あかコマ スタミナ' }))
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+
+    expect(engineMock.options?.specs.map((spec) => spec.typeId)).toEqual([
+      'stamina',
+      'balance',
+    ])
   })
 
   it('何度もういちどを押しても、そのたびに新しいrunIdになる', async () => {

@@ -8,8 +8,17 @@ import {
   startPlacement,
   type KomaBattleWorld,
 } from './komaWorld'
-import { komaSpecsForCount } from './komaSpecs'
-import { MAX_ANGULAR_SPEED, MAX_LINEAR_SPEED, PHYSICS_TIMESTEP, START_RADIUS } from './komaPhysics'
+import { KOMA_TYPE_CONFIGS, komaSpecsForCount, komaSpecsForSelection } from './komaSpecs'
+import {
+  DISK_FRICTION,
+  DISK_RESTITUTION,
+  KOMA_DENSITY,
+  MAX_ANGULAR_SPEED,
+  MAX_LINEAR_SPEED,
+  PHYSICS_TIMESTEP,
+  START_RADIUS,
+  START_SPIN_SPEED,
+} from './komaPhysics'
 import { BOWL_RADIUS, bowlHeightAt, OUT_RADIUS, WALL_INNER_RADIUS } from './komaStadium'
 import {
   createKomaJudgeState,
@@ -66,9 +75,12 @@ function simulate(
     elapsedMs += stepMs
 
     const readings = world.komas.map(readKoma)
-    for (const reading of readings) {
+    for (const [index, reading] of readings.entries()) {
+      const angularVelocity = world.komas[index]!.body.angvel()
       const angular = Math.hypot(
-        ...(Object.values(world.komas[0]!.body.angvel()) as number[]),
+        angularVelocity.x,
+        angularVelocity.y,
+        angularVelocity.z,
       )
       if (
         !Number.isFinite(reading.position.x) ||
@@ -204,6 +216,33 @@ describe('createKomaBattleWorld', () => {
     world.world.free()
     base.world.free()
   })
+
+  it('タイプ定義の密度・接触・初速が物理へ反映される', () => {
+    for (const type of KOMA_TYPE_CONFIGS) {
+      const world = createKomaBattleWorld(
+        RAPIER,
+        komaSpecsForSelection([type.id], 1),
+      )
+      const body = world.komas[0]!.body
+      const disk = body.collider(2)
+      expect(Number.isFinite(body.mass())).toBe(true)
+      expect(body.mass()).toBeGreaterThan(0)
+      expect(disk.density()).toBeCloseTo(KOMA_DENSITY * type.densityScale, 6)
+      expect(disk.friction()).toBeCloseTo(DISK_FRICTION * type.diskFrictionScale, 6)
+      expect(disk.restitution()).toBeCloseTo(
+        Math.min(
+          0.9,
+          Math.max(
+            0.05,
+            DISK_RESTITUTION * type.diskRestitutionScale * type.collisionImpulseScale,
+          ),
+        ),
+        6,
+      )
+      expect(body.angvel().y).toBeCloseTo(START_SPIN_SPEED * type.initialSpinScale, 6)
+      world.world.free()
+    }
+  })
 })
 
 describe('コマ1個の一生（実際にRapierを回して確認する）', () => {
@@ -238,6 +277,24 @@ describe('コマ1個の一生（実際にRapierを回して確認する）', () 
     expect(result.maxTiltAtEnd).toBeLessThan(0.15)
     expect(result.outcome).toBeNull()
     world.world.free()
+  })
+
+  it('4種類すべてが1個モードでも異常なく終了する', () => {
+    for (const type of KOMA_TYPE_CONFIGS) {
+      const world = createKomaBattleWorld(
+        RAPIER,
+        komaSpecsForSelection([type.id], 1),
+      )
+      const result = simulate(world, 30)
+
+      expect(result.outcome?.kind).toBe('soloFinished')
+      expect(result.outcomeAtMs).toBeGreaterThan(4000)
+      expect(result.outcomeAtMs).toBeLessThan(25000)
+      expect(result.sawFiniteAlways).toBe(true)
+      expect(result.maxLinearSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
+      expect(result.maxAngularSpeed).toBeLessThanOrEqual(MAX_ANGULAR_SPEED)
+      world.world.free()
+    }
   })
 })
 
@@ -337,6 +394,35 @@ describe('コマ2個の対戦（実際にRapierを回して確認する）', () 
     }
     world.world.free()
   })
+
+  it('4種類の全組み合わせ（同タイプを含む）で決着まで安全に進む', () => {
+    for (const first of KOMA_TYPE_CONFIGS) {
+      for (const second of KOMA_TYPE_CONFIGS) {
+        const world = createKomaBattleWorld(
+          RAPIER,
+          komaSpecsForSelection([first.id, second.id], 2),
+          {
+            // 組み合わせごとに開始条件を少しだけ変え、特定の角度だけに依存しないことも見る。
+            startAngleOffset: (first.id.length + second.id.length) * 0.17,
+            spinScales: [1.04, 0.96],
+          },
+        )
+        const result = simulate(world, 30)
+
+        expect(result.outcome).not.toBeNull()
+        expect(['win', 'draw']).toContain(result.outcome!.kind)
+        expect(result.outcomeAtMs).toBeGreaterThan(4000)
+        expect(result.outcomeAtMs).toBeLessThan(25000)
+        expect(result.sawFiniteAlways).toBe(true)
+        expect(result.maxLinearSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
+        expect(result.maxAngularSpeed).toBeLessThanOrEqual(MAX_ANGULAR_SPEED)
+        expect(result.maxRadius).toBeLessThan(OUT_RADIUS)
+        expect(result.contacts).toBeGreaterThanOrEqual(1)
+
+        world.world.free()
+      }
+    }
+  }, 60_000)
 })
 
 describe('安全弁', () => {

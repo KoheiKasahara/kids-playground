@@ -80,6 +80,8 @@ export function startPlacement(
   orbitDirection: 1 | -1 = 1,
   /** 毎回まったく同じ試合にならないよう、開始角をずらす量[rad]。既定0で完全に決定的。 */
   angleOffset = 0,
+  /** タイプごとの周回速度倍率。内向き速度は固定して外周への逃走を防ぐ。 */
+  orbitSpeedScale = 1,
 ): { position: Vector3; velocity: Vector3 } {
   if (count <= 1) {
     // 1個モードは相手がいないので、周回させず中央付近へ置く。
@@ -99,11 +101,16 @@ export function startPlacement(
   return {
     position: { x, y: bowlHeightAt(START_RADIUS) + 0.02, z },
     velocity: {
-      x: tangentX * START_ORBIT_SPEED - Math.cos(angle) * START_INWARD_SPEED,
+      x: tangentX * START_ORBIT_SPEED * orbitSpeedScale - Math.cos(angle) * START_INWARD_SPEED,
       y: 0,
-      z: tangentZ * START_ORBIT_SPEED - Math.sin(angle) * START_INWARD_SPEED,
+      z: tangentZ * START_ORBIT_SPEED * orbitSpeedScale - Math.sin(angle) * START_INWARD_SPEED,
     },
   }
+}
+
+/** タイプ定義が将来増えても、物理へ渡す倍率を安全域へ留める。 */
+function safeTypeScale(value: number, minimum: number, maximum: number): number {
+  return Number.isFinite(value) ? Math.min(Math.max(value, minimum), maximum) : 1
 }
 
 /**
@@ -155,18 +162,33 @@ export function createKomaBattleWorld(
 
   const komas: KomaEntry[] = []
   specs.forEach((spec, index) => {
+    const type = spec.type
+    const densityScale = safeTypeScale(type.densityScale, 0.75, 1.25)
+    const diskRadiusScale = safeTypeScale(type.visual.diskRadiusScale, 0.9, 1.12)
+    const diskThicknessScale = safeTypeScale(type.visual.diskThicknessScale, 0.8, 1.25)
+    const frictionScale = safeTypeScale(type.diskFrictionScale, 0.7, 1.3)
+    const restitutionScale = safeTypeScale(
+      type.diskRestitutionScale * type.collisionImpulseScale,
+      0.65,
+      1.25,
+    )
+    const angularDampingScale = safeTypeScale(type.angularDampingScale, 0.65, 1.3)
+    const initialSpinScale = safeTypeScale(type.initialSpinScale, 0.8, 1.2)
+    const orbitSpeedScale = safeTypeScale(type.orbitSpeedScale, 0.8, 1.2)
+
     // 自転の向きと周回の向きをそろえ、2個が必ず逆回りですれ違うようにする。
     const placement = startPlacement(
       index,
       specs.length,
       spec.spinDirection,
       options.startAngleOffset ?? 0,
+      orbitSpeedScale,
     )
     const body = world.createRigidBody(
       rapier.RigidBodyDesc.dynamic()
         .setTranslation(placement.position.x, placement.position.y, placement.position.z)
         .setLinearDamping(LINEAR_DAMPING)
-        .setAngularDamping(ANGULAR_DAMPING)
+        .setAngularDamping(ANGULAR_DAMPING * angularDampingScale)
         // 高速で弾かれたコマが壁や床を1ステップで飛び越えないようにする。
         .setCcdEnabled(true)
         // 回転が止まるまで判定を続けたいので、途中でsleepさせない。
@@ -177,7 +199,7 @@ export function createKomaBattleWorld(
     world.createCollider(
       rapier.ColliderDesc.ball(TIP_RADIUS)
         .setTranslation(0, TIP_RADIUS, 0)
-        .setDensity(KOMA_DENSITY)
+        .setDensity(KOMA_DENSITY * densityScale)
         .setFriction(TIP_FRICTION)
         .setRestitution(TIP_RESTITUTION),
       body,
@@ -186,25 +208,34 @@ export function createKomaBattleWorld(
     world.createCollider(
       rapier.ColliderDesc.cylinder(SHAFT_HALF_HEIGHT, SHAFT_RADIUS)
         .setTranslation(0, SHAFT_CENTER_Y, 0)
-        .setDensity(KOMA_DENSITY)
+        .setDensity(KOMA_DENSITY * densityScale)
         .setFriction(TIP_FRICTION)
         .setRestitution(TIP_RESTITUTION),
       body,
     )
     // 円盤部。相手とぶつかる本体で、慣性モーメントの大半もここが持つ。
     world.createCollider(
-      rapier.ColliderDesc.cylinder(DISK_HALF_HEIGHT, DISK_RADIUS)
+      rapier.ColliderDesc.cylinder(
+        DISK_HALF_HEIGHT * diskThicknessScale,
+        DISK_RADIUS * diskRadiusScale,
+      )
         .setTranslation(0, DISK_CENTER_Y, 0)
-        .setDensity(KOMA_DENSITY)
-        .setFriction(DISK_FRICTION)
-        .setRestitution(DISK_RESTITUTION),
+        .setDensity(KOMA_DENSITY * densityScale)
+        .setFriction(DISK_FRICTION * frictionScale)
+        .setRestitution(
+          Math.min(0.9, Math.max(0.05, DISK_RESTITUTION * restitutionScale)),
+        ),
       body,
     )
 
     body.setLinvel(placement.velocity, true)
     const spinScale = options.spinScales?.[index] ?? 1
     body.setAngvel(
-      { x: 0, y: START_SPIN_SPEED * spinScale * spec.spinDirection, z: 0 },
+      {
+        x: 0,
+        y: START_SPIN_SPEED * initialSpinScale * spinScale * spec.spinDirection,
+        z: 0,
+      },
       true,
     )
 
@@ -262,8 +293,13 @@ export function applyKomaAssist(entry: KomaEntry, dt: number): void {
     spinSpeed,
     wobblePhase: entry.wobblePhase,
   })
+  const stabilizationScale = safeTypeScale(entry.spec.type.stabilizationScale, 0.7, 1.3)
   body.applyTorqueImpulse(
-    { x: torque.x * dt, y: torque.y * dt, z: torque.z * dt },
+    {
+      x: torque.x * dt * stabilizationScale,
+      y: torque.y * dt * stabilizationScale,
+      z: torque.z * dt * stabilizationScale,
+    },
     true,
   )
 }

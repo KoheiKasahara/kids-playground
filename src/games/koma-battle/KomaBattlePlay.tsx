@@ -1,7 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import GamePlaySurface from '../../components/GamePlaySurface'
-import { komaSpecsForCount, type KomaSpec } from './komaSpecs'
+import {
+  KOMA_TYPE_CONFIGS,
+  komaSpecsForSelection,
+  type KomaSpec,
+  type KomaTypeId,
+} from './komaSpecs'
 import { useKomaBattleEngine } from './useKomaBattleEngine'
 import type { KomaDefeatReason, MatchOutcome } from './komaOutcome'
 import styles from './KomaBattlePlay.module.css'
@@ -24,10 +29,18 @@ function soloMessage(reason: KomaDefeatReason): string {
 export default function KomaBattlePlay() {
   const [phase, setPhase] = useState<Phase>('select')
   const [komaCount, setKomaCount] = useState(2)
+  // プレイヤー枠ごとに選ぶ。再戦ではこの値をそのまま使い、明示的な変更まで保持する。
+  const [selectedTypes, setSelectedTypes] = useState<[KomaTypeId, KomaTypeId]>([
+    'balance',
+    'balance',
+  ])
   const [runId, setRunId] = useState(0)
   const [outcome, setOutcome] = useState<MatchOutcome | null>(null)
 
-  const specs = useMemo(() => komaSpecsForCount(komaCount), [komaCount])
+  const specs = useMemo(
+    () => komaSpecsForSelection(selectedTypes, komaCount),
+    [komaCount, selectedTypes],
+  )
 
   const startBattle = useCallback(() => {
     setOutcome(null)
@@ -69,6 +82,57 @@ export default function KomaBattlePlay() {
                   </span>
                   {count === 1 ? '1こで まわす' : '2こで たいせん'}
                 </button>
+              ))}
+            </div>
+            <div className={styles.typePickers}>
+              {specs.map((spec, slotIndex) => (
+                <section
+                  key={spec.slotId}
+                  className={styles.typePicker}
+                  aria-labelledby={`${spec.slotId}-type-heading`}
+                >
+                  <h3 id={`${spec.slotId}-type-heading`} className={styles.typePickerTitle}>
+                    <span
+                      className={styles.playerBadge}
+                      style={{ background: spec.color }}
+                      aria-hidden="true"
+                    />
+                    {spec.name}のタイプ
+                  </h3>
+                  <div className={styles.typeChoices}>
+                    {KOMA_TYPE_CONFIGS.map((type) => {
+                      const isSelected = selectedTypes[slotIndex] === type.id
+                      return (
+                        <button
+                          key={type.id}
+                          type="button"
+                          className={`${styles.typeButton} ${
+                            isSelected ? styles.typeButtonSelected : ''
+                          }`}
+                          aria-label={`${spec.name} ${type.name}`}
+                          aria-pressed={isSelected}
+                          onClick={() => {
+                            setSelectedTypes((current) => {
+                              const next: [KomaTypeId, KomaTypeId] = [...current]
+                              next[slotIndex] = type.id
+                              return next
+                            })
+                          }}
+                        >
+                          <span
+                            className={styles.typeIcon}
+                            style={{ color: spec.color, background: type.accentColor }}
+                            aria-hidden="true"
+                          >
+                            {type.icon}
+                          </span>
+                          <span className={styles.typeName}>{type.name}</span>
+                          <span className={styles.typeDescription}>{type.description}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
               ))}
             </div>
             <button type="button" className={styles.primaryButton} onClick={startBattle}>
@@ -124,6 +188,7 @@ function KomaBattleScene({
   const { registerContainer } = useKomaBattleEngine({
     runId,
     komaCount,
+    specs,
     onFinished,
   })
 
@@ -139,7 +204,8 @@ function KomaBattleScene({
               style={{ background: spec.color }}
               aria-hidden="true"
             />
-            {spec.name}
+            <span>{spec.name}</span>
+            <span className={styles.komaTypeLabel}>{spec.type.name}</span>
           </span>
         ))}
       </div>
@@ -201,7 +267,8 @@ function ResultMessage({
           style={{ background: winner?.color }}
           aria-hidden="true"
         />
-        {winner?.name}
+        <span>{winner?.name}</span>
+        <span className={styles.komaTypeLabel}>{winner?.type.name}</span>
       </p>
       <p className={styles.overlayNote}>
         {loser?.name}が {DEFEAT_LABEL[outcome.reason]}よ

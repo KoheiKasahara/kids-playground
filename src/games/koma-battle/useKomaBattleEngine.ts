@@ -45,7 +45,7 @@ import {
   WALL_THICKNESS,
 } from './komaStadium'
 import { komaCameraSetup } from './komaCamera'
-import { komaSpecsForCount, type KomaSpec } from './komaSpecs'
+import type { KomaSpec } from './komaSpecs'
 import {
   applyKomaAssist,
   clampKomaMotion,
@@ -76,6 +76,8 @@ export type KomaBattleEngineOptions = {
   runId: number
   /** 出場するコマの数。1か2。 */
   komaCount: number
+  /** 選択画面で決めたコマ。エンジン側で既定値へ差し替えない。 */
+  specs: readonly KomaSpec[]
   /** 決着したときに一度だけ呼ばれる。 */
   onFinished: (outcome: MatchOutcome) => void
 }
@@ -129,6 +131,7 @@ type KomaGeometrySet = {
   cap: THREE.SphereGeometry
   knob: THREE.SphereGeometry
   spinRing: THREE.RingGeometry
+  diskHalfHeight: number
 }
 
 /**
@@ -162,7 +165,7 @@ export function useKomaBattleEngine(
     const runToken = Symbol('koma-battle-run')
     activeRunRef.current = runToken
 
-    const specs = komaSpecsForCount(options.komaCount)
+    const specs = options.specs
 
     let battle: KomaBattleWorld | null = null
     let scene: THREE.Scene | null = null
@@ -297,34 +300,65 @@ export function useKomaBattleEngine(
     }
 
     /**
-     * コマの見た目Meshが使うgeometryを1組だけ作る。
-     * 寸法はどのコマも同じ（色だけがKomaSpecごとに違う）ので、1個モードでも2個モードでも
-     * このセット1つを全コマで使い回し、geometry数を人数ぶんに増やさない。
+     * コマの見た目Meshが使うgeometryをタイプごとに1組作る。
+     * 同じタイプ同士ではセットを使い回し、タイプ数が増えても人数ぶんに増やさない。
      */
-    function createKomaGeometrySet(): KomaGeometrySet {
+    function createKomaGeometrySet(visual: KomaSpec['type']['visual']): KomaGeometrySet {
+      const diskRadius = DISK_RADIUS * visual.diskRadiusScale
+      const diskHalfHeight = DISK_HALF_HEIGHT * visual.diskThicknessScale
       return {
         // 軸/先端。物理では球+円柱だが、見た目は下向きの円錐にして「コマの軸」に見せる。
-        tip: track(new THREE.ConeGeometry(SHAFT_RADIUS * 1.3, DISK_CENTER_Y - DISK_HALF_HEIGHT, 12)),
+        tip: track(new THREE.ConeGeometry(SHAFT_RADIUS * 1.3, DISK_CENTER_Y - diskHalfHeight, 12)),
         // 持ち手の軸。Colliderは持たせず見た目だけ。倒れたときの傾きが分かりやすくなる。
         shaft: track(new THREE.CylinderGeometry(SHAFT_RADIUS * 0.55, SHAFT_RADIUS * 0.6, 0.14, 10)),
         // 円盤下段。樹脂パーツの土台。
         diskLower: track(
-          new THREE.CylinderGeometry(DISK_RADIUS * 0.86, DISK_RADIUS * 0.66, DISK_HALF_HEIGHT * 1.6, 24),
+          new THREE.CylinderGeometry(
+            diskRadius * 0.86,
+            diskRadius * 0.66,
+            diskHalfHeight * 1.6,
+            24,
+          ),
         ),
         // 円盤上段。下段よりわずかに大きくして段差(パネル分割)を作る。
         diskUpper: track(
-          new THREE.CylinderGeometry(DISK_RADIUS, DISK_RADIUS * 0.9, DISK_HALF_HEIGHT * 1.66, 24),
+          new THREE.CylinderGeometry(
+            diskRadius * visual.upperTopScale,
+            diskRadius * visual.upperBottomScale,
+            diskHalfHeight * 1.66,
+            24,
+          ),
         ),
         // 上下段の継ぎ目に入れる溝。上段の最小半径(0.9)よりわずかに大きくして、
         // 上段の表面に埋もれず外へ突き出すようにする（段差として実際に見えるように）。
-        groove: track(new THREE.TorusGeometry(DISK_RADIUS * 0.93, DISK_RADIUS * 0.02, 6, 28)),
+        groove: track(new THREE.TorusGeometry(diskRadius * 0.93, diskRadius * 0.02, 6, 28)),
         // 外周リング。円盤の縁いっぱいに巻く金属風パーツ。
-        outerRing: track(new THREE.TorusGeometry(DISK_RADIUS * 0.99, DISK_RADIUS * 0.1, 8, 28)),
+        outerRing: track(
+          new THREE.TorusGeometry(
+            diskRadius * 0.99,
+            diskRadius * 0.1 * visual.ringScale,
+            8,
+            28,
+          ),
+        ),
         // 中心キャップ。上面の飾りで、回っていることが上から見て分かるようにする。
-        cap: track(new THREE.SphereGeometry(DISK_RADIUS * 0.34, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2)),
-        knob: track(new THREE.SphereGeometry(SHAFT_RADIUS * 0.8, 10, 8)),
+        cap: track(
+          new THREE.SphereGeometry(
+            diskRadius * 0.34 * visual.capScale,
+            14,
+            8,
+            0,
+            Math.PI * 2,
+            0,
+            Math.PI / 2,
+          ),
+        ),
+        knob: track(new THREE.SphereGeometry(SHAFT_RADIUS * 0.8 * visual.knobScale, 10, 8)),
         // 回転演出用の半透明リング。高速回転中だけ光る。
-        spinRing: track(new THREE.RingGeometry(DISK_RADIUS * 1.15, DISK_RADIUS * 1.42, 28)),
+        spinRing: track(
+          new THREE.RingGeometry(diskRadius * 1.15, diskRadius * 1.42, 28),
+        ),
+        diskHalfHeight,
       }
     }
 
@@ -338,6 +372,7 @@ export function useKomaBattleEngine(
      */
     function createKomaMesh(spec: KomaSpec, geometrySet: KomaGeometrySet): KomaVisual {
       const group = new THREE.Group()
+      const { diskHalfHeight } = geometrySet
 
       // 樹脂パーツ。円盤の主要部分で、コマの識別色(spec.color)を持つ。
       const resinMaterial = trackMaterial(
@@ -378,14 +413,14 @@ export function useKomaBattleEngine(
 
       const tip = new THREE.Mesh(geometrySet.tip, metalMaterial)
       tip.rotation.x = Math.PI
-      tip.position.y = (DISK_CENTER_Y - DISK_HALF_HEIGHT) / 2
+      tip.position.y = (DISK_CENTER_Y - diskHalfHeight) / 2
       group.add(tip)
 
       const diskLower = new THREE.Mesh(geometrySet.diskLower, resinMaterial)
-      diskLower.position.y = DISK_CENTER_Y - DISK_HALF_HEIGHT * 0.5
+      diskLower.position.y = DISK_CENTER_Y - diskHalfHeight * 0.5
       group.add(diskLower)
 
-      const diskUpperCenterY = DISK_CENTER_Y + DISK_HALF_HEIGHT * 0.45
+      const diskUpperCenterY = DISK_CENTER_Y + diskHalfHeight * 0.45
       const diskUpper = new THREE.Mesh(geometrySet.diskUpper, resinMaterial)
       diskUpper.position.y = diskUpperCenterY
       group.add(diskUpper)
@@ -394,24 +429,24 @@ export function useKomaBattleEngine(
       // 表面にも埋もれず、実際に段差として突き出して見える。
       const groove = new THREE.Mesh(geometrySet.groove, seamMaterial)
       groove.rotation.x = Math.PI / 2
-      groove.position.y = diskUpperCenterY - (DISK_HALF_HEIGHT * 1.66) / 2
+      groove.position.y = diskUpperCenterY - (diskHalfHeight * 1.66) / 2
       group.add(groove)
 
       const outerRing = new THREE.Mesh(geometrySet.outerRing, metalMaterial)
       outerRing.rotation.x = Math.PI / 2
-      outerRing.position.y = DISK_CENTER_Y + DISK_HALF_HEIGHT * 0.3
+      outerRing.position.y = DISK_CENTER_Y + diskHalfHeight * 0.3
       group.add(outerRing)
 
       const cap = new THREE.Mesh(geometrySet.cap, matteMaterial)
-      cap.position.y = DISK_CENTER_Y + DISK_HALF_HEIGHT + 0.02
+      cap.position.y = DISK_CENTER_Y + diskHalfHeight + 0.02
       group.add(cap)
 
       const shaft = new THREE.Mesh(geometrySet.shaft, metalMaterial)
-      shaft.position.y = DISK_CENTER_Y + DISK_HALF_HEIGHT + 0.1
+      shaft.position.y = DISK_CENTER_Y + diskHalfHeight + 0.1
       group.add(shaft)
 
       const knob = new THREE.Mesh(geometrySet.knob, accentMaterial)
-      knob.position.y = DISK_CENTER_Y + DISK_HALF_HEIGHT + 0.19
+      knob.position.y = DISK_CENTER_Y + diskHalfHeight + 0.19
       group.add(knob)
 
       const spinRing = new THREE.Mesh(geometrySet.spinRing, spinRingMaterial)
@@ -706,7 +741,6 @@ export function useKomaBattleEngine(
         spinScales: createSpinScales(specs.length),
       })
 
-      const geometrySet = createKomaGeometrySet()
       const shadowGeometry = track(new THREE.CircleGeometry(DISK_RADIUS * 1.35, 20))
       const shadowMaterial = trackMaterial(
         new THREE.MeshBasicMaterial({
@@ -717,7 +751,13 @@ export function useKomaBattleEngine(
         }),
       )
 
+      const geometrySets = new Map<string, KomaGeometrySet>()
       for (const koma of battle.komas) {
+        let geometrySet = geometrySets.get(koma.spec.typeId)
+        if (!geometrySet) {
+          geometrySet = createKomaGeometrySet(koma.spec.type.visual)
+          geometrySets.set(koma.spec.typeId, geometrySet)
+        }
         const visual = createKomaMesh(koma.spec, geometrySet)
         komaVisuals.push(visual)
         scene.add(visual.group)
@@ -754,7 +794,7 @@ export function useKomaBattleEngine(
       })
 
     return release
-  }, [options.runId, options.komaCount])
+  }, [options.runId, options.komaCount, options.specs])
 
   return handle
 }
