@@ -23,9 +23,9 @@ describe('fitCameraDistance', () => {
     expect(wide).toBeGreaterThanOrEqual(radius / halfFov)
   })
 
-  test('大きい車ほど遠ざかる（ボディやタイヤを変えても画面へ収まる）', () => {
+  test('大きい車ほど遠ざかる（5ボディの大きさに追従する）', () => {
     const bigger = carBoundingRadius(
-      computeCarDimensions(selectCarOption(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'long'), 'wheel', 'big')),
+      computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'bus')),
     )
     expect(fitCameraDistance(bigger, 40, 0.7)).toBeGreaterThan(fitCameraDistance(radius, 40, 0.7))
   })

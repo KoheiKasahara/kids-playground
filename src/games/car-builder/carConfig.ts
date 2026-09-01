@@ -3,13 +3,13 @@
  *
  * このファイルはUI・3D生成・テストが共通で参照する単一情報源であり、three.jsに依存しない。
  * 後続Issueで各カテゴリの本実装を足すときは、
- *   1. ここの `CarOptionIdMap` に選択肢IDを足す（またはカテゴリを1行足す）
- *   2. `CAR_CATEGORIES` に選択肢の表示定義を足す
+ *   1. ここの \`CarOptionIdMap\` に選択肢IDを足す（またはカテゴリを1行足す）
+ *   2. \`CAR_CATEGORIES\` に選択肢の表示定義を足す
  *   3. 見た目を持つカテゴリなら carParts.ts の登録表に生成関数を足す
  * の3か所だけで完結する。カテゴリごとの巨大な条件分岐をUIや3D側に増やさないための構造。
  */
 
-export type BodyType = 'normal' | 'long'
+export type BodyType = 'sports' | 'suv' | 'bus' | 'truck' | 'police'
 export type WheelType = 'normal' | 'big'
 export type CarColorId = 'red' | 'blue' | 'yellow'
 export type FrontType = 'normal' | 'round'
@@ -80,8 +80,11 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
     emoji: '🚗',
     ariaLabel: 'ボディを えらぶ',
     options: [
-      { id: 'normal', label: 'ふつう', preview: { kind: 'emoji', emoji: '🚗' } },
-      { id: 'long', label: 'ながい', preview: { kind: 'emoji', emoji: '🚙' } },
+      { id: 'sports', label: 'スポーツカー', preview: { kind: 'emoji', emoji: '🏎️' } },
+      { id: 'suv', label: 'SUV', preview: { kind: 'emoji', emoji: '🚙' } },
+      { id: 'bus', label: 'バス', preview: { kind: 'emoji', emoji: '🚌' } },
+      { id: 'truck', label: 'トラック', preview: { kind: 'emoji', emoji: '🚚' } },
+      { id: 'police', label: 'パトカー風', preview: { kind: 'emoji', emoji: '🚓' } },
     ],
   },
   wheel: {
@@ -159,7 +162,7 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
 
 /**
  * 画面に並べる順。Issue #401 の8カテゴリの並びをそのまま持つ。
- * `CAR_CATEGORIES` の全キーを重複なく含むことは carConfig.test.ts で保証する。
+ * \`CAR_CATEGORIES\` の全キーを重複なく含むことは carConfig.test.ts で保証する。
  */
 export const CAR_CATEGORY_ORDER: readonly CarCategoryId[] = [
   'body',
@@ -173,7 +176,7 @@ export const CAR_CATEGORY_ORDER: readonly CarCategoryId[] = [
 ]
 
 export const DEFAULT_CAR_CONFIG: CarConfig = {
-  body: 'normal',
+  body: 'sports',
   wheel: 'normal',
   color: 'red',
   front: 'normal',

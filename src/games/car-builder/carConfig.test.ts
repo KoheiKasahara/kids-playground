@@ -40,12 +40,33 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
+  test('ボディは形状を識別できる5種類を持ち、文字だけに依存しないプレビューがある', () => {
+    expect(CAR_CATEGORIES.body.options.map((option) => option.id)).toEqual([
+      'sports',
+      'suv',
+      'bus',
+      'truck',
+      'police',
+    ])
+    expect(CAR_CATEGORIES.body.options.map((option) => option.label)).toEqual([
+      'スポーツカー',
+      'SUV',
+      'バス',
+      'トラック',
+      'パトカー風',
+    ])
+    for (const option of CAR_CATEGORIES.body.options) {
+      expect(option.preview.kind, option.id).toBe('emoji')
+      if (option.preview.kind === 'emoji') expect(option.preview.emoji.length, option.id).toBeGreaterThan(0)
+    }
+  })
+
   test('選択肢IDはカテゴリ内で一意で、ラベルも空でない', () => {
     for (const category of carCategoryOrder()) {
       const ids = category.options.map((option) => option.id)
-      expect(new Set(ids).size, category.id).toBe(ids.length)
+      expect(new Set(ids).size).toBe(ids.length)
       for (const option of category.options) {
-        expect(option.label.length, `${category.id}/${option.id}`).toBeGreaterThan(0)
+        expect(option.label.length, category.id + '/' + option.id).toBeGreaterThan(0)
       }
     }
   })
@@ -64,12 +85,13 @@ describe('カテゴリのカタログ', () => {
 
 describe('selectCarOption', () => {
   test('指定したカテゴリだけを更新し、他カテゴリの選択は保たれる', () => {
-    const afterColor = selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'blue')
+    const afterBody = selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'bus')
+    const afterColor = selectCarOption(afterBody, 'color', 'blue')
     const afterWheel = selectCarOption(afterColor, 'wheel', 'big')
 
+    expect(afterWheel.body).toBe('bus')
     expect(afterWheel.color).toBe('blue')
     expect(afterWheel.wheel).toBe('big')
-    expect(afterWheel.body).toBe(DEFAULT_CAR_CONFIG.body)
     expect(afterWheel.rideHeight).toBe(DEFAULT_CAR_CONFIG.rideHeight)
   })
 
@@ -85,6 +107,7 @@ describe('selectCarOption', () => {
 
   test('カタログに無い選択肢IDは無視して現状を保つ', () => {
     expect(selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'rainbow')).toBe(DEFAULT_CAR_CONFIG)
+    expect(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'normal')).toBe(DEFAULT_CAR_CONFIG)
   })
 })
 

@@ -17,7 +17,7 @@ import styles from './CarBuilderPlay.module.css'
 
 function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; className: string }) {
   if (preview.kind === 'color') {
-    return <span className={`${className} ${styles.colorChip}`} style={{ backgroundColor: preview.hex }} aria-hidden="true" />
+    return <span className={className + ' ' + styles.colorChip} style={{ backgroundColor: preview.hex }} aria-hidden="true" />
   }
   return (
     <span className={className} aria-hidden="true">
@@ -111,7 +111,12 @@ export default function CarBuilderPlay() {
                 {openCategory.label}
               </h2>
             </div>
-            <div className={styles.optionList} role="group" aria-label={openCategory.ariaLabel}>
+            <div
+              className={styles.optionList}
+              role="group"
+              aria-label={openCategory.ariaLabel}
+              data-category={openCategory.id}
+            >
               {(openCategory.options as readonly CarOptionDefinition<string>[]).map((option) => (
                 <button
                   key={option.id}
