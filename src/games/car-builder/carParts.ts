@@ -210,7 +210,11 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
   })
   const trimMaterial = standard(CHROME_COLOR, 0.28, 0.42)
   const grilleMaterial = standard('#202b36', 0.3, 0.18)
-  const archMaterial = standard('#8b3038', 0.42, 0.12)
+  const archMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color).multiplyScalar(0.56),
+    roughness: 0.42,
+    metalness: 0.12,
+  })
   const half = dimensions.length / 2
   const floor = dimensions.bodyFloorY
   const hoodStart = half - dimensions.hoodLength
