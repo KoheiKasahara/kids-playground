@@ -21,6 +21,16 @@ function boundsOf(object: THREE.Object3D): THREE.Box3 {
   return new THREE.Box3().setFromObject(object)
 }
 
+function maxYNearZ(mesh: THREE.Mesh, targetZ: number): number {
+  const position = mesh.geometry.getAttribute('position')
+  let maxY = Number.NEGATIVE_INFINITY
+  for (let index = 0; index < position.count; index += 1) {
+    if (Math.abs(position.getZ(index) - targetZ) > 0.002) continue
+    maxY = Math.max(maxY, position.getY(index))
+  }
+  return maxY
+}
+
 describe('カテゴリと3D生成の対応（後続カテゴリ追加時の落とし穴を防ぐ契約）', () => {
   test('全カテゴリが「見た目を持つ」か「他パーツの入力になる」のどちらかに必ず属する', () => {
     const covered = [...CAR_PART_CATEGORY_IDS, ...CAR_DERIVED_CATEGORY_IDS] as CarCategoryId[]
@@ -139,6 +149,65 @@ describe('createCarModel（3Dモデル生成）', () => {
     }
     model.root.rotation.y = Math.PI / 2
     expect(model.root.rotation.y).toBeCloseTo(Math.PI / 2)
+    model.dispose()
+  })
+
+  test('スポーツカーのフェンダーはボディ色の立体面でタイヤ上端へかぶさる', () => {
+    const model = createCarModel(DEFAULT_CAR_CONFIG)
+    const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
+    const body = layerOf(model.root, 'body')
+    const attachments = model.getAttachments()
+
+    for (const wheel of attachments.wheels) {
+      const fender = body.getObjectByName(`car-sports-fender-${wheel.id}`)
+      expect(fender, wheel.id).toBeInstanceOf(THREE.Mesh)
+      const bounds = boundsOf(fender!)
+      const widthAcrossSide = bounds.max.x - bounds.min.x
+
+      expect(bounds.max.y, wheel.id).toBeGreaterThan(wheel.position.y + wheel.radius)
+      expect(widthAcrossSide, wheel.id).toBeGreaterThan(wheel.width * 0.55)
+      if (wheel.side === 1) expect(bounds.max.x, wheel.id).toBeGreaterThan(dimensions.width / 2)
+      else expect(bounds.min.x, wheel.id).toBeLessThan(-dimensions.width / 2)
+    }
+
+    model.dispose()
+  })
+
+  test('スポーツカーのボンネットは中央クラウンと前輪上の厚みを持つ', () => {
+    const model = createCarModel(DEFAULT_CAR_CONFIG)
+    const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
+    const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull')
+    expect(hull).toBeInstanceOf(THREE.Mesh)
+
+    const mesh = hull as THREE.Mesh
+    const hoodStart = dimensions.length / 2 - dimensions.hoodLength
+    const frontWheelZ = dimensions.wheelbase / 2
+    expect(maxYNearZ(mesh, hoodStart)).toBeGreaterThan(dimensions.hullTopY + 0.05)
+    expect(maxYNearZ(mesh, frontWheelZ + 0.04)).toBeGreaterThan(dimensions.hullTopY + 0.04)
+
+    const position = mesh.geometry.getAttribute('position')
+    const noseVertices = Array.from({ length: position.count }, (_, index) => ({
+      x: position.getX(index),
+      z: position.getZ(index),
+    })).filter((vertex) => vertex.z > dimensions.length / 2 - 0.12)
+    const centerNoseZ = Math.max(...noseVertices.filter((vertex) => Math.abs(vertex.x) < 0.001).map((vertex) => vertex.z))
+    const sideNoseZ = Math.max(...noseVertices.filter((vertex) => Math.abs(vertex.x) > dimensions.width * 0.15).map((vertex) => vertex.z))
+    expect(centerNoseZ).toBeGreaterThan(sideNoseZ)
+
+    model.dispose()
+  })
+
+  test('スポーツカーのフロントガラスは低い姿勢のまま十分な高さを持つ', () => {
+    const model = createCarModel(DEFAULT_CAR_CONFIG)
+    const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
+    const windshield = layerOf(model.root, 'body').getObjectByName('car-sports-windshield')
+    expect(windshield).toBeInstanceOf(THREE.Mesh)
+
+    const bounds = boundsOf(windshield!)
+    expect(bounds.max.y - bounds.min.y).toBeGreaterThan(dimensions.cabinHeight * 0.55)
+    expect(bounds.min.y).toBeGreaterThan(dimensions.hullTopY)
+    expect(bounds.max.y).toBeLessThanOrEqual(dimensions.roofTopY)
+
     model.dispose()
   })
 

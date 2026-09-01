@@ -63,6 +63,10 @@ type LoftSection = {
   topY: number
   /** 上半分だけを前後へずらし、フロントガラスやリアガラスを寝かせる。 */
   topZOffset?: number
+  /** 天面の左右ショルダーの高さ。中央のクラウンとは別に緩い抑揚を作る。 */
+  shoulderY?: number
+  /** 中央クラウンだけを前後へ出し、ノーズの先端にわずかな表情をつける。 */
+  centerZOffset?: number
 }
 
 /**
@@ -80,6 +84,8 @@ function loftMesh(
     const topHalfWidth = (section.topWidth ?? section.width * 0.84) / 2
     const height = Math.max(0.04, section.topY - section.bottomY)
     const topZOffset = section.topZOffset ?? 0
+    const shoulderY = section.shoulderY ?? section.bottomY + height * 0.96
+    const centerZOffset = section.centerZOffset ?? 0
     const zAt = (weight: number) => section.z + topZOffset * weight
 
     return [
@@ -88,9 +94,9 @@ function loftMesh(
       [-halfWidth, section.bottomY + height * 0.38, zAt(0.04)],
       [-halfWidth * 0.97, section.bottomY + height * 0.68, zAt(0.32)],
       [-topHalfWidth * 0.98, section.bottomY + height * 0.86, zAt(0.7)],
-      [-topHalfWidth * 0.68, section.bottomY + height * 0.96, zAt(0.94)],
-      [0, section.topY, zAt(1)],
-      [topHalfWidth * 0.68, section.bottomY + height * 0.96, zAt(0.94)],
+      [-topHalfWidth * 0.68, shoulderY, zAt(0.94)],
+      [0, section.topY, zAt(1) + centerZOffset],
+      [topHalfWidth * 0.68, shoulderY, zAt(0.94)],
       [topHalfWidth * 0.98, section.bottomY + height * 0.86, zAt(0.7)],
       [halfWidth * 0.97, section.bottomY + height * 0.68, zAt(0.32)],
       [halfWidth, section.bottomY + height * 0.38, zAt(0.04)],
@@ -181,12 +187,12 @@ function sportsWindshieldMesh(
 ): THREE.Mesh {
   // ボンネットからルーフへ寝かせた一枚面。車体外殻の上にわずかに浮かせ、
   // 赤いキャビンの塊を別パーツとして見せない。
-  const bottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.37
+  const bottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.29
   const topY = dimensions.roofTopY - 0.018
-  const bottomZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 - 0.08
-  const topZ = bottomZ - dimensions.cabinLength * 0.28
-  const bottomHalfWidth = dimensions.cabinWidth * 0.43
-  const topHalfWidth = dimensions.cabinWidth * 0.31
+  const bottomZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 - 0.055
+  const topZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 - dimensions.cabinLength * 0.28
+  const bottomHalfWidth = dimensions.cabinWidth * 0.46
+  const topHalfWidth = dimensions.cabinWidth * 0.33
   const positions = [
     -bottomHalfWidth, bottomY, bottomZ,
     0, bottomY + 0.022, bottomZ + 0.014,
@@ -198,6 +204,75 @@ function sportsWindshieldMesh(
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setIndex([0, 3, 1, 1, 3, 4, 1, 4, 2, 2, 4, 5])
+  geometry.computeVertexNormals()
+
+  const mesh = new THREE.Mesh(geometry, material)
+  mesh.name = name
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  return mesh
+}
+
+/**
+ * タイヤの上半分にボディ色の立体的なアーチ面をかぶせる。
+ * 細いTorusだけではタイヤが外付けに見えるため、車体側からタイヤ外側へ
+ * 面の厚みを持たせ、フェンダーがボディから張り出しているように見せる。
+ */
+function sportsFenderMesh(
+  wheel: CarAttachments['wheels'][number],
+  dimensions: CarDimensions,
+  material: THREE.Material,
+  name: string,
+): THREE.Mesh {
+  const segments = 18
+  const outerRadius = wheel.radius * 1.12
+  const innerRadius = wheel.radius * 0.84
+  const bodySide = dimensions.width / 2 - 0.012
+  const wheelSide = Math.abs(wheel.position.x)
+  const outerSide = wheelSide + wheel.width * 0.46
+  const innerX = wheel.side * bodySide
+  const outerX = wheel.side * Math.max(bodySide + 0.08, outerSide)
+  const positions: number[] = []
+
+  for (let index = 0; index <= segments; index += 1) {
+    const angle = (Math.PI * index) / segments
+    const outerZ = wheel.position.z + Math.cos(angle) * outerRadius
+    const outerY = wheel.position.y + Math.sin(angle) * outerRadius
+    const innerZ = wheel.position.z + Math.cos(angle) * innerRadius
+    const innerY = wheel.position.y + Math.sin(angle) * innerRadius
+    positions.push(
+      innerX, outerY, outerZ,
+      outerX, outerY, outerZ,
+      innerX, innerY, innerZ,
+      outerX, innerY, innerZ,
+    )
+  }
+
+  const indices: number[] = []
+  for (let index = 0; index < segments; index += 1) {
+    const current = index * 4
+    const next = (index + 1) * 4
+    // アーチの上面、内側面、車体側面、外側の見える面。
+    indices.push(
+      current, next, current + 1,
+      current + 1, next, next + 1,
+      current + 2, current + 3, next + 2,
+      current + 3, next + 3, next + 2,
+      current, current + 2, next,
+      current + 2, next + 2, next,
+      current + 1, next + 1, current + 3,
+      current + 3, next + 1, next + 3,
+    )
+  }
+
+  // 前後の端面を閉じ、フェンダーの厚みを横からも読めるようにする。
+  indices.push(0, 1, 3, 0, 3, 2)
+  const last = segments * 4
+  indices.push(last, last + 2, last + 3, last, last + 3, last + 1)
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
   geometry.computeVertexNormals()
 
   const mesh = new THREE.Mesh(geometry, material)
@@ -315,6 +390,7 @@ function addBumpers(group: THREE.Group, dimensions: CarDimensions, material: THR
 function buildSportsBody({ dimensions, attachments, color }: CarPartContext): THREE.Object3D {
   const group = createBodyGroup()
   const bodyMaterial = standard(color, 0.32, 0.08)
+  bodyMaterial.side = THREE.DoubleSide
   const glassMaterial = new THREE.MeshStandardMaterial({
     color: GLASS_COLOR,
     roughness: 0.12,
@@ -338,6 +414,8 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
   const hoodStart = half - dimensions.hoodLength
   const hullTop = dimensions.hullTopY
   const roofTop = dimensions.roofTopY
+  const frontWheelZ = dimensions.wheelbase / 2
+  const rearWheelZ = -frontWheelZ
 
   // 下段とキャビンを別々に積まず、リアデッキからノーズまでの高さを一つの
   // 連続した側面シルエットとして定義する。これが「上に載ったキャビン」を
@@ -348,18 +426,23 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
         { z: -half, width: dimensions.width * 0.72, topWidth: dimensions.width * 0.58, bottomY: floor, topY: floor + dimensions.hullHeight * 0.36 },
         { z: -half + 0.18, width: dimensions.width * 0.9, topWidth: dimensions.width * 0.73, bottomY: floor, topY: floor + dimensions.hullHeight * 0.54 },
         { z: -half + 0.42, width: dimensions.width * 0.99, topWidth: dimensions.width * 0.8, bottomY: floor, topY: floor + dimensions.hullHeight * 0.7 },
-        { z: cabinRear - 0.04, width: dimensions.width * 1.02, topWidth: dimensions.width * 0.84, bottomY: floor, topY: floor + dimensions.hullHeight * 0.83 },
-        { z: roofRear - 0.2, width: dimensions.width * 0.99, topWidth: dimensions.cabinWidth * 0.88, bottomY: floor, topY: hullTop + dimensions.cabinHeight * 0.72 },
-        { z: roofRear, width: dimensions.width * 0.97, topWidth: dimensions.cabinWidth * 0.82, bottomY: floor, topY: roofTop - dimensions.cabinHeight * 0.16 },
-        { z: dimensions.cabinCenterZ - dimensions.cabinLength * 0.22, width: dimensions.width * 0.96, topWidth: dimensions.cabinWidth * 0.78, bottomY: floor, topY: roofTop - 0.012 },
-        { z: dimensions.cabinCenterZ + dimensions.cabinLength * 0.08, width: dimensions.width * 0.95, topWidth: dimensions.cabinWidth * 0.76, bottomY: floor, topY: roofTop },
-        { z: roofFront, width: dimensions.width * 0.96, topWidth: dimensions.cabinWidth * 0.72, bottomY: floor, topY: roofTop - dimensions.cabinHeight * 0.08 },
-        { z: cabinFront + 0.14, width: dimensions.width * 0.98, topWidth: dimensions.width * 0.82, bottomY: floor, topY: hullTop + dimensions.cabinHeight * 0.58 },
-        { z: hoodStart, width: dimensions.width * 0.99, topWidth: dimensions.width * 0.86, bottomY: floor, topY: hullTop - 0.02 },
-        { z: dimensions.wheelbase / 2 + 0.18, width: dimensions.width * 1.03, topWidth: dimensions.width * 0.84, bottomY: floor, topY: floor + dimensions.hullHeight * 0.82 },
-        { z: half - 0.3, width: dimensions.width * 0.91, topWidth: dimensions.width * 0.72, bottomY: floor, topY: floor + dimensions.hullHeight * 0.52 },
-        { z: half - 0.1, width: dimensions.width * 0.78, topWidth: dimensions.width * 0.62, bottomY: floor, topY: floor + dimensions.hullHeight * 0.32 },
-        { z: half, width: dimensions.width * 0.62, topWidth: dimensions.width * 0.48, bottomY: floor, topY: floor + dimensions.hullHeight * 0.18 },
+        { z: rearWheelZ - 0.15, width: dimensions.width * 1.05, topWidth: dimensions.width * 0.86, bottomY: floor, topY: floor + dimensions.hullHeight * 0.78, shoulderY: floor + dimensions.hullHeight * 0.7 },
+        { z: cabinRear - 0.04, width: dimensions.width * 1.04, topWidth: dimensions.width * 0.86, bottomY: floor, topY: floor + dimensions.hullHeight * 0.84, shoulderY: floor + dimensions.hullHeight * 0.74 },
+        { z: rearWheelZ + 0.12, width: dimensions.width * 1.05, topWidth: dimensions.width * 0.86, bottomY: floor, topY: floor + dimensions.hullHeight * 0.86, shoulderY: floor + dimensions.hullHeight * 0.76 },
+        { z: roofRear - 0.2, width: dimensions.width * 0.99, topWidth: dimensions.cabinWidth * 0.88, bottomY: floor, topY: hullTop + dimensions.cabinHeight * 0.74, topZOffset: 0.08 },
+        { z: roofRear, width: dimensions.width * 0.97, topWidth: dimensions.cabinWidth * 0.82, bottomY: floor, topY: roofTop - dimensions.cabinHeight * 0.12, topZOffset: 0.1 },
+        { z: dimensions.cabinCenterZ - dimensions.cabinLength * 0.22, width: dimensions.width * 0.96, topWidth: dimensions.cabinWidth * 0.78, bottomY: floor, topY: roofTop - 0.012, topZOffset: 0.06 },
+        { z: dimensions.cabinCenterZ + dimensions.cabinLength * 0.08, width: dimensions.width * 0.95, topWidth: dimensions.cabinWidth * 0.76, bottomY: floor, topY: roofTop, topZOffset: 0.01 },
+        { z: roofFront, width: dimensions.width * 0.96, topWidth: dimensions.cabinWidth * 0.72, bottomY: floor, topY: roofTop - dimensions.cabinHeight * 0.08, topZOffset: -0.1 },
+        { z: cabinFront + 0.14, width: dimensions.width * 0.98, topWidth: dimensions.width * 0.82, bottomY: floor, topY: hullTop + dimensions.cabinHeight * 0.58, topZOffset: -0.06 },
+        { z: hoodStart - 0.1, width: dimensions.width * 0.98, topWidth: dimensions.width * 0.85, bottomY: floor, topY: hullTop + 0.06, shoulderY: hullTop + 0.045 },
+        { z: hoodStart, width: dimensions.width * 1.0, topWidth: dimensions.width * 0.87, bottomY: floor, topY: hullTop + 0.075, shoulderY: hullTop + 0.06 },
+        { z: frontWheelZ - 0.22, width: dimensions.width * 1.04, topWidth: dimensions.width * 0.88, bottomY: floor, topY: hullTop + 0.08, shoulderY: hullTop + 0.065 },
+        { z: frontWheelZ + 0.04, width: dimensions.width * 1.07, topWidth: dimensions.width * 0.9, bottomY: floor, topY: hullTop + 0.06, shoulderY: hullTop + 0.05 },
+        { z: frontWheelZ + 0.22, width: dimensions.width * 1.03, topWidth: dimensions.width * 0.86, bottomY: floor, topY: floor + dimensions.hullHeight * 0.86, shoulderY: floor + dimensions.hullHeight * 0.76 },
+        { z: half - 0.3, width: dimensions.width * 0.91, topWidth: dimensions.width * 0.72, bottomY: floor, topY: floor + dimensions.hullHeight * 0.58, centerZOffset: 0.02 },
+        { z: half - 0.1, width: dimensions.width * 0.78, topWidth: dimensions.width * 0.62, bottomY: floor, topY: floor + dimensions.hullHeight * 0.32, centerZOffset: 0.045 },
+        { z: half, width: dimensions.width * 0.62, topWidth: dimensions.width * 0.48, bottomY: floor, topY: floor + dimensions.hullHeight * 0.18, centerZOffset: 0.07 },
       ],
       bodyMaterial,
       'car-body-hull',
@@ -383,7 +466,7 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
           [cabinRear + 0.12, sideBottomY],
           [pillarZ - 0.08, sideBottomY],
           [pillarZ - 0.16, sideTopY],
-          [roofRear + 0.04, sideTopY - 0.03],
+          [roofRear + 0.1, sideTopY - 0.03],
         ],
         xForY,
         glassMaterial,
@@ -409,8 +492,9 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
 
   // フェンダー上部だけを細いアーチで縁取り、タイヤとボディの境界を読み取りやすくする。
   for (const wheel of attachments.wheels) {
+    group.add(sportsFenderMesh(wheel, dimensions, bodyMaterial, `car-sports-fender-${wheel.id}`))
     const arch = new THREE.Mesh(
-      new THREE.TorusGeometry(wheel.radius * 1.05, 0.026, 8, 28, Math.PI),
+      new THREE.TorusGeometry(wheel.radius * 1.08, 0.018, 8, 28, Math.PI),
       archMaterial,
     )
     arch.name = `car-sports-wheel-arch-${wheel.id}`
