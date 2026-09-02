@@ -32,13 +32,56 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npm run lint
+        id: lint
+        shell: bash
+        run: |
+          start=$(date +%s)
+          set +e
+          npm run lint
+          status=$?
+          end=$(date +%s)
+          echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
-      - name: Test
-        run: npm run test:quick
+      - name: Test (quick)
+        id: test
+        shell: bash
+        run: |
+          start=$(date +%s)
+          set +e
+          npm run test:quick -- --reporter=default --reporter=json --outputFile=vitest-results.json
+          status=$?
+          end=$(date +%s)
+          echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
       - name: Build
-        run: npm run build
+        id: build
+        shell: bash
+        run: |
+          start=$(date +%s)
+          set +e
+          npm run build
+          status=$?
+          end=$(date +%s)
+          echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write CI Summary
+        if: always()
+        env:
+          CI_TEST_MODE: QUICK CI
+          CI_TEST_RESULTS_FILE: vitest-results.json
+          CI_LINT_DURATION: ${{ steps.lint.outputs.duration }}
+          CI_TEST_DURATION: ${{ steps.test.outputs.duration }}
+          CI_BUILD_DURATION: ${{ steps.build.outputs.duration }}
+          CI_LINT_OUTCOME: ${{ steps.lint.outcome }}
+          CI_TEST_OUTCOME: ${{ steps.test.outcome }}
+          CI_BUILD_OUTCOME: ${{ steps.build.outcome }}
+          CI_NODE_VERSION: '22'
+          CI_PACKAGE_MANAGER: npm
+          CI_CACHE: setup-node npm cache
+        run: node scripts/ci-summary.mjs
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5

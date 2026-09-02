@@ -29,11 +29,58 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Install coverage provider
+        run: npm install --no-save --package-lock=false @vitest/coverage-v8@4.1.10
 
-      - name: Test (full, including slow)
-        run: npm run test:full
+      - name: Lint
+        id: lint
+        shell: bash
+        run: |
+          start=$(date +%s)
+          set +e
+          npm run lint
+          status=$?
+          end=$(date +%s)
+          echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Test (full, including slow, with coverage)
+        id: test
+        shell: bash
+        run: |
+          start=$(date +%s)
+          set +e
+          npm run test:full -- --coverage --coverage.reporter=text-summary --coverage.reporter=json-summary --reporter=default --reporter=json --outputFile=vitest-results.json
+          status=$?
+          end=$(date +%s)
+          echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
       - name: Build
-        run: npm run build
+        id: build
+        shell: bash
+        run: |
+          start=$(date +%s)
+          set +e
+          npm run build
+          status=$?
+          end=$(date +%s)
+          echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write CI Summary
+        if: always()
+        env:
+          CI_TEST_MODE: FULL / NIGHTLY
+          CI_TEST_RESULTS_FILE: vitest-results.json
+          CI_COVERAGE_FILE: coverage/coverage-summary.json
+          CI_LINT_DURATION: ${{ steps.lint.outputs.duration }}
+          CI_TEST_DURATION: ${{ steps.test.outputs.duration }}
+          CI_BUILD_DURATION: ${{ steps.build.outputs.duration }}
+          CI_LINT_OUTCOME: ${{ steps.lint.outcome }}
+          CI_TEST_OUTCOME: ${{ steps.test.outcome }}
+          CI_BUILD_OUTCOME: ${{ steps.build.outcome }}
+          CI_NODE_VERSION: '22'
+          CI_PACKAGE_MANAGER: npm
+          CI_CACHE: setup-node npm cache
+        run: node scripts/ci-summary.mjs

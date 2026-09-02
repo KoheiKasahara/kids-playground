@@ -130,6 +130,12 @@ export default defineConfig({
   base,
   plugins,
   test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'json-summary'],
+      reportsDirectory: './coverage',
+      exclude: ['**/*.test.ts', '**/*.test.tsx', 'src/test/**', '**/*.d.ts'],
+    },
     projects: [
       {
         plugins,
