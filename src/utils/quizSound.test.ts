@@ -537,7 +537,7 @@ describe('quizSound', () => {
     controller.dispose()
   })
 
-  test('いろぬりパズルの完成音は5音で、連打しても重複再生を抑える', async () => {
+  test('うごくぬりえの完成音は5音で、連打しても重複再生を抑える', async () => {
     ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
     vi.resetModules()
     const { playColorPaintFinishSound } = await import('./quizSound')
@@ -550,7 +550,7 @@ describe('quizSound', () => {
     expect(instances[0].createOscillator).toHaveBeenCalledTimes(5)
   })
 
-  test('いろぬりパズルの完成音はAudio APIが無くても例外を投げない', async () => {
+  test('うごくぬりえの完成音はAudio APIが無くても例外を投げない', async () => {
     ;(window as unknown as { AudioContext?: unknown }).AudioContext = undefined
     vi.resetModules()
     const { playColorPaintFinishSound } = await import('./quizSound')

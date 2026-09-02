@@ -1,4 +1,4 @@
-// いろぬりパズルの題材（ぬりえ）データ。
+// うごくぬりえの題材（ぬりえ）データ。
 // 座標はすべて viewBox '0 0 100 100' の絶対座標で、path の d は絶対座標の
 // M / L / C / Q / Z のみで構成する（shapeBounds.ts の制約と一致させる）。
 import type { PaintShape } from './shapeBounds'

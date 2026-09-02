@@ -443,10 +443,10 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
   {
     id: 'color-paint-puzzle',
     slug: 'color-paint-puzzle',
-    title: 'いろぬりパズル',
+    title: 'うごくぬりえ',
     emoji: '🖍️',
     seo: {
-      headline: 'いろぬりパズル｜くるま・きょうりゅう・ロケットなど6つのぬりえ',
+      headline: 'うごくぬりえ｜くるま・きょうりゅう・ロケットなど6つのぬりえ',
       description:
         'くるま・さかな・ちょうちょ・ロボット・ロケット・きょうりゅうの6つの絵から題材をえらび、色をえらんでタップするだけで塗れる幼児向けのぬりえです。線からはみ出す心配がないので、はじめてのぬりえにも向いています。',
     },

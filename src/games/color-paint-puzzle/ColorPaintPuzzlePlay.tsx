@@ -69,7 +69,7 @@ export default function ColorPaintPuzzlePlay() {
           ← もどる
         </button>
         <h1 className={`${styles.title} ${celebrating ? styles.titleQuiet : ''}`}>
-          <span aria-hidden="true">🖍️</span> いろぬりパズル
+          <span aria-hidden="true">🖍️</span> うごくぬりえ
         </h1>
       </header>
 
