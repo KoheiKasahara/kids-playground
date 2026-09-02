@@ -70,25 +70,33 @@ const BUBBLE_SMALL: PaintMotionRef = { part: 'bubbleSmall' }
 const BUTTERFLY: PaintMotionRef = { group: 'butterfly' }
 const BUTTERFLY_WING_LEFT: PaintMotionRef = { group: 'butterfly', part: 'wingLeft' }
 const BUTTERFLY_WING_RIGHT: PaintMotionRef = { group: 'butterfly', part: 'wingRight' }
+const ROBOT: PaintMotionRef = { group: 'robot' }
+const ROBOT_ARM_LEFT: PaintMotionRef = { group: 'robot', part: 'robotArmLeft' }
+const ROBOT_ARM_RIGHT: PaintMotionRef = { group: 'robot', part: 'robotArmRight' }
+const ROBOT_ANTENNA: PaintMotionRef = { group: 'robot', part: 'robotAntenna' }
+const ROCKET: PaintMotionRef = { group: 'rocket' }
+const ROCKET_FLAME: PaintMotionRef = { group: 'rocket', part: 'rocketFlame' }
+// ほしはロケットと一緒に飛ばず、そらに残ってチカチカするので group には入れない。
+const ROCKET_STARS: PaintMotionRef = { part: 'rocketStars' }
+const DINO: PaintMotionRef = { group: 'dino' }
+const DINO_TAIL: PaintMotionRef = { group: 'dino', part: 'dinoTail' }
+const DINO_HEAD: PaintMotionRef = { group: 'dino', part: 'dinoHead' }
 
-// くるま・さかな・ちょうちょで共通の、画面いっぱいのラウンド角矩形（背景=そら/みず）。
+// 全題材で共通の、画面いっぱいのラウンド角矩形（背景=そら/みず）。
 const BACKDROP_PATH =
   'M 6,2 L 94,2 C 96.2,2 98,3.8 98,6 L 98,94 C 98,96.2 96.2,98 94,98 L 6,98 C 3.8,98 2,96.2 2,94 L 2,6 C 2,3.8 3.8,2 6,2 Z'
+
+// 地面に立つ題材（くるま・ロボット・きょうりゅう）で共通の、画面下の帯。
+// 元デザインは 'M 2,84 L 98,84 ...'（高さ14単位）だったが、MIN_TAP_SIZE_UNITS(16)を
+// 満たすために上端を84→82へ2単位だけ引き上げている（幅・見た目はそのまま）。
+const GROUND_PATH =
+  'M 2,82 L 98,82 L 98,94 C 98,96.2 96.2,98 94,98 L 6,98 C 3.8,98 2,96.2 2,94 Z'
 
 // くるま ------------------------------------------------------------------
 
 const carAreas: readonly PaintArea[] = [
   { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
-  {
-    id: 'ground',
-    label: 'じめん',
-    shape: {
-      kind: 'path',
-      // 元デザインは 'M 2,84 L 98,84 ...'（高さ14単位）だったが、MIN_TAP_SIZE_UNITS(16)を
-      // 満たすために上端を84→82へ2単位だけ引き上げている（幅・見た目はそのまま）。
-      d: 'M 2,82 L 98,82 L 98,94 C 98,96.2 96.2,98 94,98 L 6,98 C 3.8,98 2,96.2 2,94 Z',
-    },
-  },
+  { id: 'ground', label: 'じめん', shape: { kind: 'path', d: GROUND_PATH } },
   {
     id: 'body',
     label: 'くるまの ボディ',
@@ -334,6 +342,302 @@ const butterflyDetails: readonly PaintDetail[] = [
   },
 ]
 
+// ロボット ---------------------------------------------------------------
+
+const robotAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  { id: 'ground', label: 'じめん', shape: { kind: 'path', d: GROUND_PATH } },
+  // うで・あしは、どうたいより先に描いて付け根を隠す（＝どうたいの下に差し込む）。
+  {
+    id: 'armLeft',
+    label: 'ひだりの うで',
+    shape: {
+      kind: 'path',
+      d: 'M 14,48 L 26,48 C 30,48 32,51 32,54 L 32,60 C 32,63 30,66 26,66 L 14,66 C 11,66 8,63 8,60 L 8,54 C 8,51 11,48 14,48 Z',
+    },
+    motion: ROBOT_ARM_LEFT,
+  },
+  {
+    id: 'armRight',
+    label: 'みぎの うで',
+    shape: {
+      kind: 'path',
+      d: 'M 74,48 L 86,48 C 89,48 92,51 92,54 L 92,60 C 92,63 89,66 86,66 L 74,66 C 70,66 68,63 68,60 L 68,54 C 68,51 70,48 74,48 Z',
+    },
+    motion: ROBOT_ARM_RIGHT,
+  },
+  {
+    id: 'legLeft',
+    label: 'ひだりの あし',
+    shape: {
+      kind: 'path',
+      d: 'M 30,72 L 47,72 L 47,84 C 47,87 45,89 42,89 L 35,89 C 32,89 30,87 30,84 Z',
+    },
+    motion: ROBOT,
+  },
+  {
+    id: 'legRight',
+    label: 'みぎの あし',
+    shape: {
+      kind: 'path',
+      d: 'M 53,72 L 70,72 L 70,84 C 70,87 68,89 65,89 L 58,89 C 55,89 53,87 53,84 Z',
+    },
+    motion: ROBOT,
+  },
+  {
+    id: 'body',
+    label: 'ロボットの からだ',
+    shape: {
+      kind: 'path',
+      d: 'M 36,46 L 64,46 C 68,46 72,50 72,54 L 72,68 C 72,72 68,76 64,76 L 36,76 C 32,76 28,72 28,68 L 28,54 C 28,50 32,46 36,46 Z',
+    },
+    motion: ROBOT,
+  },
+  {
+    id: 'head',
+    label: 'あたま',
+    shape: {
+      kind: 'path',
+      // かおを内側に重ねるので、まわりに塗れる枠が十分残る大きさにしている。
+      d: 'M 37,10 L 63,10 C 67,10 71,14 71,18 L 71,35 C 71,39 67,43 63,43 L 37,43 C 33,43 29,39 29,35 L 29,18 C 29,14 33,10 37,10 Z',
+    },
+    motion: ROBOT,
+  },
+  {
+    id: 'face',
+    label: 'かお',
+    // あたまの内側に重ねる。まわりに枠がじゅうぶん残る大きさにしている。
+    shape: {
+      kind: 'path',
+      d: 'M 40,18 L 60,18 C 62,18 64,20 64,22 L 64,33 C 64,35 62,37 60,37 L 40,37 C 38,37 36,35 36,33 L 36,22 C 36,20 38,18 40,18 Z',
+    },
+    motion: ROBOT,
+  },
+  {
+    id: 'chest',
+    label: 'むねの ボタン',
+    shape: { kind: 'circle', cx: 50, cy: 59, r: 8.5 },
+    motion: ROBOT,
+  },
+]
+
+const robotDetails: readonly PaintDetail[] = [
+  // アンテナ。棒はからだと一緒に動き、先の玉だけがその場で光る。
+  {
+    shape: { kind: 'path', d: 'M 50,10 L 50,6' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 2,
+    motion: ROBOT,
+  },
+  {
+    shape: { kind: 'circle', cx: 50, cy: 4, r: 3.2 },
+    fill: '#ff8787',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: ROBOT_ANTENNA,
+  },
+  { shape: { kind: 'circle', cx: 42, cy: 26, r: 4.6 }, fill: '#ffffff', motion: ROBOT },
+  { shape: { kind: 'circle', cx: 42, cy: 26, r: 2.2 }, fill: OUTLINE_COLOR, motion: ROBOT },
+  { shape: { kind: 'circle', cx: 58, cy: 26, r: 4.6 }, fill: '#ffffff', motion: ROBOT },
+  { shape: { kind: 'circle', cx: 58, cy: 26, r: 2.2 }, fill: OUTLINE_COLOR, motion: ROBOT },
+  {
+    shape: { kind: 'path', d: 'M 44,32 C 47,35 53,35 56,32' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: ROBOT,
+  },
+  // くび。あたまとどうたいのすき間をつなぐ2本の線。
+  {
+    shape: { kind: 'path', d: 'M 44,43 L 44,47 M 56,43 L 56,47' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: ROBOT,
+  },
+  {
+    shape: { kind: 'circle', cx: 50, cy: 59, r: 3.6 },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: ROBOT,
+  },
+]
+
+// ロケット ---------------------------------------------------------------
+
+const rocketAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  // はね・ほのおはボディより先に描いて、付け根をボディで隠す。
+  {
+    id: 'finLeft',
+    label: 'ひだりの はね',
+    shape: {
+      kind: 'path',
+      d: 'M 36,50 L 36,70 L 18,78 C 16,79 14,77 15,74 L 22,56 C 23,52 26,50 30,50 Z',
+    },
+    motion: ROCKET,
+  },
+  {
+    id: 'finRight',
+    label: 'みぎの はね',
+    shape: {
+      kind: 'path',
+      d: 'M 64,50 L 64,70 L 82,78 C 84,79 86,77 85,74 L 78,56 C 77,52 74,50 70,50 Z',
+    },
+    motion: ROCKET,
+  },
+  {
+    id: 'flame',
+    label: 'ほのお',
+    shape: {
+      kind: 'path',
+      // ボディの下端と同じ幅から外へふくらみ、下は2つのまるい舌に分かれる炎の形。
+      // 単純な三角だと「とがった尾」に見え、舌を増やすと1つ1つが細くなって塗りにくいので、
+      // ふとい舌2つ＋浅い谷にしている。
+      d: 'M 43,72 C 38,80 39,87 45,92 C 47,89 48,86 50,86 C 52,86 53,89 55,92 C 61,87 62,80 57,72 Z',
+    },
+    motion: ROCKET_FLAME,
+  },
+  {
+    id: 'body',
+    label: 'ロケットの ボディ',
+    shape: {
+      kind: 'path',
+      d: 'M 36,34 L 64,34 L 64,68 C 64,72 61,74 57,74 L 43,74 C 39,74 36,72 36,68 Z',
+    },
+    motion: ROCKET,
+  },
+  {
+    id: 'nose',
+    label: 'せんたん',
+    // ボディの上に重ねて描くので、下辺（Zで閉じる線）がそのまま切りかえの線になる。
+    shape: { kind: 'path', d: 'M 36,36 C 36,22 43,10 50,6 C 57,10 64,22 64,36 Z' },
+    motion: ROCKET,
+  },
+  {
+    id: 'window',
+    label: 'まど',
+    shape: { kind: 'circle', cx: 50, cy: 46, r: 8.5 },
+    motion: ROCKET,
+  },
+]
+
+const rocketDetails: readonly PaintDetail[] = [
+  // ほしはロケットと一緒に飛ばず、そらに残ってチカチカする。
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 18,12 L 20,18 L 26,20 L 20,22 L 18,28 L 16,22 L 10,20 L 16,18 Z',
+    },
+    fill: '#ffd43b',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: ROCKET_STARS,
+  },
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 84,26 L 85.5,30.5 L 90,32 L 85.5,33.5 L 84,38 L 82.5,33.5 L 78,32 L 82.5,30.5 Z',
+    },
+    fill: '#ffd43b',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: ROCKET_STARS,
+  },
+  { shape: { kind: 'circle', cx: 47, cy: 43, r: 2.6 }, fill: '#ffffff', motion: ROCKET },
+  {
+    shape: { kind: 'path', d: 'M 36,60 L 64,60' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: ROCKET,
+  },
+  // 炎の芯。線を増やしすぎず、炎らしい奥行きだけ足す。
+  {
+    shape: { kind: 'ellipse', cx: 50, cy: 79, rx: 3.4, ry: 4.6 },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: ROCKET_FLAME,
+  },
+]
+
+// きょうりゅう -------------------------------------------------------------
+
+const dinosaurAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  { id: 'ground', label: 'じめん', shape: { kind: 'path', d: GROUND_PATH } },
+  // しっぽ・あし・せなかのトゲは、からだより先に描いて付け根をからだの塗りで隠す
+  // （からだの上に描くと、おなかの中に四角い線が浮いてしまう）。
+  {
+    id: 'tail',
+    label: 'しっぽ',
+    shape: {
+      kind: 'path',
+      d: 'M 36,52 C 26,46 12,50 8,62 C 14,60 20,63 24,67 C 29,71 35,68 37,63 Z',
+    },
+    motion: DINO_TAIL,
+  },
+  {
+    id: 'legBack',
+    label: 'うしろの あし',
+    shape: {
+      kind: 'path',
+      d: 'M 30,62 L 48,62 L 48,80 C 48,84 46,86 42,86 L 32,86 C 29,86 27,84 27,81 C 27,78 28,76 30,74 Z',
+    },
+    motion: DINO,
+  },
+  {
+    id: 'legFront',
+    label: 'まえの あし',
+    shape: {
+      kind: 'path',
+      d: 'M 58,62 L 74,62 L 74,74 C 76,76 77,78 77,81 C 77,84 75,86 72,86 L 62,86 C 59,86 58,84 58,80 Z',
+    },
+    motion: DINO,
+  },
+  {
+    id: 'spikes',
+    label: 'せなかの トゲ',
+    // まるみのある3つのコブ。下辺はからだの内側に入れて、からだの塗りで隠す。
+    shape: {
+      kind: 'path',
+      d: 'M 30,50 C 31,18 39,18 41,35 C 43,16 50,16 52,33 C 54,17 61,20 62,44 L 62,50 Z',
+    },
+    motion: DINO,
+  },
+  {
+    id: 'body',
+    label: 'きょうりゅうの からだ',
+    shape: { kind: 'ellipse', cx: 52, cy: 56, rx: 24, ry: 18 },
+    motion: DINO,
+  },
+  {
+    id: 'belly',
+    label: 'おなか',
+    shape: { kind: 'ellipse', cx: 52, cy: 64, rx: 15, ry: 9 },
+    motion: DINO,
+  },
+  {
+    id: 'head',
+    label: 'あたま',
+    shape: {
+      kind: 'path',
+      d: 'M 63,46 C 59,32 66,20 77,20 C 87,20 93,25 93,32 C 93,38 90,42 85,44 C 80,46 72,47 66,47 C 64,47 63,47 63,46 Z',
+    },
+    motion: DINO_HEAD,
+  },
+]
+
+const dinosaurDetails: readonly PaintDetail[] = [
+  { shape: { kind: 'circle', cx: 78, cy: 30, r: 4.6 }, fill: '#ffffff', motion: DINO_HEAD },
+  { shape: { kind: 'circle', cx: 78, cy: 30, r: 2.2 }, fill: OUTLINE_COLOR, motion: DINO_HEAD },
+  // 鼻の穴。目と同じ高さ・同じ大きさだと「目が2つ」に見えるので、小さく口寄りに置く。
+  { shape: { kind: 'circle', cx: 88, cy: 34, r: 1.1 }, fill: OUTLINE_COLOR, motion: DINO_HEAD },
+  {
+    shape: { kind: 'path', d: 'M 79,40 C 83,43 88,42 91,38' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: DINO_HEAD,
+  },
+]
+
 export const PAINT_PICTURES: readonly PaintPicture[] = [
   { id: 'car', label: 'くるま', emoji: '🚗', viewBox: VIEW_BOX, areas: carAreas, details: carDetails },
   { id: 'fish', label: 'さかな', emoji: '🐟', viewBox: VIEW_BOX, areas: fishAreas, details: fishDetails },
@@ -344,6 +648,30 @@ export const PAINT_PICTURES: readonly PaintPicture[] = [
     viewBox: VIEW_BOX,
     areas: butterflyAreas,
     details: butterflyDetails,
+  },
+  {
+    id: 'robot',
+    label: 'ロボット',
+    emoji: '🤖',
+    viewBox: VIEW_BOX,
+    areas: robotAreas,
+    details: robotDetails,
+  },
+  {
+    id: 'rocket',
+    label: 'ロケット',
+    emoji: '🚀',
+    viewBox: VIEW_BOX,
+    areas: rocketAreas,
+    details: rocketDetails,
+  },
+  {
+    id: 'dinosaur',
+    label: 'きょうりゅう',
+    emoji: '🦕',
+    viewBox: VIEW_BOX,
+    areas: dinosaurAreas,
+    details: dinosaurDetails,
   },
 ]
 

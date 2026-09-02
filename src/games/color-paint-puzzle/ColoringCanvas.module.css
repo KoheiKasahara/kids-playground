@@ -304,6 +304,253 @@
   }
 }
 
+/* --- ロボット: うでをふりながら、その場でぴょこぴょこ足ぶみする --- */
+
+/* あしの裏（y=89）を軸にする。絵の中心で縮めると、あしが地面から浮いてしまう。 */
+.canvas [data-motion-group='robot'] {
+  transform-origin: 50% 89%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='robot'] {
+  animation: robotEnter 480ms ease-out both, robotStep 2.4s 480ms ease-in-out infinite;
+}
+
+@keyframes robotEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(0.86);
+  }
+}
+
+@keyframes robotStep {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+
+  25% {
+    transform: translate(0, -4px) rotate(-2deg) scale(0.86);
+  }
+
+  50% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+
+  75% {
+    transform: translate(0, -4px) rotate(2deg) scale(0.86);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+}
+
+/* うでは、どうたい側の付け根（かた）を軸に前後へ振る。左右で向きを逆にして足ぶみに合わせる。 */
+.canvas[data-phase='celebrating'] [data-motion-part='robotArmLeft'] {
+  transform-origin: right center;
+  animation: robotArmSwing 1.2s 480ms ease-in-out infinite alternate;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='robotArmRight'] {
+  transform-origin: left center;
+  animation: robotArmSwingBack 1.2s 480ms ease-in-out infinite alternate;
+}
+
+@keyframes robotArmSwing {
+  from {
+    transform: rotate(-14deg);
+  }
+
+  to {
+    transform: rotate(14deg);
+  }
+}
+
+@keyframes robotArmSwingBack {
+  from {
+    transform: rotate(14deg);
+  }
+
+  to {
+    transform: rotate(-14deg);
+  }
+}
+
+/* アンテナの玉だけ、その場でチカチカ光る。 */
+.canvas[data-phase='celebrating'] [data-motion-part='robotAntenna'] {
+  animation: robotAntennaBlink 780ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes robotAntennaBlink {
+  from {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* --- ロケット: ほのおをゆらしながら、ふわりと打ち上がる。ほしはそらでチカチカ --- */
+
+.canvas[data-phase='celebrating'] [data-motion-group='rocket'] {
+  animation: rocketEnter 480ms ease-out both, rocketFly 3.2s 480ms ease-in-out infinite;
+}
+
+@keyframes rocketEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(0.84);
+  }
+}
+
+@keyframes rocketFly {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.84);
+  }
+
+  20% {
+    transform: translate(-2px, -8px) rotate(-3deg) scale(0.84);
+  }
+
+  50% {
+    transform: translate(0, -14px) rotate(0deg) scale(0.84);
+  }
+
+  80% {
+    transform: translate(2px, -7px) rotate(3deg) scale(0.84);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.84);
+  }
+}
+
+/* ほのおはロケット側の付け根（上端）を軸に、伸び縮みしてゆらぐ。 */
+.canvas[data-phase='celebrating'] [data-motion-part='rocketFlame'] {
+  transform-origin: center top;
+  animation: rocketFlameFlicker 300ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes rocketFlameFlicker {
+  from {
+    transform: scale(0.92, 0.8);
+  }
+
+  to {
+    transform: scale(1.06, 1.15);
+  }
+}
+
+/* ほしは動かさず、明るさだけ変える（ロケットと一緒に飛ばない）。 */
+.canvas[data-phase='celebrating'] [data-motion-part='rocketStars'] {
+  animation: starTwinkle 1.5s 480ms ease-in-out infinite alternate;
+}
+
+@keyframes starTwinkle {
+  from {
+    opacity: 0.35;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* --- きょうりゅう: しっぽを振り、あたまをゆらしながら、のっしのっしと歩く --- */
+
+/* あしの裏（y=86）を軸にする（ロボットと同じ理由）。 */
+.canvas [data-motion-group='dino'] {
+  transform-origin: 50% 86%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='dino'] {
+  animation: dinoEnter 480ms ease-out both, dinoWalk 3.6s 480ms ease-in-out infinite;
+}
+
+@keyframes dinoEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.86);
+  }
+}
+
+@keyframes dinoWalk {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+
+  15% {
+    transform: translate(-4px, -2px) rotate(-1.6deg) scale(0.86);
+  }
+
+  45% {
+    transform: translate(6px, -3px) rotate(1.6deg) scale(0.86);
+  }
+
+  60% {
+    transform: translate(9px, 0) rotate(0deg) scale(0.86);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+}
+
+/* しっぽは付け根（からだ側の右端）を軸に振る。 */
+.canvas[data-phase='celebrating'] [data-motion-part='dinoTail'] {
+  transform-origin: right center;
+  animation: dinoTailWag 520ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes dinoTailWag {
+  from {
+    transform: rotate(-9deg);
+  }
+
+  to {
+    transform: rotate(9deg);
+  }
+}
+
+/* あたまは、くびの付け根（あたまの左下）を軸に小さくうなずく。 */
+.canvas[data-phase='celebrating'] [data-motion-part='dinoHead'] {
+  transform-origin: 12% 92%;
+  animation: dinoHeadNod 880ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes dinoHeadNod {
+  from {
+    transform: rotate(-4deg);
+  }
+
+  to {
+    transform: rotate(4deg);
+  }
+}
+
 /* 動きを減らす設定のときは、走る・泳ぐ・羽ばたくを止めて、
    「できた」ことが分かる程度のゆっくりした呼吸だけ残す。 */
 @media (prefers-reduced-motion: reduce) {
