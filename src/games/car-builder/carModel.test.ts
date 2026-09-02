@@ -144,7 +144,7 @@ describe('createCarModel（3Dモデル生成）', () => {
 
     // 末尾2頂点は前後端面の中心。最後のリングと、その直前のリングを
     // つなぐ三角形が存在することを契約にして、断面補間時の分解表示を防ぐ。
-    const ringSize = 13
+    const ringSize = 27
     const lastRingStart = position.count - 2 - ringSize
     const previousRingStart = lastRingStart - ringSize
     let hasFinalRingJoin = false

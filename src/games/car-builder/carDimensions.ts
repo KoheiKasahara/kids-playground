@@ -61,16 +61,16 @@ export const CAR_BODY_SPECS: Record<BodyType, CarBodySpec> = {
     id: 'sports',
     style: 'sports',
     length: 4.35,
-    width: 2.02,
-    // 車体中央の厚みを少し増やし、低いまま「床→肩→窓→ルーフ」の
-    // 階層が読めるプロポーションにする。ほかのボディ寸法は変更しない。
-    hullHeight: 0.52,
-    cabinHeight: 0.38,
-    cabinLengthRatio: 0.445,
-    cabinCenterRatio: -0.08,
+    width: 2.06,
+    // 車体中央の厚みを少し増やし、キャビンを低く短く保ったまま
+    // 「床→肩→窓→ルーフ」の面が連続するプロポーションにする。
+    hullHeight: 0.54,
+    cabinHeight: 0.35,
+    cabinLengthRatio: 0.44,
+    cabinCenterRatio: -0.07,
     cabinWidthRatio: 0.78,
-    hoodLengthRatio: 0.3,
-    wheelbaseRatio: 0.66,
+    hoodLengthRatio: 0.31,
+    wheelbaseRatio: 0.68,
     baseGroundClearance: 0.12,
   },
   suv: {
