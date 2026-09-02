@@ -211,6 +211,32 @@ describe('createCarModel（3Dモデル生成）', () => {
     model.dispose()
   })
 
+  test('スポーツカーの窓は曲面化され、左右のサイドガラスが対称になる', () => {
+    const model = createCarModel(DEFAULT_CAR_CONFIG)
+    const body = layerOf(model.root, 'body')
+    const windshield = body.getObjectByName('car-sports-windshield')
+    expect(windshield).toBeInstanceOf(THREE.Mesh)
+    expect((windshield as THREE.Mesh).geometry.getAttribute('position').count).toBe(9)
+    expect((windshield as THREE.Mesh).material).toBeInstanceOf(THREE.MeshPhysicalMaterial)
+
+    const left = body.getObjectByName('car-sports-side-window-front-left')
+    const right = body.getObjectByName('car-sports-side-window-front-right')
+    expect(left).toBeInstanceOf(THREE.Mesh)
+    expect(right).toBeInstanceOf(THREE.Mesh)
+
+    const leftBounds = boundsOf(left!)
+    const rightBounds = boundsOf(right!)
+    expect(leftBounds.min.x).toBeCloseTo(-rightBounds.max.x, 5)
+    expect(leftBounds.max.x).toBeCloseTo(-rightBounds.min.x, 5)
+
+    for (const side of ['left', 'right']) {
+      expect(body.getObjectByName(`car-sports-a-pillar-${side}`)).toBeDefined()
+      expect(body.getObjectByName(`car-sports-b-pillar-${side}`)).toBeDefined()
+      expect(body.getObjectByName(`car-sports-c-pillar-${side}`)).toBeDefined()
+    }
+    model.dispose()
+  })
+
   test('タイヤは4輪が寸法どおりの位置に生成される', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
