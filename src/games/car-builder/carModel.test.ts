@@ -270,6 +270,43 @@ describe('createCarModel（3Dモデル生成）', () => {
     model.dispose()
   })
 
+  test('スポーツカーの窓は外殻の肩幅へ追従し、ガラスだけが外へ浮かない', () => {
+    const model = createCarModel(DEFAULT_CAR_CONFIG)
+    const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
+    const body = layerOf(model.root, 'body')
+    const left = body.getObjectByName('car-sports-side-window-front-left')
+    const right = body.getObjectByName('car-sports-side-window-front-right')
+    expect(left).toBeInstanceOf(THREE.Mesh)
+    expect(right).toBeInstanceOf(THREE.Mesh)
+
+    const leftBounds = boundsOf(left!)
+    const rightBounds = boundsOf(right!)
+    // 旧実装のように車幅いっぱいを窓下端の基準へ戻すと、ガラスの最大Xが
+    // ボディ外側を大きく越える。肩へ沿わせた現行形状は外殻からの差を抑える。
+    expect(leftBounds.max.x).toBeLessThan(dimensions.width / 2 + 0.01)
+    expect(rightBounds.min.x).toBeGreaterThan(-dimensions.width / 2 - 0.01)
+
+    model.dispose()
+  })
+
+  test('スポーツカーのフロントガラス下辺は中央だけが折れ曲がらず、曲率は内側へ限定される', () => {
+    const model = createCarModel(DEFAULT_CAR_CONFIG)
+    const windshield = layerOf(model.root, 'body').getObjectByName('car-sports-windshield')
+    expect(windshield).toBeInstanceOf(THREE.Mesh)
+
+    const position = (windshield as THREE.Mesh).geometry.getAttribute('position')
+    const bottomY = Array.from({ length: 5 }, (_, index) => position.getY(index))
+    const bottomZ = Array.from({ length: 5 }, (_, index) => position.getZ(index))
+    expect(Math.max(...bottomY) - Math.min(...bottomY)).toBeLessThan(1e-6)
+    expect(Math.max(...bottomZ) - Math.min(...bottomZ)).toBeLessThan(1e-6)
+
+    const middleCenterY = position.getY(2 * 5 + 2)
+    const middleEdgeY = position.getY(2 * 5)
+    expect(middleCenterY).toBeGreaterThan(middleEdgeY)
+
+    model.dispose()
+  })
+
   test('タイヤは4輪が寸法どおりの位置に生成される', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)

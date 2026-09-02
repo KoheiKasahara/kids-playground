@@ -255,12 +255,13 @@ function sportsWindshieldMesh(
   name: string,
 ): THREE.Mesh {
   // フロントガラスを平面の板にせず、4列×5列の浅い曲面にする。
-  // 下端をボンネット側へ下げ、中央だけをわずかに前・上へ出すことで、
-  // Aピラーからルーフへ光が途切れずに流れる面を作る。
-  const bottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.22
-  const topY = dimensions.roofTopY - 0.018
-  const bottomZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 + 0.035
-  const topZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 - dimensions.cabinLength * 0.31 + 0.015
+  // 下端はボンネットとの境界へ自然に差し込み、中央の膨らみは内側の行だけに
+  // 残す。全ての列へ同じ膨らみを足すと下辺中央が尖って見えるため、端の輪郭は
+  // まっすぐ保ち、Aピラーからルーフへ光が流れる面だけを作る。
+  const bottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.15
+  const topY = dimensions.roofTopY - 0.028
+  const bottomZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 + 0.02
+  const topZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 - dimensions.cabinLength * 0.31 + 0.035
   const columns = [-1, -0.5, 0, 0.5, 1]
   const rows = [
     { amount: 0, y: bottomY, z: bottomZ, halfWidth: dimensions.cabinWidth * 0.46 },
@@ -272,10 +273,11 @@ function sportsWindshieldMesh(
   for (const row of rows) {
     for (const column of columns) {
       const centerFactor = 1 - column * column
+      const rowBulge = Math.sin(Math.PI * row.amount)
       positions.push(
         column * row.halfWidth,
-        row.y + centerFactor * 0.01,
-        row.z + centerFactor * 0.018,
+        row.y + centerFactor * rowBulge * 0.006,
+        row.z + centerFactor * rowBulge * 0.016,
       )
     }
   }
@@ -306,19 +308,19 @@ function sportsWindowX(dimensions: CarDimensions, side: 1 | -1, z: number, y: nu
     Math.max(0, (y - dimensions.hullTopY) / Math.max(0.01, dimensions.cabinHeight)),
   )
   const smoothProgress = verticalProgress * verticalProgress * (3 - verticalProgress * 2)
-  // 窓の下端はボディの肩、上端はルーフの外周に乗せる。キャビン幅だけを
-  // 基準にすると下端が車体へ埋まり、上端が外へ浮くため、外殻の断面に追従させる。
-  // 上端へ向かって自然に絞り、ルーフの丸みに合わせて窓の中央だけを少し外へ出す。
-  const hullHalfWidth = (dimensions.width / 2) * 0.985
+  // 窓の下端はキャビンの肩に、上端はルーフの外周に沿わせる。車幅いっぱいを
+  // 下端の基準にするとガラスだけが外へ張り出して浮いて見えるため、キャビン
+  // 付近の外殻幅を基準にして、上へ向かってルーフ幅へ滑らかに絞る。
+  const shoulderHalfWidth = (dimensions.width / 2) * 0.93
   const roofHalfWidth = (dimensions.cabinWidth / 2) * 0.94
   const longitudinalProgress = Math.min(
     1,
     Math.max(-1, (z - dimensions.cabinCenterZ) / (dimensions.cabinLength / 2)),
   )
   const endTaper = 1 - Math.abs(longitudinalProgress) * 0.022
-  const halfWidth = lerp(hullHalfWidth, roofHalfWidth, smoothProgress) * endTaper
-  const sideCurve = 0.02 * (1 - longitudinalProgress * longitudinalProgress) * (0.35 + smoothProgress * 0.65)
-  return side * (halfWidth + sideCurve + 0.016)
+  const halfWidth = lerp(shoulderHalfWidth, roofHalfWidth, smoothProgress) * endTaper
+  const sideCurve = 0.014 * (1 - longitudinalProgress * longitudinalProgress) * (0.25 + smoothProgress * 0.75)
+  return side * (halfWidth + sideCurve + 0.01)
 }
 
 type SportsSideWindowSpec = {
@@ -634,8 +636,8 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
     ),
   )
 
-  const sideBottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.14
-  const sideTopY = dimensions.roofTopY - dimensions.cabinHeight * 0.08
+  const sideBottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.12
+  const sideTopY = dimensions.roofTopY - dimensions.cabinHeight * 0.07
   const pillarZ = dimensions.cabinCenterZ - cabinHalf * 0.06
   // 上辺もキャビンの前後へ十分に広げ、細い三角形ではなく、
   // ルーフの丸みに沿う自然な台形として見える窓輪郭にする。
@@ -680,7 +682,9 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
       ),
     )
 
-    const frameX = (z: number, y: number) => sportsWindowX(dimensions, side, z, y) + side * 0.014
+    // ガラス面のすぐ外側だけへフレームを置く。大きく離すとA/B/Cピラーも
+    // ボディから浮いた棒に見えるため、窓の曲率をそのまま追従させる。
+    const frameX = (z: number, y: number) => sportsWindowX(dimensions, side, z, y) + side * 0.006
     const frameRadius = 0.018
     group.add(
       curveTube(
@@ -719,10 +723,10 @@ function buildSportsBody({ dimensions, attachments, color }: CarPartContext): TH
 
   // フロントガラスの左右に細いAピラーを置き、ガラスが黒い板として
   // キャビンの外へ浮いて見えるのを防ぐ。ルーフ側も一本の曲線でつなぐ。
-  const windshieldBottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.22
-  const windshieldTopY = dimensions.roofTopY - 0.018
-  const windshieldBottomZ = cabinFront + 0.035
-  const windshieldTopZ = roofFront + 0.015
+  const windshieldBottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.15
+  const windshieldTopY = dimensions.roofTopY - 0.028
+  const windshieldBottomZ = cabinFront + 0.02
+  const windshieldTopZ = roofFront + 0.035
   const windshieldBottomHalfWidth = dimensions.cabinWidth * 0.46
   const windshieldTopHalfWidth = dimensions.cabinWidth * 0.36
   for (const side of [-1, 1] as const) {

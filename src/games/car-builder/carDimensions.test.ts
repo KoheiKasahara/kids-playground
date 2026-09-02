@@ -75,6 +75,13 @@ describe('computeCarDimensions（5ボディ）', () => {
     expect(dimensions.cabinHeight).toBeLessThan(dimensions.hullHeight)
   })
 
+  test('スポーツカーは低さを保ちながら、タイヤの下端とキャビンの厚みを確保する', () => {
+    expect(dimensions.bodyFloorY).toBeGreaterThanOrEqual(0.15)
+    expect(dimensions.cabinHeight).toBeGreaterThanOrEqual(0.4)
+    expect(dimensions.hullTopY).toBeLessThanOrEqual(dimensions.wheelRadius * 2)
+    expect(dimensions.roofTopY - dimensions.hullTopY).toBeGreaterThanOrEqual(0.4)
+  })
+
   test('トレッドは車幅とタイヤ厚から決まり、タイヤは車体の外側に出る', () => {
     expect(dimensions.track).toBeCloseTo(body.width + wheel.width - 0.16, 6)
     expect(dimensions.track / 2).toBeGreaterThan(body.width / 2)
