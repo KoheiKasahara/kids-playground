@@ -10,6 +10,7 @@ import {
 import { computeCarDimensions } from './carDimensions'
 import { CAR_DERIVED_CATEGORY_IDS, CAR_PART_BUILDERS, CAR_PART_CATEGORY_IDS } from './carParts'
 import { createCarModel } from './carModel'
+import { SPORTS_GLASS_GROUP, SPORTS_PAINT_GROUP, SPORTS_TRIM_GROUP } from './sportsBodySurface'
 
 function layerOf(root: THREE.Object3D, category: string): THREE.Object3D {
   const layer = root.children.find((child) => child.name === 'car-layer-' + category)
@@ -21,14 +22,31 @@ function boundsOf(object: THREE.Object3D): THREE.Box3 {
   return new THREE.Box3().setFromObject(object)
 }
 
-function maxYNearZ(mesh: THREE.Mesh, targetZ: number): number {
+function maxYNearZ(mesh: THREE.Mesh, targetZ: number, keepX: (x: number) => boolean): number {
   const position = mesh.geometry.getAttribute('position')
   let maxY = Number.NEGATIVE_INFINITY
   for (let index = 0; index < position.count; index += 1) {
-    if (Math.abs(position.getZ(index) - targetZ) > 0.002) continue
+    if (Math.abs(position.getZ(index) - targetZ) > 0.05) continue
+    if (!keepX(position.getX(index))) continue
     maxY = Math.max(maxY, position.getY(index))
   }
   return maxY
+}
+
+/** スポーツカーの外殻は `[塗装, ガラス, 開口]` の配列マテリアルを持つ。 */
+function paintColorOf(mesh: THREE.Mesh): string {
+  const material = Array.isArray(mesh.material) ? mesh.material[SPORTS_PAINT_GROUP]! : mesh.material
+  return (material as THREE.MeshStandardMaterial).color.getHexString()
+}
+
+function maxAbsXNearZ(mesh: THREE.Mesh, targetZ: number): number {
+  const position = mesh.geometry.getAttribute('position')
+  let maxX = 0
+  for (let index = 0; index < position.count; index += 1) {
+    if (Math.abs(position.getZ(index) - targetZ) > 0.05) continue
+    maxX = Math.max(maxX, Math.abs(position.getX(index)))
+  }
+  return maxX
 }
 
 describe('カテゴリと3D生成の対応（後続カテゴリ追加時の落とし穴を防ぐ契約）', () => {
@@ -85,225 +103,144 @@ describe('createCarModel（3Dモデル生成）', () => {
     }
   })
 
-  test('スポーツカーは窓・前面・フェンダーの専用造形を持つ', () => {
+  test('スポーツカーの外殻は1枚のサーフェスで、窓と開口はそのマテリアルグループ', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const body = layerOf(model.root, 'body')
     const wheel = layerOf(model.root, 'wheel')
+    const hull = body.getObjectByName('car-body-hull')
 
+    expect(hull).toBeInstanceOf(THREE.Mesh)
+    const mesh = hull as THREE.Mesh
+    // 窓・ピラー・フェンダーを別Meshで貼らないことが今回の造形方式の核心。
+    // ガラスは同じ BufferGeometry のマテリアルグループとして存在する。
+    expect(Array.isArray(mesh.material)).toBe(true)
+    const materials = mesh.material as THREE.Material[]
+    expect(materials).toHaveLength(3)
+    expect(materials[SPORTS_PAINT_GROUP]).toBeInstanceOf(THREE.MeshPhysicalMaterial)
+    expect(materials[SPORTS_GLASS_GROUP]).toBeInstanceOf(THREE.MeshPhysicalMaterial)
+
+    const groups = mesh.geometry.groups
+    expect(groups.length).toBe(3)
+    const glassGroup = groups.find((group) => group.materialIndex === SPORTS_GLASS_GROUP)
+    const trimGroup = groups.find((group) => group.materialIndex === SPORTS_TRIM_GROUP)
+    expect(glassGroup?.count ?? 0).toBeGreaterThan(0)
+    expect(trimGroup?.count ?? 0).toBeGreaterThan(0)
+
+    // 旧実装の「貼り付けた板・棒・バンド」は残っていない。
     for (const name of [
-      'car-body-hull',
       'car-sports-windshield',
-      'car-sports-side-window-rear-left',
       'car-sports-side-window-front-left',
-      'car-sports-side-window-rear-right',
-      'car-sports-side-window-front-right',
-      'car-sports-front-grille',
-      'car-sports-front-splitter',
-      'car-sports-rear-deck',
+      'car-sports-a-pillar-left',
+      'car-sports-fender-frontLeft',
       'car-sports-wheel-arch-frontLeft',
-      'car-sports-wheel-arch-frontRight',
-      'car-sports-wheel-arch-rearLeft',
-      'car-sports-wheel-arch-rearRight',
+      'car-body-cabin',
     ]) {
-      expect(body.getObjectByName(name), name).toBeDefined()
+      expect(body.getObjectByName(name), name).toBeUndefined()
     }
 
     expect(wheel.getObjectByName('car-sports-rim-ring-frontLeft')).toBeDefined()
     expect(wheel.getObjectByName('car-sports-center-cap-frontLeft')).toBeDefined()
 
+    // 他車種はスポーツ専用サーフェスを使わない（単一マテリアルのまま）。
     const suv = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'suv'))
-    expect(layerOf(suv.root, 'body').getObjectByName('car-sports-windshield')).toBeUndefined()
+    const suvBody = layerOf(suv.root, 'body')
+    suvBody.traverse((object) => {
+      if (object instanceof THREE.Mesh) expect(Array.isArray(object.material)).toBe(false)
+    })
     expect(layerOf(suv.root, 'wheel').getObjectByName('car-sports-rim-ring-frontLeft')).toBeUndefined()
     suv.dispose()
     model.dispose()
   })
 
-  test('スポーツカーはキャビンを別積みせず、全長一体のロフト外殻を持つ', () => {
+  test('スポーツカーの外殻は左右対称で、全頂点が地面より上の有限座標', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
-    const body = layerOf(model.root, 'body')
-    const hull = body.getObjectByName('car-body-hull')
+    const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull') as THREE.Mesh
+    const position = hull.geometry.getAttribute('position')
 
-    expect(body.getObjectByName('car-body-cabin-shell')).toBeUndefined()
-    expect(hull).toBeInstanceOf(THREE.Mesh)
-    const mesh = hull as THREE.Mesh
-    expect(mesh.geometry).not.toBeInstanceOf(THREE.BoxGeometry)
-    expect(mesh.geometry.getAttribute('position').count).toBeGreaterThan(150)
-    expect(mesh.geometry.getAttribute('normal')).toBeDefined()
-    model.dispose()
-  })
-
-  test('スポーツカーの補間済み全断面が外殻として最後まで接続される', () => {
-    const model = createCarModel(DEFAULT_CAR_CONFIG)
-    const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull')
-    expect(hull).toBeInstanceOf(THREE.Mesh)
-
-    const geometry = (hull as THREE.Mesh).geometry
-    const position = geometry.getAttribute('position')
-    const index = geometry.getIndex()
-    expect(index).not.toBeNull()
-
-    // 末尾2頂点は前後端面の中心。最後のリングと、その直前のリングを
-    // つなぐ三角形が存在することを契約にして、断面補間時の分解表示を防ぐ。
-    const ringSize = 27
-    const lastRingStart = position.count - 2 - ringSize
-    const previousRingStart = lastRingStart - ringSize
-    let hasFinalRingJoin = false
-    for (let offset = 0; offset < (index?.count ?? 0); offset += 3) {
-      const triangle = [index!.getX(offset), index!.getX(offset + 1), index!.getX(offset + 2)]
-      const includesLastRing = triangle.some((vertex) => vertex >= lastRingStart && vertex < lastRingStart + ringSize)
-      const includesPreviousRing = triangle.some((vertex) => vertex >= previousRingStart && vertex < lastRingStart)
-      if (includesLastRing && includesPreviousRing) {
-        hasFinalRingJoin = true
-        break
-      }
+    const key = (x: number, y: number, z: number) =>
+      `${(Math.abs(x) < 1e-6 ? 0 : x).toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}`
+    const points = new Set<string>()
+    for (let index = 0; index < position.count; index += 1) {
+      const x = position.getX(index)
+      const y = position.getY(index)
+      const z = position.getZ(index)
+      expect(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)).toBe(true)
+      expect(y).toBeGreaterThan(0)
+      points.add(key(x, y, z))
     }
-    expect(hasFinalRingJoin).toBe(true)
+    let mirrored = 0
+    for (let index = 0; index < position.count; index += 1) {
+      if (points.has(key(-position.getX(index), position.getY(index), position.getZ(index)))) mirrored += 1
+    }
+    // 半断面をミラーして組むので、丸め誤差を除けば全頂点に対の頂点がある。
+    expect(mirrored / position.count).toBeGreaterThan(0.99)
     model.dispose()
   })
 
-  test('スポーツカーの全ボディGeometryは有限座標で、回転可能なMeshとして生成される', () => {
+  test('スポーツカーの外殻はモバイル向けのポリゴン上限に収まる', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
-    const body = layerOf(model.root, 'body')
+    const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull') as THREE.Mesh
+    const index = hull.geometry.getIndex()
+    expect(index).not.toBeNull()
+    expect((index?.count ?? 0) / 3).toBeLessThanOrEqual(18000)
+    // ボディレイヤーのMesh数も抑える（旧実装は20個以上の小物Meshを積んでいた）。
     const meshes: THREE.Mesh[] = []
-
-    body.traverse((object) => {
+    layerOf(model.root, 'body').traverse((object) => {
       if (object instanceof THREE.Mesh) meshes.push(object)
     })
+    expect(meshes.length).toBeLessThanOrEqual(8)
+    model.dispose()
+  })
 
-    expect(meshes.length).toBeGreaterThan(5)
-    for (const mesh of meshes) {
-      const position = mesh.geometry.getAttribute('position')
-      expect(position.count).toBeGreaterThan(0)
-      expect(Array.from(position.array).every(Number.isFinite)).toBe(true)
+  test('スポーツカーのフェンダーは断面の膨らみとしてタイヤ外端を覆う', () => {
+    for (const wheelOption of ['normal', 'big'] as const) {
+      const config = selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', wheelOption)
+      const model = createCarModel(config)
+      const dimensions = computeCarDimensions(config)
+      const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull') as THREE.Mesh
+      const tireOuterX = dimensions.track / 2 + dimensions.wheelWidth / 2
+      const frontWheelZ = dimensions.wheelbase / 2
+
+      // 前後輪の断面はタイヤ外端より広い＝フェンダーがタイヤを覆っている。
+      expect(maxAbsXNearZ(hull, frontWheelZ), wheelOption).toBeGreaterThan(tireOuterX)
+      expect(maxAbsXNearZ(hull, -frontWheelZ), wheelOption).toBeGreaterThan(tireOuterX)
+      // ドア中央は前後輪より細い＝くびれがある（＝タイヤ上だけの独立バンドではない）。
+      expect(maxAbsXNearZ(hull, 0), wheelOption).toBeLessThan(maxAbsXNearZ(hull, frontWheelZ) - 0.05)
+      model.dispose()
     }
-    model.root.rotation.y = Math.PI / 2
-    expect(model.root.rotation.y).toBeCloseTo(Math.PI / 2)
-    model.dispose()
   })
 
-  test('スポーツカーのフェンダーはボディ色の立体面でタイヤ上端へかぶさる', () => {
+  test('スポーツカーのノーズは中央が低く、左右フェンダー側が高い', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
-    const body = layerOf(model.root, 'body')
-    const attachments = model.getAttachments()
+    const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull') as THREE.Mesh
+    const noseZ = dimensions.wheelbase / 2 + 0.3
 
-    for (const wheel of attachments.wheels) {
-      const fender = body.getObjectByName(`car-sports-fender-${wheel.id}`)
-      expect(fender, wheel.id).toBeInstanceOf(THREE.Mesh)
-      const bounds = boundsOf(fender!)
-      const widthAcrossSide = bounds.max.x - bounds.min.x
-
-      expect(bounds.max.y, wheel.id).toBeGreaterThan(wheel.position.y + wheel.radius)
-      expect(widthAcrossSide, wheel.id).toBeGreaterThan(wheel.width * 0.55)
-      if (wheel.side === 1) expect(bounds.max.x, wheel.id).toBeGreaterThan(dimensions.width / 2)
-      else expect(bounds.min.x, wheel.id).toBeLessThan(-dimensions.width / 2)
-    }
-
+    const centerTop = maxYNearZ(hull, noseZ, (x) => Math.abs(x) < dimensions.width * 0.12)
+    const fenderTop = maxYNearZ(hull, noseZ, (x) => Math.abs(x) > dimensions.width * 0.3)
+    // 旧実装の断面は外周のYを単調増加へクランプしていたため、この関係を作れなかった。
+    expect(fenderTop).toBeGreaterThan(centerTop + 0.01)
     model.dispose()
   })
 
-  test('スポーツカーのボンネットは中央クラウンと前輪上の厚みを持つ', () => {
+  test('スポーツカーの側面シルエットはボンネット→ルーフ→リアで連続して変化する', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
-    const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull')
-    expect(hull).toBeInstanceOf(THREE.Mesh)
+    const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull') as THREE.Mesh
+    const topAt = (z: number) => maxYNearZ(hull, z, () => true)
 
-    const mesh = hull as THREE.Mesh
-    const hoodStart = dimensions.length / 2 - dimensions.hoodLength
-    const frontWheelZ = dimensions.wheelbase / 2
-    expect(maxYNearZ(mesh, hoodStart)).toBeGreaterThan(dimensions.hullTopY + 0.05)
-    expect(maxYNearZ(mesh, frontWheelZ + 0.04)).toBeGreaterThan(dimensions.hullTopY + 0.04)
+    const noseTop = topAt(dimensions.length / 2 - 0.2)
+    const hoodTop = topAt(dimensions.wheelbase / 2)
+    const roofTop = topAt(dimensions.cabinCenterZ)
+    const deckTop = topAt(-dimensions.length / 2 + 0.4)
+    const tailTop = topAt(-dimensions.length / 2 + 0.1)
 
-    const position = mesh.geometry.getAttribute('position')
-    const noseVertices = Array.from({ length: position.count }, (_, index) => ({
-      x: position.getX(index),
-      z: position.getZ(index),
-    })).filter((vertex) => vertex.z > dimensions.length / 2 - 0.12)
-    const centerNoseZ = Math.max(...noseVertices.filter((vertex) => Math.abs(vertex.x) < 0.001).map((vertex) => vertex.z))
-    const sideNoseZ = Math.max(...noseVertices.filter((vertex) => Math.abs(vertex.x) > dimensions.width * 0.15).map((vertex) => vertex.z))
-    expect(centerNoseZ).toBeGreaterThan(sideNoseZ)
-
-    model.dispose()
-  })
-
-  test('スポーツカーのフロントガラスは低い姿勢のまま十分な高さを持つ', () => {
-    const model = createCarModel(DEFAULT_CAR_CONFIG)
-    const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
-    const windshield = layerOf(model.root, 'body').getObjectByName('car-sports-windshield')
-    expect(windshield).toBeInstanceOf(THREE.Mesh)
-
-    const bounds = boundsOf(windshield!)
-    expect(bounds.max.y - bounds.min.y).toBeGreaterThan(dimensions.cabinHeight * 0.55)
-    expect(bounds.min.y).toBeGreaterThan(dimensions.hullTopY)
-    expect(bounds.max.y).toBeLessThanOrEqual(dimensions.roofTopY)
-
-    model.dispose()
-  })
-
-  test('スポーツカーの窓は曲面化され、左右のサイドガラスが対称になる', () => {
-    const model = createCarModel(DEFAULT_CAR_CONFIG)
-    const body = layerOf(model.root, 'body')
-    const windshield = body.getObjectByName('car-sports-windshield')
-    expect(windshield).toBeInstanceOf(THREE.Mesh)
-    // フロントガラスは4列×5列の浅い曲面として生成する。
-    expect((windshield as THREE.Mesh).geometry.getAttribute('position').count).toBe(20)
-    expect((windshield as THREE.Mesh).material).toBeInstanceOf(THREE.MeshPhysicalMaterial)
-
-    const left = body.getObjectByName('car-sports-side-window-front-left')
-    const right = body.getObjectByName('car-sports-side-window-front-right')
-    expect(left).toBeInstanceOf(THREE.Mesh)
-    expect(right).toBeInstanceOf(THREE.Mesh)
-    // サイドガラスも4列×3列の曲面として生成し、三角形の板へ退行させない。
-    expect((left as THREE.Mesh).geometry.getAttribute('position').count).toBe(12)
-    expect((right as THREE.Mesh).geometry.getAttribute('position').count).toBe(12)
-
-    const leftBounds = boundsOf(left!)
-    const rightBounds = boundsOf(right!)
-    expect(leftBounds.min.x).toBeCloseTo(-rightBounds.max.x, 5)
-    expect(leftBounds.max.x).toBeCloseTo(-rightBounds.min.x, 5)
-
-    for (const side of ['left', 'right']) {
-      expect(body.getObjectByName(`car-sports-a-pillar-${side}`)).toBeDefined()
-      expect(body.getObjectByName(`car-sports-b-pillar-${side}`)).toBeDefined()
-      expect(body.getObjectByName(`car-sports-c-pillar-${side}`)).toBeDefined()
-    }
-    model.dispose()
-  })
-
-  test('スポーツカーの窓は外殻の肩幅へ追従し、ガラスだけが外へ浮かない', () => {
-    const model = createCarModel(DEFAULT_CAR_CONFIG)
-    const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
-    const body = layerOf(model.root, 'body')
-    const left = body.getObjectByName('car-sports-side-window-front-left')
-    const right = body.getObjectByName('car-sports-side-window-front-right')
-    expect(left).toBeInstanceOf(THREE.Mesh)
-    expect(right).toBeInstanceOf(THREE.Mesh)
-
-    const leftBounds = boundsOf(left!)
-    const rightBounds = boundsOf(right!)
-    // 旧実装のように車幅いっぱいを窓下端の基準へ戻すと、ガラスの最大Xが
-    // ボディ外側を大きく越える。肩へ沿わせた現行形状は外殻からの差を抑える。
-    expect(leftBounds.max.x).toBeLessThan(dimensions.width / 2 + 0.01)
-    expect(rightBounds.min.x).toBeGreaterThan(-dimensions.width / 2 - 0.01)
-
-    model.dispose()
-  })
-
-  test('スポーツカーのフロントガラス下辺は中央だけが折れ曲がらず、曲率は内側へ限定される', () => {
-    const model = createCarModel(DEFAULT_CAR_CONFIG)
-    const windshield = layerOf(model.root, 'body').getObjectByName('car-sports-windshield')
-    expect(windshield).toBeInstanceOf(THREE.Mesh)
-
-    const position = (windshield as THREE.Mesh).geometry.getAttribute('position')
-    const bottomY = Array.from({ length: 5 }, (_, index) => position.getY(index))
-    const bottomZ = Array.from({ length: 5 }, (_, index) => position.getZ(index))
-    expect(Math.max(...bottomY) - Math.min(...bottomY)).toBeLessThan(1e-6)
-    expect(Math.max(...bottomZ) - Math.min(...bottomZ)).toBeLessThan(1e-6)
-
-    const middleCenterY = position.getY(2 * 5 + 2)
-    const middleEdgeY = position.getY(2 * 5)
-    expect(middleCenterY).toBeGreaterThan(middleEdgeY)
-
+    expect(noseTop).toBeLessThan(hoodTop)
+    expect(hoodTop).toBeLessThan(roofTop)
+    expect(roofTop).toBeCloseTo(dimensions.roofTopY, 1)
+    // ルーフ→リアは単調に落ちる（箱状の終端や段差を作らない）。
+    expect(deckTop).toBeLessThan(roofTop)
+    expect(tailTop).toBeLessThan(deckTop)
     model.dispose()
   })
 
@@ -347,11 +284,19 @@ describe('CarConfigの反映', () => {
     }
   })
 
-  test('フロントパーツは車体の前端より前に出る', () => {
+  test('フロントパーツは車種ごとに前端まわりへ収まる', () => {
+    // 箱形の車種は前端より前へバンパーを出す。スポーツカーは丸いノーズ面の上に
+    // ライトを載せるため、前端を越えずに前輪より前にあることを契約にする。
+    const boxy = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'suv'))
+    const boxyDimensions = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'suv'))
+    expect(boundsOf(layerOf(boxy.root, 'front')).max.z).toBeGreaterThan(boxyDimensions.length / 2)
+    boxy.dispose()
+
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
     const bounds = boundsOf(layerOf(model.root, 'front'))
-    expect(bounds.max.z).toBeGreaterThan(dimensions.length / 2)
+    expect(bounds.max.z).toBeGreaterThan(dimensions.wheelbase / 2)
+    expect(bounds.max.z).toBeLessThanOrEqual(dimensions.length / 2 + 0.02)
     model.dispose()
   })
 
@@ -395,7 +340,7 @@ describe('CarConfigの反映', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const colorOf = () => {
       const hull = layerOf(model.root, 'body').children[0]!.children[0] as THREE.Mesh
-      return (hull.material as THREE.MeshStandardMaterial).color.getHexString()
+      return paintColorOf(hull)
     }
     const before = colorOf()
     model.update(selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'blue'))
@@ -421,7 +366,7 @@ describe('CarConfigの反映', () => {
     expect(layerOf(model.root, 'roof').children.length).toBeGreaterThan(0)
     expect(layerOf(model.root, 'decoration').children.length).toBeGreaterThan(0)
     const hull = layerOf(model.root, 'body').children[0]!.children[0] as THREE.Mesh
-    expect((hull.material as THREE.MeshStandardMaterial).color.getHexString()).toBe('ffc531')
+    expect(paintColorOf(hull)).toBe('ffc531')
     model.dispose()
   })
 })

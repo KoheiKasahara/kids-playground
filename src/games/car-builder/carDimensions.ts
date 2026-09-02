@@ -40,6 +40,12 @@ export type CarBodySpec = {
   wheelbaseRatio: number
   /** 素の最低地上高。実際の値はタイヤ半径と車高でクランプされる。 */
   baseGroundClearance: number
+  /**
+   * タイヤの内側をボディ側面へ入れ込む量。未指定なら `DEFAULT_WHEEL_INSET`。
+   * スポーツカーだけはフェンダーを断面の膨らみとして作るため、
+   * タイヤを少し内側へ寄せて「張り出しすぎないフェンダー」に収める。
+   */
+  wheelInset?: number
 }
 
 export type CarWheelSpec = {
@@ -60,19 +66,21 @@ export const CAR_BODY_SPECS: Record<BodyType, CarBodySpec> = {
   sports: {
     id: 'sports',
     style: 'sports',
-    length: 4.35,
-    width: 2.06,
-    // 車体の下端を少し持ち上げ、タイヤを地面へ沈めずに見せる。
-    // 上段は低さを残したまま少し厚みを足し、「潰れたキャビン」ではなく
-    // ボンネット→肩→窓→ルーフが連続するスポーツカーの断面にする。
-    hullHeight: 0.5,
-    cabinHeight: 0.41,
-    cabinLengthRatio: 0.44,
-    cabinCenterRatio: -0.07,
-    cabinWidthRatio: 0.78,
-    hoodLengthRatio: 0.31,
-    wheelbaseRatio: 0.68,
-    baseGroundClearance: 0.16,
+    // 幅に対して短く「ずんぐり」して見えていたため、全長を伸ばして車幅を絞る。
+    // 車幅はフェンダーが膨らむ前の基準幅で、実際の最大幅は断面のヒップで決まる。
+    length: 4.32,
+    width: 1.86,
+    // 下段に厚みを持たせて「低い板の上にキャビンを載せた」印象を消し、
+    // 上段（キャビン）はガラスが台形として成立する高さまで確保する。
+    hullHeight: 0.55,
+    cabinHeight: 0.52,
+    cabinLengthRatio: 0.445,
+    cabinCenterRatio: -0.05,
+    cabinWidthRatio: 0.8,
+    hoodLengthRatio: 0.29,
+    wheelbaseRatio: 0.665,
+    baseGroundClearance: 0.18,
+    wheelInset: 0.12,
   },
   suv: {
     id: 'suv',
@@ -153,7 +161,7 @@ const MIN_CLEARANCE_RATIO = 0.35
 /** タイヤ半径に対する最低地上高の上限比。高い車高でも竹馬のようにならない。 */
 const MAX_CLEARANCE_RATIO = 1.05
 /** タイヤの内側をボディ側面へどれだけ入れ込むか。トレッドはこの値から決まる。 */
-const WHEEL_INSET = 0.08
+export const DEFAULT_WHEEL_INSET = 0.08
 
 export type CarWheelAttachmentId = 'frontLeft' | 'frontRight' | 'rearLeft' | 'rearRight'
 
@@ -263,7 +271,7 @@ export function computeCarDimensions(config: CarConfig): CarDimensions {
   const groundClearance = computeGroundClearance(body, wheel, ride)
   const hullTopY = groundClearance + body.hullHeight
   const roofTopY = hullTopY + body.cabinHeight
-  const track = body.width + wheel.width - WHEEL_INSET * 2
+  const track = body.width + wheel.width - (body.wheelInset ?? DEFAULT_WHEEL_INSET) * 2
 
   return {
     bodyType: body.id,

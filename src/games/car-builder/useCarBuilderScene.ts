@@ -80,8 +80,8 @@ export function useCarBuilderScene(options: CarBuilderSceneOptions): CarBuilderS
     ground.receiveShadow = true
     scene.add(ground)
 
-    const hemisphere = new THREE.HemisphereLight('#ffffff', '#88a878', 1.9)
-    const directional = new THREE.DirectionalLight('#fff6e0', 1.9)
+    const hemisphere = new THREE.HemisphereLight('#ffffff', '#88a878', 1.35)
+    const directional = new THREE.DirectionalLight('#fff6e0', 1.45)
     directional.position.set(4, 7, 5)
     directional.castShadow = true
     directional.shadow.mapSize.set(1024, 1024)
@@ -91,7 +91,14 @@ export function useCarBuilderScene(options: CarBuilderSceneOptions): CarBuilderS
     directional.shadow.camera.bottom = -5
     directional.shadow.camera.near = 0.5
     directional.shadow.camera.far = 24
-    scene.add(hemisphere, directional)
+    // 主光1灯＋半球光だけだと、車体の左右で面の向きの差が読めず平板に見える。
+    // 影を落とさない弱いフィル光を反対側から当て、曲面の陰影だけを増やす。
+    const fill = new THREE.DirectionalLight('#dbe8ff', 0.5)
+    fill.position.set(-5, 3.2, -3.5)
+    // 塗装面のハイライトを1本作るリム光。影は落とさない。
+    const rim = new THREE.DirectionalLight('#ffffff', 0.22)
+    rim.position.set(-1.5, 5.5, -6)
+    scene.add(hemisphere, directional, fill, rim)
 
     let yaw = DEFAULT_YAW
     let pitch = DEFAULT_PITCH
@@ -255,6 +262,8 @@ export function useCarBuilderScene(options: CarBuilderSceneOptions): CarBuilderS
       groundMaterial.dispose()
       hemisphere.dispose()
       directional.dispose()
+      fill.dispose()
+      rim.dispose()
       const canvas = renderer?.domElement ?? host.querySelector('canvas')
       if (renderer !== null) {
         try {

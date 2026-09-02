@@ -3,6 +3,7 @@ import { CAR_CATEGORIES, DEFAULT_CAR_CONFIG, selectCarOption, type CarConfig } f
 import {
   CAR_BODY_SPECS,
   CAR_WHEEL_SPECS,
+  DEFAULT_WHEEL_INSET,
   carBoundingRadius,
   computeCarAttachments,
   computeCarDimensions,
@@ -77,13 +78,19 @@ describe('computeCarDimensions（5ボディ）', () => {
 
   test('スポーツカーは低さを保ちながら、タイヤの下端とキャビンの厚みを確保する', () => {
     expect(dimensions.bodyFloorY).toBeGreaterThanOrEqual(0.15)
-    expect(dimensions.cabinHeight).toBeGreaterThanOrEqual(0.4)
-    expect(dimensions.hullTopY).toBeLessThanOrEqual(dimensions.wheelRadius * 2)
-    expect(dimensions.roofTopY - dimensions.hullTopY).toBeGreaterThanOrEqual(0.4)
+    expect(dimensions.cabinHeight).toBeGreaterThanOrEqual(0.45)
+    // ショルダーラインはタイヤ上端の少し上まで。ここが低すぎると
+    // 「低い板の上にキャビンを載せた」プロポーションへ戻ってしまう。
+    expect(dimensions.hullTopY).toBeGreaterThan(dimensions.wheelRadius * 2 * 0.95)
+    expect(dimensions.hullTopY).toBeLessThanOrEqual(dimensions.wheelRadius * 2 * 1.15)
+    expect(dimensions.roofTopY - dimensions.hullTopY).toBeGreaterThanOrEqual(0.45)
   })
 
   test('トレッドは車幅とタイヤ厚から決まり、タイヤは車体の外側に出る', () => {
-    expect(dimensions.track).toBeCloseTo(body.width + wheel.width - 0.16, 6)
+    // スポーツカーだけはフェンダーを断面の膨らみで作るため、専用の wheelInset を持つ。
+    const inset = body.wheelInset ?? DEFAULT_WHEEL_INSET
+    expect(inset).toBe(0.12)
+    expect(dimensions.track).toBeCloseTo(body.width + wheel.width - inset * 2, 6)
     expect(dimensions.track / 2).toBeGreaterThan(body.width / 2)
     expect(dimensions.overallWidth).toBeGreaterThan(dimensions.width)
   })

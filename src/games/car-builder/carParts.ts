@@ -7,6 +7,7 @@
 import * as THREE from 'three'
 import type { BodyType, CarCategoryId, CarConfig, CarOptionIdMap } from './carConfig'
 import type { CarAttachment, CarAttachments, CarDimensions } from './carDimensions'
+import { createSportsHull, sportsSurfacePoint } from './sportsBodySurface'
 
 export type CarPartContext = {
   config: CarConfig
@@ -43,11 +44,10 @@ function standard(color: string, roughness = 0.45, metalness = 0.05): THREE.Mesh
 function sportsPaint(color: string): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
     color,
-    roughness: 0.24,
-    metalness: 0.08,
-    clearcoat: 0.52,
-    clearcoatRoughness: 0.14,
-    side: THREE.DoubleSide,
+    roughness: 0.4,
+    metalness: 0.05,
+    clearcoat: 0.22,
+    clearcoatRoughness: 0.26,
   })
 }
 
@@ -58,411 +58,6 @@ function box(
 ): THREE.Mesh {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), material)
   mesh.position.set(position.x, position.y, position.z)
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  return mesh
-}
-
-function lerp(start: number, end: number, amount: number): number {
-  return start + (end - start) * amount
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
-}
-
-function catmullRom(previous: number, current: number, next: number, afterNext: number, amount: number): number {
-  const amountSquared = amount * amount
-  const amountCubed = amountSquared * amount
-  const value = 0.5 * (
-    2 * current
-    + (-previous + next) * amount
-    + (2 * previous - 5 * current + 4 * next - afterNext) * amountSquared
-    + (-previous + 3 * current - 3 * next + afterNext) * amountCubed
-  )
-  // フェンダーの張り出しなど、意図的に単調な値は補間のオーバーシュートを
-  // 許さない。曲率だけを滑らかにし、設計した断面の範囲は保持する。
-  return clamp(value, Math.min(current, next), Math.max(current, next))
-}
-
-function defaultShoulderY(section: LoftSection): number {
-  const height = Math.max(0.04, section.topY - section.bottomY)
-  const requested = section.shoulderY ?? lerp(section.bottomY, section.topY, 0.94)
-  // 断面の頂点順が逆転すると、ショルダーに折り返し面ができて陰影が割れる。
-  // 意図した低い肩は保ちつつ、断面の外周だけは常に単調に上がるようにする。
-  return clamp(requested, section.bottomY + height * 0.82, section.topY - height * 0.035)
-}
-
-type LoftSection = {
-  /** 車体前後方向の中心位置。+Zが前。 */
-  z: number
-  /** 下側の最大幅。上側はtopWidthへ向かって絞る。 */
-  width: number
-  /** 天面の幅。未指定なら下側より少し絞る。 */
-  topWidth?: number
-  bottomY: number
-  topY: number
-  /** 上半分だけを前後へずらし、フロントガラスやリアガラスを寝かせる。 */
-  topZOffset?: number
-  /** 天面の左右ショルダーの高さ。中央のクラウンとは別に緩い抑揚を作る。 */
-  shoulderY?: number
-  /** 中央クラウンだけを前後へ出し、ノーズの先端にわずかな表情をつける。 */
-  centerZOffset?: number
-  /** 中央の面だけを少し持ち上げ、ボンネットの平板感を抑える。 */
-  centerYOffset?: number
-}
-
-/**
- * 前後の断面をつないだ低ポリゴンの外殻。
- * 断面の共有頂点をsmooth shadingするため、単純なBoxGeometryの集合よりも
- * 少ないMesh数で面の連続感とフェンダーの張り出しを表現できる。
- */
-function loftMesh(
-  sections: readonly LoftSection[],
-  material: THREE.Material,
-  name: string,
-): THREE.Mesh {
-  // 断面の境目が陰影の筋として見えないよう、設計断面の間を補間してから
-  // メッシュ化する。寸法や外形は変えず、面のつながりだけを滑らかにする。
-  const denseSections: LoftSection[] = []
-  for (let index = 0; index < sections.length - 1; index += 1) {
-    const current = sections[index]
-    const next = sections[index + 1]
-    if (current === undefined || next === undefined) continue
-    denseSections.push(current)
-    const previous = sections[index - 1] ?? current
-    const afterNext = sections[index + 2] ?? next
-    const topWidthOf = (section: LoftSection) => section.topWidth ?? section.width * 0.84
-    const interpolate = (get: (section: LoftSection) => number, amount: number) => catmullRom(
-      get(previous),
-      get(current),
-      get(next),
-      get(afterNext),
-      amount,
-    )
-    for (const amount of [0.16, 0.32, 0.48, 0.64, 0.8]) {
-      denseSections.push({
-        z: lerp(current.z, next.z, amount),
-        width: interpolate((section) => section.width, amount),
-        topWidth: interpolate(topWidthOf, amount),
-        bottomY: interpolate((section) => section.bottomY, amount),
-        topY: interpolate((section) => section.topY, amount),
-        topZOffset: interpolate((section) => section.topZOffset ?? 0, amount),
-        shoulderY: interpolate(defaultShoulderY, amount),
-        centerZOffset: interpolate((section) => section.centerZOffset ?? 0, amount),
-        centerYOffset: interpolate((section) => section.centerYOffset ?? 0, amount),
-      })
-    }
-  }
-  const lastSection = sections[sections.length - 1]
-  if (lastSection !== undefined) denseSections.push(lastSection)
-
-  const ringVertices = denseSections.map((section) => {
-    const halfWidth = section.width / 2
-    const topHalfWidth = (section.topWidth ?? section.width * 0.84) / 2
-    const height = Math.max(0.04, section.topY - section.bottomY)
-    const topZOffset = section.topZOffset ?? 0
-    const shoulderY = defaultShoulderY(section)
-    const centerZOffset = section.centerZOffset ?? 0
-    const centerYOffset = section.centerYOffset ?? 0
-    const zAt = (weight: number) => section.z + topZOffset * weight
-
-    return [
-      [-halfWidth * 0.72, section.bottomY, section.z],
-      [-halfWidth * 0.9, section.bottomY + height * 0.04, section.z],
-      [-halfWidth * 0.98, section.bottomY + height * 0.1, section.z],
-      [-halfWidth, section.bottomY + height * 0.22, zAt(0.02)],
-      [-halfWidth, section.bottomY + height * 0.36, zAt(0.04)],
-      [-halfWidth, section.bottomY + height * 0.5, zAt(0.06)],
-      [-halfWidth * 0.995, section.bottomY + height * 0.64, zAt(0.24)],
-      [-halfWidth * 0.97, section.bottomY + height * 0.75, zAt(0.42)],
-      [-topHalfWidth * 0.99, section.bottomY + height * 0.83, zAt(0.62)],
-      [-topHalfWidth * 0.98, shoulderY, zAt(0.8)],
-      [-topHalfWidth * 0.95, section.bottomY + height * 0.91, zAt(0.92)],
-      [-topHalfWidth * 0.84, section.topY - height * 0.045, zAt(0.97)],
-      [-topHalfWidth * 0.6, section.topY - height * 0.018, zAt(0.99)],
-      [0, section.topY + centerYOffset, zAt(1) + centerZOffset],
-      [topHalfWidth * 0.6, section.topY - height * 0.018, zAt(0.99)],
-      [topHalfWidth * 0.84, section.topY - height * 0.045, zAt(0.97)],
-      [topHalfWidth * 0.95, section.bottomY + height * 0.91, zAt(0.92)],
-      [topHalfWidth * 0.98, shoulderY, zAt(0.8)],
-      [topHalfWidth * 0.99, section.bottomY + height * 0.83, zAt(0.62)],
-      [halfWidth * 0.97, section.bottomY + height * 0.75, zAt(0.42)],
-      [halfWidth * 0.995, section.bottomY + height * 0.64, zAt(0.24)],
-      [halfWidth, section.bottomY + height * 0.5, zAt(0.06)],
-      [halfWidth, section.bottomY + height * 0.36, zAt(0.04)],
-      [halfWidth, section.bottomY + height * 0.22, zAt(0.02)],
-      [halfWidth * 0.98, section.bottomY + height * 0.1, section.z],
-      [halfWidth * 0.9, section.bottomY + height * 0.04, section.z],
-      [halfWidth * 0.72, section.bottomY, section.z],
-    ] as const
-  })
-
-  const positions: number[] = []
-  for (const ring of ringVertices) {
-    for (const vertex of ring) positions.push(vertex[0], vertex[1], vertex[2])
-  }
-
-  const ringSize = ringVertices[0]?.length ?? 0
-  const indices: number[] = []
-  for (let sectionIndex = 0; sectionIndex < denseSections.length - 1; sectionIndex += 1) {
-    const currentOffset = sectionIndex * ringSize
-    const nextOffset = (sectionIndex + 1) * ringSize
-    for (let vertexIndex = 0; vertexIndex < ringSize; vertexIndex += 1) {
-      const nextVertexIndex = (vertexIndex + 1) % ringSize
-      const current = currentOffset + vertexIndex
-      const currentNext = currentOffset + nextVertexIndex
-      const next = nextOffset + vertexIndex
-      const nextNext = nextOffset + nextVertexIndex
-      indices.push(current, next, currentNext, currentNext, next, nextNext)
-    }
-  }
-
-  // 前後の端面も閉じ、内側から見たときに穴が見えないようにする。
-  const rearCenterIndex = positions.length / 3
-  const rear = denseSections[0]
-  if (rear !== undefined) positions.push(0, (rear.bottomY + rear.topY) / 2, rear.z)
-  const frontCenterIndex = positions.length / 3
-  const front = denseSections[denseSections.length - 1]
-  if (front !== undefined) positions.push(0, (front.bottomY + front.topY) / 2, front.z)
-
-  if (ringSize > 0) {
-    for (let vertexIndex = 0; vertexIndex < ringSize; vertexIndex += 1) {
-      const nextVertexIndex = (vertexIndex + 1) % ringSize
-      indices.push(rearCenterIndex, vertexIndex, nextVertexIndex)
-      const frontOffset = (denseSections.length - 1) * ringSize
-      indices.push(frontCenterIndex, frontOffset + nextVertexIndex, frontOffset + vertexIndex)
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.name = name
-  mesh.castShadow = true
-  // 外殻自身の細い断面面をシャドウマップへ戻すと、ボンネットに自己影の筋が
-  // 出やすい。地面へは影を落としつつ、塗装面は直接光の滑らかさを優先する。
-  mesh.receiveShadow = false
-  return mesh
-}
-
-function sportsWindshieldMesh(
-  dimensions: CarDimensions,
-  material: THREE.Material,
-  name: string,
-): THREE.Mesh {
-  // フロントガラスを平面の板にせず、4列×5列の浅い曲面にする。
-  // 下端はボンネットとの境界へ自然に差し込み、中央の膨らみは内側の行だけに
-  // 残す。全ての列へ同じ膨らみを足すと下辺中央が尖って見えるため、端の輪郭は
-  // まっすぐ保ち、Aピラーからルーフへ光が流れる面だけを作る。
-  const bottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.15
-  const topY = dimensions.roofTopY - 0.028
-  const bottomZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 + 0.02
-  const topZ = dimensions.cabinCenterZ + dimensions.cabinLength * 0.5 - dimensions.cabinLength * 0.31 + 0.035
-  const columns = [-1, -0.5, 0, 0.5, 1]
-  const rows = [
-    { amount: 0, y: bottomY, z: bottomZ, halfWidth: dimensions.cabinWidth * 0.46 },
-    { amount: 0.28, y: lerp(bottomY, topY, 0.28), z: lerp(bottomZ, topZ, 0.28) + 0.014, halfWidth: dimensions.cabinWidth * 0.445 },
-    { amount: 0.62, y: lerp(bottomY, topY, 0.62), z: lerp(bottomZ, topZ, 0.62) + 0.018, halfWidth: dimensions.cabinWidth * 0.405 },
-    { amount: 1, y: topY, z: topZ, halfWidth: dimensions.cabinWidth * 0.36 },
-  ]
-  const positions: number[] = []
-  for (const row of rows) {
-    for (const column of columns) {
-      const centerFactor = 1 - column * column
-      const rowBulge = Math.sin(Math.PI * row.amount)
-      positions.push(
-        column * row.halfWidth,
-        row.y + centerFactor * rowBulge * 0.006,
-        row.z + centerFactor * rowBulge * 0.016,
-      )
-    }
-  }
-  const indices: number[] = []
-  for (let row = 0; row < rows.length - 1; row += 1) {
-    const current = row * columns.length
-    const next = (row + 1) * columns.length
-    for (let column = 0; column < columns.length - 1; column += 1) {
-      indices.push(current + column, next + column, current + column + 1)
-      indices.push(current + column + 1, next + column, next + column + 1)
-    }
-  }
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.name = name
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  return mesh
-}
-
-function sportsWindowX(dimensions: CarDimensions, side: 1 | -1, z: number, y: number): number {
-  const verticalProgress = Math.min(
-    1,
-    Math.max(0, (y - dimensions.hullTopY) / Math.max(0.01, dimensions.cabinHeight)),
-  )
-  const smoothProgress = verticalProgress * verticalProgress * (3 - verticalProgress * 2)
-  // 窓の下端はキャビンの肩に、上端はルーフの外周に沿わせる。車幅いっぱいを
-  // 下端の基準にするとガラスだけが外へ張り出して浮いて見えるため、キャビン
-  // 付近の外殻幅を基準にして、上へ向かってルーフ幅へ滑らかに絞る。
-  const shoulderHalfWidth = (dimensions.width / 2) * 0.93
-  const roofHalfWidth = (dimensions.cabinWidth / 2) * 0.94
-  const longitudinalProgress = Math.min(
-    1,
-    Math.max(-1, (z - dimensions.cabinCenterZ) / (dimensions.cabinLength / 2)),
-  )
-  const endTaper = 1 - Math.abs(longitudinalProgress) * 0.022
-  const halfWidth = lerp(shoulderHalfWidth, roofHalfWidth, smoothProgress) * endTaper
-  const sideCurve = 0.014 * (1 - longitudinalProgress * longitudinalProgress) * (0.25 + smoothProgress * 0.75)
-  return side * (halfWidth + sideCurve + 0.01)
-}
-
-type SportsSideWindowSpec = {
-  bottomRearZ: number
-  bottomFrontZ: number
-  topRearZ: number
-  topFrontZ: number
-  bottomY: number
-  topY: number
-}
-
-/**
- * サイドガラスを台形の一枚板ではなく、前後4列×上下3列の浅い曲面にする。
- * 外周の輪郭はスポーツカーらしく絞りつつ、中央の頂点を車体側面へ少し
- * 張り出させる。これによりガラス自体が車体の曲率に沿い、三角形の板を
- * 貼ったような陰影にならない。
- */
-function sportsSideWindowMesh(
-  dimensions: CarDimensions,
-  side: 1 | -1,
-  spec: SportsSideWindowSpec,
-  material: THREE.Material,
-  name: string,
-): THREE.Mesh {
-  const columns = [0, 1 / 3, 2 / 3, 1]
-  const rows = [0, 0.5, 1]
-  const positions: number[] = []
-
-  for (const row of rows) {
-    const rearZ = lerp(spec.bottomRearZ, spec.topRearZ, row)
-    const frontZ = lerp(spec.bottomFrontZ, spec.topFrontZ, row)
-    const y = lerp(spec.bottomY, spec.topY, row)
-    for (const column of columns) {
-      const longitudinalCurve = Math.sin(Math.PI * column)
-      const verticalCurve = Math.sin(Math.PI * row)
-      const z = lerp(rearZ, frontZ, column) + longitudinalCurve * verticalCurve * 0.014
-      const curvedY = y + longitudinalCurve * verticalCurve * 0.008
-      positions.push(sportsWindowX(dimensions, side, z, curvedY), curvedY, z)
-    }
-  }
-
-  const indices: number[] = []
-  for (let row = 0; row < rows.length - 1; row += 1) {
-    const current = row * columns.length
-    const next = (row + 1) * columns.length
-    for (let column = 0; column < columns.length - 1; column += 1) {
-      indices.push(current + column, next + column, current + column + 1)
-      indices.push(current + column + 1, next + column, next + column + 1)
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.name = name
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  return mesh
-}
-
-function curveTube(
-  points: readonly THREE.Vector3[],
-  radius: number,
-  material: THREE.Material,
-  name: string,
-): THREE.Mesh {
-  const curve = new THREE.CatmullRomCurve3([...points])
-  const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, radius, 6, false), material)
-  mesh.name = name
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  return mesh
-}
-
-/**
- * タイヤの上半分へ、ボディ側から滑らかに張り出すフェンダー遷移面を作る。
- * 外周へ一様な赤い輪を貼るのではなく、前後端は車体側へ戻し、頂点付近だけ
- * わずかに外へ膨らませることで、ボンネット／ドア／リアクォーターとの連続感を保つ。
- */
-function sportsFenderMesh(
-  wheel: CarAttachments['wheels'][number],
-  dimensions: CarDimensions,
-  material: THREE.Material,
-  name: string,
-): THREE.Mesh {
-  const segments = 24
-  const outerRadius = wheel.radius * 1.04
-  const innerRadius = wheel.radius * 0.99
-  const bodySide = dimensions.width / 2 - 0.015
-  const positions: number[] = []
-
-  for (let index = 0; index <= segments; index += 1) {
-    const angle = (Math.PI * index) / segments
-    const outerZ = wheel.position.z + Math.cos(angle) * outerRadius
-    const outerY = wheel.position.y + Math.sin(angle) * outerRadius
-    const innerZ = wheel.position.z + Math.cos(angle) * innerRadius
-    const innerY = wheel.position.y + Math.sin(angle) * innerRadius
-    const archProgress = Math.sin(angle)
-    // 前後端はボディへ戻し、フェンダー頂点だけタイヤ外周へ寄せる。
-    // これでアーチの両端に強い継ぎ目が生まれず、面の張り出しが自然に減衰する。
-    const innerX = wheel.side * (bodySide - 0.035 + archProgress * 0.018)
-    const outerX = wheel.side * (bodySide + 0.018 + archProgress * 0.15)
-    positions.push(
-      innerX, outerY, outerZ,
-      outerX, outerY, outerZ,
-      innerX, innerY, innerZ,
-      outerX, innerY, innerZ,
-    )
-  }
-
-  const indices: number[] = []
-  for (let index = 0; index < segments; index += 1) {
-    const current = index * 4
-    const next = (index + 1) * 4
-    // アーチの上面、内側面、車体側面、外側の見える面。
-    indices.push(
-      current, next, current + 1,
-      current + 1, next, next + 1,
-      current + 2, current + 3, next + 2,
-      current + 3, next + 3, next + 2,
-      current, current + 2, next,
-      current + 2, next + 2, next,
-      current + 1, next + 1, current + 3,
-      current + 3, next + 1, next + 3,
-    )
-  }
-
-  // 前後の端面を閉じ、フェンダーの厚みを横からも読めるようにする。
-  indices.push(0, 1, 3, 0, 3, 2)
-  const last = segments * 4
-  indices.push(last, last + 2, last + 3, last, last + 3, last + 1)
-
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.name = name
   mesh.castShadow = true
   mesh.receiveShadow = true
   return mesh
@@ -576,248 +171,35 @@ function addBumpers(group: THREE.Group, dimensions: CarDimensions, material: THR
 function buildSportsBody({ dimensions, attachments, color }: CarPartContext): THREE.Object3D {
   const group = createBodyGroup()
   const bodyMaterial = sportsPaint(color)
+  // ガラスも開口部も外殻と同じサーフェスのマテリアルグループ。板や箱を貼らない。
   const glassMaterial = new THREE.MeshPhysicalMaterial({
-    color: '#223d51',
-    roughness: 0.12,
-    metalness: 0.08,
-    clearcoat: 0.48,
-    clearcoatRoughness: 0.1,
-    side: THREE.DoubleSide,
+    color: '#1b2f42',
+    roughness: 0.09,
+    metalness: 0.1,
+    clearcoat: 0.7,
+    clearcoatRoughness: 0.06,
   })
-  const trimMaterial = standard(CHROME_COLOR, 0.28, 0.42)
-  const grilleMaterial = standard('#202b36', 0.3, 0.18)
-  // フェンダーの境界を黒い別部品にせず、塗装面の反射差だけで読む。
-  // これによりタイヤ周りに赤い輪を貼った印象を抑え、外殻の続きとして見せる。
-  const archMaterial = sportsPaint(color)
-  const half = dimensions.length / 2
-  const floor = dimensions.bodyFloorY
-  const cabinHalf = dimensions.cabinLength / 2
-  const cabinRear = dimensions.cabinCenterZ - cabinHalf
-  const cabinFront = dimensions.cabinCenterZ + cabinHalf
-  const roofRear = cabinRear + dimensions.cabinLength * 0.19
-  const roofFront = cabinFront - dimensions.cabinLength * 0.31
-  const hoodStart = half - dimensions.hoodLength
-  const hullTop = dimensions.hullTopY
-  const roofTop = dimensions.roofTopY
-  const frontWheelZ = dimensions.wheelbase / 2
-  const rearWheelZ = -frontWheelZ
+  const openingMaterial = standard('#1b232c', 0.42, 0.14)
 
-  // 下段とキャビンを別々に積まず、リアデッキからノーズまでの高さを一つの
-  // 連続した側面シルエットとして定義する。ルーフ断面も広く残すことで、
-  // ボンネット→フロントガラス→ルーフ→リアを一つの外皮として読ませる。
-  group.add(
-    loftMesh(
-      [
-        { z: -half, width: dimensions.width * 0.72, topWidth: dimensions.width * 0.58, bottomY: floor, topY: floor + dimensions.hullHeight * 0.28 },
-        { z: -half + 0.2, width: dimensions.width * 0.88, topWidth: dimensions.width * 0.74, bottomY: floor, topY: floor + dimensions.hullHeight * 0.48 },
-        { z: rearWheelZ - 0.36, width: dimensions.width * 1.02, topWidth: dimensions.width * 0.86, bottomY: floor, topY: floor + dimensions.hullHeight * 0.7 },
-        { z: rearWheelZ - 0.16, width: dimensions.width * 1.08, topWidth: dimensions.width * 0.92, bottomY: floor, topY: floor + dimensions.hullHeight * 0.86 },
-        { z: rearWheelZ + 0.1, width: dimensions.width * 1.1, topWidth: dimensions.width * 0.96, bottomY: floor, topY: hullTop + 0.015 },
-        { z: cabinRear - 0.08, width: dimensions.width * 1.08, topWidth: dimensions.width * 0.94, bottomY: floor, topY: hullTop + 0.02, shoulderY: hullTop - 0.02 },
-        { z: cabinRear + 0.1, width: dimensions.width * 1.04, topWidth: dimensions.cabinWidth * 0.95, bottomY: floor, topY: hullTop + dimensions.cabinHeight * 0.34, topZOffset: 0.055 },
-        { z: roofRear - 0.12, width: dimensions.width * 1.0, topWidth: dimensions.cabinWidth * 0.98, bottomY: floor, topY: roofTop - dimensions.cabinHeight * 0.28, topZOffset: 0.08, centerYOffset: 0.01 },
-        { z: roofRear, width: dimensions.width * 0.97, topWidth: dimensions.cabinWidth * 0.96, bottomY: floor, topY: roofTop - 0.055, topZOffset: 0.075, centerYOffset: 0.055 },
-        { z: dimensions.cabinCenterZ - dimensions.cabinLength * 0.22, width: dimensions.width * 0.94, topWidth: dimensions.cabinWidth * 0.94, bottomY: floor, topY: roofTop - 0.05, topZOffset: 0.045, centerYOffset: 0.05 },
-        { z: dimensions.cabinCenterZ + dimensions.cabinLength * 0.02, width: dimensions.width * 0.93, topWidth: dimensions.cabinWidth * 0.93, bottomY: floor, topY: roofTop - 0.04, topZOffset: 0.012, centerYOffset: 0.04 },
-        { z: dimensions.cabinCenterZ + dimensions.cabinLength * 0.18, width: dimensions.width * 0.94, topWidth: dimensions.cabinWidth * 0.95, bottomY: floor, topY: roofTop - 0.05, topZOffset: -0.035, centerYOffset: 0.05 },
-        { z: roofFront, width: dimensions.width * 0.97, topWidth: dimensions.cabinWidth * 0.96, bottomY: floor, topY: roofTop - 0.065, topZOffset: -0.08, centerYOffset: 0.065 },
-        { z: cabinFront + 0.12, width: dimensions.width * 1.02, topWidth: dimensions.width * 0.9, bottomY: floor, topY: hullTop + dimensions.cabinHeight * 0.32, topZOffset: -0.04 },
-        { z: hoodStart, width: dimensions.width * 1.04, topWidth: dimensions.width * 0.92, bottomY: floor, topY: hullTop + 0.075, shoulderY: hullTop + 0.055, centerYOffset: -0.028 },
-        { z: frontWheelZ - 0.36, width: dimensions.width * 1.06, topWidth: dimensions.width * 0.95, bottomY: floor, topY: hullTop + 0.065, shoulderY: hullTop + 0.055, centerYOffset: -0.024 },
-        { z: frontWheelZ - 0.16, width: dimensions.width * 1.1, topWidth: dimensions.width * 0.98, bottomY: floor, topY: hullTop + 0.08, shoulderY: hullTop + 0.065, centerYOffset: -0.02 },
-        { z: frontWheelZ + 0.04, width: dimensions.width * 1.08, topWidth: dimensions.width * 0.94, bottomY: floor, topY: hullTop + 0.055, shoulderY: hullTop + 0.045, centerYOffset: -0.018 },
-        { z: frontWheelZ + 0.22, width: dimensions.width * 1.02, topWidth: dimensions.width * 0.86, bottomY: floor, topY: floor + dimensions.hullHeight * 0.72, centerYOffset: 0.012 },
-        { z: half - 0.34, width: dimensions.width * 0.96, topWidth: dimensions.width * 0.78, bottomY: floor, topY: floor + dimensions.hullHeight * 0.56, centerZOffset: 0.018, centerYOffset: 0.014 },
-        { z: half - 0.12, width: dimensions.width * 0.82, topWidth: dimensions.width * 0.66, bottomY: floor, topY: floor + dimensions.hullHeight * 0.34, centerZOffset: 0.04, centerYOffset: 0.01 },
-        { z: half, width: dimensions.width * 0.64, topWidth: dimensions.width * 0.5, bottomY: floor, topY: floor + dimensions.hullHeight * 0.18, centerZOffset: 0.065, centerYOffset: 0.006 },
-      ],
-      bodyMaterial,
-      'car-body-hull',
-    ),
-  )
+  const hull = createSportsHull(dimensions, attachments, bodyMaterial, glassMaterial, openingMaterial)
+  group.add(hull.mesh)
 
-  const sideBottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.12
-  const sideTopY = dimensions.roofTopY - dimensions.cabinHeight * 0.07
-  const pillarZ = dimensions.cabinCenterZ - cabinHalf * 0.06
-  // 上辺もキャビンの前後へ十分に広げ、細い三角形ではなく、
-  // ルーフの丸みに沿う自然な台形として見える窓輪郭にする。
-  const rearWindowBottomRearZ = cabinRear + 0.12
-  const rearWindowBottomFrontZ = pillarZ - 0.02
-  const rearWindowTopFrontZ = pillarZ - 0.08
-  const rearWindowTopRearZ = roofRear + 0.08
-  const frontWindowBottomRearZ = pillarZ + 0.035
-  const frontWindowBottomFrontZ = cabinFront - 0.03
-  const frontWindowTopFrontZ = roofFront + 0.025
-  const frontWindowTopRearZ = pillarZ - 0.025
+  // テールランプ。外殻の面を直接問い合わせて置くので、リアが丸くなっても
+  // 埋まったり浮いたりしない。箱やクロームの帯はリアへ貼り足さない。
+  const lampMaterial = standard('#e2413c', 0.3, 0.12)
+  const lampAnchor = sportsSurfacePoint(dimensions, attachments, -dimensions.length / 2 + 0.16, 0.42)
   for (const side of [1, -1] as const) {
-    const sideName = side === 1 ? 'left' : 'right'
-    group.add(
-      sportsSideWindowMesh(
-        dimensions,
-        side,
-        {
-          bottomRearZ: rearWindowBottomRearZ,
-          bottomFrontZ: rearWindowBottomFrontZ,
-          topRearZ: rearWindowTopRearZ,
-          topFrontZ: rearWindowTopFrontZ,
-          bottomY: sideBottomY,
-          topY: sideTopY - 0.012,
-        },
-        glassMaterial,
-        `car-sports-side-window-rear-${sideName}`,
-      ),
-      sportsSideWindowMesh(
-        dimensions,
-        side,
-        {
-          bottomRearZ: frontWindowBottomRearZ,
-          bottomFrontZ: frontWindowBottomFrontZ,
-          topRearZ: frontWindowTopRearZ,
-          topFrontZ: frontWindowTopFrontZ,
-          bottomY: sideBottomY,
-          topY: sideTopY,
-        },
-        glassMaterial,
-        `car-sports-side-window-front-${sideName}`,
-      ),
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.085, 14, 10), lampMaterial)
+    lamp.name = `car-sports-tail-lamp-${side === 1 ? 'left' : 'right'}`
+    lamp.scale.set(2.1, 0.5, 0.55)
+    lamp.position.set(
+      side * lampAnchor.position.x * 0.62,
+      lampAnchor.position.y,
+      lampAnchor.position.z - 0.02,
     )
-
-    // ガラス面のすぐ外側だけへフレームを置く。大きく離すとA/B/Cピラーも
-    // ボディから浮いた棒に見えるため、窓の曲率をそのまま追従させる。
-    const frameX = (z: number, y: number) => sportsWindowX(dimensions, side, z, y) + side * 0.006
-    const frameRadius = 0.018
-    group.add(
-      curveTube(
-        [
-          new THREE.Vector3(frameX(frontWindowBottomFrontZ, sideBottomY), sideBottomY, frontWindowBottomFrontZ),
-          new THREE.Vector3(frameX(frontWindowTopFrontZ, sideTopY + 0.008), sideTopY + 0.008, frontWindowTopFrontZ),
-        ],
-        frameRadius * 1.05,
-        bodyMaterial,
-        `car-sports-a-pillar-${sideName}`,
-      ),
-      curveTube(
-        [
-          new THREE.Vector3(frameX(frontWindowBottomRearZ, sideBottomY), sideBottomY, frontWindowBottomRearZ),
-          new THREE.Vector3(frameX(frontWindowTopRearZ, sideTopY), sideTopY, frontWindowTopRearZ),
-        ],
-        frameRadius * 0.86,
-        bodyMaterial,
-        `car-sports-b-pillar-${sideName}`,
-      ),
-      curveTube(
-        [
-          new THREE.Vector3(frameX(rearWindowBottomRearZ, sideBottomY), sideBottomY, rearWindowBottomRearZ),
-          new THREE.Vector3(frameX(rearWindowTopRearZ, sideTopY - 0.018), sideTopY - 0.018, rearWindowTopRearZ),
-        ],
-        frameRadius,
-        bodyMaterial,
-        `car-sports-c-pillar-${sideName}`,
-      ),
-    )
+    lamp.castShadow = true
+    group.add(lamp)
   }
-
-  group.add(
-    sportsWindshieldMesh(dimensions, glassMaterial, 'car-sports-windshield'),
-  )
-
-  // フロントガラスの左右に細いAピラーを置き、ガラスが黒い板として
-  // キャビンの外へ浮いて見えるのを防ぐ。ルーフ側も一本の曲線でつなぐ。
-  const windshieldBottomY = dimensions.hullTopY + dimensions.cabinHeight * 0.15
-  const windshieldTopY = dimensions.roofTopY - 0.028
-  const windshieldBottomZ = cabinFront + 0.02
-  const windshieldTopZ = roofFront + 0.035
-  const windshieldBottomHalfWidth = dimensions.cabinWidth * 0.46
-  const windshieldTopHalfWidth = dimensions.cabinWidth * 0.36
-  for (const side of [-1, 1] as const) {
-    group.add(
-      curveTube(
-        [
-          new THREE.Vector3(side * (windshieldBottomHalfWidth + 0.018), windshieldBottomY, windshieldBottomZ),
-          new THREE.Vector3(side * (windshieldTopHalfWidth + 0.018), windshieldTopY, windshieldTopZ),
-        ],
-        0.023,
-        bodyMaterial,
-        `car-sports-windshield-pillar-${side === 1 ? 'left' : 'right'}`,
-      ),
-    )
-  }
-  group.add(
-    curveTube(
-      [
-        new THREE.Vector3(-windshieldTopHalfWidth, windshieldTopY + 0.005, windshieldTopZ),
-        new THREE.Vector3(0, windshieldTopY + 0.014, windshieldTopZ + 0.012),
-        new THREE.Vector3(windshieldTopHalfWidth, windshieldTopY + 0.005, windshieldTopZ),
-      ],
-      0.021,
-      bodyMaterial,
-      'car-sports-roof-front-frame',
-    ),
-  )
-
-  // フェンダーの頂点を極細の同色アーチで読み取りやすくする。
-  // 太い別色の輪郭線にはせず、遷移面と同じ塗装面のハイライトだけを残す。
-  for (const wheel of attachments.wheels) {
-    group.add(sportsFenderMesh(wheel, dimensions, bodyMaterial, `car-sports-fender-${wheel.id}`))
-    const arch = new THREE.Mesh(
-      new THREE.TorusGeometry(wheel.radius * 1.012, 0.007, 6, 28, Math.PI),
-      archMaterial,
-    )
-    arch.name = `car-sports-wheel-arch-${wheel.id}`
-    arch.rotation.y = Math.PI / 2
-    arch.position.set(
-      wheel.position.x + wheel.side * wheel.width * 0.43,
-      wheel.position.y,
-      wheel.position.z,
-    )
-    arch.castShadow = true
-    arch.receiveShadow = true
-    group.add(arch)
-  }
-
-  const grilleY = floor + dimensions.hullHeight * 0.33
-  const grille = box(
-    { x: dimensions.width * 0.52, y: dimensions.hullHeight * 0.16, z: 0.07 },
-    { x: 0, y: grilleY, z: half + 0.045 },
-    grilleMaterial,
-  )
-  grille.name = 'car-sports-front-grille'
-  group.add(grille)
-
-  const grilleSlatY = dimensions.hullHeight * 0.065
-  for (const offset of [-1, 0, 1]) {
-    group.add(
-      box(
-        { x: dimensions.width * 0.36, y: 0.014, z: 0.074 },
-        { x: 0, y: grilleY + offset * grilleSlatY, z: half + 0.085 },
-        grilleMaterial,
-      ),
-    )
-  }
-
-  const splitter = box(
-    { x: dimensions.width * 0.68, y: 0.035, z: 0.07 },
-    { x: 0, y: floor + dimensions.hullHeight * 0.1, z: half + 0.055 },
-    bodyMaterial,
-  )
-  splitter.name = 'car-sports-front-splitter'
-  group.add(splitter)
-
-  // 小物は主外殻の補助に限定し、面構成で出した輪郭を邪魔しない薄さにする。
-  group.add(
-    box(
-      { x: 0.035, y: 0.018, z: dimensions.hoodLength * 0.68 },
-      { x: 0, y: dimensions.hullTopY + 0.02, z: half - dimensions.hoodLength * 0.42 },
-      trimMaterial,
-    ),
-  )
-  const rearDeck = box(
-    { x: dimensions.width * 0.48, y: 0.026, z: 0.14 },
-    { x: 0, y: dimensions.hullTopY - 0.018, z: -half * 0.68 },
-    trimMaterial,
-  )
-  rearDeck.name = 'car-sports-rear-deck'
-  group.add(rearDeck)
 
   return group
 }
@@ -1100,37 +482,49 @@ function buildWheels(hubColor: string, hubRadiusRatio: number) {
 type FrontLightShape = 'box' | 'round'
 
 function buildFront(shape: FrontLightShape) {
-  return ({ attachments, config }: CarPartContext): THREE.Object3D => {
+  return ({ attachments, config, dimensions }: CarPartContext): THREE.Object3D => {
     const front = attachments.front
     const group = new THREE.Group()
     group.name = 'car-front'
     const sports = config.body === 'sports'
     const lightMaterial = standard(sports ? '#f7fbff' : '#fff3c4', sports ? 0.16 : 0.2, sports ? 0.18 : 0.1)
-    const bumperMaterial = sports
-      ? standard('#1d2730', 0.3, 0.12)
-      : standard(CHROME_COLOR, 0.35, 0.35)
 
     const lightSize = front.size.extent * (sports ? 0.27 : 0.34)
     const lightDepth = sports ? 0.065 : 0.1
     for (const side of [1, -1]) {
       const center = offsetFrom(front, lightDepth / 2)
-      const position = {
-        x: center.x + side * front.size.width * (sports ? 0.35 : 0.32),
-        y: center.y + front.size.extent * (sports ? -0.22 : 0.16),
-        z: center.z,
-      }
+      // スポーツカーのノーズは丸く絞り込まれているため、前端の平面ではなく
+      // ボンネットの肩の高さ・少し内側・少し後ろへ置いてボディ面へなじませる。
+      // スポーツカーのノーズは丸く絞り込まれているため、前端の平面を基準にすると
+      // ライトが浮くか埋まる。外殻サーフェス上の点を直接問い合わせて置く。
+      const position = sports
+        ? (() => {
+            const anchor = sportsSurfacePoint(dimensions, attachments, dimensions.length / 2 - 0.3, 0.37)
+            return {
+              x: side * anchor.position.x * 0.74,
+              y: anchor.position.y - 0.01,
+              z: anchor.position.z,
+            }
+          })()
+        : {
+            x: center.x + side * front.size.width * 0.32,
+            y: center.y + front.size.extent * 0.16,
+            z: center.z,
+          }
       if (sports && shape === 'box') {
         // 箱形ライトをそのまま置くとノーズ上に小さな直方体が浮くため、
         // 薄い楕円体にして低いボンネットの曲面へなじませる。
-        const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * 0.58, 16, 10), lightMaterial)
-        light.scale.set(1.35, 0.26, 0.22)
+        const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * 0.95, 18, 10), lightMaterial)
+        light.scale.set(1.5, 0.3, 0.55)
         light.position.set(position.x, position.y, position.z)
-        light.rotation.z = side * -0.12
+        light.rotation.z = side * -0.16
+        light.rotation.y = side * 0.2
         light.castShadow = true
         group.add(light)
       } else if (shape === 'round') {
-        const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * 0.55, 16, 12), lightMaterial)
+        const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * (sports ? 0.42 : 0.55), 16, 12), lightMaterial)
         light.position.set(position.x, position.y, position.z)
+        if (sports) light.scale.set(1, 0.62, 0.62)
         light.castShadow = true
         group.add(light)
       } else {
@@ -1138,14 +532,19 @@ function buildFront(shape: FrontLightShape) {
       }
     }
 
-    const bumperCenter = offsetFrom(front, sports ? 0.025 : 0.05)
-    group.add(
-      box(
-        { x: front.size.width * (sports ? 0.62 : 0.92), y: front.size.extent * (sports ? 0.12 : 0.18), z: sports ? 0.07 : 0.12 },
-        { x: bumperCenter.x, y: bumperCenter.y - front.size.extent * (sports ? 0.38 : 0.34), z: bumperCenter.z },
-        bumperMaterial,
-      ),
-    )
+    // スポーツカーのフロント開口は外殻のマテリアルグループとして作ってあるので、
+    // ここでバンパーの箱を前へ貼り足さない（貼ると後付け部品に見える）。
+    if (!sports) {
+      const bumperMaterial = standard(CHROME_COLOR, 0.35, 0.35)
+      const bumperCenter = offsetFrom(front, 0.05)
+      group.add(
+        box(
+          { x: front.size.width * 0.92, y: front.size.extent * 0.18, z: 0.12 },
+          { x: bumperCenter.x, y: bumperCenter.y - front.size.extent * 0.34, z: bumperCenter.z },
+          bumperMaterial,
+        ),
+      )
+    }
     return group
   }
 }
