@@ -440,6 +440,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'color-paint-puzzle',
+    slug: 'color-paint-puzzle',
+    title: 'いろぬりパズル',
+    emoji: '🖍️',
+    seo: {
+      headline: 'いろぬりパズル｜くるま・さかな・ちょうちょをぬりえ',
+      description:
+        'くるま・さかな・ちょうちょの3つの絵から題材をえらび、色をえらんでタップするだけで塗れる幼児向けのぬりえです。線からはみ出す心配がないので、はじめてのぬりえにも向いています。',
+    },
+    category: 'learning',
+    intro: {
+      howToPlay: [
+        'いろを えらんで、ぬりたい ばしょを タップするよ',
+        'えを きりかえても、ぬった いろは のこるよ',
+        '「やりなおし」で いまの えだけ まっさらに もどせるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

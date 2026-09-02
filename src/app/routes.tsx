@@ -27,6 +27,7 @@ import PrefecturePuzzlePlay from '../games/prefecture-quiz/PrefecturePuzzlePlay'
 import ColorMixQuizStart from '../games/color-mix-quiz/ColorMixQuizStart'
 import ColorMixQuizPlay from '../games/color-mix-quiz/ColorMixQuizPlay'
 import ColorMixQuizResult from '../games/color-mix-quiz/ColorMixQuizResult'
+import ColorPaintPuzzlePlay from '../games/color-paint-puzzle/ColorPaintPuzzlePlay'
 
 // 50m世界地図やmatter-js(物理エンジン)など、特定ゲームだけが必要とする重い依存は
 // そのゲームを開くときだけ読込む。Vite PWAは生成されたchunkもprecacheするため、
@@ -124,6 +125,8 @@ export const routes: RouteObject[] = [
   { path: '/games/color-mix-quiz/level', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
   { path: '/games/color-mix-quiz/:level/play', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
   { path: '/games/color-mix-quiz/:level/result', element: <Navigate to="/games/color-mix-quiz" replace /> },
+  // いろぬりパズルはSVGのみに依存し軽量なため、他ゲームのように遅延読込にはしない。
+  { path: '/games/color-paint-puzzle', element: playRoute(<ColorPaintPuzzlePlay />) },
   // こっきピンボールは物理エンジン(matter-js)を含み main chunk のサイズ警告を超えるため、
   // 旅行クイズの世界地図と同様に開くときだけ読込む。
   { path: '/games/flag-pinball', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballSelect')) },

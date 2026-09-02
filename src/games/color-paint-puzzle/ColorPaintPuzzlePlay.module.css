@@ -1,0 +1,263 @@
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-md) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  display: grid;
+  /* ぬりえのSVGは1:1のアスペクト比を持つため、列を明示的に minmax(0, 1fr) にしないと
+     行の高さぶんの幅を要求して画面からはみ出す（横スクロールが出る）。 */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: var(--space-xs);
+  background: linear-gradient(150deg, #eaf7ff 0%, #fef9e7 55%, #fbeeff 100%);
+}
+
+.header {
+  min-height: var(--tap-target-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.title {
+  margin: 0;
+  color: #3b3b3b;
+  font-size: clamp(20px, 3.8vw, 28px);
+  line-height: 1.1;
+}
+
+.home {
+  flex: 0 0 auto;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: var(--space-xs) var(--space-sm);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: rgb(255 255 255 / 88%);
+  box-shadow: var(--shadow-sm);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.home:active {
+  transform: scale(0.95);
+  box-shadow: none;
+}
+
+.pictureGroup {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.pictureButton {
+  min-width: 64px;
+  min-height: 56px;
+  padding: 4px var(--space-sm);
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: rgb(255 255 255 / 82%);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+  cursor: pointer;
+}
+
+.pictureButton span:first-child {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.pictureButtonSelected {
+  border-color: var(--color-accent-dark);
+  color: var(--color-accent-dark);
+  background: #fff3e0;
+  box-shadow: inset 0 0 0 2px var(--color-accent), var(--shadow-sm);
+}
+
+.canvasArea {
+  min-width: 0;
+  /* 縦画面で操作列が詰まってもぬりえが潰れないための下限。 */
+  min-height: 180px;
+  display: flex;
+}
+
+.canvasCard {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+/* SVGは1:1のアスペクト比を持つため、通常フローに置くと「与えられた幅ぶんの高さ」を
+   要求してレイアウト（特に横画面）を押し広げてしまう。absoluteにしてカードの大きさに
+   一切寄与させず、カード側（＝グリッドの行と列）だけで大きさを決める。
+   絵はpreserveAspectRatio="xMidYMid meet"により、この枠の中で自動的に中央に収まる。 */
+.canvas {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  /* SVGは置換要素なので、width/heightをautoにするとinsetではなく固有アスペクト比で
+     大きさが決まってしまう（カードからはみ出して下の色パレットに重なる）。必ず実寸で指定する。 */
+  width: calc(100% - var(--space-sm) * 2);
+  height: calc(100% - var(--space-sm) * 2);
+  display: block;
+}
+
+/* 幼児が押しやすいよう、狭い縦画面では4+3の2段、広い画面では7色を1段に並べる。
+   auto-fitではなく列数を固定するのは、はんぱな折返し（6+1など）を避けるため。 */
+.paletteGroup {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-xs);
+  max-width: 560px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+@media (min-width: 560px) {
+  .paletteGroup {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+.swatch {
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  border: 3px solid rgb(0 0 0 / 10%);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  cursor: pointer;
+}
+
+.swatchSelected {
+  border: 4px solid #212529;
+  box-shadow: var(--shadow-md), 0 0 0 3px rgb(33 37 41 / 15%);
+  transform: scale(1.08);
+}
+
+.swatchCheck {
+  color: white;
+  font-size: 22px;
+  font-weight: 900;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
+}
+
+.resetButton {
+  justify-self: center;
+  margin-top: 2px;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-lg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: rgb(255 255 255 / 70%);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.resetButton:active {
+  transform: scale(0.97);
+}
+
+.home:focus-visible,
+.pictureButton:focus-visible,
+.swatch:focus-visible,
+.resetButton:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 横向きの低い画面(568x320級を含む)では、左に操作列(題材・色・やりなおし)、
+   右にぬりえ本体を横並びにする。縦に積むと主要操作が画面外へ隠れてしまうため。 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .page {
+    grid-template-columns: minmax(140px, 27%) minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    padding-block: calc(var(--space-xs) + var(--safe-top)) calc(var(--space-xs) + var(--safe-bottom));
+  }
+
+  .header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-height: 0;
+  }
+
+  .pictureGroup {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .pictureButton {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 48px;
+    font-size: 12px;
+  }
+
+  .canvasArea {
+    grid-column: 2;
+    grid-row: 2 / span 3;
+    min-height: 0;
+  }
+
+  /* 縦に積むと操作列が画面外へはみ出すため、色は3列・9マス相当に詰めて高さを抑える。 */
+  .paletteGroup {
+    grid-column: 1;
+    grid-row: 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: none;
+  }
+
+  .swatch {
+    min-height: 44px;
+  }
+
+  .resetButton {
+    grid-column: 1;
+    grid-row: 4;
+    align-self: start;
+    min-height: 40px;
+    padding-inline: var(--space-md);
+  }
+}
+
+/* 320px級の狭い縦画面では、操作まわりを少し詰めてぬりえの表示面積を稼ぐ。 */
+@media (max-width: 360px) {
+  .title {
+    font-size: 18px;
+  }
+
+  .pictureButton {
+    min-width: 56px;
+    min-height: 48px;
+    font-size: 12px;
+  }
+
+  .swatch {
+    min-height: 50px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swatch,
+  .home,
+  .resetButton {
+    transition: none;
+  }
+}
