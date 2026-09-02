@@ -132,6 +132,35 @@ describe('createCarModel（3Dモデル生成）', () => {
     model.dispose()
   })
 
+  test('スポーツカーの補間済み全断面が外殻として最後まで接続される', () => {
+    const model = createCarModel(DEFAULT_CAR_CONFIG)
+    const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull')
+    expect(hull).toBeInstanceOf(THREE.Mesh)
+
+    const geometry = (hull as THREE.Mesh).geometry
+    const position = geometry.getAttribute('position')
+    const index = geometry.getIndex()
+    expect(index).not.toBeNull()
+
+    // 末尾2頂点は前後端面の中心。最後のリングと、その直前のリングを
+    // つなぐ三角形が存在することを契約にして、断面補間時の分解表示を防ぐ。
+    const ringSize = 13
+    const lastRingStart = position.count - 2 - ringSize
+    const previousRingStart = lastRingStart - ringSize
+    let hasFinalRingJoin = false
+    for (let offset = 0; offset < (index?.count ?? 0); offset += 3) {
+      const triangle = [index!.getX(offset), index!.getX(offset + 1), index!.getX(offset + 2)]
+      const includesLastRing = triangle.some((vertex) => vertex >= lastRingStart && vertex < lastRingStart + ringSize)
+      const includesPreviousRing = triangle.some((vertex) => vertex >= previousRingStart && vertex < lastRingStart)
+      if (includesLastRing && includesPreviousRing) {
+        hasFinalRingJoin = true
+        break
+      }
+    }
+    expect(hasFinalRingJoin).toBe(true)
+    model.dispose()
+  })
+
   test('スポーツカーの全ボディGeometryは有限座標で、回転可能なMeshとして生成される', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     const body = layerOf(model.root, 'body')

@@ -144,7 +144,7 @@ function loftMesh(
 
   const ringSize = ringVertices[0]?.length ?? 0
   const indices: number[] = []
-  for (let sectionIndex = 0; sectionIndex < sections.length - 1; sectionIndex += 1) {
+  for (let sectionIndex = 0; sectionIndex < denseSections.length - 1; sectionIndex += 1) {
     const currentOffset = sectionIndex * ringSize
     const nextOffset = (sectionIndex + 1) * ringSize
     for (let vertexIndex = 0; vertexIndex < ringSize; vertexIndex += 1) {
