@@ -24,6 +24,8 @@ import styles from './KomaBattlePlay.module.css'
 
 type Phase = 'select' | 'battling' | 'finished'
 
+const KOMA_COUNT = 2
+
 const DEFEAT_LABEL: Record<KomaDefeatReason, string> = {
   toppled: 'たおれた',
   stopped: 'とまった',
@@ -39,7 +41,6 @@ function soloMessage(reason: KomaDefeatReason): string {
 
 export default function KomaBattlePlay() {
   const [phase, setPhase] = useState<Phase>('select')
-  const [komaCount, setKomaCount] = useState(2)
   const [fieldId, setFieldId] = useState<KomaFieldId>(DEFAULT_KOMA_FIELD_ID)
   // プレイヤー枠ごとに選ぶ。再戦ではこの値をそのまま使い、明示的な変更まで保持する。
   const [selectedTypes, setSelectedTypes] = useState<[KomaTypeId, KomaTypeId]>([
@@ -57,8 +58,8 @@ export default function KomaBattlePlay() {
   const [outcome, setOutcome] = useState<MatchOutcome | null>(null)
 
   const specs = useMemo(
-    () => komaSpecsForSelection(selectedTypes, komaCount, selectedColors),
-    [komaCount, selectedTypes, selectedColors],
+    () => komaSpecsForSelection(selectedTypes, KOMA_COUNT, selectedColors),
+    [selectedTypes, selectedColors],
   )
 
   const selectColor = useCallback((slotIndex: number, colorId: KomaColorId) => {
@@ -121,25 +122,6 @@ export default function KomaBattlePlay() {
                 )
               })}
             </div>
-            <h2 className={styles.overlayTitle}>コマを えらんでね</h2>
-            <div className={styles.countChoices}>
-              {[1, 2].map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  className={`${styles.countButton} ${
-                    komaCount === count ? styles.countButtonSelected : ''
-                  }`}
-                  aria-pressed={komaCount === count}
-                  onClick={() => setKomaCount(count)}
-                >
-                  <span className={styles.countEmoji} aria-hidden="true">
-                    {count === 1 ? '🌀' : '🌀🌀'}
-                  </span>
-                  {count === 1 ? '1こで まわす' : '2こで たいせん'}
-                </button>
-              ))}
-            </div>
             <div className={styles.typePickers}>
               {specs.map((spec, slotIndex) => (
                 <section
@@ -147,18 +129,24 @@ export default function KomaBattlePlay() {
                   className={styles.typePicker}
                   aria-labelledby={`${spec.slotId}-type-heading`}
                 >
-                  <h3 id={`${spec.slotId}-type-heading`} className={styles.typePickerTitle}>
+                  <div className={styles.typePickerHeader}>
+                    <h3 id={`${spec.slotId}-type-heading`} className={styles.typePickerTitle}>
+                      {spec.name}のタイプ
+                    </h3>
                     <button
                       type="button"
                       className={styles.colorPickerButton}
-                      style={{ background: spec.color }}
-                      aria-label={`${spec.name}の いろを えらぶ`}
+                      aria-label={`${spec.name}の いろを かえる`}
                       onClick={() => setColorPickerSlot(spec.slotId)}
                     >
-                      <span aria-hidden="true">🎨</span>
+                      <span
+                        className={styles.colorPickerSwatch}
+                        style={{ background: spec.color }}
+                        aria-hidden="true"
+                      />
+                      <span>いろを かえる</span>
                     </button>
-                    {spec.name}のタイプ
-                  </h3>
+                  </div>
                   <div className={styles.typeChoices}>
                     {KOMA_TYPE_CONFIGS.map((type) => {
                       const isSelected = selectedTypes[slotIndex] === type.id
@@ -212,7 +200,7 @@ export default function KomaBattlePlay() {
         <GamePlaySurface>
           <KomaBattleScene
             runId={runId}
-            komaCount={komaCount}
+            komaCount={KOMA_COUNT}
             specs={specs}
             fieldId={fieldId}
             outcome={outcome}
