@@ -6,11 +6,23 @@ const VIEW_BOX_MIN = -1
 const VIEW_BOX_MAX = 101
 
 describe('paintPictures', () => {
-  test('題材が3件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
-    expect(PAINT_PICTURES).toHaveLength(3)
+  test('題材が6件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
+    expect(PAINT_PICTURES).toHaveLength(6)
     const ids = PAINT_PICTURES.map((picture) => picture.id)
+    expect(ids).toEqual(['car', 'fish', 'butterfly', 'robot', 'rocket', 'dinosaur'])
     expect(new Set(ids).size).toBe(ids.length)
     expect(findPaintPicture(DEFAULT_PICTURE_ID)).toBeDefined()
+  })
+
+  test('題材えらびの表示（label・emoji）がすべて埋まっていて重複しない', () => {
+    const labels = PAINT_PICTURES.map((picture) => picture.label)
+    const emojis = PAINT_PICTURES.map((picture) => picture.emoji)
+    for (const picture of PAINT_PICTURES) {
+      expect(picture.label.length, `${picture.id}: label`).toBeGreaterThan(0)
+      expect(picture.emoji.length, `${picture.id}: emoji`).toBeGreaterThan(0)
+    }
+    expect(new Set(labels).size).toBe(labels.length)
+    expect(new Set(emojis).size).toBe(emojis.length)
   })
 
   test('viewBoxはすべて "0 0 100 100"', () => {
@@ -29,9 +41,10 @@ describe('paintPictures', () => {
     }
   })
 
-  test('各題材のareasが2件以上ある', () => {
+  test('各題材のareasが2件以上、かつ幼児が塗り切れる件数（10件以下）に収まる', () => {
     for (const picture of PAINT_PICTURES) {
       expect(picture.areas.length, `${picture.id}: areasの件数`).toBeGreaterThanOrEqual(2)
+      expect(picture.areas.length, `${picture.id}: areasの件数`).toBeLessThanOrEqual(10)
     }
   })
 
@@ -131,6 +144,18 @@ describe('paintPictures', () => {
       for (const area of backgrounds) {
         expect(area.motion?.group, `${picture.id}.${area.id}`).toBeUndefined()
       }
+    }
+  })
+
+  test('追加した3題材にも、それぞれ動くパーツ(motion.part)がある', () => {
+    for (const id of ['robot', 'rocket', 'dinosaur']) {
+      const picture = findPaintPicture(id)!
+      const parts = new Set(
+        [...picture.areas, ...picture.details]
+          .map((item) => item.motion?.part)
+          .filter((part): part is string => Boolean(part)),
+      )
+      expect(parts.size, `${id}: motion.partの種類`).toBeGreaterThan(0)
     }
   })
 

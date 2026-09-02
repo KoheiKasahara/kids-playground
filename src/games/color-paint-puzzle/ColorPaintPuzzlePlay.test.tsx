@@ -46,7 +46,7 @@ function finishButton() {
 }
 
 describe('ColorPaintPuzzlePlay', () => {
-  test('初期表示: タイトル・もどる・7色パレット・やりなおし・3つの題材ボタンが出る', () => {
+  test('初期表示: タイトル・もどる・色パレット・やりなおし・6つの題材ボタンが出る', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'いろぬりパズル' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
@@ -147,6 +147,117 @@ describe('ColorPaintPuzzlePlay', () => {
     bodyArea.focus()
     await user.keyboard('{Enter}')
     expect(getAreaButton('くるまの ボディ')).toHaveAttribute('fill', '#e8453c')
+  })
+})
+
+describe('ColorPaintPuzzlePlay: 追加した題材（ロボット・ロケット・きょうりゅう）', () => {
+  const ADDED_PICTURE_IDS = ['robot', 'rocket', 'dinosaur'] as const
+
+  test('題材えらびに6件すべてが並び、選ぶと選択がその1件だけに移る', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    expect(screen.getAllByRole('button', { pressed: true }).length).toBeGreaterThan(0)
+
+    for (const id of ADDED_PICTURE_IDS) {
+      const picture = findPaintPicture(id)!
+      await user.click(screen.getByRole('button', { name: picture.label }))
+      for (const option of PAINT_PICTURES) {
+        expect(
+          screen.getByRole('button', { name: option.label }),
+          `${id}選択中の ${option.id}`,
+        ).toHaveAttribute('aria-pressed', option.id === id ? 'true' : 'false')
+      }
+    }
+  })
+
+  test.each(ADDED_PICTURE_IDS)('%s: 全エリアがボタンとして出て、タップで塗れる', async (id) => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    const picture = findPaintPicture(id)!
+
+    await user.click(screen.getByRole('button', { name: picture.label }))
+    expect(screen.getByRole('img', { name: `${picture.label}の ぬりえ` })).toBeInTheDocument()
+
+    // エリア以外のボタン（もどる・題材6件・色・やりなおし・できた！）を除いた数が
+    // ちょうどエリア数と一致する＝塗れないエリアも、余分なボタンもない。
+    const nonAreaButtonCount = 1 + PAINT_PICTURES.length + PAINT_COLORS.length + 1 + 1
+    expect(screen.getAllByRole('button').length - nonAreaButtonCount).toBe(picture.areas.length)
+
+    for (const area of picture.areas) {
+      await user.click(getAreaButton(area.label))
+      expect(getAreaFill(container, area.id), `${id}.${area.id}`).toBe('#e8453c')
+    }
+  })
+
+  test.each(ADDED_PICTURE_IDS)('%s: 塗ってから他の題材へ行き、戻ると色が残っている', async (id) => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    const picture = findPaintPicture(id)!
+    const firstPaintable = picture.areas[picture.areas.length - 1]
+
+    await user.click(screen.getByRole('button', { name: picture.label }))
+    await user.click(screen.getByRole('button', { name: 'あお' }))
+    await user.click(getAreaButton(firstPaintable.label))
+    expect(getAreaFill(container, firstPaintable.id)).toBe('#1c7ed6')
+
+    await user.click(screen.getByRole('button', { name: 'くるま' }))
+    expect(container.querySelectorAll('svg')).toHaveLength(1)
+    // くるまの塗りは独立している（さっきの色が持ち込まれない）。
+    expect(getAreaFill(container, 'body')).toBe(UNPAINTED_FILL)
+
+    await user.click(screen.getByRole('button', { name: picture.label }))
+    expect(getAreaFill(container, firstPaintable.id)).toBe('#1c7ed6')
+  })
+
+  test.each(ADDED_PICTURE_IDS)('%s: 「できた！」→「もういちどぬる」が成立し、色も残る', async (id) => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    const picture = findPaintPicture(id)!
+    const target = picture.areas[picture.areas.length - 1]
+
+    await user.click(screen.getByRole('button', { name: picture.label }))
+    await user.click(getAreaButton(target.label))
+    await user.click(finishButton())
+
+    expect(screen.getByRole('status')).toHaveTextContent('できた！')
+    const canvas = screen.getByRole('img', { name: `${picture.label}の ぬりえ` })
+    expect(canvas).toHaveAttribute('data-phase', 'celebrating')
+    expect(getAreaFill(container, target.id)).toBe('#e8453c')
+
+    await user.click(screen.getByRole('button', { name: 'もういちどぬる' }))
+    expect(canvas).toHaveAttribute('data-phase', 'coloring')
+    expect(getAreaFill(container, target.id)).toBe('#e8453c')
+  })
+
+  test('演出中、追加した3題材にも本体グループと動くパーツのgがある', async () => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    const groupsAndParts: Record<string, readonly string[]> = {
+      robot: ['robotArmLeft', 'robotArmRight', 'robotAntenna'],
+      rocket: ['rocketFlame', 'rocketStars'],
+      dinosaur: ['dinoTail', 'dinoHead'],
+    }
+    const motionGroupByPicture: Record<string, string> = {
+      robot: 'robot',
+      rocket: 'rocket',
+      dinosaur: 'dino',
+    }
+
+    for (const id of ADDED_PICTURE_IDS) {
+      const picture = findPaintPicture(id)!
+      await user.click(screen.getByRole('button', { name: picture.label }))
+      await user.click(finishButton())
+
+      const group = container.querySelector(`[data-motion-group="${motionGroupByPicture[id]}"]`)
+      expect(group, `${id}: 本体グループ`).not.toBeNull()
+      // 背景は本体グループの外＝絵だけが動く。
+      expect(group!.contains(getAreaShape(container, 'sky'))).toBe(false)
+      for (const part of groupsAndParts[id]) {
+        expect(container.querySelector(`[data-motion-part="${part}"]`), `${id}: ${part}`).not.toBeNull()
+      }
+
+      await user.click(screen.getByRole('button', { name: 'もういちどぬる' }))
+    }
   })
 })
 

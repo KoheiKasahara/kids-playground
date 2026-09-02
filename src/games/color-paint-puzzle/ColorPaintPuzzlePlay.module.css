@@ -53,17 +53,30 @@
   box-shadow: none;
 }
 
+/* 題材が6件あるため、色パレットと同じく列数を固定する（auto-fitやflexの折返しだと
+   幅によって4+2などのはんぱな段になる）。狭い縦画面は3列×2段、620px以上は6列×1段。
+   6列へ切り替える幅を色パレット（560px）より広く取っているのは、いちばん長い
+   「きょうりゅう」が1行で収まる列幅（およそ96px）を確保するため。 */
 .pictureGroup {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-xs);
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+@media (min-width: 620px) {
+  .pictureGroup {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }
 
 .pictureButton {
-  min-width: 64px;
+  /* 列数を固定したグリッドなので、幅は列が決める（min-widthを残すと狭い画面ではみ出す）。 */
+  min-width: 0;
   min-height: 56px;
-  padding: 4px var(--space-sm);
+  padding: 4px var(--space-xs);
   display: grid;
   place-items: center;
   gap: 1px;
@@ -341,21 +354,24 @@
     min-height: 0;
   }
 
+  /* 6件を左の細い列（27%幅）に入れると1つ62px程度になり「きょうりゅう」が収まらない。
+     横画面では題材えらびだけ全幅の1段に出して、6件を1行に並べる。
+     ぬりえは1段ぶん低くなるが、左の操作列（色・やりなおし・できた！）の高さは変わらない。 */
   .pictureGroup {
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 2;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    max-width: none;
   }
 
   .pictureButton {
-    flex: 1 1 0;
-    min-width: 0;
     min-height: 48px;
     font-size: 12px;
   }
 
   .canvasArea {
     grid-column: 2;
-    grid-row: 2 / span 3;
+    grid-row: 3 / span 2;
     min-height: 0;
   }
 
@@ -414,8 +430,8 @@
   }
 
   .pictureButton {
-    min-width: 56px;
     min-height: 48px;
+    padding-inline: 2px;
     font-size: 12px;
   }
 
