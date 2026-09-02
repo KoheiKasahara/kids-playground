@@ -24,6 +24,8 @@ import {
   MAX_LINEAR_SPEED,
   PHYSICS_TIMESTEP,
   START_RADIUS,
+  START_ORBIT_SPEED,
+  START_INWARD_SPEED,
   START_SPIN_SPEED,
 } from './komaPhysics'
 import {
@@ -278,6 +280,38 @@ describe('createKomaBattleWorld', () => {
     world.world.free()
   })
 
+  it('開始直後から高速で移動・回転し、2秒後も勢いを保つ', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
+    const initialTravelSpeeds = world.komas.map((koma) => {
+      const velocity = koma.body.linvel()
+      return Math.hypot(velocity.x, velocity.z)
+    })
+
+    // 発射直後から「回っているだけ」にならず、外周を走り出すことを確認する。
+    expect(Math.min(...initialTravelSpeeds)).toBeGreaterThan(START_ORBIT_SPEED * 0.9)
+    expect(Math.min(...initialTravelSpeeds)).toBeGreaterThan(2.5)
+    expect(Math.max(...initialTravelSpeeds)).toBeLessThan(MAX_LINEAR_SPEED)
+    expect(START_INWARD_SPEED).toBeGreaterThan(0.15)
+    expect(Math.min(...world.komas.map((koma) => Math.abs(koma.body.angvel().y)))).toBeGreaterThan(80)
+
+    for (let step = 0; step < Math.round(2 / PHYSICS_TIMESTEP); step += 1) {
+      for (const koma of world.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
+      world.world.step()
+      for (const koma of world.komas) clampKomaMotion(koma)
+    }
+
+    const twoSecondSpeeds = world.komas.map((koma) => {
+      const velocity = koma.body.linvel()
+      return {
+        linear: Math.hypot(velocity.x, velocity.z),
+        angular: Math.abs(koma.body.angvel().y),
+      }
+    })
+    expect(Math.max(...twoSecondSpeeds.map((speed) => speed.linear))).toBeGreaterThan(0.8)
+    expect(Math.min(...twoSecondSpeeds.map((speed) => speed.angular))).toBeGreaterThan(60)
+    world.world.free()
+  })
+
   it('初速のばらつきを渡すと、その割合だけ自転速度が変わる', () => {
     const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2), {
       spinScales: [1.1, 0.9],
@@ -313,7 +347,9 @@ describe('createKomaBattleWorld', () => {
         ),
         6,
       )
-      expect(body.angvel().y).toBeCloseTo(START_SPIN_SPEED * type.initialSpinScale, 6)
+      // Rapier stores angular velocity as float32; the larger launch speed makes
+      // the rounding visible at the sixth decimal place for some type multipliers.
+      expect(body.angvel().y).toBeCloseTo(START_SPIN_SPEED * type.initialSpinScale, 5)
       world.world.free()
     }
   })
