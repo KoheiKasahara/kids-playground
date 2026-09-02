@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { DEFAULT_PICTURE_ID, MIN_TAP_SIZE_UNITS, PAINT_PICTURES, findPaintPicture, type PaintArea } from './paintPictures'
+import { DEFAULT_PICTURE_ID, MIN_TAP_SIZE_UNITS, PAINT_PICTURES, findPaintPicture } from './paintPictures'
 import { shapeBounds } from './shapeBounds'
 
 const VIEW_BOX_MIN = -1
@@ -81,9 +81,76 @@ describe('paintPictures', () => {
     }
   })
 
-  test('PaintAreaはshape/id/labelのみを持ち、details相当のプロパティ(fill/stroke)を持たない', () => {
-    const sampleArea: PaintArea = PAINT_PICTURES[0].areas[0]
-    expect(Object.keys(sampleArea).sort()).toEqual(['id', 'label', 'shape'])
+  test('PaintAreaはid/label/shape/motionのみを持ち、details相当のプロパティ(fill/stroke)を持たない', () => {
+    const allowedKeys = ['id', 'label', 'motion', 'shape']
+    for (const picture of PAINT_PICTURES) {
+      for (const area of picture.areas) {
+        for (const key of Object.keys(area)) {
+          expect(allowedKeys, `${picture.id}.${area.id}: "${key}"`).toContain(key)
+        }
+      }
+    }
+  })
+
+  // --- Phase 2: 完成演出のグループ指定 ---
+
+  test('各題材に、完成演出で動かす本体グループ(motion.group)がちょうど1つある', () => {
+    for (const picture of PAINT_PICTURES) {
+      const groups = new Set(
+        [...picture.areas, ...picture.details]
+          .map((item) => item.motion?.group)
+          .filter((group): group is string => Boolean(group)),
+      )
+      expect(groups.size, `${picture.id}: motion.groupの種類`).toBe(1)
+    }
+  })
+
+  test('題材をまたいでgroup名・part名が重複しない（CSSのdata属性セレクタが混ざらないため）', () => {
+    const seenGroups = new Map<string, string>()
+    const seenParts = new Map<string, string>()
+    for (const picture of PAINT_PICTURES) {
+      for (const item of [...picture.areas, ...picture.details]) {
+        const { group, part } = item.motion ?? {}
+        if (group) {
+          expect(seenGroups.get(group) ?? picture.id).toBe(picture.id)
+          seenGroups.set(group, picture.id)
+        }
+        if (part) {
+          expect(seenParts.get(part) ?? picture.id).toBe(picture.id)
+          seenParts.set(part, picture.id)
+        }
+      }
+    }
+  })
+
+  test('背景（そら・みず・じめん）は本体グループに入っていない（絵だけが動く）', () => {
+    const backgroundAreaIds = new Set(['sky', 'water', 'ground'])
+    for (const picture of PAINT_PICTURES) {
+      const backgrounds = picture.areas.filter((area) => backgroundAreaIds.has(area.id))
+      expect(backgrounds.length, `${picture.id}: 背景エリア`).toBeGreaterThan(0)
+      for (const area of backgrounds) {
+        expect(area.motion?.group, `${picture.id}.${area.id}`).toBeUndefined()
+      }
+    }
+  })
+
+  test('くるまの左右のタイヤは別のpartになっている（同じpartだと車体の真ん中を軸に回ってしまう）', () => {
+    const car = findPaintPicture('car')!
+    const back = car.areas.find((area) => area.id === 'wheelBack')!
+    const front = car.areas.find((area) => area.id === 'wheelFront')!
+    expect(back.motion?.part).toBeDefined()
+    expect(front.motion?.part).toBeDefined()
+    expect(back.motion?.part).not.toBe(front.motion?.part)
+  })
+
+  test('くるまの各タイヤに、回転が見えるスポークの装飾がある', () => {
+    const car = findPaintPicture('car')!
+    for (const part of ['wheelBack', 'wheelFront']) {
+      const spokes = car.details.filter(
+        (detail) => detail.motion?.part === part && detail.shape.kind === 'path',
+      )
+      expect(spokes.length, `${part}: スポーク`).toBeGreaterThan(0)
+    }
   })
 
   test('detailsはareasと独立した配列で、塗り対象(areas)には含まれない', () => {

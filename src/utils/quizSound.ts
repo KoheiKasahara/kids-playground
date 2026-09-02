@@ -912,6 +912,40 @@ export function playCarGoalSound(): void {
   }
 }
 
+/**
+ * いろぬりパズルで「できた！」を押したときの完成音。
+ * ぬった絵が動き出す合図として、短く上へ駆け上がる4音＋キラッとした高音を鳴らす。
+ * 連打で音が重なって割れないよう、既存の効果音と同じく最小間隔を設けている。
+ */
+const COLOR_PAINT_FINISH_SOUND_MIN_INTERVAL_MS = 400
+let lastColorPaintFinishSoundAt: number | null = null
+
+export function playColorPaintFinishSound(): void {
+  if (!soundEnabled) return
+
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const wallClockNow = Date.now()
+    if (
+      lastColorPaintFinishSoundAt !== null
+      && wallClockNow - lastColorPaintFinishSoundAt < COLOR_PAINT_FINISH_SOUND_MIN_INTERVAL_MS
+    ) return
+    lastColorPaintFinishSoundAt = wallClockNow
+
+    const now = ctx.currentTime
+    // ド・ミ・ソ・ド（上）の分散和音。
+    playTone(ctx, 523.25, now, 0.14, 0.1, 'triangle')
+    playTone(ctx, 659.25, now + 0.06, 0.14, 0.1, 'triangle')
+    playTone(ctx, 783.99, now + 0.12, 0.16, 0.1, 'triangle')
+    playTone(ctx, 1046.5, now + 0.18, 0.32, 0.11, 'sine')
+    // 最後にキラッと高い音を重ねる（画面のキラキラと合わせる）。
+    playTone(ctx, 1567.98, now + 0.24, 0.26, 0.06, 'sine')
+  } catch {
+    // 音を出せない環境でも、完成演出はそのまま続ける。
+  }
+}
+
 export type RailTrainSoundStatus =
   | 'ready'
   | 'running'

@@ -27,6 +27,12 @@
   line-height: 1.1;
 }
 
+/* 完成演出中はタイトルを一歩引かせて、絵を主役にする。 */
+.titleQuiet {
+  opacity: 0.55;
+  transition: opacity 240ms ease;
+}
+
 .home {
   flex: 0 0 auto;
   min-width: var(--tap-target-min);
@@ -157,11 +163,19 @@
   text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
 }
 
-.resetButton {
-  justify-self: center;
+.actionRow {
   margin-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.resetButton {
+  flex: 0 0 auto;
   min-height: 44px;
-  padding: var(--space-xs) var(--space-lg);
+  padding: var(--space-xs) var(--space-md);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
@@ -175,12 +189,141 @@
   transform: scale(0.97);
 }
 
+/* 「できた！」は主操作。色パレット（平らな色のマスに✓）とは形も質感もはっきり変え、
+   幼児がひと目で「これを押す」と分かる大きさ・明るさにしている。
+   塗り残しは一切見ないので、いつでも押せる。 */
+.finishButton {
+  flex: 1 1 200px;
+  max-width: 320px;
+  min-height: 68px;
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff922b 0%, #f76707 55%, #f06595 100%);
+  box-shadow: 0 4px 0 #d9480f, var(--shadow-md);
+  font-size: clamp(20px, 5.2vw, 26px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 22%);
+  cursor: pointer;
+}
+
+.finishButton:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #d9480f;
+}
+
+/* 完成演出中の導線。塗った色はそのまま残して編集へ戻る。 */
+.againButton {
+  flex: 1 1 200px;
+  max-width: 320px;
+  min-height: 64px;
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #4dabf7 0%, #1c7ed6 100%);
+  box-shadow: 0 4px 0 #1864ab, var(--shadow-md);
+  font-size: clamp(18px, 4.6vw, 23px);
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 22%);
+  cursor: pointer;
+}
+
+.againButton:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #1864ab;
+}
+
+.finishMessage {
+  flex: 1 1 100%;
+  margin: 0;
+  color: #d9480f;
+  font-size: clamp(19px, 4.8vw, 24px);
+  font-weight: 900;
+  text-align: center;
+}
+
 .home:focus-visible,
 .pictureButton:focus-visible,
 .swatch:focus-visible,
-.resetButton:focus-visible {
+.resetButton:focus-visible,
+.finishButton:focus-visible,
+.againButton:focus-visible {
   outline: 4px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/* ===== 完成演出 =====
+   別ページへは遷移せず、同じ画面のまま「絵だけの画面」に切り替える。
+   ぬりえ本体（SVGと塗り状態）は同じものを使い続けるので、塗った色は必ずそのまま残る。
+   .page より詳細度を高くしているため、下の横画面用メディアクエリより優先される。 */
+.page.pageCelebrating {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* カードは枠いっぱいのまま（絵は1:1でその中央に自動で収まる）。カードを正方形に
+   詰めると、縦長・横長のどちらかで高さの解決が崩れて絵が枠からはみ出すため、
+   ここは大きさをグリッド／フレックスの枠だけで決める Phase 1 の方針を踏襲する。 */
+.page.pageCelebrating .canvasArea {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.canvasCardCelebrating {
+  background: linear-gradient(160deg, #fffdf7 0%, #fff7e6 100%);
+  box-shadow: var(--shadow-md), 0 0 0 4px rgb(255 212 59 / 55%), 0 0 26px rgb(255 169 77 / 45%);
+  animation: cardPop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 「できた！」を押した瞬間の、絵ぜんたいがポンッと弾む手ごたえ。 */
+@keyframes cardPop {
+  0% {
+    transform: scale(1);
+  }
+
+  45% {
+    transform: scale(1.045);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* キラキラは1回だけ弾けて消える（fill-mode: forwards で opacity 0 のまま残す）。 */
+.sparkle {
+  position: absolute;
+  line-height: 1;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: sparklePop 900ms ease-out forwards;
+}
+
+@keyframes sparklePop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2) rotate(-40deg);
+  }
+
+  35% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.25) rotate(10deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85) rotate(30deg);
+  }
 }
 
 /* 横向きの低い画面(568x320級を含む)では、左に操作列(題材・色・やりなおし)、
@@ -228,12 +371,39 @@
     min-height: 44px;
   }
 
-  .resetButton {
+  .actionRow {
     grid-column: 1;
     grid-row: 4;
     align-self: start;
+  }
+
+  .resetButton {
     min-height: 40px;
-    padding-inline: var(--space-md);
+    padding-inline: var(--space-sm);
+    font-size: 13px;
+  }
+
+  .finishButton {
+    flex: 1 1 100%;
+    min-height: 52px;
+    font-size: 19px;
+  }
+
+  /* 低い横画面では、完成メッセージを改行させず「もういちどぬる」と1行に並べて
+     高さを節約する（縦に積むと絵の高さが足りなくなる）。 */
+  .page.pageCelebrating .finishMessage {
+    flex: 0 1 auto;
+    font-size: 17px;
+  }
+
+  .page.pageCelebrating .againButton {
+    flex: 0 1 220px;
+    min-height: 48px;
+    font-size: 17px;
+  }
+
+  .page.pageCelebrating .header {
+    min-height: 0;
   }
 }
 
@@ -252,6 +422,22 @@
   .swatch {
     min-height: 50px;
   }
+
+  /* 折り返すと操作の行だけで2段ぶんの高さを食い、ぬりえが目に見えて小さくなる。
+     狭い縦画面では「やりなおし」を詰めて、必ず1行に収める。 */
+  .actionRow {
+    flex-wrap: nowrap;
+  }
+
+  .resetButton {
+    padding-inline: var(--space-sm);
+    font-size: 13px;
+  }
+
+  .finishButton {
+    flex: 1 1 auto;
+    min-height: 64px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -259,5 +445,32 @@
   .home,
   .resetButton {
     transition: none;
+  }
+
+  .titleQuiet {
+    transition: none;
+  }
+
+  /* 弾む・回るのはやめて、出たことだけが分かるようにする。 */
+  .canvasCardCelebrating {
+    animation: none;
+  }
+
+  .sparkle {
+    animation: sparkleFadeOnly 900ms ease-out forwards;
+  }
+
+  @keyframes sparkleFadeOnly {
+    0% {
+      opacity: 0;
+    }
+
+    35% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0;
+    }
   }
 }
