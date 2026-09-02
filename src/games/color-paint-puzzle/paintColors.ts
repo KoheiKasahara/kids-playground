@@ -2,7 +2,15 @@
 // 色はcolorId（例: 'red'）で状態に保持し、hexは表示直前にfindPaintColorで引く
 // （Phase 2で「塗った色のまま絵を動かす」ような再利用をしやすくするため）。
 
-export type PaintColorId = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink'
+export type PaintColorId =
+  | 'red'
+  | 'orange'
+  | 'yellow'
+  | 'green'
+  | 'blue'
+  | 'purple'
+  | 'pink'
+  | 'brown'
 
 export type PaintColor = {
   id: PaintColorId
@@ -18,6 +26,7 @@ export const PAINT_COLORS: readonly PaintColor[] = [
   { id: 'blue', label: 'あお', hex: '#1c7ed6' },
   { id: 'purple', label: 'むらさき', hex: '#9c36b5' },
   { id: 'pink', label: 'ピンク', hex: '#f06595' },
+  { id: 'brown', label: 'ちゃいろ', hex: '#8b5a2b' },
 ]
 
 export const DEFAULT_PAINT_COLOR_ID: PaintColorId = 'red'

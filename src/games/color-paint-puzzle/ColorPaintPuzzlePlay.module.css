@@ -121,7 +121,7 @@
   display: block;
 }
 
-/* 幼児が押しやすいよう、狭い縦画面では4+3の2段、広い画面では7色を1段に並べる。
+/* 幼児が押しやすいよう、狭い縦画面では4+4の2段、広い画面では8色を1段に並べる。
    auto-fitではなく列数を固定するのは、はんぱな折返し（6+1など）を避けるため。 */
 .paletteGroup {
   display: grid;
@@ -134,7 +134,7 @@
 
 @media (min-width: 560px) {
   .paletteGroup {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(8, minmax(0, 1fr));
   }
 }
 
