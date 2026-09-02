@@ -1,6 +1,15 @@
+.canvas {
+  display: block;
+}
+
 .area {
   cursor: pointer;
   transition: fill 120ms ease;
+}
+
+/* 完成演出中の塗りレイヤー。タップも入力も受け付けない（絵を見る時間にする）。 */
+.areaLocked {
+  pointer-events: none;
 }
 
 .area:focus-visible {
@@ -8,8 +17,315 @@
   outline-offset: 2px;
 }
 
+/* ===== 完成演出 =========================================================
+   すべて data 属性（ColoringCanvas が題材データの motion から出力する
+   <g data-motion-group> / <g data-motion-part>）に対して当てる。
+   塗りの fill には一切触れないので、ユーザーが塗った色はそのまま動く。
+
+   動かすのは transform / opacity だけ（GPUで合成でき、スマホでも軽い）。
+   座標はすべて viewBox の 0〜100 単位なので、px 指定はそのまま「単位」を意味する。
+
+   回転・拡大の中心:
+   - 題材ぜんたい(group)は transform-box: view-box ＋ 50% 50% ＝ viewBox の中心(50,50)。
+   - パーツ(part)は既定で transform-box: fill-box、つまりその図形自身の中心。
+     ここを view-box にすると、拡大縮小が絵の中心へ向かってしまい、
+     タイヤやあわがその場ではなく斜めにずれて動いてしまう。
+     絵の中心を軸にしたいパーツ（ちょうちょの羽）だけ個別に view-box へ戻す。
+   ===================================================================== */
+
+.canvas [data-motion-group] {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+
+.canvas [data-motion-part] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group] {
+  will-change: transform;
+}
+
+/* --- くるま: タイヤが回りながら、道を少し走って戻ってくる --- */
+
+/* くるまだけは拡大の中心を絵の中心ではなく「タイヤの接地面(y=84)」に置く。
+   中心(50,50)で縮めるとタイヤが持ち上がり、地面から浮いて走って見えてしまう。 */
+.canvas [data-motion-group='car'] {
+  transform-origin: 50% 84%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='car'] {
+  animation: carEnter 480ms ease-out both, carDrive 3.4s 480ms ease-in-out infinite;
+}
+
+/* 走る余白を作るために、演出の入りで一度ポンッと大きくしてから少しだけ小さく収める。
+   carDrive の 0% が carEnter の 100% と同じ scale(0.8) なので、繋ぎ目で跳ねない。 */
+@keyframes carEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(0.8);
+  }
+}
+
+@keyframes carDrive {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.8);
+  }
+
+  /* いったん少し下がって鼻先を上げる（走り出す前の「ため」）。 */
+  7% {
+    transform: translate(-5px, 0) rotate(-1.6deg) scale(0.8);
+  }
+
+  34% {
+    transform: translate(7px, -1px) rotate(1.4deg) scale(0.8);
+  }
+
+  48% {
+    transform: translate(13px, 0) rotate(0deg) scale(0.8);
+  }
+
+  /* 右端でちょこんと跳ねる。 */
+  53% {
+    transform: translate(13px, -2px) rotate(0deg) scale(0.8);
+  }
+
+  58% {
+    transform: translate(13px, 0) rotate(0deg) scale(0.8);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.8);
+  }
+}
+
+/* タイヤはスポーク付きなので回転が見える。carDrive と同じ 3.4s / 同じ遅延にして、
+   進行方向と回転方向を合わせている（右へ進む区間は前回り、戻る区間は逆回り）。
+   100% の 720deg は 0deg と同じ見た目なので、ループの継ぎ目が飛ばない。 */
+.canvas[data-phase='celebrating'] [data-motion-part^='wheel'] {
+  animation: carWheel 3.4s 480ms linear infinite;
+}
+
+@keyframes carWheel {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  7% {
+    transform: rotate(-30deg);
+  }
+
+  48% {
+    transform: rotate(1080deg);
+  }
+
+  58% {
+    transform: rotate(1080deg);
+  }
+
+  100% {
+    transform: rotate(720deg);
+  }
+}
+
+/* --- さかな: おびれ・はらびれを振りながら、ゆらゆら泳ぐ。あわは上へのぼる --- */
+
+.canvas[data-phase='celebrating'] [data-motion-group='fish'] {
+  animation: fishEnter 480ms ease-out both, fishSwim 4s 480ms ease-in-out infinite;
+}
+
+@keyframes fishEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.82);
+  }
+}
+
+@keyframes fishSwim {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+
+  25% {
+    transform: translate(-9px, -4px) rotate(-3deg) scale(0.82);
+  }
+
+  50% {
+    transform: translate(0, -6px) rotate(0deg) scale(0.82);
+  }
+
+  75% {
+    transform: translate(9px, -2px) rotate(3deg) scale(0.82);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+}
+
+/* おびれは付け根（からだ側の左端）を軸に振る。 */
+.canvas[data-phase='celebrating'] [data-motion-part='fishTail'] {
+  transform-origin: left center;
+  animation: finWag 420ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes finWag {
+  from {
+    transform: rotate(-13deg);
+  }
+
+  to {
+    transform: rotate(13deg);
+  }
+}
+
+/* はらびれは付け根（からだ側の上端）を軸に、おびれより控えめに揺らす。 */
+.canvas[data-phase='celebrating'] [data-motion-part='fishBellyFin'] {
+  transform-origin: center top;
+  animation: finWagSmall 600ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes finWagSmall {
+  from {
+    transform: rotate(-8deg);
+  }
+
+  to {
+    transform: rotate(8deg);
+  }
+}
+
+/* あわは魚と一緒に泳がず、その場でゆっくり上へのぼって消える。 */
+.canvas[data-phase='celebrating'] [data-motion-part='bubbleBig'] {
+  animation: bubbleRise 2.6s 480ms ease-in-out infinite;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='bubbleSmall'] {
+  animation: bubbleRise 2s 900ms ease-in-out infinite;
+}
+
+@keyframes bubbleRise {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.85);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-13px) scale(1.05);
+  }
+}
+
+/* --- ちょうちょ: 羽をぱたぱたさせながら、ふわふわ飛ぶ --- */
+
+.canvas[data-phase='celebrating'] [data-motion-group='butterfly'] {
+  animation: butterflyEnter 480ms ease-out both, butterflyFly 4.2s 480ms ease-in-out infinite;
+}
+
+@keyframes butterflyEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(0.8);
+  }
+}
+
+@keyframes butterflyFly {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.8);
+  }
+
+  20% {
+    transform: translate(-11px, -7px) rotate(-5deg) scale(0.8);
+  }
+
+  45% {
+    transform: translate(-3px, -13px) rotate(2deg) scale(0.8);
+  }
+
+  65% {
+    transform: translate(10px, -6px) rotate(5deg) scale(0.8);
+  }
+
+  85% {
+    transform: translate(5px, 4px) rotate(-2deg) scale(0.8);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.8);
+  }
+}
+
+/* 左右の羽は、からだの軸（viewBoxの中心 x=50）に向かって畳む＝羽ばたきに見える。
+   羽だけは自分の中心ではなく絵の中心を軸にしたいので view-box に戻す。 */
+.canvas[data-phase='celebrating'] [data-motion-part='wingLeft'],
+.canvas[data-phase='celebrating'] [data-motion-part='wingRight'] {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: wingFlap 340ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes wingFlap {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0.42);
+  }
+}
+
+/* 動きを減らす設定のときは、走る・泳ぐ・羽ばたくを止めて、
+   「できた」ことが分かる程度のゆっくりした呼吸だけ残す。 */
 @media (prefers-reduced-motion: reduce) {
   .area {
     transition: none;
+  }
+
+  .canvas[data-phase='celebrating'] [data-motion-part] {
+    animation: none;
+  }
+
+  .canvas[data-phase='celebrating'] [data-motion-group] {
+    animation: calmBreath 2.4s ease-in-out infinite alternate;
+  }
+
+  @keyframes calmBreath {
+    from {
+      transform: scale(1);
+    }
+
+    to {
+      transform: scale(1.05);
+    }
   }
 }
