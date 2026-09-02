@@ -179,10 +179,17 @@
 }
 
 .fieldChoices {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
   gap: var(--space-sm);
   width: min(760px, 100%);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .fieldButton {
@@ -516,15 +523,13 @@
   }
 
   .fieldChoices {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-xs);
-    min-width: 0;
-    padding: 2px 0;
-    overflow: visible;
+    padding: 2px 0 8px;
   }
   .fieldButton {
-    width: 100%;
+    flex: 0 0 31.5%;
+    width: auto;
+    min-width: 0;
     min-height: 116px;
     padding: var(--space-sm);
   }
