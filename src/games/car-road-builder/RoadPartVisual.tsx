@@ -42,7 +42,7 @@ export default function RoadPartVisual({ part }: RoadPartVisualProps) {
             : pathSpecs.map((spec, index) => <path key={index} d={pathSpecToSvgPath(spec)} />)}
           {part.kind === 'goal' && (
             <>
-              <g className={styles.goalGate} data-testid="goal-gate" transform={`rotate(${part.rotationStep * 45})`}>
+              <g className={styles.goalGate} data-testid="goal-gate" transform={`rotate(${part.rotationStep * 45} 0 0)`}>
                 {/* The lane remains visible from the one connected edge to the centre. */}
                 <rect className={styles.goalPillarShadow} x="-.4" y="-.31" width=".1" height=".57" rx=".03" />
                 <rect className={styles.goalPillarShadow} x=".3" y="-.31" width=".1" height=".57" rx=".03" />
