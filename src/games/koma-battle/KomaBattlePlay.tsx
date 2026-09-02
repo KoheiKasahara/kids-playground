@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { playKomaBattleStartSound, primeAudio } from '../../utils/quizSound'
 import {
+  KOMA_COLOR_CONFIGS,
   KOMA_TYPE_CONFIGS,
   komaSpecsForSelection,
+  type KomaColorId,
+  type KomaPlayerSlotId,
   type KomaSpec,
   type KomaTypeId,
 } from './komaSpecs'
@@ -43,13 +46,34 @@ export default function KomaBattlePlay() {
     'balance',
     'balance',
   ])
+  // 色も枠ごとに選ぶ。今までどおり1P=あか/2P=あおから始まる。
+  const [selectedColors, setSelectedColors] = useState<[KomaColorId, KomaColorId]>([
+    'red',
+    'blue',
+  ])
+  // 色選択ボタンで開いたモーダルがどちらの枠向けか。常時は表示しない。
+  const [colorPickerSlot, setColorPickerSlot] = useState<KomaPlayerSlotId | null>(null)
   const [runId, setRunId] = useState(0)
   const [outcome, setOutcome] = useState<MatchOutcome | null>(null)
 
   const specs = useMemo(
-    () => komaSpecsForSelection(selectedTypes, komaCount),
-    [komaCount, selectedTypes],
+    () => komaSpecsForSelection(selectedTypes, komaCount, selectedColors),
+    [komaCount, selectedTypes, selectedColors],
   )
+
+  const selectColor = useCallback((slotIndex: number, colorId: KomaColorId) => {
+    setSelectedColors((current) => {
+      const otherIndex = slotIndex === 0 ? 1 : 0
+      const next: [KomaColorId, KomaColorId] = [...current]
+      if (next[otherIndex] === colorId) {
+        // 相手と同じ色を選んだら、いま自分が使っていた色を相手へ譲って重ならないようにする。
+        next[otherIndex] = current[slotIndex]
+      }
+      next[slotIndex] = colorId
+      return next
+    })
+    setColorPickerSlot(null)
+  }, [])
 
   const startBattle = useCallback(() => {
     // iOSでも「まわせ！」の直後からSEを鳴らせるよう、操作イベント中に準備する。
@@ -124,11 +148,15 @@ export default function KomaBattlePlay() {
                   aria-labelledby={`${spec.slotId}-type-heading`}
                 >
                   <h3 id={`${spec.slotId}-type-heading`} className={styles.typePickerTitle}>
-                    <span
-                      className={styles.playerBadge}
+                    <button
+                      type="button"
+                      className={styles.colorPickerButton}
                       style={{ background: spec.color }}
-                      aria-hidden="true"
-                    />
+                      aria-label={`${spec.name}の いろを えらぶ`}
+                      onClick={() => setColorPickerSlot(spec.slotId)}
+                    >
+                      <span aria-hidden="true">🎨</span>
+                    </button>
                     {spec.name}のタイプ
                   </h3>
                   <div className={styles.typeChoices}>
@@ -171,6 +199,14 @@ export default function KomaBattlePlay() {
               まわせ！
             </button>
           </div>
+          {colorPickerSlot !== null ? (
+            <ColorPickerModal
+              slotName={specs.find((spec) => spec.slotId === colorPickerSlot)?.name ?? ''}
+              currentColorId={selectedColors[colorPickerSlot === 'player1' ? 0 : 1]}
+              onSelect={(colorId) => selectColor(colorPickerSlot === 'player1' ? 0 : 1, colorId)}
+              onClose={() => setColorPickerSlot(null)}
+            />
+          ) : null}
         </div>
       ) : (
         <GamePlaySurface>
@@ -273,6 +309,52 @@ function KomaBattleScene({
           </div>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * 色えらびボタンを押したときだけ出す、小さな色選択モーダル。
+ * 常に全色を並べず、必要なときだけ画面に重ねるので選択画面は一画面に収まる。
+ */
+function ColorPickerModal({
+  slotName,
+  currentColorId,
+  onSelect,
+  onClose,
+}: {
+  slotName: string
+  currentColorId: KomaColorId
+  onSelect: (colorId: KomaColorId) => void
+  onClose: () => void
+}) {
+  return (
+    <div className={styles.colorModalBackdrop} onClick={onClose}>
+      <div
+        className={styles.colorModal}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${slotName}の いろを えらぶ`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 className={styles.colorModalTitle}>{slotName}の いろ</h2>
+        <div className={styles.colorSwatches}>
+          {KOMA_COLOR_CONFIGS.map((color) => (
+            <button
+              key={color.id}
+              type="button"
+              className={styles.colorSwatchButton}
+              style={{ background: color.color }}
+              aria-label={color.name}
+              aria-pressed={currentColorId === color.id}
+              onClick={() => onSelect(color.id)}
+            />
+          ))}
+        </div>
+        <button type="button" className={styles.backLink} onClick={onClose}>
+          とじる
+        </button>
+      </div>
     </div>
   )
 }

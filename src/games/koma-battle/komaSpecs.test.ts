@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   findKomaSpec,
+  KOMA_COLOR_CONFIGS,
   KOMA_SPECS,
   KOMA_TYPE_CONFIGS,
   komaSpecsForCount,
@@ -80,6 +81,38 @@ describe('KOMA_TYPE_CONFIGS', () => {
 
   it('未知のタイプは安全な基準タイプへ戻る', () => {
     expect(komaSpecsForSelection(['unknown'], 1)[0]!.typeId).toBe('balance')
+  })
+})
+
+describe('KOMA_COLOR_CONFIGS', () => {
+  it('色がすべて一意で、ベースカラーとして使える形式を持つ', () => {
+    const ids = KOMA_COLOR_CONFIGS.map((color) => color.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const color of KOMA_COLOR_CONFIGS) {
+      expect(color.name).not.toBe('')
+      expect(color.color).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(color.colorDark).toMatch(/^#[0-9a-f]{6}$/i)
+    }
+  })
+
+  it('選んだ色をプレイヤー枠へ割り当てる', () => {
+    const selected = komaSpecsForSelection(['balance', 'balance'], 2, ['green', 'yellow'])
+    expect(selected.map((spec) => spec.colorId)).toEqual(['green', 'yellow'])
+    expect(selected.map((spec) => spec.color)).toEqual(
+      selected.map(
+        (spec) => KOMA_COLOR_CONFIGS.find((color) => color.id === spec.colorId)!.color,
+      ),
+    )
+    expect(selected.map((spec) => spec.name)).toEqual(['みどりコマ', 'きいろコマ'])
+  })
+
+  it('色を選ばない場合はこれまでどおり あか/あお になる', () => {
+    const selected = komaSpecsForSelection(['balance', 'balance'], 2)
+    expect(selected.map((spec) => spec.colorId)).toEqual(['red', 'blue'])
+  })
+
+  it('未知の色は安全な既定色へ戻る', () => {
+    expect(komaSpecsForSelection(['balance'], 1, ['unknown'])[0]!.colorId).toBe('red')
   })
 })
 

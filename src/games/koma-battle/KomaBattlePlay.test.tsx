@@ -350,4 +350,51 @@ describe('KomaBattlePlay', () => {
     renderGame()
     expect(screen.getByRole('link', { name: 'もどる' })).toHaveAttribute('href', '/')
   })
+
+  it('色えらびボタンを押すまで色の一覧は出ない', () => {
+    renderGame()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'みどり' })).not.toBeInTheDocument()
+  })
+
+  it('色えらびボタンで色を選ぶと、名前つきボタンとエンジンへ渡す色が変わる', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: /2こで たいせん/ }))
+
+    await user.click(screen.getByRole('button', { name: 'あかコマの いろを えらぶ' }))
+    expect(screen.getByRole('dialog', { name: 'あかコマの いろを えらぶ' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'みどり' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'みどりコマの いろを えらぶ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'みどりコマ バランス' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'あおコマの いろを えらぶ' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+    expect(engineMock.options?.specs.map((spec) => spec.colorId)).toEqual(['green', 'blue'])
+  })
+
+  it('相手が使っている色を選ぶと、相手の色と入れ替わる', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: /2こで たいせん/ }))
+
+    await user.click(screen.getByRole('button', { name: 'あかコマの いろを えらぶ' }))
+    await user.click(screen.getByRole('button', { name: 'あお' }))
+
+    // 元1P(あか)は「あお」を得て、元2Pは1Pが手放した「あか」へ入れ替わる。
+    expect(screen.getByRole('button', { name: 'あおコマの いろを えらぶ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'あかコマの いろを えらぶ' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+    expect(engineMock.options?.specs.map((spec) => spec.colorId)).toEqual(['blue', 'red'])
+  })
+
+  it('色を閉じるボタンで一覧を閉じられる', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'あかコマの いろを えらぶ' }))
+    await user.click(screen.getByRole('button', { name: 'とじる' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })

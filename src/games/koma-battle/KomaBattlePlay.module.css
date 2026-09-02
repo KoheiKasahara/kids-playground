@@ -307,11 +307,69 @@
   font-weight: 900;
 }
 
-.playerBadge {
-  width: 15px;
-  height: 15px;
+/* コマ選択画面の見出しに置く、いろ選択の起動ボタン。 */
+.colorPickerButton {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border: 2px solid color-mix(in srgb, #000 22%, transparent);
   border-radius: 50%;
+  background: var(--color-surface);
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* 押したときだけ全色を見せるモーダル。選択画面自体には常設しない。 */
+.colorModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  background: color-mix(in srgb, #000 45%, transparent);
+}
+
+.colorModal {
+  display: flex;
+  width: min(320px, 100%);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+}
+
+.colorModalTitle {
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(16px, 4.5vw, 20px);
+  font-weight: 900;
+}
+
+.colorSwatches {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.colorSwatchButton {
+  width: 54px;
+  height: 54px;
+  border: 3px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.colorSwatchButton[aria-pressed='true'] {
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .typeChoices {
@@ -538,6 +596,7 @@
   .typePickers { grid-template-columns: 1fr; }
   .typePicker { padding: 6px; }
   .typePickerTitle { margin-bottom: 4px; font-size: clamp(13px, 3.4vw, 16px); }
+  .colorSwatchButton { width: 46px; height: 46px; }
   .typeChoices { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
   .typeButton {
     min-height: 68px;
