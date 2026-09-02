@@ -245,13 +245,17 @@ describe('createCarModel（3Dモデル生成）', () => {
     const body = layerOf(model.root, 'body')
     const windshield = body.getObjectByName('car-sports-windshield')
     expect(windshield).toBeInstanceOf(THREE.Mesh)
-    expect((windshield as THREE.Mesh).geometry.getAttribute('position').count).toBe(9)
+    // フロントガラスは4列×5列の浅い曲面として生成する。
+    expect((windshield as THREE.Mesh).geometry.getAttribute('position').count).toBe(20)
     expect((windshield as THREE.Mesh).material).toBeInstanceOf(THREE.MeshPhysicalMaterial)
 
     const left = body.getObjectByName('car-sports-side-window-front-left')
     const right = body.getObjectByName('car-sports-side-window-front-right')
     expect(left).toBeInstanceOf(THREE.Mesh)
     expect(right).toBeInstanceOf(THREE.Mesh)
+    // サイドガラスも4列×3列の曲面として生成し、三角形の板へ退行させない。
+    expect((left as THREE.Mesh).geometry.getAttribute('position').count).toBe(12)
+    expect((right as THREE.Mesh).geometry.getAttribute('position').count).toBe(12)
 
     const leftBounds = boundsOf(left!)
     const rightBounds = boundsOf(right!)
