@@ -48,7 +48,7 @@ function finishButton() {
 describe('ColorPaintPuzzlePlay', () => {
   test('初期表示: タイトル・もどる・色パレット・やりなおし・6つの題材ボタンが出る', () => {
     renderPlay()
-    expect(screen.getByRole('heading', { name: 'いろぬりパズル' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'うごくぬりえ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'やりなおし' })).toBeInTheDocument()
     for (const color of PAINT_COLORS) {

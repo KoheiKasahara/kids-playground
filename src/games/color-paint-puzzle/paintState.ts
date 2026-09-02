@@ -1,4 +1,4 @@
-// いろぬりパズルの塗り状態を扱う純ロジック。DOM APIに触れない。
+// うごくぬりえの塗り状態を扱う純ロジック。DOM APIに触れない。
 // すべての関数は非破壊（引数のstateを変更せず、新しいオブジェクトを返す）。
 import { UNPAINTED_FILL, type PaintColorId, findPaintColor } from './paintColors'
 import type { PaintAreaId } from './paintPictures'

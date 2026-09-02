@@ -46,7 +46,7 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: 'くるまのみちづくり' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'コマバトル' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '3Dクルマづくり' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'いろぬりパズル' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'うごくぬりえ' })).toBeInTheDocument()
     expect(screen.getAllByRole('link')).toHaveLength(22)
   })
 
@@ -162,11 +162,11 @@ describe('Home', () => {
     expect(screen.getByRole('button', { name: 'ちょくせんを ついか' })).toBeInTheDocument()
   })
 
-  test('「いろぬりパズル」を押すとぬりえ画面に遷移する', async () => {
+  test('「うごくぬりえ」を押すとぬりえ画面に遷移する', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    await user.click(screen.getByRole('link', { name: 'いろぬりパズル' }))
-    expect(screen.getByRole('heading', { name: 'いろぬりパズル' })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'うごくぬりえ' }))
+    expect(screen.getByRole('heading', { name: 'うごくぬりえ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'やりなおし' })).toBeInTheDocument()
   })
 })
