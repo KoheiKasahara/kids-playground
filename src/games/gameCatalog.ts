@@ -459,6 +459,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'tsumiki-bowling',
+    slug: 'tsumiki-bowling',
+    title: 'つみきボウリング',
+    emoji: '🎳',
+    seo: {
+      headline: 'つみきボウリング｜たまを打ち込んで積み木をくずす',
+      description:
+        '3Dのレーンで玉をひっぱって発射し、つみきのタワーを勢いよくくずす幼児向けの物理あそびです。ひっぱった向きとながさで、とぶ方向と強さが変わります。3回なげて、たおしたつみきの数を数えます。',
+    },
+    category: 'threeD',
+    intro: {
+      howToPlay: [
+        'たまを ゆびで ひっぱって はなすと とんでいくよ',
+        'ひっぱる ながさで つよさが かわるよ',
+        '3かい なげたら、たおした かずが でるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
