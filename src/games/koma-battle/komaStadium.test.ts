@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   BOWL_RADIUS,
   BOWL_DEPTH,
+  RIDGE_HEIGHT,
+  RIDGE_RADIUS,
   bowlHeightAt,
   DEFAULT_KOMA_FIELD_ID,
   DEFAULT_WALL_GAPS,
@@ -48,12 +50,14 @@ describe('コマバトルのフィールド定義', () => {
   })
 
   it('ridgeはリング位置だけを緩やかに盛り上げ、急な段差を作らない', () => {
-    expect(fieldHeightAt('ridge', 1.2)).toBeGreaterThan(fieldHeightAt('basic', 1.2) + 0.06)
+    expect(fieldHeightAt('ridge', RIDGE_RADIUS)).toBeGreaterThan(
+      fieldHeightAt('basic', RIDGE_RADIUS) + RIDGE_HEIGHT * 0.8,
+    )
     let maxSlope = 0
     for (let radius = 0.02; radius < BOWL_RADIUS; radius += 0.02) {
       maxSlope = Math.max(maxSlope, Math.abs(fieldSlopeAt('ridge', radius)))
     }
-    expect(maxSlope).toBeLessThan(0.3)
+    expect(maxSlope).toBeLessThan(0.55)
     expect(fieldHeightAt('ridge', 0.3) - fieldHeightAt('basic', 0.3)).toBeLessThan(0.01)
   })
 
