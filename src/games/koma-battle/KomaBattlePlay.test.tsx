@@ -317,7 +317,7 @@ describe('KomaBattlePlay', () => {
     renderGame()
 
     await user.click(screen.getByRole('button', { name: 'あかコマの いろを かえる' }))
-    expect(screen.getByRole('dialog', { name: 'あかコマの いろを かえる' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'あかコマの いろを えらぶ' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'みどり' }))
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
