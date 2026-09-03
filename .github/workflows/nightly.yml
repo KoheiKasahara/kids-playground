@@ -29,9 +29,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install coverage provider
-        run: npm install --no-save --package-lock=false @vitest/coverage-v8@4.1.10
-
       - name: Lint
         id: lint
         shell: bash
