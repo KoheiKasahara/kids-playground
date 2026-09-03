@@ -8,6 +8,8 @@ dev-dist
 
 # testing / coverage
 coverage
+playwright-report
+test-results
 
 # logs
 *.log
