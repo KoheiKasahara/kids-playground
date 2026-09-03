@@ -65,6 +65,34 @@ jobs:
           echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
           exit "$status"
 
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Ensure Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Test (Nightly E2E route smoke)
+        id: e2e
+        shell: bash
+        run: |
+          start=$(date +%s)
+          set +e
+          npm run test:e2e:nightly
+          status=$?
+          end=$(date +%s)
+          echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
+          echo "Nightly E2E route smoke duration: $((end - start))s"
+          exit "$status"
+
       - name: Write CI Summary
         if: always()
         env:

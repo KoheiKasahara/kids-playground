@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
+import { capturePageErrors } from './support/runtimeErrors'
 
 test('メニューからこっきコロコロパズルの初期画面を開ける', async ({ page }) => {
-  const pageErrors: string[] = []
-  page.on('pageerror', (error) => pageErrors.push(error.message))
+  const pageErrors = capturePageErrors(page)
 
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { name: 'こどもミニゲーム', exact: true })).toBeVisible()
