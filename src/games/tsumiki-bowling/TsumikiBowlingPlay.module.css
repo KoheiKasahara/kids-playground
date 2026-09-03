@@ -1,0 +1,307 @@
+/*
+ * 画面の高さは min-height ではなく height で固定する。
+ * min-height だと3Dシーンの中身がページを押し広げ、縦→横に回したときに
+ * 縦画面ぶんの高さが横画面へ持ち越されてしまう（既存の3Dゲームと同じ方針）。
+ */
+.page {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  background: var(--color-background);
+  overscroll-behavior: none;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(64px, 1fr) auto minmax(64px, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.title {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(18px, 5vw, 26px);
+  font-weight: 900;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.backLink {
+  grid-column: 1;
+  grid-row: 1;
+  display: inline-flex;
+  min-width: 64px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  padding: var(--space-xs) var(--space-sm);
+  border: 2px solid transparent;
+  border-radius: var(--radius-round);
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  /* 320px幅でも「もどる」が2行に折り返さないようにする。 */
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.scene {
+  position: relative;
+  grid-row: 2;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  margin-top: var(--space-sm);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(170deg, #d7eefc 0%, #eaf6ff 55%, #fff3bf 100%);
+  overflow: hidden;
+}
+
+/* canvasの入れ物はシーン全体に広げる。UIはこの上へ重ねる。 */
+.canvasHost {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * canvasは絶対配置にして、グリッドの行の高さへ一切影響させない。
+ * touch-action: none はスリングショットのドラッグ中に
+ * ブラウザのスクロール・引っぱって更新へ持っていかれないために必要。
+ */
+.scene canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* 上部のHUD。投球数と倒した数だけを出す。 */
+.hud {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  left: var(--space-sm);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  pointer-events: none;
+}
+
+.throwCounter {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+}
+
+.throwDot {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-primary);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.throwDotCurrent {
+  background: var(--color-accent);
+  border-color: var(--color-accent-dark);
+}
+
+.throwDotDone {
+  background: var(--color-primary);
+}
+
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+  color: var(--color-primary-dark);
+  font-weight: 900;
+}
+
+.scoreLabel {
+  font-size: clamp(11px, 3vw, 14px);
+  color: var(--color-text-muted);
+}
+
+.scoreValue {
+  font-size: clamp(22px, 6vw, 30px);
+}
+
+.scoreUnit {
+  font-size: clamp(12px, 3.2vw, 16px);
+}
+
+/* ねらっている間の案内。画面下に置き、指の邪魔をしない。 */
+.aimPanel {
+  position: absolute;
+  right: var(--space-sm);
+  bottom: var(--space-sm);
+  left: var(--space-sm);
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.hint {
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-primary-dark);
+  font-size: clamp(14px, 4vw, 20px);
+  font-weight: 800;
+  text-align: center;
+}
+
+.powerMeter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: min(420px, 100%);
+  padding: 8px 14px;
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+}
+
+.powerTrack {
+  flex: 1;
+  height: 18px;
+  border-radius: var(--radius-round);
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+
+.powerFill {
+  height: 100%;
+  border-radius: var(--radius-round);
+  background: linear-gradient(90deg, #ffd43b 0%, #ff922b 55%, #fa5252 100%);
+}
+
+.powerLabel {
+  min-width: 4em;
+  color: var(--color-accent-dark);
+  font-size: clamp(14px, 4vw, 20px);
+  font-weight: 900;
+  text-align: right;
+}
+
+/* 1投ごとの結果。短い言葉だけを大きく出す。 */
+.throwResult {
+  position: absolute;
+  top: 22%;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  margin: 0;
+  color: var(--color-accent-dark);
+  font-size: clamp(24px, 8vw, 40px);
+  font-weight: 900;
+  text-align: center;
+  text-shadow: 0 2px 0 #fff, 0 0 12px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+
+/* 3投おわりの結果。 */
+.resultOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: color-mix(in srgb, var(--color-background) 80%, transparent);
+  text-align: center;
+}
+
+.resultTitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: clamp(18px, 5vw, 24px);
+  font-weight: 800;
+}
+
+.resultCount {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+  color: var(--color-primary-dark);
+}
+
+.resultNumber {
+  font-size: clamp(56px, 20vw, 96px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.resultUnit {
+  font-size: clamp(24px, 7vw, 36px);
+  font-weight: 900;
+}
+
+.resultText {
+  margin: 0 0 var(--space-sm);
+  color: var(--color-primary-dark);
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: 900;
+}
+
+.retryButton {
+  min-width: min(280px, 80vw);
+  min-height: var(--tap-target-min);
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-round);
+  background: var(--color-accent);
+  color: var(--color-text-on-primary);
+  font-family: inherit;
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: 900;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+.resultBackLink {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xs) var(--space-lg);
+  border-radius: var(--radius-round);
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .powerFill {
+    transition: none;
+  }
+}
