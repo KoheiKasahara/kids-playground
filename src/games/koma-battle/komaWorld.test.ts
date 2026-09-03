@@ -5,6 +5,7 @@ import {
   applyKomaBoost,
   applyKomaContactAssist,
   applyKomaFieldBelts,
+  applyKomaFieldRidges,
   clampKomaMotion,
   createKomaBattleWorld,
   readKoma,
@@ -98,6 +99,7 @@ function simulate(
   for (let step = 0; step < steps; step += 1) {
     for (const koma of world.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
     if (outcome === null) {
+      for (const koma of world.komas) applyKomaFieldRidges(koma, field, PHYSICS_TIMESTEP)
       for (const koma of world.komas) applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
     }
     const assist = applyKomaContactAssist(world, outcome === null)
@@ -352,6 +354,84 @@ describe('createKomaBattleWorld', () => {
       expect(body.angvel().y).toBeCloseTo(START_SPIN_SPEED * type.initialSpinScale, 5)
       world.world.free()
     }
+  })
+})
+
+describe('リングのきふく', () => {
+  beforeAll(async () => {
+    await RAPIER.init()
+  })
+
+  it('起伏の上では接線方向と山から離れる方向へ明確に補正する', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'ridge' })
+    const koma = world.komas[0]!
+    const radius = 1.2
+    koma.body.setTranslation(
+      { x: radius, y: fieldHeightAt('ridge', radius) + 0.02, z: 0 },
+      true,
+    )
+    koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+
+    applyKomaFieldRidges(koma, getKomaField('ridge'), PHYSICS_TIMESTEP)
+
+    const velocity = koma.body.linvel()
+    expect(Math.abs(velocity.z)).toBeGreaterThan(0.1)
+    expect(Number.isFinite(velocity.x)).toBe(true)
+    expect(Number.isFinite(velocity.y)).toBe(true)
+    expect(Number.isFinite(velocity.z)).toBe(true)
+    world.world.free()
+  })
+
+  it('複数方向から起伏へ入っても速度が有限値のままになる', () => {
+    for (const position of [
+      { x: 1.2, z: 0 },
+      { x: -1.2, z: 0 },
+      { x: 0, z: 1.2 },
+      { x: 0, z: -1.2 },
+    ]) {
+      const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'ridge' })
+      const koma = world.komas[0]!
+      const radius = Math.hypot(position.x, position.z)
+      koma.body.setTranslation(
+        { x: position.x, y: fieldHeightAt('ridge', radius) + 0.02, z: position.z },
+        true,
+      )
+      koma.body.setLinvel({ x: 1.1, y: 0, z: -0.7 }, true)
+
+      applyKomaFieldRidges(koma, getKomaField('ridge'), PHYSICS_TIMESTEP)
+
+      const velocity = koma.body.linvel()
+      expect(Number.isFinite(velocity.x)).toBe(true)
+      expect(Number.isFinite(velocity.y)).toBe(true)
+      expect(Number.isFinite(velocity.z)).toBe(true)
+      world.world.free()
+    }
+  })
+
+  it('起伏の外では補正せず、他フィールドへ効果を漏らさない', () => {
+    const ridgeWorld = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'ridge' })
+    const basicWorld = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'basic' })
+    const ridgeKoma = ridgeWorld.komas[0]!
+    const basicKoma = basicWorld.komas[0]!
+    const position = { x: 0.2, z: 0 }
+    const velocity = { x: 0.35, y: 0, z: -0.2 }
+    ridgeKoma.body.setTranslation(
+      { x: position.x, y: fieldHeightAt('ridge', 0.2) + 0.02, z: position.z },
+      true,
+    )
+    basicKoma.body.setTranslation(
+      { x: position.x, y: fieldHeightAt('basic', 0.2) + 0.02, z: position.z },
+      true,
+    )
+    ridgeKoma.body.setLinvel(velocity, true)
+    basicKoma.body.setLinvel(velocity, true)
+
+    applyKomaFieldRidges(ridgeKoma, getKomaField('ridge'), PHYSICS_TIMESTEP)
+    applyKomaFieldRidges(basicKoma, getKomaField('basic'), PHYSICS_TIMESTEP)
+
+    expect(ridgeKoma.body.linvel()).toEqual(basicKoma.body.linvel())
+    ridgeWorld.world.free()
+    basicWorld.world.free()
   })
 })
 

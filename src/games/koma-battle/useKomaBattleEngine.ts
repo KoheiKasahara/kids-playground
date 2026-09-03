@@ -61,6 +61,7 @@ import {
   applyKomaBoost,
   applyKomaContactAssist,
   applyKomaFieldBelts,
+  applyKomaFieldRidges,
   clampKomaMotion,
   createKomaBattleWorld,
   readKoma,
@@ -743,6 +744,103 @@ export function useKomaBattleEngine(
       )
       group.add(floor)
 
+      // Ridgeは高さ場に沿った色付きの帯を重ね、上から見ても「ここが盛り上がり」と
+      // 分かるようにする。高さは同じfieldHeightAtから読むので、物理とのずれを作らない。
+      if (selectedField.ridges.length > 0) {
+        const ridgeMaterial = trackMaterial(
+          new THREE.MeshStandardMaterial({
+            color: selectedField.theme.accent,
+            roughness: 0.52,
+            metalness: 0.04,
+            transparent: true,
+            opacity: 0.78,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+          }),
+        )
+        const ridgeEdgeMaterial = trackMaterial(
+          new THREE.MeshStandardMaterial({
+            color: 0x9b6336,
+            roughness: 0.66,
+            metalness: 0.04,
+          }),
+        )
+        for (const ridge of selectedField.ridges) {
+          if (
+            !Number.isFinite(ridge.radius) ||
+            !Number.isFinite(ridge.width) ||
+            ridge.radius <= 0 ||
+            ridge.width <= 0
+          ) continue
+
+          const radialSteps = 10
+          const angularSteps = 64
+          const innerRadius = Math.max(0.05, ridge.radius - ridge.width * 1.35)
+          const outerRadius = Math.min(BOWL_RADIUS - 0.02, ridge.radius + ridge.width * 1.35)
+          const positions: number[] = []
+          const indices: number[] = []
+          for (let radialIndex = 0; radialIndex <= radialSteps; radialIndex += 1) {
+            const radius = THREE.MathUtils.lerp(innerRadius, outerRadius, radialIndex / radialSteps)
+            for (let angleIndex = 0; angleIndex < angularSteps; angleIndex += 1) {
+              const angle = (angleIndex / angularSteps) * Math.PI * 2
+              positions.push(
+                Math.cos(angle) * radius,
+                fieldHeightAt(selectedField, radius) + 0.012,
+                Math.sin(angle) * radius,
+              )
+            }
+          }
+          for (let radialIndex = 0; radialIndex < radialSteps; radialIndex += 1) {
+            for (let angleIndex = 0; angleIndex < angularSteps; angleIndex += 1) {
+              const nextAngleIndex = (angleIndex + 1) % angularSteps
+              const current = radialIndex * angularSteps + angleIndex
+              const next = radialIndex * angularSteps + nextAngleIndex
+              const outer = (radialIndex + 1) * angularSteps + angleIndex
+              const outerNext = (radialIndex + 1) * angularSteps + nextAngleIndex
+              indices.push(current, outer, next, next, outer, outerNext)
+            }
+          }
+          const ridgeGeometry = track(new THREE.BufferGeometry())
+          ridgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+          ridgeGeometry.setIndex(indices)
+          ridgeGeometry.computeVertexNormals()
+          group.add(new THREE.Mesh(ridgeGeometry, ridgeMaterial))
+
+          // 色付き帯の内外を細い丸い縁で囲み、傾斜の始まりと頂上を読み取りやすくする。
+          const edgeGeometry = track(new THREE.TorusGeometry(ridge.radius, 0.035, 8, 64))
+          const crest = new THREE.Mesh(edgeGeometry, ridgeEdgeMaterial)
+          crest.rotation.x = Math.PI / 2
+          crest.position.y = fieldHeightAt(selectedField, ridge.radius) + 0.026
+          group.add(crest)
+
+          const boundaryRadius = Math.max(0.05, ridge.radius - ridge.width * 1.05)
+          const boundaryGeometry = track(new THREE.TorusGeometry(
+            boundaryRadius,
+            0.022,
+            8,
+            64,
+          ))
+          const innerBoundary = new THREE.Mesh(boundaryGeometry, ridgeEdgeMaterial)
+          innerBoundary.rotation.x = Math.PI / 2
+          innerBoundary.position.y = fieldHeightAt(selectedField, boundaryRadius) + 0.018
+          group.add(innerBoundary)
+
+          const outerBoundaryRadius = Math.min(BOWL_RADIUS - 0.02, ridge.radius + ridge.width * 1.05)
+          const outerBoundaryGeometry = track(new THREE.TorusGeometry(
+            outerBoundaryRadius,
+            0.022,
+            8,
+            64,
+          ))
+          const outerBoundary = new THREE.Mesh(outerBoundaryGeometry, ridgeEdgeMaterial)
+          outerBoundary.rotation.x = Math.PI / 2
+          outerBoundary.position.y = fieldHeightAt(selectedField, outerBoundaryRadius) + 0.018
+          group.add(outerBoundary)
+        }
+      }
+
       // 中央の目印。すり鉢の谷がどこかを上からでも分かりやすくする。
       const centerMark = new THREE.Mesh(
         track(new THREE.RingGeometry(0.26, 0.34, 32)),
@@ -1131,6 +1229,7 @@ export function useKomaBattleEngine(
         for (const koma of battle.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
         // 決着前だけ接触開始時の追加反発とベルトの力を適用する。決着後のsettle中は自然に倒れ切らせる。
         if (!finished) {
+          for (const koma of battle.komas) applyKomaFieldRidges(koma, selectedField, PHYSICS_TIMESTEP)
           for (const koma of battle.komas) applyKomaFieldBelts(koma, selectedField, PHYSICS_TIMESTEP)
         }
         applyKomaContactAssist(battle, !finished)

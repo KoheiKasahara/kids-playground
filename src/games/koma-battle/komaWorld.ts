@@ -29,6 +29,9 @@ import {
   KOMA_KNOCKBACK_MAX_IMPULSE,
   KOMA_KNOCKBACK_MIN_CLOSING_SPEED,
   KOMA_KNOCKBACK_MIN_IMPULSE,
+  KOMA_RIDGE_AWAY_SPEED,
+  KOMA_RIDGE_RESPONSE,
+  KOMA_RIDGE_TANGENTIAL_SPEED,
   LINEAR_DAMPING,
   MAX_ANGULAR_SPEED,
   MAX_LINEAR_SPEED,
@@ -511,6 +514,71 @@ export function applyKomaFieldBelts(entry: KomaEntry, field: KomaField, dt: numb
     const impulse = KOMA_BELT_FORCE * strength * dt
     body.applyImpulse(
       { x: Math.cos(belt.angle) * impulse, y: 0, z: Math.sin(belt.angle) * impulse },
+      true,
+    )
+  }
+}
+
+/**
+ * リング状の起伏へ入ったコマへ、斜面を越える補助力と接線方向の流れを加える。
+ *
+ * Rapierの高さ場による重力・接触解決はそのまま残し、ここでは起伏の遊びを
+ * 分かりやすくするための疑似的な補助だけを行う。起伏を持たないフィールドは
+ * `ridges.length === 0` で即座に戻るため、他ステージへ影響しない。
+ */
+export function applyKomaFieldRidges(entry: KomaEntry, field: KomaField, dt: number): void {
+  if (field.ridges.length === 0 || !Number.isFinite(dt) || dt <= 0) return
+
+  const body = entry.body
+  const translation = body.translation()
+  const radius = Math.hypot(translation.x, translation.z)
+  const radial = finiteUnitOrNull(translation.x, translation.z)
+  if (radial === null || !Number.isFinite(radius)) return
+
+  const rawVelocity = body.linvel()
+  if (
+    !Number.isFinite(rawVelocity.x) ||
+    !Number.isFinite(rawVelocity.y) ||
+    !Number.isFinite(rawVelocity.z)
+  ) return
+
+  const mass = body.mass()
+  if (!Number.isFinite(mass) || mass <= 0) return
+
+  const response = Math.min(1, dt * KOMA_RIDGE_RESPONSE)
+  for (const ridge of field.ridges) {
+    if (
+      !Number.isFinite(ridge.radius) ||
+      !Number.isFinite(ridge.width) ||
+      ridge.width <= 0
+    ) continue
+
+    // Gaussianの裾まで広く効かせ、速度が高いコマでもリングを通過したときに
+    // 効果が消えないようにする。高さそのものではなく、遊びやすい帯域を判定する。
+    const normalizedDistance = (radius - ridge.radius) / ridge.width
+    const influence = Math.exp(-0.5 * (normalizedDistance / 1.15) ** 2)
+    if (!Number.isFinite(influence) || influence < 0.08) continue
+
+    // コマ自身の回転・周回方向に合わせてリングに沿わせる。
+    const tangent = {
+      x: -radial.z * entry.spec.spinDirection,
+      z: radial.x * entry.spec.spinDirection,
+    }
+    const tangentialSpeed = rawVelocity.x * tangent.x + rawVelocity.z * tangent.z
+    const radialSpeed = rawVelocity.x * radial.x + rawVelocity.z * radial.z
+    const awayFromCrest = Math.sign(normalizedDistance)
+    const targetRadialSpeed = awayFromCrest * KOMA_RIDGE_AWAY_SPEED * influence
+    const targetTangentialSpeed = KOMA_RIDGE_TANGENTIAL_SPEED * influence
+    const tangentialDelta = targetTangentialSpeed - tangentialSpeed
+    const radialDelta = targetRadialSpeed - radialSpeed
+    const impulseScale = mass * response * influence
+
+    body.applyImpulse(
+      {
+        x: (tangent.x * tangentialDelta + radial.x * radialDelta) * impulseScale,
+        y: 0,
+        z: (tangent.z * tangentialDelta + radial.z * radialDelta) * impulseScale,
+      },
       true,
     )
   }

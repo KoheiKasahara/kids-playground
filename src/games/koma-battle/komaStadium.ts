@@ -52,6 +52,11 @@ export type KomaFieldRidge = {
   width: number
 }
 
+/** リングのきふくの主役。高さ場と見た目の基準を同じ値にそろえる。 */
+export const RIDGE_RADIUS = 1.2
+export const RIDGE_HEIGHT = 0.24
+export const RIDGE_WIDTH = 0.34
+
 export type KomaFieldObstacle = {
   type: 'bumper'
   x: number
@@ -245,8 +250,9 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     shape: 'ridge',
     bowlDepth: BOWL_DEPTH,
     valleyRadius: VALLEY_RADIUS,
-    // 幅広く低いGaussianの盛り上がり。最大勾配は約0.20で、コマが引っかからない。
-    ridges: [{ radius: 1.2, height: 0.075, width: 0.4 }],
+    // 中央を一周する、幅広くはっきりした盛り上がり。
+    // 高さ場にも同じ値を渡すので、見た目と物理の起伏がずれない。
+    ridges: [{ radius: RIDGE_RADIUS, height: RIDGE_HEIGHT, width: RIDGE_WIDTH }],
     obstacles: NO_OBSTACLES,
     belts: NO_BELTS,
     wallHeight: WALL_HEIGHT,
