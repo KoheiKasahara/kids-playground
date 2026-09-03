@@ -15,7 +15,8 @@ export const SETTLE_ANGULAR_SPEED = 1.5
 export const SETTLE_STABLE_MS = 520
 /**
  * 発射直後は必ずこの時間だけ待つ。
- * 玉が積み木へ到達する前（最速でも約0.4秒）に「止まった」と判定させないための下限。
+ * 玉が積み木へ到達する前（最速でも約0.4秒、最弱でも約0.8秒）に
+ * 「止まった」と判定させないための下限。
  */
 export const SETTLE_MIN_THROW_MS = 900
 /** 何かが延々と転がり続けても、ここで打ち切る。 */
