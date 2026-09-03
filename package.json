@@ -17,6 +17,7 @@
     "test:slow": "vitest run --project slow",
     "test:game": "vitest run",
     "test:watch": "vitest --project unit --project dom",
+    "test:e2e": "playwright test",
     "verify": "npm run lint && npm run typecheck && npm run test:quick && npm run build",
     "verify:full": "npm run lint && npm run typecheck && npm run test:full && npm run build"
   },
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.3",
