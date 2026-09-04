@@ -28,7 +28,7 @@ export const LANE_CENTER_Z = -2
 export const RAIL_HALF_HEIGHT = 0.4
 export const RAIL_HALF_WIDTH = 0.25
 /** 奥の壁。突き抜けた玉を受け止めて、次の投球までの待ち時間を短くする。 */
-export const BACK_WALL_Z = -11.4
+export const BACK_WALL_Z = -12.2
 export const BACK_WALL_HALF_HEIGHT = 0.55
 
 /**
@@ -148,12 +148,17 @@ const BIG_CUBE: readonly [number, number, number] = [0.5, 0.5, 0.5]
  * 発射位置(z=+7)と塔が近すぎると、離した瞬間にもう当たっていて
  * 「ビューンと進んでからドカン」の助走が味わえない（実画面で確認した）。
  * 塔だけをこのぶん奥へ下げ、発射の強さ・速度は一切触らずに助走を伸ばしている。
- * 玉から最前面の積み木までは 11.0m → 13.2m（約20%増）。
+ * 玉から最前面の積み木までは 11.0m → 14.1m（約27%増）。
  *
- * これ以上下げると、幼児には狙いにくく・積み木が小さく見え始めるため、
- * 「少し伸ばす」の範囲としてここで止めている。
+ * これに合わせて BACK_WALL_Z も奥へ動かし、崩れた積み木が散らばる余地を保つ
+ * （手前の塔から奥の壁までの距離は常に約2.75mのまま）。
+ *
+ * これ以上下げると、はずむだまを中くらいの力で投げたときに積み木まで届く前に
+ * 勢いを失い、何度も跳ねる持ち味が消えてしまう
+ * （Rapierで実測。offset 3.0 では中くらいの力の基準を0.7→0.8へ少し上げて
+ * 保っている。bowlingWorld.test.tsのaim(0.8)参照）。
  */
-const TOWER_DEPTH_OFFSET = 2.2
+const TOWER_DEPTH_OFFSET = 3.0
 
 /** 手前の壁が立つZ。塔より手前にして、まず壁が倒れ込むようにする。 */
 const FRONT_WALL_Z = -4.25 - TOWER_DEPTH_OFFSET

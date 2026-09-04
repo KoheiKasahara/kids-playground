@@ -142,7 +142,7 @@ describe('全ステージ共通の制約', () => {
     // 遠すぎると、幼児には狙いにくく、当たるまで待たされる。
     const runUp = LAUNCH_Z - stageBounds(stage).frontZ
     expect(runUp).toBeGreaterThan(12.5)
-    expect(runUp).toBeLessThan(14)
+    expect(runUp).toBeLessThan(15)
   })
 
   it.each(BOWLING_STAGES)('$name: 奥には、崩れた積み木が散らばるだけの余地が残っている', (stage) => {

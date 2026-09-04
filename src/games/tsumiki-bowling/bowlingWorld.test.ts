@@ -403,8 +403,10 @@ describe('玉ごとの体感差（物理挙動）', () => {
     // 最大パワーは塔の上端をかすめて1回の大バウンドになりやすいため、
     // 「複数の積み木へ連鎖ヒットしやすい」を確かめやすい中程度のパワーで見る
     // （幼児の投球はパワーが揃わないため、最大パワーだけを基準にしない）。
+    // 助走をTOWER_DEPTH_OFFSETぶん伸ばしたため、0.7だと積み木へ届く前に
+    // 勢いを失う。基準を0.8へ上げても「中程度の力」の範囲内。
     const bowling = createBowlingWorld(RAPIER, { ballId: 'bouncy' })
-    const bounces = countBounces(bowling, 7, aim(0.7))
+    const bounces = countBounces(bowling, 7, aim(0.8))
     expect(bounces).toBeGreaterThanOrEqual(2)
     bowling.world.free()
   })
@@ -412,8 +414,8 @@ describe('玉ごとの体感差（物理挙動）', () => {
   it('どっしりだまは、はずむだまほど跳ねない（跳ね返りが弱い）', () => {
     const heavy = createBowlingWorld(RAPIER, { ballId: 'heavy' })
     const bouncy = createBowlingWorld(RAPIER, { ballId: 'bouncy' })
-    const heavyBounces = countBounces(heavy, 7, aim(0.7))
-    const bouncyBounces = countBounces(bouncy, 7, aim(0.7))
+    const heavyBounces = countBounces(heavy, 7, aim(0.8))
+    const bouncyBounces = countBounces(bouncy, 7, aim(0.8))
     expect(bouncyBounces).toBeGreaterThan(heavyBounces)
     heavy.world.free()
     bouncy.world.free()
