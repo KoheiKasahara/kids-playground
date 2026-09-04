@@ -12,7 +12,7 @@
 export type BodyType = 'sports' | 'suv' | 'bus' | 'truck' | 'police'
 export type WheelType = 'small' | 'big' | 'offroad' | 'racing'
 export type CarColorId = 'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'pink' | 'purple' | 'white' | 'black'
-export type FrontType = 'normal' | 'round'
+export type FrontType = 'round' | 'square' | 'slim'
 export type RoofType = 'none' | 'carrier'
 export type DecorationType = 'none' | 'star'
 export type MarkType = 'none' | 'plate'
@@ -48,6 +48,7 @@ export type CarOptionPreview =
   | { kind: 'emoji'; emoji: string }
   | { kind: 'color'; hex: string }
   | { kind: 'wheel'; variant: WheelType }
+  | { kind: 'front'; variant: FrontType }
 
 export type CarOptionDefinition<Id extends string> = {
   id: Id
@@ -130,8 +131,9 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
     emoji: '💡',
     ariaLabel: 'フロントを えらぶ',
     options: [
-      { id: 'normal', label: 'ふつう', preview: { kind: 'emoji', emoji: '💡' } },
-      { id: 'round', label: 'まるいめ', preview: { kind: 'emoji', emoji: '😀' } },
+      { id: 'round', label: '丸ライト', preview: { kind: 'front', variant: 'round' } },
+      { id: 'square', label: '四角ライト', preview: { kind: 'front', variant: 'square' } },
+      { id: 'slim', label: '細目ライト', preview: { kind: 'front', variant: 'slim' } },
     ],
   },
   roof: {
@@ -195,7 +197,8 @@ export const DEFAULT_CAR_CONFIG: CarConfig = {
   body: 'sports',
   wheel: 'small',
   color: 'red',
-  front: 'normal',
+  // 既存の標準形を四角ライトとして引き継ぎ、初期見た目を不用意に変えない。
+  front: 'square',
   roof: 'none',
   decoration: 'none',
   mark: 'none',
