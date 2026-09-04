@@ -1,4 +1,4 @@
-import { cellKey, isInsideBoard, type BoardCell } from './board'
+import { BOARD_CELL_COUNT, cellKey, isInsideBoard, type BoardCell } from './board'
 import { shapeCells, type BlockRotation, type BlockShapeId, NO_ROTATION } from './blockShapes'
 
 /**
@@ -100,4 +100,13 @@ export function placeBlock(
 ): PlacedBlock[] | null {
   if (!canPlaceBlock(blocks, block.shapeId, block.anchor, block.rotation)) return null
   return [...blocks, block]
+}
+
+/**
+ * 盤面の全マスがブロックで埋まっているか（#482 の完成条件）。
+ * 行単位の消去は行わないため、ここでは「マス」の占有数だけを見る
+ * （何個のブロックで埋まったかは問わない）。1マスでも空きがあれば false。
+ */
+export function isBoardFull(blocks: readonly PlacedBlock[]): boolean {
+  return cellOwners(blocks).size === BOARD_CELL_COUNT
 }

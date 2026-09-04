@@ -3,6 +3,7 @@ import { BOARD_CELL_COUNT, BOARD_COLS, BOARD_ROWS, cellKey } from './board'
 import {
   canPlaceBlock,
   cellOwners,
+  isBoardFull,
   isInsideBoardPlacement,
   occupiedCells,
   occupiedCellKeys,
@@ -135,5 +136,50 @@ describe('placement: 占有マスの一覧（#481/#482の土台）', () => {
       }
     }
     expect(occupiedCellKeys(blocks).size).toBe(BOARD_CELL_COUNT)
+  })
+})
+
+describe('placement: isBoardFull（#482の完成判定）', () => {
+  test('何も置いていなければ完成ではない', () => {
+    expect(isBoardFull([])).toBe(false)
+  })
+
+  test('1マスでも空きがあれば完成ではない', () => {
+    const blocks: PlacedBlock[] = []
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        // 最後の1マス（右下）だけ空けておく。
+        if (row === BOARD_ROWS - 1 && col === BOARD_COLS - 1) continue
+        const next = placeBlock(blocks, block(`block-${col}-${row}`, 'single', col, row))
+        expect(next).not.toBeNull()
+        blocks.splice(0, blocks.length, ...next!)
+      }
+    }
+    expect(isBoardFull(blocks)).toBe(false)
+  })
+
+  test('最後の空きマスが埋まった瞬間に完成になる（行単位の消去はしない）', () => {
+    const blocks: PlacedBlock[] = []
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        const next = placeBlock(blocks, block(`block-${col}-${row}`, 'single', col, row))
+        expect(next).not.toBeNull()
+        blocks.splice(0, blocks.length, ...next!)
+        const isLastCell = row === BOARD_ROWS - 1 && col === BOARD_COLS - 1
+        expect(isBoardFull(blocks)).toBe(isLastCell)
+      }
+    }
+  })
+
+  test('形が混ざっていてもマス基準で判定する（形ごとの数は問わない）', () => {
+    let blocks: PlacedBlock[] = []
+    blocks = placeBlock(blocks, block('block-o', 'o', 0, 0))!
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        if (col < 2 && row < 2) continue // 上の o(2x2) と重なるマスは飛ばす。
+        blocks = placeBlock(blocks, block(`block-${col}-${row}`, 'single', col, row))!
+      }
+    }
+    expect(isBoardFull(blocks)).toBe(true)
   })
 })

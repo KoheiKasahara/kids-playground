@@ -979,6 +979,42 @@ export function playColorPaintFinishSound(): void {
   }
 }
 
+// --- ブロックパズル専用の効果音 ------------------------------------------
+
+/**
+ * 盤面の全マスが埋まった瞬間の「できた！」。
+ * うごくぬりえの完成音と同じ発想（ド・ミ・ソ・ド の分散和音＋キラッと高音）だが、
+ * 呼び出し側（ブロックパズル）ごとに音色/連打防止を独立させるため専用関数にする。
+ */
+const BLOCK_PUZZLE_COMPLETE_SOUND_MIN_INTERVAL_MS = 400
+let lastBlockPuzzleCompleteSoundAt: number | null = null
+
+export function playBlockPuzzleCompleteSound(): void {
+  if (!soundEnabled) return
+
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const wallClockNow = Date.now()
+    if (
+      lastBlockPuzzleCompleteSoundAt !== null
+      && wallClockNow - lastBlockPuzzleCompleteSoundAt < BLOCK_PUZZLE_COMPLETE_SOUND_MIN_INTERVAL_MS
+    ) return
+    lastBlockPuzzleCompleteSoundAt = wallClockNow
+
+    const now = ctx.currentTime
+    // ド・ミ・ソ・ド（上）の分散和音。
+    playTone(ctx, 523.25, now, 0.14, 0.1, 'triangle')
+    playTone(ctx, 659.25, now + 0.06, 0.14, 0.1, 'triangle')
+    playTone(ctx, 783.99, now + 0.12, 0.16, 0.1, 'triangle')
+    playTone(ctx, 1046.5, now + 0.18, 0.32, 0.11, 'sine')
+    // 最後にキラッと高い音を重ねる（画面のキラキラと合わせる）。
+    playTone(ctx, 1567.98, now + 0.24, 0.26, 0.06, 'sine')
+  } catch {
+    // 音を出せない環境でも、完成演出はそのまま続ける。
+  }
+}
+
 export type RailTrainSoundStatus =
   | 'ready'
   | 'running'
