@@ -17,6 +17,8 @@
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x proximity;
+  scroll-padding-inline: calc(var(--space-sm) + var(--safe-left)) calc(var(--space-sm) + var(--safe-right));
+  overscroll-behavior-inline: contain;
   -webkit-overflow-scrolling: touch;
 }
 
