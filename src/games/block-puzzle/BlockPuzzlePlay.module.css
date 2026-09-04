@@ -130,7 +130,10 @@
   }
 }
 
-/* マス。「ここにブロックをはめる」と分かるよう、へこんだ穴のように見せる。 */
+/* マス。「ここにブロックをはめる」と分かるよう、へこんだ穴のように見せる。
+   #510: スマホでのドラッグ中にページスクロールや長押しメニュー・文字選択に
+   操作を奪われないよう、盤面のマスだけに絞ってジェスチャーを抑止する
+   （ページ全体の通常操作までは止めない）。 */
 .cell {
   box-sizing: border-box;
   min-width: 0;
@@ -142,6 +145,10 @@
     radial-gradient(circle at 50% 50%, rgb(155 178 204 / 35%) 0 8%, transparent 9%),
     #ffffff;
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .cell:active {
@@ -188,6 +195,13 @@
 /* ドラッグでつまみ上げている最中は、他のすべてのパーツより手前に出す（#483）。 */
 .draggingPlacedBlock {
   z-index: 2;
+}
+
+/* ドラッグ中・新規配置中の着地プレビュー（#510）。実際のパーツより手前に置き、
+   色や有効・無効は BlockPiece 側（tone プロパティ）が決める。 */
+.dropPreview {
+  position: absolute;
+  z-index: 3;
 }
 
 /* 完成演出。盤面を覆い隠さず、キラキラ＋盤面下端のバナーだけを重ねる（#482）。

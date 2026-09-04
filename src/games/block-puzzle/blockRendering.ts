@@ -86,3 +86,66 @@ export function cellEdges(cells: readonly RenderCell[], cell: RenderCell): CellE
     left: isEmpty(cell.col - 1, cell.row),
   }
 }
+
+/** グリッド単位（1マス=1）で表した頂点。選択枠の外周をたどるのに使う。 */
+export type OutlinePoint = { readonly x: number; readonly y: number }
+
+type BoundaryEdge = { readonly x1: number; readonly y1: number; readonly x2: number; readonly y2: number }
+
+/**
+ * cellEdges で「外周かどうか」を判定した4辺を、そのセルの左上を原点(0,0)とする
+ * グリッド単位の線分に変換する。向きはどのセルから見ても時計回り
+ * （上辺は左→右、右辺は上→下、下辺は右→左、左辺は下→上）に揃えているため、
+ * 同じ形の外周どうしは必ず終点＝次の辺の始点でつながる。
+ */
+function boundaryEdges(cells: readonly RenderCell[]): BoundaryEdge[] {
+  const edges: BoundaryEdge[] = []
+  for (const cell of cells) {
+    const at = cellEdges(cells, cell)
+    const { col, row } = cell
+    if (at.top) edges.push({ x1: col, y1: row, x2: col + 1, y2: row })
+    if (at.right) edges.push({ x1: col + 1, y1: row, x2: col + 1, y2: row + 1 })
+    if (at.bottom) edges.push({ x1: col + 1, y1: row + 1, x2: col, y2: row + 1 })
+    if (at.left) edges.push({ x1: col, y1: row + 1, x2: col, y2: row })
+  }
+  return edges
+}
+
+/**
+ * パーツの外周を、内側の継ぎ目を挟まない1本の輪郭（頂点列）として取り出す（#510）。
+ * L字・T字・S字などの凹んだ形でも、囲む長方形にはならず、実際の形なりの
+ * 1つながりの多角形になる。ブロックの形は必ず1枚につながっていて穴もないため、
+ * 外周の辺は始点＝終点でつなぐと必ず1周のループになる。
+ *
+ * 呼び出し側（BlockPiece）はこの頂点列をそのまま SVG の polygon に渡すだけでよい。
+ */
+export function outlinePolygonPoints(cells: readonly RenderCell[]): OutlinePoint[] {
+  const edges = boundaryEdges(cells)
+  if (edges.length === 0) return []
+
+  const byStart = new Map<string, BoundaryEdge[]>()
+  for (const edge of edges) {
+    const key = `${edge.x1},${edge.y1}`
+    const list = byStart.get(key)
+    if (list) list.push(edge)
+    else byStart.set(key, [edge])
+  }
+
+  const used = new Set<BoundaryEdge>()
+  const start = edges[0]
+  const points: OutlinePoint[] = [{ x: start.x1, y: start.y1 }]
+  let current = start
+  used.add(current)
+  for (;;) {
+    points.push({ x: current.x2, y: current.y2 })
+    if (current.x2 === start.x1 && current.y2 === start.y1) break
+    const candidates = byStart.get(`${current.x2},${current.y2}`) ?? []
+    const next = candidates.find((edge) => !used.has(edge))
+    // ブロックの形は常につながった1枚（穴なし）なので、ここへは来ない想定だが、
+    // 万一途切れてもクラッシュさせず、たどれたところまでの輪郭を返す。
+    if (!next) break
+    used.add(next)
+    current = next
+  }
+  return points
+}

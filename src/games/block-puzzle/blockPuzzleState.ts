@@ -129,6 +129,19 @@ export function rotateSelectedPlacedBlock(state: BlockPuzzleState): BlockPuzzleS
 }
 
 /**
+ * moveOrSwapPlacedBlock がその場所へ動かせる（移動または入れ替えが成功する）かどうかだけを、
+ * 盤面を書き換えずに判定する（#510）。ドラッグ中の着地プレビューを、実際に動かす前に
+ * 配置可能／不可能で色分けするために使う。
+ */
+export function canMoveOrSwapPlacedBlock(
+  state: BlockPuzzleState,
+  blockId: string,
+  targetAnchor: BoardCell,
+): boolean {
+  return moveOrSwapPlacedBlock(state, blockId, targetAnchor) !== null
+}
+
+/**
  * いま選んでいる配置済みブロックが、いまの場所・向きのまま盤面に収まっているか。
  * 選んでいるブロックがなければ（判定の対象がないので）true を返す。
  * #483 の回転は常に成功するため、この確定判定を使って

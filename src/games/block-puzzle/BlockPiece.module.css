@@ -1,7 +1,7 @@
 /* セルの大きさは置き場所が決める。盤面では1frで枠いっぱいに広がり、
    パーツ一覧では --piece-cell-size に固定サイズが入る。
-   position: relative は、選択中の縁取り（.selectionEdge）を各セルと同じ
-   グリッド位置に絶対配置するための基準にするだけ。 */
+   position: relative は、選択中の縁取り（.selectionOutline の svg）を
+   このパーツ全体に重ねて絶対配置するための基準にするだけ。 */
 .piece {
   position: relative;
   display: grid;
@@ -23,63 +23,89 @@
 }
 
 /*
- * 選択中の縁取り。囲む長方形ではなく形なりにするため、.pieceCell と同じ
- * 「セルごとに外周の辺だけ描く」方法を使い、絶対配置でひとまわり外側にずらして
- * 重ねる（グリッド内の絶対配置は、指定した grid-row/grid-column のマス目を
- * 基準に配置される）。
+ * 選択中の縁取り（#510）。セルごとの四角を積み重ねるのではなく、cellEdges で
+ * 判定した外周の辺をつなぎ合わせた1本の多角形（SVG polygon）として描く。
+ * これにより、L字・T字・S字などの凹んだ形でも、空きマスまで囲む長方形にも、
+ * セルごとに分かれた不自然な枠にもならず、実際のパーツの外周に沿った
+ * 1つのまとまった輪郭になる。svg の viewBox はパーツのマス数（cols×rows）に
+ * 合わせているので、polygon の座標は「マス目の格子線」の位置そのままでよい。
+ * vector-effect="non-scaling-stroke" で、盤面の大きさに関わらず線の太さを一定に保つ。
  */
-.selectionEdge {
-  --select-edge-width: 4px;
-  --select-edge-outset: 3px;
-  --select-radius: 14px;
+.selectionOutline {
   position: absolute;
-  inset: calc(var(--select-edge-outset) * -1);
-  box-sizing: border-box;
-  border-style: solid;
-  border-color: var(--color-accent);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   pointer-events: none;
+}
+
+.selectionOutlineShape {
+  --select-edge-width: 5px;
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: var(--select-edge-width);
+  stroke-linejoin: round;
+  stroke-linecap: round;
   animation: blockPieceSelectionPulse 1.1s ease-in-out infinite;
 }
 
 @keyframes blockPieceSelectionPulse {
   0%,
   100% {
-    border-color: var(--color-accent);
+    stroke: var(--color-accent);
   }
 
   50% {
-    border-color: var(--color-accent-dark);
+    stroke: var(--color-accent-dark);
   }
 }
 
 /* まだ確定していない（盤面からはみ出た／他パーツと重なった）状態は、
    選択中と混同しないよう危険色の破線にする（#483）。 */
-.selectionEdgeUnconfirmed {
-  border-style: dashed;
-  border-color: var(--color-danger);
+.selectionOutlineShapeUnconfirmed {
+  stroke: var(--color-danger);
+  stroke-dasharray: 11 7;
   animation: blockPieceUnconfirmedPulse 0.9s ease-in-out infinite;
 }
 
 @keyframes blockPieceUnconfirmedPulse {
   0%,
   100% {
-    border-color: var(--color-danger);
+    stroke: var(--color-danger);
   }
 
   50% {
-    border-color: var(--color-danger-dark);
+    stroke: var(--color-danger-dark);
   }
 }
 
-/* ドラッグでつまみ上げている最中は、少し浮いて見えるようにする（#483）。 */
+/* ドラッグでつまみ上げている最中、元の位置に残す薄い見た目（#483, #510）。
+   #510 からは、この位置は動かさず「元の場所」として薄く残し、着地候補は
+   別の重ね（BlockPuzzlePlay側の着地プレビュー）で表す。 */
 .pieceDragging {
-  opacity: 0.85;
-  filter: drop-shadow(0 6px 8px rgb(0 0 0 / 25%));
+  opacity: 0.35;
+}
+
+/* 着地プレビュー（配置済みパーツのドラッグ／新規パーツの配置、共通）（#510）。
+   置ける場所は通常の色のまま半透明に、置けない場所は赤系の警告色にする。
+   どちらも「置こうとしている形」自体は消さない。 */
+.pieceToneValid {
+  opacity: 0.55;
+}
+
+.pieceToneInvalid {
+  opacity: 0.82;
+}
+
+.pieceToneInvalid .pieceCell {
+  border-style: dashed;
+  box-shadow: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .selectionEdge,
-  .selectionEdgeUnconfirmed {
+  .selectionOutlineShape,
+  .selectionOutlineShapeUnconfirmed {
     animation: none;
   }
 }
