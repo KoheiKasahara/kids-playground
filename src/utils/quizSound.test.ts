@@ -550,6 +550,20 @@ describe('quizSound', () => {
     expect(instances[0].createOscillator).toHaveBeenCalledTimes(5)
   })
 
+  test('うごくぬりえの塗り音は短い1音で、連続タップでは重ねない', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { playColorPaintFillSound } = await import('./quizSound')
+
+    playColorPaintFillSound()
+    playColorPaintFillSound()
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(1)
+    const oscillator = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    expect(oscillator.frequency.value).toBe(640)
+  })
+
   test('うごくぬりえの完成音はAudio APIが無くても例外を投げない', async () => {
     ;(window as unknown as { AudioContext?: unknown }).AudioContext = undefined
     vi.resetModules()

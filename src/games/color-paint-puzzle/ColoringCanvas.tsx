@@ -42,6 +42,10 @@ export type ColoringCanvasProps = {
   onPaintArea: (areaId: PaintAreaId) => void
   /** 'celebrating' の間は塗れず、CSS側のアニメーションが有効になる。 */
   phase: PaintPhase
+  /** 直近で塗ったエリア。短いポップ演出を表示するために使う。 */
+  feedbackAreaId?: PaintAreaId | null
+  /** 同じエリアを続けて塗ったときも演出を再起動するための連番。 */
+  feedbackSequence?: number
   className?: string
 }
 
@@ -67,6 +71,8 @@ export default function ColoringCanvas({
   painted,
   onPaintArea,
   phase,
+  feedbackAreaId = null,
+  feedbackSequence = 0,
   className,
 }: ColoringCanvasProps) {
   const interactive = phase === 'coloring'
@@ -89,14 +95,16 @@ export default function ColoringCanvas({
   const items: CanvasItem[] = []
 
   for (const area of picture.areas) {
+    const showingFeedback = interactive && feedbackAreaId === area.id
     items.push({
       motion: area.motion,
       element: (
         <ShapeNode
-          key={`${area.id}-fill`}
+          key={`${area.id}-fill-${showingFeedback ? feedbackSequence : 'steady'}`}
           shape={area.shape}
-          className={interactive ? styles.area : styles.areaLocked}
+          className={`${interactive ? styles.area : styles.areaLocked} ${showingFeedback ? styles.areaPainted : ''}`}
           data-area-id={area.id}
+          data-paint-feedback={showingFeedback ? feedbackSequence : undefined}
           fill={areaFillColor(painted, area.id)}
           // 完成演出中はエリアをボタンとして公開しない（絵ぜんたいが1枚の絵になる）。
           // SVGルート側の role="img" + aria-label は残るので、絵の名前は読み上げられる。
@@ -153,6 +161,7 @@ export default function ColoringCanvas({
       role="img"
       aria-label={`${picture.label}の ぬりえ`}
       data-phase={phase}
+      aria-describedby={phase === 'coloring' ? 'color-paint-instruction' : undefined}
       viewBox={picture.viewBox}
       preserveAspectRatio="xMidYMid meet"
       width="100%"

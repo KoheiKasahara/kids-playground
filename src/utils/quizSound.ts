@@ -480,6 +480,29 @@ export function playColorMixSound(): void {
   playTone(ctx, 610, now + 0.07, 0.11, 0.08, 'sine')
 }
 
+/** 塗った瞬間の短い「ぽんっ」。連続タップでは重ねず、操作の手触りだけを残す。 */
+const COLOR_PAINT_FILL_SOUND_MIN_INTERVAL_MS = 95
+let lastColorPaintFillSoundAt: number | null = null
+
+export function playColorPaintFillSound(): void {
+  if (!soundEnabled) return
+
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const wallClockNow = Date.now()
+    if (
+      lastColorPaintFillSoundAt !== null
+      && wallClockNow - lastColorPaintFillSoundAt < COLOR_PAINT_FILL_SOUND_MIN_INTERVAL_MS
+    ) return
+    lastColorPaintFillSoundAt = wallClockNow
+
+    playTone(ctx, 640, ctx.currentTime, 0.085, 0.055, 'triangle')
+  } catch {
+    // 音を出せない環境でも塗り操作は継続する。
+  }
+}
+
 /**
  * パネルを1枚めくったときの「ポン♪」音。
  * びっくりさせない柔らかい音にするため、低音は避けて 600Hz〜1kHz 帯の一音だけを

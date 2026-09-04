@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ColoringCanvas from './ColoringCanvas'
 import { DEFAULT_PAINT_COLOR_ID, PAINT_COLORS, type PaintColorId } from './paintColors'
 import { INITIAL_PAINT_PHASE, canPaint, reducePaintPhase, type PaintPhase } from './paintPhase'
 import { DEFAULT_PICTURE_ID, PAINT_PICTURES, findPaintPicture } from './paintPictures'
 import { createEmptyPaintings, getPaintedAreas, paintArea, resetPicture, type PaintingsState } from './paintState'
-import { playColorPaintFinishSound, primeAudio } from '../../utils/quizSound'
+import { playColorPaintFillSound, playColorPaintFinishSound, primeAudio } from '../../utils/quizSound'
 import styles from './ColorPaintPuzzlePlay.module.css'
 
 /**
@@ -28,20 +28,44 @@ export default function ColorPaintPuzzlePlay() {
   const [selectedPictureId, setSelectedPictureId] = useState<string>(DEFAULT_PICTURE_ID)
   const [paintings, setPaintings] = useState<PaintingsState>(createEmptyPaintings)
   const [phase, setPhase] = useState<PaintPhase>(INITIAL_PAINT_PHASE)
+  const [feedbackAreaId, setFeedbackAreaId] = useState<string | null>(null)
+  const [feedbackSequence, setFeedbackSequence] = useState(0)
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimeoutRef.current !== null) clearTimeout(feedbackTimeoutRef.current)
+    }
+  }, [])
 
   const picture = findPaintPicture(selectedPictureId) ?? PAINT_PICTURES[0]
   // 完成演出中も、この同じ塗り状態をそのまま渡す。演出用の別データは持たない。
   const painted = getPaintedAreas(paintings, picture.id)
   const celebrating = phase === 'celebrating'
+  const selectedColor = PAINT_COLORS.find((color) => color.id === selectedColorId) ?? PAINT_COLORS[0]
 
   const handlePaintArea = (areaId: string) => {
     // 演出中はCanvas側でもタップを受け付けないが、正となる状態更新側でも必ず弾く。
     if (!canPaint(phase)) return
+    primeAudio()
+    playColorPaintFillSound()
     setPaintings((current) => paintArea(current, picture.id, areaId, selectedColorId))
+    setFeedbackSequence((current) => current + 1)
+    setFeedbackAreaId(areaId)
+    if (feedbackTimeoutRef.current !== null) clearTimeout(feedbackTimeoutRef.current)
+    feedbackTimeoutRef.current = setTimeout(() => {
+      setFeedbackAreaId(null)
+      feedbackTimeoutRef.current = null
+    }, 300)
   }
 
   const handleReset = () => {
     setPaintings((current) => resetPicture(current, picture.id))
+    setFeedbackAreaId(null)
+    if (feedbackTimeoutRef.current !== null) {
+      clearTimeout(feedbackTimeoutRef.current)
+      feedbackTimeoutRef.current = null
+    }
   }
 
   /**
@@ -53,6 +77,11 @@ export default function ColorPaintPuzzlePlay() {
     // 演出が最初から作り直されない（＝多重起動しない）。
     setPhase((current) => reducePaintPhase(current, 'finish'))
     if (celebrating) return
+    setFeedbackAreaId(null)
+    if (feedbackTimeoutRef.current !== null) {
+      clearTimeout(feedbackTimeoutRef.current)
+      feedbackTimeoutRef.current = null
+    }
     primeAudio()
     playColorPaintFinishSound()
   }
@@ -72,6 +101,12 @@ export default function ColorPaintPuzzlePlay() {
           <span aria-hidden="true">🖍️</span> うごくぬりえ
         </h1>
       </header>
+
+      {celebrating ? null : (
+        <p id="color-paint-instruction" className={styles.instruction}>
+          いろを えらんで、えを タップしてね
+        </p>
+      )}
 
       {/* 演出中は絵を主役にするため、題材えらび・色パレット・やりなおしは出さない。 */}
       {celebrating ? null : (
@@ -99,6 +134,8 @@ export default function ColorPaintPuzzlePlay() {
             painted={painted}
             onPaintArea={handlePaintArea}
             phase={phase}
+            feedbackAreaId={feedbackAreaId}
+            feedbackSequence={feedbackSequence}
             className={styles.canvas}
           />
           {celebrating ? (
@@ -123,27 +160,34 @@ export default function ColorPaintPuzzlePlay() {
       </section>
 
       {celebrating ? null : (
-        <div className={styles.paletteGroup} role="group" aria-label="いろを えらぶ">
-          {PAINT_COLORS.map((color) => {
-            const selected = color.id === selectedColorId
-            return (
-              <button
-                key={color.id}
-                type="button"
-                className={`${styles.swatch} ${selected ? styles.swatchSelected : ''}`}
-                style={{ backgroundColor: color.hex }}
-                aria-label={color.label}
-                aria-pressed={selected}
-                onClick={() => setSelectedColorId(color.id)}
-              >
-                {selected ? (
-                  <span className={styles.swatchCheck} aria-hidden="true">
-                    ✓
-                  </span>
-                ) : null}
-              </button>
-            )
-          })}
+        <div className={styles.paletteSection} role="group" aria-label="いろを えらぶ">
+          <p className={styles.selectedColor} aria-live="polite">
+            <span>えらんだ いろ：</span>
+            <span className={styles.selectedColorDot} style={{ backgroundColor: selectedColor.hex }} aria-hidden="true" />
+            <strong>{selectedColor.label}</strong>
+          </p>
+          <div className={styles.paletteGroup}>
+            {PAINT_COLORS.map((color) => {
+              const selected = color.id === selectedColorId
+              return (
+                <button
+                  key={color.id}
+                  type="button"
+                  className={`${styles.swatch} ${selected ? styles.swatchSelected : ''}`}
+                  style={{ backgroundColor: color.hex }}
+                  aria-label={color.label}
+                  aria-pressed={selected}
+                  onClick={() => setSelectedColorId(color.id)}
+                >
+                  {selected ? (
+                    <span className={styles.swatchCheck} aria-hidden="true">
+                      ✓
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 
