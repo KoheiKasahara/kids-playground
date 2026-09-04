@@ -11,6 +11,7 @@ import {
   type CarConfig,
   type CarOptionDefinition,
   type CarOptionPreview,
+  type MarkType,
 } from './carConfig'
 import { useCarBuilderScene } from './useCarBuilderScene'
 import styles from './CarBuilderPlay.module.css'
@@ -90,6 +91,34 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
             <span className={styles.decorationPreviewDot} />
           </>
         ) : null}
+      </span>
+    )
+  }
+  if (preview.kind === 'mark') {
+    const glyphs: Record<MarkType, string> = {
+      none: '×',
+      number1: '1',
+      number2: '2',
+      number3: '3',
+      number4: '4',
+      number5: '5',
+      number6: '6',
+      number7: '7',
+      number8: '8',
+      number9: '9',
+      star: '★',
+      heart: '♥',
+      lightning: 'ϟ',
+      crown: '♛',
+      animal: '🐱',
+    }
+    return (
+      <span
+        className={`${className} ${styles.markPreview}`}
+        data-mark={preview.variant}
+        aria-hidden="true"
+      >
+        {glyphs[preview.variant]}
       </span>
     )
   }

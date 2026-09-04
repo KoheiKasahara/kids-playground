@@ -739,6 +739,79 @@
   border-width: 1px;
 }
 
+/* ナンバー／マークはプレートを思わせる背景に大きな数字・図形を置く。 */
+.optionList[data-category='mark'] {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.markPreview {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 34px;
+  border: 3px solid #25313d;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #25313d;
+  font-family: Arial, sans-serif;
+  font-size: 27px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: inset 0 0 0 2px #d9e3ec, 0 1px 2px rgba(17, 24, 39, 0.22);
+}
+
+.markPreview[data-mark='none'] {
+  border-color: #e64a4a;
+  color: #e64a4a;
+  font-size: 32px;
+}
+
+.markPreview[data-mark='star'] {
+  color: #f59f00;
+  text-shadow: 0 1px 0 #8d5529;
+}
+
+.markPreview[data-mark='heart'] {
+  color: #e64a4a;
+}
+
+.markPreview[data-mark='lightning'] {
+  color: #f08c00;
+  font-size: 34px;
+}
+
+.markPreview[data-mark='crown'] {
+  color: #8256c7;
+}
+
+.markPreview[data-mark='animal'] {
+  font-size: 25px;
+}
+
+/* カテゴリ一覧の小さなバッジでは数字／図形の輪郭だけを残す。 */
+.categoryBadge.markPreview {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+  border-radius: 50%;
+  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(33, 37, 41, 0.2);
+}
+
+.categoryBadge.markPreview[data-mark='none'] {
+  font-size: 17px;
+}
+
+.categoryBadge.markPreview[data-mark='lightning'] {
+  font-size: 17px;
+}
+
+.categoryBadge.markPreview[data-mark='animal'] {
+  font-size: 12px;
+}
+
 /* カテゴリ一覧の右上バッジでは、同じ形状を小さく収める。 */
 .categoryBadge.wheelPreview {
   width: 18px;

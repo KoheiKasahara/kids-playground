@@ -93,6 +93,28 @@ describe('カテゴリのカタログ', () => {
     for (const option of options) expect(option.preview).toEqual({ kind: 'decoration', variant: option.id })
   })
 
+  test('ナンバー／マークは「なし」と9数字・5アイコンを持つ', () => {
+    const options = CAR_CATEGORIES.mark.options
+    expect(options.map((option) => option.id)).toEqual([
+      'none',
+      'number1',
+      'number2',
+      'number3',
+      'number4',
+      'number5',
+      'number6',
+      'number7',
+      'number8',
+      'number9',
+      'star',
+      'heart',
+      'lightning',
+      'crown',
+      'animal',
+    ])
+    for (const option of options) expect(option.preview).toEqual({ kind: 'mark', variant: option.id })
+  })
+
   test('選択肢IDはカテゴリ内で一意で、ラベルも空でない', () => {
     for (const category of carCategoryOrder()) {
       const ids = category.options.map((option) => option.id)
@@ -170,6 +192,14 @@ describe('selectCarOption', () => {
   test('カタログに無い選択肢IDは無視して現状を保つ', () => {
     expect(selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'rainbow')).toBe(DEFAULT_CAR_CONFIG)
     expect(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'normal')).toBe(DEFAULT_CAR_CONFIG)
+  })
+
+  test('数字やマークを選ぶと、他カテゴリを保ったままmarkだけ更新する', () => {
+    const config = selectCarOption(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'bus'), 'color', 'blue')
+    const next = selectCarOption(config, 'mark', 'heart')
+    expect(next.mark).toBe('heart')
+    expect(next.body).toBe('bus')
+    expect(next.color).toBe('blue')
   })
 })
 
