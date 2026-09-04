@@ -97,6 +97,19 @@ export const KOMA_KNOCKBACK_MIN_IMPULSE = 0.12
  */
 export const KOMA_KNOCKBACK_MAX_IMPULSE = 1.45
 
+/**
+ * バンパー接触時に保証する、外向きの最低速度[m/s]。
+ * 通常の衝突補正より明確に強い「ドン！」を作るが、現在速度へ固定値を足すのではなく、
+ * 接触時の外向き速度との差からimpulseを求める。
+ */
+export const BUMPER_KNOCKBACK_MIN_OUTGOING_SPEED = 5.2
+/** 高速で突っ込んだときに、現在の接近速度をどの程度外向き速度へ反映するか。 */
+export const BUMPER_KNOCKBACK_INCOMING_SPEED_SCALE = 1.1
+/** バンパー接触後の外向き速度の上限。高速接触で速度が際限なく増えないようにする。 */
+export const BUMPER_KNOCKBACK_MAX_OUTGOING_SPEED = 6.8
+/** 異常な質量値などが入った場合でも、1回のバンパー補正を安全域へ留める上限。 */
+export const BUMPER_KNOCKBACK_MAX_IMPULSE = 4
+
 /** 壁へ向かう速度がこれ未満なら、静かな接触として中央向き補正を行わない。 */
 export const WALL_REDIRECT_MIN_OUTWARD_SPEED = 0.35
 /** 壁接触時に与える中央向きimpulseの範囲。接触開始時の1回だけ適用する。 */
