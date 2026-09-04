@@ -953,17 +953,35 @@ export function useKomaBattleEngine(
         anchor.rotation.y = -belt.angle
         group.add(anchor)
 
-        const surfaceSegments = 14
+        const surfaceLengthSegments = 14
+        const surfaceWidthSegments = 4
         const surfacePositions: number[] = []
         const surfaceIndices: number[] = []
-        for (let index = 0; index <= surfaceSegments; index += 1) {
-          const t = index / surfaceSegments
+        const beltCos = Math.cos(belt.angle)
+        const beltSin = Math.sin(belt.angle)
+        for (let lengthIndex = 0; lengthIndex <= surfaceLengthSegments; lengthIndex += 1) {
+          const t = lengthIndex / surfaceLengthSegments
           const localX = -belt.halfLength + t * belt.halfLength * 2
-          const height = fieldHeightAt(selectedField, Math.abs(localX)) + BELT_SURFACE_LIFT
-          surfacePositions.push(localX, height, -belt.halfWidth, localX, height, belt.halfWidth)
-          if (index < surfaceSegments) {
-            const a = index * 2
-            surfaceIndices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3)
+          for (let widthIndex = 0; widthIndex <= surfaceWidthSegments; widthIndex += 1) {
+            const widthRatio = widthIndex / surfaceWidthSegments
+            const localZ = -belt.halfWidth + widthRatio * belt.halfWidth * 2
+            // The belt is a visual overlay, so conform it to the same radial height
+            // profile as the physical bowl instead of drawing a flat strip through it.
+            const worldX = belt.x + localX * beltCos + localZ * beltSin
+            const worldZ = belt.z - localX * beltSin + localZ * beltCos
+            const height =
+              fieldHeightAt(selectedField, Math.hypot(worldX, worldZ)) + BELT_SURFACE_LIFT
+            surfacePositions.push(localX, height, localZ)
+          }
+        }
+        for (let lengthIndex = 0; lengthIndex < surfaceLengthSegments; lengthIndex += 1) {
+          for (let widthIndex = 0; widthIndex < surfaceWidthSegments; widthIndex += 1) {
+            const rowWidth = surfaceWidthSegments + 1
+            const a = lengthIndex * rowWidth + widthIndex
+            const b = a + 1
+            const c = a + rowWidth
+            const d = c + 1
+            surfaceIndices.push(a, c, b, b, c, d)
           }
         }
         const surfaceGeometry = track(new THREE.BufferGeometry())
@@ -1215,7 +1233,12 @@ export function useKomaBattleEngine(
         if (nextX > arrow.belt.halfLength) nextX -= span
         arrow.localX = nextX
         arrow.mesh.position.x = nextX
-        arrow.mesh.position.y = fieldHeightAt(selectedField, Math.abs(nextX)) + BELT_ARROW_LIFT
+        const beltCos = Math.cos(arrow.belt.angle)
+        const beltSin = Math.sin(arrow.belt.angle)
+        const worldX = arrow.belt.x + nextX * beltCos
+        const worldZ = arrow.belt.z - nextX * beltSin
+        arrow.mesh.position.y =
+          fieldHeightAt(selectedField, Math.hypot(worldX, worldZ)) + BELT_ARROW_LIFT
       }
     }
 
