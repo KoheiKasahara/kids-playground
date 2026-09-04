@@ -201,6 +201,17 @@
   font-size: clamp(22px, 6vw, 30px);
 }
 
+/* 「12 / 18」の区切りと全体数。値より小さく、控えめな色にして主役（scoreValue）を邪魔しない。 */
+.scoreSeparator {
+  font-size: clamp(14px, 4vw, 20px);
+  color: var(--color-text-muted);
+}
+
+.scoreTotal {
+  font-size: clamp(16px, 4.4vw, 22px);
+  color: var(--color-text-muted);
+}
+
 .scoreUnit {
   font-size: clamp(12px, 3.2vw, 16px);
 }
@@ -260,6 +271,45 @@
   text-align: right;
 }
 
+/*
+ * 大崩壊の短いチップ。「ガラガラー！」を0.9秒だけ出す（コンポーネント側でsetTimeout管理）。
+ *
+ * 画面下寄りに置く。上に置くと玉選択カードの文字と重なって読みにくく、崩れている
+ * 積み木の上にも被った（実画面で確認）。このチップが出るのは飛行中〜落ち着くまでで、
+ * その間は下端のねらい案内（aimPanel）が消えているため、下側は空いている。
+ * 1投の結果（throwResult, 上から22%）とも重ならない。
+ */
+.collapseChip {
+  position: absolute;
+  bottom: 16%;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(16px, 5vw, 24px);
+  font-weight: 900;
+  text-align: center;
+  text-shadow: 0 2px 0 #fff, 0 0 10px rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+  animation: collapseChipPop 0.25s ease-out;
+}
+
+@keyframes collapseChipPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* 1投ごとの結果。短い言葉だけを大きく出す。 */
 .throwResult {
   position: absolute;
@@ -276,6 +326,24 @@
   pointer-events: none;
 }
 
+/* 全部倒したときだけ添えるキラキラ演出。DOM要素を増やさず、疑似要素の輝きと拡大でまかなう。 */
+.throwResultPerfect {
+  color: #ff9f1a;
+  animation: throwResultGlow 1.4s ease-in-out infinite;
+}
+
+@keyframes throwResultGlow {
+  0%,
+  100% {
+    text-shadow: 0 2px 0 #fff, 0 0 12px rgba(255, 210, 63, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    text-shadow: 0 2px 0 #fff, 0 0 26px rgba(255, 159, 26, 0.95);
+    transform: scale(1.06);
+  }
+}
+
 /* 3投おわりの結果。 */
 .resultOverlay {
   position: absolute;
@@ -289,6 +357,86 @@
   padding: var(--space-md);
   background: color-mix(in srgb, var(--color-background) 80%, transparent);
   text-align: center;
+}
+
+/*
+ * パーフェクト（3投のうち1回でも全部倒した）を結果画面の一番上に大きく出す。
+ * 1.2秒ほどで弾んで落ち着く（animation-fill-mode: bothで最終形のまま止まる）。
+ * ボタン操作を遅らせたり覆ったりしないよう、レイアウトに関わる値（opacity/transform以外）は動かさない。
+ */
+.perfectBadge {
+  margin: 0;
+  color: #ff9f1a;
+  font-size: clamp(26px, 8vw, 40px);
+  font-weight: 900;
+  text-shadow: 0 2px 0 #fff, 0 0 18px rgba(255, 159, 26, 0.75);
+  animation: perfectPop 1.2s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes perfectPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-6deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.12) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/*
+ * 紙吹雪。DOM要素は最大14個以内(このファイル内では12個)に収め、CSSアニメーションだけで動かす。
+ * 位置・色・落下タイミングはnth-childで固定バリエーションを付け、JSでは何も計算しない。
+ * resultOverlayはposition:absolute; inset:0なので、この.confettiもそこへ重ねるだけでよい。
+ */
+.confetti {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confettiPiece {
+  position: absolute;
+  top: -8%;
+  left: 50%;
+  width: 10px;
+  height: 14px;
+  background: var(--color-accent);
+  opacity: 0;
+  animation: confettiFall 1.4s ease-in both;
+}
+
+.confettiPiece:nth-child(1) { left: 6%; background: #ff6b6b; animation-delay: 0s; }
+.confettiPiece:nth-child(2) { left: 15%; background: #ffd43b; animation-delay: 0.08s; }
+.confettiPiece:nth-child(3) { left: 24%; background: #4c6ef5; animation-delay: 0.02s; }
+.confettiPiece:nth-child(4) { left: 33%; background: #51cf66; animation-delay: 0.14s; }
+.confettiPiece:nth-child(5) { left: 42%; background: #ff922b; animation-delay: 0.06s; }
+.confettiPiece:nth-child(6) { left: 51%; background: #9775fa; animation-delay: 0.18s; }
+.confettiPiece:nth-child(7) { left: 60%; background: #22b8cf; animation-delay: 0.04s; }
+.confettiPiece:nth-child(8) { left: 69%; background: #ff6b6b; animation-delay: 0.16s; }
+.confettiPiece:nth-child(9) { left: 78%; background: #ffd43b; animation-delay: 0.1s; }
+.confettiPiece:nth-child(10) { left: 87%; background: #4c6ef5; animation-delay: 0.2s; }
+.confettiPiece:nth-child(11) { left: 94%; background: #51cf66; animation-delay: 0.12s; }
+.confettiPiece:nth-child(12) { left: 40%; background: #9775fa; animation-delay: 0.22s; }
+
+@keyframes confettiFall {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(340px) rotate(340deg);
+  }
 }
 
 .resultTitle {
@@ -416,6 +564,9 @@
   position: relative;
   display: flex;
   flex: none;
+  /* 大きさはコンポーネント側から --ball-orb-size で受け取る（玉の実際の半径比に合わせている）。 */
+  width: var(--ball-orb-size, 46px);
+  height: var(--ball-orb-size, 46px);
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -434,6 +585,28 @@
   white-space: nowrap;
 }
 
+/*
+ * 背の低い縦画面（iPhone SE 320x568 など）では、玉選択カードが積み木の上部に
+ * かぶって塔の天辺が見えなくなる（実画面で確認）。カードを一回り小さくして
+ * 積み木を見せる。縮めてもタップ領域は約70pxあり、幼児向けの下限(56px)を下回らない。
+ */
+@media (max-height: 680px) {
+  .ballCard {
+    gap: 1px;
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+
+  .ballCardOrb {
+    width: calc(var(--ball-orb-size, 46px) * 0.72);
+    height: calc(var(--ball-orb-size, 46px) * 0.72);
+  }
+
+  .ballCardIcon {
+    font-size: 12px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .powerFill {
     transition: none;
@@ -441,5 +614,24 @@
 
   .ballCard {
     transition: none;
+  }
+
+  .collapseChip {
+    animation: none;
+  }
+
+  .throwResultPerfect {
+    animation: none;
+  }
+
+  .perfectBadge {
+    animation: none;
+  }
+
+  /* 紙吹雪はアニメーションさせず、静止表示にする（動きを止めるだけで消しはしない）。 */
+  .confettiPiece {
+    animation: none;
+    opacity: 1;
+    transform: translateY(60px) rotate(0deg);
   }
 }

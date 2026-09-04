@@ -232,3 +232,116 @@ Phase 3 でステージを足すときも同じ品質を保てます。
 - **Phase 3（複数ステージ）**: `bowlingStage.ts` の `BOWLING_STAGES` へ配置データを足し、
   選択UIから `stageId` を渡す。`bowlingStage.test.ts` の不変条件検査は
   全ステージへ広げる。
+
+## 14. Phase 4（演出・効果音・UX仕上げ）
+
+対象Issue: [#472](https://github.com/KoheiKasahara/kids-playground/issues/472)
+
+物理パラメータ（`bowlingPhysics.ts` / `bowlingBalls.ts` の物理項目 / `bowlingStage.ts` の配置 /
+`bowlingWorld.ts` の Collider・CCD・ソルバ設定）は一切変更していない。足したのは
+視覚・音・触覚・UIのフィードバック層だけである。
+
+### 新規モジュール
+
+- `bowlingFeedback.ts`: 玉の運動と倒壊数から「衝突」「バウンド」「大崩壊」の演出イベントを
+  作る純粋関数。旧 `useTsumikiBowlingEngine.ts` にあった `IMPACT_SPEED_DROP` 一本槍の判定を
+  ここへ移し、バウンド検出（下向き→上向きの速度反転）と、短時間にまとめて倒れたかの
+  時間窓判定を足した。Three.js/Rapier/DOM非依存で、時間経過も `Date.now()` ではなく
+  引数の `stepMs` 積算だけで扱うため、vitestでフレーム差分をそのまま検証できる。
+- `bowlingSound.ts`: 「何を鳴らすか」（`launchTones` 等の純粋関数）と「実際に鳴らす」
+  （`createBowlingSoundController`）を分離。共有 AudioContext は `quizSound.ts` の
+  `getSharedAudioContext()`（Phase 4で追加）を使い、iOSで複数Contextを作らない。
+- `bowlingHaptics.ts`: `navigator.vibrate` を使った軽い振動。対応チェック＋try/catchで
+  必ず失敗を吸収し、非対応端末でもゲームは完全に成立する。
+
+### 発射・衝突・崩壊演出の方針
+
+- 発射ガイドはパワーに応じて点を太くし、最大付近（0.85以上）ではゆっくり脈動＋強い赤へ張り付く。
+  `prefers-reduced-motion` では脈動しない。
+- 発射直後、玉の一瞬の伸び（`LAUNCH_POP_MS`）・発射位置のフラッシュ・玉ごとの残像トレイルを追加。
+  トレイル・衝撃リング・きらめきパーティクル（`THREE.Points`を1つだけ使い回す）は、すべて
+  初期化時に確保したプール/配列を使い回し、毎フレームの新規オブジェクト生成をしていない。
+- 衝突エフェクトは強さ（strength、0〜1）でリングの大きさ・不透明度・カメラ揺れを変える。
+  弱い衝突（strength < 0.25）ではカメラを揺らさない。
+- 「大崩壊」（`BIG_COLLAPSE_COUNT`=5個が`BIG_COLLAPSE_WINDOW_MS`=450ms以内に倒れた）では、
+  大きめのきらめき・やや強めのカメラ揺れ・「ガラガラー！」の短いチップ（900ms）を出す。
+
+### 玉ごとの演出差
+
+演出専用のテーブル `BALL_VISUALS`（`useTsumikiBowlingEngine.ts` 内）と、`bowlingSound.ts` の
+玉ごとの音色分岐で、物理パラメータとは別に「見え方・聞こえ方」の差を作っている。
+
+| 玉 | トレイル | 固有の演出 | 音の主な特徴 |
+|---|---|---|---|
+| どっしりだま | 短く太い | — | 低い「ドン/ゴン」 |
+| はずむだま | 中程度 | バウンドごとに地面へ小さなリング | バウンドのたびにペンタトニックで音程が上がる（5段で頭打ち） |
+| ちいさいだま | 長く濃い | — | 「シュッ」と駆け上がる短音 |
+
+### 衝突音の多重再生対策（「ガガガガ」対策）
+
+積み木が一斉に崩れると、衝突・バウンド・カラカラ音が同一フレームに何十件も発生しうる。
+`createBowlingSoundGate`（`bowlingSound.ts`）が二段構えで間引く。
+
+1. 種類ごとのクールダウン（`BOWLING_SOUND_COOLDOWN_MS`: launch 120 / impact 90 / bounce 110 /
+   clatter 70 / perfect・result 600 ms）
+2. 直近200msに鳴らした音の合計数が `MAX_ACTIVE_BOWLING_VOICES`(6) を超えたら拒否
+
+`perfect` / `result` はクールダウンだけ効かせ、音数上限の対象から外している
+（積み木の崩壊音でお祝いの音が潰れないようにするため）。`clatterTones` 自体も、
+何十個倒れても音は最大2音までしか重ねない。
+
+### パーフェクトの定義
+
+「3投のうち1回でも、その投球で全ての積み木を倒したら（`toppled >= total`）パーフェクト」。
+`ThrowSettledResult` に `total`（そのステージの積み木総数）と `isPerfect` を追加した。
+お祝い（`playPerfect` / `haptics.perfect()`）は結果画面まで待たず、その投球が
+落ち着いた直後に鳴らす。結果画面には、3投のうち1回でもパーフェクトがあれば
+「パーフェクト！」と紙吹雪・キラキラを一番上に出す（演出は1.2秒ほどで落ち着き、
+ボタン操作をいつでも受け付ける）。
+
+### 振動の扱い
+
+`navigator.vibrate` に対応している端末だけ、発射・強い衝突（strength ≥ 0.5）・パーフェクトで
+短く振動する。非対応環境・例外・`prefers-reduced-motion: reduce` では常に何もしない
+（必須機能ではなく、手触りの上乗せという位置づけ）。
+
+### パフォーマンス方針
+
+- トレイル・バウンドリング・衝撃リング・きらめきパーティクルは、すべて `useEffect` の中で
+  一度だけ確保するプール/配列を使い回す。投球中や崩壊時に新しい `THREE.Mesh` /
+  `THREE.BufferGeometry` を作らない。
+- 音・振動のコントローラ（`createBowlingSoundController` / `createBowlingHaptics`）も
+  runにつき1つだけ作り、予約したAudioNodeは `koma-battle`（`quizSound.ts`）と同じく
+  Setで追跡して `onended` でdisconnectし、`release()` で必ず `dispose()` する。
+
+### 追加したテスト
+
+| ファイル | 確認していること |
+|---|---|
+| `bowlingFeedback.test.ts` | 衝突・バウンドの検出しきい値とstrengthの正規化、最小間隔、投球ごとのリセット、大崩壊の時間窓判定 |
+| `bowlingSound.test.ts` | 玉ごとの音色差、バウンドの音程が頭打ちになること、カラカラ音が2音を超えないこと、`createBowlingSoundGate` のクールダウンと直近音数上限（同一時刻で連続requestしても許可数が上限内に収まること）、音量・周波数レンジ |
+| `bowlingHaptics.test.ts` | 非対応環境で例外を投げない、対応環境で呼ばれる、クールダウン、`prefers-reduced-motion` で呼ばれない |
+| `TsumikiBowlingGame.test.tsx`（更新） | 「12 / 18こ」形式のHUD、投球中の増加と1投終了後の据え置き、パーフェクトのトースト・結果画面、大崩壊チップ、既存の玉選択・3投進行が壊れていないこと |
+| `TsumikiBowlingPlay.test.tsx` | ステージ選択 ⇄ プレイの切り替えと、切り替えのたびにページ先頭へ戻すこと |
+
+既存のテスト（`bowlingWorld.test.ts` 等の物理検証）は変更していない。
+
+### 実画面確認で直した点
+
+数値だけでは分からず、実際に縦画面（390x844 / 320x568）で遊んで初めて分かった不具合。
+
+- **きらめきが一度も見えなかった**: Three.jsは `geometry.boundingSphere` を最初の描画で
+  一度だけ計算してキャッシュし、position属性を `needsUpdate` しても作り直さない。
+  粒子の初期位置（画面外の y=-1000）から作られた球が残り続け、実際に光っている粒子ごと
+  視錐台カリングされていた。`sparklePoints.frustumCulled = false` で解決。
+- **衝撃リングが塔を覆っていた**: 不透明度が「0.85 × 強さ係数」で1に張り付き、広がった
+  リングが崩れる様子を隠していた。上限0.8を設け、広がる大きさも抑えた
+  （「気持ちよさは足すが、物理の見やすさは削らない」）。
+- **「ガラガラー！」が玉選択カードと重なっていた**: 画面下寄り（`bottom: 16%`）へ移した。
+  このチップが出る飛行中〜落ち着くまでは下端のねらい案内が消えているため、下側は空いている。
+- **背の低い画面でゲームが画面外にあった**: ステージ選択→プレイはURL遷移ではないため
+  `app/ScrollManager.tsx` の「遷移したら先頭へ」が効かず、一覧を下までスクロールして
+  選ぶと説明文が表示されたままだった。`TsumikiBowlingPlay` で切り替えのたびに先頭へ戻す。
+- **背の低い画面で玉選択カードが塔の天辺を隠していた**: `max-height: 680px` でカードを
+  一回り小さくする（縮めてもタップ領域は約70pxあり、幼児向けの下限56pxを下回らない）。
+  そのためカード内の玉の大きさは、インラインstyleではなくCSS変数 `--ball-orb-size` で渡している。
