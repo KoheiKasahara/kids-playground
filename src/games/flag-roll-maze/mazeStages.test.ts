@@ -180,6 +180,66 @@ describe('ステージカタログ', () => {
     expect(Math.abs(spinner.center.x)).toBeLessThan(spinner.sweepRadius)
   })
 
+  it('大砲は既存大砲を8基使い、終盤に4連続の乗り継ぎを持つ', () => {
+    const definition = MAZE_STAGES.find((stage) => stage.id === 'cannon')
+    expect(definition).toBeDefined()
+    if (definition === undefined) return
+
+    expect(definition.nameJa).toBe('大砲')
+    expect(definition.emoji).toBe('💥')
+    expect(definition.hintJa).toBe('とんで つぎへ')
+    expect(definition.rows).toHaveLength(29)
+    expect(definition.rows.every((row) => row.length === 13)).toBe(true)
+    expect(definition.gimmicks.map((gimmick) => gimmick.id)).toEqual([
+      'cannon-intro-1',
+      'cannon-intro-2',
+      'cannon-middle-1',
+      'cannon-middle-2',
+      'cannon-final-1',
+      'cannon-final-2',
+      'cannon-final-3',
+      'cannon-final-4',
+    ])
+    expect(definition.gimmicks.every((gimmick) => gimmick.kind === 'cannon')).toBe(true)
+    expect(definition.checkpointCells).toHaveLength(8)
+    expect(definition.starCells).toHaveLength(3)
+
+    const stage = createMazeStageById('cannon')
+    const cannons = stage.gimmicks.cannons
+    expect(cannons).toHaveLength(8)
+
+    // 終盤4基は各発射方向の先に次の砲台があり、弾道の左右方向と一致する。
+    const finalCannons = cannons.slice(-4)
+    expect(finalCannons.map((cannon) => cannon.id)).toEqual([
+      'cannon-final-1',
+      'cannon-final-2',
+      'cannon-final-3',
+      'cannon-final-4',
+    ])
+    for (const [index, cannon] of finalCannons.slice(0, -1).entries()) {
+      const next = finalCannons[index + 1]
+      expect(next).toBeDefined()
+      if (next === undefined) continue
+      const dx = next.center.x - cannon.center.x
+      const dz = next.center.z - cannon.center.z
+      const horizontalLength = Math.hypot(dx, dz)
+      const launch = {
+        x: Math.sin(cannon.headingRad),
+        z: Math.cos(cannon.headingRad),
+      }
+      expect(horizontalLength).toBeLessThan(5.0)
+      expect(launch.x * dx + launch.z * dz).toBeGreaterThan(0)
+      expect(Math.abs(launch.x * dz - launch.z * dx)).toBeLessThan(0.02)
+    }
+
+    const goal = stage.goal
+    const finalCannon = finalCannons.at(-1)
+    expect(finalCannon).toBeDefined()
+    if (finalCannon === undefined) return
+    expect(Math.hypot(goal.x - finalCannon.center.x, goal.z - finalCannon.center.z)).toBeLessThan(5.2)
+    expect(goal.x).toBeCloseTo(finalCannon.center.x, 8)
+  })
+
   it('GOAL手前の門は、棒に振られたボールをカップ正面へ戻せる広さにする', () => {
     const stage = createMazeStageById('athletic')
     const left = stage.terrain.boxes.find(({ id }) => id === 'athletic-goal-guide-left')
