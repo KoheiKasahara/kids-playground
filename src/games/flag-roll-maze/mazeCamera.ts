@@ -55,21 +55,24 @@ export const MAX_FOLLOW_LAG_IN_RADII = 3.0
  * プレイ中の「＋ / −」で選べる、標準のカメラ距離へ掛ける倍率。
  *
  * 端末の大きさや持ち方で「もう少し先を見たい / もう少しボールを大きく見たい」の
- * 好みが分かれるため、実機で決めた標準値（index 4 の 1.0）を真ん中にして、
- * 前後4段ずつ用意する。index が大きいほど寄る（距離が縮む）。
+ * 好みが分かれるため、実機で決めた標準値（index 7 の 1.0）を基準にして、
+ * 引く側7段、寄る側4段を用意する。index が大きいほど寄る（距離が縮む）。
  *
- * Phase 4開始後に追加した範囲として、既存の最遠（1.19）より2段引ける1.39まで、
+ * Phase 4開始後に追加した範囲として、既存の最遠（1.19）より5段引ける1.78まで、
  * 既存の最寄（0.84）より2段寄れる0.71まで広げている。一番引いても9×9の迷路
  * 全体は見渡せず、一番寄せてもボールは画面短辺の約24%に留まる。1段あたり
  * 8〜9%なので、数回押して好みの距離に合わせられる。
  */
-export const MAZE_ZOOM_SCALES = [1.39, 1.29, 1.19, 1.09, 1, 0.92, 0.84, 0.77, 0.71] as const
+export const MAZE_ZOOM_SCALES = [
+  1.78, 1.64, 1.51,
+  1.39, 1.29, 1.19, 1.09, 1, 0.92, 0.84, 0.77, 0.71,
+] as const
 
 export const MIN_MAZE_ZOOM_INDEX = 0
 export const MAX_MAZE_ZOOM_INDEX = MAZE_ZOOM_SCALES.length - 1
 
 /** ゲーム開始時のズーム。実機で決めた標準のカメラ距離をそのまま使う。 */
-export const DEFAULT_MAZE_ZOOM_INDEX = 4
+export const DEFAULT_MAZE_ZOOM_INDEX = 7
 
 /** ズームを切り替えたとき、距離が跳ねずに寄る・引く速さ（1/秒）。 */
 export const CAMERA_ZOOM_LAMBDA = 8

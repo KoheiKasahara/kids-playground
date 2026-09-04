@@ -277,14 +277,14 @@ describe('プレイ中のズーム段階', () => {
     expect(mazeZoomScale(DEFAULT_MAZE_ZOOM_INDEX)).toBe(1)
   })
 
-  it('既存の前後2段に加え、さらに前後2段ずつ選べる', () => {
+  it('ズームアウト側にさらに3段追加し、標準から引く側7段を選べる', () => {
     expect(MAZE_ZOOM_SCALES).toEqual([
-      1.39, 1.29,
-      // Phase 4実装時点のズーム段階。ここを基準に前後2段を追加する。
-      1.19, 1.09, 1, 0.92, 0.84,
+      1.78, 1.64, 1.51,
+      // Phase 4実装時点のズーム段階。ここを基準にズームアウト側へ3段追加する。
+      1.39, 1.29, 1.19, 1.09, 1, 0.92, 0.84,
       0.77, 0.71,
     ])
-    expect(DEFAULT_MAZE_ZOOM_INDEX - MIN_MAZE_ZOOM_INDEX).toBe(4)
+    expect(DEFAULT_MAZE_ZOOM_INDEX - MIN_MAZE_ZOOM_INDEX).toBe(7)
     expect(MAX_MAZE_ZOOM_INDEX - DEFAULT_MAZE_ZOOM_INDEX).toBe(4)
   })
 
@@ -315,7 +315,7 @@ describe('プレイ中のズーム段階', () => {
     const cells = visibleCellsOnShortSide(distance, aspect)
 
     expect(cells).toBeGreaterThan(visibleCellsOnShortSide(computeMazeCameraDistance(aspect), aspect))
-    expect(cells).toBeLessThan(6)
+    expect(cells).toBeLessThan(9)
   })
 
   it('一番寄せてもボールが画面を占有しすぎない', () => {
