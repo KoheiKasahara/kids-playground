@@ -272,6 +272,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       {
         barrel: THREE.Group
         ring: THREE.Mesh
+        opening: THREE.Mesh
         smoke: THREE.Mesh[]
         smokeMaterial: THREE.MeshLambertMaterial
         direction: THREE.Vector3
@@ -513,11 +514,15 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
           -visual.direction.z * recoil,
         )
         visual.ring.position.copy(visual.muzzle).addScaledVector(visual.direction, -recoil)
+        visual.opening.position
+          .copy(visual.muzzle)
+          .addScaledVector(visual.direction, 0.035 - recoil)
 
         const smokeProgress = Math.min(1, Math.max(0, (nowMs - startedAtMs) / 450))
         if (smokeProgress >= 1) {
           visual.barrel.position.set(0, 0, 0)
           visual.ring.position.copy(visual.muzzle)
+          visual.opening.position.copy(visual.muzzle).addScaledVector(visual.direction, 0.035)
           visual.smokeMaterial.opacity = 0
           for (const smoke of visual.smoke) {
             smoke.visible = false
@@ -558,6 +563,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       for (const visual of cannonVisuals.values()) {
         visual.barrel.position.set(0, 0, 0)
         visual.ring.position.copy(visual.muzzle)
+        visual.opening.position.copy(visual.muzzle).addScaledVector(visual.direction, 0.035)
         visual.ring.scale.setScalar(1)
         visual.smokeMaterial.opacity = 0
         for (const smoke of visual.smoke) {
@@ -1190,24 +1196,42 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
         }
 
         if (stage.gimmicks.cannons.length > 0) {
+          // 大砲は武器らしさよりも、丸い本体と明るい色で「入る場所」が分かる
+          // おもちゃ感を優先する。見た目専用なので物理Bodyの寸法は変えない。
+          const cannonBodyGeometry = track(new THREE.SphereGeometry(0.62, 24, 16))
           const cannonBarrelGeometry = track(
-            new THREE.CylinderGeometry(0.34, 0.34, 1.5, 16),
+            new THREE.CylinderGeometry(0.29, 0.4, 1.5, 20),
           )
           const cannonBaseGeometry = track(
-            new THREE.CylinderGeometry(0.48, 0.62, 0.36, 16),
+            new RoundedBoxGeometry(1.55, 0.26, 1.12, 5, 0.12),
+          )
+          const cannonSupportGeometry = track(
+            new RoundedBoxGeometry(0.28, 0.62, 0.38, 4, 0.1),
           )
           const cannonRingGeometry = track(
-            new THREE.TorusGeometry(0.37, 0.06, 8, 20),
+            new THREE.TorusGeometry(0.43, 0.095, 10, 24),
+          )
+          const cannonOpeningGeometry = track(
+            new THREE.CylinderGeometry(0.32, 0.32, 0.08, 20),
           )
           const cannonSmokeGeometry = track(new THREE.SphereGeometry(0.18, 12, 10))
+          const cannonBodyMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0x8067e8 }),
+          )
           const cannonBarrelMaterial = trackMaterial(
-            new THREE.MeshLambertMaterial({ color: 0x495057 }),
+            new THREE.MeshLambertMaterial({ color: 0xff922b }),
           )
           const cannonBaseMaterial = trackMaterial(
-            new THREE.MeshLambertMaterial({ color: 0x868e96 }),
+            new THREE.MeshLambertMaterial({ color: 0x5f3dc4 }),
+          )
+          const cannonSupportMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0x7048d8 }),
           )
           const cannonRingMaterial = trackMaterial(
             new THREE.MeshLambertMaterial({ color: 0xffd43b }),
+          )
+          const cannonOpeningMaterial = trackMaterial(
+            new THREE.MeshLambertMaterial({ color: 0x2b235a }),
           )
           const cannonSmokeMaterial = trackMaterial(
             new THREE.MeshLambertMaterial({
@@ -1226,20 +1250,38 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
             base.position.y = 0.18
             cannonGroup.add(base)
 
+            const body = new THREE.Mesh(cannonBodyGeometry, cannonBodyMaterial)
+            body.position.y = 0.58
+            // 少し縦につぶした球体で、ずんぐりした樽型の本体に見せる。
+            body.scale.set(1.05, 0.82, 1)
+            cannonGroup.add(body)
+
+            const supportDirection = new THREE.Vector3(
+              Math.cos(cannon.headingRad),
+              0,
+              -Math.sin(cannon.headingRad),
+            )
+            for (const side of [-1, 1]) {
+              const support = new THREE.Mesh(cannonSupportGeometry, cannonSupportMaterial)
+              support.position.copy(supportDirection).multiplyScalar(side * 0.48)
+              support.position.y = 0.49
+              cannonGroup.add(support)
+            }
+
             const barrelGroup = new THREE.Group()
             const barrel = new THREE.Mesh(cannonBarrelGeometry, cannonBarrelMaterial)
             const barrelCenterY = cannon.muzzleY * 0.66
             barrel.position.y = barrelCenterY
             // 円柱の軸を+zへ向ける仰角として扱い、設計どおりの回転量で砲身を立ち上げる。
-            barrel.rotation.x = -(Math.PI / 2 - cannon.elevationRad)
-            barrelGroup.add(barrel)
-            cannonGroup.add(barrelGroup)
-
             const direction = new THREE.Vector3(
               Math.cos(cannon.elevationRad) * Math.sin(cannon.headingRad),
               Math.sin(cannon.elevationRad),
               Math.cos(cannon.elevationRad) * Math.cos(cannon.headingRad),
             ).normalize()
+            barrel.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction)
+            barrelGroup.add(barrel)
+            cannonGroup.add(barrelGroup)
+
             const muzzle = new THREE.Vector3(0, barrelCenterY, 0).addScaledVector(
               direction,
               0.78,
@@ -1248,6 +1290,12 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
             ring.position.copy(muzzle)
             ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction)
             cannonGroup.add(ring)
+
+            // 太い黄色リングの内側を暗くして、スマホ画面でも砲口の向きを読み取りやすくする。
+            const opening = new THREE.Mesh(cannonOpeningGeometry, cannonOpeningMaterial)
+            opening.position.copy(muzzle).addScaledVector(direction, 0.035)
+            opening.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction)
+            cannonGroup.add(opening)
 
             const smoke: THREE.Mesh[] = []
             for (let index = 0; index < 3; index += 1) {
@@ -1261,6 +1309,7 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
             cannonVisuals.set(cannon.id, {
               barrel: barrelGroup,
               ring,
+              opening,
               smoke,
               smokeMaterial: cannonSmokeMaterial,
               direction,
