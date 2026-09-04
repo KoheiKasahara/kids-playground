@@ -25,6 +25,10 @@ import {
   KOMA_BOOST_MOVE_SPEED_LIMIT,
   KOMA_BOOST_SPIN_INCREMENT,
   KOMA_BELT_FORCE,
+  BUMPER_KNOCKBACK_INCOMING_SPEED_SCALE,
+  BUMPER_KNOCKBACK_MAX_IMPULSE,
+  BUMPER_KNOCKBACK_MAX_OUTGOING_SPEED,
+  BUMPER_KNOCKBACK_MIN_OUTGOING_SPEED,
   KOMA_KNOCKBACK_MAX_CLOSING_SPEED,
   KOMA_KNOCKBACK_MAX_IMPULSE,
   KOMA_KNOCKBACK_MIN_CLOSING_SPEED,
@@ -96,6 +100,8 @@ export type KomaEntry = {
 export type KomaBattleWorld = {
   world: World
   komas: KomaEntry[]
+  /** 物理と接触補正が共有するフィールド定義。バンパー補正を他フィールドへ漏らさない。 */
+  field: KomaField
   /** 接触開始時だけ補正するための試合単位状態。世界の再生成で必ず初期化される。 */
   contactAssist: KomaContactAssistState
 }
@@ -103,11 +109,14 @@ export type KomaBattleWorld = {
 export type KomaContactAssistState = {
   activeKomaPair: boolean
   activeWalls: Set<number>
+  /** `komaIndex:obstacleIndex` ごとのバンパー接触状態。接触中の毎フレーム加算を防ぐ。 */
+  activeBumpers: Set<string>
 }
 
 export type KomaContactAssistResult = {
   komaKnockbacks: number
   wallRedirects: number
+  bumperKnockbacks: number
   maxAppliedImpulse: number
 }
 
@@ -318,9 +327,11 @@ export function createKomaBattleWorld(
   return {
     world,
     komas,
+    field: selectedField,
     contactAssist: {
       activeKomaPair: false,
       activeWalls: new Set<number>(),
+      activeBumpers: new Set<string>(),
     },
   }
 }
@@ -337,11 +348,12 @@ function scaledBetween(value: number, minimum: number, maximum: number): number 
 }
 
 /**
- * 接触開始時だけ、ゲーム向けの小さなimpulseを加える。
+ * 接触開始時だけ、ゲーム向けの補正impulseを加える。
  *
  * Rapier本来の接触解決は残し、円盤同士には等大反対向きのimpulse、壁際には
- * 中央向きのimpulseだけを足す。位置・姿勢は書き換えず、質量差もRapierへ任せる。
- * `active=false` は決着後の補正停止に使い、状態も解除して再発火を防ぐ。
+ * 中央向きのimpulse、バンパーには中心から外向きの強いimpulseだけを足す。
+ * 位置・姿勢は書き換えず、質量差もRapierへ任せる。`active=false` は決着後の補正停止に使い、
+ * 状態も解除して再発火を防ぐ。
  */
 export function applyKomaContactAssist(
   battle: KomaBattleWorld,
@@ -350,12 +362,14 @@ export function applyKomaContactAssist(
   const result: KomaContactAssistResult = {
     komaKnockbacks: 0,
     wallRedirects: 0,
+    bumperKnockbacks: 0,
     maxAppliedImpulse: 0,
   }
   const state = battle.contactAssist
   if (!active) {
     state.activeKomaPair = false
     state.activeWalls.clear()
+    state.activeBumpers.clear()
     return result
   }
 
@@ -414,6 +428,77 @@ export function applyKomaContactAssist(
       }
     }
   }
+
+  // バンパーだけは通常のCollider反発に頼らず、接触開始時の外向き速度を補う。
+  // フィールド定義経由で対象を限定しているため、通常壁・コマ同士・他ステージへは影響しない。
+  battle.komas.forEach((koma, komaIndex) => {
+    const translation = koma.body.translation()
+    const diskRadius = DISK_RADIUS * koma.spec.type.visual.diskRadiusScale
+    const velocity = koma.body.linvel()
+
+    battle.field.obstacles.forEach((obstacle, obstacleIndex) => {
+      const key = `${komaIndex}:${obstacleIndex}`
+      const distance = Math.hypot(
+        translation.x - obstacle.x,
+        translation.z - obstacle.z,
+      )
+      if (!Number.isFinite(distance)) {
+        state.activeBumpers.delete(key)
+        return
+      }
+      const contactDistance = diskRadius + obstacle.radius + KOMA_CONTACT_MARGIN
+      const releaseDistance = contactDistance + CONTACT_RELEASE_MARGIN
+      if (distance > releaseDistance) {
+        state.activeBumpers.delete(key)
+        return
+      }
+      if (
+        obstacle.type !== 'bumper' ||
+        state.activeBumpers.has(key) ||
+        distance > contactDistance
+      ) {
+        return
+      }
+
+      // バンパー中心からコマ中心への外向き法線。中心が完全に重なった場合は、
+      // 現在速度の向きを使ってNaNを作らず、衝突方向を失わないようにする。
+      const outward =
+        finiteUnitOrNull(translation.x - obstacle.x, translation.z - obstacle.z) ??
+        finiteUnitOrNull(velocity.x, velocity.z) ??
+        { x: 1, z: 0 }
+      if (
+        !Number.isFinite(velocity.x) ||
+        !Number.isFinite(velocity.y) ||
+        !Number.isFinite(velocity.z)
+      ) {
+        state.activeBumpers.add(key)
+        return
+      }
+
+      const outwardSpeed = velocity.x * outward.x + velocity.z * outward.z
+      const incomingSpeed = Math.max(0, -outwardSpeed)
+      const targetOutgoingSpeed = Math.min(
+        BUMPER_KNOCKBACK_MAX_OUTGOING_SPEED,
+        Math.max(
+          BUMPER_KNOCKBACK_MIN_OUTGOING_SPEED,
+          incomingSpeed * BUMPER_KNOCKBACK_INCOMING_SPEED_SCALE,
+        ),
+      )
+      const mass = koma.body.mass()
+      const requiredImpulse =
+        Number.isFinite(mass) && mass > 0
+          ? Math.max(0, (targetOutgoingSpeed - outwardSpeed) * mass)
+          : 0
+      const impulse = Math.min(BUMPER_KNOCKBACK_MAX_IMPULSE, requiredImpulse)
+
+      if (Number.isFinite(impulse) && impulse > 0) {
+        koma.body.applyImpulse({ x: outward.x * impulse, y: 0, z: outward.z * impulse }, true)
+        result.bumperKnockbacks += 1
+        result.maxAppliedImpulse = Math.max(result.maxAppliedImpulse, impulse)
+      }
+      state.activeBumpers.add(key)
+    })
+  })
 
   battle.komas.forEach((koma, index) => {
     const translation = koma.body.translation()
