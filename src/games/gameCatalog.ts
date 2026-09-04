@@ -493,7 +493,7 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       howToPlay: [
         'したの かたちから すきな ブロックを えらぶよ',
         'ばんめんを タップすると そこに ブロックが おかれるよ',
-        'おなじ かたちは なんこでも つかえるよ',
+        'おいたあとも まわす・うごかす・けすが できるよ',
       ],
     },
   },

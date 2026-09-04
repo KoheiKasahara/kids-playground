@@ -35,20 +35,27 @@ const setup = () => {
 }
 
 describe('ブロックパズル: 画面と操作', () => {
-  test('タイトル・もどる・盤面・パーツ一覧がそろっている', () => {
+  test('タイトル・もどる・盤面・パーツ一覧・まわす/けすがそろっている', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'ブロックパズル' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'かたちを えらぶ' })).toBeInTheDocument()
-    // 盤面の全マス + パーツ9種 + もどる。
-    expect(screen.getAllByRole('button')).toHaveLength(BOARD_CELL_COUNT + BLOCK_SHAPES.length + 1)
+    expect(screen.getByRole('button', { name: /まわす/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /けす/ })).toBeInTheDocument()
+    // 盤面の全マス + パーツ9種 + もどる + まわす + けす。
+    expect(screen.getAllByRole('button')).toHaveLength(BOARD_CELL_COUNT + BLOCK_SHAPES.length + 3)
   })
 
-  test('Phase 1では後続機能（まわす・けす・できた！）のボタンを置かない', () => {
+  test('できた！などPhase 3以降の機能のボタンは置かない', () => {
     renderPlay()
-    for (const name of ['まわす', 'けす', 'ぜんぶけす', 'できた！', 'もういっかい']) {
+    for (const name of ['ぜんぶけす', 'できた！', 'もういっかい']) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
+  })
+
+  test('配置済みパーツを選んでいないとき、けす は押せない', () => {
+    renderPlay()
+    expect(screen.getByRole('button', { name: /けす/ })).toBeDisabled()
   })
 
   test('9種類の形をすべて選べ、最初は1マスが選ばれている', async () => {
@@ -128,19 +135,31 @@ describe('ブロックパズル: 画面と操作', () => {
     expect(cellContent(BOARD_COLS, BOARD_ROWS)).toBe('1マス')
   })
 
-  test('すでに置いたブロックと重なる位置には置けない', async () => {
+  test('あいているマスでも他パーツと重なる形は置けない', async () => {
+    const user = setup()
+    await user.click(shapeButton('しかく')) // よこ2〜3, たて2〜3 に 2×2
+    await user.click(cellButton(2, 2))
+
+    await user.click(shapeButton('ながいぼう'))
+    // よこ1,たて2 自体は空きだが、よこ2〜4,たて2 でしかくと重なる。
+    await user.click(cellButton(1, 2))
+    expect(cellContent(1, 2)).toBe('あき')
+    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+
+    // 空いているマスへは続けて置ける。
+    await user.click(cellButton(1, 6))
+    expect(cellContent(1, 6)).toBe('ながいぼう')
+  })
+
+  test('配置済みブロックをタップすると置こうとはせず、そのパーツを選ぶ', async () => {
     const user = setup()
     await user.click(shapeButton('しかく'))
     await user.click(cellButton(1, 1))
 
     await user.click(shapeButton('1マス'))
     await user.click(cellButton(2, 2))
-    expect(cellContent(2, 2)).toBe('しかく')
-    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
-
-    // 空いているマスへは続けて置ける。
-    await user.click(cellButton(3, 3))
-    expect(cellContent(3, 3)).toBe('1マス')
+    // 置かれず、その代わりに しかく が選ばれた状態になる。
+    expect(cellContent(2, 2)).toBe('しかく せんたくちゅう')
   })
 
   test('置けなかった知らせは、次に形を選び直すと消える', async () => {
@@ -151,5 +170,235 @@ describe('ブロックパズル: 画面と操作', () => {
 
     await user.click(shapeButton('1マス'))
     expect(screen.getByRole('status')).toHaveTextContent('かたちを えらんで')
+  })
+})
+
+function rotateButton() {
+  return screen.getByRole('button', { name: /まわす/ })
+}
+
+function deleteButton() {
+  return screen.getByRole('button', { name: /けす/ })
+}
+
+describe('ブロックパズル: まわす（未配置パーツ）', () => {
+  test('まわすを1回押すと、置いたときの向きが90度変わる', async () => {
+    const user = setup()
+    await user.click(shapeButton('ながいぼう'))
+    await user.click(rotateButton())
+    await user.click(cellButton(2, 2))
+
+    // 横4マスだった形が、縦4マスになって置かれる。
+    for (const row of [2, 3, 4, 5]) {
+      expect(cellContent(2, row)).toBe('ながいぼう')
+    }
+    expect(cellContent(3, 2)).toBe('あき')
+  })
+
+  test('4回押すと元の向きに戻る', async () => {
+    const user = setup()
+    await user.click(shapeButton('ながいぼう'))
+    const rotate = rotateButton()
+    await user.click(rotate)
+    await user.click(rotate)
+    await user.click(rotate)
+    await user.click(rotate)
+    await user.click(cellButton(2, 2))
+
+    for (const col of [2, 3, 4, 5]) {
+      expect(cellContent(col, 2)).toBe('ながいぼう')
+    }
+  })
+
+  test('対称形（1マス）は回転しても置ける位置が変わらない', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(rotateButton())
+    await user.click(cellButton(3, 3))
+    expect(cellContent(3, 3)).toBe('1マス')
+  })
+})
+
+describe('ブロックパズル: 配置済みパーツの選択', () => {
+  test('盤面上のブロックをタップすると、そのパーツ全体（1マス単位ではない）が選択される', async () => {
+    const user = setup()
+    await user.click(shapeButton('しかく'))
+    await user.click(cellButton(2, 2))
+
+    // 2×2の右下セルをタップしても、4マス全体が選ばれる。
+    await user.click(cellButton(3, 3))
+    for (const [col, row] of [
+      [2, 2],
+      [3, 2],
+      [2, 3],
+      [3, 3],
+    ]) {
+      expect(cellContent(col, row)).toBe('しかく せんたくちゅう')
+    }
+  })
+
+  test('選んでいるブロックをもう一度タップすると選択解除になる', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+    await user.click(cellButton(2, 2))
+    expect(cellContent(2, 2)).toBe('1マス せんたくちゅう')
+
+    await user.click(cellButton(2, 2))
+    expect(cellContent(2, 2)).toBe('1マス')
+  })
+
+  test('別のブロックをタップすると選択が切り替わる', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(1, 1))
+    await user.click(cellButton(5, 5))
+
+    await user.click(cellButton(1, 1))
+    expect(cellContent(1, 1)).toBe('1マス せんたくちゅう')
+
+    await user.click(cellButton(5, 5))
+    expect(cellContent(1, 1)).toBe('1マス')
+    expect(cellContent(5, 5)).toBe('1マス せんたくちゅう')
+  })
+
+  test('配置済みパーツ選択中はパーツ一覧の選択表示が消え、一覧をタップすると選択が解除される', async () => {
+    const user = setup()
+    await user.click(shapeButton('しかく'))
+    await user.click(cellButton(2, 2))
+    await user.click(cellButton(2, 2))
+    expect(shapeButton('しかく')).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(shapeButton('1マス'))
+    // 選択が解けるだけで、置いたパーツは消えない。
+    expect(cellContent(2, 2)).toBe('しかく')
+    expect(shapeButton('1マス')).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+describe('ブロックパズル: 配置済みパーツの回転', () => {
+  test('選んだブロックをまわすと、その場で向きが変わる', async () => {
+    const user = setup()
+    await user.click(shapeButton('ながいぼう'))
+    await user.click(cellButton(2, 2))
+    await user.click(cellButton(2, 2))
+    await user.click(rotateButton())
+
+    for (const row of [2, 3, 4, 5]) {
+      expect(cellContent(2, row)).toBe('ながいぼう せんたくちゅう')
+    }
+    expect(cellContent(3, 2)).toBe('あき')
+  })
+
+  test('回転すると盤面外へ出る場合は拒否し、向きと位置を保つ', async () => {
+    const user = setup()
+    await user.click(shapeButton('ながいぼう'))
+    // いちばん下の行に横4マスで置く。
+    await user.click(cellButton(1, BOARD_ROWS))
+    await user.click(cellButton(1, BOARD_ROWS))
+    await user.click(rotateButton())
+
+    expect(screen.getByRole('status')).toHaveTextContent('ここでは まわせないよ')
+    for (const col of [1, 2, 3, 4]) {
+      expect(cellContent(col, BOARD_ROWS)).toBe('ながいぼう せんたくちゅう')
+    }
+  })
+
+  test('回転すると他パーツと重なる場合は拒否し、向きと位置を保つ', async () => {
+    const user = setup()
+    await user.click(shapeButton('ながいぼう'))
+    await user.click(cellButton(1, 1)) // よこ1〜4, たて1
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(1, 3)) // よこ1, たて3
+
+    await user.click(cellButton(1, 1)) // ながいぼうを選択
+    await user.click(rotateButton())
+
+    expect(screen.getByRole('status')).toHaveTextContent('ここでは まわせないよ')
+    for (const col of [1, 2, 3, 4]) {
+      expect(cellContent(col, 1)).toBe('ながいぼう せんたくちゅう')
+    }
+    expect(cellContent(1, 3)).toBe('1マス')
+  })
+})
+
+describe('ブロックパズル: 配置済みパーツの移動', () => {
+  test('選んでからあいているマスをタップすると、そこへ移動する', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+
+    await user.click(cellButton(2, 2))
+    await user.click(cellButton(5, 6))
+
+    expect(cellContent(2, 2)).toBe('あき')
+    expect(cellContent(5, 6)).toBe('1マス せんたくちゅう')
+  })
+
+  test('移動先が盤面外になる場合は移動を拒否し、元の位置を保つ', async () => {
+    const user = setup()
+    await user.click(shapeButton('2マス'))
+    await user.click(cellButton(2, 2)) // よこ2〜3, たて2
+
+    await user.click(cellButton(2, 2))
+    await user.click(cellButton(BOARD_COLS, 4)) // 2マス目が盤面外へ出る
+
+    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+    expect(cellContent(2, 2)).toBe('2マス せんたくちゅう')
+    expect(cellContent(3, 2)).toBe('2マス せんたくちゅう')
+    expect(cellContent(BOARD_COLS, 4)).toBe('あき')
+  })
+
+  test('移動先が他パーツと重なる場合は移動を拒否し、元の位置を保つ（パーツは消えない）', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(4, 1))
+
+    await user.click(shapeButton('2マス'))
+    await user.click(cellButton(1, 3)) // よこ1〜2, たて3
+
+    await user.click(cellButton(1, 3)) // 2マスを選択
+    await user.click(cellButton(3, 1)) // よこ3〜4,たて1 になり、よこ4,たて1 と重なる
+
+    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+    expect(cellContent(1, 3)).toBe('2マス せんたくちゅう')
+    expect(cellContent(2, 3)).toBe('2マス せんたくちゅう')
+    expect(cellContent(4, 1)).toBe('1マス')
+    expect(cellContent(3, 1)).toBe('あき')
+  })
+})
+
+describe('ブロックパズル: けす（削除）', () => {
+  test('選んでいるパーツを けす で削除でき、そのセルが空く', async () => {
+    const user = setup()
+    await user.click(shapeButton('しかく'))
+    await user.click(cellButton(2, 2))
+
+    await user.click(cellButton(2, 2))
+    await user.click(deleteButton())
+
+    for (const [col, row] of [
+      [2, 2],
+      [3, 2],
+      [2, 3],
+      [3, 3],
+    ]) {
+      expect(cellContent(col, row)).toBe('あき')
+    }
+    // 削除すると選択も解けるので、けす はまた押せなくなる。
+    expect(deleteButton()).toBeDisabled()
+  })
+
+  test('削除しても在庫は減らず、同じ形をまた一覧から選んで置ける', async () => {
+    const user = setup()
+    await user.click(shapeButton('しかく'))
+    await user.click(cellButton(2, 2))
+    await user.click(cellButton(2, 2))
+    await user.click(deleteButton())
+
+    await user.click(shapeButton('しかく'))
+    await user.click(cellButton(2, 2))
+    expect(cellContent(2, 2)).toBe('しかく')
+    expect(cellContent(3, 3)).toBe('しかく')
   })
 })

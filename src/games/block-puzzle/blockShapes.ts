@@ -187,3 +187,11 @@ export function rotateOffsets(cells: readonly CellOffset[], rotation: BlockRotat
 export function shapeCells(id: BlockShapeId, rotation: BlockRotation = NO_ROTATION): CellOffset[] {
   return rotateOffsets(blockShape(id).cells, rotation)
 }
+
+/**
+ * 「まわす」を1回押した分だけ時計回りに進めた向き。4回押すと元に戻る。
+ * 1マスのような対称形でも向きの値自体はふつうに進む（見た目が変わらないだけ）。
+ */
+export function nextRotation(rotation: BlockRotation): BlockRotation {
+  return (((rotation + 90) % 360) as BlockRotation)
+}
