@@ -406,6 +406,54 @@ describe('CarConfigの反映', () => {
     model.dispose()
   })
 
+  test('カラー変更はボディの塗装だけへ適用し、他レイヤーを作り直さない', () => {
+    const config = selectCarOption(DEFAULT_CAR_CONFIG, 'front', 'round')
+    const model = createCarModel(config)
+    const bodyPart = layerOf(model.root, 'body').children[0]
+    const wheelPart = layerOf(model.root, 'wheel').children[0]
+    const frontPart = layerOf(model.root, 'front').children[0]
+    const hull = bodyPart?.getObjectByName('car-body-hull') as THREE.Mesh
+    expect(Array.isArray(hull.material)).toBe(true)
+    const glassMaterial = (hull.material as THREE.Material[])[SPORTS_GLASS_GROUP] as THREE.MeshStandardMaterial
+    const glassBefore = glassMaterial.color.getHexString()
+
+    model.update(selectCarOption(config, 'color', 'black'))
+
+    expect(layerOf(model.root, 'body').children[0]).not.toBe(bodyPart)
+    expect(layerOf(model.root, 'wheel').children[0]).toBe(wheelPart)
+    expect(layerOf(model.root, 'front').children[0]).toBe(frontPart)
+    const nextHull = layerOf(model.root, 'body').children[0]?.getObjectByName('car-body-hull') as THREE.Mesh
+    expect(paintColorOf(nextHull)).toBe('252a31')
+    const glassAfter = Array.isArray(nextHull.material)
+      ? (nextHull.material[SPORTS_GLASS_GROUP] as THREE.MeshStandardMaterial).color.getHexString()
+      : undefined
+    expect(glassAfter).toBe(glassBefore)
+    expect(glassAfter).not.toBe('252a31')
+
+    for (const category of ['wheel', 'front', 'roof', 'decoration', 'mark']) {
+      layerOf(model.root, category).traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return
+        const materials = Array.isArray(object.material) ? object.material : [object.material]
+        for (const material of materials) {
+          if ('color' in material) expect((material as THREE.MeshStandardMaterial).color.getHexString()).not.toBe('252a31')
+        }
+      })
+    }
+    model.dispose()
+  })
+
+  test('ボディを切り替えても選択中のカラーが新しいボディへ適用される', () => {
+    const blackSports = selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'black')
+    const model = createCarModel(blackSports)
+
+    const blackBus = selectCarOption(blackSports, 'body', 'bus')
+    model.update(blackBus)
+
+    const hull = layerOf(model.root, 'body').getObjectByName('car-body-hull') as THREE.Mesh
+    expect((hull.material as THREE.MeshStandardMaterial).color.getHexString()).toBe('252a31')
+    model.dispose()
+  })
+
   test('「なし」へ戻すとパーツが取り除かれる', () => {
     const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'mark', 'plate'))
     expect(layerOf(model.root, 'mark').children.length).toBeGreaterThan(0)
