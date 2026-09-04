@@ -122,6 +122,21 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
       </span>
     )
   }
+  if (preview.kind === 'rideHeight') {
+    return (
+      <span
+        className={`${className} ${styles.rideHeightPreview} ${styles[`rideHeightPreview-${preview.variant}`]}`}
+        data-height={preview.variant}
+        aria-hidden="true"
+      >
+        <span className={styles.rideHeightPreviewCar}>
+          <span className={styles.rideHeightPreviewBody} />
+          <span className={styles.rideHeightPreviewWheel} />
+          <span className={styles.rideHeightPreviewWheel} />
+        </span>
+      </span>
+    )
+  }
   return (
     <span className={className} aria-hidden="true">
       {preview.emoji}

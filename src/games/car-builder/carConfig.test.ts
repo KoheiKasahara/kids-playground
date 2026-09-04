@@ -155,6 +155,15 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
+  test('車高はひくい・ふつう・たかいの3段階を高さが分かるプレビュー付きで持つ', () => {
+    const options = CAR_CATEGORIES.rideHeight.options
+    expect(options.map((option) => option.id)).toEqual(['low', 'normal', 'high'])
+    expect(options.map((option) => option.label)).toEqual(['ひくい', 'ふつう', 'たかい'])
+    for (const option of options) {
+      expect(option.preview).toEqual({ kind: 'rideHeight', variant: option.id })
+    }
+  })
+
   test('リアルタイム反映を確かめられるよう、複数の選択肢を持つカテゴリがある', () => {
     const multi = carCategoryOrder().filter((category) => category.options.length >= 2)
     expect(multi.length).toBeGreaterThanOrEqual(3)
