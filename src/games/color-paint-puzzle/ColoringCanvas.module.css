@@ -4,7 +4,31 @@
 
 .area {
   cursor: pointer;
-  transition: fill 120ms ease;
+  transition: fill 120ms ease, filter 120ms ease;
+}
+
+/* 塗った瞬間だけ「ぽんっ」と明るくなり、どこを触ったかがすぐ分かる。 */
+.areaPainted {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: areaPaintPop 280ms ease-out both;
+}
+
+@keyframes areaPaintPop {
+  0% {
+    filter: brightness(1.28) saturate(1.08);
+    transform: scale(0.97);
+  }
+
+  45% {
+    filter: brightness(1.12) saturate(1.04);
+    transform: scale(1.025);
+  }
+
+  100% {
+    filter: brightness(1) saturate(1);
+    transform: scale(1);
+  }
 }
 
 /* 完成演出中の塗りレイヤー。タップも入力も受け付けない（絵を見る時間にする）。 */

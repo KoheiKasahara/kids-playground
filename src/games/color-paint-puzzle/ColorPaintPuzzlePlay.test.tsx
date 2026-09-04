@@ -49,6 +49,7 @@ describe('ColorPaintPuzzlePlay', () => {
   test('初期表示: タイトル・もどる・色パレット・やりなおし・6つの題材ボタンが出る', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'うごくぬりえ' })).toBeInTheDocument()
+    expect(screen.getByText('いろを えらんで、えを タップしてね')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'やりなおし' })).toBeInTheDocument()
     for (const color of PAINT_COLORS) {
@@ -73,13 +74,15 @@ describe('ColorPaintPuzzlePlay', () => {
     await user.click(screen.getByRole('button', { name: 'あお' }))
     expect(screen.getByRole('button', { name: 'あお' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'あか' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('えらんだ いろ：').parentElement).toHaveTextContent('あお')
   })
 
   test('エリアをクリックすると選択色のhexで塗られる', async () => {
     const user = userEvent.setup()
-    renderPlay()
+    const { container } = renderPlay()
     await user.click(getAreaButton('くるまの ボディ'))
     expect(getAreaButton('くるまの ボディ')).toHaveAttribute('fill', '#e8453c')
+    expect(getAreaShape(container, 'body')).toHaveAttribute('data-paint-feedback', '1')
   })
 
   test('別の色を選んで同じエリアをクリックするとfillが変わる', async () => {
