@@ -38,11 +38,18 @@ describe('KOMA_TYPE_CONFIGS', () => {
       ).size,
     ).toBe(KOMA_TYPE_CONFIGS.length)
 
+    // 色やラベルを消しても見分けられるよう、外周・中心の造形(rimStyle)は4種類とも異なる。
+    expect(new Set(KOMA_TYPE_CONFIGS.map((type) => type.visual.rimStyle)).size).toBe(
+      KOMA_TYPE_CONFIGS.length,
+    )
+
     for (const type of KOMA_TYPE_CONFIGS) {
       expect(type.name).not.toBe('')
       expect(type.description).not.toBe('')
       expect(type.icon).not.toBe('')
       expect(type.accentColor).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(type.visual.metalColor).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(['smooth', 'spike', 'block', 'star']).toContain(type.visual.rimStyle)
       for (const value of [
         type.densityScale,
         type.diskFrictionScale,

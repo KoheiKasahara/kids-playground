@@ -187,12 +187,126 @@ type KomaGeometrySet = {
   diskLower: THREE.CylinderGeometry
   diskUpper: THREE.CylinderGeometry
   groove: THREE.TorusGeometry
-  outerRing: THREE.TorusGeometry
+  /** タイプによってTorus(smooth)かトゲ/ブロック/星のExtrudeGeometryになる。 */
+  outerRing: THREE.BufferGeometry
   cap: THREE.SphereGeometry
-  knob: THREE.SphereGeometry
+  /** タイプによって球/円錐/六角柱/星のExtrudeGeometryになる。 */
+  knob: THREE.BufferGeometry
   spinRing: THREE.RingGeometry
   boostRing: THREE.RingGeometry
   diskHalfHeight: number
+}
+
+/**
+ * 星/歯車状の外周シルエットを1枚の輪郭として作る。
+ *
+ * 中心角を等分し、内側(innerRadius)→外側(outerRadius)→外側→内側 の順で頂点を結ぶことで、
+ * 「刃(tipWidthRatioが小さい)」から「ブロック状の突起(tipWidthRatioが大きい)」まで
+ * 同じ関数で表現できるようにしている。
+ */
+function createToothRingShape(
+  toothCount: number,
+  outerRadius: number,
+  innerRadius: number,
+  tipWidthRatio: number,
+): THREE.Shape {
+  const shape = new THREE.Shape()
+  const anglePerTooth = (Math.PI * 2) / toothCount
+  const halfTip = (anglePerTooth * tipWidthRatio) / 2
+  let started = false
+  const lineTo = (angle: number, radius: number) => {
+    const x = Math.cos(angle) * radius
+    const y = Math.sin(angle) * radius
+    if (!started) {
+      shape.moveTo(x, y)
+      started = true
+    } else {
+      shape.lineTo(x, y)
+    }
+  }
+  for (let i = 0; i < toothCount; i++) {
+    const center = i * anglePerTooth
+    lineTo(center - anglePerTooth / 2, innerRadius)
+    lineTo(center - halfTip, outerRadius)
+    lineTo(center + halfTip, outerRadius)
+    lineTo(center + anglePerTooth / 2, innerRadius)
+  }
+  shape.closePath()
+  return shape
+}
+
+/**
+ * タイプ別の外周リング形状。
+ *
+ * smoothだけ既存どおりTorus(滑らかな輪)を使い、他の3タイプは
+ * createToothRingShapeで作った輪郭をリング状(中心に穴あき)に押し出す。
+ * 当たり判定は別途Colliderの円柱がそのまま担うので、ここは見た目専用。
+ */
+function createRimRingGeometry(
+  rimStyle: KomaSpec['type']['visual']['rimStyle'],
+  diskRadius: number,
+  diskHalfHeight: number,
+  ringScale: number,
+): THREE.BufferGeometry {
+  if (rimStyle === 'smooth') {
+    return new THREE.TorusGeometry(diskRadius * 0.99, diskRadius * 0.1 * ringScale, 8, 28)
+  }
+  const preset =
+    rimStyle === 'spike'
+      ? { teeth: 6, outerRatio: 1.24, innerRatio: 0.82, tipWidth: 0.1, depthRatio: 1.3 }
+      : rimStyle === 'block'
+        ? { teeth: 8, outerRatio: 1.1, innerRatio: 0.94, tipWidth: 0.62, depthRatio: 2.1 }
+        : { teeth: 5, outerRatio: 1.15, innerRatio: 0.9, tipWidth: 0.3, depthRatio: 1.5 } // star
+  const outerRadius = diskRadius * preset.outerRatio
+  const innerRadius = diskRadius * preset.innerRatio
+  const shape = createToothRingShape(preset.teeth, outerRadius, innerRadius, preset.tipWidth)
+  shape.holes.push(new THREE.Path().absarc(0, 0, innerRadius * 0.9, 0, Math.PI * 2, false))
+  const depth = diskHalfHeight * preset.depthRatio
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelThickness: diskRadius * 0.015,
+    bevelSize: diskRadius * 0.015,
+    bevelSegments: 1,
+    curveSegments: 4,
+  })
+  // 押し出し方向(ローカルZ)の中心をY=0に揃え、Mesh側のrotation.x設定でTorusと同じ向きに倒せるようにする。
+  geometry.translate(0, 0, -depth / 2)
+  return geometry
+}
+
+/**
+ * タイプ別の中心つまみ形状。外周リングと同じrimStyleで揃え、
+ * 「炎/刃(spike)」「盾のリベット(block)」「星のエンブレム(star)」「滑らかな球(smooth)」を作り分ける。
+ */
+function createKnobGeometry(
+  rimStyle: KomaSpec['type']['visual']['rimStyle'],
+  radius: number,
+): THREE.BufferGeometry {
+  switch (rimStyle) {
+    case 'spike':
+      return new THREE.ConeGeometry(radius * 1.1, radius * 2.6, 10)
+    case 'block':
+      return new THREE.CylinderGeometry(radius * 1.05, radius * 1.05, radius * 1.3, 6)
+    case 'star': {
+      const shape = createToothRingShape(5, radius * 1.6, radius * 0.7, 0.42)
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: radius * 0.7,
+        bevelEnabled: true,
+        bevelThickness: radius * 0.08,
+        bevelSize: radius * 0.06,
+        bevelSegments: 1,
+        curveSegments: 4,
+      })
+      geometry.translate(0, 0, -radius * 0.35)
+      // 星は2D形状のまま作るため、上を向く(法線が+Yになる)よう寝かせる。
+      geometry.rotateX(-Math.PI / 2)
+      return geometry
+    }
+    case 'smooth':
+    default:
+      return new THREE.SphereGeometry(radius, 10, 8)
+  }
 }
 
 /**
@@ -524,14 +638,9 @@ export function useKomaBattleEngine(
         // 上下段の継ぎ目に入れる溝。上段の最小半径(0.9)よりわずかに大きくして、
         // 上段の表面に埋もれず外へ突き出すようにする（段差として実際に見えるように）。
         groove: track(new THREE.TorusGeometry(diskRadius * 0.93, diskRadius * 0.02, 6, 28)),
-        // 外周リング。円盤の縁いっぱいに巻く金属風パーツ。
+        // 外周リング。タイプのrimStyleに応じて、滑らかな輪/トゲ/ブロック/星のいずれかになる。
         outerRing: track(
-          new THREE.TorusGeometry(
-            diskRadius * 0.99,
-            diskRadius * 0.1 * visual.ringScale,
-            8,
-            28,
-          ),
+          createRimRingGeometry(visual.rimStyle, diskRadius, diskHalfHeight, visual.ringScale),
         ),
         // 中心キャップ。上面の飾りで、回っていることが上から見て分かるようにする。
         cap: track(
@@ -545,7 +654,8 @@ export function useKomaBattleEngine(
             Math.PI / 2,
           ),
         ),
-        knob: track(new THREE.SphereGeometry(SHAFT_RADIUS * 0.8 * visual.knobScale, 10, 8)),
+        // 中心つまみ。同じrimStyleで、球/円錐/六角柱/星のいずれかになる。
+        knob: track(createKnobGeometry(visual.rimStyle, SHAFT_RADIUS * 0.8 * visual.knobScale)),
         // 回転演出用の半透明リング。高速回転中だけ光る。
         spinRing: track(
           new THREE.RingGeometry(diskRadius * 1.15, diskRadius * 1.42, 28),
@@ -561,8 +671,10 @@ export function useKomaBattleEngine(
     /**
      * 見た目のコマ。物理Colliderとは別に、幼児が「コマ」と分かる形を組む。
      *
-     * 中心キャップ・樹脂の円盤(2段)・外周リング(金属風)・軸/先端(金属風)の4層構成にし、
-     * 材質もMeshStandardMaterialで樹脂/金属/マットを塗り分ける。
+     * 下段ベース(濃色)・樹脂の円盤上段・外周リング(タイプ別の金属風パーツ)・中心キャップ/つまみの
+     * 4層構成にし、材質もMeshStandardMaterialで樹脂/金属/マットを塗り分ける。
+     * 外周リングと中心つまみはタイプのrimStyle(尖り/ブロック/星/滑らか)で形自体を変え、
+     * 色やラベルを見なくてもタイプが分かるシルエット差を作る。
      * 高速回転中は上面のつまみが自転速度に応じて光り、円盤の外側に半透明のリングが浮かぶ。
      * どちらも自転速度の低下にあわせてそのまま弱まるので、専用の減衰処理は持たない。
      */
@@ -574,9 +686,22 @@ export function useKomaBattleEngine(
       const resinMaterial = trackMaterial(
         new THREE.MeshStandardMaterial({ color: spec.color, roughness: 0.55, metalness: 0.05 }),
       )
-      // 金属風。軸・先端・外周リングに使い、樹脂との質感差を出す。
+      // 下段ベースは主色より濃い陰色にして、2段の樹脂パーツが重なった立体感を出す。
+      const baseMaterial = trackMaterial(
+        new THREE.MeshStandardMaterial({
+          color: spec.playerColorDark,
+          roughness: 0.6,
+          metalness: 0.05,
+        }),
+      )
+      // 金属風。軸・先端・外周リングに使い、樹脂との質感差を出す。タイプごとに色を変え、
+      // ダーク(アタック)/シルバー(ディフェンス)/クローム(スタミナ)/ゴールド(バランス)を塗り分ける。
       const metalMaterial = trackMaterial(
-        new THREE.MeshStandardMaterial({ color: 0xcfd3d8, roughness: 0.3, metalness: 0.6 }),
+        new THREE.MeshStandardMaterial({
+          color: spec.type.visual.metalColor,
+          roughness: 0.3,
+          metalness: 0.6,
+        }),
       )
       // マット素材風。中心キャップに使う。
       const matteMaterial = trackMaterial(
@@ -624,7 +749,7 @@ export function useKomaBattleEngine(
       tip.position.y = (DISK_CENTER_Y - diskHalfHeight) / 2
       group.add(tip)
 
-      const diskLower = new THREE.Mesh(geometrySet.diskLower, resinMaterial)
+      const diskLower = new THREE.Mesh(geometrySet.diskLower, baseMaterial)
       diskLower.position.y = DISK_CENTER_Y - diskHalfHeight * 0.5
       group.add(diskLower)
 
