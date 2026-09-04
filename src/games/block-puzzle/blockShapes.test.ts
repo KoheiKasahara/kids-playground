@@ -3,8 +3,10 @@ import {
   BLOCK_SHAPES,
   DEFAULT_BLOCK_SHAPE_ID,
   blockShape,
+  nextRotation,
   rotateOffsets,
   shapeCells,
+  type BlockRotation,
   type BlockShapeId,
 } from './blockShapes'
 
@@ -193,6 +195,26 @@ describe('blockShapes: 向き（#481の土台）', () => {
       for (const rotation of [0, 90, 180, 270] as const) {
         expect(cellSet(shapeCells(shape.id, rotation)).size).toBe(shape.cells.length)
       }
+    }
+  })
+})
+
+describe('blockShapes: nextRotation（#481のまわす操作の土台）', () => {
+  test('90度ずつ時計回りに進む', () => {
+    expect(nextRotation(0)).toBe(90)
+    expect(nextRotation(90)).toBe(180)
+    expect(nextRotation(180)).toBe(270)
+  })
+
+  test('4回進めると元に戻る', () => {
+    expect(nextRotation(270)).toBe(0)
+  })
+
+  test('対称形（1マス）は向きの値自体はふつうに進み、セルは常に基準セルのみ', () => {
+    let rotation: BlockRotation = 0
+    for (let i = 0; i < 4; i += 1) {
+      rotation = nextRotation(rotation)
+      expect(shapeCells('single', rotation)).toEqual([{ col: 0, row: 0 }])
     }
   })
 })

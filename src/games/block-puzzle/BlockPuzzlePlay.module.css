@@ -5,9 +5,9 @@
   padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
     calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
   display: grid;
-  /* ヘッダー / 盤面 / ひとこと / パーツ一覧。盤面だけが余った高さを受け取る。 */
+  /* ヘッダー / 盤面 / まわす・けす / ひとこと / パーツ一覧。盤面だけが余った高さを受け取る。 */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
   gap: var(--space-xs);
   background: linear-gradient(160deg, #eef6ff 0%, #fdf6ec 60%, #fdeef7 100%);
 }
@@ -94,9 +94,9 @@
     #eef4ff;
 }
 
-/* 置けなかったマス。失敗ではないので、赤枠を出すだけにとどめる。
+/* 置けなかった・動かせなかったマス。失敗ではないので、赤枠を出すだけにとどめる。
    ブロックの上にも見えるよう、マスのボタンではなく重ねレイヤー側で描く。 */
-.rejectedCell {
+.invalidCell {
   box-sizing: border-box;
   border: 3px solid var(--color-danger);
   border-radius: 8px;
@@ -116,6 +116,103 @@
   --block-edge-width: 2px;
 }
 
+/* 盤面上で選択中のパーツ。パーツ一覧側の選択（青）と混同しないよう別の色にし、
+   常に目を引くよう脈打つ輪郭を付ける。 */
+.selectedPlacedBlock {
+  position: relative;
+  z-index: 1;
+  outline: 4px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 12px;
+  animation: selectedPlacedBlockPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes selectedPlacedBlockPulse {
+  0%,
+  100% {
+    outline-color: var(--color-accent);
+  }
+  50% {
+    outline-color: var(--color-accent-dark);
+  }
+}
+
+/* まわす・けす の操作列。いま何を操作するか（置く前の形／選んだ配置済みパーツ）を
+   左のプレビューで見せ、大きな2つのボタンだけを置く（増やしすぎない）。 */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.controlsPreview {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 配置済みパーツを編集中は、パーツ一覧と同じ青ではなく選択中パーツと同じ色にして、
+   「いま操作しているのはこっち」と分かるようにする。 */
+.controlsPreviewEditing {
+  border-color: var(--color-accent);
+}
+
+.controlsPreviewPiece {
+  --piece-cell-size: 9px;
+  --block-radius: 4px;
+  --block-edge-width: 2px;
+  width: auto;
+  height: auto;
+}
+
+.controlButton {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: 2px var(--space-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.controlButton .controlIcon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.controlButton:active {
+  transform: scale(0.95);
+}
+
+.controlButton:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+  cursor: default;
+}
+
+.controlButton:disabled:active {
+  transform: none;
+}
+
 .message {
   margin: 0;
   min-height: 1.6em;
@@ -133,6 +230,13 @@
   width: 100%;
   max-width: 560px;
   margin: 0 auto;
+  transition: opacity 0.15s ease;
+}
+
+/* 配置済みパーツの編集中は、いま操作の主役ではないことを一目で示すため薄くする
+   （操作自体はできたままにして、押しても迷わないようにする）。 */
+.paletteInactive {
+  opacity: 0.55;
 }
 
 @media (min-width: 620px) {
@@ -147,7 +251,7 @@
 @media (orientation: landscape) and (max-height: 560px) {
   .page {
     grid-template-columns: minmax(0, 1fr) 168px;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
     column-gap: var(--space-sm);
   }
 
@@ -160,14 +264,19 @@
     grid-row: 2;
   }
 
-  .message {
+  .controls {
     grid-column: 1;
     grid-row: 3;
   }
 
+  .message {
+    grid-column: 1;
+    grid-row: 4;
+  }
+
   .palette {
     grid-column: 2;
-    grid-row: 2 / span 2;
+    grid-row: 2 / span 3;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     align-content: center;
     max-width: none;
@@ -238,7 +347,12 @@
 @media (prefers-reduced-motion: reduce) {
   .home:active,
   .paletteButton:active,
-  .paletteButtonSelected:active {
+  .paletteButtonSelected:active,
+  .controlButton:active {
     transform: none;
+  }
+
+  .selectedPlacedBlock {
+    animation: none;
   }
 }
