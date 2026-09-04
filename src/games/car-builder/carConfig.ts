@@ -27,7 +27,7 @@ export type CarMarkNumber =
   | 'number9'
 export type CarMarkIcon = 'star' | 'heart' | 'lightning' | 'crown' | 'animal'
 export type MarkType = 'none' | CarMarkNumber | CarMarkIcon
-export type RideHeight = 'normal' | 'high'
+export type RideHeight = 'low' | 'normal' | 'high'
 
 /**
  * カテゴリID → そのカテゴリが取りうる選択肢IDの対応表。
@@ -63,6 +63,7 @@ export type CarOptionPreview =
   | { kind: 'roof'; variant: RoofType }
   | { kind: 'decoration'; variant: DecorationType }
   | { kind: 'mark'; variant: MarkType }
+  | { kind: 'rideHeight'; variant: RideHeight }
 
 export type CarOptionDefinition<Id extends string> = {
   id: Id
@@ -204,8 +205,9 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
     emoji: '↕️',
     ariaLabel: 'くるまの たかさを えらぶ',
     options: [
-      { id: 'normal', label: 'ふつう', preview: { kind: 'emoji', emoji: '🚗' } },
-      { id: 'high', label: 'たかい', preview: { kind: 'emoji', emoji: '⬆️' } },
+      { id: 'low', label: 'ひくい', preview: { kind: 'rideHeight', variant: 'low' } },
+      { id: 'normal', label: 'ふつう', preview: { kind: 'rideHeight', variant: 'normal' } },
+      { id: 'high', label: 'たかい', preview: { kind: 'rideHeight', variant: 'high' } },
     ],
   },
 }

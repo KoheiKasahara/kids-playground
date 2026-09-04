@@ -151,6 +151,9 @@ export const CAR_WHEEL_SPECS: Record<WheelType, CarWheelSpec> = {
 }
 
 export const CAR_RIDE_HEIGHT_SPECS: Record<RideHeight, CarRideHeightSpec> = {
+  // 「ひくい」はボディを接地基準へ近づける。大径タイヤなどで
+  // これ以上下げるとめり込む場合は computeGroundClearance の下限で止める。
+  low: { id: 'low', lift: -0.12 },
   normal: { id: 'normal', lift: 0 },
   high: { id: 'high', lift: 0.18 },
 }

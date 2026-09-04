@@ -329,6 +329,26 @@ describe('選択の即時反映', () => {
     await user.click(screen.getByRole('button', { name: 'おおきい' }))
     expect(latestConfig().wheel).toBe('big')
   })
+
+  test('車高3種類が高さの分かるサムネイル付きで並び、選択直後に反映される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'くるまの たかさを えらぶ' }))
+
+    for (const [label, height] of [
+      ['ひくい', 'low'],
+      ['ふつう', 'normal'],
+      ['たかい', 'high'],
+    ] as const) {
+      const option = screen.getByRole('button', { name: label })
+      expect(option.querySelector('[class*="rideHeightPreview"]'), label).not.toBeNull()
+      await user.click(option)
+      expect(latestConfig().rideHeight, label).toBe(height)
+      expect(option).toHaveAttribute('aria-pressed', 'true')
+      expect(option.querySelector(`[data-height="${height}"]`), label).not.toBeNull()
+    }
+  })
 })
 
 describe('カテゴリを移動しても選択状態が残る', () => {
@@ -416,6 +436,13 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
   test('屋根4選択肢はスマホ幅でも1行で見比べられる', () => {
     expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='roof'\]\s*\{[^}]*grid-template-columns:\s*repeat\(4,/)
     expect(ruleOf(CSS_SOURCE, '.roofPreview')).toMatch(/width:\s*44px/)
+  })
+
+  test('車高3種類は高さの違いが分かる専用サムネイルを持つ', () => {
+    expect(ruleOf(CSS_SOURCE, '.rideHeightPreview')).toMatch(/width:\s*52px/)
+    expect(CSS_SOURCE).toMatch(/\.rideHeightPreview-low\s+\.rideHeightPreviewBody/)
+    expect(CSS_SOURCE).toMatch(/\.rideHeightPreview-normal\s+\.rideHeightPreviewBody/)
+    expect(CSS_SOURCE).toMatch(/\.rideHeightPreview-high\s+\.rideHeightPreviewBody/)
   })
 
   test('主要なタップ領域が小さすぎない（幼児向けに44px以上・カテゴリと選択肢は64px以上）', () => {

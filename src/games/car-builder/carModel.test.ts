@@ -412,14 +412,26 @@ describe('CarConfigの反映', () => {
     }
   })
 
-  test('車高を変えると、屋根パーツも寸法に追従して持ち上がる（パーツ側の個別修正が要らない）', () => {
+  test('車高3段階でボディと屋根が上下し、タイヤの接地位置は変わらない', () => {
     const base = selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'luggage')
     const model = createCarModel(base)
-    const before = boundsOf(layerOf(model.root, 'roof')).min.y
-    model.update(selectCarOption(base, 'rideHeight', 'high'))
-    const after = boundsOf(layerOf(model.root, 'roof')).min.y
-    expect(after).toBeGreaterThan(before)
-    expect(after).toBeCloseTo(computeCarDimensions(selectCarOption(base, 'rideHeight', 'high')).roofTopY, 2)
+    const normalDimensions = computeCarDimensions(base)
+    const normalRoof = boundsOf(layerOf(model.root, 'roof')).min.y
+    const normalWheelY = model.getAttachments().wheels.map((wheel) => wheel.position.y)
+
+    const lowConfig = selectCarOption(base, 'rideHeight', 'low')
+    model.update(lowConfig)
+    const lowRoof = boundsOf(layerOf(model.root, 'roof')).min.y
+    expect(lowRoof).toBeLessThan(normalRoof)
+    expect(model.getDimensions().roofTopY).toBeLessThan(normalDimensions.roofTopY)
+    expect(model.getAttachments().wheels.map((wheel) => wheel.position.y)).toEqual(normalWheelY)
+
+    const highConfig = selectCarOption(base, 'rideHeight', 'high')
+    model.update(highConfig)
+    const highRoof = boundsOf(layerOf(model.root, 'roof')).min.y
+    expect(highRoof).toBeGreaterThan(normalRoof)
+    expect(highRoof).toBeCloseTo(computeCarDimensions(highConfig).roofTopY, 2)
+    expect(model.getAttachments().wheels.map((wheel) => wheel.position.y)).toEqual(normalWheelY)
     model.dispose()
   })
 

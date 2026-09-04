@@ -138,6 +138,15 @@ describe('組み合わせ耐性（5ボディ×タイヤ×車高の全パター�
     expect(high.roofTopY).toBeGreaterThan(small.roofTopY)
   })
 
+  test('車高「ひくい」はボディを下げるが、最低クリアランスを下回らない', () => {
+    const normal = computeCarDimensions(DEFAULT_CAR_CONFIG)
+    const low = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'rideHeight', 'low'))
+    expect(low.groundClearance).toBeLessThan(normal.groundClearance)
+    expect(low.roofTopY).toBeLessThan(normal.roofTopY)
+    expect(low.hullTopY).toBeGreaterThanOrEqual(low.wheelRadius * 2 * 0.92 - 1e-9)
+    expect(low.groundClearance).toBeGreaterThanOrEqual(low.wheelRadius * 0.35 - 1e-9)
+  })
+
   test('オフロードは最も太く、レーシングは小径側でもワイドな寸法を持つ', () => {
     const small = computeCarDimensions(DEFAULT_CAR_CONFIG)
     const offroad = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', 'offroad'))
