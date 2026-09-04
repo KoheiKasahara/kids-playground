@@ -39,6 +39,7 @@ import {
   readSettleSamples,
   removeFallenBlocks,
   resetForNextThrow,
+  setBowlingBall,
   type BowlingWorld,
 } from './bowlingWorld'
 import {
@@ -49,7 +50,7 @@ import {
 } from './bowlingTopple'
 import { createSettleState, updateSettleState, type SettleState } from './bowlingSettle'
 import { THROWS_PER_GAME } from './bowlingGame'
-import type { BowlingBallId } from './bowlingBalls'
+import type { BowlingBallId, BowlingBallSpec } from './bowlingBalls'
 
 let rapierInitPromise: Promise<void> | null = null
 
@@ -92,6 +93,14 @@ export type TsumikiBowlingEngineOptions = {
 
 export type TsumikiBowlingEngineHandle = {
   registerContainer: (element: HTMLDivElement | null) => void
+  /**
+   * 次に投げる玉を切り替える。
+   *
+   * 世界を作り直さず、玉のBody・見た目だけを差し替える
+   * （runIdを変えて全部作り直すと、積み木の状態や投球数まで失われるため）。
+   * 投球待機中以外（飛行中・組み直し中・結果画面）は内部で無視される。
+   */
+  setBallId: (ballId: BowlingBallId) => void
 }
 
 /** 1投が落ち着いてから、積み木を組み直すまでの間。崩れた形を見せる時間。 */
@@ -129,16 +138,25 @@ export function useTsumikiBowlingEngine(
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const activeRunRef = useRef<symbol | null>(null)
+  // 実体はeffectの中（bowlingが作られたあと）で差し替わる。
+  // 世界がまだ無い間にsetBallIdが呼ばれても何もしない既定値にしておく。
+  const applyBallSwitchRef = useRef<(ballId: BowlingBallId) => void>(() => {})
 
   const handle = useMemo<TsumikiBowlingEngineHandle>(
     () => ({
       registerContainer: (element) => {
         containerRef.current = element
       },
+      setBallId: (ballId) => {
+        applyBallSwitchRef.current(ballId)
+      },
     }),
     [],
   )
 
+  // ballIdは初回（または「もういちど」）の世界作りにだけ使う。
+  // 効果の依存配列に含めない: 毎投の切替はworld/sceneを作り直さずに
+  // 下のapplyBallSwitchRef経由で行う（作り直すと積み木の状態や投球数が失われる）。
   const { runId, stageId, ballId } = options
 
   useEffect(() => {
@@ -462,6 +480,20 @@ export function useTsumikiBowlingEngine(
     }
 
     /**
+     * 玉を切り替えたときに見た目（大きさ・色）を合わせる。
+     * ジオメトリは半径が変わるため作り直し、マテリアルは色だけ書き換えて使い回す。
+     */
+    function applyBallVisual(spec: BowlingBallSpec) {
+      if (!ballMesh) return
+      const oldGeometry = ballMesh.geometry
+      ballMesh.geometry = track(new THREE.SphereGeometry(spec.radius, 24, 18))
+      oldGeometry.dispose()
+      const material = ballMesh.material as THREE.MeshStandardMaterial
+      material.color.setHex(spec.color)
+      material.emissive.setHex(spec.emissive)
+    }
+
+    /**
      * 発射ガイド。玉が飛ぶ道すじを点で描き、最後に着地点の輪を置く。
      * 点の長さでパワーが、左右の曲がりで発射方向が分かる。
      */
@@ -556,6 +588,23 @@ export function useTsumikiBowlingEngine(
     function canLaunchNow(): boolean {
       return !flying && !finished && bowling !== null
     }
+
+    /**
+     * 玉の切替（TsumikiBowlingEngineHandle.setBallId）の実処理。
+     *
+     * canPullBall()と同じ条件でだけ受け付ける。飛行中・組み直し中・結果画面での
+     * 呼び出しは黙って無視する（UI側もdisabledにするが、ここでも必ず二重に防ぐ）。
+     */
+    function applyBallSwitch(nextBallId: BowlingBallId) {
+      if (!bowling || !canPullBall()) return
+      const changed = setBowlingBall(bowling, RAPIER, nextBallId)
+      if (!changed) return
+      applyBallVisual(bowling.ballSpec)
+      // ドラッグ中ではない（ボタン操作でしか呼ばれない）ので、狙いは常にリセットでよい。
+      currentAim = null
+      reportAim(null)
+    }
+    applyBallSwitchRef.current = applyBallSwitch
 
     /** 組み直し待ちを飛ばして、すぐ次を投げられるようにする。 */
     function skipRebuildWait() {
@@ -934,7 +983,10 @@ export function useTsumikiBowlingEngine(
       })
 
     return release
-  }, [runId, stageId, ballId])
+    // ballIdは意図的に依存配列へ含めない。世界の再構築（=積み木・投球数のリセット）は
+    // runId/stageIdだけで起こし、毎投の玉切替はapplyBallSwitchRef経由で行う。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runId, stageId])
 
   return handle
 }

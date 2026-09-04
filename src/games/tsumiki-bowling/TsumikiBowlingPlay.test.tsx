@@ -14,6 +14,7 @@ import { THROWS_PER_GAME } from './bowlingGame'
 const engineMock = vi.hoisted(() => ({
   options: undefined as TsumikiBowlingEngineOptions | undefined,
   registerContainer: vi.fn(),
+  setBallId: vi.fn(),
   /** エンジンが何回作り直されたか（もういちどでの作り直しを数える）。 */
   mountCount: 0,
 }))
@@ -22,7 +23,7 @@ vi.mock('./useTsumikiBowlingEngine', () => ({
   useTsumikiBowlingEngine: (options: TsumikiBowlingEngineOptions) => {
     engineMock.options = options
     engineMock.mountCount += 1
-    return { registerContainer: engineMock.registerContainer }
+    return { registerContainer: engineMock.registerContainer, setBallId: engineMock.setBallId }
   },
 }))
 
@@ -64,6 +65,7 @@ beforeEach(() => {
   engineMock.options = undefined
   engineMock.mountCount = 0
   engineMock.registerContainer.mockClear()
+  engineMock.setBallId.mockClear()
 })
 
 describe('TsumikiBowlingPlay', () => {
@@ -176,5 +178,77 @@ describe('TsumikiBowlingPlay', () => {
     renderGame()
     for (let index = 1; index <= THROWS_PER_GAME; index += 1) playThrow(2, index)
     expect(screen.getByRole('link', { name: 'ほかの あそび' })).toHaveAttribute('href', '/')
+  })
+})
+
+describe('玉の選択', () => {
+  it('3種類の玉が選べ、最初は「どっしりだま」が選ばれている', () => {
+    renderGame()
+    const heavy = screen.getByRole('button', { name: 'どっしりだま' })
+    const bouncy = screen.getByRole('button', { name: 'はずむだま' })
+    const small = screen.getByRole('button', { name: 'ちいさいだま' })
+    expect(heavy).toHaveAttribute('aria-pressed', 'true')
+    expect(bouncy).toHaveAttribute('aria-pressed', 'false')
+    expect(small).toHaveAttribute('aria-pressed', 'false')
+    expect(engineMock.options?.ballId).toBe('heavy')
+  })
+
+  it('投球待機中に玉を選び直すと、エンジンへ切替が伝わる（世界は作り直さない）', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    const runIdBefore = engineMock.options?.runId
+    await user.click(screen.getByRole('button', { name: 'はずむだま' }))
+    expect(engineMock.setBallId).toHaveBeenCalledWith('bouncy')
+    expect(screen.getByRole('button', { name: 'はずむだま' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getByRole('button', { name: 'どっしりだま' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    // runIdが変わらない＝useTsumikiBowlingEngineのworldは作り直されない
+    // （切替はエンジンのhandle.setBallId経由で行う）。
+    expect(engineMock.options?.runId).toBe(runIdBefore)
+  })
+
+  it('飛行中は玉の選択ボタンがdisabledになり、切替を呼ばない', () => {
+    renderGame()
+    startThrow()
+    const bouncy = screen.getByRole('button', { name: 'はずむだま' })
+    expect(bouncy).toBeDisabled()
+    bouncy.click()
+    expect(engineMock.setBallId).not.toHaveBeenCalled()
+  })
+
+  it('1投ごとに玉を変えても、3投制・スコア・次投への遷移は普段どおり進む', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    playThrow(3, 1)
+    await user.click(screen.getByRole('button', { name: 'はずむだま' }))
+    playThrow(5, 2)
+    await user.click(screen.getByRole('button', { name: 'ちいさいだま' }))
+    playThrow(2, 3)
+
+    expect(engineMock.setBallId).toHaveBeenNthCalledWith(1, 'bouncy')
+    expect(engineMock.setBallId).toHaveBeenNthCalledWith(2, 'small')
+    const result = screen.getByRole('dialog', { name: 'けっか' })
+    expect(result).toHaveTextContent('10')
+  })
+
+  it('もういちどしても、選んでいた玉の選択は引き継がれる', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'ちいさいだま' }))
+    for (let index = 1; index <= THROWS_PER_GAME; index += 1) playThrow(2, index)
+    await user.click(screen.getByRole('button', { name: 'もういちど' }))
+
+    expect(engineMock.options?.ballId).toBe('small')
+    expect(screen.getByRole('button', { name: 'ちいさいだま' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    // 結果画面が消え、投球待機中に戻っているので選択ボタンはまた押せる。
+    expect(screen.getByRole('button', { name: 'ちいさいだま' })).not.toBeDisabled()
   })
 })

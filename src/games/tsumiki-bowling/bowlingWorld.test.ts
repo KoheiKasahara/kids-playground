@@ -12,6 +12,7 @@ import {
   readSettleSamples,
   removeFallenBlocks,
   resetForNextThrow,
+  setBowlingBall,
   type BowlingWorld,
 } from './bowlingWorld'
 import {
@@ -281,6 +282,204 @@ describe('つみきボウリングの世界', () => {
     expect(Math.hypot(velocity.x, velocity.y, velocity.z)).toBeGreaterThanOrEqual(
       LAUNCH_SPEED_MIN - 1e-6,
     )
+    bowling.world.free()
+  })
+})
+
+describe('毎投の玉切替', () => {
+  beforeAll(async () => {
+    await RAPIER.init()
+  })
+
+  it('ballIdを指定すると、その玉のBallSpecで世界が作られる', () => {
+    for (const ballId of ['heavy', 'bouncy', 'small'] as const) {
+      const bowling = createBowlingWorld(RAPIER, { ballId })
+      expect(bowling.ballSpec.id).toBe(ballId)
+      expect(bowling.ballSpec).toEqual(getBowlingBall(ballId))
+      bowling.world.free()
+    }
+  })
+
+  it('はずむだまは発射位置が他より高い', () => {
+    const heavy = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const bouncy = createBowlingWorld(RAPIER, { ballId: 'bouncy' })
+    expect(bouncy.anchor.y).toBeGreaterThan(heavy.anchor.y)
+    heavy.world.free()
+    bouncy.world.free()
+  })
+
+  it('投球待機中は玉を切り替えられ、新しい玉が発射位置へ置かれる', () => {
+    const bowling = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const changed = setBowlingBall(bowling, RAPIER, 'small')
+    expect(changed).toBe(true)
+    expect(bowling.ballSpec.id).toBe('small')
+    const ball = readBall(bowling)
+    expect(ball.position.x).toBeCloseTo(bowling.anchor.x, 5)
+    expect(ball.position.y).toBeCloseTo(bowling.anchor.y, 5)
+    expect(ball.position.z).toBeCloseTo(bowling.anchor.z, 5)
+    expect(ball.speed).toBe(0)
+    expect(bowling.launched).toBe(false)
+    bowling.world.free()
+  })
+
+  it('同じ玉を選び直しても何も起きない（no-op）', () => {
+    const bowling = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const changed = setBowlingBall(bowling, RAPIER, 'heavy')
+    expect(changed).toBe(false)
+    expect(bowling.ballSpec.id).toBe('heavy')
+    bowling.world.free()
+  })
+
+  it('飛行中は玉を切り替えられない（見た目と物理がずれるのを防ぐ）', () => {
+    const bowling = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    launchBall(bowling, aim(1))
+    expect(bowling.launched).toBe(true)
+    const changed = setBowlingBall(bowling, RAPIER, 'small')
+    expect(changed).toBe(false)
+    expect(bowling.ballSpec.id).toBe('heavy')
+    bowling.world.free()
+  })
+
+  it('3投それぞれで違う玉を選んでも、投球数や倒れ判定はいつも通り機能する', () => {
+    const bowling = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const order: Array<'heavy' | 'bouncy' | 'small'> = ['heavy', 'bouncy', 'small']
+    const results: number[] = []
+    for (const ballId of order) {
+      if (bowling.ballSpec.id !== ballId) setBowlingBall(bowling, RAPIER, ballId)
+      results.push(runThrow(bowling, 6, aim(1)).toppled)
+      resetForNextThrow(bowling)
+    }
+    for (const toppled of results) {
+      expect(toppled).toBeGreaterThan(0)
+    }
+    bowling.world.free()
+  })
+
+  it('リトライ（作り直し）後は、指定した玉から新しい物理状態で始まる', () => {
+    const first = createBowlingWorld(RAPIER, { ballId: 'small' })
+    runThrow(first, 5, aim(1))
+    first.world.free()
+    // 「もういちど」はworldを作り直す想定。前の投球の速度や崩れは一切引き継がない。
+    const retried = createBowlingWorld(RAPIER, { ballId: 'small' })
+    expect(retried.ballSpec.id).toBe('small')
+    expect(retried.launched).toBe(false)
+    const ball = readBall(retried)
+    expect(ball.speed).toBe(0)
+    for (const sample of readSettleSamples(retried)) {
+      expect(sample.linearSpeed).toBe(0)
+    }
+    retried.world.free()
+  })
+})
+
+describe('玉ごとの体感差（物理挙動）', () => {
+  beforeAll(async () => {
+    await RAPIER.init()
+  })
+
+  /** 発射してから、玉の垂直速度が「落ちる→跳ね上がる」を何回繰り返したか数える。 */
+  function countBounces(bowling: BowlingWorld, seconds: number, launchAim: LaunchAim): number {
+    launchBall(bowling, launchAim)
+    let bounces = 0
+    let falling = false
+    const steps = Math.round(seconds / PHYSICS_TIMESTEP)
+    for (let index = 0; index < steps; index += 1) {
+      bowling.world.step()
+      clampBowlingMotion(bowling)
+      removeFallenBlocks(bowling)
+      parkFallenBall(bowling)
+      const ball = readBall(bowling)
+      if (ball.velocity.y < -0.5) {
+        falling = true
+      } else if (falling && ball.velocity.y > 1.5) {
+        bounces += 1
+        falling = false
+      }
+    }
+    return bounces
+  }
+
+  it('はずむだまは、飛んでから何度も跳ねる（1回当たって終わりにならない）', () => {
+    // 最大パワーは塔の上端をかすめて1回の大バウンドになりやすいため、
+    // 「複数の積み木へ連鎖ヒットしやすい」を確かめやすい中程度のパワーで見る
+    // （幼児の投球はパワーが揃わないため、最大パワーだけを基準にしない）。
+    const bowling = createBowlingWorld(RAPIER, { ballId: 'bouncy' })
+    const bounces = countBounces(bowling, 7, aim(0.7))
+    expect(bounces).toBeGreaterThanOrEqual(2)
+    bowling.world.free()
+  })
+
+  it('どっしりだまは、はずむだまほど跳ねない（跳ね返りが弱い）', () => {
+    const heavy = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const bouncy = createBowlingWorld(RAPIER, { ballId: 'bouncy' })
+    const heavyBounces = countBounces(heavy, 7, aim(0.7))
+    const bouncyBounces = countBounces(bouncy, 7, aim(0.7))
+    expect(bouncyBounces).toBeGreaterThan(heavyBounces)
+    heavy.world.free()
+    bouncy.world.free()
+  })
+
+  /** 発射から積み木が落ち着くまでの間に、どれかの積み木が達した最大速度。 */
+  function maxBlockSpeed(bowling: BowlingWorld, seconds: number, launchAim: LaunchAim): number {
+    launchBall(bowling, launchAim)
+    let peak = 0
+    const steps = Math.round(seconds / PHYSICS_TIMESTEP)
+    for (let index = 0; index < steps; index += 1) {
+      bowling.world.step()
+      clampBowlingMotion(bowling)
+      removeFallenBlocks(bowling)
+      parkFallenBall(bowling)
+      for (const block of bowling.blocks) {
+        if (block.removed) continue
+        const linear = block.body.linvel()
+        peak = Math.max(peak, Math.hypot(linear.x, linear.y, linear.z))
+      }
+    }
+    return peak
+  }
+
+  it('どっしりだまは、同じパワーでもいちばん積み木を激しく吹き飛ばす（質量による破壊力）', () => {
+    const heavy = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const bouncy = createBowlingWorld(RAPIER, { ballId: 'bouncy' })
+    const small = createBowlingWorld(RAPIER, { ballId: 'small' })
+    const heavyPeak = maxBlockSpeed(heavy, 3, aim(1))
+    const bouncyPeak = maxBlockSpeed(bouncy, 3, aim(1))
+    const smallPeak = maxBlockSpeed(small, 3, aim(1))
+    expect(heavyPeak).toBeGreaterThan(bouncyPeak)
+    expect(heavyPeak).toBeGreaterThan(smallPeak)
+    heavy.world.free()
+    bouncy.world.free()
+    small.world.free()
+  })
+
+  it('ちいさいだまは高速でも積み木や床をすり抜けず、必ずぶつかる', () => {
+    // ちいさいだまは隙間を抜けやすいのが仕様（副次的な特徴）なので、
+    // 「当たった後に大きく減速するか」ではなく「衝突判定そのものが
+    // 抜けていないか（必ずどこかへ当たって崩すか、速度が有限のままか）」を見る。
+    const bowling = createBowlingWorld(RAPIER, { ballId: 'small' })
+    const result = runThrow(bowling, 5, aim(1))
+    expect(result.ballPassedTower).toBe(true)
+    expect(result.toppled).toBeGreaterThan(0)
+    expect(Number.isFinite(result.ballSpeedAfterImpact)).toBe(true)
+    // すり抜けて加速するようなバグがないか（発射速度を超えて増速しない）。
+    expect(result.ballSpeedAfterImpact).toBeLessThanOrEqual(
+      launchSpeed(1, getBowlingBall('small')) * 1.05,
+    )
+    // 落下中も安全域を超えない（暴走・NaN化しない）。
+    expect(result.minBallY).toBeGreaterThan(-100)
+    bowling.world.free()
+  })
+
+  it('ちいさいだまの最大速度は安全域(MAX_BALL_SPEED)を超えない', () => {
+    const bowling = createBowlingWorld(RAPIER, { ballId: 'small' })
+    launchBall(bowling, aim(1))
+    for (let index = 0; index < 30; index += 1) {
+      bowling.world.step()
+      clampBowlingMotion(bowling)
+      const ball = readBall(bowling)
+      expect(Number.isFinite(ball.speed)).toBe(true)
+      expect(ball.speed).toBeLessThanOrEqual(MAX_BALL_SPEED * 1.001)
+    }
     bowling.world.free()
   })
 })

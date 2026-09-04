@@ -82,6 +82,48 @@ const ZERO: Vector3 = { x: 0, y: 0, z: 0 }
  */
 const SOLVER_ITERATIONS = 8
 
+/**
+ * 玉のRigidBody・Colliderを1体ぶん作る。
+ *
+ * createBowlingWorld（初回）と setBowlingBall（毎投の玉切替）の両方が使うので、
+ * 玉ごとの物理設定はここ1か所にだけ書けばよい。
+ */
+function createBallBody(
+  rapier: RapierModule,
+  world: World,
+  ballSpec: BowlingBallSpec,
+): { body: RigidBody; anchor: Vector3 } {
+  const anchor: Vector3 = {
+    x: 0,
+    y: laneSurfaceY(LAUNCH_Z) + LAUNCH_HEIGHT + ballSpec.launchHeightOffset,
+    z: LAUNCH_Z,
+  }
+  const body = world.createRigidBody(
+    rapier.RigidBodyDesc.dynamic()
+      .setTranslation(anchor.x, anchor.y, anchor.z)
+      .setLinearDamping(ballSpec.linearDamping)
+      .setAngularDamping(ballSpec.angularDamping)
+      // 高速時のすり抜け対策の主役。速度が上がってもここは切らない。
+      .setCcdEnabled(true)
+      // 連続CCDだけだと積み木の角をかすめたときに貫通が残るため、
+      // 予測ベースのsoft CCDも半径2個ぶんで併用する。玉ごとに半径が違うので
+      // ここもballSpec.radiusから求め、小さい玉でも十分な予測幅を確保する。
+      .setSoftCcdPrediction(ballSpec.radius * 2)
+      // 判定を続けたいので寝かせない。
+      .setCanSleep(false)
+      // ねらっている間は重力を切り、発射の瞬間に戻す。
+      .setGravityScale(0),
+  )
+  world.createCollider(
+    rapier.ColliderDesc.ball(ballSpec.radius)
+      .setDensity(ballSpec.density)
+      .setFriction(ballSpec.friction)
+      .setRestitution(ballSpec.restitution),
+    body,
+  )
+  return { body, anchor }
+}
+
 export function createBowlingWorld(
   rapier: RapierModule,
   options: { stageId?: string; ballId?: BowlingBallId | string } = {},
@@ -150,33 +192,7 @@ export function createBowlingWorld(
 
   // ---- 玉 ----
   const ballSpec = getBowlingBall(options.ballId)
-  const anchor: Vector3 = {
-    x: 0,
-    y: laneSurfaceY(LAUNCH_Z) + LAUNCH_HEIGHT,
-    z: LAUNCH_Z,
-  }
-  const ball = world.createRigidBody(
-    rapier.RigidBodyDesc.dynamic()
-      .setTranslation(anchor.x, anchor.y, anchor.z)
-      .setLinearDamping(ballSpec.linearDamping)
-      .setAngularDamping(ballSpec.angularDamping)
-      // 高速時のすり抜け対策の主役。速度が上がってもここは切らない。
-      .setCcdEnabled(true)
-      // 連続CCDだけだと積み木の角をかすめたときに貫通が残るため、
-      // 予測ベースのsoft CCDも半径2個ぶんで併用する。
-      .setSoftCcdPrediction(ballSpec.radius * 2)
-      // 判定を続けたいので寝かせない。
-      .setCanSleep(false)
-      // ねらっている間は重力を切り、発射の瞬間に戻す。
-      .setGravityScale(0),
-  )
-  world.createCollider(
-    rapier.ColliderDesc.ball(ballSpec.radius)
-      .setDensity(ballSpec.density)
-      .setFriction(ballSpec.friction)
-      .setRestitution(ballSpec.restitution),
-    ball,
-  )
+  const { body: ball, anchor } = createBallBody(rapier, world, ballSpec)
 
   const bowling: BowlingWorld = {
     world,
@@ -213,6 +229,33 @@ export function parkBall(bowling: BowlingWorld, aim: LaunchAim | null): void {
   bowling.ball.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
   bowling.ball.resetForces(true)
   bowling.ball.resetTorques(true)
+}
+
+/**
+ * 毎投の玉切替。今の玉のBodyを消し、選んだ玉のBodyを作り直して発射位置へ置く。
+ *
+ * 飛行中（launched）は絶対に切り替えない。飛んでいる玉が途中で
+ * 大きさ・重さの違う玉へすり替わると、見た目と物理がずれたり
+ * 判定が壊れたりするため、ここで確実に止める
+ * （呼び出し側のUIも投球待機中だけ操作できるようにしてあるが、二重の安全策にする）。
+ *
+ * 同じ玉を選び直したときはBodyを作り直さない（意味のない再生成を避ける）。
+ */
+export function setBowlingBall(
+  bowling: BowlingWorld,
+  rapier: RapierModule,
+  ballId: BowlingBallId | string,
+): boolean {
+  if (bowling.launched) return false
+  const spec = getBowlingBall(ballId)
+  if (spec.id === bowling.ballSpec.id) return false
+  bowling.world.removeRigidBody(bowling.ball)
+  const { body, anchor } = createBallBody(rapier, bowling.world, spec)
+  bowling.ball = body
+  bowling.ballSpec = spec
+  bowling.anchor = anchor
+  parkBall(bowling, null)
+  return true
 }
 
 /**
