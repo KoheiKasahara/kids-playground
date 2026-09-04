@@ -10,7 +10,7 @@
  */
 
 export type BodyType = 'sports' | 'suv' | 'bus' | 'truck' | 'police'
-export type WheelType = 'normal' | 'big'
+export type WheelType = 'small' | 'big' | 'offroad' | 'racing'
 export type CarColorId = 'red' | 'blue' | 'yellow'
 export type FrontType = 'normal' | 'round'
 export type RoofType = 'none' | 'carrier'
@@ -47,6 +47,7 @@ export type CarConfig = { readonly [K in CarCategoryId]: CarOptionIdMap[K] }
 export type CarOptionPreview =
   | { kind: 'emoji'; emoji: string }
   | { kind: 'color'; hex: string }
+  | { kind: 'wheel'; variant: WheelType }
 
 export type CarOptionDefinition<Id extends string> = {
   id: Id
@@ -93,8 +94,10 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
     emoji: '🛞',
     ariaLabel: 'タイヤを えらぶ',
     options: [
-      { id: 'normal', label: 'ふつう', preview: { kind: 'emoji', emoji: '🛞' } },
-      { id: 'big', label: 'おおきい', preview: { kind: 'emoji', emoji: '🚜' } },
+      { id: 'small', label: 'ちいさい', preview: { kind: 'wheel', variant: 'small' } },
+      { id: 'big', label: 'おおきい', preview: { kind: 'wheel', variant: 'big' } },
+      { id: 'offroad', label: 'オフロード', preview: { kind: 'wheel', variant: 'offroad' } },
+      { id: 'racing', label: 'レーシング', preview: { kind: 'wheel', variant: 'racing' } },
     ],
   },
   color: {
@@ -177,7 +180,7 @@ export const CAR_CATEGORY_ORDER: readonly CarCategoryId[] = [
 
 export const DEFAULT_CAR_CONFIG: CarConfig = {
   body: 'sports',
-  wheel: 'normal',
+  wheel: 'small',
   color: 'red',
   front: 'normal',
   roof: 'none',

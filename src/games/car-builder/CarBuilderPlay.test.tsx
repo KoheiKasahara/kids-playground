@@ -63,7 +63,7 @@ describe('初期表示', () => {
 
   test('初期CarConfigが3Dシーンへ渡される', () => {
     renderPlay()
-    expect(latestConfig()).toMatchObject({ body: 'sports', wheel: 'normal', color: 'red', rideHeight: 'normal' })
+    expect(latestConfig()).toMatchObject({ body: 'sports', wheel: 'small', color: 'red', rideHeight: 'normal' })
   })
 })
 
@@ -144,6 +144,27 @@ describe('ボディ5種類の選択', () => {
 })
 
 describe('選択の即時反映', () => {
+  test('タイヤ4種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'タイヤを えらぶ' }))
+
+    for (const [label, wheel] of [
+      ['ちいさい', 'small'],
+      ['おおきい', 'big'],
+      ['オフロード', 'offroad'],
+      ['レーシング', 'racing'],
+    ] as const) {
+      const option = screen.getByRole('button', { name: label })
+      expect(option.querySelector('[class*="wheelPreview"]'), label).not.toBeNull()
+      await user.click(option)
+      expect(latestConfig().wheel, label).toBe(wheel)
+      expect(option).toHaveAttribute('aria-pressed', 'true')
+    }
+    expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
+  })
+
   test('選んだ瞬間にCarConfigが更新され3Dシーンへ渡る（決定ボタンは無い）', async () => {
     const user = userEvent.setup()
     renderPlay()
@@ -242,6 +263,11 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
     expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='body'\]\s*\{[^}]*grid-template-columns:\s*repeat\(5,/)
     expect(ruleOf(CSS_SOURCE, '.optionButton')).toMatch(/min-height:\s*64px/)
     expect(ruleOf(CSS_SOURCE, '.optionLabel')).toMatch(/white-space:\s*normal/)
+  })
+
+  test('タイヤ4選択肢はスマホ幅でも1行で見比べられる', () => {
+    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='wheel'\]\s*\{[^}]*grid-template-columns:\s*repeat\(4,/)
+    expect(ruleOf(CSS_SOURCE, '.wheelPreview')).toMatch(/border-radius:\s*50%/)
   })
 
   test('主要なタップ領域が小さすぎない（幼児向けに44px以上・カテゴリと選択肢は64px以上）', () => {

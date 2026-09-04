@@ -61,6 +61,15 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
+  test('タイヤは4種類を持ち、形状の違いを表すプレビューがある', () => {
+    const options = CAR_CATEGORIES.wheel.options
+    expect(options.map((option) => option.id)).toEqual(['small', 'big', 'offroad', 'racing'])
+    expect(options.map((option) => option.label)).toEqual(['ちいさい', 'おおきい', 'オフロード', 'レーシング'])
+    for (const option of options) {
+      expect(option.preview).toEqual({ kind: 'wheel', variant: option.id })
+    }
+  })
+
   test('選択肢IDはカテゴリ内で一意で、ラベルも空でない', () => {
     for (const category of carCategoryOrder()) {
       const ids = category.options.map((option) => option.id)

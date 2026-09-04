@@ -141,8 +141,13 @@ export const CAR_BODY_SPECS: Record<BodyType, CarBodySpec> = {
 }
 
 export const CAR_WHEEL_SPECS: Record<WheelType, CarWheelSpec> = {
-  normal: { id: 'normal', radius: 0.34, width: 0.26 },
+  // 「小さい」は既存の標準タイヤの寸法を引き継ぎ、車体の基本プロポーションを変えない。
+  small: { id: 'small', radius: 0.34, width: 0.26 },
   big: { id: 'big', radius: 0.46, width: 0.34 },
+  // 外周のトレッドブロックを含めてもボディを過度に圧迫しない範囲で、最も太くする。
+  offroad: { id: 'offroad', radius: 0.5, width: 0.42 },
+  // 半径は小さい側に保ち、幅とリムの比率でレーシングらしさを出す。
+  racing: { id: 'racing', radius: 0.36, width: 0.34 },
 }
 
 export const CAR_RIDE_HEIGHT_SPECS: Record<RideHeight, CarRideHeightSpec> = {

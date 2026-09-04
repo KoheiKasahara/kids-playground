@@ -25,7 +25,7 @@ function dimensionCombinations(): CarConfig[] {
 describe('computeCarDimensions（5ボディ）', () => {
   const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
   const body = CAR_BODY_SPECS.sports
-  const wheel = CAR_WHEEL_SPECS.normal
+  const wheel = CAR_WHEEL_SPECS.small
 
   test('全長・車幅・ホイールベースがボディ定義から決まる', () => {
     expect(dimensions.bodyType).toBe('sports')
@@ -126,16 +126,27 @@ describe('組み合わせ耐性（5ボディ×タイヤ×車高の全パター�
   )
 
   test('タイヤを大きくすると車体が持ち上がる（低い車高でも同じ）', () => {
-    const normal = computeCarDimensions(DEFAULT_CAR_CONFIG)
+    const small = computeCarDimensions(DEFAULT_CAR_CONFIG)
     const big = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', 'big'))
-    expect(big.bodyFloorY).toBeGreaterThan(normal.bodyFloorY)
+    expect(big.bodyFloorY).toBeGreaterThan(small.bodyFloorY)
   })
 
   test('車高「たかい」は同じタイヤなら最低地上高が上がる', () => {
-    const normal = computeCarDimensions(DEFAULT_CAR_CONFIG)
+    const small = computeCarDimensions(DEFAULT_CAR_CONFIG)
     const high = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'rideHeight', 'high'))
-    expect(high.groundClearance).toBeGreaterThan(normal.groundClearance)
-    expect(high.roofTopY).toBeGreaterThan(normal.roofTopY)
+    expect(high.groundClearance).toBeGreaterThan(small.groundClearance)
+    expect(high.roofTopY).toBeGreaterThan(small.roofTopY)
+  })
+
+  test('オフロードは最も太く、レーシングは小径側でもワイドな寸法を持つ', () => {
+    const small = computeCarDimensions(DEFAULT_CAR_CONFIG)
+    const offroad = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', 'offroad'))
+    const racing = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', 'racing'))
+
+    expect(offroad.wheelRadius).toBeGreaterThan(small.wheelRadius)
+    expect(offroad.wheelWidth).toBeGreaterThan(racing.wheelWidth)
+    expect(racing.wheelWidth).toBeGreaterThan(small.wheelWidth)
+    expect(racing.wheelRadius).toBeLessThan(offroad.wheelRadius)
   })
 
   test('ボディを変えても4輪・前後端・ルーフのattachmentが寸法に追従する', () => {
