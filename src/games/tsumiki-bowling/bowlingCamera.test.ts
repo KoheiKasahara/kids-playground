@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { bowlingCameraSetup } from './bowlingCamera'
 import { LAUNCH_HEIGHT, LAUNCH_Z } from './bowlingPhysics'
-import { laneSurfaceY } from './bowlingStage'
+import { laneSurfaceY, TOWER_CENTER_Z } from './bowlingStage'
 
 /** 玉と積み木の上端。どの画面比でも、この2つが画面に入っていなければならない。 */
 const BALL_POINT = { x: 0, y: laneSurfaceY(LAUNCH_Z) + LAUNCH_HEIGHT, z: LAUNCH_Z }
-const TOWER_TOP = { x: 1.6, y: laneSurfaceY(-5.6) + 2.73, z: -5.6 }
+const TOWER_TOP = { x: 1.6, y: laneSurfaceY(TOWER_CENTER_Z) + 2.73, z: TOWER_CENTER_Z }
 
 /** その点がカメラの画角の内側に入っているか（縦・横の両方）。 */
 function isVisible(aspect: number, point: { x: number; y: number; z: number }): boolean {

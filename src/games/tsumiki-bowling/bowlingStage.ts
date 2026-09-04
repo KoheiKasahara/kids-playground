@@ -136,13 +136,33 @@ const WIDE_PLANK: readonly [number, number, number] = [3.2, 0.22, 1]
 const CUBE: readonly [number, number, number] = [0.44, 0.44, 0.44]
 const BIG_CUBE: readonly [number, number, number] = [0.5, 0.5, 0.5]
 
+/**
+ * 塔全体を奥へ下げる量[m]。
+ *
+ * 発射位置(z=+7)と塔が近すぎると、離した瞬間にもう当たっていて
+ * 「ビューンと進んでからドカン」の助走が味わえない（実画面で確認した）。
+ * 塔だけをこのぶん奥へ下げ、発射の強さ・速度は一切触らずに助走を伸ばしている。
+ * 玉から最前面の積み木までは 11.0m → 13.2m（約20%増）。
+ *
+ * これ以上下げると、幼児には狙いにくく・積み木が小さく見え始めるため、
+ * 「少し伸ばす」の範囲としてここで止めている。
+ */
+const TOWER_DEPTH_OFFSET = 2.2
+
 /** 手前の壁が立つZ。塔より手前にして、まず壁が倒れ込むようにする。 */
-const FRONT_WALL_Z = -4.25
+const FRONT_WALL_Z = -4.25 - TOWER_DEPTH_OFFSET
 /** 塔の手前側・奥側の柱が立つZ。奥行きを持たせて、力が前後にも連鎖する。 */
-const FRONT_ROW_Z = -5
-const BACK_ROW_Z = -6.3
+const FRONT_ROW_Z = -5 - TOWER_DEPTH_OFFSET
+const BACK_ROW_Z = -6.3 - TOWER_DEPTH_OFFSET
 /** 板と上段の中心Z（前後の柱にまたがる）。 */
 const TOWER_Z = (FRONT_ROW_Z + BACK_ROW_Z) / 2
+
+/**
+ * 塔のだいたいの中心Z。カメラの画角計算とテストがここを見る。
+ * 塔を前後に動かしたとき、カメラ側の数値を直し忘れて
+ * 「積み木が小さく写る／端が切れる」が起きないよう、必ずここから読む。
+ */
+export const TOWER_CENTER_Z = TOWER_Z
 
 /**
  * 1段目の柱の左右位置。

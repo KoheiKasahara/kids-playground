@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BACK_WALL_Z,
   BOWLING_STAGES,
   DEFAULT_BOWLING_STAGE_ID,
   getBowlingStage,
@@ -58,6 +59,22 @@ describe('レーンの形', () => {
   it('発射位置は積み木の一番上より高い', () => {
     const tallest = Math.max(...STAGE.blocks.map((block) => block.height + block.size[1] / 2))
     expect(LAUNCH_HEIGHT).toBeGreaterThan(tallest)
+  })
+
+  it('玉から積み木まで、ビューンと進むのを楽しめる助走距離がある', () => {
+    // 近すぎると、離した瞬間にもう当たっていて「飛んでいく」が見えない。
+    // 遠すぎると、幼児には狙いにくく、当たるまで待たされる。
+    // 実測（Rapierで最前面へ到達するまで）: 最大パワー約0.39秒、最小パワー約0.80秒。
+    const frontFaceZ = Math.max(...STAGE.blocks.map((block) => block.z + block.size[2] / 2))
+    const runUp = LAUNCH_Z - frontFaceZ
+    expect(runUp).toBeGreaterThan(12.5)
+    expect(runUp).toBeLessThan(14)
+  })
+
+  it('塔の奥には、崩れた積み木が散らばるだけの余地が残っている', () => {
+    // ここが詰まると、崩れた積み木がすぐ奥の壁で止まって「ガラガラ」が縮む。
+    const backFaceZ = Math.min(...STAGE.blocks.map((block) => block.z - block.size[2] / 2))
+    expect(backFaceZ - BACK_WALL_Z).toBeGreaterThan(2)
   })
 
   it('積み木も発射位置もレーンの内側にある', () => {

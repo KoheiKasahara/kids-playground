@@ -24,9 +24,15 @@ import {
 import { createToppleTracker, updateToppleTracker } from './bowlingTopple'
 import { createSettleState, updateSettleState } from './bowlingSettle'
 import { launchSpeed, type LaunchAim } from './bowlingLaunch'
+import { TOWER_CENTER_Z } from './bowlingStage'
 import { getBowlingBall } from './bowlingBalls'
 
 const STEP_MS = PHYSICS_TIMESTEP * 1000
+
+/** 塔の手前の目印。ここへ届いた時点の速度で「勢いのまま届いたか」を見る。 */
+const TOWER_APPROACH_Z = TOWER_CENTER_Z + 2.6
+/** 塔の奥の目印。ここまで玉が進んだら、塔を通り抜けたとみなす。 */
+const TOWER_EXIT_Z = TOWER_CENTER_Z - 1.4
 
 function aim(power: number, yaw = 0): LaunchAim {
   return { active: true, power, yaw, pull: 0.9 * power }
@@ -67,7 +73,7 @@ function runThrow(bowling: BowlingWorld, seconds: number, launchAim: LaunchAim |
     }
     const ball = readBall(bowling)
     minBallY = Math.min(minBallY, ball.position.y)
-    if (!ballPassedTower && ball.position.z <= -7) {
+    if (!ballPassedTower && ball.position.z <= TOWER_EXIT_Z) {
       ballPassedTower = true
       ballSpeedAfterImpact = ball.speed
     }
@@ -133,13 +139,13 @@ describe('つみきボウリングの世界', () => {
   it('最大パワーの玉は、積み木へ届くまでに勢いを失わない', () => {
     const bowling = createBowlingWorld(RAPIER)
     launchBall(bowling, aim(1))
-    // 積み木の手前（z ≒ -3.5）へ到達するまで進める。
+    // 積み木の少し手前へ到達するまで進める。
     let speedAtTower = 0
     for (let index = 0; index < 240; index += 1) {
       bowling.world.step()
       clampBowlingMotion(bowling)
       const ball = readBall(bowling)
-      if (ball.position.z <= -3) {
+      if (ball.position.z <= TOWER_APPROACH_Z) {
         speedAtTower = ball.speed
         break
       }
