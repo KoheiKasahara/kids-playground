@@ -14,7 +14,7 @@ export type WheelType = 'small' | 'big' | 'offroad' | 'racing'
 export type CarColorId = 'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'pink' | 'purple' | 'white' | 'black'
 export type FrontType = 'round' | 'square' | 'slim'
 export type RoofType = 'none' | 'policeLight' | 'luggage' | 'spoiler'
-export type DecorationType = 'none' | 'star'
+export type DecorationType = 'none' | 'star' | 'flame' | 'stripes' | 'dots'
 export type MarkType = 'none' | 'plate'
 export type RideHeight = 'normal' | 'high'
 
@@ -50,6 +50,7 @@ export type CarOptionPreview =
   | { kind: 'wheel'; variant: WheelType }
   | { kind: 'front'; variant: FrontType }
   | { kind: 'roof'; variant: RoofType }
+  | { kind: 'decoration'; variant: DecorationType }
 
 export type CarOptionDefinition<Id extends string> = {
   id: Id
@@ -155,8 +156,11 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
     emoji: '⭐',
     ariaLabel: 'かざりを えらぶ',
     options: [
-      { id: 'none', label: 'なし', preview: { kind: 'emoji', emoji: '🚫' } },
-      { id: 'star', label: 'ほし', preview: { kind: 'emoji', emoji: '⭐' } },
+      { id: 'none', label: 'なし', preview: { kind: 'decoration', variant: 'none' } },
+      { id: 'star', label: 'ほし', preview: { kind: 'decoration', variant: 'star' } },
+      { id: 'flame', label: 'ほのお', preview: { kind: 'decoration', variant: 'flame' } },
+      { id: 'stripes', label: 'しましま', preview: { kind: 'decoration', variant: 'stripes' } },
+      { id: 'dots', label: 'みずたま', preview: { kind: 'decoration', variant: 'dots' } },
     ],
   },
   mark: {

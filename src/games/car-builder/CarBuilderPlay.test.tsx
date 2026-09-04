@@ -249,6 +249,28 @@ describe('選択の即時反映', () => {
     expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
   })
 
+  test('飾り5種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'かざりを えらぶ' }))
+
+    for (const [label, decoration] of [
+      ['なし', 'none'],
+      ['ほし', 'star'],
+      ['ほのお', 'flame'],
+      ['しましま', 'stripes'],
+      ['みずたま', 'dots'],
+    ] as const) {
+      const option = screen.getByRole('button', { name: label })
+      expect(option.querySelector('[class*="decorationPreview"]'), label).not.toBeNull()
+      await user.click(option)
+      expect(latestConfig().decoration, label).toBe(decoration)
+      expect(option).toHaveAttribute('aria-pressed', 'true')
+    }
+    expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
+  })
+
   test('選んだ瞬間にCarConfigが更新され3Dシーンへ渡る（決定ボタンは無い）', async () => {
     const user = userEvent.setup()
     renderPlay()

@@ -66,6 +66,33 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
       </span>
     )
   }
+  if (preview.kind === 'decoration') {
+    return (
+      <span
+        className={`${className} ${styles.decorationPreview} ${styles[`decorationPreview-${preview.variant}`]}`}
+        aria-hidden="true"
+      >
+        {preview.variant === 'none' ? <span className={styles.decorationPreviewNone}>×</span> : null}
+        {preview.variant === 'star' ? <span className={styles.decorationPreviewStar}>★</span> : null}
+        {preview.variant === 'flame' ? <span className={styles.decorationPreviewFlame}>♨</span> : null}
+        {preview.variant === 'stripes' ? (
+          <>
+            <span className={styles.decorationPreviewStripe} />
+            <span className={styles.decorationPreviewStripe} />
+            <span className={styles.decorationPreviewStripe} />
+          </>
+        ) : null}
+        {preview.variant === 'dots' ? (
+          <>
+            <span className={styles.decorationPreviewDot} />
+            <span className={styles.decorationPreviewDot} />
+            <span className={styles.decorationPreviewDot} />
+            <span className={styles.decorationPreviewDot} />
+          </>
+        ) : null}
+      </span>
+    )
+  }
   return (
     <span className={className} aria-hidden="true">
       {preview.emoji}

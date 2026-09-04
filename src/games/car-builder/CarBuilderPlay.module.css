@@ -604,6 +604,141 @@
   height: 3px;
 }
 
+/* 飾りカテゴリは、文字や絵文字ではなく車体へ貼る模様の形をサムネイルで示す。 */
+.decorationPreview {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 34px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #d8e9f4 0 45%, #a6c4d5 46% 100%);
+  box-shadow: inset 0 0 0 2px rgba(17, 24, 39, 0.2), 0 1px 2px rgba(17, 24, 39, 0.2);
+}
+
+.decorationPreview::before {
+  position: absolute;
+  right: 4px;
+  bottom: 5px;
+  left: 4px;
+  height: 20px;
+  border-radius: 5px;
+  background: #3d7bf5;
+  content: '';
+}
+
+.decorationPreviewNone {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 5px;
+  color: #e64a4a;
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.decorationPreviewStar,
+.decorationPreviewFlame,
+.decorationPreviewStripe,
+.decorationPreviewDot {
+  position: relative;
+  z-index: 2;
+  display: block;
+}
+
+.decorationPreviewStar {
+  color: #ffd43b;
+  font-size: 25px;
+  line-height: 1;
+  text-shadow: 0 0 0 2px #c2410c, 0 1px 2px rgba(17, 24, 39, 0.35);
+}
+
+.decorationPreviewFlame {
+  color: #ffd43b;
+  font-size: 27px;
+  line-height: 1;
+  text-shadow: 0 -2px 0 #e64a4a, 0 1px 2px rgba(17, 24, 39, 0.35);
+}
+
+.decorationPreviewStripe {
+  width: 7px;
+  height: 25px;
+  margin: 0 2px;
+  transform: skewX(-18deg);
+  background: #ffd43b;
+}
+
+.decorationPreviewStripe:nth-child(1) {
+  background: #2563eb;
+}
+
+.decorationPreviewStripe:nth-child(3) {
+  background: #ffffff;
+}
+
+.decorationPreviewDot {
+  width: 9px;
+  height: 9px;
+  margin: 2px;
+  border: 2px solid #fff7c2;
+  border-radius: 50%;
+  background: #e64a4a;
+}
+
+.decorationPreviewDot:nth-child(3n) {
+  background: #ffd43b;
+}
+
+.decorationPreviewDot:nth-child(4n) {
+  background: #51cf66;
+}
+
+/* カテゴリ一覧の小さなバッジでも模様の判別性を保つ。 */
+.categoryBadge.decorationPreview {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-round);
+}
+
+.categoryBadge.decorationPreview::before {
+  right: 2px;
+  bottom: 2px;
+  left: 2px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.categoryBadge .decorationPreviewNone {
+  top: 0;
+  right: 2px;
+  font-size: 15px;
+}
+
+.categoryBadge .decorationPreviewStar {
+  font-size: 14px;
+}
+
+.categoryBadge .decorationPreviewFlame {
+  font-size: 15px;
+}
+
+.categoryBadge .decorationPreviewStripe {
+  width: 3px;
+  height: 12px;
+  margin: 0 1px;
+}
+
+.categoryBadge .decorationPreviewDot {
+  width: 4px;
+  height: 4px;
+  margin: 1px;
+  border-width: 1px;
+}
+
 /* カテゴリ一覧の右上バッジでは、同じ形状を小さく収める。 */
 .categoryBadge.wheelPreview {
   width: 18px;

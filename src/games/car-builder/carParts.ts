@@ -760,22 +760,191 @@ function createStarGeometry(outerRadius: number): THREE.ShapeGeometry {
   return new THREE.ShapeGeometry(shape)
 }
 
-function buildStarDecoration({ attachments }: CarPartContext): THREE.Object3D {
+function createFlameGeometry(size: number): THREE.ShapeGeometry {
+  const shape = new THREE.Shape()
+  shape.moveTo(0, size * 0.58)
+  shape.quadraticCurveTo(size * 0.07, size * 0.25, size * 0.32, size * 0.08)
+  shape.quadraticCurveTo(size * 0.5, -size * 0.08, size * 0.38, -size * 0.28)
+  shape.quadraticCurveTo(size * 0.22, -size * 0.52, 0, -size * 0.58)
+  shape.quadraticCurveTo(-size * 0.22, -size * 0.52, -size * 0.38, -size * 0.28)
+  shape.quadraticCurveTo(-size * 0.5, -size * 0.08, -size * 0.32, size * 0.08)
+  shape.quadraticCurveTo(-size * 0.08, size * 0.25, 0, size * 0.58)
+  shape.closePath()
+  return new THREE.ShapeGeometry(shape)
+}
+
+function createStripeGeometry(width: number, height: number): THREE.ShapeGeometry {
+  const shape = new THREE.Shape()
+  const slant = width * 0.42
+  shape.moveTo(-width / 2 + slant, -height / 2)
+  shape.lineTo(width / 2 + slant, -height / 2)
+  shape.lineTo(width / 2 - slant, height / 2)
+  shape.lineTo(-width / 2 - slant, height / 2)
+  shape.closePath()
+  return new THREE.ShapeGeometry(shape)
+}
+
+type SideStickerSurface = {
+  position: THREE.Vector3
+  normal: THREE.Vector3
+}
+
+/**
+ * 側面ステッカーの貼り付け面を求める。
+ * スポーツカーだけは断面が丸く、固定した attachment の平面では浮くため、
+ * 既存の外殻サーフェスから実際の位置と法線を問い合わせる。
+ */
+function sideStickerSurface(
+  context: CarPartContext,
+  side: CarAttachment,
+  z: number,
+  u: number,
+): SideStickerSurface {
+  const sideSign = side.normal.x > 0 ? 1 : -1
+  if (context.dimensions.bodyStyle === 'sports') {
+    const surface = sportsSurfacePoint(context.dimensions, context.attachments, z, u)
+    return {
+      position: new THREE.Vector3(sideSign * surface.position.x, surface.position.y, surface.position.z),
+      normal: new THREE.Vector3(sideSign * surface.normal.x, surface.normal.y, 0).normalize(),
+    }
+  }
+
+  return {
+    position: new THREE.Vector3(
+      side.position.x,
+      context.dimensions.bodyFloorY + context.dimensions.hullHeight * (0.48 + (u - 0.3) * 0.8),
+      side.position.z + z,
+    ),
+    normal: new THREE.Vector3(side.normal.x, side.normal.y, side.normal.z).normalize(),
+  }
+}
+
+/** 平面の横軸を車の前後、縦軸を車体断面の接線へ合わせる。 */
+function placeSideSticker(
+  mesh: THREE.Mesh,
+  surface: SideStickerSurface,
+  side: CarAttachment,
+  distance: number,
+): void {
+  const sideSign = side.normal.x > 0 ? 1 : -1
+  const normal = surface.normal.clone().normalize()
+  const horizontal = new THREE.Vector3(0, 0, -sideSign)
+  const vertical = new THREE.Vector3(-normal.y / sideSign, Math.abs(normal.x), 0).normalize()
+  const basis = new THREE.Matrix4().makeBasis(horizontal, vertical, normal)
+
+  mesh.position.copy(surface.position).addScaledVector(normal, distance)
+  mesh.quaternion.setFromRotationMatrix(basis)
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+}
+
+function sideStickerMesh(
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  context: CarPartContext,
+  side: CarAttachment,
+  z: number,
+  u: number,
+  distance = 0.024,
+): THREE.Mesh {
+  const mesh = new THREE.Mesh(geometry, material)
+  placeSideSticker(mesh, sideStickerSurface(context, side, z, u), side, distance)
+  return mesh
+}
+
+function buildStarDecoration(context: CarPartContext): THREE.Object3D {
   const group = new THREE.Group()
   group.name = 'car-decoration'
-  const material = new THREE.MeshStandardMaterial({
-    color: '#ffd43b',
-    roughness: 0.4,
-    side: THREE.DoubleSide,
-  })
+  const outlineMaterial = new THREE.MeshStandardMaterial({ color: '#9a3412', roughness: 0.42, side: THREE.DoubleSide })
+  const material = new THREE.MeshStandardMaterial({ color: '#ffd43b', roughness: 0.4, side: THREE.DoubleSide })
+  const outlineGeometry = createStarGeometry(context.dimensions.hullHeight * 0.39)
+  const geometry = createStarGeometry(context.dimensions.hullHeight * 0.32)
 
-  for (const side of [attachments.sideLeft, attachments.sideRight]) {
-    const geometry = createStarGeometry(side.size.extent * 0.34)
-    const star = new THREE.Mesh(geometry, material)
-    const position = offsetFrom(side, 0.012)
-    star.position.copy(position)
-    star.rotation.y = (side.normal.x > 0 ? 1 : -1) * (Math.PI / 2)
-    group.add(star)
+  for (const side of [context.attachments.sideLeft, context.attachments.sideRight]) {
+    group.add(
+      sideStickerMesh(outlineGeometry, outlineMaterial, context, side, 0, 0.3, 0.019),
+      sideStickerMesh(geometry, material, context, side, 0, 0.3, 0.029),
+    )
+  }
+  return group
+}
+
+function buildFlameDecoration(context: CarPartContext): THREE.Object3D {
+  const group = new THREE.Group()
+  group.name = 'car-decoration'
+  const outerMaterial = new THREE.MeshStandardMaterial({ color: '#b42318', roughness: 0.4, side: THREE.DoubleSide })
+  const innerMaterial = new THREE.MeshStandardMaterial({ color: '#ffd43b', roughness: 0.38, side: THREE.DoubleSide })
+  const outerGeometry = createFlameGeometry(context.dimensions.hullHeight * 0.72)
+  const innerGeometry = createFlameGeometry(context.dimensions.hullHeight * 0.42)
+
+  for (const side of [context.attachments.sideLeft, context.attachments.sideRight]) {
+    group.add(
+      sideStickerMesh(outerGeometry, outerMaterial, context, side, context.dimensions.length * 0.02, 0.3, 0.019),
+      sideStickerMesh(innerGeometry, innerMaterial, context, side, context.dimensions.length * 0.02, 0.3, 0.029),
+    )
+  }
+  return group
+}
+
+function buildStripesDecoration(context: CarPartContext): THREE.Object3D {
+  const group = new THREE.Group()
+  group.name = 'car-decoration'
+  const materials = [
+    new THREE.MeshStandardMaterial({ color: '#2563eb', roughness: 0.4, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: '#ffd43b', roughness: 0.38, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.4, side: THREE.DoubleSide }),
+  ]
+  const geometry = createStripeGeometry(context.dimensions.hullHeight * 0.17, context.dimensions.hullHeight * 0.56)
+  const offsets = [-0.16, 0, 0.16]
+
+  for (const side of [context.attachments.sideLeft, context.attachments.sideRight]) {
+    offsets.forEach((offset, index) => {
+      group.add(
+        sideStickerMesh(
+          geometry,
+          materials[index]!,
+          context,
+          side,
+          context.dimensions.length * offset,
+          0.3,
+          0.024,
+        ),
+      )
+    })
+  }
+  return group
+}
+
+function buildDotsDecoration(context: CarPartContext): THREE.Object3D {
+  const group = new THREE.Group()
+  group.name = 'car-decoration'
+  const materials = [
+    new THREE.MeshStandardMaterial({ color: '#e64a4a', roughness: 0.38, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: '#ffd43b', roughness: 0.36, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: '#51cf66', roughness: 0.38, side: THREE.DoubleSide }),
+  ]
+  const radius = context.dimensions.hullHeight * 0.105
+  const geometry = new THREE.CircleGeometry(radius, 20)
+  const zOffsets = [-0.16, 0, 0.16]
+  const rows = [0.22, 0.37]
+  let colorIndex = 0
+
+  for (const side of [context.attachments.sideLeft, context.attachments.sideRight]) {
+    for (const u of rows) {
+      for (const offset of zOffsets) {
+        group.add(
+          sideStickerMesh(
+            geometry,
+            materials[colorIndex++ % materials.length]!,
+            context,
+            side,
+            context.dimensions.length * offset,
+            u,
+            0.024,
+          ),
+        )
+      }
+    }
   }
   return group
 }
@@ -827,7 +996,13 @@ export const CAR_PART_BUILDERS: {
     luggage: buildRoofLuggage,
     spoiler: buildRoofSpoiler,
   },
-  decoration: { none: nothing, star: buildStarDecoration },
+  decoration: {
+    none: nothing,
+    star: buildStarDecoration,
+    flame: buildFlameDecoration,
+    stripes: buildStripesDecoration,
+    dots: buildDotsDecoration,
+  },
   mark: { none: nothing, plate: buildNumberPlate },
 }
 
