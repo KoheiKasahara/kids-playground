@@ -10,6 +10,7 @@ import {
 import {
   BACK_WALL_HALF_HEIGHT,
   BACK_WALL_Z,
+  getBowlingStage,
   LANE_CENTER_Z,
   LANE_HALF_LENGTH,
   LANE_HALF_THICKNESS,
@@ -163,6 +164,10 @@ export function useTsumikiBowlingEngine(
     const runToken = Symbol('tsumiki-bowling-run')
     activeRunRef.current = runToken
 
+    // カメラの画角はステージごとに変わる（bowlingCameraSetup参照）。
+    // world作りと同じくrunId/stageIdでeffectごと作り直すので、ここで一度だけ引く。
+    const stage = getBowlingStage(stageId)
+
     let bowling: BowlingWorld | null = null
     let scene: THREE.Scene | null = null
     let camera: THREE.PerspectiveCamera | null = null
@@ -283,7 +288,7 @@ export function useTsumikiBowlingEngine(
 
     function applyCamera() {
       if (!camera) return
-      const setup = bowlingCameraSetup(camera.aspect)
+      const setup = bowlingCameraSetup(camera.aspect, stage)
       cameraBase.set(setup.position.x, setup.position.y, setup.position.z)
       cameraTarget.set(setup.target.x, setup.target.y, setup.target.z)
       camera.fov = setup.fov

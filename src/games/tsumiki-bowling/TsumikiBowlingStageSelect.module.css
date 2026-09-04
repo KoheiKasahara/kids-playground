@@ -1,0 +1,138 @@
+.page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-md) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  background: var(--color-background);
+  /* カードの並びだけを縦スクロールさせ、ヘッダーと案内文は画面に固定して見せる。 */
+  overflow: hidden;
+}
+
+.header {
+  display: grid;
+  flex: none;
+  grid-template-columns: minmax(56px, 1fr) auto minmax(56px, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.title {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(18px, 5vw, 26px);
+  font-weight: 900;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.backLink {
+  grid-column: 1;
+  grid-row: 1;
+  display: inline-flex;
+  min-width: 56px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  padding: var(--space-xs) var(--space-sm);
+  border: 2px solid transparent;
+  border-radius: var(--radius-round);
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.lead {
+  flex: none;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: clamp(14px, 4vw, 18px);
+  font-weight: 800;
+  text-align: center;
+}
+
+/*
+ * カード一覧だけをスクロール領域にする。
+ * ステージが増えても横スクロールは使わず、縦に積んで破綻しないようにする。
+ */
+.cards {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 2px 2px var(--space-md);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.card {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-sm);
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.card:hover,
+.card:focus-visible {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.card:active {
+  transform: scale(0.97);
+}
+
+.preview {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+}
+
+.previewGround {
+  stroke: var(--color-border);
+  stroke-width: 0.03;
+}
+
+.cardName {
+  color: var(--color-primary-dark);
+  font-size: clamp(14px, 3.6vw, 17px);
+  font-weight: 900;
+  text-align: center;
+}
+
+.cardHint {
+  color: var(--color-text-muted);
+  font-size: clamp(11px, 3vw, 13px);
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

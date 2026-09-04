@@ -1,11 +1,11 @@
 /**
  * 固定カメラの設定。プレイヤーはカメラを操作しない（Phase 1 の非目標）。
  *
- * 画面比だけを入力にした純粋関数にしてあるので、縦画面・横画面での
- * 見え方を実機なしでもテストできる。
+ * 画面比とステージだけを入力にした純粋関数にしてあるので、縦画面・横画面や
+ * ステージごとの見え方を実機なしでもテストできる。
  */
 
-import { TOWER_CENTER_Z } from './bowlingStage'
+import { getBowlingStage, stageBounds, type BowlingStage } from './bowlingStage'
 
 export type CameraSetup = {
   position: { x: number; y: number; z: number }
@@ -26,30 +26,33 @@ const TARGET = { x: 0, y: -0.2, z: -4.6 } as const
 const POSITION = { x: 0, y: 8.4, z: 14.2 } as const
 
 /**
- * 積み木の塔まわりに確保したい左右の半幅[m]。
- * 塔の幅（約4.2m）に少し余白を足した値。
+ * どのステージでも最低限確保したい左右の半幅[m]（下限）。
+ * 既定ステージ tower の半幅(2.1)に、下のWIDTH_MARGINを足した値と一致する。
  *
- * ここは「塔がどれだけ大きく写るか」を決める値でもある。
- * 塔を奥へ下げたとき、この値のままだと画角を詰めて塔を同じ大きさへ
- * 拡大し返してしまい、そのぶん手前の玉が画面の外側へ押し出されて
- * 下端の操作パネルへ潜り込む（実画面で確認した）。
- * 余白を少し広げて画角を変更前と同じに保ち、
- * 「塔は少しだけ小さく＝少し遠くに見える／玉の見え方は変えない」形にしている。
+ * ここは「積み木がどれだけ大きく写るか」を決める値でもある。
+ * ステージごとの半幅(stageBounds().halfWidth)にそのままWIDTH_MARGINを足すと、
+ * tower より狭いステージ（例: tall）でこの下限が効き、寄りすぎて手前の玉が
+ * 画面の外側へ押し出され下端の操作パネルへ潜り込む、という事態を防ぐ
+ * （実画面で確認した）。
  */
-const REQUIRED_HALF_WIDTH = 3.75
+const REQUIRED_HALF_WIDTH_MIN = 3.75
 
 /**
- * 塔のだいたいの位置。左右がはみ出さない画角を決めるために使う。
- *
- * Zは塔の定義から読む。塔を前後へ動かしたとき、ここが古い位置のままだと
- * 実際より近いものとして画角を決めてしまい、塔が小さく写る。
+ * ステージの半幅へ足す余白[m]。
+ * tower の半幅(2.1) + WIDTH_MARGIN(1.65) = REQUIRED_HALF_WIDTH_MIN(3.75)になるよう
+ * 検算してある。つまり既定ステージでは常に下限のほうが効き、
+ * Phase 1 の画角を1度も変えない。tower より広いステージ（例: castle）だけが
+ * この余白ぶんを足した値になり、少しだけ引いて全体を収める。
  */
-const TOWER_POINT = { x: 0, y: 0.55, z: TOWER_CENTER_Z } as const
+const WIDTH_MARGIN = 1.65
 
 /**
  * 縦方向に最低限必要な画角[度]。
- * 手前の玉（視線の約11度下）と塔の上端（約9度上）が同時に入る大きさ。
+ * 手前の玉（視線の約11度下）と積み木の上端が同時に入る大きさ。
  * 横長画面ではこちらが効いて、必要以上に引かない＝大きく見える。
+ *
+ * 積み木がいちばん高いステージ(tall, 高さ3.77)でも縦方向に必要な画角は
+ * 約24.5度で、この30度に収まる（検算済み）。
  */
 const VERTICAL_FOV_MIN = 30
 
@@ -57,16 +60,25 @@ const VERTICAL_FOV_MIN = 30
 const FOV_MIN = 28
 const FOV_MAX = 52
 
-export function bowlingCameraSetup(aspect: number): CameraSetup {
+export function bowlingCameraSetup(
+  aspect: number,
+  stage: BowlingStage = getBowlingStage(undefined),
+): CameraSetup {
   const safeAspect = Number.isFinite(aspect) ? Math.min(3, Math.max(0.35, aspect)) : 1
-  const distanceToTower = Math.hypot(
-    POSITION.x - TOWER_POINT.x,
-    POSITION.y - TOWER_POINT.y,
-    POSITION.z - TOWER_POINT.z,
+  const bounds = stageBounds(stage)
+  // 距離の見積もりに使うyは常に定数0.55のまま（ステージの高さでは変えない）。
+  // zはステージ側の指定(cameraZ)を優先する。tower はここへPhase 1と同じ値を
+  // 明示しているので、既定ステージでは従来と完全に同じ距離・画角になる。
+  const stagePoint = { x: 0, y: 0.55, z: stage.cameraZ ?? bounds.centerZ }
+  const distanceToStage = Math.hypot(
+    POSITION.x - stagePoint.x,
+    POSITION.y - stagePoint.y,
+    POSITION.z - stagePoint.z,
   )
-  // 縦画面ほど横の画角が狭くなるので、そのぶん縦の画角を広げて塔の幅を収める。
+  const requiredHalfWidth = Math.max(REQUIRED_HALF_WIDTH_MIN, bounds.halfWidth + WIDTH_MARGIN)
+  // 縦画面ほど横の画角が狭くなるので、そのぶん縦の画角を広げてステージの幅を収める。
   const fovForWidth =
-    (2 * Math.atan(REQUIRED_HALF_WIDTH / distanceToTower / safeAspect) * 180) / Math.PI
+    (2 * Math.atan(requiredHalfWidth / distanceToStage / safeAspect) * 180) / Math.PI
   const fov = Math.min(FOV_MAX, Math.max(FOV_MIN, Math.max(VERTICAL_FOV_MIN, fovForWidth)))
   return {
     position: { ...POSITION },

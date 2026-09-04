@@ -174,7 +174,8 @@ export const routes: RouteObject[] = [
   // KomaBattlePlay内でバトル側の描画だけを条件付きに包んでいる。
   { path: '/games/koma-battle', element: lazyRoute(() => import('../games/koma-battle/KomaBattlePlay')) },
   // つみきボウリングもThree.js・Rapier(wasm)を含むため、開くときだけ読込む。
-  // 選択画面を持たず、開いた時点がそのままプレイ画面なのでrouteでGamePlaySurfaceへ包む。
+  // ステージ選択とプレイ画面は同一route内(TsumikiBowlingPlay)で切り替わるが、
+  // どちらも実プレイ面として扱ってrouteでGamePlaySurfaceへまとめて包んでいる。
   { path: '/games/tsumiki-bowling', element: playRoute(lazyRoute(() => import('../games/tsumiki-bowling/TsumikiBowlingPlay'))) },
   ...MATH_QUIZ_MODES.flatMap((mode) => [
     {
