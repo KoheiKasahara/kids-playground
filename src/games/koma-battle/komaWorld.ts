@@ -25,6 +25,7 @@ import {
   KOMA_BOOST_MOVE_SPEED_LIMIT,
   KOMA_BOOST_SPIN_INCREMENT,
   KOMA_BELT_FORCE,
+  KOMA_BELT_MAX_FORWARD_SPEED,
   BUMPER_KNOCKBACK_INCOMING_SPEED_SCALE,
   BUMPER_KNOCKBACK_MAX_IMPULSE,
   BUMPER_KNOCKBACK_MAX_OUTGOING_SPEED,
@@ -587,18 +588,42 @@ export function applyKomaAssist(entry: KomaEntry, dt: number): void {
  * 状態を持たない位置判定だけなので、境界を何度も出入りしても多重加算されない。
  * applyImpulseへ渡すのは`力[N] * dt`なので、質量が重いタイプほど速度変化が小さく、
  * 軽いタイプほど大きくなる（既存の質量差がそのまま活きる）。
+ * ただし前進方向の速度が上限へ達した後は、その分のimpulseだけを抑える。
+ * 速度を直接固定しないので、横方向の運動やベルトと逆向きの慣性は保持される。
  * world.step()の直前、applyKomaAssistと同じタイミングで呼ぶ。
  */
 export function applyKomaFieldBelts(entry: KomaEntry, field: KomaField, dt: number): void {
-  if (field.belts.length === 0) return
+  if (field.belts.length === 0 || !Number.isFinite(dt) || dt <= 0) return
   const body = entry.body
   const translation = body.translation()
+  const velocity = body.linvel()
+  if (
+    !Number.isFinite(velocity.x) ||
+    !Number.isFinite(velocity.y) ||
+    !Number.isFinite(velocity.z)
+  ) return
+
+  const mass = body.mass()
+  if (!Number.isFinite(mass) || mass <= 0) return
+
   for (const belt of field.belts) {
     if (!isKomaWithinBelt(belt, translation.x, translation.z)) continue
-    const strength = Number.isFinite(belt.strength) && belt.strength > 0 ? belt.strength : 1
-    const impulse = KOMA_BELT_FORCE * strength * dt
+
+    const strength = Number.isFinite(belt.strength) && belt.strength > 0
+      ? Math.min(belt.strength, 2)
+      : 1
+    const direction = { x: Math.cos(belt.angle), z: Math.sin(belt.angle) }
+    const forwardSpeed = velocity.x * direction.x + velocity.z * direction.z
+    if (!Number.isFinite(forwardSpeed) || forwardSpeed >= KOMA_BELT_MAX_FORWARD_SPEED) continue
+
+    const requestedImpulse = KOMA_BELT_FORCE * strength * dt
+    // 速度上限を越える分だけを切り落とす。逆向きに走っている場合も、通常の弱い力で
+    // 少しずつ向きを変えるだけにし、瞬間的な反転や吸着を起こさない。
+    const availableImpulse = (KOMA_BELT_MAX_FORWARD_SPEED - forwardSpeed) * mass
+    const impulse = Math.min(requestedImpulse, Math.max(0, availableImpulse))
+    if (!Number.isFinite(impulse) || impulse <= 0) continue
     body.applyImpulse(
-      { x: Math.cos(belt.angle) * impulse, y: 0, z: Math.sin(belt.angle) * impulse },
+      { x: direction.x * impulse, y: 0, z: direction.z * impulse },
       true,
     )
   }

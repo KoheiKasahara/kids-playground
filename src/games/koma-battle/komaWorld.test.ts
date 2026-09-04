@@ -20,6 +20,7 @@ import {
   BUMPER_KNOCKBACK_MIN_OUTGOING_SPEED,
   KOMA_CONTACT_MARGIN,
   KOMA_DENSITY,
+  KOMA_BELT_MAX_FORWARD_SPEED,
   KOMA_BOOST_MAX_SPIN_SPEED,
   KOMA_BOOST_MIN_SPIN_SPEED,
   MAX_ANGULAR_SPEED,
@@ -1159,6 +1160,50 @@ describe('動く床（ベルト）', () => {
     expect(light.komas[0]!.body.linvel().x).toBeGreaterThan(heavy.komas[0]!.body.linvel().x)
     light.world.free()
     heavy.world.free()
+  })
+
+  it('ベルトは前進方向成分だけを補正し、横方向と逆向きの慣性を残す', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'belt' })
+    const koma = world.komas[0]!
+    const field = getKomaField('belt')
+    koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+    koma.body.setLinvel({ x: -1, y: 0, z: 2 }, true)
+
+    applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
+
+    const velocity = koma.body.linvel()
+    expect(velocity.x).toBeGreaterThan(-1)
+    expect(velocity.z).toBeCloseTo(2, 8)
+    world.world.free()
+  })
+
+  it('ベルトへ長時間とどまっても前進速度が上限を越えて積み上がらない', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'belt' })
+    const koma = world.komas[0]!
+    const field = getKomaField('belt')
+    koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+    koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+
+    for (let step = 0; step < 10_000; step += 1) {
+      applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
+    }
+
+    expect(koma.body.linvel().x).toBeLessThanOrEqual(KOMA_BELT_MAX_FORWARD_SPEED + 1e-6)
+    world.world.free()
+  })
+
+  it('すでに前進速度上限を越えたコマへはベルトの追加加速をしない', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'belt' })
+    const koma = world.komas[0]!
+    const field = getKomaField('belt')
+    koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+    const initialSpeed = KOMA_BELT_MAX_FORWARD_SPEED + 0.4
+    koma.body.setLinvel({ x: initialSpeed, y: 0, z: 0 }, true)
+
+    applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
+
+    expect(koma.body.linvel().x).toBeCloseTo(initialSpeed, 8)
+    world.world.free()
   })
 
   it('決着後（settle中）はベルトの力を止められる（呼び出し側の既存パターンで対応できる）', () => {
