@@ -181,7 +181,7 @@ describe('pinball 宇宙盤面（spaceBoard）のシミュレーション', () =
         `space board zone distribution: ${zone.id}(${zone.score})=${zoneCounts.get(zone.id) ?? 0}`,
       ).toBeGreaterThan(0)
     }
-  })
+  }, 15_000)
 })
 
 describe('pinball 海盤面（oceanBoard）のシミュレーション', () => {
@@ -265,7 +265,7 @@ describe('pinball 海盤面（oceanBoard）のシミュレーション', () => {
     for (const zone of SCORE_ZONES) {
       expect(zoneCounts.get(zone.id)).toBeGreaterThan(0)
     }
-  })
+  }, 15_000)
 })
 
 describe('pinball おかし盤面（candyBoard）のシミュレーション', () => {

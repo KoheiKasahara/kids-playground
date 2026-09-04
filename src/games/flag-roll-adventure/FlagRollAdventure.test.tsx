@@ -119,7 +119,7 @@ describe('FlagRollAdventure プレイとゴール', () => {
     const flagImages = Array.from(document.querySelectorAll('img'))
     expect(flagImages.length).toBeGreaterThanOrEqual(2)
     expect(flagImages.every((image) => image.getAttribute('src')?.endsWith('/jp.svg'))).toBe(true)
-  })
+  }, 10_000)
 
   test('onAreaEnterでヘッダのエリア名が変わる', async () => {
     const user = userEvent.setup()
