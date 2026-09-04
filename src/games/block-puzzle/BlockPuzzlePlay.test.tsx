@@ -35,27 +35,34 @@ const setup = () => {
 }
 
 describe('ブロックパズル: 画面と操作', () => {
-  test('タイトル・もどる・盤面・パーツ一覧・まわす/けすがそろっている', () => {
+  test('タイトル・もどる・盤面・パーツ一覧・まわす/けす/ぜんぶけすがそろっている', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'ブロックパズル' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'かたちを えらぶ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /まわす/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /けす/ })).toBeInTheDocument()
-    // 盤面の全マス + パーツ9種 + もどる + まわす + けす。
-    expect(screen.getAllByRole('button')).toHaveLength(BOARD_CELL_COUNT + BLOCK_SHAPES.length + 3)
+    expect(screen.getByRole('button', { name: /^けす$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ぜんぶけす/ })).toBeInTheDocument()
+    // 盤面の全マス + パーツ9種 + もどる + ぜんぶけす + まわす + けす。
+    expect(screen.getAllByRole('button')).toHaveLength(BOARD_CELL_COUNT + BLOCK_SHAPES.length + 4)
   })
 
-  test('できた！などPhase 3以降の機能のボタンは置かない', () => {
+  test('できた！・もういっかいは、盤面が完成するまで出さない', () => {
     renderPlay()
-    for (const name of ['ぜんぶけす', 'できた！', 'もういっかい']) {
+    for (const name of ['できた！', 'もういっかい']) {
+      expect(screen.queryByText(name)).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
   })
 
   test('配置済みパーツを選んでいないとき、けす は押せない', () => {
     renderPlay()
-    expect(screen.getByRole('button', { name: /けす/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^けす$/ })).toBeDisabled()
+  })
+
+  test('何も置いていないとき、ぜんぶけす は押せない', () => {
+    renderPlay()
+    expect(screen.getByRole('button', { name: /ぜんぶけす/ })).toBeDisabled()
   })
 
   test('9種類の形をすべて選べ、最初は1マスが選ばれている', async () => {
@@ -178,7 +185,7 @@ function rotateButton() {
 }
 
 function deleteButton() {
-  return screen.getByRole('button', { name: /けす/ })
+  return screen.getByRole('button', { name: /^けす$/ })
 }
 
 describe('ブロックパズル: まわす（未配置パーツ）', () => {
@@ -400,5 +407,114 @@ describe('ブロックパズル: けす（削除）', () => {
     await user.click(cellButton(2, 2))
     expect(cellContent(2, 2)).toBe('しかく')
     expect(cellContent(3, 3)).toBe('しかく')
+  })
+})
+
+/** 1マスパーツだけで盤面全体を埋める（何度でも使えることの確認も兼ねる）。 */
+async function fillBoardWithSingles(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(shapeButton('1マス'))
+  for (let row = 1; row <= BOARD_ROWS; row += 1) {
+    for (let col = 1; col <= BOARD_COLS; col += 1) {
+      await user.click(cellButton(col, row))
+    }
+  }
+}
+
+describe('ブロックパズル: 完成判定・完成演出（#482）', () => {
+  test('全マスが埋まると「できた！」ともういっかいが表示される', async () => {
+    const user = setup()
+    await fillBoardWithSingles(user)
+
+    expect(screen.getByText('できた！')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /もういっかい/ })).toBeInTheDocument()
+  }, 20000)
+
+  test('1マスでも空きがあれば完成演出は出ない', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    for (let row = 1; row <= BOARD_ROWS; row += 1) {
+      for (let col = 1; col <= BOARD_COLS; col += 1) {
+        if (row === BOARD_ROWS && col === BOARD_COLS) continue
+        await user.click(cellButton(col, row))
+      }
+    }
+
+    expect(screen.queryByText('できた！')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /もういっかい/ })).not.toBeInTheDocument()
+  }, 20000)
+
+  test('もういっかい で盤面・パーツ一覧の選択・向きが初期状態に戻る', async () => {
+    const user = setup()
+    await fillBoardWithSingles(user)
+
+    // 完成後でもパーツ一覧・まわすは操作でき、そこでの選択は「もういっかい」で消える対象になる。
+    await user.click(shapeButton('ティーのかたち'))
+    await user.click(rotateButton())
+
+    await user.click(screen.getByRole('button', { name: /もういっかい/ }))
+
+    expect(screen.queryByText('できた！')).not.toBeInTheDocument()
+    expect(cellContent(1, 1)).toBe('あき')
+    expect(cellContent(BOARD_COLS, BOARD_ROWS)).toBe('あき')
+    expect(shapeButton('1マス')).toHaveAttribute('aria-pressed', 'true')
+    expect(deleteButton()).toBeDisabled()
+  }, 20000)
+
+  test('崩して埋め直すと完成演出がもう一度出る', async () => {
+    const user = setup()
+    await fillBoardWithSingles(user)
+    expect(screen.getByText('できた！')).toBeInTheDocument()
+
+    await user.click(cellButton(1, 1))
+    await user.click(deleteButton())
+    expect(screen.queryByText('できた！')).not.toBeInTheDocument()
+
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(1, 1))
+    expect(screen.getByText('できた！')).toBeInTheDocument()
+  }, 20000)
+})
+
+describe('ブロックパズル: ぜんぶけす（#482）', () => {
+  test('押してもすぐには消えず、はい で確認してから盤面が空になる', async () => {
+    const user = setup()
+    await user.click(shapeButton('しかく'))
+    await user.click(cellButton(2, 2))
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶけす/ }))
+    expect(cellContent(2, 2)).toBe('しかく')
+    expect(screen.getByText('ぜんぶ けす？')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'はい、けす' }))
+    expect(cellContent(2, 2)).toBe('あき')
+    expect(screen.queryByText('ぜんぶ けす？')).not.toBeInTheDocument()
+  })
+
+  test('いいえ で取り消すと盤面は変わらない', async () => {
+    const user = setup()
+    await user.click(shapeButton('しかく'))
+    await user.click(cellButton(2, 2))
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶけす/ }))
+    await user.click(screen.getByRole('button', { name: 'いいえ' }))
+
+    expect(cellContent(2, 2)).toBe('しかく')
+    expect(screen.queryByText('ぜんぶ けす？')).not.toBeInTheDocument()
+  })
+
+  test('選んでいる形・向きは変えない（もういっかいとの違い）', async () => {
+    const user = setup()
+    await user.click(shapeButton('ながいぼう'))
+    await user.click(rotateButton())
+    await user.click(cellButton(2, 2))
+
+    await user.click(screen.getByRole('button', { name: /ぜんぶけす/ }))
+    await user.click(screen.getByRole('button', { name: 'はい、けす' }))
+
+    expect(shapeButton('ながいぼう')).toHaveAttribute('aria-pressed', 'true')
+    await user.click(cellButton(2, 2))
+    for (const row of [2, 3, 4, 5]) {
+      expect(cellContent(2, row)).toBe('ながいぼう')
+    }
   })
 })

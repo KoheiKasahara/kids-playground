@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import { BOARD_COLS, BOARD_ROWS } from './board'
+import { isBoardFull } from './placement'
 import {
   createBlockPuzzleState,
   deleteSelectedPlacedBlock,
   moveSelectedPlacedBlock,
   placeSelectedBlock,
+  resetBoard,
   rotatePendingShape,
   rotateSelectedPlacedBlock,
   selectPlacedBlock,
@@ -234,5 +236,86 @@ describe('blockPuzzleState: けす（削除）', () => {
     const state = place(createBlockPuzzleState(), 0, 0)
     expect(deleteSelectedPlacedBlock(state)).toBeNull()
     expect(state.placedBlocks).toHaveLength(1)
+  })
+})
+
+describe('blockPuzzleState: 完成判定（#482）', () => {
+  test('全マスが埋まると完成になる', () => {
+    let state = createBlockPuzzleState()
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        state = place(state, col, row)
+      }
+    }
+    expect(isBoardFull(state.placedBlocks)).toBe(true)
+  })
+
+  test('1マスでも空きがあれば完成にならない', () => {
+    let state = createBlockPuzzleState()
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        if (row === 0 && col === 0) continue
+        state = place(state, col, row)
+      }
+    }
+    expect(isBoardFull(state.placedBlocks)).toBe(false)
+  })
+
+  test('完成後に削除すると完成状態が崩れ、また埋め直せば再び完成になる', () => {
+    let state = createBlockPuzzleState()
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        state = place(state, col, row)
+      }
+    }
+    expect(isBoardFull(state.placedBlocks)).toBe(true)
+
+    state = selectPlacedBlock(state, 'block-1')
+    state = deleteSelectedPlacedBlock(state)!
+    expect(isBoardFull(state.placedBlocks)).toBe(false)
+
+    state = place(state, 0, 0)
+    expect(isBoardFull(state.placedBlocks)).toBe(true)
+  })
+
+  test('完成後に移動しても、移動先しだいで完成状態が崩れたり保たれたりする', () => {
+    let state = createBlockPuzzleState()
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        state = place(state, col, row)
+      }
+    }
+    // 満杯の盤面では、選んだブロック自身の場所以外に移動先はない
+    // （＝盤面外か重なりで必ず拒否され、完成状態は崩れない）。
+    state = selectPlacedBlock(state, 'block-1')
+    expect(moveSelectedPlacedBlock(state, { col: 1, row: 0 })).toBeNull()
+    expect(isBoardFull(state.placedBlocks)).toBe(true)
+  })
+})
+
+describe('blockPuzzleState: ぜんぶけす（#482）', () => {
+  test('盤面と選択中の配置済みパーツをまとめて空にする', () => {
+    let state = place(createBlockPuzzleState(), 1, 1)
+    state = place(state, 2, 2)
+    state = selectPlacedBlock(state, 'block-1')
+
+    const reset = resetBoard(state)
+    expect(reset.placedBlocks).toEqual([])
+    expect(reset.selectedPlacedBlockId).toBeNull()
+  })
+
+  test('選んでいる形・向きは変えない（すぐ置き直せるように）', () => {
+    let state = selectShape(createBlockPuzzleState(), 'i')
+    state = rotatePendingShape(state)
+    state = place(state, 0, 0)
+
+    const reset = resetBoard(state)
+    expect(reset.selectedShapeId).toBe('i')
+    expect(reset.pendingRotation).toBe(90)
+  })
+
+  test('すでに空なら同じ状態をそのまま返す', () => {
+    const state = createBlockPuzzleState()
+    expect(resetBoard(state)).toBe(state)
   })
 })

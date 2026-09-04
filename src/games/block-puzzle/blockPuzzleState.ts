@@ -152,3 +152,13 @@ export function deleteSelectedPlacedBlock(state: BlockPuzzleState): BlockPuzzleS
   )
   return { ...state, placedBlocks, selectedPlacedBlockId: null }
 }
+
+/**
+ * 「ぜんぶけす」。プレイ途中でも盤面だけを空にする（#482）。
+ * いま選んでいる形・向きはそのまま残し、置き直す作業をすぐ再開できるようにする
+ * （パーツ一覧まで初期化する「もういっかい」とはここが違う）。
+ */
+export function resetBoard(state: BlockPuzzleState): BlockPuzzleState {
+  if (state.placedBlocks.length === 0 && state.selectedPlacedBlockId === null) return state
+  return { ...state, placedBlocks: [], selectedPlacedBlockId: null }
+}
