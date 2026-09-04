@@ -522,6 +522,40 @@ describe('CarConfigの反映', () => {
     model.dispose()
   })
 
+  test('4種類の飾りが全ボディの側面へ生成され、ボディ切替後も再配置される', () => {
+    for (const body of CAR_CATEGORIES.body.options.map((option) => option.id)) {
+      for (const decoration of ['star', 'flame', 'stripes', 'dots'] as const) {
+        const decorated = selectCarOption(
+          selectCarOption(DEFAULT_CAR_CONFIG, 'body', body),
+          'decoration',
+          decoration,
+        )
+        const model = createCarModel(decorated)
+        const before = boundsOf(layerOf(model.root, 'decoration'))
+
+        expect(layerOf(model.root, 'decoration').children.length, `${body}/${decoration}`).toBeGreaterThan(0)
+        expect(before.min.y, `${body}/${decoration}`).toBeGreaterThanOrEqual(-0.01)
+        expect(before.max.y, `${body}/${decoration}`).toBeLessThan(
+          computeCarDimensions(decorated).hullTopY + 0.15,
+        )
+        expect(
+          [before.min.x, before.min.y, before.min.z, before.max.x, before.max.y, before.max.z].every(Number.isFinite),
+          `${body}/${decoration}`,
+        ).toBe(true)
+
+        const nextBody = body === 'bus' ? 'sports' : 'bus'
+        const nextConfig = selectCarOption(decorated, 'body', nextBody)
+        model.update(nextConfig)
+        const after = boundsOf(layerOf(model.root, 'decoration'))
+        expect(after.min.y, `${body}->${nextBody}/${decoration}`).toBeGreaterThanOrEqual(-0.01)
+        expect(after.max.z, `${body}->${nextBody}/${decoration}`).toBeLessThanOrEqual(
+          computeCarDimensions(nextConfig).length / 2 + 0.08,
+        )
+        model.dispose()
+      }
+    }
+  })
+
   test('「なし」へ戻すとパーツが取り除かれる', () => {
     const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'mark', 'plate'))
     expect(layerOf(model.root, 'mark').children.length).toBeGreaterThan(0)
