@@ -15,7 +15,18 @@ export type CarColorId = 'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'pink'
 export type FrontType = 'round' | 'square' | 'slim'
 export type RoofType = 'none' | 'policeLight' | 'luggage' | 'spoiler'
 export type DecorationType = 'none' | 'star' | 'flame' | 'stripes' | 'dots'
-export type MarkType = 'none' | 'plate'
+export type CarMarkNumber =
+  | 'number1'
+  | 'number2'
+  | 'number3'
+  | 'number4'
+  | 'number5'
+  | 'number6'
+  | 'number7'
+  | 'number8'
+  | 'number9'
+export type CarMarkIcon = 'star' | 'heart' | 'lightning' | 'crown' | 'animal'
+export type MarkType = 'none' | CarMarkNumber | CarMarkIcon
 export type RideHeight = 'normal' | 'high'
 
 /**
@@ -51,6 +62,7 @@ export type CarOptionPreview =
   | { kind: 'front'; variant: FrontType }
   | { kind: 'roof'; variant: RoofType }
   | { kind: 'decoration'; variant: DecorationType }
+  | { kind: 'mark'; variant: MarkType }
 
 export type CarOptionDefinition<Id extends string> = {
   id: Id
@@ -169,8 +181,21 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
     emoji: '🔢',
     ariaLabel: 'ナンバーや マークを えらぶ',
     options: [
-      { id: 'none', label: 'なし', preview: { kind: 'emoji', emoji: '🚫' } },
-      { id: 'plate', label: 'ナンバー', preview: { kind: 'emoji', emoji: '🔢' } },
+      { id: 'none', label: 'なし', preview: { kind: 'mark', variant: 'none' } },
+      { id: 'number1', label: '1', preview: { kind: 'mark', variant: 'number1' } },
+      { id: 'number2', label: '2', preview: { kind: 'mark', variant: 'number2' } },
+      { id: 'number3', label: '3', preview: { kind: 'mark', variant: 'number3' } },
+      { id: 'number4', label: '4', preview: { kind: 'mark', variant: 'number4' } },
+      { id: 'number5', label: '5', preview: { kind: 'mark', variant: 'number5' } },
+      { id: 'number6', label: '6', preview: { kind: 'mark', variant: 'number6' } },
+      { id: 'number7', label: '7', preview: { kind: 'mark', variant: 'number7' } },
+      { id: 'number8', label: '8', preview: { kind: 'mark', variant: 'number8' } },
+      { id: 'number9', label: '9', preview: { kind: 'mark', variant: 'number9' } },
+      { id: 'star', label: 'ほし', preview: { kind: 'mark', variant: 'star' } },
+      { id: 'heart', label: 'ハート', preview: { kind: 'mark', variant: 'heart' } },
+      { id: 'lightning', label: 'いなずま', preview: { kind: 'mark', variant: 'lightning' } },
+      { id: 'crown', label: 'おうかん', preview: { kind: 'mark', variant: 'crown' } },
+      { id: 'animal', label: 'どうぶつ', preview: { kind: 'mark', variant: 'animal' } },
     ],
   },
   rideHeight: {

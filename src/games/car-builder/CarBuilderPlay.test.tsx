@@ -271,6 +271,38 @@ describe('選択の即時反映', () => {
     expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
   })
 
+  test('ナンバー／マークを視覚的に選べ、選択直後に反映される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'ナンバーや マークを えらぶ' }))
+
+    for (const [label, mark] of [
+      ['なし', 'none'],
+      ['1', 'number1'],
+      ['2', 'number2'],
+      ['3', 'number3'],
+      ['4', 'number4'],
+      ['5', 'number5'],
+      ['6', 'number6'],
+      ['7', 'number7'],
+      ['8', 'number8'],
+      ['9', 'number9'],
+      ['ほし', 'star'],
+      ['ハート', 'heart'],
+      ['いなずま', 'lightning'],
+      ['おうかん', 'crown'],
+      ['どうぶつ', 'animal'],
+    ] as const) {
+      const option = screen.getByRole('button', { name: label })
+      expect(option.querySelector('[class*="markPreview"]'), label).not.toBeNull()
+      await user.click(option)
+      expect(latestConfig().mark, label).toBe(mark)
+      expect(option).toHaveAttribute('aria-pressed', 'true')
+    }
+    expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
+  })
+
   test('選んだ瞬間にCarConfigが更新され3Dシーンへ渡る（決定ボタンは無い）', async () => {
     const user = userEvent.setup()
     renderPlay()

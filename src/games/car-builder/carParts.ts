@@ -5,7 +5,7 @@
  * タイヤ・フロント・屋根・飾り・マークの座標へボディ種別を持ち込まないこと。
  */
 import * as THREE from 'three'
-import type { BodyType, CarCategoryId, CarConfig, CarOptionIdMap, FrontType } from './carConfig'
+import type { BodyType, CarCategoryId, CarConfig, CarMarkIcon, CarOptionIdMap, FrontType, MarkType } from './carConfig'
 import type { CarAttachment, CarAttachments, CarDimensions } from './carDimensions'
 import { createSportsHull, sportsSurfacePoint } from './sportsBodySurface'
 
@@ -949,26 +949,203 @@ function buildDotsDecoration(context: CarPartContext): THREE.Object3D {
   return group
 }
 
-function buildNumberPlate({ attachments }: CarPartContext): THREE.Object3D {
+function createHeartGeometry(size: number): THREE.ShapeGeometry {
+  const shape = new THREE.Shape()
+  shape.moveTo(0, -size * 0.58)
+  shape.bezierCurveTo(-size * 0.18, -size * 0.38, -size * 0.62, -size * 0.1, -size * 0.52, size * 0.24)
+  shape.bezierCurveTo(-size * 0.45, size * 0.52, -size * 0.14, size * 0.58, 0, size * 0.3)
+  shape.bezierCurveTo(size * 0.14, size * 0.58, size * 0.45, size * 0.52, size * 0.52, size * 0.24)
+  shape.bezierCurveTo(size * 0.62, -size * 0.1, size * 0.18, -size * 0.38, 0, -size * 0.58)
+  shape.closePath()
+  return new THREE.ShapeGeometry(shape)
+}
+
+function createLightningGeometry(size: number): THREE.ShapeGeometry {
+  const shape = new THREE.Shape()
+  shape.moveTo(-size * 0.12, size * 0.58)
+  shape.lineTo(size * 0.36, size * 0.06)
+  shape.lineTo(size * 0.05, size * 0.06)
+  shape.lineTo(size * 0.18, -size * 0.58)
+  shape.lineTo(-size * 0.36, -size * 0.02)
+  shape.lineTo(-size * 0.05, -size * 0.02)
+  shape.closePath()
+  return new THREE.ShapeGeometry(shape)
+}
+
+function createCrownGeometry(size: number): THREE.ShapeGeometry {
+  const shape = new THREE.Shape()
+  shape.moveTo(-size * 0.54, -size * 0.42)
+  shape.lineTo(-size * 0.46, size * 0.38)
+  shape.lineTo(-size * 0.17, size * 0.08)
+  shape.lineTo(0, size * 0.46)
+  shape.lineTo(size * 0.17, size * 0.08)
+  shape.lineTo(size * 0.46, size * 0.38)
+  shape.lineTo(size * 0.54, -size * 0.42)
+  shape.closePath()
+  return new THREE.ShapeGeometry(shape)
+}
+
+function createAnimalGeometry(size: number): THREE.ShapeGeometry {
+  // 動物系の初期マークは、幼児にも識別しやすいネコの顔にする。
+  const shape = new THREE.Shape()
+  shape.moveTo(-size * 0.52, -size * 0.34)
+  shape.lineTo(-size * 0.5, size * 0.42)
+  shape.lineTo(-size * 0.2, size * 0.25)
+  shape.quadraticCurveTo(0, size * 0.42, size * 0.2, size * 0.25)
+  shape.lineTo(size * 0.5, size * 0.42)
+  shape.lineTo(size * 0.52, -size * 0.34)
+  shape.quadraticCurveTo(size * 0.42, -size * 0.58, 0, -size * 0.58)
+  shape.quadraticCurveTo(-size * 0.42, -size * 0.58, -size * 0.52, -size * 0.34)
+  shape.closePath()
+  return new THREE.ShapeGeometry(shape)
+}
+
+type MarkIconType = CarMarkIcon
+
+function markNumber(mark: MarkType): number | null {
+  if (!mark.startsWith('number')) return null
+  const value = Number(mark.slice('number'.length))
+  return Number.isInteger(value) && value >= 1 && value <= 9 ? value : null
+}
+
+function createMarkIconGeometry(mark: MarkIconType, size: number): THREE.ShapeGeometry {
+  switch (mark) {
+    case 'star':
+      return createStarGeometry(size)
+    case 'heart':
+      return createHeartGeometry(size)
+    case 'lightning':
+      return createLightningGeometry(size)
+    case 'crown':
+      return createCrownGeometry(size)
+    case 'animal':
+      return createAnimalGeometry(size)
+  }
+}
+
+const NUMBER_SEGMENTS: Record<number, readonly string[]> = {
+  1: ['b', 'c'],
+  2: ['a', 'b', 'g', 'e', 'd'],
+  3: ['a', 'b', 'g', 'c', 'd'],
+  4: ['f', 'g', 'b', 'c'],
+  5: ['a', 'f', 'g', 'c', 'd'],
+  6: ['a', 'f', 'g', 'e', 'c', 'd'],
+  7: ['a', 'b', 'c'],
+  8: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+  9: ['a', 'b', 'c', 'd', 'f', 'g'],
+}
+
+function addNumberMark(
+  group: THREE.Group,
+  value: number,
+  width: number,
+  height: number,
+  material: THREE.Material,
+): void {
+  const thickness = Math.min(width * 0.22, height * 0.14)
+  const verticalHeight = (height - thickness * 3) / 2
+  const segments: Record<string, { x: number; y: number; width: number; height: number }> = {
+    a: { x: 0, y: height / 2 - thickness / 2, width, height: thickness },
+    b: { x: width / 2 - thickness / 2, y: thickness / 2 + verticalHeight / 2, width: thickness, height: verticalHeight },
+    c: { x: width / 2 - thickness / 2, y: -thickness / 2 - verticalHeight / 2, width: thickness, height: verticalHeight },
+    d: { x: 0, y: -height / 2 + thickness / 2, width, height: thickness },
+    e: { x: -width / 2 + thickness / 2, y: -thickness / 2 - verticalHeight / 2, width: thickness, height: verticalHeight },
+    f: { x: -width / 2 + thickness / 2, y: thickness / 2 + verticalHeight / 2, width: thickness, height: verticalHeight },
+    g: { x: 0, y: 0, width, height: thickness },
+  }
+
+  for (const segmentId of NUMBER_SEGMENTS[value] ?? []) {
+    const segment = segments[segmentId]
+    if (segment === undefined) continue
+    const mesh = box(
+      { x: segment.width, y: segment.height, z: 0.035 },
+      { x: segment.x, y: segment.y, z: 0.035 },
+      material,
+    )
+    mesh.name = `car-mark-number-${value}-${segmentId}`
+    group.add(mesh)
+  }
+}
+
+function addIconMark(
+  group: THREE.Group,
+  mark: MarkIconType,
+  size: number,
+  outlineMaterial: THREE.Material,
+  markMaterial: THREE.Material,
+): void {
+  const outline = new THREE.Mesh(createMarkIconGeometry(mark, size * 1.16), outlineMaterial)
+  outline.name = `car-mark-${mark}-outline`
+  outline.position.z = 0.022
+  outline.castShadow = true
+  outline.receiveShadow = true
+
+  const icon = new THREE.Mesh(createMarkIconGeometry(mark, size), markMaterial)
+  icon.name = `car-mark-${mark}`
+  icon.position.z = 0.045
+  icon.castShadow = true
+  icon.receiveShadow = true
+  group.add(outline, icon)
+}
+
+function buildNumberPlate({ attachments, config }: CarPartContext): THREE.Object3D {
   const group = new THREE.Group()
   group.name = 'car-mark'
   const plateMaterial = standard('#f8f9fa', 0.5)
-  const markMaterial = standard('#3d7bf5', 0.4)
+  const plateBorderMaterial = standard('#25313d', 0.45, 0.1)
+  const markMaterial = standard('#25313d', 0.4, 0.1)
+  const markOutlineMaterial = standard('#25313d', 0.42, 0.1)
+  const mark = config.mark
+  const number = markNumber(mark)
+  const iconColors: Record<MarkIconType, string> = {
+    star: '#f59f00',
+    heart: '#e64a4a',
+    lightning: '#f08c00',
+    crown: '#8256c7',
+    animal: '#188a8a',
+  }
 
   for (const face of [attachments.front, attachments.rear]) {
-    const center = offsetFrom(face, 0.035)
-    const plateWidth = face.size.width * 0.34
-    const plateHeight = face.size.extent * 0.2
-    const plateY = center.y - face.size.extent * 0.06
-    group.add(box({ x: plateWidth, y: plateHeight, z: 0.05 }, { x: center.x, y: plateY, z: center.z }, plateMaterial))
-    const badgeCenter = offsetFrom(face, 0.065)
+    const plateWidth = Math.min(Math.max(face.size.width * 0.38, 0.78), 1.15)
+    const plateHeight = Math.min(Math.max(face.size.extent * 0.34, 0.22), 0.34)
+    const plateY = face.position.y - face.size.extent * 0.04
+    const borderCenter = offsetFrom(face, 0.038)
+    borderCenter.y = plateY
+    const plateCenter = offsetFrom(face, 0.068)
+    plateCenter.y = plateY
     group.add(
       box(
-        { x: plateWidth * 0.22, y: plateHeight * 0.5, z: 0.03 },
-        { x: badgeCenter.x - plateWidth * 0.3, y: plateY, z: badgeCenter.z },
-        markMaterial,
+        { x: plateWidth + 0.08, y: plateHeight + 0.08, z: 0.045 },
+        { x: borderCenter.x, y: borderCenter.y, z: borderCenter.z },
+        plateBorderMaterial,
+      ),
+      box(
+        { x: plateWidth, y: plateHeight, z: 0.045 },
+        { x: plateCenter.x, y: plateCenter.y, z: plateCenter.z },
+        plateMaterial,
       ),
     )
+
+    const markAnchor = offsetFrom(face, 0.105)
+    markAnchor.y = plateY
+    const markGroup = new THREE.Group()
+    markGroup.name = `car-mark-${mark}`
+    markGroup.position.copy(markAnchor)
+    // 前後どちらから見ても、数字や図形が外向きに正しく読める向きにする。
+    markGroup.rotation.y = face.normal.z > 0 ? 0 : Math.PI
+
+    if (number !== null) {
+      addNumberMark(markGroup, number, plateWidth * 0.38, plateHeight * 0.76, markMaterial)
+    } else if (mark !== 'none') {
+      addIconMark(
+        markGroup,
+        mark as MarkIconType,
+        Math.min(plateHeight * 0.76, 0.27),
+        markOutlineMaterial,
+        new THREE.MeshStandardMaterial({ color: iconColors[mark as MarkIconType], roughness: 0.4, metalness: 0.05, side: THREE.DoubleSide }),
+      )
+    }
+    group.add(markGroup)
   }
   return group
 }
@@ -1003,7 +1180,23 @@ export const CAR_PART_BUILDERS: {
     stripes: buildStripesDecoration,
     dots: buildDotsDecoration,
   },
-  mark: { none: nothing, plate: buildNumberPlate },
+  mark: {
+    none: nothing,
+    number1: buildNumberPlate,
+    number2: buildNumberPlate,
+    number3: buildNumberPlate,
+    number4: buildNumberPlate,
+    number5: buildNumberPlate,
+    number6: buildNumberPlate,
+    number7: buildNumberPlate,
+    number8: buildNumberPlate,
+    number9: buildNumberPlate,
+    star: buildNumberPlate,
+    heart: buildNumberPlate,
+    lightning: buildNumberPlate,
+    crown: buildNumberPlate,
+    animal: buildNumberPlate,
+  },
 }
 
 /**

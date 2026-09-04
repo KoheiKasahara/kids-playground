@@ -556,8 +556,35 @@ describe('CarConfigの反映', () => {
     }
   })
 
+  test('9数字と5アイコンが前後のプレートへ生成され、全ボディで再配置される', () => {
+    const marks = CAR_CATEGORIES.mark.options.map((option) => option.id).filter((mark) => mark !== 'none')
+
+    for (const body of CAR_CATEGORIES.body.options.map((option) => option.id)) {
+      for (const mark of marks) {
+        const config = selectCarOption(selectCarOption(DEFAULT_CAR_CONFIG, 'body', body), 'mark', mark)
+        const model = createCarModel(config)
+        const markLayer = layerOf(model.root, 'mark')
+        const markBounds = boundsOf(markLayer)
+
+        expect(markLayer.children.length, `${body}/${mark}`).toBeGreaterThan(0)
+        expect(markBounds.min.y, `${body}/${mark}`).toBeGreaterThanOrEqual(-0.01)
+        expect(
+          [markBounds.min.x, markBounds.min.y, markBounds.min.z, markBounds.max.x, markBounds.max.y, markBounds.max.z].every(
+            Number.isFinite,
+          ),
+          `${body}/${mark}`,
+        ).toBe(true)
+
+        const nextConfig = selectCarOption(config, 'body', body === 'bus' ? 'sports' : 'bus')
+        model.update(nextConfig)
+        expect(layerOf(model.root, 'mark').children.length, `${body}->${nextConfig.body}/${mark}`).toBeGreaterThan(0)
+        model.dispose()
+      }
+    }
+  })
+
   test('「なし」へ戻すとパーツが取り除かれる', () => {
-    const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'mark', 'plate'))
+    const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'mark', 'number1'))
     expect(layerOf(model.root, 'mark').children.length).toBeGreaterThan(0)
     model.update(DEFAULT_CAR_CONFIG)
     expect(layerOf(model.root, 'mark').children).toHaveLength(0)
