@@ -18,8 +18,15 @@ export type KomaVisualConfig = {
   /** 中心キャップとつまみの大きさ。 */
   capScale: number
   knobScale: number
-  /** 外周リングの太さ。 */
+  /** 外周リングの太さ(smoothのときだけ使う。他は下のプリセット形状で決まる)。 */
   ringScale: number
+  /**
+   * 外周リングと中心つまみの「形」。色を消してもタイプが分かるよう、
+   * シルエットの主役をここで決める(spike=尖った爪, block=厚いブロック, star=星, smooth=滑らかな円)。
+   */
+  rimStyle: 'smooth' | 'spike' | 'block' | 'star'
+  /** 軸・外周リングに使うメタル風アクセント色。 */
+  metalColor: string
 }
 
 export type KomaTypeConfig = {
@@ -69,6 +76,8 @@ export const KOMA_TYPE_CONFIGS: readonly KomaTypeConfig[] = [
       capScale: 1,
       knobScale: 1,
       ringScale: 1,
+      rimStyle: 'star',
+      metalColor: '#d9b654',
     },
     densityScale: 1,
     diskFrictionScale: 1,
@@ -93,6 +102,8 @@ export const KOMA_TYPE_CONFIGS: readonly KomaTypeConfig[] = [
       capScale: 0.84,
       knobScale: 1.1,
       ringScale: 1.05,
+      rimStyle: 'spike',
+      metalColor: '#4b4750',
     },
     // 速度と反発は少し上げる一方、軽くして弾かれやすさも残し、常勝を避ける。
     densityScale: 0.92,
@@ -118,6 +129,8 @@ export const KOMA_TYPE_CONFIGS: readonly KomaTypeConfig[] = [
       capScale: 1.08,
       knobScale: 0.92,
       ringScale: 0.94,
+      rimStyle: 'smooth',
+      metalColor: '#e9eef2',
     },
     // 減衰を下げて長持ちさせる。初速と周回速度は控え、固定勝利と外周逃走を避ける。
     densityScale: 0.98,
@@ -143,6 +156,8 @@ export const KOMA_TYPE_CONFIGS: readonly KomaTypeConfig[] = [
       capScale: 0.72,
       knobScale: 0.86,
       ringScale: 1.12,
+      rimStyle: 'block',
+      metalColor: '#cfd6dc',
     },
     // 少し重く、少し遅くするが、谷へ動ける範囲に留める。
     densityScale: 1.12,
