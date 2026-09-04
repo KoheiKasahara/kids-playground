@@ -228,6 +228,27 @@ describe('選択の即時反映', () => {
     expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
   })
 
+  test('屋根4種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'やねを えらぶ' }))
+
+    for (const [label, roof] of [
+      ['なし', 'none'],
+      ['パトランプ', 'policeLight'],
+      ['荷物', 'luggage'],
+      ['スポイラー', 'spoiler'],
+    ] as const) {
+      const option = screen.getByRole('button', { name: label })
+      expect(option.querySelector('[class*="roofPreview"]'), label).not.toBeNull()
+      await user.click(option)
+      expect(latestConfig().roof, label).toBe(roof)
+      expect(option).toHaveAttribute('aria-pressed', 'true')
+    }
+    expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
+  })
+
   test('選んだ瞬間にCarConfigが更新され3Dシーンへ渡る（決定ボタンは無い）', async () => {
     const user = userEvent.setup()
     renderPlay()
@@ -279,10 +300,10 @@ describe('カテゴリを移動しても選択状態が残る', () => {
     renderPlay()
 
     await user.click(screen.getByRole('button', { name: 'やねを えらぶ' }))
-    await user.click(screen.getByRole('button', { name: 'キャリア' }))
+    await user.click(screen.getByRole('button', { name: '荷物' }))
     await user.click(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' }))
 
-    expect(within(screen.getByRole('button', { name: 'やねを えらぶ' })).getByText('🧳')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'やねを えらぶ' }).querySelector('[class*="roofPreview"]')).not.toBeNull()
   })
 })
 
@@ -336,6 +357,11 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
   test('フロント3選択肢はスマホ幅でも1行で見比べられる', () => {
     expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='front'\]\s*\{[^}]*grid-template-columns:\s*repeat\(3,/)
     expect(ruleOf(CSS_SOURCE, '.frontPreview')).toMatch(/width:\s*42px/)
+  })
+
+  test('屋根4選択肢はスマホ幅でも1行で見比べられる', () => {
+    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='roof'\]\s*\{[^}]*grid-template-columns:\s*repeat\(4,/)
+    expect(ruleOf(CSS_SOURCE, '.roofPreview')).toMatch(/width:\s*44px/)
   })
 
   test('主要なタップ領域が小さすぎない（幼児向けに44px以上・カテゴリと選択肢は64px以上）', () => {

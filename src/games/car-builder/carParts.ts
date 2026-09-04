@@ -634,44 +634,114 @@ function buildFront(shape: FrontType) {
   }
 }
 
-function buildRoofCarrier({ attachments }: CarPartContext): THREE.Object3D {
+function buildRoofPoliceLight({ attachments }: CarPartContext): THREE.Object3D {
   const roof = attachments.roof
   const group = new THREE.Group()
   group.name = 'car-roof'
-  const material = standard('#4d5b6b', 0.5, 0.2)
+  const baseMaterial = standard('#202a35', 0.35, 0.35)
+  const blueMaterial = standard('#2f78e6', 0.22, 0.18)
+  const redMaterial = standard('#ee4b55', 0.22, 0.12)
+  const barWidth = Math.min(Math.max(roof.size.width * 0.68, 0.62), 1.5)
+  const barDepth = Math.min(Math.max(roof.size.extent * 0.2, 0.22), 0.5)
 
-  const railHeight = 0.12
-  const bar = 0.06
-  const halfWidth = (roof.size.width * 0.82) / 2
-  const halfDepth = (roof.size.extent * 0.86) / 2
-  const legTop = offsetFrom(roof, railHeight / 2)
-  const railTop = offsetFrom(roof, railHeight)
+  const base = box(
+    { x: barWidth * 0.98, y: 0.07, z: barDepth },
+    { x: roof.position.x, y: roof.position.y + 0.035, z: roof.position.z },
+    baseMaterial,
+  )
+  base.name = 'car-roof-police-light-base'
+  group.add(base)
 
-  for (const side of [1, -1]) {
-    for (const otherSide of [1, -1]) {
-      group.add(
-        box(
-          { x: bar, y: railHeight, z: bar },
-          { x: legTop.x + side * halfWidth, y: legTop.y, z: legTop.z + otherSide * halfDepth },
-          material,
-        ),
-      )
-    }
-    group.add(
-      box(
-        { x: bar, y: bar, z: halfDepth * 2 + bar },
-        { x: railTop.x + side * halfWidth, y: railTop.y, z: railTop.z },
-        material,
-      ),
+  for (const [side, material, name] of [
+    [1, blueMaterial, 'blue'],
+    [-1, redMaterial, 'red'],
+  ] as const) {
+    const light = box(
+      { x: barWidth * 0.43, y: 0.13, z: barDepth * 0.86 },
+      {
+        x: roof.position.x + side * barWidth * 0.22,
+        y: roof.position.y + 0.13,
+        z: roof.position.z,
+      },
+      material,
     )
-    group.add(
-      box(
-        { x: halfWidth * 2, y: bar, z: bar },
-        { x: railTop.x, y: railTop.y, z: railTop.z + side * halfDepth },
-        material,
-      ),
-    )
+    light.name = `car-roof-police-light-${name}`
+    group.add(light)
   }
+  return group
+}
+
+function buildRoofLuggage({ attachments }: CarPartContext): THREE.Object3D {
+  const roof = attachments.roof
+  const group = new THREE.Group()
+  group.name = 'car-roof'
+  const luggageMaterial = standard('#c88643', 0.62, 0.02)
+  const lidMaterial = standard('#e0a15c', 0.56, 0.02)
+  const strapMaterial = standard('#4b3b35', 0.72, 0)
+  const width = Math.min(Math.max(roof.size.width * 0.62, 0.58), 1.35)
+  const depth = Math.min(Math.max(roof.size.extent * 0.48, 0.48), 2.05)
+  const height = 0.22
+
+  const luggage = box(
+    { x: width, y: height, z: depth },
+    { x: roof.position.x, y: roof.position.y + height / 2, z: roof.position.z },
+    luggageMaterial,
+  )
+  luggage.name = 'car-roof-luggage'
+  group.add(luggage)
+
+  const lid = box(
+    { x: width * 0.94, y: 0.045, z: depth * 0.9 },
+    { x: roof.position.x, y: roof.position.y + height + 0.022, z: roof.position.z },
+    lidMaterial,
+  )
+  lid.name = 'car-roof-luggage-lid'
+  group.add(lid)
+
+  for (const zOffset of [-depth * 0.27, depth * 0.27]) {
+    const strap = box(
+      { x: width * 1.02, y: 0.028, z: 0.055 },
+      { x: roof.position.x, y: roof.position.y + height + 0.048, z: roof.position.z + zOffset },
+      strapMaterial,
+    )
+    strap.name = `car-roof-luggage-strap-${zOffset < 0 ? 'rear' : 'front'}`
+    group.add(strap)
+  }
+  return group
+}
+
+function buildRoofSpoiler({ attachments }: CarPartContext): THREE.Object3D {
+  const roof = attachments.roof
+  const group = new THREE.Group()
+  group.name = 'car-roof'
+  const wingMaterial = standard('#3b4651', 0.32, 0.3)
+  const supportMaterial = standard('#252e37', 0.4, 0.25)
+  const wingWidth = Math.min(Math.max(roof.size.width * 0.82, 0.7), 1.65)
+  const wingDepth = Math.min(Math.max(roof.size.extent * 0.08, 0.1), 0.24)
+  const supportHeight = 0.18
+  const wingZ = roof.position.z - roof.size.extent * 0.36
+
+  for (const side of [-1, 1] as const) {
+    const support = box(
+      { x: 0.075, y: supportHeight, z: 0.075 },
+      {
+        x: roof.position.x + side * wingWidth * 0.3,
+        y: roof.position.y + supportHeight / 2,
+        z: wingZ,
+      },
+      supportMaterial,
+    )
+    support.name = `car-roof-spoiler-support-${side === 1 ? 'left' : 'right'}`
+    group.add(support)
+  }
+
+  const wing = box(
+    { x: wingWidth, y: 0.1, z: wingDepth },
+    { x: roof.position.x, y: roof.position.y + supportHeight + 0.05, z: wingZ },
+    wingMaterial,
+  )
+  wing.name = 'car-roof-spoiler-wing'
+  group.add(wing)
   return group
 }
 
@@ -751,7 +821,12 @@ export const CAR_PART_BUILDERS: {
     racing: buildWheels({ hubColor: '#d83f45', hubRadiusRatio: 0.62, detail: 'racing' }),
   },
   front: { round: buildFront('round'), square: buildFront('square'), slim: buildFront('slim') },
-  roof: { none: nothing, carrier: buildRoofCarrier },
+  roof: {
+    none: nothing,
+    policeLight: buildRoofPoliceLight,
+    luggage: buildRoofLuggage,
+    spoiler: buildRoofSpoiler,
+  },
   decoration: { none: nothing, star: buildStarDecoration },
   mark: { none: nothing, plate: buildNumberPlate },
 }

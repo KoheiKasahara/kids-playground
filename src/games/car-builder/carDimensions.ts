@@ -194,7 +194,7 @@ export type CarAttachments = {
   front: CarAttachment
   /** 後面（後ナンバー・テールランプ）。 */
   rear: CarAttachment
-  /** ルーフ天面（キャリア・ライトバーなど）。 */
+  /** ルーフ天面（ライトバー・荷物・スポイラーなど）。 */
   roof: CarAttachment
   /** 左側面（ステッカー・飾り）。 */
   sideLeft: CarAttachment

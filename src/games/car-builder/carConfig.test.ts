@@ -79,6 +79,13 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
+  test('屋根は4種類を、形状が分かる専用プレビュー付きで持つ', () => {
+    const options = CAR_CATEGORIES.roof.options
+    expect(options.map((option) => option.id)).toEqual(['none', 'policeLight', 'luggage', 'spoiler'])
+    expect(options.map((option) => option.label)).toEqual(['なし', 'パトランプ', '荷物', 'スポイラー'])
+    for (const option of options) expect(option.preview).toEqual({ kind: 'roof', variant: option.id })
+  })
+
   test('選択肢IDはカテゴリ内で一意で、ラベルも空でない', () => {
     for (const category of carCategoryOrder()) {
       const ids = category.options.map((option) => option.id)
