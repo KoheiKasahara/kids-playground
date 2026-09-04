@@ -47,6 +47,16 @@ function getAudioContext(): AudioContext | undefined {
 }
 
 /**
+ * 共有 AudioContext をそのまま取得したいゲーム側モジュール（つみきボウリング等）向けの窓口。
+ * iOSで複数のAudioContextを作らないため、各ゲームは必ずこれを使い回し、
+ * 自前で `new AudioContext()` しないこと。挙動はgetAudioContextと同じ
+ * （非対応環境ではundefined、既存の共有インスタンスをresumeして返す）。
+ */
+export function getSharedAudioContext(): AudioContext | undefined {
+  return getAudioContext()
+}
+
+/**
  * AudioContext を用意して resume するだけの関数。
  * iOS Safari は「ユーザー操作イベントの中で最初に AudioContext を作る/resume する」ことを
  * 要求するため、パネルタップや選択肢クリックなどのイベントハンドラの先頭で呼んでおく。

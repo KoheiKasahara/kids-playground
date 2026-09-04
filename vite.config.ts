@@ -99,6 +99,7 @@ const domDependentTestTsFiles = [
   'src/games/planet-globe/three/planetRing.test.ts',
   'src/games/planet-globe/three/planetSurface.test.ts',
   'src/games/planet-globe/three/sunVisual.test.ts',
+  'src/games/tsumiki-bowling/bowlingHaptics.test.ts',
   'src/seo/applyDocumentSeo.test.ts',
   'src/speech/speechEngine.test.ts',
   'src/speech/speechSettingsStore.test.ts',

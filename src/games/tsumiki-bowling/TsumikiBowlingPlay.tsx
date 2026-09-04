@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import TsumikiBowlingGame from './TsumikiBowlingGame'
 import TsumikiBowlingStageSelect from './TsumikiBowlingStageSelect'
 
@@ -13,6 +13,16 @@ import TsumikiBowlingStageSelect from './TsumikiBowlingStageSelect'
  */
 export default function TsumikiBowlingPlay() {
   const [stageId, setStageId] = useState<string | null>(null)
+
+  // ステージ選択とプレイの切り替えはURL遷移ではないので、ScrollManager（app/ScrollManager.tsx）の
+  // 「遷移したら先頭へ」が効かない。ステージ一覧を下までスクロールして選ぶと、
+  // プレイ画面に切り替わってもスクロール位置が残り、画面の高さが低い端末では
+  // ゲームではなくページ下部の説明文が表示されてしまう（320x568の実画面で確認）。
+  // 切り替えのたびに先頭へ戻し、常にゲーム全体が見える状態から始める。
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
+    window.scrollTo(0, 0)
+  }, [stageId])
 
   if (stageId === null) {
     return <TsumikiBowlingStageSelect onSelect={setStageId} />

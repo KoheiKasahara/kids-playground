@@ -52,6 +52,16 @@ import {
 import { createSettleState, updateSettleState, type SettleState } from './bowlingSettle'
 import { THROWS_PER_GAME } from './bowlingGame'
 import type { BowlingBallId, BowlingBallSpec } from './bowlingBalls'
+import {
+  createFeedbackState,
+  noteToppled,
+  resetFeedbackState,
+  takeBigCollapse,
+  updateBallFeedback,
+  type FeedbackState,
+} from './bowlingFeedback'
+import { createBowlingSoundController, type BowlingSoundController } from './bowlingSound'
+import { createBowlingHaptics, type BowlingHaptics } from './bowlingHaptics'
 
 let rapierInitPromise: Promise<void> | null = null
 
@@ -68,6 +78,10 @@ export type ThrowSettledResult = {
   toppled: number
   /** これが最後の投球だったか。 */
   isLastThrow: boolean
+  /** そのステージの積み木の総数。 */
+  total: number
+  /** その投球で全部倒したか（toppled >= total）。 */
+  isPerfect: boolean
 }
 
 export type TsumikiBowlingEngineOptions = {
@@ -88,8 +102,14 @@ export type TsumikiBowlingEngineOptions = {
    * 投球中に倒れた数が増えたときだけ呼ぶ。
    * 崩れているのに数字が0のままだと、当たった手応えが伝わらない。
    * 呼ぶのは1投につき最大でも積み木の数だけ（毎フレームではない）。
+   * deltaはこの呼び出しで新しく倒れた数（「カラカラ」音の音量調整などに使う）。
    */
-  onToppledProgress: (toppled: number) => void
+  onToppledProgress: (toppled: number, delta: number) => void
+  /**
+   * 短時間にまとめて崩れた（大崩壊）ときに呼ぶ。任意。
+   * 演出用のコールバックなので、渡さなくてもゲーム進行に支障はない。
+   */
+  onBigCollapse?: (count: number) => void
 }
 
 export type TsumikiBowlingEngineHandle = {
@@ -109,14 +129,18 @@ const REBUILD_DELAY_MS = 700
 /** 組み直しの見た目（小さい状態から元の大きさへ戻す）にかける時間。 */
 const REBUILD_POP_MS = 260
 
-/** この速度差が1フレームで生じたら「強くぶつかった」とみなす[m/s]。 */
-const IMPACT_SPEED_DROP = 5
-/** 衝撃エフェクトの数と寿命。 */
-const IMPACT_POOL_SIZE = 3
+/**
+ * 衝撃エフェクトの数と寿命。
+ * Phase 4 で3→4に増やした。強い衝突が連発するとき（連鎖バウンド等）に
+ * 直前のリングがまだ消えきらないうちに次を出しても、使い回す枠が足りる余裕を持たせる。
+ */
+const IMPACT_POOL_SIZE = 4
 const IMPACT_DURATION_MS = 320
 /** カメラの揺れの最大幅[m]と減衰時間。 */
 const SHAKE_MAX = 0.14
 const SHAKE_DECAY_MS = 260
+/** これ未満の衝突の強さでは、カメラを揺らさない（弱い当たりまで揺らすとうるさい）。 */
+const SHAKE_MIN_STRENGTH = 0.25
 
 /** 予測軌道の点の数。多すぎると線に見えてしまい、少なすぎると方向が読めない。 */
 const GUIDE_DOT_COUNT = 18
@@ -124,9 +148,82 @@ const GUIDE_DOT_COUNT = 18
 /** HUDのパワー表示を更新する最小の変化量。細かすぎる再レンダーを避ける。 */
 const AIM_POWER_STEP = 0.04
 
+/** これ以上のパワーを「最大付近」として強調する（脈動＋強い赤）しきい値。 */
+const GUIDE_STRONG_POWER = 0.85
+
+/** 発射直後、玉を一瞬伸ばして見せる演出の長さ[ms]。物理には一切影響しない見た目だけの演出。 */
+const LAUNCH_POP_MS = 140
+/** 発射位置に出す短いフラッシュリングの長さ[ms]。 */
+const LAUNCH_FLASH_DURATION_MS = 180
+
+/** 残像トレイルのプールサイズ。玉ごとに間隔・寿命を変えるので、使い回す枠は多めに持つ。 */
+const TRAIL_POOL_SIZE = 8
+/** バウンド時に地面へ出す小さなリングのプールサイズ（はずむだま専用）。 */
+const BOUNCE_RING_POOL_SIZE = 3
+const BOUNCE_RING_DURATION_MS = 240
+
+/** きらめきパーティクルの総数。THREE.Pointsを1つだけ作り、この枠を使い回す。 */
+const SPARKLE_COUNT = 96
+const SPARKLE_LIFE_MS = 500
+/** 演出だけの重力[m/s²]。物理のGRAVITY_Y（bowlingPhysics.ts）とは無関係。 */
+const SPARKLE_GRAVITY = -9
+/** 通常の衝突・大崩壊それぞれで飛ばすきらめきの数。 */
+const SPARKLE_IMPACT_COUNT = 12
+const SPARKLE_COLLAPSE_COUNT = 32
+
+/**
+ * 玉ごとの演出（見た目）テーブル。物理パラメータ（bowlingBalls.ts）とは
+ * 完全に分けて、この演出専用のテーブルだけをここへ持つ。
+ * - ちいさいだま: トレイルを長く濃く＝「シュッ」と速く見える
+ * - どっしりだま: トレイルは短く太い＝重さを感じさせる
+ * - はずむだま  : トレイルは中間。代わりにバウンドごとの着地リングが主役になる
+ */
+type BallVisualProfile = {
+  /** トレイル1個の寿命[ms]。長いほど尾が長く見える。 */
+  trailLifeMs: number
+  /** トレイルを置く間隔[ms]。短いほど密になる。 */
+  trailIntervalMs: number
+  /** トレイルの不透明度の初期値。 */
+  trailOpacity: number
+  /** トレイルの、玉の半径に対する大きさ比。 */
+  trailScale: number
+  /** これ未満の速度ではトレイルを出さない[m/s]（ねらい直しや止まりかけで出したくない）。 */
+  trailMinSpeed: number
+}
+
+const BALL_VISUALS: Record<BowlingBallId, BallVisualProfile> = {
+  small: { trailLifeMs: 260, trailIntervalMs: 16, trailOpacity: 0.55, trailScale: 0.85, trailMinSpeed: 4 },
+  heavy: { trailLifeMs: 160, trailIntervalMs: 26, trailOpacity: 0.4, trailScale: 1.15, trailMinSpeed: 4 },
+  bouncy: { trailLifeMs: 210, trailIntervalMs: 20, trailOpacity: 0.48, trailScale: 1.0, trailMinSpeed: 4 },
+}
+
 type ImpactSlot = {
   mesh: THREE.Mesh
   remainingMs: number
+  /** 0〜1。リングの大きさ・不透明度・カメラ揺れの強さに反映する。 */
+  strength: number
+}
+
+type TrailSlot = {
+  mesh: THREE.Mesh
+  material: THREE.MeshBasicMaterial
+  remainingMs: number
+  lifeMs: number
+  baseScale: number
+  baseOpacity: number
+}
+
+type RingSlot = {
+  mesh: THREE.Mesh
+  remainingMs: number
+}
+
+type SparkleParticle = {
+  remainingMs: number
+  lifeMs: number
+  vx: number
+  vy: number
+  vz: number
 }
 
 export function useTsumikiBowlingEngine(
@@ -194,7 +291,6 @@ export function useTsumikiBowlingEngine(
 
     let currentAim: LaunchAim | null = null
     let reportedPower: number | null = null
-    let lastBallSpeed = 0
     let shakeStrength = 0
     let impactCursor = 0
 
@@ -206,6 +302,15 @@ export function useTsumikiBowlingEngine(
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+    // 演出イベント（衝突・バウンド・大崩壊）を作る層。投球ごとにresetFeedbackStateで
+    // 前の投球のバウンド回数・崩壊窓を引き継がないようにする。
+    const feedbackState: FeedbackState = createFeedbackState()
+    // 音・振動は毎フレーム作り直さず、run（このuseEffect）につき1つだけ持つ。
+    // 音OFF・非対応環境・例外はコントローラ側で必ず握りつぶすので、
+    // ここから先は「呼べば安全」として扱ってよい。
+    const soundController: BowlingSoundController = createBowlingSoundController()
+    const hapticsController: BowlingHaptics = createBowlingHaptics()
+
     const blockMeshes: THREE.Mesh[] = []
     const impactPool: ImpactSlot[] = []
     const geometries: THREE.BufferGeometry[] = []
@@ -214,6 +319,26 @@ export function useTsumikiBowlingEngine(
     const guideDots: THREE.Mesh[] = []
     let guideMaterial: THREE.MeshBasicMaterial | null = null
     let landingRing: THREE.Mesh | null = null
+    /** 発射ガイドの脈動に使う経過時間の積算（Date.now()は使わずdeltaMsだけで進める）。 */
+    let guidePulseMs = 0
+
+    // ---- リリース演出（発射直後のポップ・フラッシュ・残像トレイル） ----
+    /** 発射直後の玉の一瞬の伸び演出。残り時間が0なら演出なし。 */
+    let launchPopRemainingMs = 0
+    let launchFlash: RingSlot | null = null
+    const trailPool: TrailSlot[] = []
+    let trailCursor = 0
+    /** 前回トレイルを置いてからの経過時間[ms]。玉ごとの間隔（BALL_VISUALS）で間引く。 */
+    let trailAccumMs = 0
+
+    // ---- 衝突・崩壊演出（バウンドリング・きらめき） ----
+    const bounceRingPool: RingSlot[] = []
+    let bounceRingCursor = 0
+    let sparklePoints: THREE.Points | null = null
+    let sparklePositions: Float32Array | null = null
+    let sparkleMaterial: THREE.PointsMaterial | null = null
+    const sparkleParticles: SparkleParticle[] = []
+    let sparkleCursor = 0
 
     function track<T extends THREE.BufferGeometry>(geometry: T): T {
       geometries.push(geometry)
@@ -250,6 +375,17 @@ export function useTsumikiBowlingEngine(
       ballMesh = null
       guideMaterial = null
       landingRing = null
+      trailPool.length = 0
+      bounceRingPool.length = 0
+      sparkleParticles.length = 0
+      sparklePositions = null
+      sparklePoints = null
+      sparkleMaterial = null
+      launchFlash = null
+
+      // 音・振動は必須機能ではないが、予約済みのAudioNode・タイマーを必ず解放する。
+      soundController.dispose()
+      hapticsController.dispose()
 
       if (renderer !== null) {
         const canvas = renderer.domElement
@@ -539,18 +675,183 @@ export function useTsumikiBowlingEngine(
         mesh.visible = false
         mesh.renderOrder = 2
         target.add(mesh)
-        impactPool.push({ mesh, remainingMs: 0 })
+        impactPool.push({ mesh, remainingMs: 0, strength: 0 })
       }
     }
 
-    function spawnImpact(position: { x: number; y: number; z: number }) {
+    /** strength(0〜1)でリングの大きさ・不透明度・カメラ揺れが変わる。弱い衝突では揺らさない。 */
+    function spawnImpact(position: { x: number; y: number; z: number }, strength: number) {
       const slot = impactPool[impactCursor % Math.max(1, impactPool.length)]
       impactCursor += 1
       if (!slot) return
       slot.mesh.position.set(position.x, position.y, position.z)
       slot.mesh.visible = true
       slot.remainingMs = IMPACT_DURATION_MS
-      if (!prefersReducedMotion) shakeStrength = 1
+      slot.strength = strength
+      if (!prefersReducedMotion && strength >= SHAKE_MIN_STRENGTH) {
+        shakeStrength = Math.max(shakeStrength, strength)
+      }
+    }
+
+    /**
+     * 発射直後、発射位置に短く出すフラッシュリング。衝撃リング(impactPool)とは
+     * 役割が違う（「発射した」を伝える）ので、専用に1枚だけ用意する。
+     */
+    function createLaunchFlash(target: THREE.Scene) {
+      const geometry = track(new THREE.RingGeometry(0.3, 0.5, 20))
+      const material = trackMaterial(
+        new THREE.MeshBasicMaterial({
+          color: 0xfff8d6,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      )
+      const mesh = new THREE.Mesh(geometry, material)
+      mesh.visible = false
+      mesh.renderOrder = 2
+      target.add(mesh)
+      launchFlash = { mesh, remainingMs: 0 }
+    }
+
+    function spawnLaunchFlash(position: { x: number; y: number; z: number }) {
+      if (!launchFlash || prefersReducedMotion) return
+      launchFlash.mesh.position.set(position.x, position.y, position.z)
+      launchFlash.mesh.visible = true
+      launchFlash.remainingMs = LAUNCH_FLASH_DURATION_MS
+    }
+
+    /**
+     * 玉の残像トレイル。玉と同じ球ジオメトリ（半径1の単位球）を全スロットで使い回し、
+     * 大きさは mesh.scale で玉の半径×玉ごとの係数に合わせる
+     * （玉を切り替えるたびにジオメトリを作り直さなくて済む）。
+     */
+    function createTrailPool(target: THREE.Scene) {
+      const geometry = track(new THREE.SphereGeometry(1, 12, 8))
+      for (let index = 0; index < TRAIL_POOL_SIZE; index += 1) {
+        const material = trackMaterial(
+          new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+          }),
+        )
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.visible = false
+        mesh.renderOrder = 1
+        target.add(mesh)
+        trailPool.push({ mesh, material, remainingMs: 0, lifeMs: 0, baseScale: 1, baseOpacity: 0 })
+      }
+    }
+
+    function spawnTrail(position: { x: number; y: number; z: number }, ball: BowlingBallSpec) {
+      const profile = BALL_VISUALS[ball.id]
+      const slot = trailPool[trailCursor % Math.max(1, trailPool.length)]
+      trailCursor += 1
+      if (!slot) return
+      slot.mesh.position.set(position.x, position.y, position.z)
+      slot.mesh.visible = true
+      slot.material.color.setHex(ball.color)
+      slot.material.opacity = profile.trailOpacity
+      slot.baseOpacity = profile.trailOpacity
+      slot.baseScale = ball.radius * profile.trailScale
+      slot.mesh.scale.setScalar(slot.baseScale)
+      slot.lifeMs = profile.trailLifeMs
+      slot.remainingMs = profile.trailLifeMs
+    }
+
+    /** バウンドごとに地面付近へ出す小さなリング（はずむだま専用の演出）。 */
+    function createBounceRingPool(target: THREE.Scene) {
+      const geometry = track(new THREE.RingGeometry(0.18, 0.32, 16))
+      for (let index = 0; index < BOUNCE_RING_POOL_SIZE; index += 1) {
+        const material = trackMaterial(
+          new THREE.MeshBasicMaterial({
+            color: 0x7fe8ea,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+          }),
+        )
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.visible = false
+        mesh.renderOrder = 2
+        target.add(mesh)
+        bounceRingPool.push({ mesh, remainingMs: 0 })
+      }
+    }
+
+    function spawnBounceRing(position: { x: number; y: number; z: number }) {
+      if (prefersReducedMotion) return
+      const slot = bounceRingPool[bounceRingCursor % Math.max(1, bounceRingPool.length)]
+      bounceRingCursor += 1
+      if (!slot) return
+      slot.mesh.position.set(position.x, laneSurfaceY(position.z) + 0.03, position.z)
+      slot.mesh.quaternion.copy(flatOnLane)
+      slot.mesh.visible = true
+      slot.remainingMs = BOUNCE_RING_DURATION_MS
+    }
+
+    /**
+     * きらめきパーティクル。THREE.Pointsを1つだけ作り、position用のFloat32Arrayと
+     * 各粒子の残り寿命(sparkleParticles)を初期化時に確保して使い回す
+     * （衝突のたびに新しいオブジェクトを作らない）。
+     * PointsMaterialは粒子ごとの不透明度を持てないため、全粒子の中でいちばん
+     * 若い（寿命が長く残っている）ものに合わせてmaterial.opacityを近似的に決める。
+     */
+    function createSparkles(target: THREE.Scene) {
+      const geometry = track(new THREE.BufferGeometry())
+      sparklePositions = new Float32Array(SPARKLE_COUNT * 3)
+      // 初期位置は地面よりずっと下に置き、発火前の粒子が原点付近に集まって見えないようにする。
+      for (let index = 0; index < SPARKLE_COUNT; index += 1) sparklePositions[index * 3 + 1] = -1000
+      geometry.setAttribute('position', new THREE.BufferAttribute(sparklePositions, 3))
+      sparkleMaterial = trackMaterial(
+        new THREE.PointsMaterial({
+          color: 0xfff3b0,
+          size: 0.12,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          sizeAttenuation: true,
+        }),
+      )
+      sparklePoints = new THREE.Points(geometry, sparkleMaterial)
+      sparklePoints.renderOrder = 4
+      // 視錐台カリングを切る。Three.jsはgeometry.boundingSphereを最初の描画で一度だけ
+      // 計算してキャッシュし、position属性をneedsUpdateしても作り直さない。
+      // ここは粒子の位置を毎フレーム書き換えるので、初期位置（画面外のy=-1000）から
+      // 作られた球が残り続け、実際に光っている粒子ごとカリングされてしまう。
+      // オブジェクトは1つだけなので、常に描画対象にしても負荷は増えない。
+      sparklePoints.frustumCulled = false
+      target.add(sparklePoints)
+      for (let index = 0; index < SPARKLE_COUNT; index += 1) {
+        sparkleParticles.push({ remainingMs: 0, lifeMs: 0, vx: 0, vy: 0, vz: 0 })
+      }
+    }
+
+    function spawnSparkles(position: { x: number; y: number; z: number }, count: number) {
+      if (!sparklePositions) return
+      // reduced-motionでは数を1/3程度に抑える（出さないほうへ倒すと衝突がまったく
+      // 見えなくなるステージがあるため、消すのではなく減らすだけにする）。
+      const amount = prefersReducedMotion ? Math.max(1, Math.ceil(count / 3)) : count
+      for (let i = 0; i < amount; i += 1) {
+        const index = sparkleCursor % sparkleParticles.length
+        sparkleCursor += 1
+        const particle = sparkleParticles[index]
+        if (!particle) continue
+        const angle = Math.random() * Math.PI * 2
+        const speed = 1.4 + Math.random() * 2.2
+        particle.vx = Math.cos(angle) * speed
+        particle.vz = Math.sin(angle) * speed
+        particle.vy = 2 + Math.random() * 2.4
+        particle.lifeMs = SPARKLE_LIFE_MS
+        particle.remainingMs = SPARKLE_LIFE_MS
+        sparklePositions[index * 3] = position.x
+        sparklePositions[index * 3 + 1] = position.y
+        sparklePositions[index * 3 + 2] = position.z
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -715,9 +1016,15 @@ export function useTsumikiBowlingEngine(
       // 「倒れた」と数えないよう、投球ごとに取り直す。
       tracker = createToppleTracker(readBlockSamples(bowling))
       settle = createSettleState()
-      lastBallSpeed = 0
+      resetFeedbackState(feedbackState)
       flying = true
+      trailAccumMs = 0
+      launchPopRemainingMs = prefersReducedMotion ? 0 : LAUNCH_POP_MS
       launchBall(bowling, aim)
+      const ballPosition = bowling.ball.translation()
+      spawnLaunchFlash({ x: ballPosition.x, y: ballPosition.y, z: ballPosition.z })
+      soundController.playLaunch(bowling.ballSpec.id, aim.power)
+      hapticsController.launch()
       optionsRef.current.onThrowStart(throwIndex + 1)
     }
 
@@ -725,15 +1032,23 @@ export function useTsumikiBowlingEngine(
       if (!bowling) return
       flying = false
       const toppled = tracker?.count ?? 0
+      const total = stage.blocks.length
+      const isPerfect = toppled >= total
       const throwNumber = throwIndex + 1
       const isLastThrow = throwNumber >= THROWS_PER_GAME
       throwIndex += 1
       if (isLastThrow) {
         finished = true
+        soundController.playResult()
       } else {
         rebuildRemainingMs = REBUILD_DELAY_MS
       }
-      optionsRef.current.onThrowSettled({ throwNumber, toppled, isLastThrow })
+      // 結果画面まで待たず、全部倒したその投球の直後にお祝いする。
+      if (isPerfect) {
+        soundController.playPerfect()
+        hapticsController.perfect()
+      }
+      optionsRef.current.onThrowSettled({ throwNumber, toppled, isLastThrow, total, isPerfect })
     }
 
     function rebuildStage() {
@@ -770,16 +1085,48 @@ export function useTsumikiBowlingEngine(
       // どのしきい値も100ms以上なので、物理ステップごとに見ても結果は変わらず、
       // 積み木ぶんの読み出しだけが毎ステップ増える。
       const steppedMs = substeps * stepMs
-      if (tracker && updateToppleTracker(tracker, readBlockSamples(bowling), steppedMs) > 0) {
-        optionsRef.current.onToppledProgress(tracker.count)
+
+      // 倒れ判定。新しく倒れたぶんがあれば、進捗の通知と「カラカラ」音を鳴らす。
+      let toppledDelta = 0
+      if (tracker) {
+        toppledDelta = updateToppleTracker(tracker, readBlockSamples(bowling), steppedMs)
+        if (toppledDelta > 0) {
+          optionsRef.current.onToppledProgress(tracker.count, toppledDelta)
+          soundController.playClatter(toppledDelta)
+        }
       }
 
-      // 玉の速度が急に落ちたら、何かへ強くぶつかった合図。
-      // 重力だけでは1フレームでこれほど速度は変わらないので、衝突だけを拾える。
+      // 短時間にまとめて倒れたら「大崩壊」。deltaが0のフレームでも、
+      // 窓が開いている間はnoteToppledで経過時間だけ進める（時間切れの検出に必要）。
+      noteToppled(feedbackState, toppledDelta, steppedMs)
+      const bigCollapseCount = takeBigCollapse(feedbackState)
+      if (bigCollapseCount > 0) {
+        optionsRef.current.onBigCollapse?.(bigCollapseCount)
+        // きらめきは玉のいる場所（＝崩れている山の中）へ出す。玉が場外まで落ちた後の
+        // 崩壊では出す場所がないので、画面外で光らせずに音と揺れだけにする。
+        if (!ballOutOfPlay(bowling)) {
+          spawnSparkles(readBall(bowling).position, SPARKLE_COLLAPSE_COUNT)
+        }
+        if (!prefersReducedMotion) shakeStrength = Math.max(shakeStrength, 1)
+      }
+
+      // 玉の運動から「強くぶつかった」「跳ねた」を検出する（bowlingFeedback.ts）。
+      // 場外に落ちた玉は既に勝負がついているので対象から外す。
       if (!ballOutOfPlay(bowling)) {
         const ball = readBall(bowling)
-        if (lastBallSpeed - ball.speed >= IMPACT_SPEED_DROP) spawnImpact(ball.position)
-        lastBallSpeed = ball.speed
+        const events = updateBallFeedback(feedbackState, ball, steppedMs)
+        for (const event of events) {
+          if (event.kind === 'impact') {
+            spawnImpact(event.position, event.strength)
+            spawnSparkles(event.position, SPARKLE_IMPACT_COUNT)
+            soundController.playImpact(bowling.ballSpec.id, event.strength)
+            hapticsController.impact(event.strength)
+          } else {
+            // バウンドの見た目の主役ははずむだまだけ。音色の違いはbounceTones側で付ける。
+            if (bowling.ballSpec.id === 'bouncy') spawnBounceRing(event.position)
+            soundController.playBounce(bowling.ballSpec.id, event.index)
+          }
+        }
       }
 
       if (settle && updateSettleState(settle, readSettleSamples(bowling), steppedMs)) {
@@ -819,15 +1166,94 @@ export function useTsumikiBowlingEngine(
         mesh.visible = !block.removed
       })
 
+      // 発射直後の一瞬の伸び演出（山型: 1.0→1.22→1.0）。物理には一切影響しない。
+      let launchPopFactor = 1
+      if (launchPopRemainingMs > 0) {
+        launchPopRemainingMs = Math.max(0, launchPopRemainingMs - deltaMs)
+        const t = 1 - launchPopRemainingMs / LAUNCH_POP_MS
+        const triangle = t < 0.5 ? t * 2 : (1 - t) * 2
+        launchPopFactor = 1 + 0.22 * triangle
+      }
+
       if (ballMesh) {
         const position = bowling.ball.translation()
         const rotation = bowling.ball.rotation()
         ballMesh.position.set(position.x, position.y, position.z)
         ballMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+        ballMesh.scale.setScalar(launchPopFactor)
         ballMesh.visible = !ballOutOfPlay(bowling)
       }
 
+      // 残像トレイル。飛行中、玉が一定速度以上のときだけ玉ごとの間隔で1個ずつ置く。
+      if (flying && !prefersReducedMotion && !ballOutOfPlay(bowling)) {
+        const linvel = bowling.ball.linvel()
+        const speed = Math.hypot(linvel.x, linvel.y, linvel.z)
+        const profile = BALL_VISUALS[bowling.ballSpec.id]
+        if (speed >= profile.trailMinSpeed) {
+          trailAccumMs += deltaMs
+          if (trailAccumMs >= profile.trailIntervalMs) {
+            trailAccumMs = 0
+            const position = bowling.ball.translation()
+            spawnTrail({ x: position.x, y: position.y, z: position.z }, bowling.ballSpec)
+          }
+        } else {
+          trailAccumMs = 0
+        }
+      }
+      for (const slot of trailPool) {
+        if (slot.remainingMs <= 0) continue
+        slot.remainingMs = Math.max(0, slot.remainingMs - deltaMs)
+        const life = slot.lifeMs > 0 ? slot.remainingMs / slot.lifeMs : 0
+        slot.material.opacity = slot.baseOpacity * life
+        slot.mesh.scale.setScalar(slot.baseScale * (0.7 + 0.3 * life))
+        if (slot.remainingMs <= 0) slot.mesh.visible = false
+      }
+
+      // 発射位置の短いフラッシュ。
+      if (launchFlash && launchFlash.remainingMs > 0) {
+        launchFlash.remainingMs = Math.max(0, launchFlash.remainingMs - deltaMs)
+        const progress = 1 - launchFlash.remainingMs / LAUNCH_FLASH_DURATION_MS
+        const material = launchFlash.mesh.material as THREE.MeshBasicMaterial
+        material.opacity = Math.max(0, 0.7 * (1 - progress))
+        launchFlash.mesh.scale.setScalar(0.5 + progress * 1.8)
+        if (camera) launchFlash.mesh.quaternion.copy(camera.quaternion)
+        if (launchFlash.remainingMs <= 0) launchFlash.mesh.visible = false
+      }
+
+      // バウンドの地面リング（はずむだま専用）。
+      for (const slot of bounceRingPool) {
+        if (slot.remainingMs <= 0) continue
+        slot.remainingMs = Math.max(0, slot.remainingMs - deltaMs)
+        const progress = 1 - slot.remainingMs / BOUNCE_RING_DURATION_MS
+        const material = slot.mesh.material as THREE.MeshBasicMaterial
+        material.opacity = Math.max(0, 0.6 * (1 - progress))
+        slot.mesh.scale.setScalar(0.5 + progress * 1.6)
+        if (slot.remainingMs <= 0) slot.mesh.visible = false
+      }
+
+      // きらめきパーティクル。位置を自前で積分し、寿命に応じて全体の不透明度を近似する。
+      if (sparklePositions && sparkleMaterial && sparklePoints) {
+        let maxLifeFraction = 0
+        const dtSeconds = deltaMs / 1000
+        for (let index = 0; index < sparkleParticles.length; index += 1) {
+          const particle = sparkleParticles[index]!
+          if (particle.remainingMs <= 0) continue
+          particle.remainingMs = Math.max(0, particle.remainingMs - deltaMs)
+          particle.vy += SPARKLE_GRAVITY * dtSeconds
+          sparklePositions[index * 3]! += particle.vx * dtSeconds
+          sparklePositions[index * 3 + 1]! += particle.vy * dtSeconds
+          sparklePositions[index * 3 + 2]! += particle.vz * dtSeconds
+          const life = particle.lifeMs > 0 ? particle.remainingMs / particle.lifeMs : 0
+          maxLifeFraction = Math.max(maxLifeFraction, life)
+          if (particle.remainingMs <= 0) sparklePositions[index * 3 + 1] = -1000
+        }
+        sparkleMaterial.opacity = maxLifeFraction * 0.9
+        const positionAttribute = sparklePoints.geometry.attributes.position as THREE.BufferAttribute
+        positionAttribute.needsUpdate = true
+      }
+
       // 発射ガイド（予測軌道）
+      guidePulseMs += deltaMs
       if (guideMaterial && landingRing) {
         const aim = currentAim
         const show = aim !== null && aim.active && canPullBall()
@@ -844,13 +1270,20 @@ export function useTsumikiBowlingEngine(
               maxTime: 0.9,
             },
           )
+          // パワーが上がるほど点を太くする。最大付近(GUIDE_STRONG_POWER以上)ではゆっくり
+          // 脈動させ、「もう最大まで引けている」を体で分かるようにする
+          // （prefers-reduced-motionでは脈動させない）。
+          const powerScale = 0.85 + aim.power * 0.5
+          const isNearMax = aim.power >= GUIDE_STRONG_POWER
+          const pulse =
+            isNearMax && !prefersReducedMotion ? 1 + 0.08 * Math.sin(guidePulseMs / 90) : 1
           guideDots.forEach((dot, index) => {
             const point = points[index]
             dot.visible = point !== undefined
             if (point) {
               dot.position.set(point.x, point.y, point.z)
               // 手前を大きく、遠くを小さくして進む向きを分かりやすくする。
-              dot.scale.setScalar(1 - (index / GUIDE_DOT_COUNT) * 0.45)
+              dot.scale.setScalar((1 - (index / GUIDE_DOT_COUNT) * 0.45) * powerScale * pulse)
             }
           })
           const landing = points[points.length - 1]
@@ -858,8 +1291,10 @@ export function useTsumikiBowlingEngine(
           if (landing) {
             landingRing.position.set(landing.x, laneSurfaceY(landing.z) + 0.02, landing.z)
             landingRing.quaternion.copy(flatOnLane)
+            landingRing.scale.setScalar(pulse)
           }
-          guideColor.copy(weakColor).lerp(strongColor, aim.power)
+          // 最大付近では常に強い赤へ張り付かせ、「最大まで引けた」がはっきり伝わるようにする。
+          guideColor.copy(weakColor).lerp(strongColor, isNearMax ? 1 : aim.power)
           guideMaterial.color.copy(guideColor)
         } else {
           for (const dot of guideDots) dot.visible = false
@@ -867,14 +1302,18 @@ export function useTsumikiBowlingEngine(
         }
       }
 
-      // 衝撃エフェクト
+      // 衝撃エフェクト。strengthが強いほど大きく・濃く見せる。
       for (const slot of impactPool) {
         if (slot.remainingMs <= 0) continue
         slot.remainingMs = Math.max(0, slot.remainingMs - deltaMs)
         const progress = 1 - slot.remainingMs / IMPACT_DURATION_MS
         const material = slot.mesh.material as THREE.MeshBasicMaterial
-        material.opacity = Math.max(0, 0.85 * (1 - progress))
-        slot.mesh.scale.setScalar(0.6 + progress * 2.6)
+        // 強いほど大きく・濃くするが、上限を必ず設ける。
+        // 実画面で確認したところ、不透明度が1に張り付く（0.85×強さ係数）と
+        // 広がったリングが塔を覆って崩れる様子が見えなくなった。
+        // 「気持ちよさは足すが、物理の見やすさは削らない」ためにここで抑える。
+        material.opacity = Math.max(0, Math.min(0.8, 0.5 + slot.strength * 0.35) * (1 - progress))
+        slot.mesh.scale.setScalar((0.6 + progress * 2.2) * (0.7 + slot.strength * 0.5))
         if (camera) slot.mesh.quaternion.copy(camera.quaternion)
         if (slot.remainingMs <= 0) slot.mesh.visible = false
       }
@@ -918,11 +1357,17 @@ export function useTsumikiBowlingEngine(
 
       // 3投終わって崩れ切ったら、描画も物理も止めて端末の負荷を0にする。
       // 結果表示を出したまま放置されても、電池を使い続けない。
+      // Phase 4で足した演出（トレイル・バウンドリング・きらめき）も、
+      // 消え切る前に描画を止めてしまわないようここで一緒に確認する。
       if (
         finished &&
         bowling !== null &&
         shakeStrength <= 0 &&
         impactPool.every((slot) => slot.remainingMs <= 0) &&
+        trailPool.every((slot) => slot.remainingMs <= 0) &&
+        bounceRingPool.every((slot) => slot.remainingMs <= 0) &&
+        (launchFlash === null || launchFlash.remainingMs <= 0) &&
+        sparkleParticles.every((particle) => particle.remainingMs <= 0) &&
         readSettleSamples(bowling).every(
           (sample) => sample.linearSpeed < 0.05 && sample.angularSpeed < 0.1,
         )
@@ -961,6 +1406,10 @@ export function useTsumikiBowlingEngine(
       createBallMesh(scene, bowling)
       createGuide(scene)
       createImpactPool(scene)
+      createTrailPool(scene)
+      createBounceRingPool(scene)
+      createSparkles(scene)
+      createLaunchFlash(scene)
 
       resizeRenderer()
       writeVisuals(0)

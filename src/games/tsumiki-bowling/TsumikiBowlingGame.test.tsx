@@ -8,6 +8,7 @@ import type {
   TsumikiBowlingEngineOptions,
 } from './useTsumikiBowlingEngine'
 import { THROWS_PER_GAME } from './bowlingGame'
+import { getBowlingStage } from './bowlingStage'
 
 // WebGLとRapierはjsdomで動かさず、エンジンへ渡った設定と
 // エンジンからの通知に対する画面の反応だけを検証する。
@@ -27,6 +28,9 @@ vi.mock('./useTsumikiBowlingEngine', () => ({
   },
 }))
 
+/** テスト対象は常に'tower'ステージなので、積み木の総数もそこから読む（数値の二重管理をしない）。 */
+const TOWER_TOTAL = getBowlingStage('tower').blocks.length
+
 function renderGame(onBackToStages: () => void = vi.fn()) {
   return render(
     <MemoryRouter initialEntries={['/games/tsumiki-bowling']}>
@@ -43,9 +47,12 @@ function startThrow() {
 
 function settleThrow(result: Partial<ThrowSettledResult> & { toppled: number }) {
   act(() => {
+    const toppled = result.toppled
     engineMock.options?.onThrowSettled({
       throwNumber: 1,
       isLastThrow: false,
+      total: TOWER_TOTAL,
+      isPerfect: toppled >= TOWER_TOTAL,
       ...result,
     })
   })
@@ -73,7 +80,7 @@ describe('TsumikiBowlingGame', () => {
     renderGame()
     expect(screen.getByRole('heading', { name: 'つみきボウリング' })).toBeInTheDocument()
     expect(screen.getByText('たまを ひっぱって はなすと ビューン！')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('たおした つみき0こ')
+    expect(screen.getByRole('status')).toHaveTextContent(`たおした つみき0 / ${TOWER_TOTAL}こ`)
     expect(engineMock.registerContainer).toHaveBeenCalled()
   })
 
@@ -122,26 +129,33 @@ describe('TsumikiBowlingGame', () => {
     expect(screen.queryByText('つよい！')).not.toBeInTheDocument()
   })
 
-  it('崩れている最中も、倒れた数が増えていく', () => {
+  it('崩れている最中も、いま倒れている数がその投球ぶんとして増えていく', () => {
     renderGame()
     startThrow()
-    act(() => engineMock.options?.onToppledProgress(3))
-    expect(screen.getByRole('status')).toHaveTextContent('3こ')
-    act(() => engineMock.options?.onToppledProgress(9))
-    expect(screen.getByRole('status')).toHaveTextContent('9こ')
+    act(() => engineMock.options?.onToppledProgress(3, 3))
+    expect(screen.getByRole('status')).toHaveTextContent(`3 / ${TOWER_TOTAL}こ`)
+    act(() => engineMock.options?.onToppledProgress(9, 6))
+    expect(screen.getByRole('status')).toHaveTextContent(`9 / ${TOWER_TOTAL}こ`)
   })
 
-  it('1投終わると、その投球で倒した数を知らせる', () => {
+  it('1投終わると、その投球で倒した数を知らせ、HUDにもその投球ぶんの数が残る', () => {
     renderGame()
     playThrow(7, 1)
     expect(screen.getByText('7こ たおれた！')).toBeInTheDocument()
-    expect(screen.getAllByRole('status')[0]).toHaveTextContent('7こ')
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent(`7 / ${TOWER_TOTAL}こ`)
   })
 
   it('1個も倒せなくても失敗扱いにせず、次を促す', () => {
     renderGame()
     playThrow(0, 1)
     expect(screen.getByText('つぎは あたるかな？')).toBeInTheDocument()
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
+  })
+
+  it('全部倒すと「ぜんぶ たおれた！」になる', () => {
+    renderGame()
+    playThrow(TOWER_TOTAL, 1)
+    expect(screen.getByText('ぜんぶ たおれた！')).toBeInTheDocument()
   })
 
   it('2投目からは案内の文が変わる', () => {
@@ -150,12 +164,28 @@ describe('TsumikiBowlingGame', () => {
     expect(screen.getByText('つぎも ひっぱって はなしてね')).toBeInTheDocument()
   })
 
-  it('投球中の合計は、前の投球までの合計といまの数の足し算になる', () => {
+  it('次の投球が始まると、HUDのその投球ぶんの数字が0へ戻る', () => {
     renderGame()
     playThrow(5, 1)
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent(`5 / ${TOWER_TOTAL}こ`)
     startThrow()
-    act(() => engineMock.options?.onToppledProgress(4))
-    expect(screen.getAllByRole('status')[0]).toHaveTextContent('9こ')
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
+  })
+
+  it('大崩壊のコールバックで短いチップが出て、しばらくすると消える', () => {
+    vi.useFakeTimers()
+    try {
+      renderGame()
+      startThrow()
+      act(() => engineMock.options?.onBigCollapse?.(6))
+      expect(screen.getByText('ガラガラー！')).toBeInTheDocument()
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+      expect(screen.queryByText('ガラガラー！')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('3投したら合計を出して、もういちど できる', async () => {
@@ -166,8 +196,9 @@ describe('TsumikiBowlingGame', () => {
     playThrow(3, 3)
 
     const result = screen.getByRole('dialog', { name: 'けっか' })
+    expect(result).toHaveTextContent(`${THROWS_PER_GAME}かい なげて`)
     expect(result).toHaveTextContent('16')
-    expect(result).toHaveTextContent('たおれたよ！')
+    expect(result).toHaveTextContent('たおした！')
 
     const mountsBeforeRetry = engineMock.mountCount
     await user.click(screen.getByRole('button', { name: 'もういちど' }))
@@ -175,7 +206,7 @@ describe('TsumikiBowlingGame', () => {
     // 世界を作り直すため、エンジンへ渡すrunIdが変わる。
     expect(engineMock.mountCount).toBeGreaterThan(mountsBeforeRetry)
     expect(screen.queryByRole('dialog', { name: 'けっか' })).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('0こ')
+    expect(screen.getByRole('status')).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
     expect(screen.getByText('たまを ひっぱって はなすと ビューン！')).toBeInTheDocument()
     expect(
       screen.getByLabelText(`${THROWS_PER_GAME}かい なげるうちの 1かいめ`),
@@ -208,6 +239,43 @@ describe('TsumikiBowlingGame', () => {
     renderGame()
     for (let index = 1; index <= THROWS_PER_GAME; index += 1) playThrow(2, index)
     expect(screen.getByRole('link', { name: 'ほかの あそび' })).toHaveAttribute('href', '/')
+  })
+})
+
+describe('パーフェクト', () => {
+  it('1回でも全部倒した投球があれば、結果画面に「パーフェクト！」が出る', () => {
+    renderGame()
+    playThrow(TOWER_TOTAL, 1)
+    playThrow(0, 2)
+    playThrow(0, 3)
+
+    const result = screen.getByRole('dialog', { name: 'けっか' })
+    expect(result).toHaveTextContent('パーフェクト！')
+  })
+
+  it('全部倒した投球が1回もなければ、「パーフェクト！」は出ない', () => {
+    renderGame()
+    playThrow(2, 1)
+    playThrow(3, 2)
+    playThrow(4, 3)
+
+    const result = screen.getByRole('dialog', { name: 'けっか' })
+    expect(result).not.toHaveTextContent('パーフェクト！')
+  })
+
+  it('もういちどすると、前のプレイのパーフェクトは引き継がれない', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    playThrow(TOWER_TOTAL, 1)
+    playThrow(0, 2)
+    playThrow(0, 3)
+    expect(screen.getByRole('dialog', { name: 'けっか' })).toHaveTextContent('パーフェクト！')
+
+    await user.click(screen.getByRole('button', { name: 'もういちど' }))
+    playThrow(1, 1)
+    playThrow(1, 2)
+    playThrow(1, 3)
+    expect(screen.getByRole('dialog', { name: 'けっか' })).not.toHaveTextContent('パーフェクト！')
   })
 })
 

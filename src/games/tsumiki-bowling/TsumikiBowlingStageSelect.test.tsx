@@ -43,6 +43,9 @@ beforeEach(() => {
   engineMock.unmountCount = 0
   engineMock.registerContainer.mockClear()
   engineMock.setBallId.mockClear()
+  // TsumikiBowlingPlayは切り替えのたびにページ先頭へ戻す。
+  // jsdomのwindow.scrollToは未実装で警告を出すだけなので、ここでは差し替えておく。
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
 })
 
 describe('TsumikiBowlingStageSelect', () => {
