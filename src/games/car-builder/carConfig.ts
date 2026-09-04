@@ -13,7 +13,7 @@ export type BodyType = 'sports' | 'suv' | 'bus' | 'truck' | 'police'
 export type WheelType = 'small' | 'big' | 'offroad' | 'racing'
 export type CarColorId = 'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'pink' | 'purple' | 'white' | 'black'
 export type FrontType = 'round' | 'square' | 'slim'
-export type RoofType = 'none' | 'carrier'
+export type RoofType = 'none' | 'policeLight' | 'luggage' | 'spoiler'
 export type DecorationType = 'none' | 'star'
 export type MarkType = 'none' | 'plate'
 export type RideHeight = 'normal' | 'high'
@@ -49,6 +49,7 @@ export type CarOptionPreview =
   | { kind: 'color'; hex: string }
   | { kind: 'wheel'; variant: WheelType }
   | { kind: 'front'; variant: FrontType }
+  | { kind: 'roof'; variant: RoofType }
 
 export type CarOptionDefinition<Id extends string> = {
   id: Id
@@ -142,8 +143,10 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
     emoji: '🏠',
     ariaLabel: 'やねを えらぶ',
     options: [
-      { id: 'none', label: 'なし', preview: { kind: 'emoji', emoji: '🚫' } },
-      { id: 'carrier', label: 'キャリア', preview: { kind: 'emoji', emoji: '🧳' } },
+      { id: 'none', label: 'なし', preview: { kind: 'roof', variant: 'none' } },
+      { id: 'policeLight', label: 'パトランプ', preview: { kind: 'roof', variant: 'policeLight' } },
+      { id: 'luggage', label: '荷物', preview: { kind: 'roof', variant: 'luggage' } },
+      { id: 'spoiler', label: 'スポイラー', preview: { kind: 'roof', variant: 'spoiler' } },
     ],
   },
   decoration: {

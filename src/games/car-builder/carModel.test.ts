@@ -327,18 +327,30 @@ describe('createCarModel（3Dモデル生成）', () => {
 })
 
 describe('CarConfigの反映', () => {
-  test('屋根パーツはルーフ天面に乗り、宙に浮かない（5ボディすべてで同じ）', () => {
+  test('屋根4種類はなしを除いて生成され、ルーフ天面から下へ潜らない', () => {
     for (const option of CAR_CATEGORIES.body.options) {
-      const config = selectCarOption(
-        selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id),
-        'roof',
-        'carrier',
-      )
-      const model = createCarModel(config)
-      const dimensions = computeCarDimensions(config)
-      const bounds = boundsOf(layerOf(model.root, 'roof'))
-      expect(bounds.min.y, option.id).toBeCloseTo(dimensions.roofTopY, 2)
-      model.dispose()
+      for (const roofOption of CAR_CATEGORIES.roof.options) {
+        const config = selectCarOption(
+          selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id),
+          'roof',
+          roofOption.id,
+        )
+        const model = createCarModel(config)
+        const dimensions = computeCarDimensions(config)
+        const roofLayer = layerOf(model.root, 'roof')
+        if (roofOption.id === 'none') {
+          expect(roofLayer.children, option.id).toHaveLength(0)
+        } else {
+          const bounds = boundsOf(roofLayer)
+          expect(roofLayer.children.length, option.id + '/' + roofOption.id).toBeGreaterThan(0)
+          expect(bounds.min.y, option.id + '/' + roofOption.id).toBeGreaterThanOrEqual(dimensions.roofTopY - 0.001)
+          expect(
+            [bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z].every(Number.isFinite),
+            option.id + '/' + roofOption.id,
+          ).toBe(true)
+        }
+        model.dispose()
+      }
     }
   })
 
@@ -401,13 +413,27 @@ describe('CarConfigの反映', () => {
   })
 
   test('車高を変えると、屋根パーツも寸法に追従して持ち上がる（パーツ側の個別修正が要らない）', () => {
-    const base = selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'carrier')
+    const base = selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'luggage')
     const model = createCarModel(base)
     const before = boundsOf(layerOf(model.root, 'roof')).min.y
     model.update(selectCarOption(base, 'rideHeight', 'high'))
     const after = boundsOf(layerOf(model.root, 'roof')).min.y
     expect(after).toBeGreaterThan(before)
     expect(after).toBeCloseTo(computeCarDimensions(selectCarOption(base, 'rideHeight', 'high')).roofTopY, 2)
+    model.dispose()
+  })
+
+  test('ボディを切り替えても選択中の屋根を維持し、新しいルーフ位置へ再配置する', () => {
+    const luggageConfig = selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'luggage')
+    const model = createCarModel(luggageConfig)
+
+    const busConfig = selectCarOption(luggageConfig, 'body', 'bus')
+    model.update(busConfig)
+
+    const roofLayer = layerOf(model.root, 'roof')
+    const bounds = boundsOf(roofLayer)
+    expect(roofLayer.getObjectByName('car-roof-luggage')).toBeDefined()
+    expect(bounds.min.y).toBeCloseTo(computeCarDimensions(busConfig).roofTopY, 2)
     model.dispose()
   })
 
@@ -425,7 +451,7 @@ describe('CarConfigの反映', () => {
   })
 
   test('寸法が変わるカテゴリ（タイヤ）を変えると、他のパーツも作り直して追従する', () => {
-    const config = selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'carrier')
+    const config = selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'luggage')
     const model = createCarModel(config)
     const bodyPart = layerOf(model.root, 'body').children[0]
 
@@ -504,10 +530,22 @@ describe('CarConfigの反映', () => {
     model.dispose()
   })
 
+  test('屋根を「なし」へ戻すと、屋根パーツのgeometryとmaterialも解放される', () => {
+    const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'luggage'))
+    const spies = collectDisposeSpies(layerOf(model.root, 'roof'))
+    expect(spies.length).toBeGreaterThan(0)
+
+    model.update(DEFAULT_CAR_CONFIG)
+
+    expect(layerOf(model.root, 'roof').children).toHaveLength(0)
+    for (const spy of spies) expect(spy).toHaveBeenCalled()
+    model.dispose()
+  })
+
   test('複数カテゴリの変更が同時に保たれる（CarConfig全体が反映される）', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG)
     let config = selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'yellow')
-    config = selectCarOption(config, 'roof', 'carrier')
+    config = selectCarOption(config, 'roof', 'luggage')
     config = selectCarOption(config, 'decoration', 'star')
     model.update(config)
 
@@ -521,7 +559,7 @@ describe('CarConfigの反映', () => {
 
 describe('three.jsリソースの解放', () => {
   test('レイヤーを差し替えたとき、古いgeometry/materialがdisposeされる', () => {
-    const config = selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'carrier')
+    const config = selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'luggage')
     const model = createCarModel(config)
     const spies = collectDisposeSpies(layerOf(model.root, 'roof'))
     expect(spies.length).toBeGreaterThan(0)
@@ -533,7 +571,7 @@ describe('three.jsリソースの解放', () => {
   })
 
   test('disposeで全レイヤーのリソースが解放され、ルートが空になる', () => {
-    const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'carrier'))
+    const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'luggage'))
     const spies = collectDisposeSpies(model.root)
     expect(spies.length).toBeGreaterThan(0)
 

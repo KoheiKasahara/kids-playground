@@ -42,6 +42,30 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
       </span>
     )
   }
+  if (preview.kind === 'roof') {
+    return (
+      <span
+        className={`${className} ${styles.roofPreview} ${styles[`roofPreview-${preview.variant}`]}`}
+        aria-hidden="true"
+      >
+        {preview.variant === 'none' ? <span className={styles.roofPreviewNone}>×</span> : null}
+        {preview.variant === 'policeLight' ? (
+          <>
+            <span className={styles.roofPreviewPoliceBase} />
+            <span className={styles.roofPreviewPoliceBlue} />
+            <span className={styles.roofPreviewPoliceRed} />
+          </>
+        ) : null}
+        {preview.variant === 'luggage' ? <span className={styles.roofPreviewLuggage} /> : null}
+        {preview.variant === 'spoiler' ? (
+          <>
+            <span className={styles.roofPreviewSpoilerSupport} />
+            <span className={styles.roofPreviewSpoilerWing} />
+          </>
+        ) : null}
+      </span>
+    )
+  }
   return (
     <span className={className} aria-hidden="true">
       {preview.emoji}
