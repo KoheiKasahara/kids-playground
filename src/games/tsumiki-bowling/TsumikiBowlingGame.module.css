@@ -19,27 +19,29 @@
 
 .header {
   display: grid;
-  grid-template-columns: minmax(64px, 1fr) auto minmax(64px, 1fr);
+  grid-template-columns: minmax(56px, auto) minmax(0, 1fr) minmax(56px, auto);
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .title {
   grid-column: 2;
   grid-row: 1;
   margin: 0;
+  overflow: hidden;
   color: var(--color-primary-dark);
-  font-size: clamp(18px, 5vw, 26px);
+  font-size: clamp(15px, 4vw, 26px);
   font-weight: 900;
   text-align: center;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .backLink {
   grid-column: 1;
   grid-row: 1;
   display: inline-flex;
-  min-width: 64px;
+  min-width: 56px;
   min-height: 44px;
   align-items: center;
   justify-content: center;
@@ -54,6 +56,47 @@
   /* 320px幅でも「もどる」が2行に折り返さないようにする。 */
   white-space: nowrap;
   text-decoration: none;
+}
+
+/*
+ * いま遊んでいるステージ名と「ステージをかえる」を兼ねるボタン。
+ * ステージ名を主役にして、「かえる」は下に小さく添えるだけにする
+ * （文言そのものはaria-labelに入れてあるので、見た目は名前優先でよい）。
+ */
+.stageButton {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  gap: 1px;
+  max-width: 30vw;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 4px var(--space-sm);
+  border: 2px solid transparent;
+  border-radius: var(--radius-round);
+  background: var(--color-surface-muted);
+  color: var(--color-primary-dark);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.stageButtonName {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: clamp(10px, 2.6vw, 13px);
+  font-weight: 800;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stageButtonChange {
+  color: var(--color-text-muted);
+  font-size: clamp(9px, 2.2vw, 11px);
+  font-weight: 700;
 }
 
 .scene {
@@ -293,6 +336,21 @@
   font-size: clamp(20px, 6vw, 28px);
   font-weight: 900;
   box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+/* 「もういちど」と「ほかの あそび」の間に置く、控えめな2番目の選択肢。 */
+.changeStageButton {
+  min-width: min(280px, 80vw);
+  min-height: var(--tap-target-min);
+  padding: var(--space-xs) var(--space-lg);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  color: var(--color-accent-dark);
+  font-family: inherit;
+  font-size: clamp(16px, 5vw, 22px);
+  font-weight: 900;
   cursor: pointer;
 }
 

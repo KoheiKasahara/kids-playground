@@ -25,7 +25,7 @@ import {
 import { createToppleTracker, updateToppleTracker } from './bowlingTopple'
 import { createSettleState, updateSettleState } from './bowlingSettle'
 import { launchSpeed, type LaunchAim } from './bowlingLaunch'
-import { TOWER_CENTER_Z } from './bowlingStage'
+import { BOWLING_STAGES, TOWER_CENTER_Z } from './bowlingStage'
 import { getBowlingBall } from './bowlingBalls'
 
 const STEP_MS = PHYSICS_TIMESTEP * 1000
@@ -479,6 +479,89 @@ describe('玉ごとの体感差（物理挙動）', () => {
       const ball = readBall(bowling)
       expect(Number.isFinite(ball.speed)).toBe(true)
       expect(ball.speed).toBeLessThanOrEqual(MAX_BALL_SPEED * 1.001)
+    }
+    bowling.world.free()
+  })
+})
+
+describe('ステージごとの世界（Phase 3）', () => {
+  beforeAll(async () => {
+    await RAPIER.init()
+  })
+
+  it.each(BOWLING_STAGES)('$name: 積み木の数がステージ定義と一致する', (stage) => {
+    const bowling = createBowlingWorld(RAPIER, { stageId: stage.id })
+    expect(bowling.stage.id).toBe(stage.id)
+    expect(bowling.blocks.length).toBe(stage.blocks.length)
+    bowling.world.free()
+  })
+
+  it.each(BOWLING_STAGES)(
+    '$name: 触らずに2.5秒回しても崩れず、沈み込み・空中停止もしない',
+    (stage) => {
+      const bowling = createBowlingWorld(RAPIER, { stageId: stage.id })
+      const initial = bowling.placements.map((placement) => placement.position)
+      const result = runThrow(bowling, 2.5, null)
+      expect(result.toppled, `${stage.id}: 触っていないのに倒れた`).toBe(0)
+      bowling.blocks.forEach((block, index) => {
+        const start = initial[index]!
+        const now = block.body.translation()
+        const horizontal = Math.hypot(now.x - start.x, now.z - start.z)
+        expect(horizontal, `${stage.id}: ${index}番目の積み木が横へずれすぎている`).toBeLessThan(
+          0.12,
+        )
+        expect(
+          Math.abs(now.y - start.y),
+          `${stage.id}: ${index}番目の積み木が縦へずれすぎている（沈み込み・空中停止）`,
+        ).toBeLessThan(0.12)
+      })
+      bowling.world.free()
+    },
+  )
+
+  it.each(BOWLING_STAGES)('$name: 最大パワーで投げると2個以上倒れる', (stage) => {
+    const bowling = createBowlingWorld(RAPIER, { stageId: stage.id })
+    const result = runThrow(bowling, 3.5, aim(1))
+    expect(result.toppled).toBeGreaterThanOrEqual(2)
+    bowling.world.free()
+  })
+
+  // 3種×7ステージをすべて回すと重いので、玉ごとの体感差は代表2ステージ
+  // （tall・pyramid）でだけ確かめる。残りはheavyのみで可（設計書§6.3）。
+  const BALL_VARIETY_STAGE_IDS = new Set(['tall', 'pyramid'])
+
+  it.each(BOWLING_STAGES)('$name: 最大パワー投球後も世界が壊れない（NaNが出ない・落ち着く）', (stage) => {
+    const ballIds = BALL_VARIETY_STAGE_IDS.has(stage.id)
+      ? (['heavy', 'bouncy', 'small'] as const)
+      : (['heavy'] as const)
+    for (const ballId of ballIds) {
+      const bowling = createBowlingWorld(RAPIER, { stageId: stage.id, ballId })
+      // ちいさいだま(軽い・低減衰)はtallのように縦に高いステージで、崩れた破片が
+      // 何度も跳ねて落ち着くまでに時間がかかることがあるため、ここだけ既存の
+      // 「1投は必ず落ち着く」テスト(8秒)と同じ長さで確かめる。
+      const result = runThrow(bowling, 9, aim(1))
+      expect(Number.isFinite(result.minBallY), `${stage.id}/${ballId}: NaNが出た`).toBe(true)
+      expect(result.settledAtMs, `${stage.id}/${ballId}: 落ち着かない`).not.toBeNull()
+      bowling.world.free()
+    }
+  })
+
+  it('pyramidでも、resetForNextThrow後に積み木が初期配置へ戻る', () => {
+    const bowling = createBowlingWorld(RAPIER, { stageId: 'pyramid' })
+    const before = readBlockSamples(bowling)
+    runThrow(bowling, 4, aim(1))
+    resetForNextThrow(bowling)
+    const after = readBlockSamples(bowling)
+    after.forEach((sample, index) => {
+      const initial = before[index]!
+      expect(sample.position.x).toBeCloseTo(initial.position.x, 5)
+      expect(sample.position.y).toBeCloseTo(initial.position.y, 5)
+      expect(sample.position.z).toBeCloseTo(initial.position.z, 5)
+      expect(sample.rotation.w).toBeCloseTo(initial.rotation.w, 5)
+    })
+    for (const sample of readSettleSamples(bowling)) {
+      expect(sample.linearSpeed).toBe(0)
+      expect(sample.angularSpeed).toBe(0)
     }
     bowling.world.free()
   })

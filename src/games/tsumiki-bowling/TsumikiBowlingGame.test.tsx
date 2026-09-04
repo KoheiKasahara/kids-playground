@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import TsumikiBowlingPlay from './TsumikiBowlingPlay'
+import TsumikiBowlingGame from './TsumikiBowlingGame'
 import type {
   ThrowSettledResult,
   TsumikiBowlingEngineOptions,
@@ -27,10 +27,10 @@ vi.mock('./useTsumikiBowlingEngine', () => ({
   },
 }))
 
-function renderGame() {
+function renderGame(onBackToStages: () => void = vi.fn()) {
   return render(
     <MemoryRouter initialEntries={['/games/tsumiki-bowling']}>
-      <TsumikiBowlingPlay />
+      <TsumikiBowlingGame stageId="tower" onBackToStages={onBackToStages} />
     </MemoryRouter>,
   )
 }
@@ -68,13 +68,35 @@ beforeEach(() => {
   engineMock.setBallId.mockClear()
 })
 
-describe('TsumikiBowlingPlay', () => {
+describe('TsumikiBowlingGame', () => {
   it('最初はあそびかたの案内と、0この表示から始まる', () => {
     renderGame()
     expect(screen.getByRole('heading', { name: 'つみきボウリング' })).toBeInTheDocument()
     expect(screen.getByText('たまを ひっぱって はなすと ビューン！')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('たおした つみき0こ')
     expect(engineMock.registerContainer).toHaveBeenCalled()
+  })
+
+  it('渡したstageIdがそのままエンジンへ渡る', () => {
+    renderGame()
+    expect(engineMock.options?.stageId).toBe('tower')
+  })
+
+  it('「ステージをかえる」ボタンでonBackToStagesが呼ばれる', async () => {
+    const user = userEvent.setup()
+    const onBackToStages = vi.fn()
+    renderGame(onBackToStages)
+    await user.click(screen.getByRole('button', { name: 'ステージをかえる' }))
+    expect(onBackToStages).toHaveBeenCalledTimes(1)
+  })
+
+  it('結果画面の「べつの ステージ」でもonBackToStagesが呼ばれる', async () => {
+    const user = userEvent.setup()
+    const onBackToStages = vi.fn()
+    renderGame(onBackToStages)
+    for (let index = 1; index <= THROWS_PER_GAME; index += 1) playThrow(2, index)
+    await user.click(screen.getByRole('button', { name: 'べつの ステージ' }))
+    expect(onBackToStages).toHaveBeenCalledTimes(1)
   })
 
   it('残りの投球数が分かる表示になっている', () => {
@@ -167,6 +189,14 @@ describe('TsumikiBowlingPlay', () => {
     for (let index = 1; index <= THROWS_PER_GAME; index += 1) playThrow(2, index)
     await user.click(screen.getByRole('button', { name: 'もういちど' }))
     expect(engineMock.options?.runId).not.toBe(firstRunId)
+  })
+
+  it('「もういちど」ではrunIdだけが変わり、stageIdは変わらない（世界を作り直すのは同じステージ）', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    for (let index = 1; index <= THROWS_PER_GAME; index += 1) playThrow(2, index)
+    await user.click(screen.getByRole('button', { name: 'もういちど' }))
+    expect(engineMock.options?.stageId).toBe('tower')
   })
 
   it('ホームへもどるリンクがある', () => {

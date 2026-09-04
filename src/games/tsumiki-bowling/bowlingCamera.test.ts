@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { bowlingCameraSetup } from './bowlingCamera'
 import { LAUNCH_HEIGHT, LAUNCH_Z } from './bowlingPhysics'
-import { laneSurfaceY, TOWER_CENTER_Z } from './bowlingStage'
+import { BOWLING_STAGES, getBowlingStage, laneSurfaceY, stageBounds, TOWER_CENTER_Z } from './bowlingStage'
 
 /** 玉と積み木の上端。どの画面比でも、この2つが画面に入っていなければならない。 */
 const BALL_POINT = { x: 0, y: laneSurfaceY(LAUNCH_Z) + LAUNCH_HEIGHT, z: LAUNCH_Z }
 const TOWER_TOP = { x: 1.6, y: laneSurfaceY(TOWER_CENTER_Z) + 2.73, z: TOWER_CENTER_Z }
 
 /** その点がカメラの画角の内側に入っているか（縦・横の両方）。 */
-function isVisible(aspect: number, point: { x: number; y: number; z: number }): boolean {
-  const setup = bowlingCameraSetup(aspect)
+function isVisible(
+  aspect: number,
+  point: { x: number; y: number; z: number },
+  stage = getBowlingStage(undefined),
+): boolean {
+  const setup = bowlingCameraSetup(aspect, stage)
   const forward = {
     x: setup.target.x - setup.position.x,
     y: setup.target.y - setup.position.y,
@@ -41,6 +45,13 @@ function isVisible(aspect: number, point: { x: number; y: number; z: number }): 
     Math.abs(vertical) <= depth * halfFovTan &&
     Math.abs(horizontal) <= depth * halfFovTan * aspect
   )
+}
+
+/** そのステージの上端の左右の角。ステージが変わっても常に画角へ入っていなければならない。 */
+function stageTopCorner(stage: ReturnType<typeof getBowlingStage>, side: 1 | -1) {
+  const bounds = stageBounds(stage)
+  const z = stage.cameraZ ?? bounds.centerZ
+  return { x: side * bounds.halfWidth, y: laneSurfaceY(z) + bounds.topHeight, z }
 }
 
 describe('固定カメラ', () => {
@@ -77,5 +88,31 @@ describe('固定カメラ', () => {
 
   it('同じ画面比なら必ず同じ結果（固定カメラでぶれない）', () => {
     expect(bowlingCameraSetup(0.5)).toEqual(bowlingCameraSetup(0.5))
+  })
+
+  it('既定ステージを明示的に渡しても、渡さないときと同じ結果になる', () => {
+    const defaultStage = getBowlingStage(undefined)
+    for (const aspect of [0.46, 1, 2]) {
+      expect(bowlingCameraSetup(aspect, defaultStage)).toEqual(bowlingCameraSetup(aspect))
+    }
+  })
+})
+
+describe('ステージごとの画角', () => {
+  const ASPECTS = [0.42, 0.46, 0.55, 0.75, 1, 1.6, 2.2]
+
+  it.each(BOWLING_STAGES)('$name: どの画面比でも、玉とステージ上端の左右の角が画面に入る', (stage) => {
+    for (const aspect of ASPECTS) {
+      expect(isVisible(aspect, BALL_POINT, stage), `${stage.id}/縦横比${aspect}: 玉が見えない`).toBe(
+        true,
+      )
+      for (const side of [-1, 1] as const) {
+        const corner = stageTopCorner(stage, side)
+        expect(
+          isVisible(aspect, corner, stage),
+          `${stage.id}/縦横比${aspect}: 上端の角(${side})が見えない`,
+        ).toBe(true)
+      }
+    }
   })
 })
