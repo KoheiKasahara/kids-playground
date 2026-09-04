@@ -174,7 +174,8 @@ export function wallGapSegmentIndices(
 export const BUMPER_RADIUS = 0.22
 export const BUMPER_HEIGHT = 0.3
 export const BUMPER_FRICTION = 0.18
-export const BUMPER_RESTITUTION = 0.28
+/** 素のCollider反発は控えめにし、接触開始時の専用速度補正を主役にする。 */
+export const BUMPER_RESTITUTION = 0.08
 
 export type KomaField = {
   id: KomaFieldId

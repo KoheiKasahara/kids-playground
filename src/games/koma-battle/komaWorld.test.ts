@@ -17,6 +17,7 @@ import {
   DISK_FRICTION,
   DISK_RADIUS,
   DISK_RESTITUTION,
+  BUMPER_KNOCKBACK_MIN_OUTGOING_SPEED,
   KOMA_CONTACT_MARGIN,
   KOMA_DENSITY,
   KOMA_BOOST_MAX_SPIN_SPEED,
@@ -261,8 +262,10 @@ describe('createKomaBattleWorld', () => {
     koma.body.setLinvel({ x: 4, y: 0, z: 0 }, true)
     let maxSideVelocity = 0
     let maxSpeed = 0
+    let bumperKnockbacks = 0
     for (let step = 0; step < 180; step += 1) {
       applyKomaAssist(koma, PHYSICS_TIMESTEP)
+      bumperKnockbacks += applyKomaContactAssist(world).bumperKnockbacks
       world.world.step()
       clampKomaMotion(koma)
       const velocity = koma.body.linvel()
@@ -270,7 +273,119 @@ describe('createKomaBattleWorld', () => {
       maxSpeed = Math.max(maxSpeed, Math.hypot(velocity.x, velocity.y, velocity.z))
     }
     expect(maxSideVelocity).toBeGreaterThan(0.02)
+    expect(bumperKnockbacks).toBeGreaterThanOrEqual(1)
     expect(maxSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
+    world.world.free()
+  })
+
+  it('bumper接触は複数方向から中心の外向きへ強く弾き、接触中に重ねて加算しない', () => {
+    const baseField = getKomaField('bumper')
+    const bumper = baseField.obstacles[0]!
+    const field = { ...baseField, obstacles: [{ ...bumper, x: 0, z: 0 }] }
+    const directions = [
+      { x: 1, z: 0 },
+      { x: -1, z: 0 },
+      { x: 0, z: 1 },
+      { x: 0, z: -1 },
+      { x: Math.SQRT1_2, z: Math.SQRT1_2 },
+      { x: -Math.SQRT1_2, z: Math.SQRT1_2 },
+      { x: Math.SQRT1_2, z: -Math.SQRT1_2 },
+      { x: -Math.SQRT1_2, z: -Math.SQRT1_2 },
+    ]
+
+    for (const direction of directions) {
+      const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { field })
+      const koma = world.komas[0]!
+      const contactDistance = DISK_RADIUS + bumper.radius + KOMA_CONTACT_MARGIN - 0.01
+      koma.body.setTranslation(
+        {
+          x: direction.x * contactDistance,
+          y: fieldHeightAt(field, contactDistance) + 0.02,
+          z: direction.z * contactDistance,
+        },
+        true,
+      )
+      koma.body.setLinvel({ x: -direction.x * 0.2, y: 0, z: -direction.z * 0.2 }, true)
+
+      const first = applyKomaContactAssist(world)
+      const velocity = koma.body.linvel()
+      const outgoingSpeed = velocity.x * direction.x + velocity.z * direction.z
+      const repeated = applyKomaContactAssist(world)
+
+      expect(first.bumperKnockbacks).toBe(1)
+      expect(outgoingSpeed).toBeGreaterThanOrEqual(BUMPER_KNOCKBACK_MIN_OUTGOING_SPEED - 1e-3)
+      expect(repeated.bumperKnockbacks).toBe(0)
+      expect(world.contactAssist.activeBumpers.size).toBe(1)
+      world.world.free()
+    }
+  })
+
+  it('bumperは低速接触でも強く弾き、高速接触では速度を上限内に収める', () => {
+    const baseField = getKomaField('bumper')
+    const bumper = baseField.obstacles[0]!
+    const field = { ...baseField, obstacles: [{ ...bumper, x: 0, z: 0 }] }
+
+    function runContact(speed: number) {
+      const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { field })
+      const koma = world.komas[0]!
+      const contactDistance = DISK_RADIUS + bumper.radius + KOMA_CONTACT_MARGIN - 0.01
+      koma.body.setTranslation(
+        { x: contactDistance, y: fieldHeightAt(field, contactDistance) + 0.02, z: 0 },
+        true,
+      )
+      koma.body.setLinvel({ x: -speed, y: 0, z: 0 }, true)
+      const result = applyKomaContactAssist(world)
+      const after = koma.body.linvel()
+      const outgoingSpeed = after.x
+      const finite = [after.x, after.y, after.z].every(Number.isFinite)
+      world.world.free()
+      return { result, outgoingSpeed, finite }
+    }
+
+    const low = runContact(0.1)
+    const high = runContact(MAX_LINEAR_SPEED)
+    expect(low.result.bumperKnockbacks).toBe(1)
+    expect(low.outgoingSpeed).toBeGreaterThanOrEqual(BUMPER_KNOCKBACK_MIN_OUTGOING_SPEED - 1e-3)
+    expect(high.result.bumperKnockbacks).toBe(1)
+    expect(high.finite).toBe(true)
+    expect(high.outgoingSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED)
+
+    const repeatedWorld = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { field })
+    const repeatedKoma = repeatedWorld.komas[0]!
+    const contactDistance = DISK_RADIUS + bumper.radius + KOMA_CONTACT_MARGIN - 0.01
+    repeatedKoma.body.setTranslation(
+      { x: contactDistance, y: fieldHeightAt(field, contactDistance) + 0.02, z: 0 },
+      true,
+    )
+    repeatedKoma.body.setLinvel({ x: -0.2, y: 0, z: 0 }, true)
+    let bumperKicks = 0
+    let maxSpeed = 0
+    for (let step = 0; step < 60; step += 1) {
+      bumperKicks += applyKomaContactAssist(repeatedWorld).bumperKnockbacks
+      repeatedWorld.world.step()
+      clampKomaMotion(repeatedKoma)
+      const velocity = repeatedKoma.body.linvel()
+      maxSpeed = Math.max(maxSpeed, Math.hypot(velocity.x, velocity.y, velocity.z))
+    }
+    expect(bumperKicks).toBe(1)
+    expect(maxSpeed).toBeLessThanOrEqual(MAX_LINEAR_SPEED + 1e-4)
+    repeatedWorld.world.free()
+  })
+
+  it('bumper以外のフィールドでは同じ位置に障害物補正を追加しない', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'basic' })
+    const koma = world.komas[0]!
+    const bumper = getKomaField('bumper').obstacles[0]!
+    const distance = DISK_RADIUS + bumper.radius + KOMA_CONTACT_MARGIN - 0.01
+    koma.body.setTranslation(
+      { x: distance, y: fieldHeightAt('basic', distance) + 0.02, z: 0 },
+      true,
+    )
+    koma.body.setLinvel({ x: -0.1, y: 0, z: 0 }, true)
+    const before = koma.body.linvel()
+    const result = applyKomaContactAssist(world)
+    expect(result.bumperKnockbacks).toBe(0)
+    expect(koma.body.linvel()).toEqual(before)
     world.world.free()
   })
 
@@ -723,6 +838,7 @@ describe('コマ2個の対戦（実際にRapierを回して確認する）', () 
     expect(applyKomaContactAssist(world, false)).toEqual({
       komaKnockbacks: 0,
       wallRedirects: 0,
+      bumperKnockbacks: 0,
       maxAppliedImpulse: 0,
     })
     expect(koma.body.linvel()).toEqual(velocityBeforeFinish)
@@ -733,9 +849,11 @@ describe('コマ2個の対戦（実際にRapierを回して確認する）', () 
     const firstRun = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
     firstRun.contactAssist.activeKomaPair = true
     firstRun.contactAssist.activeWalls.add(0)
+    firstRun.contactAssist.activeBumpers.add('0:0')
     const replay = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
     expect(replay.contactAssist.activeKomaPair).toBe(false)
     expect(replay.contactAssist.activeWalls.size).toBe(0)
+    expect(replay.contactAssist.activeBumpers.size).toBe(0)
     firstRun.world.free()
     replay.world.free()
   })
