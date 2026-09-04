@@ -29,6 +29,19 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
       </span>
     )
   }
+  if (preview.kind === 'front') {
+    return (
+      <span
+        className={`${className} ${styles.frontPreview} ${styles[`frontPreview-${preview.variant}`]}`}
+        aria-hidden="true"
+      >
+        <span className={styles.frontPreviewSurround} />
+        <span className={styles.frontPreviewLight} />
+        <span className={styles.frontPreviewLight} />
+        <span className={styles.frontPreviewGrille} />
+      </span>
+    )
+  }
   return (
     <span className={className} aria-hidden="true">
       {preview.emoji}
