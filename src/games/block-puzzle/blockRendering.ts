@@ -36,6 +36,33 @@ export function normalizeCells(cells: readonly RenderCell[]): RenderCell[] {
   return cells.map((cell) => ({ col: cell.col - bounds.minCol, row: cell.row - bounds.minRow }))
 }
 
+/** 盤面全体に対する割合(%)で表した、セル群の位置と大きさ。 */
+export type CellRectPercent = {
+  readonly leftPercent: number
+  readonly topPercent: number
+  readonly widthPercent: number
+  readonly heightPercent: number
+}
+
+/**
+ * セル群が占める範囲を、盤面（boardCols × boardRows）に対する割合(%)で表す。
+ * グリッドの行・列番号ではなく割合で位置決めすることで、#483 の「回転で盤面外へ
+ * はみ出た、まだ確定していないパーツ」も同じ仕組みでそのまま描ける
+ * （CSS Gridの行番号は0や負の番号を「外側」として素直には扱えないため）。
+ */
+export function cellBoundsPercent(
+  bounds: CellBounds,
+  boardCols: number,
+  boardRows: number,
+): CellRectPercent {
+  return {
+    leftPercent: (bounds.minCol / boardCols) * 100,
+    topPercent: (bounds.minRow / boardRows) * 100,
+    widthPercent: (bounds.cols / boardCols) * 100,
+    heightPercent: (bounds.rows / boardRows) * 100,
+  }
+}
+
 /** そのセルの四辺が、パーツの外周かどうか（＝同じパーツの隣がいないか）。 */
 export type CellEdges = {
   readonly top: boolean

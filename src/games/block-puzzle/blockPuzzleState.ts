@@ -6,7 +6,15 @@ import {
   type BlockRotation,
   type BlockShapeId,
 } from './blockShapes'
-import { canPlaceBlock, placeBlock, type PlacedBlock } from './placement'
+import {
+  canPlaceBlock,
+  isInsideBoardPlacement,
+  occupiedCells,
+  overlapsPlacedBlocks,
+  placeBlock,
+  placedBlockCells,
+  type PlacedBlock,
+} from './placement'
 
 /**
  * ブロックパズル全体の状態。描画に依存しない素のデータだけを持ち、
@@ -102,22 +110,35 @@ export function clearPlacedBlockSelection(state: BlockPuzzleState): BlockPuzzleS
 }
 
 /**
- * いま選んでいる配置済みブロックを90度回す。
- * 回した結果が盤面外へ出る、または他のブロックと重なる場合は何も変えずに null を返す
- * （選択も向きも位置も、呼び出し前のまま残る）。
+ * いま選んでいる配置済みブロックを90度回す。回した結果が盤面外へ出る、または
+ * 他のブロックと重なる場合でも、回転そのものは必ず成功させる（#483）。
+ * そのかわりその場所のままでは「まだ確定していない（はみ出た／重なった）」状態になり、
+ * isSelectedPlacedBlockConfirmed() で検知できる。確定させるには、その状態のまま
+ * 動かせる場所（タップまたはドラッグ）へ移動させるか、けす で取り除く。
+ * 選んでいるブロックがなければ null を返す。
  */
 export function rotateSelectedPlacedBlock(state: BlockPuzzleState): BlockPuzzleState | null {
   const target = state.placedBlocks.find((block) => block.id === state.selectedPlacedBlockId)
   if (!target) return null
 
   const rotation = nextRotation(target.rotation)
-  const others = state.placedBlocks.filter((block) => block.id !== target.id)
-  if (!canPlaceBlock(others, target.shapeId, target.anchor, rotation)) return null
-
   const placedBlocks = state.placedBlocks.map((block) =>
     block.id === target.id ? { ...block, rotation } : block,
   )
   return { ...state, placedBlocks }
+}
+
+/**
+ * いま選んでいる配置済みブロックが、いまの場所・向きのまま盤面に収まっているか。
+ * 選んでいるブロックがなければ（判定の対象がないので）true を返す。
+ * #483 の回転は常に成功するため、この確定判定を使って
+ * 「はみ出た／重なったままの状態」を見た目や案内で知らせる。
+ */
+export function isSelectedPlacedBlockConfirmed(state: BlockPuzzleState): boolean {
+  const target = state.placedBlocks.find((block) => block.id === state.selectedPlacedBlockId)
+  if (!target) return true
+  const others = state.placedBlocks.filter((block) => block.id !== target.id)
+  return canPlaceBlock(others, target.shapeId, target.anchor, target.rotation)
 }
 
 /**
@@ -139,6 +160,61 @@ export function moveSelectedPlacedBlock(
     block.id === target.id ? { ...block, anchor: cell } : block,
   )
   return { ...state, placedBlocks }
+}
+
+/**
+ * ドラッグで配置済みブロックを動かす（#483）。タップでの移動と違い、
+ * 移動先がふさがっていても、そこにいるパーツがちょうど1つだけで、
+ * お互いの場所を交換しても盤面内・重なりなしに収まるなら入れ替える。
+ * 移動も入れ替えもできない場合は null を返し、呼び出し側が
+ * （ドラッグを離した位置を戻すなど）軽い視覚フィードバックだけを出せるようにする。
+ * 成功した場合は動かしたブロックを選択状態にする。
+ */
+export function moveOrSwapPlacedBlock(
+  state: BlockPuzzleState,
+  blockId: string,
+  targetAnchor: BoardCell,
+): BlockPuzzleState | null {
+  const target = state.placedBlocks.find((block) => block.id === blockId)
+  if (!target) return null
+
+  const others = state.placedBlocks.filter((block) => block.id !== blockId)
+
+  if (canPlaceBlock(others, target.shapeId, targetAnchor, target.rotation)) {
+    const placedBlocks = state.placedBlocks.map((block) =>
+      block.id === blockId ? { ...block, anchor: targetAnchor } : block,
+    )
+    return { ...state, placedBlocks, selectedPlacedBlockId: blockId }
+  }
+
+  // 移動先がふさがっている場合、そこと重なるパーツがちょうど1つだけなら入れ替えを試す。
+  const targetCells = occupiedCells(target.shapeId, targetAnchor, target.rotation)
+  const overlapping = others.filter((block) =>
+    placedBlockCells(block).some((cell) =>
+      targetCells.some((targetCell) => targetCell.col === cell.col && targetCell.row === cell.row),
+    ),
+  )
+  if (overlapping.length !== 1) return null
+
+  const partner = overlapping[0]
+  const rest = others.filter((block) => block.id !== partner.id)
+  const movedTarget: PlacedBlock = { ...target, anchor: targetAnchor }
+  const movedPartner: PlacedBlock = { ...partner, anchor: target.anchor }
+
+  const swapValid =
+    isInsideBoardPlacement(movedTarget.shapeId, movedTarget.anchor, movedTarget.rotation) &&
+    isInsideBoardPlacement(movedPartner.shapeId, movedPartner.anchor, movedPartner.rotation) &&
+    !overlapsPlacedBlocks(rest, movedTarget.shapeId, movedTarget.anchor, movedTarget.rotation) &&
+    !overlapsPlacedBlocks(rest, movedPartner.shapeId, movedPartner.anchor, movedPartner.rotation) &&
+    !overlapsPlacedBlocks([movedTarget], movedPartner.shapeId, movedPartner.anchor, movedPartner.rotation)
+  if (!swapValid) return null
+
+  const placedBlocks = state.placedBlocks.map((block) => {
+    if (block.id === movedTarget.id) return movedTarget
+    if (block.id === movedPartner.id) return movedPartner
+    return block
+  })
+  return { ...state, placedBlocks, selectedPlacedBlockId: blockId }
 }
 
 /**
