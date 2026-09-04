@@ -409,70 +409,117 @@ const BODY_BUILDERS: Record<BodyType, CarPartBuilder> = {
   police: buildPoliceBody,
 }
 
-function buildWheels(hubColor: string, hubRadiusRatio: number) {
+type WheelVisual = {
+  hubColor: string
+  hubRadiusRatio: number
+  detail: 'standard' | 'offroad' | 'racing'
+}
+
+function addPerformanceRim(
+  group: THREE.Group,
+  wheel: CarAttachments['wheels'][number],
+  hubMaterial: THREE.Material,
+  namePrefix: 'car-sports' | 'car-racing',
+): void {
+  const spokeMaterial = standard(namePrefix === 'car-racing' ? '#f1f4f7' : CHROME_COLOR, 0.22, 0.65)
+  const rimRing = new THREE.Mesh(
+    new THREE.TorusGeometry(wheel.radius * (namePrefix === 'car-racing' ? 0.68 : 0.58), wheel.radius * 0.055, 8, 20),
+    hubMaterial,
+  )
+  rimRing.name = `${namePrefix}-rim-ring-${wheel.id}`
+  rimRing.rotation.y = Math.PI / 2
+  rimRing.position.set(wheel.position.x, wheel.position.y, wheel.position.z)
+  rimRing.castShadow = true
+
+  const centerCap = new THREE.Mesh(
+    new THREE.SphereGeometry(wheel.radius * (namePrefix === 'car-racing' ? 0.14 : 0.17), 12, 8),
+    hubMaterial,
+  )
+  centerCap.name = `${namePrefix}-center-cap-${wheel.id}`
+  centerCap.position.set(wheel.position.x, wheel.position.y, wheel.position.z)
+  centerCap.castShadow = true
+
+  // 外側の面に短いスポークを置き、レーシングはリムを大きくしてスポーツカー以外でも判別できるようにする。
+  const spokeFaceX = wheel.position.x + wheel.side * (wheel.width * 0.58)
+  for (let spokeIndex = 0; spokeIndex < 5; spokeIndex += 1) {
+    const spoke = box(
+      { x: 0.04, y: wheel.radius * 0.1, z: wheel.radius * (namePrefix === 'car-racing' ? 0.58 : 0.5) },
+      { x: spokeFaceX, y: wheel.position.y, z: wheel.position.z },
+      spokeMaterial,
+    )
+    spoke.name = `${namePrefix}-spoke-${wheel.id}-${spokeIndex}`
+    spoke.rotation.x = (spokeIndex * Math.PI * 2) / 5
+    group.add(spoke)
+  }
+  group.add(rimRing, centerCap)
+}
+
+function addOffroadTread(
+  group: THREE.Group,
+  wheel: CarAttachments['wheels'][number],
+  material: THREE.Material,
+): void {
+  // 少数のブロックを外周へ置くだけで、重い高精細タイヤモデルなしにゴツゴツした輪郭を作る。
+  const treadCount = 10
+  // ブロックは回転時の角でも地面へ潜らないよう、中心をタイヤ外周より少し内側へ置く。
+  // ブロック自体の厚みで外周へ十分に張り出し、シルエットはゴツゴツしたまま保つ。
+  const outerRadius = wheel.radius * 0.83
+  for (let index = 0; index < treadCount; index += 1) {
+    const angle = (index * Math.PI * 2) / treadCount
+    const tread = box(
+      { x: wheel.width * 0.5, y: wheel.radius * 0.18, z: wheel.radius * 0.3 },
+      {
+        x: wheel.position.x + wheel.side * wheel.width * 0.16,
+        y: wheel.position.y + Math.cos(angle) * outerRadius,
+        z: wheel.position.z + Math.sin(angle) * outerRadius,
+      },
+      material,
+    )
+    tread.name = `car-offroad-tread-${wheel.id}-${index}`
+    tread.rotation.x = angle
+    group.add(tread)
+  }
+}
+
+function buildWheels(visual: WheelVisual) {
   return ({ attachments, config }: CarPartContext): THREE.Object3D => {
     const group = new THREE.Group()
     group.name = 'car-wheels'
     const tireMaterial = standard(TIRE_COLOR, 0.85, 0)
-    const hubMaterial = standard(hubColor, 0.35, 0.2)
+    const hubMaterial = standard(visual.hubColor, 0.35, 0.2)
+    const treadMaterial = standard('#24282c', 0.92, 0)
     const sportsWheel = config.body === 'sports'
 
     for (const wheel of attachments.wheels) {
-      // タイヤの中心位置は attachment 由来。スポーツカーだけリムの見た目を追加する。
+      // タイヤの中心位置は attachment 由来。サイズは寸法基盤から、見た目の差はvisual定義から決まる。
       const tire = new THREE.Mesh(
         new THREE.CylinderGeometry(wheel.radius, wheel.radius, wheel.width, 24),
         tireMaterial,
       )
+      tire.name = `car-wheel-tire-${wheel.id}`
       tire.rotation.z = Math.PI / 2
       tire.position.set(wheel.position.x, wheel.position.y, wheel.position.z)
       tire.castShadow = true
       const hub = new THREE.Mesh(
         new THREE.CylinderGeometry(
-          wheel.radius * hubRadiusRatio,
-          wheel.radius * hubRadiusRatio,
+          wheel.radius * visual.hubRadiusRatio,
+          wheel.radius * visual.hubRadiusRatio,
           wheel.width * 1.08,
           16,
         ),
         hubMaterial,
       )
+      hub.name = `car-wheel-hub-${wheel.id}`
       hub.rotation.z = Math.PI / 2
       hub.position.copy(tire.position)
+      group.add(tire, hub)
 
-      if (sportsWheel) {
-        const spokeMaterial = standard(CHROME_COLOR, 0.22, 0.65)
-        const rimRing = new THREE.Mesh(
-          new THREE.TorusGeometry(wheel.radius * 0.58, wheel.radius * 0.055, 8, 20),
-          hubMaterial,
-        )
-        rimRing.name = `car-sports-rim-ring-${wheel.id}`
-        rimRing.rotation.y = Math.PI / 2
-        rimRing.position.copy(tire.position)
-        rimRing.castShadow = true
-
-        const centerCap = new THREE.Mesh(
-          new THREE.SphereGeometry(wheel.radius * 0.17, 12, 8),
-          hubMaterial,
-        )
-        centerCap.name = `car-sports-center-cap-${wheel.id}`
-        centerCap.position.copy(tire.position)
-        centerCap.castShadow = true
-
-        // 平面のハブだけで終わらせず、外側の面に短い5本スポークを置く。
-        // ホイールの印象を整えるための最小限の追加で、ボディ造形の主役は奪わない。
-        const spokeFaceX = wheel.position.x + wheel.side * (wheel.width * 0.58)
-        for (let spokeIndex = 0; spokeIndex < 5; spokeIndex += 1) {
-          const spoke = box(
-            { x: 0.04, y: wheel.radius * 0.1, z: wheel.radius * 0.5 },
-            { x: spokeFaceX, y: wheel.position.y, z: wheel.position.z },
-            spokeMaterial,
-          )
-          spoke.name = `car-sports-spoke-${wheel.id}-${spokeIndex}`
-          spoke.rotation.x = (spokeIndex * Math.PI * 2) / 5
-          group.add(spoke)
-        }
-        group.add(tire, hub, rimRing, centerCap)
-      } else {
-        group.add(tire, hub)
+      if (visual.detail === 'offroad') {
+        addOffroadTread(group, wheel, treadMaterial)
+      } else if (visual.detail === 'racing') {
+        addPerformanceRim(group, wheel, hubMaterial, 'car-racing')
+      } else if (sportsWheel) {
+        addPerformanceRim(group, wheel, hubMaterial, 'car-sports')
       }
     }
     return group
@@ -659,7 +706,12 @@ export const CAR_PART_BUILDERS: {
   [K in CarPartCategoryId]: Record<CarOptionIdMap[K], CarPartBuilder>
 } = {
   body: BODY_BUILDERS,
-  wheel: { normal: buildWheels(CHROME_COLOR, 0.45), big: buildWheels('#ff922b', 0.5) },
+  wheel: {
+    small: buildWheels({ hubColor: CHROME_COLOR, hubRadiusRatio: 0.45, detail: 'standard' }),
+    big: buildWheels({ hubColor: '#ff922b', hubRadiusRatio: 0.5, detail: 'standard' }),
+    offroad: buildWheels({ hubColor: '#c8873d', hubRadiusRatio: 0.42, detail: 'offroad' }),
+    racing: buildWheels({ hubColor: '#d83f45', hubRadiusRatio: 0.62, detail: 'racing' }),
+  },
   front: { normal: buildFront('box'), round: buildFront('round') },
   roof: { none: nothing, carrier: buildRoofCarrier },
   decoration: { none: nothing, star: buildStarDecoration },

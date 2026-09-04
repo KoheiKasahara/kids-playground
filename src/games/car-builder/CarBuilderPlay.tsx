@@ -19,6 +19,16 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
   if (preview.kind === 'color') {
     return <span className={`${className} ${styles.colorChip}`} style={{ backgroundColor: preview.hex }} aria-hidden="true" />
   }
+  if (preview.kind === 'wheel') {
+    return (
+      <span
+        className={`${className} ${styles.wheelPreview} ${styles[`wheelPreview-${preview.variant}`]}`}
+        aria-hidden="true"
+      >
+        <span className={styles.wheelPreviewHub} />
+      </span>
+    )
+  }
   return (
     <span className={className} aria-hidden="true">
       {preview.emoji}

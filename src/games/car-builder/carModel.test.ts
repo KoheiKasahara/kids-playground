@@ -193,7 +193,7 @@ describe('createCarModel（3Dモデル生成）', () => {
   })
 
   test('スポーツカーのフェンダーは断面の膨らみとしてタイヤ外端を覆う', () => {
-    for (const wheelOption of ['normal', 'big'] as const) {
+    for (const wheelOption of ['small', 'big', 'offroad', 'racing'] as const) {
       const config = selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', wheelOption)
       const model = createCarModel(config)
       const dimensions = computeCarDimensions(config)
@@ -258,12 +258,70 @@ describe('createCarModel（3Dモデル生成）', () => {
     model.dispose()
   })
 
+  test('4種類のタイヤは寸法・4輪位置・専用の見た目へ追従する', () => {
+    for (const wheelOption of ['small', 'big', 'offroad', 'racing'] as const) {
+      const config = selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', wheelOption)
+      const model = createCarModel(config)
+      const dimensions = computeCarDimensions(config)
+      const attachments = model.getAttachments()
+      const wheelRoot = layerOf(model.root, 'wheel').children[0]
+      if (wheelRoot === undefined) throw new Error('タイヤが生成されていません: ' + wheelOption)
+
+      for (const attachment of attachments.wheels) {
+        const tire = wheelRoot.getObjectByName(`car-wheel-tire-${attachment.id}`) as THREE.Mesh | undefined
+        expect(tire, wheelOption + '/' + attachment.id).toBeDefined()
+        expect(tire?.position.x).toBeCloseTo(attachment.position.x, 6)
+        expect(tire?.position.y).toBeCloseTo(attachment.position.y, 6)
+        expect(tire?.position.z).toBeCloseTo(attachment.position.z, 6)
+        const geometry = tire?.geometry as THREE.CylinderGeometry | undefined
+        expect(geometry?.parameters.radiusTop).toBeCloseTo(dimensions.wheelRadius, 6)
+        expect(geometry?.parameters.height).toBeCloseTo(dimensions.wheelWidth, 6)
+      }
+
+      const bounds = boundsOf(wheelRoot)
+      expect(bounds.min.y, wheelOption).toBeGreaterThanOrEqual(-0.01)
+      if (wheelOption === 'offroad') {
+        expect(wheelRoot.getObjectByName('car-offroad-tread-frontLeft-0')).toBeDefined()
+      }
+      if (wheelOption === 'racing') {
+        expect(wheelRoot.getObjectByName('car-racing-rim-ring-frontLeft')).toBeDefined()
+        expect(wheelRoot.getObjectByName('car-racing-spoke-frontLeft-0')).toBeDefined()
+      }
+      model.dispose()
+    }
+  })
+
   test('5種類すべてで車全体が地面より上にあり、地面へ潜っていない', () => {
     for (const option of CAR_CATEGORIES.body.options) {
       const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id))
       const bounds = boundsOf(model.root)
       expect(bounds.min.y, option.id).toBeGreaterThanOrEqual(-0.01)
       model.dispose()
+    }
+  })
+
+  test('5ボディ×4タイヤの全組み合わせで4輪と車体の範囲が有限', () => {
+    for (const bodyOption of CAR_CATEGORIES.body.options) {
+      for (const wheelOption of CAR_CATEGORIES.wheel.options) {
+        const config = selectCarOption(
+          selectCarOption(DEFAULT_CAR_CONFIG, 'body', bodyOption.id),
+          'wheel',
+          wheelOption.id,
+        )
+        const model = createCarModel(config)
+        const wheelRoot = layerOf(model.root, 'wheel').children[0]
+        if (wheelRoot === undefined) throw new Error('タイヤが生成されていません')
+        const tireMeshes = wheelRoot.children.filter((child) => child.name.startsWith('car-wheel-tire-'))
+        expect(tireMeshes, bodyOption.id + '/' + wheelOption.id).toHaveLength(4)
+
+        const bounds = boundsOf(model.root)
+        expect(bounds.min.y, bodyOption.id + '/' + wheelOption.id).toBeGreaterThanOrEqual(-0.01)
+        expect(
+          [bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z].every(Number.isFinite),
+          bodyOption.id + '/' + wheelOption.id,
+        ).toBe(true)
+        model.dispose()
+      }
     }
   })
 })
