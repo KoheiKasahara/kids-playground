@@ -359,8 +359,8 @@ describe('FlagRollMazePlay', () => {
     expect(screen.getByRole('button', { name: 'スタートに もどる' })).toBeInTheDocument()
   })
 
-  it('最後のアスレチックステージではつぎのステージを出さない', () => {
-    renderPlay('athletic')
+  it('最後の大砲ステージではつぎのステージを出さない', () => {
+    renderPlay('cannon')
     act(() => engineMock.options!.onGoal())
 
     expect(screen.queryByRole('button', { name: 'つぎの ステージ' })).toBeNull()

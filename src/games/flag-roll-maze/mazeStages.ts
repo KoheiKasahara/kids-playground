@@ -651,6 +651,130 @@ const ATHLETIC_STAGE_STAR_CELLS: readonly (CellCoordinate & { y?: number })[] = 
   { column: 8.6, row: 22.7, y: 0 },
 ]
 
+/**
+ * 大砲を順番に乗り継ぐ、7マス幅の専用コース。
+ * 大砲の発射を邪魔する内部壁は置かず、左右の壁だけで弾道を見失わない範囲に収める。
+ */
+const CANNON_STAGE_ROWS = [
+  '#############',
+  '###...S...###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '###...G...###',
+  '###.......###',
+  '###.......###',
+  '###.......###',
+  '#############',
+] as const
+
+/** 発射後の弾道が次の砲口へ向くよう、既存大砲の +z 基準角を指定する。 */
+const CANNON_STAGE_GIMMICKS: readonly GimmickPlacement[] = [
+  {
+    kind: 'cannon',
+    id: 'cannon-intro-1',
+    cell: { column: 6, row: 3.2 },
+    elevationRad: (42 * Math.PI) / 180,
+    headingRad: Math.atan2(0.945, 4.347),
+    speed: 7.6,
+  },
+  {
+    kind: 'cannon',
+    id: 'cannon-intro-2',
+    cell: { column: 6.5, row: 5.5 },
+    elevationRad: (42 * Math.PI) / 180,
+    headingRad: Math.atan2(-1.89, 5.67),
+    speed: 7.6,
+  },
+  {
+    kind: 'cannon',
+    id: 'cannon-middle-1',
+    cell: { column: 5.5, row: 8.5 },
+    elevationRad: (42 * Math.PI) / 180,
+    headingRad: Math.atan2(1.89, 4.347),
+    speed: 7.6,
+  },
+  {
+    kind: 'cannon',
+    id: 'cannon-middle-2',
+    cell: { column: 6.5, row: 10.8 },
+    elevationRad: (42 * Math.PI) / 180,
+    // 次の砲台までは一度だけ短く転がる区間にする。
+    headingRad: Math.atan2(-0.945, 7.371),
+    speed: 7.6,
+  },
+  {
+    kind: 'cannon',
+    id: 'cannon-final-1',
+    cell: { column: 6, row: 14.7 },
+    elevationRad: (42 * Math.PI) / 180,
+    headingRad: Math.atan2(-0.945, 4.347),
+    speed: 7.6,
+  },
+  {
+    kind: 'cannon',
+    id: 'cannon-final-2',
+    cell: { column: 5.5, row: 17.0 },
+    elevationRad: (42 * Math.PI) / 180,
+    headingRad: Math.atan2(1.89, 4.347),
+    speed: 7.6,
+  },
+  {
+    kind: 'cannon',
+    id: 'cannon-final-3',
+    cell: { column: 6.5, row: 19.3 },
+    elevationRad: (42 * Math.PI) / 180,
+    headingRad: Math.atan2(-0.945, 4.347),
+    speed: 7.6,
+  },
+  {
+    kind: 'cannon',
+    id: 'cannon-final-4',
+    cell: { column: 6, row: 21.6 },
+    elevationRad: (42 * Math.PI) / 180,
+    headingRad: 0,
+    speed: 7.6,
+  },
+]
+
+/** 各砲台の後ろへ順に復帰地点を置き、失敗しても直前の乗り継ぎから再挑戦できるようにする。 */
+const CANNON_STAGE_CHECKPOINT_CELLS: readonly CellCoordinate[] = [
+  { column: 6, row: 1 },
+  { column: 6.5, row: 5.5 },
+  { column: 5.5, row: 8.5 },
+  { column: 6.5, row: 10.8 },
+  { column: 6, row: 14.7 },
+  { column: 5.5, row: 17.0 },
+  { column: 6.5, row: 19.3 },
+  { column: 6, row: 21.6 },
+]
+
+/** 星は弾道の中心から外し、乗り継ぎを邪魔しない寄り道の収集要素にする。 */
+const CANNON_STAGE_STAR_CELLS: readonly CellCoordinate[] = [
+  { column: 8, row: 4 },
+  { column: 4, row: 13 },
+  { column: 8, row: 23 },
+]
+
 export const MAZE_STAGES: readonly MazeStageDefinition[] = [
   {
     id: 'kantan',
@@ -713,6 +837,16 @@ export const MAZE_STAGES: readonly MazeStageDefinition[] = [
     gimmicks: ATHLETIC_STAGE_GIMMICKS,
     checkpointCells: ATHLETIC_STAGE_CHECKPOINT_CELLS,
     starCells: ATHLETIC_STAGE_STAR_CELLS,
+  },
+  {
+    id: 'cannon',
+    nameJa: '大砲',
+    emoji: '💥',
+    hintJa: 'とんで つぎへ',
+    rows: CANNON_STAGE_ROWS,
+    gimmicks: CANNON_STAGE_GIMMICKS,
+    checkpointCells: CANNON_STAGE_CHECKPOINT_CELLS,
+    starCells: CANNON_STAGE_STAR_CELLS,
   },
 ]
 
