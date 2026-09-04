@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import BlockPuzzlePlay from './BlockPuzzlePlay'
 import { BLOCK_SHAPES } from './blockShapes'
@@ -32,6 +32,52 @@ const setup = () => {
   const user = userEvent.setup()
   renderPlay()
   return user
+}
+
+/**
+ * ドラッグの座標計算は、実際の描画サイズ（getBoundingClientRect）から
+ * 1マスぶんのpxを求める。jsdomはレイアウトを持たず常に0を返すため、
+ * ここだけ盤面を1マス60px・6×8マスとして固定した矩形を用意する。
+ */
+const CELL_PX = 60
+let restoreBoardRect: (() => void) | null = null
+
+function mockBoardRect() {
+  const original = Element.prototype.getBoundingClientRect
+  Element.prototype.getBoundingClientRect = () =>
+    ({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      width: BOARD_COLS * CELL_PX,
+      height: BOARD_ROWS * CELL_PX,
+      right: BOARD_COLS * CELL_PX,
+      bottom: BOARD_ROWS * CELL_PX,
+      toJSON() {
+        return {}
+      },
+    }) as DOMRect
+  restoreBoardRect = () => {
+    Element.prototype.getBoundingClientRect = original
+  }
+}
+
+afterEach(() => {
+  restoreBoardRect?.()
+  restoreBoardRect = null
+})
+
+/** マス（1始まりの「よこ・たて」）の中心にあたる画面座標。 */
+function cellClientPoint(col: number, row: number) {
+  return { clientX: (col - 0.5) * CELL_PX, clientY: (row - 0.5) * CELL_PX }
+}
+
+/** 盤面上のパーツを、あるマスから別のマスへドラッグする。 */
+function dragCell(pointerId: number, from: [number, number], to: [number, number]) {
+  fireEvent.pointerDown(cellButton(...from), { pointerId, ...cellClientPoint(...from) })
+  fireEvent.pointerMove(window, { pointerId, ...cellClientPoint(...to) })
+  fireEvent.pointerUp(window, { pointerId, ...cellClientPoint(...to) })
 }
 
 describe('ブロックパズル: 画面と操作', () => {
@@ -297,7 +343,7 @@ describe('ブロックパズル: 配置済みパーツの回転', () => {
     expect(cellContent(3, 2)).toBe('あき')
   })
 
-  test('回転すると盤面外へ出る場合は拒否し、向きと位置を保つ', async () => {
+  test('回転すると盤面外へ出る場合でも向きは変わり、直すまでの案内が出る（#483）', async () => {
     const user = setup()
     await user.click(shapeButton('ながいぼう'))
     // いちばん下の行に横4マスで置く。
@@ -305,13 +351,16 @@ describe('ブロックパズル: 配置済みパーツの回転', () => {
     await user.click(cellButton(1, BOARD_ROWS))
     await user.click(rotateButton())
 
-    expect(screen.getByRole('status')).toHaveTextContent('ここでは まわせないよ')
-    for (const col of [1, 2, 3, 4]) {
-      expect(cellContent(col, BOARD_ROWS)).toBe('ながいぼう せんたくちゅう')
+    expect(screen.getByRole('status')).toHaveTextContent('はみだしているよ')
+    // 縦にまわり、盤面内に収まる先頭のマスだけが「ながいぼう」のまま残る
+    // （残り3マスぶんは盤面の外へ出て、もとの横並びのマスは空く）。
+    expect(cellContent(1, BOARD_ROWS)).toBe('ながいぼう せんたくちゅう')
+    for (const col of [2, 3, 4]) {
+      expect(cellContent(col, BOARD_ROWS)).toBe('あき')
     }
   })
 
-  test('回転すると他パーツと重なる場合は拒否し、向きと位置を保つ', async () => {
+  test('回転すると他パーツと重なる場合でも向きは変わり、直すまでの案内が出る（#483）', async () => {
     const user = setup()
     await user.click(shapeButton('ながいぼう'))
     await user.click(cellButton(1, 1)) // よこ1〜4, たて1
@@ -321,11 +370,55 @@ describe('ブロックパズル: 配置済みパーツの回転', () => {
     await user.click(cellButton(1, 1)) // ながいぼうを選択
     await user.click(rotateButton())
 
-    expect(screen.getByRole('status')).toHaveTextContent('ここでは まわせないよ')
-    for (const col of [1, 2, 3, 4]) {
-      expect(cellContent(col, 1)).toBe('ながいぼう せんたくちゅう')
+    expect(screen.getByRole('status')).toHaveTextContent('はみだしているよ')
+    // 縦にまわった「ながいぼう」と「1マス」が (1,3) で重なり、
+    // あとから置かれた「1マス」がそのマスの表示を持つ。
+    for (const row of [1, 2, 4]) {
+      expect(cellContent(1, row)).toBe('ながいぼう せんたくちゅう')
     }
     expect(cellContent(1, 3)).toBe('1マス')
+  })
+
+  test('はみ出た状態のまま別の形を選ぼうとすると、直すまで案内される（#483）', async () => {
+    const user = setup()
+    await user.click(shapeButton('ながいぼう'))
+    await user.click(cellButton(1, BOARD_ROWS))
+    await user.click(cellButton(1, BOARD_ROWS))
+    await user.click(rotateButton())
+    expect(screen.getByRole('status')).toHaveTextContent('はみだしているよ')
+
+    await user.click(shapeButton('1マス'))
+    expect(screen.getByRole('status')).toHaveTextContent('さきに')
+    // 形の選択も切り替わらない。
+    expect(shapeButton('ながいぼう')).toHaveAttribute('aria-pressed', 'false')
+    expect(shapeButton('1マス')).toHaveAttribute('aria-pressed', 'false')
+
+    // 直す（あいている場所へ動かす）と、確定した通常の案内に戻る。
+    await user.click(cellButton(2, 2))
+    expect(screen.getByRole('status')).toHaveTextContent('うごかしたい ばしょを タップしてね')
+  })
+
+  test('はみ出た状態のまま別の配置済みパーツを選ぼうとすると、直すまで案内される（#483）', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(5, 1)) // block-1: 1マス（他の場所に確定済み）
+
+    await user.click(shapeButton('ながいぼう'))
+    await user.click(cellButton(1, BOARD_ROWS)) // block-2
+    await user.click(cellButton(1, BOARD_ROWS)) // block-2を選択
+    await user.click(rotateButton())
+    expect(screen.getByRole('status')).toHaveTextContent('はみだしているよ')
+
+    // 別のパーツ（block-1）をタップしても選択は切り替わらない。
+    await user.click(cellButton(5, 1))
+    expect(screen.getByRole('status')).toHaveTextContent('さきに')
+    expect(cellContent(5, 1)).toBe('1マス')
+    expect(cellContent(1, BOARD_ROWS)).toBe('ながいぼう せんたくちゅう')
+
+    // 自分自身の選択解除も、直すまではさせない。
+    await user.click(cellButton(1, BOARD_ROWS))
+    expect(screen.getByRole('status')).toHaveTextContent('さきに')
+    expect(cellContent(1, BOARD_ROWS)).toBe('ながいぼう せんたくちゅう')
   })
 })
 
@@ -515,6 +608,87 @@ describe('ブロックパズル: ぜんぶけす（#482）', () => {
     await user.click(cellButton(2, 2))
     for (const row of [2, 3, 4, 5]) {
       expect(cellContent(2, row)).toBe('ながいぼう')
+    }
+  })
+})
+
+describe('ブロックパズル: ドラッグでの移動・入れ替え（#483）', () => {
+  test('あいている場所へドラッグすると移動する', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+
+    mockBoardRect()
+    dragCell(1, [2, 2], [5, 6])
+
+    expect(cellContent(2, 2)).toBe('あき')
+    expect(cellContent(5, 6)).toBe('1マス せんたくちゅう')
+  })
+
+  test('しきい値を超えて動かさない（タップ扱いの）場合はドラッグとして扱わない', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+
+    mockBoardRect()
+    // 1マス未満のわずかな動き。移動にはならない。
+    fireEvent.pointerDown(cellButton(2, 2), { pointerId: 1, clientX: 90, clientY: 90 })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 92, clientY: 91 })
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 92, clientY: 91 })
+
+    expect(cellContent(2, 2)).toBe('1マス')
+    // ドラッグ扱いされなかったので、続く click はふつうのタップとして選択する。
+    await user.click(cellButton(2, 2))
+    expect(cellContent(2, 2)).toBe('1マス せんたくちゅう')
+  })
+
+  test('ちょうど1つのパーツと重なる場所へドラッグすると入れ替わる', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(1, 1))
+    await user.click(shapeButton('2マス'))
+    await user.click(cellButton(4, 4)) // よこ4〜5, たて4
+
+    mockBoardRect()
+    dragCell(1, [1, 1], [4, 4])
+
+    expect(cellContent(1, 1)).toBe('2マス')
+    expect(cellContent(2, 1)).toBe('2マス')
+    expect(cellContent(4, 4)).toBe('1マス せんたくちゅう')
+    expect(cellContent(5, 4)).toBe('あき')
+  })
+
+  test('複数パーツにまたがる／盤面外へのドラッグは失敗し、元の位置へ戻る', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(1, 1))
+    await user.click(cellButton(2, 1))
+    await user.click(shapeButton('2マス'))
+    await user.click(cellButton(5, 5))
+
+    mockBoardRect()
+    dragCell(1, [5, 5], [1, 1])
+
+    expect(cellContent(1, 1)).toBe('1マス')
+    expect(cellContent(2, 1)).toBe('1マス')
+    expect(cellContent(5, 5)).toBe('2マス')
+    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+  })
+
+  test('はみ出た状態のパーツも、ドラッグしてあいている場所へ動かせば直る（#483）', async () => {
+    const user = setup()
+    await user.click(shapeButton('ながいぼう'))
+    await user.click(cellButton(1, BOARD_ROWS))
+    await user.click(cellButton(1, BOARD_ROWS))
+    await user.click(rotateButton())
+    expect(screen.getByRole('status')).toHaveTextContent('はみだしているよ')
+
+    mockBoardRect()
+    dragCell(1, [1, BOARD_ROWS], [3, 3])
+
+    expect(screen.getByRole('status')).toHaveTextContent('うごかしたい ばしょを タップしてね')
+    for (const row of [3, 4, 5, 6]) {
+      expect(cellContent(3, row)).toBe('ながいぼう せんたくちゅう')
     }
   })
 })

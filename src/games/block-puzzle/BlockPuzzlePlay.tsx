@@ -1,13 +1,21 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import BlockPiece from './BlockPiece'
 import { BOARD_COLS, BOARD_ROWS, allBoardCells, cellKey, type BoardCell } from './board'
 import { BLOCK_SHAPES, blockShape, shapeCells, type BlockShapeId } from './blockShapes'
-import { cellBounds } from './blockRendering'
+import { cellBounds, cellBoundsPercent } from './blockRendering'
 import { cellOwners, isBoardFull, placedBlockCells } from './placement'
 import {
   createBlockPuzzleState,
   deleteSelectedPlacedBlock,
+  isSelectedPlacedBlockConfirmed,
+  moveOrSwapPlacedBlock,
   moveSelectedPlacedBlock,
   placeSelectedBlock,
   resetBoard,
@@ -23,10 +31,31 @@ import styles from './BlockPuzzlePlay.module.css'
 const HINT_MESSAGE = 'かたちを えらんで、ばんめんを タップしてね'
 const MOVE_HINT_MESSAGE = 'うごかしたい ばしょを タップしてね'
 const CANNOT_PLACE_MESSAGE = 'ここには おけないよ'
-const CANNOT_ROTATE_MESSAGE = 'ここでは まわせないよ'
+/** #483: 回転は常に成功するが、その結果はみ出た／重なったままのときの案内。 */
+const UNCONFIRMED_MESSAGE = 'はみだしているよ。うごかして なおしてね'
+/** #483: はみ出たパーツを直す前に、他のパーツ／形を選ぼうとしたときの案内。 */
+const CANNOT_SWITCH_MESSAGE = 'さきに ここを なおしてね'
 
 /** 直前の操作で置けなかった／動かせなかったマス。 */
 type InvalidCell = { readonly cell: BoardCell } | null
+
+/**
+ * ドラッグでつまみ上げている最中の一時状態（#483）。ゲームの正本（BlockPuzzleState）には
+ * 含めない。指を離すまでは盤面には何も書き込まず、見た目の追従だけに使う。
+ */
+type DragState = {
+  readonly pointerId: number
+  readonly blockId: string
+  readonly originAnchor: BoardCell
+  readonly currentAnchor: BoardCell
+  readonly startClientX: number
+  readonly startClientY: number
+  /** 指がしきい値を超えて動いたか。タップと区別するためだけに使う。 */
+  readonly moved: boolean
+} | null
+
+/** タップとドラッグを区別するしきい値（px）。指のわずかな揺れをタップ扱いにする。 */
+const DRAG_THRESHOLD_PX = 10
 
 /**
  * 完成した瞬間に盤面のまわりで弾けるキラキラ。位置(%)と遅れ(ms)だけの静的な飾りで、
@@ -43,29 +72,36 @@ const CELEBRATION_SPARKLES: readonly { left: number; top: number; delayMs: numbe
 ]
 
 /**
- * ブロックパズル（#480 Phase 1 + #481 Phase 2 + #482 Phase 3）。
+ * ブロックパズル（#480 Phase 1 + #481 Phase 2 + #482 Phase 3 + #483 Phase 4）。
  *
  * Phase 1は「パーツ一覧で形を選ぶ → 盤面のマスをタップして置く」だけ、
  * Phase 2では置いたあとも自由に試行錯誤できるよう
  * 「まわす（未配置・配置済み共通）」「盤面上パーツの選択」「移動」「けす」を追加した。
  * Phase 3では遊びとして完成させるため、全マスが埋まったときだけの完成演出（できた！＋
- * もういっかい）と、プレイ途中でも盤面全体を空にできる「ぜんぶけす」を追加する。
+ * もういっかい）と、プレイ途中でも盤面全体を空にできる「ぜんぶけす」を追加した。
+ * Phase 4では、選択中パーツの縁取りを囲む長方形ではなく形なりにし（BlockPiece側）、
+ * 配置済みパーツの回転を常に成功させて「はみ出た／重なったまま」の状態を許し、
+ * ドラッグでの移動・入れ替えを追加した。
+ *
  * 落下・ライン消去・時間制限・スコア・ゲームオーバー・ランダム配布は最後まで持たず、
  * 操作が不正なとき（盤面外／重なり）も失敗にはせず、短いことばと赤いわくで知らせるだけにしている。
  *
  * 盤面の正本は state.placedBlocks（配置済みブロックの配列）で、
  * このコンポーネントはそこから描画を導出するだけ。マスの色を直接書き換えることはしない。
  * 完成判定（isBoardFull）も同じ配列から毎回導くだけで、専用のフラグは状態に持たない。
+ * ドラッグ中の一時的な見た目（DragState）だけは例外的にこのコンポーネントのローカル状態
+ * （盤面の正本の外）に持ち、指を離した瞬間にだけ正本へ反映する。
  */
 export default function BlockPuzzlePlay() {
   const navigate = useNavigate()
   const [state, setState] = useState<BlockPuzzleState>(createBlockPuzzleState)
   /**
    * 直前の操作で拒否されたフィードバック。「置けない」「動かせない」はマス、
-   * 「まわせない」はマスを持たないので分けて持つ。次の操作まで残す（時間で消さないので動きが読みやすい）。
+   * 「よそを選ぼうとした」はマスを持たないので分けて持つ。次の操作まで残す（時間で消さないので動きが読みやすい）。
    */
   const [invalidCell, setInvalidCell] = useState<InvalidCell>(null)
-  const [rotateBlocked, setRotateBlocked] = useState(false)
+  /** はみ出た／重なったパーツを直す前に、他のパーツや形を選ぼうとしたときの案内（#483）。 */
+  const [switchBlocked, setSwitchBlocked] = useState(false)
   /** 「ぜんぶけす」の確認中かどうか（誤操作防止のため、押した瞬間には消さない）。 */
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   /** 完成演出（キラキラ）を作り直すための世代番号。完成するたびに1つ進める。 */
@@ -73,10 +109,35 @@ export default function BlockPuzzlePlay() {
   /** 直前の描画時点で完成していたか。「いま完成した瞬間」だけを検出するために持つ。 */
   const wasCompleteRef = useRef(false)
 
+  /** ドラッグ中の一時状態。再描画のトリガー用（実体は dragRef）。 */
+  const [dragPreview, setDragPreview] = useState<DragState>(null)
+  const dragRef = useRef<DragState>(null)
+  /** ドラッグ直後に発火する click を無視するためのフラグ（タップとの二重処理を防ぐ）。 */
+  const dragMovedRef = useRef(false)
+  /** ピクセル→マスの変換に使う、盤面の実表示範囲（#483）。 */
+  const blockLayerRef = useRef<HTMLDivElement>(null)
+  /** window イベントリスナーから常に最新の state を読むための参照。 */
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  })
+
+  /**
+   * 直前のフィードバックをまとめて消す。「ぜんぶけす」の確認もここに含めるのは、
+   * 確認を出したあとに他の操作（形を選ぶ・置く・まわす・けす）を始めたら、
+   * 確認画面を出したままにしないため。
+   */
+  const clearFeedback = () => {
+    setInvalidCell(null)
+    setSwitchBlocked(false)
+    setResetConfirmOpen(false)
+  }
+
   const owners = cellOwners(state.placedBlocks)
   const selectedPlacedBlock = state.selectedPlacedBlockId
     ? (state.placedBlocks.find((block) => block.id === state.selectedPlacedBlockId) ?? null)
     : null
+  const isSelectedConfirmed = isSelectedPlacedBlockConfirmed(state)
   const isComplete = isBoardFull(state.placedBlocks)
 
   /**
@@ -95,24 +156,100 @@ export default function BlockPuzzlePlay() {
   }, [isComplete])
 
   /**
-   * 直前のフィードバックをまとめて消す。「ぜんぶけす」の確認もここに含めるのは、
-   * 確認を出したあとに他の操作（形を選ぶ・置く・まわす・けす）を始めたら、
-   * 確認画面を出したままにしないため。
+   * ドラッグの追従・確定を window レベルの pointermove / pointerup で行う（#483）。
+   * 盤面のマスボタンは pointerdown だけ受け、指が盤面の外へ出ても追従・確定できるよう
+   * window で拾う。マウント時に一度だけ張り、常に ref 経由で最新の状態を読むことで
+   * 依存配列を空のままにし、張り直しのたびに購読が切れる不具合を避けている。
    */
-  const clearFeedback = () => {
-    setInvalidCell(null)
-    setRotateBlocked(false)
-    setResetConfirmOpen(false)
-  }
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const current = dragRef.current
+      if (!current || event.pointerId !== current.pointerId) return
+      const rect = blockLayerRef.current?.getBoundingClientRect()
+      if (!rect || rect.width === 0 || rect.height === 0) return
+
+      const cellWidth = rect.width / BOARD_COLS
+      const cellHeight = rect.height / BOARD_ROWS
+      const dxCells = Math.round((event.clientX - current.startClientX) / cellWidth)
+      const dyCells = Math.round((event.clientY - current.startClientY) / cellHeight)
+      const moved =
+        current.moved ||
+        Math.abs(event.clientX - current.startClientX) > DRAG_THRESHOLD_PX ||
+        Math.abs(event.clientY - current.startClientY) > DRAG_THRESHOLD_PX
+      const nextAnchor: BoardCell = {
+        col: current.originAnchor.col + dxCells,
+        row: current.originAnchor.row + dyCells,
+      }
+      if (
+        moved === current.moved &&
+        nextAnchor.col === current.currentAnchor.col &&
+        nextAnchor.row === current.currentAnchor.row
+      ) {
+        return
+      }
+      const next = { ...current, currentAnchor: nextAnchor, moved }
+      dragRef.current = next
+      setDragPreview(next)
+    }
+
+    /** 指を離した／ドラッグが中断されたときの確定処理。 */
+    const finishDrag = (event: PointerEvent) => {
+      const current = dragRef.current
+      if (!current || event.pointerId !== current.pointerId) return
+      dragRef.current = null
+      setDragPreview(null)
+      if (!current.moved) return
+
+      // 実際に動かしたドラッグだけ、続けて発火する click（タップ扱い）を無視させる。
+      dragMovedRef.current = true
+      const result = moveOrSwapPlacedBlock(stateRef.current, current.blockId, current.currentAnchor)
+      if (result) {
+        setState(result)
+        clearFeedback()
+      } else {
+        setInvalidCell({ cell: current.currentAnchor })
+      }
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', finishDrag)
+    window.addEventListener('pointercancel', finishDrag)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', finishDrag)
+      window.removeEventListener('pointercancel', finishDrag)
+    }
+  }, [])
 
   const handleSelectShape = (shapeId: BlockShapeId) => {
+    if (selectedPlacedBlock && !isSelectedConfirmed) {
+      // はみ出た／重なったパーツを直す前に形を選ぼうとした：直すまで待たせる。
+      setSwitchBlocked(true)
+      return
+    }
     setState(selectShape(state, shapeId))
     clearFeedback()
   }
 
   const handleTapCell = (cell: BoardCell) => {
+    if (dragMovedRef.current) {
+      // 直前のドラッグの終わりに続けて発火した click。すでにドラッグ側で処理済み。
+      dragMovedRef.current = false
+      return
+    }
+
     const owner = owners.get(cellKey(cell))
     if (owner) {
+      if (state.selectedPlacedBlockId && state.selectedPlacedBlockId !== owner.id && !isSelectedConfirmed) {
+        // 選んでいるパーツがはみ出た／重なったままのとき、別のパーツはつかめない。
+        setSwitchBlocked(true)
+        return
+      }
+      if (state.selectedPlacedBlockId === owner.id && !isSelectedConfirmed) {
+        // まだ確定していない自分自身の選択解除も、直すまではさせない。
+        setSwitchBlocked(true)
+        return
+      }
       // 配置済みパーツをタップ：その1パーツ全体を選ぶ（もう一度タップで選択解除）。
       setState(selectPlacedBlock(state, owner.id))
       clearFeedback()
@@ -120,7 +257,8 @@ export default function BlockPuzzlePlay() {
     }
 
     if (state.selectedPlacedBlockId) {
-      // 配置済みパーツ選択中：あいているマスは移動先として扱う。
+      // 配置済みパーツ選択中：あいているマスは移動先として扱う
+      // （はみ出た／重なったままのパーツを直す操作もここを通る）。
       const moved = moveSelectedPlacedBlock(state, cell)
       if (!moved) {
         setInvalidCell({ cell })
@@ -140,14 +278,33 @@ export default function BlockPuzzlePlay() {
     clearFeedback()
   }
 
+  /** 盤面のマスを押し始めた瞬間（#483）。パーツの上ならドラッグの開始候補にする。 */
+  const handleCellPointerDown = (cell: BoardCell, event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const owner = owners.get(cellKey(cell))
+    if (!owner) return
+    if (state.selectedPlacedBlockId && state.selectedPlacedBlockId !== owner.id && !isSelectedConfirmed) {
+      // はみ出た／重なったパーツを直す前は、他のパーツのドラッグも始めさせない。
+      return
+    }
+
+    const next: DragState = {
+      pointerId: event.pointerId,
+      blockId: owner.id,
+      originAnchor: owner.anchor,
+      currentAnchor: owner.anchor,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      moved: false,
+    }
+    dragRef.current = next
+    setDragPreview(next)
+  }
+
   const handleRotate = () => {
     if (state.selectedPlacedBlockId) {
       const rotated = rotateSelectedPlacedBlock(state)
-      if (!rotated) {
-        setInvalidCell(null)
-        setRotateBlocked(true)
-        return
-      }
+      if (!rotated) return
       setState(rotated)
       clearFeedback()
       return
@@ -192,10 +349,12 @@ export default function BlockPuzzlePlay() {
 
   const message = invalidCell
     ? CANNOT_PLACE_MESSAGE
-    : rotateBlocked
-      ? CANNOT_ROTATE_MESSAGE
+    : switchBlocked
+      ? CANNOT_SWITCH_MESSAGE
       : selectedPlacedBlock
-        ? MOVE_HINT_MESSAGE
+        ? isSelectedConfirmed
+          ? MOVE_HINT_MESSAGE
+          : UNCONFIRMED_MESSAGE
         : HINT_MESSAGE
 
   return (
@@ -239,25 +398,44 @@ export default function BlockPuzzlePlay() {
                 style={{ gridColumn: cell.col + 1, gridRow: cell.row + 1 }}
                 aria-label={label}
                 onClick={() => handleTapCell(cell)}
+                onPointerDown={(event) => handleCellPointerDown(cell, event)}
               />
             )
           })}
 
-          {/* 置いたブロックはマス目の上に重ねて描く。タップは下のマスのボタンが受ける。 */}
-          <div className={styles.blockLayer} aria-hidden="true">
+          {/* 置いたブロックはマス目の上に重ねて描く。タップは下のマスのボタンが受ける。
+              位置は盤面に対する割合(%)で決める（#483）。回転で盤面外へはみ出た
+              まだ確定していないパーツも、CSS Gridの行番号に頼らずそのまま描ける。 */}
+          <div
+            className={styles.blockLayer}
+            aria-hidden="true"
+            ref={blockLayerRef}
+            data-testid="block-puzzle-block-layer"
+          >
             {state.placedBlocks.map((block) => {
-              const cells = placedBlockCells(block)
-              const bounds = cellBounds(cells)
               const isSelected = block.id === state.selectedPlacedBlockId
+              const isDragging = dragPreview !== null && dragPreview.blockId === block.id && dragPreview.moved
+              const renderBlock = isDragging ? { ...block, anchor: dragPreview!.currentAnchor } : block
+              const cells = placedBlockCells(renderBlock)
+              const bounds = cellBounds(cells)
+              const rect = cellBoundsPercent(bounds, BOARD_COLS, BOARD_ROWS)
+              const unconfirmed = isSelected && !isDragging && !isSelectedConfirmed
               return (
                 <BlockPiece
                   key={block.id}
                   shape={blockShape(block.shapeId)}
                   cells={cells}
-                  className={`${styles.placedBlock} ${isSelected ? styles.selectedPlacedBlock : ''}`}
+                  selected={isSelected && !isDragging}
+                  unconfirmed={unconfirmed}
+                  dragging={isDragging}
+                  className={`${styles.placedBlock} ${isSelected ? styles.selectedPlacedBlock : ''} ${
+                    isDragging ? styles.draggingPlacedBlock : ''
+                  }`}
                   style={{
-                    gridColumn: `${bounds.minCol + 1} / span ${bounds.cols}`,
-                    gridRow: `${bounds.minRow + 1} / span ${bounds.rows}`,
+                    left: `${rect.leftPercent}%`,
+                    top: `${rect.topPercent}%`,
+                    width: `${rect.widthPercent}%`,
+                    height: `${rect.heightPercent}%`,
                   }}
                 />
               )
@@ -268,7 +446,12 @@ export default function BlockPuzzlePlay() {
             {invalidCell ? (
               <span
                 className={styles.invalidCell}
-                style={{ gridColumn: invalidCell.cell.col + 1, gridRow: invalidCell.cell.row + 1 }}
+                style={{
+                  left: `${(invalidCell.cell.col / BOARD_COLS) * 100}%`,
+                  top: `${(invalidCell.cell.row / BOARD_ROWS) * 100}%`,
+                  width: `${(1 / BOARD_COLS) * 100}%`,
+                  height: `${(1 / BOARD_ROWS) * 100}%`,
+                }}
               />
             ) : null}
           </div>

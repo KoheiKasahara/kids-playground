@@ -4,6 +4,8 @@ import { isBoardFull } from './placement'
 import {
   createBlockPuzzleState,
   deleteSelectedPlacedBlock,
+  isSelectedPlacedBlockConfirmed,
+  moveOrSwapPlacedBlock,
   moveSelectedPlacedBlock,
   placeSelectedBlock,
   resetBoard,
@@ -158,31 +160,114 @@ describe('blockPuzzleState: 配置済みパーツの回転', () => {
     expect(rotated!.selectedPlacedBlockId).toBe('block-1')
   })
 
-  test('回転すると盤面外へ出る場合はnullを返し、状態を変えない', () => {
+  test('回転すると盤面外へ出る場合でも回転は成功し、まだ確定していない状態になる（#483）', () => {
     let state = selectShape(createBlockPuzzleState(), 'i')
     // 横4マスをいちばん下の行ぴったりに置く。縦へ回すとはみ出す。
     state = place(state, 0, BOARD_ROWS - 1)
     state = selectPlacedBlock(state, 'block-1')
+    expect(isSelectedPlacedBlockConfirmed(state)).toBe(true)
+
     const rotated = rotateSelectedPlacedBlock(state)
-    expect(rotated).toBeNull()
-    expect(state.placedBlocks[0]).toMatchObject({ rotation: 0, anchor: { col: 0, row: BOARD_ROWS - 1 } })
+    expect(rotated).not.toBeNull()
+    expect(rotated!.placedBlocks[0]).toMatchObject({ rotation: 90, anchor: { col: 0, row: BOARD_ROWS - 1 } })
+    // 選択もそのまま維持される（直すための操作を続けられるように）。
+    expect(rotated!.selectedPlacedBlockId).toBe('block-1')
+    expect(isSelectedPlacedBlockConfirmed(rotated!)).toBe(false)
   })
 
-  test('回転すると他パーツと重なる場合はnullを返し、状態を変えない', () => {
+  test('回転すると他パーツと重なる場合でも回転は成功し、まだ確定していない状態になる（#483）', () => {
     let state = selectShape(createBlockPuzzleState(), 'i')
     state = place(state, 0, 0)
     state = selectShape(state, 'single')
     state = place(state, 0, 2)
     state = selectPlacedBlock(state, 'block-1')
+
     const rotated = rotateSelectedPlacedBlock(state)
-    expect(rotated).toBeNull()
-    expect(state.placedBlocks).toHaveLength(2)
-    expect(state.placedBlocks[0]).toMatchObject({ rotation: 0 })
+    expect(rotated).not.toBeNull()
+    expect(rotated!.placedBlocks).toHaveLength(2)
+    expect(rotated!.placedBlocks[0]).toMatchObject({ rotation: 90 })
+    expect(isSelectedPlacedBlockConfirmed(rotated!)).toBe(false)
   })
 
   test('何も選んでいなければnullを返す', () => {
     const state = place(createBlockPuzzleState(), 0, 0)
     expect(rotateSelectedPlacedBlock(state)).toBeNull()
+  })
+})
+
+describe('blockPuzzleState: 配置済みパーツの確定判定（#483）', () => {
+  test('盤面に収まっているパーツは確定している', () => {
+    let state = place(createBlockPuzzleState(), 1, 1)
+    state = selectPlacedBlock(state, 'block-1')
+    expect(isSelectedPlacedBlockConfirmed(state)).toBe(true)
+  })
+
+  test('何も選んでいなければ確定扱い（判定の対象がない）', () => {
+    const state = place(createBlockPuzzleState(), 1, 1)
+    expect(isSelectedPlacedBlockConfirmed(state)).toBe(true)
+  })
+
+  test('あいている場所へ動かすと、はみ出た状態から確定に戻る', () => {
+    let state = selectShape(createBlockPuzzleState(), 'i')
+    state = place(state, 0, BOARD_ROWS - 1)
+    state = selectPlacedBlock(state, 'block-1')
+    state = rotateSelectedPlacedBlock(state)!
+    expect(isSelectedPlacedBlockConfirmed(state)).toBe(false)
+
+    state = moveSelectedPlacedBlock(state, { col: 3, row: 2 })!
+    expect(state).not.toBeNull()
+    expect(isSelectedPlacedBlockConfirmed(state)).toBe(true)
+  })
+})
+
+describe('blockPuzzleState: ドラッグでの移動・入れ替え（#483）', () => {
+  test('あいている場所へドラッグで動かせる', () => {
+    const state = place(createBlockPuzzleState(), 1, 1)
+    const moved = moveOrSwapPlacedBlock(state, 'block-1', { col: 4, row: 5 })
+    expect(moved).not.toBeNull()
+    expect(moved!.placedBlocks[0]).toMatchObject({ anchor: { col: 4, row: 5 } })
+    // ドラッグで動かしたパーツは選択状態になる。
+    expect(moved!.selectedPlacedBlockId).toBe('block-1')
+  })
+
+  test('盤面外へのドラッグは失敗し、元の位置を保つ', () => {
+    const state = place(createBlockPuzzleState(), 1, 1)
+    const moved = moveOrSwapPlacedBlock(state, 'block-1', { col: BOARD_COLS, row: 1 })
+    expect(moved).toBeNull()
+    expect(state.placedBlocks[0]).toMatchObject({ anchor: { col: 1, row: 1 } })
+  })
+
+  test('他パーツ1つとちょうど重なる場所へドラッグすると、お互いの場所が入れ替わる', () => {
+    let state = place(createBlockPuzzleState(), 1, 1) // block-1: 1マス
+    state = selectShape(state, 'duo')
+    state = place(state, 3, 3) // block-2: 2マス（よこ3〜4, たて3）
+
+    const swapped = moveOrSwapPlacedBlock(state, 'block-1', { col: 3, row: 3 })
+    expect(swapped).not.toBeNull()
+    expect(swapped!.placedBlocks.find((b) => b.id === 'block-1')).toMatchObject({
+      anchor: { col: 3, row: 3 },
+    })
+    expect(swapped!.placedBlocks.find((b) => b.id === 'block-2')).toMatchObject({
+      anchor: { col: 1, row: 1 },
+    })
+    expect(swapped!.selectedPlacedBlockId).toBe('block-1')
+  })
+
+  test('2つ以上のパーツにまたがる場所へのドラッグは失敗し、何も変わらない', () => {
+    let state = place(createBlockPuzzleState(), 0, 0) // block-1: 1マス
+    state = place(state, 1, 0) // block-2: 1マス
+    state = selectShape(state, 'duo')
+    state = place(state, 4, 5) // block-3: 2マス（よこ4〜5, たて5）
+
+    // block-3(2マス)を(0,0)へ動かすと、block-1・block-2の両方とまたがって重なる。
+    const result = moveOrSwapPlacedBlock(state, 'block-3', { col: 0, row: 0 })
+    expect(result).toBeNull()
+    expect(state.placedBlocks).toHaveLength(3)
+  })
+
+  test('存在しないIDを指定するとnullを返す', () => {
+    const state = place(createBlockPuzzleState(), 0, 0)
+    expect(moveOrSwapPlacedBlock(state, 'nope', { col: 1, row: 1 })).toBeNull()
   })
 })
 
