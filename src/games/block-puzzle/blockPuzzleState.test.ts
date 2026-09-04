@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { BOARD_COLS, BOARD_ROWS } from './board'
 import { isBoardFull } from './placement'
 import {
+  canMoveOrSwapPlacedBlock,
   createBlockPuzzleState,
   deleteSelectedPlacedBlock,
   isSelectedPlacedBlockConfirmed,
@@ -268,6 +269,32 @@ describe('blockPuzzleState: ドラッグでの移動・入れ替え（#483）', 
   test('存在しないIDを指定するとnullを返す', () => {
     const state = place(createBlockPuzzleState(), 0, 0)
     expect(moveOrSwapPlacedBlock(state, 'nope', { col: 1, row: 1 })).toBeNull()
+  })
+})
+
+describe('blockPuzzleState: canMoveOrSwapPlacedBlock（#510: ドラッグ着地プレビューの有効判定）', () => {
+  test('moveOrSwapPlacedBlock が成功する場所では true を返す（移動）', () => {
+    const state = place(createBlockPuzzleState(), 1, 1)
+    expect(canMoveOrSwapPlacedBlock(state, 'block-1', { col: 4, row: 5 })).toBe(true)
+  })
+
+  test('入れ替えが成立する場所でも true を返す', () => {
+    let state = place(createBlockPuzzleState(), 1, 1) // block-1
+    state = selectShape(state, 'duo')
+    state = place(state, 3, 3) // block-2
+
+    expect(canMoveOrSwapPlacedBlock(state, 'block-1', { col: 3, row: 3 })).toBe(true)
+  })
+
+  test('盤面外・複数パーツにまたがる場所では false を返す', () => {
+    const state = place(createBlockPuzzleState(), 1, 1)
+    expect(canMoveOrSwapPlacedBlock(state, 'block-1', { col: BOARD_COLS, row: 1 })).toBe(false)
+  })
+
+  test('盤面を書き換えない（判定だけを行う）', () => {
+    const state = place(createBlockPuzzleState(), 1, 1)
+    canMoveOrSwapPlacedBlock(state, 'block-1', { col: 4, row: 5 })
+    expect(state.placedBlocks[0]).toMatchObject({ anchor: { col: 1, row: 1 } })
   })
 })
 

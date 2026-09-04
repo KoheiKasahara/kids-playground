@@ -692,3 +692,210 @@ describe('ブロックパズル: ドラッグでの移動・入れ替え（#483�
     }
   })
 })
+
+describe('ブロックパズル: スマホでの安定したドラッグ（#510）', () => {
+  test('縦方向のドラッグで配置済みパーツを移動できる', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+
+    mockBoardRect()
+    dragCell(1, [2, 2], [2, 7])
+
+    expect(cellContent(2, 2)).toBe('あき')
+    expect(cellContent(2, 7)).toBe('1マス せんたくちゅう')
+  })
+
+  test('横方向のドラッグで配置済みパーツを移動できる', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(1, 3))
+
+    mockBoardRect()
+    dragCell(1, [1, 3], [6, 3])
+
+    expect(cellContent(1, 3)).toBe('あき')
+    expect(cellContent(6, 3)).toBe('1マス せんたくちゅう')
+  })
+
+  test('斜め方向のドラッグで配置済みパーツを移動できる', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(1, 1))
+
+    mockBoardRect()
+    dragCell(1, [1, 1], [4, 5])
+
+    expect(cellContent(1, 1)).toBe('あき')
+    expect(cellContent(4, 5)).toBe('1マス せんたくちゅう')
+  })
+
+  test('盤面外へ一時的に指が出てもドラッグは継続し、盤面内へ戻せば通常どおり移動できる', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(2, 2), { pointerId: 1, ...cellClientPoint(2, 2) })
+    // 盤面のずっと外まで指を動かしても、ドラッグは中断されない。
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: -500, clientY: -500 })
+    // 盤面内の別マスへ戻す。
+    fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(5, 6) })
+    fireEvent.pointerUp(window, { pointerId: 1, ...cellClientPoint(5, 6) })
+
+    expect(cellContent(2, 2)).toBe('あき')
+    expect(cellContent(5, 6)).toBe('1マス せんたくちゅう')
+  })
+
+  test('盤面外で指を離すと、配置済みパーツは消えず元の位置へ戻る', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(2, 2), { pointerId: 1, ...cellClientPoint(2, 2) })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: -500, clientY: -500 })
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: -500, clientY: -500 })
+
+    expect(cellContent(2, 2)).toBe('1マス')
+    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+  })
+
+  test('ドラッグ中に pointercancel が発生しても、置ける場所ならそのまま移動する', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(2, 2), { pointerId: 1, ...cellClientPoint(2, 2) })
+    fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(5, 6) })
+    fireEvent.pointerCancel(window, { pointerId: 1, ...cellClientPoint(5, 6) })
+
+    expect(cellContent(2, 2)).toBe('あき')
+    expect(cellContent(5, 6)).toBe('1マス せんたくちゅう')
+  })
+
+  test('盤面外での pointercancel でも、配置済みパーツは消えず元の位置へ戻る', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(2, 2), { pointerId: 1, ...cellClientPoint(2, 2) })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: -500, clientY: -500 })
+    fireEvent.pointerCancel(window, { pointerId: 1, clientX: -500, clientY: -500 })
+
+    expect(cellContent(2, 2)).toBe('1マス')
+  })
+
+  test('配置済みパーツのドラッグ中、着地候補のプレビューが配置可能／不可能で色分けされる', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(2, 2))
+
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(2, 2), { pointerId: 1, ...cellClientPoint(2, 2) })
+    fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(5, 6) })
+
+    expect(screen.getByTestId('block-puzzle-drop-preview')).toHaveAttribute('data-tone', 'valid')
+
+    // 盤面外へ出すと、形は保ったまま「置けない」プレビューに変わる。
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: -500, clientY: -500 })
+    expect(screen.getByTestId('block-puzzle-drop-preview')).toHaveAttribute('data-tone', 'invalid')
+
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: -500, clientY: -500 })
+    expect(screen.queryByTestId('block-puzzle-drop-preview')).not.toBeInTheDocument()
+  })
+
+  test('入れ替え先へのドラッグ中は、着地プレビューが配置可能として表示される', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(1, 1))
+    await user.click(shapeButton('2マス'))
+    await user.click(cellButton(4, 4))
+
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(1, 1), { pointerId: 1, ...cellClientPoint(1, 1) })
+    fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(4, 4) })
+
+    expect(screen.getByTestId('block-puzzle-drop-preview')).toHaveAttribute('data-tone', 'valid')
+
+    fireEvent.pointerUp(window, { pointerId: 1, ...cellClientPoint(4, 4) })
+    expect(cellContent(1, 1)).toBe('2マス')
+    expect(cellContent(4, 4)).toBe('1マス せんたくちゅう')
+  })
+})
+
+describe('ブロックパズル: 新規パーツのドラッグ配置とプレビュー（#510）', () => {
+  test('パーツ一覧で形を選んだ状態で盤面をドラッグすると、着地位置に配置プレビューが表示され、指を離すと配置される', () => {
+    renderPlay()
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(2, 2), { pointerId: 1, ...cellClientPoint(2, 2) })
+    fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(4, 5) })
+
+    expect(screen.getByTestId('block-puzzle-drop-preview')).toHaveAttribute('data-tone', 'valid')
+
+    fireEvent.pointerUp(window, { pointerId: 1, ...cellClientPoint(4, 5) })
+    expect(cellContent(4, 5)).toBe('1マス')
+    expect(screen.queryByTestId('block-puzzle-drop-preview')).not.toBeInTheDocument()
+  })
+
+  test('盤面外へはみ出す位置へドラッグすると、無効プレビューが表示され、指を離しても配置されない', async () => {
+    const user = setup()
+    await user.click(shapeButton('ながいぼう'))
+
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(1, 1), { pointerId: 1, ...cellClientPoint(1, 1) })
+    // 右端ぴったりへ動かすと、4マスめが盤面の外へ出て置けない。
+    fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(BOARD_COLS, 4) })
+
+    const preview = screen.getByTestId('block-puzzle-drop-preview')
+    expect(preview).toHaveAttribute('data-tone', 'invalid')
+
+    fireEvent.pointerUp(window, { pointerId: 1, ...cellClientPoint(BOARD_COLS, 4) })
+    for (const col of [BOARD_COLS - 2, BOARD_COLS - 1, BOARD_COLS]) {
+      expect(cellContent(col, 4)).toBe('あき')
+    }
+  })
+
+  test('他パーツと重なる位置へドラッグすると無効プレビューになり、配置されない', async () => {
+    const user = setup()
+    await user.click(shapeButton('しかく'))
+    await user.click(cellButton(2, 2)) // よこ2〜3, たて2〜3
+
+    await user.click(shapeButton('1マス'))
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(5, 5), { pointerId: 1, ...cellClientPoint(5, 5) })
+    fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(2, 2) })
+
+    expect(screen.getByTestId('block-puzzle-drop-preview')).toHaveAttribute('data-tone', 'invalid')
+
+    fireEvent.pointerUp(window, { pointerId: 1, ...cellClientPoint(2, 2) })
+    expect(cellContent(2, 2)).toBe('しかく')
+  })
+
+  test('しきい値未満の動きはドラッグ扱いにせず、続くタップでの配置を壊さない', () => {
+    renderPlay()
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(2, 2), { pointerId: 1, clientX: 90, clientY: 90 })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 92, clientY: 91 })
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 92, clientY: 91 })
+    expect(screen.queryByTestId('block-puzzle-drop-preview')).not.toBeInTheDocument()
+
+    fireEvent.click(cellButton(2, 2))
+    expect(cellContent(2, 2)).toBe('1マス')
+  })
+
+  test('配置済みパーツを編集中は、新規パーツのドラッグ配置を始めない', async () => {
+    const user = setup()
+    await user.click(shapeButton('1マス'))
+    await user.click(cellButton(1, 1))
+    await user.click(cellButton(1, 1)) // 配置済みパーツを選択
+
+    mockBoardRect()
+    fireEvent.pointerDown(cellButton(4, 4), { pointerId: 1, ...cellClientPoint(4, 4) })
+    fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(5, 5) })
+
+    expect(screen.queryByTestId('block-puzzle-drop-preview')).not.toBeInTheDocument()
+  })
+})
