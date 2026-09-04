@@ -346,6 +346,22 @@
   white-space: normal;
 }
 
+/* 色は幼児が見た目で選べるよう、文字や小さなチップへ詰め込まず大きく表示する。 */
+.optionList[data-category='color'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.optionList[data-category='color'] .optionButton {
+  min-height: 76px;
+}
+
+.optionList[data-category='color'] .colorChip {
+  width: 44px;
+  height: 44px;
+  border: 3px solid #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(33, 37, 41, 0.22), 0 1px 3px rgba(33, 37, 41, 0.22);
+}
+
 @media (min-width: 760px) {
   .page {
     --cb-panel-height: 240px;

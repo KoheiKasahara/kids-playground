@@ -77,6 +77,13 @@ describe('カテゴリ一覧と詳細選択の切り替え', () => {
     expect(screen.getByRole('heading', { name: 'カラー' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'あか' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'あお' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'きいろ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'みどり' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'オレンジ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ピンク' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'むらさき' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'しろ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'くろ' })).toBeInTheDocument()
     expect(screen.getByRole('application', { name: '3Dの くるま。ゆびで まわせるよ' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'タイヤを えらぶ' })).not.toBeInTheDocument()
   })
@@ -144,6 +151,28 @@ describe('ボディ5種類の選択', () => {
 })
 
 describe('選択の即時反映', () => {
+  test('9色すべてをタップすると、選んだ色が即時にCarConfigへ反映される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await user.click(screen.getByRole('button', { name: 'カラーを えらぶ' }))
+
+    for (const [label, color] of [
+      ['あか', 'red'],
+      ['あお', 'blue'],
+      ['きいろ', 'yellow'],
+      ['みどり', 'green'],
+      ['オレンジ', 'orange'],
+      ['ピンク', 'pink'],
+      ['むらさき', 'purple'],
+      ['しろ', 'white'],
+      ['くろ', 'black'],
+    ] as const) {
+      await user.click(screen.getByRole('button', { name: label }))
+      expect(latestConfig().color, label).toBe(color)
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true')
+    }
+  })
+
   test('タイヤ4種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
     const user = userEvent.setup()
     renderPlay()

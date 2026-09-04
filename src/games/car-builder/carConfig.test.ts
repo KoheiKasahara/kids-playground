@@ -80,6 +80,36 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
+  test('カラーはIssue #404の9色を、色付きプレビュー付きで持つ', () => {
+    const colors = CAR_CATEGORIES.color.options
+    expect(colors.map((option) => option.id)).toEqual([
+      'red',
+      'blue',
+      'yellow',
+      'green',
+      'orange',
+      'pink',
+      'purple',
+      'white',
+      'black',
+    ])
+    expect(colors.map((option) => option.label)).toEqual([
+      'あか',
+      'あお',
+      'きいろ',
+      'みどり',
+      'オレンジ',
+      'ピンク',
+      'むらさき',
+      'しろ',
+      'くろ',
+    ])
+    for (const option of colors) {
+      expect(option.preview.kind, option.id).toBe('color')
+      if (option.preview.kind === 'color') expect(option.preview.hex).toMatch(/^#[0-9a-f]{6}$/i)
+    }
+  })
+
   test('リアルタイム反映を確かめられるよう、複数の選択肢を持つカテゴリがある', () => {
     const multi = carCategoryOrder().filter((category) => category.options.length >= 2)
     expect(multi.length).toBeGreaterThanOrEqual(3)
@@ -131,5 +161,12 @@ describe('表示用の値の解決', () => {
     expect(resolveCarColor(selectCarOption(DEFAULT_CAR_CONFIG, 'color', 'blue'))).not.toBe(
       resolveCarColor(DEFAULT_CAR_CONFIG),
     )
+  })
+
+  test('9色すべてが異なる3D用の色値へ解決される', () => {
+    const colors = CAR_CATEGORIES.color.options.map((option) =>
+      resolveCarColor(selectCarOption(DEFAULT_CAR_CONFIG, 'color', option.id)),
+    )
+    expect(new Set(colors).size).toBe(9)
   })
 })

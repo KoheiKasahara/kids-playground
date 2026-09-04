@@ -11,7 +11,7 @@
 
 export type BodyType = 'sports' | 'suv' | 'bus' | 'truck' | 'police'
 export type WheelType = 'small' | 'big' | 'offroad' | 'racing'
-export type CarColorId = 'red' | 'blue' | 'yellow'
+export type CarColorId = 'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'pink' | 'purple' | 'white' | 'black'
 export type FrontType = 'normal' | 'round'
 export type RoofType = 'none' | 'carrier'
 export type DecorationType = 'none' | 'star'
@@ -72,6 +72,13 @@ const CAR_COLOR_HEX: Record<CarColorId, string> = {
   red: '#ef4d4d',
   blue: '#3d7bf5',
   yellow: '#ffc531',
+  green: '#42ad68',
+  orange: '#f28c28',
+  pink: '#eb5b8f',
+  purple: '#8256c7',
+  // 純白／完全な黒を避け、3D上でも陰影を読み取れる値にする。
+  white: '#e9edf2',
+  black: '#252a31',
 }
 
 export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } = {
@@ -109,6 +116,12 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'red', label: 'あか', preview: { kind: 'color', hex: CAR_COLOR_HEX.red } },
       { id: 'blue', label: 'あお', preview: { kind: 'color', hex: CAR_COLOR_HEX.blue } },
       { id: 'yellow', label: 'きいろ', preview: { kind: 'color', hex: CAR_COLOR_HEX.yellow } },
+      { id: 'green', label: 'みどり', preview: { kind: 'color', hex: CAR_COLOR_HEX.green } },
+      { id: 'orange', label: 'オレンジ', preview: { kind: 'color', hex: CAR_COLOR_HEX.orange } },
+      { id: 'pink', label: 'ピンク', preview: { kind: 'color', hex: CAR_COLOR_HEX.pink } },
+      { id: 'purple', label: 'むらさき', preview: { kind: 'color', hex: CAR_COLOR_HEX.purple } },
+      { id: 'white', label: 'しろ', preview: { kind: 'color', hex: CAR_COLOR_HEX.white } },
+      { id: 'black', label: 'くろ', preview: { kind: 'color', hex: CAR_COLOR_HEX.black } },
     ],
   },
   front: {

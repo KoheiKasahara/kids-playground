@@ -43,7 +43,10 @@ function dimensionSignature(config: CarConfig): string {
 }
 
 function layerKey(config: CarConfig, category: CarPartCategoryId): string {
-  return `${config[category]}|${dimensionSignature(config)}|${resolveCarColor(config)}`
+  // カラーは塗装を持つボディ層だけに影響する。ほかのレイヤーまで再生成すると、
+  // 色変更でライト・タイヤ・装飾のMaterialを不要に作り直すことになる。
+  const colorKey = category === 'body' ? `|${resolveCarColor(config)}` : ''
+  return `${config[category]}|${dimensionSignature(config)}${colorKey}`
 }
 
 export function createCarModel(config: CarConfig): CarModel {
