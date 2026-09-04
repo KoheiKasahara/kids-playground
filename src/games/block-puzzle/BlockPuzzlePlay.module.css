@@ -1,0 +1,244 @@
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  display: grid;
+  /* ヘッダー / 盤面 / ひとこと / パーツ一覧。盤面だけが余った高さを受け取る。 */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-xs);
+  background: linear-gradient(160deg, #eef6ff 0%, #fdf6ec 60%, #fdeef7 100%);
+}
+
+.header {
+  min-height: var(--tap-target-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.home {
+  flex: 0 0 auto;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: var(--space-xs) var(--space-sm);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: rgb(255 255 255 / 88%);
+  box-shadow: var(--shadow-sm);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.home:active {
+  transform: scale(0.95);
+  box-shadow: none;
+}
+
+.title {
+  margin: 0;
+  color: #3b3b3b;
+  font-size: clamp(20px, 3.8vw, 28px);
+  line-height: 1.1;
+}
+
+/* 盤面は縦横どちらにもはみ出さない最大サイズにしたい。
+   コンテナクエリ単位（cqw / cqh）を使うと、余っている幅と高さの両方から
+   同じ縦横比を保った大きさを1つの式で決められる（JSでの計測が要らない）。 */
+.boardArea {
+  container-type: size;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.board {
+  position: relative;
+  box-sizing: border-box;
+  width: min(100cqw, 100cqh * var(--board-cols) / var(--board-rows), 460px);
+  aspect-ratio: var(--board-cols) / var(--board-rows);
+  display: grid;
+  grid-template-columns: repeat(var(--board-cols), 1fr);
+  grid-template-rows: repeat(var(--board-rows), 1fr);
+  /* 盤面の内側の余白。重ねレイヤーの位置合わせでも同じ値を使う。 */
+  --board-padding: 6px;
+
+  padding: var(--board-padding);
+  border: 4px solid #c9d6e5;
+  border-radius: var(--radius-md);
+  background: #f7fbff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* マス。「ここにブロックをはめる」と分かるよう、へこんだ穴のように見せる。 */
+.cell {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid #dbe4ef;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 50%, rgb(155 178 204 / 35%) 0 8%, transparent 9%),
+    #ffffff;
+  cursor: pointer;
+}
+
+.cell:active {
+  background:
+    radial-gradient(circle at 50% 50%, rgb(155 178 204 / 35%) 0 8%, transparent 9%),
+    #eef4ff;
+}
+
+/* 置けなかったマス。失敗ではないので、赤枠を出すだけにとどめる。
+   ブロックの上にも見えるよう、マスのボタンではなく重ねレイヤー側で描く。 */
+.rejectedCell {
+  box-sizing: border-box;
+  border: 3px solid var(--color-danger);
+  border-radius: 8px;
+}
+
+.blockLayer {
+  position: absolute;
+  inset: var(--board-padding);
+  display: grid;
+  grid-template-columns: repeat(var(--board-cols), 1fr);
+  grid-template-rows: repeat(var(--board-rows), 1fr);
+  pointer-events: none;
+}
+
+.placedBlock {
+  --block-radius: 10px;
+  --block-edge-width: 2px;
+}
+
+.message {
+  margin: 0;
+  min-height: 1.6em;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* パーツ一覧。9種類を狭い縦画面では5列＋4列の2段、広い画面では1段に並べる。 */
+.palette {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-xs);
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+@media (min-width: 620px) {
+  .palette {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    max-width: 720px;
+  }
+}
+
+/* 低い横画面では、縦に積むと盤面の高さが足りずマスが小さくなりすぎる。
+   パーツ一覧を右側の縦並びに移し、余った高さをすべて盤面へ渡す。 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr) 168px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: var(--space-sm);
+  }
+
+  .header {
+    grid-column: 1 / -1;
+  }
+
+  .boardArea {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .message {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .palette {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-content: center;
+    max-width: none;
+  }
+}
+
+.paletteButton {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--tap-target-min);
+  padding: var(--space-xs);
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.paletteButton:active {
+  transform: scale(0.96);
+}
+
+/* 選択中は「枠・背景・拡大・チェック」を重ねて、文字を読まなくても分かるようにする。 */
+.paletteButtonSelected {
+  border-color: var(--color-primary);
+  background: #e7edff;
+  transform: scale(1.06);
+}
+
+.paletteButtonSelected:active {
+  transform: scale(1.02);
+}
+
+.palettePieceArea {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 30px;
+}
+
+.palettePiece {
+  --piece-cell-size: 12px;
+  --block-radius: 5px;
+  --block-edge-width: 2px;
+  width: auto;
+  height: auto;
+}
+
+.selectedMark {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-round);
+  color: var(--color-text-on-primary);
+  background: var(--color-primary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home:active,
+  .paletteButton:active,
+  .paletteButtonSelected:active {
+    transform: none;
+  }
+}

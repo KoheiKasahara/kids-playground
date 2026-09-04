@@ -478,6 +478,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'block-puzzle',
+    slug: 'block-puzzle',
+    title: 'ブロックパズル',
+    emoji: '🧩',
+    seo: {
+      headline: 'ブロックパズル｜すきな形をならべてマスをうめる',
+      description:
+        '1マス・2マス・ながいぼう・しかく・T・L・J・S・Zのブロックから すきな形をえらんで、マス目の盤面へ自由にならべる幼児向けパズルです。ブロックは落ちてこず、時間制限もゲームオーバーもないので、じっくり考えてならべられます。',
+    },
+    category: 'learning',
+    intro: {
+      howToPlay: [
+        'したの かたちから すきな ブロックを えらぶよ',
+        'ばんめんを タップすると そこに ブロックが おかれるよ',
+        'おなじ かたちは なんこでも つかえるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
