@@ -5,7 +5,7 @@
  * タイヤ・フロント・屋根・飾り・マークの座標へボディ種別を持ち込まないこと。
  */
 import * as THREE from 'three'
-import type { BodyType, CarCategoryId, CarConfig, CarOptionIdMap } from './carConfig'
+import type { BodyType, CarCategoryId, CarConfig, CarOptionIdMap, FrontType } from './carConfig'
 import type { CarAttachment, CarAttachments, CarDimensions } from './carDimensions'
 import { createSportsHull, sportsSurfacePoint } from './sportsBodySurface'
 
@@ -526,9 +526,7 @@ function buildWheels(visual: WheelVisual) {
   }
 }
 
-type FrontLightShape = 'box' | 'round'
-
-function buildFront(shape: FrontLightShape) {
+function buildFront(shape: FrontType) {
   return ({ attachments, config, dimensions }: CarPartContext): THREE.Object3D => {
     const front = attachments.front
     const group = new THREE.Group()
@@ -536,8 +534,13 @@ function buildFront(shape: FrontLightShape) {
     const sports = config.body === 'sports'
     const lightMaterial = standard(sports ? '#f7fbff' : '#fff3c4', sports ? 0.16 : 0.2, sports ? 0.18 : 0.1)
 
-    const lightSize = front.size.extent * (sports ? 0.27 : 0.34)
+    const lightSize = front.size.extent * (sports ? 0.29 : 0.34)
     const lightDepth = sports ? 0.065 : 0.1
+    const lightWidth =
+      shape === 'round' ? lightSize * 0.9 : shape === 'square' ? lightSize * 1.5 : lightSize * 2.2
+    const lightHeight =
+      shape === 'round' ? lightSize * 0.9 : shape === 'square' ? lightSize * 0.7 : lightSize * 0.28
+    const surroundMaterial = standard(shape === 'round' ? CHROME_COLOR : '#3f4b57', 0.32, 0.35)
     for (const side of [1, -1]) {
       const center = offsetFrom(front, lightDepth / 2)
       // スポーツカーのノーズは丸く絞り込まれているため、前端の平面ではなく
@@ -546,52 +549,87 @@ function buildFront(shape: FrontLightShape) {
       // ライトが浮くか埋まる。外殻サーフェス上の点を直接問い合わせて置く。
       const position = sports
         ? (() => {
-            const anchor = sportsSurfacePoint(dimensions, attachments, dimensions.length / 2 - 0.3, 0.37)
+            const anchor = sportsSurfacePoint(dimensions, attachments, dimensions.length / 2 - 0.34, 0.37)
             return {
-              x: side * anchor.position.x * 0.74,
-              y: anchor.position.y - 0.01,
+              x: side * anchor.position.x * (shape === 'slim' ? 0.7 : 0.74),
+              y: anchor.position.y - (shape === 'slim' ? 0.02 : 0.01),
               z: anchor.position.z,
             }
           })()
         : {
-            x: center.x + side * front.size.width * 0.32,
+            x: center.x + side * front.size.width * (shape === 'slim' ? 0.3 : 0.32),
             y: center.y + front.size.extent * 0.16,
             z: center.z,
           }
-      if (sports && shape === 'box') {
-        // 箱形ライトをそのまま置くとノーズ上に小さな直方体が浮くため、
-        // 薄い楕円体にして低いボンネットの曲面へなじませる。
-        const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * 0.95, 18, 10), lightMaterial)
-        light.scale.set(1.5, 0.3, 0.55)
+
+      if (shape === 'round') {
+        const surround = new THREE.Mesh(
+          new THREE.TorusGeometry(lightSize * 0.5, lightSize * 0.08, 8, 20),
+          surroundMaterial,
+        )
+        surround.name = `car-front-surround-round-${side === 1 ? 'left' : 'right'}`
+        surround.position.set(position.x, position.y, position.z)
+        surround.castShadow = true
+        const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * 0.48, 16, 12), lightMaterial)
+        light.name = `car-front-light-round-${side === 1 ? 'left' : 'right'}`
         light.position.set(position.x, position.y, position.z)
-        light.rotation.z = side * -0.16
-        light.rotation.y = side * 0.2
+        // 前面の丸さは保ちつつ、ライト本体が車体の前端から出すぎないよう奥行きを薄くする。
+        light.scale.set(0.8, 0.8, sports ? 0.68 : 0.62)
+        light.rotation.z = side * -0.08
         light.castShadow = true
-        group.add(light)
-      } else if (shape === 'round') {
-        const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * (sports ? 0.42 : 0.55), 16, 12), lightMaterial)
-        light.position.set(position.x, position.y, position.z)
-        if (sports) light.scale.set(1, 0.62, 0.62)
-        light.castShadow = true
-        group.add(light)
+        group.add(surround, light)
       } else {
-        group.add(box({ x: lightSize * (sports ? 1.7 : 1.3), y: lightSize * (sports ? 0.46 : 0.7), z: lightDepth }, position, lightMaterial))
+        const surround = box(
+          { x: lightWidth + lightSize * 0.18, y: lightHeight + lightSize * 0.18, z: lightDepth * 0.72 },
+          { x: position.x, y: position.y, z: position.z - lightDepth * 0.12 },
+          surroundMaterial,
+        )
+        surround.name = `car-front-surround-${shape}-${side === 1 ? 'left' : 'right'}`
+        const light = box(
+          { x: lightWidth, y: lightHeight, z: lightDepth },
+          { x: position.x, y: position.y, z: position.z + lightDepth * 0.08 },
+          lightMaterial,
+        )
+        light.name = `car-front-light-${shape}-${side === 1 ? 'left' : 'right'}`
+        group.add(surround, light)
       }
     }
 
-    // スポーツカーのフロント開口は外殻のマテリアルグループとして作ってあるので、
-    // ここでバンパーの箱を前へ貼り足さない（貼ると後付け部品に見える）。
-    if (!sports) {
-      const bumperMaterial = standard(CHROME_COLOR, 0.35, 0.35)
-      const bumperCenter = offsetFrom(front, 0.05)
-      group.add(
-        box(
-          { x: front.size.width * 0.92, y: front.size.extent * 0.18, z: 0.12 },
-          { x: bumperCenter.x, y: bumperCenter.y - front.size.extent * 0.34, z: bumperCenter.z },
-          bumperMaterial,
-        ),
-      )
-    }
+    // ライトだけでなく、中央のマスクと下端のバンパーも選択肢ごとに変える。
+    // スポーツカーは外殻に開口があるため、surface上の低い位置へ薄く置いて後付け感を抑える。
+    const grilleMaterial = standard(shape === 'round' ? '#303943' : shape === 'square' ? '#202830' : '#172027', 0.5, 0.12)
+    const bumperMaterial = standard(shape === 'round' ? CHROME_COLOR : shape === 'square' ? '#65717d' : '#252d35', 0.35, 0.35)
+    const grilleWidth = front.size.width * (shape === 'round' ? 0.42 : shape === 'square' ? 0.5 : 0.62)
+    const grilleHeight = front.size.extent * (shape === 'round' ? 0.17 : shape === 'square' ? 0.22 : 0.12)
+    const grilleCenter = sports
+      ? sportsSurfacePoint(dimensions, attachments, dimensions.length / 2 - 0.34, 0.18).position
+      : offsetFrom(front, 0.055)
+    const grille = box(
+      { x: grilleWidth, y: grilleHeight, z: sports ? 0.045 : 0.08 },
+      {
+        x: 0,
+        y: sports ? grilleCenter.y + 0.025 : grilleCenter.y - front.size.extent * 0.28,
+        z: sports ? grilleCenter.z + 0.02 : grilleCenter.z,
+      },
+      grilleMaterial,
+    )
+    grille.name = `car-front-grille-${shape}`
+    group.add(grille)
+
+    const bumperCenter = sports
+      ? sportsSurfacePoint(dimensions, attachments, dimensions.length / 2 - 0.25, 0.08).position
+      : offsetFrom(front, 0.08)
+    const bumper = box(
+      { x: front.size.width * (shape === 'slim' ? 0.86 : 0.92), y: front.size.extent * 0.14, z: sports ? 0.045 : 0.12 },
+      {
+        x: 0,
+        y: sports ? bumperCenter.y + 0.015 : bumperCenter.y - front.size.extent * 0.34,
+        z: sports ? bumperCenter.z + 0.02 : bumperCenter.z,
+      },
+      bumperMaterial,
+    )
+    bumper.name = `car-front-bumper-${shape}`
+    group.add(bumper)
     return group
   }
 }
@@ -712,7 +750,7 @@ export const CAR_PART_BUILDERS: {
     offroad: buildWheels({ hubColor: '#c8873d', hubRadiusRatio: 0.42, detail: 'offroad' }),
     racing: buildWheels({ hubColor: '#d83f45', hubRadiusRatio: 0.62, detail: 'racing' }),
   },
-  front: { normal: buildFront('box'), round: buildFront('round') },
+  front: { round: buildFront('round'), square: buildFront('square'), slim: buildFront('slim') },
   roof: { none: nothing, carrier: buildRoofCarrier },
   decoration: { none: nothing, star: buildStarDecoration },
   mark: { none: nothing, plate: buildNumberPlate },
