@@ -112,6 +112,23 @@ describe('発射速度', () => {
     expect(LAUNCH_SPEED_MIN).toBeGreaterThanOrEqual(12)
   })
 
+  it('3種類とも同じパワーなら、ちいさいだまがいちばん速く飛ぶ', () => {
+    const heavy = getBowlingBall('heavy')
+    const bouncy = getBowlingBall('bouncy')
+    const small = getBowlingBall('small')
+    for (const power of [0, 0.5, 1]) {
+      expect(launchSpeed(power, small)).toBeGreaterThan(launchSpeed(power, heavy))
+      expect(launchSpeed(power, small)).toBeGreaterThan(launchSpeed(power, bouncy))
+    }
+  })
+
+  it('どっしり・はずむだまも、最弱でも十分速い（全種類の勢いを落とさない）', () => {
+    const heavy = getBowlingBall('heavy')
+    const bouncy = getBowlingBall('bouncy')
+    expect(launchSpeed(0, heavy)).toBeGreaterThanOrEqual(LAUNCH_SPEED_MIN)
+    expect(launchSpeed(0, bouncy)).toBeGreaterThanOrEqual(LAUNCH_SPEED_MIN)
+  })
+
   it('パワーに対して単調に増える', () => {
     const speeds = [0, 0.25, 0.5, 0.75, 1].map((power) => launchSpeed(power, BALL))
     for (let index = 1; index < speeds.length; index += 1) {

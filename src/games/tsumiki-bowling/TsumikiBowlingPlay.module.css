@@ -88,18 +88,28 @@
   touch-action: none;
 }
 
-/* 上部のHUD。投球数と倒した数だけを出す。 */
-.hud {
+/*
+ * 上部の帯。HUD（投球数・倒した数）と玉選択カードを縦に並べる。
+ * まとめて上端へ固定することで、下側のスリングショット操作領域を圧迫しない。
+ */
+.topBar {
   position: absolute;
   top: var(--space-sm);
   right: var(--space-sm);
   left: var(--space-sm);
   z-index: 1;
   display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  pointer-events: none;
+}
+
+/* 投球数と倒した数だけを出す。 */
+.hud {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  pointer-events: none;
 }
 
 .throwCounter {
@@ -300,8 +310,78 @@
   text-decoration: none;
 }
 
+/*
+ * 玉の選択カード。文字を読まなくても、玉の大きさ・色・アイコンだけで
+ * 区別が付くようにする。投球待機中だけ操作でき、それ以外はdisabledにする。
+ */
+.ballSelector {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ballCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 64px;
+  min-height: var(--tap-target-min);
+  padding: 6px 8px;
+  border: 3px solid transparent;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: clamp(10px, 2.6vw, 12px);
+  font-weight: 800;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.ballCardSelected {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-surface) 97%, transparent);
+  color: var(--color-primary-dark);
+  transform: translateY(-2px) scale(1.05);
+}
+
+.ballCard:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+
+.ballCardOrb {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 -4px 6px rgba(0, 0, 0, 0.2),
+    0 2px 3px rgba(0, 0, 0, 0.18);
+}
+
+.ballCardIcon {
+  font-size: 14px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+
+.ballCardName {
+  white-space: nowrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .powerFill {
+    transition: none;
+  }
+
+  .ballCard {
     transition: none;
   }
 }
