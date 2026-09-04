@@ -1,0 +1,20 @@
+/* セルの大きさは置き場所が決める。盤面では1frで枠いっぱいに広がり、
+   パーツ一覧では --piece-cell-size に固定サイズが入る。 */
+.piece {
+  display: grid;
+  grid-template-columns: repeat(var(--piece-cols), var(--piece-cell-size, 1fr));
+  grid-template-rows: repeat(var(--piece-rows), var(--piece-cell-size, 1fr));
+  width: 100%;
+  height: 100%;
+}
+
+.pieceCell {
+  box-sizing: border-box;
+  border-style: solid;
+  border-color: var(--block-edge);
+  background: var(--block-color);
+  /* 内側の白い線でマスの区切りを見せ、下側の影で少しだけ厚みを出す。 */
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 45%),
+    inset 0 -3px 0 rgb(0 0 0 / 10%);
+}
