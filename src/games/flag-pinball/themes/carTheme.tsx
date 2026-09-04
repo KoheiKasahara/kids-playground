@@ -5,19 +5,26 @@ import styles from './carTheme.module.css'
 
 function renderCarToy(kind: ToyKind): ReactNode {
   if (kind === 'car') {
-    // デフォルメされたミニカー。物理Collider（carToy.tsのmainBody+cabin）と見た目の
-    // 比率をできるだけ合わせ、見た目とCollider（丸みのある胴体＋屋根）が大きくズレない
-    // ようにしてある。向きの反転（右向き/左向き）はこの.carMarkごとCSSでscaleXする
-    // （renderToyはkindしか受け取らず個別のtoy.carを知らないため、data-toy-facingを目印にする）。
+    // 小さな表示でも「前・中央・後ろ」が読み取れる、丸みのあるミニカー。
+    // 物理Collider（carToy.tsの胴体＋円形キャビン）は変更せず、ここでは見た目だけを
+    // ボディ／ボンネット／キャビン／前後の窓／タイヤへ分けて、車の向きを明確にする。
     return (
       <span className={styles.carMark}>
         <span className={styles.carShadow} />
         <span className={styles.carBody} />
+        <span className={styles.carHood} />
         <span className={styles.carCabin} />
-        <span className={styles.carWindow} />
+        <span className={styles.carWindowRear} />
+        <span className={styles.carWindowFront} />
+        <span className={styles.carWindowPillar} />
+        <span className={styles.carDoor} />
+        <span className={styles.carBumperRear} />
+        <span className={styles.carBumperFront} />
         <span className={`${styles.carWheel} ${styles.carWheelRear}`} />
         <span className={`${styles.carWheel} ${styles.carWheelFront}`} />
+        <span className={styles.carTailLight} />
         <span className={styles.carLight} />
+        <span className={styles.carGrille} />
       </span>
     )
   }

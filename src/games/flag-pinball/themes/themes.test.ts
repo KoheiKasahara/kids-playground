@@ -1,4 +1,7 @@
+import { isValidElement, type ReactNode } from 'react'
 import { describe, expect, test } from 'vitest'
+import carStyles from './carTheme.module.css'
+import { carTheme } from './carTheme'
 import { DEFAULT_PINBALL_THEME_ID, PINBALL_THEMES, resolvePinballTheme } from './index'
 import type { PinballThemeId } from './types'
 
@@ -49,4 +52,32 @@ describe('flag-pinball themes', () => {
       expect(theme.id satisfies PinballThemeId).toBe(theme.id)
     }
   })
+})
+
+
+function collectClassNames(node: ReactNode): string[] {
+  if (Array.isArray(node)) return node.flatMap(collectClassNames)
+  if (!isValidElement(node)) return []
+  const props = node.props as { className?: unknown; children?: ReactNode }
+  const ownClassName = typeof props.className === 'string' ? [props.className] : []
+  return [...ownClassName, ...collectClassNames(props.children)]
+}
+
+test('くるまtoyは小さくても車と分かる主要パーツを持つ', () => {
+  const classNames = collectClassNames(carTheme.renderToy('car'))
+  expect(classNames).toEqual(
+    expect.arrayContaining([
+      carStyles.carMark,
+      carStyles.carBody,
+      carStyles.carHood,
+      carStyles.carCabin,
+      carStyles.carWindowRear,
+      carStyles.carWindowFront,
+      carStyles.carWheelRear,
+      carStyles.carWheelFront,
+      carStyles.carTailLight,
+      carStyles.carLight,
+      carStyles.carGrille,
+    ]),
+  )
 })
