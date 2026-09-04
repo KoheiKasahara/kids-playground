@@ -151,6 +151,40 @@ describe('ボディ5種類の選択', () => {
 })
 
 describe('選択の即時反映', () => {
+  test('フロント3種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'フロントを えらぶ' }))
+
+    for (const [label, front] of [
+      ['丸ライト', 'round'],
+      ['四角ライト', 'square'],
+      ['細目ライト', 'slim'],
+    ] as const) {
+      const option = screen.getByRole('button', { name: label })
+      expect(option.querySelector('[class*="frontPreview"]'), label).not.toBeNull()
+      await user.click(option)
+      expect(latestConfig().front, label).toBe(front)
+      expect(option).toHaveAttribute('aria-pressed', 'true')
+    }
+    expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
+  })
+
+  test('フロントを選んでからボディを切り替えても選択状態が保たれる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'フロントを えらぶ' }))
+    await user.click(screen.getByRole('button', { name: '細目ライト' }))
+    await user.click(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' }))
+    await user.click(screen.getByRole('button', { name: 'ボディを えらぶ' }))
+    await user.click(screen.getByRole('button', { name: 'バス' }))
+
+    expect(latestConfig()).toMatchObject({ body: 'bus', front: 'slim' })
+    expect(screen.getByRole('button', { name: 'バス' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   test('9色すべてをタップすると、選んだ色が即時にCarConfigへ反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
@@ -297,6 +331,11 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
   test('タイヤ4選択肢はスマホ幅でも1行で見比べられる', () => {
     expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='wheel'\]\s*\{[^}]*grid-template-columns:\s*repeat\(4,/)
     expect(ruleOf(CSS_SOURCE, '.wheelPreview')).toMatch(/border-radius:\s*50%/)
+  })
+
+  test('フロント3選択肢はスマホ幅でも1行で見比べられる', () => {
+    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='front'\]\s*\{[^}]*grid-template-columns:\s*repeat\(3,/)
+    expect(ruleOf(CSS_SOURCE, '.frontPreview')).toMatch(/width:\s*42px/)
   })
 
   test('主要なタップ領域が小さすぎない（幼児向けに44px以上・カテゴリと選択肢は64px以上）', () => {

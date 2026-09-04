@@ -70,6 +70,15 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
+  test('フロントは丸・四角・細目の3種類を、形状が分かるプレビュー付きで持つ', () => {
+    const options = CAR_CATEGORIES.front.options
+    expect(options.map((option) => option.id)).toEqual(['round', 'square', 'slim'])
+    expect(options.map((option) => option.label)).toEqual(['丸ライト', '四角ライト', '細目ライト'])
+    for (const option of options) {
+      expect(option.preview).toEqual({ kind: 'front', variant: option.id })
+    }
+  })
+
   test('選択肢IDはカテゴリ内で一意で、ラベルも空でない', () => {
     for (const category of carCategoryOrder()) {
       const ids = category.options.map((option) => option.id)

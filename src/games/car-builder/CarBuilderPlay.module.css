@@ -235,6 +235,11 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* フロントは3種類を1行で見比べる。 */
+.optionList[data-category='front'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .optionButton {
   display: flex;
   flex-direction: column;
@@ -322,6 +327,108 @@
 
 .wheelPreview-racing .wheelPreviewHub {
   background: #d83f45;
+}
+
+/* フロントカテゴリは、ライト形状・周囲・中央マスクの違いを小さく描く。 */
+.frontPreview {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  width: 42px;
+  height: 30px;
+  padding: 0 5px;
+  border-radius: 7px 7px 4px 4px;
+  background: linear-gradient(#aeb9c5 0 18%, #4c5965 19% 100%);
+  box-shadow: inset 0 0 0 2px rgba(17, 24, 39, 0.25), 0 1px 2px rgba(17, 24, 39, 0.22);
+}
+
+.frontPreviewSurround,
+.frontPreviewLight {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: #fff4bd;
+  box-shadow: 0 0 0 2px #d9e0e6;
+}
+
+.frontPreviewSurround {
+  position: absolute;
+  inset: 0 5px auto;
+  width: auto;
+  height: 15px;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.frontPreviewGrille {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 18px;
+  height: 4px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: #202830;
+}
+
+.frontPreview-round .frontPreviewLight {
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #d9e0e6;
+}
+
+.frontPreview-square .frontPreviewLight {
+  width: 10px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.frontPreview-square .frontPreviewGrille {
+  width: 19px;
+  height: 5px;
+}
+
+.frontPreview-slim .frontPreviewLight {
+  width: 13px;
+  height: 4px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px #d9e0e6;
+}
+
+.frontPreview-slim .frontPreviewGrille {
+  bottom: 5px;
+  width: 25px;
+  height: 3px;
+  background: #172027;
+}
+
+/* カテゴリ一覧の右上バッジでは、同じ形状を小さく収める。 */
+.categoryBadge.frontPreview {
+  width: 18px;
+  height: 18px;
+  padding: 0 2px;
+  border-radius: 4px 4px 2px 2px;
+}
+
+.categoryBadge.frontPreview .frontPreviewLight {
+  width: 4px;
+  height: 4px;
+  box-shadow: 0 0 0 1px #d9e0e6;
+}
+
+.categoryBadge.frontPreview .frontPreviewGrille {
+  bottom: 2px;
+  width: 9px;
+  height: 2px;
+}
+
+.categoryBadge.frontPreview .frontPreviewSurround {
+  display: none;
 }
 
 /* カテゴリ一覧の右上バッジでは、同じ形状を小さく収める。 */

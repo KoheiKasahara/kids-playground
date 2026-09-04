@@ -358,6 +358,48 @@ describe('CarConfigの反映', () => {
     model.dispose()
   })
 
+  test('フロント3種類は各ボディで生成され、見た目の構成が異なる', () => {
+    for (const frontOption of CAR_CATEGORIES.front.options) {
+      const config = selectCarOption(DEFAULT_CAR_CONFIG, 'front', frontOption.id)
+      const model = createCarModel(config)
+      const front = layerOf(model.root, 'front')
+      const frontGroup = front.getObjectByName('car-front')
+      if (frontGroup === undefined) throw new Error('フロントグループが生成されていません: ' + frontOption.id)
+      expect(front.getObjectByName(`car-front-grille-${frontOption.id}`)).toBeDefined()
+      expect(front.getObjectByName(`car-front-bumper-${frontOption.id}`)).toBeDefined()
+      expect(frontGroup.children.length, frontOption.id).toBeGreaterThanOrEqual(6)
+      model.dispose()
+    }
+
+    const signatures = CAR_CATEGORIES.front.options.map((option) => {
+      const model = createCarModel(selectCarOption(DEFAULT_CAR_CONFIG, 'front', option.id))
+      const frontGroup = model.root.getObjectByName('car-front')
+      if (frontGroup === undefined) throw new Error('フロントグループが生成されていません: ' + option.id)
+      const signature = frontGroup.children.map((child) => child.type + '/' + child.name).join('|')
+      model.dispose()
+      return signature
+    })
+    expect(new Set(signatures).size).toBe(3)
+  })
+
+  test('フロント3種類は全ボディで前端から大きくはみ出さない', () => {
+    for (const bodyOption of CAR_CATEGORIES.body.options) {
+      for (const frontOption of CAR_CATEGORIES.front.options) {
+        const config = selectCarOption(
+          selectCarOption(DEFAULT_CAR_CONFIG, 'body', bodyOption.id),
+          'front',
+          frontOption.id,
+        )
+        const model = createCarModel(config)
+        const dimensions = computeCarDimensions(config)
+        const bounds = boundsOf(layerOf(model.root, 'front'))
+        expect(bounds.min.y, bodyOption.id + '/' + frontOption.id).toBeGreaterThanOrEqual(-0.01)
+        expect(bounds.max.z, bodyOption.id + '/' + frontOption.id).toBeLessThanOrEqual(dimensions.length / 2 + 0.15)
+        model.dispose()
+      }
+    }
+  })
+
   test('車高を変えると、屋根パーツも寸法に追従して持ち上がる（パーツ側の個別修正が要らない）', () => {
     const base = selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'carrier')
     const model = createCarModel(base)
