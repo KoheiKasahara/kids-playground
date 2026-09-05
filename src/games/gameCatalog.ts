@@ -511,7 +511,7 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     intro: {
       howToPlay: [
         'じゃぐちを おすと アヒルが うかんで あがるよ',
-        'かべを こえたら みずを へらして おろそう',
+        'かべを こえたら せんを あけて みずを へらそう',
         'ゴールの うきわに とどいたら クリアだよ',
       ],
     },

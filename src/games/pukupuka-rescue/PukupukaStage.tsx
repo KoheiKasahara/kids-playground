@@ -2,6 +2,7 @@ import { waterSurfaceYOf, type PukupukaGameState } from './pukupukaGame'
 import type { SolidDefinition, StageDefinition } from './types'
 import { surfaceYAt, waterBodyWidth } from './waterModel'
 import PukupukaFaucet from './PukupukaFaucet'
+import PukupukaDrain from './PukupukaDrain'
 import styles from './PukupukaRescuePlay.module.css'
 
 // ステージの見た目だけを持つコンポーネント。位置はすべてゲーム状態（2D座標）から決め、
@@ -66,6 +67,10 @@ type Props = {
   onFaucetHoldStart: () => void
   onFaucetHoldEnd: () => void
   onFaucetTap: () => void
+  /** せん/排水が開いている（＝排水中）かどうか。 */
+  drainOpen: boolean
+  drainDisabled: boolean
+  onDrainToggle: () => void
 }
 
 export default function PukupukaStage({
@@ -76,6 +81,9 @@ export default function PukupukaStage({
   onFaucetHoldStart,
   onFaucetHoldEnd,
   onFaucetTap,
+  drainOpen,
+  drainDisabled,
+  onDrainToggle,
 }: Props) {
   const cleared = state.phase === 'cleared'
   const goal = stage.goal.area
@@ -283,6 +291,7 @@ export default function PukupukaStage({
         onHoldEnd={onFaucetHoldEnd}
         onTap={onFaucetTap}
       />
+      <PukupukaDrain drain={stage.drain} open={drainOpen} disabled={drainDisabled} onToggle={onDrainToggle} />
     </svg>
   )
 }

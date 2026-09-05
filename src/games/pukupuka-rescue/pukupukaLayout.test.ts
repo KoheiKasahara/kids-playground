@@ -39,10 +39,6 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
   })
 
   test('主要操作のタップ領域が十分に大きい（幼児向け規約）', () => {
-    const water = ruleBody('.waterButton')
-    const minHeight = Number(water.match(/min-height:\s*(\d+)px/)?.[1])
-    expect(minHeight).toBeGreaterThanOrEqual(64)
-
     const reset = ruleBody('.reset')
     const resetHeight = Number(reset.match(/min-height:\s*(\d+)px/)?.[1])
     expect(resetHeight).toBeGreaterThanOrEqual(44)
@@ -51,14 +47,28 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
     expect(home).toMatch(/min-height:\s*var\(--tap-target-min\)/)
   })
 
-  test('押しっぱなし操作でページがスクロールしない', () => {
-    expect(ruleBody('.waterButton')).toMatch(/touch-action:\s*none/)
+  test('じゃぐち・せんのタップ領域は見た目より広めに取ってある（幼児向け規約）', () => {
+    const faucetSource = readFileSync(path.join(__dirname, 'PukupukaFaucet.tsx'), 'utf-8')
+    const drainSource = readFileSync(path.join(__dirname, 'PukupukaDrain.tsx'), 'utf-8')
+
+    // ステージ座標（幅100）に対して、指先ぶんの余裕を確保できているかを見る。
+    for (const source of [faucetSource, drainSource]) {
+      const width = Number(source.match(/HIT_WIDTH = (\d+)/)?.[1])
+      const height = Number(source.match(/HIT_HEIGHT = (\d+)/)?.[1])
+      expect(width).toBeGreaterThanOrEqual(15)
+      expect(height).toBeGreaterThanOrEqual(15)
+    }
+  })
+
+  test('じゃぐち・せんのタップ領域はタップ中にページをスクロールさせない/誤操作を防ぐ', () => {
+    expect(ruleBody('.faucetHit')).toMatch(/touch-action:\s*none/)
+    expect(ruleBody('.drainHit')).toMatch(/touch-action:\s*manipulation/)
   })
 
   test('prefers-reduced-motion で演出アニメーションを止める', () => {
     expect(CSS_SOURCE).toMatch(/@media \(prefers-reduced-motion: reduce\)/)
     const reduced = CSS_SOURCE.slice(CSS_SOURCE.indexOf('@media (prefers-reduced-motion: reduce)'))
-    for (const animated of ['waveBack', 'waveFront', 'bubble', 'floaterBob', 'goalGlow']) {
+    for (const animated of ['waveBack', 'waveFront', 'bubble', 'floaterBob', 'goalGlow', 'drainSwirl']) {
       expect(reduced).toContain(`.${animated}`)
     }
   })

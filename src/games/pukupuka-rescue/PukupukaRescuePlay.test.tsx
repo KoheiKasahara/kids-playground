@@ -78,8 +78,13 @@ function faucetActive(): boolean {
   return screen.getByTestId('pukupuka-faucet').getAttribute('data-faucet-active') === 'true'
 }
 
-function drainButton(): HTMLElement {
-  return screen.getByRole('button', { name: /みずを へらす/ })
+/** せんの操作対象（タップのたびに開⇔閉が反転する）。 */
+function drainToggle(): HTMLElement {
+  return screen.getByRole('button', { name: /せん/ })
+}
+
+function drainOpen(): boolean {
+  return screen.getByTestId('pukupuka-drain').getAttribute('data-drain-open') === 'true'
 }
 
 /** ボタンを押しっぱなしにしたまま指定フレーム進め、最後に離す。 */
@@ -110,7 +115,7 @@ describe('PukupukaRescuePlay', () => {
     expect(screen.getByRole('heading', { name: 'ぷかぷかレスキュー' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
     expect(faucet()).toBeInTheDocument()
-    expect(drainButton()).toBeInTheDocument()
+    expect(drainToggle()).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'やりなおし' })).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-stage')).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-floater-duck')).toBeInTheDocument()
@@ -144,23 +149,63 @@ describe('PukupukaRescuePlay', () => {
     expect(faucet()).toHaveAttribute('aria-pressed', 'false')
   })
 
-  test('水をへらすと水面が下がり、アヒルも下がる', () => {
+  test('せんを あけると 水面が下がり、アヒルも下がる', () => {
     renderGame()
     hold(frames, faucet(), 90)
     frames.advance(30)
     const before = duckY()
 
-    hold(frames, drainButton(), 120)
+    fireEvent.click(drainToggle())
+    frames.advance(180)
 
     expect(duckY()).toBeGreaterThan(before + 5)
   })
 
-  test('水を減らし切ってもアヒルは床の上に残る', () => {
+  test('せんを あけている あいだだけ見た目上もON（排水中）になる', () => {
     renderGame()
-    hold(frames, drainButton(), 240)
+    expect(drainOpen()).toBe(false)
+    expect(drainToggle()).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(drainToggle())
+    expect(drainOpen()).toBe(true)
+    expect(drainToggle()).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(drainToggle())
+    expect(drainOpen()).toBe(false)
+    expect(drainToggle()).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('せんを とじると水位の低下が止まる', () => {
+    renderGame()
+    fireEvent.click(drainToggle())
+    frames.advance(60)
+    fireEvent.click(drainToggle())
+    const afterClose = waterPercent()
+
+    frames.advance(120)
+
+    expect(waterPercent()).toBeCloseTo(afterClose, 0)
+  })
+
+  test('せんを あけ続けると水位が0になり、アヒルは床の上に残る', () => {
+    renderGame()
+    fireEvent.click(drainToggle())
+    frames.advance(240)
 
     expect(waterPercent()).toBe(0)
     expect(duckY()).toBeCloseTo(118, 0)
+  })
+
+  test('じゃぐちと せんを同時に使っても、水位・アヒルの位置が発散しない', () => {
+    renderGame()
+    hold(frames, faucet(), 90)
+    fireEvent.click(drainToggle())
+    frames.advance(300)
+
+    expect(Number.isFinite(waterPercent())).toBe(true)
+    expect(Number.isFinite(duckY())).toBe(true)
+    expect(waterPercent()).toBeGreaterThanOrEqual(0)
+    expect(waterPercent()).toBeLessThanOrEqual(100)
   })
 
   test('水を増やし切っても表示が壊れない（最大水位を超えない）', () => {
@@ -206,6 +251,7 @@ describe('PukupukaRescuePlay', () => {
     expect(duckX()).toBeCloseTo(27, 0)
     expect(waterPercent()).toBeCloseTo(15, 0)
     expect(faucetActive()).toBe(false)
+    expect(drainOpen()).toBe(false)
   })
 
   test('やりなおしはじゃぐちを押している最中に押しても、押しっぱなし状態を残さない', () => {
@@ -223,17 +269,33 @@ describe('PukupukaRescuePlay', () => {
     expect(waterPercent()).toBeLessThanOrEqual(percentAfterReset + 5)
   })
 
+  test('やりなおしはせんを あけている最中に押しても、あけたままにしない', () => {
+    renderGame()
+    fireEvent.click(drainToggle())
+    frames.advance(10)
+    expect(drainOpen()).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'やりなおし' }))
+
+    expect(drainOpen()).toBe(false)
+    const percentAfterReset = waterPercent()
+    frames.advance(180)
+    // リセット後は とじた扱いのままなので、排水し続けない。
+    expect(waterPercent()).toBeCloseTo(percentAfterReset, 0)
+  })
+
   test('ゴールすると「ゴール！」が1回だけ出て、水の操作ができなくなる', () => {
     renderGame()
     hold(frames, faucet(), 60 * 6)
     expect(screen.queryByText('ゴール！')).not.toBeInTheDocument()
 
-    hold(frames, drainButton(), 60 * 6)
+    fireEvent.click(drainToggle())
+    frames.advance(60 * 6)
 
     expect(screen.getAllByText('ゴール！')).toHaveLength(1)
     expect(screen.getByRole('status')).toHaveTextContent('ゴール！ アヒルを たすけたよ')
     expect(faucet()).toBeDisabled()
-    expect(drainButton()).toBeDisabled()
+    expect(drainToggle()).toBeDisabled()
 
     // クリア後にさらに進めても、表示が二重になったり消えたりしない。
     frames.advance(120)
@@ -243,7 +305,8 @@ describe('PukupukaRescuePlay', () => {
   test('ゴール後にやりなおすと、もう一度あそべる', () => {
     renderGame()
     hold(frames, faucet(), 60 * 6)
-    hold(frames, drainButton(), 60 * 6)
+    fireEvent.click(drainToggle())
+    frames.advance(60 * 6)
     expect(screen.getAllByText('ゴール！')).toHaveLength(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'やりなおし' }))

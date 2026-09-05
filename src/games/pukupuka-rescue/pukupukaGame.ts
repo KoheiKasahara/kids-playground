@@ -16,11 +16,8 @@ import {
 
 export type PukupukaPhase = 'playing' | 'cleared'
 
-/**
- * 水位操作の入力。'fill' はじゃぐち(#515)、'drain' はPhase 1由来の仮の「みずをへらす」操作で、
- * 正式な せん/排水(#516) に置き換わるまでの暫定入力として残している。
- */
-export type WaterControl = 'fill' | 'drain' | null
+/** 水位操作の入力。じゃぐち(#515)を押している間だけ 'fill'、離すと null。 */
+export type WaterControl = 'fill' | null
 
 export type PukupukaGameState = {
   readonly water: WaterField
@@ -29,6 +26,8 @@ export type PukupukaGameState = {
   readonly elapsedMs: number
   /** 固定ステップに割り切れなかった余り時間。次フレームへ持ち越す。 */
   readonly leftoverMs: number
+  /** せん/排水(#516)が開いているか。開いている間、毎フレーム drainSourceBodyId から水を抜く。 */
+  readonly drainOpen: boolean
 }
 
 export type StepResult = {
@@ -42,10 +41,16 @@ export const FIXED_STEP_MS = 1000 / 60
 /** 1フレームで進める最大ステップ数。タブ復帰などで巨大なdtが来ても暴走させない。 */
 export const MAX_STEPS_PER_FRAME = 5
 
-/** ボタンを押しっぱなしにしているあいだの増減速度（水位換算 / 秒）。 */
+/** じゃぐちを押しっぱなしにしているあいだの注水速度（水位換算 / 秒）。 */
 export const WATER_HOLD_RATE_LEVEL_PER_SEC = 24
-/** タップ1回ぶんの増減量（水位換算）。押しっぱなしにしなくても変化が分かるようにする。 */
+/** タップ1回ぶんの増加量（水位換算）。押しっぱなしにしなくても変化が分かるようにする。 */
 export const WATER_TAP_LEVEL = 10
+/**
+ * せん/排水が開いているあいだの排水速度（水位換算 / 秒）。
+ * じゃぐちの注水速度と同じ値にすることで、両方同時にONでも
+ * 「注水量 - 排水量 = 水位変化」がちょうど打ち消し合う予測しやすい挙動になる。
+ */
+export const DRAIN_RATE_LEVEL_PER_SEC = WATER_HOLD_RATE_LEVEL_PER_SEC
 
 /** Phase 1で操作する水域。将来は操作対象の水域をUIから選べるようにする余地を残す。 */
 export function primaryWaterBodyId(stage: StageDefinition): WaterBodyId {
@@ -57,12 +62,9 @@ export function faucetTargetBodyId(stage: StageDefinition): WaterBodyId {
   return stage.faucet.targetBodyId
 }
 
-/**
- * 水位操作(WaterControl)が作用する水域。'fill' はじゃぐちの注ぎ先、'drain' は暫定の
- * primaryWaterBodyId を使う（#516で正式な排水先に置き換える想定）。
- */
-function controlTargetBodyId(stage: StageDefinition, direction: 'fill' | 'drain'): WaterBodyId {
-  return direction === 'fill' ? faucetTargetBodyId(stage) : primaryWaterBodyId(stage)
+/** せん/排水が水を抜く元の水域。じゃぐちと対称に、ここだけを見ればよい構造にしてある。 */
+export function drainSourceBodyId(stage: StageDefinition): WaterBodyId {
+  return stage.drain.sourceBodyId
 }
 
 /**
@@ -83,6 +85,7 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
     phase: 'playing',
     elapsedMs: 0,
     leftoverMs: 0,
+    drainOpen: false,
   }
 }
 
@@ -135,22 +138,21 @@ export function isSettled(stage: StageDefinition, state: PukupukaGameState): boo
   return true
 }
 
-/** タップ1回ぶんの水を足す/減らす。クリア後は受け付けない。 */
-export function applyWaterTap(
-  stage: StageDefinition,
-  state: PukupukaGameState,
-  direction: 'fill' | 'drain',
-): PukupukaGameState {
+/** じゃぐちタップ1回ぶんの水を足す。クリア後は受け付けない。 */
+export function applyWaterTap(stage: StageDefinition, state: PukupukaGameState): PukupukaGameState {
   if (state.phase !== 'playing') return state
-  const deltaLevel = direction === 'fill' ? WATER_TAP_LEVEL : -WATER_TAP_LEVEL
-  const water = requestWaterChange(
-    stage.waterBodies,
-    state.water,
-    controlTargetBodyId(stage, direction),
-    deltaLevel,
-  )
+  const water = requestWaterChange(stage.waterBodies, state.water, faucetTargetBodyId(stage), WATER_TAP_LEVEL)
   if (water === state.water) return state
   return { ...state, water }
+}
+
+/**
+ * せん/排水のON/OFFを切り替える（#516）。タップのたびに開⇔閉が反転する単純な操作にすることで、
+ * 「ここを開けると水が抜ける」という因果を幼児にも分かりやすくする。クリア後は受け付けない。
+ */
+export function toggleDrain(state: PukupukaGameState): PukupukaGameState {
+  if (state.phase !== 'playing') return state
+  return { ...state, drainOpen: !state.drainOpen }
 }
 
 function advanceOneStep(
@@ -162,10 +164,25 @@ function advanceOneStep(
   const deltaSeconds = FIXED_STEP_MS / 1000
 
   let water = state.water
-  if (control !== null && state.phase === 'playing') {
-    const deltaLevel =
-      (control === 'fill' ? WATER_HOLD_RATE_LEVEL_PER_SEC : -WATER_HOLD_RATE_LEVEL_PER_SEC) * deltaSeconds
-    water = requestWaterChange(stage.waterBodies, water, controlTargetBodyId(stage, control), deltaLevel)
+  if (state.phase === 'playing') {
+    if (control === 'fill') {
+      water = requestWaterChange(
+        stage.waterBodies,
+        water,
+        faucetTargetBodyId(stage),
+        WATER_HOLD_RATE_LEVEL_PER_SEC * deltaSeconds,
+      )
+    }
+    // じゃぐちと同時に開いていても、それぞれ別々に目標水量を押し合うだけなので
+    // 「注水量 - 排水量」に相当する結果へ自然に収束する（特別な合成処理は不要）。
+    if (state.drainOpen) {
+      water = requestWaterChange(
+        stage.waterBodies,
+        water,
+        drainSourceBodyId(stage),
+        -DRAIN_RATE_LEVEL_PER_SEC * deltaSeconds,
+      )
+    }
   }
   water = stepWaterField(stage.waterBodies, water, deltaSeconds)
 
@@ -202,6 +219,7 @@ function advanceOneStep(
       phase,
       elapsedMs: state.elapsedMs + FIXED_STEP_MS,
       leftoverMs: state.leftoverMs,
+      drainOpen: state.drainOpen,
     },
     goalReached,
   }

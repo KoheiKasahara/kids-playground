@@ -1,6 +1,6 @@
 /* スマホ縦画面を最優先にしたレイアウト。
-   1画面（100dvh）の中に「もどる・タイトル / ひとこと / ステージ / みずゲージ /
-   ふやす・へらす / やりなおし」をすべて収め、横スクロールを出さない。 */
+   1画面（100dvh）の中に「もどる・タイトル / ひとこと / ステージ(じゃぐち・せんを含む) /
+   みずゲージ / やりなおし」をすべて収め、横スクロールを出さない。 */
 .page {
   min-height: 100vh;
   min-height: 100dvh;
@@ -11,7 +11,7 @@
   /* ステージSVGは縦長の固定比率のため、列を minmax(0, 1fr) にして
      行の高さぶんの幅を要求されないようにする（横スクロール防止）。 */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   gap: var(--space-xs);
   background: linear-gradient(160deg, #e3f6ff 0%, #f2fbff 55%, #fff7e6 100%);
 }
@@ -174,6 +174,54 @@
   border-radius: var(--radius-md);
 }
 
+/* ---- せん/排水（#516） ---- */
+
+.drainSwirl {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaDrainSwirl 900ms linear infinite;
+}
+
+.drainBubbleA {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaDrainSuck 620ms ease-in infinite;
+}
+
+.drainBubbleB {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaDrainSuck 620ms ease-in infinite 260ms;
+}
+
+/*
+ * 見た目の栓まわりよりタップ領域を広く取り、幼児の指でも押しやすくする。
+ * じゃぐちと違い押しっぱなしにする操作がないため、touch-actionはnoneではなく
+ * manipulation（ダブルタップズームだけ防ぎ、意図しないスクロール抑止は最小限にする）。
+ */
+.drainHit {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.drainHit:disabled {
+  cursor: default;
+}
+
+.drainHit:focus-visible {
+  outline: 3px solid #e8590c;
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
 @keyframes pukupukaWave {
   from {
     transform: translateX(0);
@@ -271,6 +319,27 @@
   }
 }
 
+@keyframes pukupukaDrainSwirl {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 栓の穴へ吸い込まれていくように見せる、あわの縮小＋中心への移動。 */
+@keyframes pukupukaDrainSuck {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(0.2) translateY(2.4px);
+    opacity: 0;
+  }
+}
+
 /* ---- クリア表示 ---- */
 
 .clearBanner {
@@ -340,57 +409,6 @@
   transition: width 90ms linear;
 }
 
-/* ---- 操作ボタン ---- */
-
-.controls {
-  display: grid;
-  grid-template-columns: minmax(0, 260px);
-  justify-content: center;
-  gap: var(--space-sm);
-}
-
-.waterButton {
-  min-height: 76px;
-  padding: var(--space-xs) var(--space-sm);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  border: 3px solid transparent;
-  border-radius: var(--radius-lg);
-  color: #ffffff;
-  font-size: clamp(15px, 4.2vw, 20px);
-  font-weight: 900;
-  line-height: 1.1;
-  box-shadow: var(--shadow-md);
-  cursor: pointer;
-  /* 押しっぱなしで水を出すため、押している間に画面がスクロールしないようにする。 */
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.waterButtonEmoji {
-  font-size: clamp(20px, 6vw, 26px);
-  line-height: 1;
-}
-
-.waterButtonDrain {
-  border-color: #e8590c;
-  background: linear-gradient(180deg, #ffa94d, #e8590c);
-}
-
-.waterButton:active:not(:disabled) {
-  transform: scale(0.96);
-  box-shadow: var(--shadow-sm);
-}
-
-.waterButton:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
 .footer {
   display: flex;
   justify-content: center;
@@ -419,7 +437,7 @@
 @media (orientation: landscape) and (max-height: 520px) {
   .page {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
     column-gap: var(--space-md);
   }
 
@@ -430,7 +448,7 @@
 
   .stageArea {
     grid-column: 1;
-    grid-row: 3 / span 3;
+    grid-row: 3 / span 2;
   }
 
   .gauge {
@@ -439,14 +457,9 @@
     align-self: end;
   }
 
-  .controls {
-    grid-column: 2;
-    grid-row: 4;
-  }
-
   .footer {
     grid-column: 2;
-    grid-row: 5;
+    grid-row: 4;
   }
 }
 
@@ -461,7 +474,10 @@
   .clearBanner,
   .faucetHandleOn,
   .faucetStream,
-  .faucetSplash {
+  .faucetSplash,
+  .drainSwirl,
+  .drainBubbleA,
+  .drainBubbleB {
     animation: none;
   }
 
