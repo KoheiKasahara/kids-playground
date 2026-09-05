@@ -342,15 +342,6 @@
 
 /* ---- ゲート（#517） ---- */
 
-/* とびら本体。開閉のたびに位置を滑らせて、閉じている/開いているの変化を分かりやすくする。 */
-.gateDoor {
-  transition: transform 260ms ease;
-}
-
-.gateDoorOpen {
-  transform: translateX(-13px);
-}
-
 .gateOpenMark {
   transform-box: fill-box;
   transform-origin: center;
@@ -535,8 +526,7 @@
     animation: none;
   }
 
-  .gaugeFill,
-  .gateDoor {
+  .gaugeFill {
     transition: none;
   }
 }
