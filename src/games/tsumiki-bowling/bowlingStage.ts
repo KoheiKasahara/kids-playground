@@ -17,12 +17,17 @@ import { LANE_SLOPE_RAD } from './bowlingPhysics'
 
 /** レーンの左右の半分の幅。玉が多少ずれても落ちない広さにしてある。 */
 export const LANE_HALF_WIDTH = 5.2
-/** レーンの奥行き（半分）。手前の発射位置から奥の壁までを覆う。 */
-export const LANE_HALF_LENGTH = 13
+/**
+ * レーンの奥行き（半分）。手前の発射位置から奥の壁までを覆う。
+ *
+ * 発射位置(LAUNCH_Z)を積み木から遠ざけたぶん、レーンそのものも伸ばしてある
+ * （手前の余白・奥の壁裏の余白は、発射距離を伸ばす前と同じ幅を保っている）。
+ */
+export const LANE_HALF_LENGTH = 19.5
 /** レーン板の厚み（半分）。見た目の板厚で、挙動には影響しない。 */
 export const LANE_HALF_THICKNESS = 0.5
 /** レーン板の中心のZ。手前(+Z)の発射位置から奥(-Z)まで届く位置に置く。 */
-export const LANE_CENTER_Z = -2
+export const LANE_CENTER_Z = 4.5
 
 /** 左右の縁。低い土手にして、崩れた積み木が画面外へ流れ続けないようにする。 */
 export const RAIL_HALF_HEIGHT = 0.4

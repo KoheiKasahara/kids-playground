@@ -586,9 +586,85 @@
 }
 
 /*
+ * 発射の高さ選択（ひくい/ふつう/たかい）。
+ *
+ * 文字だけでは幼児に伝わりにくいので、ボタンの中心はSVGで描いた弾道の形
+ * （低い曲線／中くらいの山／大きな虹形）にしてある。ドラッグ操作（狙う向き・
+ * パワー）とは完全に別のUIで、ここを押しても玉は動かない＝発射もされない。
+ * 玉選択カードのすぐ下に置き、上部の帯（topBar）だけで完結させることで、
+ * 下側のスリングショット操作領域（aimPanelより下、canvas全体）を一切圧迫しない。
+ */
+.heightSelector {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.heightButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 64px;
+  min-height: var(--tap-target-min);
+  padding: 4px 10px 6px;
+  border: 3px solid transparent;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: clamp(10px, 2.6vw, 12px);
+  font-weight: 800;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.heightButtonSelected {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-surface) 97%, transparent);
+  color: var(--color-primary-dark);
+  transform: translateY(-2px) scale(1.05);
+}
+
+.heightButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+
+.heightIcon {
+  width: 46px;
+  height: 38px;
+}
+
+.heightGroundLine {
+  stroke: var(--color-text-muted);
+  stroke-width: 2;
+  opacity: 0.35;
+}
+
+.heightArc {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.heightBallDot {
+  fill: currentColor;
+}
+
+.heightLabel {
+  white-space: nowrap;
+}
+
+/*
  * 背の低い縦画面（iPhone SE 320x568 など）では、玉選択カードが積み木の上部に
  * かぶって塔の天辺が見えなくなる（実画面で確認）。カードを一回り小さくして
  * 積み木を見せる。縮めてもタップ領域は約70pxあり、幼児向けの下限(56px)を下回らない。
+ * 高さ選択ボタンも同じ理由で、同じ比率で小さくする。
  */
 @media (max-height: 680px) {
   .ballCard {
@@ -604,6 +680,17 @@
 
   .ballCardIcon {
     font-size: 12px;
+  }
+
+  .heightButton {
+    gap: 0;
+    padding: 2px 8px 4px;
+    font-size: 10px;
+  }
+
+  .heightIcon {
+    width: 36px;
+    height: 30px;
   }
 }
 

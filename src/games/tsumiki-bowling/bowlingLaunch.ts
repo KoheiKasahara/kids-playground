@@ -7,11 +7,13 @@
  */
 
 import {
-  LAUNCH_PITCH_RAD,
+  LANE_RESTITUTION,
+  LAUNCH_HEIGHT_CONFIG,
   LAUNCH_PULL_MAX,
   LAUNCH_SPEED_MAX,
   LAUNCH_SPEED_MIN,
   LAUNCH_YAW_LIMIT_RAD,
+  type LaunchHeightLevel,
 } from './bowlingPhysics'
 import type { BowlingBallSpec } from './bowlingBalls'
 
@@ -98,14 +100,17 @@ export function aimFromDrag(drag: DragVector, viewport: ViewportSize): LaunchAim
 
 /**
  * 発射方向の単位ベクトル。
- * 常にやや下向き（LAUNCH_PITCH_RAD）で、積み木へ斜め下から打ち込む。
+ *
+ * pitchRadは仰角[rad]（正で上向き、負で下向き）。狙う高さ（ひくい/ふつう/たかい）ごとに
+ * bowlingPhysics.ts の LAUNCH_HEIGHT_CONFIG から渡す。ドラッグの上下量（DragVector.dy）は
+ * ここには一切関わらない＝ドラッグでは高さは変わらない（aimFromDrag参照）。
  */
-export function launchDirection(yaw: number): Vector3 {
+export function launchDirection(yaw: number, pitchRad: number): Vector3 {
   const safeYaw = clamp(yaw, -LAUNCH_YAW_LIMIT_RAD, LAUNCH_YAW_LIMIT_RAD)
-  const cosPitch = Math.cos(LAUNCH_PITCH_RAD)
+  const cosPitch = Math.cos(pitchRad)
   return {
     x: Math.sin(safeYaw) * cosPitch,
-    y: -Math.sin(LAUNCH_PITCH_RAD),
+    y: Math.sin(pitchRad),
     z: -Math.cos(safeYaw) * cosPitch,
   }
 }
@@ -122,10 +127,21 @@ export function launchSpeed(power: number, ball: BowlingBallSpec): number {
   return base * ball.launchSpeedScale
 }
 
-/** 発射時に玉へ与える速度ベクトル。 */
-export function launchVelocity(aim: LaunchAim, ball: BowlingBallSpec): Vector3 {
-  const speed = launchSpeed(aim.power, ball)
-  const direction = launchDirection(aim.yaw)
+/**
+ * 発射時に玉へ与える速度ベクトル。
+ *
+ * heightLevelは別UI（ひくい/ふつう/たかい）で選んだ値をそのまま渡す。
+ * ドラッグ由来のaimには高さの情報を一切含めない（型LaunchAim参照）ので、
+ * 「引っ張る量や向きで高さが勝手に変わる」ことは起きない。
+ */
+export function launchVelocity(
+  aim: LaunchAim,
+  ball: BowlingBallSpec,
+  heightLevel: LaunchHeightLevel,
+): Vector3 {
+  const heightConfig = LAUNCH_HEIGHT_CONFIG[heightLevel]
+  const speed = launchSpeed(aim.power, ball) * heightConfig.speedScale
+  const direction = launchDirection(aim.yaw, heightConfig.pitchRad)
   return {
     x: direction.x * speed,
     y: direction.y * speed,
@@ -135,17 +151,60 @@ export function launchVelocity(aim: LaunchAim, ball: BowlingBallSpec): Vector3 {
 
 /**
  * ドラッグ中に玉をどれだけ引き戻すか（世界座標のオフセット）。
- * 発射方向の逆へ水平に下げるだけで、高さは変えない
- * （高さを変えると発射のたびに軌道が変わってしまう）。
+ * 発射方向（水平成分のみ）の逆へ水平に下げるだけで、高さは変えない
+ * （高さを変えると発射のたびに軌道が変わってしまう。pitchRadに0を渡すのはそのため）。
  */
 export function pullOffset(aim: LaunchAim): Vector3 {
-  const direction = launchDirection(aim.yaw)
+  const direction = launchDirection(aim.yaw, 0)
   const horizontal = Math.hypot(direction.x, direction.z) || 1
   return {
     x: (-direction.x / horizontal) * aim.pull,
     y: 0,
     z: (-direction.z / horizontal) * aim.pull,
   }
+}
+
+export type TrajectoryOptions = {
+  gravityY: number
+  /** その位置のレーン面の高さ。ここへ届いたら軌道を打ち切る。 */
+  surfaceY: (z: number) => number
+  /** レーン面からどれだけ上で打ち切るか（玉の半径ぶん）。 */
+  clearance?: number
+  /** 何秒先まで見せるか。 */
+  maxTime?: number
+  /** 点の数。 */
+  samples?: number
+}
+
+type ArcResult = {
+  points: Vector3[]
+  /** 軌道が地面へ届いた瞬間の速度。地面に届かず尽きた場合はnull。 */
+  landingVelocity: Vector3 | null
+}
+
+/** 放物線を等間隔サンプリングし、地面（surfaceY+clearance）へ届いたら打ち切る。 */
+function simulateArc(start: Vector3, velocity: Vector3, options: TrajectoryOptions): ArcResult {
+  const { gravityY, surfaceY } = options
+  const clearance = options.clearance ?? 0
+  const maxTime = options.maxTime ?? 1.4
+  const samples = Math.max(1, Math.floor(options.samples ?? 14))
+  const points: Vector3[] = []
+  const dt = maxTime / samples
+  let landingVelocity: Vector3 | null = null
+  for (let index = 1; index <= samples; index += 1) {
+    const t = index * dt
+    const point: Vector3 = {
+      x: start.x + velocity.x * t,
+      y: start.y + velocity.y * t + 0.5 * gravityY * t * t,
+      z: start.z + velocity.z * t,
+    }
+    points.push(point)
+    if (point.y <= surfaceY(point.z) + clearance) {
+      landingVelocity = { x: velocity.x, y: velocity.y + gravityY * t, z: velocity.z }
+      break
+    }
+  }
+  return { points, landingVelocity }
 }
 
 /**
@@ -159,33 +218,59 @@ export function pullOffset(aim: LaunchAim): Vector3 {
 export function predictTrajectory(
   start: Vector3,
   velocity: Vector3,
-  options: {
-    gravityY: number
-    /** その位置のレーン面の高さ。ここへ届いたら軌道を打ち切る。 */
-    surfaceY: (z: number) => number
-    /** レーン面からどれだけ上で打ち切るか（玉の半径ぶん）。 */
-    clearance?: number
-    /** 何秒先まで見せるか。 */
-    maxTime?: number
-    /** 点の数。 */
-    samples?: number
-  },
+  options: TrajectoryOptions,
 ): Vector3[] {
-  const { gravityY, surfaceY } = options
-  const clearance = options.clearance ?? 0
-  const maxTime = options.maxTime ?? 1.4
-  const samples = Math.max(1, Math.floor(options.samples ?? 14))
-  const points: Vector3[] = []
-  const dt = maxTime / samples
-  for (let index = 1; index <= samples; index += 1) {
-    const t = index * dt
-    const point: Vector3 = {
-      x: start.x + velocity.x * t,
-      y: start.y + velocity.y * t + 0.5 * gravityY * t * t,
-      z: start.z + velocity.z * t,
-    }
-    points.push(point)
-    if (point.y <= surfaceY(point.z) + clearance) break
+  return simulateArc(start, velocity, options).points
+}
+
+/** 玉の反発係数から、床とぶつかったときのおおまかな反発係数を見積もる。 */
+export function combinedRestitution(ballRestitution: number): number {
+  return (ballRestitution + LANE_RESTITUTION) / 2
+}
+
+/** これ未満の跳ね上がり速度[m/s]では、2個目のバウンド点を出さない（最初の点とほぼ重なって見分けが付かないため）。 */
+const MIN_BOUNCE_UP_SPEED = 0.6
+
+export type BouncePreview = {
+  /** 発射から最初の接地までの点列（従来の赤い軌道ガイド用）。 */
+  points: Vector3[]
+  /** 最初に床へ着く位置。空中で軌道が尽きた場合はnull。 */
+  firstBounce: Vector3 | null
+  /** 最初の接地から先、次に床へ着くと予測される位置。ほとんど跳ねない球ではnull。 */
+  secondBounce: Vector3 | null
+}
+
+/**
+ * 軌道プレビュー（バウンド予測つき）。
+ *
+ * 実際の発射計算（launchVelocity）と同じ重力・pitchRadのロジックをそのまま使うので、
+ * ここで見せる弾道は実際の物理挙動とほぼ一致する。
+ * バウンド後の速度は、垂直成分だけを反発係数で減衰させ、水平成分はそのまま
+ * 引き継ぐ単純化した近似（実際のRapierは着地の摩擦で水平方向も減速するが、
+ * プレビューは「だいたいどこで跳ねるか」が伝われば十分なため、あえて単純化してある）。
+ */
+export function predictBouncePreview(
+  start: Vector3,
+  velocity: Vector3,
+  options: TrajectoryOptions & { restitution: number },
+): BouncePreview {
+  const first = simulateArc(start, velocity, options)
+  const firstBounce = first.points[first.points.length - 1] ?? null
+  if (!firstBounce || !first.landingVelocity) {
+    return { points: first.points, firstBounce: null, secondBounce: null }
   }
-  return points
+  const restitution = Number.isFinite(options.restitution)
+    ? Math.min(1, Math.max(0, options.restitution))
+    : 0
+  const bounceVelocity: Vector3 = {
+    x: first.landingVelocity.x,
+    y: -first.landingVelocity.y * restitution,
+    z: first.landingVelocity.z,
+  }
+  if (bounceVelocity.y < MIN_BOUNCE_UP_SPEED) {
+    return { points: first.points, firstBounce, secondBounce: null }
+  }
+  const second = simulateArc(firstBounce, bounceVelocity, options)
+  const secondBounce = second.points[second.points.length - 1] ?? null
+  return { points: first.points, firstBounce, secondBounce }
 }

@@ -4,6 +4,7 @@ import {
   BOWLING_STAGES,
   DEFAULT_BOWLING_STAGE_ID,
   getBowlingStage,
+  LANE_CENTER_Z,
   LANE_HALF_LENGTH,
   LANE_HALF_WIDTH,
   laneBodyTransform,
@@ -90,7 +91,10 @@ describe('レーンの形', () => {
   })
 
   it('積み木も発射位置もレーンの内側にある', () => {
-    expect(Math.abs(LAUNCH_Z)).toBeLessThan(LANE_HALF_LENGTH)
+    // レーンはLANE_CENTER_Zを中心に前後LANE_HALF_LENGTHぶん広がる
+    // （中心が0でないため、絶対値だけで比べる近似は使わない）。
+    expect(LAUNCH_Z).toBeLessThan(LANE_CENTER_Z + LANE_HALF_LENGTH)
+    expect(LAUNCH_Z).toBeGreaterThan(LANE_CENTER_Z - LANE_HALF_LENGTH)
   })
 
   it('既定ステージでは、発射位置は積み木の一番上より高い', () => {
@@ -140,9 +144,11 @@ describe('全ステージ共通の制約', () => {
   it.each(BOWLING_STAGES)('$name: 玉から積み木まで、ビューンと進むのを楽しめる助走距離がある', (stage) => {
     // 近すぎると、離した瞬間にもう当たっていて「飛んでいく」が見えない。
     // 遠すぎると、幼児には狙いにくく、当たるまで待たされる。
+    // 発射地点を積み木から遠ざけた（LAUNCH_Z=20）ことで、以前(12.5〜15m)の
+    // およそ1.9倍（約26〜27m）になっている。
     const runUp = LAUNCH_Z - stageBounds(stage).frontZ
-    expect(runUp).toBeGreaterThan(12.5)
-    expect(runUp).toBeLessThan(15)
+    expect(runUp).toBeGreaterThan(25)
+    expect(runUp).toBeLessThan(28)
   })
 
   it.each(BOWLING_STAGES)('$name: 奥には、崩れた積み木が散らばるだけの余地が残っている', (stage) => {

@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import {
+  DEFAULT_LAUNCH_HEIGHT_LEVEL,
   GRAVITY_Y,
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
+  type LaunchHeightLevel,
 } from './bowlingPhysics'
 import {
   BACK_WALL_HALF_HEIGHT,
@@ -24,8 +26,9 @@ import {
 import { bowlingCameraSetup } from './bowlingCamera'
 import {
   aimFromDrag,
+  combinedRestitution,
   launchVelocity,
-  predictTrajectory,
+  predictBouncePreview,
   type LaunchAim,
 } from './bowlingLaunch'
 import {
@@ -89,6 +92,12 @@ export type TsumikiBowlingEngineOptions = {
   runId: number
   stageId?: string
   ballId?: BowlingBallId
+  /**
+   * 発射の高さ（ひくい/ふつう/たかい）。毎フレーム読むだけの値なので、
+   * setBallIdのような専用ハンドルは不要。ドラッグ中のプレビューと発射の
+   * 両方で、ここに渡した最新値をそのまま使う。
+   */
+  heightLevel?: LaunchHeightLevel
   /** 発射した瞬間に1回だけ呼ばれる。 */
   onThrowStart: (throwNumber: number) => void
   /** 1投が落ち着いたときに1回だけ呼ばれる。 */
@@ -144,6 +153,14 @@ const SHAKE_MIN_STRENGTH = 0.25
 
 /** 予測軌道の点の数。多すぎると線に見えてしまい、少なすぎると方向が読めない。 */
 const GUIDE_DOT_COUNT = 18
+
+/**
+ * 予測軌道を何秒先まで計算するか。
+ * 「たかい」は滞空時間が長く、距離を伸ばした（LAUNCH_Z=20）ぶん「ふつう」でも
+ * 着地までに1秒前後かかるため、Phase 1〜4の0.9秒のままだと空中で表示が
+ * 打ち切られてしまう（実測で確認した）。
+ */
+const GUIDE_MAX_TIME_S = 1.8
 
 /** HUDのパワー表示を更新する最小の変化量。細かすぎる再レンダーを避ける。 */
 const AIM_POWER_STEP = 0.04
@@ -319,6 +336,8 @@ export function useTsumikiBowlingEngine(
     const guideDots: THREE.Mesh[] = []
     let guideMaterial: THREE.MeshBasicMaterial | null = null
     let landingRing: THREE.Mesh | null = null
+    /** 2個目の着地予測（はずむだま等、よく跳ねる球でだけ出す）。赤いlandingRingと混同しないよう別色・小さめにしてある。 */
+    let secondBounceRing: THREE.Mesh | null = null
     /** 発射ガイドの脈動に使う経過時間の積算（Date.now()は使わずdeltaMsだけで進める）。 */
     let guidePulseMs = 0
 
@@ -375,6 +394,7 @@ export function useTsumikiBowlingEngine(
       ballMesh = null
       guideMaterial = null
       landingRing = null
+      secondBounceRing = null
       trailPool.length = 0
       bounceRingPool.length = 0
       sparkleParticles.length = 0
@@ -635,8 +655,12 @@ export function useTsumikiBowlingEngine(
     }
 
     /**
-     * 発射ガイド。玉が飛ぶ道すじを点で描き、最後に着地点の輪を置く。
+     * 発射ガイド。玉が飛ぶ道すじを点で描き、最初の着地点に輪を置く。
      * 点の長さでパワーが、左右の曲がりで発射方向が分かる。
+     *
+     * よく跳ねる球（はずむだま等）では、最初の着地点よりひとまわり小さく、
+     * 別の色のリング（secondBounceRing）で「次はどこへ跳ねるか」も見せる。
+     * 通常の着地リングと見分けが付くよう、色・大きさをはっきり変えてある。
      */
     function createGuide(target: THREE.Scene) {
       guideMaterial = trackMaterial(
@@ -657,6 +681,22 @@ export function useTsumikiBowlingEngine(
       landingRing.visible = false
       landingRing.renderOrder = 3
       target.add(landingRing)
+
+      const secondBounceMaterial = trackMaterial(
+        new THREE.MeshBasicMaterial({
+          color: 0x4fd6ff,
+          transparent: true,
+          opacity: 0.85,
+          side: THREE.DoubleSide,
+        }),
+      )
+      secondBounceRing = new THREE.Mesh(
+        track(new THREE.RingGeometry(0.22, 0.36, 20)),
+        secondBounceMaterial,
+      )
+      secondBounceRing.visible = false
+      secondBounceRing.renderOrder = 3
+      target.add(secondBounceRing)
     }
 
     function createImpactPool(target: THREE.Scene) {
@@ -1020,7 +1060,7 @@ export function useTsumikiBowlingEngine(
       flying = true
       trailAccumMs = 0
       launchPopRemainingMs = prefersReducedMotion ? 0 : LAUNCH_POP_MS
-      launchBall(bowling, aim)
+      launchBall(bowling, aim, optionsRef.current.heightLevel ?? DEFAULT_LAUNCH_HEIGHT_LEVEL)
       const ballPosition = bowling.ball.translation()
       spawnLaunchFlash({ x: ballPosition.x, y: ballPosition.y, z: ballPosition.z })
       soundController.playLaunch(bowling.ballSpec.id, aim.power)
@@ -1254,22 +1294,27 @@ export function useTsumikiBowlingEngine(
 
       // 発射ガイド（予測軌道）
       guidePulseMs += deltaMs
-      if (guideMaterial && landingRing) {
+      if (guideMaterial && landingRing && secondBounceRing) {
         const aim = currentAim
         const show = aim !== null && aim.active && canPullBall()
         if (show && aim) {
           const ballPosition = bowling.ball.translation()
-          const points = predictTrajectory(
+          const heightLevel = optionsRef.current.heightLevel ?? DEFAULT_LAUNCH_HEIGHT_LEVEL
+          // 実際の発射計算（launchBall→launchVelocity）とまったく同じ関数・同じ高さ設定を
+          // 使うので、ここで見せる軌道は実際の物理挙動とほぼ一致する。
+          const preview = predictBouncePreview(
             { x: ballPosition.x, y: ballPosition.y, z: ballPosition.z },
-            launchVelocity(aim, bowling.ballSpec),
+            launchVelocity(aim, bowling.ballSpec, heightLevel),
             {
               gravityY: GRAVITY_Y,
               surfaceY: laneSurfaceY,
               clearance: bowling.ballSpec.radius,
+              restitution: combinedRestitution(bowling.ballSpec.restitution),
               samples: GUIDE_DOT_COUNT,
-              maxTime: 0.9,
+              maxTime: GUIDE_MAX_TIME_S,
             },
           )
+          const points = preview.points
           // パワーが上がるほど点を太くする。最大付近(GUIDE_STRONG_POWER以上)ではゆっくり
           // 脈動させ、「もう最大まで引けている」を体で分かるようにする
           // （prefers-reduced-motionでは脈動させない）。
@@ -1286,12 +1331,25 @@ export function useTsumikiBowlingEngine(
               dot.scale.setScalar((1 - (index / GUIDE_DOT_COUNT) * 0.45) * powerScale * pulse)
             }
           })
-          const landing = points[points.length - 1]
-          landingRing.visible = landing !== undefined
-          if (landing) {
-            landingRing.position.set(landing.x, laneSurfaceY(landing.z) + 0.02, landing.z)
+          // 最初の着地点。従来どおりの赤系リング（大きめ）。
+          const firstBounce = preview.firstBounce
+          landingRing.visible = firstBounce !== null
+          if (firstBounce) {
+            landingRing.position.set(firstBounce.x, laneSurfaceY(firstBounce.z) + 0.02, firstBounce.z)
             landingRing.quaternion.copy(flatOnLane)
             landingRing.scale.setScalar(pulse)
+          }
+          // 次に跳ねる先（はずむだま等、よく跳ねる球でだけ意味のある距離になる）。
+          // ひとまわり小さい別色のリングにして、最初の着地点と混同しないようにする。
+          const secondBounce = preview.secondBounce
+          secondBounceRing.visible = secondBounce !== null
+          if (secondBounce) {
+            secondBounceRing.position.set(
+              secondBounce.x,
+              laneSurfaceY(secondBounce.z) + 0.02,
+              secondBounce.z,
+            )
+            secondBounceRing.quaternion.copy(flatOnLane)
           }
           // 最大付近では常に強い赤へ張り付かせ、「最大まで引けた」がはっきり伝わるようにする。
           guideColor.copy(weakColor).lerp(strongColor, isNearMax ? 1 : aim.power)
@@ -1299,6 +1357,7 @@ export function useTsumikiBowlingEngine(
         } else {
           for (const dot of guideDots) dot.visible = false
           landingRing.visible = false
+          secondBounceRing.visible = false
         }
       }
 
