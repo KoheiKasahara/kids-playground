@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Project Health Dashboard が Nightly / Deploy の直近結果を GitHub Actions API
+      # から読み取るために必要な最小権限（書き込みは行わない）。
+      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -110,6 +113,38 @@ jobs:
           CI_PACKAGE_MANAGER: npm
           CI_CACHE: setup-node npm cache
         run: node scripts/ci-summary.mjs
+
+      # ここから Project Health Dashboard（Issue #523）。
+      # 既存の quick test / build の成果物と、Nightly / Deploy ワークフローの
+      # 直近実行結果を再利用するだけで、通常CIのためのテスト・buildの再実行は行わない。
+      - name: Project Health - fetch Nightly / Deploy status
+        id: project-health-context
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/project-health/fetch-github-context.mjs
+
+      - name: Project Health - download Nightly E2E smoke report
+        if: always() && steps.project-health-context.outputs.nightly_run_id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: project-health-e2e-nightly
+          run-id: ${{ steps.project-health-context.outputs.nightly_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: project-health/nightly-e2e
+
+      - name: Project Health - dependency audit
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p project-health
+          npm audit --json > project-health/npm-audit.json 2>/dev/null || true
+
+      - name: Project Health - write summary
+        if: always()
+        run: node scripts/project-health/generate-summary.mjs
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5

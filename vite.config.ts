@@ -148,7 +148,11 @@ export default defineConfig({
           globals: true,
           setupFiles: testSetupFiles,
           alias: testAlias,
-          include: ['src/**/*.test.ts', ...domIndependentTestTsxFiles],
+          include: [
+            'src/**/*.test.ts',
+            ...domIndependentTestTsxFiles,
+            'scripts/project-health/**/*.test.mjs',
+          ],
           exclude: [...domDependentTestTsFiles, ...slowTestFiles],
         },
       },
