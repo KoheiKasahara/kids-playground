@@ -497,6 +497,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'pukupuka-rescue',
+    slug: 'pukupuka-rescue',
+    title: 'ぷかぷかレスキュー',
+    emoji: '🛟',
+    seo: {
+      headline: 'ぷかぷかレスキュー｜水をふやしてアヒルをゴールへ',
+      description:
+        'よこから見た水そうの水をふやしたりへらしたりして、ぷかぷか浮かぶアヒルをゴールの浮き輪まではこぶ幼児向けのゲームです。水がふえるとアヒルが浮かび、水がへると下がる仕組みを、指2本ぶんの大きなボタンだけで確かめられます。',
+    },
+    category: 'learning',
+    intro: {
+      howToPlay: [
+        'みずを ふやすと アヒルが うかんで あがるよ',
+        'かべを こえたら みずを へらして おろそう',
+        'ゴールの うきわに とどいたら クリアだよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

@@ -4,8 +4,8 @@ import { GAME_CATALOG, GAME_CATEGORIES, findGameBySlug, gameRoutePath, type Game
 import { routes } from '../app/routes'
 
 describe('gameCatalog', () => {
-  test('カタログは24件ある', () => {
-    expect(GAME_CATALOG).toHaveLength(24)
+  test('カタログは25件ある', () => {
+    expect(GAME_CATALOG).toHaveLength(25)
   })
 
   test('slug がすべて一意（重複なし）', () => {
