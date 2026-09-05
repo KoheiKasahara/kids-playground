@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import { CAR_CATEGORIES, DEFAULT_CAR_CONFIG, selectCarOption, type CarConfig } from './carConfig'
 import {
-  CAR_WHEEL_SPECS,
+  CAR_WHEEL_RATIOS,
   carBoundingRadius,
   computeCarAttachments,
   computeCarDimensions,
+  resolveWheelSpec,
 } from './carDimensions'
 import { CAR_VEHICLES, CAR_VEHICLE_ORDER } from './carVehicles'
 
@@ -117,11 +118,21 @@ describe('組み合わせ耐性（7ボディ×タイヤ×車高の全パター�
     },
   )
 
-  test('タイヤを大きくすると車体が持ち上がる（低い車高でも同じ）', () => {
+  test('車種の実測比率に収まるタイヤは、ふつうの車高では車体を持ち上げない', () => {
+    // Phase 3 の再調整後は、タイヤが車体へめり込む危険がないかぎり
+    // 無駄に車体を持ち上げない（＝以前のように一律の絶対サイズで強制的に
+    // 持ち上げていた挙動をやめた）。
     const small = computeCarDimensions(DEFAULT_CAR_CONFIG)
     const big = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', 'big'))
-    expect(big.bodyFloorY).toBeGreaterThan(small.bodyFloorY)
-    expect(big.bodyLift).toBeGreaterThan(small.bodyLift)
+    expect(big.bodyFloorY).toBeCloseTo(small.bodyFloorY, 6)
+  })
+
+  test('低い車高で大きいタイヤを選ぶと、車体へめり込まないよう持ち上がる', () => {
+    const base = selectCarOption(DEFAULT_CAR_CONFIG, 'rideHeight', 'low')
+    const small = computeCarDimensions(base)
+    const offroad = computeCarDimensions(selectCarOption(base, 'wheel', 'offroad'))
+    expect(offroad.bodyFloorY).toBeGreaterThan(small.bodyFloorY)
+    expect(offroad.bodyLift).toBeGreaterThan(small.bodyLift)
   })
 
   test('車高「たかい」は同じタイヤなら最低地上高が上がる', () => {
@@ -148,7 +159,39 @@ describe('組み合わせ耐性（7ボディ×タイヤ×車高の全パター�
     expect(offroad.wheelWidth).toBeGreaterThan(racing.wheelWidth)
     expect(racing.wheelWidth).toBeGreaterThan(small.wheelWidth)
     expect(racing.wheelRadius).toBeLessThan(offroad.wheelRadius)
-    expect(CAR_WHEEL_SPECS.small.radius).toBeLessThan(CAR_WHEEL_SPECS.big.radius)
+    expect(CAR_WHEEL_RATIOS.small.radiusRatio).toBeLessThan(CAR_WHEEL_RATIOS.big.radiusRatio)
+  })
+
+  test('タイヤの大きさは車種ごとの元タイヤ実測値からの倍率で決まる（固定の絶対値を使わない）', () => {
+    // 元タイヤ半径が最も違う2車種（SUVが最大、SchoolBusが最小）で確かめる。
+    for (const type of ['small', 'big', 'offroad', 'racing'] as const) {
+      const suv = resolveWheelSpec(CAR_VEHICLES.suv, type)
+      const schoolBus = resolveWheelSpec(CAR_VEHICLES.schoolBus, type)
+      expect(suv.radius, type).toBeGreaterThan(schoolBus.radius)
+    }
+  })
+
+  test('オフロードタイヤでも元タイヤの1.3倍以内に収まり、ホイールアーチから大きくはみ出さない', () => {
+    // Phase 1 #534 の調査で、固定サイズだと元タイヤの約2倍になる車種があると分かった。
+    // 車種ごとの倍率にしたことで、どの車種でも極端な拡大にならないことを保証する。
+    for (const id of CAR_VEHICLE_ORDER) {
+      const vehicle = CAR_VEHICLES[id]
+      const nativeRadius = (vehicle.wheels.front.radius + vehicle.wheels.rear.radius) / 2
+      const offroad = resolveWheelSpec(vehicle, 'offroad')
+      expect(offroad.radius, id).toBeLessThanOrEqual(nativeRadius * 1.3)
+    }
+  })
+
+  test('全車種×4タイヤ種で寸法が有限かつ正の値になる', () => {
+    for (const id of CAR_VEHICLE_ORDER) {
+      for (const type of ['small', 'big', 'offroad', 'racing'] as const) {
+        const spec = resolveWheelSpec(CAR_VEHICLES[id], type)
+        expect(spec.radius, `${id}/${type}`).toBeGreaterThan(0)
+        expect(spec.width, `${id}/${type}`).toBeGreaterThan(0)
+        expect(Number.isFinite(spec.radius), `${id}/${type}`).toBe(true)
+        expect(Number.isFinite(spec.width), `${id}/${type}`).toBe(true)
+      }
+    }
   })
 
   test('ボディを変えても4輪・前後端・ルーフのattachmentが寸法に追従する', () => {

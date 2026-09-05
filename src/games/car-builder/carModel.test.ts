@@ -370,10 +370,11 @@ describe('車体の位置合わせ', () => {
     model.dispose()
   })
 
-  test('タイヤを大きくすると車体も持ち上がる', async () => {
-    const model = await createReadyModel()
+  test('低い車高でタイヤを大きくすると、めり込まないよう車体も持ち上がる', async () => {
+    const base = selectCarOption(DEFAULT_CAR_CONFIG, 'rideHeight', 'low')
+    const model = await createReadyModel(base)
     const before = layerOf(model.root, 'body').position.y
-    model.update(selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', 'offroad'))
+    model.update(selectCarOption(base, 'wheel', 'offroad'))
     expect(layerOf(model.root, 'body').position.y).toBeGreaterThan(before)
     model.dispose()
   })
