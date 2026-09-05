@@ -5,9 +5,8 @@
  * タイヤ・フロント・屋根・飾り・マークの座標へボディ種別を持ち込まないこと。
  */
 import * as THREE from 'three'
-import type { BodyType, CarCategoryId, CarConfig, CarMarkIcon, CarOptionIdMap, FrontType, MarkType } from './carConfig'
+import type { CarCategoryId, CarConfig, CarMarkIcon, CarOptionIdMap, FrontType, MarkType } from './carConfig'
 import type { CarAttachment, CarAttachments, CarDimensions } from './carDimensions'
-import { createSportsHull, sportsSurfacePoint } from './sportsBodySurface'
 
 export type CarPartContext = {
   config: CarConfig
@@ -20,35 +19,26 @@ export type CarPartContext = {
 /** パーツを持たない選択（「なし」）では null を返す。 */
 export type CarPartBuilder = (context: CarPartContext) => THREE.Object3D | null
 
-/** 3Dの見た目（レイヤー）を持つカテゴリ。 */
-export const CAR_PART_CATEGORY_IDS = ['body', 'wheel', 'front', 'roof', 'decoration', 'mark'] as const
+/** ここで手続き的に組み立てるカテゴリ。 */
+export const CAR_PART_CATEGORY_IDS = ['wheel', 'front', 'roof', 'decoration', 'mark'] as const
 export type CarPartCategoryId = (typeof CAR_PART_CATEGORY_IDS)[number]
 
 /**
+ * GLBの読み込みで表示するカテゴリ。生成関数を持たず carModel.ts が非同期に差し替える。
+ */
+export const CAR_MODEL_CATEGORY_IDS = ['body'] as const satisfies readonly CarCategoryId[]
+
+/**
  * 自前のレイヤーを持たず、他のパーツの入力（色・寸法）として効くカテゴリ。
- * カテゴリを足したときにどちらにも入れ忘れると carParts.test.ts が落ちる。
+ * カテゴリを足したときにどれにも入れ忘れると carModel.test.ts が落ちる。
  */
 export const CAR_DERIVED_CATEGORY_IDS = ['color', 'rideHeight'] as const satisfies readonly CarCategoryId[]
 
 const TIRE_COLOR = '#2f3438'
 const CHROME_COLOR = '#d5dbe1'
-const GLASS_COLOR = '#33506b'
-const WHITE_ACCENT = '#f7f9fc'
-const POLICE_BLUE = '#2451a6'
-const POLICE_RED = '#e64a4a'
 
 function standard(color: string, roughness = 0.45, metalness = 0.05): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness })
-}
-
-function sportsPaint(color: string): THREE.MeshPhysicalMaterial {
-  return new THREE.MeshPhysicalMaterial({
-    color,
-    roughness: 0.4,
-    metalness: 0.05,
-    clearcoat: 0.22,
-    clearcoatRoughness: 0.26,
-  })
 }
 
 function box(
@@ -63,38 +53,6 @@ function box(
   return mesh
 }
 
-/**
- * 車体側面の輪郭を押し出したMesh。
- * x方向へ押し出してからY軸回転することで、点列の横軸を車のZ方向として扱う。
- * 箱だけを積むよりも、スポーツカーの低い鼻先やバスの直立した輪郭を自然に出せる。
- */
-type ProfilePoint = readonly [z: number, y: number]
-
-function profileMesh(
-  points: readonly ProfilePoint[],
-  width: number,
-  material: THREE.Material,
-  name: string,
-): THREE.Mesh {
-  const shape = new THREE.Shape()
-  const first = points[0]
-  if (first === undefined) throw new Error('車体プロファイルが空です')
-  shape.moveTo(first[0], first[1])
-  for (const point of points.slice(1)) shape.lineTo(point[0], point[1])
-  shape.closePath()
-
-  const mesh = new THREE.Mesh(
-    new THREE.ExtrudeGeometry(shape, { depth: width, bevelEnabled: false }),
-    material,
-  )
-  mesh.name = name
-  mesh.rotation.y = -Math.PI / 2
-  mesh.position.x = width / 2
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  return mesh
-}
-
 /** 取り付け面から法線方向へ `distance` だけ離した位置を返す。 */
 function offsetFrom(attachment: CarAttachment, distance: number): THREE.Vector3 {
   return new THREE.Vector3(
@@ -102,311 +60,6 @@ function offsetFrom(attachment: CarAttachment, distance: number): THREE.Vector3 
     attachment.position.y + attachment.normal.y * distance,
     attachment.position.z + attachment.normal.z * distance,
   )
-}
-
-function createBodyGroup(): THREE.Group {
-  const group = new THREE.Group()
-  group.name = 'car-body'
-  return group
-}
-
-function cabinProfile(
-  dimensions: CarDimensions,
-  frontRoofRatio: number,
-  rearRoofRatio: number,
-): readonly ProfilePoint[] {
-  const halfCabin = dimensions.cabinLength / 2
-  const center = dimensions.cabinCenterZ
-  return [
-    [center - halfCabin, dimensions.hullTopY],
-    [center + halfCabin, dimensions.hullTopY],
-    [center + halfCabin * frontRoofRatio, dimensions.roofTopY],
-    [center - halfCabin * rearRoofRatio, dimensions.roofTopY],
-  ]
-}
-
-function addCabin(
-  group: THREE.Group,
-  dimensions: CarDimensions,
-  bodyMaterial: THREE.Material,
-  glassMaterial: THREE.Material,
-  frontRoofRatio: number,
-  rearRoofRatio: number,
-): void {
-  group.add(profileMesh(cabinProfile(dimensions, frontRoofRatio, rearRoofRatio), dimensions.cabinWidth, bodyMaterial, 'car-body-cabin'))
-  group.add(
-    box(
-      {
-        x: dimensions.cabinWidth * 1.01,
-        y: dimensions.cabinHeight * 0.42,
-        z: dimensions.cabinLength * 0.86,
-      },
-      {
-        x: 0,
-        y: dimensions.hullTopY + dimensions.cabinHeight * 0.58,
-        z: dimensions.cabinCenterZ,
-      },
-      glassMaterial,
-    ),
-  )
-}
-
-function addBumpers(group: THREE.Group, dimensions: CarDimensions, material: THREE.Material): void {
-  const front = dimensions.length / 2
-  const bumperY = dimensions.bodyFloorY + dimensions.hullHeight * 0.18
-  group.add(
-    box(
-      { x: dimensions.width * 0.9, y: dimensions.hullHeight * 0.14, z: 0.12 },
-      { x: 0, y: bumperY, z: front + 0.035 },
-      material,
-    ),
-    box(
-      { x: dimensions.width * 0.9, y: dimensions.hullHeight * 0.14, z: 0.12 },
-      { x: 0, y: bumperY, z: -front - 0.035 },
-      material,
-    ),
-  )
-}
-
-function buildSportsBody({ dimensions, attachments, color }: CarPartContext): THREE.Object3D {
-  const group = createBodyGroup()
-  const bodyMaterial = sportsPaint(color)
-  // ガラスも開口部も外殻と同じサーフェスのマテリアルグループ。板や箱を貼らない。
-  const glassMaterial = new THREE.MeshPhysicalMaterial({
-    color: '#1b2f42',
-    roughness: 0.09,
-    metalness: 0.1,
-    clearcoat: 0.7,
-    clearcoatRoughness: 0.06,
-  })
-  const openingMaterial = standard('#1b232c', 0.42, 0.14)
-
-  const hull = createSportsHull(dimensions, attachments, bodyMaterial, glassMaterial, openingMaterial)
-  group.add(hull.mesh)
-
-  // テールランプ。外殻の面を直接問い合わせて置くので、リアが丸くなっても
-  // 埋まったり浮いたりしない。箱やクロームの帯はリアへ貼り足さない。
-  const lampMaterial = standard('#e2413c', 0.3, 0.12)
-  const lampAnchor = sportsSurfacePoint(dimensions, attachments, -dimensions.length / 2 + 0.16, 0.42)
-  for (const side of [1, -1] as const) {
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.085, 14, 10), lampMaterial)
-    lamp.name = `car-sports-tail-lamp-${side === 1 ? 'left' : 'right'}`
-    lamp.scale.set(2.1, 0.5, 0.55)
-    lamp.position.set(
-      side * lampAnchor.position.x * 0.62,
-      lampAnchor.position.y,
-      lampAnchor.position.z - 0.02,
-    )
-    lamp.castShadow = true
-    group.add(lamp)
-  }
-
-  return group
-}
-
-function buildSuvBody({ dimensions, color }: CarPartContext): THREE.Object3D {
-  const group = createBodyGroup()
-  const bodyMaterial = standard(color, 0.44)
-  const glassMaterial = standard(GLASS_COLOR, 0.18, 0.1)
-  const trimMaterial = standard('#687585', 0.5, 0.18)
-  const half = dimensions.length / 2
-  const floor = dimensions.bodyFloorY
-  const hoodEnd = half - dimensions.hoodLength
-
-  // スポーツカーより背が高く、厚い下段と大きなキャビンを持つ。
-  group.add(
-    profileMesh(
-      [
-        [-half, floor],
-        [half, floor],
-        [half, floor + dimensions.hullHeight * 0.76],
-        [hoodEnd, floor + dimensions.hullHeight],
-        [-half * 0.86, floor + dimensions.hullHeight],
-        [-half, floor + dimensions.hullHeight * 0.7],
-      ],
-      dimensions.width,
-      bodyMaterial,
-      'car-body-hull',
-    ),
-  )
-  addCabin(group, dimensions, bodyMaterial, glassMaterial, 0.86, 0.9)
-  group.add(
-    box(
-      { x: dimensions.width * 0.88, y: 0.11, z: dimensions.hoodLength * 0.78 },
-      { x: 0, y: dimensions.hullTopY + 0.04, z: half - dimensions.hoodLength * 0.45 },
-      trimMaterial,
-    ),
-    box(
-      { x: dimensions.width * 1.04, y: 0.14, z: dimensions.length * 0.78 },
-      { x: 0, y: floor + 0.15, z: 0 },
-      trimMaterial,
-    ),
-  )
-  addBumpers(group, dimensions, trimMaterial)
-  return group
-}
-
-function buildBusBody({ dimensions, color }: CarPartContext): THREE.Object3D {
-  const group = createBodyGroup()
-  const bodyMaterial = standard(color, 0.48)
-  const glassMaterial = standard('#2f6582', 0.13, 0.1)
-  const trimMaterial = standard('#e7edf2', 0.36, 0.2)
-  const half = dimensions.length / 2
-  const floor = dimensions.bodyFloorY
-
-  // 長く高い箱形客室。横一列の窓と柱を加えて、乗用車との違いを明確にする。
-  group.add(
-    profileMesh(
-      [
-        [-half, floor],
-        [half, floor],
-        [half, floor + dimensions.hullHeight * 0.92],
-        [half * 0.96, floor + dimensions.hullHeight],
-        [-half * 0.96, floor + dimensions.hullHeight],
-        [-half, floor + dimensions.hullHeight * 0.92],
-      ],
-      dimensions.width,
-      bodyMaterial,
-      'car-body-hull',
-    ),
-  )
-  addCabin(group, dimensions, bodyMaterial, glassMaterial, 0.97, 0.97)
-
-  const windowY = dimensions.hullTopY + dimensions.cabinHeight * 0.58
-  const pillarMaterial = standard(color, 0.38)
-  const halfCabin = dimensions.cabinLength / 2
-  for (let index = 1; index < 7; index += 1) {
-    const z = dimensions.cabinCenterZ - halfCabin + (dimensions.cabinLength * index) / 7
-    for (const side of [-1, 1] as const) {
-      group.add(
-        box(
-          { x: 0.055, y: dimensions.cabinHeight * 0.48, z: 0.075 },
-          { x: side * (dimensions.cabinWidth / 2 + 0.012), y: windowY, z },
-          pillarMaterial,
-        ),
-      )
-    }
-  }
-  group.add(
-    box(
-      { x: dimensions.width * 0.72, y: dimensions.cabinHeight * 0.22, z: 0.08 },
-      { x: 0, y: dimensions.roofTopY - dimensions.cabinHeight * 0.1, z: half - 0.08 },
-      trimMaterial,
-    ),
-  )
-  addBumpers(group, dimensions, trimMaterial)
-  return group
-}
-
-function buildTruckBody({ dimensions, color }: CarPartContext): THREE.Object3D {
-  const group = createBodyGroup()
-  const bodyMaterial = standard(color, 0.5)
-  const glassMaterial = standard(GLASS_COLOR, 0.16, 0.1)
-  const trimMaterial = standard('#66717c', 0.5, 0.2)
-  const cargoMaterial = standard('#d99a4a', 0.52)
-  const half = dimensions.length / 2
-  const floor = dimensions.bodyFloorY
-  const cargoLength = Math.max(0.7, dimensions.length - dimensions.cabinLength - 0.18)
-  const cargoCenterZ = -half + cargoLength / 2 + 0.08
-
-  // 低い車台に、前方キャビンと後方荷台を別体で載せる。
-  group.add(
-    profileMesh(
-      [
-        [-half, floor],
-        [half, floor],
-        [half, floor + dimensions.hullHeight * 0.76],
-        [-half, floor + dimensions.hullHeight * 0.76],
-      ],
-      dimensions.width,
-      bodyMaterial,
-      'car-body-hull',
-    ),
-  )
-  addCabin(group, dimensions, bodyMaterial, glassMaterial, 0.76, 0.82)
-
-  const cargoHeight = dimensions.cabinHeight * 0.66
-  group.add(
-    box(
-      { x: dimensions.width * 0.91, y: cargoHeight, z: cargoLength },
-      { x: 0, y: dimensions.hullTopY - 0.02 + cargoHeight / 2, z: cargoCenterZ },
-      cargoMaterial,
-    ),
-    box(
-      { x: dimensions.width * 0.96, y: 0.11, z: cargoLength + 0.08 },
-      { x: 0, y: dimensions.hullTopY + cargoHeight - 0.015, z: cargoCenterZ },
-      trimMaterial,
-    ),
-    box(
-      { x: dimensions.width * 0.94, y: 0.1, z: dimensions.cabinLength * 0.75 },
-      { x: 0, y: dimensions.hullTopY + 0.04, z: dimensions.cabinCenterZ + dimensions.cabinLength * 0.08 },
-      trimMaterial,
-    ),
-  )
-  addBumpers(group, dimensions, trimMaterial)
-  return group
-}
-
-function buildPoliceBody({ dimensions, color }: CarPartContext): THREE.Object3D {
-  const group = createBodyGroup()
-  const bodyMaterial = standard(color, 0.4)
-  const glassMaterial = standard('#253d60', 0.14, 0.14)
-  const whiteMaterial = standard(WHITE_ACCENT, 0.3)
-  const blueMaterial = standard(POLICE_BLUE, 0.3, 0.12)
-  const redMaterial = standard(POLICE_RED, 0.3, 0.08)
-  const half = dimensions.length / 2
-  const floor = dimensions.bodyFloorY
-  const hoodEnd = half - dimensions.hoodLength
-
-  // 乗用車の形に、白い側面帯と前方の青赤アクセントを加える。
-  group.add(
-    profileMesh(
-      [
-        [-half, floor],
-        [half, floor],
-        [half, floor + dimensions.hullHeight * 0.62],
-        [hoodEnd, floor + dimensions.hullHeight],
-        [-half * 0.78, floor + dimensions.hullHeight * 0.95],
-        [-half, floor + dimensions.hullHeight * 0.58],
-      ],
-      dimensions.width,
-      bodyMaterial,
-      'car-body-hull',
-    ),
-  )
-  addCabin(group, dimensions, bodyMaterial, glassMaterial, 0.78, 0.84)
-  group.add(
-    box(
-      { x: dimensions.width * 1.02, y: 0.13, z: dimensions.length * 0.72 },
-      { x: 0, y: floor + dimensions.hullHeight * 0.58, z: -dimensions.length * 0.01 },
-      whiteMaterial,
-    ),
-    box(
-      { x: dimensions.width * 0.86, y: 0.1, z: dimensions.hoodLength * 0.72 },
-      { x: 0, y: dimensions.hullTopY + 0.03, z: half - dimensions.hoodLength * 0.45 },
-      blueMaterial,
-    ),
-    box(
-      { x: dimensions.width * 0.28, y: 0.09, z: 0.08 },
-      { x: -dimensions.width * 0.28, y: dimensions.hullTopY + 0.11, z: half + 0.04 },
-      blueMaterial,
-    ),
-    box(
-      { x: dimensions.width * 0.28, y: 0.09, z: 0.08 },
-      { x: dimensions.width * 0.28, y: dimensions.hullTopY + 0.11, z: half + 0.04 },
-      redMaterial,
-    ),
-  )
-  addBumpers(group, dimensions, blueMaterial)
-  return group
-}
-
-const BODY_BUILDERS: Record<BodyType, CarPartBuilder> = {
-  sports: buildSportsBody,
-  suv: buildSuvBody,
-  bus: buildBusBody,
-  truck: buildTruckBody,
-  police: buildPoliceBody,
 }
 
 type WheelVisual = {
@@ -488,7 +141,7 @@ function buildWheels(visual: WheelVisual) {
     const tireMaterial = standard(TIRE_COLOR, 0.85, 0)
     const hubMaterial = standard(visual.hubColor, 0.35, 0.2)
     const treadMaterial = standard('#24282c', 0.92, 0)
-    const sportsWheel = config.body === 'sports'
+    const sportsWheel = config.body === 'sportsCar'
 
     for (const wheel of attachments.wheels) {
       // タイヤの中心位置は attachment 由来。サイズは寸法基盤から、見た目の差はvisual定義から決まる。
@@ -527,15 +180,14 @@ function buildWheels(visual: WheelVisual) {
 }
 
 function buildFront(shape: FrontType) {
-  return ({ attachments, config, dimensions }: CarPartContext): THREE.Object3D => {
+  return ({ attachments }: CarPartContext): THREE.Object3D => {
     const front = attachments.front
     const group = new THREE.Group()
     group.name = 'car-front'
-    const sports = config.body === 'sports'
-    const lightMaterial = standard(sports ? '#f7fbff' : '#fff3c4', sports ? 0.16 : 0.2, sports ? 0.18 : 0.1)
+    const lightMaterial = standard('#fff3c4', 0.2, 0.1)
 
-    const lightSize = front.size.extent * (sports ? 0.29 : 0.34)
-    const lightDepth = sports ? 0.065 : 0.1
+    const lightSize = front.size.extent * 0.34
+    const lightDepth = 0.1
     const lightWidth =
       shape === 'round' ? lightSize * 0.9 : shape === 'square' ? lightSize * 1.5 : lightSize * 2.2
     const lightHeight =
@@ -543,24 +195,11 @@ function buildFront(shape: FrontType) {
     const surroundMaterial = standard(shape === 'round' ? CHROME_COLOR : '#3f4b57', 0.32, 0.35)
     for (const side of [1, -1]) {
       const center = offsetFrom(front, lightDepth / 2)
-      // スポーツカーのノーズは丸く絞り込まれているため、前端の平面ではなく
-      // ボンネットの肩の高さ・少し内側・少し後ろへ置いてボディ面へなじませる。
-      // スポーツカーのノーズは丸く絞り込まれているため、前端の平面を基準にすると
-      // ライトが浮くか埋まる。外殻サーフェス上の点を直接問い合わせて置く。
-      const position = sports
-        ? (() => {
-            const anchor = sportsSurfacePoint(dimensions, attachments, dimensions.length / 2 - 0.34, 0.37)
-            return {
-              x: side * anchor.position.x * (shape === 'slim' ? 0.7 : 0.74),
-              y: anchor.position.y - (shape === 'slim' ? 0.02 : 0.01),
-              z: anchor.position.z,
-            }
-          })()
-        : {
-            x: center.x + side * front.size.width * (shape === 'slim' ? 0.3 : 0.32),
-            y: center.y + front.size.extent * 0.16,
-            z: center.z,
-          }
+      const position = {
+        x: center.x + side * front.size.width * (shape === 'slim' ? 0.3 : 0.32),
+        y: center.y + front.size.extent * 0.16,
+        z: center.z,
+      }
 
       if (shape === 'round') {
         const surround = new THREE.Mesh(
@@ -574,7 +213,7 @@ function buildFront(shape: FrontType) {
         light.name = `car-front-light-round-${side === 1 ? 'left' : 'right'}`
         light.position.set(position.x, position.y, position.z)
         // 前面の丸さは保ちつつ、ライト本体が車体の前端から出すぎないよう奥行きを薄くする。
-        light.scale.set(0.8, 0.8, sports ? 0.68 : 0.62)
+        light.scale.set(0.8, 0.8, 0.62)
         light.rotation.z = side * -0.08
         light.castShadow = true
         group.add(surround, light)
@@ -596,36 +235,23 @@ function buildFront(shape: FrontType) {
     }
 
     // ライトだけでなく、中央のマスクと下端のバンパーも選択肢ごとに変える。
-    // スポーツカーは外殻に開口があるため、surface上の低い位置へ薄く置いて後付け感を抑える。
     const grilleMaterial = standard(shape === 'round' ? '#303943' : shape === 'square' ? '#202830' : '#172027', 0.5, 0.12)
     const bumperMaterial = standard(shape === 'round' ? CHROME_COLOR : shape === 'square' ? '#65717d' : '#252d35', 0.35, 0.35)
     const grilleWidth = front.size.width * (shape === 'round' ? 0.42 : shape === 'square' ? 0.5 : 0.62)
     const grilleHeight = front.size.extent * (shape === 'round' ? 0.17 : shape === 'square' ? 0.22 : 0.12)
-    const grilleCenter = sports
-      ? sportsSurfacePoint(dimensions, attachments, dimensions.length / 2 - 0.34, 0.18).position
-      : offsetFrom(front, 0.055)
+    const grilleCenter = offsetFrom(front, 0.055)
     const grille = box(
-      { x: grilleWidth, y: grilleHeight, z: sports ? 0.045 : 0.08 },
-      {
-        x: 0,
-        y: sports ? grilleCenter.y + 0.025 : grilleCenter.y - front.size.extent * 0.28,
-        z: sports ? grilleCenter.z + 0.02 : grilleCenter.z,
-      },
+      { x: grilleWidth, y: grilleHeight, z: 0.08 },
+      { x: 0, y: grilleCenter.y - front.size.extent * 0.28, z: grilleCenter.z },
       grilleMaterial,
     )
     grille.name = `car-front-grille-${shape}`
     group.add(grille)
 
-    const bumperCenter = sports
-      ? sportsSurfacePoint(dimensions, attachments, dimensions.length / 2 - 0.25, 0.08).position
-      : offsetFrom(front, 0.08)
+    const bumperCenter = offsetFrom(front, 0.08)
     const bumper = box(
-      { x: front.size.width * (shape === 'slim' ? 0.86 : 0.92), y: front.size.extent * 0.14, z: sports ? 0.045 : 0.12 },
-      {
-        x: 0,
-        y: sports ? bumperCenter.y + 0.015 : bumperCenter.y - front.size.extent * 0.34,
-        z: sports ? bumperCenter.z + 0.02 : bumperCenter.z,
-      },
+      { x: front.size.width * (shape === 'slim' ? 0.86 : 0.92), y: front.size.extent * 0.14, z: 0.12 },
+      { x: 0, y: bumperCenter.y - front.size.extent * 0.34, z: bumperCenter.z },
       bumperMaterial,
     )
     bumper.name = `car-front-bumper-${shape}`
@@ -791,8 +417,8 @@ type SideStickerSurface = {
 
 /**
  * 側面ステッカーの貼り付け面を求める。
- * スポーツカーだけは断面が丸く、固定した attachment の平面では浮くため、
- * 既存の外殻サーフェスから実際の位置と法線を問い合わせる。
+ * 車体はGLBなので断面の実形状は分からない。側面のattachment平面を基準に置き、
+ * 曲面へ沿わせる調整は Phase 3 のカスタムパーツ側で行う。
  */
 function sideStickerSurface(
   context: CarPartContext,
@@ -800,15 +426,6 @@ function sideStickerSurface(
   z: number,
   u: number,
 ): SideStickerSurface {
-  const sideSign = side.normal.x > 0 ? 1 : -1
-  if (context.dimensions.bodyStyle === 'sports') {
-    const surface = sportsSurfacePoint(context.dimensions, context.attachments, z, u)
-    return {
-      position: new THREE.Vector3(sideSign * surface.position.x, surface.position.y, surface.position.z),
-      normal: new THREE.Vector3(sideSign * surface.normal.x, surface.normal.y, 0).normalize(),
-    }
-  }
-
   return {
     position: new THREE.Vector3(
       side.position.x,
@@ -1159,7 +776,6 @@ const nothing: CarPartBuilder = () => null
 export const CAR_PART_BUILDERS: {
   [K in CarPartCategoryId]: Record<CarOptionIdMap[K], CarPartBuilder>
 } = {
-  body: BODY_BUILDERS,
   wheel: {
     small: buildWheels({ hubColor: CHROME_COLOR, hubRadiusRatio: 0.45, detail: 'standard' }),
     big: buildWheels({ hubColor: '#ff922b', hubRadiusRatio: 0.5, detail: 'standard' }),

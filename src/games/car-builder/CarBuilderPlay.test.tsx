@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import CarBuilderPlay from './CarBuilderPlay'
+import { CAR_VEHICLES, CAR_VEHICLE_ORDER } from './carVehicles'
 
 // 3D描画(three.js/WebGL)はjsdomでは動かせないため、シーンhookだけを差し替える。
 // 代わりにhookへ渡されたCarConfigを記録し、「UI操作 → CarConfig更新 → 3Dへ反映」の
@@ -63,7 +64,7 @@ describe('初期表示', () => {
 
   test('初期CarConfigが3Dシーンへ渡される', () => {
     renderPlay()
-    expect(latestConfig()).toMatchObject({ body: 'sports', wheel: 'small', color: 'red', rideHeight: 'normal' })
+    expect(latestConfig()).toMatchObject({ body: 'car', wheel: 'small', color: 'red', rideHeight: 'normal' })
   })
 })
 
@@ -109,26 +110,21 @@ describe('カテゴリ一覧と詳細選択の切り替え', () => {
   })
 })
 
-describe('ボディ5種類の選択', () => {
-  test('5種類が視覚的なプレビュー付きで並び、選択直後にCarConfigへ反映される', async () => {
+describe('ボディ7車種の選択', () => {
+  test('採用7車種が視覚的なプレビュー付きで並び、選択直後にCarConfigへ反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 
     await user.click(screen.getByRole('button', { name: 'ボディを えらぶ' }))
 
-    for (const label of ['スポーツカー', 'SUV', 'バス', 'トラック', 'パトカー風']) {
-      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    for (const id of CAR_VEHICLE_ORDER) {
+      expect(screen.getByRole('button', { name: CAR_VEHICLES[id].label })).toBeInTheDocument()
     }
 
-    for (const [label, body] of [
-      ['スポーツカー', 'sports'],
-      ['SUV', 'suv'],
-      ['バス', 'bus'],
-      ['トラック', 'truck'],
-      ['パトカー風', 'police'],
-    ] as const) {
+    for (const id of CAR_VEHICLE_ORDER) {
+      const label = CAR_VEHICLES[id].label
       await user.click(screen.getByRole('button', { name: label }))
-      expect(latestConfig().body, label).toBe(body)
+      expect(latestConfig().body, label).toBe(id)
     }
   })
 
@@ -143,10 +139,10 @@ describe('ボディ5種類の選択', () => {
     await user.click(screen.getByRole('button', { name: 'おおきい' }))
     await user.click(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' }))
     await user.click(screen.getByRole('button', { name: 'ボディを えらぶ' }))
-    await user.click(screen.getByRole('button', { name: 'バス' }))
+    await user.click(screen.getByRole('button', { name: 'スクールバス' }))
 
-    expect(latestConfig()).toMatchObject({ body: 'bus', wheel: 'big', color: 'yellow' })
-    expect(screen.getByRole('button', { name: 'バス' })).toHaveAttribute('aria-pressed', 'true')
+    expect(latestConfig()).toMatchObject({ body: 'schoolBus', wheel: 'big', color: 'yellow' })
+    expect(screen.getByRole('button', { name: 'スクールバス' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -179,10 +175,10 @@ describe('選択の即時反映', () => {
     await user.click(screen.getByRole('button', { name: '細目ライト' }))
     await user.click(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' }))
     await user.click(screen.getByRole('button', { name: 'ボディを えらぶ' }))
-    await user.click(screen.getByRole('button', { name: 'バス' }))
+    await user.click(screen.getByRole('button', { name: 'スクールバス' }))
 
-    expect(latestConfig()).toMatchObject({ body: 'bus', front: 'slim' })
-    expect(screen.getByRole('button', { name: 'バス' })).toHaveAttribute('aria-pressed', 'true')
+    expect(latestConfig()).toMatchObject({ body: 'schoolBus', front: 'slim' })
+    expect(screen.getByRole('button', { name: 'スクールバス' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('9色すべてをタップすると、選んだ色が即時にCarConfigへ反映される', async () => {

@@ -24,3 +24,6 @@ npm-debug.log*
 # env
 .env
 .env.local
+
+# asset conversion cache (scripts/build-car-builder-models.py)
+.cache

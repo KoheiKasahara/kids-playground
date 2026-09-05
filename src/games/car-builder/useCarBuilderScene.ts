@@ -13,6 +13,7 @@ import * as THREE from 'three'
 import type { CarConfig } from './carConfig'
 import { carBoundingRadius } from './carDimensions'
 import { createCarModel } from './carModel'
+import { clearCarVehicleModelCache } from './vehicleBody'
 
 export const MIN_CAR_ZOOM = 0.65
 export const MAX_CAR_ZOOM = 1.8
@@ -70,7 +71,9 @@ export function useCarBuilderScene(options: CarBuilderSceneOptions): CarBuilderS
     const scene = new THREE.Scene()
     scene.background = new THREE.Color('#dff1fb')
     const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100)
-    const model = createCarModel(options.config)
+    // 車体GLBは後から届くので、届いた時点で1フレーム描き直す
+    // （描画は dirty のときだけ回しているため、これが無いと車体が出てこない）。
+    const model = createCarModel(options.config, { onBodyReady: () => markDirty() })
     scene.add(model.root)
 
     const groundGeometry = new THREE.CircleGeometry(6, 48)
@@ -100,14 +103,15 @@ export function useCarBuilderScene(options: CarBuilderSceneOptions): CarBuilderS
     rim.position.set(-1.5, 5.5, -6)
     scene.add(hemisphere, directional, fill, rim)
 
+    function markDirty(): void {
+      dirty = true
+    }
+
     let yaw = DEFAULT_YAW
     let pitch = DEFAULT_PITCH
     let zoom = 1
     let fitDistance = 8
 
-    const markDirty = () => {
-      dirty = true
-    }
 
     function updateCamera() {
       const dimensions = model.getDimensions()
@@ -258,6 +262,8 @@ export function useCarBuilderScene(options: CarBuilderSceneOptions): CarBuilderS
 
       scene.remove(model.root)
       model.dispose()
+      // 取得済みのGLBバイト列は画面を離れたら手放す。再訪時はHTTPキャッシュから戻る。
+      clearCarVehicleModelCache()
       groundGeometry.dispose()
       groundMaterial.dispose()
       hemisphere.dispose()
