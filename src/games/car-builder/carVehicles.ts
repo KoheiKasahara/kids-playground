@@ -74,6 +74,16 @@ export type CarVehicleDefinition = {
   bodyFloor: number
   /** 窓の広がりから測ったキャビン。屋根パーツの取り付け基準に使う。 */
   cabin: { centerZ: number; length: number; width: number; floorY: number }
+  /**
+   * 内蔵ヘッドライト（`LightFront`）前面の実測Z。フロントのライト・グリル・
+   * ナンバーなど外装パーツの取り付け基準に使う。
+   *
+   * `size.length / 2` はボディ全長の最先端（バンパー角など）の値でしかなく、
+   * ヘッドライトの高さでは実際の前面がそれよりボディ側へ入り込んでいる車種が
+   * 多い。ここへ全長の半分をそのまま使うと、ライトやナンバーが前面から
+   * 浮いて見える（Issueの実測値。GLBを作り直したら測り直すこと）。
+   */
+  frontFaceZ: number
   wheels: { front: CarVehicleAxle; rear: CarVehicleAxle }
   /** GLBに実在するマテリアル名の一覧。carVehicles.test.ts が実ファイルと突き合わせる。 */
   materials: readonly CarMaterialRole[]
@@ -94,6 +104,7 @@ export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition 
     size: { length: 3.926, width: 1.872, height: 1.035 },
     bodyFloor: 0.168,
     cabin: { centerZ: -0.278, length: 2.242, width: 1.446, floorY: 0.83 },
+    frontFaceZ: 1.8435,
     wheels: {
       front: { z: 1.251, halfTrack: 0.725, radius: 0.28, width: 0.179 },
       rear: { z: -1.256, halfTrack: 0.701, radius: 0.28, width: 0.179 },
@@ -109,6 +120,7 @@ export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition 
     size: { length: 3.31, width: 1.638, height: 0.975 },
     bodyFloor: 0.171,
     cabin: { centerZ: -0.233, length: 1.986, width: 1.309, floorY: 0.777 },
+    frontFaceZ: 1.5652,
     wheels: {
       front: { z: 1.035, halfTrack: 0.658, radius: 0.247, width: 0.18 },
       rear: { z: -0.961, halfTrack: 0.658, radius: 0.247, width: 0.18 },
@@ -124,6 +136,7 @@ export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition 
     size: { length: 4.209, width: 2.111, height: 1.274 },
     bodyFloor: 0.254,
     cabin: { centerZ: -0.436, length: 2.776, width: 1.687, floorY: 1.035 },
+    frontFaceZ: 1.9951,
     wheels: {
       front: { z: 1.317, halfTrack: 0.767, radius: 0.327, width: 0.238 },
       rear: { z: -1.251, halfTrack: 0.794, radius: 0.327, width: 0.238 },
@@ -139,6 +152,7 @@ export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition 
     size: { length: 4.221, width: 1.807, height: 1.146 },
     bodyFloor: 0.165,
     cabin: { centerZ: -0.245, length: 2.212, width: 1.49, floorY: 0.764 },
+    frontFaceZ: 2.0616,
     wheels: {
       front: { z: 1.193, halfTrack: 0.69, radius: 0.262, width: 0.191 },
       rear: { z: -1.246, halfTrack: 0.688, radius: 0.262, width: 0.191 },
@@ -154,6 +168,7 @@ export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition 
     size: { length: 3.731, width: 1.778, height: 1.132 },
     bodyFloor: 0.106,
     cabin: { centerZ: -0.285, length: 2.054, width: 1.42, floorY: 0.756 },
+    frontFaceZ: 1.7246,
     wheels: {
       front: { z: 1.143, halfTrack: 0.712, radius: 0.275, width: 0.175 },
       rear: { z: -1.153, halfTrack: 0.689, radius: 0.275, width: 0.175 },
@@ -180,6 +195,7 @@ export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition 
     size: { length: 5.529, width: 2.254, height: 2.486 },
     bodyFloor: 0.145,
     cabin: { centerZ: -0.389, length: 4.533, width: 1.995, floorY: 0.988 },
+    frontFaceZ: 2.7033,
     wheels: {
       front: { z: 2.253, halfTrack: 0.903, radius: 0.197, width: 0.263 },
       rear: { z: -2.021, halfTrack: 0.844, radius: 0.197, width: 0.263 },
@@ -195,6 +211,7 @@ export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition 
     size: { length: 4.688, width: 2.327, height: 2.173 },
     bodyFloor: 0.216,
     cabin: { centerZ: -0.408, length: 3.728, width: 2.281, floorY: 0.968 },
+    frontFaceZ: 2.3197,
     wheels: {
       front: { z: 1.577, halfTrack: 0.813, radius: 0.231, width: 0.307 },
       rear: { z: -1.433, halfTrack: 1.003, radius: 0.231, width: 0.307 },

@@ -179,6 +179,12 @@ export type CarDimensions = {
   cabinCenterZ: number
   /** キャビンの幅。 */
   cabinWidth: number
+  /**
+   * フロント外装（ライト・グリル・ナンバー）を取り付ける実際の前面Z。
+   * `length / 2`（ボディ全長の最先端）とは別に持つ。carVehicles.ts の
+   * `frontFaceZ` を参照。
+   */
+  frontFaceZ: number
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -249,6 +255,7 @@ export function computeCarDimensions(config: CarConfig): CarDimensions {
     cabinLength: vehicle.cabin.length,
     cabinCenterZ: vehicle.cabin.centerZ,
     cabinWidth: vehicle.cabin.width,
+    frontFaceZ: vehicle.frontFaceZ,
   }
 }
 
@@ -283,7 +290,11 @@ export function computeCarAttachments(dimensions: CarDimensions): CarAttachments
 
   return {
     front: {
-      position: { x: 0, y: faceCenterY, z: halfLength },
+      // `halfLength`（ボディ全長の最先端）ではなく、内蔵ヘッドライトの実測位置
+      // （`frontFaceZ`）を基準にする。ヘッドライト高さでの前面はバンパー角の
+      // 最先端より内側に入り込んでいる車種が多く、`halfLength` を使うと
+      // ライト・グリル・ナンバーが前面から浮いて見える。
+      position: { x: 0, y: faceCenterY, z: dimensions.frontFaceZ },
       normal: { x: 0, y: 0, z: 1 },
       size: { width: dimensions.width, extent: dimensions.hullHeight },
     },

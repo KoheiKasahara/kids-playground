@@ -144,6 +144,40 @@ describe('GLB実ファイルとの整合', () => {
   })
 })
 
+describe('フロント外装の取り付け基準', () => {
+  test.each(CAR_VEHICLE_ORDER)(
+    '%s: frontFaceZは内蔵ヘッドライト（LightFront）前面の実測値と一致する',
+    (id) => {
+      const model = models.get(id)!
+      const vehicle = CAR_VEHICLES[id]
+      model.scene.updateMatrixWorld(true)
+
+      // 内蔵ヘッドライトは非表示にして使うが（carModel.ts）、位置はそのまま
+      // フロント外装パーツの取り付け基準として実測に使う。school-bus・ambulance
+      // は前後灯が同じ `LightFront` ロールを共有するため、前側（z > 0）だけを見る。
+      let measuredMaxZ = -Infinity
+      const point = new THREE.Vector3()
+      model.scene.traverse((object) => {
+        const mesh = object as THREE.Mesh
+        if (mesh.isMesh !== true) return
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+        if (!materials.some((material) => material.name === 'LightFront')) return
+        const position = mesh.geometry.getAttribute('position')
+        for (let index = 0; index < position.count; index += 1) {
+          point.fromBufferAttribute(position, index).applyMatrix4(mesh.matrixWorld)
+          if (point.z > 0) measuredMaxZ = Math.max(measuredMaxZ, point.z)
+        }
+      })
+
+      expect(measuredMaxZ, id).toBeGreaterThan(0)
+      expect(vehicle.frontFaceZ, id).toBeCloseTo(measuredMaxZ, 2)
+      // 全長の最先端（バンパー角など）より必ず内側にある。ここが最先端と同じか
+      // それより前に出ていると、実測値を使う意味がない（＝浮いて見える）。
+      expect(vehicle.frontFaceZ, id).toBeLessThanOrEqual(vehicle.size.length / 2)
+    },
+  )
+})
+
 describe('特殊装備の判別', () => {
   test('パトカーだけが内蔵パトランプを持つ', () => {
     for (const id of CAR_VEHICLE_ORDER) {

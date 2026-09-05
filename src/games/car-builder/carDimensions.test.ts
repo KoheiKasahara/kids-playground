@@ -200,7 +200,7 @@ describe('組み合わせ耐性（7ボディ×タイヤ×車高の全パター�
       const dimensions = computeCarDimensions(config)
       const attachments = computeCarAttachments(dimensions)
 
-      expect(attachments.front.position.z, option.id).toBeCloseTo(dimensions.length / 2, 6)
+      expect(attachments.front.position.z, option.id).toBeCloseTo(dimensions.frontFaceZ, 6)
       expect(attachments.rear.position.z, option.id).toBeCloseTo(-dimensions.length / 2, 6)
       expect(attachments.roof.position.y, option.id).toBeCloseTo(dimensions.roofTopY, 6)
       expect(attachments.roof.position.z, option.id).toBeCloseTo(dimensions.cabinCenterZ, 6)
@@ -217,10 +217,21 @@ describe('computeCarAttachments', () => {
   const attachments = computeCarAttachments(dimensions)
 
   test('フロント／リアが車体の前後端にあり、外向きの法線を持つ', () => {
-    expect(attachments.front.position.z).toBeCloseTo(dimensions.length / 2, 6)
+    expect(attachments.front.position.z).toBeCloseTo(dimensions.frontFaceZ, 6)
     expect(attachments.front.normal).toEqual({ x: 0, y: 0, z: 1 })
     expect(attachments.rear.position.z).toBeCloseTo(-dimensions.length / 2, 6)
     expect(attachments.rear.normal).toEqual({ x: 0, y: 0, z: -1 })
+  })
+
+  test('フロントの取り付け基準は、ボディ全長の最先端より内側にある', () => {
+    // ヘッドライトの高さでの前面は、バンパー角など全長の最先端そのものより
+    // 内側に入り込んでいる車種が多い。ここが全長の半分と同じ（またはそれより前）
+    // になっていると、ライト・グリル・ナンバーが前面から浮いて見える。
+    for (const id of CAR_VEHICLE_ORDER) {
+      const measured = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', id))
+      expect(measured.frontFaceZ, id).toBeGreaterThan(0)
+      expect(measured.frontFaceZ, id).toBeLessThanOrEqual(measured.length / 2)
+    }
   })
 
   test('ルーフ基準がルーフ天面の高さにあり、キャビン中心へ乗る', () => {

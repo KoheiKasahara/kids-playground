@@ -36,6 +36,11 @@ export const CAR_DERIVED_CATEGORY_IDS = ['color', 'rideHeight'] as const satisfi
 
 const TIRE_COLOR = '#2f3438'
 const CHROME_COLOR = '#d5dbe1'
+/**
+ * フロント外装パーツが取り付け面から出っ張ってよい最大量。ごく小さい値にして、
+ * パーツの外側の面が取り付け面へほぼ密着しつつ、ボディとのZ-fightingだけは避ける。
+ */
+const SURFACE_EPSILON = 0.006
 
 function standard(color: string, roughness = 0.45, metalness = 0.05): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness })
@@ -60,6 +65,15 @@ function offsetFrom(attachment: CarAttachment, distance: number): THREE.Vector3 
     attachment.position.y + attachment.normal.y * distance,
     attachment.position.z + attachment.normal.z * distance,
   )
+}
+
+/**
+ * 奥行き `depth` を持つパーツを、外側の面が取り付け面へほぼ密着するように置く。
+ * 中心をパーツ自身の厚みぶん取り付け面より内側（ボディ側）へ引いたうえで、
+ * `SURFACE_EPSILON` だけ外へ出してZ-fightingを避ける。
+ */
+function flushOffset(attachment: CarAttachment, depth: number): THREE.Vector3 {
+  return offsetFrom(attachment, SURFACE_EPSILON - depth / 2)
 }
 
 type WheelVisual = {
@@ -188,17 +202,21 @@ function buildFront(shape: FrontType) {
 
     const lightSize = front.size.extent * 0.34
     const lightDepth = 0.1
+    // 丸ライトはスフィアをZ方向へ0.62倍へ潰しているので、実際の奥行きはそのぶん薄い。
+    const roundLightZRadius = lightSize * 0.48 * 0.62
     const lightWidth =
       shape === 'round' ? lightSize * 0.9 : shape === 'square' ? lightSize * 1.5 : lightSize * 2.2
     const lightHeight =
       shape === 'round' ? lightSize * 0.9 : shape === 'square' ? lightSize * 0.7 : lightSize * 0.28
     const surroundMaterial = standard(shape === 'round' ? CHROME_COLOR : '#3f4b57', 0.32, 0.35)
+    // ライト外側の面がボディ前面へほぼ密着するz。
+    const lightZ =
+      shape === 'round' ? flushOffset(front, roundLightZRadius * 2).z : flushOffset(front, lightDepth).z
     for (const side of [1, -1]) {
-      const center = offsetFrom(front, lightDepth / 2)
       const position = {
-        x: center.x + side * front.size.width * (shape === 'slim' ? 0.3 : 0.32),
-        y: center.y + front.size.extent * 0.16,
-        z: center.z,
+        x: side * front.size.width * (shape === 'slim' ? 0.3 : 0.32),
+        y: front.position.y + front.size.extent * 0.16,
+        z: lightZ,
       }
 
       if (shape === 'round') {
@@ -226,7 +244,7 @@ function buildFront(shape: FrontType) {
         surround.name = `car-front-surround-${shape}-${side === 1 ? 'left' : 'right'}`
         const light = box(
           { x: lightWidth, y: lightHeight, z: lightDepth },
-          { x: position.x, y: position.y, z: position.z + lightDepth * 0.08 },
+          { x: position.x, y: position.y, z: position.z },
           lightMaterial,
         )
         light.name = `car-front-light-${shape}-${side === 1 ? 'left' : 'right'}`
@@ -239,18 +257,20 @@ function buildFront(shape: FrontType) {
     const bumperMaterial = standard(shape === 'round' ? CHROME_COLOR : shape === 'square' ? '#65717d' : '#252d35', 0.35, 0.35)
     const grilleWidth = front.size.width * (shape === 'round' ? 0.42 : shape === 'square' ? 0.5 : 0.62)
     const grilleHeight = front.size.extent * (shape === 'round' ? 0.17 : shape === 'square' ? 0.22 : 0.12)
-    const grilleCenter = offsetFrom(front, 0.055)
+    const grilleDepth = 0.08
+    const grilleCenter = flushOffset(front, grilleDepth)
     const grille = box(
-      { x: grilleWidth, y: grilleHeight, z: 0.08 },
+      { x: grilleWidth, y: grilleHeight, z: grilleDepth },
       { x: 0, y: grilleCenter.y - front.size.extent * 0.28, z: grilleCenter.z },
       grilleMaterial,
     )
     grille.name = `car-front-grille-${shape}`
     group.add(grille)
 
-    const bumperCenter = offsetFrom(front, 0.08)
+    const bumperDepth = 0.12
+    const bumperCenter = flushOffset(front, bumperDepth)
     const bumper = box(
-      { x: front.size.width * (shape === 'slim' ? 0.86 : 0.92), y: front.size.extent * 0.14, z: 0.12 },
+      { x: front.size.width * (shape === 'slim' ? 0.86 : 0.92), y: front.size.extent * 0.14, z: bumperDepth },
       { x: 0, y: bumperCenter.y - front.size.extent * 0.34, z: bumperCenter.z },
       bumperMaterial,
     )
@@ -722,28 +742,36 @@ function buildNumberPlate({ attachments, config }: CarPartContext): THREE.Object
     animal: '#188a8a',
   }
 
+  const plateDepth = 0.045
+  // 縁取りはナンバー本体より少し奥へ引っ込め、外周だけ枠として見えるようにする
+  // （元の 0.068 → 0.038 という間隔をそのまま踏襲）。
+  const plateBorderSetback = 0.03
+
   for (const face of [attachments.front, attachments.rear]) {
     const plateWidth = Math.min(Math.max(face.size.width * 0.38, 0.78), 1.15)
     const plateHeight = Math.min(Math.max(face.size.extent * 0.34, 0.22), 0.34)
     const plateY = face.position.y - face.size.extent * 0.04
-    const borderCenter = offsetFrom(face, 0.038)
-    borderCenter.y = plateY
-    const plateCenter = offsetFrom(face, 0.068)
+    // ナンバー本体の外側の面がボディ前面／後面へほぼ密着する距離。
+    const plateDistance = SURFACE_EPSILON - plateDepth / 2
+    const plateCenter = offsetFrom(face, plateDistance)
     plateCenter.y = plateY
+    const borderCenter = offsetFrom(face, plateDistance - plateBorderSetback)
+    borderCenter.y = plateY
     group.add(
       box(
-        { x: plateWidth + 0.08, y: plateHeight + 0.08, z: 0.045 },
+        { x: plateWidth + 0.08, y: plateHeight + 0.08, z: plateDepth },
         { x: borderCenter.x, y: borderCenter.y, z: borderCenter.z },
         plateBorderMaterial,
       ),
       box(
-        { x: plateWidth, y: plateHeight, z: 0.045 },
+        { x: plateWidth, y: plateHeight, z: plateDepth },
         { x: plateCenter.x, y: plateCenter.y, z: plateCenter.z },
         plateMaterial,
       ),
     )
 
-    const markAnchor = offsetFrom(face, 0.105)
+    // 数字・アイコンはナンバー本体の面から、Z-fightingを避けるぶんだけ浮かせる。
+    const markAnchor = offsetFrom(face, plateDistance + SURFACE_EPSILON)
     markAnchor.y = plateY
     const markGroup = new THREE.Group()
     markGroup.name = `car-mark-${mark}`
