@@ -1,5 +1,5 @@
 import { createFloaterState, stepFloater, type FloaterState } from './floatModel'
-import { rectContainsPoint, type StageDefinition, type WaterBodyId } from './types'
+import { rectContainsPoint, type Rect, type StageDefinition, type WaterBodyId } from './types'
 import {
   createWaterField,
   findWaterBody,
@@ -28,6 +28,8 @@ export type PukupukaGameState = {
   readonly leftoverMs: number
   /** せん/排水(#516)が開いているか。開いている間、毎フレーム drainSourceBodyId から水を抜く。 */
   readonly drainOpen: boolean
+  /** ゲート(#517)が開いているか。閉じている間、stage.gateも固定物として当たり判定に含める。 */
+  readonly gateOpen: boolean
 }
 
 export type StepResult = {
@@ -57,7 +59,7 @@ export function primaryWaterBodyId(stage: StageDefinition): WaterBodyId {
   return stage.waterBodies[0].id
 }
 
-/** じゃぐちが注ぐ先の水域。#517でゲート越しに別水域へ注ぐ構成になっても、ここだけを見ればよい。 */
+/** じゃぐちが注ぐ先の水域。将来ここが増えても、注ぎ先を変えるだけで済むようにしてある。 */
 export function faucetTargetBodyId(stage: StageDefinition): WaterBodyId {
   return stage.faucet.targetBodyId
 }
@@ -86,7 +88,16 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
     elapsedMs: 0,
     leftoverMs: 0,
     drainOpen: false,
+    gateOpen: false,
   }
+}
+
+/**
+ * 物理判定に使う固定物の一覧（#517）。ゲートが閉じている間だけ、
+ * stage.gateも他の固定物と同じ扱いで含める。開いている間は当たり判定ごと取り除く。
+ */
+export function activeSolids(stage: StageDefinition, gateOpen: boolean): readonly Rect[] {
+  return gateOpen ? stage.solids : [...stage.solids, stage.gate]
 }
 
 export function getFloater(state: PukupukaGameState, floaterId: string): FloaterState | undefined {
@@ -155,6 +166,15 @@ export function toggleDrain(state: PukupukaGameState): PukupukaGameState {
   return { ...state, drainOpen: !state.drainOpen }
 }
 
+/**
+ * ゲートのON/OFFを切り替える（#517）。せんと同じくタップのたびに開⇔閉が反転する単純な操作。
+ * クリア後は受け付けない。
+ */
+export function toggleGate(state: PukupukaGameState): PukupukaGameState {
+  if (state.phase !== 'playing') return state
+  return { ...state, gateOpen: !state.gateOpen }
+}
+
 function advanceOneStep(
   stage: StageDefinition,
   state: PukupukaGameState,
@@ -186,6 +206,7 @@ function advanceOneStep(
   }
   water = stepWaterField(stage.waterBodies, water, deltaSeconds)
 
+  const solids = activeSolids(stage, state.gateOpen)
   const floaters = state.floaters.map((floater) => {
     const definition = stage.floaters.find((candidate) => candidate.id === floater.id)
     if (!definition) return floater
@@ -194,7 +215,7 @@ function advanceOneStep(
       floater,
       {
         surfaceY: surfaceYAt(stage.waterBodies, water, floater.x, floater.y),
-        solids: stage.solids,
+        solids,
         bounds: { width: stage.width, height: stage.height },
         driftDirection,
       },
@@ -220,6 +241,7 @@ function advanceOneStep(
       elapsedMs: state.elapsedMs + FIXED_STEP_MS,
       leftoverMs: state.leftoverMs,
       drainOpen: state.drainOpen,
+      gateOpen: state.gateOpen,
     },
     goalReached,
   }

@@ -12,7 +12,7 @@ export type Rect = {
 }
 
 /** 見た目の描き分けだけに使う固定物の種類（当たり判定はどれも同じ矩形）。 */
-export type SolidKind = 'wall' | 'floor' | 'divider' | 'platform'
+export type SolidKind = 'wall' | 'floor' | 'platform'
 
 export type SolidDefinition = Rect & {
   id: string
@@ -82,8 +82,7 @@ export type FaucetDefinition = {
 /**
  * せん/排水の定義（#516）。タップでON/OFFする栓で、開いている間 `sourceBodyId` の
  * 水域から水を減らし続ける。じゃぐち（FaucetDefinition）と対称の形にしてあり、
- * 「どの水域に作用するか」だけを持たせているため、複数水域(#517)が増えても
- * 定義を1件足すだけで済む。
+ * 「どの水域に作用するか」だけを持たせているため、水域が増えても定義を1件足すだけで済む。
  * 位置(x, y)は見た目の排水口の中心で、当たり判定はこれより広めに取ってよい。
  */
 export type DrainDefinition = {
@@ -91,6 +90,18 @@ export type DrainDefinition = {
   sourceBodyId: WaterBodyId
   x: number
   y: number
+}
+
+/**
+ * ゲートの定義（#517）。タップで開閉できる仕切りで、閉じている間は他の固定物と同じ
+ * 当たり判定を持ち、浮遊物の通過をふさぐ。開くと当たり判定ごと取り除かれ、通り抜けられる。
+ *
+ * このステージは水域をひとつ（main）のままにしているため、ゲートは浮遊物の移動経路だけを
+ * 切り替える（水そのものは常に単一の水面として扱う #514 の設計を維持する）。
+ * 水域を分ける構成が必要になった場合は、この矩形の位置に合わせて水域境界を引けばよい。
+ */
+export type GateDefinition = Rect & {
+  id: string
 }
 
 export type StageDefinition = {
@@ -105,6 +116,7 @@ export type StageDefinition = {
   goal: GoalDefinition
   faucet: FaucetDefinition
   drain: DrainDefinition
+  gate: GateDefinition
   /** 幼児向けの短い1行ヒント。 */
   hint: string
 }
