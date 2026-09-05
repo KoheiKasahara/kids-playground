@@ -16,7 +16,10 @@ import {
 
 export type PukupukaPhase = 'playing' | 'cleared'
 
-/** Phase 1の簡易操作。#515 じゃぐち / #516 せん に置き換わる想定の入力。 */
+/**
+ * 水位操作の入力。'fill' はじゃぐち(#515)、'drain' はPhase 1由来の仮の「みずをへらす」操作で、
+ * 正式な せん/排水(#516) に置き換わるまでの暫定入力として残している。
+ */
 export type WaterControl = 'fill' | 'drain' | null
 
 export type PukupukaGameState = {
@@ -47,6 +50,19 @@ export const WATER_TAP_LEVEL = 10
 /** Phase 1で操作する水域。将来は操作対象の水域をUIから選べるようにする余地を残す。 */
 export function primaryWaterBodyId(stage: StageDefinition): WaterBodyId {
   return stage.waterBodies[0].id
+}
+
+/** じゃぐちが注ぐ先の水域。#517でゲート越しに別水域へ注ぐ構成になっても、ここだけを見ればよい。 */
+export function faucetTargetBodyId(stage: StageDefinition): WaterBodyId {
+  return stage.faucet.targetBodyId
+}
+
+/**
+ * 水位操作(WaterControl)が作用する水域。'fill' はじゃぐちの注ぎ先、'drain' は暫定の
+ * primaryWaterBodyId を使う（#516で正式な排水先に置き換える想定）。
+ */
+function controlTargetBodyId(stage: StageDefinition, direction: 'fill' | 'drain'): WaterBodyId {
+  return direction === 'fill' ? faucetTargetBodyId(stage) : primaryWaterBodyId(stage)
 }
 
 /**
@@ -127,7 +143,12 @@ export function applyWaterTap(
 ): PukupukaGameState {
   if (state.phase !== 'playing') return state
   const deltaLevel = direction === 'fill' ? WATER_TAP_LEVEL : -WATER_TAP_LEVEL
-  const water = requestWaterChange(stage.waterBodies, state.water, primaryWaterBodyId(stage), deltaLevel)
+  const water = requestWaterChange(
+    stage.waterBodies,
+    state.water,
+    controlTargetBodyId(stage, direction),
+    deltaLevel,
+  )
   if (water === state.water) return state
   return { ...state, water }
 }
@@ -144,7 +165,7 @@ function advanceOneStep(
   if (control !== null && state.phase === 'playing') {
     const deltaLevel =
       (control === 'fill' ? WATER_HOLD_RATE_LEVEL_PER_SEC : -WATER_HOLD_RATE_LEVEL_PER_SEC) * deltaSeconds
-    water = requestWaterChange(stage.waterBodies, water, primaryWaterBodyId(stage), deltaLevel)
+    water = requestWaterChange(stage.waterBodies, water, controlTargetBodyId(stage, control), deltaLevel)
   }
   water = stepWaterField(stage.waterBodies, water, deltaSeconds)
 

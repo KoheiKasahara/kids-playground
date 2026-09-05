@@ -66,6 +66,19 @@ export type GoalDefinition = {
   floaterId: string
 }
 
+/**
+ * じゃぐちの定義（#515）。ONの間 `targetBodyId` の水域へ水を注ぐ。
+ * 位置(x, y)は取り付け根もとの見た目座標で、当たり判定はこれより広めに取ってよい。
+ * 排水/ゲート(#516, #517)や複数ステージ(#521)を後から足すときも、
+ * 「どの水域に作用するか」をここに持たせておけば同じ形で追加できる。
+ */
+export type FaucetDefinition = {
+  id: string
+  targetBodyId: WaterBodyId
+  x: number
+  y: number
+}
+
 export type StageDefinition = {
   id: string
   name: string
@@ -76,6 +89,7 @@ export type StageDefinition = {
   waterBodies: readonly WaterBodyDefinition[]
   floaters: readonly FloaterDefinition[]
   goal: GoalDefinition
+  faucet: FaucetDefinition
   /** 幼児向けの短い1行ヒント。 */
   hint: string
 }
