@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { PUKUPUKA_STAGE } from './stageDefinitions'
 import {
+  activeSolids,
   applyWaterTap,
   createInitialState,
   drainSourceBodyId,
@@ -11,6 +12,7 @@ import {
   stageDriftDirection,
   stepGame,
   toggleDrain,
+  toggleGate,
   waterRatioOf,
   waterSurfaceYOf,
   type PukupukaGameState,
@@ -45,7 +47,7 @@ function duckOf(state: PukupukaGameState) {
   return duck
 }
 
-/** ゴールまでのひととおりの操作（水をためて壁を越え、せんを開けて台へ降ろす）。 */
+/** ゴールまでのひととおりの操作（水をためてゲートを開けて渡り、せんを開けて台へ降ろす）。 */
 function playThrough(): { state: PukupukaGameState; goalCount: number } {
   let current = createInitialState(stage)
   let goalCount = 0
@@ -54,6 +56,7 @@ function playThrough(): { state: PukupukaGameState; goalCount: number } {
   current = fill.state
   goalCount += fill.goalCount
 
+  current = toggleGate(current)
   current = toggleDrain(current)
   const drain = run(current, 6)
   current = drain.state
@@ -162,6 +165,56 @@ describe('pukupukaGame: せん/排水(#516)', () => {
   })
 })
 
+describe('pukupukaGame: ゲート(#517)', () => {
+  test('初期状態ではゲートは閉じている', () => {
+    expect(createInitialState(stage).gateOpen).toBe(false)
+  })
+
+  test('タップのたびに開閉が反転する', () => {
+    const closed = createInitialState(stage)
+    expect(closed.gateOpen).toBe(false)
+
+    const opened = toggleGate(closed)
+    expect(opened.gateOpen).toBe(true)
+
+    const closedAgain = toggleGate(opened)
+    expect(closedAgain.gateOpen).toBe(false)
+  })
+
+  test('ゲートが閉じている間は、水をどれだけためてもアヒルはゲートを越えられない', () => {
+    const { state, goalCount } = run(createInitialState(stage), 15, 'fill')
+    const duck = duckOf(state)
+
+    expect(duck.x).toBeLessThan(stage.gate.x)
+    expect(goalCount).toBe(0)
+    expect(state.phase).toBe('playing')
+  })
+
+  test('ゲートを開けて水をためると、アヒルがゲートを越えて右側へ渡れる', () => {
+    const opened = toggleGate(createInitialState(stage))
+    const { state } = run(opened, 8, 'fill')
+    const duck = duckOf(state)
+
+    expect(duck.x).toBeGreaterThan(stage.gate.x + stage.gate.width)
+  })
+
+  test('閉じているときのゲートは他の固定物と同じように当たり判定に加わる', () => {
+    const closedSolids = activeSolids(stage, false)
+    expect(closedSolids).toContainEqual(stage.gate)
+
+    const openSolids = activeSolids(stage, true)
+    expect(openSolids).not.toContainEqual(stage.gate)
+  })
+
+  test('クリア後はゲートの開閉を受け付けない', () => {
+    const cleared = playThrough().state
+    expect(cleared.phase).toBe('cleared')
+
+    const toggled = toggleGate(cleared)
+    expect(toggled.gateOpen).toBe(cleared.gateOpen)
+  })
+})
+
 describe('pukupukaGame: 水位と浮遊物の連動', () => {
   test('水位を上げるとアヒルが上がる', () => {
     const settled = run(createInitialState(stage), 3).state
@@ -240,9 +293,10 @@ describe('pukupukaGame: 水位の下限・上限', () => {
 })
 
 describe('pukupukaGame: 固定物との関係', () => {
-  test('アヒルは床・壁・しきりを大きく貫通しない', () => {
+  test('アヒルは床・壁・ゲート(閉)を大きく貫通しない', () => {
     let current = createInitialState(stage)
-    // 'fill'に加え、drainOpenをtrue/falseへ切り替えながら進める（同時ONの区間も含む）。
+    // ゲートは閉じたままにしておき、'fill'に加え、drainOpenをtrue/falseへ切り替えながら進める
+    // （同時ONの区間も含む）。
     const steps: { control: WaterControl; drainOpen: boolean }[] = [
       { control: 'fill', drainOpen: false },
       { control: null, drainOpen: false },
@@ -255,7 +309,7 @@ describe('pukupukaGame: 固定物との関係', () => {
       if (current.drainOpen !== step.drainOpen) current = toggleDrain(current)
       current = run(current, 2, step.control).state
       const duck = duckOf(current)
-      for (const solid of stage.solids) {
+      for (const solid of activeSolids(stage, current.gateOpen)) {
         const nearestX = Math.min(Math.max(duck.x, solid.x), solid.x + solid.width)
         const nearestY = Math.min(Math.max(duck.y, solid.y), solid.y + solid.height)
         const distance = Math.hypot(duck.x - nearestX, duck.y - nearestY)
@@ -318,6 +372,7 @@ describe('pukupukaGame: やりなおし', () => {
     expect(waterSurfaceYOf(stage, reset, bodyId)).toBeCloseTo(126 - 14, 5)
     expect(reset.elapsedMs).toBe(0)
     expect(reset.drainOpen).toBe(false)
+    expect(reset.gateOpen).toBe(false)
   })
 })
 

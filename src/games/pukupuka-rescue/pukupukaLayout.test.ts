@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
+import { PUKUPUKA_STAGE } from './stageDefinitions'
 
 // スマホ縦画面での破綻（横スクロール・画面外へ出る操作ボタン・小さすぎるタップ領域）は
 // jsdomでは実寸を測れないため、レイアウトの前提そのものをCSSソースで固定する。
@@ -65,11 +66,25 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
     expect(ruleBody('.drainHit')).toMatch(/touch-action:\s*manipulation/)
   })
 
+  test('ゲートのタップ領域は横方向も見た目より広く、縦方向も十分な大きさがある（幼児向け規約）', () => {
+    const gateSource = readFileSync(path.join(__dirname, 'PukupukaGate.tsx'), 'utf-8')
+    const hitWidth = Number(gateSource.match(/HIT_WIDTH = (\d+)/)?.[1])
+    const topMargin = Number(gateSource.match(/HIT_TOP_MARGIN = (\d+)/)?.[1])
+    const bottomMargin = Number(gateSource.match(/HIT_BOTTOM_MARGIN = (\d+)/)?.[1])
+    expect(hitWidth).toBeGreaterThanOrEqual(15)
+    // タップの高さは、じゃぐち・せんのタップ領域と重ならないよう上下に余白を残した
+    // ゲート矩形の高さ（stage.gate.height）から余白ぶんを引いた値になる。
+    expect(PUKUPUKA_STAGE.gate.height - topMargin - bottomMargin).toBeGreaterThanOrEqual(15)
+
+    expect(ruleBody('.gateHit')).toMatch(/touch-action:\s*manipulation/)
+  })
+
   test('prefers-reduced-motion で演出アニメーションを止める', () => {
     expect(CSS_SOURCE).toMatch(/@media \(prefers-reduced-motion: reduce\)/)
     const reduced = CSS_SOURCE.slice(CSS_SOURCE.indexOf('@media (prefers-reduced-motion: reduce)'))
-    for (const animated of ['waveBack', 'waveFront', 'bubble', 'floaterBob', 'goalGlow', 'drainSwirl']) {
+    for (const animated of ['waveBack', 'waveFront', 'bubble', 'floaterBob', 'goalGlow', 'drainSwirl', 'gateOpenMark']) {
       expect(reduced).toContain(`.${animated}`)
     }
+    expect(reduced).toContain('.gateDoor')
   })
 })

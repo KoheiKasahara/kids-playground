@@ -340,6 +340,59 @@
   }
 }
 
+/* ---- ゲート（#517） ---- */
+
+/* とびら本体。開閉のたびに位置を滑らせて、閉じている/開いているの変化を分かりやすくする。 */
+.gateDoor {
+  transition: transform 260ms ease;
+}
+
+.gateDoorOpen {
+  transform: translateX(-13px);
+}
+
+.gateOpenMark {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaGateOpenMark 1.2s ease-in-out infinite;
+}
+
+/* 見た目のとびらよりタップ領域を広く取り、幼児の指でも押しやすくする。 */
+.gateHit {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.gateHit:disabled {
+  cursor: default;
+}
+
+.gateHit:focus-visible {
+  outline: 3px solid #2f9e44;
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+@keyframes pukupukaGateOpenMark {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(1.4px);
+  }
+}
+
 /* ---- クリア表示 ---- */
 
 .clearBanner {
@@ -477,11 +530,13 @@
   .faucetSplash,
   .drainSwirl,
   .drainBubbleA,
-  .drainBubbleB {
+  .drainBubbleB,
+  .gateOpenMark {
     animation: none;
   }
 
-  .gaugeFill {
+  .gaugeFill,
+  .gateDoor {
     transition: none;
   }
 }

@@ -9,6 +9,7 @@ import {
   primaryWaterBodyId,
   stepGame,
   toggleDrain,
+  toggleGate,
   waterRatioOf,
   type PukupukaGameState,
   type WaterControl,
@@ -17,15 +18,15 @@ import { playPukupukaGoalSound, playPukupukaWaterSound, primeAudio } from '../..
 import styles from './PukupukaRescuePlay.module.css'
 
 /**
- * ぷかぷかレスキュー（Issue #514 Phase 1 / #515 じゃぐち / #516 せん・排水）。
+ * ぷかぷかレスキュー（Issue #514 Phase 1 / #515 じゃぐち / #516 せん・排水 / #517 ゲート）。
  *
  * 画面の役割はこの3つだけに絞っている。
  *  1. requestAnimationFrame でゲームを進める
- *  2. じゃぐち・せんの操作を水位操作という入力に変える
+ *  2. じゃぐち・せん・ゲートの操作を水位・通路の入力に変える
  *  3. ゲーム状態をSVGへ渡す
  *
- * 水位・浮力・ゴール判定はすべて pukupukaGame.ts 側の純粋な関数が持つため、
- * 後続のゲート(#517)などで操作を足すときも、この画面の入力部分だけを直せばよい。
+ * 水位・浮力・ゴール判定・ゲートの当たり判定はすべて pukupukaGame.ts 側の純粋な関数が持つため、
+ * 後続の機能追加でも、この画面の入力部分だけを直せばよい。
  */
 export default function PukupukaRescuePlay() {
   const navigate = useNavigate()
@@ -126,6 +127,17 @@ export default function PukupukaRescuePlay() {
     setGameState(next)
   }, [])
 
+  /** ゲートのタップ操作: 開⇔閉を切り替える。開いている間は水位に関わらず通り抜けられる。 */
+  const handleGateToggle = useCallback(() => {
+    const current = stateRef.current
+    if (current.phase !== 'playing') return
+    primeAudio()
+    const next = toggleGate(current)
+    playPukupukaWaterSound(next.gateOpen ? 'fill' : 'drain')
+    stateRef.current = next
+    setGameState(next)
+  }, [])
+
   const handleReset = () => {
     const initial = createInitialState(stage)
     setControl(null)
@@ -165,6 +177,9 @@ export default function PukupukaRescuePlay() {
           drainOpen={gameState.drainOpen}
           drainDisabled={cleared}
           onDrainToggle={handleDrainToggle}
+          gateOpen={gameState.gateOpen}
+          gateDisabled={cleared}
+          onGateToggle={handleGateToggle}
         />
         {cleared ? (
           <div className={styles.clearBanner}>

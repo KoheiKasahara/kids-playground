@@ -3,6 +3,7 @@ import type { SolidDefinition, StageDefinition } from './types'
 import { surfaceYAt, waterBodyWidth } from './waterModel'
 import PukupukaFaucet from './PukupukaFaucet'
 import PukupukaDrain from './PukupukaDrain'
+import PukupukaGate from './PukupukaGate'
 import styles from './PukupukaRescuePlay.module.css'
 
 // ステージの見た目だけを持つコンポーネント。位置はすべてゲーム状態（2D座標）から決め、
@@ -29,29 +30,6 @@ function buildWavePath(width: number, amplitude: number): string {
   return path
 }
 
-/** しきりは当たり判定こそ四角のままだが、見た目は上を丸く、底に水の通り道を開けて描く。 */
-function dividerPath(solid: SolidDefinition): string {
-  const left = solid.x
-  const right = solid.x + solid.width
-  const bottom = solid.y + solid.height
-  const radius = solid.width / 2
-  const center = left + radius
-  const holeLeft = center - 1.5
-  const holeRight = center + 1.5
-  const holeTop = bottom - 7
-  return [
-    `M ${left} ${solid.y + radius}`,
-    `A ${radius} ${radius} 0 0 1 ${right} ${solid.y + radius}`,
-    `V ${bottom}`,
-    `H ${holeRight}`,
-    `V ${holeTop}`,
-    `Q ${center} ${holeTop - 3} ${holeLeft} ${holeTop}`,
-    `V ${bottom}`,
-    `H ${left}`,
-    'Z',
-  ].join(' ')
-}
-
 function solidClassName(solid: SolidDefinition): string {
   if (solid.kind === 'floor') return styles.solidFloor
   if (solid.kind === 'platform') return styles.solidPlatform
@@ -71,6 +49,10 @@ type Props = {
   drainOpen: boolean
   drainDisabled: boolean
   onDrainToggle: () => void
+  /** ゲートが開いている（＝通り抜けられる）かどうか。 */
+  gateOpen: boolean
+  gateDisabled: boolean
+  onGateToggle: () => void
 }
 
 export default function PukupukaStage({
@@ -84,6 +66,9 @@ export default function PukupukaStage({
   drainOpen,
   drainDisabled,
   onDrainToggle,
+  gateOpen,
+  gateDisabled,
+  onGateToggle,
 }: Props) {
   const cleared = state.phase === 'cleared'
   const goal = stage.goal.area
@@ -207,21 +192,17 @@ export default function PukupukaStage({
           fill="url(#pukupuka-goal-glow)"
         />
 
-        {stage.solids.map((solid) =>
-          solid.kind === 'divider' ? (
-            <path key={solid.id} className={styles.solidWall} d={dividerPath(solid)} />
-          ) : (
-            <rect
-              key={solid.id}
-              className={solidClassName(solid)}
-              x={solid.x}
-              y={solid.y}
-              width={solid.width}
-              height={solid.height}
-              rx={solid.kind === 'floor' ? 3 : 4}
-            />
-          ),
-        )}
+        {stage.solids.map((solid) => (
+          <rect
+            key={solid.id}
+            className={solidClassName(solid)}
+            x={solid.x}
+            y={solid.y}
+            width={solid.width}
+            height={solid.height}
+            rx={solid.kind === 'floor' ? 3 : 4}
+          />
+        ))}
 
         {/* ゴールの目印: はたと浮き輪。台の上に置いて「ここへ運ぶ」と分かるようにする。 */}
         <g>
@@ -292,6 +273,7 @@ export default function PukupukaStage({
         onTap={onFaucetTap}
       />
       <PukupukaDrain drain={stage.drain} open={drainOpen} disabled={drainDisabled} onToggle={onDrainToggle} />
+      <PukupukaGate gate={stage.gate} open={gateOpen} disabled={gateDisabled} onToggle={onGateToggle} />
     </svg>
   )
 }
