@@ -79,6 +79,20 @@ export type FaucetDefinition = {
   y: number
 }
 
+/**
+ * せん/排水の定義（#516）。タップでON/OFFする栓で、開いている間 `sourceBodyId` の
+ * 水域から水を減らし続ける。じゃぐち（FaucetDefinition）と対称の形にしてあり、
+ * 「どの水域に作用するか」だけを持たせているため、複数水域(#517)が増えても
+ * 定義を1件足すだけで済む。
+ * 位置(x, y)は見た目の排水口の中心で、当たり判定はこれより広めに取ってよい。
+ */
+export type DrainDefinition = {
+  id: string
+  sourceBodyId: WaterBodyId
+  x: number
+  y: number
+}
+
 export type StageDefinition = {
   id: string
   name: string
@@ -90,6 +104,7 @@ export type StageDefinition = {
   floaters: readonly FloaterDefinition[]
   goal: GoalDefinition
   faucet: FaucetDefinition
+  drain: DrainDefinition
   /** 幼児向けの短い1行ヒント。 */
   hint: string
 }

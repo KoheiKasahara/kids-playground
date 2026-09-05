@@ -8,6 +8,7 @@ import {
   isSettled,
   primaryWaterBodyId,
   stepGame,
+  toggleDrain,
   waterRatioOf,
   type PukupukaGameState,
   type WaterControl,
@@ -15,78 +16,16 @@ import {
 import { playPukupukaGoalSound, playPukupukaWaterSound, primeAudio } from '../../utils/quizSound'
 import styles from './PukupukaRescuePlay.module.css'
 
-type WaterButtonProps = {
-  direction: 'fill' | 'drain'
-  emoji: string
-  label: string
-  variantClassName: string
-  disabled: boolean
-  onHoldStart: (direction: 'fill' | 'drain') => void
-  onHoldEnd: () => void
-  onTap: (direction: 'fill' | 'drain') => void
-}
-
 /**
- * 水位を増減させるボタン。Phase 1では「ふやす/へらす」の両方に使っていたが、
- * 「ふやす」はじゃぐち（PukupukaFaucet）に置き換わったため、現在は暫定の「みずをへらす」
- * （#516で正式な せん/排水 に置き換わるまでの仮操作）にのみ使う。
- * 押しっぱなしで出し続けられるようポインタで扱いつつ、キーボード操作（Enter / Space）でも
- * 1回ぶん動くように click を併用する。二重に動かないよう、直前がポインタ操作かを覚えておく。
- */
-function WaterButton({
-  direction,
-  emoji,
-  label,
-  variantClassName,
-  disabled,
-  onHoldStart,
-  onHoldEnd,
-  onTap,
-}: WaterButtonProps) {
-  const pointerActivatedRef = useRef(false)
-
-  const handlePointerDown = () => {
-    pointerActivatedRef.current = true
-    onHoldStart(direction)
-  }
-
-  const handleClick = () => {
-    if (pointerActivatedRef.current) {
-      pointerActivatedRef.current = false
-      return
-    }
-    onTap(direction)
-  }
-
-  return (
-    <button
-      type="button"
-      className={`${styles.waterButton} ${variantClassName}`}
-      disabled={disabled}
-      onPointerDown={handlePointerDown}
-      onPointerUp={onHoldEnd}
-      onPointerLeave={onHoldEnd}
-      onPointerCancel={onHoldEnd}
-      onClick={handleClick}
-    >
-      <span className={styles.waterButtonEmoji} aria-hidden="true">
-        {emoji}
-      </span>
-      {label}
-    </button>
-  )
-}
-
-/**
- * ぷかぷかレスキュー（Issue #514 Phase 1 / #515 じゃぐち）。
+ * ぷかぷかレスキュー（Issue #514 Phase 1 / #515 じゃぐち / #516 せん・排水）。
  *
  * 画面の役割はこの3つだけに絞っている。
  *  1. requestAnimationFrame でゲームを進める
- *  2. じゃぐち・「みずをへらす」ボタンの押下を水位操作という入力に変える
+ *  2. じゃぐち・せんの操作を水位操作という入力に変える
  *  3. ゲーム状態をSVGへ渡す
  *
  * 水位・浮力・ゴール判定はすべて pukupukaGame.ts 側の純粋な関数が持つため、
- * 排水(#516)へ操作を差し替えるときも、この画面の入力部分だけを直せばよい。
+ * 後続のゲート(#517)などで操作を足すときも、この画面の入力部分だけを直せばよい。
  */
 export default function PukupukaRescuePlay() {
   const navigate = useNavigate()
@@ -96,6 +35,7 @@ export default function PukupukaRescuePlay() {
   const [gameState, setGameState] = useState<PukupukaGameState>(() => createInitialState(stage))
   // ループの中では常に最新の状態が必要なため、描画用のstateとは別にrefでも持つ。
   const stateRef = useRef(gameState)
+  // じゃぐちを押している間だけ 'fill'。せん(drainOpen)はgameState側の状態でそのまま扱う。
   const controlRef = useRef<WaterControl>(null)
   // じゃぐちの見た目（ハンドル色・水の線）を更新するための、操作中の入力の描画用コピー。
   // controlRefだけだとrefの変更では再描画されないため、押下/解放のタイミングでここも合わせて更新する。
@@ -150,33 +90,41 @@ export default function PukupukaRescuePlay() {
     }
   }, [setControl])
 
-  const changeWater = useCallback(
-    (direction: 'fill' | 'drain') => {
-      const current = stateRef.current
-      if (current.phase !== 'playing') return
-      primeAudio()
-      playPukupukaWaterSound(direction)
-      const next = applyWaterTap(stage, current, direction)
-      stateRef.current = next
-      setGameState(next)
-    },
-    [stage],
-  )
+  const changeWater = useCallback(() => {
+    const current = stateRef.current
+    if (current.phase !== 'playing') return
+    primeAudio()
+    playPukupukaWaterSound('fill')
+    const next = applyWaterTap(stage, current)
+    stateRef.current = next
+    setGameState(next)
+  }, [stage])
 
-  /** 指で押しはじめ: 1回ぶんをすぐ足したうえで、押しているあいだ増減し続ける。 */
-  const startWaterHold = (direction: 'fill' | 'drain') => {
-    setControl(direction)
-    changeWater(direction)
+  /** じゃぐちを指で押しはじめ: 1回ぶんをすぐ足したうえで、押しているあいだ注水し続ける。 */
+  const startFaucetHold = () => {
+    setControl('fill')
+    changeWater()
   }
 
-  const stopWaterHold = () => {
+  const stopFaucetHold = () => {
     setControl(null)
   }
 
   /** キーボード（Enter / Space）での操作。押しっぱなしにはせず1回ぶんだけ動かす。 */
-  const tapWater = (direction: 'fill' | 'drain') => {
-    changeWater(direction)
+  const tapFaucet = () => {
+    changeWater()
   }
+
+  /** せんのタップ操作: 開⇔閉を切り替える。開いている間は毎フレーム自動で水位が下がる。 */
+  const handleDrainToggle = useCallback(() => {
+    const current = stateRef.current
+    if (current.phase !== 'playing') return
+    primeAudio()
+    const next = toggleDrain(current)
+    if (next.drainOpen) playPukupukaWaterSound('drain')
+    stateRef.current = next
+    setGameState(next)
+  }, [])
 
   const handleReset = () => {
     const initial = createInitialState(stage)
@@ -211,9 +159,12 @@ export default function PukupukaRescuePlay() {
           state={gameState}
           faucetActive={faucetOn}
           faucetDisabled={cleared}
-          onFaucetHoldStart={() => startWaterHold('fill')}
-          onFaucetHoldEnd={stopWaterHold}
-          onFaucetTap={() => tapWater('fill')}
+          onFaucetHoldStart={startFaucetHold}
+          onFaucetHoldEnd={stopFaucetHold}
+          onFaucetTap={tapFaucet}
+          drainOpen={gameState.drainOpen}
+          drainDisabled={cleared}
+          onDrainToggle={handleDrainToggle}
         />
         {cleared ? (
           <div className={styles.clearBanner}>
@@ -237,19 +188,6 @@ export default function PukupukaRescuePlay() {
             data-water-percent={waterPercent}
           />
         </span>
-      </div>
-
-      <div className={styles.controls}>
-        <WaterButton
-          direction="drain"
-          emoji="🕳️"
-          label="みずを へらす"
-          variantClassName={styles.waterButtonDrain}
-          disabled={cleared}
-          onHoldStart={startWaterHold}
-          onHoldEnd={stopWaterHold}
-          onTap={tapWater}
-        />
       </div>
 
       <div className={styles.footer}>
