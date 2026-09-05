@@ -83,15 +83,29 @@ jobs:
       - name: Test (Nightly E2E route smoke)
         id: e2e
         shell: bash
+        env:
+          # Project Health Dashboard（Issue #523）が対象ゲーム数/成功数を再利用できるよう、
+          # 既存のNightly実行そのものからJSONレポートも出力する（追加のテスト実行はしない）。
+          PLAYWRIGHT_JSON_OUTPUT_NAME: project-health-e2e-nightly.json
         run: |
           start=$(date +%s)
           set +e
-          npm run test:e2e:nightly
+          npm run test:e2e:nightly -- --reporter=line,json
           status=$?
           end=$(date +%s)
           echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
           echo "Nightly E2E route smoke duration: $((end - start))s"
           exit "$status"
+
+      - name: Upload Nightly E2E report for Project Health
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-health-e2e-nightly
+          path: project-health-e2e-nightly.json
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Write CI Summary
         if: always()

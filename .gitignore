@@ -11,6 +11,10 @@ coverage
 playwright-report
 test-results
 
+# Project Health Dashboard がCI実行時にリポジトリ直下へ書き出す一時取得データ
+# （集計ロジック本体は scripts/project-health/ にあり、これは対象外）
+/project-health
+
 # logs
 *.log
 npm-debug.log*
