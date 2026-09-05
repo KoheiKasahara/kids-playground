@@ -18,6 +18,11 @@ import {
   DEFAULT_BOWLING_BALL_ID,
   type BowlingBallId,
 } from './bowlingBalls'
+import {
+  DEFAULT_LAUNCH_HEIGHT_LEVEL,
+  LAUNCH_HEIGHT_LEVELS,
+  type LaunchHeightLevel,
+} from './bowlingPhysics'
 import { getBowlingStage } from './bowlingStage'
 import styles from './TsumikiBowlingGame.module.css'
 
@@ -32,6 +37,21 @@ function powerLabel(power: number): string {
   if (power < 0.34) return 'よわい'
   if (power < 0.7) return 'ふつう'
   return 'つよい！'
+}
+
+/**
+ * 発射の高さ選択ボタンの見た目（bowlingPhysics.tsのLAUNCH_HEIGHT_LEVELSの並び順で描く）。
+ *
+ * 文字だけで「ひくい/ふつう/たかい」を伝えると、まだ字が読めない・比較を
+ * 理解しにくい幼児には伝わりにくい。3段階で明らかに違う弾道の形（低い曲線→
+ * 中くらいの山→大きな虹形）を小さなSVGで描き、ぱっと見の高さの違いで
+ * 選べるようにする。pathはすべて共通のviewBox（幅48・高さ34、上に少し余白）で
+ * 「玉の位置(左)→積み木の位置(右)」への弾道を表す。
+ */
+const HEIGHT_LEVEL_UI: Record<LaunchHeightLevel, { label: string; path: string }> = {
+  low: { label: 'ひくい', path: 'M3 27 Q 24 22 45 18' },
+  normal: { label: 'ふつう', path: 'M3 28 Q 24 6 45 20' },
+  high: { label: 'たかい', path: 'M3 29 Q 24 -6 45 22' },
 }
 
 /** Three.js/Rapierの色は0xRRGGBBの数値。CSSへ渡すために16進文字列へ直す。 */
@@ -56,6 +76,11 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
   const [hasThrown, setHasThrown] = useState(false)
   // 次に投げる玉。毎投選び直せる（「もういちど」をまたいでも選択は引き継ぐ）。
   const [ballId, setBallIdState] = useState<BowlingBallId>(DEFAULT_BOWLING_BALL_ID)
+  // 次に投げる高さ（ひくい/ふつう/たかい）。玉と同じく毎投選び直せる。
+  // ドラッグ操作（狙う向き・パワー）とは完全に別のUIで、ドラッグでは変わらない。
+  const [heightLevel, setHeightLevelState] = useState<LaunchHeightLevel>(
+    DEFAULT_LAUNCH_HEIGHT_LEVEL,
+  )
   // 3投のうち1回でも全部倒したか（パーフェクトの定義）。結果画面でだけ使う。
   const [hadPerfectThrow, setHadPerfectThrow] = useState(false)
   // 大崩壊の短いチップ表示。
@@ -110,6 +135,7 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
     runId,
     stageId,
     ballId,
+    heightLevel,
     onThrowStart: handleThrowStart,
     onThrowSettled: handleThrowSettled,
     onAimChange: handleAimChange,
@@ -131,6 +157,17 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
       setBallId(id)
     },
     [canSelectBall, setBallId],
+  )
+
+  // 高さはRapierのBodyを作り直さない（bowlingLaunch.tsのlaunchVelocityが毎回
+  // 読むだけの値）ので、玉のように専用ハンドル経由で伝える必要がない。
+  // engineへはoptions.heightLevelとしてそのまま渡している。
+  const handleSelectHeight = useCallback(
+    (level: LaunchHeightLevel) => {
+      if (!canSelectBall) return
+      setHeightLevelState(level)
+    },
+    [canSelectBall],
   )
 
   const retry = useCallback(() => {
@@ -227,6 +264,36 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
               </button>
             ))}
           </div>
+
+          <div className={styles.heightSelector} role="group" aria-label="たかさをえらぶ">
+            {LAUNCH_HEIGHT_LEVELS.map((level) => {
+              const spec = HEIGHT_LEVEL_UI[level]
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  className={`${styles.heightButton} ${
+                    heightLevel === level ? styles.heightButtonSelected : ''
+                  }`}
+                  onClick={() => handleSelectHeight(level)}
+                  disabled={!canSelectBall}
+                  aria-pressed={heightLevel === level}
+                >
+                  <svg
+                    className={styles.heightIcon}
+                    viewBox="0 -10 48 40"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <line x1="0" y1="29" x2="48" y2="29" className={styles.heightGroundLine} />
+                    <path d={spec.path} className={styles.heightArc} />
+                    <circle cx="3" cy="27" r="3" className={styles.heightBallDot} />
+                  </svg>
+                  <span className={styles.heightLabel}>{spec.label}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {isAiming && !isFinished ? (
@@ -243,7 +310,9 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
                     style={{ width: `${Math.round(aimPower * 100)}%` }}
                   />
                 </div>
-                <span className={styles.powerLabel}>{powerLabel(aimPower)}</span>
+                <span className={styles.powerLabel} data-testid="power-label">
+                  {powerLabel(aimPower)}
+                </span>
               </div>
             )}
           </div>

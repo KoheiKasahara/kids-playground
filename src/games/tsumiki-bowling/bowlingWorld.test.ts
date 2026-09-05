@@ -21,11 +21,12 @@ import {
   LAUNCH_YAW_LIMIT_RAD,
   MAX_BALL_SPEED,
   PHYSICS_TIMESTEP,
+  type LaunchHeightLevel,
 } from './bowlingPhysics'
 import { createToppleTracker, updateToppleTracker } from './bowlingTopple'
 import { createSettleState, updateSettleState } from './bowlingSettle'
 import { launchSpeed, type LaunchAim } from './bowlingLaunch'
-import { BOWLING_STAGES, TOWER_CENTER_Z } from './bowlingStage'
+import { BOWLING_STAGES, laneSurfaceY, TOWER_CENTER_Z } from './bowlingStage'
 import { getBowlingBall } from './bowlingBalls'
 
 const STEP_MS = PHYSICS_TIMESTEP * 1000
@@ -54,10 +55,15 @@ type RunResult = {
  * 物理の細かい数値を固定するのではなく、
  * 「速いまま届くか」「崩れるか」「落ち着くか」という流れだけを確かめる。
  */
-function runThrow(bowling: BowlingWorld, seconds: number, launchAim: LaunchAim | null): RunResult {
+function runThrow(
+  bowling: BowlingWorld,
+  seconds: number,
+  launchAim: LaunchAim | null,
+  heightLevel?: LaunchHeightLevel,
+): RunResult {
   const tracker = createToppleTracker(readBlockSamples(bowling))
   const settle = createSettleState()
-  if (launchAim) launchBall(bowling, launchAim)
+  if (launchAim) launchBall(bowling, launchAim, heightLevel)
   let settledAtMs: number | null = null
   let minBallY = Number.POSITIVE_INFINITY
   let ballSpeedAfterImpact = 0
@@ -566,5 +572,81 @@ describe('ステージごとの世界（Phase 3）', () => {
       expect(sample.angularSpeed).toBe(0)
     }
     bowling.world.free()
+  })
+})
+
+describe('発射の高さ3段階（ひくい/ふつう/たかい、Rapier実測）', () => {
+  beforeAll(async () => {
+    await RAPIER.init()
+  })
+
+  /** 玉が最初にレーン面へ着くまでの経過時間[ms]。着かないまま終われば null。 */
+  function firstGroundContactMs(
+    bowling: BowlingWorld,
+    seconds: number,
+    launchAim: LaunchAim,
+    heightLevel: LaunchHeightLevel,
+  ): number | null {
+    launchBall(bowling, launchAim, heightLevel)
+    const steps = Math.round(seconds / PHYSICS_TIMESTEP)
+    for (let index = 0; index < steps; index += 1) {
+      bowling.world.step()
+      clampBowlingMotion(bowling)
+      const ball = readBall(bowling)
+      if (ball.position.y <= laneSurfaceY(ball.position.z) + bowling.ballSpec.radius + 0.02) {
+        return (index + 1) * STEP_MS
+      }
+    }
+    return null
+  }
+
+  it('ひくいは、ふつうよりはっきり早く床へ着く（低弾道・早期接地）', () => {
+    const low = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const normal = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const lowMs = firstGroundContactMs(low, 3, aim(1), 'low')
+    const normalMs = firstGroundContactMs(normal, 3, aim(1), 'normal')
+    expect(lowMs).not.toBeNull()
+    expect(normalMs).not.toBeNull()
+    expect(lowMs!).toBeLessThan(normalMs!)
+    low.world.free()
+    normal.world.free()
+  })
+
+  it('たかいは、ふつうよりはっきり滞空時間が長い（山なり弾道）', () => {
+    const normal = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const high = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    // 「たかい」は上向きの角度いっぱいに強く引くと積み木の頭上を通り過ぎるため
+    // （bowlingPhysics.ts参照）、中くらいの力で比べる。
+    const normalMs = firstGroundContactMs(normal, 3, aim(0.5), 'normal')
+    const highMs = firstGroundContactMs(high, 3, aim(0.5), 'high')
+    expect(normalMs).not.toBeNull()
+    expect(highMs).not.toBeNull()
+    expect(highMs!).toBeGreaterThan(normalMs!)
+    normal.world.free()
+    high.world.free()
+  })
+
+  it('3段階とも、適度な強さで投げれば積み木まで届いて崩れる', () => {
+    const cases: Array<{ heightLevel: LaunchHeightLevel; power: number }> = [
+      { heightLevel: 'low', power: 1 },
+      { heightLevel: 'normal', power: 1 },
+      { heightLevel: 'high', power: 0.5 },
+    ]
+    for (const { heightLevel, power } of cases) {
+      const bowling = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+      const result = runThrow(bowling, 6, aim(power), heightLevel)
+      expect(result.toppled, `height=${heightLevel} power=${power}`).toBeGreaterThan(0)
+      bowling.world.free()
+    }
+  })
+
+  it('高さを指定しなければ既定（ふつう）で発射される', () => {
+    const withDefault = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const withNormal = createBowlingWorld(RAPIER, { ballId: 'heavy' })
+    const velocityDefault = launchBall(withDefault, aim(1))!
+    const velocityNormal = launchBall(withNormal, aim(1), 'normal')!
+    expect(velocityDefault).toEqual(velocityNormal)
+    withDefault.world.free()
+    withNormal.world.free()
   })
 })

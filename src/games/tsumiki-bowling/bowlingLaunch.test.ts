@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
   aimFromDrag,
+  combinedRestitution,
   DRAG_DEAD_ZONE_PX,
   fullPowerDragPx,
   launchDirection,
   launchSpeed,
   launchVelocity,
+  predictBouncePreview,
   predictTrajectory,
   pullOffset,
 } from './bowlingLaunch'
 import {
-  LAUNCH_PITCH_RAD,
+  DEFAULT_LAUNCH_HEIGHT_LEVEL,
+  LANE_RESTITUTION,
+  LAUNCH_HEIGHT_CONFIG,
+  LAUNCH_HEIGHT_LEVELS,
   LAUNCH_PULL_MAX,
   LAUNCH_SPEED_MAX,
   LAUNCH_SPEED_MIN,
@@ -20,6 +25,8 @@ import { getBowlingBall } from './bowlingBalls'
 
 const VIEWPORT = { width: 390, height: 844 }
 const BALL = getBowlingBall('heavy')
+/** 「ふつう」のpitchRad。既存テストはこれまでどおり標準の弾道を確かめる。 */
+const NORMAL_PITCH_RAD = LAUNCH_HEIGHT_CONFIG.normal.pitchRad
 
 describe('aimFromDrag: ドラッグ距離とパワー', () => {
   it('デッドゾーン以下のドラッグでは発射しない', () => {
@@ -64,7 +71,7 @@ describe('aimFromDrag: ドラッグ方向と発射方向', () => {
   it('まっすぐ手前へ引くと、まっすぐ前へ飛ぶ', () => {
     const aim = aimFromDrag({ dx: 0, dy: 200 }, VIEWPORT)
     expect(aim.yaw).toBeCloseTo(0, 6)
-    const direction = launchDirection(aim.yaw)
+    const direction = launchDirection(aim.yaw, NORMAL_PITCH_RAD)
     expect(direction.x).toBeCloseTo(0, 6)
     expect(direction.z).toBeLessThan(0)
   })
@@ -74,8 +81,8 @@ describe('aimFromDrag: ドラッグ方向と発射方向', () => {
     const pulledLeft = aimFromDrag({ dx: -120, dy: 200 }, VIEWPORT)
     expect(pulledRight.yaw).toBeLessThan(0)
     expect(pulledLeft.yaw).toBeGreaterThan(0)
-    expect(launchDirection(pulledRight.yaw).x).toBeLessThan(0)
-    expect(launchDirection(pulledLeft.yaw).x).toBeGreaterThan(0)
+    expect(launchDirection(pulledRight.yaw, NORMAL_PITCH_RAD).x).toBeLessThan(0)
+    expect(launchDirection(pulledLeft.yaw, NORMAL_PITCH_RAD).x).toBeGreaterThan(0)
   })
 
   it('どれだけ斜めに引いても、左右の振れは上限を超えない', () => {
@@ -88,19 +95,90 @@ describe('aimFromDrag: ドラッグ方向と発射方向', () => {
   it('奥へ押しても後ろ向きには飛ばない（必ず前方へ出る）', () => {
     const aim = aimFromDrag({ dx: 0, dy: -200 }, VIEWPORT)
     expect(aim.active).toBe(true)
-    expect(launchDirection(aim.yaw).z).toBeLessThan(0)
+    expect(launchDirection(aim.yaw, NORMAL_PITCH_RAD).z).toBeLessThan(0)
   })
 
-  it('発射方向はつねにやや下向きで、積み木へ斜め下から入る', () => {
-    const direction = launchDirection(0)
-    expect(direction.y).toBeCloseTo(-Math.sin(LAUNCH_PITCH_RAD), 6)
-    expect(direction.y).toBeLessThan(0)
+  it('「ふつう」の発射方向はごくわずかに上向きで、単位ベクトルのまま', () => {
+    // 積み木までの距離(LAUNCH_Z)を伸ばしたため、Phase 1〜4のような下向きのままだと
+    // 速度・重力・発射位置を変えなくても手前で失速してしまう（bowlingPhysics.ts参照）。
+    // ここではわずかに上向きの標準的な放物線になる。
+    const direction = launchDirection(0, NORMAL_PITCH_RAD)
+    expect(direction.y).toBeCloseTo(Math.sin(NORMAL_PITCH_RAD), 6)
+    expect(direction.y).toBeGreaterThan(0)
     expect(Math.hypot(direction.x, direction.y, direction.z)).toBeCloseTo(1, 6)
+  })
+
+  it('ドラッグの上下量(dy)は、発射方向の仰角には一切関わらない（高さは別UIでだけ変える）', () => {
+    // dyはパワー（引いた距離）と前後判定にしか使われず、
+    // launchDirectionへ渡すpitchRadはbowlingPhysics.tsのLAUNCH_HEIGHT_CONFIGだけが決める。
+    const shallow = aimFromDrag({ dx: 0, dy: 60 }, VIEWPORT)
+    const deep = aimFromDrag({ dx: 0, dy: 500 }, VIEWPORT)
+    expect(shallow.power).not.toBeCloseTo(deep.power, 2)
+    for (const level of LAUNCH_HEIGHT_LEVELS) {
+      const pitchRad = LAUNCH_HEIGHT_CONFIG[level].pitchRad
+      expect(launchDirection(shallow.yaw, pitchRad).y).toBeCloseTo(
+        launchDirection(deep.yaw, pitchRad).y,
+        10,
+      )
+    }
   })
 
   it('NaNのドラッグでも壊れない', () => {
     const aim = aimFromDrag({ dx: Number.NaN, dy: Number.NaN }, VIEWPORT)
     expect(aim.active).toBe(false)
+  })
+})
+
+describe('発射の高さ3段階（ひくい/ふつう/たかい）', () => {
+  it('3段階あり、ふつうが既定になっている', () => {
+    expect(LAUNCH_HEIGHT_LEVELS).toEqual(['low', 'normal', 'high'])
+    expect(DEFAULT_LAUNCH_HEIGHT_LEVEL).toBe('normal')
+  })
+
+  it('ひくい＜ふつう＜たかいの順に仰角が上向きへはっきり変わる（弾道が明確に違う）', () => {
+    const low = launchDirection(0, LAUNCH_HEIGHT_CONFIG.low.pitchRad)
+    const normal = launchDirection(0, LAUNCH_HEIGHT_CONFIG.normal.pitchRad)
+    const high = launchDirection(0, LAUNCH_HEIGHT_CONFIG.high.pitchRad)
+    // ひくいははっきり下向き、たかいははっきり上向き。ふつうはその間。
+    expect(low.y).toBeLessThan(0)
+    expect(high.y).toBeGreaterThan(0)
+    expect(low.y).toBeLessThan(normal.y)
+    expect(normal.y).toBeLessThan(high.y)
+    // 3段階とも単位ベクトルのまま（速度の大きさは高さで変えない）。
+    for (const direction of [low, normal, high]) {
+      expect(Math.hypot(direction.x, direction.y, direction.z)).toBeCloseTo(1, 6)
+    }
+  })
+
+  it('たかいの速度ベクトルは、ふつうよりはっきり上向きになる', () => {
+    const aim = aimFromDrag({ dx: 0, dy: 200 }, VIEWPORT)
+    const lowVelocity = launchVelocity(aim, BALL, 'low')
+    const normalVelocity = launchVelocity(aim, BALL, 'normal')
+    const highVelocity = launchVelocity(aim, BALL, 'high')
+    expect(lowVelocity.y).toBeLessThan(0)
+    expect(normalVelocity.y).toBeGreaterThan(0)
+    expect(highVelocity.y).toBeGreaterThan(normalVelocity.y)
+  })
+
+  it('ひくい/ふつうは発射速度の大きさをそのまま使う（弾道の形だけが変わる）', () => {
+    const aim = aimFromDrag({ dx: 0, dy: 200 }, VIEWPORT)
+    for (const level of ['low', 'normal'] as const) {
+      const velocity = launchVelocity(aim, BALL, level)
+      expect(Math.hypot(velocity.x, velocity.y, velocity.z)).toBeCloseTo(
+        launchSpeed(aim.power, BALL) * LAUNCH_HEIGHT_CONFIG[level].speedScale,
+        4,
+      )
+    }
+  })
+
+  it('たかいは、強く引いても積み木の頭上を通り過ぎないよう速度をやや抑えてある', () => {
+    const aim = aimFromDrag({ dx: 0, dy: 400 }, VIEWPORT)
+    const highVelocity = launchVelocity(aim, BALL, 'high')
+    const normalVelocity = launchVelocity(aim, BALL, 'normal')
+    expect(Math.hypot(highVelocity.x, highVelocity.y, highVelocity.z)).toBeLessThan(
+      Math.hypot(normalVelocity.x, normalVelocity.y, normalVelocity.z),
+    )
+    expect(LAUNCH_HEIGHT_CONFIG.high.speedScale).toBeLessThan(1)
   })
 })
 
@@ -138,7 +216,7 @@ describe('発射速度', () => {
 
   it('速度ベクトルの大きさが発射速度と一致する', () => {
     const aim = aimFromDrag({ dx: 60, dy: 200 }, VIEWPORT)
-    const velocity = launchVelocity(aim, BALL)
+    const velocity = launchVelocity(aim, BALL, DEFAULT_LAUNCH_HEIGHT_LEVEL)
     expect(Math.hypot(velocity.x, velocity.y, velocity.z)).toBeCloseTo(
       launchSpeed(aim.power, BALL),
       4,
@@ -193,5 +271,57 @@ describe('予測軌道', () => {
     const left = predictTrajectory(start, { x: -6, y: -3.6, z: -32 }, options)
     expect(right[right.length - 1]!.x).toBeGreaterThan(0)
     expect(left[left.length - 1]!.x).toBeLessThan(0)
+  })
+})
+
+describe('反発係数の見積もり', () => {
+  it('レーンの反発とだいたい平均した値になる', () => {
+    expect(combinedRestitution(1)).toBeCloseTo((1 + LANE_RESTITUTION) / 2, 6)
+    expect(combinedRestitution(0)).toBeCloseTo(LANE_RESTITUTION / 2, 6)
+  })
+
+  it('はずむだまはどっしりだまより、床でよく跳ね返る見積もりになる', () => {
+    const heavy = getBowlingBall('heavy')
+    const bouncy = getBowlingBall('bouncy')
+    expect(combinedRestitution(bouncy.restitution)).toBeGreaterThan(
+      combinedRestitution(heavy.restitution),
+    )
+  })
+})
+
+describe('軌道プレビューのバウンド予測', () => {
+  const start = { x: 0, y: 4, z: 20 }
+  const surfaceY = (z: number) => z * 0.055
+
+  it('よく跳ねる球（反発係数が高い）では、最初の着地点のさらに先に2個目のバウンド地点が出る', () => {
+    const preview = predictBouncePreview(
+      start,
+      { x: 0, y: -2, z: -18 },
+      { gravityY: -16, surfaceY, clearance: 0.34, restitution: 0.6, maxTime: 1.5 },
+    )
+    expect(preview.firstBounce).not.toBeNull()
+    expect(preview.secondBounce).not.toBeNull()
+    // 2個目は1個目よりさらに奥（積み木側、-z方向）にある。
+    expect(preview.secondBounce!.z).toBeLessThan(preview.firstBounce!.z)
+  })
+
+  it('ほとんど跳ねない球（反発係数が低い）では、2個目のバウンド地点を出さない', () => {
+    const preview = predictBouncePreview(
+      start,
+      { x: 0, y: -2, z: -18 },
+      { gravityY: -16, surfaceY, clearance: 0.46, restitution: 0.04, maxTime: 1.5 },
+    )
+    expect(preview.firstBounce).not.toBeNull()
+    expect(preview.secondBounce).toBeNull()
+  })
+
+  it('空中で軌道が尽きて着地しなかった場合は、バウンド地点も出さない', () => {
+    const preview = predictBouncePreview(
+      start,
+      { x: 0, y: 0.01, z: -1 },
+      { gravityY: -16, surfaceY, clearance: 0.34, restitution: 0.6, maxTime: 0.05, samples: 3 },
+    )
+    expect(preview.firstBounce).toBeNull()
+    expect(preview.secondBounce).toBeNull()
   })
 })

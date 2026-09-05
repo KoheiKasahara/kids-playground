@@ -14,6 +14,7 @@ import {
   BLOCK_FRICTION,
   BLOCK_LINEAR_DAMPING,
   BLOCK_RESTITUTION,
+  DEFAULT_LAUNCH_HEIGHT_LEVEL,
   GRAVITY_Y,
   LANE_FRICTION,
   LANE_RESTITUTION,
@@ -26,6 +27,7 @@ import {
   PHYSICS_TIMESTEP,
   RAIL_FRICTION,
   RAIL_RESTITUTION,
+  type LaunchHeightLevel,
 } from './bowlingPhysics'
 import {
   BACK_WALL_HALF_HEIGHT,
@@ -262,10 +264,17 @@ export function setBowlingBall(
  * 発射する。重力を戻し、速度と転がりの回転を一度に与える。
  * 転がりぶんの角速度を最初から入れておくと、着地の瞬間に
  * 摩擦で回転を作るための減速が起きず、勢いが落ちて見えない。
+ *
+ * heightLevelは別UI（ひくい/ふつう/たかい）で選んだ値。ドラッグ由来のaimには
+ * 高さの情報を含めていないので、ここで別引数として渡す。
  */
-export function launchBall(bowling: BowlingWorld, aim: LaunchAim): Vector3 | null {
+export function launchBall(
+  bowling: BowlingWorld,
+  aim: LaunchAim,
+  heightLevel: LaunchHeightLevel = DEFAULT_LAUNCH_HEIGHT_LEVEL,
+): Vector3 | null {
   if (!aim.active || bowling.launched) return null
-  const velocity = launchVelocity(aim, bowling.ballSpec)
+  const velocity = launchVelocity(aim, bowling.ballSpec, heightLevel)
   bowling.ball.setGravityScale(1, true)
   bowling.ball.setLinvel(velocity, true)
   bowling.ball.setAngvel(

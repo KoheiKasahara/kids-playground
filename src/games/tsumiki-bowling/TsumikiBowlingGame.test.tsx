@@ -120,13 +120,15 @@ describe('TsumikiBowlingGame', () => {
   it('ドラッグ中はパワーが3段階の言葉で出る', () => {
     renderGame()
     act(() => engineMock.options?.onAimChange(0.1))
-    expect(screen.getByText('よわい')).toBeInTheDocument()
+    expect(screen.getByTestId('power-label')).toHaveTextContent('よわい')
     act(() => engineMock.options?.onAimChange(0.5))
-    expect(screen.getByText('ふつう')).toBeInTheDocument()
+    // 「ふつう」は高さ選択（既定値）のラベルとも文字がかぶるため、
+    // パワー表示のほうはdata-testidで区別して読む。
+    expect(screen.getByTestId('power-label')).toHaveTextContent('ふつう')
     act(() => engineMock.options?.onAimChange(0.95))
-    expect(screen.getByText('つよい！')).toBeInTheDocument()
+    expect(screen.getByTestId('power-label')).toHaveTextContent('つよい！')
     act(() => engineMock.options?.onAimChange(null))
-    expect(screen.queryByText('つよい！')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('power-label')).not.toBeInTheDocument()
   })
 
   it('崩れている最中も、いま倒れている数がその投球ぶんとして増えていく', () => {
@@ -348,5 +350,49 @@ describe('玉の選択', () => {
     )
     // 結果画面が消え、投球待機中に戻っているので選択ボタンはまた押せる。
     expect(screen.getByRole('button', { name: 'ちいさいだま' })).not.toBeDisabled()
+  })
+})
+
+describe('発射の高さ選択', () => {
+  it('3段階が選べ、最初は「ふつう」が選ばれていて、エンジンにもそう伝わる', () => {
+    renderGame()
+    const low = screen.getByRole('button', { name: 'ひくい' })
+    const normal = screen.getByRole('button', { name: 'ふつう' })
+    const high = screen.getByRole('button', { name: 'たかい' })
+    expect(low).toHaveAttribute('aria-pressed', 'false')
+    expect(normal).toHaveAttribute('aria-pressed', 'true')
+    expect(high).toHaveAttribute('aria-pressed', 'false')
+    expect(engineMock.options?.heightLevel).toBe('normal')
+  })
+
+  it('投球待機中に高さを選び直すと、エンジンへ渡る値が変わる（世界は作り直さない）', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    const runIdBefore = engineMock.options?.runId
+    await user.click(screen.getByRole('button', { name: 'たかい' }))
+    expect(engineMock.options?.heightLevel).toBe('high')
+    expect(screen.getByRole('button', { name: 'たかい' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'ふつう' })).toHaveAttribute('aria-pressed', 'false')
+    // runIdが変わらない＝Rapierのworldは作り直されない（高さは毎回読むだけの値のため）。
+    expect(engineMock.options?.runId).toBe(runIdBefore)
+  })
+
+  it('飛行中は高さの選択ボタンがdisabledになる', () => {
+    renderGame()
+    startThrow()
+    expect(screen.getByRole('button', { name: 'ひくい' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'たかい' })).toBeDisabled()
+  })
+
+  it('もういちどしても、選んでいた高さは引き継がれる', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'ひくい' }))
+    for (let index = 1; index <= THROWS_PER_GAME; index += 1) playThrow(2, index)
+    await user.click(screen.getByRole('button', { name: 'もういちど' }))
+
+    expect(engineMock.options?.heightLevel).toBe('low')
+    expect(screen.getByRole('button', { name: 'ひくい' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'ひくい' })).not.toBeDisabled()
   })
 })
