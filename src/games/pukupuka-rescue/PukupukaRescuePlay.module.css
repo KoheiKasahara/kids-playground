@@ -1,0 +1,399 @@
+/* スマホ縦画面を最優先にしたレイアウト。
+   1画面（100dvh）の中に「もどる・タイトル / ひとこと / ステージ / みずゲージ /
+   ふやす・へらす / やりなおし」をすべて収め、横スクロールを出さない。 */
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  display: grid;
+  /* ステージSVGは縦長の固定比率のため、列を minmax(0, 1fr) にして
+     行の高さぶんの幅を要求されないようにする（横スクロール防止）。 */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  gap: var(--space-xs);
+  background: linear-gradient(160deg, #e3f6ff 0%, #f2fbff 55%, #fff7e6 100%);
+}
+
+.header {
+  min-height: var(--tap-target-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.home {
+  flex: 0 0 auto;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: var(--space-xs) var(--space-sm);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: rgb(255 255 255 / 88%);
+  box-shadow: var(--shadow-sm);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.home:active {
+  transform: scale(0.95);
+  box-shadow: none;
+}
+
+.title {
+  margin: 0;
+  color: #17607f;
+  font-size: clamp(19px, 4.4vw, 28px);
+  line-height: 1.1;
+}
+
+.instruction {
+  margin: 0;
+  color: #1b6b8c;
+  font-size: clamp(13px, 3.4vw, 17px);
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.stageArea {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stageSvg {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  /* 縦横比を保ったまま、はみ出さずに中央へ収める。 */
+  display: block;
+}
+
+/* ---- ステージの中の要素 ---- */
+
+.solidWall {
+  fill: #ffd8a8;
+  stroke: #f08c00;
+  stroke-width: 0.8;
+}
+
+.solidFloor {
+  fill: #ffc9a0;
+  stroke: #e8590c;
+  stroke-width: 0.8;
+}
+
+.solidPlatform {
+  fill: #ffe3bf;
+  stroke: #f08c00;
+  stroke-width: 0.8;
+}
+
+.waveBack {
+  animation: pukupukaWave 3.4s linear infinite;
+}
+
+.waveFront {
+  animation: pukupukaWave 2.1s linear infinite reverse;
+}
+
+.bubble {
+  animation: pukupukaBubble 2.7s ease-in infinite;
+}
+
+.floaterBob {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaBob 2.4s ease-in-out infinite;
+}
+
+.ripple {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaRipple 1.8s ease-in-out infinite;
+}
+
+.goalGlow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaGlow 2.6s ease-in-out infinite;
+}
+
+.goalRingCleared {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaRingPop 700ms ease-out 1;
+}
+
+@keyframes pukupukaWave {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes pukupukaBubble {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(-26px);
+    opacity: 0;
+  }
+}
+
+@keyframes pukupukaBob {
+  0%,
+  100% {
+    transform: translateY(-0.5px) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(0.6px) rotate(2deg);
+  }
+}
+
+@keyframes pukupukaRipple {
+  0%,
+  100% {
+    transform: scaleX(0.9);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scaleX(1.15);
+    opacity: 0.6;
+  }
+}
+
+@keyframes pukupukaGlow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pukupukaRingPop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ---- クリア表示 ---- */
+
+.clearBanner {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-round);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: var(--shadow-md);
+  animation: pukupukaClearPop 420ms ease-out 1;
+  pointer-events: none;
+}
+
+.clearEmoji {
+  font-size: clamp(22px, 6vw, 32px);
+}
+
+.clearText {
+  color: #e8590c;
+  font-size: clamp(20px, 5.6vw, 30px);
+  font-weight: 900;
+}
+
+@keyframes pukupukaClearPop {
+  0% {
+    transform: translateX(-50%) scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+}
+
+/* ---- みずゲージ ---- */
+
+.gauge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.gaugeLabel {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.gaugeTrack {
+  flex: 1 1 auto;
+  height: 14px;
+  border-radius: var(--radius-round);
+  background: rgb(255 255 255 / 85%);
+  box-shadow: inset 0 1px 3px rgb(23 96 127 / 25%);
+  overflow: hidden;
+}
+
+.gaugeFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-round);
+  background: linear-gradient(90deg, #74d0f5, #2b9fe0);
+  transition: width 90ms linear;
+}
+
+/* ---- 操作ボタン ---- */
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.waterButton {
+  min-height: 76px;
+  padding: var(--space-xs) var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 3px solid transparent;
+  border-radius: var(--radius-lg);
+  color: #ffffff;
+  font-size: clamp(15px, 4.2vw, 20px);
+  font-weight: 900;
+  line-height: 1.1;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  /* 押しっぱなしで水を出すため、押している間に画面がスクロールしないようにする。 */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.waterButtonEmoji {
+  font-size: clamp(20px, 6vw, 26px);
+  line-height: 1;
+}
+
+.waterButtonFill {
+  border-color: #1c7ed6;
+  background: linear-gradient(180deg, #4dabf7, #1c7ed6);
+}
+
+.waterButtonDrain {
+  border-color: #e8590c;
+  background: linear-gradient(180deg, #ffa94d, #e8590c);
+}
+
+.waterButton:active:not(:disabled) {
+  transform: scale(0.96);
+  box-shadow: var(--shadow-sm);
+}
+
+.waterButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+}
+
+.reset {
+  min-width: 160px;
+  min-height: 48px;
+  padding: var(--space-xs) var(--space-lg);
+  border: 2px solid #74c0fc;
+  border-radius: var(--radius-round);
+  color: #17607f;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: var(--shadow-sm);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.reset:active {
+  transform: scale(0.96);
+  box-shadow: none;
+}
+
+/* 低い横画面では、ステージと操作を横に並べて主要操作を画面内に保つ。 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    column-gap: var(--space-md);
+  }
+
+  .header,
+  .instruction {
+    grid-column: 1 / -1;
+  }
+
+  .stageArea {
+    grid-column: 1;
+    grid-row: 3 / span 3;
+  }
+
+  .gauge {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: end;
+  }
+
+  .controls {
+    grid-column: 2;
+    grid-row: 4;
+  }
+
+  .footer {
+    grid-column: 2;
+    grid-row: 5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waveBack,
+  .waveFront,
+  .bubble,
+  .floaterBob,
+  .ripple,
+  .goalGlow,
+  .goalRingCleared,
+  .clearBanner {
+    animation: none;
+  }
+
+  .gaugeFill {
+    transition: none;
+  }
+}
