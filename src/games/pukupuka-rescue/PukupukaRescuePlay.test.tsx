@@ -69,8 +69,13 @@ function waterPercent(): number {
   return Number(screen.getByTestId('pukupuka-gauge-fill').getAttribute('data-water-percent'))
 }
 
-function fillButton(): HTMLElement {
-  return screen.getByRole('button', { name: /みずを ふやす/ })
+/** じゃぐちの操作対象（押している間だけ注水する）。 */
+function faucet(): HTMLElement {
+  return screen.getByRole('button', { name: /じゃぐち/ })
+}
+
+function faucetActive(): boolean {
+  return screen.getByTestId('pukupuka-faucet').getAttribute('data-faucet-active') === 'true'
 }
 
 function drainButton(): HTMLElement {
@@ -104,20 +109,20 @@ describe('PukupukaRescuePlay', () => {
 
     expect(screen.getByRole('heading', { name: 'ぷかぷかレスキュー' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
-    expect(fillButton()).toBeInTheDocument()
+    expect(faucet()).toBeInTheDocument()
     expect(drainButton()).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'やりなおし' })).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-stage')).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-floater-duck')).toBeInTheDocument()
   })
 
-  test('水をふやすと水面が上がり、アヒルも上がる', () => {
+  test('じゃぐちを押すと水面が上がり、アヒルも上がる', () => {
     renderGame()
     frames.advance(30)
     const before = duckY()
     const beforeSurface = surfaceY()
 
-    hold(frames, fillButton(), 90)
+    hold(frames, faucet(), 90)
 
     // Yは下向き。上がる＝値が小さくなる。
     expect(surfaceY()).toBeLessThan(beforeSurface)
@@ -125,9 +130,23 @@ describe('PukupukaRescuePlay', () => {
     expect(waterPercent()).toBeGreaterThan(20)
   })
 
+  test('じゃぐちを押しているあいだだけ見た目上もON（注水中）になる', () => {
+    renderGame()
+    expect(faucetActive()).toBe(false)
+    expect(faucet()).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.pointerDown(faucet())
+    expect(faucetActive()).toBe(true)
+    expect(faucet()).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.pointerUp(faucet())
+    expect(faucetActive()).toBe(false)
+    expect(faucet()).toHaveAttribute('aria-pressed', 'false')
+  })
+
   test('水をへらすと水面が下がり、アヒルも下がる', () => {
     renderGame()
-    hold(frames, fillButton(), 90)
+    hold(frames, faucet(), 90)
     frames.advance(30)
     const before = duckY()
 
@@ -144,18 +163,18 @@ describe('PukupukaRescuePlay', () => {
     expect(duckY()).toBeCloseTo(118, 0)
   })
 
-  test('水を増やし切っても表示が壊れない', () => {
+  test('水を増やし切っても表示が壊れない（最大水位を超えない）', () => {
     renderGame()
-    hold(frames, fillButton(), 300)
+    hold(frames, faucet(), 300)
 
     expect(waterPercent()).toBe(100)
     expect(duckY()).toBeGreaterThan(0)
     expect(surfaceY()).toBeCloseTo(30, 1)
   })
 
-  test('ボタンから指が離れたら水の増減が止まる', () => {
+  test('じゃぐちから指が離れたら水の増加が止まる', () => {
     renderGame()
-    hold(frames, fillButton(), 30)
+    hold(frames, faucet(), 30)
     const afterRelease = waterPercent()
 
     frames.advance(60)
@@ -164,12 +183,12 @@ describe('PukupukaRescuePlay', () => {
     expect(waterPercent()).toBeLessThan(afterRelease + 20)
   })
 
-  test('キーボード操作（click）でも水が増える', () => {
+  test('キーボード操作（click）でもじゃぐちから水が増える', () => {
     renderGame()
     frames.advance(30)
     const before = waterPercent()
 
-    fireEvent.click(fillButton())
+    fireEvent.click(faucet())
     frames.advance(30)
 
     expect(waterPercent()).toBeGreaterThan(before)
@@ -177,7 +196,7 @@ describe('PukupukaRescuePlay', () => {
 
   test('やりなおしで初期状態へ戻る', () => {
     renderGame()
-    hold(frames, fillButton(), 120)
+    hold(frames, faucet(), 120)
     expect(duckY()).toBeLessThan(100)
 
     fireEvent.click(screen.getByRole('button', { name: 'やりなおし' }))
@@ -186,18 +205,34 @@ describe('PukupukaRescuePlay', () => {
     expect(duckY()).toBeCloseTo(118, 0)
     expect(duckX()).toBeCloseTo(27, 0)
     expect(waterPercent()).toBeCloseTo(15, 0)
+    expect(faucetActive()).toBe(false)
+  })
+
+  test('やりなおしはじゃぐちを押している最中に押しても、押しっぱなし状態を残さない', () => {
+    renderGame()
+    fireEvent.pointerDown(faucet())
+    frames.advance(10)
+    expect(faucetActive()).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'やりなおし' }))
+
+    expect(faucetActive()).toBe(false)
+    const percentAfterReset = waterPercent()
+    frames.advance(60)
+    // リセット後は指を離した扱いのままなので、押しっぱなしのように増え続けない。
+    expect(waterPercent()).toBeLessThanOrEqual(percentAfterReset + 5)
   })
 
   test('ゴールすると「ゴール！」が1回だけ出て、水の操作ができなくなる', () => {
     renderGame()
-    hold(frames, fillButton(), 60 * 6)
+    hold(frames, faucet(), 60 * 6)
     expect(screen.queryByText('ゴール！')).not.toBeInTheDocument()
 
     hold(frames, drainButton(), 60 * 6)
 
     expect(screen.getAllByText('ゴール！')).toHaveLength(1)
     expect(screen.getByRole('status')).toHaveTextContent('ゴール！ アヒルを たすけたよ')
-    expect(fillButton()).toBeDisabled()
+    expect(faucet()).toBeDisabled()
     expect(drainButton()).toBeDisabled()
 
     // クリア後にさらに進めても、表示が二重になったり消えたりしない。
@@ -207,7 +242,7 @@ describe('PukupukaRescuePlay', () => {
 
   test('ゴール後にやりなおすと、もう一度あそべる', () => {
     renderGame()
-    hold(frames, fillButton(), 60 * 6)
+    hold(frames, faucet(), 60 * 6)
     hold(frames, drainButton(), 60 * 6)
     expect(screen.getAllByText('ゴール！')).toHaveLength(1)
 
@@ -215,7 +250,7 @@ describe('PukupukaRescuePlay', () => {
     frames.advance(1)
 
     expect(screen.queryByText('ゴール！')).not.toBeInTheDocument()
-    expect(fillButton()).toBeEnabled()
+    expect(faucet()).toBeEnabled()
     expect(duckY()).toBeCloseTo(118, 0)
   })
 

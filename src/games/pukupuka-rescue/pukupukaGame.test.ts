@@ -3,6 +3,7 @@ import { PUKUPUKA_STAGE } from './stageDefinitions'
 import {
   applyWaterTap,
   createInitialState,
+  faucetTargetBodyId,
   getFloater,
   isSettled,
   primaryWaterBodyId,
@@ -75,6 +76,23 @@ describe('pukupukaGame: 初期状態', () => {
 
   test('流れる向きはゴールのある右向き', () => {
     expect(stageDriftDirection(stage)).toBe(1)
+  })
+})
+
+describe('pukupukaGame: じゃぐち(#515)', () => {
+  test('じゃぐちの注ぎ先はステージ定義のfaucet.targetBodyIdと一致する', () => {
+    expect(faucetTargetBodyId(stage)).toBe(stage.faucet.targetBodyId)
+    expect(faucetTargetBodyId(stage)).toBe(bodyId)
+  })
+
+  test('fill操作はじゃぐちの注ぎ先の水域を増やす（primaryWaterBodyIdと別経路でも同じ水域に届く）', () => {
+    const before = createInitialState(stage)
+    const tapped = applyWaterTap(stage, before, 'fill')
+    const after = run(tapped, 1).state
+
+    expect(waterSurfaceYOf(stage, after, faucetTargetBodyId(stage))).toBeLessThan(
+      waterSurfaceYOf(stage, before, bodyId),
+    )
   })
 })
 

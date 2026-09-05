@@ -131,6 +131,49 @@
   animation: pukupukaRingPop 700ms ease-out 1;
 }
 
+/* ---- じゃぐち（#515） ---- */
+
+.faucetHandleOn {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaFaucetHandleOn 220ms ease-out 1;
+}
+
+.faucetStream {
+  stroke-dasharray: 2.4 2.2;
+  animation: pukupukaFaucetFlow 260ms linear infinite;
+}
+
+.faucetSplash {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaFaucetSplash 420ms ease-in-out infinite;
+}
+
+/* 見た目の吐水口まわりよりタップ領域を広く取り、幼児の指でも押しやすくする。 */
+.faucetHit {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.faucetHit:disabled {
+  cursor: default;
+}
+
+.faucetHit:focus-visible {
+  outline: 3px solid #1c7ed6;
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
 @keyframes pukupukaWave {
   from {
     transform: translateX(0);
@@ -195,6 +238,36 @@
   }
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes pukupukaFaucetHandleOn {
+  0% {
+    transform: scale(0.75) rotate(-30deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes pukupukaFaucetFlow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -4.6;
+  }
+}
+
+@keyframes pukupukaFaucetSplash {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.8;
   }
 }
 
@@ -271,7 +344,8 @@
 
 .controls {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 260px);
+  justify-content: center;
   gap: var(--space-sm);
 }
 
@@ -300,11 +374,6 @@
 .waterButtonEmoji {
   font-size: clamp(20px, 6vw, 26px);
   line-height: 1;
-}
-
-.waterButtonFill {
-  border-color: #1c7ed6;
-  background: linear-gradient(180deg, #4dabf7, #1c7ed6);
 }
 
 .waterButtonDrain {
@@ -389,7 +458,10 @@
   .ripple,
   .goalGlow,
   .goalRingCleared,
-  .clearBanner {
+  .clearBanner,
+  .faucetHandleOn,
+  .faucetStream,
+  .faucetSplash {
     animation: none;
   }
 
