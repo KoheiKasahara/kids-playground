@@ -12,9 +12,9 @@
 
 「こっきクイズ」「はたらくくるまクイズ」「さんすうクイズ」「都道府県クイズ」「せかい旅行クイズ」「こっきピンボール」「こっきコロコロぼうけん」「こっきころころめいろ」「こっきコロコロパズル」を収録しています。こっきクイズとはたらくくるまクイズは1ゲーム10問の4択クイズで、写真・図案から名前を答えるモードと、名前から写真・図案を答えるモードがあります。こっきクイズにはさらに、国旗を覆う16枚のパネルを少しずつめくって国名を当てる「パネルめくり」モードもあります。さんすうクイズはたしざん／ひきざん／かけざん／わりざんの4モードから選び、写真ではなく計算式（例: `3 ＋ 4 = ?`）を出題して答えの数値を4択で選びます。都道府県クイズは47都道府県から10問を出題し、形→名前・名前→形・日本地図から探す、の3モードで遊べます。せかい旅行クイズはアジア・ヨーロッパ・アフリカ・北アメリカ・南アメリカ・オセアニアから地域を選び、地図で光る国を4択で答えながら10か国を旅行します。こっきピンボールは国旗ボールを3個選んで打ち出し、物理演算(matter-js)で盤面を転がして得点ゾーンの点数を競う、正誤のないアクションゲームです。こっきコロコロぼうけんは国旗ボールを1個選び、4エリアのコースを操作せずに見守ってゴールを目指す、得点のない別ミニゲームです。こっきころころめいろは好きな国旗を1つ選び、スティック・矢印キー・スマホの傾き（ジャイロ）で盤面を傾けて、3D迷路（Rapierによる物理演算）の国旗ボールをゴールまで転がす、得点も正誤もないミニゲームです。こっきコロコロパズルは縦長の2Dボードへ横板・斜め板を置いてコースを作り、上から落とした国旗ボールを下のゴールまで導く、物理演算(matter-js)のパズルゲームです。つみきボウリングは玉を指でひっぱって離し、スリングショットの要領で積み木のタワーへ勢いよく打ち込んで崩す、3D物理演算(Three.js + Rapier)のアクショントイです。3投で倒した積み木の数を数えるだけで、正誤や失敗はありません。
 
-- セットアップ・デバッグ手順の詳細は [docs/SETUP.md](docs/SETUP.md) を参照してください。
-- 設計の詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
-- ミニゲーム追加の規約は [docs/MINIGAME_DEVELOPMENT_GUIDELINES.md](docs/MINIGAME_DEVELOPMENT_GUIDELINES.md) を参照してください。
+- セットアップ・デバッグ手順の詳細は [docs/setup.md](docs/setup.md) を参照してください。
+- 設計の詳細は [docs/architecture.md](docs/architecture.md) を参照してください。
+- ミニゲーム追加の規約は [docs/development-guidelines.md](docs/development-guidelines.md) を参照してください。
 - ピアノであそぼうの詳細は [docs/PIANO_PLAY_DESIGN.md](docs/PIANO_PLAY_DESIGN.md) を参照してください。
 - はたらくくるまクイズの詳細は [docs/WORKING_VEHICLE_QUIZ_DESIGN.md](docs/WORKING_VEHICLE_QUIZ_DESIGN.md) を参照してください。
 - さんすうクイズの詳細は [docs/MATH_QUIZ_DESIGN.md](docs/MATH_QUIZ_DESIGN.md) を参照してください。
@@ -100,7 +100,7 @@ https://kids.kasapg.com/
 
 ## 画像の出典・ライセンス
 
-`public/flags/` の国旗SVGは [flag-icons](https://github.com/lipis/flag-icons)（MIT License）由来です。素材ごとの出典、作者、ライセンス、加工内容は [docs/CREDITS.md](docs/CREDITS.md) を参照してください。はたらくくるまクイズ・おやさいクイズなどのイラスト画像はアプリ向けに用意したオリジナル素材です。
+`public/flags/` の国旗SVGは [flag-icons](https://github.com/lipis/flag-icons)（MIT License）由来です。素材ごとの出典、作者、ライセンス、加工内容は [docs/credits.md](docs/credits.md) を参照してください。はたらくくるまクイズ・おやさいクイズなどのイラスト画像はアプリ向けに用意したオリジナル素材です。
 
 ## ディレクトリ構成
 
@@ -155,7 +155,10 @@ public/
 └─ icons/               # PWAアイコン
 
 docs/
-├─ DESIGN.md                         # 概要設計書
+├─ architecture.md                   # アーキテクチャ方針
+├─ development-guidelines.md         # ミニゲーム開発規約
+├─ setup.md                          # セットアップ手順
+├─ credits.md                        # 素材のクレジット・ライセンス表記
 ├─ WORKING_VEHICLE_QUIZ_DESIGN.md    # はたらくくるまクイズ基本設計
 ├─ MATH_QUIZ_DESIGN.md               # さんすうクイズ基本設計
 ├─ PANEL_FLAG_QUIZ_DESIGN.md         # こっきクイズ「パネルめくり」モード基本設計
@@ -163,17 +166,14 @@ docs/
 ├─ FLAG_PINBALL_DESIGN.md            # こっきピンボール基本設計
 ├─ FLAG_ROLL_ADVENTURE_DESIGN.md     # こっきコロコロぼうけんPhase 1基本設計
 ├─ FLAG_ROLL_MAZE_DESIGN.md          # こっきころころめいろ基本設計（Phase 3まで）
-├─ PUKUPUKA_RESCUE_DESIGN.md         # ぷかぷかレスキューPhase 1基本設計
-├─ MINIGAME_DEVELOPMENT_GUIDELINES.md # ミニゲーム開発規約
-├─ SETUP.md                          # セットアップ・デバッグ手順
-└─ CREDITS.md                        # 素材のクレジット・ライセンス表記
+└─ PUKUPUKA_RESCUE_DESIGN.md         # ぷかぷかレスキューPhase 1基本設計
 ```
 
 新しいゲームを追加する場合は `games/<game-name>/` 以下にまとめ、既存ゲームへの影響を抑える方針です。
 
 ## 今後追加予定の機能
 
-初期リリースでは以下は対象外としています（詳細は [docs/DESIGN.md](docs/DESIGN.md) 参照）。
+初期リリースでは以下は対象外としています（詳細は [docs/architecture.md](docs/architecture.md) 参照）。
 
 - 地域別モード（アジア／ヨーロッパなど）
 - 効果音
