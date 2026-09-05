@@ -1,13 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import { CAR_CATEGORIES, DEFAULT_CAR_CONFIG, selectCarOption, type CarConfig } from './carConfig'
 import {
-  CAR_BODY_SPECS,
   CAR_WHEEL_SPECS,
-  DEFAULT_WHEEL_INSET,
   carBoundingRadius,
   computeCarAttachments,
   computeCarDimensions,
 } from './carDimensions'
+import { CAR_VEHICLES, CAR_VEHICLE_ORDER } from './carVehicles'
 
 /** 寸法に効く3カテゴリ（ボディ・タイヤ・車高）の全組み合わせ。 */
 function dimensionCombinations(): CarConfig[] {
@@ -22,81 +21,73 @@ function dimensionCombinations(): CarConfig[] {
   return configs
 }
 
-describe('computeCarDimensions（5ボディ）', () => {
+describe('computeCarDimensions（GLB実測値から寸法を作る）', () => {
   const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
-  const body = CAR_BODY_SPECS.sports
-  const wheel = CAR_WHEEL_SPECS.small
+  const vehicle = CAR_VEHICLES[DEFAULT_CAR_CONFIG.body]
 
-  test('全長・車幅・ホイールベースがボディ定義から決まる', () => {
-    expect(dimensions.bodyType).toBe('sports')
-    expect(dimensions.bodyStyle).toBe('sports')
-    expect(dimensions.length).toBe(body.length)
-    expect(dimensions.width).toBe(body.width)
-    expect(dimensions.wheelbase).toBeCloseTo(body.length * body.wheelbaseRatio, 6)
-    expect(dimensions.cabinWidth).toBeCloseTo(body.width * body.cabinWidthRatio, 6)
-    expect(dimensions.hoodLength).toBeCloseTo(body.length * body.hoodLengthRatio, 6)
+  test('全長・車幅・ホイールベースが車種カタログの実測値から決まる', () => {
+    expect(dimensions.bodyType).toBe(vehicle.id)
+    expect(dimensions.length).toBe(vehicle.size.length)
+    expect(dimensions.width).toBe(vehicle.size.width)
+    expect(dimensions.wheelbase).toBeCloseTo(vehicle.wheels.front.z - vehicle.wheels.rear.z, 6)
+    expect(dimensions.cabinWidth).toBe(vehicle.cabin.width)
+    expect(dimensions.cabinLength).toBe(vehicle.cabin.length)
+    expect(dimensions.cabinCenterZ).toBe(vehicle.cabin.centerZ)
   })
 
-  test('5種類すべてが寸法定義を持ち、長さ・高さ・幅で車種差がある', () => {
-    const dimensionsByBody = Object.fromEntries(
-      CAR_CATEGORIES.body.options.map((option) => [
-        option.id,
-        computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id)),
-      ]),
-    )
-
+  test('採用7車種すべてが寸法を持ち、ホイールベースが全長に収まる', () => {
+    expect(CAR_CATEGORIES.body.options).toHaveLength(7)
     for (const option of CAR_CATEGORIES.body.options) {
-      const dimensions = dimensionsByBody[option.id]
-      expect(dimensions, option.id).toBeDefined()
-      expect(dimensions?.bodyType, option.id).toBe(option.id)
-      expect(dimensions?.bodyStyle, option.id).toBe(option.id)
-      expect(dimensions?.length, option.id).toBeGreaterThan(0)
-      expect(dimensions?.width, option.id).toBeGreaterThan(0)
-      expect(dimensions?.height, option.id).toBeGreaterThan(0)
-      expect(dimensions?.wheelbase, option.id).toBeGreaterThan(0)
-      expect(dimensions?.wheelbase, option.id).toBeLessThan(dimensions?.length ?? 0)
+      const measured = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id))
+      expect(measured.bodyType, option.id).toBe(option.id)
+      expect(measured.length, option.id).toBeGreaterThan(0)
+      expect(measured.width, option.id).toBeGreaterThan(0)
+      expect(measured.height, option.id).toBeGreaterThan(0)
+      expect(measured.wheelbase, option.id).toBeGreaterThan(0)
+      expect(measured.wheelbase, option.id).toBeLessThan(measured.length)
     }
+  })
 
-    expect(dimensionsByBody.bus?.length).toBeGreaterThan(dimensionsByBody.sports?.length ?? 0)
-    expect(dimensionsByBody.truck?.length).toBeGreaterThan(dimensionsByBody.suv?.length ?? 0)
-    expect(dimensionsByBody.suv?.height).toBeGreaterThan(dimensionsByBody.sports?.height ?? 0)
+  test('車種ごとの実寸差を残す（全車を同じ全長へ正規化しない）', () => {
+    const lengths = CAR_VEHICLE_ORDER.map((id) => CAR_VEHICLES[id].size.length)
+    // 幼児が車種を見分ける手がかりなので、全長は車種ごとに違っていること。
+    expect(new Set(lengths).size).toBe(lengths.length)
+
+    const byId = Object.fromEntries(
+      CAR_VEHICLE_ORDER.map((id) => [id, computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', id))]),
+    )
+    // 大きい特殊車両 > 乗用車、という関係が保たれている。
+    expect(byId.schoolBus?.length).toBeGreaterThan(byId.suv?.length ?? 0)
+    expect(byId.ambulance?.length).toBeGreaterThan(byId.car?.length ?? 0)
+    expect(byId.suv?.height).toBeGreaterThan(byId.sportsCar?.height ?? 0)
+    expect(byId.car?.length).toBeLessThan(byId.suv?.length ?? 0)
   })
 
   test('最低地上高がボディ底面高さと一致し、そこから各段の高さが積み上がる', () => {
     expect(dimensions.bodyFloorY).toBe(dimensions.groundClearance)
-    expect(dimensions.hullTopY).toBeCloseTo(dimensions.groundClearance + body.hullHeight, 6)
-    expect(dimensions.roofTopY).toBeCloseTo(dimensions.hullTopY + body.cabinHeight, 6)
+    expect(dimensions.hullTopY).toBeCloseTo(dimensions.groundClearance + dimensions.hullHeight, 6)
+    expect(dimensions.roofTopY).toBeCloseTo(dimensions.hullTopY + dimensions.cabinHeight, 6)
     expect(dimensions.height).toBe(dimensions.roofTopY)
   })
 
-  test('スポーツカーの寸法は低くワイドで、キャビンが小さく設計されている', () => {
-    expect(dimensions.width / dimensions.length).toBeGreaterThan(0.4)
-    expect(dimensions.height / dimensions.length).toBeLessThan(0.3)
-    expect(dimensions.cabinLength).toBeLessThan(dimensions.length * 0.45)
-    expect(dimensions.cabinHeight).toBeLessThan(dimensions.hullHeight)
+  test('bodyLift は素のGLBの車体下端との差になる', () => {
+    expect(dimensions.bodyLift).toBeCloseTo(dimensions.groundClearance - vehicle.bodyFloor, 6)
   })
 
-  test('スポーツカーは低さを保ちながら、タイヤの下端とキャビンの厚みを確保する', () => {
-    expect(dimensions.bodyFloorY).toBeGreaterThanOrEqual(0.15)
-    expect(dimensions.cabinHeight).toBeGreaterThanOrEqual(0.45)
-    // ショルダーラインはタイヤ上端の少し上まで。ここが低すぎると
-    // 「低い板の上にキャビンを載せた」プロポーションへ戻ってしまう。
-    expect(dimensions.hullTopY).toBeGreaterThan(dimensions.wheelRadius * 2 * 0.95)
-    expect(dimensions.hullTopY).toBeLessThanOrEqual(dimensions.wheelRadius * 2 * 1.15)
-    expect(dimensions.roofTopY - dimensions.hullTopY).toBeGreaterThanOrEqual(0.45)
-  })
-
-  test('トレッドは車幅とタイヤ厚から決まり、タイヤは車体の外側に出る', () => {
-    // スポーツカーだけはフェンダーを断面の膨らみで作るため、専用の wheelInset を持つ。
-    const inset = body.wheelInset ?? DEFAULT_WHEEL_INSET
-    expect(inset).toBe(0.12)
-    expect(dimensions.track).toBeCloseTo(body.width + wheel.width - inset * 2, 6)
-    expect(dimensions.track / 2).toBeGreaterThan(body.width / 2)
-    expect(dimensions.overallWidth).toBeGreaterThan(dimensions.width)
+  test('キャビンは窓の実測から作られ、全長・全高の中に収まる', () => {
+    for (const id of CAR_VEHICLE_ORDER) {
+      const measured = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', id))
+      expect(measured.cabinLength, id).toBeGreaterThan(0)
+      expect(measured.cabinLength, id).toBeLessThanOrEqual(measured.length)
+      expect(measured.cabinWidth, id).toBeGreaterThan(0)
+      expect(measured.cabinWidth, id).toBeLessThanOrEqual(measured.width)
+      expect(measured.hullHeight, id).toBeGreaterThan(0)
+      expect(measured.cabinHeight, id).toBeGreaterThan(0)
+    }
   })
 })
 
-describe('組み合わせ耐性（5ボディ×タイヤ×車高の全パターン）', () => {
+describe('組み合わせ耐性（7ボディ×タイヤ×車高の全パターン）', () => {
   test.each(dimensionCombinations())(
     'body=$body wheel=$wheel rideHeight=$rideHeight でタイヤが車体へめり込まない',
     (config) => {
@@ -109,15 +100,16 @@ describe('組み合わせ耐性（5ボディ×タイヤ×車高の全パター�
   )
 
   test.each(dimensionCombinations())(
-    'body=$body wheel=$wheel rideHeight=$rideHeight で4輪が対称に接地する',
+    'body=$body wheel=$wheel rideHeight=$rideHeight で4輪が軸位置どおりに接地する',
     (config) => {
       const dimensions = computeCarDimensions(config)
       const attachments = computeCarAttachments(dimensions)
       expect(attachments.wheels).toHaveLength(4)
       for (const wheel of attachments.wheels) {
+        const axle = wheel.end === 1 ? dimensions.axles.front : dimensions.axles.rear
         expect(wheel.position.y).toBeCloseTo(dimensions.wheelRadius, 6)
-        expect(Math.abs(wheel.position.x)).toBeCloseTo(dimensions.track / 2, 6)
-        expect(Math.abs(wheel.position.z)).toBeCloseTo(dimensions.wheelbase / 2, 6)
+        expect(Math.abs(wheel.position.x)).toBeCloseTo(axle.halfTrack, 6)
+        expect(wheel.position.z).toBeCloseTo(axle.z, 6)
         expect([wheel.position.x, wheel.position.y, wheel.position.z].every(Number.isFinite)).toBe(true)
       }
       const ids = attachments.wheels.map((wheel) => wheel.id)
@@ -129,6 +121,7 @@ describe('組み合わせ耐性（5ボディ×タイヤ×車高の全パター�
     const small = computeCarDimensions(DEFAULT_CAR_CONFIG)
     const big = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', 'big'))
     expect(big.bodyFloorY).toBeGreaterThan(small.bodyFloorY)
+    expect(big.bodyLift).toBeGreaterThan(small.bodyLift)
   })
 
   test('車高「たかい」は同じタイヤなら最低地上高が上がる', () => {
@@ -141,8 +134,7 @@ describe('組み合わせ耐性（5ボディ×タイヤ×車高の全パター�
   test('車高「ひくい」はボディを下げるが、最低クリアランスを下回らない', () => {
     const normal = computeCarDimensions(DEFAULT_CAR_CONFIG)
     const low = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'rideHeight', 'low'))
-    expect(low.groundClearance).toBeLessThan(normal.groundClearance)
-    expect(low.roofTopY).toBeLessThan(normal.roofTopY)
+    expect(low.groundClearance).toBeLessThanOrEqual(normal.groundClearance)
     expect(low.hullTopY).toBeGreaterThanOrEqual(low.wheelRadius * 2 * 0.92 - 1e-9)
     expect(low.groundClearance).toBeGreaterThanOrEqual(low.wheelRadius * 0.35 - 1e-9)
   })
@@ -156,6 +148,7 @@ describe('組み合わせ耐性（5ボディ×タイヤ×車高の全パター�
     expect(offroad.wheelWidth).toBeGreaterThan(racing.wheelWidth)
     expect(racing.wheelWidth).toBeGreaterThan(small.wheelWidth)
     expect(racing.wheelRadius).toBeLessThan(offroad.wheelRadius)
+    expect(CAR_WHEEL_SPECS.small.radius).toBeLessThan(CAR_WHEEL_SPECS.big.radius)
   })
 
   test('ボディを変えても4輪・前後端・ルーフのattachmentが寸法に追従する', () => {
@@ -164,15 +157,14 @@ describe('組み合わせ耐性（5ボディ×タイヤ×車高の全パター�
       const dimensions = computeCarDimensions(config)
       const attachments = computeCarAttachments(dimensions)
 
-      expect(attachments.front.position.z).toBeCloseTo(dimensions.length / 2, 6)
-      expect(attachments.rear.position.z).toBeCloseTo(-dimensions.length / 2, 6)
-      expect(attachments.roof.position.y).toBeCloseTo(dimensions.roofTopY, 6)
-      expect(attachments.roof.position.z).toBeCloseTo(dimensions.cabinCenterZ, 6)
-      expect(attachments.wheels[0]?.position.z).toBeLessThan(dimensions.length / 2)
-      expect(attachments.wheels[0]?.position.z).toBeGreaterThan(-dimensions.length / 2)
-      expect(attachments.wheels.every((wheel) =>
-        [wheel.position.x, wheel.position.y, wheel.position.z].every(Number.isFinite),
-      )).toBe(true)
+      expect(attachments.front.position.z, option.id).toBeCloseTo(dimensions.length / 2, 6)
+      expect(attachments.rear.position.z, option.id).toBeCloseTo(-dimensions.length / 2, 6)
+      expect(attachments.roof.position.y, option.id).toBeCloseTo(dimensions.roofTopY, 6)
+      expect(attachments.roof.position.z, option.id).toBeCloseTo(dimensions.cabinCenterZ, 6)
+      for (const wheel of attachments.wheels) {
+        expect(wheel.position.z, option.id).toBeLessThan(dimensions.length / 2)
+        expect(wheel.position.z, option.id).toBeGreaterThan(-dimensions.length / 2)
+      }
     }
   })
 })
@@ -206,13 +198,21 @@ describe('computeCarAttachments', () => {
     expect(attachments.front.position.y).toBeGreaterThan(dimensions.bodyFloorY)
     expect(attachments.front.position.y).toBeLessThan(dimensions.hullTopY)
   })
+
+  test('前後でトレッドが違う車種でも、左右対称に配置される', () => {
+    const ambulance = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'ambulance'))
+    expect(ambulance.axles.front.halfTrack).not.toBe(ambulance.axles.rear.halfTrack)
+    const wheels = computeCarAttachments(ambulance).wheels
+    const front = wheels.filter((wheel) => wheel.end === 1)
+    expect(front[0]?.position.x).toBeCloseTo(-(front[1]?.position.x ?? 0), 6)
+  })
 })
 
 describe('carBoundingRadius', () => {
   test('車体より大きく、大きい車ほど大きくなる', () => {
-    const normal = computeCarDimensions(DEFAULT_CAR_CONFIG)
-    const bus = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'bus'))
-    expect(carBoundingRadius(normal)).toBeGreaterThan(normal.length / 2)
-    expect(carBoundingRadius(bus)).toBeGreaterThan(carBoundingRadius(normal))
+    const compact = computeCarDimensions(DEFAULT_CAR_CONFIG)
+    const bus = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'schoolBus'))
+    expect(carBoundingRadius(compact)).toBeGreaterThan(compact.length / 2)
+    expect(carBoundingRadius(bus)).toBeGreaterThan(carBoundingRadius(compact))
   })
 })

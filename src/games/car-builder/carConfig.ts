@@ -9,7 +9,10 @@
  * の3か所だけで完結する。カテゴリごとの巨大な条件分岐をUIや3D側に増やさないための構造。
  */
 
-export type BodyType = 'sports' | 'suv' | 'bus' | 'truck' | 'police'
+import { CAR_VEHICLES, CAR_VEHICLE_ORDER, type CarVehicleId } from './carVehicles'
+
+/** ボディ＝採用したQuaternius車種。実体の定義は carVehicles.ts が持つ。 */
+export type BodyType = CarVehicleId
 export type WheelType = 'small' | 'big' | 'offroad' | 'racing'
 export type CarColorId = 'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'pink' | 'purple' | 'white' | 'black'
 export type FrontType = 'round' | 'square' | 'slim'
@@ -103,13 +106,12 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
     label: 'ボディ',
     emoji: '🚗',
     ariaLabel: 'ボディを えらぶ',
-    options: [
-      { id: 'sports', label: 'スポーツカー', preview: { kind: 'emoji', emoji: '🏎️' } },
-      { id: 'suv', label: 'SUV', preview: { kind: 'emoji', emoji: '🚙' } },
-      { id: 'bus', label: 'バス', preview: { kind: 'emoji', emoji: '🚌' } },
-      { id: 'truck', label: 'トラック', preview: { kind: 'emoji', emoji: '🚚' } },
-      { id: 'police', label: 'パトカー風', preview: { kind: 'emoji', emoji: '🚓' } },
-    ],
+    // 車種の追加・並べ替えは carVehicles.ts 側だけで完結させる。
+    options: CAR_VEHICLE_ORDER.map((id) => ({
+      id,
+      label: CAR_VEHICLES[id].label,
+      preview: { kind: 'emoji', emoji: CAR_VEHICLES[id].emoji } as const,
+    })),
   },
   wheel: {
     id: 'wheel',
@@ -228,7 +230,7 @@ export const CAR_CATEGORY_ORDER: readonly CarCategoryId[] = [
 ]
 
 export const DEFAULT_CAR_CONFIG: CarConfig = {
-  body: 'sports',
+  body: 'car',
   wheel: 'small',
   color: 'red',
   // 既存の標準形を四角ライトとして引き継ぎ、初期見た目を不用意に変えない。

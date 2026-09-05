@@ -10,6 +10,7 @@ import {
   selectCarOption,
   type CarCategoryId,
 } from './carConfig'
+import { CAR_VEHICLE_ORDER } from './carVehicles'
 
 describe('カテゴリのカタログ', () => {
   test('Issue #401 の8カテゴリが定義されている', () => {
@@ -40,20 +41,16 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
-  test('ボディは形状を識別できる5種類を持ち、文字だけに依存しないプレビューがある', () => {
-    expect(CAR_CATEGORIES.body.options.map((option) => option.id)).toEqual([
-      'sports',
-      'suv',
-      'bus',
-      'truck',
-      'police',
-    ])
+  test('ボディはPhase 1で採用した7車種を持ち、文字だけに依存しないプレビューがある', () => {
+    expect(CAR_CATEGORIES.body.options.map((option) => option.id)).toEqual([...CAR_VEHICLE_ORDER])
     expect(CAR_CATEGORIES.body.options.map((option) => option.label)).toEqual([
+      'ふつうのくるま',
       'スポーツカー',
       'SUV',
-      'バス',
-      'トラック',
-      'パトカー風',
+      'タクシー',
+      'パトカー',
+      'きゅうきゅうしゃ',
+      'スクールバス',
     ])
     for (const option of CAR_CATEGORIES.body.options) {
       expect(option.preview.kind, option.id).toBe('emoji')
@@ -178,11 +175,11 @@ describe('カテゴリのカタログ', () => {
 
 describe('selectCarOption', () => {
   test('指定したカテゴリだけを更新し、他カテゴリの選択は保たれる', () => {
-    const afterBody = selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'bus')
+    const afterBody = selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'schoolBus')
     const afterColor = selectCarOption(afterBody, 'color', 'blue')
     const afterWheel = selectCarOption(afterColor, 'wheel', 'big')
 
-    expect(afterWheel.body).toBe('bus')
+    expect(afterWheel.body).toBe('schoolBus')
     expect(afterWheel.color).toBe('blue')
     expect(afterWheel.wheel).toBe('big')
     expect(afterWheel.rideHeight).toBe(DEFAULT_CAR_CONFIG.rideHeight)
@@ -204,10 +201,10 @@ describe('selectCarOption', () => {
   })
 
   test('数字やマークを選ぶと、他カテゴリを保ったままmarkだけ更新する', () => {
-    const config = selectCarOption(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'bus'), 'color', 'blue')
+    const config = selectCarOption(selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'schoolBus'), 'color', 'blue')
     const next = selectCarOption(config, 'mark', 'heart')
     expect(next.mark).toBe('heart')
-    expect(next.body).toBe('bus')
+    expect(next.body).toBe('schoolBus')
     expect(next.color).toBe('blue')
   })
 })

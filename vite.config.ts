@@ -56,7 +56,9 @@ const plugins = [
       // Rapierのwasmはbase64でrapier.mjsへ埋め込まれており、約2.24MiBあります。
       // この構造上これ以上の圧縮が難しいため、理由を明示して3MiBへ引き上げます。
       maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-      globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,mp3,webmanifest}'],
+      // 車体GLB（約550KB / 7車種）もprecacheへ含める。オフラインでも
+      // 「3Dクルマづくり」の車種切替が今までどおり成立するようにするため。
+      globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,mp3,glb,webmanifest}'],
       navigateFallback: `${base}index.html`,
       cleanupOutdatedCaches: true,
       clientsClaim: true,

@@ -127,3 +127,33 @@ SOFTWARE.
 `public/images/working-vehicles/`（はたらくくるまクイズ）、`public/images/vegetables/`（おやさいクイズ）、`public/images/fruits/`（くだものクイズ）のイラストは、いずれも外部の実写・イラスト素材（Wikimedia Commonsなど）を使わず、アプリ向けに用意したオリジナル素材です。オリジナル素材のため、素材単位での出典記載は不要としています。
 
 外部素材を新たに採用する場合は、このセクションに素材ごとの出典・ライセンスを追記してください。
+
+## 3D車体モデル (public/models/car-builder/*.glb)
+
+「3Dクルマづくり」（`src/games/car-builder/`）で表示する車体は、Quaternius が公開している CC0 のローポリ車両モデルを加工して同梱しています。実行時に外部サイトからモデルを取得することはありません。素材集は丸ごと取り込まず、採用した車種だけを配置しています。
+
+- 作者: Quaternius
+- 配布元: [Cars Pack](https://quaternius.com/packs/cars.html) / [Public Transport Pack](https://quaternius.com/packs/publictransport.html)
+- ライセンス: CC0 1.0 Universal（Public Domain Dedication）
+- 改変・商用利用: いずれも可。公式FAQで「自由に改変してよい」「クレジット不要」と明記されています
+
+| 同梱ファイル | 元モデル名 | Pack |
+| --- | --- | --- |
+| `sports-car.glb` | SportsCar2 | Cars Pack |
+| `car.glb` | NormalCar2 | Cars Pack |
+| `suv.glb` | SUV | Cars Pack |
+| `taxi.glb` | Taxi | Cars Pack |
+| `police-car.glb` | Cop | Cars Pack |
+| `school-bus.glb` | SchoolBus | Public Transport Pack |
+| `ambulance.glb` | Ambulance | Public Transport Pack |
+
+### 本アプリでの加工
+
+配布物に glTF 形式が含まれないため、公式の `.blend` を正として次の加工を行い、GLBへ書き出しています。変換手順は [`scripts/build-car-builder-models.py`](../scripts/build-car-builder-models.py) をそのまま正とし、同スクリプトを実行すれば同じGLBを再生成できます。
+
+- 元のタイヤをオブジェクト単位で削除（ゲーム側の共通タイヤへ差し替えるため）
+- 向き・接地・左右前後の中心を揃える。車種ごとの実寸差は、幼児が車種を見分ける手がかりなので残す
+- マテリアルを Principled BSDF へ作り直し、役割の分かる名前（`Body` / `Glass` / `Trim` など）へ改名
+- 面が割り当てられていないマテリアルスロットの削除
+
+CC0のためクレジット表示の義務はありませんが、将来の出所確認のために記録しています。
