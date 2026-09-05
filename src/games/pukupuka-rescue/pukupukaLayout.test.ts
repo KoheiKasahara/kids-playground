@@ -85,6 +85,5 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
     for (const animated of ['waveBack', 'waveFront', 'bubble', 'floaterBob', 'goalGlow', 'drainSwirl', 'gateOpenMark']) {
       expect(reduced).toContain(`.${animated}`)
     }
-    expect(reduced).toContain('.gateDoor')
   })
 })

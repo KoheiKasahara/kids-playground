@@ -222,6 +222,24 @@ export default function PukupukaStage({
           </g>
         </g>
 
+      </g>
+
+      <PukupukaFaucet
+        faucet={stage.faucet}
+        active={faucetActive}
+        disabled={faucetDisabled}
+        surfaceY={faucetSurfaceY}
+        onHoldStart={onFaucetHoldStart}
+        onHoldEnd={onFaucetHoldEnd}
+        onTap={onFaucetTap}
+      />
+      <PukupukaDrain drain={stage.drain} open={drainOpen} disabled={drainDisabled} onToggle={onDrainToggle} />
+      <PukupukaGate gate={stage.gate} open={gateOpen} disabled={gateDisabled} onToggle={onGateToggle} />
+
+      {/* 浮遊物はゲートの点線わくなど他の装飾より手前に描き、重なっても隠れないようにする。
+          じゃぐち・せん・ゲートより後に描く関係上、素通りにしておかないとボタンの上に
+          乗ったときにタップを奪ってしまうため、明示的にクリックを素通りさせる。 */}
+      <g aria-hidden="true" style={{ pointerEvents: 'none' }}>
         {state.floaters.map((floater) => {
           const definition = stage.floaters.find((candidate) => candidate.id === floater.id)
           if (!definition) return null
@@ -262,18 +280,6 @@ export default function PukupukaStage({
           )
         })}
       </g>
-
-      <PukupukaFaucet
-        faucet={stage.faucet}
-        active={faucetActive}
-        disabled={faucetDisabled}
-        surfaceY={faucetSurfaceY}
-        onHoldStart={onFaucetHoldStart}
-        onHoldEnd={onFaucetHoldEnd}
-        onTap={onFaucetTap}
-      />
-      <PukupukaDrain drain={stage.drain} open={drainOpen} disabled={drainDisabled} onToggle={onDrainToggle} />
-      <PukupukaGate gate={stage.gate} open={gateOpen} disabled={gateDisabled} onToggle={onGateToggle} />
     </svg>
   )
 }

@@ -5,8 +5,10 @@ import styles from './PukupukaRescuePlay.module.css'
 // 通路をふさぐ/開ける処理そのものは pukupukaGame.ts 側の純粋な関数（activeSolids）が持つ。
 //
 // せんと同じく「タップで開閉」の単純なトグルにする。閉じている間は左右の壁と同じ高さの
-// 板がまんなかをふさぎ、開くと板がわきへ引っ込んで通り道が見える見た目にすることで、
+// 板がまんなかをふさぎ、開くと板を消して通り道（点線わく＋矢印）だけを見せることで、
 // 単なる細い線ではなく「通れない/通れる」がひと目で分かるようにしている。
+// 板を残したまま色だけ変えると、開いていても「まだ何かでふさがれている」ように見えて
+// 紛らわしいため、開いているあいだは板そのものを描かない。
 // タップ領域は本物の<button>にし、見た目より広めに取る。
 
 const HIT_WIDTH = 24
@@ -40,7 +42,7 @@ export default function PukupukaGate({ gate, open, disabled, onToggle }: Props) 
         <rect x={gate.x} y={gate.y + gate.height - capHeight} width={gate.width} height={capHeight} rx="1" fill="#748ca6" />
         {open ? (
           <>
-            {/* 通り道の目印。開いた枠を点線で示し、進む向きの矢印を添える。 */}
+            {/* 通り道の目印。板は描かず、開いた枠を点線で示して進む向きの矢印を添える。 */}
             <rect
               x={gate.x - 1.5}
               y={doorY + 2}
@@ -58,21 +60,10 @@ export default function PukupukaGate({ gate, open, disabled, onToggle }: Props) 
               fill="#2f9e44"
             />
           </>
-        ) : null}
-        {/* とびら本体。閉じているときはここが道をふさぐ板。開くとわきへ引っ込む。 */}
-        <rect
-          className={`${styles.gateDoor} ${open ? styles.gateDoorOpen : ''}`}
-          x={gate.x}
-          y={doorY}
-          width={gate.width}
-          height={doorHeight}
-          rx="1.2"
-          fill={open ? '#a9e5b8' : '#ff922b'}
-          stroke={open ? '#2f9e44' : '#e8590c'}
-          strokeWidth="0.8"
-        />
-        {!open ? (
+        ) : (
           <>
+            {/* とびら本体。閉じているあいだだけ道をふさぐ板として描く。 */}
+            <rect x={gate.x} y={doorY} width={gate.width} height={doorHeight} rx="1.2" fill="#ff922b" stroke="#e8590c" strokeWidth="0.8" />
             {/* 閉じているときだけ見える横じま。バーやふみきりのような「とおれない」印象にする。 */}
             {[0.22, 0.42, 0.62, 0.82].map((position) => (
               <rect
@@ -87,7 +78,7 @@ export default function PukupukaGate({ gate, open, disabled, onToggle }: Props) 
               />
             ))}
           </>
-        ) : null}
+        )}
       </g>
       <foreignObject
         x={gate.x + gate.width / 2 - HIT_WIDTH / 2}
