@@ -30,14 +30,52 @@ export type CarRideHeightSpec = {
   lift: number
 }
 
-export const CAR_WHEEL_SPECS: Record<WheelType, CarWheelSpec> = {
-  // 「小さい」は既存の標準タイヤの寸法を引き継ぎ、車体の基本プロポーションを変えない。
-  small: { id: 'small', radius: 0.34, width: 0.26 },
-  big: { id: 'big', radius: 0.46, width: 0.34 },
-  // 外周のトレッドブロックを含めてもボディを過度に圧迫しない範囲で、最も太くする。
-  offroad: { id: 'offroad', radius: 0.5, width: 0.42 },
-  // 半径は小さい側に保ち、幅とリムの比率でレーシングらしさを出す。
-  racing: { id: 'racing', radius: 0.36, width: 0.34 },
+export type CarWheelRatio = {
+  id: WheelType
+  /** 車種の元タイヤ半径に対する倍率。 */
+  radiusRatio: number
+  /** 車種の元タイヤ幅に対する倍率。 */
+  widthRatio: number
+}
+
+/**
+ * タイヤ4種の、車種ごとの元タイヤに対する倍率。
+ *
+ * Quaternius車体は採用7車種で元タイヤ半径が0.197〜0.327と大きく異なるため、
+ * 固定の絶対サイズを全車種へ機械的に当てはめると、小柄な車種（SchoolBus等）では
+ * オフロードタイヤが元タイヤの約2倍になり、ホイールアーチからはみ出して見える
+ * （Phase 1 #534 の調査結果）。ここでは常に車種の実測値からの倍率でサイズを決め、
+ * 「小さい/大きい/オフロード/レーシング」の見た目差は径だけでなく太さ・
+ * トレッド・リム意匠（carParts.ts）でも出す。
+ */
+export const CAR_WHEEL_RATIOS: Record<WheelType, CarWheelRatio> = {
+  small: { id: 'small', radiusRatio: 0.82, widthRatio: 0.78 },
+  big: { id: 'big', radiusRatio: 1.22, widthRatio: 1.05 },
+  // 径は控えめにとどめ、太さとトレッドブロックで「ゴツさ」を表現する。
+  offroad: { id: 'offroad', radiusRatio: 1.12, widthRatio: 1.55 },
+  // 径は小さい側、幅はオフロードに次いで広くして低扁平・幅広に見せる。
+  racing: { id: 'racing', radiusRatio: 0.97, widthRatio: 1.35 },
+}
+
+/** どの車種でもタイヤが極端に豆粒／巨大にならないための絶対下限・上限。 */
+const MIN_WHEEL_RADIUS = 0.15
+const MAX_WHEEL_RADIUS = 0.6
+
+function nativeWheelSize(vehicle: CarVehicleDefinition): { radius: number; width: number } {
+  const { front, rear } = vehicle.wheels
+  return { radius: (front.radius + rear.radius) / 2, width: (front.width + rear.width) / 2 }
+}
+
+/**
+ * 車種の元タイヤ実測値（carVehicles.ts）からタイヤ種別ごとの寸法を決める。
+ * 全車種で共通のタイヤ「見た目」を保ちつつ、大きさだけは車体に合わせて変わる。
+ */
+export function resolveWheelSpec(vehicle: CarVehicleDefinition, type: WheelType): CarWheelSpec {
+  const ratio = CAR_WHEEL_RATIOS[type]
+  const native = nativeWheelSize(vehicle)
+  const radius = clamp(native.radius * ratio.radiusRatio, MIN_WHEEL_RADIUS, MAX_WHEEL_RADIUS)
+  const width = Math.max(native.width * ratio.widthRatio, radius * 0.3)
+  return { id: type, radius, width }
 }
 
 export const CAR_RIDE_HEIGHT_SPECS: Record<RideHeight, CarRideHeightSpec> = {
@@ -175,7 +213,7 @@ export function computeGroundClearance(
 /** CarConfig から車両寸法を計算する。ここが寸法の唯一の出どころ。 */
 export function computeCarDimensions(config: CarConfig): CarDimensions {
   const vehicle = CAR_VEHICLES[config.body]
-  const wheel = CAR_WHEEL_SPECS[config.wheel]
+  const wheel = resolveWheelSpec(vehicle, config.wheel)
   const ride = CAR_RIDE_HEIGHT_SPECS[config.rideHeight]
 
   const groundClearance = computeGroundClearance(vehicle, wheel, ride)
