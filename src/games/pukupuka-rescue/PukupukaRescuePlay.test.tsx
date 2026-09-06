@@ -105,6 +105,16 @@ function boardFlow(): string | null {
   return screen.getByTestId('pukupuka-board').getAttribute('data-board-flow')
 }
 
+/** 水車（#520）。専用の操作は持たず、せんの開閉に自動で連動する。 */
+function waterWheelSpinning(): boolean {
+  return screen.getByTestId('pukupuka-water-wheel').getAttribute('data-spinning') === 'true'
+}
+
+/** 水車に連動する小さな水門（#520）。 */
+function waterWheelGateOpen(): boolean {
+  return screen.getByTestId('pukupuka-water-wheel-gate').getAttribute('data-open') === 'true'
+}
+
 /** ボタンを押しっぱなしにしたまま指定フレーム進め、最後に離す。 */
 function hold(
   frames: ReturnType<typeof controlAnimationFrames>,
@@ -210,6 +220,29 @@ describe('PukupukaRescuePlay', () => {
     fireEvent.click(gateToggle())
     expect(gateOpen()).toBe(false)
     expect(gateToggle()).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('せんを あけると水車がまわり、連動する水門も開く。とじると両方とも止まる', () => {
+    renderGame()
+    expect(waterWheelSpinning()).toBe(false)
+    expect(waterWheelGateOpen()).toBe(false)
+
+    fireEvent.click(drainToggle())
+
+    expect(waterWheelSpinning()).toBe(true)
+    expect(waterWheelGateOpen()).toBe(true)
+
+    fireEvent.click(drainToggle())
+
+    expect(waterWheelSpinning()).toBe(false)
+    expect(waterWheelGateOpen()).toBe(false)
+  })
+
+  test('じゃぐちを押しているだけでは水車は回らない（せんが閉じている限り）', () => {
+    renderGame()
+    hold(frames, faucet(), 60)
+
+    expect(waterWheelSpinning()).toBe(false)
   })
 
   test('流れ板は初期状態でゴール方向へ後押ししており、タップのたびに向きが反転する', () => {
@@ -371,6 +404,18 @@ describe('PukupukaRescuePlay', () => {
     fireEvent.click(screen.getByRole('button', { name: 'やりなおし' }))
 
     expect(gateOpen()).toBe(false)
+  })
+
+  test('やりなおしは水車がまわっている最中に押しても、まわったままにしない', () => {
+    renderGame()
+    fireEvent.click(drainToggle())
+    expect(waterWheelSpinning()).toBe(true)
+    expect(waterWheelGateOpen()).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'やりなおし' }))
+
+    expect(waterWheelSpinning()).toBe(false)
+    expect(waterWheelGateOpen()).toBe(false)
   })
 
   test('ゴールすると「ゴール！」が1回だけ出て、水の操作ができなくなる', () => {

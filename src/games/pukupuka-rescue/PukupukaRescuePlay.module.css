@@ -428,6 +428,21 @@
   }
 }
 
+/* ---- 水車（#520） ---- */
+
+.waterWheelSpin {
+  animation: pukupukaWaterWheelSpin 1.6s linear infinite;
+}
+
+@keyframes pukupukaWaterWheelSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---- クリア表示 ---- */
 
 .clearBanner {
@@ -567,7 +582,8 @@
   .drainBubbleA,
   .drainBubbleB,
   .gateOpenMark,
-  .boardFlowMark {
+  .boardFlowMark,
+  .waterWheelSpin {
     animation: none;
   }
 

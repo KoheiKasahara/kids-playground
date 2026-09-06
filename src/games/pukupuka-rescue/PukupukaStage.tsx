@@ -1,10 +1,11 @@
-import { boardFlowSpeed, stageDriftDirection, waterSurfaceYOf, type PukupukaGameState } from './pukupukaGame'
+import { boardFlowSpeed, stageDriftDirection, waterSurfaceYOf, waterWheelSpinning, type PukupukaGameState } from './pukupukaGame'
 import type { BoardFlowDirection, FloaterKind, SolidDefinition, StageDefinition } from './types'
 import { surfaceYAt, waterBodyWidth } from './waterModel'
 import PukupukaFaucet from './PukupukaFaucet'
 import PukupukaDrain from './PukupukaDrain'
 import PukupukaGate from './PukupukaGate'
 import PukupukaBoard from './PukupukaBoard'
+import PukupukaWaterWheel from './PukupukaWaterWheel'
 import styles from './PukupukaRescuePlay.module.css'
 
 // ステージの見た目だけを持つコンポーネント。位置はすべてゲーム状態（2D座標）から決め、
@@ -345,6 +346,7 @@ export default function PukupukaStage({
         disabled={boardDisabled}
         onToggle={onBoardToggle}
       />
+      <PukupukaWaterWheel wheel={stage.waterWheel} spinning={waterWheelSpinning(state)} />
 
       {/* 浮遊物はゲートの点線わくなど他の装飾より手前に描き、重なっても隠れないようにする。
           じゃぐち・せん・ゲートより後に描く関係上、素通りにしておかないとボタンの上に

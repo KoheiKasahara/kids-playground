@@ -214,6 +214,17 @@ export function toggleBoard(state: PukupukaGameState): PukupukaGameState {
 }
 
 /**
+ * 水車が回っているか（#520）。専用の状態は持たせず、せん/排水(#516)が開いている
+ * あいだ＝水が流れ出ているあいだだけ回る完全自動の導出値にすることで、
+ * 「せんを あける→水が流れる→水車がまわる」という既存の因果へそのまま乗せる。
+ * トグル操作を持たないため、水車専用のリセット処理も不要になる（drainOpenのリセットに
+ * そのまま追従する）。
+ */
+export function waterWheelSpinning(state: PukupukaGameState): boolean {
+  return state.drainOpen
+}
+
+/**
  * 流れ板が浮遊物へ加える、向きも込みの押し流す速さ。ゴールの向き(driftDirection)を基準に、
  * boardFlowDirectionが'goal'ならそのまま後押しし、'back'なら逆向きに押し流す。
  * ステージのゴールがどちら向きでも同じ設定（'goal'/'back'）で意味が通じるようにするため、
