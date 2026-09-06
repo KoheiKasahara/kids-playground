@@ -8,6 +8,7 @@ import {
   isSettled,
   primaryWaterBodyId,
   stepGame,
+  toggleBoard,
   toggleDrain,
   toggleGate,
   waterRatioOf,
@@ -19,7 +20,7 @@ import styles from './PukupukaRescuePlay.module.css'
 
 /**
  * ぷかぷかレスキュー（Issue #514 Phase 1 / #515 じゃぐち / #516 せん・排水 / #517 ゲート /
- * #518 ボート・浮き輪+くまの追加）。
+ * #518 ボート・浮き輪+くまの追加 / #519 流れ板）。
  *
  * 画面の役割はこの3つだけに絞っている。
  *  1. requestAnimationFrame でゲームを進める
@@ -139,6 +140,17 @@ export default function PukupukaRescuePlay() {
     setGameState(next)
   }, [])
 
+  /** 流れ板のタップ操作: 押し流す向きを反転させる（#519）。 */
+  const handleBoardToggle = useCallback(() => {
+    const current = stateRef.current
+    if (current.phase !== 'playing') return
+    primeAudio()
+    const next = toggleBoard(current)
+    playPukupukaWaterSound(next.boardFlowDirection === 'goal' ? 'fill' : 'drain')
+    stateRef.current = next
+    setGameState(next)
+  }, [])
+
   const handleReset = () => {
     const initial = createInitialState(stage)
     setControl(null)
@@ -181,6 +193,9 @@ export default function PukupukaRescuePlay() {
           gateOpen={gameState.gateOpen}
           gateDisabled={cleared}
           onGateToggle={handleGateToggle}
+          boardFlowDirection={gameState.boardFlowDirection}
+          boardDisabled={cleared}
+          onBoardToggle={handleBoardToggle}
         />
         {cleared ? (
           <div className={styles.clearBanner}>

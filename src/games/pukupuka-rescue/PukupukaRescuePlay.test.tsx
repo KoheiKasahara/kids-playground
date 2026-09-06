@@ -96,6 +96,15 @@ function gateOpen(): boolean {
   return screen.getByTestId('pukupuka-gate').getAttribute('data-gate-open') === 'true'
 }
 
+/** 流れ板の操作対象（タップのたびに向きが反転する）。 */
+function boardToggle(): HTMLElement {
+  return screen.getByRole('button', { name: /いた/ })
+}
+
+function boardFlow(): string | null {
+  return screen.getByTestId('pukupuka-board').getAttribute('data-board-flow')
+}
+
 /** ボタンを押しっぱなしにしたまま指定フレーム進め、最後に離す。 */
 function hold(
   frames: ReturnType<typeof controlAnimationFrames>,
@@ -126,6 +135,7 @@ describe('PukupukaRescuePlay', () => {
     expect(faucet()).toBeInTheDocument()
     expect(drainToggle()).toBeInTheDocument()
     expect(gateToggle()).toBeInTheDocument()
+    expect(boardToggle()).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'やりなおし' })).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-stage')).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-floater-duck')).toBeInTheDocument()
@@ -200,6 +210,39 @@ describe('PukupukaRescuePlay', () => {
     fireEvent.click(gateToggle())
     expect(gateOpen()).toBe(false)
     expect(gateToggle()).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('流れ板は初期状態でゴール方向へ後押ししており、タップのたびに向きが反転する', () => {
+    renderGame()
+    expect(boardFlow()).toBe('goal')
+    expect(boardToggle()).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(boardToggle())
+    expect(boardFlow()).toBe('back')
+    expect(boardToggle()).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(boardToggle())
+    expect(boardFlow()).toBe('goal')
+    expect(boardToggle()).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('流れ板の向きを"ゴールから とおざける"にすると、板の高さを越えるタイミングでアヒルの位置がはっきり変わる', () => {
+    renderGame()
+    fireEvent.click(gateToggle())
+    fireEvent.click(boardToggle())
+    hold(frames, faucet(), 60 * 2)
+
+    expect(duckX()).toBeLessThan(65)
+  })
+
+  test('やりなおしは流れ板の向きを変えたままにしない', () => {
+    renderGame()
+    fireEvent.click(boardToggle())
+    expect(boardFlow()).toBe('back')
+
+    fireEvent.click(screen.getByRole('button', { name: 'やりなおし' }))
+
+    expect(boardFlow()).toBe('goal')
   })
 
   test('ゲートを とじたままだと、水をためてもアヒルは右側へ渡れない', () => {
@@ -346,6 +389,7 @@ describe('PukupukaRescuePlay', () => {
     expect(faucet()).toBeDisabled()
     expect(drainToggle()).toBeDisabled()
     expect(gateToggle()).toBeDisabled()
+    expect(boardToggle()).toBeDisabled()
 
     // クリア後にさらに進めても、表示が二重になったり消えたりしない。
     frames.advance(120)

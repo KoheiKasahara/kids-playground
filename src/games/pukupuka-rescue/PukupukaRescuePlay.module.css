@@ -384,6 +384,50 @@
   }
 }
 
+/* ---- 流れ板（#519） ---- */
+
+.boardFlowMark {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pukupukaBoardFlowMark 1s ease-in-out infinite;
+}
+
+/* 見た目の板よりタップ領域を広く取り、幼児の指でも押しやすくする。 */
+.boardHit {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.boardHit:disabled {
+  cursor: default;
+}
+
+.boardHit:focus-visible {
+  outline: 3px solid #2f9e44;
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+@keyframes pukupukaBoardFlowMark {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
 /* ---- クリア表示 ---- */
 
 .clearBanner {
@@ -522,7 +566,8 @@
   .drainSwirl,
   .drainBubbleA,
   .drainBubbleB,
-  .gateOpenMark {
+  .gateOpenMark,
+  .boardFlowMark {
     animation: none;
   }
 

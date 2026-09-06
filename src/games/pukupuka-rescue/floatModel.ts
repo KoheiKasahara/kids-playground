@@ -30,6 +30,13 @@ export const DRIFT_SPEED = 24
 export const DRIFT_RESPONSE = 2.2
 /** 速度の上限。極端な dt や連続衝突でも吹き飛ばないようにする保険。 */
 export const MAX_SPEED = 240
+/**
+ * 流れ板（#519）に触れているあいだ、目標速度へ加える押し流す速さ（ステージ座標 / 秒）。
+ * 通常のドリフト(DRIFT_SPEED)よりはっきり強くすることで、板に触れた瞬間に向きが
+ * 変わったと分かるようにする。めり込み防止の衝突処理は行わず、他の力と同じく
+ * 「目標速度に寄せる」だけの穏やかな効果にすることで、大きな物理破綻を避ける。
+ */
+export const BOARD_PUSH_SPEED = 40
 
 export type FloatStepContext = {
   /** 浮遊物がいる水域の水面Y。水域の外なら undefined（＝浮力なし）。 */
@@ -38,6 +45,8 @@ export type FloatStepContext = {
   readonly bounds: { readonly width: number; readonly height: number }
   /** 水に触れているときに流される向き（+1で右）。 */
   readonly driftDirection: number
+  /** 流れ板（#519）。触れている（円が矩形と重なっている）あいだだけ pushSpeed を目標速度へ加える。 */
+  readonly board?: { readonly rect: Rect; readonly pushSpeed: number }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -55,6 +64,15 @@ export function createFloaterState(definition: FloaterDefinition): FloaterState 
     vy: 0,
     submergedRatio: 0,
   }
+}
+
+/** 円が矩形と重なっている（触れている）かどうかだけを見る、押し出しをしない軽い判定。 */
+function circleOverlapsRect(x: number, y: number, radius: number, rect: Rect): boolean {
+  const nearestX = clamp(x, rect.x, rect.x + rect.width)
+  const nearestY = clamp(y, rect.y, rect.y + rect.height)
+  const dx = x - nearestX
+  const dy = y - nearestY
+  return dx * dx + dy * dy <= radius * radius
 }
 
 /**
@@ -121,7 +139,10 @@ export function stepFloater(
   let vy = state.vy + (GRAVITY - GRAVITY * BUOYANCY_RATIO * submergedRatio) * deltaSeconds
   vy -= vy * (AIR_VERTICAL_DRAG + WATER_VERTICAL_DRAG * submergedRatio) * deltaSeconds
 
-  const driftTarget = DRIFT_SPEED * submergedRatio * context.driftDirection
+  const board = context.board
+  const boardPush =
+    board && circleOverlapsRect(state.x, state.y, radius, board.rect) ? board.pushSpeed : 0
+  const driftTarget = DRIFT_SPEED * submergedRatio * context.driftDirection + boardPush
   let vx = state.vx + (driftTarget - state.vx) * DRIFT_RESPONSE * deltaSeconds
 
   vx = clamp(vx, -MAX_SPEED, MAX_SPEED)

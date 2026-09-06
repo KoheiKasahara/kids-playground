@@ -79,10 +79,31 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
     expect(ruleBody('.gateHit')).toMatch(/touch-action:\s*manipulation/)
   })
 
+  test('流れ板のタップ領域は見た目より広く、板の高さに対して十分な大きさがある（幼児向け規約）', () => {
+    const boardSource = readFileSync(path.join(__dirname, 'PukupukaBoard.tsx'), 'utf-8')
+    const marginX = Number(boardSource.match(/HIT_MARGIN_X = (\d+)/)?.[1])
+    const marginY = Number(boardSource.match(/HIT_MARGIN_Y = (\d+)/)?.[1])
+    expect(marginX).toBeGreaterThan(0)
+    expect(marginY).toBeGreaterThan(0)
+    expect(PUKUPUKA_STAGE.board.width + marginX * 2).toBeGreaterThanOrEqual(15)
+    expect(PUKUPUKA_STAGE.board.height + marginY * 2).toBeGreaterThanOrEqual(15)
+
+    expect(ruleBody('.boardHit')).toMatch(/touch-action:\s*manipulation/)
+  })
+
   test('prefers-reduced-motion で演出アニメーションを止める', () => {
     expect(CSS_SOURCE).toMatch(/@media \(prefers-reduced-motion: reduce\)/)
     const reduced = CSS_SOURCE.slice(CSS_SOURCE.indexOf('@media (prefers-reduced-motion: reduce)'))
-    for (const animated of ['waveBack', 'waveFront', 'bubble', 'floaterBob', 'goalGlow', 'drainSwirl', 'gateOpenMark']) {
+    for (const animated of [
+      'waveBack',
+      'waveFront',
+      'bubble',
+      'floaterBob',
+      'goalGlow',
+      'drainSwirl',
+      'gateOpenMark',
+      'boardFlowMark',
+    ]) {
       expect(reduced).toContain(`.${animated}`)
     }
   })

@@ -1,5 +1,11 @@
-import { createFloaterState, stepFloater, type FloaterState } from './floatModel'
-import { rectContainsPoint, type Rect, type StageDefinition, type WaterBodyId } from './types'
+import { BOARD_PUSH_SPEED, createFloaterState, stepFloater, type FloaterState } from './floatModel'
+import {
+  rectContainsPoint,
+  type BoardFlowDirection,
+  type Rect,
+  type StageDefinition,
+  type WaterBodyId,
+} from './types'
 import {
   createWaterField,
   findWaterBody,
@@ -30,6 +36,8 @@ export type PukupukaGameState = {
   readonly drainOpen: boolean
   /** ゲート(#517)が開いているか。閉じている間、stage.gateも固定物として当たり判定に含める。 */
   readonly gateOpen: boolean
+  /** 流れ板(#519)が現在押し流している向き。タップのたびに反転する。 */
+  readonly boardFlowDirection: BoardFlowDirection
 }
 
 export type StepResult = {
@@ -91,6 +99,7 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
     leftoverMs: 0,
     drainOpen: false,
     gateOpen: false,
+    boardFlowDirection: stage.board.initialFlowDirection,
   }
 }
 
@@ -195,6 +204,26 @@ export function toggleGate(state: PukupukaGameState): PukupukaGameState {
   return { ...state, gateOpen: !state.gateOpen }
 }
 
+/**
+ * 流れ板の向きを反転させる（#519）。せん・ゲートと同じくタップのたびに反転する単純な操作。
+ * クリア後は受け付けない。
+ */
+export function toggleBoard(state: PukupukaGameState): PukupukaGameState {
+  if (state.phase !== 'playing') return state
+  return { ...state, boardFlowDirection: state.boardFlowDirection === 'goal' ? 'back' : 'goal' }
+}
+
+/**
+ * 流れ板が浮遊物へ加える、向きも込みの押し流す速さ。ゴールの向き(driftDirection)を基準に、
+ * boardFlowDirectionが'goal'ならそのまま後押しし、'back'なら逆向きに押し流す。
+ * ステージのゴールがどちら向きでも同じ設定（'goal'/'back'）で意味が通じるようにするため、
+ * 符号付きの絶対向き(driftDirection)と組み合わせてここで具体的な速度に変換する。
+ */
+export function boardFlowSpeed(state: PukupukaGameState, driftDirection: number): number {
+  const sign = state.boardFlowDirection === 'goal' ? 1 : -1
+  return BOARD_PUSH_SPEED * driftDirection * sign
+}
+
 function advanceOneStep(
   stage: StageDefinition,
   state: PukupukaGameState,
@@ -233,6 +262,7 @@ function advanceOneStep(
   // 見分けられる状態を保つ。アヒル1体だけの時と同じく、クリア後に水の操作を
   // 受け付けなくなるのと合わせて「ここでおしまい」を見た目でも表す。
   const solids = activeSolids(stage, state.gateOpen)
+  const board = { rect: stage.board, pushSpeed: boardFlowSpeed(state, driftDirection) }
   const floaters =
     state.phase === 'playing'
       ? state.floaters.map((floater) => {
@@ -246,6 +276,7 @@ function advanceOneStep(
               solids,
               bounds: { width: stage.width, height: stage.height },
               driftDirection,
+              board,
             },
             deltaSeconds,
           )
@@ -268,6 +299,7 @@ function advanceOneStep(
       leftoverMs: state.leftoverMs,
       drainOpen: state.drainOpen,
       gateOpen: state.gateOpen,
+      boardFlowDirection: state.boardFlowDirection,
     },
     goalReached,
   }

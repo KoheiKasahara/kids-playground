@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   BUOYANCY_RATIO,
+  MAX_SPEED,
   createFloaterState,
   resolveCircleAgainstRect,
   stepFloater,
@@ -124,6 +125,70 @@ describe('floatModel: 水平の流れ', () => {
     const drifted = advance(createFloaterState(duck), 10, ctx)
 
     expect(drifted.x).toBeLessThanOrEqual(60 - 8 + 0.001)
+  })
+})
+
+describe('floatModel: 流れ板(#519)', () => {
+  const boardRect: Rect = { x: 40, y: 40, width: 20, height: 10 }
+
+  test('板に触れていなければ通常のドリフトのまま', () => {
+    // 水面を板(y:40〜50)よりずっと低い位置にして、浮遊物が板の高さへ近づかないようにする。
+    const withoutBoard = advance(
+      createFloaterState(duck),
+      2,
+      context({ surfaceY: 110, driftDirection: 1 }),
+    )
+    const farFromBoard = advance(
+      createFloaterState(duck),
+      2,
+      context({ surfaceY: 110, driftDirection: 1, board: { rect: boardRect, pushSpeed: 40 } }),
+    )
+
+    expect(farFromBoard.x).toBeCloseTo(withoutBoard.x, 3)
+  })
+
+  test('板に触れているあいだは、板の向きへ強く押し流される', () => {
+    const started: FloaterState = { id: 'duck', x: 35, y: 45, vx: 0, vy: 0, submergedRatio: 0 }
+    const withoutBoard = advance(started, 1, context({ surfaceY: 45, driftDirection: 1 }))
+    const withBoard = advance(
+      started,
+      1,
+      context({
+        surfaceY: 45,
+        driftDirection: 1,
+        board: { rect: boardRect, pushSpeed: 40 },
+      }),
+    )
+
+    expect(withBoard.x).toBeGreaterThan(withoutBoard.x + 5)
+  })
+
+  test('板の向きを逆にすると、逆向きに押し流される', () => {
+    const started: FloaterState = { id: 'duck', x: 35, y: 45, vx: 0, vy: 0, submergedRatio: 0 }
+    const pushedToGoal = advance(
+      started,
+      1,
+      context({ surfaceY: 45, driftDirection: 1, board: { rect: boardRect, pushSpeed: 40 } }),
+    )
+    const pushedBack = advance(
+      started,
+      1,
+      context({ surfaceY: 45, driftDirection: 1, board: { rect: boardRect, pushSpeed: -40 } }),
+    )
+
+    expect(pushedBack.x).toBeLessThan(pushedToGoal.x)
+  })
+
+  test('板を抜けたあとは通常のドリフトへ戻り、速度が発散しない', () => {
+    const started: FloaterState = { id: 'duck', x: 35, y: 45, vx: 0, vy: 0, submergedRatio: 0 }
+    const passedThrough = advance(
+      started,
+      6,
+      context({ surfaceY: 45, driftDirection: 1, board: { rect: boardRect, pushSpeed: 40 } }),
+    )
+
+    expect(Number.isFinite(passedThrough.x)).toBe(true)
+    expect(Math.abs(passedThrough.vx)).toBeLessThanOrEqual(MAX_SPEED)
   })
 })
 
