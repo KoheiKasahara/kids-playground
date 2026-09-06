@@ -39,4 +39,15 @@ describe('parseProjectHealthConfig', () => {
     const config = parseProjectHealthConfig(JSON.stringify({ lighthouse: { targets: [] } }))
     expect(config.lighthouse.targets).toEqual([{ name: 'Top', path: '/' }])
   })
+
+  it('history.maxEntriesを指定するとそれを使う', () => {
+    const config = parseProjectHealthConfig(JSON.stringify({ history: { maxEntries: 30 } }))
+    expect(config.history.maxEntries).toBe(30)
+  })
+
+  it('history設定が無い/不正な場合はデフォルト件数を使う', () => {
+    expect(parseProjectHealthConfig(undefined).history.maxEntries).toBe(180)
+    expect(parseProjectHealthConfig(JSON.stringify({ history: { maxEntries: -1 } })).history.maxEntries).toBe(180)
+    expect(parseProjectHealthConfig(JSON.stringify({ history: { maxEntries: 'abc' } })).history.maxEntries).toBe(180)
+  })
 })

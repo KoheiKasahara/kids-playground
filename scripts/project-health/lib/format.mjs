@@ -50,3 +50,18 @@ export function thresholdWarningIcon(value, threshold) {
   }
   return value >= threshold ? '✅' : '⚠️'
 }
+
+// Issue #525: 前回値との差分を「▲ 32 KB」「▼ 1」「→」のように表示する。
+// trend が無い（前回の有効な履歴が無い等）場合は — にする。
+export function formatTrendCell(trend, { unit = '', formatMagnitude } = {}) {
+  if (!trend) {
+    return DASH
+  }
+  if (trend.trend === 'flat') {
+    return '→'
+  }
+
+  const arrow = trend.trend === 'up' ? '▲' : '▼'
+  const magnitude = formatMagnitude ? formatMagnitude(Math.abs(trend.delta)) : String(Math.abs(trend.delta))
+  return unit ? `${arrow} ${magnitude} ${unit}` : `${arrow} ${magnitude}`
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBytes, ratioIcon, statusIcon, thresholdWarningIcon } from './format.mjs'
+import { formatBytes, formatTrendCell, ratioIcon, statusIcon, thresholdWarningIcon } from './format.mjs'
 
 describe('formatBytes', () => {
   it('1MB以上はMB単位で表示する', () => {
@@ -67,5 +67,28 @@ describe('thresholdWarningIcon', () => {
 
   it('閾値が無い場合は判定しない', () => {
     expect(thresholdWarningIcon(94, null)).toBe('')
+  })
+})
+
+describe('formatTrendCell', () => {
+  it('増加は▲、単位付きで表示する', () => {
+    expect(formatTrendCell({ delta: 32, trend: 'up', judgement: 'worsened' }, { unit: 'KB' })).toBe('▲ 32 KB')
+  })
+
+  it('減少は▼で表示する', () => {
+    expect(formatTrendCell({ delta: -1, trend: 'down', judgement: 'worsened' })).toBe('▼ 1')
+  })
+
+  it('変化なしは→で表示する', () => {
+    expect(formatTrendCell({ delta: 0, trend: 'flat', judgement: 'neutral' })).toBe('→')
+  })
+
+  it('trendが無い（前回の有効な履歴が無い）場合はダッシュを返す', () => {
+    expect(formatTrendCell(null)).toBe('—')
+  })
+
+  it('formatMagnitudeで数値の整形をカスタマイズできる', () => {
+    const trend = { delta: -2048, trend: 'down', judgement: 'improved' }
+    expect(formatTrendCell(trend, { unit: 'KB', formatMagnitude: (n) => (n / 1024).toFixed(1) })).toBe('▼ 2.0 KB')
   })
 })
