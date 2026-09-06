@@ -13,6 +13,8 @@ describe('buildProjectHealthRows', () => {
       nightly: { conclusion: 'success', htmlUrl: 'https://x/nightly' },
       deploy: { conclusion: 'success', htmlUrl: 'https://x/deploy' },
       e2e: { total: 25, passed: 25 },
+      lighthouse: { performance: 94, accessibility: 96 },
+      thresholds: { lighthousePerformance: 90, accessibility: 90 },
     })
 
     expect(findRow(rows, 'Games').value).toBe('25')
@@ -23,6 +25,10 @@ describe('buildProjectHealthRows', () => {
     expect(findRow(rows, 'Bundle').value).toBe('1.43 MB')
     expect(findRow(rows, 'Dependencies').value).toBe('0 vulnerable')
     expect(findRow(rows, 'Dependencies').status).toBe('✅')
+    expect(findRow(rows, 'Lighthouse Performance').value).toBe('94')
+    expect(findRow(rows, 'Lighthouse Performance').status).toBe('✅')
+    expect(findRow(rows, 'Accessibility').value).toBe('96')
+    expect(findRow(rows, 'Accessibility').status).toBe('✅')
     expect(findRow(rows, 'Nightly').status).toBe('✅')
     expect(findRow(rows, 'Last deploy').status).toBe('✅')
   })
@@ -76,6 +82,25 @@ describe('buildProjectHealthRows', () => {
   it('E2Eレポートが無い場合はGames件数を対象数として使う', () => {
     const rows = buildProjectHealthRows({ gamesCount: 25, e2e: null })
     expect(findRow(rows, 'E2E smoke').value).toBe('? / 25')
+  })
+
+  it('Lighthouseが閾値未満でも❌ではなく⚠️（Warning）で表示する', () => {
+    const rows = buildProjectHealthRows({
+      lighthouse: { performance: 80, accessibility: 85 },
+      thresholds: { lighthousePerformance: 90, accessibility: 90 },
+    })
+    expect(findRow(rows, 'Lighthouse Performance').value).toBe('80')
+    expect(findRow(rows, 'Lighthouse Performance').status).toBe('⚠️')
+    expect(findRow(rows, 'Accessibility').value).toBe('85')
+    expect(findRow(rows, 'Accessibility').status).toBe('⚠️')
+  })
+
+  it('Lighthouse計測に失敗してもクラッシュせずN/A相当（—/❓）で表示する', () => {
+    const rows = buildProjectHealthRows()
+    expect(findRow(rows, 'Lighthouse Performance').value).toBe('—')
+    expect(findRow(rows, 'Lighthouse Performance').status).toBe('❓')
+    expect(findRow(rows, 'Accessibility').value).toBe('—')
+    expect(findRow(rows, 'Accessibility').status).toBe('❓')
   })
 })
 

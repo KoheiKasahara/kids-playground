@@ -114,9 +114,10 @@ jobs:
           CI_CACHE: setup-node npm cache
         run: node scripts/ci-summary.mjs
 
-      # ここから Project Health Dashboard（Issue #523）。
+      # ここから Project Health Dashboard（Issue #523 / #524）。
       # 既存の quick test / build の成果物と、Nightly / Deploy ワークフローの
-      # 直近実行結果を再利用するだけで、通常CIのためのテスト・buildの再実行は行わない。
+      # 直近実行結果（Lighthouse含む）を再利用するだけで、通常CIのためのテスト・
+      # build・Lighthouse計測の再実行は行わない。
       - name: Project Health - fetch Nightly / Deploy status
         id: project-health-context
         if: always()
@@ -134,6 +135,16 @@ jobs:
           run-id: ${{ steps.project-health-context.outputs.nightly_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: project-health/nightly-e2e
+
+      - name: Project Health - download Nightly Lighthouse report
+        if: always() && steps.project-health-context.outputs.nightly_run_id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: project-health-lighthouse-nightly
+          run-id: ${{ steps.project-health-context.outputs.nightly_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: project-health/lighthouse-nightly
 
       - name: Project Health - dependency audit
         if: always()

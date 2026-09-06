@@ -1,0 +1,11 @@
+{
+  "thresholds": {
+    "lighthousePerformance": 90,
+    "accessibility": 90
+  },
+  "lighthouse": {
+    "targets": [
+      { "name": "Top", "path": "/" }
+    ]
+  }
+}

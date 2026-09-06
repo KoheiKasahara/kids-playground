@@ -6,6 +6,8 @@ import { parseVitestSummary } from './lib/vitestReport.mjs'
 import { measureBundleSize } from './lib/bundleSize.mjs'
 import { parseNpmAudit } from './lib/npmAudit.mjs'
 import { parsePlaywrightSummary } from './lib/playwrightReport.mjs'
+import { parseLighthouseSummary } from './lib/lighthouseReport.mjs'
+import { parseProjectHealthConfig } from './lib/projectHealthConfig.mjs'
 import { buildProjectHealthRows, renderProjectHealthMarkdown } from './lib/report.mjs'
 
 // Project Health Dashboard の本体。既存 CI（quick test / build）が生成した
@@ -63,7 +65,33 @@ const e2e = safe('e2e smoke', () => {
   return file ? parsePlaywrightSummary(readJson(join(e2eReportDir, file))) : null
 })
 
-const rows = buildProjectHealthRows({ gamesCount, unitTests, bundle, dependencies, nightly, deploy, e2e })
+// 閾値・計測対象ページは `.project-health.json` に集約する（Issue #524）。
+const configPath = process.env.PROJECT_HEALTH_CONFIG ?? '.project-health.json'
+const { thresholds, lighthouse: lighthouseConfig } = parseProjectHealthConfig(
+  safe('project-health config', () => readFileSync(configPath, 'utf8'), undefined),
+)
+
+// Lighthouse計測はNightly / 手動 Full Test 側でのみ実行し、通常CIは
+// そこで生成されたサマリJSONを読み取って表示するだけ（再計測はしない）。
+const lighthouseSummaryPath =
+  process.env.PROJECT_HEALTH_LIGHTHOUSE_SUMMARY ?? 'project-health/lighthouse-nightly/lighthouse-summary.json'
+const lighthouse = safe(
+  'lighthouse',
+  () => parseLighthouseSummary(readJson(lighthouseSummaryPath)),
+  { name: null, performance: null, accessibility: null },
+)
+
+const rows = buildProjectHealthRows({
+  gamesCount,
+  unitTests,
+  bundle,
+  dependencies,
+  nightly,
+  deploy,
+  e2e,
+  lighthouse,
+  thresholds,
+})
 
 const links = []
 if (nightly?.htmlUrl) {
@@ -72,6 +100,11 @@ if (nightly?.htmlUrl) {
 if (deploy?.htmlUrl) {
   links.push(`Last deploy: ${deploy.htmlUrl}`)
 }
+links.push(
+  `Lighthouse target: ${lighthouse?.name ?? lighthouseConfig.targets[0]?.name ?? 'Top'} (${
+    lighthouseConfig.targets.map((target) => target.path).join(', ')
+  })`,
+)
 
 const markdown = renderProjectHealthMarkdown(rows, { links })
 appendFileSync(summaryPath, `${markdown}\n`)

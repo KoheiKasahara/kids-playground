@@ -1,4 +1,4 @@
-import { formatBytes, ratioIcon, statusIcon } from './format.mjs'
+import { formatBytes, ratioIcon, statusIcon, thresholdWarningIcon } from './format.mjs'
 
 const DASH = '—'
 
@@ -13,6 +13,8 @@ export function buildProjectHealthRows({
   nightly = null,
   deploy = null,
   e2e = null,
+  lighthouse = { performance: null, accessibility: null },
+  thresholds = { lighthousePerformance: null, accessibility: null },
 } = {}) {
   const unitTotal = unitTests?.total ?? null
   const unitPassed = unitTests?.passed ?? null
@@ -59,6 +61,16 @@ export function buildProjectHealthRows({
       status: dependencySeverity(dependencies),
     },
     {
+      metric: 'Lighthouse Performance',
+      value: lighthouse?.performance !== null && lighthouse?.performance !== undefined ? String(lighthouse.performance) : DASH,
+      status: thresholdWarningIcon(lighthouse?.performance ?? null, thresholds?.lighthousePerformance ?? null),
+    },
+    {
+      metric: 'Accessibility',
+      value: lighthouse?.accessibility !== null && lighthouse?.accessibility !== undefined ? String(lighthouse.accessibility) : DASH,
+      status: thresholdWarningIcon(lighthouse?.accessibility ?? null, thresholds?.accessibility ?? null),
+    },
+    {
       metric: 'Nightly',
       value: nightly ? (nightly.conclusion ?? nightly.status ?? DASH) : DASH,
       status: statusIcon(nightly?.conclusion ?? null),
@@ -87,9 +99,10 @@ export function renderProjectHealthMarkdown(rows, { links = [] } = {}) {
 
   lines.push(
     '_Games / Unit tests / Bundle / Dependencies はこのジョブの build・test 結果の再集計です。' +
-      ' E2E smoke / Nightly / Last deploy は直近の Nightly・Deploy ワークフロー実行結果の再利用です' +
-      '（Dashboardのために再実行はしていません）。' +
-      ' 取得に失敗した指標は — / ❓ で表示され、Dashboard全体は失敗しません。_',
+      ' E2E smoke / Nightly / Last deploy / Lighthouse Performance / Accessibility は直近の' +
+      ' Nightly・Deploy ワークフロー実行結果の再利用です（Dashboardのために再実行はしていません）。' +
+      ' 取得に失敗した指標は — / ❓ で表示され、Dashboard全体は失敗しません。' +
+      ' Lighthouse は実行環境でスコアが揺らぐため、閾値未達は⚠️（Warning）表示とし、現時点ではCIを失敗させません。_',
     '',
   )
 
