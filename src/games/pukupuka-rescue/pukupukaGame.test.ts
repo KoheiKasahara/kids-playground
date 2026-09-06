@@ -9,6 +9,7 @@ import {
   faucetTargetBodyId,
   getFloater,
   isSettled,
+  isWaterWheelSpinning,
   primaryWaterBodyId,
   stageDriftDirection,
   stepGame,
@@ -17,10 +18,12 @@ import {
   toggleGate,
   waterRatioOf,
   waterSurfaceYOf,
+  waterWheelSubmergedRatioOf,
   type PukupukaGameState,
   type WaterControl,
 } from './pukupukaGame'
 import { rectContainsPoint, type StageDefinition } from './types'
+import { levelToVolume } from './waterModel'
 
 const stage = PUKUPUKA_STAGE
 const FRAME_MS = 1000 / 60
@@ -299,6 +302,54 @@ describe('pukupukaGame: 流れ板(#519)', () => {
   })
 })
 
+describe('pukupukaGame: 水車(#520)', () => {
+  test('初期状態では水車は回っていない', () => {
+    const state = createInitialState(stage)
+    expect(state.waterWheel.angleDeg).toBe(0)
+    expect(isWaterWheelSpinning(stage, state)).toBe(false)
+  })
+
+  test('水位が水車の羽根まで届かないあいだは回らない', () => {
+    // main-water-wheel は cy:74, radius:9 のため、羽根の下端(83)まで届く前の
+    // わずかな注水では回転が始まらない（水面が届いていないと沈み込み割合0のまま)。
+    const { state } = run(createInitialState(stage), 0.5, 'fill')
+    expect(isWaterWheelSpinning(stage, state)).toBe(false)
+    expect(state.waterWheel.angleDeg).toBe(0)
+  })
+
+  test('水位を上げて羽根まで水面が届くと回りだし、角度が進む', () => {
+    const { state } = run(createInitialState(stage), 4, 'fill')
+    expect(waterWheelSubmergedRatioOf(stage, state)).toBeGreaterThan(0)
+    expect(isWaterWheelSpinning(stage, state)).toBe(true)
+    expect(state.waterWheel.angleDeg).toBeGreaterThan(0)
+  })
+
+  test('水位が下がって羽根から離れると、はっきり回っているとは扱わなくなる', () => {
+    const filled = run(createInitialState(stage), 4, 'fill').state
+    expect(isWaterWheelSpinning(stage, filled)).toBe(true)
+
+    const drained = run(toggleDrain(filled), 10).state
+    expect(isWaterWheelSpinning(stage, drained)).toBe(false)
+  })
+
+  test('クリア後は回転が止まる', () => {
+    const cleared = playThrough().state
+    expect(cleared.phase).toBe('cleared')
+
+    const angleAtClear = cleared.waterWheel.angleDeg
+    const later = run(cleared, 1).state
+    expect(later.waterWheel.angleDeg).toBe(angleAtClear)
+  })
+
+  test('やりなおすと回転角が0へ戻る', () => {
+    const spun = run(createInitialState(stage), 4, 'fill').state
+    expect(spun.waterWheel.angleDeg).toBeGreaterThan(0)
+
+    const reset = createInitialState(stage)
+    expect(reset.waterWheel.angleDeg).toBe(0)
+  })
+})
+
 describe('pukupukaGame: 水位と浮遊物の連動', () => {
   test('水位を上げるとアヒルが上がる', () => {
     const settled = run(createInitialState(stage), 3).state
@@ -508,6 +559,7 @@ describe('pukupukaGame: やりなおし', () => {
     expect(reset.elapsedMs).toBe(0)
     expect(reset.drainOpen).toBe(false)
     expect(reset.gateOpen).toBe(false)
+    expect(reset.waterWheel.angleDeg).toBe(0)
   })
 })
 
@@ -527,6 +579,22 @@ describe('pukupukaGame: 落ち着いたかどうかの判定', () => {
     const tapped = run(applyWaterTap(stage, settled), 0.2).state
 
     expect(isSettled(stage, tapped)).toBe(false)
+  })
+
+  test('水車(#520)が浸かっているあいだは、水も浮遊物も止まっていても落ち着いたとは扱わない', () => {
+    const base = createInitialState(stage)
+    const definition = stage.waterBodies[0]
+    // main-water-wheel(cy:74, radius:9)の羽根の下端(83)より上、上端(65)より下の
+    // surfaceY=70 なら、しきい値をはっきり超えて浸かる(沈み込み割合0.72)。
+    const volume = levelToVolume(definition, definition.floorY - 70)
+    const submerged: PukupukaGameState = {
+      ...base,
+      water: { ...base.water, [definition.id]: { volume, targetVolume: volume } },
+      floaters: base.floaters.map((floater) => ({ ...floater, vx: 0, vy: 0 })),
+    }
+
+    expect(isWaterWheelSpinning(stage, submerged)).toBe(true)
+    expect(isSettled(stage, submerged)).toBe(false)
   })
 })
 

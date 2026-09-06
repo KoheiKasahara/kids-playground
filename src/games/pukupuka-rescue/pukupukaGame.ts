@@ -1,4 +1,4 @@
-import { BOARD_PUSH_SPEED, createFloaterState, stepFloater, type FloaterState } from './floatModel'
+import { BOARD_PUSH_SPEED, WHEEL_PUSH_SPEED, createFloaterState, stepFloater, type FloaterState } from './floatModel'
 import {
   rectContainsPoint,
   type BoardFlowDirection,
@@ -17,6 +17,14 @@ import {
   type WaterBodyState,
   type WaterField,
 } from './waterModel'
+import {
+  createWaterWheelState,
+  isWaterWheelSpinningAt,
+  stepWaterWheel,
+  waterWheelSpinSpeedDeg,
+  waterWheelSubmergedRatio,
+  type WaterWheelState,
+} from './waterWheelModel'
 
 // ゲーム状態と1フレームの進行をまとめるモジュール。画面（React）はこの関数だけを呼ぶ。
 
@@ -38,6 +46,8 @@ export type PukupukaGameState = {
   readonly gateOpen: boolean
   /** 流れ板(#519)が現在押し流している向き。タップのたびに反転する。 */
   readonly boardFlowDirection: BoardFlowDirection
+  /** 水車(#520)の回転状態。操作対象ではなく、水に浸かっているかどうかだけで自動的に動く。 */
+  readonly waterWheel: WaterWheelState
 }
 
 export type StepResult = {
@@ -100,6 +110,7 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
     drainOpen: false,
     gateOpen: false,
     boardFlowDirection: stage.board.initialFlowDirection,
+    waterWheel: createWaterWheelState(),
   }
 }
 
@@ -156,6 +167,20 @@ export function waterSurfaceYOf(
   return waterSurfaceY(definition, bodyState)
 }
 
+/**
+ * 水車(#520)がいまどれだけ浸かっているか(0〜1)。ゲーム状態全体から、水車の位置にある
+ * 水域の水面Yを引いて求める。画面側の見た目（回転しているかどうかの色分けなど）にも使う。
+ */
+export function waterWheelSubmergedRatioOf(stage: StageDefinition, state: PukupukaGameState): number {
+  const surfaceY = surfaceYAt(stage.waterBodies, state.water, stage.waterWheel.cx, stage.waterWheel.cy)
+  return waterWheelSubmergedRatio(stage.waterWheel, surfaceY)
+}
+
+/** 水車(#520)がはっきり回っているかどうか。連動アクション（浮遊物を押し流す）の発動判定にも使う。 */
+export function isWaterWheelSpinning(stage: StageDefinition, state: PukupukaGameState): boolean {
+  return isWaterWheelSpinningAt(waterWheelSubmergedRatioOf(stage, state))
+}
+
 /** 位置・速度が「止まっている」とみなす速さ（ステージ座標 / 秒）。 */
 const SETTLED_SPEED = 0.05
 
@@ -175,6 +200,9 @@ export function isSettled(stage: StageDefinition, state: PukupukaGameState): boo
   for (const floater of state.floaters) {
     if (Math.abs(floater.vx) > SETTLED_SPEED || Math.abs(floater.vy) > SETTLED_SPEED) return false
   }
+  // 水車(#520)は水位が一定でも、浸かっているあいだは回り続ける（羽根が動き続ける)ため、
+  // 水も浮遊物も止まっていてもここだけは別に見る。
+  if (isWaterWheelSpinning(stage, state)) return false
   return true
 }
 
@@ -255,6 +283,15 @@ function advanceOneStep(
   }
   water = stepWaterField(stage.waterBodies, water, deltaSeconds)
 
+  // 水車(#520)。水の状態（水面が水車に届いているか）だけを見て回転を進める。
+  // プレイヤーが直接操作する対象ではなく、じゃぐち・せんで動いた水位の結果として
+  // 「回る/止まる」が決まる、水そのものと同じ扱いにしている。
+  const wheelDefinition = stage.waterWheel
+  const wheelSurfaceY = surfaceYAt(stage.waterBodies, water, wheelDefinition.cx, wheelDefinition.cy)
+  const wheelSubmergedRatio = waterWheelSubmergedRatio(wheelDefinition, wheelSurfaceY)
+  const wheelSpinSpeedDeg = state.phase === 'playing' ? waterWheelSpinSpeedDeg(wheelSubmergedRatio, driftDirection) : 0
+  const waterWheel = stepWaterWheel(state.waterWheel, wheelSpinSpeedDeg, deltaSeconds)
+
   // クリア後は浮遊物を止めた絵のままにする(#518)。複数の浮遊物が同じゴールへ集まる
   // 構成では、止めずに動かし続けると、みな同じ水の流れに乗って結局ほぼ同じ場所へ
   // 寄っていってしまい、せっかく描き分けたシルエットが重なって見分けにくくなる。
@@ -263,6 +300,15 @@ function advanceOneStep(
   // 受け付けなくなるのと合わせて「ここでおしまい」を見た目でも表す。
   const solids = activeSolids(stage, state.gateOpen)
   const board = { rect: stage.board, pushSpeed: boardFlowSpeed(state, driftDirection) }
+  // 水車の連動アクション(#520): はっきり回っているあいだだけ、触れている浮遊物を
+  // 流れと同じ向きへ弱く押し流す。「水を流す→水車が回る→浮遊物が動く」という
+  // 因果を1つ持たせつつ、ゲート・せんのような既存の判定には手を加えない。
+  const wheel = {
+    cx: wheelDefinition.cx,
+    cy: wheelDefinition.cy,
+    radius: wheelDefinition.radius,
+    pushSpeed: isWaterWheelSpinningAt(wheelSubmergedRatio) ? WHEEL_PUSH_SPEED * driftDirection : 0,
+  }
   const floaters =
     state.phase === 'playing'
       ? state.floaters.map((floater) => {
@@ -277,6 +323,7 @@ function advanceOneStep(
               bounds: { width: stage.width, height: stage.height },
               driftDirection,
               board,
+              wheel,
             },
             deltaSeconds,
           )
@@ -300,6 +347,7 @@ function advanceOneStep(
       drainOpen: state.drainOpen,
       gateOpen: state.gateOpen,
       boardFlowDirection: state.boardFlowDirection,
+      waterWheel,
     },
     goalReached,
   }

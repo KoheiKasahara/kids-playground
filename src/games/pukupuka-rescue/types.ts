@@ -126,6 +126,20 @@ export type BoardDefinition = Rect & {
   initialFlowDirection: BoardFlowDirection
 }
 
+/**
+ * 水車の定義（#520）。中心(cx, cy)と半径(radius)を持つ円で当たり判定（＝押し流す範囲）を表す。
+ * 壁やゲートのようなめり込み防止の当たり判定は持たせず、常に「水にどれだけ浸かっているか」
+ * だけで回転の有無を決める（`waterWheelModel.ts`）。回転しているあいだ、触れている浮遊物を
+ * 弱く押し流す連動アクションを持つ（`floatModel.ts` の流れ板(#519)と同じ、目標速度に寄せる
+ * だけの穏やかな処理を再利用し、水車専用の押し出し処理は増やさない）。
+ */
+export type WaterWheelDefinition = {
+  id: string
+  cx: number
+  cy: number
+  radius: number
+}
+
 export type StageDefinition = {
   id: string
   name: string
@@ -140,6 +154,7 @@ export type StageDefinition = {
   drain: DrainDefinition
   gate: GateDefinition
   board: BoardDefinition
+  waterWheel: WaterWheelDefinition
   /** 幼児向けの短い1行ヒント。 */
   hint: string
 }

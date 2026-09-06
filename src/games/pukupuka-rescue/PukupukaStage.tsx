@@ -1,10 +1,17 @@
-import { boardFlowSpeed, stageDriftDirection, waterSurfaceYOf, type PukupukaGameState } from './pukupukaGame'
+import {
+  boardFlowSpeed,
+  isWaterWheelSpinning,
+  stageDriftDirection,
+  waterSurfaceYOf,
+  type PukupukaGameState,
+} from './pukupukaGame'
 import type { BoardFlowDirection, FloaterKind, SolidDefinition, StageDefinition } from './types'
 import { surfaceYAt, waterBodyWidth } from './waterModel'
 import PukupukaFaucet from './PukupukaFaucet'
 import PukupukaDrain from './PukupukaDrain'
 import PukupukaGate from './PukupukaGate'
 import PukupukaBoard from './PukupukaBoard'
+import PukupukaWaterWheel from './PukupukaWaterWheel'
 import styles from './PukupukaRescuePlay.module.css'
 
 // ステージの見た目だけを持つコンポーネント。位置はすべてゲーム状態（2D座標）から決め、
@@ -168,6 +175,7 @@ export default function PukupukaStage({
   const goal = stage.goal.area
   const faucetSurfaceY = waterSurfaceYOf(stage, state, stage.faucet.targetBodyId)
   const boardPushDirection = Math.sign(boardFlowSpeed(state, stageDriftDirection(stage))) || 1
+  const wheelSpinning = isWaterWheelSpinning(stage, state)
 
   return (
     <svg
@@ -306,6 +314,8 @@ export default function PukupukaStage({
             rx={solid.kind === 'floor' ? 3 : 4}
           />
         ))}
+
+        <PukupukaWaterWheel wheel={stage.waterWheel} angleDeg={state.waterWheel.angleDeg} spinning={wheelSpinning} />
 
         {/* ゴールの目印: はたと浮き輪。台の上に置いて「ここへ運ぶ」と分かるようにする。 */}
         <g>

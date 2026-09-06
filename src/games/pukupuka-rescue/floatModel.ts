@@ -37,6 +37,12 @@ export const MAX_SPEED = 240
  * 「目標速度に寄せる」だけの穏やかな効果にすることで、大きな物理破綻を避ける。
  */
 export const BOARD_PUSH_SPEED = 40
+/**
+ * 水車（#520）に触れているあいだ、目標速度へ加える押し流す速さ（ステージ座標 / 秒）。
+ * 通常のドリフト(DRIFT_SPEED)より少し強い程度にとどめ、流れ板ほどはっきりした
+ * 押し出しにはしない（水車は羽根がなでる程度の弱い連動、という位置づけにするため）。
+ */
+export const WHEEL_PUSH_SPEED = 28
 
 export type FloatStepContext = {
   /** 浮遊物がいる水域の水面Y。水域の外なら undefined（＝浮力なし）。 */
@@ -47,6 +53,11 @@ export type FloatStepContext = {
   readonly driftDirection: number
   /** 流れ板（#519）。触れている（円が矩形と重なっている）あいだだけ pushSpeed を目標速度へ加える。 */
   readonly board?: { readonly rect: Rect; readonly pushSpeed: number }
+  /**
+   * 水車（#520）。回っている（pushSpeedが0でない）あいだだけ、円が重なっている浮遊物を
+   * 弱く押し流す。板と違って開閉できず、水に浸かって回りだしたかどうかだけで決まる。
+   */
+  readonly wheel?: { readonly cx: number; readonly cy: number; readonly radius: number; readonly pushSpeed: number }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -142,7 +153,15 @@ export function stepFloater(
   const board = context.board
   const boardPush =
     board && circleOverlapsRect(state.x, state.y, radius, board.rect) ? board.pushSpeed : 0
-  const driftTarget = DRIFT_SPEED * submergedRatio * context.driftDirection + boardPush
+  const wheel = context.wheel
+  const wheelDx = wheel ? state.x - wheel.cx : 0
+  const wheelDy = wheel ? state.y - wheel.cy : 0
+  const wheelReach = wheel ? wheel.radius + radius : 0
+  const wheelPush =
+    wheel && wheel.pushSpeed !== 0 && wheelDx * wheelDx + wheelDy * wheelDy <= wheelReach * wheelReach
+      ? wheel.pushSpeed
+      : 0
+  const driftTarget = DRIFT_SPEED * submergedRatio * context.driftDirection + boardPush + wheelPush
   let vx = state.vx + (driftTarget - state.vx) * DRIFT_RESPONSE * deltaSeconds
 
   vx = clamp(vx, -MAX_SPEED, MAX_SPEED)

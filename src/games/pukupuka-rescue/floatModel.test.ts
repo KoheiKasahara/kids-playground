@@ -192,6 +192,56 @@ describe('floatModel: 流れ板(#519)', () => {
   })
 })
 
+describe('floatModel: 水車(#520)', () => {
+  const wheel = { cx: 50, cy: 45, radius: 8 }
+
+  test('回っていない(pushSpeed: 0)あいだは通常のドリフトのまま', () => {
+    const withoutWheel = advance(createFloaterState(duck), 2, context({ surfaceY: 110, driftDirection: 1 }))
+    const stoppedWheel = advance(
+      createFloaterState(duck),
+      2,
+      context({ surfaceY: 110, driftDirection: 1, wheel: { ...wheel, pushSpeed: 0 } }),
+    )
+
+    expect(stoppedWheel.x).toBeCloseTo(withoutWheel.x, 3)
+  })
+
+  test('離れていれば、回っていても押し流されない', () => {
+    const farFromWheel = advance(
+      createFloaterState(duck),
+      2,
+      context({ surfaceY: 110, driftDirection: 1, wheel: { ...wheel, pushSpeed: 28 } }),
+    )
+    const withoutWheel = advance(createFloaterState(duck), 2, context({ surfaceY: 110, driftDirection: 1 }))
+
+    expect(farFromWheel.x).toBeCloseTo(withoutWheel.x, 3)
+  })
+
+  test('回っていて触れているあいだは、流れの向きへ弱く押し流される', () => {
+    const started: FloaterState = { id: 'duck', x: 50, y: 45, vx: 0, vy: 0, submergedRatio: 0 }
+    const withoutWheel = advance(started, 1, context({ surfaceY: 45, driftDirection: 1 }))
+    const withWheel = advance(
+      started,
+      1,
+      context({ surfaceY: 45, driftDirection: 1, wheel: { ...wheel, pushSpeed: 28 } }),
+    )
+
+    expect(withWheel.x).toBeGreaterThan(withoutWheel.x + 2)
+  })
+
+  test('水車を抜けたあとは通常のドリフトへ戻り、速度が発散しない', () => {
+    const started: FloaterState = { id: 'duck', x: 50, y: 45, vx: 0, vy: 0, submergedRatio: 0 }
+    const passedThrough = advance(
+      started,
+      6,
+      context({ surfaceY: 45, driftDirection: 1, wheel: { ...wheel, pushSpeed: 28 } }),
+    )
+
+    expect(Number.isFinite(passedThrough.x)).toBe(true)
+    expect(Math.abs(passedThrough.vx)).toBeLessThanOrEqual(MAX_SPEED)
+  })
+})
+
 describe('floatModel: 破綻しないこと', () => {
   test('ステージ外へ出ない', () => {
     const ctx = context({ surfaceY: 0, solids: [] })
