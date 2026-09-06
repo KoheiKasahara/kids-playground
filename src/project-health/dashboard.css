@@ -1,0 +1,261 @@
+/*
+ * Project Health Dashboard専用のスタイル。開発者向け画面のため、本体ゲームの
+ * src/styles/global.css / tokens.css には依存せず独立させる（Issue #526）。
+ * 本体サイトは prefers-color-scheme 対応を持たないため、既存方針に合わせて
+ * ここも単一のライトパレットのみとする。
+ */
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #f4f5f9;
+  color: #1c1f26;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Hiragino Kaku Gothic ProN',
+    'Noto Sans JP',
+    sans-serif;
+  overflow-x: hidden;
+}
+
+.ph-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+.ph-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.ph-header__eyebrow {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+}
+
+.ph-header__title {
+  margin: 4px 0 12px;
+  font-size: clamp(1.5rem, 5vw, 2.2rem);
+  letter-spacing: 0.04em;
+  font-weight: 800;
+}
+
+.ph-header__meta {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.ph-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.ph-banner__icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.ph-banner--ok {
+  background: #e3f7e9;
+  color: #1e7d3c;
+}
+
+.ph-banner--warning {
+  background: #fff4dd;
+  color: #92660a;
+}
+
+.ph-banner--error {
+  background: #fde3e3;
+  color: #b3261e;
+}
+
+.ph-banner--neutral {
+  background: #e8e9ee;
+  color: #4b5160;
+}
+
+.ph-loading,
+.ph-empty,
+.ph-error {
+  text-align: center;
+  color: #4b5160;
+  padding: 32px 8px;
+}
+
+.ph-section {
+  margin: 24px 0;
+}
+
+.ph-section__title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: #2d3140;
+}
+
+.ph-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 10px;
+}
+
+.ph-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #d1d5db;
+  min-width: 0;
+}
+
+.ph-card--ok {
+  border-left-color: #2f9e57;
+}
+
+.ph-card--warning {
+  border-left-color: #d69a1d;
+}
+
+.ph-card--error {
+  border-left-color: #d6483f;
+}
+
+.ph-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.ph-card__label {
+  font-size: 0.78rem;
+  color: #6b7280;
+  line-height: 1.3;
+}
+
+.ph-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.ph-card__status-text {
+  display: none;
+}
+
+.ph-card__value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.ph-card__trend {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.ph-trend--improved {
+  color: #1e7d3c;
+}
+
+.ph-trend--worsened {
+  color: #b3261e;
+}
+
+.ph-trend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.ph-trend-item {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.ph-trend-item__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ph-trend-item__label {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.ph-trend-item__value {
+  font-weight: 700;
+}
+
+.ph-sparkline {
+  display: block;
+  width: 100%;
+  height: 32px;
+}
+
+.ph-sparkline__line {
+  stroke: #4c6ef5;
+}
+
+.ph-sparkline__dot {
+  fill: #4c6ef5;
+}
+
+.ph-sparkline--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.ph-footer {
+  margin-top: 28px;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.ph-footer code {
+  background: #e8e9ee;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+@media (min-width: 640px) {
+  .ph-card__status-text {
+    display: inline;
+    font-size: 0.72rem;
+    color: #6b7280;
+  }
+}

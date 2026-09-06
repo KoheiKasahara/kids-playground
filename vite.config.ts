@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { staticRoutePages } from './src/build/staticRoutePages'
 import { sitemapFile } from './src/build/sitemap'
+import { projectHealthDashboardOutput } from './src/build/projectHealthDashboardOutput'
 
 // カスタムドメイン（https://kids.kasapg.com/）直下で公開するため base は常に '/'。
 const base = '/'
@@ -59,6 +60,12 @@ const plugins = [
       // 車体GLB（約550KB / 7車種）もprecacheへ含める。オフラインでも
       // 「3Dクルマづくり」の車種切替が今までどおり成立するようにするため。
       globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,mp3,glb,webmanifest}'],
+      // Project Health Dashboard（Issue #526）は開発者向けの別ページであり、
+      // 本体ゲームを遊ぶ子ども向け端末のPWAキャッシュを不要に増やさないため、
+      // precache対象から明示的に除外する。VitePWAのcloseBundleは
+      // projectHealthDashboardOutput（dist/src/project-health/ → dist/project-health/
+      // への移動）より先に実行されるため、移動前後どちらのパスも除外する。
+      globIgnores: ['project-health/**', 'src/project-health/**'],
       navigateFallback: `${base}index.html`,
       cleanupOutdatedCaches: true,
       clientsClaim: true,
@@ -68,6 +75,7 @@ const plugins = [
   // 二重で含まれないようにする（ナビゲーションはSWのnavigateFallbackが担う）。
   staticRoutePages(),
   sitemapFile(),
+  projectHealthDashboardOutput(),
 ]
 
 // Vitest の `test.projects` は各要素が独立した設定として扱われ、ルートの
@@ -129,9 +137,47 @@ const slowTestFiles = [
   'src/games/flag-roll-adventure/adventureSimulation.test.ts',
 ]
 
+// Project Health Dashboard（Issue #526）は本体ゲームと独立した別entry/別HTMLにする。
+// index.html（本体ゲーム）からは一切参照しないため初期ロード・bundleへ影響しないが、
+// 素朴に多エントリ化するとJS/CSSが本体と同じdist/assets/へ混在し、
+// scripts/project-health/lib/bundleSize.mjs が集計する「本体ゲームのbundle size」に
+// Dashboard分のサイズが混ざってしまう。出力先を dist/project-health/ 配下へ分離し、
+// bundleSize.mjs 側でもそのディレクトリを除外することで指標を汚さないようにする。
+// HTMLエントリ自体はsrc/project-health/index.htmlに置いており（リポジトリ直下の
+// `project-health/` はCIの一時データ用に.gitignoreされているため置けない）、
+// Viteのデフォルト挙動だと dist/src/project-health/index.html に出力されてしまう。
+// これは src/build/projectHealthDashboardOutput.ts が closeBundle で
+// dist/project-health/index.html へ移動する。
+const isProjectHealthChunk = (moduleIds: readonly string[]) =>
+  moduleIds.some((id) => id.includes('/src/project-health/'))
+
 export default defineConfig({
   base,
   plugins,
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        'project-health': fileURLToPath(new URL('./src/project-health/index.html', import.meta.url)),
+      },
+      output: {
+        entryFileNames: (chunk) =>
+          chunk.name === 'project-health' ? 'project-health/assets/[name]-[hash].js' : 'assets/[name]-[hash].js',
+        chunkFileNames: (chunk) =>
+          isProjectHealthChunk(chunk.moduleIds) ? 'project-health/assets/[name]-[hash].js' : 'assets/[name]-[hash].js',
+        assetFileNames: (asset) => {
+          const names = asset.names ?? (asset.name ? [asset.name] : [])
+          const originalFileNames = 'originalFileNames' in asset ? (asset.originalFileNames as string[]) : []
+          const isProjectHealthAsset = [...names, ...originalFileNames].some((name) =>
+            name?.includes('project-health'),
+          )
+          return isProjectHealthAsset
+            ? 'project-health/assets/[name]-[hash][extname]'
+            : 'assets/[name]-[hash][extname]'
+        },
+      },
+    },
+  },
   test: {
     coverage: {
       provider: 'v8',

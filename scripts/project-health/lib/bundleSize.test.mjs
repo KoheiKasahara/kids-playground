@@ -38,4 +38,15 @@ describe('measureBundleSize', () => {
   it('distが存在しない場合はnullを返す（Dashboard全体は壊れない）', () => {
     expect(measureBundleSize(join(tmpdir(), 'project-health-does-not-exist'))).toBeNull()
   })
+
+  it('dist/project-health配下（Web Dashboard自身のbuild成果物）は集計から除外する', () => {
+    dir = mkdtempSync(join(tmpdir(), 'project-health-bundle-'))
+    mkdirSync(join(dir, 'assets'))
+    mkdirSync(join(dir, 'project-health', 'assets'), { recursive: true })
+    writeFileSync(join(dir, 'assets', 'app.js'), 'a'.repeat(100))
+    writeFileSync(join(dir, 'project-health', 'assets', 'dashboard.js'), 'd'.repeat(9999))
+    writeFileSync(join(dir, 'project-health', 'index.html'), '<html></html>')
+
+    expect(measureBundleSize(dir)).toEqual({ js: 100, css: 0, total: 100 })
+  })
 })
