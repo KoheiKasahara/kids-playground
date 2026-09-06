@@ -37,3 +37,16 @@ export function ratioIcon(passed, total) {
   }
   return passed === total ? '✅' : '❌'
 }
+
+// Lighthouse等、実行環境で多少揺らぐ指標向けのアイコン。
+// Issue #524: 揺らぎがある指標をいきなりFailure（❌）扱いにはせず、まずは
+// Warning（⚠️）で観測を優先し、安定性が確認できてからゲート化する方針とする。
+export function thresholdWarningIcon(value, threshold) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '❓'
+  }
+  if (threshold === null || threshold === undefined || !Number.isFinite(threshold)) {
+    return ''
+  }
+  return value >= threshold ? '✅' : '⚠️'
+}

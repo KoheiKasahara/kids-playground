@@ -107,6 +107,26 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      # Project Health Dashboard（Issue #524）向けの Lighthouse 計測。
+      # 通常PR CIには含めず、Nightly / 手動 Full Test でのみ実行する。
+      # 対象ページは `.project-health.json` の lighthouse.targets に集約されている。
+      # 計測に失敗しても Nightly 自体は失敗させず（continue-on-error）、
+      # Project Health Summary 側は N/A（—/❓）として安全に表示する。
+      - name: Project Health - run Lighthouse
+        if: always()
+        continue-on-error: true
+        run: node scripts/project-health/run-lighthouse.mjs
+
+      - name: Upload Lighthouse report for Project Health
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-health-lighthouse-nightly
+          path: project-health/lighthouse-summary.json
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Write CI Summary
         if: always()
         env:

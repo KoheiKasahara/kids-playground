@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBytes, ratioIcon, statusIcon } from './format.mjs'
+import { formatBytes, ratioIcon, statusIcon, thresholdWarningIcon } from './format.mjs'
 
 describe('formatBytes', () => {
   it('1MB以上はMB単位で表示する', () => {
@@ -47,5 +47,25 @@ describe('ratioIcon', () => {
   it('値が無い場合は❓', () => {
     expect(ratioIcon(null, null)).toBe('❓')
     expect(ratioIcon(5, null)).toBe('❓')
+  })
+})
+
+describe('thresholdWarningIcon', () => {
+  it('閾値以上は✅', () => {
+    expect(thresholdWarningIcon(94, 90)).toBe('✅')
+    expect(thresholdWarningIcon(90, 90)).toBe('✅')
+  })
+
+  it('閾値未満は❌ではなく⚠️（Warning）', () => {
+    expect(thresholdWarningIcon(85, 90)).toBe('⚠️')
+  })
+
+  it('計測できていない場合は❓', () => {
+    expect(thresholdWarningIcon(null, 90)).toBe('❓')
+    expect(thresholdWarningIcon(undefined, 90)).toBe('❓')
+  })
+
+  it('閾値が無い場合は判定しない', () => {
+    expect(thresholdWarningIcon(94, null)).toBe('')
   })
 })
