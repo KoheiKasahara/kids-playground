@@ -67,6 +67,12 @@ const plugins = [
       // への移動）より先に実行されるため、移動前後どちらのパスも除外する。
       globIgnores: ['project-health/**', 'src/project-health/**'],
       navigateFallback: `${base}index.html`,
+      // Project Health Dashboardは本体PWAとは独立した静的HTMLとして配信するため、
+      // precache除外だけでなくnavigation fallbackの対象からも明示的に外す。
+      // これがないと、既存Service Worker登録済みのブラウザで `/project-health/`
+      // への遷移が本体 `index.html` へフォールバックしてしまう（Issue #555）。
+      // `/project-health` と `/project-health/` の両方、および配下パスを対象にする。
+      navigateFallbackDenylist: [/^\/project-health(?:\/|$)/],
       cleanupOutdatedCaches: true,
       clientsClaim: true,
     },
