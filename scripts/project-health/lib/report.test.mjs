@@ -102,6 +102,41 @@ describe('buildProjectHealthRows', () => {
     expect(findRow(rows, 'Accessibility').value).toBe('—')
     expect(findRow(rows, 'Accessibility').status).toBe('❓')
   })
+
+  it('前回の履歴があればTrend（増加/減少/変化なし）を算出する（Issue #525）', () => {
+    const rows = buildProjectHealthRows({
+      unitTests: { total: 650, passed: 650 },
+      bundle: { js: 1_900_000, css: 0, total: 1_900_000 },
+      dependencies: { total: 0 },
+      lighthouse: { performance: 93, accessibility: 96 },
+      previous: {
+        unitTests: 638,
+        bundleKb: Math.round(1_900_000 / 1024) - 32,
+        lighthousePerformance: 94,
+        accessibility: 96,
+        vulnerabilities: 2,
+      },
+    })
+
+    expect(findRow(rows, 'Unit tests').trend).toBe('▲ 12')
+    expect(findRow(rows, 'Bundle').trend).toBe('▲ 32 KB')
+    expect(findRow(rows, 'Lighthouse Performance').trend).toBe('▼ 1')
+    expect(findRow(rows, 'Accessibility').trend).toBe('→')
+    expect(findRow(rows, 'Dependencies').trend).toBe('▼ 2')
+  })
+
+  it('前回の有効な履歴が無い場合はTrendがダッシュになる（初回実行）', () => {
+    const rows = buildProjectHealthRows({ unitTests: { total: 638, passed: 638 } })
+    expect(findRow(rows, 'Unit tests').trend).toBe('—')
+    expect(findRow(rows, 'Bundle').trend).toBe('—')
+  })
+
+  it('Games / Nightly / Last deploy はTrend対象外', () => {
+    const rows = buildProjectHealthRows({ gamesCount: 42 })
+    expect(findRow(rows, 'Games').trend).toBe('')
+    expect(findRow(rows, 'Nightly').trend).toBe('')
+    expect(findRow(rows, 'Last deploy').trend).toBe('')
+  })
 })
 
 describe('renderProjectHealthMarkdown', () => {
@@ -109,6 +144,17 @@ describe('renderProjectHealthMarkdown', () => {
     const markdown = renderProjectHealthMarkdown(buildProjectHealthRows({ gamesCount: 3 }))
     expect(markdown).toContain('## Project Health')
     expect(markdown).toContain('| Games | 3 |')
+  })
+
+  it('Trend列を含み、前回値との差分を表示する（Issue #525）', () => {
+    const rows = buildProjectHealthRows({
+      lighthouse: { performance: 93, accessibility: 96 },
+      previous: { lighthousePerformance: 94, accessibility: 96 },
+    })
+    const markdown = renderProjectHealthMarkdown(rows)
+    expect(markdown).toContain('| Metric | Value | Status | Trend')
+    expect(markdown).toContain('▼ 1')
+    expect(markdown).toContain('→')
   })
 
   it('リンクが無ければDetailsを出さない', () => {

@@ -11,7 +11,11 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  # Project Health 履歴（Issue #525）を public/project-health/history.json へ
+  # コミットするための書き込み権限と、Nightly/Deploy の直近状態を取得するための
+  # Actions API 読み取り権限。書き込みはこのファイル1つに限定する。
+  contents: write
+  actions: read
 
 jobs:
   full:
@@ -143,3 +147,58 @@ jobs:
           CI_PACKAGE_MANAGER: npm
           CI_CACHE: setup-node npm cache
         run: node scripts/ci-summary.mjs
+
+      # ここから Project Health Dashboard 履歴保存（Issue #525）。
+      # このNightly実行自身が生成した成果物（vitest / dist / e2e / lighthouse）を
+      # 再利用するだけで、履歴保存のための追加テスト・追加計測は行わない。
+      - name: Project Health - dependency audit
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p project-health
+          npm audit --json > project-health/npm-audit.json 2>/dev/null || true
+
+      - name: Project Health - fetch Nightly / Deploy status
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/project-health/fetch-github-context.mjs
+
+      - name: Project Health - write history
+        if: always()
+        continue-on-error: true
+        env:
+          PROJECT_HEALTH_NIGHTLY_LINT_OUTCOME: ${{ steps.lint.outcome }}
+          PROJECT_HEALTH_NIGHTLY_TEST_OUTCOME: ${{ steps.test.outcome }}
+          PROJECT_HEALTH_NIGHTLY_BUILD_OUTCOME: ${{ steps.build.outcome }}
+          PROJECT_HEALTH_NIGHTLY_E2E_OUTCOME: ${{ steps.e2e.outcome }}
+        run: node scripts/project-health/write-history.mjs
+
+      # 履歴は public/project-health/history.json（リポジトリ内・機械可読なJSON）に
+      # 保存し、Nightly完了時のみ main へコミットする。通常PRのCIはこのファイルを
+      # 読むだけで書き込まないため、PRごとの履歴コミットは発生しない。
+      # public/ 配下に置くことで、通常のビルド・デプロイでそのまま
+      # GitHub Pages上の静的データとしても配信され、将来のPhase 4 Web Dashboardが
+      # 追加のAPI呼び出し無しで取得できる。
+      # コミット/pushに失敗しても（例: ブランチ保護等）Nightly自体は失敗させない。
+      - name: Project Health - commit history
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -z "$(git status --porcelain public/project-health/history.json)" ]; then
+            echo "No history changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/project-health/history.json
+          git commit -m "chore(project-health): update history $(date -u +%Y-%m-%d)"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "push attempt $attempt failed, retrying..."
+            sleep 5
+          done
+          echo "::warning::Project Health history commit could not be pushed (see logs). Nightly itself is not affected."

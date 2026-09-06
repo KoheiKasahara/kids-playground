@@ -8,6 +8,7 @@ import { parseNpmAudit } from './lib/npmAudit.mjs'
 import { parsePlaywrightSummary } from './lib/playwrightReport.mjs'
 import { parseLighthouseSummary } from './lib/lighthouseReport.mjs'
 import { parseProjectHealthConfig } from './lib/projectHealthConfig.mjs'
+import { findPreviousMetricValue, parseHistoryFile } from './lib/history.mjs'
 import { buildProjectHealthRows, renderProjectHealthMarkdown } from './lib/report.mjs'
 
 // Project Health Dashboard の本体。既存 CI（quick test / build）が生成した
@@ -81,6 +82,26 @@ const lighthouse = safe(
   { name: null, performance: null, accessibility: null },
 )
 
+// Issue #525: 履歴（Nightly実行時に日次更新）内で直近の有効な値を指標ごとに
+// 探し、前回値との差分をSummaryに表示する。履歴ファイルが無い/壊れている
+// 場合も空履歴として扱われるため、初回実行時もDashboard生成は失敗しない。
+const historyPath = process.env.PROJECT_HEALTH_HISTORY_FILE ?? 'public/project-health/history.json'
+const { entries: historyEntries } = safe(
+  'history',
+  () => parseHistoryFile(readFileSync(historyPath, 'utf8')),
+  { entries: [] },
+) ?? { entries: [] }
+
+const previous = {
+  unitTests: findPreviousMetricValue(historyEntries, undefined, 'unitTests'),
+  bundleKb: findPreviousMetricValue(historyEntries, undefined, 'bundleKb'),
+  lighthousePerformance: findPreviousMetricValue(historyEntries, undefined, 'lighthousePerformance'),
+  accessibility: findPreviousMetricValue(historyEntries, undefined, 'accessibility'),
+  vulnerabilities: findPreviousMetricValue(historyEntries, undefined, 'vulnerabilities'),
+  e2eSmokePassed: findPreviousMetricValue(historyEntries, undefined, 'e2eSmokePassed'),
+  e2eSmokeTotal: findPreviousMetricValue(historyEntries, undefined, 'e2eSmokeTotal'),
+}
+
 const rows = buildProjectHealthRows({
   gamesCount,
   unitTests,
@@ -91,6 +112,7 @@ const rows = buildProjectHealthRows({
   e2e,
   lighthouse,
   thresholds,
+  previous,
 })
 
 const links = []
