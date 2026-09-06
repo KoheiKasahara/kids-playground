@@ -1,9 +1,10 @@
-import { waterSurfaceYOf, type PukupukaGameState } from './pukupukaGame'
-import type { FloaterKind, SolidDefinition, StageDefinition } from './types'
+import { boardFlowSpeed, stageDriftDirection, waterSurfaceYOf, type PukupukaGameState } from './pukupukaGame'
+import type { BoardFlowDirection, FloaterKind, SolidDefinition, StageDefinition } from './types'
 import { surfaceYAt, waterBodyWidth } from './waterModel'
 import PukupukaFaucet from './PukupukaFaucet'
 import PukupukaDrain from './PukupukaDrain'
 import PukupukaGate from './PukupukaGate'
+import PukupukaBoard from './PukupukaBoard'
 import styles from './PukupukaRescuePlay.module.css'
 
 // ステージの見た目だけを持つコンポーネント。位置はすべてゲーム状態（2D座標）から決め、
@@ -139,6 +140,10 @@ type Props = {
   gateOpen: boolean
   gateDisabled: boolean
   onGateToggle: () => void
+  /** 流れ板が押し流している向き。 */
+  boardFlowDirection: BoardFlowDirection
+  boardDisabled: boolean
+  onBoardToggle: () => void
 }
 
 export default function PukupukaStage({
@@ -155,10 +160,14 @@ export default function PukupukaStage({
   gateOpen,
   gateDisabled,
   onGateToggle,
+  boardFlowDirection,
+  boardDisabled,
+  onBoardToggle,
 }: Props) {
   const cleared = state.phase === 'cleared'
   const goal = stage.goal.area
   const faucetSurfaceY = waterSurfaceYOf(stage, state, stage.faucet.targetBodyId)
+  const boardPushDirection = Math.sign(boardFlowSpeed(state, stageDriftDirection(stage))) || 1
 
   return (
     <svg
@@ -329,6 +338,13 @@ export default function PukupukaStage({
       />
       <PukupukaDrain drain={stage.drain} open={drainOpen} disabled={drainDisabled} onToggle={onDrainToggle} />
       <PukupukaGate gate={stage.gate} open={gateOpen} disabled={gateDisabled} onToggle={onGateToggle} />
+      <PukupukaBoard
+        board={stage.board}
+        flowDirection={boardFlowDirection}
+        pushDirection={boardPushDirection}
+        disabled={boardDisabled}
+        onToggle={onBoardToggle}
+      />
 
       {/* 浮遊物はゲートの点線わくなど他の装飾より手前に描き、重なっても隠れないようにする。
           じゃぐち・せん・ゲートより後に描く関係上、素通りにしておかないとボタンの上に

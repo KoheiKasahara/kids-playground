@@ -111,6 +111,21 @@ export type GateDefinition = Rect & {
   id: string
 }
 
+/** 流れ板（#519）が押し流す向き。goal: ゴール方向を後押しする。back: ゴールから遠ざける。 */
+export type BoardFlowDirection = 'goal' | 'back'
+
+/**
+ * 流れ板（いた）の定義（#519）。板の範囲(x, y, width, height)に浮遊物が触れているあいだだけ、
+ * `initialFlowDirection`（タップで反転できる。現在値はゲート同様ゲーム状態側が持つ）の
+ * 向きへ弱く押し流す。壁・ゲートのようなめり込み防止の当たり判定は持たせず、常に
+ * 「触れているあいだ目標速度を変えるだけ」の処理にすることで、接触時にめり込み・
+ * 吹き飛び・振動が起きないようにしてある（floatModel.ts の共通のドリフト処理をそのまま使う）。
+ */
+export type BoardDefinition = Rect & {
+  id: string
+  initialFlowDirection: BoardFlowDirection
+}
+
 export type StageDefinition = {
   id: string
   name: string
@@ -124,6 +139,7 @@ export type StageDefinition = {
   faucet: FaucetDefinition
   drain: DrainDefinition
   gate: GateDefinition
+  board: BoardDefinition
   /** 幼児向けの短い1行ヒント。 */
   hint: string
 }

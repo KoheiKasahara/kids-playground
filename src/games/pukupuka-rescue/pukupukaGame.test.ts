@@ -12,6 +12,7 @@ import {
   primaryWaterBodyId,
   stageDriftDirection,
   stepGame,
+  toggleBoard,
   toggleDrain,
   toggleGate,
   waterRatioOf,
@@ -239,6 +240,62 @@ describe('pukupukaGame: ゲート(#517)', () => {
 
     const toggled = toggleGate(cleared)
     expect(toggled.gateOpen).toBe(cleared.gateOpen)
+  })
+})
+
+describe('pukupukaGame: 流れ板(#519)', () => {
+  test('初期状態はステージ定義の初期の向きと一致する', () => {
+    expect(createInitialState(stage).boardFlowDirection).toBe(stage.board.initialFlowDirection)
+    expect(createInitialState(stage).boardFlowDirection).toBe('goal')
+  })
+
+  test('タップのたびに向きが反転する', () => {
+    const goal = createInitialState(stage)
+    expect(goal.boardFlowDirection).toBe('goal')
+
+    const back = toggleBoard(goal)
+    expect(back.boardFlowDirection).toBe('back')
+
+    const goalAgain = toggleBoard(back)
+    expect(goalAgain.boardFlowDirection).toBe('goal')
+  })
+
+  test('クリア後は向きの変更を受け付けない', () => {
+    const cleared = playThrough().state
+    expect(cleared.phase).toBe('cleared')
+
+    const toggled = toggleBoard(cleared)
+    expect(toggled.boardFlowDirection).toBe(cleared.boardFlowDirection)
+  })
+
+  test('板の向きを逆にすると、板の高さを越えるタイミングでの位置がはっきり変わる（経路が変わる）', () => {
+    // 板(main-board)は y:54〜64 にあり、じゃぐちで水を満たしていく途中でこの高さを通る。
+    // 3秒時点はまだ板を越えている最中の個体差が出る時間帯で、'goal'なら板を後押しに
+    // 使ってすでに右壁近くまで進むのに対し、'back'は押し戻されるぶん明確に出遅れる。
+    const goalRun = run(toggleGate(createInitialState(stage)), 3, 'fill').state
+    const backRun = run(toggleBoard(toggleGate(createInitialState(stage))), 3, 'fill').state
+
+    expect(duckOf(backRun).x).toBeLessThan(duckOf(goalRun).x - 15)
+  })
+
+  test('やりなおしで初期の向きへ戻る', () => {
+    const toggled = toggleBoard(createInitialState(stage))
+    expect(toggled.boardFlowDirection).toBe('back')
+
+    const reset = createInitialState(stage)
+    expect(reset.boardFlowDirection).toBe('goal')
+  })
+
+  test('向きを"back"のままでも、水を満たしきればいずれ板の高さを抜けて進める（詰みにならない）', () => {
+    const backState = toggleBoard(toggleGate(createInitialState(stage)))
+    const { state } = run(backState, 8, 'fill')
+    const duck = duckOf(state)
+
+    // 満水になれば水面が板の高さより上へ抜けるため、押し戻されたままにはならず
+    // ゴール側の壁ぎわまでたどり着く。
+    expect(duck.x).toBeGreaterThan(stage.board.x + stage.board.width - 10)
+    expect(Number.isFinite(duck.x)).toBe(true)
+    expect(Number.isFinite(duck.y)).toBe(true)
   })
 })
 
