@@ -129,6 +129,9 @@ describe('PukupukaRescuePlay', () => {
     expect(screen.getByRole('button', { name: 'やりなおし' })).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-stage')).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-floater-duck')).toBeInTheDocument()
+    // ボート・浮き輪+くまも同じ画面に生成される(#518)。
+    expect(screen.getByTestId('pukupuka-floater-boat')).toBeInTheDocument()
+    expect(screen.getByTestId('pukupuka-floater-ringBear')).toBeInTheDocument()
   })
 
   test('じゃぐちを押すと水面が上がり、アヒルも上がる', () => {
@@ -329,15 +332,17 @@ describe('PukupukaRescuePlay', () => {
 
   test('ゴールすると「ゴール！」が1回だけ出て、水の操作ができなくなる', () => {
     renderGame()
-    hold(frames, faucet(), 60 * 6)
+    // ゲートを先に開けてから水をため、アヒル・ボート・浮き輪+くまの3体すべてが
+    // ゴールの台の手前を越えるまで運ぶ（せんを先に開けると出遅れる浮遊物が出るため#518）。
     fireEvent.click(gateToggle())
+    hold(frames, faucet(), 60 * 8)
     expect(screen.queryByText('ゴール！')).not.toBeInTheDocument()
 
     fireEvent.click(drainToggle())
-    frames.advance(60 * 6)
+    frames.advance(60 * 5)
 
     expect(screen.getAllByText('ゴール！')).toHaveLength(1)
-    expect(screen.getByRole('status')).toHaveTextContent('ゴール！ アヒルを たすけたよ')
+    expect(screen.getByRole('status')).toHaveTextContent('ゴール！ みんなを たすけたよ')
     expect(faucet()).toBeDisabled()
     expect(drainToggle()).toBeDisabled()
     expect(gateToggle()).toBeDisabled()
@@ -349,10 +354,10 @@ describe('PukupukaRescuePlay', () => {
 
   test('ゴール後にやりなおすと、もう一度あそべる', () => {
     renderGame()
-    hold(frames, faucet(), 60 * 6)
     fireEvent.click(gateToggle())
+    hold(frames, faucet(), 60 * 8)
     fireEvent.click(drainToggle())
-    frames.advance(60 * 6)
+    frames.advance(60 * 5)
     expect(screen.getAllByText('ゴール！')).toHaveLength(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'やりなおし' }))

@@ -18,7 +18,8 @@ import { playPukupukaGoalSound, playPukupukaWaterSound, primeAudio } from '../..
 import styles from './PukupukaRescuePlay.module.css'
 
 /**
- * ぷかぷかレスキュー（Issue #514 Phase 1 / #515 じゃぐち / #516 せん・排水 / #517 ゲート）。
+ * ぷかぷかレスキュー（Issue #514 Phase 1 / #515 じゃぐち / #516 せん・排水 / #517 ゲート /
+ * #518 ボート・浮き輪+くまの追加）。
  *
  * 画面の役割はこの3つだけに絞っている。
  *  1. requestAnimationFrame でゲームを進める
@@ -162,7 +163,7 @@ export default function PukupukaRescuePlay() {
       </header>
 
       <p className={styles.instruction} role="status" aria-live="polite">
-        {cleared ? 'ゴール！ アヒルを たすけたよ' : stage.hint}
+        {cleared ? 'ゴール！ みんなを たすけたよ' : stage.hint}
       </p>
 
       <div className={styles.stageArea}>
