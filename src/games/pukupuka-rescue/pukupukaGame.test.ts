@@ -17,6 +17,7 @@ import {
   toggleGate,
   waterRatioOf,
   waterSurfaceYOf,
+  waterWheelSpinning,
   type PukupukaGameState,
   type WaterControl,
 } from './pukupukaGame'
@@ -296,6 +297,34 @@ describe('pukupukaGame: 流れ板(#519)', () => {
     expect(duck.x).toBeGreaterThan(stage.board.x + stage.board.width - 10)
     expect(Number.isFinite(duck.x)).toBe(true)
     expect(Number.isFinite(duck.y)).toBe(true)
+  })
+})
+
+describe('pukupukaGame: 水車(#520)', () => {
+  test('初期状態では回っていない', () => {
+    expect(waterWheelSpinning(createInitialState(stage))).toBe(false)
+  })
+
+  test('せんを あけている あいだだけ回る', () => {
+    const opened = toggleDrain(createInitialState(stage))
+    expect(opened.drainOpen).toBe(true)
+    expect(waterWheelSpinning(opened)).toBe(true)
+
+    const closed = toggleDrain(opened)
+    expect(waterWheelSpinning(closed)).toBe(false)
+  })
+
+  test('じゃぐちで注水しているだけでは回らない（せんが閉じている限り）', () => {
+    const filled = run(createInitialState(stage), 3, 'fill').state
+    expect(waterWheelSpinning(filled)).toBe(false)
+  })
+
+  test('やりなおすと回転が止まる', () => {
+    const spinning = toggleDrain(createInitialState(stage))
+    expect(waterWheelSpinning(spinning)).toBe(true)
+
+    const reset = createInitialState(stage)
+    expect(waterWheelSpinning(reset)).toBe(false)
   })
 })
 

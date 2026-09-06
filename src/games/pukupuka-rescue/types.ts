@@ -126,6 +126,25 @@ export type BoardDefinition = Rect & {
   initialFlowDirection: BoardFlowDirection
 }
 
+/**
+ * 水車の定義（#520）。せん/排水(#516)を開いている間、水が流れ出て水車を回す。
+ * 専用の開閉状態は持たせず、`PukupukaGameState.drainOpen` から回転の有無をそのまま
+ * 導出する（水車自身はタップ操作を持たない完全自動のギミック）。こうすることで、
+ * 専用のリセット処理を書かなくても「やりなおし」で drainOpen が戻るだけで
+ * 水車も自動的に初期状態（停止）へ戻る。
+ *
+ * 回転に連動して `linkedGate`（隣の小さな水門）も開閉させ、「水車がまわる→何かが動く」を
+ * もう一段見せる。水門は水そう本体の外（床の下）に置く前提の位置指定で、浮遊物の移動経路や
+ * ゴール判定には関与しないため、既存ステージの難易度・クリア条件を変えない。
+ */
+export type WaterWheelDefinition = {
+  id: string
+  x: number
+  y: number
+  radius: number
+  linkedGate: Rect
+}
+
 export type StageDefinition = {
   id: string
   name: string
@@ -140,6 +159,7 @@ export type StageDefinition = {
   drain: DrainDefinition
   gate: GateDefinition
   board: BoardDefinition
+  waterWheel: WaterWheelDefinition
   /** 幼児向けの短い1行ヒント。 */
   hint: string
 }

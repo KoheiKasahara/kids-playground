@@ -103,6 +103,7 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
       'drainSwirl',
       'gateOpenMark',
       'boardFlowMark',
+      'waterWheelSpin',
     ]) {
       expect(reduced).toContain(`.${animated}`)
     }
