@@ -8,14 +8,22 @@ export const STAGE_HEIGHT = 150
  * Phase 1の唯一のステージ「はじめの おふろ」。
  *
  * 遊びの流れ（幼児が見ただけで因果が分かることを最優先にした構成）:
- *   1. じゃぐちを おす → 水が出て水面が上がる → アヒルが浮いて上がる（#515）
- *   2. ゲートを あける → まんなかの しきりが 開いて アヒルが右へ流れて渡れる（#517）
- *   3. せんを あける → 水面が下がる → アヒルが ゴールの台（浮き輪）へ降りてクリア（#516）
+ *   1. じゃぐちを おす → 水が出て水面が上がる → みんなが浮いて上がる（#515）
+ *   2. ゲートを あける → まんなかの しきりが 開いて みんなが右へ流れて渡れる（#517）
+ *   3. せんを あける → 水面が下がる → みんなが ゴールの台（浮き輪）へ降りてクリア（#516）
  *
  * ゲートは閉じている間、水位に関わらず（天井近くまで）通路をふさぐ完全な壁として働く。
  * 「じゃぐち」「ゲート」「せん」のどれか1つでも欠けるとクリアできず、3つの因果を
  * それぞれ1回ずつ体験できる。ゴール領域は台の上に十分な高さを取ってあり、降ろす途中で
  * 必ず通過するため水位をぴったり合わせる精度は要求しない。
+ *
+ * アヒルに加え、ボート・浮き輪に乗ったくまも同じ水域に浮かべ、同じゴールへ運ぶ（#518）。
+ * 浮遊物ごとの水位判定・壁との衝突・ゴール判定はすべて共通処理（floatModel.ts /
+ * pukupukaGame.ts）をそのまま使い、違いは半径（サイズ）だけにしてある。半径が大きいほど
+ * 水面の変化に対してゆっくり動く（ボートは少し どっしり、浮き輪は少し 身軽に見える）。
+ * ゲートを あけたまま じゃぐちで しばらく 満たしてから せんを あけると、3つとも
+ * 台の手前を越えてからゴールへ降りられる（せんだけ先に あけると 台の手前で
+ * 沈みかけて 出遅れることがあるため、ヒントでも「ゲートを あけてから」の順を示す）。
  */
 export const PUKUPUKA_STAGE: StageDefinition = {
   id: 'ofuro',
@@ -26,7 +34,7 @@ export const PUKUPUKA_STAGE: StageDefinition = {
     { id: 'floor', kind: 'floor', x: 6, y: 126, width: 88, height: 14 },
     { id: 'wall-left', kind: 'wall', x: 6, y: 22, width: 8, height: 104 },
     { id: 'wall-right', kind: 'wall', x: 86, y: 22, width: 8, height: 104 },
-    // ゴールの台。水を減らすとアヒルがこの上に降りる。
+    // ゴールの台。水を減らすと浮遊物たちがこの上に降りる。
     { id: 'goal-platform', kind: 'platform', x: 54, y: 96, width: 32, height: 30 },
   ],
   waterBodies: [
@@ -40,13 +48,19 @@ export const PUKUPUKA_STAGE: StageDefinition = {
       initialLevel: 14,
     },
   ],
-  floaters: [{ id: 'duck', kind: 'duck', radius: 8, startX: 27, startY: 118 }],
+  floaters: [
+    { id: 'duck', kind: 'duck', radius: 8, startX: 27, startY: 118 },
+    // ボートは少し大きい半径にして、見た目どおり少しどっしり動く。
+    { id: 'boat', kind: 'boat', radius: 9, startX: 36, startY: 116 },
+    // 浮き輪+くまは少し小さい半径にして、見た目どおり少し身軽に動く。
+    { id: 'ringBear', kind: 'ringBear', radius: 7, startX: 22, startY: 118 },
+  ],
   goal: {
-    // 台の上（y=96）へ降りたアヒルの中心は y=88。浮いたまま近づいた場合も含めて拾えるよう、
-    // 台のすぐ上を少し高めに取ってある。水を減らし切れば必ずこの範囲に入るので、
-    // 水位をぴったり合わせる操作は要らない。
+    // 台の上（y=96）へ降りた浮遊物の中心は y = 96 - 半径。浮いたまま近づいた場合も含めて
+    // 拾えるよう、台のすぐ上を少し高めに取ってある。水を減らし切れば半径が違ってもこの
+    // 範囲に入るので、水位をぴったり合わせる操作は要らない。
     area: { x: 56, y: 86, width: 28, height: 10 },
-    floaterId: 'duck',
+    floaterIds: ['duck', 'boat', 'ringBear'],
   },
   // アヒルの近く・雲と重ならない位置に取り付ける（#515）。押している間だけ main へ注水する。
   faucet: { id: 'main-faucet', targetBodyId: 'main', x: 38, y: 10 },
@@ -57,7 +71,7 @@ export const PUKUPUKA_STAGE: StageDefinition = {
   // 水位をどれだけ上げても越えられない完全な壁として働く。開くと当たり判定ごと消え、
   // アヒルが右側へ渡れるようになる。
   gate: { id: 'main-gate', x: 46, y: 22, width: 8, height: 104 },
-  hint: 'じゃぐち・ゲート・せんを つかって アヒルを ゴールへ はこぼう',
+  hint: 'じゃぐち・ゲートを つかって みんなを ゴールの てまえまで はこんでから、せんを あけよう',
 }
 
 export const PUKUPUKA_STAGES: readonly StageDefinition[] = [PUKUPUKA_STAGE]

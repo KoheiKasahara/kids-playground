@@ -150,3 +150,49 @@ describe('floatModel: 破綻しないこと', () => {
     expect(current.y).toBeLessThanOrEqual(112.001)
   })
 })
+
+describe('floatModel: ボート・浮き輪+くま(#518)も共通処理で浮く', () => {
+  const boat: FloaterDefinition = { id: 'boat', kind: 'boat', radius: 9, startX: 30, startY: 100 }
+  const ringBear: FloaterDefinition = {
+    id: 'ringBear',
+    kind: 'ringBear',
+    radius: 7,
+    startX: 30,
+    startY: 100,
+  }
+
+  function advanceWith(definition: FloaterDefinition, seconds: number, ctx: FloatStepContext): FloaterState {
+    let current = createFloaterState(definition)
+    const steps = Math.round(seconds / STEP)
+    for (let index = 0; index < steps; index += 1) {
+      current = stepFloater(definition, current, ctx, STEP)
+    }
+    return current
+  }
+
+  test.each([
+    ['boat', boat],
+    ['ringBear', ringBear],
+  ])('%s は水面付近で落ち着き、床を貫通しない', (_label, definition) => {
+    const settled = advanceWith(definition, 6, context({ surfaceY: 60 }))
+
+    expect(settled.submergedRatio).toBeCloseTo(1 / BUOYANCY_RATIO, 1)
+    expect(Math.abs(settled.y - 60)).toBeLessThan(definition.radius)
+
+    const onFloor = advanceWith(definition, 3, context())
+    expect(onFloor.y).toBeCloseTo(120 - definition.radius, 1)
+  })
+
+  test.each([
+    ['boat', boat],
+    ['ringBear', ringBear],
+  ])('%s も壁を越えず、ステージ外へ出ない', (_label, definition) => {
+    const wall: Rect = { x: 60, y: 0, width: 8, height: 130 }
+    const ctx = context({ surfaceY: 60, solids: [floor, wall] })
+    const drifted = advanceWith(definition, 10, ctx)
+
+    expect(drifted.x).toBeLessThanOrEqual(60 - definition.radius + 0.001)
+    expect(Number.isFinite(drifted.x)).toBe(true)
+    expect(Number.isFinite(drifted.y)).toBe(true)
+  })
+})

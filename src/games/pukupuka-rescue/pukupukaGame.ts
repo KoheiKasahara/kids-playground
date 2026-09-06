@@ -72,10 +72,12 @@ export function drainSourceBodyId(stage: StageDefinition): WaterBodyId {
 /**
  * 水に触れている浮遊物が流される向き。ゴールが右にあるステージなら右へ流れる。
  * ステージ定義に向きを持たせなくても、ゴールと開始位置から自然に決まる。
+ * 対象が複数(#518)でも、代表して先頭のIDの開始位置だけを見れば向きは同じになる
+ * （どの対象も同じ側から同じゴールへ向かうレイアウトを前提にしている）。
  */
 export function stageDriftDirection(stage: StageDefinition): number {
   const goalCenterX = stage.goal.area.x + stage.goal.area.width / 2
-  const target = stage.floaters.find((floater) => floater.id === stage.goal.floaterId)
+  const target = stage.floaters.find((floater) => floater.id === stage.goal.floaterIds[0])
   const startX = target ? target.startX : goalCenterX
   return Math.sign(goalCenterX - startX) || 1
 }
@@ -102,6 +104,21 @@ export function activeSolids(stage: StageDefinition, gateOpen: boolean): readonl
 
 export function getFloater(state: PukupukaGameState, floaterId: string): FloaterState | undefined {
   return state.floaters.find((floater) => floater.id === floaterId)
+}
+
+/**
+ * ゴール判定の共通処理(#518)。対象がアヒル1体でもボート・浮き輪など複数でも、
+ * ここを1本通すだけで済むようにしてあり、浮遊物の種類ごとに判定をコピーしない。
+ * すべての対象がゴール領域に入っていたら true。
+ */
+export function allFloatersAtGoal(
+  stage: StageDefinition,
+  floaters: readonly FloaterState[],
+): boolean {
+  return stage.goal.floaterIds.every((floaterId) => {
+    const floater = floaters.find((candidate) => candidate.id === floaterId)
+    return floater !== undefined && rectContainsPoint(stage.goal.area, floater.x, floater.y)
+  })
 }
 
 export function getWaterBodyState(
@@ -139,6 +156,9 @@ const SETTLED_SPEED = 0.05
  * （水位が目標に届いていない・浮遊物が揺れているあいだは false なので、演出は途切れない）。
  */
 export function isSettled(stage: StageDefinition, state: PukupukaGameState): boolean {
+  // クリア後は浮遊物を止めているため(#518)、クリアした瞬間の速度が残っていても
+  // 動き続けているとは扱わない。
+  if (state.phase === 'cleared') return true
   for (const definition of stage.waterBodies) {
     const bodyState = state.water[definition.id]
     if (bodyState && bodyState.volume !== bodyState.targetVolume) return false
@@ -206,31 +226,37 @@ function advanceOneStep(
   }
   water = stepWaterField(stage.waterBodies, water, deltaSeconds)
 
+  // クリア後は浮遊物を止めた絵のままにする(#518)。複数の浮遊物が同じゴールへ集まる
+  // 構成では、止めずに動かし続けると、みな同じ水の流れに乗って結局ほぼ同じ場所へ
+  // 寄っていってしまい、せっかく描き分けたシルエットが重なって見分けにくくなる。
+  // クリアした瞬間の(まだ少しばらけている)並びのまま止めることで、常にきれいに
+  // 見分けられる状態を保つ。アヒル1体だけの時と同じく、クリア後に水の操作を
+  // 受け付けなくなるのと合わせて「ここでおしまい」を見た目でも表す。
   const solids = activeSolids(stage, state.gateOpen)
-  const floaters = state.floaters.map((floater) => {
-    const definition = stage.floaters.find((candidate) => candidate.id === floater.id)
-    if (!definition) return floater
-    return stepFloater(
-      definition,
-      floater,
-      {
-        surfaceY: surfaceYAt(stage.waterBodies, water, floater.x, floater.y),
-        solids,
-        bounds: { width: stage.width, height: stage.height },
-        driftDirection,
-      },
-      deltaSeconds,
-    )
-  })
+  const floaters =
+    state.phase === 'playing'
+      ? state.floaters.map((floater) => {
+          const definition = stage.floaters.find((candidate) => candidate.id === floater.id)
+          if (!definition) return floater
+          return stepFloater(
+            definition,
+            floater,
+            {
+              surfaceY: surfaceYAt(stage.waterBodies, water, floater.x, floater.y),
+              solids,
+              bounds: { width: stage.width, height: stage.height },
+              driftDirection,
+            },
+            deltaSeconds,
+          )
+        })
+      : state.floaters
 
   let phase = state.phase
   let goalReached = false
-  if (phase === 'playing') {
-    const target = floaters.find((floater) => floater.id === stage.goal.floaterId)
-    if (target && rectContainsPoint(stage.goal.area, target.x, target.y)) {
-      phase = 'cleared'
-      goalReached = true
-    }
+  if (phase === 'playing' && allFloatersAtGoal(stage, floaters)) {
+    phase = 'cleared'
+    goalReached = true
   }
 
   return {

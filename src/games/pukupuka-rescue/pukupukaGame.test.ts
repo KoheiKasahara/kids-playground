@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { PUKUPUKA_STAGE } from './stageDefinitions'
 import {
   activeSolids,
+  allFloatersAtGoal,
   applyWaterTap,
   createInitialState,
   drainSourceBodyId,
@@ -18,7 +19,7 @@ import {
   type PukupukaGameState,
   type WaterControl,
 } from './pukupukaGame'
-import { rectContainsPoint } from './types'
+import { rectContainsPoint, type StageDefinition } from './types'
 
 const stage = PUKUPUKA_STAGE
 const FRAME_MS = 1000 / 60
@@ -47,18 +48,25 @@ function duckOf(state: PukupukaGameState) {
   return duck
 }
 
-/** ゴールまでのひととおりの操作（水をためてゲートを開けて渡り、せんを開けて台へ降ろす）。 */
+/**
+ * ゴールまでのひととおりの操作。
+ *
+ * ゲートを先に開けてから水をため、浮遊物3体（アヒル・ボート・浮き輪+くま）が
+ * ゴールの台の手前を越えるまで運んでから、せんを開けて台へ降ろす。せんを先に
+ * 開けてしまうと、半径の大きいボートなど動きがゆっくりな浮遊物が台の手前で
+ * 水面と一緒に沈み込み、台の横で出遅れてしまう(#518)ため、この順番が必要になる。
+ */
 function playThrough(): { state: PukupukaGameState; goalCount: number } {
   let current = createInitialState(stage)
   let goalCount = 0
 
-  const fill = run(current, 6, 'fill')
-  current = fill.state
-  goalCount += fill.goalCount
-
   current = toggleGate(current)
+  const cross = run(current, 8, 'fill')
+  current = cross.state
+  goalCount += cross.goalCount
+
   current = toggleDrain(current)
-  const drain = run(current, 6)
+  const drain = run(current, 5)
   current = drain.state
   goalCount += drain.goalCount
 
@@ -82,6 +90,25 @@ describe('pukupukaGame: 初期状態', () => {
 
   test('流れる向きはゴールのある右向き', () => {
     expect(stageDriftDirection(stage)).toBe(1)
+  })
+
+  test('ボート・浮き輪+くまも開始位置に生成され、アヒルとは重複しないIDを持つ(#518)', () => {
+    const state = createInitialState(stage)
+
+    const boat = getFloater(state, 'boat')
+    const ringBear = getFloater(state, 'ringBear')
+    expect(boat).toBeDefined()
+    expect(ringBear).toBeDefined()
+    expect(boat!.x).toBe(36)
+    expect(boat!.y).toBe(116)
+    expect(ringBear!.x).toBe(22)
+    expect(ringBear!.y).toBe(118)
+
+    // アヒルの既存挙動（開始位置・phase）はこれらを足しても変わらない。
+    const duck = duckOf(state)
+    expect(duck.x).toBe(27)
+    expect(duck.y).toBe(118)
+    expect(state.phase).toBe('playing')
   })
 })
 
@@ -330,13 +357,17 @@ describe('pukupukaGame: 固定物との関係', () => {
 })
 
 describe('pukupukaGame: ゴール', () => {
-  test('水をためて壁を越え、水を減らすとゴールできる', () => {
+  test('水をためて壁を越え、水を減らすとゴールできる（アヒル・ボート・浮き輪+くまの3体すべて）', () => {
     const { state, goalCount } = playThrough()
     const duck = duckOf(state)
+    const boat = getFloater(state, 'boat')
+    const ringBear = getFloater(state, 'ringBear')
 
     expect(state.phase).toBe('cleared')
     expect(goalCount).toBe(1)
     expect(rectContainsPoint(stage.goal.area, duck.x, duck.y)).toBe(true)
+    expect(rectContainsPoint(stage.goal.area, boat!.x, boat!.y)).toBe(true)
+    expect(rectContainsPoint(stage.goal.area, ringBear!.x, ringBear!.y)).toBe(true)
   })
 
   test('クリア後に進め続けてもゴールは1回しか発火しない', () => {
@@ -349,6 +380,21 @@ describe('pukupukaGame: ゴール', () => {
     expect(after.state.phase).toBe('cleared')
   })
 
+  test('クリア後は浮遊物も止まり、クリアした瞬間の並びのまま動かない(#518)', () => {
+    // 複数の浮遊物が同じゴールへ集まる構成では、クリア後も動かし続けると
+    // 結局みな同じ水の流れに乗って重なってしまうため、クリアの瞬間で止める。
+    const cleared = playThrough().state
+    const before = stage.floaters.map((f) => getFloater(cleared, f.id)!)
+
+    const after = run(cleared, 8).state
+    const positionsAfter = stage.floaters.map((f) => getFloater(after, f.id)!)
+
+    before.forEach((floater, index) => {
+      expect(positionsAfter[index].x).toBeCloseTo(floater.x, 5)
+      expect(positionsAfter[index].y).toBeCloseTo(floater.y, 5)
+    })
+  })
+
   test('クリア後は水の操作を受け付けない', () => {
     const { state } = playThrough()
     const surfaceBefore = waterSurfaceYOf(stage, state, bodyId)
@@ -357,6 +403,38 @@ describe('pukupukaGame: ゴール', () => {
     const stepped = run(tapped, 2, 'fill').state
 
     expect(waterSurfaceYOf(stage, stepped, bodyId)).toBeCloseTo(surfaceBefore, 5)
+  })
+})
+
+describe('pukupukaGame: ゴール判定の共通化(#518)', () => {
+  // ゴール判定(allFloatersAtGoal)がアヒル固有の処理ではなく、どの浮遊物の組み合わせでも
+  // 同じ関数だけで動くことを、アヒルを含まないミニステージで確かめる。
+  const miniGoalArea = { x: 40, y: 40, width: 20, height: 20 }
+  const miniStage: StageDefinition = {
+    ...stage,
+    floaters: [
+      { id: 'boat-1', kind: 'boat', radius: 9, startX: 0, startY: 0 },
+      { id: 'ring-1', kind: 'ringBear', radius: 7, startX: 0, startY: 0 },
+    ],
+    goal: { area: miniGoalArea, floaterIds: ['boat-1', 'ring-1'] },
+  }
+
+  function floaterAt(id: string, x: number, y: number) {
+    return { id, x, y, vx: 0, vy: 0, submergedRatio: 0 }
+  }
+
+  test('アヒル以外の浮遊物だけを対象にしても、全員が領域内なら true になる', () => {
+    const floaters = [floaterAt('boat-1', 45, 45), floaterAt('ring-1', 55, 50)]
+    expect(allFloatersAtGoal(miniStage, floaters)).toBe(true)
+  })
+
+  test('対象のうち1体でも領域外なら false になる', () => {
+    const floaters = [floaterAt('boat-1', 45, 45), floaterAt('ring-1', 10, 10)]
+    expect(allFloatersAtGoal(miniStage, floaters)).toBe(false)
+  })
+
+  test('対象の浮遊物が存在しない場合も false になる（未生成扱い）', () => {
+    expect(allFloatersAtGoal(miniStage, [floaterAt('boat-1', 45, 45)])).toBe(false)
   })
 })
 

@@ -47,8 +47,12 @@ export type WaterBodyDefinition = {
   initialLevel: number
 }
 
-/** Phase 1で実装する浮遊物はアヒルのみ。ボート・浮き輪は#518で足す。 */
-export type FloaterKind = 'duck'
+/**
+ * 浮遊物の種類（見た目の描き分けだけに使う。水位判定・壁との衝突・ゴール判定は
+ * どの種類も`floatModel.ts`/`pukupukaGame.ts`の共通処理をそのまま使い、種類ごとの
+ * 個別実装は持たない #518）。サイズや浮き方の違いは半径（radius）だけで表現する。
+ */
+export type FloaterKind = 'duck' | 'boat' | 'ringBear'
 
 export type FloaterDefinition = {
   id: string
@@ -62,8 +66,11 @@ export type FloaterDefinition = {
 export type GoalDefinition = {
   /** ゴール判定領域。中心がこの矩形に入ったらクリア。 */
   area: Rect
-  /** ゴールへ運ぶ対象の浮遊物ID。 */
-  floaterId: string
+  /**
+   * ゴールへ運ぶ対象の浮遊物IDの一覧。すべてがこの領域に入った瞬間にクリアになる。
+   * 種類が増えても判定処理は共通のまま、ここへIDを足すだけで済むようにしてある(#518)。
+   */
+  floaterIds: readonly string[]
 }
 
 /**
