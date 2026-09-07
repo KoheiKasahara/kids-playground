@@ -100,6 +100,11 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
     expect(ruleBody('.boardHit')).toMatch(/touch-action:\s*manipulation/)
   })
 
+  test('水車と連動水門の絵は、重なったせんのタップを遮らない', () => {
+    const wheelSource = readFileSync(path.join(__dirname, 'PukupukaWaterWheel.tsx'), 'utf-8')
+    expect(wheelSource).toMatch(/<g aria-hidden="true" pointerEvents="none">/)
+  })
+
   test('prefers-reduced-motion で演出アニメーションを止める', () => {
     expect(CSS_SOURCE).toMatch(/@media \(prefers-reduced-motion: reduce\)/)
     const reduced = CSS_SOURCE.slice(CSS_SOURCE.indexOf('@media (prefers-reduced-motion: reduce)'))
