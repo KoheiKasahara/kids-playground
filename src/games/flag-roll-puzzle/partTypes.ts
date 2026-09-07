@@ -35,6 +35,8 @@ export type PartTypeId =
   | 'conveyorUp'
   /** 中央支点で動くため、横向き固定の物理ギミック。 */
   | 'seesaw'
+  | 'fanRight' | 'fanDown' | 'fanLeft' | 'fanUp'
+  | 'bubbleLift' | 'warpIn' | 'warpOut'
 
 /** パーツを構成する長方形。アンカーセルの中心を原点とした相対位置(px)で表す。 */
 export type PartSegment = {
@@ -51,7 +53,7 @@ export type PartSegment = {
 }
 
 /** 木の板以外も、役割を文字に頼らず見分けられるようにするための見た目の種類。 */
-export type PartAppearance = 'wood' | 'curve' | 'bumper' | 'guide' | 'jumpRamp' | 'cannon' | 'spinner' | 'conveyor' | 'seesaw'
+export type PartAppearance = 'fan' | 'bubbleLift' | 'warpIn' | 'warpOut' | 'wood' | 'curve' | 'bumper' | 'guide' | 'jumpRamp' | 'cannon' | 'spinner' | 'conveyor' | 'seesaw'
 
 export type PartDefinition = {
   readonly id: PartTypeId
@@ -65,6 +67,8 @@ export type PartDefinition = {
   readonly segments: readonly PartSegment[]
   readonly restitution: number
   readonly friction: number
+  /** パーツを選んだときに表示する短い遊び方。 */
+  readonly hint?: string
   /** 置き場だけで使う縮小率。盤面の描画・物理・占有マスには一切影響しない。 */
   readonly previewScale?: number
   readonly previewOffsetX?: number
@@ -231,6 +235,25 @@ function curveDefinition(
   }
 }
 
+export const FAN_ANGLES = { fanRight: 0, fanDown: 90, fanLeft: 180, fanUp: 270 } as const
+export function isAirToy(id: PartTypeId): boolean {
+  return id in FAN_ANGLES || id === 'bubbleLift' || id === 'warpIn' || id === 'warpOut'
+}
+const AIR_TOYS: readonly PartDefinition[] = [
+  ...Object.entries(FAN_ANGLES).map(([id, angleDeg]): PartDefinition => ({
+    id: id as PartTypeId, label: 'せんぷうき', inTray: id === 'fanRight', appearance: 'fan',
+    cells: SINGLE_CELL, segments: [{ offsetX: 0, offsetY: 0, width: 48, height: 48, angleDeg }],
+    restitution: 0, friction: 0, hint: 'かぜで おすよ！ まわすと むきが かわるよ',
+  })),
+  ...(['bubbleLift', 'warpIn', 'warpOut'] as const).map((id): PartDefinition => ({
+    id, label: { bubbleLift: 'あわリフト', warpIn: 'ワープ いりぐち', warpOut: 'ワープ でぐち' }[id],
+    inTray: true, appearance: id, cells: SINGLE_CELL,
+    segments: [{ offsetX: 0, offsetY: 0, width: 48, height: 48, angleDeg: 0 }],
+    restitution: 0, friction: 0,
+    hint: id === 'bubbleLift' ? 'あわで うえへ！ うえを あけて おこう' : 'あおから オレンジへ！ でぐちは 1こ おこう',
+  })),
+]
+
 export const PART_DEFINITIONS: readonly PartDefinition[] = [
   {
     id: 'slopeLeft', label: 'ひだりへ', inTray: true, appearance: 'wood', cells: SINGLE_CELL,
@@ -306,6 +329,8 @@ export const PART_DEFINITIONS: readonly PartDefinition[] = [
     restitution: 0.55, friction: 0.03,
   },
 
+  ...AIR_TOYS,
+
   conveyorDefinition('conveyorRight', 0, true),
   conveyorDefinition('conveyorDown', 1),
   conveyorDefinition('conveyorLeft', 2),
@@ -331,6 +356,7 @@ export function partDefinition(id: PartTypeId): PartDefinition {
 
 /** パーツごとに意味のある固定向きだけを循環する。 */
 const NEXT_ROTATION_TYPE: Readonly<Partial<Record<PartTypeId, PartTypeId>>> = {
+  fanRight: 'fanDown', fanDown: 'fanLeft', fanLeft: 'fanUp', fanUp: 'fanRight',
   slopeLeft: 'slopeRight', slopeRight: 'slopeLeft',
   curveLeft: 'curveLeft90', curveLeft90: 'curveLeft180', curveLeft180: 'curveLeft270', curveLeft270: 'curveLeft',
   curveRight: 'curveRight90', curveRight90: 'curveRight180', curveRight180: 'curveRight270', curveRight270: 'curveRight',

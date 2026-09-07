@@ -1,3 +1,4 @@
+import { createAirToyRuntime } from './airToyPhysics'
 import { useEffect, useMemo, useRef } from 'react'
 import * as Matter from 'matter-js'
 import {
@@ -15,6 +16,7 @@ import { cellCenter, type Point } from './grid'
 import { createStopObservation, observeBallStop } from './ballStopDetection'
 import { isInGoalArea } from './goal'
 import {
+  isAirToy,
   isCannonPart,
   isConveyorPart,
   isJumpRampPart,
@@ -138,7 +140,7 @@ function wallBodies(goalArea: GoalArea): Matter.Body[] {
 export function createPuzzlePartBodies(part: PlacedPart): Matter.Body[] {
   // Cannonの見た目は専用センサーだけ、Spinnerの見た目と当たり判定は専用Coreだけ、
   // シーソーのデッキと支点は専用Runtimeだけを使う。通常の静的板Bodyを重ねない。
-  if (isCannonPart(part.typeId) || isSpinnerPart(part.typeId) || isSeesawPart(part.typeId)) return []
+  if (isAirToy(part.typeId) || isCannonPart(part.typeId) || isSpinnerPart(part.typeId) || isSeesawPart(part.typeId)) return []
   const definition = partDefinition(part.typeId)
   const center = cellCenter(part.cell)
   return definition.segments.map((segment, index) => {
@@ -424,6 +426,8 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     const cannonStates = new Map<string, CannonCaptureState>()
     const cannonCaptureRecords = new Map<string, { readonly ballId: string; readonly cannonId: string }>()
     const capturedCannonByBall = new Map<string, string>()
+    const airToys = createAirToyRuntime(current.parts)
+    const airToyObstacles = [...partBodyEntries.map(({ body }) => body), ...spinnerRuntimes.map(({ core }) => core.body)]
     let simulationTime = 0
 
     const prefersReducedMotion = typeof window !== 'undefined'
@@ -717,6 +721,18 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
         updateSeesaws()
         updateCannonContactsAndFire()
         updateSpinners()
+        for (const ball of runtimeBalls) {
+          const active = !ball.body.isStatic && !ball.reachedGoal && !capturedCannonByBall.has(ball.id)
+          if (!active) airToys.cancel(ball.id)
+          const result = active ? airToys.step(ball.id, ball.body, simulationTime, airToyObstacles) : null
+          const element = elementsRef.current.get(ball.id)
+          if (element) {
+            element.style.borderRadius = '50%'
+            element.style.boxShadow = result?.carried ? '0 0 0 5px #8ee8ef, 0 0 12px 7px #d4faff' : ''
+          }
+          if (result?.reactedPartId) animatePartImpact(result.reactedPartId, ball.id)
+          if (result?.carried) ball.stopObservation = createStopObservation()
+        }
         accumulator -= STEP_MS
         substeps += 1
       }
@@ -774,6 +790,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     writeAllTransforms()
     rafId = requestAnimationFrame(tick)
     const registeredPartMotionElements = partMotionElementsRef.current
+    const registeredElements = elementsRef.current
 
     return () => {
       stopped = true
@@ -789,6 +806,10 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
         // 明示的に外し、将来のcleanup経路変更で古い支点が残らないようにする。
         Composite.remove(engine.world, seesaw.constraint)
         Composite.remove(engine.world, seesaw.body)
+      }
+      for (const ball of runtimeBalls) {
+        const element = registeredElements.get(ball.id)
+        if (element) element.style.boxShadow = ''
       }
       Composite.clear(engine.world, false)
       Engine.clear(engine)
