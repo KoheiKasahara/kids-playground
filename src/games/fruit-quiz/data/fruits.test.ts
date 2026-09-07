@@ -15,7 +15,7 @@ describe('fruits', () => {
 
   test('登録した画像はすべてpublic配下の実ファイルを参照する', () => {
     for (const item of fruits) {
-      expect(item.image).toMatch(/^images\/fruits\/[a-z-]+\.png$/)
+      expect(item.image).toMatch(/^images\/fruits\/[a-z-]+\.webp$/)
       expect(existsSync(resolve('public', item.image))).toBe(true)
     }
   })
