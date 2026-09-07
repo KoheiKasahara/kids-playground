@@ -172,14 +172,21 @@ export default function PukupukaStage({
   const goalRingX = goal.x + goal.width * 0.72
   const goalRingY = goal.y + goal.height * 0.52
   const goalFlagX = goal.x + goal.width * 0.18
+  const viewportWidth = Math.min(stage.viewportWidth ?? stage.width, stage.width)
+  const followedFloaters = state.floaters.filter((floater) => stage.goal.floaterIds.includes(floater.id))
+  const focusX = followedFloaters.length
+    ? followedFloaters.reduce((sum, floater) => sum + floater.x, 0) / followedFloaters.length
+    : viewportWidth / 2
+  const cameraX = Math.max(0, Math.min(stage.width - viewportWidth, focusX - viewportWidth * 0.4))
 
   return (
     <svg
       className={styles.stageSvg}
-      viewBox={`0 0 ${stage.width} ${stage.height}`}
+      viewBox={`${cameraX} 0 ${viewportWidth} ${stage.height}`}
       preserveAspectRatio="xMidYMid meet"
       focusable="false"
       data-testid="pukupuka-stage"
+      data-camera-x={cameraX.toFixed(2)}
     >
       <defs>
         <linearGradient id="pukupuka-sky" x1="0" y1="0" x2="0" y2="1">
@@ -236,11 +243,15 @@ export default function PukupukaStage({
       {/* 装飾・状態表示だけの内容。じゃぐちの操作ボタンだけはこの外に置き、AT/キーボードから見える。 */}
       <g aria-hidden="true">
         <rect x="0" y="0" width={stage.width} height={stage.height} fill="url(#pukupuka-sky)" />
-        <ellipse cx="22" cy="12" rx="13" ry="5.5" fill="#ffffff" opacity="0.75" />
-        <ellipse cx="74" cy="9" rx="10" ry="4.5" fill="#ffffff" opacity="0.6" />
+        {Array.from({ length: Math.ceil(stage.width / 100) }, (_, index) => (
+          <g key={`clouds-${index}`} transform={`translate(${index * 100} 0)`}>
+            <ellipse cx="22" cy="12" rx="13" ry="5.5" fill="#ffffff" opacity="0.75" />
+            <ellipse cx="74" cy="9" rx="10" ry="4.5" fill="#ffffff" opacity="0.6" />
+          </g>
+        ))}
 
         {/* 水そうの内側。水がないところはうすい水色にして、水面の位置を分かりやすくする。 */}
-        <rect x="6" y="20" width="88" height="120" rx="8" fill="#f4fbff" />
+        <rect x="6" y="20" width={stage.width - 12} height="120" rx="8" fill="#f4fbff" />
 
         {stage.waterBodies.map((body) => {
           const surfaceY = waterSurfaceYOf(stage, state, body.id)
