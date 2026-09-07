@@ -812,9 +812,9 @@ const airplaneDetails: readonly PaintDetail[] = [
     strokeWidth: 1.4,
     motion: PLANE,
   },
-  // 機首寄りのコクピットの丸窓。
+  // 機首寄りのコクピットの丸窓。胴体の輪郭に接しないよう内側へ寄せている。
   {
-    shape: { kind: 'circle', cx: 80, cy: 46, r: 3 },
+    shape: { kind: 'circle', cx: 78, cy: 48, r: 3 },
     stroke: OUTLINE_COLOR,
     strokeWidth: 1.4,
     motion: PLANE,
@@ -895,14 +895,16 @@ const shipDetails: readonly PaintDetail[] = [
     strokeWidth: 1.4,
     motion: SHIP,
   },
-  // マストの線とはた。付け根（マスト上端）を軸に小さくはためかせたいので、
-  // 線とはたをまとめて1つのpartにする。
+  // マストの線は船体と一緒に動くだけ（groupのみ）にする。SHIP_FLAGに入れて旗と
+  // 一緒に振ると、マストの足元（デッキ上面 y=38）まで左右にずれてデッキから浮いてしまうため。
   {
     shape: { kind: 'path', d: 'M 36,10 L 36,38' },
     stroke: OUTLINE_COLOR,
     strokeWidth: 1.6,
-    motion: SHIP_FLAG,
+    motion: SHIP,
   },
+  // はた（三角形）だけをSHIP_FLAGにする。付け根＝旗自身のbboxの左端(x=36)を軸に
+  // 小さくはためく（マストは動かないので、旗だけが竿の先で揺れて見える）。
   {
     shape: { kind: 'path', d: 'M 36,10 L 44,13 L 36,16 Z' },
     fill: '#ff8787',

@@ -596,32 +596,35 @@
   }
 
   100% {
-    transform: scale(0.78);
+    transform: scale(0.7);
   }
 }
 
-/* くるまより走行距離をはっきり大きく(±20px)取り、4分割の等間隔（右へ・中央へ・左へ・中央へ）で
+/* くるまより走行距離をはっきり大きく(±17px)取り、4分割の等間隔（右へ・中央へ・左へ・中央へ）で
    進むことで、くるまの「ため→走る→跳ねる」より一定速な「まっすぐ走る」印象にする。
-   上下動・かたむきは折り返し点（25%・75%）だけごく僅かに付ける。 */
+   上下動・かたむきは折り返し点（25%・75%）だけごく僅かに付ける。
+   translateはscaleより先（＝スケール前の座標系）に効くため、ボディ右端(x=93)が
+   50 + 0.7*(93-50) + 17 ≒ 97.1、左端(x=7)が 50 - 0.7*(50-7) - 17 ≒ 2.9 となるよう
+   scale(0.7)・±17pxの組み合わせにして、紙（BACKDROPは2〜98）の内側に収めている。 */
 @keyframes trainRun {
   0% {
-    transform: translate(0, 0) rotate(0deg) scale(0.78);
+    transform: translate(0, 0) rotate(0deg) scale(0.7);
   }
 
   25% {
-    transform: translate(20px, -1px) rotate(0.6deg) scale(0.78);
+    transform: translate(17px, -1px) rotate(0.6deg) scale(0.7);
   }
 
   50% {
-    transform: translate(0, 0) rotate(0deg) scale(0.78);
+    transform: translate(0, 0) rotate(0deg) scale(0.7);
   }
 
   75% {
-    transform: translate(-20px, -1px) rotate(-0.6deg) scale(0.78);
+    transform: translate(-17px, -1px) rotate(-0.6deg) scale(0.7);
   }
 
   100% {
-    transform: translate(0, 0) rotate(0deg) scale(0.78);
+    transform: translate(0, 0) rotate(0deg) scale(0.7);
   }
 }
 
@@ -706,22 +709,24 @@
 }
 
 /* 画面外へ出さず、0%と100%を同じ値にして瞬間移動しないループにする
-   （幼児が絵を見失わないため）。上がるときに機首が上がるようrotateをつける。 */
+   （幼児が絵を見失わないため）。SVGは正のrotateが時計回り＝機首(右向き)が下がるので、
+   上がるときに機首が上がるよう負のrotateを、下がるときは正のrotateをつける
+   （くるまのcarDriveも「鼻先を上げる」区間でrotate(-1.6deg)を使っており、この規約と揃える）。 */
 @keyframes planeFly {
   0% {
     transform: translate(0, 0) rotate(0deg) scale(0.8);
   }
 
   30% {
-    transform: translate(-8px, 4px) rotate(-6deg) scale(0.8);
+    transform: translate(-8px, 4px) rotate(6deg) scale(0.8);
   }
 
   60% {
-    transform: translate(9px, -10px) rotate(4deg) scale(0.8);
+    transform: translate(9px, -10px) rotate(-4deg) scale(0.8);
   }
 
   85% {
-    transform: translate(4px, -3px) rotate(-2deg) scale(0.8);
+    transform: translate(4px, -3px) rotate(2deg) scale(0.8);
   }
 
   100% {
