@@ -154,9 +154,9 @@ const cases: Case[] = [
 describe('すべてのクイズのプレイ画面に よみあげトグルがある', () => {
   test.each(cases.map((testCase) => [testCase.name, testCase] as const))(
     '%s',
-    (_name, testCase) => {
+    async (_name, testCase) => {
       testCase.render()
-      expect(screen.getByRole('heading', { name: testCase.heading })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: testCase.heading })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /よみあげ/ })).toBeInTheDocument()
     },
   )
