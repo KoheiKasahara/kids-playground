@@ -34,12 +34,13 @@ export const celestialBodies: readonly CelestialBody[] = [
     // ベース模様とのブレンド強さとして使う(MeshStandardMaterialのemissiveではない。
     // 太陽はkind:'star'のときだけ専用ShaderMaterialへ差し替わるため、通常のemissiveと
     // 意味は異なるが、既存のデータ形を増やさずに済ませるためこの2フィールドを流用する)。
-    material: { roughness: 1, emissive: '#fff3c4', emissiveIntensity: 0.55 },
+    material: { roughness: 1, emissive: '#fff3c4', emissiveIntensity: 0.84 },
     // 恒星は影のできる側面でも真っ暗にならないよう、ambient/fillを他天体よりだいぶ高くする
     // (ShaderMaterialへ切り替わった今も、Canvas 2Dが使えない環境向けのMeshStandardMaterial
     // フォールバックが同じ値を読むため維持する)。
     lighting: { keyIntensity: 2.0, ambientIntensity: 0.55, hemisphereIntensity: 0.4, fillIntensity: 0.42 },
-    zoom: { outMargin: 1.15, inMargin: 0.6 },
+    // 外炎(1.18R)まで縦画面に収め、球面だけで画面を埋めない。
+    zoom: { outMargin: 1.35, inMargin: 0.6 },
     surface: {
       style: 'gas',
       baseColor: '#ffcf5e',
@@ -147,6 +148,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     material: { roughness: 1 },
     lighting: { keyIntensity: 1, ambientIntensity: 0.8, hemisphereIntensity: 0.5, fillIntensity: 0.46 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
+    visual: { atmosphere: { color: '#ffe0a0', opacity: 0.45, scale: 1.035 } },
     surface: {
       style: 'gas',
       baseColor: '#f2dfae',
@@ -194,8 +196,9 @@ export const celestialBodies: readonly CelestialBody[] = [
     lighting: { keyIntensity: 1, ambientIntensity: 0.86, hemisphereIntensity: 0.54, fillIntensity: 0.5 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
     visual: {
+      atmosphere: { color: '#55baff', opacity: 0.6, scale: 1.035 },
       clouds: {
-        opacity: 0.58,
+        opacity: 0.86,
         // 雲のスポットと常に一致するよう、地表と同じ自転速度で回す。
         // 別メッシュによる奥行きは保ちつつ、回転後にマーカーだけずれないことを優先する。
         spinSpeed: 0.035,
@@ -332,6 +335,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     material: { roughness: 0.95, bumpScale: 1.5 },
     lighting: { keyIntensity: 1.05, ambientIntensity: 0.82, hemisphereIntensity: 0.52, fillIntensity: 0.48 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
+    visual: { atmosphere: { color: '#e7a477', opacity: 0.2, scale: 1.018 } },
     surface: {
       style: 'rocky',
       baseColor: '#b0542c',
@@ -400,6 +404,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     material: { roughness: 1 },
     lighting: { keyIntensity: 0.98, ambientIntensity: 0.86, hemisphereIntensity: 0.56, fillIntensity: 0.5 },
     zoom: { outMargin: 1.15, inMargin: 0.58 },
+    visual: { atmosphere: { color: '#edd7bd', opacity: 0.23, scale: 1.02 } },
     surface: {
       style: 'gas',
       baseColor: '#d8bb92',
@@ -514,6 +519,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     // 輪をよく開いて見せるための視点上書き。
     viewDirection: { x: 0.3, y: 0.52, z: 0.8 },
     zoom: { outMargin: 1.08, inMargin: 0.62 },
+    visual: { atmosphere: { color: '#f3dbab', opacity: 0.3, scale: 1.025 } },
     surface: {
       style: 'gas',
       baseColor: '#d9c193',
@@ -612,6 +618,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     material: { roughness: 1 },
     lighting: { keyIntensity: 0.98, ambientIntensity: 0.86, hemisphereIntensity: 0.56, fillIntensity: 0.5 },
     zoom: { outMargin: 1.15, inMargin: 0.6 },
+    visual: { atmosphere: { color: '#a6f2ed', opacity: 0.42, scale: 1.035 } },
     surface: {
       style: 'gas',
       baseColor: '#c3ece4',
@@ -671,6 +678,7 @@ export const celestialBodies: readonly CelestialBody[] = [
     material: { roughness: 1 },
     lighting: { keyIntensity: 0.98, ambientIntensity: 0.86, hemisphereIntensity: 0.56, fillIntensity: 0.5 },
     zoom: { outMargin: 1.15, inMargin: 0.6 },
+    visual: { atmosphere: { color: '#649dff', opacity: 0.48, scale: 1.035 } },
     surface: {
       style: 'gas',
       baseColor: '#3a6fe0',

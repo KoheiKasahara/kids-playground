@@ -422,10 +422,11 @@ describe('earth(地球の見た目)', () => {
     expect(earth.surface.polarCaps?.southEdgeLatDeg).toBeLessThan(0)
   })
 
-  it('国境を持ち込まず、地表と座標がそろった雲を持ち、外周膜を持たない', () => {
+  it('国境を持ち込まず、地表と座標がそろった雲と薄い大気を持つ', () => {
     expect(earth.visual?.clouds?.patches.length).toBeGreaterThanOrEqual(3)
     expect(earth.visual?.clouds?.spinSpeed).toBe(earth.spinSpeed)
-    expect(earth.visual?.atmosphere).toBeUndefined()
+    expect(earth.visual?.atmosphere?.scale).toBeGreaterThan(1)
+    expect(earth.visual?.atmosphere?.scale).toBeLessThanOrEqual(1.04)
     if (earth.surface.style !== 'rocky') throw new Error('unreachable')
     expect(earth.surface.patches.some((patch) => patch.id.includes('border'))).toBe(false)
   })

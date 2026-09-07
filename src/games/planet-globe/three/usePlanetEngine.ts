@@ -28,6 +28,8 @@ import { createCloudTexture, createSurfaceMaps, type SurfaceMaps } from './plane
 import { axialTiltRotationZ, createRingMeshes, createRingSegmentTexture } from './planetRing'
 import {
   createSunSurfaceMaterial,
+  createSunCoronaMaterial,
+  SUN_CORONA_SCALE,
   updateSunSurfaceMaterial,
 } from './sunVisual'
 import {
@@ -37,6 +39,7 @@ import {
   type PlanetLights,
 } from './planetLighting'
 import { createStarField, disposeStarField } from './starField'
+import { createAtmosphereMaterial } from './atmosphereVisual'
 import { renderPixelRatioForDevice } from './renderQuality'
 import {
   exceedsTapMovement,
@@ -198,6 +201,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
     // 太陽(kind: 'star')だけが持つ、毎frame動かす必要がある参照。所有権(dispose対象)は
     // sphereMeshが持つため、ここは「今フレーム何を動かすか」を指すだけ。
     let sunMaterial: THREE.ShaderMaterial | null = null
+    let coronaMaterial: THREE.ShaderMaterial | null = null
 
     // マーカー・パルスのテクスチャはeffectスコープで1回だけ生成する。モジュールスコープに
     // キャッシュしてdisposeすると、再マウント時に破棄済みテクスチャを使ってしまうため。
@@ -385,6 +389,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       visualObjects = []
       cloudSpinGroup = null
       sunMaterial = null
+      coronaMaterial = null
       if (spinGroup !== null) {
         spinGroup.removeFromParent()
         spinGroup = null
@@ -417,7 +422,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
           map: maps.map,
           hotColor: body.material.emissive ?? '#fff3c4',
           flowStrength: body.material.emissiveIntensity ?? 0.5,
-          // 外周スプライトに頼らず、球面内の縁だけを暖色でごく薄く明るくする。
+          // 球面内の縁。外炎は共有ジオメトリの殻で別に描く。
           rimColor: '#ffb347',
         })
         sunMaterial = sunMat
@@ -453,6 +458,15 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       nextSpinGroup.add(mesh)
       nextTiltGroup.add(nextSpinGroup)
 
+      if (isSun) {
+        coronaMaterial = createSunCoronaMaterial()
+        const corona = new THREE.Mesh(bodyGeometry, coronaMaterial)
+        corona.scale.setScalar(body.radius * SUN_CORONA_SCALE)
+        nextTiltGroup.add(corona)
+        visualObjects.push(corona)
+        visualMaterials.push(coronaMaterial)
+      }
+
       const visual = body.visual
       if (visual?.clouds !== undefined) {
         const texture = getOrCreateCloudTexture(body)
@@ -476,14 +490,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       }
 
       if (visual?.atmosphere !== undefined) {
-        const atmosphereMaterial = new THREE.MeshBasicMaterial({
-          color: visual.atmosphere.color,
-          transparent: true,
-          opacity: visual.atmosphere.opacity,
-          side: THREE.BackSide,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        })
+        const atmosphereMaterial = createAtmosphereMaterial(visual.atmosphere)
         const atmosphere = new THREE.Mesh(bodyGeometry, atmosphereMaterial)
         const atmosphereScale = body.radius * visual.atmosphere.scale
         atmosphere.scale.set(
@@ -1066,6 +1073,7 @@ export function usePlanetEngine(options: UsePlanetEngineOptions): UsePlanetEngin
       const t = now / 1000
 
       if (sunMaterial !== null) updateSunSurfaceMaterial(sunMaterial, t)
+      if (coronaMaterial !== null) updateSunSurfaceMaterial(coronaMaterial, t)
     }
 
     function resizeRenderer() {

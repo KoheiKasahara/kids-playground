@@ -9,6 +9,7 @@ import type {
 } from '../types'
 import { CAMERA_FAR, CAMERA_NEAR, fitDistance } from './planetCamera'
 import { axialTiltRotationZ, createRingMeshes } from './planetRing'
+import { createSunCoronaMaterial, createSunSurfaceMaterial, SUN_CORONA_SCALE, updateSunSurfaceMaterial } from './sunVisual'
 import { createStarField, disposeStarField } from './starField'
 import { renderPixelRatioForDevice } from './renderQuality'
 import {
@@ -143,6 +144,7 @@ export function useSolarSystemOverviewEngine(
     const disposableGeometries: THREE.BufferGeometry[] = [sphereGeometry, orbitLineGeometry]
     const disposableMaterials: THREE.Material[] = []
     const disposableTextures: THREE.Texture[] = []
+    const sunAnimationMaterials: THREE.ShaderMaterial[] = []
 
     const planetEntries: PlanetEntry[] = []
     const interactiveBodies: InteractiveBody[] = []
@@ -240,7 +242,15 @@ export function useSolarSystemOverviewEngine(
       }
       disposableMaterials.push(material)
 
-      const mesh = new THREE.Mesh(sphereGeometry, material)
+      let surfaceMaterial: THREE.Material = material
+      if (body.kind === 'star' && texture !== null) {
+        const sun = createSunSurfaceMaterial({ map: texture, hotColor: body.material.emissive ?? '#fff3c4',
+          flowStrength: body.material.emissiveIntensity ?? 0.84, rimColor: '#ffb347' })
+        disposableMaterials.push(sun)
+        sunAnimationMaterials.push(sun)
+        surfaceMaterial = sun
+      }
+      const mesh = new THREE.Mesh(sphereGeometry, surfaceMaterial)
       mesh.scale.set(overviewRadius, overviewRadius * (1 - (body.flattening ?? 0)), overviewRadius)
       return mesh
     }
@@ -255,6 +265,12 @@ export function useSolarSystemOverviewEngine(
 
       const mesh = createBodyMesh(body, overviewRadius)
       sunRoot.add(mesh)
+      const coronaMaterial = createSunCoronaMaterial()
+      disposableMaterials.push(coronaMaterial)
+      sunAnimationMaterials.push(coronaMaterial)
+      const corona = new THREE.Mesh(sphereGeometry, coronaMaterial)
+      corona.scale.setScalar(overviewRadius * SUN_CORONA_SCALE)
+      sunRoot.add(corona)
 
       const label = buildLabel(body.displayName, overviewRadius)
       if (label !== null) sunRoot.add(label)
@@ -471,6 +487,9 @@ export function useSolarSystemOverviewEngine(
       controls?.update()
 
       if (playing && !reducedMotion) {
+        for (const material of sunAnimationMaterials) {
+          updateSunSurfaceMaterial(material, material.uniforms.uTime.value + dt)
+        }
         for (const entry of planetEntries) {
           entry.angle += entry.angularSpeed * dt
           entry.orbitPivot.rotation.y = entry.angle

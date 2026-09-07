@@ -57,7 +57,7 @@ function paintPatch(ctx: CanvasRenderingContext2D, patch: SurfacePatch, width: n
 
 /**
  * 天体表面の軽量CanvasTexture。rocky/gasどちらも「緯度グラデーション+主要パッチ」だけで表す
- * (ノイズ・クレーター・極冠・ガス惑星の斑点は個別観察側だけの表現に留める)。
+ * (ノイズ・クレーター・極冠は個別観察側だけの表現に留める)。
  */
 export function createOverviewSurfaceTexture(surface: SurfaceSpec): THREE.CanvasTexture | null {
   const canvas = document.createElement('canvas')
@@ -68,6 +68,13 @@ export function createOverviewSurfaceTexture(surface: SurfaceSpec): THREE.Canvas
 
   if (surface.style === 'gas') {
     paintLatitudeGradient(ctx, surface.belts, OVERVIEW_TEXTURE_WIDTH, OVERVIEW_TEXTURE_HEIGHT)
+    // 大赤斑・大暗斑も小さな一覧で残す。重いノイズ生成は行わない。
+    for (const spot of surface.spots) {
+      const center = spot.stops[0]
+      if (center === undefined) continue
+      paintPatch(ctx, { ...spot, color: center.color, opacity: center.opacity, softness: 0.5 },
+        OVERVIEW_TEXTURE_WIDTH, OVERVIEW_TEXTURE_HEIGHT)
+    }
   } else {
     paintLatitudeGradient(ctx, surface.latitudeStops, OVERVIEW_TEXTURE_WIDTH, OVERVIEW_TEXTURE_HEIGHT)
     if (surface.landmasses !== undefined) {
