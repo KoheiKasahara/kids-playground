@@ -79,7 +79,7 @@ describe('TsumikiBowlingGame', () => {
   it('最初はあそびかたの案内と、0この表示から始まる', () => {
     renderGame()
     expect(screen.getByRole('heading', { name: 'つみきボウリング' })).toBeInTheDocument()
-    expect(screen.getByText('たまを ひっぱって はなすと ビューン！')).toBeInTheDocument()
+    expect(screen.getByText('ねらう ほうを さわって はなそう！')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent(`たおした つみき0 / ${TOWER_TOTAL}こ`)
     expect(engineMock.registerContainer).toHaveBeenCalled()
   })
@@ -117,18 +117,13 @@ describe('TsumikiBowlingGame', () => {
     ).toBeInTheDocument()
   })
 
-  it('ドラッグ中はパワーが3段階の言葉で出る', () => {
+  it('狙っている間は離す案内だけを出し、強さ調整を要求しない', () => {
     renderGame()
-    act(() => engineMock.options?.onAimChange(0.1))
-    expect(screen.getByTestId('power-label')).toHaveTextContent('よわい')
-    act(() => engineMock.options?.onAimChange(0.5))
-    // 「ふつう」は高さ選択（既定値）のラベルとも文字がかぶるため、
-    // パワー表示のほうはdata-testidで区別して読む。
-    expect(screen.getByTestId('power-label')).toHaveTextContent('ふつう')
-    act(() => engineMock.options?.onAimChange(0.95))
-    expect(screen.getByTestId('power-label')).toHaveTextContent('つよい！')
-    act(() => engineMock.options?.onAimChange(null))
+    act(() => engineMock.options?.onAimChange(0.9))
+    expect(screen.getByText('そこを ねらって はなそう！')).toBeInTheDocument()
     expect(screen.queryByTestId('power-label')).not.toBeInTheDocument()
+    act(() => engineMock.options?.onAimChange(null))
+    expect(screen.getByText('ねらう ほうを さわって はなそう！')).toBeInTheDocument()
   })
 
   it('崩れている最中も、いま倒れている数がその投球ぶんとして増えていく', () => {
@@ -163,7 +158,7 @@ describe('TsumikiBowlingGame', () => {
   it('2投目からは案内の文が変わる', () => {
     renderGame()
     playThrow(2, 1)
-    expect(screen.getByText('つぎも ひっぱって はなしてね')).toBeInTheDocument()
+    expect(screen.getByText('たまを かえて ためしてね')).toBeInTheDocument()
   })
 
   it('次の投球が始まると、HUDのその投球ぶんの数字が0へ戻る', () => {
@@ -209,7 +204,7 @@ describe('TsumikiBowlingGame', () => {
     expect(engineMock.mountCount).toBeGreaterThan(mountsBeforeRetry)
     expect(screen.queryByRole('dialog', { name: 'けっか' })).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
-    expect(screen.getByText('たまを ひっぱって はなすと ビューン！')).toBeInTheDocument()
+    expect(screen.getByText('ねらう ほうを さわって はなそう！')).toBeInTheDocument()
     expect(
       screen.getByLabelText(`${THROWS_PER_GAME}かい なげるうちの 1かいめ`),
     ).toBeInTheDocument()
@@ -353,46 +348,11 @@ describe('玉の選択', () => {
   })
 })
 
-describe('発射の高さ選択', () => {
-  it('3段階が選べ、最初は「ふつう」が選ばれていて、エンジンにもそう伝わる', () => {
+describe('玉だけで飛び方を選ぶ', () => {
+  it('高さの追加操作がなく、3つの役割を見せる', () => {
     renderGame()
-    const low = screen.getByRole('button', { name: 'ひくい' })
-    const normal = screen.getByRole('button', { name: 'ふつう' })
-    const high = screen.getByRole('button', { name: 'たかい' })
-    expect(low).toHaveAttribute('aria-pressed', 'false')
-    expect(normal).toHaveAttribute('aria-pressed', 'true')
-    expect(high).toHaveAttribute('aria-pressed', 'false')
-    expect(engineMock.options?.heightLevel).toBe('normal')
-  })
-
-  it('投球待機中に高さを選び直すと、エンジンへ渡る値が変わる（世界は作り直さない）', async () => {
-    const user = userEvent.setup()
-    renderGame()
-    const runIdBefore = engineMock.options?.runId
-    await user.click(screen.getByRole('button', { name: 'たかい' }))
-    expect(engineMock.options?.heightLevel).toBe('high')
-    expect(screen.getByRole('button', { name: 'たかい' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'ふつう' })).toHaveAttribute('aria-pressed', 'false')
-    // runIdが変わらない＝Rapierのworldは作り直されない（高さは毎回読むだけの値のため）。
-    expect(engineMock.options?.runId).toBe(runIdBefore)
-  })
-
-  it('飛行中は高さの選択ボタンがdisabledになる', () => {
-    renderGame()
-    startThrow()
-    expect(screen.getByRole('button', { name: 'ひくい' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'たかい' })).toBeDisabled()
-  })
-
-  it('もういちどしても、選んでいた高さは引き継がれる', async () => {
-    const user = userEvent.setup()
-    renderGame()
-    await user.click(screen.getByRole('button', { name: 'ひくい' }))
-    for (let index = 1; index <= THROWS_PER_GAME; index += 1) playThrow(2, index)
-    await user.click(screen.getByRole('button', { name: 'もういちど' }))
-
-    expect(engineMock.options?.heightLevel).toBe('low')
-    expect(screen.getByRole('button', { name: 'ひくい' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'ひくい' })).not.toBeDisabled()
+    expect(screen.queryByRole('group', { name: 'たかさをえらぶ' })).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'たまをえらぶ' }).querySelectorAll('svg')).toHaveLength(3)
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument()
   })
 })

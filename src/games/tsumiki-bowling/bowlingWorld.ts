@@ -46,14 +46,20 @@ import {
   type BowlingStage,
 } from './bowlingStage'
 import { getBowlingBall, type BowlingBallId, type BowlingBallSpec } from './bowlingBalls'
-import { launchVelocity, pullOffset, type LaunchAim, type Vector3 } from './bowlingLaunch'
+import {
+  automaticLaunchVelocity,
+  launchVelocity,
+  pullOffset,
+  type LaunchAim,
+  type Vector3,
+} from './bowlingLaunch'
 import type { BlockSample } from './bowlingTopple'
 import type { MotionSample } from './bowlingSettle'
 
 /** Hookとheadlessテストが同じRapierコンストラクタを共有するための最小インターフェース。 */
 export type RapierModule = Pick<
   typeof import('@dimforge/rapier3d-compat'),
-  'World' | 'RigidBodyDesc' | 'ColliderDesc'
+  'World' | 'RigidBodyDesc' | 'ColliderDesc' | 'CoefficientCombineRule'
 >
 
 export type BowlingBlockEntry = {
@@ -120,7 +126,8 @@ function createBallBody(
     rapier.ColliderDesc.ball(ballSpec.radius)
       .setDensity(ballSpec.density)
       .setFriction(ballSpec.friction)
-      .setRestitution(ballSpec.restitution),
+      .setRestitution(ballSpec.restitution)
+      .setRestitutionCombineRule(ballSpec.id === 'bouncy' ? rapier.CoefficientCombineRule.Max : rapier.CoefficientCombineRule.Average),
     body,
   )
   return { body, anchor }
@@ -275,6 +282,28 @@ export function launchBall(
 ): Vector3 | null {
   if (!aim.active || bowling.launched) return null
   const velocity = launchVelocity(aim, bowling.ballSpec, heightLevel)
+  applyLaunchVelocity(bowling, velocity)
+  return velocity
+}
+
+/**
+ * 玉の役割に決められた弾道・速さで発射する。
+ *
+ * ねらう操作は左右の目標だけを決め、パワーや高さを調整しないため、
+ * 実プレイではこちらを使う。aimのpullは常に0で、発射位置が狙いによって
+ * 動くこともない。従来のlaunchBallは既存の物理テストと互換性を保つため残す。
+ */
+export function launchAutomaticBall(
+  bowling: BowlingWorld,
+  aim: LaunchAim,
+): Vector3 | null {
+  if (!aim.active || bowling.launched) return null
+  const velocity = automaticLaunchVelocity(aim, bowling.ballSpec)
+  applyLaunchVelocity(bowling, velocity)
+  return velocity
+}
+
+function applyLaunchVelocity(bowling: BowlingWorld, velocity: Vector3): void {
   bowling.ball.setGravityScale(1, true)
   bowling.ball.setLinvel(velocity, true)
   bowling.ball.setAngvel(
@@ -286,7 +315,6 @@ export function launchBall(
     true,
   )
   bowling.launched = true
-  return velocity
 }
 
 /**

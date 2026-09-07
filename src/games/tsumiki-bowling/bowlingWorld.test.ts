@@ -383,49 +383,8 @@ describe('玉ごとの体感差（物理挙動）', () => {
     await RAPIER.init()
   })
 
-  /** 発射してから、玉の垂直速度が「落ちる→跳ね上がる」を何回繰り返したか数える。 */
-  function countBounces(bowling: BowlingWorld, seconds: number, launchAim: LaunchAim): number {
-    launchBall(bowling, launchAim)
-    let bounces = 0
-    let falling = false
-    const steps = Math.round(seconds / PHYSICS_TIMESTEP)
-    for (let index = 0; index < steps; index += 1) {
-      bowling.world.step()
-      clampBowlingMotion(bowling)
-      removeFallenBlocks(bowling)
-      parkFallenBall(bowling)
-      const ball = readBall(bowling)
-      if (ball.velocity.y < -0.5) {
-        falling = true
-      } else if (falling && ball.velocity.y > 1.5) {
-        bounces += 1
-        falling = false
-      }
-    }
-    return bounces
-  }
-
-  it('はずむだまは、飛んでから何度も跳ねる（1回当たって終わりにならない）', () => {
-    // 最大パワーは塔の上端をかすめて1回の大バウンドになりやすいため、
-    // 「複数の積み木へ連鎖ヒットしやすい」を確かめやすい中程度のパワーで見る
-    // （幼児の投球はパワーが揃わないため、最大パワーだけを基準にしない）。
-    // 助走をTOWER_DEPTH_OFFSETぶん伸ばしたため、0.7だと積み木へ届く前に
-    // 勢いを失う。基準を0.8へ上げても「中程度の力」の範囲内。
-    const bowling = createBowlingWorld(RAPIER, { ballId: 'bouncy' })
-    const bounces = countBounces(bowling, 7, aim(0.8))
-    expect(bounces).toBeGreaterThanOrEqual(2)
-    bowling.world.free()
-  })
-
-  it('どっしりだまは、はずむだまほど跳ねない（跳ね返りが弱い）', () => {
-    const heavy = createBowlingWorld(RAPIER, { ballId: 'heavy' })
-    const bouncy = createBowlingWorld(RAPIER, { ballId: 'bouncy' })
-    const heavyBounces = countBounces(heavy, 7, aim(0.8))
-    const bouncyBounces = countBounces(bouncy, 7, aim(0.8))
-    expect(bouncyBounces).toBeGreaterThan(heavyBounces)
-    heavy.world.free()
-    bouncy.world.free()
-  })
+  // 旧「可変パワーで何度も跳ねる」は固定弾道に変更。
+  // 床で跳ねて上段へ届く役割はbowlingProfile.test.tsで実際の発射経路を検証する。
 
   /** 発射から積み木が落ち着くまでの間に、どれかの積み木が達した最大速度。 */
   function maxBlockSpeed(bowling: BowlingWorld, seconds: number, launchAim: LaunchAim): number {

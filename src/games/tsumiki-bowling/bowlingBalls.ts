@@ -16,6 +16,23 @@
 
 export type BowlingBallId = 'heavy' | 'bouncy' | 'small'
 
+/**
+ * 画面で玉を選んだときに自動で使う発射設定。
+ *
+ * power と弾道はプレイヤーが細かく調整する値ではなく、玉の役割そのもの。
+ * どの玉でも同じ操作で、重い玉は低く押し、はずむ玉は山なりに跳ね、
+ * 小さい玉は速く低く進む。
+ */
+export type BowlingLaunchProfile = {
+  power: number
+  pitchRad: number
+  speedScale: number
+  /** 玉カードに添える、短くて読まなくても意味を想像しやすい役割。 */
+  role: string
+  /** 玉カードに描く弾道のSVG path。 */
+  trajectoryPath: string
+}
+
 export type BowlingBallSpec = {
   id: BowlingBallId
   /** 画面に出す名前。 */
@@ -48,6 +65,8 @@ export type BowlingBallSpec = {
   icon: string
   /** 選択カードで玉を描く相対サイズ（1.0がいちばん大きい玉）。実際の半径比に合わせている。 */
   uiSizeScale: number
+  /** プレイヤーが選んだ玉に対して自動で適用する発射の役割。 */
+  launchProfile: BowlingLaunchProfile
 }
 
 export const BOWLING_BALL_SPECS: readonly BowlingBallSpec[] = [
@@ -71,6 +90,14 @@ export const BOWLING_BALL_SPECS: readonly BowlingBallSpec[] = [
     emissive: 0x5a0f0a,
     icon: '💪',
     uiSizeScale: 1,
+    launchProfile: {
+      // 低く速く進み、前面の積み木をまとめて押す。
+      power: 0.9,
+      pitchRad: -0.2,
+      speedScale: 1,
+      role: 'ひくく おして くずす',
+      trajectoryPath: 'M3 27 Q 24 22 45 24',
+    },
   },
   {
     id: 'bouncy',
@@ -84,11 +111,8 @@ export const BOWLING_BALL_SPECS: readonly BowlingBallSpec[] = [
     // 複数回跳ねる前に戻ってこなかった）。
     density: 6,
     friction: 0.16,
-    // 高反発。床にも積み木にもはっきり弾む。
-    // 0.74まで上げると威力のある衝突で跳ね返りが強すぎ、1回の大バウンドで
-    // 終わってしまう投球が増えたため、複数回の連鎖バウンドが安定して
-    // 出る0.6に調整している（どっしり0.08・ちいさい0.18よりは明確に高い）。
-    restitution: 0.6,
+    // 床との合成はMaxを使い、手前で跳ねて上段へ当てる役割を保つ。
+    restitution: 0.85,
     linearDamping: 0.006,
     angularDamping: 0.03,
     launchSpeedScale: 1,
@@ -100,6 +124,14 @@ export const BOWLING_BALL_SPECS: readonly BowlingBallSpec[] = [
     emissive: 0x043b3d,
     icon: '⚡',
     uiSizeScale: 0.72,
+    launchProfile: {
+      // まずレーンへ落としてから、反発で上段へ届く山なりの玉。
+      power: 0.86,
+      pitchRad: 0,
+      speedScale: 1,
+      role: 'はねて うえを ねらう',
+      trajectoryPath: 'M3 8 Q10 14 17 28 Q30 -4 45 20',
+    },
   },
   {
     id: 'small',
@@ -119,6 +151,14 @@ export const BOWLING_BALL_SPECS: readonly BowlingBallSpec[] = [
     emissive: 0x7a4b00,
     icon: '💨',
     uiSizeScale: 0.5,
+    launchProfile: {
+      // 軽さと速さを活かし、低いすき間を通して奥へ届ける。
+      power: 0.92,
+      pitchRad: -0.16,
+      speedScale: 0.92,
+      role: 'シュッと すりぬける',
+      trajectoryPath: 'M3 27 Q 24 20 45 22',
+    },
   },
 ]
 
