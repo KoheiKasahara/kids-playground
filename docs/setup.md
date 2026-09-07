@@ -54,7 +54,7 @@ npm run typecheck
 
 ## テスト
 
-日常的な確認には、DOM描画を伴わない軽量なテストのみを実行するコマンドを使います。
+日常的な確認には、通常のunit（node）とDOM（jsdom）テストを実行する次のコマンドを使います。長時間の物理試行はFull側で実行します。
 
 ```bash
 npm run test:quick

@@ -4,6 +4,10 @@
 
 新しい画像・音源を追加、または既存素材を差し替えたときは、このファイルを必ず更新してください。
 
+## おえかきコロコロのもよう・ローラー・台紙
+
+`src/games/oekaki-korokoro/` の花・星・足あと・ハート・しま模様、ローラー本体と台紙は、本アプリ用に作成したSVGパス・Canvas・CSSによるオリジナル図形です。外部の画像・音源は使用していません。
+
 ## 世界地図 (world-atlas / countries-50m.json)
 
 世界地図の国境は [world-atlas](https://github.com/topojson/world-atlas) npmパッケージの [`countries-50m.json`](https://unpkg.com/world-atlas/countries-50m.json) を、ビルド時に静的importしてバンドルしています。実行時のCDN・地図API通信は行いません。
@@ -159,3 +163,7 @@ SOFTWARE.
 - 面が割り当てられていないマテリアルスロットの削除
 
 CC0のためクレジット表示の義務はありませんが、将来の出所確認のために記録しています。
+
+### クイズ画像の配信形式
+
+野菜・果物・はたらくくるまの元PNGは、透過を含むRGBAピクセルと解像度を維持したロスレスWebPで配信しています。変換はPillowの `save(format="WEBP", lossless=True, exact=True, method=6)` を使用し、再デコードした全ピクセルの一致を確認しています。元画像はGit履歴から復元できます。形式変更による素材の出典・権利の変更はありません。WebPも既存PWAのprecache対象です。

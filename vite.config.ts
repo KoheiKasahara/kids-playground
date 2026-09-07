@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { fileURLToPath, URL } from 'node:url'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -73,6 +74,12 @@ const plugins = [
       // への遷移が本体 `index.html` へフォールバックしてしまう（Issue #555）。
       // `/project-health` と `/project-health/` の両方、および配下パスを対象にする。
       navigateFallbackDenylist: [/^\/project-health(?:\/|$)/],
+      // 実際のprecache対象を既存ビルドから集計する。JSONはprecache対象外。
+      manifestTransforms: [(entries) => {
+        mkdirSync('dist/.vite', { recursive: true })
+        writeFileSync('dist/.vite/precache.json', JSON.stringify(entries))
+        return { manifest: entries, warnings: [] }
+      }],
       cleanupOutdatedCaches: true,
       clientsClaim: true,
     },
@@ -161,6 +168,7 @@ export default defineConfig({
   base,
   plugins,
   build: {
+    manifest: true,
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),

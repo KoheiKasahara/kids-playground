@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { releaseRailPiece } from './railPieceResources'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
   applyRailLoopClosure,
@@ -2893,7 +2894,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       const incomingIds = new Set(pieces.map((piece) => piece.id))
       for (const [pieceId, object] of pieceObjects) {
         if (incomingIds.has(pieceId)) continue
-        railRoot.remove(object)
+        releaseRailPiece(object)
         pieceObjects.delete(pieceId)
         selectionRings.delete(pieceId)
         connectorCaps.delete(pieceId)
@@ -3499,6 +3500,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       host.removeEventListener('wheel', handleWheel)
       host.removeEventListener('contextmenu', handleContextMenu)
       trainSound.dispose()
+      for (const object of pieceObjects.values()) releaseRailPiece(object)
+      pieceObjects.clear()
       if (scene !== null) {
         scene.remove(railRoot)
         // GridHelperなどの非共有資源はツリー走査で一度だけ回収する。

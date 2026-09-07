@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -78,6 +79,17 @@ describe('PianoPlay', () => {
   })
 
   const renderPiano = () => render(<MemoryRouter><PianoPlay /></MemoryRouter>)
+
+  test('StrictModeの再setup後も発音し、退出時に現在のengineを閉じる', () => {
+    const { unmount } = render(<StrictMode><MemoryRouter><PianoPlay /></MemoryRouter></StrictMode>)
+    const current = contexts.at(-1)!
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'ド C5' }), { pointerId: 6 })
+    expect(current.createOscillator).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'ド C5' })).toHaveAttribute('aria-pressed', 'true')
+    unmount()
+    expect(contexts.every((context) => context.close.mock.calls.length === 1)).toBe(true)
+    expect(current.createOscillator.mock.results.every(({ value }) => value.stop.mock.calls.length === 1)).toBe(true)
+  })
 
   test('白鍵8本と黒鍵5本を表示する', () => {
     renderPiano()

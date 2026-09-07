@@ -27,9 +27,6 @@ import PrefecturePuzzlePlay from '../games/prefecture-quiz/PrefecturePuzzlePlay'
 import ColorMixQuizStart from '../games/color-mix-quiz/ColorMixQuizStart'
 import ColorMixQuizPlay from '../games/color-mix-quiz/ColorMixQuizPlay'
 import ColorMixQuizResult from '../games/color-mix-quiz/ColorMixQuizResult'
-import ColorPaintPuzzlePlay from '../games/color-paint-puzzle/ColorPaintPuzzlePlay'
-import BlockPuzzlePlay from '../games/block-puzzle/BlockPuzzlePlay'
-import PukupukaRescuePlay from '../games/pukupuka-rescue/PukupukaRescuePlay'
 
 // 50m世界地図やmatter-js(物理エンジン)など、特定ゲームだけが必要とする重い依存は
 // そのゲームを開くときだけ読込む。Vite PWAは生成されたchunkもprecacheするため、
@@ -57,6 +54,7 @@ const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
   { path: '/games/circuit-racing', element: lazyRoute(() => import('../games/circuit-racing/CircuitRacingPlay')) },
+  { path: '/games/oekaki-korokoro', element: playRoute(lazyRoute(() => import('../games/oekaki-korokoro/OekakiKorokoroPlay'))) },
   { path: '/games/flag-quiz', element: <FlagQuizStart /> },
   { path: '/games/flag-quiz/flag-to-name', element: <FlagQuizLevelSelect mode="flagToName" /> },
   {
@@ -128,14 +126,10 @@ export const routes: RouteObject[] = [
   { path: '/games/color-mix-quiz/level', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
   { path: '/games/color-mix-quiz/:level/play', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
   { path: '/games/color-mix-quiz/:level/result', element: <Navigate to="/games/color-mix-quiz" replace /> },
-  // うごくぬりえはSVGのみに依存し軽量なため、他ゲームのように遅延読込にはしない。
-  { path: '/games/color-paint-puzzle', element: playRoute(<ColorPaintPuzzlePlay />) },
-  // ブロックパズルはCSSグリッドと純粋なロジックだけで動き、重い依存を持たないため
-  // うごくぬりえと同じく静的importで登録する。
-  { path: '/games/block-puzzle', element: playRoute(<BlockPuzzlePlay />) },
-  // ぷかぷかレスキューはSVGと自前の軽い水位計算だけで動き、物理エンジンなどの重い依存を
-  // 持たないため、ブロックパズルと同じく静的importで登録する（1routeでプレイまで完結）。
-  { path: '/games/pukupuka-rescue', element: playRoute(<PukupukaRescuePlay />) },
+  // 単体で軽いゲームも増設時の初期bundle累積を避け、開く時に読み込む。
+  { path: '/games/color-paint-puzzle', element: playRoute(lazyRoute(() => import('../games/color-paint-puzzle/ColorPaintPuzzlePlay'))) },
+  { path: '/games/block-puzzle', element: playRoute(lazyRoute(() => import('../games/block-puzzle/BlockPuzzlePlay'))) },
+  { path: '/games/pukupuka-rescue', element: playRoute(lazyRoute(() => import('../games/pukupuka-rescue/PukupukaRescuePlay'))) },
   // こっきピンボールは物理エンジン(matter-js)を含み main chunk のサイズ警告を超えるため、
   // 旅行クイズの世界地図と同様に開くときだけ読込む。
   { path: '/games/flag-pinball', element: lazyRoute(() => import('../games/flag-pinball/FlagPinballSelect')) },

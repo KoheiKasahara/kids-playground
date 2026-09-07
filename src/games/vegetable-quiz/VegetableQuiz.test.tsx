@@ -15,7 +15,7 @@ function renderApp(path: string) {
 
 function vegetableForQuestionImage() {
   const src = screen.getByAltText('もんだいの イラスト').getAttribute('src') ?? ''
-  const fileName = src.match(/images\/vegetables\/([a-z-]+)\.png$/)?.[1]
+  const fileName = src.match(/images\/vegetables\/([a-z-]+)\.webp$/)?.[1]
   const vegetable = vegetables.find((item) => item.id === fileName)
   if (!vegetable) throw new Error(`unexpected vegetable image: ${src}`)
   return vegetable

@@ -82,6 +82,20 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'oekaki-korokoro',
+    slug: 'oekaki-korokoro',
+    title: 'おえかきコロコロ',
+    emoji: '🎨',
+    category: 'learning',
+    seo: {
+      headline: 'おえかきコロコロ｜ローラーでもようを描くおえかきあそび',
+      description: 'ゆびやマウスでなぞると、お花・星・足あとなどの柄がころころつながる幼児向けのおえかきあそびです。すきな色と台紙をえらび、できた絵はPNG画像で端末に保存できます。正解も時間制限もありません。',
+    },
+    intro: {
+      howToPlay: ['すきな もようと いろを えらんで、かみを なぞってね', '「1かい もどす」で さっき かいた もようを けせるよ', '「できた！」で えを がぞうに ほぞんできるよ'],
+    },
+  },
+  {
     id: 'flag-quiz',
     slug: 'flag-quiz',
     title: 'こっきクイズ',
