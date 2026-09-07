@@ -3070,6 +3070,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       if (event.button !== 0) return
       event.preventDefault()
       if (optionsRef.current.soundEnabled ?? true) primeAudio()
+      // 新しい主ポインターは前の接触が終わった証拠。終了通知の欠落から復帰する。
+      if (event.isPrimary && pointers.size > 0) resetInteraction()
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
       try {
         host.setPointerCapture(event.pointerId)
@@ -3206,7 +3208,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     }
 
     function handlePointerUp(event: PointerEvent) {
-      pointers.delete(event.pointerId)
+      if (!pointers.delete(event.pointerId)) return
       try {
         host.releasePointerCapture(event.pointerId)
       } catch {
@@ -3222,7 +3224,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     }
 
     function handlePointerCancel(event: PointerEvent) {
-      pointers.delete(event.pointerId)
+      if (!pointers.delete(event.pointerId)) return
       if (drag?.pointerId === event.pointerId) {
         drag = null
         setMarker(null)
@@ -3236,6 +3238,32 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         mode = 'none'
         panLastGround = null
       }
+    }
+
+    function resetInteraction() {
+      const activeIds = [...pointers.keys()]
+      pointers.clear()
+      const hadDrag = drag !== null
+      const hadTrainDrag = trainDrag !== null
+      drag = null
+      trainDrag = null
+      mode = 'none'
+      panLastGround = null
+      pinchStartDistance = 0
+      setMarker(null)
+      if (hadDrag) syncPieces(optionsRef.current.pieces, optionsRef.current.selectedPieceId)
+      else if (hadTrainDrag) reportTrainState()
+      for (const pointerId of activeIds) {
+        try {
+          host.releasePointerCapture(pointerId)
+        } catch {
+          // 中断時にはブラウザー側ですでに解放されている場合がある。
+        }
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden') resetInteraction()
     }
 
     function handleWheel(event: WheelEvent) {
@@ -3420,8 +3448,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       window.addEventListener('orientationchange', resize)
       host.addEventListener('pointerdown', handlePointerDown, { passive: false })
       host.addEventListener('pointermove', handlePointerMove, { passive: false })
-      host.addEventListener('pointerup', handlePointerUp, { passive: false })
-      host.addEventListener('pointercancel', handlePointerCancel, { passive: false })
+      // captureが失敗・喪失してhost外で指を離した場合も終了を受け取る。
+      window.addEventListener('pointerup', handlePointerUp, true)
+      window.addEventListener('pointercancel', handlePointerCancel, true)
+      host.addEventListener('lostpointercapture', handlePointerCancel)
+      window.addEventListener('blur', resetInteraction)
+      document.addEventListener('visibilitychange', handleVisibilityChange)
       host.addEventListener('wheel', handleWheel, { passive: false })
       host.addEventListener('contextmenu', handleContextMenu)
 
@@ -3495,8 +3527,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       window.removeEventListener('orientationchange', resize)
       host.removeEventListener('pointerdown', handlePointerDown)
       host.removeEventListener('pointermove', handlePointerMove)
-      host.removeEventListener('pointerup', handlePointerUp)
-      host.removeEventListener('pointercancel', handlePointerCancel)
+      window.removeEventListener('pointerup', handlePointerUp, true)
+      window.removeEventListener('pointercancel', handlePointerCancel, true)
+      host.removeEventListener('lostpointercapture', handlePointerCancel)
+      window.removeEventListener('blur', resetInteraction)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       host.removeEventListener('wheel', handleWheel)
       host.removeEventListener('contextmenu', handleContextMenu)
       trainSound.dispose()
