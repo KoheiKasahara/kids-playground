@@ -168,7 +168,7 @@ describe('Home', () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     await user.click(screen.getByRole('link', { name: 'うごくぬりえ' }))
-    expect(screen.getByRole('heading', { name: 'うごくぬりえ' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'うごくぬりえ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'やりなおし' })).toBeInTheDocument()
   })
 })
