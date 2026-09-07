@@ -53,6 +53,7 @@ const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
+  { path: '/games/oekaki-korokoro', element: playRoute(lazyRoute(() => import('../games/oekaki-korokoro/OekakiKorokoroPlay'))) },
   { path: '/games/flag-quiz', element: <FlagQuizStart /> },
   { path: '/games/flag-quiz/flag-to-name', element: <FlagQuizLevelSelect mode="flagToName" /> },
   {
