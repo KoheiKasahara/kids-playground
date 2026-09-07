@@ -6,10 +6,20 @@ const VIEW_BOX_MIN = -1
 const VIEW_BOX_MAX = 101
 
 describe('paintPictures', () => {
-  test('題材が6件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
-    expect(PAINT_PICTURES).toHaveLength(6)
+  test('題材が9件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
+    expect(PAINT_PICTURES).toHaveLength(9)
     const ids = PAINT_PICTURES.map((picture) => picture.id)
-    expect(ids).toEqual(['car', 'fish', 'butterfly', 'robot', 'rocket', 'dinosaur'])
+    expect(ids).toEqual([
+      'car',
+      'fish',
+      'butterfly',
+      'robot',
+      'rocket',
+      'dinosaur',
+      'train',
+      'airplane',
+      'ship',
+    ])
     expect(new Set(ids).size).toBe(ids.length)
     expect(findPaintPicture(DEFAULT_PICTURE_ID)).toBeDefined()
   })
@@ -147,8 +157,8 @@ describe('paintPictures', () => {
     }
   })
 
-  test('追加した3題材にも、それぞれ動くパーツ(motion.part)がある', () => {
-    for (const id of ['robot', 'rocket', 'dinosaur']) {
+  test('追加した6題材にも、それぞれ動くパーツ(motion.part)がある', () => {
+    for (const id of ['robot', 'rocket', 'dinosaur', 'train', 'airplane', 'ship']) {
       const picture = findPaintPicture(id)!
       const parts = new Set(
         [...picture.areas, ...picture.details]
@@ -156,6 +166,24 @@ describe('paintPictures', () => {
           .filter((part): part is string => Boolean(part)),
       )
       expect(parts.size, `${id}: motion.partの種類`).toBeGreaterThan(0)
+    }
+  })
+
+  test('でんしゃ・ひこうき・ふねのgroup名・part名がデータ上に存在する', () => {
+    const expectedByPicture: Record<string, { group: string; parts: readonly string[] }> = {
+      train: { group: 'train', parts: ['trainWheelBack', 'trainWheelFront', 'trainSmokeA', 'trainSmokeB'] },
+      airplane: { group: 'plane', parts: ['planeClouds'] },
+      ship: { group: 'ship', parts: ['shipFlag', 'shipWave'] },
+    }
+    for (const [id, expected] of Object.entries(expectedByPicture)) {
+      const picture = findPaintPicture(id)!
+      const items = [...picture.areas, ...picture.details]
+      const groups = new Set(items.map((item) => item.motion?.group).filter(Boolean))
+      const parts = new Set(items.map((item) => item.motion?.part).filter(Boolean))
+      expect(groups, `${id}: group`).toEqual(new Set([expected.group]))
+      for (const part of expected.parts) {
+        expect(parts.has(part), `${id}: part "${part}"`).toBe(true)
+      }
     }
   })
 

@@ -62,10 +62,11 @@
   box-shadow: none;
 }
 
-/* 題材が6件あるため、色パレットと同じく列数を固定する（auto-fitやflexの折返しだと
-   幅によって4+2などのはんぱな段になる）。狭い縦画面は3列×2段、620px以上は6列×1段。
-   6列へ切り替える幅を色パレット（560px）より広く取っているのは、いちばん長い
-   「きょうりゅう」が1行で収まる列幅（およそ96px）を確保するため。 */
+/* 題材が9件あるため、色パレットと同じく列数を固定する（auto-fitやflexの折返しだと
+   幅によって4+2などのはんぱな段になる）。狭い〜中間の画面は3列×3段、900px以上は9列×1段。
+   9列に必要な列幅（いちばん長い「きょうりゅう」が1行で収まる、およそ96px）を確保できる
+   幅が900px付近であるため、そこで切り替える。900px未満はボタンが大きくなるだけで
+   3列×3段のまま破綻はしない。 */
 .pictureGroup {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -75,9 +76,10 @@
   margin: 0 auto;
 }
 
-@media (min-width: 620px) {
+@media (min-width: 900px) {
   .pictureGroup {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    max-width: 920px;
   }
 }
 
@@ -390,13 +392,13 @@
     min-height: 0;
   }
 
-  /* 6件を左の細い列（27%幅）に入れると1つ62px程度になり「きょうりゅう」が収まらない。
-     横画面では題材えらびだけ全幅の1段に出して、6件を1行に並べる。
+  /* 9件を左の細い列（27%幅）に入れると1つがさらに小さくなり「きょうりゅう」が収まらない。
+     横画面では題材えらびだけ全幅の1段に出して、9件を1行に並べる。
      ぬりえは1段ぶん低くなるが、左の操作列（色・やりなおし・できた！）の高さは変わらない。 */
   .pictureGroup {
     grid-column: 1 / -1;
     grid-row: 3;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(9, minmax(0, 1fr));
     max-width: none;
   }
 
@@ -405,9 +407,15 @@
     grid-row: 2;
   }
 
+  /* 9件を1行に詰めるため、絵文字とラベルの両方を少し縮める（min-heightはタップ領域を
+     保つためそのまま）。 */
   .pictureButton {
     min-height: 48px;
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .pictureButton span:first-child {
+    font-size: 18px;
   }
 
   .canvasArea {

@@ -81,6 +81,21 @@ const ROCKET_STARS: PaintMotionRef = { part: 'rocketStars' }
 const DINO: PaintMotionRef = { group: 'dino' }
 const DINO_TAIL: PaintMotionRef = { group: 'dino', part: 'dinoTail' }
 const DINO_HEAD: PaintMotionRef = { group: 'dino', part: 'dinoHead' }
+const TRAIN: PaintMotionRef = { group: 'train' }
+// タイヤはくるまと同じ理由で、左右を別partにする（中心が違うため）。
+const TRAIN_WHEEL_BACK: PaintMotionRef = { group: 'train', part: 'trainWheelBack' }
+const TRAIN_WHEEL_FRONT: PaintMotionRef = { group: 'train', part: 'trainWheelFront' }
+// けむりはでんしゃと一緒に進むのでgroupに入れつつ、ロケットのほのおのように
+// もう1段階、自分だけの揺れ（浮かんで薄くなる）を持たせたいので個別partにする。
+const TRAIN_SMOKE_A: PaintMotionRef = { group: 'train', part: 'trainSmokeA' }
+const TRAIN_SMOKE_B: PaintMotionRef = { group: 'train', part: 'trainSmokeB' }
+const PLANE: PaintMotionRef = { group: 'plane' }
+// くもはひこうきと一緒に飛ばず、そらに残ってゆっくり流れるのでgroupには入れない。
+const PLANE_CLOUDS: PaintMotionRef = { part: 'planeClouds' }
+const SHIP: PaintMotionRef = { group: 'ship' }
+const SHIP_FLAG: PaintMotionRef = { group: 'ship', part: 'shipFlag' }
+// なみはふねと一緒に進まず、その場で揺れるのでgroupには入れない。
+const SHIP_WAVE: PaintMotionRef = { part: 'shipWave' }
 
 // 全題材で共通の、画面いっぱいのラウンド角矩形（背景=そら/みず）。
 const BACKDROP_PATH =
@@ -638,6 +653,286 @@ const dinosaurDetails: readonly PaintDetail[] = [
   },
 ]
 
+// でんしゃ -----------------------------------------------------------------
+
+const trainAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  { id: 'ground', label: 'じめん', shape: { kind: 'path', d: GROUND_PATH } },
+  {
+    id: 'body',
+    label: 'でんしゃの ボディ',
+    shape: {
+      kind: 'path',
+      d: 'M 12,42 L 88,42 C 91,42 93,44 93,47 L 93,72 C 93,75 91,77 88,77 L 12,77 C 9,77 7,75 7,72 L 7,47 C 7,44 9,42 12,42 Z',
+    },
+    motion: TRAIN,
+  },
+  {
+    id: 'roof',
+    label: 'やね',
+    // えんとつを含んだ1つの輪郭にして、ボディの上に重ねて描く（付け根が隠れる）。
+    shape: {
+      kind: 'path',
+      d: 'M 14,44 L 14,33 C 14,28 18,25 24,25 L 60,25 L 60,16 L 72,16 L 72,25 L 76,25 C 82,25 86,28 86,33 L 86,44 Z',
+    },
+    motion: TRAIN,
+  },
+  {
+    id: 'window',
+    label: 'まど',
+    // ボディの内側・左寄りに重ねて描く。やねとの間・右のぜんめんとの間に枠が残る大きさ。
+    shape: {
+      kind: 'path',
+      d: 'M 26,47 L 62,47 C 64,47 65,48 65,50 L 65,62 C 65,64 64,65 62,65 L 26,65 C 24,65 23,64 23,62 L 23,50 C 23,48 24,47 26,47 Z',
+    },
+    motion: TRAIN,
+  },
+  {
+    id: 'front',
+    label: 'ぜんめん',
+    // 進行方向（右端）の顔。ボディの右端に重ねて描き、ライトを乗せる台にする。
+    shape: {
+      kind: 'path',
+      d: 'M 72,46 L 86,46 C 89,46 91,48 91,51 L 91,68 C 91,71 89,73 86,73 L 72,73 Z',
+    },
+    motion: TRAIN,
+  },
+  {
+    id: 'wheelBack',
+    label: 'うしろの タイヤ',
+    shape: { kind: 'circle', cx: 28, cy: 78, r: 9 },
+    motion: TRAIN_WHEEL_BACK,
+  },
+  {
+    id: 'wheelFront',
+    label: 'まえの タイヤ',
+    shape: { kind: 'circle', cx: 72, cy: 78, r: 9 },
+    motion: TRAIN_WHEEL_FRONT,
+  },
+]
+
+const trainDetails: readonly PaintDetail[] = [
+  // タイヤのスポーク・中心の丸はくるまと同じ作法（回転していることが分かるように）。
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 20,78 L 36,78 M 28,70 L 28,86 M 22.3,72.3 L 33.7,83.7 M 33.7,72.3 L 22.3,83.7',
+    },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.3,
+    motion: TRAIN_WHEEL_BACK,
+  },
+  { shape: { kind: 'circle', cx: 28, cy: 78, r: 3.6 }, fill: '#495057', motion: TRAIN_WHEEL_BACK },
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 64,78 L 80,78 M 72,70 L 72,86 M 66.3,72.3 L 77.7,83.7 M 77.7,72.3 L 66.3,83.7',
+    },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.3,
+    motion: TRAIN_WHEEL_FRONT,
+  },
+  { shape: { kind: 'circle', cx: 72, cy: 78, r: 3.6 }, fill: '#495057', motion: TRAIN_WHEEL_FRONT },
+  // まどを2〜3枚に見せる縦の仕切り線。
+  {
+    shape: { kind: 'path', d: 'M 37,49 L 37,63 M 51,49 L 51,63' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: TRAIN,
+  },
+  // ぜんめんのライト。
+  { shape: { kind: 'circle', cx: 86, cy: 52, r: 3 }, fill: '#ffd43b', motion: TRAIN },
+  // けむり。えんとつ(x=60〜72、中心≒66)の上に出る丸を2つ。片方ずつ別partにして
+  // 交互に浮かび上がるようにする（groupはtrainを付け、でんしゃと一緒に進む）。
+  {
+    shape: { kind: 'circle', cx: 66, cy: 10, r: 4.5 },
+    fill: '#dee2e6',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1,
+    motion: TRAIN_SMOKE_A,
+  },
+  {
+    shape: { kind: 'circle', cx: 74, cy: 5, r: 3.5 },
+    fill: '#dee2e6',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1,
+    motion: TRAIN_SMOKE_B,
+  },
+]
+
+// ひこうき -------------------------------------------------------------
+
+const airplaneAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  // びよく・しゅよくは、どうたいより先に描いて付け根を隠す（くるまのうで・あしと同じ作法）。
+  {
+    id: 'tailWing',
+    label: 'びよく',
+    // 後方・左上に立つ三角形のはね。
+    shape: { kind: 'path', d: 'M 16,42 L 34,42 L 28,20 C 27,16 22,14 17,17 Z' },
+    motion: PLANE,
+  },
+  {
+    id: 'body',
+    label: 'ひこうきの どうたい',
+    // 右へ行くほどすぼまり、機首がとがる形。
+    shape: {
+      kind: 'path',
+      d: 'M 22,40 L 60,40 C 76,40 88,45 94,52 C 88,59 76,64 60,64 L 22,64 C 17,64 14,61 14,56 L 14,48 C 14,43 17,40 22,40 Z',
+    },
+    motion: PLANE,
+  },
+  {
+    id: 'mainWing',
+    label: 'しゅよく',
+    // どうたいの下から手前・後方へ広がるはね。
+    shape: {
+      kind: 'path',
+      d: 'M 46,60 L 68,60 L 60,86 C 59,89 56,90 52,90 L 32,90 C 28,90 27,87 30,83 Z',
+    },
+    motion: PLANE,
+  },
+  {
+    id: 'window',
+    label: 'まど',
+    // どうたい内側の横長エリア。仕切り線で複数のまどに見せる。
+    shape: {
+      kind: 'path',
+      d: 'M 34,44 L 58,44 C 62,44 64,47 64,52 C 64,57 62,60 58,60 L 34,60 C 30,60 28,57 28,52 C 28,47 30,44 34,44 Z',
+    },
+    motion: PLANE,
+  },
+]
+
+const airplaneDetails: readonly PaintDetail[] = [
+  // まどの縦仕切り線。
+  {
+    shape: { kind: 'path', d: 'M 40,47 L 40,57 M 52,47 L 52,57' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: PLANE,
+  },
+  // 機首寄りのコクピットの丸窓。胴体の輪郭に接しないよう内側へ寄せている。
+  {
+    shape: { kind: 'circle', cx: 78, cy: 48, r: 3 },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: PLANE,
+  },
+  // くも2つ。角丸の重なった丸で作る（1つの丸だとボールに見えてしまうため）。
+  // ひこうきと一緒に飛ばずそらに残るので、まとめて1つのpartにする。
+  { shape: { kind: 'circle', cx: 6, cy: 10, r: 4 }, fill: '#ffffff', motion: PLANE_CLOUDS },
+  {
+    shape: { kind: 'circle', cx: 11, cy: 8, r: 5 },
+    fill: '#ffffff',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1,
+    motion: PLANE_CLOUDS,
+  },
+  { shape: { kind: 'circle', cx: 16, cy: 11, r: 4 }, fill: '#ffffff', motion: PLANE_CLOUDS },
+  { shape: { kind: 'circle', cx: 76, cy: 10, r: 4 }, fill: '#ffffff', motion: PLANE_CLOUDS },
+  {
+    shape: { kind: 'circle', cx: 81, cy: 8, r: 5 },
+    fill: '#ffffff',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1,
+    motion: PLANE_CLOUDS,
+  },
+  { shape: { kind: 'circle', cx: 86, cy: 11, r: 4 }, fill: '#ffffff', motion: PLANE_CLOUDS },
+]
+
+// ふね ---------------------------------------------------------------------
+
+const shipAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  // 水面はGROUND_PATH（画面下の帯）をそのまま「うみ」として再利用する。
+  { id: 'water', label: 'うみ', shape: { kind: 'path', d: GROUND_PATH } },
+  {
+    id: 'hull',
+    label: 'ふねの せんたい',
+    shape: {
+      kind: 'path',
+      d: 'M 14,62 L 86,62 L 78,84 C 76,87 72,88 66,88 L 34,88 C 28,88 24,87 22,84 Z',
+    },
+    motion: SHIP,
+  },
+  {
+    id: 'funnel',
+    label: 'えんとつ',
+    // デッキより先に描き、付け根をデッキの塗りで隠す。
+    shape: {
+      kind: 'path',
+      d: 'M 46,20 L 62,20 C 64,20 65,22 65,25 L 65,40 L 43,40 L 43,25 C 43,22 44,20 46,20 Z',
+    },
+    motion: SHIP,
+  },
+  {
+    id: 'deck',
+    label: 'じょうぶ',
+    shape: {
+      kind: 'path',
+      d: 'M 34,38 L 66,38 C 69,38 71,40 71,43 L 71,64 L 29,64 L 29,43 C 29,40 31,38 34,38 Z',
+    },
+    motion: SHIP,
+  },
+  {
+    id: 'window',
+    label: 'まど',
+    // じょうぶ内側の横長エリア。仕切り線で3つのまどに見せる。
+    shape: {
+      kind: 'path',
+      d: 'M 36,45 L 64,45 C 66,45 67,46 67,48 L 67,58 C 67,60 66,61 64,61 L 36,61 C 34,61 33,60 33,58 L 33,48 C 33,46 34,45 36,45 Z',
+    },
+    motion: SHIP,
+  },
+]
+
+const shipDetails: readonly PaintDetail[] = [
+  // まどの縦仕切り線。
+  {
+    shape: { kind: 'path', d: 'M 44,47 L 44,59 M 56,47 L 56,59' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: SHIP,
+  },
+  // マストの線は船体と一緒に動くだけ（groupのみ）にする。SHIP_FLAGに入れて旗と
+  // 一緒に振ると、マストの足元（デッキ上面 y=38）まで左右にずれてデッキから浮いてしまうため。
+  {
+    shape: { kind: 'path', d: 'M 36,10 L 36,38' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: SHIP,
+  },
+  // はた（三角形）だけをSHIP_FLAGにする。付け根＝旗自身のbboxの左端(x=36)を軸に
+  // 小さくはためく（マストは動かないので、旗だけが竿の先で揺れて見える）。
+  {
+    shape: { kind: 'path', d: 'M 36,10 L 44,13 L 36,16 Z' },
+    fill: '#ff8787',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1,
+    motion: SHIP_FLAG,
+  },
+  // なみ。ふねの手前（下）に描く波線2本。ふねと一緒に進まず、その場で揺れる。
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 6,90 C 16,86 26,94 36,90 C 46,86 56,94 66,90 C 76,86 86,94 94,90',
+    },
+    stroke: '#1c7ed6',
+    strokeWidth: 1.6,
+    motion: SHIP_WAVE,
+  },
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 6,95 C 16,91 26,99 36,95 C 46,91 56,99 66,95 C 76,91 86,99 94,95',
+    },
+    stroke: '#1c7ed6',
+    strokeWidth: 1.6,
+    motion: SHIP_WAVE,
+  },
+]
+
 export const PAINT_PICTURES: readonly PaintPicture[] = [
   { id: 'car', label: 'くるま', emoji: '🚗', viewBox: VIEW_BOX, areas: carAreas, details: carDetails },
   { id: 'fish', label: 'さかな', emoji: '🐟', viewBox: VIEW_BOX, areas: fishAreas, details: fishDetails },
@@ -672,6 +967,30 @@ export const PAINT_PICTURES: readonly PaintPicture[] = [
     viewBox: VIEW_BOX,
     areas: dinosaurAreas,
     details: dinosaurDetails,
+  },
+  {
+    id: 'train',
+    label: 'でんしゃ',
+    emoji: '🚂',
+    viewBox: VIEW_BOX,
+    areas: trainAreas,
+    details: trainDetails,
+  },
+  {
+    id: 'airplane',
+    label: 'ひこうき',
+    emoji: '✈️',
+    viewBox: VIEW_BOX,
+    areas: airplaneAreas,
+    details: airplaneDetails,
+  },
+  {
+    id: 'ship',
+    label: 'ふね',
+    emoji: '🚢',
+    viewBox: VIEW_BOX,
+    areas: shipAreas,
+    details: shipDetails,
   },
 ]
 
