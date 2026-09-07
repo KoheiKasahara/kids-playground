@@ -38,7 +38,7 @@ if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
  * （Issue #299）。ここでは遷移の種類ごとに以下のように振る舞いを分ける。
  *
  * - 通常の遷移（トップからゲームを開く、ゲーム間を移動する等のPUSH/REPLACE）は
- *   常にページ先頭から始まるようにする。
+ *   ページ先頭から始まる。ホームへの復帰だけは直前の一覧位置へ戻す。
  * - ブラウザの戻る/進む（POP）は、そのページを最後に見ていたスクロール位置へ戻す
  *   （ブラウザ標準の履歴挙動を壊さないため）。
  */
@@ -46,15 +46,19 @@ export default function ScrollManager(): null {
   const location = useLocation()
   const navigationType = useNavigationType()
   const currentKeyRef = useRef(location.key)
+  const currentPathRef = useRef(location.pathname)
+  // 起動をまたがない、最後に見たホーム一覧の位置。POPは引き続き履歴キーを優先する。
+  const homeScrollRef = useRef(0)
   // 直近に位置合わせを済ませたlocation.key。nullは「まだ一度も処理していない」を表す。
   const resolvedKeyRef = useRef<string | null>(null)
 
   // レイアウト確定後・ペイント前に位置を合わせ、先頭以外の位置が一瞬でも見えないようにする。
   useLayoutEffect(() => {
     currentKeyRef.current = location.key
+    currentPathRef.current = location.pathname
 
     // StrictMode（開発時）はeffectを1回のコミットで2回実行するが、その2回は
-    // 同じ[location.key, navigationType]のまま呼ばれる。ブラウザの実際の遷移は
+    // 同じ[location.key, location.pathname, navigationType]のまま呼ばれる。ブラウザの実際の遷移は
     // 必ずlocation.keyが変わるため、前回処理したキーと同じであれば実質的な遷移ではない
     // 二重実行とみなしてスキップする（真偽値フラグだと2回目の実行で誤って
     // 「初回ではない」と判定してしまうため、キー自体を比較する）。
@@ -72,15 +76,18 @@ export default function ScrollManager(): null {
 
     if (!isInitialLoad && navigationType === 'POP') {
       window.scrollTo(0, readSavedScrollY(location.key))
+    } else if (!isInitialLoad && location.pathname === '/') {
+      window.scrollTo(0, homeScrollRef.current)
     } else {
       window.scrollTo(0, 0)
     }
-  }, [location.key, navigationType])
+  }, [location.key, location.pathname, navigationType])
 
   // 遷移先を問わず、現在のページを離れる直前のスクロール位置をpopstate復元用に覚えておく。
   useEffect(() => {
     const handleScroll = () => {
       writeSavedScrollY(currentKeyRef.current, window.scrollY)
+      if (currentPathRef.current === '/') homeScrollRef.current = window.scrollY
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
