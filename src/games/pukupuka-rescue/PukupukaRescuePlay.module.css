@@ -25,25 +25,7 @@
   gap: var(--space-xs);
 }
 
-.home {
-  flex: 0 0 auto;
-  min-width: var(--tap-target-min);
-  min-height: var(--tap-target-min);
-  padding: var(--space-xs) var(--space-sm);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  background: rgb(255 255 255 / 88%);
-  box-shadow: var(--shadow-sm);
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-}
 
-.home:active {
-  transform: scale(0.95);
-  box-shadow: none;
-}
 
 .title {
   min-width: 0;

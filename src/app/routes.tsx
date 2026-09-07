@@ -24,9 +24,7 @@ import PrefectureQuizPlay from '../games/prefecture-quiz/PrefectureQuizPlay'
 import PrefectureQuizResult from '../games/prefecture-quiz/PrefectureQuizResult'
 import PrefecturePuzzleStart from '../games/prefecture-quiz/PrefecturePuzzleStart'
 import PrefecturePuzzlePlay from '../games/prefecture-quiz/PrefecturePuzzlePlay'
-import ColorMixQuizStart from '../games/color-mix-quiz/ColorMixQuizStart'
-import ColorMixQuizPlay from '../games/color-mix-quiz/ColorMixQuizPlay'
-import ColorMixQuizResult from '../games/color-mix-quiz/ColorMixQuizResult'
+import { colorMixQuizRoutes } from '../games/color-mix-quiz/routes'
 
 // 50m世界地図やmatter-js(物理エンジン)など、特定ゲームだけが必要とする重い依存は
 // そのゲームを開くときだけ読込む。Vite PWAは生成されたchunkもprecacheするため、
@@ -119,13 +117,7 @@ export const routes: RouteObject[] = [
   { path: '/games/fruit-quiz/name-to-image/play', element: playRoute(<FruitQuizPlay mode="nameToImage" />) },
   { path: '/games/fruit-quiz/name-to-image/result', element: <FruitQuizResult mode="nameToImage" /> },
   { path: '/games/math-quiz', element: <MathQuizStart /> },
-  { path: '/games/color-mix-quiz', element: <ColorMixQuizStart /> },
-  { path: '/games/color-mix-quiz/play', element: playRoute(<ColorMixQuizPlay />) },
-  { path: '/games/color-mix-quiz/result', element: <ColorMixQuizResult /> },
-  // Old difficulty URLs now begin the single colour-mix game directly.
-  { path: '/games/color-mix-quiz/level', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
-  { path: '/games/color-mix-quiz/:level/play', element: <Navigate to="/games/color-mix-quiz/play" replace /> },
-  { path: '/games/color-mix-quiz/:level/result', element: <Navigate to="/games/color-mix-quiz" replace /> },
+  { path: '/games/color-mix-quiz', children: colorMixQuizRoutes },
   // 単体で軽いゲームも増設時の初期bundle累積を避け、開く時に読み込む。
   { path: '/games/color-paint-puzzle', element: playRoute(lazyRoute(() => import('../games/color-paint-puzzle/ColorPaintPuzzlePlay'))) },
   { path: '/games/block-puzzle', element: playRoute(lazyRoute(() => import('../games/block-puzzle/BlockPuzzlePlay'))) },

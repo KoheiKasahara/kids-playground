@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -134,7 +134,7 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
 
     renderApp('/games/color-mix-quiz/play')
     // 別のクイズ画面でも、設定を ON にし直さなくてもその場で問題文が読み上げられる。
-    expect(mock.spoken).toHaveLength(1)
+    await waitFor(() => expect(mock.spoken).toHaveLength(1))
     expect(mock.spoken[0]).toMatch(/この (2|3)しょくを まぜると？|この いろから ひくと？/)
   })
 })

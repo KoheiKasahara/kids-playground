@@ -1,3 +1,5 @@
+import { useContext } from 'react'
+import { GameIntroState } from './gameIntroState'
 import { Link, useLocation } from 'react-router-dom'
 import { findGameBySlug, GAME_ROUTE_PREFIX } from '../games/gameCatalog'
 import styles from './GameIntro.module.css'
@@ -10,8 +12,9 @@ const GAME_ROOT_PATTERN = new RegExp(`^${GAME_ROUTE_PREFIX}/([^/]+)$`)
 /**
  * ゲームルートURL（例: /games/planet-globe）にだけ表示する、検索エンジン向けの本文セクション。
  *
- * App.tsx にこの1箇所だけをマウントし、17個の各ゲームコンポーネントには一切手を入れない
- * （HARD CONSTRAINTS）。これにより、新しいゲームを gameCatalog.ts に追加するだけで
+ * App.tsxに一度だけ配置。単一路線ゲームはuseGameIntroPlayingでプレイ中だけ隠せる。
+ * 初期画面には静的HTMLと同じ本文が残り、選択画面へ戻れば再度読める。
+ * 新しいゲームを gameCatalog.ts に追加すると
  * このセクションも自動的に付いてくる。
  *
  * 表示をゲームルートURLだけに絞っているのは2つの理由から:
@@ -21,6 +24,7 @@ const GAME_ROOT_PATTERN = new RegExp(`^${GAME_ROUTE_PREFIX}/([^/]+)$`)
  */
 export default function GameIntro() {
   const { pathname } = useLocation()
+  const { playing } = useContext(GameIntroState)
 
   // 末尾スラッシュを正規化する（'/games/planet-globe/' も同じゲームルートとして扱う）。
   // '/' 自体は正規化不要（GAME_ROOT_PATTERNにそもそもマッチしない）。
@@ -28,7 +32,7 @@ export default function GameIntro() {
 
   const match = normalizedPath.match(GAME_ROOT_PATTERN)
   const entry = match ? findGameBySlug(match[1]) : undefined
-  if (!entry) return null
+  if (!entry || playing) return null
 
   return (
     <section className={styles.intro} aria-labelledby="game-intro-heading">

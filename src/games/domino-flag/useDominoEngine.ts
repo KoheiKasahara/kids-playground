@@ -1,3 +1,4 @@
+import { initializeRapier } from '../../physics/rapierLoader'
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
@@ -86,7 +87,6 @@ import {
 } from './dominoSound'
 import type { World } from '@dimforge/rapier3d-compat'
 
-let rapierInitPromise: Promise<void> | null = null
 
 // 350×350の地面全体をロングの俯瞰から描画するための値。通常モードは100のままにする。
 const LONG_CAMERA_FAR = 400
@@ -96,11 +96,7 @@ const LONG_CAMERA_FAR = 400
  */
 const BIG_CAMERA_FAR = 220
 
-/** Rapierのwasm初期化をモジュール内で一度だけ実行し、再入場時に共有する。 */
-function initializeRapier(): Promise<void> {
-  if (rapierInitPromise === null) rapierInitPromise = RAPIER.init()
-  return rapierInitPromise
-}
+
 
 export type DominoEngineOptions = {
   /** 値が変わったら世界を作り直す（もういちど用）。 */

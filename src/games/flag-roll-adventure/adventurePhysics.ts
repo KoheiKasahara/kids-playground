@@ -208,11 +208,10 @@ export const GOAL_CUP_BOTTOM_MARGIN = 34
 export const STEP_MS = 1000 / 60
 
 /**
- * ピンボールの0.55より弱い重力。
- * 長い縦コースで待ち時間が出ないよう、従来の0.35から少しだけ強める。
+ * 滑走路の終端から次の仕掛けへ、勢いを保って落下するための重力。
  * エリアごとの細かな違いは AdventureArea.gravityScale で調整する。
  */
-export const GRAVITY = { x: 0, y: 0.39 } as const
+export const GRAVITY = { x: 0, y: 0.65 } as const
 
 /**
  * スタート時の位置と初速の揺らぎ。
@@ -238,8 +237,8 @@ export const BALL_RADIUS = 22
 export const BALL_RESTITUTION = 0.45
 /** 斜面の上を滑りすぎず、転がりが止まりすぎない中間の接触摩擦。 */
 export const BALL_FRICTION = 0.02
-/** 空気抵抗を小さくして、重力でゆっくり加速する感触を残す。 */
-export const BALL_FRICTION_AIR = 0.012
+/** 空気抵抗を抑え、滑走や発射で得た勢いを次の仕掛けまで残す。 */
+export const BALL_FRICTION_AIR = 0.004
 /** Matter.jsで重さを極端に変えず、既存ピンボールと同じ桁で安定させる密度。 */
 export const BALL_DENSITY = 0.002
 
@@ -276,12 +275,12 @@ export const LIFTER_COOLDOWN_MS = 900
 export const LIFTER_RESTITUTION = 0.5
 /** 横方向の散らしを強くしすぎず、エリアの外壁へ届く前に次の接触を作る上限(px/step)。 */
 export const LIFTER_MAX_HORIZONTAL_SPEED = 5.5
-/** 真上へ固定せず左右どちらかへ見える最小の散らし(px/step)。 */
-export const LIFTER_RANDOM_HORIZONTAL_MIN = 1.6
-/** シード差による変化を残しつつ、横移動が主役になりすぎない最大の散らし(px/step)。 */
-export const LIFTER_RANDOM_HORIZONTAL_MAX = 3.4
-/** 直前の横速度を少しだけ残し、接触前の流れを完全には消さない割合。 */
-export const LIFTER_HORIZONTAL_RETENTION = 0.3
+/** 同じバネへ戻らず、左右の着地点へ届く最小の横速度(px/step)。 */
+export const LIFTER_RANDOM_HORIZONTAL_MIN = 5
+/** 左右の分岐を保ちつつ、外壁への跳ね返りを抑える横速度上限(px/step)。 */
+export const LIFTER_RANDOM_HORIZONTAL_MAX = 5.5
+/** 打ち上げ方向と進入速度の相殺による垂直往復を防ぐため、横速度を引き継がない。 */
+export const LIFTER_HORIZONTAL_RETENTION = 0
 /** MAX_SPEEDより少し下にし、打ち上げ直後の速度が過大にならないようにする(px/step)。 */
 export const LIFTER_SPEED_CAP = 12
 

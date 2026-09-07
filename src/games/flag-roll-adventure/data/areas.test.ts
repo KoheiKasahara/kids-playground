@@ -12,7 +12,6 @@ import {
   CUP_SENSOR_TOP_OFFSET,
   EXIT_WIDTH,
   MAX_SPEED,
-  PORTAL_FLOOR_HEIGHT,
   SPINNER_BLADE_THICKNESS,
 } from '../adventurePhysics'
 import { areaGroundRects, cupBottomRect, cupFrontLipRect, cupSensorRect, cupWellRect, worldSize } from '../adventureGeometry'
@@ -57,7 +56,7 @@ function pointToObbDistance(pointX: number, pointY: number, wall: AreaObstacle):
   return Math.hypot(localX - nearestX, localY - nearestY)
 }
 
-/** 円と回転矩形は点からOBBまでの厳密距離、矩形どうしだけは既存のAABB近似を使う。 */
+/** 円・回転矩形の実際の輪郭間の距離。 */
 function obstacleClearance(first: AreaObstacle, second: AreaObstacle): number {
   const firstRadius = circleRadius(first)
   const secondRadius = circleRadius(second)
@@ -67,11 +66,25 @@ function obstacleClearance(first: AreaObstacle, second: AreaObstacle): number {
   if (firstRadius !== null) return pointToObbDistance(first.x, first.y, second) - firstRadius
   if (secondRadius !== null) return pointToObbDistance(second.x, second.y, first) - secondRadius
 
-  const firstExtents = objectExtents(first)
-  const secondExtents = objectExtents(second)
-  const gapX = Math.max(0, Math.abs(first.x - second.x) - firstExtents.x - secondExtents.x)
-  const gapY = Math.max(0, Math.abs(first.y - second.y) - firstExtents.y - secondExtents.y)
-  return Math.hypot(gapX, gapY)
+  // 細長い斜面のAABBは空白まで覆うため、回転矩形そのものの距離を測る。
+  const corners = (wall: AreaObstacle) => {
+    if (wall.kind !== 'wall' && wall.kind !== 'jump') return []
+    return [-1, 1].flatMap((sx) => [-1, 1].map((sy) => ({
+      x: wall.x + sx * wall.width / 2 * Math.cos(wall.angle) - sy * wall.height / 2 * Math.sin(wall.angle),
+      y: wall.y + sx * wall.width / 2 * Math.sin(wall.angle) + sy * wall.height / 2 * Math.cos(wall.angle),
+    })))
+  }
+  const a = corners(first)
+  const b = corners(second)
+  if ((first.kind !== 'wall' && first.kind !== 'jump') || (second.kind !== 'wall' && second.kind !== 'jump')) return 0
+  const separated = [first.angle, second.angle].flatMap((angle) => [angle, angle + Math.PI / 2]).some((angle) => {
+    const project = (points: typeof a) => points.map((p) => p.x * Math.cos(angle) + p.y * Math.sin(angle))
+    const pa = project(a)
+    const pb = project(b)
+    return Math.max(...pa) < Math.min(...pb) || Math.max(...pb) < Math.min(...pa)
+  })
+  if (!separated) return 0
+  return Math.min(...a.map((p) => pointToObbDistance(p.x, p.y, second)), ...b.map((p) => pointToObbDistance(p.x, p.y, first)))
 }
 
 function areaObstacles(area: (typeof AREAS)[number]): readonly AreaObstacle[] {
@@ -79,7 +92,7 @@ function areaObstacles(area: (typeof AREAS)[number]): readonly AreaObstacle[] {
 }
 
 describe('area gravity settings', () => {
-  it('各エリアで重力係数を持ち、密なピンやゴールだけ控えめにできる', () => {
+  it('川は加速し、雲とゴールは少し緩やかにする', () => {
     expect(AREAS.every((area) => area.gravityScale !== undefined)).toBe(true)
     expect(AREAS.every((area) => (area.gravityScale ?? 0) >= 0.9)).toBe(true)
     expect(AREAS.every((area) => (area.gravityScale ?? Infinity) <= 1.1)).toBe(true)
@@ -430,18 +443,10 @@ describe('area data', () => {
     }
   })
 
-  it('各エリアの160px帯には回転後AABBが交差するオブジェクトがある', () => {
-    const bandHeight = 160
+  it('小ピンの格子を増やさず、各エリアを少数の滑走路と主役で構成する', () => {
     for (const area of AREAS) {
-      const floorY = area.cup ? area.cup.rimY : AREA_HEIGHT - PORTAL_FLOOR_HEIGHT
-      for (let bandTop = AREA_ENTRY_CLEARANCE; bandTop < floorY; bandTop += bandHeight) {
-        const bandBottom = Math.min(floorY, bandTop + bandHeight)
-        const hasObject = area.objects.some((object) => {
-          const extents = objectExtents(object)
-          return object.y - extents.y < bandBottom && object.y + extents.y > bandTop
-        })
-        expect(hasObject, `${area.id}:${bandTop}-${bandBottom}`).toBe(true)
-      }
+      expect(area.objects.length).toBeLessThanOrEqual(8)
+      expect(area.objects.some((object) => object.kind === 'wall')).toBe(true)
     }
   })
 
@@ -464,9 +469,7 @@ describe('area data', () => {
             }
             continue
           }
-          // 壁は長い矩形なので、円形の外接半径だけで判定すると、上下に離れた
-          // 斜面まで「重なった」と誤判定する。回転後のAABB間隔を使い、
-          // ボール直径＋16pxの通路が実際に残ることを保守的に確認する。
+          // 回転した斜面の実際の輪郭で、ボール直径＋16pxの通路を確認する。
           const surfaceClearance = obstacleClearance(first, second)
           if (surfaceClearance < requiredClearance) {
             violations.push(`${area.id}:${first.id}/${second.id} clearance=${surfaceClearance}`)

@@ -48,7 +48,13 @@ function elementTypeIsGamePlaySurface(element: RouteObject['element']): boolean 
 }
 
 describe('routes.tsx: GamePlaySurfaceの適用範囲(Issue #166)', () => {
-  const pathedRoutes = routes.filter((route): route is RouteObject & { path: string } => typeof route.path === 'string')
+  function flatten(entries: RouteObject[], parent = ''): (RouteObject & { path: string })[] {
+    return entries.flatMap((route) => {
+      const path = route.path?.startsWith('/') ? route.path : `${parent}/${route.path ?? ''}`.replace(/\/$/, '')
+      return route.children ? flatten(route.children, path) : [{ ...route, path }]
+    })
+  }
+  const pathedRoutes = flatten(routes)
 
   test('全ルートが少なくとも1つ以上存在する(前提の健全性チェック)', () => {
     expect(pathedRoutes.length).toBeGreaterThan(50)

@@ -72,6 +72,7 @@ export const PUZZLE_STAGES: readonly PuzzleStageDefinition[] = [
     emoji: '🌱',
     description: 'ボール1こ・ひろいゴール',
     balls: [easyBall],
+    partLimits: { warpOut: 1 },
     goalArea: wideEasyGoal,
     availablePartTypeIds: ALL_TRAY_PART_TYPE_IDS,
   },
@@ -82,6 +83,7 @@ export const PUZZLE_STAGES: readonly PuzzleStageDefinition[] = [
     emoji: '🌼',
     description: 'スタートからよこへ はこぼう',
     balls: [{ id: 'ball-a', startPosition: { x: 90, y: BALL_START.y } }],
+    partLimits: { warpOut: 1 },
     goalArea: normalGoal,
     // バンパーを外して、道を考える違いだけを加える。個数制限は設けない。
     availablePartTypeIds: ALL_TRAY_PART_TYPE_IDS.filter((id) => id !== 'bumper'),
@@ -96,6 +98,7 @@ export const PUZZLE_STAGES: readonly PuzzleStageDefinition[] = [
       { id: 'ball-a', startPosition: { x: 90, y: BALL_START.y } },
       { id: 'ball-b', startPosition: { x: 270, y: BALL_START.y } },
     ],
+    partLimits: { warpOut: 1 },
     goalArea: hardGoal,
     availablePartTypeIds: ALL_TRAY_PART_TYPE_IDS,
   },

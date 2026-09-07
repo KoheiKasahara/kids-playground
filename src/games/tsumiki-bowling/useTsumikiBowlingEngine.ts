@@ -1,3 +1,4 @@
+import { initializeRapier } from '../../physics/rapierLoader'
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
@@ -66,13 +67,8 @@ import {
 import { createBowlingSoundController, type BowlingSoundController } from './bowlingSound'
 import { createBowlingHaptics, type BowlingHaptics } from './bowlingHaptics'
 
-let rapierInitPromise: Promise<void> | null = null
 
-/** Rapierのwasm初期化はモジュール内で一度だけ行い、もういちどや再入場で共有する。 */
-function initializeRapier(): Promise<void> {
-  if (rapierInitPromise === null) rapierInitPromise = RAPIER.init()
-  return rapierInitPromise
-}
+
 
 export type ThrowSettledResult = {
   /** 何投目か（1始まり）。 */

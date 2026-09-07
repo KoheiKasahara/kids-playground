@@ -34,7 +34,8 @@ describe('gameCatalog', () => {
       expect(matches).not.toBeNull()
       const lastMatch = matches![matches!.length - 1]
       // '*' の catch-all にフォールバックしていないことを確認する。
-      expect(lastMatch.route.path).toBe(pagePath)
+      expect(matches!.some((match) => match.route.path === pagePath)).toBe(true)
+      expect(lastMatch.route.path === pagePath || lastMatch.route.index === true).toBe(true)
     }
   })
 

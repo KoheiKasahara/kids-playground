@@ -41,6 +41,17 @@ describe('SPA遷移時のスクロール位置管理（Issue #299）', () => {
     expect(scrollToSpy).toHaveBeenLastCalledWith(0, 0)
   })
 
+  test('ホームへのPUSH復帰は一覧位置を復元し、ゲーム側のスクロールを混ぜない', async () => {
+    const user = userEvent.setup()
+    render(<BrowserRouter><App /></BrowserRouter>)
+    setScrollY(1200)
+    await user.click(screen.getByRole('link', { name: '都道府県クイズ' }))
+    expect(scrollToSpy).toHaveBeenLastCalledWith(0, 0)
+    setScrollY(300)
+    await user.click(screen.getByRole('button', { name: 'もどる' }))
+    expect(scrollToSpy).toHaveBeenLastCalledWith(0, 1200)
+  })
+
   test('SEO説明文までスクロール→別画面→同じゲームを再訪しても先頭から表示される', async () => {
     const user = userEvent.setup()
     render(

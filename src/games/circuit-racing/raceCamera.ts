@@ -77,3 +77,30 @@ export function tracksideCameraPose(
     },
   }
 }
+
+/** Fit the circuit bounds with a margin, including perspective depth. */
+export function overviewCameraPose(
+  bounds: { min: RaceCameraVector; max: RaceCameraVector },
+  aspect: number,
+  fov = 48,
+): RaceCameraPose {
+  const target = {
+    x: (bounds.min.x + bounds.max.x) / 2,
+    y: 0,
+    z: (bounds.min.z + bounds.max.z) / 2,
+  }
+  const halfWidth = (bounds.max.x - bounds.min.x) / 2
+  const halfDepth = (bounds.max.z - bounds.min.z) / 2
+  const elevation = Math.PI / 3
+  const sin = Math.sin(elevation)
+  const cos = Math.cos(elevation)
+  const tan = Math.tan(fov * Math.PI / 360)
+  const distance = halfDepth * cos + Math.max(
+    halfWidth / (tan * Math.max(0.1, aspect)),
+    halfDepth * sin / tan,
+  ) * 1.12
+  return {
+    target,
+    position: { x: target.x, y: distance * sin, z: target.z + distance * cos },
+  }
+}

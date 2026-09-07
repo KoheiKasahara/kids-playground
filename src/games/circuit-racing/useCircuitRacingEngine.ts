@@ -10,6 +10,7 @@ import { createMotionProfile, sampleMotion, type MotionProfile } from './motion'
 // Camera placement is independent of the motion table and React state.
 import {
   chaseCameraPose,
+  overviewCameraPose,
   tracksideCameraPose,
   type RaceCameraMode,
 } from './raceCamera'
@@ -27,7 +28,7 @@ export type CircuitRacingEngineOptions = {
 export type CircuitRacingEngineHandle = {
   registerContainer: (element: HTMLDivElement | null) => void
   retry: () => void
-  adjustCamera: (action: 'left' | 'right' | 'up' | 'down' | 'in' | 'out' | 'turnLeft' | 'turnRight') => void
+  adjustCamera: (action: 'left' | 'right' | 'up' | 'down' | 'in' | 'out' | 'turnLeft' | 'turnRight' | 'overview') => void
 }
 
 type PlainVector = { x: number; y: number; z: number }
@@ -364,6 +365,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     let contextLost = false
     let previousCameraMode: RaceCameraMode | null = null
     let lastCameraKey = ''
+    let overviewActive = false
+    const circuitBounds = new THREE.Box3().setFromPoints(CIRCUIT.curve.getPoints(1024)).expandByScalar(ROAD_EDGE + 1)
     let dirty = true
     let currentKey = ''
     let cars: CarVisual[] = []
@@ -371,7 +374,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color('#a9d9f0')
-    scene.fog = new THREE.Fog('#a9d9f0', 150, 520)
+    const raceFog = new THREE.Fog('#a9d9f0', 150, 520)
+    scene.fog = raceFog
     const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR)
     camera.position.set(0, 10, 18)
 
@@ -402,6 +406,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     const groundMaterial = own(new THREE.MeshStandardMaterial({ color: '#86c276', roughness: 0.96 }), staticResources)
     const ground = new THREE.Mesh(groundGeometry, groundMaterial)
     ground.rotation.x = -Math.PI / 2
+    ground.position.y = -0.2
     ground.receiveShadow = true
     scene.add(ground)
 
@@ -477,6 +482,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       camera.updateProjectionMatrix()
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO))
       renderer.setSize(width, height, false)
+      if (overviewActive && optionsRef.current.cameraMode === 'free') showOverview()
       markDirty()
     }
 
@@ -495,6 +501,28 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       return { position, tangent }
     }
 
+    function showOverview(): void {
+      if (controls === null) return
+      const pose = overviewCameraPose(circuitBounds, camera.aspect, CAMERA_FOV)
+      controls.target.set(pose.target.x, pose.target.y, pose.target.z)
+      camera.position.set(pose.position.x, pose.position.y, pose.position.z)
+      camera.fov = CAMERA_FOV
+      const distance = camera.position.distanceTo(controls.target)
+      controls.maxDistance = Math.max(500, distance * 1.3)
+      camera.far = Math.max(CAMERA_FAR, controls.maxDistance + 700)
+      camera.updateProjectionMatrix()
+      // Discard residual drag damping before applying the preset.
+      const damping = controls.enableDamping
+      controls.enableDamping = false
+      controls.update()
+      controls.target.set(pose.target.x, pose.target.y, pose.target.z)
+      camera.position.set(pose.position.x, pose.position.y, pose.position.z)
+      controls.update()
+      controls.enableDamping = damping
+      overviewActive = true
+      markDirty()
+    }
+
     function updateCamera(): void {
       const currentCars = cars
       const target = currentCars[Math.min(currentCars.length - 1, Math.max(0, optionsRef.current.targetIndex))]
@@ -504,15 +532,15 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       }
       const frame = applyCarFrame(target, elapsedSeconds)
       const mode = optionsRef.current.cameraMode
+      // Free views must remain clear at the full circuit distance.
+      scene.fog = mode === 'free' ? null : raceFog
+      camera.near = mode === 'free' ? 2 : CAMERA_NEAR
+      camera.updateProjectionMatrix()
       if (mode === 'free') {
         if (controls !== null) {
           controls.enabled = true
           if (previousCameraMode !== 'free') {
-            controls.target.set(frame.position.x, 0.8, frame.position.z)
-            camera.position.copy(controls.target).add(new THREE.Vector3(14, 12, 18).multiplyScalar(Math.max(1, 1 / camera.aspect)))
-            camera.fov = CAMERA_FOV
-            camera.updateProjectionMatrix()
-            controls.update()
+            showOverview()
           }
         }
         previousCameraMode = mode
@@ -629,6 +657,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       controls.minDistance = 4
       controls.maxDistance = 500
       controls.addEventListener('change', markDirty)
+      controls.addEventListener('start', () => { overviewActive = false })
       resize()
       if (typeof ResizeObserver !== 'undefined') {
         resizeObserver = new ResizeObserver(resize)
@@ -643,12 +672,17 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       cameraAdjustmentRef.current = (action) => {
         if (controls === null) return
         controls.enabled = true
+        if (action === 'overview') {
+          showOverview()
+          return
+        }
+        overviewActive = false
         const spherical = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target))
         const target = controls.target.clone()
         if (action === 'turnLeft') spherical.theta += 0.24
         if (action === 'turnRight') spherical.theta -= 0.24
         if (action === 'in') spherical.radius = Math.max(4, spherical.radius / 1.16)
-        if (action === 'out') spherical.radius = Math.min(500, spherical.radius * 1.16)
+        if (action === 'out') spherical.radius = Math.min(controls.maxDistance, spherical.radius * 1.16)
         const direction = new THREE.Vector3()
         if (action === 'left' || action === 'right') {
           camera.getWorldDirection(direction)

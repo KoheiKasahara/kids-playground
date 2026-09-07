@@ -59,6 +59,7 @@ export type UseGlobeEngineOptions = {
 }
 
 export type UseGlobeEngineHandle = {
+  status: 'loading' | 'ready' | 'error'
   /** 3D描画先の div を登録する ref コールバック（null で解除）。 */
   registerContainer: (element: HTMLDivElement | null) => void
 }

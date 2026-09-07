@@ -1,3 +1,4 @@
+import { initializeRapier } from '../../physics/rapierLoader'
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
@@ -109,13 +110,8 @@ import {
 } from '../../utils/quizSound'
 import type { RigidBody, World } from '@dimforge/rapier3d-compat'
 
-let rapierInitPromise: Promise<void> | null = null
 
-/** Rapierのwasm初期化はモジュール内で一度だけ行い、再入場時に共有する。 */
-function initializeRapier(): Promise<void> {
-  if (rapierInitPromise === null) rapierInitPromise = RAPIER.init()
-  return rapierInitPromise
-}
+
 
 /** WebGLモックや一部のコンテキストでは異方性上限を取得できないため、失敗時は省略する。 */
 function getRendererMaxAnisotropy(

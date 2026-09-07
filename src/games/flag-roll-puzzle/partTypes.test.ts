@@ -37,7 +37,7 @@ describe('partTypes', () => {
   test('置き場には残ったパーツ、ジャンプ台、キャノン・Spinner・シーソーの基本向きを出す', () => {
     expect(TRAY_PART_DEFINITIONS.map((definition) => definition.id)).toEqual([
       'slopeLeft', 'slopeRight', 'curveLeft', 'curveRight',
-      'bumper', 'guideLeft', 'guideRight', 'jumpRampRight', 'cannon', 'spinner', 'conveyorRight', 'seesaw',
+      'bumper', 'guideLeft', 'guideRight', 'jumpRampRight', 'cannon', 'spinner', 'fanRight', 'bubbleLift', 'warpIn', 'warpOut', 'conveyorRight', 'seesaw',
     ])
   })
 

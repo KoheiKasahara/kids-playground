@@ -3,7 +3,7 @@
 // 全ルートの網羅は routes.gamePlaySurface.test.tsx（route構造の機械チェック）に任せ、
 // ここでは代表的なURLについてだけ実DOMで確認する。
 import { describe, expect, test } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import App from './App'
 import surfaceStyles from '../components/GamePlaySurface.module.css'
@@ -22,13 +22,13 @@ describe('実プレイURLでのGamePlaySurface適用(Issue #166、DOM検証)', (
     expect(hasGamePlaySurface(container)).toBe(true)
   })
 
-  test('/games/color-mix-quiz/play (静的import) にはclassが付く', () => {
+  test('/games/color-mix-quiz/play (ゲーム内lazyルート) にはclassが付く', async () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/games/color-mix-quiz/play']}>
         <App />
       </MemoryRouter>,
     )
-    expect(hasGamePlaySurface(container)).toBe(true)
+    await waitFor(() => expect(hasGamePlaySurface(container)).toBe(true))
   })
 
   test('/games/piano-play (lazyルート、単一routeでプレイまで完結) にはclassが付く', async () => {

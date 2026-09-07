@@ -1,0 +1,36 @@
+name: Representative Gameplay Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'e2e/*.nightly.spec.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/gameplay-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gameplay-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gameplay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      # テスト定義を変えたPRだけ先行検証する。普段はNightlyで実行。
+      - run: npx playwright test e2e/representative-3d.nightly.spec.ts e2e/piano-landscape.nightly.spec.ts --workers=1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: representative-gameplay-results
+          path: test-results/
