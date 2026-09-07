@@ -1,3 +1,4 @@
+import { slowestTestFiles } from './project-health/lib/slowTestFiles.mjs'
 import { appendFileSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -136,6 +137,16 @@ const lines = [
   `| Slow suite | ${slowValue} |`,
   '',
 ]
+
+const slowest = slowestTestFiles(testReport)
+lines.push('## Slowest test files', '',
+  '_File elapsed time (including failed files); parallel times are not additive._', '')
+if (slowest.length) {
+  lines.push('| File | Status | Seconds |', '| --- | --- | ---: |',
+    ...slowest.map((file) => `| ${file.name.replaceAll('|', '&#124;').replaceAll('\n', ' ')} | ${file.status} | ${(file.milliseconds / 1000).toFixed(2)} |`), '')
+} else {
+  lines.push('Not available (missing or invalid file timings).', '')
+}
 
 if (isFull) {
   lines.push(

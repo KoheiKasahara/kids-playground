@@ -142,6 +142,7 @@ const domIndependentTestTsxFiles = [
 // 分類基準: 1テストあたり2秒を超える完走シミュレーションのみを対象にし、
 // 件数が多いだけの通常ユニットテスト（komaWorld.test.ts 等）は含めない。
 const slowTestFiles = [
+  'src/games/flag-pinball/pinballSimulation.full.test.ts',
   'src/games/domino-flag/dominoChain.test.ts',
   'src/games/domino-flag/dominoBigChain.test.ts',
   'src/games/domino-flag/dominoLongChain.test.ts',
