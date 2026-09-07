@@ -2,17 +2,16 @@ import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import {
-  DEFAULT_LAUNCH_HEIGHT_LEVEL,
   GRAVITY_Y,
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
-  type LaunchHeightLevel,
 } from './bowlingPhysics'
 import {
   BACK_WALL_HALF_HEIGHT,
   BACK_WALL_Z,
   getBowlingStage,
+  stageBounds,
   LANE_CENTER_Z,
   LANE_HALF_LENGTH,
   LANE_HALF_THICKNESS,
@@ -24,10 +23,11 @@ import {
   RAIL_HALF_WIDTH,
 } from './bowlingStage'
 import { bowlingCameraSetup } from './bowlingCamera'
+import { aimFromScreen } from './bowlingAim'
 import {
-  aimFromDrag,
+  aimAtTarget,
   combinedRestitution,
-  launchVelocity,
+  automaticLaunchVelocity,
   predictBouncePreview,
   type LaunchAim,
 } from './bowlingLaunch'
@@ -35,7 +35,7 @@ import {
   ballOutOfPlay,
   clampBowlingMotion,
   createBowlingWorld,
-  launchBall,
+  launchAutomaticBall,
   parkBall,
   parkFallenBall,
   readBall,
@@ -92,18 +92,12 @@ export type TsumikiBowlingEngineOptions = {
   runId: number
   stageId?: string
   ballId?: BowlingBallId
-  /**
-   * 発射の高さ（ひくい/ふつう/たかい）。毎フレーム読むだけの値なので、
-   * setBallIdのような専用ハンドルは不要。ドラッグ中のプレビューと発射の
-   * 両方で、ここに渡した最新値をそのまま使う。
-   */
-  heightLevel?: LaunchHeightLevel
   /** 発射した瞬間に1回だけ呼ばれる。 */
   onThrowStart: (throwNumber: number) => void
   /** 1投が落ち着いたときに1回だけ呼ばれる。 */
   onThrowSettled: (result: ThrowSettledResult) => void
   /**
-   * ドラッグ中のパワー(0〜1)。離したりドラッグしていないときはnull。
+   * 狙っている間は玉の固定パワー(0〜1)、離したときはnull。
    * 毎フレームではなく、値が目に見えて変わったときだけ呼ぶ。
    */
   onAimChange: (power: number | null) => void
@@ -162,11 +156,9 @@ const GUIDE_DOT_COUNT = 18
  */
 const GUIDE_MAX_TIME_S = 1.8
 
-/** HUDのパワー表示を更新する最小の変化量。細かすぎる再レンダーを避ける。 */
+/** 狙い状態の通知をまとめ、細かすぎる再レンダーを避ける。 */
 const AIM_POWER_STEP = 0.04
 
-/** これ以上のパワーを「最大付近」として強調する（脈動＋強い赤）しきい値。 */
-const GUIDE_STRONG_POWER = 0.85
 
 /** 発射直後、玉を一瞬伸ばして見せる演出の長さ[ms]。物理には一切影響しない見た目だけの演出。 */
 const LAUNCH_POP_MS = 140
@@ -338,6 +330,7 @@ export function useTsumikiBowlingEngine(
     let landingRing: THREE.Mesh | null = null
     /** 2個目の着地予測（はずむだま等、よく跳ねる球でだけ出す）。赤いlandingRingと混同しないよう別色・小さめにしてある。 */
     let secondBounceRing: THREE.Mesh | null = null
+    let targetMarker: THREE.Mesh | null = null
     /** 発射ガイドの脈動に使う経過時間の積算（Date.now()は使わずdeltaMsだけで進める）。 */
     let guidePulseMs = 0
 
@@ -393,6 +386,7 @@ export function useTsumikiBowlingEngine(
       guideDots.length = 0
       ballMesh = null
       guideMaterial = null
+      targetMarker = null
       landingRing = null
       secondBounceRing = null
       trailPool.length = 0
@@ -656,7 +650,7 @@ export function useTsumikiBowlingEngine(
 
     /**
      * 発射ガイド。玉が飛ぶ道すじを点で描き、最初の着地点に輪を置く。
-     * 点の長さでパワーが、左右の曲がりで発射方向が分かる。
+     * 玉ごとの飛び方と、左右の発射方向を点で見せる。
      *
      * よく跳ねる球（はずむだま等）では、最初の着地点よりひとまわり小さく、
      * 別の色のリング（secondBounceRing）で「次はどこへ跳ねるか」も見せる。
@@ -697,6 +691,12 @@ export function useTsumikiBowlingEngine(
       secondBounceRing.visible = false
       secondBounceRing.renderOrder = 3
       target.add(secondBounceRing)
+      targetMarker = new THREE.Mesh(
+        track(new THREE.RingGeometry(0.3, 0.43, 24)),
+        trackMaterial(new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, side: THREE.DoubleSide })),
+      )
+      targetMarker.renderOrder = 4
+      target.add(targetMarker)
     }
 
     function createImpactPool(target: THREE.Scene) {
@@ -922,7 +922,7 @@ export function useTsumikiBowlingEngine(
      * 実際に発射できるかは指を離すときに判定する。
      */
     function canStartAim(): boolean {
-      return !finished && bowling !== null
+      return !flying && !finished && bowling !== null
     }
 
     /** 玉を引いて見せてよいか。前の投球中と組み直し中は玉を動かさない。 */
@@ -942,7 +942,8 @@ export function useTsumikiBowlingEngine(
      * 呼び出しは黙って無視する（UI側もdisabledにするが、ここでも必ず二重に防ぐ）。
      */
     function applyBallSwitch(nextBallId: BowlingBallId) {
-      if (!bowling || !canPullBall()) return
+      if (!bowling || !canLaunchNow()) return
+      skipRebuildWait()
       const changed = setBowlingBall(bowling, RAPIER, nextBallId)
       if (!changed) return
       applyBallVisual(bowling.ballSpec)
@@ -963,15 +964,14 @@ export function useTsumikiBowlingEngine(
       if (!renderer) return
       const canvas = renderer.domElement
       let activePointerId: number | null = null
-      let startX = 0
-      let startY = 0
-
-      const viewportOf = () => {
-        const rect = canvas.getBoundingClientRect()
-        return {
-          width: rect.width || canvas.clientWidth || 1,
-          height: rect.height || canvas.clientHeight || 1,
-        }
+      const bounds = stageBounds(stage)
+      const aimFromPointer = (event: PointerEvent): LaunchAim | null => {
+        if (!camera || !bowling) return null
+        return aimFromScreen(
+          { x: event.clientX, y: event.clientY },
+          canvas.getBoundingClientRect(), camera,
+          { ...bounds, launchZ: bowling.anchor.z }, bowling.ballSpec,
+        )
       }
 
       const onPointerDown = (event: PointerEvent) => {
@@ -979,10 +979,9 @@ export function useTsumikiBowlingEngine(
         if (event.pointerType === 'mouse' && event.button !== 0) return
         if (!canStartAim()) return
         activePointerId = event.pointerId
-        startX = event.clientX
-        startY = event.clientY
-        currentAim = null
-        if (canPullBall()) reportAim(0)
+        skipRebuildWait()
+        currentAim = aimFromPointer(event)
+        if (canPullBall()) reportAim(currentAim?.power ?? null)
         try {
           canvas.setPointerCapture(event.pointerId)
         } catch {
@@ -993,10 +992,8 @@ export function useTsumikiBowlingEngine(
 
       const onPointerMove = (event: PointerEvent) => {
         if (activePointerId !== event.pointerId || !bowling) return
-        const aim = aimFromDrag(
-          { dx: event.clientX - startX, dy: event.clientY - startY },
-          viewportOf(),
-        )
+        const aim = aimFromPointer(event)
+        if (!aim) return
         currentAim = aim
         // 前の投球中・組み直し中は玉を動かさない（まだ前の投球の位置にいる）。
         if (canPullBall()) {
@@ -1016,7 +1013,7 @@ export function useTsumikiBowlingEngine(
         } catch {
           // capture していない場合は何もしなくてよい。
         }
-        const aim = currentAim
+        const aim = launch ? aimFromPointer(event) ?? currentAim : null
         currentAim = null
         reportAim(null)
         if (!bowling) return
@@ -1060,7 +1057,7 @@ export function useTsumikiBowlingEngine(
       flying = true
       trailAccumMs = 0
       launchPopRemainingMs = prefersReducedMotion ? 0 : LAUNCH_POP_MS
-      launchBall(bowling, aim, optionsRef.current.heightLevel ?? DEFAULT_LAUNCH_HEIGHT_LEVEL)
+      launchAutomaticBall(bowling, aim)
       const ballPosition = bowling.ball.translation()
       spawnLaunchFlash({ x: ballPosition.x, y: ballPosition.y, z: ballPosition.z })
       soundController.playLaunch(bowling.ballSpec.id, aim.power)
@@ -1174,7 +1171,6 @@ export function useTsumikiBowlingEngine(
       }
     }
 
-    const guideColor = new THREE.Color()
     /** レーン面へ寝かせるための姿勢。着地点の輪に使う。 */
     const flatOnLane = (() => {
       const tilt = laneTiltQuaternion()
@@ -1182,8 +1178,6 @@ export function useTsumikiBowlingEngine(
         .setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2)
         .premultiply(new THREE.Quaternion(tilt.x, tilt.y, tilt.z, tilt.w))
     })()
-    const weakColor = new THREE.Color(0xffe066)
-    const strongColor = new THREE.Color(0xff3b30)
 
     function writeVisuals(deltaMs: number) {
       if (!bowling) return
@@ -1295,33 +1289,45 @@ export function useTsumikiBowlingEngine(
       // 発射ガイド（予測軌道）
       guidePulseMs += deltaMs
       if (guideMaterial && landingRing && secondBounceRing) {
-        const aim = currentAim
-        const show = aim !== null && aim.active && canPullBall()
+        const bounds = stageBounds(stage)
+        const aim = currentAim ?? aimAtTarget(0, bowling.anchor.z - bounds.frontZ, bounds.halfWidth, bowling.ballSpec)
+        const show = canPullBall()
         if (show && aim) {
           const ballPosition = bowling.ball.translation()
-          const heightLevel = optionsRef.current.heightLevel ?? DEFAULT_LAUNCH_HEIGHT_LEVEL
-          // 実際の発射計算（launchBall→launchVelocity）とまったく同じ関数・同じ高さ設定を
-          // 使うので、ここで見せる軌道は実際の物理挙動とほぼ一致する。
+          // 同じ固定弾道をプレビューと実発射で使う。
           const preview = predictBouncePreview(
             { x: ballPosition.x, y: ballPosition.y, z: ballPosition.z },
-            launchVelocity(aim, bowling.ballSpec, heightLevel),
+            automaticLaunchVelocity(aim, bowling.ballSpec),
             {
               gravityY: GRAVITY_Y,
               surfaceY: laneSurfaceY,
               clearance: bowling.ballSpec.radius,
-              restitution: combinedRestitution(bowling.ballSpec.restitution),
+              restitution: bowling.ballSpec.id === 'bouncy' ? bowling.ballSpec.restitution : combinedRestitution(bowling.ballSpec.restitution),
               samples: GUIDE_DOT_COUNT,
               maxTime: GUIDE_MAX_TIME_S,
             },
           )
-          const points = preview.points
-          // パワーが上がるほど点を太くする。最大付近(GUIDE_STRONG_POWER以上)ではゆっくり
-          // 脈動させ、「もう最大まで引けている」を体で分かるようにする
-          // （prefers-reduced-motionでは脈動させない）。
-          const powerScale = 0.85 + aim.power * 0.5
-          const isNearMax = aim.power >= GUIDE_STRONG_POWER
-          const pulse =
-            isNearMax && !prefersReducedMotion ? 1 + 0.08 * Math.sin(guidePulseMs / 90) : 1
+          const path = [...preview.points, ...preview.bouncePoints].filter((point) => point.z >= bounds.frontZ)
+          // 接地後も転がる方向が見えるよう、低い玉のガイドを目標の手前まで伸ばす。
+          const rollingStart = preview.secondBounce ?? preview.firstBounce
+          if (rollingStart && bowling.ballSpec.id !== 'bouncy') {
+            const start = rollingStart
+            for (let index = 1; index <= 10; index += 1) {
+              const z = start.z + (bounds.frontZ - start.z) * index / 10
+              if (z > start.z) break
+              path.push({ x: Math.tan(aim.yaw) * (bowling.anchor.z - z), y: laneSurfaceY(z) + bowling.ballSpec.radius, z })
+            }
+          }
+          const points = path.length <= GUIDE_DOT_COUNT ? path : Array.from({ length: GUIDE_DOT_COUNT }, (_, index) => path[Math.round(index * (path.length - 1) / (GUIDE_DOT_COUNT - 1))]!)
+          if (targetMarker) {
+            // 左右の狙いを示す目印。衝突後の到達位置を保証するものではない。
+            targetMarker.visible = true
+            targetMarker.position.set(Math.tan(aim.yaw) * (bowling.anchor.z - bounds.frontZ), laneSurfaceY(bounds.frontZ) + 0.5, bounds.frontZ + 0.1)
+            if (camera) targetMarker.quaternion.copy(camera.quaternion)
+          }
+          // 待機中のガイドを穏やかに脈動させ、触れる場所に気づきやすくする。
+          const powerScale = 1.15
+          const pulse = prefersReducedMotion ? 1 : 1 + 0.06 * Math.sin(guidePulseMs / 250)
           guideDots.forEach((dot, index) => {
             const point = points[index]
             dot.visible = point !== undefined
@@ -1351,10 +1357,9 @@ export function useTsumikiBowlingEngine(
             )
             secondBounceRing.quaternion.copy(flatOnLane)
           }
-          // 最大付近では常に強い赤へ張り付かせ、「最大まで引けた」がはっきり伝わるようにする。
-          guideColor.copy(weakColor).lerp(strongColor, isNearMax ? 1 : aim.power)
-          guideMaterial.color.copy(guideColor)
+          guideMaterial.color.set(bowling.ballSpec.color)
         } else {
+          if (targetMarker) targetMarker.visible = false
           for (const dot of guideDots) dot.visible = false
           landingRing.visible = false
           secondBounceRing.visible = false

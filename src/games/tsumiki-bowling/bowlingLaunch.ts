@@ -40,6 +40,25 @@ export type LaunchAim = {
   pull: number
 }
 
+/** 指で示した左右位置をそのまま狙う。高さ・強さは玉の役割に任せる。 */
+export function aimAtTarget(targetX: number, distance: number, halfWidth: number, ball: BowlingBallSpec): LaunchAim {
+  const x = clamp(targetX, -Math.max(0, halfWidth), Math.max(0, halfWidth))
+  return {
+    active: true,
+    yaw: clamp(Math.atan2(x, Math.max(1, distance)), -LAUNCH_YAW_LIMIT_RAD, LAUNCH_YAW_LIMIT_RAD),
+    power: ball.launchProfile.power,
+    pull: 0,
+  }
+}
+
+/** プレビューと実発射が共有する、玉ごとの固定弾道。 */
+export function automaticLaunchVelocity(aim: LaunchAim, ball: BowlingBallSpec): Vector3 {
+  const profile = ball.launchProfile
+  const speed = launchSpeed(profile.power, ball) * profile.speedScale
+  const direction = launchDirection(aim.yaw, profile.pitchRad)
+  return { x: direction.x * speed, y: direction.y * speed, z: direction.z * speed }
+}
+
 /** これ未満のドラッグは、画面に触れただけとみなして発射しない。 */
 export const DRAG_DEAD_ZONE_PX = 12
 
@@ -200,7 +219,19 @@ function simulateArc(start: Vector3, velocity: Vector3, options: TrajectoryOptio
     }
     points.push(point)
     if (point.y <= surfaceY(point.z) + clearance) {
-      landingVelocity = { x: velocity.x, y: velocity.y + gravityY * t, z: velocity.z }
+      // サンプル間で床を突き抜けた分を二分探索で戻す。
+      let low = t - dt
+      let high = t
+      for (let iteration = 0; iteration < 16; iteration += 1) {
+        const middle = (low + high) / 2
+        const y = start.y + velocity.y * middle + 0.5 * gravityY * middle * middle
+        if (y > surfaceY(start.z + velocity.z * middle) + clearance) low = middle
+        else high = middle
+      }
+      point.x = start.x + velocity.x * high
+      point.z = start.z + velocity.z * high
+      point.y = surfaceY(point.z) + clearance
+      landingVelocity = { x: velocity.x, y: velocity.y + gravityY * high, z: velocity.z }
       break
     }
   }
@@ -232,6 +263,8 @@ export function combinedRestitution(ballRestitution: number): number {
 const MIN_BOUNCE_UP_SPEED = 0.6
 
 export type BouncePreview = {
+  /** 最初の接地から次の接地までの近似弾道。 */
+  bouncePoints: Vector3[]
   /** 発射から最初の接地までの点列（従来の赤い軌道ガイド用）。 */
   points: Vector3[]
   /** 最初に床へ着く位置。空中で軌道が尽きた場合はnull。 */
@@ -245,8 +278,8 @@ export type BouncePreview = {
  *
  * 実際の発射計算（launchVelocity）と同じ重力・pitchRadのロジックをそのまま使うので、
  * ここで見せる弾道は実際の物理挙動とほぼ一致する。
- * バウンド後の速度は、垂直成分だけを反発係数で減衰させ、水平成分はそのまま
- * 引き継ぐ単純化した近似（実際のRapierは着地の摩擦で水平方向も減速するが、
+ * バウンド後の速度は、床の法線に沿って反射させた近似（実際のRapierは
+ * 着地の摩擦でも減速するが、
  * プレビューは「だいたいどこで跳ねるか」が伝われば十分なため、あえて単純化してある）。
  */
 export function predictBouncePreview(
@@ -257,20 +290,26 @@ export function predictBouncePreview(
   const first = simulateArc(start, velocity, options)
   const firstBounce = first.points[first.points.length - 1] ?? null
   if (!firstBounce || !first.landingVelocity) {
-    return { points: first.points, firstBounce: null, secondBounce: null }
+    return { points: first.points, bouncePoints: [], firstBounce: null, secondBounce: null }
   }
   const restitution = Number.isFinite(options.restitution)
     ? Math.min(1, Math.max(0, options.restitution))
     : 0
+  // 坂の法線に沿って反射する。垂直成分だけを反転すると下り坂では
+  // 実物理より高く跳ねるガイドになり、上段への狙いがずれて見える。
+  const slope = (options.surfaceY(firstBounce.z + 0.01) - options.surfaceY(firstBounce.z - 0.01)) / 0.02
+  const normalY = 1 / Math.hypot(1, slope)
+  const normalZ = -slope * normalY
+  const normalSpeed = first.landingVelocity.y * normalY + first.landingVelocity.z * normalZ
   const bounceVelocity: Vector3 = {
     x: first.landingVelocity.x,
-    y: -first.landingVelocity.y * restitution,
-    z: first.landingVelocity.z,
+    y: first.landingVelocity.y - (1 + restitution) * normalSpeed * normalY,
+    z: first.landingVelocity.z - (1 + restitution) * normalSpeed * normalZ,
   }
   if (bounceVelocity.y < MIN_BOUNCE_UP_SPEED) {
-    return { points: first.points, firstBounce, secondBounce: null }
+    return { points: first.points, bouncePoints: [], firstBounce, secondBounce: null }
   }
   const second = simulateArc(firstBounce, bounceVelocity, options)
   const secondBounce = second.points[second.points.length - 1] ?? null
-  return { points: first.points, firstBounce, secondBounce }
+  return { points: first.points, bouncePoints: second.points, firstBounce, secondBounce: second.landingVelocity ? secondBounce : null }
 }
