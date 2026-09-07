@@ -4,18 +4,20 @@ import type { StageDefinition } from './types'
 export const STAGE_WIDTH = 100
 export const STAGE_HEIGHT = 150
 
-const tankWalls = [
-  { id: 'floor', kind: 'floor' as const, x: 6, y: 126, width: 88, height: 14 },
-  { id: 'wall-left', kind: 'wall' as const, x: 6, y: 22, width: 8, height: 104 },
-  { id: 'wall-right', kind: 'wall' as const, x: 86, y: 22, width: 8, height: 104 },
-]
+function tankWalls(width = STAGE_WIDTH) {
+  return [
+    { id: 'floor', kind: 'floor' as const, x: 6, y: 126, width: width - 12, height: 14 },
+    { id: 'wall-left', kind: 'wall' as const, x: 6, y: 22, width: 8, height: 104 },
+    { id: 'wall-right', kind: 'wall' as const, x: width - 14, y: 22, width: 8, height: 104 },
+  ]
+}
 
-function water(initialLevel: number, ceilingY = 30) {
+function water(initialLevel: number, ceilingY = 30, right = 86) {
   return {
     id: 'main',
     label: 'おふろ',
     left: 14,
-    right: 86,
+    right,
     floorY: 126,
     ceilingY,
     initialLevel,
@@ -47,7 +49,7 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
     width: STAGE_WIDTH,
     height: STAGE_HEIGHT,
     solids: [
-      ...tankWalls,
+      ...tankWalls(),
       // 右の高い台。水を増やして上から台の上へ運ぶ。
       { id: 'goal-platform', kind: 'platform', x: 64, y: 80, width: 22, height: 46 },
     ],
@@ -65,7 +67,7 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
     width: STAGE_WIDTH,
     height: STAGE_HEIGHT,
     solids: [
-      ...tankWalls,
+      ...tankWalls(),
       // まず高い障害を越え、最後に右の広い台へ下ろす。
       { id: 'high-block', kind: 'wall', x: 44, y: 52, width: 12, height: 74 },
       { id: 'goal-platform', kind: 'platform', x: 62, y: 88, width: 24, height: 38 },
@@ -88,7 +90,7 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
     width: STAGE_WIDTH,
     height: STAGE_HEIGHT,
     solids: [
-      ...tankWalls,
+      ...tankWalls(),
       { id: 'goal-platform', kind: 'platform', x: 62, y: 88, width: 24, height: 38 },
     ],
     waterBodies: [water(10)],
@@ -110,7 +112,7 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
     width: STAGE_WIDTH,
     height: STAGE_HEIGHT,
     solids: [
-      ...tankWalls,
+      ...tankWalls(),
       { id: 'goal-platform', kind: 'platform', x: 68, y: 88, width: 18, height: 38 },
     ],
     // ceilingYを板の高さより下にして、板を逆向きのまま満水にしても越せないようにする。
@@ -127,6 +129,54 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
     board: { id: 'main-board', x: 34, y: 44, width: 26, height: 10, initialFlowDirection: 'back' },
     waterWheel: wheel,
     hint: 'いたを ゴールむきにして、ゲートを あけよう',
+  },
+  {
+    id: 'water-wheel-gate',
+    name: 'すいしゃの すいもん',
+    icon: '⚙️',
+    width: STAGE_WIDTH,
+    height: STAGE_HEIGHT,
+    solids: [...tankWalls()],
+    waterBodies: [water(54)],
+    floaters: [
+      { id: 'duck', kind: 'duck', radius: 8, startX: 22, startY: 68 },
+      { id: 'ringBear', kind: 'ringBear', radius: 7, startX: 32, startY: 69 },
+    ],
+    goal: { area: { x: 50, y: 108, width: 18, height: 16 }, floaterIds: ['duck', 'ringBear'] },
+    faucet,
+    drain: { id: 'wheel-drain', sourceBodyId: 'main', x: 50, y: 126 },
+    waterWheel: {
+      id: 'passage-water-wheel',
+      x: 50,
+      y: 143,
+      radius: 5.5,
+      linkedGate: { x: 48, y: 22, width: 6, height: 104 },
+      linkedGateBlocksPassage: true,
+    },
+    hint: 'みずを ためてから、せんで すいしゃの すいもんを ひらこう',
+  },
+  {
+    id: 'long-waterway',
+    name: 'ながい すいろ',
+    icon: '🚣',
+    width: 240,
+    height: STAGE_HEIGHT,
+    viewportWidth: STAGE_WIDTH,
+    solids: [
+      ...tankWalls(240),
+      { id: 'first-wall', kind: 'wall', x: 66, y: 58, width: 10, height: 68 },
+    ],
+    waterBodies: [water(10, 30, 226)],
+    floaters: [
+      { id: 'duck', kind: 'duck', radius: 8, startX: 22, startY: 116 },
+      { id: 'boat', kind: 'boat', radius: 9, startX: 32, startY: 115 },
+      { id: 'ringBear', kind: 'ringBear', radius: 7, startX: 41, startY: 116 },
+    ],
+    goal: { area: { x: 198, y: 22, width: 24, height: 22 }, floaterIds: ['duck', 'boat', 'ringBear'] },
+    faucet,
+    gate: { id: 'journey-gate', x: 112, y: 22, width: 8, height: 104 },
+    board: { id: 'journey-board', x: 142, y: 22, width: 34, height: 12, initialFlowDirection: 'back' },
+    hint: 'たかい かべ、ゲート、いたを じゅんばんに こえよう',
   },
 ]
 
@@ -151,7 +201,7 @@ export const PUKUPUKA_STAGE: LegacyStageDefinition = {
   width: STAGE_WIDTH,
   height: STAGE_HEIGHT,
   solids: [
-    ...tankWalls,
+    ...tankWalls(),
     { id: 'goal-platform', kind: 'platform', x: 54, y: 96, width: 32, height: 30 },
   ],
   waterBodies: [water(14)],
