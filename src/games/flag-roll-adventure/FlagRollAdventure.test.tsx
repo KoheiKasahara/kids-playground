@@ -1,6 +1,6 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
 import type { AdventureEngineOptions } from './useAdventureEngine'
@@ -14,6 +14,15 @@ vi.mock('./useAdventureEngine', () => ({
     return { registerBall: () => {}, registerWorld: () => {} }
   },
 }))
+
+/**
+ * プレイ画面はAppの実行時にはlazy chunkだが、このファイルの対象テストは
+ * lazy読込そのものではなく、開始操作後の表示と選択国旗を検証する。先にchunkを
+ * 一度だけ解決して、重い初回変換待ちが「やめる」の取得タイムアウトへ混ざらないようにする。
+ */
+beforeAll(async () => {
+  await import('./FlagRollAdventurePlay')
+})
 
 function renderApp(path: string) {
   return render(
@@ -119,7 +128,7 @@ describe('FlagRollAdventure プレイとゴール', () => {
     const flagImages = Array.from(document.querySelectorAll('img'))
     expect(flagImages.length).toBeGreaterThanOrEqual(2)
     expect(flagImages.every((image) => image.getAttribute('src')?.endsWith('/jp.svg'))).toBe(true)
-  }, 10_000)
+  })
 
   test('onAreaEnterでヘッダのエリア名が変わる', async () => {
     const user = userEvent.setup()

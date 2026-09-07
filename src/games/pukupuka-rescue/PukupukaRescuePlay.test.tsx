@@ -21,13 +21,15 @@ function controlAnimationFrames() {
 
   return {
     advance(frames = 1) {
-      for (let index = 0; index < frames; index += 1) {
-        const current = pending
-        if (!current) throw new Error('次のフレームが予約されていません')
-        pending = null
-        now += 1000 / 60
-        act(() => current.callback(now))
-      }
+      act(() => {
+        for (let index = 0; index < frames; index += 1) {
+          const current = pending
+          if (!current) throw new Error('次のフレームが予約されていません')
+          pending = null
+          now += 1000 / 60
+          current.callback(now)
+        }
+      })
     },
     hasPendingFrame: () => pending !== null,
   }
@@ -205,8 +207,8 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
     expect(screen.getByTestId('pukupuka-floater-duck')).toBeInTheDocument()
   })
 
-  // 合計3000フレーム（6×60 + 12×60 + 12×60 + 20×60）を1フレームずつact()で
-  // 進めるため、既定の5秒タイムアウトでは足りない（実測 約5秒）。
+  // 各区間のフレームを1回のact()にまとめて進める。フレーム間のstateRefは
+  // 実装どおり逐次更新されるため、実時間の経過と同じゲーム進行を検証できる。
   test('最終ステージをクリアするとステージ選択へ戻る', () => {
     renderGame()
     chooseStage(6)
@@ -223,7 +225,7 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
     expect(returnButton).toBeInTheDocument()
     fireEvent.click(returnButton)
     expect(screen.getByTestId('pukupuka-stage-select')).toBeInTheDocument()
-  }, 20000)
+  })
 
   test('水車の水門は、せんを開けて水車を回すと通過してクリアできる', () => {
     renderGame()
