@@ -13,9 +13,9 @@ describe('vehicles', () => {
     expect(new Set(vehicles.map((vehicle) => vehicle.photo)).size).toBe(30)
   })
 
-  test('写真パスは images/working-vehicles/<id>.png で、public配下に実ファイルがある', () => {
+  test('写真パスは images/working-vehicles/<id>.webp で、public配下に実ファイルがある', () => {
     for (const vehicle of vehicles) {
-      expect(vehicle.photo).toBe(`images/working-vehicles/${vehicle.id}.png`)
+      expect(vehicle.photo).toBe(`images/working-vehicles/${vehicle.id}.webp`)
       expect(existsSync(resolve('public', vehicle.photo))).toBe(true)
     }
   })

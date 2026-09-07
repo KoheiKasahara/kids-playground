@@ -18,7 +18,7 @@ function renderApp(path: string) {
 
 function vehicleIdFromImage(image: Element | null): string {
   const src = image?.getAttribute('src') ?? ''
-  const match = src.match(/images\/working-vehicles\/([a-z-]+)\.png$/)
+  const match = src.match(/images\/working-vehicles\/([a-z-]+)\.webp$/)
   if (!match) throw new Error(`unexpected vehicle src: ${src}`)
   return match[1]
 }
