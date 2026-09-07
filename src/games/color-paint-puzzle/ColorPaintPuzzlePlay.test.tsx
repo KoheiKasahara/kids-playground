@@ -153,6 +153,32 @@ describe('ColorPaintPuzzlePlay', () => {
   })
 })
 
+describe('ColorPaintPuzzlePlay: 題材えらびの横スクロール', () => {
+  test('9件の題材ボタンは role="group"（えを えらぶ）の中に入っている', () => {
+    renderPlay()
+    const group = screen.getByRole('group', { name: 'えを えらぶ' })
+    for (const picture of PAINT_PICTURES) {
+      expect(group).toContainElement(screen.getByRole('button', { name: picture.label }))
+    }
+  })
+
+  test('横スクロール領域のラッパーがグループを包み、左右のヒント状態を持つ', () => {
+    renderPlay()
+    const group = screen.getByRole('group', { name: 'えを えらぶ' })
+    const scroller = group.parentElement!
+    // jsdomはレイアウトを持たない（幅がすべて0）ので、スクロール不要と判定されて両方false。
+    expect(scroller).toHaveAttribute('data-scroll-left', 'false')
+    expect(scroller).toHaveAttribute('data-scroll-right', 'false')
+  })
+
+  test('完成演出中は横スクロール領域ごと題材えらびが消える', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    await user.click(finishButton())
+    expect(screen.queryByRole('group', { name: 'えを えらぶ' })).not.toBeInTheDocument()
+  })
+})
+
 describe('ColorPaintPuzzlePlay: 追加した題材（ロボット・ロケット・きょうりゅう）', () => {
   const ADDED_PICTURE_IDS = ['robot', 'rocket', 'dinosaur'] as const
 
