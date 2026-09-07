@@ -19,7 +19,7 @@ test('3Dレースを操作して退出し、新しいengineで再入場できる
   await page.getByRole('link', { name: 'サーキットレース', exact: true }).click()
   await expect(begin).toBeEnabled({ timeout: 15_000 })
   await begin.click()
-  await expect(page.getByRole('heading', { name: /はしってるよ/ })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'レースの そうさ', exact: true })).toBeVisible()
   await expect(page.locator('canvas')).toHaveCount(1)
   expect(errors).toEqual([])
 })
