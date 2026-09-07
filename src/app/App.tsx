@@ -1,4 +1,5 @@
-import { Suspense, useEffect } from 'react'
+import { useEffect } from 'react'
+import GameRouteBoundary from './GameRouteBoundary'
 import { useRoutes } from 'react-router-dom'
 import { routes } from './routes'
 import GameIntro from '../components/GameIntro'
@@ -19,21 +20,11 @@ export default function App() {
     <>
       <ScrollManager />
       <SeoManager />
-      {/*
-       * ゲーム本体（element、一部はroutes.tsxでReact.lazy）とGameIntroを同じSuspense境界に
-       * 同居させる（Issue #298）。lazyルートのチャンクが未解決の間はこの境界ごとfallback={null}
-       * になるため、GameIntroだけが先に描画されてゲーム本体が存在しない中間状態が起きない。
-       * チャンク解決後は両方が同一コミットで一緒に現れ、従来どおりゲーム下部にGameIntroが並ぶ。
-       *
-       * GameIntroはここ1箇所だけでマウントする（17個の各ゲームコンポーネントには手を入れない）。
-       * 自分でゲームルートURLかどうかを判定して、該当しなければ何も描画しない
-       * （詳細はsrc/components/GameIntro.tsxのコメントを参照）。静的importのルート（Suspenseが
-       * 実際にサスペンドしない）では、このSuspenseは何もしないラッパーとして振る舞う。
-       */}
-      <Suspense fallback={null}>
+      {/* ゲームと説明を同じSuspenseで待ち、説明だけを先行表示しない。 */}
+      <GameRouteBoundary>
         {element}
         <GameIntro />
-      </Suspense>
+      </GameRouteBoundary>
       <PwaStatus />
     </>
   )

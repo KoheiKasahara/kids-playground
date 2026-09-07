@@ -42,9 +42,10 @@ describe('lazyルートとGameIntroのSuspense同期(Issue #298)', () => {
 
       // Suspense解決前: GameIntro（「このゲームについて」見出し）が先に露出しないこと。
       // App.tsxで{element}とGameIntroを同じSuspense境界に入れているため、
-      // 未解決の間はどちらもfallback={null}に置き換わり、何も描画されない。
+      // 未解決の間はどちらも読込表示に置き換わり、本体と説明は描画されない。
       expect(screen.queryByRole('heading', { name: 'このゲームについて' })).not.toBeInTheDocument()
       expect(screen.queryByRole('main')).not.toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent('よみこみちゅう')
 
       deferred.resolve({ default: () => <main>rail-builder stub</main> })
 
