@@ -74,3 +74,12 @@
   .numberPad { width: 100%; max-width: none; margin: 0; }
   .mapHint { display: none; }
 }
+
+/* 問題文とヒントをまとめ、横画面でも右列の1行目に収める。 */
+.shapePrompt { width: 100%; min-width: 0; display: flex; flex-direction: column; gap: var(--space-xs); }
+.featureHint { margin: 0; padding: 6px 10px; border-radius: var(--radius-sm); background: #fff3ce; color: #664b16; font-size: clamp(15px, 4vw, 18px); font-weight: 700; line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
+@media (orientation: landscape) {
+  .shapePrompt { grid-column: 2; grid-row: 1; }
+  .shapePrompt .question { font-size: clamp(20px, 3.4dvh, 34px); }
+  .featureHint { font-size: clamp(14px, 2.8dvh, 18px); }
+}
