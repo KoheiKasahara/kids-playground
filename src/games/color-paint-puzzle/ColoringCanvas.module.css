@@ -575,6 +575,270 @@
   }
 }
 
+/* --- でんしゃ: タイヤを回しながら、はっきり左右に走る。けむりは交互に浮かぶ --- */
+
+/* タイヤの接地面(y≒87%)を軸にする（くるま・ロボットと同じ理由）。 */
+.canvas [data-motion-group='train'] {
+  transform-origin: 50% 87%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='train'] {
+  animation: trainEnter 480ms ease-out both, trainRun 5s 480ms ease-in-out infinite;
+}
+
+@keyframes trainEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.78);
+  }
+}
+
+/* くるまより走行距離をはっきり大きく(±20px)取り、4分割の等間隔（右へ・中央へ・左へ・中央へ）で
+   進むことで、くるまの「ため→走る→跳ねる」より一定速な「まっすぐ走る」印象にする。
+   上下動・かたむきは折り返し点（25%・75%）だけごく僅かに付ける。 */
+@keyframes trainRun {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.78);
+  }
+
+  25% {
+    transform: translate(20px, -1px) rotate(0.6deg) scale(0.78);
+  }
+
+  50% {
+    transform: translate(0, 0) rotate(0deg) scale(0.78);
+  }
+
+  75% {
+    transform: translate(-20px, -1px) rotate(-0.6deg) scale(0.78);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.78);
+  }
+}
+
+/* タイヤはtrainRunと同じduration・同じ遅延・同じ4分割点で回し、進行方向と回転方向を
+   一致させる（右へ進む0-25%は正回転、中央へ戻る25-50%と左へ進む50-75%は逆回転、
+   中央へ戻る75-100%は正回転）。360degの倍数で閉じるのでループの継ぎ目が飛ばない。 */
+.canvas[data-phase='celebrating'] [data-motion-part='trainWheelBack'],
+.canvas[data-phase='celebrating'] [data-motion-part='trainWheelFront'] {
+  animation: trainWheel 5s 480ms linear infinite;
+}
+
+@keyframes trainWheel {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(360deg);
+  }
+
+  50% {
+    transform: rotate(0deg);
+  }
+
+  75% {
+    transform: rotate(-360deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* けむりはbubbleRiseと同様に、上へ昇りながら薄くなって消える。durationと遅延を
+   ずらして2つが交互に出るようにする。 */
+.canvas[data-phase='celebrating'] [data-motion-part='trainSmokeA'] {
+  animation: trainSmokeRise 2.4s 480ms ease-in-out infinite;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='trainSmokeB'] {
+  animation: trainSmokeRise 2.4s 1200ms ease-in-out infinite;
+}
+
+@keyframes trainSmokeRise {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.85);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(1.15);
+  }
+}
+
+/* --- ひこうき: 左下から右上へゆるやかに上がって飛ぶ。くもはそらをゆっくり流れる --- */
+
+.canvas[data-phase='celebrating'] [data-motion-group='plane'] {
+  animation: planeEnter 480ms ease-out both, planeFly 4.6s 480ms ease-in-out infinite;
+}
+
+@keyframes planeEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(0.8);
+  }
+}
+
+/* 画面外へ出さず、0%と100%を同じ値にして瞬間移動しないループにする
+   （幼児が絵を見失わないため）。上がるときに機首が上がるようrotateをつける。 */
+@keyframes planeFly {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.8);
+  }
+
+  30% {
+    transform: translate(-8px, 4px) rotate(-6deg) scale(0.8);
+  }
+
+  60% {
+    transform: translate(9px, -10px) rotate(4deg) scale(0.8);
+  }
+
+  85% {
+    transform: translate(4px, -3px) rotate(-2deg) scale(0.8);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.8);
+  }
+}
+
+/* くもはひこうきと一緒に飛ばず、そらをゆっくり横へ流れて端で薄くなる（飛んでいる視差）。 */
+.canvas[data-phase='celebrating'] [data-motion-part='planeClouds'] {
+  animation: planeCloudsDrift 6s 480ms ease-in-out infinite;
+}
+
+@keyframes planeCloudsDrift {
+  0% {
+    opacity: 0.7;
+    transform: translateX(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateX(-10px);
+  }
+
+  100% {
+    opacity: 0.7;
+    transform: translateX(0);
+  }
+}
+
+/* --- ふね: 左右へ進みながら、ずっと波に揺れる。はたははためき、なみはその場で寄せる --- */
+
+/* 喫水線(y≒88%)を軸にする（くるま・ロボットと同じ理由）。 */
+.canvas [data-motion-group='ship'] {
+  transform-origin: 50% 88%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='ship'] {
+  animation: shipEnter 480ms ease-out both, shipSail 5s 480ms ease-in-out infinite;
+}
+
+@keyframes shipEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(0.82);
+  }
+}
+
+/* 1サイクル中にtranslateYの山を3回作り、進行中ずっと波に揺れている見た目にする。
+   rotateは船首が波に乗るように小さくつける。 */
+@keyframes shipSail {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+
+  16% {
+    transform: translate(-8px, -3px) rotate(-2.5deg) scale(0.82);
+  }
+
+  33% {
+    transform: translate(-16px, 0) rotate(0deg) scale(0.82);
+  }
+
+  50% {
+    transform: translate(-8px, -3px) rotate(2.5deg) scale(0.82);
+  }
+
+  66% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+
+  83% {
+    transform: translate(8px, -3px) rotate(-2.5deg) scale(0.82);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+}
+
+/* はたは付け根（マスト上端）を軸に小さくはためく。 */
+.canvas[data-phase='celebrating'] [data-motion-part='shipFlag'] {
+  transform-origin: left center;
+  animation: shipFlagWave 460ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes shipFlagWave {
+  from {
+    transform: rotate(-10deg) scaleX(0.94);
+  }
+
+  to {
+    transform: rotate(10deg) scaleX(1.04);
+  }
+}
+
+/* なみはふねと一緒に進まず、横に少し寄せながら上下する短いループでその場に揺れる。 */
+.canvas[data-phase='celebrating'] [data-motion-part='shipWave'] {
+  animation: shipWaveBob 1.6s 480ms ease-in-out infinite alternate;
+}
+
+@keyframes shipWaveBob {
+  from {
+    transform: translate(-4px, 1px);
+  }
+
+  to {
+    transform: translate(4px, -1px);
+  }
+}
+
 /* 動きを減らす設定のときは、走る・泳ぐ・羽ばたくを止めて、
    「できた」ことが分かる程度のゆっくりした呼吸だけ残す。 */
 @media (prefers-reduced-motion: reduce) {
