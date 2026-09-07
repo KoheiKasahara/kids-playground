@@ -5,11 +5,13 @@
  * タイヤ・フロント・屋根・飾り・マークの座標へボディ種別を持ち込まないこと。
  */
 import * as THREE from 'three'
+import type { CarSurface } from './carSurface'
 import type { CarCategoryId, CarConfig, CarMarkIcon, CarOptionIdMap, FrontType, MarkType } from './carConfig'
 import type { CarAttachment, CarAttachments, CarDimensions } from './carDimensions'
 
 export type CarPartContext = {
   config: CarConfig
+  surface?: CarSurface
   dimensions: CarDimensions
   attachments: CarAttachments
   /** ボディカラー（hex）。カラーカテゴリの選択がここへ流れてくる。 */
@@ -81,7 +83,7 @@ function addPerformanceRim(
   )
   rimRing.name = `${namePrefix}-rim-ring-${wheel.id}`
   rimRing.rotation.y = Math.PI / 2
-  rimRing.position.set(wheel.position.x, wheel.position.y, wheel.position.z)
+  rimRing.position.set(wheel.position.x + wheel.side * wheel.width * 0.51, wheel.position.y, wheel.position.z)
   rimRing.castShadow = true
 
   const centerCap = new THREE.Mesh(
@@ -89,11 +91,11 @@ function addPerformanceRim(
     hubMaterial,
   )
   centerCap.name = `${namePrefix}-center-cap-${wheel.id}`
-  centerCap.position.set(wheel.position.x, wheel.position.y, wheel.position.z)
+  centerCap.position.set(wheel.position.x + wheel.side * wheel.width * 0.51, wheel.position.y, wheel.position.z)
   centerCap.castShadow = true
 
   // 外側の面に短いスポークを置き、レーシングはリムを大きくしてスポーツカー以外でも判別できるようにする。
-  const spokeFaceX = wheel.position.x + wheel.side * (wheel.width * 0.58)
+  const spokeFaceX = wheel.position.x + wheel.side * (wheel.width * 0.51)
   for (let spokeIndex = 0; spokeIndex < 5; spokeIndex += 1) {
     const spoke = box(
       { x: 0.04, y: wheel.radius * 0.1, z: wheel.radius * (namePrefix === 'car-racing' ? 0.58 : 0.5) },
@@ -180,7 +182,7 @@ function buildWheels(visual: WheelVisual) {
 }
 
 function buildFront(shape: FrontType) {
-  return ({ attachments }: CarPartContext): THREE.Object3D => {
+  return ({ attachments, surface }: CarPartContext): THREE.Object3D => {
     const front = attachments.front
     const group = new THREE.Group()
     group.name = 'car-front'
@@ -256,12 +258,21 @@ function buildFront(shape: FrontType) {
     )
     bumper.name = `car-front-bumper-${shape}`
     group.add(bumper)
+    // Fit each housing at its own height and lateral position, not the bounding box front.
+    for (const child of group.children) {
+      const point = new THREE.Vector3(child.position.x, child.position.y, front.position.z)
+      const mounted = surface?.(point, new THREE.Vector3(0, 0, 1)) ?? point
+      child.position.z += mounted.z - front.position.z - 0.035
+    }
     return group
   }
 }
 
-function buildRoofPoliceLight({ attachments }: CarPartContext): THREE.Object3D {
-  const roof = attachments.roof
+function buildRoofPoliceLight({ attachments, surface }: CarPartContext): THREE.Object3D {
+  const original = attachments.roof
+  const point = new THREE.Vector3(original.position.x, original.position.y, original.position.z)
+  const mounted = surface?.(point, new THREE.Vector3(0, 1, 0)) ?? point
+  const roof = { ...original, position: mounted }
   const group = new THREE.Group()
   group.name = 'car-roof'
   const baseMaterial = standard('#202a35', 0.35, 0.35)
@@ -297,8 +308,11 @@ function buildRoofPoliceLight({ attachments }: CarPartContext): THREE.Object3D {
   return group
 }
 
-function buildRoofLuggage({ attachments }: CarPartContext): THREE.Object3D {
-  const roof = attachments.roof
+function buildRoofLuggage({ attachments, surface }: CarPartContext): THREE.Object3D {
+  const original = attachments.roof
+  const point = new THREE.Vector3(original.position.x, original.position.y, original.position.z)
+  const mounted = surface?.(point, new THREE.Vector3(0, 1, 0)) ?? point
+  const roof = { ...original, position: mounted }
   const group = new THREE.Group()
   group.name = 'car-roof'
   const luggageMaterial = standard('#c88643', 0.62, 0.02)
@@ -336,8 +350,11 @@ function buildRoofLuggage({ attachments }: CarPartContext): THREE.Object3D {
   return group
 }
 
-function buildRoofSpoiler({ attachments }: CarPartContext): THREE.Object3D {
-  const roof = attachments.roof
+function buildRoofSpoiler({ attachments, surface }: CarPartContext): THREE.Object3D {
+  const original = attachments.roof
+  const point = new THREE.Vector3(original.position.x, original.position.y, original.position.z)
+  const mounted = surface?.(point, new THREE.Vector3(0, 1, 0)) ?? point
+  const roof = { ...original, position: mounted }
   const group = new THREE.Group()
   group.name = 'car-roof'
   const wingMaterial = standard('#3b4651', 0.32, 0.3)
@@ -357,6 +374,12 @@ function buildRoofSpoiler({ attachments }: CarPartContext): THREE.Object3D {
       },
       supportMaterial,
     )
+    const foot = new THREE.Vector3(support.position.x, roof.position.y, wingZ)
+    const footY = surface?.(foot, new THREE.Vector3(0, 1, 0)).y ?? foot.y
+    const topY = roof.position.y + supportHeight
+    const legHeight = Math.max(0.02, topY - footY + 0.01)
+    support.scale.y = legHeight / supportHeight
+    support.position.y = topY - legHeight / 2
     support.name = `car-roof-spoiler-support-${side === 1 ? 'left' : 'right'}`
     group.add(support)
   }
@@ -417,8 +440,7 @@ type SideStickerSurface = {
 
 /**
  * 側面ステッカーの貼り付け面を求める。
- * 車体はGLBなので断面の実形状は分からない。側面のattachment平面を基準に置き、
- * 曲面へ沿わせる調整は Phase 3 のカスタムパーツ側で行う。
+ * 読み込み済みGLBの側面へ投影し、最大車幅からの浮きを防ぐ。
  */
 function sideStickerSurface(
   context: CarPartContext,
@@ -426,27 +448,32 @@ function sideStickerSurface(
   z: number,
   u: number,
 ): SideStickerSurface {
-  return {
-    position: new THREE.Vector3(
-      side.position.x,
-      context.dimensions.bodyFloorY + context.dimensions.hullHeight * (0.48 + (u - 0.3) * 0.8),
-      side.position.z + z,
-    ),
-    normal: new THREE.Vector3(side.normal.x, side.normal.y, side.normal.z).normalize(),
+  const point = new THREE.Vector3(
+    side.position.x,
+    context.dimensions.bodyFloorY + context.dimensions.hullHeight * (0.48 + (u - 0.3) * 0.8),
+    side.position.z + z,
+  )
+  const normal = new THREE.Vector3(side.normal.x, side.normal.y, side.normal.z).normalize()
+  const position = context.surface?.(point, normal) ?? point
+  if (context.surface) {
+    const above = context.surface(point.clone().add(new THREE.Vector3(0, 0.02, 0)), normal)
+    const ahead = context.surface(point.clone().add(new THREE.Vector3(0, 0, 0.02)), normal)
+    const tangentY = above.sub(position)
+    const tangentZ = ahead.sub(position)
+    normal.copy(tangentY.cross(tangentZ).normalize()).multiplyScalar(side.normal.x)
   }
+  return { position, normal }
 }
 
 /** 平面の横軸を車の前後、縦軸を車体断面の接線へ合わせる。 */
 function placeSideSticker(
   mesh: THREE.Mesh,
   surface: SideStickerSurface,
-  side: CarAttachment,
   distance: number,
 ): void {
-  const sideSign = side.normal.x > 0 ? 1 : -1
   const normal = surface.normal.clone().normalize()
-  const horizontal = new THREE.Vector3(0, 0, -sideSign)
-  const vertical = new THREE.Vector3(-normal.y / sideSign, Math.abs(normal.x), 0).normalize()
+  const horizontal = new THREE.Vector3(0, 1, 0).cross(normal).normalize()
+  const vertical = normal.clone().cross(horizontal).normalize()
   const basis = new THREE.Matrix4().makeBasis(horizontal, vertical, normal)
 
   mesh.position.copy(surface.position).addScaledVector(normal, distance)
@@ -465,7 +492,7 @@ function sideStickerMesh(
   distance = 0.024,
 ): THREE.Mesh {
   const mesh = new THREE.Mesh(geometry, material)
-  placeSideSticker(mesh, sideStickerSurface(context, side, z, u), side, distance)
+  placeSideSticker(mesh, sideStickerSurface(context, side, z, u), distance)
   return mesh
 }
 
@@ -705,7 +732,7 @@ function addIconMark(
   group.add(outline, icon)
 }
 
-function buildNumberPlate({ attachments, config }: CarPartContext): THREE.Object3D {
+function buildNumberPlate({ attachments, config, surface }: CarPartContext): THREE.Object3D {
   const group = new THREE.Group()
   group.name = 'car-mark'
   const plateMaterial = standard('#f8f9fa', 0.5)
@@ -722,7 +749,11 @@ function buildNumberPlate({ attachments, config }: CarPartContext): THREE.Object
     animal: '#188a8a',
   }
 
-  for (const face of [attachments.front, attachments.rear]) {
+  for (const original of [attachments.front, attachments.rear]) {
+    const point = new THREE.Vector3(original.position.x, original.position.y - original.size.extent * 0.04, original.position.z)
+    const normal = new THREE.Vector3(original.normal.x, original.normal.y, original.normal.z)
+    const mounted = surface?.(point, normal) ?? point
+    const face = { ...original, position: { ...original.position, z: mounted.z - normal.z * 0.025 } }
     const plateWidth = Math.min(Math.max(face.size.width * 0.38, 0.78), 1.15)
     const plateHeight = Math.min(Math.max(face.size.extent * 0.34, 0.22), 0.34)
     const plateY = face.position.y - face.size.extent * 0.04
