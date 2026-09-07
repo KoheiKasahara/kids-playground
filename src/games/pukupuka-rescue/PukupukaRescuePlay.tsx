@@ -19,8 +19,8 @@ import {
   playPukupukaActionSound,
   playPukupukaGoalSound,
   playPukupukaWaterSound,
-  primeAudio,
-} from '../../utils/quizSound'
+} from './sounds'
+import { primeAudio } from '../../audio/sound'
 import styles from './PukupukaRescuePlay.module.css'
 
 /** ステージ選択。カードは番号・記号・名前を大きく並べ、読めなくても選びやすくする。 */

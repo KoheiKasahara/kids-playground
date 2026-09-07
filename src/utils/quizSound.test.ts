@@ -51,6 +51,20 @@ describe('quizSound', () => {
     vi.resetModules()
   })
 
+  test('ゲーム固有SEも既存のContextとmute設定を共有する', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { primeAudio, setSoundEnabled } = await import('./quizSound')
+    const { playPukupukaActionSound } = await import('../games/pukupuka-rescue/sounds')
+    primeAudio()
+    playPukupukaActionSound('gate')
+    expect(instances).toHaveLength(1)
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(2)
+    setSoundEnabled(false)
+    playPukupukaActionSound('board')
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(2)
+  })
+
   test('playCorrectSound は「ピンポーン」の2音を鳴らす', async () => {
     ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
     vi.resetModules()

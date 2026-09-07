@@ -1,72 +1,5 @@
-/**
- * クイズの正解・不正解、パネルめくりの手触りを知らせる効果音を Web Audio API で合成する。
- * 音声ファイルを追加せず標準APIだけで鳴らすことで、アセット追加やライセンスの心配なしに
- * オフライン（PWA）でも確実に再生できるようにする。
- * Web Audio 非対応環境（一部ブラウザやテスト環境の jsdom）では何もしない。
- */
-
-type AudioContextConstructor = new () => AudioContext
-
-function getAudioContextConstructor(): AudioContextConstructor | undefined {
-  if (typeof window === 'undefined') return undefined
-  const withWebkit = window as typeof window & { webkitAudioContext?: AudioContextConstructor }
-  return withWebkit.AudioContext ?? withWebkit.webkitAudioContext
-}
-
-let sharedContext: AudioContext | undefined
-
-/** 音を鳴らすかどうか。将来 UI から ON/OFF できるようにするための切り替えフラグ（既定は ON）。 */
-let soundEnabled = true
-
-/** サウンドの ON/OFF を切り替える。false にすると、以降すべての play* 関数が即座に何もしなくなる。 */
-export function setSoundEnabled(enabled: boolean): void {
-  soundEnabled = enabled
-}
-
-/** 現在サウンドが有効かどうかを返す。 */
-export function isSoundEnabled(): boolean {
-  return soundEnabled
-}
-
-function getAudioContext(): AudioContext | undefined {
-  const Ctor = getAudioContextConstructor()
-  if (!Ctor) return undefined
-  if (!sharedContext) {
-    try {
-      sharedContext = new Ctor()
-    } catch {
-      return undefined
-    }
-  }
-  if (sharedContext.state === 'suspended') {
-    // クリックなどのユーザー操作中に呼ばれるため resume() は許可される想定だが、
-    // 環境によっては拒否されることがあるので失敗しても無視する。
-    sharedContext.resume().catch(() => {})
-  }
-  return sharedContext
-}
-
-/**
- * 共有 AudioContext をそのまま取得したいゲーム側モジュール（つみきボウリング等）向けの窓口。
- * iOSで複数のAudioContextを作らないため、各ゲームは必ずこれを使い回し、
- * 自前で `new AudioContext()` しないこと。挙動はgetAudioContextと同じ
- * （非対応環境ではundefined、既存の共有インスタンスをresumeして返す）。
- */
-export function getSharedAudioContext(): AudioContext | undefined {
-  return getAudioContext()
-}
-
-/**
- * AudioContext を用意して resume するだけの関数。
- * iOS Safari は「ユーザー操作イベントの中で最初に AudioContext を作る/resume する」ことを
- * 要求するため、パネルタップや選択肢クリックなどのイベントハンドラの先頭で呼んでおく。
- * setTimeout 経由で少し後から鳴らす音（パネルの連続めくりなど）も、ここで先に
- * resume 済みにしておくことで iOS でも確実に鳴るようにする。
- */
-export function primeAudio(): void {
-  if (!soundEnabled) return
-  getAudioContext()
-}
+import { getSharedAudioContext, isSoundEnabled, playTone, createToneNodes } from '../audio/sound'
+export { getSharedAudioContext, isSoundEnabled, primeAudio, setSoundEnabled } from '../audio/sound'
 
 export type KomaBattleImpactSoundKind = 'koma' | 'bumper' | 'wall'
 type KomaBattleDefeatReason = 'toppled' | 'stopped' | 'outOfArena'
@@ -111,9 +44,9 @@ function setSmoothedAudioParam(
 
 /** 「まわせ！」を押した瞬間の短い上行音。AudioContextは共有utilityから取得する。 */
 export function playKomaBattleStartSound(): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
   try {
-    const ctx = getAudioContext()
+    const ctx = getSharedAudioContext()
     if (!ctx) return
     const now = ctx.currentTime
     playTone(ctx, 280, now, 0.1, 0.11, 'triangle')
@@ -128,9 +61,9 @@ function playKomaBattleImpactSound(
   intensity: number,
   activeTones: Set<KomaBattleTone>,
 ): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
   try {
-    const ctx = getAudioContext()
+    const ctx = getSharedAudioContext()
     if (!ctx) return
     const safeIntensity = Number.isFinite(intensity)
       ? Math.min(1, Math.max(0, intensity))
@@ -169,9 +102,9 @@ function playKomaBattleDefeatSound(
   reason: KomaBattleDefeatReason,
   activeTones: Set<KomaBattleTone>,
 ): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
   try {
-    const ctx = getAudioContext()
+    const ctx = getSharedAudioContext()
     if (!ctx) return
     const now = ctx.currentTime
     if (reason === 'outOfArena') {
@@ -190,9 +123,9 @@ function playKomaBattleDefeatSound(
 
 /** タップしたコマが元気になった瞬間を伝える、短い上行音。 */
 function playKomaBattleBoostSound(activeTones: Set<KomaBattleTone>): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
   try {
-    const ctx = getAudioContext()
+    const ctx = getSharedAudioContext()
     if (!ctx) return
     const now = ctx.currentTime
     playTrackedKomaTone(ctx, 520, now, 0.075, 0.065, 'triangle', activeTones)
@@ -243,8 +176,8 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
   const activeTones = new Set<KomaBattleTone>()
 
   function ensureSpinNodes(): AudioContext | undefined {
-    if (disposed || !soundEnabled) return undefined
-    const ctx = getAudioContext()
+    if (disposed || !isSoundEnabled()) return undefined
+    const ctx = getSharedAudioContext()
     if (!ctx) return undefined
     if (oscillator === undefined || gain === undefined) {
       oscillator = ctx.createOscillator()
@@ -270,7 +203,7 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
   function stopSpin(): void {
     spinRequested = false
     if (gain === undefined) return
-    const ctx = spinContext ?? getAudioContext()
+    const ctx = spinContext ?? getSharedAudioContext()
     if (ctx) setSpinGain(0, ctx.currentTime)
   }
 
@@ -281,7 +214,7 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
     },
     updateSpin(spinSpeed) {
       if (disposed || !spinRequested) return
-      if (suspended || !soundEnabled) {
+      if (suspended || !isSoundEnabled()) {
         // グローバルの音量設定が途中でOFFになっても、既に鳴っている回転音を残さない。
         if (gain !== undefined && spinContext !== undefined) {
           setSpinGain(0, spinContext.currentTime)
@@ -299,7 +232,7 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
     },
     stopSpin,
     playImpact(kind, intensity) {
-      if (disposed || !soundEnabled) return
+      if (disposed || !isSoundEnabled()) return
       const wallClockNow = Date.now()
       if (
         lastImpactAt !== null
@@ -309,24 +242,24 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
       playKomaBattleImpactSound(kind, intensity, activeTones)
     },
     playBoost() {
-      if (disposed || !soundEnabled) return
+      if (disposed || !isSoundEnabled()) return
       const wallClockNow = Date.now()
       if (lastBoostAt !== null && wallClockNow - lastBoostAt < KOMA_BOOST_SOUND_COOLDOWN_MS) return
       lastBoostAt = wallClockNow
       playKomaBattleBoostSound(activeTones)
     },
     playDefeat(reason) {
-      if (disposed || !soundEnabled) return
+      if (disposed || !isSoundEnabled()) return
       const wallClockNow = Date.now()
       if (lastDefeatAt !== null && wallClockNow - lastDefeatAt < KOMA_DEFEAT_SOUND_COOLDOWN_MS) return
       lastDefeatAt = wallClockNow
       playKomaBattleDefeatSound(reason, activeTones)
     },
     playVictory() {
-      if (disposed || !soundEnabled || resultPlayed) return
+      if (disposed || !isSoundEnabled() || resultPlayed) return
       resultPlayed = true
       try {
-        const ctx = getAudioContext()
+        const ctx = getSharedAudioContext()
         if (!ctx) return
         const now = ctx.currentTime
         ;[523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
@@ -345,10 +278,10 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
       }
     },
     playDraw() {
-      if (disposed || !soundEnabled || resultPlayed) return
+      if (disposed || !isSoundEnabled() || resultPlayed) return
       resultPlayed = true
       try {
-        const ctx = getAudioContext()
+        const ctx = getSharedAudioContext()
         if (!ctx) return
         const now = ctx.currentTime
         playTrackedKomaTone(ctx, 440, now, 0.13, 0.09, 'sine', activeTones)
@@ -361,7 +294,7 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
       suspended = nextSuspended
       if (suspended) {
         if (gain !== undefined) {
-          // 隠れている間にgetAudioContext()を呼ぶと、既にsuspendedでも
+          // 隠れている間にgetSharedAudioContext()を呼ぶと、既にsuspendedでも
           // resumeを試みてしまうため、このrunで保持しているContextだけを使う。
           const ctx = spinContext
           if (ctx) setSpinGain(0, ctx.currentTime)
@@ -392,39 +325,6 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
   }
 }
 
-function playTone(
-  ctx: AudioContext,
-  frequency: number,
-  startTime: number,
-  duration: number,
-  volume: number,
-  type: OscillatorType,
-): void {
-  const tone = createToneNodes(ctx, frequency, startTime, duration, volume, type)
-  tone.oscillator.start(startTime)
-  tone.oscillator.stop(startTime + duration)
-}
-
-function createToneNodes(
-  ctx: AudioContext,
-  frequency: number,
-  startTime: number,
-  duration: number,
-  volume: number,
-  type: OscillatorType,
-): KomaBattleTone {
-  const oscillator = ctx.createOscillator()
-  const gain = ctx.createGain()
-  oscillator.type = type
-  oscillator.frequency.value = frequency
-  gain.gain.setValueAtTime(0, startTime)
-  gain.gain.linearRampToValueAtTime(volume, startTime + 0.02)
-  gain.gain.linearRampToValueAtTime(0, startTime + duration)
-  oscillator.connect(gain)
-  gain.connect(ctx.destination)
-  return { oscillator, gain }
-}
-
 /** コマバトルの予約音をrun単位で追跡し、再戦時に途中停止できるようにする。 */
 function playTrackedKomaTone(
   ctx: AudioContext,
@@ -449,8 +349,8 @@ function playTrackedKomaTone(
 
 /** せいかい音「ピンポーン」: 高いラ→低いミ の2音チャイム */
 export function playCorrectSound(): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 880, now, 0.25, 0.2, 'sine') // ピン (A5)
@@ -459,8 +359,8 @@ export function playCorrectSound(): void {
 
 /** ふせいかい音「ブブー」: 低い音を2回短く鳴らすブザー */
 export function playIncorrectSound(): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 150, now, 0.18, 0.15, 'sawtooth')
@@ -472,8 +372,8 @@ export function playIncorrectSound(): void {
  * 成功チャイムとは時間をずらして ColorMixQuizPlay 側で鳴らすため、二つの演出が重ならない。
  */
 export function playColorMixSound(): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 430, now, 0.14, 0.1, 'triangle')
@@ -485,10 +385,10 @@ const COLOR_PAINT_FILL_SOUND_MIN_INTERVAL_MS = 95
 let lastColorPaintFillSoundAt: number | null = null
 
 export function playColorPaintFillSound(): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
 
   try {
-    const ctx = getAudioContext()
+    const ctx = getSharedAudioContext()
     if (!ctx) return
     const wallClockNow = Date.now()
     if (
@@ -509,8 +409,8 @@ export function playColorPaintFillSound(): void {
  * 短く（130ms）鳴らす。正解音より控えめな音量にしてある。
  */
 export function playPanelOpenSound(): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 740, now, 0.13, 0.12, 'triangle')
@@ -525,7 +425,7 @@ let lastGlobeCountrySelectSoundAt: number | null = null
  * 小さな上行2音を重ねずに並べ、クリック音や正解音より控えめな手触りにする。
  */
 export function playGlobeCountrySelectSound(): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
   const wallClockNow = Date.now()
   if (
     lastGlobeCountrySelectSoundAt !== null
@@ -533,7 +433,7 @@ export function playGlobeCountrySelectSound(): void {
   ) return
   lastGlobeCountrySelectSoundAt = wallClockNow
 
-  const ctx = getAudioContext()
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 520, now, 0.09, 0.07, 'triangle')
@@ -549,7 +449,7 @@ let lastPlanetSpotSelectSoundAt: number | null = null
  * 正解音のような達成感は出さず(クイズではないため)、音量も控えめにする。特徴ごとに音は変えない。
  */
 export function playPlanetSpotSelectSound(): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
   const wallClockNow = Date.now()
   if (
     lastPlanetSpotSelectSoundAt !== null
@@ -557,7 +457,7 @@ export function playPlanetSpotSelectSound(): void {
   ) return
   lastPlanetSpotSelectSoundAt = wallClockNow
 
-  const ctx = getAudioContext()
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 784, now, 0.09, 0.05, 'sine') // G5
@@ -579,8 +479,8 @@ const REVEAL_BASE_FREQUENCY = 587.33
  * 連続再生されるため、通常のパネル音より小さい音量・短い長さにしてある。
  */
 export function playPanelRevealSound(step: number, total: number): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const safeTotal = Math.max(1, Math.trunc(total))
   const safeStep = Math.min(Math.max(Math.trunc(step), 1), safeTotal)
@@ -602,8 +502,8 @@ export function playPanelRevealSound(step: number, total: number): void {
  * 低い音→高い音の2音を間を詰めて連続再生することで「駆け上がる」勢いを表す。
  */
 export function playPinballLaunchSound(): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 320, now, 0.09, 0.12, 'triangle')
@@ -620,11 +520,11 @@ let lastBumperSoundAt = 0
 
 /** バンパー衝突の「コッ」。短く控えめな音を、クールダウンで間引きながら鳴らす */
 export function playPinballBumperSound(): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
   const now = Date.now()
   if (now - lastBumperSoundAt < BUMPER_SOUND_MIN_INTERVAL_MS) return
   lastBumperSoundAt = now
-  const ctx = getAudioContext()
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   // 400〜700Hz帯の中で毎回わずかに高さを変え、単調な連打に聞こえないようにする
   const frequency = 400 + Math.random() * 300
@@ -636,7 +536,7 @@ const PINBALL_TOY_SOUND_MIN_INTERVAL_MS = 70
 let lastPinballToySoundAt: number | null = null
 
 function canPlayPinballToySound(): boolean {
-  if (!soundEnabled) return false
+  if (!isSoundEnabled()) return false
   const now = Date.now()
   if (
     lastPinballToySoundAt !== null &&
@@ -651,7 +551,7 @@ function canPlayPinballToySound(): boolean {
 /** 回転おもちゃの「くるくる」。短い2音を少しずらし、主役の音より控えめに鳴らす。 */
 export function playPinballSpinnerSound(): void {
   if (!canPlayPinballToySound()) return
-  const ctx = getAudioContext()
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 620, now, 0.06, 0.05, 'sine')
@@ -661,7 +561,7 @@ export function playPinballSpinnerSound(): void {
 /** 押し上げおもちゃの「ポンッ」。短い低音から高音へつなぎ、弾む感じだけを添える。 */
 export function playPinballLauncherSound(): void {
   if (!canPlayPinballToySound()) return
-  const ctx = getAudioContext()
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 300, now, 0.06, 0.06, 'triangle')
@@ -671,7 +571,7 @@ export function playPinballLauncherSound(): void {
 /** ジャンプ台の「ドュン↑」。押し上げおもちゃより勢いのある3音の駆け上がりで、ロケット発射の印象にする。 */
 export function playPinballJumppadSound(): void {
   if (!canPlayPinballToySound()) return
-  const ctx = getAudioContext()
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 220, now, 0.05, 0.07, 'triangle')
@@ -682,7 +582,7 @@ export function playPinballJumppadSound(): void {
 /** シーソーの「ギィ、コトン」。木の板が傾く低めの2音で、回転・打ち上げ系とは違う質感にする。 */
 export function playPinballSeesawSound(): void {
   if (!canPlayPinballToySound()) return
-  const ctx = getAudioContext()
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 260, now, 0.07, 0.06, 'triangle')
@@ -691,8 +591,8 @@ export function playPinballSeesawSound(): void {
 
 /** 得点ゾーンの得点。1000点にいちばん近いほど高く華やかな音になる */
 export function playPinballScoreSound(score: number): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   // 得点(100〜1000)を0〜1に正規化し、ペンタトニックスケール1オクターブぶんの高さへ割り当てる
@@ -708,8 +608,8 @@ export function playPinballScoreSound(score: number): void {
 
 /** 合計点発表のファンファーレ。ペンタトニックで3音、駆け上がる */
 export function playPinballTotalSound(): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   const base = 523.25 // C5
@@ -757,8 +657,8 @@ function playDominoClick(
 
 /** ドミノが倒れ始めたときの「カタッ」。連打を前提に短く小さく鳴らす。 */
 export function playDominoTickSound(intensity: number): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
 
   const safeIntensity = Number.isFinite(intensity)
@@ -780,8 +680,8 @@ export function playDominoTickSound(intensity: number): void {
 
 /** 国旗完成の「できた！」。短い4音の上行アルペジオで倒伏音と区別する。 */
 export function playDominoCompleteSound(): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
 
   const now = ctx.currentTime
@@ -797,8 +697,8 @@ export function playDominoCompleteSound(): void {
 
 /** 壁に当たった「コツ」。衝突判定側で間引くため、ここではクールダウンを持たせない。 */
 export function playMazeWallHitSound(intensity: number): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
 
   const safeIntensity = Number.isFinite(intensity)
@@ -812,8 +712,8 @@ export function playMazeWallHitSound(intensity: number): void {
 
 /** 星を取った「キラッ」。集めた順にペンタトニックを一段ずつ上がる2音にする。 */
 export function playMazeStarSound(collectedIndex: number): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
 
   const safeIndex = Number.isFinite(collectedIndex)
@@ -840,8 +740,8 @@ export function playMazeStarSound(collectedIndex: number): void {
 
 /** ゴールの「できた！」。C5からC6までを0.1秒間隔で短く駆け上がる。 */
 export function playMazeGoalSound(): void {
-  if (!soundEnabled) return
-  const ctx = getAudioContext()
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
 
   const now = ctx.currentTime
@@ -855,16 +755,16 @@ export function playMazeGoalSound(): void {
 
 /** レールの接続が確定したときの、短く明るいクリック。 */
 export function playRailSnapSound(enabled = true): void {
-  if (!enabled || !soundEnabled) return
-  const ctx = getAudioContext()
+  if (!enabled || !isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   playTone(ctx, 920, ctx.currentTime, 0.075, 0.045, 'triangle')
 }
 
 /** 電車が通常走行を始めるときの小さな発車音。 */
 export function playRailDepartureSound(enabled = true): void {
-  if (!enabled || !soundEnabled) return
-  const ctx = getAudioContext()
+  if (!enabled || !isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 260, now, 0.13, 0.045, 'triangle')
@@ -873,8 +773,8 @@ export function playRailDepartureSound(enabled = true): void {
 
 /** 駅に停車したときの柔らかな到着音。 */
 export function playRailStationStopSound(enabled = true): void {
-  if (!enabled || !soundEnabled) return
-  const ctx = getAudioContext()
+  if (!enabled || !isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 660, now, 0.16, 0.04, 'sine')
@@ -883,8 +783,8 @@ export function playRailStationStopSound(enabled = true): void {
 
 /** 駅から再発車するときの短い上行音。 */
 export function playRailStationDepartureSound(enabled = true): void {
-  if (!enabled || !soundEnabled) return
-  const ctx = getAudioContext()
+  if (!enabled || !isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
   if (!ctx) return
   const now = ctx.currentTime
   playTone(ctx, 420, now, 0.12, 0.04, 'triangle')
@@ -904,7 +804,7 @@ const CAR_DEPARTURE_SOUND_MIN_INTERVAL_MS = 120
 let lastCarDepartureSoundAt: number | null = null
 
 export function playCarDepartureSound(): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
   const wallClockNow = Date.now()
   if (
     lastCarDepartureSoundAt !== null
@@ -924,10 +824,10 @@ const CAR_GOAL_SOUND_MIN_INTERVAL_MS = 180
 let lastCarGoalSoundAt: number | null = null
 
 export function playCarGoalSound(): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
 
   try {
-    const ctx = getAudioContext()
+    const ctx = getSharedAudioContext()
     if (!ctx) return
     const wallClockNow = Date.now()
     if (
@@ -954,10 +854,10 @@ const COLOR_PAINT_FINISH_SOUND_MIN_INTERVAL_MS = 400
 let lastColorPaintFinishSoundAt: number | null = null
 
 export function playColorPaintFinishSound(): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
 
   try {
-    const ctx = getAudioContext()
+    const ctx = getSharedAudioContext()
     if (!ctx) return
     const wallClockNow = Date.now()
     if (
@@ -990,10 +890,10 @@ const BLOCK_PUZZLE_COMPLETE_SOUND_MIN_INTERVAL_MS = 400
 let lastBlockPuzzleCompleteSoundAt: number | null = null
 
 export function playBlockPuzzleCompleteSound(): void {
-  if (!soundEnabled) return
+  if (!isSoundEnabled()) return
 
   try {
-    const ctx = getAudioContext()
+    const ctx = getSharedAudioContext()
     if (!ctx) return
     const wallClockNow = Date.now()
     if (
@@ -1012,87 +912,6 @@ export function playBlockPuzzleCompleteSound(): void {
     playTone(ctx, 1567.98, now + 0.24, 0.26, 0.06, 'sine')
   } catch {
     // 音を出せない環境でも、完成演出はそのまま続ける。
-  }
-}
-
-/**
- * ぷかぷかレスキューの「みずをふやす／へらす」。
- * ボタンを押したことが分かる短いポチャッという1音だけを鳴らす。
- * 押しっぱなしのあいだ鳴り続けるとうるさいため、連打防止の間隔を長めに取る。
- */
-const PUKUPUKA_WATER_SOUND_MIN_INTERVAL_MS = 220
-let lastPukupukaWaterSoundAt: number | null = null
-
-export function playPukupukaWaterSound(direction: 'fill' | 'drain'): void {
-  if (!soundEnabled) return
-
-  try {
-    const ctx = getAudioContext()
-    if (!ctx) return
-    const wallClockNow = Date.now()
-    if (
-      lastPukupukaWaterSoundAt !== null
-      && wallClockNow - lastPukupukaWaterSoundAt < PUKUPUKA_WATER_SOUND_MIN_INTERVAL_MS
-    ) return
-    lastPukupukaWaterSoundAt = wallClockNow
-
-    const now = ctx.currentTime
-    // 増やすときは上がる2音、減らすときは下がる2音にして、音だけでも向きが分かるようにする。
-    const [first, second] = direction === 'fill' ? [523.25, 783.99] : [659.25, 392.0]
-    playTone(ctx, first, now, 0.1, 0.07, 'sine')
-    playTone(ctx, second, now + 0.05, 0.12, 0.06, 'sine')
-  } catch {
-    // 音が出せない環境でも水位の操作はそのまま続ける。
-  }
-}
-
-/** ぷかぷかレスキューの仕掛け操作。仕掛けごとに違う短音で結果を返す。 */
-export function playPukupukaActionSound(kind: 'gate' | 'board' | 'wheel'): void {
-  if (!soundEnabled) return
-
-  try {
-    const ctx = getAudioContext()
-    if (!ctx) return
-    const now = ctx.currentTime
-    if (kind === 'gate') {
-      playTone(ctx, 330, now, 0.09, 0.07, 'square')
-      playTone(ctx, 440, now + 0.06, 0.12, 0.06, 'triangle')
-    } else if (kind === 'board') {
-      playTone(ctx, 659.25, now, 0.08, 0.06, 'triangle')
-      playTone(ctx, 523.25, now + 0.055, 0.11, 0.06, 'triangle')
-    } else {
-      playTone(ctx, 392, now, 0.09, 0.055, 'sine')
-      playTone(ctx, 523.25, now + 0.07, 0.14, 0.06, 'sine')
-    }
-  } catch {
-    // 音を出せない環境でも仕掛けの操作はそのまま続ける。
-  }
-}
-
-/** ぷかぷかレスキューのゴール。短い上昇アルペジオ1回だけ。 */
-const PUKUPUKA_GOAL_SOUND_MIN_INTERVAL_MS = 600
-let lastPukupukaGoalSoundAt: number | null = null
-
-export function playPukupukaGoalSound(): void {
-  if (!soundEnabled) return
-
-  try {
-    const ctx = getAudioContext()
-    if (!ctx) return
-    const wallClockNow = Date.now()
-    if (
-      lastPukupukaGoalSoundAt !== null
-      && wallClockNow - lastPukupukaGoalSoundAt < PUKUPUKA_GOAL_SOUND_MIN_INTERVAL_MS
-    ) return
-    lastPukupukaGoalSoundAt = wallClockNow
-
-    const now = ctx.currentTime
-    playTone(ctx, 587.33, now, 0.14, 0.09, 'triangle')
-    playTone(ctx, 739.99, now + 0.08, 0.14, 0.09, 'triangle')
-    playTone(ctx, 880.0, now + 0.16, 0.3, 0.1, 'sine')
-    playTone(ctx, 1174.66, now + 0.24, 0.28, 0.06, 'sine')
-  } catch {
-    // 音が出せない環境でもゴール表示はそのまま出す。
   }
 }
 
@@ -1153,8 +972,8 @@ export function createRailTrainSoundController(initialEnabled = true): RailTrain
   }
 
   const ensureNodes = (): AudioContext | undefined => {
-    if (disposed || !enabled || !soundEnabled) return undefined
-    const ctx = getAudioContext()
+    if (disposed || !enabled || !isSoundEnabled()) return undefined
+    const ctx = getSharedAudioContext()
     if (!ctx) return undefined
     if (oscillator === undefined || gain === undefined) {
       oscillator = ctx.createOscillator()
@@ -1177,14 +996,14 @@ export function createRailTrainSoundController(initialEnabled = true): RailTrain
       const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0
       if (!isMoving || safeSpeed <= 0.015) {
         if (gain !== undefined) {
-          const ctx = getAudioContext()
+          const ctx = getSharedAudioContext()
           if (ctx !== undefined) setGain(0, ctx.currentTime)
         }
         return
       }
       const ctx = isMoving && safeSpeed > 0.015 ? ensureNodes() : undefined
       if (ctx === undefined || gain === undefined || oscillator === undefined) {
-        if (gain !== undefined && !soundEnabled) setGain(0, getAudioContext()?.currentTime ?? 0)
+        if (gain !== undefined && !isSoundEnabled()) setGain(0, getSharedAudioContext()?.currentTime ?? 0)
         return
       }
       const now = ctx.currentTime
@@ -1208,7 +1027,7 @@ export function createRailTrainSoundController(initialEnabled = true): RailTrain
       if (enabled === nextEnabled) return
       enabled = nextEnabled
       if (!enabled && gain !== undefined) {
-        setGain(0, getAudioContext()?.currentTime ?? 0)
+        setGain(0, getSharedAudioContext()?.currentTime ?? 0)
       }
     },
     dispose() {
