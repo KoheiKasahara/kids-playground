@@ -4,6 +4,10 @@
 
 新しい画像・音源を追加、または既存素材を差し替えたときは、このファイルを必ず更新してください。
 
+## おえかきコロコロのもよう・ローラー・台紙
+
+`src/games/oekaki-korokoro/` の花・星・足あと・ハート・しま模様、ローラー本体と台紙は、本アプリ用に作成したSVGパス・Canvas・CSSによるオリジナル図形です。外部の画像・音源は使用していません。
+
 ## 世界地図 (world-atlas / countries-50m.json)
 
 世界地図の国境は [world-atlas](https://github.com/topojson/world-atlas) npmパッケージの [`countries-50m.json`](https://unpkg.com/world-atlas/countries-50m.json) を、ビルド時に静的importしてバンドルしています。実行時のCDN・地図API通信は行いません。

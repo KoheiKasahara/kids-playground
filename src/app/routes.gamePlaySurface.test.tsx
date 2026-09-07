@@ -38,6 +38,7 @@ function isPlayRoutePath(route: RouteObject & { path: string }): boolean {
     '/games/color-paint-puzzle',
     '/games/block-puzzle',
     '/games/pukupuka-rescue',
+    '/games/oekaki-korokoro',
     '/games/tsumiki-bowling',
   ].includes(route.path)
 }
