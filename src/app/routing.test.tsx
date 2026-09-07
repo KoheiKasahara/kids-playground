@@ -5,6 +5,10 @@ import { BrowserRouter, MemoryRouter } from 'react-router-dom'
 import App from './App'
 
 describe('直接アクセス（URL直入力を想定）', () => {
+  test('/games/circuit-racing を直接開くと車選択画面が出る', async () => {
+    render(<MemoryRouter initialEntries={['/games/circuit-racing']}><App /></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'サーキットレース' })).toBeInTheDocument()
+  })
   test('/games/prefecture-quiz を直接開くと都道府県クイズの開始画面が出る', () => {
     render(
       <MemoryRouter initialEntries={['/games/prefecture-quiz']}>

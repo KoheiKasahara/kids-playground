@@ -134,6 +134,8 @@ SOFTWARE.
 
 ## 3D車体モデル (public/models/car-builder/*.glb)
 
+「サーキットレース」（`src/games/circuit-racing/`）も、下記の `sports-car.glb`（SportsCar2）、`car.glb`（NormalCar2）、`suv.glb`（SUV）を再利用します。モデルの複製や新しいパックの追加は行っていません。2026-09-08に[公式Cars Pack](https://quaternius.com/packs/cars.html)と[作者の配布ページ](https://quaternius.itch.io/lowpoly-cars)でCC0を再確認しました。[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)は商用利用・改変・再配布を許可しています。既存GLBの車体形状を活かし、実行時にボディの色変更とタイヤの追加・回転を行います。
+
 「3Dクルマづくり」（`src/games/car-builder/`）で表示する車体は、Quaternius が公開している CC0 のローポリ車両モデルを加工して同梱しています。実行時に外部サイトからモデルを取得することはありません。素材集は丸ごと取り込まず、採用した車種だけを配置しています。
 
 - 作者: Quaternius

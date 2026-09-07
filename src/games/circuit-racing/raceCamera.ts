@@ -1,0 +1,79 @@
+/**
+ * Camera calculations for Circuit Racing.
+ *
+ * These functions deliberately contain no Three.js or browser state.  The
+ * renderer hook can therefore keep the camera responsive while the UI only
+ * needs to choose a mode.
+ */
+
+export type RaceCameraMode = 'chase' | 'trackside' | 'free'
+
+export type RaceCameraVector = {
+  x: number
+  y?: number
+  z: number
+}
+
+export type RaceCameraPose = {
+  position: { x: number; y: number; z: number }
+  target: { x: number; y: number; z: number }
+}
+
+function finite(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) ? value! : fallback
+}
+
+function normalise(x: number, z: number): { x: number; z: number } {
+  const length = Math.hypot(x, z)
+  if (length < 0.0001) return { x: 0, z: 1 }
+  return { x: x / length, z: z / length }
+}
+
+/** Camera position behind and above the selected car.  Cars face +Z. */
+export function chaseCameraPose(
+  position: RaceCameraVector,
+  tangent: RaceCameraVector,
+  options: { distance?: number; height?: number; lookAhead?: number; targetHeight?: number } = {},
+): RaceCameraPose {
+  const direction = normalise(tangent.x, tangent.z)
+  const distance = Math.max(1, finite(options.distance, 9))
+  const height = Math.max(0.5, finite(options.height, 5.1))
+  const lookAhead = Math.max(0, finite(options.lookAhead, 8))
+  const targetHeight = Math.max(0, finite(options.targetHeight, 0.75))
+  const y = finite(position.y, 0)
+
+  return {
+    position: {
+      x: position.x - direction.x * distance,
+      y: y + height,
+      z: position.z - direction.z * distance,
+    },
+    target: {
+      x: position.x + direction.x * lookAhead,
+      y: y + targetHeight,
+      z: position.z + direction.z * lookAhead,
+    },
+  }
+}
+
+/** A fixed place just outside the circuit that watches the selected car. */
+export function tracksideCameraPose(
+  cameraPosition: RaceCameraVector,
+  targetPosition: RaceCameraVector,
+  options: { height?: number; targetHeight?: number } = {},
+): RaceCameraPose {
+  const height = Math.max(0.5, finite(options.height, 4.6))
+  const targetHeight = Math.max(0, finite(options.targetHeight, 0.7))
+  return {
+    position: {
+      x: cameraPosition.x,
+      y: finite(cameraPosition.y, 0) + height,
+      z: cameraPosition.z,
+    },
+    target: {
+      x: targetPosition.x,
+      y: finite(targetPosition.y, 0) + targetHeight,
+      z: targetPosition.z,
+    },
+  }
+}

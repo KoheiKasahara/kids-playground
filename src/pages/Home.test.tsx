@@ -6,6 +6,12 @@ import App from '../app/App'
 import { GAME_CATALOG, gameRoutePath } from '../games/gameCatalog'
 
 describe('Home', () => {
+  test('サーキットレースをホームから開ける', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await user.click(screen.getByRole('link', { name: 'サーキットレース' }))
+    expect(await screen.findByRole('heading', { name: 'サーキットレース' })).toBeInTheDocument()
+  })
   // JSのonClickだけに依存させず、クローラが辿れる通常リンクであることを守るための監査テスト。
   test('全ゲームカードが<a href="/games/<slug>">の通常リンクとして出力される', () => {
     render(
