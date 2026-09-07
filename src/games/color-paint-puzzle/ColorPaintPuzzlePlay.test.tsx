@@ -62,6 +62,7 @@ describe('ColorPaintPuzzlePlay', () => {
 
   test('初期選択色は「あか」で、aria-pressedがあかだけtrue', () => {
     renderPlay()
+    expect(screen.queryByText('えらんだ いろ：')).not.toBeInTheDocument()
     for (const color of PAINT_COLORS) {
       const button = screen.getByRole('button', { name: color.label })
       expect(button).toHaveAttribute('aria-pressed', color.id === 'red' ? 'true' : 'false')
@@ -74,7 +75,6 @@ describe('ColorPaintPuzzlePlay', () => {
     await user.click(screen.getByRole('button', { name: 'あお' }))
     expect(screen.getByRole('button', { name: 'あお' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'あか' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByText('えらんだ いろ：').parentElement).toHaveTextContent('あお')
   })
 
   test('エリアをクリックすると選択色のhexで塗られる', async () => {
