@@ -1,0 +1,414 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  padding: calc(var(--space-xs) + var(--safe-top)) calc(var(--space-xs) + var(--safe-right)) calc(var(--space-xs) + var(--safe-bottom)) calc(var(--space-xs) + var(--safe-left));
+  overflow: hidden;
+  background: #b7e1f2;
+}
+
+.scene {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: linear-gradient(#a9d9f0 0 48%, #86c276 48% 100%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.scene canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sceneStatus {
+  position: absolute;
+  z-index: 3;
+  top: var(--space-sm);
+  left: 50%;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+  padding: 6px 10px;
+  transform: translateX(-50%);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  white-space: normal;
+}
+
+.sceneStatusIcon {
+  font-size: 20px;
+}
+
+.retryButton,
+.homeButton,
+.backButton,
+.pauseButton,
+.beginButton,
+.countButton,
+.carButton,
+.cameraButton,
+.targetButton,
+.accessibleCamera button {
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.retryButton {
+  min-height: 38px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: #e85d6f;
+  color: white;
+  font-weight: 700;
+}
+
+.selectionPanel,
+.racePanel {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 760px;
+  margin: var(--space-xs) auto 0;
+  padding: var(--space-sm);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow-md);
+}
+
+.selectionPanel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(47dvh, 430px);
+  overflow: hidden;
+}
+
+.header,
+.raceHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.title,
+.raceTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: clamp(18px, 4vw, 23px);
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.homeButton,
+.backButton,
+.pauseButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 6px 12px;
+  border: 2px solid rgba(53, 73, 91, 0.14);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.backButton {
+  border-color: transparent;
+  background: #5c6ac4;
+  color: #fff;
+}
+
+.pauseButton {
+  border-color: transparent;
+  background: #f2a93b;
+  color: #35250d;
+}
+
+.countRow,
+.choiceRow,
+.colorRow,
+.cameraModes,
+.targetRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.countRow {
+  flex-shrink: 0;
+  justify-content: center;
+  margin: var(--space-xs) 0;
+}
+
+.sectionLabel,
+.colorLabel {
+  font-weight: 800;
+}
+
+.countButton {
+  min-width: 66px;
+  min-height: 48px;
+  border: 3px solid #c9d5e9;
+  border-radius: var(--radius-md);
+  background: #f7faff;
+  color: var(--color-text);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.countButton[aria-pressed='true'],
+.carButton[aria-pressed='true'],
+.cameraButton[aria-pressed='true'],
+.targetButton[aria-pressed='true'] {
+  border-color: #4c6ef5;
+  background: #e7edff;
+  box-shadow: inset 0 0 0 2px rgba(76, 110, 245, 0.25);
+}
+
+.slotList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.slot {
+  min-width: 0;
+  padding: 7px;
+  border: 2px solid #dce4f1;
+  border-radius: var(--radius-md);
+  background: #fbfdff;
+}
+
+.slotTitle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.slotNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffcf4a;
+  color: #463500;
+}
+
+.choiceRow {
+  align-items: stretch;
+}
+
+.carButton {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 66px;
+  padding: 3px;
+  border: 3px solid #d9e2f0;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.carEmoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.colorRow {
+  margin-top: 5px;
+}
+
+.colorButton {
+  width: 44px;
+  height: 44px;
+  padding: 4px;
+  border: 3px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.colorButton span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 2px solid rgba(0, 0, 0, 0.16);
+  border-radius: 50%;
+  background: var(--swatch);
+}
+
+.colorButton[aria-pressed='true'] {
+  border-color: #26384c;
+}
+
+.beginButton {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: block;
+  width: min(100%, 430px);
+  min-height: 60px;
+  margin: var(--space-sm) auto 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: #23a36d;
+  color: #fff;
+  font-size: 21px;
+  font-weight: 900;
+  box-shadow: 0 4px 0 #177a50;
+  padding: 7px 0;
+}
+
+.beginButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.racePanel {
+  padding: 8px;
+  max-height: 62dvh;
+  overflow-y: auto;
+}
+
+.raceTools {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.cameraButton,
+.targetButton {
+  min-height: 44px;
+  padding: 5px 10px;
+  border: 2px solid #d5deed;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.targetRow {
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.accessibleCamera {
+  display: grid;
+  grid-template-columns: repeat(4, 44px);
+  gap: 4px;
+}
+
+.accessibleCamera button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 2px solid #ccd8e7;
+  border-radius: var(--radius-sm);
+  background: #f8fbff;
+  color: var(--color-text);
+  font-size: 19px;
+  font-weight: 900;
+}
+
+@media (max-width: 620px) {
+  .slotList {
+    grid-template-columns: 1fr;
+  }
+
+  .selectionPanel {
+    max-height: 55dvh;
+  }
+
+  .raceTitle {
+    display: none;
+  }
+
+  .raceHeader {
+    justify-content: space-between;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .page {
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  .selectionPanel,
+  .racePanel {
+    flex: 0 0 48%;
+    width: 48%;
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+  }
+
+  .slotList {
+    grid-template-columns: 1fr;
+  }
+
+  .raceTitle {
+    display: none;
+  }
+
+  .slot {
+    padding: 4px;
+  }
+
+  .carButton {
+    min-height: 48px;
+  }
+
+  .carEmoji {
+    font-size: 21px;
+  }
+
+  .beginButton {
+    min-height: 48px;
+    margin-top: 5px;
+  }
+}

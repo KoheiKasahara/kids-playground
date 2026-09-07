@@ -56,6 +56,7 @@ const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
+  { path: '/games/circuit-racing', element: lazyRoute(() => import('../games/circuit-racing/CircuitRacingPlay')) },
   { path: '/games/flag-quiz', element: <FlagQuizStart /> },
   { path: '/games/flag-quiz/flag-to-name', element: <FlagQuizLevelSelect mode="flagToName" /> },
   {

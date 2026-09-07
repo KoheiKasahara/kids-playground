@@ -64,6 +64,24 @@ export function gameRoutePath(slug: string): string {
 // id/title/emoji は既存の src/pages/Home.tsx と同じ並び順・内容を維持する。
 export const GAME_CATALOG: readonly GameCatalogEntry[] = [
   {
+    id: 'circuit-racing',
+    slug: 'circuit-racing',
+    title: 'サーキットレース',
+    emoji: '🏎️',
+    seo: {
+      headline: 'サーキットレース｜好きな車と色で3Dレースを楽しむ',
+      description: 'スポーツカー・SUV・コンパクトカーから好きな車と色を選んで、サーキットを自動で走る様子を楽しむ幼児向け3Dゲームです。追走・固定・フリーカメラで、車ごとの速さや曲がり方の違いを眺められます。',
+    },
+    category: 'threeD',
+    intro: {
+      howToPlay: [
+        'すきな くるまと いろを えらんで スタート！',
+        'くるまは じどうで はしるよ。カメラを かえて みてね',
+        'やすむ ボタンで ひとやすみ。なんどでも あそべるよ',
+      ],
+    },
+  },
+  {
     id: 'flag-quiz',
     slug: 'flag-quiz',
     title: 'こっきクイズ',

@@ -6,6 +6,12 @@ import App from '../app/App'
 import { GAME_CATALOG, gameRoutePath } from '../games/gameCatalog'
 
 describe('Home', () => {
+  test('サーキットレースをホームから開ける', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await user.click(screen.getByRole('link', { name: 'サーキットレース' }))
+    expect(await screen.findByRole('heading', { name: 'サーキットレース' })).toBeInTheDocument()
+  })
   // JSのonClickだけに依存させず、クローラが辿れる通常リンクであることを守るための監査テスト。
   test('全ゲームカードが<a href="/games/<slug>">の通常リンクとして出力される', () => {
     render(
@@ -19,7 +25,7 @@ describe('Home', () => {
     }
   })
 
-  test('ゲーム一覧に現在の25ゲームすべてが表示される', () => {
+  test('ゲーム一覧に現在の26ゲームすべてが表示される', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -49,7 +55,8 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: 'うごくぬりえ' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'ブロックパズル' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'ぷかぷかレスキュー' })).toBeInTheDocument()
-    expect(screen.getAllByRole('link')).toHaveLength(25)
+    expect(screen.getByRole('link', { name: 'サーキットレース' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(26)
   })
 
   test('「都道府県クイズ」を押すと開始画面に遷移する', async () => {
