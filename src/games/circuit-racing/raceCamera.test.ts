@@ -1,5 +1,7 @@
+import { Box3, PerspectiveCamera, Vector3 } from 'three'
+import { CIRCUIT } from './circuit'
 import { describe, expect, test } from 'vitest'
-import { chaseCameraPose, tracksideCameraPose } from './raceCamera'
+import { chaseCameraPose, tracksideCameraPose, overviewCameraPose } from './raceCamera'
 
 describe('サーキットレースの カメラ計算', () => {
   test('おいかけるカメラは車のうしろ、見る先は車のまえになる', () => {
@@ -29,5 +31,24 @@ describe('サーキットレースの カメラ計算', () => {
     const pose = chaseCameraPose({ x: 0, y: 0, z: 0 }, { x: 0, z: 0 })
     expect(Object.values(pose.position).every(Number.isFinite)).toBe(true)
     expect(Object.values(pose.target).every(Number.isFinite)).toBe(true)
+  })
+})
+
+describe('全体表示のフレーミング', () => {
+  test.each([0.45, 0.8, 1, 2.2])('画面比率 %s で道路全体が余白つきで収まる', (aspect) => {
+    const bounds = new Box3().setFromPoints(CIRCUIT.curve.getPoints(1024)).expandByScalar(CIRCUIT.width / 2 + 1)
+    const pose = overviewCameraPose(bounds, aspect)
+    const camera = new PerspectiveCamera(48, aspect, 2, 2000)
+    camera.position.set(pose.position.x, pose.position.y, pose.position.z)
+    camera.lookAt(pose.target.x, pose.target.y, pose.target.z)
+    camera.updateMatrixWorld()
+    for (const x of [bounds.min.x, bounds.max.x]) {
+      for (const z of [bounds.min.z, bounds.max.z]) {
+        const projected = new Vector3(x, 0, z).project(camera)
+        expect(Math.abs(projected.x)).toBeLessThan(0.95)
+        expect(Math.abs(projected.y)).toBeLessThan(0.95)
+        expect(Math.abs(projected.z)).toBeLessThan(1)
+      }
+    }
   })
 })

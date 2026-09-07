@@ -412,3 +412,8 @@
     margin-top: 5px;
   }
 }
+
+.accessibleCamera .overviewButton {
+  grid-column: 1 / -1;
+  font-size: 16px;
+}
