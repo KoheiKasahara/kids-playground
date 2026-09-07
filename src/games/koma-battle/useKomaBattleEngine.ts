@@ -62,7 +62,6 @@ import {
   applyKomaBoost,
   applyKomaContactAssist,
   applyKomaFieldBelts,
-  applyKomaFieldRidges,
   clampKomaMotion,
   createKomaBattleWorld,
   readKoma,
@@ -881,13 +880,6 @@ export function useKomaBattleEngine(
             polygonOffsetUnits: -1,
           }),
         )
-        const ridgeEdgeMaterial = trackMaterial(
-          new THREE.MeshStandardMaterial({
-            color: 0x9b6336,
-            roughness: 0.66,
-            metalness: 0.04,
-          }),
-        )
         for (const ridge of selectedField.ridges) {
           if (
             !Number.isFinite(ridge.radius) ||
@@ -929,36 +921,7 @@ export function useKomaBattleEngine(
           ridgeGeometry.computeVertexNormals()
           group.add(new THREE.Mesh(ridgeGeometry, ridgeMaterial))
 
-          // 色付き帯の内外を細い丸い縁で囲み、傾斜の始まりと頂上を読み取りやすくする。
-          const edgeGeometry = track(new THREE.TorusGeometry(ridge.radius, 0.035, 8, 64))
-          const crest = new THREE.Mesh(edgeGeometry, ridgeEdgeMaterial)
-          crest.rotation.x = Math.PI / 2
-          crest.position.y = fieldHeightAt(selectedField, ridge.radius) + 0.026
-          group.add(crest)
 
-          const boundaryRadius = Math.max(0.05, ridge.radius - ridge.width * 1.05)
-          const boundaryGeometry = track(new THREE.TorusGeometry(
-            boundaryRadius,
-            0.022,
-            8,
-            64,
-          ))
-          const innerBoundary = new THREE.Mesh(boundaryGeometry, ridgeEdgeMaterial)
-          innerBoundary.rotation.x = Math.PI / 2
-          innerBoundary.position.y = fieldHeightAt(selectedField, boundaryRadius) + 0.018
-          group.add(innerBoundary)
-
-          const outerBoundaryRadius = Math.min(BOWL_RADIUS - 0.02, ridge.radius + ridge.width * 1.05)
-          const outerBoundaryGeometry = track(new THREE.TorusGeometry(
-            outerBoundaryRadius,
-            0.022,
-            8,
-            64,
-          ))
-          const outerBoundary = new THREE.Mesh(outerBoundaryGeometry, ridgeEdgeMaterial)
-          outerBoundary.rotation.x = Math.PI / 2
-          outerBoundary.position.y = fieldHeightAt(selectedField, outerBoundaryRadius) + 0.018
-          group.add(outerBoundary)
         }
       }
 
@@ -1088,8 +1051,8 @@ export function useKomaBattleEngine(
             const localZ = -belt.halfWidth + widthRatio * belt.halfWidth * 2
             // The belt is a visual overlay, so conform it to the same radial height
             // profile as the physical bowl instead of drawing a flat strip through it.
-            const worldX = belt.x + localX * beltCos + localZ * beltSin
-            const worldZ = belt.z - localX * beltSin + localZ * beltCos
+            const worldX = belt.x + localX * beltCos - localZ * beltSin
+            const worldZ = belt.z + localX * beltSin + localZ * beltCos
             const height =
               fieldHeightAt(selectedField, Math.hypot(worldX, worldZ)) + BELT_SURFACE_LIFT
             surfacePositions.push(localX, height, localZ)
@@ -1155,7 +1118,7 @@ export function useKomaBattleEngine(
           const mesh = new THREE.Mesh(arrowGeometry, arrowMaterial)
           mesh.position.set(
             localX,
-            fieldHeightAt(selectedField, Math.abs(localX)) + BELT_ARROW_LIFT,
+            fieldHeightAt(selectedField, Math.hypot(belt.x + localX * beltCos, belt.z + localX * beltSin)) + BELT_ARROW_LIFT,
             0,
           )
           anchor.add(mesh)
@@ -1357,7 +1320,7 @@ export function useKomaBattleEngine(
         const beltCos = Math.cos(arrow.belt.angle)
         const beltSin = Math.sin(arrow.belt.angle)
         const worldX = arrow.belt.x + nextX * beltCos
-        const worldZ = arrow.belt.z - nextX * beltSin
+        const worldZ = arrow.belt.z + nextX * beltSin
         arrow.mesh.position.y =
           fieldHeightAt(selectedField, Math.hypot(worldX, worldZ)) + BELT_ARROW_LIFT
       }
@@ -1373,7 +1336,6 @@ export function useKomaBattleEngine(
         for (const koma of battle.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
         // 決着前だけ接触開始時の追加反発とベルトの力を適用する。決着後のsettle中は自然に倒れ切らせる。
         if (!finished) {
-          for (const koma of battle.komas) applyKomaFieldRidges(koma, selectedField, PHYSICS_TIMESTEP)
           for (const koma of battle.komas) applyKomaFieldBelts(koma, selectedField, PHYSICS_TIMESTEP)
         }
         applyKomaContactAssist(battle, !finished)
