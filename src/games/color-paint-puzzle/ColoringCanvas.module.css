@@ -658,36 +658,6 @@
   }
 }
 
-/* けむりはbubbleRiseと同様に、上へ昇りながら薄くなって消える。durationと遅延を
-   ずらして2つが交互に出るようにする。 */
-.canvas[data-phase='celebrating'] [data-motion-part='trainSmokeA'] {
-  animation: trainSmokeRise 2.4s 480ms ease-in-out infinite;
-}
-
-.canvas[data-phase='celebrating'] [data-motion-part='trainSmokeB'] {
-  animation: trainSmokeRise 2.4s 1200ms ease-in-out infinite;
-}
-
-@keyframes trainSmokeRise {
-  0% {
-    opacity: 0;
-    transform: translateY(4px) scale(0.85);
-  }
-
-  20% {
-    opacity: 1;
-  }
-
-  85% {
-    opacity: 1;
-  }
-
-  100% {
-    opacity: 0;
-    transform: translateY(-14px) scale(1.15);
-  }
-}
-
 /* --- ひこうき: 左下から右上へゆるやかに上がって飛ぶ。くもはそらをゆっくり流れる --- */
 
 .canvas[data-phase='celebrating'] [data-motion-group='plane'] {
@@ -842,6 +812,73 @@
   to {
     transform: translate(4px, -1px);
   }
+}
+
+/* --- 新しい題材: ドアを開く家・跳ねるかえる・手を振るおばけ --- */
+.canvas[data-phase='celebrating'] [data-motion-group='house'] {
+  transform-origin: 50% 84%;
+  animation: houseBounce 3s ease-in-out infinite;
+}
+
+@keyframes houseBounce {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.02, 0.97); }
+  55% { transform: scale(0.98, 1.03); }
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='houseDoor'] {
+  transform-origin: left center;
+  animation: houseDoorOpen 3s ease-in-out infinite;
+}
+
+@keyframes houseDoorOpen {
+  0%, 100% { transform: scaleX(1); }
+  40%, 65% { transform: scaleX(0.25); }
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='frog'] {
+  transform-origin: 50% 85%;
+  animation: frogHop 2.4s ease-in-out infinite;
+}
+
+@keyframes frogHop {
+  0%, 65%, 100% { transform: translateY(0) scale(1); }
+  18% { transform: scale(1.05, 0.9); }
+  38% { transform: translateY(-10px) scale(0.97, 1.04); }
+  55% { transform: scale(1.05, 0.94); }
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='frogBelly'] {
+  animation: frogBreathe 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes frogBreathe {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='ghost'] {
+  animation: ghostFloat 3.2s ease-in-out infinite;
+}
+
+@keyframes ghostFloat {
+  0%, 100% { transform: translate(-2px, 2px) rotate(-3deg); }
+  50% { transform: translate(2px, -5px) rotate(3deg); }
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='ghostArmLeft'] {
+  transform-origin: right center;
+  animation: ghostWave 800ms ease-in-out infinite alternate;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='ghostArmRight'] {
+  transform-origin: left center;
+  animation: ghostWave 800ms ease-in-out infinite alternate-reverse;
+}
+
+@keyframes ghostWave {
+  from { transform: rotate(-12deg); }
+  to { transform: rotate(12deg); }
 }
 
 /* 動きを減らす設定のときは、走る・泳ぐ・羽ばたくを止めて、
