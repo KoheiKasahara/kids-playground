@@ -75,3 +75,15 @@ docsには次のような、変更頻度が高く陳腐化しやすい情報を�
 - 個別のテストケースや受け入れ条件の列挙
 
 これらは GitHub Issue、または実装コードとテストを正とします。
+
+### ゲーム追加・変更時の小さな共通基盤（全体レビュー Phase 2）
+
+- 登録は `gameCatalog.ts` のデータと中央 `routes.tsx` の入口。複数画面がある新ゲームは `color-mix-quiz/routes.tsx` の相対ルート＋画面ごとのlazy importを参考にする。既存URLは維持し、全ゲームをまとめて移行しない。
+- ディレクトリは `src/games/<slug>/` に入口、必要に応じて `routes.tsx`、画面、ゲーム固有 `sounds.ts` / physics / data を置き、テストを対象ファイルの隣に置く。短いゲームを形式のために分割しない。
+- 戻る導線は `GameBackButton` に `to` または `onBack` で一階層上を明示する。safe-area付きの既存ヘッダーの左端へ配置する（ボタン側ではsafe-areaを重ねない）。先行導入はレスキューとボウリング。他ゲームは #558 で段階移行する。
+- `useGameIntroPlaying` は単一路線の選択→プレイ切替に利用できる。ボウリングではプレイ中のみ共通説明を隠し、「もどる」で選択画面と説明を復元する。初期表示と静的HTMLの本文は維持する。
+- Rapierはlazy側から `physics/rapierLoader` で初期化。初期化失敗は呼出元に伝え、次の呼出しで再試行する。world・step・free、RAF、イベント、GPU資源はゲームが所有し、effect cleanupで対応する資源を解放する。非同期完了は退出済みなら新しいworldを開始しない。
+- 新しいSEはゲーム内へ。`audio/sound` の共有Context・mute・primeAudio・短音を利用し、ゲーム退出時に共有Contextをcloseしない。既存 `quizSound` の未移行SEは次に触るときに移す。
+- Quickには純粋ロジックの境界と代表DOM遷移（開始・操作・リセット・退出）、資源を持つゲームにはcleanup/再入場の回帰検査。広いseed・完走・分布はFull。ピンボールでは既存網羅試行を `pinballSimulation.full.test.ts` に残す。
+- E2Eはカタログ由来の全入口smokeと、Nightlyの代表3D・横向き実操作。ゲーム追加ごとに全操作E2Eを複製しない。Nightly spec変更PRでは代表2本を先行実行する。
+- CI Summaryの遅いファイル上位は既存Vitest JSONの開始・終了時刻を使う。並列実行のファイル時間を足してCI時間と扱わない。
