@@ -237,15 +237,22 @@ export function createCloudTexture(patches: readonly SurfacePatch[]): THREE.Canv
     forEachWrappedLon(patch.lonDeg, patch.lonRadiusDeg, (lonDeg) => {
       const centerXPx = ((lonDeg + 180) / 360) * CLOUD_TEXTURE_WIDTH
       fillEllipseGradient(ctx, centerXPx, centerYPx, radiusXPx, radiusYPx, patch.rotationDeg, (c) => {
-        const gradient = c.createRadialGradient(0, 0, 0, 0, 0, 1)
-        const innerStop = THREE.MathUtils.clamp(1 - patch.softness, 0, 0.98)
-        gradient.addColorStop(0, withAlpha(patch.color, patch.opacity))
-        gradient.addColorStop(innerStop, withAlpha(patch.color, patch.opacity))
-        gradient.addColorStop(1, withAlpha(patch.color, 0))
-        c.fillStyle = gradient
-        c.beginPath()
-        c.arc(0, 0, 1, 0, Math.PI * 2)
-        c.fill()
+        // 1枚のぼけた楕円から、隙間のある渦状の雲の房へ。最大12房/patch。
+        const random = createRandom(Math.round(patch.lonDeg * 131 + patch.latDeg * 977))
+        for (let i = 0; i < 12; i += 1) {
+          const t = i / 11
+          const x = (t - 0.5) * 1.45
+          const y = Math.sin(t * Math.PI * 2) * 0.25 + (random() - 0.5) * 0.16
+          const radius = 0.17 + random() * 0.18
+          const gradient = c.createRadialGradient(x, y, 0, x, y, radius)
+          gradient.addColorStop(0, withAlpha(patch.color, patch.opacity))
+          gradient.addColorStop(0.45, withAlpha(patch.color, patch.opacity * 0.7))
+          gradient.addColorStop(1, withAlpha(patch.color, 0))
+          c.fillStyle = gradient
+          c.beginPath()
+          c.arc(x, y, radius, 0, Math.PI * 2)
+          c.fill()
+        }
       })
     })
   }
@@ -271,7 +278,7 @@ function paintRockyColorBase(ctx: CanvasRenderingContext2D, surface: RockySurfac
   const darkRgb = hexToRgb(surface.noise.darkColor)
   const lightRgb = hexToRgb(surface.noise.lightColor)
   const { periodX, frequencyY, octaves, amount } = surface.noise
-  const contrast = surface.noise.contrast ?? 1
+  const contrast = (surface.noise.contrast ?? 1) * 1.22
 
   for (let y = 0; y < height; y += 1) {
     const v = (y + 0.5) / height
@@ -533,7 +540,7 @@ function drawCraterColorShape(
   ctx.fill()
 
   const body = ctx.createRadialGradient(xPx, yPx, 0, xPx, yPx, radiusPx)
-  body.addColorStop(0, withAlpha('#000000', depth * 0.55))
+  body.addColorStop(0, withAlpha('#000000', depth * 0.68))
   body.addColorStop(0.72, withAlpha('#000000', depth * 0.3))
   body.addColorStop(0.86, withAlpha('#ffffff', depth * 0.45))
   body.addColorStop(1, withAlpha('#ffffff', 0))
@@ -757,7 +764,9 @@ function paintGasColorBase(ctx: CanvasRenderingContext2D, surface: GasSurfaceSpe
         (fbm2D(mottleNoise, u * mottle.periodX, v * mottle.frequencyY, mottle.periodX, mottle.octaves) -
           0.5) *
         2
-      const factor = 1 + m * mottle.amount
+      // 既存の乱流サンプルを再利用して細い雲の筋を焼く。追加fbm/画像なし。
+      const filaments = Math.sin((latW * Math.PI / 180) * 72 + warp * 5 + m * 2)
+      const factor = 1 + m * mottle.amount * 1.2 + filaments * mottle.amount * 0.28
 
       const idx = (y * width + x) * 4
       data[idx] = r0 * factor

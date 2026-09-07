@@ -9,6 +9,7 @@ import {
   viewDirectionOf,
   viewRadiusOf,
 } from './planetCamera'
+import { SUN_CORONA_SCALE } from './sunVisual'
 import { ringOuterRadiusRatio } from './planetRing'
 import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL, type ZoomLevel } from '../types'
 
@@ -31,6 +32,14 @@ describe('fitDistance', () => {
 })
 
 describe('cameraDistanceForZoom', () => {
+  it('太陽の標準ズームは縦横ともに外炎全体を収める', () => {
+    const sun = celestialBodies.find((body) => body.kind === 'star')!
+    for (const aspect of [PORTRAIT_ASPECT, LANDSCAPE_ASPECT]) {
+      const distance = cameraDistanceForZoom(sun, 0, aspect)
+      expect(sun.radius * SUN_CORONA_SCALE).toBeLessThan(distance * Math.sin(limitingHalfFovRadians(aspect)))
+    }
+  })
+
   it('追加したズームアウト2段階を含め、レベル-2→3で単調に近づく', () => {
     const body = celestialBodies[0]
     const levels: ZoomLevel[] = [-2, -1, 0, 1, 2, 3]
