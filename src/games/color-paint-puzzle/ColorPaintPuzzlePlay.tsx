@@ -45,7 +45,6 @@ export default function ColorPaintPuzzlePlay() {
   // 完成演出中も、この同じ塗り状態をそのまま渡す。演出用の別データは持たない。
   const painted = getPaintedAreas(paintings, picture.id)
   const celebrating = phase === 'celebrating'
-  const selectedColor = PAINT_COLORS.find((color) => color.id === selectedColorId) ?? PAINT_COLORS[0]
 
   /**
    * 題材えらびの横スクロールで、左右どちらに続きがあるかを見張る（端のフェードと矢印の出し分け）。
@@ -196,11 +195,6 @@ export default function ColorPaintPuzzlePlay() {
 
       {celebrating ? null : (
         <div className={styles.paletteSection} role="group" aria-label="いろを えらぶ">
-          <p className={styles.selectedColor} aria-live="polite">
-            <span>えらんだ いろ：</span>
-            <span className={styles.selectedColorDot} style={{ backgroundColor: selectedColor.hex }} aria-hidden="true" />
-            <strong>{selectedColor.label}</strong>
-          </p>
           <div className={styles.paletteGroup}>
             {PAINT_COLORS.map((color) => {
               const selected = color.id === selectedColorId
