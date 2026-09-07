@@ -133,9 +133,9 @@ export type BoardDefinition = Rect & {
  * 専用のリセット処理を書かなくても「やりなおし」で drainOpen が戻るだけで
  * 水車も自動的に初期状態（停止）へ戻る。
  *
- * 回転に連動して `linkedGate`（隣の小さな水門）も開閉させ、「水車がまわる→何かが動く」を
- * もう一段見せる。水門は水そう本体の外（床の下）に置く前提の位置指定で、浮遊物の移動経路や
- * ゴール判定には関与しないため、既存ステージの難易度・クリア条件を変えない。
+ * 回転に連動して `linkedGate`（小さな水門）も開閉させ、「水車がまわる→門が開く」を
+ * もう一段見せる。既存ステージでは床下の演出として使い、明示したステージだけ通路の
+ * 当たり判定にも使える。
  */
 export type WaterWheelDefinition = {
   id: string
@@ -143,6 +143,8 @@ export type WaterWheelDefinition = {
   y: number
   radius: number
   linkedGate: Rect
+  /** true のとき、連動水門は停止中に通路をふさぎ、排水で水車が回ると通れる。 */
+  linkedGateBlocksPassage?: boolean
 }
 
 export type StageDefinition = {
@@ -153,6 +155,8 @@ export type StageDefinition = {
   /** ステージ座標の幅・高さ（SVGのviewBoxと一致させる）。 */
   width: number
   height: number
+  /** 横長ステージで画面に見せる幅。省略時はステージ全幅を表示する。 */
+  viewportWidth?: number
   solids: readonly SolidDefinition[]
   waterBodies: readonly WaterBodyDefinition[]
   floaters: readonly FloaterDefinition[]
