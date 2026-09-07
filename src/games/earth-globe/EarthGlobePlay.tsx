@@ -27,7 +27,7 @@ export default function EarthGlobePlay() {
     setSelectionFeedbackKey((key) => key + 1)
   }, [])
 
-  const { registerContainer } = useGlobeEngine({
+  const { registerContainer, status } = useGlobeEngine({
     countries: globeCountries,
     features: worldFeatures,
     zoomLevel,
@@ -44,7 +44,7 @@ export default function EarthGlobePlay() {
 
   return (
     <main className={styles.page}>
-      <div ref={registerContainer} className={styles.scene} aria-hidden="true" />
+      <div ref={registerContainer} className={styles.scene} style={{ visibility: status === 'ready' ? 'visible' : 'hidden' }} aria-hidden="true" />
 
       <div className={styles.ui}>
         <header className={styles.header}>
@@ -58,16 +58,25 @@ export default function EarthGlobePlay() {
           もどる
         </button>
 
-        <CountryCard
-          selectedCountryId={selectedCountryId}
-          onCountrySelect={setSelectedCountryId}
-        />
-        <ZoomControls
-          zoomLevel={zoomLevel}
-          onZoomIn={() => setZoomLevel((level) => zoomIn(level))}
-          onZoomOut={() => setZoomLevel((level) => zoomOut(level))}
-          onReset={handleReset}
-        />
+        {status !== 'ready' && (
+          <div className={styles.loading}>
+            {status === 'loading'
+              ? <p role="status">よみこみちゅう…</p>
+              : <p role="alert">うまく よみこめませんでした。もどって もういちど あそんでね。</p>}
+          </div>
+        )}
+        {status === 'ready' && <>
+          <CountryCard
+            selectedCountryId={selectedCountryId}
+            onCountrySelect={setSelectedCountryId}
+          />
+          <ZoomControls
+            zoomLevel={zoomLevel}
+            onZoomIn={() => setZoomLevel((level) => zoomIn(level))}
+            onZoomOut={() => setZoomLevel((level) => zoomOut(level))}
+            onReset={handleReset}
+          />
+        </>}
       </div>
     </main>
   )

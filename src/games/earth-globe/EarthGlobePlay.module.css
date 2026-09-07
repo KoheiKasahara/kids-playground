@@ -120,3 +120,14 @@
     transition: none;
   }
 }
+
+.loading {
+  position: absolute;
+  inset: 25% 10%;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-large);
+  font-weight: 700;
+}

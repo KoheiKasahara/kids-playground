@@ -48,3 +48,22 @@ export function isGlobeBodyObject(object: THREE.Object3D): boolean {
 
   return false
 }
+
+/** three-globe の非同期 digest が全ての陸地 mesh を作り終えたか確認する。 */
+export function hasGlobePolygons(
+  globe: THREE.Object3D,
+  features: readonly import('../types').GlobeFeature[],
+): boolean {
+  const expected = features.reduce((count, feature) => count + (
+    feature.geometry.type === 'MultiPolygon'
+      ? (feature.geometry.coordinates as unknown[]).length
+      : 1
+  ), 0)
+  let actual = 0
+  globe.traverse((object) => {
+    if (threeGlobeObjectOf(object).__globeObjType !== 'polygon') return
+    const cap = object.children[0]
+    if (cap instanceof THREE.Mesh && cap.geometry.getAttribute('position')?.count > 0) actual += 1
+  })
+  return actual === expected
+}
