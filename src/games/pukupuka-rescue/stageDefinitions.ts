@@ -67,6 +67,7 @@ const wheel = {
 export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
   {
     id: 'water-rise',
+    stars: [{ id: 'star-1', x: 25, y: 94 }, { id: 'star-2', x: 33, y: 65 }, { id: 'star-3', x: 49, y: 39 }],
     name: 'みずで ぷかぷか',
     icon: '💧',
     width: STAGE_WIDTH,
@@ -85,6 +86,7 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
   },
   {
     id: 'land-on-platform',
+    stars: [{ id: 'star-1', x: 24, y: 83 }, { id: 'star-2', x: 37, y: 37 }, { id: 'star-3', x: 69, y: 48 }],
     name: 'うえから ちゃくち',
     icon: '🛟',
     width: STAGE_WIDTH,
@@ -108,6 +110,7 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
   },
   {
     id: 'open-the-gate',
+    stars: [{ id: 'star-1', x: 27, y: 83 }, { id: 'star-2', x: 36, y: 43 }, { id: 'star-3', x: 61, y: 64 }],
     name: 'ゲートを あけよう',
     icon: '🚪',
     width: STAGE_WIDTH,
@@ -130,6 +133,7 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
   },
   {
     id: 'change-the-flow',
+    stars: [{ id: 'star-1', x: 28, y: 85 }, { id: 'star-2', x: 42, y: 44 }, { id: 'star-3', x: 72, y: 64 }],
     name: 'ながれを かえよう',
     icon: '↔️',
     width: STAGE_WIDTH,
@@ -154,6 +158,7 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
   },
   {
     id: 'water-wheel-gate',
+    stars: [{ id: 'star-1', x: 29, y: 65 }, { id: 'star-2', x: 36, y: 40 }, { id: 'star-3', x: 61, y: 91 }],
     name: 'すいしゃの すいもん',
     icon: '⚙️',
     width: STAGE_WIDTH,
@@ -179,6 +184,7 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
   },
   {
     id: 'long-waterway',
+    stars: [{ id: 'star-1', x: 37, y: 84 }, { id: 'star-2', x: 87, y: 39 }, { id: 'star-3', x: 163, y: 67 }],
     name: 'ながい すいろ',
     icon: '🚣',
     width: 240,

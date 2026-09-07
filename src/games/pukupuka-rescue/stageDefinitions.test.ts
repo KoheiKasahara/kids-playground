@@ -186,6 +186,7 @@ describe('ぷかぷかレスキューのステージ成立性', () => {
         state = toggleGate(state)
         state = run(stage, state, 12).state
       }
+      expect(state.collectedStarIds, stage.id).toHaveLength(3)
       expect(state.phase).toBe('cleared')
     },
   )
