@@ -8,9 +8,9 @@ import styles from './PukupukaRescuePlay.module.css'
 //
 // 回転に連動して隣の小さな水門(linkedGate)も同時に開閉させ、「水車がまわる→何かが動く」を
 // もう一段見せる。見た目はメインのゲート（PukupukaGate、閉:オレンジのしま／開:緑の点線わく）と
-// 同じ言語にそろえ、「これも門なんだ」とひと目で伝わるようにする。水門は水そう本体の外
-// （床の下）に置いてあるぶん、浮遊物の経路やゴール判定には関与しない完全な飾りで、
-// 操作もできない（クリックできる要素を持たないため aria-hidden のままでよい）。
+// 同じ言語にそろえ、「これも門なんだ」とひと目で伝わるようにする。通常ステージでは
+// 床下の演出だが、linkedGateBlocksPassage のステージでは通路を実際に開閉する。
+// いずれも水車自体は操作せず、せんとの因果だけで動く。
 //
 // 回転そのものはCSSアニメーションの再生/一時停止だけで表現し、ゲーム状態には角度を
 // 持たせない（水位・浮遊物と同じく、判定に使わない見た目の演出は表示側に閉じる方針 #514 を踏襲）。
@@ -30,7 +30,7 @@ export default function PukupukaWaterWheel({ wheel, spinning }: Props) {
   const pipeWidth = radius * 0.7
 
   return (
-    <g aria-hidden="true">
+    <g aria-hidden="true" pointerEvents="none">
       {/* せんの排水口(main-drain)から水車の軸まで、床に埋め込まれたパイプ。 */}
       <rect
         x={x - pipeWidth / 2}

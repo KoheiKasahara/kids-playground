@@ -17,13 +17,15 @@ function run(stage: StageDefinition, state: PukupukaGameState, seconds: number, 
 }
 
 describe('ぷかぷかレスキューのステージ定義', () => {
-  test('4ステージのIDが一意で、参照先と配置が成立している', () => {
-    expect(PUKUPUKA_STAGES).toHaveLength(4)
+  test('6ステージのIDが一意で、参照先と配置が成立している', () => {
+    expect(PUKUPUKA_STAGES).toHaveLength(6)
     expect(new Set(PUKUPUKA_STAGES.map((stage) => stage.id)).size).toBe(PUKUPUKA_STAGES.length)
 
     for (const stage of PUKUPUKA_STAGES) {
       expect(stage.width).toBeGreaterThan(0)
       expect(stage.height).toBeGreaterThan(0)
+      expect(stage.viewportWidth ?? stage.width).toBeGreaterThan(0)
+      expect(stage.viewportWidth ?? stage.width).toBeLessThanOrEqual(stage.width)
       expect(stage.waterBodies.length).toBeGreaterThan(0)
 
       const bodyIds = new Set(stage.waterBodies.map((body) => body.id))
@@ -99,7 +101,7 @@ describe('ぷかぷかレスキューのステージ定義', () => {
   })
 
   test('序盤は少ないギミック、後半は既習ギミックを組み合わせる', () => {
-    const [first, second, third, fourth] = PUKUPUKA_STAGES
+    const [first, second, third, fourth, fifth, sixth] = PUKUPUKA_STAGES
     expect(first.faucet).toBeDefined()
     expect(first.drain).toBeUndefined()
     expect(first.gate).toBeUndefined()
@@ -113,6 +115,11 @@ describe('ぷかぷかレスキューのステージ定義', () => {
     expect(fourth.gate).toBeDefined()
     expect(fourth.board?.initialFlowDirection).toBe('back')
     expect(fourth.waterWheel).toBeDefined()
+    expect(fifth.waterWheel?.linkedGateBlocksPassage).toBe(true)
+    expect(fifth.gate).toBeUndefined()
+    expect(sixth.width).toBeGreaterThan(sixth.viewportWidth ?? sixth.width)
+    expect(sixth.gate).toBeDefined()
+    expect(sixth.board?.initialFlowDirection).toBe('back')
   })
 })
 
@@ -136,12 +143,24 @@ describe('ぷかぷかレスキューのステージ成立性', () => {
         state = run(stage, state, 8, 'fill').state
         state = toggleDrain(state)
         state = run(stage, state, 8).state
-      } else {
+      } else if (stage.id === 'change-the-flow') {
         state = toggleBoard(state)
         state = toggleGate(state)
         state = run(stage, state, 8, 'fill').state
         state = toggleDrain(state)
         state = run(stage, state, 8).state
+      } else if (stage.id === 'water-wheel-gate') {
+        state = run(stage, state, 6, 'fill').state
+        state = run(stage, state, 6).state
+        state = toggleDrain(state)
+        state = run(stage, state, 8).state
+      } else {
+        state = run(stage, state, 6, 'fill').state
+        state = run(stage, state, 12).state
+        state = toggleGate(state)
+        state = run(stage, state, 12).state
+        state = toggleBoard(state)
+        state = run(stage, state, 20).state
       }
       expect(state.phase).toBe('cleared')
     },
@@ -151,6 +170,8 @@ describe('ぷかぷかレスキューのステージ成立性', () => {
     const stage2 = PUKUPUKA_STAGES[1]
     const stage3 = PUKUPUKA_STAGES[2]
     const stage4 = PUKUPUKA_STAGES[3]
+    const stage5 = PUKUPUKA_STAGES[4]
+    const stage6 = PUKUPUKA_STAGES[5]
 
     // 排水しないと台へ降りない。
     expect(run(stage2, createInitialState(stage2), 8, 'fill').state.phase).toBe('playing')
@@ -164,6 +185,22 @@ describe('ぷかぷかレスキューのステージ成立性', () => {
     let stage4Back = run(stage4, toggleGate(createInitialState(stage4)), 8, 'fill').state
     stage4Back = run(stage4, toggleDrain(stage4Back), 8).state
     expect(stage4Back.phase).toBe('playing')
+
+    // 水車を回さなければ連動水門は実際の壁として通路をふさぐ。
+    let stage5Stopped = run(stage5, createInitialState(stage5), 6, 'fill').state
+    stage5Stopped = run(stage5, stage5Stopped, 12).state
+    expect(stage5Stopped.phase).toBe('playing')
+    expect(Math.max(...stage5Stopped.floaters.map((floater) => floater.x))).toBeLessThan(48)
+
+    // 最初から排水するだけでは高さが足りず、先にじゃぐちで水をためる必要がある。
+    const stage5DrainOnly = run(stage5, toggleDrain(createInitialState(stage5)), 12).state
+    expect(stage5DrainOnly.phase).toBe('playing')
+
+    // 長い水路はゲートと逆向きの板の両方を越えないとゴールできない。
+    let stage6Blocked = run(stage6, createInitialState(stage6), 6, 'fill').state
+    stage6Blocked = run(stage6, stage6Blocked, 16).state
+    expect(stage6Blocked.phase).toBe('playing')
+    expect(Math.max(...stage6Blocked.floaters.map((floater) => floater.x))).toBeLessThan(112)
   })
 
   test('ステージ3はゲートを閉じたまま注水しても、後から開けて回復できる', () => {

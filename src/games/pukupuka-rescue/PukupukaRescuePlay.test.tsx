@@ -56,12 +56,12 @@ function faucet() {
 }
 
 describe('PukupukaRescuePlay: ステージ選択', () => {
-  test('起動時は4つのステージ選択だけを表示する', () => {
+  test('起動時は6つのステージ選択だけを表示する', () => {
     renderGame()
 
     expect(screen.getByTestId('pukupuka-stage-select')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'どのステージで あそぶ？' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /^\d / })).toHaveLength(4)
+    expect(screen.getAllByRole('button', { name: /^\d / })).toHaveLength(6)
     expect(screen.queryByTestId('pukupuka-stage')).not.toBeInTheDocument()
   })
 
@@ -187,20 +187,51 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
 
   test('最終ステージをクリアするとステージ選択へ戻る', () => {
     renderGame()
-    chooseStage(4)
+    chooseStage(6)
 
-    fireEvent.click(screen.getByRole('button', { name: /いた/ }))
-    fireEvent.click(screen.getByRole('button', { name: /ゲート/ }))
     fireEvent.pointerDown(faucet())
-    frames.advance(8 * 60)
+    frames.advance(6 * 60)
     fireEvent.pointerUp(faucet())
-    fireEvent.click(screen.getByRole('button', { name: /せん/ }))
-    frames.advance(8 * 60)
+    frames.advance(12 * 60)
+    fireEvent.click(screen.getByRole('button', { name: /ゲート/ }))
+    frames.advance(12 * 60)
+    fireEvent.click(screen.getByRole('button', { name: /いた/ }))
+    frames.advance(20 * 60)
 
     const returnButton = screen.getByRole('button', { name: 'ステージをえらぶ' })
     expect(returnButton).toBeInTheDocument()
     fireEvent.click(returnButton)
     expect(screen.getByTestId('pukupuka-stage-select')).toBeInTheDocument()
+  })
+
+  test('水車の水門は、せんを開けて水車を回すと通過してクリアできる', () => {
+    renderGame()
+    chooseStage(5)
+
+    fireEvent.pointerDown(faucet())
+    frames.advance(6 * 60)
+    fireEvent.pointerUp(faucet())
+    frames.advance(6 * 60)
+    expect(screen.queryByText('ゴール！')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /せん/ }))
+    expect(screen.getByTestId('pukupuka-water-wheel-gate')).toHaveAttribute('data-open', 'true')
+    frames.advance(8 * 60)
+    expect(screen.getByText('ゴール！')).toBeInTheDocument()
+  })
+
+  test('長い水路では浮遊物を追って横方向へカメラが移動する', () => {
+    renderGame()
+    chooseStage(6)
+
+    const stage = screen.getByTestId('pukupuka-stage')
+    expect(stage).toHaveAttribute('viewBox', '0 0 100 150')
+    fireEvent.pointerDown(faucet())
+    frames.advance(6 * 60)
+    fireEvent.pointerUp(faucet())
+
+    expect(Number(stage.getAttribute('data-camera-x'))).toBeGreaterThan(30)
+    expect(stage.getAttribute('viewBox')?.split(' ')[2]).toBe('100')
   })
 
   test('プレイ画面をアンマウントすると予約中のRAFをキャンセルする', () => {
