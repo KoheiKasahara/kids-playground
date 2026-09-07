@@ -45,6 +45,8 @@ export type FloatStepContext = {
   readonly bounds: { readonly width: number; readonly height: number }
   /** 水に触れているときに流される向き（+1で右）。 */
   readonly driftDirection: number
+  /** 開門放水による安全な追加目標速度。水中率に応じて効く。 */
+  readonly gateFlowSpeed?: number
   /** 流れ板（#519）。触れている（円が矩形と重なっている）あいだだけ pushSpeed を目標速度へ加える。 */
   readonly board?: { readonly rect: Rect; readonly pushSpeed: number }
 }
@@ -142,7 +144,8 @@ export function stepFloater(
   const board = context.board
   const boardPush =
     board && circleOverlapsRect(state.x, state.y, radius, board.rect) ? board.pushSpeed : 0
-  const driftTarget = DRIFT_SPEED * submergedRatio * context.driftDirection + boardPush
+  const driftTarget =
+    (DRIFT_SPEED * context.driftDirection + (context.gateFlowSpeed ?? 0)) * submergedRatio + boardPush
   let vx = state.vx + (driftTarget - state.vx) * DRIFT_RESPONSE * deltaSeconds
 
   vx = clamp(vx, -MAX_SPEED, MAX_SPEED)

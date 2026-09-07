@@ -90,7 +90,7 @@ export default function PukupukaGate({ gate, open, disabled, onToggle }: Props) 
           type="button"
           className={styles.gateHit}
           disabled={disabled}
-          aria-label={open ? 'ゲート。あいています。とおれます' : 'ゲート。とじています。おすと あきます'}
+          aria-label={open ? 'ゲートの すいもん。あいています。みずが ながれます' : 'ゲートの すいもん。とじています。みずを せきとめています'}
           aria-pressed={open}
           onClick={onToggle}
         />

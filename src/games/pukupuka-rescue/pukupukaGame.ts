@@ -9,8 +9,10 @@ import {
 import {
   createWaterField,
   findWaterBody,
+  findWaterBodyAt,
   requestWaterChange,
   stepWaterField,
+  transferWaterThroughGate,
   waterFillRatio,
   waterSurfaceY,
   surfaceYAt,
@@ -38,6 +40,16 @@ export type PukupukaGameState = {
   readonly gateOpen: boolean
   /** 流れ板(#519)が現在押し流している向き。タップのたびに反転する。 */
   readonly boardFlowDirection: BoardFlowDirection
+  /** 実際の開門移送から導いた流れ。演出と浮遊物の力で同じ値を使う。 */
+  readonly gateFlow: GateFlowState
+}
+
+export type GateFlowState = {
+  readonly direction: -1 | 0 | 1
+  readonly strength: number
+  readonly transferredVolume: number
+  readonly fromBodyId?: WaterBodyId
+  readonly toBodyId?: WaterBodyId
 }
 
 export type StepResult = {
@@ -61,6 +73,8 @@ export const WATER_TAP_LEVEL = 10
  * 「注水量 - 排水量 = 水位変化」がちょうど打ち消し合う予測しやすい挙動になる。
  */
 export const DRAIN_RATE_LEVEL_PER_SEC = WATER_HOLD_RATE_LEVEL_PER_SEC
+/** 最大水位差での放水目標速度。既存の速度追従・上限を通すため直接加速はしない。 */
+export const GATE_FLOW_SPEED = 108
 
 /** Phase 1で操作する水域。将来は操作対象の水域をUIから選べるようにする余地を残す。 */
 export function primaryWaterBodyId(stage: StageDefinition): WaterBodyId {
@@ -100,6 +114,7 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
     drainOpen: false,
     gateOpen: false,
     boardFlowDirection: stage.board?.initialFlowDirection ?? 'goal',
+    gateFlow: { direction: 0, strength: 0, transferredVolume: 0 },
   }
 }
 
@@ -177,6 +192,7 @@ export function isSettled(stage: StageDefinition, state: PukupukaGameState): boo
   // クリア後は浮遊物を止めているため(#518)、クリアした瞬間の速度が残っていても
   // 動き続けているとは扱わない。
   if (state.phase === 'cleared') return true
+  if (state.gateOpen && state.gateFlow.strength > 0) return false
   for (const definition of stage.waterBodies) {
     const bodyState = state.water[definition.id]
     if (bodyState && bodyState.volume !== bodyState.targetVolume) return false
@@ -274,6 +290,34 @@ function advanceOneStep(
     }
   }
   water = stepWaterField(stage.waterBodies, water, deltaSeconds)
+  let gateFlow: GateFlowState = { direction: 0, strength: 0, transferredVolume: 0 }
+  if (state.phase === 'playing' && state.gateOpen && stage.gate) {
+    const transfer = transferWaterThroughGate(
+      stage.waterBodies,
+      water,
+      stage.gate.leftBodyId,
+      stage.gate.rightBodyId,
+      deltaSeconds,
+    )
+    water = transfer.field
+    const carriedStrength =
+      state.gateFlow.direction === transfer.direction
+        ? Math.max(0, state.gateFlow.strength - deltaSeconds * 0.42)
+        : 0
+    gateFlow = {
+      direction: transfer.direction,
+      strength: Math.max(transfer.strength, carriedStrength),
+      transferredVolume: transfer.transferredVolume,
+      fromBodyId: transfer.fromBodyId,
+      toBodyId: transfer.toBodyId,
+    }
+    // 水位差がそろった瞬間に流れが消えると因果が見えにくいため、短い残流だけ滑らかに減衰させる。
+    // 閉門時はこの分岐へ入らず即リセットされるので、開閉の繰り返しにも状態を持ち越さない。
+    if (transfer.direction === 0 && state.gateFlow.direction !== 0) {
+      const strength = Math.max(0, state.gateFlow.strength - deltaSeconds * 0.42)
+      if (strength > 0) gateFlow = { ...state.gateFlow, strength, transferredVolume: 0 }
+    }
+  }
 
   // クリア後は浮遊物を止めた絵のままにする(#518)。複数の浮遊物が同じゴールへ集まる
   // 構成では、止めずに動かし続けると、みな同じ水の流れに乗って結局ほぼ同じ場所へ
@@ -282,7 +326,8 @@ function advanceOneStep(
   // 見分けられる状態を保つ。アヒル1体だけの時と同じく、クリア後に水の操作を
   // 受け付けなくなるのと合わせて「ここでおしまい」を見た目でも表す。
   const solids = activeSolids(stage, state.gateOpen, state.drainOpen)
-  const board = stage.board
+  // Legacy互換面（同じ水域ID同士のゲート）だけ、従来の接触板として扱う。
+  const board = stage.board && stage.gate?.leftBodyId === stage.gate?.rightBodyId
     ? { rect: stage.board, pushSpeed: boardFlowSpeed(state, driftDirection) }
     : undefined
   const floaters =
@@ -290,6 +335,16 @@ function advanceOneStep(
       ? state.floaters.map((floater) => {
           const definition = stage.floaters.find((candidate) => candidate.id === floater.id)
           if (!definition) return floater
+          const body = findWaterBodyAt(stage.waterBodies, floater.x, floater.y)
+          let flowDirection = gateFlow.direction
+          const bodyId = body?.id
+          if (bodyId === gateFlow.toBodyId && bodyId === stage.board?.targetBodyId) {
+            flowDirection = Math.sign(boardFlowSpeed(state, driftDirection)) as -1 | 1
+          }
+          const affectedByGate = body?.id === gateFlow.fromBodyId || body?.id === gateFlow.toBodyId
+          const directedReleaseBoard =
+            stage.gate?.leftBodyId !== stage.gate?.rightBodyId && bodyId === stage.board?.targetBodyId
+          const ambientScale = directedReleaseBoard ? 0 : (stage.ambientDriftScale ?? 1)
           return stepFloater(
             definition,
             floater,
@@ -297,7 +352,8 @@ function advanceOneStep(
               surfaceY: surfaceYAt(stage.waterBodies, water, floater.x, floater.y),
               solids,
               bounds: { width: stage.width, height: stage.height },
-              driftDirection,
+              driftDirection: driftDirection * ambientScale,
+              gateFlowSpeed: affectedByGate ? GATE_FLOW_SPEED * gateFlow.strength * flowDirection : 0,
               board,
             },
             deltaSeconds,
@@ -322,6 +378,7 @@ function advanceOneStep(
       drainOpen: state.drainOpen,
       gateOpen: state.gateOpen,
       boardFlowDirection: state.boardFlowDirection,
+      gateFlow,
     },
     goalReached,
   }

@@ -6,6 +6,7 @@ import {
   requestWaterChange,
   stepWaterField,
   surfaceYAt,
+  transferWaterThroughGate,
   waterBodyCapacity,
   waterBodyMaxLevel,
   waterFillRatio,
@@ -108,6 +109,73 @@ describe('waterModel: 水量の増減', () => {
     const level = waterLevelOf(upper, afterShortStep.upper)
     expect(level).toBeGreaterThan(10)
     expect(level).toBeLessThan(40)
+  })
+})
+
+describe('waterModel: 水門の2水域移送(#568)', () => {
+  test('高い側から低い側へ移り、総水量を保存しながら水位差が縮む', () => {
+    const before = createWaterField(bodies)
+    const totalBefore = before.upper.volume + before.lower.volume
+    const result = transferWaterThroughGate(bodies, before, 'upper', 'lower', 0.1)
+
+    expect(result.direction).toBe(1)
+    expect(result.fromBodyId).toBe('upper')
+    expect(result.toBodyId).toBe('lower')
+    expect(result.transferredVolume).toBeGreaterThan(0)
+    expect(result.field.upper.volume + result.field.lower.volume).toBeCloseTo(totalBefore, 8)
+    expect(waterLevelOf(upper, result.field.upper)).toBeLessThan(waterLevelOf(upper, before.upper))
+    expect(waterLevelOf(lower, result.field.lower)).toBeGreaterThan(waterLevelOf(lower, before.lower))
+  })
+
+  test('幅が違っても差を逆転させず、繰り返すと同じ水位で止まる', () => {
+    let field = createWaterField(bodies)
+    for (let index = 0; index < 120; index += 1) {
+      field = transferWaterThroughGate(bodies, field, 'upper', 'lower', 1 / 60).field
+    }
+
+    expect(waterLevelOf(upper, field.upper)).toBeCloseTo(waterLevelOf(lower, field.lower), 5)
+    expect(transferWaterThroughGate(bodies, field, 'upper', 'lower', 1 / 60).direction).toBe(0)
+  })
+
+  test('逆の水位差なら右から左へ移り、targetVolumeも同量移動して後続stepに戻されない', () => {
+    const lowerFilled = stepWaterField(
+      bodies,
+      requestWaterChange(bodies, createWaterField(bodies), 'lower', 30),
+      10,
+    )
+    const result = transferWaterThroughGate(bodies, lowerFilled, 'upper', 'lower', 0.1)
+
+    expect(result.direction).toBe(-1)
+    expect(result.field.upper.volume).toBe(result.field.upper.targetVolume)
+    expect(result.field.lower.volume).toBe(result.field.lower.targetVolume)
+    expect(stepWaterField(bodies, result.field, 1)).toBe(result.field)
+  })
+
+  test('不正なdt・同一ID・未知IDでは状態を変えない', () => {
+    const field = createWaterField(bodies)
+    expect(transferWaterThroughGate(bodies, field, 'upper', 'lower', Number.NaN).field).toBe(field)
+    expect(transferWaterThroughGate(bodies, field, 'upper', 'upper', 1).field).toBe(field)
+    expect(transferWaterThroughGate(bodies, field, 'upper', 'unknown', 1).field).toBe(field)
+  })
+
+  test.each([
+    ['排水予約中', -1000],
+    ['給水予約中', 20],
+  ])('%sでもtargetVolume合計を保存し、有限値かつ容量内に保つ', (_label, pendingDelta) => {
+    const pending = requestWaterChange(bodies, createWaterField(bodies), 'upper', pendingDelta as number)
+    const targetTotalBefore = pending.upper.targetVolume + pending.lower.targetVolume
+    const result = transferWaterThroughGate(bodies, pending, 'upper', 'lower', 0.1)
+    const targetTotalAfter = result.field.upper.targetVolume + result.field.lower.targetVolume
+
+    expect(targetTotalAfter).toBeCloseTo(targetTotalBefore, 8)
+    for (const [definition, state] of [
+      [upper, result.field.upper],
+      [lower, result.field.lower],
+    ] as const) {
+      expect(Number.isFinite(state.targetVolume)).toBe(true)
+      expect(state.targetVolume).toBeGreaterThanOrEqual(0)
+      expect(state.targetVolume).toBeLessThanOrEqual(waterBodyCapacity(definition))
+    }
   })
 })
 

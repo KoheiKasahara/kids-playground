@@ -131,6 +131,26 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
     expect(drain).toBeDisabled()
   })
 
+  test('水門ステージは閉門中に左右の水位差を見せ、開門すると実移送方向の放水を表示する', () => {
+    renderGame()
+    chooseStage(3)
+
+    const gate = screen.getByRole('button', { name: /ゲートの すいもん/ })
+    fireEvent.pointerDown(faucet())
+    frames.advance(2 * 60)
+    fireEvent.pointerUp(faucet())
+
+    const leftSurface = Number(screen.getByTestId('pukupuka-water-left').getAttribute('data-surface-y'))
+    const rightSurface = Number(screen.getByTestId('pukupuka-water-right').getAttribute('data-surface-y'))
+    expect(leftSurface).toBeLessThan(rightSurface - 20)
+    expect(screen.queryByTestId('pukupuka-gate-flow')).not.toBeInTheDocument()
+
+    fireEvent.click(gate)
+    frames.advance(2)
+    expect(screen.getByTestId('pukupuka-gate-flow')).toHaveAttribute('data-flow-direction', 'right')
+    expect(gate).toHaveAccessibleName(/みずが ながれます/)
+  })
+
   test('じゃぐちから指を離すと注水中表示が消え、注水を押し続けない', () => {
     renderGame()
     chooseStage(1)
@@ -195,10 +215,9 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
     frames.advance(6 * 60)
     fireEvent.pointerUp(faucet())
     frames.advance(12 * 60)
+    fireEvent.click(screen.getByRole('button', { name: /いた/ }))
     fireEvent.click(screen.getByRole('button', { name: /ゲート/ }))
     frames.advance(12 * 60)
-    fireEvent.click(screen.getByRole('button', { name: /いた/ }))
-    frames.advance(20 * 60)
 
     const returnButton = screen.getByRole('button', { name: 'ステージをえらぶ' })
     expect(returnButton).toBeInTheDocument()

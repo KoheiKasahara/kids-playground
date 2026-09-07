@@ -24,6 +24,29 @@ function water(initialLevel: number, ceilingY = 30, right = 86) {
   }
 }
 
+function dividedWater(boundaryX: number, leftInitialLevel: number, rightInitialLevel: number, right = 86) {
+  return [
+    {
+      id: 'left',
+      label: 'ひだりの すいそう',
+      left: 14,
+      right: boundaryX,
+      floorY: 126,
+      ceilingY: 30,
+      initialLevel: leftInitialLevel,
+    },
+    {
+      id: 'right',
+      label: 'みぎの すいそう',
+      left: boundaryX,
+      right,
+      floorY: 126,
+      ceilingY: 30,
+      initialLevel: rightInitialLevel,
+    },
+  ]
+}
+
 /** 排水を使うステージ用の見た目位置。水車は水槽の外（床下）だがstage viewBox内に置く。 */
 const faucet = { id: 'main-faucet', targetBodyId: 'main', x: 24, y: 10 }
 const drain = { id: 'main-drain', sourceBodyId: 'main', x: 24, y: 126 }
@@ -93,17 +116,17 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
       ...tankWalls(),
       { id: 'goal-platform', kind: 'platform', x: 62, y: 88, width: 24, height: 38 },
     ],
-    waterBodies: [water(10)],
+    waterBodies: dividedWater(50, 10, 0),
     floaters: [
       { id: 'duck', kind: 'duck', radius: 8, startX: 22, startY: 116 },
       { id: 'boat', kind: 'boat', radius: 9, startX: 31, startY: 115 },
     ],
     goal: { area: { x: 64, y: 68, width: 18, height: 20 }, floaterIds: ['duck', 'boat'] },
-    faucet,
-    drain,
-    gate: { id: 'main-gate', x: 46, y: 22, width: 8, height: 104 },
-    waterWheel: wheel,
-    hint: 'ゲートを あけて、みずを ためよう',
+    faucet: { ...faucet, targetBodyId: 'left' },
+    drain: { id: 'right-drain', sourceBodyId: 'right', x: 74, y: 126 },
+    gate: { id: 'main-gate', x: 46, y: 22, width: 8, height: 104, leftBodyId: 'left', rightBodyId: 'right' },
+    ambientDriftScale: 0.08,
+    hint: 'すいもんを とじたまま ためて、あけて ながそう',
   },
   {
     id: 'change-the-flow',
@@ -113,22 +136,21 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
     height: STAGE_HEIGHT,
     solids: [
       ...tankWalls(),
-      { id: 'goal-platform', kind: 'platform', x: 68, y: 88, width: 18, height: 38 },
+      { id: 'goal-platform', kind: 'platform', x: 70, y: 88, width: 16, height: 38 },
     ],
-    // ceilingYを板の高さより下にして、板を逆向きのまま満水にしても越せないようにする。
-    waterBodies: [water(10, 48)],
+    waterBodies: dividedWater(60, 10, 0),
     floaters: [
       { id: 'duck', kind: 'duck', radius: 8, startX: 21, startY: 116 },
       { id: 'boat', kind: 'boat', radius: 9, startX: 30, startY: 115 },
       { id: 'ringBear', kind: 'ringBear', radius: 7, startX: 38, startY: 116 },
     ],
-    goal: { area: { x: 68, y: 68, width: 12, height: 20 }, floaterIds: ['duck', 'boat', 'ringBear'] },
-    faucet,
-    drain,
-    gate: { id: 'main-gate', x: 64, y: 22, width: 8, height: 104 },
-    board: { id: 'main-board', x: 34, y: 44, width: 26, height: 10, initialFlowDirection: 'back' },
-    waterWheel: wheel,
-    hint: 'いたを ゴールむきにして、ゲートを あけよう',
+    goal: { area: { x: 68, y: 68, width: 16, height: 20 }, floaterIds: ['duck', 'boat', 'ringBear'] },
+    faucet: { ...faucet, targetBodyId: 'left' },
+    drain: { id: 'right-drain', sourceBodyId: 'right', x: 76, y: 126 },
+    gate: { id: 'main-gate', x: 56, y: 22, width: 8, height: 104, leftBodyId: 'left', rightBodyId: 'right' },
+    board: { id: 'main-board', x: 64, y: 66, width: 18, height: 10, initialFlowDirection: 'back', targetBodyId: 'right' },
+    ambientDriftScale: 0,
+    hint: 'すいもんを とじて ため、いたを ゴールむきにして あけよう',
   },
   {
     id: 'water-wheel-gate',
@@ -166,16 +188,18 @@ export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
       ...tankWalls(240),
       { id: 'first-wall', kind: 'wall', x: 66, y: 58, width: 10, height: 68 },
     ],
-    waterBodies: [water(10, 30, 226)],
+    waterBodies: dividedWater(116, 10, 0, 226),
     floaters: [
       { id: 'duck', kind: 'duck', radius: 8, startX: 22, startY: 116 },
       { id: 'boat', kind: 'boat', radius: 9, startX: 32, startY: 115 },
       { id: 'ringBear', kind: 'ringBear', radius: 7, startX: 41, startY: 116 },
     ],
-    goal: { area: { x: 198, y: 22, width: 24, height: 22 }, floaterIds: ['duck', 'boat', 'ringBear'] },
-    faucet,
-    gate: { id: 'journey-gate', x: 112, y: 22, width: 8, height: 104 },
-    board: { id: 'journey-board', x: 142, y: 22, width: 34, height: 12, initialFlowDirection: 'back' },
+    goal: { area: { x: 176, y: 64, width: 46, height: 24 }, floaterIds: ['duck', 'boat', 'ringBear'] },
+    faucet: { ...faucet, targetBodyId: 'left' },
+    drain: { id: 'journey-drain', sourceBodyId: 'right', x: 134, y: 126 },
+    gate: { id: 'journey-gate', x: 112, y: 22, width: 8, height: 104, leftBodyId: 'left', rightBodyId: 'right' },
+    board: { id: 'journey-board', x: 142, y: 74, width: 34, height: 12, initialFlowDirection: 'back', targetBodyId: 'right' },
+    ambientDriftScale: 0.75,
     hint: 'たかい かべ、ゲート、いたを じゅんばんに こえよう',
   },
 ]
@@ -213,8 +237,8 @@ export const PUKUPUKA_STAGE: LegacyStageDefinition = {
   goal: { area: { x: 56, y: 86, width: 28, height: 10 }, floaterIds: ['duck', 'boat', 'ringBear'] },
   faucet: { id: 'main-faucet', targetBodyId: 'main', x: 38, y: 10 },
   drain: { id: 'main-drain', sourceBodyId: 'main', x: 36, y: 126 },
-  gate: { id: 'main-gate', x: 46, y: 22, width: 8, height: 104 },
-  board: { id: 'main-board', x: 56, y: 54, width: 26, height: 10, initialFlowDirection: 'goal' },
+  gate: { id: 'main-gate', x: 46, y: 22, width: 8, height: 104, leftBodyId: 'main', rightBodyId: 'main' },
+  board: { id: 'main-board', x: 56, y: 54, width: 26, height: 10, initialFlowDirection: 'goal', targetBodyId: 'main' },
   waterWheel: {
     id: 'main-water-wheel',
     x: 36,

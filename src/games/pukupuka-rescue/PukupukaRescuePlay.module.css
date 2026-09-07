@@ -437,6 +437,24 @@
   animation: pukupukaGateOpenMark 1.2s ease-in-out infinite;
 }
 
+.gateWaterFlow {
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 1px 1px rgb(23 96 127 / 45%));
+  animation: pukupukaGateWaterFlow 520ms ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes pukupukaGateWaterFlow {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* 見た目のとびらよりタップ領域を広く取り、幼児の指でも押しやすくする。 */
 .gateHit {
   width: 100%;
@@ -692,6 +710,7 @@
   .drainBubbleA,
   .drainBubbleB,
   .gateOpenMark,
+  .gateWaterFlow,
   .boardFlowMark,
   .waterWheelSpin {
     animation: none;
