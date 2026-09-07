@@ -148,6 +148,8 @@ export type WaterWheelDefinition = {
 export type StageDefinition = {
   id: string
   name: string
+  /** ステージ選択画面で、文字を読まなくても違いを見分けるための記号。 */
+  icon: string
   /** ステージ座標の幅・高さ（SVGのviewBoxと一致させる）。 */
   width: number
   height: number
@@ -155,11 +157,12 @@ export type StageDefinition = {
   waterBodies: readonly WaterBodyDefinition[]
   floaters: readonly FloaterDefinition[]
   goal: GoalDefinition
-  faucet: FaucetDefinition
-  drain: DrainDefinition
-  gate: GateDefinition
-  board: BoardDefinition
-  waterWheel: WaterWheelDefinition
+  /** ステージで使うギミックだけ定義する。省略したギミックは表示・操作しない。 */
+  faucet?: FaucetDefinition
+  drain?: DrainDefinition
+  gate?: GateDefinition
+  board?: BoardDefinition
+  waterWheel?: WaterWheelDefinition
   /** 幼児向けの短い1行ヒント。 */
   hint: string
 }
