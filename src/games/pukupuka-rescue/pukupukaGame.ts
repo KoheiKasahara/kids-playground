@@ -104,11 +104,20 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
 }
 
 /**
- * 物理判定に使う固定物の一覧（#517）。ゲートが閉じている間だけ、
- * stage.gateも他の固定物と同じ扱いで含める。開いている間は当たり判定ごと取り除く。
+ * 物理判定に使う固定物の一覧。操作ゲートと水車連動水門は、閉じている間だけ
+ * 他の固定物と同じ扱いで含め、開くと当たり判定ごと取り除く。
  */
-export function activeSolids(stage: StageDefinition, gateOpen: boolean): readonly Rect[] {
-  return gateOpen || !stage.gate ? stage.solids : [...stage.solids, stage.gate]
+export function activeSolids(
+  stage: StageDefinition,
+  gateOpen: boolean,
+  drainOpen = false,
+): readonly Rect[] {
+  const solids: Rect[] = [...stage.solids]
+  if (stage.gate && !gateOpen) solids.push(stage.gate)
+  if (stage.waterWheel?.linkedGateBlocksPassage && !drainOpen) {
+    solids.push(stage.waterWheel.linkedGate)
+  }
+  return solids
 }
 
 export function getFloater(state: PukupukaGameState, floaterId: string): FloaterState | undefined {
@@ -272,7 +281,7 @@ function advanceOneStep(
   // クリアした瞬間の(まだ少しばらけている)並びのまま止めることで、常にきれいに
   // 見分けられる状態を保つ。アヒル1体だけの時と同じく、クリア後に水の操作を
   // 受け付けなくなるのと合わせて「ここでおしまい」を見た目でも表す。
-  const solids = activeSolids(stage, state.gateOpen)
+  const solids = activeSolids(stage, state.gateOpen, state.drainOpen)
   const board = stage.board
     ? { rect: stage.board, pushSpeed: boardFlowSpeed(state, driftDirection) }
     : undefined
