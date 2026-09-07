@@ -227,15 +227,15 @@ describe('TsumikiBowlingGame', () => {
     expect(engineMock.options?.stageId).toBe('tower')
   })
 
-  it('ホームへもどるリンクがある', () => {
+  it('プレイから一階層上のステージ選択へ戻れる', () => {
     renderGame()
-    expect(screen.getByRole('link', { name: 'もどる' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('button', { name: 'ステージ選択へもどる' })).toBeInTheDocument()
   })
 
-  it('結果画面からもホームへ戻れる', () => {
+  it('結果画面からもステージ選択へ戻れる', () => {
     renderGame()
     for (let index = 1; index <= THROWS_PER_GAME; index += 1) playThrow(2, index)
-    expect(screen.getByRole('link', { name: 'ほかの あそび' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('button', { name: 'べつの ステージ' })).toBeInTheDocument()
   })
 })
 

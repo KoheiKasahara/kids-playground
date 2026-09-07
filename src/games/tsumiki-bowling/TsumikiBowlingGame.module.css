@@ -37,26 +37,6 @@
   text-overflow: ellipsis;
 }
 
-.backLink {
-  grid-column: 1;
-  grid-row: 1;
-  display: inline-flex;
-  min-width: 56px;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  justify-self: start;
-  padding: var(--space-xs) var(--space-sm);
-  border: 2px solid transparent;
-  border-radius: var(--radius-round);
-  background: var(--color-surface-muted);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-base);
-  font-weight: 700;
-  /* 320px幅でも「もどる」が2行に折り返さないようにする。 */
-  white-space: nowrap;
-  text-decoration: none;
-}
 
 /*
  * いま遊んでいるステージ名と「ステージをかえる」を兼ねるボタン。
@@ -470,19 +450,6 @@
   cursor: pointer;
 }
 
-.resultBackLink {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-xs) var(--space-lg);
-  border-radius: var(--radius-round);
-  background: var(--color-surface-muted);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-base);
-  font-weight: 700;
-  text-decoration: none;
-}
 
 /*
  * 玉の選択カード。文字を読まなくても、玉の大きさ・色・アイコンだけで

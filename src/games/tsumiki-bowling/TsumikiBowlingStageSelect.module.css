@@ -15,7 +15,7 @@
 .header {
   display: grid;
   flex: none;
-  grid-template-columns: minmax(56px, 1fr) auto minmax(56px, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-sm);
 }
@@ -28,28 +28,11 @@
   font-size: clamp(18px, 5vw, 26px);
   font-weight: 900;
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.backLink {
-  grid-column: 1;
-  grid-row: 1;
-  display: inline-flex;
-  min-width: 56px;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  justify-self: start;
-  padding: var(--space-xs) var(--space-sm);
-  border: 2px solid transparent;
-  border-radius: var(--radius-round);
-  background: var(--color-surface-muted);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-base);
-  font-weight: 700;
-  white-space: nowrap;
-  text-decoration: none;
-}
 
 .lead {
   flex: none;

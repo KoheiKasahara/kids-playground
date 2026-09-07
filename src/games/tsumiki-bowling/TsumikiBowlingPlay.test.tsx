@@ -1,3 +1,5 @@
+import GameIntro from '../../components/GameIntro'
+import GameIntroProvider from '../../components/GameIntroProvider'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -13,7 +15,7 @@ vi.mock('./useTsumikiBowlingEngine', () => ({
 function renderPlay() {
   return render(
     <MemoryRouter initialEntries={['/games/tsumiki-bowling']}>
-      <TsumikiBowlingPlay />
+      <GameIntroProvider><TsumikiBowlingPlay /><GameIntro /></GameIntroProvider>
     </MemoryRouter>,
   )
 }
@@ -24,6 +26,16 @@ beforeEach(() => {
 })
 
 describe('TsumikiBowlingPlay', () => {
+  it('初期画面の説明はプレイ中だけ隠れ、もどると再度読める', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    expect(screen.getByRole('heading', { name: 'このゲームについて' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /つみきタワー/ }))
+    expect(screen.queryByRole('heading', { name: 'このゲームについて' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'ステージ選択へもどる' }))
+    expect(screen.getByRole('heading', { name: 'このゲームについて' })).toBeInTheDocument()
+  })
+
   it('最初はステージ選択が出て、選ぶとプレイ画面へ切り替わる', async () => {
     const user = userEvent.setup()
     renderPlay()

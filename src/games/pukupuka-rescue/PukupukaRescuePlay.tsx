@@ -1,3 +1,4 @@
+import GameBackButton from '../../components/GameBackButton'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PukupukaStage from './PukupukaStage'
@@ -28,9 +29,7 @@ export function PukupukaStageSelect({ onSelect, onHome }: { onSelect: (id: Pukup
   return (
     <main className={`${styles.page} ${styles.selectionPage}`} data-testid="pukupuka-stage-select">
       <header className={styles.header}>
-        <button type="button" className={styles.home} onClick={onHome}>
-          ← もどる
-        </button>
+        <GameBackButton onBack={onHome} />
         <h1 className={styles.title}>
           <span aria-hidden="true">🛟</span> ぷかぷかレスキュー
         </h1>
@@ -230,14 +229,7 @@ export default function PukupukaRescuePlay() {
   return (
     <main className={styles.page} data-testid="pukupuka-play">
       <header className={styles.header}>
-        <button
-          type="button"
-          className={styles.home}
-          aria-label="ステージ選択へもどる"
-          onClick={handleBackToSelection}
-        >
-          ← もどる
-        </button>
+        <GameBackButton onBack={handleBackToSelection} label="ステージ選択へもどる" />
         <h1 className={styles.title}>
           <span aria-hidden="true">🛟</span> ぷかぷかレスキュー
         </h1>

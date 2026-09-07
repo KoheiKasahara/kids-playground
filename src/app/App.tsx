@@ -3,6 +3,7 @@ import GameRouteBoundary from './GameRouteBoundary'
 import { useRoutes } from 'react-router-dom'
 import { routes } from './routes'
 import GameIntro from '../components/GameIntro'
+import GameIntroProvider from '../components/GameIntroProvider'
 import PwaStatus from '../pwa/PwaStatus'
 import ScrollManager from './ScrollManager'
 import SeoManager from '../seo/SeoManager'
@@ -22,8 +23,10 @@ export default function App() {
       <SeoManager />
       {/* ゲームと説明を同じSuspenseで待ち、説明だけを先行表示しない。 */}
       <GameRouteBoundary>
-        {element}
-        <GameIntro />
+        <GameIntroProvider>
+          {element}
+          <GameIntro />
+        </GameIntroProvider>
       </GameRouteBoundary>
       <PwaStatus />
     </>
