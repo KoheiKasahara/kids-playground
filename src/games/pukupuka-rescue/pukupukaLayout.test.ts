@@ -33,6 +33,15 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
     expect(page).toMatch(/--safe-bottom/)
   })
 
+  test('320px級でもheaderの戻るボタンとタイトルが横幅を押し広げない', () => {
+    const header = ruleBody('.header')
+    const title = ruleBody('.title')
+    expect(header).toMatch(/min-width:\s*0/)
+    expect(title).toMatch(/min-width:\s*0/)
+    expect(title).toMatch(/flex:\s*1 1 auto/)
+    expect(title).toMatch(/overflow-wrap:\s*anywhere/)
+  })
+
   test('ステージSVGは幅・高さとも親に収まる', () => {
     const svg = ruleBody('.stageSvg')
     expect(svg).toMatch(/width:\s*100%/)
