@@ -39,13 +39,13 @@ describe('直接アクセス（URL直入力を想定）', () => {
     expect(screen.getByRole('button', { name: /たしざん/ })).toBeInTheDocument()
   })
 
-  test('/games/color-mix-quiz を直接開くといろまぜクイズの開始画面が出る', () => {
+  test('/games/color-mix-quiz を直接開くといろまぜクイズの開始画面が出る', async () => {
     render(
       <MemoryRouter initialEntries={['/games/color-mix-quiz']}>
         <App />
       </MemoryRouter>,
     )
-    expect(screen.getByRole('heading', { name: 'いろまぜクイズ' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'いろまぜクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'はじめる' })).toBeInTheDocument()
   })
 

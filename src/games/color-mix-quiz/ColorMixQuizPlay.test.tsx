@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -19,8 +19,10 @@ vi.mock('./questionGenerator', async (importOriginal) => {
   }
 })
 
-function renderApp(path: string) {
-  return render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>)
+async function renderApp(path: string) {
+  const view = render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>)
+  await waitFor(() => expect(screen.queryByText('よみこみちゅう…')).not.toBeInTheDocument())
+  return view
 }
 
 afterEach(() => {
@@ -31,19 +33,19 @@ afterEach(() => {
 describe('ColorMixQuizPlay', () => {
   test('開始画面から難易度選択なしでプレイ画面へ進む', async () => {
     const user = userEvent.setup()
-    renderApp('/games/color-mix-quiz')
+    await renderApp('/games/color-mix-quiz')
     await user.click(screen.getByRole('button', { name: 'はじめる' }))
-    expect(screen.getByRole('heading', { name: /この (2|3)しょくを まぜると？|この いろから ひくと？/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /この (2|3)しょくを まぜると？|この いろから ひくと？/ })).toBeInTheDocument()
   })
 
-  test('色名を答えに使わない4つの色パネルを表示する', () => {
-    renderApp('/games/color-mix-quiz/play')
+  test('色名を答えに使わない4つの色パネルを表示する', async () => {
+    await renderApp('/games/color-mix-quiz/play')
     expect(screen.getAllByRole('button', { name: /[1-4]ばんめの いろ/ })).toHaveLength(4)
   })
 
   test('回答するとロックされ、共通フィードバックが表示される', async () => {
     const user = userEvent.setup()
-    renderApp('/games/color-mix-quiz/play')
+    await renderApp('/games/color-mix-quiz/play')
     const choices = screen.getAllByRole('button', { name: /[1-4]ばんめの いろ/ })
     await user.click(choices[0])
     expect(screen.getByRole('status')).toHaveTextContent(/せいかい！|ざんねん！/)
@@ -63,7 +65,7 @@ describe('ColorMixQuizPlay', () => {
       choices: ['#e94b3c', '#f6d743', '#58a85c', '#ef8a2f'],
     }]
 
-    renderApp('/games/color-mix-quiz/play')
+    await renderApp('/games/color-mix-quiz/play')
 
     expect(screen.getByTestId('subtraction-removal-particles')).toBeInTheDocument()
     for (const choice of screen.getAllByRole('button', { name: /[1-4]ばんめの いろ/ })) expect(choice).toBeEnabled()
@@ -86,7 +88,7 @@ describe('ColorMixQuizPlay', () => {
       choices: ['#e94b3c', '#58a85c', '#ef8a2f', '#7950a1'],
     }]
 
-    renderApp('/games/color-mix-quiz/play')
+    await renderApp('/games/color-mix-quiz/play')
 
     await userEvent.setup().click(screen.getByRole('button', { name: '1ばんめの いろ' }))
 
@@ -96,9 +98,9 @@ describe('ColorMixQuizPlay', () => {
     expect(screen.getByRole('button', { name: '1ばんめの いろ' })).toHaveTextContent('✕')
   })
 
-  test('旧難易度URLも単一のプレイ画面へ進む', () => {
-    renderApp('/games/color-mix-quiz/expert/play')
-    expect(screen.getByRole('heading', { name: /この (2|3)しょくを まぜると？|この いろから ひくと？/ })).toBeInTheDocument()
+  test('旧難易度URLも単一のプレイ画面へ進む', async () => {
+    await renderApp('/games/color-mix-quiz/expert/play')
+    expect(await screen.findByRole('heading', { name: /この (2|3)しょくを まぜると？|この いろから ひくと？/ })).toBeInTheDocument()
   })
 
   test('10問を正解と不正解を混ぜて進めると、正確な結果を表示する', async () => {
@@ -113,7 +115,7 @@ describe('ColorMixQuizPlay', () => {
       choices: ['#333333', '#444444', '#555555', '#666666'],
     }))
     const user = userEvent.setup()
-    renderApp('/games/color-mix-quiz/play')
+    await renderApp('/games/color-mix-quiz/play')
 
     for (let index = 0; index < 10; index += 1) {
       // 最終問題も正解にして、結果遷移直前の加点が取りこぼされないことを守る。
@@ -125,13 +127,13 @@ describe('ColorMixQuizPlay', () => {
     expect(await screen.findByText('5 / 10もん せいかい！')).toBeInTheDocument()
   })
 
-  test('有効な結果stateなしで結果URLを開くと開始画面へ戻る', () => {
-    renderApp('/games/color-mix-quiz/result')
+  test('有効な結果stateなしで結果URLを開くと開始画面へ戻る', async () => {
+    await renderApp('/games/color-mix-quiz/result')
     expect(screen.getByRole('heading', { name: 'いろまぜクイズ' })).toBeInTheDocument()
   })
 
-  test('共有する難易度選択は他のクイズでそのまま使える', () => {
-    renderApp('/games/flag-quiz/flag-to-name')
+  test('共有する難易度選択は他のクイズでそのまま使える', async () => {
+    await renderApp('/games/flag-quiz/flag-to-name')
     expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /かんたん/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /ふつう/ })).toBeInTheDocument()
