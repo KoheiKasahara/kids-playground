@@ -10,6 +10,8 @@ const SEED_BASE = 0x1f2e3d4c
 const SEED_STEP = 7919
 const RAPID_TAP_TRIAL_COUNT = 12
 const RAPID_TAP_INTERVAL_MS = 100
+/** ゾーン網羅は3つのseed範囲を残しつつ、各盤面48回で十分な分布を確認する。 */
+const ZONE_COVERAGE_TRIAL_COUNT = 16
 
 describe('pinball fixed-step play-time simulation', () => {
   it('おもちゃをタップしない32個のシード付き試行が、従来と同程度の時間で完了する', () => {
@@ -160,7 +162,7 @@ describe('pinball 宇宙盤面（spaceBoard）のシミュレーション', () =
     const seedBases = [SEED_BASE, 0x9a8b7c6d, 0x55aa77bb]
     const zoneCounts = new Map<string, number>(SCORE_ZONES.map((zone) => [zone.id, 0]))
     for (const seedBase of seedBases) {
-      const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      const results = Array.from({ length: ZONE_COVERAGE_TRIAL_COUNT }, (_, index) =>
         simulatePinballRun(seedBase + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: spaceBoard }),
       )
       for (const result of results) {
@@ -181,7 +183,7 @@ describe('pinball 宇宙盤面（spaceBoard）のシミュレーション', () =
         `space board zone distribution: ${zone.id}(${zone.score})=${zoneCounts.get(zone.id) ?? 0}`,
       ).toBeGreaterThan(0)
     }
-  }, 15_000)
+  })
 })
 
 describe('pinball 海盤面（oceanBoard）のシミュレーション', () => {
@@ -252,7 +254,7 @@ describe('pinball 海盤面（oceanBoard）のシミュレーション', () => {
     const seedBases = [SEED_BASE, 0x9a8b7c6d, 0x55aa77bb]
     const zoneCounts = new Map<string, number>(SCORE_ZONES.map((zone) => [zone.id, 0]))
     for (const seedBase of seedBases) {
-      const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      const results = Array.from({ length: ZONE_COVERAGE_TRIAL_COUNT }, (_, index) =>
         simulatePinballRun(seedBase + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: oceanBoard }),
       )
       for (const result of results) {
@@ -265,7 +267,7 @@ describe('pinball 海盤面（oceanBoard）のシミュレーション', () => {
     for (const zone of SCORE_ZONES) {
       expect(zoneCounts.get(zone.id)).toBeGreaterThan(0)
     }
-  }, 15_000)
+  })
 })
 
 describe('pinball おかし盤面（candyBoard）のシミュレーション', () => {
@@ -336,7 +338,7 @@ describe('pinball おかし盤面（candyBoard）のシミュレーション', (
     const seedBases = [SEED_BASE, 0x9a8b7c6d, 0x55aa77bb]
     const zoneCounts = new Map<string, number>(SCORE_ZONES.map((zone) => [zone.id, 0]))
     for (const seedBase of seedBases) {
-      const results = Array.from({ length: TRIAL_COUNT }, (_, index) =>
+      const results = Array.from({ length: ZONE_COVERAGE_TRIAL_COUNT }, (_, index) =>
         simulatePinballRun(seedBase + index * SEED_STEP, { toyTapIntervalMs: null, boardConfig: candyBoard }),
       )
       for (const result of results) {

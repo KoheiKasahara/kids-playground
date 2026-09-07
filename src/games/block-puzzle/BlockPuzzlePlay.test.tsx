@@ -111,16 +111,19 @@ describe('ブロックパズル: 画面と操作', () => {
     expect(screen.getByRole('button', { name: /ぜんぶけす/ })).toBeDisabled()
   })
 
-  test('9種類の形をすべて選べ、最初は1マスが選ばれている', async () => {
-    const user = setup()
-    expect(shapeButton('1マス')).toHaveAttribute('aria-pressed', 'true')
+  test('9種類の形をすべて選べ、最初は1マスが選ばれている', () => {
+    renderPlay()
+    const shapeButtons = new Map(
+      BLOCK_SHAPES.map((shape) => [shape.id, shapeButton(shape.label)]),
+    )
+    expect(shapeButtons.get('single')).toHaveAttribute('aria-pressed', 'true')
 
     for (const shape of BLOCK_SHAPES) {
-      await user.click(shapeButton(shape.label))
-      expect(shapeButton(shape.label)).toHaveAttribute('aria-pressed', 'true')
-      const others = BLOCK_SHAPES.filter((other) => other.id !== shape.id)
-      for (const other of others) {
-        expect(shapeButton(other.label)).toHaveAttribute('aria-pressed', 'false')
+      fireEvent.click(shapeButtons.get(shape.id)!)
+      expect(shapeButtons.get(shape.id)).toHaveAttribute('aria-pressed', 'true')
+      for (const other of BLOCK_SHAPES) {
+        if (other.id === shape.id) continue
+        expect(shapeButtons.get(other.id)).toHaveAttribute('aria-pressed', 'false')
       }
     }
   })
