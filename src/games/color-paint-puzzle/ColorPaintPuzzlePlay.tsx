@@ -56,7 +56,13 @@ export default function ColorPaintPuzzlePlay() {
     const element = pictureGroupRef.current
     if (element === null) return
     const update = () => {
-      setScrollHint(pictureScrollHint(element.scrollLeft, element.scrollWidth, element.clientWidth))
+      const next = pictureScrollHint(element.scrollLeft, element.scrollWidth, element.clientWidth)
+      // 中身が同じでも新しいオブジェクトを渡すと参照が変わって再レンダリングされ、
+      // ぬりえのSVG（数十要素）ごと作り直される。scrollは指1本のドラッグで毎秒何十回も
+      // 飛んでくるので、左右の値が実際に変わったときだけ差し替える。
+      setScrollHint((current) =>
+        current.left === next.left && current.right === next.right ? current : next,
+      )
     }
     update()
     element.addEventListener('scroll', update, { passive: true })
