@@ -1,3 +1,4 @@
+import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { useLayoutEffect, useState } from 'react'
 import TsumikiBowlingGame from './TsumikiBowlingGame'
 import TsumikiBowlingStageSelect from './TsumikiBowlingStageSelect'
@@ -13,6 +14,7 @@ import TsumikiBowlingStageSelect from './TsumikiBowlingStageSelect'
  */
 export default function TsumikiBowlingPlay() {
   const [stageId, setStageId] = useState<string | null>(null)
+  useGameIntroPlaying(stageId !== null)
 
   // ステージ選択とプレイの切り替えはURL遷移ではないので、ScrollManager（app/ScrollManager.tsx）の
   // 「遷移したら先頭へ」が効かない。ステージ一覧を下までスクロールして選ぶと、

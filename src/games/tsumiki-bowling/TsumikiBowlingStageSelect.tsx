@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import { BOWLING_STAGES, stagePreview, type BowlingStage } from './bowlingStage'
 import styles from './TsumikiBowlingStageSelect.module.css'
 
@@ -46,9 +46,7 @@ export default function TsumikiBowlingStageSelect({ onSelect }: TsumikiBowlingSt
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link to="/" className={styles.backLink}>
-          もどる
-        </Link>
+        <GameBackButton to="/" />
         <h1 className={styles.title}>つみきボウリング</h1>
       </header>
 

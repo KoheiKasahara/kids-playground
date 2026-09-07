@@ -1,5 +1,5 @@
+import GameBackButton from '../../components/GameBackButton'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
 import {
   createBowlingGameState,
   currentThrowNumber,
@@ -145,9 +145,7 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link to="/" className={styles.backLink}>
-          もどる
-        </Link>
+        <GameBackButton onBack={onBackToStages} label="ステージ選択へもどる" />
         <h1 className={styles.title}>つみきボウリング</h1>
         <button
           type="button"
@@ -293,9 +291,6 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
             >
               べつの ステージ
             </button>
-            <Link to="/" className={styles.resultBackLink}>
-              ほかの あそび
-            </Link>
           </div>
         ) : null}
       </div>

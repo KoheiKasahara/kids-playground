@@ -88,7 +88,7 @@ describe('TsumikiBowlingStageSelect', () => {
         <TsumikiBowlingStageSelect onSelect={vi.fn()} />
       </MemoryRouter>,
     )
-    expect(screen.getByRole('link', { name: 'もどる' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: '← もどる' })).toHaveAttribute('href', '/')
   })
 })
 

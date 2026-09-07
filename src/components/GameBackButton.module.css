@@ -1,0 +1,25 @@
+.back {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.back:active { background: #f0f2f5; }
+.back:focus-visible { outline: 3px solid var(--color-primary-dark); outline-offset: 2px; }

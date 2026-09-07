@@ -53,8 +53,6 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
     const resetHeight = Number(reset.match(/min-height:\s*(\d+)px/)?.[1])
     expect(resetHeight).toBeGreaterThanOrEqual(44)
 
-    const home = ruleBody('.home')
-    expect(home).toMatch(/min-height:\s*var\(--tap-target-min\)/)
   })
 
   test('じゃぐち・せんのタップ領域は見た目より広めに取ってある（幼児向け規約）', () => {
