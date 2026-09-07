@@ -221,6 +221,7 @@ export default function CircuitRacingPlay() {
                 })}
               </div>
               {cameraMode === 'free' ? <div className={styles.accessibleCamera} aria-label="カメラの ボタンそうさ">
+                <button type="button" className={styles.overviewButton} onClick={() => adjustCamera('overview')}>▣ ぜんたい</button>
                 <button type="button" aria-label="カメラを ひだりに まわす" onClick={() => adjustCamera('turnLeft')}>↶</button>
                 <button type="button" aria-label="カメラを みぎに まわす" onClick={() => adjustCamera('turnRight')}>↷</button>
                 <button type="button" aria-label="カメラを ひだりへ" onClick={() => adjustCamera('left')}>←</button>
