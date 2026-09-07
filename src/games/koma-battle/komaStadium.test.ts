@@ -27,12 +27,13 @@ import {
 } from './komaStadium'
 
 describe('コマバトルのフィールド定義', () => {
-  it('4つのフィールドをデータとして持ち、未知のIDはbasicへ戻る', () => {
+  it('5つのフィールドをデータとして持ち、未知のIDはbasicへ戻る', () => {
     expect(KOMA_FIELD_DEFINITIONS.map((field) => field.id)).toEqual([
       'basic',
       'bumper',
       'ridge',
       'belt',
+      'whirl',
     ])
     expect(getKomaField(DEFAULT_KOMA_FIELD_ID).id).toBe('basic')
     expect(getKomaField('not-a-field').id).toBe('basic')
@@ -57,15 +58,15 @@ describe('コマバトルのフィールド定義', () => {
     for (let radius = 0.02; radius < BOWL_RADIUS; radius += 0.02) {
       maxSlope = Math.max(maxSlope, Math.abs(fieldSlopeAt('ridge', radius)))
     }
-    expect(maxSlope).toBeLessThan(0.55)
+    expect(maxSlope).toBeLessThan(0.22)
     expect(fieldHeightAt('ridge', 0.3) - fieldHeightAt('basic', 0.3)).toBeLessThan(0.01)
   })
 
-  it('bumperは3つで、コマが通れる隙間と面内の位置を保つ', () => {
+  it('bumperは2つで、コマが通れる隙間と面内の位置を保つ', () => {
     const bumpers = getKomaField('bumper').obstacles
-    expect(bumpers).toHaveLength(3)
+    expect(bumpers).toHaveLength(2)
     for (const bumper of bumpers) {
-      expect(Math.hypot(bumper.x, bumper.z)).toBeCloseTo(0.95, 6)
+      expect(Math.hypot(bumper.x, bumper.z)).toBeCloseTo(1.2, 6)
       expect(bumper.radius).toBeGreaterThan(0)
       expect(bumper.height).toBeGreaterThan(0)
       expect(Math.hypot(bumper.x, bumper.z) + bumper.radius).toBeLessThan(BOWL_RADIUS)
@@ -74,7 +75,7 @@ describe('コマバトルのフィールド定義', () => {
       for (let second = first + 1; second < bumpers.length; second += 1) {
         const a = bumpers[first]!
         const b = bumpers[second]!
-        expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(a.radius + b.radius + 0.1)
+        expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(a.radius + b.radius + 0.68)
       }
     }
   })
@@ -90,23 +91,29 @@ describe('コマバトルのフィールド定義', () => {
 })
 
 describe('動く床（ベルト）のフィールドデータ', () => {
-  it('belt以外のフィールドはベルトを持たない', () => {
+  it('belt/whirl以外のフィールドはベルトを持たない', () => {
     for (const field of KOMA_FIELD_DEFINITIONS) {
-      if (field.id === 'belt') continue
+      if (field.id === 'belt' || field.id === 'whirl') continue
       expect(field.belts).toHaveLength(0)
     }
   })
 
-  it('beltフィールドはちょうど1本のベルトを持ち、壁からは十分離れている', () => {
-    const belts = getKomaField('belt').belts
-    expect(belts).toHaveLength(1)
-    const belt = belts[0]!
-    expect(belt.halfLength).toBeGreaterThan(0)
-    expect(belt.halfWidth).toBeGreaterThan(0)
-    // ベルトの端（中心から最も遠い角）が外周壁より内側に収まっている。
-    // 「床に乗っただけで場外へ一直線に押し出される」配置を避けるための確認。
-    const farthestCorner = Math.hypot(belt.halfLength, belt.halfWidth)
-    expect(farthestCorner).toBeLessThan(WALL_INNER_RADIUS - 1)
+  it('流れる床は中央を空け、壁からコマ1個分以上離す', () => {
+    expect(getKomaField('belt').belts).toHaveLength(2)
+    expect(getKomaField('whirl').belts).toHaveLength(4)
+    for (const field of KOMA_FIELD_DEFINITIONS) {
+      for (const belt of field.belts) {
+        expect(isKomaWithinBelt(belt, 0, 0)).toBe(false)
+        for (const x of [-belt.halfLength, belt.halfLength]) {
+          for (const z of [-belt.halfWidth, belt.halfWidth]) {
+            const worldX = belt.x + x * Math.cos(belt.angle) - z * Math.sin(belt.angle)
+            const worldZ = belt.z + x * Math.sin(belt.angle) + z * Math.cos(belt.angle)
+            expect(Math.hypot(worldX, worldZ)).toBeLessThan(WALL_INNER_RADIUS - 0.6)
+          }
+        }
+        expect(belt.x * Math.cos(belt.angle) + belt.z * Math.sin(belt.angle)).toBeLessThan(0)
+      }
+    }
   })
 
   it('beltフィールドの床の高さはbasicと同じ（地形は変えず、ベルトだけを足す）', () => {
@@ -142,9 +149,10 @@ describe('isKomaWithinBelt', () => {
 })
 
 describe('外周壁の開口（場外ポイント）', () => {
-  it('全フィールドが同じ既定の開口配置を持ち、全周を壁で埋め尽くさない', () => {
+  it('各フィールドは2〜4か所の開口を持ち、基本面は落ちにくくする', () => {
     for (const field of KOMA_FIELD_DEFINITIONS) {
-      expect(field.wallGaps).toEqual(DEFAULT_WALL_GAPS)
+      expect(field.wallGaps?.count).toBeGreaterThanOrEqual(2)
+      expect(field.wallGaps?.count).toBeLessThanOrEqual(4)
     }
     expect(DEFAULT_WALL_GAPS.count).toBeGreaterThanOrEqual(2)
     expect(DEFAULT_WALL_GAPS.count).toBeLessThanOrEqual(4)

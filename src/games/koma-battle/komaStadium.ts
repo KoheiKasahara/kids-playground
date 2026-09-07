@@ -44,7 +44,7 @@ export const OUT_RADIUS = 2.72
  * ゲーム本体へフィールド名ごとの条件分岐を足さずに済む。Phase 4では固定障害物
  * だけを扱い、動的な剛体は追加しない。
  */
-export type KomaFieldId = 'basic' | 'bumper' | 'ridge' | 'belt'
+export type KomaFieldId = 'basic' | 'bumper' | 'ridge' | 'belt' | 'whirl'
 
 export type KomaFieldRidge = {
   radius: number
@@ -54,8 +54,8 @@ export type KomaFieldRidge = {
 
 /** リングのきふくの主役。高さ場と見た目の基準を同じ値にそろえる。 */
 export const RIDGE_RADIUS = 1.2
-export const RIDGE_HEIGHT = 0.24
-export const RIDGE_WIDTH = 0.34
+export const RIDGE_HEIGHT = 0.04
+export const RIDGE_WIDTH = 0.7
 
 export type KomaFieldObstacle = {
   type: 'bumper'
@@ -209,8 +209,8 @@ const NO_BELTS: readonly KomaFieldBelt[] = []
 export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
   {
     id: 'basic',
-    name: 'ベーシック',
-    description: 'まんなかへ あつまりやすい',
+    name: 'まんなか バトル',
+    description: 'ひろい ゆかで しょうぶ！',
     icon: '⭕',
     shape: 'bowl',
     bowlDepth: BOWL_DEPTH,
@@ -220,22 +220,22 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     belts: NO_BELTS,
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,
-    wallGaps: DEFAULT_WALL_GAPS,
+    wallGaps: { ...DEFAULT_WALL_GAPS, count: 2 },
     theme: { floor: 0xf2e4c8, rim: 0x3c5f92, wall: 0x5a7fb5, accent: 0xe0c9a0 },
   },
   {
     id: 'bumper',
-    name: 'バンパー',
-    description: 'ぶつかって みちが かわる',
+    name: 'ぽんぽん バンパー',
+    description: 'はずんで あいてに たいあたり！',
     icon: '🔵',
     shape: 'bumper',
     bowlDepth: BOWL_DEPTH,
     valleyRadius: VALLEY_RADIUS,
     ridges: NO_RIDGES,
+    // 中央の対戦スペースを空け、外周にもコマ1個以上の通路を残す。
     obstacles: [
-      { type: 'bumper', x: Math.cos(Math.PI / 6) * 0.95, z: Math.sin(Math.PI / 6) * 0.95, radius: BUMPER_RADIUS, height: BUMPER_HEIGHT },
-      { type: 'bumper', x: Math.cos((5 * Math.PI) / 6) * 0.95, z: Math.sin((5 * Math.PI) / 6) * 0.95, radius: BUMPER_RADIUS, height: BUMPER_HEIGHT },
-      { type: 'bumper', x: Math.cos((3 * Math.PI) / 2) * 0.95, z: Math.sin((3 * Math.PI) / 2) * 0.95, radius: BUMPER_RADIUS, height: BUMPER_HEIGHT },
+      { type: 'bumper', x: 0, z: 1.2, radius: BUMPER_RADIUS, height: BUMPER_HEIGHT },
+      { type: 'bumper', x: 0, z: -1.2, radius: BUMPER_RADIUS, height: BUMPER_HEIGHT },
     ],
     belts: NO_BELTS,
     wallHeight: WALL_HEIGHT,
@@ -245,8 +245,8 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
   },
   {
     id: 'ridge',
-    name: 'リングの きふく',
-    description: 'ゆるい おかで みちが かわる',
+    name: 'なだらか おか',
+    description: 'おかを こえて ぶつかろう！',
     icon: '🟠',
     shape: 'ridge',
     bowlDepth: BOWL_DEPTH,
@@ -263,8 +263,8 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
   },
   {
     id: 'belt',
-    name: 'ながれる ゆか',
-    description: 'のると ぐいっと おされる',
+    name: 'あつまれ ゆか',
+    description: 'りょうがわから まんなかへ！',
     icon: '➡️',
     shape: 'belt',
     bowlDepth: BOWL_DEPTH,
@@ -272,16 +272,38 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     ridges: NO_RIDGES,
     obstacles: NO_OBSTACLES,
     belts: [
-      // 谷(VALLEY_RADIUS)のすぐ外側までを覆う、中央を横切る一本のベルト。
-      // 谷に沿って回り続けるだけの軌道を+X方向へ押し出し、反対側から来た
-      // もう1個と再接近しやすくする。壁からは十分離れているので、
-      // ベルトの力だけで場外へ一直線に押し出されることはない。
-      { x: 0, z: 0, angle: 0, halfLength: 0.85, halfWidth: 0.34, strength: 1 },
+      // 中央で逆方向の力が重ならない、少しずらした2本の合流路。
+      { x: -0.95, z: -0.28, angle: 0, halfLength: 0.65, halfWidth: 0.38, strength: 1.05 },
+      { x: 0.95, z: 0.28, angle: Math.PI, halfLength: 0.65, halfWidth: 0.38, strength: 1.05 },
     ],
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,
     wallGaps: DEFAULT_WALL_GAPS,
     theme: { floor: 0xe3ece8, rim: 0x3c6f78, wall: 0x4f8fa0, accent: 0xffb24e },
+  },
+  {
+    id: 'whirl',
+    name: 'ぐるぐる ゆか',
+    description: 'ながれに のって おいかけっこ！',
+    icon: '🌀',
+    shape: 'belt',
+    bowlDepth: BOWL_DEPTH,
+    valleyRadius: VALLEY_RADIUS,
+    ridges: NO_RIDGES,
+    obstacles: NO_OBSTACLES,
+    // 外周へ投げ出さず、少し内向きに流す4本。中央は自由な対戦スペース。
+    belts: [0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle) => ({
+      x: Math.cos(angle) * 1.05,
+      z: Math.sin(angle) * 1.05,
+      angle: angle + Math.PI / 2 + 0.3,
+      halfLength: 0.55,
+      halfWidth: 0.34,
+      strength: 0.65,
+    })),
+    wallHeight: WALL_HEIGHT,
+    outRadius: OUT_RADIUS,
+    wallGaps: { ...DEFAULT_WALL_GAPS, count: 2 },
+    theme: { floor: 0xe9e2fa, rim: 0x7252a3, wall: 0x9974c5, accent: 0xef9dda },
   },
 ]
 
@@ -345,7 +367,9 @@ export function fieldHeightAt(
       return height
     }
     const distance = (radius - ridge.radius) / ridge.width
-    return height + ridge.height * Math.exp(-0.5 * distance * distance)
+    // 裾を有限範囲で滑らかにゼロへ戻し、外周との段差も作らない。
+    if (Math.abs(distance) >= 1) return height
+    return height + ridge.height * (1 + Math.cos(Math.PI * distance)) / 2
   }, base)
 }
 

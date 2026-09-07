@@ -54,19 +54,20 @@ beforeEach(() => {
 })
 
 describe('KomaBattlePlay', () => {
-  it('最初はbasicが選ばれ、4つのフィールドカードから選べる', () => {
+  it('最初はbasicが選ばれ、5つのフィールドカードから選べる', () => {
     renderGame()
-    expect(screen.getByRole('button', { name: 'ベーシック' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'バンパー' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('button', { name: 'リングの きふく' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'ながれる ゆか' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'まんなか バトル' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'ぽんぽん バンパー' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'ぐるぐる ゆか' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'なだらか おか' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'あつまれ ゆか' })).toBeInTheDocument()
   })
 
   it('選んだフィールドをエンジンへ渡し、再戦・コマ選び直しでも保持する', async () => {
     const user = userEvent.setup()
     renderGame()
-    await user.click(screen.getByRole('button', { name: 'バンパー' }))
-    expect(screen.getByRole('button', { name: 'バンパー' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'ぽんぽん バンパー' }))
+    expect(screen.getByRole('button', { name: 'ぽんぽん バンパー' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: 'まわせ！' }))
     expect(engineMock.options?.fieldId).toBe('bumper')
 
@@ -75,16 +76,16 @@ describe('KomaBattlePlay', () => {
     expect(engineMock.options?.fieldId).toBe('bumper')
     finishWith({ kind: 'draw', reason: 'simultaneous' })
     await user.click(screen.getByRole('button', { name: 'コマを えらびなおす' }))
-    expect(screen.getByRole('button', { name: 'バンパー' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'ぽんぽん バンパー' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('動く床フィールド（belt）を選ぶとエンジンへそのIDが渡る', async () => {
+  it.each([['belt', 'あつまれ ゆか'], ['whirl', 'ぐるぐる ゆか']])('%sを選ぶとエンジンへそのIDが渡る', async (fieldId, name) => {
     const user = userEvent.setup()
     renderGame()
-    await user.click(screen.getByRole('button', { name: 'ながれる ゆか' }))
-    expect(screen.getByRole('button', { name: 'ながれる ゆか' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name }))
+    expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: 'まわせ！' }))
-    expect(engineMock.options?.fieldId).toBe('belt')
+    expect(engineMock.options?.fieldId).toBe(fieldId)
   })
 
   it('コマ選択UIは表示せず、常に2個対戦になる', async () => {

@@ -5,7 +5,6 @@ import {
   applyKomaBoost,
   applyKomaContactAssist,
   applyKomaFieldBelts,
-  applyKomaFieldRidges,
   clampKomaMotion,
   createKomaBattleWorld,
   readKoma,
@@ -41,6 +40,7 @@ import {
   OUT_RADIUS,
   WALL_INNER_RADIUS,
   WALL_SEGMENTS,
+  wallGapSegmentIndices,
 } from './komaStadium'
 import {
   createKomaJudgeState,
@@ -77,6 +77,7 @@ function simulate(
   contacts: number
   knockbacks: number
   wallRedirects: number
+  bumperKnockbacks: number
 } {
   const field = getKomaField(fieldId)
   const steps = Math.round(seconds / PHYSICS_TIMESTEP)
@@ -97,16 +98,17 @@ function simulate(
   let touching = false
   let knockbacks = 0
   let wallRedirects = 0
+  let bumperKnockbacks = 0
 
   for (let step = 0; step < steps; step += 1) {
     for (const koma of world.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
     if (outcome === null) {
-      for (const koma of world.komas) applyKomaFieldRidges(koma, field, PHYSICS_TIMESTEP)
       for (const koma of world.komas) applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
     }
     const assist = applyKomaContactAssist(world, outcome === null)
     knockbacks += assist.komaKnockbacks
     wallRedirects += assist.wallRedirects
+    bumperKnockbacks += assist.bumperKnockbacks
     world.world.step()
     for (const koma of world.komas) clampKomaMotion(koma)
     elapsedMs += stepMs
@@ -182,6 +184,7 @@ function simulate(
     contacts,
     knockbacks,
     wallRedirects,
+    bumperKnockbacks,
   }
 }
 
@@ -240,12 +243,12 @@ describe('createKomaBattleWorld', () => {
     world.world.free()
   })
 
-  it('フィールドごとの固定Collider数を小さく保つ（bumperだけ3つ増え、開口ぶん壁が減る）', () => {
+  it('フィールドごとの固定Collider数を小さく保つ（障害物と開口の数に一致）', () => {
     for (const field of KOMA_FIELD_DEFINITIONS) {
       const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2), { fieldId: field.id })
       expect(world.world.bodies.len()).toBe(2)
       // 場外ポイント（開口）ぶんだけ壁Colliderが既定の24枚から減っている。
-      expect(world.world.colliders.len()).toBe(field.id === 'bumper' ? 26 : 23)
+      expect(world.world.colliders.len()).toBe(7 + WALL_SEGMENTS - wallGapSegmentIndices(field.wallGaps).size + field.obstacles.length)
       world.world.free()
     }
   })
@@ -473,81 +476,36 @@ describe('createKomaBattleWorld', () => {
   })
 })
 
-describe('リングのきふく', () => {
-  beforeAll(async () => {
-    await RAPIER.init()
-  })
+describe('なだらかな丘の通行', () => {
+  beforeAll(async () => { await RAPIER.init() })
 
-  it('起伏の上では接線方向と山から離れる方向へ明確に補正する', () => {
-    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'ridge' })
-    const koma = world.komas[0]!
-    const radius = 1.2
-    koma.body.setTranslation(
-      { x: radius, y: fieldHeightAt('ridge', radius) + 0.02, z: 0 },
-      true,
-    )
-    koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-
-    applyKomaFieldRidges(koma, getKomaField('ridge'), PHYSICS_TIMESTEP)
-
-    const velocity = koma.body.linvel()
-    expect(Math.abs(velocity.z)).toBeGreaterThan(0.1)
-    expect(Number.isFinite(velocity.x)).toBe(true)
-    expect(Number.isFinite(velocity.y)).toBe(true)
-    expect(Number.isFinite(velocity.z)).toBe(true)
-    world.world.free()
-  })
-
-  it('複数方向から起伏へ入っても速度が有限値のままになる', () => {
-    for (const position of [
-      { x: 1.2, z: 0 },
-      { x: -1.2, z: 0 },
-      { x: 0, z: 1.2 },
-      { x: 0, z: -1.2 },
-    ]) {
-      const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'ridge' })
-      const koma = world.komas[0]!
-      const radius = Math.hypot(position.x, position.z)
-      koma.body.setTranslation(
-        { x: position.x, y: fieldHeightAt('ridge', radius) + 0.02, z: position.z },
-        true,
-      )
-      koma.body.setLinvel({ x: 1.1, y: 0, z: -0.7 }, true)
-
-      applyKomaFieldRidges(koma, getKomaField('ridge'), PHYSICS_TIMESTEP)
-
-      const velocity = koma.body.linvel()
-      expect(Number.isFinite(velocity.x)).toBe(true)
-      expect(Number.isFinite(velocity.y)).toBe(true)
-      expect(Number.isFinite(velocity.z)).toBe(true)
-      world.world.free()
+  it.each(KOMA_TYPE_CONFIGS.map((type) => type.id))('%sは内外の両方向から丘を越えられる', (typeId) => {
+    for (const direction of [-1, 1]) {
+      const battle = createKomaBattleWorld(RAPIER, komaSpecsForSelection([typeId], 1), { fieldId: 'ridge' })
+      try {
+        const koma = battle.komas[0]!
+        const start = direction === 1 ? 0.65 : 1.75
+        const target = direction === 1 ? 1.65 : 0.75
+        koma.body.setTranslation({ x: start, y: fieldHeightAt('ridge', start) + 0.02, z: 0 }, true)
+        // 普段の周回速度で、ブーストなしで越える。
+        koma.body.setLinvel({ x: direction * START_ORBIT_SPEED, y: 0, z: 0 }, true)
+        let crossed = false
+        for (let step = 0; step < 180; step += 1) {
+          applyKomaAssist(koma, PHYSICS_TIMESTEP)
+          battle.world.step()
+          clampKomaMotion(koma)
+          const reading = readKoma(koma)
+          if ((reading.radius - target) * direction >= 0) {
+            expect(reading.tiltRad).toBeLessThan(0.5)
+            crossed = true
+            break
+          }
+        }
+        expect(crossed, `direction=${direction}`).toBe(true)
+      } finally {
+        battle.world.free()
+      }
     }
-  })
-
-  it('起伏の外では補正せず、他フィールドへ効果を漏らさない', () => {
-    const ridgeWorld = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'ridge' })
-    const basicWorld = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'basic' })
-    const ridgeKoma = ridgeWorld.komas[0]!
-    const basicKoma = basicWorld.komas[0]!
-    const position = { x: 0.2, z: 0 }
-    const velocity = { x: 0.35, y: 0, z: -0.2 }
-    ridgeKoma.body.setTranslation(
-      { x: position.x, y: fieldHeightAt('ridge', 0.2) + 0.02, z: position.z },
-      true,
-    )
-    basicKoma.body.setTranslation(
-      { x: position.x, y: fieldHeightAt('basic', 0.2) + 0.02, z: position.z },
-      true,
-    )
-    ridgeKoma.body.setLinvel(velocity, true)
-    basicKoma.body.setLinvel(velocity, true)
-
-    applyKomaFieldRidges(ridgeKoma, getKomaField('ridge'), PHYSICS_TIMESTEP)
-    applyKomaFieldRidges(basicKoma, getKomaField('basic'), PHYSICS_TIMESTEP)
-
-    expect(ridgeKoma.body.linvel()).toEqual(basicKoma.body.linvel())
-    ridgeWorld.world.free()
-    basicWorld.world.free()
   })
 })
 
@@ -683,7 +641,7 @@ describe('コマ1個の一生（実際にRapierを回して確認する）', () 
     }
   })
 
-  it('3フィールドすべてで1個モードが有限値のまま完走する', () => {
+  it('5フィールドすべてで1個モードが有限値のまま完走する', () => {
     for (const field of KOMA_FIELD_DEFINITIONS) {
       const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: field.id })
       const result = simulate(world, 18, field.id)
@@ -1027,6 +985,26 @@ describe('コマ2個の対戦（実際にRapierを回して確認する）', () 
     }
   }, 60_000)
 
+  it.each(KOMA_FIELD_DEFINITIONS.map((field) => field.id))('%sは開始角を変えても対戦が成立する', (fieldId) => {
+    for (const offset of [0, 0.7, 1.4]) {
+      const battle = createKomaBattleWorld(RAPIER, komaSpecsForCount(2), {
+        fieldId, startAngleOffset: offset, spinScales: [1.07, 0.93],
+      })
+      try {
+        const result = simulate(battle, 25, fieldId)
+        expect(result.sawFiniteAlways).toBe(true)
+        expect(result.outcome, `offset=${offset}`).not.toBeNull()
+        // バンパー面は相手との接触に加え、仕掛けとの跳ね返りも遊びの中心。
+        expect(result.contacts, `offset=${offset}`).toBeGreaterThanOrEqual(fieldId === 'bumper' ? 1 : 2)
+        expect(result.contacts + result.bumperKnockbacks).toBeGreaterThanOrEqual(2)
+        expect(result.outcomeAtMs).toBeGreaterThan(3000)
+        expect(result.outcomeAtMs).toBeLessThan(25000)
+      } finally {
+        battle.world.free()
+      }
+    }
+  })
+
   it('beltフィールドでも2個対戦で複数回すれ違い・衝突する（再接近が起きている確認）', () => {
     // applyKomaFieldBeltsを呼ばないbasicと同じ開始条件でも成立する既存の最低ラインを、
     // ベルトの力を加えたbeltフィールドでも下回らないことを確かめる。
@@ -1056,7 +1034,7 @@ describe('動く床（ベルト）', () => {
     const field = getKomaField('belt')
 
     koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-    koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+    koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
     applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
     expect(koma.body.linvel().x).toBeGreaterThan(0)
     expect(koma.body.linvel().z).toBeCloseTo(0, 6)
@@ -1090,7 +1068,7 @@ describe('動く床（ベルト）', () => {
     const koma = world.komas[0]!
     const field = getKomaField('belt')
     const belt = field.belts[0]!
-    const outsideX = belt.halfLength + 0.3
+    const outsideX = belt.x - belt.halfLength - 0.3
     let previousInsideDeltaX: number | null = null
 
     for (let cycle = 0; cycle < 4; cycle += 1) {
@@ -1101,7 +1079,7 @@ describe('動く床（ベルト）', () => {
       expect(outsideVelocity.x).toBe(0)
       expect(outsideVelocity.z).toBe(0)
 
-      koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+      koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
       koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
       applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
       const insideDeltaX = koma.body.linvel().x
@@ -1119,7 +1097,7 @@ describe('動く床（ベルト）', () => {
     const koma = world.komas[0]!
     const field = getKomaField('belt')
     const belt = field.belts[0]!
-    koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+    koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
     koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     koma.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
 
@@ -1153,7 +1131,7 @@ describe('動く床（ベルト）', () => {
     for (const world of [light, heavy]) {
       const koma = world.komas[0]!
       koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-      koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+      koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
     }
     applyKomaFieldBelts(light.komas[0]!, field, PHYSICS_TIMESTEP)
     applyKomaFieldBelts(heavy.komas[0]!, field, PHYSICS_TIMESTEP)
@@ -1166,7 +1144,7 @@ describe('動く床（ベルト）', () => {
     const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'belt' })
     const koma = world.komas[0]!
     const field = getKomaField('belt')
-    koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+    koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
     koma.body.setLinvel({ x: -1, y: 0, z: 2 }, true)
 
     applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
@@ -1181,7 +1159,7 @@ describe('動く床（ベルト）', () => {
     const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'belt' })
     const koma = world.komas[0]!
     const field = getKomaField('belt')
-    koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+    koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
     koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
 
     for (let step = 0; step < 10_000; step += 1) {
@@ -1196,7 +1174,7 @@ describe('動く床（ベルト）', () => {
     const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'belt' })
     const koma = world.komas[0]!
     const field = getKomaField('belt')
-    koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+    koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
     const initialSpeed = KOMA_BELT_MAX_FORWARD_SPEED + 0.4
     koma.body.setLinvel({ x: initialSpeed, y: 0, z: 0 }, true)
 
@@ -1211,7 +1189,7 @@ describe('動く床（ベルト）', () => {
     const koma = world.komas[0]!
     const field = getKomaField('belt')
     koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-    koma.body.setTranslation({ x: 0, y: fieldHeightAt('belt', 0) + 0.02, z: 0 }, true)
+    koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
 
     // useKomaBattleEngineの決着後と同じく、呼び出し側でガードすれば何も起きない。
     const finished = true
