@@ -20,7 +20,6 @@ function isMobilePortrait(): boolean {
 export default function PianoPlay() {
   const navigate = useNavigate()
   const engineRef = useRef<PianoAudioEngine | null>(null)
-  if (engineRef.current === null) engineRef.current = new PianoAudioEngine()
 
   const activePointers = useRef(new Map<number, ActivePointer>())
   const feedbackTimers = useRef(new Set<ReturnType<typeof setTimeout>>())
@@ -46,8 +45,13 @@ export default function PianoPlay() {
   }, [])
 
   useEffect(() => {
-    const engine = engineRef.current
-    if (!engine) return undefined
+    // Engineとplayerは同じeffectで所有する。StrictModeの再setupでも新しく作る。
+    const engine = new PianoAudioEngine()
+    engineRef.current = engine
+    const pointers = activePointers.current
+    const timers = feedbackTimers.current
+    const feedbackCounts = keyboardFeedbackCounts.current
+    const autoFeedbackCounts = automaticFeedbackCounts.current
     const player = new PianoSongPlayer(engine, {
       onNoteStart: (noteId) => {
         automaticFeedbackCounts.current.set(noteId, (automaticFeedbackCounts.current.get(noteId) ?? 0) + 1)
@@ -66,9 +70,18 @@ export default function PianoPlay() {
       onComplete: () => setPlaybackState('finished'),
     })
     songPlayerRef.current = player
+    // 録音サンプル読込中・失敗時はengineの短い合成音へフォールバックする。
+    void engine.prepare()
     return () => {
       player.dispose()
+      for (const timer of timers) clearTimeout(timer)
+      timers.clear()
+      pointers.clear()
+      feedbackCounts.clear()
+      autoFeedbackCounts.clear()
+      engine.dispose()
       if (songPlayerRef.current === player) songPlayerRef.current = null
+      if (engineRef.current === engine) engineRef.current = null
     }
   }, [syncActiveNotes])
 
@@ -142,30 +155,6 @@ export default function PianoPlay() {
     setSelectedSongId(songId)
     setPlaybackState('stopped')
   }
-
-  useEffect(() => {
-    const engine = engineRef.current
-    const pointers = activePointers.current
-    const timers = feedbackTimers.current
-    const feedbackCounts = keyboardFeedbackCounts.current
-    const autoFeedbackCounts = automaticFeedbackCounts.current
-    return () => {
-      for (const timer of timers) clearTimeout(timer)
-      timers.clear()
-      pointers.clear()
-      feedbackCounts.clear()
-      autoFeedbackCounts.clear()
-      engine?.dispose()
-    }
-  }, [])
-
-  useEffect(() => {
-    // 画面に入った時点でピアノ13音を先読みする。失敗時・読込中もstartNote側の短い合成音フォールバックで
-    // 無反応にはせず、ロード完了後は同じAPIから録音サンプルへ自動で切り替わる。ロード状態は画面に表示しない。
-    const engine = engineRef.current
-    if (!engine) return
-    void engine.prepare()
-  }, [])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia?.(MOBILE_PORTRAIT_QUERY)
