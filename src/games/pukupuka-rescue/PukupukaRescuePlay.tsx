@@ -15,7 +15,12 @@ import {
   type PukupukaGameState,
   type WaterControl,
 } from './pukupukaGame'
-import { playPukupukaGoalSound, playPukupukaWaterSound, primeAudio } from '../../utils/quizSound'
+import {
+  playPukupukaActionSound,
+  playPukupukaGoalSound,
+  playPukupukaWaterSound,
+  primeAudio,
+} from '../../utils/quizSound'
 import styles from './PukupukaRescuePlay.module.css'
 
 /** ステージ選択。カードは番号・記号・名前を大きく並べ、読めなくても選びやすくする。 */
@@ -77,6 +82,7 @@ export default function PukupukaRescuePlay() {
   const stateRef = useRef(gameState)
   const controlRef = useRef<WaterControl>(null)
   const [activeControl, setActiveControl] = useState<WaterControl>(null)
+  const [feedback, setFeedback] = useState('たすけて！')
 
   const setControl = useCallback((next: WaterControl) => {
     controlRef.current = next
@@ -91,6 +97,7 @@ export default function PukupukaRescuePlay() {
       setControl(null)
       stateRef.current = initial
       setGameState(initial)
+      setFeedback('たすけて！')
       setSelectedStageId(stageId)
     },
     [setControl],
@@ -140,6 +147,7 @@ export default function PukupukaRescuePlay() {
     primeAudio()
     playPukupukaWaterSound('fill')
     const next = applyWaterTap(stage, current)
+    setFeedback('みずが でた！')
     stateRef.current = next
     setGameState(next)
   }
@@ -158,6 +166,8 @@ export default function PukupukaRescuePlay() {
     primeAudio()
     const next = toggleDrain(current)
     if (next.drainOpen) playPukupukaWaterSound('drain')
+    if (next.drainOpen && stage.waterWheel) playPukupukaActionSound('wheel')
+    setFeedback(next.drainOpen ? (stage.waterWheel ? '水車が まわった！' : 'みずが ながれる！') : 'せんを しめたよ')
     stateRef.current = next
     setGameState(next)
   }
@@ -167,7 +177,8 @@ export default function PukupukaRescuePlay() {
     if (current.phase !== 'playing' || !stage.gate) return
     primeAudio()
     const next = toggleGate(current)
-    playPukupukaWaterSound(next.gateOpen ? 'fill' : 'drain')
+    playPukupukaActionSound('gate')
+    setFeedback(next.gateOpen ? 'ゲートが あいた！' : 'ゲートを しめたよ')
     stateRef.current = next
     setGameState(next)
   }
@@ -177,7 +188,8 @@ export default function PukupukaRescuePlay() {
     if (current.phase !== 'playing' || !stage.board) return
     primeAudio()
     const next = toggleBoard(current)
-    playPukupukaWaterSound(next.boardFlowDirection === 'goal' ? 'fill' : 'drain')
+    playPukupukaActionSound('board')
+    setFeedback(next.boardFlowDirection === 'goal' ? 'ゴールへ ながすよ！' : 'ながれが かわった！')
     stateRef.current = next
     setGameState(next)
   }
@@ -187,6 +199,7 @@ export default function PukupukaRescuePlay() {
     setControl(null)
     stateRef.current = initial
     setGameState(initial)
+    setFeedback('たすけて！')
   }
 
   const handleBackToSelection = () => {
@@ -257,6 +270,14 @@ export default function PukupukaRescuePlay() {
           <div className={styles.clearBanner}>
             <span className={styles.clearEmoji} aria-hidden="true">🎉</span>
             <span className={styles.clearText}>ゴール！</span>
+          </div>
+        ) : null}
+        <div className={`${styles.feedbackBubble} ${cleared ? styles.feedbackCleared : ''}`} aria-live="polite">
+          {cleared ? 'やったー！' : feedback}
+        </div>
+        {cleared ? (
+          <div className={styles.celebration} aria-hidden="true">
+            <span>★</span><span>●</span><span>★</span><span>●</span><span>★</span>
           </div>
         ) : null}
       </div>

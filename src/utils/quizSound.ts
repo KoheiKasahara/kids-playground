@@ -1046,6 +1046,29 @@ export function playPukupukaWaterSound(direction: 'fill' | 'drain'): void {
   }
 }
 
+/** ぷかぷかレスキューの仕掛け操作。仕掛けごとに違う短音で結果を返す。 */
+export function playPukupukaActionSound(kind: 'gate' | 'board' | 'wheel'): void {
+  if (!soundEnabled) return
+
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+    if (kind === 'gate') {
+      playTone(ctx, 330, now, 0.09, 0.07, 'square')
+      playTone(ctx, 440, now + 0.06, 0.12, 0.06, 'triangle')
+    } else if (kind === 'board') {
+      playTone(ctx, 659.25, now, 0.08, 0.06, 'triangle')
+      playTone(ctx, 523.25, now + 0.055, 0.11, 0.06, 'triangle')
+    } else {
+      playTone(ctx, 392, now, 0.09, 0.055, 'sine')
+      playTone(ctx, 523.25, now + 0.07, 0.14, 0.06, 'sine')
+    }
+  } catch {
+    // 音を出せない環境でも仕掛けの操作はそのまま続ける。
+  }
+}
+
 /** ぷかぷかレスキューのゴール。短い上昇アルペジオ1回だけ。 */
 const PUKUPUKA_GOAL_SOUND_MIN_INTERVAL_MS = 600
 let lastPukupukaGoalSoundAt: number | null = null

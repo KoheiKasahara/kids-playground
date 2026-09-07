@@ -73,6 +73,7 @@ describe('PukupukaRescuePlay: ステージ選択', () => {
 
     expect(screen.getByTestId('pukupuka-play')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('ゲートを あけよう')
+    expect(screen.getByText('たすけて！')).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-gate')).toBeInTheDocument()
   })
 
@@ -149,6 +150,7 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
 
     fireEvent.click(gate)
     frames.advance(2)
+    expect(screen.getByText('ゲートが あいた！')).toBeInTheDocument()
     expect(screen.getByTestId('pukupuka-gate-flow')).toHaveAttribute('data-flow-direction', 'right')
     expect(gate).toHaveAccessibleName(/みずが ながれます/)
   })
@@ -241,6 +243,7 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
     expect(screen.getByTestId('pukupuka-water-wheel-gate')).toHaveAttribute('data-open', 'true')
     frames.advance(8 * 60)
     expect(screen.getByText('ゴール！')).toBeInTheDocument()
+    expect(screen.getByText('やったー！')).toBeInTheDocument()
   })
 
   test('長い水路では浮遊物を追って横方向へカメラが移動する', () => {
