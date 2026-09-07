@@ -4,6 +4,8 @@ import PukupukaStage from './PukupukaStage'
 import { findPukupukaStage, PUKUPUKA_STAGES, type PukupukaStageId } from './stageDefinitions'
 import {
   applyWaterTap,
+  applyWave,
+  waterSurfaceYOf,
   createInitialState,
   isSettled,
   primaryWaterBodyId,
@@ -21,10 +23,11 @@ import {
   playPukupukaWaterSound,
   primeAudio,
 } from '../../utils/quizSound'
+import { readRescueProgress, saveRescueProgress, type RescueProgress } from './rescueProgress'
 import styles from './PukupukaRescuePlay.module.css'
 
 /** ステージ選択。カードは番号・記号・名前を大きく並べ、読めなくても選びやすくする。 */
-export function PukupukaStageSelect({ onSelect, onHome }: { onSelect: (id: PukupukaStageId) => void; onHome: () => void }) {
+export function PukupukaStageSelect({ onSelect, onHome, progress = {} }: { onSelect: (id: PukupukaStageId) => void; onHome: () => void; progress?: RescueProgress }) {
   return (
     <main className={`${styles.page} ${styles.selectionPage}`} data-testid="pukupuka-stage-select">
       <header className={styles.header}>
@@ -57,6 +60,7 @@ export function PukupukaStageSelect({ onSelect, onHome }: { onSelect: (id: Pukup
                 {stage.icon}
               </span>
               <span className={styles.stageOptionLabel}>{stage.name}</span>
+              {progress[stage.id] !== undefined ? <span className={styles.stageRecord} aria-label={`クリアずみ。ほし ${progress[stage.id]}こ`}>✓ {'★'.repeat(progress[stage.id])}{'☆'.repeat(3 - progress[stage.id])}</span> : null}
             </button>
           ))}
         </div>
@@ -83,6 +87,8 @@ export default function PukupukaRescuePlay() {
   const controlRef = useRef<WaterControl>(null)
   const [activeControl, setActiveControl] = useState<WaterControl>(null)
   const [feedback, setFeedback] = useState('たすけて！')
+  const [progress, setProgress] = useState(readRescueProgress)
+  const [focusedFloaterId, setFocusedFloaterId] = useState<string | undefined>(undefined)
 
   const setControl = useCallback((next: WaterControl) => {
     controlRef.current = next
@@ -98,9 +104,10 @@ export default function PukupukaRescuePlay() {
       stateRef.current = initial
       setGameState(initial)
       setFeedback('たすけて！')
+      setFocusedFloaterId(undefined)
       setSelectedStageId(stageId)
     },
-    [setControl],
+    [setControl, setFocusedFloaterId],
   )
 
   useEffect(() => {
@@ -112,14 +119,29 @@ export default function PukupukaRescuePlay() {
       const delta = now - previous
       previous = now
       const control = controlRef.current
-      const result = stepGame(stage, stateRef.current, delta, control)
+      const previousState = stateRef.current
+      const result = stepGame(stage, previousState, delta, control)
       stateRef.current = result.state
-      if (result.goalReached || control !== null || !isSettled(stage, result.state)) {
+      const rescued = result.state.rescuedIds.length > previousState.rescuedIds.length
+      const collected = result.state.collectedStarIds.length > previousState.collectedStarIds.length
+      if (result.goalReached || previousState.wave || rescued || collected || control !== null || !isSettled(stage, result.state)) {
         setGameState(result.state)
+      }
+      if (rescued && !result.goalReached) {
+        setFeedback('たすかったよ！ つぎの なかまへ！')
+        playPukupukaActionSound('wheel')
+      } else if (collected) {
+        setFeedback('キラキラ！ ほしを みつけた！')
+        playPukupukaActionSound('board')
       }
       if (result.goalReached) {
         setControl(null)
         playPukupukaGoalSound()
+        setProgress((current) => {
+          const next = { ...current, [stage.id]: Math.max(current[stage.id] ?? 0, result.state.collectedStarIds.length) }
+          saveRescueProgress(next)
+          return next
+        })
       }
       frameId = requestAnimationFrame(frame)
     }
@@ -133,9 +155,13 @@ export default function PukupukaRescuePlay() {
 
   useEffect(() => {
     const stop = () => setControl(null)
+    window.addEventListener('blur', stop)
+    document.addEventListener('visibilitychange', stop)
     window.addEventListener('pointerup', stop)
     window.addEventListener('pointercancel', stop)
     return () => {
+      window.removeEventListener('blur', stop)
+      document.removeEventListener('visibilitychange', stop)
       window.removeEventListener('pointerup', stop)
       window.removeEventListener('pointercancel', stop)
     }
@@ -194,8 +220,35 @@ export default function PukupukaRescuePlay() {
     setGameState(next)
   }
 
+  const handleWave = (x: number, y: number) => {
+    const next = applyWave(stage, stateRef.current, x, y)
+    if (next === stateRef.current) return
+    primeAudio()
+    playPukupukaWaterSound('fill')
+    stateRef.current = next
+    setGameState(next)
+    setFeedback('ぽちゃん！ なみで はこぼう')
+  }
+
+  const nudge = (direction: -1 | 1) => {
+    const remaining = stateRef.current.floaters.filter((item) => !stateRef.current.rescuedIds.includes(item.id))
+    const target = remaining.find((item) => item.id === focusedFloaterId) ?? remaining[0]
+    if (!target) return
+    const body = stage.waterBodies.find((item) => target.x >= item.left && target.x <= item.right)
+    if (!body) return
+    const y = waterSurfaceYOf(stage, stateRef.current, body.id) + 2
+    for (const offset of [14, 8, 3]) {
+      const x = Math.max(body.left + 1, Math.min(body.right - 1, target.x - direction * offset))
+      if (applyWave(stage, stateRef.current, x, y) !== stateRef.current) {
+        handleWave(x, y)
+        return
+      }
+    }
+  }
+
   const handleReset = () => {
     const initial = createInitialState(stage)
+    setFocusedFloaterId(undefined)
     setControl(null)
     stateRef.current = initial
     setGameState(initial)
@@ -218,7 +271,7 @@ export default function PukupukaRescuePlay() {
   }
 
   if (!selectedStageId) {
-    return <PukupukaStageSelect onSelect={selectStage} onHome={() => navigate('/')} />
+    return <PukupukaStageSelect onSelect={selectStage} onHome={() => navigate('/')} progress={progress} />
   }
 
   const cleared = gameState.phase === 'cleared'
@@ -251,6 +304,8 @@ export default function PukupukaRescuePlay() {
         <PukupukaStage
           stage={stage}
           state={gameState}
+          onWave={handleWave}
+          focusedFloaterId={focusedFloaterId}
           faucetActive={faucetOn}
           faucetDisabled={cleared}
           onFaucetHoldStart={startFaucetHold}
@@ -282,16 +337,48 @@ export default function PukupukaRescuePlay() {
         ) : null}
       </div>
 
-      <div className={styles.gauge}>
-        <span className={styles.gaugeLabel} aria-hidden="true">💧</span>
-        <span className={styles.gaugeTrack}>
-          <span
-            className={styles.gaugeFill}
-            style={{ width: `${waterPercent}%` }}
-            data-testid="pukupuka-gauge-fill"
-            data-water-percent={waterPercent}
-          />
-        </span>
+      <div className={styles.playTools}>
+        <div className={styles.rescueRow}>
+          <div className={styles.friends} role="group" aria-label="たすける なかま">
+            {stage.floaters.map((floater) => {
+              const rescued = gameState.rescuedIds.includes(floater.id)
+              const label = floater.kind === 'duck' ? 'あひる' : floater.kind === 'boat' ? 'ボート' : 'くま'
+              return <button key={floater.id} type="button" className={styles.friendButton}
+                disabled={rescued} aria-label={`${label}${rescued ? ' たすけた！' : 'を みる'}`}
+                aria-pressed={focusedFloaterId === floater.id}
+                onClick={() => setFocusedFloaterId(floater.id)}>
+                {floater.kind === 'duck' ? '🦆' : floater.kind === 'boat' ? '⛵' : '🐻'}{rescued ? '✓' : ''}
+              </button>
+            })}
+          </div>
+          <span className={styles.starScore} aria-label={`ほし ${gameState.collectedStarIds.length} / ${stage.stars?.length ?? 0}`}>
+            {'★'.repeat(gameState.collectedStarIds.length)}{'☆'.repeat((stage.stars?.length ?? 0) - gameState.collectedStarIds.length)}
+          </span>
+        </div>
+        {!cleared ? <>
+          <p className={styles.waveHint}>みずを タッチ！ なみで おそう 👆</p>
+          <div className={styles.waveButtons}>
+            <button type="button" onClick={() => nudge(-1)} aria-label="ひだりへ なみ">🌊 ←</button>
+            <button type="button" onClick={() => nudge(1)} aria-label="みぎへ なみ">→ 🌊</button>
+          </div>
+          {stage.viewportWidth ? <div className={styles.remoteControls} role="group" aria-label="すいろの そうさ">
+            <button type="button" onClick={tapFaucet}>💧 みずを たす</button>
+            <button type="button" onClick={handleGateToggle} aria-pressed={gameState.gateOpen}>🚪 {gameState.gateOpen ? 'とじる' : 'あける'}</button>
+            <button type="button" onClick={handleBoardToggle}>↔️ ながれを かえる</button>
+            <button type="button" onClick={handleDrainToggle} aria-pressed={gameState.drainOpen}>🌀 {gameState.drainOpen ? 'みずを とめる' : 'みずを ぬく'}</button>
+          </div> : null}
+        </> : <p className={styles.waveHint}>{gameState.collectedStarIds.length === stage.stars?.length ? 'ほしも ぜんぶ！ だいせいこう！' : 'だいせいこう！ つぎは ほしも さがそう'}</p>}
+        <div className={styles.gauge}>
+          <span className={styles.gaugeLabel} aria-hidden="true">💧</span>
+          <span className={styles.gaugeTrack}>
+            <span
+              className={styles.gaugeFill}
+              style={{ width: `${waterPercent}%` }}
+              data-testid="pukupuka-gauge-fill"
+              data-water-percent={waterPercent}
+            />
+          </span>
+        </div>
       </div>
 
       <div className={styles.footer}>

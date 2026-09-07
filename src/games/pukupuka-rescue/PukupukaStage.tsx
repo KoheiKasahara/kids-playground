@@ -144,6 +144,8 @@ type Props = {
   /** 流れ板が押し流している向き。 */
   boardFlowDirection: BoardFlowDirection
   boardDisabled: boolean
+  onWave?: (x: number, y: number) => void
+  focusedFloaterId?: string
   onBoardToggle: () => void
 }
 
@@ -164,6 +166,8 @@ export default function PukupukaStage({
   boardFlowDirection,
   boardDisabled,
   onBoardToggle,
+  onWave,
+  focusedFloaterId,
 }: Props) {
   const cleared = state.phase === 'cleared'
   const goal = stage.goal.area
@@ -184,7 +188,9 @@ export default function PukupukaStage({
   const goalRingY = goal.y + goal.height * 0.52
   const goalFlagX = goal.x + goal.width * 0.18
   const viewportWidth = Math.min(stage.viewportWidth ?? stage.width, stage.width)
-  const followedFloaters = state.floaters.filter((floater) => stage.goal.floaterIds.includes(floater.id))
+  const remainingFloaters = state.floaters.filter((floater) => stage.goal.floaterIds.includes(floater.id) && !state.rescuedIds.includes(floater.id))
+  const focused = remainingFloaters.find((floater) => floater.id === focusedFloaterId)
+  const followedFloaters = focused ? [focused] : remainingFloaters.length ? remainingFloaters : state.floaters
   const focusX = followedFloaters.length
     ? followedFloaters.reduce((sum, floater) => sum + floater.x, 0) / followedFloaters.length
     : viewportWidth / 2
@@ -198,6 +204,16 @@ export default function PukupukaStage({
       focusable="false"
       data-testid="pukupuka-stage"
       data-camera-x={cameraX.toFixed(2)}
+      onPointerDown={(event) => {
+        if ((event.target as Element).closest('foreignObject') || event.button > 0) return
+        const matrix = event.currentTarget.getScreenCTM()
+        if (!matrix) return
+        const point = event.currentTarget.createSVGPoint()
+        point.x = event.clientX
+        point.y = event.clientY
+        const local = point.matrixTransform(matrix.inverse())
+        onWave?.(local.x, local.y)
+      }}
     >
       <defs>
         <linearGradient id="pukupuka-sky" x1="0" y1="0" x2="0" y2="1">
@@ -372,6 +388,21 @@ export default function PukupukaStage({
 
       </g>
 
+      <g aria-hidden="true" pointerEvents="none">
+        {(stage.stars ?? []).filter((star) => !state.collectedStarIds.includes(star.id)).map((star) => (
+          <g key={star.id} transform={`translate(${star.x} ${star.y})`} data-testid={`pukupuka-${star.id}`}>
+            <circle r="6" fill="#fff9db" opacity="0.85" />
+            <path d="M0 -5 L1.5 -1.5 L5 -1.5 L2.4 1 L3.2 4.8 L0 2.8 L-3.2 4.8 L-2.4 1 L-5 -1.5 L-1.5 -1.5 Z" fill="#fcc419" stroke="#e67700" strokeWidth="0.5" />
+          </g>
+        ))}
+        {state.wave ? (
+          <g data-testid="pukupuka-player-wave" opacity={state.wave.remainingMs / 1000}>
+            <ellipse cx={state.wave.x} cy={state.wave.y} rx={4 + (1 - state.wave.remainingMs / 1000) * 32} ry={3 + (1 - state.wave.remainingMs / 1000) * 8} fill="none" stroke="#fff" strokeWidth="2" />
+            <path d={`M${state.wave.x - 8} ${state.wave.y} l-4 -3 m4 3 l-4 3 M${state.wave.x + 8} ${state.wave.y} l4 -3 m-4 3 l4 3`} fill="none" stroke="#1971c2" strokeWidth="1.4" />
+          </g>
+        ) : null}
+      </g>
+
       {stage.faucet ? (
         <PukupukaFaucet
           faucet={stage.faucet}
@@ -418,7 +449,7 @@ export default function PukupukaStage({
             // 波紋は「その浮遊物がいる水域」の水面へ描く（水域が増えても正しい水面に付く）。
             const surfaceY = surfaceYAt(stage.waterBodies, state.water, floater.x, floater.y)
             return (
-              <g key={floater.id}>
+              <g key={floater.id} opacity={!cleared && state.rescuedIds.includes(floater.id) ? 0.35 : 1}>
                 {surfaceY !== undefined && floater.submergedRatio > 0.05 ? (
                   <ellipse
                     className={styles.ripple}

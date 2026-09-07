@@ -40,6 +40,10 @@ export type PukupukaGameState = {
   readonly gateOpen: boolean
   /** 流れ板(#519)が現在押し流している向き。タップのたびに反転する。 */
   readonly boardFlowDirection: BoardFlowDirection
+  /** 到着した仲間は以後固定し、救助を取り消さない。 */
+  readonly rescuedIds: readonly string[]
+  readonly collectedStarIds: readonly string[]
+  readonly wave: { x: number; y: number; bodyId: string; remainingMs: number } | null
   /** 実際の開門移送から導いた流れ。演出と浮遊物の力で同じ値を使う。 */
   readonly gateFlow: GateFlowState
 }
@@ -114,6 +118,9 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
     drainOpen: false,
     gateOpen: false,
     boardFlowDirection: stage.board?.initialFlowDirection ?? 'goal',
+    rescuedIds: [],
+    collectedStarIds: [],
+    wave: null,
     gateFlow: { direction: 0, strength: 0, transferredVolume: 0 },
   }
 }
@@ -192,6 +199,7 @@ export function isSettled(stage: StageDefinition, state: PukupukaGameState): boo
   // クリア後は浮遊物を止めているため(#518)、クリアした瞬間の速度が残っていても
   // 動き続けているとは扱わない。
   if (state.phase === 'cleared') return true
+  if (state.wave) return false
   if (state.gateOpen && state.gateFlow.strength > 0) return false
   for (const definition of stage.waterBodies) {
     const bodyState = state.water[definition.id]
@@ -209,6 +217,18 @@ export function applyWaterTap(stage: StageDefinition, state: PukupukaGameState):
   const water = requestWaterChange(stage.waterBodies, state.water, faucetTargetBodyId(stage), WATER_TAP_LEVEL)
   if (water === state.water) return state
   return { ...state, water }
+}
+
+/** 水をタップして左右へ広がる波を作る。乾いた場所・壁では作れない。
+ * 連打は加算せず置き換えるので速度が際限なく増えない。 */
+export function applyWave(stage: StageDefinition, state: PukupukaGameState, x: number, y: number): PukupukaGameState {
+  if (state.phase !== 'playing' || !Number.isFinite(x) || !Number.isFinite(y)) return state
+  const body = findWaterBodyAt(stage.waterBodies, x, y)
+  if (!body || !state.water[body.id]) return state
+  const surface = waterSurfaceY(body, state.water[body.id])
+  if (surface >= body.floorY - 1 || y < surface - 8 || y > body.floorY) return state
+  if (activeSolids(stage, state.gateOpen, state.drainOpen).some((solid) => rectContainsPoint(solid, x, y))) return state
+  return { ...state, wave: { x, y: Math.max(surface, y), bodyId: body.id, remainingMs: 1000 } }
 }
 
 /**
@@ -334,7 +354,7 @@ function advanceOneStep(
     state.phase === 'playing'
       ? state.floaters.map((floater) => {
           const definition = stage.floaters.find((candidate) => candidate.id === floater.id)
-          if (!definition) return floater
+          if (!definition || state.rescuedIds.includes(floater.id)) return floater
           const body = findWaterBodyAt(stage.waterBodies, floater.x, floater.y)
           let flowDirection = gateFlow.direction
           const bodyId = body?.id
@@ -345,6 +365,13 @@ function advanceOneStep(
           const directedReleaseBoard =
             stage.gate?.leftBodyId !== stage.gate?.rightBodyId && bodyId === stage.board?.targetBodyId
           const ambientScale = directedReleaseBoard ? 0 : (stage.ambientDriftScale ?? 1)
+          const wave = state.wave
+          const waveDistance = wave ? Math.abs(floater.x - wave.x) : Infinity
+          // 同じ水域でだけ作用する。水門を閉めた向こう岸を遠隔操作しない。
+          const waveSpeed = wave && bodyId === wave.bodyId && waveDistance < 38
+            ? (Math.sign(floater.x - wave.x) || driftDirection) * 110 *
+              (1 - waveDistance / 38) * wave.remainingMs / 1000
+            : 0
           return stepFloater(
             definition,
             floater,
@@ -353,7 +380,7 @@ function advanceOneStep(
               solids,
               bounds: { width: stage.width, height: stage.height },
               driftDirection: driftDirection * ambientScale,
-              gateFlowSpeed: affectedByGate ? GATE_FLOW_SPEED * gateFlow.strength * flowDirection : 0,
+              gateFlowSpeed: (affectedByGate ? GATE_FLOW_SPEED * gateFlow.strength * flowDirection : 0) + waveSpeed,
               board,
             },
             deltaSeconds,
@@ -361,9 +388,24 @@ function advanceOneStep(
         })
       : state.floaters
 
+  const collectedStarIds = [...state.collectedStarIds]
+  for (const star of stage.stars ?? []) {
+    if (collectedStarIds.includes(star.id)) continue
+    if (floaters.some((floater) => !state.rescuedIds.includes(floater.id) &&
+      Math.hypot(floater.x - star.x, floater.y - star.y) <=
+        (stage.floaters.find((item) => item.id === floater.id)?.radius ?? 0) + 4)) {
+      collectedStarIds.push(star.id)
+    }
+  }
+  // 1人ずつ到着を記録し、後の排水や逆流で救助を取り消さない。
+  const rescuedIds = [...state.rescuedIds]
+  for (const floater of floaters) {
+    if (stage.goal.floaterIds.includes(floater.id) && !rescuedIds.includes(floater.id) &&
+      rectContainsPoint(stage.goal.area, floater.x, floater.y)) rescuedIds.push(floater.id)
+  }
   let phase = state.phase
   let goalReached = false
-  if (phase === 'playing' && allFloatersAtGoal(stage, floaters)) {
+  if (phase === 'playing' && stage.goal.floaterIds.every((id) => rescuedIds.includes(id))) {
     phase = 'cleared'
     goalReached = true
   }
@@ -379,6 +421,10 @@ function advanceOneStep(
       gateOpen: state.gateOpen,
       boardFlowDirection: state.boardFlowDirection,
       gateFlow,
+      rescuedIds,
+      collectedStarIds,
+      wave: state.wave && state.wave.remainingMs > FIXED_STEP_MS && phase === 'playing'
+        ? { ...state.wave, remainingMs: state.wave.remainingMs - FIXED_STEP_MS } : null,
     },
     goalReached,
   }

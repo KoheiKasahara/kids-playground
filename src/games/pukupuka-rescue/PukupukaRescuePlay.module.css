@@ -4,6 +4,7 @@
 .page {
   min-height: 100vh;
   min-height: 100dvh;
+  height: 100dvh;
   box-sizing: border-box;
   padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
     calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
@@ -160,6 +161,7 @@
   width: 100%;
   height: 100%;
   max-height: 100%;
+  touch-action: none;
   /* 縦横比を保ったまま、はみ出さずに中央へ収める。 */
   display: block;
 }
@@ -755,7 +757,7 @@
     grid-row: 3 / span 2;
   }
 
-  .gauge {
+  .playTools {
     grid-column: 2;
     grid-row: 3;
     align-self: end;
@@ -792,4 +794,28 @@
   .gaugeFill {
     transition: none;
   }
+}
+
+.playTools { width: min(100%, 440px); margin: 0 auto; min-height: 0; overflow-y: auto; }
+.rescueRow, .friends, .waveButtons, .remoteControls { display: flex; align-items: center; gap: 6px; justify-content: center; }
+.rescueRow { justify-content: space-between; }
+.friendButton, .waveButtons button, .remoteControls button {
+  min-height: 44px; min-width: 44px; border: 2px solid #74c0fc; border-radius: 14px;
+  background: #fff; color: #17607f; font-weight: 800; cursor: pointer; touch-action: manipulation;
+}
+.friendButton { font-size: 23px; }
+.friendButton:disabled { opacity: 1; background: #d3f9d8; border-color: #69db7c; }
+.friendButton[aria-pressed="true"] { border-color: #e67700; background: #fff3bf; }
+.waveButtons button { flex: 1; font-size: 22px; background: #e7f5ff; }
+.waveButtons button:active { background: #a5d8ff; transform: scale(0.96); }
+.waveHint { margin: 4px 0; text-align: center; color: #17607f; font-size: 13px; font-weight: 800; }
+.starScore { color: #b66a00; font-size: 27px; letter-spacing: 2px; white-space: nowrap; }
+.stageRecord { grid-column: 1 / -1; color: #996000; font-size: 18px; }
+.remoteControls { flex-wrap: wrap; margin-top: 4px; }
+.remoteControls button { flex: 1 1 45%; font-size: 12px; }
+.playTools .gauge { margin-top: 4px; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .playTools { align-self: stretch; }
+  .friendButton { min-height: 44px; }
+  .page.selectionPage { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
 }

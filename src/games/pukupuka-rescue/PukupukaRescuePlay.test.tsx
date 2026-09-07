@@ -92,6 +92,7 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
   let frames: ReturnType<typeof controlAnimationFrames>
 
   beforeEach(() => {
+    localStorage.clear()
     frames = controlAnimationFrames()
   })
 
@@ -223,6 +224,7 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
     fireEvent.click(screen.getByRole('button', { name: /ゲート/ }))
     frames.advance(12 * 60)
 
+    expect(Number(screen.getByTestId('pukupuka-stage').getAttribute('data-camera-x'))).toBeGreaterThan(100)
     const returnButton = screen.getByRole('button', { name: 'ステージをえらぶ' })
     expect(returnButton).toBeInTheDocument()
     fireEvent.click(returnButton)
@@ -258,6 +260,69 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
 
     expect(Number(stage.getAttribute('data-camera-x'))).toBeGreaterThan(30)
     expect(stage.getAttribute('viewBox')?.split(' ')[2]).toBe('100')
+  })
+
+  test('なみボタンで移動でき、やりなおしで波と星をリセットする', () => {
+    renderGame()
+    chooseStage(1)
+    frames.advance(30)
+    const duck = screen.getByTestId('pukupuka-floater-duck')
+    const initialX = Number(duck.getAttribute('data-floater-x'))
+    fireEvent.click(screen.getByRole('button', { name: 'みぎへ なみ' }))
+    expect(screen.getByTestId('pukupuka-player-wave')).toBeInTheDocument()
+    frames.advance(30)
+    expect(Number(duck.getAttribute('data-floater-x'))).toBeGreaterThan(initialX + 2)
+    fireEvent.click(screen.getByRole('button', { name: 'やりなおし' }))
+    expect(screen.queryByTestId('pukupuka-player-wave')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('ほし 0 / 3')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'あひるを みる' })).toBeEnabled()
+  })
+
+  test('クリア記録は再起動してもステージ選択に残る', () => {
+    const view = renderGame()
+    chooseStage(1)
+    fireEvent.pointerDown(faucet())
+    frames.advance(5 * 60)
+    fireEvent.pointerUp(faucet())
+    expect(screen.getByRole('button', { name: 'あひる たすけた！' })).toBeDisabled()
+    view.unmount()
+    renderGame()
+    expect(screen.getByLabelText(/クリアずみ。ほし/)).toBeInTheDocument()
+  })
+
+  test('長い水路でも手元のボタンで給水・水門・流れ・排水を操作できる', () => {
+    renderGame()
+    chooseStage(6)
+    fireEvent.click(screen.getByRole('button', { name: '💧 みずを たす' }))
+    frames.advance(30)
+    expect(Number(screen.getByTestId('pukupuka-gauge-fill').getAttribute('data-water-percent'))).toBeGreaterThan(10)
+    fireEvent.click(screen.getByRole('button', { name: '🚪 あける' }))
+    expect(screen.getByTestId('pukupuka-gate')).toHaveAttribute('data-gate-open', 'true')
+    fireEvent.click(screen.getByRole('button', { name: '↔️ ながれを かえる' }))
+    expect(screen.getByRole('button', { name: /いた/ })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: '🌀 みずを ぬく' }))
+    expect(screen.getByRole('button', { name: '🌀 みずを とめる' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('なかまを選ぶとその子を追い、波の対象も切り替わる', () => {
+    renderGame()
+    chooseStage(6)
+    fireEvent.click(screen.getByRole('button', { name: 'くまを みる' }))
+    expect(screen.getByRole('button', { name: 'くまを みる' })).toHaveAttribute('aria-pressed', 'true')
+    expect(Number(screen.getByTestId('pukupuka-stage').getAttribute('data-camera-x'))).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: 'みぎへ なみ' }))
+    expect(screen.getByTestId('pukupuka-player-wave')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'あひるを みる' }))
+    expect(screen.getByTestId('pukupuka-stage')).toHaveAttribute('data-camera-x', '0.00')
+  })
+
+  test('画面を離れると押しっぱなしの注水を止める', () => {
+    renderGame()
+    chooseStage(1)
+    fireEvent.pointerDown(faucet())
+    expect(faucet()).toHaveAttribute('aria-pressed', 'true')
+    fireEvent(window, new Event('blur'))
+    expect(faucet()).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('プレイ画面をアンマウントすると予約中のRAFをキャンセルする', () => {

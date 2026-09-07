@@ -639,9 +639,11 @@ describe('pukupukaGame: 水門と放水板(#568)', () => {
   })
 
   test('板の向きで放水先の移動結果が明確に反転する', () => {
-    const filled = runStage(boardStage, createInitialState(boardStage), 8, 'fill')
-    const back = runStage(boardStage, toggleGate(filled), 3)
-    const towardGoal = runStage(boardStage, toggleGate(toggleBoard(filled)), 3)
+    // 救助後の固定で移動距離が切り詰められないよう、力の比較ではゴールを水槽外へ置く。
+    const flowStage = { ...boardStage, goal: { ...boardStage.goal, area: { x: 90, y: 0, width: 5, height: 5 } } }
+    const filled = runStage(flowStage, createInitialState(flowStage), 8, 'fill')
+    const back = runStage(flowStage, toggleGate(filled), 3)
+    const towardGoal = runStage(flowStage, toggleGate(toggleBoard(filled)), 3)
     const averageX = (state: PukupukaGameState) =>
       state.floaters.reduce((sum, floater) => sum + floater.x, 0) / state.floaters.length
 

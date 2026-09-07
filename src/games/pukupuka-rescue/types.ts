@@ -67,7 +67,7 @@ export type GoalDefinition = {
   /** ゴール判定領域。中心がこの矩形に入ったらクリア。 */
   area: Rect
   /**
-   * ゴールへ運ぶ対象の浮遊物IDの一覧。すべてがこの領域に入った瞬間にクリアになる。
+   * ゴールへ運ぶ対象の浮遊物IDの一覧。それぞれの到着を記録し、全員が救助されたらクリアになる。
    * 種類が増えても判定処理は共通のまま、ここへIDを足すだけで済むようにしてある(#518)。
    */
   floaterIds: readonly string[]
@@ -168,6 +168,8 @@ export type StageDefinition = {
   waterWheel?: WaterWheelDefinition
   /** 通常のゴール向きドリフト倍率。水門攻略面では0にして放水を主役にできる。 */
   ambientDriftScale?: number
+  /** 任意の寄り道目標。救助の必須条件にはしない。 */
+  stars?: readonly { id: string; x: number; y: number }[]
   /** 幼児向けの短い1行ヒント。 */
   hint: string
 }
