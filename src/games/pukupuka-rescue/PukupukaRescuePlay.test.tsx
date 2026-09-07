@@ -185,6 +185,8 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
     expect(screen.getByTestId('pukupuka-floater-duck')).toBeInTheDocument()
   })
 
+  // 合計3000フレーム（6×60 + 12×60 + 12×60 + 20×60）を1フレームずつact()で
+  // 進めるため、既定の5秒タイムアウトでは足りない（実測 約5秒）。
   test('最終ステージをクリアするとステージ選択へ戻る', () => {
     renderGame()
     chooseStage(6)
@@ -202,7 +204,7 @@ describe('PukupukaRescuePlay: ステージ固有の操作', () => {
     expect(returnButton).toBeInTheDocument()
     fireEvent.click(returnButton)
     expect(screen.getByTestId('pukupuka-stage-select')).toBeInTheDocument()
-  })
+  }, 20000)
 
   test('水車の水門は、せんを開けて水車を回すと通過してクリアできる', () => {
     renderGame()
