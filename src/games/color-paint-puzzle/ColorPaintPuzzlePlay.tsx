@@ -5,6 +5,7 @@ import { DEFAULT_PAINT_COLOR_ID, PAINT_COLORS, type PaintColorId } from './paint
 import { INITIAL_PAINT_PHASE, canPaint, reducePaintPhase, type PaintPhase } from './paintPhase'
 import { DEFAULT_PICTURE_ID, PAINT_PICTURES, findPaintPicture } from './paintPictures'
 import { createEmptyPaintings, getPaintedAreas, paintArea, resetPicture, type PaintingsState } from './paintState'
+import { pictureScrollHint, type PictureScrollHint } from './pictureScrollHint'
 import { playColorPaintFillSound, playColorPaintFinishSound, primeAudio } from '../../utils/quizSound'
 import styles from './ColorPaintPuzzlePlay.module.css'
 
@@ -31,6 +32,8 @@ export default function ColorPaintPuzzlePlay() {
   const [feedbackAreaId, setFeedbackAreaId] = useState<string | null>(null)
   const [feedbackSequence, setFeedbackSequence] = useState(0)
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pictureGroupRef = useRef<HTMLDivElement | null>(null)
+  const [scrollHint, setScrollHint] = useState<PictureScrollHint>({ left: false, right: false })
 
   useEffect(() => {
     return () => {
@@ -43,6 +46,26 @@ export default function ColorPaintPuzzlePlay() {
   const painted = getPaintedAreas(paintings, picture.id)
   const celebrating = phase === 'celebrating'
   const selectedColor = PAINT_COLORS.find((color) => color.id === selectedColorId) ?? PAINT_COLORS[0]
+
+  /**
+   * 題材えらびの横スクロールで、左右どちらに続きがあるかを見張る（端のフェードと矢印の出し分け）。
+   * 完成演出中は題材えらび自体が消えて要素が付け外しされるため、celebrating を依存に入れて
+   * 貼り直す。ResizeObserver は使わず、resize と scroll だけで足りる範囲にとどめている。
+   */
+  useEffect(() => {
+    const element = pictureGroupRef.current
+    if (element === null) return
+    const update = () => {
+      setScrollHint(pictureScrollHint(element.scrollLeft, element.scrollWidth, element.clientWidth))
+    }
+    update()
+    element.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      element.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [celebrating])
 
   const handlePaintArea = (areaId: string) => {
     // 演出中はCanvas側でもタップを受け付けないが、正となる状態更新側でも必ず弾く。
@@ -110,19 +133,25 @@ export default function ColorPaintPuzzlePlay() {
 
       {/* 演出中は絵を主役にするため、題材えらび・色パレット・やりなおしは出さない。 */}
       {celebrating ? null : (
-        <div className={styles.pictureGroup} role="group" aria-label="えを えらぶ">
-          {PAINT_PICTURES.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              className={`${styles.pictureButton} ${option.id === picture.id ? styles.pictureButtonSelected : ''}`}
-              aria-pressed={option.id === picture.id}
-              onClick={() => setSelectedPictureId(option.id)}
-            >
-              <span aria-hidden="true">{option.emoji}</span>
-              <span>{option.label}</span>
-            </button>
-          ))}
+        <div
+          className={styles.pictureScroller}
+          data-scroll-left={scrollHint.left ? 'true' : 'false'}
+          data-scroll-right={scrollHint.right ? 'true' : 'false'}
+        >
+          <div className={styles.pictureGroup} role="group" aria-label="えを えらぶ" ref={pictureGroupRef}>
+            {PAINT_PICTURES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`${styles.pictureButton} ${option.id === picture.id ? styles.pictureButtonSelected : ''}`}
+                aria-pressed={option.id === picture.id}
+                onClick={() => setSelectedPictureId(option.id)}
+              >
+                <span aria-hidden="true">{option.emoji}</span>
+                <span>{option.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

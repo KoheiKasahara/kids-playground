@@ -62,29 +62,91 @@
   box-shadow: none;
 }
 
-/* 題材が9件あるため、色パレットと同じく列数を固定する（auto-fitやflexの折返しだと
-   幅によって4+2などのはんぱな段になる）。狭い〜中間の画面は3列×3段、900px以上は9列×1段。
-   9列に必要な列幅（いちばん長い「きょうりゅう」が1行で収まる、およそ96px）を確保できる
-   幅が900px付近であるため、そこで切り替える。900px未満はボタンが大きくなるだけで
-   3列×3段のまま破綻はしない。 */
-.pictureGroup {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-xs);
-  max-width: 640px;
+/* 横スクロールする題材えらびの外枠。端のフェードと矢印（::before / ::after）を
+   スクロールしない位置に固定して重ねるため、スクロールする .pictureGroup とは別の要素にしている。 */
+.pictureScroller {
+  position: relative;
   width: 100%;
+  min-width: 0;
+  max-width: 920px;
   margin: 0 auto;
 }
 
-@media (min-width: 900px) {
-  .pictureGroup {
-    grid-template-columns: repeat(9, minmax(0, 1fr));
-    max-width: 920px;
+/* 題材が9件あるので、縦画面で3列×3段にすると題材えらびだけで3段ぶんの高さを食い、
+   ぬりえが目に見えて小さくなる。段数を2に固定して、あふれたぶんは横スクロールで見せる。
+   最小列幅は、いちばん長いラベル「きょうりゅう」（13px×6文字＋パディング）が1行で
+   収まる幅を下回らないようにしている。上限（1fr）があるので、広い画面では列が伸びて
+   9件が2段に収まり、スクロールバーも矢印も出ない。 */
+.pictureGroup {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-columns: minmax(clamp(88px, 26vw, 112px), 1fr);
+  gap: var(--space-xs);
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  /* スクロールバーぶんの余白。ボタンが枠に貼り付かないように。 */
+  padding-bottom: 2px;
+}
+
+/* スクロールできることを幼児にも知らせる手がかり。スクロールできる向きにだけ、
+   端をうすく白くぼかして「まだ続きがある」ことを示し、右端には矢印も重ねる。
+   タップ可能な要素は増やさない（誤タップを避けるため）ので、
+   pointer-events: none で下のボタンのタップをそのまま通す。 */
+.pictureScroller::before,
+.pictureScroller::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  width: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--color-accent-dark);
+  font-size: 17px;
+  font-weight: 900;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.pictureScroller::before {
+  left: 0;
+  content: '❮';
+  background: linear-gradient(to right, rgb(255 255 255 / 92%), rgb(255 255 255 / 0%));
+}
+
+.pictureScroller::after {
+  right: 0;
+  content: '❯';
+  background: linear-gradient(to left, rgb(255 255 255 / 92%), rgb(255 255 255 / 0%));
+  animation: pictureScrollNudge 1.4s ease-in-out infinite alternate;
+}
+
+.pictureScroller[data-scroll-left='true']::before {
+  opacity: 1;
+}
+
+.pictureScroller[data-scroll-right='true']::after {
+  opacity: 1;
+}
+
+/* 「まだ右にあるよ」の合図。目立ちすぎると絵より先に矢印を触ってしまうので、ごく控えめに。 */
+@keyframes pictureScrollNudge {
+  from {
+    transform: translateX(-3px);
+  }
+
+  to {
+    transform: translateX(3px);
   }
 }
 
 .pictureButton {
-  /* 列数を固定したグリッドなので、幅は列が決める（min-widthを残すと狭い画面ではみ出す）。 */
+  scroll-snap-align: start;
+  /* 幅は grid-auto-columns（＝列）が決める（min-widthを残すと列の指定に勝ってはみ出す）。 */
   min-width: 0;
   min-height: 56px;
   padding: 4px var(--space-xs);
@@ -393,13 +455,16 @@
   }
 
   /* 9件を左の細い列（27%幅）に入れると1つがさらに小さくなり「きょうりゅう」が収まらない。
-     横画面では題材えらびだけ全幅の1段に出して、9件を1行に並べる。
-     ぬりえは1段ぶん低くなるが、左の操作列（色・やりなおし・できた！）の高さは変わらない。 */
-  .pictureGroup {
+     横画面では題材えらびだけ全幅に出す。縦の余裕がないので段は1段にして、
+     入りきらないぶんは縦画面と同じく横スクロールで見せる。 */
+  .pictureScroller {
     grid-column: 1 / -1;
     grid-row: 3;
-    grid-template-columns: repeat(9, minmax(0, 1fr));
     max-width: none;
+  }
+
+  .pictureGroup {
+    grid-template-rows: auto;
   }
 
   .instruction {
@@ -407,15 +472,11 @@
     grid-row: 2;
   }
 
-  /* 9件を1行に詰めるため、絵文字とラベルの両方を少し縮める（min-heightはタップ領域を
-     保つためそのまま）。 */
+  /* 横スクロールで見せるので1行に詰め込む必要はなく、ラベルは読める大きさのまま。
+     min-heightだけタップ領域を保ちつつ抑える。 */
   .pictureButton {
     min-height: 48px;
-    font-size: 11px;
-  }
-
-  .pictureButton span:first-child {
-    font-size: 18px;
+    font-size: 12px;
   }
 
   .canvasArea {
@@ -535,6 +596,13 @@
   }
 
   .titleQuiet {
+    transition: none;
+  }
+
+  /* 矢印は揺らさない。出ていること自体が「まだ右にある」の合図になる。 */
+  .pictureScroller::before,
+  .pictureScroller::after {
+    animation: none;
     transition: none;
   }
 
