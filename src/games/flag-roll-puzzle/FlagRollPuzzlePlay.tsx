@@ -11,7 +11,7 @@ import PartTray from './PartTray'
 import PuzzleBoard from './PuzzleBoard'
 import PuzzleStageSelect from './PuzzleStageSelect'
 import { nearestCell, sameCell, type GridCell } from './grid'
-import { isRotatablePart, type PartTypeId } from './partTypes'
+import { partDefinition, isRotatablePart, type PartTypeId } from './partTypes'
 import { boardPointFromClient, canMovePart, canPlacePart, partAtCell } from './placement'
 import {
   clearAll,
@@ -398,7 +398,7 @@ export default function FlagRollPuzzlePlay() {
   const selectedPart = state.parts.find((part) => part.id === state.selectedPartId) ?? null
   // パーツを選んでいるあいだは、同じ行に出る「けす」がそのまま案内になるため
   // ひとことは出さない（同じことを2つ並べて書かない）。
-  const editHint = partSelected ? '' : EDIT_HINT
+  const editHint = partSelected ? '' : selectedTypeId ? (partDefinition(selectedTypeId).hint ?? EDIT_HINT) : EDIT_HINT
   const status =
     message ||
     (state.phase === 'cleared'
