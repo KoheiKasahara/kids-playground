@@ -69,12 +69,12 @@ export function primaryWaterBodyId(stage: StageDefinition): WaterBodyId {
 
 /** じゃぐちが注ぐ先の水域。将来ここが増えても、注ぎ先を変えるだけで済むようにしてある。 */
 export function faucetTargetBodyId(stage: StageDefinition): WaterBodyId {
-  return stage.faucet.targetBodyId
+  return stage.faucet?.targetBodyId ?? primaryWaterBodyId(stage)
 }
 
 /** せん/排水が水を抜く元の水域。じゃぐちと対称に、ここだけを見ればよい構造にしてある。 */
 export function drainSourceBodyId(stage: StageDefinition): WaterBodyId {
-  return stage.drain.sourceBodyId
+  return stage.drain?.sourceBodyId ?? primaryWaterBodyId(stage)
 }
 
 /**
@@ -99,7 +99,7 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
     leftoverMs: 0,
     drainOpen: false,
     gateOpen: false,
-    boardFlowDirection: stage.board.initialFlowDirection,
+    boardFlowDirection: stage.board?.initialFlowDirection ?? 'goal',
   }
 }
 
@@ -108,7 +108,7 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
  * stage.gateも他の固定物と同じ扱いで含める。開いている間は当たり判定ごと取り除く。
  */
 export function activeSolids(stage: StageDefinition, gateOpen: boolean): readonly Rect[] {
-  return gateOpen ? stage.solids : [...stage.solids, stage.gate]
+  return gateOpen || !stage.gate ? stage.solids : [...stage.solids, stage.gate]
 }
 
 export function getFloater(state: PukupukaGameState, floaterId: string): FloaterState | undefined {
@@ -255,11 +255,11 @@ function advanceOneStep(
     }
     // じゃぐちと同時に開いていても、それぞれ別々に目標水量を押し合うだけなので
     // 「注水量 - 排水量」に相当する結果へ自然に収束する（特別な合成処理は不要）。
-    if (state.drainOpen) {
+    if (state.drainOpen && stage.drain) {
       water = requestWaterChange(
         stage.waterBodies,
         water,
-        drainSourceBodyId(stage),
+        stage.drain.sourceBodyId,
         -DRAIN_RATE_LEVEL_PER_SEC * deltaSeconds,
       )
     }
@@ -273,7 +273,9 @@ function advanceOneStep(
   // 見分けられる状態を保つ。アヒル1体だけの時と同じく、クリア後に水の操作を
   // 受け付けなくなるのと合わせて「ここでおしまい」を見た目でも表す。
   const solids = activeSolids(stage, state.gateOpen)
-  const board = { rect: stage.board, pushSpeed: boardFlowSpeed(state, driftDirection) }
+  const board = stage.board
+    ? { rect: stage.board, pushSpeed: boardFlowSpeed(state, driftDirection) }
+    : undefined
   const floaters =
     state.phase === 'playing'
       ? state.floaters.map((floater) => {

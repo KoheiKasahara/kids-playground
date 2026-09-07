@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PukupukaStage from './PukupukaStage'
-import { PUKUPUKA_STAGE } from './stageDefinitions'
+import { findPukupukaStage, PUKUPUKA_STAGES, type PukupukaStageId } from './stageDefinitions'
 import {
   applyWaterTap,
   createInitialState,
@@ -18,30 +18,64 @@ import {
 import { playPukupukaGoalSound, playPukupukaWaterSound, primeAudio } from '../../utils/quizSound'
 import styles from './PukupukaRescuePlay.module.css'
 
+/** ステージ選択。カードは番号・記号・名前を大きく並べ、読めなくても選びやすくする。 */
+export function PukupukaStageSelect({ onSelect, onHome }: { onSelect: (id: PukupukaStageId) => void; onHome: () => void }) {
+  return (
+    <main className={`${styles.page} ${styles.selectionPage}`} data-testid="pukupuka-stage-select">
+      <header className={styles.header}>
+        <button type="button" className={styles.home} onClick={onHome}>
+          ← もどる
+        </button>
+        <h1 className={styles.title}>
+          <span aria-hidden="true">🛟</span> ぷかぷかレスキュー
+        </h1>
+      </header>
+
+      <section className={styles.selectionContent} aria-labelledby="pukupuka-stage-select-title">
+        <h2 id="pukupuka-stage-select-title" className={styles.selectionTitle}>
+          どのステージで あそぶ？
+        </h2>
+        <div className={styles.stageOptions} role="group" aria-label="ステージ選択">
+          {PUKUPUKA_STAGES.map((stage, index) => (
+            <button
+              key={stage.id}
+              type="button"
+              className={styles.stageOption}
+              data-stage-id={stage.id}
+              aria-label={`${index + 1} ${stage.name}`}
+              onClick={() => onSelect(stage.id as PukupukaStageId)}
+            >
+              <span className={styles.stageOptionNumber} aria-hidden="true">
+                {index + 1}
+              </span>
+              <span className={styles.stageOptionIcon} aria-hidden="true">
+                {stage.icon}
+              </span>
+              <span className={styles.stageOptionLabel}>{stage.name}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </main>
+  )
+}
+
 /**
- * ぷかぷかレスキュー（Issue #514 Phase 1 / #515 じゃぐち / #516 せん・排水 / #517 ゲート /
- * #518 ボート・浮き輪+くまの追加 / #519 流れ板）。
+ * ぷかぷかレスキュー。
  *
- * 画面の役割はこの3つだけに絞っている。
- *  1. requestAnimationFrame でゲームを進める
- *  2. じゃぐち・せん・ゲートの操作を水位・通路の入力に変える
- *  3. ゲーム状態をSVGへ渡す
- *
- * 水位・浮力・ゴール判定・ゲートの当たり判定はすべて pukupukaGame.ts 側の純粋な関数が持つため、
- * 後続の機能追加でも、この画面の入力部分だけを直せばよい。
+ * ステージ選択とプレイ画面を同じrouteで切り替える。物理は純粋な pukupukaGame.ts に
+ * 閉じ込め、ここでは入力・描画・ステージ導線だけを扱う。
  */
 export default function PukupukaRescuePlay() {
   const navigate = useNavigate()
-  const stage = PUKUPUKA_STAGE
+  const [selectedStageId, setSelectedStageId] = useState<PukupukaStageId | null>(null)
+  // 選択前もHooksを同じ順序で呼ぶための表示用フォールバック。選択画面では描画しない。
+  const stage = (selectedStageId ? findPukupukaStage(selectedStageId) : undefined) ?? PUKUPUKA_STAGES[0]
   const bodyId = primaryWaterBodyId(stage)
 
   const [gameState, setGameState] = useState<PukupukaGameState>(() => createInitialState(stage))
-  // ループの中では常に最新の状態が必要なため、描画用のstateとは別にrefでも持つ。
   const stateRef = useRef(gameState)
-  // じゃぐちを押している間だけ 'fill'。せん(drainOpen)はgameState側の状態でそのまま扱う。
   const controlRef = useRef<WaterControl>(null)
-  // じゃぐちの見た目（ハンドル色・水の線）を更新するための、操作中の入力の描画用コピー。
-  // controlRefだけだとrefの変更では再描画されないため、押下/解放のタイミングでここも合わせて更新する。
   const [activeControl, setActiveControl] = useState<WaterControl>(null)
 
   const setControl = useCallback((next: WaterControl) => {
@@ -49,24 +83,34 @@ export default function PukupukaRescuePlay() {
     setActiveControl(next)
   }, [])
 
+  const selectStage = useCallback(
+    (stageId: PukupukaStageId) => {
+      const nextStage = findPukupukaStage(stageId)
+      if (!nextStage) return
+      const initial = createInitialState(nextStage)
+      setControl(null)
+      stateRef.current = initial
+      setGameState(initial)
+      setSelectedStageId(stageId)
+    },
+    [setControl],
+  )
+
   useEffect(() => {
+    if (!selectedStageId) return undefined
+
     let frameId: number | null = null
     let previous = performance.now()
-
     const frame = (now: number) => {
       const delta = now - previous
       previous = now
       const control = controlRef.current
       const result = stepGame(stage, stateRef.current, delta, control)
       stateRef.current = result.state
-      // 水も浮遊物も止まっていて操作もされていないときは、同じ絵を描き直さない
-      // （置きっぱなしのスマホで毎フレーム再描画し続けないようにするため）。
       if (result.goalReached || control !== null || !isSettled(stage, result.state)) {
         setGameState(result.state)
       }
       if (result.goalReached) {
-        // ゴール達成時、じゃぐちを押したままでも見た目（ハンドル・水の線）を即座にOFFへ戻す。
-        // 指を離すまで待つと、離すまでの一瞬だけ「注水中」の絵が残ってしまうため。
         setControl(null)
         playPukupukaGoalSound()
       }
@@ -78,13 +122,10 @@ export default function PukupukaRescuePlay() {
       if (frameId !== null) cancelAnimationFrame(frameId)
       controlRef.current = null
     }
-  }, [stage, setControl])
+  }, [selectedStageId, stage, setControl])
 
-  // ボタン・じゃぐちの外で指を離した場合にも押しっぱなしを必ず解除する。
   useEffect(() => {
-    const stop = () => {
-      setControl(null)
-    }
+    const stop = () => setControl(null)
     window.addEventListener('pointerup', stop)
     window.addEventListener('pointercancel', stop)
     return () => {
@@ -93,63 +134,53 @@ export default function PukupukaRescuePlay() {
     }
   }, [setControl])
 
-  const changeWater = useCallback(() => {
+  const changeWater = () => {
     const current = stateRef.current
-    if (current.phase !== 'playing') return
+    if (current.phase !== 'playing' || !stage.faucet) return
     primeAudio()
     playPukupukaWaterSound('fill')
     const next = applyWaterTap(stage, current)
     stateRef.current = next
     setGameState(next)
-  }, [stage])
+  }
 
-  /** じゃぐちを指で押しはじめ: 1回ぶんをすぐ足したうえで、押しているあいだ注水し続ける。 */
   const startFaucetHold = () => {
     setControl('fill')
     changeWater()
   }
 
-  const stopFaucetHold = () => {
-    setControl(null)
-  }
+  const stopFaucetHold = () => setControl(null)
+  const tapFaucet = () => changeWater()
 
-  /** キーボード（Enter / Space）での操作。押しっぱなしにはせず1回ぶんだけ動かす。 */
-  const tapFaucet = () => {
-    changeWater()
-  }
-
-  /** せんのタップ操作: 開⇔閉を切り替える。開いている間は毎フレーム自動で水位が下がる。 */
-  const handleDrainToggle = useCallback(() => {
+  const handleDrainToggle = () => {
     const current = stateRef.current
-    if (current.phase !== 'playing') return
+    if (current.phase !== 'playing' || !stage.drain) return
     primeAudio()
     const next = toggleDrain(current)
     if (next.drainOpen) playPukupukaWaterSound('drain')
     stateRef.current = next
     setGameState(next)
-  }, [])
+  }
 
-  /** ゲートのタップ操作: 開⇔閉を切り替える。開いている間は水位に関わらず通り抜けられる。 */
-  const handleGateToggle = useCallback(() => {
+  const handleGateToggle = () => {
     const current = stateRef.current
-    if (current.phase !== 'playing') return
+    if (current.phase !== 'playing' || !stage.gate) return
     primeAudio()
     const next = toggleGate(current)
     playPukupukaWaterSound(next.gateOpen ? 'fill' : 'drain')
     stateRef.current = next
     setGameState(next)
-  }, [])
+  }
 
-  /** 流れ板のタップ操作: 押し流す向きを反転させる（#519）。 */
-  const handleBoardToggle = useCallback(() => {
+  const handleBoardToggle = () => {
     const current = stateRef.current
-    if (current.phase !== 'playing') return
+    if (current.phase !== 'playing' || !stage.board) return
     primeAudio()
     const next = toggleBoard(current)
     playPukupukaWaterSound(next.boardFlowDirection === 'goal' ? 'fill' : 'drain')
     stateRef.current = next
     setGameState(next)
-  }, [])
+  }
 
   const handleReset = () => {
     const initial = createInitialState(stage)
@@ -158,15 +189,40 @@ export default function PukupukaRescuePlay() {
     setGameState(initial)
   }
 
+  const handleBackToSelection = () => {
+    setControl(null)
+    setSelectedStageId(null)
+    stateRef.current = createInitialState(PUKUPUKA_STAGES[0])
+    setGameState(stateRef.current)
+  }
+
+  const handleNextStage = () => {
+    if (!selectedStageId) return
+    const currentIndex = PUKUPUKA_STAGES.findIndex((candidate) => candidate.id === selectedStageId)
+    const next = PUKUPUKA_STAGES[currentIndex + 1]
+    if (next) selectStage(next.id as PukupukaStageId)
+    else handleBackToSelection()
+  }
+
+  if (!selectedStageId) {
+    return <PukupukaStageSelect onSelect={selectStage} onHome={() => navigate('/')} />
+  }
+
   const cleared = gameState.phase === 'cleared'
   const waterRatio = waterRatioOf(stage, gameState, bodyId)
   const waterPercent = Math.round(waterRatio * 100)
   const faucetOn = activeControl === 'fill'
+  const isLastStage = PUKUPUKA_STAGES.at(-1)?.id === selectedStageId
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-testid="pukupuka-play">
       <header className={styles.header}>
-        <button type="button" className={styles.home} onClick={() => navigate('/')}>
+        <button
+          type="button"
+          className={styles.home}
+          aria-label="ステージ選択へもどる"
+          onClick={handleBackToSelection}
+        >
           ← もどる
         </button>
         <h1 className={styles.title}>
@@ -175,7 +231,7 @@ export default function PukupukaRescuePlay() {
       </header>
 
       <p className={styles.instruction} role="status" aria-live="polite">
-        {cleared ? 'ゴール！ みんなを たすけたよ' : stage.hint}
+        {cleared ? 'ゴール！ みんなを たすけたよ' : `${stage.name}：${stage.hint}`}
       </p>
 
       <div className={styles.stageArea}>
@@ -199,18 +255,14 @@ export default function PukupukaRescuePlay() {
         />
         {cleared ? (
           <div className={styles.clearBanner}>
-            <span className={styles.clearEmoji} aria-hidden="true">
-              🎉
-            </span>
+            <span className={styles.clearEmoji} aria-hidden="true">🎉</span>
             <span className={styles.clearText}>ゴール！</span>
           </div>
         ) : null}
       </div>
 
       <div className={styles.gauge}>
-        <span className={styles.gaugeLabel} aria-hidden="true">
-          💧
-        </span>
+        <span className={styles.gaugeLabel} aria-hidden="true">💧</span>
         <span className={styles.gaugeTrack}>
           <span
             className={styles.gaugeFill}
@@ -222,9 +274,12 @@ export default function PukupukaRescuePlay() {
       </div>
 
       <div className={styles.footer}>
-        <button type="button" className={styles.reset} onClick={handleReset}>
-          やりなおし
-        </button>
+        <button type="button" className={styles.reset} onClick={handleReset}>やりなおし</button>
+        {cleared ? (
+          <button type="button" className={styles.nextStage} onClick={handleNextStage}>
+            {isLastStage ? 'ステージをえらぶ' : 'つぎのステージ'}
+          </button>
+        ) : null}
       </div>
     </main>
   )

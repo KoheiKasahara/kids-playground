@@ -167,8 +167,11 @@ export default function PukupukaStage({
 }: Props) {
   const cleared = state.phase === 'cleared'
   const goal = stage.goal.area
-  const faucetSurfaceY = waterSurfaceYOf(stage, state, stage.faucet.targetBodyId)
+  const faucetSurfaceY = waterSurfaceYOf(stage, state, stage.faucet?.targetBodyId ?? stage.waterBodies[0].id)
   const boardPushDirection = Math.sign(boardFlowSpeed(state, stageDriftDirection(stage))) || 1
+  const goalRingX = goal.x + goal.width * 0.72
+  const goalRingY = goal.y + goal.height * 0.52
+  const goalFlagX = goal.x + goal.width * 0.18
 
   return (
     <svg
@@ -310,14 +313,17 @@ export default function PukupukaStage({
 
         {/* ゴールの目印: はたと浮き輪。台の上に置いて「ここへ運ぶ」と分かるようにする。 */}
         <g>
-          <rect x="61.2" y="82" width="1.6" height="14" rx="0.8" fill="#8d6e4f" />
-          <path d="M62.8 82.6 L71 85.6 L62.8 88.6 Z" fill="#ff6b6b" />
+          <rect x={goalFlagX} y={goal.y - 2} width="1.6" height={goal.height + 2} rx="0.8" fill="#8d6e4f" />
+          <path
+            d={`M${goalFlagX + 1.6} ${goal.y - 1.4} L${goalFlagX + 9.8} ${goal.y + 1.6} L${goalFlagX + 1.6} ${goal.y + 4.6} Z`}
+            fill="#ff6b6b"
+          />
           <g className={cleared ? styles.goalRingCleared : undefined}>
-            <circle cx="76" cy="87.6" r="7" fill="none" stroke="#ffffff" strokeWidth="3.4" />
+            <circle cx={goalRingX} cy={goalRingY} r={Math.min(7, goal.height * 0.32)} fill="none" stroke="#ffffff" strokeWidth="3.4" />
             <circle
-              cx="76"
-              cy="87.6"
-              r="7"
+              cx={goalRingX}
+              cy={goalRingY}
+              r={Math.min(7, goal.height * 0.32)}
               fill="none"
               stroke="#ff6b6b"
               strokeWidth="3.4"
@@ -328,25 +334,33 @@ export default function PukupukaStage({
 
       </g>
 
-      <PukupukaFaucet
-        faucet={stage.faucet}
-        active={faucetActive}
-        disabled={faucetDisabled}
-        surfaceY={faucetSurfaceY}
-        onHoldStart={onFaucetHoldStart}
-        onHoldEnd={onFaucetHoldEnd}
-        onTap={onFaucetTap}
-      />
-      <PukupukaDrain drain={stage.drain} open={drainOpen} disabled={drainDisabled} onToggle={onDrainToggle} />
-      <PukupukaGate gate={stage.gate} open={gateOpen} disabled={gateDisabled} onToggle={onGateToggle} />
-      <PukupukaBoard
-        board={stage.board}
-        flowDirection={boardFlowDirection}
-        pushDirection={boardPushDirection}
-        disabled={boardDisabled}
-        onToggle={onBoardToggle}
-      />
-      <PukupukaWaterWheel wheel={stage.waterWheel} spinning={waterWheelSpinning(state)} />
+      {stage.faucet ? (
+        <PukupukaFaucet
+          faucet={stage.faucet}
+          active={faucetActive}
+          disabled={faucetDisabled}
+          surfaceY={faucetSurfaceY}
+          onHoldStart={onFaucetHoldStart}
+          onHoldEnd={onFaucetHoldEnd}
+          onTap={onFaucetTap}
+        />
+      ) : null}
+      {stage.drain ? (
+        <PukupukaDrain drain={stage.drain} open={drainOpen} disabled={drainDisabled} onToggle={onDrainToggle} />
+      ) : null}
+      {stage.gate ? (
+        <PukupukaGate gate={stage.gate} open={gateOpen} disabled={gateDisabled} onToggle={onGateToggle} />
+      ) : null}
+      {stage.board ? (
+        <PukupukaBoard
+          board={stage.board}
+          flowDirection={boardFlowDirection}
+          pushDirection={boardPushDirection}
+          disabled={boardDisabled}
+          onToggle={onBoardToggle}
+        />
+      ) : null}
+      {stage.waterWheel ? <PukupukaWaterWheel wheel={stage.waterWheel} spinning={waterWheelSpinning(state)} /> : null}
 
       {/* 浮遊物はゲートの点線わくなど他の装飾より手前に描き、重なっても隠れないようにする。
           じゃぐち・せん・ゲートより後に描く関係上、素通りにしておかないとボタンの上に
