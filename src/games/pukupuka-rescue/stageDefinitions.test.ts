@@ -74,8 +74,15 @@ describe('ぷかぷかレスキューのステージ定義', () => {
         expect(rect.x + rect.width).toBeLessThanOrEqual(stage.width)
         expect(rect.y + rect.height).toBeLessThanOrEqual(stage.height)
       }
-      if (stage.gate) checkRect(stage.gate)
-      if (stage.board) checkRect(stage.board)
+      if (stage.gate) {
+        checkRect(stage.gate)
+        expect(bodyIds.has(stage.gate.leftBodyId)).toBe(true)
+        expect(bodyIds.has(stage.gate.rightBodyId)).toBe(true)
+      }
+      if (stage.board) {
+        checkRect(stage.board)
+        expect(bodyIds.has(stage.board.targetBodyId)).toBe(true)
+      }
       if (stage.waterWheel) {
         expect(stage.waterWheel.radius).toBeGreaterThan(0)
         expect(stage.waterWheel.x - stage.waterWheel.radius).toBeGreaterThanOrEqual(0)
@@ -85,8 +92,18 @@ describe('ぷかぷかレスキューのステージ定義', () => {
         checkRect(stage.waterWheel.linkedGate)
       }
 
-      if (stage.faucet) expect(bodyIds.has(stage.faucet.targetBodyId)).toBe(true)
-      if (stage.drain) expect(bodyIds.has(stage.drain.sourceBodyId)).toBe(true)
+      if (stage.faucet) {
+        expect(bodyIds.has(stage.faucet.targetBodyId)).toBe(true)
+        const targetBody = stage.waterBodies.find((body) => body.id === stage.faucet?.targetBodyId)!
+        expect(stage.faucet.x).toBeGreaterThanOrEqual(targetBody.left)
+        expect(stage.faucet.x).toBeLessThanOrEqual(targetBody.right)
+      }
+      if (stage.drain) {
+        expect(bodyIds.has(stage.drain.sourceBodyId)).toBe(true)
+        const sourceBody = stage.waterBodies.find((body) => body.id === stage.drain?.sourceBodyId)!
+        expect(stage.drain.x).toBeGreaterThanOrEqual(sourceBody.left)
+        expect(stage.drain.x).toBeLessThanOrEqual(sourceBody.right)
+      }
       for (const control of [stage.faucet, stage.drain]) {
         if (!control) continue
         expect(control.x).toBeGreaterThanOrEqual(0)
@@ -114,12 +131,17 @@ describe('ぷかぷかレスキューのステージ定義', () => {
     expect(third.board).toBeUndefined()
     expect(fourth.gate).toBeDefined()
     expect(fourth.board?.initialFlowDirection).toBe('back')
-    expect(fourth.waterWheel).toBeDefined()
+    expect(fourth.waterWheel).toBeUndefined()
     expect(fifth.waterWheel?.linkedGateBlocksPassage).toBe(true)
     expect(fifth.gate).toBeUndefined()
     expect(sixth.width).toBeGreaterThan(sixth.viewportWidth ?? sixth.width)
     expect(sixth.gate).toBeDefined()
     expect(sixth.board?.initialFlowDirection).toBe('back')
+    // 逆向き放水でゲート直後に止まっても、同じカメラ範囲内に復帰用の右排水栓が見える。
+    expect(sixth.drain!.x).toBeGreaterThan(sixth.gate!.x + sixth.gate!.width)
+    expect(sixth.drain!.x).toBeLessThan(sixth.gate!.x + (sixth.viewportWidth ?? sixth.width) / 2)
+    // 板と排水の広いタップ領域はXが近くてもY方向に十分離れている。
+    expect(Math.abs(sixth.drain!.y - sixth.board!.y)).toBeGreaterThan(30)
   })
 })
 
@@ -139,14 +161,16 @@ describe('ぷかぷかレスキューのステージ成立性', () => {
         state = toggleDrain(state)
         state = run(stage, state, 8).state
       } else if (stage.id === 'open-the-gate') {
-        state = toggleGate(state)
         state = run(stage, state, 8, 'fill').state
+        state = toggleGate(state)
+        state = run(stage, state, 4).state
         state = toggleDrain(state)
         state = run(stage, state, 8).state
       } else if (stage.id === 'change-the-flow') {
+        state = run(stage, state, 8, 'fill').state
         state = toggleBoard(state)
         state = toggleGate(state)
-        state = run(stage, state, 8, 'fill').state
+        state = run(stage, state, 4).state
         state = toggleDrain(state)
         state = run(stage, state, 8).state
       } else if (stage.id === 'water-wheel-gate') {
@@ -157,10 +181,10 @@ describe('ぷかぷかレスキューのステージ成立性', () => {
       } else {
         state = run(stage, state, 6, 'fill').state
         state = run(stage, state, 12).state
+        // 放水前に板をゴール向きへ変える。水位差を使い切った後の細かいタイミング操作は不要。
+        state = toggleBoard(state)
         state = toggleGate(state)
         state = run(stage, state, 12).state
-        state = toggleBoard(state)
-        state = run(stage, state, 20).state
       }
       expect(state.phase).toBe('cleared')
     },
@@ -215,6 +239,19 @@ describe('ぷかぷかレスキューのステージ成立性', () => {
     state = run(stage, state, 8).state
 
     expect(state.phase).toBe('cleared')
+  })
+
+  test('ステージ3は最初から開門して注水するより、閉門でためてから開けた方が強い放水になり攻略できる', () => {
+    const stage = PUKUPUKA_STAGES[2]
+    const alwaysOpen = run(stage, toggleGate(createInitialState(stage)), 8, 'fill').state
+
+    const stored = run(stage, createInitialState(stage), 8, 'fill').state
+    const released = stepGame(stage, toggleGate(stored), FRAME_MS * 1.01).state
+    const completed = run(stage, released, 4).state
+
+    expect(alwaysOpen.phase).toBe('playing')
+    expect(released.gateFlow.strength).toBeGreaterThan(alwaysOpen.gateFlow.strength + 0.5)
+    expect(completed.phase).toBe('cleared')
   })
 
   test('ステージ4は板を逆向きのまま注水しても、後から板とゲートを直して回復できる', () => {

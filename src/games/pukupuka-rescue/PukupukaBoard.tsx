@@ -2,13 +2,10 @@ import type { BoardDefinition, BoardFlowDirection } from './types'
 import styles from './PukupukaRescuePlay.module.css'
 
 // 流れ板（#519）の見た目と入力だけを持つコンポーネント。ゲート・せんと同じ形で、
-// 押し流す処理そのもの（目標速度を変える処理）は floatModel.ts / pukupukaGame.ts 側の
-// 純粋な関数（boardFlowSpeed）が持つ。
+// 放水方向を変える処理そのものは pukupukaGame.ts 側が持つ。
 //
-// ゲートが「とおれる/とおれない」の二択なのに対し、この板は常にとおり抜けられる。
-// タップのたびに「ゴールへ後押しする/ゴールから遠ざける」の向きが反転するだけで、
-// めり込み防止の当たり判定は持たせない（floatModel.ts が既存のドリフトと同じ
-// 「目標速度に寄せる」処理として扱うため、接触してもめり込み・吹き飛び・振動が起きない）。
+// タップのたびに「ゴールへ流す/ゴールから遠ざける」が反転し、対象水域全体へ効く。
+// めり込み防止の当たり判定は持たず、放水中だけ安全な目標速度として作用する。
 // タップ領域は本物の<button>にし、見た目より広めに取る。
 
 const HIT_MARGIN_X = 5
@@ -69,7 +66,7 @@ export default function PukupukaBoard({ board, flowDirection, pushDirection, dis
           type="button"
           className={styles.boardHit}
           disabled={disabled}
-          aria-label={towardGoal ? 'いた。ゴールの ほうへ ながしています' : 'いた。ゴールから とおざけて います'}
+          aria-label={towardGoal ? 'ながれの いた。みずを ゴールの ほうへ ながします' : 'ながれの いた。みずを ゴールから とおざけます'}
           aria-pressed={towardGoal}
           onClick={onToggle}
         />

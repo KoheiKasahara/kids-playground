@@ -168,6 +168,17 @@ export default function PukupukaStage({
   const cleared = state.phase === 'cleared'
   const goal = stage.goal.area
   const faucetSurfaceY = waterSurfaceYOf(stage, state, stage.faucet?.targetBodyId ?? stage.waterBodies[0].id)
+  const gateFlowY = stage.gate
+    ? Math.max(
+        stage.gate.y + 10,
+        Math.min(
+          stage.gate.y + stage.gate.height - 10,
+          (waterSurfaceYOf(stage, state, stage.gate.leftBodyId) +
+            waterSurfaceYOf(stage, state, stage.gate.rightBodyId)) /
+            2,
+        ),
+      )
+    : 0
   const boardPushDirection = Math.sign(boardFlowSpeed(state, stageDriftDirection(stage))) || 1
   const goalRingX = goal.x + goal.width * 0.72
   const goalRingY = goal.y + goal.height * 0.52
@@ -238,6 +249,7 @@ export default function PukupukaStage({
             </g>
           )
         })}
+
       </defs>
 
       {/* 装飾・状態表示だけの内容。じゃぐちの操作ボタンだけはこの外に置き、AT/キーボードから見える。 */}
@@ -299,6 +311,21 @@ export default function PukupukaStage({
             </g>
           )
         })}
+
+        {stage.gate && state.gateFlow.direction !== 0 && state.gateFlow.strength > 0 ? (
+          <g
+            className={styles.gateWaterFlow}
+            data-testid="pukupuka-gate-flow"
+            data-flow-direction={state.gateFlow.direction > 0 ? 'right' : 'left'}
+            data-flow-strength={state.gateFlow.strength.toFixed(2)}
+            transform={`translate(${stage.gate.x + stage.gate.width / 2} ${gateFlowY}) scale(${state.gateFlow.direction} 1)`}
+          >
+            <path d="M -13 -5 L -3 0 L -13 5" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M -3 -5 L 7 0 L -3 5" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="9" cy="-7" r="2.4" fill="#d8f5ff" />
+            <circle cx="13" cy="4" r="1.8" fill="#ffffff" />
+          </g>
+        ) : null}
 
         {/* ゴールの光。水位に関係なく同じ場所で光り続け、目印になる。 */}
         <ellipse

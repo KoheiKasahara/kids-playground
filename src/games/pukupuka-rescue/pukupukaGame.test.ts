@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { PUKUPUKA_STAGE } from './stageDefinitions'
+import { PUKUPUKA_STAGE, PUKUPUKA_STAGES } from './stageDefinitions'
 import {
   activeSolids,
   allFloatersAtGoal,
@@ -601,5 +601,93 @@ describe('pukupukaGame: 進行の安定性', () => {
     }
 
     expect(duckOf(coarse).y).toBeCloseTo(duckOf(fine).y, 6)
+  })
+})
+
+describe('pukupukaGame: 水門と放水板(#568)', () => {
+  const gateStage = PUKUPUKA_STAGES[2]
+  const boardStage = PUKUPUKA_STAGES[3]
+
+  function runStage(targetStage: StageDefinition, initial: PukupukaGameState, seconds: number, control: WaterControl = null) {
+    let current = initial
+    for (let index = 0; index < Math.round(seconds * 60); index += 1) {
+      current = stepGame(targetStage, current, FRAME_MS, control).state
+    }
+    return current
+  }
+
+  test('閉門中は左への給水だけが増え、右水位との差を保持する', () => {
+    const initial = createInitialState(gateStage)
+    const filled = runStage(gateStage, initial, 3, 'fill')
+
+    expect(filled.water.left.volume).toBeGreaterThan(initial.water.left.volume)
+    expect(filled.water.right.volume).toBe(initial.water.right.volume)
+    expect(filled.gateFlow.direction).toBe(0)
+  })
+
+  test('開門すると総水量を保ったまま右へ移送し、実移送と同じ向きの流れが生じる', () => {
+    const filled = runStage(gateStage, createInitialState(gateStage), 3, 'fill')
+    const totalBefore = filled.water.left.volume + filled.water.right.volume
+    const opened = toggleGate(filled)
+    const flowing = stepGame(gateStage, opened, FRAME_MS * 1.01).state
+
+    expect(flowing.gateFlow.direction).toBe(1)
+    expect(flowing.gateFlow.transferredVolume).toBeGreaterThan(0)
+    expect(flowing.water.left.volume + flowing.water.right.volume).toBeCloseTo(totalBefore, 5)
+    expect(flowing.water.left.volume).toBeLessThan(filled.water.left.volume)
+    expect(flowing.water.right.volume).toBeGreaterThan(filled.water.right.volume)
+  })
+
+  test('板の向きで放水先の移動結果が明確に反転する', () => {
+    const filled = runStage(boardStage, createInitialState(boardStage), 8, 'fill')
+    const back = runStage(boardStage, toggleGate(filled), 3)
+    const towardGoal = runStage(boardStage, toggleGate(toggleBoard(filled)), 3)
+    const averageX = (state: PukupukaGameState) =>
+      state.floaters.reduce((sum, floater) => sum + floater.x, 0) / state.floaters.length
+
+    expect(averageX(towardGoal)).toBeGreaterThan(averageX(back) + 12)
+    expect(Math.max(...back.floaters.map((floater) => floater.x))).toBeLessThan(70)
+  })
+
+  test('閉じ直すと残流が止まり、右だけ排水して再開門すると放水が再発生する', () => {
+    let state = runStage(gateStage, createInitialState(gateStage), 3, 'fill')
+    state = toggleGate(state)
+    state = runStage(gateStage, state, 0.5)
+    expect(state.gateFlow.direction).toBe(1)
+
+    state = toggleGate(state)
+    state = runStage(gateStage, state, 0.1)
+    expect(state.gateFlow.direction).toBe(0)
+    const beforeDrain = state.water
+    state = toggleDrain(state)
+    state = runStage(gateStage, state, 0.5)
+    expect(state.water.left.volume).toBeCloseTo(beforeDrain.left.volume, 8)
+    expect(state.water.right.volume).toBeLessThan(beforeDrain.right.volume)
+    expect(state.gateFlow.direction).toBe(0)
+
+    state = toggleDrain(state)
+    state = toggleGate(state)
+    state = stepGame(gateStage, state, FRAME_MS * 1.01).state
+    expect(state.gateOpen).toBe(true)
+    expect(state.gateFlow.direction).toBe(1)
+    expect(state.gateFlow.transferredVolume).toBeGreaterThan(0)
+
+    const reset = createInitialState(gateStage)
+    expect(reset.gateOpen).toBe(false)
+    expect(reset.gateFlow.direction).toBe(0)
+    expect(reset.water).toEqual(createInitialState(gateStage).water)
+  })
+
+  test('開門中に残流がある間は、速度が一時的に0でも落ち着いた扱いにしない', () => {
+    const filled = runStage(gateStage, createInitialState(gateStage), 3, 'fill')
+    const flowing = stepGame(gateStage, toggleGate(filled), FRAME_MS * 1.01).state
+    const stoppedFloaters = {
+      ...flowing,
+      floaters: flowing.floaters.map((floater) => ({ ...floater, vx: 0, vy: 0 })),
+    }
+
+    expect(stoppedFloaters.gateFlow.strength).toBeGreaterThan(0)
+    expect(isSettled(gateStage, stoppedFloaters)).toBe(false)
+    expect(isSettled(gateStage, { ...stoppedFloaters, gateOpen: false })).toBe(true)
   })
 })

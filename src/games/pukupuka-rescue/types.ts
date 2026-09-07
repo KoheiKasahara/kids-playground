@@ -100,30 +100,29 @@ export type DrainDefinition = {
 }
 
 /**
- * ゲートの定義（#517）。タップで開閉できる仕切りで、閉じている間は他の固定物と同じ
- * 当たり判定を持ち、浮遊物の通過をふさぐ。開くと当たり判定ごと取り除かれ、通り抜けられる。
- *
- * このステージは水域をひとつ（main）のままにしているため、ゲートは浮遊物の移動経路だけを
- * 切り替える（水そのものは常に単一の水面として扱う #514 の設計を維持する）。
- * 水域を分ける構成が必要になった場合は、この矩形の位置に合わせて水域境界を引けばよい。
+ * ゲートの定義（#517, #568）。閉じている間は固定物として通過と水の移動をふさぎ、
+ * 開くと当たり判定を除いて、明示した左右2水域の高い側から低い側へ水を移す。
  */
 export type GateDefinition = Rect & {
   id: string
+  /** 閉門中に独立し、開門時に水を移す左右2水域。 */
+  leftBodyId: WaterBodyId
+  rightBodyId: WaterBodyId
 }
 
 /** 流れ板（#519）が押し流す向き。goal: ゴール方向を後押しする。back: ゴールから遠ざける。 */
 export type BoardFlowDirection = 'goal' | 'back'
 
 /**
- * 流れ板（いた）の定義（#519）。板の範囲(x, y, width, height)に浮遊物が触れているあいだだけ、
- * `initialFlowDirection`（タップで反転できる。現在値はゲート同様ゲーム状態側が持つ）の
- * 向きへ弱く押し流す。壁・ゲートのようなめり込み防止の当たり判定は持たせず、常に
- * 「触れているあいだ目標速度を変えるだけ」の処理にすることで、接触時にめり込み・
- * 吹き飛び・振動が起きないようにしてある（floatModel.ts の共通のドリフト処理をそのまま使う）。
+ * 流れ板（いた）の定義（#519, #568）。タップで向きを反転し、開門放水が対象水域へ入った間、
+ * その流れ全体をゴール方向または逆方向へ誘導する。矩形は見た目とタップ領域に使い、
+ * 浮遊物との細い接触タイミングは要求しない。
  */
 export type BoardDefinition = Rect & {
   id: string
   initialFlowDirection: BoardFlowDirection
+  /** ゲートから放水された流れを、この水域全体で誘導する。 */
+  targetBodyId: WaterBodyId
 }
 
 /**
@@ -167,6 +166,8 @@ export type StageDefinition = {
   gate?: GateDefinition
   board?: BoardDefinition
   waterWheel?: WaterWheelDefinition
+  /** 通常のゴール向きドリフト倍率。水門攻略面では0にして放水を主役にできる。 */
+  ambientDriftScale?: number
   /** 幼児向けの短い1行ヒント。 */
   hint: string
 }

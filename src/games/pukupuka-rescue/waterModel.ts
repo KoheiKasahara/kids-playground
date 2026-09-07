@@ -18,11 +18,24 @@ export type WaterBodyState = {
 
 export type WaterField = Readonly<Record<WaterBodyId, WaterBodyState>>
 
+export type GateTransferResult = {
+  readonly field: WaterField
+  /** +1は左から右、-1は右から左、0は移送なし。 */
+  readonly direction: -1 | 0 | 1
+  readonly transferredVolume: number
+  /** 0〜1。開門前の水位差を、浮遊物の流れと演出へ共用する。 */
+  readonly strength: number
+  readonly fromBodyId?: WaterBodyId
+  readonly toBodyId?: WaterBodyId
+}
+
 /**
  * 目標水量へ追いつく速さ（水位換算 / 秒）。
  * タップで水位が瞬間的に跳ねると「水が増えた」ことが見えないため、必ず時間をかけて動かす。
  */
 export const WATER_FILL_SPEED_LEVEL_PER_SEC = 55
+/** 開門時に移せる最大量。狭い側の水位換算/秒で制限し、急な吹き飛びを避ける。 */
+export const GATE_TRANSFER_LEVEL_PER_SEC = 38
 
 export function waterBodyWidth(definition: WaterBodyDefinition): number {
   return definition.right - definition.left
@@ -130,6 +143,76 @@ export function stepWaterField(
   }
 
   return changed ? next : field
+}
+
+/**
+ * 1つの水門で隣接する2水域をつなぐ、有限速度の開門移送。
+ * 実volumeとtargetVolumeを同量だけ動かすため、直後のstepWaterFieldに打ち消されない。
+ */
+export function transferWaterThroughGate(
+  definitions: readonly WaterBodyDefinition[],
+  field: WaterField,
+  leftBodyId: WaterBodyId,
+  rightBodyId: WaterBodyId,
+  deltaSeconds: number,
+): GateTransferResult {
+  const idle: GateTransferResult = { field, direction: 0, transferredVolume: 0, strength: 0 }
+  if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0 || leftBodyId === rightBodyId) return idle
+
+  const leftDefinition = findWaterBody(definitions, leftBodyId)
+  const rightDefinition = findWaterBody(definitions, rightBodyId)
+  const leftState = field[leftBodyId]
+  const rightState = field[rightBodyId]
+  if (!leftDefinition || !rightDefinition || !leftState || !rightState) return idle
+
+  const leftLevel = waterLevelOf(leftDefinition, leftState)
+  const rightLevel = waterLevelOf(rightDefinition, rightState)
+  const levelDifference = leftLevel - rightLevel
+  if (Math.abs(levelDifference) < 0.001) return idle
+
+  const leftToRight = levelDifference > 0
+  const sourceDefinition = leftToRight ? leftDefinition : rightDefinition
+  const targetDefinition = leftToRight ? rightDefinition : leftDefinition
+  const sourceState = leftToRight ? leftState : rightState
+  const targetState = leftToRight ? rightState : leftState
+  const sourceWidth = waterBodyWidth(sourceDefinition)
+  const targetWidth = waterBodyWidth(targetDefinition)
+  // qを移したときの水位差減少は q/sourceWidth + q/targetWidth。ここを上限にすれば逆転しない。
+  const equalizingVolume = Math.abs(levelDifference) / (1 / sourceWidth + 1 / targetWidth)
+  const rateLimit = Math.min(sourceWidth, targetWidth) * GATE_TRANSFER_LEVEL_PER_SEC * deltaSeconds
+  const amount = Math.min(
+    equalizingVolume,
+    rateLimit,
+    sourceState.volume,
+    waterBodyCapacity(targetDefinition) - targetState.volume,
+  )
+  if (!Number.isFinite(amount) || amount <= 0) return idle
+
+  const sourceVolume = sourceState.volume - amount
+  const targetVolume = targetState.volume + amount
+  // 予約水量は実水量とは独立に、移せる量だけを必ず同量で増減する。
+  // 排水予約中（targetVolume < volume）でもclamp片側だけが効いて予約総量が増えないようにする。
+  const targetTransferAmount = Math.min(
+    amount,
+    sourceState.targetVolume,
+    waterBodyCapacity(targetDefinition) - targetState.targetVolume,
+  )
+  const sourceTarget = sourceState.targetVolume - targetTransferAmount
+  const targetTarget = targetState.targetVolume + targetTransferAmount
+  const next = {
+    ...field,
+    [sourceDefinition.id]: { volume: sourceVolume, targetVolume: sourceTarget },
+    [targetDefinition.id]: { volume: targetVolume, targetVolume: targetTarget },
+  }
+  const maxDifference = Math.max(waterBodyMaxLevel(leftDefinition), waterBodyMaxLevel(rightDefinition), 1)
+  return {
+    field: next,
+    direction: leftToRight ? 1 : -1,
+    transferredVolume: amount,
+    strength: clamp(Math.abs(levelDifference) / (maxDifference * 0.45), 0, 1),
+    fromBodyId: sourceDefinition.id,
+    toBodyId: targetDefinition.id,
+  }
 }
 
 /**
