@@ -33,6 +33,8 @@ export type CarVehicleBody = {
    * Phase 3 で「やね＝パトランプ」と二重にならないようにするための口。
    */
   setPoliceLightVisible: (visible: boolean) => void
+  /** カスタム屋根と重ならないよう、タクシーの看板を切り替える。 */
+  setRoofSignVisible: (visible: boolean) => void
   /**
    * 車体内蔵のヘッドライトの表示切替。
    * ゲーム側の「フロント」カテゴリが自前のライトを必ず1組置くため、
@@ -85,6 +87,7 @@ function buildBody(scene: THREE.Object3D): CarVehicleBody {
   const bodyMaterials: THREE.Material[] = []
   const bodyLowerMaterials: THREE.Material[] = []
   const policeLightMeshes: THREE.Object3D[] = []
+  const signMeshes: THREE.Object3D[] = []
   const headlightMeshes: THREE.Object3D[] = []
 
   scene.traverse((child) => {
@@ -97,6 +100,7 @@ function buildBody(scene: THREE.Object3D): CarVehicleBody {
       if (material.name === CAR_BODY_MATERIAL) bodyMaterials.push(material)
       else if (material.name === CAR_BODY_LOWER_MATERIAL) bodyLowerMaterials.push(material)
       else if (isPoliceLightMaterial(material.name)) policeLightMeshes.push(mesh)
+      else if (material.name.startsWith('Sign')) signMeshes.push(mesh)
       else if (material.name === CAR_HEADLIGHT_MATERIAL) headlightMeshes.push(mesh)
     }
   })
@@ -113,6 +117,9 @@ function buildBody(scene: THREE.Object3D): CarVehicleBody {
     },
     setPoliceLightVisible: (visible: boolean) => {
       for (const mesh of policeLightMeshes) mesh.visible = visible
+    },
+    setRoofSignVisible: (visible: boolean) => {
+      for (const mesh of signMeshes) mesh.visible = visible
     },
     setHeadlightVisible: (visible: boolean) => {
       for (const mesh of headlightMeshes) mesh.visible = visible

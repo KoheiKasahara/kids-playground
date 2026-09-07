@@ -69,6 +69,7 @@ function createFakeBody(id: CarVehicleId): FakeBody {
         if (material.name === 'Body') material.color.set(hex)
       }
     },
+    setRoofSignVisible: vi.fn(),
     setPoliceLightVisible: (visible) => {
       body.policeLightVisible = visible
     },
@@ -346,7 +347,7 @@ describe('ボディカラーと固有装備', () => {
     model.dispose()
   })
 
-  test('屋根にパトランプを付けたときだけ、車体内蔵のパトランプを隠す', async () => {
+  test('屋根パーツを付けたときは内蔵のパトランプと看板を隠し、なしで復元する', async () => {
     const harness = fakeLoaderHarness()
     const base = selectCarOption(DEFAULT_CAR_CONFIG, 'body', 'policeCar')
     const model = createCarModel(base, harness.options)
@@ -357,7 +358,11 @@ describe('ボディカラーと固有装備', () => {
     expect(harness.bodies[0]?.policeLightVisible).toBe(false)
 
     model.update(selectCarOption(base, 'roof', 'luggage'))
+    expect(harness.bodies[0]?.policeLightVisible).toBe(false)
+    expect(harness.bodies[0]?.setRoofSignVisible).toHaveBeenLastCalledWith(false)
+    model.update(base)
     expect(harness.bodies[0]?.policeLightVisible).toBe(true)
+    expect(harness.bodies[0]?.setRoofSignVisible).toHaveBeenLastCalledWith(true)
     model.dispose()
   })
 })
@@ -561,3 +566,14 @@ describe('three.jsリソースの解放', () => {
     expect(model.root.children).toHaveLength(0)
   })
 })
+
+test('読み込み中の色・屋根変更を届いた車体へ反映する', async () => {
+    const harness = fakeLoaderHarness()
+    const model = createCarModel(DEFAULT_CAR_CONFIG, harness.options)
+    const next = selectCarOption(selectCarOption(DEFAULT_CAR_CONFIG, 'roof', 'luggage'), 'color', 'blue')
+    model.update(next)
+    await harness.resolveAll()
+    expect(harness.bodies[0]?.bodyColor).toBe(resolveCarColor(next))
+    expect(harness.bodies[0]?.setRoofSignVisible).toHaveBeenLastCalledWith(false)
+    model.dispose()
+  })

@@ -6,6 +6,7 @@
  * それ以外のカテゴリは carParts.ts が同期的に組み立て、変化したレイヤーだけを作り直す。
  */
 import * as THREE from 'three'
+import { createCarSurface } from './carSurface'
 import { resolveCarColor, type CarConfig } from './carConfig'
 import {
   computeCarAttachments,
@@ -83,6 +84,7 @@ export function createCarModel(config: CarConfig, options: CarModelOptions = {})
     root.add(layer)
   }
 
+  let currentConfig = config
   let dimensions = computeCarDimensions(config)
   let attachments = computeCarAttachments(dimensions)
   let body: CarVehicleBody | null = null
@@ -110,8 +112,9 @@ export function createCarModel(config: CarConfig, options: CarModelOptions = {})
     target.setBodyColor(resolveCarColor(nextConfig))
     // 「フロント」カテゴリが必ず自前のライトを置くので、車体内蔵のライトは隠す。
     target.setHeadlightVisible(false)
-    // 屋根にパトランプを付けたときだけ、車体内蔵のパトランプを隠して二重を避ける。
-    target.setPoliceLightVisible(nextConfig.roof !== 'policeLight')
+    // カスタム屋根と内蔵の看板・パトランプが重ならないよう切り替える。
+    target.setPoliceLightVisible(nextConfig.roof === 'none')
+    target.setRoofSignVisible(nextConfig.roof === 'none')
   }
 
   function requestBody(nextConfig: CarConfig): void {
@@ -130,8 +133,10 @@ export function createCarModel(config: CarConfig, options: CarModelOptions = {})
           return
         }
         body = loaded
-        applyBodyConfig(loaded, nextConfig)
+        applyBodyConfig(loaded, currentConfig)
         bodyLayer.add(loaded.object)
+        for (const category of CAR_PART_CATEGORY_IDS) keys[category] = null
+        update(currentConfig)
         setBodyStatus('ready')
         options.onBodyReady?.()
       },
@@ -146,6 +151,7 @@ export function createCarModel(config: CarConfig, options: CarModelOptions = {})
   }
 
   function update(nextConfig: CarConfig): void {
+    currentConfig = nextConfig
     dimensions = computeCarDimensions(nextConfig)
     attachments = computeCarAttachments(dimensions)
 
@@ -156,6 +162,7 @@ export function createCarModel(config: CarConfig, options: CarModelOptions = {})
 
     const context: CarPartContext = {
       config: nextConfig,
+      surface: body ? createCarSurface(body.object, dimensions.bodyLift) : undefined,
       dimensions,
       attachments,
       color: resolveCarColor(nextConfig),
