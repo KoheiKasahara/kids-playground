@@ -1,3 +1,4 @@
+import { initializeRapier } from '../../physics/rapierLoader'
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
@@ -82,13 +83,8 @@ import {
 } from './komaImpact'
 import { findNearestKomaTapTarget } from './komaTapTarget'
 
-let rapierInitPromise: Promise<void> | null = null
 
-/** Rapierのwasm初期化はモジュール内で一度だけ行い、再戦や再入場で共有する。 */
-function initializeRapier(): Promise<void> {
-  if (rapierInitPromise === null) rapierInitPromise = RAPIER.init()
-  return rapierInitPromise
-}
+
 
 export type KomaBattleEngineOptions = {
   /** 値が変わったら世界を作り直す（もういちど）。 */
