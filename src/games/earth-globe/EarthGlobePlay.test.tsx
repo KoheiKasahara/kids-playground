@@ -6,13 +6,14 @@ import type { UseGlobeEngineOptions } from './types'
 import App from '../../app/App'
 
 const globeEngineMock = vi.hoisted(() => ({
+  status: 'ready' as 'loading' | 'ready' | 'error',
   options: undefined as UseGlobeEngineOptions | undefined,
 }))
 
 vi.mock('./three/useGlobeEngine', () => ({
   useGlobeEngine: (options: UseGlobeEngineOptions) => {
     globeEngineMock.options = options
-    return { registerContainer: () => undefined }
+    return { registerContainer: () => undefined, status: globeEngineMock.status }
   },
 }))
 
@@ -42,10 +43,31 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  globeEngineMock.status = 'ready'
   globeEngineMock.options = undefined
 })
 
 describe('EarthGlobePlay', () => {
+  it('keeps the incomplete globe and controls hidden until ready', async () => {
+    globeEngineMock.status = 'loading'
+    const view = renderApp('/games/earth-globe')
+    await screen.findByRole('heading', { name: 'ちきゅうぎ' })
+    expect(screen.getByRole('status')).toHaveTextContent('よみこみちゅう')
+    expect(screen.queryByRole('button', { name: 'もっと ちかづく' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeEnabled()
+    globeEngineMock.status = 'ready'
+    view.rerender(<MemoryRouter initialEntries={['/games/earth-globe']}><App /></MemoryRouter>)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もっと ちかづく' })).toBeEnabled()
+  })
+
+  it('shows an error instead of endless loading if WebGL initialization fails', async () => {
+    globeEngineMock.status = 'error'
+    renderApp('/games/earth-globe')
+    expect(await screen.findByRole('alert')).toHaveTextContent('うまく よみこめませんでした')
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeEnabled()
+  })
+
   it('opens from the earth-globe route with the main controls', async () => {
     renderApp('/games/earth-globe')
 

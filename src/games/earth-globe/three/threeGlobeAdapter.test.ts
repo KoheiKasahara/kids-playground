@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import {
   isGlobeBodyObject,
+  hasGlobePolygons,
   polygonNumericIdFromObject,
 } from './threeGlobeAdapter'
 
@@ -61,5 +62,31 @@ describe('three-globe adapter', () => {
     expect(isGlobeBodyObject(globeMesh)).toBe(true)
     expect(isGlobeBodyObject(polygon)).toBe(false)
     expect(isGlobeBodyObject(new THREE.Object3D())).toBe(false)
+  })
+})
+
+describe('polygon readiness', () => {
+  it('waits for all polygon parts with generated geometry, not just the globe or borders', () => {
+    const globe = new THREE.Group()
+    globe.add(new THREE.Mesh(new THREE.SphereGeometry()))
+    const features = [{ id: 392, geometry: { type: 'MultiPolygon' as const, coordinates: [[], []] } }]
+    expect(hasGlobePolygons(globe, features)).toBe(false)
+    const part = () => {
+      const polygon = new THREE.Group()
+      setThreeGlobeInternals(polygon, { __globeObjType: 'polygon' })
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry())
+      polygon.add(mesh)
+      globe.add(polygon)
+      return mesh
+    }
+    const first = part()
+    expect(hasGlobePolygons(globe, features)).toBe(false)
+    first.geometry = new THREE.PlaneGeometry()
+    expect(hasGlobePolygons(globe, features)).toBe(false)
+    const second = part()
+    expect(hasGlobePolygons(globe, features)).toBe(false)
+    second.geometry = new THREE.PlaneGeometry()
+    expect(hasGlobePolygons(globe, features)).toBe(true)
+    globe.traverse((object) => { if (object instanceof THREE.Mesh) object.geometry.dispose() })
   })
 })

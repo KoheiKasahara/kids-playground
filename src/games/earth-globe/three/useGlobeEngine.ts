@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import ThreeGlobe from 'three-globe'
 import type { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
@@ -20,6 +20,7 @@ import {
 } from './zoomLevels'
 import {
   isGlobeBodyObject,
+  hasGlobePolygons,
   polygonNumericIdFromObject,
 } from './threeGlobeAdapter'
 import {
@@ -106,6 +107,7 @@ function disposeGlobeTree(globe: ThreeGlobe) {
 
 /** Three.jsのシーンと操作系をhookのライフサイクル内で完結させる。 */
 export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHandle {
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const optionsRef = useRef(options)
   useEffect(() => {
     optionsRef.current = options
@@ -119,8 +121,8 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
   }, [])
 
   const handle = useMemo<UseGlobeEngineHandle>(
-    () => ({ registerContainer }),
-    [registerContainer],
+    () => ({ registerContainer, status }),
+    [registerContainer, status],
   )
 
   useEffect(() => {
@@ -163,6 +165,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let selectionPopTimerId: number | null = null
     let polygonDataLoadStarted = false
     let hasRenderedFirstFrame = false
+    let ready = false
     let released = false
     let reducedMotion = initialOptions.reducedMotion
     let selectedNumericId = initialOptions.selectedCountryId === null
@@ -205,7 +208,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       if (globe === null) return
 
       globe.polygonsTransitionDuration(
-        reducedMotion ? 0 : transitionDurationMs,
+        !ready || reducedMotion ? 0 : transitionDurationMs,
       )
       // 高度アクセサの差し替えは、タップ直後と収束時の2回だけ行う。
       // requestAnimationFrameごとにgeometryを作り直さないため、地球儀の描画負荷を増やさない。
@@ -260,11 +263,8 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       globeToPopulate.polygonsTransitionDuration(0)
       globeToPopulate.polygonsData(polygonData)
 
-      if (released || globe !== globeToPopulate) return
-      // reduced-motionでも初回フレームを先に描画する遅延は維持し、段階的な演出は行わない。
-      globeToPopulate.polygonsTransitionDuration(
-        reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS,
-      )
+      // three-globe の更新は非同期。生成前に duration を戻すと初期陸地にも
+      // tween が作られるため、初回の完成描画までは 0 のまま維持する。
     }
 
     function schedulePolygonDataFallback() {
@@ -622,6 +622,17 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       updateSelectionBorderAnimations(now)
       if (renderer !== null && scene !== null && camera !== null) {
         renderer.render(scene, camera)
+        // polygonsData の setter は生成完了を意味しない。実際の mesh が揃い、
+        // GPU へ描画した後で UI を開く（国境線だけのフレームは公開しない）。
+        if (
+          !ready && globe !== null
+          && (polygonDataLoadStarted || polygonData.length === 0)
+          && hasGlobePolygons(globe, polygonData)
+        ) {
+          ready = true
+          globe.polygonsTransitionDuration(reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS)
+          setStatus('ready')
+        }
         if (!hasRenderedFirstFrame) {
           hasRenderedFirstFrame = true
           // 現在のフレームを表示する機会を確保してから、重いgeometry生成を始める。
@@ -807,6 +818,9 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       // 最初のtickが停止しても、一定時間後にはポリゴン生成を開始できるようにする。
       schedulePolygonDataFallback()
     } catch {
+      // WebGL 初期化の失敗を UI に通知する。再初期化を誘発する依存関係はない。
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStatus('error')
       release()
     }
 
