@@ -81,17 +81,6 @@ const ROCKET_STARS: PaintMotionRef = { part: 'rocketStars' }
 const DINO: PaintMotionRef = { group: 'dino' }
 const DINO_TAIL: PaintMotionRef = { group: 'dino', part: 'dinoTail' }
 const DINO_HEAD: PaintMotionRef = { group: 'dino', part: 'dinoHead' }
-const TRAIN: PaintMotionRef = { group: 'train' }
-// タイヤはくるまと同じ理由で、左右を別partにする（中心が違うため）。
-const TRAIN_WHEEL_BACK: PaintMotionRef = { group: 'train', part: 'trainWheelBack' }
-const TRAIN_WHEEL_FRONT: PaintMotionRef = { group: 'train', part: 'trainWheelFront' }
-// けむりはでんしゃと一緒に進むのでgroupに入れつつ、ロケットのほのおのように
-// もう1段階、自分だけの揺れ（浮かんで薄くなる）を持たせたいので個別partにする。
-const TRAIN_SMOKE_A: PaintMotionRef = { group: 'train', part: 'trainSmokeA' }
-const TRAIN_SMOKE_B: PaintMotionRef = { group: 'train', part: 'trainSmokeB' }
-const PLANE: PaintMotionRef = { group: 'plane' }
-// くもはひこうきと一緒に飛ばず、そらに残ってゆっくり流れるのでgroupには入れない。
-const PLANE_CLOUDS: PaintMotionRef = { part: 'planeClouds' }
 const SHIP: PaintMotionRef = { group: 'ship' }
 const SHIP_FLAG: PaintMotionRef = { group: 'ship', part: 'shipFlag' }
 // なみはふねと一緒に進まず、その場で揺れるのでgroupには入れない。
@@ -655,190 +644,186 @@ const dinosaurDetails: readonly PaintDetail[] = [
 
 // でんしゃ -----------------------------------------------------------------
 
+// パンタグラフ・両開きドア・前面窓で、身近な電車の形にする。
 const trainAreas: readonly PaintArea[] = [
-  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
-  { id: 'ground', label: 'じめん', shape: { kind: 'path', d: GROUND_PATH } },
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'ground',
+    label: 'じめん',
+    shape: { kind: 'path', d: GROUND_PATH },
+  },
   {
     id: 'body',
     label: 'でんしゃの ボディ',
-    shape: {
-      kind: 'path',
-      d: 'M 12,42 L 88,42 C 91,42 93,44 93,47 L 93,72 C 93,75 91,77 88,77 L 12,77 C 9,77 7,75 7,72 L 7,47 C 7,44 9,42 12,42 Z',
-    },
-    motion: TRAIN,
-  },
-  {
-    id: 'roof',
-    label: 'やね',
-    // えんとつを含んだ1つの輪郭にして、ボディの上に重ねて描く（付け根が隠れる）。
-    shape: {
-      kind: 'path',
-      d: 'M 14,44 L 14,33 C 14,28 18,25 24,25 L 60,25 L 60,16 L 72,16 L 72,25 L 76,25 C 82,25 86,28 86,33 L 86,44 Z',
-    },
-    motion: TRAIN,
+    shape: { kind: 'path', d: 'M 9,38 Q 9,30 17,30 L 73,30 Q 85,30 89,43 L 94,63 L 94,75 L 9,75 Z' },
+    motion: { group: 'train' },
   },
   {
     id: 'window',
-    label: 'まど',
-    // ボディの内側・左寄りに重ねて描く。やねとの間・右のぜんめんとの間に枠が残る大きさ。
-    shape: {
-      kind: 'path',
-      d: 'M 26,47 L 62,47 C 64,47 65,48 65,50 L 65,62 C 65,64 64,65 62,65 L 26,65 C 24,65 23,64 23,62 L 23,50 C 23,48 24,47 26,47 Z',
-    },
-    motion: TRAIN,
+    label: 'きゃくせきの まど',
+    shape: { kind: 'path', d: 'M 15,39 L 34,39 L 34,56 L 15,56 Z' },
+    motion: { group: 'train' },
+  },
+  {
+    id: 'door',
+    label: 'りょうびらきの ドア',
+    shape: { kind: 'path', d: 'M 41,38 L 62,38 L 62,72 L 41,72 Z' },
+    motion: { group: 'train' },
   },
   {
     id: 'front',
-    label: 'ぜんめん',
-    // 進行方向（右端）の顔。ボディの右端に重ねて描き、ライトを乗せる台にする。
-    shape: {
-      kind: 'path',
-      d: 'M 72,46 L 86,46 C 89,46 91,48 91,51 L 91,68 C 91,71 89,73 86,73 L 72,73 Z',
-    },
-    motion: TRAIN,
+    label: 'うんてんせきの まど',
+    shape: { kind: 'path', d: 'M 70,38 L 80,38 Q 83,39 85,46 L 88,56 L 70,56 Z' },
+    motion: { group: 'train' },
   },
   {
     id: 'wheelBack',
-    label: 'うしろの タイヤ',
-    shape: { kind: 'circle', cx: 28, cy: 78, r: 9 },
-    motion: TRAIN_WHEEL_BACK,
+    label: 'うしろの しゃりん',
+    shape: { kind: 'circle', cx: 25, cy: 78, r: 8 },
+    motion: { group: 'train', part: 'trainWheelBack' },
   },
   {
     id: 'wheelFront',
-    label: 'まえの タイヤ',
-    shape: { kind: 'circle', cx: 72, cy: 78, r: 9 },
-    motion: TRAIN_WHEEL_FRONT,
+    label: 'まえの しゃりん',
+    shape: { kind: 'circle', cx: 77, cy: 78, r: 8 },
+    motion: { group: 'train', part: 'trainWheelFront' },
   },
 ]
 
 const trainDetails: readonly PaintDetail[] = [
-  // タイヤのスポーク・中心の丸はくるまと同じ作法（回転していることが分かるように）。
   {
-    shape: {
-      kind: 'path',
-      d: 'M 20,78 L 36,78 M 28,70 L 28,86 M 22.3,72.3 L 33.7,83.7 M 33.7,72.3 L 22.3,83.7',
-    },
+    shape: { kind: 'path', d: 'M 24,30 L 24,26 L 16,20 L 27,13 L 38,20 L 30,26 L 30,30 M 17,12 L 37,12' },
     stroke: OUTLINE_COLOR,
-    strokeWidth: 1.3,
-    motion: TRAIN_WHEEL_BACK,
+    strokeWidth: 2,
+    motion: { group: 'train' },
   },
-  { shape: { kind: 'circle', cx: 28, cy: 78, r: 3.6 }, fill: '#495057', motion: TRAIN_WHEEL_BACK },
   {
-    shape: {
-      kind: 'path',
-      d: 'M 64,78 L 80,78 M 72,70 L 72,86 M 66.3,72.3 L 77.7,83.7 M 77.7,72.3 L 66.3,83.7',
-    },
+    shape: { kind: 'path', d: 'M 24.5,40 L 24.5,55 M 51.5,39 L 51.5,71 M 10,64 L 40,64 M 63,64 L 93,64' },
     stroke: OUTLINE_COLOR,
-    strokeWidth: 1.3,
-    motion: TRAIN_WHEEL_FRONT,
+    strokeWidth: 1.8,
+    motion: { group: 'train' },
   },
-  { shape: { kind: 'circle', cx: 72, cy: 78, r: 3.6 }, fill: '#495057', motion: TRAIN_WHEEL_FRONT },
-  // まどを2〜3枚に見せる縦の仕切り線。
   {
-    shape: { kind: 'path', d: 'M 37,49 L 37,63 M 51,49 L 51,63' },
-    stroke: OUTLINE_COLOR,
-    strokeWidth: 1.4,
-    motion: TRAIN,
-  },
-  // ぜんめんのライト。
-  { shape: { kind: 'circle', cx: 86, cy: 52, r: 3 }, fill: '#ffd43b', motion: TRAIN },
-  // けむり。えんとつ(x=60〜72、中心≒66)の上に出る丸を2つ。片方ずつ別partにして
-  // 交互に浮かび上がるようにする（groupはtrainを付け、でんしゃと一緒に進む）。
-  {
-    shape: { kind: 'circle', cx: 66, cy: 10, r: 4.5 },
-    fill: '#dee2e6',
+    shape: { kind: 'path', d: 'M 45,42 L 48,42 L 48,53 L 45,53 Z M 55,42 L 58,42 L 58,53 L 55,53 Z' },
+    fill: '#dff4ff',
     stroke: OUTLINE_COLOR,
     strokeWidth: 1,
-    motion: TRAIN_SMOKE_A,
+    motion: { group: 'train' },
   },
   {
-    shape: { kind: 'circle', cx: 74, cy: 5, r: 3.5 },
-    fill: '#dee2e6',
+    shape: { kind: 'path', d: 'M 72,69 L 87,69' },
     stroke: OUTLINE_COLOR,
-    strokeWidth: 1,
-    motion: TRAIN_SMOKE_B,
+    strokeWidth: 2,
+    motion: { group: 'train' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 19,78 L 31,78 M 25,72 L 25,84' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.5,
+    motion: { group: 'train', part: 'trainWheelBack' },
+  },
+  {
+    shape: { kind: 'circle', cx: 25, cy: 78, r: 2.5 },
+    fill: '#495057',
+    motion: { group: 'train', part: 'trainWheelBack' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 71,78 L 83,78 M 77,72 L 77,84' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.5,
+    motion: { group: 'train', part: 'trainWheelFront' },
+  },
+  {
+    shape: { kind: 'circle', cx: 77, cy: 78, r: 2.5 },
+    fill: '#495057',
+    motion: { group: 'train', part: 'trainWheelFront' },
+  },
+  {
+    shape: { kind: 'circle', cx: 90, cy: 61, r: 2 },
+    fill: '#ffd43b',
+    motion: { group: 'train' },
   },
 ]
 
 // ひこうき -------------------------------------------------------------
 
+// 奥の主翼と尾翼 → 胴体 → 手前の主翼の順に重ねる。
 const airplaneAreas: readonly PaintArea[] = [
-  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
-  // びよく・しゅよくは、どうたいより先に描いて付け根を隠す（くるまのうで・あしと同じ作法）。
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'farWing',
+    label: 'おくの しゅよく',
+    shape: { kind: 'path', d: 'M 40,43 L 29,17 Q 28,14 32,14 L 46,14 Q 49,14 51,18 L 66,43 Z' },
+    motion: { group: 'plane' },
+  },
   {
     id: 'tailWing',
     label: 'びよく',
-    // 後方・左上に立つ三角形のはね。
-    shape: { kind: 'path', d: 'M 16,42 L 34,42 L 28,20 C 27,16 22,14 17,17 Z' },
-    motion: PLANE,
+    shape: { kind: 'path', d: 'M 14,47 L 11,26 Q 11,23 15,23 L 23,23 L 34,47 Z' },
+    motion: { group: 'plane' },
   },
   {
     id: 'body',
     label: 'ひこうきの どうたい',
-    // 右へ行くほどすぼまり、機首がとがる形。
-    shape: {
-      kind: 'path',
-      d: 'M 22,40 L 60,40 C 76,40 88,45 94,52 C 88,59 76,64 60,64 L 22,64 C 17,64 14,61 14,56 L 14,48 C 14,43 17,40 22,40 Z',
-    },
-    motion: PLANE,
-  },
-  {
-    id: 'mainWing',
-    label: 'しゅよく',
-    // どうたいの下から手前・後方へ広がるはね。
-    shape: {
-      kind: 'path',
-      d: 'M 46,60 L 68,60 L 60,86 C 59,89 56,90 52,90 L 32,90 C 28,90 27,87 30,83 Z',
-    },
-    motion: PLANE,
+    shape: { kind: 'path', d: 'M 14,42 L 65,42 Q 79,42 90,50 Q 97,56 90,60 Q 80,65 63,65 L 26,65 Q 18,65 15,59 L 10,47 Q 8,42 14,42 Z' },
+    motion: { group: 'plane' },
   },
   {
     id: 'window',
-    label: 'まど',
-    // どうたい内側の横長エリア。仕切り線で複数のまどに見せる。
-    shape: {
-      kind: 'path',
-      d: 'M 34,44 L 58,44 C 62,44 64,47 64,52 C 64,57 62,60 58,60 L 34,60 C 30,60 28,57 28,52 C 28,47 30,44 34,44 Z',
-    },
-    motion: PLANE,
+    label: 'きゃくせきの まど',
+    shape: { kind: 'path', d: 'M 29,45 L 61,45 Q 64,45 64,49 L 64,57 Q 64,61 61,61 L 29,61 Q 26,61 26,57 L 26,49 Q 26,45 29,45 Z' },
+    motion: { group: 'plane' },
+  },
+  {
+    id: 'mainWing',
+    label: 'てまえの しゅよく',
+    shape: { kind: 'path', d: 'M 49,62 L 70,62 L 52,85 Q 50,88 46,88 L 28,88 Q 24,88 28,83 Z' },
+    motion: { group: 'plane' },
   },
 ]
 
 const airplaneDetails: readonly PaintDetail[] = [
-  // まどの縦仕切り線。
   {
-    shape: { kind: 'path', d: 'M 40,47 L 40,57 M 52,47 L 52,57' },
+    shape: { kind: 'path', d: 'M 37,48 L 37,58 M 48,48 L 48,58 M 59,48 L 59,58' },
     stroke: OUTLINE_COLOR,
-    strokeWidth: 1.4,
-    motion: PLANE,
+    strokeWidth: 1.5,
+    motion: { group: 'plane' },
   },
-  // 機首寄りのコクピットの丸窓。胴体の輪郭に接しないよう内側へ寄せている。
   {
-    shape: { kind: 'circle', cx: 78, cy: 48, r: 3 },
+    shape: { kind: 'path', d: 'M 75,46 Q 82,47 87,51 L 76,52 Z' },
+    fill: '#dff4ff',
     stroke: OUTLINE_COLOR,
-    strokeWidth: 1.4,
-    motion: PLANE,
+    strokeWidth: 1.2,
+    motion: { group: 'plane' },
   },
-  // くも2つ。角丸の重なった丸で作る（1つの丸だとボールに見えてしまうため）。
-  // ひこうきと一緒に飛ばずそらに残るので、まとめて1つのpartにする。
-  { shape: { kind: 'circle', cx: 6, cy: 10, r: 4 }, fill: '#ffffff', motion: PLANE_CLOUDS },
   {
-    shape: { kind: 'circle', cx: 11, cy: 8, r: 5 },
+    shape: { kind: 'path', d: 'M 34,80 L 50,80' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.1,
+    motion: { group: 'plane' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 17,17 C 12,17 12,11 17,11 C 17,4 27,4 28,10 C 35,8 38,17 32,17 Z' },
     fill: '#ffffff',
     stroke: OUTLINE_COLOR,
     strokeWidth: 1,
-    motion: PLANE_CLOUDS,
+    motion: { part: 'planeClouds' },
   },
-  { shape: { kind: 'circle', cx: 16, cy: 11, r: 4 }, fill: '#ffffff', motion: PLANE_CLOUDS },
-  { shape: { kind: 'circle', cx: 76, cy: 10, r: 4 }, fill: '#ffffff', motion: PLANE_CLOUDS },
   {
-    shape: { kind: 'circle', cx: 81, cy: 8, r: 5 },
+    shape: { kind: 'path', d: 'M 70,27 C 65,27 65,21 70,21 C 70,14 80,14 81,20 C 88,18 91,27 85,27 Z' },
     fill: '#ffffff',
     stroke: OUTLINE_COLOR,
     strokeWidth: 1,
-    motion: PLANE_CLOUDS,
+    motion: { part: 'planeClouds' },
   },
-  { shape: { kind: 'circle', cx: 86, cy: 11, r: 4 }, fill: '#ffffff', motion: PLANE_CLOUDS },
 ]
 
 // ふね ---------------------------------------------------------------------
@@ -933,6 +918,228 @@ const shipDetails: readonly PaintDetail[] = [
   },
 ]
 
+// いえ・かえる・おばけ -----------------------------------------------------
+
+const houseAreas: readonly PaintArea[] = [
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'ground',
+    label: 'じめん',
+    shape: { kind: 'path', d: GROUND_PATH },
+  },
+  {
+    id: 'wall',
+    label: 'いえの かべ',
+    shape: { kind: 'path', d: 'M 20,41 L 80,41 L 80,84 L 20,84 Z' },
+    motion: { group: 'house' },
+  },
+  {
+    id: 'roof',
+    label: 'さんかくの やね',
+    shape: { kind: 'path', d: 'M 12,43 L 48,14 Q 50,12 52,14 L 88,43 Z' },
+    motion: { group: 'house' },
+  },
+  {
+    id: 'window',
+    label: 'まど',
+    shape: { kind: 'path', d: 'M 28,51 L 47,51 L 47,70 L 28,70 Z' },
+    motion: { group: 'house' },
+  },
+  {
+    id: 'door',
+    label: 'ドア',
+    shape: { kind: 'path', d: 'M 56,52 L 73,52 L 73,83 L 56,83 Z' },
+    motion: { group: 'house', part: 'houseDoor' },
+  },
+]
+
+const houseDetails: readonly PaintDetail[] = [
+  {
+    shape: { kind: 'path', d: 'M 37.5,52 L 37.5,69 M 29,60.5 L 46,60.5' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'house' },
+  },
+  {
+    shape: { kind: 'circle', cx: 68, cy: 68, r: 1.8 },
+    fill: '#ffd43b',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'house', part: 'houseDoor' },
+  },
+  {
+    shape: { kind: 'circle', cx: 50, cy: 33, r: 4 },
+    fill: '#fff4c2',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'house' },
+  },
+]
+
+const frogAreas: readonly PaintArea[] = [
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'ground',
+    label: 'じめん',
+    shape: { kind: 'path', d: GROUND_PATH },
+  },
+  {
+    id: 'legLeft',
+    label: 'ひだりの あし',
+    shape: { kind: 'ellipse', cx: 25, cy: 73, rx: 16, ry: 12 },
+    motion: { group: 'frog' },
+  },
+  {
+    id: 'legRight',
+    label: 'みぎの あし',
+    shape: { kind: 'ellipse', cx: 75, cy: 73, rx: 16, ry: 12 },
+    motion: { group: 'frog' },
+  },
+  {
+    id: 'body',
+    label: 'かえるの からだ',
+    shape: { kind: 'ellipse', cx: 50, cy: 64, rx: 24, ry: 23 },
+    motion: { group: 'frog' },
+  },
+  {
+    id: 'belly',
+    label: 'おなか',
+    shape: { kind: 'ellipse', cx: 50, cy: 68, rx: 15, ry: 16 },
+    motion: { group: 'frog', part: 'frogBelly' },
+  },
+  {
+    id: 'head',
+    label: 'かえるの かお',
+    shape: { kind: 'path', d: 'M 22,36 C 15,14 39,11 42,28 Q 50,25 58,28 C 61,11 85,14 78,36 C 90,48 76,59 50,59 C 24,59 10,48 22,36 Z' },
+    motion: { group: 'frog' },
+  },
+]
+
+const frogDetails: readonly PaintDetail[] = [
+  {
+    shape: { kind: 'ellipse', cx: 31, cy: 30, rx: 5, ry: 7 },
+    fill: '#ffffff',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'frog' },
+  },
+  {
+    shape: { kind: 'ellipse', cx: 69, cy: 30, rx: 5, ry: 7 },
+    fill: '#ffffff',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'frog' },
+  },
+  {
+    shape: { kind: 'circle', cx: 32, cy: 31, r: 2.5 },
+    fill: '#2b2b2b',
+    motion: { group: 'frog' },
+  },
+  {
+    shape: { kind: 'circle', cx: 68, cy: 31, r: 2.5 },
+    fill: '#2b2b2b',
+    motion: { group: 'frog' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 30,44 Q 50,58 70,44' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 2,
+    motion: { group: 'frog' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 14,77 L 21,74 M 86,77 L 79,74' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'frog' },
+  },
+  {
+    shape: { kind: 'ellipse', cx: 25, cy: 43, rx: 4, ry: 2.5 },
+    fill: '#ffb3c1',
+    motion: { group: 'frog' },
+  },
+  {
+    shape: { kind: 'ellipse', cx: 75, cy: 43, rx: 4, ry: 2.5 },
+    fill: '#ffb3c1',
+    motion: { group: 'frog' },
+  },
+]
+
+const ghostAreas: readonly PaintArea[] = [
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'armLeft',
+    label: 'ひだりの て',
+    shape: { kind: 'path', d: 'M 32,45 Q 17,34 13,42 Q 10,54 31,63 Z' },
+    motion: { group: 'ghost', part: 'ghostArmLeft' },
+  },
+  {
+    id: 'armRight',
+    label: 'みぎの て',
+    shape: { kind: 'path', d: 'M 68,45 Q 83,34 87,42 Q 90,54 69,63 Z' },
+    motion: { group: 'ghost', part: 'ghostArmRight' },
+  },
+  {
+    id: 'body',
+    label: 'おばけの からだ',
+    shape: { kind: 'path', d: 'M 25,43 C 25,8 75,8 75,43 L 78,76 Q 80,87 71,82 L 62,77 Q 57,90 50,80 Q 43,91 37,79 L 27,84 Q 20,87 23,75 Z' },
+    motion: { group: 'ghost' },
+  },
+  {
+    id: 'hat',
+    label: 'ぼうし',
+    shape: { kind: 'path', d: 'M 39,31 L 37,12 L 60,12 L 62,31 Z' },
+    motion: { group: 'ghost' },
+  },
+]
+
+const ghostDetails: readonly PaintDetail[] = [
+  {
+    shape: { kind: 'ellipse', cx: 39, cy: 47, rx: 3, ry: 5 },
+    fill: '#2b2b2b',
+    motion: { group: 'ghost' },
+  },
+  {
+    shape: { kind: 'ellipse', cx: 61, cy: 47, rx: 3, ry: 5 },
+    fill: '#2b2b2b',
+    motion: { group: 'ghost' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 41,59 Q 50,70 59,59 Z' },
+    fill: '#ffb3c1',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'ghost' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 34,32 L 66,32 M 39,25 L 60,25' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 2,
+    motion: { group: 'ghost' },
+  },
+  {
+    shape: { kind: 'ellipse', cx: 31, cy: 57, rx: 4, ry: 2.5 },
+    fill: '#ffb3c1',
+    motion: { group: 'ghost' },
+  },
+  {
+    shape: { kind: 'ellipse', cx: 69, cy: 57, rx: 4, ry: 2.5 },
+    fill: '#ffb3c1',
+    motion: { group: 'ghost' },
+  },
+]
+
 export const PAINT_PICTURES: readonly PaintPicture[] = [
   { id: 'car', label: 'くるま', emoji: '🚗', viewBox: VIEW_BOX, areas: carAreas, details: carDetails },
   { id: 'fish', label: 'さかな', emoji: '🐟', viewBox: VIEW_BOX, areas: fishAreas, details: fishDetails },
@@ -971,7 +1178,7 @@ export const PAINT_PICTURES: readonly PaintPicture[] = [
   {
     id: 'train',
     label: 'でんしゃ',
-    emoji: '🚂',
+    emoji: '🚃',
     viewBox: VIEW_BOX,
     areas: trainAreas,
     details: trainDetails,
@@ -992,6 +1199,9 @@ export const PAINT_PICTURES: readonly PaintPicture[] = [
     areas: shipAreas,
     details: shipDetails,
   },
+  { id: 'house', label: 'いえ', emoji: '🏠', viewBox: VIEW_BOX, areas: houseAreas, details: houseDetails },
+  { id: 'frog', label: 'かえる', emoji: '🐸', viewBox: VIEW_BOX, areas: frogAreas, details: frogDetails },
+  { id: 'ghost', label: 'おばけ', emoji: '👻', viewBox: VIEW_BOX, areas: ghostAreas, details: ghostDetails },
 ]
 
 export const DEFAULT_PICTURE_ID = 'car'

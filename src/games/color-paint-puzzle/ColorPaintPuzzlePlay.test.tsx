@@ -154,7 +154,7 @@ describe('ColorPaintPuzzlePlay', () => {
 })
 
 describe('ColorPaintPuzzlePlay: 題材えらびの横スクロール', () => {
-  test('9件の題材ボタンは role="group"（えを えらぶ）の中に入っている', () => {
+  test('12件の題材ボタンは role="group"（えを えらぶ）の中に入っている', () => {
     renderPlay()
     const group = screen.getByRole('group', { name: 'えを えらぶ' })
     for (const picture of PAINT_PICTURES) {
@@ -182,7 +182,7 @@ describe('ColorPaintPuzzlePlay: 題材えらびの横スクロール', () => {
 describe('ColorPaintPuzzlePlay: 追加した題材（ロボット・ロケット・きょうりゅう）', () => {
   const ADDED_PICTURE_IDS = ['robot', 'rocket', 'dinosaur'] as const
 
-  test('題材えらびに9件すべてが並び、選ぶと選択がその1件だけに移る', async () => {
+  test('題材えらびに12件すべてが並び、選ぶと選択がその1件だけに移る', async () => {
     const user = userEvent.setup()
     renderPlay()
     expect(screen.getAllByRole('button', { pressed: true }).length).toBeGreaterThan(0)
@@ -290,8 +290,8 @@ describe('ColorPaintPuzzlePlay: 追加した題材（ロボット・ロケット
   })
 })
 
-describe('ColorPaintPuzzlePlay: 追加した題材（でんしゃ・ひこうき・ふね）', () => {
-  const NEW_PICTURE_IDS = ['train', 'airplane', 'ship'] as const
+describe('ColorPaintPuzzlePlay: 乗り物と新しい題材', () => {
+  const NEW_PICTURE_IDS = ['train', 'airplane', 'ship', 'house', 'frog', 'ghost'] as const
 
   test.each(NEW_PICTURE_IDS)('%s: 全エリアがボタンとして出て、タップで塗れる', async (id) => {
     const user = userEvent.setup()
@@ -330,18 +330,24 @@ describe('ColorPaintPuzzlePlay: 追加した題材（でんしゃ・ひこうき
     expect(getAreaFill(container, target.id)).toBe('#e8453c')
   })
 
-  test('演出中、でんしゃ・ひこうき・ふねにも本体グループと動くパーツのgがある', async () => {
+  test('演出中、乗り物・いえ・かえる・おばけに本体グループと動くパーツのgがある', async () => {
     const user = userEvent.setup()
     const { container } = renderPlay()
     const groupsAndParts: Record<string, readonly string[]> = {
-      train: ['trainWheelBack', 'trainWheelFront', 'trainSmokeA', 'trainSmokeB'],
+      train: ['trainWheelBack', 'trainWheelFront'],
       airplane: ['planeClouds'],
       ship: ['shipFlag', 'shipWave'],
+      house: ['houseDoor'],
+      frog: ['frogBelly'],
+      ghost: ['ghostArmLeft', 'ghostArmRight'],
     }
     const motionGroupByPicture: Record<string, string> = {
       train: 'train',
       airplane: 'plane',
       ship: 'ship',
+      house: 'house',
+      frog: 'frog',
+      ghost: 'ghost',
     }
 
     for (const id of NEW_PICTURE_IDS) {

@@ -6,8 +6,8 @@ const VIEW_BOX_MIN = -1
 const VIEW_BOX_MAX = 101
 
 describe('paintPictures', () => {
-  test('題材が9件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
-    expect(PAINT_PICTURES).toHaveLength(9)
+  test('題材が12件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
+    expect(PAINT_PICTURES).toHaveLength(12)
     const ids = PAINT_PICTURES.map((picture) => picture.id)
     expect(ids).toEqual([
       'car',
@@ -19,6 +19,9 @@ describe('paintPictures', () => {
       'train',
       'airplane',
       'ship',
+      'house',
+      'frog',
+      'ghost',
     ])
     expect(new Set(ids).size).toBe(ids.length)
     expect(findPaintPicture(DEFAULT_PICTURE_ID)).toBeDefined()
@@ -171,7 +174,7 @@ describe('paintPictures', () => {
 
   test('でんしゃ・ひこうき・ふねのgroup名・part名がデータ上に存在する', () => {
     const expectedByPicture: Record<string, { group: string; parts: readonly string[] }> = {
-      train: { group: 'train', parts: ['trainWheelBack', 'trainWheelFront', 'trainSmokeA', 'trainSmokeB'] },
+      train: { group: 'train', parts: ['trainWheelBack', 'trainWheelFront'] },
       airplane: { group: 'plane', parts: ['planeClouds'] },
       ship: { group: 'ship', parts: ['shipFlag', 'shipWave'] },
     }
