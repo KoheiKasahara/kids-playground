@@ -7,12 +7,12 @@ import CircuitRacingPlay from './CircuitRacingPlay'
 import { CIRCUITS } from './circuit'
 import { RACE_CARS } from './raceConfig'
 
-const engineMock = vi.hoisted(() => ({ options: undefined as CircuitRacingEngineOptions | undefined, retry: vi.fn(), adjustCamera: vi.fn() }))
+const engineMock = vi.hoisted(() => ({ options: undefined as CircuitRacingEngineOptions | undefined, retry: vi.fn(), boost: vi.fn(), adjustCamera: vi.fn() }))
 
 vi.mock('./useCircuitRacingEngine', () => ({
   useCircuitRacingEngine: (options: CircuitRacingEngineOptions) => {
     engineMock.options = options
-    return { registerContainer: () => {}, retry: engineMock.retry, adjustCamera: engineMock.adjustCamera }
+    return { registerContainer: () => {}, retry: engineMock.retry, boost: engineMock.boost, adjustCamera: engineMock.adjustCamera }
   },
 }))
 
@@ -94,16 +94,18 @@ describe('サーキットレースの じゅんびと そうさ', () => {
       .getByRole('button', { name: 'きゅうきゅうしゃを えらぶ' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  test('一時停止、カメラ切り替え、対象選択、選択画面へ戻る', async () => {
+  test('対象の車を加速し、カメラ切り替え、選択画面へ戻る', async () => {
     const user = userEvent.setup()
     renderGame()
     await user.click(screen.getByRole('button', { name: 'レースを はじめる' }))
-    await user.click(screen.getByRole('button', { name: 'やすむ' }))
-    expect(engineMock.options?.running).toBe(false)
+    expect(screen.queryByRole('button', { name: 'やすむ' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'みちばた' }))
     expect(engineMock.options?.cameraMode).toBe('trackside')
     await user.click(screen.getByRole('button', { name: /2だいめ/ }))
     expect(engineMock.options?.targetIndex).toBe(1)
+    await user.click(screen.getByRole('button', { name: '2だいめを かそく' }))
+    expect(engineMock.boost).toHaveBeenLastCalledWith(1)
+    expect(engineMock.options?.running).toBe(true)
     await user.click(screen.getByRole('button', { name: 'じゆうに みる' }))
     expect(engineMock.options?.cameraMode).toBe('free')
     await user.click(screen.getByRole('button', { name: /ぜんたい/ }))
