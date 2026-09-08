@@ -87,9 +87,6 @@ export default function FlagPinballResult() {
         <BigButton variant="secondary" onClick={() => navigate('/games/flag-pinball', { replace: true })}>
           ボールをかえる
         </BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>
-          ホームへ
-        </BigButton>
       </div>
     </main>
   )

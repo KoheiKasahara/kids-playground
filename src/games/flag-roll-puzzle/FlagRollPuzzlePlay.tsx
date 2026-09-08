@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import FlagBall from '../../components/flag-ball/FlagBall'
@@ -68,7 +67,6 @@ type DragState = {
 const EDIT_HINT = 'いたを おいて、ゴールまで はこぼう！'
 
 export default function FlagRollPuzzlePlay() {
-  const navigate = useNavigate()
   const [state, setState] = useState(createPuzzleState)
   /** null はステージ選択画面。ステージを選ぶと同じroute内でプレイ画面へ進む。 */
   const [selectedStageId, setSelectedStageId] = useState<PuzzleStageId | null>(null)
@@ -427,9 +425,6 @@ export default function FlagRollPuzzlePlay() {
     <GamePlaySurface>
       <main className={styles.page} data-layout={isLandscapeLayout ? 'landscape' : 'portrait'}>
         <header className={styles.header}>
-          <button type="button" className={styles.quit} onClick={() => navigate('/')}>
-            やめる
-          </button>
           <h1 className={styles.title}>こっきコロコロパズル</h1>
           <button
             type="button"

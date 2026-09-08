@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom'
 import { PUZZLE_STAGES, type PuzzleStageId } from './puzzleStages'
 import styles from './PuzzleStageSelect.module.css'
 
@@ -8,13 +7,9 @@ type PuzzleStageSelectProps = {
 
 /** 文字が読めなくても個数と絵で区別できる、3枚だけのステージ選択。 */
 export default function PuzzleStageSelect({ onSelect }: PuzzleStageSelectProps) {
-  const navigate = useNavigate()
   return (
     <main className={styles.page} data-testid="puzzle-stage-select">
       <header className={styles.header}>
-        <button type="button" className={styles.homeButton} onClick={() => navigate('/')}>
-          ホームへ
-        </button>
         <h1 className={styles.title}>こっきコロコロパズル</h1>
       </header>
       <section className={styles.content} aria-labelledby="puzzle-stage-title">

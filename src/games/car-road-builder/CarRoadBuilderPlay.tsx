@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import BigButton from '../../components/BigButton'
 import CarRoadBoard from './CarRoadBoard'
 import PartPalette from './PartPalette'
@@ -80,7 +81,6 @@ function stageIdFromNavigationState(state: unknown): StageId | null {
 
 export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps = {}) {
   const location = useLocation()
-  const navigate = useNavigate()
   const activeStageId = stageId ?? stageIdFromNavigationState(location.state) ?? 'normal'
   const [board, setBoard] = useState<Board>(() => createStageBoard(activeStageId))
   const [vehicleId, setVehicleId] = useState<VehicleId>('car')
@@ -526,9 +526,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
   return (
     <main className={`${styles.page} ${phase === 'cleared' ? styles.cleared : ''}`} data-phase={phase} data-stage-id={activeStageId}>
         <header className={styles.header}>
-          <button type="button" className={styles.backButton} onClick={() => navigate('/games/car-road-builder')} disabled={running}>
-            <span aria-hidden="true">‹</span> もどる
-          </button>
+          <GameBackButton to="/games/car-road-builder" />
           <h1><span aria-hidden="true">🚗</span> くるまのみちづくり</h1>
         </header>
 

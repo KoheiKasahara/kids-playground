@@ -101,11 +101,11 @@ describe('カテゴリ一覧と詳細選択の切り替え', () => {
     expect(screen.getByRole('button', { name: 'カラーを えらぶ' })).toBeInTheDocument()
   })
 
-  test('詳細のもどるとホームへもどるは別々のボタン', async () => {
+  test('詳細では共通のもどるが先にカテゴリ一覧を閉じる', async () => {
     const user = userEvent.setup()
     renderPlay()
     await user.click(screen.getByRole('button', { name: 'ボディを えらぶ' }))
-    expect(screen.getByRole('button', { name: 'ホームへ もどる' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'ホームへ もどる' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' })).toBeInTheDocument()
   })
 })

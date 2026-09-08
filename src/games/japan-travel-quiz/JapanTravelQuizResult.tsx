@@ -19,8 +19,8 @@ export default function JapanTravelQuizResult() {
   if (!isResult(location.state)) return <Navigate to="/games/japan-travel-quiz" replace />
   const course = japanTravelCourses.find((item) => item.id === location.state.courseId)
   if (!course) return <Navigate to="/games/japan-travel-quiz" replace />
-  return <Result course={course} score={location.state.correctCount} onAgain={() => navigate('/games/japan-travel-quiz/play', { replace: true })} onHome={() => navigate('/games/japan-travel-quiz')} onRoot={() => navigate('/')} />
+  return <Result course={course} score={location.state.correctCount} onAgain={() => navigate('/games/japan-travel-quiz/play', { replace: true })} onHome={() => navigate('/games/japan-travel-quiz')} />
 }
-function Result({ course, score, onAgain, onHome, onRoot }: { course: JapanTravelCourse; score: number; onAgain: () => void; onHome: () => void; onRoot: () => void }) {
-  return <main className={styles.page}><h1>たびが しゅうりょう！</h1><div className={styles.map}><JapanTravelMap course={course} questionIndex={9} phase="answering" onTravelComplete={() => {}} result /></div><p className={styles.course}>{course.name}</p><p className={styles.score}>{score} / 10 もん せいかい！</p><p className={styles.praise}>{praise(score)}</p><div className={styles.actions}><BigButton variant="primary" onClick={onAgain}>もういちど</BigButton><BigButton variant="secondary" onClick={onHome}>さいしょへ</BigButton><BigButton variant="secondary" onClick={onRoot}>ホームへ</BigButton></div></main>
+function Result({ course, score, onAgain, onHome }: { course: JapanTravelCourse; score: number; onAgain: () => void; onHome: () => void }) {
+  return <main className={styles.page}><h1>たびが しゅうりょう！</h1><div className={styles.map}><JapanTravelMap course={course} questionIndex={9} phase="answering" onTravelComplete={() => {}} result /></div><p className={styles.course}>{course.name}</p><p className={styles.score}>{score} / 10 もん せいかい！</p><p className={styles.praise}>{praise(score)}</p><div className={styles.actions}><BigButton variant="primary" onClick={onAgain}>もういちど</BigButton><BigButton variant="secondary" onClick={onHome}>さいしょへ</BigButton></div></main>
 }

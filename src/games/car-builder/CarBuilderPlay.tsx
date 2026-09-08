@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import {
   CAR_CATEGORIES,
   carCategoryOrder,
@@ -152,7 +152,6 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
 }
 
 export default function CarBuilderPlay() {
-  const navigate = useNavigate()
   // カスタマイズ状態はこの1か所だけが持つ（3D側は同じCarConfigを受け取るだけで状態を複製しない）。
   const [config, setConfig] = useState<CarConfig>(DEFAULT_CAR_CONFIG)
   // 下部エリアが「カテゴリ一覧」か「詳細選択」かだけを持つUI状態。CarConfigとは別物。
@@ -172,16 +171,12 @@ export default function CarBuilderPlay() {
 
   return (
     <main className={styles.page}>
+      <GameBackButton
+        to={openCategory === null ? '/' : undefined}
+        onClick={openCategory === null ? undefined : () => setOpenCategoryId(null)}
+        ariaLabel={openCategory === null ? 'ホームへ もどる' : 'カテゴリ一覧へ もどる'}
+      />
       <header className={styles.header}>
-        <button
-          type="button"
-          className={styles.homeButton}
-          onClick={() => navigate('/')}
-          aria-label="ホームへ もどる"
-        >
-          <span aria-hidden="true">‹</span>
-          <span>もどる</span>
-        </button>
         <h1 className={styles.title}>
           <span aria-hidden="true">🚙</span> 3Dクルマづくり
         </h1>
@@ -222,15 +217,6 @@ export default function CarBuilderPlay() {
         ) : (
           <div className={styles.detail}>
             <div className={styles.detailHeader}>
-              <button
-                type="button"
-                className={styles.backButton}
-                onClick={() => setOpenCategoryId(null)}
-                aria-label="カテゴリ一覧へ もどる"
-              >
-                <span aria-hidden="true">‹</span>
-                <span>もどる</span>
-              </button>
               <h2 className={styles.detailTitle}>
                 <span aria-hidden="true">{openCategory.emoji}</span>
                 {openCategory.label}

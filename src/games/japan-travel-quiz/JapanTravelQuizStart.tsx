@@ -10,7 +10,6 @@ export default function JapanTravelQuizStart() {
     <div className={styles.ticket} aria-hidden="true"><span>🗾</span><span>✈️</span><span>🏝️</span></div>
     <div className={styles.actions}>
       <BigButton variant="primary" className={styles.start} onClick={() => navigate('/games/japan-travel-quiz/play')}>たびに しゅっぱつ！</BigButton>
-      <BigButton variant="secondary" onClick={() => navigate('/')}>もどる</BigButton>
     </div>
   </main>
 }

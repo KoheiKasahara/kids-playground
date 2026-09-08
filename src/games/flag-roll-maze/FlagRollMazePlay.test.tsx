@@ -411,13 +411,13 @@ describe('FlagRollMazePlay', () => {
     expect(screen.getByText('スタートに もどったよ')).toBeInTheDocument()
   })
 
-  it('「もどる」でホームへ戻れる', async () => {
+  it('「もどる」でステージ選択へ戻れる', async () => {
     const user = userEvent.setup()
     renderPlay()
 
     await user.click(screen.getByRole('button', { name: 'もどる' }))
 
-    expect(navigateMock).toHaveBeenCalledWith('/')
+    expect(navigateMock).toHaveBeenCalledWith('/games/flag-roll-maze')
   })
 
   it('stateなしでplayを直接開くと選択画面へ戻る', () => {

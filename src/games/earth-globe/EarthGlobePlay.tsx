@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { globeCountries } from './data/globeCountries'
 import { worldFeatures } from './data/worldFeatures'
 import styles from './EarthGlobePlay.module.css'
@@ -12,7 +11,6 @@ import { zoomIn, zoomOut } from './zoomState'
 import { playGlobeCountrySelectSound } from '../../utils/quizSound'
 
 export default function EarthGlobePlay() {
-  const navigate = useNavigate()
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(MIN_ZOOM_LEVEL)
   const [selectedCountryId, setSelectedCountryId] = useState<string | null>(null)
   const [selectionFeedbackKey, setSelectionFeedbackKey] = useState(0)
@@ -54,9 +52,6 @@ export default function EarthGlobePlay() {
           <p className={styles.instruction}>さわって うごかして みよう</p>
         </header>
 
-        <button type="button" className={styles.home} onClick={() => navigate('/')}>
-          もどる
-        </button>
 
         {status !== 'ready' && (
           <div className={styles.loading}>

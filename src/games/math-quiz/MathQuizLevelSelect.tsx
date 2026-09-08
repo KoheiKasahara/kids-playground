@@ -32,9 +32,6 @@ export default function MathQuizLevelSelect({ mode }: MathQuizLevelSelectProps) 
             <span className={styles.levelDescription}>{LEVEL_DESCRIPTION[mode][level]}</span>
           </BigButton>
         ))}
-        <BigButton variant="secondary" onClick={() => navigate('/games/math-quiz')}>
-          もどる
-        </BigButton>
       </div>
     </main>
   )

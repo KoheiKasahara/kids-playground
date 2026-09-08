@@ -72,9 +72,6 @@ function PinballGame({ mode, flagIds }: { mode: PinballMode; flagIds: string[] }
 
   return (
     <main className={styles.page}>
-      <button type="button" className={styles.quit} onClick={() => navigate('/')}>
-        やめる
-      </button>
 
       <header className={styles.header}>
         {mode === 'normal' ? (

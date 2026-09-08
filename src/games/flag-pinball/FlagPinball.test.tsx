@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -49,7 +49,7 @@ async function selectDefaultThreeAndPlay(user: ReturnType<typeof userEvent.setup
   await clickButton(user, 'かんこく')
   await clickButton(user, 'ちゅうごく')
   await clickButton(user, 'あそぶ！')
-  await screen.findByRole('button', { name: 'やめる' })
+  await waitFor(() => expect(engineMock.options).toBeDefined())
 }
 
 /**
@@ -60,7 +60,7 @@ async function selectDefaultThreeAndPlay(user: ReturnType<typeof userEvent.setup
 async function selectAllFlagsAndPlay(user: ReturnType<typeof userEvent.setup>) {
   await clickButton(user, 'ぜんぶ ながす')
   await clickButton(user, 'あそぶ！')
-  await screen.findByRole('button', { name: 'やめる' })
+  await waitFor(() => expect(engineMock.options).toBeDefined())
 }
 
 /** 全射出モードのヘッダ文言（「n / 40 こ(全角スペース)ごうけい ○○てん」）を、正規化後の空白と比べて作る */
@@ -187,7 +187,7 @@ describe('FlagPinball プレイ画面', () => {
     renderApp('/games/flag-pinball')
     await selectDefaultThreeAndPlay(user)
 
-    expect(screen.getByRole('button', { name: 'やめる' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
     expect(screen.getAllByText('・・・')).toHaveLength(3)
     expect(flagImageFilenames()).toEqual(expect.arrayContaining(['cn.svg', 'jp.svg', 'kr.svg']))
     expect(engineMock.options).toBeDefined()
@@ -295,10 +295,9 @@ describe('FlagPinball 結果画面', () => {
     await playToResult(user)
 
     await clickButton(user, 'もういちど')
-    await screen.findByRole('button', { name: 'やめる' })
 
     // 再プレイ時に前回の得点が残らない（ヘッダは3球とも未確定「・・・」に戻る）
-    expect(screen.getAllByText('・・・')).toHaveLength(3)
+    expect(await screen.findAllByText('・・・')).toHaveLength(3)
     // 同じ3球のまま（にほん・かんこく・ちゅうごくの国旗のみが表示される）
     const filenames = flagImageFilenames()
     expect(filenames).toEqual(expect.arrayContaining(['cn.svg', 'jp.svg', 'kr.svg']))
@@ -327,12 +326,12 @@ describe('FlagPinball 結果画面', () => {
     expect(body).not.toMatch(/ざんねん|しっぱい|まけ/)
   })
 
-  test('ホームへ、で戻れる', async () => {
+  test('共通の「もどる」で選択画面へ戻れる', async () => {
     const user = userEvent.setup()
     await playToResult(user)
 
-    await clickButton(user, 'ホームへ')
-    expect(await screen.findByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
+    await clickButton(user, 'もどる')
+    expect(await screen.findByRole('heading', { name: 'こっきピンボール' })).toBeInTheDocument()
   })
 })
 
@@ -424,7 +423,6 @@ describe('FlagPinball 全射出モード', () => {
     await screen.findByRole('heading', { name: 'けっか' })
 
     await clickButton(user, 'もういちど')
-    await screen.findByRole('button', { name: 'やめる' })
 
     expect(engineMock.options?.mode).toBe('allFlags')
     expect(engineMock.options?.flagIds).toEqual(PINBALL_FLAG_IDS)

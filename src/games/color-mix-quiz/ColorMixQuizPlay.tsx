@@ -73,7 +73,6 @@ function ColorMixQuizGame() {
     <main className={styles.page}>
       <header className={styles.header}>
         <SpeechToggle />
-        <button type="button" className={styles.quit} onClick={() => navigate('/')}>やめる</button>
         <div className={styles.progressArea}>
           <p className={styles.progressLabel}>{state.index + 1} / {questions.length}</p>
           <ProgressBar current={state.index + 1} total={questions.length} />

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import GameBackButton from '../../components/GameBackButton'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { flagBalls } from '../../components/flag-ball/flagBalls'
 import { primeAudio } from '../../utils/quizSound'
@@ -37,6 +38,7 @@ export default function FlagRollMazeSelect() {
 
   return (
     <main className={styles.page}>
+      <GameBackButton to="/" />
       <header className={styles.header}>
         <h1 className={styles.title}>こっきころころめいろ</h1>
         <p className={styles.instruction}>
@@ -109,9 +111,6 @@ export default function FlagRollMazeSelect() {
           <>
             <BigButton variant="primary" disabled={selectedFlagId === null} onClick={advanceToStage}>
               つぎへ
-            </BigButton>
-            <BigButton variant="secondary" onClick={() => navigate('/')}>
-              もどる
             </BigButton>
           </>
         ) : (

@@ -50,7 +50,7 @@ describe('ColorPaintPuzzlePlay', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'うごくぬりえ' })).toBeInTheDocument()
     expect(screen.getByText('いろを えらんで、えを タップしてね')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'やりなおし' })).toBeInTheDocument()
     for (const color of PAINT_COLORS) {
       expect(screen.getByRole('button', { name: color.label })).toBeInTheDocument()
@@ -538,7 +538,7 @@ describe('ColorPaintPuzzlePlay: 完成演出中', () => {
     expect(screen.queryByRole('button', { name: 'やりなおし' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'できた！' })).not.toBeInTheDocument()
     // ホームへ戻る導線は、いつでも抜けられるように残す。
-    expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
   })
 
   test('演出中はエリアがボタンでなくなり、タップしても塗られない', async () => {

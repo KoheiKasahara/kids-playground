@@ -63,9 +63,6 @@ export default function MathQuizResult({ mode }: MathQuizResultProps) {
         <BigButton variant="secondary" onClick={() => navigate('/games/math-quiz')}>
           べつの けいさん
         </BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>
-          ホームへ
-        </BigButton>
       </div>
     </main>
   )

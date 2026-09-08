@@ -29,9 +29,6 @@ export default function FlagQuizLevelSelect({ mode }: FlagQuizLevelSelectProps) 
             <span className={styles.levelDescription}>{LEVEL_DESCRIPTION[level]}</span>
           </BigButton>
         ))}
-        <BigButton variant="secondary" onClick={() => navigate('/games/flag-quiz')}>
-          もどる
-        </BigButton>
       </div>
     </main>
   )

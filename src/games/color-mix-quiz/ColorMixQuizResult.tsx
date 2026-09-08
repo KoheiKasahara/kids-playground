@@ -22,7 +22,6 @@ export default function ColorMixQuizResult() {
       <p className={styles.praise}><span aria-hidden="true">{emoji}</span> {message}</p>
       <div className={styles.actions}>
         <BigButton variant="primary" onClick={() => navigate('/games/color-mix-quiz/play', { replace: true })}>もういちど</BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>ホームへ</BigButton>
       </div>
     </main>
   )

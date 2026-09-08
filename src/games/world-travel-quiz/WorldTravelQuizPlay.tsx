@@ -54,7 +54,7 @@ function TravelGame({ region, answerMode }: { region: TravelRegion; answerMode: 
   const isCorrect = selectedId === question.answer.id
   useQuestionSpeech(answerMode === 'flag' ? 'この くにの こっきは どれ？' : 'この くには どこ？', index)
   return <main className={styles.page}>
-    <header className={styles.header}><SpeechToggle /><button type="button" className={styles.quit} onClick={() => navigate('/games/world-travel-quiz')}>やめる</button><div className={styles.progress}><p>{index + 1} / {QUESTION_COUNT}</p><ProgressBar current={index + 1} total={QUESTION_COUNT} /></div></header>
+    <header className={styles.header}><SpeechToggle /><div className={styles.progress}><p>{index + 1} / {QUESTION_COUNT}</p><ProgressBar current={index + 1} total={QUESTION_COUNT} /></div></header>
     <section className={styles.content} aria-label="せかい旅行クイズのもんだい">
       <div className={styles.mapWrap}><WorldTravelMap course={course} questionIndex={index} phase={phase} onTravelComplete={completeTravel} /><p className={styles.mapHint}>{phase === 'traveling' ? 'ひこうきで いどう中…' : 'ひかっている くにを さがそう！'}</p></div>
       <div className={styles.answerWrap}>

@@ -57,7 +57,7 @@ describe('くだものクイズ', () => {
     expect(screen.getByRole('heading', { name: 'これは なに？' })).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2')
     // ヘッダの「やめる」「よみあげ」トグルを除いた、選択肢ボタンだけを数える。
-    expect(screen.getAllByRole('button', { name: /^(?!やめる$)(?!よみあげ).+/ })).toHaveLength(4)
+    expect(screen.getAllByRole('button', { name: /^(?!もどる$)(?!よみあげ).+/ })).toHaveLength(4)
   })
 
   test('名前→イラストは4択画像を表示し、不正解でも正しい名前と画像を示す', async () => {

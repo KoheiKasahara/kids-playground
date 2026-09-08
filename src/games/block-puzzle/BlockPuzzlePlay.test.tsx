@@ -84,7 +84,7 @@ describe('ブロックパズル: 画面と操作', () => {
   test('タイトル・もどる・盤面・パーツ一覧・まわす/けす/ぜんぶけすがそろっている', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'ブロックパズル' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '← もどる' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'かたちを えらぶ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /まわす/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^けす$/ })).toBeInTheDocument()

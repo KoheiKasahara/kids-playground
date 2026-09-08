@@ -668,10 +668,10 @@ describe('こっきコロコロパズル', () => {
     expect(placedParts()).toHaveLength(0)
   })
 
-  test('「やめる」でホームへ戻る', async () => {
+  test('共通の「もどる」でホームへ戻る', async () => {
     const user = userEvent.setup()
     await renderGame()
-    await user.click(screen.getByRole('button', { name: 'やめる' }))
+    await user.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
   })
 })

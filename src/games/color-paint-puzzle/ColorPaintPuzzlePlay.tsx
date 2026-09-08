@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import ColoringCanvas from './ColoringCanvas'
 import { DEFAULT_PAINT_COLOR_ID, PAINT_COLORS, type PaintColorId } from './paintColors'
 import { INITIAL_PAINT_PHASE, canPaint, reducePaintPhase, type PaintPhase } from './paintPhase'
@@ -24,7 +24,6 @@ const SPARKLES: readonly { left: number; top: number; delayMs: number; scale: nu
 ]
 
 export default function ColorPaintPuzzlePlay() {
-  const navigate = useNavigate()
   const [selectedColorId, setSelectedColorId] = useState<PaintColorId>(DEFAULT_PAINT_COLOR_ID)
   const [selectedPictureId, setSelectedPictureId] = useState<string>(DEFAULT_PICTURE_ID)
   const [paintings, setPaintings] = useState<PaintingsState>(createEmptyPaintings)
@@ -133,9 +132,7 @@ export default function ColorPaintPuzzlePlay() {
   return (
     <main className={`${styles.page} ${celebrating ? styles.pageCelebrating : ''}`}>
       <header className={styles.header}>
-        <button type="button" className={styles.home} onClick={() => navigate('/')}>
-          ← もどる
-        </button>
+        <GameBackButton to="/" />
         <h1 className={`${styles.title} ${celebrating ? styles.titleQuiet : ''}`}>
           <span aria-hidden="true">🖍️</span> うごくぬりえ
         </h1>

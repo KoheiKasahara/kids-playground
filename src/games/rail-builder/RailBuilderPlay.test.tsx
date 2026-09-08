@@ -45,7 +45,7 @@ afterEach(() => {
 describe('RailBuilderPlay 縦画面の操作UI', () => {
   test('「もどる」ボタンが残っている（家ボタンを消してもナビゲーションは失われない）', () => {
     renderPlay()
-    expect(screen.getByRole('button', { name: 'ホームへ もどる' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
   })
 
   test('「しゃこを みる」ボタン（家ボタン）は削除されている', () => {

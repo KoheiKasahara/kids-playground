@@ -13,7 +13,6 @@ export default function ColorMixQuizStart() {
         <BigButton variant="primary" onClick={() => navigate('/games/color-mix-quiz/play')}>
           はじめる
         </BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>もどる</BigButton>
       </div>
     </main>
   )

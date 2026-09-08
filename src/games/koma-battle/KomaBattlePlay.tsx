@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { playKomaBattleStartSound, primeAudio } from '../../utils/quizSound'
 import {
@@ -93,9 +93,7 @@ export default function KomaBattlePlay() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link to="/" className={styles.backLink} aria-label="もどる">
-          もどる
-        </Link>
+        <GameBackButton to="/" />
         <h1 className={styles.title}>コマバトル</h1>
       </header>
 

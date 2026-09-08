@@ -87,7 +87,6 @@ export default function ImageQuizPlay({ config, mode }: ImageQuizPlayProps) {
     <main className={[styles.playPage, mode === 'nameToImage' ? styles.playPageNameToImage : ''].filter(Boolean).join(' ')}>
       <header className={styles.header}>
         <SpeechToggle />
-        <button type="button" className={styles.quit} onClick={() => navigate('/')}>やめる</button>
         <div className={styles.progressArea}>
           <p className={styles.progressLabel}>{state.index + 1} / {totalCount}</p>
           <ProgressBar current={state.index + 1} total={totalCount} />

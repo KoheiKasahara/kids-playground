@@ -83,7 +83,7 @@ describe('PukupukaRescuePlay: ステージ選択', () => {
     fireEvent.click(screen.getByRole('button', { name: /ステージ選択へもどる/ }))
     expect(screen.getByTestId('pukupuka-stage-select')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '← もどる' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByTestId('location-probe')).toHaveTextContent('/')
   })
 })

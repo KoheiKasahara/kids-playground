@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import { celestialBodies, celestialBodyById, DEFAULT_CELESTIAL_BODY_ID } from './data/celestialBodies'
 import { featureSpotsFor } from './data/featureSpots'
 import { satellitesFor } from './data/satellites'
@@ -17,7 +17,6 @@ const SINGLE_MODE_INSTRUCTION = 'ひかる ところを さわってみよう'
 const OVERVIEW_MODE_INSTRUCTION = 'みやすいように おおきさや きょりを かえているよ'
 
 export default function PlanetGlobePlay() {
-  const navigate = useNavigate()
   const [mode, setMode] = useState<SolarSystemMode>('single')
   const [bodyId, setBodyId] = useState<CelestialBodyId>(DEFAULT_CELESTIAL_BODY_ID)
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(DEFAULT_ZOOM_LEVEL)
@@ -93,6 +92,7 @@ export default function PlanetGlobePlay() {
         )}
 
         <header className={styles.header}>
+        <GameBackButton to="/" />
           <h1 className={styles.title}>
             <span aria-hidden="true">🪐</span> たいようけい
           </h1>
@@ -101,9 +101,6 @@ export default function PlanetGlobePlay() {
           </p>
         </header>
 
-        <button type="button" className={styles.home} onClick={() => navigate('/')}>
-          もどる
-        </button>
         {mode === 'single' && satellites.length > 0 && (
           <div className={styles.satelliteToggleSlot}>
             <SatelliteToggle

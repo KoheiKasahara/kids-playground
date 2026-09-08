@@ -36,7 +36,6 @@ export default function ImageQuizResult({ config, mode }: ImageQuizResultProps) 
       <div className={styles.actions}>
         <BigButton variant="primary" onClick={() => navigate(`${config.basePath}/${modePath}/play`, { replace: true })}>もういちど</BigButton>
         <BigButton variant="secondary" onClick={() => navigate(config.basePath)}>べつの こたえかた</BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>ホームへ</BigButton>
       </div>
     </main>
   )

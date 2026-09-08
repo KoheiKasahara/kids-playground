@@ -46,7 +46,7 @@ export default function JapanTravelQuizPlay() {
   useQuestionSpeech('ここは なんけん？', index)
 
   return <main className={styles.page}>
-    <header className={styles.header}><SpeechToggle /><button type="button" className={styles.quit} onClick={() => navigate('/games/japan-travel-quiz')}>やめる</button><div className={styles.progress}><p>{index + 1} / {JAPAN_TRAVEL_QUESTION_COUNT}</p><ProgressBar current={index + 1} total={JAPAN_TRAVEL_QUESTION_COUNT} /></div></header>
+    <header className={styles.header}><SpeechToggle /><div className={styles.progress}><p>{index + 1} / {JAPAN_TRAVEL_QUESTION_COUNT}</p><ProgressBar current={index + 1} total={JAPAN_TRAVEL_QUESTION_COUNT} /></div></header>
     <section className={styles.content} aria-label="にほん旅行クイズのもんだい">
       <div className={styles.mapWrap}><JapanTravelMap course={course} questionIndex={index} phase={phase} onTravelComplete={completeTravel} /><p className={styles.mapHint}>{phase === 'traveling' ? 'ひこうきで いどう中…' : 'ひかっている けんを さがそう！'}</p></div>
       <div className={styles.answerWrap}><p className={styles.route} aria-label={`旅行コース: ${course.name}`}>{course.name}</p><h1 className={styles.question}>ここは なんけん？</h1><div className={styles.choices}>{question.choices.map((choice) => <BigButton key={choice.id} className={styles.choice} variant={selectedId ? choice.id === question.answer.id ? 'correct' : choice.id === selectedId ? 'wrong' : 'secondary' : 'primary'} disabled={phase !== 'answering'} onClick={() => select(choice.id)}>{selectedId ? choice.id === question.answer.id ? '○ ' : choice.id === selectedId ? '× ' : '' : ''}{choice.nameHiragana}</BigButton>)}</div></div>

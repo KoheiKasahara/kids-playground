@@ -51,9 +51,6 @@ export default function FlagRollAdventureGoal() {
         >
           べつの こっき
         </BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>
-          やめる
-        </BigButton>
       </div>
     </main>
   )

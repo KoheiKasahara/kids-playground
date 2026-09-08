@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import PianoKeyboard from './PianoKeyboard'
 import { PianoAudioEngine, type PianoVoiceHandle } from './pianoAudio'
 import type { PianoNote } from './notes'
@@ -18,7 +18,6 @@ function isMobilePortrait(): boolean {
 }
 
 export default function PianoPlay() {
-  const navigate = useNavigate()
   const engineRef = useRef<PianoAudioEngine | null>(null)
 
   const activePointers = useRef(new Map<number, ActivePointer>())
@@ -174,9 +173,7 @@ export default function PianoPlay() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <button type="button" className={styles.home} onClick={() => navigate('/')}>
-          ← もどる
-        </button>
+        <GameBackButton to="/" />
         <h1 className={styles.title}>
           <span aria-hidden="true">🎹</span> ピアノであそぼう
         </h1>

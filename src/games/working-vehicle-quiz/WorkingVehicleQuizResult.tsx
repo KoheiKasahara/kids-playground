@@ -67,9 +67,6 @@ export default function WorkingVehicleQuizResult({ mode }: WorkingVehicleQuizRes
         <BigButton variant="secondary" onClick={() => navigate('/games/working-vehicle-quiz')}>
           べつの クイズ
         </BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>
-          ホームへ
-        </BigButton>
       </div>
     </main>
   )

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../utils/quizSound'
 import { dominoFlags, type DominoFlagId } from './flagDefinitions'
@@ -21,7 +21,6 @@ const COURSE_LABELS: Record<DominoCourseType, { name: string; hint: string }> = 
 }
 
 export default function DominoFlagPlay() {
-  const navigate = useNavigate()
   const [gameState, setGameState] = useState<DominoGameState>('select')
   const [flagId, setFlagId] = useState<DominoFlagId | null>(null)
   const [runId, setRunId] = useState(0)
@@ -76,6 +75,7 @@ export default function DominoFlagPlay() {
 
   const page = (
     <main className={styles.page}>
+      <GameBackButton to="/" />
       <div ref={registerContainer} className={styles.scene} aria-hidden="true" />
       {gameState === 'complete' && flagId !== null && (
         <DominoCompleteConfetti key={`${runId}-${flagId}`} />
@@ -202,9 +202,6 @@ export default function DominoFlagPlay() {
         )}
       </div>
 
-      <button type="button" className={styles.home} onClick={() => navigate('/')}>
-        もどる
-      </button>
 
       <button
         type="button"

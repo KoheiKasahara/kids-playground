@@ -1,14 +1,33 @@
-import { Link } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styles from './GameBackButton.module.css'
+import { gameBackPath } from './gameBackPath'
 
-type Props = { label?: string } & (
-  | { to: string; onBack?: never }
-  | { onBack: () => void; to?: never }
-)
+type Props = {
+  to?: string
+  onBack?: () => void
+  onClick?: () => void
+  label?: string
+  ariaLabel?: string
+}
 
-/** 親のsafe-area付きヘッダーの左端へ配置する。戻り先は画面が明示する。 */
-export default function GameBackButton(props: Props) {
-  return props.to !== undefined
-    ? <Link className={styles.back} to={props.to} aria-label={props.label}>← もどる</Link>
-    : <button className={styles.back} type="button" onClick={props.onBack} aria-label={props.label}>← もどる</button>
+/** 全ゲーム共通の固定戻るボタン。画面内状態へ戻す場合はコールバックを渡す。 */
+export default function GameBackButton({ to, onBack, onClick, label, ariaLabel }: Props = {}) {
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const backPath = to ?? gameBackPath(pathname)
+  const handleBack = onBack ?? onClick
+
+  if (!backPath && !handleBack) return null
+
+  return (
+    <button
+      type="button"
+      className={styles.back}
+      onClick={handleBack ?? (() => navigate(backPath!))}
+      aria-label={ariaLabel ?? label ?? 'もどる'}
+      data-game-back-button
+    >
+      <span aria-hidden="true">←</span> もどる
+    </button>
+  )
 }

@@ -27,7 +27,7 @@ function getToggle(): HTMLElement {
 
 /** 「やめる」「つぎのもんだい」「けっかを みる」「よみあげ」を除いた、国名の選択肢ボタン */
 function getChoiceButtons(): HTMLElement[] {
-  const excluded = new Set(['やめる', 'つぎのもんだい', 'けっかを みる'])
+  const excluded = new Set(['← もどる', 'つぎのもんだい', 'けっかを みる'])
   return screen
     .getAllByRole('button')
     .filter((btn) => !excluded.has(btn.textContent ?? '') && !(btn.textContent ?? '').includes('よみあげ'))
@@ -91,7 +91,7 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
     await user.click(getToggle())
     mock.reset()
 
-    await user.click(screen.getByRole('button', { name: 'やめる' }))
+    await user.click(screen.getByRole('button', { name: 'もどる' }))
 
     expect(mock.cancelCount).toBeGreaterThanOrEqual(1)
   })

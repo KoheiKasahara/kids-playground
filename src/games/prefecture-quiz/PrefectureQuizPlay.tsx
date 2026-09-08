@@ -58,7 +58,6 @@ function PrefectureQuizPlayGame({ mode }: { mode: PrefectureQuizMode }) {
   return <main className={styles.page}>
     <header className={styles.header}>
       <SpeechToggle />
-      <button type="button" className={styles.quit} onClick={() => navigate('/games/prefecture-quiz')}>やめる</button>
       <div className={styles.progress}><p>{state.index + 1} / {questions.length}</p><ProgressBar current={state.index + 1} total={questions.length} /></div>
     </header>
     <section className={styles.body} aria-label="もんだい">

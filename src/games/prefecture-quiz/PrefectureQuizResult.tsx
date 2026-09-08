@@ -22,7 +22,6 @@ export default function PrefectureQuizResult() {
     <div className={styles.actions}>
       <BigButton onClick={() => navigate(`/games/prefecture-quiz/${MODE_PATH[mode]}/play`, { replace: true })}>もういちど</BigButton>
       <BigButton variant="secondary" onClick={() => navigate('/games/prefecture-quiz')}>べつの モード</BigButton>
-      <BigButton variant="secondary" onClick={() => navigate('/')}>ホームへ</BigButton>
     </div>
   </main>
 }

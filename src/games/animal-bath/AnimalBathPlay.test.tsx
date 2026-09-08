@@ -103,7 +103,7 @@ describe('どうぶつのおふろ', () => {
     fireEvent.click(screen.getByRole('button', { name: 'くまを あらう' }))
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
     fireEvent.click(screen.getByRole('button', { name: /もどる/ }))
-    fireEvent.click(screen.getByRole('link', { name: /もどる/ }))
+    fireEvent.click(screen.getByRole('button', { name: /もどる/ }))
     expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
     view.unmount()
     render(<MemoryRouter initialEntries={['/games/animal-bath']}><App /></MemoryRouter>)

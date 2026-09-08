@@ -93,7 +93,7 @@ describe('GameIntro（表示しないURL）', () => {
     await screen.findByRole('heading', { level: 1, name: 'ぷにぷにスライム' }, FIND)
     expect(screen.queryByRole('heading', { name: 'このゲームについて' })).not.toBeInTheDocument()
     expect(screen.queryByText(findGameBySlug('puni-slime')!.seo.description)).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('link', { name: '← もどる' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
     fireEvent.click(await screen.findByRole('link', { name: 'こっきクイズ' }, FIND))
     expect(await screen.findByText(findGameBySlug('flag-quiz')!.seo.description, undefined, FIND)).toBeInTheDocument()
   }, TEST_TIMEOUT)

@@ -1,6 +1,6 @@
-import GameBackButton from '../../components/GameBackButton'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import PukupukaStage from './PukupukaStage'
 import { findPukupukaStage, PUKUPUKA_STAGES, type PukupukaStageId } from './stageDefinitions'
 import {
