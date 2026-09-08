@@ -64,6 +64,24 @@ export function gameRoutePath(slug: string): string {
 // id/title/emoji は既存の src/pages/Home.tsx と同じ並び順・内容を維持する。
 export const GAME_CATALOG: readonly GameCatalogEntry[] = [
   {
+    id: 'animal-bath',
+    slug: 'animal-bath',
+    title: 'どうぶつのおふろ',
+    emoji: '🛁',
+    category: 'learning',
+    seo: {
+      headline: 'どうぶつのおふろ｜なでて洗うどうぶつのお世話あそび',
+      description: '泥んこの犬・うさぎ・くまを、せっけん・シャワー・タオルでぴかぴかにする幼児向けのお世話あそびです。指でなでたりタップしたりすると、汚れが泡に、泡がしずくに変わります。時間制限も失敗もなく、4歳から自分のペースで楽しめます。',
+    },
+    intro: {
+      howToPlay: [
+        'あらいたい どうぶつを タップしてね',
+        'どろんこや あわ、しずくを ゆびで なでてね',
+        'ぜんぶ きれいに なったら、つぎの どうぐへ！',
+      ],
+    },
+  },
+  {
     id: 'snowball-roll',
     slug: 'snowball-roll',
     title: 'ゆきだまころころ',
