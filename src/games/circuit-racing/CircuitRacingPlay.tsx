@@ -8,7 +8,7 @@ import {
   type RaceCarId,
   type RaceSelection,
 } from './raceConfig'
-import { CIRCUITS, circuitPreview } from './circuit'
+import { CIRCUITS, CIRCUIT_SCENERY, circuitPreview } from './circuit'
 import type { RaceCameraMode } from './raceCamera'
 import {
   useCircuitRacingEngine,
@@ -134,6 +134,7 @@ export default function CircuitRacingPlay() {
                       key={course.id}
                       type="button"
                       className={styles.courseButton}
+                      style={{ '--course-ground': CIRCUIT_SCENERY[course.scenery].ground, '--course-sky': CIRCUIT_SCENERY[course.scenery].sky } as CSSProperties}
                       aria-label={course.name}
                       aria-pressed={circuit.id === course.id}
                       onClick={() => {
@@ -147,6 +148,7 @@ export default function CircuitRacingPlay() {
                       </svg>
                       <span>{circuit.id === course.id ? '✓ ' : ''}{course.name}</span>
                       <small>{course.description}</small>
+                      <small><span aria-hidden="true">{CIRCUIT_SCENERY[course.scenery].icon}</span> {CIRCUIT_SCENERY[course.scenery].label}</small>
                     </button>
                   ))}
                 </div>
