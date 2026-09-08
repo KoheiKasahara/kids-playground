@@ -21,14 +21,14 @@ export type InstrumentSpec = {
   icon: string
   /** 楽器間の知覚音量を揃える補正値（voice gain側の第1層）。 */
   gain: number
-  /** 対象13鍵で許容する最近傍アンカーからの最大移調幅（半音）。 */
+  /** 対象鍵盤で許容する最近傍アンカーからの最大移調幅（半音）。 */
   maxPitchShift: number
   samples: readonly PianoSampleDefinition[]
 }
 
 export type ResolvedSample = {
   definition: PianoSampleDefinition
-  /** 13鍵の対象音へ近いアンカーを再生時にこの倍率で移調する。 */
+  /** 鍵盤の対象音へ近いアンカーを再生時にこの倍率で移調する。 */
   playbackRate: number
   /** 対象音とアンカーの符号付き移調幅（半音）。 */
   pitchShiftSemitones: number
@@ -147,12 +147,13 @@ const xylophoneSamples: readonly PianoSampleDefinition[] = [
   },
 ]
 
+// C5より上の4半音は既存C5音源を移調する。追加ダウンロードなしで高いミまで鳴らす。
 export const INSTRUMENT_SPECS: readonly InstrumentSpec[] = [
-  { id: 'piano', label: 'ピアノ', icon: '🎹', gain: 1, maxPitchShift: 0, samples: PIANO_SAMPLE_DEFINITIONS },
-  { id: 'violin', label: 'バイオリン', icon: '🎻', gain: 0.82, maxPitchShift: 2, samples: violinSamples },
-  { id: 'trumpet', label: 'ラッパ', icon: '🎺', gain: 0.58, maxPitchShift: 2, samples: trumpetSamples },
-  { id: 'flute', label: 'フルート', icon: '🪈', gain: 0.82, maxPitchShift: 2, samples: fluteSamples },
-  { id: 'xylophone', label: '木琴', icon: '🪇', gain: 0.72, maxPitchShift: 3, samples: xylophoneSamples },
+  { id: 'piano', label: 'ピアノ', icon: '🎹', gain: 1, maxPitchShift: 4, samples: PIANO_SAMPLE_DEFINITIONS },
+  { id: 'violin', label: 'バイオリン', icon: '🎻', gain: 0.82, maxPitchShift: 4, samples: violinSamples },
+  { id: 'trumpet', label: 'ラッパ', icon: '🎺', gain: 0.58, maxPitchShift: 4, samples: trumpetSamples },
+  { id: 'flute', label: 'フルート', icon: '🪈', gain: 0.82, maxPitchShift: 4, samples: fluteSamples },
+  { id: 'xylophone', label: '木琴', icon: '🪇', gain: 0.72, maxPitchShift: 4, samples: xylophoneSamples },
 ] as const
 
 const instrumentById = new Map(INSTRUMENT_SPECS.map((spec) => [spec.id, spec]))
@@ -165,7 +166,7 @@ export function findPianoSample(noteId: PianoNoteId): PianoSampleDefinition | un
   return PIANO_SAMPLE_DEFINITIONS.find((sample) => sample.noteId === noteId)
 }
 
-/** 対象13音に最も近い公式アンカーを一つ選び、AudioBufferSourceNode用の移調倍率を返す。 */
+/** 対象音に最も近い公式アンカーを一つ選び、AudioBufferSourceNode用の移調倍率を返す。 */
 export function resolveInstrumentSample(instrumentId: InstrumentId, noteId: PianoNoteId): ResolvedSample | undefined {
   const targetMidi = midiForNote(noteId)
   if (targetMidi === undefined) return undefined

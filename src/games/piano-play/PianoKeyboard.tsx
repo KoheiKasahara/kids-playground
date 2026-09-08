@@ -39,7 +39,7 @@ export default function PianoKeyboard({
         black ? styles.blackKey : styles.whiteKey,
         activeNoteIds.has(note.id) ? styles.keyActive : '',
       ].filter(Boolean).join(' ')}
-      style={black ? ({ left: `${((note.whiteKeyIndex + 1) / WHITE_NOTES.length) * 100}%` } as CSSProperties) : undefined}
+      style={black ? ({ left: `${((note.whiteKeyIndex + 1) / WHITE_NOTES.length) * 100}%`, width: `${75 / WHITE_NOTES.length}%` } as CSSProperties) : undefined}
       aria-label={accessibleName(note)}
       aria-pressed={activeNoteIds.has(note.id)}
       data-note={note.id}

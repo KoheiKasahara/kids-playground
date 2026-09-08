@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { PIANO_NOTES } from './notes'
+import { PIANO_NOTES, findPianoNote } from './notes'
 import { PianoAudioEngine } from './pianoAudio'
-import { PIANO_SAMPLE_DEFINITIONS } from './pianoSamples'
+import { INSTRUMENT_SPECS, PIANO_SAMPLE_DEFINITIONS } from './pianoSamples'
 
 class MockAudioParam {
   value = 0.42
@@ -86,6 +86,25 @@ describe('PianoAudioEngine', () => {
     expect(contexts[0].resume).toHaveBeenCalledTimes(1)
     expect(contexts[0].createBufferSource).toHaveBeenCalledTimes(1)
     expect(contexts[0].createOscillator).not.toHaveBeenCalled()
+  })
+
+  test.each(INSTRUMENT_SPECS)('$idの追加高音をサンプル移調で手動・自動演奏できる', async ({ id, samples }) => {
+    const engine = new PianoAudioEngine()
+    await engine.setInstrument(id)
+    for (const [noteId, semitones] of [['C#5', 1], ['D5', 2], ['D#5', 3], ['E5', 4]] as const) {
+      const note = findPianoNote(noteId)!
+      const manual = engine.startNote(note)
+      expect(manual).not.toBeNull()
+      expect(contexts[0].createBufferSource.mock.results.at(-1)!.value.playbackRate.value).toBeCloseTo(2 ** (semitones / 12))
+      engine.stopNote(manual!)
+      const automatic = engine.playNote(note, 300)
+      expect(automatic).not.toBeNull()
+      expect(contexts[0].createBufferSource.mock.results.at(-1)!.value.playbackRate.value).toBeCloseTo(2 ** (semitones / 12))
+      engine.stopNote(automatic!)
+    }
+    expect(fetch).toHaveBeenCalledTimes(samples.length)
+    expect(contexts[0].createOscillator).not.toHaveBeenCalled()
+    engine.dispose()
   })
 
   test('同音連打・和音・手動と自動の各voiceを独立したAudioBufferSourceNodeで鳴らす', async () => {

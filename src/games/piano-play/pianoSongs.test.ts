@@ -10,7 +10,7 @@ const PHRASE_END_NOTE_INDEXES: Readonly<Record<string, readonly number[]>> = {
   'london-bridge': [6, 12, 19],
   'kaeru-no-uta': [7, 15],
   'row-row-row-your-boat': [5, 11],
-  'old-macdonald-had-a-farm': [7, 13, 21],
+  'old-macdonald-had-a-farm': [6, 11, 16, 21, 33, 40],
   chocho: [7, 15, 23],
   'jingle-bells': [5, 10],
   'happy-birthday': [5, 11, 18],
@@ -23,7 +23,7 @@ const EXPECTED_OPENING_NOTE_IDS: Readonly<Record<string, readonly string[]>> = {
   'london-bridge': ['G4', 'A4', 'G4', 'F4', 'E4', 'F4', 'G4'],
   'kaeru-no-uta': ['C4', 'D4', 'E4', 'F4', 'E4', 'D4', 'C4'],
   'row-row-row-your-boat': ['C4', 'C4', 'C4', 'D4', 'E4'],
-  'old-macdonald-had-a-farm': ['C4', 'C4', 'C4', 'G4', 'A4', 'A4', 'G4'],
+  'old-macdonald-had-a-farm': ['C5', 'C5', 'C5', 'G4', 'A4', 'A4', 'G4'],
   chocho: ['G4', 'E4', 'E4', 'F4', 'D4', 'D4', 'C4'],
   'jingle-bells': ['E4', 'E4', 'E4', 'E4', 'E4', 'E4'],
   'happy-birthday': ['C4', 'C4', 'D4', 'C4', 'F4', 'E4'],
@@ -65,11 +65,11 @@ describe('PIANO_SONGS', () => {
 
     expect(EXPECTED_OPENING_NOTE_IDS['london-bridge']).toEqual(['G4', 'A4', 'G4', 'F4', 'E4', 'F4', 'G4'])
     expect(EXPECTED_OPENING_NOTE_IDS['london-bridge']).not.toEqual(previousLondonOpening)
-    expect(EXPECTED_OPENING_NOTE_IDS['old-macdonald-had-a-farm']).toEqual(['C4', 'C4', 'C4', 'G4', 'A4', 'A4', 'G4'])
+    expect(EXPECTED_OPENING_NOTE_IDS['old-macdonald-had-a-farm']).toEqual(['C5', 'C5', 'C5', 'G4', 'A4', 'A4', 'G4'])
     expect(EXPECTED_OPENING_NOTE_IDS['old-macdonald-had-a-farm']).not.toEqual(twinkleOpening)
   })
 
-  test('すべての曲データは有効で、使用音はC4〜C5の13鍵に限定される', () => {
+  test('すべての曲データは有効で、使用音はC4〜E5の17鍵に限定される', () => {
     const validNoteIds = new Set(PIANO_NOTES.map((note) => note.id))
 
     for (const song of PIANO_SONGS) {
@@ -80,6 +80,19 @@ describe('PIANO_SONGS', () => {
       expect(Math.min(...notes.map((item) => PIANO_NOTES.findIndex((note) => note.id === item.noteId)))).toBeGreaterThanOrEqual(0)
       expect(Math.max(...notes.map((item) => PIANO_NOTES.findIndex((note) => note.id === item.noteId)))).toBeLessThan(PIANO_NOTES.length)
     }
+  })
+
+  test('ハッピーバースデーの最終フレーズはシ♭・ラを含む正しい下降になる', () => {
+    const notes = findPianoSong('happy-birthday')!.timeline.filter((item) => item.kind === 'note')
+    expect(notes.slice(-6).map((item) => item.noteId)).toEqual(['A#4', 'A#4', 'A4', 'F4', 'G4', 'F4'])
+  })
+
+  test('ゆかいな牧場は低いソへ下がり、高いミ・レからドへ戻る', () => {
+    const notes = findPianoSong('old-macdonald-had-a-farm')!.timeline.filter((item) => item.kind === 'note')
+    expect(notes.slice(0, 12).map((item) => item.noteId)).toEqual([
+      'C5', 'C5', 'C5', 'G4', 'A4', 'A4', 'G4', 'E5', 'E5', 'D5', 'D5', 'C5',
+    ])
+    expect(notes.slice(-5).map((item) => item.noteId)).toEqual(['E5', 'E5', 'D5', 'D5', 'C5'])
   })
 
   test('監査した全曲のフレーズ接続箇所に追加の無音時間を入れない', () => {

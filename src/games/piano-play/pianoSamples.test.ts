@@ -10,7 +10,7 @@ import {
 describe('piano sample mapping', () => {
   test('C4〜C5の13鍵すべてを個別の同音程サンプルへ対応付ける', () => {
     expect(PIANO_SAMPLE_DEFINITIONS).toHaveLength(13)
-    expect(PIANO_SAMPLE_DEFINITIONS.map((sample) => sample.noteId)).toEqual(PIANO_NOTES.map((note) => note.id))
+    expect(PIANO_SAMPLE_DEFINITIONS.map((sample) => sample.noteId)).toEqual(PIANO_NOTES.slice(0, 13).map((note) => note.id))
     expect(new Set(PIANO_SAMPLE_DEFINITIONS.map((sample) => sample.noteId)).size).toBe(13)
     expect(new Set(PIANO_SAMPLE_DEFINITIONS.map((sample) => sample.url)).size).toBe(13)
     expect(PIANO_SAMPLE_DEFINITIONS.every((sample) => sample.url.endsWith('.mp3'))).toBe(true)
@@ -29,10 +29,10 @@ describe('piano sample mapping', () => {
     ])
   })
 
-  test('4楽器は公式アンカーだけを定義し、全13鍵を最近傍移調で解決する', () => {
+  test('4楽器は公式アンカーだけを定義し、全17鍵を最近傍移調で解決する', () => {
     expect(INSTRUMENT_SPECS.map((spec) => spec.id)).toEqual(['piano', 'violin', 'trumpet', 'flute', 'xylophone'])
     expect(INSTRUMENT_SPECS.map((spec) => spec.samples.length)).toEqual([13, 5, 4, 4, 3])
-    expect(INSTRUMENT_SPECS.map((spec) => spec.maxPitchShift)).toEqual([0, 2, 2, 2, 3])
+    expect(INSTRUMENT_SPECS.map((spec) => spec.maxPitchShift)).toEqual([4, 4, 4, 4, 4])
     for (const instrument of INSTRUMENT_SPECS) {
       for (const note of PIANO_NOTES) {
         const resolved = resolveInstrumentSample(instrument.id, note.id)
