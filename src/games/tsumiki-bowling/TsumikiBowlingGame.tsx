@@ -42,7 +42,7 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
   const [aimPower, setAimPower] = useState<number | null>(null)
   const [lastThrow, setLastThrow] = useState<ThrowSettledResult | null>(null)
   // 投球中に増えていく、その投球ぶんの倒した数。
-  // 1投が落ち着いたあとも、次の投球が始まるまではその投球の最終値を表示したままにする
+  // 1投が落ち着いたあとは、積み木を組み直すまで最終値を表示する
   // （積み木は毎投組み直されるので、累計を全体数と比べても意味がないため）。
   const [liveToppled, setLiveToppled] = useState(0)
   // 1投目を投げ終えたら、操作説明は出しっぱなしにしない。
@@ -71,6 +71,16 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
     setGame((current) => startThrow(current))
   }, [])
 
+  const handleStageRebuilt = useCallback(() => {
+    setLastThrow(null)
+    setLiveToppled(0)
+    setBigCollapseChip(false)
+    if (collapseChipTimeoutRef.current !== null) {
+      clearTimeout(collapseChipTimeoutRef.current)
+      collapseChipTimeoutRef.current = null
+    }
+  }, [])
+
   const handleToppledProgress = useCallback((toppled: number) => {
     setLiveToppled(toppled)
   }, [])
@@ -78,7 +88,7 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
   const handleThrowSettled = useCallback((result: ThrowSettledResult) => {
     setLastThrow(result)
     // 崩れている最中に増えていった数を、この投球の最終値として確定させる
-    // （次の投球が始まるまではこの値を出し続ける）。
+    // （積み木を組み直すまではこの値を出し続ける）。
     setLiveToppled(result.toppled)
     if (result.isPerfect) setHadPerfectThrow(true)
     setGame((current) => finishThrow(current, result.toppled))
@@ -105,6 +115,7 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
     ballId,
     onThrowStart: handleThrowStart,
     onThrowSettled: handleThrowSettled,
+    onStageRebuilt: handleStageRebuilt,
     onAimChange: handleAimChange,
     onToppledProgress: handleToppledProgress,
     onBigCollapse: handleBigCollapse,
@@ -198,7 +209,6 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
                 onClick={() => handleSelectBall(ball.id)}
                 disabled={!canSelectBall}
                 aria-label={ball.name}
-                aria-describedby={`ball-role-${ball.id}`}
                 aria-pressed={ballId === ball.id}
               >
                 <span
@@ -209,7 +219,7 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
                   // インラインstyleに負けて効かなくなるため。
                   style={
                     {
-                      '--ball-orb-size': `${32 + ball.uiSizeScale * 26}px`,
+                      '--ball-orb-size': `${20 + ball.uiSizeScale * 12}px`,
                       background: toCssColor(ball.color),
                     } as CSSProperties
                   }
@@ -217,11 +227,6 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
                   <span className={styles.ballCardIcon}>{ball.icon}</span>
                 </span>
                 <span className={styles.ballCardName}>{ball.name}</span>
-                <svg className={styles.ballTrajectory} viewBox="0 -4 48 38" aria-hidden="true">
-                  <path d={ball.launchProfile.trajectoryPath} />
-                  <path d="M40 18 L45 23 L40 28" />
-                </svg>
-                <span id={`ball-role-${ball.id}`} className={styles.ballRole}>{ball.launchProfile.role}</span>
               </button>
             ))}
           </div>

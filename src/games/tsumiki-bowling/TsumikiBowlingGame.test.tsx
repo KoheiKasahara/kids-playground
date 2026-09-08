@@ -155,6 +155,27 @@ describe('TsumikiBowlingGame', () => {
     expect(screen.getByText('ぜんぶ たおれた！')).toBeInTheDocument()
   })
 
+  it.each([0, 7, TOWER_TOTAL])('組み直したら前の結果とスコアを消し、次を狙える（%iこ）', (toppled) => {
+    renderGame()
+    playThrow(toppled, 1)
+    expect(screen.getAllByRole('status')).toHaveLength(2)
+    act(() => engineMock.options?.onBigCollapse?.(6))
+    act(() => engineMock.options?.onStageRebuilt())
+    expect(screen.getByRole('status')).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
+    expect(screen.queryByText('ぜんぶ たおれた！')).not.toBeInTheDocument()
+    expect(screen.queryByText('ガラガラー！')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(`${THROWS_PER_GAME}かい なげるうちの 2かいめ`)).toBeInTheDocument()
+    act(() => engineMock.options?.onAimChange(0.9))
+    expect(screen.getByRole('status')).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
+    playThrow(0, 2)
+    act(() => engineMock.options?.onStageRebuilt())
+    playThrow(0, 3)
+    const result = screen.getByRole('dialog', { name: 'けっか' })
+    expect(result).toHaveTextContent(String(toppled))
+    if (toppled === TOWER_TOTAL) expect(result).toHaveTextContent('パーフェクト！')
+    else expect(result).not.toHaveTextContent('パーフェクト！')
+  })
+
   it('2投目からは案内の文が変わる', () => {
     renderGame()
     playThrow(2, 1)
@@ -349,10 +370,10 @@ describe('玉の選択', () => {
 })
 
 describe('玉だけで飛び方を選ぶ', () => {
-  it('高さの追加操作がなく、3つの役割を見せる', () => {
+  it('高さの追加操作がなく、玉の説明と軌道図を表示しない', () => {
     renderGame()
     expect(screen.queryByRole('group', { name: 'たかさをえらぶ' })).not.toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'たまをえらぶ' }).querySelectorAll('svg')).toHaveLength(3)
+    expect(screen.getByRole('group', { name: 'たまをえらぶ' }).querySelectorAll('svg')).toHaveLength(0)
     expect(screen.queryByRole('slider')).not.toBeInTheDocument()
   })
 })
