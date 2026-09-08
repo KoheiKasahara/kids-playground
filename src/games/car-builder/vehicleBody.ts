@@ -23,9 +23,18 @@ import {
 /** 下部パネルはボディカラーをそのまま使うと2トーンに見えないので、暗くして敷く。 */
 const BODY_LOWER_SHADE = 0.55
 
+export type CarHeadlightMount = {
+  /** 車両を正面から見た左側（+X）の、元モデルのライト開口部。 */
+  left: { position: THREE.Vector3; size: THREE.Vector3 }
+  /** 車両を正面から見た右側（-X）の、元モデルのライト開口部。 */
+  right: { position: THREE.Vector3; size: THREE.Vector3 }
+}
+
 export type CarVehicleBody = {
   /** シーンへ追加するオブジェクト。 */
   object: THREE.Object3D
+  /** 元モデルのライト開口部。カスタムライトを穴へ重ねる取り付け基準に使う。 */
+  headlightMount: CarHeadlightMount | null
   /** ボディ塗装（Body / BodyLower）だけを塗り替える。 */
   setBodyColor: (hex: string) => void
   /**
@@ -43,6 +52,46 @@ export type CarVehicleBody = {
   setHeadlightVisible: (visible: boolean) => void
   /** このインスタンスが持つGeometry / Materialをすべて解放する。 */
   dispose: () => void
+}
+
+/**
+ * LightFront の頂点から左右それぞれの実測範囲を取り出す。
+ * 一部モデルは前後のライトが同じMeshにまとまるため、前方（+Z）だけを採用する。
+ */
+function measureHeadlightMount(scene: THREE.Object3D): CarHeadlightMount | null {
+  scene.updateWorldMatrix(true, true)
+  const left = new THREE.Box3()
+  const right = new THREE.Box3()
+
+  scene.traverse((child) => {
+    const mesh = child as THREE.Mesh
+    if (mesh.isMesh !== true) return
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    const position = mesh.geometry.attributes.position
+    if (position === undefined) return
+    const index = mesh.geometry.index
+    const groups = mesh.geometry.groups.length > 0
+      ? mesh.geometry.groups
+      : [{ start: 0, count: index?.count ?? position.count, materialIndex: 0 }]
+
+    for (const group of groups) {
+      const materialIndex = group.materialIndex ?? 0
+      if (materials[materialIndex]?.name !== CAR_HEADLIGHT_MATERIAL) continue
+      for (let offset = group.start; offset < group.start + group.count; offset += 1) {
+        const vertexIndex = index?.getX(offset) ?? offset
+        const vertex = new THREE.Vector3().fromBufferAttribute(position, vertexIndex).applyMatrix4(mesh.matrixWorld)
+        if (vertex.z <= 0) continue
+        const sideBounds = vertex.x >= 0 ? left : right
+        sideBounds.expandByPoint(vertex)
+      }
+    }
+  })
+
+  if (left.isEmpty() || right.isEmpty()) return null
+  return {
+    left: { position: left.getCenter(new THREE.Vector3()), size: left.getSize(new THREE.Vector3()) },
+    right: { position: right.getCenter(new THREE.Vector3()), size: right.getSize(new THREE.Vector3()) },
+  }
 }
 
 /**
@@ -89,6 +138,7 @@ function buildBody(scene: THREE.Object3D): CarVehicleBody {
   const policeLightMeshes: THREE.Object3D[] = []
   const signMeshes: THREE.Object3D[] = []
   const headlightMeshes: THREE.Object3D[] = []
+  const headlightMount = measureHeadlightMount(scene)
 
   scene.traverse((child) => {
     const mesh = child as THREE.Mesh
@@ -107,6 +157,7 @@ function buildBody(scene: THREE.Object3D): CarVehicleBody {
 
   return {
     object: scene,
+    headlightMount,
     setBodyColor: (hex: string) => {
       for (const material of bodyMaterials) {
         if (isColorMaterial(material)) material.color.set(hex)

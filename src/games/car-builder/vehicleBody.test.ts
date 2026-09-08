@@ -82,6 +82,25 @@ describe('loadCarVehicleBody', () => {
     second.dispose()
   })
 
+  test('元モデルの左右ライト開口部を取り付け位置として実測する', async () => {
+    stubFetchWithRealModels()
+    const car = await loadCarVehicleBody('car')
+    expect(car.headlightMount).not.toBeNull()
+    expect(car.headlightMount?.left.position.x).toBeGreaterThan(0)
+    expect(car.headlightMount?.right.position.x).toBeLessThan(0)
+    expect(car.headlightMount?.left.position.y).toBeCloseTo(0.472, 2)
+    expect(car.headlightMount?.left.position.z).toBeGreaterThan(1.4)
+    expect(car.headlightMount?.left.size.x).toBeGreaterThan(0.2)
+    car.dispose()
+  })
+
+  test('ライト開口部を持たないオリジナル車体では取り付け位置を返さない', async () => {
+    stubFetchWithRealModels()
+    const pickup = await loadCarVehicleBody('pickup')
+    expect(pickup.headlightMount).toBeNull()
+    pickup.dispose()
+  })
+
   test('別の車種どうしでもMaterialを共有しない', async () => {
     stubFetchWithRealModels()
     const taxi = await loadCarVehicleBody('taxi')
