@@ -51,6 +51,7 @@ const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
+  { path: '/games/animal-bath', element: lazyRoute(() => import('../games/animal-bath/AnimalBathPlay')) },
   { path: '/games/bento-builder', element: playRoute(lazyRoute(() => import('../games/bento-builder/BentoBuilderPlay'))) },
   { path: '/games/circuit-racing', element: lazyRoute(() => import('../games/circuit-racing/CircuitRacingPlay')) },
   { path: '/games/oekaki-korokoro', element: playRoute(lazyRoute(() => import('../games/oekaki-korokoro/OekakiKorokoroPlay'))) },
