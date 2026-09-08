@@ -163,6 +163,7 @@ export function createCarModel(config: CarConfig, options: CarModelOptions = {})
     const context: CarPartContext = {
       config: nextConfig,
       surface: body ? createCarSurface(body.object, dimensions.bodyLift) : undefined,
+      headlightMount: body?.headlightMount ?? null,
       dimensions,
       attachments,
       color: resolveCarColor(nextConfig),

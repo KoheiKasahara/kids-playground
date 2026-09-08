@@ -8,12 +8,15 @@ import * as THREE from 'three'
 import type { CarSurface } from './carSurface'
 import type { CarCategoryId, CarConfig, CarMarkIcon, CarOptionIdMap, FrontType, MarkType } from './carConfig'
 import type { CarAttachment, CarAttachments, CarDimensions } from './carDimensions'
+import type { CarHeadlightMount } from './vehicleBody'
 
 export type CarPartContext = {
   config: CarConfig
   surface?: CarSurface
   dimensions: CarDimensions
   attachments: CarAttachments
+  /** 元GLBにある左右のライト開口部。存在するときは共通前面座標より優先する。 */
+  headlightMount?: CarHeadlightMount | null
   /** ボディカラー（hex）。カラーカテゴリの選択がここへ流れてくる。 */
   color: string
 }
@@ -205,48 +208,91 @@ function buildWheels(visual: WheelVisual) {
 }
 
 function buildFront(shape: FrontType) {
-  return ({ attachments, surface }: CarPartContext): THREE.Object3D => {
+  return ({ attachments, dimensions, headlightMount, surface }: CarPartContext): THREE.Object3D => {
     const front = attachments.front
     const group = new THREE.Group()
     group.name = 'car-front'
     const lightMaterial = standard('#fff3c4', 0.2, 0.1)
 
     const rounded = shape === 'round' || shape === 'twin'
-    const lightSize = front.size.extent * 0.34 * (shape === 'twin' ? 0.7 : 1)
+    const fallbackLightSize = front.size.extent * 0.34 * (shape === 'twin' ? 0.7 : 1)
     const lightDepth = 0.1
-    const lightWidth =
-      shape === 'round' ? lightSize * 0.9 : shape === 'square' ? lightSize * 1.5 : lightSize * 2.2
-    const lightHeight =
-      shape === 'round' ? lightSize * 0.9 : shape === 'square' ? lightSize * 0.7 : lightSize * 0.28
     const surroundMaterial = standard(shape === 'round' ? CHROME_COLOR : '#3f4b57', 0.32, 0.35)
     for (const side of [1, -1]) {
+      const mount = side === 1 ? headlightMount?.left : headlightMount?.right
+      const apertureWidth = mount?.size.x ?? 0
+      const apertureHeight = mount?.size.y ?? 0
+      const lightWidth = mount
+        ? shape === 'round'
+          ? Math.min(apertureWidth * 0.52, apertureHeight * 0.84)
+          : shape === 'square'
+            ? apertureWidth * 0.86
+            : shape === 'slim'
+              ? apertureWidth * 0.92
+              : Math.min(apertureWidth * 0.28, apertureHeight * 0.62)
+        : shape === 'round'
+          ? fallbackLightSize * 0.9
+          : shape === 'square'
+            ? fallbackLightSize * 1.5
+            : shape === 'slim'
+              ? fallbackLightSize * 2.2
+              : fallbackLightSize
+      const lightHeight = mount
+        ? rounded
+          ? lightWidth
+          : shape === 'square'
+            ? apertureHeight * 0.7
+            : apertureHeight * 0.38
+        : rounded
+          ? lightWidth
+          : shape === 'square'
+            ? fallbackLightSize * 0.7
+            : fallbackLightSize * 0.28
+      const baseX = mount?.position.x ?? side * front.size.width * (shape === 'slim' ? 0.3 : 0.32)
+      const baseY = mount?.position.y !== undefined
+        ? mount.position.y + dimensions.bodyLift
+        : front.position.y + front.size.extent * 0.16
+
+      // 元ライトを隠したあとに残るくぼみを、実測した開口部と同じ位置・大きさのハウジングで覆う。
+      if (mount) {
+        const coverCenter = offsetFrom(front, lightDepth * 0.22)
+        const cover = box(
+          { x: apertureWidth * 1.06, y: apertureHeight * 1.1, z: lightDepth * 0.55 },
+          { x: baseX, y: baseY, z: coverCenter.z },
+          surroundMaterial,
+        )
+        cover.name = `car-front-cutout-cover-${side === 1 ? 'left' : 'right'}`
+        group.add(cover)
+      }
+
       for (const lampOffset of (shape === 'twin' ? [-1, 1] : [0])) {
         const center = offsetFrom(front, lightDepth / 2)
         const position = {
-          x: center.x + side * front.size.width * (shape === 'slim' ? 0.3 : 0.32) + lampOffset * lightSize * 0.58,
-          y: center.y + front.size.extent * 0.16,
+          x: baseX + lampOffset * (mount ? apertureWidth * 0.22 : fallbackLightSize * 0.58),
+          y: baseY,
           z: center.z,
         }
 
         if (rounded) {
           const surround = new THREE.Mesh(
-            new THREE.TorusGeometry(lightSize * 0.5, lightSize * 0.08, 8, 20),
+            new THREE.TorusGeometry(lightWidth * 0.42, lightWidth * 0.08, 8, 20),
             surroundMaterial,
           )
           surround.name = `car-front-surround-${shape}-${side === 1 ? 'left' : 'right'}${shape === 'twin' ? `-${lampOffset}` : ''}`
           surround.position.set(position.x, position.y, position.z)
           surround.castShadow = true
-          const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * 0.48, 16, 12), lightMaterial)
+          const light = new THREE.Mesh(new THREE.SphereGeometry(lightWidth * 0.42, 16, 12), lightMaterial)
           light.name = `car-front-light-${shape}-${side === 1 ? 'left' : 'right'}${shape === 'twin' ? `-${lampOffset}` : ''}`
           light.position.set(position.x, position.y, position.z)
           // 前面の丸さは保ちつつ、ライト本体が車体の前端から出すぎないよう奥行きを薄くする。
-          light.scale.set(0.8, 0.8, 0.62)
+          light.scale.set(1, 1, 0.62)
           light.rotation.z = side * -0.08
           light.castShadow = true
           group.add(surround, light)
         } else {
+          const surroundPadding = mount ? Math.min(apertureWidth, apertureHeight) * 0.12 : fallbackLightSize * 0.18
           const surround = box(
-            { x: lightWidth + lightSize * 0.18, y: lightHeight + lightSize * 0.18, z: lightDepth * 0.72 },
+            { x: lightWidth + surroundPadding, y: lightHeight + surroundPadding, z: lightDepth * 0.72 },
             { x: position.x, y: position.y, z: position.z - lightDepth * 0.12 },
             surroundMaterial,
           )

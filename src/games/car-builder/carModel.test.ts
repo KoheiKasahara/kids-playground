@@ -63,6 +63,7 @@ function createFakeBody(id: CarVehicleId): FakeBody {
     headlightVisible: true,
     materials,
     object: group,
+    headlightMount: null,
     setBodyColor: (hex) => {
       body.bodyColor = hex
       for (const material of materials) {
@@ -486,6 +487,26 @@ describe('カテゴリごとのレイヤー', () => {
         model.dispose()
       }
     }
+  })
+
+  test('元モデルのライト開口部があれば、その中心へフロントを重ねてくぼみを覆う', async () => {
+    const body = createFakeBody('car')
+    body.headlightMount = {
+      left: { position: new THREE.Vector3(0.52, 0.47, 1.49), size: new THREE.Vector3(0.24, 0.14, 0.14) },
+      right: { position: new THREE.Vector3(-0.52, 0.47, 1.49), size: new THREE.Vector3(0.24, 0.14, 0.14) },
+    }
+    const model = createCarModel(DEFAULT_CAR_CONFIG, { loadBody: async () => body })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const front = layerOf(model.root, 'front')
+    const cover = front.getObjectByName('car-front-cutout-cover-left')
+    const light = front.getObjectByName('car-front-light-square-left')
+    expect(cover?.position.x).toBeCloseTo(0.52)
+    expect(cover?.position.y).toBeCloseTo(0.47)
+    expect(light?.position.x).toBeCloseTo(0.52)
+    expect(light?.position.y).toBeCloseTo(0.47)
+    model.dispose()
   })
 
   test('飾りとマークが全車種で生成される', () => {
