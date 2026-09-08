@@ -6,6 +6,27 @@ import App from '../app/App'
 import { GAME_CATALOG, gameRoutePath } from '../games/gameCatalog'
 
 describe('Home', () => {
+
+  test('こっきクイズが先頭で、先頭にあったゲームは末尾へ移動する', () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    )
+    const links = screen.getAllByRole('link')
+    expect(links[0]).toHaveAccessibleName('こっきクイズ')
+    expect(links.slice(-7).map((link) => link.getAttribute('href'))).toEqual(
+      [
+        'animal-bath',
+        'snowball-roll',
+        'magic-sandbox',
+        'puni-slime',
+        'bento-builder',
+        'circuit-racing',
+        'oekaki-korokoro',
+      ].map(gameRoutePath),
+    )
+  })
   test('サーキットレースをホームから開ける', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
