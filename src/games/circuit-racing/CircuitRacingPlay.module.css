@@ -58,7 +58,7 @@
 .retryButton,
 .homeButton,
 .backButton,
-.pauseButton,
+.boostButton,
 .beginButton,
 .countButton,
 .carButton,
@@ -123,7 +123,7 @@
 
 .homeButton,
 .backButton,
-.pauseButton {
+.boostButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -144,10 +144,23 @@
   color: #fff;
 }
 
-.pauseButton {
+.boostButton {
   border-color: transparent;
-  background: #f2a93b;
-  color: #35250d;
+  background: linear-gradient(135deg, #16c7ed, #536dfe 70%);
+  color: #fff;
+  box-shadow: 0 4px 0 #2844b8, 0 0 0 3px rgba(255, 228, 92, 0.45);
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.boostButton[data-active='true'] {
+  animation: boost-pop 420ms ease-out;
+}
+
+@keyframes boost-pop {
+  0% { transform: scale(0.9); filter: brightness(1); }
+  38% { transform: scale(1.16) rotate(-2deg); filter: brightness(1.35); }
+  100% { transform: scale(1); filter: brightness(1); }
 }
 
 .countRow,

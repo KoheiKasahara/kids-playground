@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import {
   DEFAULT_SELECTIONS,
@@ -51,10 +51,10 @@ export default function CircuitRacingPlay() {
   const [circuit, setCircuit] = useState(CIRCUITS[0]!)
   const [carCount, setCarCount] = useState<2 | 3>(2)
   const [phase, setPhase] = useState<'select' | 'race'>('select')
-  const [paused, setPaused] = useState(false)
   const [cameraMode, setCameraMode] = useState<RaceCameraMode>(() => prefersReducedMotion() ? 'trackside' : 'chase')
   const [targetIndex, setTargetIndex] = useState(0)
   const [sceneStatus, setSceneStatus] = useState<CircuitRacingEngineStatus>('loading')
+  const [boostFeedback, setBoostFeedback] = useState(0)
 
   const handleSceneStatus = useCallback((status: CircuitRacingEngineStatus) => {
     setSceneStatus(status)
@@ -62,12 +62,18 @@ export default function CircuitRacingPlay() {
   const engine = useCircuitRacingEngine({
     selections,
     circuit,
-    running: phase === 'race' && !paused && sceneStatus === 'ready',
+    running: phase === 'race' && sceneStatus === 'ready',
     cameraMode,
     targetIndex,
     onStatusChange: handleSceneStatus,
   })
-  const { registerContainer, retry, adjustCamera } = engine
+  const { registerContainer, retry, boost, adjustCamera } = engine
+
+  useEffect(() => {
+    if (boostFeedback === 0) return undefined
+    const timeout = window.setTimeout(() => setBoostFeedback(0), 420)
+    return () => window.clearTimeout(timeout)
+  }, [boostFeedback])
 
   const chooseCarCount = useCallback((count: 2 | 3) => {
     setCarCount(count)
@@ -90,17 +96,20 @@ export default function CircuitRacingPlay() {
   }, [])
 
   const beginRace = useCallback(() => {
-    setPaused(false)
     setTargetIndex(0)
     setCameraMode(prefersReducedMotion() ? 'trackside' : 'chase')
     setPhase('race')
   }, [])
 
   const backToSelection = useCallback(() => {
-    setPaused(true)
     setCameraMode(prefersReducedMotion() ? 'trackside' : 'chase')
     setPhase('select')
   }, [])
+
+  const handleBoost = useCallback(() => {
+    boost(targetIndex)
+    setBoostFeedback((value) => value + 1)
+  }, [boost, targetIndex])
 
   const cameraButtons = useMemo(() => [
     { mode: 'chase' as const, label: 'おいかける', icon: '🚗' },
@@ -216,8 +225,14 @@ export default function CircuitRacingPlay() {
             <div className={styles.raceHeader}>
               <button type="button" className={styles.backButton} onClick={backToSelection}>‹ えらびなおす</button>
               <h1 className={styles.raceTitle}><span aria-hidden="true">🏁</span> はしってるよ！</h1>
-              <button type="button" className={styles.pauseButton} onClick={() => setPaused((value) => !value)}>
-                <span aria-hidden="true">{paused ? '▶' : 'Ⅱ'}</span>{paused ? 'つづける' : 'やすむ'}
+              <button
+                type="button"
+                className={styles.boostButton}
+                data-active={boostFeedback > 0 ? 'true' : 'false'}
+                aria-label={`${targetIndex + 1}だいめを かそく`}
+                onClick={handleBoost}
+              >
+                <span aria-hidden="true">⚡</span> かそく！
               </button>
             </div>
             <p className={styles.courseName}>{circuit.name}</p>
