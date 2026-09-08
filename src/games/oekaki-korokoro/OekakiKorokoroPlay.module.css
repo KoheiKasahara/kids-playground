@@ -49,7 +49,6 @@
 .dialog p { margin: 10px 0; }
 .dialogActions { display: flex; gap: 12px; justify-content: center; margin-top: 20px; }
 .dialogActions button { padding: 10px 20px; background: #e5eedc; }
-.dialog .saveNote { font-size: 13px; color: #847661; }
 .celebration { font-size: 36px; animation: celebrate .65s ease-out; }
 .error { color: #953b39; font-size: 13px; }
 @keyframes roll { from { transform: translateX(-45px) rotate(-15deg); } to { transform: translateX(45px) rotate(15deg); } }
@@ -98,4 +97,27 @@
   .actions button > span { font-size: 20px; }
   .actions .save { font-size: 15px; }
   .paperPicker > span { display: none; }
+}
+
+.workspace[hidden] { display: none; }
+.modePicker { display: flex; justify-content: center; gap: 8px; }
+.modePicker button { padding: 4px 12px; font-size: 14px; }
+.drawingTools { display: grid; gap: 10px; }
+.drawingTools button { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px; }
+.drawingTools button > span { font-size: 26px; }
+@media (max-width: 650px) and (orientation: portrait) {
+  .rollerWorkspace .caption { display: none; }
+  .drawingTools { grid-template-columns: 1fr 1fr; gap: 5px; }
+  .fallingActions { grid-template-columns: 1fr 1fr; }
+  .modePicker { gap: 5px; }
+  .modePicker button { font-size: 12px; padding: 4px 7px; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .modePicker { position: absolute; top: max(5px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); }
+  .modePicker button { font-size: 11px; padding: 4px 7px; }
+  .header .badge { display: none; }
+  .header h1 { font-size: 16px; }
+  .fallingTools { gap: 10px; width: 250px; }
+  .drawingTools { grid-template-columns: 1fr 1fr; gap: 4px; }
+  .drawingTools button { flex-direction: column; gap: 0; font-size: 12px; padding: 3px; }
 }

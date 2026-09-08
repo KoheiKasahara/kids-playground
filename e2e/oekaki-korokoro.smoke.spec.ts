@@ -11,11 +11,12 @@ async function stroke(page: Page, y = .45) {
   await page.mouse.up()
 }
 
-test('home → drawing → pattern/color → undo → paper → guarded clear → PNG → home', async ({ page }) => {
+test('home → drawing → pattern/color → undo → paper → guarded clear → celebration → home', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
   await page.getByRole('link', { name: 'おえかきコロコロ', exact: true }).click()
+  await page.getByRole('button', { name: '🌸 もようで おえかき' }).click()
   await expect(drawing(page)).toBeVisible()
   const blank = await pixels(page)
   await stroke(page)
@@ -42,32 +43,10 @@ test('home → drawing → pattern/color → undo → paper → guarded clear �
   expect(await pixels(page)).toBe(blank)
   await page.getByRole('button', { name: '1かい もどす' }).click()
   expect(await pixels(page)).toBe(first)
-  // Inspect the actual exported PNG, including opaque paper and ink.
-  await page.evaluate(() => {
-    document.addEventListener('click', e => {
-      const target = e.target
-      if (target instanceof HTMLAnchorElement && target.download) document.documentElement.dataset.savedPng = target.href
-    })
-  })
-  const downloading = page.waitForEvent('download')
+  const downloads: string[] = []
+  page.on('download', download => downloads.push(download.suggestedFilename()))
   await page.getByRole('button', { name: 'できた！', exact: true }).click()
-  const download = await downloading
-  expect(download.suggestedFilename()).toBe('oekaki-korokoro.png')
-  expect(await download.failure()).toBeNull()
-  const exported = await page.evaluate(async () => {
-    const img = new Image()
-    img.src = document.documentElement.dataset.savedPng!
-    await img.decode()
-    const canvas = document.createElement('canvas')
-    canvas.width = img.width; canvas.height = img.height
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(img, 0, 0)
-    return { width: img.width, height: img.height, corner: [...ctx.getImageData(0, 0, 1, 1).data], center: [...ctx.getImageData(144, 324, 1, 1).data] }
-  })
-  expect(exported.width).toBe(960)
-  expect(exported.height).toBe(720)
-  expect(exported.corner).toEqual([38, 54, 87, 255])
-  expect(exported.center).not.toEqual(exported.corner)
+  expect(downloads).toEqual([])
   await expect(page.getByRole('dialog', { name: 'できた！' })).toBeVisible()
   await page.getByRole('button', { name: 'もっと かく' }).click()
   await page.getByRole('link', { name: '← もどる' }).click()
@@ -79,8 +58,9 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
   test(`usable paper and controls at ${viewport.width}×${viewport.height}; resize preserves artwork`, async ({ page }) => {
     await page.setViewportSize(viewport)
     await page.goto('/games/oekaki-korokoro')
+    await page.getByRole('button', { name: '🌸 もようで おえかき' }).click()
     await expect(drawing(page)).toBeVisible()
-    for (const control of await page.locator('main button, main a').all()) {
+    for (const control of await page.locator('main button:visible, main a:visible').all()) {
       const box = (await control.boundingBox())!
       expect(box.width).toBeGreaterThanOrEqual(44)
       expect(box.height).toBeGreaterThanOrEqual(44)
@@ -104,6 +84,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
 
 test('real touch drag does not scroll; extra finger/cancel and pointer capture remain usable', async ({ page, context }) => {
   await page.goto('/games/oekaki-korokoro')
+  await page.getByRole('button', { name: '🌸 もようで おえかき' }).click()
   await expect(drawing(page)).toBeVisible()
   const blank = await pixels(page)
   const box = (await drawing(page).boundingBox())!
@@ -132,6 +113,7 @@ test('real touch drag does not scroll; extra finger/cancel and pointer capture r
 
 test('curved trails use every motif; sustained drawing stays responsive', async ({ page }, testInfo) => {
   await page.goto('/games/oekaki-korokoro')
+  await page.getByRole('button', { name: '🌸 もようで おえかき' }).click()
   await expect(drawing(page)).toBeVisible()
   await page.getByRole('button', { name: 'そら', exact: true }).click()
   const timings: number[] = []
