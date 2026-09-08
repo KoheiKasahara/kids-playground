@@ -6,6 +6,7 @@ import { loadCarVehicleBody, type CarVehicleBody } from '../car-builder/vehicleB
 import { RACE_CARS, type RaceCarId, type RaceSelection } from './raceConfig'
 import { CIRCUIT, CIRCUIT_SCENERY, type CircuitDefinition } from './circuit'
 import { createCircuitScenery } from './scenery'
+import { createCircuitRoad, ROAD_Y } from './road'
 import { createMotionProfile, sampleMotion, type MotionProfile } from './motion'
 
 // Camera placement is independent of the motion table and React state.
@@ -55,7 +56,6 @@ type CarVisual = {
 const CAMERA_FOV = 48
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 900
-const ROAD_Y = 0.024
 const MAX_DEVICE_PIXEL_RATIO = 2
 const BOOST_DURATION_SECONDS = 1.6
 const BOOST_SPEED_MULTIPLIER = 1.85
@@ -76,50 +76,6 @@ function own<T extends THREE.BufferGeometry | THREE.Material>(
 ): T {
   list.push(resource)
   return resource
-}
-
-function makeRibbon(
-  points: readonly PlainVector[],
-  halfWidth: number,
-  y: number,
-  color: string,
-  resources: Array<THREE.BufferGeometry | THREE.Material>,
-): THREE.Mesh {
-  const positions = new Float32Array(points.length * 2 * 3)
-  const indices: number[] = []
-  for (let index = 0; index < points.length; index += 1) {
-    const point = points[index]!
-    const previous = points[(index + points.length - 1) % points.length]!
-    const next = points[(index + 1) % points.length]!
-    const tangentX = next.x - previous.x
-    const tangentZ = next.z - previous.z
-    const tangentLength = Math.hypot(tangentX, tangentZ) || 1
-    const normalX = -tangentZ / tangentLength
-    const normalZ = tangentX / tangentLength
-    const offset = index * 6
-    positions[offset] = point.x - normalX * halfWidth
-    positions[offset + 1] = y
-    positions[offset + 2] = point.z - normalZ * halfWidth
-    positions[offset + 3] = point.x + normalX * halfWidth
-    positions[offset + 4] = y
-    positions[offset + 5] = point.z + normalZ * halfWidth
-    const nextIndex = (index + 1) % points.length
-    // The vertices are left, right for each sample.  Winding them left-right
-    // then next-left keeps the upward normal visible from the camera.
-    indices.push(index * 2, index * 2 + 1, nextIndex * 2)
-    indices.push(index * 2 + 1, nextIndex * 2 + 1, nextIndex * 2)
-  }
-  const geometry = own(new THREE.BufferGeometry(), resources)
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-  const material = own(
-    new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0.02 }),
-    resources,
-  )
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.receiveShadow = true
-  return mesh
 }
 
 function createWheelVisual(
@@ -241,55 +197,6 @@ function disposeCarVisual(car: CarVisual): void {
   car.root.removeFromParent()
 }
 
-function createRoadside(
-  roadEdge: number,
-  points: readonly PlainVector[],
-  resources: Array<THREE.BufferGeometry | THREE.Material>,
-): THREE.Group {
-  const group = new THREE.Group()
-  const postGeometry = own(new THREE.CylinderGeometry(0.07, 0.09, 0.9, 8), resources)
-  const postMaterial = own(new THREE.MeshStandardMaterial({ color: '#f7fbff', roughness: 0.65 }), resources)
-  const capGeometry = own(new THREE.BoxGeometry(0.26, 0.1, 0.08), resources)
-  const capMaterial = own(new THREE.MeshStandardMaterial({ color: '#f15b5b', roughness: 0.7 }), resources)
-  const railGeometry = own(new THREE.BoxGeometry(0.12, 0.5, 1), resources)
-  const railMaterial = own(new THREE.MeshStandardMaterial({ color: '#c9d2da', roughness: 0.5, metalness: 0.35 }), resources)
-
-  // Guardrails and posts are intentionally sparse so the track reads clearly
-  // at racing speed and remains light on low-power phones.
-  for (let index = 0; index < points.length; index += 8) {
-    const point = points[index]!
-    const next = points[(index + 1) % points.length]!
-    const dx = next.x - point.x
-    const dz = next.z - point.z
-    const length = Math.hypot(dx, dz) || 1
-    const tx = dx / length
-    const tz = dz / length
-    const nx = -tz
-    const nz = tx
-    for (const side of [-1, 1]) {
-      const x = point.x + nx * side * (roadEdge + 1.15)
-      const z = point.z + nz * side * (roadEdge + 1.15)
-      const post = new THREE.Mesh(postGeometry, postMaterial)
-      post.position.set(x, 0.45, z)
-      post.castShadow = true
-      group.add(post)
-      const cap = new THREE.Mesh(capGeometry, capMaterial)
-      cap.position.set(x, 0.82, z)
-      cap.rotation.y = Math.atan2(tx, tz)
-      group.add(cap)
-
-      if (index % 16 === 0) {
-        const rail = new THREE.Mesh(railGeometry, railMaterial)
-        rail.scale.z = Math.min(length * 6, 9)
-        rail.position.set(x + tx * rail.scale.z * 0.5, 0.54, z + tz * rail.scale.z * 0.5)
-        rail.rotation.y = Math.atan2(tx, tz)
-        group.add(rail)
-      }
-    }
-  }
-  return group
-}
-
 export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): CircuitRacingEngineHandle {
   const circuit = options.circuit ?? CIRCUIT
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -388,6 +295,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     scene.add(ground)
 
     let scenery: ReturnType<typeof createCircuitScenery> | undefined
+    let road: ReturnType<typeof createCircuitRoad> | undefined
     let tracksideAnchor: PlainVector
     try {
       curve.arcLengthDivisions = 4096
@@ -409,43 +317,9 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         y: 8,
         z: anchor.z + (dx / tangentLength) * (roadEdge + 8),
       }
-      const road = makeRibbon(referencePoints, roadEdge, ROAD_Y, palette.road, staticResources)
-      scene.add(road)
-
-      const curbGeometry = own(new THREE.BoxGeometry(0.46, 0.12, 1), staticResources)
-      const curbRed = own(new THREE.MeshStandardMaterial({ color: palette.curb, roughness: 0.86 }), staticResources)
-      const curbWhite = own(new THREE.MeshStandardMaterial({ color: '#fff8ec', roughness: 0.8 }), staticResources)
-      const lineGeometry = own(new THREE.BoxGeometry(0.14, 0.012, 1), staticResources)
-      const lineMaterial = own(new THREE.MeshStandardMaterial({ color: '#ffe99a', roughness: 0.82 }), staticResources)
-      for (let index = 0; index < referencePoints.length; index += 1) {
-        const point = referencePoints[index]!
-        const nextPoint = referencePoints[(index + 1) % referencePoints.length]!
-        const dxSegment = nextPoint.x - point.x
-        const dzSegment = nextPoint.z - point.z
-        const segmentLength = Math.hypot(dxSegment, dzSegment) || 1
-        const tx = dxSegment / segmentLength
-        const tz = dzSegment / segmentLength
-        const nx = -tz
-        const nz = tx
-        const angle = Math.atan2(tx, tz)
-        for (const side of [-1, 1]) {
-          const curb = new THREE.Mesh(curbGeometry, index % 2 === 0 ? curbRed : curbWhite)
-          curb.position.set(point.x + nx * side * (roadEdge + 0.27), ROAD_Y + 0.07, point.z + nz * side * (roadEdge + 0.27))
-          curb.rotation.y = angle
-          curb.scale.z = Math.min(segmentLength * 1.03, 6)
-          curb.receiveShadow = true
-          scene.add(curb)
-        }
-        if (index % 3 === 0) {
-          const line = new THREE.Mesh(lineGeometry, lineMaterial)
-          line.position.set(point.x, ROAD_Y + 0.014, point.z)
-          line.rotation.y = angle
-          line.scale.z = Math.min(segmentLength * 0.58, 2.5)
-          scene.add(line)
-        }
-      }
+      road = createCircuitRoad(circuit)
       scenery = createCircuitScenery(circuit)
-      scene.add(createRoadside(roadEdge, referencePoints, staticResources), scenery.group)
+      scene.add(road.group, scenery.group)
     } catch (error) {
       // A malformed circuit is recoverable from the UI and should not strand
       // the player on a blank page.
@@ -759,6 +633,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       }
       disposeCars()
       scenery?.dispose()
+      road?.dispose()
       staticResources.forEach((resource) => resource.dispose())
       hemisphere.dispose()
       sun.dispose()
@@ -780,3 +655,4 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
 
   return handle
 }
+

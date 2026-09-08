@@ -34,7 +34,7 @@ describe('circuit scenery', () => {
 
   it.each(CIRCUITS)('$id batches scenery within a mobile draw budget and releases all resources', (circuit) => {
     const scenery = createCircuitScenery(circuit)
-    expect(scenery.group.children.length).toBeLessThanOrEqual(40)
+    expect(scenery.group.children.length).toBeLessThanOrEqual(5)
     const bounds = new THREE.Box3().setFromObject(scenery.group)
     expect(bounds.min.x).toBeGreaterThan(-350)
     expect(bounds.max.x).toBeLessThan(350)
