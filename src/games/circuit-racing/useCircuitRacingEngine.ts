@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { CAR_VEHICLES } from '../car-builder/carVehicles'
 import { loadCarVehicleBody, type CarVehicleBody } from '../car-builder/vehicleBody'
 import { RACE_CARS, type RaceCarId, type RaceSelection } from './raceConfig'
-import { CIRCUIT } from './circuit'
+import { CIRCUIT, type CircuitDefinition } from './circuit'
 import { createMotionProfile, sampleMotion, type MotionProfile } from './motion'
 
 // Camera placement is independent of the motion table and React state.
@@ -19,6 +19,7 @@ export type CircuitRacingEngineStatus = 'loading' | 'ready' | 'error'
 
 export type CircuitRacingEngineOptions = {
   selections: readonly RaceSelection[]
+  circuit?: CircuitDefinition
   running: boolean
   cameraMode: RaceCameraMode
   targetIndex: number
@@ -49,7 +50,6 @@ const CAMERA_FOV = 48
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 900
 const ROAD_Y = 0.024
-const ROAD_EDGE = CIRCUIT.width / 2
 const MAX_DEVICE_PIXEL_RATIO = 2
 
 function plainVector(value: THREE.Vector3): PlainVector {
@@ -209,6 +209,7 @@ function disposeCarVisual(car: CarVisual): void {
 }
 
 function createRoadside(
+  roadEdge: number,
   points: readonly PlainVector[],
   resources: Array<THREE.BufferGeometry | THREE.Material>,
 ): THREE.Group {
@@ -233,8 +234,8 @@ function createRoadside(
     const nx = -tz
     const nz = tx
     for (const side of [-1, 1]) {
-      const x = point.x + nx * side * (ROAD_EDGE + 1.15)
-      const z = point.z + nz * side * (ROAD_EDGE + 1.15)
+      const x = point.x + nx * side * (roadEdge + 1.15)
+      const z = point.z + nz * side * (roadEdge + 1.15)
       const post = new THREE.Mesh(postGeometry, postMaterial)
       post.position.set(x, 0.45, z)
       post.castShadow = true
@@ -319,6 +320,7 @@ function createSceneDecor(
 }
 
 export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): CircuitRacingEngineHandle {
+  const circuit = options.circuit ?? CIRCUIT
   const containerRef = useRef<HTMLDivElement | null>(null)
   const optionsRef = useRef(options)
   const syncSelectionsRef = useRef<((selections: readonly RaceSelection[]) => void) | null>(null)
@@ -352,6 +354,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
   useEffect(() => {
     const host = containerRef.current
     if (host === null || typeof window === 'undefined') return undefined
+    const curve = circuit.curve.clone()
+    const roadEdge = circuit.width / 2
     const sceneHost = host
     let renderer: THREE.WebGLRenderer | null = null
     let controls: OrbitControls | null = null
@@ -366,7 +370,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     let previousCameraMode: RaceCameraMode | null = null
     let lastCameraKey = ''
     let overviewActive = false
-    const circuitBounds = new THREE.Box3().setFromPoints(CIRCUIT.curve.getPoints(1024)).expandByScalar(ROAD_EDGE + 1)
+    const circuitBounds = new THREE.Box3().setFromPoints(curve.getPoints(1024)).expandByScalar(roadEdge + 1)
     let dirty = true
     let currentKey = ''
     let cars: CarVisual[] = []
@@ -412,10 +416,10 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
 
     let tracksideAnchor: PlainVector
     try {
-      CIRCUIT.curve.arcLengthDivisions = 4096
-      CIRCUIT.curve.updateArcLengths()
+      curve.arcLengthDivisions = 4096
+      curve.updateArcLengths()
       const referencePoints = Array.from({ length: 192 }, (_, index) => {
-        const point = CIRCUIT.curve.getPointAt(index / 192)
+        const point = curve.getPointAt(index / 192)
         point.y = ROAD_Y
         return point
       })
@@ -427,11 +431,11 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       const dz = next.z - previous.z
       const tangentLength = Math.hypot(dx, dz) || 1
       tracksideAnchor = {
-        x: anchor.x + (-dz / tangentLength) * (ROAD_EDGE + 8),
+        x: anchor.x + (-dz / tangentLength) * (roadEdge + 8),
         y: 8,
-        z: anchor.z + (dx / tangentLength) * (ROAD_EDGE + 8),
+        z: anchor.z + (dx / tangentLength) * (roadEdge + 8),
       }
-      const road = makeRibbon(referencePoints, ROAD_EDGE, ROAD_Y, staticResources)
+      const road = makeRibbon(referencePoints, roadEdge, ROAD_Y, staticResources)
       scene.add(road)
 
       const curbGeometry = own(new THREE.BoxGeometry(0.46, 0.12, 1), staticResources)
@@ -452,7 +456,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         const angle = Math.atan2(tx, tz)
         for (const side of [-1, 1]) {
           const curb = new THREE.Mesh(curbGeometry, index % 2 === 0 ? curbRed : curbWhite)
-          curb.position.set(point.x + nx * side * (ROAD_EDGE + 0.27), ROAD_Y + 0.07, point.z + nz * side * (ROAD_EDGE + 0.27))
+          curb.position.set(point.x + nx * side * (roadEdge + 0.27), ROAD_Y + 0.07, point.z + nz * side * (roadEdge + 0.27))
           curb.rotation.y = angle
           curb.scale.z = Math.min(segmentLength * 1.03, 6)
           curb.receiveShadow = true
@@ -466,7 +470,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
           scene.add(line)
         }
       }
-      scene.add(createRoadside(referencePoints, staticResources), createSceneDecor(referencePoints, staticResources))
+      scene.add(createRoadside(roadEdge, referencePoints, staticResources), createSceneDecor(referencePoints, staticResources))
     } catch (error) {
       // A malformed circuit is recoverable from the UI and should not strand
       // the player on a blank page.
@@ -591,7 +595,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
           const selection = selections[index]
           if (selection === undefined) continue
           const lane = selections.length === 2 ? [-3, 3][index] : [-3, 0, 3][index]
-          const profile = createMotionProfile(raceCarDefinition(selection.carId), CIRCUIT.curve, lane)
+          const profile = createMotionProfile(raceCarDefinition(selection.carId), curve, lane)
           const body = await loadCarVehicleBody(selection.carId)
           loaded.push({ selection, profile, body })
           if (released || token !== loadingToken) {
@@ -768,9 +772,9 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       }
       if (canvas !== null && canvas.parentNode === sceneHost) sceneHost.removeChild(canvas)
     }
-    // The scene is created once.  Selection/running/camera changes travel
+    // Rebuild and dispose the scene when the course changes. Car/camera changes travel
     // through refs so StrictMode does not create duplicate renderers.
-  }, [generation])
+  }, [generation, circuit])
 
   return handle
 }

@@ -3,6 +3,7 @@ import * as THREE from 'three'
 export type CircuitDefinition = {
   id: string
   name: string
+  description: string
   width: number
   curve: THREE.CatmullRomCurve3
 }
@@ -31,8 +32,8 @@ const CONTROL_POINTS: readonly [number, number][] = [
   [-136, -25],
 ]
 
-function createCurve(): THREE.CatmullRomCurve3 {
-  const points = CONTROL_POINTS.map(([x, z]) => new THREE.Vector3(x, 0, z))
+function createCurve(controlPoints: readonly [number, number][] = CONTROL_POINTS): THREE.CatmullRomCurve3 {
+  const points = controlPoints.map(([x, z]) => new THREE.Vector3(x, 0, z))
   return new THREE.CatmullRomCurve3(points, true, 'centripetal', 0.5)
 }
 
@@ -40,9 +41,60 @@ export function buildCircuit(): CircuitDefinition {
   return {
     id: 'classic-circuit',
     name: 'みんなのサーキット',
+    description: 'まっすぐも カーブも！',
     width: 12,
     curve: createCurve(),
   }
 }
 
 export const CIRCUIT: CircuitDefinition = buildCircuit()
+
+
+/** Each route is a flat, non-crossing loop with room for all three lanes. */
+export const CIRCUITS: readonly CircuitDefinition[] = [
+  CIRCUIT,
+  {
+    id: 'speed-oval',
+    name: 'びゅんびゅんオーバル',
+    description: 'ながい みちを びゅーん！',
+    width: 12,
+    curve: createCurve([
+      [-110, -60], [-40, -60], [40, -60], [110, -60],
+      [152, -42], [170, 0], [152, 42], [110, 60],
+      [40, 60], [-40, 60], [-110, 60], [-152, 42], [-170, 0], [-152, -42],
+    ]),
+  },
+  {
+    id: 's-curves',
+    name: 'くねくねカーブ',
+    description: 'みぎへ ひだりへ くねくね！',
+    width: 12,
+    curve: createCurve([
+      [-145, -45], [-100, -65], [-55, -35], [-10, -65],
+      [35, -35], [80, -65], [125, -45], [155, 0],
+      [125, 60], [60, 80], [-30, 80], [-115, 65], [-155, 20],
+    ]),
+  },
+  {
+    id: 'hairpin',
+    name: 'ぐるっとヘアピン',
+    description: 'ゆっくり まがって また ダッシュ！',
+    width: 12,
+    curve: createCurve([
+      [-130, -70], [-50, -70], [40, -70], [130, -70],
+      [155, -30], [145, 50], [100, 80], [65, 50],
+      [60, 0], [35, -25], [10, 0], [5, 50],
+      [-35, 80], [-110, 65], [-145, 20],
+    ]),
+  },
+]
+
+/** The selector uses the same sampled curve as the road, not a separate icon. */
+export function circuitPreview(circuit: CircuitDefinition): { viewBox: string; points: string } {
+  const points = circuit.curve.getPoints(160)
+  const bounds = new THREE.Box3().setFromPoints(points).expandByScalar(16)
+  return {
+    viewBox: `${bounds.min.x} ${bounds.min.z} ${bounds.max.x - bounds.min.x} ${bounds.max.z - bounds.min.z}`,
+    points: points.map((point) => `${point.x.toFixed(1)},${point.z.toFixed(1)}`).join(' '),
+  }
+}

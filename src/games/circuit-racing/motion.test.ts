@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { CIRCUIT } from './circuit'
+import { CIRCUIT, CIRCUITS } from './circuit'
 import { RACE_CARS } from './raceConfig'
 import { createMotionProfile, sampleMotion } from './motion'
 
@@ -87,5 +87,32 @@ describe('circuit motion', () => {
       expect(after.position.distanceTo(before.position) / (2 * epsilon)).toBeCloseTo(at.speed, 1)
       expect(at.position).toBeInstanceOf(THREE.Vector3)
     }
+  })
+})
+
+
+describe('all selectable routes', () => {
+  it.each(CIRCUITS)('$id supports every car and lane across a full lap', (course) => {
+    for (const car of RACE_CARS) {
+      for (const lane of laneOffsets) {
+        const profile = createMotionProfile(car, course.curve, lane)
+        expect(profile.duration).toBeGreaterThan(0)
+        expect(Number.isFinite(profile.duration)).toBe(true)
+        for (const sample of profile.samples) {
+          expect(sample.position.toArray().every(Number.isFinite)).toBe(true)
+          expect(sample.speed).toBeGreaterThan(0)
+          expect(sample.speed).toBeLessThanOrEqual(car.maxSpeed + 1e-8)
+        }
+        const start = sampleMotion(profile, 0)
+        expect(sampleMotion(profile, profile.duration).position.distanceTo(start.position)).toBeLessThan(1e-6)
+      }
+    }
+  })
+
+  it('makes the oval faster and the hairpin demand more braking', () => {
+    const oval = createMotionProfile(RACE_CARS[0], CIRCUITS[1]!.curve, 0)
+    const hairpin = createMotionProfile(RACE_CARS[0], CIRCUITS[3]!.curve, 0)
+    expect(oval.length / oval.duration).toBeGreaterThan(hairpin.length / hairpin.duration)
+    expect(Math.min(...oval.samples.map((s) => s.speed))).toBeGreaterThan(Math.min(...hairpin.samples.map((s) => s.speed)))
   })
 })
