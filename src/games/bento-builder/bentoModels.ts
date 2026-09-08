@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { DIVIDER_HALF, FLOOR_Y, FOODS, HALF_DEPTH, HALF_WIDTH, ROUND_RADIUS, type BoxKind, type FoodDefinition, type FoodKind } from './bentoState'
+import { CUPS, type CupKind, DIVIDER_HALF, FLOOR_Y, FOODS, HALF_DEPTH, HALF_WIDTH, ROUND_RADIUS, type BoxKind, type FoodDefinition, type FoodKind } from './bentoState'
 
 function mesh(geometry: THREE.BufferGeometry, color: string, x = 0, y = 0, z = 0) {
   const object = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, roughness: 0.75 }))
@@ -71,6 +71,57 @@ export function createHandmadeFood(kind: FoodKind): THREE.Group {
   return root
 }
 
+/** Shallow, fluted plastic cup. Its rim stays inside the food's placement radius. */
+export function createFoodCup(radius: number, kind: CupKind): THREE.Group {
+  const root = new THREE.Group()
+  root.name = 'food-cup'
+  const color = CUPS.find(cup => cup.id === kind)!.color
+  const segments = 64
+  const vertices: number[] = []
+  const indices: number[] = []
+  for (let row = 0; row < 2; row++) for (let i = 0; i <= segments; i++) {
+    const angle = i / segments * Math.PI * 2
+    const r = radius * (row === 0 ? 0.76 : (i % 2 ? 0.94 : 1))
+    vertices.push(Math.cos(angle) * r, row === 0 ? 0.018 : 0.18, Math.sin(angle) * r)
+  }
+  for (let i = 0; i < segments; i++) {
+    const top = i + segments + 1
+    indices.push(i, top, i + 1, i + 1, top, top + 1)
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  const wall = mesh(geometry, color)
+  wall.material.side = THREE.DoubleSide
+  wall.material.roughness = 0.5
+  wall.castShadow = false
+  const bottom = mesh(new THREE.CylinderGeometry(radius * 0.76, radius * 0.76, 0.025, 48), color, 0, 0.0125)
+  root.add(bottom, wall)
+  return root
+}
+
+// Imported FBX materials carry dark colors and 40% metalness. Food is dielectric;
+// use a fresh palette without increasing every light and washing out the rice.
+const FOOD_PALETTE: Record<string, string> = {
+  White: '#fff9e9', Yellow: '#ffd23f', Orange: '#ff9347',
+  LightGreen: '#9ddd60', DarkGreen: '#43a83c', DarkRed: '#f34438',
+}
+export function freshenFoodMaterials(source: THREE.Object3D) {
+  source.traverse(object => {
+    if (!(object instanceof THREE.Mesh)) return
+    for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+      if (!(material instanceof THREE.MeshStandardMaterial)) continue
+      const color = FOOD_PALETTE[material.name]
+      if (color) material.color.set(color)
+      material.metalness = 0
+      material.roughness = material.name === 'DarkRed' ? 0.38 : 0.68
+    }
+    // Avoid harsh self-shadow bands on small low-poly foods; they still cast a floor shadow.
+    object.receiveShadow = false
+  })
+}
+
 /** Center X/Z and put the actual lowest vertex on the floor, independent of source origins. */
 export function normalizeFood(source: THREE.Object3D, definition: FoodDefinition): THREE.Group {
   const root = new THREE.Group()
@@ -89,7 +140,7 @@ export function normalizeFood(source: THREE.Object3D, definition: FoodDefinition
   source.traverse(object => {
     if (object instanceof THREE.Mesh) {
       object.castShadow = true
-      object.receiveShadow = true
+      object.receiveShadow = false
     }
   })
   root.updateMatrixWorld(true)
@@ -103,6 +154,7 @@ export async function loadFoodTemplates(): Promise<Map<FoodKind, THREE.Group>> {
     const source = definition.model
       ? (await loader.loadAsync(`${import.meta.env.BASE_URL}models/bento-builder/${definition.model}`)).scene
       : createHandmadeFood(definition.id)
+    freshenFoodMaterials(source)
     return [definition.id, normalizeFood(source, definition)] as const
   }))
   const templates = new Map<FoodKind, THREE.Group>()

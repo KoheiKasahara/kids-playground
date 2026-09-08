@@ -132,6 +132,39 @@ describe('ColorPaintPuzzlePlay', () => {
     expect(getAreaButton('くるまの ボディ')).toHaveAttribute('fill', '#e8453c')
   })
 
+  test('船を開き直すたびに描画面を更新し、塗った色と完成演出では同じ描画面を保つ', () => {
+    const { container } = renderPlay()
+    for (const label of ['でんしゃ', 'ひこうき', 'さかな']) {
+      fireEvent.click(screen.getByRole('button', { name: label }))
+      const previousCanvas = screen.getByRole('img', { name: `${label}の ぬりえ` })
+      fireEvent.click(screen.getByRole('button', { name: 'ふね' }))
+      const shipCanvas = screen.getByRole('img', { name: 'ふねの ぬりえ' })
+      expect(previousCanvas).not.toBeInTheDocument()
+      expect(shipCanvas.querySelector('[data-motion-part="shipFlag"] path')).not.toBeNull()
+      expect(shipCanvas.querySelectorAll('[data-motion-part="shipWave"] path')).toHaveLength(2)
+
+      fireEvent.click(getAreaButton('ふねの せんたい'))
+      expect(getAreaFill(container, 'hull')).toBe('#e8453c')
+      expect(screen.getByRole('img', { name: 'ふねの ぬりえ' })).toBe(shipCanvas)
+      fireEvent.click(finishButton())
+      expect(shipCanvas).toHaveAttribute('data-phase', 'celebrating')
+      fireEvent.click(screen.getByRole('button', { name: 'もういちどぬる' }))
+      expect(screen.getByRole('img', { name: 'ふねの ぬりえ' })).toBe(shipCanvas)
+      expect(getAreaFill(container, 'hull')).toBe('#e8453c')
+    }
+  })
+
+  test('塗った直後に船へ切り替えても、同じIDの空に塗りの演出が残らない', () => {
+    const { container } = renderPlay()
+    fireEvent.click(getAreaButton('そら'))
+    expect(getAreaShape(container, 'sky')).toHaveAttribute('data-paint-feedback')
+    fireEvent.click(screen.getByRole('button', { name: 'ふね' }))
+    expect(container.querySelector('[data-paint-feedback]')).toBeNull()
+    expect(getAreaFill(container, 'sky')).toBe(UNPAINTED_FILL)
+    fireEvent.click(screen.getByRole('button', { name: 'くるま' }))
+    expect(getAreaFill(container, 'sky')).toBe('#e8453c')
+  })
+
   test('全塗りエリアがrole="button"かつアクセシブルネームを持つ', () => {
     renderPlay()
     const allButtons = screen.getAllByRole('button')

@@ -1,0 +1,25 @@
+/* SVGの透明な余白は盤面を透かす。影は四角い領域ではなく形に沿わせる。 */
+.toy {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  overflow: visible;
+  filter: drop-shadow(0 3px 2px rgba(55, 75, 84, 0.28));
+}
+
+.toy[data-variant='selected'] {
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 3px #536dfe);
+}
+
+.toy[data-variant='dragging'] {
+  filter: brightness(1.08) drop-shadow(0 5px 3px rgba(33, 37, 41, 0.35));
+}
+
+.toy[data-variant='ghost'] {
+  opacity: 0.45;
+  filter: none;
+}

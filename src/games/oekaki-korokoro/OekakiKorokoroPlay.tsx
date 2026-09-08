@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, typ
 import { Link } from 'react-router-dom'
 import { COLORS, PAPERS, PATTERNS, PAPER_HEIGHT, PAPER_WIDTH, STAMP_SCALE, type Pattern } from './rollerData'
 import { advanceStroke, finishStroke, startStroke, type StrokeCursor } from './rollerStroke'
-import { composePicture, drawPaper, drawStamps } from './rollerDrawing'
+import { drawPaper, drawStamps } from './rollerDrawing'
+import FallingDrawingPlay from './FallingDrawingPlay'
 import styles from './OekakiKorokoroPlay.module.css'
 
 function Motif({ pattern }: { pattern: Pattern }) {
@@ -18,6 +19,7 @@ function Dialog({ children, title, close }: { children: ReactNode; title: string
 }
 
 export default function OekakiKorokoroPlay() {
+  const [mode, setMode] = useState<'falling' | 'roller'>('falling')
   const [pattern, setPattern] = useState<Pattern>(PATTERNS[0])
   const [color, setColor] = useState<string>(COLORS[0].value)
   const [paper, setPaper] = useState(PAPERS[0] as typeof PAPERS[number])
@@ -136,21 +138,10 @@ export default function OekakiKorokoroPlay() {
     setModal(null)
   }
 
-  function save() {
+  function celebrate() {
     endStroke()
-    try {
-      const picture = composePicture(ink.current!, paper)
-      const link = document.createElement('a')
-      link.href = picture.toDataURL('image/png')
-      link.download = 'oekaki-korokoro.png'
-      document.body.append(link)
-      link.click()
-      link.remove()
-      setModal('done')
-      setError('')
-    } catch {
-      setError('ほぞんできなかったよ。もういちど おしてね')
-    }
+    setModal('done')
+    setError('')
   }
 
   return <main className={styles.page} style={{ '--ink': color } as CSSProperties}>
@@ -159,7 +150,12 @@ export default function OekakiKorokoroPlay() {
       <h1>おえかきコロコロ</h1>
       <span className={styles.badge} aria-hidden="true">じゆうに あそぼう</span>
     </header>
-    <div className={styles.workspace}>
+    <div className={styles.modePicker} role="group" aria-label="あそびを えらぶ">
+      <button aria-pressed={mode === 'falling'} onClick={() => { endStroke(); setMode('falling') }}>✏️ かいて ころがす</button>
+      <button aria-pressed={mode === 'roller'} onClick={() => setMode('roller')}>🌸 もようで おえかき</button>
+    </div>
+    <FallingDrawingPlay active={mode === 'falling'} />
+    <div className={`${styles.workspace} ${styles.rollerWorkspace}`} hidden={mode !== 'roller'}>
       <section className={styles.studio} aria-label="おえかき">
         <div className={styles.caption}>
           <span>ゆびで なぞって コロコロ！</span>
@@ -190,12 +186,12 @@ export default function OekakiKorokoroPlay() {
         <div className={styles.actions}>
           <button disabled={!canUndo} onClick={undo}><span aria-hidden="true">↶</span>1かい もどす</button>
           <button disabled={!hasInk} onClick={() => { endStroke(); setModal('clear') }}><span aria-hidden="true">▱</span>ぜんぶ けす</button>
-          <button className={styles.save} onClick={save}><span aria-hidden="true">★</span>できた！</button>
+          <button className={styles.save} onClick={celebrate}><span aria-hidden="true">★</span>できた！</button>
         </div>
       </aside>
     </div>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {modal === 'clear' && <Dialog title="ぜんぶ けしても いい？" close={() => setModal(null)}><p>あたらしい えを かこう</p><div className={styles.dialogActions}><button autoFocus onClick={() => setModal(null)}>まだ かく</button><button onClick={clear}>けす</button></div></Dialog>}
-    {modal === 'done' && <Dialog title="できた！" close={() => setModal(null)}><div className={styles.celebration} aria-hidden="true">✦ 🌸 ★ 🌈 ✦</div><p>すてきな えに なったね！</p><p className={styles.saveNote}>えを PNGで ダウンロードするよ</p><div className={styles.dialogActions}><button autoFocus onClick={() => setModal(null)}>もっと かく</button></div></Dialog>}
+    {modal === 'done' && <Dialog title="できた！" close={() => setModal(null)}><div className={styles.celebration} aria-hidden="true">✦ 🌸 ★ 🌈 ✦</div><p>すてきな えに なったね！</p><div className={styles.dialogActions}><button autoFocus onClick={() => setModal(null)}>もっと かく</button></div></Dialog>}
   </main>
 }

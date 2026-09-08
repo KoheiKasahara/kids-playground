@@ -185,11 +185,12 @@ export default function CircuitRacingPlay() {
                               onClick={() => chooseCar(slot, car.id)}
                             >
                               <span className={styles.carEmoji} aria-hidden="true">{car.emoji}</span>
-                              <span>{car.label}</span>
+                              <span>{selection.carId === car.id ? '✓ ' : ''}{car.label}</span>
                             </button>
                           )
                         })}
                       </div>
+                      <p className={styles.carDescription}>{selectedCar.description}</p>
                       <div className={styles.colorRow} aria-label={`${selectedCar.label}の いろを えらぶ`}>
                         <span className={styles.colorLabel}>いろ</span>
                         {RACE_COLORS.map((color) => (

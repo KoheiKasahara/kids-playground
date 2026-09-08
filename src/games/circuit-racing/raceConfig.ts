@@ -1,5 +1,5 @@
-/** The three raceable models are the small CC0 vehicles already used by car-builder. */
-export type RaceCarId = 'sportsCar' | 'car' | 'suv'
+/** Race cars reuse the vehicle models and axle dimensions from car-builder. */
+export type RaceCarId = 'sportsCar' | 'car' | 'suv' | 'policeCar' | 'ambulance' | 'taxi' | 'pickup' | 'van'
 
 /**
  * The tuning values use SI units: speed is m/s, and the three rates are m/s².
@@ -28,7 +28,7 @@ export type RaceColor = {
 }
 
 /**
- * Race-tuned values for the existing SportsCar, NormalCar and SUV models.
+ * Race-tuned values for the existing vehicle models.
  * Keep this as an array so the selection order remains obvious in the UI.
  */
 export const RACE_CARS: readonly RaceCarDefinition[] = [
@@ -61,6 +61,56 @@ export const RACE_CARS: readonly RaceCarDefinition[] = [
     acceleration: 3.8,
     braking: 7.5,
     cornering: 7.1,
+  },
+  {
+    id: 'policeCar',
+    label: 'パトカー',
+    emoji: '🚓',
+    description: 'ぐんぐん スピードアップ',
+    maxSpeed: 48,
+    acceleration: 6.5,
+    braking: 10,
+    cornering: 10.8,
+  },
+  {
+    id: 'ambulance',
+    label: 'きゅうきゅうしゃ',
+    emoji: '🚑',
+    description: 'おおきな からだで すいすい',
+    maxSpeed: 41,
+    acceleration: 4.2,
+    braking: 9,
+    cornering: 7.8,
+  },
+  {
+    id: 'taxi',
+    label: 'タクシー',
+    emoji: '🚕',
+    description: 'カーブを くるりと まがる',
+    maxSpeed: 43,
+    acceleration: 5.1,
+    braking: 9.5,
+    cornering: 11.5,
+  },
+  {
+    id: 'pickup',
+    label: 'ピックアップ',
+    emoji: '🛻',
+    description: 'ながい みちで ぐんぐん',
+    maxSpeed: 46,
+    acceleration: 4.1,
+    braking: 7.8,
+    cornering: 7.5,
+  },
+  {
+    id: 'van',
+    label: 'バン',
+    emoji: '🚐',
+    description: 'ゆったり なめらかに はしる',
+    maxSpeed: 38,
+    acceleration: 3.6,
+    braking: 8,
+    cornering: 8.5,
   },
 ]
 

@@ -1,4 +1,5 @@
-import { FAN_ANGLES, isAirToy, partDefinition, type PartAppearance, type PartSegment, type PartTypeId } from './partTypes'
+import AirToyShape from './AirToyShape'
+import { isAirToy, partDefinition, type PartAppearance, type PartSegment, type PartTypeId } from './partTypes'
 import styles from './PartShape.module.css'
 
 /**
@@ -47,24 +48,7 @@ type PartShapeProps = {
 export default function PartShape({ typeId, variant = 'placed', motionRef }: PartShapeProps) {
   const definition = partDefinition(typeId)
   if (isAirToy(typeId)) {
-    const angle = FAN_ANGLES[typeId as keyof typeof FAN_ANGLES] ?? 0
-    return <svg aria-hidden="true" viewBox="-30 -30 60 60" className={`${styles.airToy} ${styles[variant]}`}>
-      {definition.appearance === 'fan' ? <g transform={`rotate(${angle})`}>
-        <rect x="-26" y="-26" width="52" height="52" rx="12" fill="#d9faff" stroke="#199bb1" strokeDasharray="4 3" />
-        <circle cx="-13" cy="0" r="12" fill="#43c4ce" stroke="#126e83" strokeWidth="3" />
-        <path d="M-20 -7L-6 7M-20 7L-6 -7" stroke="white" strokeWidth="4" />
-        <path d="M3 -14H23M3 0H25M3 14H23M18 -6L25 0L18 6" fill="none" stroke="#12889c" strokeWidth="3" />
-      </g> : definition.appearance === 'bubbleLift' ? <>
-        <circle r="23" fill="#e6faff" stroke="#38bdce" strokeWidth="3" />
-        <path d="M-14 -9Q-13 -17 -5 -18" fill="none" stroke="white" strokeWidth="5" />
-        <path d="M0 13V-8M-8 0L0 -8L8 0" fill="none" stroke="#2696bb" strokeWidth="4" />
-        <circle cx="-16" cy="22" r="5" fill="#8ee8ef" /><circle cx="15" cy="23" r="4" fill="#8ee8ef" />
-      </> : <>
-        <ellipse rx="22" ry="25" fill={typeId === 'warpIn' ? '#dcedff' : '#fff0ce'} stroke={typeId === 'warpIn' ? '#3974e7' : '#e58918'} strokeWidth="5" />
-        <ellipse rx="13" ry="17" fill={typeId === 'warpIn' ? '#497edb' : '#efa13b'} />
-        <path d={typeId === 'warpIn' ? 'M0 -12V10M-7 3L0 10L7 3' : 'M0 -10V12M-7 5L0 12L7 5'} stroke="white" strokeWidth="4" fill="none" />
-      </>}
-    </svg>
+    return <AirToyShape typeId={typeId} variant={variant} />
   }
   if (definition.appearance === 'jumpRamp') {
     const [deck] = definition.segments

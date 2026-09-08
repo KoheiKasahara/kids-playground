@@ -20,14 +20,23 @@ export const FOODS: FoodDefinition[] = [
   { id: 'carrot', name: 'にんじん', emoji: '🥕', radius: 0.49, model: 'carrot.glb', rotation: 0, tilt: Math.PI / 2 },
 ]
 export const foodDefinition = (kind: FoodKind) => FOODS.find(food => food.id === kind)!
-export const MAX_FOODS = 20
+export type CupKind = 'green' | 'pink' | 'blue'
+export const CUPS: { id: CupKind; name: string; color: string }[] = [
+  { id: 'green', name: 'みどり', color: '#82d871' },
+  { id: 'pink', name: 'ピンク', color: '#ff9fbb' },
+  { id: 'blue', name: 'あお', color: '#83d5f3' },
+]
+export const MAX_FOODS = 40
+// Footprint circles include empty corners around long/triangular foods.
+// Allow those margins to touch so children can pack food closely.
+export const PACKING_RATIO = 0.74
 export const HALF_WIDTH = 3
 export const HALF_DEPTH = 2.2
 export const ROUND_RADIUS = 2.65
 export const DIVIDER_HALF = 0.1
 export const FLOOR_Y = 0.2
 export type Point = { x: number; z: number }
-export type Food = Point & { id: number; kind: FoodKind; rotation: number }
+export type Food = Point & { id: number; kind: FoodKind; rotation: number; cup?: CupKind }
 export type BentoState = {
   mode: 'choose' | 'edit' | 'done'; box: BoxKind; color: string
   foods: Food[]; selected: number | null; nextId: number; message: string
@@ -51,22 +60,22 @@ export function clampToBox(box: BoxKind, p: Point, radius: number): Point {
   }
   return { x, z }
 }
-export function fits(box: BoxKind, p: Point, radius: number, others: Food[]): boolean {
+export function fits(box: BoxKind, p: Point, radius: number, others: Food[], contactRadius = radius * PACKING_RATIO): boolean {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) return false
   const bounded = clampToBox(box, p, radius)
   if (Math.hypot(bounded.x - p.x, bounded.z - p.z) > 0.0001) return false
   // A little contact is allowed; large overlaps are prevented without rigid-body physics.
-  return others.every(other => Math.hypot(other.x - p.x, other.z - p.z) >= (radius + foodDefinition(other.kind).radius) * 0.9)
+  return others.every(other => Math.hypot(other.x - p.x, other.z - p.z) >= contactRadius + foodDefinition(other.kind).radius * (other.cup ? 1 : PACKING_RATIO))
 }
-export function findPlacement(box: BoxKind, desired: Point, radius: number, others: Food[], searchDistance: number): Point | null {
+export function findPlacement(box: BoxKind, desired: Point, radius: number, others: Food[], searchDistance: number, contactRadius = radius * PACKING_RATIO): Point | null {
   if (!Number.isFinite(desired.x) || !Number.isFinite(desired.z)) return null
   const origin = clampToBox(box, desired, radius)
-  if (fits(box, origin, radius, others)) return origin
+  if (fits(box, origin, radius, others, contactRadius)) return origin
   for (let distance = 0.12; distance <= searchDistance; distance += 0.12) {
     for (let step = 0; step < 32; step++) {
       const angle = step * Math.PI / 16
       const p = { x: origin.x + Math.cos(angle) * distance, z: origin.z + Math.sin(angle) * distance }
-      if (fits(box, p, radius, others)) return p
+      if (fits(box, p, radius, others, contactRadius)) return p
     }
   }
   return null
@@ -74,6 +83,7 @@ export function findPlacement(box: BoxKind, desired: Point, radius: number, othe
 export type BentoAction =
   | { type: 'box'; box: BoxKind } | { type: 'color'; color: string }
   | { type: 'start' | 'back' | 'finish' | 'edit' | 'restart' | 'rotate' | 'remove' }
+  | { type: 'cup'; cup: CupKind | null }
   | { type: 'add'; kind: FoodKind } | { type: 'select'; id: number | null }
   | { type: 'move'; id: number; point: Point }
 export function bentoReducer(state: BentoState, action: BentoAction): BentoState {
@@ -96,13 +106,27 @@ export function bentoReducer(state: BentoState, action: BentoAction): BentoState
       const food = { ...point, id: state.nextId, kind: action.kind, rotation: definition.rotation }
       return { ...state, foods: [...state.foods, food], selected: food.id, nextId: food.id + 1, message: `${definition.name}を いれたよ！ ゆびで うごかせるよ` }
     }
+    case 'cup': {
+      const selected = state.foods.find(food => food.id === state.selected)
+      if (!selected || selected.cup === (action.cup ?? undefined)) return state
+      const radius = foodDefinition(selected.kind).radius
+      // Plastic rims need their full footprint, even when nearby food is packed tightly.
+      const point = action.cup ? findPlacement(state.box, selected, radius,
+        state.foods.filter(food => food.id !== selected.id), 0.6, radius) : selected
+      if (!point) return { ...state, message: 'カップの ばしょを あけてね。おかずを すこし うごかそう' }
+      return {
+        ...state,
+        foods: state.foods.map(food => food.id === selected.id ? { ...food, ...point, cup: action.cup ?? undefined } : food),
+        message: action.cup ? 'カップに いれたよ！ いっしょに うごかせるよ' : 'カップを はずしたよ',
+      }
+    }
     case 'select': return { ...state, selected: state.foods.some(food => food.id === action.id) ? action.id : null, message: '' }
     case 'remove': return { ...state, foods: state.foods.filter(food => food.id !== state.selected), selected: null, message: 'とりだしたよ' }
     case 'rotate': return { ...state, foods: state.foods.map(food => food.id === state.selected ? { ...food, rotation: (food.rotation + Math.PI / 2) % (Math.PI * 2) } : food) }
     case 'move': {
       const food = state.foods.find(item => item.id === action.id)
       if (!food) return state
-      const point = findPlacement(state.box, action.point, foodDefinition(food.kind).radius, state.foods.filter(item => item.id !== food.id), 0.6)
+      const point = findPlacement(state.box, action.point, foodDefinition(food.kind).radius, state.foods.filter(item => item.id !== food.id), 0.6, food.cup ? foodDefinition(food.kind).radius : undefined)
       return { ...state, foods: state.foods.map(item => item.id === food.id ? { ...item, ...(point ?? food) } : item), message: point ? 'ここに おいたよ' : 'ここは いっぱい。もとの ばしょに もどしたよ' }
     }
   }

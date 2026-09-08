@@ -64,6 +64,38 @@ export function gameRoutePath(slug: string): string {
 // id/title/emoji は既存の src/pages/Home.tsx と同じ並び順・内容を維持する。
 export const GAME_CATALOG: readonly GameCatalogEntry[] = [
   {
+    id: 'animal-bath',
+    slug: 'animal-bath',
+    title: 'どうぶつのおふろ',
+    emoji: '🛁',
+    category: 'learning',
+    seo: {
+      headline: 'どうぶつのおふろ｜なでて洗うどうぶつのお世話あそび',
+      description: '泥んこの犬・うさぎ・くまを、せっけん・シャワー・タオルでぴかぴかにする幼児向けのお世話あそびです。指でなでたりタップしたりすると、汚れが泡に、泡がしずくに変わります。時間制限も失敗もなく、4歳から自分のペースで楽しめます。',
+    },
+    intro: {
+      howToPlay: [
+        'あらいたい どうぶつを タップしてね',
+        'どろんこや あわ、しずくを ゆびで なでてね',
+        'ぜんぶ きれいに なったら、つぎの どうぐへ！',
+      ],
+    },
+  },
+  {
+    id: 'snowball-roll',
+    slug: 'snowball-roll',
+    title: 'ゆきだまころころ',
+    emoji: '❄️',
+    category: 'threeD',
+    seo: {
+      headline: 'ゆきだまころころ｜雪玉を転がして大きくする3Dあそび',
+      description: '雪の広場で雪玉を転がし、どんぐりやプレゼントをくっつけて大きくする幼児向け3Dゲームです。大きくなると雪だるま、木、車まで集められます。時間制限もゲームオーバーもなく、指一本で成長と収集を楽しめます。',
+    },
+    intro: {
+      howToPlay: ['ひろばを さわって、ゆびを うごかすと ころがるよ', 'ちいさいものを くっつけて おおきく しよう', 'メーターが いっぱいに なったら だいせいこう！'],
+    },
+  },
+  {
     id: 'magic-sandbox',
     slug: 'magic-sandbox',
     title: 'まほうのすなば',
@@ -134,11 +166,11 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     emoji: '🎨',
     category: 'learning',
     seo: {
-      headline: 'おえかきコロコロ｜ローラーでもようを描くおえかきあそび',
-      description: 'ゆびやマウスでなぞると、お花・星・足あとなどの柄がころころつながる幼児向けのおえかきあそびです。すきな色と台紙をえらび、できた絵はPNG画像で端末に保存できます。正解も時間制限もありません。',
+      headline: 'おえかきコロコロ｜描いた線がころがるおえかきあそび',
+      description: '描いた線が落ちて、ぶつかって、ころがる幼児向けのおえかきあそびです。丸や棒を積んで崩したり、ボールをカゴへ入れたりできます。お花や星のローラーでもようを描くあそびも楽しめます。正解も時間制限もありません。',
     },
     intro: {
-      howToPlay: ['すきな もようと いろを えらんで、かみを なぞってね', '「1かい もどす」で さっき かいた もようを けせるよ', '「できた！」で えを がぞうに ほぞんできるよ'],
+      howToPlay: ['せんを かいて はなすと、おちて ころがるよ', '「ボールを おく」を えらんで、かごに いれてみよう', '「ぜんぶ おとす」で おかたづけ。もようの おえかきも あそべるよ'],
     },
   },
   {

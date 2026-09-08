@@ -1,0 +1,50 @@
+.select, .play { color: #493e38; background: #e8f8f7; padding: calc(10px + var(--safe-top)) calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(12px + var(--safe-left)); box-sizing: border-box; }
+.select { min-height: 100dvh; }
+.header { display: flex; align-items: center; gap: 12px; }
+.header h1 { font-size: clamp(16px, 4vw, 24px); margin: 0; flex: 1; }
+.sound { min-width: 48px; min-height: 48px; border: 2px solid #b0d6d9; border-radius: 50%; background: white; font-size: 24px; cursor: pointer; }
+.welcome { text-align: center; margin: 36px auto 24px; }
+.welcome > span { font-size: 40px; }
+.welcome h2 { font-size: 30px; margin: 18px 0 10px; }
+.welcome p, .selectHint { font-size: 16px; text-align: center; }
+.animals { display: flex; justify-content: center; gap: 14px; max-width: 790px; margin: auto; }
+.animal { width: 30%; max-width: 230px; padding: 8px 4px 14px; border: 3px solid white; border-radius: 28px; background: #fff8eb; box-shadow: 0 5px 0 #badadc; cursor: pointer; color: inherit; font: inherit; font-weight: 700; }
+.animal svg { display: block; width: 100%; }
+.animal:hover { background: #fff0ce; }
+.animal:active { transform: translateY(3px); box-shadow: 0 2px 0 #badadc; }
+.selectHint { margin-top: 28px; }
+.play { height: 100dvh; min-height: 480px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.layout { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.board { display: block; flex: 1; min-height: 0; width: 100%; border: 0; padding: 0; background: transparent; touch-action: none; cursor: grab; -webkit-tap-highlight-color: transparent; }
+.board:active { cursor: grabbing; }
+.scene { display: block; height: 100%; width: auto; max-width: 100%; aspect-ratio: 1; margin: auto; border-radius: 28px; background: #c4edef; }
+.controls { width: min(100%, 460px); text-align: center; flex-shrink: 0; }
+.steps { display: flex; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.steps li { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 4px; background: #fff9; border: 2px solid transparent; border-radius: 14px; font-size: 13px; }
+.steps li[aria-current='step'] { border-color: #408b90; background: #fff; font-weight: 700; }
+.steps li > span:first-child { font-size: 25px; }
+.instruction { font-size: clamp(18px, 4vw, 24px); font-weight: 700; margin: 10px 0; }
+.progress { display: flex; justify-content: center; gap: 6px; margin: 8px 0 10px; }
+.progress span { width: 17px; height: 12px; border-radius: 8px; background: #fff; border: 1px solid #6daeb2; }
+.progress .filled { background: #48999d; }
+.hint { min-height: 60px; margin: 0; line-height: 1.5; font-size: 18px; }
+.hint small { font-size: 13px; }
+.primary { min-height: 64px; width: 100%; padding: 8px; border: 0; border-radius: 20px; background: #ffda77; color: #493e38; font: inherit; font-size: 19px; font-weight: 700; box-shadow: inset 0 -4px 0 #e9b850; cursor: pointer; }
+.play button:focus-visible, .select button:focus-visible { outline: 4px solid #426db5; outline-offset: 3px; }
+.bubbles { animation: pop .25s ease-out; }
+.sparkle { animation: pop .4s ease-out; }
+.happy { transform-origin: 200px 320px; animation: wiggle .6s ease-in-out 3; }
+@keyframes pop { from { opacity: .3; scale: .65; } to { opacity: 1; scale: 1; } }
+@keyframes wiggle { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@media (max-width: 380px) { .animals { gap: 8px; } .animal { border-radius: 20px; font-size: 18px; } .header { gap: 6px; } .steps li { font-size: 12px; } }
+@media (orientation: landscape) and (min-width: 600px) {
+  .play { min-height: 300px; }
+  .layout { flex-direction: row; justify-content: center; gap: 24px; }
+  .board { height: 100%; width: auto; flex: 0 1 55%; }
+  .controls { width: min(42%, 380px); }
+  .welcome { margin: 12px 0; }
+  .welcome > span { display: none; }
+  .welcome h2 { margin: 8px; }
+  .animal { max-width: 150px; }
+}
+@media (prefers-reduced-motion: reduce) { .bubbles, .sparkle, .happy { animation: none; } }

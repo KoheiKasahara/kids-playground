@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { isSoundEnabled, setSoundEnabled } from '../../audio/sound'
-import { bentoReducer, BOXES, COLORS, FOODS, foodDefinition, initialBentoState, type BentoState, type BoxKind, type Point } from './bentoState'
+import { bentoReducer, BOXES, COLORS, CUPS, FOODS, foodDefinition, initialBentoState, type BentoState, type BoxKind, type Point } from './bentoState'
 import { createBentoScene, type SceneCallbacks } from './bentoScene'
 import { playBentoSound } from './sounds'
 import styles from './BentoBuilderPlay.module.css'
@@ -106,6 +106,17 @@ export default function BentoBuilderPlay() {
           {FOODS.map(food => <button key={food.id} type="button" disabled={status !== 'ready'} aria-label={`${food.name}を いれる`} onClick={() => {
             dispatch({ type: 'add', kind: food.id }); playBentoSound('add')
           }}><span aria-hidden="true">{food.emoji}</span><span>{food.name}</span></button>)}
+        </div>
+        <div className={styles.cups} role="group" aria-label="おかずカップ">
+          <span>カップ</span>
+          {CUPS.map(cup => <button key={cup.id} type="button" disabled={!selected || status !== 'ready'}
+            aria-label={`${cup.name}の カップ`} aria-pressed={selected?.cup === cup.id}
+            onClick={() => { dispatch({ type: 'cup', cup: cup.id }); playBentoSound('place') }}>
+            <svg viewBox="0 0 40 30" aria-hidden="true"><path d="M3 5h34l-5 22H8z" fill={cup.color} stroke="#638a78" strokeWidth="1.5" /><path d="M10 7l3 17M20 7v17M30 7l-3 17" fill="none" stroke="#ffffff" strokeWidth="2" /><ellipse cx="20" cy="5" rx="17" ry="4" fill={cup.color} stroke="#638a78" strokeWidth="1.5" /></svg>
+            <span>{cup.name}</span>
+          </button>)}
+          <button type="button" disabled={!selected?.cup || status !== 'ready'} aria-label="カップを はずす"
+            onClick={() => dispatch({ type: 'cup', cup: null })}>なし</button>
         </div>
         <div className={styles.placed} role="group" aria-label="いれた おかず">
           {state.foods.map((food, index) => <button key={food.id} type="button" aria-label={`${index + 1}こめの ${foodDefinition(food.kind).name}`} aria-pressed={state.selected === food.id} disabled={status !== 'ready'} onClick={() => select(food.id)}>
