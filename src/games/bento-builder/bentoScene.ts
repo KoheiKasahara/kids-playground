@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { createBox, disposeObjects, loadFoodTemplates } from './bentoModels'
+import { createBox, createFoodCup, disposeObjects, loadFoodTemplates } from './bentoModels'
 import { bindBentoPointer } from './bentoPointer'
 import { clampToBox, FLOOR_Y, foodDefinition, type BentoState, type FoodKind, type Point } from './bentoState'
 
@@ -26,14 +26,15 @@ export function createBentoScene(host: HTMLDivElement, initial: BentoState, call
   ground.rotation.x = -Math.PI / 2
   ground.position.y = -0.03
   ground.receiveShadow = true
-  scene.add(ground, new THREE.HemisphereLight('#fffefa', '#b7a591', 2.1))
-  const light = new THREE.DirectionalLight('#fff5e3', 2.7)
+  scene.add(ground, new THREE.HemisphereLight('#ffffff', '#eadcc6', 2.5))
+  const light = new THREE.DirectionalLight('#ffffff', 2.0)
   light.position.set(-3, 9, 5)
   light.castShadow = true
   light.shadow.mapSize.set(1024, 1024)
   Object.assign(light.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 0.5, far: 20 })
   light.shadow.normalBias = 0.025
   light.shadow.bias = -0.0002
+  light.shadow.intensity = 0.3
   scene.add(light)
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.94, 1, 40), new THREE.MeshBasicMaterial({ color: '#258aa2', transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }))
   ring.rotation.x = -Math.PI / 2
@@ -117,15 +118,29 @@ export function createBentoScene(host: HTMLDivElement, initial: BentoState, call
     const ids = new Set(state.foods.map(food => food.id))
     for (const [id, node] of nodes) if (!ids.has(id)) {
       scene.remove(node)
+      const cup = node.getObjectByName('food-cup')
+      if (cup) disposeObjects([cup])
       nodes.delete(id)
       pops.delete(id)
     }
     if (templates) for (const food of state.foods) if (!nodes.has(food.id)) {
-      const node = templates.get(food.kind)!.clone(true)
+      const node = new THREE.Group()
+      node.add(templates.get(food.kind)!.clone(true))
       node.userData.foodId = food.id
       nodes.set(food.id, node)
       scene.add(node)
       if (!reducedMotion) pops.set(food.id, performance.now())
+    }
+    for (const food of state.foods) {
+      const node = nodes.get(food.id)
+      if (!node || node.userData.cup === food.cup) continue
+      const previousCup = node.getObjectByName('food-cup')
+      if (previousCup) { node.remove(previousCup); disposeObjects([previousCup]) }
+      if (food.cup) node.add(createFoodCup(foodDefinition(food.kind).radius, food.cup))
+      // Keep food inside the cup's rim, with its bottom resting on the cup base.
+      node.children[0]!.scale.setScalar(food.cup ? 0.84 : 1)
+      node.children[0]!.position.y = food.cup ? 0.025 : 0
+      node.userData.cup = food.cup
     }
     syncFoodPositions()
   }
