@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { CircuitRacingEngineOptions } from './useCircuitRacingEngine'
 import CircuitRacingPlay from './CircuitRacingPlay'
+import { CIRCUITS } from './circuit'
 
 const engineMock = vi.hoisted(() => ({ options: undefined as CircuitRacingEngineOptions | undefined, retry: vi.fn(), adjustCamera: vi.fn() }))
 
@@ -86,4 +87,26 @@ describe('サーキットレースの じゅんびと そうさ', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'もういちど' }))
     expect(engineMock.retry).toHaveBeenCalledOnce()
   })
+})
+
+
+test('コースを選んで開始・戻る・変更でき、車の選択を保持する', async () => {
+  const user = userEvent.setup()
+  renderGame()
+  await user.click(screen.getByRole('button', { name: '3だい' }))
+  const selections = engineMock.options!.selections
+  for (const course of CIRCUITS.slice(1)) {
+    await user.click(screen.getByRole('button', { name: course.name }))
+    expect(screen.getByRole('button', { name: course.name })).toHaveAttribute('aria-pressed', 'true')
+    expect(engineMock.options?.circuit).toBe(course)
+    expect(engineMock.options?.running).toBe(false)
+    expect(screen.getByRole('button', { name: 'レースを はじめる' })).toBeDisabled()
+    act(() => engineMock.options?.onStatusChange?.('ready'))
+    await user.click(screen.getByRole('button', { name: 'レースを はじめる' }))
+    expect(engineMock.options?.running).toBe(true)
+    expect(screen.getByText(course.name)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /えらびなおす/ }))
+    expect(screen.getByRole('button', { name: course.name })).toHaveAttribute('aria-pressed', 'true')
+    expect(engineMock.options?.selections).toEqual(selections)
+  }
 })

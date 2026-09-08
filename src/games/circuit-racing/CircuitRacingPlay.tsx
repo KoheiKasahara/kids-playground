@@ -8,12 +8,15 @@ import {
   type RaceCarId,
   type RaceSelection,
 } from './raceConfig'
+import { CIRCUITS, circuitPreview } from './circuit'
 import type { RaceCameraMode } from './raceCamera'
 import {
   useCircuitRacingEngine,
   type CircuitRacingEngineStatus,
 } from './useCircuitRacingEngine'
 import styles from './CircuitRacingPlay.module.css'
+
+const COURSE_PREVIEWS = CIRCUITS.map(circuitPreview)
 
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
@@ -47,6 +50,7 @@ function SceneStatus({ status, onRetry }: { status: CircuitRacingEngineStatus; o
 export default function CircuitRacingPlay() {
   const navigate = useNavigate()
   const [selections, setSelections] = useState<RaceSelection[]>(() => copySelections(DEFAULT_SELECTIONS))
+  const [circuit, setCircuit] = useState(CIRCUITS[0]!)
   const [carCount, setCarCount] = useState<2 | 3>(2)
   const [phase, setPhase] = useState<'select' | 'race'>('select')
   const [paused, setPaused] = useState(false)
@@ -59,6 +63,7 @@ export default function CircuitRacingPlay() {
   }, [])
   const engine = useCircuitRacingEngine({
     selections,
+    circuit,
     running: phase === 'race' && !paused && sceneStatus === 'ready',
     cameraMode,
     targetIndex,
@@ -120,62 +125,89 @@ export default function CircuitRacingPlay() {
               </button>
               <h1 className={styles.title}><span aria-hidden="true">🏁</span> サーキットレース</h1>
             </header>
-            <div className={styles.countRow} aria-label="くるまの かず">
-              <span className={styles.sectionLabel}>くるまの かず</span>
-              {[2, 3].map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  className={styles.countButton}
-                  aria-pressed={carCount === count}
-                  onClick={() => chooseCarCount(count as 2 | 3)}
-                >
-                  {count}だい
-                </button>
-              ))}
-            </div>
-            <div className={styles.slotList}>
-              {selections.map((selection, slot) => {
-                const selectedCar = carById(selection.carId)
-                return (
-                  <section key={slot} className={styles.slot} aria-label={`${slot + 1}だいめの くるま`}>
-                    <h2 className={styles.slotTitle}><span className={styles.slotNumber}>{slot + 1}</span> だいめ</h2>
-                    <div className={styles.choiceRow} aria-label={`${slot + 1}だいめの くるまを えらぶ`}>
-                      {RACE_CARS.map((car) => {
-                        return (
+            <div className={styles.selectionScroll}>
+              <section className={styles.courseSection} aria-label="コースを えらぶ">
+                <h2 className={styles.sectionLabel}>コースを えらぶ</h2>
+                <div className={styles.courseGrid}>
+                  {CIRCUITS.map((course, index) => (
+                    <button
+                      key={course.id}
+                      type="button"
+                      className={styles.courseButton}
+                      aria-label={course.name}
+                      aria-pressed={circuit.id === course.id}
+                      onClick={() => {
+                        if (circuit.id === course.id) return
+                        setSceneStatus('loading')
+                        setCircuit(course)
+                      }}
+                    >
+                      <svg viewBox={COURSE_PREVIEWS[index]!.viewBox} aria-hidden="true" focusable="false">
+                        <polyline points={COURSE_PREVIEWS[index]!.points} fill="none" stroke="currentColor" strokeWidth="10" strokeLinejoin="round" />
+                      </svg>
+                      <span>{circuit.id === course.id ? '✓ ' : ''}{course.name}</span>
+                      <small>{course.description}</small>
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <div className={styles.countRow} aria-label="くるまの かず">
+                <span className={styles.sectionLabel}>くるまの かず</span>
+                {[2, 3].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    className={styles.countButton}
+                    aria-pressed={carCount === count}
+                    onClick={() => chooseCarCount(count as 2 | 3)}
+                  >
+                    {count}だい
+                  </button>
+                ))}
+              </div>
+              <div className={styles.slotList}>
+                {selections.map((selection, slot) => {
+                  const selectedCar = carById(selection.carId)
+                  return (
+                    <section key={slot} className={styles.slot} aria-label={`${slot + 1}だいめの くるま`}>
+                      <h2 className={styles.slotTitle}><span className={styles.slotNumber}>{slot + 1}</span> だいめ</h2>
+                      <div className={styles.choiceRow} aria-label={`${slot + 1}だいめの くるまを えらぶ`}>
+                        {RACE_CARS.map((car) => {
+                          return (
+                            <button
+                              key={car.id}
+                              type="button"
+                              className={styles.carButton}
+                              aria-label={`${car.label}を えらぶ`}
+                              aria-pressed={selection.carId === car.id}
+                              onClick={() => chooseCar(slot, car.id)}
+                            >
+                              <span className={styles.carEmoji} aria-hidden="true">{car.emoji}</span>
+                              <span>{car.label}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className={styles.colorRow} aria-label={`${selectedCar.label}の いろを えらぶ`}>
+                        <span className={styles.colorLabel}>いろ</span>
+                        {RACE_COLORS.map((color) => (
                           <button
-                            key={car.id}
+                            key={color.value}
                             type="button"
-                            className={styles.carButton}
-                            aria-label={`${car.label}を えらぶ`}
-                            aria-pressed={selection.carId === car.id}
-                            onClick={() => chooseCar(slot, car.id)}
+                            className={styles.colorButton}
+                            aria-label={color.label}
+                            aria-pressed={selection.color === color.value}
+                            onClick={() => chooseColor(slot, color.value)}
+                            style={{ '--swatch': color.value } as CSSProperties}
                           >
-                            <span className={styles.carEmoji} aria-hidden="true">{car.emoji}</span>
-                            <span>{car.label}</span>
+                            <span aria-hidden="true" />
                           </button>
-                        )
-                      })}
-                    </div>
-                    <div className={styles.colorRow} aria-label={`${selectedCar.label}の いろを えらぶ`}>
-                      <span className={styles.colorLabel}>いろ</span>
-                      {RACE_COLORS.map((color) => (
-                        <button
-                          key={color.value}
-                          type="button"
-                          className={styles.colorButton}
-                          aria-label={color.label}
-                          aria-pressed={selection.color === color.value}
-                          onClick={() => chooseColor(slot, color.value)}
-                          style={{ '--swatch': color.value } as CSSProperties}
-                        >
-                          <span aria-hidden="true" />
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                )
-              })}
+                        ))}
+                      </div>
+                    </section>
+                  )
+                })}
+              </div>
             </div>
             <button type="button" className={styles.beginButton} onClick={beginRace} disabled={sceneStatus !== 'ready'}>
               <span aria-hidden="true">▶</span> レースを はじめる
@@ -190,6 +222,7 @@ export default function CircuitRacingPlay() {
                 <span aria-hidden="true">{paused ? '▶' : 'Ⅱ'}</span>{paused ? 'つづける' : 'やすむ'}
               </button>
             </div>
+            <p className={styles.courseName}>{circuit.name}</p>
             <div className={styles.raceTools}>
               <div className={styles.cameraModes} aria-label="カメラを えらぶ">
                 {cameraButtons.map((button) => (
