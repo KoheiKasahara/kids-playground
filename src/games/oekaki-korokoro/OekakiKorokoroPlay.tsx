@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { COLORS, PAPERS, PATTERNS, PAPER_HEIGHT, PAPER_WIDTH, STAMP_SCALE, type Pattern } from './rollerData'
+import { PAPERS, PATTERNS, PAPER_WIDTH, ROLLER_COLORS, ROLLER_PAPER_HEIGHT, STAMP_SCALE, type Pattern } from './rollerData'
 import { advanceStroke, finishStroke, startStroke, type StrokeCursor } from './rollerStroke'
 import { drawPaper, drawStamps } from './rollerDrawing'
 import FallingDrawingPlay from './FallingDrawingPlay'
@@ -21,7 +21,7 @@ function Dialog({ children, title, close }: { children: ReactNode; title: string
 export default function OekakiKorokoroPlay() {
   const [mode, setMode] = useState<'falling' | 'roller'>('falling')
   const [pattern, setPattern] = useState<Pattern>(PATTERNS[0])
-  const [color, setColor] = useState<string>(COLORS[0].value)
+  const [color, setColor] = useState<string>(ROLLER_COLORS[0].value)
   const [paper, setPaper] = useState(PAPERS[0] as typeof PAPERS[number])
   const [hasInk, setHasInk] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
@@ -62,14 +62,14 @@ export default function OekakiKorokoroPlay() {
     const box = ink.current!.getBoundingClientRect()
     return {
       x: Math.max(0, Math.min(PAPER_WIDTH, (event.clientX - box.left) * PAPER_WIDTH / box.width)),
-      y: Math.max(0, Math.min(PAPER_HEIGHT, (event.clientY - box.top) * PAPER_HEIGHT / box.height)),
+      y: Math.max(0, Math.min(ROLLER_PAPER_HEIGHT, (event.clientY - box.top) * ROLLER_PAPER_HEIGHT / box.height)),
     }
   }
 
   function showRoller(x: number, y: number, angle: number) {
     if (!roller.current) return
     roller.current.style.left = `${x / PAPER_WIDTH * 100}%`
-    roller.current.style.top = `${y / PAPER_HEIGHT * 100}%`
+    roller.current.style.top = `${y / ROLLER_PAPER_HEIGHT * 100}%`
     roller.current.style.transform = `translate(-50%, -90%) rotate(${angle + Math.PI / 2}rad)`
     roller.current.style.opacity = '1'
   }
@@ -81,7 +81,7 @@ export default function OekakiKorokoroPlay() {
     if (!canvas.getContext('2d')) { setError('おえかきが ひらけなかったよ。もういちど ひらいてね'); return }
     previous.current ??= document.createElement('canvas')
     previous.current.width = PAPER_WIDTH
-    previous.current.height = PAPER_HEIGHT
+    previous.current.height = ROLLER_PAPER_HEIGHT
     previous.current.getContext('2d')?.drawImage(canvas, 0, 0)
     previousHasInk.current = hasInk
     const p = point(event)
@@ -117,7 +117,7 @@ export default function OekakiKorokoroPlay() {
     endStroke()
     const ctx = ink.current?.getContext('2d')
     if (!ctx || !previous.current) return
-    ctx.clearRect(0, 0, PAPER_WIDTH, PAPER_HEIGHT)
+    ctx.clearRect(0, 0, PAPER_WIDTH, ROLLER_PAPER_HEIGHT)
     ctx.drawImage(previous.current, 0, 0)
     setHasInk(previousHasInk.current)
     setCanUndo(false)
@@ -129,10 +129,10 @@ export default function OekakiKorokoroPlay() {
     const canvas = ink.current!
     previous.current ??= document.createElement('canvas')
     previous.current.width = PAPER_WIDTH
-    previous.current.height = PAPER_HEIGHT
+    previous.current.height = ROLLER_PAPER_HEIGHT
     previous.current.getContext('2d')?.drawImage(canvas, 0, 0)
     previousHasInk.current = hasInk
-    canvas.getContext('2d')?.clearRect(0, 0, PAPER_WIDTH, PAPER_HEIGHT)
+    canvas.getContext('2d')?.clearRect(0, 0, PAPER_WIDTH, ROLLER_PAPER_HEIGHT)
     setHasInk(false)
     setCanUndo(true)
     setModal(null)
@@ -159,12 +159,12 @@ export default function OekakiKorokoroPlay() {
       <section className={styles.studio} aria-label="おえかき">
         <div className={styles.caption}>
           <span>ゆびで なぞって コロコロ！</span>
-          <span className={styles.current} aria-label={`いまのローラー: ${pattern.name}・${COLORS.find(c => c.value === color)?.name}`}><Motif pattern={pattern} />{pattern.name}</span>
+          <span className={styles.current} aria-label={`いまのローラー: ${pattern.name}・${ROLLER_COLORS.find(c => c.value === color)?.name}`}><Motif pattern={pattern} />{pattern.name}</span>
         </div>
         <div className={styles.mat}>
-          <div className={styles.paper}>
-            <canvas ref={background} width={PAPER_WIDTH} height={PAPER_HEIGHT} className={styles.background} aria-hidden="true" />
-            <canvas ref={ink} width={PAPER_WIDTH} height={PAPER_HEIGHT} className={styles.canvas} aria-label="おえかきの かみ。ゆびや マウスで なぞってね"
+          <div className={`${styles.paper} ${styles.rollerPaper}`}>
+            <canvas ref={background} width={PAPER_WIDTH} height={ROLLER_PAPER_HEIGHT} className={styles.background} aria-hidden="true" />
+            <canvas ref={ink} width={PAPER_WIDTH} height={ROLLER_PAPER_HEIGHT} className={styles.canvas} aria-label="おえかきの かみ。ゆびや マウスで なぞってね"
               onPointerDown={begin} onPointerMove={move} onPointerUp={e => finish(e, true)} onPointerCancel={e => finish(e, false)} onLostPointerCapture={e => finish(e, false)}>
               ゆびや マウスで なぞると もようが えがけるよ。
             </canvas>
@@ -178,10 +178,12 @@ export default function OekakiKorokoroPlay() {
       </section>
       <aside className={styles.tools} aria-label="おえかきの どうぐ">
         <div className={styles.toolGroup} role="group" aria-label="もようを えらぶ">
-          <h2>もよう</h2><div className={styles.patterns}>{PATTERNS.map(p => <button key={p.id} aria-label={p.name} aria-pressed={pattern.id === p.id} onClick={() => { endStroke(); setPattern(p) }}><Motif pattern={p} /><small>{p.name}</small></button>)}</div>
+          <h2>もよう</h2><span className={styles.scrollHint} aria-hidden="true">↔ よこに うごくよ</span>
+          <div className={styles.scrollWindow}><div className={styles.patterns} data-testid="pattern-picker">{PATTERNS.map(p => <button key={p.id} aria-label={p.name} aria-pressed={pattern.id === p.id} onClick={() => { endStroke(); setPattern(p) }}><Motif pattern={p} /><small>{p.name}</small></button>)}</div></div>
         </div>
         <div className={styles.toolGroup} role="group" aria-label="いろを えらぶ">
-          <h2>いろ</h2><div className={styles.colors}>{COLORS.map(c => <button key={c.value} aria-label={c.name} aria-pressed={color === c.value} style={{ '--swatch': c.value } as CSSProperties} onClick={() => { endStroke(); setColor(c.value) }}><span>{color === c.value ? '✓' : ''}</span></button>)}</div>
+          <h2>いろ</h2><span className={styles.scrollHint} aria-hidden="true">↔ よこに うごくよ</span>
+          <div className={styles.scrollWindow}><div className={styles.colors} data-testid="color-picker">{ROLLER_COLORS.map(c => <button key={c.value} aria-label={c.name} aria-pressed={color === c.value} style={{ '--swatch': c.value } as CSSProperties} onClick={() => { endStroke(); setColor(c.value) }}><span>{color === c.value ? '✓' : ''}</span></button>)}</div></div>
         </div>
         <div className={styles.actions}>
           <button disabled={!canUndo} onClick={undo}><span aria-hidden="true">↶</span>1かい もどす</button>
