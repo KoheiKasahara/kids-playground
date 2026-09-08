@@ -4,7 +4,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { CAR_VEHICLES } from '../car-builder/carVehicles'
 import { loadCarVehicleBody, type CarVehicleBody } from '../car-builder/vehicleBody'
 import { RACE_CARS, type RaceCarId, type RaceSelection } from './raceConfig'
-import { CIRCUIT, type CircuitDefinition } from './circuit'
+import { CIRCUIT, CIRCUIT_SCENERY, type CircuitDefinition } from './circuit'
+import { createCircuitScenery } from './scenery'
 import { createMotionProfile, sampleMotion, type MotionProfile } from './motion'
 
 // Camera placement is independent of the motion table and React state.
@@ -74,6 +75,7 @@ function makeRibbon(
   points: readonly PlainVector[],
   halfWidth: number,
   y: number,
+  color: string,
   resources: Array<THREE.BufferGeometry | THREE.Material>,
 ): THREE.Mesh {
   const positions = new Float32Array(points.length * 2 * 3)
@@ -105,7 +107,7 @@ function makeRibbon(
   geometry.setIndex(indices)
   geometry.computeVertexNormals()
   const material = own(
-    new THREE.MeshStandardMaterial({ color: '#353a40', roughness: 0.92, metalness: 0.02 }),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0.02 }),
     resources,
   )
   const mesh = new THREE.Mesh(geometry, material)
@@ -257,68 +259,6 @@ function createRoadside(
   return group
 }
 
-function createSceneDecor(
-  points: readonly PlainVector[],
-  resources: Array<THREE.BufferGeometry | THREE.Material>,
-): THREE.Group {
-  const group = new THREE.Group()
-  const treeTrunkGeometry = own(new THREE.CylinderGeometry(0.12, 0.16, 0.9, 8), resources)
-  const treeTrunkMaterial = own(new THREE.MeshStandardMaterial({ color: '#986b4d', roughness: 0.9 }), resources)
-  const treeTopGeometry = own(new THREE.SphereGeometry(0.65, 12, 8), resources)
-  const treeTopMaterial = own(new THREE.MeshStandardMaterial({ color: '#54aa67', roughness: 0.95 }), resources)
-  const standGeometry = own(new THREE.BoxGeometry(2.8, 0.65, 0.8), resources)
-  const standMaterial = own(new THREE.MeshStandardMaterial({ color: '#f0a44b', roughness: 0.8 }), resources)
-  const personGeometry = own(new THREE.SphereGeometry(0.18, 10, 8), resources)
-  const personMaterial = own(new THREE.MeshStandardMaterial({ color: '#5265c7', roughness: 0.8 }), resources)
-
-  for (let index = 4; index < points.length; index += 30) {
-    const point = points[index]!
-    const previous = points[(index + points.length - 1) % points.length]!
-    const next = points[(index + 1) % points.length]!
-    const dx = next.x - previous.x
-    const dz = next.z - previous.z
-    const length = Math.hypot(dx, dz) || 1
-    const nx = -dz / length
-    const nz = dx / length
-    const tree = new THREE.Group()
-    tree.position.set(point.x + nx * 11, 0, point.z + nz * 11)
-    const trunk = new THREE.Mesh(treeTrunkGeometry, treeTrunkMaterial)
-    trunk.position.y = 0.45
-    const top = new THREE.Mesh(treeTopGeometry, treeTopMaterial)
-    top.position.y = 1.18
-    tree.add(trunk, top)
-    tree.traverse((child) => {
-      const mesh = child as THREE.Mesh
-      if (mesh.isMesh) mesh.castShadow = true
-    })
-    group.add(tree)
-  }
-
-  const standPoint = points[Math.floor(points.length * 0.68)]
-  if (standPoint !== undefined) {
-    const previous = points[Math.floor(points.length * 0.68) - 1] ?? standPoint
-    const next = points[Math.floor(points.length * 0.68) + 1] ?? standPoint
-    const dx = next.x - previous.x
-    const dz = next.z - previous.z
-    const length = Math.hypot(dx, dz) || 1
-    const nx = -dz / length
-    const nz = dx / length
-    const stand = new THREE.Group()
-    stand.position.set(standPoint.x + nx * 10, 0, standPoint.z + nz * 10)
-    stand.rotation.y = Math.atan2(dx, dz)
-    const base = new THREE.Mesh(standGeometry, standMaterial)
-    base.position.y = 0.35
-    stand.add(base)
-    for (let index = -1; index <= 1; index += 1) {
-      const person = new THREE.Mesh(personGeometry, personMaterial)
-      person.position.set(index * 0.65, 0.95, 0)
-      stand.add(person)
-    }
-    group.add(stand)
-  }
-  return group
-}
-
 export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): CircuitRacingEngineHandle {
   const circuit = options.circuit ?? CIRCUIT
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -354,6 +294,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
   useEffect(() => {
     const host = containerRef.current
     if (host === null || typeof window === 'undefined') return undefined
+    const palette = CIRCUIT_SCENERY[circuit.scenery]
     const curve = circuit.curve.clone()
     const roadEdge = circuit.width / 2
     const sceneHost = host
@@ -377,8 +318,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     const staticResources: Array<THREE.BufferGeometry | THREE.Material> = []
 
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color('#a9d9f0')
-    const raceFog = new THREE.Fog('#a9d9f0', 150, 520)
+    scene.background = new THREE.Color(palette.sky)
+    const raceFog = new THREE.Fog(palette.sky, 150, 520)
     scene.fog = raceFog
     const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR)
     camera.position.set(0, 10, 18)
@@ -392,7 +333,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     }
     notify('loading')
 
-    const hemisphere = new THREE.HemisphereLight('#f8fcff', '#71a36f', 1.45)
+    const hemisphere = new THREE.HemisphereLight('#f8fcff', palette.ground, 1.45)
     const sun = new THREE.DirectionalLight('#fff5db', 1.65)
     sun.position.set(-35, 55, 25)
     sun.castShadow = true
@@ -407,13 +348,14 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     scene.add(hemisphere, sun, fill)
 
     const groundGeometry = own(new THREE.PlaneGeometry(700, 700), staticResources)
-    const groundMaterial = own(new THREE.MeshStandardMaterial({ color: '#86c276', roughness: 0.96 }), staticResources)
+    const groundMaterial = own(new THREE.MeshStandardMaterial({ color: palette.ground, roughness: 0.96 }), staticResources)
     const ground = new THREE.Mesh(groundGeometry, groundMaterial)
     ground.rotation.x = -Math.PI / 2
     ground.position.y = -0.2
     ground.receiveShadow = true
     scene.add(ground)
 
+    let scenery: ReturnType<typeof createCircuitScenery> | undefined
     let tracksideAnchor: PlainVector
     try {
       curve.arcLengthDivisions = 4096
@@ -435,11 +377,11 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         y: 8,
         z: anchor.z + (dx / tangentLength) * (roadEdge + 8),
       }
-      const road = makeRibbon(referencePoints, roadEdge, ROAD_Y, staticResources)
+      const road = makeRibbon(referencePoints, roadEdge, ROAD_Y, palette.road, staticResources)
       scene.add(road)
 
       const curbGeometry = own(new THREE.BoxGeometry(0.46, 0.12, 1), staticResources)
-      const curbRed = own(new THREE.MeshStandardMaterial({ color: '#e76d6d', roughness: 0.86 }), staticResources)
+      const curbRed = own(new THREE.MeshStandardMaterial({ color: palette.curb, roughness: 0.86 }), staticResources)
       const curbWhite = own(new THREE.MeshStandardMaterial({ color: '#fff8ec', roughness: 0.8 }), staticResources)
       const lineGeometry = own(new THREE.BoxGeometry(0.14, 0.012, 1), staticResources)
       const lineMaterial = own(new THREE.MeshStandardMaterial({ color: '#ffe99a', roughness: 0.82 }), staticResources)
@@ -470,7 +412,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
           scene.add(line)
         }
       }
-      scene.add(createRoadside(roadEdge, referencePoints, staticResources), createSceneDecor(referencePoints, staticResources))
+      scenery = createCircuitScenery(circuit)
+      scene.add(createRoadside(roadEdge, referencePoints, staticResources), scenery.group)
     } catch (error) {
       // A malformed circuit is recoverable from the UI and should not strand
       // the player on a blank page.
@@ -757,6 +700,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored)
       }
       disposeCars()
+      scenery?.dispose()
       staticResources.forEach((resource) => resource.dispose())
       hemisphere.dispose()
       sun.dispose()

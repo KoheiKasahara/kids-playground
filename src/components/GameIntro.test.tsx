@@ -4,7 +4,7 @@
 // 全17ゲームに対する横展開のスモークテスト（test.each）も合わせて行う。
 
 import { describe, expect, test } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../app/App'
 import { GAME_CATALOG, findGameBySlug, gameRoutePath } from '../games/gameCatalog'
@@ -77,7 +77,8 @@ describe('GameIntro（代表ゲームでの詳細確認）', () => {
 // 横展開テスト。個々のゲーム画面の詳細（h1の内容など）までは見ず、GameIntroが
 // 描画したはずの文言だけを確認する。
 describe('GameIntro（全ゲームへの横展開スモークテスト）', () => {
-  test.each(GAME_CATALOG)('$slug: descriptionとhowToPlayの全行が出る', async (entry) => {
+  // スライムは開始画面を挟まず即プレイするため、操作を妨げる説明を隠す。
+  test.each(GAME_CATALOG.filter((entry) => entry.slug !== 'puni-slime'))('$slug: descriptionとhowToPlayの全行が出る', async (entry) => {
     renderAt(gameRoutePath(entry.slug))
     expect(await screen.findByText(entry.seo.description, undefined, FIND)).toBeInTheDocument()
     for (const line of entry.intro.howToPlay) {
@@ -87,6 +88,16 @@ describe('GameIntro（全ゲームへの横展開スモークテスト）', () =
 })
 
 describe('GameIntro（表示しないURL）', () => {
+  test('スライムは即プレイ中の説明を隠し、別ゲームへ戻ると説明を復元する', async () => {
+    renderAt('/games/puni-slime')
+    await screen.findByRole('heading', { level: 1, name: 'ぷにぷにスライム' }, FIND)
+    expect(screen.queryByRole('heading', { name: 'このゲームについて' })).not.toBeInTheDocument()
+    expect(screen.queryByText(findGameBySlug('puni-slime')!.seo.description)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: '← もどる' }))
+    fireEvent.click(await screen.findByRole('link', { name: 'こっきクイズ', exact: true }, FIND))
+    expect(await screen.findByText(findGameBySlug('flag-quiz')!.seo.description, undefined, FIND)).toBeInTheDocument()
+  }, TEST_TIMEOUT)
+
   test('ホーム（/）では「このゲームについて」は出ない', () => {
     renderAt('/')
     expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()

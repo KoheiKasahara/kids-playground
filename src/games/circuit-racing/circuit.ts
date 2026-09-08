@@ -1,9 +1,17 @@
 import * as THREE from 'three'
 
+export const CIRCUIT_SCENERY = {
+  grandPrix: { label: 'かんらんしゃと ピット', icon: '🎡', sky: '#aeddf5', ground: '#79ad65', road: '#353a40', curb: '#de5254' },
+  stadium: { label: 'おおきな スタンド', icon: '🏟️', sky: '#b8dbef', ground: '#8eac83', road: '#39414e', curb: '#438bc9' },
+  forest: { label: 'みどりの もり', icon: '🌲', sky: '#c0e6dd', ground: '#628f50', road: '#41443d', curb: '#e0af43' },
+  alpine: { label: 'いわやまの けしき', icon: '⛰️', sky: '#cbdfee', ground: '#b1ac8c', road: '#49474a', curb: '#ce6946' },
+} as const
+
 export type CircuitDefinition = {
   id: string
   name: string
   description: string
+  scenery: keyof typeof CIRCUIT_SCENERY
   width: number
   curve: THREE.CatmullRomCurve3
 }
@@ -42,6 +50,7 @@ export function buildCircuit(): CircuitDefinition {
     id: 'classic-circuit',
     name: 'みんなのサーキット',
     description: 'まっすぐも カーブも！',
+    scenery: 'grandPrix',
     width: 12,
     curve: createCurve(),
   }
@@ -57,6 +66,7 @@ export const CIRCUITS: readonly CircuitDefinition[] = [
     id: 'speed-oval',
     name: 'びゅんびゅんオーバル',
     description: 'ながい みちを びゅーん！',
+    scenery: 'stadium',
     width: 12,
     curve: createCurve([
       [-110, -60], [-40, -60], [40, -60], [110, -60],
@@ -68,6 +78,7 @@ export const CIRCUITS: readonly CircuitDefinition[] = [
     id: 's-curves',
     name: 'くねくねカーブ',
     description: 'みぎへ ひだりへ くねくね！',
+    scenery: 'forest',
     width: 12,
     curve: createCurve([
       [-145, -45], [-100, -65], [-55, -35], [-10, -65],
@@ -79,6 +90,7 @@ export const CIRCUITS: readonly CircuitDefinition[] = [
     id: 'hairpin',
     name: 'ぐるっとヘアピン',
     description: 'ゆっくり まがって また ダッシュ！',
+    scenery: 'alpine',
     width: 12,
     curve: createCurve([
       [-130, -70], [-50, -70], [40, -70], [130, -70],
