@@ -41,7 +41,7 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
-  test('ボディはPhase 1で採用した7車種を持ち、文字だけに依存しないプレビューがある', () => {
+  test('ボディは9車種を持ち、文字だけに依存しないプレビューがある', () => {
     expect(CAR_CATEGORIES.body.options.map((option) => option.id)).toEqual([...CAR_VEHICLE_ORDER])
     expect(CAR_CATEGORIES.body.options.map((option) => option.label)).toEqual([
       'ふつうのくるま',
@@ -51,6 +51,8 @@ describe('カテゴリのカタログ', () => {
       'パトカー',
       'きゅうきゅうしゃ',
       'スクールバス',
+      'ピックアップ',
+      'バン',
     ])
     for (const option of CAR_CATEGORIES.body.options) {
       expect(option.preview.kind, option.id).toBe('emoji')
@@ -58,39 +60,39 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
-  test('タイヤは4種類を持ち、形状の違いを表すプレビューがある', () => {
+  test('タイヤは6種類を持ち、形状の違いを表すプレビューがある', () => {
     const options = CAR_CATEGORIES.wheel.options
-    expect(options.map((option) => option.id)).toEqual(['small', 'big', 'offroad', 'racing'])
-    expect(options.map((option) => option.label)).toEqual(['ちいさい', 'おおきい', 'オフロード', 'レーシング'])
+    expect(options.map((option) => option.id)).toEqual(['small', 'big', 'offroad', 'racing', 'whitewall', 'flower'])
+    expect(options.map((option) => option.label)).toEqual(['ちいさい', 'おおきい', 'オフロード', 'レーシング', 'しろリボン', 'おはな'])
     for (const option of options) {
       expect(option.preview).toEqual({ kind: 'wheel', variant: option.id })
     }
   })
 
-  test('フロントは丸・四角・細目の3種類を、形状が分かるプレビュー付きで持つ', () => {
+  test('フロントは丸・四角・細目・4灯の4種類を、形状が分かるプレビュー付きで持つ', () => {
     const options = CAR_CATEGORIES.front.options
-    expect(options.map((option) => option.id)).toEqual(['round', 'square', 'slim'])
-    expect(options.map((option) => option.label)).toEqual(['丸ライト', '四角ライト', '細目ライト'])
+    expect(options.map((option) => option.id)).toEqual(['round', 'square', 'slim', 'twin'])
+    expect(options.map((option) => option.label)).toEqual(['丸ライト', '四角ライト', '細目ライト', 'よつめライト'])
     for (const option of options) {
       expect(option.preview).toEqual({ kind: 'front', variant: option.id })
     }
   })
 
-  test('屋根は4種類を、形状が分かる専用プレビュー付きで持つ', () => {
+  test('屋根は6種類を、形状が分かる専用プレビュー付きで持つ', () => {
     const options = CAR_CATEGORIES.roof.options
-    expect(options.map((option) => option.id)).toEqual(['none', 'policeLight', 'luggage', 'spoiler'])
-    expect(options.map((option) => option.label)).toEqual(['なし', 'パトランプ', '荷物', 'スポイラー'])
+    expect(options.map((option) => option.id)).toEqual(['none', 'policeLight', 'luggage', 'spoiler', 'rabbit', 'surfboard'])
+    expect(options.map((option) => option.label)).toEqual(['なし', 'パトランプ', '荷物', 'スポイラー', 'うさぎみみ', 'サーフボード'])
     for (const option of options) expect(option.preview).toEqual({ kind: 'roof', variant: option.id })
   })
 
-  test('飾りは「なし」と4種類の模様を、形状が分かる専用プレビュー付きで持つ', () => {
+  test('飾りは「なし」と6種類の模様を、形状が分かる専用プレビュー付きで持つ', () => {
     const options = CAR_CATEGORIES.decoration.options
-    expect(options.map((option) => option.id)).toEqual(['none', 'star', 'flame', 'stripes', 'dots'])
-    expect(options.map((option) => option.label)).toEqual(['なし', 'ほし', 'ほのお', 'しましま', 'みずたま'])
+    expect(options.map((option) => option.id)).toEqual(['none', 'star', 'flame', 'stripes', 'dots', 'hearts', 'checker'])
+    expect(options.map((option) => option.label)).toEqual(['なし', 'ほし', 'ほのお', 'しましま', 'みずたま', 'ハート', 'チェック'])
     for (const option of options) expect(option.preview).toEqual({ kind: 'decoration', variant: option.id })
   })
 
-  test('ナンバー／マークは「なし」と9数字・5アイコンを持つ', () => {
+  test('ナンバー／マークは「なし」と9数字・7アイコンを持つ', () => {
     const options = CAR_CATEGORIES.mark.options
     expect(options.map((option) => option.id)).toEqual([
       'none',
@@ -108,6 +110,8 @@ describe('カテゴリのカタログ', () => {
       'lightning',
       'crown',
       'animal',
+      'flower',
+      'moon',
     ])
     for (const option of options) expect(option.preview).toEqual({ kind: 'mark', variant: option.id })
   })
@@ -122,7 +126,7 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
-  test('カラーはIssue #404の9色を、色付きプレビュー付きで持つ', () => {
+  test('カラーは12色を、色付きプレビュー付きで持つ', () => {
     const colors = CAR_CATEGORIES.color.options
     expect(colors.map((option) => option.id)).toEqual([
       'red',
@@ -134,6 +138,9 @@ describe('カテゴリのカタログ', () => {
       'purple',
       'white',
       'black',
+      'sky',
+      'mint',
+      'brown',
     ])
     expect(colors.map((option) => option.label)).toEqual([
       'あか',
@@ -145,6 +152,9 @@ describe('カテゴリのカタログ', () => {
       'むらさき',
       'しろ',
       'くろ',
+      'みずいろ',
+      'ミント',
+      'ちゃいろ',
     ])
     for (const option of colors) {
       expect(option.preview.kind, option.id).toBe('color')
@@ -222,10 +232,10 @@ describe('表示用の値の解決', () => {
     )
   })
 
-  test('9色すべてが異なる3D用の色値へ解決される', () => {
+  test('12色すべてが異なる3D用の色値へ解決される', () => {
     const colors = CAR_CATEGORIES.color.options.map((option) =>
       resolveCarColor(selectCarOption(DEFAULT_CAR_CONFIG, 'color', option.id)),
     )
-    expect(new Set(colors).size).toBe(9)
+    expect(new Set(colors).size).toBe(12)
   })
 })

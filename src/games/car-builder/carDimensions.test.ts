@@ -36,8 +36,8 @@ describe('computeCarDimensions（GLB実測値から寸法を作る）', () => {
     expect(dimensions.cabinCenterZ).toBe(vehicle.cabin.centerZ)
   })
 
-  test('採用7車種すべてが寸法を持ち、ホイールベースが全長に収まる', () => {
-    expect(CAR_CATEGORIES.body.options).toHaveLength(7)
+  test('採用9車種すべてが寸法を持ち、ホイールベースが全長に収まる', () => {
+    expect(CAR_CATEGORIES.body.options).toHaveLength(9)
     for (const option of CAR_CATEGORIES.body.options) {
       const measured = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id))
       expect(measured.bodyType, option.id).toBe(option.id)
@@ -164,7 +164,7 @@ describe('組み合わせ耐性（7ボディ×タイヤ×車高の全パター�
 
   test('タイヤの大きさは車種ごとの元タイヤ実測値からの倍率で決まる（固定の絶対値を使わない）', () => {
     // 元タイヤ半径が最も違う2車種（SUVが最大、SchoolBusが最小）で確かめる。
-    for (const type of ['small', 'big', 'offroad', 'racing'] as const) {
+    for (const type of ['small', 'big', 'offroad', 'racing', 'whitewall', 'flower'] as const) {
       const suv = resolveWheelSpec(CAR_VEHICLES.suv, type)
       const schoolBus = resolveWheelSpec(CAR_VEHICLES.schoolBus, type)
       expect(suv.radius, type).toBeGreaterThan(schoolBus.radius)
@@ -184,7 +184,7 @@ describe('組み合わせ耐性（7ボディ×タイヤ×車高の全パター�
 
   test('全車種×4タイヤ種で寸法が有限かつ正の値になる', () => {
     for (const id of CAR_VEHICLE_ORDER) {
-      for (const type of ['small', 'big', 'offroad', 'racing'] as const) {
+      for (const type of ['small', 'big', 'offroad', 'racing', 'whitewall', 'flower'] as const) {
         const spec = resolveWheelSpec(CAR_VEHICLES[id], type)
         expect(spec.radius, `${id}/${type}`).toBeGreaterThan(0)
         expect(spec.width, `${id}/${type}`).toBeGreaterThan(0)

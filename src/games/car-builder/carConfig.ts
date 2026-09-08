@@ -13,11 +13,11 @@ import { CAR_VEHICLES, CAR_VEHICLE_ORDER, type CarVehicleId } from './carVehicle
 
 /** ボディ＝採用したQuaternius車種。実体の定義は carVehicles.ts が持つ。 */
 export type BodyType = CarVehicleId
-export type WheelType = 'small' | 'big' | 'offroad' | 'racing'
-export type CarColorId = 'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'pink' | 'purple' | 'white' | 'black'
-export type FrontType = 'round' | 'square' | 'slim'
-export type RoofType = 'none' | 'policeLight' | 'luggage' | 'spoiler'
-export type DecorationType = 'none' | 'star' | 'flame' | 'stripes' | 'dots'
+export type WheelType = 'small' | 'big' | 'offroad' | 'racing' | 'whitewall' | 'flower'
+export type CarColorId = 'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'pink' | 'purple' | 'white' | 'black' | 'sky' | 'mint' | 'brown'
+export type FrontType = 'round' | 'square' | 'slim' | 'twin'
+export type RoofType = 'none' | 'policeLight' | 'luggage' | 'spoiler' | 'rabbit' | 'surfboard'
+export type DecorationType = 'none' | 'star' | 'flame' | 'stripes' | 'dots' | 'hearts' | 'checker'
 export type CarMarkNumber =
   | 'number1'
   | 'number2'
@@ -28,7 +28,7 @@ export type CarMarkNumber =
   | 'number7'
   | 'number8'
   | 'number9'
-export type CarMarkIcon = 'star' | 'heart' | 'lightning' | 'crown' | 'animal'
+export type CarMarkIcon = 'star' | 'heart' | 'lightning' | 'crown' | 'animal' | 'flower' | 'moon'
 export type MarkType = 'none' | CarMarkNumber | CarMarkIcon
 export type RideHeight = 'low' | 'normal' | 'high'
 
@@ -98,6 +98,9 @@ const CAR_COLOR_HEX: Record<CarColorId, string> = {
   // 純白／完全な黒を避け、3D上でも陰影を読み取れる値にする。
   white: '#e9edf2',
   black: '#252a31',
+  sky: '#62c7ed',
+  mint: '#8cd9b3',
+  brown: '#a5754d',
 }
 
 export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } = {
@@ -123,6 +126,8 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'big', label: 'おおきい', preview: { kind: 'wheel', variant: 'big' } },
       { id: 'offroad', label: 'オフロード', preview: { kind: 'wheel', variant: 'offroad' } },
       { id: 'racing', label: 'レーシング', preview: { kind: 'wheel', variant: 'racing' } },
+      { id: 'whitewall', label: 'しろリボン', preview: { kind: 'wheel', variant: 'whitewall' } },
+      { id: 'flower', label: 'おはな', preview: { kind: 'wheel', variant: 'flower' } },
     ],
   },
   color: {
@@ -140,6 +145,9 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'purple', label: 'むらさき', preview: { kind: 'color', hex: CAR_COLOR_HEX.purple } },
       { id: 'white', label: 'しろ', preview: { kind: 'color', hex: CAR_COLOR_HEX.white } },
       { id: 'black', label: 'くろ', preview: { kind: 'color', hex: CAR_COLOR_HEX.black } },
+      { id: 'sky', label: 'みずいろ', preview: { kind: 'color', hex: CAR_COLOR_HEX.sky } },
+      { id: 'mint', label: 'ミント', preview: { kind: 'color', hex: CAR_COLOR_HEX.mint } },
+      { id: 'brown', label: 'ちゃいろ', preview: { kind: 'color', hex: CAR_COLOR_HEX.brown } },
     ],
   },
   front: {
@@ -151,6 +159,7 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'round', label: '丸ライト', preview: { kind: 'front', variant: 'round' } },
       { id: 'square', label: '四角ライト', preview: { kind: 'front', variant: 'square' } },
       { id: 'slim', label: '細目ライト', preview: { kind: 'front', variant: 'slim' } },
+      { id: 'twin', label: 'よつめライト', preview: { kind: 'front', variant: 'twin' } },
     ],
   },
   roof: {
@@ -163,6 +172,8 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'policeLight', label: 'パトランプ', preview: { kind: 'roof', variant: 'policeLight' } },
       { id: 'luggage', label: '荷物', preview: { kind: 'roof', variant: 'luggage' } },
       { id: 'spoiler', label: 'スポイラー', preview: { kind: 'roof', variant: 'spoiler' } },
+      { id: 'rabbit', label: 'うさぎみみ', preview: { kind: 'roof', variant: 'rabbit' } },
+      { id: 'surfboard', label: 'サーフボード', preview: { kind: 'roof', variant: 'surfboard' } },
     ],
   },
   decoration: {
@@ -176,6 +187,8 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'flame', label: 'ほのお', preview: { kind: 'decoration', variant: 'flame' } },
       { id: 'stripes', label: 'しましま', preview: { kind: 'decoration', variant: 'stripes' } },
       { id: 'dots', label: 'みずたま', preview: { kind: 'decoration', variant: 'dots' } },
+      { id: 'hearts', label: 'ハート', preview: { kind: 'decoration', variant: 'hearts' } },
+      { id: 'checker', label: 'チェック', preview: { kind: 'decoration', variant: 'checker' } },
     ],
   },
   mark: {
@@ -199,6 +212,8 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'lightning', label: 'いなずま', preview: { kind: 'mark', variant: 'lightning' } },
       { id: 'crown', label: 'おうかん', preview: { kind: 'mark', variant: 'crown' } },
       { id: 'animal', label: 'どうぶつ', preview: { kind: 'mark', variant: 'animal' } },
+      { id: 'flower', label: 'おはな', preview: { kind: 'mark', variant: 'flower' } },
+      { id: 'moon', label: 'おつきさま', preview: { kind: 'mark', variant: 'moon' } },
     ],
   },
   rideHeight: {

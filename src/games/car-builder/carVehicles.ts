@@ -1,8 +1,9 @@
 /**
- * 「3Dクルマづくり」で使う車体（Quaternius製CC0モデル）のカタログ。
+ * 「3Dクルマづくり」で使う車体（Quaternius製CC0モデルとオリジナルモデル）のカタログ。
  *
  * three.jsに依存しない純粋なデータなので、UI・寸法計算・テストがここを共通の
- * 正として参照できる。数値はすべて `scripts/build-car-builder-models.py` が
+ * 正として参照できる。数値は `scripts/build-car-builder-models.py` または
+ * `scripts/build-car-builder-extra-models.mjs` が
  * 書き出したGLBからの実測値で、手で目分量の値を入れてはいけない
  * （GLBを作り直したら、スクリプトの `--metrics` 出力で更新する）。
  *
@@ -12,7 +13,7 @@
  */
 
 /** 採用車種。GLBのファイル名（kebab-case）とは別に、コード上のIDはcamelCaseで持つ。 */
-export type CarVehicleId = 'sportsCar' | 'car' | 'suv' | 'taxi' | 'policeCar' | 'schoolBus' | 'ambulance'
+export type CarVehicleId = 'sportsCar' | 'car' | 'suv' | 'taxi' | 'policeCar' | 'schoolBus' | 'ambulance' | 'pickup' | 'van'
 
 /**
  * GLB内のマテリアル名。ビルドスクリプトが役割の分かる名前へ付け替えているので、
@@ -82,7 +83,7 @@ export type CarVehicleDefinition = {
 }
 
 /**
- * 採用7車種。並び順はそのまま車種選択UIの並びになる。
+ * 採用車種。並び順はそのまま車種選択UIの並びになる。
  * 小さい乗用車から大きい特殊車両へ向かう順にして、サイズの差が伝わるようにしている。
  */
 export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition } = {
@@ -202,6 +203,36 @@ export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition 
     materials: ['Body', 'Accent', 'Glass', 'TrimDark', 'LightFront', 'Trim'],
     source: { pack: 'Public Transport Pack', model: 'Ambulance' },
   },
+  pickup: {
+    id: 'pickup',
+    label: 'ピックアップ',
+    emoji: '🛻',
+    modelFile: 'pickup.glb',
+    size: { length: 4.46, width: 2.14, height: 1.5 },
+    bodyFloor: 0.22,
+    cabin: { centerZ: 0.434, length: 1.534, width: 1.71, floorY: 1.019 },
+    wheels: {
+      front: { z: 1.43, halfTrack: 0.84, radius: 0.3, width: 0.23 },
+      rear: { z: -1.37, halfTrack: 0.84, radius: 0.3, width: 0.23 },
+    },
+    materials: ['Body', 'TrimDark', 'Glass', 'LightRear', 'Trim'],
+    source: { pack: 'Kids Playground Originals', model: 'pickup' },
+  },
+  van: {
+    id: 'van',
+    label: 'バン',
+    emoji: '🚐',
+    modelFile: 'van.glb',
+    size: { length: 4.26, width: 2.14, height: 1.72 },
+    bodyFloor: 0.22,
+    cabin: { centerZ: -0.015, length: 4.143, width: 1.838, floorY: 1.046 },
+    wheels: {
+      front: { z: 1.33, halfTrack: 0.84, radius: 0.3, width: 0.23 },
+      rear: { z: -1.27, halfTrack: 0.84, radius: 0.3, width: 0.23 },
+    },
+    materials: ['Body', 'Glass', 'TrimDark', 'LightRear', 'Trim'],
+    source: { pack: 'Kids Playground Originals', model: 'van' },
+  },
 }
 
 /** 車種選択UIと3D側が共有する並び順。 */
@@ -213,6 +244,8 @@ export const CAR_VEHICLE_ORDER: readonly CarVehicleId[] = [
   'policeCar',
   'ambulance',
   'schoolBus',
+  'pickup',
+  'van',
 ]
 
 /** GLBの公開URL。`public/` 配下をそのまま配信するため、base込みで組み立てる。 */

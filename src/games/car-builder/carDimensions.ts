@@ -49,6 +49,8 @@ export type CarWheelRatio = {
  * トレッド・リム意匠（carParts.ts）でも出す。
  */
 export const CAR_WHEEL_RATIOS: Record<WheelType, CarWheelRatio> = {
+  whitewall: { id: 'whitewall', radiusRatio: 1.03, widthRatio: 1.0 },
+  flower: { id: 'flower', radiusRatio: 1.0, widthRatio: 1.08 },
   small: { id: 'small', radiusRatio: 0.82, widthRatio: 0.78 },
   big: { id: 'big', radiusRatio: 1.22, widthRatio: 1.05 },
   // 径は控えめにとどめ、太さとトレッドブロックで「ゴツさ」を表現する。

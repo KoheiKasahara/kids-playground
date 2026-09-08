@@ -12,9 +12,9 @@ describe('実車体への取り付け', () => {
   test.each(CAR_VEHICLE_ORDER)('%s: 全ライト・車高で実GLBに接する', async (body) => {
     const file = await readFile(`public/models/car-builder/${CAR_VEHICLES[body].modelFile}`)
     const gltf = await new GLTFLoader().parseAsync(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer, '')
-    for (const wheel of ['small', 'big', 'offroad', 'racing'] as const) {
+    for (const wheel of ['small', 'big', 'offroad', 'racing', 'whitewall', 'flower'] as const) {
       for (const rideHeight of ['low', 'normal', 'high'] as const) {
-        for (const front of ['round', 'square', 'slim'] as const) {
+        for (const front of ['round', 'square', 'slim', 'twin'] as const) {
           const config = { ...DEFAULT_CAR_CONFIG, body, wheel, rideHeight, front }
           const dimensions = computeCarDimensions(config)
           const attachments = computeCarAttachments(dimensions)
@@ -28,7 +28,7 @@ describe('実車体への取り付け', () => {
           }
           disposeCarObject(part)
           // Other categories use the same real shell, including the lower roof behind a sign.
-          for (const roof of ['policeLight', 'luggage', 'spoiler'] as const) {
+          for (const roof of ['policeLight', 'luggage', 'spoiler', 'rabbit', 'surfboard'] as const) {
             const roofPart = CAR_PART_BUILDERS.roof[roof]({ config: { ...config, roof }, dimensions, attachments, surface, color: '#ff0000' })!
             const supports = roofPart.children.filter((child) => child.name.includes('support') || child.name === 'car-roof-luggage' || child.name.endsWith('-base'))
             for (const support of supports) {
