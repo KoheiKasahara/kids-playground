@@ -4,6 +4,7 @@ import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import { playDominoCompleteSound, playDominoTickSound } from '../../utils/quizSound'
 import { FLAG_COLOR_HEX, type DominoFlagId } from './flagDefinitions'
+import { completedFlagBodyMatrix, configureFlagFaceTexture, createFlagFaceLocalMatrix, FLAG_FINISH_DURATION_MS, loadFlagFaceTexture } from './flagFaceRendering'
 import {
   DOMINO_DEPTH,
   DOMINO_HEIGHT,
@@ -181,6 +182,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     let groundMaterial: THREE.MeshLambertMaterial | null = null
     let dominoMaterial: THREE.MeshLambertMaterial | null = null
     let flagMaterial: THREE.MeshBasicMaterial | null = null
+    let flagTexture: THREE.Texture | null = null
     let ballGeometry: THREE.SphereGeometry | null = null
     let ballMaterial: THREE.MeshLambertMaterial | null = null
     let ballMesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshLambertMaterial> | null = null
@@ -201,6 +203,12 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
     let started = false
     let startedAt: number | null = null
     let completeNotified = false
+    let completedAt: number | null = null
+    let arrangementWritten = false
+    const finishPoses = new Map<number, {
+      fromPosition: THREE.Vector3; fromRotation: THREE.Quaternion; fromScale: THREE.Vector3
+      toPosition: THREE.Vector3; toRotation: THREE.Quaternion; toScale: THREE.Vector3
+    }>()
     let lastFrameTime: number | null = null
     let accumulator = 0
     let lastInspectionAt = Number.NEGATIVE_INFINITY
@@ -236,19 +244,10 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
 
     const bodyMatrix = new THREE.Matrix4()
     const flagMatrix = new THREE.Matrix4()
-    const flagLocalMatrix = new THREE.Matrix4()
+    const flagLocalMatrix = createFlagFaceLocalMatrix()
     const bodyPosition = new THREE.Vector3()
     const bodyScale = new THREE.Vector3()
     const bodyQuaternion = new THREE.Quaternion()
-    const flagLocalQuaternion = new THREE.Quaternion().setFromAxisAngle(
-      new THREE.Vector3(0, 1, 0),
-      Math.PI,
-    )
-    flagLocalMatrix.compose(
-      new THREE.Vector3(0, 0, -0.5 - 0.004 / DOMINO_DEPTH),
-      flagLocalQuaternion,
-      new THREE.Vector3(0.86, 0.82, 1),
-    )
 
     function release() {
       if (released) return
@@ -277,6 +276,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       groundMaterial?.dispose()
       dominoMaterial?.dispose()
       flagMaterial?.dispose()
+      flagTexture?.dispose()
       ballGeometry?.dispose()
       ballMaterial?.dispose()
       railFloorMaterial?.dispose()
@@ -488,18 +488,26 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       camera.lookAt(smoothedTarget.x, smoothedTarget.y, smoothedTarget.z)
     }
 
-    function writeVisuals() {
+    function writeVisuals(now = performance.now()) {
       if (!dominoMesh || !flagMesh) return
       let wroteDominoMatrix = false
       for (const [index, entry] of bodies.entries()) {
+        const finishPose = finishPoses.get(index)
         const sleeping = entry.body.isSleeping()
-        if (sleeping && entry.sleepPoseWritten) continue
+        if (finishPose ? arrangementWritten : sleeping && entry.sleepPoseWritten) continue
         if (!sleeping) entry.sleepPoseWritten = false
         const translation = entry.body.translation()
         const rotation = entry.body.rotation()
         bodyPosition.set(translation.x, translation.y, translation.z)
         bodyQuaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
         bodyScale.set(entry.placement.width, DOMINO_HEIGHT, DOMINO_DEPTH)
+        if (finishPose && completedAt !== null) {
+          const progress = Math.min(1, Math.max(0, (now - completedAt) / FLAG_FINISH_DURATION_MS))
+          const eased = progress * progress * (3 - 2 * progress)
+          bodyPosition.lerpVectors(finishPose.fromPosition, finishPose.toPosition, eased)
+          bodyQuaternion.slerpQuaternions(finishPose.fromRotation, finishPose.toRotation, eased)
+          bodyScale.lerpVectors(finishPose.fromScale, finishPose.toScale, eased)
+        }
         bodyMatrix.compose(
           bodyPosition,
           bodyQuaternion,
@@ -513,6 +521,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         entry.sleepPoseWritten = sleeping
         wroteDominoMatrix = true
       }
+      if (completedAt !== null && now - completedAt >= FLAG_FINISH_DURATION_MS) arrangementWritten = true
       if (wroteDominoMatrix) {
         dominoMesh.instanceMatrix.needsUpdate = true
         flagMesh.instanceMatrix.needsUpdate = true
@@ -619,6 +628,18 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
 
       if (completion.complete && !completeNotified) {
         completeNotified = true
+        completedAt = now
+        for (const [index, entry] of bodies.entries()) {
+          if (entry.flagInstanceIndex === null || !dominoMesh) continue
+          const pose = {
+            fromPosition: new THREE.Vector3(), fromRotation: new THREE.Quaternion(), fromScale: new THREE.Vector3(),
+            toPosition: new THREE.Vector3(), toRotation: new THREE.Quaternion(), toScale: new THREE.Vector3(),
+          }
+          dominoMesh.getMatrixAt(index, bodyMatrix)
+          bodyMatrix.decompose(pose.fromPosition, pose.fromRotation, pose.fromScale)
+          completedFlagBodyMatrix(entry.placement).decompose(pose.toPosition, pose.toRotation, pose.toScale)
+          finishPoses.set(index, pose)
+        }
         soundController.notifyComplete(now)
         optionsRef.current.onComplete()
         return
@@ -692,7 +713,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         }
       }
 
-      writeVisuals()
+      writeVisuals(now)
       if (isBigCourse) {
         updateBigCamera(deltaSeconds, now)
       } else if (course.approachCount > 0) {
@@ -724,7 +745,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       const devicePixelRatio = window.devicePixelRatio || 1
       try {
         renderer = new THREE.WebGLRenderer({
-          antialias: devicePixelRatio <= 1.25,
+          antialias: true,
           powerPreference: 'high-performance',
         })
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
@@ -767,6 +788,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
           color: 0xffffff,
           side: THREE.FrontSide,
         })
+        configureFlagFaceTexture(flagMaterial, flagPlacements)
         flagMesh = new THREE.InstancedMesh(flagGeometry, flagMaterial, flagPlacements.length)
         flagMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
         flagMesh.frustumCulled = false
@@ -789,6 +811,23 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
         if (dominoMesh.instanceColor) dominoMesh.instanceColor.needsUpdate = true
         if (flagMesh.instanceColor) flagMesh.instanceColor.needsUpdate = true
         scene.add(dominoMesh, flagMesh)
+        // Keep the existing mosaic as a usable fallback if the SVG cannot load.
+        void loadFlagFaceTexture(flagId!).then((texture) => {
+          if (released || !flagMaterial || !flagMesh) {
+            texture.dispose()
+            return
+          }
+          flagTexture = texture
+          flagMaterial.map = texture
+          // Printed SVG colors must not be multiplied by the old cell palette.
+          for (let index = 0; index < flagPlacements.length; index += 1) {
+            flagMesh.setColorAt(index, new THREE.Color(0xffffff))
+          }
+          if (flagMesh.instanceColor) flagMesh.instanceColor.needsUpdate = true
+          flagMaterial.needsUpdate = true
+        }).catch(() => {
+          // Offline/cache failures retain the original colored domino faces.
+        })
 
         if (course.ballSection !== null || course.seesawBallSection !== null) {
           ballGeometry = new THREE.SphereGeometry(BALL_RADIUS, 24, 16)

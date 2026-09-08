@@ -51,15 +51,3 @@ export function drawPaper(ctx: CanvasRenderingContext2D, paper: Paper) {
   }
   ctx.restore()
 }
-
-/** Ink stays separate, so changing paper and exporting never destroys transparency. */
-export function composePicture(ink: HTMLCanvasElement, paper: Paper) {
-  const picture = document.createElement('canvas')
-  picture.width = PAPER_WIDTH
-  picture.height = PAPER_HEIGHT
-  const ctx = picture.getContext('2d')
-  if (!ctx) throw new Error('Canvas is unavailable')
-  drawPaper(ctx, paper)
-  ctx.drawImage(ink, 0, 0)
-  return picture
-}

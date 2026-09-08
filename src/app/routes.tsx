@@ -50,6 +50,7 @@ const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePla
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
+  { path: '/games/magic-sandbox', element: lazyRoute(() => import('../games/magic-sandbox/MagicSandboxPlay')) },
   { path: '/', element: <Home /> },
   { path: '/games/animal-bath', element: lazyRoute(() => import('../games/animal-bath/AnimalBathPlay')) },
   { path: '/games/bento-builder', element: playRoute(lazyRoute(() => import('../games/bento-builder/BentoBuilderPlay'))) },
@@ -135,6 +136,7 @@ export const routes: RouteObject[] = [
   // 選択画面と、Three.js・Rapier(wasm)を使うプレイ画面を必要なときだけ読込む。
   { path: '/games/flag-roll-maze', element: lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazeSelect')) },
   { path: '/games/flag-roll-maze/play', element: playRoute(lazyRoute(() => import('../games/flag-roll-maze/FlagRollMazePlay'))) },
+  { path: '/games/snowball-roll', element: lazyRoute(() => import('../games/snowball-roll/SnowballRoll')) },
   // こっきコロコロパズルも物理エンジン(matter-js)を含むため、開くときだけ読込む。
   // 選択画面とプレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // FlagRollPuzzlePlay内でプレイ側の描画だけを条件付きに包んでいる。

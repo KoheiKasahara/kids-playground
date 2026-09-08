@@ -5,7 +5,9 @@ import { MemoryRouter } from 'react-router-dom'
 import OekakiKorokoroPlay from './OekakiKorokoroPlay'
 import { drawStamps } from './rollerDrawing'
 
-vi.mock('./rollerDrawing', () => ({ drawPaper: vi.fn(), drawStamps: vi.fn(), composePicture: vi.fn(() => document.createElement('canvas')) }))
+vi.mock('./rollerDrawing', () => ({ drawPaper: vi.fn(), drawStamps: vi.fn() }))
+
+vi.mock('./FallingDrawingPlay', () => ({ default: () => null }))
 
 const ctx = { clearRect: vi.fn(), drawImage: vi.fn() }
 beforeEach(() => {
@@ -33,6 +35,7 @@ afterEach(() => {
 
 function open() {
   render(<MemoryRouter><OekakiKorokoroPlay /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: '🌸 もようで おえかき' }))
   return screen.getByLabelText('おえかきの かみ。ゆびや マウスで なぞってね')
 }
 function tap(canvas: HTMLElement) {
@@ -78,28 +81,25 @@ describe('おえかきコロコロのあそび', () => {
     tap(canvas)
     expect(drawStamps).toHaveBeenLastCalledWith(ctx, [{ x: 200, y: 200, angle: 0 }], expect.anything(), expect.anything())
   })
-  test('paper changes do not clear ink; PNG download celebrates and returns to drawing', async () => {
+  test('paper changes preserve ink; done celebrates without exporting and returns to drawing', async () => {
     const user = userEvent.setup()
     tap(open())
     await user.click(screen.getByRole('button', { name: 'そら' }))
     expect(ctx.clearRect).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'できた！' }))
-    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce()
+    expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled()
+    expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: 'できた！' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'もっと かく' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ぜんぶ けす' })).toBeEnabled()
   })
-  test('download failure leaves the artwork available for retry', async () => {
+  test('switching toys preserves the existing artwork and undo', async () => {
     const user = userEvent.setup()
     tap(open())
-    vi.mocked(HTMLCanvasElement.prototype.toDataURL).mockImplementationOnce(() => { throw new Error('export failed') })
-    await user.click(screen.getByRole('button', { name: 'できた！' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('ほぞんできなかったよ')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'ぜんぶ けす' })).toBeEnabled()
-    await user.click(screen.getByRole('button', { name: 'できた！' }))
-    expect(screen.getByRole('dialog', { name: 'できた！' })).toBeInTheDocument()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '✏️ かいて ころがす' }))
+    await user.click(screen.getByRole('button', { name: '🌸 もようで おえかき' }))
+    expect(ctx.clearRect).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '1かい もどす' })).toBeEnabled()
   })
 })
