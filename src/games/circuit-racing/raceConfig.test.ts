@@ -5,9 +5,12 @@ import { CAR_VEHICLES } from '../car-builder/carVehicles'
 import { DEFAULT_SELECTIONS, RACE_CARS, RACE_COLORS } from './raceConfig'
 
 describe('raceConfig', () => {
-  it('reuses exactly the three raceable car ids', () => {
-    expect(RACE_CARS.map((car) => car.id)).toEqual(['sportsCar', 'car', 'suv'])
+  it('offers eight distinct reusable vehicles', () => {
+    expect(RACE_CARS.map((car) => car.id)).toEqual([
+      'sportsCar', 'car', 'suv', 'policeCar', 'ambulance', 'taxi', 'pickup', 'van',
+    ])
     expect(new Set(RACE_CARS.map((car) => car.id)).size).toBe(RACE_CARS.length)
+    expect(new Set(RACE_CARS.map((car) => CAR_VEHICLES[car.id].modelFile)).size).toBe(8)
   })
 
   it('keeps tuning values positive and in the expected speed range', () => {
@@ -30,9 +33,14 @@ describe('raceConfig', () => {
     }
   })
 
-  it('points each reusable race car at an existing CC0 model', () => {
+  it('points each reusable race car at an existing model that fits its lane', () => {
     for (const car of RACE_CARS) {
       expect(existsSync(resolve('public', 'models', 'car-builder', CAR_VEHICLES[car.id].modelFile))).toBe(true)
+      const vehicle = CAR_VEHICLES[car.id]
+      expect(vehicle.size.width).toBeLessThan(3)
+      for (const axle of [vehicle.wheels.front, vehicle.wheels.rear]) {
+        expect(2 * axle.halfTrack + axle.width).toBeLessThan(3)
+      }
     }
   })
 })
