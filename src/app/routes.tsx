@@ -50,6 +50,7 @@ const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePla
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
+  { path: '/games/draw-goal', element: lazyRoute(() => import('../games/draw-goal/DrawGoalPlay')) },
   { path: '/games/magic-sandbox', element: lazyRoute(() => import('../games/magic-sandbox/MagicSandboxPlay')) },
   { path: '/', element: <Home /> },
   { path: '/games/puni-slime', element: playRoute(lazyRoute(() => import('../games/puni-slime/PuniSlimePlay'))) },

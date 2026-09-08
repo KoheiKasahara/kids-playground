@@ -106,25 +106,10 @@
   .paperPicker > span { display: none; }
 }
 
-.workspace[hidden] { display: none; }
-.modePicker { display: flex; justify-content: center; gap: 8px; }
-.modePicker button { padding: 4px 12px; font-size: 14px; }
-.drawingTools { display: grid; gap: 10px; }
-.drawingTools button { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px; }
-.drawingTools button > span { font-size: 26px; }
 @media (max-width: 650px) and (orientation: portrait) {
   .rollerWorkspace .caption { display: none; }
-  .drawingTools { grid-template-columns: 1fr 1fr; gap: 5px; }
-  .fallingActions { grid-template-columns: 1fr 1fr; }
-  .modePicker { gap: 5px; }
-  .modePicker button { font-size: 12px; padding: 4px 7px; }
 }
 @media (orientation: landscape) and (max-height: 540px) {
-  .modePicker { position: absolute; top: max(5px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); }
-  .modePicker button { font-size: 11px; padding: 4px 7px; }
   .header .badge { display: none; }
   .header h1 { font-size: 16px; }
-  .fallingTools { gap: 10px; width: 250px; }
-  .drawingTools { grid-template-columns: 1fr 1fr; gap: 4px; }
-  .drawingTools button { flex-direction: column; gap: 0; font-size: 12px; padding: 3px; }
 }

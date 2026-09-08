@@ -16,7 +16,6 @@ test('home → drawing → pattern/color → undo → paper → guarded clear �
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
   await page.getByRole('link', { name: 'おえかきコロコロ', exact: true }).click()
-  await page.getByRole('button', { name: '🌸 もようで おえかき' }).click()
   await expect(drawing(page)).toBeVisible()
   await expect(page.getByText('↔ よこに うごくよ')).toHaveCount(2)
   for (const picker of [page.getByTestId('pattern-picker'), page.getByTestId('color-picker')]) {
@@ -53,7 +52,7 @@ test('home → drawing → pattern/color → undo → paper → guarded clear �
   expect(downloads).toEqual([])
   await expect(page.getByRole('dialog', { name: 'できた！' })).toBeVisible()
   await page.getByRole('button', { name: 'もっと かく' }).click()
-  await page.getByRole('link', { name: '← もどる' }).click()
+  await page.getByRole('button', { name: 'もどる', exact: true }).click()
   await expect(page).toHaveURL(/\/$/)
   expect(errors).toEqual([])
 })
@@ -62,7 +61,6 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
   test(`usable paper and controls at ${viewport.width}×${viewport.height}; resize preserves artwork`, async ({ page }) => {
     await page.setViewportSize(viewport)
     await page.goto('/games/oekaki-korokoro')
-    await page.getByRole('button', { name: '🌸 もようで おえかき' }).click()
     await expect(drawing(page)).toBeVisible()
     for (const control of await page.locator('main button:visible, main a:visible').all()) {
       const box = (await control.boundingBox())!
@@ -88,7 +86,6 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
 
 test('real touch drag does not scroll; extra finger/cancel and pointer capture remain usable', async ({ page, context }) => {
   await page.goto('/games/oekaki-korokoro')
-  await page.getByRole('button', { name: '🌸 もようで おえかき' }).click()
   await expect(drawing(page)).toBeVisible()
   const blank = await pixels(page)
   const box = (await drawing(page).boundingBox())!
@@ -117,7 +114,6 @@ test('real touch drag does not scroll; extra finger/cancel and pointer capture r
 
 test('curved trails use every motif; sustained drawing stays responsive', async ({ page }, testInfo) => {
   await page.goto('/games/oekaki-korokoro')
-  await page.getByRole('button', { name: '🌸 もようで おえかき' }).click()
   await expect(drawing(page)).toBeVisible()
   await page.getByRole('button', { name: 'そら', exact: true }).click()
   const timings: number[] = []

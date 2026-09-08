@@ -15,7 +15,7 @@ describe('Home', () => {
     )
     const links = screen.getAllByRole('link')
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
-    expect(links.slice(-7).map((link) => link.getAttribute('href'))).toEqual(
+    expect(links.slice(-8).map((link) => link.getAttribute('href'))).toEqual(
       [
         'animal-bath',
         'snowball-roll',
@@ -24,6 +24,7 @@ describe('Home', () => {
         'bento-builder',
         'circuit-racing',
         'oekaki-korokoro',
+        'draw-goal',
       ].map(gameRoutePath),
     )
   })
