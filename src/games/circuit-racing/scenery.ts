@@ -163,7 +163,9 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
     for (let i = 0; i < 16; i++) place((i + 0.2) / 16, 13, (m) => {
       const height = 16 + (i % 4) * 6
       part(m, 'cone', i % 2 ? '#8b9196' : '#9ca29e', 0, height / 2, 0, 24, height, 24)
-      part(m, 'cone', '#f2f2e6', 0, height * 0.85, 0, 7.2, height * 0.3, 7.2)
+      // Keep the snow cap slightly outside the mountain slope. Matching both
+      // cone surfaces exactly makes the depth buffer alternate between them.
+      part(m, 'cone', '#f2f2e6', 0, height * 0.86, 0, 7.6, height * 0.32, 7.6)
     })
     for (let i = 0; i < 20; i++) place((i + 0.6) / 20, 4, (m) => tree(m, i, true))
   }
