@@ -7,7 +7,6 @@ import { drawStamps } from './rollerDrawing'
 
 vi.mock('./rollerDrawing', () => ({ drawPaper: vi.fn(), drawStamps: vi.fn() }))
 
-vi.mock('./FallingDrawingPlay', () => ({ default: () => null }))
 
 const ctx = { clearRect: vi.fn(), drawImage: vi.fn() }
 beforeEach(() => {
@@ -35,7 +34,6 @@ afterEach(() => {
 
 function open() {
   render(<MemoryRouter><OekakiKorokoroPlay /></MemoryRouter>)
-  fireEvent.click(screen.getByRole('button', { name: '🌸 もようで おえかき' }))
   return screen.getByLabelText('おえかきの かみ。ゆびや マウスで なぞってね')
 }
 function tap(canvas: HTMLElement) {
@@ -102,12 +100,9 @@ describe('おえかきコロコロのあそび', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ぜんぶ けす' })).toBeEnabled()
   })
-  test('switching toys preserves the existing artwork and undo', async () => {
-    const user = userEvent.setup()
-    tap(open())
-    await user.click(screen.getByRole('button', { name: '✏️ かいて ころがす' }))
-    await user.click(screen.getByRole('button', { name: '🌸 もようで おえかき' }))
-    expect(ctx.clearRect).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: '1かい もどす' })).toBeEnabled()
+  test('opens the stamp studio directly without the old mode tabs', () => {
+    open()
+    expect(screen.queryByRole('group', { name: 'あそびを えらぶ' })).not.toBeInTheDocument()
+    expect(screen.queryByText('かいて ころがす')).not.toBeInTheDocument()
   })
 })
