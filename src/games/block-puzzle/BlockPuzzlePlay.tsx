@@ -29,7 +29,7 @@ import {
 import { playBlockPuzzleCompleteSound, primeAudio } from '../../utils/quizSound'
 import styles from './BlockPuzzlePlay.module.css'
 
-const HINT_MESSAGE = 'かたちを えらんで、ばんめんを タップしてね'
+const HINT_MESSAGE = 'かたちを ひっぱって おこう！ タップでも おけるよ'
 const MOVE_HINT_MESSAGE = 'うごかしたい ばしょを タップしてね'
 const CANNOT_PLACE_MESSAGE = 'ここには おけないよ'
 /** #483: 回転は常に成功するが、その結果はみ出た／重なったままのときの案内。 */
@@ -47,7 +47,7 @@ type InvalidCell = { readonly cell: BoardCell } | null
  * kind: 'move' は配置済みパーツをつかんで動かす／入れ替える操作（#483）、
  * 'place' はパーツ一覧で選んだ「まだ置いていない形」を、あきマスの上へ
  * ドラッグして置く操作（#510）。どちらも指を離すまでは着地候補を見せるだけで、
- * 実際に盤面を書き換えるのは pointerup／pointercancel の時点だけにする。
+ * 実際に盤面を書き換えるのは pointerup の時点だけにする。
  */
 type MoveDragState = {
   readonly kind: 'move'
@@ -216,6 +216,7 @@ export default function BlockPuzzlePlay() {
               row: Math.floor((event.clientY - rect.top) / cellHeight),
             }
 
+      if (moved) event.preventDefault()
       if (
         moved === current.moved &&
         nextAnchor.col === current.currentAnchor.col &&
@@ -223,15 +224,15 @@ export default function BlockPuzzlePlay() {
       ) {
         return
       }
-      // しきい値を超えて実際にドラッグが始まったら、ブラウザ既定のスクロール等を打ち消す。
-      if (moved) event.preventDefault()
       const next = { ...current, currentAnchor: nextAnchor, moved } as DragState
       dragRef.current = next
       setDragPreview(next)
     }
 
-    /** 指を離した／ドラッグが中断されたときの確定処理。 */
+    /** 指を離したときだけ確定する。 */
     const finishDrag = (event: PointerEvent) => {
+      // 最後の move と up の座標が異なる場合も、離した場所を使う。
+      handlePointerMove(event)
       const current = dragRef.current
       if (!current || event.pointerId !== current.pointerId) return
       dragRef.current = null
@@ -252,7 +253,15 @@ export default function BlockPuzzlePlay() {
         return
       }
 
-      const placed = placeSelectedBlock(stateRef.current, current.currentAnchor)
+      const placed = placeSelectedBlock(
+        {
+          ...stateRef.current,
+          selectedShapeId: current.shapeId,
+          pendingRotation: current.rotation,
+          selectedPlacedBlockId: null,
+        },
+        current.currentAnchor,
+      )
       if (placed) {
         setState(placed)
         clearFeedback()
@@ -261,17 +270,31 @@ export default function BlockPuzzlePlay() {
       }
     }
 
-    window.addEventListener('pointermove', handlePointerMove)
+    const cancelDrag = (event: PointerEvent) => {
+      if (event.pointerId !== dragRef.current?.pointerId) return
+      dragMovedRef.current = dragRef.current.moved
+      dragRef.current = null
+      setDragPreview(null)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false })
     window.addEventListener('pointerup', finishDrag)
-    window.addEventListener('pointercancel', finishDrag)
+    window.addEventListener('pointercancel', cancelDrag)
+    window.addEventListener('lostpointercapture', cancelDrag)
     return () => {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', finishDrag)
-      window.removeEventListener('pointercancel', finishDrag)
+      window.removeEventListener('pointercancel', cancelDrag)
+      window.removeEventListener('lostpointercapture', cancelDrag)
     }
   }, [])
 
   const handleSelectShape = (shapeId: BlockShapeId) => {
+    if (dragRef.current) return
+    if (dragMovedRef.current) {
+      dragMovedRef.current = false
+      return
+    }
     if (selectedPlacedBlock && !isSelectedConfirmed) {
       // はみ出た／重なったパーツを直す前に形を選ぼうとした：直すまで待たせる。
       setSwitchBlocked(true)
@@ -281,7 +304,39 @@ export default function BlockPuzzlePlay() {
     clearFeedback()
   }
 
+  const handlePalettePointerDown = (shapeId: BlockShapeId, event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (dragRef.current || (event.pointerType === 'mouse' && event.button !== 0)) return
+    dragMovedRef.current = false
+    if (selectedPlacedBlock && !isSelectedConfirmed) {
+      setSwitchBlocked(true)
+      return
+    }
+    const rect = blockLayerRef.current?.getBoundingClientRect()
+    if (!rect || rect.width === 0 || rect.height === 0) return
+    const selected = selectShape(state, shapeId)
+    setState(selected)
+    stateRef.current = selected
+    clearFeedback()
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    const next: PlaceDragState = {
+      kind: 'place',
+      pointerId: event.pointerId,
+      shapeId,
+      rotation: selected.pendingRotation,
+      currentAnchor: {
+        col: Math.floor((event.clientX - rect.left) / (rect.width / BOARD_COLS)),
+        row: Math.floor((event.clientY - rect.top) / (rect.height / BOARD_ROWS)),
+      },
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      moved: false,
+    }
+    dragRef.current = next
+    setDragPreview(next)
+  }
+
   const handleTapCell = (cell: BoardCell) => {
+    if (dragRef.current) return
     if (dragMovedRef.current) {
       // 直前のドラッグの終わりに続けて発火した click。すでにドラッグ側で処理済み。
       dragMovedRef.current = false
@@ -335,7 +390,8 @@ export default function BlockPuzzlePlay() {
    * タップと同じ扱いのままなので、既存のタップ操作は変えない。
    */
   const handleCellPointerDown = (cell: BoardCell, event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return
+    if (dragRef.current || (event.pointerType === 'mouse' && event.button !== 0)) return
+    dragMovedRef.current = false
     const owner = owners.get(cellKey(cell))
 
     if (owner) {
@@ -426,7 +482,7 @@ export default function BlockPuzzlePlay() {
    * そのまま返し、valid だけで区別する（プレビューを消さないため）。
    */
   const dropPreview = (() => {
-    if (!dragPreview) return null
+    if (!dragPreview || !dragPreview.moved) return null
     if (dragPreview.kind === 'move') {
       if (!dragPreview.moved) return null
       const block = state.placedBlocks.find((candidate) => candidate.id === dragPreview.blockId)
@@ -678,6 +734,7 @@ export default function BlockPuzzlePlay() {
               aria-pressed={selected}
               aria-label={`${shape.label} を えらぶ`}
               onClick={() => handleSelectShape(shape.id)}
+              onPointerDown={(event) => handlePalettePointerDown(shape.id, event)}
             >
               <span className={styles.palettePieceArea}>
                 <BlockPiece shape={shape} cells={shape.cells} className={styles.palettePiece} />
