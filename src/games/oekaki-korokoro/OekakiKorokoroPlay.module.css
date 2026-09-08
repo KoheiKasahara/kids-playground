@@ -10,6 +10,7 @@
 .current svg { width: 30px; height: 30px; }
 .mat { flex: 1; min-height: 0; container-type: size; display: grid; place-items: center; border-radius: 26px; background: #eadfca; background-image: radial-gradient(#d7c8af 1px, transparent 1px); background-size: 14px 14px; overflow: hidden; padding: 10px; }
 .paper { position: relative; width: min(100cqw, calc(100cqh * 4 / 3)); aspect-ratio: 4 / 3; border-radius: 9px; overflow: hidden; box-shadow: 0 5px 12px #79644b26; isolation: isolate; }
+.rollerPaper { width: min(100cqw, 100cqh); aspect-ratio: 1; }
 .background, .canvas { position: absolute; width: 100%; height: 100%; inset: 0; }
 .canvas { touch-action: none; cursor: crosshair; }
 .hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; color: #857661; gap: 12px; font-size: 16px; }
@@ -31,14 +32,18 @@
 .paperPicker button > span { display: grid; place-items: center; border-radius: 5px; width: 25px; height: 27px; border: 1px solid #51473930; font-size: 21px; }
 .page small { font-size: 11px; white-space: nowrap; }
 .tools { width: 232px; display: flex; flex-direction: column; justify-content: center; gap: 20px; background: #fffaf2; border: 1px solid #eadfcd; border-radius: 24px; padding: 16px; }
-.toolGroup h2 { font-size: 13px; margin-bottom: 8px; color: #81725d; }
-.patterns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-.patterns button { display: flex; flex-direction: column; align-items: center; padding: 3px; color: var(--ink); }
+.toolGroup { position: relative; min-width: 0; }
+.toolGroup h2 { font-size: 13px; margin-bottom: 2px; color: #81725d; }
+.scrollHint { display: block; margin-bottom: 4px; color: #8c7251; font-size: 10px; font-weight: bold; letter-spacing: .02em; }
+.scrollWindow { position: relative; min-width: 0; }
+.scrollWindow::after { content: '›'; position: absolute; z-index: 1; right: -1px; inset-block: 0; display: grid; place-items: center; width: 24px; color: #655440; font-size: 25px; font-weight: bold; pointer-events: none; background: linear-gradient(90deg, transparent, #fffaf2 65%); }
+.colors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.scrollWindow .patterns, .scrollWindow .colors { display: flex; gap: 7px; overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: inline proximity; scrollbar-width: thin; scrollbar-color: #bda98a #eee5d6; padding: 1px 22px 5px 1px; touch-action: pan-x; }
+.patterns button { flex: 0 0 62px; display: flex; flex-direction: column; align-items: center; padding: 3px; color: var(--ink); scroll-snap-align: start; }
 .patterns svg { width: 36px; height: 36px; }
 .patterns small { color: #514739; }
-.colors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.colors button { display: grid; place-items: center; padding: 4px; }
-.colors span { width: 32px; height: 32px; border-radius: 50%; background: var(--swatch); color: #fff; font-size: 24px; line-height: 30px; text-shadow: 0 1px 2px #0005; }
+.colors button { flex: 0 0 48px; display: grid; place-items: center; padding: 4px; scroll-snap-align: start; }
+.colors span { width: 32px; height: 32px; border-radius: 50%; background: var(--swatch); color: #fff; font-size: 24px; line-height: 30px; text-shadow: 0 1px 2px #0008; box-shadow: inset 0 0 0 1px #51473930; }
 .actions { display: grid; gap: 8px; }
 .actions button { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; background: #eee8dc; }
 .actions button > span { font-size: 24px; }
@@ -65,9 +70,12 @@
   .tools { width: 100%; gap: 9px; padding: 9px; border-radius: 20px; }
   .toolGroup { display: flex; align-items: center; gap: 6px; }
   .toolGroup h2 { writing-mode: vertical-rl; font-size: 11px; margin: 0; }
-  .patterns, .colors { flex: 1; display: grid; gap: 5px; }
-  .patterns { grid-template-columns: repeat(5, 1fr); }
+  .patterns, .colors { flex: 1; gap: 5px; }
   .colors { grid-template-columns: repeat(6, 1fr); }
+  .rollerWorkspace .toolGroup { display: grid; grid-template-columns: 18px minmax(0, 1fr); grid-template-rows: 16px auto; column-gap: 6px; }
+  .rollerWorkspace .toolGroup h2 { grid-row: 1 / 3; align-self: center; }
+  .scrollHint { grid-column: 2; margin: 0; align-self: center; }
+  .scrollWindow { grid-column: 2; }
   .actions { grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
   .actions button { font-size: 11px; gap: 2px; }
   .actions .save { font-size: 16px; min-height: 48px; }
@@ -84,15 +92,14 @@
   .mat { padding: 5px; border-radius: 16px; }
   .tools { width: 285px; padding: 8px; gap: 8px; border-radius: 18px; }
   .toolGroup h2 { display: none; }
-  .patterns { grid-template-columns: repeat(5, 1fr); gap: 4px; }
-  .colors { grid-template-columns: repeat(6, 1fr); gap: 0; }
+  .scrollHint { margin-bottom: 2px; }
+  .patterns, .colors { gap: 4px; }
   .actions { grid-template-columns: 1fr 1fr; gap: 5px; }
   .actions .save { grid-column: 1 / -1; min-height: 44px; }
   .paperPicker button { min-height: 44px; }
 }
 @media (max-width: 360px) and (orientation: portrait) {
-  .colors { gap: 0; }
-  .toolGroup:has(.colors) h2 { display: none; }
+  .colors { gap: 3px; }
   .actions button { flex-direction: column; line-height: 1.2; padding: 3px 0; }
   .actions button > span { font-size: 20px; }
   .actions .save { font-size: 15px; }

@@ -18,6 +18,10 @@ test('home → drawing → pattern/color → undo → paper → guarded clear �
   await page.getByRole('link', { name: 'おえかきコロコロ', exact: true }).click()
   await page.getByRole('button', { name: '🌸 もようで おえかき' }).click()
   await expect(drawing(page)).toBeVisible()
+  await expect(page.getByText('↔ よこに うごくよ')).toHaveCount(2)
+  for (const picker of [page.getByTestId('pattern-picker'), page.getByTestId('color-picker')]) {
+    expect(await picker.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+  }
   const blank = await pixels(page)
   await stroke(page)
   const first = await pixels(page)

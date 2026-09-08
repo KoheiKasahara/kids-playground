@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import OekakiKorokoroPlay from './OekakiKorokoroPlay'
@@ -13,7 +13,7 @@ const ctx = { clearRect: vi.fn(), drawImage: vi.fn() }
 beforeEach(() => {
   vi.clearAllMocks()
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as ReturnType<HTMLCanvasElement['getContext']>)
-  vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, width: 960, height: 720, right: 960, bottom: 720, toJSON() {} })
+  vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, width: 960, height: 960, right: 960, bottom: 960, toJSON() {} })
   vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,AAAA')
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
   vi.stubGlobal('PointerEvent', class extends MouseEvent {
@@ -54,9 +54,17 @@ describe('おえかきコロコロのあそび', () => {
     expect(drawStamps).toHaveBeenLastCalledWith(ctx, [{ x: 200, y: 200, angle: 0 }], expect.objectContaining({ id: 'star' }), '#408dcc')
     expect(screen.getByRole('button', { name: 'ほし' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: '1かい もどす' }))
-    expect(ctx.clearRect).toHaveBeenCalledWith(0, 0, 960, 720)
+    expect(ctx.clearRect).toHaveBeenCalledWith(0, 0, 960, 960)
     expect(screen.getByRole('button', { name: 'ぜんぶ けす' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '1かい もどす' })).toBeDisabled()
+  })
+  test('offers expanded, horizontally scrollable motif and color choices with a visible cue', () => {
+    open()
+    expect(screen.getAllByText('↔ よこに うごくよ')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'おんぷ' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('color-picker')).getByRole('button', { name: 'しろ' })).toBeInTheDocument()
+    expect(screen.getByTestId('pattern-picker').children).toHaveLength(8)
+    expect(screen.getByTestId('color-picker').children).toHaveLength(10)
   })
   test('clearing requires confirmation, cancel preserves ink, confirmed clear is recoverable', async () => {
     const user = userEvent.setup()
