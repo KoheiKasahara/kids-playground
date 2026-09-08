@@ -20,6 +20,9 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
+  /* 3Dゲームの操作オーバーレイは背面canvasへ操作を通すため
+     pointer-events: none を使う。そこに置かれても「もどる」は必ず押せるよう戻す。 */
+  pointer-events: auto;
   touch-action: manipulation;
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);

@@ -18,7 +18,7 @@ test('横向きピアノで鍵盤を押して離せる [piano-play]', async ({ p
   await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await expect(key).toHaveAttribute('aria-pressed', 'false')
   await session.detach()
-  await page.getByRole('button', { name: '← もどる', exact: true }).click()
+  await page.locator('[data-game-back-button]').click()
   await expect(page.getByRole('heading', { name: 'こどもミニゲーム', exact: true })).toBeVisible()
   expect(errors).toEqual([])
 })
