@@ -92,6 +92,8 @@ export type TsumikiBowlingEngineOptions = {
   onThrowStart: (throwNumber: number) => void
   /** 1投が落ち着いたときに1回だけ呼ばれる。 */
   onThrowSettled: (result: ThrowSettledResult) => void
+  /** 積み木を組み直し、次の投球の盤面へ戻したときに呼ぶ。 */
+  onStageRebuilt: () => void
   /**
    * 狙っている間は玉の固定パワー(0〜1)、離したときはnull。
    * 毎フレームではなく、値が目に見えて変わったときだけ呼ぶ。
@@ -1089,6 +1091,7 @@ export function useTsumikiBowlingEngine(
       resetForNextThrow(bowling)
       if (tracker) resetToppleTracker(tracker, readBlockSamples(bowling))
       popRemainingMs = REBUILD_POP_MS
+      optionsRef.current.onStageRebuilt()
     }
 
     // -----------------------------------------------------------------------

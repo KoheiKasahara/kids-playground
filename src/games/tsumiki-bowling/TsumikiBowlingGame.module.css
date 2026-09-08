@@ -487,7 +487,7 @@
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-surface) 97%, transparent);
   color: var(--color-primary-dark);
-  transform: translateY(-2px) scale(1.05);
+  transform: translateY(-1px);
 }
 
 .ballCard:disabled {
@@ -519,22 +519,6 @@
 
 .ballCardName {
   white-space: nowrap;
-}
-
-.ballTrajectory {
-  width: 48px;
-  height: 25px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.ballRole {
-  font-size: clamp(9px, 2.4vw, 10px);
-  line-height: 1.25;
-  white-space: normal;
 }
 
 @media (max-height: 680px) {
