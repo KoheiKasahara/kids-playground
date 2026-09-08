@@ -32,7 +32,7 @@ export function midiToFrequency(midi: number): number {
 }
 
 /**
- * 自由演奏と曲データで共有するC4〜C5の鍵盤。曲データから `C4` のようなIDで参照できるよう、
+ * 自由演奏と曲データで共有するC4〜E5の鍵盤。曲データから `C4` のようなIDで参照できるよう、
  * 表示順・音程・見た目を同じ定義へ集約する。
  */
 export const PIANO_NOTES: readonly PianoNote[] = (() => {
@@ -40,8 +40,8 @@ export const PIANO_NOTES: readonly PianoNote[] = (() => {
 
   const pitchesByOctave = [
     { octave: 4, pitches: PITCHES },
-    // C5は次のオクターブの白鍵として、他のノートと同じ定義・発音経路に載せる。
-    { octave: 5, pitches: PITCHES.slice(0, 1) },
+    // 高いド〜ミも黒鍵を含め、同じ定義・発音経路に載せる。
+    { octave: 5, pitches: PITCHES.slice(0, 5) },
   ] as const
 
   return pitchesByOctave.flatMap(({ octave, pitches }) => pitches.map((pitch) => {

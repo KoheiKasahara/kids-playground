@@ -91,9 +91,9 @@ describe('PianoPlay', () => {
     expect(current.createOscillator.mock.results.every(({ value }) => value.stop.mock.calls.length === 1)).toBe(true)
   })
 
-  test('白鍵8本と黒鍵5本を表示する', () => {
+  test('白鍵10本と黒鍵7本を表示する', () => {
     renderPiano()
-    expect(screen.getAllByRole('button').filter((button) => button.hasAttribute('data-note'))).toHaveLength(13)
+    expect(screen.getAllByRole('button').filter((button) => button.hasAttribute('data-note'))).toHaveLength(17)
     expect(screen.getByRole('button', { name: 'ド C4' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ド C5' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'C シャープ4' })).toBeInTheDocument()
@@ -160,9 +160,9 @@ describe('PianoPlay', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
-  test('C5も既存の鍵盤と同じ経路で発音・ハイライトできる', () => {
+  test.each(['ド C5', 'C シャープ5', 'レ D5', 'D シャープ5', 'ミ E5'])('%sも既存の鍵盤と同じ経路で発音・ハイライトできる', (name) => {
     renderPiano()
-    const c5 = screen.getByRole('button', { name: 'ド C5' })
+    const c5 = screen.getByRole('button', { name })
     fireEvent.pointerDown(c5, { pointerId: 6 })
 
     expect(contexts[0].createOscillator).toHaveBeenCalledTimes(2)
