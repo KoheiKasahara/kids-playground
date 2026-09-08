@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, test } from 'vitest'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { createFoodCup, freshenFoodMaterials, createHandmadeFood, disposeObjects, normalizeFood } from './bentoModels'
+import { createBox, createFoodCup, freshenFoodMaterials, createHandmadeFood, disposeObjects, normalizeFood } from './bentoModels'
 import { CUPS, FOODS } from './bentoState'
 
 describe('実モデルと配置判定の整合性', () => {
@@ -64,4 +64,26 @@ test('全色・全サイズのカップが配置半径内に収まり浅い容�
     })
     disposeObjects([cup])
   }
+})
+
+test('弁当箱の内側は卵白と見分けられるクリーム色になる', () => {
+  for (const kind of ['rectangle', 'round'] as const) {
+    const box = createBox(kind, '#ee6664')
+    const lining = box.children.find(object => object instanceof THREE.Mesh
+      && object.material instanceof THREE.MeshStandardMaterial
+      && object.material.color.getHexString() === 'f3e5c8')
+    expect(lining).toBeDefined()
+    disposeObjects([box])
+  }
+})
+
+test('にんじんの根は葉に負けない太さになる', () => {
+  const carrot = createHandmadeFood('carrot')
+  carrot.updateMatrixWorld(true)
+  const orange = carrot.children[0] as THREE.Mesh
+  const green = carrot.children.slice(1) as THREE.Mesh[]
+  const rootWidth = new THREE.Box3().setFromObject(orange).getSize(new THREE.Vector3()).x
+  const leavesWidth = new THREE.Box3().setFromObject(new THREE.Group().add(...green)).getSize(new THREE.Vector3()).x
+  expect(rootWidth / leavesWidth).toBeGreaterThan(0.55)
+  disposeObjects([carrot])
 })
