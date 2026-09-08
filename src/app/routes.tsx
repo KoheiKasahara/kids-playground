@@ -50,6 +50,7 @@ const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePla
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
+  { path: '/games/magic-sandbox', element: lazyRoute(() => import('../games/magic-sandbox/MagicSandboxPlay')) },
   { path: '/', element: <Home /> },
   { path: '/games/bento-builder', element: playRoute(lazyRoute(() => import('../games/bento-builder/BentoBuilderPlay'))) },
   { path: '/games/circuit-racing', element: lazyRoute(() => import('../games/circuit-racing/CircuitRacingPlay')) },
