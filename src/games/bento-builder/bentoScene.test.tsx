@@ -120,3 +120,35 @@ test('実Raycasterで食材をつかみ、底面への投影でドラッグ位�
   expect(callbacks.move.mock.calls[0]![1].z).toBeCloseTo(0)
   handle.dispose()
 })
+
+test('カップの付け替え・削除で旧資源を解放し、おかずの共有モデルは保つ', async () => {
+  const template = new THREE.Group()
+  template.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), new THREE.MeshStandardMaterial()))
+  mock.load.mockResolvedValueOnce(new Map([['egg', template]]))
+  const active = setup()
+  await tick()
+  const state = { ...initialBentoState, mode: 'edit' as const, foods: [
+    { id: 1, kind: 'egg' as const, x: 1, z: 0, rotation: 0, cup: 'green' as const },
+  ] }
+  active.scene.sync(state)
+  for (const [id, frame] of [...pendingFrames]) { pendingFrames.delete(id); frame(performance.now() + 400) }
+  const scene = mock.render.mock.calls.at(-1)![0] as THREE.Scene
+  const node = scene.children.find(child => child.userData.foodId === 1)!
+  expect(node.getObjectByName('food-cup')).toBeDefined()
+  expect(node.position.x).toBe(1)
+  const oldCup = node.getObjectByName('food-cup')!
+  active.scene.sync({ ...state, foods: [{ ...state.foods[0]!, cup: 'pink' }] })
+  expect(mock.disposeObjects).toHaveBeenCalledWith([oldCup])
+  expect(node.getObjectByName('food-cup')).not.toBe(oldCup)
+  const currentCup = node.getObjectByName('food-cup')!
+  active.scene.sync({ ...state, foods: [{ ...state.foods[0]!, cup: undefined }] })
+  expect(node.getObjectByName('food-cup')).toBeUndefined()
+  expect(node.children[0]!.scale.x).toBe(1)
+  expect(node.children[0]!.position.y).toBe(0)
+  expect(mock.disposeObjects).toHaveBeenCalledWith([currentCup])
+  active.scene.sync(state)
+  const removedCup = node.getObjectByName('food-cup')!
+  active.scene.sync({ ...state, foods: [] })
+  expect(mock.disposeObjects).toHaveBeenLastCalledWith([removedCup])
+  active.scene.dispose()
+})

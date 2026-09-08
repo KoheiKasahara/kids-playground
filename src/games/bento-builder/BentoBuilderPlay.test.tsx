@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 import BentoBuilderPlay from './BentoBuilderPlay'
-import { FOODS, type BentoState } from './bentoState'
+import { FOODS, MAX_FOODS, type BentoState } from './bentoState'
 import type { SceneCallbacks } from './bentoScene'
 const mock = vi.hoisted(() => ({ latest: null as BentoState | null, callbacks: null as SceneCallbacks | null, dispose: vi.fn(), status: 'ready' as 'ready' | 'error' }))
 vi.mock('./bentoScene', () => ({ createBentoScene: (_host: HTMLDivElement, state: BentoState, callbacks: SceneCallbacks) => {
@@ -66,7 +66,7 @@ test('完成→編集→箱選択の1階層戻りで配置を保つ', () => {
 test('上限は子ども向け表示、削除するとまた追加できる', () => {
   open()
   fireEvent.click(screen.getByRole('button', { name: 'つくる！' }))
-  for (let i = 0; i < 23; i++) fireEvent.click(screen.getByRole('button', { name: 'ミニトマトを いれる' }))
+  for (let i = 0; i < MAX_FOODS + 3; i++) fireEvent.click(screen.getByRole('button', { name: 'ミニトマトを いれる' }))
   expect(screen.getByRole('status')).toHaveTextContent('いっぱいだね')
   const count = within(screen.getByRole('group', { name: 'いれた おかず' })).getAllByRole('button').length
   fireEvent.click(screen.getByRole('button', { name: '− けす' }))
@@ -84,4 +84,18 @@ test('ロード失敗の再試行で配置を失わず旧シーンを解放す�
   expect(mock.dispose).toHaveBeenCalledOnce()
   expect(mock.latest!.foods).toHaveLength(1)
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+test('選んだおかずにカップを付け替え・取り外しできる', () => {
+  open()
+  fireEvent.click(screen.getByRole('button', { name: 'つくる！' }))
+  expect(screen.getByRole('button', { name: 'みどりの カップ' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'ブロッコリーを いれる' }))
+  fireEvent.click(screen.getByRole('button', { name: 'みどりの カップ' }))
+  expect(mock.latest!.foods[0]!.cup).toBe('green')
+  expect(screen.getByRole('button', { name: 'みどりの カップ' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: 'ピンクの カップ' }))
+  expect(mock.latest!.foods[0]!.cup).toBe('pink')
+  fireEvent.click(screen.getByRole('button', { name: 'カップを はずす' }))
+  expect(mock.latest!.foods[0]!.cup).toBeUndefined()
 })

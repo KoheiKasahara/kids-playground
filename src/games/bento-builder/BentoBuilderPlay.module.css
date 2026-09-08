@@ -80,3 +80,7 @@
   .foods button span:first-child { font-size: 26px; line-height: 30px; }
 }
 @media (prefers-reduced-motion: reduce) { .sparkles { animation: none; } }
+
+.cups { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; flex-shrink: 0; }
+.cups button { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 48px; padding: 3px 5px; font-size: 11px; }
+.cups svg { width: 28px; height: 26px; flex-shrink: 0; }
