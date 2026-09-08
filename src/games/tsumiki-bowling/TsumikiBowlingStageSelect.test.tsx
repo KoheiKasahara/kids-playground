@@ -82,13 +82,13 @@ describe('TsumikiBowlingStageSelect', () => {
     expect(onSelect).toHaveBeenCalledWith('triangle')
   })
 
-  it('ホームへもどるリンクがある', () => {
+  it('共通のもどるボタンがある', () => {
     render(
       <MemoryRouter>
         <TsumikiBowlingStageSelect onSelect={vi.fn()} />
       </MemoryRouter>,
     )
-    expect(screen.getByRole('link', { name: '← もどる' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
   })
 })
 

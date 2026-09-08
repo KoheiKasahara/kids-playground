@@ -44,6 +44,7 @@ function getCorrectCountry(container: HTMLElement): Country {
 function getChoiceButtons(): HTMLElement[] {
   const excluded = new Set([
     'やめる',
+    '← もどる',
     'つぎのもんだい',
     'けっかを みる',
     'もういちど',

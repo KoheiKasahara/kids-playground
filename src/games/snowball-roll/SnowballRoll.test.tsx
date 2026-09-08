@@ -46,7 +46,7 @@ test('start, keyboard play, success, replay and one-level back reset the game', 
   expect(screen.queryByRole('heading', { name: 'だいせいこう！' })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: /もどる/ }))
   expect(screen.getByRole('button', { name: /あそぶ/ })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: /もどる/ })).toHaveAttribute('href', '/')
+  expect(screen.getByRole('button', { name: /もどる/ })).toBeInTheDocument()
 })
 
 test('drag releases on cancel and keys do not remain held after app blur', () => {

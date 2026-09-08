@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import FlagBall from '../../components/flag-ball/FlagBall'
+import GameBackButton from '../../components/GameBackButton'
 import { findFlagBall, type FlagBallData } from '../../components/flag-ball/flagBalls'
 import { primeAudio } from '../../utils/quizSound'
 import VirtualStick from './VirtualStick'
@@ -252,6 +253,7 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
 
   return (
     <main className={styles.page}>
+      <GameBackButton to="/games/flag-roll-maze" />
       <div className={styles.scene}>
         <div ref={registerContainer} className={styles.sceneCanvas} aria-hidden="true" />
         {gameState === 'playing' && starTotalCount > 0 && (
@@ -382,9 +384,6 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
               スタートに もどる
             </button>
           )}
-          <button type="button" className={styles.button} onClick={() => navigate('/')}>
-            もどる
-          </button>
         </div>
       </div>
 

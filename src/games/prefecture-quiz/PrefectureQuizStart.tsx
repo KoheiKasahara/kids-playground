@@ -14,7 +14,6 @@ export default function PrefectureQuizStart() {
         <BigButton onClick={() => navigate(`/games/prefecture-quiz/${MODE_PATH.shapeToName}/play`)}>🗺️ かたちを みて こたえる</BigButton>
         <BigButton onClick={() => navigate(`/games/prefecture-quiz/${MODE_PATH.nameToShape}/play`)}>🔎 なまえを みて かたちを えらぶ</BigButton>
         <BigButton onClick={() => navigate(`/games/prefecture-quiz/${MODE_PATH.nameToMap}/play`)}>🗾 にほんちず から さがす</BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>もどる</BigButton>
       </div>
     </main>
   )

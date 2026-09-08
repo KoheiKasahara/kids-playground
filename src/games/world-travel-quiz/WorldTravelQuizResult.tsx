@@ -22,8 +22,8 @@ export default function WorldTravelQuizResult() {
   if (!isTravelRegion(pathRegion) || !isAnswerMode(pathAnswerMode) || !isResult(location.state) || location.state.answerMode !== pathAnswerMode) return <Navigate to="/games/world-travel-quiz" replace />
   const course = travelCourses.find((item) => item.id === location.state.courseId)
   if (!course || course.region !== pathRegion) return <Navigate to="/games/world-travel-quiz" replace />
-  return <Result course={course} score={location.state.correctCount} onAgain={() => navigate(`/games/world-travel-quiz/${pathRegion}/${pathAnswerMode}/play`, { replace: true })} onHome={() => navigate('/games/world-travel-quiz')} onRoot={() => navigate('/')} />
+  return <Result course={course} score={location.state.correctCount} onAgain={() => navigate(`/games/world-travel-quiz/${pathRegion}/${pathAnswerMode}/play`, { replace: true })} onHome={() => navigate('/games/world-travel-quiz')} />
 }
-function Result({ course, score, onAgain, onHome, onRoot }: { course: TravelCourse; score: number; onAgain: () => void; onHome: () => void; onRoot: () => void }) {
-  return <main className={styles.page}><h1>たびが しゅうりょう！</h1><div className={styles.map}><WorldTravelMap course={course} questionIndex={9} phase="answering" onTravelComplete={() => {}} result /></div><p className={styles.course}>{course.name}</p><p className={styles.score}>{score} / 10 もん せいかい！</p><p className={styles.praise}>{praise(score)}</p><div className={styles.actions}><BigButton variant="primary" onClick={onAgain}>もういちど</BigButton><BigButton variant="secondary" onClick={onHome}>ちいきを えらぶ</BigButton><BigButton variant="secondary" onClick={onRoot}>ホームへ</BigButton></div></main>
+function Result({ course, score, onAgain, onHome }: { course: TravelCourse; score: number; onAgain: () => void; onHome: () => void }) {
+  return <main className={styles.page}><h1>たびが しゅうりょう！</h1><div className={styles.map}><WorldTravelMap course={course} questionIndex={9} phase="answering" onTravelComplete={() => {}} result /></div><p className={styles.course}>{course.name}</p><p className={styles.score}>{score} / 10 もん せいかい！</p><p className={styles.praise}>{praise(score)}</p><div className={styles.actions}><BigButton variant="primary" onClick={onAgain}>もういちど</BigButton><BigButton variant="secondary" onClick={onHome}>ちいきを えらぶ</BigButton></div></main>
 }

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import { PAPERS, PATTERNS, PAPER_WIDTH, ROLLER_COLORS, ROLLER_PAPER_HEIGHT, STAMP_SCALE, type Pattern } from './rollerData'
 import { advanceStroke, finishStroke, startStroke, type StrokeCursor } from './rollerStroke'
 import { drawPaper, drawStamps } from './rollerDrawing'
@@ -146,7 +145,6 @@ export default function OekakiKorokoroPlay() {
 
   return <main className={styles.page} style={{ '--ink': color } as CSSProperties}>
     <header className={styles.header}>
-      <Link className={styles.back} to="/">← もどる</Link>
       <h1>おえかきコロコロ</h1>
       <span className={styles.badge} aria-hidden="true">じゆうに あそぼう</span>
     </header>

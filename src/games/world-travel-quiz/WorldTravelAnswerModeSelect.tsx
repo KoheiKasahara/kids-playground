@@ -24,7 +24,6 @@ export default function WorldTravelAnswerModeSelect() {
           <small>ひかっている くにの こっきを えらぶ</small>
         </BigButton>
       </div>
-      <BigButton variant="secondary" onClick={() => navigate('/games/world-travel-quiz')}>もどる</BigButton>
     </main>
   )
 }

@@ -44,9 +44,10 @@ async function clickButton(user: ReturnType<typeof userEvent.setup>, name: strin
   await user.click(await screen.findByRole('button', { name }, { timeout: LAZY_ROUTE_TIMEOUT_MS }))
 }
 
-/** lazy な画面が現れるまで待って「やめる」を掴む。プレイ画面に入れたことの確認を兼ねる。 */
+/** lazy な画面が現れるまで待って共通の「もどる」を掴む。プレイ画面に入れたことの確認を兼ねる。 */
 async function findQuitButton() {
-  return screen.findByRole('button', { name: 'やめる' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })
+  await screen.findByText('そら', {}, { timeout: LAZY_ROUTE_TIMEOUT_MS })
+  return screen.getByRole('button', { name: 'もどる' })
 }
 
 async function selectJapanAndPlay(user: ReturnType<typeof userEvent.setup>) {
@@ -123,7 +124,7 @@ describe('FlagRollAdventure プレイとゴール', () => {
     renderApp('/games/flag-roll-adventure')
     await selectJapanAndPlay(user)
 
-    expect(screen.getByRole('button', { name: 'やめる' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
     expect(screen.getByText('そら')).toBeInTheDocument()
     const flagImages = Array.from(document.querySelectorAll('img'))
     expect(flagImages.length).toBeGreaterThanOrEqual(2)
@@ -161,7 +162,7 @@ describe('FlagRollAdventure プレイとゴール', () => {
     await clickButton(user, 'もういっかい')
     await findQuitButton()
     expect(screen.getByText('そら')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'やめる' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
     expect(engineMock.options).toBeDefined()
   })
 
@@ -177,14 +178,14 @@ describe('FlagRollAdventure プレイとゴール', () => {
     expect(screen.getByRole('button', { name: 'スタート！' })).toBeDisabled()
   })
 
-  test('「やめる」でホームへ戻る', async () => {
+  test('ゴール画面の共通「もどる」で選択画面へ戻る', async () => {
     const user = userEvent.setup()
     renderApp('/games/flag-roll-adventure')
     await selectJapanAndPlay(user)
     await reachGoal()
 
-    await clickButton(user, 'やめる')
-    expect(await screen.findByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
+    await clickButton(user, 'もどる')
+    expect(await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' })).toBeInTheDocument()
   })
 
   test('stateなしでplay/goalを直接開くと選択画面へ戻る', async () => {

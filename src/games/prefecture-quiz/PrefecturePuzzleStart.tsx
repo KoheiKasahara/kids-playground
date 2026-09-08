@@ -14,6 +14,5 @@ export default function PrefecturePuzzleStart() {
     <div className={styles.regions} aria-label="地方をえらぶ">
       {puzzleRegions.map((region) => <BigButton key={region} onClick={() => navigate(`/games/prefecture-quiz/puzzle/${region}/play`)}>{REGION_LABEL[region]}地方</BigButton>)}
     </div>
-    <BigButton variant="secondary" onClick={() => navigate('/games/prefecture-quiz')}>もどる</BigButton>
   </main>
 }

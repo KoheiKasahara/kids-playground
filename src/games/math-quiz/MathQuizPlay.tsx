@@ -114,9 +114,6 @@ function MathQuizPlayGame({ mode, level }: MathQuizPlayGameProps) {
     <main className={styles.page}>
       <div className={styles.header}>
         <SpeechToggle />
-        <button type="button" className={styles.quit} onClick={() => navigate('/')}>
-          やめる
-        </button>
         <div className={styles.progressArea}>
           <p className={styles.progressLabel}>
             <span className={styles.levelLabel}>{LEVEL_LABEL[level]}</span>

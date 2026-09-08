@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import {
   createRailPiece,
   deleteRailPiece,
@@ -112,7 +112,6 @@ function RailPreview({ kind, branchSide }: { kind: RailPieceKind; branchSide?: R
 }
 
 export default function RailBuilderPlay() {
-  const navigate = useNavigate()
   const [pieces, setPieces] = useState<RailPiece[]>(() => INITIAL_PIECES.map((piece) => ({
     ...piece,
     position: { ...piece.position },
@@ -272,11 +271,8 @@ export default function RailBuilderPlay() {
 
       <div className={styles.overlay}>
         <header className={styles.header}>
+            <GameBackButton to="/" />
           <div className={styles.headerRow}>
-            <button type="button" className={styles.backButton} onClick={() => navigate('/')} aria-label="ホームへ もどる">
-              <span aria-hidden="true">‹</span>
-              <span>もどる</span>
-            </button>
             <h1 className={styles.title}><span aria-hidden="true">🚂</span> 3Dせんろづくり</h1>
             <button
               type="button"

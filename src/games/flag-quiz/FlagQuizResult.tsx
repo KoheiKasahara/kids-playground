@@ -101,9 +101,6 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
         <BigButton variant="secondary" onClick={() => navigate('/games/flag-quiz')}>
           べつの クイズ
         </BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>
-          ホームへ
-        </BigButton>
       </div>
     </main>
   )

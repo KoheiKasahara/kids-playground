@@ -88,7 +88,6 @@ function PuzzleGame({ region }: { region: RegionId }) {
 
   return <main className={styles.page}>
     <header className={styles.header}>
-      <button type="button" className={styles.back} onClick={() => navigate('/games/prefecture-quiz/puzzle')}>もどる</button>
       <div><h1>{REGION_LABEL[region]}地方 パズル</h1><div className={styles.progressRow}><p>{Object.values(placements).filter(Boolean).length} / {ids.length} おいたよ</p><SpeechToggle compact /></div></div>
     </header>
     {checked && <section className={styles.result} aria-live="polite"><strong>{praise}</strong><span>みどりは せいかい。オレンジは「ここだったよ」の しるしだよ。</span></section>}
@@ -104,7 +103,7 @@ function PuzzleGame({ region }: { region: RegionId }) {
       </section>
       <BigButton className={styles.check} disabled={!complete} onClick={() => { setChecked(true); if (score === ids.length) playCorrectSound() }}>こたえあわせ！</BigButton>
     </>}
-    {checked && <div className={styles.actions}><BigButton onClick={reset}>もういちど</BigButton><BigButton variant="secondary" onClick={() => navigate('/games/prefecture-quiz/puzzle')}>地方をえらぶ</BigButton><BigButton variant="secondary" onClick={() => navigate('/')}>ホームへ</BigButton></div>}
+    {checked && <div className={styles.actions}><BigButton onClick={reset}>もういちど</BigButton><BigButton variant="secondary" onClick={() => navigate('/games/prefecture-quiz/puzzle')}>地方をえらぶ</BigButton></div>}
     {drag?.moved && <div className={styles.dragPreview} style={{ left: drag.x, top: drag.y }}>{byId.get(drag.id)?.nameHiragana}</div>}
   </main>
 }

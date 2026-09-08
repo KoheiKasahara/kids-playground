@@ -24,9 +24,6 @@ export default function MathQuizStart() {
             <span aria-hidden="true">{MODE_EMOJI[mode]}</span> {MODE_LABEL[mode]}
           </BigButton>
         ))}
-        <BigButton variant="secondary" onClick={() => navigate('/')}>
-          もどる
-        </BigButton>
       </div>
     </main>
   )

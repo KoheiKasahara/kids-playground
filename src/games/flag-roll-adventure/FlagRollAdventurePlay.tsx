@@ -65,9 +65,6 @@ function AdventureGame({ flagId }: { flagId: string }) {
 
   return (
     <main className={styles.page}>
-      <button type="button" className={styles.quit} onClick={() => navigate('/')}>
-        やめる
-      </button>
 
       <header className={styles.header}>
         <FlagBall flag={flag} size={32} />

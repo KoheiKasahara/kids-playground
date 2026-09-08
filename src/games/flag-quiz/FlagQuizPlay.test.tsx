@@ -46,6 +46,7 @@ function getCorrectCountry(container: HTMLElement): Country {
 function getChoiceButtons(): HTMLElement[] {
   const excluded = new Set([
     'やめる',
+    '← もどる',
     'つぎのもんだい',
     'けっかを みる',
     'もういちど',
@@ -260,16 +261,15 @@ describe('FlagQuizPlay', () => {
   )
 
   test(
-    '結果画面の「ホームへ」でホーム画面に戻る',
+    '結果画面の共通「もどる」でむずかしさ選択へ戻る',
     async () => {
       const user = userEvent.setup()
       const { container } = renderApp(['/games/flag-quiz/flag-to-name/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, container, true)
       }
-      const homeButton = screen.getByRole('button', { name: 'ホームへ' })
-      await user.click(homeButton)
-      expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'もどる' }))
+      expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
     },
     20000,
   )

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import styles from './CarRoadBuilder.module.css'
 import { STAGE_ORDER, STAGES, type StageId } from './stageDefinitions'
 
@@ -13,9 +14,7 @@ export default function CarRoadBuilderStageSelect() {
   return (
     <main className={`${styles.page} ${styles.stageSelectPage}`}>
       <header className={styles.header}>
-        <button type="button" className={styles.backButton} onClick={() => navigate('/')}>
-          <span aria-hidden="true">‹</span> もどる
-        </button>
+        <GameBackButton to="/" />
         <h1><span aria-hidden="true">🚗</span> くるまのみちづくり</h1>
       </header>
 

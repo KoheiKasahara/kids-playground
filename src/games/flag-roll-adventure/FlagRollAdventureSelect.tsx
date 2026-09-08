@@ -56,9 +56,6 @@ export default function FlagRollAdventureSelect() {
         <BigButton variant="primary" disabled={!selectedFlagId} onClick={start}>
           スタート！
         </BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>
-          もどる
-        </BigButton>
       </div>
     </main>
   )

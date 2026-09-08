@@ -302,9 +302,9 @@ describe('KomaBattlePlay', () => {
     expect(screen.queryByRole('heading', { name: 'かち！' })).not.toBeInTheDocument()
   })
 
-  it('選択画面からホームへ戻る「もどる」リンクがある', () => {
+  it('選択画面に共通の「もどる」ボタンがある', () => {
     renderGame()
-    expect(screen.getByRole('link', { name: 'もどる' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
   })
 
   it('色えらびボタンを押すまで色の一覧は出ない', () => {

@@ -29,9 +29,6 @@ export default function ImageQuizStart({ config }: ImageQuizStartProps) {
         >
           <span aria-hidden="true">🔎</span> なまえを みて こたえる
         </BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>
-          もどる
-        </BigButton>
       </div>
     </main>
   )

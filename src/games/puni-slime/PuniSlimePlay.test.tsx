@@ -14,7 +14,7 @@ function advance() { act(() => { for (let i = 0; i < 120; i++) frame(i * 1000 / 
 describe('PuniSlimePlay', () => {
   it('opens ready to play and offers color/feel choices without resetting the body', () => {
     const { container } = renderGame()
-    expect(screen.getByRole('link', { name: '← もどる' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
     advance()
     const body = container.querySelector('svg > path')!
     const shape = body.getAttribute('d')

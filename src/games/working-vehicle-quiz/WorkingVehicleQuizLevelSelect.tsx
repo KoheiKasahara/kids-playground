@@ -36,9 +36,6 @@ export default function WorkingVehicleQuizLevelSelect({
             <span className={styles.levelDescription}>{LEVEL_DESCRIPTION[level]}</span>
           </BigButton>
         ))}
-        <BigButton variant="secondary" onClick={() => navigate('/games/working-vehicle-quiz')}>
-          もどる
-        </BigButton>
       </div>
     </main>
   )

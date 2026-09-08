@@ -116,9 +116,6 @@ export default function FlagPinballSelect() {
         <BigButton variant="primary" disabled={!canPlay} onClick={play}>
           あそぶ！
         </BigButton>
-        <BigButton variant="secondary" onClick={() => navigate('/')}>
-          もどる
-        </BigButton>
       </div>
     </main>
   )

@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, type CSSProperties } from 'react'
-import { useNavigate } from 'react-router-dom'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import {
   DEFAULT_SELECTIONS,
@@ -48,7 +47,6 @@ function SceneStatus({ status, onRetry }: { status: CircuitRacingEngineStatus; o
 }
 
 export default function CircuitRacingPlay() {
-  const navigate = useNavigate()
   const [selections, setSelections] = useState<RaceSelection[]>(() => copySelections(DEFAULT_SELECTIONS))
   const [circuit, setCircuit] = useState(CIRCUITS[0]!)
   const [carCount, setCarCount] = useState<2 | 3>(2)
@@ -120,9 +118,6 @@ export default function CircuitRacingPlay() {
         {phase === 'select' ? (
           <section className={styles.selectionPanel} aria-label="レースの じゅんび">
             <header className={styles.header}>
-              <button type="button" className={styles.homeButton} onClick={() => navigate('/')} aria-label="ホームへ もどる">
-                <span aria-hidden="true">‹</span><span>もどる</span>
-              </button>
               <h1 className={styles.title}><span aria-hidden="true">🏁</span> サーキットレース</h1>
             </header>
             <div className={styles.selectionScroll}>

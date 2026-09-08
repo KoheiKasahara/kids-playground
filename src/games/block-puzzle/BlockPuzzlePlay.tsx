@@ -5,7 +5,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
+import GameBackButton from '../../components/GameBackButton'
 import BlockPiece from './BlockPiece'
 import { BOARD_COLS, BOARD_ROWS, allBoardCells, cellKey, type BoardCell } from './board'
 import { BLOCK_SHAPES, blockShape, shapeCells, type BlockRotation, type BlockShapeId } from './blockShapes'
@@ -114,7 +114,6 @@ const CELEBRATION_SPARKLES: readonly { left: number; top: number; delayMs: numbe
  * （盤面の正本の外）に持ち、指を離した瞬間にだけ正本へ反映する。
  */
 export default function BlockPuzzlePlay() {
-  const navigate = useNavigate()
   const [state, setState] = useState<BlockPuzzleState>(createBlockPuzzleState)
   /**
    * 直前の操作で拒否されたフィードバック。「置けない」「動かせない」はマス、
@@ -513,9 +512,7 @@ export default function BlockPuzzlePlay() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <button type="button" className={styles.home} onClick={() => navigate('/')}>
-          ← もどる
-        </button>
+        <GameBackButton to="/" />
         <h1 className={styles.title}>
           <span aria-hidden="true">🧩</span> ブロックパズル
         </h1>
