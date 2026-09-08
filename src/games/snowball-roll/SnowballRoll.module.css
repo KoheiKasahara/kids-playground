@@ -1,0 +1,44 @@
+.start, .game { color: #24455e; background: #eaf6fc; }
+.start { min-height: 100dvh; padding: calc(12px + var(--safe-top)) calc(18px + var(--safe-right)) calc(24px + var(--safe-bottom)) calc(18px + var(--safe-left)); text-align: center; }
+.start header { display: flex; }
+.hero { margin: 30px auto 12px; font-size: clamp(76px, 18dvh, 140px); filter: drop-shadow(0 10px 0 #cce7f4); }
+.start h1 { font-size: clamp(25px, 6vw, 36px); }
+.start p { margin: 18px 0; font-size: 21px; font-weight: 700; line-height: 1.7; }
+.items { margin: 20px 0; font-size: clamp(20px, 5.5vw, 30px); }
+.start small { display: block; margin-top: 20px; }
+.startButton, .overlay button { border: 0; border-radius: 20px; background: #177ea2; color: white; min-height: 60px; padding: 14px 28px; font: inherit; font-size: 22px; font-weight: 800; box-shadow: 0 5px 0 #0a536f; cursor: pointer; }
+.game { height: 100vh; height: 100dvh; display: flex; flex-direction: column; padding: calc(6px + var(--safe-top)) calc(8px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(8px + var(--safe-left)); overflow: hidden; overscroll-behavior: none; }
+.header { display: flex; flex-shrink: 0; gap: 8px; align-items: center; }
+.header h1 { flex: 1; min-width: 0; text-align: center; font-size: clamp(15px, 4vw, 23px); }
+.sound { flex: 0 0 48px; height: 48px; border: 0; border-radius: 16px; background: white; font-size: 24px; cursor: pointer; }
+.hud { display: flex; flex-shrink: 0; align-items: center; gap: 10px; padding: 8px 12px; }
+.meter { height: 20px; flex: 1; border: 2px solid #8ac2d4; border-radius: 20px; background: white; overflow: hidden; }
+.meter div { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #61c3c7, #f4c95b); transition: width 0.25s; }
+.count { min-width: 48px; font-weight: 800; }
+.sceneWrap { flex: 1; min-height: 0; position: relative; border-radius: 22px; overflow: hidden; background: #b7dfef; }
+.scene { position: absolute; inset: 0; touch-action: none; outline-offset: -4px; }
+.scene canvas { display: block; width: 100%; height: 100%; }
+.instructions { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); padding: 8px 16px; border-radius: 24px; background: #ffffffdc; font-weight: 700; white-space: nowrap; pointer-events: none; }
+.footer { min-height: 66px; flex-shrink: 0; text-align: center; padding: 9px 4px 0; }
+.footer p { margin: 0 0 4px; font-size: clamp(14px, 4vw, 19px); font-weight: 800; }
+.footer small { font-size: 13px; }
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; overflow: auto; background: #eaf6fce8; text-align: center; }
+.overlay h2, .overlay p { margin: 0; }
+.result { inset: auto 12px 12px; border-radius: 20px; gap: 8px; max-height: 70%; }
+.overlay h2 { font-size: clamp(24px, 7vw, 38px); }
+.winIcon { font-size: clamp(30px, 8vw, 60px); }
+.stick { position: absolute; z-index: 1; width: 96px; height: 96px; margin: -48px; border: 3px solid #ffffffab; border-radius: 50%; background: #24455e22; pointer-events: none; }
+.stick i { position: absolute; width: 36px; height: 36px; left: 27px; top: 27px; border-radius: 50%; background: #ffffffbf; }
+.game button:focus-visible, .start button:focus-visible, .scene:focus-visible { outline: 3px solid #d26621; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .hero { margin: 8px auto; font-size: 64px; }
+  .start p { margin: 8px 0; font-size: 17px; }
+  .items { margin: 10px 0; }
+  .footer { min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 16px; padding: 4px; }
+  .hud { padding: 3px 12px; }
+  .instructions { bottom: 5px; padding: 4px 12px; font-size: 13px; }
+  .overlay { gap: 6px; }
+  .winIcon { display: none; }
+  .overlay button { min-height: 48px; padding: 8px 20px; font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .meter div { transition: none; } }
