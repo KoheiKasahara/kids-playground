@@ -26,7 +26,7 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
         className={`${className} ${styles.wheelPreview} ${styles[`wheelPreview-${preview.variant}`]}`}
         aria-hidden="true"
       >
-        <span className={styles.wheelPreviewHub} />
+        {preview.variant === 'flower' ? <span className={styles.wheelPreviewFlower}>✿</span> : <span className={styles.wheelPreviewHub} />}
       </span>
     )
   }
@@ -39,6 +39,7 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
         <span className={styles.frontPreviewSurround} />
         <span className={styles.frontPreviewLight} />
         <span className={styles.frontPreviewLight} />
+        {preview.variant === 'twin' ? <><span className={styles.frontPreviewLight} /><span className={styles.frontPreviewLight} /></> : null}
         <span className={styles.frontPreviewGrille} />
       </span>
     )
@@ -57,6 +58,8 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
             <span className={styles.roofPreviewPoliceRed} />
           </>
         ) : null}
+        {preview.variant === 'rabbit' ? <span className={styles.roofPreviewRabbit}>🐰</span> : null}
+        {preview.variant === 'surfboard' ? <span className={styles.roofPreviewSurfboard} /> : null}
         {preview.variant === 'luggage' ? <span className={styles.roofPreviewLuggage} /> : null}
         {preview.variant === 'spoiler' ? (
           <>
@@ -74,6 +77,8 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
         aria-hidden="true"
       >
         {preview.variant === 'none' ? <span className={styles.decorationPreviewNone}>×</span> : null}
+        {preview.variant === 'hearts' ? <span className={styles.decorationPreviewHearts}>♥♥</span> : null}
+        {preview.variant === 'checker' ? <span className={styles.decorationPreviewChecker} /> : null}
         {preview.variant === 'star' ? <span className={styles.decorationPreviewStar}>★</span> : null}
         {preview.variant === 'flame' ? <span className={styles.decorationPreviewFlame}>♨</span> : null}
         {preview.variant === 'stripes' ? (
@@ -111,6 +116,8 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
       lightning: 'ϟ',
       crown: '♛',
       animal: '🐱',
+      flower: '✿',
+      moon: '☾',
     }
     return (
       <span

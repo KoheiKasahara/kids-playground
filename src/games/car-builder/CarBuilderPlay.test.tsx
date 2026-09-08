@@ -110,8 +110,8 @@ describe('カテゴリ一覧と詳細選択の切り替え', () => {
   })
 })
 
-describe('ボディ7車種の選択', () => {
-  test('採用7車種が視覚的なプレビュー付きで並び、選択直後にCarConfigへ反映される', async () => {
+describe('ボディ9車種の選択', () => {
+  test('採用9車種が視覚的なプレビュー付きで並び、選択直後にCarConfigへ反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 
@@ -157,6 +157,7 @@ describe('選択の即時反映', () => {
       ['丸ライト', 'round'],
       ['四角ライト', 'square'],
       ['細目ライト', 'slim'],
+      ['よつめライト', 'twin'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="frontPreview"]'), label).not.toBeNull()
@@ -181,7 +182,7 @@ describe('選択の即時反映', () => {
     expect(screen.getByRole('button', { name: 'スクールバス' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  test('9色すべてをタップすると、選んだ色が即時にCarConfigへ反映される', async () => {
+  test('12色すべてをタップすると、選んだ色が即時にCarConfigへ反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
     await user.click(screen.getByRole('button', { name: 'カラーを えらぶ' }))
@@ -196,6 +197,9 @@ describe('選択の即時反映', () => {
       ['むらさき', 'purple'],
       ['しろ', 'white'],
       ['くろ', 'black'],
+      ['みずいろ', 'sky'],
+      ['ミント', 'mint'],
+      ['ちゃいろ', 'brown'],
     ] as const) {
       await user.click(screen.getByRole('button', { name: label }))
       expect(latestConfig().color, label).toBe(color)
@@ -203,7 +207,7 @@ describe('選択の即時反映', () => {
     }
   })
 
-  test('タイヤ4種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+  test('タイヤ6種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 
@@ -214,6 +218,8 @@ describe('選択の即時反映', () => {
       ['おおきい', 'big'],
       ['オフロード', 'offroad'],
       ['レーシング', 'racing'],
+      ['しろリボン', 'whitewall'],
+      ['おはな', 'flower'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="wheelPreview"]'), label).not.toBeNull()
@@ -224,7 +230,7 @@ describe('選択の即時反映', () => {
     expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
   })
 
-  test('屋根4種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+  test('屋根6種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 
@@ -235,6 +241,8 @@ describe('選択の即時反映', () => {
       ['パトランプ', 'policeLight'],
       ['荷物', 'luggage'],
       ['スポイラー', 'spoiler'],
+      ['うさぎみみ', 'rabbit'],
+      ['サーフボード', 'surfboard'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="roofPreview"]'), label).not.toBeNull()
@@ -245,7 +253,7 @@ describe('選択の即時反映', () => {
     expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
   })
 
-  test('飾り5種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+  test('飾り7種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 
@@ -257,6 +265,8 @@ describe('選択の即時反映', () => {
       ['ほのお', 'flame'],
       ['しましま', 'stripes'],
       ['みずたま', 'dots'],
+      ['ハート', 'hearts'],
+      ['チェック', 'checker'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="decorationPreview"]'), label).not.toBeNull()
@@ -289,6 +299,8 @@ describe('選択の即時反映', () => {
       ['いなずま', 'lightning'],
       ['おうかん', 'crown'],
       ['どうぶつ', 'animal'],
+      ['おはな', 'flower'],
+      ['おつきさま', 'moon'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="markPreview"]'), label).not.toBeNull()
@@ -413,24 +425,24 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
     expect(ruleOf(CSS_SOURCE, '.optionList')).toMatch(/overflow-y:\s*auto/)
   })
 
-  test('ボディ5選択肢はスマホ幅でも横スクロールせず1行で比較できる', () => {
-    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='body'\]\s*\{[^}]*grid-template-columns:\s*repeat\(5,/)
+  test('ボディ9選択肢はスマホ幅でも3列で押しやすい幅を保つ', () => {
+    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='body'\]\s*\{[^}]*grid-template-columns:\s*repeat\(3,/)
     expect(ruleOf(CSS_SOURCE, '.optionButton')).toMatch(/min-height:\s*64px/)
     expect(ruleOf(CSS_SOURCE, '.optionLabel')).toMatch(/white-space:\s*normal/)
   })
 
-  test('タイヤ4選択肢はスマホ幅でも1行で見比べられる', () => {
-    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='wheel'\]\s*\{[^}]*grid-template-columns:\s*repeat\(4,/)
+  test('タイヤ6選択肢はスマホ幅でも3列で見比べられる', () => {
+    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='wheel'\]\s*\{[^}]*grid-template-columns:\s*repeat\(3,/)
     expect(ruleOf(CSS_SOURCE, '.wheelPreview')).toMatch(/border-radius:\s*50%/)
   })
 
-  test('フロント3選択肢はスマホ幅でも1行で見比べられる', () => {
-    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='front'\]\s*\{[^}]*grid-template-columns:\s*repeat\(3,/)
+  test('フロント4選択肢はスマホ幅でも1行で見比べられる', () => {
+    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='front'\]\s*\{[^}]*grid-template-columns:\s*repeat\(4,/)
     expect(ruleOf(CSS_SOURCE, '.frontPreview')).toMatch(/width:\s*42px/)
   })
 
-  test('屋根4選択肢はスマホ幅でも1行で見比べられる', () => {
-    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='roof'\]\s*\{[^}]*grid-template-columns:\s*repeat\(4,/)
+  test('屋根6選択肢はスマホ幅でも3列で見比べられる', () => {
+    expect(CSS_SOURCE).toMatch(/\.optionList\[data-category='roof'\]\s*\{[^}]*grid-template-columns:\s*repeat\(3,/)
     expect(ruleOf(CSS_SOURCE, '.roofPreview')).toMatch(/width:\s*44px/)
   })
 

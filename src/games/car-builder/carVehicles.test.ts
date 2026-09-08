@@ -53,8 +53,8 @@ beforeAll(async () => {
 })
 
 describe('採用車種カタログ', () => {
-  test('Phase 1 で採用した7車種だけを持ち、IDと並び順が一致する', () => {
-    expect(CAR_VEHICLE_ORDER).toHaveLength(7)
+  test('既存と追加の9車種を持ち、IDと並び順が一致する', () => {
+    expect(CAR_VEHICLE_ORDER).toHaveLength(9)
     expect([...CAR_VEHICLE_ORDER].sort()).toEqual(Object.keys(CAR_VEHICLES).sort())
     for (const id of CAR_VEHICLE_ORDER) expect(CAR_VEHICLES[id].id).toBe(id)
   })
@@ -62,7 +62,7 @@ describe('採用車種カタログ', () => {
   test('出典（Pack名・元モデル名）が全車種に残っている', () => {
     for (const id of CAR_VEHICLE_ORDER) {
       const { source } = CAR_VEHICLES[id]
-      expect(source.pack, id).toMatch(/^(Cars Pack|Public Transport Pack)$/)
+      expect(source.pack, id).toMatch(/^(Cars Pack|Public Transport Pack|Kids Playground Originals)$/)
       expect(source.model.length, id).toBeGreaterThan(0)
     }
     // 元モデルを使い回していないこと（同じ車体の水増しをしない）。
@@ -80,6 +80,17 @@ describe('採用車種カタログ', () => {
 })
 
 describe('GLB実ファイルとの整合', () => {
+  test('ピックアップは開いた荷台、バンは閉じた屋根を持つ', () => {
+    const ray = new THREE.Raycaster(new THREE.Vector3(0, 3, -1), new THREE.Vector3(0, -1, 0))
+    const pickup = models.get('pickup')!.scene
+    const van = models.get('van')!.scene
+    const pickupTop = ray.intersectObject(pickup, true)[0]!
+    const vanTop = ray.intersectObject(van, true)[0]!
+    expect(pickupTop.object.name).toBe('cargo-floor')
+    expect(pickupTop.point.y).toBeLessThan(1)
+    expect(vanTop.point.y).toBeGreaterThan(1.8)
+  })
+
   test.each(CAR_VEHICLE_ORDER)('%s: カタログのマテリアル一覧がGLBと一致する', (id) => {
     const model = models.get(id)!
     expect(new Set(model.materialNames)).toEqual(new Set(CAR_VEHICLES[id].materials))

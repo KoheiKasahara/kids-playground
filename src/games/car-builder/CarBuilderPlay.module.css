@@ -225,24 +225,24 @@
   overscroll-behavior: contain;
 }
 
-/* ボディは5種類をスマホ縦画面でも1列に見せ、形の違いを比較しやすくする。 */
+/* 追加後もスマホ縦画面で押しやすい幅を保ち、選択肢の中だけをスクロールする。 */
 .optionList[data-category='body'] {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-/* タイヤは4種類を1行で見比べられるようにする。狭いスマホでも各ボタンの幅を確保する。 */
-.optionList[data-category='wheel'] {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-/* フロントは3種類を1行で見比べる。 */
-.optionList[data-category='front'] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* 屋根4種類はスマホ縦画面でも1行で比較する。 */
-.optionList[data-category='roof'] {
+/* タイヤ・屋根は3列で、6種類を均等に並べる。 */
+.optionList[data-category='wheel'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* フロントは4種類を1行で見比べる。 */
+.optionList[data-category='front'] {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* 屋根も選択エリア内で折り返す。 */
+.optionList[data-category='roof'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .optionButton {
@@ -983,4 +983,49 @@
   .hint {
     display: none;
   }
+}
+
+/* Additional options share the existing preview sizes, including category badges. */
+.wheelPreview-whitewall {
+  background: radial-gradient(circle, #d5dbe1 0 30%, #2f3438 31% 42%, #fff7e6 43% 64%, #2f3438 65%);
+}
+
+.wheelPreviewFlower {
+  color: #f48fb1;
+  font-size: 1.6em;
+  line-height: 1;
+}
+
+.frontPreview-twin .frontPreviewLight {
+  width: 16%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #d9e0e6;
+}
+
+.roofPreviewRabbit {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.roofPreviewSurfboard {
+  width: 80%;
+  height: 32%;
+  border-radius: 50%;
+  transform: rotate(-25deg);
+  background: linear-gradient(90deg, #27c7ce 25%, #ffd43b 25% 32%, #27c7ce 32% 68%, #ffd43b 68% 75%, #27c7ce 75%);
+  box-shadow: 0 3px #334155;
+}
+
+.decorationPreviewHearts {
+  color: #f0598f;
+  font-size: 0.9em;
+  letter-spacing: -0.2em;
+}
+
+.decorationPreviewChecker {
+  width: 85%;
+  height: 60%;
+  background: repeating-conic-gradient(#25313d 0 25%, #fff5eb 0 50%) 0 / 33.333% 100%;
 }

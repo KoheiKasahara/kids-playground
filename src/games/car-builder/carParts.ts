@@ -67,7 +67,7 @@ function offsetFrom(attachment: CarAttachment, distance: number): THREE.Vector3 
 type WheelVisual = {
   hubColor: string
   hubRadiusRatio: number
-  detail: 'standard' | 'offroad' | 'racing'
+  detail: 'standard' | 'offroad' | 'racing' | 'whitewall' | 'flower'
 }
 
 function addPerformanceRim(
@@ -173,6 +173,29 @@ function buildWheels(visual: WheelVisual) {
         addOffroadTread(group, wheel, treadMaterial)
       } else if (visual.detail === 'racing') {
         addPerformanceRim(group, wheel, hubMaterial, 'car-racing')
+      } else if (visual.detail === 'whitewall' || visual.detail === 'flower') {
+        const faceX = wheel.position.x + wheel.side * wheel.width * 0.55
+        if (visual.detail === 'whitewall') {
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(wheel.radius * 0.58, wheel.radius * 0.85, 24),
+            standard('#fff7e6', 0.7),
+          )
+          ring.name = `car-whitewall-ring-${wheel.id}`
+          ring.rotation.y = wheel.side * Math.PI / 2
+          ring.position.set(faceX, wheel.position.y, wheel.position.z)
+          group.add(ring)
+        } else {
+          const petals = standard('#f48fb1', 0.45)
+          for (let index = 0; index < 6; index++) {
+            const angle = index * Math.PI / 3
+            const petal = new THREE.Mesh(new THREE.SphereGeometry(wheel.radius * 0.21, 10, 6), petals)
+            petal.name = `car-flower-petal-${wheel.id}-${index}`
+            petal.scale.x = 0.2
+            petal.position.set(faceX, wheel.position.y + Math.cos(angle) * wheel.radius * 0.43,
+              wheel.position.z + Math.sin(angle) * wheel.radius * 0.43)
+            group.add(petal)
+          }
+        }
       } else if (sportsWheel) {
         addPerformanceRim(group, wheel, hubMaterial, 'car-sports')
       }
@@ -188,7 +211,8 @@ function buildFront(shape: FrontType) {
     group.name = 'car-front'
     const lightMaterial = standard('#fff3c4', 0.2, 0.1)
 
-    const lightSize = front.size.extent * 0.34
+    const rounded = shape === 'round' || shape === 'twin'
+    const lightSize = front.size.extent * 0.34 * (shape === 'twin' ? 0.7 : 1)
     const lightDepth = 0.1
     const lightWidth =
       shape === 'round' ? lightSize * 0.9 : shape === 'square' ? lightSize * 1.5 : lightSize * 2.2
@@ -196,43 +220,45 @@ function buildFront(shape: FrontType) {
       shape === 'round' ? lightSize * 0.9 : shape === 'square' ? lightSize * 0.7 : lightSize * 0.28
     const surroundMaterial = standard(shape === 'round' ? CHROME_COLOR : '#3f4b57', 0.32, 0.35)
     for (const side of [1, -1]) {
-      const center = offsetFrom(front, lightDepth / 2)
-      const position = {
-        x: center.x + side * front.size.width * (shape === 'slim' ? 0.3 : 0.32),
-        y: center.y + front.size.extent * 0.16,
-        z: center.z,
-      }
+      for (const lampOffset of (shape === 'twin' ? [-1, 1] : [0])) {
+        const center = offsetFrom(front, lightDepth / 2)
+        const position = {
+          x: center.x + side * front.size.width * (shape === 'slim' ? 0.3 : 0.32) + lampOffset * lightSize * 0.58,
+          y: center.y + front.size.extent * 0.16,
+          z: center.z,
+        }
 
-      if (shape === 'round') {
-        const surround = new THREE.Mesh(
-          new THREE.TorusGeometry(lightSize * 0.5, lightSize * 0.08, 8, 20),
-          surroundMaterial,
-        )
-        surround.name = `car-front-surround-round-${side === 1 ? 'left' : 'right'}`
-        surround.position.set(position.x, position.y, position.z)
-        surround.castShadow = true
-        const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * 0.48, 16, 12), lightMaterial)
-        light.name = `car-front-light-round-${side === 1 ? 'left' : 'right'}`
-        light.position.set(position.x, position.y, position.z)
-        // 前面の丸さは保ちつつ、ライト本体が車体の前端から出すぎないよう奥行きを薄くする。
-        light.scale.set(0.8, 0.8, 0.62)
-        light.rotation.z = side * -0.08
-        light.castShadow = true
-        group.add(surround, light)
-      } else {
-        const surround = box(
-          { x: lightWidth + lightSize * 0.18, y: lightHeight + lightSize * 0.18, z: lightDepth * 0.72 },
-          { x: position.x, y: position.y, z: position.z - lightDepth * 0.12 },
-          surroundMaterial,
-        )
-        surround.name = `car-front-surround-${shape}-${side === 1 ? 'left' : 'right'}`
-        const light = box(
-          { x: lightWidth, y: lightHeight, z: lightDepth },
-          { x: position.x, y: position.y, z: position.z + lightDepth * 0.08 },
-          lightMaterial,
-        )
-        light.name = `car-front-light-${shape}-${side === 1 ? 'left' : 'right'}`
-        group.add(surround, light)
+        if (rounded) {
+          const surround = new THREE.Mesh(
+            new THREE.TorusGeometry(lightSize * 0.5, lightSize * 0.08, 8, 20),
+            surroundMaterial,
+          )
+          surround.name = `car-front-surround-${shape}-${side === 1 ? 'left' : 'right'}${shape === 'twin' ? `-${lampOffset}` : ''}`
+          surround.position.set(position.x, position.y, position.z)
+          surround.castShadow = true
+          const light = new THREE.Mesh(new THREE.SphereGeometry(lightSize * 0.48, 16, 12), lightMaterial)
+          light.name = `car-front-light-${shape}-${side === 1 ? 'left' : 'right'}${shape === 'twin' ? `-${lampOffset}` : ''}`
+          light.position.set(position.x, position.y, position.z)
+          // 前面の丸さは保ちつつ、ライト本体が車体の前端から出すぎないよう奥行きを薄くする。
+          light.scale.set(0.8, 0.8, 0.62)
+          light.rotation.z = side * -0.08
+          light.castShadow = true
+          group.add(surround, light)
+        } else {
+          const surround = box(
+            { x: lightWidth + lightSize * 0.18, y: lightHeight + lightSize * 0.18, z: lightDepth * 0.72 },
+            { x: position.x, y: position.y, z: position.z - lightDepth * 0.12 },
+            surroundMaterial,
+          )
+          surround.name = `car-front-surround-${shape}-${side === 1 ? 'left' : 'right'}`
+          const light = box(
+            { x: lightWidth, y: lightHeight, z: lightDepth },
+            { x: position.x, y: position.y, z: position.z + lightDepth * 0.08 },
+            lightMaterial,
+          )
+          light.name = `car-front-light-${shape}-${side === 1 ? 'left' : 'right'}`
+          group.add(surround, light)
+        }
       }
     }
 
@@ -392,6 +418,105 @@ function buildRoofSpoiler({ attachments, surface }: CarPartContext): THREE.Objec
   wing.name = 'car-roof-spoiler-wing'
   group.add(wing)
   return group
+}
+
+/** Roof toys sit on a rail with feet sampled separately on the real shell. */
+function buildRoofToy(kind: 'rabbit' | 'surfboard'): CarPartBuilder {
+  return ({ attachments, surface }) => {
+    const roof = attachments.roof
+    const group = new THREE.Group()
+    group.name = 'car-roof'
+    const width = Math.min(roof.size.width * 0.62, 1.1)
+    const depth = Math.min(roof.size.extent * 0.35, 0.65)
+    const feet = [-1, 1].flatMap((x) => [-1, 1].map((z) => {
+      const point = new THREE.Vector3(x * width * 0.4, roof.position.y, roof.position.z + z * depth * 0.4)
+      return surface?.(point, new THREE.Vector3(0, 1, 0)) ?? point
+    }))
+    const top = Math.max(...feet.map((point) => point.y)) + 0.08
+    const railMaterial = standard('#334155', 0.5)
+    feet.forEach((point, index) => {
+      const height = top - point.y
+      const foot = box({ x: 0.08, y: height, z: 0.08 },
+        { x: point.x, y: point.y + height / 2, z: point.z }, railMaterial)
+      foot.name = `car-roof-${kind}-support-${index}`
+      group.add(foot)
+    })
+    group.add(box({ x: width, y: 0.05, z: depth }, { x: 0, y: top + 0.025, z: roof.position.z }, railMaterial))
+    if (kind === 'rabbit') {
+      const white = standard('#fff4eb', 0.65)
+      const pink = standard('#f38cac', 0.6)
+      for (const side of [-1, 1]) {
+        const ear = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), white)
+        ear.name = `car-roof-rabbit-ear-${side}`
+        ear.scale.set(width * 0.15, 0.31, 0.095)
+        ear.position.set(side * width * 0.28, top + 0.34, roof.position.z)
+        const inner = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), pink)
+        inner.scale.set(width * 0.085, 0.23, 0.035)
+        inner.position.copy(ear.position).add(new THREE.Vector3(0, 0.025, 0.075))
+        group.add(ear, inner)
+      }
+    } else {
+      const boardLength = Math.min(roof.size.extent * 0.85, 2.5)
+      const board = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8), standard('#27c7ce', 0.4))
+      board.name = 'car-roof-surfboard'
+      board.scale.set(width * 0.46, 0.07, boardLength / 2)
+      board.position.set(0, top + 0.12, roof.position.z)
+      group.add(board)
+      for (const z of [-1, 1]) {
+        group.add(box({ x: width * 0.68, y: 0.025, z: 0.075 },
+          { x: 0, y: top + 0.185, z: roof.position.z + z * boardLength * 0.2 }, standard('#ffd43b')))
+      }
+    }
+    return group
+  }
+}
+
+function buildPatternDecoration(kind: 'hearts' | 'checker'): CarPartBuilder {
+  return (context) => {
+    const group = new THREE.Group()
+    group.name = 'car-decoration'
+    const size = context.dimensions.hullHeight * 0.18
+    const dark = standard(kind === 'hearts' ? '#f0598f' : '#25313d')
+    const light = standard('#fff5eb')
+    for (const side of [context.attachments.sideLeft, context.attachments.sideRight]) {
+      for (let column = 0; column < (kind === 'hearts' ? 3 : 6); column++) {
+        if (kind === 'hearts') {
+          const z = (column - 1) * context.dimensions.length * 0.15
+          group.add(sideStickerMesh(createHeartGeometry(size * 1.5), light, context, side, z, 0.3, 0.019))
+          group.add(sideStickerMesh(createHeartGeometry(size * 1.2), dark, context, side, z, 0.3, 0.029))
+        } else {
+          for (let row = 0; row < 2; row++) {
+            group.add(sideStickerMesh(new THREE.PlaneGeometry(size, size), (row + column) % 2 ? dark : light,
+              context, side, (column - 2.5) * size, 0.3 + (row - 0.5) * 0.225))
+          }
+        }
+      }
+    }
+    return group
+  }
+}
+
+function createFlowerGeometry(size: number): THREE.ShapeGeometry {
+  const shape = new THREE.Shape()
+  for (let index = 0; index <= 96; index++) {
+    const angle = index * Math.PI * 2 / 96
+    const radius = size * (0.42 + 0.14 * Math.cos(angle * 6))
+    const x = Math.cos(angle) * radius
+    const y = Math.sin(angle) * radius
+    if (index === 0) shape.moveTo(x, y)
+    else shape.lineTo(x, y)
+  }
+  shape.closePath()
+  return new THREE.ShapeGeometry(shape)
+}
+
+function createMoonGeometry(size: number): THREE.ShapeGeometry {
+  const shape = new THREE.Shape()
+  shape.moveTo(size * 0.18, size * 0.52)
+  shape.bezierCurveTo(-size * 0.65, size * 0.55, -size * 0.65, -size * 0.55, size * 0.18, -size * 0.52)
+  shape.bezierCurveTo(-size * 0.23, -size * 0.25, -size * 0.23, size * 0.25, size * 0.18, size * 0.52)
+  shape.closePath()
+  return new THREE.ShapeGeometry(shape)
 }
 
 function createStarGeometry(outerRadius: number): THREE.ShapeGeometry {
@@ -664,6 +789,10 @@ function createMarkIconGeometry(mark: MarkIconType, size: number): THREE.ShapeGe
       return createCrownGeometry(size)
     case 'animal':
       return createAnimalGeometry(size)
+    case 'flower':
+      return createFlowerGeometry(size)
+    case 'moon':
+      return createMoonGeometry(size)
   }
 }
 
@@ -747,6 +876,8 @@ function buildNumberPlate({ attachments, config, surface }: CarPartContext): THR
     lightning: '#f08c00',
     crown: '#8256c7',
     animal: '#188a8a',
+    flower: '#e95198',
+    moon: '#f5bc32',
   }
 
   for (const original of [attachments.front, attachments.rear]) {
@@ -811,14 +942,18 @@ export const CAR_PART_BUILDERS: {
     small: buildWheels({ hubColor: CHROME_COLOR, hubRadiusRatio: 0.45, detail: 'standard' }),
     big: buildWheels({ hubColor: '#ff922b', hubRadiusRatio: 0.5, detail: 'standard' }),
     offroad: buildWheels({ hubColor: '#c8873d', hubRadiusRatio: 0.42, detail: 'offroad' }),
+    whitewall: buildWheels({ hubColor: CHROME_COLOR, hubRadiusRatio: 0.46, detail: 'whitewall' }),
+    flower: buildWheels({ hubColor: '#ffd43b', hubRadiusRatio: 0.24, detail: 'flower' }),
     racing: buildWheels({ hubColor: '#d83f45', hubRadiusRatio: 0.62, detail: 'racing' }),
   },
-  front: { round: buildFront('round'), square: buildFront('square'), slim: buildFront('slim') },
+  front: { round: buildFront('round'), square: buildFront('square'), slim: buildFront('slim'), twin: buildFront('twin') },
   roof: {
     none: nothing,
     policeLight: buildRoofPoliceLight,
     luggage: buildRoofLuggage,
     spoiler: buildRoofSpoiler,
+    rabbit: buildRoofToy('rabbit'),
+    surfboard: buildRoofToy('surfboard'),
   },
   decoration: {
     none: nothing,
@@ -826,6 +961,8 @@ export const CAR_PART_BUILDERS: {
     flame: buildFlameDecoration,
     stripes: buildStripesDecoration,
     dots: buildDotsDecoration,
+    hearts: buildPatternDecoration('hearts'),
+    checker: buildPatternDecoration('checker'),
   },
   mark: {
     none: nothing,
@@ -843,6 +980,8 @@ export const CAR_PART_BUILDERS: {
     lightning: buildNumberPlate,
     crown: buildNumberPlate,
     animal: buildNumberPlate,
+    flower: buildNumberPlate,
+    moon: buildNumberPlate,
   },
 }
 
