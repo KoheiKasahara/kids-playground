@@ -24,9 +24,9 @@ import {
   RAIL_HALF_WIDTH,
 } from './bowlingStage'
 import { bowlingCameraSetup } from './bowlingCamera'
-import { aimFromScreen } from './bowlingAim'
 import {
   aimAtTarget,
+  aimFromDrag,
   combinedRestitution,
   automaticLaunchVelocity,
   predictBouncePreview,
@@ -95,7 +95,7 @@ export type TsumikiBowlingEngineOptions = {
   /** 積み木を組み直し、次の投球の盤面へ戻したときに呼ぶ。 */
   onStageRebuilt: () => void
   /**
-   * 狙っている間は玉の固定パワー(0〜1)、離したときはnull。
+   * 引っ張っている間は見た目の引き量(0〜1)、離したときはnull。
    * 毎フレームではなく、値が目に見えて変わったときだけ呼ぶ。
    */
   onAimChange: (power: number | null) => void
@@ -914,10 +914,7 @@ export function useTsumikiBowlingEngine(
     /**
      * ドラッグを受け付けてよいか。
      *
-     * 前の投球がまだ転がっている最中でも受け付けるのが大事なところ。
-     * 幼児は積み木が止まる前に次を触るので、ここで弾くと
-     * 「ひっぱったのに何も起きない」投球が生まれる（実画面で確認した）。
-     * 実際に発射できるかは指を離すときに判定する。
+     * 発射待機中だけ受け付ける。飛行中のタップを次の投球へ持ち越さない。
      */
     function canStartAim(): boolean {
       return !flying && !finished && bowling !== null
@@ -962,14 +959,15 @@ export function useTsumikiBowlingEngine(
       if (!renderer) return
       const canvas = renderer.domElement
       let activePointerId: number | null = null
-      const bounds = stageBounds(stage)
-      const aimFromPointer = (event: PointerEvent): LaunchAim | null => {
-        if (!camera || !bowling) return null
-        return aimFromScreen(
-          { x: event.clientX, y: event.clientY },
-          canvas.getBoundingClientRect(), camera,
-          { ...bounds, launchZ: bowling.anchor.z }, bowling.ballSpec,
-        )
+      let startX = 0
+      let startY = 0
+
+      const viewportOf = () => {
+        const rect = canvas.getBoundingClientRect()
+        return {
+          width: rect.width || canvas.clientWidth || 1,
+          height: rect.height || canvas.clientHeight || 1,
+        }
       }
 
       const onPointerDown = (event: PointerEvent) => {
@@ -977,9 +975,11 @@ export function useTsumikiBowlingEngine(
         if (event.pointerType === 'mouse' && event.button !== 0) return
         if (!canStartAim()) return
         activePointerId = event.pointerId
-        skipRebuildWait()
-        currentAim = aimFromPointer(event)
-        if (canPullBall()) reportAim(currentAim?.power ?? null)
+        startX = event.clientX
+        startY = event.clientY
+        // タップだけでは発射しない。移動量がデッドゾーンを超えて初めて狙いを作る。
+        currentAim = null
+        reportAim(null)
         try {
           canvas.setPointerCapture(event.pointerId)
         } catch {
@@ -990,13 +990,18 @@ export function useTsumikiBowlingEngine(
 
       const onPointerMove = (event: PointerEvent) => {
         if (activePointerId !== event.pointerId || !bowling) return
-        const aim = aimFromPointer(event)
-        if (!aim) return
+        const aim = aimFromDrag(
+          { dx: event.clientX - startX, dy: event.clientY - startY },
+          viewportOf(),
+        )
         currentAim = aim
+        // 有効な引っ張りになった時点でだけ、次投の組み直し待ちを短縮する。
+        // タップや小さな指ぶれでは盤面もゲーム状態も変えない。
+        if (aim.active) skipRebuildWait()
         // 前の投球中・組み直し中は玉を動かさない（まだ前の投球の位置にいる）。
         if (canPullBall()) {
           parkBall(bowling, aim)
-          reportAim(aim.active ? aim.power : 0)
+          reportAim(aim.active ? aim.power : null)
         } else {
           reportAim(null)
         }
@@ -1011,7 +1016,7 @@ export function useTsumikiBowlingEngine(
         } catch {
           // capture していない場合は何もしなくてよい。
         }
-        const aim = launch ? aimFromPointer(event) ?? currentAim : null
+        const aim = launch ? currentAim : null
         currentAim = null
         reportAim(null)
         if (!bowling) return
@@ -1058,7 +1063,8 @@ export function useTsumikiBowlingEngine(
       launchAutomaticBall(bowling, aim)
       const ballPosition = bowling.ball.translation()
       spawnLaunchFlash({ x: ballPosition.x, y: ballPosition.y, z: ballPosition.z })
-      soundController.playLaunch(bowling.ballSpec.id, aim.power)
+      // 引っ張る長さは発射条件と見た目だけ。音の強さも玉ごとの固定値にそろえる。
+      soundController.playLaunch(bowling.ballSpec.id, bowling.ballSpec.launchProfile.power)
       hapticsController.launch()
       optionsRef.current.onThrowStart(throwIndex + 1)
     }

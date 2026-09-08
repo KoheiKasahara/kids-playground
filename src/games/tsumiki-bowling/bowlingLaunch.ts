@@ -59,23 +59,23 @@ export function automaticLaunchVelocity(aim: LaunchAim, ball: BowlingBallSpec): 
   return { x: direction.x * speed, y: direction.y * speed, z: direction.z * speed }
 }
 
-/** これ未満のドラッグは、画面に触れただけとみなして発射しない。 */
-export const DRAG_DEAD_ZONE_PX = 12
+/** これ以下のドラッグは、画面に触れただけとみなして発射しない。 */
+export const DRAG_DEAD_ZONE_PX = 24
 
 /**
  * パワーが最大に達するドラッグ距離[px]。
  *
- * 端末の画面サイズに比例させる。小さい画面で最大パワーを出すのに
- * 画面外まで指を動かす必要があると、幼児には最大まで引けない。
- * 上下限は、極端に大きい/小さい画面でも「引ける長さ」に収める保険。
+ * 発射の強さは玉ごとに固定で、この値は玉を引く見た目にだけ使う。
+ * 以前の長いスリングショット操作より短くし、幼児が少し引くだけで
+ * 十分な発射感が出る長さに収める。
  */
 export function fullPowerDragPx(viewport: ViewportSize): number {
   const shorterSide = Math.min(
     Number.isFinite(viewport.width) ? viewport.width : 0,
     Number.isFinite(viewport.height) ? viewport.height : 0,
   )
-  const base = Math.max(shorterSide, 0) * 0.45
-  return Math.min(320, Math.max(110, base))
+  const base = Math.max(shorterSide, 0) * 0.18
+  return Math.min(120, Math.max(70, base))
 }
 
 function clamp(value: number, min: number, max: number): number {

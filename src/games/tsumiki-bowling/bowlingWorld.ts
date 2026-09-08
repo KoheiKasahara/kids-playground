@@ -289,9 +289,8 @@ export function launchBall(
 /**
  * 玉の役割に決められた弾道・速さで発射する。
  *
- * ねらう操作は左右の目標だけを決め、パワーや高さを調整しないため、
- * 実プレイではこちらを使う。aimのpullは常に0で、発射位置が狙いによって
- * 動くこともない。従来のlaunchBallは既存の物理テストと互換性を保つため残す。
+ * 引っ張る操作は発射感と左右の向きだけを決め、パワーや高さを調整しないため、
+ * 実プレイではこちらを使う。従来のlaunchBallは既存の物理テストと互換性を保つため残す。
  */
 export function launchAutomaticBall(
   bowling: BowlingWorld,

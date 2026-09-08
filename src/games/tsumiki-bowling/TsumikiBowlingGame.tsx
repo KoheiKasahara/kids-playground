@@ -236,8 +236,8 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
           <div className={styles.aimPanel}>
             <p className={styles.hint}>
               {aimPower !== null
-                ? 'そこを ねらって はなそう！'
-                : hasThrown ? 'たまを かえて ためしてね' : 'ねらう ほうを さわって はなそう！'}
+                ? 'そのまま はなそう！'
+                : hasThrown ? 'つぎも ひっぱって はなしてね' : 'たまを すこし ひっぱって はなそう！'}
             </p>
           </div>
         ) : null}

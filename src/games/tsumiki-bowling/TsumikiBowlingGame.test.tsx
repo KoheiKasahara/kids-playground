@@ -79,7 +79,7 @@ describe('TsumikiBowlingGame', () => {
   it('最初はあそびかたの案内と、0この表示から始まる', () => {
     renderGame()
     expect(screen.getByRole('heading', { name: 'つみきボウリング' })).toBeInTheDocument()
-    expect(screen.getByText('ねらう ほうを さわって はなそう！')).toBeInTheDocument()
+    expect(screen.getByText('たまを すこし ひっぱって はなそう！')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent(`たおした つみき0 / ${TOWER_TOTAL}こ`)
     expect(engineMock.registerContainer).toHaveBeenCalled()
   })
@@ -120,10 +120,10 @@ describe('TsumikiBowlingGame', () => {
   it('狙っている間は離す案内だけを出し、強さ調整を要求しない', () => {
     renderGame()
     act(() => engineMock.options?.onAimChange(0.9))
-    expect(screen.getByText('そこを ねらって はなそう！')).toBeInTheDocument()
+    expect(screen.getByText('そのまま はなそう！')).toBeInTheDocument()
     expect(screen.queryByTestId('power-label')).not.toBeInTheDocument()
     act(() => engineMock.options?.onAimChange(null))
-    expect(screen.getByText('ねらう ほうを さわって はなそう！')).toBeInTheDocument()
+    expect(screen.getByText('たまを すこし ひっぱって はなそう！')).toBeInTheDocument()
   })
 
   it('崩れている最中も、いま倒れている数がその投球ぶんとして増えていく', () => {
@@ -179,7 +179,7 @@ describe('TsumikiBowlingGame', () => {
   it('2投目からは案内の文が変わる', () => {
     renderGame()
     playThrow(2, 1)
-    expect(screen.getByText('たまを かえて ためしてね')).toBeInTheDocument()
+    expect(screen.getByText('つぎも ひっぱって はなしてね')).toBeInTheDocument()
   })
 
   it('次の投球が始まると、HUDのその投球ぶんの数字が0へ戻る', () => {
@@ -225,7 +225,7 @@ describe('TsumikiBowlingGame', () => {
     expect(engineMock.mountCount).toBeGreaterThan(mountsBeforeRetry)
     expect(screen.queryByRole('dialog', { name: 'けっか' })).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
-    expect(screen.getByText('ねらう ほうを さわって はなそう！')).toBeInTheDocument()
+    expect(screen.getByText('たまを すこし ひっぱって はなそう！')).toBeInTheDocument()
     expect(
       screen.getByLabelText(`${THROWS_PER_GAME}かい なげるうちの 1かいめ`),
     ).toBeInTheDocument()
