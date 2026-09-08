@@ -34,6 +34,7 @@ function isPlayRoutePath(route: RouteObject & { path: string }): boolean {
     '/games/planet-globe',
     '/games/rail-builder',
     '/games/car-builder',
+    '/games/bento-builder',
     '/games/piano-play',
     '/games/color-paint-puzzle',
     '/games/block-puzzle',

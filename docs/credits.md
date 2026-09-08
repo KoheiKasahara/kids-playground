@@ -167,3 +167,21 @@ CC0のためクレジット表示の義務はありませんが、将来の出�
 ### クイズ画像の配信形式
 
 野菜・果物・はたらくくるまの元PNGは、透過を含むRGBAピクセルと解像度を維持したロスレスWebPで配信しています。変換はPillowの `save(format="WEBP", lossless=True, exact=True, method=6)` を使用し、再デコードした全ピクセルの一致を確認しています。元画像はGit履歴から復元できます。形式変更による素材の出典・権利の変更はありません。WebPも既存PWAのprecache対象です。
+
+## 3Dおべんとうづくり
+
+- 食材モデル: [Quaternius Ultimate Food Pack](https://quaternius.com/packs/ultimatefood.html)、作者 Quaternius。
+- ライセンス: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)。公式パックページおよびPoly Pizzaの各モデルページで確認。
+- GLB取得元: [Poly Pizza版 Ultimate Food Pack](https://poly.pizza/bundle/Ultimate-Food-Pack-h3WC1gyRb4)（2026-09-08取得）。使用する5ファイルのみ `public/models/bento-builder/` に同梱。テクスチャ・外部通信は不要。
+
+| ファイル | 元モデル・取得ページ |
+| --- | --- |
+| egg.glb | [Egg Fried](https://poly.pizza/m/NVrB2yd66v) |
+| broccoli.glb | [Broccoli](https://poly.pizza/m/6exp0qAEVd) |
+| tomato.glb | [Tomato](https://poly.pizza/m/ByggGxctjw) |
+| sushi.glb | [Sushi Nigiri](https://poly.pizza/m/ea93ie9bKj) |
+| carrot.glb | [Carrot](https://poly.pizza/m/l4YmYv8hFK) |
+
+GLBは元ファイルのまま保存し、ゲーム内でサイズ・中心・底面を正規化。にんじんは横置きに調整。
+おにぎり・からあげ・ウインナーと弁当箱は本プロジェクトでThree.jsの形状から制作。パックのHotdogはパン付き、Chicken Legは骨付きのため、お弁当の単品おかずに合わせて補完した。他作者の食材パックは使用していない。
+SEはWeb Audioで合成（外部音源なし）。

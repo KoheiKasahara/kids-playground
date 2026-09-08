@@ -64,6 +64,24 @@ export function gameRoutePath(slug: string): string {
 // id/title/emoji は既存の src/pages/Home.tsx と同じ並び順・内容を維持する。
 export const GAME_CATALOG: readonly GameCatalogEntry[] = [
   {
+    id: 'bento-builder',
+    slug: 'bento-builder',
+    title: '3Dおべんとうづくり',
+    emoji: '🍱',
+    category: 'threeD',
+    seo: {
+      headline: '3Dおべんとうづくり｜おかずをつめる自由なおままごと',
+      description: '好きな形と色のお弁当箱に、おにぎり・たまご・ブロッコリーなど8種類のおかずを自由につめる幼児向け3Dゲームです。指で動かして、まわして、自分だけのお弁当を作れます。正解も時間制限もありません。',
+    },
+    intro: {
+      howToPlay: [
+        'すきな はこと いろを えらんで「つくる！」',
+        'おかずを タップして いれたら、ゆびで うごかしてね',
+        '「できた！」で ながめよう。「なおす」で つづけられるよ',
+      ],
+    },
+  },
+  {
     id: 'circuit-racing',
     slug: 'circuit-racing',
     title: 'サーキットレース',
