@@ -64,6 +64,20 @@ export function gameRoutePath(slug: string): string {
 // id/title/emoji は既存の src/pages/Home.tsx と同じ並び順・内容を維持する。
 export const GAME_CATALOG: readonly GameCatalogEntry[] = [
   {
+    id: 'magic-sandbox',
+    slug: 'magic-sandbox',
+    title: 'まほうのすなば',
+    emoji: '🏜️',
+    category: 'learning',
+    seo: {
+      headline: 'まほうのすなば｜砂と水とたねをまぜる自由あそび',
+      description: '指でなぞって砂・水・石・たねをふらせる幼児向けの砂場あそびです。砂山に水をかけたり、石で水路を作ったり、湿った砂にたねをまいて花を育てたり。正解も時間制限もなく、自由に変化を楽しめます。',
+    },
+    intro: {
+      howToPlay: ['そざいを えらんで、すなばを なぞってね', 'すなに みずを かけて、たねを まいてみよう', '「ゆらす」で さらさら。「けす」で トンネルも つくれるよ'],
+    },
+  },
+  {
     id: 'bento-builder',
     slug: 'bento-builder',
     title: '3Dおべんとうづくり',
