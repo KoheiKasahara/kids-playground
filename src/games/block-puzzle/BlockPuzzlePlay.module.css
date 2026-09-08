@@ -1,4 +1,10 @@
 .page {
+  /* ゲーム内の余白から始めたスワイプも操作中のページ移動にしない。
+     この main の外にある説明エリアでは通常どおりスクロールできる。 */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   min-height: 100vh;
   min-height: 100dvh;
   box-sizing: border-box;

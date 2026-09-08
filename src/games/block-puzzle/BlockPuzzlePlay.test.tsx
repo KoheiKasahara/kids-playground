@@ -225,7 +225,7 @@ describe('ブロックパズル: 画面と操作', () => {
     expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
 
     await user.click(shapeButton('1マス'))
-    expect(screen.getByRole('status')).toHaveTextContent('かたちを えらんで')
+    expect(screen.getByRole('status')).toHaveTextContent('かたちを ひっぱって')
   })
 })
 
@@ -764,7 +764,7 @@ describe('ブロックパズル: スマホでの安定したドラッグ（#510�
     expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
   })
 
-  test('ドラッグ中に pointercancel が発生しても、置ける場所ならそのまま移動する', async () => {
+  test('ドラッグ中に pointercancel が発生したら、置ける場所でも元の位置を保つ', async () => {
     const user = setup()
     await user.click(shapeButton('1マス'))
     await user.click(cellButton(2, 2))
@@ -774,8 +774,8 @@ describe('ブロックパズル: スマホでの安定したドラッグ（#510�
     fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(5, 6) })
     fireEvent.pointerCancel(window, { pointerId: 1, ...cellClientPoint(5, 6) })
 
-    expect(cellContent(2, 2)).toBe('あき')
-    expect(cellContent(5, 6)).toBe('1マス せんたくちゅう')
+    expect(cellContent(2, 2)).toBe('1マス')
+    expect(cellContent(5, 6)).toBe('あき')
   })
 
   test('盤面外での pointercancel でも、配置済みパーツは消えず元の位置へ戻る', async () => {
@@ -900,5 +900,79 @@ describe('ブロックパズル: 新規パーツのドラッグ配置とプレ�
     fireEvent.pointerMove(window, { pointerId: 1, ...cellClientPoint(5, 5) })
 
     expect(screen.queryByTestId('block-puzzle-drop-preview')).not.toBeInTheDocument()
+  })
+})
+
+describe('ブロックパズル: パーツ一覧から直接ドラッグ', () => {
+  const start = { pointerId: 11, pointerType: 'touch', clientX: 90, clientY: 570 }
+
+  test('未選択の形をつかみ、プレビューを表示して一度だけ配置する', () => {
+    renderPlay()
+    mockBoardRect()
+    fireEvent.pointerDown(shapeButton('しかく'), start)
+    expect(screen.queryByTestId('block-puzzle-drop-preview')).not.toBeInTheDocument()
+    fireEvent.pointerMove(window, { ...start, ...cellClientPoint(2, 2) })
+    expect(screen.getByTestId('block-puzzle-drop-preview')).toHaveAttribute('data-tone', 'valid')
+    expect(cellContent(2, 2)).toBe('あき')
+    fireEvent.pointerUp(window, { ...start, ...cellClientPoint(2, 2) })
+    fireEvent.click(shapeButton('しかく')) // capture先へ発火する互換click
+    expect(cellContent(2, 2)).toBe('しかく')
+    expect(cellContent(3, 3)).toBe('しかく')
+    expect(screen.queryByTestId('block-puzzle-drop-preview')).not.toBeInTheDocument()
+    fireEvent.pointerDown(cellButton(5, 5), { pointerId: 12, ...cellClientPoint(5, 5) })
+    fireEvent.pointerUp(window, { pointerId: 12, ...cellClientPoint(5, 5) })
+    fireEvent.click(cellButton(5, 5))
+    expect(cellContent(5, 5)).toBe('しかく')
+  })
+
+  test('パーツのタップ選択と盤面タップ配置を維持する', () => {
+    renderPlay()
+    mockBoardRect()
+    fireEvent.pointerDown(shapeButton('しかく'), start)
+    fireEvent.pointerUp(window, start)
+    fireEvent.click(shapeButton('しかく'))
+    expect(cellContent(2, 2)).toBe('あき')
+    fireEvent.click(cellButton(2, 2))
+    expect(cellContent(3, 3)).toBe('しかく')
+  })
+
+  test.each(['pointerCancel', 'lostPointerCapture'] as const)('%s では配置せず、次のドラッグができる', (cancel) => {
+    renderPlay()
+    mockBoardRect()
+    fireEvent.pointerDown(shapeButton('しかく'), start)
+    fireEvent.pointerMove(window, { ...start, ...cellClientPoint(2, 2) })
+    fireEvent[cancel](window, { ...start, ...cellClientPoint(2, 2) })
+    expect(cellContent(2, 2)).toBe('あき')
+    expect(screen.queryByTestId('block-puzzle-drop-preview')).not.toBeInTheDocument()
+    fireEvent.pointerDown(shapeButton('しかく'), start)
+    fireEvent.pointerUp(window, { ...start, ...cellClientPoint(3, 3) })
+    expect(cellContent(3, 3)).toBe('しかく')
+  })
+
+  test('盤面外・重なる場所へ落としても配置せず、離した座標を使う', () => {
+    renderPlay()
+    mockBoardRect()
+    fireEvent.click(cellButton(2, 2))
+    for (const point of [cellClientPoint(2, 2), { clientX: -200, clientY: -200 }]) {
+      fireEvent.pointerDown(shapeButton('しかく'), start)
+      fireEvent.pointerMove(window, { ...start, ...cellClientPoint(4, 4) })
+      fireEvent.pointerUp(window, { ...start, ...point })
+      expect(cellContent(4, 4)).toBe('あき')
+      expect(cellContent(2, 2)).toBe('1マス')
+    }
+  })
+
+  test('2本目の指で選択やドラッグを奪わない', () => {
+    renderPlay()
+    mockBoardRect()
+    fireEvent.pointerDown(shapeButton('しかく'), start)
+    fireEvent.pointerDown(shapeButton('1マス'), { ...start, pointerId: 12 })
+    fireEvent.pointerMove(window, { ...start, pointerId: 12, ...cellClientPoint(5, 5) })
+    fireEvent.pointerUp(window, { ...start, pointerId: 12, ...cellClientPoint(5, 5) })
+    fireEvent.click(shapeButton('1マス'))
+    expect(shapeButton('しかく')).toHaveAttribute('aria-pressed', 'true')
+    expect(cellContent(5, 5)).toBe('あき')
+    fireEvent.pointerUp(window, { ...start, ...cellClientPoint(2, 2) })
+    expect(cellContent(3, 3)).toBe('しかく')
   })
 })
