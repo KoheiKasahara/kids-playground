@@ -99,6 +99,7 @@ export default function BentoBuilderPlay() {
         <div className={styles.actions}>
           <button type="button" disabled={!selected || status !== 'ready'} onClick={() => { dispatch({ type: 'rotate' }); playBentoSound('place') }}>↻ まわす</button>
           <button type="button" disabled={!selected || status !== 'ready'} onClick={() => { dispatch({ type: 'remove' }); playBentoSound('remove') }}>− けす</button>
+          <button type="button" className={styles.clearAction} disabled={!state.foods.length || status !== 'ready'} onClick={() => { dispatch({ type: 'clear' }); playBentoSound('remove') }}>↺ やりなおし</button>
           <button type="button" className={styles.primary} disabled={!state.foods.length || status !== 'ready'} onClick={() => { dispatch({ type: 'finish' }); playBentoSound('finish') }}>✓ できた！</button>
         </div>
         <p className={styles.message} role="status">{state.message || (selected ? `${foodDefinition(selected.kind).name}を うごかしてね` : 'おかずを タップして いれよう')}</p>

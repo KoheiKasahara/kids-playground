@@ -53,6 +53,15 @@ describe('自由制作の遊びのループ', () => {
     expect(s.box).toBe('divided')
     expect(s.color).toBe('#62b9df')
   })
+  test('やりなおしですべてのおかずと選択を消す', () => {
+    let s = bentoReducer(initialBentoState, { type: 'start' })
+    s = bentoReducer(s, { type: 'add', kind: 'carrot' })
+    s = bentoReducer(s, { type: 'add', kind: 'tomato' })
+    s = bentoReducer(s, { type: 'clear' })
+    expect(s.foods).toEqual([])
+    expect(s.selected).toBeNull()
+    expect(s.message).toContain('さいしょから')
+  })
   for (const box of BOXES) test(`${box.name}に同じ食材を追加し続けても上限・壁・めり込みを守る`, () => {
     let s: BentoState = { ...initialBentoState, box: box.id, mode: 'edit' }
     for (let i = 0; i < MAX_FOODS + 5; i++) s = bentoReducer(s, { type: 'add', kind: 'tomato' })
