@@ -56,7 +56,11 @@ describe('EarthGlobePlay', () => {
     expect(screen.queryByRole('button', { name: 'もっと ちかづく' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もどる' })).toBeEnabled()
     globeEngineMock.status = 'ready'
-    view.rerender(<MemoryRouter initialEntries={['/games/earth-globe']}><App /></MemoryRouter>)
+    view.rerender(
+      <MemoryRouter initialEntries={['/games/earth-globe']}>
+        <App key={globeEngineMock.status} />
+      </MemoryRouter>,
+    )
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もっと ちかづく' })).toBeEnabled()
   })
