@@ -17,7 +17,7 @@ export const FOODS: FoodDefinition[] = [
   { id: 'broccoli', name: 'ブロッコリー', emoji: '🥦', radius: 0.48, model: 'broccoli.glb', rotation: 0 },
   { id: 'tomato', name: 'ミニトマト', emoji: '🍅', radius: 0.36, model: 'tomato.glb', rotation: 0 },
   { id: 'sushi', name: 'おすし', emoji: '🍣', radius: 0.57, model: 'sushi.glb', rotation: 0 },
-  { id: 'carrot', name: 'にんじん', emoji: '🥕', radius: 0.49, model: 'carrot.glb', rotation: 0, tilt: Math.PI / 2 },
+  { id: 'carrot', name: 'にんじん', emoji: '🥕', radius: 0.49, rotation: 0, tilt: Math.PI / 2 },
 ]
 export const foodDefinition = (kind: FoodKind) => FOODS.find(food => food.id === kind)!
 export type CupKind = 'green' | 'pink' | 'blue'

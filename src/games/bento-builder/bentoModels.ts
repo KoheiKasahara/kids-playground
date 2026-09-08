@@ -3,6 +3,8 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { CUPS, type CupKind, DIVIDER_HALF, FLOOR_Y, FOODS, HALF_DEPTH, HALF_WIDTH, ROUND_RADIUS, type BoxKind, type FoodDefinition, type FoodKind } from './bentoState'
 
+const BENTO_LINING_COLOR = '#f3e5c8'
+
 function mesh(geometry: THREE.BufferGeometry, color: string, x = 0, y = 0, z = 0) {
   const object = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, roughness: 0.75 }))
   object.position.set(x, y, z)
@@ -26,12 +28,12 @@ export function createBox(kind: BoxKind, color: string): THREE.Group {
     wall.rotation.x = -Math.PI / 2
     wall.position.y = FLOOR_Y
     root.add(wall)
-    const lining = mesh(new THREE.CircleGeometry(ROUND_RADIUS - 0.015, 64), '#fff7e1', 0, FLOOR_Y + 0.004)
+    const lining = mesh(new THREE.CircleGeometry(ROUND_RADIUS - 0.015, 64), BENTO_LINING_COLOR, 0, FLOOR_Y + 0.004)
     lining.rotation.x = -Math.PI / 2
     root.add(lining)
   } else {
     root.add(rounded(HALF_WIDTH * 2 + 0.4, FLOOR_Y, HALF_DEPTH * 2 + 0.4, color, 0, FLOOR_Y / 2))
-    root.add(rounded(HALF_WIDTH * 2 - 0.02, 0.02, HALF_DEPTH * 2 - 0.02, '#fff7e1', 0, FLOOR_Y - 0.006, 0))
+    root.add(rounded(HALF_WIDTH * 2 - 0.02, 0.02, HALF_DEPTH * 2 - 0.02, BENTO_LINING_COLOR, 0, FLOOR_Y - 0.006, 0))
     for (const side of [-1, 1]) {
       root.add(rounded(0.2, 0.58, HALF_DEPTH * 2 + 0.4, color, side * (HALF_WIDTH + 0.1), 0.39))
       root.add(rounded(HALF_WIDTH * 2, 0.58, 0.2, color, 0, 0.39, side * (HALF_DEPTH + 0.1)))
@@ -63,6 +65,16 @@ export function createHandmadeFood(kind: FoodKind): THREE.Group {
       const cut = rounded(0.035, 0.016, 0.21, '#f6b77b', x, 0.457, 0, 0.006)
       cut.rotation.y = 0.35
       root.add(cut)
+    }
+  } else if (kind === 'carrot') {
+    // Keep the edible root substantial beside the leaves, even at the small
+    // in-box display size. The imported model's root was only a thin sliver.
+    const carrot = mesh(new THREE.ConeGeometry(0.27, 0.82, 12), '#ff9347', 0, 0.41)
+    root.add(carrot)
+    for (const [x, angle] of [[-0.12, -0.34], [0, 0], [0.12, 0.34]] as const) {
+      const leaf = mesh(new THREE.ConeGeometry(0.1, 0.42, 8), '#43a83c', x, 0.98)
+      leaf.rotation.z = angle
+      root.add(leaf)
     }
   } else {
     const chunks = [[0, 0.29, 0, 0.36], [-0.2, 0.23, 0.09, 0.24], [0.18, 0.25, 0.13, 0.25], [0.03, 0.35, -0.13, 0.26]]
