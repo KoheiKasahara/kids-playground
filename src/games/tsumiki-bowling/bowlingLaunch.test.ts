@@ -33,6 +33,7 @@ describe('aimFromDrag: ドラッグ距離とパワー', () => {
     const aim = aimFromDrag({ dx: 0, dy: DRAG_DEAD_ZONE_PX - 1 }, VIEWPORT)
     expect(aim.active).toBe(false)
     expect(aim.power).toBe(0)
+    expect(aimFromDrag({ dx: 0, dy: DRAG_DEAD_ZONE_PX }, VIEWPORT).active).toBe(false)
   })
 
   it('デッドゾーンを超えると発射できるようになる', () => {
@@ -55,9 +56,9 @@ describe('aimFromDrag: ドラッグ距離とパワー', () => {
   })
 
   it('パワー最大までのドラッグ距離は画面の短辺に比例し、上下限で頭打ちになる', () => {
-    expect(fullPowerDragPx({ width: 390, height: 844 })).toBeCloseTo(390 * 0.45, 5)
-    expect(fullPowerDragPx({ width: 120, height: 200 })).toBe(110)
-    expect(fullPowerDragPx({ width: 1600, height: 1200 })).toBe(320)
+    expect(fullPowerDragPx({ width: 390, height: 844 })).toBeCloseTo(390 * 0.18, 5)
+    expect(fullPowerDragPx({ width: 120, height: 200 })).toBe(70)
+    expect(fullPowerDragPx({ width: 1600, height: 1200 })).toBe(120)
   })
 
   it('引いた距離が同じなら、向きが違ってもパワーは同じ', () => {
