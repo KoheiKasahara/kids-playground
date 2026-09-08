@@ -110,6 +110,20 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'puni-slime',
+    slug: 'puni-slime',
+    title: 'ぷにぷにスライム',
+    emoji: '🫠',
+    category: 'learning',
+    seo: {
+      headline: 'ぷにぷにスライム｜のばしてつぶす感触あそび',
+      description: 'ぷにぷにのスライムを指で引っ張って、つぶして、落として楽しむ幼児向けの感触あそびです。3つの色と2つのやわらかさを選べます。得点も時間制限もなく、いつでも元に戻して遊べます。',
+    },
+    intro: {
+      howToPlay: ['スライムを ひっぱって はなすと ぷるぷる！', '「ぺったん」で つぶして「ぽとん」で おとしてみよう', 'いろや やわらかさを かえて、なんどでも あそべるよ'],
+    },
+  },
+  {
     id: 'bento-builder',
     slug: 'bento-builder',
     title: '3Dおべんとうづくり',
