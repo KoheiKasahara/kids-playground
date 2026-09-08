@@ -96,6 +96,17 @@ export default function ColorPaintPuzzlePlay() {
     }
   }
 
+  const handleSelectPicture = (pictureId: string) => {
+    if (pictureId === picture.id) return
+    setSelectedPictureId(pictureId)
+    // sky / waterなど同じエリアIDを持つ次の題材へ、塗りの演出を持ち越さない。
+    setFeedbackAreaId(null)
+    if (feedbackTimeoutRef.current !== null) {
+      clearTimeout(feedbackTimeoutRef.current)
+      feedbackTimeoutRef.current = null
+    }
+  }
+
   /**
    * 「できた！」。塗り具合は一切見ない（何も塗っていなくても押せる）。
    * 完成判定はシステムではなく子ども自身がするのがこのゲームの前提。
@@ -150,7 +161,7 @@ export default function ColorPaintPuzzlePlay() {
                 type="button"
                 className={`${styles.pictureButton} ${option.id === picture.id ? styles.pictureButtonSelected : ''}`}
                 aria-pressed={option.id === picture.id}
-                onClick={() => setSelectedPictureId(option.id)}
+                onClick={() => handleSelectPicture(option.id)}
               >
                 <span aria-hidden="true">{option.emoji}</span>
                 <span>{option.label}</span>

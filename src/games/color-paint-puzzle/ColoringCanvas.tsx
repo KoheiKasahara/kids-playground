@@ -157,6 +157,9 @@ export default function ColoringCanvas({
 
   return (
     <svg
+      // 題材変更時はSVGごと更新し、前の図形の描画範囲をブラウザに再利用させない。
+      // フェーズや塗り色の変更では同じSVGを保ち、完成演出を途切れさせない。
+      key={picture.id}
       className={`${styles.canvas} ${className ?? ''}`}
       role="img"
       aria-label={`${picture.label}の ぬりえ`}
