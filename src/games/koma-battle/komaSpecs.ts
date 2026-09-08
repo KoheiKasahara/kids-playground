@@ -103,7 +103,7 @@ export const KOMA_TYPE_CONFIGS: readonly KomaTypeConfig[] = [
       knobScale: 1.1,
       ringScale: 1.05,
       rimStyle: 'spike',
-      metalColor: '#4b4750',
+      metalColor: '#a9b9cd',
     },
     // 速度と反発は少し上げる一方、軽くして弾かれやすさも残し、常勝を避ける。
     densityScale: 0.92,

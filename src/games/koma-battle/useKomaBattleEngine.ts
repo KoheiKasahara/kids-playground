@@ -2,6 +2,7 @@ import { initializeRapier } from '../../physics/rapierLoader'
 import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
+import { createKomaArmor } from './komaArmor'
 import {
   createKomaBattleSoundController,
   type KomaBattleImpactSoundKind,
@@ -178,14 +179,15 @@ type KomaVisual = {
 /** 見た目Meshで使い回すgeometry一式。コマごとに寸法は同じなので、色違いのMaterialだけを分ける。 */
 type KomaGeometrySet = {
   tip: THREE.ConeGeometry
-  shaft: THREE.CylinderGeometry
   diskLower: THREE.CylinderGeometry
   diskUpper: THREE.CylinderGeometry
   groove: THREE.TorusGeometry
   /** タイプによってTorus(smooth)かトゲ/ブロック/星のExtrudeGeometryになる。 */
   outerRing: THREE.BufferGeometry
-  cap: THREE.SphereGeometry
-  /** タイプによって球/円錐/六角柱/星のExtrudeGeometryになる。 */
+  armor: THREE.BufferGeometry
+  trim: THREE.BufferGeometry
+  cap: THREE.CylinderGeometry
+  /** タイプ別の薄い紋章。 */
   knob: THREE.BufferGeometry
   spinRing: THREE.RingGeometry
   boostRing: THREE.RingGeometry
@@ -248,7 +250,7 @@ function createRimRingGeometry(
   }
   const preset =
     rimStyle === 'spike'
-      ? { teeth: 6, outerRatio: 1.24, innerRatio: 0.82, tipWidth: 0.1, depthRatio: 1.3 }
+      ? { teeth: 3, outerRatio: 1.21, innerRatio: 0.88, tipWidth: 0.42, depthRatio: 1.3 }
       : rimStyle === 'block'
         ? { teeth: 8, outerRatio: 1.1, innerRatio: 0.94, tipWidth: 0.62, depthRatio: 2.1 }
         : { teeth: 5, outerRatio: 1.15, innerRatio: 0.9, tipWidth: 0.3, depthRatio: 1.5 } // star
@@ -268,40 +270,6 @@ function createRimRingGeometry(
   // 押し出し方向(ローカルZ)の中心をY=0に揃え、Mesh側のrotation.x設定でTorusと同じ向きに倒せるようにする。
   geometry.translate(0, 0, -depth / 2)
   return geometry
-}
-
-/**
- * タイプ別の中心つまみ形状。外周リングと同じrimStyleで揃え、
- * 「炎/刃(spike)」「盾のリベット(block)」「星のエンブレム(star)」「滑らかな球(smooth)」を作り分ける。
- */
-function createKnobGeometry(
-  rimStyle: KomaSpec['type']['visual']['rimStyle'],
-  radius: number,
-): THREE.BufferGeometry {
-  switch (rimStyle) {
-    case 'spike':
-      return new THREE.ConeGeometry(radius * 1.1, radius * 2.6, 10)
-    case 'block':
-      return new THREE.CylinderGeometry(radius * 1.05, radius * 1.05, radius * 1.3, 6)
-    case 'star': {
-      const shape = createToothRingShape(5, radius * 1.6, radius * 0.7, 0.42)
-      const geometry = new THREE.ExtrudeGeometry(shape, {
-        depth: radius * 0.7,
-        bevelEnabled: true,
-        bevelThickness: radius * 0.08,
-        bevelSize: radius * 0.06,
-        bevelSegments: 1,
-        curveSegments: 4,
-      })
-      geometry.translate(0, 0, -radius * 0.35)
-      // 星は2D形状のまま作るため、上を向く(法線が+Yになる)よう寝かせる。
-      geometry.rotateX(-Math.PI / 2)
-      return geometry
-    }
-    case 'smooth':
-    default:
-      return new THREE.SphereGeometry(radius, 10, 8)
-  }
 }
 
 /**
@@ -607,11 +575,12 @@ export function useKomaBattleEngine(
     function createKomaGeometrySet(visual: KomaSpec['type']['visual']): KomaGeometrySet {
       const diskRadius = DISK_RADIUS * visual.diskRadiusScale
       const diskHalfHeight = DISK_HALF_HEIGHT * visual.diskThicknessScale
+      const armor = createKomaArmor(visual, diskRadius)
       return {
+        armor: track(armor.armor),
+        trim: track(armor.trim),
         // 軸/先端。物理では球+円柱だが、見た目は下向きの円錐にして「コマの軸」に見せる。
         tip: track(new THREE.ConeGeometry(SHAFT_RADIUS * 1.3, DISK_CENTER_Y - diskHalfHeight, 12)),
-        // 持ち手の軸。Colliderは持たせず見た目だけ。倒れたときの傾きが分かりやすくなる。
-        shaft: track(new THREE.CylinderGeometry(SHAFT_RADIUS * 0.55, SHAFT_RADIUS * 0.6, 0.14, 10)),
         // 円盤下段。樹脂パーツの土台。
         diskLower: track(
           new THREE.CylinderGeometry(
@@ -637,20 +606,9 @@ export function useKomaBattleEngine(
         outerRing: track(
           createRimRingGeometry(visual.rimStyle, diskRadius, diskHalfHeight, visual.ringScale),
         ),
-        // 中心キャップ。上面の飾りで、回っていることが上から見て分かるようにする。
-        cap: track(
-          new THREE.SphereGeometry(
-            diskRadius * 0.34 * visual.capScale,
-            14,
-            8,
-            0,
-            Math.PI * 2,
-            0,
-            Math.PI / 2,
-          ),
-        ),
-        // 中心つまみ。同じrimStyleで、球/円錐/六角柱/星のいずれかになる。
-        knob: track(createKnobGeometry(visual.rimStyle, SHAFT_RADIUS * 0.8 * visual.knobScale)),
+        // 低い六角メダリオンと、上から読み取れる大きな紋章。
+        cap: track(new THREE.CylinderGeometry(diskRadius * 0.36, diskRadius * 0.41, diskRadius * 0.12, 6)),
+        knob: track(armor.emblem),
         // 回転演出用の半透明リング。高速回転中だけ光る。
         spinRing: track(
           new THREE.RingGeometry(diskRadius * 1.15, diskRadius * 1.42, 28),
@@ -666,11 +624,11 @@ export function useKomaBattleEngine(
     /**
      * 見た目のコマ。物理Colliderとは別に、幼児が「コマ」と分かる形を組む。
      *
-     * 下段ベース(濃色)・樹脂の円盤上段・外周リング(タイプ別の金属風パーツ)・中心キャップ/つまみの
-     * 4層構成にし、材質もMeshStandardMaterialで樹脂/金属/マットを塗り分ける。
-     * 外周リングと中心つまみはタイプのrimStyle(尖り/ブロック/星/滑らか)で形自体を変え、
+     * 濃色ベース・メタルリング・掃引形状の装甲・メダリオンを積み重ねる。
+     * 同材質の装甲を結合し、タイプごとにgeometryを共有して描画負荷を抑える。
+     * 外周リングと中心の紋章はタイプのrimStyle(尖り/ブロック/星/滑らか)で形自体を変え、
      * 色やラベルを見なくてもタイプが分かるシルエット差を作る。
-     * 高速回転中は上面のつまみが自転速度に応じて光り、円盤の外側に半透明のリングが浮かぶ。
+     * 高速回転中は上面の紋章が自転速度に応じて光り、円盤の外側に半透明のリングが浮かぶ。
      * どちらも自転速度の低下にあわせてそのまま弱まるので、専用の減衰処理は持たない。
      */
     function createKomaMesh(spec: KomaSpec, geometrySet: KomaGeometrySet): KomaVisual {
@@ -679,7 +637,7 @@ export function useKomaBattleEngine(
 
       // 樹脂パーツ。円盤の主要部分で、コマの識別色(spec.color)を持つ。
       const resinMaterial = trackMaterial(
-        new THREE.MeshStandardMaterial({ color: spec.color, roughness: 0.55, metalness: 0.05 }),
+        new THREE.MeshStandardMaterial({ color: spec.color, roughness: 0.3, metalness: 0.2 }),
       )
       // 下段ベースは主色より濃い陰色にして、2段の樹脂パーツが重なった立体感を出す。
       const baseMaterial = trackMaterial(
@@ -690,7 +648,7 @@ export function useKomaBattleEngine(
         }),
       )
       // 金属風。軸・先端・外周リングに使い、樹脂との質感差を出す。タイプごとに色を変え、
-      // ダーク(アタック)/シルバー(ディフェンス)/クローム(スタミナ)/ゴールド(バランス)を塗り分ける。
+      // スチール(アタック)/シルバー(ディフェンス)/クローム(スタミナ)/ゴールド(バランス)を塗り分ける。
       const metalMaterial = trackMaterial(
         new THREE.MeshStandardMaterial({
           color: spec.type.visual.metalColor,
@@ -698,15 +656,15 @@ export function useKomaBattleEngine(
           metalness: 0.6,
         }),
       )
-      // マット素材風。中心キャップに使う。
+      // 紋章の背面を濃くして、小さな画面でもコントラストを確保。
       const matteMaterial = trackMaterial(
-        new THREE.MeshStandardMaterial({ color: spec.accentColor, roughness: 0.92, metalness: 0 }),
+        new THREE.MeshStandardMaterial({ color: 0x17243b, roughness: 0.35, metalness: 0.35 }),
       )
       // 上下段の継ぎ目の溝。ごく暗い色で段差を強調する。
       const seamMaterial = trackMaterial(
         new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.8, metalness: 0.1 }),
       )
-      // 上部のつまみ。回転速度に応じて自己発光させ、速く回っているほど光って見える。
+      // 上部の紋章。回転速度に応じて自己発光させ、速く回っているほど光って見える。
       const accentMaterial = trackMaterial(
         new THREE.MeshStandardMaterial({
           color: spec.accentColor,
@@ -765,16 +723,21 @@ export function useKomaBattleEngine(
       outerRing.position.y = DISK_CENTER_Y + diskHalfHeight * 0.3
       group.add(outerRing)
 
+      const deckY = diskUpperCenterY + diskHalfHeight * 0.83
+      const armor = new THREE.Mesh(geometrySet.armor, resinMaterial)
+      armor.position.y = deckY
+      group.add(armor)
+      const trim = new THREE.Mesh(geometrySet.trim, metalMaterial)
+      trim.position.y = deckY
+      group.add(trim)
+
+      const diskRadius = DISK_RADIUS * spec.type.visual.diskRadiusScale
       const cap = new THREE.Mesh(geometrySet.cap, matteMaterial)
-      cap.position.y = DISK_CENTER_Y + diskHalfHeight + 0.02
+      cap.position.y = deckY + diskRadius * 0.12
       group.add(cap)
 
-      const shaft = new THREE.Mesh(geometrySet.shaft, metalMaterial)
-      shaft.position.y = DISK_CENTER_Y + diskHalfHeight + 0.1
-      group.add(shaft)
-
       const knob = new THREE.Mesh(geometrySet.knob, accentMaterial)
-      knob.position.y = DISK_CENTER_Y + diskHalfHeight + 0.19
+      knob.position.y = deckY + diskRadius * 0.19
       group.add(knob)
 
       const spinRing = new THREE.Mesh(geometrySet.spinRing, spinRingMaterial)
