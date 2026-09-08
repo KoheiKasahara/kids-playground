@@ -154,6 +154,7 @@ describe('pinball 宇宙盤面（spaceBoard）のシミュレーション', () =
     }
   })
 
+// coverage付きFullでは共有runnerの負荷で既定5秒を超えるため、この重い網羅テストだけ余裕を持たせる。
   it('5つの得点ゾーンすべてに実際にボールが入る（明確なデッドスペースがないこと）', () => {
     // ゴール直前の配置は「均等な分布」ではなく「どのゾーンにも到達できること」を狙っている。
     // 1000点・右側の300点/100点ゾーンは意図的にレア寄りのままでよいが、十分な試行数の中で
@@ -183,7 +184,7 @@ describe('pinball 宇宙盤面（spaceBoard）のシミュレーション', () =
         `space board zone distribution: ${zone.id}(${zone.score})=${zoneCounts.get(zone.id) ?? 0}`,
       ).toBeGreaterThan(0)
     }
-  })
+  }, 15_000)
 })
 
 describe('pinball 海盤面（oceanBoard）のシミュレーション', () => {
