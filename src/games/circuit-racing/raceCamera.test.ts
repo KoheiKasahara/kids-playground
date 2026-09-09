@@ -4,7 +4,7 @@ import { createCircuitScenery } from './scenery'
 import { createMotionProfile, sampleMotion } from './motion'
 import { RACE_CARS } from './raceConfig'
 import { describe, expect, test } from 'vitest'
-import { chaseCameraPose, tracksideCameraPose, overviewCameraPose, createTracksideAnchors, selectTracksideAnchor } from './raceCamera'
+import { chaseCameraPose, tracksideCameraPose, overviewCameraPose, createTracksideAnchor, createTracksideLift, tracksideDistancePosition, sampleTracksideLift } from './raceCamera'
 
 describe('サーキットレースの カメラ計算', () => {
   test('おいかけるカメラは車のうしろ、見る先は車のまえになる', () => {
@@ -56,91 +56,76 @@ describe('全体表示のフレーミング', () => {
   })
 })
 
-describe('みちばたの自動切り替え', () => {
-  test('半周の境界と周回でだけ切り替え、車やモードの選び直しでも同じ区間を使う', () => {
-    for (const [progress, expected] of [[0, 0], [0.4999, 0], [0.5, 1], [0.9999, 1], [1, 0], [1.5, 1], [-0.1, 1], [NaN, 0]]) {
-      expect(selectTracksideAnchor(progress)).toBe(expected)
-    }
+describe('ひとつの定位置から自然に見る', () => {
+  test('近い車では動かず、遠くても移動は24m以内', () => {
+    const anchor = { x: 0, y: 100, z: 0 }
+    expect(tracksideDistancePosition(anchor, { x: 100, z: 0 })).toEqual(anchor)
+    const far = tracksideDistancePosition(anchor, { x: 1000, z: 0 })
+    expect(far.x).toBeGreaterThan(0)
+    expect(far.x).toBeLessThanOrEqual(24)
+    expect(far.y).toBe(100)
   })
 
-  test.each(CIRCUITS)('$id は周回をまたいで2か所だけを半周ごとに使う', (circuit) => {
-    const anchors = createTracksideAnchors(circuit.curve, circuit.width)
-    let selected = -1
-    let cuts = 0
-    const used = new Set<number>()
-    for (let step = 0; step <= 2048; step++) {
-      const point = circuit.curve.getPointAt((step % 1024) / 1024)
-      const next = selectTracksideAnchor((step % 1024) / 1024)
-      if (selected !== -1 && next !== selected) cuts++
-      selected = next
-      used.add(selected)
-      const pose = tracksideCameraPose(anchors[selected], point)
-      expect(Math.hypot(pose.position.x - point.x, pose.position.z - point.z)).toBeLessThan(320)
-      expect(pose.position.y).toBeGreaterThan(20)
-    }
-    expect(anchors).toHaveLength(2)
-    expect(used.size).toBe(2)
-    expect(cuts).toBe(4)
+  test('障害物がなければ高さを変えず、避けきれなくても大きく飛び回らない', () => {
+    const anchor = createTracksideAnchor(CIRCUIT.curve, CIRCUIT.width)
+    expect(createTracksideLift(CIRCUIT.curve, anchor, () => false).every(h => h === 0)).toBe(true)
+    const blocked = createTracksideLift(CIRCUIT.curve, anchor, () => true)
+    expect(blocked.every(h => h === 0)).toBe(true)
+    expect(sampleTracksideLift(blocked, NaN)).toBe(0)
   })
 
-  test.each(CIRCUITS)('$id は実際の走行ラインでも各半周を同じ位置から見続ける', (circuit) => {
-    for (const lane of [-3, 0, 3]) {
-      const profile = createMotionProfile(RACE_CARS[0], circuit.curve, lane)
-      const anchors = createTracksideAnchors(circuit.curve, circuit.width)
-      let previous = 0
-      const cuts: number[] = []
-      for (let step = 0; step <= 2048; step++) {
-        const elapsed = profile.duration * step / 1024
-        const sample = sampleMotion(profile, elapsed)
-        const index = selectTracksideAnchor(sample.distance / profile.length)
-        if (index !== previous) cuts.push(elapsed)
-        previous = index
-        // Avoid a near-vertical view that spins as the car passes underneath.
-        expect(Math.hypot(anchors[index].x - sample.position.x, anchors[index].z - sample.position.z)).toBeGreaterThan(25)
-        expect(tracksideCameraPose(anchors[index], sample.position).position).toEqual({
-          x: anchors[index].x, y: anchors[index].y! + 4.6, z: anchors[index].z,
-        })
-      }
-      expect(cuts).toHaveLength(4)
-      for (let index = 1; index < cuts.length; index++) {
-        expect(cuts[index] - cuts[index - 1]).toBeGreaterThan(5)
-      }
-    }
+  test('周回境界の遮蔽物に備えてなめらかに上がり、その後は定位置へ戻る', () => {
+    const curve = { getPointAt: (t: number) => ({ x: Math.cos(t * 2 * Math.PI) * 100, z: Math.sin(t * 2 * Math.PI) * 100 }) }
+    const lifts = createTracksideLift(curve, { x: 0, y: 100, z: -150 }, pose => pose.target.x > 99 && pose.position.y < 119)
+    expect(sampleTracksideLift(lifts, 0)).toBeGreaterThan(15)
+    expect(sampleTracksideLift(lifts, 0.5)).toBe(0)
+    const epsilon = 0.00001
+    const left = (sampleTracksideLift(lifts, 0) - sampleTracksideLift(lifts, -epsilon)) / epsilon
+    const right = (sampleTracksideLift(lifts, epsilon) - sampleTracksideLift(lifts, 0)) / epsilon
+    expect(left).toBeCloseTo(right, 2)
   })
 
-  test.each(CIRCUITS)('$id は構造物の多い区間でも周回の大部分で見通しを確保する', (circuit) => {
+  test.each(CIRCUITS)('$id は全レーン・周回境界でもカットせず、移動量と見通しを保つ', circuit => {
     const scenery = createCircuitScenery(circuit)
     scenery.group.updateMatrixWorld(true)
-    const anchors = createTracksideAnchors(circuit.curve, circuit.width)
-    const t = Math.floor(192 * 0.28) / 192
-    const oldPoint = circuit.curve.getPointAt(t)
-    const oldTangent = circuit.curve.getPointAt((Math.floor(192 * 0.28) + 1) / 192)
-      .sub(circuit.curve.getPointAt((Math.floor(192 * 0.28) - 1) / 192)).normalize()
-    const oldAnchor = { x: oldPoint.x - oldTangent.z * (circuit.width / 2 + 8), y: 8,
-      z: oldPoint.z + oldTangent.x * (circuit.width / 2 + 8) }
     const ray = new Raycaster()
-    let blocked = 0
-    let oldBlocked = 0
+    const blocked = (pose: ReturnType<typeof tracksideCameraPose>) => {
+      const origin = new Vector3(pose.position.x, pose.position.y, pose.position.z)
+      const direction = new Vector3(pose.target.x, pose.target.y, pose.target.z).sub(origin)
+      ray.far = direction.length() - 0.5
+      ray.set(origin, direction.normalize())
+      return ray.intersectObject(scenery.group, true).length > 0
+    }
     try {
-      for (let step = 0; step < 96; step++) {
-        const point = circuit.curve.getPointAt(step / 96)
-        const selected = selectTracksideAnchor(step / 96)
-        for (const [index, anchor] of [anchors[selected], oldAnchor].entries()) {
-          const pose = tracksideCameraPose(anchor, point)
-          const origin = new Vector3(pose.position.x, pose.position.y, pose.position.z)
-          const direction = new Vector3(pose.target.x, pose.target.y, pose.target.z).sub(origin)
-          ray.far = direction.length() - 0.5
-          ray.set(origin, direction.normalize())
-          if (ray.intersectObject(scenery.group, true).length > 0) {
-            if (index === 0) blocked++
-            else oldBlocked++
+      const anchor = createTracksideAnchor(circuit.curve, circuit.width)
+      const lifts = createTracksideLift(circuit.curve, anchor, blocked)
+      for (const lane of [-3, 0, 3]) {
+        const profile = createMotionProfile(RACE_CARS[0], circuit.curve, lane)
+        let previous: Vector3 | undefined
+        let hidden = 0
+        let fixedHidden = 0
+        for (let step = 0; step <= 1024; step++) {
+          const sample = sampleMotion(profile, profile.duration * step / 1024)
+          const position = tracksideDistancePosition(anchor, sample.position)
+          position.y = anchor.y! + sampleTracksideLift(lifts, sample.distance / profile.length)
+          const pose = tracksideCameraPose(position, sample.position)
+          const current = new Vector3(pose.position.x, pose.position.y, pose.position.z)
+          expect(Math.hypot(position.x - anchor.x, position.z - anchor.z)).toBeLessThanOrEqual(24)
+          expect(position.y - anchor.y!).toBeGreaterThanOrEqual(-0.00001)
+          expect(position.y - anchor.y!).toBeLessThanOrEqual(24.00001)
+          expect(Math.hypot(position.x - sample.position.x, position.z - sample.position.z)).toBeGreaterThan(25)
+          if (previous) expect(current.distanceTo(previous)).toBeLessThan(1.5)
+          previous = current
+          if (step % 8 === 0) {
+            if (blocked(pose)) hidden++
+            if (blocked(tracksideCameraPose(tracksideDistancePosition(anchor, sample.position), sample.position))) fixedHidden++
           }
         }
+        expect(hidden).toBeLessThanOrEqual(fixedHidden)
+        expect(hidden).toBeLessThanOrEqual(16)
       }
-      // Open ovals already have few obstructions; other courses must improve.
-      expect(blocked).toBeLessThanOrEqual(oldBlocked)
-      if (circuit.scenery !== 'stadium') expect(blocked).toBeLessThan(oldBlocked)
-      expect(blocked).toBeLessThanOrEqual(10)
+      expect(sampleTracksideLift(lifts, 1 - 0.000001)).toBeCloseTo(sampleTracksideLift(lifts, 0), 2)
+      expect(sampleTracksideLift(lifts, -0.000001)).toBeCloseTo(sampleTracksideLift(lifts, 0), 2)
     } finally {
       scenery.dispose()
     }
