@@ -10,12 +10,12 @@ export type Crab = Point & {
   phase: number
   digging: boolean
 }
-const protectedCell = (cell: number) => cell === Cell.Stone || cell === Cell.Seed || cell >= Cell.Stem
+const blockingCell = (cell: number) => cell === Cell.Stone || cell === Cell.Seed
 const soil = (cell: number) => cell === Cell.Sand || cell === Cell.Mud
 
 function blocked(world: Sandbox, x: number, y: number) {
   for (let dy = -7; dy <= 0; dy++) for (let dx = -6; dx <= 6; dx++) {
-    if (protectedCell(world.get(Math.round(x + dx), Math.round(y + dy)))) return true
+    if (blockingCell(world.get(Math.round(x + dx), Math.round(y + dy)))) return true
   }
   return false
 }
@@ -28,7 +28,7 @@ export function addCrab(world: Sandbox, random: () => number) {
     const x = (start + i) % world.width
     if (x < 7 || x >= world.width - 7) continue
     let y = 8
-    while (y < world.height - 1 && !soil(world.get(x, y + 1)) && !protectedCell(world.get(x, y + 1))) y++
+    while (y < world.height - 1 && !soil(world.get(x, y + 1)) && !blockingCell(world.get(x, y + 1))) y++
     if (blocked(world, x, y) || world.crabs.some(c => Math.hypot(c.x - x, c.y - y) < 20)) continue
     world.crabs.push({ x, y, direction: random() < 0.5 ? -1 : 1, decision: 90, resting: false, wave: 70, cooldown: 300, phase: 0, digging: false })
     return true
@@ -62,7 +62,7 @@ export function stepCrabs(world: Sandbox, random: () => number) {
     }
     if (feet < world.height - 1 && [-3, 0, 3].every(dx => {
       const cell = world.get(x + dx, feet + 1)
-      return cell === Cell.Empty || cell === Cell.Water
+      return !soil(cell) && !blockingCell(cell)
     })) {
       if (!blocked(world, crab.x, crab.y + 0.35)) crab.y = Math.min(world.height - 1, crab.y + 0.35)
       continue
@@ -103,7 +103,7 @@ export function stepCrabs(world: Sandbox, random: () => number) {
     if (crab.resting || crab.wave > 0) continue
     const nx = crab.x + crab.direction * 0.075
     let ny = crab.y
-    // Small sand slopes are climbed gradually; rocks and plants turn the crab around.
+    // Small sand slopes are climbed gradually; rocks and ungerminated seeds turn the crab around.
     if (soil(world.get(Math.round(nx + crab.direction * 4), feet))) ny -= 0.12
     if (nx < 7 || nx >= world.width - 7 || blocked(world, nx, ny)) {
       crab.direction *= -1; crab.resting = true; crab.decision = 35

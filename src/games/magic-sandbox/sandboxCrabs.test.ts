@@ -48,7 +48,7 @@ describe('sandbox crabs', () => {
     expect(world.cells).toEqual(grains)
   })
 
-  it.each([Cell.Stone, Cell.Seed, Cell.Stem, Cell.Root])('turns away from protected material %s without damaging it', material => {
+  it.each([Cell.Stone, Cell.Seed])('turns away from protected material %s without damaging it', material => {
     const world = flat()
     world.addCrab()
     const crab = world.crabs[0]
@@ -94,4 +94,36 @@ describe('sandbox crabs', () => {
     stepCrabs(world, () => 0.5)
     expect(crab.y).toBeGreaterThan(y)
   })
+})
+
+
+it.each([Cell.Stem, Cell.Petal, Cell.Pollen, Cell.Root])('walks through grown plant material %s without changing it', material => {
+  const world = flat()
+  world.addCrab()
+  const crab = world.crabs[0]
+  crab.wave = 0; crab.direction = 1; crab.decision = 1000
+  const x = Math.round(crab.x) + 7
+  for (let y = 40; y < 50; y++) world.cells[y * 80 + x] = material
+  const cells = world.cells.slice()
+  for (let i = 0; i < 200; i++) stepCrabs(world, () => 0.5)
+  expect(crab.x).toBeGreaterThan(x + 6)
+  expect(crab.direction).toBe(1)
+  expect(world.cells).toEqual(cells)
+})
+
+it('ignores grown plants when spawning, falling and digging upward', () => {
+  const world = flat()
+  for (let x = 0; x < 80; x++) world.cells[30 * 80 + x] = Cell.Petal
+  world.addCrab()
+  const crab = world.crabs[0]
+  expect(crab.y).toBe(49)
+  crab.y = 29
+  stepCrabs(world, () => 0.5)
+  expect(crab.y).toBeGreaterThan(29)
+  crab.y = 49
+  for (let x = 0; x < 80; x++) world.cells[49 * 80 + x] = Cell.Sand
+  world.cells[45 * 80 + Math.round(crab.x)] = Cell.Stem
+  stepCrabs(world, () => 0.5)
+  expect(crab.y).toBeLessThan(49)
+  expect(world.get(Math.round(crab.x), 45)).toBe(Cell.Stem)
 })
