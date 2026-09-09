@@ -128,7 +128,7 @@ export default function CircuitRacingPlay() {
 
   return (
     <GamePlaySurface>
-      <main className={styles.page}>
+      <main className={styles.page} data-game-back-overlap-ok>
         <div ref={registerContainer} className={styles.scene} role="application" aria-label="サーキットレースの 3Dコース">
           <SceneStatus status={sceneStatus} onRetry={retry} />
         </div>

@@ -42,11 +42,38 @@
   box-shadow: none;
 }
 
+/*
+ * 戻るボタンは全画面で同じ位置に固定するため、通常のレイアウト幅を持たない。
+ * そのままだとゲームごとに左寄せ・中央寄せされた最初の見出しがボタンの下へ
+ * 入ることがある。ボタンが存在するゲームの先頭見出しにだけ左側の表示領域を
+ * 予約し、縦横の回転後も文字が隠れないようにする。
+ *
+ * サーキットレースは3Dシーンと選択パネルが上下に分かれ、既存の重なりが
+ * 視認性を損なわないため data-game-back-overlap-ok で明示的に対象外にする。
+ */
+:global(#root > [data-game-back-button] ~ main:not([data-game-back-overlap-ok]) > h1:first-of-type),
+:global(#root > [data-game-back-button] ~ main:not([data-game-back-overlap-ok]) > header:first-child h1:first-of-type),
+:global(main:not([data-game-back-overlap-ok]):has([data-game-back-button]) > h1:first-of-type),
+:global(main:not([data-game-back-overlap-ok]) > header:first-child h1:first-of-type),
+:global(main:not([data-game-back-overlap-ok]) > [data-game-back-button] ~ header:first-of-type h1:first-of-type),
+:global(main:not([data-game-back-overlap-ok]) > [data-game-back-button] ~ * > h1:first-child) {
+  padding-inline-start: 116px;
+}
+
 @media (max-width: 360px), (max-height: 560px) {
   .back {
     min-width: 100px;
     min-height: 48px;
     padding: 6px 12px;
     font-size: 16px;
+  }
+
+  :global(#root > [data-game-back-button] ~ main:not([data-game-back-overlap-ok]) > h1:first-of-type),
+  :global(#root > [data-game-back-button] ~ main:not([data-game-back-overlap-ok]) > header:first-child h1:first-of-type),
+  :global(main:not([data-game-back-overlap-ok]):has([data-game-back-button]) > h1:first-of-type),
+  :global(main:not([data-game-back-overlap-ok]) > header:first-child h1:first-of-type),
+  :global(main:not([data-game-back-overlap-ok]) > [data-game-back-button] ~ header:first-of-type h1:first-of-type),
+  :global(main:not([data-game-back-overlap-ok]) > [data-game-back-button] ~ * > h1:first-child) {
+    padding-inline-start: 108px;
   }
 }
