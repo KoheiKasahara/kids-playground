@@ -16,6 +16,7 @@ import {
   type BowlingWorld,
 } from './bowlingWorld'
 import {
+  LAUNCH_PULL_MAX,
   LAUNCH_SPEED_MAX,
   LAUNCH_SPEED_MIN,
   LAUNCH_YAW_LIMIT_RAD,
@@ -99,7 +100,7 @@ describe('つみきボウリングの世界', () => {
     expect(bowling.launched).toBe(false)
     const ball = readBall(bowling)
     expect(ball.speed).toBe(0)
-    expect(ball.position.z).toBeCloseTo(bowling.anchor.z, 5)
+    expect(ball.position.z).toBeCloseTo(bowling.anchor.z - LAUNCH_PULL_MAX, 5)
     bowling.world.free()
   })
 
@@ -118,14 +119,17 @@ describe('つみきボウリングの世界', () => {
     bowling.world.free()
   })
 
-  it('ドラッグ中は玉が引いた向きの逆へ下がる', () => {
+  it('ドラッグ中は奥の待機位置から従来の発射位置まで手前へ下がる', () => {
     const bowling = createBowlingWorld(RAPIER)
+    const ready = readBall(bowling).position
+    expect(ready.z).toBeCloseTo(bowling.anchor.z - LAUNCH_PULL_MAX, 6)
     parkBall(bowling, aim(1))
     const pulled = readBall(bowling).position
-    expect(pulled.z).toBeGreaterThan(bowling.anchor.z)
+    expect(pulled.z).toBeGreaterThan(ready.z)
+    expect(pulled.z).toBeCloseTo(bowling.anchor.z, 6)
     expect(pulled.y).toBeCloseTo(bowling.anchor.y, 6)
     parkBall(bowling, null)
-    expect(readBall(bowling).position.z).toBeCloseTo(bowling.anchor.z, 6)
+    expect(readBall(bowling).position.z).toBeCloseTo(ready.z, 6)
     bowling.world.free()
   })
 
@@ -322,7 +326,7 @@ describe('毎投の玉切替', () => {
     const ball = readBall(bowling)
     expect(ball.position.x).toBeCloseTo(bowling.anchor.x, 5)
     expect(ball.position.y).toBeCloseTo(bowling.anchor.y, 5)
-    expect(ball.position.z).toBeCloseTo(bowling.anchor.z, 5)
+    expect(ball.position.z).toBeCloseTo(bowling.anchor.z - LAUNCH_PULL_MAX, 5)
     expect(ball.speed).toBe(0)
     expect(bowling.launched).toBe(false)
     bowling.world.free()
