@@ -107,6 +107,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
   }
   return {
     unavailable, stop, crabCount, turtleCount, creatureMessage,
+    setNight: (night: boolean) => { stop(); world.setNight(night); draw.current() },
     dismissCreatureMessage: () => setCreatureMessage(''),
     addCrab: () => {
       stop()

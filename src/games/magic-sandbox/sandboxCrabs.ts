@@ -22,6 +22,17 @@ export type Creature = Point & {
   cooldown: number
   phase: number
   digging: boolean
+  sleeping: number
+  sleepDelay: number
+}
+// Simulation runs at 60 steps/second. Each animal gets its own bedtime.
+export const nextSleepDelay = (random: () => number) => 480 + Math.floor(random() * 900)
+export function wakeCreature(creature: Creature) {
+  if (!creature.sleeping) return
+  creature.sleeping = 0
+  creature.sleepDelay = 480
+  creature.resting = false
+  creature.decision = 90
 }
 const blockingCell = (cell: number) => cell === Cell.Stone || cell === Cell.Seed
 const soil = (cell: number) => cell === Cell.Sand || cell === Cell.Mud
@@ -46,7 +57,7 @@ function addCreature(world: Sandbox, random: () => number, kind: Creature['kind'
     let y = 8
     while (y < world.height - 1 && !soil(world.get(x, y + 1)) && !blockingCell(world.get(x, y + 1))) y++
     if (blocked(world, x, y) || [...world.crabs, ...world.turtles].some(c => Math.hypot(c.x - x, c.y - y) < 20)) continue
-    group.push({ kind, growth: 0, fullness: 600, search: 0, target: null, pursuit: 0, eating: 0, celebration: 0, x, y, direction: random() < 0.5 ? -1 : 1, decision: 90, resting: false, wave: 70, cooldown: 300, phase: 0, digging: false })
+    group.push({ kind, growth: 0, fullness: 600, search: 0, target: null, pursuit: 0, eating: 0, celebration: 0, x, y, direction: random() < 0.5 ? -1 : 1, decision: 90, resting: false, wave: 70, cooldown: 300, phase: 0, digging: false, sleeping: 0, sleepDelay: world.night ? nextSleepDelay(random) : 0 })
     return true
   }
   return false
@@ -58,6 +69,7 @@ function tapCreature(world: Sandbox, point: Point, group: Creature[]) {
   const crab = group.find(c => Math.abs(c.x - point.x) <= 9 * creatureScale(c) && Math.abs(c.y - 4 * creatureScale(c) - point.y) <= 9 * creatureScale(c) &&
     !soil(world.get(Math.round(c.x), Math.round(c.y - 5))))
   if (!crab) return false
+  wakeCreature(crab)
   crab.target = null; crab.eating = 0; crab.search = 90
   crab.wave = 90
   crab.direction *= -1
@@ -78,6 +90,7 @@ function separate(world: Sandbox, creature: Creature, scale: number) {
   const others = [...world.crabs, ...world.turtles].filter(c => c !== creature)
   const crowd = others.filter(c => overlap(creature, c) > 0)
   if (!crowd.length) return false
+  wakeCreature(creature)
   const nearest = crowd.sort((a, b) => Math.abs(a.x - creature.x) - Math.abs(b.x - creature.x))[0]
   const order = [...world.crabs, ...world.turtles]
   const away = Math.sign(creature.x - nearest.x) || (order.indexOf(creature) < order.indexOf(nearest) ? -1 : 1)
@@ -103,12 +116,13 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
     const scale = crab.x < 7 * grownScale || crab.x >= world.width - 7 * grownScale || blocked(world, crab.x, crab.y, grownScale) ? 1 : grownScale
     crab.fullness = Math.max(0, crab.fullness - 1)
     crab.celebration = Math.max(0, crab.celebration - 1)
-    crab.phase += 0.12
+    if (!crab.sleeping) crab.phase += 0.12
     crab.wave = Math.max(0, crab.wave - 1)
     crab.cooldown = Math.max(0, crab.cooldown - 1)
     const x = Math.round(crab.x), feet = Math.round(crab.y)
     crab.digging = [-3, 0, 3].some(dx => soil(world.get(x + dx, feet)))
     if (crab.digging) {
+      wakeCreature(crab)
       crab.target = null; crab.eating = 0
       // Never snap to a surface: claws, eyes, then legs emerge as the body rises.
       if (!blocked(world, crab.x, crab.y - 0.055, scale)) crab.y = Math.max(8, crab.y - 0.055)
@@ -119,12 +133,32 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
       const cell = world.get(x + dx, feet + 1)
       return !soil(cell) && !blockingCell(cell)
     })) {
+      wakeCreature(crab)
       crab.target = null; crab.eating = 0
       if (!blocked(world, crab.x, crab.y + 0.35, scale)) crab.y = Math.min(world.height - 1, crab.y + 0.35)
       continue
     }
     if (separate(world, crab, scale)) continue
-    if (feed(world, crab, random)) continue
+    const feeding = feed(world, crab, random)
+    if (feeding || crab.target) wakeCreature(crab)
+    if (feeding) continue
+    // Falling grains and water can touch any part of a grown animal's body.
+    let disturbed = false
+    for (let dy = -Math.ceil(8 * grownScale); world.night && dy <= 0 && !disturbed; dy++) {
+      for (let dx = -Math.ceil(6 * grownScale); dx <= Math.ceil(6 * grownScale); dx++) {
+        const cell = world.get(x + dx, feet + dy)
+        if (soil(cell) || cell === Cell.Water) { disturbed = true; break }
+      }
+    }
+    if (!world.night || disturbed) wakeCreature(crab)
+    if (crab.sleeping) {
+      if (crab.sleeping === 1) { wakeCreature(crab); crab.sleepDelay = nextSleepDelay(random) }
+      else { crab.sleeping--; continue }
+    } else if (world.night && !disturbed && !crab.target && !crab.wave && !crab.celebration && --crab.sleepDelay <= 0) {
+      crab.sleeping = 180 + Math.floor(random() * 180)
+      crab.resting = true
+      continue
+    }
     if (!crab.target && --crab.decision <= 0) {
       crab.decision = 80 + Math.floor(random() * 160)
       crab.resting = random() < 0.35
@@ -141,7 +175,7 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
         }
       }
     }
-    const other = crab.kind === 'crab' && !crab.target ? world.crabs.find(c => c !== crab && !c.target) : undefined
+    const other = crab.kind === 'crab' && !crab.target ? world.crabs.find(c => c !== crab && !c.target && !c.sleeping) : undefined
     if (other && !other.digging && Math.abs(other.y - crab.y) < 5) {
       const distance = Math.abs(other.x - crab.x)
       if (distance < 22 && crab.cooldown === 0 && other.cooldown === 0) {
@@ -204,11 +238,16 @@ export function renderCrabs(world: Sandbox, pixels: Uint8ClampedArray) {
       if (dx * dx / 25 + (dy + 3) ** 2 / 9 <= 1) dot(dx, dy, dy === -5 ? [255, 184, 117] : shell)
     }
     for (const side of [-1, 1]) {
-      dot(side * 2, -6, shell); dot(side * 2, -7, [255, 255, 236])
-      dot(side * 2 + crab.direction, -7, [63, 56, 48])
+      dot(side * 2, -6, shell)
+      if (crab.sleeping) {
+        dot(side * 2, -7, [63, 56, 48]); dot(side * 2 + 1, -7, [63, 56, 48])
+      } else {
+        dot(side * 2, -7, [255, 255, 236]); dot(side * 2 + crab.direction, -7, [63, 56, 48])
+      }
     }
     dot(-1, -2, [120, 57, 40]); dot(0, -1, [120, 57, 40]); dot(1, -2, [120, 57, 40])
     renderCelebration(dot, crab)
+    renderSleep(dot, crab)
   }
 }
 
@@ -289,6 +328,15 @@ function renderCelebration(dot: Dot, creature: Creature) {
   const pink = [246, 105, 144]
   for (const [x, y] of [[-2, -15], [-1, -15], [1, -15], [2, -15], [-2, -14], [-1, -14], [0, -14], [1, -14], [2, -14], [-1, -13], [0, -13], [1, -13], [0, -12]]) dot(x, y - rise, pink)
 }
+function renderSleep(dot: Dot, creature: Creature) {
+  if (!creature.sleeping) return
+  const rise = Math.floor((creature.sleeping % 120) / 40)
+  const blue = [215, 233, 255]
+  // Two quiet pixel Zs, with a slow breath instead of sparkling particles.
+  for (const [ox, oy] of [[0, -14 - rise], [5, -18 - rise]]) {
+    for (const [dx, dy] of [[0, 0], [1, 0], [2, 0], [1, 1], [0, 2], [1, 2], [2, 2]]) dot(ox + dx, oy + dy, blue)
+  }
+}
 export function renderTurtles(world: Sandbox, pixels: Uint8ClampedArray) {
   for (const turtle of world.turtles) {
     const wobble = turtle.digging ? Math.sin(turtle.phase * 2) * 0.6 : 0
@@ -300,7 +348,7 @@ export function renderTurtles(world: Sandbox, pixels: Uint8ClampedArray) {
       for (let dx = 2; dx <= 4; dx++) { dot(side * dx, -1, skin); dot(side * dx + stride, 0, skin) }
     }
     dot(-turtle.direction * 7, -2, skin)
-    let hx = turtle.direction * 7, hy = -4
+    let hx = turtle.direction * (turtle.sleeping ? 5 : 7), hy = -4
     if (turtle.eating && turtle.target) {
       const stretch = Math.min(1, (EATING_STEPS - turtle.eating) / 30)
       hx += ((turtle.target.x - cx) / creatureScale(turtle) - turtle.direction * 2 - hx) * stretch
@@ -308,7 +356,7 @@ export function renderTurtles(world: Sandbox, pixels: Uint8ClampedArray) {
     } else if (turtle.wave || turtle.digging) hy -= 1 + Math.sin(turtle.phase)
     for (let dy = 0; dy <= 1; dy++) line(dot, turtle.direction * 4, -3 + dy, hx, hy + dy, skin)
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 2; dx++) dot(hx + dx, hy + dy, skin)
-    dot(hx + turtle.direction, hy - 1, [255, 255, 236])
+    if (!turtle.sleeping) dot(hx + turtle.direction, hy - 1, [255, 255, 236])
     dot(hx + turtle.direction, hy, [42, 62, 47])
     if (turtle.eating && Math.sin(turtle.phase * 3) > 0) dot(hx + turtle.direction * 2, hy + 1, dark)
     for (let dy = -7; dy <= -2; dy++) for (let dx = -6; dx <= 6; dx++) {
@@ -318,5 +366,6 @@ export function renderTurtles(world: Sandbox, pixels: Uint8ClampedArray) {
     }
     dot(-2, -6, [159, 196, 103]); dot(-1, -6, [159, 196, 103])
     renderCelebration(dot, turtle)
+    renderSleep(dot, turtle)
   }
 }

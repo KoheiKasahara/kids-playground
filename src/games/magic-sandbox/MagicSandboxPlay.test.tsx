@@ -23,6 +23,32 @@ function start() {
   render(<MemoryRouter><MagicSandboxPlay /></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: 'あそぶ！' }))
 }
+it('toggles night while paused without resetting the world or brush, and wakes animals on daylight', () => {
+  const add = vi.spyOn(Sandbox.prototype, 'addTurtle')
+  start()
+  const toggle = screen.getByRole('button', { name: 'よる' })
+  expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  fireEvent.click(screen.getByRole('button', { name: 'カメを ふやす（0/1）' }))
+  fireEvent.click(screen.getByRole('button', { name: 'みず' }))
+  fireEvent.click(screen.getByRole('button', { name: /とめる/ }))
+  const world = add.mock.instances[0] as Sandbox
+  const cells = world.cells.slice()
+  fireEvent.click(toggle)
+  expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  expect(toggle).toHaveTextContent('🌙')
+  expect(world.night).toBe(true)
+  expect(world.cells).toEqual(cells)
+  expect(world.turtles).toHaveLength(1)
+  expect(screen.getByRole('button', { name: 'みず' })).toHaveAttribute('aria-pressed', 'true')
+  world.turtles[0].sleeping = 200
+  frame(100)
+  expect(world.turtles[0].sleeping).toBe(200)
+  fireEvent.click(toggle)
+  expect(world.night).toBe(false)
+  expect(world.turtles[0].sleeping).toBe(0)
+  expect(toggle).toHaveTextContent('☀️')
+  expect(frames.size).toBe(1)
+})
 it('starts, selects materials, places with keyboard, pauses, clears and returns; reopening has one loop', () => {
   const paint = vi.spyOn(Sandbox.prototype, 'paint'), step = vi.spyOn(Sandbox.prototype, 'step'), clear = vi.spyOn(Sandbox.prototype, 'clear')
   start()
