@@ -88,6 +88,21 @@
   white-space: nowrap;
 }
 
+/*
+ * PCではvw由来の文字サイズだけが上限まで大きくなるため、92px幅のカードから
+ * 「てんのうせい」「かいおうせい」などがはみ出してしまう。横スクロール式の
+ * 選択バーなので、広い画面ではカード側にも十分な幅を持たせて名前を収める。
+ */
+@media (min-width: 768px) {
+  .button {
+    width: 128px;
+  }
+
+  .name {
+    font-size: 18px;
+  }
+}
+
 @media (max-width: 360px) {
   .name {
     font-size: 12px;
