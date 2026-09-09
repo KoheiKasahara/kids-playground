@@ -3,6 +3,7 @@ import { CELL_SIZE } from './boardLayout'
 import {
   PART_DEFINITIONS,
   TRAY_PART_DEFINITIONS,
+  FAN_ANGLES,
   nextRotationType,
   isRotatablePart,
   partDefinition,
@@ -116,6 +117,12 @@ describe('partTypes', () => {
     expect(left.segments[0].angleDeg).toBeGreaterThan(0)
     expect(nextRotationType('jumpRampRight')).toBe('jumpRampLeft')
     expect(nextRotationType('jumpRampLeft')).toBe('jumpRampRight')
+  })
+
+  test('せんぷうきは台座を下に保つ左右2方向だけを切り替える', () => {
+    expect(FAN_ANGLES).toEqual({ fanRight: 0, fanLeft: 180 })
+    expect(nextRotationType('fanRight')).toBe('fanLeft')
+    expect(nextRotationType('fanLeft')).toBe('fanRight')
   })
 
   test('ベルトコンベアは4方向へ回転し、基本向きだけ置き場に出る', () => {
