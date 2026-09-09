@@ -17,7 +17,7 @@ export function addCircuitDetails(circuit: CircuitDefinition, { part, place }: S
   const grass = alpine ? '#acae79' : forest ? '#8cba65' : '#a1c96e'
 
   function pond(m: THREE.Matrix4) {
-    // Opaque, shallow color plates suggest water without reflections or overdraw.
+    // Opaque, shallow color plates suggest water without reflections or transparent passes.
     part(m, 'cylinder', alpine ? '#d5cbb2' : '#c6cf8b', 0, -0.08, 0, 25, 0.16, 21)
     part(m, 'cylinder', '#50b8d1', 0, 0.03, 0, 22, 0.08, 18)
     part(m, 'cylinder', '#66cadd', -0.8, 0.085, 0.4, 17, 0.025, 13)
@@ -98,7 +98,8 @@ export function addCircuitDetails(circuit: CircuitDefinition, { part, place }: S
       // Thick, double-faced pennants remain readable from either side of the course.
       part(m, 'box', festive[(index + pole) % festive.length]!, 0, height - 0.9,
         z + 0.7, 0.1, 1.8, 1.5)
-      part(m, 'box', '#fff3d7', -0.01, height - 0.65, z + 0.7, 0.13, 0.18, 1.2)
+      // Leave depth separation on BOTH faces, including distant overview cameras.
+      part(m, 'box', '#fff3d7', 0, height - 0.65, z + 0.7, 0.18, 0.18, 1.2)
     }
   }
 
