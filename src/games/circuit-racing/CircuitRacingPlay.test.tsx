@@ -7,12 +7,12 @@ import CircuitRacingPlay from './CircuitRacingPlay'
 import { CIRCUITS } from './circuit'
 import { RACE_CARS } from './raceConfig'
 
-const engineMock = vi.hoisted(() => ({ options: undefined as CircuitRacingEngineOptions | undefined, retry: vi.fn(), boost: vi.fn(), adjustCamera: vi.fn() }))
+const engineMock = vi.hoisted(() => ({ options: undefined as CircuitRacingEngineOptions | undefined, retry: vi.fn(), special: vi.fn(), boost: vi.fn(), adjustCamera: vi.fn() }))
 
 vi.mock('./useCircuitRacingEngine', () => ({
   useCircuitRacingEngine: (options: CircuitRacingEngineOptions) => {
     engineMock.options = options
-    return { registerContainer: () => {}, retry: engineMock.retry, boost: engineMock.boost, adjustCamera: engineMock.adjustCamera }
+    return { registerContainer: () => {}, retry: engineMock.retry, special: engineMock.special, boost: engineMock.boost, adjustCamera: engineMock.adjustCamera }
   },
 }))
 
@@ -144,4 +144,27 @@ test('コースを選んで開始・戻る・変更でき、車の選択を保�
     expect(screen.getByRole('button', { name: course.name })).toHaveAttribute('aria-pressed', 'true')
     expect(engineMock.options?.selections).toEqual(selections)
   }
+})
+
+ test('スペシャルは満タンの対象車だけで使え、エラー中には使えない', async () => {
+  const user = userEvent.setup()
+  renderGame()
+  await user.click(screen.getByRole('button', { name: 'レースを はじめる' }))
+  const button = screen.getByRole('button', { name: /スペシャル：/ })
+  expect(button).toBeDisabled()
+  act(() => engineMock.options?.onSpecialChange?.([{ charge: 1, remaining: 0 }, { charge: 0.5, remaining: 0 }]))
+  expect(button).toBeEnabled()
+  await user.click(button)
+  expect(engineMock.special).toHaveBeenLastCalledWith(0)
+  act(() => engineMock.options?.onSpecialChange?.([{ charge: 0, remaining: 3 }, { charge: 0.5, remaining: 0 }]))
+  expect(button).toBeDisabled()
+  expect(button).toHaveTextContent('はつどうちゅう！')
+  await user.click(screen.getByRole('button', { name: '2だいめ' }))
+  expect(button).toHaveAccessibleName('スペシャル：スターダッシュ')
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50')
+  expect(button).toBeDisabled()
+  act(() => engineMock.options?.onSpecialChange?.([{ charge: 0, remaining: 0 }, { charge: 1, remaining: 0 }]))
+  expect(button).toBeEnabled()
+  act(() => engineMock.options?.onStatusChange?.('error'))
+  expect(button).toBeDisabled()
 })

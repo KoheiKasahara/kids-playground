@@ -15,6 +15,8 @@ import {
 } from './useCircuitRacingEngine'
 import styles from './CircuitRacingPlay.module.css'
 
+import { SPECIALS, type SpecialState } from './special'
+
 const COURSE_PREVIEWS = CIRCUITS.map(circuitPreview)
 
 function prefersReducedMotion(): boolean {
@@ -54,6 +56,7 @@ export default function CircuitRacingPlay() {
   const [cameraMode, setCameraMode] = useState<RaceCameraMode>(() => prefersReducedMotion() ? 'trackside' : 'chase')
   const [targetIndex, setTargetIndex] = useState(0)
   const [sceneStatus, setSceneStatus] = useState<CircuitRacingEngineStatus>('loading')
+  const [specialStates, setSpecialStates] = useState<readonly SpecialState[]>([])
   const [boostFeedback, setBoostFeedback] = useState(0)
 
   const handleSceneStatus = useCallback((status: CircuitRacingEngineStatus) => {
@@ -66,8 +69,9 @@ export default function CircuitRacingPlay() {
     cameraMode,
     targetIndex,
     onStatusChange: handleSceneStatus,
+    onSpecialChange: setSpecialStates,
   })
-  const { registerContainer, retry, boost, adjustCamera } = engine
+  const { registerContainer, retry, boost, special, adjustCamera } = engine
 
   useEffect(() => {
     if (boostFeedback === 0) return undefined
@@ -110,6 +114,11 @@ export default function CircuitRacingPlay() {
     boost(targetIndex)
     setBoostFeedback((value) => value + 1)
   }, [boost, targetIndex])
+
+  const selectedSpecial = SPECIALS[selections[targetIndex]!.carId]
+  const specialState = specialStates[targetIndex]
+  const specialReady = (specialState?.charge ?? 0) >= 1 && !specialState?.remaining
+  const specialActive = (specialState?.remaining ?? 0) > 0
 
   const cameraButtons = useMemo(() => [
     { mode: 'chase' as const, label: 'おいかける', icon: '🚗' },
@@ -223,8 +232,22 @@ export default function CircuitRacingPlay() {
         ) : (
           <section className={styles.racePanel} aria-label="レースの そうさ">
             <div className={styles.raceHeader}>
-              <button type="button" className={styles.backButton} onClick={backToSelection}>‹ えらびなおす</button>
+              <button type="button" className={styles.backButton} onClick={backToSelection} aria-label="えらびなおす"><span aria-hidden="true">えらび<br />なおす</span></button>
               <h1 className={styles.raceTitle}><span aria-hidden="true">🏁</span> はしってるよ！</h1>
+              <button
+                type="button"
+                className={styles.specialButton}
+                disabled={!specialReady || sceneStatus !== 'ready'}
+                data-ready={specialReady}
+                aria-label={`スペシャル：${selectedSpecial.label}`}
+                onClick={() => special(targetIndex)}
+              >
+                <span>{selectedSpecial.icon} スペシャル</span>
+                <span className={styles.specialGauge} role="progressbar" aria-label="スペシャルゲージ" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor((specialState?.charge ?? 0) * 100)}>
+                  <span style={{ width: `${(specialState?.charge ?? 0) * 100}%` }} />
+                </span>
+                <small>{specialActive ? 'はつどうちゅう！' : specialReady ? 'つかえるよ！' : 'ためているよ'}</small>
+              </button>
               <button
                 type="button"
                 className={styles.boostButton}
