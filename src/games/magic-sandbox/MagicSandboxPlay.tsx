@@ -47,12 +47,14 @@ function Playground({ back }: { back: () => void }) {
       <aside className={styles.tools} aria-label="すなばの どうぐ">
         <div className={styles.materials} role="group" aria-label="そざい">
           {MATERIALS.map(m => <button key={m.id} aria-label={m.name} aria-pressed={m.id === material.id} onClick={() => { sandbox.stop(); setMaterial(m) }}><span aria-hidden="true">{m.icon}</span><b>{m.id === material.id ? '✓ ' : ''}{m.name}</b></button>)}
+          <button aria-label={`カニを ふやす（${sandbox.crabCount}/2）`} disabled={sandbox.crabCount >= 2} onClick={sandbox.addCrab}><span aria-hidden="true">🦀</span><b>カニ {sandbox.crabCount}/2</b></button>
         </div>
         <div className={styles.sizes} role="group" aria-label="ふとさ">
           <button aria-pressed={!wide} onClick={() => { sandbox.stop(); setWide(false) }}>● すこし</button>
           <button aria-pressed={wide} onClick={() => { sandbox.stop(); setWide(true) }}>⬤ たっぷり</button>
         </div>
-        <p className={styles.toolHint}>{material.hint}</p>
+        <p className={styles.toolHint}>{sandbox.crabMessage.startsWith('カニの') ? sandbox.crabMessage : material.hint}</p>
+        <span className={styles.crabStatus} role="status">{sandbox.crabMessage}</span>
       </aside>
       <section className={`${styles.board} ${shaking ? styles.shaking : ''}`} aria-label="すなば">
         <div className={styles.cloud} aria-hidden="true">☁</div>

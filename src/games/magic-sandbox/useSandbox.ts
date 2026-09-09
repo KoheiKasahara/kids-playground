@@ -5,6 +5,8 @@ type Brush = { material: Material; radius: number }
 type Gesture = Brush & { point: Point; pointerId: number }
 export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush: Brush, paused: boolean, onFlower: () => void) {
   const [world] = useState(() => { const result = new Sandbox(); result.prepare(); return result })
+  const [crabCount, setCrabCount] = useState(0)
+  const [crabMessage, setCrabMessage] = useState('')
   const active = useRef<Gesture | null>(null)
   const keyboardPoint = useRef<Point>({ x: 72, y: 30 })
   const draw = useRef<() => void>(() => {})
@@ -66,6 +68,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
     if (!p) return
     event.preventDefault()
     event.currentTarget.focus({ preventScroll: true })
+    if (world.tapCrab(p)) { draw.current(); return }
     event.currentTarget.setPointerCapture(event.pointerId)
     active.current = { ...brush, point: p, pointerId: event.pointerId }
     world.paint(p, brush.material, brush.radius)
@@ -97,14 +100,21 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       event.currentTarget.style.setProperty('--cursor-y', `${p.y / world.height * 100}%`)
     } else if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault()
-      world.paint(p, brush.material, brush.radius)
+      if (!world.tapCrab(p)) world.paint(p, brush.material, brush.radius)
       draw.current()
     }
   }
   return {
-    unavailable, stop,
+    unavailable, stop, crabCount, crabMessage,
+    addCrab: () => {
+      stop()
+      const added = world.addCrab()
+      setCrabCount(world.crabs.length)
+      setCrabMessage(added ? '🦀 カニを タップしてみよう' : 'カニの はいる ばしょを あけてね')
+      draw.current()
+    },
     canvasProps: { width: world.width, height: world.height, onPointerDown: begin, onPointerMove: move, onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end, onKeyDown: keyDown },
-    clear: () => { stop(); world.clear(); draw.current() },
+    clear: () => { stop(); world.clear(); setCrabCount(0); setCrabMessage(''); draw.current() },
     shake: () => { stop(); world.shake(); draw.current() },
   }
 }
