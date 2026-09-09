@@ -68,6 +68,33 @@ function tapCreature(world: Sandbox, point: Point, group: Creature[]) {
 
 export const stepCrabs = (world: Sandbox, random: () => number) => stepCreatures(world, random, world.crabs)
 export const stepTurtles = (world: Sandbox, random: () => number) => stepCreatures(world, random, world.turtles)
+function overlap(a: Creature, b: Creature, x = a.x, y = a.y) {
+  const sa = creatureScale(a), sb = creatureScale(b)
+  if (y <= b.y - 9 * sb || b.y <= y - 9 * sa) return 0
+  return Math.max(0, 9 * (sa + sb) - Math.abs(x - b.x))
+}
+
+function separate(world: Sandbox, creature: Creature, scale: number) {
+  const others = [...world.crabs, ...world.turtles].filter(c => c !== creature)
+  const crowd = others.filter(c => overlap(creature, c) > 0)
+  if (!crowd.length) return false
+  const nearest = crowd.sort((a, b) => Math.abs(a.x - creature.x) - Math.abs(b.x - creature.x))[0]
+  const order = [...world.crabs, ...world.turtles]
+  const away = Math.sign(creature.x - nearest.x) || (order.indexOf(creature) < order.indexOf(nearest) ? -1 : 1)
+  for (const direction of [away, -away]) {
+    const nx = creature.x + direction * 0.12
+    if (nx < 7 * scale || nx >= world.width - 7 * scale || blocked(world, nx, creature.y, scale)) continue
+    // Escape existing overlaps without pushing into another animal.
+    if (others.some(c => overlap(creature, c, nx) > overlap(creature, c))) continue
+    creature.x = nx
+    creature.direction = direction
+    creature.resting = false; creature.wave = 0; creature.decision = 90
+    break
+  }
+  creature.target = null; creature.eating = 0; creature.search = 90
+  return true
+}
+
 function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) {
   for (const crab of group) {
     const grownScale = creatureScale(crab)
@@ -96,6 +123,7 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
       if (!blocked(world, crab.x, crab.y + 0.35, scale)) crab.y = Math.min(world.height - 1, crab.y + 0.35)
       continue
     }
+    if (separate(world, crab, scale)) continue
     if (feed(world, crab, random)) continue
     if (!crab.target && --crab.decision <= 0) {
       crab.decision = 80 + Math.floor(random() * 160)
@@ -135,6 +163,11 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
     let ny = crab.y
     // Small sand slopes are climbed gradually; rocks and ungerminated seeds turn the crab around.
     if (soil(world.get(Math.round(nx + crab.direction * 4), feet))) ny -= 0.12
+    if ([...world.crabs, ...world.turtles].some(c => c !== crab && overlap(crab, c, nx, ny) > overlap(crab, c))) {
+      crab.target = null; crab.eating = 0; crab.search = 90
+      crab.direction *= -1; crab.decision = 90
+      continue
+    }
     if (nx < 7 * scale || nx >= world.width - 7 * scale || blocked(world, nx, ny, scale)) {
       crab.target = null; crab.eating = 0
       crab.direction *= -1; crab.resting = true; crab.decision = 35
@@ -236,7 +269,7 @@ function creaturePainter(world: Sandbox, pixels: Uint8ClampedArray, creature: Cr
         if (x < 0 || x >= world.width || y < 0 || y >= world.height) continue
         const cell = world.get(x, y)
         // Grains mask the body as claws / head / shell gradually emerge.
-        if (cell !== Cell.Empty && cell !== Cell.Water) continue
+        if (soil(cell) || blockingCell(cell)) continue
         const offset = (y * world.width + x) * 4
         pixels[offset] = color[0]; pixels[offset + 1] = color[1]; pixels[offset + 2] = color[2]; pixels[offset + 3] = 255
       }
