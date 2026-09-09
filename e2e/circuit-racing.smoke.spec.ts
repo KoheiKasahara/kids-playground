@@ -3,6 +3,11 @@ import { capturePageErrors } from './support/runtimeErrors'
 
 test('車を選んで走行・加速・カメラ変更・選び直しができる', async ({ page }) => {
   const errors = capturePageErrors(page)
+  page.on('console', message => {
+    if (message.type() === 'error' && /THREE.WebGLProgram|VALIDATE_STATUS|shader error/i.test(message.text())) {
+      errors.push(message.text())
+    }
+  })
   await page.goto('/games/circuit-racing')
   await expect(page.getByRole('heading', { name: 'サーキットレース', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '3だい', exact: true }).click()

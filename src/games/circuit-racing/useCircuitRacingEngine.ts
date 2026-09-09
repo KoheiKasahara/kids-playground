@@ -15,6 +15,7 @@ import { createMotionProfile, sampleMotion, type MotionProfile } from './motion'
 
 import { activateSpecial, advanceSpecial, SPECIAL_SPEED_MULTIPLIER, type SpecialState } from './special'
 import { createSpecialEffect, animateSpecialEffect } from './specialEffect'
+import { createBoostEffect, animateBoostEffect, BOOST_DURATION_SECONDS } from './boostEffect'
 
 // Camera placement is independent of the motion table and React state.
 import {
@@ -63,14 +64,12 @@ type CarVisual = {
   specialEffect: THREE.Group
   boostRemaining: number
   boostEffect: THREE.Group
-  boostMaterials: THREE.MeshBasicMaterial[]
 }
 
 const CAMERA_FOV = 48
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 900
 const MAX_DEVICE_PIXEL_RATIO = 2
-const BOOST_DURATION_SECONDS = 1.6
 const BOOST_SPEED_MULTIPLIER = 1.85
 
 function plainVector(value: THREE.Vector3): PlainVector {
@@ -166,25 +165,7 @@ function createLoadedCarVisual(
   const bounds = new THREE.Box3().setFromObject(root)
   const specialEffect = createSpecialEffect(selection.carId)
   root.add(specialEffect)
-  const boostEffect = new THREE.Group()
-  boostEffect.name = 'boost-effect'
-  boostEffect.visible = false
-  const boostMaterials = [
-    new THREE.MeshBasicMaterial({ color: '#58e6ff', transparent: true, opacity: 0.86, blending: THREE.AdditiveBlending, depthWrite: false }),
-    new THREE.MeshBasicMaterial({ color: '#ffe45c', transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
-  ]
-  const streakGeometry = new THREE.CylinderGeometry(0.06, 0.18, 4.8, 6)
-  streakGeometry.rotateX(Math.PI / 2)
-  for (let index = 0; index < 5; index += 1) {
-    const streak = new THREE.Mesh(streakGeometry, boostMaterials[index % boostMaterials.length]!)
-    streak.position.set((index - 2) * 0.56, 0.45 + (index % 2) * 0.38, -2.8 - (index % 3) * 0.55)
-    boostEffect.add(streak)
-  }
-  const ringGeometry = new THREE.TorusGeometry(1.45, 0.1, 8, 24)
-  const ring = new THREE.Mesh(ringGeometry, boostMaterials[0]!)
-  ring.name = 'boost-ring'
-  ring.position.set(0, 0.85, -2.2)
-  boostEffect.add(ring)
+  const boostEffect = createBoostEffect(bounds.min.z, vehicle.size.width / 2)
   root.add(boostEffect)
   // `root.traverse` during disposal sees every wheel resource.  Keeping this
   // list local avoids a second ownership system and protects StrictMode's
@@ -201,7 +182,6 @@ function createLoadedCarVisual(
     specialEffect,
     boostRemaining: 0,
     boostEffect,
-    boostMaterials,
   }
 }
 
@@ -630,7 +610,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         const target = cars[Math.min(cars.length - 1, Math.max(0, targetIndex))]
         if (target === undefined) return
         target.boostRemaining = BOOST_DURATION_SECONDS
-        target.boostEffect.visible = true
+        animateBoostEffect(target.boostEffect, target.boostRemaining)
         markDirty()
       }
 
@@ -651,20 +631,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
             car.elapsedSeconds += specialSeconds * SPECIAL_SPEED_MULTIPLIER + (delta - specialSeconds) * (boosting ? BOOST_SPEED_MULTIPLIER : 1)
             animateSpecialEffect(car.specialEffect, car.specialState.remaining)
             car.boostRemaining = Math.max(0, car.boostRemaining - delta)
-            car.boostEffect.visible = car.boostRemaining > 0
-            if (car.boostEffect.visible) {
-              const progress = 1 - car.boostRemaining / BOOST_DURATION_SECONDS
-              const pulse = 1 + Math.sin(progress * Math.PI * 10) * 0.12
-              car.boostEffect.scale.set(pulse, pulse, 0.9 + progress * 0.75)
-              const ring = car.boostEffect.getObjectByName('boost-ring')
-              if (ring !== undefined) {
-                const ringPulse = 0.75 + (progress * 3 % 1) * 1.2
-                ring.scale.setScalar(ringPulse)
-              }
-              for (const material of car.boostMaterials) {
-                material.opacity = 0.58 + Math.sin(progress * Math.PI * 12) * 0.25
-              }
-            }
+            animateBoostEffect(car.boostEffect, car.boostRemaining)
             applyCarFrame(car)
           }
           publishSpecial()
