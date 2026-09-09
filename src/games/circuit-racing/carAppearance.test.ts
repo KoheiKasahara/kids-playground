@@ -1,9 +1,35 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
-import { createCarContactShadows, styleRaceCar } from './carAppearance'
+import { createCarContactShadows, createRacingStripes, styleRaceCar } from './carAppearance'
 import { ROAD_Y } from './trackVisuals'
 
 describe('race car appearance', () => {
+  it('projects stripes onto upward body panels while leaving glass clear', () => {
+    const body = new THREE.MeshStandardMaterial()
+    body.name = 'Body'
+    const glass = new THREE.MeshStandardMaterial()
+    glass.name = 'Glass'
+    const bodyGeometry = new THREE.BoxGeometry(2, 1, 4).translate(0, 0.5, 0)
+    const glassGeometry = new THREE.BoxGeometry(1, 0.2, 1).translate(0, 1.1, 0)
+    const group = new THREE.Group()
+    group.add(new THREE.Mesh(bodyGeometry, body), new THREE.Mesh(glassGeometry, glass))
+    const stripes = createRacingStripes(group)!
+    expect(stripes).not.toBeNull()
+    const position = stripes.geometry.getAttribute('position')
+    const normal = stripes.geometry.getAttribute('normal')
+    expect(position.count).toBeGreaterThan(100)
+    for (let i = 0; i < position.count; i++) {
+      expect(Math.abs(position.getZ(i))).toBeGreaterThanOrEqual(0.5)
+      expect(position.getY(i)).toBeCloseTo(1.006)
+      expect(normal.getY(i)).toBeGreaterThan(0.99)
+    }
+    body.name = 'Glass'
+    expect(createRacingStripes(group)).toBeNull()
+    stripes.geometry.dispose()
+    ;(stripes.material as THREE.Material).dispose()
+    for (const resource of [body, glass, bodyGeometry, glassGeometry]) resource.dispose()
+  })
+
   it('preserves the selected paint and shades shared lower panels only once', () => {
     const paint = new THREE.MeshStandardMaterial({ color: '#9333ea' })
     paint.name = 'Body'
