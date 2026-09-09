@@ -19,6 +19,7 @@ import {
   LANE_FRICTION,
   LANE_RESTITUTION,
   LAUNCH_HEIGHT,
+  LAUNCH_PULL_MAX,
   LAUNCH_Z,
   MAX_ANGULAR_SPEED,
   MAX_BALL_SPEED,
@@ -218,8 +219,8 @@ export function createBowlingWorld(
 }
 
 /**
- * 玉を発射位置へ固定する。ドラッグ中は引いた向きの逆へずらして、
- * スリングショットを引いている見た目にする。
+ * 玉を待機位置へ固定する。触っていないときは発射点より最大引き幅ぶん奥へ置き、
+ * ドラッグすると従来の発射点へ向かって手前に動かす。
  */
 export function parkBall(bowling: BowlingWorld, aim: LaunchAim | null): void {
   const offset = aim && aim.active ? pullOffset(aim) : ZERO
@@ -231,7 +232,7 @@ export function parkBall(bowling: BowlingWorld, aim: LaunchAim | null): void {
     {
       x: bowling.anchor.x + offset.x,
       y: bowling.anchor.y + offset.y,
-      z: bowling.anchor.z + offset.z,
+      z: bowling.anchor.z - LAUNCH_PULL_MAX + offset.z,
     },
     true,
   )
@@ -303,6 +304,9 @@ export function launchAutomaticBall(
 }
 
 function applyLaunchVelocity(bowling: BowlingWorld, velocity: Vector3): void {
+  // 待機中は奥に置くが、実際の弾道は従来どおりanchorから始める。
+  // 最大まで引いたときは既に同じ位置なので動かず、短い引きでも発射結果を変えない。
+  bowling.ball.setTranslation(bowling.anchor, true)
   bowling.ball.setGravityScale(1, true)
   bowling.ball.setLinvel(velocity, true)
   bowling.ball.setAngvel(
