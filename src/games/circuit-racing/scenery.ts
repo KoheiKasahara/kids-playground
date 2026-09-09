@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 import { CIRCUIT_SCENERY, type CircuitDefinition } from './circuit'
+import { addCircuitDetails, type SceneryShape } from './sceneryDetails'
 
-type Shape = 'box' | 'cone' | 'sphere' | 'cylinder' | 'ring'
+type Shape = SceneryShape
 type Batch = { shape: Shape; colors: THREE.Color[]; matrices: THREE.Matrix4[] }
-export type SceneryFootprint = { x: number; z: number; radius: number }
+export type SceneryFootprint = { x: number; z: number; radius: number; kind: string }
 
 /** Static, low-poly scenery; repeated parts share one instanced draw per shape with instance colors. */
 export function createCircuitScenery(circuit: CircuitDefinition) {
@@ -35,7 +36,7 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
 
   // Check the entire road, including the opposite side of a hairpin. The
   // bounding disc also keeps neighboring scenery from intersecting each other.
-  function place(t: number, radius: number, build: (matrix: THREE.Matrix4) => void, side = 1) {
+  function place(t: number, radius: number, build: (matrix: THREE.Matrix4) => void, side = 1, kind = 'landmark') {
     const point = circuit.curve.getPointAt(t)
     const tangent = circuit.curve.getTangentAt(t)
     for (let offset = circuit.width / 2 + radius + 5; offset < 125; offset += 6) {
@@ -44,7 +45,7 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
       const clearance = radius + circuit.width / 2 + 3
       if (road.some((p) => Math.hypot(p.x - x, p.z - z) < clearance)) continue
       if (footprints.some((p) => Math.hypot(p.x - x, p.z - z) < p.radius + radius + 2)) continue
-      footprints.push({ x, z, radius })
+      footprints.push({ x, z, radius, kind })
       const matrix = new THREE.Matrix4().makeRotationY(Math.atan2(tangent.x, tangent.z))
       matrix.setPosition(x, 0, z)
       build(matrix)
@@ -140,7 +141,6 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
     place(0.98, 17, (m) => stand(m, '#dd6058'))
     place(0.21, 16, wheel)
     place(0.59, 17, (m) => stand(m, '#438ac3'))
-    for (let i = 0; i < 18; i++) place((i + 0.5) / 18, 4, (m) => tree(m, i, false))
   } else if (circuit.scenery === 'stadium') {
     for (const t of [0.06, 0.18, 0.45, 0.57, 0.69, 0.91]) {
       place(t, 22, (m) => stand(m, '#408dcc', 38))
@@ -157,7 +157,6 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
       part(m, 'box', '#f9f2d5', 0, 20, 0, 1.2, 1.8, 6)
     })
   } else if (circuit.scenery === 'forest') {
-    for (let i = 0; i < 62; i++) place((i + 0.3) / 62, 4, (m) => tree(m, i, true), i % 3 === 0 ? -1 : 1)
     place(0.42, 10, (m) => {
       part(m, 'box', '#aa7850', 0, 3, 0, 8, 6, 10)
       part(m, 'cone', '#963f39', 0, 7.5, 0, 13, 5, 15)
@@ -171,7 +170,18 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
       // cone surfaces exactly makes the depth buffer alternate between them.
       part(m, 'cone', '#f2f2e6', 0, height * 0.86, 0, 7.6, height * 0.32, 7.6)
     })
-    for (let i = 0; i < 20; i++) place((i + 0.6) / 20, 4, (m) => tree(m, i, true))
+  }
+
+  // Keep the existing major landmarks, then reserve space for new landscape
+  // clusters before the small trees and rocks occupy the remaining gaps.
+  addCircuitDetails(circuit, { part, place })
+  const treeCount = circuit.scenery === 'forest' ? 62 : circuit.scenery === 'alpine' ? 20 : 18
+  if (circuit.scenery !== 'stadium') {
+    for (let i = 0; i < treeCount; i++) {
+      const offset = circuit.scenery === 'forest' ? 0.3 : circuit.scenery === 'alpine' ? 0.6 : 0.5
+      const side = circuit.scenery === 'forest' && i % 3 === 0 ? -1 : 1
+      place((i + offset) / treeCount, 4, (m) => tree(m, i, circuit.scenery !== 'grandPrix'), side)
+    }
   }
 
   // Small landmarks fill the roadside between larger course-specific structures.
