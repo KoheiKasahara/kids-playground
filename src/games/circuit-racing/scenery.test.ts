@@ -36,7 +36,8 @@ describe('circuit scenery', () => {
         mesh.getMatrixAt(instance, matrix)
         for (let vertex = 0; vertex < positions.count; vertex++) {
           point.fromBufferAttribute(positions, vertex).applyMatrix4(matrix)
-          if (point.y > 6) continue
+          // Below-surface water and bridge foundations cannot obstruct cars.
+          if (point.y > 6 || point.y < 0) continue
           closestVertexSquared = Math.min(closestVertexSquared, roadDistanceSquared(road, point.x, point.z))
         }
       }

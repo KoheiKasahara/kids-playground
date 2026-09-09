@@ -4,6 +4,8 @@ export const CIRCUIT_SCENERY = {
   grandPrix: { label: 'かんらんしゃと ピット', icon: '🎡', sky: '#aeddf5', ground: '#79ad65', road: '#353a40', curb: '#de5254' },
   stadium: { label: 'おおきな スタンド', icon: '🏟️', sky: '#b8dbef', ground: '#8eac83', road: '#39414e', curb: '#438bc9' },
   forest: { label: 'みどりの もり', icon: '🌲', sky: '#c0e6dd', ground: '#628f50', road: '#41443d', curb: '#e0af43' },
+  city: { label: 'ビルと はしと トンネル', icon: '🏙️', sky: '#b9e0f5', ground: '#a8b9b0', road: '#3b4350', curb: '#e26955' },
+  coast: { label: 'うみと とうだい', icon: '🌊', sky: '#a5e2f5', ground: '#c5d59a', road: '#465365', curb: '#e45d55' },
   alpine: { label: 'いわやまの けしき', icon: '⛰️', sky: '#cbdfee', ground: '#b1ac8c', road: '#49474a', curb: '#ce6946' },
 } as const
 
@@ -97,6 +99,24 @@ export const CIRCUITS: readonly CircuitDefinition[] = [
       [155, -30], [145, 50], [100, 80], [65, 50],
       [60, 0], [35, -25], [10, 0], [5, 50],
       [-35, 80], [-110, 65], [-145, 20],
+    ]),
+  },
+  {
+    id: 'city-circuit', name: 'シティコース',
+    description: 'ビルの まちで はしと トンネル！', scenery: 'city', width: 12,
+    curve: createCurve([
+      [-120, -78], [-60, -78], [0, -78], [60, -78], [120, -78],
+      [150, -50], [150, -20], [150, 20], [150, 50], [118, 78],
+      [60, 78], [22, 48], [-30, 48], [-75, 78], [-125, 65], [-150, 25], [-150, -35],
+    ]),
+  },
+  {
+    id: 'coastal-circuit', name: 'うみぞいコース',
+    description: 'あおい うみと とうだいへ！', scenery: 'coast', width: 12,
+    curve: createCurve([
+      [-125, -60], [-65, -82], [10, -78], [88, -65], [130, -32],
+      [142, 10], [127, 53], [85, 85], [35, 72], [-10, 42],
+      [-58, 57], [-110, 65], [-145, 25], [-148, -20],
     ]),
   },
 ]

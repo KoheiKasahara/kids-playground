@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { CIRCUIT_SCENERY, type CircuitDefinition } from './circuit'
 import { addCircuitDetails, type SceneryShape } from './sceneryDetails'
+import { addDestinationScenery } from './destinationScenery'
 
 type Shape = SceneryShape
 type Batch = { shape: Shape; colors: THREE.Color[]; matrices: THREE.Matrix4[] }
@@ -42,6 +43,7 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
     for (let offset = circuit.width / 2 + radius + 5; offset < 125; offset += 6) {
       const x = point.x + tangent.z * offset * side
       const z = point.z - tangent.x * offset * side
+      if (circuit.scenery === 'coast' && x + radius > 160) continue
       const clearance = radius + circuit.width / 2 + 3
       if (road.some((p) => Math.hypot(p.x - x, p.z - z) < clearance)) continue
       if (footprints.some((p) => Math.hypot(p.x - x, p.z - z) < p.radius + radius + 2)) continue
@@ -162,7 +164,7 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
       part(m, 'cone', '#963f39', 0, 7.5, 0, 13, 5, 15)
       part(m, 'box', '#f2dba0', -4.1, 3.5, 0, 0.2, 2, 6)
     })
-  } else {
+  } else if (circuit.scenery === 'alpine') {
     for (let i = 0; i < 16; i++) place((i + 0.2) / 16, 13, (m) => {
       const height = 16 + (i % 4) * 6
       part(m, 'cone', i % 2 ? '#8b9196' : '#9ca29e', 0, height / 2, 0, 24, height, 24)
@@ -174,13 +176,17 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
 
   // Keep the existing major landmarks, then reserve space for new landscape
   // clusters before the small trees and rocks occupy the remaining gaps.
-  addCircuitDetails(circuit, { part, place })
+  if (circuit.scenery === 'city' || circuit.scenery === 'coast') {
+    addDestinationScenery(circuit, { part, place })
+  } else {
+    addCircuitDetails(circuit, { part, place })
+  }
   const treeCount = circuit.scenery === 'forest' ? 62 : circuit.scenery === 'alpine' ? 20 : 18
   if (circuit.scenery !== 'stadium') {
     for (let i = 0; i < treeCount; i++) {
       const offset = circuit.scenery === 'forest' ? 0.3 : circuit.scenery === 'alpine' ? 0.6 : 0.5
       const side = circuit.scenery === 'forest' && i % 3 === 0 ? -1 : 1
-      place((i + offset) / treeCount, 4, (m) => tree(m, i, circuit.scenery !== 'grandPrix'), side)
+      place((i + offset) / treeCount, 4, (m) => tree(m, i, circuit.scenery === 'forest' || circuit.scenery === 'alpine'), side)
     }
   }
 

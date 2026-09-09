@@ -24,7 +24,7 @@ describe('circuit', () => {
 
 describe('selectable circuits', () => {
   it('has unique choices and previews derived from each closed road', () => {
-    expect(CIRCUITS).toHaveLength(4)
+    expect(CIRCUITS).toHaveLength(6)
     expect(new Set(CIRCUITS.map((course) => course.id)).size).toBe(CIRCUITS.length)
     expect(new Set(CIRCUITS.map((course) => circuitPreview(course).points)).size).toBe(CIRCUITS.length)
   })
