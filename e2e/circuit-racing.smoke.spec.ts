@@ -65,3 +65,30 @@ test('WebGL初期化失敗後もレンダラーを作り直せる', async ({ pag
   await expect(page.getByRole('button', { name: 'レースを はじめる', exact: true })).toBeEnabled()
   await expect(page.locator('canvas')).toHaveCount(1)
 })
+
+test('全コースの描画を切り替え、WebGL復帰後も走れる', async ({ page }) => {
+  const errors = capturePageErrors(page)
+  await page.goto('/games/circuit-racing')
+  await page.getByRole('button', { name: '3だい', exact: true }).click()
+  for (const course of ['くねくねカーブ', 'びゅんびゅんオーバル', 'ぐるっとヘアピン', 'シティコース', 'うみぞいコース', 'みんなのサーキット']) {
+    await page.getByRole('button', { name: course, exact: true }).click()
+    await expect(page.getByRole('button', { name: 'レースを はじめる', exact: true })).toBeEnabled()
+    await expect(page.locator('canvas')).toHaveCount(1)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+  }
+  await page.getByRole('button', { name: '2だい', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'レースを はじめる', exact: true })).toBeEnabled()
+  await page.evaluate(() => {
+    const extension = document.querySelector('canvas')!.getContext('webgl2')!.getExtension('WEBGL_lose_context')!
+    Object.defineProperty(window, '__restoreLiveRaceContext', { value: () => extension.restoreContext() })
+    extension.loseContext()
+  })
+  await expect(page.getByRole('alert')).toBeVisible()
+  await page.evaluate(() => (window as unknown as { __restoreLiveRaceContext: () => void }).__restoreLiveRaceContext())
+  await expect(page.getByRole('button', { name: 'レースを はじめる', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'レースを はじめる', exact: true }).click()
+  const canvas = page.locator('canvas')
+  const first = await canvas.screenshot()
+  await expect.poll(async () => (await canvas.screenshot()).equals(first)).toBe(false)
+  expect(errors).toEqual([])
+})

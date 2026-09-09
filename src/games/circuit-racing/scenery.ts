@@ -7,7 +7,12 @@ type Shape = SceneryShape
 type Batch = { shape: Shape; colors: THREE.Color[]; matrices: THREE.Matrix4[] }
 export type SceneryFootprint = { x: number; z: number; radius: number; kind: string }
 
-/** Static, low-poly scenery; repeated parts share one instanced draw per shape with instance colors. */
+function variation(index: number): number {
+  const value = Math.sin(index * 127.1 + 311.7) * 43758.5453
+  return value - Math.floor(value)
+}
+
+/** Static, low-poly scenery; instance colors keep all variants in one draw per shape. */
 export function createCircuitScenery(circuit: CircuitDefinition) {
   const group = new THREE.Group()
   group.name = `scenery-${circuit.scenery}`
@@ -17,7 +22,7 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
   const road = circuit.curve.getSpacedPoints(1024)
   const dummy = new THREE.Object3D()
   const geometries = new Map<Shape, THREE.BufferGeometry>()
-  const material = new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true })
+  const material = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.88, flatShading: true })
 
   function part(parent: THREE.Matrix4, shape: Shape, color: string,
     x: number, y: number, z: number, sx: number, sy: number, sz: number, rz = 0) {
@@ -31,8 +36,8 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
       batch = { shape, colors: [], matrices: [] }
       batches.set(key, batch)
     }
-    batch.colors.push(new THREE.Color(color))
     batch.matrices.push(new THREE.Matrix4().multiplyMatrices(parent, dummy.matrix))
+    batch.colors.push(new THREE.Color(color).multiplyScalar(0.92 + variation(batch.matrices.length + x * 3 + z * 7) * 0.16))
   }
 
   // Check the entire road, including the opposite side of a hairpin. The
@@ -60,9 +65,15 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
       part(matrix, 'box', '#dedfd9', row * 1.8 - 3, (row + 1) * 0.65, 0, 1.9, (row + 1) * 1.3, length)
       part(matrix, 'box', color, row * 1.8 - 3, (row + 1) * 1.3 + 0.12, 0, 1.6, 0.24, length)
       for (let seat = 0; seat < 12; seat++) {
-        const shirt = ['#e55a4f', '#ffc94e', '#418ac1', '#f9f3de'][(seat + row) % 4]!
-        part(matrix, 'sphere', shirt, row * 1.8 - 3, (row + 1) * 1.3 + 0.8,
-          (seat - 5.5) * (length / 13), 0.65, 0.85, 0.65)
+        const seed = seat + row * 13 + length
+        if (variation(seed) < 0.12) continue
+        const shirt = ['#e55a4f', '#ffc94e', '#418ac1', '#f9f3de', '#6cb998'][Math.floor(variation(seed + 5) * 5)]!
+        const height = 0.72 + variation(seed + 2) * 0.38
+        const z = (seat - 5.5) * (length / 13) + (variation(seed + 1) - 0.5) * 0.4
+        part(matrix, 'sphere', shirt, row * 1.8 - 3, (row + 1) * 1.3 + height / 2 + 0.22,
+          z, 0.68, height, 0.62)
+        part(matrix, 'box', ['#dfaa7c', '#915f43', '#f2cfaa'][seat % 3]!,
+          row * 1.8 - 3, (row + 1) * 1.3 + height + 0.38, z, 0.44, 0.46, 0.44)
       }
     }
     for (const z of [-length / 2 + 1, length / 2 - 1]) {
@@ -73,11 +84,13 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
   }
 
   function pit(matrix: THREE.Matrix4) {
+    part(matrix, 'box', '#7d8785', 0, 0.12, 0, 9.5, 0.24, 31.5)
     part(matrix, 'box', '#e6e9e7', 0, 3, 0, 8, 6, 30)
     part(matrix, 'box', '#445c6b', -4.08, 4.7, 0, 0.15, 1.4, 28)
     for (let bay = 0; bay < 6; bay++) {
       part(matrix, 'box', '#3e4750', -4.1, 1.6, (bay - 2.5) * 4.7, 0.2, 2.7, 3.7)
       part(matrix, 'box', ['#df5555', '#e6b642', '#448dc4'][bay % 3]!, -4.25, 3.2, (bay - 2.5) * 4.7, 0.3, 0.5, 4.4)
+      part(matrix, 'box', '#eef1de', -4.23, 1.6, (bay - 2.5) * 4.7 - 1.95, 0.25, 3, 0.18)
     }
     part(matrix, 'box', '#ecf1ef', 0, 6.3, 0, 9, 0.6, 32)
     part(matrix, 'box', '#647f8d', 0, 9, 8, 6, 5, 6)
@@ -106,17 +119,19 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
   }
 
   function tree(matrix: THREE.Matrix4, index: number, pine: boolean) {
-    const height = 5 + (index % 4) * 1.2
-    part(matrix, 'cylinder', '#84654a', 0, height / 3, 0, 0.65, height * 2 / 3, 0.65)
-    const color = ['#44865a', '#65a35c', '#86b760'][index % 3]!
-    // Low, opaque ground islands add color without textures or extra shadow passes.
+    const height = 6 + variation(index) * 4
+    const crown = 0.88 + variation(index + 50) * 0.22
+    const rotated = matrix.clone().multiply(new THREE.Matrix4().makeRotationY(variation(index + 20) * Math.PI * 2))
+    part(rotated, 'cylinder', '#795a40', 0, height / 3, 0, 0.65, height * 2 / 3, 0.65)
+    const color = ['#39754b', '#4d8c52', '#669950', '#41846a'][index % 4]!
+    const light = new THREE.Color(color).multiplyScalar(1.22).getStyle()
     part(matrix, 'cylinder', '#91b96c', 0, -0.16, 0, 7.4, 0.06, 6.4)
     if (pine) {
-      part(matrix, 'cone', color, 0, height * 0.64, 0, 5, height, 5)
-      part(matrix, 'cone', color, 0, height, 0, 3.5, height * 0.7, 3.5)
+      part(rotated, 'cone', color, 0, height * 0.64, 0, 5.6 * crown, height, 5.6 * crown)
+      part(rotated, 'cone', light, 0, height, 0, 3.7 * crown, height * 0.7, 3.7 * crown)
     } else {
-      part(matrix, 'sphere', color, -0.7, height * 0.85, 0, 4.6, 5.4, 4.6)
-      part(matrix, 'sphere', '#86b760', 1.3, height * 0.92, 0.5, 3.5, 3.8, 3.5)
+      part(rotated, 'sphere', color, -0.65, height * 0.73, 0, 5.1 * crown, 4.8, 5.3 * crown)
+      part(rotated, 'sphere', light, 0.6, height * 0.99, 0.3, 4.7 * crown, 4.6, 4.8 * crown)
     }
   }
 
@@ -225,7 +240,7 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
     if (!value) {
       switch (shape) {
         case 'box': value = new THREE.BoxGeometry(1, 1, 1); break
-        case 'sphere': value = new THREE.SphereGeometry(0.5, 8, 6); break
+        case 'sphere': value = new THREE.IcosahedronGeometry(0.5, 1); break
         case 'cone': value = new THREE.ConeGeometry(0.5, 1, 7); break
         case 'cylinder': value = new THREE.CylinderGeometry(0.5, 0.5, 1, 8); break
         case 'ring': value = new THREE.TorusGeometry(1, 0.026, 4, 48); break
