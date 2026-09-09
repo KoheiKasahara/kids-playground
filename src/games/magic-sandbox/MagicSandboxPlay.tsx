@@ -46,15 +46,16 @@ function Playground({ back }: { back: () => void }) {
     <div className={styles.workspace}>
       <aside className={styles.tools} aria-label="すなばの どうぐ">
         <div className={styles.materials} role="group" aria-label="そざい">
-          {MATERIALS.map(m => <button key={m.id} aria-label={m.name} aria-pressed={m.id === material.id} onClick={() => { sandbox.stop(); setMaterial(m) }}><span aria-hidden="true">{m.icon}</span><b>{m.id === material.id ? '✓ ' : ''}{m.name}</b></button>)}
+          {MATERIALS.map(m => <button key={m.id} aria-label={m.name} aria-pressed={m.id === material.id} onClick={() => { sandbox.stop(); sandbox.dismissCreatureMessage(); setMaterial(m) }}><span aria-hidden="true">{m.icon}</span><b>{m.id === material.id ? '✓ ' : ''}{m.name}</b></button>)}
           <button aria-label={`カニを ふやす（${sandbox.crabCount}/2）`} disabled={sandbox.crabCount >= 2} onClick={sandbox.addCrab}><span aria-hidden="true">🦀</span><b>カニ {sandbox.crabCount}/2</b></button>
+          <button aria-label={`カメを ふやす（${sandbox.turtleCount}/1）`} disabled={sandbox.turtleCount >= 1} onClick={sandbox.addTurtle}><span aria-hidden="true">🐢</span><b>カメ {sandbox.turtleCount}/1</b></button>
         </div>
         <div className={styles.sizes} role="group" aria-label="ふとさ">
           <button aria-pressed={!wide} onClick={() => { sandbox.stop(); setWide(false) }}>● すこし</button>
           <button aria-pressed={wide} onClick={() => { sandbox.stop(); setWide(true) }}>⬤ たっぷり</button>
         </div>
-        <p className={styles.toolHint}>{sandbox.crabMessage.startsWith('カニの') ? sandbox.crabMessage : material.hint}</p>
-        <span className={styles.crabStatus} role="status">{sandbox.crabMessage}</span>
+        <p className={styles.toolHint}>{sandbox.creatureMessage || material.hint}</p>
+        <span className={styles.creatureStatus} role="status">{sandbox.creatureMessage}</span>
       </aside>
       <section className={`${styles.board} ${shaking ? styles.shaking : ''}`} aria-label="すなば">
         <div className={styles.cloud} aria-hidden="true">☁</div>
