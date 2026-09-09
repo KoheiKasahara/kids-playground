@@ -79,4 +79,3 @@ describe('でんしゃの たび controls', () => {
     expect(engine.options?.reducedMotion).toBe(true)
   })
 })
-
