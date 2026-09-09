@@ -54,8 +54,13 @@ export function createCircuitRoad(circuit: CircuitDefinition) {
     }
   }
 
+  // The darker driving ribbon and sunlit shoulders add asphalt depth without
+  // noisy textures, coplanar decals or another material/draw call.
+  const shoulder = `#${new THREE.Color(palette.road).lerp(new THREE.Color('#8b999e'), 0.12).getHexString()}`
+  strip(-edge + 0.35, -edge * 0.57, ROAD_Y, ROAD_Y, shoulder)
+  strip(-edge * 0.57, edge * 0.57, ROAD_Y, ROAD_Y, palette.road)
+  strip(edge * 0.57, edge - 0.35, ROAD_Y, ROAD_Y, shoulder)
   // Adjacent bands share boundaries, avoiding coplanar overlays and flicker.
-  strip(-edge + 0.35, edge - 0.35, ROAD_Y, ROAD_Y, palette.road)
   for (const side of [-1, 1]) {
     const bands: [number, number, number, number, string | ((i: number) => string)][] = [
       [edge - 0.35, edge - 0.19, ROAD_Y, ROAD_Y, '#f8f4df'],
