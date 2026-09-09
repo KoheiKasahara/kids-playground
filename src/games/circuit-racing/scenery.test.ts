@@ -24,8 +24,14 @@ describe('circuit scenery', () => {
         for (let vertex = 0; vertex < positions.count; vertex++) {
           point.fromBufferAttribute(positions, vertex).applyMatrix4(matrix)
           if (point.y > 6) continue
-          const closest = Math.min(...road.map((p) => Math.hypot(p.x - point.x, p.z - point.z)))
-          expect(closest).toBeGreaterThan(circuit.width / 2 + 0.5)
+          // Avoid allocating a 2049-entry array for every instanced vertex.
+          let closestSquared = Infinity
+          for (const p of road) {
+            const dx = p.x - point.x
+            const dz = p.z - point.z
+            closestSquared = Math.min(closestSquared, dx * dx + dz * dz)
+          }
+          expect(closestSquared).toBeGreaterThan((circuit.width / 2 + 0.5) ** 2)
         }
       }
     }
@@ -34,7 +40,7 @@ describe('circuit scenery', () => {
 
   it.each(CIRCUITS)('$id batches scenery within a mobile draw budget and releases all resources', (circuit) => {
     const scenery = createCircuitScenery(circuit)
-    expect(scenery.group.children.length).toBeLessThanOrEqual(40)
+    expect(scenery.group.children.length).toBeLessThanOrEqual(5)
     const bounds = new THREE.Box3().setFromObject(scenery.group)
     expect(bounds.min.x).toBeGreaterThan(-350)
     expect(bounds.max.x).toBeLessThan(350)

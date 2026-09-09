@@ -6,6 +6,8 @@ import { loadCarVehicleBody, type CarVehicleBody } from '../car-builder/vehicleB
 import { RACE_CARS, type RaceCarId, type RaceSelection } from './raceConfig'
 import { CIRCUIT, CIRCUIT_SCENERY, type CircuitDefinition } from './circuit'
 import { createCircuitScenery } from './scenery'
+import { createTrackVisuals, ROAD_Y } from './trackVisuals'
+import { createCarContactShadows, createRaceEnvironment, styleRaceCar } from './carAppearance'
 import { createMotionProfile, sampleMotion, type MotionProfile } from './motion'
 
 // Camera placement is independent of the motion table and React state.
@@ -45,12 +47,13 @@ type CarVisual = {
   body: CarVehicleBody
   wheels: WheelVisual[]
   profile: MotionProfile
+  shadowSize: THREE.Vector3
+  shadowCenter: THREE.Vector3
 }
 
 const CAMERA_FOV = 48
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 900
-const ROAD_Y = 0.024
 const MAX_DEVICE_PIXEL_RATIO = 2
 
 function plainVector(value: THREE.Vector3): PlainVector {
@@ -69,50 +72,6 @@ function own<T extends THREE.BufferGeometry | THREE.Material>(
 ): T {
   list.push(resource)
   return resource
-}
-
-function makeRibbon(
-  points: readonly PlainVector[],
-  halfWidth: number,
-  y: number,
-  color: string,
-  resources: Array<THREE.BufferGeometry | THREE.Material>,
-): THREE.Mesh {
-  const positions = new Float32Array(points.length * 2 * 3)
-  const indices: number[] = []
-  for (let index = 0; index < points.length; index += 1) {
-    const point = points[index]!
-    const previous = points[(index + points.length - 1) % points.length]!
-    const next = points[(index + 1) % points.length]!
-    const tangentX = next.x - previous.x
-    const tangentZ = next.z - previous.z
-    const tangentLength = Math.hypot(tangentX, tangentZ) || 1
-    const normalX = -tangentZ / tangentLength
-    const normalZ = tangentX / tangentLength
-    const offset = index * 6
-    positions[offset] = point.x - normalX * halfWidth
-    positions[offset + 1] = y
-    positions[offset + 2] = point.z - normalZ * halfWidth
-    positions[offset + 3] = point.x + normalX * halfWidth
-    positions[offset + 4] = y
-    positions[offset + 5] = point.z + normalZ * halfWidth
-    const nextIndex = (index + 1) % points.length
-    // The vertices are left, right for each sample.  Winding them left-right
-    // then next-left keeps the upward normal visible from the camera.
-    indices.push(index * 2, index * 2 + 1, nextIndex * 2)
-    indices.push(index * 2 + 1, nextIndex * 2 + 1, nextIndex * 2)
-  }
-  const geometry = own(new THREE.BufferGeometry(), resources)
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-  const material = own(
-    new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0.02 }),
-    resources,
-  )
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.receiveShadow = true
-  return mesh
 }
 
 function createWheelVisual(
@@ -137,7 +96,7 @@ function createWheelVisual(
   tire.receiveShadow = true
   group.add(tire)
 
-  const hubGeometry = own(new THREE.CylinderGeometry(radius * 0.32, radius * 0.32, width * 1.08, 16), resources)
+  const hubGeometry = own(new THREE.CylinderGeometry(radius * 0.54, radius * 0.54, width * 1.04, 16), resources)
   hubGeometry.rotateZ(Math.PI / 2)
   const hubMaterial = own(
     new THREE.MeshStandardMaterial({ color: '#dce4ea', roughness: 0.3, metalness: 0.65 }),
@@ -147,7 +106,7 @@ function createWheelVisual(
   hub.castShadow = true
   group.add(hub)
 
-  const spokeGeometry = own(new THREE.BoxGeometry(width * 1.12, radius * 1.24, radius * 0.08), resources)
+  const spokeGeometry = own(new THREE.BoxGeometry(width * 0.06, radius * 1.02, radius * 0.11), resources)
   const spokeMaterial = own(
     new THREE.MeshStandardMaterial({ color: '#9aa9b4', roughness: 0.35, metalness: 0.6 }),
     resources,
@@ -155,7 +114,7 @@ function createWheelVisual(
   const outward = x < 0 ? -1 : 1
   for (const rotation of [0, Math.PI / 2]) {
     const spoke = new THREE.Mesh(spokeGeometry, spokeMaterial)
-    spoke.position.x = outward * (width * 0.56)
+    spoke.position.x = outward * (width * 0.54)
     spoke.rotation.x = rotation
     spoke.castShadow = true
     group.add(spoke)
@@ -173,6 +132,7 @@ function createLoadedCarVisual(
   const root = new THREE.Group()
   root.name = `race-car-${selection.carId}`
   body.setBodyColor(selection.color)
+  styleRaceCar(body.object)
   root.add(body.object)
 
   const generatedResources: Array<THREE.BufferGeometry | THREE.Material> = []
@@ -187,11 +147,14 @@ function createLoadedCarVisual(
   // `root.traverse` during disposal sees every wheel resource.  Keeping this
   // list local avoids a second ownership system and protects StrictMode's
   // mount/unmount cycle from disposing a shared wheel accidentally.
+  const bounds = new THREE.Box3().setFromObject(root)
   return {
     root,
     body,
     wheels,
     profile,
+    shadowSize: bounds.getSize(new THREE.Vector3()),
+    shadowCenter: bounds.getCenter(new THREE.Vector3()).setY(0),
   }
 }
 
@@ -208,55 +171,6 @@ function disposeCarVisual(car: CarVisual): void {
   geometries.forEach((geometry) => geometry.dispose())
   materials.forEach((material) => material.dispose())
   car.root.removeFromParent()
-}
-
-function createRoadside(
-  roadEdge: number,
-  points: readonly PlainVector[],
-  resources: Array<THREE.BufferGeometry | THREE.Material>,
-): THREE.Group {
-  const group = new THREE.Group()
-  const postGeometry = own(new THREE.CylinderGeometry(0.07, 0.09, 0.9, 8), resources)
-  const postMaterial = own(new THREE.MeshStandardMaterial({ color: '#f7fbff', roughness: 0.65 }), resources)
-  const capGeometry = own(new THREE.BoxGeometry(0.26, 0.1, 0.08), resources)
-  const capMaterial = own(new THREE.MeshStandardMaterial({ color: '#f15b5b', roughness: 0.7 }), resources)
-  const railGeometry = own(new THREE.BoxGeometry(0.12, 0.5, 1), resources)
-  const railMaterial = own(new THREE.MeshStandardMaterial({ color: '#c9d2da', roughness: 0.5, metalness: 0.35 }), resources)
-
-  // Guardrails and posts are intentionally sparse so the track reads clearly
-  // at racing speed and remains light on low-power phones.
-  for (let index = 0; index < points.length; index += 8) {
-    const point = points[index]!
-    const next = points[(index + 1) % points.length]!
-    const dx = next.x - point.x
-    const dz = next.z - point.z
-    const length = Math.hypot(dx, dz) || 1
-    const tx = dx / length
-    const tz = dz / length
-    const nx = -tz
-    const nz = tx
-    for (const side of [-1, 1]) {
-      const x = point.x + nx * side * (roadEdge + 1.15)
-      const z = point.z + nz * side * (roadEdge + 1.15)
-      const post = new THREE.Mesh(postGeometry, postMaterial)
-      post.position.set(x, 0.45, z)
-      post.castShadow = true
-      group.add(post)
-      const cap = new THREE.Mesh(capGeometry, capMaterial)
-      cap.position.set(x, 0.82, z)
-      cap.rotation.y = Math.atan2(tx, tz)
-      group.add(cap)
-
-      if (index % 16 === 0) {
-        const rail = new THREE.Mesh(railGeometry, railMaterial)
-        rail.scale.z = Math.min(length * 6, 9)
-        rail.position.set(x + tx * rail.scale.z * 0.5, 0.54, z + tz * rail.scale.z * 0.5)
-        rail.rotation.y = Math.atan2(tx, tz)
-        group.add(rail)
-      }
-    }
-  }
-  return group
 }
 
 export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): CircuitRacingEngineHandle {
@@ -315,9 +229,13 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     let dirty = true
     let currentKey = ''
     let cars: CarVisual[] = []
-    const staticResources: Array<THREE.BufferGeometry | THREE.Material> = []
+    const contactShadows = createCarContactShadows()
 
     const scene = new THREE.Scene()
+    scene.add(contactShadows.mesh)
+    const environment = createRaceEnvironment()
+    scene.environment = environment
+    scene.environmentIntensity = 0.45
     scene.background = new THREE.Color(palette.sky)
     const raceFog = new THREE.Fog(palette.sky, 150, 520)
     scene.fog = raceFog
@@ -333,8 +251,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     }
     notify('loading')
 
-    const hemisphere = new THREE.HemisphereLight('#f8fcff', palette.ground, 1.45)
-    const sun = new THREE.DirectionalLight('#fff5db', 1.65)
+    const hemisphere = new THREE.HemisphereLight('#e8f4ff', '#8a9279', 1.5)
+    const sun = new THREE.DirectionalLight('#fff1d6', 2.3)
     sun.position.set(-35, 55, 25)
     sun.castShadow = true
     sun.shadow.mapSize.set(1024, 1024)
@@ -342,19 +260,17 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     sun.shadow.camera.right = 80
     sun.shadow.camera.top = 80
     sun.shadow.camera.bottom = -80
-    sun.shadow.camera.far = 220
+    sun.shadow.camera.far = 500
+    sun.shadow.bias = -0.0002
+    sun.shadow.normalBias = 0.035
     const fill = new THREE.DirectionalLight('#d6e8ff', 0.38)
     fill.position.set(35, 16, -45)
-    scene.add(hemisphere, sun, fill)
+    scene.add(hemisphere, sun, sun.target, fill)
+    const overviewCenter = circuitBounds.getCenter(new THREE.Vector3())
+    const overviewShadowExtent = circuitBounds.getSize(new THREE.Vector3()).length() / 2
+    const sunOffset = new THREE.Vector3(-75, 150, 65)
 
-    const groundGeometry = own(new THREE.PlaneGeometry(700, 700), staticResources)
-    const groundMaterial = own(new THREE.MeshStandardMaterial({ color: palette.ground, roughness: 0.96 }), staticResources)
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial)
-    ground.rotation.x = -Math.PI / 2
-    ground.position.y = -0.2
-    ground.receiveShadow = true
-    scene.add(ground)
-
+    let track: ReturnType<typeof createTrackVisuals> | undefined
     let scenery: ReturnType<typeof createCircuitScenery> | undefined
     let tracksideAnchor: PlainVector
     try {
@@ -377,43 +293,10 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         y: 8,
         z: anchor.z + (dx / tangentLength) * (roadEdge + 8),
       }
-      const road = makeRibbon(referencePoints, roadEdge, ROAD_Y, palette.road, staticResources)
-      scene.add(road)
-
-      const curbGeometry = own(new THREE.BoxGeometry(0.46, 0.12, 1), staticResources)
-      const curbRed = own(new THREE.MeshStandardMaterial({ color: palette.curb, roughness: 0.86 }), staticResources)
-      const curbWhite = own(new THREE.MeshStandardMaterial({ color: '#fff8ec', roughness: 0.8 }), staticResources)
-      const lineGeometry = own(new THREE.BoxGeometry(0.14, 0.012, 1), staticResources)
-      const lineMaterial = own(new THREE.MeshStandardMaterial({ color: '#ffe99a', roughness: 0.82 }), staticResources)
-      for (let index = 0; index < referencePoints.length; index += 1) {
-        const point = referencePoints[index]!
-        const nextPoint = referencePoints[(index + 1) % referencePoints.length]!
-        const dxSegment = nextPoint.x - point.x
-        const dzSegment = nextPoint.z - point.z
-        const segmentLength = Math.hypot(dxSegment, dzSegment) || 1
-        const tx = dxSegment / segmentLength
-        const tz = dzSegment / segmentLength
-        const nx = -tz
-        const nz = tx
-        const angle = Math.atan2(tx, tz)
-        for (const side of [-1, 1]) {
-          const curb = new THREE.Mesh(curbGeometry, index % 2 === 0 ? curbRed : curbWhite)
-          curb.position.set(point.x + nx * side * (roadEdge + 0.27), ROAD_Y + 0.07, point.z + nz * side * (roadEdge + 0.27))
-          curb.rotation.y = angle
-          curb.scale.z = Math.min(segmentLength * 1.03, 6)
-          curb.receiveShadow = true
-          scene.add(curb)
-        }
-        if (index % 3 === 0) {
-          const line = new THREE.Mesh(lineGeometry, lineMaterial)
-          line.position.set(point.x, ROAD_Y + 0.014, point.z)
-          line.rotation.y = angle
-          line.scale.z = Math.min(segmentLength * 0.58, 2.5)
-          scene.add(line)
-        }
-      }
+      track = createTrackVisuals(circuit, referencePoints)
+      scene.add(track.group)
       scenery = createCircuitScenery(circuit)
-      scene.add(createRoadside(roadEdge, referencePoints, staticResources), scenery.group)
+      scene.add(scenery.group)
     } catch (error) {
       // A malformed circuit is recoverable from the UI and should not strand
       // the player on a blank page.
@@ -514,6 +397,19 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     function render(): void {
       if (renderer === null || released || contextLost) return
       if (dirty) {
+        contactShadows.update(cars)
+        // Spend the existing 1024px map on the watched car in close views.
+        // Every car retains its contact shadow outside this focused region.
+        const target = cars[Math.min(cars.length - 1, Math.max(0, optionsRef.current.targetIndex))]
+        const overview = optionsRef.current.cameraMode === 'free'
+        const center = overview ? overviewCenter : target?.root.position ?? sun.target.position
+        const extent = overview ? overviewShadowExtent : 28
+        sun.target.position.copy(center)
+        sun.position.copy(center).add(sunOffset)
+        sun.target.updateMatrixWorld()
+        sun.shadow.camera.left = sun.shadow.camera.bottom = -extent
+        sun.shadow.camera.right = sun.shadow.camera.top = extent
+        sun.shadow.camera.updateProjectionMatrix()
         renderer.render(scene, camera)
         dirty = false
       }
@@ -522,6 +418,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     function disposeCars(): void {
       for (const car of cars) disposeCarVisual(car)
       cars = []
+      contactShadows.update(cars)
     }
 
     const reloadCars = async (selections: readonly RaceSelection[], force = false): Promise<void> => {
@@ -586,6 +483,9 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
       renderer.outputColorSpace = THREE.SRGBColorSpace
+      renderer.toneMapping = THREE.ACESFilmicToneMapping
+      renderer.toneMappingExposure = 1.1
+      track?.setAnisotropy(renderer.capabilities.getMaxAnisotropy())
       renderer.shadowMap.enabled = true
       renderer.shadowMap.type = THREE.PCFSoftShadowMap
       renderer.domElement.setAttribute('aria-hidden', 'true')
@@ -701,7 +601,9 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       }
       disposeCars()
       scenery?.dispose()
-      staticResources.forEach((resource) => resource.dispose())
+      track?.dispose()
+      contactShadows.dispose()
+      environment.dispose()
       hemisphere.dispose()
       sun.dispose()
       fill.dispose()
