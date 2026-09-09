@@ -1,0 +1,90 @@
+.page {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: var(--safe-top) calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  background: #edf3e7;
+  color: #344d51;
+}
+.page button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.page button:focus-visible { outline: 4px solid #f3a82c; outline-offset: 3px; }
+.page button:disabled { opacity: 0.5; cursor: default; }
+.page button:active:not(:disabled) { transform: translateY(2px); }
+.header { height: 66px; flex: 0 0 66px; display: flex; align-items: center; justify-content: space-between; padding-left: 120px; gap: 4px; }
+.header h1 { margin: 0; font-size: clamp(15px, 4.5vw, 22px); font-weight: 900; letter-spacing: 0.01em; white-space: nowrap; }
+.soundButton { border: 0; border-radius: 16px; background: #fffdf5; width: 46px; height: 48px; flex: 0 0 46px; font-size: 23px !important; box-shadow: 0 2px 0 #d6dfcc; }
+.scene { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 22px; background: #c3e5e9; touch-action: none; isolation: isolate; }
+.scene canvas { width: 100%; height: 100%; display: block; }
+.sceneCaption { position: absolute; left: 12px; right: 12px; top: 12px; z-index: 2; width: fit-content; max-width: calc(100% - 24px); border-radius: 30px; padding: 7px 13px; background: #fffff5e8; color: #465f5d; box-shadow: 0 2px 8px #37697512; font-weight: 800; font-size: 13px; pointer-events: none; }
+.sceneStatus { position: absolute; z-index: 5; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; padding: 20px; background: #d7ebe8ee; font-size: 16px; text-align: center; }
+.sceneStatus > span:first-child { font-size: 52px; }
+.sceneStatus button { min-height: 56px; border: 0; border-radius: 18px; background: #467c72; color: white; padding: 10px 30px; font-weight: 800; }
+.loadingDots { letter-spacing: 12px; color: #739c86; animation: breathe 1s ease-in-out infinite alternate; }
+.map { position: absolute; z-index: 2; right: 10px; top: 54px; width: 106px; border-radius: 16px; padding: 5px; background: #fffef2dc; box-shadow: 0 3px 10px #375d5520; pointer-events: none; }
+.map svg { display: block; width: 100%; height: 94px; }
+.map span { display: block; text-align: center; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.pointMarker { position: absolute; z-index: 3; transform: translate(-50%, -100%); border: 3px solid #fff9e4; border-radius: 17px; background: var(--route-color); color: white; padding: 4px 10px 6px; min-width: 68px; min-height: 56px; box-shadow: 0 4px 0 #2849564d; }
+.pointMarker[hidden] { display: none; }
+.pointMarker::after { content: ''; position: absolute; left: calc(50% - 6px); bottom: -10px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 8px solid #fff9e4; }
+.pointMarker span { display: block; font-size: 23px; line-height: 1.1; }
+.pointMarker small { display: block; font-size: 10px; font-weight: 800; }
+.page .pointMarker:active:not(:disabled) { transform: translate(-50%, -100%) scale(0.96); }
+.fitButton { position: absolute; z-index: 2; bottom: 10px; left: 10px; min-height: 44px; border: 2px solid #e2e4d0; border-radius: 14px; background: #fffff1ed; color: #4e6763; padding: 5px 13px; font-size: 12px !important; font-weight: 800 !important; }
+.selection, .controls { flex: 0 0 auto; margin: 8px auto 0; width: 100%; max-width: 740px; border-radius: 22px; background: #fffdf5; padding: 12px; box-shadow: 0 4px 14px #53674410; }
+.selection h2 { font-size: 16px; text-align: center; margin: 0 0 9px; }
+.trains { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.trainButton { position: relative; display: flex; flex-direction: column; align-items: center; padding: 2px 2px 9px; background: #f2f4ef; border: 3px solid transparent; border-radius: 18px; color: #41575c; min-width: 0; }
+.trainButton[aria-pressed='true'] { border-color: var(--train-color); background: #fffdf8; box-shadow: 0 3px 0 color-mix(in srgb, var(--train-color), transparent 75%); }
+.trainButton img { width: 74px; height: 64px; object-fit: contain; }
+.trainButton strong { font-size: 12px; white-space: nowrap; }
+.trainButton small { margin-top: 3px; font-size: 10px; white-space: nowrap; color: #6b7c7a; }
+.check { position: absolute; top: 5px; right: 6px; color: var(--train-color); font-size: 16px; font-weight: 900; }
+.beginButton { display: block; width: 100%; min-height: 58px; margin-top: 12px; border: 0; border-radius: 17px; background: #428775; color: white; font-size: 23px !important; font-weight: 900 !important; box-shadow: 0 4px 0 #30695d; letter-spacing: 0.07em; }
+.beginButton span { margin-right: 12px; font-size: 18px; }
+.primaryActions { display: grid; grid-template-columns: 1.15fr 1fr; gap: 10px; }
+.routeButton { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 95px; padding: 6px 4px; color: var(--route-color); background: #f3f8f4; border: 3px solid var(--route-color); border-radius: 18px; box-shadow: 0 3px 0 color-mix(in srgb, var(--route-color), transparent 75%); }
+.routeButton svg { width: 44px; flex: 0 0 44px; }
+.routeButton span { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.routeButton strong { font-size: 19px; white-space: nowrap; }
+.routeButton small { font-size: 11px; font-weight: 800; }
+.boostButton { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: #ffe19a; border: 3px solid #f7c664; border-radius: 18px; box-shadow: 0 3px 0 #dea944; color: #78572d; }
+.boostButton > span { font-size: 25px; line-height: 1.1; }
+.boostButton strong { font-size: 23px; }
+.boostButton small { font-size: 10px; font-weight: 800; }
+.boostButton[data-active='true'] { background: #ffc861; border-color: #e6a739; box-shadow: 0 0 0 3px #ffe5a0; }
+.tools { margin-top: 12px; display: grid; grid-template-columns: 1.25fr 1.1fr 0.8fr 0.8fr 0.8fr; gap: 5px; }
+.tools button { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-height: 53px; padding: 3px 1px; border: 2px solid #e2e7dc; border-radius: 13px; color: #52645f; background: #f5f6f0; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.tools button span { font-size: 20px; line-height: 1; }
+.tools button[aria-pressed='true'] { border-color: #669e8b; color: #356b5e; background: #e8f2e7; }
+.hint { display: flex; justify-content: center; flex-wrap: wrap; gap: 3px 10px; font-size: 10px; font-weight: 700; margin: 9px 0 0; color: #64776d; }
+.hint span { font-weight: 500; }
+@keyframes breathe { to { opacity: 0.35; } }
+@media (min-width: 700px) and (orientation: portrait) { .header h1 { margin-left: auto; margin-right: auto; } .selection { padding: 16px; } .trainButton img { height: 85px; width: 100px; } .trainButton strong { font-size: 16px; } }
+@media (max-width: 360px) { .header { padding-left: 113px; } .header h1 { font-size: 14px; } .soundButton { flex-basis: 40px; width: 40px; } .selection, .controls { padding: 9px; } .routeButton { gap: 3px; } .routeButton svg { width: 34px; flex-basis: 34px; } .routeButton strong { font-size: 17px; } .trainButton strong { font-size: 11px; } .trainButton small { font-size: 9px; } }
+@media (orientation: landscape) and (min-width: 600px) {
+  .page { display: grid; grid-template-columns: minmax(0, 1fr) 290px; grid-template-rows: 60px minmax(0, 1fr); gap: 0 8px; }
+  .header { grid-column: 1 / -1; height: 60px; padding-left: 120px; }
+  .header h1 { margin-right: auto; margin-left: 10px; font-size: 19px; }
+  .scene { grid-column: 1; height: 100%; }
+  .selection, .controls { grid-column: 2; grid-row: 2; width: 100%; margin: 0; align-self: center; max-height: 100%; overflow-y: auto; padding: 12px; }
+  .selection h2 { font-size: 14px; }
+  .trains { gap: 5px; }
+  .trainButton img { width: 64px; height: 58px; }
+  .trainButton strong { font-size: 10px; }
+  .trainButton small { display: none; }
+  .primaryActions { gap: 6px; }
+  .routeButton { flex-direction: column; gap: 2px; min-height: 110px; }
+  .routeButton svg { width: 35px; height: 33px; flex-basis: 33px; }
+  .routeButton span { gap: 1px; }
+  .routeButton strong { font-size: 17px; }
+  .routeButton small { font-size: 9px; }
+  .tools { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
+  .tools button { font-size: 9px; }
+  .hint { flex-direction: column; text-align: center; font-size: 9px; }
+  .map { width: 87px; top: 50px; }
+  .map svg { height: 76px; }
+  .map span { font-size: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .loadingDots { animation: none; } }

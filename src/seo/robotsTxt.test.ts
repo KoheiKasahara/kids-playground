@@ -21,7 +21,7 @@ describe('public/robots.txt', () => {
   })
 
   test('Sitemapがちょうど1つ指定されており、absoluteUrlで組み立てたURLと一致する', () => {
-    const sitemapLines = ROBOTS_TXT.split('\n').filter((line) => line.startsWith('Sitemap: '))
+    const sitemapLines = ROBOTS_TXT.split(/\r?\n/).filter((line) => line.startsWith('Sitemap: '))
     expect(sitemapLines).toHaveLength(1)
     expect(sitemapLines[0]).toBe(`Sitemap: ${absoluteUrl('/sitemap.xml')}`)
   })
