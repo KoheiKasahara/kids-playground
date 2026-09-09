@@ -1,3 +1,5 @@
+import { addCrab, tapCrab, stepCrabs, renderCrabs, type Crab } from './sandboxCrabs'
+
 // Original, bounded falling-sand simulation. No external engine or copied OSS code.
 export const Cell = { Empty: 0, Sand: 1, Water: 2, Stone: 3, Seed: 4, Mud: 5, Stem: 6, Petal: 7, Pollen: 8, Root: 9 } as const
 export type Material = 0 | 1 | 2 | 3 | 4
@@ -10,6 +12,9 @@ export class Sandbox {
   private readonly moved: Uint8Array
   private plants: Plant[] = []
   private tick = 0
+  readonly crabs: Crab[] = []
+  addCrab() { return addCrab(this, this.random) }
+  tapCrab(point: Point) { return tapCrab(this, point) }
   flowers = 0
   constructor(readonly width = 144, readonly height = 176, private random = Math.random) {
     this.cells = new Uint8Array(width * height)
@@ -27,6 +32,7 @@ export class Sandbox {
     this.moved[i] = 1
   }
   clear() {
+    this.crabs.length = 0
     this.cells.fill(0)
     this.age.fill(0)
     this.plants = []
@@ -102,6 +108,7 @@ export class Sandbox {
       }
     }
     this.grow()
+    stepCrabs(this, this.random)
   }
   private grow() {
     this.plants = this.plants.filter(p => this.get(p.x, p.y) === Cell.Root)
@@ -150,4 +157,5 @@ export function renderSandbox(world: Sandbox, pixels: Uint8ClampedArray) {
     pixels[offset + 2] = color[2] + variation
     pixels[offset + 3] = material === Cell.Empty ? 0 : 255
   }
+  renderCrabs(world, pixels)
 }
