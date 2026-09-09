@@ -9,6 +9,9 @@ import { createCircuitScenery } from './scenery'
 import { createCircuitRoad, ROAD_Y } from './road'
 import { createMotionProfile, sampleMotion, type MotionProfile } from './motion'
 
+import { activateSpecial, advanceSpecial, SPECIAL_SPEED_MULTIPLIER, type SpecialState } from './special'
+import { createSpecialEffect, animateSpecialEffect } from './specialEffect'
+
 // Camera placement is independent of the motion table and React state.
 import {
   chaseCameraPose,
@@ -25,12 +28,14 @@ export type CircuitRacingEngineOptions = {
   running: boolean
   cameraMode: RaceCameraMode
   targetIndex: number
+  onSpecialChange?: (states: readonly SpecialState[]) => void
   onStatusChange?: (status: CircuitRacingEngineStatus, message?: string) => void
 }
 
 export type CircuitRacingEngineHandle = {
   registerContainer: (element: HTMLDivElement | null) => void
   retry: () => void
+  special: (targetIndex: number) => void
   boost: (targetIndex: number) => void
   adjustCamera: (action: 'left' | 'right' | 'up' | 'down' | 'in' | 'out' | 'turnLeft' | 'turnRight' | 'overview') => void
 }
@@ -48,6 +53,8 @@ type CarVisual = {
   wheels: WheelVisual[]
   profile: MotionProfile
   elapsedSeconds: number
+  specialState: SpecialState
+  specialEffect: THREE.Group
   boostRemaining: number
   boostEffect: THREE.Group
   boostMaterials: THREE.MeshBasicMaterial[]
@@ -147,6 +154,8 @@ function createLoadedCarVisual(
       )
     }
   }
+  const specialEffect = createSpecialEffect(selection.carId)
+  root.add(specialEffect)
   const boostEffect = new THREE.Group()
   boostEffect.name = 'boost-effect'
   boostEffect.visible = false
@@ -176,6 +185,8 @@ function createLoadedCarVisual(
     wheels,
     profile,
     elapsedSeconds: 0,
+    specialState: { charge: 0, remaining: 0 },
+    specialEffect,
     boostRemaining: 0,
     boostEffect,
     boostMaterials,
@@ -204,6 +215,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
   const syncSelectionsRef = useRef<((selections: readonly RaceSelection[]) => void) | null>(null)
   const [generation, setGeneration] = useState(0)
   const cameraAdjustmentRef = useRef<CircuitRacingEngineHandle['adjustCamera'] | null>(null)
+  const specialRef = useRef<CircuitRacingEngineHandle['special'] | null>(null)
   const boostRef = useRef<CircuitRacingEngineHandle['boost'] | null>(null)
   const requestRenderRef = useRef<(() => void) | null>(null)
   const selectionKey = options.selections.map((selection) => `${selection.carId}:${selection.color}`).join('|')
@@ -220,6 +232,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     () => ({
       registerContainer,
       retry: () => setGeneration((value) => value + 1),
+      special: (targetIndex) => specialRef.current?.(targetIndex),
       boost: (targetIndex) => boostRef.current?.(targetIndex),
       adjustCamera: (action) => cameraAdjustmentRef.current?.(action),
     }),
@@ -254,6 +267,14 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     let dirty = true
     let currentKey = ''
     let cars: CarVisual[] = []
+    let lastSpecialKey = ''
+    function publishSpecial(): void {
+      if (released) return
+      const key = cars.map(car => `${Math.floor(car.specialState.charge * 100)}:${car.specialState.remaining > 0}`).join('|')
+      if (key === lastSpecialKey) return
+      lastSpecialKey = key
+      optionsRef.current.onSpecialChange?.(cars.map(car => ({ ...car.specialState })))
+    }
     const staticResources: Array<THREE.BufferGeometry | THREE.Material> = []
 
     const scene = new THREE.Scene()
@@ -429,6 +450,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     function disposeCars(): void {
       for (const car of cars) disposeCarVisual(car)
       cars = []
+      publishSpecial()
     }
 
     const reloadCars = async (selections: readonly RaceSelection[], force = false): Promise<void> => {
@@ -462,6 +484,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         }
         nextCars.forEach((car) => { scene.add(car.root); applyCarFrame(car) })
         cars = nextCars
+        publishSpecial()
         notify('ready')
       } catch (error) {
         // Dispose every model that did arrive when one of the other models
@@ -550,6 +573,14 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         controls.update()
         markDirty()
       }
+      specialRef.current = (targetIndex) => {
+        if (!optionsRef.current.running || contextLost || document.hidden) return
+        const target = cars[targetIndex]
+        if (!target || !activateSpecial(target.specialState)) return
+        animateSpecialEffect(target.specialEffect, target.specialState.remaining)
+        publishSpecial()
+        markDirty()
+      }
       boostRef.current = (targetIndex) => {
         const target = cars[Math.min(cars.length - 1, Math.max(0, targetIndex))]
         if (target === undefined) return
@@ -571,7 +602,9 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         if (running) {
           for (const car of cars) {
             const boosting = car.boostRemaining > 0
-            car.elapsedSeconds += delta * (boosting ? BOOST_SPEED_MULTIPLIER : 1)
+            const specialSeconds = advanceSpecial(car.specialState, delta)
+            car.elapsedSeconds += specialSeconds * SPECIAL_SPEED_MULTIPLIER + (delta - specialSeconds) * (boosting ? BOOST_SPEED_MULTIPLIER : 1)
+            animateSpecialEffect(car.specialEffect, car.specialState.remaining)
             car.boostRemaining = Math.max(0, car.boostRemaining - delta)
             car.boostEffect.visible = car.boostRemaining > 0
             if (car.boostEffect.visible) {
@@ -589,6 +622,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
             }
             applyCarFrame(car)
           }
+          publishSpecial()
           updateCamera()
           dirty = true
         } else if (wasRunning || cameraChanged) {
@@ -620,6 +654,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       loadingToken += 1
       syncSelectionsRef.current = null
       cameraAdjustmentRef.current = null
+      specialRef.current = null
       boostRef.current = null
       requestRenderRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)

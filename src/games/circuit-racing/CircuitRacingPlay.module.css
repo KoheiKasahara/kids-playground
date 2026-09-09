@@ -503,3 +503,37 @@
   font-size: 13px;
   font-weight: 700;
 }
+
+.raceHeader {
+  grid-template-columns: 64px minmax(0, 1fr) 116px auto;
+  gap: 6px;
+}
+
+.backButton { padding: 4px; line-height: 1.2; }
+
+.specialButton {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  min-height: 58px;
+  padding: 5px;
+  border: 2px solid #8163b7;
+  border-radius: var(--radius-md);
+  background: #eee7fb;
+  color: #4b3275;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+.specialButton[data-ready='true'] { background: #ffdb55; border-color: #b56b0c; color: #523208; cursor: pointer; }
+.specialButton:focus-visible { outline: 3px solid #26384c; outline-offset: 2px; }
+.specialButton small { font-size: 10px; }
+.specialGauge { width: 100%; height: 7px; background: #d1c3e5; border-radius: 5px; overflow: hidden; }
+.specialGauge > span { display: block; height: 100%; background: #7951b7; }
+
+@media (max-width: 620px), (orientation: landscape) and (max-height: 560px) {
+  .raceHeader { grid-template-columns: 60px minmax(100px, 1fr) auto; }
+  .boostButton { padding: 6px 8px; }
+}
