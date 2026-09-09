@@ -19,6 +19,41 @@ export type RaceCameraPose = {
   target: { x: number; y: number; z: number }
 }
 
+/** Elevated local shots keep the sightline away from distant infield scenery. */
+export function createTracksideAnchors(
+  curve: { getPointAt: (t: number) => RaceCameraVector; getTangentAt: (t: number) => RaceCameraVector },
+  roadWidth: number,
+): RaceCameraVector[] {
+  return Array.from({ length: 12 }, (_, index) => {
+    const point = curve.getPointAt(index / 12)
+    const tangent = curve.getTangentAt(index / 12)
+    const direction = normalise(tangent.x, tangent.z)
+    // Stay in the clear strip next to the road, above barriers and stand roofs.
+    const offset = roadWidth / 2 + 2
+    return { x: point.x - direction.z * offset, y: 18, z: point.z + direction.x * offset }
+  })
+}
+
+/** Hold each shot until another camera is at least eight metres closer. */
+export function selectTracksideAnchor(
+  anchors: readonly RaceCameraVector[],
+  target: RaceCameraVector,
+  previous = -1,
+): number {
+  const distance = (anchor: RaceCameraVector) => Math.hypot(anchor.x - target.x, anchor.z - target.z)
+  let nearest = -1
+  let nearestDistance = Infinity
+  anchors.forEach((anchor, index) => {
+    const candidateDistance = distance(anchor)
+    if (candidateDistance < nearestDistance) {
+      nearest = index
+      nearestDistance = candidateDistance
+    }
+  })
+  const current = anchors[previous]
+  return current && distance(current) <= nearestDistance + 8 ? previous : nearest
+}
+
 function finite(value: number | undefined, fallback: number): number {
   return Number.isFinite(value) ? value! : fallback
 }

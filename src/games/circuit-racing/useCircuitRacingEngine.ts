@@ -19,6 +19,8 @@ import { createSpecialEffect, animateSpecialEffect } from './specialEffect'
 // Camera placement is independent of the motion table and React state.
 import {
   chaseCameraPose,
+  createTracksideAnchors,
+  selectTracksideAnchor,
   overviewCameraPose,
   tracksideCameraPose,
   type RaceCameraMode,
@@ -332,27 +334,13 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     let track: ReturnType<typeof createTrackVisuals> | undefined
     let scenery: ReturnType<typeof createCircuitScenery> | undefined
     let sceneryShadows: ReturnType<typeof createSceneryShadows> | undefined
-    let tracksideAnchor: PlainVector
+    let tracksideAnchors: ReturnType<typeof createTracksideAnchors> = []
+    let tracksideIndex = -1
+    let tracksideTarget: CarVisual | undefined
     try {
       curve.arcLengthDivisions = 4096
       curve.updateArcLengths()
-      const referencePoints = Array.from({ length: 192 }, (_, index) => {
-        const point = curve.getPointAt(index / 192)
-        point.y = ROAD_Y
-        return point
-      })
-      const anchorIndex = Math.floor(referencePoints.length * 0.28)
-      const anchor = referencePoints[anchorIndex] ?? { x: 0, y: 0, z: 0 }
-      const previous = referencePoints[(anchorIndex + referencePoints.length - 1) % referencePoints.length] ?? anchor
-      const next = referencePoints[(anchorIndex + 1) % referencePoints.length] ?? anchor
-      const dx = next.x - previous.x
-      const dz = next.z - previous.z
-      const tangentLength = Math.hypot(dx, dz) || 1
-      tracksideAnchor = {
-        x: anchor.x + (-dz / tangentLength) * (roadEdge + 8),
-        y: 8,
-        z: anchor.z + (dx / tangentLength) * (roadEdge + 8),
-      }
+      tracksideAnchors = createTracksideAnchors(curve, circuit.width)
       track = createTrackVisuals(circuit)
       scene.add(track.group)
       scenery = createCircuitScenery(circuit)
@@ -371,7 +359,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       // A malformed circuit is recoverable from the UI and should not strand
       // the player on a blank page.
       notify('error', error instanceof Error ? error.message : 'コースを つくれません')
-      tracksideAnchor = { x: 10, y: 0, z: 8 }
+      tracksideAnchors = [{ x: 10, y: 18, z: 8 }]
     }
 
     function resize(): void {
@@ -447,8 +435,14 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         previousCameraMode = mode
         return
       }
+      if (mode === 'trackside') {
+        const previous = previousCameraMode === mode && tracksideTarget === target ? tracksideIndex : -1
+        tracksideIndex = selectTracksideAnchor(tracksideAnchors, frame.position, previous)
+        tracksideTarget = target
+      }
+      // Cut between fixed shots; flying through the infield would cross scenery.
       const pose = mode === 'trackside'
-        ? tracksideCameraPose(tracksideAnchor, frame.position)
+        ? tracksideCameraPose(tracksideAnchors[tracksideIndex], frame.position)
         : chaseCameraPose(frame.position, frame.tangent)
       if (controls !== null) {
         controls.enabled = false
