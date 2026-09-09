@@ -51,7 +51,8 @@ describe.each(kinds)('%s flower play', kind => {
     }
     expect(world.bloomingFlowers()).toHaveLength(0)
     for (let i = 0; i < before.length; i++) {
-      if (before[i] !== Cell.Petal && before[i] !== Cell.Pollen) expect(world.cells[i]).toBe(before[i])
+      if (before[i] >= Cell.Stem) expect(world.cells[i]).toBe(Cell.Empty)
+      else expect(world.cells[i]).toBe(before[i])
     }
     for (let i = 0; i < 100; i++) world.step()
     expect(world.bloomingFlowers()).toHaveLength(0)
@@ -148,7 +149,7 @@ it('allows two crabs and one turtle, shares flower reservations and clears both 
   const a = add(world, 'crab'), b = add(world, 'crab'), c = add(world, 'turtle')
   expect(world.addCrab()).toBe(false)
   expect(world.addTurtle()).toBe(false)
-  a.x = 18; b.x = 38; c.x = 58
+  a.x = 16; b.x = 38; c.x = 60
   for (const creature of [a, b, c]) creature.fullness = 0
   tick(world)
   expect(new Set([a.target?.x, b.target?.x, c.target?.x]).size).toBe(3)
@@ -168,7 +169,7 @@ it('only one animal can gain growth from the last flower', () => {
   const a = add(world, 'crab'), b = add(world, 'turtle')
   a.x = b.x = world.bloomingFlowers()[0].x - 7
   a.fullness = b.fullness = 0
-  tick(world, EATING_STEPS + 1)
+  tick(world, EATING_STEPS + 500)
   expect(a.growth + b.growth).toBe(1)
   expect(world.bloomingFlowers()).toHaveLength(0)
 })
@@ -184,4 +185,75 @@ it('turtles walk more slowly than crabs and react to a tap', () => {
   expect(tx - turtle.x).toBeGreaterThan(0)
   expect(world.tapTurtle({ x: turtle.x, y: turtle.y - 4 })).toBe(true)
   expect(turtle.wave).toBe(90)
+})
+
+describe.each([0, 2])('creature spacing at growth %s', growth => {
+  it.each(['crab', 'turtle'] as const)('separates a crab and %s even when resting at the same position beside a wall', kind => {
+    const world = garden()
+    const a = add(world, 'crab'), b = add(world, kind)
+    for (const c of [a, b]) {
+      c.x = 7 * (1 + growth * 0.25); c.growth = growth
+      c.resting = true; c.wave = 90; c.decision = 1000
+    }
+    tick(world, 400)
+    expect(Math.abs(a.x - b.x)).toBeGreaterThanOrEqual(18 * (1 + growth * 0.25))
+    expect(Math.min(a.x, b.x)).toBeGreaterThanOrEqual(7 * (1 + growth * 0.25))
+  })
+
+  it('turns away from another species while pursuing a flower', () => {
+    const world = garden()
+    const a = add(world, 'crab'), b = add(world, 'turtle')
+    a.x = 10; b.x = 40
+    for (const c of [a, b]) { c.growth = growth; c.fullness = 0; c.wave = 0 }
+    for (let i = 0; i < 700; i++) {
+      tick(world)
+      // Meals may enlarge the body, but walking must never cross the other animal.
+      expect(b.x - a.x).toBeGreaterThan(17)
+    }
+  })
+})
+
+it.each(kinds)('renders the %s in front of plants while terrain still masks its body', kind => {
+  const world = garden()
+  const c = add(world, kind)
+  c.x = 15
+  const pixels = new Uint8ClampedArray(world.cells.length * 4)
+  const index = (Math.round(c.y - 3) * world.width + c.x) * 4
+  renderSandbox(world, pixels)
+  const body = pixels.slice(index, index + 4)
+  for (const material of [Cell.Stem, Cell.Petal, Cell.Pollen, Cell.Root, Cell.Sand, Cell.Mud, Cell.Stone, Cell.Seed]) {
+    world.cells[index / 4] = material
+    renderSandbox(world, pixels)
+    if (material >= Cell.Stem) expect(pixels.slice(index, index + 4)).toEqual(body)
+    else expect(pixels.slice(index, index + 4)).not.toEqual(body)
+    expect(world.cells[index / 4]).toBe(material)
+  }
+})
+
+it.each([30, 80])('withers the whole plant when its support disappears after %s steps', steps => {
+  const world = new Sandbox(100, 70, () => 0.5)
+  world.cells.fill(Cell.Mud, 55 * world.width)
+  world.paint({ x: 25, y: 54 }, Cell.Seed, 0)
+  for (let i = 0; i < steps; i++) world.step()
+  expect(world.cells.some(c => c === Cell.Stem)).toBe(true)
+  world.cells.fill(Cell.Empty, 55 * world.width)
+  world.step()
+  expect(world.cells.some(c => c >= Cell.Stem)).toBe(false)
+  for (let i = 0; i < 80; i++) world.step()
+  expect(world.bloomingFlowers()).toHaveLength(0)
+})
+
+it('withers an erased root without deleting replacement material or neighboring plants', () => {
+  const world = garden()
+  const neighbors = world.cells.slice()
+  world.paint({ x: 25, y: 54 }, Cell.Empty, 0)
+  world.paint({ x: 25, y: 50 }, Cell.Empty, 0)
+  world.paint({ x: 25, y: 50 }, Cell.Stone, 0)
+  world.step()
+  expect(world.get(25, 50)).toBe(Cell.Stone)
+  expect(world.bloomingFlowers()).toHaveLength(2)
+  for (let y = 0; y < 55; y++) {
+    for (let x = 23; x <= 27; x++) expect(world.get(x, y)).toBe(x === 25 && y === 50 ? Cell.Stone : Cell.Empty)
+    for (let x = 43; x <= 67; x++) expect(world.get(x, y)).toBe(neighbors[y * world.width + x])
+  }
 })

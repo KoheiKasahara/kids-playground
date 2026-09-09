@@ -4,7 +4,7 @@ import { addCrab, addTurtle, tapCrab, tapTurtle, stepCrabs, stepTurtles, renderC
 export const Cell = { Empty: 0, Sand: 1, Water: 2, Stone: 3, Seed: 4, Mud: 5, Stem: 6, Petal: 7, Pollen: 8, Root: 9 } as const
 export type Material = 0 | 1 | 2 | 3 | 4
 export type Point = { x: number; y: number }
-type Plant = Point & { height: number; age: number; target: number }
+type Plant = Point & { height: number; age: number; target: number; cells: Map<number, number> }
 
 export class Sandbox {
   readonly cells: Uint8Array
@@ -24,13 +24,21 @@ export class Sandbox {
   }
   eatFlower(point: Point) {
     if (!this.bloomingFlowers().some(p => p.x === point.x && p.y === point.y)) return false
-    // Leave stems, roots, grains and neighboring plants intact. Flowers is the
-    // cumulative discovery counter, so eating must not trigger another bloom.
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-      const cell = this.get(point.x + dx, point.y + dy)
-      if (cell === Cell.Petal || cell === Cell.Pollen) this.set(point.x + dx, point.y + dy, Cell.Empty)
-    }
+    const plant = this.plants.find(p => p.x === point.x && p.y - p.height === point.y)!
+    this.wither(plant)
+    this.plants = this.plants.filter(p => p !== plant)
     return true
+  }
+  private wither(plant: Plant) {
+    // Remove only this plant's surviving cells, preserving replacement grains.
+    for (const [index, material] of plant.cells) {
+      if (this.cells[index] === material) this.set(index % this.width, Math.floor(index / this.width), Cell.Empty)
+    }
+  }
+  private plantCell(plant: Plant, x: number, y: number, material: number) {
+    if (x < 0 || x >= this.width || y < 0 || y >= this.height) return
+    this.set(x, y, material)
+    plant.cells.set(y * this.width + x, material)
   }
   flowers = 0
   constructor(readonly width = 144, readonly height = 176, private random = Math.random) {
@@ -106,7 +114,7 @@ export class Sandbox {
         this.age[i]++
         if (this.age[i] >= 18 && y > 12 && (this.get(x, y - 1) === Cell.Empty || this.get(x, y - 1) === Cell.Water) && !this.plants.some(p => Math.abs(p.x - x) < 6 && Math.abs(p.y - y) < 14)) {
           this.set(x, y, Cell.Root)
-          this.plants.push({ x, y, height: 0, age: 0, target: 8 + Math.floor(this.random() * 5) })
+          this.plants.push({ x, y, height: 0, age: 0, target: 8 + Math.floor(this.random() * 5), cells: new Map([[i, Cell.Root]]) })
         }
         continue
       }
@@ -130,24 +138,29 @@ export class Sandbox {
     stepTurtles(this, this.random)
   }
   private grow() {
-    this.plants = this.plants.filter(p => this.get(p.x, p.y) === Cell.Root)
+    this.plants = this.plants.filter(p => {
+      const support = this.get(p.x, p.y + 1)
+      if (this.get(p.x, p.y) === Cell.Root && (support === Cell.Mud || support === Cell.Sand || support === Cell.Stone)) return true
+      this.wither(p)
+      return false
+    })
     for (const plant of this.plants) {
       if (plant.height >= plant.target || ++plant.age % 4 !== 0) continue
       const y = plant.y - plant.height - 1
       // A puddle must not make watering a failure: shoots can grow through water.
       if (this.get(plant.x, y) !== Cell.Empty && this.get(plant.x, y) !== Cell.Water) continue
-      this.set(plant.x, y, Cell.Stem)
+      this.plantCell(plant, plant.x, y, Cell.Stem)
       plant.height++
       if (plant.height % 3 === 0) {
         const side = plant.height % 2 ? -1 : 1
-        if (this.get(plant.x + side, y) === Cell.Empty) this.set(plant.x + side, y, Cell.Stem)
+        if (this.get(plant.x + side, y) === Cell.Empty) this.plantCell(plant, plant.x + side, y, Cell.Stem)
       }
       if (plant.height === plant.target) {
         for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
           if (Math.abs(dx) + Math.abs(dy) > 3) continue
-          if (this.get(plant.x + dx, y + dy) === Cell.Empty) this.set(plant.x + dx, y + dy, Cell.Petal)
+          if (this.get(plant.x + dx, y + dy) === Cell.Empty) this.plantCell(plant, plant.x + dx, y + dy, Cell.Petal)
         }
-        this.set(plant.x, y, Cell.Pollen)
+        this.plantCell(plant, plant.x, y, Cell.Pollen)
         this.flowers++
       }
     }
