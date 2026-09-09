@@ -37,8 +37,8 @@ export function chaseCameraPose(
 ): RaceCameraPose {
   const direction = normalise(tangent.x, tangent.z)
   const distance = Math.max(1, finite(options.distance, 9))
-  const height = Math.max(0.5, finite(options.height, 5.1))
-  const lookAhead = Math.max(0, finite(options.lookAhead, 8))
+  const height = Math.max(0.5, finite(options.height, 4.3))
+  const lookAhead = Math.max(0, finite(options.lookAhead, 6.5))
   const targetHeight = Math.max(0, finite(options.targetHeight, 0.75))
   const y = finite(position.y, 0)
 

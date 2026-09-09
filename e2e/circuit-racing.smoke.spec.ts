@@ -68,6 +68,12 @@ test('WebGL初期化失敗後もレンダラーを作り直せる', async ({ pag
 
 test('全コースの描画を切り替え、WebGL復帰後も走れる', async ({ page }) => {
   const errors = capturePageErrors(page)
+  // Shader compile failures can leave only part of the scene blank without a pageerror.
+  page.on('console', message => {
+    if (message.type() === 'error' && /THREE.WebGLProgram|VALIDATE_STATUS|shader error/i.test(message.text())) {
+      errors.push(message.text())
+    }
+  })
   await page.goto('/games/circuit-racing')
   await page.getByRole('button', { name: '3だい', exact: true }).click()
   for (const course of ['くねくねカーブ', 'びゅんびゅんオーバル', 'ぐるっとヘアピン', 'シティコース', 'うみぞいコース', 'みんなのサーキット']) {

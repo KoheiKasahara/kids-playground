@@ -65,14 +65,8 @@ export function addDestinationScenery(circuit: CircuitDefinition, { part, place 
       part(m, 'box', '#e58264', 0.25, 5.8, 0, 0.12, 2, 1.4)
     }, 1, 'streetlight')
   } else if (circuit.scenery === 'coast') {
-    // A continuous sea beside the eastern coastline, not a small inland pond.
+    // The water surface and surf are rendered by trackVisuals in one batch.
     part(world, 'box', '#eddb9c', 170, -0.09, 0, 20, 0.12, 630)
-    part(world, 'box', '#49bed0', 187, -0.075, 0, 14, 0.1, 630)
-    part(world, 'box', '#309ec7', 257, -0.09, 0, 126, 0.12, 630)
-    for (let i = 0; i < 22; i++) {
-      part(world, 'box', '#b8eff0', 183 + (i % 3) * 2.5, 0.005, (i - 10.5) * 25,
-        0.45, 0.025, 9 + (i % 3) * 3)
-    }
     place(0.28, 12, (m) => {
       part(m, 'cylinder', '#e2d7b5', 0, 0.2, 0, 18, 0.8, 18)
       part(m, 'cylinder', '#f8efda', 0, 2, 0, 9, 3, 9)

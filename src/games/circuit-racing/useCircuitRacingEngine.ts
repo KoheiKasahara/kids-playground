@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { CAR_VEHICLES } from '../car-builder/carVehicles'
 import { loadCarVehicleBody, type CarVehicleBody } from '../car-builder/vehicleBody'
 import { RACE_CARS, type RaceCarId, type RaceSelection } from './raceConfig'
 import { CIRCUIT, CIRCUIT_SCENERY, type CircuitDefinition } from './circuit'
 import { createCircuitScenery } from './scenery'
 import { createTrackVisuals, ROAD_Y } from './trackVisuals'
-import { createCarContactShadows, createRaceEnvironment, styleRaceCar } from './carAppearance'
+import { createCarContactShadows, createRaceEnvironment, createRacingStripes, styleRaceCar } from './carAppearance'
+import { createRaceAtmosphere } from './atmosphere'
+import { createSceneryShadows, RACE_SUN_OFFSET } from './sceneryShadows'
 import { createMotionProfile, sampleMotion, type MotionProfile } from './motion'
 
 import { activateSpecial, advanceSpecial, SPECIAL_SPEED_MULTIPLIER, type SpecialState } from './special'
@@ -110,29 +113,26 @@ function createWheelVisual(
   tire.receiveShadow = true
   group.add(tire)
 
-  const hubGeometry = own(new THREE.CylinderGeometry(radius * 0.54, radius * 0.54, width * 1.04, 16), resources)
-  hubGeometry.rotateZ(Math.PI / 2)
+  const outward = x < 0 ? -1 : 1
+  const face = outward * width * 0.54
+  const rim = new THREE.TorusGeometry(radius * 0.72, radius * 0.07, 6, 24)
+  rim.rotateY(Math.PI / 2).translate(face, 0, 0)
+  const cap = new THREE.CylinderGeometry(radius * 0.18, radius * 0.18, width * 0.1, 12)
+  cap.rotateZ(Math.PI / 2).translate(face, 0, 0)
+  const parts: THREE.BufferGeometry[] = [rim, cap]
+  for (let i = 0; i < 5; i++) {
+    const spoke = new THREE.BoxGeometry(width * 0.08, radius * 0.66, radius * 0.13)
+    spoke.translate(0, radius * 0.39, 0).rotateX(i * Math.PI * 2 / 5).translate(face, 0, 0)
+    parts.push(spoke)
+  }
+  const hubGeometry = own(mergeGeometries(parts), resources)
+  parts.forEach(part => part.dispose())
   const hubMaterial = own(
-    new THREE.MeshStandardMaterial({ color: '#dce4ea', roughness: 0.3, metalness: 0.65 }),
+    new THREE.MeshStandardMaterial({ color: '#dce4ea', roughness: 0.25, metalness: 0.75 }),
     resources,
   )
   const hub = new THREE.Mesh(hubGeometry, hubMaterial)
-  hub.castShadow = true
   group.add(hub)
-
-  const spokeGeometry = own(new THREE.BoxGeometry(width * 0.06, radius * 1.02, radius * 0.11), resources)
-  const spokeMaterial = own(
-    new THREE.MeshStandardMaterial({ color: '#9aa9b4', roughness: 0.35, metalness: 0.6 }),
-    resources,
-  )
-  const outward = x < 0 ? -1 : 1
-  for (const rotation of [0, Math.PI / 2]) {
-    const spoke = new THREE.Mesh(spokeGeometry, spokeMaterial)
-    spoke.position.x = outward * (width * 0.54)
-    spoke.rotation.x = rotation
-    spoke.castShadow = true
-    group.add(spoke)
-  }
   parent.add(group)
   return { group, radius }
 }
@@ -148,6 +148,10 @@ function createLoadedCarVisual(
   body.setBodyColor(selection.color)
   styleRaceCar(body.object)
   root.add(body.object)
+  if (selection.carId === 'sportsCar') {
+    const stripes = createRacingStripes(body.object)
+    if (stripes) root.add(stripes)
+  }
 
   const generatedResources: Array<THREE.BufferGeometry | THREE.Material> = []
   const wheels: WheelVisual[] = []
@@ -288,10 +292,12 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     const scene = new THREE.Scene()
     scene.add(contactShadows.mesh)
     const environment = createRaceEnvironment()
+    const atmosphere = createRaceAtmosphere(circuit)
+    scene.add(atmosphere.group)
     scene.environment = environment
     scene.environmentIntensity = 0.45
     scene.background = new THREE.Color(palette.sky)
-    const raceFog = new THREE.Fog(palette.sky, 150, 520)
+    const raceFog = new THREE.Fog(atmosphere.horizonColor, 160, 560)
     scene.fog = raceFog
     const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR)
     camera.position.set(0, 10, 18)
@@ -305,8 +311,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     }
     notify('loading')
 
-    const hemisphere = new THREE.HemisphereLight('#e8f4ff', '#8a9279', 1.5)
-    const sun = new THREE.DirectionalLight('#fff1d6', 2.3)
+    const hemisphere = new THREE.HemisphereLight('#e8f4ff', '#78856b', 1.0)
+    const sun = new THREE.DirectionalLight('#fff1d6', 2.5)
     sun.position.set(-35, 55, 25)
     sun.castShadow = true
     sun.shadow.mapSize.set(1024, 1024)
@@ -322,10 +328,10 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     scene.add(hemisphere, sun, sun.target, fill)
     const overviewCenter = circuitBounds.getCenter(new THREE.Vector3())
     const overviewShadowExtent = circuitBounds.getSize(new THREE.Vector3()).length() / 2
-    const sunOffset = new THREE.Vector3(-75, 150, 65)
 
     let track: ReturnType<typeof createTrackVisuals> | undefined
     let scenery: ReturnType<typeof createCircuitScenery> | undefined
+    let sceneryShadows: ReturnType<typeof createSceneryShadows> | undefined
     let tracksideAnchor: PlainVector
     try {
       curve.arcLengthDivisions = 4096
@@ -351,6 +357,16 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       scene.add(track.group)
       scenery = createCircuitScenery(circuit)
       scene.add(scenery.group)
+      sceneryShadows = createSceneryShadows(scenery.group)
+      const receivers = new Set<THREE.MeshStandardMaterial>()
+      for (const group of [track.group, scenery.group]) group.traverse(child => {
+        if (!(child instanceof THREE.Mesh)) return
+        const materials = Array.isArray(child.material) ? child.material : [child.material]
+        materials.forEach(material => {
+          if (material instanceof THREE.MeshStandardMaterial) receivers.add(material)
+        })
+      })
+      receivers.forEach(material => sceneryShadows!.apply(material))
     } catch (error) {
       // A malformed circuit is recoverable from the UI and should not strand
       // the player on a blank page.
@@ -460,11 +476,13 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         const center = overview ? overviewCenter : target?.root.position ?? sun.target.position
         const extent = overview ? overviewShadowExtent : 28
         sun.target.position.copy(center)
-        sun.position.copy(center).add(sunOffset)
+        sun.position.copy(center).add(RACE_SUN_OFFSET)
         sun.target.updateMatrixWorld()
         sun.shadow.camera.left = sun.shadow.camera.bottom = -extent
         sun.shadow.camera.right = sun.shadow.camera.top = extent
         sun.shadow.camera.updateProjectionMatrix()
+        atmosphere.update(camera)
+        track?.update(cars[0]?.elapsedSeconds ?? 0)
         renderer.render(scene, camera)
         dirty = false
       }
@@ -540,7 +558,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
       renderer.outputColorSpace = THREE.SRGBColorSpace
       renderer.toneMapping = THREE.ACESFilmicToneMapping
-      renderer.toneMappingExposure = 1.1
+      renderer.toneMappingExposure = 1.0
       track?.setAnisotropy(renderer.capabilities.getMaxAnisotropy())
       renderer.shadowMap.enabled = true
       renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -695,6 +713,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       }
       disposeCars()
       scenery?.dispose()
+      sceneryShadows?.dispose()
+      atmosphere.dispose()
       track?.dispose()
       contactShadows.dispose()
       environment.dispose()

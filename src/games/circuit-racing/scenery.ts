@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { createMountainGeometry } from './mountainGeometry'
 import { CIRCUIT_SCENERY, type CircuitDefinition } from './circuit'
 import { addCircuitDetails, type SceneryShape } from './sceneryDetails'
 import { addDestinationScenery } from './destinationScenery'
@@ -182,10 +183,8 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
   } else if (circuit.scenery === 'alpine') {
     for (let i = 0; i < 16; i++) place((i + 0.2) / 16, 13, (m) => {
       const height = 16 + (i % 4) * 6
-      part(m, 'cone', i % 2 ? '#8b9196' : '#9ca29e', 0, height / 2, 0, 24, height, 24)
-      // Keep the snow cap slightly outside the mountain slope. Matching both
-      // cone surfaces exactly makes the depth buffer alternate between them.
-      part(m, 'cone', '#f2f2e6', 0, height * 0.86, 0, 7.6, height * 0.32, 7.6)
+      const rotated = m.clone().multiply(new THREE.Matrix4().makeRotationY(i * 1.7))
+      part(rotated, 'mountain', i % 2 ? '#f0f4f7' : '#ffffff', 0, height / 2, 0, 24, height, 24)
     })
   }
 
@@ -244,12 +243,18 @@ export function createCircuitScenery(circuit: CircuitDefinition) {
         case 'cone': value = new THREE.ConeGeometry(0.5, 1, 7); break
         case 'cylinder': value = new THREE.CylinderGeometry(0.5, 0.5, 1, 8); break
         case 'ring': value = new THREE.TorusGeometry(1, 0.026, 4, 48); break
+        case 'mountain': value = createMountainGeometry(); break
+      }
+      if (!value.getAttribute('color')) {
+        const white = new Float32Array(value.getAttribute('position').count * 3).fill(1)
+        value.setAttribute('color', new THREE.BufferAttribute(white, 3))
       }
       geometries.set(shape, value)
     }
     return value
   }
 
+  material.vertexColors = true
   for (const { shape, colors, matrices } of batches.values()) {
     const mesh = new THREE.InstancedMesh(geometry(shape), material, matrices.length)
     mesh.name = `scenery-${shape}`

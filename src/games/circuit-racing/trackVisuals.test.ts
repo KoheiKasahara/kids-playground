@@ -12,8 +12,17 @@ describe('track visuals', () => {
       if (child instanceof THREE.InstancedMesh) batches.push(child)
       if (child instanceof THREE.Mesh) drawCount++
     })
-    expect(drawCount).toBe(3)
+    expect(drawCount).toBe(circuit.scenery === 'coast' ? 4 : 3)
     expect(batches).toHaveLength(1)
+    const water = track.group.getObjectByName('coastal-water')
+    if (circuit.scenery === 'coast') {
+      expect(water).toBeDefined()
+      const bounds = new THREE.Box3().setFromObject(water!)
+      const roadBounds = new THREE.Box3().setFromPoints(circuit.curve.getSpacedPoints(2048))
+      expect(bounds.min.x).toBeGreaterThan(roadBounds.max.x + circuit.width / 2 + 2)
+      const normal = (water as THREE.Mesh).geometry.getAttribute('normal')
+      expect(normal.getY(0)).toBeGreaterThan(0.99)
+    } else expect(water).toBeUndefined()
     const road = track.group.getObjectByName('road-surface') as THREE.Mesh
     const geometry = road.geometry
     const position = geometry.getAttribute('position')

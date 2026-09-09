@@ -1,7 +1,7 @@
 import type * as THREE from 'three'
 import type { CircuitDefinition } from './circuit'
 
-export type SceneryShape = 'box' | 'cone' | 'sphere' | 'cylinder' | 'ring'
+export type SceneryShape = 'box' | 'cone' | 'sphere' | 'cylinder' | 'ring' | 'mountain'
 export type SceneryWriter = {
   part: (parent: THREE.Matrix4, shape: SceneryShape, color: string,
     x: number, y: number, z: number, sx: number, sy: number, sz: number, rz?: number) => void
