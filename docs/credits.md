@@ -190,3 +190,7 @@ SEはWeb Audioで合成（外部音源なし）。
 
 - 犬・うさぎ・くま、汚れ・泡・しずくのSVGは本プロジェクトで作成したオリジナルのコード描画です。外部画像・音源は使用していません。
 - 効果音は共有Web Audio基盤による合成音です。
+
+## でんしゃの たび — Kenney Train Kit
+
+「でんしゃの たび」（`src/games/train-journey/`）は [Kenney Train Kit 1.1](https://kenney.nl/assets/train-kit) の電車7モデルと枕木1モデル、共通カラーパレット、選択画面用プレビュー3点を使用します。作者は Kenney、追加クレジットは Guus Vermeulen / Tony Schaer。2026-09-10に公式配布のCC0表記と同梱ライセンスを確認しました。原本のライセンスは `public/models/train-journey/License.txt`、取得元と利用内容は同フォルダーの `SOURCE.md` に記録しています。モデルはそのまま収録し、実行時に車両の向き・配置・車輪回転を調整します。線路の連続形状、駅、橋、トンネル、周辺オブジェクト、UI、合成効果音はゲーム用に生成します。

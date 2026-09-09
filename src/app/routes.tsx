@@ -57,6 +57,7 @@ export const routes: RouteObject[] = [
   { path: '/games/animal-bath', element: lazyRoute(() => import('../games/animal-bath/AnimalBathPlay')) },
   { path: '/games/bento-builder', element: playRoute(lazyRoute(() => import('../games/bento-builder/BentoBuilderPlay'))) },
   { path: '/games/circuit-racing', element: lazyRoute(() => import('../games/circuit-racing/CircuitRacingPlay')) },
+  { path: '/games/train-journey', element: lazyRoute(() => import('../games/train-journey/TrainJourneyPlay')) },
   { path: '/games/oekaki-korokoro', element: playRoute(lazyRoute(() => import('../games/oekaki-korokoro/OekakiKorokoroPlay'))) },
   { path: '/games/flag-quiz', element: <FlagQuizStart /> },
   { path: '/games/flag-quiz/flag-to-name', element: <FlagQuizLevelSelect mode="flagToName" /> },

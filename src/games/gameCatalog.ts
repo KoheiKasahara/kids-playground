@@ -595,6 +595,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'train-journey',
+    slug: 'train-journey',
+    title: 'でんしゃの たび',
+    emoji: '🚂',
+    category: 'threeD',
+    seo: {
+      headline: 'でんしゃの たび｜橋とトンネルを走る3D電車あそび',
+      description: '新幹線・機関車・貨物列車を選んで、立体的な線路を自動で走る様子を楽しむ幼児向け3Dゲームです。ポイントを切り替えると、高架の橋や森のトンネルへ。駅でひとやすみしたり、加速や汽笛で自由に遊べます。',
+    },
+    intro: {
+      howToPlay: [
+        'すきな でんしゃを えらんで「しゅっぱつ！」',
+        '「ポイント」で、はしと トンネルの みちを きりかえよう',
+        '「かそく！」で びゅーん！「ぜんたい」で コースを ながめよう',
+      ],
+    },
+  },
+  {
     id: 'circuit-racing',
     slug: 'circuit-racing',
     title: 'サーキットレース',

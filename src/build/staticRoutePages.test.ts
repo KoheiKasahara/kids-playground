@@ -87,7 +87,8 @@ describe('applyPageSeoToHtml（実際のindex.htmlに対して）', () => {
   const seo = buildGameSeo(planetGlobe)
 
   test('title / description / canonical / og:* / twitter:* を書き換えられる', () => {
-    const result = applyPageSeoToHtml(REAL_INDEX_HTML, seo)
+    // Git's Windows checkout may use CRLF; metadata content is independent of it.
+    const result = applyPageSeoToHtml(REAL_INDEX_HTML, seo).replace(/\r\n/g, '\n')
 
     expect(result).toContain(`<title>${seo.title}</title>`)
     expect(result).toContain(`name="description"\n      content="${seo.description}"`)
