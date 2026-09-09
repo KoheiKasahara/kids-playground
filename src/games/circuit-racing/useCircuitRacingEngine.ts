@@ -20,8 +20,10 @@ import { createBoostEffect, animateBoostEffect, BOOST_DURATION_SECONDS } from '.
 // Camera placement is independent of the motion table and React state.
 import {
   chaseCameraPose,
-  createTracksideAnchors,
-  selectTracksideAnchor,
+  createTracksideAnchor,
+  createTracksideLift,
+  sampleTracksideLift,
+  tracksideDistancePosition,
   overviewCameraPose,
   tracksideCameraPose,
   type RaceCameraMode,
@@ -314,15 +316,28 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     let track: ReturnType<typeof createTrackVisuals> | undefined
     let scenery: ReturnType<typeof createCircuitScenery> | undefined
     let sceneryShadows: ReturnType<typeof createSceneryShadows> | undefined
-    let tracksideAnchors: ReturnType<typeof createTracksideAnchors> = []
+    let tracksideAnchor = { x: 10, y: 100, z: -120 }
+    let tracksideLift: number[] = []
     try {
       curve.arcLengthDivisions = 4096
       curve.updateArcLengths()
-      tracksideAnchors = createTracksideAnchors(curve, circuit.width)
+      tracksideAnchor = createTracksideAnchor(curve, circuit.width)
       track = createTrackVisuals(circuit)
       scene.add(track.group)
       scenery = createCircuitScenery(circuit)
       scene.add(scenery.group)
+      scenery.group.updateMatrixWorld(true)
+      const sightline = new THREE.Raycaster()
+      const origin = new THREE.Vector3()
+      const direction = new THREE.Vector3()
+      const obstacles = scenery.group
+      tracksideLift = createTracksideLift(curve, tracksideAnchor, pose => {
+        origin.set(pose.position.x, pose.position.y, pose.position.z)
+        direction.set(pose.target.x, pose.target.y, pose.target.z).sub(origin)
+        sightline.far = direction.length() - 0.5
+        sightline.set(origin, direction.normalize())
+        return sightline.intersectObject(obstacles, true).length > 0
+      })
       sceneryShadows = createSceneryShadows(scenery.group)
       const receivers = new Set<THREE.MeshStandardMaterial>()
       for (const group of [track.group, scenery.group]) group.traverse(child => {
@@ -337,7 +352,6 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       // A malformed circuit is recoverable from the UI and should not strand
       // the player on a blank page.
       notify('error', error instanceof Error ? error.message : 'コースを つくれません')
-      tracksideAnchors = [{ x: 10, y: 18, z: 8 }]
     }
 
     function resize(): void {
@@ -413,10 +427,10 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         previousCameraMode = mode
         return
       }
-      const tracksideIndex = Math.min(tracksideAnchors.length - 1, selectTracksideAnchor(frame.progress))
-      // Cut between fixed shots; flying through the infield would cross scenery.
+      const tracksidePosition = tracksideDistancePosition(tracksideAnchor, frame.position)
+      tracksidePosition.y = tracksideAnchor.y + sampleTracksideLift(tracksideLift, frame.progress)
       const pose = mode === 'trackside'
-        ? tracksideCameraPose(tracksideAnchors[tracksideIndex], frame.position)
+        ? tracksideCameraPose(tracksidePosition, frame.position)
         : chaseCameraPose(frame.position, frame.tangent)
       if (controls !== null) {
         controls.enabled = false
