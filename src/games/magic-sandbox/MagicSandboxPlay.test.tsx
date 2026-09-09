@@ -74,3 +74,37 @@ it('releases a held pour on cancel, outside move, blur, rotation, and hidden tab
   expect(frames.size).toBe(0)
   expect(paint).not.toHaveBeenCalled()
 })
+
+it('adds two crabs without changing the brush, pauses them and resets the button after clearing', () => {
+  const add = vi.spyOn(Sandbox.prototype, 'addCrab')
+  start()
+  fireEvent.click(screen.getByRole('button', { name: 'カニを ふやす（0/2）' }))
+  fireEvent.click(screen.getByRole('button', { name: 'カニを ふやす（1/2）' }))
+  expect(screen.getByRole('button', { name: 'カニを ふやす（2/2）' })).toBeDisabled()
+  expect(add).toHaveBeenCalledTimes(2)
+  expect(screen.getByRole('button', { name: 'すな' })).toHaveAttribute('aria-pressed', 'true')
+  const world = add.mock.instances[0] as Sandbox
+  fireEvent.click(screen.getByRole('button', { name: /とめる/ }))
+  const snapshot = JSON.stringify(world.crabs)
+  frame(100); frame(200)
+  expect(JSON.stringify(world.crabs)).toBe(snapshot)
+  fireEvent.click(screen.getByRole('button', { name: /ぜんぶけす/ }))
+  fireEvent.click(screen.getByRole('dialog').querySelectorAll('button')[1])
+  expect(world.crabs).toHaveLength(0)
+  expect(screen.getByRole('button', { name: 'カニを ふやす（0/2）' })).toBeEnabled()
+})
+
+it('reacts to a crab tap without starting a material stream', () => {
+  vi.stubGlobal('PointerEvent', MouseEvent)
+  const add = vi.spyOn(Sandbox.prototype, 'addCrab')
+  const paint = vi.spyOn(Sandbox.prototype, 'paint')
+  start()
+  fireEvent.click(screen.getByRole('button', { name: 'カニを ふやす（0/2）' }))
+  const crab = (add.mock.instances[0] as Sandbox).crabs[0]
+  const canvas = screen.getByLabelText(/^すなば。/)
+  vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, right: 144, bottom: 176, width: 144, height: 176 } as DOMRect)
+  fireEvent.pointerDown(canvas, { clientX: crab.x, clientY: crab.y - 4, button: 0 })
+  expect(crab.wave).toBe(90)
+  frame(100)
+  expect(paint).not.toHaveBeenCalled()
+})

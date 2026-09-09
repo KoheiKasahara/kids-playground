@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, typ
 import { PAPERS, PATTERNS, PAPER_WIDTH, ROLLER_COLORS, ROLLER_PAPER_HEIGHT, STAMP_SCALE, type Pattern } from './rollerData'
 import { advanceStroke, finishStroke, startStroke, type StrokeCursor } from './rollerStroke'
 import { drawPaper, drawStamps } from './rollerDrawing'
-import FallingDrawingPlay from './FallingDrawingPlay'
+import GameBackButton from '../../components/GameBackButton'
 import styles from './OekakiKorokoroPlay.module.css'
 
 function Motif({ pattern }: { pattern: Pattern }) {
@@ -18,7 +18,6 @@ function Dialog({ children, title, close }: { children: ReactNode; title: string
 }
 
 export default function OekakiKorokoroPlay() {
-  const [mode, setMode] = useState<'falling' | 'roller'>('falling')
   const [pattern, setPattern] = useState<Pattern>(PATTERNS[0])
   const [color, setColor] = useState<string>(ROLLER_COLORS[0].value)
   const [paper, setPaper] = useState(PAPERS[0] as typeof PAPERS[number])
@@ -145,15 +144,11 @@ export default function OekakiKorokoroPlay() {
 
   return <main className={styles.page} style={{ '--ink': color } as CSSProperties}>
     <header className={styles.header}>
+      <GameBackButton to="/" />
       <h1>おえかきコロコロ</h1>
       <span className={styles.badge} aria-hidden="true">じゆうに あそぼう</span>
     </header>
-    <div className={styles.modePicker} role="group" aria-label="あそびを えらぶ">
-      <button aria-pressed={mode === 'falling'} onClick={() => { endStroke(); setMode('falling') }}>✏️ かいて ころがす</button>
-      <button aria-pressed={mode === 'roller'} onClick={() => setMode('roller')}>🌸 もようで おえかき</button>
-    </div>
-    <FallingDrawingPlay active={mode === 'falling'} />
-    <div className={`${styles.workspace} ${styles.rollerWorkspace}`} hidden={mode !== 'roller'}>
+    <div className={`${styles.workspace} ${styles.rollerWorkspace}`}>
       <section className={styles.studio} aria-label="おえかき">
         <div className={styles.caption}>
           <span>ゆびで なぞって コロコロ！</span>

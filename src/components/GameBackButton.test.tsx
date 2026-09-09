@@ -42,3 +42,16 @@ test('共通ボタンでひとつ上の画面へ移動する', async () => {
   await user.click(screen.getByRole('button', { name: 'もどる' }))
   expect(screen.getByText('/games/flag-pinball')).toBeInTheDocument()
 })
+
+test('ヘッダー内の固定ボタン用にレイアウトの席を描画する', () => {
+  render(
+    <MemoryRouter initialEntries={['/games/flag-pinball']}>
+      <header>
+        <GameBackButton />
+        <h1>旗あげピンボール</h1>
+      </header>
+    </MemoryRouter>,
+  )
+
+  expect(document.querySelector('[data-game-back-layout-slot]')).toHaveAttribute('aria-hidden', 'true')
+})

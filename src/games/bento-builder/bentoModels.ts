@@ -67,12 +67,22 @@ export function createHandmadeFood(kind: FoodKind): THREE.Group {
       root.add(cut)
     }
   } else if (kind === 'carrot') {
-    // Keep the edible root substantial beside the leaves, even at the small
-    // in-box display size. The imported model's root was only a thin sliver.
-    const carrot = mesh(new THREE.ConeGeometry(0.27, 0.82, 12), '#ff9347', 0, 0.41)
+    // A cone reads as a flat triangle once the carrot is laid on its side.
+    // Use a softly bulging profile so the root stays round and recognisable.
+    const profile = [
+      new THREE.Vector2(0.015, 0),
+      new THREE.Vector2(0.09, 0.13),
+      new THREE.Vector2(0.19, 0.38),
+      new THREE.Vector2(0.285, 0.66),
+      new THREE.Vector2(0.29, 0.75),
+      new THREE.Vector2(0.22, 0.82),
+      new THREE.Vector2(0, 0.84),
+    ]
+    const carrot = mesh(new THREE.LatheGeometry(profile, 12), '#ff8a3d')
     root.add(carrot)
-    for (const [x, angle] of [[-0.12, -0.34], [0, 0], [0.12, 0.34]] as const) {
-      const leaf = mesh(new THREE.ConeGeometry(0.1, 0.42, 8), '#43a83c', x, 0.98)
+    for (const [x, angle, scale] of [[-0.13, -0.35, 0.92], [0, 0, 1.08], [0.13, 0.35, 0.92]] as const) {
+      const leaf = mesh(new THREE.SphereGeometry(0.16, 8, 6), '#43a83c', x, 1.02)
+      leaf.scale.set(0.62, 1.45 * scale, 0.48)
       leaf.rotation.z = angle
       root.add(leaf)
     }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import {
   DEFAULT_SELECTIONS,
@@ -14,6 +14,8 @@ import {
   type CircuitRacingEngineStatus,
 } from './useCircuitRacingEngine'
 import styles from './CircuitRacingPlay.module.css'
+
+import { SPECIALS, type SpecialState } from './special'
 
 const COURSE_PREVIEWS = CIRCUITS.map(circuitPreview)
 
@@ -51,10 +53,11 @@ export default function CircuitRacingPlay() {
   const [circuit, setCircuit] = useState(CIRCUITS[0]!)
   const [carCount, setCarCount] = useState<2 | 3>(2)
   const [phase, setPhase] = useState<'select' | 'race'>('select')
-  const [paused, setPaused] = useState(false)
   const [cameraMode, setCameraMode] = useState<RaceCameraMode>(() => prefersReducedMotion() ? 'trackside' : 'chase')
   const [targetIndex, setTargetIndex] = useState(0)
   const [sceneStatus, setSceneStatus] = useState<CircuitRacingEngineStatus>('loading')
+  const [specialStates, setSpecialStates] = useState<readonly SpecialState[]>([])
+  const [boostFeedback, setBoostFeedback] = useState(0)
 
   const handleSceneStatus = useCallback((status: CircuitRacingEngineStatus) => {
     setSceneStatus(status)
@@ -62,12 +65,19 @@ export default function CircuitRacingPlay() {
   const engine = useCircuitRacingEngine({
     selections,
     circuit,
-    running: phase === 'race' && !paused && sceneStatus === 'ready',
+    running: phase === 'race' && sceneStatus === 'ready',
     cameraMode,
     targetIndex,
     onStatusChange: handleSceneStatus,
+    onSpecialChange: setSpecialStates,
   })
-  const { registerContainer, retry, adjustCamera } = engine
+  const { registerContainer, retry, boost, special, adjustCamera } = engine
+
+  useEffect(() => {
+    if (boostFeedback === 0) return undefined
+    const timeout = window.setTimeout(() => setBoostFeedback(0), 420)
+    return () => window.clearTimeout(timeout)
+  }, [boostFeedback])
 
   const chooseCarCount = useCallback((count: 2 | 3) => {
     setCarCount(count)
@@ -90,17 +100,25 @@ export default function CircuitRacingPlay() {
   }, [])
 
   const beginRace = useCallback(() => {
-    setPaused(false)
     setTargetIndex(0)
     setCameraMode(prefersReducedMotion() ? 'trackside' : 'chase')
     setPhase('race')
   }, [])
 
   const backToSelection = useCallback(() => {
-    setPaused(true)
     setCameraMode(prefersReducedMotion() ? 'trackside' : 'chase')
     setPhase('select')
   }, [])
+
+  const handleBoost = useCallback(() => {
+    boost(targetIndex)
+    setBoostFeedback((value) => value + 1)
+  }, [boost, targetIndex])
+
+  const selectedSpecial = SPECIALS[selections[targetIndex]!.carId]
+  const specialState = specialStates[targetIndex]
+  const specialReady = (specialState?.charge ?? 0) >= 1 && !specialState?.remaining
+  const specialActive = (specialState?.remaining ?? 0) > 0
 
   const cameraButtons = useMemo(() => [
     { mode: 'chase' as const, label: 'おいかける', icon: '🚗' },
@@ -214,10 +232,30 @@ export default function CircuitRacingPlay() {
         ) : (
           <section className={styles.racePanel} aria-label="レースの そうさ">
             <div className={styles.raceHeader}>
-              <button type="button" className={styles.backButton} onClick={backToSelection}>‹ えらびなおす</button>
+              <button type="button" className={styles.backButton} onClick={backToSelection} aria-label="えらびなおす"><span aria-hidden="true">えらび<br />なおす</span></button>
               <h1 className={styles.raceTitle}><span aria-hidden="true">🏁</span> はしってるよ！</h1>
-              <button type="button" className={styles.pauseButton} onClick={() => setPaused((value) => !value)}>
-                <span aria-hidden="true">{paused ? '▶' : 'Ⅱ'}</span>{paused ? 'つづける' : 'やすむ'}
+              <button
+                type="button"
+                className={styles.specialButton}
+                disabled={!specialReady || sceneStatus !== 'ready'}
+                data-ready={specialReady}
+                aria-label={`スペシャル：${selectedSpecial.label}`}
+                onClick={() => special(targetIndex)}
+              >
+                <span>{selectedSpecial.icon} スペシャル</span>
+                <span className={styles.specialGauge} role="progressbar" aria-label="スペシャルゲージ" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor((specialState?.charge ?? 0) * 100)}>
+                  <span style={{ width: `${(specialState?.charge ?? 0) * 100}%` }} />
+                </span>
+                <small>{specialActive ? 'はつどうちゅう！' : specialReady ? 'つかえるよ！' : 'ためているよ'}</small>
+              </button>
+              <button
+                type="button"
+                className={styles.boostButton}
+                data-active={boostFeedback > 0 ? 'true' : 'false'}
+                aria-label={`${targetIndex + 1}だいめを かそく`}
+                onClick={handleBoost}
+              >
+                <span aria-hidden="true">⚡</span> かそく！
               </button>
             </div>
             <p className={styles.courseName}>{circuit.name}</p>

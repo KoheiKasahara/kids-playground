@@ -10,6 +10,9 @@ import { createTrackVisuals, ROAD_Y } from './trackVisuals'
 import { createCarContactShadows, createRaceEnvironment, styleRaceCar } from './carAppearance'
 import { createMotionProfile, sampleMotion, type MotionProfile } from './motion'
 
+import { activateSpecial, advanceSpecial, SPECIAL_SPEED_MULTIPLIER, type SpecialState } from './special'
+import { createSpecialEffect, animateSpecialEffect } from './specialEffect'
+
 // Camera placement is independent of the motion table and React state.
 import {
   chaseCameraPose,
@@ -26,12 +29,15 @@ export type CircuitRacingEngineOptions = {
   running: boolean
   cameraMode: RaceCameraMode
   targetIndex: number
+  onSpecialChange?: (states: readonly SpecialState[]) => void
   onStatusChange?: (status: CircuitRacingEngineStatus, message?: string) => void
 }
 
 export type CircuitRacingEngineHandle = {
   registerContainer: (element: HTMLDivElement | null) => void
   retry: () => void
+  special: (targetIndex: number) => void
+  boost: (targetIndex: number) => void
   adjustCamera: (action: 'left' | 'right' | 'up' | 'down' | 'in' | 'out' | 'turnLeft' | 'turnRight' | 'overview') => void
 }
 
@@ -49,12 +55,20 @@ type CarVisual = {
   profile: MotionProfile
   shadowSize: THREE.Vector3
   shadowCenter: THREE.Vector3
+  elapsedSeconds: number
+  specialState: SpecialState
+  specialEffect: THREE.Group
+  boostRemaining: number
+  boostEffect: THREE.Group
+  boostMaterials: THREE.MeshBasicMaterial[]
 }
 
 const CAMERA_FOV = 48
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 900
 const MAX_DEVICE_PIXEL_RATIO = 2
+const BOOST_DURATION_SECONDS = 1.6
+const BOOST_SPEED_MULTIPLIER = 1.85
 
 function plainVector(value: THREE.Vector3): PlainVector {
   return { x: value.x, y: value.y, z: value.z }
@@ -144,10 +158,33 @@ function createLoadedCarVisual(
       )
     }
   }
+  // Effects extend behind the car and must not enlarge its contact shadow.
+  const bounds = new THREE.Box3().setFromObject(root)
+  const specialEffect = createSpecialEffect(selection.carId)
+  root.add(specialEffect)
+  const boostEffect = new THREE.Group()
+  boostEffect.name = 'boost-effect'
+  boostEffect.visible = false
+  const boostMaterials = [
+    new THREE.MeshBasicMaterial({ color: '#58e6ff', transparent: true, opacity: 0.86, blending: THREE.AdditiveBlending, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: '#ffe45c', transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
+  ]
+  const streakGeometry = new THREE.CylinderGeometry(0.06, 0.18, 4.8, 6)
+  streakGeometry.rotateX(Math.PI / 2)
+  for (let index = 0; index < 5; index += 1) {
+    const streak = new THREE.Mesh(streakGeometry, boostMaterials[index % boostMaterials.length]!)
+    streak.position.set((index - 2) * 0.56, 0.45 + (index % 2) * 0.38, -2.8 - (index % 3) * 0.55)
+    boostEffect.add(streak)
+  }
+  const ringGeometry = new THREE.TorusGeometry(1.45, 0.1, 8, 24)
+  const ring = new THREE.Mesh(ringGeometry, boostMaterials[0]!)
+  ring.name = 'boost-ring'
+  ring.position.set(0, 0.85, -2.2)
+  boostEffect.add(ring)
+  root.add(boostEffect)
   // `root.traverse` during disposal sees every wheel resource.  Keeping this
   // list local avoids a second ownership system and protects StrictMode's
   // mount/unmount cycle from disposing a shared wheel accidentally.
-  const bounds = new THREE.Box3().setFromObject(root)
   return {
     root,
     body,
@@ -155,6 +192,12 @@ function createLoadedCarVisual(
     profile,
     shadowSize: bounds.getSize(new THREE.Vector3()),
     shadowCenter: bounds.getCenter(new THREE.Vector3()).setY(0),
+    elapsedSeconds: 0,
+    specialState: { charge: 0, remaining: 0 },
+    specialEffect,
+    boostRemaining: 0,
+    boostEffect,
+    boostMaterials,
   }
 }
 
@@ -180,6 +223,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
   const syncSelectionsRef = useRef<((selections: readonly RaceSelection[]) => void) | null>(null)
   const [generation, setGeneration] = useState(0)
   const cameraAdjustmentRef = useRef<CircuitRacingEngineHandle['adjustCamera'] | null>(null)
+  const specialRef = useRef<CircuitRacingEngineHandle['special'] | null>(null)
+  const boostRef = useRef<CircuitRacingEngineHandle['boost'] | null>(null)
   const requestRenderRef = useRef<(() => void) | null>(null)
   const selectionKey = options.selections.map((selection) => `${selection.carId}:${selection.color}`).join('|')
 
@@ -195,6 +240,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     () => ({
       registerContainer,
       retry: () => setGeneration((value) => value + 1),
+      special: (targetIndex) => specialRef.current?.(targetIndex),
+      boost: (targetIndex) => boostRef.current?.(targetIndex),
       adjustCamera: (action) => cameraAdjustmentRef.current?.(action),
     }),
     [registerContainer],
@@ -218,7 +265,6 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     let rafId: number | null = null
     let released = false
     let loadingToken = 0
-    let elapsedSeconds = 0
     let previousTime = 0
     let wasRunning = false
     let contextLost = false
@@ -230,6 +276,14 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     let currentKey = ''
     let cars: CarVisual[] = []
     const contactShadows = createCarContactShadows()
+    let lastSpecialKey = ''
+    function publishSpecial(): void {
+      if (released) return
+      const key = cars.map(car => `${Math.floor(car.specialState.charge * 100)}:${car.specialState.remaining > 0}`).join('|')
+      if (key === lastSpecialKey) return
+      lastSpecialKey = key
+      optionsRef.current.onSpecialChange?.(cars.map(car => ({ ...car.specialState })))
+    }
 
     const scene = new THREE.Scene()
     scene.add(contactShadows.mesh)
@@ -293,7 +347,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         y: 8,
         z: anchor.z + (dx / tangentLength) * (roadEdge + 8),
       }
-      track = createTrackVisuals(circuit, referencePoints)
+      track = createTrackVisuals(circuit)
       scene.add(track.group)
       scenery = createCircuitScenery(circuit)
       scene.add(scenery.group)
@@ -316,7 +370,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       markDirty()
     }
 
-    function applyCarFrame(car: CarVisual, elapsed: number): { position: PlainVector; tangent: PlainVector } {
+    function applyCarFrame(car: CarVisual): { position: PlainVector; tangent: PlainVector } {
+      const elapsed = car.elapsedSeconds
       const duration = Math.max(0.001, car.profile.duration)
       const sample = sampleMotion(car.profile, elapsed % duration)
       const position = plainVector(sample.position)
@@ -360,7 +415,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         camera.lookAt(0, 0, 0)
         return
       }
-      const frame = applyCarFrame(target, elapsedSeconds)
+      const frame = applyCarFrame(target)
       const mode = optionsRef.current.cameraMode
       // Free views must remain clear at the full circuit distance.
       scene.fog = mode === 'free' ? null : raceFog
@@ -419,6 +474,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       for (const car of cars) disposeCarVisual(car)
       cars = []
       contactShadows.update(cars)
+      publishSpecial()
     }
 
     const reloadCars = async (selections: readonly RaceSelection[], force = false): Promise<void> => {
@@ -450,9 +506,9 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         for (const { selection, profile, body } of loaded) {
           nextCars.push(createLoadedCarVisual(selection, body, profile))
         }
-        elapsedSeconds = 0
-        nextCars.forEach((car) => { scene.add(car.root); applyCarFrame(car, 0) })
+        nextCars.forEach((car) => { scene.add(car.root); applyCarFrame(car) })
         cars = nextCars
+        publishSpecial()
         notify('ready')
       } catch (error) {
         // Dispose every model that did arrive when one of the other models
@@ -544,6 +600,21 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         controls.update()
         markDirty()
       }
+      specialRef.current = (targetIndex) => {
+        if (!optionsRef.current.running || contextLost || document.hidden) return
+        const target = cars[targetIndex]
+        if (!target || !activateSpecial(target.specialState)) return
+        animateSpecialEffect(target.specialEffect, target.specialState.remaining)
+        publishSpecial()
+        markDirty()
+      }
+      boostRef.current = (targetIndex) => {
+        const target = cars[Math.min(cars.length - 1, Math.max(0, targetIndex))]
+        if (target === undefined) return
+        target.boostRemaining = BOOST_DURATION_SECONDS
+        target.boostEffect.visible = true
+        markDirty()
+      }
 
       requestRenderRef.current = markDirty
 
@@ -556,8 +627,29 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         const cameraKey = `${optionsRef.current.cameraMode}:${optionsRef.current.targetIndex}`
         const cameraChanged = cameraKey !== lastCameraKey
         if (running) {
-          elapsedSeconds += delta
-          for (const car of cars) applyCarFrame(car, elapsedSeconds)
+          for (const car of cars) {
+            const boosting = car.boostRemaining > 0
+            const specialSeconds = advanceSpecial(car.specialState, delta)
+            car.elapsedSeconds += specialSeconds * SPECIAL_SPEED_MULTIPLIER + (delta - specialSeconds) * (boosting ? BOOST_SPEED_MULTIPLIER : 1)
+            animateSpecialEffect(car.specialEffect, car.specialState.remaining)
+            car.boostRemaining = Math.max(0, car.boostRemaining - delta)
+            car.boostEffect.visible = car.boostRemaining > 0
+            if (car.boostEffect.visible) {
+              const progress = 1 - car.boostRemaining / BOOST_DURATION_SECONDS
+              const pulse = 1 + Math.sin(progress * Math.PI * 10) * 0.12
+              car.boostEffect.scale.set(pulse, pulse, 0.9 + progress * 0.75)
+              const ring = car.boostEffect.getObjectByName('boost-ring')
+              if (ring !== undefined) {
+                const ringPulse = 0.75 + (progress * 3 % 1) * 1.2
+                ring.scale.setScalar(ringPulse)
+              }
+              for (const material of car.boostMaterials) {
+                material.opacity = 0.58 + Math.sin(progress * Math.PI * 12) * 0.25
+              }
+            }
+            applyCarFrame(car)
+          }
+          publishSpecial()
           updateCamera()
           dirty = true
         } else if (wasRunning || cameraChanged) {
@@ -589,6 +681,8 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       loadingToken += 1
       syncSelectionsRef.current = null
       cameraAdjustmentRef.current = null
+      specialRef.current = null
+      boostRef.current = null
       requestRenderRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)
       resizeObserver?.disconnect()

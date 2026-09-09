@@ -13,7 +13,7 @@ test('3Dレースを操作して退出し、新しいengineで再入場できる
   await expect(page.getByRole('button', { name: 'みちばた', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('canvas')).toHaveCount(1)
   await page.getByRole('button', { name: /えらびなおす/ }).click()
-  await page.getByRole('button', { name: 'ホームへ もどる', exact: true }).click()
+  await page.locator('[data-game-back-button]').click()
   await expect(page.getByRole('heading', { name: 'こどもミニゲーム', exact: true })).toBeVisible()
   await expect(page.locator('canvas')).toHaveCount(0)
   await page.getByRole('link', { name: 'サーキットレース', exact: true }).click()

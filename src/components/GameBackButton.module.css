@@ -20,6 +20,9 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
+  /* 3Dゲームの操作オーバーレイは背面canvasへ操作を通すため
+     pointer-events: none を使う。そこに置かれても「もどる」は必ず押せるよう戻す。 */
+  pointer-events: auto;
   touch-action: manipulation;
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
@@ -39,11 +42,38 @@
   box-shadow: none;
 }
 
+.slot {
+  display: none;
+}
+
+/*
+ * ボタン自体は全画面で同じ位置に固定する。ヘッダー内で使う場合だけ同寸の透明な席を
+ * 通常レイアウトへ残し、タイトルの文字幅や中央揃えを直接書き換えずに衝突を防ぐ。
+ */
+:global(header) > .slot,
+.slotVisible {
+  display: block;
+  box-sizing: border-box;
+  flex: 0 0 108px;
+  width: 108px;
+  min-width: 108px;
+  height: 52px;
+  pointer-events: none;
+}
+
 @media (max-width: 360px), (max-height: 560px) {
   .back {
     min-width: 100px;
     min-height: 48px;
     padding: 6px 12px;
     font-size: 16px;
+  }
+
+  :global(header) > .slot,
+  .slotVisible {
+    flex-basis: 100px;
+    width: 100px;
+    min-width: 100px;
+    height: 48px;
   }
 }

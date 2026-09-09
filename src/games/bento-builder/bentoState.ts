@@ -82,7 +82,7 @@ export function findPlacement(box: BoxKind, desired: Point, radius: number, othe
 }
 export type BentoAction =
   | { type: 'box'; box: BoxKind } | { type: 'color'; color: string }
-  | { type: 'start' | 'back' | 'finish' | 'edit' | 'restart' | 'rotate' | 'remove' }
+  | { type: 'start' | 'back' | 'finish' | 'edit' | 'restart' | 'rotate' | 'remove' | 'clear' }
   | { type: 'cup'; cup: CupKind | null }
   | { type: 'add'; kind: FoodKind } | { type: 'select'; id: number | null }
   | { type: 'move'; id: number; point: Point }
@@ -122,6 +122,7 @@ export function bentoReducer(state: BentoState, action: BentoAction): BentoState
     }
     case 'select': return { ...state, selected: state.foods.some(food => food.id === action.id) ? action.id : null, message: '' }
     case 'remove': return { ...state, foods: state.foods.filter(food => food.id !== state.selected), selected: null, message: 'とりだしたよ' }
+    case 'clear': return { ...state, foods: [], selected: null, message: 'さいしょから つくろう！' }
     case 'rotate': return { ...state, foods: state.foods.map(food => food.id === state.selected ? { ...food, rotation: (food.rotation + Math.PI / 2) % (Math.PI * 2) } : food) }
     case 'move': {
       const food = state.foods.find(item => item.id === action.id)

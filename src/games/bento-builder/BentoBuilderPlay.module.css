@@ -39,6 +39,7 @@
 .page .primary { background: #248872; color: white; border-color: #18715e; padding: 8px 14px; }
 .actions { display: flex; gap: 8px; justify-content: center; }
 .actions button { flex: 1; max-width: 230px; padding: 6px 4px; }
+.page .clearAction { color: #934f28; border-color: #e4b58e; background: #fff6e9; }
 .message { min-height: 18px; margin: 0; text-align: center; font-size: 12px; line-height: 18px; }
 .foods { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; touch-action: pan-x; padding-bottom: 4px; }
 .foods button { min-width: 85px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; }

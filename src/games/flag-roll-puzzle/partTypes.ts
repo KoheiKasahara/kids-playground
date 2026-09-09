@@ -35,7 +35,8 @@ export type PartTypeId =
   | 'conveyorUp'
   /** 中央支点で動くため、横向き固定の物理ギミック。 */
   | 'seesaw'
-  | 'fanRight' | 'fanDown' | 'fanLeft' | 'fanUp'
+  /** 台座を下に保ったまま、左右へミラーする2方向だけを持つ。 */
+  | 'fanRight' | 'fanLeft'
   | 'bubbleLift' | 'warpIn' | 'warpOut'
 
 /** パーツを構成する長方形。アンカーセルの中心を原点とした相対位置(px)で表す。 */
@@ -235,7 +236,7 @@ function curveDefinition(
   }
 }
 
-export const FAN_ANGLES = { fanRight: 0, fanDown: 90, fanLeft: 180, fanUp: 270 } as const
+export const FAN_ANGLES = { fanRight: 0, fanLeft: 180 } as const
 export function isAirToy(id: PartTypeId): boolean {
   return id in FAN_ANGLES || id === 'bubbleLift' || id === 'warpIn' || id === 'warpOut'
 }
@@ -356,7 +357,7 @@ export function partDefinition(id: PartTypeId): PartDefinition {
 
 /** パーツごとに意味のある固定向きだけを循環する。 */
 const NEXT_ROTATION_TYPE: Readonly<Partial<Record<PartTypeId, PartTypeId>>> = {
-  fanRight: 'fanDown', fanDown: 'fanLeft', fanLeft: 'fanUp', fanUp: 'fanRight',
+  fanRight: 'fanLeft', fanLeft: 'fanRight',
   slopeLeft: 'slopeRight', slopeRight: 'slopeLeft',
   curveLeft: 'curveLeft90', curveLeft90: 'curveLeft180', curveLeft180: 'curveLeft270', curveLeft270: 'curveLeft',
   curveRight: 'curveRight90', curveRight90: 'curveRight180', curveRight180: 'curveRight270', curveRight270: 'curveRight',
