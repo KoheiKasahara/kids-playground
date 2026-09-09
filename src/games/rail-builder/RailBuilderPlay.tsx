@@ -271,8 +271,8 @@ export default function RailBuilderPlay() {
 
       <div className={styles.overlay}>
         <header className={styles.header}>
-            <GameBackButton to="/" />
           <div className={styles.headerRow}>
+            <GameBackButton to="/" reserveSpace />
             <h1 className={styles.title}><span aria-hidden="true">🚂</span> 3Dせんろづくり</h1>
             <button
               type="button"

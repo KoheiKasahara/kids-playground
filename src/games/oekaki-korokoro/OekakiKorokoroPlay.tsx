@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, typ
 import { PAPERS, PATTERNS, PAPER_WIDTH, ROLLER_COLORS, ROLLER_PAPER_HEIGHT, STAMP_SCALE, type Pattern } from './rollerData'
 import { advanceStroke, finishStroke, startStroke, type StrokeCursor } from './rollerStroke'
 import { drawPaper, drawStamps } from './rollerDrawing'
+import GameBackButton from '../../components/GameBackButton'
 import styles from './OekakiKorokoroPlay.module.css'
 
 function Motif({ pattern }: { pattern: Pattern }) {
@@ -143,6 +144,7 @@ export default function OekakiKorokoroPlay() {
 
   return <main className={styles.page} style={{ '--ink': color } as CSSProperties}>
     <header className={styles.header}>
+      <GameBackButton to="/" />
       <h1>おえかきコロコロ</h1>
       <span className={styles.badge} aria-hidden="true">じゆうに あそぼう</span>
     </header>
