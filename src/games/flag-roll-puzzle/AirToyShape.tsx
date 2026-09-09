@@ -16,6 +16,7 @@ export default function AirToyShape({ typeId, variant }: AirToyShapeProps) {
   const bubble = `${id}-bubble`
   const isFan = typeId in FAN_ANGLES
   const isLift = typeId === 'bubbleLift'
+  const isWarpIn = typeId === 'warpIn'
   const isWarm = typeId === 'warpOut'
   const edge = isWarm ? '#b96508' : isFan || isLift ? '#0c8595' : '#3154ac'
   const light = isWarm ? '#ffe08a' : isFan || isLift ? '#99e9f2' : '#a5c8ff'
@@ -41,7 +42,12 @@ export default function AirToyShape({ typeId, variant }: AirToyShapeProps) {
         </radialGradient>
       </defs>
       {isFan ? (
-        <g transform={`rotate(${FAN_ANGLES[typeId as keyof typeof FAN_ANGLES]})`} strokeLinecap="round" strokeLinejoin="round">
+        <g
+          data-fan-direction={typeId === 'fanLeft' ? 'left' : 'right'}
+          transform={typeId === 'fanLeft' ? 'scale(-1 1)' : undefined}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="-16" y="11" width="12" height="11" rx="4" fill={`url(#${shell})`} stroke={edge} strokeWidth="2" />
           <rect x="-23" y="19" width="26" height="7" rx="3.5" fill={`url(#${shell})`} stroke={edge} strokeWidth="2" />
           <circle cx="-10" cy="-3" r="17" fill={`url(#${shell})`} stroke={edge} strokeWidth="2" />
@@ -64,15 +70,28 @@ export default function AirToyShape({ typeId, variant }: AirToyShapeProps) {
           <circle cx="20" cy="10" r="3" fill={`url(#${bubble})`} stroke="#22b8cf" strokeWidth="1.5" />
         </g>
       ) : (
-        <g strokeLinecap="round" strokeLinejoin="round">
-          <rect x="-17" y="20" width="34" height="7" rx="3.5" fill={`url(#${shell})`} stroke={edge} strokeWidth="2" />
-          <ellipse cy="1" rx="23" ry="26" fill={edge} />
-          <ellipse cy="-1" rx="22" ry="25" fill={`url(#${shell})`} stroke={edge} strokeWidth="2" />
-          <ellipse cy="-1" rx="15.5" ry="18.5" fill={`url(#${inset})`} stroke={light} strokeWidth="2" />
-          <path d="M-17 -11Q-13 -22 -3 -23" fill="none" stroke="white" strokeOpacity=".7" strokeWidth="2.5" />
-          <path d="M0 -11V9M-7 2L0 9L7 2" fill="none" stroke="#fff9ed" strokeWidth="3.5" />
-          <circle cx="-12" cy="22.5" r="1.5" fill={light} />
-          <circle cx="12" cy="22.5" r="1.5" fill={light} />
+        <g data-warp-role={isWarpIn ? 'entrance' : 'exit'} strokeLinecap="round" strokeLinejoin="round">
+          {isWarpIn ? (
+            <>
+              {/* 上が広い入口。ボールを受け止めて奥へ吸い込む漏斗の形。 */}
+              <path d="M-25 -23Q-25 -27 -20 -27H20Q25 -27 25 -23L16 21Q15 26 10 26H-10Q-15 26 -16 21Z" fill={edge} />
+              <path d="M-22 -22H22L14 21H-14Z" fill={`url(#${shell})`} stroke={edge} strokeWidth="2" />
+              <path d="M-15 -16H15L9 14H-9Z" fill={`url(#${inset})`} stroke={light} strokeWidth="2" />
+              <path d="M-17 -20H7" fill="none" stroke="white" strokeOpacity=".65" strokeWidth="2.5" />
+              <path d="M-22 -25Q0 -30 22 -25" fill="none" stroke={light} strokeWidth="2" />
+              <ellipse cy="-14" rx="13" ry="5" fill="#172554" fillOpacity=".34" stroke={light} strokeWidth="1.5" />
+            </>
+          ) : (
+            <>
+              {/* 下が広い出口。奥から手前へ広がって出てくるラッパの形。 */}
+              <path d="M-10 -26Q-15 -26 -16 -21L-25 23Q-25 27 -20 27H20Q25 27 25 23L16 -21Q15 -26 10 -26Z" fill={edge} />
+              <path d="M-14 -21H14L22 22H-22Z" fill={`url(#${shell})`} stroke={edge} strokeWidth="2" />
+              <path d="M-9 -14H9L15 16H-15Z" fill={`url(#${inset})`} stroke={light} strokeWidth="2" />
+              <path d="M-8 -19H8" fill="none" stroke="white" strokeOpacity=".65" strokeWidth="2.5" />
+              <path d="M-22 25Q0 30 22 25" fill="none" stroke={light} strokeWidth="2" />
+              <ellipse cy="14" rx="13" ry="5" fill="#7c2d12" fillOpacity=".3" stroke={light} strokeWidth="1.5" />
+            </>
+          )}
         </g>
       )}
     </svg>

@@ -20,4 +20,22 @@ describe('PartShape', () => {
     expect(segment?.style.transform).not.toContain('scaleY(1.12)')
     expect(segment?.style.transform).not.toContain('scale(1.05)')
   })
+
+  test('せんぷうきは台座を上下反転せず、左右だけをミラーする', () => {
+    const right = render(<PartShape typeId="fanRight" />)
+    const left = render(<PartShape typeId="fanLeft" />)
+
+    expect(right.container.querySelector('[data-fan-direction="right"]')).not.toHaveAttribute('transform')
+    expect(left.container.querySelector('[data-fan-direction="left"]')).toHaveAttribute('transform', 'scale(-1 1)')
+  })
+
+  test('ワープは矢印なしで、入口と出口を逆向きの漏斗形にする', () => {
+    const entrance = render(<PartShape typeId="warpIn" />)
+    const exit = render(<PartShape typeId="warpOut" />)
+
+    expect(entrance.container.querySelector('[data-warp-role="entrance"] path')?.getAttribute('d')).toContain('H20')
+    expect(exit.container.querySelector('[data-warp-role="exit"] path')?.getAttribute('d')).toContain('H20')
+    expect(entrance.container.querySelector('[data-warp-role="entrance"] ellipse')).toHaveAttribute('cy', '-14')
+    expect(exit.container.querySelector('[data-warp-role="exit"] ellipse')).toHaveAttribute('cy', '14')
+  })
 })

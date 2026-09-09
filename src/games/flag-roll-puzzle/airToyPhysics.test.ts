@@ -12,10 +12,10 @@ const part = (typeId: PlacedPart['typeId'], col = 3, row = 4, id = typeId): Plac
 const ballAt = (p: PlacedPart) => { const c = cellCenter(p.cell); return Bodies.circle(c.x, c.y, BALL_RADIUS) }
 
 describe('air toys', () => {
-  it.each(['fanRight', 'fanDown', 'fanLeft', 'fanUp', 'bubbleLift', 'warpIn', 'warpOut'] as const)('%s has no invisible solid board', id => {
+  it.each(['fanRight', 'fanLeft', 'bubbleLift', 'warpIn', 'warpOut'] as const)('%s has no invisible solid board', id => {
     expect(createPuzzlePartBodies(part(id))).toEqual([])
   })
-  it.each([['fanRight', 1, 0], ['fanDown', 0, 1], ['fanLeft', -1, 0], ['fanUp', 0, -1]] as const)('fan direction %s and bounded acceleration', (id, x, y) => {
+  it.each([['fanRight', 1, 0], ['fanLeft', -1, 0]] as const)('fan direction %s and bounded acceleration', (id, x, y) => {
     const p = part(id); const ball = ballAt(p); const runtime = createAirToyRuntime([p])
     for (let i = 0; i < 200; i++) runtime.step('a', ball, i * STEP_MS, [])
     expect(ball.velocity.x).toBeCloseTo(x * 6)
@@ -24,18 +24,6 @@ describe('air toys', () => {
     Body.setVelocity(ball, { x: 0, y: 0 })
     runtime.step('a', ball, 4000, [])
     expect(ball.speed).toBe(0)
-  })
-  it('upward wind reverses a falling ball with real gravity', () => {
-    const p = part('fanUp'); const ball = ballAt(p); const engine = Engine.create({ gravity: { ...GRAVITY } })
-    Body.setPosition(ball, { x: ball.position.x, y: ball.position.y - 25 })
-    Body.setVelocity(ball, { x: 0, y: 5 })
-    Composite.add(engine.world, ball)
-    const runtime = createAirToyRuntime([p]); let rose = false
-    for (let i = 0; i < 90; i++) {
-      Engine.update(engine, STEP_MS); runtime.step('a', ball, i * STEP_MS, [])
-      if (ball.velocity.y < -1) rose = true
-    }
-    expect(rose).toBe(true)
   })
   it('bubble lifts two cells then releases sideways; balls and new runs are independent', () => {
     const p = part('bubbleLift'); const ball = ballAt(p); const startY = ball.position.y
