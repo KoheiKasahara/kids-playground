@@ -18,6 +18,7 @@ import {
   LAUNCH_HEIGHT_LEVELS,
   LAUNCH_PULL_MAX,
   LAUNCH_SPEED_MAX,
+  LAUNCH_Z,
   LAUNCH_SPEED_MIN,
   LAUNCH_YAW_LIMIT_RAD,
 } from './bowlingPhysics'
@@ -231,6 +232,13 @@ describe('引き戻し', () => {
     const strong = aimFromDrag({ dx: 0, dy: 400 }, VIEWPORT)
     expect(weak.pull).toBeLessThan(strong.pull)
     expect(strong.pull).toBeCloseTo(LAUNCH_PULL_MAX, 5)
+  })
+
+  it('最大まで手前へ引くと、従来の開始位置まで下がる', () => {
+    const aim = aimFromDrag({ dx: 0, dy: 400 }, VIEWPORT)
+    const offset = pullOffset(aim)
+    expect(LAUNCH_Z).toBeLessThan(20)
+    expect(LAUNCH_Z + offset.z).toBeCloseTo(20, 5)
   })
 
   it('発射方向の逆へ、高さを変えずに下がる', () => {
