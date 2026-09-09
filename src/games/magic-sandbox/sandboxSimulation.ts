@@ -1,4 +1,4 @@
-import { addCrab, addTurtle, tapCrab, tapTurtle, stepCrabs, stepTurtles, renderCrabs, renderTurtles, type Creature } from './sandboxCrabs'
+import { addCrab, addTurtle, tapCrab, tapTurtle, stepCrabs, stepTurtles, renderCrabs, renderTurtles, nextSleepDelay, wakeCreature, creatureScale, type Creature } from './sandboxCrabs'
 
 // Original, bounded falling-sand simulation. No external engine or copied OSS code.
 export const Cell = { Empty: 0, Sand: 1, Water: 2, Stone: 3, Seed: 4, Mud: 5, Stem: 6, Petal: 7, Pollen: 8, Root: 9 } as const
@@ -14,6 +14,15 @@ export class Sandbox {
   private tick = 0
   readonly crabs: Creature[] = []
   readonly turtles: Creature[] = []
+  night = false
+  setNight(night: boolean) {
+    if (this.night === night) return
+    this.night = night
+    for (const creature of [...this.crabs, ...this.turtles]) {
+      wakeCreature(creature)
+      creature.sleepDelay = night ? nextSleepDelay(this.random) : 0
+    }
+  }
   addCrab() { return addCrab(this, this.random) }
   addTurtle() { return addTurtle(this, this.random) }
   tapCrab(point: Point) { return tapCrab(this, point) }
@@ -72,6 +81,10 @@ export class Sandbox {
     }
   }
   paint(point: Point, material: Material, radius: number) {
+    for (const creature of [...this.crabs, ...this.turtles]) {
+      const scale = creatureScale(creature)
+      if (Math.abs(point.x - creature.x) <= radius + 8 * scale && Math.abs(point.y - (creature.y - 4 * scale)) <= radius + 5 * scale) wakeCreature(creature)
+    }
     const cx = Math.round(point.x), cy = Math.round(point.y)
     for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
       if (dx * dx + dy * dy > radius * radius) continue
@@ -166,6 +179,7 @@ export class Sandbox {
     }
   }
   shake() {
+    for (const creature of [...this.crabs, ...this.turtles]) wakeCreature(creature)
     // Lift loose grains into available space; stone walls and rooted flowers stay put.
     for (let y = 1; y < this.height; y++) for (let x = 0; x < this.width; x++) {
       const material = this.get(x, y)

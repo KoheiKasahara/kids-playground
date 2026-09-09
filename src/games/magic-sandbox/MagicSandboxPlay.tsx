@@ -25,6 +25,7 @@ function Playground({ back }: { back: () => void }) {
   const [material, setMaterial] = useState(MATERIALS[0])
   const [wide, setWide] = useState(false)
   const [paused, setPaused] = useState(false)
+  const [night, setNight] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   const [discovery, setDiscovery] = useState(false)
   const [shaking, setShaking] = useState(false)
@@ -41,8 +42,8 @@ function Playground({ back }: { back: () => void }) {
     const timer = window.setTimeout(() => setDiscovery(false), 3500)
     return () => window.clearTimeout(timer)
   }, [discovery])
-  return <main className={styles.page}>
-    <header className={styles.header}><GameBackButton onBack={back} /><h1>まほうのすなば</h1><span aria-hidden="true">☀️</span></header>
+  return <main className={`${styles.page} ${night ? styles.night : ''}`}>
+    <header className={styles.header}><GameBackButton onBack={back} /><h1>まほうのすなば</h1><button className={styles.dayNight} aria-label="よる" aria-pressed={night} title={night ? 'ひるに する' : 'よるに する'} onClick={() => { sandbox.setNight(!night); setNight(!night) }}><span aria-hidden="true">{night ? '🌙' : '☀️'}</span></button></header>
     <div className={styles.workspace}>
       <aside className={styles.tools} aria-label="すなばの どうぐ">
         <div className={styles.materials} role="group" aria-label="そざい">
@@ -59,6 +60,7 @@ function Playground({ back }: { back: () => void }) {
       </aside>
       <section className={`${styles.board} ${shaking ? styles.shaking : ''}`} aria-label="すなば">
         <div className={styles.cloud} aria-hidden="true">☁</div>
+        <div className={styles.nightSky} aria-hidden="true"><span className={styles.moon} /><i /><i /><i /><i /><i /></div>
         <canvas ref={canvasRef} {...sandbox.canvasProps} className={styles.canvas} tabIndex={0} aria-label="すなば。なぞって そざいを ふらせよう。キーボードは やじるしで ばしょ、スペースで そざいを おくよ">
           すなと みずと たねを まぜて あそぼう。
         </canvas>

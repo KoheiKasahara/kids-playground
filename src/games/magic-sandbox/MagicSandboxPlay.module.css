@@ -2,7 +2,21 @@
 .page { height: 100dvh; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
 .header { display: flex; align-items: center; gap: 12px; min-height: 44px; flex-shrink: 0; }
 .header h1 { font-size: clamp(17px, 4vw, 25px); white-space: nowrap; }
-.header > span { margin-left: auto; font-size: 28px; }
+.header .dayNight { margin-left: auto; flex-shrink: 0; width: 48px; height: 48px; font-size: 28px; border-radius: 50%; }
+.page { transition: background-color 1s ease, color 1s ease; }
+.page.night { background: #283954; color: #e4edf9; }
+.page.night .notice { color: #42584f; }
+.page.night .dayNight { background: #455a7c; border-color: #b9cfee; box-shadow: 0 0 16px #dbe9ff30; }
+.nightSky { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1s ease; background: linear-gradient(#304b78, #597d9d 62%, #b5c5c5); }
+.night .nightSky { opacity: 1; }
+.moon { position: absolute; top: 7%; right: 12%; width: clamp(26px, 6vw, 46px); aspect-ratio: 1; border-radius: 50%; background: #fff4cd; box-shadow: 0 0 24px 9px #fff0c52b; }
+.nightSky i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #dfecffb3; left: 20%; top: 12%; }
+.nightSky i:nth-of-type(2) { left: 40%; top: 23%; width: 2px; height: 2px; }
+.nightSky i:nth-of-type(3) { left: 61%; top: 9%; }
+.nightSky i:nth-of-type(4) { left: 73%; top: 32%; width: 2px; height: 2px; }
+.nightSky i:nth-of-type(5) { left: 31%; top: 39%; width: 2px; height: 2px; }
+.canvas { transition: filter 1s ease; }
+.night .canvas { filter: brightness(.94); }
 .workspace { flex: 1; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; width: 100%; max-width: 1100px; margin: auto; }
 .tools { display: flex; flex-direction: column; gap: 6px; }
 .materials { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
@@ -65,7 +79,7 @@
   .intro { margin: 10px auto; }
   .illustration { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .shaking { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .shaking { animation: none; } .page, .nightSky, .canvas { transition: none; } }
 
 .page button:disabled { opacity: .6; cursor: default; }
 .creatureStatus { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
