@@ -19,39 +19,29 @@ export type RaceCameraPose = {
   target: { x: number; y: number; z: number }
 }
 
-/** Elevated local shots keep the sightline away from distant infield scenery. */
+/** Two elevated fixed shots, each covering one half of the circuit. */
 export function createTracksideAnchors(
-  curve: { getPointAt: (t: number) => RaceCameraVector; getTangentAt: (t: number) => RaceCameraVector },
+  curve: { getPointAt: (t: number) => RaceCameraVector },
   roadWidth: number,
 ): RaceCameraVector[] {
-  return Array.from({ length: 12 }, (_, index) => {
-    const point = curve.getPointAt(index / 12)
-    const tangent = curve.getTangentAt(index / 12)
-    const direction = normalise(tangent.x, tangent.z)
-    // Stay in the clear strip next to the road, above barriers and stand roofs.
-    const offset = roadWidth / 2 + 2
-    return { x: point.x - direction.z * offset, y: 18, z: point.z + direction.x * offset }
+  return [0, 1].map((sector) => {
+    const points = Array.from({ length: 65 }, (_, step) => curve.getPointAt((sector + step / 64) / 2))
+    const minX = Math.min(...points.map(point => point.x))
+    const maxX = Math.max(...points.map(point => point.x))
+    // Use sector bounds instead of a local tangent: an S-bend's normal can
+    // point back onto another stretch of road and cause an overhead camera spin.
+    const edgeZ = sector === 0
+      ? Math.min(...points.map(point => point.z))
+      : Math.max(...points.map(point => point.z))
+    const offset = roadWidth / 2 + 35
+    return { x: (minX + maxX) / 2, y: 100, z: edgeZ + (sector === 0 ? -offset : offset) }
   })
 }
 
-/** Hold each shot until another camera is at least eight metres closer. */
-export function selectTracksideAnchor(
-  anchors: readonly RaceCameraVector[],
-  target: RaceCameraVector,
-  previous = -1,
-): number {
-  const distance = (anchor: RaceCameraVector) => Math.hypot(anchor.x - target.x, anchor.z - target.z)
-  let nearest = -1
-  let nearestDistance = Infinity
-  anchors.forEach((anchor, index) => {
-    const candidateDistance = distance(anchor)
-    if (candidateDistance < nearestDistance) {
-      nearest = index
-      nearestDistance = candidateDistance
-    }
-  })
-  const current = anchors[previous]
-  return current && distance(current) <= nearestDistance + 8 ? previous : nearest
+/** Half-lap sectors prevent hairpins or nearby straights from causing extra cuts. */
+export function selectTracksideAnchor(progress: number): number {
+  const wrapped = ((finite(progress, 0) % 1) + 1) % 1
+  return wrapped < 0.5 ? 0 : 1
 }
 
 function finite(value: number | undefined, fallback: number): number {

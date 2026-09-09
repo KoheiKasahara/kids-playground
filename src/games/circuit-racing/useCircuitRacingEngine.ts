@@ -315,8 +315,6 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
     let scenery: ReturnType<typeof createCircuitScenery> | undefined
     let sceneryShadows: ReturnType<typeof createSceneryShadows> | undefined
     let tracksideAnchors: ReturnType<typeof createTracksideAnchors> = []
-    let tracksideIndex = -1
-    let tracksideTarget: CarVisual | undefined
     try {
       curve.arcLengthDivisions = 4096
       curve.updateArcLengths()
@@ -354,7 +352,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       markDirty()
     }
 
-    function applyCarFrame(car: CarVisual): { position: PlainVector; tangent: PlainVector } {
+    function applyCarFrame(car: CarVisual): { position: PlainVector; tangent: PlainVector; progress: number } {
       const elapsed = car.elapsedSeconds
       const duration = Math.max(0.001, car.profile.duration)
       const sample = sampleMotion(car.profile, elapsed % duration)
@@ -367,7 +365,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
       const laps = Math.floor(elapsed / duration)
       const unwrappedDistance = laps * car.profile.length + sample.distance
       for (const wheel of car.wheels) wheel.group.rotation.x = -unwrappedDistance / wheel.radius
-      return { position, tangent }
+      return { position, tangent, progress: sample.distance / car.profile.length }
     }
 
     function showOverview(): void {
@@ -415,11 +413,7 @@ export function useCircuitRacingEngine(options: CircuitRacingEngineOptions): Cir
         previousCameraMode = mode
         return
       }
-      if (mode === 'trackside') {
-        const previous = previousCameraMode === mode && tracksideTarget === target ? tracksideIndex : -1
-        tracksideIndex = selectTracksideAnchor(tracksideAnchors, frame.position, previous)
-        tracksideTarget = target
-      }
+      const tracksideIndex = Math.min(tracksideAnchors.length - 1, selectTracksideAnchor(frame.progress))
       // Cut between fixed shots; flying through the infield would cross scenery.
       const pose = mode === 'trackside'
         ? tracksideCameraPose(tracksideAnchors[tracksideIndex], frame.position)
