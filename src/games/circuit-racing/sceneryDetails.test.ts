@@ -8,10 +8,13 @@ describe('colorful circuit landscape', () => {
     const scenery = createCircuitScenery(circuit)
     try {
       const kinds = new Set(scenery.footprints.map((footprint) => footprint.kind))
-      for (const kind of ['pond', 'meadow', 'pavilion', 'banners', 'tireWall']) {
+      const expected = circuit.scenery === 'city' ? ['building', 'streetlight']
+        : circuit.scenery === 'coast' ? ['lighthouse', 'palm', 'beach']
+          : ['pond', 'meadow', 'pavilion', 'banners', 'tireWall']
+      for (const kind of expected) {
         expect(kinds.has(kind), `${circuit.id}: ${kind}`).toBe(true)
       }
-      expect(kinds.has('cottage')).toBe(circuit.scenery !== 'stadium')
+      expect(kinds.has('cottage')).toBe(!['stadium', 'city', 'coast'].includes(circuit.scenery))
       for (let i = 0; i < scenery.footprints.length; i++) {
         const a = scenery.footprints[i]!
         for (let j = i + 1; j < scenery.footprints.length; j++) {
