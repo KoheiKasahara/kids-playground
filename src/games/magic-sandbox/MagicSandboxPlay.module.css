@@ -5,7 +5,7 @@
 .header > span { margin-left: auto; font-size: 28px; }
 .workspace { flex: 1; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; width: 100%; max-width: 1100px; margin: auto; }
 .tools { display: flex; flex-direction: column; gap: 6px; }
-.materials { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.materials { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .page button, .start button { min-height: 44px; min-width: 44px; border: 2px solid transparent; border-radius: 14px; background: #fff; color: #42584f; font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; }
 .page button:focus-visible, .start button:focus-visible { outline: 3px solid #3066ae; outline-offset: 2px; }
 .page button[aria-pressed=true] { border-color: #377b62; background: #e6f3d7; box-shadow: 0 2px #377b62; }
@@ -68,4 +68,6 @@
 @media (prefers-reduced-motion: reduce) { .shaking { animation: none; } }
 
 .page button:disabled { opacity: .6; cursor: default; }
-.crabStatus { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.creatureStatus { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+@media (max-width: 374px) and (orientation: portrait) { .materials { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

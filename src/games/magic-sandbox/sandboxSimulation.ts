@@ -1,4 +1,4 @@
-import { addCrab, tapCrab, stepCrabs, renderCrabs, type Crab } from './sandboxCrabs'
+import { addCrab, addTurtle, tapCrab, tapTurtle, stepCrabs, stepTurtles, renderCrabs, renderTurtles, type Creature } from './sandboxCrabs'
 
 // Original, bounded falling-sand simulation. No external engine or copied OSS code.
 export const Cell = { Empty: 0, Sand: 1, Water: 2, Stone: 3, Seed: 4, Mud: 5, Stem: 6, Petal: 7, Pollen: 8, Root: 9 } as const
@@ -12,9 +12,26 @@ export class Sandbox {
   private readonly moved: Uint8Array
   private plants: Plant[] = []
   private tick = 0
-  readonly crabs: Crab[] = []
+  readonly crabs: Creature[] = []
+  readonly turtles: Creature[] = []
   addCrab() { return addCrab(this, this.random) }
+  addTurtle() { return addTurtle(this, this.random) }
   tapCrab(point: Point) { return tapCrab(this, point) }
+  tapTurtle(point: Point) { return tapTurtle(this, point) }
+  bloomingFlowers(): Point[] {
+    return this.plants.filter(p => p.height === p.target && this.get(p.x, p.y) === Cell.Root &&
+      this.get(p.x, p.y - p.height) === Cell.Pollen).map(p => ({ x: p.x, y: p.y - p.height }))
+  }
+  eatFlower(point: Point) {
+    if (!this.bloomingFlowers().some(p => p.x === point.x && p.y === point.y)) return false
+    // Leave stems, roots, grains and neighboring plants intact. Flowers is the
+    // cumulative discovery counter, so eating must not trigger another bloom.
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const cell = this.get(point.x + dx, point.y + dy)
+      if (cell === Cell.Petal || cell === Cell.Pollen) this.set(point.x + dx, point.y + dy, Cell.Empty)
+    }
+    return true
+  }
   flowers = 0
   constructor(readonly width = 144, readonly height = 176, private random = Math.random) {
     this.cells = new Uint8Array(width * height)
@@ -33,6 +50,7 @@ export class Sandbox {
   }
   clear() {
     this.crabs.length = 0
+    this.turtles.length = 0
     this.cells.fill(0)
     this.age.fill(0)
     this.plants = []
@@ -109,6 +127,7 @@ export class Sandbox {
     }
     this.grow()
     stepCrabs(this, this.random)
+    stepTurtles(this, this.random)
   }
   private grow() {
     this.plants = this.plants.filter(p => this.get(p.x, p.y) === Cell.Root)
@@ -158,4 +177,5 @@ export function renderSandbox(world: Sandbox, pixels: Uint8ClampedArray) {
     pixels[offset + 3] = material === Cell.Empty ? 0 : 255
   }
   renderCrabs(world, pixels)
+  renderTurtles(world, pixels)
 }

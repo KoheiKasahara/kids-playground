@@ -6,7 +6,8 @@ type Gesture = Brush & { point: Point; pointerId: number }
 export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush: Brush, paused: boolean, onFlower: () => void) {
   const [world] = useState(() => { const result = new Sandbox(); result.prepare(); return result })
   const [crabCount, setCrabCount] = useState(0)
-  const [crabMessage, setCrabMessage] = useState('')
+  const [turtleCount, setTurtleCount] = useState(0)
+  const [creatureMessage, setCreatureMessage] = useState('')
   const active = useRef<Gesture | null>(null)
   const keyboardPoint = useRef<Point>({ x: 72, y: 30 })
   const draw = useRef<() => void>(() => {})
@@ -68,7 +69,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
     if (!p) return
     event.preventDefault()
     event.currentTarget.focus({ preventScroll: true })
-    if (world.tapCrab(p)) { draw.current(); return }
+    if (world.tapCrab(p) || world.tapTurtle(p)) { draw.current(); return }
     event.currentTarget.setPointerCapture(event.pointerId)
     active.current = { ...brush, point: p, pointerId: event.pointerId }
     world.paint(p, brush.material, brush.radius)
@@ -100,21 +101,29 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       event.currentTarget.style.setProperty('--cursor-y', `${p.y / world.height * 100}%`)
     } else if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault()
-      if (!world.tapCrab(p)) world.paint(p, brush.material, brush.radius)
+      if (!world.tapCrab(p) && !world.tapTurtle(p)) world.paint(p, brush.material, brush.radius)
       draw.current()
     }
   }
   return {
-    unavailable, stop, crabCount, crabMessage,
+    unavailable, stop, crabCount, turtleCount, creatureMessage,
+    dismissCreatureMessage: () => setCreatureMessage(''),
     addCrab: () => {
       stop()
       const added = world.addCrab()
       setCrabCount(world.crabs.length)
-      setCrabMessage(added ? '🦀 カニを タップしてみよう' : 'カニの はいる ばしょを あけてね')
+      setCreatureMessage(added ? '🦀 おはなを たべると おおきくなるよ' : 'カニの はいる ばしょを あけてね')
+      draw.current()
+    },
+    addTurtle: () => {
+      stop()
+      const added = world.addTurtle()
+      setTurtleCount(world.turtles.length)
+      setCreatureMessage(added ? '🐢 おはなを たべると おおきくなるよ' : 'カメの はいる ばしょを あけてね')
       draw.current()
     },
     canvasProps: { width: world.width, height: world.height, onPointerDown: begin, onPointerMove: move, onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end, onKeyDown: keyDown },
-    clear: () => { stop(); world.clear(); setCrabCount(0); setCrabMessage(''); draw.current() },
+    clear: () => { stop(); world.clear(); setCrabCount(0); setTurtleCount(0); setCreatureMessage(''); draw.current() },
     shake: () => { stop(); world.shake(); draw.current() },
   }
 }
