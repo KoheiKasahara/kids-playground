@@ -1,6 +1,8 @@
 import { Box3, PerspectiveCamera, Raycaster, Vector3 } from 'three'
 import { CIRCUIT, CIRCUITS } from './circuit'
 import { createCircuitScenery } from './scenery'
+import { createMotionProfile, sampleMotion } from './motion'
+import { RACE_CARS } from './raceConfig'
 import { describe, expect, test } from 'vitest'
 import { chaseCameraPose, tracksideCameraPose, overviewCameraPose, createTracksideAnchors, selectTracksideAnchor } from './raceCamera'
 
@@ -55,33 +57,55 @@ describe('全体表示のフレーミング', () => {
 })
 
 describe('みちばたの自動切り替え', () => {
-  test('境界付近では同じショットを保ち、十分近づいてから切り替える', () => {
-    const anchors = [{ x: 0, z: 0 }, { x: 40, z: 0 }]
-    expect(selectTracksideAnchor(anchors, { x: 21, z: 0 }, 0)).toBe(0)
-    expect(selectTracksideAnchor(anchors, { x: 25, z: 0 }, 0)).toBe(1)
-    expect(selectTracksideAnchor(anchors, { x: 19, z: 0 }, 1)).toBe(1)
-    // A new watched car or mode starts at its nearest camera immediately.
-    expect(selectTracksideAnchor(anchors, { x: 1, z: 0 })).toBe(0)
-    expect(selectTracksideAnchor(anchors, { x: 39, z: 0 })).toBe(1)
+  test('半周の境界と周回でだけ切り替え、車やモードの選び直しでも同じ区間を使う', () => {
+    for (const [progress, expected] of [[0, 0], [0.4999, 0], [0.5, 1], [0.9999, 1], [1, 0], [1.5, 1], [-0.1, 1], [NaN, 0]]) {
+      expect(selectTracksideAnchor(progress)).toBe(expected)
+    }
   })
 
-  test.each(CIRCUITS)('$id は周回をまたいで近くの12か所を順に使う', (circuit) => {
+  test.each(CIRCUITS)('$id は周回をまたいで2か所だけを半周ごとに使う', (circuit) => {
     const anchors = createTracksideAnchors(circuit.curve, circuit.width)
     let selected = -1
     let cuts = 0
     const used = new Set<number>()
     for (let step = 0; step <= 2048; step++) {
       const point = circuit.curve.getPointAt((step % 1024) / 1024)
-      const next = selectTracksideAnchor(anchors, point, selected)
+      const next = selectTracksideAnchor((step % 1024) / 1024)
       if (selected !== -1 && next !== selected) cuts++
       selected = next
       used.add(selected)
       const pose = tracksideCameraPose(anchors[selected], point)
-      expect(Math.hypot(pose.position.x - point.x, pose.position.z - point.z)).toBeLessThan(60)
+      expect(Math.hypot(pose.position.x - point.x, pose.position.z - point.z)).toBeLessThan(320)
       expect(pose.position.y).toBeGreaterThan(20)
     }
-    expect(used.size).toBe(12)
-    expect(cuts).toBe(24)
+    expect(anchors).toHaveLength(2)
+    expect(used.size).toBe(2)
+    expect(cuts).toBe(4)
+  })
+
+  test.each(CIRCUITS)('$id は実際の走行ラインでも各半周を同じ位置から見続ける', (circuit) => {
+    for (const lane of [-3, 0, 3]) {
+      const profile = createMotionProfile(RACE_CARS[0], circuit.curve, lane)
+      const anchors = createTracksideAnchors(circuit.curve, circuit.width)
+      let previous = 0
+      const cuts: number[] = []
+      for (let step = 0; step <= 2048; step++) {
+        const elapsed = profile.duration * step / 1024
+        const sample = sampleMotion(profile, elapsed)
+        const index = selectTracksideAnchor(sample.distance / profile.length)
+        if (index !== previous) cuts.push(elapsed)
+        previous = index
+        // Avoid a near-vertical view that spins as the car passes underneath.
+        expect(Math.hypot(anchors[index].x - sample.position.x, anchors[index].z - sample.position.z)).toBeGreaterThan(25)
+        expect(tracksideCameraPose(anchors[index], sample.position).position).toEqual({
+          x: anchors[index].x, y: anchors[index].y! + 4.6, z: anchors[index].z,
+        })
+      }
+      expect(cuts).toHaveLength(4)
+      for (let index = 1; index < cuts.length; index++) {
+        expect(cuts[index] - cuts[index - 1]).toBeGreaterThan(5)
+      }
+    }
   })
 
   test.each(CIRCUITS)('$id は構造物の多い区間でも周回の大部分で見通しを確保する', (circuit) => {
@@ -95,13 +119,12 @@ describe('みちばたの自動切り替え', () => {
     const oldAnchor = { x: oldPoint.x - oldTangent.z * (circuit.width / 2 + 8), y: 8,
       z: oldPoint.z + oldTangent.x * (circuit.width / 2 + 8) }
     const ray = new Raycaster()
-    let selected = -1
     let blocked = 0
     let oldBlocked = 0
     try {
       for (let step = 0; step < 96; step++) {
         const point = circuit.curve.getPointAt(step / 96)
-        selected = selectTracksideAnchor(anchors, point, selected)
+        const selected = selectTracksideAnchor(step / 96)
         for (const [index, anchor] of [anchors[selected], oldAnchor].entries()) {
           const pose = tracksideCameraPose(anchor, point)
           const origin = new Vector3(pose.position.x, pose.position.y, pose.position.z)
