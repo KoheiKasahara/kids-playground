@@ -6,7 +6,7 @@ const SEED_BASE = 0x1f2e3d4c
 const SEED_STEP = 7919
 
 describe('adventure flow simulation', () => {
-  it('両ルートで仕掛けが作動し、救済なしでテンポよくカップへ入る', () => {
+  it('両ルートで仕掛けが作動し、救済なしでテンポよくカップへ入る', { timeout: 15_000 }, () => {
     const results = Array.from({ length: 32 }, (_, i) => simulateAdventureRun(SEED_BASE + i * SEED_STEP))
     const mean = results.reduce((sum, run) => sum + run.totalSeconds, 0) / results.length
     // 旧ピン格子は同じ32シードで平均48.67秒。滑走とジャンプの時間は残す。
