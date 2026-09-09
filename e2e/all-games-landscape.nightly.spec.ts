@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { GAME_CATALOG } from '../src/games/gameCatalog'
+import { boxesOverlap, visibleTextBox } from './support/layout'
 import { capturePageErrors } from './support/runtimeErrors'
 
 const LANDSCAPE_VIEWPORTS = [
@@ -32,6 +33,16 @@ for (const viewport of LANDSCAPE_VIEWPORTS) {
         const backButtonBox = await backButton.boundingBox()
         expect(backButtonBox?.width).toBeGreaterThanOrEqual(44)
         expect(backButtonBox?.height).toBeGreaterThanOrEqual(44)
+
+        // サーキットレースは背景の3Dシーン上に独立して載るため、タイトルとの
+        // 矩形上の重なりを許容する。それ以外は文字を隠さないことを保証する。
+        if (game.slug !== 'circuit-racing') {
+          const headingBox = await visibleTextBox(page.getByRole('heading', { name: game.title, exact: true }))
+          expect(
+            !boxesOverlap(backButtonBox, headingBox),
+            `${game.title} (${game.slug}) のタイトルに戻るボタンが重なっています`,
+          ).toBe(true)
+        }
 
         const documentWidth = await page.evaluate(() => ({
           clientWidth: document.documentElement.clientWidth,
