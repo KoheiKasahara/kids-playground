@@ -60,19 +60,23 @@ export default function PukupukaFaucet({
     <g data-testid="pukupuka-faucet" data-faucet-active={active}>
       <g aria-hidden="true" transform={`translate(${faucet.x} ${faucet.y})`}>
         {/* 取り付けのパイプ */}
-        <rect x="-1.6" y="0" width="3.2" height="12" rx="1.4" fill="#748ca6" />
+        <ellipse cx="-8" cy="5" rx="2.5" ry="5" fill="#476d7b" stroke="#c4e5e6" strokeWidth="1" />
+        <path d="M-8 5 H-2 Q0 5 0 8 V12" fill="none" stroke="#426c7d" strokeWidth="5" strokeLinecap="round" />
+        <path d="M-8 3.8 H-2 Q1 3.8 1 8" fill="none" stroke="#d1e9e8" strokeWidth="1.6" />
         {/* 吐水口 */}
         <rect x="-3.4" y="10" width="6.8" height="4.4" rx="2" fill="#5c7591" />
+        <rect x="-1.2" y="0" width="2.4" height="6" rx="0.8" fill="#698f9b" />
         {/* ハンドル。ON/OFFで色を変え、押しているあいだだけ動く見た目にする。 */}
         <circle
           className={active ? styles.faucetHandleOn : undefined}
           cx="0"
           cy="-3"
           r="3.8"
-          fill={active ? '#51cf66' : '#adb5bd'}
+          fill={active ? '#51cf66' : '#45bbd2'}
           stroke="#495057"
           strokeWidth="0.6"
         />
+        <path d="M-2.2 -3 H2.2 M0 -5.2 V-0.8" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" />
         {showStream ? (
           <>
             <line

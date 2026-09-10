@@ -16,11 +16,12 @@ type Props = {
   flowDirection: BoardFlowDirection
   /** 実際に押し流す向き（+1: みぎ、-1: ひだり）。矢印の向きに使う。 */
   pushDirection: number
+  active?: boolean
   disabled: boolean
   onToggle: () => void
 }
 
-export default function PukupukaBoard({ board, flowDirection, pushDirection, disabled, onToggle }: Props) {
+export default function PukupukaBoard({ board, flowDirection, pushDirection, active = false, disabled, onToggle }: Props) {
   const towardGoal = flowDirection === 'goal'
   const centerX = board.x + board.width / 2
   const centerY = board.y + board.height / 2
@@ -34,13 +35,23 @@ export default function PukupukaBoard({ board, flowDirection, pushDirection, dis
   return (
     <g data-testid="pukupuka-board" data-board-flow={flowDirection}>
       <g aria-hidden="true" style={{ pointerEvents: 'none' }}>
+        {board.circulation ? <>
+          <path d={`M${centerX} ${centerY + 5} V122`} stroke="#658e99" strokeWidth="3" />
+          <rect x={centerX - 4} y="120" width="8" height="3" rx="1" fill="#3c6d7c" />
+          <circle cx={centerX} cy={centerY} r="9" fill="#e1f4e8" stroke="#578490" strokeWidth="1" />
+          <g transform={`translate(${centerX} ${centerY})`}>
+            <g className={active ? styles.currentRotor : undefined}>
+              {[0, 90, 180, 270].map((angle) => <path key={angle} transform={`rotate(${angle})`} d="M0 0 Q-6 -9 0 -8 Q4 -7 0 0Z" fill="#78bfc2" />)}
+            </g>
+          </g>
+        </> : null}
         <rect
           transform={`rotate(${tilt} ${centerX} ${centerY})`}
           x={board.x}
           y={board.y}
           width={board.width}
           height={board.height}
-          rx={board.height / 2}
+          rx={board.height / 2} opacity="0.94"
           fill={color}
           stroke={strokeColor}
           strokeWidth="0.8"

@@ -76,12 +76,9 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
   test('ゲートのタップ領域は横方向も見た目より広く、縦方向も十分な大きさがある（幼児向け規約）', () => {
     const gateSource = readFileSync(path.join(__dirname, 'PukupukaGate.tsx'), 'utf-8')
     const hitWidth = Number(gateSource.match(/HIT_WIDTH = (\d+)/)?.[1])
-    const topMargin = Number(gateSource.match(/HIT_TOP_MARGIN = (\d+)/)?.[1])
-    const bottomMargin = Number(gateSource.match(/HIT_BOTTOM_MARGIN = (\d+)/)?.[1])
+    const hitHeight = Number(gateSource.match(/HIT_HEIGHT = (\d+)/)?.[1])
     expect(hitWidth).toBeGreaterThanOrEqual(15)
-    // タップの高さは、じゃぐち・せんのタップ領域と重ならないよう上下に余白を残した
-    // ゲート矩形の高さ（stage.gate.height）から余白ぶんを引いた値になる。
-    expect(PUKUPUKA_STAGE.gate.height - topMargin - bottomMargin).toBeGreaterThanOrEqual(15)
+    expect(hitHeight).toBeGreaterThanOrEqual(15)
 
     expect(ruleBody('.gateHit')).toMatch(/touch-action:\s*manipulation/)
   })

@@ -38,6 +38,8 @@ export type PukupukaGameState = {
   readonly drainOpen: boolean
   /** ゲート(#517)が開いているか。閉じている間、stage.gateも固定物として当たり判定に含める。 */
   readonly gateOpen: boolean
+  /** 0: 全閉、1: 全開。描画・衝突・通水で共用する。 */
+  readonly gateLift: number
   /** 流れ板(#519)が現在押し流している向き。タップのたびに反転する。 */
   readonly boardFlowDirection: BoardFlowDirection
   /** 到着した仲間は以後固定し、救助を取り消さない。 */
@@ -117,6 +119,7 @@ export function createInitialState(stage: StageDefinition): PukupukaGameState {
     leftoverMs: 0,
     drainOpen: false,
     gateOpen: false,
+    gateLift: 0,
     boardFlowDirection: stage.board?.initialFlowDirection ?? 'goal',
     rescuedIds: [],
     collectedStarIds: [],
@@ -133,9 +136,10 @@ export function activeSolids(
   stage: StageDefinition,
   gateOpen: boolean,
   drainOpen = false,
+  gateLift = gateOpen ? 1 : 0,
 ): readonly Rect[] {
   const solids: Rect[] = [...stage.solids]
-  if (stage.gate && !gateOpen) solids.push(stage.gate)
+  if (stage.gate && gateLift < 1) solids.push({ ...stage.gate, height: stage.gate.height * (1 - gateLift) })
   if (stage.waterWheel?.linkedGateBlocksPassage && !drainOpen) {
     solids.push(stage.waterWheel.linkedGate)
   }
@@ -199,7 +203,7 @@ export function isSettled(stage: StageDefinition, state: PukupukaGameState): boo
   // クリア後は浮遊物を止めているため(#518)、クリアした瞬間の速度が残っていても
   // 動き続けているとは扱わない。
   if (state.phase === 'cleared') return true
-  if (state.wave) return false
+  if (state.wave || state.gateLift !== (state.gateOpen ? 1 : 0)) return false
   if (state.gateOpen && state.gateFlow.strength > 0) return false
   for (const definition of stage.waterBodies) {
     const bodyState = state.water[definition.id]
@@ -227,7 +231,7 @@ export function applyWave(stage: StageDefinition, state: PukupukaGameState, x: n
   if (!body || !state.water[body.id]) return state
   const surface = waterSurfaceY(body, state.water[body.id])
   if (surface >= body.floorY - 1 || y < surface - 8 || y > body.floorY) return state
-  if (activeSolids(stage, state.gateOpen, state.drainOpen).some((solid) => rectContainsPoint(solid, x, y))) return state
+  if (activeSolids(stage, state.gateOpen, state.drainOpen, state.gateLift).some((solid) => rectContainsPoint(solid, x, y))) return state
   return { ...state, wave: { x, y: Math.max(surface, y), bodyId: body.id, remainingMs: 1000 } }
 }
 
@@ -288,6 +292,7 @@ function advanceOneStep(
 ): StepResult {
   const deltaSeconds = FIXED_STEP_MS / 1000
 
+  const gateLift = Math.max(0, Math.min(1, state.gateLift + (state.gateOpen ? 1 : -1) * deltaSeconds / 0.65))
   let water = state.water
   if (state.phase === 'playing') {
     if (control === 'fill') {
@@ -301,23 +306,29 @@ function advanceOneStep(
     // じゃぐちと同時に開いていても、それぞれ別々に目標水量を押し合うだけなので
     // 「注水量 - 排水量」に相当する結果へ自然に収束する（特別な合成処理は不要）。
     if (state.drainOpen && stage.drain) {
-      water = requestWaterChange(
-        stage.waterBodies,
-        water,
-        stage.drain.sourceBodyId,
-        -DRAIN_RATE_LEVEL_PER_SEC * deltaSeconds,
-      )
+      const drainBody = findWaterBody(stage.waterBodies, stage.drain.sourceBodyId)
+      if (drainBody) {
+        const minimumVolume = Math.max(0, drainBody.floorY - stage.drain.y) * (drainBody.right - drainBody.left)
+        const current = water[drainBody.id]
+        // 壁の排水口より低い水位では吸い上げない。空になった後の再描画も増やさない。
+        if (current.targetVolume > minimumVolume) {
+          water = { ...water, [drainBody.id]: { ...current,
+            targetVolume: Math.max(minimumVolume, current.targetVolume - DRAIN_RATE_LEVEL_PER_SEC * deltaSeconds * (drainBody.right - drainBody.left)),
+          } }
+        }
+      }
     }
   }
   water = stepWaterField(stage.waterBodies, water, deltaSeconds)
   let gateFlow: GateFlowState = { direction: 0, strength: 0, transferredVolume: 0 }
-  if (state.phase === 'playing' && state.gateOpen && stage.gate) {
+  if (state.phase === 'playing' && gateLift > 0 && stage.gate) {
     const transfer = transferWaterThroughGate(
       stage.waterBodies,
       water,
       stage.gate.leftBodyId,
       stage.gate.rightBodyId,
       deltaSeconds,
+      { sillY: stage.gate.y + stage.gate.height, fraction: gateLift },
     )
     water = transfer.field
     const carriedStrength =
@@ -332,7 +343,7 @@ function advanceOneStep(
       toBodyId: transfer.toBodyId,
     }
     // 水位差がそろった瞬間に流れが消えると因果が見えにくいため、短い残流だけ滑らかに減衰させる。
-    // 閉門時はこの分岐へ入らず即リセットされるので、開閉の繰り返しにも状態を持ち越さない。
+    // 全閉になった時点で残流も止める。閉まり途中は実際の開口に応じた通水を続ける。
     if (transfer.direction === 0 && state.gateFlow.direction !== 0) {
       const strength = Math.max(0, state.gateFlow.strength - deltaSeconds * 0.42)
       if (strength > 0) gateFlow = { ...state.gateFlow, strength, transferredVolume: 0 }
@@ -345,7 +356,7 @@ function advanceOneStep(
   // クリアした瞬間の(まだ少しばらけている)並びのまま止めることで、常にきれいに
   // 見分けられる状態を保つ。アヒル1体だけの時と同じく、クリア後に水の操作を
   // 受け付けなくなるのと合わせて「ここでおしまい」を見た目でも表す。
-  const solids = activeSolids(stage, state.gateOpen, state.drainOpen)
+  const solids = activeSolids(stage, state.gateOpen, state.drainOpen, gateLift)
   // Legacy互換面（同じ水域ID同士のゲート）だけ、従来の接触板として扱う。
   const board = stage.board && stage.gate?.leftBodyId === stage.gate?.rightBodyId
     ? { rect: stage.board, pushSpeed: boardFlowSpeed(state, driftDirection) }
@@ -364,6 +375,9 @@ function advanceOneStep(
           const affectedByGate = body?.id === gateFlow.fromBodyId || body?.id === gateFlow.toBodyId
           const directedReleaseBoard =
             stage.gate?.leftBodyId !== stage.gate?.rightBodyId && bodyId === stage.board?.targetBodyId
+          const circulation = stage.board?.circulation && bodyId === stage.board.targetBodyId && body &&
+            waterSurfaceY(body, water[body.id]) < body.floorY - 2
+          const circulationSpeed = circulation ? 150 * Math.sign(boardFlowSpeed(state, driftDirection)) : 0
           const ambientScale = directedReleaseBoard ? 0 : (stage.ambientDriftScale ?? 1)
           const wave = state.wave
           const waveDistance = wave ? Math.abs(floater.x - wave.x) : Infinity
@@ -380,7 +394,7 @@ function advanceOneStep(
               solids,
               bounds: { width: stage.width, height: stage.height },
               driftDirection: driftDirection * ambientScale,
-              gateFlowSpeed: (affectedByGate ? GATE_FLOW_SPEED * gateFlow.strength * flowDirection : 0) + waveSpeed,
+              gateFlowSpeed: (circulation ? circulationSpeed : affectedByGate ? GATE_FLOW_SPEED * gateFlow.strength * flowDirection : 0) + waveSpeed,
               board,
             },
             deltaSeconds,
@@ -401,7 +415,12 @@ function advanceOneStep(
   const rescuedIds = [...state.rescuedIds]
   for (const floater of floaters) {
     if (stage.goal.floaterIds.includes(floater.id) && !rescuedIds.includes(floater.id) &&
-      rectContainsPoint(stage.goal.area, floater.x, floater.y)) rescuedIds.push(floater.id)
+      rectContainsPoint(stage.goal.area, floater.x, floater.y) &&
+      (!stage.goal.requiresLanding || solids.some((solid) => {
+        const radius = stage.floaters.find((item) => item.id === floater.id)!.radius
+        return Math.abs(floater.y + radius - solid.y) < 0.6 &&
+          floater.x >= solid.x && floater.x <= solid.x + solid.width && Math.abs(floater.vy) < 1
+      }))) rescuedIds.push(floater.id)
   }
   let phase = state.phase
   let goalReached = false
@@ -419,6 +438,7 @@ function advanceOneStep(
       leftoverMs: state.leftoverMs,
       drainOpen: state.drainOpen,
       gateOpen: state.gateOpen,
+      gateLift,
       boardFlowDirection: state.boardFlowDirection,
       gateFlow,
       rescuedIds,
