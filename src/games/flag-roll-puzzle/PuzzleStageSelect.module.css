@@ -17,18 +17,6 @@
   gap: var(--space-sm);
 }
 
-.homeButton {
-  min-width: 80px;
-  min-height: 44px;
-  padding: var(--space-xs) var(--space-sm);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-round);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  font-weight: 700;
-  cursor: pointer;
-}
-
 .title {
   flex: 1;
   margin: 0;

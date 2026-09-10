@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import BigButton from '../../components/BigButton'
+import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { findFlagBall, type FlagBallData } from '../../components/flag-ball/flagBalls'
@@ -425,16 +426,8 @@ export default function FlagRollPuzzlePlay() {
     <GamePlaySurface>
       <main className={styles.page} data-layout={isLandscapeLayout ? 'landscape' : 'portrait'}>
         <header className={styles.header}>
+          <GameBackButton onBack={() => setSelectedStageId(null)} reserveSpace />
           <h1 className={styles.title}>こっきコロコロパズル</h1>
-          <button
-            type="button"
-            className={styles.stageButton}
-            aria-label="ステージを えらびなおす"
-            disabled={!editing}
-            onClick={() => setSelectedStageId(null)}
-          >
-            {stage.emoji} {stage.nameJa}
-          </button>
           {!isLandscapeLayout ? (
             <button
               type="button"
