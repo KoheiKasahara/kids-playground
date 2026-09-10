@@ -2,7 +2,20 @@
 .header { min-height: 54px; padding-left: 116px; display: flex; justify-content: space-between; align-items: center; gap: 5px; flex-shrink: 0; }
 .header h1 { font-size: clamp(17px, 4vw, 24px); margin: 0; }
 .header span { font-size: 12px; white-space: nowrap; }
+.header .score { color: #d9932a; font-size: 15px; letter-spacing: 1px; }
 .hint, .tip { text-align: center; margin: 0; font-size: 13px; font-weight: bold; flex-shrink: 0; }
+.star { animation: twinkle 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.starDone { opacity: .5; }
+.breeze { animation: breeze 1.8s ease-in-out infinite; }
+.spin { animation: spin 6s linear infinite; transform-box: fill-box; transform-origin: center; }
+.cardStars { color: #d9932a; font-size: 26px; letter-spacing: 3px; margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; font-size: 13px; }
+@keyframes twinkle { 0%, 100% { opacity: 1 } 50% { opacity: .6 } }
+@keyframes breeze { 0%, 100% { opacity: .35 } 50% { opacity: .95 } }
+@keyframes spin { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) {
+  .star, .breeze, .spin { animation: none; }
+}
 .boardArea { flex: 1; min-height: 0; container-type: size; display: grid; place-items: center; }
 .board { width: min(100cqw, calc(100cqh * 2 / 3)); aspect-ratio: 2 / 3; position: relative; overflow: hidden; border-radius: 20px; box-shadow: 0 3px 12px #244c5920; }
 .svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; cursor: crosshair; }
