@@ -1,3 +1,4 @@
+import GameBackButton from '../../components/GameBackButton'
 import { PUZZLE_STAGES, type PuzzleStageId } from './puzzleStages'
 import styles from './PuzzleStageSelect.module.css'
 
@@ -10,6 +11,7 @@ export default function PuzzleStageSelect({ onSelect }: PuzzleStageSelectProps) 
   return (
     <main className={styles.page} data-testid="puzzle-stage-select">
       <header className={styles.header}>
+        <GameBackButton to="/" reserveSpace />
         <h1 className={styles.title}>こっきコロコロパズル</h1>
       </header>
       <section className={styles.content} aria-labelledby="puzzle-stage-title">

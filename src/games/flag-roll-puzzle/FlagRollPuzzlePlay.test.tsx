@@ -162,7 +162,7 @@ describe('こっきコロコロパズル', () => {
     expect(screen.getByRole('status')).not.toHaveTextContent('あと 1こ！')
   })
 
-  test('むずかしいで両方止まった後、ゴール済みを動かさず未ゴールだけ再開する', async () => {
+  test('むずかしいで片方だけゴールし、もう片方が止まったら両方スタート位置へ戻り、再開でそろって動く', async () => {
     const user = userEvent.setup()
     await renderStageSelect()
     await user.click(screen.getByRole('button', { name: 'むずかしい' }))
@@ -171,11 +171,18 @@ describe('こっきコロコロパズル', () => {
     act(() => engineMock.options?.onGoal?.('ball-a'))
     act(() => engineMock.options?.onStopped?.('ball-b'))
     expect(screen.getByRole('button', { name: 'ボールを おとす！' })).toBeEnabled()
-    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
-    expect(engineMock.options?.balls?.find((ball) => ball.id === 'ball-a')?.status).toBe('goal')
-    expect(engineMock.options?.balls?.find((ball) => ball.id === 'ball-b')?.status).toBe('moving')
+    expect(screen.getAllByTestId('puzzle-ball').map((ball) => ball.getAttribute('data-status'))).toEqual([
+      'stopped',
+      'stopped',
+    ])
 
-    act(() => engineMock.options?.onGoal?.('ball-b'))
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    expect(engineMock.options?.balls?.every((ball) => ball.status === 'moving')).toBe(true)
+
+    act(() => {
+      engineMock.options?.onGoal?.('ball-a')
+      engineMock.options?.onGoal?.('ball-b')
+    })
     expect(screen.getByRole('status')).toHaveTextContent('ゴール！ すごい！')
     expect(screen.getByRole('status')).not.toHaveTextContent('あと 1こ！')
   })
@@ -668,9 +675,12 @@ describe('こっきコロコロパズル', () => {
     expect(placedParts()).toHaveLength(0)
   })
 
-  test('共通の「もどる」でホームへ戻る', async () => {
+  test('「もどる」はステージ選択、さらにホームの順に一画面ずつ戻る', async () => {
     const user = userEvent.setup()
     await renderGame()
+    await user.click(screen.getByRole('button', { name: 'もどる' }))
+    expect(screen.getByRole('heading', { name: 'どのステージで あそぶ？' })).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByRole('heading', { name: 'こどもミニゲーム' })).toBeInTheDocument()
   })

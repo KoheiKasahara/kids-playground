@@ -260,12 +260,20 @@ describe('puzzleState', () => {
     expect(bothStopped.balls.find((ball) => ball.id === 'ball-b')?.position).toEqual(startB)
   })
 
-  test('再開時はゴール済みを動かさず、未ゴール停止球だけを動かす', () => {
+  test('片方だけゴールし、もう片方が停止したときは両方スタート位置へ戻り、再開でそろって動く', () => {
     const running = startRun(createPuzzleState('hard'))
+    const startA = running.balls.find((ball) => ball.id === 'ball-a')!.startPosition
+    const startB = running.balls.find((ball) => ball.id === 'ball-b')!.startPosition
     const stopped = markBallStopped(markBallGoal(running, 'ball-a'), 'ball-b')
+
+    expect(stopped.phase).toBe('stopped')
+    expect(stopped.balls.find((ball) => ball.id === 'ball-a')?.status).toBe('stopped')
+    expect(stopped.balls.find((ball) => ball.id === 'ball-a')?.position).toEqual(startA)
+    expect(stopped.balls.find((ball) => ball.id === 'ball-b')?.status).toBe('stopped')
+    expect(stopped.balls.find((ball) => ball.id === 'ball-b')?.position).toEqual(startB)
+
     const resumed = startRun(stopped)
-    expect(resumed.balls.find((ball) => ball.id === 'ball-a')?.status).toBe('goal')
-    expect(resumed.balls.find((ball) => ball.id === 'ball-b')?.status).toBe('moving')
+    expect(resumed.balls.every((ball) => ball.status === 'moving')).toBe(true)
   })
 
   test('もどす・ぜんぶけすは全ボールを各スタートへ戻し、国旗とステージを維持する', () => {

@@ -152,6 +152,17 @@ function updateBallSnapshots(
   })
 }
 
+/**
+ * 動いている球がもういなければ、そのrunの結果を確定する。
+ * 全球そろってゴールできなかった場合は、一部がゴール済みでも全員をスタート位置へ戻し、
+ * 「いっしょにゴール」できるまで やり直せるようにする（ゴール済み球を個別に確保しない）。
+ */
+function finalizeBalls(balls: readonly PuzzleBallState[]): readonly PuzzleBallState[] {
+  if (balls.some((ball) => ball.status === 'moving')) return balls
+  if (balls.every((ball) => ball.status === 'goal')) return balls
+  return balls.map((ball) => ({ ...ball, position: { ...ball.startPosition }, status: 'stopped' as const }))
+}
+
 function phaseAfterBallChange(balls: readonly PuzzleBallState[]): PuzzlePhase {
   if (balls.every((ball) => ball.status === 'goal')) return 'cleared'
   if (balls.some((ball) => ball.status === 'moving')) return 'running'
@@ -191,8 +202,8 @@ export function markBallGoal(
   if (state.phase !== 'running' && state.phase !== 'cleared') return state
   if (!state.balls.some((ball) => ball.id === ballId)) return state
   const synced = updateBallSnapshots(state.balls, snapshots)
-  const balls = synced.map((ball) =>
-    ball.id === ballId ? { ...ball, status: 'goal' as const } : ball,
+  const balls = finalizeBalls(
+    synced.map((ball) => (ball.id === ballId ? { ...ball, status: 'goal' as const } : ball)),
   )
   return { ...state, balls, phase: phaseAfterBallChange(balls) }
 }
@@ -211,10 +222,12 @@ export function markBallStopped(
   if (state.phase !== 'running') return state
   if (!state.balls.some((ball) => ball.id === ballId)) return state
   const synced = updateBallSnapshots(state.balls, snapshots)
-  const balls = synced.map((ball) =>
-    ball.id === ballId && ball.status !== 'goal'
-      ? { ...ball, position: { ...ball.startPosition }, status: 'stopped' as const }
-      : ball,
+  const balls = finalizeBalls(
+    synced.map((ball) =>
+      ball.id === ballId && ball.status !== 'goal'
+        ? { ...ball, position: { ...ball.startPosition }, status: 'stopped' as const }
+        : ball,
+    ),
   )
   return { ...state, balls, phase: phaseAfterBallChange(balls) }
 }

@@ -22,6 +22,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/domino-flag',
   '/games/flag-roll-maze',
   '/games/flag-roll-maze/play',
+  '/games/flag-roll-puzzle',
   '/games/koma-battle',
   '/games/magic-sandbox',
   '/games/oekaki-korokoro',
