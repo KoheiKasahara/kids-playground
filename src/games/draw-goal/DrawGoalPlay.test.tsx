@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import DrawGoalPlay from './DrawGoalPlay'
+import { STAGES } from './stages'
 import { playCorrectSound } from '../../utils/quizSound'
 
 vi.mock('../../utils/quizSound', () => ({ primeAudio: vi.fn(), playCorrectSound: vi.fn() }))
@@ -41,14 +42,25 @@ function draw(svg: HTMLElement) {
   fireEvent.pointerUp(svg, { clientX: 285, clientY: 520 })
 }
 describe('draw goal play', () => {
-  test('draw → release → physical goal → next; back returns one level', () => {
+  test('draw → start → physical goal → next; back returns one level', () => {
     const svg = open()
     expect(screen.getAllByRole('button', { name: 'もどる' })).toHaveLength(1)
     draw(svg)
     expect(screen.getByRole('button', { name: '↶ 1ぽん もどす' })).toBeEnabled()
+    // The road alone never launches the ball: more roads can be drawn before start.
+    const ball = svg.querySelector('g')!
+    advance(1)
+    const parked = ball.getAttribute('transform')
+    advance(120)
+    expect(ball.getAttribute('transform')).toBe(parked)
+    expect(screen.getByText('▶ スタートを おそう！')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '▶ スタート' }))
     advance()
     expect(screen.getByRole('heading', { name: '🎉 ゴール！' })).toBeInTheDocument()
     expect(playCorrectSound).toHaveBeenCalledOnce()
+    // The celebration waits for the ball to come to rest on the floor of the cup.
+    const [, y] = ball.getAttribute('transform')!.match(/translate\((-?[\d.]+) (-?[\d.]+)\)/)!.slice(1).map(Number)
+    expect(y).toBeGreaterThan(STAGES[0].goal.y + 40)
     advance()
     expect(playCorrectSound).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'つぎへ →' }))
@@ -60,7 +72,7 @@ describe('draw goal play', () => {
   })
   test('drawing pauses the ball; secondary/canceled/resize gestures create no road', () => {
     const svg = open()
-    fireEvent.click(screen.getByRole('button', { name: '▶ もういちど' }))
+    fireEvent.click(screen.getByRole('button', { name: '▶ スタート' }))
     advance(2)
     const ball = svg.querySelector('g')!
     const position = ball.getAttribute('transform')
@@ -79,7 +91,8 @@ describe('draw goal play', () => {
   test('replay keeps roads, undo and restart remove them; unmount cancels animation', () => {
     const svg = open()
     draw(svg)
-    fireEvent.click(screen.getByRole('button', { name: '▶ もういちど' }))
+    fireEvent.click(screen.getByRole('button', { name: '▶ スタート' }))
+    expect(screen.getByRole('button', { name: '▶ もういちど' })).toBeEnabled()
     expect(screen.getByRole('button', { name: '↶ 1ぽん もどす' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: '↶ 1ぽん もどす' }))
     expect(screen.getByRole('button', { name: '↶ 1ぽん もどす' })).toBeDisabled()

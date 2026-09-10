@@ -38,7 +38,8 @@ function Board({ index, back, next }: { index: number; back: () => void; next: (
       if (lastStatus !== game.state) {
         lastStatus = game.state
         setStatus(game.state)
-        if (game.state === 'goal') playCorrectSound()
+        // Cheer the moment the ball enters the cup; it keeps rolling until it rests.
+        if (game.state === 'scored') playCorrectSound()
       }
       frame = requestAnimationFrame(tick)
     }
@@ -64,7 +65,7 @@ function Board({ index, back, next }: { index: number; back: () => void; next: (
   }
   function begin(event: PointerEvent<SVGSVGElement>) {
     const game = world.current
-    if (!game || gesture.current || !event.isPrimary || event.button !== 0 || game.state === 'goal' || game.state === 'retry') return
+    if (!game || gesture.current || !event.isPrimary || event.button !== 0 || game.state === 'scored' || game.state === 'goal' || game.state === 'retry') return
     event.preventDefault()
     primeAudio()
     if (game.lines.length >= MAX_LINES) { setNotice('「1ぽん もどす」で かきなおそう'); return }
@@ -105,7 +106,7 @@ function Board({ index, back, next }: { index: number; back: () => void; next: (
   return <GamePlaySurface><main className={styles.page}>
     <GameBackButton onBack={back} />
     <header className={styles.header}><h1>かいてゴール！</h1><span>{index + 1} / {STAGES.length}</span></header>
-    <p className={styles.hint} role="status">{notice || (status === 'goal' ? '🎉 ゴール！' : status === 'retry' ? 'もういちど やってみよう！' : status === 'ready' ? stage.hint : 'せんを たしても いいよ')}</p>
+    <p className={styles.hint} role="status">{notice || (status === 'goal' || status === 'scored' ? '🎉 ゴール！' : status === 'retry' ? 'もういちど やってみよう！' : status === 'running' ? 'せんを たしても いいよ' : lines.length ? '▶ スタートを おそう！' : stage.hint)}</p>
     <div className={styles.boardArea}>
       <div className={styles.board}>
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} aria-label="せんを かく ばしょ" className={styles.svg}
@@ -128,10 +129,10 @@ function Board({ index, back, next }: { index: number; back: () => void; next: (
     </div>
     <div className={styles.tools}>
       <button onClick={() => reset(true)}>↻ やりなおし</button>
-      <button disabled={!lines.length || status === 'goal'} onClick={() => { gesture.current = null; setPreview([]); world.current?.undo(); setLines(world.current?.lines.map(l => l.points) ?? []); setStatus('ready'); setNotice('') }}>↶ 1ぽん もどす</button>
-      <button disabled={status === 'goal'} onClick={() => { primeAudio(); reset(false); world.current?.start(); setStatus('running') }}>▶ もういちど</button>
+      <button disabled={!lines.length || status === 'scored' || status === 'goal'} onClick={() => { gesture.current = null; setPreview([]); world.current?.undo(); setLines(world.current?.lines.map(l => l.points) ?? []); setStatus('ready'); setNotice('') }}>↶ 1ぽん もどす</button>
+      <button disabled={status === 'scored' || status === 'goal'} onClick={() => { primeAudio(); reset(false); world.current?.start(); setStatus('running') }}>{status === 'ready' ? '▶ スタート' : '▶ もういちど'}</button>
     </div>
-    <p className={styles.tip}>かく → はなすと コロコロ！</p>
+    <p className={styles.tip}>せんを かいたら ▶ スタート！</p>
   </main></GamePlaySurface>
 }
 
@@ -142,6 +143,6 @@ export default function DrawGoalPlay() {
     <GameBackButton to="/" />
     <h1>かいてゴール！</h1><p>せんを かいて、ボールを ゴールへ！</p>
     <div className={styles.stageGrid}>{STAGES.map((s, i) => <button key={s.name} aria-label={`${i + 1} ${s.name}`} onClick={() => { primeAudio(); setIndex(i) }}><span>{i + 1}</span>{s.name}</button>)}</div>
-    <p>せんは そのまま みちに なるよ。<br />ゆびを はなすと ボールが うごくよ。</p>
+    <p>せんは そのまま みちに なるよ。<br />なんぼんでも かいてから、スタートで ボールが うごくよ。</p>
   </main>
 }

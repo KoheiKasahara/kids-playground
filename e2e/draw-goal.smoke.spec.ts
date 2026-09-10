@@ -21,6 +21,8 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
     await page.mouse.down()
     await page.mouse.move(box.x + box.width * 285 / 400, box.y + box.height * 520 / 600, { steps: 25 })
     await page.mouse.up()
+    await expect(page.getByRole('heading', { name: '🎉 ゴール！' })).toHaveCount(0)
+    await page.getByRole('button', { name: '▶ スタート' }).click()
     await expect(page.getByRole('heading', { name: '🎉 ゴール！' })).toBeVisible({ timeout: 10000 })
     expect(await page.evaluate(() => window.scrollY)).toBe(0)
     await page.getByRole('button', { name: 'つぎへ →' }).click()

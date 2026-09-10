@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import Matter from 'matter-js'
-import { STAGES } from './stages'
-import { appendPoint, createWorld, MAX_LINES, MAX_POINTS, MAX_SEGMENTS } from './world'
+import { BALL_RADIUS, STAGES } from './stages'
+import { appendPoint, createWorld, MAX_LINES, MAX_POINTS, MAX_SEGMENTS, SETTLE_FRAMES } from './world'
 import type { Point } from './stroke'
 
 function run(world: ReturnType<typeof createWorld>) {
-  for (let i = 0; i < 1200 && world.state === 'running'; i++) world.step()
+  for (let i = 0; i < 1200 && (world.state === 'running' || world.state === 'scored'); i++) world.step()
 }
 // Wide, imprecise example roads. Test the actual physics, not a mocked goal flag.
 const solutions: Point[][][] = [
@@ -21,6 +21,7 @@ describe('fixed drawing roads', () => {
     const world = createWorld(STAGES[i])
     for (const line of solutions[i]) expect(world.addStroke(line)).toBe(true)
     const before = world.lines.flatMap(l => l.bodies.map(b => ({ ...b.position })))
+    world.start()
     run(world)
     expect(world.state, JSON.stringify(world.ball.position)).toBe('goal')
     expect(world.lines.flatMap(l => l.bodies.map(b => b.position))).toEqual(before)
@@ -38,6 +39,7 @@ describe('fixed drawing roads', () => {
     for (const i of [0, 1, 2]) {
       const world = createWorld(STAGES[i])
       world.addStroke(solutions[i][0].map(p => ({ x: p.x + offset, y: p.y })))
+      world.start()
       run(world)
       expect(world.state, `stage ${i + 1}, offset ${offset}`).toBe('goal')
       world.destroy()
@@ -62,20 +64,52 @@ describe('fixed drawing roads', () => {
     expect(world.lines).toHaveLength(0)
     world.destroy()
   })
-  test('only entering the cup counts, and a goal is stable', () => {
+  test('only entering the cup counts, and the ball rolls to rest in the cup', () => {
     const world = createWorld(STAGES[0])
     world.start()
     Matter.Body.setPosition(world.ball, { x: STAGES[0].goal.x, y: STAGES[0].goal.y - 20 })
     world.step()
     expect(world.state).toBe('running')
-    Matter.Body.setPosition(world.ball, { x: STAGES[0].goal.x, y: STAGES[0].goal.y + 40 })
+    Matter.Body.setPosition(world.ball, { x: STAGES[0].goal.x - 40, y: STAGES[0].goal.y + 25 })
+    Matter.Body.setVelocity(world.ball, { x: 4, y: 0 })
     world.step()
+    expect(world.state).toBe('scored')
+    // The ball keeps rolling inside the cup instead of freezing where it crossed the rim.
+    const entry = { ...world.ball.position }
+    run(world)
     expect(world.state).toBe('goal')
+    expect(world.ball.position.y).toBeGreaterThan(entry.y)
+    expect(world.ball.position.y).toBeCloseTo(STAGES[0].goal.y + 80 - 6 - BALL_RADIUS, 0)
+    expect(world.ball.speed).toBeLessThan(.3)
     const position = { ...world.ball.position }
     world.step()
     expect(world.ball.position).toEqual(position)
     world.retry(true)
     expect(world.state).toBe('ready')
+    world.destroy()
+  })
+  test('the celebration still arrives when the ball never settles', () => {
+    const world = createWorld(STAGES[0])
+    world.start()
+    Matter.Body.setPosition(world.ball, { x: STAGES[0].goal.x, y: STAGES[0].goal.y + 40 })
+    world.step()
+    expect(world.state).toBe('scored')
+    for (let i = 0; i <= SETTLE_FRAMES; i++) {
+      Matter.Body.setVelocity(world.ball, { x: 5, y: 0 })
+      world.step()
+    }
+    expect(world.state).toBe('goal')
+    world.destroy()
+  })
+  test('drawn roads wait for start, and extra roads can be added first', () => {
+    const world = createWorld(STAGES[5])
+    for (const line of solutions[5]) expect(world.addStroke(line)).toBe(true)
+    for (let i = 0; i < 120; i++) world.step()
+    expect(world.state).toBe('ready')
+    expect(world.ball.position).toEqual(STAGES[5].ball)
+    world.start()
+    run(world)
+    expect(world.state).toBe('goal')
     world.destroy()
   })
   test('bounds scribbles and ignores invalid, tiny and overlapping lines', () => {
