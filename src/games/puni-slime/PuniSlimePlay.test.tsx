@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PuniSlimePlay from './PuniSlimePlay'
+import { CONTAINERS } from './slimeSimulation'
 
 let frame: FrameRequestCallback
 beforeEach(() => {
@@ -75,5 +76,46 @@ describe('PuniSlimePlay', () => {
     expect(body.getAttribute('d')).toBe(original)
     unmount()
     expect(cancelAnimationFrame).toHaveBeenCalled()
+  })
+  it('かたちを えらぶと 本体の輪郭が入れ替わる', () => {
+    const { container } = renderGame()
+    advance()
+    const body = container.querySelector('svg > path')!
+    const round = body.getAttribute('d')
+    expect(screen.getByRole('button', { name: 'まる' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'ドーナツ' }))
+    act(() => frame(0))
+    expect(screen.getByRole('button', { name: 'ドーナツ' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'まる' })).toHaveAttribute('aria-pressed', 'false')
+    // ドーナツだけは穴のぶんパスが2周ぶんになる。
+    expect(body.getAttribute('d')!.match(/M/g)).toHaveLength(2)
+    expect(screen.getByText('ドーナツに へんしん！')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'ながぼう' }))
+    act(() => frame(0))
+    expect(body.getAttribute('d')).not.toBe(round)
+    expect(body.getAttribute('d')!.match(/M/g)).toHaveLength(1)
+  })
+  it('いれものを おいたり かたづけたり できる', () => {
+    const { container } = renderGame()
+    const wall = (id: string) => container.querySelector(`path[d="${CONTAINERS.find((holder) => holder.id === id)!.wall}"]`)
+    expect(wall('cup')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /コップ/ }))
+    fireEvent.click(screen.getByRole('button', { name: /ほしがた/ }))
+    advance()
+    expect(wall('cup')).not.toBeNull()
+    expect(wall('star')).not.toBeNull()
+    expect(wall('plate')).toBeNull()
+    expect(screen.getByRole('button', { name: /コップ/ })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: /コップ/ }))
+    advance()
+    expect(wall('cup')).toBeNull()
+    expect(wall('star')).not.toBeNull()
+  })
+  it('おとを けしたり だしたり できる', () => {
+    renderGame()
+    const button = screen.getByRole('button', { name: 'おとを けす' })
+    expect(button).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(button)
+    expect(screen.getByRole('button', { name: 'おとを だす' })).toHaveAttribute('aria-pressed', 'false')
   })
 })
