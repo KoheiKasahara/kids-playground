@@ -1140,6 +1140,527 @@ const ghostDetails: readonly PaintDetail[] = [
   },
 ]
 
+// ユーフォー ---------------------------------------------------------------
+
+// ビーム → えんばん → ドーム → ライトの順に重ね、ビームとドームの付け根を
+// えんばんの塗りで隠す。
+const ufoAreas: readonly PaintArea[] = [
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'beam',
+    label: 'したむきの ひかり',
+    // 下へひろがる台形。上端はえんばんの内側に入れて、付け根を隠す。
+    shape: { kind: 'path', d: 'M 38,60 L 62,60 L 78,94 L 22,94 Z' },
+    motion: { group: 'ufo', part: 'ufoBeam' },
+  },
+  {
+    id: 'body',
+    label: 'ユーフォーの えんばん',
+    shape: { kind: 'ellipse', cx: 50, cy: 56, rx: 36, ry: 13 },
+    motion: { group: 'ufo' },
+  },
+  {
+    id: 'dome',
+    label: 'まるい まど',
+    // えんばんの上に重ねて描くので、下辺（Zで閉じる線）がそのまま切りかえの線になる。
+    shape: { kind: 'path', d: 'M 30,45 C 30,26 70,26 70,45 Z' },
+    motion: { group: 'ufo' },
+  },
+  {
+    id: 'lightLeft',
+    label: 'ひだりの ライト',
+    shape: { kind: 'circle', cx: 32, cy: 68, r: 8.5 },
+    motion: { group: 'ufo', part: 'ufoLightLeft' },
+  },
+  {
+    id: 'lightRight',
+    label: 'みぎの ライト',
+    shape: { kind: 'circle', cx: 68, cy: 68, r: 8.5 },
+    motion: { group: 'ufo', part: 'ufoLightRight' },
+  },
+]
+
+const ufoDetails: readonly PaintDetail[] = [
+  { shape: { kind: 'ellipse', cx: 41, cy: 36, rx: 5, ry: 3.5 }, fill: '#ffffff', motion: { group: 'ufo' } },
+  // えんばんのふち。まるい板が立体に見える1本だけの線。
+  {
+    shape: { kind: 'path', d: 'M 16,52 C 32,62 68,62 84,52' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'ufo' },
+  },
+  { shape: { kind: 'circle', cx: 44, cy: 61, r: 2.2 }, fill: '#ffd43b', motion: { group: 'ufo' } },
+  { shape: { kind: 'circle', cx: 56, cy: 61, r: 2.2 }, fill: '#ffd43b', motion: { group: 'ufo' } },
+  // ライトの芯。それぞれのライトと一緒にチカチカする。
+  {
+    shape: { kind: 'circle', cx: 32, cy: 68, r: 3.4 },
+    fill: '#fff4c2',
+    motion: { group: 'ufo', part: 'ufoLightLeft' },
+  },
+  {
+    shape: { kind: 'circle', cx: 68, cy: 68, r: 3.4 },
+    fill: '#fff4c2',
+    motion: { group: 'ufo', part: 'ufoLightRight' },
+  },
+]
+
+// ヘリコプター -------------------------------------------------------------
+
+// しっぽの ぼう → うしろの はね → どうたい → まど → うえの はね の順に重ね、
+// はねの付け根をどうたい・ぼうの塗りで隠す。
+const helicopterAreas: readonly PaintArea[] = [
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'tailBoom',
+    label: 'しっぽの ぼう',
+    // ぼうだけだと高さがMIN_TAP_SIZE_UNITSに足りないので、後ろの立ちばねまで
+    // ひとつのエリアにして、幼児の指で押せる大きさにしている。
+    shape: { kind: 'path', d: 'M 60,48 L 74,52 L 74,38 C 74,35 77,35 79,38 L 84,52 L 84,58 L 60,60 Z' },
+    motion: { group: 'heli' },
+  },
+  {
+    id: 'tailRotor',
+    label: 'うしろの はね',
+    // 2枚の羽をXに組んだ形（うえの はねと同じ作り）。同じ向きに閉じた2つの
+    // サブパスなので、交差部分も穴にならず1枚に塗れる。
+    shape: { kind: 'path', d: 'M 75,33 L 93,45 L 93,50 L 75,38 Z M 75,45 L 93,33 L 93,38 L 75,50 Z' },
+    motion: { group: 'heli', part: 'heliTailRotor' },
+  },
+  {
+    id: 'body',
+    label: 'ヘリコプターの どうたい',
+    shape: {
+      kind: 'path',
+      d: 'M 30,42 L 54,42 C 62,42 68,48 68,56 C 68,66 60,72 48,72 L 34,72 C 24,72 18,65 18,56 C 18,48 22,42 30,42 Z',
+    },
+    motion: { group: 'heli' },
+  },
+  {
+    id: 'window',
+    label: 'コックピットの まど',
+    shape: { kind: 'ellipse', cx: 34, cy: 56, rx: 11, ry: 9 },
+    motion: { group: 'heli' },
+  },
+  {
+    id: 'mainRotor',
+    label: 'うえの はね',
+    // まっすぐな羽2枚をXに組む。まるい形にすると回しても見た目が変わらないので、
+    // 「羽が回っている」ことが幼児にも分かるようこの形にしている。
+    // 回すと図形は自分の対角線を半径とする円を掃くので、その円（中心(50,22)・半径約20）が
+    // 紙の内側に収まる長さにしている（長い羽にすると回った瞬間に紙からはみ出す）。
+    shape: { kind: 'path', d: 'M 32,13 L 68,25 L 68,31 L 32,19 Z M 32,25 L 68,13 L 68,19 L 32,31 Z' },
+    motion: { group: 'heli', part: 'heliMainRotor' },
+  },
+]
+
+const helicopterDetails: readonly PaintDetail[] = [
+  // ローターの軸。どうたいと一緒に飛ぶだけで、回らない。
+  {
+    shape: { kind: 'path', d: 'M 50,26 L 50,44' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 2.4,
+    motion: { group: 'heli' },
+  },
+  // 羽の中心。回転の軸そのものなので、羽と一緒に回さずその場に置く。
+  { shape: { kind: 'circle', cx: 50, cy: 22, r: 3 }, fill: '#495057', motion: { group: 'heli' } },
+  { shape: { kind: 'circle', cx: 84, cy: 41.5, r: 2.4 }, fill: '#495057', motion: { group: 'heli' } },
+  // 着地脚（スキッド）。
+  {
+    shape: { kind: 'path', d: 'M 24,78 L 60,78 M 32,71 L 30,78 M 52,71 L 54,78' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.8,
+    motion: { group: 'heli' },
+  },
+  { shape: { kind: 'ellipse', cx: 30, cy: 51, rx: 3.6, ry: 2.4 }, fill: '#ffffff', motion: { group: 'heli' } },
+  { shape: { kind: 'circle', cx: 66, cy: 60, r: 2.2 }, fill: '#ffd43b', motion: { group: 'heli' } },
+]
+
+// いぬ ---------------------------------------------------------------------
+
+// しっぽ・あし → からだ → みみ → あたま の順に重ね、しっぽとみみの付け根を
+// からだ・あたまの塗りで隠す。
+const dogAreas: readonly PaintArea[] = [
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'ground',
+    label: 'じめん',
+    shape: { kind: 'path', d: GROUND_PATH },
+  },
+  {
+    id: 'tail',
+    label: 'しっぽ',
+    shape: { kind: 'path', d: 'M 18,58 C 10,52 6,40 13,36 C 19,39 21,48 26,54 Z' },
+    motion: { group: 'dog', part: 'dogTail' },
+  },
+  {
+    id: 'legs',
+    label: 'あし',
+    // 前あし・後ろあしをまとめて1エリアにする（1本ずつに分けると、どちらも
+    // 幼児の指で押せる太さにならない）。
+    shape: {
+      kind: 'path',
+      d: 'M 22,64 L 34,64 L 34,80 C 34,83 32,84 28,84 C 24,84 22,83 22,80 Z M 46,64 L 58,64 L 58,80 C 58,83 56,84 52,84 C 48,84 46,83 46,80 Z',
+    },
+    motion: { group: 'dog' },
+  },
+  {
+    id: 'body',
+    label: 'いぬの からだ',
+    shape: { kind: 'ellipse', cx: 38, cy: 60, rx: 22, ry: 14 },
+    motion: { group: 'dog' },
+  },
+  {
+    id: 'earLeft',
+    label: 'ひだりの みみ',
+    shape: { kind: 'path', d: 'M 56,26 C 44,22 38,30 40,42 C 42,52 52,52 56,44 Z' },
+    motion: { group: 'dog', part: 'dogEarLeft' },
+  },
+  {
+    id: 'earRight',
+    label: 'みぎの みみ',
+    shape: { kind: 'path', d: 'M 76,26 C 88,22 94,30 92,42 C 90,52 80,52 76,44 Z' },
+    motion: { group: 'dog', part: 'dogEarRight' },
+  },
+  {
+    id: 'head',
+    label: 'いぬの あたま',
+    shape: {
+      kind: 'path',
+      d: 'M 50,40 C 50,28 58,22 66,22 C 76,22 82,29 82,38 C 82,47 75,53 66,53 C 56,53 50,48 50,40 Z',
+    },
+    motion: { group: 'dog' },
+  },
+]
+
+const dogDetails: readonly PaintDetail[] = [
+  { shape: { kind: 'circle', cx: 60, cy: 32, r: 4.4 }, fill: '#ffffff', motion: { group: 'dog' } },
+  { shape: { kind: 'circle', cx: 60, cy: 32, r: 2.1 }, fill: OUTLINE_COLOR, motion: { group: 'dog' } },
+  { shape: { kind: 'circle', cx: 72, cy: 32, r: 4.4 }, fill: '#ffffff', motion: { group: 'dog' } },
+  { shape: { kind: 'circle', cx: 72, cy: 32, r: 2.1 }, fill: OUTLINE_COLOR, motion: { group: 'dog' } },
+  // マズル（はなさき）。塗った色が透けるよう線だけで描き、いぬの横がおに見せる。
+  {
+    shape: { kind: 'ellipse', cx: 74, cy: 44, rx: 8.5, ry: 6.5 },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'dog' },
+  },
+  // はな。マズルの上に置く。
+  { shape: { kind: 'circle', cx: 78, cy: 40, r: 3.2 }, fill: OUTLINE_COLOR, motion: { group: 'dog' } },
+  {
+    shape: { kind: 'path', d: 'M 70,45 C 73,49 78,48 80,44' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'dog' },
+  },
+  // からだのもよう。
+  {
+    shape: { kind: 'circle', cx: 30, cy: 58, r: 6.5 },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'dog' },
+  },
+  // あしのつめ。
+  {
+    shape: { kind: 'path', d: 'M 24,80 L 32,80 M 48,80 L 56,80' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'dog' },
+  },
+]
+
+// ねこ ---------------------------------------------------------------------
+
+// しっぽ → からだ → みみ → あたま の順に重ねる（いぬと同じ考え方）。
+const catAreas: readonly PaintArea[] = [
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'ground',
+    label: 'じめん',
+    shape: { kind: 'path', d: GROUND_PATH },
+  },
+  {
+    id: 'tail',
+    label: 'しっぽ',
+    // からだの右うしろから立ち上がって、先が内へ巻くしっぽ。
+    shape: {
+      kind: 'path',
+      d: 'M 56,78 C 74,80 84,70 82,54 C 80,45 71,43 68,50 C 73,52 76,56 74,63 C 71,71 64,72 56,70 Z',
+    },
+    motion: { group: 'cat', part: 'catTail' },
+  },
+  {
+    id: 'body',
+    label: 'ねこの からだ',
+    // おすわりのかたち。下がひろく、じめんに座って見えるようにする。
+    shape: {
+      kind: 'path',
+      d: 'M 34,54 C 46,54 58,64 58,80 C 58,84 56,85 52,85 L 26,85 C 22,85 20,84 20,80 C 20,64 26,54 34,54 Z',
+    },
+    motion: { group: 'cat' },
+  },
+  {
+    id: 'earLeft',
+    label: 'ひだりの みみ',
+    shape: { kind: 'path', d: 'M 24,32 L 20,13 L 38,24 Z' },
+    motion: { group: 'cat' },
+  },
+  {
+    id: 'earRight',
+    label: 'みぎの みみ',
+    shape: { kind: 'path', d: 'M 54,32 L 58,13 L 40,24 Z' },
+    motion: { group: 'cat' },
+  },
+  {
+    id: 'head',
+    label: 'ねこの かお',
+    shape: { kind: 'circle', cx: 39, cy: 40, r: 17 },
+    motion: { group: 'cat' },
+  },
+]
+
+const catDetails: readonly PaintDetail[] = [
+  // みみの内側。
+  { shape: { kind: 'path', d: 'M 26,29 L 24,19 L 33,25 Z' }, fill: '#ffb3c1', motion: { group: 'cat' } },
+  { shape: { kind: 'path', d: 'M 52,29 L 54,19 L 45,25 Z' }, fill: '#ffb3c1', motion: { group: 'cat' } },
+  { shape: { kind: 'ellipse', cx: 32, cy: 38, rx: 4.5, ry: 5.5 }, fill: '#ffffff', motion: { group: 'cat' } },
+  { shape: { kind: 'ellipse', cx: 32, cy: 38, rx: 2, ry: 3.6 }, fill: OUTLINE_COLOR, motion: { group: 'cat' } },
+  { shape: { kind: 'ellipse', cx: 46, cy: 38, rx: 4.5, ry: 5.5 }, fill: '#ffffff', motion: { group: 'cat' } },
+  { shape: { kind: 'ellipse', cx: 46, cy: 38, rx: 2, ry: 3.6 }, fill: OUTLINE_COLOR, motion: { group: 'cat' } },
+  { shape: { kind: 'path', d: 'M 36,46 L 42,46 L 39,50 Z' }, fill: '#ffb3c1', motion: { group: 'cat' } },
+  {
+    shape: { kind: 'path', d: 'M 33,52 C 36,55 42,55 45,52' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'cat' },
+  },
+  // ひげ。左右に3本ずつだと線が多くなるので2本ずつにしている。
+  {
+    shape: { kind: 'path', d: 'M 14,42 L 26,45 M 14,50 L 26,48' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'cat' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 64,42 L 52,45 M 64,50 L 52,48' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'cat' },
+  },
+  // まえあし。
+  {
+    shape: { kind: 'path', d: 'M 27,85 C 27,81 33,81 33,85 M 45,85 C 45,81 51,81 51,85' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'cat' },
+  },
+]
+
+// ミツバチ -----------------------------------------------------------------
+
+// はね2枚 → からだ → あたま の順に重ね、はねの付け根をからだの塗りで隠す。
+const beeAreas: readonly PaintArea[] = [
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'wingBack',
+    label: 'うしろの はね',
+    shape: { kind: 'path', d: 'M 44,44 C 34,26 18,20 14,30 C 10,40 24,50 40,50 Z' },
+    motion: { group: 'bee', part: 'beeWingBack' },
+  },
+  {
+    id: 'wingFront',
+    label: 'まえの はね',
+    shape: { kind: 'path', d: 'M 52,44 C 54,24 66,18 72,27 C 76,35 66,46 52,48 Z' },
+    motion: { group: 'bee', part: 'beeWingFront' },
+  },
+  {
+    id: 'body',
+    label: 'ミツバチの からだ',
+    shape: { kind: 'ellipse', cx: 46, cy: 58, rx: 24, ry: 17 },
+    motion: { group: 'bee' },
+  },
+  {
+    id: 'head',
+    label: 'ミツバチの あたま',
+    shape: { kind: 'circle', cx: 78, cy: 50, r: 12 },
+    motion: { group: 'bee' },
+  },
+]
+
+const beeDetails: readonly PaintDetail[] = [
+  // しま模様。塗った色の上に太い線を3本のせて、はちのしまに見せる。
+  {
+    shape: { kind: 'path', d: 'M 26,52 C 24,56 24,60 26,64' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 4,
+    motion: { group: 'bee' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 34,47 C 31,54 31,62 34,69' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 4,
+    motion: { group: 'bee' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 48,45 C 45,54 45,64 48,72' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 4,
+    motion: { group: 'bee' },
+  },
+  // はり。からだの左のはしに小さくつける。
+  { shape: { kind: 'path', d: 'M 24,54 L 13,58 L 24,62 Z' }, fill: OUTLINE_COLOR, motion: { group: 'bee' } },
+  { shape: { kind: 'circle', cx: 82, cy: 46, r: 4.4 }, fill: '#ffffff', motion: { group: 'bee' } },
+  { shape: { kind: 'circle', cx: 82, cy: 46, r: 2.1 }, fill: OUTLINE_COLOR, motion: { group: 'bee' } },
+  {
+    shape: { kind: 'path', d: 'M 80,59 C 83,61 86,59 87,56' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'bee' },
+  },
+  // しょっかく。
+  {
+    shape: { kind: 'path', d: 'M 76,39 C 76,31 80,27 85,27 M 82,40 C 84,33 88,31 92,32' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'bee' },
+  },
+  { shape: { kind: 'circle', cx: 85, cy: 27, r: 2 }, fill: OUTLINE_COLOR, motion: { group: 'bee' } },
+  { shape: { kind: 'circle', cx: 92, cy: 32, r: 2 }, fill: OUTLINE_COLOR, motion: { group: 'bee' } },
+  // はねのすじ。それぞれのはねと一緒にはばたく。
+  {
+    shape: { kind: 'path', d: 'M 20,29 C 26,35 32,41 38,46' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: { group: 'bee', part: 'beeWingBack' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 68,26 C 64,33 58,41 52,45' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: { group: 'bee', part: 'beeWingFront' },
+  },
+]
+
+// てんとうむし -------------------------------------------------------------
+
+// からだ（中の羽） → 左右のはね（甲羅） → あたま の順に重ねる。
+// 甲羅がひらくと、下のからだが見える。
+const ladybugAreas: readonly PaintArea[] = [
+  {
+    id: 'sky',
+    label: 'そら',
+    shape: { kind: 'path', d: BACKDROP_PATH },
+  },
+  {
+    id: 'ground',
+    label: 'じめん',
+    shape: { kind: 'path', d: GROUND_PATH },
+  },
+  {
+    id: 'body',
+    label: 'てんとうむしの からだ',
+    shape: { kind: 'ellipse', cx: 50, cy: 60, rx: 27, ry: 21 },
+    motion: { group: 'ladybug' },
+  },
+  {
+    id: 'shellLeft',
+    label: 'ひだりの はね',
+    shape: { kind: 'path', d: 'M 50,38 C 34,38 25,48 25,60 C 25,73 36,80 50,80 Z' },
+    motion: { group: 'ladybug', part: 'ladybugShellLeft' },
+  },
+  {
+    id: 'shellRight',
+    label: 'みぎの はね',
+    shape: { kind: 'path', d: 'M 50,38 C 66,38 75,48 75,60 C 75,73 64,80 50,80 Z' },
+    motion: { group: 'ladybug', part: 'ladybugShellRight' },
+  },
+  {
+    id: 'head',
+    label: 'てんとうむしの あたま',
+    shape: { kind: 'circle', cx: 50, cy: 32, r: 13 },
+    motion: { group: 'ladybug' },
+  },
+]
+
+const ladybugDetails: readonly PaintDetail[] = [
+  // 水玉もよう。それぞれの甲羅と一緒にひらくよう、左右のpartへ入れる。
+  {
+    shape: { kind: 'circle', cx: 35, cy: 53, r: 3.6 },
+    fill: OUTLINE_COLOR,
+    motion: { group: 'ladybug', part: 'ladybugShellLeft' },
+  },
+  {
+    shape: { kind: 'circle', cx: 43, cy: 66, r: 3.2 },
+    fill: OUTLINE_COLOR,
+    motion: { group: 'ladybug', part: 'ladybugShellLeft' },
+  },
+  {
+    shape: { kind: 'circle', cx: 33, cy: 68, r: 2.8 },
+    fill: OUTLINE_COLOR,
+    motion: { group: 'ladybug', part: 'ladybugShellLeft' },
+  },
+  {
+    shape: { kind: 'circle', cx: 65, cy: 53, r: 3.6 },
+    fill: OUTLINE_COLOR,
+    motion: { group: 'ladybug', part: 'ladybugShellRight' },
+  },
+  {
+    shape: { kind: 'circle', cx: 57, cy: 66, r: 3.2 },
+    fill: OUTLINE_COLOR,
+    motion: { group: 'ladybug', part: 'ladybugShellRight' },
+  },
+  {
+    shape: { kind: 'circle', cx: 67, cy: 68, r: 2.8 },
+    fill: OUTLINE_COLOR,
+    motion: { group: 'ladybug', part: 'ladybugShellRight' },
+  },
+  { shape: { kind: 'circle', cx: 44, cy: 30, r: 4 }, fill: '#ffffff', motion: { group: 'ladybug' } },
+  { shape: { kind: 'circle', cx: 44, cy: 30, r: 2 }, fill: OUTLINE_COLOR, motion: { group: 'ladybug' } },
+  { shape: { kind: 'circle', cx: 56, cy: 30, r: 4 }, fill: '#ffffff', motion: { group: 'ladybug' } },
+  { shape: { kind: 'circle', cx: 56, cy: 30, r: 2 }, fill: OUTLINE_COLOR, motion: { group: 'ladybug' } },
+  // しょっかく。
+  {
+    shape: { kind: 'path', d: 'M 44,22 C 42,16 38,13 34,13 M 56,22 C 58,16 62,13 66,13' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'ladybug' },
+  },
+  { shape: { kind: 'circle', cx: 34, cy: 13, r: 2 }, fill: OUTLINE_COLOR, motion: { group: 'ladybug' } },
+  { shape: { kind: 'circle', cx: 66, cy: 13, r: 2 }, fill: OUTLINE_COLOR, motion: { group: 'ladybug' } },
+  // あし。甲羅ではなくからだから出るので、group側（甲羅と一緒にひらかない）に入れる。
+  {
+    shape: { kind: 'path', d: 'M 27,48 L 15,42 M 24,60 L 12,60 M 27,72 L 18,82' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.8,
+    motion: { group: 'ladybug' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 73,48 L 85,42 M 76,60 L 88,60 M 73,72 L 82,82' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.8,
+    motion: { group: 'ladybug' },
+  },
+]
+
 export const PAINT_PICTURES: readonly PaintPicture[] = [
   { id: 'car', label: 'くるま', emoji: '🚗', viewBox: VIEW_BOX, areas: carAreas, details: carDetails },
   { id: 'fish', label: 'さかな', emoji: '🐟', viewBox: VIEW_BOX, areas: fishAreas, details: fishDetails },
@@ -1202,6 +1723,26 @@ export const PAINT_PICTURES: readonly PaintPicture[] = [
   { id: 'house', label: 'いえ', emoji: '🏠', viewBox: VIEW_BOX, areas: houseAreas, details: houseDetails },
   { id: 'frog', label: 'かえる', emoji: '🐸', viewBox: VIEW_BOX, areas: frogAreas, details: frogDetails },
   { id: 'ghost', label: 'おばけ', emoji: '👻', viewBox: VIEW_BOX, areas: ghostAreas, details: ghostDetails },
+  { id: 'ufo', label: 'ユーフォー', emoji: '🛸', viewBox: VIEW_BOX, areas: ufoAreas, details: ufoDetails },
+  {
+    id: 'helicopter',
+    label: 'ヘリコプター',
+    emoji: '🚁',
+    viewBox: VIEW_BOX,
+    areas: helicopterAreas,
+    details: helicopterDetails,
+  },
+  { id: 'dog', label: 'いぬ', emoji: '🐶', viewBox: VIEW_BOX, areas: dogAreas, details: dogDetails },
+  { id: 'cat', label: 'ねこ', emoji: '🐱', viewBox: VIEW_BOX, areas: catAreas, details: catDetails },
+  { id: 'bee', label: 'ミツバチ', emoji: '🐝', viewBox: VIEW_BOX, areas: beeAreas, details: beeDetails },
+  {
+    id: 'ladybug',
+    label: 'てんとうむし',
+    emoji: '🐞',
+    viewBox: VIEW_BOX,
+    areas: ladybugAreas,
+    details: ladybugDetails,
+  },
 ]
 
 export const DEFAULT_PICTURE_ID = 'car'

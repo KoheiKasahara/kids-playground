@@ -881,6 +881,464 @@
   to { transform: rotate(12deg); }
 }
 
+/* --- ユーフォー: 左右にふわふわ浮遊しながら、ビームがのびちぢみしてライトがチカチカ --- */
+
+.canvas[data-phase='celebrating'] [data-motion-group='ufo'] {
+  animation: ufoEnter 480ms ease-out both, ufoHover 4.4s 480ms ease-in-out infinite;
+}
+
+@keyframes ufoEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(0.84);
+  }
+}
+
+/* おばけのghostFloatと同じ「その場でふわふわ」だが、円盤なので上下より左右を大きく取る。 */
+@keyframes ufoHover {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.84);
+  }
+
+  25% {
+    transform: translate(-11px, -4px) rotate(-3deg) scale(0.84);
+  }
+
+  50% {
+    transform: translate(0, -7px) rotate(0deg) scale(0.84);
+  }
+
+  75% {
+    transform: translate(11px, -4px) rotate(3deg) scale(0.84);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.84);
+  }
+}
+
+/* ビームは円盤側の付け根（上端）を軸に、下へのびちぢみする。 */
+.canvas[data-phase='celebrating'] [data-motion-part='ufoBeam'] {
+  transform-origin: center top;
+  animation: ufoBeamStretch 1.4s 480ms ease-in-out infinite alternate;
+}
+
+@keyframes ufoBeamStretch {
+  from {
+    opacity: 0.55;
+    transform: scale(0.9, 0.82);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.04, 1.12);
+  }
+}
+
+/* ライトは左右で位相をずらしてチカチカさせる（同時だと点滅が単調になる）。 */
+.canvas[data-phase='celebrating'] [data-motion-part='ufoLightLeft'] {
+  animation: ufoLightBlink 900ms 480ms ease-in-out infinite alternate;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='ufoLightRight'] {
+  animation: ufoLightBlink 900ms 480ms ease-in-out infinite alternate-reverse;
+}
+
+@keyframes ufoLightBlink {
+  from {
+    opacity: 0.4;
+    transform: scale(0.86);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+/* --- ヘリコプター: 羽を高速で回しながら、左右へゆっくり飛ぶ --- */
+
+.canvas[data-phase='celebrating'] [data-motion-group='heli'] {
+  animation: heliEnter 480ms ease-out both, heliFly 4.8s 480ms ease-in-out infinite;
+}
+
+@keyframes heliEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(0.82);
+  }
+}
+
+/* ひこうきのplaneFlyと同じ「画面内を往復する」飛び方だが、ヘリなので上下の
+   浮き沈みを主にして、かたむきは小さくする（機首から突っ込んで行かない）。 */
+@keyframes heliFly {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+
+  25% {
+    transform: translate(-12px, -6px) rotate(-2.5deg) scale(0.82);
+  }
+
+  50% {
+    transform: translate(0, -8px) rotate(0deg) scale(0.82);
+  }
+
+  75% {
+    transform: translate(12px, -6px) rotate(2.5deg) scale(0.82);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+}
+
+/* ローターは、くるまのcarWheel・でんしゃのtrainWheelと同じ「自分の中心で回る」パーツだが、
+   タイヤと違い1周が本物のローターらしく速い（1周320ms／テールは220ms）。
+   0deg→360degの1周だけなのでループの継ぎ目が飛ばず、linearで回り続けて見える。
+   羽の中心（軸）はdetails側でgroupに入れてあるので、軸は回らず羽だけが回る。 */
+.canvas[data-phase='celebrating'] [data-motion-part='heliMainRotor'] {
+  animation: heliRotorSpin 320ms 480ms linear infinite;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='heliTailRotor'] {
+  animation: heliRotorSpin 220ms 480ms linear infinite;
+}
+
+@keyframes heliRotorSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- いぬ: しっぽをブンブン振り、みみをぱたぱたさせながら、とことこ歩く --- */
+
+/* あしの裏（y=84）を軸にする（ロボット・きょうりゅうと同じ理由）。 */
+.canvas [data-motion-group='dog'] {
+  transform-origin: 50% 84%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='dog'] {
+  animation: dogEnter 480ms ease-out both, dogTrot 2.8s 480ms ease-in-out infinite;
+}
+
+@keyframes dogEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.86);
+  }
+}
+
+/* きょうりゅうのdinoWalkと同じ「歩いて戻る」動きだが、小型犬らしく1歩ごとに
+   軽く弾む（上下動を大きめ・周期を短め）。 */
+@keyframes dogTrot {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+
+  15% {
+    transform: translate(-4px, -3px) rotate(-1.6deg) scale(0.86);
+  }
+
+  35% {
+    transform: translate(2px, 0) rotate(0deg) scale(0.86);
+  }
+
+  55% {
+    transform: translate(7px, -3px) rotate(1.6deg) scale(0.86);
+  }
+
+  70% {
+    transform: translate(8px, 0) rotate(0deg) scale(0.86);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+}
+
+/* しっぽは付け根（からだ側の右下）を軸に、きょうりゅうのdinoTailWagより
+   速く小刻みに振る。 */
+.canvas[data-phase='celebrating'] [data-motion-part='dogTail'] {
+  transform-origin: right bottom;
+  animation: dogTailWag 220ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes dogTailWag {
+  from {
+    transform: rotate(-15deg);
+  }
+
+  to {
+    transform: rotate(15deg);
+  }
+}
+
+/* みみは、あたま側の付け根を軸にぱたぱたさせる。左右で向きを逆にして、
+   歩くリズムに合わせて交互に揺れて見せる。 */
+.canvas[data-phase='celebrating'] [data-motion-part='dogEarLeft'] {
+  transform-origin: right center;
+  animation: dogEarFlop 440ms 480ms ease-in-out infinite alternate;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='dogEarRight'] {
+  transform-origin: left center;
+  animation: dogEarFlop 440ms 480ms ease-in-out infinite alternate-reverse;
+}
+
+@keyframes dogEarFlop {
+  from {
+    transform: rotate(-7deg);
+  }
+
+  to {
+    transform: rotate(7deg);
+  }
+}
+
+/* --- ねこ: その場でゆったり揺れながら、しっぽを大きくゆっくり揺らす --- */
+
+/* おすわりのおしり（y=85）を軸にする。 */
+.canvas [data-motion-group='cat'] {
+  transform-origin: 50% 85%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='cat'] {
+  animation: catEnter 480ms ease-out both, catSway 4.4s 480ms ease-in-out infinite;
+}
+
+@keyframes catEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.86);
+  }
+}
+
+/* 歩かず、その場で左右にゆったり傾く（おすわりのまま体を揺らす）。 */
+@keyframes catSway {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+
+  25% {
+    transform: translate(-4px, -1px) rotate(-2.5deg) scale(0.86);
+  }
+
+  50% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+
+  75% {
+    transform: translate(4px, -1px) rotate(2.5deg) scale(0.86);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+}
+
+/* しっぽは付け根（からだ側の左下）を軸に、さかなのfinWagより大きく・ゆっくり
+   優雅に揺らす。 */
+.canvas[data-phase='celebrating'] [data-motion-part='catTail'] {
+  transform-origin: left bottom;
+  animation: catTailSway 1.8s 480ms ease-in-out infinite alternate;
+}
+
+@keyframes catTailSway {
+  from {
+    transform: rotate(-8deg);
+  }
+
+  to {
+    transform: rotate(12deg);
+  }
+}
+
+/* --- ミツバチ: はねを高速でぱたぱたさせながら、ジグザグに飛ぶ --- */
+
+.canvas[data-phase='celebrating'] [data-motion-group='bee'] {
+  animation: beeEnter 480ms ease-out both, beeZigzag 3.4s 480ms ease-in-out infinite;
+}
+
+@keyframes beeEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(0.82);
+  }
+}
+
+/* ちょうちょのbutterflyFlyと同じ往復飛行だが、はちらしく折り返しを増やして
+   ジグザグに、かたむきも小さめにする（ふわふわではなくブンブン飛ぶ）。 */
+@keyframes beeZigzag {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+
+  18% {
+    transform: translate(-11px, -6px) rotate(-4deg) scale(0.82);
+  }
+
+  36% {
+    transform: translate(-5px, 3px) rotate(2deg) scale(0.82);
+  }
+
+  54% {
+    transform: translate(7px, -8px) rotate(4deg) scale(0.82);
+  }
+
+  76% {
+    transform: translate(11px, 2px) rotate(-2deg) scale(0.82);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+}
+
+/* はねは、からだ側の付け根を軸にはばたく。ちょうちょのwingFlap(340ms)より
+   ずっと速い130msにして、はちのブンブン感を出す。 */
+.canvas[data-phase='celebrating'] [data-motion-part='beeWingBack'] {
+  transform-origin: right bottom;
+  animation: beeWingFlapBack 130ms 480ms ease-in-out infinite alternate;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='beeWingFront'] {
+  transform-origin: left bottom;
+  animation: beeWingFlapFront 130ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes beeWingFlapBack {
+  from {
+    transform: rotate(-10deg) scaleY(1);
+  }
+
+  to {
+    transform: rotate(14deg) scaleY(0.84);
+  }
+}
+
+@keyframes beeWingFlapFront {
+  from {
+    transform: rotate(10deg) scaleY(1);
+  }
+
+  to {
+    transform: rotate(-14deg) scaleY(0.84);
+  }
+}
+
+/* --- てんとうむし: とことこ歩きながら、甲羅がパカッとひらいて中が見える --- */
+
+/* あしの先（y=84）を軸にする（いぬ・ロボットと同じ理由）。 */
+.canvas [data-motion-group='ladybug'] {
+  transform-origin: 50% 84%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='ladybug'] {
+  animation: ladybugEnter 480ms ease-out both, ladybugCrawl 4.2s 480ms ease-in-out infinite;
+}
+
+@keyframes ladybugEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.86);
+  }
+}
+
+/* 小さな虫らしく、ゆっくり左右へとことこ。折り返しでだけごく僅かに上下する。 */
+@keyframes ladybugCrawl {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+
+  25% {
+    transform: translate(-12px, -1px) rotate(-1.5deg) scale(0.86);
+  }
+
+  50% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+
+  75% {
+    transform: translate(12px, -1px) rotate(1.5deg) scale(0.86);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+}
+
+/* 甲羅は、いえのhouseDoorOpenと同じscaleXパターンで背中の合わせ目（左の甲羅は
+   右端、右の甲羅は左端）を蝶番にしてひらく。歩きと同じdurationにして、
+   1往復に1回だけパカッとひらく。 */
+.canvas[data-phase='celebrating'] [data-motion-part='ladybugShellLeft'] {
+  transform-origin: right center;
+  animation: ladybugShellOpen 4.2s 480ms ease-in-out infinite;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='ladybugShellRight'] {
+  transform-origin: left center;
+  animation: ladybugShellOpen 4.2s 480ms ease-in-out infinite;
+}
+
+@keyframes ladybugShellOpen {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+
+  40%,
+  62% {
+    transform: scaleX(0.3);
+  }
+}
+
 /* 動きを減らす設定のときは、走る・泳ぐ・羽ばたくを止めて、
    「できた」ことが分かる程度のゆっくりした呼吸だけ残す。 */
 @media (prefers-reduced-motion: reduce) {
