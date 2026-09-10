@@ -155,6 +155,7 @@ export function transferWaterThroughGate(
   leftBodyId: WaterBodyId,
   rightBodyId: WaterBodyId,
   deltaSeconds: number,
+  opening?: { sillY: number; fraction: number },
 ): GateTransferResult {
   const idle: GateTransferResult = { field, direction: 0, transferredVolume: 0, strength: 0 }
   if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0 || leftBodyId === rightBodyId) return idle
@@ -165,9 +166,7 @@ export function transferWaterThroughGate(
   const rightState = field[rightBodyId]
   if (!leftDefinition || !rightDefinition || !leftState || !rightState) return idle
 
-  const leftLevel = waterLevelOf(leftDefinition, leftState)
-  const rightLevel = waterLevelOf(rightDefinition, rightState)
-  const levelDifference = leftLevel - rightLevel
+  const levelDifference = waterSurfaceY(rightDefinition, rightState) - waterSurfaceY(leftDefinition, leftState)
   if (Math.abs(levelDifference) < 0.001) return idle
 
   const leftToRight = levelDifference > 0
@@ -179,10 +178,15 @@ export function transferWaterThroughGate(
   const targetWidth = waterBodyWidth(targetDefinition)
   // qを移したときの水位差減少は q/sourceWidth + q/targetWidth。ここを上限にすれば逆転しない。
   const equalizingVolume = Math.abs(levelDifference) / (1 / sourceWidth + 1 / targetWidth)
-  const rateLimit = Math.min(sourceWidth, targetWidth) * GATE_TRANSFER_LEVEL_PER_SEC * deltaSeconds
+  const accessibleVolume = opening
+    ? Math.max(0, opening.sillY - waterSurfaceY(sourceDefinition, sourceState)) * sourceWidth
+    : sourceState.volume
+  const rateLimit = Math.min(sourceWidth, targetWidth) * GATE_TRANSFER_LEVEL_PER_SEC * deltaSeconds *
+    Math.max(0, Math.min(1, opening?.fraction ?? 1))
   const amount = Math.min(
     equalizingVolume,
     rateLimit,
+    accessibleVolume,
     sourceState.volume,
     waterBodyCapacity(targetDefinition) - targetState.volume,
   )

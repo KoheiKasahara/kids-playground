@@ -216,13 +216,21 @@ export default function PukupukaStage({
       }}
     >
       <defs>
+        <linearGradient id="pukupuka-stone" x1="0" y1="0" x2="1" y2="1">
+          <stop stopColor="#accfd1" /><stop offset="1" stopColor="#628e9c" />
+        </linearGradient>
+        <pattern id="pukupuka-tiles" width="12" height="10" patternUnits="userSpaceOnUse">
+          <rect width="12" height="10" fill="#edf6ee" />
+          <path d="M0 10H12 M12 0V10" fill="none" stroke="#d6e7dd" strokeWidth="0.5" />
+          <rect x="1" y="1" width="10" height="8" rx="1.5" fill="#fff" opacity="0.3" />
+        </pattern>
         <linearGradient id="pukupuka-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#e7f7ff" />
-          <stop offset="100%" stopColor="#fff6e0" />
+          <stop offset="0%" stopColor="#9cdae3" />
+          <stop offset="100%" stopColor="#f1f3da" />
         </linearGradient>
         <linearGradient id="pukupuka-water" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#7fd6f7" />
-          <stop offset="100%" stopColor="#3aa7e0" />
+          <stop offset="0%" stopColor="#67dfe3" />
+          <stop offset="100%" stopColor="#258cb9" />
         </linearGradient>
         <linearGradient id="pukupuka-duck" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#ffe066" />
@@ -279,7 +287,12 @@ export default function PukupukaStage({
         ))}
 
         {/* 水そうの内側。水がないところはうすい水色にして、水面の位置を分かりやすくする。 */}
-        <rect x="6" y="20" width={stage.width - 12} height="120" rx="8" fill="#f4fbff" />
+        <path d={`M0 24 Q18 7 42 24 T92 20 T${stage.width} 24 V145 H0Z`} fill="#a1cbb7" opacity="0.6" />
+        <rect x="6" y="22" width={stage.width - 10} height="121" rx="7" fill="#427a83" opacity="0.25" />
+        <rect x="6" y="20" width={stage.width - 12} height="120" rx="6" fill="url(#pukupuka-tiles)" />
+        {stage.waterBodies.map((body) => <g key={`marks-${body.id}`} opacity="0.45">
+          {Array.from({ length: 8 }, (_, i) => <path key={i} d={`M${body.left + 1} ${body.floorY - 12 * (i + 1)} h${i % 2 ? 2 : 4}`} stroke="#4c8e9a" strokeWidth="0.6" />)}
+        </g>)}
 
         {stage.waterBodies.map((body) => {
           const surfaceY = waterSurfaceYOf(stage, state, body.id)
@@ -308,6 +321,13 @@ export default function PukupukaStage({
                   />
                 ))}
               </g>
+              {stage.board?.circulation && stage.board.targetBodyId === body.id && depth > 2 ? (
+                <g clipPath={`url(#pukupuka-clip-${body.id})`} opacity="0.45">
+                  {[0.25, 0.55, 0.8].map((part) => <g key={part} transform={`translate(${body.left + width * part} ${surfaceY + Math.min(12, depth * 0.5)}) scale(${boardPushDirection} 1)`}>
+                    <path className={styles.currentArrow} d="M-3 -2 L0 0 L-3 2 M1 -2 L4 0 L1 2" fill="none" stroke="#edffff" strokeWidth="1.2" strokeLinecap="round" />
+                  </g>)}
+                </g>
+              ) : null}
               {depth > 0 ? (
                 <g transform={`translate(${body.left} ${surfaceY})`}>
                   <path
@@ -343,6 +363,10 @@ export default function PukupukaStage({
           </g>
         ) : null}
 
+        {stage.levelMarkerY ? <g>
+          <path d={`M16 ${stage.levelMarkerY} H44`} stroke="#448856" strokeWidth="1.3" strokeDasharray="2 2" />
+          <path d={`M15 ${stage.levelMarkerY - 3} l4 3 l-4 3Z`} fill="#448856" />
+        </g> : null}
         {/* ゴールの光。水位に関係なく同じ場所で光り続け、目印になる。 */}
         <ellipse
           className={styles.goalGlow}
@@ -354,16 +378,20 @@ export default function PukupukaStage({
         />
 
         {stage.solids.map((solid) => (
-          <rect
-            key={solid.id}
-            className={solidClassName(solid)}
-            x={solid.x}
-            y={solid.y}
-            width={solid.width}
-            height={solid.height}
-            rx={solid.kind === 'floor' ? 3 : 4}
-          />
+          <g key={solid.id}>
+            <rect className={solidClassName(solid)} x={solid.x} y={solid.y} width={solid.width} height={solid.height} rx="1.3" />
+            <rect x={solid.x + 0.6} y={solid.y + 0.6} width={Math.max(0, solid.width - 1.2)} height={Math.max(0, solid.height - 1.2)} rx="1" fill="url(#pukupuka-stone)" />
+            {Array.from({ length: Math.floor(solid.height / 9) }, (_, i) => <path key={i} d={`M${solid.x + 0.5} ${solid.y + (i + 1) * 9} h${solid.width - 1} m${-solid.width / 2} 0 v-4`} stroke="#547f90" strokeWidth="0.5" opacity="0.55" />)}
+            <path d={`M${solid.x + 1} ${solid.y + 1} H${solid.x + solid.width - 1}`} stroke={solid.kind === 'platform' ? '#a3d481' : '#e1f0e3'} strokeWidth="2" strokeLinecap="round" />
+            {solid.kind === 'platform' ? <path d={`M${solid.x + 2} ${solid.y - 0.5} l1 -2 l1 2 m3 0 l1 -3 l1 3`} stroke="#5e9f74" fill="none" strokeWidth="0.8" /> : null}
+          </g>
         ))}
+        <g>
+          <rect x={goal.x} y={goal.y + goal.height} width={goal.width} height="3" rx="1" fill="#b37c4a" />
+          <path d={`M${goal.x + 1} ${goal.y + goal.height + 1} h${goal.width - 2}`} stroke="#f6d3a1" strokeWidth="0.7" />
+          <rect x={goal.x + 1} y={goal.y + goal.height + 3} width="2" height="5" fill="#805c3f" />
+          <rect x={goal.x + goal.width - 3} y={goal.y + goal.height + 3} width="2" height="5" fill="#805c3f" />
+        </g>
 
         {/* ゴールの目印: はたと浮き輪。台の上に置いて「ここへ運ぶ」と分かるようにする。 */}
         <g>
@@ -418,11 +446,12 @@ export default function PukupukaStage({
         <PukupukaDrain drain={stage.drain} open={drainOpen} disabled={drainDisabled} onToggle={onDrainToggle} />
       ) : null}
       {stage.gate ? (
-        <PukupukaGate gate={stage.gate} open={gateOpen} disabled={gateDisabled} onToggle={onGateToggle} />
+        <PukupukaGate gate={stage.gate} open={gateOpen} lift={state.gateLift} disabled={gateDisabled} onToggle={onGateToggle} />
       ) : null}
       {stage.board ? (
         <PukupukaBoard
           board={stage.board}
+          active={waterSurfaceYOf(stage, state, stage.board.targetBodyId) < (stage.waterBodies.find((body) => body.id === stage.board?.targetBodyId)?.floorY ?? 126) - 2}
           flowDirection={boardFlowDirection}
           pushDirection={boardPushDirection}
           disabled={boardDisabled}
@@ -467,7 +496,13 @@ export default function PukupukaStage({
                   data-floater-y={floater.y.toFixed(2)}
                   transform={`translate(${floater.x} ${floater.y})`}
                 >
-                  <FloaterShape kind={definition.kind} />
+                  <g transform={`scale(${definition.radius / (definition.kind === 'duck' ? 8 : definition.kind === 'boat' ? 9 : 7)})`}>
+                    <FloaterShape kind={definition.kind} />
+                  </g>
+                  {definition.kind !== 'duck' && !state.rescuedIds.includes(floater.id) && floater.submergedRatio < 0.1 ? <g className={styles.waitingFriend}>
+                    <path d="M-4 -12 Q-4 -17 0 -17 H6 Q9 -17 9 -14 V-11 Q9 -8 6 -8 H2 L0 -5 V-8 H-1 Q-4 -8 -4 -12Z" fill="#fffdf1" stroke="#d2ac67" strokeWidth="0.5" />
+                    <text x="2.5" y="-10" textAnchor="middle" fontSize="6" fill="#b87943" fontWeight="bold">!</text>
+                  </g> : null}
                 </g>
               </g>
             )

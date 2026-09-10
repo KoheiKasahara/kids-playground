@@ -9,12 +9,10 @@ import {
   waterSurfaceYOf,
   createInitialState,
   isSettled,
-  primaryWaterBodyId,
   stepGame,
   toggleBoard,
   toggleDrain,
   toggleGate,
-  waterRatioOf,
   type PukupukaGameState,
   type WaterControl,
 } from './pukupukaGame'
@@ -79,7 +77,6 @@ export default function PukupukaRescuePlay() {
   const [selectedStageId, setSelectedStageId] = useState<PukupukaStageId | null>(null)
   // 選択前もHooksを同じ順序で呼ぶための表示用フォールバック。選択画面では描画しない。
   const stage = (selectedStageId ? findPukupukaStage(selectedStageId) : undefined) ?? PUKUPUKA_STAGES[0]
-  const bodyId = primaryWaterBodyId(stage)
 
   const [gameState, setGameState] = useState<PukupukaGameState>(() => createInitialState(stage))
   const stateRef = useRef(gameState)
@@ -87,7 +84,6 @@ export default function PukupukaRescuePlay() {
   const [activeControl, setActiveControl] = useState<WaterControl>(null)
   const [feedback, setFeedback] = useState('たすけて！')
   const [progress, setProgress] = useState(readRescueProgress)
-  const [focusedFloaterId, setFocusedFloaterId] = useState<string | undefined>(undefined)
 
   const setControl = useCallback((next: WaterControl) => {
     controlRef.current = next
@@ -103,10 +99,9 @@ export default function PukupukaRescuePlay() {
       stateRef.current = initial
       setGameState(initial)
       setFeedback('たすけて！')
-      setFocusedFloaterId(undefined)
       setSelectedStageId(stageId)
     },
-    [setControl, setFocusedFloaterId],
+    [setControl],
   )
 
   useEffect(() => {
@@ -123,7 +118,9 @@ export default function PukupukaRescuePlay() {
       stateRef.current = result.state
       const rescued = result.state.rescuedIds.length > previousState.rescuedIds.length
       const collected = result.state.collectedStarIds.length > previousState.collectedStarIds.length
-      if (result.goalReached || previousState.wave || rescued || collected || control !== null || !isSettled(stage, result.state)) {
+      if (result.goalReached || previousState.wave || rescued || collected || control !== null ||
+        result.state.gateLift !== previousState.gateLift || result.state.water !== previousState.water ||
+        !isSettled(stage, result.state)) {
         setGameState(result.state)
       }
       if (rescued && !result.goalReached) {
@@ -231,7 +228,7 @@ export default function PukupukaRescuePlay() {
 
   const nudge = (direction: -1 | 1) => {
     const remaining = stateRef.current.floaters.filter((item) => !stateRef.current.rescuedIds.includes(item.id))
-    const target = remaining.find((item) => item.id === focusedFloaterId) ?? remaining[0]
+    const target = remaining[0]
     if (!target) return
     const body = stage.waterBodies.find((item) => target.x >= item.left && target.x <= item.right)
     if (!body) return
@@ -247,7 +244,6 @@ export default function PukupukaRescuePlay() {
 
   const handleReset = () => {
     const initial = createInitialState(stage)
-    setFocusedFloaterId(undefined)
     setControl(null)
     stateRef.current = initial
     setGameState(initial)
@@ -274,8 +270,6 @@ export default function PukupukaRescuePlay() {
   }
 
   const cleared = gameState.phase === 'cleared'
-  const waterRatio = waterRatioOf(stage, gameState, bodyId)
-  const waterPercent = Math.round(waterRatio * 100)
   const faucetOn = activeControl === 'fill'
   const isLastStage = PUKUPUKA_STAGES.at(-1)?.id === selectedStageId
 
@@ -286,6 +280,7 @@ export default function PukupukaRescuePlay() {
         <h1 className={styles.title}>
           <span aria-hidden="true">🛟</span> ぷかぷかレスキュー
         </h1>
+        <button type="button" className={styles.reset} onClick={handleReset} aria-label="やりなおし">↻</button>
       </header>
 
       <p className={styles.instruction} role="status" aria-live="polite">
@@ -293,11 +288,18 @@ export default function PukupukaRescuePlay() {
       </p>
 
       <div className={styles.stageArea}>
+        <div className={styles.rescueStatus} role="status" aria-label={`なかま ${gameState.rescuedIds.length} / ${stage.goal.floaterIds.length} たすけた`}>
+          {stage.floaters.map((floater) => <span key={floater.id} className={gameState.rescuedIds.includes(floater.id) ? styles.rescuedFriend : undefined}>
+            {floater.kind === 'duck' ? '🦆' : floater.kind === 'boat' ? '⛵' : '🐻'}{gameState.rescuedIds.includes(floater.id) ? '✓' : ''}
+          </span>)}
+          <span className={styles.starScore} aria-label={`ほし ${gameState.collectedStarIds.length} / ${stage.stars?.length ?? 0}`}>
+            {'★'.repeat(gameState.collectedStarIds.length)}{'☆'.repeat((stage.stars?.length ?? 0) - gameState.collectedStarIds.length)}
+          </span>
+        </div>
         <PukupukaStage
           stage={stage}
           state={gameState}
           onWave={handleWave}
-          focusedFloaterId={focusedFloaterId}
           faucetActive={faucetOn}
           faucetDisabled={cleared}
           onFaucetHoldStart={startFaucetHold}
@@ -313,6 +315,10 @@ export default function PukupukaRescuePlay() {
           boardDisabled={cleared}
           onBoardToggle={handleBoardToggle}
         />
+        {!cleared ? <div className={styles.waveButtons}>
+          <button type="button" onClick={() => nudge(-1)} aria-label="ひだりへ なみ">🌊 ←</button>
+          <button type="button" onClick={() => nudge(1)} aria-label="みぎへ なみ">→ 🌊</button>
+        </div> : null}
         {cleared ? (
           <div className={styles.clearBanner}>
             <span className={styles.clearEmoji} aria-hidden="true">🎉</span>
@@ -329,58 +335,12 @@ export default function PukupukaRescuePlay() {
         ) : null}
       </div>
 
-      <div className={styles.playTools}>
-        <div className={styles.rescueRow}>
-          <div className={styles.friends} role="group" aria-label="たすける なかま">
-            {stage.floaters.map((floater) => {
-              const rescued = gameState.rescuedIds.includes(floater.id)
-              const label = floater.kind === 'duck' ? 'あひる' : floater.kind === 'boat' ? 'ボート' : 'くま'
-              return <button key={floater.id} type="button" className={styles.friendButton}
-                disabled={rescued} aria-label={`${label}${rescued ? ' たすけた！' : 'を みる'}`}
-                aria-pressed={focusedFloaterId === floater.id}
-                onClick={() => setFocusedFloaterId(floater.id)}>
-                {floater.kind === 'duck' ? '🦆' : floater.kind === 'boat' ? '⛵' : '🐻'}{rescued ? '✓' : ''}
-              </button>
-            })}
-          </div>
-          <span className={styles.starScore} aria-label={`ほし ${gameState.collectedStarIds.length} / ${stage.stars?.length ?? 0}`}>
-            {'★'.repeat(gameState.collectedStarIds.length)}{'☆'.repeat((stage.stars?.length ?? 0) - gameState.collectedStarIds.length)}
-          </span>
-        </div>
-        {!cleared ? <>
-          <p className={styles.waveHint}>みずを タッチ！ なみで おそう 👆</p>
-          <div className={styles.waveButtons}>
-            <button type="button" onClick={() => nudge(-1)} aria-label="ひだりへ なみ">🌊 ←</button>
-            <button type="button" onClick={() => nudge(1)} aria-label="みぎへ なみ">→ 🌊</button>
-          </div>
-          {stage.viewportWidth ? <div className={styles.remoteControls} role="group" aria-label="すいろの そうさ">
-            <button type="button" onClick={tapFaucet}>💧 みずを たす</button>
-            <button type="button" onClick={handleGateToggle} aria-pressed={gameState.gateOpen}>🚪 {gameState.gateOpen ? 'とじる' : 'あける'}</button>
-            <button type="button" onClick={handleBoardToggle}>↔️ ながれを かえる</button>
-            <button type="button" onClick={handleDrainToggle} aria-pressed={gameState.drainOpen}>🌀 {gameState.drainOpen ? 'みずを とめる' : 'みずを ぬく'}</button>
-          </div> : null}
-        </> : <p className={styles.waveHint}>{gameState.collectedStarIds.length === stage.stars?.length ? 'ほしも ぜんぶ！ だいせいこう！' : 'だいせいこう！ つぎは ほしも さがそう'}</p>}
-        <div className={styles.gauge}>
-          <span className={styles.gaugeLabel} aria-hidden="true">💧</span>
-          <span className={styles.gaugeTrack}>
-            <span
-              className={styles.gaugeFill}
-              style={{ width: `${waterPercent}%` }}
-              data-testid="pukupuka-gauge-fill"
-              data-water-percent={waterPercent}
-            />
-          </span>
-        </div>
-      </div>
+      {cleared ? <div className={styles.finishActions}>
+        <button type="button" className={styles.nextStage} onClick={handleNextStage}>
+          {isLastStage ? 'ステージをえらぶ' : 'つぎのステージ'}
+        </button>
+      </div> : null}
 
-      <div className={styles.footer}>
-        <button type="button" className={styles.reset} onClick={handleReset}>やりなおし</button>
-        {cleared ? (
-          <button type="button" className={styles.nextStage} onClick={handleNextStage}>
-            {isLastStage ? 'ステージをえらぶ' : 'つぎのステージ'}
-          </button>
-        ) : null}
-      </div>
     </main>
   )
 }

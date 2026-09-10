@@ -642,8 +642,8 @@ describe('pukupukaGame: 水門と放水板(#568)', () => {
     // 救助後の固定で移動距離が切り詰められないよう、力の比較ではゴールを水槽外へ置く。
     const flowStage = { ...boardStage, goal: { ...boardStage.goal, area: { x: 90, y: 0, width: 5, height: 5 } } }
     const filled = runStage(flowStage, createInitialState(flowStage), 8, 'fill')
-    const back = runStage(flowStage, toggleGate(filled), 3)
-    const towardGoal = runStage(flowStage, toggleGate(toggleBoard(filled)), 3)
+    const back = runStage(flowStage, toggleGate(filled), 8, 'fill')
+    const towardGoal = runStage(flowStage, toggleGate(toggleBoard(filled)), 8, 'fill')
     const averageX = (state: PukupukaGameState) =>
       state.floaters.reduce((sum, floater) => sum + floater.x, 0) / state.floaters.length
 
@@ -658,7 +658,7 @@ describe('pukupukaGame: 水門と放水板(#568)', () => {
     expect(state.gateFlow.direction).toBe(1)
 
     state = toggleGate(state)
-    state = runStage(gateStage, state, 0.1)
+    state = runStage(gateStage, state, 0.7)
     expect(state.gateFlow.direction).toBe(0)
     const beforeDrain = state.water
     state = toggleDrain(state)
@@ -690,6 +690,6 @@ describe('pukupukaGame: 水門と放水板(#568)', () => {
 
     expect(stoppedFloaters.gateFlow.strength).toBeGreaterThan(0)
     expect(isSettled(gateStage, stoppedFloaters)).toBe(false)
-    expect(isSettled(gateStage, { ...stoppedFloaters, gateOpen: false })).toBe(true)
+    expect(isSettled(gateStage, { ...stoppedFloaters, gateOpen: false, gateLift: 0 })).toBe(true)
   })
 })

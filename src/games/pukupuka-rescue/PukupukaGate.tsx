@@ -1,99 +1,43 @@
+import { useId } from 'react'
 import type { GateDefinition } from './types'
 import styles from './PukupukaRescuePlay.module.css'
 
-// ゲート（#517）の見た目と入力だけを持つコンポーネント。じゃぐち・せんと同じ形で、
-// 通路をふさぐ/開ける処理そのものは pukupukaGame.ts 側の純粋な関数（activeSolids）が持つ。
-//
-// せんと同じく「タップで開閉」の単純なトグルにする。閉じている間は左右の壁と同じ高さの
-// 板がまんなかをふさぎ、開くと板を消して通り道（点線わく＋矢印）だけを見せることで、
-// 単なる細い線ではなく「通れない/通れる」がひと目で分かるようにしている。
-// 板を残したまま色だけ変えると、開いていても「まだ何かでふさがれている」ように見えて
-// 紛らわしいため、開いているあいだは板そのものを描かない。
-// タップ領域は本物の<button>にし、見た目より広めに取る。
-
-const HIT_WIDTH = 24
-// ゲートの当たり判定は縦に長いため、上下いっぱいまで広げるとじゃぐち・せんの
-// タップ領域と重なり、実機で先にゲートがタップを奪ってしまう。
-// 上下に余白を残し、じゃぐち（上部）・せん（下部）のタップ領域を避ける。
-const HIT_TOP_MARGIN = 12
-const HIT_BOTTOM_MARGIN = 26
+const HIT_WIDTH = 22
+const HIT_HEIGHT = 22
 
 type Props = {
   gate: GateDefinition
-  /** 開いている（＝通り抜けられる）かどうか。見た目（板の位置・色）に反映する。 */
   open: boolean
+  lift?: number
   disabled: boolean
   onToggle: () => void
 }
 
-export default function PukupukaGate({ gate, open, disabled, onToggle }: Props) {
-  const capHeight = 4
-  const doorY = gate.y + capHeight
-  const doorHeight = gate.height - capHeight * 2
-
+/** 引き上がる扉を開口でクリップする。表示と衝突は同じliftを使う。 */
+export default function PukupukaGate({ gate, open, lift = open ? 1 : 0, disabled, onToggle }: Props) {
+  const clipId = useId()
+  const cx = gate.x + gate.width / 2
+  const cy = gate.y + gate.height / 2
   return (
-    <g data-testid="pukupuka-gate" data-gate-open={open}>
-      {/* aria-hiddenは読み上げからの除外だけで、実ブラウザでのヒットテストは防がない。
-          ゲートは縦に長く、せん・じゃぐちのタップ領域に絵が重なりうるため、
-          装飾側は明示的にクリックを素通りさせ、実際の操作は<button>だけに絞る。 */}
-      <g aria-hidden="true" style={{ pointerEvents: 'none' }}>
-        {/* 上下の枠。開閉に関わらず常に表示し、「ここに通路がある」ことを示す。 */}
-        <rect x={gate.x} y={gate.y} width={gate.width} height={capHeight} rx="1" fill="#748ca6" />
-        <rect x={gate.x} y={gate.y + gate.height - capHeight} width={gate.width} height={capHeight} rx="1" fill="#748ca6" />
-        {open ? (
-          <>
-            {/* 通り道の目印。板は描かず、開いた枠を点線で示して進む向きの矢印を添える。 */}
-            <rect
-              x={gate.x - 1.5}
-              y={doorY + 2}
-              width={gate.width + 3}
-              height={doorHeight - 4}
-              rx="2"
-              fill="none"
-              stroke="#2f9e44"
-              strokeWidth="1.2"
-              strokeDasharray="3 2.4"
-            />
-            <path
-              className={styles.gateOpenMark}
-              d={`M ${gate.x - 0.5} ${gate.y + gate.height / 2 - 3} L ${gate.x + 3.5} ${gate.y + gate.height / 2} L ${gate.x - 0.5} ${gate.y + gate.height / 2 + 3} Z`}
-              fill="#2f9e44"
-            />
-          </>
-        ) : (
-          <>
-            {/* とびら本体。閉じているあいだだけ道をふさぐ板として描く。 */}
-            <rect x={gate.x} y={doorY} width={gate.width} height={doorHeight} rx="1.2" fill="#ff922b" stroke="#e8590c" strokeWidth="0.8" />
-            {/* 閉じているときだけ見える横じま。バーやふみきりのような「とおれない」印象にする。 */}
-            {[0.22, 0.42, 0.62, 0.82].map((position) => (
-              <rect
-                key={position}
-                x={gate.x + 0.6}
-                y={doorY + doorHeight * position}
-                width={gate.width - 1.2}
-                height="2.2"
-                rx="1"
-                fill="#ffffff"
-                opacity="0.75"
-              />
-            ))}
-          </>
-        )}
+    <g data-testid="pukupuka-gate" data-gate-open={open} data-gate-lift={lift}>
+      <defs><clipPath id={clipId}><rect x={gate.x} y={gate.y} width={gate.width} height={gate.height} /></clipPath></defs>
+      <g aria-hidden="true" pointerEvents="none">
+        <rect x={gate.x - 1} y={gate.y} width={gate.width + 2} height={gate.height} rx="1" fill="#164d62" fillOpacity="0.1" stroke="#37657b" strokeWidth="0.7" />
+        <g clipPath={`url(#${clipId})`}>
+          <g transform={`translate(0 ${-gate.height * lift})`}>
+            <rect x={gate.x} y={gate.y} width={gate.width} height={gate.height} fill="#f6ac45" stroke="#a95729" strokeWidth="0.8" />
+            {Array.from({ length: Math.ceil(gate.height / 5) }, (_, i) => <path key={i} d={`M${gate.x + 0.6} ${gate.y + i * 5 + 1} h${gate.width - 1.2}`} stroke="#ffe5ac" strokeWidth="1.6" />)}
+            <rect x={gate.x} y={gate.y + gate.height - 2} width={gate.width} height="2" fill="#af6234" />
+          </g>
+        </g>
+        <rect x={gate.x - 2} y={gate.y - 3} width={gate.width + 4} height="5" rx="1.5" fill="#456f7d" />
+        <circle cx={cx} cy={cy} r="7" fill={open ? '#d9fff0' : '#fff8df'} stroke="#2c6477" strokeWidth="1" />
+        <path d={open ? `M${cx - 3} ${cy - 1.5} l3 3 l3 -3` : `M${cx - 3} ${cy + 1.5} l3 -3 l3 3`} fill="none" stroke="#247b83" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </g>
-      <foreignObject
-        x={gate.x + gate.width / 2 - HIT_WIDTH / 2}
-        y={gate.y + HIT_TOP_MARGIN}
-        width={HIT_WIDTH}
-        height={gate.height - HIT_TOP_MARGIN - HIT_BOTTOM_MARGIN}
-      >
-        <button
-          type="button"
-          className={styles.gateHit}
-          disabled={disabled}
-          aria-label={open ? 'ゲートの すいもん。あいています。みずが ながれます' : 'ゲートの すいもん。とじています。みずを せきとめています'}
-          aria-pressed={open}
-          onClick={onToggle}
-        />
+      <foreignObject x={cx - HIT_WIDTH / 2} y={cy - HIT_HEIGHT / 2} width={HIT_WIDTH} height={HIT_HEIGHT}>
+        <button type="button" className={styles.gateHit} disabled={disabled}
+          aria-label={open ? 'ゲートの すいもん。あいています。おすと さがります' : 'ゲートの すいもん。とじています。おすと あがります'}
+          aria-pressed={open} onClick={onToggle} />
       </foreignObject>
     </g>
   )

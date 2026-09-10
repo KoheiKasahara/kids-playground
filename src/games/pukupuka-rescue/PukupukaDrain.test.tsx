@@ -6,7 +6,7 @@ import type { DrainDefinition } from './types'
 const drain: DrainDefinition = { id: 'main-drain', sourceBodyId: 'main', x: 36, y: 126 }
 
 describe('PukupukaDrain', () => {
-  test('閉じているときはaria-pressedがfalseで、開いているときだけの演出（渦・あわ）は出ない', () => {
+  test('閉じているときも栓の取っ手を表示し、渦は出ない', () => {
     const { container } = render(
       <svg>
         <PukupukaDrain drain={drain} open={false} disabled={false} onToggle={() => {}} />
@@ -15,10 +15,11 @@ describe('PukupukaDrain', () => {
 
     expect(screen.getByTestId('pukupuka-drain')).toHaveAttribute('data-drain-open', 'false')
     expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'false')
-    expect(container.querySelectorAll('circle')).toHaveLength(0)
+    expect(container.querySelectorAll('circle')).toHaveLength(1)
+    expect(container.querySelector('ellipse[stroke-dasharray]')).toBeNull()
   })
 
-  test('開いているときはaria-pressedがtrueになり、渦とあわが出る', () => {
+  test('開いているときは栓が浮き上がり、穴に渦が出る', () => {
     const { container } = render(
       <svg>
         <PukupukaDrain drain={drain} open={true} disabled={false} onToggle={() => {}} />
@@ -27,7 +28,8 @@ describe('PukupukaDrain', () => {
 
     expect(screen.getByTestId('pukupuka-drain')).toHaveAttribute('data-drain-open', 'true')
     expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true')
-    expect(container.querySelectorAll('circle')).toHaveLength(2)
+    expect(container.querySelector('ellipse[stroke-dasharray]')).not.toBeNull()
+    expect(container.querySelector('g[style]')).toHaveStyle({ transform: 'translateY(-8px)' })
   })
 
   test('タップでonToggleが1回だけ呼ばれる', () => {

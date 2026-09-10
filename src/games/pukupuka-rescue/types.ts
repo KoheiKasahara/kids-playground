@@ -71,6 +71,8 @@ export type GoalDefinition = {
    * 種類が増えても判定処理は共通のまま、ここへIDを足すだけで済むようにしてある(#518)。
    */
   floaterIds: readonly string[]
+  /** 桟橋へ着地して初めて救助。上空の通過ではクリアしない。 */
+  requiresLanding?: boolean
 }
 
 /**
@@ -95,6 +97,8 @@ export type FaucetDefinition = {
 export type DrainDefinition = {
   id: string
   sourceBodyId: WaterBodyId
+  /** 壁の内面に横向きで取り付ける。省略時は床。 */
+  orientation?: 'floor' | 'left-wall' | 'right-wall'
   x: number
   y: number
 }
@@ -123,6 +127,8 @@ export type BoardDefinition = Rect & {
   initialFlowDirection: BoardFlowDirection
   /** ゲートから放水された流れを、この水域全体で誘導する。 */
   targetBodyId: WaterBodyId
+  /** 底の取水口に水がある間、循環水流を作る方向切替装置。 */
+  circulation?: boolean
 }
 
 /**
@@ -168,6 +174,8 @@ export type StageDefinition = {
   waterWheel?: WaterWheelDefinition
   /** 通常のゴール向きドリフト倍率。水門攻略面では0にして放水を主役にできる。 */
   ambientDriftScale?: number
+  /** 水位を合わせる目印。答えを自動操作せず、止める高さを示す。 */
+  levelMarkerY?: number
   /** 任意の寄り道目標。救助の必須条件にはしない。 */
   stars?: readonly { id: string; x: number; y: number }[]
   /** 幼児向けの短い1行ヒント。 */

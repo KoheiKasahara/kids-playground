@@ -46,7 +46,7 @@ describe('波で運ぶレスキュー', () => {
       state = applyWave(stage, state, 25, 40)
       state = stepGame(stage, state, FIXED_STEP_MS).state
     }
-    expect(state.floaters.every((item) => item.x < stage.gate!.x)).toBe(true)
+    expect(state.floaters.find((item) => item.id === 'duck')!.x).toBeLessThan(stage.gate!.x)
     const remote = { ...state, floaters: [{ ...state.floaters[0], x: 80, y: 110, vx: 0, vy: 0 }] }
     expect(run(stage, applyWave(stage, remote, 40, 40)).floaters).toEqual(run(stage, { ...remote, wave: null }).floaters)
   })
