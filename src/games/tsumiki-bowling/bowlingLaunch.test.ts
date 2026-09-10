@@ -4,6 +4,7 @@ import {
   combinedRestitution,
   DRAG_DEAD_ZONE_PX,
   fullPowerDragPx,
+  HORIZONTAL_DRAG_SENSITIVITY,
   launchDirection,
   launchSpeed,
   launchVelocity,
@@ -61,9 +62,9 @@ describe('aimFromDrag: ドラッグ距離とパワー', () => {
     expect(fullPowerDragPx({ width: 1600, height: 1200 })).toBe(120)
   })
 
-  it('引いた距離が同じなら、向きが違ってもパワーは同じ', () => {
-    const down = aimFromDrag({ dx: 0, dy: 150 }, VIEWPORT)
-    const diagonal = aimFromDrag({ dx: 150 * Math.SQRT1_2, dy: 150 * Math.SQRT1_2 }, VIEWPORT)
+  it('左右へ動かしても、手前へ引いた量が同じならパワーは変わらない', () => {
+    const down = aimFromDrag({ dx: 0, dy: 80 }, VIEWPORT)
+    const diagonal = aimFromDrag({ dx: 200, dy: 80 }, VIEWPORT)
     expect(diagonal.power).toBeCloseTo(down.power, 5)
   })
 })
@@ -86,17 +87,26 @@ describe('aimFromDrag: ドラッグ方向と発射方向', () => {
     expect(launchDirection(pulledLeft.yaw, NORMAL_PITCH_RAD).x).toBeGreaterThan(0)
   })
 
-  it('どれだけ斜めに引いても、左右の振れは上限を超えない', () => {
+  it('左右入力は感度を下げたうえで、振れの上限を超えない', () => {
+    const dx = 5
+    const dy = 100
+    const aim = aimFromDrag({ dx, dy }, VIEWPORT)
+    expect(aim.yaw).toBeCloseTo(
+      Math.atan2(-dx, dy) * HORIZONTAL_DRAG_SENSITIVITY,
+      6,
+    )
     for (const dx of [-2000, -400, 400, 2000]) {
-      const aim = aimFromDrag({ dx, dy: 5 }, VIEWPORT)
-      expect(Math.abs(aim.yaw)).toBeLessThanOrEqual(LAUNCH_YAW_LIMIT_RAD + 1e-9)
+      const aim = aimFromDrag({ dx, dy: 30 }, VIEWPORT)
+      expect(Math.abs(aim.yaw)).toBeLessThanOrEqual(
+        LAUNCH_YAW_LIMIT_RAD * HORIZONTAL_DRAG_SENSITIVITY + 1e-9,
+      )
     }
   })
 
-  it('奥へ押しても後ろ向きには飛ばない（必ず前方へ出る）', () => {
-    const aim = aimFromDrag({ dx: 0, dy: -200 }, VIEWPORT)
-    expect(aim.active).toBe(true)
-    expect(launchDirection(aim.yaw, NORMAL_PITCH_RAD).z).toBeLessThan(0)
+  it('横移動だけ、または奥へ押す操作では発射しない', () => {
+    expect(aimFromDrag({ dx: 200, dy: 0 }, VIEWPORT).active).toBe(false)
+    expect(aimFromDrag({ dx: 0, dy: -200 }, VIEWPORT).active).toBe(false)
+    expect(aimFromDrag({ dx: 200, dy: -200 }, VIEWPORT).active).toBe(false)
   })
 
   it('「ふつう」の発射方向はごくわずかに上向きで、単位ベクトルのまま', () => {

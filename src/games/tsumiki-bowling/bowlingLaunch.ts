@@ -62,6 +62,9 @@ export function automaticLaunchVelocity(aim: LaunchAim, ball: BowlingBallSpec): 
 /** これ以下のドラッグは、画面に触れただけとみなして発射しない。 */
 export const DRAG_DEAD_ZONE_PX = 24
 
+/** 左右入力を少し穏やかにし、狙いが大きく振れすぎないようにする。 */
+export const HORIZONTAL_DRAG_SENSITIVITY = 0.7
+
 /**
  * パワーが最大に達するドラッグ距離[px]。
  *
@@ -95,24 +98,25 @@ function clamp(value: number, min: number, max: number): number {
 export function aimFromDrag(drag: DragVector, viewport: ViewportSize): LaunchAim {
   const dx = Number.isFinite(drag.dx) ? drag.dx : 0
   const dy = Number.isFinite(drag.dy) ? drag.dy : 0
-  const length = Math.hypot(dx, dy)
+  // 手前（画面下）へ引いた量だけで引き始めと引き量を決める。
+  // 横移動や奥へ押す操作だけでは、玉を動かしたり発射したりしない。
+  const toward = Math.max(dy, 0)
   const fullPower = fullPowerDragPx(viewport)
-  if (length <= DRAG_DEAD_ZONE_PX) {
+  if (toward <= DRAG_DEAD_ZONE_PX) {
     return { active: false, power: 0, yaw: 0, pull: 0 }
   }
   const power = clamp(
-    (length - DRAG_DEAD_ZONE_PX) / Math.max(1, fullPower - DRAG_DEAD_ZONE_PX),
+    (toward - DRAG_DEAD_ZONE_PX) / Math.max(1, fullPower - DRAG_DEAD_ZONE_PX),
     0,
     1,
   )
-  // 手前(下)へ引いた量だけを前方成分として扱う。
-  // 上へ引いた（＝奥へ押した）場合も、後ろ向きには飛ばさず真っ直ぐ前へ出す。
-  const forward = Math.max(dy, 0)
-  const rawYaw = Math.atan2(-dx, Math.max(forward, 1))
+  const rawYaw = Math.atan2(-dx, Math.max(toward, 1))
   return {
     active: true,
     power,
-    yaw: clamp(rawYaw, -LAUNCH_YAW_LIMIT_RAD, LAUNCH_YAW_LIMIT_RAD),
+    yaw:
+      clamp(rawYaw, -LAUNCH_YAW_LIMIT_RAD, LAUNCH_YAW_LIMIT_RAD) *
+      HORIZONTAL_DRAG_SENSITIVITY,
     pull: LAUNCH_PULL_MAX * power,
   }
 }
