@@ -5,6 +5,8 @@ const { Bodies, Body, Composite, Engine } = Matter
 export const MAX_LINES = 12
 export const MAX_POINTS = 120
 export const MAX_SEGMENTS = 32
+// The cup keeps the ball, so settling is capped only to guarantee the celebration appears.
+export const SETTLE_FRAMES = 150
 
 export function appendPoint(points: Point[], p: Point) {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return
@@ -29,13 +31,15 @@ export function createWorld(stage: Stage) {
     ...stage.platforms.map(p => Bodies.rectangle(p.x, p.y, p.width, 18, { isStatic: true, angle: p.angle ?? 0, restitution: p.bounce ? .8 : .1 })),
   ]
   Composite.add(engine.world, [...fixtures, ball])
-  let state: 'ready' | 'running' | 'goal' | 'retry' = 'ready'
+  let state: 'ready' | 'running' | 'scored' | 'goal' | 'retry' = 'ready'
   let stillFrames = 0
+  let settleFrames = 0
+  let restFrames = 0
   return {
     ball, lines,
     get state() { return state },
     addStroke(input: Point[]) {
-      if (lines.length >= MAX_LINES || state === 'goal' || state === 'retry') return false
+      if (lines.length >= MAX_LINES || state === 'scored' || state === 'goal' || state === 'retry') return false
       const sampled: Point[] = []
       input.forEach(p => appendPoint(sampled, p))
       let points = simplify(sampled)
@@ -49,7 +53,7 @@ export function createWorld(stage: Stage) {
       if (Matter.Query.collides(ball, bodies).length) return false
       lines.push({ points, bodies })
       Composite.add(engine.world, bodies)
-      state = 'running'
+      // Drawing never launches the ball: several roads can be drawn before start().
       return true
     },
     retry(clear = false) {
@@ -58,7 +62,7 @@ export function createWorld(stage: Stage) {
       Body.setVelocity(ball, { x: 0, y: 0 })
       Body.setAngularVelocity(ball, 0)
       Body.setAngle(ball, 0)
-      stillFrames = 0
+      stillFrames = settleFrames = restFrames = 0
       state = 'ready'
     },
     start() { if (state === 'ready') state = 'running' },
@@ -68,14 +72,22 @@ export function createWorld(stage: Stage) {
       this.retry()
     },
     step() {
-      if (state !== 'running') return
+      if (state !== 'running' && state !== 'scored') return
       for (let i = 0; i < 2; i++) {
         const speed = Math.hypot(ball.velocity.x, ball.velocity.y)
         if (speed > 6) Body.setVelocity(ball, { x: ball.velocity.x * 6 / speed, y: ball.velocity.y * 6 / speed })
         Engine.update(engine, 1000 / 120)
+        if (state !== 'running') continue
         const { x, y } = ball.position
-        if (Math.abs(x - goal.x) < 60 - 6 - BALL_RADIUS && y > goal.y + BALL_RADIUS && y < goal.y + 80 - 6) { state = 'goal'; return }
+        if (Math.abs(x - goal.x) < 60 - 6 - BALL_RADIUS && y > goal.y + BALL_RADIUS && y < goal.y + 80 - 6) { state = 'scored'; settleFrames = restFrames = 0; continue }
         if (!Number.isFinite(x) || !Number.isFinite(y) || y > HEIGHT + 30) { state = 'retry'; return }
+      }
+      if (state === 'scored') {
+        // Keep simulating inside the cup so the ball rolls to a stop instead of freezing in mid-air.
+        settleFrames++
+        restFrames = ball.speed < .3 ? restFrames + 1 : 0
+        if (restFrames > 10 || settleFrames > SETTLE_FRAMES) state = 'goal'
+        return
       }
       stillFrames = ball.speed < .12 ? stillFrames + 1 : 0
       if (stillFrames > 180) state = 'retry'
