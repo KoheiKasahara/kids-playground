@@ -54,9 +54,13 @@ describe('draw goal play', () => {
     advance(120)
     expect(ball.getAttribute('transform')).toBe(parked)
     expect(screen.getByText('▶ スタートを おそう！')).toBeInTheDocument()
+    expect(screen.getByLabelText('ほし 0 / 1')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '▶ スタート' }))
     advance()
     expect(screen.getByRole('heading', { name: '🎉 ゴール！' })).toBeInTheDocument()
+    // The road runs over the bonus star, so the counter and the goal card both show it.
+    expect(screen.getByLabelText('ほし 1 / 1')).toBeInTheDocument()
+    expect(screen.getByText('ほし ぜんぶ ゲット！')).toBeInTheDocument()
     expect(playCorrectSound).toHaveBeenCalledOnce()
     // The celebration waits for the ball to come to rest on the floor of the cup.
     const [, y] = ball.getAttribute('transform')!.match(/translate\((-?[\d.]+) (-?[\d.]+)\)/)!.slice(1).map(Number)
@@ -64,10 +68,10 @@ describe('draw goal play', () => {
     advance()
     expect(playCorrectSound).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'つぎへ →' }))
-    expect(screen.getByText('2 / 6')).toBeInTheDocument()
+    expect(screen.getByText('2 / 10')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '↶ 1ぽん もどす' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
-    expect(screen.getByRole('button', { name: '6 だんだん みち' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '10 さいごの ぼうけん' })).toBeInTheDocument()
     expect(screen.queryByLabelText('せんを かく ばしょ')).not.toBeInTheDocument()
   })
   test('drawing pauses the ball; secondary/canceled/resize gestures create no road', () => {
