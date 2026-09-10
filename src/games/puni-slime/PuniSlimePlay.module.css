@@ -1,6 +1,7 @@
 .page { height: 100dvh; min-height: 300px; display: flex; flex-direction: column; gap: 10px; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); color: #31554c; background: #f4f8ee; overflow: hidden; }
 .header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .header h1 { font-size: clamp(17px, 3vw, 25px); }
+.sound { margin-left: auto; width: 48px; font-size: 21px; }
 .workspace { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 1200px; margin: 0 auto; }
 .stage { position: relative; flex: 1; min-height: 0; border-radius: 28px; background: radial-gradient(ellipse at 50% 30%, #fff 15%, #ecf5ec 90%); border: 2px solid #e1ecdf; overflow: hidden; touch-action: none; }
 .hint { position: absolute; top: 12px; left: 0; right: 0; text-align: center; font-size: clamp(12px, 2vw, 16px); font-weight: bold; pointer-events: none; z-index: 1; }
@@ -12,31 +13,44 @@
 .page button:active { transform: scale(.95); }
 .page button:focus-visible { outline: 3px solid #245d9e; outline-offset: 2px; }
 .page button[aria-pressed=true] { border-color: #31554c; box-shadow: 0 2px 0 #31554c; }
+.shapes { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.shapes button { display: flex; align-items: center; justify-content: center; padding: 3px; }
+.shapes svg { width: 100%; height: 100%; max-height: 36px; }
 .colors { display: flex; gap: 8px; align-items: center; justify-content: center; }
 .colors button { width: 48px; border-radius: 50%; font-size: 25px; }
 .feels { display: flex; gap: 6px; }
 .feels button { flex: 1; padding: 4px; font-size: 12px; }
+.holders { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.holders button { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 4px; font-size: 20px; background: #eef6ff; }
+.holders span { font-size: 12px; white-space: nowrap; }
 .actions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .actions button { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px; font-size: 23px; background: #dfeee1; }
 .actions span { font-size: 13px; white-space: nowrap; }
 @media (orientation: landscape) {
   .workspace { flex-direction: row; }
-  .tools { width: 205px; display: flex; flex-direction: column; justify-content: center; }
-  .actions { grid-template-columns: 1fr; }
+  .tools { width: 224px; display: flex; flex-direction: column; justify-content: center; overflow-y: auto; }
+  .shapes { grid-template-columns: repeat(3, 1fr); }
+  .actions, .holders { grid-template-columns: repeat(3, 1fr); }
+  .actions button, .holders button { flex-direction: column; gap: 1px; font-size: 19px; }
+  .actions span, .holders span { font-size: 11px; }
   .hint { top: 6px; }
   .note { bottom: 3px; }
 }
 @media (max-height: 430px) and (orientation: landscape) {
   .page { gap: 4px; padding-top: max(4px, env(safe-area-inset-top)); padding-bottom: max(4px, env(safe-area-inset-bottom)); }
   .tools { gap: 5px; }
-  .actions { gap: 4px; }
+  .actions, .holders, .shapes { gap: 4px; }
   .page button { min-height: 44px; }
   .colors button { height: 44px; }
+  .shapes svg { max-height: 30px; }
   .note { display: none; }
 }
 @media (max-width: 360px) and (orientation: portrait) {
   .tools { gap: 6px; }
   .colors { gap: 4px; }
   .colors button { width: 44px; }
-  .actions span { font-size: 11px; }
+  .shapes { gap: 4px; }
+  .shapes button { min-width: 40px; }
+  .feels button { font-size: 11px; }
+  .actions span, .holders span { font-size: 11px; }
 }
