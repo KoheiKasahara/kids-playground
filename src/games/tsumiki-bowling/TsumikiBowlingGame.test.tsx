@@ -190,20 +190,10 @@ describe('TsumikiBowlingGame', () => {
     expect(screen.getAllByRole('status')[0]).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
   })
 
-  it('大崩壊のコールバックで短いチップが出て、しばらくすると消える', () => {
-    vi.useFakeTimers()
-    try {
-      renderGame()
-      startThrow()
-      act(() => engineMock.options?.onBigCollapse?.(6))
-      expect(screen.getByText('ガラガラー！')).toBeInTheDocument()
-      act(() => {
-        vi.advanceTimersByTime(1000)
-      })
-      expect(screen.queryByText('ガラガラー！')).not.toBeInTheDocument()
-    } finally {
-      vi.useRealTimers()
-    }
+  it('大崩壊でも画面下部に「ガラガラー！」を表示しない', () => {
+    renderGame()
+    expect(engineMock.options?.onBigCollapse).toBeUndefined()
+    expect(screen.queryByText('ガラガラー！')).not.toBeInTheDocument()
   })
 
   it('3投したら合計を出して、もういちど できる', async () => {

@@ -1,5 +1,5 @@
 import GameBackButton from '../../components/GameBackButton'
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useState, type CSSProperties } from 'react'
 import {
   createBowlingGameState,
   currentThrowNumber,
@@ -32,9 +32,6 @@ function toCssColor(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`
 }
 
-/** 大崩壊チップを出しておく長さ[ms]。短く出して消す（0.9秒）。 */
-const BIG_COLLAPSE_CHIP_MS = 900
-
 export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiBowlingGameProps) {
   const stage = getBowlingStage(stageId)
   const [runId, setRunId] = useState(0)
@@ -51,18 +48,6 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
   const [ballId, setBallIdState] = useState<BowlingBallId>(DEFAULT_BOWLING_BALL_ID)
   // 3投のうち1回でも全部倒したか（パーフェクトの定義）。結果画面でだけ使う。
   const [hadPerfectThrow, setHadPerfectThrow] = useState(false)
-  // 大崩壊の短いチップ表示。
-  const [bigCollapseChip, setBigCollapseChip] = useState(false)
-  const collapseChipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (collapseChipTimeoutRef.current !== null) {
-        clearTimeout(collapseChipTimeoutRef.current)
-      }
-    }
-  }, [])
-
   const handleThrowStart = useCallback(() => {
     setAimPower(null)
     setLastThrow(null)
@@ -74,11 +59,6 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
   const handleStageRebuilt = useCallback(() => {
     setLastThrow(null)
     setLiveToppled(0)
-    setBigCollapseChip(false)
-    if (collapseChipTimeoutRef.current !== null) {
-      clearTimeout(collapseChipTimeoutRef.current)
-      collapseChipTimeoutRef.current = null
-    }
   }, [])
 
   const handleToppledProgress = useCallback((toppled: number) => {
@@ -98,17 +78,6 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
     setAimPower(power)
   }, [])
 
-  const handleBigCollapse = useCallback(() => {
-    setBigCollapseChip(true)
-    if (collapseChipTimeoutRef.current !== null) {
-      clearTimeout(collapseChipTimeoutRef.current)
-    }
-    collapseChipTimeoutRef.current = setTimeout(() => {
-      setBigCollapseChip(false)
-      collapseChipTimeoutRef.current = null
-    }, BIG_COLLAPSE_CHIP_MS)
-  }, [])
-
   const { registerContainer, setBallId } = useTsumikiBowlingEngine({
     runId,
     stageId,
@@ -118,7 +87,6 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
     onStageRebuilt: handleStageRebuilt,
     onAimChange: handleAimChange,
     onToppledProgress: handleToppledProgress,
-    onBigCollapse: handleBigCollapse,
   })
 
   const throwNumber = currentThrowNumber(game)
@@ -144,11 +112,6 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
     setLiveToppled(0)
     setHasThrown(false)
     setHadPerfectThrow(false)
-    setBigCollapseChip(false)
-    if (collapseChipTimeoutRef.current !== null) {
-      clearTimeout(collapseChipTimeoutRef.current)
-      collapseChipTimeoutRef.current = null
-    }
     // 世界を作り直して、前のプレイの物理状態を一切残さない。
     setRunId((current) => current + 1)
   }, [])
@@ -240,12 +203,6 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
                 : hasThrown ? 'つぎも ひっぱって はなしてね' : 'たまを すこし ひっぱって はなそう！'}
             </p>
           </div>
-        ) : null}
-
-        {bigCollapseChip ? (
-          <p className={styles.collapseChip} aria-hidden="true">
-            ガラガラー！
-          </p>
         ) : null}
 
         {lastThrow && !isFinished ? (
