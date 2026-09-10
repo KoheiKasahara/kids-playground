@@ -6,8 +6,8 @@ const VIEW_BOX_MIN = -1
 const VIEW_BOX_MAX = 101
 
 describe('paintPictures', () => {
-  test('題材が12件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
-    expect(PAINT_PICTURES).toHaveLength(12)
+  test('題材が18件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
+    expect(PAINT_PICTURES).toHaveLength(18)
     const ids = PAINT_PICTURES.map((picture) => picture.id)
     expect(ids).toEqual([
       'car',
@@ -22,6 +22,12 @@ describe('paintPictures', () => {
       'house',
       'frog',
       'ghost',
+      'ufo',
+      'helicopter',
+      'dog',
+      'cat',
+      'bee',
+      'ladybug',
     ])
     expect(new Set(ids).size).toBe(ids.length)
     expect(findPaintPicture(DEFAULT_PICTURE_ID)).toBeDefined()
@@ -169,6 +175,56 @@ describe('paintPictures', () => {
           .filter((part): part is string => Boolean(part)),
       )
       expect(parts.size, `${id}: motion.partの種類`).toBeGreaterThan(0)
+    }
+  })
+
+  test('新しく追加した6題材（ユーフォー〜てんとうむし）にも、それぞれ動くパーツ(motion.part)がある', () => {
+    for (const id of ['ufo', 'helicopter', 'dog', 'cat', 'bee', 'ladybug']) {
+      const picture = findPaintPicture(id)!
+      const parts = new Set(
+        [...picture.areas, ...picture.details]
+          .map((item) => item.motion?.part)
+          .filter((part): part is string => Boolean(part)),
+      )
+      expect(parts.size, `${id}: motion.partの種類`).toBeGreaterThan(0)
+    }
+  })
+
+  test('ユーフォー〜てんとうむしのgroup名・part名がデータ上に存在する', () => {
+    const expectedByPicture: Record<string, { group: string; parts: readonly string[] }> = {
+      ufo: { group: 'ufo', parts: ['ufoBeam', 'ufoLightLeft', 'ufoLightRight'] },
+      helicopter: { group: 'heli', parts: ['heliMainRotor', 'heliTailRotor'] },
+      dog: { group: 'dog', parts: ['dogTail', 'dogEarLeft', 'dogEarRight'] },
+      cat: { group: 'cat', parts: ['catTail'] },
+      bee: { group: 'bee', parts: ['beeWingBack', 'beeWingFront'] },
+      ladybug: { group: 'ladybug', parts: ['ladybugShellLeft', 'ladybugShellRight'] },
+    }
+    for (const [id, expected] of Object.entries(expectedByPicture)) {
+      const picture = findPaintPicture(id)!
+      const items = [...picture.areas, ...picture.details]
+      const groups = new Set(items.map((item) => item.motion?.group).filter(Boolean))
+      const parts = new Set(items.map((item) => item.motion?.part).filter(Boolean))
+      expect(groups, `${id}: group`).toEqual(new Set([expected.group]))
+      for (const part of expected.parts) {
+        expect(parts.has(part), `${id}: part "${part}"`).toBe(true)
+      }
+    }
+  })
+
+  test('ヘリコプターの左右のローターは別のpart（それぞれ自分の中心で回す）', () => {
+    const helicopter = findPaintPicture('helicopter')!
+    const main = helicopter.areas.find((area) => area.id === 'mainRotor')!
+    const tail = helicopter.areas.find((area) => area.id === 'tailRotor')!
+    expect(main.motion?.part).toBeDefined()
+    expect(tail.motion?.part).toBeDefined()
+    expect(main.motion?.part).not.toBe(tail.motion?.part)
+  })
+
+  test('てんとうむしの水玉もようは、ひらく左右の甲羅と同じpartに入っている', () => {
+    const ladybug = findPaintPicture('ladybug')!
+    for (const part of ['ladybugShellLeft', 'ladybugShellRight']) {
+      const spots = ladybug.details.filter((detail) => detail.motion?.part === part)
+      expect(spots.length, `${part}: 水玉`).toBeGreaterThan(0)
     }
   })
 

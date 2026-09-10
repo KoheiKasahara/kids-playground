@@ -46,7 +46,7 @@ function finishButton() {
 }
 
 describe('ColorPaintPuzzlePlay', () => {
-  test('初期表示: タイトル・もどる・色パレット・やりなおし・9つの題材ボタンが出る', () => {
+  test('初期表示: タイトル・もどる・色パレット・やりなおし・18件の題材ボタンが出る', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'うごくぬりえ' })).toBeInTheDocument()
     expect(screen.getByText('いろを えらんで、えを タップしてね')).toBeInTheDocument()
@@ -187,7 +187,7 @@ describe('ColorPaintPuzzlePlay', () => {
 })
 
 describe('ColorPaintPuzzlePlay: 題材えらびの横スクロール', () => {
-  test('12件の題材ボタンは role="group"（えを えらぶ）の中に入っている', () => {
+  test('18件の題材ボタンは role="group"（えを えらぶ）の中に入っている', () => {
     renderPlay()
     const group = screen.getByRole('group', { name: 'えを えらぶ' })
     for (const picture of PAINT_PICTURES) {
@@ -215,7 +215,7 @@ describe('ColorPaintPuzzlePlay: 題材えらびの横スクロール', () => {
 describe('ColorPaintPuzzlePlay: 追加した題材（ロボット・ロケット・きょうりゅう）', () => {
   const ADDED_PICTURE_IDS = ['robot', 'rocket', 'dinosaur'] as const
 
-  test('題材えらびに12件すべてが並び、選ぶと選択がその1件だけに移る', async () => {
+  test('題材えらびに18件すべてが並び、選ぶと選択がその1件だけに移る', async () => {
     const user = userEvent.setup()
     renderPlay()
     expect(screen.getAllByRole('button', { pressed: true }).length).toBeGreaterThan(0)
@@ -240,7 +240,7 @@ describe('ColorPaintPuzzlePlay: 追加した題材（ロボット・ロケット
     await user.click(screen.getByRole('button', { name: picture.label }))
     expect(screen.getByRole('img', { name: `${picture.label}の ぬりえ` })).toBeInTheDocument()
 
-    // エリア以外のボタン（もどる・題材6件・色・やりなおし・できた！）を除いた数が
+    // エリア以外のボタン（もどる・題材ぜんぶ・色・やりなおし・できた！）を除いた数が
     // ちょうどエリア数と一致する＝塗れないエリアも、余分なボタンもない。
     const nonAreaButtonCount = 1 + PAINT_PICTURES.length + PAINT_COLORS.length + 1 + 1
     expect(screen.getAllByRole('button').length - nonAreaButtonCount).toBe(picture.areas.length)
@@ -384,6 +384,84 @@ describe('ColorPaintPuzzlePlay: 乗り物と新しい題材', () => {
     }
 
     for (const id of NEW_PICTURE_IDS) {
+      const picture = findPaintPicture(id)!
+      await user.click(screen.getByRole('button', { name: picture.label }))
+      await user.click(finishButton())
+
+      const group = container.querySelector(`[data-motion-group="${motionGroupByPicture[id]}"]`)
+      expect(group, `${id}: 本体グループ`).not.toBeNull()
+      // 背景は本体グループの外＝絵だけが動く。
+      expect(group!.contains(getAreaShape(container, 'sky'))).toBe(false)
+      for (const part of groupsAndParts[id]) {
+        expect(container.querySelector(`[data-motion-part="${part}"]`), `${id}: ${part}`).not.toBeNull()
+      }
+
+      await user.click(screen.getByRole('button', { name: 'もういちどぬる' }))
+    }
+  })
+})
+
+describe('ColorPaintPuzzlePlay: いきもの・空とぶ題材', () => {
+  const LIVING_PICTURE_IDS = ['ufo', 'helicopter', 'dog', 'cat', 'bee', 'ladybug'] as const
+
+  test.each(LIVING_PICTURE_IDS)('%s: 全エリアがボタンとして出て、タップで塗れる', async (id) => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    const picture = findPaintPicture(id)!
+
+    await user.click(screen.getByRole('button', { name: picture.label }))
+    expect(screen.getByRole('img', { name: `${picture.label}の ぬりえ` })).toBeInTheDocument()
+
+    const nonAreaButtonCount = 1 + PAINT_PICTURES.length + PAINT_COLORS.length + 1 + 1
+    expect(screen.getAllByRole('button').length - nonAreaButtonCount).toBe(picture.areas.length)
+
+    for (const area of picture.areas) {
+      await user.click(getAreaButton(area.label))
+      expect(getAreaFill(container, area.id), `${id}.${area.id}`).toBe('#e8453c')
+    }
+  })
+
+  test.each(LIVING_PICTURE_IDS)('%s: 「できた！」→「もういちどぬる」が成立し、色も残る', async (id) => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    const picture = findPaintPicture(id)!
+    const target = picture.areas[picture.areas.length - 1]
+
+    await user.click(screen.getByRole('button', { name: picture.label }))
+    await user.click(getAreaButton(target.label))
+    await user.click(finishButton())
+
+    expect(screen.getByRole('status')).toHaveTextContent('できた！')
+    const canvas = screen.getByRole('img', { name: `${picture.label}の ぬりえ` })
+    expect(canvas).toHaveAttribute('data-phase', 'celebrating')
+    expect(getAreaFill(container, target.id)).toBe('#e8453c')
+
+    await user.click(screen.getByRole('button', { name: 'もういちどぬる' }))
+    expect(canvas).toHaveAttribute('data-phase', 'coloring')
+    expect(getAreaFill(container, target.id)).toBe('#e8453c')
+  })
+
+  test('演出中、6題材すべてに本体グループと動くパーツのgがある', async () => {
+    const user = userEvent.setup()
+    const { container } = renderPlay()
+    const groupsAndParts: Record<string, readonly string[]> = {
+      ufo: ['ufoBeam', 'ufoLightLeft', 'ufoLightRight'],
+      helicopter: ['heliMainRotor', 'heliTailRotor'],
+      dog: ['dogTail', 'dogEarLeft', 'dogEarRight'],
+      cat: ['catTail'],
+      bee: ['beeWingBack', 'beeWingFront'],
+      ladybug: ['ladybugShellLeft', 'ladybugShellRight'],
+    }
+    const motionGroupByPicture: Record<string, string> = {
+      ufo: 'ufo',
+      helicopter: 'heli',
+      dog: 'dog',
+      cat: 'cat',
+      bee: 'bee',
+      ladybug: 'ladybug',
+    }
+
+    for (const id of LIVING_PICTURE_IDS) {
       const picture = findPaintPicture(id)!
       await user.click(screen.getByRole('button', { name: picture.label }))
       await user.click(finishButton())
