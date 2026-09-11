@@ -404,6 +404,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'marble-course',
+    slug: 'marble-course',
+    title: '3Dビーだまコースづくり',
+    emoji: '🔮',
+    seo: {
+      headline: '3Dビーだまコースづくり｜パーツをつないで転がそう',
+      description: 'まっすぐ・坂道・カーブ・分岐・ゴールを自由につなぐ、幼児向けの3Dビー玉あそびです。高さの違うコースを組み立て、ビー玉が重力で転がったり跳ねたりする様子を楽しめます。',
+    },
+    category: 'threeD',
+    intro: {
+      howToPlay: [
+        'したの パーツを タップするか ドラッグして つなごう',
+        'パーツを えらんで「まわす」で むきを かえられるよ',
+        '「ビーだま ころがす！」で スタート。なんどでも あそべるよ',
+      ],
+    },
+  },
+  {
     id: 'car-road-builder',
     slug: 'car-road-builder',
     title: 'くるまのみちづくり',
