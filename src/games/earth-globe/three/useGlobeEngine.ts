@@ -38,7 +38,7 @@ import {
   SELECTED_POLYGON_POP_ALTITUDE,
   SELECTED_POLYGON_POP_BORDER_RADIUS,
 } from './globeLayers'
-import { renderPixelRatioForDevice } from './renderQuality'
+import { renderPixelRatioForDevice, shouldRenderGlobeFrame } from './renderQuality'
 import { configureGlobeRotationControls } from './rotationControls'
 import {
   type BorderScaleAnimation,
@@ -167,6 +167,8 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     let hasRenderedFirstFrame = false
     let ready = false
     let released = false
+    let renderRequested = true
+    let renderThrough = 0
     let reducedMotion = initialOptions.reducedMotion
     let selectedNumericId = initialOptions.selectedCountryId === null
       ? null
@@ -182,6 +184,11 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     const cameraDirection = new THREE.Vector3()
     const origin = new THREE.Vector3()
     let pointerStart: { pointerId: number; x: number; y: number } | null = null
+
+    function requestRender(durationMs = 0) {
+      renderRequested = true
+      renderThrough = Math.max(renderThrough, performance.now() + durationMs)
+    }
 
     function setCameraDistance(distance: number) {
       if (camera === null || controls === null) return
@@ -217,6 +224,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
           ? selectedPolygonAltitude
           : BASE_POLYGON_ALTITUDE
       ))
+      requestRender(transitionDurationMs)
     }
 
     function updatePolygonAppearance(transitionDurationMs = POLYGONS_TRANSITION_DURATION_MS) {
@@ -304,6 +312,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         setCameraDistance(targetDistance)
         controls.rotateSpeed = rotateSpeedForZoom(level)
         updatePointOfView()
+        requestRender()
         return
       }
 
@@ -314,6 +323,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         fromRotateSpeed: controls.rotateSpeed,
         toRotateSpeed: rotateSpeedForZoom(level),
       }
+      requestRender(ZOOM_ANIMATION_DURATION_MS)
     }
 
     function cancelSelectionPop() {
@@ -475,6 +485,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       }
 
       updatePolygonAppearance()
+      requestRender()
     }
 
     function updateSelectionBorderAnimations(now: number) {
@@ -611,16 +622,36 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       // 向きが変わった場合も、最小ズームだけはその画面比に合う表示範囲へ戻す。
       if (activeZoomLevel === 0) setCameraDistance(cameraDistanceForViewport(activeZoomLevel))
       updatePointOfView()
+      requestRender()
+    }
+
+    function handleControlsChange() {
+      updatePointOfView()
+      requestRender()
     }
 
     function tick(now: number) {
       if (released) return
       rafId = window.requestAnimationFrame(tick)
 
-      if (controls !== null) controls.update()
+      const controlsChanged = controls?.update() ?? false
       updateZoomAnimation(now)
       updateSelectionBorderAnimations(now)
-      if (renderer !== null && scene !== null && camera !== null) {
+      const animationsActive = zoomAnimation !== null
+        || selectedBorderAnimation !== null
+        || departingBorderAnimation !== null
+      if (
+        renderer !== null && scene !== null && camera !== null
+        && shouldRenderGlobeFrame({
+          ready,
+          renderRequested,
+          renderThrough,
+          now,
+          controlsChanged,
+          animationsActive,
+        })
+      ) {
+        renderRequested = false
         renderer.render(scene, camera)
         // polygonsData の setter は生成完了を意味しない。実際の mesh が揃い、
         // GPU へ描画した後で UI を開く（国境線だけのフレームは公開しない）。
@@ -631,6 +662,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         ) {
           ready = true
           globe.polygonsTransitionDuration(reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS)
+          requestRender(reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS)
           setStatus('ready')
         }
         if (!hasRenderedFirstFrame) {
@@ -666,7 +698,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         canvas.removeEventListener('pointerup', handlePointerUp)
         canvas.removeEventListener('pointercancel', handlePointerCancel)
       }
-      controls?.removeEventListener('change', updatePointOfView)
+      controls?.removeEventListener('change', handleControlsChange)
       controls?.dispose()
       controls = null
 
@@ -796,7 +828,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       controls.minDistance = cameraDistanceForZoom(3) - 10
       controls.maxDistance = cameraDistanceForZoom(0, true) + 10
       controls.update()
-      controls.addEventListener('change', updatePointOfView)
+      controls.addEventListener('change', handleControlsChange)
 
       updatePointOfView()
       resizeRenderer()
