@@ -71,6 +71,8 @@
 @media (min-width: 850px) and (min-height: 601px) {
   .panel { align-items: center; }
   .foods, .actions, .placed { width: min(100%, 850px); }
+  /* With this many foods a single row would scroll even on a wide screen. */
+  .foods { flex-wrap: wrap; justify-content: center; }
   .foods button { flex: 1; }
   .boxes { width: 500px; }
   .panel > .primary { width: 300px; }

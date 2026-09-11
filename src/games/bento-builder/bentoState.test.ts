@@ -1,6 +1,16 @@
 import { describe, expect, test } from 'vitest'
 import { bentoReducer, BOXES, clampToBox, DIVIDER_HALF, findPlacement, fits, FOODS, foodDefinition, HALF_DEPTH, HALF_WIDTH, initialBentoState, MAX_FOODS, PACKING_RATIO, ROUND_RADIUS, type BentoState } from './bentoState'
 
+test('おかずのID・名前・絵文字が重複せず、半径が箱に収まる', () => {
+  for (const key of ['id', 'name', 'emoji'] as const) {
+    expect(new Set(FOODS.map(food => food[key])).size).toBe(FOODS.length)
+  }
+  for (const food of FOODS) {
+    expect(food.radius).toBeGreaterThan(0)
+    expect(food.radius).toBeLessThan(Math.min(HALF_DEPTH, ROUND_RADIUS - DIVIDER_HALF))
+  }
+})
+
 describe('箱の配置領域', () => {
   for (const box of BOXES) test(`${box.name}の壁と仕切りから食材の半径分を確保する`, () => {
     for (const food of FOODS) for (const x of [-20, -3, -0.01, 0, 0.01, 3, 20]) for (const z of [-20, 0, 20]) {

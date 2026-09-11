@@ -19,7 +19,7 @@ function open() {
     <Route path="/" element={<h1>ホーム</h1>} />
   </Routes></MemoryRouter>)
 }
-test('箱選択から8種類の追加、編集、完成、修正、再挑戦、退出まで通る', () => {
+test('箱選択から全種類の追加、編集、完成、修正、再挑戦、退出まで通る', () => {
   open()
   fireEvent.click(screen.getByRole('button', { name: 'しきりつき' }))
   fireEvent.click(screen.getByRole('button', { name: 'あお' }))
@@ -29,7 +29,7 @@ test('箱選択から8種類の追加、編集、完成、修正、再挑戦、�
   expect(screen.getByRole('button', { name: '✓ できた！' })).toBeDisabled()
   expect(screen.getByRole('button', { name: '↺ やりなおし' })).toBeDisabled()
   for (const food of FOODS) fireEvent.click(screen.getByRole('button', { name: `${food.name}を いれる` }))
-  expect(mock.latest!.foods).toHaveLength(8)
+  expect(mock.latest!.foods).toHaveLength(FOODS.length)
   fireEvent.click(screen.getByRole('button', { name: '1こめの おにぎり' }))
   fireEvent.click(screen.getByRole('button', { name: '↻ まわす' }))
   expect(mock.latest!.foods[0]!.rotation).toBeCloseTo(Math.PI / 2)
@@ -42,7 +42,7 @@ test('箱選択から8種類の追加、編集、完成、修正、再挑戦、�
   expect(mock.latest!.foods).toEqual(before)
   fireEvent.click(screen.getByRole('button', { name: '1こめの おにぎり' }))
   fireEvent.click(screen.getByRole('button', { name: '− けす' }))
-  expect(mock.latest!.foods).toHaveLength(7)
+  expect(mock.latest!.foods).toHaveLength(FOODS.length - 1)
   fireEvent.click(screen.getByRole('button', { name: '✓ できた！' }))
   fireEvent.click(screen.getByRole('button', { name: '🍱 もういちど' }))
   expect(mock.latest!.foods).toEqual([])

@@ -1,5 +1,7 @@
 export type BoxKind = 'rectangle' | 'round' | 'divided'
-export type FoodKind = 'onigiri' | 'egg' | 'sausage' | 'chicken' | 'broccoli' | 'tomato' | 'sushi' | 'carrot'
+export type FoodKind =
+  | 'onigiri' | 'egg' | 'sausage' | 'chicken' | 'broccoli' | 'tomato' | 'sushi' | 'carrot'
+  | 'shrimp' | 'potato' | 'cheese' | 'corn' | 'cucumber' | 'strawberry'
 export const BOXES: { id: BoxKind; name: string }[] = [
   { id: 'rectangle', name: 'しかく' }, { id: 'round', name: 'まる' }, { id: 'divided', name: 'しきりつき' },
 ]
@@ -9,15 +11,22 @@ export const COLORS = [
 ]
 export type FoodDefinition = { id: FoodKind; name: string; emoji: string; radius: number; model?: string; rotation: number; tilt?: number }
 // radius encloses the model's X/Z footprint, so a quarter turn cannot cross a wall.
+// Grouped as mains, vegetables, then the fruit so the picker stays scannable.
 export const FOODS: FoodDefinition[] = [
   { id: 'onigiri', name: 'おにぎり', emoji: '🍙', radius: 0.62, rotation: 0 },
+  { id: 'sushi', name: 'おすし', emoji: '🍣', radius: 0.57, model: 'sushi.glb', rotation: 0 },
   { id: 'egg', name: 'たまご', emoji: '🍳', radius: 0.58, model: 'egg.glb', rotation: 0 },
   { id: 'sausage', name: 'ウインナー', emoji: '🌭', radius: 0.53, rotation: 0 },
   { id: 'chicken', name: 'からあげ', emoji: '🍗', radius: 0.49, rotation: 0 },
+  { id: 'shrimp', name: 'えびフライ', emoji: '🍤', radius: 0.58, rotation: 0 },
+  { id: 'potato', name: 'ポテト', emoji: '🍟', radius: 0.54, rotation: 0 },
+  { id: 'cheese', name: 'チーズ', emoji: '🧀', radius: 0.5, rotation: 0 },
   { id: 'broccoli', name: 'ブロッコリー', emoji: '🥦', radius: 0.48, model: 'broccoli.glb', rotation: 0 },
   { id: 'tomato', name: 'ミニトマト', emoji: '🍅', radius: 0.36, model: 'tomato.glb', rotation: 0 },
-  { id: 'sushi', name: 'おすし', emoji: '🍣', radius: 0.57, model: 'sushi.glb', rotation: 0 },
   { id: 'carrot', name: 'にんじん', emoji: '🥕', radius: 0.49, rotation: 0, tilt: Math.PI / 2 },
+  { id: 'corn', name: 'とうもろこし', emoji: '🌽', radius: 0.46, rotation: 0 },
+  { id: 'cucumber', name: 'きゅうり', emoji: '🥒', radius: 0.5, rotation: 0 },
+  { id: 'strawberry', name: 'いちご', emoji: '🍓', radius: 0.42, rotation: 0 },
 ]
 export const foodDefinition = (kind: FoodKind) => FOODS.find(food => food.id === kind)!
 export type CupKind = 'green' | 'pink' | 'blue'

@@ -43,10 +43,12 @@ export function createBox(kind: BoxKind, color: string): THREE.Group {
   return root
 }
 
-/** Three Japanese bento foods absent from the pack (hotdog includes a bun). */
-export function createHandmadeFood(kind: FoodKind): THREE.Group {
-  const root = new THREE.Group()
-  if (kind === 'onigiri') {
+/** Bento foods the pack does not cover, built from flat-shaded primitives so they
+ * sit beside the imported low-poly models without looking like a different set.
+ * The pack's hotdog includes a bun and its chicken leg keeps the bone, so even the
+ * shapes it does ship cannot stand in for single bento pieces. */
+const HANDMADE: Partial<Record<FoodKind, (root: THREE.Group) => void>> = {
+  onigiri(root) {
     const triangle = new THREE.Shape()
     triangle.moveTo(-0.5, 0.04)
     triangle.quadraticCurveTo(-0.62, 0.08, -0.48, 0.29)
@@ -57,7 +59,8 @@ export function createHandmadeFood(kind: FoodKind): THREE.Group {
     triangle.closePath()
     const rice = mesh(new THREE.ExtrudeGeometry(triangle, { depth: 0.36, bevelEnabled: true, bevelSize: 0.07, bevelThickness: 0.07, bevelSegments: 2, steps: 1 }), '#fffaf0', 0, 0, -0.18)
     root.add(rice, rounded(0.36, 0.4, 0.51, '#24463b', 0, 0.21, 0, 0.035))
-  } else if (kind === 'sausage') {
+  },
+  sausage(root) {
     const sausage = mesh(new THREE.CapsuleGeometry(0.22, 0.6, 3, 10), '#d66542', 0, 0.24)
     sausage.rotation.z = Math.PI / 2
     root.add(sausage)
@@ -66,7 +69,12 @@ export function createHandmadeFood(kind: FoodKind): THREE.Group {
       cut.rotation.y = 0.35
       root.add(cut)
     }
-  } else if (kind === 'carrot') {
+  },
+  chicken(root) {
+    const chunks = [[0, 0.29, 0, 0.36], [-0.2, 0.23, 0.09, 0.24], [0.18, 0.25, 0.13, 0.25], [0.03, 0.35, -0.13, 0.26]]
+    chunks.forEach(([x, y, z, radius], index) => root.add(mesh(new THREE.IcosahedronGeometry(radius!, 1), index % 2 ? '#c58436' : '#dc9d47', x, y, z)))
+  },
+  carrot(root) {
     // A cone reads as a flat triangle once the carrot is laid on its side.
     // Use a softly bulging profile so the root stays round and recognisable.
     const profile = [
@@ -86,10 +94,119 @@ export function createHandmadeFood(kind: FoodKind): THREE.Group {
       leaf.rotation.z = angle
       root.add(leaf)
     }
-  } else {
-    const chunks = [[0, 0.29, 0, 0.36], [-0.2, 0.23, 0.09, 0.24], [0.18, 0.25, 0.13, 0.25], [0.03, 0.35, -0.13, 0.26]]
-    chunks.forEach(([x, y, z, radius], index) => root.add(mesh(new THREE.IcosahedronGeometry(radius!, 1), index % 2 ? '#c58436' : '#dc9d47', x, y, z)))
-  }
+  },
+  shrimp(root) {
+    const body = mesh(new THREE.CapsuleGeometry(0.21, 0.66, 4, 12), '#dfa257', -0.11, 0.21)
+    body.rotation.z = Math.PI / 2
+    root.add(body)
+    // Panko lumps, lighter than the coating, keep this from reading as another sausage.
+    for (const [x, z, size] of [[-0.34, 0.03, 0.09], [-0.11, -0.1, 0.11], [0.12, 0.08, 0.1], [0.01, 0.12, 0.08], [-0.24, -0.11, 0.08]] as const) {
+      root.add(mesh(new THREE.IcosahedronGeometry(size, 0), '#f0c485', x, 0.35, z))
+    }
+    // The tail fan lies flat, so it stays visible from the game's overhead camera.
+    const fan = new THREE.Shape()
+    fan.moveTo(0, 0)
+    fan.lineTo(0.3, 0.26)
+    fan.lineTo(0.37, 0.02)
+    fan.lineTo(0.3, -0.26)
+    fan.closePath()
+    const tail = mesh(new THREE.ExtrudeGeometry(fan, { depth: 0.06, bevelEnabled: false }), '#ef8462', 0.19, 0.14)
+    tail.rotation.x = -Math.PI / 2
+    root.add(tail)
+  },
+  potato(root) {
+    // Crossed sticks with one on top: a tidy parallel row would read as a single slab.
+    const sticks = [
+      [-0.16, 0.08, -0.2, 0.42, '#f3c454'], [0.12, 0.08, -0.02, -0.24, '#e7ad3b'],
+      [-0.04, 0.08, 0.22, 0.12, '#f3c454'], [0, 0.24, 0.02, 0.75, '#eeba48'],
+    ] as const
+    for (const [x, y, z, angle, color] of sticks) {
+      const stick = rounded(0.86, 0.16, 0.16, color, x, y, z, 0.05)
+      stick.rotation.y = angle
+      root.add(stick)
+    }
+  },
+  cheese(root) {
+    const wedge = new THREE.Shape()
+    wedge.moveTo(-0.5, -0.3)
+    wedge.lineTo(0.5, -0.3)
+    wedge.lineTo(0, 0.46)
+    wedge.closePath()
+    // Extruded upright, the holes read as real holes from above rather than painted dots.
+    for (const [x, y, radius] of [[-0.17, -0.14, 0.08], [0.18, -0.12, 0.07], [0, 0.07, 0.06]] as const) {
+      const hole = new THREE.Path()
+      hole.absarc(x, y, radius, 0, Math.PI * 2, true)
+      wedge.holes.push(hole)
+    }
+    const block = mesh(new THREE.ExtrudeGeometry(wedge, { depth: 0.26, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 2, steps: 1, curveSegments: 12 }), '#f6c23c')
+    block.rotation.x = -Math.PI / 2
+    root.add(block)
+  },
+  corn(root) {
+    // Every other quad of the cob sits proud, so the flat-shaded surface reads as rows
+    // of kernels. One mesh keeps it cheap: each placed piece clones this geometry.
+    const rows = 11
+    const columns = 12
+    const height = 1.02
+    const point = (row: number, column: number) => {
+      const along = row / rows
+      const taper = (1 - Math.abs(2 * along - 1) ** 6) ** 0.32
+      const radius = 0.205 * taper + (taper > 0.72 && (row + column) % 2 ? 0.032 : 0)
+      const angle = column / columns * Math.PI * 2
+      return [Math.cos(angle) * radius, along * height, Math.sin(angle) * radius]
+    }
+    const vertices: number[] = []
+    for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+      const [a, b, c, d] = [point(row, column), point(row + 1, column), point(row + 1, column + 1), point(row, column + 1)]
+      vertices.push(...a, ...b, ...c, ...a, ...c, ...d)
+    }
+    // Unindexed, so computeVertexNormals leaves every kernel facet crisply flat.
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+    geometry.computeVertexNormals()
+    const cob = mesh(geometry, '#f6cc3c', height / 2, 0.24)
+    cob.rotation.z = Math.PI / 2
+    root.add(cob)
+  },
+  cucumber(root) {
+    for (const [x, z, lean, turn] of [[-0.3, 0.12, -0.5, 0.3], [0, -0.02, -0.42, 0.05], [0.3, 0.1, -0.34, -0.22]] as const) {
+      const slice = new THREE.Group()
+      // The pale core pokes through both faces of the darker skin, leaving a green rim.
+      slice.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.09, 18), '#4f9b3d'))
+      slice.add(mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.095, 18), '#dcefb6'))
+      slice.rotation.set(Math.PI / 2 + lean, turn, 0)
+      slice.position.set(x, 0.3, z)
+      root.add(slice)
+    }
+  },
+  strawberry(root) {
+    // A sharp taper and a pinker red keep it apart from the round tomato model.
+    const profile = [
+      new THREE.Vector2(0, 0),
+      new THREE.Vector2(0.09, 0.06),
+      new THREE.Vector2(0.18, 0.19),
+      new THREE.Vector2(0.27, 0.4),
+      new THREE.Vector2(0.33, 0.62),
+      new THREE.Vector2(0.31, 0.78),
+      new THREE.Vector2(0.16, 0.88),
+      new THREE.Vector2(0, 0.9),
+    ]
+    root.add(mesh(new THREE.LatheGeometry(profile, 12), '#ef4a56'))
+    for (let index = 0; index < 5; index++) {
+      const angle = index * Math.PI * 2 / 5
+      const leaf = mesh(new THREE.SphereGeometry(0.14, 6, 5), '#43a83c', Math.sin(angle) * 0.17, 0.87, Math.cos(angle) * 0.17)
+      leaf.scale.set(0.42, 0.2, 1.25)
+      // Tilt inside the leaf's own frame so every leaf lifts away from the berry.
+      leaf.rotation.order = 'YXZ'
+      leaf.rotation.set(-0.3, angle, 0)
+      root.add(leaf)
+    }
+    root.add(mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.14, 6), '#43a83c', 0, 0.96))
+  },
+}
+export function createHandmadeFood(kind: FoodKind): THREE.Group {
+  const root = new THREE.Group()
+  HANDMADE[kind]?.(root)
   return root
 }
 
