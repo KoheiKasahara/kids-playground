@@ -25,6 +25,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/flag-roll-puzzle',
   '/games/koma-battle',
   '/games/magic-sandbox',
+  '/games/marble-course',
   '/games/oekaki-korokoro',
   '/games/piano-play',
   '/games/planet-globe',

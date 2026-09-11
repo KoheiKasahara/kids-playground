@@ -147,6 +147,7 @@ export const routes: RouteObject[] = [
   { path: '/games/earth-globe', element: playRoute(lazyRoute(() => import('../games/earth-globe/EarthGlobePlay'))) },
   { path: '/games/planet-globe', element: playRoute(lazyRoute(() => import('../games/planet-globe/PlanetGlobePlay'))) },
   { path: '/games/rail-builder', element: playRoute(lazyRoute(() => import('../games/rail-builder/RailBuilderPlay'))) },
+  { path: '/games/marble-course', element: playRoute(lazyRoute(() => import('../games/marble-course/MarbleCoursePlay'))) },
   // 3Dクルマづくりもthree.jsを含むため、開くときだけ読込む。
   { path: '/games/car-builder', element: playRoute(lazyRoute(() => import('../games/car-builder/CarBuilderPlay'))) },
   { path: '/games/car-road-builder', element: lazyRoute(() => import('../games/car-road-builder/CarRoadBuilderStageSelect')) },

@@ -1,0 +1,41 @@
+.page { height: 100vh; height: 100dvh; display: flex; flex-direction: column; gap: 10px; overflow: hidden; background: #f6f5ec; color: #344b51; padding: var(--safe-top) calc(12px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(12px + var(--safe-left)); }
+.page button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.page button:disabled { opacity: 0.42; cursor: default; }
+.page button:focus-visible, .scene:focus-visible { outline: 3px solid #cf8510; outline-offset: 3px; }
+.page button:active:not(:disabled) { transform: translateY(2px); }
+.header { flex: 0 0 60px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.header h1 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: clamp(16px, 2.9vw, 24px); font-weight: 900; }
+.sound { width: 44px; height: 44px; border: 1px solid #e5e5d8; border-radius: 15px; background: #fffef8; font-size: 21px !important; }
+.marbleIcon { display: inline-block; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 28% 23%, white 0 7%, transparent 18%), repeating-conic-gradient(from 35deg, #29c8c4 0deg 60deg, #a2f0dc 75deg 115deg, #2685ba 130deg 180deg); box-shadow: inset -4px -4px 7px #17476d80, inset 2px 2px 3px #ffffff9c, 0 3px 4px #153f5225; }
+.scene { flex: 1; min-height: 140px; position: relative; overflow: hidden; isolation: isolate; border-radius: 24px; background: #e9f3ef; border: 1px solid #dbe5d8; touch-action: none; }
+.scene canvas { display: block; width: 100%; height: 100%; }
+.caption { position: absolute; z-index: 2; top: 13px; left: 13px; max-width: calc(100% - 76px); border: 1px solid #fff; border-radius: 20px; background: #fffef2e8; padding: 9px 14px; font-size: 13px; font-weight: 800; pointer-events: none; }
+.camera { position: absolute; z-index: 3; top: 12px; right: 10px; display: grid; gap: 7px; }
+.camera button { width: 44px; height: 44px; border-radius: 14px; border: 1px solid #ffffff; background: #fffef6e8; color: #476666; font-size: 23px; box-shadow: 0 2px 6px #45675612; }
+.sceneFooter { position: absolute; bottom: 12px; left: 14px; right: 14px; display: flex; justify-content: space-between; gap: 10px; color: #576f63; font-size: 11px; font-weight: 700; pointer-events: none; }
+.sceneFooter span { padding: 5px 9px; background: #f9fceecc; border-radius: 12px; }
+.workbench { flex: 0 0 auto; display: grid; gap: 11px; width: min(100%, 850px); margin: 0 auto; }
+.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tools button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 46px; padding: 4px; border: 1px solid #e3e4d6; border-radius: 14px; background: #fffef7; color: #47605e; font-size: 12px; font-weight: 800; }
+.tools button span { font-size: 23px; }
+.tools button[aria-pressed="true"] { border-color: #efc077; background: #fff2d5; }
+.palette { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.palette button { display: flex; flex-direction: column; align-items: center; padding: 4px 2px 9px; border: 1px solid color-mix(in srgb, var(--part-color) 50%, white); border-radius: 17px; background: color-mix(in srgb, var(--part-color) 10%, #fffef8); box-shadow: 0 3px 0 color-mix(in srgb, var(--part-color) 25%, #e4e5d9); color: var(--part-color); touch-action: none; }
+.palette svg { width: clamp(42px, 9vw, 64px); height: clamp(42px, 9vw, 64px); }
+.palette strong { font-size: 11px; color: #425b5e; white-space: nowrap; }
+.playRow { display: flex; gap: 10px; }
+.roll { flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 56px; border: 1px solid #226f66; border-radius: 18px; color: #fffef4; background: #318b7b; box-shadow: 0 4px 0 #21685f; font-size: 17px !important; font-weight: 900 !important; }
+.roll > span:last-child { font-size: 14px; opacity: 0.7; }
+.edit { min-width: 82px; border: 1px solid #dbdecc; border-radius: 16px; background: #fffef6; color: #43625c; font-size: 14px !important; font-weight: 800 !important; }
+.empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; color: #567566; line-height: 1.8; font-size: 16px; font-weight: 800; pointer-events: none; }
+.empty span { display: block; font-size: 38px; }
+.loading { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; background: #e9f3efef; font-size: 15px; }
+.loading .marbleIcon { width: 52px; height: 52px; }
+.loading button { min-height: 52px; padding: 8px 24px; border: 0; border-radius: 14px; background: #318b7b; color: white; }
+.success { position: absolute; inset: 20% 0 auto; display: flex; justify-content: center; align-items: center; gap: 25px; color: #f6ba32; text-shadow: 0 3px 0 white, 0 0 20px #fff5bb; pointer-events: none; }
+.success strong { font-size: 76px; animation: celebrate 0.6s ease-out both; }
+.success span { font-size: 38px; animation: celebrate 0.85s ease-out both; }
+@keyframes celebrate { from { transform: translateY(18px) scale(0.3) rotate(-20deg); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+@media (max-width: 430px) { .page { gap: 7px; padding-left: calc(8px + var(--safe-left)); padding-right: calc(8px + var(--safe-right)); } .header { flex-basis: 56px; } .header h1 .marbleIcon { display: none; } .palette { gap: 6px; } .workbench { gap: 9px; } .tools { gap: 6px; } .tools button { font-size: 11px; } }
+@media (orientation: landscape) and (max-height: 600px) { .page { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: 47px minmax(0, 1fr); gap: 7px 12px; } .header { grid-column: 1 / -1; } .header h1 { font-size: 19px; } .scene { min-height: 0; } .workbench { align-self: center; gap: 14px; } .tools { grid-template-columns: repeat(2, 1fr); } .palette { gap: 5px; } .palette svg { width: 43px; height: 43px; } .roll { font-size: 14px !important; gap: 7px; } }
+@media (prefers-reduced-motion: reduce) { .success strong, .success span { animation: none; } }
