@@ -1,8 +1,8 @@
-import { useCallback, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useCallback, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { getSharedAudioContext, isSoundEnabled, playTone, primeAudio } from '../../audio/sound'
-import { appendPart, BOARD_LIMIT, initialCourse, MAX_PARTS, PARTS, snapPart, type Course, type PartKind } from './marbleModel'
+import { appendPart, BOARD_LIMIT, GADGET_HINTS, hasConnectedInput, initialCourse, isGadget, MAX_PARTS, PARTS, snapPart, type Course, type PartKind } from './marbleModel'
 import type { RunStatus } from './marbleWorld'
 import { useMarbleEngine } from './useMarbleEngine'
 import PartIcon from './PartIcon'
@@ -16,6 +16,8 @@ export default function MarbleCoursePlay() {
   const [phase, setPhase] = useState<RunStatus>('ready')
   const [sound, setSound] = useState(true)
   const [hint, setHint] = useState('パーツを つないで みよう！')
+  const [category, setCategory] = useState<'paths' | 'gadgets'>('paths')
+  const seen = useRef(new Set<PartKind>())
   const play = useCallback((success: boolean) => {
     if (!sound || !isSoundEnabled()) return
     const ctx = getSharedAudioContext()
@@ -23,24 +25,32 @@ export default function MarbleCoursePlay() {
     for (const [i, note] of (success ? [660, 830, 990] : [750]).entries()) playTone(ctx, note, ctx.currentTime + i * 0.11, 0.15, 0.06, 'sine')
   }, [sound])
   const commit = useCallback((next: Course) => {
+    if (next === course) return
     setHistory(previous => [...previous.slice(-49), course])
     setCourse(next)
     setPhase('ready')
     setHint('つづきを つなごう！')
+    const added = next.parts.find(part => !course.parts.some(previous => previous.id === part.id))
+    if (added && isGadget(added.kind) && !seen.current.has(added.kind)) {
+      seen.current.add(added.kind)
+      setHint(GADGET_HINTS[added.kind])
+    }
+    if (added && course.parts.length && !hasConnectedInput(added, course.parts)) setHint('ここに おいたよ。みちを つなぎなおそう！')
   }, [course])
   const onPhase = useCallback((next: RunStatus) => {
     setPhase(next)
     if (next === 'goal') play(true)
-    if (next === 'ready') setHint('なんどでも ころがして みよう！')
+    if (next === 'ready') setHint('みちを つないで また ころがそう！')
   }, [play])
-  const onSnap = useCallback(() => { setHint('ぴたっ！ つながったよ'); play(false) }, [play])
-  const { registerContainer, status, roll, stop, palette, nextId, retry, zoom, overview } = useMarbleEngine({ course, selectedId, onCommit: commit, onSelect: setSelectedId, onPhase, onSnap })
+  const onSnap = useCallback(() => { play(false) }, [play])
+  const onEvent = useCallback(() => play(false), [play])
+  const { registerContainer, status, roll, stop, palette, nextId, retry, zoom, overview } = useMarbleEngine({ course, selectedId, onCommit: commit, onSelect: setSelectedId, onPhase, onSnap, onHint: setHint, onEvent })
   const selected = course.parts.find(part => part.id === selectedId)
   const rolling = phase === 'rolling'
   const locked = status !== 'ready' || rolling
   const add = (kind: PartKind) => {
     const next = appendPart(course, kind, nextId(), selectedId)
-    if (next === course) return
+    if (next === course) { setHint('あいている ところへ うごかそう！'); return }
     commit(next)
     setSelectedId(next.parts.at(-1)!.id)
     if (snapPart(next.parts.at(-1)!, course.parts).snapped) onSnap()
@@ -108,11 +118,25 @@ export default function MarbleCoursePlay() {
         <button type="button" disabled={locked || !history.length} onClick={undo}><span aria-hidden="true">↶</span>もどす</button>
         <button type="button" disabled={locked || !course.parts.length} onClick={() => { stop(); commit({ parts: [], startId: null }); setSelectedId(null) }}><span aria-hidden="true">▤</span>クリア</button>
       </div>
-      <div className={styles.palette} aria-label="パーツを えらぶ">
-        {PARTS.map(part => <button type="button" key={part.kind} style={{ '--part-color': part.color } as CSSProperties} aria-label={`${part.label}を ついか`} disabled={locked || course.parts.length >= MAX_PARTS} onPointerDown={event => { if (sound) primeAudio(); event.currentTarget.setPointerCapture(event.pointerId); palette(part.kind, event.nativeEvent) }} onClick={event => { if (event.detail === 0) add(part.kind) }}>
+      <div className={styles.tabs} role="tablist" aria-label="パーツの しゅるい">
+        {(['paths', 'gadgets'] as const).map(value => <button type="button" role="tab" id={`tab-${value}`} key={value} aria-controls="part-palette" aria-selected={category === value} tabIndex={category === value ? 0 : -1} onClick={() => setCategory(value)} onKeyDown={event => {
+          if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+            event.preventDefault()
+            const next = event.key === 'Home' ? 'paths' : event.key === 'End' ? 'gadgets' : category === 'paths' ? 'gadgets' : 'paths'
+            setCategory(next)
+            document.getElementById(`tab-${next}`)?.focus()
+          }
+        }}><span aria-hidden="true">{value === 'paths' ? '⌁' : '✦'}</span>{value === 'paths' ? 'みち' : 'しかけ'}</button>)}
+      </div>
+      <div className={styles.palette} id="part-palette" role="tabpanel" aria-labelledby={`tab-${category}`}>
+        {PARTS.filter(part => isGadget(part.kind) === (category === 'gadgets')).map(part => <button type="button" key={part.kind} style={{ '--part-color': part.color } as CSSProperties} aria-label={`${part.label}を ついか`} disabled={locked || course.parts.length >= MAX_PARTS} onPointerDown={event => { if (sound) primeAudio(); event.currentTarget.setPointerCapture(event.pointerId); palette(part.kind, event.nativeEvent) }} onClick={event => { if (event.detail === 0) add(part.kind) }}>
           <PartIcon kind={part.kind} /><strong>{part.label}</strong>
         </button>)}
       </div>
+      {selected?.kind === 'spinner' && <div className={styles.settings} aria-label="くるくるの せってい">
+        <button type="button" disabled={locked} aria-label={`はやさ：${selected.settings.speed === 'slow' ? 'ゆっくり' : 'はやい'}`} onClick={() => commit({ ...course, parts: course.parts.map(part => part.id === selected.id ? { ...selected, settings: { ...selected.settings, speed: selected.settings.speed === 'slow' ? 'fast' : 'slow' } } : part) })}>はやさ：{selected.settings.speed === 'slow' ? 'ゆっくり' : 'はやい'}</button>
+        <button type="button" disabled={locked} aria-pressed={selected.settings.reverse} onClick={() => commit({ ...course, parts: course.parts.map(part => part.id === selected.id ? { ...selected, settings: { ...selected.settings, reverse: !selected.settings.reverse } } : part) })}><span aria-hidden="true">↶</span> ぎゃくまわり</button>
+      </div>}
       <div className={styles.playRow}>
         {rolling && <button type="button" className={styles.edit} onClick={stop} aria-label="つくるに もどる">✎ つくる</button>}
         <button type="button" className={styles.roll} disabled={status !== 'ready' || !course.startId} onClick={() => { if (sound) primeAudio(); roll() }}><span className={styles.marbleIcon} aria-hidden="true" />{rolling ? 'もういちど ころがす！' : 'ビーだま ころがす！'}<span aria-hidden="true">▶</span></button>

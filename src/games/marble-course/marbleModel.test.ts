@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendPart, connectors, createPart, initialCourse, launchPose, MAX_PARTS, openConnectors, snapPart, toLocal, toWorld, type Course } from './marbleModel'
+import { appendPart, canPlace, connectors, createPart, hasConnectedInput, initialCourse, launchPose, MAX_PARTS, openConnectors, snapPart, toLocal, toWorld, type Course } from './marbleModel'
 
 describe('marble course placement', () => {
   it('snaps all four orientations and inherits height at the mouth', () => {
@@ -68,5 +68,31 @@ describe('marble course placement', () => {
     expect(local.y).toBeCloseTo(point.y)
     expect(local.z).toBeCloseTo(point.z)
     expect(launchPose({ parts: [part], startId: 's' })!.velocity.z).toBeCloseTo(2.5)
+  })
+  it('connects every gadget at both mouths with the correct height in four directions', () => {
+    for (const kind of ['jump', 'spinner', 'funnel', 'booster', 'seesaw'] as const) for (let rotation = 0; rotation < 4; rotation++) {
+      const initial = initialCourse()
+      initial.parts[0]!.rotation = rotation
+      let course = appendPart(initial, kind, 'gadget', 'part-0')
+      const gadget = course.parts[1]!
+      expect(hasConnectedInput(gadget, initial.parts)).toBe(true)
+      expect(canPlace(gadget)).toBe(true)
+      course = appendPart(course, 'goal', 'goal', 'gadget')
+      expect(hasConnectedInput(course.parts[2]!, [gadget])).toBe(true)
+      if (kind === 'funnel') expect(connectors(gadget)[1]!.position.y).toBeLessThan(connectors(gadget)[0]!.position.y)
+      expect(connectors(gadget)).toHaveLength(2)
+    }
+  })
+  it('rejects out-of-height funnel snaps and finds clear alternatives at board edges', () => {
+    const low = createPart('straight', 'low', { x: 0, y: 1, z: 0 })
+    const funnel = createPart('funnel', 'f', { x: 5, y: 2.4, z: 1.65 })
+    expect(snapPart(funnel, [low]).snapped).toBe(false)
+    const course: Course = { parts: [createPart('straight', 'edge', { x: 19, y: 2.4, z: 0 })], startId: 'edge' }
+    const one = appendPart(course, 'jump', 'one', 'edge')
+    const two = appendPart(one, 'jump', 'two', 'edge')
+    for (const part of two.parts.slice(1)) expect(canPlace(part)).toBe(true)
+    expect(hasConnectedInput(one.parts[1]!, course.parts)).toBe(false)
+    expect(two.parts[1]!.position).not.toEqual(two.parts[2]!.position)
+    expect(createPart('straight', 'plain')).not.toHaveProperty('settings')
   })
 })
