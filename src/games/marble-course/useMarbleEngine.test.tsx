@@ -2,7 +2,7 @@ import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
 import { initialCourse } from './marbleModel'
-import { useMarbleEngine } from './useMarbleEngine'
+import { owningPartId, useMarbleEngine } from './useMarbleEngine'
 
 const mocks = vi.hoisted(() => ({ initialize: vi.fn<() => Promise<void>>(), createScene: vi.fn(), createWorld: vi.fn() }))
 vi.mock('../../physics/rapierLoader', () => ({ initializeRapier: mocks.initialize }))
@@ -14,9 +14,9 @@ beforeEach(() => {
   mocks.createScene.mockReset().mockImplementation((host: HTMLDivElement) => {
     const canvas = document.createElement('canvas')
     host.appendChild(canvas)
-    return { renderer: { domElement: canvas }, camera: new THREE.OrthographicCamera(), root: new THREE.Group(), ball: new THREE.Mesh(), geometries: {}, update: vi.fn(), select: vi.fn(), render: vi.fn(), zoom: vi.fn(), overview: vi.fn(), dispose: vi.fn(() => canvas.remove()) }
+    return { renderer: { domElement: canvas }, camera: new THREE.OrthographicCamera(), root: new THREE.Group(), ball: new THREE.Mesh(), geometries: {}, update: vi.fn(), select: vi.fn(), render: vi.fn(), zoom: vi.fn(), overview: vi.fn(), syncMechanisms: vi.fn(), effect: vi.fn(), dispose: vi.fn(() => canvas.remove()) }
   })
-  mocks.createWorld.mockReset().mockImplementation(() => ({ step: vi.fn(() => 'rolling'), ball: { translation: () => ({ x: 1, y: 3, z: 0 }), rotation: () => ({ x: 0, y: 0, z: 0, w: 1 }) }, dispose: vi.fn() }))
+  mocks.createWorld.mockReset().mockImplementation(() => ({ step: vi.fn(() => 'rolling'), consumeEvents: () => [], mechanismPoses: () => [], ball: { translation: () => ({ x: 1, y: 3, z: 0 }), rotation: () => ({ x: 0, y: 0, z: 0, w: 1 }) }, dispose: vi.fn() }))
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frame = callback; return 1 })
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
 })
@@ -45,6 +45,7 @@ it('owns one world per run and disposes worlds, scene and RAF on stop/exit', asy
   act(() => { frame(100); frame(150) })
   const second = mocks.createWorld.mock.results[1]!.value
   expect(second.step).toHaveBeenCalled()
+  expect(mocks.createScene.mock.results[0]!.value.syncMechanisms).toHaveBeenCalled()
   act(() => app.current().stop())
   expect(second.dispose).toHaveBeenCalledOnce()
   const scene = mocks.createScene.mock.results[0]!.value
@@ -52,6 +53,14 @@ it('owns one world per run and disposes worlds, scene and RAF on stop/exit', asy
   expect(scene.dispose).toHaveBeenCalledOnce()
   expect(window.cancelAnimationFrame).toHaveBeenCalled()
   expect(document.querySelectorAll('canvas')).toHaveLength(0)
+})
+
+it('resolves child meshes such as spinner tips to the owning part', () => {
+  const root = new THREE.Group(), part = new THREE.Mesh(), bar = new THREE.Mesh(), tip = new THREE.Mesh()
+  part.userData.partId = 'spinner'
+  root.add(part); part.add(bar); bar.add(tip)
+  expect(owningPartId(tip)).toBe('spinner')
+  expect(owningPartId(root)).toBeUndefined()
 })
 
 it('ignores late initialization after exit, and starts fresh on re-entry', async () => {
@@ -78,6 +87,17 @@ it('rolls back interrupted palette drags and removes its window listeners', asyn
   app.unmount()
   act(() => window.dispatchEvent(Object.assign(new Event('pointerup'), { pointerId: 1 })))
   expect(app.onCommit).not.toHaveBeenCalled()
+})
+
+it('cancels an unfinished palette gesture when rolling starts, so its release cannot edit the running course', async () => {
+  const app = setup()
+  await waitFor(() => expect(app.current().status).toBe('ready'))
+  const pointer = (type: string) => Object.assign(new Event(type), { pointerId: 8, clientX: 100, clientY: 500, button: 0 }) as PointerEvent
+  act(() => app.current().palette('spinner', pointer('pointerdown')))
+  act(() => app.current().roll())
+  act(() => window.dispatchEvent(pointer('pointerup')))
+  expect(app.onCommit).not.toHaveBeenCalled()
+  expect(app.onPhase).toHaveBeenLastCalledWith('rolling')
 })
 
 it('retries rejected initialization, preserving its course', async () => {

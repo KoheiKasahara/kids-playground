@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { initializeRapier } from '../../physics/rapierLoader'
-import { appendPart, BOARD_LIMIT, snapPart, type Course, type MarblePart, type PartKind } from './marbleModel'
+import { appendPart, BOARD_LIMIT, hasConnectedInput, snapPart, type Course, type MarblePart, type PartKind } from './marbleModel'
 import { createMarbleScene, type MarbleScene } from './marbleScene'
-import { createMarbleWorld, type MarbleWorld, type RunStatus } from './marbleWorld'
+import { createMarbleWorld, type MarbleEvent, type MarbleWorld, type RunStatus } from './marbleWorld'
 
 export type EngineStatus = 'loading' | 'ready' | 'error'
 export type EngineOptions = {
@@ -13,9 +13,18 @@ export type EngineOptions = {
   onSelect: (id: string | null) => void
   onPhase: (phase: RunStatus) => void
   onSnap: () => void
+  onHint?: (hint: string) => void
+  onEvent?: (event: MarbleEvent) => void
 }
 type Drag = { pointerId: number; x: number; y: number; original: Course; part: MarblePart; offset: THREE.Vector3; moved: boolean; palette: boolean; snapped: boolean }
-type Runtime = { scene: MarbleScene; run: MarbleWorld | null; drag: Drag | null; dirty: number; phase: RunStatus }
+type Runtime = { scene: MarbleScene; run: MarbleWorld | null; drag: Drag | null; dirty: number; phase: RunStatus; accumulator: number }
+
+export function owningPartId(object: THREE.Object3D | undefined): string | undefined {
+  while (object) {
+    if (typeof object.userData.partId === 'string') return object.userData.partId
+    object = object.parent ?? undefined
+  }
+}
 
 export function useMarbleEngine(options: EngineOptions) {
   const [container, registerContainer] = useState<HTMLDivElement | null>(null)
@@ -28,6 +37,11 @@ export function useMarbleEngine(options: EngineOptions) {
   useEffect(() => {
     const rt = runtime.current
     if (!rt) return
+    rt.run?.dispose()
+    rt.run = null
+    rt.drag = null
+    rt.accumulator = 0
+    rt.phase = 'ready'
     rt.scene.update(options.course, latest.current.selectedId)
     rt.dirty = 90
   }, [options.course])
@@ -42,7 +56,7 @@ export function useMarbleEngine(options: EngineOptions) {
     let frame = 0
     let rt: Runtime
     try {
-      rt = { scene: createMarbleScene(container), run: null, drag: null, dirty: 90, phase: 'ready' }
+      rt = { scene: createMarbleScene(container), run: null, drag: null, dirty: 90, phase: 'ready', accumulator: 0 }
       runtime.current = rt
       rt.scene.update(latest.current.course, latest.current.selectedId)
     } catch {
@@ -50,22 +64,24 @@ export function useMarbleEngine(options: EngineOptions) {
       return () => { disposed = true }
     }
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-    let previous = 0, lastRender = 0, accumulator = 0
+    let previous = 0, lastRender = 0
     const animate = (now: number) => {
       frame = requestAnimationFrame(animate)
       const dt = previous ? Math.min((now - previous) / 1000, 0.075) : 0
       previous = now
-      if (document.hidden) { accumulator = 0; return }
+      if (document.hidden) { rt.accumulator = 0; return }
       if (rt.run && rt.phase === 'rolling') {
-        accumulator += dt
-        while (accumulator >= 1 / 120 && rt.phase === 'rolling') {
+        rt.accumulator += dt
+        while (rt.accumulator >= 1 / 120 && rt.phase === 'rolling') {
           rt.phase = rt.run.step()
-          accumulator -= 1 / 120
+          for (const event of rt.run.consumeEvents()) { rt.scene.effect(event); latest.current.onEvent?.(event) }
+          rt.accumulator -= 1 / 120
           if (rt.phase !== 'rolling') latest.current.onPhase(rt.phase)
         }
         const p = rt.run.ball.translation(), q = rt.run.ball.rotation()
         rt.scene.ball.position.copy(p)
         rt.scene.ball.quaternion.set(q.x, q.y, q.z, q.w)
+        rt.scene.syncMechanisms(rt.run.mechanismPoses())
         rt.dirty = 90
       }
       if (now - lastRender < 25 || rt.dirty <= 0) return
@@ -87,8 +103,8 @@ export function useMarbleEngine(options: EngineOptions) {
     const down = (event: PointerEvent) => {
       if (event.button !== 0 || rt.phase === 'rolling' || rt.drag) return
       ray(event)
-      const hit = raycaster.intersectObjects(rt.scene.root.children, false)[0]
-      const part = latest.current.course.parts.find(item => item.id === hit?.object.userData.partId)
+      const hit = raycaster.intersectObjects(rt.scene.root.children, true)[0]
+      const part = latest.current.course.parts.find(item => item.id === owningPartId(hit?.object))
       latest.current.onSelect(part?.id ?? null)
       if (!part) return
       plane.constant = -part.position.y
@@ -183,7 +199,9 @@ export function useMarbleEngine(options: EngineOptions) {
     if (!rt) return
     rt.run?.dispose()
     rt.run = null
+    rt.drag = null
     rt.phase = 'ready'
+    rt.accumulator = 0
     rt.dirty = 90
     rt.scene.update(latest.current.course, latest.current.selectedId)
     latest.current.onPhase('ready')
@@ -192,10 +210,13 @@ export function useMarbleEngine(options: EngineOptions) {
     const rt = runtime.current
     if (!rt || status !== 'ready') return
     rt.run?.dispose()
+    rt.drag = null
+    rt.scene.update(latest.current.course, latest.current.selectedId, false)
     // A tiny variation in release position gives the physical splitter different contact angles.
     rt.run = createMarbleWorld(latest.current.course, rt.scene.geometries, (Math.random() - 0.5) * 0.16)
     if (!rt.run) return
     rt.phase = 'rolling'
+    rt.accumulator = 0
     rt.dirty = 90
     latest.current.onPhase('rolling')
   }, [status])
@@ -204,9 +225,12 @@ export function useMarbleEngine(options: EngineOptions) {
     if (!rt || status !== 'ready' || rt.phase === 'rolling' || rt.drag || event.button !== 0) return
     const course = latest.current.course
     const appended = appendPart(course, kind, `part-${sequence.current++}`, latest.current.selectedId)
-    if (appended === course) return
+    if (appended === course) { latest.current.onHint?.('あいている ところへ うごかそう！'); return }
     const part = appended.parts.at(-1)!
     rt.drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, original: course, part, offset: new THREE.Vector3(), moved: false, palette: true, snapped: false }
+    rt.scene.update(appended, part.id, false)
+    rt.dirty = 90
+    if (course.parts.length && !hasConnectedInput(part, course.parts)) latest.current.onHint?.('ここに おけるよ。みちを つなぎなおそう！')
   }, [status])
   const nextId = useCallback(() => `part-${sequence.current++}`, [])
   const retry = useCallback(() => { setStatus('loading'); setAttempt(value => value + 1) }, [])

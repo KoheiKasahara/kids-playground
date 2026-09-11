@@ -1,7 +1,7 @@
 import * as THREE from 'three'
-import type { PartKind, Vec3 } from './marbleModel'
+import { FUNNEL_DROP, SPINNER_DROP, type PartKind, type Vec3 } from './marbleModel'
 
-type PathPoint = Vec3 & { nx: number; nz: number }
+type PathPoint = Vec3 & { nx: number; nz: number; width?: number }
 
 function geometry(vertices: number[]): THREE.BufferGeometry {
   const result = new THREE.BufferGeometry()
@@ -19,7 +19,7 @@ const PROFILE = [[-0.82, -0.18], [-0.82, 0.43], [-0.78, 0.49], [-0.75, 0.49], [-
 
 function sweep(points: PathPoint[]): THREE.BufferGeometry {
   const vertices: number[] = []
-  const at = (p: PathPoint, i: number): Vec3 => ({ x: p.x + PROFILE[i]![0]! * p.nx, y: p.y + PROFILE[i]![1]!, z: p.z + PROFILE[i]![0]! * p.nz })
+  const at = (p: PathPoint, i: number): Vec3 => ({ x: p.x + PROFILE[i]![0]! * p.nx * (p.width ?? 1), y: p.y + PROFILE[i]![1]!, z: p.z + PROFILE[i]![0]! * p.nz * (p.width ?? 1) })
   for (let j = 0; j < points.length - 1; j++) {
     for (let i = 0; i < PROFILE.length; i++) quad(vertices, at(points[j]!, i), at(points[j + 1]!, i), at(points[j + 1]!, (i + 1) % PROFILE.length), at(points[j]!, (i + 1) % PROFILE.length))
   }
@@ -31,7 +31,7 @@ function sweep(points: PathPoint[]): THREE.BufferGeometry {
   return result
 }
 
-export function trackGeometry(kind: Exclude<PartKind, 'branch' | 'goal'>): THREE.BufferGeometry {
+export function trackGeometry(kind: 'straight' | 'slope' | 'curve'): THREE.BufferGeometry {
   const points: PathPoint[] = []
   const segments = kind === 'curve' ? 28 : 1
   for (let i = 0; i <= segments; i++) {
@@ -136,5 +136,72 @@ export function compactGroups(source: THREE.BufferGeometry): THREE.BufferGeometr
 }
 
 export function createPartGeometries(): Record<PartKind, THREE.BufferGeometry> {
-  return { straight: compactGroups(trackGeometry('straight')), slope: compactGroups(trackGeometry('slope')), curve: compactGroups(trackGeometry('curve')), branch: compactGroups(branchGeometry()), goal: compactGroups(goalGeometry()) }
+  return {
+    straight: compactGroups(trackGeometry('straight')), slope: compactGroups(trackGeometry('slope')), curve: compactGroups(trackGeometry('curve')), branch: compactGroups(branchGeometry()), goal: compactGroups(goalGeometry()),
+    jump: compactGroups(jumpGeometry()), spinner: compactGroups(trayGeometry()), funnel: compactGroups(funnelGeometry()), booster: compactGroups(trackGeometry('straight')), seesaw: compactGroups(seesawGeometry()),
+  }
+}
+
+const pathPoint = (x: number, y = 0, width = 1, z = 0): PathPoint => ({ x, y, z, nx: 0, nz: 1, width })
+
+function combine(sources: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const vertices: number[] = []
+  const result = new THREE.BufferGeometry()
+  for (const source of sources) {
+    const offset = vertices.length / 3
+    vertices.push(...Array.from(source.getAttribute('position').array))
+    for (const group of source.groups) result.addGroup(offset + group.start, group.count, group.materialIndex)
+    source.dispose()
+  }
+  result.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  result.computeVertexNormals()
+  return result
+}
+
+/** Two genuinely disconnected surfaces. The widened landing tapers back to the standard mouth. */
+function jumpGeometry(): THREE.BufferGeometry {
+  const ramp = [pathPoint(-3), pathPoint(-1.55)]
+  for (let i = 1; i <= 10; i++) {
+    const t = i / 10
+    ramp.push(pathPoint(-1.55 + 1.1 * t, 0.18 * t * t))
+  }
+  return combine([sweep(ramp), sweep([pathPoint(0.2, -0.1, 1.6), pathPoint(1.8, -0.06, 1.6), pathPoint(3)])])
+}
+
+function trayGeometry(): THREE.BufferGeometry {
+  return sweep([pathPoint(-3), pathPoint(-1.7, -SPINNER_DROP * 1.3 / 6, 2.8), pathPoint(1.7, -SPINNER_DROP * 4.7 / 6, 2.8), pathPoint(3, -SPINNER_DROP)])
+}
+
+/** The hole is left open; the receiving trough below slopes toward its lower connector. */
+function funnelGeometry(): THREE.BufferGeometry {
+  const inlet = sweep([pathPoint(-3, 0, 1, -1.4), pathPoint(-1.15, 0, 1, -1.4)])
+  const receiver = sweep([pathPoint(-0.95, -1.12, 1.45), pathPoint(0.9, -1.35, 1.45), pathPoint(3, -FUNNEL_DROP)])
+  const vertices: number[] = []
+  const groups: { start: number; count: number; material: number }[] = []
+  const rings = [[0.48, -0.6], [0.75, -0.55], [1.1, -0.44], [1.5, -0.25], [1.95, -0.035], [2.25, 0.12], [2.3, 0.55], [2.43, 0.58], [2.48, 0.48], [2.48, -0.1]]
+  const point = (ring: number[], a: number): Vec3 => ({ x: ring[0]! * Math.cos(a), y: ring[1]!, z: ring[0]! * Math.sin(a) })
+  for (let i = 0; i < 40; i++) {
+    const a = i * Math.PI / 20, b = (i + 1) * Math.PI / 20
+    for (let j = 0; j < rings.length - 1; j++) {
+      // Open the upper rim only at the tangent inlet.
+      if (j >= 4 && Math.cos((a + b) / 2) < -0.35 && Math.sin((a + b) / 2) < -0.35) continue
+      groups.push({ start: vertices.length / 3, count: 6, material: j >= 5 ? 0 : 1 })
+      quad(vertices, point(rings[j]!, a), point(rings[j]!, b), point(rings[j + 1]!, b), point(rings[j + 1]!, a))
+    }
+  }
+  const bowl = geometry(vertices)
+  for (const group of groups) bowl.addGroup(group.start, group.count, group.material)
+  return combine([inlet, bowl, receiver])
+}
+
+function seesawGeometry(): THREE.BufferGeometry {
+  return combine([
+    sweep([pathPoint(-3), pathPoint(-1.6, -0.15)]),
+    sweep([pathPoint(1.6, -0.15), pathPoint(3)]),
+  ])
+}
+
+/** Shared visible/physical moving board, in the joint's local coordinate frame. */
+export function seesawBoardGeometry(): THREE.BufferGeometry {
+  return compactGroups(sweep([pathPoint(-1.95), pathPoint(1.95)]))
 }

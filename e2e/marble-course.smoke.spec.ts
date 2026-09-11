@@ -51,3 +51,102 @@ test('touch-drag adds a part, cancellation rolls back, and rotation/keyboard pla
   await page.getByRole('button', { name: 'ゴールを ついか', exact: true }).click()
   await page.screenshot({ path: testInfo.outputPath('parts-portrait.png') })
 })
+
+for (const label of ['ジャンプ', 'くるくる', 'ぐるぐる', 'ぎったん']) {
+  test(`${label}: adds from a tab, rolls to the goal and retries in portrait/landscape`, async ({ page }, testInfo) => {
+    test.setTimeout(75_000)
+    const errors = capturePageErrors(page)
+    await page.goto('/games/marble-course')
+    const roll = page.getByRole('button', { name: 'ビーだま ころがす！', exact: true })
+    await expect(roll).toBeEnabled({ timeout: 20_000 })
+    await page.getByRole('tab', { name: 'しかけ', exact: true }).click()
+    await page.getByRole('button', { name: `${label}を ついか`, exact: true }).click()
+    await page.screenshot({ path: testInfo.outputPath('gadget-portrait.png') })
+    if (label === 'くるくる') {
+      await page.getByRole('button', { name: 'はやさ：ゆっくり', exact: true }).click()
+      await page.getByRole('button', { name: 'ぎゃくまわり', exact: true }).click()
+      await page.setViewportSize({ width: 844, height: 390 })
+      await expect(roll).toBeInViewport()
+      await expect(page.getByRole('button', { name: 'はやさ：はやい', exact: true })).toBeInViewport()
+      await page.screenshot({ path: testInfo.outputPath('spinner-settings-landscape.png') })
+      await page.getByRole('button', { name: 'もどす', exact: true }).click()
+      await page.getByRole('button', { name: 'もどす', exact: true }).click()
+    }
+    await page.getByRole('tab', { name: 'みち', exact: true }).click()
+    await page.getByRole('button', { name: 'ゴールを ついか', exact: true }).click()
+    await expect(page.getByText('3 / 36', { exact: true })).toBeVisible()
+    await roll.click()
+    await expect(page.getByTestId('marble-scene').getByRole('status')).toHaveText('⭐ ゴール！ やったね！', { timeout: 35_000 })
+    await page.setViewportSize({ width: 844, height: 390 })
+    await expect(roll).toBeInViewport()
+    await roll.click()
+    await expect(page.getByTestId('marble-scene').getByRole('status')).toHaveText('⭐ ゴール！ やったね！', { timeout: 35_000 })
+    expect(errors).toEqual([])
+  })
+}
+
+test('keyboard builds a booster-jump course and touch drags a gadget without switching tabs', async ({ page }, testInfo) => {
+  const errors = capturePageErrors(page)
+  await page.goto('/games/marble-course')
+  const roll = page.getByRole('button', { name: 'ビーだま ころがす！', exact: true })
+  await expect(roll).toBeEnabled({ timeout: 20_000 })
+  await page.getByRole('button', { name: 'クリア', exact: true }).click()
+  await page.getByRole('button', { name: 'まっすぐを ついか', exact: true }).press('Enter')
+  await page.getByRole('tab', { name: 'みち', exact: true }).press('ArrowRight')
+  await page.getByRole('button', { name: 'びゅーんを ついか', exact: true }).press('Enter')
+  await page.getByRole('button', { name: 'ジャンプを ついか', exact: true }).press('Enter')
+  await page.getByRole('tab', { name: 'しかけ', exact: true }).press('ArrowLeft')
+  await page.getByRole('button', { name: 'ゴールを ついか', exact: true }).press('Enter')
+  await roll.click()
+  await expect(page.getByTestId('marble-scene').getByRole('status')).toHaveText('⭐ ゴール！ やったね！', { timeout: 20_000 })
+  await page.getByRole('tab', { name: 'しかけ', exact: true }).click()
+  const source = (await page.getByRole('button', { name: 'くるくるを ついか', exact: true }).boundingBox())!
+  const scene = (await page.getByTestId('marble-scene').boundingBox())!
+  const client = await page.context().newCDPSession(page)
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: source.x + source.width / 2, y: source.y + source.height / 2 }] })
+  await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: scene.x + scene.width * 0.3, y: scene.y + scene.height * 0.4 }] })
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await expect(page.getByText('5 / 36', { exact: true })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'しかけ', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await page.screenshot({ path: testInfo.outputPath('gadgets-touch.png') })
+  expect(errors).toEqual([])
+})
+
+test('keeps the full gadget palette responsive at the placement limit with reduced motion and CPU throttling', async ({ page }, testInfo) => {
+  test.setTimeout(90_000)
+  const errors = capturePageErrors(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/games/marble-course')
+  await expect(page.getByRole('button', { name: 'ビーだま ころがす！', exact: true })).toBeEnabled({ timeout: 20_000 })
+  await page.getByRole('tab', { name: 'しかけ', exact: true }).click()
+  const labels = ['ジャンプ', 'くるくる', 'ぐるぐる', 'びゅーん', 'ぎったん']
+  for (let i = 0; i < 35; i++) await page.getByRole('button', { name: `${labels[i % labels.length]}を ついか`, exact: true }).press('Enter')
+  await expect(page.getByText('36 / 36', { exact: true })).toBeVisible()
+  for (const label of labels) await expect(page.getByRole('button', { name: `${label}を ついか`, exact: true })).toBeDisabled()
+  const client = await page.context().newCDPSession(page)
+  await client.send('Emulation.setCPUThrottlingRate', { rate: 4 })
+  await page.getByRole('button', { name: 'ビーだま ころがす！', exact: true }).click()
+  const timing = await page.evaluate(() => new Promise<{ frames: number; p95FrameMs: number; maxFrameMs: number }>(resolve => {
+    const intervals: number[] = []
+    const start = performance.now()
+    let previous = start
+    const measure = (now: number) => {
+      intervals.push(now - previous)
+      previous = now
+      if (now - start < 2500) requestAnimationFrame(measure)
+      else {
+        intervals.sort((a, b) => a - b)
+        resolve({ frames: intervals.length, p95FrameMs: intervals[Math.floor(intervals.length * 0.95)]!, maxFrameMs: intervals.at(-1)! })
+      }
+    }
+    requestAnimationFrame(measure)
+  }))
+  await testInfo.attach('36-parts-4x-cpu-frame-timing', { body: JSON.stringify(timing), contentType: 'application/json' })
+  expect(timing.frames).toBeGreaterThan(10)
+  await page.getByRole('button', { name: 'つくるに もどる', exact: true }).click()
+  await client.send('Emulation.setCPUThrottlingRate', { rate: 1 })
+  await page.getByRole('button', { name: 'もどす', exact: true }).click()
+  await expect(page.getByText('35 / 36', { exact: true })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('maximum-course.png') })
+  expect(errors).toEqual([])
+})
