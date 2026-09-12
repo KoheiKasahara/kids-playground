@@ -17,7 +17,9 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
   const mechanisms = new Map<string, RAPIER.RigidBody>()
   const bars = new Map<string, RAPIER.Collider>()
   const spinners = course.parts.filter(part => part.kind === 'spinner')
-  const gadgets = course.parts.filter(part => ['spinner', 'seesaw', 'funnel'].includes(part.kind))
+  // Only the motor and the tipping board legitimately hold a nearly still ball; a funnel has
+  // nothing left to move it, so a ball resting there is stuck and must end the run like any track.
+  const gadgets = course.parts.filter(part => ['spinner', 'seesaw'].includes(part.kind))
   for (const part of course.parts) {
     const vertices = new Float32Array(geometries[part.kind].getAttribute('position').array)
     const indices = Uint32Array.from({ length: vertices.length / 3 }, (_, i) => i)
