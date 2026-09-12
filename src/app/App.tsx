@@ -19,6 +19,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/car-road-builder',
   '/games/car-road-builder/play',
   '/games/color-paint-puzzle',
+  '/games/crane-game',
   '/games/domino-flag',
   '/games/flag-roll-maze',
   '/games/flag-roll-maze/play',
