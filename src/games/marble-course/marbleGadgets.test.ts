@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { initializeRapier } from '../../physics/rapierLoader'
 import { createPartGeometries } from './marbleGeometry'
-import { appendPart, createPart, initialCourse, rotate, SEESAW_ANGLE, toLocal, toWorld, type Course, type GadgetKind } from './marbleModel'
+import { appendPart, createPart, FUNNEL_LIFT, initialCourse, rotate, SEESAW_ANGLE, toLocal, toWorld, type Course, type GadgetKind } from './marbleModel'
 import { createMarbleWorld, type MarbleEvent, type MarbleWorld, type RunStatus } from './marbleWorld'
 
 const geometries = createPartGeometries()
@@ -58,6 +58,26 @@ describe('physical gadgets', () => {
     }
   })
 
+  it('pours the funnel in over the rim, so a swirling ball never meets its own mouth', () => {
+    const course = courseFor('funnel')
+    const funnel = course.parts[1]!
+    const result = simulate(course)
+    expect(result.status).toBe('goal')
+    const path = result.path.map(point => toLocal(funnel, point))
+    const chuteLevel = FUNNEL_LIFT - 0.3
+    const entered = path.findIndex(point => point.y < chuteLevel && Math.hypot(point.x, point.z) < 2.4)
+    expect(entered).toBeGreaterThan(0)
+    const bowl = path.slice(entered).filter(point => point.y > -0.9)
+    expect(bowl.length).toBeGreaterThan(8)
+    for (const point of bowl) {
+      // The chute is the only thing at its height over the bowl, and the wall is unbroken.
+      expect(point.y, JSON.stringify(point)).toBeLessThan(chuteLevel)
+      expect(Math.hypot(point.x, point.z), JSON.stringify(point)).toBeLessThan(2.4)
+    }
+    // A bowl that holds a marble for half a minute is a stall, however pretty the spiral is.
+    expect(result.path.length * 0.1).toBeLessThan(16)
+  })
+
   it('keeps a ball landing anywhere on the funnel rim circling down to the hole', () => {
     let course: Course = { parts: [createPart('slope', 'start', { x: 0, y: 6, z: 0 })], startId: 'start' }
     course = appendPart(course, 'funnel', 'funnel', 'start')
@@ -66,7 +86,7 @@ describe('physical gadgets', () => {
     for (let degrees = 0; degrees < 360; degrees += 15) {
       const angle = degrees * Math.PI / 180
       const result = simulate(course, 0, run => {
-        run.ball.setTranslation(toWorld(funnel, { x: 2.1 * Math.cos(angle), y: 0.6, z: 2.1 * Math.sin(angle) }), true)
+        run.ball.setTranslation(toWorld(funnel, { x: 2.1 * Math.cos(angle), y: 0.35, z: 2.1 * Math.sin(angle) }), true)
         run.ball.setLinvel(rotate({ x: -3 * Math.sin(angle), y: 0, z: 3 * Math.cos(angle) }, funnel.rotation), true)
       })
       expect(result.status, `${degrees} degrees: ${JSON.stringify(toLocal(funnel, result.end))}`).toBe('goal')

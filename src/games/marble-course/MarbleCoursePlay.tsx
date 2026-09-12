@@ -1,8 +1,8 @@
-import { useCallback, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { getSharedAudioContext, isSoundEnabled, playTone, primeAudio } from '../../audio/sound'
-import { appendPart, BOARD_LIMIT, GADGET_HINTS, hasConnectedInput, initialCourse, isGadget, MAX_PARTS, PARTS, snapPart, type Course, type PartKind } from './marbleModel'
+import { appendPart, BOARD_LIMIT, GADGET_HINTS, hasConnectedInput, initialCourse, isGadget, MAX_PARTS, needsMoreHeight, PARTS, removePart, snapPart, type Course, type PartKind } from './marbleModel'
 import type { RunStatus } from './marbleWorld'
 import { useMarbleEngine } from './useMarbleEngine'
 import PartIcon from './PartIcon'
@@ -17,7 +17,14 @@ export default function MarbleCoursePlay() {
   const [sound, setSound] = useState(true)
   const [hint, setHint] = useState('パーツを つないで みよう！')
   const [category, setCategory] = useState<'paths' | 'gadgets'>('paths')
+  const [confirmingClear, setConfirmingClear] = useState(false)
   const seen = useRef(new Set<PartKind>())
+  // Wiping the whole board asks twice, and forgets the question if the next tap goes elsewhere.
+  useEffect(() => {
+    if (!confirmingClear) return
+    const timer = window.setTimeout(() => setConfirmingClear(false), 4000)
+    return () => window.clearTimeout(timer)
+  }, [confirmingClear])
   const play = useCallback((success: boolean) => {
     if (!sound || !isSoundEnabled()) return
     const ctx = getSharedAudioContext()
@@ -29,14 +36,18 @@ export default function MarbleCoursePlay() {
     setHistory(previous => [...previous.slice(-49), course])
     setCourse(next)
     setPhase('ready')
+    setConfirmingClear(false)
     setHint('つづきを つなごう！')
     const added = next.parts.find(part => !course.parts.some(previous => previous.id === part.id))
     if (added && isGadget(added.kind) && !seen.current.has(added.kind)) {
       seen.current.add(added.kind)
       setHint(GADGET_HINTS[added.kind])
     }
-    if (added && course.parts.length && !hasConnectedInput(added, course.parts)) setHint('ここに おいたよ。みちを つなぎなおそう！')
-  }, [course])
+    // Against the committed course: joining a piece can also lift everything else to make room.
+    if (added && course.parts.length && !hasConnectedInput(added, next.parts)) {
+      setHint(needsMoreHeight(course, added.kind, selectedId) ? 'たかさが いっぱい！ べつの ところに おいたよ' : 'ここに おいたよ。みちを つなぎなおそう！')
+    }
+  }, [course, selectedId])
   const onPhase = useCallback((next: RunStatus) => {
     setPhase(next)
     if (next === 'goal') play(true)
@@ -53,7 +64,7 @@ export default function MarbleCoursePlay() {
     if (next === course) { setHint('あいている ところへ うごかそう！'); return }
     commit(next)
     setSelectedId(next.parts.at(-1)!.id)
-    if (snapPart(next.parts.at(-1)!, course.parts).snapped) onSnap()
+    if (hasConnectedInput(next.parts.at(-1)!, next.parts)) onSnap()
   }
   const rotate = () => {
     if (!selected) return
@@ -69,8 +80,35 @@ export default function MarbleCoursePlay() {
     setCourse(previous)
     setHistory(items => items.slice(0, -1))
     setSelectedId(previous.parts.at(-1)?.id ?? null)
+    setConfirmingClear(false)
+  }
+  /** One tap removes only the chosen piece, so the whole course is never lost by mistake. */
+  const erase = () => {
+    if (!selected) return
+    stop()
+    const index = course.parts.findIndex(part => part.id === selectedId)
+    const next = removePart(course, selectedId)
+    commit(next)
+    setSelectedId(next.parts[Math.min(index, next.parts.length - 1)]?.id ?? null)
+    setHint(next.parts.length ? 'けしたよ。もどすで もどせるよ！' : 'パーツを つないで みよう！')
+  }
+  const eraseAll = () => {
+    if (!confirmingClear) {
+      setConfirmingClear(true)
+      setHint('ぜんぶ けす？ もういちど おしてね')
+      return
+    }
+    stop()
+    commit({ parts: [], startId: null })
+    setSelectedId(null)
+    setHint('ぜんぶ けしたよ。もどすで もどせるよ！')
   }
   const keyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!locked && selected && ['Delete', 'Backspace'].includes(event.key)) {
+      event.preventDefault()
+      erase()
+      return
+    }
     if (locked || !selected || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return
     event.preventDefault()
     const position = { ...selected.position }
@@ -89,7 +127,7 @@ export default function MarbleCoursePlay() {
       <h1 aria-label="3Dビーだまコースづくり"><span className={styles.marbleIcon} aria-hidden="true" />ビーだまコース</h1>
       <button type="button" className={styles.sound} aria-label="おと" aria-pressed={sound} onClick={() => { if (!sound) primeAudio(); setSound(value => !value) }}>{sound ? '🔊' : '🔇'}</button>
     </header>
-    <div className={styles.scene} ref={registerContainer} data-testid="marble-scene" role="application" aria-label="ビーだまの コース。パーツを ドラッグで うごかせるよ" tabIndex={0} onKeyDown={event => {
+    <div className={styles.scene} ref={registerContainer} data-testid="marble-scene" role="application" aria-label="ビーだまの コース。パーツを ドラッグで うごかせるよ。なにもない ところを なぞると カメラが うごき、ゆび2ほんで おおきさが かわるよ" tabIndex={0} onKeyDown={event => {
       keyboard(event)
       if (event.key === 'Enter' && selected && !locked) {
         const result = snapPart(selected, course.parts)
@@ -116,7 +154,8 @@ export default function MarbleCoursePlay() {
         <button type="button" disabled={locked || !selected} onClick={rotate}><span aria-hidden="true">↻</span>まわす</button>
         <button type="button" disabled={locked || !selected || selected.kind === 'goal'} aria-pressed={Boolean(selected && selectedId === course.startId)} onClick={() => { commit({ ...course, startId: selectedId }); setHint('ここから ころがすよ！') }}><span aria-hidden="true">🚩</span>スタート</button>
         <button type="button" disabled={locked || !history.length} onClick={undo}><span aria-hidden="true">↶</span>もどす</button>
-        <button type="button" disabled={locked || !course.parts.length} onClick={() => { stop(); commit({ parts: [], startId: null }); setSelectedId(null) }}><span aria-hidden="true">▤</span>クリア</button>
+        <button type="button" disabled={locked || !selected} onClick={erase}><span aria-hidden="true">🗑</span>けす</button>
+        <button type="button" className={styles.eraseAll} data-confirming={confirmingClear || undefined} disabled={locked || !course.parts.length} onClick={eraseAll}><span aria-hidden="true">⌫</span>{confirmingClear ? 'ほんとに？' : 'ぜんぶけす'}</button>
       </div>
       <div className={styles.tabs} role="tablist" aria-label="パーツの しゅるい">
         {(['paths', 'gadgets'] as const).map(value => <button type="button" role="tab" id={`tab-${value}`} key={value} aria-controls="part-palette" aria-selected={category === value} tabIndex={category === value ? 0 : -1} onClick={() => setCategory(value)} onKeyDown={event => {

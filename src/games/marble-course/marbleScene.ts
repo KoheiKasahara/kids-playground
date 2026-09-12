@@ -1,8 +1,11 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { createPartGeometries, seesawBoardGeometry } from './marbleGeometry'
-import { BALL_RADIUS, connectors, isGadget, launchPose, MAX_PARTS, PARTS, SEESAW_ANGLE, SEESAW_PIVOT, SPINNER_ANGLE, SPINNER_DROP, toLocal, toWorld, type Course, type Vec3 } from './marbleModel'
+import { BALL_RADIUS, BOARD_LIMIT, connectors, isGadget, launchPose, MAX_PARTS, PARTS, SEESAW_ANGLE, SEESAW_PIVOT, SPINNER_ANGLE, SPINNER_DROP, toLocal, toWorld, type Course, type Vec3 } from './marbleModel'
 import type { MarbleEvent, MechanismPose } from './marbleWorld'
+
+const MIN_ZOOM = 0.45
+const MAX_ZOOM = 3
 
 export function createMarbleScene(container: HTMLDivElement) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'low-power' })
@@ -25,6 +28,8 @@ export function createMarbleScene(container: HTMLDivElement) {
   const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 180)
   const target = new THREE.Vector3(0, 2, 0)
   const overviewTarget = target.clone()
+  // What the fingers dragged the view by, kept on top of whatever the course bounds fit to.
+  const panOffset = new THREE.Vector3()
   const cameraOffset = new THREE.Vector3(10, 15, 18)
   let viewSize = 14
   let overviewSize = 14
@@ -46,7 +51,7 @@ export function createMarbleScene(container: HTMLDivElement) {
   floor.position.y = -0.09
   floor.receiveShadow = true
   scene.add(floor)
-  const grid = new THREE.GridHelper(48, 24, '#bfcec1', '#d2ded2')
+  const grid = new THREE.GridHelper(BOARD_LIMIT * 2 + 4, BOARD_LIMIT + 2, '#bfcec1', '#d2ded2')
   grid.position.y = -0.075
   scene.add(grid)
   const geometries = createPartGeometries()
@@ -177,13 +182,16 @@ export function createMarbleScene(container: HTMLDivElement) {
   const fit = () => {
     const box = new THREE.Box3().setFromObject(root)
     if (box.isEmpty()) box.setFromCenterAndSize(new THREE.Vector3(0, 2, 0), new THREE.Vector3(6, 4, 6))
+    // A course stands on legs, so the ground belongs to it: centring on the track alone
+    // would leave as much empty sky above as there is stand below.
+    box.min.y = Math.min(box.min.y, 0)
     box.getCenter(overviewTarget)
     // Project all eight bounds corners onto the fixed camera basis, including elevated supports.
     camera.position.copy(overviewTarget).add(cameraOffset)
     camera.lookAt(overviewTarget)
     camera.updateMatrixWorld()
     let maxX = 0, maxY = 0
-    for (const x of [box.min.x, box.max.x]) for (const y of [0, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
       const v = new THREE.Vector3(x, y, z).applyMatrix4(camera.matrixWorldInverse)
       maxX = Math.max(maxX, Math.abs(v.x))
       maxY = Math.max(maxY, Math.abs(v.y))
@@ -251,7 +259,7 @@ export function createMarbleScene(container: HTMLDivElement) {
       }
       const ends = connectors(part)
       const feet = part.kind === 'goal' ? [ends[0]!.position, toWorld(part, { x: 0.55, y: -0.4, z: 0 })] : ends.map(end => end.position)
-      if (part.kind === 'funnel') for (const x of [-1.4, 1.4]) for (const z of [-1.4, 1.4]) feet.push(toWorld(part, { x, y: -0.05, z }))
+      if (part.kind === 'funnel') for (const x of [-1.6, 1.6]) for (const z of [-1.6, 1.6]) feet.push(toWorld(part, { x, y: -0.1, z }))
       if (part.kind === 'seesaw' || part.kind === 'spinner') for (const z of [-1, 1]) feet.push(toWorld(part, { x: 0, y: part.kind === 'seesaw' ? SEESAW_PIVOT : -SPINNER_DROP / 2, z: z * (part.kind === 'seesaw' ? 1.1 : 2.2) }))
       for (const foot of feet) {
         dummy.position.set(foot.x * 0.85 + part.position.x * 0.15, (foot.y - 0.2) / 2, foot.z * 0.85 + part.position.z * 0.15)
@@ -318,7 +326,7 @@ export function createMarbleScene(container: HTMLDivElement) {
     if (count) overlap.computeBoundingSphere()
   }
   function render(follow: Vec3 | null, reducedMotion: boolean) {
-    const destination = follow && !reducedMotion ? new THREE.Vector3(follow.x, Math.max(1, follow.y), follow.z) : overviewTarget
+    const destination = follow && !reducedMotion ? new THREE.Vector3(follow.x, Math.max(1, follow.y), follow.z) : overviewTarget.clone().add(panOffset)
     target.lerp(destination, reducedMotion ? 1 : 0.08)
     const nearJump = follow && current.parts.some(part => part.kind === 'jump' && Math.abs(toLocal(part, follow).x) < 4 && Math.abs(toLocal(part, follow).z) < 2)
     viewSize += ((follow && !reducedMotion ? Math.max(nearJump ? 11 : 8, (nearJump ? 12 : 9) / aspect) * (nearJump ? Math.max(1, zoom) : 1) : overviewSize) - viewSize) * (reducedMotion ? 1 : 0.08)
@@ -356,8 +364,23 @@ export function createMarbleScene(container: HTMLDivElement) {
       const part = current.parts.find(item => item.id === event.id)
       if (part && boostGlow.visible) { boostGlow.position.copy(part.position); boostGlow.rotation.y = -part.rotation * Math.PI / 2 }
     },
-    zoom(delta: number) { zoom = THREE.MathUtils.clamp(zoom + delta, 0.65, 2); projection() },
-    overview() { zoom = 1; fit() },
+    zoom(delta: number) { zoom = THREE.MathUtils.clamp(zoom + delta, MIN_ZOOM, MAX_ZOOM); projection() },
+    /** Pinching scales what is already on screen, so the same gesture works at any zoom. */
+    zoomBy(factor: number) { zoom = THREE.MathUtils.clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM); projection() },
+    /** Drags the board under the fingers: screen pixels become ground distance at the current zoom. */
+    pan(dx: number, dy: number) {
+      const perPixel = viewSize / zoom / Math.max(container.clientHeight, 1)
+      camera.updateMatrixWorld()
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+      const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
+      // Screen-up runs into the board, so only the part of it that lies on the ground counts.
+      const ground = new THREE.Vector3(up.x, 0, up.z)
+      const lean = Math.max(0.25, ground.length())
+      panOffset.addScaledVector(right, -dx * perPixel).addScaledVector(ground.normalize(), dy * perPixel / lean)
+      panOffset.x = THREE.MathUtils.clamp(panOffset.x, -BOARD_LIMIT, BOARD_LIMIT)
+      panOffset.z = THREE.MathUtils.clamp(panOffset.z, -BOARD_LIMIT, BOARD_LIMIT)
+    },
+    overview() { zoom = 1; panOffset.set(0, 0, 0); fit() },
     dispose() {
       observer.disconnect()
       for (const item of Object.values(geometries)) item.dispose()

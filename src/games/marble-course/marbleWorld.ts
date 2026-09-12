@@ -6,6 +6,8 @@ export type RunStatus = 'rolling' | 'goal' | 'ready'
 export type MechanismPose = { id: string; position: Vec3; rotation: { x: number; y: number; z: number; w: number } }
 export type MarbleEvent = { id: string; kind: 'takeoff' | 'land' | 'boost' | 'hit'; position: Vec3 }
 const yaw = (angle: number) => ({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) })
+/** How quickly a bowl bleeds a swirling ball's energy: a few laps, not a minute of orbiting. */
+const FUNNEL_DRAG = 1.2
 
 /** All paths remain physical surfaces. Only the motor and a bounded, contact-triggered boost supply energy. */
 export function createMarbleWorld(course: Course, geometries: Record<PartKind, BufferGeometry>, offset = 0) {
@@ -24,11 +26,16 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
     const vertices = new Float32Array(geometries[part.kind].getAttribute('position').array)
     const indices = Uint32Array.from({ length: vertices.length / 3 }, (_, i) => i)
     const angle = -part.rotation * Math.PI / 2
+    // The funnel swallows the drop from its raised mouth instead of turning it into more
+    // orbiting: a lively bounce there keeps a ball circling the bowl long after it should
+    // have drained.
+    const funnel = part.kind === 'funnel'
     surfaces.set(part.id, world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices)
       .setTranslation(part.position.x, part.position.y, part.position.z)
       .setRotation({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) })
       .setCollisionGroups(0x00020001)
-      .setFriction(part.kind === 'funnel' ? 0.28 : 0.18).setRestitution(0.12)))
+      .setRestitutionCombineRule(funnel ? RAPIER.CoefficientCombineRule.Min : RAPIER.CoefficientCombineRule.Average)
+      .setFriction(funnel ? 0.28 : 0.18).setRestitution(funnel ? 0.02 : 0.12)))
     if (part.kind === 'spinner') {
       const p = toWorld(part, { x: 0, y: 0.34 - SPINNER_DROP / 2, z: 0.3 })
       const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(p.x, p.y, p.z).setRotation(yaw(angle + SPINNER_ANGLE)))
@@ -65,6 +72,7 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
   const goals = course.parts.filter(part => part.kind === 'goal')
   const boosters = course.parts.filter(part => part.kind === 'booster')
   const jumps = course.parts.filter(part => part.kind === 'jump')
+  const funnels = course.parts.filter(part => part.kind === 'funnel')
   const boosted = new Set<string>()
   const airborne = new Set<string>()
   const lastHit = new Map<string, number>()
@@ -95,6 +103,13 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
       world.step()
       elapsed += world.timestep
       const p = ball.translation()
+      // Rolling resistance inside a bowl. A polished sphere on a polished bowl keeps orbiting for
+      // far longer than a child will watch, and nothing else in the funnel takes that energy away.
+      const swirling = funnels.some(part => {
+        const local = toLocal(part, p)
+        return Math.hypot(local.x, local.z) < 2.5 && local.y > -0.9 && local.y < 0.7
+      })
+      ball.setAngularDamping(swirling ? FUNNEL_DRAG : 0.035)
       for (const part of boosters) {
         const local = toLocal(part, p)
         if (Math.abs(local.x) > 2.5 || Math.abs(local.z) > 1.2 || local.y > 1.2 || local.y < -0.5) boosted.delete(part.id)

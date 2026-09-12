@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendPart, canPlace, connectors, createPart, hasConnectedInput, initialCourse, launchPose, MAX_PARTS, openConnectors, snapPart, toLocal, toWorld, type Course } from './marbleModel'
+import { appendPart, BOARD_LIMIT, BUILD_HEIGHT, canPlace, connectors, createPart, FUNNEL_INLET_Z, FUNNEL_LIFT, hasConnectedInput, initialCourse, launchPose, MAX_HEIGHT, MAX_PARTS, needsMoreHeight, openConnectors, removePart, snapPart, SNAP_RADIUS, toLocal, toWorld, type Course } from './marbleModel'
 
 describe('marble course placement', () => {
   it('snaps all four orientations and inherits height at the mouth', () => {
@@ -20,24 +20,24 @@ describe('marble course placement', () => {
   it('builds rising and falling courses with slopes, without a height control', () => {
     const initial = initialCourse()
     const downhill = appendPart(initial, 'slope', 'down', 'part-0')
-    expect(downhill.parts[1]!.position.y).toBeCloseTo(0.8)
-    const uphill = { ...createPart('slope', 'up', { x: 4.1, y: 2.4, z: 0 }), rotation: 2 }
+    expect(downhill.parts[1]!.position.y).toBeCloseTo(BUILD_HEIGHT - 1.6)
+    const uphill = { ...createPart('slope', 'up', { x: 4.1, y: BUILD_HEIGHT, z: 0 }), rotation: 2 }
     const result = snapPart(uphill, initial.parts)
     expect(result.snapped).toBe(true)
     const upperEnd = connectors(result.part)[0]!.position
-    expect(upperEnd.y).toBeCloseTo(4)
+    expect(upperEnd.y).toBeCloseTo(BUILD_HEIGHT + 1.6)
   })
   it('keeps occupied mouths unavailable and rejects incompatible headings', () => {
     const first = initialCourse()
     const course = appendPart(first, 'straight', 'a', 'part-0')
     expect(openConnectors(course.parts)).toHaveLength(2)
     expect(snapPart(createPart('straight', 'b', course.parts[1]!.position), course.parts).snapped).toBe(false)
-    expect(snapPart({ ...createPart('straight', 'b', { x: 4, y: 2.4, z: 0 }), rotation: 1 }, first.parts).snapped).toBe(false)
+    expect(snapPart({ ...createPart('straight', 'b', { x: 4, y: BUILD_HEIGHT, z: 0 }), rotation: 1 }, first.parts).snapped).toBe(false)
   })
   it('releases old connections on a move and leaves the previous course immutable', () => {
     const initial = initialCourse()
     const next = appendPart(initial, 'curve', 'c', 'part-0')
-    const moved = next.parts.map(part => part.id === 'c' ? { ...part, position: { x: 12, y: 2.4, z: 12 } } : part)
+    const moved = next.parts.map(part => part.id === 'c' ? { ...part, position: { x: 12, y: BUILD_HEIGHT, z: 12 } } : part)
     expect(openConnectors(moved)).toHaveLength(4)
     expect(initial.parts).toHaveLength(1)
     expect(next.parts[1]!.position.x).toBe(4)
@@ -85,14 +85,52 @@ describe('marble course placement', () => {
   })
   it('rejects out-of-height funnel snaps and finds clear alternatives at board edges', () => {
     const low = createPart('straight', 'low', { x: 0, y: 1, z: 0 })
-    const funnel = createPart('funnel', 'f', { x: 5, y: 2.4, z: 1.65 })
+    const funnel = createPart('funnel', 'f', { x: 5, y: 1 - FUNNEL_LIFT, z: -FUNNEL_INLET_Z })
+    // Dragging never moves anything but the piece in hand, so the floor still rejects this one.
     expect(snapPart(funnel, [low]).snapped).toBe(false)
-    const course: Course = { parts: [createPart('straight', 'edge', { x: 19, y: 2.4, z: 0 })], startId: 'edge' }
+    expect(needsMoreHeight(initialCourse(), 'funnel', 'part-0')).toBe(false)
+    const course: Course = { parts: [createPart('straight', 'edge', { x: BOARD_LIMIT - 4, y: BUILD_HEIGHT, z: 0 })], startId: 'edge' }
     const one = appendPart(course, 'jump', 'one', 'edge')
     const two = appendPart(one, 'jump', 'two', 'edge')
     for (const part of two.parts.slice(1)) expect(canPlace(part)).toBe(true)
     expect(hasConnectedInput(one.parts[1]!, course.parts)).toBe(false)
+    expect(needsMoreHeight(course, 'jump', 'edge')).toBe(false)
     expect(two.parts[1]!.position).not.toEqual(two.parts[2]!.position)
     expect(createPart('straight', 'plain')).not.toHaveProperty('settings')
+  })
+  it('joins a rough drop from the palette by turning it, and keeps placed headings as chosen', () => {
+    const initial = initialCourse()
+    const exit = connectors(initial.parts[0]!)[1]!.position
+    // A piece dropped past the mouth, facing the wrong way: only a palette piece may turn to fit.
+    const loose = { ...createPart('curve', 'c', { x: exit.x + 1.6, y: BUILD_HEIGHT, z: exit.z + 0.9 }), rotation: 2 }
+    expect(snapPart(loose, initial.parts).snapped).toBe(false)
+    const turned = snapPart(loose, initial.parts, { turn: true })
+    expect(turned.snapped).toBe(true)
+    expect(hasConnectedInput(turned.part, initial.parts)).toBe(true)
+    // Far from any mouth nothing clicks, however forgiving the radius is.
+    expect(snapPart({ ...loose, position: { x: exit.x + SNAP_RADIUS + 3, y: BUILD_HEIGHT, z: 0 } }, initial.parts, { turn: true }).snapped).toBe(false)
+  })
+  it('lifts the whole course to make room for a drop, and only gives up at the ceiling', () => {
+    const low: Course = { parts: [createPart('straight', 'low', { x: 0, y: 1, z: 0 })], startId: 'low' }
+    const joined = appendPart(low, 'funnel', 'f', 'low')
+    expect(hasConnectedInput(joined.parts[1]!, joined.parts)).toBe(true)
+    // The track that was already there rose with it, so nothing came apart underneath.
+    expect(joined.parts[0]!.position.y).toBeGreaterThan(1)
+    expect(joined.parts.every(canPlace)).toBe(true)
+    expect(needsMoreHeight(low, 'funnel', 'low')).toBe(false)
+    const tall: Course = { parts: [...low.parts, createPart('straight', 'tall', { x: 12, y: MAX_HEIGHT - 0.2, z: 0 })], startId: 'low' }
+    expect(needsMoreHeight(tall, 'funnel', 'low')).toBe(true)
+    expect(hasConnectedInput(appendPart(tall, 'funnel', 'f', 'low').parts.at(-1)!, tall.parts)).toBe(false)
+  })
+  it('removes a single piece and hands the start flag to a piece that can still roll', () => {
+    let course = appendPart(initialCourse(), 'straight', 'a', 'part-0')
+    course = appendPart(course, 'goal', 'goal', 'a')
+    expect(removePart(course, 'missing')).toBe(course)
+    const withoutStart = removePart(course, 'part-0')
+    expect(withoutStart.parts.map(part => part.id)).toEqual(['a', 'goal'])
+    expect(withoutStart.startId).toBe('a')
+    expect(removePart(withoutStart, 'a').startId).toBeNull()
+    expect(removePart(course, 'goal').startId).toBe('part-0')
+    expect(course.parts).toHaveLength(3)
   })
 })
