@@ -29,7 +29,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       # テスト定義を変えたPRだけ先行検証する。普段はNightlyで実行。
       - run: npx playwright test e2e/representative-3d.nightly.spec.ts e2e/piano-landscape.nightly.spec.ts --workers=1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: representative-gameplay-results

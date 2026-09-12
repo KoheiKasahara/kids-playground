@@ -8,7 +8,9 @@ export type HistoryLoadState =
   | { status: 'loading' }
   | { status: 'ready'; entries: ProjectHealthHistoryEntry[]; updatedAt: string | null }
 
-const HISTORY_URL = `${import.meta.env.BASE_URL}project-health/history.json`
+const HISTORY_URL = import.meta.env.DEV
+  ? `${import.meta.env.BASE_URL}project-health/history.json`
+  : 'https://raw.githubusercontent.com/KoheiKasahara/kids-playground/project-health-history/public/project-health/history.json'
 
 export function useProjectHealthHistory(): HistoryLoadState {
   const [state, setState] = useState<HistoryLoadState>({ status: 'loading' })

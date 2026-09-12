@@ -1,10 +1,6 @@
-import { lazy } from 'react'
 import { Navigate, type RouteObject } from 'react-router-dom'
 import GamePlaySurface from '../../components/GamePlaySurface'
-
-const Start = lazy(() => import('./ColorMixQuizStart'))
-const Play = lazy(() => import('./ColorMixQuizPlay'))
-const Result = lazy(() => import('./ColorMixQuizResult'))
+import { Play, Result, Start } from './routeComponents'
 
 // このゲーム内の相対URLを所有する。Suspense/読込失敗UIはAppの共通境界を使う。
 export const colorMixQuizRoutes: RouteObject[] = [
