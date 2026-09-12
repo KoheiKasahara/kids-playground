@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { initializeRapier } from '../../physics/rapierLoader'
 import { createPartGeometries } from './marbleGeometry'
-import { appendPart, createPart, initialCourse, SEESAW_ANGLE, toLocal, toWorld, type Course, type GadgetKind } from './marbleModel'
-import { createMarbleWorld, type MarbleEvent, type RunStatus } from './marbleWorld'
+import { appendPart, createPart, initialCourse, rotate, SEESAW_ANGLE, toLocal, toWorld, type Course, type GadgetKind } from './marbleModel'
+import { createMarbleWorld, type MarbleEvent, type MarbleWorld, type RunStatus } from './marbleWorld'
 
 const geometries = createPartGeometries()
 beforeAll(async () => { await initializeRapier() })
@@ -14,8 +14,9 @@ function courseFor(kind: GadgetKind, rotation = 0): Course {
   return appendPart(appendPart(initial, kind, 'gadget', 'part-0'), 'goal', 'goal', 'gadget')
 }
 
-function simulate(course: Course, offset = 0) {
+function simulate(course: Course, offset = 0, place?: (run: MarbleWorld) => void) {
   const run = createMarbleWorld(course, geometries, offset)!
+  place?.(run)
   const events: MarbleEvent[] = []
   const path: { x: number; y: number; z: number }[] = []
   let status: RunStatus = 'rolling'
@@ -44,6 +45,34 @@ describe('physical gadgets', () => {
       }
     })
   }
+  it('drains the funnel at every entry speed instead of stopping beside its mouth', () => {
+    let course: Course = { parts: [createPart('straight', 'start', { x: 0, y: 6, z: 0 })], startId: 'start' }
+    course = appendPart(course, 'funnel', 'funnel', 'start')
+    course = appendPart(course, 'goal', 'goal', 'funnel')
+    const funnel = course.parts[1]!
+    // A flat feed hands the bowl every speed, not just a slope's. A slow ball circles for
+    // a long time before the hole takes it, which is exactly when it used to find a way out.
+    for (const speed of [1, 2, 3.5, 5, 7]) for (const offset of [-0.4, 0, 0.4]) {
+      const result = simulate(course, offset, run => run.ball.setLinvel({ x: speed, y: 0, z: 0 }, true))
+      expect(result.status, `speed ${speed}, offset ${offset}: ${JSON.stringify(toLocal(funnel, result.end))}`).toBe('goal')
+    }
+  })
+
+  it('keeps a ball landing anywhere on the funnel rim circling down to the hole', () => {
+    let course: Course = { parts: [createPart('slope', 'start', { x: 0, y: 6, z: 0 })], startId: 'start' }
+    course = appendPart(course, 'funnel', 'funnel', 'start')
+    course = appendPart(course, 'goal', 'goal', 'funnel')
+    const funnel = course.parts[1]!
+    for (let degrees = 0; degrees < 360; degrees += 15) {
+      const angle = degrees * Math.PI / 180
+      const result = simulate(course, 0, run => {
+        run.ball.setTranslation(toWorld(funnel, { x: 2.1 * Math.cos(angle), y: 0.6, z: 2.1 * Math.sin(angle) }), true)
+        run.ball.setLinvel(rotate({ x: -3 * Math.sin(angle), y: 0, z: 3 * Math.cos(angle) }, funnel.rotation), true)
+      })
+      expect(result.status, `${degrees} degrees: ${JSON.stringify(toLocal(funnel, result.end))}`).toBe('goal')
+    }
+  })
+
   it('boosts a straight start into a physical jump', () => {
     let course: Course = { parts: [createPart('straight', 'start')], startId: 'start' }
     course = appendPart(course, 'booster', 'boost', 'start')
