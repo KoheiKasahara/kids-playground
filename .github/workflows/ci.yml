@@ -129,7 +129,7 @@ jobs:
       - name: Project Health - download Nightly E2E smoke report
         if: always() && steps.project-health-context.outputs.nightly_run_id != ''
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: project-health-e2e-nightly
           run-id: ${{ steps.project-health-context.outputs.nightly_run_id }}
@@ -139,7 +139,7 @@ jobs:
       - name: Project Health - download Nightly Lighthouse report
         if: always() && steps.project-health-context.outputs.nightly_run_id != ''
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: project-health-lighthouse-nightly
           run-id: ${{ steps.project-health-context.outputs.nightly_run_id }}

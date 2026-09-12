@@ -104,7 +104,7 @@ jobs:
       - name: Upload Nightly E2E report for Project Health
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: project-health-e2e-nightly
           path: project-health-e2e-nightly.json
@@ -124,7 +124,7 @@ jobs:
       - name: Upload Lighthouse report for Project Health
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: project-health-lighthouse-nightly
           path: project-health/lighthouse-summary.json
@@ -165,9 +165,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/project-health/fetch-github-context.mjs
 
+      # main は PR と build check を必須にしているため、履歴は専用ブランチに保存する。
+      # 前回値を復元してから当日分を追記し、Dashboard はこのブランチの raw JSON を読む。
+      - name: Project Health - restore history
+        if: always()
+        shell: bash
+        run: |
+          if git ls-remote --exit-code --heads origin project-health-history >/dev/null 2>&1; then
+            git fetch --no-tags origin project-health-history:refs/remotes/origin/project-health-history
+            git show origin/project-health-history:public/project-health/history.json > public/project-health/history.json
+          else
+            echo "No existing Project Health history branch; starting from the repository seed."
+          fi
+
       - name: Project Health - write history
         if: always()
-        continue-on-error: true
         env:
           PROJECT_HEALTH_NIGHTLY_LINT_OUTCOME: ${{ steps.lint.outcome }}
           PROJECT_HEALTH_NIGHTLY_TEST_OUTCOME: ${{ steps.test.outcome }}
@@ -175,17 +187,24 @@ jobs:
           PROJECT_HEALTH_NIGHTLY_E2E_OUTCOME: ${{ steps.e2e.outcome }}
         run: node scripts/project-health/write-history.mjs
 
-      # 履歴は public/project-health/history.json（リポジトリ内・機械可読なJSON）に
-      # 保存し、Nightly完了時のみ main へコミットする。通常PRのCIはこのファイルを
-      # 読むだけで書き込まないため、PRごとの履歴コミットは発生しない。
-      # public/ 配下に置くことで、通常のビルド・デプロイでそのまま
-      # GitHub Pages上の静的データとしても配信され、将来のPhase 4 Web Dashboardが
-      # 追加のAPI呼び出し無しで取得できる。
-      # コミット/pushに失敗しても（例: ブランチ保護等）Nightly自体は失敗させない。
+      # 履歴は専用の project-health-history ブランチへ fast-forward push する。
+      # main の ruleset を迂回せず、履歴保存に失敗した場合も握りつぶさない。
       - name: Project Health - commit history
         if: always()
-        continue-on-error: true
+        shell: bash
         run: |
+          history_file=public/project-health/history.json
+          history_copy="$RUNNER_TEMP/project-health-history.json"
+          cp "$history_file" "$history_copy"
+          git restore --worktree "$history_file"
+
+          if git show-ref --verify --quiet refs/remotes/origin/project-health-history; then
+            git switch --force-create project-health-history origin/project-health-history
+          else
+            git switch --create project-health-history
+          fi
+          cp "$history_copy" "$history_file"
+
           if [ -z "$(git status --porcelain public/project-health/history.json)" ]; then
             echo "No history changes to commit"
             exit 0
@@ -194,11 +213,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add public/project-health/history.json
           git commit -m "chore(project-health): update history $(date -u +%Y-%m-%d)"
-          for attempt in 1 2 3; do
-            if git pull --rebase origin main && git push origin HEAD:main; then
-              exit 0
-            fi
-            echo "push attempt $attempt failed, retrying..."
-            sleep 5
-          done
-          echo "::warning::Project Health history commit could not be pushed (see logs). Nightly itself is not affected."
+          git push origin HEAD:project-health-history
