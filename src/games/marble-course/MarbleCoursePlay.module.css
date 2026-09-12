@@ -15,10 +15,13 @@
 .sceneFooter { position: absolute; bottom: 12px; left: 14px; right: 14px; display: flex; justify-content: space-between; gap: 10px; color: #576f63; font-size: 11px; font-weight: 700; pointer-events: none; }
 .sceneFooter span { padding: 5px 9px; background: #f9fceecc; border-radius: 12px; }
 .workbench { flex: 0 0 auto; display: grid; gap: 11px; width: min(100%, 850px); margin: 0 auto; }
-.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.tools button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 46px; padding: 4px; border: 1px solid #e3e4d6; border-radius: 14px; background: #fffef7; color: #47605e; font-size: 12px; font-weight: 800; }
-.tools button span { font-size: 23px; }
+.tools { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+.tools button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 50px; padding: 4px 2px; border: 1px solid #e3e4d6; border-radius: 14px; background: #fffef7; color: #47605e; font-size: 11px; font-weight: 800; }
+.tools button span { font-size: 21px; line-height: 1.1; }
 .tools button[aria-pressed="true"] { border-color: #efc077; background: #fff2d5; }
+/* Wiping everything looks and reads different from the single-piece eraser beside it. */
+.tools button.eraseAll { border-color: #e9c3b4; background: #fff6f2; color: #a2563a; }
+.tools button.eraseAll[data-confirming] { border-color: #c96a45; background: #f8ddd1; color: #8e3f24; }
 .palette { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
 .palette button { display: flex; flex-direction: column; align-items: center; padding: 4px 2px 9px; border: 1px solid color-mix(in srgb, var(--part-color) 50%, white); border-radius: 17px; background: color-mix(in srgb, var(--part-color) 10%, #fffef8); box-shadow: 0 3px 0 color-mix(in srgb, var(--part-color) 25%, #e4e5d9); color: var(--part-color); touch-action: none; }
 .palette svg { width: clamp(42px, 9vw, 64px); height: clamp(42px, 9vw, 64px); }
@@ -43,6 +46,6 @@
 .success strong { font-size: 76px; animation: celebrate 0.6s ease-out both; }
 .success span { font-size: 38px; animation: celebrate 0.85s ease-out both; }
 @keyframes celebrate { from { transform: translateY(18px) scale(0.3) rotate(-20deg); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
-@media (max-width: 430px) { .page { gap: 7px; padding-left: calc(8px + var(--safe-left)); padding-right: calc(8px + var(--safe-right)); } .header { flex-basis: 56px; } .header h1 .marbleIcon { display: none; } .palette { gap: 6px; } .workbench { gap: 9px; } .tools { gap: 6px; } .tools button { font-size: 11px; } }
-@media (orientation: landscape) and (max-height: 600px) { .page { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: 44px minmax(0, 1fr); gap: 5px 10px; } .header { grid-column: 1 / -1; } .header h1 { font-size: 19px; } .scene { min-height: 0; } .workbench { align-self: center; gap: 7px; max-height: 100%; overflow-y: auto; padding-bottom: 5px; } .tools { gap: 5px; } .tools button { flex-direction: column; gap: 0; min-height: 44px; font-size: 11px; } .tools button span { font-size: 18px; line-height: 1; } .tabs { padding: 2px; } .tabs button { min-height: 40px; } .palette { gap: 5px; } .palette svg { width: 43px; height: 43px; } .palette button { padding-bottom: 6px; } .roll { min-height: 48px; font-size: 14px !important; gap: 7px; } .settings button { font-size: 12px; } }
+@media (max-width: 430px) { .page { gap: 7px; padding-left: calc(8px + var(--safe-left)); padding-right: calc(8px + var(--safe-right)); } .header { flex-basis: 56px; } .header h1 .marbleIcon { display: none; } .palette { gap: 6px; } .workbench { gap: 9px; } .tools { gap: 5px; } .tools button { font-size: 10px; } .tools button span { font-size: 19px; } }
+@media (orientation: landscape) and (max-height: 600px) { .page { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: 44px minmax(0, 1fr); gap: 5px 10px; } .header { grid-column: 1 / -1; } .header h1 { font-size: 19px; } .scene { min-height: 0; } .workbench { align-self: center; gap: 7px; max-height: 100%; overflow-y: auto; padding-bottom: 5px; } .tools { gap: 5px; } .tools button { gap: 0; min-height: 44px; font-size: 10px; } .tools button span { font-size: 18px; line-height: 1; } .tabs { padding: 2px; } .tabs button { min-height: 40px; } .palette { gap: 5px; } .palette svg { width: 43px; height: 43px; } .palette button { padding-bottom: 6px; } .roll { min-height: 48px; font-size: 14px !important; gap: 7px; } .settings button { font-size: 12px; } }
 @media (prefers-reduced-motion: reduce) { .success strong, .success span { animation: none; } }

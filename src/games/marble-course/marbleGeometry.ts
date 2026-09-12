@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { FUNNEL_DROP, SPINNER_DROP, type PartKind, type Vec3 } from './marbleModel'
+import { FUNNEL_DROP, FUNNEL_INLET_Z, FUNNEL_LIFT, SPINNER_DROP, type PartKind, type Vec3 } from './marbleModel'
 
 type PathPoint = Vec3 & { nx: number; nz: number; width?: number }
 
@@ -186,39 +186,42 @@ function trayGeometry(): THREE.BufferGeometry {
   return sweep([pathPoint(-3), pathPoint(-1.7, -SPINNER_DROP * 1.3 / 6, 2.8), pathPoint(1.7, -SPINNER_DROP * 4.7 / 6, 2.8), pathPoint(3, -SPINNER_DROP)])
 }
 
-const FUNNEL_INLET_Z = -1.4
-const FUNNEL_INLET_END = -1.15
-// The inlet trough is swept at the standard half width, so its floor covers exactly this strip.
-const FUNNEL_INLET_HALF_WIDTH = 0.82
+// A narrowed spout lets the mouth end well inside the rim: a ball riding either wall of the
+// chute still lands on the bowl floor rather than over its edge.
+const FUNNEL_SPOUT_WIDTH = 0.6
+const FUNNEL_INLET_END = -1.1
 const FUNNEL_BOWL_SEGMENTS = 80
 
-/** The hole is left open; the receiving trough below slopes toward its lower connector. */
+/**
+ * A chute that crosses over the rim, an unbroken bowl, and a receiving trough under the hole.
+ * The chute pours the ball in from above instead of reaching into the bowl through a gap in
+ * the wall: a circling ball has nothing to run into and no way back out, so it keeps swirling
+ * down to the hole however fast it arrived.
+ */
 function funnelGeometry(): THREE.BufferGeometry {
-  const inlet = sweep([pathPoint(-3, 0, 1, FUNNEL_INLET_Z), pathPoint(FUNNEL_INLET_END, 0, 1, FUNNEL_INLET_Z)])
-  const receiverStart = pathPoint(-0.95, -1.12, 1.45)
-  const receiver = sweep([receiverStart, pathPoint(0.9, -1.35, 1.45), pathPoint(3, -FUNNEL_DROP)])
+  const inlet = sweep([
+    pathPoint(-3, FUNNEL_LIFT, 1, FUNNEL_INLET_Z),
+    pathPoint(-1.8, FUNNEL_LIFT, 1, FUNNEL_INLET_Z),
+    pathPoint(FUNNEL_INLET_END, FUNNEL_LIFT, FUNNEL_SPOUT_WIDTH, FUNNEL_INLET_Z),
+  ])
+  const receiverStart = pathPoint(-1.05, -1.28, 1.45)
+  const receiver = sweep([receiverStart, pathPoint(0.9, -1.42, 1.45), pathPoint(3, -FUNNEL_DROP)])
   const vertices: number[] = []
   const groups: { start: number; count: number; material: number }[] = []
-  const rings = [[0.48, -0.6], [0.75, -0.55], [1.1, -0.44], [1.5, -0.25], [1.95, -0.035], [2.25, 0.12], [2.3, 0.55], [2.43, 0.58], [2.48, 0.48], [2.48, -0.1]]
+  // The last step into the hole is the steepest, so a slow ball can never settle beside it.
+  const rings = [[0.5, -0.62], [0.78, -0.48], [1.1, -0.34], [1.5, -0.2], [1.95, -0.05], [2.25, 0.06], [2.3, 0.6], [2.43, 0.64], [2.48, 0.54], [2.48, -0.2]]
   const point = (ring: number[], a: number): Vec3 => ({ x: ring[0]! * Math.cos(a), y: ring[1]!, z: ring[0]! * Math.sin(a) })
-  // The rim opens over the inlet trough and nowhere else: the trough floor spans this
-  // whole strip, so the ball always rolls in on a surface. A wider notch used to leave
-  // the bare bowl edge exposed beside the mouth, where a circling ball could perch on
-  // the lip and never reach the hole (or drop off the bowl altogether).
-  const underInlet = (p: Vec3) => p.x < FUNNEL_INLET_END && Math.abs(p.z - FUNNEL_INLET_Z) < FUNNEL_INLET_HALF_WIDTH
   for (let i = 0; i < FUNNEL_BOWL_SEGMENTS; i++) {
     const a = i * 2 * Math.PI / FUNNEL_BOWL_SEGMENTS, b = (i + 1) * 2 * Math.PI / FUNNEL_BOWL_SEGMENTS
     for (let j = 0; j < rings.length - 1; j++) {
-      const corners = [point(rings[j]!, a), point(rings[j]!, b), point(rings[j + 1]!, b), point(rings[j + 1]!, a)]
-      // Drop a whole face as soon as it touches the mouth, so no sliver of wall is left standing in the trough.
-      if (j >= 4 && corners.some(underInlet)) continue
       groups.push({ start: vertices.length / 3, count: 6, material: j >= 5 ? 0 : 1 })
-      quad(vertices, corners[0]!, corners[1]!, corners[2]!, corners[3]!)
+      quad(vertices, point(rings[j]!, a), point(rings[j]!, b), point(rings[j + 1]!, b), point(rings[j + 1]!, a))
     }
   }
   const bowl = geometry(vertices)
   for (const group of groups) bowl.addGroup(group.start, group.count, group.material)
-  // The ball still circles once it has dropped, so the receiver needs a back: its upstream mouth is a way out.
+  // A ball dropping through the hole still carries its swirl, so the receiver needs a back:
+  // its upstream mouth is a way out.
   return combine([inlet, bowl, receiver, endWall(receiverStart)])
 }
 

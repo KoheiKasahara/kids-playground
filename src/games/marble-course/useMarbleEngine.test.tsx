@@ -1,7 +1,7 @@
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
-import { initialCourse } from './marbleModel'
+import { BUILD_HEIGHT, initialCourse } from './marbleModel'
 import { owningPartId, useMarbleEngine } from './useMarbleEngine'
 
 const mocks = vi.hoisted(() => ({ initialize: vi.fn<() => Promise<void>>(), createScene: vi.fn(), createWorld: vi.fn() }))
@@ -14,7 +14,7 @@ beforeEach(() => {
   mocks.createScene.mockReset().mockImplementation((host: HTMLDivElement) => {
     const canvas = document.createElement('canvas')
     host.appendChild(canvas)
-    return { renderer: { domElement: canvas }, camera: new THREE.OrthographicCamera(), root: new THREE.Group(), ball: new THREE.Mesh(), geometries: {}, update: vi.fn(), select: vi.fn(), render: vi.fn(), zoom: vi.fn(), overview: vi.fn(), syncMechanisms: vi.fn(), effect: vi.fn(), dispose: vi.fn(() => canvas.remove()) }
+    return { renderer: { domElement: canvas }, camera: new THREE.OrthographicCamera(), root: new THREE.Group(), ball: new THREE.Mesh(), geometries: {}, update: vi.fn(), select: vi.fn(), render: vi.fn(), zoom: vi.fn(), zoomBy: vi.fn(), pan: vi.fn(), overview: vi.fn(), syncMechanisms: vi.fn(), effect: vi.fn(), dispose: vi.fn(() => canvas.remove()) }
   })
   mocks.createWorld.mockReset().mockImplementation(() => ({ step: vi.fn(() => 'rolling'), consumeEvents: () => [], mechanismPoses: () => [], ball: { translation: () => ({ x: 1, y: 3, z: 0 }), rotation: () => ({ x: 0, y: 0, z: 0, w: 1 }) }, dispose: vi.fn() }))
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frame = callback; return 1 })
@@ -24,15 +24,15 @@ afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 function setup() {
   let engine!: ReturnType<typeof useMarbleEngine>
-  const onCommit = vi.fn(), onPhase = vi.fn()
+  const onCommit = vi.fn(), onPhase = vi.fn(), onSelect = vi.fn()
   const course = initialCourse()
   function Harness() {
-    engine = useMarbleEngine({ course, selectedId: 'part-0', onCommit, onPhase, onSelect: vi.fn(), onSnap: vi.fn() })
+    engine = useMarbleEngine({ course, selectedId: 'part-0', onCommit, onPhase, onSelect, onSnap: vi.fn() })
     const { registerContainer } = engine
     return <div ref={registerContainer} />
   }
   const result = render(<Harness />)
-  return { ...result, current: () => engine, onCommit, onPhase }
+  return { ...result, current: () => engine, onCommit, onPhase, onSelect }
 }
 
 it('owns one world per run and disposes worlds, scene and RAF on stop/exit', async () => {
@@ -127,5 +127,27 @@ it('projects a palette drag onto the board and commits its snapped height once',
   expect(app.onCommit).not.toHaveBeenCalled()
   act(() => window.dispatchEvent(pointer('pointerup', 290, 200)))
   expect(app.onCommit).toHaveBeenCalledOnce()
-  expect(app.onCommit.mock.calls[0]![0].parts[1].position).toEqual({ x: 4, y: 2.4, z: 0 })
+  expect(app.onCommit.mock.calls[0]![0].parts[1].position).toEqual({ x: 4, y: BUILD_HEIGHT, z: 0 })
+})
+
+it('drags the camera on empty board and pinches to zoom, without touching the course', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 400, width: 400, height: 400, toJSON: () => ({}) })
+  const app = setup()
+  await waitFor(() => expect(app.current().status).toBe('ready'))
+  const scene = mocks.createScene.mock.results[0]!.value
+  const canvas = document.querySelector('canvas')!
+  const pointer = (type: string, id: number, x: number, y: number) => Object.assign(new Event(type, { bubbles: true }), { pointerId: id, clientX: x, clientY: y, button: 0, isPrimary: id === 1 }) as PointerEvent
+  // Nothing is under the first finger, so dragging moves the view and clears the selection.
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 1, 100, 100)))
+  expect(app.onSelect).toHaveBeenLastCalledWith(null)
+  act(() => window.dispatchEvent(pointer('pointermove', 1, 130, 160)))
+  expect(scene.pan).toHaveBeenCalledWith(30, 60)
+  // A second finger takes over as a pinch: the spread doubles, and its middle keeps panning.
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 2, 130, 260)))
+  act(() => window.dispatchEvent(pointer('pointermove', 2, 130, 360)))
+  expect(scene.zoomBy).toHaveBeenCalledWith(2)
+  expect(scene.pan).toHaveBeenLastCalledWith(0, 50)
+  act(() => window.dispatchEvent(pointer('pointerup', 1, 130, 160)))
+  act(() => window.dispatchEvent(pointer('pointerup', 2, 130, 360)))
+  expect(app.onCommit).not.toHaveBeenCalled()
 })

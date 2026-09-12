@@ -28,16 +28,23 @@ export const GADGET_HINTS: Record<GadgetKind, string> = {
   seesaw: 'ビーだまが のると ぎったん！',
 }
 export const isGadget = (kind: PartKind): kind is GadgetKind => kind in GADGET_HINTS
-export const FUNNEL_DROP = 1.65
+/** The mouth sits above the bowl rim, so a circling ball can never meet the piece it came in on. */
+export const FUNNEL_LIFT = 0.9
+export const FUNNEL_INLET_Z = -1.4
+export const FUNNEL_DROP = 1.55
 export const SEESAW_ANGLE = 0.1
 export const SEESAW_PIVOT = 0.12
 export const SPINNER_ANGLE = Math.PI / 4
 export const SPINNER_DROP = 0.45
 export const MAX_PARTS = 36
 export const BALL_RADIUS = 0.27
-export const MIN_HEIGHT = 0.7
-export const MAX_HEIGHT = 12
-export const BOARD_LIMIT = 22
+export const MIN_HEIGHT = 0.5
+export const MAX_HEIGHT = 14
+export const BOARD_LIMIT = 28
+/** New pieces start high enough that several drops still fit above the floor. */
+export const BUILD_HEIGHT = 5.4
+/** Small hands aim roughly, so a mouth within half a piece still clicks together. */
+export const SNAP_RADIUS = 2.4
 
 export function rotate(v: Vec3, rotation: number): Vec3 {
   const a = rotation * Math.PI / 2
@@ -55,7 +62,8 @@ export function toLocal(part: MarblePart, point: Vec3): Vec3 {
 
 export function connectors(part: MarblePart): Connector[] {
   const length = isGadget(part.kind) && part.kind !== 'booster' ? 3 : 2
-  const ends: Connector[] = [{ position: { x: -length, y: part.kind === 'slope' ? 1.6 : 0, z: part.kind === 'funnel' ? -1.4 : 0 }, direction: { x: -1, y: 0, z: 0 } }]
+  const mouth = part.kind === 'slope' ? 1.6 : part.kind === 'funnel' ? FUNNEL_LIFT : 0
+  const ends: Connector[] = [{ position: { x: -length, y: mouth, z: part.kind === 'funnel' ? FUNNEL_INLET_Z : 0 }, direction: { x: -1, y: 0, z: 0 } }]
   if (part.kind === 'curve') ends.push({ position: { x: 0, y: 0, z: 2 }, direction: { x: 0, y: 0, z: 1 } })
   else if (part.kind === 'branch') {
     for (const z of [-2, 2]) ends.push({ position: { x: 2, y: 0, z }, direction: { x: 1, y: 0, z: 0 } })
@@ -72,10 +80,17 @@ function footprint(part: MarblePart): { x: number; z: number } {
   return part.rotation % 2 === 0 ? { x: halfLength, z: halfWidth } : { x: halfWidth, z: halfLength }
 }
 
-export function canPlace(part: MarblePart): boolean {
+function insideBoard(part: MarblePart): boolean {
   const size = footprint(part)
-  const insideBoard = Math.abs(part.position.x) + size.x <= BOARD_LIMIT && Math.abs(part.position.z) + size.z <= BOARD_LIMIT
-  return insideBoard && connectors(part).every(end => end.position.y >= MIN_HEIGHT - 1e-6 && end.position.y <= MAX_HEIGHT + 1e-6)
+  return Math.abs(part.position.x) + size.x <= BOARD_LIMIT && Math.abs(part.position.z) + size.z <= BOARD_LIMIT
+}
+
+function insideHeights(part: MarblePart): boolean {
+  return connectors(part).every(end => end.position.y >= MIN_HEIGHT - 1e-6 && end.position.y <= MAX_HEIGHT + 1e-6)
+}
+
+export function canPlace(part: MarblePart): boolean {
+  return insideBoard(part) && insideHeights(part)
 }
 
 /** A loose placement stays available for experiments, but never silently changes a connector height. */
@@ -89,55 +104,105 @@ export function openConnectors(parts: readonly MarblePart[], omitId?: string): C
   return others.flatMap(part => connectors(part).filter(end => !others.some(other => other.id !== part.id && connectors(other).some(candidate => distance(end.position, candidate.position) < 0.08 && opposite(end.direction, candidate.direction)))))
 }
 
-/** Height is inherited only from a connector; dragging itself always stays on a horizontal plane. */
-export function snapPart(part: MarblePart, parts: readonly MarblePart[], radius = 1.65): { part: MarblePart; snapped: boolean } {
+/**
+ * Height is inherited only from a connector; dragging itself always stays on a horizontal plane.
+ * `turn` lets a piece that has no chosen heading yet — one still coming out of the palette —
+ * pick the heading that fits, so a rough drop alone is enough to join a course.
+ */
+export function snapPart(part: MarblePart, parts: readonly MarblePart[], options: { radius?: number; turn?: boolean } = {}): { part: MarblePart; snapped: boolean } {
+  const headings = options.turn ? [0, 1, 2, 3].map(step => (part.rotation + step) % 4) : [part.rotation]
   let best: MarblePart | undefined
-  let bestDistance = radius
+  let bestDistance = options.radius ?? SNAP_RADIUS
   for (const target of openConnectors(parts, part.id)) {
-    for (const end of connectors(part)) {
-      if (!opposite(end.direction, target.direction)) continue
-      const d = Math.hypot(end.position.x - target.position.x, end.position.z - target.position.z)
-      const position = {
-        x: part.position.x + target.position.x - end.position.x,
-        y: part.position.y + target.position.y - end.position.y,
-        z: part.position.z + target.position.z - end.position.z,
-      }
-      if (d < bestDistance && canPlace({ ...part, position })) {
-        best = { ...part, position }
-        bestDistance = d
+    for (const rotation of headings) {
+      const turned = { ...part, rotation }
+      for (const end of connectors(turned)) {
+        if (!opposite(end.direction, target.direction)) continue
+        // The gap the piece has to cross to click on: a rough drop nearby still joins.
+        const d = Math.hypot(end.position.x - target.position.x, end.position.z - target.position.z)
+        const position = {
+          x: turned.position.x + target.position.x - end.position.x,
+          y: turned.position.y + target.position.y - end.position.y,
+          z: turned.position.z + target.position.z - end.position.z,
+        }
+        if (d < bestDistance && canPlace({ ...turned, position })) {
+          best = { ...turned, position }
+          bestDistance = d
+        }
       }
     }
   }
   return { part: best ?? part, snapped: Boolean(best) }
 }
 
-export function createPart(kind: PartKind, id: string, position: Vec3 = { x: 0, y: 2.4, z: 0 }): MarblePart {
+export function createPart(kind: PartKind, id: string, position: Vec3 = { x: 0, y: BUILD_HEIGHT, z: 0 }): MarblePart {
   return kind === 'spinner' ? { id, kind, position, rotation: 0, settings: { speed: 'slow', reverse: false } } : { id, kind, position, rotation: 0 }
+}
+
+/** The mouth a tap continues from: the selected piece's own exit, otherwise the newest open one. */
+function joinTarget(course: Course, selectedId: string | null): Connector | undefined {
+  const selected = course.parts.find(item => item.id === selectedId)
+  const ends = openConnectors(course.parts)
+  const preferred = selected ? connectors(selected).slice(1).find(end => ends.some(open => distance(open.position, end.position) < 0.01)) : undefined
+  return preferred ?? ends.at(-1)
+}
+
+/** Every heading that would meet the mouth, before board limits decide which of them fit. */
+function joinPoses(part: MarblePart, target: Connector): MarblePart[] {
+  const poses: MarblePart[] = []
+  for (let rotation = 0; rotation < 4; rotation++) {
+    const candidate = { ...part, rotation }
+    const input = connectors(candidate)[0]!
+    if (!opposite(input.direction, target.direction)) continue
+    poses.push({ ...candidate, position: {
+      x: candidate.position.x + target.position.x - input.position.x,
+      y: candidate.position.y + target.position.y - input.position.y,
+      z: candidate.position.z + target.position.z - input.position.z,
+    } })
+  }
+  return poses
+}
+
+/**
+ * The board has a floor but plenty of sky, so a piece whose drop would sink under the floor
+ * takes the whole course up with it instead of refusing to join. Every piece keeps its place
+ * relative to the others, so nothing that was connected comes apart.
+ */
+function liftToFit(course: Course, addition: MarblePart): MarblePart[] | null {
+  const lift = MIN_HEIGHT - Math.min(...connectors(addition).map(end => end.position.y))
+  if (lift <= 0) return null
+  const raise = (part: MarblePart): MarblePart => ({ ...part, position: { ...part.position, y: part.position.y + lift } })
+  const parts = [...course.parts.map(raise), raise(addition)]
+  return parts.every(canPlace) ? parts : null
+}
+
+/** A piece fits the open mouth, but not even lifting the course keeps it on the board. */
+export function needsMoreHeight(course: Course, kind: PartKind, selectedId: string | null): boolean {
+  const target = joinTarget(course, selectedId)
+  if (!target) return false
+  const poses = joinPoses(createPart(kind, 'probe'), target)
+  return poses.length > 0 && poses.every(pose => insideBoard(pose) && !insideHeights(pose) && !liftToFit(course, pose))
 }
 
 /** A palette tap also connects a piece, so building is possible without precision dragging. */
 export function appendPart(course: Course, kind: PartKind, id: string, selectedId: string | null): Course {
   if (course.parts.length >= MAX_PARTS) return course
   const part = createPart(kind, id)
-  const selected = course.parts.find(item => item.id === selectedId)
-  const ends = openConnectors(course.parts)
-  const preferred = selected ? connectors(selected).slice(1).find(end => ends.some(open => distance(open.position, end.position) < 0.01)) : undefined
-  const target = preferred ?? ends.at(-1)
-  let placed = part
-  if (target) {
-    for (let rotation = 0; rotation < 4; rotation++) {
-      const candidate = { ...part, rotation }
-      const input = connectors(candidate)[0]!
-      if (!opposite(input.direction, target.direction)) continue
-      const position = { x: target.position.x - input.position.x, y: target.position.y - input.position.y + part.position.y, z: target.position.z - input.position.z }
-      if (canPlace({ ...candidate, position })) placed = { ...candidate, position }
+  const target = joinTarget(course, selectedId)
+  const poses = target ? joinPoses(part, target) : []
+  let placed = poses.filter(canPlace).at(-1) ?? part
+  if (placed === part) {
+    for (const pose of poses.filter(insideBoard)) {
+      const lifted = liftToFit(course, pose)
+      if (lifted) return { parts: lifted, startId: course.startId ?? (kind === 'goal' ? null : id) }
     }
   }
   if (placed === part && course.parts.length) {
     // Preview a clear alternative, even for a closed course. Never pile rejected taps at the origin.
     const candidates: MarblePart[] = []
     const size = footprint(part)
-    for (let x = -18; x <= 18; x += 6) for (let z = -18; z <= 18; z += 6) candidates.push({ ...part, position: { x, y: 2.4, z } })
+    const span = Math.floor((BOARD_LIMIT - 4) / 6) * 6
+    for (let x = -span; x <= span; x += 6) for (let z = -span; z <= span; z += 6) candidates.push({ ...part, position: { x, y: BUILD_HEIGHT, z } })
     const clear = candidates.filter(candidate => canPlace(candidate) && course.parts.every(other => {
       const otherSize = footprint(other)
       return Math.abs(other.position.x - candidate.position.x) >= size.x + otherSize.x - 0.01 || Math.abs(other.position.z - candidate.position.z) >= size.z + otherSize.z - 0.01
@@ -146,6 +211,13 @@ export function appendPart(course: Course, kind: PartKind, id: string, selectedI
     placed = clear
   }
   return { parts: [...course.parts, placed], startId: course.startId ?? (kind === 'goal' ? null : id) }
+}
+
+/** Removing one piece keeps the rest of the course, and hands the flag to a piece that can still roll. */
+export function removePart(course: Course, id: string | null): Course {
+  if (!id || !course.parts.some(part => part.id === id)) return course
+  const parts = course.parts.filter(part => part.id !== id)
+  return { parts, startId: course.startId === id ? parts.find(part => part.kind !== 'goal')?.id ?? null : course.startId }
 }
 
 export function launchPose(course: Course, offset = 0): { position: Vec3; velocity: Vec3 } | null {

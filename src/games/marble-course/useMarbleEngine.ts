@@ -17,6 +17,8 @@ export type EngineOptions = {
   onEvent?: (event: MarbleEvent) => void
 }
 type Drag = { pointerId: number; x: number; y: number; original: Course; part: MarblePart; offset: THREE.Vector3; moved: boolean; palette: boolean; snapped: boolean }
+/** A one-finger drag on empty board, or the two-finger spread that also zooms. */
+type View = { pointerId: number | null; x: number; y: number; spread: number }
 type Runtime = { scene: MarbleScene; run: MarbleWorld | null; drag: Drag | null; dirty: number; phase: RunStatus; accumulator: number }
 
 export function owningPartId(object: THREE.Object3D | undefined): string | undefined {
@@ -100,13 +102,27 @@ export function useMarbleEngine(options: EngineOptions) {
       pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1)
       raycaster.setFromCamera(pointer, rt.scene.camera)
     }
+    const pointers = new Map<number, { x: number; y: number }>()
+    let view: View | null = null
+    const spread = (): View | null => {
+      const [a, b] = [...pointers.values()]
+      return a && b ? { pointerId: null, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, spread: Math.hypot(a.x - b.x, a.y - b.y) } : null
+    }
     const down = (event: PointerEvent) => {
-      if (event.button !== 0 || rt.phase === 'rolling' || rt.drag) return
+      if (event.button !== 0) return
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      // Two fingers always mean the camera, so a piece caught by the first one is put back.
+      if (pointers.size === 2) { cancelDrag(); view = spread(); return }
+      if (pointers.size > 2 || view || rt.phase === 'rolling' || rt.drag) return
       ray(event)
       const hit = raycaster.intersectObjects(rt.scene.root.children, true)[0]
       const part = latest.current.course.parts.find(item => item.id === owningPartId(hit?.object))
       latest.current.onSelect(part?.id ?? null)
-      if (!part) return
+      if (!part) {
+        // Empty board under the finger: drag the view instead of nothing.
+        view = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, spread: 0 }
+        return
+      }
       plane.constant = -part.position.y
       if (!raycaster.ray.intersectPlane(plane, planePoint)) return
       rt.drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, original: latest.current.course, part, offset: new THREE.Vector3().copy(part.position).sub(planePoint), moved: false, palette: false, snapped: false }
@@ -114,6 +130,16 @@ export function useMarbleEngine(options: EngineOptions) {
       rt.dirty = 90
     }
     const move = (event: PointerEvent) => {
+      if (pointers.has(event.pointerId)) pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (view) {
+        const next = view.pointerId === null ? spread() : view.pointerId === event.pointerId ? { ...view, x: event.clientX, y: event.clientY } : null
+        if (!next) return
+        if (view.spread > 0 && next.spread > 0) rt.scene.zoomBy(next.spread / view.spread)
+        rt.scene.pan(next.x - view.x, next.y - view.y)
+        view = next
+        rt.dirty = 90
+        return
+      }
       const drag = rt.drag
       if (!drag || event.pointerId !== drag.pointerId) return
       if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 7 && !drag.moved) return
@@ -123,7 +149,7 @@ export function useMarbleEngine(options: EngineOptions) {
       plane.constant = -drag.part.position.y
       if (!raycaster.ray.intersectPlane(plane, planePoint)) return
       const position = planePoint.clone().add(drag.offset)
-      const result = snapPart({ ...drag.part, position: { x: THREE.MathUtils.clamp(position.x, -BOARD_LIMIT, BOARD_LIMIT), y: drag.part.position.y, z: THREE.MathUtils.clamp(position.z, -BOARD_LIMIT, BOARD_LIMIT) } }, drag.original.parts)
+      const result = snapPart({ ...drag.part, position: { x: THREE.MathUtils.clamp(position.x, -BOARD_LIMIT, BOARD_LIMIT), y: drag.part.position.y, z: THREE.MathUtils.clamp(position.z, -BOARD_LIMIT, BOARD_LIMIT) } }, drag.original.parts, { turn: drag.palette })
       drag.moved = true
       drag.snapped = result.snapped
       const parts = drag.palette ? [...drag.original.parts, result.part] : drag.original.parts.map(part => part.id === drag.part.id ? result.part : part)
@@ -134,6 +160,11 @@ export function useMarbleEngine(options: EngineOptions) {
     }
     let preview: MarblePart | null = null
     const finish = (event: PointerEvent) => {
+      pointers.delete(event.pointerId)
+      if (view && (view.pointerId === null || view.pointerId === event.pointerId)) {
+        view = pointers.size === 2 ? spread() : null
+        return
+      }
       const drag = rt.drag
       if (!drag || event.pointerId !== drag.pointerId) return
       rt.drag = null
@@ -151,7 +182,7 @@ export function useMarbleEngine(options: EngineOptions) {
         const next = appendPart(drag.original, drag.part.kind, drag.part.id, latest.current.selectedId)
         latest.current.onCommit(next)
         latest.current.onSelect(drag.part.id)
-        if (snapPart(next.parts.at(-1)!, drag.original.parts).snapped) latest.current.onSnap()
+        if (hasConnectedInput(next.parts.at(-1)!, next.parts)) latest.current.onSnap()
       }
       preview = null
       rt.dirty = 90
@@ -164,15 +195,22 @@ export function useMarbleEngine(options: EngineOptions) {
       rt.scene.update(latest.current.course, latest.current.selectedId)
       rt.dirty = 90
     }
-    const visibility = () => { if (document.hidden) cancelDrag(); redraw() }
+    const release = () => { pointers.clear(); view = null; cancelDrag() }
+    const visibility = () => { if (document.hidden) release(); redraw() }
     const lostContext = (event: Event) => { event.preventDefault(); setStatus('error') }
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault()
+      rt.scene.zoomBy(Math.exp(-event.deltaY * 0.0016))
+      rt.dirty = 90
+    }
     const canvas = rt.scene.renderer.domElement
     canvas.addEventListener('pointerdown', down)
+    canvas.addEventListener('wheel', wheel, { passive: false })
     canvas.addEventListener('webglcontextlost', lostContext)
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
-    window.addEventListener('blur', cancelDrag)
+    window.addEventListener('blur', release)
     window.addEventListener('lostpointercapture', cancelDrag)
     window.addEventListener('resize', redraw)
     document.addEventListener('visibilitychange', visibility)
@@ -180,11 +218,12 @@ export function useMarbleEngine(options: EngineOptions) {
       disposed = true
       cancelAnimationFrame(frame)
       canvas.removeEventListener('pointerdown', down)
+      canvas.removeEventListener('wheel', wheel)
       canvas.removeEventListener('webglcontextlost', lostContext)
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
-      window.removeEventListener('blur', cancelDrag)
+      window.removeEventListener('blur', release)
       window.removeEventListener('lostpointercapture', cancelDrag)
       window.removeEventListener('resize', redraw)
       document.removeEventListener('visibilitychange', visibility)
