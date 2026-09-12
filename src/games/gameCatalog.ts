@@ -676,6 +676,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       howToPlay: ['ステージを えらんで、せんで みちを かこう', 'せんは なんぼんでも かけるよ。スタートで ボールが コロコロ！', 'ほしを ひろって ゴールに はいったら クリア。なんどでも やりなおせるよ'],
     },
   },
+  {
+    id: 'crane-game',
+    slug: 'crane-game',
+    title: 'クレーンゲーム',
+    emoji: '🧸',
+    category: 'threeD',
+    seo: {
+      headline: 'クレーンゲーム｜アームでぬいぐるみをキャッチ',
+      description: 'アームを よこ・おくへ動かしてねらいを決め、ぬいぐるみやカプセルをつかむ3Dクレーンゲームです。景品は物理演算で動くので、つかみ方によってはすべり落ちます。',
+    },
+    intro: {
+      howToPlay: [
+        'よこ・おくの ボタンで アームを うごかすよ',
+        'つかむを おすと アームが おりて けいひんを つかむよ',
+        'あなの うえで はなすと けいひんが とれるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
