@@ -11,10 +11,35 @@
 .areaPainted {
   transform-box: fill-box;
   transform-origin: center;
-  animation: areaPaintPop 280ms ease-out both;
 }
 
-@keyframes areaPaintPop {
+.areaPaintedOdd {
+  animation: areaPaintPopOdd 280ms ease-out both;
+}
+
+.areaPaintedEven {
+  animation: areaPaintPopEven 280ms ease-out both;
+}
+
+/* 同じエリアを続けて塗ったときも、図形DOMを差し替えずanimationだけ再起動する。 */
+@keyframes areaPaintPopOdd {
+  0% {
+    filter: brightness(1.28) saturate(1.08);
+    transform: scale(0.97);
+  }
+
+  45% {
+    filter: brightness(1.12) saturate(1.04);
+    transform: scale(1.025);
+  }
+
+  100% {
+    filter: brightness(1) saturate(1);
+    transform: scale(1);
+  }
+}
+
+@keyframes areaPaintPopEven {
   0% {
     filter: brightness(1.28) saturate(1.08);
     transform: scale(0.97);

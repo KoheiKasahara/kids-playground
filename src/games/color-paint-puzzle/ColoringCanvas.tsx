@@ -96,13 +96,16 @@ export default function ColoringCanvas({
 
   for (const area of picture.areas) {
     const showingFeedback = interactive && feedbackAreaId === area.id
+    const feedbackAnimation = feedbackSequence % 2 === 0
+      ? styles.areaPaintedEven
+      : styles.areaPaintedOdd
     items.push({
       motion: area.motion,
       element: (
         <ShapeNode
-          key={`${area.id}-fill-${showingFeedback ? feedbackSequence : 'steady'}`}
+          key={`${area.id}-fill`}
           shape={area.shape}
-          className={`${interactive ? styles.area : styles.areaLocked} ${showingFeedback ? styles.areaPainted : ''}`}
+          className={`${interactive ? styles.area : styles.areaLocked} ${showingFeedback ? `${styles.areaPainted} ${feedbackAnimation}` : ''}`}
           data-area-id={area.id}
           data-paint-feedback={showingFeedback ? feedbackSequence : undefined}
           fill={areaFillColor(painted, area.id)}

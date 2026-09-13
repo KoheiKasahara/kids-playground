@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -91,7 +91,9 @@ describe('ColorPaintPuzzlePlay', () => {
     await user.click(getAreaButton('くるまの ボディ'))
     expect(getAreaButton('くるまの ボディ')).toHaveAttribute('fill', '#e8453c')
 
-    await user.click(screen.getByRole('button', { name: 'みどり' }))
+    const green = screen.getByRole('button', { name: 'みどり' })
+    await user.click(green)
+    await waitFor(() => expect(green).toHaveAttribute('aria-pressed', 'true'))
     await user.click(getAreaButton('くるまの ボディ'))
     expect(getAreaButton('くるまの ボディ')).toHaveAttribute('fill', '#37b24d')
   })
