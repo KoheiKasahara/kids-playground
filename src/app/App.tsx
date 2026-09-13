@@ -32,6 +32,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/planet-globe',
   '/games/puni-slime',
   '/games/pukupuka-rescue',
+  '/games/putter-golf',
   '/games/rail-builder',
   '/games/snowball-roll',
   '/games/treasure-dig',
