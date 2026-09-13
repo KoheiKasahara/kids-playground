@@ -694,6 +694,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'treasure-dig',
+    slug: 'treasure-dig',
+    title: 'ざくざく たからほり',
+    emoji: '⛏️',
+    category: 'learning',
+    seo: {
+      headline: 'ざくざく たからほり｜砂と水を動かして宝を集めるドット絵パズル',
+      description: '指でなぞって砂を掘り、くずれる砂や流れる水にのせて宝を宝箱へ運ぶ幼児向けのドット絵パズルです。石ですべり台を作ったり、水をかけて宝を押し流したり。10のステージを自分のやり方で遊べます。',
+    },
+    intro: {
+      howToPlay: [
+        'すなや つちを なぞって ほると、たからが おちてくるよ',
+        'いしで すべりだいを つくったり、みずで ながしたり できるよ',
+        'たからばこが いっぱいに なったら クリア！',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

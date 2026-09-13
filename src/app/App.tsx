@@ -34,6 +34,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/pukupuka-rescue',
   '/games/rail-builder',
   '/games/snowball-roll',
+  '/games/treasure-dig',
   '/games/tsumiki-bowling',
 ])
 
