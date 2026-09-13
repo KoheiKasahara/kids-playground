@@ -52,9 +52,13 @@ function playable(index: number) {
     world,
     dig: (from: [number, number], to: [number, number], tool: Tool = 'dig', radius = 5) =>
       world.stroke(at(...from), at(...to), tool, radius),
-    settle: (steps: number) => { for (let i = 0; i < steps; i++) world.step() },
+    settle: (steps: number) => { for (let i = 0; i < steps && !world.cleared; i++) world.step() },
     pour: (column: number, row: number, frames: number) => {
-      for (let frame = 0; frame < frames; frame++) { world.apply(at(column, row), 'water', 5); world.step(); world.step() }
+      for (let frame = 0; frame < frames && !world.cleared; frame++) {
+        world.apply(at(column, row), 'water', 5)
+        world.step()
+        if (!world.cleared) world.step()
+      }
     },
   }
 }
