@@ -712,6 +712,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'putter-golf',
+    slug: 'putter-golf',
+    title: 'パターゴルフ',
+    emoji: '⛳',
+    category: 'threeD',
+    seo: {
+      headline: 'パターゴルフ｜ひっぱって うつ3Dミニゴルフ',
+      description: 'はらっぱ・うみべ・おつきさまの3コース9ホールを回る、幼児向けの3Dパターゴルフです。画面をひっぱって はなすとボールが転がり、坂やバンパー、ふうしゃ、ジャンプ台で物理演算のとおりに動きます。',
+    },
+    intro: {
+      howToPlay: [
+        'ボールの まわりを ひっぱって はなすと うてるよ',
+        'ボタンで むきと つよさを えらんでも うてるよ',
+        'カップに はいったら つぎの ホールへ！',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
