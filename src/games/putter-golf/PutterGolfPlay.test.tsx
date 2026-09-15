@@ -69,9 +69,10 @@ describe('パターゴルフの画面', () => {
     expect(screen.getByRole('button', { name: 'うつ！' })).toBeDisabled()
   })
 
-  test('3ホールを回ると成績が出て、いちばん多い★を覚える', async () => {
+  test('コースの ホールを ぜんぶ回ると成績が出て、いちばん多い★を覚える', async () => {
     const user = userEvent.setup()
     renderGame()
+    const holes = engine.options!.course.holes.length
     await user.click(screen.getByRole('button', { name: 'スタート！' }))
     holeIn(2)
     const result = screen.getByRole('region', { name: 'カップイン' })
@@ -84,14 +85,21 @@ describe('パターゴルフの画面', () => {
     expect(screen.getByText('ホールインワン！')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'つぎの ホールへ ▶' }))
     holeIn(6)
+    // 3ホールめまでで ★3+★3+★1。のこりのホールは めやすどおりの ★3 でうめる。
+    let stars = 7
+    for (let index = 2; index < holes - 1; index++) {
+      await user.click(screen.getByRole('button', { name: 'つぎの ホールへ ▶' }))
+      holeIn(engine.options!.course.holes[index + 1]!.par)
+      stars += 3
+    }
     await user.click(screen.getByRole('button', { name: 'けっかを みる ▶' }))
     const card = screen.getByRole('region', { name: 'けっか' })
     expect(within(card).getByText(/はらっぱコース クリア/)).toBeInTheDocument()
-    expect(within(card).getAllByRole('row')).toHaveLength(4)
-    expect(within(card).getByLabelText('ほし 7こ')).toBeInTheDocument()
+    expect(within(card).getAllByRole('row')).toHaveLength(holes + 1)
+    expect(within(card).getByLabelText(`ほし ${stars}こ`)).toBeInTheDocument()
     expect(within(card).getByText('🎉 さいこう きろく！')).toBeInTheDocument()
     await user.click(within(card).getByRole('button', { name: 'コースを えらぶ' }))
-    expect(screen.getByText('さいこう 7/9 ★')).toBeInTheDocument()
+    expect(screen.getByText(`さいこう ${stars}/${holes * 3} ★`)).toBeInTheDocument()
   })
 
   test('おたすけは5回うってから使え、水に落ちたら ひとこと出る', async () => {

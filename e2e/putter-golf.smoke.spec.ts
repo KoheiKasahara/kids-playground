@@ -59,7 +59,7 @@ test('コースを選んで ひっぱって打ち、3ホールを回ってスコ
   await expect(scene).toHaveAttribute('data-camera', 'overview')
   await page.getByRole('button', { name: 'ボールを みる', exact: true }).click()
 
-  for (const [index, next] of [[1, 'meadow-2'], [2, 'meadow-3'], [3, null]] as const) {
+  for (const [index, next] of [[1, 'meadow-2'], [2, 'meadow-3'], [3, 'meadow-4'], [4, null]] as const) {
     await playHole(page)
     await page.screenshot({ path: `test-results/putter-golf-hole${index}.png` })
     if (next) {
@@ -72,11 +72,11 @@ test('コースを選んで ひっぱって打ち、3ホールを回ってスコ
   }
   const card = page.getByRole('region', { name: 'けっか', exact: true })
   await expect(card.getByText(/はらっぱコース クリア/)).toBeVisible()
-  await expect(card.getByRole('row')).toHaveCount(4)
+  await expect(card.getByRole('row')).toHaveCount(5)
   expect(Number(await scene.getAttribute('data-draw-calls'))).toBeLessThan(80)
   expect(Number(await scene.getAttribute('data-triangles'))).toBeLessThan(150_000)
   await card.getByRole('button', { name: 'コースを えらぶ', exact: true }).click()
-  await expect(page.getByText(/さいこう \d\/9 ★/)).toBeVisible()
+  await expect(page.getByText(/さいこう \d+\/12 ★/)).toBeVisible()
   expect(errors).toEqual([])
 })
 

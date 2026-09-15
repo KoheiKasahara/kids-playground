@@ -24,7 +24,7 @@ function fakeWorld() {
     time: 0,
     restPosition: state.position,
     ball: () => ({ position: { ...state.position }, rotation: { x: 0, y: 0, z: 0, w: 1 }, velocity: { x: 0, y: 0, z: 0 } }),
-    windmillAngles: () => [],
+    motion: () => ({ windmills: [], gates: [], critters: [] }),
     step: vi.fn(),
     consumeEvents: () => { const next = events; events = []; return next },
     shoot: vi.fn((_direction: { x: number; z: number }, power: number) => {
@@ -56,7 +56,7 @@ beforeEach(() => {
       camera: {},
       aspect: 1,
       pickGround: vi.fn(() => ({ x: 3, z: 4.5 })),
-      setHole: vi.fn(), setBallStyle: vi.fn(), syncBall: vi.fn(), syncWindmills: vi.fn(), setFlagLifted: vi.fn(),
+      setHole: vi.fn(), setBallStyle: vi.fn(), syncBall: vi.fn(), syncGadgets: vi.fn(), setFlagLifted: vi.fn(),
       setAim: vi.fn(), swingClub: vi.fn(), setHint: vi.fn(), pulseBumper: vi.fn(), effect: vi.fn(), setCamera: vi.fn(),
       resize: vi.fn(), render: vi.fn(),
       stats: () => ({ calls: 31, triangles: 9000 }),

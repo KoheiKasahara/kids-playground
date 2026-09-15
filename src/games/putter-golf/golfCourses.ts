@@ -37,8 +37,21 @@ export type Gadget =
   | { kind: 'windmill'; id: string; x: number; z: number; speed: number }
   /** 上を通ったボールを dir の向きへ speed まで速くする ダッシュパネル。 */
   | { kind: 'booster'; id: string; x: number; z: number; dir: Vec2; speed: number }
+  /**
+   * 行ったり来たりする うごくカベ。中心 (x,z) から axis の向きへ ±span うごく。
+   * 真ん中に寄っても左右に すきまが残る幅にして、いつかは通れるようにする。
+   */
+  | { kind: 'gate'; id: string; x: number; z: number; axis: Vec2; span: number; speed: number; halfWidth: number }
+  /** (x,z) と to のあいだを 行ったり来たり歩く どうぶつ。ぶつかると ぽよんと はねる。 */
+  | { kind: 'critter'; id: string; x: number; z: number; to: Vec2; speed: number; look: CritterLook }
+  /** 入ると exit から exitDir の向きへ出てくる どかん。2つ向かい合わせに置くと行き来できる。 */
+  | { kind: 'warp'; id: string; x: number; z: number; radius: number; exit: Vec2; exitDir: Vec2 }
 
-export type SandZone = { x: number; z: number; radius: number }
+export type CritterLook = 'duck' | 'crab' | 'alien' | 'penguin'
+
+/** ゆかの ちがう ところ。すなば・こおり・ふかふか。 */
+export type ZoneKind = 'sand' | 'ice' | 'rough'
+export type SurfaceZone = { kind: ZoneKind; x: number; z: number; radius: number }
 
 /** みちすじの点。minPower は「ここを通るなら最低この強さ」（ジャンプ台の手前など）。 */
 export type RoutePoint = Vec2 & { minPower?: number }
@@ -52,14 +65,16 @@ export type HoleDefinition = {
   floors: readonly FloorPiece[]
   features?: readonly HeightFeature[]
   gadgets?: readonly Gadget[]
-  sand?: readonly SandZone[]
+  zones?: readonly SurfaceZone[]
   /** 目安のみちすじ（tee → … → cup）。ヒントの矢印と「おたすけ」に使う。 */
   route: readonly RoutePoint[]
   /** ホールの はじめに出す ひとこと。 */
   tip: string
 }
 
-export type CourseId = 'meadow' | 'beach' | 'moon'
+/** コースの並び順。★の保存やコース選びは、この一覧を正とする。 */
+export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow'] as const
+export type CourseId = (typeof COURSE_IDS)[number]
 
 export type CourseLook = {
   felt: string
@@ -67,6 +82,8 @@ export type CourseLook = {
   wallCap: string
   skirt: string
   sand: string
+  ice: string
+  rough: string
   ground: string
   sky: string
   horizon: string
@@ -118,7 +135,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
     color: '#3f9a4f',
     gravity: EARTH_GRAVITY,
     rollingScale: 1,
-    look: { felt: '#58b65a', wall: '#c98b55', wallCap: '#f6e7c8', skirt: '#9a6b42', sand: '#eed6a0', ground: '#9fd36e', sky: '#bfe7ff', horizon: '#eef8e0', bumper: '#f06a5b', bumperCap: '#fff4e6', rock: '#9aa3a8' },
+    look: { felt: '#58b65a', wall: '#c98b55', wallCap: '#f6e7c8', skirt: '#9a6b42', sand: '#eed6a0', ice: '#cfeaf7', rough: '#3d8a48', ground: '#9fd36e', sky: '#bfe7ff', horizon: '#eef8e0', bumper: '#f06a5b', bumperCap: '#fff4e6', rock: '#9aa3a8' },
     holes: [
       {
         id: 'meadow-1',
@@ -163,6 +180,18 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         route: [{ x: 0, z: 4.8 }, { x: 0, z: 1.6 }, { x: 0, z: -1.2 }, { x: 0, z: -4.4 }],
         tip: 'はねが とおりすぎたら うとう',
       },
+      {
+        id: 'meadow-4',
+        name: 'かもさん',
+        par: 3,
+        tee: { x: 0, z: 5.2 },
+        cup: { x: 0, z: -5.0 },
+        floors: [{ corners: rect(-1.7, -6.2, 1.7, 6.2, 0.6, 1.1) }],
+        features: [{ kind: 'bump', x: -1.0, z: -2.6, radius: 1.1, height: 0.18 }],
+        gadgets: [{ kind: 'critter', id: 'duck', x: -1.2, z: 1.0, to: { x: 1.2, z: 1.0 }, speed: 1.2, look: 'duck' }],
+        route: [{ x: 0, z: 5.2 }, { x: 0.5, z: -1.4 }, { x: 0, z: -5.0 }],
+        tip: 'かもさんが とおりすぎたら うとう',
+      },
     ],
   },
   {
@@ -173,7 +202,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
     color: '#2f8fb7',
     gravity: EARTH_GRAVITY,
     rollingScale: 1,
-    look: { felt: '#3fb59a', wall: '#fbfbf4', wallCap: '#4aa3d6', skirt: '#d8c7a0', sand: '#f1dca6', ground: '#f3dfae', sky: '#aee3f5', horizon: '#f5fbf7', bumper: '#ff8fb8', bumperCap: '#fff0f6', rock: '#b9ada0' },
+    look: { felt: '#3fb59a', wall: '#fbfbf4', wallCap: '#4aa3d6', skirt: '#d8c7a0', sand: '#f1dca6', ice: '#d7f3f9', rough: '#2f9a86', ground: '#f3dfae', sky: '#aee3f5', horizon: '#f5fbf7', bumper: '#ff8fb8', bumperCap: '#fff0f6', rock: '#b9ada0' },
     holes: [
       {
         id: 'beach-1',
@@ -182,7 +211,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         tee: { x: 0.6, z: 3.9 },
         cup: { x: -0.5, z: -3.5 },
         floors: [{ corners: rect(-2.1, -4.8, 2.1, 5.0, 1.6, 1.6) }],
-        sand: [{ x: 0.35, z: 0.3, radius: 1.3 }, { x: 1.25, z: -2.7, radius: 0.6 }],
+        zones: [{ kind: 'sand', x: 0.35, z: 0.3, radius: 1.3 }, { kind: 'sand', x: 1.25, z: -2.7, radius: 0.6 }],
         route: [{ x: 0.6, z: 3.9 }, { x: -1.3, z: 0.4 }, { x: -0.5, z: -3.5 }],
         tip: 'すなばは ころがりにくいよ',
       },
@@ -227,6 +256,25 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         route: [{ x: -2.1, z: 5.1 }, { x: -2.0, z: -0.1 }, { x: 0, z: 0.45 }, { x: 2.1, z: -0.2 }, { x: 2.1, z: -4.9 }],
         tip: 'くらげを よけて くねくね',
       },
+      {
+        id: 'beach-4',
+        name: 'どかん',
+        par: 3,
+        tee: { x: 0, z: 5.2 },
+        cup: { x: 2.7, z: -4.6 },
+        floors: [
+          { corners: rect(-1.7, 1.2, 1.7, 6.2, 0.6, 1.0) },
+          { corners: rect(1.0, -5.8, 4.4, -0.6, 0.9, 1.0) },
+        ],
+        // 2つの どかんは 向かい合わせ。入った どかんの むこうから 同じ 勢いで 出てくる。
+        gadgets: [
+          { kind: 'warp', id: 'pipe-in', x: 0, z: 2.2, radius: 0.42, exit: { x: 2.7, z: -1.4 }, exitDir: { x: 0, z: -1 } },
+          { kind: 'warp', id: 'pipe-out', x: 2.7, z: -1.4, radius: 0.42, exit: { x: 0, z: 2.2 }, exitDir: { x: 0, z: 1 } },
+        ],
+        zones: [{ kind: 'sand', x: 1.6, z: -3.4, radius: 0.8 }],
+        route: [{ x: 0, z: 5.2 }, { x: 0, z: 2.2, minPower: 0.6 }, { x: 2.7, z: -1.4 }, { x: 2.7, z: -4.6 }],
+        tip: 'どかんに いれると むこうがわへ！',
+      },
     ],
   },
   {
@@ -237,7 +285,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
     color: '#6f5fc7',
     gravity: EARTH_GRAVITY / 3,
     rollingScale: 3,
-    look: { felt: '#7d8ee0', wall: '#e9ecff', wallCap: '#ffd66b', skirt: '#8e8aa8', sand: '#c9c3d9', ground: '#bdbccb', sky: '#1d2352', horizon: '#3a4480', bumper: '#7ee0d2', bumperCap: '#fff8c7', rock: '#a29fb3' },
+    look: { felt: '#7d8ee0', wall: '#e9ecff', wallCap: '#ffd66b', skirt: '#8e8aa8', sand: '#c9c3d9', ice: '#bcd8ff', rough: '#5d67a8', ground: '#bdbccb', sky: '#1d2352', horizon: '#3a4480', bumper: '#7ee0d2', bumperCap: '#fff8c7', rock: '#a29fb3' },
     holes: [
       {
         id: 'moon-1',
@@ -291,6 +339,96 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         ],
         route: [{ x: 0, z: 7.3 }, { x: 0, z: 4.7, minPower: 0.35 }, { x: 0, z: -3.2 }, { x: 0.75, z: -5.5 }],
         tip: 'ダッシュパネルで びゅーん！',
+      },
+      {
+        id: 'moon-4',
+        name: 'じどう とびら',
+        par: 3,
+        tee: { x: 0, z: 5.8 },
+        cup: { x: 0, z: -5.6 },
+        floors: [{ corners: rect(-1.7, -6.6, 1.7, 6.6, 0.6, 1.1) }],
+        // 2まいの とびらは 速さが ちがうので、同じ ならびに ならない。
+        // とびらは、まん中に よっても 左右に すきまが のこり、はしに よると まん中が あく幅にする。
+        gadgets: [
+          { kind: 'gate', id: 'door-a', x: 0, z: 2.4, axis: { x: 1, z: 0 }, span: 1.15, speed: 0.9, halfWidth: 0.55 },
+          { kind: 'gate', id: 'door-b', x: 0, z: -1.8, axis: { x: 1, z: 0 }, span: 1.15, speed: 1.35, halfWidth: 0.55 },
+        ],
+        route: [{ x: 0, z: 5.8 }, { x: 0, z: 0.6 }, { x: 0, z: -5.6 }],
+        tip: 'とびらの あいた ほうを ねらおう',
+      },
+    ],
+  },
+  {
+    id: 'snow',
+    label: 'ゆきやま',
+    icon: '⛄',
+    description: 'つるつる すべる こおり',
+    color: '#4f86c6',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#dce9f7', wall: '#cfe3f5', wallCap: '#8fc4e8', skirt: '#a3b6cc', sand: '#e6eef8', ice: '#b6e6f7', rough: '#b9cde3', ground: '#f0f6ff', sky: '#bcdcff', horizon: '#ffffff', bumper: '#e35b6d', bumperCap: '#fdfdff', rock: '#9fb0c2' },
+    holes: [
+      {
+        id: 'snow-1',
+        name: 'つるつる',
+        par: 2,
+        tee: { x: 0, z: 4.6 },
+        cup: { x: 0, z: -4.4 },
+        floors: [{ corners: rect(-1.2, -5.8, 1.2, 5.8, 0.5, 1.0) }],
+        zones: [{ kind: 'ice', x: 0, z: 0.4, radius: 1.6 }],
+        route: [{ x: 0, z: 4.6 }, { x: 0, z: -4.4 }],
+        tip: 'こおりの うえは よく すべるよ',
+      },
+      {
+        id: 'snow-2',
+        name: 'ふかふか',
+        par: 3,
+        tee: { x: 1.4, z: 4.2 },
+        cup: { x: -1.2, z: -3.6 },
+        floors: [{ corners: rect(-2.3, -4.8, 2.3, 5.2, 1.4, 1.4) }],
+        zones: [
+          { kind: 'rough', x: -0.6, z: 0.8, radius: 1.4 },
+          { kind: 'rough', x: -1.6, z: -1.8, radius: 0.8 },
+        ],
+        gadgets: [
+          { kind: 'bumper', id: 'snowman', x: 0.9, z: -2.4, radius: 0.3 },
+          { kind: 'critter', id: 'penguin', x: 1.9, z: 2.0, to: { x: -1.9, z: 2.0 }, speed: 0.95, look: 'penguin' },
+        ],
+        route: [{ x: 1.4, z: 4.2 }, { x: 1.5, z: 0 }, { x: -1.2, z: -3.6 }],
+        tip: 'ふかふかの ゆきは とまりやすいよ',
+      },
+      {
+        id: 'snow-3',
+        name: 'そり ジャンプ',
+        par: 3,
+        tee: { x: 0, z: 4.8 },
+        cup: { x: 0, z: -4.4 },
+        floors: [
+          { corners: [{ x: -1.1, z: 5.8, r: 0.5 }, { x: -1.1, z: 1.2 }, { x: 1.1, z: 1.2 }, { x: 1.1, z: 5.8, r: 0.5 }], open: [1] },
+          { corners: [{ x: -1.8, z: -0.4 }, { x: -1.8, z: -5.4, r: 1.0 }, { x: 1.8, z: -5.4, r: 1.0 }, { x: 1.8, z: -0.4 }], y: -0.3, open: [3] },
+        ],
+        features: [{ kind: 'kicker', from: { x: 0, z: 2.4 }, to: { x: 0, z: 1.2 }, halfWidth: 1.1, rise: 0.32 }],
+        zones: [{ kind: 'ice', x: 0, z: -2.0, radius: 1.5 }],
+        route: [{ x: 0, z: 4.8 }, { x: 0, z: 1.4, minPower: 0.82 }, { x: 0, z: -4.4 }],
+        tip: 'つよく うって ジャンプ！',
+      },
+      {
+        id: 'snow-4',
+        name: 'こおりの トンネル',
+        par: 3,
+        tee: { x: -1.6, z: 4.8 },
+        cup: { x: 1.6, z: 4.2 },
+        floors: [
+          { corners: rect(-2.6, -5.4, -0.6, 5.8, 0.6, 1.0) },
+          { corners: rect(0.6, -5.4, 2.6, 5.8, 0.6, 1.0) },
+        ],
+        gadgets: [
+          { kind: 'warp', id: 'tunnel-in', x: -1.6, z: -4.2, radius: 0.42, exit: { x: 1.6, z: -4.2 }, exitDir: { x: 0, z: 1 } },
+          { kind: 'warp', id: 'tunnel-out', x: 1.6, z: -4.2, radius: 0.42, exit: { x: -1.6, z: -4.2 }, exitDir: { x: 0, z: 1 } },
+        ],
+        zones: [{ kind: 'ice', x: 1.6, z: 0.4, radius: 1.5 }],
+        route: [{ x: -1.6, z: 4.8 }, { x: -1.6, z: -1.0 }, { x: -1.6, z: -4.2, minPower: 0.45 }, { x: 1.6, z: -4.2 }, { x: 1.6, z: 4.2 }],
+        tip: 'トンネルで むこうの みちへ',
       },
     ],
   },

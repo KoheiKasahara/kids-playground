@@ -172,8 +172,18 @@ export function usePutterGolfEngine(options: Options) {
       for (const event of events) {
         if (event.kind === 'shot') { strokes++; scene.swingClub(); heading = direction }
         if (event.kind === 'bumper') { scene.pulseBumper(event.id); scene.effect('sparkle', event.position) }
+        if (event.kind === 'critter') scene.effect('sparkle', event.position)
         if (event.kind === 'boost') scene.effect('sparkle', event.position)
-        if (event.kind === 'sand') scene.effect('dust', event.position, 0.7)
+        if (event.kind === 'surface') scene.effect(event.surface === 'ice' ? 'sparkle' : 'dust', event.position, 0.7)
+        if (event.kind === 'warp') {
+          scene.effect('ring', event.position)
+          scene.effect('sparkle', event.to)
+          // 出口へは カメラを すぐ移す。ゆっくり追うと コースの上を 長く流れてしまう。
+          const velocity = world.ball().velocity
+          const speed = Math.hypot(velocity.x, velocity.z)
+          if (speed > 0.1) heading = { x: velocity.x / speed, z: velocity.z / speed }
+          pose = null
+        }
         if (event.kind === 'land') scene.effect('dust', event.position, event.strength)
         if (event.kind === 'splash') { scene.effect('splash', event.position); returnTimer = 1.2 }
         if (event.kind === 'lost') returnTimer = 0.6
@@ -220,7 +230,7 @@ export function usePutterGolfEngine(options: Options) {
         }
         const state = world.ball()
         scene.syncBall(state.position, state.rotation)
-        scene.syncWindmills(world.windmillAngles())
+        scene.syncGadgets(world.motion())
         const { cup } = geometry
         scene.setFlagLifted(world.phase === 'holed' || (world.phase === 'rolling' && Math.hypot(state.position.x - cup.x, state.position.z - cup.z) < 2.4))
         const speed = Math.hypot(state.velocity.x, state.velocity.z)

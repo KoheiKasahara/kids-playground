@@ -27,9 +27,10 @@ export const SHOT_SPEED_MAX = 6.8
 /** 弱い側ほど細かく強さを選べるように曲げる。 */
 export const SHOT_CURVE = 1.5
 
-export type Surface = 'green' | 'sand'
-/** 転がり抵抗の係数。重さ（重力）に比例する一定の減速として扱う。 */
-export const ROLLING: Record<Surface, number> = { green: 0.092, sand: 0.62 }
+/** 芝・すなば・こおり・ふかふかの ゆか。 */
+export type Surface = 'green' | 'sand' | 'ice' | 'rough'
+/** 転がり抵抗の係数。重さ（重力）に比例する一定の減速として扱う。こおりは芝の1/3、ふかふかは3倍。 */
+export const ROLLING: Record<Surface, number> = { green: 0.092, sand: 0.62, ice: 0.03, rough: 0.3 }
 
 /** これより遅く、回転も小さい状態が REST_SECONDS 続いたら止まったとみなす。 */
 export const REST_SPEED = 0.05
@@ -49,10 +50,29 @@ export const WINDMILL = { tunnelHalf: 0.36, halfDepth: 0.7, outer: 1.6, pillarHe
 /** ダッシュパネルの広さ（半分の幅・半分の長さ）。 */
 export const BOOSTER = { halfWidth: 0.55, halfLength: 0.6 } as const
 export const BUMPER_HEIGHT = 0.44
+/** うごくカベ（ゲート）の寸法。半分の厚みと高さ。 */
+export const GATE = { halfDepth: 0.13, height: 0.44 } as const
+/** 歩く どうぶつの大きさ。 */
+export const CRITTER = { radius: 0.24, height: 0.46 } as const
+/** ワープの どかん。入口の高さと、出てくるときに残る速さの割合。 */
+export const WARP = { height: 0.42, keepSpeed: 0.9, minSpeed: 0.3 } as const
 
 /** ふうしゃの はねの角度。物理と見た目で同じ時刻から求める。 */
 export function windmillAngle(speed: number, time: number): number {
   return -speed * time
+}
+
+/**
+ * 行ったり来たりする しかけの位置（-span〜+span）。
+ * ふうしゃと同じで、時刻だけから決まるので物理と見た目が必ずそろう。
+ */
+export function patrolOffset(speed: number, time: number, span: number): number {
+  return Math.sin(speed * time) * span
+}
+
+/** 行ったり来たりする しかけの進み具合（0〜1）。どうぶつが from→to を歩くのに使う。 */
+export function patrolPhase(speed: number, time: number): number {
+  return (patrolOffset(speed, time, 1) + 1) / 2
 }
 
 function clamp(value: number, min: number, max: number): number {
