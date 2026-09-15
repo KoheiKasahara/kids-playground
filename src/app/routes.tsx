@@ -53,6 +53,7 @@ export const routes: RouteObject[] = [
   { path: '/games/draw-goal', element: lazyRoute(() => import('../games/draw-goal/DrawGoalPlay')) },
   { path: '/games/magic-sandbox', element: lazyRoute(() => import('../games/magic-sandbox/MagicSandboxPlay')) },
   { path: '/games/treasure-dig', element: lazyRoute(() => import('../games/treasure-dig/TreasureDigPlay')) },
+  { path: '/games/water-wheel-maze', element: lazyRoute(() => import('../games/water-wheel-maze/WaterWheelMazePlay')) },
   { path: '/', element: <Home /> },
   { path: '/games/puni-slime', element: playRoute(lazyRoute(() => import('../games/puni-slime/PuniSlimePlay'))) },
   { path: '/games/animal-bath', element: lazyRoute(() => import('../games/animal-bath/AnimalBathPlay')) },
