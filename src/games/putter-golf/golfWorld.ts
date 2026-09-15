@@ -12,9 +12,13 @@ import {
   BALL_RADIUS,
   BOOSTER,
   BUMPER_HEIGHT,
+  CRITTER,
   cupPull,
+  GATE,
   isHoled,
   MAX_BALL_SPEED,
+  patrolOffset,
+  patrolPhase,
   PHYSICS_STEP,
   powerForDistance,
   REST_SECONDS,
@@ -26,6 +30,7 @@ import {
   SHOT_TIMEOUT_SECONDS,
   shotSpeed,
   shotVelocity,
+  WARP,
   WINDMILL,
   windmillAngle,
   type Surface,
@@ -39,10 +44,17 @@ export type GolfEvent =
   | { kind: 'shot'; power: number; position: Vec3 }
   | { kind: 'wall' | 'rock' | 'windmill'; strength: number; position: Vec3 }
   | { kind: 'bumper'; id: string; strength: number; position: Vec3 }
+  /** うごくカベに あたった。 */
+  | { kind: 'gate'; id: string; strength: number; position: Vec3 }
+  /** 歩く どうぶつに あたって はねた。 */
+  | { kind: 'critter'; id: string; strength: number; position: Vec3 }
+  /** どかんに入って、to から出てきた。 */
+  | { kind: 'warp'; id: string; position: Vec3; to: Vec3 }
   | { kind: 'boost'; id: string; position: Vec3 }
   | { kind: 'takeoff'; position: Vec3 }
   | { kind: 'land'; strength: number; position: Vec3 }
-  | { kind: 'sand'; position: Vec3 }
+  /** 芝ではない ゆかに入った。 */
+  | { kind: 'surface'; surface: Exclude<Surface, 'green'>; position: Vec3 }
   /** 水に落ちた。 */
   | { kind: 'splash'; position: Vec3 }
   /** 壁の上など、床のない所で止まった。 */
@@ -50,10 +62,24 @@ export type GolfEvent =
   | { kind: 'cup'; position: Vec3 }
   | { kind: 'rest'; position: Vec3 }
 export type ShotSuggestion = { direction: Vec2; power: number; target: Vec2 }
+/** 動くしかけの いまの様子。見た目（golfScene）は これだけを受け取って動かす。 */
+export type GadgetMotion = {
+  windmills: number[]
+  gates: Vec2[]
+  critters: { x: number; z: number; facing: number }[]
+}
 
 const BUMPER_KICK = 2.8
+const CRITTER_KICK = 2.1
 
-type Role = { kind: 'floor' | 'wall' | 'bumper' | 'rock' | 'blade'; id: string; x: number; z: number }
+type Role = {
+  kind: 'floor' | 'wall' | 'bumper' | 'rock' | 'blade' | 'gate' | 'critter'
+  id: string
+  x: number
+  z: number
+  /** 動くしかけは、ぶつかった ときの位置を からだから読む。 */
+  body?: RAPIER.RigidBody
+}
 
 const quatY = (angle: number): Quat => ({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) })
 const quatZ = (angle: number): Quat => ({ x: 0, y: 0, z: Math.sin(angle / 2), w: Math.cos(angle / 2) })
@@ -79,7 +105,8 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     const collider = world.createCollider(desc, body)
     roles.set(collider.handle, role)
     if (role.kind === 'floor') floorHandles.add(collider.handle)
-    if (role.kind === 'wall' || role.kind === 'bumper' || role.kind === 'rock') obstacleHandles.add(collider.handle)
+    // ふうしゃの はねと とびらは「待てば どく」ので、ねらいの見通しでは じゃま物あつかいしない。
+    if (role.kind !== 'floor' && role.kind !== 'blade' && role.kind !== 'gate') obstacleHandles.add(collider.handle)
     return collider
   }
 
@@ -93,6 +120,13 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
   const groundOf = (x: number, z: number) => geometry.heightAt(x, z) ?? geometry.tee.y
   const windmills: { speed: number; body: RAPIER.RigidBody }[] = []
   const boosters: { id: string; x: number; z: number; dir: Vec2; speed: number; inside: boolean }[] = []
+  const gates: { x: number; z: number; y: number; axis: Vec2; span: number; speed: number; body: RAPIER.RigidBody }[] = []
+  const critters: { from: Vec2; to: Vec2; speed: number; base: number; body: RAPIER.RigidBody }[] = []
+  const warps: { id: string; x: number; z: number; radius: number; exit: Vec2; dir: Vec2; inside: boolean }[] = []
+  const unit = (v: Vec2): Vec2 => {
+    const length = Math.hypot(v.x, v.z) || 1
+    return { x: v.x / length, z: v.z / length }
+  }
   for (const gadget of hole.gadgets ?? []) {
     const ground = groundOf(gadget.x, gadget.z)
     if (gadget.kind === 'bumper') {
@@ -115,6 +149,23 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
           .setRotation(quatZ(-alpha)).setFriction(0.1).setRestitution(0.5), { kind: 'blade', id: gadget.id, x: gadget.x, z: gadget.z }, body)
       }
       windmills.push({ speed: gadget.speed, body })
+    } else if (gadget.kind === 'gate') {
+      // うごくカベ。からだは まっすぐ動かすだけにして、向きはコライダー側で付ける。
+      const axis = unit(gadget.axis)
+      const y = ground + GATE.height / 2 - 0.05
+      const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(gadget.x, y, gadget.z))
+      add(RAPIER.ColliderDesc.cuboid(gadget.halfWidth, GATE.height / 2, GATE.halfDepth)
+        // すこし はねかえし、動くと ボールを よこへ はらう（止まった ボールが とびらの前に へばりつかない）。
+        .setRotation(quatY(Math.atan2(-axis.z, axis.x))).setFriction(0.12).setRestitution(0.5),
+        { kind: 'gate', id: gadget.id, x: gadget.x, z: gadget.z, body }, body)
+      gates.push({ x: gadget.x, z: gadget.z, y, axis, span: gadget.span, speed: gadget.speed, body })
+    } else if (gadget.kind === 'critter') {
+      const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(gadget.x, ground + CRITTER.height / 2, gadget.z))
+      add(RAPIER.ColliderDesc.cylinder(CRITTER.height / 2, CRITTER.radius).setFriction(0.2).setRestitution(0.4),
+        { kind: 'critter', id: gadget.id, x: gadget.x, z: gadget.z, body }, body)
+      critters.push({ from: { x: gadget.x, z: gadget.z }, to: gadget.to, speed: gadget.speed, base: ground, body })
+    } else if (gadget.kind === 'warp') {
+      warps.push({ id: gadget.id, x: gadget.x, z: gadget.z, radius: gadget.radius, exit: gadget.exit, dir: unit(gadget.exitDir), inside: false })
     } else {
       const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
       boosters.push({ id: gadget.id, x: gadget.x, z: gadget.z, dir: { x: gadget.dir.x / length, z: gadget.dir.z / length }, speed: gadget.speed, inside: false })
@@ -129,6 +180,16 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
   const outY = Math.min(geometry.bounds.minY, cup.y - cup.depth) - 0.4
   const waterY = Math.min(...geometry.outlines.map(outline => outline.base)) - 0.3
   const decelOf = (surface: Surface) => rollingDecel(surface, course.gravity, course.rollingScale)
+  /** その線の上の ゆかを ならした 転がり抵抗。こおりの上を通る線は、弱く うつ目安になる。 */
+  const decelAlong = (from: Vec2, to: Vec2) => {
+    const steps = 6
+    let total = 0
+    for (let index = 0; index <= steps; index++) {
+      const t = index / steps
+      total += decelOf(geometry.surfaceAt(from.x + (to.x - from.x) * t, from.z + (to.z - from.z) * t) ?? 'green')
+    }
+    return total / (steps + 1)
+  }
   const ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 })
   const probe = new RAPIER.Ball(BALL_RADIUS)
   const isFloor = (collider: RAPIER.Collider) => floorHandles.has(collider.handle)
@@ -142,7 +203,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
   let airTime = 0
   let airborne = false
   let airSpeed = 0
-  let inSand = false
+  let lastSurface: Surface = 'green'
   let events: GolfEvent[] = []
   const lastEmit = new Map<string, number>()
   const emit = (event: GolfEvent, key?: string, cooldown = 0.1) => {
@@ -166,7 +227,8 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
 
   function place(point: Vec2): Vec3 {
     const ground = geometry.heightAt(point.x, point.z) ?? geometry.tee.y
-    rest = { x: point.x, y: ground + BALL_RADIUS + 0.003, z: point.z }
+    rest = clearOfGates({ x: point.x, y: ground + BALL_RADIUS + 0.003, z: point.z })
+    for (const warp of warps) warp.inside = false
     pin(rest)
     ball.setRotation(IDENTITY, true)
     phase = 'ready'
@@ -185,16 +247,41 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     if (role.kind === 'wall' && speed > 0.35) emit({ kind: 'wall', strength, position: p }, 'wall', 0.08)
     if (role.kind === 'rock') emit({ kind: 'rock', strength, position: p }, 'rock', 0.12)
     if (role.kind === 'blade') emit({ kind: 'windmill', strength: Math.max(0.4, strength), position: p }, 'blade', 0.2)
-    if (role.kind === 'bumper') {
+    if (role.kind === 'gate' && speed > 0.3) emit({ kind: 'gate', id: role.id, strength: Math.max(0.4, strength), position: p }, `gate-${role.id}`, 0.15)
+    if (role.kind === 'bumper' || role.kind === 'critter') {
       // 反発だけでは遅い球の「ぽよん」が弱いので、外向きの速さを最低限そろえる。
-      const dx = p.x - role.x
-      const dz = p.z - role.z
+      // 動く どうぶつは、いまの居場所を からだから読む。
+      const center = role.body?.translation() ?? role
+      const dx = p.x - center.x
+      const dz = p.z - center.z
       const length = Math.hypot(dx, dz) || 1
       const v = ball.linvel()
       const outward = (v.x * dx + v.z * dz) / length
-      if (outward < BUMPER_KICK) ball.setLinvel({ x: v.x + (dx / length) * (BUMPER_KICK - outward), y: v.y, z: v.z + (dz / length) * (BUMPER_KICK - outward) }, true)
-      emit({ kind: 'bumper', id: role.id, strength: Math.max(0.5, strength), position: p }, `bumper-${role.id}`, 0.15)
+      const kick = role.kind === 'bumper' ? BUMPER_KICK : CRITTER_KICK
+      if (outward < kick) ball.setLinvel({ x: v.x + (dx / length) * (kick - outward), y: v.y, z: v.z + (dz / length) * (kick - outward) }, true)
+      emit(role.kind === 'bumper'
+        ? { kind: 'bumper', id: role.id, strength: Math.max(0.5, strength), position: p }
+        : { kind: 'critter', id: role.id, strength: Math.max(0.5, strength), position: p }, `${role.kind}-${role.id}`, 0.15)
     }
+  }
+
+  /**
+   * うごくカベの通り道で止まったら、カベの外へ そっとずらす。
+   * 止まったボールは その場に固定するので、カベと重なったままにしないため。
+   */
+  function clearOfGates(p: Vec3): Vec3 {
+    let point = p
+    for (const gate of gates) {
+      const side = (point.x - gate.x) * gate.axis.z - (point.z - gate.z) * gate.axis.x
+      const reach = GATE.halfDepth + BALL_RADIUS + 0.04
+      if (Math.abs(side) >= reach) continue
+      const shift = (reach - Math.abs(side)) * (side < 0 ? -1 : 1)
+      const moved = { x: point.x + gate.axis.z * shift, z: point.z - gate.axis.x * shift }
+      const ground = geometry.heightAt(moved.x, moved.z)
+      if (ground === null) continue
+      point = { x: moved.x, y: ground + BALL_RADIUS + 0.003, z: moved.z }
+    }
+    return point
   }
 
   function settle() {
@@ -205,15 +292,36 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       emit({ kind: 'lost', position: p })
       return
     }
-    pin(p)
-    rest = p
+    const spot = clearOfGates(p)
+    pin(spot)
+    rest = spot
     phase = 'ready'
-    emit({ kind: 'rest', position: p })
+    emit({ kind: 'rest', position: spot })
+  }
+
+  /** いま どこを歩いているか。見た目と物理で同じ時刻から求める。 */
+  function critterAt(critter: { from: Vec2; to: Vec2; speed: number }): Vec2 {
+    const t = patrolPhase(critter.speed, time)
+    return { x: critter.from.x + (critter.to.x - critter.from.x) * t, z: critter.from.z + (critter.to.z - critter.from.z) * t }
+  }
+
+  /** うごくカベの いまの位置。 */
+  function gateAt(gate: { x: number; z: number; axis: Vec2; span: number; speed: number }): Vec2 {
+    const offset = patrolOffset(gate.speed, time, gate.span)
+    return { x: gate.x + gate.axis.x * offset, z: gate.z + gate.axis.z * offset }
   }
 
   function step(): void {
     time += PHYSICS_STEP
     for (const windmill of windmills) windmill.body.setNextKinematicRotation(quatZ(windmillAngle(windmill.speed, time)))
+    for (const gate of gates) {
+      const at = gateAt(gate)
+      gate.body.setNextKinematicTranslation({ x: at.x, y: gate.y, z: at.z })
+    }
+    for (const critter of critters) {
+      const at = critterAt(critter)
+      critter.body.setNextKinematicTranslation({ x: at.x, y: (geometry.heightAt(at.x, at.z) ?? critter.base) + CRITTER.height / 2, z: at.z })
+    }
     const before = ball.linvel()
     const speedBefore = Math.hypot(before.x, before.y, before.z)
     if (phase === 'rolling') {
@@ -243,6 +351,26 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       emit({ kind: 'splash', position: { x: p.x, y: waterY, z: p.z } })
       return
     }
+    for (const warp of warps) {
+      const near = Math.hypot(p.x - warp.x, p.z - warp.z) < warp.radius
+      if (!near) { warp.inside = false; continue }
+      if (warp.inside) continue
+      warp.inside = true
+      const before = ball.linvel()
+      const speed = Math.hypot(before.x, before.y, before.z)
+      if (speed < WARP.minSpeed) continue
+      const to = { x: warp.exit.x, y: (geometry.heightAt(warp.exit.x, warp.exit.z) ?? geometry.tee.y) + BALL_RADIUS + 0.01, z: warp.exit.z }
+      const next = speed * WARP.keepSpeed
+      ball.setTranslation(to, true)
+      ball.setLinvel({ x: warp.dir.x * next, y: 0, z: warp.dir.z * next }, true)
+      ball.setAngvel({ x: (warp.dir.z * next) / BALL_RADIUS, y: 0, z: (-warp.dir.x * next) / BALL_RADIUS }, true)
+      // 出口の どかんで すぐ入り直さないように、重なっている どかんは通ったことにする。
+      for (const other of warps) other.inside = Math.hypot(to.x - other.x, to.z - other.z) < other.radius
+      airborne = false
+      airTime = 0
+      emit({ kind: 'warp', id: warp.id, position: p, to })
+      return
+    }
     const grounded = ground(p) !== null
     let v = ball.linvel()
     if (!grounded) {
@@ -256,8 +384,8 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       airTime = 0
       const speed = Math.hypot(v.x, v.y, v.z)
       const surface = geometry.surfaceAt(p.x, p.z) ?? 'green'
-      if (surface === 'sand' && !inSand && speed > 0.3) emit({ kind: 'sand', position: p })
-      inSand = surface === 'sand'
+      if (surface !== 'green' && surface !== lastSurface && speed > 0.3) emit({ kind: 'surface', surface, position: p })
+      lastSurface = surface
       const factor = rollingFactor(speed, decelOf(surface), PHYSICS_STEP)
       if (factor < 1) {
         const w = ball.angvel()
@@ -292,8 +420,8 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     if (restTimer >= REST_SECONDS || shotTime > SHOT_TIMEOUT_SECONDS) settle()
   }
 
-  /** ボールの形で、止まっている障害物（壁・バンパー・いわ）へ当たるまでの距離と、当たった面の向き。 */
-  function cast(from: Vec3, direction: Vec2, distance: number): { distance: number; normal: Vec2 } | null {
+  /** ボールの形で、じゃまな物（壁・バンパー・いわ・とびら・どうぶつ）へ当たるまでの距離と、当たった面の向き・種類。 */
+  function cast(from: Vec3, direction: Vec2, distance: number): { distance: number; normal: Vec2; kind: Role['kind'] } | null {
     const origin = { x: from.x, y: from.y + 0.02, z: from.z }
     const hit = world.castShape(origin, IDENTITY, { x: direction.x, y: 0, z: direction.z }, probe, 0, distance, false, undefined, undefined, ballCollider, ball, isObstacle)
     if (!hit) return null
@@ -306,7 +434,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       const length = Math.hypot(nx, nz)
       if (length > 1e-5) normal = { x: nx / length, z: nz / length }
     }
-    return { distance: hit.time_of_impact, normal }
+    return { distance: hit.time_of_impact, normal, kind: roles.get(hit.collider.handle)?.kind ?? 'wall' }
   }
 
   function clearLine(from: Vec3, to: Vec2): boolean {
@@ -315,8 +443,8 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     const length = Math.hypot(dx, dz)
     if (length < 0.05) return true
     if (cast(from, { x: dx / length, z: dz / length }, length)) return false
-    // すなばの中を横切る線は選ばない。ねらう点がすなばの中なら、それはしかたない。
-    return !(hole.sand ?? []).some(zone => Math.hypot(to.x - zone.x, to.z - zone.z) > zone.radius && segmentDistance(zone, from, to) < zone.radius + 0.12)
+    // ころがりにくい ゆか（すなば・ふかふか）の中を横切る線は選ばない。こおりは よく すべるので通ってよい。
+    return !(hole.zones ?? []).some(zone => zone.kind !== 'ice' && Math.hypot(to.x - zone.x, to.z - zone.z) > zone.radius && segmentDistance(zone, from, to) < zone.radius + 0.12)
   }
 
   // Rapierの問い合わせ（ねらいの見通し）は、1ステップ進めて当たり判定の索引ができてから使える。
@@ -333,7 +461,19 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       const velocity = ball.linvel()
       return { position: position(), rotation: { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }, velocity: { x: velocity.x, y: velocity.y, z: velocity.z } }
     },
-    windmillAngles(): number[] { return windmills.map(windmill => windmillAngle(windmill.speed, time)) },
+    /** 動くしかけの いまの様子。見た目だけが使う。 */
+    motion(): GadgetMotion {
+      return {
+        windmills: windmills.map(windmill => windmillAngle(windmill.speed, time)),
+        gates: gates.map(gateAt),
+        critters: critters.map(critter => {
+          const at = critterAt(critter)
+          const heading = Math.atan2(critter.to.x - critter.from.x, critter.to.z - critter.from.z)
+          // 行きと帰りで むきを かえる。速さの向き（sin の かたむき）で見分ける。
+          return { x: at.x, z: at.z, facing: Math.cos(critter.speed * time) >= 0 ? heading : heading + Math.PI }
+        }),
+      }
+    },
     step,
     consumeEvents(): GolfEvent[] { const next = events; events = []; return next },
     /** 止まっているボールをうつ。うてないときは false。 */
@@ -347,7 +487,9 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       restTimer = 0
       airborne = false
       airTime = 0
-      inSand = false
+      lastSurface = 'green'
+      // どかんの上で止まっていたら、ここから うって そのまま入れる。
+      for (const warp of warps) warp.inside = false
       emit({ kind: 'shot', power, position: position() })
       return true
     },
@@ -360,7 +502,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       const start = position()
       const length = Math.hypot(direction.x, direction.z) || 1
       let d = { x: direction.x / length, z: direction.z / length }
-      let remaining = Math.min(maxLength, rollDistance(shotSpeed(power), decelOf('green')))
+      let remaining = Math.min(maxLength, rollDistance(shotSpeed(power), decelAlong(start, { x: start.x + d.x * maxLength, z: start.z + d.z * maxLength })))
       const points: Vec3[] = [start]
       let from = start
       for (let bounce = 0; bounce < 2 && remaining > 0.05; bounce++) {
@@ -388,11 +530,11 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         const distance = segmentDistance(p, route[index]!, route[index + 1]!)
         if (distance <= nearest + 1e-6) { nearest = distance; segment = index }
       }
-      const decel = decelOf('green')
       const aimAt = (target: Vec2, extra: number, lastPassed: number): ShotSuggestion => {
         const dx = target.x - p.x
         const dz = target.z - p.z
         const distance = Math.hypot(dx, dz) || 1
+        const decel = decelAlong(p, target)
         const rise = Math.max(0, (geometry.heightAt(target.x, target.z) ?? p.y) - (p.y - BALL_RADIUS))
         // 上り坂は、転がる玉の運動エネルギー（回転ぶん7/5倍）で登る高さのぶんだけ強くする。
         let power = powerForDistance(distance + extra + (course.gravity * rise * 1.4) / decel, decel)
@@ -403,18 +545,21 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       for (let index = route.length - 1; index > segment; index--) {
         if (clearLine(p, route[index]!)) return aimAt(route[index]!, index === route.length - 1 ? 0.6 : 0.25, index)
       }
-      // 2. 次の点の向きを少しずつ ずらし、バンパーや いわの よこを通す。
+      // 2. 次の点の向きを少しずつ ずらし、バンパーや いわ・とびらの よこを通す。
+      //    近くで ふさがれているときは、大きく ずらさないと すきまへ入らないので、角度は広めまで ためす。
       const next = route[segment + 1]!
       const toward = Math.atan2(next.z - p.z, next.x - p.x)
       const reach = Math.hypot(next.x - p.x, next.z - p.z)
-      for (const offset of [8, -8, 16, -16, 24, -24, 32, -32]) {
+      for (const offset of [8, -8, 16, -16, 24, -24, 32, -32, 45, -45, 60, -60]) {
         const angle = toward + (offset * Math.PI) / 180
         const target = { x: p.x + Math.cos(angle) * reach, z: p.z + Math.sin(angle) * reach }
         if (clearLine(p, target)) return aimAt(target, 0.6, segment + 1)
       }
       // 3. ふうしゃの柱のかげなどでは、いまの区間の はじめの点（トンネルの入口など）へ戻る。
+      //    ふさいでいるのが うごくカベなら、開くのを待てばよいので さがらない。
+      const blocking = cast(p, { x: Math.cos(toward), z: Math.sin(toward) }, reach)
       const back = route[segment]!
-      if (Math.hypot(back.x - p.x, back.z - p.z) > 0.4 && clearLine(p, back)) return aimAt(back, 0.25, segment)
+      if (blocking?.kind !== 'gate' && Math.hypot(back.x - p.x, back.z - p.z) > 0.4 && clearLine(p, back)) return aimAt(back, 0.25, segment)
       return aimAt(next, 0.6, segment + 1)
     },
     dispose() {

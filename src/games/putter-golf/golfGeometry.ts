@@ -7,7 +7,7 @@
  * DOM も Rapier も使わないので、形の正しさをそのままテストできる。
  */
 import { ShapeUtils, Vector2 } from 'three'
-import type { FloorPiece, HoleDefinition, Vec2 } from './golfCourses'
+import type { FloorPiece, HoleDefinition, SurfaceZone, Vec2, ZoneKind } from './golfCourses'
 import { CUP_DEPTH, CUP_RADIUS, PLATFORM_DEPTH, WALL_HEIGHT, WALL_THICKNESS, type Surface, type Vec3 } from './golfPhysics'
 
 export const CELL = 0.25
@@ -19,7 +19,7 @@ export type MeshBuffers = { positions: Float32Array; normals: Float32Array; indi
 /** 壁1本ぶんの箱。yaw は y 軸まわりの回転で、箱のローカル x が壁の向き。 */
 export type WallBox = { x: number; y: number; z: number; hx: number; hy: number; hz: number; yaw: number }
 export type HoleGeometry = {
-  floor: MeshBuffers & { sand: Float32Array }
+  floor: MeshBuffers
   wallBody: MeshBuffers
   wallCap: MeshBuffers
   skirt: MeshBuffers
@@ -211,13 +211,22 @@ export function buildHoleGeometry(hole: HoleDefinition, cupRadius = CUP_RADIUS):
     const outline = pieceAt(x, z)
     return outline ? outline.base + height(x, z) : null
   }
-  const sandZones = hole.sand ?? []
-  const sandWeight = (x: number, z: number) => Math.max(0, ...sandZones.map(zone => 1 - smoothstep(zone.radius - 0.08, zone.radius + 0.08, Math.hypot(x - zone.x, z - zone.z))))
+  const zones = hole.zones ?? []
+  const zoneWeight = (zone: SurfaceZone, x: number, z: number) => 1 - smoothstep(zone.radius - 0.08, zone.radius + 0.08, Math.hypot(x - zone.x, z - zone.z))
+  // いちばん濃く重なっている ゆかの種類。どれにも入っていなければ null（＝芝）。
+  const zoneAt = (x: number, z: number): ZoneKind | null => {
+    let found: ZoneKind | null = null
+    let weight = 0.5
+    for (const zone of zones) {
+      const value = zoneWeight(zone, x, z)
+      if (value > weight) { weight = value; found = zone.kind }
+    }
+    return found
+  }
   const cupPiece = pieceAt(hole.cup.x, hole.cup.z)
   const cupY = (cupPiece?.base ?? 0) + height(hole.cup.x, hole.cup.z)
 
   const floor = builder()
-  const sand: number[] = []
   let vertexKeys = new Map<string, number>()
   const addVertex = (x: number, z: number, base: number, fixedY?: number) => {
     const key = `${Math.round(x * 1e5)}:${Math.round(z * 1e5)}`
@@ -230,7 +239,6 @@ export function buildHoleGeometry(hole: HoleDefinition, cupRadius = CUP_RADIUS):
     const length = Math.hypot(nx, 1, nz)
     floor.positions.push(x, fixedY ?? base + height(x, z), z)
     floor.normals.push(nx / length, 1 / length, nz / length)
-    sand.push(sandWeight(x, z))
     vertexKeys.set(key, index)
     return index
   }
@@ -380,7 +388,7 @@ export function buildHoleGeometry(hole: HoleDefinition, cupRadius = CUP_RADIUS):
   }
   const teePiece = pieceAt(hole.tee.x, hole.tee.z)
   return {
-    floor: { ...finish(floor), sand: new Float32Array(sand) },
+    floor: finish(floor),
     wallBody: finish(wallBody),
     wallCap: finish(wallCap),
     skirt: finish(skirt),
@@ -391,6 +399,6 @@ export function buildHoleGeometry(hole: HoleDefinition, cupRadius = CUP_RADIUS):
     tee: { x: hole.tee.x, y: (teePiece?.base ?? 0) + height(hole.tee.x, hole.tee.z), z: hole.tee.z },
     bounds,
     heightAt,
-    surfaceAt: (x, z) => (pieceAt(x, z) ? (sandWeight(x, z) > 0.5 ? 'sand' : 'green') : null),
+    surfaceAt: (x, z) => (pieceAt(x, z) ? zoneAt(x, z) ?? 'green' : null),
   }
 }

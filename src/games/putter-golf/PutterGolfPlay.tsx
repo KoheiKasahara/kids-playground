@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../audio/sound'
-import { findCourse, GOLF_BALLS, GOLF_COURSES, type CourseDefinition, type CourseId, type GolfBallId, type HoleDefinition } from './golfCourses'
+import { findCourse, GOLF_BALLS, GOLF_COURSES, type CourseDefinition, type CourseId, type Gadget, type GolfBallId, type HoleDefinition } from './golfCourses'
 import { roundOutline } from './golfGeometry'
 import { ASSIST_AFTER, createRound, finishHole, loadBestStars, nextHole, recordShot, restartHole, roundTotals, saveBestStars, STAMP_TEXT, stampFor, type RoundState } from './golfRound'
 import { golfSound, type GolfSoundKind } from './golfSound'
@@ -35,17 +35,40 @@ function HoleMap({ hole, course, markerRef }: { hole: HoleDefinition; course: Co
   return (
     <svg viewBox={shape.viewBox} aria-hidden="true" focusable="false">
       {shape.polygons.map(points => <polygon key={points} points={points} fill={course.look.felt} stroke={course.look.wall} strokeWidth="0.32" strokeLinejoin="round" />)}
-      {(hole.sand ?? []).map(zone => <circle key={`${zone.x}:${zone.z}`} cx={zone.x} cy={zone.z} r={zone.radius} fill={course.look.sand} />)}
-      {(hole.gadgets ?? []).map(gadget => gadget.kind === 'windmill'
-        ? <rect key={gadget.id} x={gadget.x - 1.3} y={gadget.z - 0.7} width="2.6" height="1.4" rx="0.3" fill="#fbf5e6" stroke="#d9573f" strokeWidth="0.2" />
-        : gadget.kind === 'booster'
-          ? <rect key={gadget.id} x={gadget.x - 0.55} y={gadget.z - 0.6} width="1.1" height="1.2" rx="0.2" fill="#ffb13b" />
-          : <circle key={gadget.id} cx={gadget.x} cy={gadget.z} r={gadget.radius} fill={gadget.kind === 'rock' ? course.look.rock : course.look.bumper} />)}
+      {(hole.zones ?? []).map(zone => <circle key={`${zone.kind}:${zone.x}:${zone.z}`} cx={zone.x} cy={zone.z} r={zone.radius} fill={zone.kind === 'sand' ? course.look.sand : zone.kind === 'ice' ? course.look.ice : course.look.rough} />)}
+      {(hole.gadgets ?? []).map(gadget => <GadgetMark key={gadget.id} gadget={gadget} course={course} />)}
       <circle cx={hole.cup.x} cy={hole.cup.z} r="0.42" fill="#2b332d" stroke="#ffffff" strokeWidth="0.14" />
       <path d={`M${hole.cup.x} ${hole.cup.z}V${hole.cup.z - 1.5}l1 0.35l-1 0.35`} fill="#ff4f5e" stroke="#ffffff" strokeWidth="0.1" />
       {markerRef && <circle ref={markerRef} cx={hole.tee.x} cy={hole.tee.z} r="0.4" fill="#ffffff" stroke="#e8505b" strokeWidth="0.16" />}
     </svg>
   )
+}
+
+/** ミニマップの しかけの しるし。しかけの種類ごとに 形を 変える。 */
+function GadgetMark({ gadget, course }: { gadget: Gadget; course: CourseDefinition }) {
+  switch (gadget.kind) {
+    case 'windmill':
+      return <rect x={gadget.x - 1.3} y={gadget.z - 0.7} width="2.6" height="1.4" rx="0.3" fill="#fbf5e6" stroke="#d9573f" strokeWidth="0.2" />
+    case 'booster':
+      return <rect x={gadget.x - 0.55} y={gadget.z - 0.6} width="1.1" height="1.2" rx="0.2" fill="#ffb13b" />
+    case 'gate': {
+      const length = Math.hypot(gadget.axis.x, gadget.axis.z) || 1
+      const half = { x: (gadget.axis.x / length) * gadget.halfWidth, z: (gadget.axis.z / length) * gadget.halfWidth }
+      return <line x1={gadget.x - half.x} y1={gadget.z - half.z} x2={gadget.x + half.x} y2={gadget.z + half.z} stroke={course.look.bumper} strokeWidth="0.42" strokeLinecap="round" />
+    }
+    case 'critter':
+      return <g>
+        <line x1={gadget.x} y1={gadget.z} x2={gadget.to.x} y2={gadget.to.z} stroke={course.look.bumper} strokeWidth="0.12" strokeDasharray="0.3 0.3" />
+        <circle cx={(gadget.x + gadget.to.x) / 2} cy={(gadget.z + gadget.to.z) / 2} r="0.3" fill={course.look.bumper} />
+      </g>
+    case 'warp':
+      return <g>
+        <line x1={gadget.x} y1={gadget.z} x2={gadget.exit.x} y2={gadget.exit.z} stroke={course.look.bumperCap} strokeWidth="0.12" strokeDasharray="0.4 0.4" />
+        <circle cx={gadget.x} cy={gadget.z} r={gadget.radius} fill="#2b2f52" stroke={course.look.bumper} strokeWidth="0.18" />
+      </g>
+    default:
+      return <circle cx={gadget.x} cy={gadget.z} r={gadget.radius} fill={gadget.kind === 'rock' ? course.look.rock : course.look.bumper} />
+  }
 }
 
 function stars(count: number, total = 3) {
@@ -82,12 +105,18 @@ export default function PutterGolfPlay() {
       case 'wall': play('wall', event.strength); break
       case 'rock': play('rock', event.strength); break
       case 'bumper': play('bumper'); setMessage('ぽよーん！'); break
+      case 'gate': play('gate', event.strength); setMessage('とびらに あたった！ あくのを まとう'); break
+      case 'critter': play('critter'); setMessage('どうぶつに ぽーん！'); break
+      case 'warp': play('warp'); setMessage('しゅーん！ むこうがわへ！'); break
       case 'windmill': play('windmill'); setMessage('はねに あたった！ タイミングを みて もういちど'); break
       case 'boost': play('boost'); setMessage('びゅーん！'); break
       case 'takeoff': play('jump'); setMessage('ジャンプ！'); break
       case 'land': play('land', event.strength); break
-      case 'sand': play('sand'); setMessage('すなばで ザザッ'); break
-      case 'splash': play('splash'); setMessage(courseId === 'moon' ? 'ひゅーん！ もとの ばしょに もどるよ' : 'ぽちゃん！ もとの ばしょに もどるよ'); break
+      case 'surface':
+        if (event.surface === 'ice') { play('ice'); setMessage('つるつる すべるよ！') }
+        else { play('sand'); setMessage(event.surface === 'sand' ? 'すなばで ザザッ' : 'ふかふかで とまりやすいよ') }
+        break
+      case 'splash': play('splash'); setMessage(courseId === 'moon' ? 'ひゅーん！ もとの ばしょに もどるよ' : courseId === 'snow' ? 'ゆきに ぼふっ！ もとの ばしょに もどるよ' : 'ぽちゃん！ もとの ばしょに もどるよ'); break
       case 'lost': setMessage('おっと！ もとの ばしょに もどるよ'); break
       case 'returned': setMessage('ここから もういちど！'); break
       case 'assisted': play('click'); setMessage('カップの ちかくに おいたよ！'); break
@@ -210,7 +239,7 @@ export default function PutterGolfPlay() {
               <strong>{item.label}</strong>
               <small>{item.description}</small>
               <span className={styles.holeThumbs} aria-hidden="true">{item.holes.map(entry => <HoleMap key={entry.id} hole={entry} course={item} />)}</span>
-              {best[item.id] ? <small className={styles.best}>さいこう {best[item.id]}/9 ★</small> : null}
+              {best[item.id] ? <small className={styles.best}>さいこう {best[item.id]}/{item.holes.length * 3} ★</small> : null}
             </button>)}
           </div>
           <div className={styles.options}>

@@ -84,7 +84,8 @@ describe.each(HOLES.map(hole => [hole.id, hole] as [string, HoleDefinition]))('%
   })
   test('壁の箱は外周の外側にあり、ボールが通れるすき間を残さない', () => {
     for (const wall of geometry.walls) {
-      expect(insideOutline(wall.x, wall.z, geometry.outlines.flatMap(outline => outline.points))).toBe(false)
+      // 床が2まい以上あるホールもあるので、外周ごとに見る（点をつなげて1つの多角形にはできない）。
+      for (const outline of geometry.outlines) expect(insideOutline(wall.x, wall.z, outline.points)).toBe(false)
       expect(wall.hy * 2).toBeGreaterThan(0.3)
     }
     for (const outline of geometry.outlines) {

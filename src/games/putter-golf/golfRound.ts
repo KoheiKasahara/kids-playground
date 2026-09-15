@@ -2,7 +2,7 @@
  * 1コース（3ホール）ぶんの進みぐあいと成績。純粋な計算だけを置く。
  * 打った数が多くても「できた！」で終わり、失敗やゲームオーバーは作らない。
  */
-import type { CourseId } from './golfCourses'
+import { COURSE_IDS, type CourseId } from './golfCourses'
 
 export type Stamp = 'hole-in-one' | 'great' | 'par' | 'clear'
 export type HoleScore = { holeId: string; strokes: number; par: number; stars: number; stamp: Stamp }
@@ -74,7 +74,7 @@ export function loadBestStars(store: StorageLike | null = storage()): Partial<Re
     if (!parsed || typeof parsed !== 'object') return {}
     const result: Partial<Record<CourseId, number>> = {}
     for (const [key, value] of Object.entries(parsed)) {
-      if ((key === 'meadow' || key === 'beach' || key === 'moon') && typeof value === 'number' && Number.isFinite(value)) result[key] = value
+      if ((COURSE_IDS as readonly string[]).includes(key) && typeof value === 'number' && Number.isFinite(value)) result[key as CourseId] = value
     }
     return result
   } catch { return {} }

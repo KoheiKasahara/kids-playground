@@ -101,6 +101,91 @@ describe('パターゴルフの物理', () => {
     expect(passed).toBeGreaterThanOrEqual(12)
   })
 
+  it('うごくカベは、うつタイミングしだいで ボールを とめたり とおしたりする', () => {
+    const hole = holeById('moon-4')
+    let blocked = 0
+    let passed = 0
+    // とびらの ひとまわり（およそ7秒）ぜんたいから、うつ時刻を えらぶ。
+    for (let k = 0; k < 24; k++) {
+      withWorld(open(MOON, hole), world => {
+        for (let i = 0; i < k * 36; i++) world.step()
+        world.shoot({ x: 0, z: -1 }, 0.62)
+        let crossed = false
+        const events = roll(world, () => { if (world.ball().position.z < 2.0) crossed = true })
+        if (crossed) passed++
+        else {
+          expect(events.some(event => event.kind === 'gate')).toBe(true)
+          blocked++
+        }
+      })
+    }
+    expect(blocked).toBeGreaterThanOrEqual(3)
+    expect(passed).toBeGreaterThanOrEqual(8)
+  })
+
+  it('うごくカベの 通り道に 置いたボールは、カベの 外へ どく', () => {
+    const hole = holeById('moon-4')
+    withWorld(open(MOON, hole), world => {
+      const door = hole.gadgets!.find(gadget => gadget.kind === 'gate')!
+      const rest = world.placeBall({ x: 0, z: door.z })
+      expect(Math.abs(rest.z - door.z)).toBeGreaterThan(BALL_RADIUS)
+      expect(rest.x).toBeCloseTo(0, 5)
+    })
+  })
+
+  it('どかんに入ると、むこうの どかんから 勢いを のこして 出てくる', () => {
+    const hole = holeById('beach-4')
+    withWorld(open(BEACH, hole), world => {
+      world.placeBall({ x: 0, z: 4.2 })
+      world.shoot({ x: 0, z: -1 }, 0.6)
+      const events = roll(world)
+      const warp = events.find(event => event.kind === 'warp')
+      expect(warp).toBeDefined()
+      if (warp?.kind !== 'warp') throw new Error('warp')
+      expect(Math.hypot(warp.to.x - 2.7, warp.to.z + 1.4)).toBeLessThan(0.05)
+      // 出たあとも 転がって、むこうの 島で 止まる（すぐ 入口へ 戻らない）。
+      const ball = world.ball().position
+      expect(ball.x).toBeGreaterThan(1)
+      expect(ball.z).toBeLessThan(-1.4)
+    })
+  })
+
+  it('こおりは よく すべり、ふかふかは すぐ止まる', () => {
+    const lane = (zones?: HoleDefinition['zones']): HoleDefinition => ({
+      id: 'lane', name: 'lane', par: 1, tee: { x: 0, z: 14 }, cup: { x: 0, z: -14 },
+      floors: [{ corners: [{ x: -1.5, z: 15 }, { x: -1.5, z: -15 }, { x: 1.5, z: -15 }, { x: 1.5, z: 15 }] }],
+      zones, route: [{ x: 0, z: 14 }, { x: 0, z: -14 }], tip: '',
+    })
+    const travel = (zones?: HoleDefinition['zones']) => withWorld(open(MEADOW, lane(zones)), world => {
+      world.shoot({ x: 0, z: -1 }, 0.5)
+      const events = roll(world)
+      return { distance: 14 - world.ball().position.z, surfaces: events.flatMap(event => (event.kind === 'surface' ? [event.surface] : [])) }
+    })
+    const plain = travel()
+    const ice = travel([{ kind: 'ice', x: 0, z: 10, radius: 3 }])
+    const rough = travel([{ kind: 'rough', x: 0, z: 10, radius: 3 }])
+    expect(plain.surfaces).toEqual([])
+    expect(ice.surfaces).toContain('ice')
+    expect(rough.surfaces).toContain('rough')
+    expect(ice.distance).toBeGreaterThan(plain.distance * 1.3)
+    expect(rough.distance).toBeLessThan(plain.distance * 0.8)
+  })
+
+  it('歩く どうぶつに あたると、ボールは はねかえる', () => {
+    const hole = holeById('meadow-4')
+    withWorld(open(MEADOW, hole), world => {
+      // どうぶつの 歩く線の 上から うつ（よけられない ように）。
+      const duck = world.motion().critters[0]!
+      world.placeBall({ x: 1.5, z: duck.z })
+      world.shoot({ x: -1, z: 0 }, 0.4)
+      const events = roll(world)
+      const hit = events.find(event => event.kind === 'critter')
+      expect(hit?.kind).toBe('critter')
+      // ぶつかった所より うった がわへ もどされる。
+      expect(world.ball().position.x).toBeGreaterThan(hit!.position.x)
+    })
+  })
+
   it.each(GOLF_COURSES.flatMap(course => course.holes.map(hole => [hole.id, course, hole] as const)))('%s: みちすじの どの点からも、先の点が見通せる', (_, course, hole) => {
     withWorld(open(course, hole), world => {
       hole.route.slice(0, -1).forEach((point, index) => {
@@ -144,14 +229,14 @@ describe('パターゴルフの物理', () => {
       world.placeBall({ x: 0.35, z: 2.8 })
       world.shoot({ x: 0, z: -1 }, 0.5)
       const events = roll(world)
-      expect(events.some(event => event.kind === 'sand')).toBe(true)
+      expect(events.some(event => event.kind === 'surface' && event.surface === 'sand')).toBe(true)
       return 2.8 - world.ball().position.z
     })
     const around = withWorld(open(BEACH, hole), world => {
       world.placeBall({ x: -1.4, z: 2.8 })
       world.shoot({ x: 0, z: -1 }, 0.5)
       const events = roll(world)
-      expect(events.some(event => event.kind === 'sand')).toBe(false)
+      expect(events.some(event => event.kind === 'surface')).toBe(false)
       return 2.8 - world.ball().position.z
     })
     expect(through).toBeLessThan(around * 0.7)
