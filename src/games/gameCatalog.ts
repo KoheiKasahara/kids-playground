@@ -730,6 +730,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'water-wheel-maze',
+    slug: 'water-wheel-maze',
+    title: 'ぐるぐる すいしゃ',
+    emoji: '🎡',
+    category: 'learning',
+    seo: {
+      headline: 'ぐるぐる すいしゃ｜まるい迷路を回して水を下へ落とす',
+      description: 'まるい迷路を指でぐるぐる回して、まんなかの水を下のすいしゃまで落とすパズルです。わっかのすきまを下にむけると水が一段ずつおりていき、とどいた水がすいしゃとかんらんしゃを回します。6つのステージを自分のペースで遊べます。',
+    },
+    intro: {
+      howToPlay: [
+        'めいろを ゆびで まわすと、みずが したへ おちるよ',
+        'わっかの すきまを したに むけるのが コツだよ',
+        'みずが とどくと かんらんしゃが まわって、どうぶつが のれるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
