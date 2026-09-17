@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendPart, BOARD_LIMIT, BUILD_HEIGHT, canPlace, connectors, createPart, FUNNEL_INLET_Z, FUNNEL_LIFT, hasConnectedInput, initialCourse, launchPose, MAX_HEIGHT, MAX_PARTS, needsMoreHeight, openConnectors, removePart, snapPart, SNAP_RADIUS, toLocal, toWorld, type Course } from './marbleModel'
+import { appendPart, BALL_RADIUS, BOARD_LIMIT, BUILD_HEIGHT, canPlace, connectors, createPart, FUNNEL_INLET_Z, FUNNEL_LIFT, hasConnectedInput, initialCourse, launchPose, MAX_HEIGHT, MAX_PARTS, needsMoreHeight, openConnectors, removePart, snapPart, SNAP_RADIUS, spinnerFloor, SPINNER_BAR_RADIUS, SPINNER_BAR_REACH, SPINNER_BAR_Y, SPINNER_DROP, toLocal, toWorld, type Course } from './marbleModel'
 
 describe('marble course placement', () => {
   it('snaps all four orientations and inherits height at the mouth', () => {
@@ -121,6 +121,15 @@ describe('marble course placement', () => {
     const tall: Course = { parts: [...low.parts, createPart('straight', 'tall', { x: 12, y: MAX_HEIGHT - 0.2, z: 0 })], startId: 'low' }
     expect(needsMoreHeight(tall, 'funnel', 'low')).toBe(true)
     expect(hasConnectedInput(appendPart(tall, 'funnel', 'f', 'low').parts.at(-1)!, tall.parts)).toBe(false)
+  })
+  it('falls across the motor tray and still swings the bar clear of it', () => {
+    // A ball that the bar has stopped has somewhere to roll, at either end of the tray.
+    expect(spinnerFloor(-3)).toBeCloseTo(0)
+    expect(spinnerFloor(3)).toBeCloseTo(-SPINNER_DROP)
+    expect(SPINNER_DROP / 6).toBeGreaterThan(0.1)
+    // The tips pass over the uphill floor they reach, and the bar still meets a ball rather than its top.
+    expect(SPINNER_BAR_Y - SPINNER_BAR_RADIUS).toBeGreaterThan(spinnerFloor(-SPINNER_BAR_REACH))
+    expect(SPINNER_BAR_Y).toBeLessThan(spinnerFloor(0) + 2 * BALL_RADIUS)
   })
   it('removes a single piece and hands the start flag to a piece that can still roll', () => {
     let course = appendPart(initialCourse(), 'straight', 'a', 'part-0')

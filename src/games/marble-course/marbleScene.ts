@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { createPartGeometries, seesawBoardGeometry } from './marbleGeometry'
-import { BALL_RADIUS, BOARD_LIMIT, connectors, isGadget, launchPose, MAX_PARTS, PARTS, SEESAW_ANGLE, SEESAW_PIVOT, SPINNER_ANGLE, SPINNER_DROP, toLocal, toWorld, type Course, type Vec3 } from './marbleModel'
+import { BALL_RADIUS, BOARD_LIMIT, connectors, isGadget, launchPose, MAX_PARTS, PARTS, SEESAW_ANGLE, SEESAW_PIVOT, SPINNER_ANGLE, SPINNER_BAR_HALF, SPINNER_BAR_RADIUS, SPINNER_BAR_Y, SPINNER_DROP, spinnerFloor, toLocal, toWorld, type Course, type Vec3 } from './marbleModel'
 import type { MarbleEvent, MechanismPose } from './marbleWorld'
 
 const MIN_ZOOM = 0.45
@@ -112,8 +112,9 @@ export function createMarbleScene(container: HTMLDivElement) {
   const meshes = new Map<string, THREE.Mesh>()
   const moving = new Map<string, THREE.Object3D>()
   const boardGeometry = seesawBoardGeometry()
-  const barGeometry = new THREE.CapsuleGeometry(0.16, 1.8, 5, 12).rotateZ(Math.PI / 2)
-  const hubGeometry = new THREE.CylinderGeometry(0.16, 0.21, 0.7, 16)
+  const barGeometry = new THREE.CapsuleGeometry(SPINNER_BAR_RADIUS, SPINNER_BAR_HALF * 2, 5, 12).rotateZ(Math.PI / 2)
+  const HUB_HEIGHT = 0.7
+  const hubGeometry = new THREE.CylinderGeometry(0.16, 0.21, HUB_HEIGHT, 16)
   const axleGeometry = new THREE.CylinderGeometry(0.12, 0.12, 2, 12).rotateX(Math.PI / 2)
   const tipGeometry = new THREE.TorusGeometry(0.165, 0.035, 6, 12).rotateY(Math.PI / 2)
   const holeGeometry = new THREE.TorusGeometry(0.49, 0.035, 6, 32).rotateX(-Math.PI / 2)
@@ -131,15 +132,17 @@ export function createMarbleScene(container: HTMLDivElement) {
   jumpGuide.computeLineDistances()
   jumpGuide.renderOrder = 4
   scene.add(jumpGuide)
+  // The turn mark rides just over the bar, wherever the tray's fall has put it.
+  const spinGuideY = SPINNER_BAR_Y + 0.44
   const circleGeometry = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 28 }, (_, i) => {
     const a = i / 27 * Math.PI * 1.65
-    return new THREE.Vector3(Math.cos(a) * 1.4, 0.55, 0.3 + Math.sin(a) * 1.4)
+    return new THREE.Vector3(Math.cos(a) * 1.4, spinGuideY, 0.3 + Math.sin(a) * 1.4)
   }))
   const circleMaterial = new THREE.LineBasicMaterial({ color: '#a4476e' })
   const spinGuide = new THREE.Group()
   spinGuide.add(new THREE.Line(circleGeometry, circleMaterial))
   const spinArrow = new THREE.Mesh(arrowGeometry, inkMaterial)
-  spinArrow.position.set(1.4, 0.55, 0.3)
+  spinArrow.position.set(1.4, spinGuideY, 0.3)
   spinArrow.rotation.y = Math.PI / 2
   spinGuide.add(spinArrow)
   scene.add(spinGuide)
@@ -218,7 +221,8 @@ export function createMarbleScene(container: HTMLDivElement) {
           mesh.add(bar)
           moving.set(part.id, bar)
           const hub = new THREE.Mesh(hubGeometry, supportMaterial)
-          hub.position.set(0, 0.34 - SPINNER_DROP / 2, 0.3)
+          // The post stands on the tray floor, so the fall across the tray leaves no gap under it.
+          hub.position.set(0, spinnerFloor(0) + HUB_HEIGHT / 2, 0.3)
           mesh.add(hub)
         }
         if (part.kind === 'seesaw') {
@@ -254,7 +258,7 @@ export function createMarbleScene(container: HTMLDivElement) {
       mesh.rotation.y = -part.rotation * Math.PI / 2
       const mechanism = moving.get(part.id)
       if (mechanism) {
-        mechanism.position.set(0, part.kind === 'spinner' ? 0.34 - SPINNER_DROP / 2 : SEESAW_PIVOT, part.kind === 'spinner' ? 0.3 : 0)
+        mechanism.position.set(0, part.kind === 'spinner' ? SPINNER_BAR_Y : SEESAW_PIVOT, part.kind === 'spinner' ? 0.3 : 0)
         mechanism.rotation.set(0, part.kind === 'spinner' ? SPINNER_ANGLE : 0, part.kind === 'seesaw' ? SEESAW_ANGLE : 0)
       }
       const ends = connectors(part)
