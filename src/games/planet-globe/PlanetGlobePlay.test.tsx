@@ -213,7 +213,7 @@ describe('PlanetGlobePlay', () => {
 
     expect(screen.getByText('だいせきはん')).toBeInTheDocument()
     expect(
-      screen.getByText('もくせいに ある、とても おおきな あらしだよ。ちきゅうより おおきいんだ。'),
+      screen.getByText('ちきゅうが すっぽり はいる おおきな あらしだよ。'),
     ).toBeInTheDocument()
   })
 
@@ -253,12 +253,12 @@ describe('PlanetGlobePlay', () => {
     act(() => {
       planetEngineMock.options?.onSpotSelect('moon-crater')
     })
-    expect(screen.getByText('クレーター')).toBeInTheDocument()
+    expect(screen.getByText('ティコ クレーター')).toBeInTheDocument()
 
     act(() => {
       planetEngineMock.options?.onSpotSelect(null)
     })
-    expect(screen.queryByText('クレーター')).not.toBeInTheDocument()
+    expect(screen.queryByText('ティコ クレーター')).not.toBeInTheDocument()
   })
 
   it('switches to Phase 4で追加した天体 and passes their kind/spots to the engine', async () => {
@@ -277,7 +277,7 @@ describe('PlanetGlobePlay', () => {
     expect(planetEngineMock.options?.body.id).toBe('earth')
     expect(planetEngineMock.options?.body.kind).toBe('planet')
     expect(planetEngineMock.options?.spots.map((spot) => spot.id)).toEqual(
-      expect.arrayContaining(['continent-asia', 'ocean-pacific', 'earth-north-pole', 'earth-south-pole']),
+      expect.arrayContaining(['continent-asia', 'ocean-pacific', 'earth-north-pole', 'continent-antarctica']),
     )
 
     await user.click(screen.getByRole('button', { name: 'めいおうせい' }))
@@ -441,7 +441,7 @@ describe('PlanetGlobePlay のよみあげ挙動', () => {
     })
 
     expect(mock.spoken).toEqual([
-      'つきの うみ。くろく みえる たいらな ところだよ。うみと よばれるけど、みずは ないんだ。',
+      'つきの うみ。くろく みえる たいらな ところ。ここに ひとが おりたよ。',
     ])
   })
 
