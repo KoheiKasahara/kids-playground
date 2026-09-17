@@ -1,0 +1,608 @@
+/* おちてくるモード（#711）。自由に置くモードと同じ雰囲気にしつつ、
+   盤面まわりの操作が「えらぶ → おとす」の2つだけに見えるように並べる。 */
+.page {
+  /* 盤面や操作ボタンから始めたスワイプでページが動かないようにする。
+     この main の外にある説明エリアでは通常どおりスクロールできる。 */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  display: grid;
+  /* ヘッダー / つぎ・そろえた / 盤面 / ひとこと / 操作 / はやさ。盤面だけが余った高さを受け取る。 */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  gap: var(--space-xs);
+  background: linear-gradient(160deg, #eef6ff 0%, #fdf6ec 60%, #fdeef7 100%);
+}
+
+.header {
+  min-height: var(--tap-target-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* もどる／さいしょから にはさまれた狭い幅でも読めるよう、
+   自由に置くモードの見出しより小さめの字にし、折り返すときは語の切れ目で折る。 */
+.titleWord {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: #3b3b3b;
+  font-size: clamp(15px, 4vw, 26px);
+  line-height: 1.15;
+  text-align: center;
+}
+
+.restartButton {
+  flex: 0 0 auto;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: var(--space-xs) var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: rgb(255 255 255 / 88%);
+  box-shadow: var(--shadow-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.restartButton:active {
+  transform: scale(0.95);
+  box-shadow: none;
+}
+
+.restartButton:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+  cursor: default;
+}
+
+.restartButton:disabled:active {
+  transform: none;
+}
+
+/* つぎに出てくる形と、そろえた段の数。文字が読めなくても、
+   形の絵と星の数で「つぎ」と「ごほうび」が分かるようにする。 */
+.statusRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+
+.nextBox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: 3px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: var(--shadow-sm);
+}
+
+.nextLabel {
+  color: var(--color-primary-dark);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.nextPieceArea {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 28px;
+}
+
+.nextPiece {
+  --piece-cell-size: 11px;
+  --block-radius: 4px;
+  --block-edge-width: 2px;
+  width: auto;
+  height: auto;
+}
+
+.score {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.score strong {
+  color: #e8590c;
+  font-size: 20px;
+}
+
+/* 盤面は縦横どちらにもはみ出さない最大サイズにする（自由に置くモードと同じ考え方）。 */
+.boardArea {
+  container-type: size;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.board {
+  position: relative;
+  box-sizing: border-box;
+  width: min(100cqw, 100cqh * var(--board-cols) / var(--board-rows), 380px);
+  aspect-ratio: var(--board-cols) / var(--board-rows);
+  --board-padding: 6px;
+
+  padding: var(--board-padding);
+  border: 4px solid #c9d6e5;
+  border-radius: var(--radius-md);
+  background: #f7fbff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* よこ1れつがそろった瞬間の、盤面ぜんたいがポンッと弾む手ごたえ。 */
+.boardCleared {
+  animation: fallingBoardPop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes fallingBoardPop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  45% {
+    transform: scale(1.03);
+  }
+}
+
+.cellGrid {
+  position: absolute;
+  inset: var(--board-padding);
+  display: grid;
+  grid-template-columns: repeat(var(--board-cols), 1fr);
+  grid-template-rows: repeat(var(--board-rows), 1fr);
+}
+
+.cell {
+  box-sizing: border-box;
+  border: 1px solid #dbe4ef;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 50%, rgb(155 178 204 / 35%) 0 8%, transparent 9%),
+    #ffffff;
+}
+
+/* ブロックを重ねるレイヤー。位置は盤面に対する割合(%)で決める。 */
+.blockLayer {
+  position: absolute;
+  inset: var(--board-padding);
+  pointer-events: none;
+}
+
+.pieceSlot {
+  position: absolute;
+  --block-radius: 8px;
+  --block-edge-width: 2px;
+}
+
+.piece {
+  width: 100%;
+  height: 100%;
+}
+
+/* 着地予定のうすいブロック。実際のブロックより後ろに置く。 */
+.ghost {
+  z-index: 0;
+  opacity: 0.75;
+}
+
+/* 落ちているブロック。よこの移動はすばやく、下への移動は落ちて見える速さにする。 */
+.fallingPiece {
+  z-index: 1;
+  transition:
+    top 260ms cubic-bezier(0.45, 0.05, 0.55, 0.95),
+    left 130ms ease-out;
+}
+
+/* 列をえらぶ透明なボタン。1列まるごとが押せる大きさになる。 */
+.columnLayer {
+  position: absolute;
+  inset: var(--board-padding);
+  display: grid;
+  grid-template-columns: repeat(var(--board-cols), 1fr);
+  z-index: 2;
+}
+
+.columnButton {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* 押した列がひと目で分かるように、押している間だけ薄く光らせる。 */
+.columnButton:active {
+  background: rgb(76 110 245 / 12%);
+}
+
+.columnButton:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: -3px;
+}
+
+.sparkles {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.sparkle {
+  position: absolute;
+  font-size: 24px;
+  line-height: 1;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: fallingSparklePop 900ms ease-out forwards;
+}
+
+@keyframes fallingSparklePop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2) rotate(-30deg);
+  }
+
+  35% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2) rotate(8deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85) rotate(20deg);
+  }
+}
+
+/* いっぱいになったときの知らせ。責めない言い方にして、すぐやり直せるようにする。 */
+.overBanner {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-md);
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: var(--space-sm) var(--space-md);
+  max-width: calc(100% - var(--space-md) * 2);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  border-radius: var(--radius-lg);
+  background: rgb(255 255 255 / 94%);
+  box-shadow: var(--shadow-md), 0 0 0 4px rgb(255 212 59 / 55%);
+  animation: fallingBannerIn 260ms ease-out both;
+}
+
+@keyframes fallingBannerIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.94);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.overText {
+  margin: 0;
+  color: #d9480f;
+  font-size: clamp(17px, 4.4vw, 22px);
+  font-weight: 900;
+  text-align: center;
+}
+
+.againButton {
+  min-width: 160px;
+  min-height: var(--tap-target-min);
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  border-radius: var(--radius-round);
+  color: #fff;
+  background: linear-gradient(135deg, #4dabf7 0%, #1c7ed6 100%);
+  box-shadow: 0 4px 0 #1864ab, var(--shadow-md);
+  font-size: clamp(16px, 4.4vw, 20px);
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 22%);
+  cursor: pointer;
+}
+
+.againButton:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #1864ab;
+}
+
+.message {
+  margin: 0;
+  min-height: 1.6em;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* うごかす・まわす・おとす。おとす だけ色と大きさを変えて、
+   「さいごに押すのはこれ」が分かるようにする。 */
+.controls {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.controlButton {
+  flex: 0 1 auto;
+  box-sizing: border-box;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: 2px var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dropButton {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  max-width: 200px;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  padding: 2px var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: linear-gradient(135deg, #ffa94d 0%, #f76707 100%);
+  box-shadow: 0 4px 0 #d9480f, var(--shadow-sm);
+  font-size: 15px;
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 20%);
+  cursor: pointer;
+}
+
+.controlIcon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.controlButton:active {
+  transform: scale(0.95);
+}
+
+.dropButton:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #d9480f;
+}
+
+.controlButton:disabled,
+.dropButton:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+  cursor: default;
+}
+
+.controlButton:disabled:active,
+.dropButton:disabled:active {
+  transform: none;
+}
+
+/* おちる はやさ。おとなが子どもに合わせて変えられるよう、遊んでいる間ずっと出しておく。 */
+.speeds {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.speedButton {
+  min-height: 40px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-round);
+  background: rgb(255 255 255 / 92%);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.speedButtonSelected {
+  border-color: var(--color-primary);
+  background: #e7edff;
+  color: var(--color-primary-dark);
+}
+
+.speedButton:active {
+  transform: scale(0.96);
+}
+
+/* さいしょから の確認。押した瞬間には消さず、ここで一度立ち止まらせる。 */
+.restartConfirm {
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.restartConfirmText {
+  margin: 0;
+  color: var(--color-danger-dark);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.restartConfirmButtons {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.restartConfirmCancel,
+.restartConfirmOk {
+  min-width: var(--tap-target-min);
+  min-height: 40px;
+  padding: var(--space-xs) var(--space-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 92%);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.restartConfirmOk {
+  border-color: var(--color-danger-dark);
+  color: #fff;
+  background: var(--color-danger);
+}
+
+.restartConfirmCancel:active,
+.restartConfirmOk:active {
+  transform: scale(0.96);
+}
+
+/* 低い横画面では、縦に積むと盤面の高さが足りない。
+   操作まわりを右側の縦並びに移し、余った高さをすべて盤面へ渡す。 */
+/* 低い横画面では、縦に積むと盤面の高さが足りない。
+   操作まわりを右側の縦並びに移し、余った高さをすべて盤面へ渡す。
+   盤面が行をまたいで縮まないよう、右側の4つには行番号を明示して、
+   盤面にはヘッダー以外のすべての行を割り当てる。 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr) 240px;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    column-gap: var(--space-sm);
+  }
+
+  .header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .boardArea {
+    grid-column: 1;
+    grid-row: 2 / -1;
+  }
+
+  .statusRow {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .message,
+  .restartConfirm {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: center;
+  }
+
+  .controls {
+    grid-column: 2;
+    grid-row: 4;
+    flex-wrap: wrap;
+  }
+
+  .speeds {
+    grid-column: 2;
+    grid-row: 5;
+  }
+
+  .speedButton {
+    padding: var(--space-xs) 6px;
+    font-size: 12px;
+  }
+
+  .dropButton {
+    flex: 1 0 100%;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .restartButton:active,
+  .controlButton:active,
+  .dropButton:active,
+  .speedButton:active,
+  .againButton:active,
+  .restartConfirmCancel:active,
+  .restartConfirmOk:active {
+    transform: none;
+  }
+
+  .boardCleared,
+  .overBanner {
+    animation: none;
+  }
+
+  /* 落ちる動きは残しつつ、ゆれや弾みは出さない。 */
+  .fallingPiece {
+    transition: none;
+  }
+
+  .sparkle {
+    animation: fallingSparkleFadeOnly 900ms ease-out forwards;
+  }
+}
+
+@keyframes fallingSparkleFadeOnly {
+  0% {
+    opacity: 0;
+  }
+
+  35% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}

@@ -13,8 +13,13 @@ import GamePlaySurface from '../components/GamePlaySurface'
 
 // 選択画面とプレイ画面が同一route内で切り替わるゲームは、routeでは包まずコンポーネント内で
 // 条件付きに適用しているため、route構造の機械チェックからは除外し、専用テストに委ねる
-// （FlagRollPuzzlePlay.test.tsx / DominoFlagPlay.test.tsx 側の状態別テストを参照）。
-const CONDITIONALLY_WRAPPED_PATHS = new Set(['/games/domino-flag', '/games/flag-roll-puzzle'])
+// （FlagRollPuzzlePlay.test.tsx / DominoFlagPlay.test.tsx / BlockPuzzlePlay.test.tsx 側の
+// 状態別テストを参照）。
+const CONDITIONALLY_WRAPPED_PATHS = new Set([
+  '/games/block-puzzle',
+  '/games/domino-flag',
+  '/games/flag-roll-puzzle',
+])
 
 function elementType(element: RouteObject['element']): unknown {
   if (element === null || element === undefined || typeof element !== 'object') return undefined
@@ -39,7 +44,6 @@ function isPlayRoutePath(route: RouteObject & { path: string }): boolean {
     '/games/puni-slime',
     '/games/piano-play',
     '/games/color-paint-puzzle',
-    '/games/block-puzzle',
     '/games/pukupuka-rescue',
     '/games/oekaki-korokoro',
     '/games/tsumiki-bowling',
