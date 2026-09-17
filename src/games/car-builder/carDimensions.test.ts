@@ -164,7 +164,7 @@ describe('組み合わせ耐性（7ボディ×タイヤ×車高の全パター�
 
   test('タイヤの大きさは車種ごとの元タイヤ実測値からの倍率で決まる（固定の絶対値を使わない）', () => {
     // 元タイヤ半径が最も違う2車種（SUVが最大、SchoolBusが最小）で確かめる。
-    for (const type of ['small', 'big', 'offroad', 'racing', 'whitewall', 'flower'] as const) {
+    for (const type of CAR_CATEGORIES.wheel.options.map((option) => option.id)) {
       const suv = resolveWheelSpec(CAR_VEHICLES.suv, type)
       const schoolBus = resolveWheelSpec(CAR_VEHICLES.schoolBus, type)
       expect(suv.radius, type).toBeGreaterThan(schoolBus.radius)
@@ -182,9 +182,9 @@ describe('組み合わせ耐性（7ボディ×タイヤ×車高の全パター�
     }
   })
 
-  test('全車種×4タイヤ種で寸法が有限かつ正の値になる', () => {
+  test('全車種×全タイヤ種で寸法が有限かつ正の値になる', () => {
     for (const id of CAR_VEHICLE_ORDER) {
-      for (const type of ['small', 'big', 'offroad', 'racing', 'whitewall', 'flower'] as const) {
+      for (const type of CAR_CATEGORIES.wheel.options.map((option) => option.id)) {
         const spec = resolveWheelSpec(CAR_VEHICLES[id], type)
         expect(spec.radius, `${id}/${type}`).toBeGreaterThan(0)
         expect(spec.width, `${id}/${type}`).toBeGreaterThan(0)

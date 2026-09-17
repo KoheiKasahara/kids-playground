@@ -39,7 +39,7 @@ export type CarWheelRatio = {
 }
 
 /**
- * タイヤ4種の、車種ごとの元タイヤに対する倍率。
+ * 各タイヤ種の、車種ごとの元タイヤに対する倍率。
  *
  * Quaternius車体は採用7車種で元タイヤ半径が0.197〜0.327と大きく異なるため、
  * 固定の絶対サイズを全車種へ機械的に当てはめると、小柄な車種（SchoolBus等）では
@@ -51,6 +51,8 @@ export type CarWheelRatio = {
 export const CAR_WHEEL_RATIOS: Record<WheelType, CarWheelRatio> = {
   whitewall: { id: 'whitewall', radiusRatio: 1.03, widthRatio: 1.0 },
   flower: { id: 'flower', radiusRatio: 1.0, widthRatio: 1.08 },
+  star: { id: 'star', radiusRatio: 1.05, widthRatio: 1.0 },
+  rainbow: { id: 'rainbow', radiusRatio: 1.08, widthRatio: 1.1 },
   small: { id: 'small', radiusRatio: 0.82, widthRatio: 0.78 },
   big: { id: 'big', radiusRatio: 1.22, widthRatio: 1.05 },
   // 径は控えめにとどめ、太さとトレッドブロックで「ゴツさ」を表現する。

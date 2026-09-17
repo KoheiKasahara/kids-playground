@@ -13,11 +13,11 @@ import { CAR_VEHICLES, CAR_VEHICLE_ORDER, type CarVehicleId } from './carVehicle
 
 /** ボディ＝採用したQuaternius車種。実体の定義は carVehicles.ts が持つ。 */
 export type BodyType = CarVehicleId
-export type WheelType = 'small' | 'big' | 'offroad' | 'racing' | 'whitewall' | 'flower'
+export type WheelType = 'small' | 'big' | 'offroad' | 'racing' | 'whitewall' | 'flower' | 'star' | 'rainbow'
 export type CarColorId = 'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'pink' | 'purple' | 'white' | 'black' | 'sky' | 'mint' | 'brown'
-export type FrontType = 'round' | 'square' | 'slim' | 'twin'
-export type RoofType = 'none' | 'policeLight' | 'luggage' | 'spoiler' | 'rabbit' | 'surfboard'
-export type DecorationType = 'none' | 'star' | 'flame' | 'stripes' | 'dots' | 'hearts' | 'checker'
+export type FrontType = 'round' | 'square' | 'slim' | 'twin' | 'smile'
+export type RoofType = 'none' | 'policeLight' | 'luggage' | 'spoiler' | 'rabbit' | 'surfboard' | 'crown' | 'iceCream'
+export type DecorationType = 'none' | 'star' | 'flame' | 'stripes' | 'dots' | 'hearts' | 'checker' | 'rainbow' | 'paw'
 export type CarMarkNumber =
   | 'number1'
   | 'number2'
@@ -28,7 +28,16 @@ export type CarMarkNumber =
   | 'number7'
   | 'number8'
   | 'number9'
-export type CarMarkIcon = 'star' | 'heart' | 'lightning' | 'crown' | 'animal' | 'flower' | 'moon'
+export type CarMarkIcon =
+  | 'star'
+  | 'heart'
+  | 'lightning'
+  | 'crown'
+  | 'animal'
+  | 'flower'
+  | 'moon'
+  | 'rocket'
+  | 'dinosaur'
 export type MarkType = 'none' | CarMarkNumber | CarMarkIcon
 export type RideHeight = 'low' | 'normal' | 'high'
 
@@ -128,6 +137,8 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'racing', label: 'レーシング', preview: { kind: 'wheel', variant: 'racing' } },
       { id: 'whitewall', label: 'しろリボン', preview: { kind: 'wheel', variant: 'whitewall' } },
       { id: 'flower', label: 'おはな', preview: { kind: 'wheel', variant: 'flower' } },
+      { id: 'star', label: 'ほし', preview: { kind: 'wheel', variant: 'star' } },
+      { id: 'rainbow', label: 'にじいろ', preview: { kind: 'wheel', variant: 'rainbow' } },
     ],
   },
   color: {
@@ -160,6 +171,7 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'square', label: '四角ライト', preview: { kind: 'front', variant: 'square' } },
       { id: 'slim', label: '細目ライト', preview: { kind: 'front', variant: 'slim' } },
       { id: 'twin', label: 'よつめライト', preview: { kind: 'front', variant: 'twin' } },
+      { id: 'smile', label: 'にこにこ', preview: { kind: 'front', variant: 'smile' } },
     ],
   },
   roof: {
@@ -174,6 +186,8 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'spoiler', label: 'スポイラー', preview: { kind: 'roof', variant: 'spoiler' } },
       { id: 'rabbit', label: 'うさぎみみ', preview: { kind: 'roof', variant: 'rabbit' } },
       { id: 'surfboard', label: 'サーフボード', preview: { kind: 'roof', variant: 'surfboard' } },
+      { id: 'crown', label: 'おうかん', preview: { kind: 'roof', variant: 'crown' } },
+      { id: 'iceCream', label: 'ソフトクリーム', preview: { kind: 'roof', variant: 'iceCream' } },
     ],
   },
   decoration: {
@@ -189,6 +203,8 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'dots', label: 'みずたま', preview: { kind: 'decoration', variant: 'dots' } },
       { id: 'hearts', label: 'ハート', preview: { kind: 'decoration', variant: 'hearts' } },
       { id: 'checker', label: 'チェック', preview: { kind: 'decoration', variant: 'checker' } },
+      { id: 'rainbow', label: 'にじ', preview: { kind: 'decoration', variant: 'rainbow' } },
+      { id: 'paw', label: 'にくきゅう', preview: { kind: 'decoration', variant: 'paw' } },
     ],
   },
   mark: {
@@ -214,6 +230,8 @@ export const CAR_CATEGORIES: { [K in CarCategoryId]: CarCategoryDefinition<K> } 
       { id: 'animal', label: 'どうぶつ', preview: { kind: 'mark', variant: 'animal' } },
       { id: 'flower', label: 'おはな', preview: { kind: 'mark', variant: 'flower' } },
       { id: 'moon', label: 'おつきさま', preview: { kind: 'mark', variant: 'moon' } },
+      { id: 'rocket', label: 'ロケット', preview: { kind: 'mark', variant: 'rocket' } },
+      { id: 'dinosaur', label: 'きょうりゅう', preview: { kind: 'mark', variant: 'dinosaur' } },
     ],
   },
   rideHeight: {
