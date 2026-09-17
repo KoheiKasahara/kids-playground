@@ -127,10 +127,25 @@ const IMPACT_CONTACT_MARGIN = 0.03
 // 動く床（ベルト）演出。矢印メッシュを少数だけ流し、文字なしで向きを伝える。
 // ---------------------------------------------------------------------------
 
-/** ベルト1本あたりに流す矢印の数。少数固定なので毎フレームの更新コストは無視できる。 */
-const BELT_ARROW_COUNT = 3
-/** 矢印が流れる見た目上の速さ[m/s]。物理のforceとは独立した演出用の値。 */
-const BELT_ARROW_SPEED = 0.85
+/** ベルト1本・1レーンあたりに流す矢印の数。少数固定なので毎フレームの更新コストは無視できる。 */
+const BELT_ARROW_COUNT = 4
+/**
+ * 矢印を流すレーンの数。
+ *
+ * 1列だと帯の真ん中に細い線が見えるだけで、床全体が動いているようには見えない。
+ * 左右2列を半個ぶんずらして流すと、幅のある面がまとめて送られていくように読める。
+ */
+const BELT_ARROW_LANES = 2
+/**
+ * 矢印が流れる見た目上の速さ[m/s]。
+ *
+ * 物理のforceとは独立した演出用の値だが、ベルトが出せる前進速度
+ * （KOMA_BELT_MAX_FORWARD_SPEED）に近い速さにして、乗ったコマの動きと
+ * 矢印の流れが食い違って見えないようにしている。
+ */
+const BELT_ARROW_SPEED = 2.6
+/** 矢印が明滅する周期[ms]。流れる向きと合わせて「送られている」感じを強める。 */
+const BELT_PULSE_PERIOD_MS = 620
 /** 床面との重なりを避ける、ごくわずかな浮き。 */
 const BELT_SURFACE_LIFT = 0.006
 const BELT_ARROW_LIFT = 0.011
@@ -164,6 +179,8 @@ type BeltArrow = {
   belt: KomaFieldBelt
   /** ベルトのローカルX（進行方向）上の位置。halfLengthを超えたら反対側へ折り返す。 */
   localX: number
+  /** ベルトのローカルZ（幅方向）上の位置。レーンごとに固定。 */
+  localZ: number
 }
 
 type KomaVisual = {
@@ -334,6 +351,10 @@ export function useKomaBattleEngine(
     const shadowBlobs: THREE.Mesh[] = []
     const impactPool: ImpactSlot[] = []
     const beltArrows: BeltArrow[] = []
+    /** ベルトの明滅はマテリアル単位でまとめて更新する（矢印Mesh1枚ずつは触らない）。 */
+    const beltArrowMaterials: THREE.MeshStandardMaterial[] = []
+    const beltSurfaceMaterials: THREE.MeshStandardMaterial[] = []
+    let beltPulseMs = 0
     const geometries: THREE.BufferGeometry[] = []
     const materials: THREE.Material[] = []
 
@@ -375,6 +396,8 @@ export function useKomaBattleEngine(
       shadowBlobs.length = 0
       impactPool.length = 0
       beltArrows.length = 0
+      beltArrowMaterials.length = 0
+      beltSurfaceMaterials.length = 0
 
       if (renderer !== null) {
         const canvas = renderer.domElement
@@ -1038,18 +1061,55 @@ export function useKomaBattleEngine(
         )
         surfaceGeometry.setIndex(surfaceIndices)
         surfaceGeometry.computeVertexNormals()
+        // 床そのものと明確に色を分け、暗い下地の上を明るい矢印が流れる形にする。
+        // 面が光って見えるぶん、止まっている床との違いがひと目で分かる。
         const surfaceMaterial = trackMaterial(
           new THREE.MeshStandardMaterial({
-            color: selectedField.theme.wall,
-            roughness: 0.7,
-            metalness: 0.08,
+            color: selectedField.theme.rim,
+            roughness: 0.45,
+            metalness: 0.16,
             side: THREE.DoubleSide,
+            emissive: new THREE.Color(selectedField.theme.wall),
+            emissiveIntensity: 0.22,
           }),
         )
         anchor.add(new THREE.Mesh(surfaceGeometry, surfaceMaterial))
+        beltSurfaceMaterials.push(surfaceMaterial)
 
-        const arrowLength = Math.min(0.26, belt.halfWidth * 1.5)
-        const arrowWidth = Math.min(0.22, belt.halfWidth * 1.3)
+        // 帯の縁を1本の線で見せる。幅のどこまでが動く床なのかが分かりやすくなる。
+        // すり鉢の上では両端ほど床が高くなるので、縁も面と同じ高さ関数から引く。
+        // 1本の高さで引くと、端のほうで線が面へ潜って消えてしまう。
+        const edgePoints: THREE.Vector3[] = []
+        const edgeCorners = [
+          [-belt.halfLength, -belt.halfWidth],
+          [belt.halfLength, -belt.halfWidth],
+          [belt.halfLength, belt.halfWidth],
+          [-belt.halfLength, belt.halfWidth],
+        ] as const
+        for (let corner = 0; corner < edgeCorners.length; corner += 1) {
+          const [fromX, fromZ] = edgeCorners[corner]!
+          const [toX, toZ] = edgeCorners[(corner + 1) % edgeCorners.length]!
+          const sideSegments = 8
+          // 各辺の始点だけを出し、終点は次の辺の始点として出す（角の重複を作らない）。
+          for (let sample = 0; sample < sideSegments; sample += 1) {
+            const t = sample / sideSegments
+            const localX = fromX + (toX - fromX) * t
+            const localZ = fromZ + (toZ - fromZ) * t
+            edgePoints.push(
+              new THREE.Vector3(localX, beltArrowHeight(belt, localX, localZ), localZ),
+            )
+          }
+        }
+        edgePoints.push(edgePoints[0]!.clone())
+        const edgeGeometry = track(new THREE.BufferGeometry().setFromPoints(edgePoints))
+        const edgeMaterial = trackMaterial(
+          new THREE.LineBasicMaterial({ color: selectedField.theme.accent, transparent: true, opacity: 0.85 }),
+        )
+        anchor.add(new THREE.Line(edgeGeometry, edgeMaterial))
+
+        // 矢印は帯の幅いっぱいを使う大きさにする。小さすぎると「模様」に見えてしまう。
+        const arrowLength = Math.min(0.34, belt.halfLength * 0.62)
+        const arrowWidth = Math.min(0.34, (belt.halfWidth * 2) / BELT_ARROW_LANES - 0.04)
         const arrowGeometry = track(new THREE.BufferGeometry())
         arrowGeometry.setAttribute(
           'position',
@@ -1067,25 +1127,29 @@ export function useKomaBattleEngine(
         const arrowMaterial = trackMaterial(
           new THREE.MeshStandardMaterial({
             color: selectedField.theme.accent,
-            roughness: 0.4,
+            roughness: 0.3,
             metalness: 0.05,
             side: THREE.DoubleSide,
             emissive: new THREE.Color(selectedField.theme.accent),
-            emissiveIntensity: 0.35,
+            emissiveIntensity: 0.85,
           }),
         )
+        beltArrowMaterials.push(arrowMaterial)
         const beltLength = belt.halfLength * 2
-        for (let arrowIndex = 0; arrowIndex < BELT_ARROW_COUNT; arrowIndex += 1) {
-          const localX =
-            -belt.halfLength + ((arrowIndex + 0.5) / BELT_ARROW_COUNT) * beltLength
-          const mesh = new THREE.Mesh(arrowGeometry, arrowMaterial)
-          mesh.position.set(
-            localX,
-            fieldHeightAt(selectedField, Math.hypot(belt.x + localX * beltCos, belt.z + localX * beltSin)) + BELT_ARROW_LIFT,
-            0,
-          )
-          anchor.add(mesh)
-          beltArrows.push({ mesh, belt, localX })
+        for (let lane = 0; lane < BELT_ARROW_LANES; lane += 1) {
+          // レーンは帯の幅を等分した中央。左右のレーンは半個ぶん流す位置をずらす。
+          const localZ =
+            -belt.halfWidth + ((lane + 0.5) / BELT_ARROW_LANES) * belt.halfWidth * 2
+          const lanePhase = (lane % 2) * 0.5
+          for (let arrowIndex = 0; arrowIndex < BELT_ARROW_COUNT; arrowIndex += 1) {
+            const localX =
+              -belt.halfLength +
+              (((arrowIndex + lanePhase) % BELT_ARROW_COUNT) / BELT_ARROW_COUNT) * beltLength
+            const mesh = new THREE.Mesh(arrowGeometry, arrowMaterial)
+            mesh.position.set(localX, beltArrowHeight(belt, localX, localZ), localZ)
+            anchor.add(mesh)
+            beltArrows.push({ mesh, belt, localX, localZ })
+          }
         }
       }
 
@@ -1270,22 +1334,48 @@ export function useKomaBattleEngine(
       updateBeltArrows(dtMs)
     }
 
-    /** 矢印の流れる位置だけを進める。新規オブジェクトは作らず、既存Meshを動かすだけ。 */
+    /**
+     * 矢印1個ぶんの、床の高さに沿った高さ。
+     * ベルトは軸並行とは限らないので、ローカル座標をワールドへ戻してから高さを引く。
+     */
+    function beltArrowHeight(belt: KomaFieldBelt, localX: number, localZ: number): number {
+      const beltCos = Math.cos(belt.angle)
+      const beltSin = Math.sin(belt.angle)
+      const worldX = belt.x + localX * beltCos - localZ * beltSin
+      const worldZ = belt.z + localX * beltSin + localZ * beltCos
+      return fieldHeightAt(selectedField, Math.hypot(worldX, worldZ)) + BELT_ARROW_LIFT
+    }
+
+    /**
+     * 矢印の流れる位置と明滅だけを進める。新規オブジェクトは作らず、既存Meshを動かすだけ。
+     *
+     * 端では大きさを絞って出入りをなじませ、真ん中でいちばん大きくする。
+     * 位置が折り返す瞬間に矢印がパッと現れないので、帯全体が連続して送られて見える。
+     */
     function updateBeltArrows(dtMs: number) {
       if (beltArrows.length === 0) return
-      const step = (BELT_ARROW_SPEED * dtMs) / 1000
+      const speed = prefersReducedMotion ? BELT_ARROW_SPEED * 0.35 : BELT_ARROW_SPEED
+      const step = (speed * dtMs) / 1000
       for (const arrow of beltArrows) {
         const span = arrow.belt.halfLength * 2
         let nextX = arrow.localX + step
         if (nextX > arrow.belt.halfLength) nextX -= span
         arrow.localX = nextX
         arrow.mesh.position.x = nextX
-        const beltCos = Math.cos(arrow.belt.angle)
-        const beltSin = Math.sin(arrow.belt.angle)
-        const worldX = arrow.belt.x + nextX * beltCos
-        const worldZ = arrow.belt.z + nextX * beltSin
-        arrow.mesh.position.y =
-          fieldHeightAt(selectedField, Math.hypot(worldX, worldZ)) + BELT_ARROW_LIFT
+        arrow.mesh.position.y = beltArrowHeight(arrow.belt, nextX, arrow.localZ)
+        const edgeFade = Math.min(1, (arrow.belt.halfLength - Math.abs(nextX)) / (span * 0.22))
+        arrow.mesh.scale.setScalar(0.45 + 0.55 * Math.max(0, edgeFade))
+      }
+
+      if (prefersReducedMotion) return
+      // 流れる向きと同じ周期で、矢印と下地を逆位相に明滅させる。
+      beltPulseMs = (beltPulseMs + dtMs) % BELT_PULSE_PERIOD_MS
+      const pulse = Math.sin((beltPulseMs / BELT_PULSE_PERIOD_MS) * Math.PI * 2)
+      for (const material of beltArrowMaterials) {
+        material.emissiveIntensity = 0.85 + pulse * 0.45
+      }
+      for (const material of beltSurfaceMaterials) {
+        material.emissiveIntensity = 0.22 - pulse * 0.12
       }
     }
 

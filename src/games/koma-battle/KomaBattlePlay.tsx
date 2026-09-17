@@ -365,7 +365,8 @@ function FieldPreview({ field }: { field: KomaField }) {
       {field.shape === 'ridge' ? <span className={styles.previewRidge} /> : null}
       {field.shape === 'belt' ? (
         <span className={styles.previewBelt} aria-hidden="true">
-          ➡️➡️➡️
+          {/* 流し続けても途切れないよう、同じ並びを2つ繋げて半分ぶん動かす。 */}
+          <span>➡️➡️➡️➡️➡️➡️</span>
         </span>
       ) : null}
       <span className={styles.previewCenter} />

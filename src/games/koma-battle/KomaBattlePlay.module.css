@@ -272,14 +272,34 @@
   opacity: 0.96;
 }
 
+/*
+ * 選ぶ前から「この床は動く」と分かるように、プレビューの矢印も流す。
+ * 帯の外へはみ出さないよう、親側でマスクしてから中身をずらしている。
+ */
 .previewBelt {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  display: flex;
+  width: 62%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 34%);
   font-size: clamp(10px, 3vw, 14px);
   letter-spacing: -1px;
   filter: drop-shadow(0 1px 0 rgb(255 255 255 / 60%));
+  transform: translate(-50%, -50%);
+}
+
+.previewBelt span {
+  flex: none;
+  padding-inline: 2px;
+  animation: previewBeltFlow 1.1s linear infinite;
+}
+
+@keyframes previewBeltFlow {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
 }
 
 .previewBumper {
@@ -545,6 +565,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .primaryButton:active { transform: none; }
+  .previewBelt span { animation: none; }
   .resultSparkles span { animation: none; }
 }
 
