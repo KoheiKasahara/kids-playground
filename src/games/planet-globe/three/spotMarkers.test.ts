@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { celestialBodyById } from '../data/celestialBodies'
-import type { CelestialBody } from '../types'
+import { celestialBodies, celestialBodyById } from '../data/celestialBodies'
+import { featureSpotsFor } from '../data/featureSpots'
+import { DEFAULT_ZOOM_LEVEL, type CelestialBody } from '../types'
+import { cameraDistanceForZoom, viewDirectionOf } from './planetCamera'
+import { axialTiltRotationZ } from './planetRing'
+import { isRingPointVisible } from './spotPicking'
 import {
   MARKER_SURFACE_OFFSET_RATIO,
   resolveRingHighlightBands,
@@ -119,4 +123,42 @@ describe('resolveRingHighlightBands', () => {
     const bands = resolveRingHighlightBands(saturn, { kind: 'ring', radiusRatio: 1.5, angleDeg: 0 })
     expect(bands).toEqual([])
   })
+})
+
+/**
+ * 輪は自転させず `tiltGroup` 直下に固定するので(`usePlanetEngine` 参照)、
+ * `angleDeg` の選び方しだいでマーカーが永久に天体の裏側へ隠れてタップできなくなる。
+ * 既定視点・既定ズームで全ての輪スポットが見えることを固定する。
+ */
+describe('輪スポットは既定の視点から見える位置にある', () => {
+  const PORTRAIT_ASPECT = 390 / 660
+
+  it.each(celestialBodies.filter((body) => body.ring !== undefined).map((body) => body.id))(
+    '%s の輪スポットは天体の裏に隠れない',
+    (bodyId) => {
+      const body = celestialBodyById(bodyId)
+      const view = viewDirectionOf(body)
+      const distance = cameraDistanceForZoom(body, DEFAULT_ZOOM_LEVEL, PORTRAIT_ASPECT)
+      const length = Math.hypot(view.x, view.y, view.z)
+
+      // カメラのワールド座標を tiltGroup ローカルへ移す(tiltGroupはZ軸まわりの回転のみ)。
+      const tilt = -axialTiltRotationZ(body)
+      const worldX = (view.x / length) * distance
+      const worldY = (view.y / length) * distance
+      const worldZ = (view.z / length) * distance
+      const flattening = body.flattening ?? 0
+      const camera = {
+        x: (worldX * Math.cos(tilt) - worldY * Math.sin(tilt)) / body.radius,
+        y: (worldX * Math.sin(tilt) + worldY * Math.cos(tilt)) / (body.radius * (1 - flattening)),
+        z: worldZ / body.radius,
+      }
+
+      for (const spot of featureSpotsFor(bodyId)) {
+        if (spot.target.kind !== 'ring') continue
+        const position = ringSpotLocalPosition(body, spot.target)
+        const normalized = { x: position.x / body.radius, y: 0, z: position.z / body.radius }
+        expect(isRingPointVisible(camera, normalized), `${spot.id} が裏側で隠れている`).toBe(true)
+      }
+    },
+  )
 })
