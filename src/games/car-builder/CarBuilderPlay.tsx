@@ -182,6 +182,8 @@ export default function CarBuilderPlay() {
     setConfig((current) => selectCarOption(current, categoryId, optionId))
   }, [])
 
+  const closeCategory = useCallback(() => setOpenCategoryId(null), [])
+
   const openCategory =
     openCategoryId === null
       ? null
@@ -189,12 +191,13 @@ export default function CarBuilderPlay() {
 
   return (
     <main className={styles.page}>
-      <GameBackButton
-        to={openCategory === null ? '/' : undefined}
-        onClick={openCategory === null ? undefined : () => setOpenCategoryId(null)}
-        ariaLabel={openCategory === null ? 'ホームへ もどる' : 'カテゴリ一覧へ もどる'}
-      />
       <header className={styles.header}>
+        {/*
+         * 左上は常にホーム（メニュー）へ戻す口にする。カテゴリ一覧へ戻すのは下部エリアの
+         * 「もどる」が受け持つので、同じボタンの行き先が画面状態で変わらない。
+         * headerの中に置くと、固定表示のボタンと同じ幅の席が確保され、タイトルと重ならない。
+         */}
+        <GameBackButton to="/" ariaLabel="ホームへ もどる" />
         <h1 className={styles.title}>
           <span aria-hidden="true">🚙</span> 3Dクルマづくり
         </h1>
@@ -235,6 +238,15 @@ export default function CarBuilderPlay() {
         ) : (
           <div className={styles.detail}>
             <div className={styles.detailHeader}>
+              {/* 分類名のとなりに置き、選び終わったらここから一覧へ戻る。 */}
+              <button
+                type="button"
+                className={styles.backButton}
+                onClick={closeCategory}
+                aria-label="カテゴリ一覧へ もどる"
+              >
+                <span aria-hidden="true">←</span> もどる
+              </button>
               <h2 className={styles.detailTitle}>
                 <span aria-hidden="true">{openCategory.emoji}</span>
                 {openCategory.label}

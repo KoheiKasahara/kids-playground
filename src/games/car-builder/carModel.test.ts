@@ -525,6 +525,26 @@ describe('カテゴリごとのレイヤー', () => {
     }
   })
 
+  test('ナンバープレートは前面を覆わず、車幅の一部に収まる', () => {
+    for (const bodyOption of CAR_CATEGORIES.body.options) {
+      const base = selectCarOption(DEFAULT_CAR_CONFIG, 'body', bodyOption.id)
+      for (const mark of ['number8', 'dinosaur'] as const) {
+        const config = selectCarOption(base, 'mark', mark)
+        const model = createCarModel(config, immediateLoader())
+        const dimensions = computeCarDimensions(config)
+        const bounds = boundsOf(layerOf(model.root, 'mark'))
+        const label = `${bodyOption.id}/${mark}`
+        const width = bounds.max.x - bounds.min.x
+        const height = bounds.max.y - bounds.min.y
+        expect(width, label).toBeLessThan(dimensions.width * 0.4)
+        expect(height, label).toBeLessThan(dimensions.hullHeight * 0.55)
+        // 小さくしすぎると数字・マークが見分けられないので、下限も決めておく。
+        expect(width, label).toBeGreaterThan(dimensions.width * 0.18)
+        model.dispose()
+      }
+    }
+  })
+
   test('1カテゴリだけ変えたときは、そのレイヤーだけを作り直す', () => {
     const model = createCarModel(DEFAULT_CAR_CONFIG, immediateLoader())
     const wheelBefore = layerOf(model.root, 'wheel').children[0]

@@ -5,8 +5,8 @@
  * 3D表示エリアの高さが跳ねてカメラのフィットが動くのを防ぐため。
  */
 .page {
-  /* 一覧・詳細で共通の下部エリア高さ。 */
-  --cb-panel-height: clamp(190px, 28dvh, 232px);
+  /* 一覧・詳細で共通の下部エリア高さ。詳細側の「もどる」ぶんも含めて選択肢2行が見える値。 */
+  --cb-panel-height: clamp(220px, 32dvh, 262px);
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -25,10 +25,14 @@
   width: 100%;
 }
 
+/*
+ * 「もどる」は固定表示だが、headerの中では同寸の席（GameBackButtonのslot）が通常レイアウトに
+ * 入る。タイトルはその残り幅の中央に置く。狭い端末では字を詰めて、省略記号にしない。
+ */
 .title {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 20px;
+  font-size: clamp(17px, 4.8vw, 20px);
   font-weight: 700;
   text-align: center;
   white-space: nowrap;
@@ -942,7 +946,7 @@
 
 @media (min-width: 760px) {
   .page {
-    --cb-panel-height: 240px;
+    --cb-panel-height: 272px;
   }
 
   .panel {
@@ -964,7 +968,7 @@
  */
 @media (orientation: landscape) and (max-height: 560px) {
   .page {
-    --cb-panel-height: 150px;
+    --cb-panel-height: 176px;
   }
 
   .categoryGrid {
