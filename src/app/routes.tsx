@@ -130,7 +130,7 @@ export const routes: RouteObject[] = [
   { path: '/games/color-mix-quiz', children: colorMixQuizRoutes },
   // 単体で軽いゲームも増設時の初期bundle累積を避け、開く時に読み込む。
   { path: '/games/color-paint-puzzle', element: playRoute(lazyRoute(() => import('../games/color-paint-puzzle/ColorPaintPuzzlePlay'))) },
-  { path: '/games/block-puzzle', element: playRoute(lazyRoute(() => import('../games/block-puzzle/BlockPuzzlePlay'))) },
+  { path: '/games/block-puzzle', element: lazyRoute(() => import('../games/block-puzzle/BlockPuzzlePlay')) },
   { path: '/games/pukupuka-rescue', element: playRoute(lazyRoute(() => import('../games/pukupuka-rescue/PukupukaRescuePlay'))) },
   // こっきピンボールは物理エンジン(matter-js)を含み main chunk のサイズ警告を超えるため、
   // 旅行クイズの世界地図と同様に開くときだけ読込む。
