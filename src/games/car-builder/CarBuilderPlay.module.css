@@ -786,7 +786,9 @@
   color: #8256c7;
 }
 
-.markPreview[data-mark='animal'] {
+.markPreview[data-mark='animal'],
+.markPreview[data-mark='rocket'],
+.markPreview[data-mark='dinosaur'] {
   font-size: 25px;
 }
 
@@ -808,7 +810,9 @@
   font-size: 17px;
 }
 
-.categoryBadge.markPreview[data-mark='animal'] {
+.categoryBadge.markPreview[data-mark='animal'],
+.categoryBadge.markPreview[data-mark='rocket'],
+.categoryBadge.markPreview[data-mark='dinosaur'] {
   font-size: 12px;
 }
 
@@ -990,10 +994,18 @@
   background: radial-gradient(circle, #d5dbe1 0 30%, #2f3438 31% 42%, #fff7e6 43% 64%, #2f3438 65%);
 }
 
-.wheelPreviewFlower {
-  color: #f48fb1;
+.wheelPreviewGlyph {
   font-size: 1.6em;
   line-height: 1;
+}
+
+.wheelPreviewGlyph-flower {
+  color: #f48fb1;
+}
+
+.wheelPreviewGlyph-star {
+  color: #ffd43b;
+  text-shadow: 0 1px 1px rgba(17, 24, 39, 0.45);
 }
 
 .frontPreview-twin .frontPreviewLight {
@@ -1010,22 +1022,117 @@
 }
 
 .roofPreviewSurfboard {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  left: 50%;
+  display: block;
   width: 80%;
   height: 32%;
   border-radius: 50%;
-  transform: rotate(-25deg);
+  transform: translateX(-50%) rotate(-25deg);
   background: linear-gradient(90deg, #27c7ce 25%, #ffd43b 25% 32%, #27c7ce 32% 68%, #ffd43b 68% 75%, #27c7ce 75%);
   box-shadow: 0 3px #334155;
 }
 
 .decorationPreviewHearts {
+  position: relative;
+  z-index: 2;
   color: #f0598f;
   font-size: 0.9em;
   letter-spacing: -0.2em;
 }
 
 .decorationPreviewChecker {
+  position: relative;
+  z-index: 2;
   width: 85%;
   height: 60%;
   background: repeating-conic-gradient(#25313d 0 25%, #fff5eb 0 50%) 0 / 33.333% 100%;
+}
+
+/* さらに足した選択肢も、既存のプレビュー枠とバッジの大きさをそのまま使う。 */
+.wheelPreview-star {
+  background: radial-gradient(circle, #454e57 0 24%, #2f3438 25% 100%);
+}
+
+.wheelPreview-rainbow {
+  background: conic-gradient(
+    #ef4d4d 0 16.6%,
+    #f59f00 0 33.3%,
+    #ffd43b 0 50%,
+    #51cf66 0 66.6%,
+    #3d7bf5 0 83.3%,
+    #8256c7 0
+  );
+}
+
+.wheelPreview-rainbow .wheelPreviewHub {
+  border-color: #2f3438;
+  background: #f8fafc;
+}
+
+/* にこにこは、丸い目と口の弧で顔に見せる。 */
+.frontPreview-smile .frontPreviewLight {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 62%, #25313d 0 32%, #fdfbf3 33% 100%);
+}
+
+.frontPreview-smile .frontPreviewGrille {
+  bottom: 3px;
+  width: 20px;
+  height: 7px;
+  border-bottom: 3px solid #b4404f;
+  border-radius: 0 0 50% 50%;
+  background: none;
+}
+
+.categoryBadge.frontPreview-smile .frontPreviewLight {
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 62%, #25313d 0 34%, #fdfbf3 35% 100%);
+}
+
+.categoryBadge.frontPreview-smile .frontPreviewGrille {
+  height: 4px;
+  border-bottom-width: 2px;
+}
+
+.roofPreviewCrown,
+.roofPreviewIceCream {
+  position: absolute;
+  z-index: 2;
+  top: 2px;
+  left: 50%;
+  font-size: 1.15em;
+  line-height: 1;
+  transform: translateX(-50%);
+}
+
+.decorationPreviewRainbow {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 30px;
+  height: 15px;
+  border-radius: 15px 15px 0 0;
+  background: radial-gradient(
+    circle at 50% 100%,
+    transparent 0 24%,
+    #8256c7 24% 36%,
+    #3d7bf5 36% 48%,
+    #51cf66 48% 60%,
+    #ffd43b 60% 72%,
+    #f59f00 72% 84%,
+    #ef4d4d 84% 100%
+  );
+}
+
+.decorationPreviewPaw {
+  position: relative;
+  z-index: 2;
+  display: block;
+  font-size: 22px;
+  line-height: 1;
 }

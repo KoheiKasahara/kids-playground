@@ -460,7 +460,7 @@ describe('カテゴリごとのレイヤー', () => {
 
   test('屋根全種類（なしを除く）が全車種でルーフ天面より上に置かれる', () => {
     for (const bodyOption of CAR_CATEGORIES.body.options) {
-      for (const roof of ['policeLight', 'luggage', 'spoiler', 'rabbit', 'surfboard'] as const) {
+      for (const roof of ['policeLight', 'luggage', 'spoiler', 'rabbit', 'surfboard', 'crown', 'iceCream'] as const) {
         const config = selectCarOption(selectCarOption(DEFAULT_CAR_CONFIG, 'body', bodyOption.id), 'roof', roof)
         const label = `${bodyOption.id}/${roof}`
         const model = createCarModel(config, immediateLoader())
@@ -475,7 +475,7 @@ describe('カテゴリごとのレイヤー', () => {
 
   test('フロント全種類が全車種で前端まわりに収まる', () => {
     for (const bodyOption of CAR_CATEGORIES.body.options) {
-      for (const front of ['round', 'square', 'slim', 'twin'] as const) {
+      for (const front of ['round', 'square', 'slim', 'twin', 'smile'] as const) {
         const config = selectCarOption(selectCarOption(DEFAULT_CAR_CONFIG, 'body', bodyOption.id), 'front', front)
         const label = `${bodyOption.id}/${front}`
         const model = createCarModel(config, immediateLoader())
@@ -512,12 +512,12 @@ describe('カテゴリごとのレイヤー', () => {
   test('飾りとマークが全車種で生成される', () => {
     for (const bodyOption of CAR_CATEGORIES.body.options) {
       const base = selectCarOption(DEFAULT_CAR_CONFIG, 'body', bodyOption.id)
-      for (const decoration of ['star', 'flame', 'stripes', 'dots', 'hearts', 'checker'] as const) {
+      for (const decoration of ['star', 'flame', 'stripes', 'dots', 'hearts', 'checker', 'rainbow', 'paw'] as const) {
         const model = createCarModel(selectCarOption(base, 'decoration', decoration), immediateLoader())
         expect(layerOf(model.root, 'decoration').children, `${bodyOption.id}/${decoration}`).toHaveLength(1)
         model.dispose()
       }
-      for (const mark of ['number1', 'star', 'crown', 'flower', 'moon'] as const) {
+      for (const mark of ['number1', 'star', 'crown', 'flower', 'moon', 'rocket', 'dinosaur'] as const) {
         const model = createCarModel(selectCarOption(base, 'mark', mark), immediateLoader())
         expect(layerOf(model.root, 'mark').children, `${bodyOption.id}/${mark}`).toHaveLength(1)
         model.dispose()

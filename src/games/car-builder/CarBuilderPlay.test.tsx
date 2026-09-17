@@ -147,7 +147,7 @@ describe('ボディ9車種の選択', () => {
 })
 
 describe('選択の即時反映', () => {
-  test('フロント3種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+  test('フロント5種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 
@@ -158,6 +158,7 @@ describe('選択の即時反映', () => {
       ['四角ライト', 'square'],
       ['細目ライト', 'slim'],
       ['よつめライト', 'twin'],
+      ['にこにこ', 'smile'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="frontPreview"]'), label).not.toBeNull()
@@ -207,7 +208,7 @@ describe('選択の即時反映', () => {
     }
   })
 
-  test('タイヤ6種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+  test('タイヤ8種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 
@@ -220,6 +221,8 @@ describe('選択の即時反映', () => {
       ['レーシング', 'racing'],
       ['しろリボン', 'whitewall'],
       ['おはな', 'flower'],
+      ['ほし', 'star'],
+      ['にじいろ', 'rainbow'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="wheelPreview"]'), label).not.toBeNull()
@@ -230,7 +233,7 @@ describe('選択の即時反映', () => {
     expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
   })
 
-  test('屋根6種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+  test('屋根8種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 
@@ -243,6 +246,8 @@ describe('選択の即時反映', () => {
       ['スポイラー', 'spoiler'],
       ['うさぎみみ', 'rabbit'],
       ['サーフボード', 'surfboard'],
+      ['おうかん', 'crown'],
+      ['ソフトクリーム', 'iceCream'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="roofPreview"]'), label).not.toBeNull()
@@ -253,7 +258,7 @@ describe('選択の即時反映', () => {
     expect(screen.queryByRole('button', { name: /けってい|決定|てきよう/ })).not.toBeInTheDocument()
   })
 
-  test('飾り7種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
+  test('飾り9種類が視覚的なプレビュー付きで並び、選択直後に反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 
@@ -267,6 +272,8 @@ describe('選択の即時反映', () => {
       ['みずたま', 'dots'],
       ['ハート', 'hearts'],
       ['チェック', 'checker'],
+      ['にじ', 'rainbow'],
+      ['にくきゅう', 'paw'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="decorationPreview"]'), label).not.toBeNull()
@@ -301,6 +308,8 @@ describe('選択の即時反映', () => {
       ['どうぶつ', 'animal'],
       ['おはな', 'flower'],
       ['おつきさま', 'moon'],
+      ['ロケット', 'rocket'],
+      ['きょうりゅう', 'dinosaur'],
     ] as const) {
       const option = screen.getByRole('button', { name: label })
       expect(option.querySelector('[class*="markPreview"]'), label).not.toBeNull()

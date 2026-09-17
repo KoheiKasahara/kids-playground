@@ -12,21 +12,33 @@ import {
   type CarOptionDefinition,
   type CarOptionPreview,
   type MarkType,
+  type WheelType,
 } from './carConfig'
 import { useCarBuilderScene } from './useCarBuilderScene'
 import styles from './CarBuilderPlay.module.css'
+
+/** タイヤ面の飾りを字で表せる種類。ここに無い種類はハブ（中心）だけを描く。 */
+const WHEEL_PREVIEW_GLYPHS: Partial<Record<WheelType, string>> = {
+  flower: '✿',
+  star: '★',
+}
 
 function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; className: string }) {
   if (preview.kind === 'color') {
     return <span className={`${className} ${styles.colorChip}`} style={{ backgroundColor: preview.hex }} aria-hidden="true" />
   }
   if (preview.kind === 'wheel') {
+    const glyph = WHEEL_PREVIEW_GLYPHS[preview.variant]
     return (
       <span
         className={`${className} ${styles.wheelPreview} ${styles[`wheelPreview-${preview.variant}`]}`}
         aria-hidden="true"
       >
-        {preview.variant === 'flower' ? <span className={styles.wheelPreviewFlower}>✿</span> : <span className={styles.wheelPreviewHub} />}
+        {glyph === undefined ? (
+          <span className={styles.wheelPreviewHub} />
+        ) : (
+          <span className={`${styles.wheelPreviewGlyph} ${styles[`wheelPreviewGlyph-${preview.variant}`]}`}>{glyph}</span>
+        )}
       </span>
     )
   }
@@ -59,6 +71,8 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
           </>
         ) : null}
         {preview.variant === 'rabbit' ? <span className={styles.roofPreviewRabbit}>🐰</span> : null}
+        {preview.variant === 'crown' ? <span className={styles.roofPreviewCrown}>👑</span> : null}
+        {preview.variant === 'iceCream' ? <span className={styles.roofPreviewIceCream}>🍦</span> : null}
         {preview.variant === 'surfboard' ? <span className={styles.roofPreviewSurfboard} /> : null}
         {preview.variant === 'luggage' ? <span className={styles.roofPreviewLuggage} /> : null}
         {preview.variant === 'spoiler' ? (
@@ -78,6 +92,8 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
       >
         {preview.variant === 'none' ? <span className={styles.decorationPreviewNone}>×</span> : null}
         {preview.variant === 'hearts' ? <span className={styles.decorationPreviewHearts}>♥♥</span> : null}
+        {preview.variant === 'rainbow' ? <span className={styles.decorationPreviewRainbow} /> : null}
+        {preview.variant === 'paw' ? <span className={styles.decorationPreviewPaw}>🐾</span> : null}
         {preview.variant === 'checker' ? <span className={styles.decorationPreviewChecker} /> : null}
         {preview.variant === 'star' ? <span className={styles.decorationPreviewStar}>★</span> : null}
         {preview.variant === 'flame' ? <span className={styles.decorationPreviewFlame}>♨</span> : null}
@@ -118,6 +134,8 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
       animal: '🐱',
       flower: '✿',
       moon: '☾',
+      rocket: '🚀',
+      dinosaur: '🦕',
     }
     return (
       <span
