@@ -170,6 +170,14 @@ export function wallGapSegmentIndices(
   return indices
 }
 
+/**
+ * 「あつまれ ゆか」の2本を向け合わせる角度をどれだけ斜めへずらすか[rad]。
+ *
+ * 0にすると2個が中央で完全な正面衝突になり、接触時の跳ね返りだけで
+ * 外周の開口から飛び出しやすくなる。少しだけずらして すれ違いの接触にする。
+ */
+export const BELT_MERGE_TILT = 0.22
+
 /** バンパーの共通物理・見た目設定。少数固定配置で扱う。 */
 export const BUMPER_RADIUS = 0.22
 export const BUMPER_HEIGHT = 0.3
@@ -273,8 +281,12 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     obstacles: NO_OBSTACLES,
     belts: [
       // 中央で逆方向の力が重ならない、少しずらした2本の合流路。
-      { x: -0.95, z: -0.28, angle: 0, halfLength: 0.65, halfWidth: 0.38, strength: 1.05 },
-      { x: 0.95, z: 0.28, angle: Math.PI, halfLength: 0.65, halfWidth: 0.38, strength: 1.05 },
+      // コマ1個ぶんよりはっきり広く・長く取り、乗ったら運ばれ切るだけの滞在時間を作る。
+      // 真正面ではなく少し斜めに向け合わせているのは、強く運ばれた2個が完全な
+      // 正面衝突を繰り返すと、跳ね返りだけで場外へ飛び出しやすくなるため。
+      // わずかに軸をずらすと、中央では すれ違いざまの接触になって場内に残る。
+      { x: -0.88, z: -0.3, angle: BELT_MERGE_TILT, halfLength: 0.7, halfWidth: 0.44, strength: 1 },
+      { x: 0.88, z: 0.3, angle: Math.PI + BELT_MERGE_TILT, halfLength: 0.7, halfWidth: 0.44, strength: 1 },
     ],
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,
@@ -292,13 +304,15 @@ export const KOMA_FIELD_DEFINITIONS: readonly KomaField[] = [
     ridges: NO_RIDGES,
     obstacles: NO_OBSTACLES,
     // 外周へ投げ出さず、少し内向きに流す4本。中央は自由な対戦スペース。
+    // 1本ずつを長く・広く取って一周の流れに見せる。ただし4本で囲い切ってしまうと
+    // 2個が同じ速さで並走したまますれ違わなくなるため、力はあつまれ ゆかより控えめにする。
     belts: [0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle) => ({
       x: Math.cos(angle) * 1.05,
       z: Math.sin(angle) * 1.05,
       angle: angle + Math.PI / 2 + 0.3,
-      halfLength: 0.55,
-      halfWidth: 0.34,
-      strength: 0.65,
+      halfLength: 0.62,
+      halfWidth: 0.38,
+      strength: 0.64,
     })),
     wallHeight: WALL_HEIGHT,
     outRadius: OUT_RADIUS,

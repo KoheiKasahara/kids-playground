@@ -25,6 +25,7 @@ import {
   KOMA_BOOST_MOVE_SPEED_LIMIT,
   KOMA_BOOST_SPIN_INCREMENT,
   KOMA_BELT_FORCE,
+  KOMA_BELT_LATERAL_GRIP,
   KOMA_BELT_MAX_FORWARD_SPEED,
   BUMPER_KNOCKBACK_INCOMING_SPEED_SCALE,
   BUMPER_KNOCKBACK_MAX_IMPULSE,
@@ -580,13 +581,15 @@ export function applyKomaAssist(entry: KomaEntry, dt: number): void {
 }
 
 /**
- * ベルト（動く床）エリア内にいるコマへ、毎ステップ弱い力を進行方向へ加える。
+ * ベルト（動く床）エリア内にいるコマへ、毎ステップ進行方向の力と横滑りの抑えを加える。
  *
  * 状態を持たない位置判定だけなので、境界を何度も出入りしても多重加算されない。
  * applyImpulseへ渡すのは`力[N] * dt`なので、質量が重いタイプほど速度変化が小さく、
  * 軽いタイプほど大きくなる（既存の質量差がそのまま活きる）。
  * ただし前進方向の速度が上限へ達した後は、その分のimpulseだけを抑える。
- * 速度を直接固定しないので、横方向の運動やベルトと逆向きの慣性は保持される。
+ * 併せて、進行方向と直交する速度成分を毎ステップ少しずつ削り、斜めに入ったコマの
+ * 軌道が矢印の向きへ曲がっていくようにする（床に運ばれている感触を出す）。
+ * どちらも速度を直接固定しないので、ベルトと逆向きの慣性や弾かれた勢いは残る。
  * world.step()の直前、applyKomaAssistと同じタイミングで呼ぶ。
  */
 export function applyKomaFieldBelts(entry: KomaEntry, field: KomaField, dt: number): void {
@@ -611,10 +614,25 @@ export function applyKomaFieldBelts(entry: KomaEntry, field: KomaField, dt: numb
       : 1
     const direction = { x: Math.cos(belt.angle), z: Math.sin(belt.angle) }
     const forwardSpeed = velocity.x * direction.x + velocity.z * direction.z
-    if (!Number.isFinite(forwardSpeed) || forwardSpeed >= KOMA_BELT_MAX_FORWARD_SPEED) continue
+    if (!Number.isFinite(forwardSpeed)) continue
 
+    // 横滑りを削る。減らすのは直交成分の一部だけなので符号は反転せず、
+    // 上限を越えて走っているコマも含めて同じように矢印の向きへ寄っていく。
+    const lateral = {
+      x: velocity.x - direction.x * forwardSpeed,
+      z: velocity.z - direction.z * forwardSpeed,
+    }
+    const grip = Math.min(1, Math.max(0, KOMA_BELT_LATERAL_GRIP * strength * dt))
+    if (grip > 0) {
+      body.applyImpulse(
+        { x: -lateral.x * grip * mass, y: 0, z: -lateral.z * grip * mass },
+        true,
+      )
+    }
+
+    if (forwardSpeed >= KOMA_BELT_MAX_FORWARD_SPEED) continue
     const requestedImpulse = KOMA_BELT_FORCE * strength * dt
-    // 速度上限を越える分だけを切り落とす。逆向きに走っている場合も、通常の弱い力で
+    // 速度上限を越える分だけを切り落とす。逆向きに走っている場合も、通常の力で
     // 少しずつ向きを変えるだけにし、瞬間的な反転や吸着を起こさない。
     const availableImpulse = (KOMA_BELT_MAX_FORWARD_SPEED - forwardSpeed) * mass
     const impulse = Math.min(requestedImpulse, Math.max(0, availableImpulse))

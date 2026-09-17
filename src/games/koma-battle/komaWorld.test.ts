@@ -1028,16 +1028,24 @@ describe('動く床（ベルト）', () => {
     await RAPIER.init()
   })
 
+  /** ベルトが押す向きの単位ベクトル。ベルトは軸並行とは限らないので、向きは定義から読む。 */
+  function beltForward(belt: { angle: number }) {
+    return { x: Math.cos(belt.angle), z: Math.sin(belt.angle) }
+  }
+
   it('エリア内では進行方向へimpulseが加わり、エリア外では何も起きない', () => {
     const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'belt' })
     const koma = world.komas[0]!
     const field = getKomaField('belt')
+    const forward = beltForward(field.belts[0]!)
 
     koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
     applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
-    expect(koma.body.linvel().x).toBeGreaterThan(0)
-    expect(koma.body.linvel().z).toBeCloseTo(0, 6)
+    const pushed = koma.body.linvel()
+    // 静止状態からなので、加わるのはベルトの向きの成分だけ（直交成分は増えない）。
+    expect(pushed.x * forward.x + pushed.z * forward.z).toBeGreaterThan(0)
+    expect(pushed.z * forward.x - pushed.x * forward.z).toBeCloseTo(0, 6)
 
     koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     koma.body.setTranslation({ x: 5, y: 0.5, z: 5 }, true)
@@ -1140,7 +1148,7 @@ describe('動く床（ベルト）', () => {
     heavy.world.free()
   })
 
-  it('ベルトは前進方向成分だけを補正し、横方向と逆向きの慣性を残す', () => {
+  it('ベルトは前進を押しつつ横滑りを弱めるが、横方向を反転も固定もしない', () => {
     const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'belt' })
     const koma = world.komas[0]!
     const field = getKomaField('belt')
@@ -1150,8 +1158,37 @@ describe('動く床（ベルト）', () => {
     applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
 
     const velocity = koma.body.linvel()
+    // 進行方向(+X)へは押されるが、逆走している慣性そのものは1ステップでは消えない。
     expect(velocity.x).toBeGreaterThan(-1)
-    expect(velocity.z).toBeCloseTo(2, 8)
+    expect(velocity.x).toBeLessThan(0)
+    // 横方向(+Z)は少しだけ削られる。符号は保ったまま、1ステップで消し去らない。
+    expect(velocity.z).toBeLessThan(2)
+    expect(velocity.z).toBeGreaterThan(1.9)
+    world.world.free()
+  })
+
+  it('横滑りを削る力は、ベルトを1回通り抜ける間に軌道が曲がる程度には効く', () => {
+    // 「押されてはいるが、そのまま横切って素通りする」状態だと動く床だと伝わらない。
+    // 横方向の速度が、ベルト滞在時間ぶんでそれと分かるだけ減ることを数値で押さえる。
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1), { fieldId: 'belt' })
+    const koma = world.komas[0]!
+    const field = getKomaField('belt')
+    const belt = field.belts[0]!
+    const forward = beltForward(belt)
+    koma.body.setTranslation({ x: belt.x, y: fieldHeightAt(field, Math.hypot(belt.x, belt.z)) + 0.02, z: belt.z }, true)
+    // ベルトを真横に突っ切る向きで入る。
+    koma.body.setLinvel({ x: -forward.z * 2, y: 0, z: forward.x * 2 }, true)
+
+    for (let step = 0; step < Math.round(0.6 / PHYSICS_TIMESTEP); step += 1) {
+      applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
+    }
+
+    const velocity = koma.body.linvel()
+    const lateral = velocity.z * forward.x - velocity.x * forward.z
+    expect(lateral).toBeLessThan(1.5)
+    expect(lateral).toBeGreaterThan(0)
+    // 同じ時間で前進方向にも、開始時の横速度に並ぶくらいの速度が乗る。
+    expect(velocity.x * forward.x + velocity.z * forward.z).toBeGreaterThan(1)
     world.world.free()
   })
 
@@ -1166,7 +1203,11 @@ describe('動く床（ベルト）', () => {
       applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
     }
 
-    expect(koma.body.linvel().x).toBeLessThanOrEqual(KOMA_BELT_MAX_FORWARD_SPEED + 1e-6)
+    const forward = beltForward(field.belts[0]!)
+    const velocity = koma.body.linvel()
+    expect(velocity.x * forward.x + velocity.z * forward.z).toBeLessThanOrEqual(
+      KOMA_BELT_MAX_FORWARD_SPEED + 1e-6,
+    )
     world.world.free()
   })
 
@@ -1175,12 +1216,16 @@ describe('動く床（ベルト）', () => {
     const koma = world.komas[0]!
     const field = getKomaField('belt')
     koma.body.setTranslation({ x: field.belts[0]!.x, y: fieldHeightAt(field, Math.hypot(field.belts[0]!.x, field.belts[0]!.z)) + 0.02, z: field.belts[0]!.z }, true)
+    const forward = beltForward(field.belts[0]!)
     const initialSpeed = KOMA_BELT_MAX_FORWARD_SPEED + 0.4
-    koma.body.setLinvel({ x: initialSpeed, y: 0, z: 0 }, true)
+    koma.body.setLinvel({ x: forward.x * initialSpeed, y: 0, z: forward.z * initialSpeed }, true)
 
     applyKomaFieldBelts(koma, field, PHYSICS_TIMESTEP)
 
-    expect(koma.body.linvel().x).toBeCloseTo(initialSpeed, 8)
+    const velocity = koma.body.linvel()
+    // Rapierの速度はf32なので、向きへ射影し直すぶんの丸め（1e-8程度）は許容する。
+    // 実際に力が加わった場合はこれより3桁以上大きく動く。
+    expect(velocity.x * forward.x + velocity.z * forward.z).toBeCloseTo(initialSpeed, 6)
     world.world.free()
   })
 
