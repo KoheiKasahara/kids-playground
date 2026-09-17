@@ -1264,8 +1264,10 @@ function buildNumberPlate({ attachments, config, surface }: CarPartContext): THR
     const normal = new THREE.Vector3(original.normal.x, original.normal.y, original.normal.z)
     const mounted = surface?.(point, normal) ?? point
     const face = { ...original, position: { ...original.position, z: mounted.z - normal.z * 0.025 } }
-    const plateWidth = Math.min(Math.max(face.size.width * 0.38, 0.78), 1.15)
-    const plateHeight = Math.min(Math.max(face.size.extent * 0.34, 0.22), 0.34)
+    // 実車のナンバープレートに近い、車幅の3割ほどに収まる大きさ。
+    // 以前は前面の半分近くを覆っていたので、数字・マークが読める範囲で小さくする。
+    const plateWidth = Math.min(Math.max(face.size.width * 0.27, 0.46), 0.72)
+    const plateHeight = Math.min(Math.max(face.size.extent * 0.28, 0.2), 0.28)
     const plateY = face.position.y - face.size.extent * 0.04
     const borderCenter = offsetFrom(face, 0.038)
     borderCenter.y = plateY
@@ -1273,7 +1275,7 @@ function buildNumberPlate({ attachments, config, surface }: CarPartContext): THR
     plateCenter.y = plateY
     group.add(
       box(
-        { x: plateWidth + 0.08, y: plateHeight + 0.08, z: 0.045 },
+        { x: plateWidth + 0.06, y: plateHeight + 0.06, z: 0.045 },
         { x: borderCenter.x, y: borderCenter.y, z: borderCenter.z },
         plateBorderMaterial,
       ),
@@ -1293,12 +1295,19 @@ function buildNumberPlate({ attachments, config, surface }: CarPartContext): THR
     markGroup.rotation.y = face.normal.z > 0 ? 0 : Math.PI
 
     if (number !== null) {
-      addNumberMark(markGroup, number, plateWidth * 0.38, plateHeight * 0.76, markMaterial)
+      // 数字は横に潰れないよう、幅をプレート高さからも抑える。
+      addNumberMark(
+        markGroup,
+        number,
+        Math.min(plateWidth * 0.42, plateHeight * 0.7),
+        plateHeight * 0.8,
+        markMaterial,
+      )
     } else if (mark !== 'none') {
       addIconMark(
         markGroup,
         mark as MarkIconType,
-        Math.min(plateHeight * 0.76, 0.27),
+        Math.min(plateHeight * 0.68, 0.27),
         markOutlineMaterial,
         new THREE.MeshStandardMaterial({ color: iconColors[mark as MarkIconType], roughness: 0.4, metalness: 0.05, side: THREE.DoubleSide }),
       )

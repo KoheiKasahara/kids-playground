@@ -89,24 +89,40 @@ describe('カテゴリ一覧と詳細選択の切り替え', () => {
     expect(screen.queryByRole('button', { name: 'タイヤを えらぶ' })).not.toBeInTheDocument()
   })
 
-  test('「もどる」でカテゴリ一覧へ戻れる', async () => {
+  test('分類名のとなりの「もどる」でカテゴリ一覧へ戻れる', async () => {
     const user = userEvent.setup()
     renderPlay()
 
     await user.click(screen.getByRole('button', { name: 'タイヤを えらぶ' }))
-    expect(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' })).toBeInTheDocument()
+    const back = within(panel()).getByRole('button', { name: 'カテゴリ一覧へ もどる' })
+    // 「タイヤ」などの分類名と同じ見出し行にあり、下部エリアの中で完結して戻れる。
+    expect(back.parentElement).toBe(screen.getByRole('heading', { name: 'タイヤ' }).parentElement)
 
-    await user.click(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' }))
+    await user.click(back)
     expect(within(panel()).getAllByRole('button')).toHaveLength(8)
     expect(screen.getByRole('button', { name: 'カラーを えらぶ' })).toBeInTheDocument()
   })
 
-  test('詳細では共通のもどるが先にカテゴリ一覧を閉じる', async () => {
+  test('詳細を開いても左上のもどるはホーム（メニュー）行きのまま変わらない', async () => {
     const user = userEvent.setup()
     renderPlay()
     await user.click(screen.getByRole('button', { name: 'ボディを えらぶ' }))
-    expect(screen.queryByRole('button', { name: 'ホームへ もどる' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' })).toBeInTheDocument()
+
+    const home = screen.getByRole('button', { name: 'ホームへ もどる' })
+    expect(home).toBeInTheDocument()
+    // 左上はヘッダー側だけにあり、下部エリアの「もどる」とは別のボタンとして並ぶ。
+    expect(within(panel()).queryByRole('button', { name: 'ホームへ もどる' })).not.toBeInTheDocument()
+    expect(within(panel()).getByRole('button', { name: 'カテゴリ一覧へ もどる' })).toBeInTheDocument()
+  })
+
+  test('タイトルと重ならないよう、左上のもどるはヘッダーの中に席を持つ', () => {
+    renderPlay()
+    const heading = screen.getByRole('heading', { name: '3Dクルマづくり' })
+    const header = heading.parentElement
+    expect(header?.tagName).toBe('HEADER')
+    // 固定表示のボタン本体と、通常レイアウト側の席（slot）がどちらもヘッダーの直下にある。
+    expect(header?.querySelector('[data-game-back-button]')).not.toBeNull()
+    expect(header?.querySelector('[data-game-back-layout-slot]')).not.toBeNull()
   })
 })
 
@@ -426,6 +442,10 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
     const scene = ruleOf(CSS_SOURCE, '.scene')
     expect(scene).toMatch(/flex:\s*1 1 auto/)
     expect(scene).toMatch(/touch-action:\s*none/)
+  })
+
+  test('タイトルは狭い端末でも字を詰めて収め、固定表示の「もどる」と重ねない', () => {
+    expect(ruleOf(CSS_SOURCE, '.title')).toMatch(/font-size:\s*clamp\(/)
   })
 
   test('下部エリアの高さは一覧・詳細で共通の固定値（詳細へ入ってもレイアウトが跳ねない）', () => {
