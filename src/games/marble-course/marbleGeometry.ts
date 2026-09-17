@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { FUNNEL_DROP, FUNNEL_INLET_Z, FUNNEL_LIFT, SPINNER_DROP, type PartKind, type Vec3 } from './marbleModel'
+import { FUNNEL_DROP, FUNNEL_INLET_Z, FUNNEL_LIFT, spinnerFloor, SPINNER_DROP, type PartKind, type Vec3 } from './marbleModel'
 
 type PathPoint = Vec3 & { nx: number; nz: number; width?: number }
 
@@ -182,15 +182,49 @@ function jumpGeometry(): THREE.BufferGeometry {
   return combine([sweep(ramp), sweep([pathPoint(0.2, -0.1, 1.6), pathPoint(1.8, -0.06, 1.6), pathPoint(3)])])
 }
 
+/** One unbroken fall from mouth to mouth, widened where the bar sweeps. */
 function trayGeometry(): THREE.BufferGeometry {
-  return sweep([pathPoint(-3), pathPoint(-1.7, -SPINNER_DROP * 1.3 / 6, 2.8), pathPoint(1.7, -SPINNER_DROP * 4.7 / 6, 2.8), pathPoint(3, -SPINNER_DROP)])
+  return sweep([pathPoint(-3), pathPoint(-1.7, spinnerFloor(-1.7), 2.8), pathPoint(1.7, spinnerFloor(1.7), 2.8), pathPoint(3, -SPINNER_DROP)])
 }
 
 // A narrowed spout lets the mouth end well inside the rim: a ball riding either wall of the
 // chute still lands on the bowl floor rather than over its edge.
 const FUNNEL_SPOUT_WIDTH = 0.6
-const FUNNEL_INLET_END = -1.1
-const FUNNEL_BOWL_SEGMENTS = 80
+/** How far the chute keeps its mouth's heading, so a ball is handed over before it turns. */
+const FUNNEL_BEND_X = -2.6
+/** A wide bend that aims the spout along the wall instead of across the middle of the bowl. */
+const FUNNEL_BEND_RADIUS = 4
+const FUNNEL_BEND_TURN = 0.29
+/** Where the chute lets go: still clear of a circling ball, so the whole fall happens first. */
+const FUNNEL_SPOUT_Y = 0.98
+// Bend and bowl share one piece's vertex budget, and both are already finer than a ball can feel.
+const FUNNEL_BEND_STEPS = 5
+const FUNNEL_BOWL_SEGMENTS = 72
+
+/**
+ * The chute, from its mouth to where it lets go: a steady fall that turns towards the wall,
+ * so a ball leaves it fast and already running the way the bowl will carry it.
+ */
+function funnelInlet(): PathPoint[] {
+  const straight = FUNNEL_BEND_X + 3
+  const bend = FUNNEL_BEND_RADIUS * FUNNEL_BEND_TURN
+  const fall = (run: number) => FUNNEL_LIFT - (FUNNEL_LIFT - FUNNEL_SPOUT_Y) * run / (straight + bend)
+  const points: PathPoint[] = [
+    { x: -3, y: FUNNEL_LIFT, z: FUNNEL_INLET_Z, nx: 0, nz: 1 },
+    { x: FUNNEL_BEND_X, y: fall(straight), z: FUNNEL_INLET_Z, nx: 0, nz: 1 },
+  ]
+  for (let i = 1; i <= FUNNEL_BEND_STEPS; i++) {
+    const turn = FUNNEL_BEND_TURN * i / FUNNEL_BEND_STEPS
+    points.push({
+      x: FUNNEL_BEND_X + FUNNEL_BEND_RADIUS * Math.sin(turn),
+      y: fall(straight + FUNNEL_BEND_RADIUS * turn),
+      z: FUNNEL_INLET_Z - FUNNEL_BEND_RADIUS * (1 - Math.cos(turn)),
+      nx: Math.sin(turn), nz: Math.cos(turn),
+      width: 1 - (1 - FUNNEL_SPOUT_WIDTH) * i / FUNNEL_BEND_STEPS,
+    })
+  }
+  return points
+}
 
 /**
  * A chute that crosses over the rim, an unbroken bowl, and a receiving trough under the hole.
@@ -199,12 +233,10 @@ const FUNNEL_BOWL_SEGMENTS = 80
  * down to the hole however fast it arrived.
  */
 function funnelGeometry(): THREE.BufferGeometry {
-  const inlet = sweep([
-    pathPoint(-3, FUNNEL_LIFT, 1, FUNNEL_INLET_Z),
-    pathPoint(-1.8, FUNNEL_LIFT, 1, FUNNEL_INLET_Z),
-    pathPoint(FUNNEL_INLET_END, FUNNEL_LIFT, FUNNEL_SPOUT_WIDTH, FUNNEL_INLET_Z),
-  ])
-  const receiverStart = pathPoint(-1.05, -1.28, 1.45)
+  const inlet = sweep(funnelInlet())
+  // The trough keeps falling too: a ball that has just dropped out of the hole rolls on rather
+  // than settling under it.
+  const receiverStart = pathPoint(-1.05, -1.12, 1.45)
   const receiver = sweep([receiverStart, pathPoint(0.9, -1.42, 1.45), pathPoint(3, -FUNNEL_DROP)])
   const vertices: number[] = []
   const groups: { start: number; count: number; material: number }[] = []

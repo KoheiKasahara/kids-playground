@@ -28,14 +28,29 @@ export const GADGET_HINTS: Record<GadgetKind, string> = {
   seesaw: 'ビーだまが のると ぎったん！',
 }
 export const isGadget = (kind: PartKind): kind is GadgetKind => kind in GADGET_HINTS
-/** The mouth sits above the bowl rim, so a circling ball can never meet the piece it came in on. */
-export const FUNNEL_LIFT = 0.9
+/**
+ * The mouth sits above the bowl rim, so a circling ball can never meet the piece it came in on,
+ * and high enough above it that the whole chute can fall towards the bowl on the way there.
+ */
+export const FUNNEL_LIFT = 1.55
 export const FUNNEL_INLET_Z = -1.4
-export const FUNNEL_DROP = 1.55
+export const FUNNEL_DROP = 1.7
 export const SEESAW_ANGLE = 0.1
 export const SEESAW_PIVOT = 0.12
 export const SPINNER_ANGLE = Math.PI / 4
-export const SPINNER_DROP = 0.45
+/** The tray falls all the way across, so a ball the bar has just stopped picks its pace back up. */
+export const SPINNER_DROP = 0.9
+/** The tray floor at a point along the piece, from the raised mouth to the lower one. */
+export const spinnerFloor = (x: number): number => -(x + 3) * SPINNER_DROP / 6
+/** The bar: a capsule swinging from a hub beside the middle of the tray. */
+export const SPINNER_BAR_HALF = 0.9
+export const SPINNER_BAR_RADIUS = 0.16
+export const SPINNER_BAR_REACH = SPINNER_BAR_HALF + SPINNER_BAR_RADIUS
+/**
+ * The bar hangs a fixed clearance over the highest tray floor its tips can reach, so a steeper
+ * tray tilts the ball on without letting the sweep scrape the uphill end.
+ */
+export const SPINNER_BAR_Y = spinnerFloor(-SPINNER_BAR_REACH) + 0.26
 export const MAX_PARTS = 36
 export const BALL_RADIUS = 0.27
 export const MIN_HEIGHT = 0.5

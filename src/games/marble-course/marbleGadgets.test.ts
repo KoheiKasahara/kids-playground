@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { initializeRapier } from '../../physics/rapierLoader'
 import { createPartGeometries } from './marbleGeometry'
-import { appendPart, createPart, FUNNEL_LIFT, initialCourse, rotate, SEESAW_ANGLE, toLocal, toWorld, type Course, type GadgetKind } from './marbleModel'
+import { appendPart, BALL_RADIUS, createPart, FUNNEL_INLET_Z, FUNNEL_LIFT, initialCourse, rotate, SEESAW_ANGLE, spinnerFloor, toLocal, toWorld, type Course, type GadgetKind } from './marbleModel'
 import { createMarbleWorld, type MarbleEvent, type MarbleWorld, type RunStatus } from './marbleWorld'
 
 const geometries = createPartGeometries()
@@ -12,6 +12,13 @@ function courseFor(kind: GadgetKind, rotation = 0): Course {
   const initial = initialCourse()
   initial.parts[0]!.rotation = rotation
   return appendPart(appendPart(initial, kind, 'gadget', 'part-0'), 'goal', 'goal', 'gadget')
+}
+
+/** A funnel fed at track level, so the piece itself decides what the ball does with its pace. */
+function funnelCourse(start: 'straight' | 'slope' = 'straight'): Course {
+  let course: Course = { parts: [createPart(start, 'start', { x: 0, y: 6, z: 0 })], startId: 'start' }
+  course = appendPart(course, 'funnel', 'funnel', 'start')
+  return appendPart(course, 'goal', 'goal', 'funnel')
 }
 
 function simulate(course: Course, offset = 0, place?: (run: MarbleWorld) => void) {
@@ -46,9 +53,7 @@ describe('physical gadgets', () => {
     })
   }
   it('drains the funnel at every entry speed instead of stopping beside its mouth', () => {
-    let course: Course = { parts: [createPart('straight', 'start', { x: 0, y: 6, z: 0 })], startId: 'start' }
-    course = appendPart(course, 'funnel', 'funnel', 'start')
-    course = appendPart(course, 'goal', 'goal', 'funnel')
+    const course = funnelCourse()
     const funnel = course.parts[1]!
     // A flat feed hands the bowl every speed, not just a slope's. A slow ball circles for
     // a long time before the hole takes it, which is exactly when it used to find a way out.
@@ -79,9 +84,7 @@ describe('physical gadgets', () => {
   })
 
   it('keeps a ball landing anywhere on the funnel rim circling down to the hole', () => {
-    let course: Course = { parts: [createPart('slope', 'start', { x: 0, y: 6, z: 0 })], startId: 'start' }
-    course = appendPart(course, 'funnel', 'funnel', 'start')
-    course = appendPart(course, 'goal', 'goal', 'funnel')
+    const course = funnelCourse('slope')
     const funnel = course.parts[1]!
     for (let degrees = 0; degrees < 360; degrees += 15) {
       const angle = degrees * Math.PI / 180
@@ -197,6 +200,94 @@ describe('physical gadgets', () => {
         place(0, 0.27, 0)
         for (let i = 0; i < 5; i++) run.step()
         expect(run.consumeEvents().map(event => event.kind)).toEqual(['boost'])
+      } finally { run.dispose() }
+    }
+  })
+
+  it('runs a ball resting at the funnel mouth down the chute and into the bowl', () => {
+    const course = funnelCourse()
+    const funnel = course.parts[1]!
+    const run = createMarbleWorld(course, geometries)!
+    try {
+      // A level chute would still be holding this ball; this one falls all the way to the bowl.
+      run.ball.setTranslation(toWorld(funnel, { x: -2.9, y: FUNNEL_LIFT + BALL_RADIUS + 0.02, z: FUNNEL_INLET_Z }), true)
+      run.ball.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      let arrived = -1
+      let speed = 0
+      for (let i = 0; i < 480 && arrived < 0; i++) {
+        run.step()
+        const local = toLocal(funnel, run.ball.translation())
+        if (local.y < 0.3 && Math.hypot(local.x, local.z) < 2.4) {
+          arrived = i / 120
+          speed = Math.hypot(...Object.values(run.ball.linvel()))
+        }
+      }
+      expect(arrived).toBeGreaterThan(0)
+      expect(speed).toBeGreaterThan(3)
+    } finally { run.dispose() }
+  })
+
+  it('lets a ball go along the bowl wall instead of throwing it across the middle', () => {
+    const course = courseFor('funnel')
+    const funnel = course.parts[1]!
+    const result = simulate(course)
+    expect(result.status).toBe('goal')
+    const path = result.path.map(point => toLocal(funnel, point))
+    // From where the spout first reaches in over the bowl, through the first lap.
+    const over = path.findIndex(point => Math.hypot(point.x, point.z) < 2.3)
+    expect(over).toBeGreaterThan(0)
+    // The spout points along the wall, so the ball follows it round rather than cutting the middle.
+    for (const point of path.slice(over, over + 10)) {
+      expect(Math.hypot(point.x, point.z), JSON.stringify(point)).toBeGreaterThan(1.5)
+    }
+  })
+
+  it('rolls a ball that has dropped through the hole out of the trough on its own', () => {
+    const course = funnelCourse()
+    const funnel = course.parts[1]!
+    const run = createMarbleWorld(course, geometries)!
+    try {
+      run.ball.setTranslation(toWorld(funnel, { x: 0, y: -0.95, z: 0 }), true)
+      run.ball.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      let left = -1
+      let speed = 0
+      for (let i = 0; i < 600 && left < 0; i++) {
+        run.step()
+        if (toLocal(funnel, run.ball.translation()).x > 3) {
+          left = i / 120
+          speed = Math.hypot(...Object.values(run.ball.linvel()))
+        }
+      }
+      expect(left).toBeGreaterThan(0)
+      expect(left).toBeLessThan(3)
+      expect(speed).toBeGreaterThan(2)
+    } finally { run.dispose() }
+  })
+
+  it('tilts a ball the bar has stopped back off the motor tray', () => {
+    for (const speed of ['slow', 'fast'] as const) {
+      const course = courseFor('spinner')
+      const part = course.parts[1]!
+      if (part.kind !== 'spinner') throw new Error('spinner required')
+      part.settings = { speed, reverse: false }
+      const run = createMarbleWorld(course, geometries)!
+      try {
+        // Stopped dead past the sweep, where a level tray would simply keep it.
+        run.ball.setTranslation(toWorld(part, { x: 1.5, y: spinnerFloor(1.5) + BALL_RADIUS + 0.02, z: 0 }), true)
+        run.ball.setLinvel({ x: 0, y: 0, z: 0 }, true)
+        let left = -1
+        let pace = 0
+        for (let i = 0; i < 480 && left < 0; i++) {
+          run.step()
+          if (toLocal(part, run.ball.translation()).x > 3) {
+            left = i / 120
+            pace = Math.hypot(...Object.values(run.ball.linvel()))
+          }
+        }
+        expect(left, speed).toBeGreaterThan(0)
+        expect(left, speed).toBeLessThan(2.2)
+        // Not a crawl: the fall hands the next piece a ball that is still moving.
+        expect(pace, speed).toBeGreaterThan(1.55)
       } finally { run.dispose() }
     }
   })

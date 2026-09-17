@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import type { BufferGeometry } from 'three'
-import { BALL_RADIUS, launchPose, rotate, SEESAW_ANGLE, SEESAW_PIVOT, SPINNER_ANGLE, SPINNER_DROP, toLocal, toWorld, type Course, type MarblePart, type PartKind, type Vec3 } from './marbleModel'
+import { BALL_RADIUS, launchPose, rotate, SEESAW_ANGLE, SEESAW_PIVOT, SPINNER_ANGLE, SPINNER_BAR_HALF, SPINNER_BAR_RADIUS, SPINNER_BAR_Y, toLocal, toWorld, type Course, type MarblePart, type PartKind, type Vec3 } from './marbleModel'
 
 export type RunStatus = 'rolling' | 'goal' | 'ready'
 export type MechanismPose = { id: string; position: Vec3; rotation: { x: number; y: number; z: number; w: number } }
@@ -37,9 +37,9 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
       .setRestitutionCombineRule(funnel ? RAPIER.CoefficientCombineRule.Min : RAPIER.CoefficientCombineRule.Average)
       .setFriction(funnel ? 0.28 : 0.18).setRestitution(funnel ? 0.02 : 0.12)))
     if (part.kind === 'spinner') {
-      const p = toWorld(part, { x: 0, y: 0.34 - SPINNER_DROP / 2, z: 0.3 })
+      const p = toWorld(part, { x: 0, y: SPINNER_BAR_Y, z: 0.3 })
       const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(p.x, p.y, p.z).setRotation(yaw(angle + SPINNER_ANGLE)))
-      bars.set(part.id, world.createCollider(RAPIER.ColliderDesc.capsule(0.9, 0.16).setRotation({ x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }).setFriction(0.15).setRestitution(0.1), body))
+      bars.set(part.id, world.createCollider(RAPIER.ColliderDesc.capsule(SPINNER_BAR_HALF, SPINNER_BAR_RADIUS).setRotation({ x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }).setFriction(0.15).setRestitution(0.1), body))
       world.createCollider(RAPIER.ColliderDesc.cylinder(0.36, 0.14).setTranslation(p.x, p.y, p.z))
       mechanisms.set(part.id, body)
     }
@@ -97,7 +97,7 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
     step(): RunStatus {
       if (status !== 'rolling') return status
       for (const part of spinners) {
-        const speed = (part.settings.speed === 'fast' ? 1.4 : 0.65) * (part.settings.reverse ? -1 : 1)
+        const speed = (part.settings.speed === 'fast' ? 2.2 : 1.05) * (part.settings.reverse ? -1 : 1)
         mechanisms.get(part.id)!.setNextKinematicRotation(yaw(-part.rotation * Math.PI / 2 + SPINNER_ANGLE + (elapsed + world.timestep) * speed))
       }
       world.step()
@@ -107,7 +107,8 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
       // far longer than a child will watch, and nothing else in the funnel takes that energy away.
       const swirling = funnels.some(part => {
         const local = toLocal(part, p)
-        return Math.hypot(local.x, local.z) < 2.5 && local.y > -0.9 && local.y < 0.7
+        // Only the bowl itself: the trough under the hole is a track, and a rolling ball keeps its pace there.
+        return Math.hypot(local.x, local.z) < 2.5 && local.y > -0.72 && local.y < 0.7
       })
       ball.setAngularDamping(swirling ? FUNNEL_DRAG : 0.035)
       for (const part of boosters) {
