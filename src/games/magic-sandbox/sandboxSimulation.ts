@@ -1,4 +1,5 @@
 import { addCrab, addTurtle, tapCrab, tapTurtle, stepCrabs, stepTurtles, renderCrabs, renderTurtles, nextSleepDelay, wakeCreature, creatureScale, type Creature } from './sandboxCrabs'
+import { addButterfly, tapButterfly, stepButterflies, renderButterflies, type Butterfly } from './sandboxButterfly'
 
 // Original, bounded falling-sand simulation. No external engine or copied OSS code.
 export const Cell = { Empty: 0, Sand: 1, Water: 2, Stone: 3, Seed: 4, Mud: 5, Stem: 6, Petal: 7, Pollen: 8, Root: 9 } as const
@@ -14,19 +15,24 @@ export class Sandbox {
   private tick = 0
   readonly crabs: Creature[] = []
   readonly turtles: Creature[] = []
+  readonly butterflies: Butterfly[] = []
   night = false
   setNight(night: boolean) {
     if (this.night === night) return
     this.night = night
-    for (const creature of [...this.crabs, ...this.turtles]) {
+    for (const creature of [...this.crabs, ...this.turtles, ...this.butterflies]) {
       wakeCreature(creature)
       creature.sleepDelay = night ? nextSleepDelay(this.random) : 0
     }
   }
   addCrab() { return addCrab(this, this.random) }
   addTurtle() { return addTurtle(this, this.random) }
+  addButterfly() { return addButterfly(this, this.random) }
   tapCrab(point: Point) { return tapCrab(this, point) }
   tapTurtle(point: Point) { return tapTurtle(this, point) }
+  tapButterfly(point: Point) { return tapButterfly(this, point) }
+  // A seed only sprouts clear of the plants already growing around it.
+  crowdedForSeed(x: number, y: number) { return this.plants.some(p => Math.abs(p.x - x) < 6 && Math.abs(p.y - y) < 14) }
   bloomingFlowers(): Point[] {
     return this.plants.filter(p => p.height === p.target && this.get(p.x, p.y) === Cell.Root &&
       this.get(p.x, p.y - p.height) === Cell.Pollen).map(p => ({ x: p.x, y: p.y - p.height }))
@@ -68,6 +74,7 @@ export class Sandbox {
   clear() {
     this.crabs.length = 0
     this.turtles.length = 0
+    this.butterflies.length = 0
     this.cells.fill(0)
     this.age.fill(0)
     this.plants = []
@@ -84,6 +91,9 @@ export class Sandbox {
     for (const creature of [...this.crabs, ...this.turtles]) {
       const scale = creatureScale(creature)
       if (Math.abs(point.x - creature.x) <= radius + 8 * scale && Math.abs(point.y - (creature.y - 4 * scale)) <= radius + 5 * scale) wakeCreature(creature)
+    }
+    for (const butterfly of this.butterflies) {
+      if (Math.abs(point.x - butterfly.x) <= radius + 7 && Math.abs(point.y - butterfly.y) <= radius + 6) wakeCreature(butterfly)
     }
     const cx = Math.round(point.x), cy = Math.round(point.y)
     for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
@@ -125,7 +135,7 @@ export class Sandbox {
       // Seeds need damp soil beneath them; dry sand and stone never germinate.
       if (material === Cell.Seed && this.get(x, y + 1) === Cell.Mud) {
         this.age[i]++
-        if (this.age[i] >= 18 && y > 12 && (this.get(x, y - 1) === Cell.Empty || this.get(x, y - 1) === Cell.Water) && !this.plants.some(p => Math.abs(p.x - x) < 6 && Math.abs(p.y - y) < 14)) {
+        if (this.age[i] >= 18 && y > 12 && (this.get(x, y - 1) === Cell.Empty || this.get(x, y - 1) === Cell.Water) && !this.crowdedForSeed(x, y)) {
           this.set(x, y, Cell.Root)
           this.plants.push({ x, y, height: 0, age: 0, target: 8 + Math.floor(this.random() * 5), cells: new Map([[i, Cell.Root]]) })
         }
@@ -149,6 +159,7 @@ export class Sandbox {
     this.grow()
     stepCrabs(this, this.random)
     stepTurtles(this, this.random)
+    stepButterflies(this, this.random)
   }
   private grow() {
     this.plants = this.plants.filter(p => {
@@ -179,7 +190,7 @@ export class Sandbox {
     }
   }
   shake() {
-    for (const creature of [...this.crabs, ...this.turtles]) wakeCreature(creature)
+    for (const creature of [...this.crabs, ...this.turtles, ...this.butterflies]) wakeCreature(creature)
     // Lift loose grains into available space; stone walls and rooted flowers stay put.
     for (let y = 1; y < this.height; y++) for (let x = 0; x < this.width; x++) {
       const material = this.get(x, y)
@@ -205,4 +216,5 @@ export function renderSandbox(world: Sandbox, pixels: Uint8ClampedArray) {
   }
   renderCrabs(world, pixels)
   renderTurtles(world, pixels)
+  renderButterflies(world, pixels)
 }

@@ -27,7 +27,9 @@ export type Creature = Point & {
 }
 // Simulation runs at 60 steps/second. Each animal gets its own bedtime.
 export const nextSleepDelay = (random: () => number) => 480 + Math.floor(random() * 900)
-export function wakeCreature(creature: Creature) {
+// Crabs, turtles and the butterfly all nap the same way, so they share these helpers.
+export type Napping = { sleeping: number; sleepDelay: number; resting: boolean; decision: number }
+export function wakeCreature(creature: Napping) {
   if (!creature.sleeping) return
   creature.sleeping = 0
   creature.sleepDelay = 480
@@ -298,9 +300,10 @@ function feed(world: Sandbox, creature: Creature, random: () => number) {
   return true
 }
 
-type Dot = (x: number, y: number, color: number[]) => void
-function creaturePainter(world: Sandbox, pixels: Uint8ClampedArray, creature: Creature, cx: number, cy: number): Dot {
-  const scale = creatureScale(creature)
+export type Dot = (x: number, y: number, color: number[]) => void
+const creaturePainter = (world: Sandbox, pixels: Uint8ClampedArray, creature: Creature, cx: number, cy: number) =>
+  spritePainter(world, pixels, cx, cy, creatureScale(creature))
+export function spritePainter(world: Sandbox, pixels: Uint8ClampedArray, cx: number, cy: number, scale: number): Dot {
   return (dx, dy, color) => {
     // Fill scaled pixels, avoiding gaps in the larger growth stages.
     for (let y = Math.round(cy + dy * scale); y < Math.round(cy + (dy + 1) * scale); y++) {
@@ -328,7 +331,7 @@ function renderCelebration(dot: Dot, creature: Creature) {
   const pink = [246, 105, 144]
   for (const [x, y] of [[-2, -15], [-1, -15], [1, -15], [2, -15], [-2, -14], [-1, -14], [0, -14], [1, -14], [2, -14], [-1, -13], [0, -13], [1, -13], [0, -12]]) dot(x, y - rise, pink)
 }
-function renderSleep(dot: Dot, creature: Creature) {
+export function renderSleep(dot: Dot, creature: { sleeping: number }) {
   if (!creature.sleeping) return
   const rise = Math.floor((creature.sleeping % 120) / 40)
   const blue = [215, 233, 255]

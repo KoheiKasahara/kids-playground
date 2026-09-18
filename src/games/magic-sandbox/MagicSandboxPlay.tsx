@@ -43,13 +43,17 @@ function Playground({ back }: { back: () => void }) {
     return () => window.clearTimeout(timer)
   }, [discovery])
   return <main className={`${styles.page} ${night ? styles.night : ''}`}>
-    <header className={styles.header}><GameBackButton onBack={back} /><h1>まほうのすなば</h1><button className={styles.dayNight} aria-label="よる" aria-pressed={night} title={night ? 'ひるに する' : 'よるに する'} onClick={() => { sandbox.setNight(!night); setNight(!night) }}><span aria-hidden="true">{night ? '🌙' : '☀️'}</span></button></header>
+    <header className={styles.header}><GameBackButton onBack={back} /><h1>まほうのすなば</h1><button className={styles.dayNight} aria-label="よる" aria-pressed={night} title={night ? 'ひるに する' : 'よるに する'} onClick={() => { sandbox.setNight(!night); setNight(!night) }}><i aria-hidden="true" /><span aria-hidden="true">☀️</span><span aria-hidden="true">🌙</span></button></header>
     <div className={styles.workspace}>
       <aside className={styles.tools} aria-label="すなばの どうぐ">
-        <div className={styles.materials} role="group" aria-label="そざい">
-          {MATERIALS.map(m => <button key={m.id} aria-label={m.name} aria-pressed={m.id === material.id} onClick={() => { sandbox.stop(); sandbox.dismissCreatureMessage(); setMaterial(m) }}><span aria-hidden="true">{m.icon}</span><b>{m.id === material.id ? '✓ ' : ''}{m.name}</b></button>)}
-          <button aria-label={`カニを ふやす（${sandbox.crabCount}/2）`} disabled={sandbox.crabCount >= 2} onClick={sandbox.addCrab}><span aria-hidden="true">🦀</span><b>カニ {sandbox.crabCount}/2</b></button>
-          <button aria-label={`カメを ふやす（${sandbox.turtleCount}/1）`} disabled={sandbox.turtleCount >= 1} onClick={sandbox.addTurtle}><span aria-hidden="true">🐢</span><b>カメ {sandbox.turtleCount}/1</b></button>
+        <span className={styles.scrollHint} aria-hidden="true">↔ よこに うごくよ</span>
+        <div className={styles.scrollWindow}>
+          <div className={styles.materials} role="group" aria-label="そざい">
+            {MATERIALS.map(m => <button key={m.id} aria-label={m.name} aria-pressed={m.id === material.id} onClick={() => { sandbox.stop(); sandbox.dismissCreatureMessage(); setMaterial(m) }}><span aria-hidden="true">{m.icon}</span><b>{m.id === material.id ? '✓ ' : ''}{m.name}</b></button>)}
+            <button aria-label={`カニを ふやす（${sandbox.crabCount}/2）`} disabled={sandbox.crabCount >= 2} onClick={sandbox.addCrab}><span aria-hidden="true">🦀</span><b>カニ {sandbox.crabCount}/2</b></button>
+            <button aria-label={`カメを ふやす（${sandbox.turtleCount}/1）`} disabled={sandbox.turtleCount >= 1} onClick={sandbox.addTurtle}><span aria-hidden="true">🐢</span><b>カメ {sandbox.turtleCount}/1</b></button>
+            <button aria-label={`ちょうちょを ふやす（${sandbox.butterflyCount}/1）`} disabled={sandbox.butterflyCount >= 1} onClick={sandbox.addButterfly}><span aria-hidden="true">🦋</span><b>ちょうちょ {sandbox.butterflyCount}/1</b></button>
+          </div>
         </div>
         <div className={styles.sizes} role="group" aria-label="ふとさ">
           <button aria-pressed={!wide} onClick={() => { sandbox.stop(); setWide(false) }}>● すこし</button>
@@ -82,7 +86,7 @@ export default function MagicSandboxPlay() {
   return <main className={styles.start}>
     <header className={styles.header}><GameBackButton to="/" /></header>
     <div className={styles.intro}>
-      <div className={styles.illustration} aria-hidden="true"><span>☀️</span><div>💧<span>🌼 🌱 🌸</span></div><footer>・ . ・ . ・ . ・ . ・ . ・</footer></div>
+      <div className={styles.illustration} aria-hidden="true"><span>☀️ 🦋</span><div>💧<span>🌼 🌱 🌸</span></div><footer>・ . ・ . ・ . ・ . ・ . ・</footer></div>
       <p className={styles.eyebrow}>さらさら、じゃぶじゃぶ、にょきっ！</p>
       <h1>まほうのすなば</h1>
       <p>すなと みずを まぜたら<br />なにが おこるかな？</p>

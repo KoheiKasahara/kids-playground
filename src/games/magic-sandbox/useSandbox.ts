@@ -7,6 +7,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
   const [world] = useState(() => { const result = new Sandbox(); result.prepare(); return result })
   const [crabCount, setCrabCount] = useState(0)
   const [turtleCount, setTurtleCount] = useState(0)
+  const [butterflyCount, setButterflyCount] = useState(0)
   const [creatureMessage, setCreatureMessage] = useState('')
   const active = useRef<Gesture | null>(null)
   const keyboardPoint = useRef<Point>({ x: 72, y: 30 })
@@ -69,7 +70,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
     if (!p) return
     event.preventDefault()
     event.currentTarget.focus({ preventScroll: true })
-    if (world.tapCrab(p) || world.tapTurtle(p)) { draw.current(); return }
+    if (world.tapButterfly(p) || world.tapCrab(p) || world.tapTurtle(p)) { draw.current(); return }
     event.currentTarget.setPointerCapture(event.pointerId)
     active.current = { ...brush, point: p, pointerId: event.pointerId }
     world.paint(p, brush.material, brush.radius)
@@ -101,12 +102,12 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       event.currentTarget.style.setProperty('--cursor-y', `${p.y / world.height * 100}%`)
     } else if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault()
-      if (!world.tapCrab(p) && !world.tapTurtle(p)) world.paint(p, brush.material, brush.radius)
+      if (!world.tapButterfly(p) && !world.tapCrab(p) && !world.tapTurtle(p)) world.paint(p, brush.material, brush.radius)
       draw.current()
     }
   }
   return {
-    unavailable, stop, crabCount, turtleCount, creatureMessage,
+    unavailable, stop, crabCount, turtleCount, butterflyCount, creatureMessage,
     setNight: (night: boolean) => { stop(); world.setNight(night); draw.current() },
     dismissCreatureMessage: () => setCreatureMessage(''),
     addCrab: () => {
@@ -123,8 +124,15 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       setCreatureMessage(added ? '🐢 おはなを たべると おおきくなるよ' : 'カメの はいる ばしょを あけてね')
       draw.current()
     },
+    addButterfly: () => {
+      stop()
+      const added = world.addButterfly()
+      setButterflyCount(world.butterflies.length)
+      setCreatureMessage(added ? '🦋 おはなに とまると たねが とぶよ' : 'ちょうちょの とぶ ばしょを あけてね')
+      draw.current()
+    },
     canvasProps: { width: world.width, height: world.height, onPointerDown: begin, onPointerMove: move, onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end, onKeyDown: keyDown },
-    clear: () => { stop(); world.clear(); setCrabCount(0); setTurtleCount(0); setCreatureMessage(''); draw.current() },
+    clear: () => { stop(); world.clear(); setCrabCount(0); setTurtleCount(0); setButterflyCount(0); setCreatureMessage(''); draw.current() },
     shake: () => { stop(); world.shake(); draw.current() },
   }
 }
