@@ -150,8 +150,26 @@ export function moveFallingPieceSideways(state: FallingPuzzleState, delta: numbe
 }
 
 /**
+ * 左右に1〜(盤面の幅-1)マスずらす・1マス持ち上げる、の順で試す壁キック一覧。
+ * 「ながいぼう」（4マス）のような幅の広い形は、壁ぎわで向きを変えると
+ * 2マスを超えるずらしが必要になることがあるため、盤面の幅ぶんまで試せるようにする
+ * （幼児が壁ぎわでまわしても「反応しない」と感じることがないように、必ず置ける場所を探す）。
+ */
+const HORIZONTAL_KICK_COLS: readonly number[] = [
+  0,
+  ...Array.from({ length: FALLING_COLS - 1 }, (_unused, index) => index + 1).flatMap((magnitude) => [
+    -magnitude,
+    magnitude,
+  ]),
+]
+const ROTATE_KICKS: readonly BoardCell[] = [
+  ...HORIZONTAL_KICK_COLS.map((col) => ({ col, row: 0 })),
+  ...HORIZONTAL_KICK_COLS.map((col) => ({ col, row: -1 })),
+]
+
+/**
  * 落ちているブロックを90度まわす。そのままだと壁や積まれたマスに当たる場合は、
- * 左右に1〜2マスずらす・1マス持ち上げる、の順で置ける場所を探してから回す
+ * 左右にずらす・1マス持ち上げる、の順で置ける場所を探してから回す
  * （幼児が壁ぎわでまわしても「反応しない」と感じにくくするため）。
  * どこにも置けないときだけ、何も変えずに同じ状態を返す。
  */
@@ -159,15 +177,7 @@ export function rotateFallingPiece(state: FallingPuzzleState): FallingPuzzleStat
   const piece = state.piece
   if (!piece || state.status !== 'playing') return state
   const rotation = nextRotation(piece.rotation)
-  const kicks: readonly BoardCell[] = [
-    { col: 0, row: 0 },
-    { col: -1, row: 0 },
-    { col: 1, row: 0 },
-    { col: -2, row: 0 },
-    { col: 2, row: 0 },
-    { col: 0, row: -1 },
-  ]
-  for (const kick of kicks) {
+  for (const kick of ROTATE_KICKS) {
     const candidate: FallingPiece = {
       ...piece,
       rotation,

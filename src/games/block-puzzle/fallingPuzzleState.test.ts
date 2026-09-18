@@ -155,6 +155,20 @@ describe('おちてくるモード: まわす', () => {
     expect(fallingPieceCells(rotated.piece!).every((cell) => cell.col >= 0)).toBe(true)
   })
 
+  test('ながいぼうは、かべぎわの縦向きからでも横向きへ必ずまわせる（幅4マスぶんのキック）', () => {
+    // 左のかべぎわで縦向き → 横向きにすると、そのままでは盤面の外へ左へはみ出す。
+    const atLeftWall = stateWith([], { shapeId: 'i', rotation: 90, anchor: { col: 0, row: 3 } })
+    const rotatedAtLeftWall = rotateFallingPiece(atLeftWall)
+    expect(rotatedAtLeftWall.piece!.rotation).toBe(180)
+    expect(fallingPieceCells(rotatedAtLeftWall.piece!).every((cell) => cell.col >= 0)).toBe(true)
+
+    // 右のかべぎわで縦向き → 横向きにすると、そのままでは盤面の外へ右へはみ出す。
+    const atRightWall = stateWith([], { shapeId: 'i', rotation: 270, anchor: { col: FALLING_COLS - 1, row: 3 } })
+    const rotatedAtRightWall = rotateFallingPiece(atRightWall)
+    expect(rotatedAtRightWall.piece!.rotation).toBe(0)
+    expect(fallingPieceCells(rotatedAtRightWall.piece!).every((cell) => cell.col < FALLING_COLS)).toBe(true)
+  })
+
   test('どうやっても置けないときだけ、まわさずそのままにする', () => {
     const piece: FallingPiece = { shapeId: 'i', rotation: 0, anchor: { col: 0, row: 8 } }
     const state = stateWith([], piece)
