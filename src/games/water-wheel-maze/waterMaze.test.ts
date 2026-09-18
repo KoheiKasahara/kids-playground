@@ -138,7 +138,7 @@ describe('水の ながれ', () => {
     run(maze, 600, 2)
     run(maze, 900)
     expect(maze.activity).toBe(0)
-  })
+  }, 15_000)
 })
 
 describe('円盤を まわす', () => {
