@@ -1364,6 +1364,365 @@
   }
 }
 
+/* --- ショベルカー: アームを上下させながら、ローラーを回して すすむ --- */
+
+/* キャタピラの接地面(y=86)を軸にする（くるま・ロボットと同じ理由）。 */
+.canvas [data-motion-group='excavator'] {
+  transform-origin: 50% 86%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='excavator'] {
+  animation: excavatorEnter 480ms ease-out both, excavatorWork 4.6s 480ms ease-in-out infinite;
+}
+
+@keyframes excavatorEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.82);
+  }
+}
+
+/* 重たい車体なので、くるまのcarDriveより ゆっくり・短い距離で動かし、
+   掘っているあいだ（アームが下がる区間）は止まって見えるようにする。 */
+@keyframes excavatorWork {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+
+  22% {
+    transform: translate(-8px, 0) rotate(-1.2deg) scale(0.82);
+  }
+
+  /* 掘る区間。ここだけ位置を変えずに、アームの動きを見せる。 */
+  40%,
+  62% {
+    transform: translate(-8px, 0) rotate(0deg) scale(0.82);
+  }
+
+  85% {
+    transform: translate(8px, 0) rotate(1.2deg) scale(0.82);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+}
+
+/* アームは車体側のつけね（＝バケットとアームを合わせたbboxの右下）を軸に、
+   すくい上げる向きへゆっくり回す。角度を大きくすると紙からはみ出すので控えめにする。 */
+.canvas[data-phase='celebrating'] [data-motion-part='excavatorArm'] {
+  transform-origin: 96% 94%;
+  animation: excavatorArmSwing 4.6s 480ms ease-in-out infinite;
+}
+
+@keyframes excavatorArmSwing {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  /* 下ろして掘る → すくい上げる。 */
+  40% {
+    transform: rotate(14deg);
+  }
+
+  62% {
+    transform: rotate(-9deg);
+  }
+}
+
+/* ローラーはくるまのタイヤと同じ考え方で、車体が進む区間だけ回す。
+   掘っている区間(40%〜62%)は角度を変えず、その場で止まって見せる。 */
+.canvas[data-phase='celebrating'] [data-motion-part^='excavatorRoller'] {
+  animation: excavatorRollerSpin 4.6s 480ms linear infinite;
+}
+
+@keyframes excavatorRollerSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  22% {
+    transform: rotate(-260deg);
+  }
+
+  40%,
+  62% {
+    transform: rotate(-260deg);
+  }
+
+  85% {
+    transform: rotate(360deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* --- ききゅう: ふわりと うかびながら、かごが ゆれて ひが ゆらめく --- */
+
+.canvas[data-phase='celebrating'] [data-motion-group='balloon'] {
+  animation: balloonEnter 480ms ease-out both, balloonFloat 5.2s 480ms ease-in-out infinite;
+}
+
+@keyframes balloonEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.86);
+  }
+}
+
+/* ユーフォーのufoHoverと同じ「その場でふわふわ」だが、ききゅうなので
+   左右より上下を大きく取り、風に流されるように ゆっくり傾ける。 */
+@keyframes balloonFloat {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+
+  25% {
+    transform: translate(-5px, -6px) rotate(-2.5deg) scale(0.86);
+  }
+
+  50% {
+    transform: translate(0, -10px) rotate(0deg) scale(0.86);
+  }
+
+  75% {
+    transform: translate(5px, -6px) rotate(2.5deg) scale(0.86);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.86);
+  }
+}
+
+/* かごはロープでぶら下がっているので、上端を軸にして振り子のように揺らす。
+   ふくろの揺れ(5.2s)と同じ周期にして、ばらばらに動いて見えないようにする。 */
+.canvas[data-phase='celebrating'] [data-motion-part='balloonBasket'] {
+  transform-origin: center top;
+  animation: balloonBasketSwing 5.2s 480ms ease-in-out infinite;
+}
+
+@keyframes balloonBasketSwing {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(4deg);
+  }
+
+  75% {
+    transform: rotate(-4deg);
+  }
+}
+
+/* ほのおは、ロケットのrocketFlameFlickerと同じく上端（バーナー側）を軸に
+   のびちぢみさせる。 */
+.canvas[data-phase='celebrating'] [data-motion-part='balloonFlame'] {
+  transform-origin: center top;
+  animation: balloonFlameFlicker 620ms 480ms ease-in-out infinite alternate;
+}
+
+@keyframes balloonFlameFlicker {
+  from {
+    opacity: 0.75;
+    transform: scale(0.88, 0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.08, 1.18);
+  }
+}
+
+/* くもは ききゅうと一緒に上がらず、その場をゆっくり流れていく。 */
+.canvas[data-phase='celebrating'] [data-motion-part='balloonCloud'] {
+  animation: balloonCloudDrift 9s 480ms ease-in-out infinite;
+}
+
+@keyframes balloonCloudDrift {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: translate(0, 0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translate(9px, -2px);
+  }
+}
+
+/* --- ペンギン: つばさを ぱたぱたさせながら、よちよち あるく --- */
+
+/* あしの裏(y=94)を軸にする（いぬ・てんとうむしと同じ理由）。 */
+.canvas [data-motion-group='penguin'] {
+  transform-origin: 50% 94%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='penguin'] {
+  animation: penguinEnter 480ms ease-out both, penguinWaddle 2.6s 480ms ease-in-out infinite;
+}
+
+@keyframes penguinEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.88);
+  }
+}
+
+/* よちよち歩きは「進む」より「左右に体を倒す」が主。倒した側へ少しだけ進む。 */
+@keyframes penguinWaddle {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.88);
+  }
+
+  25% {
+    transform: translate(-6px, -1px) rotate(-6deg) scale(0.88);
+  }
+
+  50% {
+    transform: translate(0, 0) rotate(0deg) scale(0.88);
+  }
+
+  75% {
+    transform: translate(6px, -1px) rotate(6deg) scale(0.88);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(0.88);
+  }
+}
+
+/* つばさは肩（上端）を軸に、体の傾きと同じ周期で交互にはばたく。 */
+.canvas[data-phase='celebrating'] [data-motion-part='penguinWingLeft'] {
+  transform-origin: center top;
+  animation: penguinWingFlap 1.3s 480ms ease-in-out infinite alternate;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-part='penguinWingRight'] {
+  transform-origin: center top;
+  animation: penguinWingFlap 1.3s 480ms ease-in-out infinite alternate-reverse;
+}
+
+@keyframes penguinWingFlap {
+  from {
+    transform: rotate(-10deg);
+  }
+
+  to {
+    transform: rotate(14deg);
+  }
+}
+
+/* --- かたつむり: つのを のびちぢみさせながら、ゆっくり すすむ --- */
+
+/* からだの底(y=82)を軸にする。 */
+.canvas [data-motion-group='snail'] {
+  transform-origin: 50% 82%;
+}
+
+.canvas[data-phase='celebrating'] [data-motion-group='snail'] {
+  animation: snailEnter 480ms ease-out both, snailCrawl 7s 480ms ease-in-out infinite;
+}
+
+@keyframes snailEnter {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(0.86);
+  }
+}
+
+/* 他のどの題材よりも ゆっくり（7s）、上下せずに すーっと横へ進む。 */
+@keyframes snailCrawl {
+  0% {
+    transform: translate(0, 0) scale(0.86);
+  }
+
+  45% {
+    transform: translate(-13px, 0) scale(0.86);
+  }
+
+  50% {
+    transform: translate(-13px, 0) scale(0.86);
+  }
+
+  95% {
+    transform: translate(13px, 0) scale(0.86);
+  }
+
+  100% {
+    transform: translate(0, 0) scale(0.86);
+  }
+}
+
+/* からは、進む向きに合わせて ゆらりと傾く（歩みと同じ7s）。 */
+.canvas[data-phase='celebrating'] [data-motion-part='snailShell'] {
+  animation: snailShellRock 7s 480ms ease-in-out infinite;
+}
+
+@keyframes snailShellRock {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  45% {
+    transform: rotate(-5deg);
+  }
+
+  95% {
+    transform: rotate(5deg);
+  }
+}
+
+/* つのは、つけね（下端）を軸に たてへ のびちぢみする。 */
+.canvas[data-phase='celebrating'] [data-motion-part='snailAntenna'] {
+  transform-origin: center bottom;
+  animation: snailAntennaStretch 2.2s 480ms ease-in-out infinite alternate;
+}
+
+@keyframes snailAntennaStretch {
+  from {
+    transform: scale(0.92, 0.82);
+  }
+
+  to {
+    transform: scale(1.04, 1.1);
+  }
+}
+
 /* 動きを減らす設定のときは、走る・泳ぐ・羽ばたくを止めて、
    「できた」ことが分かる程度のゆっくりした呼吸だけ残す。 */
 @media (prefers-reduced-motion: reduce) {
