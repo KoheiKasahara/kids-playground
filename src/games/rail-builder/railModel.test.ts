@@ -10,12 +10,14 @@ import {
   LOOP_CLOSURE_MAX_ANGLE_DIFFERENCE,
   LOOP_CLOSURE_MAX_DISTANCE,
   LOOP_CLOSURE_MAX_HEIGHT_DIFFERENCE,
+  RAIL_APPEND_LIMIT,
   RAIL_UNIT_LENGTH,
   SHORT_STRAIGHT_LENGTH,
   SLOPE_LENGTH,
   STATION_LENGTH,
   STRAIGHT_LENGTH,
   TUNNEL_LENGTH,
+  appendRailPiece,
   applyRailLoopClosure,
   areRailConnectionsSymmetric,
   connectRailPieceRemainingEndpoints,
@@ -1855,5 +1857,154 @@ describe('facility connectivity spec (issue #253)', () => {
     expect(worldConnectorForRailPiece(bridge, 'b').position.y).toBeCloseTo(ELEVATED_HEIGHT)
     expect(worldConnectorForRailPiece(slope2, 'b').position.y).toBeCloseTo(ELEVATED_HEIGHT)
     expect(worldConnectorForRailPiece(slope2, 'a').position.y).toBeCloseTo(0)
+  })
+})
+
+describe('appending a palette piece to the selected piece', () => {
+  const fallback = { x: 12, y: 0, z: 12 }
+
+  function appendStraight(pieces: RailPiece[], selectedPieceId: string | null) {
+    return appendRailPiece(pieces, 'straight', 'added', selectedPieceId, { fallbackPosition: fallback })
+  }
+
+  it('joins the new piece to the open exit of the selected piece', () => {
+    const result = appendStraight([createRailPiece('straight', 's1', origin)], 's1')
+
+    expect(result.connected).toBe(true)
+    expect(result.piece.position).toEqual({ x: STRAIGHT_LENGTH, y: 0, z: 0 })
+    expect(result.piece.connections.a).toEqual({ pieceId: 's1', connectorId: 'b' })
+    const added = result.pieces.find((piece) => piece.id === 'added')!
+    const selected = result.pieces.find((piece) => piece.id === 's1')!
+    expect(selected.connections.b).toEqual({ pieceId: 'added', connectorId: 'a' })
+    expect(distanceBetweenRailPoints(
+      worldConnectorForRailPiece(added, 'a').position,
+      worldConnectorForRailPiece(selected, 'b').position,
+    )).toBeLessThan(1e-9)
+    expect(areRailConnectionsSymmetric(result.pieces)).toBe(true)
+  })
+
+  it('uses the remaining open end when the exit is already taken', () => {
+    const base = connectRailPieces(
+      [createRailPiece('straight', 's1', origin), createRailPiece('straight', 's2', origin)],
+      's2',
+      'a',
+      's1',
+      'b',
+    )
+
+    const result = appendStraight(base, 's1')
+
+    expect(result.connected).toBe(true)
+    expect(result.piece.connections.a).toEqual({ pieceId: 's1', connectorId: 'a' })
+    expect(result.piece.position.x).toBeCloseTo(-STRAIGHT_LENGTH)
+    expect(result.piece.position.z).toBeCloseTo(0)
+  })
+
+  it('continues from the branch outlet when the main line is taken', () => {
+    const base = connectRailPieces(
+      [createRailPiece('branch', 'br', origin), createRailPiece('straight', 'main', origin)],
+      'main',
+      'a',
+      'br',
+      'b',
+    )
+
+    const result = appendStraight(base, 'br')
+
+    expect(result.piece.connections.a).toEqual({ pieceId: 'br', connectorId: 'c' })
+    const added = result.pieces.find((piece) => piece.id === 'added')!
+    const branch = result.pieces.find((piece) => piece.id === 'br')!
+    expect(distanceBetweenRailPoints(
+      worldConnectorForRailPiece(added, 'a').position,
+      worldConnectorForRailPiece(branch, 'c').position,
+    )).toBeLessThan(1e-9)
+    expect(areRailConnectionsSymmetric(result.pieces)).toBe(true)
+  })
+
+  it('lines up curves and facilities on the joint, not on the fallback position', () => {
+    for (const kind of ['curve', 'short-straight', 'slope', 'station', 'tunnel', 'depot'] as const) {
+      const result = appendRailPiece(
+        [createRailPiece('straight', 's1', origin)],
+        kind,
+        'added',
+        's1',
+        { fallbackPosition: fallback },
+      )
+
+      expect(result.connected).toBe(true)
+      const added = result.pieces.find((piece) => piece.id === 'added')!
+      const selected = result.pieces.find((piece) => piece.id === 's1')!
+      const joint = worldConnectorForRailPiece(added, 'a')
+      expect(distanceBetweenRailPoints(
+        joint.position,
+        worldConnectorForRailPiece(selected, 'b').position,
+      )).toBeLessThan(1e-9)
+      expect(areRailConnectionsSymmetric(result.pieces)).toBe(true)
+    }
+  })
+
+  it('also connects the far end when it lands on another open connector', () => {
+    const base = [
+      createRailPiece('straight', 's1', origin),
+      createRailPiece('straight', 's3', { x: STRAIGHT_LENGTH * 2, y: 0, z: 0 }),
+    ]
+
+    const result = appendStraight(base, 's1')
+
+    expect(result.piece.connections.a).toEqual({ pieceId: 's1', connectorId: 'b' })
+    expect(result.piece.connections.b).toEqual({ pieceId: 's3', connectorId: 'a' })
+    expect(areRailConnectionsSymmetric(result.pieces)).toBe(true)
+  })
+
+  it('keeps the loose spawn when nothing is selected', () => {
+    const result = appendStraight([createRailPiece('straight', 's1', origin)], null)
+
+    expect(result.connected).toBe(false)
+    expect(result.piece.position).toEqual(fallback)
+    expect(result.piece.connections).toEqual({})
+    expect(result.pieces).toHaveLength(2)
+  })
+
+  it('keeps the loose spawn instead of stacking the piece onto another one', () => {
+    const base = [
+      createRailPiece('straight', 's1', origin),
+      createRailPiece('straight', 'front', { x: STRAIGHT_LENGTH, y: 0, z: 0 }),
+      createRailPiece('straight', 'back', { x: -STRAIGHT_LENGTH, y: 0, z: 0 }),
+    ]
+
+    const result = appendStraight(base, 's1')
+
+    expect(result.connected).toBe(false)
+    expect(result.piece.position).toEqual(fallback)
+    expect(result.piece.connections).toEqual({})
+  })
+
+  it('keeps the loose spawn instead of pushing the piece off the ground', () => {
+    const edge = RAIL_APPEND_LIMIT - STRAIGHT_LENGTH - 1
+    const base = connectRailPieces(
+      [
+        createRailPiece('straight', 's1', { x: edge, y: 0, z: 0 }),
+        createRailPiece('straight', 'behind', { x: edge, y: 0, z: 0 }),
+      ],
+      'behind',
+      'b',
+      's1',
+      'a',
+    )
+
+    const result = appendStraight(base, 's1')
+
+    expect(result.connected).toBe(false)
+    expect(result.piece.position).toEqual(fallback)
+  })
+
+  it('leaves the given pieces untouched', () => {
+    const base = [createRailPiece('straight', 's1', origin)]
+
+    const result = appendStraight(base, 's1')
+
+    expect(base).toHaveLength(1)
+    expect(base[0]!.connections).toEqual({})
+    expect(result.pieces[0]).not.toBe(base[0])
   })
 })

@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import {
+  appendRailPiece,
   createRailPiece,
   deleteRailPiece,
+  RAIL_APPEND_LIMIT,
   rotateRailPiece,
   snapAndConnectRailPiece,
   toggleRailBranch,
@@ -28,7 +30,7 @@ import {
   ZOOM_STEP,
   useRailBuilderEngine,
 } from './useRailBuilderEngine'
-import { primeAudio } from '../../utils/quizSound'
+import { playRailSnapSound, primeAudio } from '../../utils/quizSound'
 
 function createInitialRailPieces(): RailPiece[] {
   // しゃこ(depot)が1番線・2番線の平行2線を持つ。rail-2とrail-3は
@@ -77,9 +79,9 @@ function nextSpawnPosition(pieces: readonly RailPiece[], cameraTarget: RailVec3)
   for (const offset of SPAWN_OFFSETS) {
     // 線路全体が100x100の地面からはみ出さない範囲に、現在見ている場所を基準に出す。
     const candidate = {
-      x: Math.min(40, Math.max(-40, cameraTarget.x + offset.x)),
+      x: Math.min(RAIL_APPEND_LIMIT, Math.max(-RAIL_APPEND_LIMIT, cameraTarget.x + offset.x)),
       y: 0,
-      z: Math.min(40, Math.max(-40, cameraTarget.z + offset.z)),
+      z: Math.min(RAIL_APPEND_LIMIT, Math.max(-RAIL_APPEND_LIMIT, cameraTarget.z + offset.z)),
     }
     const isOpen = pieces.every((piece) => {
       const dx = piece.position.x - candidate.x
@@ -90,9 +92,9 @@ function nextSpawnPosition(pieces: readonly RailPiece[], cameraTarget: RailVec3)
   }
   const index = pieces.length
   return {
-    x: Math.min(40, Math.max(-40, cameraTarget.x + ((index % 4) - 1.5) * 5)),
+    x: Math.min(RAIL_APPEND_LIMIT, Math.max(-RAIL_APPEND_LIMIT, cameraTarget.x + ((index % 4) - 1.5) * 5)),
     y: 0,
-    z: Math.min(40, Math.max(-40, cameraTarget.z + Math.floor(index / 4) * 5)),
+    z: Math.min(RAIL_APPEND_LIMIT, Math.max(-RAIL_APPEND_LIMIT, cameraTarget.z + Math.floor(index / 4) * 5)),
   }
 }
 
@@ -163,17 +165,16 @@ export default function RailBuilderPlay() {
   })
 
   const addPiece = useCallback((kind: RailPieceKind, branchSide?: RailBranchSide) => {
-    const piece = createRailPiece(
-      kind,
-      nextPieceId(pieces),
-      nextSpawnPosition(pieces, getCameraTarget()),
-      0,
-      'left',
+    // 置いてあるせんろを選んでいるときは、その空き端点へつないだ状態で置く。
+    // つなげないときだけ、これまでどおり見ている場所の空きへ出す。
+    const result = appendRailPiece(pieces, kind, nextPieceId(pieces), selectedPieceId, {
       branchSide,
-    )
-    setPieces((current) => [...current, piece])
-    setSelection({ kind: 'piece', id: piece.id })
-  }, [getCameraTarget, pieces])
+      fallbackPosition: nextSpawnPosition(pieces, getCameraTarget()),
+    })
+    setPieces(result.pieces)
+    setSelection({ kind: 'piece', id: result.piece.id })
+    if (result.connected) playRailSnapSound(soundEnabled)
+  }, [getCameraTarget, pieces, selectedPieceId, soundEnabled])
 
   const rotateSelected = useCallback(() => {
     if (selectedPieceId === null || occupiedRailIdSet.has(selectedPieceId)) return
@@ -248,7 +249,7 @@ export default function RailBuilderPlay() {
   const hint = useMemo(() => {
     if (selectedPieceIsOccupied) return 'でんしゃが のっている せんろは そのままだよ'
     if (selectedPiece?.kind === 'branch') return 'ひかっている ほうへ すすむよ。ポイントを きりかえよう'
-    if (selectedPiece !== undefined) return 'つなぎめを ちかづけると ぴったり！'
+    if (selectedPiece !== undefined) return 'したから せんろを えらぶと つづきに つながるよ'
     if (selectedTrain !== undefined) return 'はしる／とまる で うんてん してみよう'
     if (fleetSummaries.some((train) => train.blocked)) return 'まえが あくまで ゆっくり まつよ'
     const trainStatus: RailTrainStatus = fleetSummaries[0]?.status ?? 'ready'

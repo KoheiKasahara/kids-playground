@@ -174,6 +174,18 @@ export const DEFAULT_SNAP_HEIGHT = 0.35
 export const DEFAULT_SNAP_ANGLE = (58 * Math.PI) / 180
 
 /**
+ * パレットから足したpieceを置ける範囲。100x100の地面からはみ出さないよう、
+ * 未接続で置くときのスポーン位置と同じ範囲に収める。
+ */
+export const RAIL_APPEND_LIMIT = 40
+/**
+ * 自動接続の置き先が既存パーツの真上になっていないかを見る、中心どうしの最小距離。
+ * いちばん短いパーツ（みじかい線路）を端点でつないでも中心は長さ分だけ離れるため、
+ * 通常の並びをこの値で弾いてしまうことはない。
+ */
+export const RAIL_APPEND_MIN_CENTER_DISTANCE = 1.2
+
+/**
  * ループ閉鎖の補助（通常のsnapでは成立しない終端同士を、玩具として
  * 許容できる範囲でだけ自動でつなげる）に使うしきい値。
  * 通常のDEFAULT_SNAP_*より少し広いが、明らかに離れた/向きが違う
@@ -1111,6 +1123,125 @@ export function snapAndConnectRailPiece(
     candidate.targetConnectorId,
     candidate.transform,
   )
+}
+
+export type AppendRailPieceOptions = {
+  curveDirection?: CurveDirection
+  branchSide?: RailBranchSide
+  /** 自動接続できないときに置く位置。 */
+  fallbackPosition?: RailVec3
+  /** 置ける範囲（|x| と |z| の上限）。 */
+  limit?: number
+  /** 既存パーツの真上と見なす、パーツ中心どうしの距離。 */
+  minCenterDistance?: number
+}
+
+export type AppendRailPieceResult = {
+  pieces: RailPiece[]
+  /** 追加されたpiece（自動接続した場合は接続後の位置・向き）。 */
+  piece: RailPiece
+  /** 選択中のpieceへ自動でつながったか。 */
+  connected: boolean
+}
+
+/**
+ * 自動接続で使う空き端点の優先順。進行方向の出口(B)から見て、
+ * 入口(A)は他に空きがないときの最後の候補にする。
+ */
+const APPEND_CONNECTOR_ORDER: readonly RailConnectorId[] = ['b', 'c', 'd', 'a']
+const APPEND_SAMPLES = 8
+
+function isRailPieceInsideLimit(piece: RailPiece, limit: number): boolean {
+  const paths = [piece.path, piece.branchPath, piece.secondaryPath].filter(
+    (path): path is RailPath => path !== undefined,
+  )
+  for (const path of paths) {
+    for (let index = 0; index <= APPEND_SAMPLES; index += 1) {
+      const point = worldRailPathPoint(piece, index / APPEND_SAMPLES, path)
+      if (Math.abs(point.x) > limit || Math.abs(point.z) > limit) return false
+    }
+  }
+  return true
+}
+
+/**
+ * 置こうとしているpieceが既存パーツとほぼ同じ場所に重なるかどうか。
+ * 端点どうしをつなぐ普通の並びは中心が離れるため、ここで弾かれるのは
+ * 「別のパーツの真上に積んでしまう」配置だけになる。
+ */
+function stacksOnRailPiece(
+  piece: RailPiece,
+  others: readonly RailPiece[],
+  minCenterDistance: number,
+): boolean {
+  const center = worldRailPieceVisualCenter(piece)
+  return others.some((other) => (
+    distanceBetweenRailPoints(center, worldRailPieceVisualCenter(other)) < minCenterDistance
+  ))
+}
+
+/**
+ * パレットで選んだ種類のpieceを1つ足す。
+ *
+ * 置いてあるpieceを選んでいるときは、その空き端点へ新しいpieceのAをつないだ
+ * 状態で置く。幼児がドラッグで位置を合わせなくても線路を伸ばしていけるようにする
+ * ための入口で、つないだあとは通常のドラッグ配置と同じく残りの空き端点も判定する。
+ *
+ * つなげる先がない場合や、つなぐと地面の外・既存パーツの真上になる場合は、
+ * 従来どおり fallbackPosition へ未接続のまま置く。
+ */
+export function appendRailPiece(
+  pieces: readonly RailPiece[],
+  kind: RailPieceKind,
+  id: string,
+  selectedPieceId: string | null,
+  options?: AppendRailPieceOptions,
+): AppendRailPieceResult {
+  const limit = options?.limit ?? RAIL_APPEND_LIMIT
+  const minCenterDistance = options?.minCenterDistance ?? RAIL_APPEND_MIN_CENTER_DISTANCE
+  const piece = createRailPiece(
+    kind,
+    id,
+    options?.fallbackPosition ?? ZERO,
+    0,
+    options?.curveDirection ?? 'left',
+    options?.branchSide ?? DEFAULT_BRANCH_SIDE,
+  )
+  const selected = selectedPieceId === null
+    ? undefined
+    : pieces.find((candidate) => candidate.id === selectedPieceId)
+
+  if (selected !== undefined) {
+    const selectedConnectorIds = getRailConnectorIds(selected)
+    const openConnectorIds = APPEND_CONNECTOR_ORDER.filter((connectorId) => (
+      selectedConnectorIds.includes(connectorId) && selected.connections[connectorId] === undefined
+    ))
+    const others = pieces.filter((candidate) => candidate.id !== selected.id)
+    for (const targetConnectorId of openConnectorIds) {
+      const transform = snapTransformForConnectors(piece, 'a', selected, targetConnectorId)
+      const placed: RailPiece = {
+        ...piece,
+        position: cloneVec(transform.position),
+        rotationY: transform.rotationY,
+      }
+      if (!isRailPieceInsideLimit(placed, limit)) continue
+      if (stacksOnRailPiece(placed, others, minCenterDistance)) continue
+      const connectedPieces = connectRailPieces(
+        [...pieces, placed],
+        id,
+        'a',
+        selected.id,
+        targetConnectorId,
+        transform,
+      )
+      const settled = connectRailPieceRemainingEndpoints(connectedPieces, id).pieces
+      const appended = settled.find((candidate) => candidate.id === id)
+      if (appended !== undefined) return { pieces: settled, piece: appended, connected: true }
+    }
+  }
+
+  const nextPieces = [...pieces.map(clonePiece), piece]
+  return { pieces: nextPieces, piece, connected: false }
 }
 
 export function deleteRailPiece(
