@@ -1,0 +1,191 @@
+.page {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: calc(var(--space-md) + var(--safe-top)) calc(var(--space-md) + var(--safe-right))
+    calc(var(--space-md) + var(--safe-bottom)) calc(var(--space-md) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  background: linear-gradient(160deg, #fff0f6 0%, var(--color-background) 55%, #e7f5ff 100%);
+}
+
+.header {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(28px, 8vw, var(--font-size-xlarge));
+  text-align: center;
+}
+
+.instruction {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: clamp(22px, 6vw, var(--font-size-large));
+  font-weight: 700;
+  text-align: center;
+}
+
+.difficultyGrid {
+  width: min(100%, 420px);
+  margin-top: var(--space-md);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.difficultyButton {
+  min-height: var(--tap-target-min);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.difficultyButton:active {
+  transform: scale(0.97);
+}
+
+.difficultyButton:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.difficultyName {
+  font-size: var(--font-size-large);
+  font-weight: 900;
+}
+
+.difficultyHint {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.status {
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(var(--font-size-base), 5vw, var(--font-size-large));
+  font-weight: 700;
+  text-align: center;
+}
+
+.grid {
+  width: min(100%, 480px);
+  display: grid;
+  gap: clamp(var(--space-xs), 2vw, var(--space-sm));
+}
+
+.card {
+  aspect-ratio: 3 / 4;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+  font-size: clamp(24px, 8vw, 40px);
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.card:disabled {
+  cursor: default;
+}
+
+.card:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+.card:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.cardFaceUp {
+  background: var(--color-surface);
+  border: 3px solid var(--color-border);
+  transform: none;
+}
+
+.cardMatched {
+  background: var(--color-success-bg);
+  border-color: var(--color-success);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+
+.button {
+  min-height: var(--tap-target-min);
+  padding: 0 var(--space-lg);
+  border: none;
+  border-radius: var(--radius-round);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.button:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.start {
+  color: var(--color-text-on-primary);
+  background: var(--color-success);
+}
+
+.retry {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+}
+
+.soundToggle {
+  position: fixed;
+  right: calc(var(--space-md) + var(--safe-right));
+  bottom: calc(var(--space-md) + var(--safe-bottom));
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  font-size: 28px;
+  cursor: pointer;
+}
+
+.soundToggle:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}

@@ -17,7 +17,6 @@ describe('Home', () => {
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
     expect(links.slice(-10).map((link) => link.getAttribute('href'))).toEqual(
       [
-        'puni-slime',
         'bento-builder',
         'train-journey',
         'circuit-racing',
@@ -26,6 +25,7 @@ describe('Home', () => {
         'crane-game',
         'treasure-dig',
         'putter-golf',
+        'shinkeisuijaku',
         'water-wheel-maze',
       ].map(gameRoutePath),
     )
