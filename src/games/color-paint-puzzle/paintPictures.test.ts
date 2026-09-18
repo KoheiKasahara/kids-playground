@@ -6,8 +6,8 @@ const VIEW_BOX_MIN = -1
 const VIEW_BOX_MAX = 101
 
 describe('paintPictures', () => {
-  test('題材が18件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
-    expect(PAINT_PICTURES).toHaveLength(18)
+  test('題材が22件、idが一意、DEFAULT_PICTURE_IDが実在する', () => {
+    expect(PAINT_PICTURES).toHaveLength(22)
     const ids = PAINT_PICTURES.map((picture) => picture.id)
     expect(ids).toEqual([
       'car',
@@ -28,6 +28,10 @@ describe('paintPictures', () => {
       'cat',
       'bee',
       'ladybug',
+      'excavator',
+      'balloon',
+      'penguin',
+      'snail',
     ])
     expect(new Set(ids).size).toBe(ids.length)
     expect(findPaintPicture(DEFAULT_PICTURE_ID)).toBeDefined()
@@ -226,6 +230,52 @@ describe('paintPictures', () => {
       const spots = ladybug.details.filter((detail) => detail.motion?.part === part)
       expect(spots.length, `${part}: 水玉`).toBeGreaterThan(0)
     }
+  })
+
+  test('あたらしく追加した4題材（ショベルカー〜かたつむり）にも、それぞれ動くパーツ(motion.part)がある', () => {
+    for (const id of ['excavator', 'balloon', 'penguin', 'snail']) {
+      const picture = findPaintPicture(id)!
+      const parts = new Set(
+        [...picture.areas, ...picture.details]
+          .map((item) => item.motion?.part)
+          .filter((part): part is string => Boolean(part)),
+      )
+      expect(parts.size, `${id}: motion.partの種類`).toBeGreaterThan(0)
+    }
+  })
+
+  test('ショベルカー〜かたつむりのgroup名・part名がデータ上に存在する', () => {
+    const expectedByPicture: Record<string, { group: string; parts: readonly string[] }> = {
+      excavator: { group: 'excavator', parts: ['excavatorArm', 'excavatorRollerBack', 'excavatorRollerFront'] },
+      balloon: { group: 'balloon', parts: ['balloonBasket', 'balloonFlame', 'balloonCloud'] },
+      penguin: { group: 'penguin', parts: ['penguinWingLeft', 'penguinWingRight'] },
+      snail: { group: 'snail', parts: ['snailShell', 'snailAntenna'] },
+    }
+    for (const [id, expected] of Object.entries(expectedByPicture)) {
+      const picture = findPaintPicture(id)!
+      const items = [...picture.areas, ...picture.details]
+      const groups = new Set(items.map((item) => item.motion?.group).filter(Boolean))
+      const parts = new Set(items.map((item) => item.motion?.part).filter(Boolean))
+      expect(groups, `${id}: group`).toEqual(new Set([expected.group]))
+      for (const part of expected.parts) {
+        expect(parts.has(part), `${id}: part "${part}"`).toBe(true)
+      }
+    }
+  })
+
+  test('ショベルカーの左右のローターは別のpart（それぞれ自分の中心で回す）', () => {
+    const excavator = findPaintPicture('excavator')!
+    const back = excavator.details.filter((detail) => detail.motion?.part === 'excavatorRollerBack')
+    const front = excavator.details.filter((detail) => detail.motion?.part === 'excavatorRollerFront')
+    expect(back.length, 'うしろのローター').toBeGreaterThan(0)
+    expect(front.length, 'まえのローター').toBeGreaterThan(0)
+  })
+
+  test('ききゅうのくもは本体グループの外（ききゅうと一緒に上がらない）', () => {
+    const balloon = findPaintPicture('balloon')!
+    const cloud = balloon.areas.find((area) => area.id === 'cloud')!
+    expect(cloud.motion?.group).toBeUndefined()
+    expect(cloud.motion?.part).toBe('balloonCloud')
   })
 
   test('でんしゃ・ひこうき・ふねのgroup名・part名がデータ上に存在する', () => {

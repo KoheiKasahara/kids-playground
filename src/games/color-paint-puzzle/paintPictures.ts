@@ -1661,6 +1661,354 @@ const ladybugDetails: readonly PaintDetail[] = [
   },
 ]
 
+// ショベルカー ------------------------------------------------------------
+
+// バケット・アームは車体の後ろから生えるので、キャタピラ・しゃたいより先に描く。
+// バケットとアームは同じ`excavatorArm`に入れて、いっしょに上下させる。
+const excavatorAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  { id: 'ground', label: 'じめん', shape: { kind: 'path', d: GROUND_PATH } },
+  {
+    id: 'bucket',
+    label: 'バケット',
+    shape: {
+      kind: 'path',
+      d: 'M 12,15 L 31,22 L 28,38 C 27,44 21,47 15,45 C 8,42 5,33 6,26 C 7,20 9,14 12,15 Z',
+    },
+    motion: { group: 'excavator', part: 'excavatorArm' },
+  },
+  {
+    id: 'arm',
+    label: 'アーム',
+    shape: { kind: 'path', d: 'M 52,54 L 60,44 L 28,16 L 20,26 Z' },
+    motion: { group: 'excavator', part: 'excavatorArm' },
+  },
+  {
+    id: 'crawler',
+    label: 'キャタピラ',
+    shape: {
+      kind: 'path',
+      d: 'M 26,68 L 68,68 C 76,68 82,72 82,77 C 82,82 76,86 68,86 L 26,86 C 18,86 12,82 12,77 C 12,72 18,68 26,68 Z',
+    },
+    motion: { group: 'excavator' },
+  },
+  {
+    id: 'body',
+    label: 'しゃたい',
+    shape: {
+      kind: 'path',
+      d: 'M 36,52 L 84,52 C 87,52 89,54 89,57 L 89,66 C 89,69 87,70 84,70 L 36,70 C 33,70 31,69 31,66 L 31,57 C 31,54 33,52 36,52 Z',
+    },
+    motion: { group: 'excavator' },
+  },
+  {
+    id: 'cab',
+    label: 'うんてんせき',
+    shape: {
+      kind: 'path',
+      d: 'M 62,22 L 82,22 C 85,22 87,24 87,27 L 87,52 L 57,52 L 57,27 C 57,24 59,22 62,22 Z',
+    },
+    motion: { group: 'excavator' },
+  },
+]
+
+const excavatorDetails: readonly PaintDetail[] = [
+  // まど。
+  {
+    shape: { kind: 'path', d: 'M 63,29 L 81,29 L 81,45 L 63,45 Z' },
+    fill: '#dff4ff',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'excavator' },
+  },
+  // アームのつけね（ピン）。回るのはアーム側なので、ピンはgroupに置いて止めておく。
+  { shape: { kind: 'circle', cx: 56, cy: 49, r: 3.2 }, fill: '#495057', motion: { group: 'excavator' } },
+  // バケットのつめ。バケットと一緒に上下するようアームのpartへ入れる。
+  {
+    shape: { kind: 'path', d: 'M 7,34 L 7,41 L 12,38 Z M 13,40 L 15,47 L 19,42 Z M 21,44 L 25,48 L 26,40 Z' },
+    fill: OUTLINE_COLOR,
+    motion: { group: 'excavator', part: 'excavatorArm' },
+  },
+  // キャタピラのローラー。くるまのタイヤと同じで、スポークがあると回転が見える。
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 18,77 L 34,77 M 26,69 L 26,85 M 20.3,71.3 L 31.7,82.7 M 31.7,71.3 L 20.3,82.7',
+    },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.3,
+    motion: { group: 'excavator', part: 'excavatorRollerBack' },
+  },
+  {
+    shape: { kind: 'circle', cx: 26, cy: 77, r: 3.6 },
+    fill: '#495057',
+    motion: { group: 'excavator', part: 'excavatorRollerBack' },
+  },
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 60,77 L 76,77 M 68,69 L 68,85 M 62.3,71.3 L 73.7,82.7 M 73.7,71.3 L 62.3,82.7',
+    },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.3,
+    motion: { group: 'excavator', part: 'excavatorRollerFront' },
+  },
+  {
+    shape: { kind: 'circle', cx: 68, cy: 77, r: 3.6 },
+    fill: '#495057',
+    motion: { group: 'excavator', part: 'excavatorRollerFront' },
+  },
+  // キャタピラのみぞ。
+  {
+    shape: { kind: 'path', d: 'M 40,68 L 40,86 M 48,68 L 48,86 M 56,68 L 56,86' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: { group: 'excavator' },
+  },
+  // えんとつ。
+  {
+    shape: { kind: 'path', d: 'M 44,42 L 50,42 L 50,52 L 44,52 Z' },
+    fill: '#495057',
+    motion: { group: 'excavator' },
+  },
+]
+
+// ききゅう ----------------------------------------------------------------
+
+// くもは ききゅうと一緒に上がらず、その場で流れるので group には入れない。
+const balloonAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  {
+    id: 'cloud',
+    label: 'くも',
+    shape: {
+      kind: 'path',
+      d: 'M 10,86 C 6,84 6,78 11,76 C 12,70 21,68 25,73 C 31,72 36,77 34,83 C 33,86 30,88 26,88 L 14,88 C 12,88 11,87 10,86 Z',
+    },
+    motion: { part: 'balloonCloud' },
+  },
+  {
+    id: 'balloonBody',
+    label: 'ききゅうの ふくろ',
+    shape: {
+      kind: 'path',
+      d: 'M 50,6 C 68,6 82,20 82,36 C 82,50 68,58 57,67 L 43,67 C 32,58 18,50 18,36 C 18,20 32,6 50,6 Z',
+    },
+    motion: { group: 'balloon' },
+  },
+  {
+    id: 'stripe',
+    label: 'まんなかの しま',
+    shape: {
+      kind: 'path',
+      d: 'M 50,6 C 57,6 61,20 61,36 C 61,50 57,58 55,67 L 45,67 C 43,58 39,50 39,36 C 39,20 43,6 50,6 Z',
+    },
+    motion: { group: 'balloon' },
+  },
+  {
+    id: 'basket',
+    label: 'かご',
+    shape: {
+      kind: 'path',
+      d: 'M 42,76 L 58,76 C 60,76 61,78 61,80 L 60,90 C 60,92 58,94 56,94 L 44,94 C 42,94 40,92 40,90 L 39,80 C 39,78 40,76 42,76 Z',
+    },
+    motion: { group: 'balloon', part: 'balloonBasket' },
+  },
+]
+
+const balloonDetails: readonly PaintDetail[] = [
+  // ふくろのつなぎめ。
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 50,6 C 40,18 36,42 43,67 M 50,6 C 60,18 64,42 57,67 M 18,36 C 34,44 66,44 82,36',
+    },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'balloon' },
+  },
+  // ロープ。
+  {
+    shape: { kind: 'path', d: 'M 44,67 L 42,76 M 56,67 L 58,76' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'balloon' },
+  },
+  // バーナーのほのお。
+  {
+    shape: { kind: 'path', d: 'M 50,65 C 54,68 56,72 54,75 C 52,78 47,78 45,75 C 43,72 46,68 50,65 Z' },
+    fill: '#ff8787',
+    motion: { group: 'balloon', part: 'balloonFlame' },
+  },
+  // かごのあみめ。かごと一緒に揺れるよう、かごと同じpartへ入れる。
+  {
+    shape: { kind: 'path', d: 'M 39,82 L 61,82 M 46,76 L 47,94 M 53,76 L 53,94' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: { group: 'balloon', part: 'balloonBasket' },
+  },
+  // とおくを とぶ とり。そらに残るのでgroupには入れない。
+  {
+    shape: { kind: 'path', d: 'M 12,26 C 15,22 18,26 21,22 M 22,14 C 25,10 28,14 31,10' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+  },
+]
+
+// ペンギン ----------------------------------------------------------------
+
+// あし → つばさ → からだ → おなか の順に重ねる。つばさはからだの後ろで動かす。
+const penguinAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  { id: 'ground', label: 'ゆき', shape: { kind: 'path', d: GROUND_PATH } },
+  {
+    id: 'feet',
+    label: 'あし',
+    shape: {
+      kind: 'path',
+      // 片足ずつだと幼児には小さすぎるので、左右のあしを1つのエリアにまとめる。
+      d: 'M 36,76 L 36,88 C 30,90 24,92 26,94 C 30,96 44,96 48,93 L 48,76 Z M 52,76 L 52,93 C 56,96 70,96 74,94 C 76,92 70,90 64,88 L 64,76 Z',
+    },
+    motion: { group: 'penguin' },
+  },
+  {
+    id: 'wingLeft',
+    label: 'ひだりの つばさ',
+    shape: { kind: 'path', d: 'M 28,36 C 16,42 11,58 15,70 C 19,78 27,76 29,66 C 27,56 27,44 28,36 Z' },
+    motion: { group: 'penguin', part: 'penguinWingLeft' },
+  },
+  {
+    id: 'wingRight',
+    label: 'みぎの つばさ',
+    shape: { kind: 'path', d: 'M 72,36 C 84,42 89,58 85,70 C 81,78 73,76 71,66 C 73,56 73,44 72,36 Z' },
+    motion: { group: 'penguin', part: 'penguinWingRight' },
+  },
+  {
+    id: 'body',
+    label: 'ペンギンの からだ',
+    shape: {
+      kind: 'path',
+      d: 'M 50,14 C 66,14 76,32 76,54 C 76,74 66,86 50,86 C 34,86 24,74 24,54 C 24,32 34,14 50,14 Z',
+    },
+    motion: { group: 'penguin' },
+  },
+  {
+    id: 'belly',
+    label: 'おなか',
+    shape: {
+      kind: 'path',
+      d: 'M 50,30 C 62,30 68,44 68,58 C 68,72 60,81 50,81 C 40,81 32,72 32,58 C 32,44 38,30 50,30 Z',
+    },
+    motion: { group: 'penguin' },
+  },
+]
+
+const penguinDetails: readonly PaintDetail[] = [
+  { shape: { kind: 'circle', cx: 43, cy: 36, r: 4.4 }, fill: '#ffffff', motion: { group: 'penguin' } },
+  { shape: { kind: 'circle', cx: 43, cy: 36, r: 2.2 }, fill: OUTLINE_COLOR, motion: { group: 'penguin' } },
+  { shape: { kind: 'circle', cx: 57, cy: 36, r: 4.4 }, fill: '#ffffff', motion: { group: 'penguin' } },
+  { shape: { kind: 'circle', cx: 57, cy: 36, r: 2.2 }, fill: OUTLINE_COLOR, motion: { group: 'penguin' } },
+  // くちばし。
+  {
+    shape: { kind: 'path', d: 'M 43,45 L 57,45 L 50,54 Z' },
+    fill: '#ffd43b',
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.4,
+    motion: { group: 'penguin' },
+  },
+  { shape: { kind: 'circle', cx: 35, cy: 45, r: 3.4 }, fill: '#ffb3c1', motion: { group: 'penguin' } },
+  { shape: { kind: 'circle', cx: 65, cy: 45, r: 3.4 }, fill: '#ffb3c1', motion: { group: 'penguin' } },
+  // あしのみずかき。
+  {
+    shape: { kind: 'path', d: 'M 38,90 L 34,94 M 43,90 L 42,95 M 62,90 L 58,95 M 66,90 L 66,94' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: { group: 'penguin' },
+  },
+  // つばさのすじ。それぞれのつばさと一緒にはばたく。
+  {
+    shape: { kind: 'path', d: 'M 24,44 C 19,52 18,62 21,70' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: { group: 'penguin', part: 'penguinWingLeft' },
+  },
+  {
+    shape: { kind: 'path', d: 'M 76,44 C 81,52 82,62 79,70' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: { group: 'penguin', part: 'penguinWingRight' },
+  },
+]
+
+// かたつむり --------------------------------------------------------------
+
+// からだ → からの そと → からの なか の順に重ねる。からは2枚あわせで、
+// うずまきの装飾と一緒に`snailShell`へ入れてゆっくり揺らす。
+const snailAreas: readonly PaintArea[] = [
+  { id: 'sky', label: 'そら', shape: { kind: 'path', d: BACKDROP_PATH } },
+  { id: 'ground', label: 'じめん', shape: { kind: 'path', d: GROUND_PATH } },
+  {
+    id: 'body',
+    label: 'かたつむりの からだ',
+    shape: {
+      kind: 'path',
+      d: 'M 26,52 C 16,54 10,62 10,70 C 10,76 14,82 22,82 L 70,82 C 80,82 86,76 84,68 C 82,60 72,56 62,58 L 40,58 C 33,58 29,56 26,52 Z',
+    },
+    motion: { group: 'snail' },
+  },
+  {
+    id: 'shell',
+    label: 'からの そと',
+    shape: { kind: 'circle', cx: 60, cy: 44, r: 24 },
+    motion: { group: 'snail', part: 'snailShell' },
+  },
+  {
+    id: 'shellInner',
+    label: 'からの なか',
+    shape: { kind: 'circle', cx: 62, cy: 46, r: 13 },
+    motion: { group: 'snail', part: 'snailShell' },
+  },
+]
+
+const snailDetails: readonly PaintDetail[] = [
+  // からのうずまき。
+  {
+    shape: {
+      kind: 'path',
+      d: 'M 62,52 C 57,52 54,48 57,44 C 60,39 68,40 70,46 C 72,55 64,61 56,59 C 47,57 43,48 47,39',
+    },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'snail', part: 'snailShell' },
+  },
+  // つの。のびちぢみさせるので、先の玉も同じpartへ入れる。
+  {
+    shape: { kind: 'path', d: 'M 22,54 C 18,44 15,38 12,34 M 30,52 C 28,44 27,38 26,32' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.8,
+    motion: { group: 'snail', part: 'snailAntenna' },
+  },
+  { shape: { kind: 'circle', cx: 11, cy: 31, r: 3 }, fill: OUTLINE_COLOR, motion: { group: 'snail', part: 'snailAntenna' } },
+  { shape: { kind: 'circle', cx: 26, cy: 29, r: 3 }, fill: OUTLINE_COLOR, motion: { group: 'snail', part: 'snailAntenna' } },
+  // め と くち。
+  { shape: { kind: 'circle', cx: 22, cy: 64, r: 4.2 }, fill: '#ffffff', motion: { group: 'snail' } },
+  { shape: { kind: 'circle', cx: 22, cy: 64, r: 2.1 }, fill: OUTLINE_COLOR, motion: { group: 'snail' } },
+  {
+    shape: { kind: 'path', d: 'M 15,72 C 18,75 23,75 26,72' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.6,
+    motion: { group: 'snail' },
+  },
+  { shape: { kind: 'circle', cx: 32, cy: 68, r: 3.2 }, fill: '#ffb3c1', motion: { group: 'snail' } },
+  // からだのすじ。
+  {
+    shape: { kind: 'path', d: 'M 24,78 C 40,74 60,74 76,78' },
+    stroke: OUTLINE_COLOR,
+    strokeWidth: 1.2,
+    motion: { group: 'snail' },
+  },
+]
+
 export const PAINT_PICTURES: readonly PaintPicture[] = [
   { id: 'car', label: 'くるま', emoji: '🚗', viewBox: VIEW_BOX, areas: carAreas, details: carDetails },
   { id: 'fish', label: 'さかな', emoji: '🐟', viewBox: VIEW_BOX, areas: fishAreas, details: fishDetails },
@@ -1742,6 +2090,24 @@ export const PAINT_PICTURES: readonly PaintPicture[] = [
     viewBox: VIEW_BOX,
     areas: ladybugAreas,
     details: ladybugDetails,
+  },
+  {
+    id: 'excavator',
+    label: 'ショベルカー',
+    emoji: '🚜',
+    viewBox: VIEW_BOX,
+    areas: excavatorAreas,
+    details: excavatorDetails,
+  },
+  { id: 'balloon', label: 'ききゅう', emoji: '🎈', viewBox: VIEW_BOX, areas: balloonAreas, details: balloonDetails },
+  { id: 'penguin', label: 'ペンギン', emoji: '🐧', viewBox: VIEW_BOX, areas: penguinAreas, details: penguinDetails },
+  {
+    id: 'snail',
+    label: 'かたつむり',
+    emoji: '🐌',
+    viewBox: VIEW_BOX,
+    areas: snailAreas,
+    details: snailDetails,
   },
 ]
 
