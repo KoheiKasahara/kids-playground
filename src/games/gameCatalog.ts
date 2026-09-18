@@ -731,6 +731,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'shinkeisuijaku',
+    slug: 'shinkeisuijaku',
+    title: 'しんけいすいじゃく',
+    emoji: '🃏',
+    category: 'learning',
+    seo: {
+      headline: 'しんけいすいじゃく｜カードをめくって同じ絵をさがす記憶あそび',
+      description:
+        'どうぶつの絵がかかれたカードを2まいずつめくって、同じ絵のペアをさがす幼児向けの記憶あそびです。かんたん・むずかしいの2つのむずかしさから選べ、何度でも遊べます。',
+    },
+    intro: {
+      howToPlay: [
+        'カードを 2まい めくって、おなじ えを さがそう',
+        'おなじ えなら そのまま のこるよ。ちがったら もとに もどるよ',
+        'ぜんぶ そろえたら クリア！ なんどでも あそべるよ',
+      ],
+    },
+  },
+  {
     id: 'water-wheel-maze',
     slug: 'water-wheel-maze',
     title: 'ぐるぐる すいしゃ',

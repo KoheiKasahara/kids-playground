@@ -54,6 +54,9 @@ export const routes: RouteObject[] = [
   { path: '/games/magic-sandbox', element: lazyRoute(() => import('../games/magic-sandbox/MagicSandboxPlay')) },
   { path: '/games/treasure-dig', element: lazyRoute(() => import('../games/treasure-dig/TreasureDigPlay')) },
   { path: '/games/water-wheel-maze', element: lazyRoute(() => import('../games/water-wheel-maze/WaterWheelMazePlay')) },
+  // 選択画面とプレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // ShinkeisuijakuPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/shinkeisuijaku', element: lazyRoute(() => import('../games/shinkeisuijaku/ShinkeisuijakuPlay')) },
   { path: '/', element: <Home /> },
   { path: '/games/puni-slime', element: playRoute(lazyRoute(() => import('../games/puni-slime/PuniSlimePlay'))) },
   { path: '/games/animal-bath', element: lazyRoute(() => import('../games/animal-bath/AnimalBathPlay')) },
