@@ -6,11 +6,11 @@ import PutterGolfPlay from './PutterGolfPlay'
 import type { usePutterGolfEngine } from './usePutterGolfEngine'
 
 type Options = Parameters<typeof usePutterGolfEngine>[0]
-const engine = vi.hoisted(() => ({ options: undefined as Options | undefined, retry: vi.fn(), shoot: vi.fn(), turn: vi.fn(), setPower: vi.fn(), hint: vi.fn(), assist: vi.fn() }))
+const engine = vi.hoisted(() => ({ options: undefined as Options | undefined, retry: vi.fn() }))
 vi.mock('./usePutterGolfEngine', () => ({
   usePutterGolfEngine: (options: Options) => {
     engine.options = options
-    return { registerContainer: () => {}, registerMapMarker: () => {}, retry: engine.retry, shoot: engine.shoot, turn: engine.turn, setPower: engine.setPower, hint: engine.hint, assist: engine.assist }
+    return { registerContainer: () => {}, registerMapMarker: () => {}, retry: engine.retry }
   },
 }))
 vi.mock('./golfSound', () => ({ golfSound: vi.fn() }))
@@ -50,23 +50,14 @@ describe('パターゴルフの画面', () => {
     expect(screen.getByText('すなばは ころがりにくいよ')).toBeInTheDocument()
   })
 
-  test('うつ・むき・つよさ・カメラ・ヒントのボタンが engine に届く', async () => {
+  test('カメラの ボタンが engine に届く', async () => {
     const user = userEvent.setup()
     renderGame()
     await user.click(screen.getByRole('button', { name: 'スタート！' }))
-    await user.click(screen.getByRole('button', { name: 'ひだりへ むける' }))
-    await user.click(screen.getByRole('button', { name: 'みぎへ むける' }))
-    expect(engine.turn.mock.calls).toEqual([[-1], [1]])
-    await user.click(screen.getByRole('button', { name: /つよく/ }))
-    expect(engine.setPower).toHaveBeenCalledWith(0.85)
-    await user.click(screen.getByRole('button', { name: 'うつ！' }))
-    expect(engine.shoot).toHaveBeenCalledOnce()
     await user.click(screen.getByRole('button', { name: 'ホール ぜんたいを みる' }))
     expect(engine.options?.camera).toBe('overview')
-    await user.click(screen.getByRole('button', { name: 'ヒント' }))
-    expect(engine.hint).toHaveBeenCalledOnce()
-    act(() => engine.options?.onFeedback({ phase: 'rolling', strokes: 1, power: 0.5, aiming: false, returning: false }))
-    expect(screen.getByRole('button', { name: 'うつ！' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'ボールを みる' }))
+    expect(engine.options?.camera).toBe('ball')
   })
 
   test('コースの ホールを ぜんぶ回ると成績が出て、いちばん多い★を覚える', async () => {
@@ -102,15 +93,10 @@ describe('パターゴルフの画面', () => {
     expect(screen.getByText(`さいこう ${stars}/${holes * 3} ★`)).toBeInTheDocument()
   })
 
-  test('おたすけは5回うってから使え、水に落ちたら ひとこと出る', async () => {
+  test('水に落ちたら ひとこと出る', async () => {
     const user = userEvent.setup()
     renderGame()
     await user.click(screen.getByRole('button', { name: 'スタート！' }))
-    expect(screen.getByRole('button', { name: 'おたすけ' })).toBeDisabled()
-    for (let i = 0; i < 5; i++) emit({ kind: 'shot', power: 0.5, position })
-    expect(screen.getByRole('button', { name: 'おたすけ' })).toBeEnabled()
-    await user.click(screen.getByRole('button', { name: 'おたすけ' }))
-    expect(engine.assist).toHaveBeenCalledOnce()
     emit({ kind: 'splash', position })
     expect(screen.getByRole('status')).toHaveTextContent('ぽちゃん！')
     emit({ kind: 'returned' })
