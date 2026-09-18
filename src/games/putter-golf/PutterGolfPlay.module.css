@@ -62,22 +62,10 @@
 .scoreRow strong { font-size: 18px; font-weight: 900; color: var(--course-color); }
 .holeName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .holeName strong { font-size: 15px; }
-.shotRow { display: grid; grid-template-columns: 1fr 1.8fr 1fr; gap: 8px; }
-.turnButton { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70px; border: 3px solid #d4e3cc; border-radius: 18px; background: #f2f7ef; color: #3f6a4f; box-shadow: 0 3px 0 #d9e6d2; }
-.turnButton > span { font-size: 28px; line-height: 1; font-weight: 900; }
-.turnButton small { font-size: 11px; font-weight: 800; }
-.shootButton { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 70px; border: 0; border-radius: 18px; background: var(--course-color); color: white; box-shadow: 0 4px 0 color-mix(in srgb, var(--course-color), black 25%); }
-.shootButton > span { font-size: 26px; line-height: 1; }
-.shootButton strong { font-size: 26px; font-weight: 900; letter-spacing: 0.06em; }
-.powers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
-.powers button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 46px; border: 2px solid #e1e8dc; border-radius: 14px; background: #f7f9f4; color: #3a5044; font-size: 13px; font-weight: 800; }
-.powers button[aria-pressed='true'] { border-color: #f0a830; background: #fff3d8; color: #8a5b10; }
-.powerDots { font-size: 9px; letter-spacing: 1px; color: #f0a830; }
-.tools { margin-top: 8px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
-.tools button { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-height: 52px; padding: 3px 1px; border: 2px solid #e1e8dc; border-radius: 13px; color: #4a6254; background: #f5f7f1; font-size: 10px; font-weight: 800; white-space: nowrap; }
-.tools button span { font-size: 19px; line-height: 1; }
+.tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.tools button { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-height: 56px; padding: 3px 1px; border: 2px solid #e1e8dc; border-radius: 13px; color: #4a6254; background: #f5f7f1; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.tools button span { font-size: 20px; line-height: 1; }
 .tools button[aria-pressed='true'] { border-color: #5f9e74; color: #2f6b45; background: #e4f2e4; }
-.hint { display: flex; justify-content: center; font-size: 10px; font-weight: 700; margin: 8px 0 0; color: #62776a; text-align: center; }
 .totalStars { margin: 0; text-align: center; font-size: 24px; color: #f2b01e; letter-spacing: 2px; }
 .newBest { margin: 2px 0 0; text-align: center; font-weight: 900; color: #e8505b; }
 .scorecard { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 12px; }
@@ -104,8 +92,6 @@
   .panel { padding: 9px; }
   .courseButton strong { font-size: 11px; }
   .courseButton small { font-size: 9px; }
-  .shootButton strong { font-size: 22px; }
-  .turnButton, .shootButton { min-height: 62px; }
   .map { width: 80px; }
   .map svg { height: 78px; }
 }
@@ -126,11 +112,7 @@
   .options { margin-top: 6px; }
   .ballButton { min-height: 44px; }
   .beginButton { margin-top: 8px; min-height: 52px; font-size: 20px !important; }
-  .turnButton, .shootButton { min-height: 60px; }
-  .shootButton strong { font-size: 22px; }
-  .powers button { min-height: 44px; }
   .tools button { font-size: 9px; min-height: 48px; }
-  .hint { font-size: 9px; }
   .map { width: 84px; }
   .map svg { height: 80px; }
 }

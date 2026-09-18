@@ -4,16 +4,11 @@ import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../audio/sound'
 import { findCourse, GOLF_BALLS, GOLF_COURSES, type CourseDefinition, type CourseId, type Gadget, type GolfBallId, type HoleDefinition } from './golfCourses'
 import { roundOutline } from './golfGeometry'
-import { ASSIST_AFTER, createRound, finishHole, loadBestStars, nextHole, recordShot, restartHole, roundTotals, saveBestStars, STAMP_TEXT, stampFor, type RoundState } from './golfRound'
+import { createRound, finishHole, loadBestStars, nextHole, recordShot, restartHole, roundTotals, saveBestStars, STAMP_TEXT, stampFor, type RoundState } from './golfRound'
 import { golfSound, type GolfSoundKind } from './golfSound'
 import { usePutterGolfEngine, type EngineEvent, type GolfCamera, type GolfFeedback, type GolfStatus } from './usePutterGolfEngine'
 import styles from './PutterGolfPlay.module.css'
 
-const POWERS = [
-  { label: 'そっと', value: 0.3 },
-  { label: 'ふつう', value: 0.5 },
-  { label: 'つよく', value: 0.85 },
-] as const
 const EMPTY: GolfFeedback = { phase: 'ready', strokes: 0, power: 0.5, aiming: false, returning: false }
 
 /** ホールを上から見た線。ミニマップとコースえらびの見本に使う。 */
@@ -138,7 +133,7 @@ export default function PutterGolfPlay() {
     }
   }, [courseId, hole, play])
 
-  const { registerContainer, registerMapMarker, retry, shoot, turn, setPower, hint, assist } = usePutterGolfEngine({
+  const { registerContainer, registerMapMarker, retry } = usePutterGolfEngine({
     course, holeIndex, attempt, ballStyle: ballId, bigCup, camera,
     active: phase === 'play', reducedMotion,
     onStatus: setStatus, onFeedback: setFeedback, onEvent,
@@ -180,7 +175,6 @@ export default function PutterGolfPlay() {
   }
 
   const ready = status === 'ready'
-  const canShoot = ready && phase === 'play' && feedback.phase === 'ready' && !holed
   const lastScore = round.scores[round.holeIndex]
   const totals = roundTotals(round.scores)
   const caption = phase === 'select'
@@ -261,26 +255,11 @@ export default function PutterGolfPlay() {
             <span aria-label={`うった かず ${round.strokes}`}>うった かず <strong>{round.strokes}</strong></span>
             <span aria-label={`めやす ${hole.par}かい`}>めやす <strong>{hole.par}</strong></span>
           </div>
-          <div className={styles.shotRow}>
-            <button type="button" className={styles.turnButton} disabled={!canShoot} aria-label="ひだりへ むける" onClick={() => turn(-1)}><span aria-hidden="true">↶</span><small>ひだり</small></button>
-            <button type="button" className={styles.shootButton} disabled={!canShoot} aria-label="うつ！" onClick={shoot}>
-              <span aria-hidden="true">⛳</span><strong>うつ！</strong>
-            </button>
-            <button type="button" className={styles.turnButton} disabled={!canShoot} aria-label="みぎへ むける" onClick={() => turn(1)}><span aria-hidden="true">↷</span><small>みぎ</small></button>
-          </div>
-          <div className={styles.powers} role="group" aria-label="うつ つよさ">
-            {POWERS.map(item => <button key={item.label} type="button" disabled={!canShoot} aria-pressed={Math.abs(feedback.power - item.value) < 0.08} onClick={() => { setPower(item.value); play('click') }}>
-              <span aria-hidden="true" className={styles.powerDots}>{'●'.repeat(POWERS.indexOf(item) + 1)}</span>{item.label}
-            </button>)}
-          </div>
           <div className={styles.tools}>
             <button type="button" aria-pressed={camera === 'ball'} aria-label="ボールを みる" onClick={() => setCamera('ball')}><span aria-hidden="true">⚪</span>ボール</button>
             <button type="button" aria-pressed={camera === 'overview'} aria-label="ホール ぜんたいを みる" onClick={() => setCamera('overview')}><span aria-hidden="true">🗺️</span>ぜんたい</button>
-            <button type="button" disabled={!canShoot} aria-label="ヒント" onClick={hint}><span aria-hidden="true">💡</span>ヒント</button>
-            <button type="button" disabled={!canShoot || round.strokes < ASSIST_AFTER} aria-label="おたすけ" onClick={assist}><span aria-hidden="true">🤝</span>おたすけ</button>
             <button type="button" disabled={!ready} aria-label="この ホールを やりなおす" onClick={restart}><span aria-hidden="true">↺</span>やりなおす</button>
           </div>
-          <p className={styles.hint}>{round.strokes >= ASSIST_AFTER ? '「おたすけ」で カップの ちかくに おけるよ' : 'ボールの まわりを ひっぱって はなすと うてるよ'}</p>
         </section>}
 
         {phase === 'finished' && <section className={styles.panel} aria-label="けっか">
