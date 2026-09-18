@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import RailBuilderPlay from './RailBuilderPlay'
-import type { RailBuilderEngineHandle } from './useRailBuilderEngine'
+import type { RailBuilderEngineHandle, RailBuilderEngineOptions } from './useRailBuilderEngine'
 
 // 3D描画(three.js/WebGL)はjsdomでは動かせないため useRailBuilderEngine だけを差し替え、
 // 縦画面UIの整理（家ボタン削除・「ぜんぶうごかす」のコンパクト化）を検証する。
@@ -13,20 +13,26 @@ import type { RailBuilderEngineHandle } from './useRailBuilderEngine'
 // 値が二重管理にならないよう実モジュールのものをそのまま再export する。
 const startTrainMock = vi.fn()
 const pauseTrainMock = vi.fn()
+// 3D側の選択・配置結果は画面のDOMに出ないため、engineへ渡る最新のoptionsを覗いて
+// 「選択→パーツ追加」の結果(pieces)を検証する。
+const engineOptions: { current: RailBuilderEngineOptions | null } = { current: null }
 
 vi.mock('./useRailBuilderEngine', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./useRailBuilderEngine')>()),
-  useRailBuilderEngine: (): RailBuilderEngineHandle => ({
-    registerContainer: () => {},
-    getCameraTarget: () => ({ x: 0, y: 0, z: 0 }),
-    startTrain: startTrainMock,
-    pauseTrain: pauseTrainMock,
-    addTrain: () => {},
-    removeTrain: () => {},
-    focusTrain: () => {},
-    focusDepot: () => {},
-    setTrainType: () => {},
-  }),
+  useRailBuilderEngine: (options: RailBuilderEngineOptions): RailBuilderEngineHandle => {
+    engineOptions.current = options
+    return {
+      registerContainer: () => {},
+      getCameraTarget: () => ({ x: 0, y: 0, z: 0 }),
+      startTrain: startTrainMock,
+      pauseTrain: pauseTrainMock,
+      addTrain: () => {},
+      removeTrain: () => {},
+      focusTrain: () => {},
+      focusDepot: () => {},
+      setTrainType: () => {},
+    }
+  },
 }))
 
 function renderPlay() {
@@ -40,7 +46,24 @@ function renderPlay() {
 afterEach(() => {
   startTrainMock.mockClear()
   pauseTrainMock.mockClear()
+  engineOptions.current = null
 })
+
+function engine(): RailBuilderEngineOptions {
+  const options = engineOptions.current
+  if (options === null) throw new Error('engineにoptionsが渡っていません')
+  return options
+}
+
+function selectPiece(pieceId: string | null) {
+  act(() => { engine().onSelectPiece(pieceId) })
+}
+
+function addedPiece(pieceId: string) {
+  const piece = engine().pieces.find((candidate) => candidate.id === pieceId)
+  if (piece === undefined) throw new Error(`${pieceId}が追加されていません`)
+  return piece
+}
 
 describe('RailBuilderPlay 縦画面の操作UI', () => {
   test('「もどる」ボタンが残っている（家ボタンを消してもナビゲーションは失われない）', () => {
@@ -75,6 +98,41 @@ describe('RailBuilderPlay 縦画面の操作UI', () => {
     expect(screen.getByLabelText('でんしゃ 1りょうへんせい')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'でんしゃを ふやす' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'ぜんぶの でんしゃを うごかす' })).toBeInTheDocument()
+  })
+
+  test('えらんだ せんろの あいている はしへ、あたらしいパーツが つながって ふえる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    const before = engine().pieces.length
+    // rail-4は最初から自由に動かせるカーブ。両端とも空いている。
+    selectPiece('rail-4')
+
+    await user.click(screen.getByRole('button', { name: 'ちょくせんを ついか' }))
+
+    expect(engine().pieces).toHaveLength(before + 1)
+    expect(addedPiece('rail-5').connections.a).toEqual({ pieceId: 'rail-4', connectorId: 'b' })
+    expect(addedPiece('rail-4').connections.b).toEqual({ pieceId: 'rail-5', connectorId: 'a' })
+  })
+
+  test('つないだパーツが えらばれた ままなので、つづけて タップすると 線路が のびていく', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    selectPiece('rail-4')
+
+    await user.click(screen.getByRole('button', { name: 'ちょくせんを ついか' }))
+    await user.click(screen.getByRole('button', { name: 'カーブを ついか' }))
+
+    expect(addedPiece('rail-6').connections.a).toEqual({ pieceId: 'rail-5', connectorId: 'b' })
+  })
+
+  test('なにも えらんでいない ときは、これまでどおり 未接続のまま おかれる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    selectPiece(null)
+
+    await user.click(screen.getByRole('button', { name: 'ちょくせんを ついか' }))
+
+    expect(addedPiece('rail-5').connections).toEqual({})
   })
 
   test('音ボタンを押すと aria-pressed が切り替わる', async () => {
