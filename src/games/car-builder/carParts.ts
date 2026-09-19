@@ -7,7 +7,13 @@
 import * as THREE from 'three'
 import type { CarSurface } from './carSurface'
 import type { CarCategoryId, CarConfig, CarMarkIcon, CarOptionIdMap, FrontType, MarkType } from './carConfig'
-import type { CarAttachment, CarAttachments, CarDimensions } from './carDimensions'
+import type {
+  CarAttachment,
+  CarAttachments,
+  CarDimensions,
+  CarWheelAttachment,
+  CarWheelAttachmentId,
+} from './carDimensions'
 import type { CarHeadlightMount } from './vehicleBody'
 
 export type CarPartContext = {
@@ -210,6 +216,14 @@ function addWheelFace(
   })
 }
 
+/**
+ * 1輪ぶんの部品をまとめる軸グループの名前。
+ * 走行画面（useCarDriveScene）はこの名前でグループを引き、X軸まわりに回してタイヤを転がす。
+ */
+export function carWheelPivotName(id: CarWheelAttachmentId): string {
+  return `car-wheel-${id}`
+}
+
 function buildWheels(visual: WheelVisual) {
   return ({ attachments, config }: CarPartContext): THREE.Object3D => {
     const group = new THREE.Group()
@@ -221,13 +235,19 @@ function buildWheels(visual: WheelVisual) {
 
     for (const wheel of attachments.wheels) {
       // タイヤの中心位置は attachment 由来。サイズは寸法基盤から、見た目の差はvisual定義から決まる。
+      // 車軸を原点とするグループへ部品を入れ、位置はグループ側だけが持つ。こうすると
+      // 飾り（おはな・ほし・にじいろ・オフロードのブロック）も含めて1か所回すだけで転がる。
+      const pivot = new THREE.Group()
+      pivot.name = carWheelPivotName(wheel.id)
+      pivot.position.set(wheel.position.x, wheel.position.y, wheel.position.z)
+      const axle: CarWheelAttachment = { ...wheel, position: { x: 0, y: 0, z: 0 } }
+
       const tire = new THREE.Mesh(
         new THREE.CylinderGeometry(wheel.radius, wheel.radius, wheel.width, 24),
         tireMaterial,
       )
       tire.name = `car-wheel-tire-${wheel.id}`
       tire.rotation.z = Math.PI / 2
-      tire.position.set(wheel.position.x, wheel.position.y, wheel.position.z)
       tire.castShadow = true
       const hub = new THREE.Mesh(
         new THREE.CylinderGeometry(
@@ -240,18 +260,18 @@ function buildWheels(visual: WheelVisual) {
       )
       hub.name = `car-wheel-hub-${wheel.id}`
       hub.rotation.z = Math.PI / 2
-      hub.position.copy(tire.position)
-      group.add(tire, hub)
+      pivot.add(tire, hub)
 
       if (visual.detail === 'offroad') {
-        addOffroadTread(group, wheel, treadMaterial)
+        addOffroadTread(pivot, axle, treadMaterial)
       } else if (visual.detail === 'racing') {
-        addPerformanceRim(group, wheel, hubMaterial, 'car-racing')
+        addPerformanceRim(pivot, axle, hubMaterial, 'car-racing')
       } else if (visual.detail === 'standard') {
-        if (sportsWheel) addPerformanceRim(group, wheel, hubMaterial, 'car-sports')
+        if (sportsWheel) addPerformanceRim(pivot, axle, hubMaterial, 'car-sports')
       } else {
-        addWheelFace(group, wheel, visual.detail)
+        addWheelFace(pivot, axle, visual.detail)
       }
+      group.add(pivot)
     }
     return group
   }

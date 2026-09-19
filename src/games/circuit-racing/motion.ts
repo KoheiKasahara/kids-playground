@@ -1,6 +1,16 @@
 import * as THREE from 'three'
 import type { RaceCarDefinition } from './raceConfig'
 
+/**
+ * The tuning a lap profile needs. Labels and icons never reach the motion table,
+ * so any game with its own car (car-builder's drive stage) can build a profile
+ * from the same code as the race cars.
+ */
+export type MotionCarPerformance = Pick<
+  RaceCarDefinition,
+  'maxSpeed' | 'acceleration' | 'braking' | 'cornering'
+>
+
 /** A point in the precomputed, lane-offset motion table. */
 export type MotionSample = {
   distance: number
@@ -11,7 +21,7 @@ export type MotionSample = {
 }
 
 export type MotionProfile = {
-  readonly car: RaceCarDefinition
+  readonly car: MotionCarPerformance
   readonly curve: THREE.Curve<THREE.Vector3>
   readonly laneOffset: number
   /** Length of one lane centre line in metres. */
@@ -112,7 +122,7 @@ function cyclicCurvature(
  * before a bend instead of only at its tightest point.
  */
 export function createMotionProfile(
-  car: RaceCarDefinition,
+  car: MotionCarPerformance,
   curve: THREE.Curve<THREE.Vector3>,
   laneOffset = 0,
 ): MotionProfile {

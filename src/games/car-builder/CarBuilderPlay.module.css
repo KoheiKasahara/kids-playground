@@ -5,8 +5,11 @@
  * 3D表示エリアの高さが跳ねてカメラのフィットが動くのを防ぐため。
  */
 .page {
-  /* 一覧・詳細で共通の下部エリア高さ。詳細側の「もどる」ぶんも含めて選択肢2行が見える値。 */
-  --cb-panel-height: clamp(220px, 32dvh, 262px);
+  /*
+   * 一覧・詳細で共通の下部エリア高さ。詳細側の「もどる」ぶんも含めて選択肢2行が見え、
+   * 一覧側では8カテゴリ（2行）＋「はしる！」がそのまま収まる値。
+   */
+  --cb-panel-height: clamp(248px, 34dvh, 292px);
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -168,6 +171,32 @@
   color: var(--color-text-muted);
   font-size: 13px;
   text-align: center;
+}
+
+/* 「はしる！」は一覧のいちばん下で、カテゴリボタンより明らかに大きく・強い色にする。 */
+.driveButton {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 64px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #ffb057, #ff7043 72%);
+  color: #fff;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 900;
+  box-shadow: 0 4px 0 #d65124;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.driveButton:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #d65124;
 }
 
 .detail {

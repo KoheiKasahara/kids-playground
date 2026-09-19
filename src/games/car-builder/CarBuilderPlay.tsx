@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
+import { useGameIntroPlaying } from '../../components/gameIntroState'
 import {
   CAR_CATEGORIES,
   carCategoryOrder,
@@ -14,6 +15,7 @@ import {
   type MarkType,
   type WheelType,
 } from './carConfig'
+import CarDrivePlay from './CarDrivePlay'
 import { useCarBuilderScene } from './useCarBuilderScene'
 import styles from './CarBuilderPlay.module.css'
 
@@ -169,13 +171,34 @@ function OptionPreviewMark({ preview, className }: { preview: CarOptionPreview; 
   )
 }
 
+/**
+ * つくりかえ画面の3D表示。走行画面へ切り替えると、この部品ごと外れて
+ * レンダラーとWebGLコンテキストが解放される（2つのシーンが同時に生きない）。
+ */
+function BuildScene({ config }: { config: CarConfig }) {
+  const { registerContainer } = useCarBuilderScene({ config })
+  return (
+    <div
+      ref={registerContainer}
+      className={styles.scene}
+      role="application"
+      aria-label="3Dの くるま。ゆびで まわせるよ"
+    />
+  )
+}
+
 export default function CarBuilderPlay() {
   // カスタマイズ状態はこの1か所だけが持つ（3D側は同じCarConfigを受け取るだけで状態を複製しない）。
   const [config, setConfig] = useState<CarConfig>(DEFAULT_CAR_CONFIG)
   // 下部エリアが「カテゴリ一覧」か「詳細選択」かだけを持つUI状態。CarConfigとは別物。
   const [openCategoryId, setOpenCategoryId] = useState<CarCategoryId | null>(null)
+  // 「つくる」か「はしる」か。CarConfigはどちらの画面でも同じものを使う。
+  const [driving, setDriving] = useState(false)
+  // 走行中は共通の説明文を隠す。画面が1画面ぶんに収まり、走っている最中に
+  // 下へスクロールしてしまうことがなくなる（「もどる」で説明も戻る）。
+  useGameIntroPlaying(driving)
 
-  const { registerContainer } = useCarBuilderScene({ config })
+  const backToBuilding = useCallback(() => setDriving(false), [])
 
   const handleSelectOption = useCallback((categoryId: CarCategoryId, optionId: string) => {
     // 決定ボタンは置かない。選んだ瞬間にCarConfigが変わり、3D側がそれを受け取る。
@@ -188,6 +211,9 @@ export default function CarBuilderPlay() {
     openCategoryId === null
       ? null
       : (CAR_CATEGORIES[openCategoryId] as CarCategoryDefinition<CarCategoryId>)
+
+  // つくった車をそのまま走らせる。画面ごと入れ替えるので、3Dシーンは同時に1つだけになる。
+  if (driving) return <CarDrivePlay config={config} onBack={backToBuilding} />
 
   return (
     <main className={styles.page}>
@@ -203,12 +229,7 @@ export default function CarBuilderPlay() {
         </h1>
       </header>
 
-      <div
-        ref={registerContainer}
-        className={styles.scene}
-        role="application"
-        aria-label="3Dの くるま。ゆびで まわせるよ"
-      />
+      <BuildScene config={config} />
 
       <section className={styles.panel} aria-label="くるまの カスタマイズ">
         {openCategory === null ? (
@@ -234,6 +255,18 @@ export default function CarBuilderPlay() {
               ))}
             </div>
             <p className={styles.hint}>えらぶと すぐに くるまが かわるよ</p>
+            {/*
+              できあがった車をそのままコースへ持っていく、この画面のいちばん大きな口。
+              パーツを選んでいる最中に走り出さないよう、詳細選択のときは出さない。
+            */}
+            <button
+              type="button"
+              className={styles.driveButton}
+              onClick={() => setDriving(true)}
+              aria-label="つくった くるまを はしらせる"
+            >
+              <span aria-hidden="true">🏁</span> はしる！
+            </button>
           </>
         ) : (
           <div className={styles.detail}>

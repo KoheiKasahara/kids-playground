@@ -422,13 +422,35 @@ describe('カテゴリごとのレイヤー', () => {
     const dimensions = computeCarDimensions(DEFAULT_CAR_CONFIG)
     const attachments = model.getAttachments()
     const wheelRoot = layerOf(model.root, 'wheel').children[0]!
+    model.root.updateMatrixWorld(true)
     for (const attachment of attachments.wheels) {
       const tire = wheelRoot.getObjectByName(`car-wheel-tire-${attachment.id}`) as THREE.Mesh | undefined
       expect(tire, attachment.id).toBeDefined()
-      expect(tire?.position.x).toBeCloseTo(attachment.position.x, 6)
-      expect(tire?.position.y).toBeCloseTo(dimensions.wheelRadius, 6)
-      expect(tire?.position.z).toBeCloseTo(attachment.position.z, 6)
+      // 回転軸グループの下に入るため、車の中での位置はワールド座標で確かめる。
+      const position = tire!.getWorldPosition(new THREE.Vector3())
+      expect(position.x).toBeCloseTo(attachment.position.x, 6)
+      expect(position.y).toBeCloseTo(dimensions.wheelRadius, 6)
+      expect(position.z).toBeCloseTo(attachment.position.z, 6)
     }
+    model.dispose()
+  })
+
+  test('4輪それぞれが回転軸グループを持ち、回すとタイヤの飾りごと転がる', () => {
+    const config = selectCarOption(DEFAULT_CAR_CONFIG, 'wheel', 'rainbow')
+    const model = createCarModel(config, immediateLoader())
+    const pivots = model.getWheelPivots()
+    expect(pivots).toHaveLength(4)
+
+    const segment = pivots[0]!.getObjectByName('car-rainbow-segment-frontLeft-0')
+    expect(segment).toBeDefined()
+    model.root.updateMatrixWorld(true)
+    const before = segment!.getWorldPosition(new THREE.Vector3())
+    pivots[0]!.rotation.x = Math.PI / 2
+    model.root.updateMatrixWorld(true)
+    const after = segment!.getWorldPosition(new THREE.Vector3())
+    // 車軸（X）の位置はそのままで、飾りだけが軸のまわりを回る＝転がって見える。
+    expect(after.x).toBeCloseTo(before.x, 6)
+    expect(after.distanceTo(before)).toBeGreaterThan(0.01)
     model.dispose()
   })
 
@@ -444,8 +466,12 @@ describe('カテゴリごとのレイヤー', () => {
         const model = createCarModel(config, immediateLoader())
         const wheelRoot = layerOf(model.root, 'wheel').children[0]
         if (wheelRoot === undefined) throw new Error('タイヤが生成されていません: ' + label)
-        const tires = wheelRoot.children.filter((child) => child.name.startsWith('car-wheel-tire-'))
+        const tires: THREE.Object3D[] = []
+        wheelRoot.traverse((child) => {
+          if (child.name.startsWith('car-wheel-tire-')) tires.push(child)
+        })
         expect(tires, label).toHaveLength(4)
+        expect(model.getWheelPivots(), label).toHaveLength(4)
 
         const bounds = boundsOf(model.root)
         expect(bounds.min.y, label).toBeGreaterThanOrEqual(-0.01)
