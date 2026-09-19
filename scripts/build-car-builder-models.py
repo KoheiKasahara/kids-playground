@@ -61,6 +61,7 @@ BLEND_DRIVE_IDS = {
     'Cop.blend': '1dWk2t09F_mfUHF-6gwgbic6H89K67YDU',
     'SchoolBus.blend': '1NHBDghhuMVcm8Ke7lOcBe1KyX1p87FLN',
     'Ambulance.blend': '15muKRM_51PcFrNBiNGL8HK766hiDRJ7f',
+    'Bus.blend': '1V1At0yRIJkOi9Wwqa89kvOviGNqFGPw1',
 }
 
 # マテリアルの役割名。ゲーム側（carVehicles.ts）はこの名前でボディ・ガラス・
@@ -241,6 +242,27 @@ VEHICLES = [
             'Yellow': ROLE_BODY,
             'Bumper': ROLE_TRIM_DARK,
             'Details': ROLE_TRIM,
+            'Windows': ROLE_GLASS,
+            'Lights': ROLE_LIGHT_FRONT,
+        },
+    ),
+    Vehicle(
+        vehicle_id='bus',
+        blend='Bus.blend',
+        body_object='Bus',
+        pack='Public Transport Pack',
+        source_model='Bus',
+        # スクールバスと同じく前方が -X。
+        yaw_deg=90.0,
+        # 同じPackのスクールバスと同じ倍率をかける。元モデルどうしの大きさの差
+        # （路線バスの方が短く低い）はそのまま残り、並べたときに見分けがつく。
+        scale=1.20,
+        materials={
+            'Top': ROLE_BODY,
+            # 腰から下の帯。元も車体色より暗いので、そのまま下部パネルとして扱う。
+            'Bottom': ROLE_BODY_LOWER,
+            'Details': ROLE_TRIM,
+            'Bumper': ROLE_TRIM_DARK,
             'Windows': ROLE_GLASS,
             'Lights': ROLE_LIGHT_FRONT,
         },

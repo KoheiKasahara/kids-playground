@@ -147,8 +147,8 @@ describe('カテゴリ一覧と詳細選択の切り替え', () => {
   })
 })
 
-describe('ボディ9車種の選択', () => {
-  test('採用9車種が視覚的なプレビュー付きで並び、選択直後にCarConfigへ反映される', async () => {
+describe('ボディ10車種の選択', () => {
+  test('採用10車種が視覚的なプレビュー付きで並び、選択直後にCarConfigへ反映される', async () => {
     const user = userEvent.setup()
     renderPlay()
 

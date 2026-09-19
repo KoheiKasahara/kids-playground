@@ -53,8 +53,8 @@ beforeAll(async () => {
 })
 
 describe('採用車種カタログ', () => {
-  test('既存と追加の9車種を持ち、IDと並び順が一致する', () => {
-    expect(CAR_VEHICLE_ORDER).toHaveLength(9)
+  test('既存と追加の10車種を持ち、IDと並び順が一致する', () => {
+    expect(CAR_VEHICLE_ORDER).toHaveLength(10)
     expect([...CAR_VEHICLE_ORDER].sort()).toEqual(Object.keys(CAR_VEHICLES).sort())
     for (const id of CAR_VEHICLE_ORDER) expect(CAR_VEHICLES[id].id).toBe(id)
   })

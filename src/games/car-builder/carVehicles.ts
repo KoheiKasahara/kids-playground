@@ -13,7 +13,17 @@
  */
 
 /** 採用車種。GLBのファイル名（kebab-case）とは別に、コード上のIDはcamelCaseで持つ。 */
-export type CarVehicleId = 'sportsCar' | 'car' | 'suv' | 'taxi' | 'policeCar' | 'schoolBus' | 'ambulance' | 'pickup' | 'van'
+export type CarVehicleId =
+  | 'sportsCar'
+  | 'car'
+  | 'suv'
+  | 'taxi'
+  | 'policeCar'
+  | 'schoolBus'
+  | 'bus'
+  | 'ambulance'
+  | 'pickup'
+  | 'van'
 
 /**
  * GLB内のマテリアル名。ビルドスクリプトが役割の分かる名前へ付け替えているので、
@@ -188,6 +198,21 @@ export const CAR_VEHICLES: { readonly [K in CarVehicleId]: CarVehicleDefinition 
     materials: ['Body', 'Glass', 'Trim', 'TrimDark', 'LightFront'],
     source: { pack: 'Public Transport Pack', model: 'SchoolBus' },
   },
+  bus: {
+    id: 'bus',
+    label: 'バス',
+    emoji: '🚍',
+    modelFile: 'bus.glb',
+    size: { length: 4.904, width: 2.094, height: 1.866 },
+    bodyFloor: 0.145,
+    cabin: { centerZ: -0.028, length: 4.63, width: 1.995, floorY: 0.988 },
+    wheels: {
+      front: { z: 1.71, halfTrack: 0.903, radius: 0.197, width: 0.263 },
+      rear: { z: -1.708, halfTrack: 0.844, radius: 0.197, width: 0.263 },
+    },
+    materials: ['Body', 'BodyLower', 'Glass', 'Trim', 'TrimDark', 'LightFront'],
+    source: { pack: 'Public Transport Pack', model: 'Bus' },
+  },
   ambulance: {
     id: 'ambulance',
     label: 'きゅうきゅうしゃ',
@@ -243,6 +268,7 @@ export const CAR_VEHICLE_ORDER: readonly CarVehicleId[] = [
   'taxi',
   'policeCar',
   'ambulance',
+  'bus',
   'schoolBus',
   'pickup',
   'van',
