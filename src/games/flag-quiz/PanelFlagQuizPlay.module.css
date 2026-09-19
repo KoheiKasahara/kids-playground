@@ -80,6 +80,7 @@
 }
 
 .header {
+  composes: header from '../../components/QuizHeader.module.css';
   flex: 0 0 auto;
   display: flex;
   align-items: center;

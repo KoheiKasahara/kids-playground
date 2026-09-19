@@ -383,3 +383,9 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+
+@media (orientation: portrait) and (max-width: 600px) {
+  .ui { padding-top: calc(64px + var(--safe-top)); }
+  .title { font-size: 26px; }
+}

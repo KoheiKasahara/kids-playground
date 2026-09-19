@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CAMERA_FAR,
   CAMERA_NEAR,
+  cameraDistanceForAspect,
   cameraDistanceForZoom,
   easeOutCubic,
   GLOBE_RADIUS,
@@ -21,6 +22,26 @@ function depthResolutionAt(distance: number): number {
 }
 
 describe('earth-globe zoom levels', () => {
+  it.each([[390, 844], [402, 874], [440, 956], [844, 390], [1366, 768]])(
+    'fits the atmosphere inside both view angles at %i × %i', (width, height) => {
+      const aspect = width / height
+      const distance = cameraDistanceForAspect(0, aspect)
+      const angularRadius = Math.asin(ATMOSPHERE_RADIUS / distance)
+      expect(angularRadius).toBeLessThan(Math.PI / 8)
+      expect(angularRadius).toBeLessThan(Math.atan(Math.tan(Math.PI / 8) * aspect))
+      expect(distance + ATMOSPHERE_RADIUS).toBeLessThan(CAMERA_FAR)
+    },
+  )
+
+  it('preserves close zooms and handles a viewport without usable dimensions', () => {
+    for (const level of [1, 2, 3] as const) {
+      expect(cameraDistanceForAspect(level, 390 / 844)).toBe(cameraDistanceForZoom(level))
+    }
+    for (const aspect of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(cameraDistanceForAspect(0, aspect)).toBe(cameraDistanceForZoom(0))
+    }
+  })
+
   it('uses progressively shorter camera distances', () => {
     expect(GLOBE_RADIUS).toBe(100)
     expect(cameraDistanceForZoom(0)).toBe(300)

@@ -14,6 +14,7 @@ import {
   CAMERA_FAR,
   CAMERA_NEAR,
   cameraDistanceForZoom,
+  cameraDistanceForAspect,
   easeOutCubic,
   rotateSpeedForZoom,
   ZOOM_ANIMATION_DURATION_MS,
@@ -201,10 +202,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
 
     function cameraDistanceForViewport(level: ZoomLevel) {
       const rect = container?.getBoundingClientRect()
-      return cameraDistanceForZoom(
-        level,
-        (rect?.height ?? 0) > (rect?.width ?? Number.POSITIVE_INFINITY),
-      )
+      return cameraDistanceForAspect(level, rect && rect.height > 0 ? rect.width / rect.height : 1)
     }
 
     function updatePointOfView() {
@@ -608,6 +606,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         Math.floor(rect.height || container.clientHeight || window.innerHeight || 1),
       )
 
+      if (controls !== null) controls.maxDistance = cameraDistanceForAspect(0, width / height) + 10
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height, false)
@@ -826,7 +825,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       controls.dampingFactor = reducedMotion ? 1 : 0.22
       controls.touches.ONE = THREE.TOUCH.ROTATE
       controls.minDistance = cameraDistanceForZoom(3) - 10
-      controls.maxDistance = cameraDistanceForZoom(0, true) + 10
+      controls.maxDistance = cameraDistanceForViewport(0) + 10
       controls.update()
       controls.addEventListener('change', handleControlsChange)
 

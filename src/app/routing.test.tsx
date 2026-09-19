@@ -5,6 +5,18 @@ import { BrowserRouter, MemoryRouter } from 'react-router-dom'
 import App from './App'
 
 describe('直接アクセス（URL直入力を想定）', () => {
+  test.each([
+    ['/games/shinkeisuijaku', 'しんけいすいじゃく', 'かんたん 6ペア'],
+    ['/games/water-wheel-maze', 'ぐるぐる すいしゃ', '1 はじめての みずみち'],
+  ])('%s の選択画面とプレイ画面に戻るボタンを重複表示しない', async (path, title, start) => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>)
+    await screen.findByRole('heading', { name: title })
+    expect(screen.getAllByRole('button', { name: 'もどる' })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: start }))
+    expect(screen.getAllByRole('button', { name: 'もどる' })).toHaveLength(1)
+  })
+
   test('/games/snowball-roll を直接開くと開始画面が出る', async () => {
     render(<MemoryRouter initialEntries={['/games/snowball-roll']}><App /></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: 'ゆきだまころころ' })).toBeInTheDocument()

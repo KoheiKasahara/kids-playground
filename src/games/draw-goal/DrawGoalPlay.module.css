@@ -45,3 +45,13 @@
   .tools button { flex: 0 0 auto; }
   .tip { grid-column: 1; grid-row: 3; font-size: 11px; }
 }
+
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .select { padding-top: calc(12px + var(--safe-top)); padding-bottom: 8px; }
+  .select h1 { margin-bottom: 4px; }
+  .select p { margin: 6px 0; font-size: 13px; line-height: 1.4; }
+  .stageGrid { grid-template-columns: repeat(5, minmax(0, 1fr)); max-width: 900px; gap: 8px; margin: 12px auto; }
+  .stageGrid button { min-height: 86px; gap: 4px; font-size: 13px; }
+  .stageGrid span { width: 30px; height: 30px; font-size: 18px; }
+}

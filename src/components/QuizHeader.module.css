@@ -1,0 +1,21 @@
+/* 固定の戻ると同じ高さを実際のレイアウトに確保する。 */
+.header.header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding-left: calc(116px + var(--safe-left));
+  padding-right: 0;
+}
+.header.header > button {
+  min-height: 44px;
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.header.header > button::after { inset: 0; }
+.header.header > div { min-width: 0; }
+@media (max-width: 360px), (max-height: 560px) {
+  .header.header { min-height: 48px; padding-left: calc(108px + var(--safe-left)); }
+}

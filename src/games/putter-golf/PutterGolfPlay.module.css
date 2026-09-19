@@ -117,3 +117,13 @@
   .map svg { height: 80px; }
 }
 @media (prefers-reduced-motion: reduce) { .loadingDots { animation: none; } .holeResult { animation: none; } }
+
+
+@media (orientation: landscape) and (min-width: 600px) {
+  .beginButton { position: sticky; bottom: 0; z-index: 3; }
+  .panel:has(.beginButton) { align-self: stretch; }
+  .courseButton { padding-block: 4px; }
+  .holeThumbs, .holeThumbs svg { height: 20px; }
+  .options { margin-top: 4px; }
+  .bigCupButton { min-height: 48px; }
+}

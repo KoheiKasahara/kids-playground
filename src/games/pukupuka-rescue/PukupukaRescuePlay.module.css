@@ -841,3 +841,12 @@
 @keyframes currentRotor { to { transform: rotate(360deg); } }
 @keyframes currentArrow { 50% { opacity: 0.5; transform: translateX(2px); } }
 @media (prefers-reduced-motion: reduce) { .currentRotor, .currentArrow { animation: none; } }
+
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .selectionContent { width: min(100%, 900px); }
+  .stageOptions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stageOption { min-height: 100px; }
+  .stageOptionIcon { font-size: 34px; min-height: 34px; }
+  .stageOptionLabel { font-size: 15px; }
+}
