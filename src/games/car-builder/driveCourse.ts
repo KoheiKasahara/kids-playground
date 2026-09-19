@@ -90,6 +90,7 @@ const BODY_DRIVE_FEELS: Record<CarVehicleId, { topSpeed: number; grip: number }>
   suv: { topSpeed: 20.5, grip: 7.6 },
   ambulance: { topSpeed: 20, grip: 6.8 },
   van: { topSpeed: 19.5, grip: 7 },
+  bus: { topSpeed: 19, grip: 6.4 },
   schoolBus: { topSpeed: 18, grip: 6 },
 }
 

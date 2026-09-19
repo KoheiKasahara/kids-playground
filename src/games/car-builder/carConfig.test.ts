@@ -41,7 +41,7 @@ describe('カテゴリのカタログ', () => {
     }
   })
 
-  test('ボディは9車種を持ち、文字だけに依存しないプレビューがある', () => {
+  test('ボディは10車種を持ち、文字だけに依存しないプレビューがある', () => {
     expect(CAR_CATEGORIES.body.options.map((option) => option.id)).toEqual([...CAR_VEHICLE_ORDER])
     expect(CAR_CATEGORIES.body.options.map((option) => option.label)).toEqual([
       'ふつうのくるま',
@@ -50,6 +50,7 @@ describe('カテゴリのカタログ', () => {
       'タクシー',
       'パトカー',
       'きゅうきゅうしゃ',
+      'バス',
       'スクールバス',
       'ピックアップ',
       'バン',

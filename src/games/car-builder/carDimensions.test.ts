@@ -36,8 +36,8 @@ describe('computeCarDimensions（GLB実測値から寸法を作る）', () => {
     expect(dimensions.cabinCenterZ).toBe(vehicle.cabin.centerZ)
   })
 
-  test('採用9車種すべてが寸法を持ち、ホイールベースが全長に収まる', () => {
-    expect(CAR_CATEGORIES.body.options).toHaveLength(9)
+  test('採用10車種すべてが寸法を持ち、ホイールベースが全長に収まる', () => {
+    expect(CAR_CATEGORIES.body.options).toHaveLength(10)
     for (const option of CAR_CATEGORIES.body.options) {
       const measured = computeCarDimensions(selectCarOption(DEFAULT_CAR_CONFIG, 'body', option.id))
       expect(measured.bodyType, option.id).toBe(option.id)

@@ -151,6 +151,7 @@ SOFTWARE.
 | `taxi.glb` | Taxi | Cars Pack |
 | `police-car.glb` | Cop | Cars Pack |
 | `school-bus.glb` | SchoolBus | Public Transport Pack |
+| `bus.glb` | Bus | Public Transport Pack |
 | `ambulance.glb` | Ambulance | Public Transport Pack |
 
 ### 本アプリでの加工
