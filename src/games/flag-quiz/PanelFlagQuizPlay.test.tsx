@@ -234,7 +234,7 @@ describe('PanelFlagQuizPlay', () => {
     renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     await user.click(getChoiceButtons()[0])
     // 自動めくりはランダム順の時間差（stagger）で開くため、即時ではなく waitFor で待つ
-    await waitFor(() => expect(getOpenPanelCount()).toBe(PANEL_COUNT), { timeout: 2000 })
+    await waitFor(() => expect(getOpenPanelCount()).toBe(PANEL_COUNT), { timeout: 10_000 })
   })
 
   test('回答後の自動めくりで枚数は増えるが、得点表示の「〇まいで わかった！」は自分で開いた枚数のまま変わらない', async () => {
@@ -247,7 +247,7 @@ describe('PanelFlagQuizPlay', () => {
     await user.click(button)
     expect(screen.getByText(/2まいで わかった/)).toBeInTheDocument()
     // 自動めくりが完了して16枚すべて開いた後も…
-    await waitFor(() => expect(getOpenPanelCount()).toBe(PANEL_COUNT), { timeout: 2000 })
+    await waitFor(() => expect(getOpenPanelCount()).toBe(PANEL_COUNT), { timeout: 10_000 })
     // 得点・「〇まいで わかった！」の表示は増えず、自分で開いた2枚のままであること
     expect(screen.getByText(/2まいで わかった/)).toBeInTheDocument()
     expect(screen.getByText(/90てん/)).toBeInTheDocument()

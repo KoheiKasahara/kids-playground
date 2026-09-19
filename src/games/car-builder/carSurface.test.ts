@@ -44,7 +44,7 @@ describe('実車体への取り付け', () => {
       }
     }
     disposeCarObject(gltf.scene)
-  }, 15_000)
+  }, 60_000)
 
   test('親の車高移動を二重加算しない・看板は屋根として扱わない', () => {
     const group = new THREE.Group()

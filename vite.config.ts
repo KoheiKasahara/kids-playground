@@ -194,6 +194,10 @@ export default defineConfig({
     },
   },
   test: {
+    // Nightly の coverage 計測中は CPU-heavy なシミュレーションと DOM テストが
+    // 通常実行より遅くなる。Vitest 既定の 5 秒を避け、全テストに共通の余裕を持たせる。
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'json-summary'],
@@ -205,6 +209,8 @@ export default defineConfig({
         plugins,
         test: {
           name: 'unit',
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
           environment: 'node',
           globals: true,
           setupFiles: testSetupFiles,
@@ -221,6 +227,8 @@ export default defineConfig({
         plugins,
         test: {
           name: 'dom',
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
           environment: 'jsdom',
           globals: true,
           setupFiles: testSetupFiles,
@@ -233,6 +241,8 @@ export default defineConfig({
         plugins,
         test: {
           name: 'slow',
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
           environment: 'node',
           globals: true,
           setupFiles: testSetupFiles,

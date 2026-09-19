@@ -82,7 +82,7 @@ describe('ステージが クリアできる', () => {
     game.pour(9, 5, 200)
     game.settle(1500)
     expect(game.world.cleared).toBe(true)
-  }, 15_000)
+  }, 60_000)
   test('4 たからばこの まうえを ほる', () => {
     const game = playable(3)
     game.dig([11, 6], [11, 9])
@@ -101,7 +101,7 @@ describe('ステージが クリアできる', () => {
     game.dig([7, 13], [7, 14])
     game.settle(3000)
     expect(game.world.cleared).toBe(true)
-  }, 15_000)
+  }, 60_000)
   test('7 たからばこ側の みちを ひらく', () => {
     const game = playable(6)
     game.dig([16, 6], [16, 12])
@@ -114,7 +114,7 @@ describe('ステージが クリアできる', () => {
     game.dig([11, 11], [11, 12])
     game.settle(2400)
     expect(game.world.cleared).toBe(true)
-  }, 15_000)
+  }, 60_000)
   test('9 めいろを つなぐ', () => {
     const game = playable(8)
     game.dig([9, 6], [13, 11], 'dig', 6)
@@ -123,11 +123,11 @@ describe('ステージが クリアできる', () => {
     game.dig([12, 25], [12, 27], 'dig', 6)
     game.settle(3000)
     expect(game.world.cleared).toBe(true)
-  }, 15_000)
+  }, 60_000)
   test('10 やまの したの つちを ほる', () => {
     const game = playable(9)
     game.dig([12, 8], [12, 13])
     game.settle(3000)
     expect(game.world.cleared).toBe(true)
-  }, 15_000)
+  }, 60_000)
 })

@@ -69,7 +69,7 @@ describe('PlanetGlobePlay', () => {
     renderApp('/games/planet-globe')
 
     // three.js を含む lazy route は、初回のモジュール評価だけ標準の1秒をわずかに超えることがある。
-    expect(await screen.findByRole('heading', { name: /たいようけい/ }, { timeout: 3_000 }))
+    expect(await screen.findByRole('heading', { name: /たいようけい/ }, { timeout: 10_000 }))
       .toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
   })
