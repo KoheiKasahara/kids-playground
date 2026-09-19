@@ -42,3 +42,11 @@
   .overlay button { min-height: 48px; padding: 8px 20px; font-size: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .meter div { transition: none; } }
+
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .start { padding-bottom: calc(8px + var(--safe-bottom)); }
+  .hero { display: none; }
+  .start h1 { margin-top: 8px; }
+  .start small { margin-top: 10px; }
+}

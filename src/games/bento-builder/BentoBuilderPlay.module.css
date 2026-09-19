@@ -48,7 +48,7 @@
 .placed { display: flex; align-items: center; gap: 5px; overflow-x: auto; touch-action: pan-x; overscroll-behavior-x: contain; min-height: 48px; font-size: 12px; }
 .placed button { min-width: 48px; font-size: 23px; }
 .finishActions { display: flex; justify-content: center; gap: 12px; padding: 8px; }
-.finishActions button { padding: 12px 20px; }
+.finishActions button { padding: 12px 8px; white-space: nowrap; }
 .celebration { position: absolute; top: 6px; inset-inline: 0; pointer-events: none; text-align: center; }
 .celebration h2 { margin: 0; font-size: clamp(20px, 5vw, 30px); color: #236d59; text-shadow: 0 2px #fff; }
 .sparkles { color: #b68616; display: block; font-size: 32px; animation: sparkle 1s ease-in-out 3; }
@@ -84,6 +84,14 @@
 }
 @media (prefers-reduced-motion: reduce) { .sparkles { animation: none; } }
 
-.cups { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; flex-shrink: 0; }
-.cups button { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 48px; padding: 3px 5px; font-size: 11px; }
+.cups { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; flex-shrink: 0; white-space: nowrap; }
+.cups button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-width: 48px; padding: 3px 5px; font-size: 11px; }
 .cups svg { width: 28px; height: 26px; flex-shrink: 0; }
+
+
+.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.actions button { min-width: 0; max-width: none; min-height: 48px; padding: 4px; white-space: nowrap; font-size: 14px; }
+@media (orientation: landscape) and (max-height: 600px) {
+  .panel > .actions, .panel > .message, .panel > .placed { flex-shrink: 0; }
+  .panel .foods { min-height: 76px; }
+}

@@ -97,3 +97,16 @@
   .sparkles, .illustration i { animation: none; }
   .meterFill { transition: none; }
 }
+
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .select { display: grid; grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 16px; align-content: center; }
+  .selectHeader { position: absolute; top: calc(8px + var(--safe-top)); }
+  .intro { grid-column: 1; grid-row: 1; margin: 48px 0 0; }
+  .intro h1 { font-size: 26px; margin: 6px 0; }
+  .intro p { font-size: 13px; line-height: 1.4; }
+  .intro .eyebrow { margin-top: 0; }
+  .stageGrid { grid-column: 2; grid-row: 1; width: 100%; max-width: none; gap: 8px; margin: 6px 0; }
+  .stageGrid button { padding: 6px; min-height: 44px; }
+  .legend { grid-column: 1 / -1; margin: 8px 0 0; }
+}

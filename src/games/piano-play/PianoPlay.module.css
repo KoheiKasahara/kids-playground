@@ -512,3 +512,15 @@
     transition: none;
   }
 }
+
+
+@media (orientation: portrait) {
+  .playLayout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .songControls { align-self: start; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .instrumentPicker { grid-column: 1 / -1; }
+  .songPicker select, .playButton, .stopButton { min-height: 48px; }
+  .playbackStatus { grid-column: 1 / -1; }
+  .pianoCase { padding-inline: 6px; }
+  .keyboard { height: min(42dvh, 320px); }
+  .noteLabel { font-size: 14px; white-space: nowrap; }
+}

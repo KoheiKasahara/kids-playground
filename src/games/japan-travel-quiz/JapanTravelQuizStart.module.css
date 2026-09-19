@@ -11,3 +11,13 @@
   .actions > button,
   .actions > .start { width: auto; min-height: var(--tap-target-min); }
 }
+
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .page { padding-block: calc(60px + var(--safe-top)) calc(12px + var(--safe-bottom)); gap: 10px; }
+  .title { font-size: 28px; }
+  .description { font-size: 17px; line-height: 1.4; }
+  .ticket { font-size: 32px; padding: 6px; }
+  .actions { display: flex; align-items: center; }
+  .actions .start { width: min(100%, 420px); min-height: 52px; }
+}

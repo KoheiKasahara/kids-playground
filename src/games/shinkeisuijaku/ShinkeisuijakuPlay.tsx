@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
@@ -172,7 +172,7 @@ export default function ShinkeisuijakuPlay() {
 
           <div
             className={styles.grid}
-            style={{ gridTemplateColumns: `repeat(${GRID_COLUMNS[difficulty]}, minmax(0, 1fr))` }}
+            style={{ '--card-cols': GRID_COLUMNS[difficulty], '--wide-cols': totalPairs } as CSSProperties}
           >
             {cards.map((card) => {
               const faceUp = card.status !== 'hidden'

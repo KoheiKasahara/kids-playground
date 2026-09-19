@@ -47,3 +47,9 @@ export function easeOutCubic(progress: number): number {
   const clamped = Math.min(1, Math.max(0, progress))
   return 1 - (1 - clamped) ** 3
 }
+/** 最小ズームでは縦横の狭い画角にも大気と余白が収まる距離まで引く（垂直画角45度）。 */
+export function cameraDistanceForAspect(level: ZoomLevel, aspect: number): number {
+  if (level !== 0 || !Number.isFinite(aspect) || aspect <= 0) return cameraDistanceForZoom(level)
+  const halfAngle = Math.atan(Math.tan(Math.PI / 8) * Math.min(1, aspect))
+  return Math.max(cameraDistanceForZoom(level), GLOBE_RADIUS * 1.12 / Math.sin(halfAngle))
+}

@@ -332,3 +332,18 @@
     align-self: center;
   }
 }
+
+
+.page { height: 100dvh; min-height: 0; padding-top: calc(64px + var(--safe-top)); }
+.header { flex-shrink: 0; }
+.grid { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start; padding: 8px; }
+.actions { position: static; flex: 0 0 auto; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .page { max-width: none; padding-top: calc(8px + var(--safe-top)); }
+  .header { margin: 0 0 6px; padding-left: calc(112px + var(--safe-left)); min-height: 48px; }
+  .title { font-size: 24px; }
+  .instruction { font-size: 17px; margin-top: 4px; }
+  .status { font-size: 14px; margin-top: 2px; }
+  .actions { grid-template-columns: 1fr; padding-block: 6px calc(8px + var(--safe-bottom)); }
+  .actions button { min-height: 48px; padding: 6px; font-size: 20px; }
+}

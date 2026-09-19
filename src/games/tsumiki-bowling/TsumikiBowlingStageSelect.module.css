@@ -119,3 +119,13 @@
     transition: none;
   }
 }
+
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .page { height: 100dvh; min-height: 0; }
+  .cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .card { min-height: 110px; padding: 4px; gap: 2px; }
+  .preview { height: 54px; width: auto; max-width: 100%; }
+  .cardName { font-size: 14px; }
+  .cardHint { font-size: 11px; }
+}

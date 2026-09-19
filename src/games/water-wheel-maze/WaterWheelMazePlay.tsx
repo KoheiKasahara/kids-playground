@@ -55,13 +55,6 @@ function Board({ index, back, select, next, record, cleared }: {
           aria-label="まるい めいろ。ゆびで まわすと みずが おちるよ。キーボードは ひだり・みぎの やじるしで まわせるよ">
           めいろを まわして、まんなかの みずを すいしゃへ おとそう。
         </canvas>
-        <p className={styles.notice} role="status">
-          {game.unavailable ? 'ばんめんを ひらけなかったよ。もういちど ひらいてね'
-            : game.cleared ? ''
-              : game.reachedGoal ? '⭐ ぜんいん のれたよ！ のこりの みずも とどけてみよう'
-                : game.settled ? '💧 みずが とまったよ。めいろを まわしてみよう'
-                  : game.started ? '' : stage.hint}
-        </p>
         {game.cleared && <div className={styles.overlay}>
           <div className={styles.card}>
             <p className={styles.sparkles} aria-hidden="true">✨ 🎡 ✨</p>
@@ -76,6 +69,13 @@ function Board({ index, back, select, next, record, cleared }: {
           </div>
         </div>}
       </section>
+      <p className={styles.notice} role="status">
+        {game.unavailable ? 'ばんめんを ひらけなかったよ。もういちど ひらいてね'
+          : game.cleared ? ''
+            : game.reachedGoal ? '⭐ ぜんいん のれたよ！ のこりの みずも とどけてみよう'
+              : game.settled ? '💧 みずが とまったよ。めいろを まわしてみよう'
+                : game.started ? '' : stage.hint}
+      </p>
       <div className={styles.controls} role="group" aria-label="めいろを まわす">
         <button aria-label="ひだりへ まわす" {...spinProps(-1)}><span aria-hidden="true">↺</span> ひだり</button>
         <button aria-label="みぎへ まわす" {...spinProps(1)}>みぎ <span aria-hidden="true">↻</span></button>
