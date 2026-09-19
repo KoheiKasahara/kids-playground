@@ -172,6 +172,25 @@ describe('おちてくる ブロック: ばしょをえらんで おとす', () 
     expect(new Set(rotated.map((cell) => cell.split(',')[0])).size).toBe(1)
   })
 
+  test('エルのかたちも、出てきたところで押すたびにまわる', () => {
+    // 上へ伸びる向きを持つ形。出てきた直後はいちばん上の段にいるため、
+    // 以前は「まわす」を押しても向きが変わらなかった。
+    randomValue = FALLING_SHAPE_IDS.indexOf('l') / FALLING_SHAPE_IDS.length + 0.01
+    renderFalling()
+    const spawned = pieceCells()
+
+    const seen = [spawned]
+    for (let press = 0; press < 3; press += 1) {
+      fireEvent.click(controlButton('まわす'))
+      expect(seen, `${press + 1}回目でまわらなかった`).not.toContain(pieceCells())
+      seen.push(pieceCells())
+    }
+
+    // 4回で1周して、元の向き・元の場所へ戻る。
+    fireEvent.click(controlButton('まわす'))
+    expect(pieceCells()).toBe(spawned)
+  })
+
   test('キーボードの矢印でも、うごかす・まわす・おとすができる', () => {
     renderFalling()
     fireEvent.keyDown(window, { key: 'ArrowLeft' })

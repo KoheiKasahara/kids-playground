@@ -150,38 +150,92 @@ export function moveFallingPieceSideways(state: FallingPuzzleState, delta: numbe
 }
 
 /**
- * 左右に1〜(盤面の幅-1)マスずらす・1マス持ち上げる、の順で試す壁キック一覧。
- * 「ながいぼう」（4マス）のような幅の広い形は、壁ぎわで向きを変えると
- * 2マスを超えるずらしが必要になることがあるため、盤面の幅ぶんまで試せるようにする
- * （幼児が壁ぎわでまわしても「反応しない」と感じることがないように、必ず置ける場所を探す）。
+ * いちばん長い形の長さ（マス）。ながいぼうなら4。
+ * まわすときに縦へどれだけずらして試すかの上限に使うので、
+ * 形を足しても、ずらせる範囲が足りなくなることがない。
  */
-const HORIZONTAL_KICK_COLS: readonly number[] = [
-  0,
-  ...Array.from({ length: FALLING_COLS - 1 }, (_unused, index) => index + 1).flatMap((magnitude) => [
-    -magnitude,
-    magnitude,
-  ]),
-]
-const ROTATE_KICKS: readonly BoardCell[] = [
-  ...HORIZONTAL_KICK_COLS.map((col) => ({ col, row: 0 })),
-  ...HORIZONTAL_KICK_COLS.map((col) => ({ col, row: -1 })),
-]
+const LONGEST_SHAPE_SPAN = Math.max(
+  ...FALLING_SHAPE_IDS.map((shapeId) => {
+    const bounds = cellBounds(shapeCells(shapeId, NO_ROTATION))
+    return Math.max(bounds.cols, bounds.rows)
+  }),
+)
 
 /**
- * 落ちているブロックを90度まわす。そのままだと壁や積まれたマスに当たる場合は、
- * 左右にずらす・1マス持ち上げる、の順で置ける場所を探してから回す
- * （幼児が壁ぎわでまわしても「反応しない」と感じにくくするため）。
+ * まわした先がふさがっているときに、ずらして試す量の一覧。
+ * 横は盤面の幅ぶん、縦はいちばん長い形の長さぶんまで試し、
+ * 元の位置から近い順（同じ距離なら、まず左右へ、つぎに持ち上げる方）に並べる。
+ * これだけ広く探すのは、幼児が「まわす」を押したときに
+ * 「反応しない」と感じることがないように、置ける場所があれば必ず見つけるため。
+ */
+function buildRotateKicks(): BoardCell[] {
+  const maxCols = FALLING_COLS - 1
+  const maxRows = LONGEST_SHAPE_SPAN - 1
+  const kicks: BoardCell[] = []
+  for (let row = -maxRows; row <= maxRows; row += 1) {
+    for (let col = -maxCols; col <= maxCols; col += 1) kicks.push({ col, row })
+  }
+  return kicks.sort(
+    (a, b) =>
+      Math.abs(a.col) + Math.abs(a.row) - (Math.abs(b.col) + Math.abs(b.row)) ||
+      Math.abs(a.row) - Math.abs(b.row) ||
+      a.row - b.row ||
+      Math.abs(a.col) - Math.abs(b.col) ||
+      a.col - b.col,
+  )
+}
+
+const ROTATE_KICKS: readonly BoardCell[] = buildRotateKicks()
+
+/** 長さ span のまとまりが 0〜limit の内側に収まるように、左上の位置を端で止める。 */
+function clampSpan(start: number, span: number, limit: number): number {
+  return Math.min(Math.max(start, 0), limit - span)
+}
+
+/**
+ * 向きが変わって長さが beforeSpan から afterSpan になるとき、
+ * まんなかを保つためのずらし量。半マスぶんの端数は0の側へ寄せる。
+ * こうすると行き（長い→短い）と帰り（短い→長い）のずらし量が必ず打ち消し合うので、
+ * 「まわす」を4回押すと、ブロックは元の向き・元の場所へきっちり戻る。
+ */
+function centeringShift(beforeSpan: number, afterSpan: number): number {
+  return Math.trunc((beforeSpan - afterSpan) / 2)
+}
+
+/**
+ * まわしたあとの基準セル。囲む長方形（見た目の四角）のまんなかがまわす前と
+ * 同じところに来るようにし、盤面からはみ出す分は端で止める。
+ *
+ * 形は「基準セル（いちばん上の段の、いちばん左のマス）からの相対セル」で定義されているため、
+ * 基準セルを動かさずにまわすと、向きによっては形が基準セルより上へ伸びる。
+ * 落ちてくるブロックは出てきた直後がいちばん上の段なので、それだけで盤面の外へ出てしまい、
+ * 「まわす」を押しても向きが変わらない形（エル・ティー・しかく など）があった。
+ * 見た目の四角を基準に位置を取り直すことで、いちばん上にいてもその場で向きが変わる。
+ */
+function rotatedAnchor(piece: FallingPiece, rotation: BlockRotation): BoardCell {
+  const before = cellBounds(fallingPieceCells(piece))
+  const after = cellBounds(shapeCells(piece.shapeId, rotation))
+  const left = clampSpan(before.minCol + centeringShift(before.cols, after.cols), after.cols, FALLING_COLS)
+  const top = clampSpan(before.minRow + centeringShift(before.rows, after.rows), after.rows, FALLING_ROWS)
+  return { col: left - after.minCol, row: top - after.minRow }
+}
+
+/**
+ * 落ちているブロックを90度まわす。まわしたあとも見た目の四角が同じところに来るように
+ * 位置を取り直し、それでも かべ や 積まれたマス に当たるときは、
+ * 近いところから順にずらして置ける場所を探す。
  * どこにも置けないときだけ、何も変えずに同じ状態を返す。
  */
 export function rotateFallingPiece(state: FallingPuzzleState): FallingPuzzleState {
   const piece = state.piece
   if (!piece || state.status !== 'playing') return state
   const rotation = nextRotation(piece.rotation)
+  const anchor = rotatedAnchor(piece, rotation)
   for (const kick of ROTATE_KICKS) {
     const candidate: FallingPiece = {
       ...piece,
       rotation,
-      anchor: { col: piece.anchor.col + kick.col, row: piece.anchor.row + kick.row },
+      anchor: { col: anchor.col + kick.col, row: anchor.row + kick.row },
     }
     if (fitsOnGrid(state.grid, candidate)) return { ...state, piece: candidate }
   }
