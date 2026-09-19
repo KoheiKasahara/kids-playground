@@ -17,6 +17,7 @@ import {
 import {
   CAR_PART_BUILDERS,
   CAR_PART_CATEGORY_IDS,
+  carWheelPivotName,
   disposeCarObject,
   type CarPartCategoryId,
   type CarPartContext,
@@ -45,6 +46,11 @@ export type CarModel = {
   getDimensions: () => CarDimensions
   /** 現在の取り付け基準。 */
   getAttachments: () => CarAttachments
+  /**
+   * 4輪それぞれの回転軸グループ。走行画面がX軸まわりに回してタイヤを転がす。
+   * レイヤーは設定変更や車体の到着で作り直されるので、呼ぶたびに今のグループを引き直す。
+   */
+  getWheelPivots: () => readonly THREE.Object3D[]
   /** 車体GLBの読み込み状況。 */
   getBodyStatus: () => CarBodyStatus
   /** 生成済みのthree.jsリソースをすべて解放する。 */
@@ -195,6 +201,10 @@ export function createCarModel(config: CarConfig, options: CarModelOptions = {})
     update,
     getDimensions: () => dimensions,
     getAttachments: () => attachments,
+    getWheelPivots: () =>
+      attachments.wheels
+        .map((wheel) => layers.wheel.getObjectByName(carWheelPivotName(wheel.id)))
+        .filter((pivot): pivot is THREE.Object3D => pivot !== undefined),
     getBodyStatus: () => bodyStatus,
     dispose: () => {
       disposed = true

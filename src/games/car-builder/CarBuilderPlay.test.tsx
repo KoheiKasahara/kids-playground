@@ -19,6 +19,16 @@ vi.mock('./useCarBuilderScene', () => ({
   },
 }))
 
+// 走行シーンも同じ理由で差し替え、「はしる」で渡されたCarConfigだけを記録する。
+const driveConfigs = vi.hoisted(() => [] as Record<string, string>[])
+
+vi.mock('./useCarDriveScene', () => ({
+  useCarDriveScene: (options: { config: Record<string, string> }) => {
+    driveConfigs.push(options.config)
+    return { registerContainer: () => {}, boost: () => {}, retry: () => {} }
+  },
+}))
+
 function renderPlay() {
   return render(
     <MemoryRouter initialEntries={['/games/car-builder']}>
@@ -37,9 +47,21 @@ function panel() {
   return screen.getByRole('region', { name: 'くるまの カスタマイズ' })
 }
 
+/** 下部エリアに並ぶカテゴリボタン（「◯◯を えらぶ」）だけを数える。 */
+function categoryButtons() {
+  return within(panel()).getAllByRole('button', { name: /を えらぶ$/ })
+}
+
 beforeEach(() => {
   receivedConfigs.length = 0
+  driveConfigs.length = 0
 })
+
+function latestDriveConfig(): Record<string, string> {
+  const config = driveConfigs[driveConfigs.length - 1]
+  if (config === undefined) throw new Error('走行シーンへ CarConfig が渡されていません')
+  return config
+}
 
 describe('初期表示', () => {
   test('タイトルと3D表示エリアが出る', () => {
@@ -55,8 +77,7 @@ describe('初期表示', () => {
 
   test('Issue #401 の8カテゴリが下部に並ぶ', () => {
     renderPlay()
-    const buttons = within(panel()).getAllByRole('button')
-    expect(buttons).toHaveLength(8)
+    expect(categoryButtons()).toHaveLength(8)
     for (const label of ['ボディ', 'タイヤ', 'カラー', 'フロント', 'やね', 'かざり', 'ナンバー', 'たかさ']) {
       expect(within(panel()).getByText(label)).toBeInTheDocument()
     }
@@ -99,7 +120,7 @@ describe('カテゴリ一覧と詳細選択の切り替え', () => {
     expect(back.parentElement).toBe(screen.getByRole('heading', { name: 'タイヤ' }).parentElement)
 
     await user.click(back)
-    expect(within(panel()).getAllByRole('button')).toHaveLength(8)
+    expect(categoryButtons()).toHaveLength(8)
     expect(screen.getByRole('button', { name: 'カラーを えらぶ' })).toBeInTheDocument()
   })
 
@@ -414,6 +435,47 @@ describe('カテゴリを移動しても選択状態が残る', () => {
   })
 })
 
+describe('つくった くるまを はしらせる', () => {
+  test('カテゴリ一覧に「はしる！」があり、パーツを選んでいる間は出さない', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    expect(within(panel()).getByRole('button', { name: 'つくった くるまを はしらせる' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'カラーを えらぶ' }))
+    expect(screen.queryByRole('button', { name: 'つくった くるまを はしらせる' })).not.toBeInTheDocument()
+  })
+
+  test('「はしる！」で走行画面へ切り替わり、つくった車がそのまま走る', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'カラーを えらぶ' }))
+    await user.click(screen.getByRole('button', { name: 'みどり' }))
+    await user.click(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' }))
+    await user.click(screen.getByRole('button', { name: 'つくった くるまを はしらせる' }))
+
+    expect(screen.getByRole('application', { name: 'つくった くるまが はしる 3Dコース' })).toBeInTheDocument()
+    expect(latestDriveConfig()).toMatchObject({ color: 'green' })
+    // つくりかえ画面の3Dは外れる（WebGLのシーンが2つ同時に生きない）。
+    expect(screen.queryByRole('application', { name: '3Dの くるま。ゆびで まわせるよ' })).not.toBeInTheDocument()
+  })
+
+  test('走行画面の「もどる」で、つくったままの車のつくりかえ画面へ帰れる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'タイヤを えらぶ' }))
+    await user.click(screen.getByRole('button', { name: 'レーシング' }))
+    await user.click(screen.getByRole('button', { name: 'カテゴリ一覧へ もどる' }))
+    await user.click(screen.getByRole('button', { name: 'つくった くるまを はしらせる' }))
+    await user.click(screen.getByRole('button', { name: 'クルマづくりへ もどる' }))
+
+    expect(screen.getByRole('application', { name: '3Dの くるま。ゆびで まわせるよ' })).toBeInTheDocument()
+    expect(latestConfig()).toMatchObject({ wheel: 'racing' })
+    expect(categoryButtons()).toHaveLength(8)
+  })
+})
+
 // jsdomはCSS Modulesの適用もメディアクエリも評価しないため、スマホ縦画面のレイアウト条件は
 // CSSソースを直接読んで検証する（rail-builderのテストと同じ手法）。
 const CSS_SOURCE = readFileSync(path.join(__dirname, 'CarBuilderPlay.module.css'), 'utf-8')
@@ -480,6 +542,14 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
     expect(CSS_SOURCE).toMatch(/\.rideHeightPreview-low\s+\.rideHeightPreviewBody/)
     expect(CSS_SOURCE).toMatch(/\.rideHeightPreview-normal\s+\.rideHeightPreviewBody/)
     expect(CSS_SOURCE).toMatch(/\.rideHeightPreview-high\s+\.rideHeightPreviewBody/)
+  })
+
+  test('「はしる！」はカテゴリボタンより大きく、下部エリアに収まる', () => {
+    const driveButton = ruleOf(CSS_SOURCE, '.driveButton')
+    const driveHeight = Number(driveButton.match(/min-height:\s*(\d+)px/)?.[1])
+    const categoryHeight = Number(ruleOf(CSS_SOURCE, '.categoryButton').match(/min-height:\s*(\d+)px/)?.[1])
+    expect(driveHeight).toBeGreaterThanOrEqual(categoryHeight)
+    expect(driveButton).toMatch(/width:\s*100%/)
   })
 
   test('主要なタップ領域が小さすぎない（幼児向けに44px以上・カテゴリと選択肢は64px以上）', () => {

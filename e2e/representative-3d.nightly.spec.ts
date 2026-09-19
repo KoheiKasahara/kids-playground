@@ -24,6 +24,42 @@ test('3Dレースを操作して退出し、新しいengineで再入場できる
   expect(errors).toEqual([])
 })
 
+test('つくった車を走らせ、つくりかえ画面へ戻って入り直せる [car-builder]', async ({ page }) => {
+  const errors = capturePageErrors(page)
+  await page.goto('/')
+  await page.getByRole('link', { name: '3Dクルマづくり', exact: true }).click()
+  await page.getByRole('button', { name: 'カラーを えらぶ', exact: true }).click()
+  await page.getByRole('button', { name: 'みどり', exact: true }).click()
+  await page.getByRole('button', { name: 'カテゴリ一覧へ もどる', exact: true }).click()
+  await page.getByRole('button', { name: 'つくった くるまを はしらせる', exact: true }).click()
+
+  // モデル・WebGL初期化を示す実際のready状態を待つ。周回数や経過秒には依存しない。
+  const boost = page.getByRole('button', { name: /かそく/ })
+  await expect(boost).toBeEnabled({ timeout: 20_000 })
+  await expect(page.locator('canvas')).toHaveCount(1)
+  const driving = await page.locator('canvas').screenshot()
+  await expect.poll(async () => (await page.locator('canvas').screenshot()).equals(driving)).toBe(false)
+  await boost.click()
+  await page.getByRole('button', { name: /みちばた/ }).click()
+  await expect(page.getByRole('button', { name: /みちばた/ })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: /ぜんたい/ }).click()
+  await expect(page.getByRole('button', { name: /ぜんたい/ })).toHaveAttribute('aria-pressed', 'true')
+
+  // つくりかえ画面へ戻ると、選んだ色を保ったまま3Dシーンは1つだけになる。
+  await page.getByRole('button', { name: 'クルマづくりへ もどる', exact: true }).click()
+  await expect(page.getByRole('application', { name: '3Dの くるま。ゆびで まわせるよ' })).toBeVisible()
+  await expect(page.locator('canvas')).toHaveCount(1)
+  await page.getByRole('button', { name: 'カラーを えらぶ', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'みどり', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'カテゴリ一覧へ もどる', exact: true }).click()
+
+  await page.getByRole('button', { name: 'つくった くるまを はしらせる', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'はしらせる そうさ', exact: true })).toBeVisible()
+  await expect(boost).toBeEnabled({ timeout: 20_000 })
+  await expect(page.locator('canvas')).toHaveCount(1)
+  expect(errors).toEqual([])
+})
+
 test('クレーンゲームでアームを動かしてつかみ、退出して再入場できる [crane-game]', async ({ page }) => {
   test.setTimeout(90_000)
   const errors = capturePageErrors(page)
