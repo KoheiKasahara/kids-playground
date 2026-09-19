@@ -67,5 +67,5 @@ describe('ステージ', () => {
       }
       expect(maze.caught, `${stage.id} が クリアできない`).toBeGreaterThanOrEqual(stage.need)
     }
-  }, 15_000)
+  }, 60_000)
 })

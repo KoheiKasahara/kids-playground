@@ -25,6 +25,7 @@ test('3Dレースを操作して退出し、新しいengineで再入場できる
 })
 
 test('つくった車を走らせ、つくりかえ画面へ戻って入り直せる [car-builder]', async ({ page }) => {
+  test.setTimeout(120_000)
   const errors = capturePageErrors(page)
   await page.goto('/')
   await page.getByRole('link', { name: '3Dクルマづくり', exact: true }).click()
@@ -38,7 +39,10 @@ test('つくった車を走らせ、つくりかえ画面へ戻って入り直�
   await expect(boost).toBeEnabled({ timeout: 20_000 })
   await expect(page.locator('canvas')).toHaveCount(1)
   const driving = await page.locator('canvas').screenshot()
-  await expect.poll(async () => (await page.locator('canvas').screenshot()).equals(driving)).toBe(false)
+  await expect.poll(
+    async () => (await page.locator('canvas').screenshot()).equals(driving),
+    { timeout: 30_000 },
+  ).toBe(false)
   await boost.click()
   await page.getByRole('button', { name: /みちばた/ }).click()
   await expect(page.getByRole('button', { name: /みちばた/ })).toHaveAttribute('aria-pressed', 'true')

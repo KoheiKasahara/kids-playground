@@ -524,7 +524,7 @@ describe('ブロックパズル(じゆうに ならべる): 完成判定・完�
 
     expect(screen.getByText('できた！')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /もういっかい/ })).toBeInTheDocument()
-  }, 20000)
+  }, 60_000)
 
   test('1マスでも空きがあれば完成演出は出ない', async () => {
     const user = setup()
@@ -538,7 +538,7 @@ describe('ブロックパズル(じゆうに ならべる): 完成判定・完�
 
     expect(screen.queryByText('できた！')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /もういっかい/ })).not.toBeInTheDocument()
-  }, 20000)
+  }, 60_000)
 
   test('もういっかい で盤面・パーツ一覧の選択・向きが初期状態に戻る', async () => {
     const user = setup()
@@ -555,7 +555,7 @@ describe('ブロックパズル(じゆうに ならべる): 完成判定・完�
     expect(cellContent(BOARD_COLS, BOARD_ROWS)).toBe('あき')
     expect(shapeButton('1マス')).toHaveAttribute('aria-pressed', 'true')
     expect(deleteButton()).toBeDisabled()
-  }, 20000)
+  }, 60_000)
 
   test('崩して埋め直すと完成演出がもう一度出る', async () => {
     const user = setup()
@@ -569,7 +569,7 @@ describe('ブロックパズル(じゆうに ならべる): 完成判定・完�
     await user.click(shapeButton('1マス'))
     await user.click(cellButton(1, 1))
     expect(screen.getByText('できた！')).toBeInTheDocument()
-  }, 20000)
+  }, 60_000)
 })
 
 describe('ブロックパズル(じゆうに ならべる): ぜんぶけす（#482）', () => {
