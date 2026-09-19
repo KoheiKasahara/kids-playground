@@ -9,6 +9,7 @@ import {
   fallingLandingAnchor,
   fallingPieceCells,
   fitsOnGrid,
+  isInsideFallingBoard,
   lockFallingPiece,
   moveFallingPieceSideways,
   moveFallingPieceToColumn,
@@ -145,6 +146,41 @@ describe('おちてくるモード: まわす', () => {
     expect(new Set(fallingPieceCells(rotated.piece!).map((cell) => cell.col)).size).toBe(1)
   })
 
+  test('出てきたばかりのどの形も、押すたびにその場で向きが変わる', () => {
+    // 出てきた直後はいちばん上の段にいる。まわすと形が上へ伸びる向きがあるため、
+    // 基準セルを動かさずにまわしていたころは、ここで向きが変わらない形があった。
+    for (const shapeId of FALLING_SHAPE_IDS) {
+      let state: FallingPuzzleState = {
+        ...createFallingPuzzleState(alwaysFirstShape),
+        piece: spawnFallingPiece(shapeId),
+      }
+      for (const expected of [90, 180, 270, 0] as const) {
+        state = rotateFallingPiece(state)
+        expect(state.piece!.rotation, `${shapeId} が いちばん上でまわらない`).toBe(expected)
+        expect(
+          fallingPieceCells(state.piece!).every(isInsideFallingBoard),
+          `${shapeId} が まわしたあとに盤面からはみ出した`,
+        ).toBe(true)
+      }
+    }
+  })
+
+  test('4回まわすと、向きも場所も元どおりになる', () => {
+    for (const shapeId of FALLING_SHAPE_IDS) {
+      // いちばん上や かべぎわ では端で止まるぶん位置が変わるので、少し下げたところで確かめる。
+      let state: FallingPuzzleState = {
+        ...createFallingPuzzleState(alwaysFirstShape),
+        piece: spawnFallingPiece(shapeId),
+      }
+      for (let step = 0; step < 3; step += 1) state = stepFallingPieceDown(state)!
+      const before = cellKeys(fallingPieceCells(state.piece!))
+
+      for (let press = 0; press < 4; press += 1) state = rotateFallingPiece(state)
+      expect(state.piece!.rotation).toBe(0)
+      expect(cellKeys(fallingPieceCells(state.piece!)), `${shapeId} がまわすたびにずれていく`).toEqual(before)
+    }
+  })
+
   test('かべぎわでも、少しずらして必ずまわせる', () => {
     const state = moveFallingPieceToColumn(
       { ...createFallingPuzzleState(alwaysFirstShape), piece: spawnFallingPiece('t') },
@@ -169,12 +205,18 @@ describe('おちてくるモード: まわす', () => {
     expect(fallingPieceCells(rotatedAtRightWall.piece!).every((cell) => cell.col < FALLING_COLS)).toBe(true)
   })
 
+  test('床にくっついているながいぼうも、持ち上げてたてにできる', () => {
+    const onFloor = stateWith([], { shapeId: 'i', rotation: 0, anchor: { col: 0, row: FALLING_ROWS - 1 } })
+    const rotated = rotateFallingPiece(onFloor)
+    expect(rotated.piece!.rotation).toBe(90)
+    expect(fallingPieceCells(rotated.piece!).every(isInsideFallingBoard)).toBe(true)
+  })
+
   test('どうやっても置けないときだけ、まわさずそのままにする', () => {
-    const piece: FallingPiece = { shapeId: 'i', rotation: 0, anchor: { col: 0, row: 8 } }
-    const state = stateWith([], piece)
-    const rotated = rotateFallingPiece(state)
-    // たてにすると盤面の下からはみ出し、持ち上げても1マスでは足りない。
-    expect(rotated.piece!.rotation).toBe(0)
+    // よこ2マスぶんのすき間にはまった「2マス」。盤面の空きはそこだけなので、たてには置けない。
+    const piece: FallingPiece = { shapeId: 'duo', rotation: 0, anchor: { col: 0, row: FALLING_ROWS - 1 } }
+    const state = stateWith([...Array.from({ length: FALLING_ROWS - 1 }, () => 'sssss'), '..sss'], piece)
+    expect(rotateFallingPiece(state)).toBe(state)
   })
 })
 
