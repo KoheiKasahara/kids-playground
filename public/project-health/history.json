@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-18T20:53:54.168Z",
+  "updatedAt": "2026-09-19T20:46:26.204Z",
   "entries": [
     {
       "date": "2026-09-13",
@@ -105,6 +105,21 @@
       "deploy": "success",
       "recordedAt": "2026-09-18T20:53:54.168Z",
       "runId": "35393234786"
+    },
+    {
+      "date": "2026-09-20",
+      "games": 40,
+      "unitTests": 5822,
+      "e2eSmokePassed": 243,
+      "e2eSmokeTotal": 244,
+      "bundleKb": 8202,
+      "lighthousePerformance": 87,
+      "accessibility": 100,
+      "vulnerabilities": 3,
+      "nightly": "failure",
+      "deploy": "success",
+      "recordedAt": "2026-09-19T20:46:26.204Z",
+      "runId": "35467397717"
     }
   ]
 }
