@@ -27,7 +27,7 @@
   color: var(--color-text-muted);
 }
 
-/* ボタンが4つ（むずかしさ3つ＋もどる）になるぶん、space-lg のままだと縦に間延びするので space-md に詰める */
+/* ボタンが4つ（むずかしさ）並ぶぶん、space-lg のままだと縦に間延びするので space-md に詰める */
 .actions {
   width: 100%;
   display: flex;
@@ -57,8 +57,9 @@
 }
 
 /* 高さの足りない端末では余白・文字サイズを詰めて縦スクロールなしに収める
-   （FlagQuizStart.module.css と同じ考え方） */
-@media (max-height: 700px) {
+   （FlagQuizStart.module.css と同じ考え方）。
+   むずかしさが4つになり素の高さが増えたので、しきい値も上げてある。 */
+@media (max-height: 760px) {
   .page {
     padding-top: calc(var(--space-md) + var(--safe-top));
     padding-bottom: calc(var(--space-md) + var(--safe-bottom));
@@ -76,9 +77,27 @@
   .levelDescription {
     font-size: 14px;
   }
+
+  /* むずかしさが4つあるので、ボタンの上下余白も詰めて縦スクロールなしに収める
+     （BigButton の min-height でタップ領域は確保される） */
+  .levelButton {
+    padding-top: var(--space-sm);
+    padding-bottom: var(--space-sm);
+  }
 }
 
-/* 横向き（低背）では、むずかしさ3つ＋もどるの4ボタンを2列×2行にして縦を節約する */
+/* さらに背の低い縦画面では、見出しとむずかしさの文字も小さくして4つぶんを収める */
+@media (max-height: 620px) {
+  .title {
+    font-size: 26px;
+  }
+
+  .levelLabel {
+    font-size: 24px;
+  }
+}
+
+/* 横向き（低背）では、むずかしさ4つを2列×2行にして縦を節約する */
 @media (max-height: 560px) {
   .title {
     font-size: 26px;
