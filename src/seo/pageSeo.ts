@@ -18,7 +18,7 @@ export type PageSeo = {
 }
 
 export const HOME_SEO: PageSeo = {
-  title: 'こどもミニゲーム｜国旗・宇宙・電車で遊べる幼児向け無料ゲーム',
+  title: 'こどもミニゲーム｜国旗・のりもの・3Dあそびの幼児向け無料ゲーム',
   description: SITE_DESCRIPTION,
   canonicalUrl: absoluteUrl('/'),
   ogType: 'website',
