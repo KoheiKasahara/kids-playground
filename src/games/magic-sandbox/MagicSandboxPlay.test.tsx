@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import MagicSandboxPlay from './MagicSandboxPlay'
-import { Sandbox } from './sandboxSimulation'
+import { Cell, Sandbox } from './sandboxSimulation'
 
 let frames: Map<number, FrameRequestCallback>
 let nextFrame: number
@@ -212,4 +212,30 @@ it('reacts to a butterfly tap without pouring sand and reports a failed spawn', 
   expect(butterfly.wave).toBe(90)
   frame(100)
   expect(paint).not.toHaveBeenCalled()
+})
+
+const board = (width: number, height: number) =>
+  ({ left: 0, top: 0, right: width, bottom: height, width, height }) as DOMRect
+
+it('gives the grid the shape of the board and keeps the picture when the device turns', () => {
+  const box = vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockReturnValue(board(360, 511))
+  const resize = vi.spyOn(Sandbox.prototype, 'resize')
+  start()
+  const canvas = screen.getByLabelText(/^すなば。/) as HTMLCanvasElement
+  const world = resize.mock.instances[0] as Sandbox
+  // A grain is as wide as it is tall, so a crab keeps its shape on any board.
+  expect(Math.abs(360 / canvas.width - 511 / canvas.height)).toBeLessThan(0.05)
+  expect(canvas.width).toBe(world.width)
+  expect(canvas.height).toBe(world.height)
+  expect(canvas.width).toBeLessThan(canvas.height)
+  act(() => { world.paint({ x: 60, y: 160 }, Cell.Stone, 4) })
+  const stones = world.cells.filter(cell => cell === Cell.Stone).length
+  expect(stones).toBeGreaterThan(0)
+  box.mockReturnValue(board(560, 307))
+  fireEvent(window, new Event('resize'))
+  expect(Math.abs(560 / canvas.width - 307 / canvas.height)).toBeLessThan(0.05)
+  expect(canvas.width).toBeGreaterThan(canvas.height)
+  // Turning the device re-shapes the sandbox; it never wipes what the child drew.
+  expect(world.cells.filter(cell => cell === Cell.Stone).length).toBe(stones)
+  expect(world.cells.filter(cell => cell === Cell.Sand).length).toBeGreaterThan(0)
 })
