@@ -43,7 +43,7 @@ function Playground({ back }: { back: () => void }) {
     return () => window.clearTimeout(timer)
   }, [discovery])
   return <main className={`${styles.page} ${night ? styles.night : ''}`}>
-    <header className={styles.header}><GameBackButton onBack={back} /><h1>まほうのすなば</h1><button className={styles.dayNight} aria-label="よる" aria-pressed={night} title={night ? 'ひるに する' : 'よるに する'} onClick={() => { sandbox.setNight(!night); setNight(!night) }}><i aria-hidden="true" /><span aria-hidden="true">☀️</span><span aria-hidden="true">🌙</span></button></header>
+    <header className={styles.header}><GameBackButton onBack={back} reserveSpace /><h1>まほうのすなば</h1><button className={styles.dayNight} aria-label="よる" aria-pressed={night} title={night ? 'ひるに する' : 'よるに する'} onClick={() => { sandbox.setNight(!night); setNight(!night) }}><i aria-hidden="true" /><span aria-hidden="true">☀️</span><span aria-hidden="true">🌙</span></button></header>
     <div className={styles.workspace}>
       <aside className={styles.tools} aria-label="すなばの どうぐ">
         <span className={styles.scrollHint} aria-hidden="true">↔ よこに うごくよ</span>

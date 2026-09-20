@@ -23,6 +23,13 @@ function start() {
   render(<MemoryRouter><MagicSandboxPlay /></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: 'あそぶ！' }))
 }
+it('keeps the landscape title clear of the fixed back button', () => {
+  start()
+  const heading = screen.getByRole('heading', { name: 'まほうのすなば' })
+  const header = heading.parentElement
+  expect(header?.querySelector('[data-game-back-button]')).not.toBeNull()
+  expect(header?.querySelector('[data-game-back-layout-slot]')).not.toBeNull()
+})
 it('toggles night while paused without resetting the world or brush, and wakes animals on daylight', () => {
   const add = vi.spyOn(Sandbox.prototype, 'addTurtle')
   start()
