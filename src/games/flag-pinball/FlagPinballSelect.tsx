@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { PINBALL_FLAG_IDS, pinballFlags } from './data/pinballFlags'
-import { isSelectionComplete, MAX_SELECTION, remainingCount, toggleSelection } from './selection'
+import { isSelectionComplete, MAX_SELECTION, toggleSelection } from './selection'
 import type { PinballMode } from './types'
 import { primeAudio } from '../../utils/quizSound'
 import PinballThemePicker from './PinballThemePicker'
@@ -19,7 +19,6 @@ export default function FlagPinballSelect() {
   // 選択内容はモードを切り替えても保持する（'normal' に戻したときに選び直しにならないように）。
   const [selected, setSelected] = useState<string[]>([])
   const complete = isSelectionComplete(selected)
-  const remaining = remainingCount(selected)
   // 全射出モードは選ぶ必要がないため常に押せる。通常モードは3個そろうまで押せない。
   const canPlay = mode === 'allFlags' || complete
 
@@ -70,9 +69,6 @@ export default function FlagPinballSelect() {
                   <span key={i} className={i < selected.length ? styles.dotFilled : styles.dotEmpty} />
                 ))}
               </span>
-              <p className={styles.status} role="status" aria-live="polite">
-                {complete ? 'じゅんび OK！' : `あと${remaining}こ！`}
-              </p>
             </div>
           </>
         ) : (

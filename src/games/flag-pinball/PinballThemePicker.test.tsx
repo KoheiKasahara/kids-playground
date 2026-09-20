@@ -27,7 +27,7 @@ describe('PinballThemePicker', () => {
     const user = userEvent.setup()
     render(<PinballThemePicker />)
 
-    await user.click(screen.getByRole('button', { name: 'つぎの もよう' }))
+    await user.click(screen.getByRole('button', { name: 'つぎの ステージ' }))
 
     expect(screen.getByRole('status')).toHaveTextContent('うちゅう')
     expect(screen.getByRole('status')).toHaveTextContent('🚀')
@@ -39,7 +39,7 @@ describe('PinballThemePicker', () => {
     const user = userEvent.setup()
     render(<PinballThemePicker />)
 
-    await user.click(screen.getByRole('button', { name: 'つぎの もよう' }))
+    await user.click(screen.getByRole('button', { name: 'つぎの ステージ' }))
 
     expect(getPinballThemeId()).toBe('normal')
     expect(screen.getByRole('status')).toHaveTextContent('ノーマル')
@@ -49,7 +49,7 @@ describe('PinballThemePicker', () => {
     const user = userEvent.setup()
     render(<PinballThemePicker />)
 
-    await user.click(screen.getByRole('button', { name: 'まえの もよう' }))
+    await user.click(screen.getByRole('button', { name: 'まえの ステージ' }))
 
     expect(getPinballThemeId()).toBe('car')
     expect(screen.getByRole('status')).toHaveTextContent('くるま')
@@ -59,7 +59,7 @@ describe('PinballThemePicker', () => {
     const user = userEvent.setup()
     render(<PinballThemePicker />)
 
-    await user.click(screen.getByRole('button', { name: 'つぎの もよう' }))
+    await user.click(screen.getByRole('button', { name: 'つぎの ステージ' }))
 
     expect(getPinballThemeId()).toBe('space')
     expect(localStorage.getItem(PINBALL_THEME_STORAGE_KEY)).toBe('space')
@@ -71,7 +71,7 @@ describe('PinballThemePicker', () => {
 
     for (let index = 0; index < PINBALL_THEMES.length; index += 1) {
       if (index > 0) {
-        await user.click(screen.getByRole('button', { name: 'つぎの もよう' }))
+        await user.click(screen.getByRole('button', { name: 'つぎの ステージ' }))
       }
 
       const theme = PINBALL_THEMES[index]
@@ -85,7 +85,9 @@ describe('PinballThemePicker', () => {
   test('左右ボタンにアクセシブルネームがある', () => {
     render(<PinballThemePicker />)
 
-    expect(screen.getByRole('button', { name: 'まえの もよう' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'つぎの もよう' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'まえの ステージ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'つぎの ステージ' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'ステージ選択' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'もよう' })).not.toBeInTheDocument()
   })
 })

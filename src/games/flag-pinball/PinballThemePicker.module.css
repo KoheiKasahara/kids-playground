@@ -1,4 +1,4 @@
-/* 矢印だけで迷わず選べるよう、左右の主操作は64px以上の丸いボタンにする。 */
+/* 矢印だけで迷わず選べるよう、左右の主操作は56pxの丸いボタンにする。 */
 .picker {
   width: min(100%, 360px);
   margin-inline: auto;
@@ -8,24 +8,18 @@
   gap: var(--space-xs);
 }
 
-.heading {
-  font-size: 18px;
-  line-height: 1.2;
-  color: var(--color-text-muted);
-}
-
 .controls {
   width: 100%;
   display: grid;
-  grid-template-columns: var(--tap-target-min) minmax(0, 1fr) var(--tap-target-min);
+  grid-template-columns: 56px minmax(0, 1fr) 56px;
   align-items: center;
   gap: var(--space-xs);
 }
 
 .arrowButton {
-  width: var(--tap-target-min);
-  min-width: var(--tap-target-min);
-  min-height: var(--tap-target-min);
+  width: 56px;
+  min-width: 56px;
+  min-height: 56px;
   display: grid;
   place-items: center;
   padding: 0;
@@ -34,7 +28,7 @@
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   color: var(--color-primary-dark);
-  font-size: 34px;
+  font-size: 30px;
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
@@ -129,12 +123,8 @@
   }
 }
 
-/* 320px級の縦画面では、矢印の64pxタップ領域を保ったまま中央の表示だけ少し詰める。 */
+/* 320px級の縦画面では、矢印の56pxタップ領域を保ったまま中央の表示だけ少し詰める。 */
 @media (max-width: 360px) {
-  .heading {
-    font-size: 16px;
-  }
-
   .current {
     grid-template-columns: 48px minmax(0, 1fr);
   }

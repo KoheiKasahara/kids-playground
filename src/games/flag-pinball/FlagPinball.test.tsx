@@ -125,6 +125,14 @@ describe('FlagPinball 選択画面', () => {
     expect(flagButtons()).toHaveLength(PINBALL_FLAG_IDS.length)
   })
 
+  test('選択画面に不要な進捗文言とテーマ見出しを表示しない', async () => {
+    renderApp('/games/flag-pinball')
+    await screen.findByRole('heading', { name: 'こっきピンボール' })
+
+    expect(screen.queryByText('あと3こ！')).not.toBeInTheDocument()
+    expect(screen.queryByText('もよう')).not.toBeInTheDocument()
+  })
+
   test('国旗を最大3個まで選択できる（4個目を押しても3個のまま）', async () => {
     const user = userEvent.setup()
     renderApp('/games/flag-pinball')
