@@ -19,15 +19,12 @@ export default function PinballThemePicker() {
   }
 
   return (
-    <section className={styles.picker} aria-labelledby="pinball-theme-picker-title">
-      <h2 id="pinball-theme-picker-title" className={styles.heading}>
-        もよう
-      </h2>
+    <section className={styles.picker} aria-label="ステージ選択">
       <div className={styles.controls}>
         <button
           type="button"
           className={styles.arrowButton}
-          aria-label="まえの もよう"
+          aria-label="まえの ステージ"
           onClick={() => moveTheme(-1)}
         >
           <span aria-hidden="true">＜</span>
@@ -49,7 +46,7 @@ export default function PinballThemePicker() {
         <button
           type="button"
           className={styles.arrowButton}
-          aria-label="つぎの もよう"
+          aria-label="つぎの ステージ"
           onClick={() => moveTheme(1)}
         >
           <span aria-hidden="true">＞</span>
