@@ -1,0 +1,323 @@
+.page {
+  position: relative;
+  height: 100dvh;
+  min-height: 480px;
+  box-sizing: border-box;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  background: linear-gradient(170deg, #e3fafc 0%, var(--color-background) 45%, #ffe8cc 100%);
+}
+
+.header {
+  position: relative;
+  width: 100%;
+  min-height: 52px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding-right: 56px;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(15px, 4.4vw, 28px);
+  line-height: 1.25;
+  text-align: center;
+}
+
+.instruction {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: clamp(20px, 6vw, var(--font-size-large));
+  font-weight: 700;
+  text-align: center;
+}
+
+.difficultyGrid {
+  width: min(100%, 420px);
+  margin-top: var(--space-md);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.difficultyButton {
+  min-height: var(--tap-target-min);
+  padding: var(--space-md) var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.difficultyButton:active {
+  transform: scale(0.97);
+}
+
+.difficultyButton:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.difficultyName {
+  font-size: var(--font-size-large);
+  font-weight: 900;
+}
+
+.difficultyHint {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.status {
+  width: min(100%, 460px);
+  flex: 0 0 auto;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  color: var(--color-primary-dark);
+  font-size: clamp(18px, 5vw, var(--font-size-large));
+  font-weight: 900;
+}
+
+.timer {
+  color: var(--color-accent-dark);
+}
+
+.timerTrack {
+  width: min(100%, 460px);
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-round);
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+
+.timerFill {
+  height: 100%;
+  border-radius: var(--radius-round);
+  background: var(--color-accent);
+  transition: width 0.1s linear;
+}
+
+.board {
+  /* 縦画面では正方形にして穴が細長くならないようにし、余った高さは上下の余白にする。 */
+  width: min(100%, 420px);
+  aspect-ratio: 1;
+  flex: 0 1 auto;
+  min-height: 0;
+  margin: auto 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: clamp(var(--space-xs), 2vw, var(--space-sm));
+}
+
+.hole {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  border: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 30%, #495057 0%, #343a40 55%, #212529 100%);
+  box-shadow: inset 0 6px 10px rgba(0, 0, 0, 0.45), 0 0 0 5px #d8f5a2;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.holeUp {
+  background: radial-gradient(ellipse at 50% 30%, #5c636a 0%, #3b4148 55%, #212529 100%);
+}
+
+.hole:active {
+  transform: scale(0.96);
+}
+
+.hole:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.creature {
+  display: block;
+  padding-bottom: 6%;
+  font-size: clamp(30px, 11vw, 56px);
+  line-height: 1;
+  animation: pyoko-pop 0.18s ease-out;
+}
+
+@keyframes pyoko-pop {
+  from {
+    transform: translateY(60%);
+    opacity: 0.2;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .creature {
+    animation: none;
+  }
+
+  .timerFill {
+    transition: none;
+  }
+}
+
+.resultEmoji {
+  margin: var(--space-md) 0 0;
+  font-size: clamp(56px, 20vw, 96px);
+  line-height: 1;
+}
+
+.resultMessage {
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(22px, 6.5vw, var(--font-size-large));
+  font-weight: 900;
+  text-align: center;
+}
+
+.actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.button {
+  min-height: 48px;
+  padding: 6px var(--space-lg);
+  border: none;
+  border-radius: var(--radius-round);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.button:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.start {
+  color: var(--color-text-on-primary);
+  background: var(--color-success);
+}
+
+.retry {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+}
+
+.soundToggle {
+  position: absolute;
+  top: calc(var(--space-sm) + var(--safe-top));
+  right: calc(var(--space-sm) + var(--safe-right));
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.soundToggle:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* 横画面では高さが足りなくなるため、盤面を中央に置いたまま周りの余白と文字を詰める。 */
+@media (orientation: landscape) {
+  .page {
+    min-height: 0;
+    gap: var(--space-xs);
+  }
+
+  .header {
+    min-height: 48px;
+  }
+
+  .title {
+    font-size: clamp(18px, 3.4vw, 28px);
+  }
+
+  .instruction {
+    font-size: clamp(16px, 3vw, 22px);
+  }
+
+  .difficultyGrid {
+    margin-top: var(--space-xs);
+    gap: var(--space-sm);
+  }
+
+  .difficultyButton {
+    min-height: 56px;
+    padding: var(--space-sm);
+  }
+
+  .difficultyName {
+    font-size: var(--font-size-base);
+  }
+
+  .difficultyHint {
+    font-size: 16px;
+  }
+
+  .board {
+    /* 横画面は高さが足りないので、正方形をやめて残りの高さに合わせる。 */
+    width: min(100%, 360px);
+    aspect-ratio: auto;
+    flex: 1 1 0;
+    margin: 0;
+  }
+
+  .creature {
+    font-size: clamp(24px, 5vw, 44px);
+  }
+
+  .resultEmoji {
+    margin-top: 0;
+    font-size: clamp(40px, 9vw, 72px);
+  }
+
+  .resultMessage {
+    font-size: clamp(18px, 3.6vw, 26px);
+  }
+}
