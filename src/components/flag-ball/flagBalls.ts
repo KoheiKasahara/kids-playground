@@ -1,19 +1,19 @@
 import { countries } from '../../games/flag-quiz/data/countries'
-import type { Country } from '../../games/flag-quiz/types'
+import type { Continent, Country } from '../../games/flag-quiz/types'
 
 /**
- * flag-quizの105か国マスターに含まれない、国旗ボール専用の追加国。
+ * flag-quizのcountriesマスターに含まれない、国旗ボール専用の追加国。
  * 北マケドニアはこっきドミノで先に同じ扱い(flag-icons@7.5.0のflags/4x3/mk.svgを個別追加)を
  * しており、その前例にならう。ブルガリアも同じ配布物からflags/bg.svgを追加した。
- * マスターを増やすとクイズ側の国数（105か国）が変わってしまうため、ここでだけ持つ。
+ * クイズの出題国を増やす判断とは切り離したいため、この2か国はここでだけ持つ。
  */
-const SUPPLEMENTAL_COUNTRIES: Readonly<Record<string, Country>> = {
-  mk: { id: 'mk', nameJa: 'きたマケドニア', nameEn: 'North Macedonia', continent: 'europe', flag: 'flags/mk.svg', level: 'hard' },
-  bg: { id: 'bg', nameJa: 'ブルガリア', nameEn: 'Bulgaria', continent: 'europe', flag: 'flags/bg.svg', level: 'hard' },
-}
+const SUPPLEMENTAL_COUNTRIES: readonly Country[] = [
+  { id: 'mk', nameJa: 'きたマケドニア', nameEn: 'North Macedonia', continent: 'europe', flag: 'flags/mk.svg', level: 'hard' },
+  { id: 'bg', nameJa: 'ブルガリア', nameEn: 'Bulgaria', continent: 'europe', flag: 'flags/bg.svg', level: 'hard' },
+]
 
 /**
- * 2つの国旗ミニゲームで共有する国旗ボールのデータ。
+ * 国旗を使う4つのミニゲーム（ピンボール・ころころ3種）で共有する国旗ボールのデータ。
  * 国旗クイズの Country をそのまま使い、円形ボールにしたときだけ必要になる
  * 横方向の表示調整を任意プロパティとして足す。ゲーム固有の得点や物理値は持たせない。
  */
@@ -26,30 +26,23 @@ export type FlagBallData = Country & {
 }
 
 /**
- * 選択画面に並べる国旗ボールの id。
- * 円形にクロップしても模様の特徴が一目で分かる国を選んである。
- * 表示順は アジア → ヨーロッパ → 北米・中南米 → アフリカ → オセアニア。
- * ('id' は インドネシア、'in' は インド。取り違えに注意)
+ * 選択画面に並べる大陸の順。
+ * 近い地域がまとまって出るよう アジア → ヨーロッパ → 北米・中南米 → アフリカ → オセアニア にする。
  */
-export const FLAG_BALL_IDS: readonly string[] = [
-  // アジア(19)
-  'jp', 'kr', 'cn', 'in', 'bd', 'th', 'vn', 'id', 'ph', 'sg', 'pk',
-  'my', 'mn', 'np', 'kz', 'il', 'sa', 'lk', 'kh',
-  // ヨーロッパ(26)
-  'gb', 'fr', 'de', 'it', 'es', 'pt', 'nl', 'be', 'ch', 'se',
-  'fi', 'no', 'dk', 'gr', 'tr', 'pl', 'ua', 'at', 'ie',
-  'cz', 'is', 'hr', 'mk', 'ro', 'hu', 'bg',
-  // 北米・中南米(13)
-  'us', 'ca', 'mx', 'br', 'ar', 'cl', 'co', 'jm', 'uy', 'cu', 'pe', 've', 'cr',
-  // アフリカ(11)
-  'za', 'eg', 'ke', 'ma', 'ng', 'et', 'tz', 'gh', 'sn', 'cm', 'dz',
-  // オセアニア(6)
-  'au', 'nz', 'pg', 'ws', 'fj', 'to',
+const CONTINENT_ORDER: readonly Continent[] = [
+  'asia',
+  'europe',
+  'northAmerica',
+  'southAmerica',
+  'africa',
+  'oceania',
 ]
 
 /**
  * 国旗クイズの countries は他ゲームのマスターなので、円形表示の調整だけをここで持つ。
- * 国旗ボールの選択肢は75件に固定し、ピンボールと新しい冒険ゲームで同じ一覧を使う。
+ * 中央クロップでは左右が各12.5%切れるため、旗竿側(左)や旗尾側(右)に意匠が寄っている
+ * 国旗だけ寄せ位置を指定する。
+ * ('id' は インドネシア、'in' は インド。取り違えに注意)
  */
 const BALL_ADJUSTMENTS: Record<string, { positionX: number }> = {
   // 三日月と星を左側へ残すため、シンガポールだけ左端寄せにする。
@@ -60,20 +53,55 @@ const BALL_ADJUSTMENTS: Record<string, { positionX: number }> = {
   mn: { positionX: 0 },
   // 左上のカントン(白地に赤十字)が中央クロップだとほぼ切れて消えるため、左端寄せにする。
   to: { positionX: 0 },
+
+  // ここから150か国へ広げたときに足した分。どれも旗竿側(左)の意匠が中央クロップで
+  // 切れてしまい、残った色だけでは他国の旗と見分けられなくなるもの。
+  om: { positionX: 0 }, // ハンジャル(短剣)の紋章
+  by: { positionX: 0 }, // 赤白の飾り帯
+  mt: { positionX: 0 }, // ジョージ十字
+  si: { positionX: 0 }, // 国章。ないと他のスラブ系三色旗と区別できない
+  mz: { positionX: 0 }, // 三角の中の紋章
+  vu: { positionX: 0 }, // いのししの牙の紋章
+  zw: { positionX: 0 }, // ジンバブエ・バード
+
+  // 逆に旗尾側(右)へ意匠が寄っている国旗は、右端寄せにする。
+  zm: { positionX: 1 }, // 右端の3色帯とワシ
+  va: { positionX: 1 }, // 右側の鍵の紋章
 }
 
 /**
- * FLAG_BALL_IDS の順に、countries（flag-quizマスター）→ SUPPLEMENTAL_COUNTRIES の順で解決した配列。
- * どちらにも見つからない場合はデータ不整合なので、起動時に気付けるようここで throw する。
+ * 国旗クイズのマスター(150か国)＋ボール専用の追加国を、大陸順に並べた国旗ボール一覧。
+ * ピンボール・ころころ3種の選択肢はこの一覧をそのまま使うため、
+ * マスターへ国が増えれば4ゲームの選択肢もそのまま増える。
+ * 並びは大陸ごとにまとめたうえで、大陸の中ではマスターの並び（よく知られた国が先）を保つ。
  */
-export const flagBalls: readonly FlagBallData[] = FLAG_BALL_IDS.map((id) => {
-  const country = countries.find((c) => c.id === id) ?? SUPPLEMENTAL_COUNTRIES[id]
-  if (!country) throw new Error(`flag-ball: countries に存在しない id が指定されています: ${id}`)
-  const adjustment = BALL_ADJUSTMENTS[id]
-  return adjustment ? { ...country, ballPositionX: adjustment.positionX } : country
-})
+export const flagBalls: readonly FlagBallData[] = [...countries, ...SUPPLEMENTAL_COUNTRIES]
+  .map((country, order) => ({ country, order }))
+  .sort(
+    (left, right) =>
+      CONTINENT_ORDER.indexOf(left.country.continent) - CONTINENT_ORDER.indexOf(right.country.continent) ||
+      left.order - right.order,
+  )
+  .map(({ country }) => {
+    const adjustment = BALL_ADJUSTMENTS[country.id]
+    return adjustment ? { ...country, ballPositionX: adjustment.positionX } : country
+  })
+
+/**
+ * 選択画面に並べる国旗ボールの id。表示順は flagBalls と同じ。
+ * 保存された選択（URL・playState）の検証にも使うため、一覧とは別に公開する。
+ */
+export const FLAG_BALL_IDS: readonly string[] = flagBalls.map((flag) => flag.id)
 
 const flagBallsById = new Map(flagBalls.map((flag) => [flag.id, flag]))
+
+// 調整だけが残って対象の国が消えると、意図した寄せが黙って効かなくなる。
+// データ不整合として起動時に気付けるようここで throw する。
+for (const id of Object.keys(BALL_ADJUSTMENTS)) {
+  if (!flagBallsById.has(id)) {
+    throw new Error(`flag-ball: 存在しない id に表示調整が指定されています: ${id}`)
+  }
+}
 
 /** id から国旗ボールを引く。未知の id は undefined */
 export function findFlagBall(id: string): FlagBallData | undefined {

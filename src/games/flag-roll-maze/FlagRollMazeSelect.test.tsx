@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { FLAG_BALL_IDS } from '../../components/flag-ball/flagBalls'
 import FlagRollMazeSelect from './FlagRollMazeSelect'
 import { DEFAULT_MAZE_STAGE_ID, MAZE_STAGES } from './mazeStages'
 
@@ -19,7 +20,7 @@ function stageButton(stage: (typeof MAZE_STAGES)[number]) {
 describe('FlagRollMazeSelect', () => {
   beforeEach(() => navigateMock.mockClear())
 
-  it('75個の国旗から1つだけを選べ、未選択ではつぎへ進めない', async () => {
+  it('一覧ぶんの国旗から1つだけを選べ、未選択ではつぎへ進めない', async () => {
     const user = userEvent.setup()
     render(
       <MemoryRouter>
@@ -28,7 +29,7 @@ describe('FlagRollMazeSelect', () => {
     )
 
     const flags = screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
-    expect(flags).toHaveLength(75)
+    expect(flags).toHaveLength(FLAG_BALL_IDS.length)
     expect(screen.getByRole('button', { name: 'つぎへ' })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'にほん' }))
