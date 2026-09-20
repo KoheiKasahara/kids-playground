@@ -59,6 +59,30 @@ it('toggles night while paused without resetting the world or brush, and wakes a
   expect(toggle).toHaveAttribute('title', 'よるに する')
   expect(frames.size).toBe(1)
 })
+it('sends a crow across the night sky, keeps it flying by day and freezes it when stopped', () => {
+  const night = vi.spyOn(Sandbox.prototype, 'setNight')
+  start()
+  const toggle = screen.getByRole('button', { name: 'よる' })
+  fireEvent.click(toggle)
+  const world = night.mock.instances[0] as Sandbox
+  // Skip the wait: the crow arrives once its quiet stretch of night runs out.
+  world.crowDelay = 1
+  frame(100)
+  expect(world.crows).toHaveLength(1)
+  const crow = world.crows[0]
+  expect(crow.y).toBeLessThan(world.height / 3)
+  fireEvent.click(toggle)
+  expect(world.night).toBe(false)
+  expect(world.crows[0]).toBe(crow)
+  const flying = crow.x
+  frame(200)
+  expect(crow.x).not.toBe(flying)
+  fireEvent.click(screen.getByRole('button', { name: /とめる/ }))
+  const held = crow.x
+  frame(300); frame(400)
+  expect(crow.x).toBe(held)
+})
+
 it('starts, selects materials, places with keyboard, pauses, clears and returns; reopening has one loop', () => {
   const paint = vi.spyOn(Sandbox.prototype, 'paint'), step = vi.spyOn(Sandbox.prototype, 'step'), clear = vi.spyOn(Sandbox.prototype, 'clear')
   start()
