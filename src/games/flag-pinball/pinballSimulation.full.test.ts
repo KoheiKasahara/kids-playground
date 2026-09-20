@@ -445,7 +445,7 @@ describe('pinball 空盤面（skyBoard）のシミュレーション', () => {
 })
 
 describe('pinball 全射出モードのシミュレーション', () => {
-  it('40球・800ms間隔でも全球が得点確定し、安全タイマーに頼らない', () => {
+  it('国旗一覧ぶんの球を800ms間隔で射出しても全球が得点確定し、安全タイマーに頼らない', () => {
     const ballCount = PINBALL_FLAG_IDS.length
     const result = simulatePinballRun(0x2468ace0, {
       ballCount,

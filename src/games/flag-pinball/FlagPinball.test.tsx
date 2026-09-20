@@ -118,10 +118,11 @@ describe('FlagPinball 選択画面', () => {
     expect(screen.getByText('ボールを 3こ えらんでね！')).toBeInTheDocument()
   })
 
-  test('75個の国旗ボールのボタンが並ぶ', async () => {
+  test('国旗ボールのボタンが一覧ぶん並ぶ', async () => {
     renderApp('/games/flag-pinball')
     await screen.findByRole('heading', { name: 'こっきピンボール' })
-    expect(flagButtons()).toHaveLength(75)
+    // 件数そのものは共通データ側(flagBalls.test.ts)で守るため、ここでは一覧と一致することだけ見る。
+    expect(flagButtons()).toHaveLength(PINBALL_FLAG_IDS.length)
   })
 
   test('国旗を最大3個まで選択できる（4個目を押しても3個のまま）', async () => {

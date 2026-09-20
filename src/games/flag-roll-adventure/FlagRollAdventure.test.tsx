@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
+import { FLAG_BALL_IDS } from '../../components/flag-ball/flagBalls'
 import type { AdventureEngineOptions } from './useAdventureEngine'
 
 // matter-jsはjsdomで回さず、物理から画面へ渡るイベントだけをテスト側から発火する。
@@ -97,12 +98,12 @@ describe('FlagRollAdventure 選択画面', () => {
     expect(screen.getByText('こっきを 1こ えらんでね！')).toBeInTheDocument()
   })
 
-  test('75個の国旗が並び、2つ目を押すと1つ目の選択が置き換わる', async () => {
+  test('一覧ぶんの国旗が並び、2つ目を押すと1つ目の選択が置き換わる', async () => {
     const user = userEvent.setup()
     renderApp('/games/flag-roll-adventure')
     await screen.findByRole('heading', { name: 'こっきコロコロぼうけん' }, { timeout: LAZY_ROUTE_TIMEOUT_MS })
     const flagButtons = screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
-    expect(flagButtons).toHaveLength(75)
+    expect(flagButtons).toHaveLength(FLAG_BALL_IDS.length)
 
     await clickButton(user, 'にほん')
     await clickButton(user, 'かんこく')
