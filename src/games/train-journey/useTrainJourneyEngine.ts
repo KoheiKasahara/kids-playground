@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { chaseCameraPose, overviewCameraPose } from '../circuit-racing/raceCamera'
 import { createRaceEnvironment } from '../circuit-racing/carAppearance'
+import { CITY_CROSSING } from './journeyCity'
 import { advanceJourney, boostJourney, CAR_SPACING, createJourneyMotion, railOrientation, sampleJourney, TRAINS, type JourneyCourse, type JourneyRoute, type TrainId } from './journeyModel'
 import { createJourneyScene, disposeJourneyObject } from './journeyScene'
 import { journeySound } from './journeySound'
@@ -76,6 +77,7 @@ export function useTrainJourneyEngine(options: Options) {
     let dirty = true
     let railSoundDistance = 0
     let totalTime = 0
+    let crossingClosed = false
     const templates = new Map<string, THREE.Group>()
     const assetRoot = new THREE.Group()
     assetRoot.visible = false
@@ -189,12 +191,20 @@ export function useTrainJourneyEngine(options: Options) {
         const sample = sampleJourney(motion, course, 1.8)
         const factor = Math.max(1, 0.78 / camera.aspect)
         const pose = chaseCameraPose(sample.position, sample.tangent, { distance: 10.5 * factor, height: 8.5 * factor, lookAhead: 0.6, targetHeight: 0.6 })
-        // Side offset shows the shape of the whole train, including the last car.
-        desiredPosition.set(pose.position.x - sample.tangent.z * 5, pose.position.y, pose.position.z + sample.tangent.x * 5)
+        // Side offset shows the shape of the whole train, including the last
+        // car. The town crowds both shoulders of its avenue, so there the
+        // camera stays near the centre line instead of swinging into a block.
+        const shoulder = sample.edge === 'city' ? 1.6 : 5
+        desiredPosition.set(pose.position.x - sample.tangent.z * shoulder, pose.position.y, pose.position.z + sample.tangent.x * shoulder)
         // On the lower forest line, stay east of the elevated crossing. A
         // trailing camera on its west side would look through the red truss.
         const forestView = motion.edge === 'forest' || (motion.edge === 'common' && current.route === 'forest' && course.lengths.common - motion.distance < 8)
         if (forestView) desiredPosition.set(sample.position.x + 12 * factor, sample.position.y + 9 * factor, sample.position.z + 7 * factor)
+        // The town line leaves the turnout alongside that same loop, so its
+        // first stretch is watched from the open ground east of the rails too.
+        const townApproach = (motion.edge === 'city' && motion.distance < 15)
+          || (motion.edge === 'common' && current.route === 'city' && course.lengths.common - motion.distance < 5)
+        if (townApproach) desiredPosition.set(sample.position.x + 9 * factor, sample.position.y + 9.5 * factor, sample.position.z + 7 * factor)
         desiredTarget.set(pose.target.x, pose.target.y, pose.target.z)
         const blend = changed || current.reducedMotion ? 1 : 1 - Math.exp(-dt * 3)
         camera.position.lerp(desiredPosition, blend)
@@ -218,7 +228,12 @@ export function useTrainJourneyEngine(options: Options) {
     function publish() {
       const atStation = motion.dwell > 0
       const inTunnel = motion.edge === 'forest' && motion.distance > (world?.tunnelStart ?? 0) && motion.distance < (world?.tunnelEnd ?? 0) + 4
-      const location = atStation ? 'にじいろえきで ひとやすみ' : inTunnel ? 'トンネルを くぐるよ！' : motion.edge === 'bridge' ? 'おそらの はしへ！' : motion.edge === 'forest' ? 'もりを はしるよ！' : 'しゅっぱつ しんこう！'
+      const location = atStation ? 'にじいろえきで ひとやすみ'
+        : inTunnel ? 'トンネルを くぐるよ！'
+        : motion.edge === 'bridge' ? 'おそらの はしへ！'
+        : motion.edge === 'forest' ? 'もりを はしるよ！'
+        : motion.edge !== 'city' ? 'しゅっぱつ しんこう！'
+        : crossingClosed ? 'ふみきり カンカン！' : 'ビルの まちを はしるよ！'
       const next = { location, atStation, boosting: motion.boostRemaining > 0 }
       const key = JSON.stringify(next)
       if (key !== feedbackKey) { feedbackKey = key; optionsRef.current.onFeedback(next) }
@@ -243,6 +258,10 @@ export function useTrainJourneyEngine(options: Options) {
         const visits = motion.visits
         advanceJourney(motion, course, dt, current.route, current.train)
         totalTime += dt
+        // Barriers drop before the cab reaches the road and lift once it is past.
+        const closing = motion.edge === 'city' && motion.distance > CITY_CROSSING - 6.5 && motion.distance < CITY_CROSSING + 2.8
+        if (closing && !crossingClosed && current.sound) journeySound('crossing')
+        crossingClosed = closing
         if (current.sound && motion.visits > visits) journeySound('station')
         if (current.sound && motion.totalDistance - railSoundDistance > 1.5) {
           journeySound('rail')
@@ -251,7 +270,7 @@ export function useTrainJourneyEngine(options: Options) {
         dirty = true
       }
       updateTrain()
-      world.update(totalTime, current.reducedMotion)
+      world.update(totalTime, current.reducedMotion, crossingClosed)
       updateCamera(dt)
       updateMarkers()
       if ((dirty || current.camera === 'follow') && now - lastDraw >= 1000 / 40) {

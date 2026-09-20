@@ -1,9 +1,14 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { type JourneyCourse, type JourneyEdge, type JourneyRoute, railOrientation, TRACK_Y } from './journeyModel'
+import { CITY_CROSSING, createCityDistrict } from './journeyCity'
+import { type JourneyCourse, type JourneyEdge, type JourneyRoute, railOrientation, ROUTE_ORDER, ROUTES, TRACK_Y } from './journeyModel'
 
-type Shape = 'box' | 'sphere' | 'cone' | 'cylinder' | 'roof'
+export type Shape = 'box' | 'sphere' | 'cone' | 'cylinder' | 'roof'
 type Batch = { matrices: THREE.Matrix4[]; colors: THREE.Color[] }
+const BED_COLORS: Record<JourneyEdge, string> = { common: '#dab779', bridge: '#4b98c6', forest: '#73a389', city: '#a9a69b' }
+const BED_HIGHLIGHTS: Record<JourneyRoute, string> = { bridge: '#318dc9', forest: '#519456', city: '#c07a38' }
+const ARROW_COLORS: Record<JourneyRoute, string> = { bridge: '#147dd5', forest: '#147e43', city: '#cf7220' }
+const LEVER_ANGLES: Record<JourneyRoute, number> = { bridge: -0.6, forest: 0.6, city: 0 }
 
 /** Repeated scenery costs five draws, regardless of tree / sleeper count. */
 function sceneryBatch(parent: THREE.Group) {
@@ -157,10 +162,12 @@ export function createJourneyScene(course: JourneyCourse, sleeper: THREE.Object3
   const dummy = new THREE.Object3D()
   const up = new THREE.Vector3(0, 1, 0)
   const railGeometries: THREE.BufferGeometry[] = []
-  for (const edge of ['common', 'bridge', 'forest'] as const) {
+  for (const edge of ['common', 'bridge', 'forest', 'city'] as const) {
     const curve = course.curves[edge]
     const length = course.lengths[edge]
-    const bed = mesh(ribbon(curve, 1.85, 0.24, -0.04, Math.ceil(length * 5)), edge === 'bridge' ? '#4b98c6' : edge === 'forest' ? '#73a389' : '#dab779')
+    // Three branches now fan into the same junction throat, so the newest bed
+    // rides millimetres higher and their overlap never fights for depth.
+    const bed = mesh(ribbon(curve, 1.85, 0.24, edge === 'city' ? -0.033 : -0.04, Math.ceil(length * 5)), BED_COLORS[edge])
     bed.name = `track-${edge}`
     trackMaterials[edge] = bed.material as THREE.MeshStandardMaterial
     for (const side of [-1, 1]) {
@@ -274,6 +281,14 @@ export function createJourneyScene(course: JourneyCourse, sleeper: THREE.Object3
   tunnelLabel.position.copy(tunnelPoint).add(new THREE.Vector3(0, 3.6, 0))
   group.add(tunnelLabel)
 
+  // The town along the city branch: blocks, a level crossing and its traffic.
+  const town = createCityDistrict({ part, beam, clear }, course.curves.city, course.lengths.city)
+  let gateLift = Math.PI / 2
+  for (const gate of town.gates) { gate.rotation.x = -gateLift; group.add(gate) }
+  const cityLabel = journeyLabel('ビルの まち', '#b0642a', 5)
+  cityLabel.position.copy(course.curves.city.getPointAt(CITY_CROSSING / course.lengths.city)).add(new THREE.Vector3(0, 5.4, 0))
+  group.add(cityLabel)
+
   // Pond, little islets, reeds and a boat below the elevated loop.
   part('cylinder', '#cbdab0', 3, 0.005, 7.5, 14, 0.1, 12)
   const pond = mesh(new THREE.CircleGeometry(1, 48), '#58bbcf')
@@ -331,11 +346,15 @@ export function createJourneyScene(course: JourneyCourse, sleeper: THREE.Object3
       part('cone', '#79a876', x, size * 1.5, z, size, size * 1.4, size)
     } else part('sphere', greens[seed % greens.length], x, size * 1.3, z, size * 1.65, size * 1.65, size * 1.65)
   }
+  // The town stands where the northern woods used to, on both sides of the
+  // viaduct, and its outskirts keep whatever ground each block asked for.
+  const inTown = (x: number, z: number) => (x > -15 && x < 3.5 && z > -21 && z < -4.5)
+    || town.footprints.some(spot => Math.hypot(spot.x - x, spot.z - z) < spot.radius)
   for (let i = 0; i < 200; i++) {
     const x = noise(i * 3 + 1) * 54 - 27
     const z = noise(i * 3 + 2) * 53 - 27
     const size = 0.85 + noise(i * 3 + 3) * 0.9
-    if (z > 18 || (x > -5 && x < 11 && z > 1 && z < 15) || (x > 21 && z > -20)) continue
+    if (z > 18 || (x > -5 && x < 11 && z > 1 && z < 15) || (x > 21 && z > -20) || inTown(x, z)) continue
     if (clear(x, z, 2.15 + size * 0.3)) tree(x, z, size, z < -6, i)
   }
   // Soft low-poly hills on the northwestern coast, away from both tracks.
@@ -374,7 +393,7 @@ export function createJourneyScene(course: JourneyCourse, sleeper: THREE.Object3
   for (let i = 0; i < 100; i++) {
     const x = noise(i + 600) * 50 - 25
     const z = noise(i + 800) * 49 - 23
-    if (!clear(x, z, 2) || (x > -5 && x < 11 && z > 1 && z < 15) || z > 19) continue
+    if (!clear(x, z, 2) || (x > -5 && x < 11 && z > 1 && z < 15) || z > 19 || inTown(x, z)) continue
     part('sphere', '#86ae65', x, 0.05, z, 1.2, 0.16, 0.8)
     for (let j = 0; j < 3; j++) part('sphere', ['#ffe5a1', '#fff5d7', '#e99c9e'][i % 3], x + j * 0.2, 0.18, z + (j % 2) * 0.22, 0.18, 0.18, 0.18)
   }
@@ -395,12 +414,12 @@ export function createJourneyScene(course: JourneyCourse, sleeper: THREE.Object3
   marker.position.set(-12, TRACK_Y + 0.06, -3)
   group.add(marker)
   // A short sequence of arrows makes the turnout's selected exit unmistakable.
-  const routeArrows = { bridge: new THREE.Group(), forest: new THREE.Group() }
+  const routeArrows: Record<JourneyRoute, THREE.Group> = { bridge: new THREE.Group(), forest: new THREE.Group(), city: new THREE.Group() }
   const arrowGeometry = new THREE.BufferGeometry()
   arrowGeometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, .42, -.3, 0, -.2, .3, 0, -.2], 3))
   arrowGeometry.computeVertexNormals()
-  for (const edge of ['bridge', 'forest'] as const) {
-    const material = new THREE.MeshBasicMaterial({ color: edge === 'bridge' ? '#147dd5' : '#147e43', side: THREE.DoubleSide })
+  for (const edge of ROUTE_ORDER) {
+    const material = new THREE.MeshBasicMaterial({ color: ARROW_COLORS[edge], side: THREE.DoubleSide })
     for (let d = 2; d < 13; d += 2) {
       const arrow = new THREE.Mesh(arrowGeometry, material)
       arrow.position.copy(course.curves[edge].getPointAt(d / course.lengths[edge])).addScaledVector(up, 0.245)
@@ -442,8 +461,13 @@ export function createJourneyScene(course: JourneyCourse, sleeper: THREE.Object3
     setOverview(overview: boolean) {
       stationLabel.visible = overview
       tunnelLabel.visible = overview
+      cityLabel.visible = overview
     },
-    update(seconds: number, reducedMotion: boolean) {
+    update(seconds: number, reducedMotion: boolean, crossingClosed = false) {
+      // The barriers are a safety cue, so they keep working when motion is reduced.
+      const target = crossingClosed ? 0 : Math.PI / 2
+      gateLift = reducedMotion ? target : gateLift + Math.max(-0.08, Math.min(0.08, target - gateLift))
+      for (const gate of town.gates) gate.rotation.x = -gateLift
       if (reducedMotion) return
       sails.rotation.z = seconds * 0.23
       ripples.children.forEach((ripple, i) => {
@@ -452,13 +476,12 @@ export function createJourneyScene(course: JourneyCourse, sleeper: THREE.Object3
       })
     },
     setRoute(route: JourneyRoute) {
-      routeArrows.bridge.visible = route === 'bridge'
-      routeArrows.forest.visible = route === 'forest'
-      lever.rotation.z = route === 'bridge' ? -0.6 : 0.6
-      ;(leverKnob.material as THREE.MeshStandardMaterial).color.set(route === 'bridge' ? '#287fca' : '#328555')
-      for (const edge of ['bridge', 'forest'] as const) {
+      lever.rotation.z = LEVER_ANGLES[route]
+      ;(leverKnob.material as THREE.MeshStandardMaterial).color.set(ROUTES[route].color)
+      for (const edge of ROUTE_ORDER) {
+        routeArrows[edge].visible = edge === route
         const material = trackMaterials[edge]!
-        material.emissive.set(edge === route ? (edge === 'bridge' ? '#318dc9' : '#519456') : '#000000')
+        material.emissive.set(edge === route ? BED_HIGHLIGHTS[edge] : '#000000')
         material.emissiveIntensity = edge === route ? 0.19 : 0
       }
     },

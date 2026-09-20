@@ -1,6 +1,6 @@
 import { CubicBezierCurve3, CurvePath, Euler, Quaternion, Vector3 } from 'three'
 
-export type JourneyRoute = 'bridge' | 'forest'
+export type JourneyRoute = 'bridge' | 'forest' | 'city'
 export type JourneyEdge = 'common' | JourneyRoute
 export type TrainId = 'bullet' | 'steam' | 'cargo'
 export const TRAINS = [
@@ -9,9 +9,16 @@ export const TRAINS = [
   { id: 'cargo', label: 'かもつれっしゃ', icon: '🚃', color: '#d59329', description: 'にもつを はこぶよ', models: ['train-diesel-a', 'train-carriage-container-red', 'train-carriage-container-green'], speed: 4.2 },
 ] as const
 export const ROUTES = {
-  bridge: { label: 'はし', icon: '🌉', color: '#287fca' },
-  forest: { label: 'トンネル', icon: '🌲', color: '#328555' },
+  bridge: { label: 'はし', icon: '🌉', color: '#287fca', hint: '🌉 あおい みちで はしへ' },
+  forest: { label: 'トンネル', icon: '🌲', color: '#328555', hint: '🌲 みどりの みちで トンネルへ' },
+  city: { label: 'まち', icon: '🏙️', color: '#c4702c', hint: '🏙️ オレンジの みちで ビルの まちへ' },
 } as const
+export const ROUTE_ORDER = ['bridge', 'forest', 'city'] as const
+
+/** The point control cycles the branches, so one big button covers them all. */
+export function nextRoute(route: JourneyRoute): JourneyRoute {
+  return ROUTE_ORDER[(ROUTE_ORDER.indexOf(route) + 1) % ROUTE_ORDER.length]
+}
 export const TRACK_Y = 0.3
 export const CAR_SPACING = 2.95
 export const BOOST_SECONDS = 2.4
@@ -44,7 +51,10 @@ export function createJourneyCourse() {
   const common = path([[16, 0, -10], [20, 0, 0], [18, 0, 12], [9, 0, 18], [-7, 0, 18], [-19, 0, 12], [-21, 0, 2], [-17, 0, -3], [-12, 0, -3]], south, east)
   const bridge = path([[-12, 0, -3], [-6, 1.2, -2], [0, 3.5, 2], [7, 5.4, 4], [8, 5.4, 10], [1, 5.4, 11], [-5, 5.4, 6], [-6, 5.4, -2], [-8, 4.5, -12], [-5, 2, -21], [5, 0, -24], [14, 0, -20], [16, 0, -10]], east, south)
   const forest = path([[-12, 0, -3], [-5, 0, -3], [3, 0, -7], [5, 0, -14], [11, 0, -17], [16, 0, -10]], east, south)
-  const curves = { common, bridge, forest }
+  // The town line keeps to the level ground the other two branches leave free:
+  // north up the avenue, then east along the outskirts into the junction throat.
+  const city = path([[-12, 0, -3], [-6.5, 0, -4.5], [-3.5, 0, -9.5], [-3, 0, -15.5], [2, 0, -20], [8.5, 0, -20.8], [12.6, 0, -19], [14.4, 0, -15.6], [16, 0, -10]], east, south)
+  const curves = { common, bridge, forest, city }
   const lengths = Object.fromEntries(Object.entries(curves).map(([key, curve]) => [key, curve.getLength()])) as Record<JourneyEdge, number>
   let stationDistance = 0
   let nearest = Infinity
