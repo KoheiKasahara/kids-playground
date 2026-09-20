@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { Vector3 } from 'three'
-import { advanceJourney, boostJourney, BOOST_SECONDS, CAR_SPACING, createJourneyCourse, createJourneyMotion, railOrientation, sampleJourney, TRACK_Y, type JourneyRoute } from './journeyModel'
+import { advanceJourney, boostJourney, BOOST_SECONDS, CAR_SPACING, createJourneyCourse, createJourneyMotion, nextRoute, railOrientation, ROUTE_ORDER, sampleJourney, TRACK_Y, type JourneyRoute } from './journeyModel'
 
 const course = createJourneyCourse()
 
@@ -15,8 +15,8 @@ describe('continuous three-dimensional railway', () => {
       }
     }
   })
-  test('both branches meet the common line with matching position and direction', () => {
-    for (const branch of ['bridge', 'forest'] as const) {
+  test('every branch meets the common line with matching position and direction', () => {
+    for (const branch of ROUTE_ORDER) {
       const curve = course.curves[branch]
       expect(curve.getPointAt(0).distanceTo(course.curves.common.getPointAt(1))).toBeLessThan(0.00001)
       expect(curve.getPointAt(1).distanceTo(course.curves.common.getPointAt(0))).toBeLessThan(0.00001)
@@ -34,6 +34,20 @@ describe('continuous three-dimensional railway', () => {
     expect(crossing.length).toBeGreaterThan(0)
     expect(Math.min(...crossing.map(p => p.y - TRACK_Y))).toBeGreaterThan(3)
   })
+  test('the town branch stays level and keeps its own ground until the junction', () => {
+    const points = course.curves.city.getSpacedPoints(700)
+    expect(Math.min(...points.map(p => p.y))).toBeCloseTo(TRACK_Y, 6)
+    expect(Math.max(...points.map(p => p.y))).toBeCloseTo(TRACK_Y, 6)
+    const others = [course.curves.common, course.curves.bridge, course.curves.forest].flatMap(curve => curve.getSpacedPoints(900))
+    let closest = Infinity
+    points.forEach((p, i) => {
+      // Inside nine metres of the turnout and the merge, branches fan together.
+      const distance = i / 700 * course.lengths.city
+      if (distance < 9 || distance > course.lengths.city - 9) return
+      for (const q of others) if (Math.abs(p.y - q.y) < 2.6) closest = Math.min(closest, Math.hypot(p.x - q.x, p.z - q.z))
+    })
+    expect(closest).toBeGreaterThan(1.5)
+  })
 })
 
 describe('train journey motion', () => {
@@ -44,7 +58,7 @@ describe('train journey motion', () => {
     expect(front.edge).toBe('forest')
     expect(front.position.distanceTo(course.curves.forest.getPointAt(0.42 / course.lengths.forest))).toBeLessThan(0.00001)
   })
-  test.each<JourneyRoute>(['bridge', 'forest'])('takes the selected %s branch and returns to the station', route => {
+  test.each<JourneyRoute>([...ROUTE_ORDER])('takes the selected %s branch and returns to the station', route => {
     const motion = createJourneyMotion(course)
     const visited = new Set<string>()
     for (let i = 0; i < 6000; i++) {
@@ -75,7 +89,7 @@ describe('train journey motion', () => {
     let previous = [0, 1, 2].map(i => sampleJourney(motion, course, i * CAR_SPACING).position)
     let maximumStep = 0
     for (let i = 0; i < 18000; i++) {
-      advanceJourney(motion, course, 1 / 60, i % 7 < 4 ? 'bridge' : 'forest', 'cargo')
+      advanceJourney(motion, course, 1 / 60, ROUTE_ORDER[i % ROUTE_ORDER.length], 'cargo')
       const next = [0, 1, 2].map(j => sampleJourney(motion, course, j * CAR_SPACING).position)
       next.forEach((p, j) => { maximumStep = Math.max(maximumStep, p.distanceTo(previous[j])) })
       previous = next
@@ -83,6 +97,12 @@ describe('train journey motion', () => {
     expect(maximumStep).toBeLessThan(0.11)
     expect(motion.visits).toBeGreaterThan(3)
     expect(motion.history.length).toBeLessThanOrEqual(6)
+  })
+  test('the point control cycles every branch and comes back round', () => {
+    let route: JourneyRoute = ROUTE_ORDER[0]
+    const visited = ROUTE_ORDER.map(() => (route = nextRoute(route)))
+    expect(new Set(visited)).toEqual(new Set(ROUTE_ORDER))
+    expect(route).toBe(ROUTE_ORDER[0])
   })
   test('boost departs the station, increases speed, expires, and cannot stack', () => {
     const motion = createJourneyMotion(course)

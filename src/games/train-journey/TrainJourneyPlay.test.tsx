@@ -34,16 +34,19 @@ describe('でんしゃの たび controls', () => {
     expect(engine.options?.running).toBe(false)
     expect(screen.getByRole('button', { name: 'きかんしゃを えらぶ' })).toHaveAttribute('aria-pressed', 'true')
   })
-  test('both point controls update the same visible destination', async () => {
+  test('both point controls cycle through every destination in step', async () => {
     const user = userEvent.setup()
     ready()
     await user.click(screen.getByRole('button', { name: 'しゅっぱつ！' }))
-    await user.click(screen.getByRole('button', { name: 'ポイントを きりかえる' }))
-    expect(engine.options?.route).toBe('forest')
-    expect(screen.getByRole('complementary')).toHaveAccessibleName('コースマップ。つぎは トンネル')
-    await user.click(screen.getByRole('button', { name: 'コースの ポイントを きりかえる' }))
-    expect(engine.options?.route).toBe('bridge')
-    expect(screen.getByRole('complementary')).toHaveAccessibleName('コースマップ。つぎは はし')
+    for (const [control, route, label] of [
+      ['ポイントを きりかえる', 'forest', 'トンネル'],
+      ['コースの ポイントを きりかえる', 'city', 'まち'],
+      ['ポイントを きりかえる', 'bridge', 'はし'],
+    ] as const) {
+      await user.click(screen.getByRole('button', { name: control }))
+      expect(engine.options?.route).toBe(route)
+      expect(screen.getByRole('complementary')).toHaveAccessibleName(`コースマップ。つぎは ${label}`)
+    }
   })
   test('pausing, resuming with boost, camera selection, and mute are independent', async () => {
     const user = userEvent.setup()
