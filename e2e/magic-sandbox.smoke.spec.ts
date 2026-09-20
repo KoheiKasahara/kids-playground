@@ -22,6 +22,12 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
     await page.getByRole('button', { name: 'カメを ふやす（0/1）' }).click()
     await page.getByRole('button', { name: 'ちょうちょを ふやす（0/1）' }).click()
     await expect(page.getByRole('button', { name: 'ちょうちょを ふやす（1/1）' })).toBeDisabled()
+    // すなつぶが正方形なら、カニもカメもちょうちょも横長に伸びない。
+    const grain = await canvas.evaluate((element: HTMLCanvasElement) => {
+      const box = element.getBoundingClientRect()
+      return { across: box.width / element.width, down: box.height / element.height }
+    })
+    expect(Math.abs(grain.across - grain.down)).toBeLessThan(0.05)
     const dayKnob = (await knob.boundingBox())!.x
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-pressed', 'true')

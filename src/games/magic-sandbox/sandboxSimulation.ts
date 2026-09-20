@@ -7,10 +7,34 @@ export type Material = 0 | 1 | 2 | 3 | 4
 export type Point = { x: number; y: number }
 type Plant = Point & { height: number; age: number; target: number; cells: Map<number, number> }
 
+// A portrait board is the reference shape: keeping the count of grains steady over
+// every shape keeps a grain - and every animal drawn out of grains - the same size.
+const GRAINS = 144 * 176
+/** The grid that fills a board of this size with square grains. */
+export function sandboxGrid(boxWidth: number, boxHeight: number) {
+  if (!(boxWidth > 0) || !(boxHeight > 0)) return null
+  const aspect = boxWidth / boxHeight
+  const height = Math.min(Math.max(Math.round(Math.sqrt(GRAINS / aspect)), 80), 280)
+  return { width: Math.min(Math.max(Math.round(height * aspect), 80), 480), height }
+}
+
+// Nudge an animal onto the re-shaped board instead of losing it over the edge, and
+// drop the errand it was on: the flower it walked towards may be gone with the trim.
+function reseat(group: (Point & { target: Point | null })[], dx: number, dy: number, width: number, height: number) {
+  for (const creature of group) {
+    creature.x = Math.min(Math.max(creature.x + dx, 7), width - 8)
+    creature.y = Math.min(Math.max(creature.y + dy, 4), height - 2)
+    creature.target = null
+  }
+}
+
 export class Sandbox {
-  readonly cells: Uint8Array
-  private readonly age: Uint16Array
-  private readonly moved: Uint8Array
+  // Only resize() swaps these grids and the size that indexes them.
+  cells: Uint8Array
+  private age: Uint16Array
+  private moved: Uint8Array
+  width: number
+  height: number
   private plants: Plant[] = []
   private tick = 0
   readonly crabs: Creature[] = []
@@ -56,7 +80,9 @@ export class Sandbox {
     plant.cells.set(y * this.width + x, material)
   }
   flowers = 0
-  constructor(readonly width = 144, readonly height = 176, private random = Math.random) {
+  constructor(width = 144, height = 176, private random = Math.random) {
+    this.width = width
+    this.height = height
     this.cells = new Uint8Array(width * height)
     this.age = new Uint16Array(width * height)
     this.moved = new Uint8Array(width * height)
@@ -86,6 +112,53 @@ export class Sandbox {
       const depth = Math.round(10 + 9 * Math.sin(x / this.width * Math.PI * 2) ** 2)
       for (let y = this.height - depth; y < this.height; y++) this.set(x, y, Cell.Sand)
     }
+  }
+  /**
+   * Re-shape the grid to the board without losing the picture: the sand keeps its
+   * place along the bottom and the drawing stays centred. Turning the device then
+   * gives the sandbox a new shape instead of stretching every grain sideways.
+   */
+  resize(width: number, height: number) {
+    if (width === this.width && height === this.height) return false
+    const cells = new Uint8Array(width * height)
+    const age = new Uint16Array(width * height)
+    const dx = Math.round((width - this.width) / 2), dy = height - this.height
+    const inside = (x: number, y: number) => x >= 0 && x < width && y >= 0 && y < height
+    for (let y = 0; y < this.height; y++) for (let x = 0; x < this.width; x++) {
+      if (!inside(x + dx, y + dy)) continue
+      const from = y * this.width + x, to = (y + dy) * width + x + dx
+      cells[to] = this.cells[from]
+      age[to] = this.age[from]
+    }
+    // A wider board leaves bare columns at the ends: carry the nearest ground over
+    // them, so the beach still reaches both walls. Walls and plants are not copied.
+    const first = Math.max(0, dx), last = Math.min(width, dx + this.width) - 1
+    for (let x = 0; x < width; x++) {
+      if (x >= first && x <= last) continue
+      for (let y = 0; y < height; y++) {
+        const material = cells[y * width + (x < first ? first : last)]
+        if (material === Cell.Sand || material === Cell.Mud) cells[y * width + x] = material
+      }
+    }
+    const previous = this.width
+    this.cells = cells
+    this.age = age
+    this.moved = new Uint8Array(width * height)
+    this.width = width
+    this.height = height
+    this.plants = this.plants.flatMap(plant => {
+      const moved = new Map<number, number>()
+      for (const [index, material] of plant.cells) {
+        const x = index % previous + dx, y = Math.floor(index / previous) + dy
+        if (inside(x, y)) moved.set(y * width + x, material)
+      }
+      if (inside(plant.x + dx, plant.y + dy)) return [{ ...plant, x: plant.x + dx, y: plant.y + dy, cells: moved }]
+      // A root pushed off the board can never grow or wither, so clear what it left.
+      for (const [index, material] of moved) if (cells[index] === material) cells[index] = Cell.Empty
+      return []
+    })
+    for (const group of [this.crabs, this.turtles, this.butterflies]) reseat(group, dx, dy, width, height)
+    return true
   }
   paint(point: Point, material: Material, radius: number) {
     for (const creature of [...this.crabs, ...this.turtles]) {

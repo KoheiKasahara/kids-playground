@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Cell, Sandbox, renderSandbox } from './sandboxSimulation'
+import { Cell, Sandbox, renderSandbox, sandboxGrid } from './sandboxSimulation'
 const advance = (world: Sandbox, steps = 100) => { for (let i = 0; i < steps; i++) world.step() }
 const count = (world: Sandbox, material: number) => world.cells.filter(c => c === material).length
 function seeded() {
@@ -108,5 +108,70 @@ describe('falling sand play loop', () => {
     renderSandbox(world, pixels)
     expect(pixels[3]).toBe(0)
     for (let i = 1; i <= Cell.Root; i++) expect(pixels[i * 4 + 3]).toBe(255)
+  })
+})
+
+describe('a board that changes shape', () => {
+  const grains = (box: { width: number; height: number }, grid: { width: number; height: number }) =>
+    [box.width / grid.width, box.height / grid.height]
+  it('gives every board shape a grid of square grains', () => {
+    for (const box of [{ width: 560, height: 307 }, { width: 360, height: 511 }, { width: 882, height: 709 }]) {
+      const grid = sandboxGrid(box.width, box.height)!
+      const [wide, tall] = grains(box, grid)
+      // A grain as wide as it is tall is what keeps a crab from being drawn stretched.
+      expect(Math.abs(wide - tall)).toBeLessThan(0.05)
+      expect(grid.width * grid.height).toBeGreaterThan(20000)
+      expect(grid.width * grid.height).toBeLessThan(32000)
+    }
+    expect(sandboxGrid(0, 307)).toBeNull()
+    expect(sandboxGrid(560, 0)).toBeNull()
+  })
+  it('keeps the drawing when the board turns, without stretching it', () => {
+    const world = new Sandbox(60, 60, seeded())
+    world.prepare()
+    world.stroke({ x: 30, y: 30 }, { x: 30, y: 45 }, Cell.Stone, 0)
+    const wall = count(world, Cell.Stone)
+    expect(world.resize(100, 44)).toBe(true)
+    expect([world.width, world.height]).toEqual([100, 44])
+    expect(count(world, Cell.Stone)).toBe(wall)
+    // The wall keeps the bottom of the board and stays one grain wide.
+    expect(world.get(50, 29)).toBe(Cell.Stone)
+    expect(world.get(49, 29)).not.toBe(Cell.Stone)
+    expect(world.get(51, 29)).not.toBe(Cell.Stone)
+    // The beach still reaches both walls of the wider board.
+    expect(world.get(0, 43)).toBe(Cell.Sand)
+    expect(world.get(99, 43)).toBe(Cell.Sand)
+    expect(world.resize(100, 44)).toBe(false)
+    advance(world)
+    expect(count(world, Cell.Stone)).toBe(wall)
+  })
+  it('lets a flower keep growing on the re-shaped board', () => {
+    const world = bed(Cell.Mud)
+    advance(world, 40)
+    const stems = count(world, Cell.Stem)
+    expect(stems).toBeGreaterThan(0)
+    expect(world.flowers).toBe(0)
+    world.resize(64, 48)
+    expect(count(world, Cell.Stem)).toBe(stems)
+    advance(world, 200)
+    expect(world.flowers).toBe(1)
+    expect(count(world, Cell.Petal)).toBeGreaterThan(0)
+  })
+  it('brings the animals along instead of losing them over the new edge', () => {
+    const world = new Sandbox(120, 90, () => 0.5)
+    world.prepare()
+    expect(world.addCrab()).toBe(true)
+    expect(world.addButterfly()).toBe(true)
+    const crab = world.crabs[0]
+    crab.x = 112
+    world.resize(70, 90)
+    expect(world.crabs).toHaveLength(1)
+    expect(world.butterflies).toHaveLength(1)
+    for (const animal of [...world.crabs, ...world.butterflies]) {
+      expect(animal.x).toBeGreaterThanOrEqual(7)
+      expect(animal.x).toBeLessThan(world.width - 7)
+      expect(animal.y).toBeLessThan(world.height)
+      expect(animal.target).toBeNull()
+    }
   })
 })

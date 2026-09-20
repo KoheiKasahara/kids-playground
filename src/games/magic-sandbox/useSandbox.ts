@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react'
-import { Cell, Sandbox, renderSandbox, type Material, type Point } from './sandboxSimulation'
+import { Cell, Sandbox, renderSandbox, sandboxGrid, type Material, type Point } from './sandboxSimulation'
 
 type Brush = { material: Material; radius: number }
 type Gesture = Brush & { point: Point; pointerId: number }
@@ -12,6 +12,10 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
   const active = useRef<Gesture | null>(null)
   const keyboardPoint = useRef<Point>({ x: 72, y: 30 })
   const draw = useRef<() => void>(() => {})
+  const untouched = useRef(true)
+  // fit() owns the bitmap size from the first frame on; React keeps the attributes it
+  // rendered, because re-setting width or height would blank the canvas mid-play.
+  const [bitmap] = useState({ width: world.width, height: world.height })
   const [unavailable, setUnavailable] = useState(false)
   const stop = useCallback(() => {
     const pointer = active.current?.pointerId
@@ -21,9 +25,32 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
   useEffect(() => {
     const element = canvasRef.current
     const context = element?.getContext('2d')
-    if (!context) return
-    const pixels = context.createImageData(world.width, world.height)
+    if (!element || !context) return
+    let pixels = context.createImageData(world.width, world.height)
     draw.current = () => { renderSandbox(world, pixels.data); context.putImageData(pixels, 0, 0) }
+    // Give the grid the shape of the board. A portrait grid stretched across a
+    // landscape board drew every crab, turtle and butterfly twice as wide as it is tall.
+    const fit = () => {
+      const box = element.getBoundingClientRect()
+      const grid = sandboxGrid(box.width, box.height)
+      if (!grid) return
+      const fresh = untouched.current
+      untouched.current = false
+      // Leave a grain or two of play, so a creeping address bar cannot rebuild the world every frame.
+      if (Math.abs(grid.width - world.width) <= 2 && Math.abs(grid.height - world.height) <= 2) return
+      // A pour in flight holds a spot on the old grid, so let go of it before re-shaping.
+      stop()
+      if (!world.resize(grid.width, grid.height)) return
+      // The first fit lands before anyone has drawn: start from dunes made for this shape.
+      if (fresh) world.prepare()
+      element.width = world.width
+      element.height = world.height
+      pixels = context.createImageData(world.width, world.height)
+      const cursor = keyboardPoint.current
+      cursor.x = Math.min(cursor.x, world.width - 1)
+      cursor.y = Math.min(cursor.y, world.height - 1)
+      draw.current()
+    }
     let request = 0, last = 0, emitted = 0, flowers = world.flowers
     const frame = (time: number) => {
       if (document.hidden) return
@@ -43,18 +70,24 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       cancelAnimationFrame(request)
       if (!document.hidden) { last = 0; request = requestAnimationFrame(frame) }
     }
+    const reshape = () => { stop(); fit() }
+    fit()
     draw.current()
     if (!document.hidden) request = requestAnimationFrame(frame)
     document.addEventListener('visibilitychange', suspend)
     window.addEventListener('blur', stop)
-    window.addEventListener('resize', stop)
+    window.addEventListener('resize', reshape)
+    // jsdom has no ResizeObserver; there the window resize above carries the change.
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(fit)
+    observer?.observe(element)
     return () => {
       stop()
       cancelAnimationFrame(request)
       draw.current = () => {}
+      observer?.disconnect()
       document.removeEventListener('visibilitychange', suspend)
       window.removeEventListener('blur', stop)
-      window.removeEventListener('resize', stop)
+      window.removeEventListener('resize', reshape)
     }
   }, [canvasRef, world, paused, onFlower, stop])
 
@@ -131,7 +164,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       setCreatureMessage(added ? '🦋 おはなに とまると たねが とぶよ' : 'ちょうちょの とぶ ばしょを あけてね')
       draw.current()
     },
-    canvasProps: { width: world.width, height: world.height, onPointerDown: begin, onPointerMove: move, onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end, onKeyDown: keyDown },
+    canvasProps: { width: bitmap.width, height: bitmap.height, onPointerDown: begin, onPointerMove: move, onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end, onKeyDown: keyDown },
     clear: () => { stop(); world.clear(); setCrabCount(0); setTurtleCount(0); setButterflyCount(0); setCreatureMessage(''); draw.current() },
     shake: () => { stop(); world.shake(); draw.current() },
   }
