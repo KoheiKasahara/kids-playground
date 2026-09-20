@@ -3,18 +3,20 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import ShinkeisuijakuPlay from './ShinkeisuijakuPlay'
 import type { ShinkeisuijakuDifficulty } from './cardDeck'
+import type { ShinkeisuijakuTheme } from './cardFaces'
 
 // 山札の並びをテストごとに固定し、どのカードがペアかをid順から確実に判定できるようにする
 // （シャッフルの結果に依存すると、一致/不一致のテストが不安定になる）。
 vi.mock('./cardDeck', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./cardDeck')>()
+  const { THEMES } = await import('./cardFaces')
   return {
     ...actual,
-    createShuffledDeck: (difficulty: ShinkeisuijakuDifficulty) => {
+    createShuffledDeck: (theme: ShinkeisuijakuTheme, difficulty: ShinkeisuijakuDifficulty) => {
       const pairCount = actual.DIFFICULTY_PAIR_COUNT[difficulty]
-      return actual.CARD_SYMBOLS.slice(0, pairCount).flatMap(({ symbol, name }, pairIndex) => [
-        { id: `card-${pairIndex * 2}`, symbol, name, status: 'hidden' as const },
-        { id: `card-${pairIndex * 2 + 1}`, symbol, name, status: 'hidden' as const },
+      return THEMES[theme].faces.slice(0, pairCount).flatMap((face, pairIndex) => [
+        { id: `card-${pairIndex * 2}`, face, status: 'hidden' as const },
+        { id: `card-${pairIndex * 2 + 1}`, face, status: 'hidden' as const },
       ])
     },
   }
@@ -49,13 +51,26 @@ function selectEasy() {
   fireEvent.click(screen.getByRole('button', { name: 'かんたん 6ペア' }))
 }
 
+function selectTheme(name: string) {
+  fireEvent.click(screen.getByRole('button', { name }))
+}
+
 describe('ShinkeisuijakuPlay', () => {
-  test('初期表示: タイトル・もどる・むずかしさ選択が出る', () => {
+  test('初期表示: タイトル・もどる・えがら選択・むずかしさ選択が出る', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'しんけいすいじゃく' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
+    for (const name of ['どうぶつ', 'はたらくくるま', 'すうじ', 'こっき']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
     expect(screen.getByRole('button', { name: 'かんたん 6ペア' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'むずかしい 8ペア' })).toBeInTheDocument()
+  })
+
+  test('はじめは「どうぶつ」がえらばれている', () => {
+    renderPlay()
+    expect(screen.getByRole('button', { name: 'どうぶつ' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'こっき' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('かんたんを選ぶと12枚(6ペア)のカードが裏向きで並ぶ', () => {
@@ -74,6 +89,50 @@ describe('ShinkeisuijakuPlay', () => {
     const revealed = cardButton(container, 'card-0')
     expect(revealed).toHaveAttribute('aria-pressed', 'true')
     expect(revealed.getAttribute('aria-label')).not.toBe('カード')
+  })
+
+  test('えがらに「こっき」をえらぶと、めくったカードに国旗の画像が出る', () => {
+    const { container } = renderPlay()
+    selectTheme('こっき')
+    expect(screen.getByRole('button', { name: 'こっき' })).toHaveAttribute('aria-pressed', 'true')
+    selectEasy()
+
+    fireEvent.click(cardButton(container, 'card-0'))
+    const revealed = cardButton(container, 'card-0')
+    expect(revealed).toHaveAttribute('aria-label', 'にほん')
+    expect(revealed.querySelector('img')?.getAttribute('src')).toContain('flags/jp.svg')
+  })
+
+  test('えがらに「すうじ」をえらぶと、めくったカードにすうじが出る', () => {
+    const { container } = renderPlay()
+    selectTheme('すうじ')
+    selectEasy()
+
+    fireEvent.click(cardButton(container, 'card-0'))
+    const revealed = cardButton(container, 'card-0')
+    expect(revealed).toHaveAttribute('aria-label', 'いち')
+    expect(revealed).toHaveTextContent('1')
+  })
+
+  test('えがらをかえても、一致・不一致の判定は同じように動く', () => {
+    const { container } = renderPlay()
+    selectTheme('はたらくくるま')
+    selectEasy()
+
+    fireEvent.click(cardButton(container, 'card-0'))
+    fireEvent.click(cardButton(container, 'card-1'))
+    act(() => {
+      vi.advanceTimersByTime(AFTER_RESOLVE_MS)
+    })
+    expect(screen.getByText('みつけた ペア：1 / 6')).toBeInTheDocument()
+
+    fireEvent.click(cardButton(container, 'card-2'))
+    fireEvent.click(cardButton(container, 'card-4'))
+    act(() => {
+      vi.advanceTimersByTime(AFTER_RESOLVE_MS)
+    })
+    expect(cardButton(container, 'card-2')).toHaveAttribute('aria-label', 'カード')
+    expect(screen.getByText('みつけた ペア：1 / 6')).toBeInTheDocument()
   })
 
   test('一致する2枚をめくると、少し待ってから揃ってdisabledになる', () => {
@@ -129,12 +188,14 @@ describe('ShinkeisuijakuPlay', () => {
     expect(screen.getByRole('button', { name: 'もういちど' })).toBeInTheDocument()
   })
 
-  test('「むずかしさをかえる」で選択画面に戻る', () => {
+  test('「えらびなおす」で選択画面に戻り、えらんだえがらは残る', () => {
     renderPlay()
+    selectTheme('こっき')
     selectEasy()
-    fireEvent.click(screen.getByRole('button', { name: 'むずかしさをかえる' }))
+    fireEvent.click(screen.getByRole('button', { name: 'えらびなおす' }))
 
     expect(screen.getByRole('button', { name: 'かんたん 6ペア' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'こっき' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryAllByRole('button', { name: 'カード' })).toHaveLength(0)
   })
 

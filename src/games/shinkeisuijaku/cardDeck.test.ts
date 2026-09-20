@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import {
-  CARD_SYMBOLS,
   DIFFICULTY_PAIR_COUNT,
   countMatchedPairs,
   createShuffledDeck,
@@ -8,6 +7,9 @@ import {
   shuffle,
   type MemoryCard,
 } from './cardDeck'
+import { THEMES, THEME_ORDER, type ShinkeisuijakuTheme } from './cardFaces'
+
+const themes = Object.keys(THEMES) as ShinkeisuijakuTheme[]
 
 describe('shuffle', () => {
   test('randomFnを固定すると、Fisher-Yatesの手順どおりの決定的な並びになる', () => {
@@ -30,15 +32,15 @@ describe('shuffle', () => {
 
 describe('createShuffledDeck', () => {
   test.each(['easy', 'hard'] as const)('%sは、むずかしさどおりのペア数×2枚を返す', (difficulty) => {
-    const deck = createShuffledDeck(difficulty, () => 0.5)
+    const deck = createShuffledDeck('animal', difficulty, () => 0.5)
     expect(deck).toHaveLength(DIFFICULTY_PAIR_COUNT[difficulty] * 2)
   })
 
-  test('各絵柄がちょうど2枚ずつ含まれる', () => {
-    const deck = createShuffledDeck('hard', () => 0.3)
+  test.each(themes)('%sでも、各絵柄がちょうど2枚ずつ含まれる', (theme) => {
+    const deck = createShuffledDeck(theme, 'hard', () => 0.3)
     const counts = new Map<string, number>()
     for (const card of deck) {
-      counts.set(card.symbol, (counts.get(card.symbol) ?? 0) + 1)
+      counts.set(card.face.id, (counts.get(card.face.id) ?? 0) + 1)
     }
     expect(counts.size).toBe(DIFFICULTY_PAIR_COUNT.hard)
     for (const count of counts.values()) {
@@ -46,24 +48,44 @@ describe('createShuffledDeck', () => {
     }
   })
 
+  test.each(themes)('%sは、そのテーマの絵柄だけで山札を作る', (theme) => {
+    const deck = createShuffledDeck(theme, 'hard', () => 0.4)
+    const faceIds = new Set(THEMES[theme].faces.map((face) => face.id))
+    for (const card of deck) {
+      expect(faceIds.has(card.face.id)).toBe(true)
+    }
+  })
+
+  test('テーマが違えば絵柄も入れ替わる', () => {
+    const animalIds = new Set(createShuffledDeck('animal', 'easy', () => 0.5).map((card) => card.face.id))
+    const flagIds = new Set(createShuffledDeck('flag', 'easy', () => 0.5).map((card) => card.face.id))
+    for (const id of flagIds) {
+      expect(animalIds.has(id)).toBe(false)
+    }
+  })
+
   test('idが重複しない', () => {
-    const deck = createShuffledDeck('easy', () => 0.1)
+    const deck = createShuffledDeck('animal', 'easy', () => 0.1)
     expect(new Set(deck.map((card) => card.id)).size).toBe(deck.length)
   })
 
   test('生成直後は全カードがhidden', () => {
-    const deck = createShuffledDeck('easy', () => 0.7)
+    const deck = createShuffledDeck('number', 'easy', () => 0.7)
     expect(deck.every((card) => card.status === 'hidden')).toBe(true)
   })
 
-  test('hardのペア数は使用する絵柄の種類数を超えない', () => {
-    expect(DIFFICULTY_PAIR_COUNT.hard).toBeLessThanOrEqual(CARD_SYMBOLS.length)
+  test.each(THEME_ORDER)('%sのペア数は、そのテーマの絵柄の種類数を超えない', (theme) => {
+    expect(DIFFICULTY_PAIR_COUNT.hard).toBeLessThanOrEqual(THEMES[theme].faces.length)
   })
 })
 
 describe('isDeckComplete', () => {
   function makeCards(statuses: MemoryCard['status'][]): MemoryCard[] {
-    return statuses.map((status, index) => ({ id: `card-${index}`, symbol: '🐶', name: 'いぬ', status }))
+    return statuses.map((status, index) => ({
+      id: `card-${index}`,
+      face: { id: 'dog', name: 'いぬ', symbol: '🐶' },
+      status,
+    }))
   }
 
   test('空の山札は未完成として扱う', () => {
@@ -82,7 +104,7 @@ describe('isDeckComplete', () => {
 
 describe('countMatchedPairs', () => {
   test('matchedのカード枚数の半分を返す', () => {
-    const deck = createShuffledDeck('easy', () => 0.2).map((card, index) => ({
+    const deck = createShuffledDeck('animal', 'easy', () => 0.2).map((card, index) => ({
       ...card,
       status: index < 4 ? ('matched' as const) : card.status,
     }))
@@ -90,7 +112,7 @@ describe('countMatchedPairs', () => {
   })
 
   test('matchedが無ければ0', () => {
-    const deck = createShuffledDeck('easy', () => 0.2)
+    const deck = createShuffledDeck('animal', 'easy', () => 0.2)
     expect(countMatchedPairs(deck)).toBe(0)
   })
 })

@@ -128,7 +128,7 @@ SOFTWARE.
 
 ## イラスト画像 (public/images/)
 
-`public/images/working-vehicles/`（はたらくくるまクイズ）、`public/images/vegetables/`（おやさいクイズ）、`public/images/fruits/`（くだものクイズ）のイラストは、いずれも外部の実写・イラスト素材（Wikimedia Commonsなど）を使わず、アプリ向けに用意したオリジナル素材です。オリジナル素材のため、素材単位での出典記載は不要としています。
+`public/images/working-vehicles/`（はたらくくるまクイズ）、`public/images/vegetables/`（おやさいクイズ）、`public/images/fruits/`（くだものクイズ）のイラストは、いずれも外部の実写・イラスト素材（Wikimedia Commonsなど）を使わず、アプリ向けに用意したオリジナル素材です。オリジナル素材のため、素材単位での出典記載は不要としています。はたらくくるまのイラストは「しんけいすいじゃく」の絵柄としても再利用しています（素材の追加はありません）。
 
 外部素材を新たに採用する場合は、このセクションに素材ごとの出典・ライセンスを追記してください。
 

@@ -81,6 +81,79 @@
   color: var(--color-text-muted);
 }
 
+/* 絵柄えらび。文字を読めなくても選べるよう、その絵柄の1枚目を見本として並べる。 */
+.themeGrid {
+  width: min(100%, 420px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.themeButton {
+  position: relative;
+  min-height: var(--tap-target-min);
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  border: 3px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+/* 選択中は「枠・背景・チェック」を重ねて、色だけに頼らずに分かるようにする。 */
+.themeButtonSelected {
+  border-color: var(--color-primary);
+  background: #e7edff;
+  color: var(--color-primary-dark);
+}
+
+.themeButton:active {
+  transform: scale(0.97);
+}
+
+.themeButton:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.themePreview {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+}
+
+.themeName {
+  min-width: 0;
+  /* 「はたらくくるま」が小さい画面でも1行に収まる大きさまで縮める。 */
+  font-size: clamp(15px, 4.4vw, var(--font-size-base));
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* チェックは列を占めず角に重ねる。名前に使える幅を減らさないため。 */
+.themeCheck {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-sm);
+  color: var(--color-primary);
+  font-size: var(--font-size-base);
+  font-weight: 900;
+  line-height: 1;
+}
+
 .status {
   margin: 0;
   color: var(--color-primary-dark);
@@ -98,6 +171,7 @@
 .card {
   aspect-ratio: 3 / 4;
   min-width: 0;
+  padding: var(--space-xs);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -124,6 +198,9 @@
 }
 
 .cardFaceUp {
+  /* めくったカードはdisabledになるため、ブラウザ既定の淡い文字色に戻らないよう色を明示する
+     （すうじの絵柄がうすく見えてしまう）。 */
+  color: var(--color-text);
   background: var(--color-surface);
   border: 3px solid var(--color-border);
   transform: none;
@@ -132,6 +209,27 @@
 .cardMatched {
   background: var(--color-success-bg);
   border-color: var(--color-success);
+}
+
+/* カードの表面。絵文字・すうじは文字のまま、はたらくくるま・こっきは画像で描く。 */
+.faceSymbol {
+  /* すうじは絵文字より字面が小さいため、カードの文字サイズより一回り大きく描く。 */
+  font-size: 1.25em;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.faceImage {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  /* 白地の国旗（にほん・かんこくなど）でも輪郭が分かるように細い枠を付ける。 */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  /* めくる前後で画像がドラッグされないようにする（長押し抑制はGamePlaySurface側）。 */
+  pointer-events: none;
 }
 
 .actions {
@@ -203,4 +301,10 @@
 @media (orientation: landscape) {
   .grid { width: min(100%, 1050px); grid-template-columns: repeat(var(--wide-cols), minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
   .header { min-height: 48px; }
+  /* 横画面では絵柄を1段に並べ、むずかしさのボタンまでスクロールせずに見えるようにする。 */
+  .themeGrid { width: min(100%, 720px); grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .difficultyGrid { margin-top: 0; }
 }
+
+/* 絵柄とむずかしさの2段になる選択画面は、100dvhに詰め込まず内容ぶんの高さを許す。 */
+.pageSelect { height: auto; min-height: 100dvh; }

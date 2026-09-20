@@ -11,6 +11,7 @@ import {
   type MemoryCard,
   type ShinkeisuijakuDifficulty,
 } from './cardDeck'
+import { THEMES, THEME_ORDER, type CardFace, type ShinkeisuijakuTheme } from './cardFaces'
 import { playAllMatchedSound, playCardFlipSound, playCardMatchSound, playCardMismatchSound } from './sounds'
 import styles from './ShinkeisuijakuPlay.module.css'
 
@@ -32,8 +33,24 @@ const MISMATCH_DELAY_MS = 900
 /** 一致したカードを確定表示にするまでの待ち時間[ms]。めくった瞬間の一致を目で確認できるようにする。 */
 const MATCH_DELAY_MS = 450
 
+/**
+ * カードの表面。絵文字・すうじは文字のまま、はたらくくるま・こっきは画像で描く。
+ * 名前は呼び出し側のボタンがaria-labelに持つため、ここは装飾として隠す。
+ */
+function CardFaceView({ face }: { face: CardFace }) {
+  if ('image' in face) {
+    return <img className={styles.faceImage} src={import.meta.env.BASE_URL + face.image} alt="" />
+  }
+  return (
+    <span className={styles.faceSymbol} aria-hidden="true">
+      {face.symbol}
+    </span>
+  )
+}
+
 export default function ShinkeisuijakuPlay() {
   const [gameState, setGameState] = useState<GameState>('select')
+  const [theme, setTheme] = useState<ShinkeisuijakuTheme>('animal')
   const [difficulty, setDifficulty] = useState<ShinkeisuijakuDifficulty>('easy')
   const [cards, setCards] = useState<MemoryCard[]>([])
   const [revealedIds, setRevealedIds] = useState<string[]>([])
@@ -49,13 +66,14 @@ export default function ShinkeisuijakuPlay() {
     }
   }, [])
 
-  const startNewGame = (nextDifficulty: ShinkeisuijakuDifficulty) => {
+  const startNewGame = (nextTheme: ShinkeisuijakuTheme, nextDifficulty: ShinkeisuijakuDifficulty) => {
     if (resolveTimeoutRef.current !== null) {
       clearTimeout(resolveTimeoutRef.current)
       resolveTimeoutRef.current = null
     }
+    setTheme(nextTheme)
     setDifficulty(nextDifficulty)
-    setCards(createShuffledDeck(nextDifficulty))
+    setCards(createShuffledDeck(nextTheme, nextDifficulty))
     setRevealedIds([])
     setLocked(false)
     setGameState('playing')
@@ -63,15 +81,15 @@ export default function ShinkeisuijakuPlay() {
 
   const handleSelectDifficulty = (nextDifficulty: ShinkeisuijakuDifficulty) => {
     primeAudio()
-    startNewGame(nextDifficulty)
+    startNewGame(theme, nextDifficulty)
   }
 
   const handleRetry = () => {
     primeAudio()
-    startNewGame(difficulty)
+    startNewGame(theme, difficulty)
   }
 
-  const handleChangeDifficulty = () => {
+  const handleBackToSelect = () => {
     if (resolveTimeoutRef.current !== null) {
       clearTimeout(resolveTimeoutRef.current)
       resolveTimeoutRef.current = null
@@ -101,7 +119,7 @@ export default function ShinkeisuijakuPlay() {
     const [firstId, secondId] = nextRevealedIds
     const firstCard = revealedCards.find((current) => current.id === firstId)!
     const secondCard = revealedCards.find((current) => current.id === secondId)!
-    const isMatch = firstCard.symbol === secondCard.symbol
+    const isMatch = firstCard.face.id === secondCard.face.id
 
     setLocked(true)
     // 判定確定後の最終状態をここで先に組み立てる。lockedがtrueの間は他の操作でcardsが
@@ -134,7 +152,7 @@ export default function ShinkeisuijakuPlay() {
   const totalPairs = DIFFICULTY_PAIR_COUNT[difficulty]
 
   const page = (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${gameState === 'select' ? styles.pageSelect : ''}`}>
       <header className={styles.header}>
         <GameBackButton to="/" />
         <h1 className={styles.title}>
@@ -144,6 +162,33 @@ export default function ShinkeisuijakuPlay() {
 
       {gameState === 'select' ? (
         <>
+          <p id="shinkeisuijaku-theme-instruction" className={styles.instruction}>
+            えがらを えらんでね
+          </p>
+          <div className={styles.themeGrid} role="group" aria-labelledby="shinkeisuijaku-theme-instruction">
+            {THEME_ORDER.map((option) => {
+              const selected = option === theme
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  className={[styles.themeButton, selected ? styles.themeButtonSelected : ''].filter(Boolean).join(' ')}
+                  // 色だけでなく、押されている状態と「えらんだよ」の印でも選択中が分かるようにする。
+                  aria-pressed={selected}
+                  onClick={() => setTheme(option)}
+                >
+                  <span className={styles.themePreview}>
+                    <CardFaceView face={THEMES[option].faces[0]!} />
+                  </span>
+                  <span className={styles.themeName}>{THEMES[option].label}</span>
+                  <span className={styles.themeCheck} aria-hidden="true">
+                    {selected ? '✓' : ''}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
           <p id="shinkeisuijaku-instruction" className={styles.instruction}>
             むずかしさを えらんでね
           </p>
@@ -188,12 +233,18 @@ export default function ShinkeisuijakuPlay() {
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  aria-label={faceUp ? card.name : 'カード'}
+                  aria-label={faceUp ? card.face.name : 'カード'}
                   aria-pressed={faceUp}
                   disabled={card.status !== 'hidden'}
                   onClick={() => handleCardClick(card.id)}
                 >
-                  <span aria-hidden="true">{faceUp ? card.symbol : '❓'}</span>
+                  {faceUp ? (
+                    <CardFaceView face={card.face} />
+                  ) : (
+                    <span className={styles.faceSymbol} aria-hidden="true">
+                      ❓
+                    </span>
+                  )}
                 </button>
               )
             })}
@@ -205,8 +256,8 @@ export default function ShinkeisuijakuPlay() {
                 もういちど
               </button>
             )}
-            <button type="button" className={`${styles.button} ${styles.retry}`} onClick={handleChangeDifficulty}>
-              むずかしさをかえる
+            <button type="button" className={`${styles.button} ${styles.retry}`} onClick={handleBackToSelect}>
+              えらびなおす
             </button>
           </div>
         </>
