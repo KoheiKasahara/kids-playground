@@ -4,7 +4,7 @@ import { LEVEL_DESCRIPTION, LEVEL_LABEL, LEVEL_STARS, MODE_LABEL, MODE_PATH } fr
 import type { QuizLevel, QuizMode } from './types'
 import styles from './FlagQuizLevelSelect.module.css'
 
-const levels: QuizLevel[] = ['easy', 'normal', 'hard']
+const levels: QuizLevel[] = ['easy', 'normal', 'hard', 'oni']
 
 type FlagQuizLevelSelectProps = {
   mode: QuizMode

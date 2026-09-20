@@ -18,12 +18,13 @@ function renderApp(initialEntries: string[]) {
 }
 
 describe('FlagQuizLevelSelect', () => {
-  test('3つのむずかしさボタンと「もどる」ボタンが表示される', () => {
+  test('4つのむずかしさボタンと「もどる」ボタンが表示される', () => {
     renderApp(['/games/flag-quiz/flag-to-name'])
     expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /かんたん/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /ふつう/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /むずかしい/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /おに/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
   })
 
@@ -56,6 +57,14 @@ describe('FlagQuizLevelSelect', () => {
     await user.click(screen.getByRole('button', { name: /むずかしい/ }))
     expect(screen.getAllByRole('button', { name: /ばんめ の こっき/ })).toHaveLength(4)
     expect(screen.getByText('むずかしい')).toBeInTheDocument()
+  })
+
+  test('「おに」を押すと、こっき→なまえモードのおにのプレイ画面に遷移する', async () => {
+    const user = userEvent.setup()
+    renderApp(['/games/flag-quiz/flag-to-name'])
+    await user.click(screen.getByRole('button', { name: /おに/ }))
+    expect(screen.getByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
+    expect(screen.getByText('おに')).toBeInTheDocument()
   })
 
   test('パネルめくりモードで「かんたん」を押すと、パネルクイズのプレイ画面に遷移する', async () => {

@@ -1,14 +1,43 @@
-import type { QuizLevel, QuizQuestion } from '../quiz-core/types'
-
-export type { QuizLevel } from '../quiz-core/types'
-export {
-  CHOICE_COUNT,
-  isQuizLevel,
-  LEVEL_LABEL,
-  LEVEL_RANK,
-  LEVEL_STARS,
-  QUESTION_COUNT,
+import type { QuizLevel as CoreQuizLevel, QuizQuestion } from '../quiz-core/types'
+import {
+  isQuizLevel as isCoreQuizLevel,
+  LEVEL_LABEL as CORE_LEVEL_LABEL,
+  LEVEL_RANK as CORE_LEVEL_RANK,
+  LEVEL_STARS as CORE_LEVEL_STARS,
 } from '../quiz-core/types'
+
+export { CHOICE_COUNT, QUESTION_COUNT } from '../quiz-core/types'
+
+/**
+ * こっきクイズの むずかしさ。共通の3段階に、このゲームだけの最上位「おに」を足す。
+ * 「おに」は国数がとびぬけて多く、他のクイズには対応するデータがないため、
+ * 共通レイヤー (`quiz-core`) の QuizLevel は増やさずここで拡張する。
+ */
+export type QuizLevel = CoreQuizLevel | 'oni';
+
+/** 出題プールを累積させるためのむずかしさ順。おにが最上位。 */
+export const LEVEL_RANK: Record<QuizLevel, number> = {
+  ...CORE_LEVEL_RANK,
+  oni: 3,
+};
+
+/** むずかしさの表示名。 */
+export const LEVEL_LABEL: Record<QuizLevel, string> = {
+  ...CORE_LEVEL_LABEL,
+  oni: 'おに',
+};
+
+/** むずかしさ選択に表示する記号。読み上げでは非表示にして使う。 */
+export const LEVEL_STARS: Record<QuizLevel, string> = {
+  ...CORE_LEVEL_STARS,
+  // おにだけは星の数ではなく鬼の顔にして、別格のむずかしさだと一目で分かるようにする。
+  oni: '👹',
+};
+
+/** URLなど外部入力の値が正しいむずかしさかを判定する。 */
+export function isQuizLevel(value: unknown): value is QuizLevel {
+  return isCoreQuizLevel(value) || value === 'oni';
+}
 
 export type Continent =
   | 'asia'
@@ -65,4 +94,5 @@ export const LEVEL_DESCRIPTION: Record<QuizLevel, string> = {
   easy: 'よく しってる 20の くに',
   normal: '45の くに',
   hard: 'せかいの 105の くに',
+  oni: 'せかいじゅうの 150の くに',
 };
