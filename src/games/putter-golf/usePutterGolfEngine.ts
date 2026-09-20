@@ -188,7 +188,13 @@ export function usePutterGolfEngine(options: Options) {
         if (event.kind === 'splash') { scene.effect('splash', event.position); returnTimer = 1.2 }
         if (event.kind === 'lost') returnTimer = 0.6
         if (event.kind === 'cup') scene.effect(strokes === 1 ? 'fireworks' : 'confetti', geometry.cup)
-        if (event.kind === 'rest') aimAtSuggestion()
+        if (event.kind === 'rest') {
+          aimAtSuggestion()
+          // 曲がり角で止まったとき、前の打球を追っていたカメラから
+          // 新しいねらいへ補間すると、一時的に別の方向を向いてしまう。
+          // 次の打ち始めは、ボールの後ろの正しい位置から見せる。
+          pose = null
+        }
         latest.current.onEvent(event)
       }
       // うった・止まった・入ったは、ボタンの有効・無効にすぐ効くよう待たずに知らせる。
@@ -225,6 +231,7 @@ export function usePutterGolfEngine(options: Options) {
             returnTimer = 0
             world.returnToRest()
             aimAtSuggestion()
+            pose = null
             current.onEvent({ kind: 'returned' })
           }
         }
