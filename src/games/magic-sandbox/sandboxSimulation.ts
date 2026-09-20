@@ -1,5 +1,6 @@
 import { addCrab, addTurtle, tapCrab, tapTurtle, stepCrabs, stepTurtles, renderCrabs, renderTurtles, nextSleepDelay, wakeCreature, creatureScale, type Creature } from './sandboxCrabs'
 import { addButterfly, tapButterfly, stepButterflies, renderButterflies, type Butterfly } from './sandboxButterfly'
+import { nextCrowDelay, reshapeCrows, stepCrows, renderCrows, type Crow } from './sandboxCrow'
 
 // Original, bounded falling-sand simulation. No external engine or copied OSS code.
 export const Cell = { Empty: 0, Sand: 1, Water: 2, Stone: 3, Seed: 4, Mud: 5, Stem: 6, Petal: 7, Pollen: 8, Root: 9 } as const
@@ -40,10 +41,14 @@ export class Sandbox {
   readonly crabs: Creature[] = []
   readonly turtles: Creature[] = []
   readonly butterflies: Butterfly[] = []
+  // Crows only pass overhead; they never land, so the board never holds more than one.
+  readonly crows: Crow[] = []
+  crowDelay = 0
   night = false
   setNight(night: boolean) {
     if (this.night === night) return
     this.night = night
+    if (night) this.crowDelay = nextCrowDelay(this.random)
     for (const creature of [...this.crabs, ...this.turtles, ...this.butterflies]) {
       wakeCreature(creature)
       creature.sleepDelay = night ? nextSleepDelay(this.random) : 0
@@ -101,6 +106,7 @@ export class Sandbox {
     this.crabs.length = 0
     this.turtles.length = 0
     this.butterflies.length = 0
+    this.crows.length = 0
     this.cells.fill(0)
     this.age.fill(0)
     this.plants = []
@@ -140,7 +146,7 @@ export class Sandbox {
         if (material === Cell.Sand || material === Cell.Mud) cells[y * width + x] = material
       }
     }
-    const previous = this.width
+    const previous = this.width, previousHeight = this.height
     this.cells = cells
     this.age = age
     this.moved = new Uint8Array(width * height)
@@ -158,6 +164,7 @@ export class Sandbox {
       return []
     })
     for (const group of [this.crabs, this.turtles, this.butterflies]) reseat(group, dx, dy, width, height)
+    reshapeCrows(this, previous, previousHeight)
     return true
   }
   paint(point: Point, material: Material, radius: number) {
@@ -233,6 +240,7 @@ export class Sandbox {
     stepCrabs(this, this.random)
     stepTurtles(this, this.random)
     stepButterflies(this, this.random)
+    stepCrows(this, this.random)
   }
   private grow() {
     this.plants = this.plants.filter(p => {
@@ -290,4 +298,5 @@ export function renderSandbox(world: Sandbox, pixels: Uint8ClampedArray) {
   renderCrabs(world, pixels)
   renderTurtles(world, pixels)
   renderButterflies(world, pixels)
+  renderCrows(world, pixels)
 }
