@@ -8,7 +8,8 @@ const PHRASE_END_NOTE_INDEXES: Readonly<Record<string, readonly number[]>> = {
   'mary-had-a-little-lamb': [7, 15],
   'ode-to-joy': [15],
   'london-bridge': [6, 12, 19],
-  'kaeru-no-uta': [7, 15],
+  // 反復音の途中（音符15→16）は、意図した半拍休符のため監査対象から除く。
+  'kaeru-no-uta': [7],
   'row-row-row-your-boat': [5, 11],
   'old-macdonald-had-a-farm': [6, 11, 16, 21, 33, 40],
   chocho: [7, 15, 23],
@@ -85,6 +86,19 @@ describe('PIANO_SONGS', () => {
   test('ハッピーバースデーの最終フレーズはシ♭・ラを含む正しい下降になる', () => {
     const notes = findPianoSong('happy-birthday')!.timeline.filter((item) => item.kind === 'note')
     expect(notes.slice(-6).map((item) => item.noteId)).toEqual(['A#4', 'A#4', 'A4', 'F4', 'G4', 'F4'])
+  })
+
+  test('かえるのうたの最後の反復音は半拍の休符で区切る', () => {
+    const timeline = findPianoSong('kaeru-no-uta')!.timeline.slice(14)
+    const repeatedPart = timeline.slice(0, 28)
+
+    expect(repeatedPart).toHaveLength(28)
+    expect(repeatedPart.filter((item) => item.kind === 'rest')).toHaveLength(14)
+    for (let index = 0; index < repeatedPart.length; index += 2) {
+      expect(repeatedPart[index]).toMatchObject({ kind: 'note', durationMs: 268 })
+      expect(repeatedPart[index + 1]).toMatchObject({ kind: 'rest', durationMs: 268 })
+    }
+    expect(timeline[28]).toMatchObject({ kind: 'note', noteId: 'C4', durationMs: 1_071 })
   })
 
   test('ゆかいな牧場は低いソへ下がり、高いミ・レからドへ戻る', () => {
