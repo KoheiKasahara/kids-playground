@@ -33,6 +33,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/puni-slime',
   '/games/pukupuka-rescue',
   '/games/putter-golf',
+  '/games/pyoko-touch',
   '/games/rail-builder',
   '/games/snowball-roll',
   '/games/shinkeisuijaku',

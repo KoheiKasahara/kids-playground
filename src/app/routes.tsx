@@ -57,6 +57,9 @@ export const routes: RouteObject[] = [
   // 選択画面とプレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // ShinkeisuijakuPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/shinkeisuijaku', element: lazyRoute(() => import('../games/shinkeisuijaku/ShinkeisuijakuPlay')) },
+  // むずかしさ選択・プレイ・結果が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // PyokoTouchPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/pyoko-touch', element: lazyRoute(() => import('../games/pyoko-touch/PyokoTouchPlay')) },
   { path: '/', element: <Home /> },
   { path: '/games/puni-slime', element: playRoute(lazyRoute(() => import('../games/puni-slime/PuniSlimePlay'))) },
   { path: '/games/animal-bath', element: lazyRoute(() => import('../games/animal-bath/AnimalBathPlay')) },

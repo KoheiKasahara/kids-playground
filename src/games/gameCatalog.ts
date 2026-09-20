@@ -767,6 +767,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'pyoko-touch',
+    slug: 'pyoko-touch',
+    title: 'ぴょこぴょこタッチ',
+    emoji: '🐹',
+    category: 'learning',
+    seo: {
+      headline: 'ぴょこぴょこタッチ｜あなから出るどうぶつをタッチする反射あそび',
+      description:
+        '9つのあなから顔を出すどうぶつを、引っこむ前にタッチして点をあつめる幼児向けの反射あそびです。やさしい・はやいの2つのむずかしさがあり、30びょうで何点とれるか何度でもちょうせんできます。',
+    },
+    intro: {
+      howToPlay: [
+        'あなから でてきた どうぶつを タッチしよう',
+        'はちに さわると 1てん もどっちゃうよ',
+        '30びょうで なんてん とれるかな？',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
