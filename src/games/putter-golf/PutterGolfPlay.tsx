@@ -11,6 +11,14 @@ import styles from './PutterGolfPlay.module.css'
 
 const EMPTY: GolfFeedback = { phase: 'ready', strokes: 0, power: 0.5, aiming: false, returning: false }
 
+/** コースの そとへ 落ちたときの ひとこと。コースごとに 落ちる先が ちがう。 */
+const SPLASH_TEXT: Partial<Record<CourseId, string>> = {
+  moon: 'ひゅーん！ もとの ばしょに もどるよ',
+  snow: 'ゆきに ぼふっ！ もとの ばしょに もどるよ',
+  candy: 'ミルクに ぽちゃん！ もとの ばしょに もどるよ',
+  dino: 'したへ おっこちた！ もとの ばしょに もどるよ',
+}
+
 /** ホールを上から見た線。ミニマップとコースえらびの見本に使う。 */
 function holeShape(hole: HoleDefinition) {
   const outlines = hole.floors.map(piece => roundOutline(piece).points)
@@ -111,7 +119,7 @@ export default function PutterGolfPlay() {
         if (event.surface === 'ice') { play('ice'); setMessage('つるつる すべるよ！') }
         else { play('sand'); setMessage(event.surface === 'sand' ? 'すなばで ザザッ' : 'ふかふかで とまりやすいよ') }
         break
-      case 'splash': play('splash'); setMessage(courseId === 'moon' ? 'ひゅーん！ もとの ばしょに もどるよ' : courseId === 'snow' ? 'ゆきに ぼふっ！ もとの ばしょに もどるよ' : 'ぽちゃん！ もとの ばしょに もどるよ'); break
+      case 'splash': play('splash'); setMessage(SPLASH_TEXT[courseId] ?? 'ぽちゃん！ もとの ばしょに もどるよ'); break
       case 'lost': setMessage('おっと！ もとの ばしょに もどるよ'); break
       case 'returned': setMessage('ここから もういちど！'); break
       case 'assisted': play('click'); setMessage('カップの ちかくに おいたよ！'); break
