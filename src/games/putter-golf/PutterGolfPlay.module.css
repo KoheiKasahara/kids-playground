@@ -35,7 +35,7 @@
 .nextButton { width: 100%; min-height: 56px; margin-top: 4px; border: 0; border-radius: 16px; background: var(--course-color); color: white; font-size: 19px !important; font-weight: 900 !important; box-shadow: 0 4px 0 color-mix(in srgb, var(--course-color), black 25%); }
 .panel { flex: 0 0 auto; margin: 8px auto 0; width: 100%; max-width: 740px; border-radius: 22px; background: #fffdf5; padding: 12px; box-shadow: 0 4px 14px #2f5a3a12; }
 .panel h2 { font-size: 16px; text-align: center; margin: 0 0 9px; }
-.courses { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.courses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .courseButton { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 3px 8px; background: #f2f5ef; border: 3px solid transparent; border-radius: 18px; color: #3a5044; min-width: 0; }
 .courseButton[aria-pressed='true'] { border-color: var(--card-color); background: #fffdf8; box-shadow: 0 3px 0 color-mix(in srgb, var(--card-color), transparent 72%); }
 .courseIcon { font-size: 30px; line-height: 1.1; }
@@ -79,7 +79,7 @@
 @keyframes pop { from { opacity: 0; transform: translate(-50%, 24px) scale(0.9); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @media (min-width: 700px) and (orientation: portrait) {
   .panel { padding: 16px; }
-  .courses { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .courses { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .courseIcon { font-size: 40px; }
   .courseButton strong { font-size: 16px; }
   .courseButton small { font-size: 12px; }
@@ -90,8 +90,12 @@
   .header h1 { font-size: 14px; }
   .soundButton { flex-basis: 40px; width: 40px; }
   .panel { padding: 9px; }
+  .courses { gap: 4px; }
+  .courseButton { padding-inline: 2px; }
   .courseButton strong { font-size: 11px; }
   .courseButton small { font-size: 9px; }
+  .holeThumbs { gap: 1px; height: 28px; }
+  .holeThumbs svg { width: 17px; height: 28px; }
   .map { width: 80px; }
   .map svg { height: 78px; }
 }

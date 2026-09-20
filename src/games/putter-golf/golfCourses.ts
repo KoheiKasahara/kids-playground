@@ -47,7 +47,7 @@ export type Gadget =
   /** 入ると exit から exitDir の向きへ出てくる どかん。2つ向かい合わせに置くと行き来できる。 */
   | { kind: 'warp'; id: string; x: number; z: number; radius: number; exit: Vec2; exitDir: Vec2 }
 
-export type CritterLook = 'duck' | 'crab' | 'alien' | 'penguin'
+export type CritterLook = 'duck' | 'crab' | 'alien' | 'penguin' | 'dino'
 
 /** ゆかの ちがう ところ。すなば・こおり・ふかふか。 */
 export type ZoneKind = 'sand' | 'ice' | 'rough'
@@ -73,7 +73,7 @@ export type HoleDefinition = {
 }
 
 /** コースの並び順。★の保存やコース選びは、この一覧を正とする。 */
-export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow'] as const
+export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow', 'candy', 'dino'] as const
 export type CourseId = (typeof COURSE_IDS)[number]
 
 export type CourseLook = {
@@ -429,6 +429,201 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         zones: [{ kind: 'ice', x: 1.6, z: 0.4, radius: 1.5 }],
         route: [{ x: -1.6, z: 4.8 }, { x: -1.6, z: -1.0 }, { x: -1.6, z: -4.2, minPower: 0.45 }, { x: 1.6, z: -4.2 }, { x: 1.6, z: 4.2 }],
         tip: 'トンネルで むこうの みちへ',
+      },
+    ],
+  },
+  {
+    id: 'candy',
+    label: 'おかしのくに',
+    icon: '🍩',
+    description: 'ひろい おさらを まわろう',
+    color: '#e2649b',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#8fe0c4', wall: '#fff1dc', wallCap: '#ff9ec4', skirt: '#7a4a30', sand: '#f4d79f', ice: '#cdf1ff', rough: '#ffe0ef', ground: '#ffe3c2', sky: '#ffd6ec', horizon: '#fff6ea', bumper: '#ff5f9e', bumperCap: '#fff7d8', rock: '#8a5a3c' },
+    holes: [
+      {
+        id: 'candy-1',
+        name: 'クリームの おさら',
+        par: 2,
+        tee: { x: -2.4, z: 2.4 },
+        cup: { x: 2.4, z: -2.4 },
+        // 正方形の おさら。まん中の クリームは ころがりにくいので、ふちを まわって ななめに わたる。
+        floors: [{ corners: rect(-3.4, -3.4, 3.4, 3.4, 1.1, 1.1) }],
+        zones: [{ kind: 'rough', x: 0, z: 0, radius: 1.55 }],
+        gadgets: [{ kind: 'bumper', id: 'gumdrop', x: -2.1, z: -2.1, radius: 0.3 }],
+        route: [{ x: -2.4, z: 2.4 }, { x: 2.35, z: 2.25 }, { x: 2.4, z: -2.4 }],
+        tip: 'クリームを よけて まわろう',
+      },
+      {
+        id: 'candy-2',
+        name: 'グミの ひろば',
+        par: 3,
+        tee: { x: 0, z: 2.9 },
+        cup: { x: 0, z: -0.6 },
+        // 正方形の ひろばの まん中に カップ。4つの グミが かこんでいて、ななめの すきまから ねらう。
+        floors: [{ corners: rect(-3.5, -3.5, 3.5, 3.5, 1.2, 1.2) }],
+        gadgets: [
+          { kind: 'bumper', id: 'gum-n', x: 0, z: 0.6, radius: 0.3 },
+          { kind: 'bumper', id: 'gum-e', x: 1.2, z: -0.6, radius: 0.3 },
+          { kind: 'bumper', id: 'gum-s', x: 0, z: -1.8, radius: 0.3 },
+          { kind: 'bumper', id: 'gum-w', x: -1.2, z: -0.6, radius: 0.3 },
+        ],
+        route: [{ x: 0, z: 2.9 }, { x: 1.5, z: 0.8 }, { x: 0, z: -0.6 }],
+        tip: 'グミの あいだを ぬけよう',
+      },
+      {
+        id: 'candy-3',
+        name: 'ぐるっと まわりみち',
+        par: 3,
+        tee: { x: -2.55, z: 3.7 },
+        cup: { x: 2.55, z: 3.3 },
+        // コの字。まん中は かべなので、下を ぐるっと まわって となりの みちへ。
+        floors: [{
+          corners: [
+            { x: -3.3, z: 4.6, r: 0.7 },
+            { x: -3.3, z: -4.6, r: 1.1 },
+            { x: 3.3, z: -4.6, r: 1.1 },
+            { x: 3.3, z: 4.6, r: 0.7 },
+            { x: 1.2, z: 4.6, r: 0.7 },
+            { x: 1.2, z: -2.4, r: 0.9 },
+            { x: -1.2, z: -2.4, r: 0.9 },
+            { x: -1.2, z: 4.6, r: 0.7 },
+          ],
+        }],
+        zones: [
+          { kind: 'rough', x: -1.55, z: 0.6, radius: 0.72 },
+          { kind: 'rough', x: 1.55, z: -0.4, radius: 0.72 },
+        ],
+        gadgets: [{ kind: 'bumper', id: 'gumdrop-mid', x: 0, z: -2.9, radius: 0.28 }],
+        route: [{ x: -2.55, z: 3.7 }, { x: -2.55, z: -3.5 }, { x: 2.55, z: -3.5 }, { x: 2.55, z: 3.3 }],
+        tip: 'かべの そとがわを ぐるっと！',
+      },
+      {
+        id: 'candy-4',
+        name: 'いちごの とびら',
+        par: 3,
+        tee: { x: -0.9, z: 4.0 },
+        cup: { x: 0.9, z: -4.0 },
+        // ふたつの へやを ほそい みちで つないだ かたち。みちの まん中を いちごの とびらが 行き来する。
+        floors: [{
+          corners: [
+            { x: -1.95, z: 5.1, r: 0.8 },
+            { x: -1.95, z: 1.25, r: 0.55 },
+            { x: -1.0, z: 1.25, r: 0.45 },
+            { x: -1.0, z: -1.25, r: 0.45 },
+            { x: -1.95, z: -1.25, r: 0.55 },
+            { x: -1.95, z: -5.1, r: 0.8 },
+            { x: 1.95, z: -5.1, r: 0.8 },
+            { x: 1.95, z: -1.25, r: 0.55 },
+            { x: 1.0, z: -1.25, r: 0.45 },
+            { x: 1.0, z: 1.25, r: 0.45 },
+            { x: 1.95, z: 1.25, r: 0.55 },
+            { x: 1.95, z: 5.1, r: 0.8 },
+          ],
+        }],
+        gadgets: [{ kind: 'gate', id: 'strawberry-gate', x: 0, z: 0, axis: { x: 1, z: 0 }, span: 0.62, speed: 1.05, halfWidth: 0.5 }],
+        route: [{ x: -0.9, z: 4.0 }, { x: 0, z: 1.8 }, { x: 0, z: -1.8 }, { x: 0.9, z: -4.0 }],
+        tip: 'とびらの あいた ほうを ぬけよう',
+      },
+    ],
+  },
+  {
+    id: 'dino',
+    label: 'きょうりゅう',
+    icon: '🦕',
+    description: 'いわと どろの みち',
+    color: '#c1672f',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#8cbc5b', wall: '#b4623c', wallCap: '#f0c98a', skirt: '#7a3f28', sand: '#e8c08a', ice: '#bfe6f0', rough: '#9a7a4a', ground: '#c98a5c', sky: '#ffcf93', horizon: '#ffeccb', bumper: '#cf7a4e', bumperCap: '#fff0cf', rock: '#a9705a' },
+    holes: [
+      {
+        id: 'dino-1',
+        name: 'いわの みち',
+        par: 2,
+        tee: { x: -2.0, z: 4.2 },
+        cup: { x: 2.0, z: -4.2 },
+        // ななめに はしる みち。まん中の いわを よけて、のこりを ななめに わたる。
+        floors: [{
+          corners: [
+            { x: -1.26, z: 5.66, r: 0.9 },
+            { x: -3.6, z: 4.54, r: 0.9 },
+            { x: 1.26, z: -5.66, r: 0.9 },
+            { x: 3.6, z: -4.54, r: 0.9 },
+          ],
+        }],
+        gadgets: [
+          { kind: 'rock', id: 'rock-mid', x: -0.76, z: 1.6, radius: 0.34 },
+          { kind: 'rock', id: 'rock-side', x: 1.33, z: -0.59, radius: 0.3 },
+        ],
+        route: [{ x: -2.0, z: 4.2 }, { x: -1.35, z: 1.35 }, { x: 2.0, z: -4.2 }],
+        tip: 'いわを よけて ななめに すすもう',
+      },
+      {
+        id: 'dino-2',
+        name: 'どろんこ ひろば',
+        par: 3,
+        tee: { x: 0, z: 4.3 },
+        cup: { x: -2.6, z: -3.4 },
+        // Tの字。ほそい みちを おりると、ひろい ひろばで きょうりゅうが さんぽしている。
+        floors: [{
+          corners: [
+            { x: -1.15, z: 5.2, r: 0.6 },
+            { x: -1.15, z: -1.0, r: 0.5 },
+            { x: -3.7, z: -1.0, r: 0.7 },
+            { x: -3.7, z: -4.6, r: 1.0 },
+            { x: 3.7, z: -4.6, r: 1.0 },
+            { x: 3.7, z: -1.0, r: 0.7 },
+            { x: 1.15, z: -1.0, r: 0.5 },
+            { x: 1.15, z: 5.2, r: 0.6 },
+          ],
+        }],
+        zones: [
+          { kind: 'rough', x: 1.7, z: -2.3, radius: 1.15 },
+          { kind: 'rough', x: -0.1, z: -4.2, radius: 0.85 },
+        ],
+        gadgets: [{ kind: 'critter', id: 'dino-walk', x: 2.9, z: -3.7, to: { x: -1.0, z: -3.7 }, speed: 0.8, look: 'dino' }],
+        route: [{ x: 0, z: 4.3 }, { x: 0, z: -2.0 }, { x: -2.6, z: -3.4 }],
+        tip: 'きょうりゅうが とおりすぎたら うとう',
+      },
+      {
+        id: 'dino-3',
+        name: 'いわの とびら',
+        par: 3,
+        tee: { x: 0, z: 3.6 },
+        cup: { x: -1.5, z: -1.8 },
+        // ひし形の ひろば。おおきな いわの とびらが 行き来して、あいた ほうだけ とおれる。
+        floors: [{
+          corners: [
+            { x: 0, z: 5.4, r: 1.3 },
+            { x: -4.2, z: 0, r: 1.3 },
+            { x: 0, z: -5.4, r: 1.3 },
+            { x: 4.2, z: 0, r: 1.3 },
+          ],
+        }],
+        zones: [{ kind: 'rough', x: 1.7, z: -2.4, radius: 1.0 }],
+        gadgets: [{ kind: 'gate', id: 'boulder', x: -0.7, z: 0.9, axis: { x: 1, z: 0 }, span: 1.5, speed: 0.95, halfWidth: 1.25 }],
+        route: [{ x: 0, z: 3.6 }, { x: -0.5, z: 2.0 }, { x: -1.5, z: -1.8 }],
+        tip: 'とびらの あいた ほうへ',
+      },
+      {
+        id: 'dino-4',
+        name: 'おやまの むこう',
+        par: 3,
+        tee: { x: 0, z: 3.8 },
+        cup: { x: 0, z: -3.6 },
+        // まん中の おやまは のぼれない。いわを よけて、ひがしがわを まわって むこうがわへ。
+        floors: [{ corners: rect(-3.8, -4.8, 3.8, 4.8, 1.3, 1.3) }],
+        features: [{ kind: 'bump', x: 0, z: 0, radius: 2.4, height: 0.38 }],
+        zones: [{ kind: 'rough', x: -2.7, z: 0.2, radius: 1.0 }],
+        gadgets: [
+          { kind: 'rock', id: 'rock-n', x: -0.15, z: 1.95, radius: 0.38 },
+          { kind: 'rock', id: 'rock-s', x: 0.3, z: -1.95, radius: 0.38 },
+          { kind: 'critter', id: 'dino-big', x: 2.55, z: 1.7, to: { x: 2.55, z: -1.3 }, speed: 0.7, look: 'dino' },
+        ],
+        route: [{ x: 0, z: 3.8 }, { x: 3.2, z: -0.2 }, { x: 0, z: -3.6 }],
+        tip: 'おやまの そとがわを まわろう',
       },
     ],
   },

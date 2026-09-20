@@ -152,7 +152,7 @@ function ballTexture(id: GolfBallId) {
 /** 歩く どうぶつ。コースに合わせて見た目だけ変える（歩き方は同じ）。 */
 function critterModel(look: CritterLook, accent: string): THREE.Group {
   const group = new THREE.Group()
-  const skin = { duck: '#ffd94a', crab: '#ff6f5b', penguin: '#3c4560', alien: '#8ee6a8' }[look]
+  const skin = { duck: '#ffd94a', crab: '#ff6f5b', penguin: '#3c4560', alien: '#8ee6a8', dino: '#6fc07f' }[look]
   const r = CRITTER.radius
   const body = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshStandardMaterial({ color: skin, roughness: 0.6 }))
   body.scale.set(1, 0.92, 1.12)
@@ -191,6 +191,19 @@ function critterModel(look: CritterLook, accent: string): THREE.Group {
       const tip = new THREE.Mesh(new THREE.SphereGeometry(r * 0.12, 8, 6), new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.4, roughness: 0.3 }))
       tip.position.set(side * r * 0.24, CRITTER.height * 1.25, r * 0.2)
       group.add(stalk, tip)
+    }
+  }
+  if (look === 'dino') {
+    // しっぽと せなかの とげ。うしろから見ても きょうりゅうだと わかるようにする。
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(r * 0.34, r * 1.4, 10), new THREE.MeshStandardMaterial({ color: skin, roughness: 0.6 }))
+    tail.rotation.x = -Math.PI / 2.3
+    tail.position.set(0, r * 0.8, -r * 1.1)
+    group.add(tail)
+    for (let i = 0; i < 3; i++) {
+      const plate = new THREE.Mesh(new THREE.ConeGeometry(r * 0.17, r * 0.36, 4), new THREE.MeshStandardMaterial({ color: accent, roughness: 0.5 }))
+      plate.position.set(0, r * (1.78 - i * 0.14), -r * (0.1 + i * 0.42))
+      plate.rotation.y = Math.PI / 4
+      group.add(plate)
     }
   }
   return group
@@ -519,6 +532,35 @@ export function createGolfScene(container: HTMLElement) {
             const eye = new THREE.Mesh(new THREE.SphereGeometry(r * 0.09, 8, 6), new THREE.MeshStandardMaterial({ color: '#3b3340' }))
             eye.position.set(x * r, BUMPER_HEIGHT * 1.03, r * 0.62)
             group.add(eye)
+          }
+        } else if (course.id === 'candy') {
+          // グミ。つやつやの やま形に、さとうの つぶを まぶす。
+          const plate = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.2, r * 1.2, 0.05, 20), new THREE.MeshStandardMaterial({ color: look.bumperCap, roughness: 0.55 }))
+          plate.position.y = 0.025
+          const drop = new THREE.Mesh(new THREE.SphereGeometry(r * 1.12, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.15, transparent: true, opacity: 0.92, emissive: look.bumper, emissiveIntensity: 0.14 }))
+          drop.scale.y = 1.3
+          drop.position.y = 0.04
+          group.add(plate, drop)
+          for (let i = 0; i < 7; i++) {
+            const angle = (i / 7) * Math.PI * 2
+            const sugar = new THREE.Mesh(new THREE.SphereGeometry(r * 0.1, 6, 5), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 }))
+            sugar.position.set(Math.cos(angle) * r * 1.0, BUMPER_HEIGHT * (0.25 + 0.22 * (i % 3)), Math.sin(angle) * r * 1.0)
+            group.add(sugar)
+          }
+        } else if (course.id === 'dino') {
+          // きょうりゅうの たまご。くさの すに のっている。
+          const nest = new THREE.Mesh(new THREE.TorusGeometry(r * 1.05, r * 0.26, 8, 18), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.9 }))
+          nest.rotation.x = Math.PI / 2
+          nest.position.y = r * 0.24
+          const egg = new THREE.Mesh(new THREE.SphereGeometry(r * 1.0, 18, 12), new THREE.MeshStandardMaterial({ color: look.bumperCap, roughness: 0.6 }))
+          egg.scale.set(1, 1.35, 1)
+          egg.position.y = BUMPER_HEIGHT * 0.66
+          group.add(nest, egg)
+          for (let i = 0; i < 5; i++) {
+            const angle = (i / 5) * Math.PI * 2 + 0.4
+            const spot = new THREE.Mesh(new THREE.SphereGeometry(r * 0.13, 8, 6), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.7 }))
+            spot.position.set(Math.cos(angle) * r * 0.94, BUMPER_HEIGHT * (0.5 + 0.34 * (i % 2)), Math.sin(angle) * r * 0.94)
+            group.add(spot)
           }
         } else {
           // ユーフォー
@@ -897,6 +939,136 @@ export function createGolfScene(container: HTMLElement) {
       const points3d = new THREE.Points(flakes, new THREE.PointsMaterial({ color: '#ffffff', size: 0.11, transparent: true, opacity: 0.9, depthWrite: false, fog: false }))
       root.add(points3d)
       snow = { points: points3d, base: baseY, height: snowHeight }
+    } else if (course.id === 'candy') {
+      // クッキーの じめんに、ロリポップ・ドーナツ・カップケーキ。ぜんぶ おかしの 大きさにする。
+      const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 48), new THREE.MeshStandardMaterial({ color: look.ground, roughness: 1 }))
+      ground.rotation.x = -Math.PI / 2
+      ground.position.y = baseY - 0.01
+      ground.receiveShadow = true
+      root.add(ground)
+      const sweets = ['#ff7fb0', '#7fe3d0', '#ffd66b', '#c9a0ff', '#fffdf6']
+      // チョコスプレー。
+      for (let i = 0; i < 140; i++) {
+        const x = cx + (hash(i + 210) - 0.5) * 26
+        const z = cz + (hash(i + 410) - 0.5) * 28
+        if (!clear(x, z, 0.7)) continue
+        solid.add('box', sweets[i % sweets.length]!, x, baseY + 0.05, z, 0.32, 0.08, 0.12, 0, hash(i + 3) * Math.PI, 0)
+      }
+      // ロリポップ。
+      for (let i = 0; i < 28; i++) {
+        const angle = hash(i + 61) * Math.PI * 2
+        const distance = 5 + hash(i + 67) * 21
+        const x = cx + Math.cos(angle) * distance
+        const z = cz + Math.sin(angle) * distance
+        const size = 0.8 + hash(i + 71) * 0.7
+        if (!clear(x, z, 1.5 + size)) continue
+        solid.add('cylinder', '#fffdf6', x, baseY + size * 0.95, z, 0.14, size * 1.9, 0.14)
+        solid.add('cylinder', sweets[i % sweets.length]!, x, baseY + size * 2.1, z, size * 1.2, 0.18, size * 1.2, Math.PI / 2, 0, 0)
+        solid.add('cylinder', '#fffdf6', x, baseY + size * 2.1, z, size * 0.5, 0.2, size * 0.5, Math.PI / 2, 0, 0)
+      }
+      // ドーナツ。ねかせて じめんに ならべる。
+      for (let i = 0; i < 14; i++) {
+        const angle = hash(i + 131) * Math.PI * 2
+        const distance = 7 + hash(i + 137) * 17
+        const x = cx + Math.cos(angle) * distance
+        const z = cz + Math.sin(angle) * distance
+        if (!clear(x, z, 2.4)) continue
+        solid.add('torus', i % 2 ? '#ff9ec4' : '#b5744a', x, baseY + 0.42, z, 1.8, 1.8, 1.8, -Math.PI / 2, 0, 0)
+      }
+      // カップケーキ。
+      for (let i = 0; i < 12; i++) {
+        const angle = hash(i + 181) * Math.PI * 2
+        const distance = 6 + hash(i + 187) * 16
+        const x = cx + Math.cos(angle) * distance
+        const z = cz + Math.sin(angle) * distance
+        if (!clear(x, z, 2.0)) continue
+        solid.add('cylinder', i % 2 ? '#f2b56b' : '#e08bb4', x, baseY + 0.55, z, 1.5, 1.1, 1.5)
+        solid.add('sphere', '#fff6ea', x, baseY + 1.35, z, 1.6, 1.3, 1.6)
+        solid.add('sphere', '#ff5f6d', x, baseY + 2.0, z, 0.4, 0.4, 0.4)
+      }
+      // コースの そばの 大きな ケーキと、キャンディの つえ。
+      const kx = bounds.maxX + 4.2
+      const kz = bounds.maxZ - 1.6
+      solid.add('cylinder', '#fff1dc', kx, baseY + 0.9, kz, 5.0, 1.8, 5.0)
+      solid.add('cylinder', '#ffc0d8', kx, baseY + 2.2, kz, 4.2, 1.0, 4.2)
+      solid.add('cylinder', '#fff1dc', kx, baseY + 3.0, kz, 3.4, 0.8, 3.4)
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2
+        solid.add('cylinder', '#ff5f9e', kx + Math.cos(angle) * 1.1, baseY + 3.8, kz + Math.sin(angle) * 1.1, 0.16, 0.9, 0.16)
+        solid.add('sphere', '#ffd66b', kx + Math.cos(angle) * 1.1, baseY + 4.35, kz + Math.sin(angle) * 1.1, 0.24, 0.3, 0.24)
+      }
+      const sx = bounds.minX - 3.6
+      const sz = bounds.minZ + 2.2
+      for (let k = 0; k < 7; k++) solid.add('cylinder', k % 2 ? '#ffffff' : '#ff5f9e', sx, baseY + 0.4 + k * 0.8, sz, 0.55, 0.8, 0.55)
+      for (let k = 0; k < 4; k++) solid.add('sphere', k % 2 ? '#ffffff' : '#ff5f9e', sx + 0.35 + k * 0.42, baseY + 6.1 + Math.cos(k * 0.7) * 0.35, sz, 0.55, 0.55, 0.55)
+      // とおくの クリームの おか。
+      for (const [x, z, size] of [[-36, -26, 11], [18, -44, 13], [42, 14, 9]] as const) {
+        soft.add('sphere', '#fff0dd', cx + x, baseY, cz + z, size * 2.4, size, size * 2)
+      }
+    } else if (course.id === 'dino') {
+      // あかつちの じめんに、しだの木・いわ・かざん。コースの そばに 大きな きょうりゅう。
+      const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 48), new THREE.MeshStandardMaterial({ color: look.ground, roughness: 1 }))
+      ground.rotation.x = -Math.PI / 2
+      ground.position.y = baseY - 0.01
+      ground.receiveShadow = true
+      root.add(ground)
+      // しだの木。ボールの うしろからの ながめを ふさがないよう、コースから はなして 立てる。
+      for (let i = 0; i < 34; i++) {
+        const angle = hash(i + 21) * Math.PI * 2
+        const distance = 7 + hash(i + 23) * 21
+        const x = cx + Math.cos(angle) * distance
+        const z = cz + Math.sin(angle) * distance
+        const size = 0.8 + hash(i + 29) * 0.7
+        if (!clear(x, z, 3.2 + size * 1.6)) continue
+        for (let k = 0; k < 2; k++) solid.add('cylinder', '#8a6247', x, baseY + size * (0.45 + k * 0.85), z, 0.26 * size, size * 0.9, 0.26 * size)
+        for (let k = 0; k < 5; k++) {
+          const leaf = (k / 5) * Math.PI * 2
+          solid.add('cone', k % 2 ? '#3f8a4a' : '#579f52', x + Math.cos(leaf) * size * 0.5, baseY + size * 2.0, z + Math.sin(leaf) * size * 0.5, size * 0.5, size * 1.3, size * 0.5, Math.PI / 5.1, leaf, 0)
+        }
+      }
+      // 足もとの しだの かぶ。
+      for (let i = 0; i < 36; i++) {
+        const x = cx + (hash(i + 331) - 0.5) * 26
+        const z = cz + (hash(i + 337) - 0.5) * 28
+        if (!clear(x, z, 1.1)) continue
+        soft.add('sphere', i % 2 ? '#4f9a58' : '#69ac5c', x, baseY + 0.06, z, 0.9 + hash(i) * 0.7, 0.5, 0.9 + hash(i + 7) * 0.6)
+      }
+      // ごろごろした いわと、すの たまご。
+      for (let i = 0; i < 44; i++) {
+        const x = cx + (hash(i + 511) - 0.5) * 28
+        const z = cz + (hash(i + 713) - 0.5) * 30
+        const size = 0.5 + hash(i + 17) * 1.3
+        if (!clear(x, z, 1.0 + size * 0.6)) continue
+        solid.add('rock', i % 3 ? look.rock : '#8d6a58', x, baseY + size * 0.25, z, size * 1.6, size * 1.2, size * 1.5, hash(i) * 0.6, hash(i + 5) * 3, hash(i + 9) * 0.5)
+      }
+      for (let i = 0; i < 5; i++) {
+        const angle = hash(i + 301) * Math.PI * 2
+        const distance = 7 + hash(i + 307) * 12
+        const x = cx + Math.cos(angle) * distance
+        const z = cz + Math.sin(angle) * distance
+        if (!clear(x, z, 2.2)) continue
+        solid.add('torus', '#9a7a4a', x, baseY + 0.24, z, 2.2, 2.2, 2.2, -Math.PI / 2, 0, 0)
+        for (let k = 0; k < 3; k++) solid.add('sphere', '#f2e3c4', x + Math.cos(k * 2.1) * 0.5, baseY + 0.45, z + Math.sin(k * 2.1) * 0.5, 0.7, 0.9, 0.7)
+      }
+      // とおくの かざん。てっぺんから けむりが 立ちのぼる。
+      const vx = cx - 34
+      const vz = cz - 38
+      solid.add('cone', '#8a5a42', vx, baseY + 7, vz, 34, 14, 34)
+      solid.add('cone', '#ff7a3d', vx, baseY + 14.4, vz, 5.4, 1.6, 5.4)
+      for (let k = 0; k < 5; k++) soft.add('sphere', '#d8cec6', vx + k * 1.6, baseY + 16 + k * 3.2, vz + k * 1.2, 4 + k, 3 + k * 0.8, 4 + k)
+      for (const [x, z, size] of [[30, -40, 12], [44, 10, 10], [-18, 34, 9]] as const) {
+        soft.add('sphere', '#a9784f', cx + x, baseY, cz + z, size * 2.4, size, size * 2)
+      }
+      // くびの ながい きょうりゅう。コースの となりで こちらを 見ている。
+      const dx = bounds.maxX + 5.4
+      const dz = cz + 1.2
+      const hide = '#6fb07f'
+      solid.add('sphere', hide, dx, baseY + 2.3, dz, 3.6, 2.5, 2.4)
+      for (let k = 0; k < 4; k++) solid.add('cylinder', hide, dx - 1.5 - k * 0.5, baseY + 3.4 + k * 0.9, dz, 0.78 - k * 0.09, 1.2, 0.78 - k * 0.09, 0, 0, 0.44)
+      solid.add('sphere', hide, dx - 3.7, baseY + 6.7, dz, 1.0, 0.85, 0.95)
+      for (const side of [-1, 1]) solid.add('sphere', '#2f2a33', dx - 4.0, baseY + 6.9, dz + side * 0.36, 0.14, 0.14, 0.14)
+      solid.add('cone', hide, dx + 3.1, baseY + 2.6, dz, 1.0, 3.8, 1.0, 0, 0, -Math.PI / 2.4)
+      for (const front of [-1, 1]) for (const side of [-1, 1]) solid.add('cylinder', hide, dx + front * 1.2, baseY + 0.9, dz + side * 0.9, 0.62, 1.9, 0.62)
     }
     solid.build(root, true)
     soft.build(root, false)
@@ -910,7 +1082,7 @@ export function createGolfScene(container: HTMLElement) {
     sun.shadow.camera.updateProjectionMatrix()
     const moon = course.id === 'moon'
     hemisphere.color.set(moon ? '#b3b8ff' : '#eef8ff')
-    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : '#7fa35a')
+    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : course.id === 'candy' ? '#ffdcc0' : course.id === 'dino' ? '#c08a5e' : '#7fa35a')
     hemisphere.intensity = moon ? 0.9 : 1.05
     sun.color.set(moon ? '#f2f0ff' : '#fff1d6')
     sun.intensity = moon ? 2.1 : 2.4
