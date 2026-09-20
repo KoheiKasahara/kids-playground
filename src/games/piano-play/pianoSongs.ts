@@ -32,6 +32,11 @@ type SongDefinition = {
   readonly steps: readonly SongStep[]
 }
 
+/** 同音の連打を、音の余韻が重ならないよう半拍ずつ区切る。 */
+function detachedNote(noteId: PianoNoteId): readonly SongStep[] {
+  return [[noteId, 0.5], ['rest', 0.5]]
+}
+
 function defineSong({ id, title, tempoBpm, steps }: SongDefinition): PianoSong {
   const beatMs = 60_000 / tempoBpm
   let startMs = 0
@@ -110,8 +115,11 @@ export const PIANO_SONGS: readonly PianoSong[] = [
     steps: [
       ['C4', 1], ['D4', 1], ['E4', 1], ['F4', 1], ['E4', 1], ['D4', 1], ['C4', 2],
       ['E4', 1], ['F4', 1], ['G4', 1], ['A4', 1], ['G4', 1], ['F4', 1], ['E4', 2],
-      ['C4', 1], ['C4', 1], ['C4', 1], ['C4', 1], ['D4', 1], ['D4', 1], ['D4', 1], ['D4', 1],
-      ['E4', 1], ['E4', 1], ['F4', 1], ['F4', 1], ['E4', 1], ['D4', 1], ['C4', 2],
+      // 「くわっ、くわっ…」の反復は短く鳴らして半拍休み、音の余韻を区切る。
+      ...detachedNote('C4'), ...detachedNote('C4'), ...detachedNote('C4'), ...detachedNote('C4'),
+      ...detachedNote('D4'), ...detachedNote('D4'), ...detachedNote('D4'), ...detachedNote('D4'),
+      ...detachedNote('E4'), ...detachedNote('E4'), ...detachedNote('F4'), ...detachedNote('F4'),
+      ...detachedNote('E4'), ...detachedNote('D4'), ['C4', 2],
     ],
   }),
   defineSong({
