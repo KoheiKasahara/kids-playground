@@ -1,6 +1,7 @@
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { GOLF_COURSES } from './golfCourses'
+import { aimPose } from './golfCamera'
 import type { GolfEvent } from './golfWorld'
 import { aimFromDrag, usePutterGolfEngine, type EngineEvent, type GolfFeedback } from './usePutterGolfEngine'
 
@@ -132,6 +133,20 @@ it('「うつ！」はおすすめの向きと、えらんだ強さでうち、�
   expect(scene().swingClub).toHaveBeenCalledOnce()
   expect(app.host.dataset.strokes).toBe('1')
   expect(app.feedback.at(-1)).toMatchObject({ phase: 'rolling', strokes: 1 })
+})
+
+it('打ち終わったら、次のねらいの後ろへカメラを置き直す', async () => {
+  const app = setup()
+  await waitFor(() => expect(app.status).toContain('ready'))
+  runFrames(2)
+  const next = { direction: { x: 1, z: 0 }, power: 0.5, target: { x: 3, z: 4.5 } }
+  world().suggestShot.mockReturnValueOnce(next)
+  world().state.phase = 'ready'
+  world().queue({ kind: 'rest', position: world().state.position })
+
+  runFrames(1)
+
+  expect(scene().setCamera).toHaveBeenLastCalledWith(aimPose(world().state.position, next.direction, 1))
 })
 
 it('えらぶ画面の間は、うてない', async () => {
