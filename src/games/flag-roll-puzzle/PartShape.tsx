@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react'
 import AirToyShape from './AirToyShape'
-import { isAirToy, partDefinition, type PartAppearance, type PartSegment, type PartTypeId } from './partTypes'
+import { isAirToy, partDefinition, type PartAppearance, type PartDefinition, type PartSegment, type PartTypeId } from './partTypes'
+import { spinnerSpec } from './spinnerPhysics'
 import styles from './PartShape.module.css'
 
 /**
@@ -25,13 +27,30 @@ function visualTransform(segment: PartSegment, appearance: PartAppearance) {
   return `translate(-50%, -50%) translate(${segment.offsetX}px, ${segment.offsetY}px) rotate(${segment.angleDeg}deg)${visualScale}`
 }
 
+type PartShapeVariant = 'placed' | 'selected' | 'dragging' | 'ghost'
+
+/** パーツ定義の長方形をそのまま並べる、すべての見た目に共通の下地。 */
+function segmentSpans(definition: PartDefinition, variant: PartShapeVariant) {
+  return definition.segments.map((segment, index) => (
+    <span
+      key={index}
+      className={`${styles.segment} ${styles[variant]} ${styles[definition.appearance]} ${segment.role ? styles[segment.role] : ''}`}
+      style={{
+        width: segment.width,
+        height: segment.height,
+        transform: visualTransform(segment, definition.appearance),
+      }}
+    />
+  ))
+}
+
 type PartShapeProps = {
   typeId: PartTypeId
   /**
    * 見た目の状態。置いたパーツ・選んでいるパーツ・ドラッグ中の分身・
    * 置ける位置の下書き で色を変える。
    */
-  variant?: 'placed' | 'selected' | 'dragging' | 'ghost'
+  variant?: PartShapeVariant
   /** 実行中に物理Bodyの角度を書き込む対象。シーソーのデッキだけを回す。 */
   motionRef?: (element: HTMLSpanElement | null) => void
 }
@@ -105,19 +124,28 @@ export default function PartShape({ typeId, variant = 'placed', motionRef }: Par
     )
   }
 
-  return (
-    <>
-      {definition.segments.map((segment, index) => (
+  if (definition.appearance === 'spinner') {
+    const { angularVelocity, bladeThickness, center, radius } = spinnerSpec(typeId)
+    // 回る向きは、止まっているあいだも矢印で分かるようにする。羽根といっしょに回るので、
+    // 動き出したあとも「そっちへ進む」という手がかりがそのまま残る。
+    const reverse = angularVelocity < 0
+    return (
+      <>
+        {segmentSpans(definition, variant)}
         <span
-          key={index}
-          className={`${styles.segment} ${styles[variant]} ${styles[definition.appearance]} ${segment.role ? styles[segment.role] : ''}`}
+          className={`${styles.spinArrow} ${reverse ? styles.spinArrowReverse : ''}`}
+          data-variant={variant}
+          data-spin={reverse ? 'reverse' : 'forward'}
           style={{
-            width: segment.width,
-            height: segment.height,
-            transform: visualTransform(segment, definition.appearance),
-          }}
+            '--spin-arrow-x': `${center.x}px`,
+            '--spin-arrow-y': `${center.y - radius * 0.55}px`,
+            '--spin-arrow-half': `${bladeThickness * 0.55}px`,
+            '--spin-arrow-length': `${bladeThickness}px`,
+          } as CSSProperties}
         />
-      ))}
-    </>
-  )
+      </>
+    )
+  }
+
+  return <>{segmentSpans(definition, variant)}</>
 }

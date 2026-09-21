@@ -2,11 +2,14 @@ import { describe, expect, test } from 'vitest'
 import { CELL_SIZE } from './boardLayout'
 import {
   PART_DEFINITIONS,
+  SPINNER_TYPE_IDS,
   TRAY_PART_DEFINITIONS,
   FAN_ANGLES,
+  isSpinnerPart,
   nextRotationType,
   isRotatablePart,
   partDefinition,
+  partFootprint,
   type PartDefinition,
   type PartTypeId,
 } from './partTypes'
@@ -38,7 +41,8 @@ describe('partTypes', () => {
   test('置き場には残ったパーツ、ジャンプ台、キャノン・Spinner・シーソーの基本向きを出す', () => {
     expect(TRAY_PART_DEFINITIONS.map((definition) => definition.id)).toEqual([
       'slopeLeft', 'slopeRight', 'curveLeft', 'curveRight',
-      'bumper', 'guideLeft', 'guideRight', 'jumpRampRight', 'cannon', 'spinner', 'fanRight', 'bubbleLift', 'warpIn', 'warpOut', 'conveyorRight', 'seesaw',
+      'bumper', 'guideLeft', 'guideRight', 'jumpRampRight', 'cannon', 'spinner', 'spinnerLarge',
+      'fanRight', 'bubbleLift', 'warpIn', 'warpOut', 'conveyorRight', 'seesaw',
     ])
   })
 
@@ -94,7 +98,7 @@ describe('partTypes', () => {
     expect(isRotatablePart('bumper')).toBe(false)
   })
 
-  test('キャノンは8方向を循環し、Spinnerはユーザー回転しない', () => {
+  test('キャノンは8方向を循環する', () => {
     const cannonDirections = [
       'cannon', 'cannonDownRight', 'cannonDown', 'cannonDownLeft',
       'cannonLeft', 'cannonUpLeft', 'cannonUp', 'cannonUpRight',
@@ -105,7 +109,40 @@ describe('partTypes', () => {
       expect(current).toBe(expected)
     }
     expect(nextRotationType(current)).toBe('cannon')
-    expect(isRotatablePart('spinner')).toBe(false)
+  })
+
+  test('回転盤は「まわす」で逆回しへ切り替わり、置き場には順回しだけを出す', () => {
+    expect(SPINNER_TYPE_IDS.every((id) => isSpinnerPart(id))).toBe(true)
+    expect(isSpinnerPart('bumper')).toBe(false)
+
+    for (const [forward, reverse] of [['spinner', 'spinnerReverse'], ['spinnerLarge', 'spinnerLargeReverse']] as const) {
+      expect(isRotatablePart(forward)).toBe(true)
+      expect(nextRotationType(forward)).toBe(reverse)
+      expect(nextRotationType(reverse)).toBe(forward)
+      // 逆回しは見た目が同じで、回る向きだけが違う。占有マスも形も揃える。
+      expect(partDefinition(reverse).segments).toEqual(partDefinition(forward).segments)
+      expect(partDefinition(reverse).cells).toEqual(partDefinition(forward).cells)
+      expect(partDefinition(forward).inTray).toBe(true)
+      expect(partDefinition(reverse).inTray).toBe(false)
+    }
+  })
+
+  test('2×2の回転盤は4マスを占有し、羽根をその中心へ置く', () => {
+    const small = partDefinition('spinner')
+    const large = partDefinition('spinnerLarge')
+    expect(small.cells).toHaveLength(1)
+    expect(large.cells).toHaveLength(4)
+
+    const footprint = partFootprint(large.cells)
+    expect(footprint).toMatchObject({ cols: 2, rows: 2, center: { x: CELL_SIZE / 2, y: CELL_SIZE / 2 } })
+    for (const segment of large.segments) {
+      expect(segment.offsetX).toBe(footprint.center.x)
+      expect(segment.offsetY).toBe(footprint.center.y)
+    }
+
+    const bladeLength = (definition: PartDefinition) =>
+      Math.max(...definition.segments.filter((segment) => segment.role === 'blade').map((segment) => segment.width))
+    expect(bladeLength(large)).toBeGreaterThan(bladeLength(small))
   })
 
   test('ジャンプ台は左右の向きを回転で切り替え、右向きは右上がりの斜面になる', () => {

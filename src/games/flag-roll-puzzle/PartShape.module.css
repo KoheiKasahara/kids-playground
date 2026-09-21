@@ -178,6 +178,36 @@
   box-sizing: border-box;
 }
 
+/*
+ * 回転盤が回る向きの矢印。色だけに頼らず形で向きを示し、羽根といっしょに回ることで
+ * 「この向きへ進む」という手がかりを動きでも伝える。
+ */
+.spinArrow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  border-top: var(--spin-arrow-half, 6px) solid transparent;
+  border-bottom: var(--spin-arrow-half, 6px) solid transparent;
+  border-left: var(--spin-arrow-length, 10px) solid #7c4b00;
+  transform: translate(-50%, -50%) translate(var(--spin-arrow-x, 0px), var(--spin-arrow-y, 0px));
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.9));
+  pointer-events: none;
+}
+
+/* 逆回しは同じ三角を左向きにして、羽根が進む向きと矢印の向きをそろえる。 */
+.spinArrowReverse {
+  border-left: 0;
+  border-right: var(--spin-arrow-length, 10px) solid #7c4b00;
+}
+
+.spinArrow[data-variant='ghost'] {
+  opacity: 0.5;
+  filter: none;
+}
+
 /* シーソーは支点を固定して、デッキだけを物理Bodyの角度へ合わせて回す。 */
 .seesawDeckMotion {
   position: absolute;

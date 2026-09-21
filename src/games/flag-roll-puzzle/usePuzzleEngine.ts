@@ -42,6 +42,14 @@ import {
   type CannonCaptureState,
 } from './cannonPhysics'
 import { createSpinnerCore, type SpinnerCore } from '../shared/toys/spinnerCore'
+import {
+  SPINNER_BALL_SPEED_CAP,
+  SPINNER_INFLUENCE_MARGIN,
+  SPINNER_NUDGE_COOLDOWN_MS,
+  SPINNER_NUDGE_SPEED,
+  SPINNER_STALL_SPEED,
+  spinnerSpec,
+} from './spinnerPhysics'
 import type { PlacedPart } from './placement'
 import type { PuzzleBallSnapshot, PuzzleBallState } from './puzzleState'
 import {
@@ -72,15 +80,6 @@ const DEG_TO_RAD = Math.PI / 180
 
 /** キャノンのセンサーは見た目のチャンバーにだけ置き、筒自体はボールを遮らない。 */
 export const CANNON_SENSOR_RADIUS = 10
-/** Spinnerの十字は1マス内へ収め、ボールへ伝わる接線速度を安全域に制限する。 */
-export const PUZZLE_SPINNER_RADIUS = 24
-export const PUZZLE_SPINNER_BLADE_THICKNESS = 10
-export const PUZZLE_SPINNER_ANGULAR_VELOCITY = 0.08
-export const PUZZLE_SPINNER_BALL_SPEED_CAP = 11
-const PUZZLE_SPINNER_INFLUENCE_MARGIN = 8
-const PUZZLE_SPINNER_STALL_SPEED = 0.3
-const PUZZLE_SPINNER_NUDGE_SPEED = 2.2
-const PUZZLE_SPINNER_NUDGE_COOLDOWN_MS = 220
 /** 連続接触で画面がちらつかないよう、同じ球とパーツの反応を短く間引く。 */
 const PART_IMPACT_COOLDOWN_MS = 120
 
@@ -175,6 +174,8 @@ type CannonRuntime = {
 type SpinnerRuntime = {
   readonly partId: string
   readonly core: SpinnerCore
+  /** 回る向きはパーツ種類ごとに決まる（逆回しは符号だけが反転する）。 */
+  readonly angularVelocity: number
   readonly lastNudgeAt: Map<string, number>
 }
 
@@ -248,21 +249,23 @@ export function createCannonSensorBody(part: PlacedPart): Matter.Body {
 }
 
 function spinnerRuntime(part: PlacedPart): SpinnerRuntime {
-  const center = cellCenter(part.cell)
+  const spec = spinnerSpec(part.typeId)
+  const anchor = cellCenter(part.cell)
   const core = createSpinnerCore({
-    x: center.x,
-    y: center.y,
-    radius: PUZZLE_SPINNER_RADIUS,
-    bladeThickness: PUZZLE_SPINNER_BLADE_THICKNESS,
+    // 2×2の回転盤は、アンカーセルではなく占有マス全体の中心を軸に回す。
+    x: anchor.x + spec.center.x,
+    y: anchor.y + spec.center.y,
+    radius: spec.radius,
+    bladeThickness: spec.bladeThickness,
     friction: partDefinition(part.typeId).friction,
     restitution: partDefinition(part.typeId).restitution,
     label: `spinner:${part.id}`,
-    ballSpeedCap: PUZZLE_SPINNER_BALL_SPEED_CAP,
-    influenceMargin: PUZZLE_SPINNER_INFLUENCE_MARGIN,
+    ballSpeedCap: SPINNER_BALL_SPEED_CAP,
+    influenceMargin: SPINNER_INFLUENCE_MARGIN,
     ballRadius: BALL_RADIUS,
     stepMs: STEP_MS,
   })
-  return { partId: part.id, core, lastNudgeAt: new Map() }
+  return { partId: part.id, core, angularVelocity: spec.angularVelocity, lastNudgeAt: new Map() }
 }
 
 /** Spinner専用の静的な十字Bodyを返すテスト用ファクトリ。 */
@@ -688,10 +691,10 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
           if (ball.body.isStatic || ball.reachedGoal) continue
           spinner.core.capBallSpeed(ball.body)
           const speed = Math.hypot(ball.body.velocity.x, ball.body.velocity.y)
-          if (speed >= PUZZLE_SPINNER_STALL_SPEED) continue
+          if (speed >= SPINNER_STALL_SPEED) continue
           const lastNudge = spinner.lastNudgeAt.get(ball.id) ?? -Infinity
-          if (simulationTime - lastNudge < PUZZLE_SPINNER_NUDGE_COOLDOWN_MS) continue
-          if (spinner.core.nudgeIfStalled(ball.body, PUZZLE_SPINNER_STALL_SPEED, PUZZLE_SPINNER_NUDGE_SPEED)) {
+          if (simulationTime - lastNudge < SPINNER_NUDGE_COOLDOWN_MS) continue
+          if (spinner.core.nudgeIfStalled(ball.body, SPINNER_STALL_SPEED, SPINNER_NUDGE_SPEED)) {
             spinner.lastNudgeAt.set(ball.id, simulationTime)
           }
         }
@@ -713,7 +716,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
         // 静的Spinnerでも、Engine.update前に角度を進めることで、このstepの
         // 接触解決が羽根の接線速度を実際の運動として受け取れる。
         for (const spinner of spinnerRuntimes) {
-          spinner.core.advance(STEP_MS, PUZZLE_SPINNER_ANGULAR_VELOCITY)
+          spinner.core.advance(STEP_MS, spinner.angularVelocity)
         }
         holdCapturedBalls()
         Engine.update(engine, STEP_MS)

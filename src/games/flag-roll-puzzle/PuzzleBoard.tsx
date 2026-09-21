@@ -1,4 +1,4 @@
-import type { PointerEvent, RefObject } from 'react'
+import type { CSSProperties, PointerEvent, RefObject } from 'react'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import type { FlagBallData } from '../../components/flag-ball/flagBalls'
 import {
@@ -18,6 +18,7 @@ import PartShape from './PartShape'
 import { isJumpRampPart, isSeesawPart, isSpinnerPart, type PartTypeId } from './partTypes'
 import { occupiedCells, type PlacedPart } from './placement'
 import { ballLetter } from './puzzleStages'
+import { spinnerSpec } from './spinnerPhysics'
 import styles from './PuzzleBoard.module.css'
 
 type PuzzleBallView = PuzzleBallState & { readonly flag: FlagBallData }
@@ -45,6 +46,18 @@ type PuzzleBoardProps = {
   onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void
   onPointerMove?: (event: PointerEvent<HTMLDivElement>) => void
   onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void
+}
+
+/**
+ * 回転盤の回転軸。2×2版はアンカーセル中心から占有マス全体の中心へずれるので、
+ * その点を軸に回す（軸がずれると、羽根が回らずに盤面を周回してしまう）。
+ */
+function spinnerAxisStyle(typeId: PartTypeId): CSSProperties {
+  const { center } = spinnerSpec(typeId)
+  return {
+    '--spinner-center-x': `${center.x}px`,
+    '--spinner-center-y': `${center.y}px`,
+  } as CSSProperties
 }
 
 function selectionRingStyle(part: PlacedPart) {
@@ -145,6 +158,7 @@ export default function PuzzleBoard({
                     ref={(element) => registerPartMotionElement(part.id, element)}
                     className={styles.spinnerVisual}
                     aria-hidden="true"
+                    style={spinnerAxisStyle(part.typeId)}
                   >
                     <PartShape typeId={part.typeId} variant={selected ? 'selected' : 'placed'} />
                   </span>

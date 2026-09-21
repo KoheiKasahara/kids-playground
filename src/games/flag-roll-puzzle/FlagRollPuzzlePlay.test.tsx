@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
-import { CELL_SIZE, GRID_TOP } from './boardLayout'
+import { CELL_SIZE, GRID_COLS, GRID_TOP } from './boardLayout'
 import type { PuzzleEngineOptions } from './usePuzzleEngine'
 import surfaceStyles from '../../components/GamePlaySurface.module.css'
 
@@ -238,6 +238,7 @@ describe('こっきコロコロパズル', () => {
     expect(trayPart('みぎへ おす')).toBeEnabled()
     expect(trayPart('たいほう みぎ')).toBeEnabled()
     expect(trayPart('かいてんばん')).toBeEnabled()
+    expect(trayPart('おおきい かいてんばん')).toBeEnabled()
     expect(trayPart('ベルトコンベア')).toBeEnabled()
     expect(trayPart('シーソー')).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'よこいた' })).not.toBeInTheDocument()
@@ -357,6 +358,48 @@ describe('こっきコロコロパズル', () => {
     expect(screen.getByRole('button', { name: 'まわす' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'まわす' }))
     expect(placedParts()[0]).toHaveAttribute('data-part-type', 'cannonDownRight')
+  })
+
+  test('回転盤は配置・選択でき、「まわす」で逆回しへ切り替わる', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('かいてんばん'))
+    expect(screen.getByRole('status')).toHaveTextContent('くるくる')
+    tapBoard(2, 3)
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'spinner')
+
+    tapBoard(2, 3)
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'spinnerReverse')
+    // もう一度押すと元の向きへ戻る（2つの向きを行き来するだけ）。
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'spinner')
+
+    await user.click(screen.getByRole('button', { name: 'けす' }))
+    expect(placedParts()).toHaveLength(0)
+  })
+
+  test('2×2の回転盤は4マスを使い、どのマスからでも選んで逆回しにできる', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('おおきい かいてんばん'))
+
+    // 右端では4マスぶんが盤面に収まらないので置けない。
+    tapBoard(GRID_COLS - 1, 3)
+    expect(placedParts()).toHaveLength(0)
+    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+
+    tapBoard(2, 3)
+    expect(placedParts()).toHaveLength(1)
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'spinnerLarge')
+    expect(placedParts()[0]).toHaveAttribute('data-cell', '2,3')
+
+    // 左上以外のマスを押しても同じ回転盤を選べる。
+    tapBoard(3, 4)
+    expect(placedParts()[0]).toHaveAttribute('data-selected', 'true')
+    await user.click(screen.getByRole('button', { name: 'まわす' }))
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'spinnerLargeReverse')
+    expect(engineMock.options?.parts[0].typeId).toBe('spinnerLargeReverse')
   })
 
   test('ベルトコンベアは配置・移動・4方向回転・削除ができる', async () => {

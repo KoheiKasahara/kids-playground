@@ -178,7 +178,11 @@
   width: 0;
   height: 0;
   display: block;
-  transform: rotate(var(--spinner-angle, 0rad));
+  /* 回転軸まで寄せてから回し、元へ戻す。2×2の回転盤は4マスの中心が軸になる。 */
+  transform:
+    translate(var(--spinner-center-x, 0px), var(--spinner-center-y, 0px))
+    rotate(var(--spinner-angle, 0rad))
+    translate(calc(-1 * var(--spinner-center-x, 0px)), calc(-1 * var(--spinner-center-y, 0px)));
   transform-origin: 0 0;
   will-change: transform;
 }
