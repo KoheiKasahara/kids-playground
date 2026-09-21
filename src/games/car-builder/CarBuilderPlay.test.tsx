@@ -572,3 +572,25 @@ describe('スマホ縦画面のレイアウト（CSS）', () => {
     }
   })
 })
+
+describe('横画面の左右レイアウト（CSS）', () => {
+  const landscapeStart = CSS_SOURCE.indexOf('@media (orientation: landscape) {')
+  const lowLandscapeStart = CSS_SOURCE.indexOf('@media (orientation: landscape) and (max-height: 560px)')
+
+  test('横向きは左に3Dプレビュー、右にパーツパネルを置く2列グリッドになる', () => {
+    expect(landscapeStart).toBeGreaterThan(-1)
+    expect(lowLandscapeStart).toBeGreaterThan(landscapeStart)
+    const landscape = CSS_SOURCE.slice(landscapeStart, lowLandscapeStart)
+
+    expect(landscape).toMatch(/\.page\s*\{[\s\S]*display:\s*grid/)
+    expect(landscape).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+clamp\(320px,\s*40vw,\s*760px\)/)
+    expect(landscape).toMatch(/\.scene\s*\{[\s\S]*grid-column:\s*1/)
+    expect(landscape).toMatch(/\.panel\s*\{[\s\S]*grid-column:\s*2/)
+  })
+
+  test('横向きのカテゴリ一覧も右パネル内で4列に収める', () => {
+    const landscape = CSS_SOURCE.slice(landscapeStart, lowLandscapeStart)
+    expect(landscape).toMatch(/\.categoryGrid\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,/)
+    expect(landscape).toMatch(/\.categoryGrid\s*\{[\s\S]*flex:\s*0 0 auto/)
+  })
+})

@@ -1,6 +1,6 @@
 /*
  * スマホ縦画面を最優先したレイアウト。
- * 上=3Dの車（可変・できるだけ大きく）、下=カスタマイズUI（高さ固定）の2段構成。
+ * 縦向きは上=3Dの車（可変・できるだけ大きく）、下=カスタマイズUI（高さ固定）の2段構成。
  * 下部の高さを一覧／詳細で共通の固定値にしているのは、カテゴリを開いたときに
  * 3D表示エリアの高さが跳ねてカメラのフィットが動くのを防ぐため。
  */
@@ -992,8 +992,53 @@
 }
 
 /*
+ * 横向きは、車を見ながらパーツを選べるように左右2列へ切り替える。
+ * 左=3Dプレビュー、右=カスタマイズUIに固定し、カテゴリ一覧と詳細選択の両方で
+ * 同じ位置関係を保つ。縦向きの2段構成には影響しない。
+ */
+@media (orientation: landscape) {
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 40vw, 760px);
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: var(--space-sm);
+    row-gap: var(--space-xs);
+  }
+
+  .header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .scene {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    margin-top: 0;
+  }
+
+  .panel {
+    grid-column: 2;
+    grid-row: 2;
+    width: auto;
+    max-width: none;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    overflow: hidden;
+    justify-content: center;
+  }
+
+  /* 大きな横画面でもカテゴリボタンだけが縦に伸びすぎないよう、内容の高さで置く。 */
+  .categoryGrid {
+    flex: 0 0 auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/*
  * 低い横画面。下部エリアを薄くして3Dの車の高さを確保しつつ、
- * タップ領域は44px以上を保つ（min-width: 760px と両方に当たる端末があるため後ろに置く）。
+ * 左右2列レイアウトの中でも、タップ領域は44px以上を保つ。
  */
 @media (orientation: landscape) and (max-height: 560px) {
   .page {
@@ -1001,7 +1046,7 @@
   }
 
   .categoryGrid {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .categoryButton {
