@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../audio/sound'
@@ -10,6 +10,9 @@ import { usePutterGolfEngine, type EngineEvent, type GolfCamera, type GolfFeedba
 import styles from './PutterGolfPlay.module.css'
 
 const EMPTY: GolfFeedback = { phase: 'ready', strokes: 0, power: 0.5, aiming: false, returning: false }
+
+/** むきの ボタンを おしつづけている あいだ、この あいだかくで すこしずつ まわす。 */
+const TURN_REPEAT_MS = 110
 
 /** コースの そとへ 落ちたときの ひとこと。コースごとに 落ちる先が ちがう。 */
 const SPLASH_TEXT: Partial<Record<CourseId, string>> = {
@@ -149,10 +152,36 @@ export default function PutterGolfPlay() {
     }
   }, [courseId, hole, play])
 
-  const { registerContainer, registerMapMarker, retry } = usePutterGolfEngine({
+  const { registerContainer, registerMapMarker, retry, turn } = usePutterGolfEngine({
     course, holeIndex, attempt, ballStyle: ballId, bigCup, camera,
     active: phase === 'play', reducedMotion,
     onStatus: setStatus, onFeedback: setFeedback, onEvent,
+  })
+
+  // ← → は おしている あいだ ずっと まわる。指を はなしたら 止める。
+  const holdTimer = useRef<number | null>(null)
+  const stopTurn = useCallback(() => {
+    if (holdTimer.current === null) return
+    window.clearInterval(holdTimer.current)
+    holdTimer.current = null
+  }, [])
+  useEffect(() => stopTurn, [stopTurn])
+  const startTurn = useCallback((side: number) => {
+    stopTurn()
+    turn(side)
+    play('click')
+    holdTimer.current = window.setInterval(() => turn(side), TURN_REPEAT_MS)
+  }, [play, stopTurn, turn])
+  const turnHandlers = (side: number) => ({
+    onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
+      try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* とれなくても 操作は続けられる */ }
+      startTurn(side)
+    },
+    onPointerUp: stopTurn,
+    onPointerCancel: stopTurn,
+    onLostPointerCapture: stopTurn,
+    // キーボードでも 1回ずつ まわせるようにする（おしっぱなしは キーリピートにまかせる）。
+    onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => { if (event.key === 'Enter' || event.key === ' ') turn(side) },
   })
 
   const begin = () => {
@@ -272,9 +301,11 @@ export default function PutterGolfPlay() {
             <span aria-label={`めやす ${hole.par}かい`}>めやす <strong>{hole.par}</strong></span>
           </div>
           <div className={styles.tools}>
+            <button type="button" disabled={!ready} aria-label="むきを ひだりへ かえる" {...turnHandlers(-1)}><span aria-hidden="true">←</span>ひだり</button>
             <button type="button" aria-pressed={camera === 'ball'} aria-label="ボールを みる" onClick={() => setCamera('ball')}><span aria-hidden="true">⚪</span>ボール</button>
             <button type="button" aria-pressed={camera === 'overview'} aria-label="ホール ぜんたいを みる" onClick={() => setCamera('overview')}><span aria-hidden="true">🗺️</span>ぜんたい</button>
             <button type="button" disabled={!ready} aria-label="この ホールを やりなおす" onClick={restart}><span aria-hidden="true">↺</span>やりなおす</button>
+            <button type="button" disabled={!ready} aria-label="むきを みぎへ かえる" {...turnHandlers(1)}><span aria-hidden="true">→</span>みぎ</button>
           </div>
         </section>}
 

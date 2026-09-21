@@ -19,6 +19,9 @@ type Shape = 'box' | 'sphere' | 'cone' | 'pyramid' | 'cylinder' | 'rock' | 'toru
 
 const hash = (n: number) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s) }
 const SEA_Y = -0.62
+/** ボールより FADE_MARGIN 手前から 景色を消しはじめ、FADE_DEPTH 手前より カメラ側は すっかり消す。 */
+const FADE_MARGIN = 0.8
+const FADE_DEPTH = 2.6
 
 function disposeTree(root: THREE.Object3D) {
   const geometries = new Set<THREE.BufferGeometry>()
@@ -46,6 +49,33 @@ function bufferGeometry(buffers: MeshBuffers): THREE.BufferGeometry {
   return geometry
 }
 
+/**
+ * カメラとボールのあいだに入った景色を、点々に くずして 消す。
+ * うつときに 木が じゃまで ボールが見えなくなるのを ふせぐ。
+ * すきとおらせる（transparent）と 前後の ならびが くずれるので、画素を まばらに 捨てる。
+ * こうすると おくゆきの記録も そのままで、後ろの景色が 透けて見えることもない。
+ * reach は「カメラからボールまでの距離」。0 なら どこも 消さない。
+ */
+function fadeInFront(material: THREE.Material, reach: { value: number }) {
+  material.onBeforeCompile = shader => {
+    shader.uniforms.uReach = reach
+    shader.vertexShader = `varying float vCameraDistance;\n${shader.vertexShader}`.replace(
+      '#include <project_vertex>',
+      '#include <project_vertex>\n\tvCameraDistance = length(mvPosition.xyz);',
+    )
+    shader.fragmentShader = `varying float vCameraDistance;\nuniform float uReach;\n${shader.fragmentShader}`.replace(
+      '#include <clipping_planes_fragment>',
+      `#include <clipping_planes_fragment>
+      float keep = smoothstep(uReach - ${FADE_DEPTH.toFixed(1)}, uReach - ${FADE_MARGIN.toFixed(1)}, vCameraDistance);
+      if (keep < 1.0) {
+        float speck = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+        if (keep < speck) discard;
+      }`,
+    )
+  }
+  material.customProgramCacheKey = () => 'golf-fade-v1'
+}
+
 /** 同じ形の飾りを色ちがいでまとめて1回で描く。 */
 function createBatch() {
   const items = new Map<Shape, { matrices: THREE.Matrix4[]; colors: THREE.Color[] }>()
@@ -61,7 +91,7 @@ function createBatch() {
       item.colors.push(new THREE.Color(color))
       items.set(shape, item)
     },
-    build(parent: THREE.Object3D, shadows: boolean) {
+    build(parent: THREE.Object3D, shadows: boolean, fade: { value: number }) {
       const shapes: Record<Shape, () => THREE.BufferGeometry> = {
         box: () => new THREE.BoxGeometry(1, 1, 1),
         sphere: () => new THREE.IcosahedronGeometry(0.5, 1),
@@ -72,6 +102,7 @@ function createBatch() {
         torus: () => new THREE.TorusGeometry(0.5, 0.12, 6, 20),
       }
       const material = new THREE.MeshStandardMaterial({ roughness: 0.85, flatShading: true })
+      fadeInFront(material, fade)
       for (const [shape, item] of items) {
         const mesh = new THREE.InstancedMesh(shapes[shape](), material, item.matrices.length)
         item.matrices.forEach((matrix, index) => { mesh.setMatrixAt(index, matrix); mesh.setColorAt(index, item.colors[index]!) })
@@ -353,6 +384,8 @@ export function createGolfScene(container: HTMLElement) {
     floaters: { object: THREE.Object3D; base: number; phase: number }[]
   }
   let hole: HoleContent | null = null
+  // カメラとボールのあいだの景色を消すための距離。ホールが変わっても作り直さない。
+  const fade = { value: 0 }
   let flagLift = 0
   let flagLifted = false
   let clubPull = 0
@@ -1233,8 +1266,8 @@ export function createGolfScene(container: HTMLElement) {
       solid.add('pyramid', '#d9573f', hx, groundY + 2.1, hz, 3.1, 1.0, 2.9, 0, Math.PI / 4)
       solid.add('box', '#8a5a3c', hx - 1.21, groundY + 0.55, hz, 0.05, 1.0, 0.5)
     }
-    solid.build(root, true)
-    soft.build(root, false)
+    solid.build(root, true, fade)
+    soft.build(root, false, fade)
     root.traverse(child => { if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial && !child.material.transparent) child.receiveShadow = true })
 
     // 影を落とす範囲をホールの大きさに合わせる。
@@ -1415,9 +1448,11 @@ export function createGolfScene(container: HTMLElement) {
         ring.mesh.visible = true
       }
     },
-    setCamera(pose: CameraPose) {
+    /** reach は「カメラからボールまでの距離」。0 にすると 景色を消さない（ぜんたい表示など）。 */
+    setCamera(pose: CameraPose, reach = 0) {
       camera.position.set(pose.position.x, pose.position.y, pose.position.z)
       camera.lookAt(pose.target.x, pose.target.y, pose.target.z)
+      fade.value = reach
     },
     resize,
     render(dt: number, reducedMotion: boolean) {

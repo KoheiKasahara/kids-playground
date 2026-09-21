@@ -6,11 +6,11 @@ import PutterGolfPlay from './PutterGolfPlay'
 import type { usePutterGolfEngine } from './usePutterGolfEngine'
 
 type Options = Parameters<typeof usePutterGolfEngine>[0]
-const engine = vi.hoisted(() => ({ options: undefined as Options | undefined, retry: vi.fn() }))
+const engine = vi.hoisted(() => ({ options: undefined as Options | undefined, retry: vi.fn(), turn: vi.fn() }))
 vi.mock('./usePutterGolfEngine', () => ({
   usePutterGolfEngine: (options: Options) => {
     engine.options = options
-    return { registerContainer: () => {}, registerMapMarker: () => {}, retry: engine.retry }
+    return { registerContainer: () => {}, registerMapMarker: () => {}, retry: engine.retry, turn: engine.turn }
   },
 }))
 vi.mock('./golfSound', () => ({ golfSound: vi.fn() }))
@@ -48,6 +48,16 @@ describe('パターゴルフの画面', () => {
     expect(engine.options).toMatchObject({ active: true, holeIndex: 0, camera: 'ball' })
     expect(screen.getByRole('region', { name: 'ゴルフの そうさ' })).toBeInTheDocument()
     expect(screen.getByText('すなばは ころがりにくいよ')).toBeInTheDocument()
+  })
+
+  test('← → の ボタンで ねらう むきを かえる', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'スタート！' }))
+    await user.click(screen.getByRole('button', { name: 'むきを ひだりへ かえる' }))
+    expect(engine.turn).toHaveBeenLastCalledWith(-1)
+    await user.click(screen.getByRole('button', { name: 'むきを みぎへ かえる' }))
+    expect(engine.turn).toHaveBeenLastCalledWith(1)
   })
 
   test('カメラの ボタンが engine に届く', async () => {

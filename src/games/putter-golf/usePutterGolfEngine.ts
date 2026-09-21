@@ -51,6 +51,8 @@ type Runtime = {
 export const DRAG_DEAD_ZONE = 14
 const INTRO_SECONDS = 1.8
 const TURN_STEP = (5 * Math.PI) / 180
+/** 景色を消す範囲の上限。はじまりのカメラ移動中に、遠くの景色まで消さないため。 */
+const MAX_FADE_REACH = 8
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 const ease = (t: number) => t * t * (3 - 2 * t)
@@ -123,6 +125,8 @@ export function usePutterGolfEngine(options: Options) {
       host.dataset.power = power.toFixed(2)
       host.dataset.ballX = ball.x.toFixed(2)
       host.dataset.ballZ = ball.z.toFixed(2)
+      host.dataset.aimX = direction.x.toFixed(3)
+      host.dataset.aimZ = direction.z.toFixed(3)
       host.dataset.camera = latest.current.active ? latest.current.camera : 'overview'
       marker.current?.setAttribute('cx', ball.x.toFixed(2))
       marker.current?.setAttribute('cy', ball.z.toFixed(2))
@@ -252,7 +256,10 @@ export function usePutterGolfEngine(options: Options) {
           const desired = desiredPose()
           if (desired) pose = !pose || current.reducedMotion || introTime > 0 ? desired : lerpPose(pose, desired, 1 - Math.exp(-dt * 4.5))
         }
-        if (pose) scene.setCamera(pose)
+        // ボールの手前にある景色だけ消す。ぜんたい表示や コース選びでは消さない。
+        if (pose) scene.setCamera(pose, current.active && current.camera === 'ball'
+          ? Math.min(MAX_FADE_REACH, Math.hypot(pose.position.x - state.position.x, pose.position.y - state.position.y, pose.position.z - state.position.z))
+          : 0)
         if (current.active && world.phase === 'ready') {
           const ball = state.position
           const key = `${ball.x.toFixed(3)}:${ball.z.toFixed(3)}:${direction.x.toFixed(4)}:${direction.z.toFixed(4)}:${power.toFixed(3)}`
