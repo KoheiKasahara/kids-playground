@@ -1,6 +1,8 @@
 import * as Matter from 'matter-js'
 import { describe, expect, it } from 'vitest'
 import { createCannonSensorBody, createPuzzlePartBodies, createPuzzleSeesawRuntime, createPuzzleSpinnerBody } from './usePuzzleEngine'
+import { CELL_SIZE } from './boardLayout'
+import { cellCenter } from './grid'
 import { SEESAW_MAX_ANGLE, SEESAW_MAX_ANGULAR_VELOCITY, stabilizeSeesawBody } from './seesawPhysics'
 
 describe('flag-roll-puzzle の特殊パーツBody', () => {
@@ -25,6 +27,25 @@ describe('flag-roll-puzzle の特殊パーツBody', () => {
     expect(spinner.isStatic).toBe(true)
     expect(spinner.isSensor).toBe(false)
     expect(spinner.parts).toHaveLength(3)
+  })
+
+  it('2×2の回転盤は、占有する4マスの中心を軸にした大きい十字になる', () => {
+    const cell = { col: 2, row: 3 }
+    const small = createPuzzleSpinnerBody({ id: 'part-small', typeId: 'spinner', cell })
+    const large = createPuzzleSpinnerBody({ id: 'part-large', typeId: 'spinnerLarge', cell })
+    const center = cellCenter(cell)
+    const width = (body: Matter.Body) => body.bounds.max.x - body.bounds.min.x
+
+    expect(small.position.x).toBeCloseTo(center.x)
+    expect(small.position.y).toBeCloseTo(center.y)
+    // 左上のマスではなく、占有する4マスの中心が軸になる。
+    expect(large.position.x).toBeCloseTo(center.x + CELL_SIZE / 2)
+    expect(large.position.y).toBeCloseTo(center.y + CELL_SIZE / 2)
+    expect(large.isStatic).toBe(true)
+    expect(large.parts).toHaveLength(3)
+    expect(width(large)).toBeGreaterThan(width(small))
+    // 羽根は占有する2マスぶん(120px)の内側に収まる。
+    expect(width(large)).toBeLessThanOrEqual(CELL_SIZE * 2)
   })
 
   it('ジャンプ台は配置したIDと向きを持つ静的な傾斜Bodyを作る', () => {

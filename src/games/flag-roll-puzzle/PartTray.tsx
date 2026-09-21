@@ -1,6 +1,6 @@
 import { useRef, type CSSProperties, type PointerEvent } from 'react'
 import PartShape from './PartShape'
-import { TRAY_PART_DEFINITIONS, type PartTypeId } from './partTypes'
+import { partFootprint, TRAY_PART_DEFINITIONS, type PartDefinition, type PartTypeId } from './partTypes'
 import styles from './PartTray.module.css'
 
 type PartTrayProps = {
@@ -15,6 +15,22 @@ type PartTrayProps = {
   onPartPointerMove: (event: PointerEvent<HTMLButtonElement>) => void
   onPartPointerUp: (event: PointerEvent<HTMLButtonElement>) => void
   onPartClick: (typeId: PartTypeId) => void
+}
+
+/**
+ * 見本の中での形の置き方。複数マスのパーツは占有マス全体の中心を見本の中心へ合わせ、
+ * 広がったぶんだけ形を縮める。ただし1マスぶんまで縮めると1マスのパーツと同じ大きさに
+ * 見えてしまうため、少し大きめに残して「これは大きい」と形だけで分かるようにする。
+ */
+const PREVIEW_MULTI_CELL_EMPHASIS = 1.2
+
+function previewShapeStyle(definition: PartDefinition): CSSProperties {
+  const { cols, rows, center } = partFootprint(definition.cells)
+  return {
+    '--preview-shape-scale': Math.min(1, PREVIEW_MULTI_CELL_EMPHASIS / Math.max(cols, rows)),
+    '--preview-shape-x': `${-center.x}px`,
+    '--preview-shape-y': `${-center.y}px`,
+  } as CSSProperties
 }
 
 /**
@@ -121,12 +137,11 @@ export default function PartTray({
             className={styles.preview}
             aria-hidden="true"
             data-preview-scale={definition.previewScale ?? 1.1}
-            style={{
-              '--preview-scale': definition.previewScale ?? 1.1,
-              '--preview-offset-x': `${definition.previewOffsetX ?? 0}px`,
-            } as CSSProperties}
+            style={{ '--preview-scale': definition.previewScale ?? 1.1 } as CSSProperties}
           >
-            <PartShape typeId={definition.id} />
+            <span className={styles.previewShape} style={previewShapeStyle(definition)}>
+              <PartShape typeId={definition.id} />
+            </span>
           </span>
           <span className={styles.label}>{definition.label}</span>
         </button>

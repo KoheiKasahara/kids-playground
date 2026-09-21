@@ -29,6 +29,26 @@ describe('PartShape', () => {
     expect(left.container.querySelector('[data-fan-direction="left"]')).toHaveAttribute('transform', 'scale(-1 1)')
   })
 
+  test('回転盤は回る向きの矢印を持ち、逆回しでは向きだけが反転する', () => {
+    const forward = render(<PartShape typeId="spinner" />)
+    const reverse = render(<PartShape typeId="spinnerReverse" />)
+
+    expect(forward.container.querySelector('[data-spin="forward"]')).toBeInTheDocument()
+    expect(reverse.container.querySelector('[data-spin="reverse"]')).toBeInTheDocument()
+    // 十字（羽根2枚＋中心）はどちらも同じで、増えるのは矢印1つだけ。
+    expect(forward.container.querySelectorAll('span')).toHaveLength(4)
+    expect(reverse.container.querySelectorAll('span')).toHaveLength(4)
+  })
+
+  test('2×2の回転盤は、矢印も占有する4マスの中心を基準に置く', () => {
+    const { container } = render(<PartShape typeId="spinnerLarge" />)
+    const arrow = container.querySelector<HTMLElement>('[data-spin="forward"]')
+
+    expect(arrow?.style.getPropertyValue('--spin-arrow-x')).toBe('30px')
+    // 軸より上（マイナス側）へ置き、羽根の進む向きを指す。
+    expect(Number.parseFloat(arrow?.style.getPropertyValue('--spin-arrow-y') ?? '0')).toBeLessThan(30)
+  })
+
   test('ワープは矢印なしで、入口と出口を逆向きの漏斗形にする', () => {
     const entrance = render(<PartShape typeId="warpIn" />)
     const exit = render(<PartShape typeId="warpOut" />)

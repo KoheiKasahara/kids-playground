@@ -34,6 +34,30 @@ describe('placement', () => {
     expect(occupiedCells('spinner', { col: 2, row: 3 })).toEqual([{ col: 2, row: 3 }])
   })
 
+  test('2×2の回転盤は、押したマスを左上として4マスを占有する', () => {
+    expect(occupiedCells('spinnerLarge', { col: 2, row: 3 })).toEqual([
+      { col: 2, row: 3 }, { col: 3, row: 3 },
+      { col: 2, row: 4 }, { col: 3, row: 4 },
+    ])
+    // 右下の端では、はみ出す3マスぶんが盤外になるので置けない。
+    expect(isInsideBoard('spinnerLarge', { col: GRID_COLS - 2, row: GRID_ROWS - 2 })).toBe(true)
+    expect(isInsideBoard('spinnerLarge', { col: GRID_COLS - 1, row: GRID_ROWS - 2 })).toBe(false)
+    expect(isInsideBoard('spinnerLarge', { col: GRID_COLS - 2, row: GRID_ROWS - 1 })).toBe(false)
+    // 1マスでも重なる位置には置けない（重なり判定は占有マス全体で見る）。
+    const parts = [partAt(3, 4)]
+    expect(canPlacePart(parts, 'spinnerLarge', { col: 2, row: 3 })).toBe(false)
+    expect(canPlacePart(parts, 'spinnerLarge', { col: 0, row: 0 })).toBe(true)
+  })
+
+  test('2×2の回転盤も、逆回しへの切り替えは同じ4マスのまま通る', () => {
+    const parts = [{ id: 'part-1', typeId: 'spinnerLarge', cell: { col: 2, row: 3 } } as const]
+    expect(canRotatePart(parts, 'part-1', 'spinnerLargeReverse')).toBe(true)
+    expect(rotatePart(parts, 'part-1', 'spinnerLargeReverse')?.[0]).toMatchObject({
+      typeId: 'spinnerLargeReverse',
+      cell: { col: 2, row: 3 },
+    })
+  })
+
   test('置かれた全パーツの占有マスを集計できる', () => {
     const keys = occupiedCellKeys([partAt(0, 0), partAt(1, 2)])
     expect(keys.size).toBe(2)

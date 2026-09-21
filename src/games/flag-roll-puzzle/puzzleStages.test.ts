@@ -25,6 +25,9 @@ describe('puzzleStages', () => {
       expect(stage.availablePartTypeIds).toContain('jumpRampRight')
       expect(stage.availablePartTypeIds).toContain('cannon')
       expect(stage.availablePartTypeIds).toContain('spinner')
+      expect(stage.availablePartTypeIds).toContain('spinnerLarge')
+      // 逆回しは「まわす」でしか出てこない向きなので、置き場の一覧には入れない。
+      expect(stage.availablePartTypeIds).not.toContain('spinnerReverse')
     }
   })
 })

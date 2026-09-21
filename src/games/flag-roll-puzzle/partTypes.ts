@@ -1,4 +1,5 @@
-import type { GridCell } from './grid'
+import { CELL_SIZE } from './boardLayout'
+import type { GridCell, Point } from './grid'
 
 /** 盤面へ保存する向きまで含めたパーツ種類。置き場にはこのうち基本向きだけを出す。 */
 export type PartTypeId =
@@ -27,7 +28,12 @@ export type PartTypeId =
   | 'cannonUpLeft'
   | 'cannonUp'
   | 'cannonUpRight'
+  /** 時計回りが基本の向き。逆回しは盤面上の回転専用ID。 */
   | 'spinner'
+  | 'spinnerReverse'
+  /** 2×2マスを占有する大きい回転盤。回転操作は1マス版と同じく逆回しへの切り替え。 */
+  | 'spinnerLarge'
+  | 'spinnerLargeReverse'
   /** 右向きが基本向き。残りの3方向は盤面上の回転専用ID。 */
   | 'conveyorRight'
   | 'conveyorDown'
@@ -72,10 +78,41 @@ export type PartDefinition = {
   readonly hint?: string
   /** 置き場だけで使う縮小率。盤面の描画・物理・占有マスには一切影響しない。 */
   readonly previewScale?: number
-  readonly previewOffsetX?: number
 }
 
 const SINGLE_CELL: readonly GridCell[] = [{ col: 0, row: 0 }]
+const TWO_BY_TWO_CELLS: readonly GridCell[] = [
+  { col: 0, row: 0 }, { col: 1, row: 0 },
+  { col: 0, row: 1 }, { col: 1, row: 1 },
+]
+
+/** 占有マス全体の広がりと中心。中心はアンカーセル中心を原点とした相対px。 */
+export type PartFootprint = {
+  readonly cols: number
+  readonly rows: number
+  readonly center: Point
+}
+
+/**
+ * 複数マスのパーツは、アンカーセル（左上）の中心と、占有マス全体の中心がずれる。
+ * 形・回転軸・置き場の見本はこの中心を基準にそろえる。
+ */
+export function partFootprint(cells: readonly GridCell[]): PartFootprint {
+  const cols = cells.map((cell) => cell.col)
+  const rows = cells.map((cell) => cell.row)
+  const minCol = Math.min(...cols)
+  const maxCol = Math.max(...cols)
+  const minRow = Math.min(...rows)
+  const maxRow = Math.max(...rows)
+  return {
+    cols: maxCol - minCol + 1,
+    rows: maxRow - minRow + 1,
+    center: {
+      x: ((minCol + maxCol) / 2) * CELL_SIZE,
+      y: ((minRow + maxRow) / 2) * CELL_SIZE,
+    },
+  }
+}
 
 const RAIL_THICKNESS = 12
 const SLOPE_ANGLE_DEG = 30
@@ -172,10 +209,56 @@ function cannonDefinition(
   }
 }
 
-const SPINNER_SEGMENTS: readonly PartSegment[] = [
-  { offsetX: 0, offsetY: 0, width: 48, height: 10, angleDeg: 0, role: 'blade' },
-  { offsetX: 0, offsetY: 0, width: 10, height: 48, angleDeg: 0, role: 'blade' },
-  { offsetX: 0, offsetY: 0, width: 16, height: 16, angleDeg: 0, kind: 'circle', role: 'chamber' },
+/**
+ * 回転盤は時計回りが基本で、回転操作では向きではなく「回る向き」を逆にする。
+ * 逆回し向きのIDは盤面専用にし、置き場へは基本向きだけを出す。
+ */
+export const SPINNER_TYPE_IDS = ['spinner', 'spinnerReverse', 'spinnerLarge', 'spinnerLargeReverse'] as const
+export type SpinnerTypeId = (typeof SPINNER_TYPE_IDS)[number]
+
+/** 回転盤の羽根の寸法。1マス版と2×2版で、この3つの値だけが変わる。 */
+const SPINNER_SIZES = {
+  small: { cells: SINGLE_CELL, radius: 24, bladeThickness: 10, hubSize: 16 },
+  large: { cells: TWO_BY_TWO_CELLS, radius: 50, bladeThickness: 14, hubSize: 24 },
+} as const
+
+type SpinnerSizeId = keyof typeof SPINNER_SIZES
+
+/** 回る向きは見た目では変わらないため、順回し・逆回しで同じ十字を使う。 */
+function spinnerSegments(sizeId: SpinnerSizeId): readonly PartSegment[] {
+  const { cells, radius, bladeThickness, hubSize } = SPINNER_SIZES[sizeId]
+  const { center } = partFootprint(cells)
+  const bladeLength = radius * 2
+  return [
+    { offsetX: center.x, offsetY: center.y, width: bladeLength, height: bladeThickness, angleDeg: 0, role: 'blade' },
+    { offsetX: center.x, offsetY: center.y, width: bladeThickness, height: bladeLength, angleDeg: 0, role: 'blade' },
+    { offsetX: center.x, offsetY: center.y, width: hubSize, height: hubSize, angleDeg: 0, kind: 'circle', role: 'chamber' },
+  ]
+}
+
+function spinnerDefinition(id: SpinnerTypeId, sizeId: SpinnerSizeId, reverse: boolean): PartDefinition {
+  const large = sizeId === 'large'
+  return {
+    id,
+    label: large ? 'おおきい かいてんばん' : 'かいてんばん',
+    // 逆回しは「まわす」でしか出てこない向きなので、置き場には基本向きだけを並べる。
+    inTray: !reverse,
+    appearance: 'spinner',
+    cells: SPINNER_SIZES[sizeId].cells,
+    segments: spinnerSegments(sizeId),
+    restitution: 0.55,
+    friction: 0.03,
+    hint: large
+      ? 'おおきく くるくる！ 4マスぶん ばしょが いるよ'
+      : 'くるくる まわって はじくよ！ まわすと むきが かわるよ',
+  }
+}
+
+const SPINNER_DEFINITIONS: readonly PartDefinition[] = [
+  spinnerDefinition('spinner', 'small', false),
+  spinnerDefinition('spinnerReverse', 'small', true),
+  spinnerDefinition('spinnerLarge', 'large', false),
+  spinnerDefinition('spinnerLargeReverse', 'large', true),
 ]
 
 export const CONVEYOR_TYPE_IDS = ['conveyorRight', 'conveyorDown', 'conveyorLeft', 'conveyorUp'] as const
@@ -324,11 +407,7 @@ export const PART_DEFINITIONS: readonly PartDefinition[] = [
   cannonDefinition('cannonUp', 270),
   cannonDefinition('cannonUpRight', 315),
 
-  {
-    id: 'spinner', label: 'かいてんばん', inTray: true, appearance: 'spinner', cells: SINGLE_CELL,
-    segments: SPINNER_SEGMENTS,
-    restitution: 0.55, friction: 0.03,
-  },
+  ...SPINNER_DEFINITIONS,
 
   ...AIR_TOYS,
 
@@ -371,6 +450,9 @@ const NEXT_ROTATION_TYPE: Readonly<Partial<Record<PartTypeId, PartTypeId>>> = {
   cannonUpLeft: 'cannonUp',
   cannonUp: 'cannonUpRight',
   cannonUpRight: 'cannon',
+  // 回転盤だけは向きではなく回る向きを切り替える（時計回り ⇄ 逆回し）。
+  spinner: 'spinnerReverse', spinnerReverse: 'spinner',
+  spinnerLarge: 'spinnerLargeReverse', spinnerLargeReverse: 'spinnerLarge',
   conveyorRight: 'conveyorDown',
   conveyorDown: 'conveyorLeft',
   conveyorLeft: 'conveyorUp',
@@ -389,8 +471,8 @@ export function isCannonPart(id: PartTypeId): id is (typeof CANNON_TYPE_IDS)[num
   return (CANNON_TYPE_IDS as readonly string[]).includes(id)
 }
 
-export function isSpinnerPart(id: PartTypeId): id is 'spinner' {
-  return id === 'spinner'
+export function isSpinnerPart(id: PartTypeId): id is SpinnerTypeId {
+  return (SPINNER_TYPE_IDS as readonly string[]).includes(id)
 }
 
 export function isJumpRampPart(id: string): id is 'jumpRampRight' | 'jumpRampLeft' {
