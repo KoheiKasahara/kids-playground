@@ -8,6 +8,9 @@ import { createGolfWorld, type GolfEvent, type GolfWorld } from './golfWorld'
 beforeAll(async () => { await initializeRapier() })
 
 const [MEADOW, BEACH, MOON] = GOLF_COURSES as [CourseDefinition, CourseDefinition, CourseDefinition]
+const courseById = (id: string) => GOLF_COURSES.find(course => course.id === id)!
+const FOREST = courseById('forest')
+const DOWNHILL = courseById('downhill')
 const holeById = (id: string) => GOLF_COURSES.flatMap(course => course.holes).find(hole => hole.id === id)!
 
 function open(course: CourseDefinition, hole: HoleDefinition): GolfWorld {
@@ -147,6 +150,52 @@ describe('パターゴルフの物理', () => {
       const ball = world.ball().position
       expect(ball.x).toBeGreaterThan(1)
       expect(ball.z).toBeLessThan(-1.4)
+    })
+  })
+
+  it('きに あたると、ボールは はねかえる', () => {
+    const hole = holeById('forest-1')
+    withWorld(open(FOREST, hole), world => {
+      const tree = hole.gadgets!.find(gadget => gadget.kind === 'tree')!
+      // きの まうしろから、みきへ まっすぐ うつ。
+      world.placeBall({ x: tree.x, z: tree.z + 2.0 })
+      world.shoot({ x: 0, z: -1 }, 0.5)
+      const events = roll(world)
+      const hit = events.find(event => event.kind === 'tree')
+      expect(hit?.kind).toBe('tree')
+      // みきの 手前で はねかえされ、むこうがわへは 行かない。
+      expect(world.ball().position.z).toBeGreaterThan(tree.z + tree.radius)
+    })
+  })
+
+  it('さかを くだると、同じ強さでも 遠くまで転がり、さかの上では 止まらない', () => {
+    const lane = (features?: HoleDefinition['features']): HoleDefinition => ({
+      id: 'lane', name: 'lane', par: 1, tee: { x: 0, z: 14 }, cup: { x: 0, z: -14 },
+      floors: [{ corners: [{ x: -1.5, z: 15 }, { x: -1.5, z: -15 }, { x: 1.5, z: -15 }, { x: 1.5, z: 15 }] }],
+      features, route: [{ x: 0, z: 14 }, { x: 0, z: -14 }], tip: '',
+    })
+    const travel = (features?: HoleDefinition['features']) => withWorld(open(MEADOW, lane(features)), world => {
+      world.shoot({ x: 0, z: -1 }, 0.4)
+      roll(world)
+      return world.ball().position.z
+    })
+    const flat = travel()
+    const slope = travel([{ kind: 'slope', from: { x: 0, z: 12 }, to: { x: 0, z: 10.8 }, drop: 0.5 }])
+    // 0.5 おりたぶんの いきおいで、平らなときより先まで 転がる。
+    expect(flat - slope).toBeGreaterThan(1.5)
+    // さかの とちゅうでは 止まらない（さかの下まで おりている）。
+    expect(slope).toBeLessThan(10.8)
+  })
+
+  it('だんさを おりると、ボールが ぴょんと はねる', () => {
+    const hole = holeById('downhill-3')
+    withWorld(open(DOWNHILL, hole), world => {
+      world.shoot({ x: 0, z: -1 }, 0.5)
+      const events = roll(world)
+      expect(events.map(event => event.kind)).toEqual(expect.arrayContaining(['takeoff', 'land']))
+      // だんだんを おりきって、下の ひろばで 止まる。
+      expect(world.phase).toBe('ready')
+      expect(world.ball().position.y).toBeLessThan(-0.5)
     })
   })
 

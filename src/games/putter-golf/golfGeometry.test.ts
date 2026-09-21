@@ -89,10 +89,13 @@ describe.each(HOLES.map(hole => [hole.id, hole] as [string, HoleDefinition]))('%
       expect(wall.hy * 2).toBeGreaterThan(0.3)
     }
     for (const outline of geometry.outlines) {
+      const xs = outline.points.map(point => point.x)
+      const zs = outline.points.map(point => point.z)
+      // 外周は、そのホールの大きさに収まるまっすぐな線分でつながる（長いホールでは壁も長い）。
+      const span = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs))
       outline.points.forEach((point, index) => {
         const next = outline.points[(index + 1) % outline.points.length]!
-        // 壁のない辺以外は、となりの点との間がボールより十分せまい線分で囲まれている。
-        if (outline.walled[index]) expect(Math.hypot(next.x - point.x, next.z - point.z)).toBeLessThan(12)
+        if (outline.walled[index]) expect(Math.hypot(next.x - point.x, next.z - point.z)).toBeLessThanOrEqual(span)
         expect(Math.hypot(next.x - point.x, next.z - point.z)).toBeGreaterThan(BALL_RADIUS * 0.01)
       })
     }
@@ -106,6 +109,32 @@ test('おおきい カップを選ぶと穴が広がる', () => {
   const { positions } = geometry.floor
   for (let i = 0; i < positions.length; i += 3) {
     expect(Math.hypot(positions[i]! - hole.cup.x, positions[i + 2]! - hole.cup.z)).toBeGreaterThan(BIG_CUP_RADIUS - 1e-4)
+  }
+})
+
+test('さかは from から to まで下がり、その先はずっと下がったまま', () => {
+  const hole = HOLES.find(item => item.id === 'downhill-1')!
+  const geometry = buildHoleGeometry(hole)
+  // さかの手前は 平ら。
+  expect(geometry.heightAt(0, 4.6)).toBeCloseTo(0, 5)
+  // さかの とちゅうは その あいだの 高さ。
+  expect(geometry.heightAt(0, 3.8)).toBeLessThan(-0.1)
+  expect(geometry.heightAt(0, 3.8)).toBeGreaterThan(-0.4)
+  // さかを おりきったら、その先は ずっと 同じ 高さ。
+  expect(geometry.heightAt(0, 3.0)).toBeCloseTo(-0.5, 5)
+  expect(geometry.heightAt(0, 0)).toBeCloseTo(-0.5, 5)
+  // ふたつめの さかの あとは、ふたつぶん 下がっている。
+  expect(geometry.heightAt(0, -3.0)).toBeCloseTo(-0.95, 5)
+})
+
+test('台は、坂で下がった床よりも下まである', () => {
+  for (const hole of HOLES) {
+    const geometry = buildHoleGeometry(hole)
+    let floorLow = Infinity
+    for (let i = 1; i < geometry.floor.positions.length; i += 3) floorLow = Math.min(floorLow, geometry.floor.positions[i]!)
+    let wallLow = Infinity
+    for (let i = 1; i < geometry.wallBody.positions.length; i += 3) wallLow = Math.min(wallLow, geometry.wallBody.positions[i]!)
+    expect(wallLow, hole.id).toBeLessThan(floorLow)
   }
 })
 

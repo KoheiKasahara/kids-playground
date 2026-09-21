@@ -54,6 +54,8 @@ export const BUMPER_HEIGHT = 0.44
 export const GATE = { halfDepth: 0.13, height: 0.44 } as const
 /** 歩く どうぶつの大きさ。 */
 export const CRITTER = { radius: 0.24, height: 0.46 } as const
+/** コースに はえた きの みき。あたりも 見た目も この高さで作る。 */
+export const TREE = { trunk: 1.05 } as const
 /** ワープの どかん。入口の高さと、出てくるときに残る速さの割合。 */
 export const WARP = { height: 0.42, keepSpeed: 0.9, minSpeed: 0.3 } as const
 

@@ -27,6 +27,11 @@ export type HeightFeature =
   | { kind: 'ridge'; from: Vec2; to: Vec2; radius: number; height: number }
   /** ジャンプ台。from で0、to で rise まで一定の坂で上がる。 */
   | { kind: 'kicker'; from: Vec2; to: Vec2; halfWidth: number; rise: number }
+  /**
+   * さか。from で0、to で drop ぶん下がり、その先は下がったまま。
+   * コースの はばいっぱいに きくので、短くすれば だんさ、長くすれば ゆるい さかになる。
+   */
+  | { kind: 'slope'; from: Vec2; to: Vec2; drop: number }
 
 export type Gadget =
   /** ぽよんと はねかえす バンパー。 */
@@ -46,8 +51,12 @@ export type Gadget =
   | { kind: 'critter'; id: string; x: number; z: number; to: Vec2; speed: number; look: CritterLook }
   /** 入ると exit から exitDir の向きへ出てくる どかん。2つ向かい合わせに置くと行き来できる。 */
   | { kind: 'warp'; id: string; x: number; z: number; radius: number; exit: Vec2; exitDir: Vec2 }
+  /** コースに はえた き。みきに あたると こつんと はねかえる。radius は みきの太さ。 */
+  | { kind: 'tree'; id: string; x: number; z: number; radius: number; look: TreeLook }
 
-export type CritterLook = 'duck' | 'crab' | 'alien' | 'penguin' | 'dino'
+export type CritterLook = 'duck' | 'crab' | 'alien' | 'penguin' | 'dino' | 'squirrel' | 'sheep'
+/** きの見た目。とがった もみの木と、まるい 広葉樹。 */
+export type TreeLook = 'pine' | 'broadleaf'
 
 /** ゆかの ちがう ところ。すなば・こおり・ふかふか。 */
 export type ZoneKind = 'sand' | 'ice' | 'rough'
@@ -73,7 +82,7 @@ export type HoleDefinition = {
 }
 
 /** コースの並び順。★の保存やコース選びは、この一覧を正とする。 */
-export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow', 'candy', 'dino'] as const
+export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow', 'candy', 'dino', 'forest', 'downhill'] as const
 export type CourseId = (typeof COURSE_IDS)[number]
 
 export type CourseLook = {
@@ -624,6 +633,234 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         ],
         route: [{ x: 0, z: 3.8 }, { x: 3.2, z: -0.2 }, { x: 0, z: -3.6 }],
         tip: 'おやまの そとがわを まわろう',
+      },
+    ],
+  },
+  {
+    id: 'forest',
+    label: 'もり',
+    icon: '🌲',
+    description: 'きを よけて すすもう',
+    color: '#2e6f3c',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#5cb05a', wall: '#8d6242', wallCap: '#e8d3a8', skirt: '#5f4028', sand: '#e6d2a4', ice: '#cfe9f5', rough: '#3d7f45', ground: '#4f7f46', sky: '#a8dcf2', horizon: '#dff1dd', bumper: '#c97f3f', bumperCap: '#ffeccd', rock: '#8f978e' },
+    holes: [
+      {
+        id: 'forest-1',
+        name: 'もりの みち',
+        par: 4,
+        tee: { x: 0, z: 9.8 },
+        cup: { x: -0.5, z: -10.0 },
+        // 正方形のコースを たてに3つ ならべたくらいの 長い みち。きが 左右 かわりばんこに 立っていて、
+        // まっすぐ カップまでは 見通せない。
+        floors: [{ corners: rect(-3.4, -11.2, 3.4, 11.2, 1.2, 1.2) }],
+        gadgets: [
+          { kind: 'tree', id: 'oak-mid', x: 0.45, z: 6.2, radius: 0.5, look: 'broadleaf' },
+          { kind: 'tree', id: 'pine-w', x: -2.7, z: 6.6, radius: 0.38, look: 'pine' },
+          { kind: 'tree', id: 'pine-e', x: 3.0, z: 5.8, radius: 0.4, look: 'pine' },
+          { kind: 'tree', id: 'oak-w', x: -1.5, z: 1.0, radius: 0.5, look: 'broadleaf' },
+          { kind: 'tree', id: 'oak-e', x: 1.7, z: 0.4, radius: 0.45, look: 'broadleaf' },
+          { kind: 'tree', id: 'pine-far', x: 3.3, z: 0.8, radius: 0.34, look: 'pine' },
+          { kind: 'tree', id: 'oak-low', x: -0.2, z: -4.6, radius: 0.5, look: 'broadleaf' },
+          { kind: 'tree', id: 'pine-low', x: 2.9, z: -5.2, radius: 0.4, look: 'pine' },
+          { kind: 'tree', id: 'pine-cup', x: 1.4, z: -8.6, radius: 0.42, look: 'pine' },
+        ],
+        zones: [
+          { kind: 'rough', x: -2.6, z: -2.0, radius: 0.9 },
+          { kind: 'rough', x: 2.4, z: -9.0, radius: 0.9 },
+        ],
+        route: [{ x: 0, z: 9.8 }, { x: -1.2, z: 6.4 }, { x: 0.1, z: 0.6 }, { x: -1.6, z: -4.8 }, { x: -0.5, z: -10.0 }],
+        tip: 'きの あいだを ぬけて いこう',
+      },
+      {
+        id: 'forest-2',
+        name: 'きの ひろば',
+        par: 3,
+        tee: { x: -4.2, z: 5.4 },
+        cup: { x: 4.2, z: -5.4 },
+        // とても ひろい ひろば。まん中の きの かたまりは とおれないので、そとがわを まわる。
+        floors: [{ corners: rect(-5.6, -7.0, 5.6, 7.0, 1.6, 1.6) }],
+        gadgets: [
+          { kind: 'tree', id: 'grove-n', x: -0.6, z: 2.8, radius: 0.4, look: 'pine' },
+          { kind: 'tree', id: 'grove-ne', x: 1.6, z: 2.2, radius: 0.45, look: 'broadleaf' },
+          { kind: 'tree', id: 'grove-mid', x: 0, z: 1.2, radius: 0.55, look: 'broadleaf' },
+          { kind: 'tree', id: 'grove-w', x: -1.2, z: -0.4, radius: 0.5, look: 'broadleaf' },
+          { kind: 'tree', id: 'grove-e', x: 1.3, z: -1.0, radius: 0.5, look: 'pine' },
+          { kind: 'tree', id: 'grove-s', x: 0.2, z: -2.9, radius: 0.45, look: 'broadleaf' },
+          { kind: 'critter', id: 'squirrel', x: -2.6, z: 3.4, to: { x: -2.6, z: -2.6 }, speed: 1.1, look: 'squirrel' },
+        ],
+        zones: [
+          { kind: 'rough', x: -2.8, z: -5.0, radius: 1.0 },
+          { kind: 'rough', x: 3.4, z: 1.6, radius: 1.1 },
+        ],
+        route: [{ x: -4.2, z: 5.4 }, { x: -4.0, z: -1.0 }, { x: 0.6, z: -5.6 }, { x: 4.2, z: -5.4 }],
+        tip: 'まん中の きを よけて ぐるっと',
+      },
+      {
+        id: 'forest-3',
+        name: 'まるたの かど',
+        par: 4,
+        tee: { x: 0, z: 9.8 },
+        cup: { x: 7.6, z: -5.4 },
+        // Lの字の 大きな もり。ながい みちを おりて、かどを まがった おくに カップ。
+        floors: [{
+          corners: [
+            { x: -3.2, z: 11.4, r: 1.2 },
+            { x: -3.2, z: -8.0, r: 1.4 },
+            { x: 9.0, z: -8.0, r: 1.4 },
+            { x: 9.0, z: -2.6, r: 1.2 },
+            { x: 3.2, z: -2.6, r: 1.0 },
+            { x: 3.2, z: 11.4, r: 1.2 },
+          ],
+        }],
+        gadgets: [
+          { kind: 'tree', id: 'top-e', x: 1.4, z: 7.0, radius: 0.5, look: 'broadleaf' },
+          { kind: 'tree', id: 'top-w', x: -2.6, z: 6.6, radius: 0.4, look: 'pine' },
+          { kind: 'tree', id: 'mid-e', x: 0.9, z: 2.2, radius: 0.5, look: 'broadleaf' },
+          { kind: 'tree', id: 'mid-w', x: -2.9, z: 1.4, radius: 0.36, look: 'pine' },
+          { kind: 'tree', id: 'corner', x: 4.0, z: -3.4, radius: 0.5, look: 'broadleaf' },
+          { kind: 'tree', id: 'end-s', x: 5.6, z: -6.8, radius: 0.45, look: 'pine' },
+          { kind: 'tree', id: 'end-n', x: 6.6, z: -3.4, radius: 0.45, look: 'pine' },
+        ],
+        zones: [{ kind: 'rough', x: -2.2, z: -5.4, radius: 1.2 }],
+        route: [{ x: 0, z: 9.8 }, { x: -1.0, z: 4.4 }, { x: 0.8, z: -1.0 }, { x: 2.2, z: -5.4 }, { x: 7.6, z: -5.4 }],
+        tip: 'かどを まがって おくの カップへ',
+      },
+      {
+        id: 'forest-4',
+        name: 'もりの おく',
+        par: 4,
+        tee: { x: 0, z: 12.2 },
+        cup: { x: 0, z: -12.4 },
+        // いちばん ながい みち。正方形のコース4つぶんの ながさを、4つの きの もんを ぬけて すすむ。
+        floors: [{ corners: rect(-3.4, -13.6, 3.4, 13.6, 1.2, 1.2) }],
+        gadgets: [
+          { kind: 'tree', id: 'gate1-mid', x: 0.5, z: 9.0, radius: 0.5, look: 'broadleaf' },
+          { kind: 'tree', id: 'gate1-w', x: -3.1, z: 9.4, radius: 0.34, look: 'pine' },
+          { kind: 'tree', id: 'gate2-e', x: 1.2, z: 2.6, radius: 0.5, look: 'pine' },
+          { kind: 'tree', id: 'gate2-w', x: -2.9, z: 2.0, radius: 0.4, look: 'broadleaf' },
+          { kind: 'tree', id: 'gate3-mid', x: -1.2, z: -5.0, radius: 0.5, look: 'broadleaf' },
+          { kind: 'tree', id: 'gate3-e', x: 3.0, z: -5.4, radius: 0.4, look: 'pine' },
+          { kind: 'tree', id: 'gate4-w', x: -1.9, z: -10.4, radius: 0.45, look: 'pine' },
+          { kind: 'tree', id: 'gate4-e', x: 2.4, z: -10.8, radius: 0.4, look: 'broadleaf' },
+        ],
+        zones: [
+          { kind: 'rough', x: 2.6, z: 6.2, radius: 1.0 },
+          { kind: 'rough', x: -2.8, z: -7.6, radius: 1.0 },
+        ],
+        route: [{ x: 0, z: 12.2 }, { x: -1.5, z: 5.6 }, { x: 1.4, z: -2.0 }, { x: -1.0, z: -8.6 }, { x: 0, z: -12.4 }],
+        tip: 'もんを ぬけて どこまでも すすもう',
+      },
+    ],
+  },
+  {
+    id: 'downhill',
+    label: 'くだりざか',
+    icon: '⛰️',
+    description: 'たかだいから おりよう',
+    color: '#2f9c8e',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#74c46a', wall: '#c08f5e', wallCap: '#ffe7b4', skirt: '#7b5334', sand: '#ecd7a2', ice: '#cbeaf7', rough: '#4c9457', ground: '#8cc76a', sky: '#a6dbff', horizon: '#eef8e6', bumper: '#f0913c', bumperCap: '#fff2d6', rock: '#9aa096' },
+    holes: [
+      {
+        id: 'downhill-1',
+        name: 'さかみち',
+        par: 2,
+        tee: { x: 0, z: 5.4 },
+        cup: { x: 0, z: -5.0 },
+        // たかだいの てっぺんから、ふたつの さかを おりて ふもとへ。
+        floors: [{ corners: rect(-1.5, -6.2, 1.5, 6.2, 0.6, 1.1) }],
+        features: [
+          { kind: 'slope', from: { x: 0, z: 4.4 }, to: { x: 0, z: 3.2 }, drop: 0.5 },
+          { kind: 'slope', from: { x: 0, z: -0.6 }, to: { x: 0, z: -1.7 }, drop: 0.45 },
+        ],
+        route: [{ x: 0, z: 5.4 }, { x: 0, z: 0.6 }, { x: 0, z: -5.0 }],
+        tip: 'さかで どんどん はやくなるよ',
+      },
+      {
+        id: 'downhill-2',
+        name: 'だんだんばたけ',
+        par: 3,
+        tee: { x: -1.65, z: 5.2 },
+        cup: { x: 1.75, z: -5.2 },
+        // Zの字の だんだん畑。みじかい さかが だんさになっていて、3だんで ふもとまで おりる。
+        floors: [{
+          corners: [
+            { x: -2.9, z: 6.3, r: 0.8 },
+            { x: -0.4, z: 6.3, r: 0.8 },
+            { x: -0.4, z: 1.1, r: 0.7 },
+            { x: 3.0, z: 1.1, r: 0.8 },
+            { x: 3.0, z: -6.3, r: 0.8 },
+            { x: 0.5, z: -6.3, r: 0.8 },
+            { x: 0.5, z: -1.3, r: 0.7 },
+            { x: -2.9, z: -1.3, r: 0.8 },
+          ],
+        }],
+        features: [
+          { kind: 'slope', from: { x: 0, z: 3.9 }, to: { x: 0, z: 3.1 }, drop: 0.3 },
+          { kind: 'slope', from: { x: 0, z: 0.7 }, to: { x: 0, z: -0.1 }, drop: 0.3 },
+          { kind: 'slope', from: { x: 0, z: -3.1 }, to: { x: 0, z: -3.9 }, drop: 0.3 },
+        ],
+        gadgets: [{ kind: 'rock', id: 'ledge-rock', x: -2.62, z: 2.4, radius: 0.28 }],
+        zones: [{ kind: 'rough', x: 2.75, z: -3.0, radius: 0.62 }],
+        route: [{ x: -1.65, z: 5.2 }, { x: -1.9, z: -0.85 }, { x: 1.75, z: -0.9 }, { x: 1.75, z: -5.2 }],
+        tip: 'だんだんを おりて よこへ すすもう',
+      },
+      {
+        id: 'downhill-3',
+        name: 'だんだん がけ',
+        par: 3,
+        tee: { x: 0, z: 5.8 },
+        cup: { x: -1.4, z: -4.2 },
+        // 3だんの だんさを ころころ おりて、下の ひろばへ。だんさでは ボールが ぴょんと はねる。
+        floors: [{
+          corners: [
+            { x: -1.6, z: 6.4, r: 0.9 },
+            { x: -1.6, z: 1.0, r: 0.5 },
+            { x: -2.8, z: 1.0, r: 0.7 },
+            { x: -2.8, z: -6.0, r: 1.1 },
+            { x: 2.8, z: -6.0, r: 1.1 },
+            { x: 2.8, z: 1.0, r: 0.7 },
+            { x: 1.6, z: 1.0, r: 0.5 },
+            { x: 1.6, z: 6.4, r: 0.9 },
+          ],
+        }],
+        features: [
+          { kind: 'slope', from: { x: 0, z: 4.7 }, to: { x: 0, z: 4.2 }, drop: 0.3 },
+          { kind: 'slope', from: { x: 0, z: 3.5 }, to: { x: 0, z: 3.0 }, drop: 0.3 },
+          { kind: 'slope', from: { x: 0, z: 2.3 }, to: { x: 0, z: 1.8 }, drop: 0.3 },
+        ],
+        gadgets: [
+          { kind: 'bumper', id: 'barrel', x: 1.5, z: -1.6, radius: 0.3 },
+          { kind: 'rock', id: 'fallen-rock', x: -2.2, z: -2.0, radius: 0.32 },
+        ],
+        zones: [{ kind: 'rough', x: 1.9, z: -4.4, radius: 0.9 }],
+        route: [{ x: 0, z: 5.8 }, { x: 0, z: 0.2 }, { x: -1.4, z: -4.2 }],
+        tip: 'だんだんを ころころ おりよう',
+      },
+      {
+        id: 'downhill-4',
+        name: 'ひつじの おか',
+        par: 3,
+        tee: { x: 0, z: 5.0 },
+        cup: { x: -1.0, z: -4.6 },
+        // ひろい おかを おりていく みち。とちゅうに なみと いわ、ひつじが よこぎる。
+        floors: [{ corners: rect(-3.4, -5.6, 3.4, 6.0, 1.0, 1.3) }],
+        features: [
+          { kind: 'slope', from: { x: 0, z: 3.6 }, to: { x: 0, z: 2.5 }, drop: 0.45 },
+          { kind: 'slope', from: { x: 0, z: -0.6 }, to: { x: 0, z: -1.7 }, drop: 0.45 },
+          { kind: 'ridge', from: { x: -3.6, z: -2.8 }, to: { x: 3.6, z: -2.8 }, radius: 0.6, height: 0.12 },
+        ],
+        gadgets: [
+          { kind: 'critter', id: 'sheep', x: -2.2, z: 1.2, to: { x: 2.2, z: 1.2 }, speed: 0.8, look: 'sheep' },
+          { kind: 'rock', id: 'hill-rock', x: 1.6, z: -3.0, radius: 0.36 },
+          { kind: 'rock', id: 'hill-rock-w', x: -1.9, z: -0.2, radius: 0.34 },
+        ],
+        zones: [{ kind: 'rough', x: 2.7, z: 3.6, radius: 0.9 }],
+        route: [{ x: 0, z: 5.0 }, { x: 0.2, z: 0.2 }, { x: -1.0, z: -4.6 }],
+        tip: 'ひつじさんが とおりすぎたら うとう',
       },
     ],
   },
