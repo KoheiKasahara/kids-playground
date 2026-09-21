@@ -68,8 +68,16 @@ test('コースを選んで ひっぱって打ち、3ホールを回ってスコ
   await expect(page.getByRole('region', { name: 'ゴルフの そうさ', exact: true })).toBeVisible()
   await expect(scene).toHaveAttribute('data-camera', 'ball')
 
-  // 画面を下へひっぱって はなすと、前へ打てる。
+  // ← → で ねらう むき（＝カメラの むき）が かわる。うつ前の ティーで たしかめる。
   await expect(scene).toHaveAttribute('data-phase', 'ready')
+  const aimed = Number(await scene.getAttribute('data-aim-x'))
+  await page.getByRole('button', { name: 'むきを ひだりへ かえる', exact: true }).click()
+  await expect.poll(async () => Number(await scene.getAttribute('data-aim-x'))).toBeLessThan(aimed)
+  const turned = Number(await scene.getAttribute('data-aim-x'))
+  await page.getByRole('button', { name: 'むきを みぎへ かえる', exact: true }).click()
+  await expect.poll(async () => Number(await scene.getAttribute('data-aim-x'))).toBeGreaterThan(turned)
+
+  // 画面を下へひっぱって はなすと、前へ打てる。
   const startZ = Number(await scene.getAttribute('data-ball-z'))
   await dragTowardCup(page, scene, 'meadow', 0)
   await expect(scene).toHaveAttribute('data-strokes', '1')
@@ -106,7 +114,7 @@ test('縦・横どちらでも主な操作が画面に入り、横にはみ出�
   await page.getByRole('button', { name: 'スタート！', exact: true }).click({ timeout: 20_000 })
   for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }, { width: 667, height: 375 }, { width: 320, height: 568 }]) {
     await page.setViewportSize(viewport)
-    for (const name of ['ボールを みる', 'ホール ぜんたいを みる', 'この ホールを やりなおす']) await expect(page.getByRole('button', { name, exact: true })).toBeInViewport()
+    for (const name of ['むきを ひだりへ かえる', 'ボールを みる', 'ホール ぜんたいを みる', 'この ホールを やりなおす', 'むきを みぎへ かえる']) await expect(page.getByRole('button', { name, exact: true })).toBeInViewport()
     expect((await page.getByTestId('golf-scene').boundingBox())!.height).toBeGreaterThan(180)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     const buttons = await page.getByRole('region', { name: 'ゴルフの そうさ' }).getByRole('button').evaluateAll(elements => elements.map(element => element.getBoundingClientRect()))

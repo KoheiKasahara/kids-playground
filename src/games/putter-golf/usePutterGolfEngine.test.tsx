@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { GOLF_COURSES } from './golfCourses'
 import { aimPose } from './golfCamera'
 import type { GolfEvent } from './golfWorld'
-import { aimFromDrag, usePutterGolfEngine, type EngineEvent, type GolfFeedback } from './usePutterGolfEngine'
+import { aimFromDrag, usePutterGolfEngine, type EngineEvent, type GolfCamera, type GolfFeedback } from './usePutterGolfEngine'
 
 const mocks = vi.hoisted(() => ({ initialize: vi.fn<() => Promise<void>>(), createScene: vi.fn(), createWorld: vi.fn() }))
 vi.mock('../../physics/rapierLoader', () => ({ initializeRapier: mocks.initialize }))
@@ -70,14 +70,14 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); frame = undefined })
 
-type Props = { holeIndex?: number; active?: boolean; attempt?: number }
+type Props = { holeIndex?: number; active?: boolean; attempt?: number; camera?: GolfCamera }
 function setup(initial: Props = {}) {
   const harness = { status: [] as string[], feedback: [] as GolfFeedback[], events: [] as EngineEvent[] } as {
     status: string[]; feedback: GolfFeedback[]; events: EngineEvent[]; host: HTMLDivElement; engine: ReturnType<typeof usePutterGolfEngine>
   }
-  function Screen({ holeIndex = 0, active = true, attempt = 0 }: Props) {
+  function Screen({ holeIndex = 0, active = true, attempt = 0, camera = 'ball' }: Props) {
     const engine = usePutterGolfEngine({
-      course: GOLF_COURSES[0]!, holeIndex, attempt, ballStyle: 'white', bigCup: false, camera: 'ball', active, reducedMotion: true,
+      course: GOLF_COURSES[0]!, holeIndex, attempt, ballStyle: 'white', bigCup: false, camera, active, reducedMotion: true,
       onStatus: status => harness.status.push(status), onFeedback: feedback => harness.feedback.push(feedback), onEvent: event => harness.events.push(event),
     })
     harness.engine = engine
@@ -146,7 +146,17 @@ it('打ち終わったら、次のねらいの後ろへカメラを置き直す'
 
   runFrames(1)
 
-  expect(scene().setCamera).toHaveBeenLastCalledWith(aimPose(world().state.position, next.direction, 1))
+  const ball = world().state.position
+  const pose = aimPose(ball, next.direction, 1)
+  // カメラとボールの距離もわたす。手前の景色だけを消すために使う。
+  expect(scene().setCamera).toHaveBeenLastCalledWith(pose, Math.hypot(pose.position.x - ball.x, pose.position.y - ball.y, pose.position.z - ball.z))
+})
+
+it('ホールぜんたいを見るときは、景色を消さない', async () => {
+  const app = setup({ camera: 'overview' })
+  await waitFor(() => expect(app.status).toContain('ready'))
+  runFrames(2)
+  expect(scene().setCamera).toHaveBeenLastCalledWith(expect.anything(), 0)
 })
 
 it('えらぶ画面の間は、うてない', async () => {

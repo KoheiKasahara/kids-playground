@@ -62,7 +62,7 @@
 .scoreRow strong { font-size: 18px; font-weight: 900; color: var(--course-color); }
 .holeName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .holeName strong { font-size: 15px; }
-.tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.tools { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
 .tools button { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-height: 56px; padding: 3px 1px; border: 2px solid #e1e8dc; border-radius: 13px; color: #4a6254; background: #f5f7f1; font-size: 11px; font-weight: 800; white-space: nowrap; }
 .tools button span { font-size: 20px; line-height: 1; }
 .tools button[aria-pressed='true'] { border-color: #5f9e74; color: #2f6b45; background: #e4f2e4; }
@@ -96,6 +96,8 @@
   .courseButton small { font-size: 9px; }
   .holeThumbs { gap: 1px; height: 26px; }
   .holeThumbs svg { width: 12px; height: 26px; }
+  .tools { gap: 4px; }
+  .tools button { font-size: 9px; }
   .map { width: 80px; }
   .map svg { height: 78px; }
 }
