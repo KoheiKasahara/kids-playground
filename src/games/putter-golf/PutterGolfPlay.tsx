@@ -17,6 +17,8 @@ const SPLASH_TEXT: Partial<Record<CourseId, string>> = {
   snow: 'ゆきに ぼふっ！ もとの ばしょに もどるよ',
   candy: 'ミルクに ぽちゃん！ もとの ばしょに もどるよ',
   dino: 'したへ おっこちた！ もとの ばしょに もどるよ',
+  forest: 'しげみに ぽふっ！ もとの ばしょに もどるよ',
+  downhill: 'さかの したへ ころん！ もとの ばしょに もどるよ',
 }
 
 /** ホールを上から見た線。ミニマップとコースえらびの見本に使う。 */
@@ -64,6 +66,11 @@ function GadgetMark({ gadget, course }: { gadget: Gadget; course: CourseDefiniti
         <line x1={gadget.x} y1={gadget.z} x2={gadget.to.x} y2={gadget.to.z} stroke={course.look.bumper} strokeWidth="0.12" strokeDasharray="0.3 0.3" />
         <circle cx={(gadget.x + gadget.to.x) / 2} cy={(gadget.z + gadget.to.z) / 2} r="0.3" fill={course.look.bumper} />
       </g>
+    case 'tree':
+      return <g>
+        <circle cx={gadget.x} cy={gadget.z} r={gadget.radius * 2.2} fill="#4f9f52" />
+        <circle cx={gadget.x} cy={gadget.z} r={gadget.radius} fill="#7c5334" />
+      </g>
     case 'warp':
       return <g>
         <line x1={gadget.x} y1={gadget.z} x2={gadget.exit.x} y2={gadget.exit.z} stroke={course.look.bumperCap} strokeWidth="0.12" strokeDasharray="0.4 0.4" />
@@ -107,6 +114,7 @@ export default function PutterGolfPlay() {
       case 'shot': setRound(current => recordShot(current)); setMessage(null); play('putt', 0.5 + event.power * 0.5); break
       case 'wall': play('wall', event.strength); break
       case 'rock': play('rock', event.strength); break
+      case 'tree': play('tree', event.strength); setMessage('きに こつん！'); break
       case 'bumper': play('bumper'); setMessage('ぽよーん！'); break
       case 'gate': play('gate', event.strength); setMessage('とびらに あたった！ あくのを まとう'); break
       case 'critter': play('critter'); setMessage('どうぶつに ぽーん！'); break

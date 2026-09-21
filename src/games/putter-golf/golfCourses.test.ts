@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { COURSE_IDS, findCourse, GOLF_COURSES } from './golfCourses'
+import { COURSE_IDS, findCourse, GOLF_COURSES, type Vec2 } from './golfCourses'
+import { BALL_RADIUS } from './golfPhysics'
 
 const HOLES = GOLF_COURSES.flatMap(course => course.holes)
 
@@ -33,6 +34,25 @@ describe('パターゴルフのコース定義', () => {
       expect(hole.par, hole.id).toBeGreaterThanOrEqual(2)
       expect(hole.name.length, hole.id).toBeGreaterThan(0)
       expect(hole.tip.length, hole.id).toBeGreaterThan(0)
+    }
+  })
+
+  test('きは みちすじの 線から はなれていて、ボールが とおれる', () => {
+    const distanceToSegment = (point: Vec2, a: Vec2, b: Vec2) => {
+      const dx = b.x - a.x
+      const dz = b.z - a.z
+      const t = Math.min(1, Math.max(0, ((point.x - a.x) * dx + (point.z - a.z) * dz) / (dx * dx + dz * dz || 1)))
+      return Math.hypot(point.x - (a.x + dx * t), point.z - (a.z + dz * t))
+    }
+    for (const hole of HOLES) {
+      for (const gadget of hole.gadgets ?? []) {
+        if (gadget.kind !== 'tree') continue
+        hole.route.slice(0, -1).forEach((point, index) => {
+          const distance = distanceToSegment(gadget, point, hole.route[index + 1]!)
+          // みちすじは きの みきを よけて通る（ボールの太さぶんの すきま つき）。
+          expect(distance, `${hole.id} の ${gadget.id} と ${index}ばんめの線`).toBeGreaterThan(gadget.radius + BALL_RADIUS + 0.3)
+        })
+      }
     }
   })
 

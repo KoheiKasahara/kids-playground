@@ -30,6 +30,7 @@ import {
   SHOT_TIMEOUT_SECONDS,
   shotSpeed,
   shotVelocity,
+  TREE,
   WARP,
   WINDMILL,
   windmillAngle,
@@ -42,7 +43,7 @@ export type Quat = { x: number; y: number; z: number; w: number }
 export type GolfPhase = 'ready' | 'rolling' | 'holed' | 'out'
 export type GolfEvent =
   | { kind: 'shot'; power: number; position: Vec3 }
-  | { kind: 'wall' | 'rock' | 'windmill'; strength: number; position: Vec3 }
+  | { kind: 'wall' | 'rock' | 'windmill' | 'tree'; strength: number; position: Vec3 }
   | { kind: 'bumper'; id: string; strength: number; position: Vec3 }
   /** うごくカベに あたった。 */
   | { kind: 'gate'; id: string; strength: number; position: Vec3 }
@@ -73,7 +74,7 @@ const BUMPER_KICK = 2.8
 const CRITTER_KICK = 2.1
 
 type Role = {
-  kind: 'floor' | 'wall' | 'bumper' | 'rock' | 'blade' | 'gate' | 'critter'
+  kind: 'floor' | 'wall' | 'bumper' | 'rock' | 'tree' | 'blade' | 'gate' | 'critter'
   id: string
   x: number
   z: number
@@ -133,6 +134,11 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       add(RAPIER.ColliderDesc.cylinder(BUMPER_HEIGHT / 2, gadget.radius).setTranslation(gadget.x, ground + BUMPER_HEIGHT / 2 - 0.02, gadget.z).setFriction(0).setRestitution(1), { kind: 'bumper', id: gadget.id, x: gadget.x, z: gadget.z })
     } else if (gadget.kind === 'rock') {
       add(RAPIER.ColliderDesc.ball(gadget.radius).setTranslation(gadget.x, ground - gadget.radius * 0.3, gadget.z).setFriction(0.3).setRestitution(0.3), { kind: 'rock', id: gadget.id, x: gadget.x, z: gadget.z })
+    } else if (gadget.kind === 'tree') {
+      // きの みき。ほとんど はねないので、あたると その場に ぽとりと 落ちる。
+      add(RAPIER.ColliderDesc.cylinder(TREE.trunk / 2, gadget.radius)
+        .setTranslation(gadget.x, ground + TREE.trunk / 2 - 0.05, gadget.z)
+        .setFriction(0.5).setRestitution(0.35), { kind: 'tree', id: gadget.id, x: gadget.x, z: gadget.z })
     } else if (gadget.kind === 'windmill') {
       // トンネルの両わきの柱。ボールはトンネルの中しか通れない。
       for (const side of [-1, 1]) {
@@ -246,6 +252,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     const strength = Math.min(1, speed / 6)
     if (role.kind === 'wall' && speed > 0.35) emit({ kind: 'wall', strength, position: p }, 'wall', 0.08)
     if (role.kind === 'rock') emit({ kind: 'rock', strength, position: p }, 'rock', 0.12)
+    if (role.kind === 'tree') emit({ kind: 'tree', strength: Math.max(0.35, strength), position: p }, 'tree', 0.14)
     if (role.kind === 'blade') emit({ kind: 'windmill', strength: Math.max(0.4, strength), position: p }, 'blade', 0.2)
     if (role.kind === 'gate' && speed > 0.3) emit({ kind: 'gate', id: role.id, strength: Math.max(0.4, strength), position: p }, `gate-${role.id}`, 0.15)
     if (role.kind === 'bumper' || role.kind === 'critter') {
@@ -535,9 +542,12 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         const dz = target.z - p.z
         const distance = Math.hypot(dx, dz) || 1
         const decel = decelAlong(p, target)
-        const rise = Math.max(0, (geometry.heightAt(target.x, target.z) ?? p.y) - (p.y - BALL_RADIUS))
         // 上り坂は、転がる玉の運動エネルギー（回転ぶん7/5倍）で登る高さのぶんだけ強くする。
-        let power = powerForDistance(distance + extra + (course.gravity * rise * 1.4) / decel, decel)
+        // 下り坂は逆に、落ちたぶんだけ よぶんに転がるので、その距離を引いて弱くうつ。
+        // ボールは床からほんの少しうかせて置くので、わずかな高さの差は平らとみなす。
+        const rise = (geometry.heightAt(target.x, target.z) ?? p.y - BALL_RADIUS) - (p.y - BALL_RADIUS)
+        const climb = Math.abs(rise) < 0.02 ? 0 : (course.gravity * rise * (rise > 0 ? 1.4 : 0.7)) / decel
+        let power = powerForDistance(distance + extra + climb, decel)
         for (let index = segment + 1; index <= lastPassed; index++) power = Math.max(power, route[index]!.minPower ?? 0)
         return { direction: { x: dx / distance, z: dz / distance }, power: Math.min(1, Math.max(0.12, power)), target: { x: target.x, z: target.z } }
       }

@@ -128,6 +128,14 @@ export function createHeightFunction(hole: HoleDefinition, cupRadius = CUP_RADIU
       } else if (feature.kind === 'ridge') {
         const d = segmentDistance(x, z, feature.from, feature.to)
         if (d < feature.radius) height += (feature.height * (1 + Math.cos((Math.PI * d) / feature.radius))) / 2
+      } else if (feature.kind === 'slope') {
+        const dx = feature.to.x - feature.from.x
+        const dz = feature.to.z - feature.from.z
+        const length = Math.hypot(dx, dz)
+        const along = ((x - feature.from.x) * dx + (z - feature.from.z) * dz) / length
+        // from の手前は0、to の先はずっと drop ぶん低いまま。
+        // つなぎ目をなめらかにして、坂の上と下でボールがはねないようにする。
+        height -= feature.drop * smoothstep(0, length, along)
       } else {
         const dx = feature.to.x - feature.from.x
         const dz = feature.to.z - feature.from.z
@@ -250,8 +258,11 @@ export function buildHoleGeometry(hole: HoleDefinition, cupRadius = CUP_RADIUS):
     else floor.indices.push(a, c, b)
   }
 
+  // 台の厚みは、その床のいちばん低いところから測る。坂で下がったぶんも台になる。
+  const floorLow = new Map<Outline, number>()
   for (const outline of outlines) {
     vertexKeys = new Map()
+    const firstVertex = floor.positions.length
     const xs = outline.points.map(point => point.x)
     const zs = outline.points.map(point => point.z)
     // カップのまわりの正方形はマス目から外し、円い穴に合う三角形でうめる。
@@ -300,6 +311,9 @@ export function buildHoleGeometry(hole: HoleDefinition, cupRadius = CUP_RADIUS):
         else { addTriangle(at(outer, o).id, at(inner, r).id, at(inner, r + 1).id); r++ }
       }
     }
+    let low = outline.base
+    for (let i = firstVertex + 1; i < floor.positions.length; i += 3) low = Math.min(low, floor.positions[i]!)
+    floorLow.set(outline, low)
   }
 
   // カップの内壁（上が開いた筒）。上の縁は床の穴の縁と同じ高さ・同じ分割にする。
@@ -339,7 +353,7 @@ export function buildHoleGeometry(hole: HoleDefinition, cupRadius = CUP_RADIUS):
       }
       return wallAfter ? after : before
     })
-    const bottom = base - PLATFORM_DEPTH
+    const bottom = (floorLow.get(outline) ?? base) - PLATFORM_DEPTH
     for (let index = 0; index < n; index++) {
       const a = points[index]!
       const b = points[(index + 1) % n]!
