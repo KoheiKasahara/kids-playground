@@ -786,6 +786,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'hoshi-tsunagi',
+    slug: 'hoshi-tsunagi',
+    title: 'よぞらの ほしつなぎ',
+    emoji: '🌙',
+    category: 'learning',
+    seo: {
+      headline: 'よぞらの ほしつなぎ｜数字の順に星をつなぐと星座が動き出す',
+      description:
+        '夜空の星を1・2・3…と数字の順に指でつなぐと、さかな・ロケット・ちょうちょなどの星座が完成して動き出す幼児向けの点つなぎあそびです。なぞっても、タップしてもつなげられ、数の順番を楽しくおぼえられます。',
+    },
+    intro: {
+      howToPlay: [
+        '1の ほしから じゅんばんに つないでね',
+        'ゆびで なぞっても、タップしても つながるよ',
+        'さいごまで つなぐと ほしざが うごきだすよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
