@@ -13,12 +13,14 @@ import type { SpeechSynthesisMock } from '../../test/speechSynthesisMock'
  * ここでは「クイズ画面に正しく配線されているか」（ON/OFF・次の問題・画面離脱で
  * 正しいタイミングで speak/cancel が呼ばれるか、読み上げテキストが妥当か）だけを見る。
  */
-function renderApp(path: string) {
-  return render(
+async function renderApp(path: string) {
+  const view = render(
     <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>,
   )
+  await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
+  return view
 }
 
 function getToggle(): HTMLElement {
@@ -46,21 +48,21 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
     uninstallSpeechSynthesisMock()
   })
 
-  test('よみあげ OFF（初期状態）のままでは、1問目でも読み上げない', () => {
-    renderApp('/games/flag-quiz/flag-to-name/hard/play')
+  test('よみあげ OFF（初期状態）のままでは、1問目でも読み上げない', async () => {
+    await renderApp('/games/flag-quiz/flag-to-name/hard/play')
     expect(mock.spoken).toEqual([])
   })
 
   test('トグルを押して ON にすると、いま表示中の問題文がその場で読み上げられる', async () => {
     const user = userEvent.setup()
-    renderApp('/games/flag-quiz/flag-to-name/hard/play')
+    await renderApp('/games/flag-quiz/flag-to-name/hard/play')
     await user.click(getToggle())
     expect(mock.spoken).toEqual(['この くにの なまえは？'])
   })
 
   test('ON のまま選択肢をタップして正誤演出が出ても、読み上げ回数が増えない', async () => {
     const user = userEvent.setup()
-    renderApp('/games/flag-quiz/flag-to-name/hard/play')
+    await renderApp('/games/flag-quiz/flag-to-name/hard/play')
     await user.click(getToggle())
     expect(mock.spoken).toHaveLength(1)
 
@@ -73,7 +75,7 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
 
   test('「つぎのもんだい」で次の問題に進むと、もう一度読み上げられ、その直前に cancel() が呼ばれている', async () => {
     const user = userEvent.setup()
-    renderApp('/games/flag-quiz/flag-to-name/hard/play')
+    await renderApp('/games/flag-quiz/flag-to-name/hard/play')
     await user.click(getToggle())
     await user.click(getChoiceButtons()[0])
     mock.reset()
@@ -87,7 +89,7 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
 
   test('「やめる」で画面を離れると cancel() が呼ばれる（アンマウントで停止する）', async () => {
     const user = userEvent.setup()
-    renderApp('/games/flag-quiz/flag-to-name/hard/play')
+    await renderApp('/games/flag-quiz/flag-to-name/hard/play')
     await user.click(getToggle())
     mock.reset()
 
@@ -98,7 +100,7 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
 
   test('ON のあと OFF に戻すと cancel() が呼ばれる', async () => {
     const user = userEvent.setup()
-    renderApp('/games/flag-quiz/flag-to-name/hard/play')
+    await renderApp('/games/flag-quiz/flag-to-name/hard/play')
     await user.click(getToggle())
     mock.reset()
 
@@ -109,7 +111,7 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
 
   test('読み上げテキストに進捗表示や「やめる」が含まれない', async () => {
     const user = userEvent.setup()
-    renderApp('/games/flag-quiz/flag-to-name/hard/play')
+    await renderApp('/games/flag-quiz/flag-to-name/hard/play')
     await user.click(getToggle())
     await user.click(getChoiceButtons()[0])
     await user.click(screen.getByRole('button', { name: /つぎのもんだい|けっかを みる/ }))
@@ -126,13 +128,13 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
 
   test('よみあげ設定は他のクイズのプレイ画面にも共有される（ON にしてから別画面へ遷移してもONのまま）', async () => {
     const user = userEvent.setup()
-    const { unmount } = renderApp('/games/flag-quiz/flag-to-name/hard/play')
+    const { unmount } = await renderApp('/games/flag-quiz/flag-to-name/hard/play')
     await user.click(getToggle())
     expect(mock.spoken).toEqual(['この くにの なまえは？'])
     unmount()
     mock.reset()
 
-    renderApp('/games/color-mix-quiz/play')
+    await renderApp('/games/color-mix-quiz/play')
     // 別のクイズ画面でも、設定を ON にし直さなくてもその場で問題文が読み上げられる。
     await waitFor(() => expect(mock.spoken).toHaveLength(1))
     expect(mock.spoken[0]).toMatch(/この (2|3)しょくを まぜると？|この いろから ひくと？/)

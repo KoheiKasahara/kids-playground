@@ -13,12 +13,14 @@ import type { Country } from './types'
  * 画面遷移まわり（けっか画面への遷移・リダイレクトなど）を実際のルート定義で検証するため、
  * MemoryRouter + App を使う（既存の FlagQuizPlay.test.tsx / NameToFlagPlay.test.tsx と同じ方針）。
  */
-function renderApp(initialEntries: string[]) {
-  return render(
+async function renderApp(initialEntries: string[]) {
+  const view = render(
     <MemoryRouter initialEntries={initialEntries}>
       <App />
     </MemoryRouter>,
   )
+  await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
+  return view
 }
 
 /**
@@ -101,26 +103,26 @@ async function answerCurrentQuestion(
 }
 
 describe('PanelFlagQuizPlay', () => {
-  test('クイズを開始すると、16枚のパネルのうち1枚だけが開いた状態で表示される', () => {
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+  test('クイズを開始すると、16枚のパネルのうち1枚だけが開いた状態で表示される', async () => {
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     expect(screen.getAllByTestId(/^panel-\d+$/)).toHaveLength(PANEL_COUNT)
     expect(getOpenPanelCount()).toBe(1)
   })
 
-  test('4つの国名選択肢ボタンが表示される', () => {
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+  test('4つの国名選択肢ボタンが表示される', async () => {
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     expect(getChoiceButtons()).toHaveLength(4)
   })
 
-  test('むずかしさが表示される', () => {
-    renderApp(['/games/flag-quiz/panel-flag/normal/play'])
+  test('むずかしさが表示される', async () => {
+    await renderApp(['/games/flag-quiz/panel-flag/normal/play'])
     expect(screen.getByText('ふつう')).toBeInTheDocument()
   })
 
-  test('かんたんでは、easyランクの国しか出題されない', () => {
+  test('かんたんでは、easyランクの国しか出題されない', async () => {
     const easyIds = new Set(countriesForLevel('easy').map((c) => c.id))
     for (let seed = 0; seed < 10; seed += 1) {
-      const { container, unmount } = renderApp(['/games/flag-quiz/panel-flag/easy/play'])
+      const { container, unmount } = await renderApp(['/games/flag-quiz/panel-flag/easy/play'])
       const correctCountry = getCorrectCountry(container)
       expect(easyIds.has(correctCountry.id)).toBe(true)
       for (const btn of getChoiceButtons()) {
@@ -132,15 +134,15 @@ describe('PanelFlagQuizPlay', () => {
     }
   })
 
-  test('不正な level でアクセスすると、パネルめくりモードのむずかしさ選択画面へリダイレクトされる', () => {
-    renderApp(['/games/flag-quiz/panel-flag/super-hard/play'])
+  test('不正な level でアクセスすると、パネルめくりモードのむずかしさ選択画面へリダイレクトされる', async () => {
+    await renderApp(['/games/flag-quiz/panel-flag/super-hard/play'])
     expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
     expect(screen.getByText('パネルめくり')).toBeInTheDocument()
   })
 
   test('開始画面の「パネルを めくって こたえる」から、むずかしさ選択を経てプレイ画面に入れる', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz'])
+    await renderApp(['/games/flag-quiz'])
     await user.click(screen.getByRole('button', { name: /パネルを めくって こたえる/ }))
     expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /かんたん/ }))
@@ -150,7 +152,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('「もう1まい めくる！」を押すたびに開いたパネルが1枚ずつ増える', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     expect(getOpenPanelCount()).toBe(1)
     await user.click(getRevealButton())
     expect(getOpenPanelCount()).toBe(2)
@@ -160,7 +162,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('開いたパネルの index は重複しない', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     for (let i = 0; i < 6; i += 1) {
       await user.click(getRevealButton())
     }
@@ -171,7 +173,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('16枚を超えて開かない。開ける枚数が上限に達するとボタンがdisabledになる', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     for (let i = 0; i < 20; i += 1) {
       const button = getRevealButton()
       if ((button as HTMLButtonElement).disabled) break
@@ -183,7 +185,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('正解の選択肢を押すと「せいかい」のフィードバックと得点(100てん)が表示される（1枚目で正解）', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     const correctCountry = getCorrectCountry(container)
     const button = screen.getByRole('button', { name: correctCountry.nameJa })
     await user.click(button)
@@ -194,7 +196,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('2枚めくってから正解すると90点になる', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     await user.click(getRevealButton())
     const correctCountry = getCorrectCountry(container)
     const button = screen.getByRole('button', { name: correctCountry.nameJa })
@@ -205,7 +207,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('4枚めくってから正解すると70点になる', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     await user.click(getRevealButton())
     await user.click(getRevealButton())
     await user.click(getRevealButton())
@@ -218,7 +220,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('不正解の選択肢を押すと「ざんねん！」と正しい国名、0てんが表示される', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     const correctCountry = getCorrectCountry(container)
     const choiceButtons = getChoiceButtons()
     const wrongButton = choiceButtons.find((btn) => btn.textContent !== correctCountry.nameJa)
@@ -231,7 +233,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('回答後は自動めくりで16枚すべてのパネルが開き、国旗全体が見える', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     await user.click(getChoiceButtons()[0])
     // 自動めくりはランダム順の時間差（stagger）で開くため、即時ではなく waitFor で待つ
     await waitFor(() => expect(getOpenPanelCount()).toBe(PANEL_COUNT), { timeout: 10_000 })
@@ -239,7 +241,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('回答後の自動めくりで枚数は増えるが、得点表示の「〇まいで わかった！」は自分で開いた枚数のまま変わらない', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     await user.click(getRevealButton())
     expect(getOpenPanelCount()).toBe(2)
     const correctCountry = getCorrectCountry(container)
@@ -255,7 +257,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('回答直後に「つぎのもんだい」を押すと、前問の自動めくり timer が残らず、次の問題は1枚だけ開いた状態になる', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     await user.click(getChoiceButtons()[0])
     const nextButton = screen.getByRole('button', { name: /つぎのもんだい|けっかを みる/ })
     await user.click(nextButton)
@@ -270,7 +272,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('回答前後でページのルート要素の className が変化しない（レイアウトシフトしない）', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     const pageElement = container.firstElementChild
     const classNameBefore = pageElement?.className
     expect(classNameBefore).toBeTruthy()
@@ -280,7 +282,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('回答後は選択肢ボタンと「もう1まい めくる！」ボタンが disabled になる', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     const choiceButtons = getChoiceButtons()
     await user.click(choiceButtons[0])
     for (const btn of choiceButtons) {
@@ -291,7 +293,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('回答後のフィードバックはスクリーンリーダーに通知される（role=status）', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     await user.click(getChoiceButtons()[0])
     const status = screen.getByRole('status')
     expect(status).toHaveTextContent(/せいかい！|ざんねん！/)
@@ -301,7 +303,7 @@ describe('PanelFlagQuizPlay', () => {
 
   test('「つぎのもんだい」で次の問題に進み、パネル状態がリセットされる（再び1枚だけ開いている）', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
     expect(screen.getByRole('progressbar', { name: '1 / 10 もん' })).toBeInTheDocument()
     await user.click(getRevealButton())
     await user.click(getRevealButton())
@@ -317,7 +319,7 @@ describe('PanelFlagQuizPlay', () => {
     '10問すべてに1枚目で正解すると結果画面へ遷移し、正解数と満点(1000/1000てん)が表示される',
     async () => {
       const user = userEvent.setup()
-      const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+      const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, container, true)
       }
@@ -332,7 +334,7 @@ describe('PanelFlagQuizPlay', () => {
     '一部を不正解にすると、正解数がその件数どおりに結果画面へ表示される',
     async () => {
       const user = userEvent.setup()
-      const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+      const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
       const pattern = [true, false, true, true, false, true, false, true, false, true]
       for (const correct of pattern) {
         await answerCurrentQuestion(user, container, correct)
@@ -346,7 +348,7 @@ describe('PanelFlagQuizPlay', () => {
     '結果画面の「もういちど」でパネルクイズが再開され、1問目に戻る（1枚だけ開いた状態）',
     async () => {
       const user = userEvent.setup()
-      const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+      const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, container, true)
       }
@@ -362,7 +364,7 @@ describe('PanelFlagQuizPlay', () => {
     '結果画面の「べつの むずかしさ」でパネルめくりモードのむずかしさ選択画面に戻る',
     async () => {
       const user = userEvent.setup()
-      const { container } = renderApp(['/games/flag-quiz/panel-flag/hard/play'])
+      const { container } = await renderApp(['/games/flag-quiz/panel-flag/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, container, true)
       }
@@ -374,8 +376,8 @@ describe('PanelFlagQuizPlay', () => {
     20000,
   )
 
-  test('結果画面へ直接アクセス（stateなし）すると開始画面へリダイレクトされる', () => {
-    renderApp(['/games/flag-quiz/panel-flag/hard/result'])
+  test('結果画面へ直接アクセス（stateなし）すると開始画面へリダイレクトされる', async () => {
+    await renderApp(['/games/flag-quiz/panel-flag/hard/result'])
     expect(screen.getByRole('heading', { name: 'こっきクイズ' })).toBeInTheDocument()
   })
 })

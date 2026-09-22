@@ -8,12 +8,14 @@ import type { Vehicle } from './types'
 import { LEVEL_LABEL, QUESTION_COUNT } from '../quiz-core/types'
 import type { QuizLevel } from '../quiz-core/types'
 
-function renderApp(path: string) {
-  return render(
+async function renderApp(path: string) {
+  const view = render(
     <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>,
   )
+  await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
+  return view
 }
 
 function vehicleIdFromImage(image: Element | null): string {
@@ -67,8 +69,8 @@ async function answerNameToPhoto(user: UserEvent, correct: boolean) {
 }
 
 describe('はたらくくるまクイズ', () => {
-  test('開始画面から2つのモードを選べる', () => {
-    renderApp('/games/working-vehicle-quiz')
+  test('開始画面から2つのモードを選べる', async () => {
+    await renderApp('/games/working-vehicle-quiz')
     expect(screen.getByRole('heading', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /しゃしんを みて こたえる/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /なまえを みて こたえる/ })).toBeInTheDocument()
@@ -76,7 +78,7 @@ describe('はたらくくるまクイズ', () => {
 
   test('モード選択後にレベルごとの種類数を選べる', async () => {
     const user = userEvent.setup()
-    renderApp('/games/working-vehicle-quiz')
+    await renderApp('/games/working-vehicle-quiz')
     await user.click(screen.getByRole('button', { name: /しゃしんを みて こたえる/ }))
     expect(screen.getByText('しゃしん → なまえ')).toBeInTheDocument()
     for (const level of ['easy', 'normal', 'hard'] as const satisfies QuizLevel[]) {
@@ -86,8 +88,8 @@ describe('はたらくくるまクイズ', () => {
     }
   })
 
-  test('写真→名前は問題写真と名前4択を表示する', () => {
-    renderApp('/games/working-vehicle-quiz/photo-to-name/easy/play')
+  test('写真→名前は問題写真と名前4択を表示する', async () => {
+    await renderApp('/games/working-vehicle-quiz/photo-to-name/easy/play')
     expect(screen.getByRole('heading', { name: 'この くるまの なまえは？' })).toBeInTheDocument()
     expect(questionVehicleFromPhoto()).toBeDefined()
     const nameButtons = vehicles.filter((vehicle) =>
@@ -97,8 +99,8 @@ describe('はたらくくるまクイズ', () => {
     expect(screen.getByRole('progressbar', { name: '1 / 10 もん' })).toBeInTheDocument()
   })
 
-  test('名前→写真は車名と写真4択を表示する', () => {
-    renderApp('/games/working-vehicle-quiz/name-to-photo/normal/play')
+  test('名前→写真は車名と写真4択を表示する', async () => {
+    await renderApp('/games/working-vehicle-quiz/name-to-photo/normal/play')
     expect(questionVehicleFromName()).toBeDefined()
     expect(photoChoiceButtons()).toHaveLength(4)
     expect(screen.getByText('ふつう')).toBeInTheDocument()
@@ -106,7 +108,7 @@ describe('はたらくくるまクイズ', () => {
 
   test('回答後は正誤を色だけでなく記号と文でも通知する', async () => {
     const user = userEvent.setup()
-    renderApp('/games/working-vehicle-quiz/photo-to-name/hard/play')
+    await renderApp('/games/working-vehicle-quiz/photo-to-name/hard/play')
     const answer = questionVehicleFromPhoto()
     await user.click(screen.getByRole('button', { name: answer.nameJa }))
     const status = screen.getByRole('status')
@@ -117,7 +119,7 @@ describe('はたらくくるまクイズ', () => {
 
   test('回答前後でページのルート要素の className が変化しない（レイアウトシフトしない）', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp('/games/working-vehicle-quiz/photo-to-name/hard/play')
+    const { container } = await renderApp('/games/working-vehicle-quiz/photo-to-name/hard/play')
     const pageElement = container.firstElementChild
     const classNameBefore = pageElement?.className
     expect(classNameBefore).toBeTruthy()
@@ -126,15 +128,15 @@ describe('はたらくくるまクイズ', () => {
     expect(container.firstElementChild?.className).toBe(classNameBefore)
   })
 
-  test('不正なlevelは同じモードのむずかしさ選択へ安全に戻す', () => {
-    renderApp('/games/working-vehicle-quiz/name-to-photo/super-hard/play')
+  test('不正なlevelは同じモードのむずかしさ選択へ安全に戻す', async () => {
+    await renderApp('/games/working-vehicle-quiz/name-to-photo/super-hard/play')
     expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
     expect(screen.getByText('なまえ → しゃしん')).toBeInTheDocument()
   })
 
   test('写真→名前を10問終えると結果を表示する', async () => {
     const user = userEvent.setup()
-    renderApp('/games/working-vehicle-quiz/photo-to-name/hard/play')
+    await renderApp('/games/working-vehicle-quiz/photo-to-name/hard/play')
     for (let index = 0; index < QUESTION_COUNT; index += 1) {
       await answerPhotoToName(user, true)
     }
@@ -144,7 +146,7 @@ describe('はたらくくるまクイズ', () => {
 
   test('名前→写真を10問終えて「もういちど」で再開できる', async () => {
     const user = userEvent.setup()
-    renderApp('/games/working-vehicle-quiz/name-to-photo/hard/play')
+    await renderApp('/games/working-vehicle-quiz/name-to-photo/hard/play')
     for (let index = 0; index < QUESTION_COUNT; index += 1) {
       await answerNameToPhoto(user, true)
     }
@@ -153,8 +155,8 @@ describe('はたらくくるまクイズ', () => {
     expect(photoChoiceButtons()).toHaveLength(4)
   }, 20000)
 
-  test('結果URLへ直接アクセスすると開始画面へ戻る', () => {
-    renderApp('/games/working-vehicle-quiz/photo-to-name/easy/result')
+  test('結果URLへ直接アクセスすると開始画面へ戻る', async () => {
+    await renderApp('/games/working-vehicle-quiz/photo-to-name/easy/result')
     expect(screen.getByRole('heading', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
   })
 })

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { gzipSync } from 'node:zlib'
 
 // Viteのstatic imports/cssだけを辿る。dynamicImportsは遊ぶ時の取得なので含めない。
@@ -24,7 +24,7 @@ export function measureLoadingSize(distDir) {
   function readAsset(file) {
     const target = resolve(base, file)
     const path = relative(base, target)
-    if (isAbsolute(path) || path === '..' || path.startsWith('../')) throw new Error('Asset outside dist')
+    if (isAbsolute(path) || path === '..' || path.startsWith(`..${sep}`)) throw new Error('Asset outside dist')
     return readFileSync(target)
   }
   const initial = { js: { raw: 0, gzip: 0 }, css: { raw: 0, gzip: 0 } }

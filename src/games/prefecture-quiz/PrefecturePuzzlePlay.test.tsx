@@ -15,7 +15,7 @@ describe('prefecture puzzle screens', () => {
     const user = userEvent.setup()
     const count = prefecturesForRegion('kanto').length
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/puzzle/kanto/play']}><App /></MemoryRouter>)
-    const tray = screen.getByRole('region', { name: 'まだおいていないピース' })
+    const tray = await screen.findByRole('region', { name: 'まだおいていないピース' })
     const pieces = within(tray).getAllByRole('button')
     expect(pieces).toHaveLength(count)
     expect(screen.getByRole('button', { name: 'こたえあわせ！' })).toBeDisabled()
@@ -29,7 +29,7 @@ describe('prefecture puzzle screens', () => {
     const user = userEvent.setup()
     const count = prefecturesForRegion('shikoku').length
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/puzzle/shikoku/play']}><App /></MemoryRouter>)
-    const tray = screen.getByRole('region', { name: 'まだおいていないピース' })
+    const tray = await screen.findByRole('region', { name: 'まだおいていないピース' })
     const map = screen.getByRole('group', { name: '都道府県パズルの地図' })
     for (let index = 0; index < count; index += 1) {
       await user.click(within(tray).getAllByRole('button')[0])

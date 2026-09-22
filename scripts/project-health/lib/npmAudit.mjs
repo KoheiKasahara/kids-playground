@@ -7,5 +7,7 @@ export function parseNpmAudit(report) {
   }
 
   const { info = 0, low = 0, moderate = 0, high = 0, critical = 0, total } = vulnerabilities
+  if ([info, low, moderate, high, critical, total].some((count) => !Number.isInteger(count) || count < 0)) return null
+  if (info + low + moderate + high + critical !== total) return null
   return { total, info, low, moderate, high, critical }
 }

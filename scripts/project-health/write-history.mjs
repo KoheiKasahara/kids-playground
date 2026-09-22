@@ -4,6 +4,7 @@ import { dirname } from 'node:path'
 import { countGames } from './lib/gameCatalog.mjs'
 import { parseVitestSummary } from './lib/vitestReport.mjs'
 import { measureBundleSize } from './lib/bundleSize.mjs'
+import { measureLoadingSize } from './lib/loadingSize.mjs'
 import { parseNpmAudit } from './lib/npmAudit.mjs'
 import { parsePlaywrightSummary } from './lib/playwrightReport.mjs'
 import { parseLighthouseSummary } from './lib/lighthouseReport.mjs'
@@ -14,8 +15,7 @@ import { findPreviousMetricValue, parseHistoryFile, toJstDateString, upsertHisto
 // 既存の Nightly 実行が生成した成果物（vitest / dist / e2e / lighthouse）を
 // 再利用して1レコードを追記する。履歴保存専用の追加テスト・追加計測は行わない。
 //
-// 失敗しても Nightly 自体や通常開発を止めないよう、ここでは常に exit 0 とする
-// （呼び出し側の workflow でも continue-on-error にしている）。
+// 各計測の欠損は null にする。履歴自体の書き込み失敗はジョブへ通知する。
 
 const readJson = (path) => {
   try {
@@ -69,6 +69,8 @@ function main() {
 
   const distDir = process.env.PROJECT_HEALTH_DIST_DIR ?? 'dist'
   const bundle = safe('bundle size', () => measureBundleSize(distDir))
+  const loading = safe('loading size', () => measureLoadingSize(distDir))
+  const toKb = (bytes) => typeof bytes === 'number' ? Math.round(bytes / 1024 * 10) / 10 : null
 
   const auditPath = process.env.PROJECT_HEALTH_AUDIT_FILE ?? 'project-health/npm-audit.json'
   const dependencies = safe('dependencies', () => parseNpmAudit(readJson(auditPath)))
@@ -98,12 +100,25 @@ function main() {
     date,
     games: gamesCount ?? null,
     unitTests: unitTests?.total ?? null,
+    unitTestsPassed: unitTests?.passed ?? null,
     e2eSmokePassed: e2e?.passed ?? null,
     e2eSmokeTotal: e2e?.total ?? null,
+    e2eSmokeFlaky: e2e?.flaky ?? null,
+    e2eSmokeSkipped: e2e?.skipped ?? null,
     bundleKb: bundle ? Math.round(bundle.total / 1024) : null,
+    initialJsGzipKb: toKb(loading?.initial.js.gzip),
+    initialCssGzipKb: toKb(loading?.initial.css.gzip),
+    precacheKb: toKb(loading?.precache.bytes),
+    precacheEntries: loading?.precache.count ?? null,
     lighthousePerformance: lighthouse?.performance ?? null,
     accessibility: lighthouse?.accessibility ?? null,
+    lighthouseTarget: lighthouse?.name ?? null,
     vulnerabilities: dependencies?.total ?? null,
+    vulnerabilitiesCritical: dependencies?.critical ?? null,
+    vulnerabilitiesHigh: dependencies?.high ?? null,
+    vulnerabilitiesModerate: dependencies?.moderate ?? null,
+    vulnerabilitiesLow: dependencies?.low ?? null,
+    vulnerabilitiesInfo: dependencies?.info ?? null,
     nightly: resolveNightlyOutcome(),
     deploy: deploy?.conclusion ?? null,
     recordedAt,
@@ -126,10 +141,4 @@ function main() {
   )
 }
 
-try {
-  main()
-} catch (error) {
-  console.warn(`[project-health] failed to update history: ${error instanceof Error ? error.message : error}`)
-}
-
-process.exit(0)
+main()

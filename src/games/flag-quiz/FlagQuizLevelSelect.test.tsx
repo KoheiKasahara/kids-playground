@@ -47,7 +47,7 @@ describe('FlagQuizLevelSelect', () => {
     const user = userEvent.setup()
     renderApp(['/games/flag-quiz/flag-to-name'])
     await user.click(screen.getByRole('button', { name: /かんたん/ }))
-    expect(screen.getByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
     expect(screen.getByText('かんたん')).toBeInTheDocument()
   })
 
@@ -55,7 +55,7 @@ describe('FlagQuizLevelSelect', () => {
     const user = userEvent.setup()
     renderApp(['/games/flag-quiz/name-to-flag'])
     await user.click(screen.getByRole('button', { name: /むずかしい/ }))
-    expect(screen.getAllByRole('button', { name: /ばんめ の こっき/ })).toHaveLength(4)
+    expect(await screen.findAllByRole('button', { name: /ばんめ の こっき/ })).toHaveLength(4)
     expect(screen.getByText('むずかしい')).toBeInTheDocument()
   })
 
@@ -63,7 +63,7 @@ describe('FlagQuizLevelSelect', () => {
     const user = userEvent.setup()
     renderApp(['/games/flag-quiz/flag-to-name'])
     await user.click(screen.getByRole('button', { name: /おに/ }))
-    expect(screen.getByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
     expect(screen.getByText('おに')).toBeInTheDocument()
   })
 
@@ -71,7 +71,7 @@ describe('FlagQuizLevelSelect', () => {
     const user = userEvent.setup()
     renderApp(['/games/flag-quiz/panel-flag'])
     await user.click(screen.getByRole('button', { name: /かんたん/ }))
-    expect(screen.getByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'この くにの なまえは？' })).toBeInTheDocument()
     expect(screen.getByText('かんたん')).toBeInTheDocument()
   })
 

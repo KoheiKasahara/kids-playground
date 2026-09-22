@@ -17,7 +17,7 @@
     "test:slow": "vitest run --project slow",
     "test:game": "vitest run",
     "test:watch": "vitest --project unit --project dom",
-    "test:e2e": "playwright test e2e/flag-roll-puzzle.smoke.spec.ts e2e/draw-goal.smoke.spec.ts e2e/magic-sandbox.smoke.spec.ts",
+    "test:e2e": "playwright test e2e/flag-roll-puzzle.smoke.spec.ts e2e/draw-goal.smoke.spec.ts e2e/magic-sandbox.smoke.spec.ts e2e/project-health.smoke.spec.ts e2e/quiz-lazy-loading.smoke.spec.ts",
     "test:e2e:nightly": "playwright test e2e/all-games.smoke.spec.ts e2e/all-games-portrait.nightly.spec.ts e2e/all-games-landscape.nightly.spec.ts e2e/representative-3d.nightly.spec.ts e2e/piano-landscape.nightly.spec.ts --workers=1",
     "verify": "npm run lint && npm run typecheck && npm run test:quick && npm run build",
     "verify:full": "npm run lint && npm run typecheck && npm run test:full && npm run build"
@@ -45,7 +45,7 @@
     "@types/react-dom": "^19.2.4",
     "@types/three": "^0.180.0",
     "@vitejs/plugin-react": "^6.0.5",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "4.1.11",
     "chrome-launcher": "^1.2.1",
     "eslint": "^10.8.1",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -60,6 +60,6 @@
     "typescript-eslint": "^8.66.0",
     "vite": "^8.2.1",
     "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^4.1.10"
+    "vitest": "4.1.11"
   }
 }
