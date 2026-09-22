@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-21T22:14:18.610Z",
+  "updatedAt": "2026-09-22T21:24:55.226Z",
   "entries": [
     {
       "date": "2026-09-13",
@@ -150,6 +150,34 @@
       "deploy": "success",
       "recordedAt": "2026-09-21T22:14:18.610Z",
       "runId": "35659808557"
+    },
+    {
+      "date": "2026-09-23",
+      "games": 41,
+      "unitTests": 6068,
+      "unitTestsPassed": 6068,
+      "e2eSmokePassed": 250,
+      "e2eSmokeTotal": 250,
+      "e2eSmokeFlaky": 0,
+      "e2eSmokeSkipped": 0,
+      "bundleKb": 8266,
+      "initialJsGzipKb": 102.6,
+      "initialCssGzipKb": 6,
+      "precacheKb": 58638.8,
+      "precacheEntries": 530,
+      "lighthousePerformance": 98,
+      "accessibility": 100,
+      "lighthouseTarget": "ホーム画面",
+      "vulnerabilities": 0,
+      "vulnerabilitiesCritical": 0,
+      "vulnerabilitiesHigh": 0,
+      "vulnerabilitiesModerate": 0,
+      "vulnerabilitiesLow": 0,
+      "vulnerabilitiesInfo": 0,
+      "nightly": "success",
+      "deploy": "success",
+      "recordedAt": "2026-09-22T21:24:55.226Z",
+      "runId": "35784880604"
     }
   ]
 }
