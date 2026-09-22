@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
+import GameBackButton from '../../components/GameBackButton'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { PINBALL_FLAG_IDS, pinballFlags } from './data/pinballFlags'
 import { isSelectionComplete, MAX_SELECTION, toggleSelection } from './selection'
@@ -39,7 +40,10 @@ export default function FlagPinballSelect() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>こっきピンボール</h1>
+        <div className={styles.titleRow}>
+          <GameBackButton reserveSpace />
+          <h1 className={styles.title}>こっきピンボール</h1>
+        </div>
 
         <div className={styles.modeToggle} role="group" aria-label="あそびかた">
           <button

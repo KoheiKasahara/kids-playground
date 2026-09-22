@@ -27,10 +27,18 @@
   margin-bottom: var(--space-md);
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
 .title {
-  font-size: clamp(24px, 7.5vw, var(--font-size-xlarge));
+  flex: 1;
+  min-width: 0;
+  font-size: clamp(20px, 6.5vw, var(--font-size-xlarge));
   color: var(--color-primary-dark);
-  padding-left: 108px;
   text-align: left;
 }
 
@@ -307,7 +315,7 @@
 .actions { position: static; flex: 0 0 auto; }
 @media (orientation: landscape) and (max-height: 560px) {
   .page { max-width: none; padding-top: calc(8px + var(--safe-top)); }
-  .header { margin: 0 0 6px; padding-left: calc(112px + var(--safe-left)); min-height: 48px; }
+  .header { margin: 0 0 6px; min-height: 48px; }
   .title { font-size: 22px; }
   .instruction { font-size: 17px; margin-top: 4px; }
   .actions { grid-template-columns: 1fr; padding-block: 6px calc(8px + var(--safe-bottom)); }
@@ -319,6 +327,7 @@
 @media (orientation: landscape) and (max-height: 560px) {
   .page { display: grid; grid-template-columns: 290px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px 12px; }
   .header { grid-column: 1; grid-row: 1; padding: 48px 0 0; margin: 0; }
+  .titleRow [data-game-back-layout-slot] { display: none; }
   .modeToggle { margin-top: 6px; }
   .indicator { flex-direction: row; justify-content: center; margin-top: 4px; gap: 8px; }
   .themePicker { grid-column: 1; grid-row: 2; min-height: 0; margin: 0; align-self: center; }
