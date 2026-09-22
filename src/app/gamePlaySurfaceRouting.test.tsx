@@ -13,13 +13,13 @@ function hasGamePlaySurface(container: HTMLElement): boolean {
 }
 
 describe('実プレイURLでのGamePlaySurface適用(Issue #166、DOM検証)', () => {
-  test('/games/flag-quiz/flag-to-name/hard/play (静的import) にはclassが付く', () => {
+  test('/games/flag-quiz/flag-to-name/hard/play (lazyルート) にはclassが付く', async () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/games/flag-quiz/flag-to-name/hard/play']}>
         <App />
       </MemoryRouter>,
     )
-    expect(hasGamePlaySurface(container)).toBe(true)
+    await waitFor(() => expect(hasGamePlaySurface(container)).toBe(true))
   })
 
   test('/games/color-mix-quiz/play (ゲーム内lazyルート) にはclassが付く', async () => {
@@ -79,7 +79,7 @@ describe('プレイ以外の画面にはGamePlaySurfaceが付かない(Issue #16
     expect(hasGamePlaySurface(container)).toBe(false)
   })
 
-  test('旧URLからのリダイレクト(/games/flag-quiz/play) には付かない(遷移先のむずかしいプレイには付くべきだが、Navigate自体はGamePlaySurfaceを持たない)', () => {
+  test('旧URLからのリダイレクト後も実プレイ画面に適用する', async () => {
     // 旧URLはNavigateでプレイ画面へリダイレクトされる。最終的に着地する先は実プレイ画面なので
     // GamePlaySurfaceは付いた状態になる（付かないことを検証したいのではなく、
     // リダイレクトを挟んでも最終的な実プレイ画面には正しく適用され続けることを確認する）。
@@ -88,6 +88,6 @@ describe('プレイ以外の画面にはGamePlaySurfaceが付かない(Issue #16
         <App />
       </MemoryRouter>,
     )
-    expect(hasGamePlaySurface(container)).toBe(true)
+    await waitFor(() => expect(hasGamePlaySurface(container)).toBe(true))
   })
 })

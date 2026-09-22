@@ -24,9 +24,10 @@ function currentAnswerPrefecture() {
  * 名前→地図のプレイ画面を描画する。最初の問題はランダムなため、まれに北海道
  * （同地方に他県がなく誤答の選択肢を作れない）が出た場合は描画をやり直す。
  */
-function renderNameToMapWithAlternatives() {
+async function renderNameToMapWithAlternatives() {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const view = render(<MemoryRouter initialEntries={['/games/prefecture-quiz/name-to-map/play']}><App /></MemoryRouter>)
+    await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
     const answer = currentAnswerPrefecture()
     if (numberedPrefecturesForRegion(answer.region).length > 1) return { ...view, answer }
     view.unmount()
@@ -35,7 +36,7 @@ function renderNameToMapWithAlternatives() {
 }
 
 describe('Prefecture quiz screens', () => {
-  test('開始画面に3モードを表示する', () => {
+  test('開始画面に3モードを表示する', async () => {
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz']}><App /></MemoryRouter>)
     expect(screen.getByRole('heading', { name: '都道府県クイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /かたちを みて/ })).toBeInTheDocument()
@@ -43,7 +44,7 @@ describe('Prefecture quiz screens', () => {
     expect(screen.getByRole('button', { name: /にほんちず から/ })).toBeInTheDocument()
   })
 
-  test('日本地図の47県はキーボード操作できるボタンになる', () => {
+  test('日本地図の47県はキーボード操作できるボタンになる', async () => {
     render(<PrefectureMap onSelect={() => undefined} />)
     expect(screen.getAllByRole('button')).toHaveLength(47)
     expect(screen.getByRole('button', { name: '1ばんめ の ばしょを えらぶ' })).toHaveAttribute('tabindex', '0')
@@ -52,6 +53,7 @@ describe('Prefecture quiz screens', () => {
   test('形→名前は回答前に県名を輪郭のアクセシブルネームへ出さず、回答後にひらがなの答えを出す', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/shape-to-name/play']}><App /></MemoryRouter>)
+    await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
     expect(screen.getByRole('img', { name: '都道府県の かたち' })).toBeInTheDocument()
     const choices = screen
       .getAllByRole('button')
@@ -64,6 +66,7 @@ describe('Prefecture quiz screens', () => {
   test('名前→形は4択を一度選ぶとロックし、次問へ進める', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/name-to-shape/play']}><App /></MemoryRouter>)
+    await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
     const choices = screen
       .getAllByRole('button')
       .filter((button) => button.textContent !== '← もどる' && !(button.textContent ?? '').includes('よみあげ'))
@@ -78,6 +81,7 @@ describe('Prefecture quiz screens', () => {
   test('名前→地図は地方だけを表示し、Enterで選び、回答後に答えを出す', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/name-to-map/play']}><App /></MemoryRouter>)
+    await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
     const map = screen.getByRole('group', { name: '都道府県をえらぶ ちず' })
     const places = within(map).getAllByRole('button')
     // 地方のpathに加え、九州・沖縄地方では沖縄専用insetが存在しうる。
@@ -99,7 +103,7 @@ describe('Prefecture quiz screens', () => {
     expect(onSelect).toHaveBeenCalledWith('47')
   })
 
-  test('地方地図のnumbered表示では全県に番号ボタンがある（中部9県で確認）', () => {
+  test('地方地図のnumbered表示では全県に番号ボタンがある（中部9県で確認）', async () => {
     const chubu = numberedPrefecturesForRegion('chubu')
     render(<PrefectureNumberPad items={chubu} answerId="never" selectedId={null} onSelect={() => undefined} />)
     const pad = screen.getByRole('group', { name: 'ばんごうで こたえる' })
@@ -110,13 +114,13 @@ describe('Prefecture quiz screens', () => {
     }
   })
 
-  test('中部地方の地図にnumberedを付けると9県ぶんの番号バッジが描画される', () => {
+  test('中部地方の地図にnumberedを付けると9県ぶんの番号バッジが描画される', async () => {
     const chubu = prefecturesForRegion('chubu')
     const { container } = render(<PrefectureMap items={chubu} onSelect={() => undefined} numbered />)
     expect(container.querySelectorAll('circle')).toHaveLength(chubu.length)
   })
 
-  test('回答後も沖縄insetを同位置に残し、県名を読めるようにする', () => {
+  test('回答後も沖縄insetを同位置に残し、県名を読めるようにする', async () => {
     const kyushu = prefecturesForRegion('kyushuOkinawa')
     const okinawa = kyushu.find((prefecture) => prefecture.id === '47')
     if (!okinawa) throw new Error('テスト用の都道府県がありません')
@@ -126,8 +130,9 @@ describe('Prefecture quiz screens', () => {
     expect(inset).toHaveAttribute('x', '250')
   })
 
-  test('nameToMapプレイ画面の数字ボタン数はその地方の県数と一致する', () => {
+  test('nameToMapプレイ画面の数字ボタン数はその地方の県数と一致する', async () => {
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/name-to-map/play']}><App /></MemoryRouter>)
+    await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
     const answer = currentAnswerPrefecture()
     const pad = screen.getByRole('group', { name: 'ばんごうで こたえる' })
     expect(within(pad).getAllByRole('button')).toHaveLength(numberedPrefecturesForRegion(answer.region).length)
@@ -135,7 +140,7 @@ describe('Prefecture quiz screens', () => {
 
   test('nameToMapは数字ボタンで正解でき、地図上の該当県pathも正解表示になる', async () => {
     const user = userEvent.setup()
-    const { answer, container } = renderNameToMapWithAlternatives()
+    const { answer, container } = await renderNameToMapWithAlternatives()
     const number = prefectureNumberInRegion(answer)
     const pad = screen.getByRole('group', { name: 'ばんごうで こたえる' })
     await user.click(within(pad).getByRole('button', { name: `${number}ばん` }))
@@ -148,7 +153,7 @@ describe('Prefecture quiz screens', () => {
 
   test('nameToMapは数字ボタンで不正解を選べ、選んだ県pathが誤答表示になる', async () => {
     const user = userEvent.setup()
-    const { answer, container } = renderNameToMapWithAlternatives()
+    const { answer, container } = await renderNameToMapWithAlternatives()
     const numbered = numberedPrefecturesForRegion(answer.region)
     const wrong = numbered.find((entry) => entry.prefecture.id !== answer.id)
     if (!wrong) throw new Error('不正解の選択肢がありません')
@@ -163,7 +168,7 @@ describe('Prefecture quiz screens', () => {
 
   test('nameToMapは地図タップからも回答できる', async () => {
     const user = userEvent.setup()
-    renderNameToMapWithAlternatives()
+    await renderNameToMapWithAlternatives()
     const map = screen.getByRole('group', { name: '都道府県をえらぶ ちず' })
     const places = within(map).getAllByRole('button')
     await user.click(places[0])
@@ -172,7 +177,7 @@ describe('Prefecture quiz screens', () => {
 
   test('nameToMapは地図で正解を選ぶと、対応する数字ボタンも正解状態になる', async () => {
     const user = userEvent.setup()
-    const { answer } = renderNameToMapWithAlternatives()
+    const { answer } = await renderNameToMapWithAlternatives()
     const number = prefectureNumberInRegion(answer)
     const map = screen.getByRole('group', { name: '都道府県をえらぶ ちず' })
     // 地図上の正解県pathを直接クリックする（地図タップ経路）。
@@ -187,7 +192,7 @@ describe('Prefecture quiz screens', () => {
 
   test('nameToMapは地図と数字ボタンが同じ回答処理を使い、回答後は両方ロックされる', async () => {
     const user = userEvent.setup()
-    const { answer } = renderNameToMapWithAlternatives()
+    const { answer } = await renderNameToMapWithAlternatives()
     const number = prefectureNumberInRegion(answer)
     const pad = screen.getByRole('group', { name: 'ばんごうで こたえる' })
     await user.click(within(pad).getByRole('button', { name: `${number}ばん` }))
@@ -201,7 +206,7 @@ describe('Prefecture quiz screens', () => {
     remaining.forEach((button) => expect(button).toHaveAttribute('aria-disabled', 'true'))
   })
 
-  test('地図SVGは輪郭だけを低背時に縮めるCSSの対象外として識別される', () => {
+  test('地図SVGは輪郭だけを低背時に縮めるCSSの対象外として識別される', async () => {
     render(<PrefectureMap onSelect={() => undefined} />)
     expect(screen.getByRole('group')).toHaveAttribute('data-prefecture-map', 'true')
   })
@@ -209,6 +214,7 @@ describe('Prefecture quiz screens', () => {
   test('10問目の次へで結果画面に遷移する', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/games/prefecture-quiz/shape-to-name/play']}><App /></MemoryRouter>)
+    await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
     for (let index = 0; index < 10; index += 1) {
       const choice = screen
         .getAllByRole('button')

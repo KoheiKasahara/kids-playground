@@ -12,12 +12,14 @@ import type { Country } from './types'
  * 画面遷移まわり（けっか画面への遷移など）を実際のルート定義で検証するため、
  * MemoryRouter + App を使う。
  */
-function renderApp(initialEntries: string[]) {
-  return render(
+async function renderApp(initialEntries: string[]) {
+  const view = render(
     <MemoryRouter initialEntries={initialEntries}>
       <App />
     </MemoryRouter>,
   )
+  await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
+  return view
 }
 
 /**
@@ -72,8 +74,8 @@ async function answerCurrentQuestion(user: UserEvent, correct: boolean): Promise
 }
 
 describe('NameToFlagPlay', () => {
-  test('クイズを開始すると、国名の設問と4つの国旗選択肢ボタンが表示される', () => {
-    renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
+  test('クイズを開始すると、国名の設問と4つの国旗選択肢ボタンが表示される', async () => {
+    await renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
     const questionCountry = getQuestionCountry()
     expect(screen.getByRole('heading')).toHaveTextContent(
       `「${questionCountry.nameJa}」の こっきは どれ？`,
@@ -81,15 +83,15 @@ describe('NameToFlagPlay', () => {
     expect(getFlagChoiceButtons()).toHaveLength(4)
   })
 
-  test('むずかしさが表示される', () => {
-    renderApp(['/games/flag-quiz/name-to-flag/easy/play'])
+  test('むずかしさが表示される', async () => {
+    await renderApp(['/games/flag-quiz/name-to-flag/easy/play'])
     expect(screen.getByText('かんたん')).toBeInTheDocument()
   })
 
-  test('かんたんでは、easyランクの国しか出題されない', () => {
+  test('かんたんでは、easyランクの国しか出題されない', async () => {
     const easyIds = new Set(countriesForLevel('easy').map((c) => c.id))
     for (let seed = 0; seed < 10; seed += 1) {
-      const { unmount } = renderApp(['/games/flag-quiz/name-to-flag/easy/play'])
+      const { unmount } = await renderApp(['/games/flag-quiz/name-to-flag/easy/play'])
       const questionCountry = getQuestionCountry()
       expect(easyIds.has(questionCountry.id)).toBe(true)
       for (const btn of getFlagChoiceButtons()) {
@@ -99,20 +101,20 @@ describe('NameToFlagPlay', () => {
     }
   })
 
-  test('不正な level でアクセスすると、むずかしさ選択画面へリダイレクトされる', () => {
-    renderApp(['/games/flag-quiz/name-to-flag/super-hard/play'])
+  test('不正な level でアクセスすると、むずかしさ選択画面へリダイレクトされる', async () => {
+    await renderApp(['/games/flag-quiz/name-to-flag/super-hard/play'])
     expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
   })
 
-  test('旧URL (/games/flag-quiz/name-to-flag/play) にアクセスすると、むずかしいモードにリダイレクトされる', () => {
-    renderApp(['/games/flag-quiz/name-to-flag/play'])
+  test('旧URL (/games/flag-quiz/name-to-flag/play) にアクセスすると、むずかしいモードにリダイレクトされる', async () => {
+    await renderApp(['/games/flag-quiz/name-to-flag/play'])
     expect(getFlagChoiceButtons()).toHaveLength(4)
     expect(screen.getByText('むずかしい')).toBeInTheDocument()
   })
 
   test('正解の国旗を押すと「せいかい」のフィードバックが表示される', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
     const questionCountry = getQuestionCountry()
     const target = findButtonForCountry(getFlagChoiceButtons(), questionCountry)
     await user.click(target)
@@ -121,7 +123,7 @@ describe('NameToFlagPlay', () => {
 
   test('誤答の国旗を押すと「ざんねん！」と正しい国名が表示される', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
     const questionCountry = getQuestionCountry()
     const buttons = getFlagChoiceButtons()
     const wrongButton = buttons.find((btn) => countryIdFromButton(btn) !== questionCountry.id)
@@ -133,7 +135,7 @@ describe('NameToFlagPlay', () => {
 
   test('回答後は選択肢ボタンがすべて disabled になる', async () => {
     const user = userEvent.setup()
-    renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
+    await renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
     const buttons = getFlagChoiceButtons()
     await user.click(buttons[0])
     for (const btn of buttons) {
@@ -143,7 +145,7 @@ describe('NameToFlagPlay', () => {
 
   test('回答前後でページのルート要素の className が変化しない（レイアウトシフトしない）', async () => {
     const user = userEvent.setup()
-    const { container } = renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
+    const { container } = await renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
     const pageElement = container.firstElementChild
     const classNameBefore = pageElement?.className
     expect(classNameBefore).toBeTruthy()
@@ -155,7 +157,7 @@ describe('NameToFlagPlay', () => {
     '10問すべてに正解すると結果画面へ遷移し、正解数が表示される',
     async () => {
       const user = userEvent.setup()
-      renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
+      await renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, true)
       }
@@ -169,7 +171,7 @@ describe('NameToFlagPlay', () => {
     '結果画面の「もういちど」でなまえ→こっきモードの1問目に戻る',
     async () => {
       const user = userEvent.setup()
-      renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
+      await renderApp(['/games/flag-quiz/name-to-flag/hard/play'])
       for (let i = 0; i < QUESTION_COUNT; i += 1) {
         await answerCurrentQuestion(user, true)
       }

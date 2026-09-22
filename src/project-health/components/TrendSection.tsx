@@ -10,6 +10,7 @@ export default function TrendSection({ series }: { series: SparklineSeries[] }) 
   return (
     <section className="ph-section">
       <h2 className="ph-section__title">直近のトレンド</h2>
+      <p className="ph-section__description">直近12回の計測。右側の数値は最新回の値です。</p>
       <div className="ph-trend-grid">
         {withData.map((entry) => (
           <div className="ph-trend-item" key={entry.key}>

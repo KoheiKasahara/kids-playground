@@ -43,6 +43,7 @@ npm run dev
 - [docs/architecture.md](docs/architecture.md): アーキテクチャ方針
 - [docs/development-guidelines.md](docs/development-guidelines.md): ミニゲーム開発の共通規約
 - [docs/credits.md](docs/credits.md): 素材の出典・ライセンス
+- [docs/project-health.md](docs/project-health.md): 品質・安全性ダッシュボードの指標と更新方法
 - [docs/games/](docs/games/): 一部ミニゲームの設計メモ（全ゲーム分ではありません）
 
 ## ライセンス / クレジット
