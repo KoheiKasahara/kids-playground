@@ -96,6 +96,30 @@ describe('HoshiTsunagiPlay', () => {
     expect(screen.getByRole('status')).toHaveTextContent(`${first.name}の せいざが できた！`)
   })
 
+  test('まえ／つぎのボタンで、つながなくても星座を行き来できる', () => {
+    const { container } = renderPlay()
+    selectEasy()
+    const course = courseConstellations('easy')
+    const previous = screen.getByRole('button', { name: 'まえの せいざ' })
+    const next = screen.getByRole('button', { name: 'つぎの せいざへ すすむ' })
+    expect(previous).toBeDisabled()
+
+    fireEvent.pointerDown(star(container, 0))
+    fireEvent.click(next)
+    expect(screen.getByRole('list', { name: `2こめ / ${course.length}こ` })).toBeInTheDocument()
+    expect(container.querySelectorAll('[data-star-index]')).toHaveLength(course[1]!.points.length)
+    expect(screen.getByRole('status')).toHaveTextContent('1の ほしから つなごう')
+    expect(previous).toBeEnabled()
+
+    fireEvent.click(previous)
+    expect(screen.getByRole('list', { name: `1こめ / ${course.length}こ` })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('1の ほしから つなごう')
+
+    for (let index = 1; index < course.length; index += 1) fireEvent.click(next)
+    expect(screen.getByRole('list', { name: `${course.length}こめ / ${course.length}こ` })).toBeInTheDocument()
+    expect(next).toBeDisabled()
+  })
+
   test('やめる でコース選択にもどれる', () => {
     renderPlay()
     selectEasy()
