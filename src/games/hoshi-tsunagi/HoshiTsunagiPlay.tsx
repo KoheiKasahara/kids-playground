@@ -19,7 +19,8 @@ import styles from './HoshiTsunagiPlay.module.css'
 
 const COURSE_LABELS: Record<HoshiCourse, { name: string; hint: string }> = {
   easy: { name: 'かんたん', hint: 'ほしが すくない' },
-  hard: { name: 'むずかしい', hint: 'ほしが いっぱい' },
+  normal: { name: 'ふつう', hint: 'ほしが ちょっと おおい' },
+  hard: { name: 'むずかしい', hint: 'ほしが たくさん' },
 }
 
 /** SVGの表示範囲。星の番号が外側にはみ出しても切れないよう、0〜100の座標より少し広くとる。 */
@@ -194,7 +195,7 @@ export default function HoshiTsunagiPlay() {
   const nextNumber = board.connected + 1
 
   const status = complete
-    ? `${constellation.name}の ほしざが できた！`
+    ? `${constellation.name}の せいざが できた！`
     : board.connected === 0
       ? '1の ほしから つなごう'
       : `つぎは ${nextNumber}の ほし`
@@ -266,7 +267,7 @@ export default function HoshiTsunagiPlay() {
             className={styles.sky}
             viewBox={`${VIEW_MIN} ${VIEW_MIN} ${VIEW_SIZE} ${VIEW_SIZE}`}
             role="group"
-            aria-label={complete ? `${constellation.name}の ほしざ` : 'よぞら'}
+            aria-label={complete ? `${constellation.name}の せいざ` : 'よぞら'}
             data-connected={board.connected}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -370,7 +371,7 @@ export default function HoshiTsunagiPlay() {
           <div className={styles.actions}>
             {complete ? (
               <button type="button" className={`${styles.button} ${styles.next}`} onClick={goNext}>
-                {isLastStage ? 'おしまい' : 'つぎの ほしざ'}
+                {isLastStage ? 'おしまい' : 'つぎの せいざ'}
               </button>
             ) : null}
             <button type="button" className={`${styles.button} ${styles.quiet}`} onClick={backToSelect}>
@@ -386,7 +387,7 @@ export default function HoshiTsunagiPlay() {
             {constellations.map((item) => item.emoji).join('')}
           </p>
           <p className={styles.resultMessage} role="status">
-            ぜんぶの ほしざが できたね！
+            ぜんぶの せいざが できたね！
           </p>
           <div className={styles.actions}>
             <button type="button" className={`${styles.button} ${styles.next}`} onClick={() => startCourse(course)}>

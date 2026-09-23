@@ -52,16 +52,17 @@ describe('星座データ', () => {
     }
   })
 
-  test('コースは実在する星座だけを重複なく参照し、かんたんの方が星が少ない', () => {
-    const easy = courseConstellations('easy')
-    const hard = courseConstellations('hard')
-    expect(easy.length).toBe(COURSE_CONSTELLATION_IDS.easy.length)
-    expect(hard.length).toBe(COURSE_CONSTELLATION_IDS.hard.length)
-    const all = [...COURSE_CONSTELLATION_IDS.easy, ...COURSE_CONSTELLATION_IDS.hard]
+  test('コースは実在する星座だけを重複なく参照し、かんたん → ふつう → むずかしい の順に星が多くなる', () => {
+    const courses = (['easy', 'normal', 'hard'] as const).map((course) => {
+      const constellations = courseConstellations(course)
+      expect(constellations.length).toBe(COURSE_CONSTELLATION_IDS[course].length)
+      return constellations.map((item) => item.points.length)
+    })
+    const all = [...COURSE_CONSTELLATION_IDS.easy, ...COURSE_CONSTELLATION_IDS.normal, ...COURSE_CONSTELLATION_IDS.hard]
     expect(new Set(all).size).toBe(all.length)
-    const maxEasy = Math.max(...easy.map((item) => item.points.length))
-    const minHard = Math.min(...hard.map((item) => item.points.length))
-    expect(maxEasy).toBeLessThan(minHard)
+    for (let index = 1; index < courses.length; index += 1) {
+      expect(Math.max(...courses[index - 1]!)).toBeLessThan(Math.min(...courses[index]!))
+    }
   })
 })
 
