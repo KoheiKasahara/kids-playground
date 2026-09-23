@@ -1,12 +1,12 @@
 // よぞらの ほしつなぎ の純粋ロジック。
 // 星座の形（データ）と、「つぎにつなぐ星」を進める規則だけを持ち、描画・音・入力方法は持たない。
 
-/** ほしざ ができたあとに、形そのものが動き出すときの動き方。 */
+/** せいざ ができたあとに、形そのものが動き出すときの動き方。 */
 export type ConstellationMotion = 'spin' | 'hop' | 'swim' | 'sail' | 'beat' | 'fly' | 'nod' | 'flutter'
 
 export type Constellation = {
   id: string
-  /** ひらがなの なまえ。「〇〇の ほしざ」として表示する。 */
+  /** ひらがなの なまえ。「〇〇の せいざ」として表示する。 */
   name: string
   emoji: string
   /** 0〜100 の正方形座標。配列の順番が、つなぐ順番（1ばんめ・2ばんめ…）になる。 */
@@ -181,14 +181,116 @@ export const CONSTELLATIONS: readonly Constellation[] = [
     color: '#4dabf7',
     motion: 'swim',
   },
+  {
+    id: 'airplane',
+    name: 'ひこうき',
+    emoji: '✈️',
+    points: [
+      [50, 6],
+      [57, 16],
+      [57, 38],
+      [94, 58],
+      [94, 68],
+      [57, 58],
+      [57, 78],
+      [70, 86],
+      [70, 97],
+      [50, 90],
+      [30, 97],
+      [30, 86],
+      [43, 78],
+      [43, 58],
+      [6, 68],
+      [6, 58],
+      [43, 38],
+      [43, 16],
+    ],
+    color: '#a5d8ff',
+    motion: 'fly',
+  },
+  {
+    id: 'dinosaur',
+    name: 'きょうりゅう',
+    emoji: '🦕',
+    points: [
+      [74, 8],
+      [86, 8],
+      [96, 16],
+      [88, 24],
+      [78, 26],
+      [74, 40],
+      [72, 54],
+      [74, 88],
+      [62, 88],
+      [60, 72],
+      [44, 72],
+      [44, 88],
+      [32, 88],
+      [30, 70],
+      [16, 72],
+      [4, 80],
+      [12, 60],
+      [28, 50],
+      [46, 42],
+      [62, 40],
+      [66, 22],
+    ],
+    color: '#8ce99a',
+    motion: 'hop',
+  },
+  {
+    id: 'castle',
+    name: 'おしろ',
+    emoji: '🏰',
+    points: [
+      [6, 92],
+      [6, 18],
+      [17, 18],
+      [17, 29],
+      [28, 29],
+      [28, 18],
+      [39, 18],
+      [39, 44],
+      [50, 28],
+      [61, 44],
+      [61, 18],
+      [72, 18],
+      [72, 29],
+      [83, 29],
+      [83, 18],
+      [94, 18],
+      [94, 92],
+      [61, 92],
+      [61, 72],
+      [50, 61],
+      [39, 72],
+      [39, 92],
+    ],
+    color: '#b197fc',
+    motion: 'beat',
+  },
+  {
+    id: 'fireworks',
+    name: 'はなび',
+    emoji: '🎆',
+    // 外がわ（半径44）と内がわ（半径24）をこうごにたどる、12本のとげの はなび。
+    points: Array.from({ length: 24 }, (_, index): [number, number] => {
+      const radius = index % 2 === 0 ? 44 : 24
+      const angle = ((index * 15 - 90) * Math.PI) / 180
+      return [Math.round((50 + radius * Math.cos(angle)) * 10) / 10, Math.round((50 + radius * Math.sin(angle)) * 10) / 10]
+    }),
+    color: '#ffa94d',
+    motion: 'spin',
+  },
 ]
 
-export type HoshiCourse = 'easy' | 'hard'
+export type HoshiCourse = 'easy' | 'normal' | 'hard'
 
-/** コースごとに遊ぶ星座の順番。かんたんは星が少なく、むずかしいは星が多い形だけにする。 */
+/** コースごとに遊ぶ星座の順番。かんたん → ふつう → むずかしい の順に星が多くなる形だけにする。 */
 export const COURSE_CONSTELLATION_IDS: Record<HoshiCourse, readonly string[]> = {
   easy: ['star', 'house', 'fish', 'yacht', 'heart'],
-  hard: ['cat', 'rocket', 'butterfly', 'whale'],
+  normal: ['cat', 'rocket', 'butterfly', 'whale'],
+  hard: ['airplane', 'dinosaur', 'castle', 'fireworks'],
 }
 
 export function courseConstellations(course: HoshiCourse): Constellation[] {

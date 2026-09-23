@@ -32,7 +32,7 @@ export function playWrongSound(): void {
   }
 }
 
-/** ほしざ ができたときの、きらきら上がっていく和音。 */
+/** せいざ ができたときの、きらきら上がっていく和音。 */
 export function playCompleteSound(): void {
   if (!isSoundEnabled()) return
   try {

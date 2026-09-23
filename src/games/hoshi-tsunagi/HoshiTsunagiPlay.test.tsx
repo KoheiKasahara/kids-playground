@@ -36,7 +36,8 @@ describe('HoshiTsunagiPlay', () => {
     expect(screen.getByRole('heading', { name: 'よぞらの ほしつなぎ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'かんたん ほしが すくない' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'むずかしい ほしが いっぱい' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ふつう ほしが ちょっと おおい' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'むずかしい ほしが たくさん' })).toBeInTheDocument()
   })
 
   test('コースを選ぶと、番号つきの星が出て「1の ほしから つなごう」とさそう', () => {
@@ -75,15 +76,24 @@ describe('HoshiTsunagiPlay', () => {
 
     course.forEach((constellation, stage) => {
       connectCurrent(container, constellation.points.length)
-      expect(screen.getByRole('status')).toHaveTextContent(`${constellation.name}の ほしざが できた！`)
-      expect(screen.getByRole('group', { name: `${constellation.name}の ほしざ` })).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(`${constellation.name}の せいざが できた！`)
+      expect(screen.getByRole('group', { name: `${constellation.name}の せいざ` })).toBeInTheDocument()
       const isLast = stage === course.length - 1
-      fireEvent.click(screen.getByRole('button', { name: isLast ? 'おしまい' : 'つぎの ほしざ' }))
+      fireEvent.click(screen.getByRole('button', { name: isLast ? 'おしまい' : 'つぎの せいざ' }))
     })
 
-    expect(screen.getByRole('status')).toHaveTextContent('ぜんぶの ほしざが できたね！')
+    expect(screen.getByRole('status')).toHaveTextContent('ぜんぶの せいざが できたね！')
     fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
     expect(screen.getByRole('status')).toHaveTextContent('1の ほしから つなごう')
+  })
+
+  test('むずかしい コースは星がたくさんある形から始まり、さいごまでつなぐとできあがる', () => {
+    const { container } = renderPlay()
+    fireEvent.click(screen.getByRole('button', { name: 'むずかしい ほしが たくさん' }))
+    const first = courseConstellations('hard')[0]!
+    expect(container.querySelectorAll('[data-star-index]')).toHaveLength(first.points.length)
+    connectCurrent(container, first.points.length)
+    expect(screen.getByRole('status')).toHaveTextContent(`${first.name}の せいざが できた！`)
   })
 
   test('やめる でコース選択にもどれる', () => {
