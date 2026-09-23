@@ -98,6 +98,24 @@ export const CONSTELLATIONS: readonly Constellation[] = [
     motion: 'beat',
   },
   {
+    id: 'moon',
+    name: 'おつきさま',
+    emoji: '🌙',
+    // 外がわの丸みから内がわのくぼみへ戻り、三日月の輪郭をつくる。
+    points: [
+      [68, 10],
+      [36, 20],
+      [18, 50],
+      [36, 80],
+      [68, 90],
+      [52, 70],
+      [44, 50],
+      [52, 30],
+    ],
+    color: '#ffe066',
+    motion: 'sail',
+  },
+  {
     id: 'rocket',
     name: 'ロケット',
     emoji: '🚀',
@@ -134,6 +152,41 @@ export const CONSTELLATIONS: readonly Constellation[] = [
     ],
     color: '#ffc078',
     motion: 'nod',
+  },
+  {
+    id: 'flower',
+    name: 'おはな',
+    emoji: '🌼',
+    // 6枚の花びらを、外がわと谷間の星をこうごにつないで描く。
+    points: Array.from({ length: 12 }, (_, index): [number, number] => {
+      const radius = index % 2 === 0 ? 40 : 25
+      const angle = ((index * 30 - 90) * Math.PI) / 180
+      return [Math.round(50 + radius * Math.cos(angle)), Math.round(50 + radius * Math.sin(angle))]
+    }),
+    color: '#ffd43b',
+    motion: 'spin',
+  },
+  {
+    id: 'umbrella',
+    name: 'かさ',
+    emoji: '☂️',
+    points: [
+      [50, 12],
+      [72, 22],
+      [88, 44],
+      [92, 56],
+      [76, 52],
+      [62, 60],
+      [50, 52],
+      [38, 60],
+      [24, 52],
+      [8, 56],
+      [12, 44],
+      [28, 22],
+      [40, 16],
+    ],
+    color: '#b197fc',
+    motion: 'sail',
   },
   {
     id: 'butterfly',
@@ -207,6 +260,63 @@ export const CONSTELLATIONS: readonly Constellation[] = [
     ],
     color: '#a5d8ff',
     motion: 'fly',
+  },
+  {
+    id: 'tree',
+    name: 'もみのき',
+    emoji: '🌲',
+    points: [
+      [50, 6],
+      [62, 22],
+      [56, 36],
+      [72, 36],
+      [64, 50],
+      [82, 50],
+      [72, 66],
+      [90, 78],
+      [60, 78],
+      [60, 94],
+      [40, 94],
+      [40, 78],
+      [10, 78],
+      [28, 66],
+      [18, 50],
+      [36, 50],
+      [28, 36],
+      [44, 36],
+      [38, 22],
+    ],
+    color: '#69db7c',
+    motion: 'nod',
+  },
+  {
+    id: 'robot',
+    name: 'ロボット',
+    emoji: '🤖',
+    points: [
+      [30, 8],
+      [44, 8],
+      [44, 22],
+      [58, 22],
+      [58, 8],
+      [72, 8],
+      [72, 22],
+      [84, 22],
+      [84, 72],
+      [72, 72],
+      [72, 90],
+      [58, 90],
+      [58, 72],
+      [44, 72],
+      [44, 90],
+      [30, 90],
+      [30, 72],
+      [18, 72],
+      [18, 22],
+      [30, 22],
+    ],
+    color: '#74c0fc',
+    motion: 'hop',
   },
   {
     id: 'dinosaur',
@@ -288,9 +398,9 @@ export type HoshiCourse = 'easy' | 'normal' | 'hard'
 
 /** コースごとに遊ぶ星座の順番。かんたん → ふつう → むずかしい の順に星が多くなる形だけにする。 */
 export const COURSE_CONSTELLATION_IDS: Record<HoshiCourse, readonly string[]> = {
-  easy: ['star', 'house', 'fish', 'yacht', 'heart'],
-  normal: ['cat', 'rocket', 'butterfly', 'whale'],
-  hard: ['airplane', 'dinosaur', 'castle', 'fireworks'],
+  easy: ['star', 'house', 'fish', 'yacht', 'heart', 'moon'],
+  normal: ['cat', 'rocket', 'flower', 'umbrella', 'butterfly', 'whale'],
+  hard: ['airplane', 'tree', 'robot', 'dinosaur', 'castle', 'fireworks'],
 }
 
 export function courseConstellations(course: HoshiCourse): Constellation[] {
