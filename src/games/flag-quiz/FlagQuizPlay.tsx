@@ -1,12 +1,11 @@
 import { useReducer, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
 import FlagChoiceGrid from './FlagChoiceGrid'
 import FlagImage from './FlagImage'
-import { countriesForLevel } from './data/countries'
-import { generateQuestions } from './questionGenerator'
+import { createGame } from './continueState'
 import { isQuizLevel, LEVEL_LABEL, MODE_PATH } from './types'
 import type { Country, QuizLevel, QuizMode } from './types'
 import { playCorrectSound, playIncorrectSound } from '../../utils/quizSound'
@@ -80,10 +79,13 @@ type FlagQuizPlayGameProps = {
 
 function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
   const navigate = useNavigate()
-  const [questions] = useState(() => generateQuestions(countriesForLevel(level)))
+  const location = useLocation()
+  const [{ questions, continueFrom }] = useState(() => createGame(level, location.state))
   const [state, dispatch] = useReducer(reducer, initialState)
 
   const totalCount = questions.length
+  // 「つづける」で来たときは、それまでの問題数を足した通し番号で表示する
+  const baseCount = continueFrom?.totalCount ?? 0
   const question = questions[state.index]
   const isLastQuestion = state.index === totalCount - 1
   const answered = state.selectedId !== null
@@ -109,7 +111,11 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
     if (isLastQuestion) {
       navigate(`/games/flag-quiz/${MODE_PATH[mode]}/${level}/result`, {
         replace: true,
-        state: { correctCount: state.correctCount, totalCount },
+        state: {
+          correctCount: (continueFrom?.correctCount ?? 0) + state.correctCount,
+          totalCount: baseCount + totalCount,
+          usedIds: [...(continueFrom?.usedIds ?? []), ...questions.map((q) => q.answer.id)],
+        },
       })
       return
     }
@@ -127,9 +133,9 @@ function FlagQuizPlayGame({ mode, level }: FlagQuizPlayGameProps) {
         <div className={styles.progressArea}>
           <p className={styles.progressLabel}>
             <span className={styles.levelLabel}>{LEVEL_LABEL[level]}</span>
-            {state.index + 1} / {totalCount}
+            {baseCount + state.index + 1} / {baseCount + totalCount}
           </p>
-          <ProgressBar current={state.index + 1} total={totalCount} />
+          <ProgressBar current={baseCount + state.index + 1} total={baseCount + totalCount} />
         </div>
       </div>
 

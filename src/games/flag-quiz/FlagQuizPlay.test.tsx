@@ -12,7 +12,7 @@ import type { Country } from './types'
  * 画面遷移まわり（けっか画面への遷移・リダイレクトなど）を実際のルート定義で検証するため、
  * MemoryRouter + App を使う。
  */
-async function renderApp(initialEntries: string[]) {
+async function renderApp(initialEntries: Array<string | { pathname: string; state: unknown }>) {
   const view = render(
     <MemoryRouter initialEntries={initialEntries}>
       <App />
@@ -293,4 +293,55 @@ describe('FlagQuizPlay', () => {
     expect(screen.getByRole('heading', { name: 'こっきクイズ' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'こっきを みて こたえる' })).toBeInTheDocument()
   })
+
+  test(
+    '「つづける」で分母が10ずつ増え、出題済みの国は出ない',
+    async () => {
+      const user = userEvent.setup()
+      const { container } = await renderApp(['/games/flag-quiz/flag-to-name/normal/play'])
+      const seen = new Set<string>()
+      for (let i = 0; i < QUESTION_COUNT; i += 1) {
+        seen.add(getCorrectCountry(container).id)
+        await answerCurrentQuestion(user, container, true)
+      }
+      expect(screen.getByText('10 / 10もん せいかい！')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'つづける' }))
+      expect(screen.getByText('11 / 20')).toBeInTheDocument()
+      for (let i = 0; i < QUESTION_COUNT; i += 1) {
+        const id = getCorrectCountry(container).id
+        expect(seen.has(id)).toBe(false)
+        seen.add(id)
+        await answerCurrentQuestion(user, container, i % 2 === 0)
+      }
+      expect(screen.getByText('15 / 20もん せいかい！')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'つづける' })).toBeInTheDocument()
+    },
+    30000,
+  )
+
+  test(
+    'むずかしさ内の国を出しつくすと、途中の問題数で終わり「つづける」が出ない',
+    async () => {
+      const user = userEvent.setup()
+      const pool = countriesForLevel('normal')
+      const usedIds = pool.slice(0, 40).map((c) => c.id)
+      const { container } = await renderApp([
+        {
+          pathname: '/games/flag-quiz/flag-to-name/normal/result',
+          state: { correctCount: 40, totalCount: 40, usedIds },
+        },
+      ])
+      await user.click(screen.getByRole('button', { name: 'つづける' }))
+      const rest = pool.length - 40
+      expect(screen.getByText(`41 / ${pool.length}`)).toBeInTheDocument()
+      for (let i = 0; i < rest; i += 1) {
+        expect(usedIds).not.toContain(getCorrectCountry(container).id)
+        await answerCurrentQuestion(user, container, true)
+      }
+      expect(screen.getByText(`${pool.length} / ${pool.length}もん せいかい！`)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'つづける' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'もういちど' })).toBeInTheDocument()
+    },
+    30000,
+  )
 })

@@ -1,6 +1,8 @@
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import { isQuizResultState } from '../quiz-core/resultState'
+import { countriesForLevel } from './data/countries'
+import { isStringArray, remainingCountryCount } from './continueState'
 import { isQuizLevel, LEVEL_LABEL, MODE_LABEL, MODE_PATH } from './types'
 import type { QuizMode } from './types'
 import styles from './FlagQuizResult.module.css'
@@ -11,11 +13,14 @@ type ResultState = {
   /** パネルめくりモードなど、得点制のモードでだけ渡される。既存の flagToName/nameToFlag は渡さない */
   score?: number
   maxScore?: number
+  /** ここまでに出題した国。あれば「つづける」で残りの国から出題できる */
+  usedIds?: string[]
 }
 
 function isResultState(value: unknown): value is ResultState {
   if (!isQuizResultState(value)) return false
   const candidate = value as Record<string, unknown>
+  if (candidate.usedIds !== undefined && !isStringArray(candidate.usedIds)) return false
   const hasScore = candidate.score !== undefined
   const hasMaxScore = candidate.maxScore !== undefined
   // score/maxScore は任意だが、どちらかを渡すなら得点として一貫した整数の組にする。
@@ -37,10 +42,11 @@ function getPraise(correctCount: number, totalCount: number): { emoji: string; m
   if (totalCount > 0 && correctCount === totalCount) {
     return { emoji: '🏆', message: 'かんぺき！' }
   }
-  if (correctCount >= 7) {
+  // 「つづける」で問題数が増えても同じ基準になるよう、10問あたり7問・4問の割合で判定する
+  if (correctCount * 10 >= totalCount * 7) {
     return { emoji: '🎉', message: 'すごい！' }
   }
-  if (correctCount >= 4) {
+  if (correctCount * 10 >= totalCount * 4) {
     return { emoji: '👍', message: 'よくできました' }
   }
   return { emoji: '😊', message: 'またあそぼう！' }
@@ -64,9 +70,11 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
     return <Navigate to={`/games/flag-quiz/${MODE_PATH[mode]}`} replace />
   }
 
-  const { correctCount, totalCount, score, maxScore } = location.state
+  const { correctCount, totalCount, score, maxScore, usedIds } = location.state
   const praise = getPraise(correctCount, totalCount)
   const hasScore = typeof score === 'number' && typeof maxScore === 'number'
+  // このむずかしさの国をすべて出題しおえたら「つづける」は出さない
+  const canContinue = usedIds !== undefined && remainingCountryCount(countriesForLevel(level), usedIds) > 0
 
   return (
     <main className={styles.page}>
@@ -86,8 +94,21 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
         <span aria-hidden="true">{praise.emoji}</span> {praise.message}
       </p>
       <div className={styles.actions}>
+        {canContinue && (
+          <BigButton
+            variant="primary"
+            onClick={() =>
+              navigate(`/games/flag-quiz/${MODE_PATH[mode]}/${level}/play`, {
+                replace: true,
+                state: { continueFrom: { correctCount, totalCount, score, maxScore, usedIds } },
+              })
+            }
+          >
+            つづける
+          </BigButton>
+        )}
         <BigButton
-          variant="primary"
+          variant={canContinue ? 'secondary' : 'primary'}
           onClick={() => navigate(`/games/flag-quiz/${MODE_PATH[mode]}/${level}/play`, { replace: true })}
         >
           もういちど
