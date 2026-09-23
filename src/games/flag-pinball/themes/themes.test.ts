@@ -17,18 +17,18 @@ const expectedDefinitionKeys = [
 ].sort()
 
 describe('flag-pinball themes', () => {
-  test('6テーマが指定順で揃い、id・emoji・labelJaが重複しない', () => {
-    expect(PINBALL_THEMES.map((theme) => theme.id)).toEqual(['normal', 'space', 'ocean', 'candy', 'sky', 'car'])
-    expect(new Set(PINBALL_THEMES.map((theme) => theme.id)).size).toBe(6)
-    expect(new Set(PINBALL_THEMES.map((theme) => theme.emoji)).size).toBe(6)
-    expect(new Set(PINBALL_THEMES.map((theme) => theme.labelJa)).size).toBe(6)
+  test('7テーマが指定順で揃い、id・emoji・labelJaが重複しない', () => {
+    expect(PINBALL_THEMES.map((theme) => theme.id)).toEqual(['normal', 'space', 'ocean', 'candy', 'sky', 'car', 'forest'])
+    expect(new Set(PINBALL_THEMES.map((theme) => theme.id)).size).toBe(7)
+    expect(new Set(PINBALL_THEMES.map((theme) => theme.emoji)).size).toBe(7)
+    expect(new Set(PINBALL_THEMES.map((theme) => theme.labelJa)).size).toBe(7)
   })
 
   test('盤面とおもちゃのクラス名は空でなく、テーマ間で重複しない', () => {
     expect(PINBALL_THEMES.every((theme) => theme.boardClassName !== '')).toBe(true)
     expect(PINBALL_THEMES.every((theme) => theme.toyClassName !== '')).toBe(true)
-    expect(new Set(PINBALL_THEMES.map((theme) => theme.boardClassName)).size).toBe(6)
-    expect(new Set(PINBALL_THEMES.map((theme) => theme.toyClassName)).size).toBe(6)
+    expect(new Set(PINBALL_THEMES.map((theme) => theme.boardClassName)).size).toBe(7)
+    expect(new Set(PINBALL_THEMES.map((theme) => theme.toyClassName)).size).toBe(7)
   })
 
   test('renderToy は全種類で絵を返す', () => {
