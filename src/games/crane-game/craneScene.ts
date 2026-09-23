@@ -99,6 +99,21 @@ function prizeParts(species: PrizeSpecies): Part[] {
       add(new THREE.CylinderGeometry(half.x * 0.12, half.x * 0.12, half.y * 0.9, 8), accent, matrix(half.x * 0.45, half.y * 1.35, 0, 0, 0, 0.2))
       break
     }
+    case 'fruit': {
+      if (species.body.form === 'capsule') {
+        // バナナ。ねかせたカプセルの 両はしに へたと さきっぽを つける。
+        const { radius: r, half } = species.body
+        add(new THREE.CapsuleGeometry(r, half * 2, 8, 18), body, matrix(0, 0, 0))
+        add(new THREE.CylinderGeometry(r * 0.28, r * 0.34, r * 0.8, 8), accent, matrix(0, half + r * 1.1, 0))
+        add(new THREE.SphereGeometry(r * 0.3, 8, 6), accent, matrix(0, -half - r * 0.82, 0))
+        break
+      }
+      const r = reach
+      add(new THREE.SphereGeometry(r, 22, 16), body, matrix(0, 0, 0))
+      add(new THREE.CylinderGeometry(r * 0.07, r * 0.09, r * 0.45, 6), eye, matrix(0, r * 1.06, 0, 0, 0, 0.15))
+      add(new THREE.SphereGeometry(r * 0.26, 10, 6), accent, matrix(r * 0.26, r * 0.98, 0, 0, 0, -0.6, 0.35))
+      break
+    }
   }
   return parts
 }
