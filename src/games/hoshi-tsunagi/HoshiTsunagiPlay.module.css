@@ -120,6 +120,43 @@
   text-align: center;
 }
 
+.stageNav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.stageNavButton {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  color: #f8f9fa;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 20px;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.stageNavButton:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.stageNavButton:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.stageNavButton:focus-visible {
+  outline: 4px solid #ffd43b;
+  outline-offset: 3px;
+}
+
 .progress {
   margin: 0;
   padding: 0;

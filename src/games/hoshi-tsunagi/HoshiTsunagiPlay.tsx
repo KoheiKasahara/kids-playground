@@ -70,6 +70,8 @@ export default function HoshiTsunagiPlay() {
   const [phase, setPhase] = useState<Phase>('select')
   const [course, setCourse] = useState<HoshiCourse>('easy')
   const [stageIndex, setStageIndex] = useState(0)
+  // まえ／つぎのボタンで好きな順に遊べるため、できた星座は番号で覚えておく。
+  const [cleared, setCleared] = useState<ReadonlySet<number>>(() => new Set())
   const [soundOn, setSoundOn] = useState(true)
   // なぞる操作では1回の描画のあいだに複数の星へふれることがあるため、進行の正はrefに持つ。
   const [board, setBoard] = useState<BoardState>(createBoard)
@@ -95,6 +97,7 @@ export default function HoshiTsunagiPlay() {
     primeAudio()
     setCourse(nextCourse)
     setStageIndex(0)
+    setCleared(new Set())
     commit(createBoard())
     setWrong(null)
     setPhase('play')
@@ -105,6 +108,17 @@ export default function HoshiTsunagiPlay() {
     setWrong(null)
     setPointer(null)
     setPhase('select')
+  }
+
+  /** まえ／つぎのボタンで、えらんだ星座へ移動する。移動先は最初からつなぎなおす。 */
+  const moveStage = (delta: number) => {
+    const target = stageIndex + delta
+    if (target < 0 || target >= constellations.length) return
+    setPointer(null)
+    setWrong(null)
+    draggingRef.current = false
+    commit(createBoard())
+    setStageIndex(target)
   }
 
   const goNext = () => {
@@ -131,6 +145,9 @@ export default function HoshiTsunagiPlay() {
     }
     commit(next)
     setWrong(null)
+    if (result === 'complete') {
+      setCleared((current) => new Set(current).add(stageIndex))
+    }
     if (!soundOn) return
     if (result === 'complete') playCompleteSound()
     else playConnectSound(next.connected - 1)
@@ -242,24 +259,44 @@ export default function HoshiTsunagiPlay() {
             <p className={styles.status} role="status">
               {status}
             </p>
-            <ol className={styles.progress} aria-label={`${stageIndex + 1}こめ / ${constellations.length}こ`}>
-              {constellations.map((item, index) => (
-                <li
-                  key={item.id}
-                  className={[
-                    styles.progressDot,
-                    index < stageIndex || (index === stageIndex && complete) ? styles.progressDone : '',
-                    index === stageIndex ? styles.progressCurrent : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                >
-                  <span aria-hidden="true">
-                    {index < stageIndex || (index === stageIndex && complete) ? item.emoji : '・'}
-                  </span>
-                </li>
-              ))}
-            </ol>
+            <div className={styles.stageNav}>
+              <button
+                type="button"
+                className={styles.stageNavButton}
+                aria-label="まえの せいざ"
+                disabled={stageIndex === 0}
+                onClick={() => moveStage(-1)}
+              >
+                <span aria-hidden="true">◀</span>
+              </button>
+              <ol className={styles.progress} aria-label={`${stageIndex + 1}こめ / ${constellations.length}こ`}>
+                {constellations.map((item, index) => (
+                  <li
+                    key={item.id}
+                    className={[
+                      styles.progressDot,
+                      cleared.has(index) ? styles.progressDone : '',
+                      index === stageIndex ? styles.progressCurrent : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    <span aria-hidden="true">
+                      {cleared.has(index) ? item.emoji : '・'}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <button
+                type="button"
+                className={styles.stageNavButton}
+                aria-label="つぎの せいざへ すすむ"
+                disabled={isLastStage}
+                onClick={() => moveStage(1)}
+              >
+                <span aria-hidden="true">▶</span>
+              </button>
+            </div>
           </div>
 
           <svg
