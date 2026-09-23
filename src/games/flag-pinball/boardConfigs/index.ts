@@ -1,6 +1,7 @@
 import type { PinballThemeId } from '../themes/types'
 import { candyBoard } from './candyBoard'
 import { carBoard } from './carBoard'
+import { forestBoard } from './forestBoard'
 import { normalBoard } from './normalBoard'
 import { oceanBoard } from './oceanBoard'
 import { skyBoard } from './skyBoard'
@@ -14,6 +15,7 @@ export { oceanBoard } from './oceanBoard'
 export { candyBoard } from './candyBoard'
 export { skyBoard } from './skyBoard'
 export { carBoard } from './carBoard'
+export { forestBoard } from './forestBoard'
 
 function assertUniqueIds(items: readonly { readonly id: string }[], label: string): void {
   const ids = items.map((item) => item.id)
@@ -42,6 +44,7 @@ export const BOARD_CONFIGS: Readonly<Record<PinballThemeId, BoardConfig>> = {
   candy: candyBoard,
   sky: skyBoard,
   car: carBoard,
+  forest: forestBoard,
 }
 
 for (const [themeId, config] of Object.entries(BOARD_CONFIGS) as [PinballThemeId, BoardConfig][]) {

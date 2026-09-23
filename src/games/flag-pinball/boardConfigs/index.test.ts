@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { PinballThemeId } from '../themes/types'
-import { BOARD_CONFIGS, candyBoard, carBoard, getBoardConfig, normalBoard, oceanBoard, skyBoard, spaceBoard } from './index'
+import { BOARD_CONFIGS, candyBoard, carBoard, forestBoard, getBoardConfig, normalBoard, oceanBoard, skyBoard, spaceBoard } from './index'
 
-const THEME_IDS: readonly PinballThemeId[] = ['normal', 'space', 'ocean', 'candy', 'sky', 'car']
+const THEME_IDS: readonly PinballThemeId[] = ['normal', 'space', 'ocean', 'candy', 'sky', 'car', 'forest']
 
 describe('BOARD_CONFIGS', () => {
-  it('6テーマすべてに盤面設定が存在する', () => {
+  it('7テーマすべてに盤面設定が存在する', () => {
     for (const themeId of THEME_IDS) {
       expect(BOARD_CONFIGS[themeId]).toBeDefined()
     }
@@ -19,6 +19,7 @@ describe('BOARD_CONFIGS', () => {
     expect(getBoardConfig('candy')).toBe(candyBoard)
     expect(getBoardConfig('sky')).toBe(skyBoard)
     expect(getBoardConfig('car')).toBe(carBoard)
+    expect(getBoardConfig('forest')).toBe(forestBoard)
   })
 
   it('不明なテーマIDを渡すと既定盤面へ握りつぶさずthrowする', () => {
@@ -63,8 +64,15 @@ describe('BOARD_CONFIGS', () => {
     expect(carBoard.toys).not.toEqual(normalBoard.toys)
   })
 
+  it('もりも専用盤面になっており、通常盤面とは異なる配置を持つ', () => {
+    // もり盤面は空盤面と同じく専用の壁を追加していない（壁一式は通常盤面と同じ6枚のまま）。
+    expect(forestBoard).not.toEqual(normalBoard)
+    expect(forestBoard.obstacles).not.toEqual(normalBoard.obstacles)
+    expect(forestBoard.toys).not.toEqual(normalBoard.toys)
+  })
+
   it('テーマ設定同士は内容が同じでも同一のmutableオブジェクトを共有していない', () => {
-    const configs = [normalBoard, spaceBoard, oceanBoard, candyBoard, skyBoard, carBoard]
+    const configs = [normalBoard, spaceBoard, oceanBoard, candyBoard, skyBoard, carBoard, forestBoard]
     for (let i = 0; i < configs.length; i += 1) {
       for (let j = i + 1; j < configs.length; j += 1) {
         expect(configs[i]).not.toBe(configs[j])
