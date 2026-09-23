@@ -76,6 +76,28 @@ function fadeInFront(material: THREE.Material, reach: { value: number }) {
   material.customProgramCacheKey = () => 'golf-fade-v1'
 }
 
+/**
+ * しかけ全体を、点々に まびいて 透かす。keep は のこす画素の わりあい（1 で ふつう）。
+ * ふうしゃの うしろに ボールが かくれたときに使う。
+ */
+function ditherOut(material: THREE.Material, keep: { value: number }) {
+  material.onBeforeCompile = shader => {
+    shader.uniforms.uKeep = keep
+    shader.fragmentShader = `uniform float uKeep;\n${shader.fragmentShader}`.replace(
+      '#include <clipping_planes_fragment>',
+      `#include <clipping_planes_fragment>
+      if (uKeep < 1.0) {
+        float speck = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+        if (uKeep < speck) discard;
+      }`,
+    )
+  }
+  material.customProgramCacheKey = () => 'golf-dither-v1'
+}
+
+/** ふうしゃが ボールを かくしているとき、のこす画素の わりあい。 */
+const SEE_THROUGH_KEEP = 0.28
+
 /** 同じ形の飾りを色ちがいでまとめて1回で描く。 */
 function createBatch() {
   const items = new Map<Shape, { matrices: THREE.Matrix4[]; colors: THREE.Color[] }>()
@@ -374,6 +396,8 @@ export function createGolfScene(container: HTMLElement) {
     flagBase: number
     cloth: THREE.Mesh
     blades: THREE.Group[]
+    /** ボールを かくしたら 透かす しかけ（ふうしゃ）。box は あたり判定用の 外わく。 */
+    seeThrough: { box: THREE.Box3; keep: { value: number }; goal: number }[]
     gates: THREE.Object3D[]
     critters: THREE.Object3D[]
     snow: { points: THREE.Points; base: number; height: number } | null
@@ -386,6 +410,7 @@ export function createGolfScene(container: HTMLElement) {
   let hole: HoleContent | null = null
   // カメラとボールのあいだの景色を消すための距離。ホールが変わっても作り直さない。
   const fade = { value: 0 }
+  const seeThroughHit = new THREE.Vector3()
   let flagLift = 0
   let flagLifted = false
   let clubPull = 0
@@ -547,6 +572,7 @@ export function createGolfScene(container: HTMLElement) {
 
     // しかけ。
     const blades: THREE.Group[] = []
+    const seeThrough: HoleContent['seeThrough'] = []
     const gates: THREE.Object3D[] = []
     const critters: THREE.Object3D[] = []
     const bumpers = new Map<string, THREE.Group>()
@@ -698,7 +724,8 @@ export function createGolfScene(container: HTMLElement) {
         const roof = new THREE.Mesh(new THREE.ConeGeometry(1.02, 1.0, 4), roofMaterial)
         roof.rotation.y = Math.PI / 4
         roof.position.y = WINDMILL.pillarHeight + 1.6 + 0.5
-        const lookout = new THREE.Mesh(new THREE.CircleGeometry(0.17, 20), new THREE.MeshStandardMaterial({ color: '#fff3c4', emissive: '#ffcf6b', emissiveIntensity: 0.35 }))
+        const lookoutMaterial = new THREE.MeshStandardMaterial({ color: '#fff3c4', emissive: '#ffcf6b', emissiveIntensity: 0.35 })
+        const lookout = new THREE.Mesh(new THREE.CircleGeometry(0.17, 20), lookoutMaterial)
         lookout.position.set(0, WINDMILL.pillarHeight + 1.32, 0.64)
         const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.3, 12), roofMaterial)
         hub.rotation.x = Math.PI / 2
@@ -725,6 +752,14 @@ export function createGolfScene(container: HTMLElement) {
         }
         group.add(bladeGroup)
         group.traverse(child => { if (child instanceof THREE.Mesh) child.castShadow = child.receiveShadow = true })
+        // ボールが うしろや トンネルの中に かくれたら、ふうしゃごと 透かして 見えるようにする。
+        const keep = { value: 1 }
+        for (const material of [bodyMaterial, brick, roofMaterial, lookoutMaterial, wood, sail]) ditherOut(material, keep)
+        const box = new THREE.Box3(
+          new THREE.Vector3(gadget.x - WINDMILL.outer, ground, gadget.z - WINDMILL.halfDepth),
+          new THREE.Vector3(gadget.x + WINDMILL.outer, ground + WINDMILL.pillarHeight + 2.6, gadget.z + WINDMILL.bladeFront + 0.1),
+        )
+        seeThrough.push({ box, keep, goal: 1 })
         root.add(group)
         blades.push(bladeGroup)
       } else if (gadget.kind === 'gate') {
@@ -1284,7 +1319,7 @@ export function createGolfScene(container: HTMLElement) {
     sun.intensity = moon ? 2.1 : 2.4
     scene.environmentIntensity = moon ? 0.3 : 0.38
     scene.add(root)
-    return { root, heightAt: geometry.heightAt, cupY: cup.y, flag, flagBase, cloth, blades, gates, critters, snow, bumpers, boosters, water, spinners, floaters }
+    return { root, heightAt: geometry.heightAt, cupY: cup.y, flag, flagBase, cloth, blades, seeThrough, gates, critters, snow, bumpers, boosters, water, spinners, floaters }
   }
 
   function resize() {
@@ -1453,11 +1488,22 @@ export function createGolfScene(container: HTMLElement) {
       camera.position.set(pose.position.x, pose.position.y, pose.position.z)
       camera.lookAt(pose.target.x, pose.target.y, pose.target.z)
       fade.value = reach
+      if (!hole) return
+      // カメラから ボールへの 見通しを さえぎる ふうしゃだけ 透かす。
+      const eye = camera.position
+      const toBall = ball.position.clone().sub(eye)
+      const distance = toBall.length()
+      const ray = new THREE.Ray(eye.clone(), toBall.normalize())
+      for (const item of hole.seeThrough) {
+        const hit = reach > 0 && distance > 1e-3 ? ray.intersectBox(item.box, seeThroughHit) : null
+        item.goal = hit && hit.distanceTo(eye) < distance - BALL_RADIUS ? SEE_THROUGH_KEEP : 1
+      }
     },
     resize,
     render(dt: number, reducedMotion: boolean) {
       clock += dt
       if (hole) {
+        for (const item of hole.seeThrough) item.keep.value = Math.abs(item.goal - item.keep.value) < 0.01 ? item.goal : item.keep.value + (item.goal - item.keep.value) * Math.min(1, dt * 8)
         flagLift += ((flagLifted ? 1 : 0) - flagLift) * Math.min(1, dt * 6)
         hole.flag.position.y = hole.flagBase + flagLift * 0.95
         if (!reducedMotion) {
