@@ -71,8 +71,8 @@ export const LEVELS: readonly Level[] = [
   {
     name: 'かべの むこう', difficulty: 'easy', balls: 6,
     hint: 'かべに あたると たまは とまるよ',
-    targets: [{ x: 90, y: 290 }, { x: 310, y: 290 }, { x: 200, y: 160, motion: line(120, 0, 6.5) }],
-    walls: [{ x: 200, y: 400, w: 110, h: 26 }],
+    targets: [{ x: 90, y: 290 }, { x: 310, y: 290 }, { x: 200, y: 160, motion: line(150, 0, 8) }],
+    walls: [{ x: 200, y: 400, w: 80, h: 26 }],
   },
   {
     name: 'きらきら きんの まと', difficulty: 'easy', balls: 7,
@@ -114,7 +114,7 @@ export const LEVELS: readonly Level[] = [
       { x: 200, y: 330, motion: line(120, 0, 3.6) },
       { x: 200, y: 125, kind: 'gold', motion: orbit(40, 2.6) },
     ],
-    walls: [{ x: 200, y: 450, w: 56, h: 56 }],
+    walls: [{ x: 200, y: 450, w: 50, h: 50 }],
   },
   {
     name: 'ぽよんと はねかえり', difficulty: 'normal', balls: 7,
@@ -131,10 +131,7 @@ export const LEVELS: readonly Level[] = [
     name: 'きえる かべ', difficulty: 'hard', balls: 7,
     hint: 'かべが きえた しゅんかんを ねらおう',
     targets: [{ x: 200, y: 150, motion: line(130, 0, 3.4) }, { x: 110, y: 240 }, { x: 290, y: 240 }],
-    walls: [
-      { x: 200, y: 340, w: 320, h: 22, blink: { period: 3, on: .55 } },
-      { x: 200, y: 460, w: 170, h: 22, blink: { period: 2.4, on: .5, phase: .5 } },
-    ],
+    walls: [{ x: 200, y: 400, w: 320, h: 22, blink: { period: 3.6, on: .45 } }],
   },
   {
     name: 'まわる ガード', difficulty: 'hard', balls: 8,
@@ -168,10 +165,9 @@ export const LEVELS: readonly Level[] = [
       { x: 200, y: 250, kind: 'gold', motion: line(0, 50, 1.8) },
     ],
     walls: [
-      { x: 200, y: 370, w: 240, h: 22, blink: { period: 2.8, on: .5 } },
+      { x: 200, y: 370, w: 240, h: 22, blink: { period: 3.4, on: .42 } },
       { x: 18, y: 330, w: 22, h: 200, kind: 'bouncy' },
       { x: 382, y: 330, w: 22, h: 200, kind: 'bouncy' },
-      { x: 200, y: 480, w: 90, h: 24, motion: line(110, 0, 3.4, .25) },
     ],
   },
 ]
