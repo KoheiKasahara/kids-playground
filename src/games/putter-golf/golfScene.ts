@@ -973,7 +973,8 @@ export function createGolfScene(container: HTMLElement) {
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping
         texture.repeat.set(1, 1.5)
         const pad = new THREE.Mesh(new THREE.PlaneGeometry(BOOSTER.halfWidth * 2, BOOSTER.halfLength * 2), new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }))
-        pad.rotation.set(-Math.PI / 2, 0, Math.atan2(gadget.dir.x, -gadget.dir.z) + Math.PI)
+        // やじるし（テクスチャの上むき）を dir の向きに そろえる。
+        pad.rotation.set(-Math.PI / 2, 0, Math.atan2(-gadget.dir.x, -gadget.dir.z))
         pad.position.set(gadget.x, ground + 0.006, gadget.z)
         root.add(pad)
         boosters.push(texture)
