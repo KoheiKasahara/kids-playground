@@ -107,7 +107,7 @@ describe('おちてくる ブロック: 画面', () => {
 describe('おちてくる ブロック: ばしょをえらんで おとす', () => {
   test('列をタップすると、落ちているブロックと着地予定がその列へ動く', () => {
     renderFalling()
-    expect(pieceCells()).toBe('2,0')
+    expect(pieceCells()).toBe('3,0')
 
     fireEvent.click(columnButton(1))
     expect(pieceCells()).toBe('0,0')
@@ -124,7 +124,7 @@ describe('おちてくる ブロック: ばしょをえらんで おとす', () 
     dropAndSettle()
 
     expect(settledCells()).toEqual([`0,${FALLING_ROWS - 1}`])
-    expect(pieceCells()).toBe('2,0')
+    expect(pieceCells()).toBe('3,0')
   })
 
   test('同じ列につづけておとすと、上へ積み上がる', () => {
@@ -150,9 +150,9 @@ describe('おちてくる ブロック: ばしょをえらんで おとす', () 
   test('ひだり・みぎで1マスずつ動き、盤面の外へは出ない', () => {
     renderFalling()
     fireEvent.click(controlButton('ひだりへ うごかす'))
-    expect(pieceCells()).toBe('1,0')
-    fireEvent.click(controlButton('みぎへ うごかす'))
     expect(pieceCells()).toBe('2,0')
+    fireEvent.click(controlButton('みぎへ うごかす'))
+    expect(pieceCells()).toBe('3,0')
 
     for (let step = 0; step < FALLING_COLS; step += 1) {
       fireEvent.click(controlButton('ひだりへ うごかす'))
@@ -164,7 +164,7 @@ describe('おちてくる ブロック: ばしょをえらんで おとす', () 
     // ながいぼう（4マス）を出して、たてに変わることを確かめる。
     randomValue = FALLING_SHAPE_IDS.indexOf('i') / FALLING_SHAPE_IDS.length + 0.01
     renderFalling()
-    expect(pieceCells()).toBe('0,0 1,0 2,0 3,0')
+    expect(pieceCells()).toBe('2,0 3,0 4,0 5,0')
 
     fireEvent.click(controlButton('まわす'))
     const rotated = pieceCells().split(' ')
@@ -194,15 +194,15 @@ describe('おちてくる ブロック: ばしょをえらんで おとす', () 
   test('キーボードの矢印でも、うごかす・まわす・おとすができる', () => {
     renderFalling()
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
-    expect(pieceCells()).toBe('1,0')
-    fireEvent.keyDown(window, { key: 'ArrowRight' })
     expect(pieceCells()).toBe('2,0')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(pieceCells()).toBe('3,0')
 
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     act(() => {
       vi.advanceTimersByTime(AFTER_DROP_MS)
     })
-    expect(settledCells()).toEqual([`2,${FALLING_ROWS - 1}`])
+    expect(settledCells()).toEqual([`3,${FALLING_ROWS - 1}`])
   })
 })
 
@@ -214,7 +214,7 @@ describe('おちてくる ブロック: おちる はやさ', () => {
     act(() => {
       vi.advanceTimersByTime(SLOW_STEP_MS * 3)
     })
-    expect(pieceCells()).toBe('2,0')
+    expect(pieceCells()).toBe('3,0')
     expect(settledCells()).toEqual([])
   })
 
@@ -226,12 +226,12 @@ describe('おちてくる ブロック: おちる はやさ', () => {
     act(() => {
       vi.advanceTimersByTime(SLOW_STEP_MS)
     })
-    expect(pieceCells()).toBe('2,1')
+    expect(pieceCells()).toBe('3,1')
 
     act(() => {
       vi.advanceTimersByTime(SLOW_STEP_MS)
     })
-    expect(pieceCells()).toBe('2,2')
+    expect(pieceCells()).toBe('3,2')
   })
 
   test('下まで来てもすぐには積まれず、1回ぶん待ってから積まれる', () => {
@@ -241,7 +241,7 @@ describe('おちてくる ブロック: おちる はやさ', () => {
     act(() => {
       vi.advanceTimersByTime(SLOW_STEP_MS * (FALLING_ROWS - 1))
     })
-    expect(pieceCells()).toBe(`2,${FALLING_ROWS - 1}`)
+    expect(pieceCells()).toBe(`3,${FALLING_ROWS - 1}`)
 
     // 床に着いた直後の1回ぶんは、動かし直せる猶予として積まずに待つ。
     act(() => {
@@ -252,7 +252,7 @@ describe('おちてくる ブロック: おちる はやさ', () => {
     act(() => {
       vi.advanceTimersByTime(SLOW_STEP_MS)
     })
-    expect(settledCells()).toEqual([`2,${FALLING_ROWS - 1}`])
+    expect(settledCells()).toEqual([`3,${FALLING_ROWS - 1}`])
   })
 })
 
@@ -302,7 +302,7 @@ describe('おちてくる ブロック: いっぱいになったとき', () => {
     fireEvent.click(screen.getByRole('button', { name: 'もういっかい' }))
 
     expect(settledCells()).toEqual([])
-    expect(pieceCells()).toBe('2,0')
+    expect(pieceCells()).toBe('3,0')
     expect(screen.getByText('そろえた:').parentElement).toHaveTextContent('そろえた: 0')
   })
 })

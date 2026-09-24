@@ -67,8 +67,8 @@ const alwaysFirstShape = () => 0
 
 describe('おちてくるモード: 盤面と出る形', () => {
   test('盤面は自由に置くモードと別に持ち、幼児が1れつそろえやすい大きさにしている', () => {
-    expect(FALLING_COLS).toBe(5)
-    expect(FALLING_ROWS).toBe(9)
+    expect(FALLING_COLS).toBe(8)
+    expect(FALLING_ROWS).toBe(12)
   })
 
   test('見分けにくいS字・Z字は落ちてこない', () => {
@@ -129,9 +129,9 @@ describe('おちてくるモード: 場所をえらぶ', () => {
   })
 
   test('よこに積まれたブロックがあって動かせないときは、同じ状態のままにする', () => {
-    // 盤面のいちばん下の段に「ss.ss」が積まれ、その真ん中のすき間に1マスが落ちている状態。
+    // 盤面のいちばん下の段に「ss.sssss」が積まれ、その真ん中のすき間に1マスが落ちている状態。
     const piece: FallingPiece = { shapeId: 'single', rotation: 0, anchor: { col: 2, row: FALLING_ROWS - 1 } }
-    const state = stateWith(['ss.ss'], piece)
+    const state = stateWith(['ss.sssss'], piece)
     expect(moveFallingPieceSideways(state, -1)).toBe(state)
     expect(moveFallingPieceSideways(state, 1)).toBe(state)
     expect(moveFallingPieceToColumn(state, 0)).toBe(state)
@@ -215,7 +215,7 @@ describe('おちてくるモード: まわす', () => {
   test('どうやっても置けないときだけ、まわさずそのままにする', () => {
     // よこ2マスぶんのすき間にはまった「2マス」。盤面の空きはそこだけなので、たてには置けない。
     const piece: FallingPiece = { shapeId: 'duo', rotation: 0, anchor: { col: 0, row: FALLING_ROWS - 1 } }
-    const state = stateWith([...Array.from({ length: FALLING_ROWS - 1 }, () => 'sssss'), '..sss'], piece)
+    const state = stateWith([...Array.from({ length: FALLING_ROWS - 1 }, () => 'ssssssss'), '..ssssss'], piece)
     expect(rotateFallingPiece(state)).toBe(state)
   })
 })
@@ -225,7 +225,7 @@ describe('おちてくるモード: 着地と積み上げ', () => {
     const state = createFallingPuzzleState(alwaysFirstShape)
     expect(fallingLandingAnchor(state)).toEqual({ col: state.piece!.anchor.col, row: FALLING_ROWS - 1 })
 
-    const stacked = stateWith(['..s..'], { shapeId: 'single', rotation: 0, anchor: { col: 2, row: 0 } })
+    const stacked = stateWith(['..s.....'], { shapeId: 'single', rotation: 0, anchor: { col: 2, row: 0 } })
     expect(fallingLandingAnchor(stacked)).toEqual({ col: 2, row: FALLING_ROWS - 2 })
     expect(cellKeys(fallingGhostCells(stacked))).toEqual([`2,${FALLING_ROWS - 2}`])
   })
@@ -260,14 +260,14 @@ describe('おちてくるモード: 着地と積み上げ', () => {
 
 describe('おちてくるモード: よこ1れつ', () => {
   test('よこ1れつがそろうと、その段が消えて上の段が下りてくる', () => {
-    const piece: FallingPiece = { shapeId: 'single', rotation: 0, anchor: { col: 4, row: 0 } }
-    const state = stateWith(['..d..', 'ssss.'], piece)
+    const piece: FallingPiece = { shapeId: 'single', rotation: 0, anchor: { col: 7, row: 0 } }
+    const state = stateWith(['..d.....', 'sssssss.'], piece)
     const locked = lockFallingPiece(dropFallingPieceToLanding(state), alwaysFirstShape)
 
     expect(locked.lastClearedRows).toBe(1)
     expect(locked.clearedRows).toBe(1)
-    expect(gridRows(locked.grid)[FALLING_ROWS - 1]).toBe('..d..')
-    expect(gridRows(locked.grid)[FALLING_ROWS - 2]).toBe('.....')
+    expect(gridRows(locked.grid)[FALLING_ROWS - 1]).toBe('..d.....')
+    expect(gridRows(locked.grid)[FALLING_ROWS - 2]).toBe('........')
   })
 
   test('そろわなかった着地では、消えた段は0になる', () => {
@@ -279,30 +279,31 @@ describe('おちてくるモード: よこ1れつ', () => {
 
   test('いちどに2段そろえてもまとめて消え、消えなかったマスは下りてくる', () => {
     // たてにしたながいぼう（4マス）を、右はしだけ空いた2段のすき間へ落とす。
-    const piece: FallingPiece = { shapeId: 'i', rotation: 90, anchor: { col: 4, row: 0 } }
-    const state = stateWith(['ssss.', 'ssss.'], piece)
+    const piece: FallingPiece = { shapeId: 'i', rotation: 90, anchor: { col: 7, row: 0 } }
+    const state = stateWith(['sssssss.', 'sssssss.'], piece)
     const locked = lockFallingPiece(dropFallingPieceToLanding(state), alwaysFirstShape)
 
     expect(locked.lastClearedRows).toBe(2)
     // 下の2段だけが消え、はみ出ていた上の2マスがそのぶん下りてくる。
-    expect(gridRows(locked.grid).slice(-3)).toEqual(['.....', '....i', '....i'])
+    expect(gridRows(locked.grid).slice(-3)).toEqual(['........', '.......i', '.......i'])
   })
 })
 
 describe('おちてくるモード: いっぱいになったとき', () => {
   test('つぎのブロックが出られないほど積み上がると、いっぱいになったことだけを伝える', () => {
-    const piece: FallingPiece = { shapeId: 'single', rotation: 0, anchor: { col: 2, row: 0 } }
-    const rows = Array.from({ length: FALLING_ROWS - 1 }, () => '..s..')
+    // 1マスの形は、8れつの盤面では左から4れつめ（col 3）に出てくる。
+    const piece: FallingPiece = { shapeId: 'single', rotation: 0, anchor: { col: 3, row: 0 } }
+    const rows = Array.from({ length: FALLING_ROWS - 1 }, () => '...s....')
     const locked = lockFallingPiece(stateWith(rows, piece), alwaysFirstShape)
 
     expect(locked.status).toBe('over')
     expect(locked.piece).toBeNull()
     // 積んだ盤面は消さずに残す（やり直すかどうかは遊ぶ子が決める）。
-    expect(locked.grid[1][2]).toBe('single')
+    expect(locked.grid[1][3]).toBe('single')
   })
 
   test('いっぱいのあとは、動かす・まわす・積むのどれも盤面を変えない', () => {
-    const over = stateWith(['..s..'], null)
+    const over = stateWith(['..s.....'], null)
     expect(moveFallingPieceToColumn(over, 0)).toBe(over)
     expect(moveFallingPieceSideways(over, 1)).toBe(over)
     expect(rotateFallingPiece(over)).toBe(over)
@@ -314,14 +315,14 @@ describe('おちてくるモード: いっぱいになったとき', () => {
 
 describe('おちてくるモード: 積まれたマスのまとまり（描画用）', () => {
   test('同じ色でつながったマスを1つのまとまりにする', () => {
-    const groups = settledGroups(gridFrom(['oo...', 'oo..s']))
+    const groups = settledGroups(gridFrom(['oo......', 'oo..s...']))
     const square = groups.find((group) => group.shapeId === 'o')
     expect(square?.cells).toHaveLength(4)
     expect(groups.filter((group) => group.shapeId === 'single')).toHaveLength(1)
   })
 
   test('色がちがえば、となりあっていても別のまとまりになる', () => {
-    const groups = settledGroups(gridFrom(['sd...']))
+    const groups = settledGroups(gridFrom(['sd......']))
     expect(groups).toHaveLength(2)
     expect(groups.map((group) => group.shapeId).sort()).toEqual(['duo', 'single'])
   })

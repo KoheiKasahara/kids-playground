@@ -38,6 +38,20 @@ describe('car road route', () => {
     }
   })
 
+  test('a goal turned 45 degrees accepts a diagonal road', () => {
+    let board = createInitialBoard()
+    board = placePartAt(board, 0, 0, createPlacedPart('start', 3))
+    // Entering from the north-west corner means the goal faces NW (rotation 7).
+    board = placePartAt(board, 1, 1, createPlacedPart('goal', 7))
+    const route = buildRoute(board)
+    expect(route.stopReason).toBe('goal')
+    expect(route.segments.map((segment) => segment.kind)).toEqual(['start', 'goal'])
+
+    board = placePartAt(createInitialBoard(), 0, 0, createPlacedPart('start', 3))
+    board = placePartAt(board, 1, 1, createPlacedPart('goal', 0))
+    expect(buildRoute(board).reachedGoal).toBe(false)
+  })
+
   test('stops at empty, mismatch and edge instead of warping', () => {
     let board = createInitialBoard()
     board = placePartAt(board, 0, 0, createPlacedPart('start', 0))
