@@ -37,6 +37,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/putter-golf',
   '/games/pyoko-touch',
   '/games/rail-builder',
+  '/games/robo-kuzushi',
   '/games/snowball-roll',
   '/games/shinkeisuijaku',
   '/games/water-wheel-maze',

@@ -805,6 +805,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'robo-kuzushi',
+    slug: 'robo-kuzushi',
+    title: 'とばせ！ロボくずし',
+    emoji: '🤖',
+    category: 'learning',
+    seo: {
+      headline: 'とばせ！ロボくずし｜パチンコでたまを飛ばす物理パズル',
+      description:
+        'パチンコでたまを飛ばし、木・こおり・いしのとりでにいるいたずらロボットをたおす小学生向けの物理パズル。角度と強さで変わる放物線や、重い鉄のたま・3つに分かれるたまで10ステージにちょうせん。',
+    },
+    intro: {
+      howToPlay: [
+        'たまを うしろへ ひっぱって はなすと とぶよ',
+        'かくどと つよさを かえて、ロボットを ぜんぶ たおそう',
+        'たまを のこして クリアすると ほしが ふえるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
