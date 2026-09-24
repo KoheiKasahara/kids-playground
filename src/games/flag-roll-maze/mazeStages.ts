@@ -775,6 +775,65 @@ const CANNON_STAGE_STAR_CELLS: readonly CellCoordinate[] = [
   { column: 8, row: 23 },
 ]
 
+/**
+ * 上から下へ3本の道路を横切るコース。車は道路の中央を左右へ往復し、
+ * 両端には車が来ない歩道ぶんの余白を残すので、端で待ってから渡ることもできる。
+ */
+const KURUMA_STAGE_ROWS = [
+  '###########',
+  '#....S....#',
+  '#.........#',
+  '#.........#',
+  '#.........#',
+  '#.........#',
+  '###.....###',
+  '#.........#',
+  '#.........#',
+  '#.........#',
+  '###.....###',
+  '#.........#',
+  '#.........#',
+  '#.........#',
+  '#....G....#',
+  '###########',
+] as const
+
+/** 車の走る行へ道路を敷き、どこを横切るかが絵で分かるようにする。 */
+const KURUMA_STAGE_TERRAIN: readonly TerrainPlacement[] = [3, 8, 12].map((row) => ({
+  kind: 'slab' as const,
+  id: `kuruma-road-${row}`,
+  cell: { column: 5, row },
+  widthCells: 9,
+  depthCells: 1.4,
+  bottom: 0,
+  top: 0.02,
+  style: 'road' as const,
+}))
+
+/**
+ * 奥ほど少しずつ速くして、最後の道路を一番の見せ場にする。
+ * 振れ幅は両端の壁との間にボール直径より広い待ち場所が残る大きさに抑える。
+ */
+const KURUMA_STAGE_GIMMICKS: readonly GimmickPlacement[] = [
+  { kind: 'car', id: 'car-kuruma-1', cell: { column: 5, row: 3 }, amplitude: 5.2, speed: 1.8, phaseOffsetSeconds: 0, initialDirection: 1 },
+  { kind: 'car', id: 'car-kuruma-2', cell: { column: 5, row: 8 }, amplitude: 5.2, speed: 2.0, phaseOffsetSeconds: 1.4, initialDirection: -1 },
+  { kind: 'car', id: 'car-kuruma-3', cell: { column: 5, row: 12 }, amplitude: 5.2, speed: 2.2, phaseOffsetSeconds: 2.6, initialDirection: 1 },
+]
+
+/** 道路を渡りきった歩道へ順に置き、車に押し戻されても渡った所から再開できるようにする。 */
+const KURUMA_STAGE_CHECKPOINT_CELLS: readonly CellCoordinate[] = [
+  { column: 5, row: 1 },  // START
+  { column: 5, row: 5 },  // 1本目の道路を渡った所
+  { column: 5, row: 10 }, // 2本目の道路を渡った所
+]
+
+/** 星は歩道の端へ置き、車の来ない所で取れるようにする。 */
+const KURUMA_STAGE_STAR_CELLS: readonly CellCoordinate[] = [
+  { column: 1, row: 5 }, // 1本目を渡った左の歩道
+  { column: 9, row: 9 }, // 2本目を渡った右の歩道
+  { column: 2, row: 14 }, // GOAL横の寄り道
+]
+
 export const MAZE_STAGES: readonly MazeStageDefinition[] = [
   {
     id: 'kantan',
@@ -815,6 +874,17 @@ export const MAZE_STAGES: readonly MazeStageDefinition[] = [
     gimmicks: [],
     checkpointCells: ANAANA_STAGE_CHECKPOINT_CELLS,
     starCells: ANAANA_STAGE_STAR_CELLS,
+  },
+  {
+    id: 'kuruma',
+    nameJa: 'くるま',
+    emoji: '🚗',
+    hintJa: 'くるまに きをつけて',
+    rows: KURUMA_STAGE_ROWS,
+    terrain: KURUMA_STAGE_TERRAIN,
+    gimmicks: KURUMA_STAGE_GIMMICKS,
+    checkpointCells: KURUMA_STAGE_CHECKPOINT_CELLS,
+    starCells: KURUMA_STAGE_STAR_CELLS,
   },
   {
     id: 'adventure',

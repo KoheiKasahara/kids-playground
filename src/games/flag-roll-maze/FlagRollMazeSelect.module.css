@@ -45,13 +45,16 @@
 
 /* 文字を読む前でも絵文字と大きな面で選べる、ステージ用のカード一覧。 */
 .stageGrid {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
   align-content: start;
   gap: var(--space-sm);
-  padding-bottom: var(--space-md);
+  /* 選択枠や影が画面端やスクロール境界で切れないよう、内側に余白を取る。 */
+  padding: 8px;
 }
 
 .cell {
@@ -73,20 +76,22 @@
 
 .stageCell {
   position: relative;
-  min-height: 96px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  column-gap: var(--space-sm);
+  min-width: 0;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: var(--space-sm) var(--space-md);
+  justify-content: center;
+  gap: 4px;
+  padding: var(--space-sm);
   border: 3px solid transparent;
   border-radius: var(--radius-md);
   background-color: var(--color-surface);
   box-shadow: var(--shadow-sm);
   color: var(--color-primary-dark);
+  text-align: center;
   cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
 }
 
 .cell:focus-visible {
@@ -116,27 +121,29 @@
 }
 
 .stageEmoji {
-  grid-row: 1 / -1;
-  font-size: 48px;
+  font-size: 44px;
   line-height: 1;
 }
 
+/* 2列のカード幅でも名前が途中で折り返さない大きさにする。 */
 .stageName {
-  align-self: end;
-  font-size: 21px;
+  max-width: 100%;
+  font-size: 20px;
   font-weight: 900;
   line-height: 1.15;
+  white-space: nowrap;
 }
 
 .stageHint {
-  align-self: start;
+  max-width: 100%;
   color: var(--color-text-muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.25;
+  text-wrap: balance;
+  line-break: strict;
 }
 
-/* 1つだけ選べることを枠とチェックの両方で伝え、aria-pressedとも一致させる。 */
 .selected {
   border-color: var(--color-primary);
   transform: scale(1.06);
@@ -145,6 +152,9 @@
 
 .stageCell.selected {
   background-color: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  /* 拡大すると画面端のカードの枠が切れるため、ステージは拡大せず枠と色で示す。 */
+  transform: none;
+  animation: none;
 }
 
 .check {
@@ -274,27 +284,19 @@
 
   .stageCell {
     min-height: 76px;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
-    justify-items: center;
-    align-content: center;
     gap: 2px;
     padding: var(--space-xs);
-    text-align: center;
   }
 
   .stageEmoji {
-    grid-row: auto;
     font-size: 32px;
   }
 
   .stageName {
-    align-self: auto;
     font-size: 16px;
   }
 
   .stageHint {
-    align-self: auto;
     font-size: 12px;
   }
 }
@@ -318,13 +320,30 @@
 
   .stageCell {
     min-height: 112px;
+    display: grid;
     grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: var(--space-sm);
+    align-items: center;
     padding: var(--space-md);
+    text-align: left;
   }
 
-  .stageName,
-  .stageHint {
+  .stageEmoji {
+    grid-row: 1 / -1;
+    font-size: 48px;
+  }
+
+  .stageName {
+    align-self: end;
     min-width: 0;
+    font-size: 21px;
+  }
+
+  .stageHint {
+    align-self: start;
+    min-width: 0;
+    font-size: 14px;
   }
 
   .actions {

@@ -48,11 +48,11 @@ function visibleCellsOnShortSide(distance: number, aspect: number): number {
 
 describe('computeMazeCameraDistance', () => {
   it.each([
-    ['スマホ縦', 390 / 780, 15.6],
-    ['正方形', 1, 7.8],
-    ['タブレット', 820 / 1180, 11.2],
-    ['PC横', 1440 / 810, 7.8],
-    ['低い横画面', 900 / 380, 7.8],
+    ['スマホ縦', 390 / 780, 19.3],
+    ['正方形', 1, 9.65],
+    ['タブレット', 820 / 1180, 13.89],
+    ['PC横', 1440 / 810, 9.65],
+    ['低い横画面', 900 / 380, 9.65],
   ])(
     '%sではボールの画面短辺占有率を狙い、3.4マス以上を残す',
     (_label, aspect, expectedDistance) => {

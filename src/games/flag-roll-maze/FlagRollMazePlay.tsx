@@ -253,7 +253,6 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
 
   return (
     <main className={styles.page}>
-      <GameBackButton to="/games/flag-roll-maze" />
       <div className={styles.scene}>
         <div ref={registerContainer} className={styles.sceneCanvas} aria-hidden="true" />
         {gameState === 'playing' && starTotalCount > 0 && (
@@ -290,7 +289,11 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
       </div>
 
       <div className={styles.ui}>
-        <h1 className={styles.title}>こっきころころめいろ</h1>
+        {/* 固定の「もどる」と同じ幅の席を横に置き、スマホ縦でタイトルと重ならないようにする。 */}
+        <div className={styles.titleRow}>
+          <GameBackButton to="/games/flag-roll-maze" reserveSpace />
+          <h1 className={styles.title}>こっきころころめいろ</h1>
+        </div>
         {gameState === 'playing' && stageDefinition !== null && (
           <p className={styles.stageBadge}>
             {stageDefinition.emoji} {stageDefinition.nameJa}

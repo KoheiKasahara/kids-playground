@@ -14,7 +14,7 @@ vi.mock('react-router-dom', async () => {
 })
 
 function stageButton(stage: (typeof MAZE_STAGES)[number]) {
-  return screen.getByRole('button', { name: new RegExp(stage.nameJa) })
+  return screen.getByRole('button', { name: new RegExp(`^${stage.nameJa}`) })
 }
 
 describe('FlagRollMazeSelect', () => {
