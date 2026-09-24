@@ -5,6 +5,8 @@
  */
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { BIN, CHUTE, prizeReach, type CraneMachine, type PrizeLook, type PrizeSpecies } from './craneMachines'
 import { CLAW } from './craneRig'
 import type { FingerView, PrizeView } from './craneWorld'
@@ -38,80 +40,175 @@ function disposeObject(root: THREE.Object3D) {
   materials.forEach(material => material.dispose())
 }
 
+/** 継ぎ目で分かれた頂点をまとめて法線を取りなおし、変形した形でもつるんと見えるようにする。 */
+function smooth(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  geometry.deleteAttribute('normal')
+  geometry.deleteAttribute('uv')
+  const merged = mergeVertices(geometry, 1e-5)
+  geometry.dispose()
+  merged.computeVertexNormals()
+  return merged
+}
+
+const ball = (r: number, width = 36, height = 24) => new THREE.SphereGeometry(r, width, height)
+/** 丸いものを ひらたく・ほそながくした形（ほっぺ、翼、葉っぱなど）。 */
+const blob = (r: number, sx: number, sy: number, sz: number) => ball(r, 20, 14).scale(sx, sy, sz)
+
+/** りんご。上下がすこしくぼんだ まるい形を、輪郭の回転で作る。 */
+function appleGeometry(r: number) {
+  const points: THREE.Vector2[] = []
+  const steps = 40
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI
+    const bulge = 1 + 0.07 * Math.sin(t) * Math.max(0, -Math.cos(t))
+    let y = -Math.cos(t) * r * 0.94
+    y -= r * 0.2 * Math.exp(-(((Math.PI - t) / 0.42) ** 2))
+    y += r * 0.1 * Math.exp(-((t / 0.36) ** 2))
+    points.push(new THREE.Vector2(Math.max(Math.sin(t) * r * bulge, 1e-4), y))
+  }
+  return smooth(new THREE.LatheGeometry(points, 56))
+}
+
+/** バナナ。カプセルを さきぼそにして弓なりに曲げる。y の＋側が へた。 */
+function bananaGeometry(r: number, half: number) {
+  const geometry = new THREE.CapsuleGeometry(r, half * 2, 16, 36, 16)
+  const end = half + r
+  const bend = (r * 1.05) / (end * end)
+  const position = geometry.getAttribute('position')
+  for (let i = 0; i < position.count; i++) {
+    const y = position.getY(i)
+    const along = y / end
+    const taper = 1 - 0.32 * along * along + 0.06 * along
+    position.setXYZ(i, position.getX(i) * taper + bend * (y * y - end * end * 0.4), y, position.getZ(i) * taper * 0.94)
+  }
+  return { geometry: smooth(geometry), tipShift: bend * end * end * 0.6 }
+}
+
 /** 景品の見た目。胴体のほかに耳や顔などの部品を、景品のローカル座標で並べる。 */
 function prizeParts(species: PrizeSpecies): Part[] {
-  const body = new THREE.MeshStandardMaterial({ color: species.color, roughness: species.look === 'marble' || species.look === 'egg' ? 0.12 : 0.72, metalness: 0.02 })
-  const accent = new THREE.MeshStandardMaterial({ color: species.accent, roughness: 0.5 })
-  const eye = new THREE.MeshStandardMaterial({ color: '#3c2a24', roughness: 0.3 })
+  const look = species.look as PrizeLook
+  const plush = look === 'bear' || look === 'bunny' || look === 'chick'
+  const glossy = look === 'marble' || look === 'egg'
+  const body = new THREE.MeshPhysicalMaterial({
+    color: species.color,
+    roughness: plush ? 0.9 : glossy ? 0.18 : look === 'fruit' ? 0.4 : 0.5,
+    metalness: 0,
+    clearcoat: glossy ? 1 : look === 'fruit' ? 0.55 : look === 'drink' || look === 'snack' ? 0.3 : 0,
+    clearcoatRoughness: 0.2,
+    sheen: plush ? 1 : 0,
+    sheenRoughness: 0.45,
+    sheenColor: new THREE.Color(species.color).lerp(new THREE.Color('#ffffff'), 0.55),
+    ...(look === 'marble' ? { transparent: true, opacity: 0.62 } : {}),
+  })
+  const accent = new THREE.MeshPhysicalMaterial({
+    color: species.accent,
+    roughness: plush ? 0.85 : 0.45,
+    clearcoat: plush ? 0 : 0.35,
+    clearcoatRoughness: 0.3,
+    sheen: plush ? 0.8 : 0,
+    sheenRoughness: 0.5,
+    sheenColor: new THREE.Color(species.accent).lerp(new THREE.Color('#ffffff'), 0.5),
+  })
+  const eye = new THREE.MeshPhysicalMaterial({ color: '#2f211c', roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.05 })
+  const sparkle = new THREE.MeshBasicMaterial({ color: '#ffffff' })
+  const blush = new THREE.MeshStandardMaterial({ color: '#ff9fb0', roughness: 0.9, transparent: true, opacity: 0.7 })
+  const stem = new THREE.MeshStandardMaterial({ color: '#6b4a2b', roughness: 0.7 })
   const parts: Part[] = []
   const add = (geometry: THREE.BufferGeometry, material: THREE.Material, local: THREE.Matrix4) => parts.push({ geometry, material, local })
+  /** 目。くろめに白い光を入れて、いきいきさせる。 */
+  const eyes = (size: number, x: number, y: number, z: number) => {
+    for (const side of [-1, 1]) {
+      add(ball(size, 14, 10), eye, matrix(side * x, y, z))
+      add(ball(size * 0.34, 8, 6), sparkle, matrix(side * x + size * 0.3, y + size * 0.36, z + size * 0.72))
+    }
+  }
+  const cheeks = (size: number, x: number, y: number, z: number, ry: number) => {
+    for (const side of [-1, 1]) add(blob(size, 1, 0.62, 0.3), blush, matrix(side * x, y, z, 0, side * ry, 0))
+  }
   const reach = prizeReach(species.body)
-  switch (species.look as PrizeLook) {
+  switch (look) {
     case 'bear': {
       const r = reach
-      add(new THREE.SphereGeometry(r, 20, 14), body, matrix(0, 0, 0))
-      for (const side of [-1, 1]) add(new THREE.SphereGeometry(r * 0.32, 12, 8), body, matrix(side * r * 0.66, r * 0.68, 0))
-      add(new THREE.SphereGeometry(r * 0.42, 14, 10), accent, matrix(0, -r * 0.18, r * 0.76, 0, 0, 0, 1))
-      for (const side of [-1, 1]) add(new THREE.SphereGeometry(r * 0.1, 8, 6), eye, matrix(side * r * 0.3, r * 0.24, r * 0.88))
+      add(ball(r), body, matrix(0, 0, 0))
+      for (const side of [-1, 1]) {
+        add(ball(r * 0.32, 20, 14), body, matrix(side * r * 0.66, r * 0.68, 0))
+        add(blob(r * 0.19, 1, 1, 0.45), accent, matrix(side * r * 0.68, r * 0.7, r * 0.2))
+      }
+      add(blob(r * 0.4, 1, 0.78, 0.72), accent, matrix(0, -r * 0.2, r * 0.74))
+      add(blob(r * 0.12, 1.25, 0.85, 0.9), eye, matrix(0, -r * 0.06, r * 1.0))
+      eyes(r * 0.1, r * 0.32, r * 0.2, r * 0.88)
+      cheeks(r * 0.14, r * 0.56, -r * 0.1, r * 0.76, 0.62)
       break
     }
     case 'bunny': {
       const r = species.body.form === 'capsule' ? species.body.radius : reach
       const half = species.body.form === 'capsule' ? species.body.half : r * 0.6
-      add(new THREE.CapsuleGeometry(r, half * 2, 8, 18), body, matrix(0, 0, 0))
-      for (const side of [-1, 1]) add(new THREE.CapsuleGeometry(r * 0.17, r * 0.8, 4, 10), body, matrix(side * r * 0.38, half + r * 0.82, 0, 0, 0, side * 0.26))
-      add(new THREE.SphereGeometry(r * 0.3, 12, 8), accent, matrix(0, half * 0.45, r * 0.82))
-      for (const side of [-1, 1]) add(new THREE.SphereGeometry(r * 0.09, 8, 6), eye, matrix(side * r * 0.3, half * 0.85, r * 0.9))
+      add(new THREE.CapsuleGeometry(r, half * 2, 12, 32), body, matrix(0, 0, 0))
+      for (const side of [-1, 1]) {
+        const ear = matrix(side * r * 0.38, half + r * 0.82, 0, 0, 0, side * 0.26)
+        add(new THREE.CapsuleGeometry(r * 0.17, r * 0.8, 6, 16), body, ear)
+        add(new THREE.CapsuleGeometry(r * 0.09, r * 0.62, 5, 12).scale(1, 1, 0.5), accent, ear.clone().multiply(matrix(0, 0, r * 0.1)))
+      }
+      add(blob(r * 0.13, 1.2, 0.85, 0.8), accent, matrix(0, half * 0.5, r * 0.96))
+      eyes(r * 0.1, r * 0.34, half * 0.9, r * 0.9)
+      cheeks(r * 0.15, r * 0.6, half * 0.35, r * 0.78, 0.66)
       break
     }
     case 'chick': {
       const r = reach
-      add(new THREE.SphereGeometry(r, 18, 14), body, matrix(0, 0, 0))
-      add(new THREE.ConeGeometry(r * 0.22, r * 0.42, 8), accent, matrix(0, 0, r * 0.95, Math.PI / 2, 0, 0))
-      for (const side of [-1, 1]) add(new THREE.SphereGeometry(r * 0.1, 8, 6), eye, matrix(side * r * 0.32, r * 0.3, r * 0.84))
-      for (const side of [-1, 1]) add(new THREE.SphereGeometry(r * 0.42, 10, 8), body, matrix(side * r * 0.86, -r * 0.1, 0, 0, 0, 0, 0.52))
+      add(ball(r), body, matrix(0, 0, 0))
+      add(new THREE.ConeGeometry(r * 0.2, r * 0.36, 28, 1).scale(1, 1, 0.7), accent, matrix(0, 0.02 * r, r * 1.02, Math.PI / 2, 0, 0))
+      for (const side of [-1, 1]) add(blob(r * 0.42, 0.45, 1, 1), body, matrix(side * r * 0.9, -r * 0.12, 0, 0, 0, side * -0.3))
+      for (const tilt of [-0.4, 0, 0.4]) add(blob(r * 0.12, 0.5, 1.6, 0.5), body, matrix(tilt * r * 0.3, r * 1.02, 0, 0, 0, -tilt))
+      eyes(r * 0.1, r * 0.34, r * 0.3, r * 0.85)
+      cheeks(r * 0.14, r * 0.58, r * 0.05, r * 0.78, 0.64)
       break
     }
     case 'egg': {
       const r = species.body.form === 'capsule' ? species.body.radius : reach
       const half = species.body.form === 'capsule' ? species.body.half : r * 0.4
-      add(new THREE.CapsuleGeometry(r, half * 2, 10, 20), body, matrix(0, 0, 0))
-      add(new THREE.TorusGeometry(r * 1.01, r * 0.12, 8, 22), accent, matrix(0, 0, 0, Math.PI / 2))
+      add(new THREE.CapsuleGeometry(r, half * 2, 20, 44), body, matrix(0, 0, 0))
+      add(new THREE.TorusGeometry(r * 1.0, r * 0.1, 18, 56), accent, matrix(0, 0, 0, Math.PI / 2))
       break
     }
     case 'marble': {
       const r = reach
-      add(new THREE.SphereGeometry(r, 22, 16), body, matrix(0, 0, 0))
-      add(new THREE.SphereGeometry(r * 0.48, 14, 10), accent, matrix(0, 0, 0))
+      add(ball(r, 48, 32), body, matrix(0, 0, 0))
+      add(ball(r * 0.5, 32, 22), accent, matrix(0, 0, 0))
       break
     }
     case 'snack': {
       const half = species.body.form === 'box' ? species.body.half : { x: reach, y: reach, z: reach }
-      add(new THREE.BoxGeometry(half.x * 2, half.y * 2, half.z * 2), body, matrix(0, 0, 0))
-      add(new THREE.BoxGeometry(half.x * 1.35, half.y * 0.9, half.z * 2.04), accent, matrix(0, 0, 0))
-      add(new THREE.CylinderGeometry(half.y * 0.66, half.y * 0.66, half.z * 0.4, 14), accent, matrix(0, half.y * 1.02, 0, Math.PI / 2))
+      const round = Math.min(half.x, half.y, half.z) * 0.45
+      add(new RoundedBoxGeometry(half.x * 2, half.y * 2, half.z * 2, 6, round), body, matrix(0, 0, 0))
+      add(new RoundedBoxGeometry(half.x * 1.3, half.y * 2.04, half.z * 2.04, 6, round * 0.9), accent, matrix(0, 0, 0))
+      add(new THREE.CylinderGeometry(half.y * 0.5, half.y * 0.5, half.z * 0.2, 36), body, matrix(0, 0, half.z * 1.04, Math.PI / 2))
       break
     }
     case 'drink': {
       const half = species.body.form === 'box' ? species.body.half : { x: reach, y: reach * 1.4, z: reach }
-      add(new THREE.BoxGeometry(half.x * 2, half.y * 2, half.z * 2), body, matrix(0, 0, 0))
-      add(new THREE.BoxGeometry(half.x * 2.04, half.y * 0.7, half.z * 2.04), accent, matrix(0, -half.y * 0.2, 0))
-      add(new THREE.CylinderGeometry(half.x * 0.12, half.x * 0.12, half.y * 0.9, 8), accent, matrix(half.x * 0.45, half.y * 1.35, 0, 0, 0, 0.2))
+      const round = Math.min(half.x, half.z) * 0.4
+      add(new RoundedBoxGeometry(half.x * 2, half.y * 2, half.z * 2, 6, round), body, matrix(0, 0, 0))
+      add(new RoundedBoxGeometry(half.x * 2.04, half.y * 0.8, half.z * 2.04, 6, round), accent, matrix(0, -half.y * 0.15, 0))
+      add(new THREE.CapsuleGeometry(half.x * 0.1, half.y * 0.8, 6, 16), accent, matrix(half.x * 0.45, half.y * 1.35, 0, 0, 0, 0.2))
       break
     }
     case 'fruit': {
       if (species.body.form === 'capsule') {
-        // バナナ。ねかせたカプセルの 両はしに へたと さきっぽを つける。
+        // バナナ。さきぼそで弓なりの胴に、へたと さきっぽを つける。
         const { radius: r, half } = species.body
-        add(new THREE.CapsuleGeometry(r, half * 2, 8, 18), body, matrix(0, 0, 0))
-        add(new THREE.CylinderGeometry(r * 0.28, r * 0.34, r * 0.8, 8), accent, matrix(0, half + r * 1.1, 0))
-        add(new THREE.SphereGeometry(r * 0.3, 8, 6), accent, matrix(0, -half - r * 0.82, 0))
+        const { geometry, tipShift } = bananaGeometry(r, half)
+        add(geometry, body, matrix(0, 0, 0))
+        add(new THREE.CylinderGeometry(r * 0.22, r * 0.3, r * 0.8, 20), accent, matrix(tipShift, half + r * 1.05, 0, 0, 0, -0.35))
+        add(ball(r * 0.22, 16, 12), stem, matrix(tipShift, -half - r * 0.86, 0))
         break
       }
       const r = reach
-      add(new THREE.SphereGeometry(r, 22, 16), body, matrix(0, 0, 0))
-      add(new THREE.CylinderGeometry(r * 0.07, r * 0.09, r * 0.45, 6), eye, matrix(0, r * 1.06, 0, 0, 0, 0.15))
-      add(new THREE.SphereGeometry(r * 0.26, 10, 6), accent, matrix(r * 0.26, r * 0.98, 0, 0, 0, -0.6, 0.35))
+      if (species.id === 'apple') add(appleGeometry(r), body, matrix(0, 0, 0))
+      else add(ball(r, 48, 32).scale(1, 0.9, 1), body, matrix(0, 0, 0))
+      const top = species.id === 'apple' ? r * 0.76 : r * 0.9
+      add(new THREE.CylinderGeometry(r * 0.05, r * 0.07, r * 0.42, 14), stem, matrix(0, top + r * 0.16, 0, 0, 0, 0.15))
+      add(blob(r * 0.3, 1, 0.14, 0.5), accent, matrix(r * 0.24, top + r * 0.18, 0, 0, 0, -0.5))
       break
     }
   }
