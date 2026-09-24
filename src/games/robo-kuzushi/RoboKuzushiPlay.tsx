@@ -28,18 +28,39 @@ const CONFETTI: CSSProperties[] = Array.from({ length: 26 }, (_, i) => {
 
 const BALL_NAMES: Record<BallKind, string> = { normal: 'あか', heavy: 'てつ', split: 'あお' }
 
-type Hud = { state: GameState; score: number; queue: readonly BallKind[]; robots: number; canSplit: boolean; shots: number }
+type Hud = { state: GameState; score: number; queue: readonly BallKind[]; robots: number; shots: number }
 type Result = { kind: 'clear'; stars: number; score: number } | { kind: 'fail'; robots: number }
 
 function hudOf(game: Game): Hud {
-  return { state: game.state, score: game.score, queue: [...game.queue], robots: game.robotsLeft, canSplit: game.canSplit, shots: game.shots }
+  return { state: game.state, score: game.score, queue: [...game.queue], robots: game.robotsLeft, shots: game.shots }
 }
 /** 毎フレーム あたらしい オブジェクトを つくらずに、かわったかだけを しらべる。 */
-const hudChanged = (hud: Hud, game: Game) => hud.state !== game.state || hud.score !== game.score || hud.queue.length !== game.queue.length || hud.robots !== game.robotsLeft || hud.canSplit !== game.canSplit || hud.shots !== game.shots
+const hudChanged = (hud: Hud, game: Game) => hud.state !== game.state || hud.score !== game.score || hud.queue.length !== game.queue.length || hud.robots !== game.robotsLeft || hud.shots !== game.shots
 /** けっかの カードを だしてから この フレーム数 たったら、うごきを とめて 電池を まもる。 */
 const REST_AFTER_RESULT = 150
 /** 1フレームで ならす ぶつかる音の かず。いっきに くずれても 音が われない。 */
 const HIT_SOUNDS_PER_FRAME = 3
+
+/** ピアノと おなじ: スマホを たてに もっている ときだけ よこむきを おねがいする。 */
+const MOBILE_PORTRAIT_QUERY = '(max-width: 767px) and (pointer: coarse) and (orientation: portrait)'
+
+function isMobilePortrait() {
+  return typeof matchMedia === 'function' && matchMedia(MOBILE_PORTRAIT_QUERY).matches
+}
+
+/** たてむきの スマホかどうかを 見はる。むきを かえたら すぐに かわる。 */
+function useMobilePortrait() {
+  const [portrait, setPortrait] = useState(isMobilePortrait)
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return
+    const query = matchMedia(MOBILE_PORTRAIT_QUERY)
+    const update = () => setPortrait(query.matches)
+    update()
+    query.addEventListener?.('change', update)
+    return () => query.removeEventListener?.('change', update)
+  }, [])
+  return portrait
+}
 
 function reducedMotionQuery() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -63,10 +84,14 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
   const keyAim = useRef({ angle: 35, power: .8, active: false })
   const gesture = useRef<{ id: number; mode: 'aim' | 'pan'; origin: Point; center: number } | null>(null)
   const camera = useRef({ center: level.width, manual: false, intro: INTRO_FRAMES, hold: 0 })
-  const [hud, setHud] = useState<Hud>(() => ({ state: 'aim', score: 0, queue: level.balls, robots: level.pieces.filter(p => p.type === 'robot').length, canSplit: false, shots: 0 }))
+  const [hud, setHud] = useState<Hud>(() => ({ state: 'aim', score: 0, queue: level.balls, robots: level.pieces.filter(p => p.type === 'robot').length, shots: 0 }))
   const [result, setResult] = useState<Result | null>(null)
   const [aimLabel, setAimLabel] = useState('')
   const showHint = useRef(index === 0 && !reducedMotionQuery())
+  const portrait = useMobilePortrait()
+  /** たてむきの あいだは ゲームを とめておく（よこにしたら つづきから）。 */
+  const paused = useRef(portrait)
+  useEffect(() => { paused.current = portrait }, [portrait])
 
   useEffect(() => {
     const game = createGame(level)
@@ -122,7 +147,7 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
       const elapsed = previous ? Math.min(100, now - previous) : 0
       previous = now
       let frames = 0
-      if (!document.hidden) {
+      if (!document.hidden && !paused.current) {
         accumulator += elapsed
         while (accumulator >= FRAME_MS && frames < 6) {
           game.step()
@@ -224,11 +249,10 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
   function down(event: PointerEvent<HTMLCanvasElement>) {
     const game = gameRef.current
     const view = viewRef.current
-    if (!game || !view || !event.isPrimary || event.button !== 0 || gesture.current) return
+    if (!game || !view || paused.current || !event.isPrimary || event.button !== 0 || gesture.current) return
     event.preventDefault()
     primeAudio()
     event.currentTarget.focus({ preventScroll: true })
-    if (game.state === 'flying') { game.split(); return }
     if (game.state !== 'aim') return
     const cam = camera.current
     if (cam.intro > 0) cam.intro = 0
@@ -267,13 +291,12 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
 
   function key(event: KeyboardEvent<HTMLCanvasElement>) {
     const game = gameRef.current
-    if (!game) return
+    if (!game || paused.current) return
     const aim = keyAim.current
     if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault()
       primeAudio()
-      if (game.state === 'flying') game.split()
-      else if (game.state === 'aim' && aim.active) { aim.active = false; shoot() }
+      if (game.state === 'aim' && aim.active) { aim.active = false; shoot() }
       else if (game.state === 'aim') { camera.current.intro = 0; aim.active = true; setPull(pullFromKeys(aim.angle, aim.power)) }
       return
     }
@@ -289,9 +312,7 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
   }
 
   const next = hud.queue[0]
-  const hint = hud.state === 'flying'
-    ? (hud.canSplit ? 'いま タップすると 3つに わかれるよ！' : '')
-    : hud.state === 'aim' && hud.shots === 0 && !aimLabel ? level.hint : ''
+  const hint = hud.state === 'aim' && hud.shots === 0 && !aimLabel ? level.hint : ''
   return <GamePlaySurface><main className={styles.play}>
     <h1 className={styles.srOnly}>{TITLE}</h1>
     <GameBackButton onBack={onExit} />
@@ -312,7 +333,13 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
       {aimLabel || hint}
       {hud.state === 'aim' && next && !aimLabel && hint && <span className={styles.nextBall}>つぎは {BALL_NAMES[next]}の たま</span>}
     </p>
-    {hud.canSplit && <button type="button" className={styles.splitButton} onClick={() => gameRef.current?.split()}>✨ わける！</button>}
+    {portrait && <section className={styles.orientationGuide} aria-label="よこむきで あそぶ あんない">
+      <div className={styles.orientationCard}>
+        <span className={styles.orientationIcon} aria-hidden="true">↻</span>
+        <h2>よこにして<br />あそんでね</h2>
+        <p>スマホを よこむきにすると<br />ひろい ばしょで あそべるよ</p>
+      </div>
+    </section>}
     {result && <div className={styles.overlay}>
       {result.kind === 'clear' ? <div className={styles.card} role="dialog" aria-label="クリア">
         <div className={styles.confetti} aria-hidden="true">{CONFETTI.map((style, i) => <i key={i} style={style} />)}</div>
@@ -397,9 +424,9 @@ function StageSelect({ progress, onPick }: { progress: RoboProgress; onPick: (in
     <ul className={styles.legend}>
       <li><i className={`${styles.ballDot} ${styles.normal}`} />あか: ふつうの たま</li>
       <li><i className={`${styles.ballDot} ${styles.heavy}`} />てつ: おもくて つよい</li>
-      <li><i className={`${styles.ballDot} ${styles.split}`} />あお: タップで 3つに</li>
+      <li><i className={`${styles.ballDot} ${styles.split}`} />あお: とちゅうで 3つに</li>
     </ul>
-    <p className={styles.tip}>よこむきに すると ひろく みえるよ</p>
+    <p className={styles.tip}>スマホは よこむきに して あそんでね</p>
   </main>
 }
 

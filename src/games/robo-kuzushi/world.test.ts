@@ -74,21 +74,46 @@ describe('robo-kuzushi world', () => {
     game.destroy()
   })
 
-  test('the blue ball splits into three only once, and only while flying', () => {
+  test('the blue ball splits into three by itself partway through the flight, only once', () => {
     const game = createGame(LEVELS[6])
     expect(game.split()).toBe(false)
     game.launch(pullAt(40, 100))
-    for (let i = 0; i < 10; i++) game.step()
-    expect(game.canSplit).toBe(true)
-    expect(game.split()).toBe(true)
-    expect(game.projectiles).toHaveLength(3)
+    for (let i = 0; i < 5; i++) game.step()
+    // パチンコの すぐ そばでは まだ わかれない。
+    expect(game.projectiles).toHaveLength(1)
+    let splitAt = -1
+    for (let i = 5; i < 60 && splitAt < 0; i++) {
+      const vy = game.projectiles[0].body.velocity.y
+      game.step()
+      if (game.projectiles.length === 3) { splitAt = i; expect(vy > -1 || i >= 35).toBe(true) }
+    }
+    expect(splitAt).toBeGreaterThan(5)
+    expect(game.canSplit).toBe(false)
     expect(game.split()).toBe(false)
+    const events = game.drainEvents()
+    expect(events.filter(e => e.type === 'split')).toHaveLength(1)
     // わかれた たまは かさなっていても はじきあわず、空中で ぶつかる音も でない。
-    game.drainEvents()
     const speeds = game.projectiles.map(p => p.body.speed)
     game.step()
+    expect(game.projectiles).toHaveLength(3)
     expect(game.drainEvents().filter(e => e.type === 'hit')).toEqual([])
     game.projectiles.forEach((p, i) => expect(p.body.speed).toBeCloseTo(speeds[i], 0))
+    game.destroy()
+  })
+
+  test('a flat shot with the blue ball still splits on the way', () => {
+    const game = createGame(LEVELS[6])
+    game.launch(pullAt(0, 60))
+    for (let i = 0; i < 40; i++) game.step()
+    expect(game.drainEvents().some(e => e.type === 'split')).toBe(true)
+    game.destroy()
+  })
+
+  test('the stage of the blue ball can be cleared with a single well aimed shot', () => {
+    const game = createGame(LEVELS[6])
+    game.launch(pullAt(20, 100))
+    settle(game)
+    expect(game.state).toBe('clear')
     game.destroy()
   })
 
