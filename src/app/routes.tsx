@@ -59,6 +59,9 @@ export const routes: RouteObject[] = [
   // コース選択・プレイ・結果が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // HoshiTsunagiPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/hoshi-tsunagi', element: lazyRoute(() => import('../games/hoshi-tsunagi/HoshiTsunagiPlay')) },
+  // ステージ選択とプレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // RoboKuzushiPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/robo-kuzushi', element: lazyRoute(() => import('../games/robo-kuzushi/RoboKuzushiPlay')) },
   { path: '/', element: <Home /> },
   { path: '/games/puni-slime', element: playRoute(lazyRoute(() => import('../games/puni-slime/PuniSlimePlay'))) },
   { path: '/games/animal-bath', element: lazyRoute(() => import('../games/animal-bath/AnimalBathPlay')) },
