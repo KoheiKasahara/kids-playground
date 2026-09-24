@@ -1,4 +1,4 @@
-import { Cell, type Point, type Sandbox } from './sandboxSimulation'
+import { Cell, isSeed, type Point, type Sandbox } from './sandboxSimulation'
 
 export const MAX_CRABS = 2
 export const MAX_TURTLES = 1
@@ -36,7 +36,7 @@ export function wakeCreature(creature: Napping) {
   creature.resting = false
   creature.decision = 90
 }
-const blockingCell = (cell: number) => cell === Cell.Stone || cell === Cell.Seed
+const blockingCell = (cell: number) => cell === Cell.Stone || isSeed(cell)
 const soil = (cell: number) => cell === Cell.Sand || cell === Cell.Mud
 
 function blocked(world: Sandbox, x: number, y: number, scale = 1) {
