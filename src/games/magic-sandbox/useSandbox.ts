@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react'
-import { Cell, Sandbox, renderSandbox, sandboxGrid, type Material, type Point } from './sandboxSimulation'
+import { Sandbox, isSeed, renderSandbox, sandboxGrid, type Material, type Point } from './sandboxSimulation'
 
 type Brush = { material: Material; radius: number }
 type Gesture = Brush & { point: Point; pointerId: number }
@@ -57,7 +57,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       if (time - last >= 1000 / 30) {
         last = time
         const gesture = active.current
-        if (gesture && (gesture.material !== Cell.Seed || emitted++ % 6 === 0)) world.paint(gesture.point, gesture.material, gesture.radius)
+        if (gesture && (!isSeed(gesture.material) || emitted++ % 6 === 0)) world.paint(gesture.point, gesture.material, gesture.radius)
         if (!paused) { world.step(); world.step() }
         if (world.flowers > flowers) onFlower()
         flowers = world.flowers
@@ -116,8 +116,8 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
     // End on leaving the play area; never clamp an outside drag into a stream at its edge.
     if (!p) { stop(); return }
     event.preventDefault()
-    if (gesture.material === Cell.Seed) {
-      if (Math.hypot(p.x - gesture.point.x, p.y - gesture.point.y) >= 6) world.paint(p, Cell.Seed, 0)
+    if (isSeed(gesture.material)) {
+      if (Math.hypot(p.x - gesture.point.x, p.y - gesture.point.y) >= 6) world.paint(p, gesture.material, 0)
     } else world.stroke(gesture.point, p, gesture.material, gesture.radius)
     gesture.point = p
     draw.current()

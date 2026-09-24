@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import GameBackButton from '../../components/GameBackButton'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
-import { Cell, type Material } from './sandboxSimulation'
+import { Cell, isSeed, type Material } from './sandboxSimulation'
 import { useSandbox } from './useSandbox'
 import styles from './MagicSandboxPlay.module.css'
 
@@ -11,6 +11,7 @@ const MATERIALS: { id: Material; name: string; icon: string; hint: string }[] = 
   { id: Cell.Water, name: 'みず', icon: '💧', hint: 'すなに かけると しっとり！' },
   { id: Cell.Stone, name: 'いし', icon: '🪨', hint: 'かべを かいて みずを ためよう' },
   { id: Cell.Seed, name: 'たね', icon: '🌱', hint: 'ぬれた すなに まいてみよう' },
+  { id: Cell.TulipSeed, name: 'チューリップ', icon: '🌷', hint: 'チューリップの たね。ぬれた すなに まこう' },
   { id: Cell.Empty, name: 'けす', icon: '🧽', hint: 'なぞって けそう。トンネルも つくれるよ' },
 ]
 function ClearDialog({ close, clear }: { close: () => void; clear: () => void }) {
@@ -31,7 +32,7 @@ function Playground({ back }: { back: () => void }) {
   const [shaking, setShaking] = useState(false)
   const onFlower = useCallback(() => setDiscovery(true), [])
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const sandbox = useSandbox(canvasRef, { material: material.id, radius: material.id === Cell.Seed ? 0 : wide ? 6 : 3 }, paused || confirmClear, onFlower)
+  const sandbox = useSandbox(canvasRef, { material: material.id, radius: isSeed(material.id) ? 0 : wide ? 6 : 3 }, paused || confirmClear, onFlower)
   useEffect(() => {
     if (!shaking) return
     const timer = window.setTimeout(() => setShaking(false), 450)
