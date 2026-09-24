@@ -31,6 +31,8 @@ export type HoleGeometry = {
   bounds: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }
   heightAt: (x: number, z: number) => number | null
   surfaceAt: (x: number, z: number) => Surface | null
+  /** みずの上か。margin だけ みずを ふくらませ、はしは margin だけ せまくして しらべる。 */
+  waterAt: (x: number, z: number, margin?: number) => boolean
 }
 
 const smoothstep = (edge0: number, edge1: number, value: number) => {
@@ -114,6 +116,34 @@ function segmentDistance(x: number, z: number, from: Vec2, to: Vec2): number {
   const dz = to.z - from.z
   const t = Math.min(1, Math.max(0, ((x - from.x) * dx + (z - from.z) * dz) / (dx * dx + dz * dz || 1)))
   return Math.hypot(x - (from.x + dx * t), z - (from.z + dz * t))
+}
+
+/**
+ * みず（いけ・かわ）の上かどうか。はしの上は みずに おちない。
+ * 物理（おちたか）・おすすめ（みずを こえる線は えらばない）・見た目で 同じ形を使う。
+ */
+export function createWaterFunction(hole: HoleDefinition): (x: number, z: number, margin?: number) => boolean {
+  const waters = hole.water ?? []
+  const bridges = (hole.gadgets ?? []).flatMap(gadget => (gadget.kind === 'bridge' ? [gadget] : []))
+  const onBridge = (x: number, z: number, margin: number) => bridges.some(bridge => {
+    const length = Math.hypot(bridge.dir.x, bridge.dir.z) || 1
+    const along = ((x - bridge.x) * bridge.dir.x + (z - bridge.z) * bridge.dir.z) / length
+    const side = ((x - bridge.x) * bridge.dir.z - (z - bridge.z) * bridge.dir.x) / length
+    return Math.abs(along) <= bridge.halfLength && Math.abs(side) <= bridge.halfWidth - margin
+  })
+  return (x, z, margin = 0) => {
+    if (!waters.length) return false
+    const wet = waters.some(water => {
+      if (water.kind === 'pond') return Math.hypot(x - water.x, z - water.z) < water.radius + margin
+      const dx = water.to.x - water.from.x
+      const dz = water.to.z - water.from.z
+      const length = Math.hypot(dx, dz) || 1
+      const along = ((x - water.from.x) * dx + (z - water.from.z) * dz) / length
+      const side = Math.abs((x - water.from.x) * dz - (z - water.from.z) * dx) / length
+      return along > -margin && along < length + margin && side < water.halfWidth + margin
+    })
+    return wet && !onBridge(x, z, margin)
+  }
 }
 
 /** こぶ・なみ・ジャンプ台を足し合わせた高さ。カップとティーのまわりは平らにならす。 */
@@ -414,5 +444,6 @@ export function buildHoleGeometry(hole: HoleDefinition, cupRadius = CUP_RADIUS):
     bounds,
     heightAt,
     surfaceAt: (x, z) => (pieceAt(x, z) ? zoneAt(x, z) ?? 'green' : null),
+    waterAt: createWaterFunction(hole),
   }
 }

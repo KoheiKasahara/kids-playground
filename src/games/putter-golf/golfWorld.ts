@@ -11,6 +11,7 @@ import type { HoleGeometry } from './golfGeometry'
 import {
   BALL_RADIUS,
   BOOSTER,
+  BRIDGE,
   BUMPER_HEIGHT,
   CRITTER,
   cupPull,
@@ -24,6 +25,7 @@ import {
   REST_SECONDS,
   REST_SPEED,
   REST_SPIN,
+  REFLECTOR,
   rollDistance,
   rollingDecel,
   rollingFactor,
@@ -47,6 +49,8 @@ export type GolfEvent =
   | { kind: 'bumper'; id: string; strength: number; position: Vec3 }
   /** うごくカベに あたった。 */
   | { kind: 'gate'; id: string; strength: number; position: Vec3 }
+  /** はねかえし いたで はねた。 */
+  | { kind: 'reflector'; id: string; strength: number; position: Vec3 }
   /** 歩く どうぶつに あたって はねた。 */
   | { kind: 'critter'; id: string; strength: number; position: Vec3 }
   /** どかんに入って、to から出てきた。 */
@@ -56,8 +60,8 @@ export type GolfEvent =
   | { kind: 'land'; strength: number; position: Vec3 }
   /** 芝ではない ゆかに入った。 */
   | { kind: 'surface'; surface: Exclude<Surface, 'green'>; position: Vec3 }
-  /** 水に落ちた。 */
-  | { kind: 'splash'; position: Vec3 }
+  /** 水に落ちた。pond は コースの中の いけや かわに おちたとき。 */
+  | { kind: 'splash'; position: Vec3; pond?: boolean }
   /** 壁の上など、床のない所で止まった。 */
   | { kind: 'lost'; position: Vec3 }
   | { kind: 'cup'; position: Vec3 }
@@ -74,10 +78,12 @@ const BUMPER_KICK = 2.8
 const CRITTER_KICK = 2.1
 
 type Role = {
-  kind: 'floor' | 'wall' | 'bumper' | 'rock' | 'tree' | 'blade' | 'gate' | 'critter'
+  kind: 'floor' | 'wall' | 'bumper' | 'rock' | 'tree' | 'blade' | 'gate' | 'critter' | 'reflector'
   id: string
   x: number
   z: number
+  /** はねかえし いたの 両はし。はねる向きを いたの面から決める。 */
+  ends?: [Vec2, Vec2]
   /** 動くしかけは、ぶつかった ときの位置を からだから読む。 */
   body?: RAPIER.RigidBody
 }
@@ -170,6 +176,27 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       add(RAPIER.ColliderDesc.cylinder(CRITTER.height / 2, CRITTER.radius).setFriction(0.2).setRestitution(0.4),
         { kind: 'critter', id: gadget.id, x: gadget.x, z: gadget.z, body }, body)
       critters.push({ from: { x: gadget.x, z: gadget.z }, to: gadget.to, speed: gadget.speed, base: ground, body })
+    } else if (gadget.kind === 'bridge') {
+      // はしの てすり。はしの両がわに ながい カベを置く。
+      if (!gadget.rails) continue
+      const axis = unit(gadget.dir)
+      for (const side of [-1, 1]) {
+        const offset = side * (gadget.halfWidth + BRIDGE.railHalf)
+        const x = gadget.x + axis.z * offset
+        const z = gadget.z - axis.x * offset
+        add(RAPIER.ColliderDesc.cuboid(gadget.halfLength, BRIDGE.railHeight / 2 + 0.15, BRIDGE.railHalf)
+          .setTranslation(x, groundOf(x, z) + BRIDGE.railHeight / 2 - 0.15, z)
+          .setRotation(quatY(Math.atan2(-axis.z, axis.x))).setFriction(0).setRestitution(0.6), { kind: 'wall', id: gadget.id, x, z })
+      }
+    } else if (gadget.kind === 'reflector') {
+      const axis = unit(gadget.dir)
+      const ends: [Vec2, Vec2] = [
+        { x: gadget.x - axis.x * gadget.halfLength, z: gadget.z - axis.z * gadget.halfLength },
+        { x: gadget.x + axis.x * gadget.halfLength, z: gadget.z + axis.z * gadget.halfLength },
+      ]
+      add(RAPIER.ColliderDesc.cuboid(gadget.halfLength, REFLECTOR.height / 2, REFLECTOR.halfDepth)
+        .setTranslation(gadget.x, ground + REFLECTOR.height / 2 - 0.05, gadget.z)
+        .setRotation(quatY(Math.atan2(-axis.z, axis.x))).setFriction(0).setRestitution(0.9), { kind: 'reflector', id: gadget.id, x: gadget.x, z: gadget.z, ends })
     } else if (gadget.kind === 'warp') {
       warps.push({ id: gadget.id, x: gadget.x, z: gadget.z, radius: gadget.radius, exit: gadget.exit, dir: unit(gadget.exitDir), inside: false })
     } else {
@@ -247,9 +274,29 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     return world.castRayAndGetNormal(ray, BALL_RADIUS + 0.06, true, undefined, undefined, ballCollider, ball, isFloor)
   }
 
-  function contact(role: Role, speed: number) {
+  function contact(role: Role, speed: number, before: Vec3) {
     const p = position()
     const strength = Math.min(1, speed / 6)
+    if (role.kind === 'reflector' && role.ends) {
+      // いたの面で 鏡のように はねかえす。回転も 新しい向きに そろえて、はねたあと すべらずに 転がす。
+      const [a, b] = role.ends
+      const dx = b.x - a.x
+      const dz = b.z - a.z
+      const t = Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.z - a.z) * dz) / (dx * dx + dz * dz || 1)))
+      let nx = p.x - (a.x + dx * t)
+      let nz = p.z - (a.z + dz * t)
+      const length = Math.hypot(nx, nz) || 1
+      nx /= length
+      nz /= length
+      const into = before.x * nx + before.z * nz
+      if (into < 0) {
+        const vx = (before.x - 2 * into * nx) * REFLECTOR.keep
+        const vz = (before.z - 2 * into * nz) * REFLECTOR.keep
+        ball.setLinvel({ x: vx, y: Math.min(0, before.y), z: vz }, true)
+        ball.setAngvel({ x: vz / BALL_RADIUS, y: 0, z: -vx / BALL_RADIUS }, true)
+      }
+      emit({ kind: 'reflector', id: role.id, strength: Math.max(0.5, strength), position: p }, `reflector-${role.id}`, 0.15)
+    }
     if (role.kind === 'wall' && speed > 0.35) emit({ kind: 'wall', strength, position: p }, 'wall', 0.08)
     if (role.kind === 'rock') emit({ kind: 'rock', strength, position: p }, 'rock', 0.12)
     if (role.kind === 'tree') emit({ kind: 'tree', strength: Math.max(0.35, strength), position: p }, 'tree', 0.14)
@@ -330,6 +377,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       critter.body.setNextKinematicTranslation({ x: at.x, y: (geometry.heightAt(at.x, at.z) ?? critter.base) + CRITTER.height / 2, z: at.z })
     }
     const before = ball.linvel()
+    const velocityBefore = { x: before.x, y: before.y, z: before.z }
     const speedBefore = Math.hypot(before.x, before.y, before.z)
     if (phase === 'rolling') {
       const p = ball.translation()
@@ -341,7 +389,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       if (!started || phase !== 'rolling') return
       const other = a === ballCollider.handle ? b : b === ballCollider.handle ? a : null
       const role = other === null ? undefined : roles.get(other)
-      if (role) contact(role, speedBefore)
+      if (role) contact(role, speedBefore, velocityBefore)
     })
     if (phase === 'ready') { pin(rest); return }
     if (phase !== 'rolling') return
@@ -389,6 +437,12 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       if (airborne) emit({ kind: 'land', strength: Math.min(1, airSpeed / 4), position: p })
       airborne = false
       airTime = 0
+      // いけや かわに ころがりこんだ。とんで こえている あいだは おちない。
+      if (geometry.waterAt(p.x, p.z)) {
+        phase = 'out'
+        emit({ kind: 'splash', position: { x: p.x, y: p.y - BALL_RADIUS, z: p.z }, pond: true })
+        return
+      }
       const speed = Math.hypot(v.x, v.y, v.z)
       const surface = geometry.surfaceAt(p.x, p.z) ?? 'green'
       if (surface !== 'green' && surface !== lastSurface && speed > 0.3) emit({ kind: 'surface', surface, position: p })
@@ -450,10 +504,21 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     const length = Math.hypot(dx, dz)
     if (length < 0.05) return true
     if (cast(from, { x: dx / length, z: dz / length }, length)) return false
+    // みずを わたる線と、がけの そとへ はみだす線は えらばない（はしの上は よい）。
+    // ジャンプ台や どかんで とびこえる ホールでは、ゆかの きれめを こえるのが みちすじなので ゆかは しらべない。
+    const ux = dx / length
+    const uz = dz / length
+    for (let travel = 0.3; travel <= length; travel += 0.1) {
+      const x = from.x + ux * travel
+      const z = from.z + uz * travel
+      if (geometry.waterAt(x, z, 0.12)) return false
+      if (!leaps && [0, -0.2, 0.2].some(side => geometry.heightAt(x + uz * side, z - ux * side) === null)) return false
+    }
     // ころがりにくい ゆか（すなば・ふかふか）の中を横切る線は選ばない。こおりは よく すべるので通ってよい。
     return !(hole.zones ?? []).some(zone => zone.kind !== 'ice' && Math.hypot(to.x - zone.x, to.z - zone.z) > zone.radius && segmentDistance(zone, from, to) < zone.radius + 0.12)
   }
 
+  const leaps = (hole.features ?? []).some(feature => feature.kind === 'kicker') || warps.length > 0
   // Rapierの問い合わせ（ねらいの見通し）は、1ステップ進めて当たり判定の索引ができてから使える。
   world.step(queue)
   queue.drainCollisionEvents(() => {})
@@ -551,9 +616,22 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         for (let index = segment + 1; index <= lastPassed; index++) power = Math.max(power, route[index]!.minPower ?? 0)
         return { direction: { x: dx / distance, z: dz / distance }, power: Math.min(1, Math.max(0.12, power)), target: { x: target.x, z: target.z } }
       }
+      // はねかえし いたの手前の点は、いたで はねて その先の点まで ころがる強さにする。
+      // はねると すこし おそくなるので、はねたあとの きょりは REFLECTOR.keep で わって 見つもる。
+      const aimAtIndex = (index: number) => {
+        let last = index
+        let after = 0
+        let keep = 1
+        while (route[last]!.bank && last < route.length - 1) {
+          keep *= REFLECTOR.keep * REFLECTOR.keep
+          after += Math.hypot(route[last + 1]!.x - route[last]!.x, route[last + 1]!.z - route[last]!.z) / keep
+          last++
+        }
+        return aimAt(route[index]!, after + (last === route.length - 1 ? 0.6 : 0.25), last)
+      }
       // 1. 先の点のうち、見通せる いちばん先の点。途中の点はそこで止まる強さにする（点は次の点が見通せる所に置いてある）。
       for (let index = route.length - 1; index > segment; index--) {
-        if (clearLine(p, route[index]!)) return aimAt(route[index]!, index === route.length - 1 ? 0.6 : 0.25, index)
+        if (clearLine(p, route[index]!)) return aimAtIndex(index)
       }
       // 2. 次の点の向きを少しずつ ずらし、バンパーや いわ・とびらの よこを通す。
       //    近くで ふさがれているときは、大きく ずらさないと すきまへ入らないので、角度は広めまで ためす。

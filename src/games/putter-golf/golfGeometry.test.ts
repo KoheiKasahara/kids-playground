@@ -147,3 +147,27 @@ test('ジャンプ台は切れ目に向かって上がり、向こう岸は持�
   expect(geometry.heightAt(0, -1.3)).toBeCloseTo(-0.3, 5)
   expect(geometry.heightAt(0, 0.4)).toBeNull()
 })
+
+test('いけと かわは みずで、はしの上だけは みずではない', () => {
+  const pond = HOLES.find(item => item.id === 'river-1')!
+  const pondWater = buildHoleGeometry(pond).waterAt
+  expect(pondWater(1.2, 5.0)).toBe(true)
+  expect(pondWater(1.2 + 2.5, 5.0)).toBe(false)
+  // ふちの すこし外でも、margin を つけると みずに ふくまれる。
+  expect(pondWater(1.2 + 2.5, 5.0, 0.2)).toBe(true)
+
+  const river = HOLES.find(item => item.id === 'river-2')!
+  const riverWater = buildHoleGeometry(river).waterAt
+  // かわは コースの はばいっぱい。はしの上は わたれる。
+  expect(riverWater(1.0, 5.0)).toBe(true)
+  expect(riverWater(3.3, 5.0)).toBe(true)
+  expect(riverWater(-1.8, 5.0)).toBe(false)
+  expect(riverWater(-1.8, 5.0 + 1.25)).toBe(false)
+  // はしの はしっこは margin だけ せまくなる。
+  expect(riverWater(-1.8 + 0.65, 5.0)).toBe(false)
+  expect(riverWater(-1.8 + 0.65, 5.0, 0.12)).toBe(true)
+  // かわの そとは みずではない。
+  expect(riverWater(1.0, 7.0)).toBe(false)
+  // みずの ない ホールは どこも みずではない。
+  expect(buildHoleGeometry(HOLES.find(item => item.id === 'meadow-1')!).waterAt(0, 0)).toBe(false)
+})

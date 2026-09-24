@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { COURSE_IDS, findCourse, GOLF_COURSES, type Vec2 } from './golfCourses'
+import { buildHoleGeometry } from './golfGeometry'
 import { BALL_RADIUS } from './golfPhysics'
 
 const HOLES = GOLF_COURSES.flatMap(course => course.holes)
@@ -53,6 +54,36 @@ describe('パターゴルフのコース定義', () => {
           expect(distance, `${hole.id} の ${gadget.id} と ${index}ばんめの線`).toBeGreaterThan(gadget.radius + BALL_RADIUS + 0.3)
         })
       }
+    }
+  })
+
+  test('みちすじは いけや かわを よこぎらない（はしの上は よい）', () => {
+    for (const hole of HOLES) {
+      if (!hole.water?.length) continue
+      const geometry = buildHoleGeometry(hole)
+      hole.route.slice(0, -1).forEach((point, index) => {
+        const next = hole.route[index + 1]!
+        const length = Math.hypot(next.x - point.x, next.z - point.z)
+        for (let travel = 0; travel <= length; travel += 0.1) {
+          const t = travel / length
+          expect(geometry.waterAt(point.x + (next.x - point.x) * t, point.z + (next.z - point.z) * t, BALL_RADIUS), `${hole.id} の ${index}ばんめの線`).toBe(false)
+        }
+      })
+    }
+  })
+
+  test('はねかえし いたの てまえの点は いたの まえにあり、はねた先の点も いたの おなじ がわにある', () => {
+    for (const hole of HOLES) {
+      const reflectors = (hole.gadgets ?? []).flatMap(gadget => (gadget.kind === 'reflector' ? [gadget] : []))
+      hole.route.forEach((point, index) => {
+        if (!point.bank) return
+        const next = hole.route[index + 1]!
+        const nearest = [...reflectors].sort((a, b) => Math.hypot(a.x - point.x, a.z - point.z) - Math.hypot(b.x - point.x, b.z - point.z))[0]
+        expect(nearest, `${hole.id} の ${index}ばんめ`).toBeDefined()
+        const side = (p: Vec2) => (p.x - nearest!.x) * nearest!.dir.z - (p.z - nearest!.z) * nearest!.dir.x
+        expect(Math.sign(side(point)), `${hole.id} の ${index}ばんめ`).toBe(Math.sign(side(next)))
+        expect(Math.hypot(nearest!.x - point.x, nearest!.z - point.z), `${hole.id} の ${index}ばんめ`).toBeLessThan(nearest!.halfLength + 2)
+      })
     }
   })
 

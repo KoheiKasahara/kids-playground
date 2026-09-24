@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { CAMERA_FOV, type CameraPose } from './golfCamera'
 import { GOLF_BALLS, type CourseDefinition, type CritterLook, type GolfBallId, type HoleDefinition, type Vec2 } from './golfCourses'
 import { insideOutline, type HoleGeometry, type MeshBuffers } from './golfGeometry'
-import { BALL_RADIUS, BOOSTER, BUMPER_HEIGHT, CRITTER, GATE, PLATFORM_DEPTH, TREE, WARP, WINDMILL, type Vec3 } from './golfPhysics'
+import { BALL_RADIUS, BOOSTER, BRIDGE, BUMPER_HEIGHT, CRITTER, GATE, PLATFORM_DEPTH, REFLECTOR, TREE, WARP, WINDMILL, type Vec3 } from './golfPhysics'
 import type { GadgetMotion } from './golfWorld'
 
 export type EffectKind = 'splash' | 'dust' | 'confetti' | 'fireworks' | 'sparkle' | 'ring'
@@ -136,6 +136,23 @@ function createBatch() {
     },
   }
 }
+
+/** さざなみの ゆれる みず。うみ・いけ・かわで 同じ しくみを使い、time を進めると 波が動く。 */
+function rippleMaterial(color: string, uniforms: { uTime: { value: number } }): THREE.MeshStandardMaterial {
+  const material = new THREE.MeshStandardMaterial({ color, roughness: 0.25, metalness: 0.05 })
+  material.onBeforeCompile = shader => {
+    shader.uniforms.uTime = uniforms.uTime
+    shader.vertexShader = 'varying vec2 vWave;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvWave = (modelMatrix * vec4(transformed, 1.0)).xz;')
+    shader.fragmentShader = 'varying vec2 vWave;\nuniform float uTime;\n' + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      float wave = sin(vWave.x * 0.9 + uTime * 1.3) * sin(vWave.y * 0.7 - uTime * 0.9) + 0.4 * sin((vWave.x + vWave.y) * 2.1 + uTime * 2.0);
+      diffuseColor.rgb += vec3(0.12, 0.16, 0.14) * smoothstep(0.6, 1.2, wave);`)
+  }
+  material.customProgramCacheKey = () => 'golf-sea-v1'
+  return material
+}
+
+/** コースの中の いけと かわの 色。 */
+const POND_COLOR = '#3aa6d8'
 
 function skyDome(top: string, horizon: string): THREE.Mesh {
   const geometry = new THREE.SphereGeometry(170, 32, 16)
@@ -405,6 +422,8 @@ export function createGolfScene(container: HTMLElement) {
     boosters: THREE.Texture[]
     water: { uniforms: { uTime: { value: number } } } | null
     spinners: THREE.Object3D[]
+    /** すいしゃ。よこむきの じくで まわす。 */
+    wheels: THREE.Object3D[]
     floaters: { object: THREE.Object3D; base: number; phase: number }[]
   }
   let hole: HoleContent | null = null
@@ -505,6 +524,61 @@ export function createGolfScene(container: HTMLElement) {
         }
       }
     }
+    // いけと かわ。床の高さに そって はった 水面で、ふちには すなの きしを 付ける。
+    const waves = { uniforms: { uTime: { value: 0 } } }
+    let water: HoleContent['water'] = null
+    const onFloor = (x: number, z: number) => (geometry.heightAt(x, z) ?? 0) + 0.012
+    for (const [index, hazard] of (definition.water ?? []).entries()) {
+      let surface: THREE.BufferGeometry
+      if (hazard.kind === 'pond') {
+        surface = new THREE.CircleGeometry(hazard.radius, 48)
+        surface.rotateX(-Math.PI / 2)
+        surface.translate(hazard.x, 0, hazard.z)
+        const bank = new THREE.Mesh(new THREE.RingGeometry(hazard.radius - 0.02, hazard.radius + 0.14, 48), new THREE.MeshStandardMaterial({ color: '#d9c48f', roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }))
+        bank.rotation.x = -Math.PI / 2
+        bank.position.set(hazard.x, onFloor(hazard.x, hazard.z) - 0.002, hazard.z)
+        root.add(bank)
+        // はすの は と、ふちの あし。
+        for (let k = 0; k < 4; k++) {
+          const angle = hash(index * 7 + k) * Math.PI * 2
+          const reach = hazard.radius * (0.35 + hash(index * 11 + k) * 0.45)
+          const x = hazard.x + Math.cos(angle) * reach
+          const z = hazard.z + Math.sin(angle) * reach
+          solid.add('cylinder', k % 2 ? '#5fae4f' : '#72bd5a', x, onFloor(x, z) + 0.01, z, 0.42, 0.02, 0.42)
+        }
+        for (let k = 0; k < 7; k++) {
+          const angle = hash(index * 13 + k + 40) * Math.PI * 2
+          const x = hazard.x + Math.cos(angle) * (hazard.radius + 0.05)
+          const z = hazard.z + Math.sin(angle) * (hazard.radius + 0.05)
+          soft.add('cone', k % 2 ? '#4f8f3f' : '#6aa84a', x, onFloor(x, z) + 0.18, z, 0.07, 0.4, 0.07)
+        }
+      } else {
+        const dx = hazard.to.x - hazard.from.x
+        const dz = hazard.to.z - hazard.from.z
+        const length = Math.hypot(dx, dz)
+        surface = new THREE.PlaneGeometry(length, hazard.halfWidth * 2, Math.max(1, Math.ceil(length / 0.25)), Math.max(1, Math.ceil(hazard.halfWidth / 0.125)))
+        surface.rotateX(-Math.PI / 2)
+        surface.rotateY(Math.atan2(-dz, dx))
+        surface.translate((hazard.from.x + hazard.to.x) / 2, 0, (hazard.from.z + hazard.to.z) / 2)
+        // かわの きし。すなの ほそい おびを 両がわに。
+        for (const side of [-1, 1]) {
+          const x = (hazard.from.x + hazard.to.x) / 2 + (dz / length) * side * (hazard.halfWidth + 0.05)
+          const z = (hazard.from.z + hazard.to.z) / 2 - (dx / length) * side * (hazard.halfWidth + 0.05)
+          solid.add('box', '#d9c48f', x, onFloor(x, z) - 0.005, z, length, 0.02, 0.14, 0, Math.atan2(-dz, dx), 0)
+        }
+      }
+      const position = surface.getAttribute('position')
+      for (let i = 0; i < position.count; i++) position.setY(i, onFloor(position.getX(i), position.getZ(i)))
+      surface.computeVertexNormals()
+      const mesh = new THREE.Mesh(surface, rippleMaterial(POND_COLOR, waves.uniforms))
+      mesh.material.polygonOffset = true
+      mesh.material.polygonOffsetFactor = -1
+      mesh.material.polygonOffsetUnits = -1
+      mesh.receiveShadow = true
+      root.add(mesh)
+      water = waves
+    }
+
     const part = (buffers: MeshBuffers, material: THREE.Material) => {
       const mesh = new THREE.Mesh(bufferGeometry(buffers), material)
       mesh.castShadow = mesh.receiveShadow = true
@@ -801,6 +875,67 @@ export function createGolfScene(container: HTMLElement) {
         }
         // ねもとの くさ。
         solid.add('sphere', '#3f8a4a', gadget.x, ground + 0.04, gadget.z, r * 2.6, 0.16, r * 2.6)
+      } else if (gadget.kind === 'bridge') {
+        // まるたの はし。いたを ならべ、てすりの ある はしは さくを、つりばしは ロープを はる。
+        const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
+        const along = { x: gadget.dir.x / length, z: gadget.dir.z / length }
+        const turn = Math.atan2(along.x, along.z)
+        const at = (a: number, side: number) => ({ x: gadget.x + along.x * a + along.z * side, z: gadget.z + along.z * a - along.x * side })
+        const planks = Math.max(2, Math.round((gadget.halfLength * 2) / 0.27))
+        for (let k = 0; k < planks; k++) {
+          const p = at(-gadget.halfLength + ((k + 0.5) * gadget.halfLength * 2) / planks, 0)
+          solid.add('box', k % 2 ? '#b98552' : '#a8743f', p.x, groundOf(p.x, p.z) + 0.012, p.z, gadget.halfWidth * 2 + 0.12, 0.024, (gadget.halfLength * 2) / planks - 0.035, 0, turn, 0)
+        }
+        for (const side of [-1, 1]) {
+          const beam = at(0, side * (gadget.halfWidth - 0.05))
+          solid.add('box', '#7c5334', beam.x, ground - 0.1, beam.z, 0.14, 0.18, gadget.halfLength * 2, 0, turn, 0)
+          if (gadget.rails) {
+            const rail = at(0, side * (gadget.halfWidth + BRIDGE.railHalf))
+            solid.add('box', '#c08f5e', rail.x, ground + BRIDGE.railHeight, rail.z, 0.09, 0.07, gadget.halfLength * 2, 0, turn, 0)
+            const posts = Math.max(2, Math.round((gadget.halfLength * 2) / 0.8) + 1)
+            for (let k = 0; k < posts; k++) {
+              const post = at(-gadget.halfLength + (k * gadget.halfLength * 2) / (posts - 1), side * (gadget.halfWidth + BRIDGE.railHalf))
+              solid.add('cylinder', '#8d6242', post.x, groundOf(post.x, post.z) + BRIDGE.railHeight / 2, post.z, 0.1, BRIDGE.railHeight + 0.04, 0.1)
+            }
+          } else {
+            // つりばしの はしらと ロープ。はしの 外がわに 立てて、ボールの じゃまに ならないようにする。
+            for (const end of [-1, 1]) {
+              const post = at(end * (gadget.halfLength - 0.15), side * (gadget.halfWidth + 0.14))
+              solid.add('cylinder', '#7c5334', post.x, groundOf(post.x, post.z) + 0.45, post.z, 0.14, 0.9, 0.14)
+            }
+            const rope = at(0, side * (gadget.halfWidth + 0.14))
+            solid.add('box', '#e8d3a0', rope.x, ground + 0.72, rope.z, 0.035, 0.035, gadget.halfLength * 2 - 0.3, 0, turn, 0)
+          }
+        }
+      } else if (gadget.kind === 'reflector') {
+        // はねかえし いた。ぴかぴかの いたに しまもようを 付けて、ふちと はしらは コースの色。
+        const group = new THREE.Group()
+        const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
+        group.rotation.y = Math.atan2(-gadget.dir.z / length, gadget.dir.x / length)
+        group.position.set(gadget.x, ground - 0.05, gadget.z)
+        const stripes = canvasTexture(256, 32, ctx => {
+          ctx.fillStyle = '#e9f7ff'
+          ctx.fillRect(0, 0, 256, 32)
+          ctx.fillStyle = '#7fd8ff'
+          for (let x = -32; x < 256; x += 32) {
+            ctx.beginPath(); ctx.moveTo(x, 32); ctx.lineTo(x + 14, 32); ctx.lineTo(x + 30, 0); ctx.lineTo(x + 16, 0); ctx.closePath(); ctx.fill()
+          }
+        })
+        stripes.wrapS = THREE.RepeatWrapping
+        stripes.repeat.set(Math.max(1, Math.round(gadget.halfLength)), 1)
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(gadget.halfLength * 2, REFLECTOR.height, REFLECTOR.halfDepth * 2), new THREE.MeshStandardMaterial({ map: stripes, roughness: 0.15, metalness: 0.35, emissive: '#bfefff', emissiveIntensity: 0.18 }))
+        panel.position.y = REFLECTOR.height / 2
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(gadget.halfLength * 2 + 0.08, 0.07, REFLECTOR.halfDepth * 2 + 0.06), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.45 }))
+        cap.position.y = REFLECTOR.height + 0.02
+        group.add(panel, cap)
+        for (const end of [-1, 1]) {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, REFLECTOR.height + 0.14, 12), new THREE.MeshStandardMaterial({ color: look.bumperCap, roughness: 0.5 }))
+          post.position.set(end * gadget.halfLength, (REFLECTOR.height + 0.14) / 2, 0)
+          group.add(post)
+        }
+        group.traverse(child => { if (child instanceof THREE.Mesh) child.castShadow = true })
+        root.add(group)
+        bumpers.set(gadget.id, group)
       } else if (gadget.kind === 'warp') {
         // どかん。入口の わっかと、中の くらい あなで「すいこまれそう」に見せる。
         const group = new THREE.Group()
@@ -845,8 +980,8 @@ export function createGolfScene(container: HTMLElement) {
 
     // まわりの景色。
     const spinners: THREE.Object3D[] = []
+    const wheels: THREE.Object3D[] = []
     const floaters: { object: THREE.Object3D; base: number; phase: number }[] = []
-    let water: HoleContent['water'] = null
     let snow: HoleContent['snow'] = null
     const baseY = Math.min(...outlines.map(outline => outline.base)) - PLATFORM_DEPTH
     if (course.id === 'moon') {
@@ -939,7 +1074,9 @@ export function createGolfScene(container: HTMLElement) {
       floaters.push({ object: satellite, base: satellite.position.y, phase: 2 })
     } else {
       scene.background = new THREE.Color(look.horizon)
-      scene.fog = new THREE.Fog(look.horizon, 38, 140)
+      // ひろい ホールでも おくが きりで かすまないように、ホールの 大きさに あわせて とおざける。
+      const span = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ)
+      scene.fog = new THREE.Fog(look.horizon, Math.max(38, span * 1.4), Math.max(140, span * 4))
       root.add(skyDome(look.sky, look.horizon))
       for (let i = 0; i < 9; i++) {
         const angle = hash(i + 300) * Math.PI * 2
@@ -985,21 +1122,11 @@ export function createGolfScene(container: HTMLElement) {
       solid.add('pyramid', '#d9573f', hx, baseY + 2.1, hz, 2.9, 1.0, 2.7, 0, Math.PI / 4)
       solid.add('box', '#8a5a3c', hx - 1.11, baseY + 0.55, hz, 0.05, 1.0, 0.5)
     } else if (course.id === 'beach') {
-      const sea = new THREE.Mesh(new THREE.PlaneGeometry(320, 320, 1, 1), new THREE.MeshStandardMaterial({ color: '#3cb7d4', roughness: 0.25, metalness: 0.05 }))
+      const sea = new THREE.Mesh(new THREE.PlaneGeometry(320, 320, 1, 1), rippleMaterial('#3cb7d4', waves.uniforms))
       sea.rotation.x = -Math.PI / 2
       sea.position.y = SEA_Y
-      const uniforms = { uTime: { value: 0 } }
-      const material = sea.material as THREE.MeshStandardMaterial
-      material.onBeforeCompile = shader => {
-        shader.uniforms.uTime = uniforms.uTime
-        shader.vertexShader = 'varying vec2 vWave;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvWave = (modelMatrix * vec4(transformed, 1.0)).xz;')
-        shader.fragmentShader = 'varying vec2 vWave;\nuniform float uTime;\n' + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-          float wave = sin(vWave.x * 0.9 + uTime * 1.3) * sin(vWave.y * 0.7 - uTime * 0.9) + 0.4 * sin((vWave.x + vWave.y) * 2.1 + uTime * 2.0);
-          diffuseColor.rgb += vec3(0.12, 0.16, 0.14) * smoothstep(0.6, 1.2, wave);`)
-      }
-      material.customProgramCacheKey = () => 'golf-sea-v1'
       root.add(sea)
-      water = { uniforms }
+      water = waves
       for (const outline of outlines) {
         outline.points.forEach((point, index) => {
           if (index % 7) return
@@ -1300,6 +1427,132 @@ export function createGolfScene(container: HTMLElement) {
       solid.add('box', '#fff1d6', hx, groundY + 0.8, hz, 2.4, 1.6, 2.0)
       solid.add('pyramid', '#d9573f', hx, groundY + 2.1, hz, 3.1, 1.0, 2.9, 0, Math.PI / 4)
       solid.add('box', '#8a5a3c', hx - 1.21, groundY + 0.55, hz, 0.05, 1.0, 0.5)
+    } else if (course.id === 'river') {
+      // かわべの はらっぱ。コースの おくを 大きな かわが ながれ、きしに すいしゃごやが 立つ。
+      const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 48), new THREE.MeshStandardMaterial({ color: look.ground, roughness: 1 }))
+      ground.rotation.x = -Math.PI / 2
+      ground.position.y = baseY - 0.01
+      ground.receiveShadow = true
+      root.add(ground)
+      const width = bounds.maxX - bounds.minX
+      const depth = bounds.maxZ - bounds.minZ
+      const riverZ = bounds.minZ - 9
+      const bigRiver = new THREE.Mesh(new THREE.PlaneGeometry(200, 9, 1, 1), rippleMaterial('#4ab4df', waves.uniforms))
+      bigRiver.rotation.x = -Math.PI / 2
+      bigRiver.position.set(cx, baseY, riverZ)
+      root.add(bigRiver)
+      water = waves
+      for (const side of [-1, 1]) solid.add('box', '#d9c48f', cx, baseY - 0.004, riverZ + side * 4.7, 200, 0.02, 0.6)
+      const greens = ['#4f9d5b', '#62aa62', '#7cb867', '#3f8a5a']
+      for (let i = 0; i < 120; i++) {
+        const x = cx + (hash(i * 1.9 + 7) - 0.5) * (width + 46)
+        const z = cz + (hash(i * 2.7 + 13) - 0.5) * (depth + 40)
+        const size = 0.8 + hash(i + 19) * 0.9
+        if (!clear(x, z, 1.8 + size) || Math.abs(z - riverZ) < 6 + size) continue
+        solid.add('cylinder', '#8a6247', x, baseY + size * 0.45, z, 0.22 * size, size * 0.9, 0.22 * size)
+        if (i % 3) solid.add('sphere', greens[i % greens.length]!, x, baseY + size * 1.35, z, size * 1.6, size * 1.5, size * 1.6)
+        else solid.add('cone', greens[i % greens.length]!, x, baseY + size * 1.5, z, size * 1.3, size * 2, size * 1.3)
+      }
+      // かわぞいの あしと、はなばたけ。
+      for (let i = 0; i < 90; i++) {
+        const x = cx + (hash(i + 1300) - 0.5) * (width + 30)
+        const side = hash(i + 1400) < 0.5 ? -1 : 1
+        const z = riverZ + side * (4.9 + hash(i + 1500) * 0.8)
+        soft.add('cone', i % 2 ? '#4f8f3f' : '#6aa84a', x, baseY + 0.3, z, 0.12, 0.7, 0.12)
+      }
+      for (let i = 0; i < 110; i++) {
+        const x = cx + (hash(i + 1600) - 0.5) * (width + 20)
+        const z = cz + (hash(i + 1700) - 0.5) * (depth + 16)
+        if (!clear(x, z, 0.7) || Math.abs(z - riverZ) < 5.6) continue
+        solid.add('sphere', ['#ffe28a', '#ffffff', '#ff9eb5', '#9fd0ff'][i % 4]!, x, baseY + 0.12, z, 0.18, 0.16, 0.18)
+      }
+      // すいしゃごや。まわる すいしゃは、ほかの まわる けしきと いっしょに うごかす。
+      const mx = bounds.maxX + 4.5
+      const mz = riverZ + 5.6
+      solid.add('box', '#fff1d6', mx, baseY + 1.0, mz, 2.6, 2.0, 2.2)
+      solid.add('pyramid', '#b84a3a', mx, baseY + 2.6, mz, 3.4, 1.2, 3.0, 0, Math.PI / 4)
+      const wheel = new THREE.Group()
+      wheel.position.set(mx - 1.6, baseY + 0.9, mz - 1.3)
+      const wood = new THREE.MeshStandardMaterial({ color: '#8d6242', roughness: 0.8 })
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.08, 8, 24), wood)
+      rim.rotation.y = Math.PI / 2
+      wheel.add(rim)
+      for (let k = 0; k < 8; k++) {
+        const paddle = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 1.1), wood)
+        const angle = (k / 8) * Math.PI * 2
+        paddle.position.set(0, Math.sin(angle) * 1.05, Math.cos(angle) * 1.05)
+        paddle.rotation.x = -angle
+        wheel.add(paddle)
+      }
+      root.add(wheel)
+      wheels.push(wheel)
+      for (const [x, z, size] of [[-40, 20, 12], [42, 16, 10], [-30, -50, 14], [30, -56, 12]] as const) {
+        soft.add('sphere', '#86bf6c', cx + x, baseY, cz + z, size * 2.4, size, size * 2)
+      }
+    } else if (course.id === 'canyon') {
+      // たにまの コース。コースは たかい いわの だいの上にあり、ふかい たにの そこを かわが ながれる。
+      const groundY = baseY - 7
+      const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 48), new THREE.MeshStandardMaterial({ color: look.ground, roughness: 1 }))
+      ground.rotation.x = -Math.PI / 2
+      ground.position.y = groundY
+      ground.receiveShadow = true
+      root.add(ground)
+      // コースの ゆかを そのまま 下へ のばした いわの だい。しまもようは たかさで ぬりわける。
+      const strata = ['#c07448', '#a95d38', '#d08a55', '#b8683f'].map(value => new THREE.Color(value))
+      const ropeBridges = (definition.gadgets ?? []).flatMap(gadget => (gadget.kind === 'bridge' && !gadget.rails ? [gadget] : []))
+      for (const outline of outlines) {
+        // つりばしの ゆかは いわに しない（たにの 上に かかって見えるように）。
+        const spansGap = ropeBridges.some(bridge => outline.points.every(point => Math.abs(point.x - bridge.x) <= bridge.halfWidth + 0.3 && Math.abs(point.z - bridge.z) <= bridge.halfLength + 0.3))
+        if (spansGap) continue
+        let low = outline.base
+        for (const point of outline.points) low = Math.min(low, geometry.heightAt(point.x, point.z) ?? low)
+        const top = low - PLATFORM_DEPTH + 0.02
+        const shape = new THREE.Shape(outline.points.map(point => new THREE.Vector2(point.x, point.z)))
+        const cliff = new THREE.ExtrudeGeometry(shape, { depth: top - groundY, bevelEnabled: false, curveSegments: 1, steps: 6 })
+        cliff.rotateX(Math.PI / 2)
+        cliff.translate(0, top, 0)
+        const position = cliff.getAttribute('position')
+        const colors = new Float32Array(position.count * 3)
+        for (let i = 0; i < position.count; i++) {
+          const band = strata[Math.floor((top - position.getY(i)) / 1.1 + hash(Math.round(position.getX(i) * 2)) * 0.6) % strata.length]!
+          colors.set([band.r, band.g, band.b], i * 3)
+        }
+        cliff.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+        const mesh = new THREE.Mesh(cliff, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }))
+        mesh.castShadow = mesh.receiveShadow = true
+        root.add(mesh)
+      }
+      // たにの そこの かわ。
+      const width = bounds.maxX - bounds.minX
+      const depth = bounds.maxZ - bounds.minZ
+      const valley = new THREE.Mesh(new THREE.PlaneGeometry(7, 200, 1, 1), rippleMaterial('#3f9fcf', waves.uniforms))
+      valley.rotation.x = -Math.PI / 2
+      valley.position.set(cx + 1, groundY + 0.02, cz)
+      root.add(valley)
+      water = waves
+      // とおくの テーブルの ような いわやま と、サボテン と いわ。
+      for (let i = 0; i < 16; i++) {
+        const angle = hash(i + 2100) * Math.PI * 2
+        const distance = Math.max(width, depth) / 2 + 14 + hash(i + 2110) * 30
+        const x = cx + Math.cos(angle) * distance
+        const z = cz + Math.sin(angle) * distance
+        const size = 4 + hash(i + 2120) * 6
+        const height = 5 + hash(i + 2130) * 9
+        solid.add('cylinder', strata[i % strata.length]!.getStyle(), x, groundY + height / 2, z, size * 2, height, size * 1.6)
+        solid.add('cylinder', '#e0a070', x, groundY + height + 0.2, z, size * 2.05, 0.4, size * 1.65)
+      }
+      for (let i = 0; i < 60; i++) {
+        const x = cx + (hash(i * 2.3 + 2200) - 0.5) * (width + 40)
+        const z = cz + (hash(i * 3.1 + 2300) - 0.5) * (depth + 40)
+        if (!clear(x, z, 2.2) || Math.abs(x - cx - 1) < 4.5) continue
+        if (i % 3) {
+          solid.add('rock', i % 2 ? look.rock : '#9a6448', x, groundY + 0.3, z, 1.6, 1.0, 1.4, hash(i) * 0.6, hash(i + 5) * 3, 0)
+        } else {
+          solid.add('cylinder', '#4f9a58', x, groundY + 1.1, z, 0.5, 2.2, 0.5)
+          solid.add('cylinder', '#4f9a58', x + 0.45, groundY + 1.3, z, 0.3, 0.9, 0.3)
+          solid.add('cylinder', '#4f9a58', x - 0.4, groundY + 1.6, z, 0.28, 0.7, 0.28)
+        }
+      }
     }
     solid.build(root, true, fade)
     soft.build(root, false, fade)
@@ -1309,17 +1562,17 @@ export function createGolfScene(container: HTMLElement) {
     const extent = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) / 2 + 2.5
     sun.target.position.set(cx, 0, cz)
     sun.position.set(cx - 7, 14, cz + 6)
-    Object.assign(sun.shadow.camera, { left: -extent, right: extent, top: extent, bottom: -extent, near: 1, far: 45 })
+    Object.assign(sun.shadow.camera, { left: -extent, right: extent, top: extent, bottom: -extent, near: 1, far: Math.max(45, extent * 2 + 20) })
     sun.shadow.camera.updateProjectionMatrix()
     const moon = course.id === 'moon'
     hemisphere.color.set(moon ? '#b3b8ff' : '#eef8ff')
-    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : course.id === 'candy' ? '#ffdcc0' : course.id === 'dino' ? '#c08a5e' : course.id === 'forest' ? '#4a7a46' : '#7fa35a')
+    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : course.id === 'candy' ? '#ffdcc0' : course.id === 'dino' ? '#c08a5e' : course.id === 'forest' ? '#4a7a46' : course.id === 'canyon' ? '#c9865a' : '#7fa35a')
     hemisphere.intensity = moon ? 0.9 : 1.05
     sun.color.set(moon ? '#f2f0ff' : '#fff1d6')
     sun.intensity = moon ? 2.1 : 2.4
     scene.environmentIntensity = moon ? 0.3 : 0.38
     scene.add(root)
-    return { root, heightAt: geometry.heightAt, cupY: cup.y, flag, flagBase, cloth, blades, seeThrough, gates, critters, snow, bumpers, boosters, water, spinners, floaters }
+    return { root, heightAt: geometry.heightAt, cupY: cup.y, flag, flagBase, cloth, blades, seeThrough, gates, critters, snow, bumpers, boosters, water, spinners, wheels, floaters }
   }
 
   function resize() {
@@ -1516,6 +1769,7 @@ export function createGolfScene(container: HTMLElement) {
           hole.boosters.forEach(texture => { texture.offset.y = (texture.offset.y - dt * 1.4) % 1 })
           if (hole.water) hole.water.uniforms.uTime.value = clock
           hole.spinners.forEach((object, index) => { object.rotation.y += dt * (index ? 0.3 : 0.05) })
+          hole.wheels.forEach(object => { object.rotation.x -= dt * 0.8 })
           if (hole.snow) {
             const flakes = hole.snow.points.geometry.getAttribute('position')
             for (let i = 0; i < flakes.count; i++) {

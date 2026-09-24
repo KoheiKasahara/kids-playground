@@ -176,6 +176,7 @@ export function usePutterGolfEngine(options: Options) {
       for (const event of events) {
         if (event.kind === 'shot') { strokes++; scene.swingClub(); heading = direction }
         if (event.kind === 'bumper') { scene.pulseBumper(event.id); scene.effect('sparkle', event.position) }
+        if (event.kind === 'reflector') { scene.pulseBumper(event.id); scene.effect('sparkle', event.position) }
         if (event.kind === 'critter') scene.effect('sparkle', event.position)
         if (event.kind === 'boost') scene.effect('sparkle', event.position)
         if (event.kind === 'surface') scene.effect(event.surface === 'ice' ? 'sparkle' : 'dust', event.position, 0.7)
