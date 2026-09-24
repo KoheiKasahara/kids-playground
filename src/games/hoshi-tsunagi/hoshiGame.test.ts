@@ -55,7 +55,7 @@ describe('星座データ', () => {
   test('コースは実在する星座だけを重複なく参照し、かんたん → ふつう → むずかしい の順に星が多くなる', () => {
     const courses = (['easy', 'normal', 'hard'] as const).map((course) => {
       const constellations = courseConstellations(course)
-      expect(constellations.length).toBe(6)
+      expect(constellations.length).toBe(8)
       expect(constellations.length).toBe(COURSE_CONSTELLATION_IDS[course].length)
       return constellations.map((item) => item.points.length)
     })
