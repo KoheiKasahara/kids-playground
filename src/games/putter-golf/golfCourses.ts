@@ -53,6 +53,17 @@ export type Gadget =
   | { kind: 'warp'; id: string; x: number; z: number; radius: number; exit: Vec2; exitDir: Vec2 }
   /** コースに はえた き。みきに あたると こつんと はねかえる。radius は みきの太さ。 */
   | { kind: 'tree'; id: string; x: number; z: number; radius: number; look: TreeLook }
+  /**
+   * かわや たにを わたる はし。dir の向きに ±halfLength、よこ ±halfWidth。
+   * はしの上は みずに おちない。rails なら 両がわに てすり（カベ）が付き、なければ おちられる。
+   * たにを わたる はしは、はしの形の ゆかも いっしょに置く（はしは 見た目と てすりだけ）。
+   */
+  | { kind: 'bridge'; id: string; x: number; z: number; dir: Vec2; halfLength: number; halfWidth: number; rails: boolean }
+  /**
+   * ボールを はねかえす いた。(x,z) を中心に dir の向きへ ±halfLength のびる。
+   * かべと ちがい、当たっても いきおいが ほとんど へらないので、ラフや いけを よけて まがれる。
+   */
+  | { kind: 'reflector'; id: string; x: number; z: number; dir: Vec2; halfLength: number }
 
 export type CritterLook = 'duck' | 'crab' | 'alien' | 'penguin' | 'dino' | 'squirrel' | 'sheep'
 /** きの見た目。とがった もみの木と、まるい 広葉樹。 */
@@ -62,8 +73,18 @@ export type TreeLook = 'pine' | 'broadleaf'
 export type ZoneKind = 'sand' | 'ice' | 'rough'
 export type SurfaceZone = { kind: ZoneKind; x: number; z: number; radius: number }
 
-/** みちすじの点。minPower は「ここを通るなら最低この強さ」（ジャンプ台の手前など）。 */
-export type RoutePoint = Vec2 & { minPower?: number }
+/** みず。ころがって はいると ぽちゃんと おちて、うつ前の ばしょへ もどる。とんでいる ボールは おちない。 */
+export type WaterHazard =
+  /** まるい いけ。 */
+  | { kind: 'pond'; x: number; z: number; radius: number }
+  /** まっすぐな かわ。from→to の線から halfWidth までが みずで、はしは しかく。 */
+  | { kind: 'river'; from: Vec2; to: Vec2; halfWidth: number }
+
+/**
+ * みちすじの点。minPower は「ここを通るなら最低この強さ」（ジャンプ台の手前など）。
+ * bank は はねかえし いたの手前の点。ここを ねらうと いたで はねて、つぎの点まで すすむ。
+ */
+export type RoutePoint = Vec2 & { minPower?: number; bank?: boolean }
 
 export type HoleDefinition = {
   id: string
@@ -75,6 +96,7 @@ export type HoleDefinition = {
   features?: readonly HeightFeature[]
   gadgets?: readonly Gadget[]
   zones?: readonly SurfaceZone[]
+  water?: readonly WaterHazard[]
   /** 目安のみちすじ（tee → … → cup）。ヒントの矢印と「おたすけ」に使う。 */
   route: readonly RoutePoint[]
   /** ホールの はじめに出す ひとこと。 */
@@ -82,7 +104,7 @@ export type HoleDefinition = {
 }
 
 /** コースの並び順。★の保存やコース選びは、この一覧を正とする。 */
-export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow', 'candy', 'dino', 'forest', 'downhill'] as const
+export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow', 'candy', 'dino', 'forest', 'downhill', 'river', 'canyon'] as const
 export type CourseId = (typeof COURSE_IDS)[number]
 
 export type CourseLook = {
@@ -861,6 +883,236 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         zones: [{ kind: 'rough', x: 2.7, z: 3.6, radius: 0.9 }],
         route: [{ x: 0, z: 5.0 }, { x: 0.2, z: 0.2 }, { x: -1.0, z: -4.6 }],
         tip: 'ひつじさんが とおりすぎたら うとう',
+      },
+    ],
+  },
+  {
+    id: 'river',
+    label: 'かわべ',
+    icon: '🏞️',
+    description: 'いけと かわを はしで わたろう',
+    color: '#3f6fd1',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#63bd62', wall: '#a8784e', wallCap: '#f3e2c0', skirt: '#7a5536', sand: '#efdca8', ice: '#d0ecf7', rough: '#3f8a4c', ground: '#8cc86c', sky: '#b4e2ff', horizon: '#eef9ea', bumper: '#f08a3c', bumperCap: '#fff4e0', rock: '#95a0a0' },
+    holes: [
+      {
+        id: 'river-1',
+        name: 'いけの まわり',
+        par: 3,
+        tee: { x: 1.5, z: 15.5 },
+        cup: { x: -1.0, z: -15.0 },
+        // ながい ひろばに いけが ふたつ。ひだり・みぎと じぐざぐに よけて すすむ。
+        floors: [{ corners: rect(-4, -17, 4, 17, 1.2, 1.4) }],
+        water: [
+          { kind: 'pond', x: 1.2, z: 5.0, radius: 2.4 },
+          { kind: 'pond', x: -1.6, z: -5.0, radius: 2.2 },
+        ],
+        zones: [
+          { kind: 'sand', x: 1.6, z: -12.2, radius: 0.9 },
+          { kind: 'rough', x: -3.0, z: 11.5, radius: 0.9 },
+        ],
+        gadgets: [{ kind: 'critter', id: 'duck', x: -3.3, z: 0.2, to: { x: 3.3, z: 0.2 }, speed: 0.8, look: 'duck' }],
+        route: [{ x: 1.5, z: 15.5 }, { x: -1.9, z: 5.0 }, { x: 1.9, z: -5.0 }, { x: -1.0, z: -15.0 }],
+        tip: 'いけに おちないように ぐねぐね すすもう',
+      },
+      {
+        id: 'river-2',
+        name: 'まるたの はし',
+        par: 4,
+        tee: { x: -1.8, z: 17.0 },
+        cup: { x: 1.8, z: -16.5 },
+        // かわが 2ほん よこぎる。はしは ひだりと みぎに ひとつずつ。まっすぐ わたらないと ぽちゃん。
+        floors: [{ corners: rect(-3.5, -19, 3.5, 19, 1.0, 1.2) }],
+        water: [
+          { kind: 'river', from: { x: -3.6, z: 5.0 }, to: { x: 3.6, z: 5.0 }, halfWidth: 1.3 },
+          { kind: 'river', from: { x: -3.6, z: -7.0 }, to: { x: 3.6, z: -7.0 }, halfWidth: 1.3 },
+        ],
+        zones: [
+          { kind: 'rough', x: 2.0, z: 1.0, radius: 0.9 },
+          { kind: 'sand', x: -1.8, z: -12.6, radius: 1.0 },
+        ],
+        gadgets: [
+          { kind: 'bridge', id: 'log-bridge-1', x: -1.8, z: 5.0, dir: { x: 0, z: 1 }, halfLength: 1.7, halfWidth: 0.7, rails: true },
+          { kind: 'bridge', id: 'log-bridge-2', x: 1.8, z: -7.0, dir: { x: 0, z: 1 }, halfLength: 1.7, halfWidth: 0.7, rails: true },
+          { kind: 'rock', id: 'bank-rock', x: -2.6, z: 10.5, radius: 0.34 },
+        ],
+        route: [{ x: -1.8, z: 17.0 }, { x: -1.8, z: -0.5 }, { x: 1.8, z: -3.2 }, { x: 1.8, z: -16.5 }],
+        tip: 'はしを まっすぐ わたろう',
+      },
+      {
+        id: 'river-3',
+        name: 'ジャンプで ひとっとび',
+        par: 4,
+        tee: { x: -3.0, z: 18.0 },
+        cup: { x: 3.0, z: -18.0 },
+        // かわを わたるのは はしか、みぎの ジャンプ台。つよく うてば かわを とびこえられる。
+        floors: [{ corners: rect(-5, -20, 5, 20, 1.4, 1.6) }],
+        features: [{ kind: 'kicker', from: { x: 2.5, z: 5.9 }, to: { x: 2.5, z: 3.2 }, halfWidth: 0.9, rise: 0.6 }],
+        water: [
+          { kind: 'river', from: { x: -5.1, z: 2.0 }, to: { x: 5.1, z: 2.0 }, halfWidth: 0.85 },
+          { kind: 'pond', x: 0, z: -11.0, radius: 2.0 },
+        ],
+        zones: [
+          { kind: 'sand', x: 4.0, z: -14.2, radius: 0.8 },
+          { kind: 'rough', x: -0.6, z: 9.5, radius: 1.2 },
+        ],
+        gadgets: [
+          { kind: 'bridge', id: 'bridge', x: -3.4, z: 2.0, dir: { x: 0, z: 1 }, halfLength: 1.25, halfWidth: 0.7, rails: true },
+          { kind: 'booster', id: 'dash', x: 2.5, z: 7.4, dir: { x: 0, z: -1 }, speed: 6.6 },
+          { kind: 'tree', id: 'willow', x: -4.2, z: -6.5, radius: 0.35, look: 'broadleaf' },
+        ],
+        route: [{ x: -3.0, z: 18.0 }, { x: -3.4, z: -2.0 }, { x: -2.8, z: -12.0 }, { x: 3.0, z: -18.0 }],
+        tip: 'はしか ジャンプ台で かわを こえよう',
+      },
+      {
+        id: 'river-4',
+        name: 'しまの カップ',
+        par: 5,
+        tee: { x: -1.0, z: 20.0 },
+        cup: { x: -1.5, z: -17.0 },
+        // カップは みずに かこまれた しまの上。しまへは みぎの はしから わたる。
+        floors: [{ corners: rect(-6, -22, 8, 22, 1.6, 1.6) }],
+        water: [
+          { kind: 'pond', x: -2.0, z: 8.0, radius: 2.6 },
+          { kind: 'pond', x: 1.6, z: 0, radius: 2.0 },
+          { kind: 'river', from: { x: -6.1, z: -11.2 }, to: { x: 5.2, z: -11.2 }, halfWidth: 1.2 },
+          { kind: 'river', from: { x: 4.0, z: -10.0 }, to: { x: 4.0, z: -22.1 }, halfWidth: 1.2 },
+        ],
+        zones: [
+          { kind: 'sand', x: 6.4, z: 6.0, radius: 0.9 },
+          { kind: 'sand', x: 0.6, z: -19.6, radius: 0.8 },
+        ],
+        gadgets: [
+          { kind: 'bridge', id: 'island-bridge', x: 4.0, z: -17.0, dir: { x: 1, z: 0 }, halfLength: 1.6, halfWidth: 0.75, rails: true },
+          { kind: 'critter', id: 'swan', x: 6.6, z: -12.0, to: { x: 6.6, z: -8.0 }, speed: 0.7, look: 'duck' },
+        ],
+        route: [{ x: -1.0, z: 20.0 }, { x: 2.2, z: 9.0 }, { x: 6.6, z: -5.0 }, { x: 6.6, z: -17.0 }, { x: -1.5, z: -17.0 }],
+        tip: 'みぎの はしから しまへ わたろう',
+      },
+    ],
+  },
+  {
+    id: 'canyon',
+    label: 'たにま',
+    icon: '🏜️',
+    description: 'がけと はねかえし いた',
+    color: '#b84a3a',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#a6c46a', wall: '#c9784a', wallCap: '#f4d6a8', skirt: '#a0522d', sand: '#f0d49a', ice: '#d4eef6', rough: '#6f9a4a', ground: '#d08a55', sky: '#ffd9a8', horizon: '#fff0da', bumper: '#e0663a', bumperCap: '#fff3dc', rock: '#b0785a' },
+    holes: [
+      {
+        id: 'canyon-1',
+        name: 'がけっぷちの みち',
+        par: 3,
+        tee: { x: 0, z: 16.0 },
+        cup: { x: 0.8, z: -15.5 },
+        // ほそい がけの みちには かべが ない。はみだすと たにへ まっさかさま。
+        floors: [{
+          corners: [
+            { x: -3.0, z: 18.0, r: 1.0 },
+            { x: -3.0, z: 9.0 },
+            { x: -1.1, z: 9.0 },
+            { x: -1.1, z: -7.0 },
+            { x: -3.5, z: -7.0 },
+            { x: -3.5, z: -18.0, r: 1.2 },
+            { x: 3.5, z: -18.0, r: 1.2 },
+            { x: 3.5, z: -7.0 },
+            { x: 1.1, z: -7.0 },
+            { x: 1.1, z: 9.0 },
+            { x: 3.0, z: 9.0 },
+            { x: 3.0, z: 18.0, r: 1.0 },
+          ],
+          open: [1, 2, 3, 7, 8, 9],
+        }],
+        features: [{ kind: 'slope', from: { x: 0, z: 4.0 }, to: { x: 0, z: 0 }, drop: 0.35 }],
+        zones: [
+          { kind: 'sand', x: 1.9, z: -11.5, radius: 0.9 },
+          { kind: 'sand', x: -2.0, z: -15.0, radius: 0.8 },
+        ],
+        gadgets: [{ kind: 'rock', id: 'ledge-rock', x: 0.5, z: 6.0, radius: 0.32 }],
+        route: [{ x: 0, z: 16.0 }, { x: -0.4, z: -9.5 }, { x: 0.8, z: -15.5 }],
+        tip: 'がけから おちないように まっすぐ！',
+      },
+      {
+        id: 'canyon-2',
+        name: 'はねかえし いた',
+        par: 3,
+        tee: { x: -3.8, z: 8.0 },
+        cup: { x: 3.8, z: 7.0 },
+        // まん中は ふかふかの くさ。すみの はねかえし いたに あてて、ぐるっと まわりこむ。
+        floors: [{ corners: rect(-6, -12, 6, 10, 1.2, 1.2) }],
+        zones: [
+          { kind: 'rough', x: 0, z: 5.4, radius: 2.6 },
+          { kind: 'rough', x: 0, z: 0.6, radius: 2.7 },
+          { kind: 'rough', x: 0, z: -4.2, radius: 2.6 },
+          { kind: 'sand', x: 5.0, z: 2.0, radius: 0.7 },
+        ],
+        gadgets: [
+          { kind: 'reflector', id: 'mirror-left', x: -3.675, z: -9.835, dir: { x: 1, z: -1 }, halfLength: 3.07 },
+          { kind: 'reflector', id: 'mirror-right', x: 3.675, z: -9.835, dir: { x: 1, z: 1 }, halfLength: 3.07 },
+        ],
+        route: [{ x: -3.8, z: 8.0 }, { x: -3.8, z: -8.4, bank: true }, { x: 1.2, z: -9.4 }, { x: 2.8, z: -9.4, bank: true }, { x: 3.8, z: 7.0 }],
+        tip: 'いたに あてると ぐるっと まがるよ',
+      },
+      {
+        id: 'canyon-3',
+        name: 'つりばし',
+        par: 4,
+        tee: { x: -2.5, z: 18.0 },
+        cup: { x: 2.5, z: -17.0 },
+        // ふたつの がけの あいだに ほそい つりばし。てすりが ないので まっすぐ わたろう。
+        floors: [
+          { corners: [{ x: -5, z: 20, r: 1.2 }, { x: -5, z: 5 }, { x: 5, z: 5 }, { x: 5, z: 20, r: 1.2 }], open: [1] },
+          { corners: [{ x: -0.8, z: 5.3 }, { x: -0.8, z: -3.3 }, { x: 0.8, z: -3.3 }, { x: 0.8, z: 5.3 }], open: [0, 1, 2, 3] },
+          { corners: [{ x: -5, z: -3 }, { x: -5, z: -20, r: 1.2 }, { x: 5, z: -20, r: 1.2 }, { x: 5, z: -3 }], open: [3] },
+        ],
+        zones: [
+          { kind: 'sand', x: -2.4, z: -13.0, radius: 1.0 },
+          { kind: 'rough', x: 3.2, z: -8.0, radius: 1.0 },
+        ],
+        gadgets: [
+          { kind: 'bridge', id: 'rope-bridge', x: 0, z: 1.0, dir: { x: 0, z: 1 }, halfLength: 4.3, halfWidth: 0.8, rails: false },
+          { kind: 'rock', id: 'top-rock', x: 2.6, z: 11.5, radius: 0.4 },
+          { kind: 'rock', id: 'low-rock', x: 0.6, z: -12.0, radius: 0.36 },
+        ],
+        route: [{ x: -2.5, z: 18.0 }, { x: 0, z: 9.0 }, { x: 0, z: -7.0 }, { x: 2.5, z: -17.0 }],
+        tip: 'つりばしの まんなかを まっすぐ わたろう',
+      },
+      {
+        id: 'canyon-4',
+        name: 'たにの おく',
+        par: 4,
+        tee: { x: -2.0, z: 20.0 },
+        cup: { x: 4.0, z: -16.5 },
+        // たかだいから がけの さかみちを くだり、はねかえし いたで まがって たにの おくへ。
+        floors: [{
+          corners: [
+            { x: -6, z: 22, r: 1.2 },
+            { x: -6, z: -20, r: 1.2 },
+            { x: 6, z: -20, r: 1.2 },
+            { x: 6, z: -2 },
+            { x: -3.8, z: -2 },
+            { x: -3.8, z: 12 },
+            { x: 2, z: 12 },
+            { x: 2, z: 22, r: 1.2 },
+          ],
+          open: [3, 4, 5],
+        }],
+        features: [{ kind: 'slope', from: { x: 0, z: 11.0 }, to: { x: 0, z: -1.0 }, drop: 0.8 }],
+        zones: [
+          { kind: 'rough', x: -0.5, z: -11.0, radius: 2.6 },
+          { kind: 'rough', x: -3.5, z: -15.5, radius: 2.0 },
+          { kind: 'sand', x: 5.0, z: -13.0, radius: 0.8 },
+          { kind: 'sand', x: 0.0, z: 17.5, radius: 1.0 },
+        ],
+        gadgets: [
+          { kind: 'reflector', id: 'canyon-mirror', x: -4.575, z: -6.635, dir: { x: 1, z: -1 }, halfLength: 1.8 },
+          { kind: 'rock', id: 'mesa-rock', x: -4.2, z: 17.0, radius: 0.4 },
+        ],
+        route: [{ x: -2.0, z: 20.0 }, { x: -4.9, z: 13.0 }, { x: -4.9, z: -5.0, bank: true }, { x: 3.4, z: -6.0 }, { x: 4.0, z: -16.5 }],
+        tip: 'さかを くだって いたに あてよう',
       },
     ],
   },

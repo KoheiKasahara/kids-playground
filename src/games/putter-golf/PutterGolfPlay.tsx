@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../audio/sound'
-import { findCourse, GOLF_BALLS, GOLF_COURSES, type CourseDefinition, type CourseId, type Gadget, type GolfBallId, type HoleDefinition } from './golfCourses'
+import { findCourse, GOLF_BALLS, GOLF_COURSES, type CourseDefinition, type CourseId, type Gadget, type GolfBallId, type HoleDefinition, type WaterHazard } from './golfCourses'
 import { roundOutline } from './golfGeometry'
 import { createRound, finishHole, loadBestStars, nextHole, recordShot, restartHole, roundTotals, saveBestStars, STAMP_TEXT, stampFor, type RoundState } from './golfRound'
 import { golfSound, type GolfSoundKind } from './golfSound'
@@ -22,7 +22,11 @@ const SPLASH_TEXT: Partial<Record<CourseId, string>> = {
   dino: 'したへ おっこちた！ もとの ばしょに もどるよ',
   forest: 'しげみに ぽふっ！ もとの ばしょに もどるよ',
   downhill: 'さかの したへ ころん！ もとの ばしょに もどるよ',
+  canyon: 'たにへ まっさかさま！ もとの ばしょに もどるよ',
 }
+
+/** ミニマップの みずの色。 */
+const WATER_COLOR = '#4fb3e8'
 
 /** ホールを上から見た線。ミニマップとコースえらびの見本に使う。 */
 function holeShape(hole: HoleDefinition) {
@@ -44,12 +48,19 @@ function HoleMap({ hole, course, markerRef }: { hole: HoleDefinition; course: Co
     <svg viewBox={shape.viewBox} aria-hidden="true" focusable="false">
       {shape.polygons.map(points => <polygon key={points} points={points} fill={course.look.felt} stroke={course.look.wall} strokeWidth="0.32" strokeLinejoin="round" />)}
       {(hole.zones ?? []).map(zone => <circle key={`${zone.kind}:${zone.x}:${zone.z}`} cx={zone.x} cy={zone.z} r={zone.radius} fill={zone.kind === 'sand' ? course.look.sand : zone.kind === 'ice' ? course.look.ice : course.look.rough} />)}
+      {(hole.water ?? []).map((water, index) => <WaterMark key={index} water={water} />)}
       {(hole.gadgets ?? []).map(gadget => <GadgetMark key={gadget.id} gadget={gadget} course={course} />)}
       <circle cx={hole.cup.x} cy={hole.cup.z} r="0.42" fill="#2b332d" stroke="#ffffff" strokeWidth="0.14" />
       <path d={`M${hole.cup.x} ${hole.cup.z}V${hole.cup.z - 1.5}l1 0.35l-1 0.35`} fill="#ff4f5e" stroke="#ffffff" strokeWidth="0.1" />
       {markerRef && <circle ref={markerRef} cx={hole.tee.x} cy={hole.tee.z} r="0.4" fill="#ffffff" stroke="#e8505b" strokeWidth="0.16" />}
     </svg>
   )
+}
+
+/** ミニマップの いけと かわ。 */
+function WaterMark({ water }: { water: WaterHazard }) {
+  if (water.kind === 'pond') return <circle cx={water.x} cy={water.z} r={water.radius} fill={WATER_COLOR} />
+  return <line x1={water.from.x} y1={water.from.z} x2={water.to.x} y2={water.to.z} stroke={WATER_COLOR} strokeWidth={water.halfWidth * 2} />
 }
 
 /** ミニマップの しかけの しるし。しかけの種類ごとに 形を 変える。 */
@@ -74,6 +85,16 @@ function GadgetMark({ gadget, course }: { gadget: Gadget; course: CourseDefiniti
         <circle cx={gadget.x} cy={gadget.z} r={gadget.radius * 2.2} fill="#4f9f52" />
         <circle cx={gadget.x} cy={gadget.z} r={gadget.radius} fill="#7c5334" />
       </g>
+    case 'bridge': {
+      const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
+      const along = { x: (gadget.dir.x / length) * gadget.halfLength, z: (gadget.dir.z / length) * gadget.halfLength }
+      return <line x1={gadget.x - along.x} y1={gadget.z - along.z} x2={gadget.x + along.x} y2={gadget.z + along.z} stroke="#b07a48" strokeWidth={gadget.halfWidth * 2} />
+    }
+    case 'reflector': {
+      const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
+      const along = { x: (gadget.dir.x / length) * gadget.halfLength, z: (gadget.dir.z / length) * gadget.halfLength }
+      return <line x1={gadget.x - along.x} y1={gadget.z - along.z} x2={gadget.x + along.x} y2={gadget.z + along.z} stroke="#7fd8ff" strokeWidth="0.36" strokeLinecap="round" />
+    }
     case 'warp':
       return <g>
         <line x1={gadget.x} y1={gadget.z} x2={gadget.exit.x} y2={gadget.exit.z} stroke={course.look.bumperCap} strokeWidth="0.12" strokeDasharray="0.4 0.4" />
@@ -119,6 +140,7 @@ export default function PutterGolfPlay() {
       case 'rock': play('rock', event.strength); break
       case 'tree': play('tree', event.strength); setMessage('きに こつん！'); break
       case 'bumper': play('bumper'); setMessage('ぽよーん！'); break
+      case 'reflector': play('reflector', event.strength); setMessage('いたで カキーン！'); break
       case 'gate': play('gate', event.strength); setMessage('とびらに あたった！ あくのを まとう'); break
       case 'critter': play('critter'); setMessage('どうぶつに ぽーん！'); break
       case 'warp': play('warp'); setMessage('しゅーん！ むこうがわへ！'); break
@@ -130,7 +152,7 @@ export default function PutterGolfPlay() {
         if (event.surface === 'ice') { play('ice'); setMessage('つるつる すべるよ！') }
         else { play('sand'); setMessage(event.surface === 'sand' ? 'すなばで ザザッ' : 'ふかふかで とまりやすいよ') }
         break
-      case 'splash': play('splash'); setMessage(SPLASH_TEXT[courseId] ?? 'ぽちゃん！ もとの ばしょに もどるよ'); break
+      case 'splash': play('splash'); setMessage(event.pond ? 'みずに ぽちゃん！ もとの ばしょに もどるよ' : SPLASH_TEXT[courseId] ?? 'ぽちゃん！ もとの ばしょに もどるよ'); break
       case 'lost': setMessage('おっと！ もとの ばしょに もどるよ'); break
       case 'returned': setMessage('ここから もういちど！'); break
       case 'assisted': play('click'); setMessage('カップの ちかくに おいたよ！'); break

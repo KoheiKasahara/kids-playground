@@ -11,6 +11,8 @@ const [MEADOW, BEACH, MOON] = GOLF_COURSES as [CourseDefinition, CourseDefinitio
 const courseById = (id: string) => GOLF_COURSES.find(course => course.id === id)!
 const FOREST = courseById('forest')
 const DOWNHILL = courseById('downhill')
+const RIVER = courseById('river')
+const CANYON = courseById('canyon')
 const holeById = (id: string) => GOLF_COURSES.flatMap(course => course.holes).find(hole => hole.id === id)!
 
 function open(course: CourseDefinition, hole: HoleDefinition): GolfWorld {
@@ -346,6 +348,88 @@ describe('パターゴルフの物理', () => {
       const events = roll(world)
       expect(events.map(event => event.kind)).toEqual(expect.arrayContaining(['boost', 'takeoff', 'land']))
       expect(world.ball().position.z).toBeLessThan(-1.4)
+    })
+  })
+
+  it('いけに ころがりこむと ぽちゃんと おちて、うつ前の ばしょへ もどる', () => {
+    const hole = holeById('river-1')
+    withWorld(open(RIVER, hole), world => {
+      const start = world.placeBall({ x: 1.2, z: 9.5 })
+      world.shoot({ x: 0, z: -1 }, 0.5)
+      const events = roll(world)
+      const splash = events.find(event => event.kind === 'splash')
+      expect(splash).toMatchObject({ kind: 'splash', pond: true })
+      expect(world.phase).toBe('out')
+      // いけの ふちで おちる（いけの 中まで ころがりつづけない）。
+      if (splash?.kind !== 'splash') throw new Error('splash')
+      expect(Math.hypot(splash.position.x - 1.2, splash.position.z - 5.0)).toBeLessThan(2.6)
+      const back = world.returnToRest()
+      expect(Math.hypot(back.x - start.x, back.z - start.z)).toBeLessThan(1e-6)
+    })
+  })
+
+  it('はしの上は おちずに わたれ、はしを はずすと かわに おちる', () => {
+    const hole = holeById('river-2')
+    withWorld(open(RIVER, hole), world => {
+      world.shoot({ x: 0, z: -1 }, 0.8)
+      const events = roll(world)
+      expect(events.some(event => event.kind === 'splash')).toBe(false)
+      expect(world.phase).toBe('ready')
+      // かわ（z = 3.7〜6.3）を こえた むこう岸で 止まる。
+      expect(world.ball().position.z).toBeLessThan(3.7)
+    })
+    withWorld(open(RIVER, hole), world => {
+      world.placeBall({ x: 1.0, z: 9.0 })
+      world.shoot({ x: 0, z: -1 }, 0.8)
+      const events = roll(world)
+      expect(events.at(-1)?.kind).toBe('splash')
+      expect(world.phase).toBe('out')
+    })
+  })
+
+  it('ダッシュパネルと ジャンプ台で、かわを とびこえられる', () => {
+    const hole = holeById('river-3')
+    withWorld(open(RIVER, hole), world => {
+      world.placeBall({ x: 2.5, z: 12 })
+      world.shoot({ x: 0, z: -1 }, 0.6)
+      const events = roll(world)
+      expect(events.map(event => event.kind)).toEqual(expect.arrayContaining(['boost', 'takeoff', 'land']))
+      expect(events.some(event => event.kind === 'splash')).toBe(false)
+      expect(world.phase).toBe('ready')
+      expect(world.ball().position.z).toBeLessThan(0)
+    })
+  })
+
+  it('はねかえし いたに あたると、いきおいを のこして 90ど まがる', () => {
+    const hole = holeById('canyon-2')
+    withWorld(open(CANYON, hole), world => {
+      // ティーから まっすぐ下へ。ふかふかを とおらずに いたで みぎへ まがる。
+      world.shoot({ x: 0, z: -1 }, 0.95)
+      const events = roll(world)
+      expect(events.some(event => event.kind === 'reflector')).toBe(true)
+      expect(events.some(event => event.kind === 'surface')).toBe(false)
+      const ball = world.ball().position
+      expect(ball.x).toBeGreaterThan(-1)
+      expect(Math.abs(ball.z + 9.4)).toBeLessThan(0.6)
+    })
+  })
+
+  it('かべの ない がけの みちから はみだすと、たにへ おちて もどる', () => {
+    const hole = holeById('canyon-1')
+    withWorld(open(CANYON, hole), world => {
+      world.placeBall({ x: 0, z: 3 })
+      world.shoot({ x: 1, z: -0.2 }, 0.4)
+      const events = roll(world)
+      expect(events.at(-1)?.kind).toBe('splash')
+      expect(world.phase).toBe('out')
+      expect(world.returnToRest().x).toBeCloseTo(0, 5)
+    })
+  })
+
+  it('おすすめは がけの そとへ はみだす線を えらばない', () => {
+    withWorld(open(CANYON, holeById('canyon-3')), world => {
+      // ティーから つりばしの むこうは まっすぐ見えるが、ななめに わたると おちるので まず はしの まえへ。
+      expect(world.suggestShot().target).toEqual({ x: 0, z: 9.0 })
     })
   })
 
