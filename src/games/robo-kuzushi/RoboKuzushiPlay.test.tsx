@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import RoboKuzushiPlay from './RoboKuzushiPlay'
-import { playClearSound, playLaunchSound } from './sounds'
+import { playClearSound, playLaunchSound, playSplitSound } from './sounds'
 
 vi.mock('./sounds', async importOriginal => {
   const actual = await importOriginal<typeof import('./sounds')>()
@@ -103,7 +103,7 @@ describe('robo-kuzushi play', () => {
     expect(screen.getByLabelText('のこりの たま 3こ')).toBeInTheDocument()
   })
 
-  test('keyboard: arrows aim, space shoots, space again splits the blue ball', () => {
+  test('keyboard: arrows aim, space shoots, and the blue ball splits by itself', () => {
     const canvas = open(/^7 みっつに わかれる/)
     advance(10)
     fireEvent.keyDown(canvas, { key: 'ArrowUp' })
@@ -111,11 +111,25 @@ describe('robo-kuzushi play', () => {
     fireEvent.keyDown(canvas, { key: 'ArrowRight' })
     expect(screen.getByRole('status')).toHaveTextContent('つよさ 85%')
     fireEvent.keyDown(canvas, { key: ' ' })
-    advance(8)
+    advance(60)
     expect(playLaunchSound).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '✨ わける！' })).toBeInTheDocument()
+    expect(playSplitSound).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: /わける/ })).not.toBeInTheDocument()
+  })
+
+  test('a phone held upright is asked to turn sideways, and the stage waits', () => {
+    const listeners = new Set<() => void>()
+    const query = { matches: true, addEventListener: (_: string, cb: () => void) => listeners.add(cb), removeEventListener: (_: string, cb: () => void) => listeners.delete(cb) }
+    vi.stubGlobal('matchMedia', vi.fn((q: string) => q.includes('portrait') ? query : { matches: false, addEventListener() {}, removeEventListener() {} }))
+    const canvas = open(/^1 はじめの いっぽ/)
+    expect(screen.getByRole('heading', { name: /よこにして/ })).toBeInTheDocument()
     fireEvent.keyDown(canvas, { key: ' ' })
-    advance(1)
-    expect(screen.queryByRole('button', { name: '✨ わける！' })).not.toBeInTheDocument()
+    fireEvent.keyDown(canvas, { key: ' ' })
+    advance(60)
+    expect(playLaunchSound).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('のこりの たま 3こ')).toBeInTheDocument()
+    query.matches = false
+    act(() => listeners.forEach(cb => cb()))
+    expect(screen.queryByRole('heading', { name: /よこにして/ })).not.toBeInTheDocument()
   })
 })

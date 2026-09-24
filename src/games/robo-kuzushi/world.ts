@@ -15,6 +15,10 @@ const BLAST_RADIUS = 230
 const TURN_LIMIT = 60 * 8
 const QUIET_FRAMES = 45
 const SLOW_BALL_FRAMES = 90
+/** あおい たまは とびだして すぐには わかれない（パチンコの すぐ そばで わかれない）。 */
+const AUTO_SPLIT_MIN_FRAMES = 12
+/** やまなりに ならない まっすぐな うちかたでも、この フレームで かならず わかれる。 */
+const AUTO_SPLIT_MAX_FRAMES = 36
 
 export const BALLS: Record<BallKind, { radius: number; density: number; restitution: number }> = {
   normal: { radius: 22, density: .004, restitution: .35 },
@@ -258,7 +262,17 @@ export function createGame(level: Level) {
     if (bonus) { score += bonus; events.push({ type: 'bonus', score: bonus }) }
   }
 
-  return {
+  /**
+   * あおい たまは とんでいる とちゅうで じどうで 3つに わかれる。
+   * やまの てっぺん（おちはじめた ところ）で わかれ、まっすぐ うっても すこし とんだら わかれる。
+   */
+  function autoSplit() {
+    const source = projectiles.find(p => p.canSplit)
+    if (!source || turnFrames < AUTO_SPLIT_MIN_FRAMES) return
+    if (Body.getVelocity(source.body).y >= 0 || turnFrames >= AUTO_SPLIT_MAX_FRAMES) api.split()
+  }
+
+  const api = {
     level,
     pieces,
     projectiles,
@@ -284,7 +298,7 @@ export function createGame(level: Level) {
       events.push({ type: 'launch' })
       return true
     },
-    /** とんでいる あおい たまを 3つに わける。 */
+    /** とんでいる あおい たまを 3つに わける（ふつうは step の なかで じどうで よばれる）。 */
     split() {
       const source = projectiles.find(p => p.canSplit)
       if (state !== 'flying' || !source) return false
@@ -301,6 +315,7 @@ export function createGame(level: Level) {
     get canSplit() { return state === 'flying' && projectiles.some(p => p.canSplit) },
     step() {
       stepEngine(engine)
+      if (state === 'flying') autoSplit()
       for (const target of [...pending]) remove(target)
       pending.clear()
       for (const box of pendingBlasts.splice(0)) blast(box.body.position)
@@ -340,6 +355,7 @@ export function createGame(level: Level) {
       Engine.clear(engine)
     },
   }
+  return api
 }
 
 export type Game = ReturnType<typeof createGame>

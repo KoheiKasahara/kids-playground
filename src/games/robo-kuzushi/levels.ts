@@ -111,7 +111,7 @@ function level6(): Piece[] {
 }
 
 function level7(): Piece[] {
-  // ばらばらに ならんだ ロボットは 3つに わかれる たまで いっぺんに ねらう。
+  // ばらばらに ならんだ ロボットは とちゅうで 3つに わかれる たまで いっぺんに ねらう。
   const a = gate(960, GROUND_Y, 90, 70, 'ice')
   const b = gate(1110, GROUND_Y, 90, 140, 'wood')
   const c = gate(1260, GROUND_Y, 90, 210, 'ice')
@@ -160,7 +160,7 @@ export const LEVELS: readonly Level[] = [
   { name: 'いしの かべ', hint: 'くろい てつの たまは とっても おもいよ', width: 1400, balls: ['heavy', 'normal', 'heavy'], pieces: level4() },
   { name: 'おかの とりで', hint: 'うえに むけて やまなりに とばそう', width: 1550, balls: ['normal', 'normal', 'heavy'], pieces: level5() },
   { name: 'びっくりばこ', hint: '？の はこに あてると ドカーン！', width: 1500, balls: ['normal', 'normal', 'normal'], pieces: level6() },
-  { name: 'みっつに わかれる', hint: 'あおい たまは とんでいる ときに タップ！', width: 1500, balls: ['split', 'split', 'normal'], pieces: level7() },
+  { name: 'みっつに わかれる', hint: 'あおい たまは とちゅうで 3つに わかれるよ！', width: 1500, balls: ['split', 'split', 'normal'], pieces: level7() },
   { name: 'ひょろながタワー', hint: 'たかい ところを ねらうと ばたーん！', width: 1500, balls: ['normal', 'split', 'heavy'], pieces: level8() },
   { name: 'いしの とりで', hint: 'びっくりばこは どこかな？', width: 1450, balls: ['heavy', 'split', 'normal', 'normal'], pieces: level9() },
   { name: 'さいごの おしろ', hint: 'ぜんぶの たまを つかって がんばろう！', width: 1700, balls: ['split', 'heavy', 'normal', 'heavy'], pieces: level10() },
