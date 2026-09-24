@@ -948,7 +948,7 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         cup: { x: 3.0, z: -18.0 },
         // かわを わたるのは はしか、みぎの ジャンプ台。つよく うてば かわを とびこえられる。
         floors: [{ corners: rect(-5, -20, 5, 20, 1.4, 1.6) }],
-        features: [{ kind: 'kicker', from: { x: 2.5, z: 5.9 }, to: { x: 2.5, z: 3.2 }, halfWidth: 0.9, rise: 0.6 }],
+        features: [{ kind: 'kicker', from: { x: 2.5, z: 5.9 }, to: { x: 2.5, z: 3.2 }, halfWidth: 1.2, rise: 0.6 }],
         water: [
           { kind: 'river', from: { x: -5.1, z: 2.0 }, to: { x: 5.1, z: 2.0 }, halfWidth: 0.85 },
           { kind: 'pond', x: 0, z: -11.0, radius: 2.0 },
@@ -1041,14 +1041,21 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         par: 3,
         tee: { x: -3.8, z: 8.0 },
         cup: { x: 3.8, z: 7.0 },
-        // まん中は ふかふかの くさ。すみの はねかえし いたに あてて、ぐるっと まわりこむ。
-        floors: [{ corners: rect(-6, -12, 6, 10, 1.2, 1.2) }],
-        zones: [
-          { kind: 'rough', x: 0, z: 5.4, radius: 2.6 },
-          { kind: 'rough', x: 0, z: 0.6, radius: 2.7 },
-          { kind: 'rough', x: 0, z: -4.2, radius: 2.6 },
-          { kind: 'sand', x: 5.0, z: 2.0, radius: 0.7 },
-        ],
+        // コの字の みち。まん中は ふかい たに。すみの はねかえし いたに あてて、ぐるっと まわりこむ。
+        floors: [{
+          corners: [
+            { x: -6, z: 10, r: 1.2 },
+            { x: -6, z: -12, r: 1.2 },
+            { x: 6, z: -12, r: 1.2 },
+            { x: 6, z: 10, r: 1.2 },
+            { x: 1.6, z: 10 },
+            { x: 1.6, z: -7 },
+            { x: -1.6, z: -7 },
+            { x: -1.6, z: 10 },
+          ],
+          open: [4, 5, 6],
+        }],
+        zones: [{ kind: 'sand', x: 5.0, z: 2.0, radius: 0.7 }],
         gadgets: [
           { kind: 'reflector', id: 'mirror-left', x: -3.675, z: -9.835, dir: { x: 1, z: -1 }, halfLength: 3.07 },
           { kind: 'reflector', id: 'mirror-right', x: 3.675, z: -9.835, dir: { x: 1, z: 1 }, halfLength: 3.07 },
