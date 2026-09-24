@@ -13,7 +13,7 @@ export type PrizeBody =
   | { form: 'capsule'; radius: number; half: number }
   | { form: 'box'; half: Vec3; round: number }
 
-export type PrizeLook = 'bear' | 'bunny' | 'chick' | 'egg' | 'marble' | 'snack' | 'drink'
+export type PrizeLook = 'bear' | 'bunny' | 'chick' | 'egg' | 'marble' | 'snack' | 'drink' | 'fruit'
 
 export type PrizeSpecies = {
   id: string
@@ -93,6 +93,12 @@ const SNACK_SPECIES: readonly PrizeSpecies[] = [
   { id: 'juice', label: 'ジュース', emoji: '🧃', color: '#ef8340', accent: '#fff1d8', look: 'drink', body: { form: 'box', half: { x: 0.036, y: 0.062, z: 0.036 }, round: 0.008 }, mass: 0.115, friction: 0.62, restitution: 0.04 },
 ]
 
+const FRUIT_SPECIES: readonly PrizeSpecies[] = [
+  { id: 'apple', label: 'りんご', emoji: '🍎', color: '#e5484d', accent: '#5fa347', look: 'fruit', body: { form: 'ball', radius: 0.064 }, mass: 0.085, friction: 0.5, restitution: 0.12 },
+  { id: 'orange', label: 'みかん', emoji: '🍊', color: '#f59a2a', accent: '#4f9a3c', look: 'fruit', body: { form: 'ball', radius: 0.056 }, mass: 0.07, friction: 0.55, restitution: 0.12 },
+  { id: 'banana', label: 'バナナ', emoji: '🍌', color: '#f7d54a', accent: '#8a6a2c', look: 'fruit', body: { form: 'capsule', radius: 0.036, half: 0.058 }, mass: 0.06, friction: 0.6, restitution: 0.06 },
+]
+
 /** 穴の上を避けた並べ場所。ケースの内側へ景品の大きさ分の余白を残してある。 */
 function grid(species: readonly string[]): PrizeSlot[] {
   const xs = [-0.45, -0.16, 0.13, 0.42]
@@ -141,6 +147,17 @@ export const CRANE_MACHINES: readonly CraneMachine[] = [
     grip: { hold: 2.1, stiffness: 150, damping: 3.4, capture: 0.085 },
     species: SNACK_SPECIES,
     slots: grid(['cookie', 'chocolate', 'juice', 'chocolate', 'cookie', 'juice']),
+  },
+  {
+    id: 'fruit',
+    label: 'フルーツ',
+    emoji: '🍎',
+    color: '#5aa84f',
+    description: 'ころころ ころがるよ',
+    hint: 'まるいから ころがる まえに つかもう',
+    grip: { hold: 1.75, stiffness: 150, damping: 3.3, capture: 0.085 },
+    species: FRUIT_SPECIES,
+    slots: grid(['apple', 'banana', 'orange', 'apple', 'orange', 'banana']),
   },
 ]
 

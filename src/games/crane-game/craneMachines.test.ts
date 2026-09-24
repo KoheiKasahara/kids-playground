@@ -12,7 +12,7 @@ import {
 
 describe('クレーンゲームの機械', () => {
   it('機械のidと見せ方がそろっている', () => {
-    expect(CRANE_MACHINES.length).toBeGreaterThanOrEqual(3)
+    expect(CRANE_MACHINES.length).toBeGreaterThanOrEqual(4)
     expect(new Set(CRANE_MACHINES.map(machine => machine.id)).size).toBe(CRANE_MACHINES.length)
     for (const machine of CRANE_MACHINES) {
       expect(machine.label.length).toBeGreaterThan(0)
