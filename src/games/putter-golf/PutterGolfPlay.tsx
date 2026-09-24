@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../audio/sound'
@@ -107,6 +107,51 @@ function GadgetMark({ gadget, course }: { gadget: Gadget; course: CourseDefiniti
 
 function stars(count: number, total = 3) {
   return '★'.repeat(count) + '☆'.repeat(Math.max(0, total - count))
+}
+
+/**
+ * コースえらびの よこスクロール。はしに かげと ◀ ▶ を出して、まだ先に コースが あると わかるようにする。
+ */
+function CourseScroller({ selectedId, children }: { selectedId: CourseId; children: ReactNode }) {
+  const list = useRef<HTMLDivElement | null>(null)
+  const [edges, setEdges] = useState({ start: true, end: false })
+  const update = useCallback(() => {
+    const element = list.current
+    if (!element) return
+    const start = element.scrollLeft <= 4
+    const end = element.scrollLeft + element.clientWidth >= element.scrollWidth - 4
+    setEdges(previous => previous.start === start && previous.end === end ? previous : { start, end })
+  }, [])
+  useEffect(() => {
+    update()
+    const element = list.current
+    if (!element || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [update])
+  // えらんだ コースが 見えるところまで よせる。
+  useEffect(() => {
+    const element = list.current
+    const card = element?.querySelector<HTMLElement>('[aria-pressed="true"]')
+    if (!element || !card) return
+    const left = card.offsetLeft - element.offsetLeft
+    if (left < element.scrollLeft || left + card.offsetWidth > element.scrollLeft + element.clientWidth) {
+      element.scrollTo?.({ left: left - (element.clientWidth - card.offsetWidth) / 2, behavior: 'smooth' })
+    }
+  }, [selectedId])
+  const page = (side: number) => {
+    const element = list.current
+    element?.scrollBy?.({ left: side * element.clientWidth * 0.8, behavior: 'smooth' })
+  }
+  return (
+    <div className={styles.courseScroller} data-at-start={edges.start} data-at-end={edges.end}>
+      <div ref={list} className={styles.courses} onScroll={update} data-testid="golf-course-list">{children}</div>
+      <button type="button" className={`${styles.scrollArrow} ${styles.scrollPrev}`} aria-label="まえの コースを みる" hidden={edges.start} onClick={() => page(-1)}>◀</button>
+      <button type="button" className={`${styles.scrollArrow} ${styles.scrollNext}`} aria-label="つぎの コースを みる" hidden={edges.end} onClick={() => page(1)}>▶</button>
+      <p className={styles.scrollHint} aria-hidden="true">{edges.end ? '◀ ゆびで よこに うごかせるよ' : 'ゆびで よこに うごかせるよ ▶'}</p>
+    </div>
+  )
 }
 
 export default function PutterGolfPlay() {
@@ -285,7 +330,7 @@ export default function PutterGolfPlay() {
 
         {phase === 'select' && <section className={styles.panel} aria-label="コースを えらぶ">
           <h2>どの コースで あそぶ？</h2>
-          <div className={styles.courses}>
+          <CourseScroller selectedId={courseId}>
             {GOLF_COURSES.map(item => <button
               key={item.id}
               type="button"
@@ -302,7 +347,7 @@ export default function PutterGolfPlay() {
               <span className={styles.holeThumbs} aria-hidden="true">{item.holes.map(entry => <HoleMap key={entry.id} hole={entry} course={item} />)}</span>
               {best[item.id] ? <small className={styles.best}>さいこう {best[item.id]}/{item.holes.length * 3} ★</small> : null}
             </button>)}
-          </div>
+          </CourseScroller>
           <div className={styles.options}>
             <div className={styles.balls} role="group" aria-label="ボールを えらぶ">
               {GOLF_BALLS.map(item => <button key={item.id} type="button" className={styles.ballButton} style={{ '--ball': item.color, '--accent': item.accent } as CSSProperties} aria-label={`${item.label}の ボール`} aria-pressed={ballId === item.id} onClick={() => { setBallId(item.id); play('click') }}>
