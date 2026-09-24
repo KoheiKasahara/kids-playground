@@ -61,7 +61,7 @@ export type GolfEvent =
   /** 芝ではない ゆかに入った。 */
   | { kind: 'surface'; surface: Exclude<Surface, 'green'>; position: Vec3 }
   /** 水に落ちた。pond は コースの中の いけや かわに おちたとき。 */
-  | { kind: 'splash'; position: Vec3; pond?: boolean }
+  | { kind: 'splash'; position: Vec3; pond?: boolean; velocity?: Vec2 }
   /** 壁の上など、床のない所で止まった。 */
   | { kind: 'lost'; position: Vec3 }
   | { kind: 'cup'; position: Vec3 }
@@ -440,7 +440,10 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       // いけや かわに ころがりこんだ。とんで こえている あいだは おちない。
       if (geometry.waterAt(p.x, p.z)) {
         phase = 'out'
-        emit({ kind: 'splash', position: { x: p.x, y: p.y - BALL_RADIUS, z: p.z }, pond: true })
+        emit({ kind: 'splash', position: { x: p.x, y: p.y - BALL_RADIUS, z: p.z }, pond: true, velocity: { x: v.x, z: v.z } })
+        // 水の上を ころがりつづけないよう、その場で とめる。しずむ 見た目は 実行係が つける。
+        ball.setLinvel({ x: 0, y: 0, z: 0 }, true)
+        ball.setAngvel({ x: 0, y: 0, z: 0 }, true)
         return
       }
       const speed = Math.hypot(v.x, v.y, v.z)

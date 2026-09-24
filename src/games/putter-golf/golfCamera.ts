@@ -1,7 +1,7 @@
 /**
  * パターゴルフのカメラの置き場所。Three.js にもブラウザにも依存しない計算だけを置く。
  *
- * - ねらう: ボールのうしろ上から、うつ向きを見る
+ * - ねらう: ボールのうしろ上から、カップの ほう（ねらいが 大きく それたら ねらいの ほう）を見る
  * - おいかける: 転がるボールを、進む向きのうしろから追う
  * - ぜんたい: ホール全体がちょうど入る高さから見下ろす
  */
@@ -20,6 +20,24 @@ function normalize(direction: Vec2): Vec2 {
 /** 縦長の画面では左右が見切れやすいので、少しうしろへ下げて広く見せる。 */
 function portraitScale(aspect: number): number {
   return Math.min(1.7, Math.max(1, 1.05 / Math.max(0.3, aspect)))
+}
+
+/** ねらう向きと カメラの向きの ずれの上限。これより ずれると 矢じるしが 画面の はしへ 出てしまう。 */
+export const MAX_VIEW_OFFSET = (55 * Math.PI) / 180
+
+/**
+ * ねらうときの カメラの向き。基本は カップの ほうを 見る。
+ * ねらいが カップから 大きく それているときだけ、矢じるしが 見える所まで ねらいの ほうへ 回す。
+ */
+export function viewHeading(ball: Vec2, cup: Vec2, aim: Vec2, maxOffset = MAX_VIEW_OFFSET): Vec2 {
+  const a = normalize(aim)
+  const toCup = { x: cup.x - ball.x, z: cup.z - ball.z }
+  if (Math.hypot(toCup.x, toCup.z) < 0.3) return a
+  const c = normalize(toCup)
+  const offset = Math.atan2(a.z * c.x - a.x * c.z, a.x * c.x + a.z * c.z)
+  if (Math.abs(offset) <= maxOffset) return c
+  const turn = offset - Math.sign(offset) * maxOffset
+  return { x: c.x * Math.cos(turn) - c.z * Math.sin(turn), z: c.z * Math.cos(turn) + c.x * Math.sin(turn) }
 }
 
 export function aimPose(ball: Vec3, direction: Vec2, aspect: number): CameraPose {

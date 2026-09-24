@@ -527,7 +527,7 @@ export function createGolfScene(container: HTMLElement) {
     // いけと かわ。床の高さに そって はった 水面で、ふちには すなの きしを 付ける。
     const waves = { uniforms: { uTime: { value: 0 } } }
     let water: HoleContent['water'] = null
-    const onFloor = (x: number, z: number) => (geometry.heightAt(x, z) ?? 0) + 0.012
+    const onFloor = (x: number, z: number) => (geometry.heightAt(x, z) ?? 0) + 0.016
     for (const [index, hazard] of (definition.water ?? []).entries()) {
       let surface: THREE.BufferGeometry
       if (hazard.kind === 'pond') {
@@ -570,10 +570,12 @@ export function createGolfScene(container: HTMLElement) {
       const position = surface.getAttribute('position')
       for (let i = 0; i < position.count; i++) position.setY(i, onFloor(position.getX(i), position.getZ(i)))
       surface.computeVertexNormals()
+      // polygonOffset の かたむき項は、遠くで ななめに 見ると 大きく なりすぎ、はしの いたの 上に 水が かぶってしまう。
+      // 水面は 床から すこし うかせてあるので、ずらすのは 一定の わずかな ぶんだけにする。
       const mesh = new THREE.Mesh(surface, rippleMaterial(POND_COLOR, waves.uniforms))
       mesh.material.polygonOffset = true
-      mesh.material.polygonOffsetFactor = -1
-      mesh.material.polygonOffsetUnits = -1
+      mesh.material.polygonOffsetFactor = 0
+      mesh.material.polygonOffsetUnits = -2
       mesh.receiveShadow = true
       root.add(mesh)
       water = waves
@@ -884,7 +886,7 @@ export function createGolfScene(container: HTMLElement) {
         const planks = Math.max(2, Math.round((gadget.halfLength * 2) / 0.27))
         for (let k = 0; k < planks; k++) {
           const p = at(-gadget.halfLength + ((k + 0.5) * gadget.halfLength * 2) / planks, 0)
-          solid.add('box', k % 2 ? '#b98552' : '#a8743f', p.x, groundOf(p.x, p.z) + 0.012, p.z, gadget.halfWidth * 2 + 0.12, 0.024, (gadget.halfLength * 2) / planks - 0.035, 0, turn, 0)
+          solid.add('box', k % 2 ? '#b98552' : '#a8743f', p.x, groundOf(p.x, p.z) + 0.024, p.z, gadget.halfWidth * 2 + 0.12, 0.032, (gadget.halfLength * 2) / planks - 0.035, 0, turn, 0)
         }
         for (const side of [-1, 1]) {
           const beam = at(0, side * (gadget.halfWidth - 0.05))

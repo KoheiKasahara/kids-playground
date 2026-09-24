@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { aimPose, followPose, lerpPose, overviewPose, projectPoint } from './golfCamera'
+import { aimPose, followPose, lerpPose, MAX_VIEW_OFFSET, overviewPose, projectPoint, viewHeading } from './golfCamera'
 import { GOLF_COURSES } from './golfCourses'
 import { buildHoleGeometry } from './golfGeometry'
 
@@ -51,5 +51,21 @@ describe('パターゴルフのカメラ', () => {
     const b = { position: { x: 2, y: 4, z: 6 }, target: { x: 2, y: 0, z: -3 } }
     expect(lerpPose(a, b, 0.5)).toEqual({ position: { x: 1, y: 2, z: 3 }, target: { x: 1, y: 0, z: -2 } })
     expect(lerpPose(a, b, 4)).toEqual(b)
+  })
+
+  test('ねらうカメラは カップの ほうを 見て、ねらいが 大きく それたときだけ ねらいへ よる', () => {
+    const ball = { x: 0, z: 0 }
+    const cup = { x: 0, z: -10 }
+    // すこし ずらした ねらいでは、カップの ほうを 見たまま。
+    expect(viewHeading(ball, cup, { x: 0.3, z: -1 })).toEqual({ x: 0, z: -1 })
+    // うしろ向きの ねらいでも、矢じるしが 見える 角度までしか まわらない。
+    for (const aim of [{ x: 0, z: 1 }, { x: 1, z: 0 }, { x: -1, z: 0.2 }]) {
+      const view = viewHeading(ball, cup, aim)
+      const length = Math.hypot(aim.x, aim.z)
+      const between = Math.acos(Math.min(1, (view.x * aim.x + view.z * aim.z) / length))
+      expect(between).toBeCloseTo(MAX_VIEW_OFFSET, 5)
+      expect(Math.hypot(view.x, view.z)).toBeCloseTo(1, 6)
+      expect(view.z).toBeLessThan(0.6)
+    }
   })
 })
