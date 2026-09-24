@@ -824,6 +824,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'mato-ate',
+    slug: 'mato-ate',
+    title: 'ねらって！まとあて',
+    emoji: '🎯',
+    category: 'learning',
+    seo: {
+      headline: 'ねらって！まとあて｜たいほうで まとを ねらう しゃてきゲーム',
+      description:
+        'たいほうから とんでいく たまで まとを わる子ども向けのしゃてきゲーム。うごく まと・うごく かべ・きえる かべ・はねかえる かべなどの しかけを、かんたん・ふつう・むずかしいの3レベルで たのしめます。',
+    },
+    intro: {
+      howToPlay: [
+        'ねらう ところを タップすると たまが とんでいくよ',
+        'うごく まとは たまが とどく じかんを よんで ねらおう',
+        'かべを よけたり はねかえしたりして まとを ぜんぶ わろう',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
