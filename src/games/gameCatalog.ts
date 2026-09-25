@@ -862,6 +862,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'dot-zoo',
+    slug: 'dot-zoo',
+    title: 'ドットの どうぶつえん',
+    emoji: '🦁',
+    category: 'learning',
+    seo: {
+      headline: 'ドットの どうぶつえん｜ドット絵の どうぶつえんを つくって ながめるゲーム',
+      description:
+        '立体の ドット絵で ライオンや ゾウ、キリンなどの どうぶつと 木や いけを ならべて、じぶんだけの どうぶつえんを つくる 子ども向けゲーム。おにくや くさを あげると すきな どうぶつが たべにくるよ。',
+    },
+    intro: {
+      howToPlay: [
+        'どうぶつや 木を えらんで、おきたい ところを タップしよう',
+        'えさを なげると、その たべものが すきな どうぶつが たべにくるよ',
+        'うんちを タップすると おそうじ できるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
