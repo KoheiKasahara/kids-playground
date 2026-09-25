@@ -8,6 +8,10 @@
 
 `src/games/oekaki-korokoro/` の花・星・足あと・ハート・しま模様、ローラー本体と台紙は、本アプリ用に作成したSVGパス・Canvas・CSSによるオリジナル図形です。外部の画像・音源は使用していません。
 
+## ドットの ぼうけんのドット絵・効果音・BGM
+
+`src/games/dot-adventure/` の主人公・いきもの・木・いわ・地面・水面・たからものなどのドット絵は、本アプリ用に手で打ったドットデータと、Canvasで実行時に生成するオリジナル図形です。効果音とBGMもWeb Audio APIで実行時に合成するオリジナル曲で、外部の画像・音源は使用していません。
+
 ## 世界地図 (world-atlas / countries-50m.json)
 
 世界地図の国境は [world-atlas](https://github.com/topojson/world-atlas) npmパッケージの [`countries-50m.json`](https://unpkg.com/world-atlas/countries-50m.json) を、ビルド時に静的importしてバンドルしています。実行時のCDN・地図API通信は行いません。
