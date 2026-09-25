@@ -881,6 +881,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'dot-aquarium',
+    slug: 'dot-aquarium',
+    title: 'ドットの すいぞくかん',
+    emoji: '🐠',
+    category: 'learning',
+    seo: {
+      headline: 'ドットの すいぞくかん｜ドット絵の すいそうを つくって ながめるゲーム',
+      description:
+        'むかしの ゲーム機の ような ドット絵で、クマノミや ウミガメ、サメ、クラゲと かいそうや サンゴを すいそうに ならべる 子ども向けゲーム。えさを いれると すきな いきものが たべにくるよ。よるは クラゲが ひかるよ。',
+    },
+    intro: {
+      howToPlay: [
+        'いきものや ものを えらんで、いれたい ところを タップしよう',
+        'えさを いれると、その えさが すきな いきものが たべにくるよ',
+        'ガラスに コケが ついたら「そうじ」で こすって ふこう',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
