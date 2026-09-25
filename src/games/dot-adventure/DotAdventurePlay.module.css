@@ -1,0 +1,562 @@
+/* SFC の RPG の ような 青い グラデーションの まど。ドット絵は ぼかさず 拡大する。 */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.window {
+  position: relative;
+  box-sizing: border-box;
+  border: 3px solid #f4f4ff;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(180deg, #4a64d8 0%, #2c3ea8 48%, #16207a 100%);
+  box-shadow:
+    0 0 0 2px #0c1030,
+    inset 0 0 0 2px #8494e8,
+    inset 0 -3px 0 2px rgb(8 12 60 / 45%),
+    0 4px 0 2px rgb(0 0 0 / 30%);
+  text-shadow: 2px 2px 0 #0c1030;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+
+button.window {
+  cursor: pointer;
+  touch-action: manipulation;
+  font: inherit;
+  font-weight: 900;
+}
+
+button.window:hover { filter: brightness(1.12); }
+button.window:active { transform: translateY(2px); }
+button.window:focus-visible {
+  outline: 3px solid #ffe060;
+  outline-offset: 3px;
+}
+
+/* ---------------- タイトル ---------------- */
+
+.title {
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #081018;
+  color: #fff;
+}
+
+.titleCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.titleMusic {
+  position: absolute;
+  z-index: 3;
+  top: calc(var(--safe-top) + 8px);
+  right: calc(var(--safe-right) + 10px);
+  min-height: 48px;
+  padding: 6px 14px;
+  font-size: 16px;
+}
+
+.titleInner {
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 3vh, 24px);
+  padding: calc(var(--safe-top) + 64px) calc(var(--safe-right) + 16px) calc(var(--safe-bottom) + 16px) calc(var(--safe-left) + 16px);
+}
+
+.logo {
+  text-align: center;
+  filter: drop-shadow(0 6px 0 rgb(0 0 0 / 35%));
+}
+
+.logo h1 {
+  margin: 0;
+  font-size: clamp(34px, 7.4vw, 72px);
+  line-height: 1.1;
+  letter-spacing: .08em;
+  color: #ffe36a;
+  text-shadow:
+    0 -2px 0 #fff8c8,
+    3px 0 0 #6a2a00, -3px 0 0 #6a2a00, 0 3px 0 #6a2a00, 0 -3px 0 #6a2a00,
+    3px 3px 0 #6a2a00, -3px 3px 0 #6a2a00, 3px -3px 0 #6a2a00, -3px -3px 0 #6a2a00,
+    0 7px 0 #2a0c00;
+  animation: logoIn .9s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+
+.logoSub {
+  margin: 0 0 6px;
+  font-size: clamp(14px, 2.2vw, 20px);
+  font-weight: 900;
+  letter-spacing: .12em;
+  color: #fff;
+  text-shadow: 2px 2px 0 #0c1030, -1px -1px 0 #0c1030, 1px -1px 0 #0c1030, -1px 1px 0 #0c1030;
+}
+
+@keyframes logoIn {
+  from { opacity: 0; transform: translateY(-18px) scale(.92); }
+  to { opacity: 1; transform: none; }
+}
+
+.stageList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(8px, 1.6vw, 18px);
+  width: min(100%, 920px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stageCard {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 8px 10px;
+  text-align: center;
+  animation: cardIn .6s ease-out both;
+}
+
+.stageList li:nth-child(2) .stageCard { animation-delay: .08s; }
+.stageList li:nth-child(3) .stageCard { animation-delay: .16s; }
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 200 / 112;
+  margin-bottom: 4px;
+  overflow: hidden;
+  border: 2px solid #0c1030;
+  border-radius: 4px;
+  background: #1a3a20;
+}
+
+.thumb[data-theme='sunset'] { background: #b06040; }
+.thumb[data-theme='night'] { background: #141a3a; }
+
+.thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.stageNo {
+  font-size: 12px;
+  color: #b8c4ff;
+}
+
+.stageName {
+  font-size: clamp(16px, 2.3vw, 22px);
+  line-height: 1.2;
+}
+
+.stageLead {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #dfe4ff;
+}
+
+.stageBadge {
+  margin-top: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgb(0 0 30 / 35%);
+  font-size: 12px;
+  color: #c8d0ff;
+}
+
+.stageCard[data-cleared] .stageBadge {
+  color: #ffe070;
+  background: rgb(60 30 0 / 45%);
+}
+
+.titleFoot {
+  margin: 0;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgb(0 0 20 / 45%);
+  font-size: 14px;
+  font-weight: 900;
+  text-shadow: 1px 1px 0 #000;
+}
+
+@media (max-height: 460px) {
+  .titleInner {
+    justify-content: flex-start;
+    padding-top: calc(var(--safe-top) + 10px);
+    gap: 8px;
+  }
+
+  .logo { padding: 0 120px; }
+  .logo h1 { font-size: clamp(28px, 5.4vw, 44px); }
+  .logoSub { font-size: 12px; margin-bottom: 2px; }
+  .stageLead { display: none; }
+  .stageList { width: min(100%, 760px); }
+  .stageCard { padding: 6px 6px 8px; }
+  .titleFoot { display: none; }
+}
+
+@media (max-width: 560px) {
+  .stageList { grid-template-columns: 1fr; width: min(100%, 360px); }
+  .stageCard { grid-template-columns: 110px 1fr; grid-template-rows: auto auto auto; justify-items: start; text-align: left; column-gap: 10px; }
+  .thumb { grid-row: 1 / span 4; margin: 0; }
+  .stageLead { display: none; }
+}
+
+/* ---------------- よこむき あんない ---------------- */
+
+.rotate {
+  min-height: 100dvh;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-top) + 72px) 20px calc(var(--safe-bottom) + 24px);
+  background:
+    radial-gradient(circle at 50% 30%, rgb(80 110 255 / 35%), transparent 60%),
+    linear-gradient(180deg, #0e1640, #1a2a6a 60%, #0a3a28);
+  color: #fff;
+}
+
+.rotateCard {
+  max-width: 320px;
+  padding: 26px 22px;
+  border: 3px solid #f4f4ff;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #4a64d8 0%, #2c3ea8 48%, #16207a 100%);
+  box-shadow: 0 0 0 2px #0c1030, inset 0 0 0 2px #8494e8, 0 8px 0 rgb(0 0 0 / 35%);
+  text-align: center;
+  text-shadow: 2px 2px 0 #0c1030;
+}
+
+.rotateCard h1 {
+  margin: 0;
+  font-size: 30px;
+  color: #ffe070;
+}
+
+.rotateLead {
+  margin: 10px 0 4px;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.rotateCard p:last-child {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.rotateIcon {
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  margin: 0 auto 12px;
+  border: 3px solid #fff;
+  border-radius: 16px;
+  background: #16207a;
+  font-size: 46px;
+  font-weight: 900;
+  animation: tilt 2.4s ease-in-out infinite;
+}
+
+@keyframes tilt {
+  0%, 30% { transform: rotate(0deg); }
+  55%, 85% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.rotateOverlay {
+  position: fixed;
+  z-index: 900;
+  inset: 0;
+}
+
+/* ---------------- プレイ ---------------- */
+
+.play {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  outline: none;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.canvas:focus-visible { box-shadow: inset 0 0 0 3px #ffe060; }
+
+.hud {
+  position: absolute;
+  top: calc(var(--safe-top) + 8px);
+  right: calc(var(--safe-right) + 10px);
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.hud > * { pointer-events: auto; }
+
+.shardBox,
+.friendBox {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 2px 12px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.starOn {
+  color: #ffe060;
+  text-shadow: 0 0 6px #ffb020, 2px 2px 0 #3a1400;
+  animation: starPop .5s cubic-bezier(.2, 1.8, .4, 1) both;
+}
+
+.starOff {
+  color: rgb(255 255 255 / 28%);
+  text-shadow: 2px 2px 0 #0c1030;
+}
+
+@keyframes starPop {
+  from { transform: scale(.2) rotate(-60deg); }
+  to { transform: none; }
+}
+
+.heart {
+  margin-right: 6px;
+  color: #ff7c9c;
+}
+
+.iconButton {
+  min-width: 48px;
+  min-height: 44px;
+  padding: 0 10px;
+  font-size: 22px;
+}
+
+.banner {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  padding: 10px 34px 12px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: banner 2.6s ease-in-out both;
+}
+
+.banner small {
+  font-size: 13px;
+  color: #b8c4ff;
+}
+
+.banner strong {
+  font-size: clamp(22px, 4vw, 34px);
+  letter-spacing: .1em;
+}
+
+@keyframes banner {
+  0% { opacity: 0; transform: translate(-50%, -12px); }
+  15%, 80% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
+
+.dialog {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 12px);
+  width: min(620px, calc(100% - 40px));
+  min-height: 58px;
+  padding: 10px 44px 10px 20px;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  border: 3px solid #f4f4ff;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgb(74 100 216 / 94%) 0%, rgb(44 62 168 / 94%) 48%, rgb(22 32 122 / 94%) 100%);
+  box-shadow: 0 0 0 2px #0c1030, inset 0 0 0 2px #8494e8, 0 4px 0 2px rgb(0 0 0 / 30%);
+  pointer-events: none;
+  animation: dialogIn .18s ease-out both;
+}
+
+.dialog p {
+  margin: 0;
+  font-size: clamp(17px, 2.6vw, 22px);
+  font-weight: 900;
+  line-height: 1.5;
+  text-shadow: 2px 2px 0 #0c1030;
+}
+
+.hidden { visibility: hidden; }
+
+.cursor {
+  position: absolute;
+  right: 16px;
+  bottom: 8px;
+  font-style: normal;
+  font-size: 14px;
+  animation: blink .8s steps(2) infinite;
+}
+
+@keyframes dialogIn {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-top) + 12px) 16px calc(var(--safe-bottom) + 12px);
+  background: radial-gradient(circle, rgb(0 0 20 / 25%), rgb(0 0 20 / 70%));
+  animation: fadeIn .4s ease-out both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+}
+
+.resultCard {
+  width: min(440px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 14px 18px 16px;
+  text-align: center;
+  animation: pop .5s cubic-bezier(.2, 1.5, .4, 1) both;
+}
+
+@keyframes pop {
+  from { transform: scale(.7); opacity: 0; }
+}
+
+.resultCard h2 {
+  margin: 0;
+  font-size: clamp(22px, 4vw, 30px);
+  color: #ffe070;
+}
+
+.treasureStage {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 80px;
+  margin: 8px auto 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 240 160 / 55%), rgb(255 240 160 / 0) 70%);
+  animation: shine 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes shine {
+  to { background-size: 120% 120%; filter: brightness(1.2); }
+}
+
+.treasure {
+  width: 64px;
+  height: auto;
+  image-rendering: pixelated;
+  animation: float 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes float {
+  to { transform: translateY(-5px); }
+}
+
+.treasureName {
+  margin: 0;
+  font-size: 20px;
+}
+
+.resultNote {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.perfect { color: #ffe070; }
+
+.cardButtons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.cardButtons button {
+  min-height: 50px;
+  padding: 8px 16px;
+  border: 3px solid #f4f4ff;
+  border-radius: 8px;
+  background: #16207a;
+  color: #fff;
+  box-shadow: 0 0 0 2px #0c1030, 0 3px 0 2px rgb(0 0 0 / 35%);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 900;
+  text-shadow: 2px 2px 0 #0c1030;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cardButtons .primary {
+  background: linear-gradient(180deg, #ffb030, #e06a10);
+  color: #fff;
+}
+
+.cardButtons button:focus-visible {
+  outline: 3px solid #ffe060;
+  outline-offset: 3px;
+}
+
+@media (max-height: 420px) {
+  .resultCard { padding: 10px 14px 12px; }
+  .treasureStage { width: 72px; height: 56px; margin: 4px auto 2px; }
+  .treasure { width: 48px; }
+  .cardButtons { margin-top: 8px; }
+  .cardButtons button { min-height: 46px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo h1, .stageCard, .banner, .dialog, .overlay, .resultCard, .treasure, .treasureStage, .rotateIcon, .starOn { animation: none; }
+}

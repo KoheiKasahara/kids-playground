@@ -843,6 +843,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'dot-adventure',
+    slug: 'dot-adventure',
+    title: 'ドットの ぼうけん',
+    emoji: '🗺️',
+    category: 'learning',
+    seo: {
+      headline: 'ドットの ぼうけん｜ドット絵の せかいを あるく ぼうけんゲーム',
+      description:
+        'むかしの ゲーム機の ような ドット絵で えがいた もり・ゆうやけの はまべ・よるの いせきを あるいて、ほしの かけらを あつめる 子ども向けの ぼうけんゲーム。スライムや カニを なかまに して、たからばこを さがそう。',
+    },
+    intro: {
+      howToPlay: [
+        'いきたい ところを タップすると あるくよ',
+        'ほしの かけらを ぜんぶ あつめると たからばこが でてくるよ',
+        'スライムに ちかづくと なかまに なって ついてくるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

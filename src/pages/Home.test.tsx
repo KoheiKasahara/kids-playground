@@ -17,7 +17,6 @@ describe('Home', () => {
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
     expect(links.slice(-10).map((link) => link.getAttribute('href'))).toEqual(
       [
-        'draw-goal',
         'crane-game',
         'treasure-dig',
         'putter-golf',
@@ -27,6 +26,7 @@ describe('Home', () => {
         'hoshi-tsunagi',
         'robo-kuzushi',
         'mato-ate',
+        'dot-adventure',
       ].map(gameRoutePath),
     )
   })
