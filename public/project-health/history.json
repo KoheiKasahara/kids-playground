@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-25T21:47:18.048Z",
+  "updatedAt": "2026-09-26T21:21:56.313Z",
   "entries": [
     {
       "date": "2026-09-13",
@@ -251,7 +251,6 @@
       "precacheEntries": 543,
       "lighthousePerformance": 96,
       "accessibility": 100,
-      "lighthouseTarget": "ホーム画面",
       "vulnerabilities": 0,
       "vulnerabilitiesCritical": 0,
       "vulnerabilitiesHigh": 0,
@@ -261,7 +260,36 @@
       "nightly": "success",
       "deploy": "success",
       "recordedAt": "2026-09-25T21:47:18.048Z",
-      "runId": "36191426165"
+      "runId": "36191426165",
+      "lighthouseTarget": "ホーム画面"
+    },
+    {
+      "date": "2026-09-27",
+      "games": 50,
+      "unitTests": 6571,
+      "unitTestsPassed": 6571,
+      "e2eSmokePassed": 301,
+      "e2eSmokeTotal": 304,
+      "e2eSmokeFlaky": 0,
+      "e2eSmokeSkipped": 0,
+      "bundleKb": 8955,
+      "initialJsGzipKb": 111,
+      "initialCssGzipKb": 6.9,
+      "precacheKb": 59327.2,
+      "precacheEntries": 553,
+      "lighthousePerformance": 96,
+      "accessibility": 100,
+      "lighthouseTarget": "ホーム画面",
+      "vulnerabilities": 0,
+      "vulnerabilitiesCritical": 0,
+      "vulnerabilitiesHigh": 0,
+      "vulnerabilitiesModerate": 0,
+      "vulnerabilitiesLow": 0,
+      "vulnerabilitiesInfo": 0,
+      "nightly": "failure",
+      "deploy": "success",
+      "recordedAt": "2026-09-26T21:21:56.313Z",
+      "runId": "36271249439"
     }
   ]
 }
