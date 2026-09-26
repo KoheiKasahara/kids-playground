@@ -539,11 +539,9 @@ export class AquaRenderer {
       return
     }
 
-    // しょうめんを むいている いきものは ふりむかない。
-    const front = c.species === 'crab' || c.species === 'octopus'
-    const facing = front ? 1 : c.turn < .5 ? -c.face : c.face
+    const facing = c.species === 'crab' ? 1 : c.turn < .5 ? -c.face : c.face
     const img = facing > 0 ? s.canvas : s.flip
-    const squash = front ? 1 : Math.max(.2, Math.abs(1 - c.turn * 2))
+    const squash = c.species === 'crab' ? 1 : Math.max(.2, Math.abs(1 - c.turn * 2))
     const w = Math.max(2, Math.round(s.w * squash))
     const bob = c.species === 'seahorse' ? Math.round(Math.sin(c.phase * 1.4) * 1.2) : 0
     const x = Math.round(c.x - w / 2), y = Math.round(c.y - s.h / 2) + bob

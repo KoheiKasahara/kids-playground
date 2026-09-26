@@ -31,8 +31,8 @@ export const R = {
   skin: ['#1c2c28', '#3a5a4c', '#62866e', '#90b490', '#cce4c0'],
   shark: ['#141c2c', '#2e3e58', '#566c88', '#8aa0b8', '#c2d4e4'],
   seahorse: ['#4a1a04', '#9a4a0a', '#e08a18', '#ffbe3a', '#fff0a0'],
-  octo: ['#4a0c16', '#902232', '#d84a58', '#f07a82', '#ffbcbc'],
-  octoLip: ['#8a3a44', '#d07a84', '#f6bcba', '#ffdad6', '#fff2f0'],
+  octo: ['#380604', '#7a160a', '#bc2e18', '#e2542e', '#ff9464'],
+  sucker: ['#5a2226', '#9a4e50', '#d08884', '#ecb2a8', '#ffdcd0'],
   squid: ['#5a3a4a', '#a07888', '#e0c2cc', '#f8e6ec', '#ffffff'],
   squidDot: ['#4a1a10', '#8a3420', '#c85a34', '#e88a58', '#ffc49a'],
   moray: ['#1a1e06', '#3e4610', '#72801c', '#a8b432', '#dce274'],
@@ -421,41 +421,37 @@ function shark(f: number): Model {
   }
 }
 
-/** タコ（しょうめん。まるい あたまに ちょんちょん めと まるい くち、あしを ひろげて 2ほんは くるん）。 */
+/** タコ（よこむき。ふくろの ような あたまと、きゅうばんの ついた 8ほんの あし）。 */
 function octopus(f: number): Model {
-  const w = 30, h = 25, cx = 15
+  const w = 34, h = 25
   const ph = f / 4 * TAU
   const prims: Prim[] = []
-  // したの 6ほん（そとがわほど よこに ひらく）。
-  const legs: [number, number][] = [[-11, 19.5], [-7.5, 22.5], [-2.6, 23.6], [2.6, 23.6], [7.5, 22.5], [11, 19.5]]
-  legs.forEach(([dx, ey], i) => {
-    const sway = Math.sin(ph + i * 1.1) * .9
-    const bx = cx + dx * .32, by = 15.5
-    const mx = cx + dx * .7 + sway * .6, my = (by + ey) / 2 + .4
-    const ex = cx + dx + sway, back = i === 0 || i === 5 ? 0 : i === 1 || i === 4 ? .08 : .14
-    prims.push(
-      { t: 'cap', x1: bx, y1: by, x2: mx, y2: my, r1: 2.1, r2: 1.5, ramp: R.octo, shift: -back, flat: .6 },
-      { t: 'cap', x1: mx, y1: my, x2: ex, y2: ey, r1: 1.5, r2: 1.1, ramp: R.octo, shift: -back, flat: .6, edge: true },
-    )
-  })
-  // うえに くるんと あげた 2ほん（きゅうばん つき）。
-  for (let side = -1; side <= 1; side += 2) {
-    const up = Math.sin(ph + (side > 0 ? Math.PI : 0)) * .8
-    const pts: [number, number][] = [[cx + side * 5, 13.4], [cx + side * 9.5, 15 + up * .4], [cx + side * 12.6, 12.6 + up * .6], [cx + side * 13.2, 8.4 + up], [cx + side * 11.8, 5.6 + up]]
-    for (let i = 0; i < pts.length - 1; i++) {
-      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1]
-      prims.push({ t: 'cap', x1, y1, x2, y2, r1: 2 - i * .25, r2: 1.75 - i * .25, ramp: R.octo, flat: .62 })
+  const suckers = (s: Sample) => (s.v > .45 && Math.floor(s.u * 4) % 2 === 0 ? { ramp: R.sucker, flat: .62 } : undefined)
+  // あし 1ぽん: ねもとから ゆるく まがって、さきが くるん。
+  const arm = (x: number, y: number, a: number, bend: number, len: number, seed: number, back: boolean) => {
+    const n = 7, step = len / n
+    for (let j = 0; j < n; j++) {
+      const na = a + bend * (j > 4 ? 3 : 1) + Math.sin(ph + seed - j * .7) * .2
+      const nx = x + Math.cos(na) * step, ny = y + Math.sin(na) * step
+      const r = 2 - j * .22
+      prims.push({ t: 'cap', x1: x, y1: y, x2: nx, y2: ny, r1: r, r2: r - .22, ramp: R.octo, shift: back ? -.22 : 0, pat: suckers })
+      x = nx; y = ny; a = na
     }
-    for (const [x, y] of pts.slice(2)) prims.push({ t: 'px', x: x + side * 1.1, y, color: '#ffe0dc' })
-    prims.push({ t: 'px', x: pts[1][0], y: pts[1][1] + 1.2, color: '#ffe0dc' })
   }
+  // おくの 4ほん → てまえの 4ほん。
+  arm(14, 13.5, 2.7, -.1, 15, 0, true)
+  arm(16, 14, 1.95, .12, 12, 1.6, true)
+  arm(18, 14, 1.05, -.14, 11, 3.1, true)
+  arm(20, 13.5, .3, .18, 12, 4.7, true)
+  arm(13.5, 14, 3, -.14, 16, 2.2, false)
+  arm(15.5, 14.5, 2.25, .1, 13, 3.8, false)
+  arm(17.5, 14.5, 1.4, -.18, 11, 5.3, false)
+  arm(19.5, 14, .55, .22, 12, .8, false)
+  const bumps = (s: Sample) => (spots(s, 1.6, .2) ? { shift: -.14 } : undefined)
   prims.push(
-    { t: 'ell', x: cx, y: 15, rx: 6.2, ry: 3.2, ramp: R.octo, flat: .6 },
-    { t: 'ell', x: cx, y: 8, rx: 8.4, ry: 7.6, ramp: R.octo, gloss: .35, pat: s => ({ flat: .64 - s.nx * .08 - s.ny * .1 }) },
-    { t: 'px', x: cx - 3.2, y: 7.4, color: '#1a0a10' }, { t: 'px', x: cx - 3.2, y: 8.4, color: '#1a0a10' },
-    { t: 'px', x: cx + 3.2, y: 7.4, color: '#1a0a10' }, { t: 'px', x: cx + 3.2, y: 8.4, color: '#1a0a10' },
-    { t: 'ell', x: cx, y: 11.8, rx: 2.3, ry: 2.1, ramp: R.octoLip, flat: .7, edge: true },
-    { t: 'px', x: cx, y: 11.8, color: '#3a0a14' },
+    // あたま（ここに めも つく）。
+    { t: 'ell', x: 16.4, y: 8.4, rx: 8.2, ry: 6.8, rot: -.22, ramp: R.octo, gloss: .45, pat: bumps },
+    { t: 'eye', x: 21.4, y: 10.6, r: 1.35, iris: '#f0c040' },
   )
   return { w, h, prims }
 }
