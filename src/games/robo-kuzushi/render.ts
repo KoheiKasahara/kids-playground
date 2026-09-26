@@ -647,10 +647,11 @@ function drawAim(ctx: CanvasRenderingContext2D, scene: Scene) {
   if (!scene.pull || !scene.path.length) return
   scene.path.forEach((p, i) => {
     const t = i / scene.path.length
-    ctx.fillStyle = `rgba(255,255,255,${.95 - t * .75})`
-    ctx.strokeStyle = `rgba(40,70,110,${.5 - t * .4})`
-    ctx.lineWidth = 1.5
-    ctx.beginPath(); ctx.arc(p.x, p.y, 6.5 - t * 3.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    // そらや くさの まえでも みえるように、とおくの てんも うすく しすぎない。
+    ctx.fillStyle = `rgba(255,255,255,${1 - t * .55})`
+    ctx.strokeStyle = `rgba(30,55,95,${.75 - t * .4})`
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.arc(p.x, p.y, 7.5 - t * 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
   })
 }
 
