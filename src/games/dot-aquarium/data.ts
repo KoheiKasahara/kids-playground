@@ -1,6 +1,7 @@
 // すいそうに いれられる いきもの・もの・えさ の きまり。
 
 export type SpeciesId = 'clown' | 'neon' | 'angel' | 'tang' | 'puffer' | 'seahorse' | 'jelly' | 'crab' | 'eel' | 'turtle' | 'shark'
+  | 'octopus' | 'squid' | 'moray' | 'ray'
 export type DecorKind = 'kelp' | 'rock' | 'wood' | 'coral' | 'anemone' | 'clam' | 'chest' | 'castle' | 'pot' | 'bubbler'
 export type FoodKind = 'flake' | 'pellet' | 'shrimp'
 
@@ -42,6 +43,10 @@ export const SPECIES: readonly SpeciesDef[] = [
   { id: 'eel', name: 'チンアナゴ', limit: 5, w: 6, h: 26, zone: 'sand', speed: 0, eats: ['flake'], likes: ['rock', 'clam'], small: false, act: 'すなから こんにちは' },
   { id: 'turtle', name: 'ウミガメ', limit: 1, w: 38, h: 18, zone: 'any', speed: 9, eats: ['shrimp', 'pellet'], likes: ['rock', 'wood'], small: false, act: 'のんびり いこうね' },
   { id: 'shark', name: 'サメ', limit: 1, w: 56, h: 20, zone: 'mid', speed: 15, eats: ['shrimp'], likes: ['castle', 'chest'], small: false, act: 'ぼく やさしい サメだよ' },
+  { id: 'octopus', name: 'タコ', limit: 1, w: 20, h: 18, zone: 'low', speed: 7, eats: ['shrimp', 'pellet'], likes: ['pot', 'rock'], small: false, act: 'あしは 8ぽん あるよ' },
+  { id: 'squid', name: 'イカ', limit: 3, w: 24, h: 10, zone: 'high', speed: 16, eats: ['shrimp', 'flake'], likes: ['kelp', 'bubbler'], small: true, act: 'すいすい〜っ' },
+  { id: 'moray', name: 'ウツボ', limit: 1, w: 40, h: 10, zone: 'low', speed: 8, eats: ['shrimp'], likes: ['rock', 'castle'], small: false, act: 'くちを パクパク。こわくないよ' },
+  { id: 'ray', name: 'エイ', limit: 2, w: 30, h: 12, zone: 'low', speed: 10, eats: ['pellet', 'shrimp'], likes: ['clam', 'rock'], small: false, act: 'つばさみたいに ひらひら' },
 ]
 
 export type DecorDef = {
