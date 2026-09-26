@@ -409,7 +409,8 @@ function TitleScreen({ progress, music, onMusic, onPick }: { progress: Progress;
         const scene = sceneFor(stage, world)
         if (!scene) return
         const w = 200, h = 112
-        const focus = stage.id === 'ruins' ? { x: 320, y: 200 } : stage.id === 'beach' ? { x: 290, y: 250 } : { x: 250, y: 150 }
+        const focus = stage.id === 'ruins' ? { x: 320, y: 200 } : stage.id === 'beach' ? { x: 290, y: 250 }
+          : stage.id === 'snow' ? { x: 190, y: 120 } : { x: 250, y: 150 }
         const img = scene.draw(world, scene.camera(focus, w, h), 3, createFx(), w, h)
         try { const url = img?.toDataURL(); if (url) setThumbs(t => ({ ...t, [stage.id]: url })) } catch { /* え なしで つづける */ }
       }, 120 + i * 90))

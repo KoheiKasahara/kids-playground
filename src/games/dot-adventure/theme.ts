@@ -57,6 +57,20 @@ export const GROUND: Record<string, GroundPalette> = {
     moss: ['#1a4228', '#285c30', '#3c7a3a'],
     wood: ['#2e1a0e', '#4c2e18', '#6e4624', '#926236', '#b4824c'],
   },
+  // ゆきの ステージは くさ＝ゆき、すな＝こおり、つち＝ふみかためた ゆきみち に ぬりかえる。
+  snow: {
+    grass: ['#8494b8', '#a2b2d2', '#c0cee8', '#d8e2f4', '#ecf2fc', '#ffffff'],
+    dirt: ['#46506c', '#5e6886', '#7a84a0', '#96a0ba', '#b2bcd2', '#ccd4e6'],
+    sand: ['#5e94c0', '#7eb0d8', '#9ecaea', '#c0e2f6', '#e4f6ff'],
+    stone: ['#34384a', '#4a5064', '#646a80', '#80879c', '#a0a6ba', '#c6cadc'],
+    bank: ['#262c44', '#3a4260', '#525c7c', '#6e7898'],
+    stoneWall: ['#1a1c2a', '#2a2e3e', '#3c4054', '#50566c'],
+    water: ['#0a2440', '#10365c', '#184c7a', '#226496', '#3082b0', '#50a4cc', '#90d0ea'],
+    foam: '#ffffff',
+    flowers: [['#a8d4ff', '#ffffff'], ['#c8e4ff', '#ffffff'], ['#8ab8e8', '#e8f6ff']],
+    moss: ['#a8b8d4', '#d0dcee', '#eef4fc'],
+    wood: ['#2e1a0e', '#4c2e18', '#6e4624', '#926236', '#b4824c'],
+  },
 }
 
 export const TREE: Record<string, TreeStyle> = {
@@ -78,6 +92,13 @@ export const TREE: Record<string, TreeStyle> = {
     trunk: ['#20140c', '#382214', '#56381e', '#76502c', '#96683c'],
     trunkOutline: '#100804',
   },
+  // うえに ゆきが つもった 木（あかるい ところが しろく なる）。
+  snow: {
+    leaves: ['#0a2426', '#123634', '#1c4c44', '#2e6a5a', '#8ea8bc', '#d4e2f0', '#ffffff'],
+    leafOutline: '#061418',
+    trunk: ['#22160e', '#3a2618', '#583c22', '#7a5430', '#9a6e42'],
+    trunkOutline: '#100804',
+  },
 }
 
 export const BERRY_BUSH = (stage: string): TreeStyle => ({ ...TREE[stage], fruit: stage === 'ruins' ? '#8ac8ff' : '#e8385a' })
@@ -86,6 +107,8 @@ export const ROCK: Record<string, RockStyle> = {
   forest: { ramp: ['#2a2c3a', '#43475a', '#62687e', '#868ea4', '#b0b8c8', '#d8dce6'], outline: '#12121a', moss: ['#2a5428', '#44803a', '#6aac4c'] },
   beach: { ramp: ['#2e2622', '#4a3c34', '#6a584a', '#8e7a64', '#b4a084', '#d8c8a8'], outline: '#16100c' },
   ruins: { ramp: ['#24222e', '#3a384a', '#545268', '#727088', '#9492a8', '#bcbacc'], outline: '#0e0c14', moss: ['#1a4228', '#2c6034', '#447c40'] },
+  // こけの かわりに ゆきの ぼうし。
+  snow: { ramp: ['#262a3a', '#3e4458', '#5a6278', '#7c849c', '#a2aac0', '#c8cedc'], outline: '#10121c', moss: ['#b8c8e0', '#dce6f4', '#ffffff'] },
 }
 
 export const PALM: PalmStyle = {
@@ -108,6 +131,7 @@ export const SLIME: Record<FriendDef['color'], SlimeStyle> = {
   purple: { ramp: ['#2e1460', '#4a2494', '#6e3ec4', '#9a68e4', '#c49cff', '#e8d8ff'], outline: '#160832', rim: '#c8a8ff' },
   mint: { ramp: ['#0c4a3a', '#147058', '#22987a', '#3cc49c', '#7ae4c0', '#c0fae4'], outline: '#06261e', rim: '#90f4d0' },
   red: { ramp: ['#5a0c10', '#921a1c', '#cc3028', '#ec5a44', '#ff8c70', '#ffc4b0'], outline: '#2e0608', rim: '#ff9a80' },
+  ice: { ramp: ['#2a4a7a', '#4a78ae', '#78a8d8', '#a8d4f4', '#d4ecff', '#f4fbff'], outline: '#14223e', rim: '#e0f4ff' },
 }
 
 export const SHARD_RAMP = ['#8a3a00', '#d07a10', '#ffbe30', '#ffe070', '#fff6c0', '#ffffff'] as const
@@ -118,5 +142,6 @@ export const LIGHTING: Record<Theme, { ambient: string | null; top?: string; glo
   day: { ambient: null, glow: 0 },
   sunset: { ambient: '#ffb48c', top: '#ff7c64', glow: .45 },
   night: { ambient: '#232a58', glow: 1 },
+  snow: { ambient: '#eef2ff', top: '#d4e0fa', glow: 0 },
 }
 

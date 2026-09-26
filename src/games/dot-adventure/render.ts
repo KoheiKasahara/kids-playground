@@ -3,8 +3,8 @@
 
 import { bayer, hash2, makeCanvas, pack, periodicNoise, rng } from './pixel'
 import {
-  CHEST_CLOSED, CHEST_OPEN, CROWN, CRAB_FRAMES, HEART, HERO_PALETTE, LILY, LILY_FLOWER, NOTE, RAINBOW_SHELL,
-  SHELL, STARFISH, BUTTERFLY, heroRows, spriteCanvas, type Facing,
+  CHEST_CLOSED, CHEST_OPEN, CROWN, CRAB_FRAMES, HEART, HERO_PALETTE, LILY, LILY_FLOWER, NOTE, PENGUIN_FRAMES, RAINBOW_SHELL,
+  SHELL, SNOW_CRYSTAL, STARFISH, BUTTERFLY, heroRows, spriteCanvas, type Facing,
 } from './sprites'
 import {
   brazierCanvas, bushCanvas, flameCanvas, gemCanvas, palmCanvas, pillarCanvas, rockCanvas, shadowCanvas, shardCanvas,
@@ -23,7 +23,7 @@ type Particle = {
   kind: 'spark' | 'dust' | 'heart' | 'note' | 'ring' | 'mote'
   x: number; y: number; vx: number; vy: number; life: number; max: number; color: string
 }
-type Critter = { kind: 'butterfly' | 'leaf' | 'firefly' | 'gull'; x: number; y: number; vx: number; vy: number; t: number; seed: number }
+type Critter = { kind: 'butterfly' | 'leaf' | 'firefly' | 'gull' | 'snow'; x: number; y: number; vx: number; vy: number; t: number; seed: number }
 
 export type Fx = { parts: Particle[]; critters: Critter[]; chestAt: number; openAt: number; marker: { x: number; y: number; t: number } | null }
 
@@ -162,8 +162,9 @@ export class Scene {
     this.hero = { down: heroFrames('down', false), up: heroFrames('up', false), right: heroFrames('side', false), left: heroFrames('side', true) }
     for (const def of stage.friends) {
       if (this.friends.has(def.name)) continue
-      if (def.kind === 'crab') {
-        this.friends.set(def.name, { kind: 'crab', frames: CRAB_FRAMES.map(f => need(spriteCanvas(f))), blink: need(spriteCanvas(CRAB_FRAMES[0])) })
+      if (def.kind === 'crab' || def.kind === 'penguin') {
+        const art = def.kind === 'crab' ? CRAB_FRAMES : PENGUIN_FRAMES
+        this.friends.set(def.name, { kind: def.kind, frames: art.map(f => need(spriteCanvas(f))), blink: need(spriteCanvas(art[0])) })
       } else {
         const st = SLIME[def.color]
         const sizes: [number, number][] = [[14, 11], [15, 10], [16, 9], [13, 12], [12, 13]]
@@ -173,6 +174,7 @@ export class Scene {
     this.shards = Array.from({ length: 12 }, (_, i) => need(shardCanvas(i / 12 * Math.PI * 2, SHARD_RAMP, SHARD_OUTLINE)))
     this.chest = [need(spriteCanvas(CHEST_CLOSED)), need(spriteCanvas(CHEST_OPEN))]
     this.treasure = stage.id === 'ruins' ? need(spriteCanvas(CROWN)) : stage.id === 'beach' ? need(spriteCanvas(RAINBOW_SHELL))
+      : stage.id === 'snow' ? need(spriteCanvas(SNOW_CRYSTAL))
       : need(gemCanvas(['#063a1c', '#0c6a30', '#18a048', '#4cd070', '#a0f0b0', '#ffffff'], '#02200e'))
     this.flames = [0, 1, 2, 3, 4, 5].map(i => need(flameCanvas(i)))
     this.heart = need(spriteCanvas(HEART))
@@ -180,7 +182,7 @@ export class Scene {
     this.butterflies = BUTTERFLY.map(b => need(spriteCanvas(b)))
     this.shadowBig = need(shadowCanvas(14, 5))
     this.shadowSmall = need(shadowCanvas(9, 4))
-    if (stage.theme === 'day') this.clouds = cloudCanvas()
+    if (stage.theme === 'day' || stage.theme === 'snow') this.clouds = cloudCanvas()
   }
 
   /** ひかりの でる もの。 */
@@ -385,10 +387,11 @@ export class Scene {
     const art = this.friends.get(f.def.name)
     if (!art) return
     const x = Math.round(f.x) - cam.x, y = Math.round(f.y) - cam.y
-    if (art.kind === 'crab') {
-      const img = art.frames[f.moving ? Math.floor(f.hop / 6) % 2 : 0]
+    if (art.kind !== 'slime') {
+      // カニは よこあるき、ペンギンは よちよち。
+      const img = art.frames[f.moving ? Math.floor(f.hop / (art.kind === 'penguin' ? 8 : 6)) % 2 : 0]
       if (!ghost) { ctx.globalAlpha = .35; ctx.drawImage(this.shadowBig, x - 7, y - 3); ctx.globalAlpha = 1 }
-      ctx.drawImage(img, x - 8, y - 12)
+      ctx.drawImage(img, x - 8, y - img.height)
       return
     }
     // スライムは ぴょんぴょん。とまっている ときは ぷるぷる いきをする。
@@ -494,6 +497,11 @@ export class Scene {
         ctx.fillStyle = c.seed % 3 === 0 ? '#d8a040' : c.seed % 3 === 1 ? '#78b848' : '#a8cc50'
         const flip = Math.floor(time * 4 + c.seed) % 2
         ctx.fillRect(x, y, flip ? 2 : 1, flip ? 1 : 2)
+      } else if (c.kind === 'snow') {
+        // ふる ゆき。ときどき 大きな ひとつぶ。
+        ctx.fillStyle = '#ffffff'
+        if (c.seed % 5 === 0) { ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3) }
+        else ctx.fillRect(x, y, c.seed % 3 === 0 ? 2 : 1, 1)
       } else if (c.kind === 'gull') {
         // かもめの かげ。
         ctx.globalAlpha = .18
@@ -507,7 +515,7 @@ export class Scene {
     if (this.clouds && theme !== 'night') {
       const cw = this.clouds.width
       const ox = Math.floor((cam.x + time * 6) % cw), oy = Math.floor((cam.y + time * 2.5) % cw)
-      ctx.globalAlpha = theme === 'sunset' ? .14 : .2
+      ctx.globalAlpha = theme === 'sunset' ? .14 : theme === 'snow' ? .12 : .2
       for (let yy = -oy; yy < h; yy += cw) for (let xx = -ox; xx < w; xx += cw) ctx.drawImage(this.clouds, xx, yy)
       ctx.globalAlpha = 1
     }
@@ -564,7 +572,7 @@ export class Scene {
         for (const f of world.friends) if (f.def.color === 'mint' || f.def.color === 'purple') addLight(f.x, f.y - 6, 22, f.def.color === 'mint' ? '#80ffd0' : '#c0a0ff', .7)
         for (const c of fx.critters) if (c.kind === 'firefly') addLight(c.x, c.y, 7, '#d0ff80', .8)
         if (world.chest.visible) addLight(world.chest.x, world.chest.y - 8, 40, '#ffe8a0', .9)
-      } else {
+      } else if (theme === 'sunset') {
         // ゆうやけの 空の まぶしさ。
         l.globalAlpha = .12
         l.fillStyle = '#ffe0b0'
@@ -714,6 +722,7 @@ function updateCritters(fx: Fx, stage: StageDef, cam: Point, w: number, h: numbe
     leaf: stage.id === 'forest' ? 10 : 0,
     firefly: stage.theme === 'night' ? 22 : 0,
     gull: stage.id === 'beach' ? 3 : 0,
+    snow: stage.theme === 'snow' ? 46 : 0,
   }
   const counts: Record<string, number> = {}
   for (const c of fx.critters) counts[c.kind] = (counts[c.kind] ?? 0) + 1
@@ -721,7 +730,7 @@ function updateCritters(fx: Fx, stage: StageDef, cam: Point, w: number, h: numbe
   for (const kind of Object.keys(want) as Critter['kind'][]) {
     for (let i = counts[kind] ?? 0; i < want[kind]; i++) {
       const r = rng(seedBase + i * 17 + kind.length * 1000)
-      fx.critters.push({ kind, x: cam.x + r() * w, y: cam.y + (kind === 'leaf' ? -r() * h : r() * h), vx: 0, vy: 0, t: r() * 10, seed: Math.floor(r() * 1000) })
+      fx.critters.push({ kind, x: cam.x + r() * w, y: cam.y + (kind === 'leaf' ? -r() * h : kind === 'snow' ? (r() * 2 - 1) * h : r() * h), vx: 0, vy: 0, t: r() * 10, seed: Math.floor(r() * 1000) })
     }
   }
   for (const c of fx.critters) {
@@ -735,6 +744,10 @@ function updateCritters(fx: Fx, stage: StageDef, cam: Point, w: number, h: numbe
     } else if (c.kind === 'firefly') {
       c.x += Math.sin(c.t * .7 + c.seed) * .25
       c.y += Math.cos(c.t * .5 + c.seed * 2) * .2
+    } else if (c.kind === 'snow') {
+      const fall = .28 + (c.seed % 7) * .05
+      c.x += Math.sin(c.t * .8 + c.seed) * .22 - .06
+      c.y += fall
     } else if (c.kind === 'gull') {
       c.x -= .9
       c.y += Math.sin(c.t * .5 + c.seed) * .2

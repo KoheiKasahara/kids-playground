@@ -116,9 +116,9 @@ button.window:focus-visible {
 
 .stageList {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(8px, 1.6vw, 18px);
-  width: min(100%, 920px);
+  width: min(100%, 1040px);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -137,6 +137,7 @@ button.window:focus-visible {
 
 .stageList li:nth-child(2) .stageCard { animation-delay: .08s; }
 .stageList li:nth-child(3) .stageCard { animation-delay: .16s; }
+.stageList li:nth-child(4) .stageCard { animation-delay: .24s; }
 
 @keyframes cardIn {
   from { opacity: 0; transform: translateY(16px); }
@@ -156,6 +157,7 @@ button.window:focus-visible {
 
 .thumb[data-theme='sunset'] { background: #b06040; }
 .thumb[data-theme='night'] { background: #141a3a; }
+.thumb[data-theme='snow'] { background: #c8d8f0; }
 
 .thumb img {
   display: block;
@@ -216,7 +218,7 @@ button.window:focus-visible {
   .logo h1 { font-size: clamp(28px, 5.4vw, 44px); }
   .logoSub { font-size: 12px; margin-bottom: 2px; }
   .stageLead { display: none; }
-  .stageList { width: min(100%, 760px); }
+  .stageList { width: min(100%, 860px); }
   .stageCard { padding: 6px 6px 8px; }
   .titleFoot { display: none; }
 }

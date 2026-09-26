@@ -144,6 +144,12 @@ export const SONGS: Record<string, Song> = {
     bass: ['A2', 'E2', 'F2', 'E2', 'A2', 'C3', 'G2', 'E2'],
     arp: true,
   },
+  snow: {
+    bpm: 92,
+    melody: 'G5 - E5 - C6 - G5 - | A5 - G5 - E5 - - - | F5 - A5 - G5 - E5 - | D5 - - - - - . . | E5 - G5 - C6 - D6 - | E6 - D6 - C6 - A5 - | G5 - E5 - D5 - G5 - | C5 - - - - - . .',
+    bass: ['C3', 'A2', 'F2', 'G2', 'C3', 'A2', 'G2', 'C3'],
+    arp: true,
+  },
 }
 
 /** ステージの BGM を ながす。とめる 関数を かえす。 */
