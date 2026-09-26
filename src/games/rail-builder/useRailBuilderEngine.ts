@@ -41,9 +41,11 @@ import {
   moveRailFleetTrainTo,
   occupiedRailFleetPieceIds,
   removeRailFleetTrain,
+  resolveTrainVisualConfig,
   setRailFleetTrainRunning,
   setRailFleetTrainType,
   summarizeRailFleet,
+  TRAIN_TYPES,
   updateRailFleet,
   type RailFleetTrain,
   type RailFleetTrainSummary,
@@ -118,6 +120,9 @@ const TRAIN_DRAG_MAX_DISTANCE = 8
 // 下げる。見た目のgeometryには影響せず、raycast用の透明hit areaだけを広げる。
 const RAIL_HIT_AREA_MAX_WIDTH_SCALE = 2.4
 const RAIL_HIT_AREA_HEIGHT = 0.6
+/** 車両選択パネルの3Dサムネイル解像度(カード表示の約2倍でRetinaでも粗くならない)。 */
+const TRAIN_THUMBNAIL_WIDTH = 480
+const TRAIN_THUMBNAIL_HEIGHT = 270
 
 export type RailBuilderEngineOptions = {
   pieces: readonly RailPiece[]
@@ -149,6 +154,11 @@ export type RailBuilderEngineHandle = {
   revealPiece: (piece: RailPiece) => void
   /** Phase 3の車両選択UIから、既存列車の見た目(trainType)だけを差し替えるためのAPI。 */
   setTrainType: (trainId: string, trainType: TrainType) => void
+  /**
+   * 車両選択パネル用に、走行中と同じ3Dモデルの先頭車を描いたPNG(data URL)を返す。
+   * WebGLが使えない環境では空のMapを返し、呼び出し側はSVGサムネイルへ戻す。
+   */
+  getTrainThumbnails: () => ReadonlyMap<TrainType, string>
 }
 
 /** 新しいせんろが「見えている」とみなす画面範囲（NDC）。上下はUIに隠れやすいので狭め。 */
@@ -886,6 +896,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
   const focusDepotRef = useRef<(() => void) | null>(null)
   const revealPieceRef = useRef<((piece: RailPiece) => void) | null>(null)
   const setTrainTypeRef = useRef<((trainId: string, trainType: TrainType) => void) | null>(null)
+  const getTrainThumbnailsRef = useRef<(() => ReadonlyMap<TrainType, string>) | null>(null)
 
   const registerContainer = useCallback((element: HTMLDivElement | null) => {
     containerRef.current = element
@@ -925,6 +936,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     setTrainTypeRef.current?.(trainId, trainType)
   }, [])
 
+  const getTrainThumbnails = useCallback((): ReadonlyMap<TrainType, string> => {
+    return getTrainThumbnailsRef.current?.() ?? new Map()
+  }, [])
+
   const handle = useMemo<RailBuilderEngineHandle>(
     () => ({
       registerContainer,
@@ -937,9 +952,11 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       focusDepot,
       revealPiece,
       setTrainType,
+      getTrainThumbnails,
     }),
     [
       addTrain,
+      getTrainThumbnails,
       focusDepot,
       revealPiece,
       focusTrain,
@@ -2259,7 +2276,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         : makeSpecialTrainCar(runtime, trainId, role, definition)
     }
 
-    function createTrainVisualRuntime(train: RailFleetTrain): TrainVisualRuntime {
+    function createTrainVisualRuntime(train: Pick<RailFleetTrain, 'id' | 'trainType' | 'appearance'>): TrainVisualRuntime {
       const specialMaterials = train.trainType === 'basic'
         ? undefined
         : specialTrainVisualMaterials.get(train.trainType)
@@ -2299,6 +2316,127 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       // 車体固有のbasic clone materialだけが非共有として解放される。
       // E5の共有material/geometryはeffectのcleanupで一度だけ解放する。
       disposeObjectTree(runtime.root, sharedGeometries, sharedMaterials)
+    }
+
+    const trainThumbnailCache = new Map<TrainType, string>()
+
+    /**
+     * 車両選択パネル用のサムネイルを、走行中と同じ編成組み立て処理で作った
+     * 先頭車から描く。本体のrendererをオフスクリーンのrender targetへ一度だけ
+     * 向けて描き、結果はdata URLとしてキャッシュする(2回目以降は描かない)。
+     */
+    function getTrainThumbnailsNow(): ReadonlyMap<TrainType, string> {
+      if (renderer === null || trainThumbnailCache.size === TRAIN_TYPES.length) return trainThumbnailCache
+      const canvas = document.createElement('canvas')
+      canvas.width = TRAIN_THUMBNAIL_WIDTH
+      canvas.height = TRAIN_THUMBNAIL_HEIGHT
+      const context = canvas.getContext('2d')
+      if (context === null) return trainThumbnailCache
+
+      const thumbnailScene = new THREE.Scene()
+      thumbnailScene.add(new THREE.HemisphereLight('#fffaf0', '#8a9aa6', 2.1))
+      const keyLight = new THREE.DirectionalLight('#fff8e7', 2.2)
+      keyLight.position.set(4, 9, 7)
+      thumbnailScene.add(keyLight)
+      const rimLight = new THREE.DirectionalLight('#dff4ff', 0.9)
+      rimLight.position.set(-6, 3, -4)
+      thumbnailScene.add(rimLight)
+      const thumbnailCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100)
+      const target = new THREE.WebGLRenderTarget(TRAIN_THUMBNAIL_WIDTH, TRAIN_THUMBNAIL_HEIGHT, { samples: 4 })
+      target.texture.colorSpace = THREE.SRGBColorSpace
+      const pixels = new Uint8Array(TRAIN_THUMBNAIL_WIDTH * TRAIN_THUMBNAIL_HEIGHT * 4)
+      const imageData = context.createImageData(TRAIN_THUMBNAIL_WIDTH, TRAIN_THUMBNAIL_HEIGHT)
+      const previousTarget = renderer.getRenderTarget()
+      const previousClearColor = renderer.getClearColor(new THREE.Color())
+      const previousClearAlpha = renderer.getClearAlpha()
+      const previousShadowAutoUpdate = renderer.shadowMap.autoUpdate
+      const box = new THREE.Box3()
+      const center = new THREE.Vector3()
+      const size = new THREE.Vector3()
+      // 右前・やや上から見下ろす3/4ビュー。ノーズが右を向き、側面の帯と窓も見える。
+      const viewDirection = new THREE.Vector3(0.42, 0.38, 1).normalize()
+
+      try {
+        renderer.shadowMap.autoUpdate = false
+        // 縁のアンチエイリアスが白いカード背景へ自然に溶けるよう、透明な白でクリアする。
+        renderer.setClearColor('#ffffff', 0)
+        for (const [index, trainType] of TRAIN_TYPES.entries()) {
+          if (trainThumbnailCache.has(trainType)) continue
+          const runtime = createTrainVisualRuntime({
+            id: `thumbnail-${trainType}`,
+            trainType,
+            appearance: { ...resolveTrainVisualConfig(trainType, index) },
+          })
+          trainRoot.remove(runtime.root)
+          const leadCar = runtime.cars[0]
+          if (leadCar === undefined) {
+            disposeObjectTree(runtime.root, sharedGeometries, sharedMaterials)
+            continue
+          }
+          runtime.root.remove(leadCar)
+          thumbnailScene.add(leadCar)
+          leadCar.updateMatrixWorld(true)
+          box.setFromObject(leadCar)
+          box.getCenter(center)
+          box.getSize(size)
+          const radius = size.length() / 2
+          thumbnailCamera.position.copy(center).addScaledVector(viewDirection, radius * 4)
+          thumbnailCamera.lookAt(center)
+          thumbnailCamera.updateMatrixWorld(true)
+          // 箱の8頂点をカメラ座標へ投影し、余白込みでぴったり収まる範囲を求める。
+          const inverse = thumbnailCamera.matrixWorldInverse
+          let minX = Infinity
+          let maxX = -Infinity
+          let minY = Infinity
+          let maxY = -Infinity
+          for (const x of [box.min.x, box.max.x]) {
+            for (const y of [box.min.y, box.max.y]) {
+              for (const z of [box.min.z, box.max.z]) {
+                const corner = new THREE.Vector3(x, y, z).applyMatrix4(inverse)
+                minX = Math.min(minX, corner.x)
+                maxX = Math.max(maxX, corner.x)
+                minY = Math.min(minY, corner.y)
+                maxY = Math.max(maxY, corner.y)
+              }
+            }
+          }
+          const aspect = TRAIN_THUMBNAIL_WIDTH / TRAIN_THUMBNAIL_HEIGHT
+          const halfHeight = Math.max((maxY - minY) / 2, (maxX - minX) / 2 / aspect) * 1.08
+          const midX = (minX + maxX) / 2
+          const midY = (minY + maxY) / 2
+          thumbnailCamera.left = midX - halfHeight * aspect
+          thumbnailCamera.right = midX + halfHeight * aspect
+          thumbnailCamera.top = midY + halfHeight
+          thumbnailCamera.bottom = midY - halfHeight
+          thumbnailCamera.far = radius * 8
+          thumbnailCamera.updateProjectionMatrix()
+
+          renderer.setRenderTarget(target)
+          renderer.clear()
+          renderer.render(thumbnailScene, thumbnailCamera)
+          renderer.readRenderTargetPixels(target, 0, 0, TRAIN_THUMBNAIL_WIDTH, TRAIN_THUMBNAIL_HEIGHT, pixels)
+          // WebGLは下から上へ読み出すので、上下を反転してcanvasへ移す。
+          const rowBytes = TRAIN_THUMBNAIL_WIDTH * 4
+          for (let row = 0; row < TRAIN_THUMBNAIL_HEIGHT; row += 1) {
+            const sourceStart = (TRAIN_THUMBNAIL_HEIGHT - 1 - row) * rowBytes
+            imageData.data.set(pixels.subarray(sourceStart, sourceStart + rowBytes), row * rowBytes)
+          }
+          context.putImageData(imageData, 0, 0)
+          trainThumbnailCache.set(trainType, canvas.toDataURL('image/png'))
+
+          thumbnailScene.remove(leadCar)
+          disposeObjectTree(leadCar, sharedGeometries, sharedMaterials)
+          disposeObjectTree(runtime.root, sharedGeometries, sharedMaterials)
+        }
+      } catch {
+        // WebGLが途中で失われても、描けた分だけ返し残りはSVGにまかせる。
+      } finally {
+        renderer.setRenderTarget(previousTarget)
+        renderer.setClearColor(previousClearColor, previousClearAlpha)
+        renderer.shadowMap.autoUpdate = previousShadowAutoUpdate
+        target.dispose()
+      }
+      return trainThumbnailCache
     }
 
     function ensureTrainVisuals() {
@@ -2519,6 +2657,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     focusDepotRef.current = focusDepotNow
     revealPieceRef.current = revealPieceNow
     setTrainTypeRef.current = setTrainTypeNow
+    getTrainThumbnailsRef.current = getTrainThumbnailsNow
 
     function addPieceFacilityDetails(group: THREE.Group, localPiece: RailPiece) {
       const pieceId = localPiece.id
@@ -3551,6 +3690,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       focusDepotRef.current = null
       revealPieceRef.current = null
       setTrainTypeRef.current = null
+      getTrainThumbnailsRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)
       resizeObserver?.disconnect()
       if (resizeObserver === null) window.removeEventListener('resize', resize)
