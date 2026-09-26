@@ -60,7 +60,7 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
     expect(mock.spoken).toEqual(['この くにの なまえは？'])
   })
 
-  test('ON のまま選択肢をタップして正誤演出が出ても、読み上げ回数が増えない', async () => {
+  test('ON のまま選択肢をタップして正誤演出が出ても、問題文は読み直さない（不正解なら答えだけ読み上げる）', async () => {
     const user = userEvent.setup()
     await renderApp('/games/flag-quiz/flag-to-name/hard/play')
     await user.click(getToggle())
@@ -69,8 +69,36 @@ describe('国旗クイズ（こっき→なまえ）のよみあげ挙動', () =
     await user.click(getChoiceButtons()[0])
     expect(screen.getByRole('status')).toBeInTheDocument()
     // 正誤演出の表示・再レンダーだけでは questionKey (state.index) が変わらないため、
-    // 読み上げは増えないはず。
-    expect(mock.spoken).toHaveLength(1)
+    // 問題文の読み上げは増えない。選択肢はランダムなので、不正解だったときだけ
+    // 「こたえは ○○」の読み上げが1回だけ加わる（Issue #784 A9）。
+    const wrong = screen.queryByText('ざんねん！') !== null
+    expect(mock.spoken.filter((text) => !text.startsWith('こたえは '))).toEqual(['この くにの なまえは？'])
+    if (wrong) {
+      expect(mock.spoken).toHaveLength(2)
+      expect(mock.spoken[1]).toMatch(/^こたえは \S/)
+    } else {
+      expect(mock.spoken).toHaveLength(1)
+    }
+  })
+
+  test('不正解のときは「こたえは ○○」と正解を1回だけ読み上げる', async () => {
+    const user = userEvent.setup()
+    await renderApp('/games/flag-quiz/flag-to-name/hard/play')
+    await user.click(getToggle())
+
+    // どれが正解か分からないため、1つ選んで正解だった場合は次の問題でもう一度試す。
+    for (let attempt = 0; attempt < 10; attempt++) {
+      mock.reset()
+      await user.click(getChoiceButtons()[0])
+      if (screen.queryByText('ざんねん！') !== null) {
+        const answer = screen.getByText(/^こたえ: /).textContent!.replace(/^こたえ: /, '')
+        expect(mock.spoken).toEqual([`こたえは ${answer}`])
+        return
+      }
+      await user.click(screen.getByRole('button', { name: /つぎのもんだい|けっかを みる/ }))
+    }
+    // 10問つづけて先頭の選択肢が正解になる確率はごくわずかなので、ここへは来ない想定。
+    throw new Error('不正解の問題に当たりませんでした')
   })
 
   test('「つぎのもんだい」で次の問題に進むと、もう一度読み上げられ、その直前に cancel() が呼ばれている', async () => {
