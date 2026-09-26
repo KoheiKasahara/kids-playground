@@ -535,6 +535,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'origami-play',
+    slug: 'origami-play',
+    title: 'ぱたぱた おりがみ',
+    emoji: '🟧',
+    seo: {
+      headline: 'ぱたぱた おりがみ｜タップで楽しむ紙折りあそび',
+      description: '好きな色の紙を選び、光るところをタップしてきつね・チューリップ・ふねを作る、4〜6歳向けの折り紙あそびです。紙がぱたんと折れる動きや、完成した作品のゆらめきを楽しめます。時間制限はなく、自分のペースで遊べます。',
+    },
+    category: 'learning',
+    intro: {
+      howToPlay: [
+        'かみの いろと つくりたい おりがみを えらんでね',
+        'ひかる ところを タップすると かみが おれるよ',
+        'できあがったら ほかの いろでも おってみよう',
+      ],
+    },
+  },
+  {
     id: 'animal-bath',
     slug: 'animal-bath',
     title: 'どうぶつのおふろ',
