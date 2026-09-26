@@ -4,11 +4,12 @@ import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
 import { STAGES, type FriendDef, type StageDef } from './stages'
-import { createWorld, drainEvents, friendsJoined, nextGoal, shardsLeft, stepWorld, walkTo, TILE, type Point, type World } from './world'
+import { createWorld, drainEvents, friendsJoined, nextGoal, shardsLeft, stepWorld, walkTo, TILE, type Point, type World, type WorldEvent } from './world'
 import { Scene, createFx, spawnFx, updateFx, viewSize, type Fx } from './render'
 import { readMusic, readProgress, recordClear, writeMusic, type Progress } from './progress'
 import {
-  playBumpSound, playChestAppearSound, playFanfare, playJoinSound, playShardSound, playTapSound, playTextBlip, startBgm,
+  playBumpSound, playChestAppearSound, playFanfare, playGateSound, playJoinSound, playShardSound, playSwitchSound, playTapSound,
+  playTextBlip, playTorchSound, startBgm,
 } from './sounds'
 import styles from './DotAdventurePlay.module.css'
 
@@ -57,6 +58,23 @@ function fitCanvas(canvas: HTMLCanvasElement) {
   if (canvas.width !== view.dw) canvas.width = view.dw
   if (canvas.height !== view.dh) canvas.height = view.dh
   return { ...view, dpr, box }
+}
+
+/** しかけの できごとに あわせた ことば。 */
+function gimmickMessage(event: WorldEvent): string | null {
+  switch (event.type) {
+    case 'gimmick-hint':
+      if (event.kind === 'boulder') return `おおきな いわだ。なかまが あと ${event.need}にん いれば おせそう`
+      if (event.kind === 'bridge') return 'はしが きれている… どこかに スイッチが あるかも'
+      return `いしの とびらだ。たいまつに ひを ともそう（あと ${event.need}こ）`
+    case 'switch': return 'カチッ！ スイッチを ふんだ'
+    case 'torch': return event.left > 0 ? `たいまつに ひが ついた！ あと ${event.left}こ` : null
+    case 'gate-open':
+      if (event.kind === 'boulder') return 'みんなで おしたら いわが どいた！'
+      if (event.kind === 'bridge') return 'はしが のびた！ わたれるよ'
+      return 'いしの とびらが ひらいた！'
+    default: return null
+  }
 }
 
 // ---------------- メッセージ（SFC の RPG ふうの まど） ----------------
@@ -196,6 +214,11 @@ function Stage({ index, music, onMusic, paused, onExit, onNext }: {
           openAt = view.time
           setMessages([])
         } else if (event.type === 'bump') playBumpSound()
+        else if (event.type === 'switch') playSwitchSound()
+        else if (event.type === 'torch') playTorchSound()
+        else if (event.type === 'gate-open') playGateSound()
+        const text = gimmickMessage(event)
+        if (text) say(text)
       }
       if (steps) {
         setHud(prev => {

@@ -2,7 +2,7 @@
 // マスの 地図・あるく ルートさがし・なかまの ついてくる うごき・かけらと たからばこ を あつかう。
 
 import { hash2 } from './pixel'
-import { GROUND_CHARS, OBJECT_CHARS, WATER_CHARS, type FriendDef, type StageDef } from './stages'
+import { GROUND_CHARS, OBJECT_CHARS, WATER_CHARS, type FriendDef, type GimmickDef, type StageDef } from './stages'
 
 export const TILE = 16
 /** 1フレーム（1/60びょう）に すすむ ドット数。 */
@@ -11,10 +11,15 @@ const FRIEND_GAP = 17
 const PICK_RADIUS = 13
 const JOIN_RADIUS = 15
 const CHEST_RADIUS = 22
+/** しかけの そばに きた と みなす きょり。 */
+const GATE_RADIUS = 24
+const TORCH_RADIUS = 22
+const SWITCH_RADIUS = 10
 
 export type Point = { x: number; y: number }
 export type Dir = 'down' | 'up' | 'left' | 'right'
 export type MapObject = { kind: string; tx: number; ty: number; seed: number }
+export type Tile = { tx: number; ty: number }
 
 export type Level = {
   w: number
@@ -27,6 +32,10 @@ export type Level = {
   friendSpawns: Point[]
   chest: Point
   start: Point
+  /** しかけで とおせんぼ している マス。 */
+  gates: Tile[]
+  switches: Point[]
+  torches: Tile[]
 }
 
 export const tileCenter = (tx: number, ty: number): Point => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 + 2 })
@@ -39,6 +48,9 @@ export function parseLevel(stage: StageDef): Level {
   const objects: MapObject[] = []
   const shards: Point[] = []
   const friendSpawns: Point[] = []
+  const gates: Tile[] = []
+  const switches: Point[] = []
+  const torches: Tile[] = []
   let chest: Point | null = null
   let start: Point | null = null
   const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? '' : stage.map[y][x])
@@ -53,8 +65,12 @@ export function parseLevel(stage: StageDef): Level {
       if (n && GROUND_CHARS.includes(n) && !'~#'.includes(n)) counts[n] = (counts[n] ?? 0) + (Math.abs(dx) + Math.abs(dy) === 1 ? 2 : 1)
     }
     const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0]
-    ground[y * w + x] = c === 'h' ? 's' : best ?? '.'
+    // きれた はしの ところは みずの まま。
+    ground[y * w + x] = c === 'h' ? 's' : c === 'G' && stage.gimmick.kind === 'bridge' ? '~' : best ?? '.'
+    if (c === 'u') torches.push({ tx: x, ty: y })
     if (OBJECT_CHARS.includes(c) || c === 'h') objects.push({ kind: c, tx: x, ty: y, seed: x * 131 + y * 7 })
+    else if (c === 'G') gates.push({ tx: x, ty: y })
+    else if (c === 'k') switches.push(tileCenter(x, y))
     else if (c === '*') shards.push(tileCenter(x, y))
     else if (c === 'm') friendSpawns.push(tileCenter(x, y))
     else if (c === 'C') chest = tileCenter(x, y)
@@ -63,8 +79,9 @@ export function parseLevel(stage: StageDef): Level {
   const solid = new Uint8Array(w * h)
   for (let i = 0; i < w * h; i++) if (WATER_CHARS.includes(ground[i])) solid[i] = 1
   for (const o of objects) if (o.kind !== 'h') solid[o.ty * w + o.tx] = 1
+  for (const g of gates) solid[g.ty * w + g.tx] = 1
   if (!chest || !start) throw new Error(`stage ${stage.id} needs C and @`)
-  return { w, h, ground, objects, solid, shards, friendSpawns, chest, start }
+  return { w, h, ground, objects, solid, shards, friendSpawns, chest, start, gates, switches, torches }
 }
 
 export function isSolidTile(level: Level, tx: number, ty: number) {
@@ -201,8 +218,26 @@ export type WorldEvent =
   | { type: 'chest-appear'; x: number; y: number }
   | { type: 'chest-open'; x: number; y: number }
   | { type: 'bump'; x: number; y: number }
+  /** しかけの そばに きたけど まだ とけていない。need は あと なんにん / なんこ。 */
+  | { type: 'gimmick-hint'; kind: GimmickDef['kind']; x: number; y: number; need: number }
+  | { type: 'switch'; x: number; y: number }
+  | { type: 'torch'; x: number; y: number; left: number }
+  | { type: 'gate-open'; kind: GimmickDef['kind']; x: number; y: number }
 
 export type Hero = { x: number; y: number; dir: Dir; moving: boolean; walk: number }
+
+export type Gimmick = {
+  def: GimmickDef
+  open: boolean
+  /** ひらいた ときの world.frame（えんしゅつ よう）。 */
+  openFrame: number
+  pressed: boolean
+  lit: boolean[]
+  /** いわを おした むき。 */
+  push: Point
+  /** いま しかけの そばに いるか（ヒントを 1かいだけ だす ため）。 */
+  near: boolean
+}
 
 export type World = {
   level: Level
@@ -212,6 +247,7 @@ export type World = {
   friends: Friend[]
   shards: { x: number; y: number; taken: boolean }[]
   chest: { x: number; y: number; visible: boolean; open: boolean }
+  gimmick: Gimmick
   state: 'play' | 'clear'
   frame: number
   events: WorldEvent[]
@@ -232,6 +268,10 @@ export function createWorld(stage: StageDef): World {
     })),
     shards: level.shards.map(p => ({ ...p, taken: false })),
     chest: { ...level.chest, visible: false, open: false },
+    gimmick: {
+      def: stage.gimmick, open: level.gates.length === 0, openFrame: -1, pressed: false,
+      lit: level.torches.map(() => false), push: { x: 0, y: -1 }, near: false,
+    },
     state: 'play',
     frame: 0,
     events: [],
@@ -246,7 +286,13 @@ export function walkTo(world: World, target: Point): boolean {
   if (world.state !== 'play') return false
   const chest = chestBlock(world)
   const ctx = chest ? Math.floor(chest.x / TILE) : -1, cty = chest ? Math.floor((chest.y - 2) / TILE) : -1
-  const path = findPath(world.level, world.hero, target, chest ? (x, y) => x === ctx && y === cty : undefined)
+  const extra = chest ? (x: number, y: number) => x === ctx && y === cty : undefined
+  let path = findPath(world.level, world.hero, target, extra)
+  // しかけの むこうを タップしたら、とおせんぼの まえまで いく。
+  if (!path && !world.gimmick.open) {
+    const gate = gateApproach(world, target)
+    if (gate) path = findPath(world.level, world.hero, gate, extra)
+  }
   if (!path) return false
   world.path = path
   world.stuck = 0
@@ -323,6 +369,7 @@ export function stepWorld(world: World, input: Point = { x: 0, y: 0 }) {
   }
   updateFriends(world)
   if (world.state !== 'play') return
+  updateGimmick(world)
   for (const shard of world.shards) {
     if (shard.taken || Math.hypot(shard.x - hero.x, shard.y - hero.y) > PICK_RADIUS) continue
     shard.taken = true
@@ -404,6 +451,134 @@ function updateFriends(world: World) {
   }
 }
 
+function nearestGate(level: Level, p: Point): Point | null {
+  let best: Point | null = null, bd = Infinity
+  for (const g of level.gates) {
+    const c = tileCenter(g.tx, g.ty)
+    const d = Math.hypot(c.x - p.x, c.y - p.y)
+    if (d < bd) { bd = d; best = c }
+  }
+  return best
+}
+
+/** とおせんぼの てまえで、いま いける マスのうち target に いちばん ちかい ところ。 */
+function gateApproach(world: World, target: Point): Point | null {
+  const reach = reachMap(world)
+  if (!reach) return null
+  const { level } = world
+  let best: Point | null = null, bd = Infinity
+  for (const g of level.gates) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const x = g.tx + dx, y = g.ty + dy
+    if (x < 0 || y < 0 || x >= level.w || y >= level.h || !reach[y * level.w + x]) continue
+    const c = tileCenter(x, y)
+    const d = Math.hypot(c.x - target.x, c.y - target.y)
+    if (d < bd) { bd = d; best = c }
+  }
+  return best
+}
+
+function gateCenter(level: Level): Point {
+  const cs = level.gates.map(g => tileCenter(g.tx, g.ty))
+  return { x: cs.reduce((a, c) => a + c.x, 0) / cs.length, y: cs.reduce((a, c) => a + c.y, 0) / cs.length }
+}
+
+function openGate(world: World) {
+  const g = world.gimmick
+  const level = world.level
+  g.open = true
+  g.openFrame = world.frame
+  for (const t of level.gates) level.solid[t.ty * level.w + t.tx] = 0
+  const c = gateCenter(level)
+  world.events.push({ type: 'gate-open', kind: g.def.kind, x: c.x, y: c.y })
+}
+
+/** しかけを しらべる。とけたら とおせんぼの マスを とおれるように する。 */
+function updateGimmick(world: World) {
+  const g = world.gimmick
+  if (g.open) return
+  const hero = world.hero
+  const level = world.level
+  const dist = (p: Point) => Math.hypot(p.x - hero.x, p.y - hero.y)
+  let near: Point | null = null
+  for (const t of level.gates) {
+    const c = tileCenter(t.tx, t.ty)
+    if (dist(c) < GATE_RADIUS) { near = c; break }
+  }
+  const def = g.def
+  if (def.kind === 'boulder') {
+    if (near && friendsJoined(world) >= def.need) {
+      const d = Math.hypot(near.x - hero.x, near.y - hero.y) || 1
+      g.push = { x: (near.x - hero.x) / d, y: (near.y - hero.y) / d }
+      openGate(world)
+      return
+    }
+  } else if (def.kind === 'bridge') {
+    const sw = level.switches.find(s => dist(s) < SWITCH_RADIUS)
+    if (sw && !g.pressed) {
+      g.pressed = true
+      world.events.push({ type: 'switch', x: sw.x, y: sw.y })
+      openGate(world)
+      return
+    }
+  } else {
+    level.torches.forEach((t, i) => {
+      if (g.lit[i]) return
+      const c = tileCenter(t.tx, t.ty)
+      if (dist(c) >= TORCH_RADIUS) return
+      g.lit[i] = true
+      world.events.push({ type: 'torch', x: c.x, y: c.y, left: g.lit.filter(l => !l).length })
+    })
+    if (g.lit.every(Boolean)) { openGate(world); return }
+  }
+  if (near && !g.near) {
+    const need = def.kind === 'boulder' ? def.need - friendsJoined(world) : def.kind === 'torch' ? g.lit.filter(l => !l).length : 1
+    world.events.push({ type: 'gimmick-hint', kind: def.kind, x: near.x, y: near.y, need })
+  }
+  g.near = !!near
+}
+
+/** 主人公から あるいて いける マス（しかけの むこうは はいらない）。 */
+function reachMap(world: World) {
+  const level = world.level
+  const seen = new Uint8Array(level.w * level.h)
+  const sx = Math.floor(world.hero.x / TILE), sy = Math.floor((world.hero.y - 2) / TILE)
+  if (isSolidTile(level, sx, sy)) return null
+  const queue = [sy * level.w + sx]
+  seen[queue[0]] = 1
+  while (queue.length) {
+    const i = queue.pop()!
+    const x = i % level.w, y = (i - x) / level.w
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy
+      if (isSolidTile(level, nx, ny)) continue
+      const ni = ny * level.w + nx
+      if (seen[ni]) continue
+      seen[ni] = 1
+      queue.push(ni)
+    }
+  }
+  return seen
+}
+
+/** しかけを とく ために いく ところ。 */
+function gimmickGoal(world: World): Point | null {
+  const g = world.gimmick
+  const level = world.level
+  const hero = world.hero
+  const nearest = (list: Point[]) => {
+    let best: Point | null = null, bd = Infinity
+    for (const p of list) {
+      const d = Math.hypot(p.x - hero.x, p.y - hero.y)
+      if (d < bd) { bd = d; best = p }
+    }
+    return best
+  }
+  if (g.def.kind === 'boulder' && friendsJoined(world) < g.def.need) return nearest(world.friends.filter(f => !f.joined)) ?? nearestGate(level, hero)
+  if (g.def.kind === 'bridge') return nearest(level.switches)
+  if (g.def.kind === 'torch') return nearest(level.torches.filter((_, i) => !g.lit[i]).map(t => tileCenter(t.tx, t.ty)))
+  return nearestGate(level, hero)
+}
+
 export function drainEvents(world: World): WorldEvent[] {
   const out = world.events
   world.events = []
@@ -413,10 +588,23 @@ export function drainEvents(world: World): WorldEvent[] {
 export const shardsLeft = (world: World) => world.shards.filter(s => !s.taken).length
 export const friendsJoined = (world: World) => world.friends.filter(f => f.joined).length
 
-/** いちばん ちかい のこりの かけら（たからばこが でたら たからばこ）。 */
+/**
+ * いちばん ちかい のこりの かけら（たからばこが でたら たからばこ）。
+ * のこりが しかけの むこうに しか ない ときは、しかけを とく ところを さす。
+ */
 export function nextGoal(world: World): Point | null {
   if (world.chest.visible) return world.chest.open ? null : world.chest
+  const reach = world.gimmick.open ? null : reachMap(world)
+  const canReach = (p: Point) => !reach || reach[Math.floor((p.y - 2) / TILE) * world.level.w + Math.floor(p.x / TILE)] === 1
   let best: Point | null = null, bd = Infinity
+  for (const s of world.shards) {
+    if (s.taken || !canReach(s)) continue
+    const d = Math.hypot(s.x - world.hero.x, s.y - world.hero.y)
+    if (d < bd) { bd = d; best = s }
+  }
+  if (best || !reach) return best
+  const key = gimmickGoal(world)
+  if (key) return key
   for (const s of world.shards) {
     if (s.taken) continue
     const d = Math.hypot(s.x - world.hero.x, s.y - world.hero.y)
