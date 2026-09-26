@@ -5,6 +5,12 @@ import * as THREE from 'three'
 import { createKomaArmor } from './komaArmor'
 import { createKomaDriver } from './komaDriver'
 import {
+  BOOST_WAVE_INNER_RATIO,
+  SPIN_TRAIL_INNER_RATIO,
+  createBoostWaveTexture,
+  createSpinTrailTexture,
+} from './komaEffects'
+import {
   createKomaBattleSoundController,
   type KomaBattleImpactSoundKind,
 } from '../../utils/quizSound'
@@ -165,6 +171,8 @@ const KOMA_TAP_DUPLICATE_GUARD_MS = 36
 /** タップ対象を示す発光リングの寿命。 */
 const BOOST_EFFECT_DURATION_MS = 380
 
+const WORLD_UP = new THREE.Vector3(0, 1, 0)
+
 type ImpactSlot = {
   mesh: THREE.Mesh
   material: THREE.MeshBasicMaterial
@@ -185,8 +193,13 @@ type BeltArrow = {
 
 type KomaVisual = {
   group: THREE.Group
-  /** 毎フレーム、その時点の自転速度で回転演出を更新する。 */
-  updateSpin: (spinSpeedAbs: number, dtMs: number) => void
+  /**
+   * 残像と衝撃波の入れ物。本体の高速自転に合わせて回すと筋がちらつくので、
+   * 位置と傾きだけ本体に合わせ、向き(ヨー)は演出側で落ち着いた速さに回す。
+   */
+  effectGroup: THREE.Group
+  /** 毎フレーム、その時点の自転速度(符号付き)で回転演出を更新する。 */
+  updateSpin: (spinSpeed: number, dtMs: number) => void
   /** タップ対象だけへ、使い回しの発光リングと短い光量変化を出す。 */
   triggerBoost: () => void
   /** 決着後に勝者だけを少し強調する。物理Bodyの姿勢は変更しない。 */
@@ -351,6 +364,9 @@ export function useKomaBattleEngine(
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     const komaVisuals: KomaVisual[] = []
+    const spinTrailTexture = createSpinTrailTexture()
+    const boostWaveTexture = createBoostWaveTexture()
+    const effectUp = new THREE.Vector3()
     const shadowBlobs: THREE.Mesh[] = []
     const impactPool: ImpactSlot[] = []
     const beltArrows: BeltArrow[] = []
@@ -393,6 +409,8 @@ export function useKomaBattleEngine(
 
       for (const geometry of geometries) geometry.dispose()
       for (const material of materials) material.dispose()
+      spinTrailTexture.dispose()
+      boostWaveTexture.dispose()
       geometries.length = 0
       materials.length = 0
       komaVisuals.length = 0
@@ -642,13 +660,21 @@ export function useKomaBattleEngine(
         // 低い六角メダリオンと、上から読み取れる大きな紋章。
         cap: track(new THREE.CylinderGeometry(diskRadius * 0.36, diskRadius * 0.41, diskRadius * 0.12, 6)),
         knob: track(armor.emblem),
-        // 回転演出用の半透明リング。高速回転中だけ光る。
+        // 回転の残像。円盤の縁に沿って、尾を引く風の筋を貼る。
         spinRing: track(
-          new THREE.RingGeometry(diskRadius * 1.15, diskRadius * 1.42, 28),
+          new THREE.RingGeometry(
+            diskRadius * 1.5 * SPIN_TRAIL_INNER_RATIO,
+            diskRadius * 1.5,
+            48,
+          ),
         ),
-        // タップ時だけ一瞬広がるリング。常時描画せず、コマごとに1個を使い回す。
+        // タップ時だけ一瞬広がる衝撃波。常時描画せず、コマごとに1個を使い回す。
         boostRing: track(
-          new THREE.RingGeometry(diskRadius * 1.18, diskRadius * 1.72, 32),
+          new THREE.RingGeometry(
+            diskRadius * 1.7 * BOOST_WAVE_INNER_RATIO,
+            diskRadius * 1.7,
+            48,
+          ),
         ),
         diskHalfHeight,
       }
@@ -709,7 +735,8 @@ export function useKomaBattleEngine(
       )
       const spinRingMaterial = trackMaterial(
         new THREE.MeshBasicMaterial({
-          color: spec.accentColor,
+          map: spinTrailTexture,
+          color: new THREE.Color(spec.accentColor).lerp(new THREE.Color(0xffffff), 0.35),
           transparent: true,
           opacity: 0,
           side: THREE.DoubleSide,
@@ -719,7 +746,8 @@ export function useKomaBattleEngine(
       )
       const boostRingMaterial = trackMaterial(
         new THREE.MeshBasicMaterial({
-          color: spec.accentColor,
+          map: boostWaveTexture,
+          color: new THREE.Color(spec.accentColor).lerp(new THREE.Color(0xffffff), 0.25),
           transparent: true,
           opacity: 0,
           side: THREE.DoubleSide,
@@ -784,43 +812,59 @@ export function useKomaBattleEngine(
       knob.position.y = deckY + diskRadius * 0.19
       group.add(knob)
 
+      const effectGroup = new THREE.Group()
+      // Euler XYZでは rotation.z がリング自身の法線まわりの回転になる(平面内で回る)。
       const spinRing = new THREE.Mesh(geometrySet.spinRing, spinRingMaterial)
       spinRing.rotation.x = -Math.PI / 2
-      spinRing.position.y = DISK_CENTER_Y
-      group.add(spinRing)
+      spinRing.position.y = DISK_CENTER_Y + diskHalfHeight * 0.3
+      spinRing.renderOrder = 3
+      effectGroup.add(spinRing)
 
       const boostRing = new THREE.Mesh(geometrySet.boostRing, boostRingMaterial)
       boostRing.rotation.x = -Math.PI / 2
       boostRing.position.y = DISK_CENTER_Y + 0.025
       boostRing.visible = false
       boostRing.renderOrder = 4
-      group.add(boostRing)
+      effectGroup.add(boostRing)
 
-      function updateSpin(spinSpeedAbs: number, dtMs: number) {
+      function updateSpin(spinSpeed: number, dtMs: number) {
+        const spinSpeedAbs = Math.abs(spinSpeed)
         const ratio = THREE.MathUtils.clamp(
           (spinSpeedAbs - SPIN_EFFECT_FLOOR_SPEED) / (SPIN_EFFECT_FULL_SPEED - SPIN_EFFECT_FLOOR_SPEED),
           0,
           1,
         )
+        // 立ち上がりをなめらかにし、失速すると自然に薄れて消える。
+        const eased = ratio * ratio * (3 - 2 * ratio)
         spinRingMaterial.opacity = Math.min(
-          0.72,
-          ratio * 0.4 + (outcomeEmphasis === 'winner' ? 0.18 : 0),
+          0.8,
+          eased * 0.62 + (outcomeEmphasis === 'winner' ? 0.18 : 0),
         )
+        spinRing.visible = spinRingMaterial.opacity > 0.01
         const boostRatio = Math.max(0, boostRemainingMs / BOOST_EFFECT_DURATION_MS)
         accentMaterial.emissiveIntensity = Math.max(
           ratio * 0.6,
           boostRatio * 1.35,
           outcomeEmphasis === 'winner' ? 0.8 : outcomeEmphasis === 'loser' ? 0.05 : 0,
         )
-        // リングは本体よりわずかに速く自転させ、残像のような「滑り」を出す。
-        spinRing.rotation.y += (dtMs / 1000) * spinSpeedAbs * 0.5
+        // 筋は本体の自転方向へ、目で追える速さ(上限あり)で流す。実速度のままだとちらつく。
+        // 逆回転では左右反転して、尾が常に回転の後ろ側へ伸びるようにする。
+        const direction = spinSpeed < 0 ? -1 : 1
+        spinRing.scale.x = direction
+        const flowSpeed = prefersReducedMotion ? 0 : Math.min(spinSpeedAbs * 0.3, 9)
+        spinRing.rotation.z += (dtMs / 1000) * flowSpeed * direction
+        // 速いほど筋がわずかに外へ広がり、風をまとっている感じを出す。
+        spinRing.scale.y = 0.92 + eased * 0.1
+        spinRing.scale.x *= spinRing.scale.y
 
         if (boostRemainingMs > 0) {
           boostRemainingMs = Math.max(0, boostRemainingMs - dtMs)
           const progress = 1 - boostRemainingMs / BOOST_EFFECT_DURATION_MS
           boostRing.visible = boostRemainingMs > 0
-          boostRingMaterial.opacity = (1 - progress) * 0.92
-          const scale = prefersReducedMotion ? 1.12 : 0.82 + progress * 0.78
+          // 最初に勢いよく広がり、後半はゆっくり薄れる(ease-out)。
+          const eased = 1 - Math.pow(1 - progress, 3)
+          boostRingMaterial.opacity = Math.pow(1 - progress, 1.5) * 0.95
+          const scale = prefersReducedMotion ? 1.12 : 0.6 + eased * 0.9
           boostRing.scale.setScalar(scale)
         } else if (boostRing.visible) {
           boostRing.visible = false
@@ -831,16 +875,18 @@ export function useKomaBattleEngine(
       function triggerBoost() {
         boostRemainingMs = BOOST_EFFECT_DURATION_MS
         boostRing.visible = true
-        boostRing.scale.setScalar(prefersReducedMotion ? 1.12 : 0.82)
-        boostRingMaterial.opacity = 0.92
+        boostRing.scale.setScalar(prefersReducedMotion ? 1.12 : 0.6)
+        boostRingMaterial.opacity = 0.95
       }
 
       function setOutcome(isWinner: boolean | null) {
         outcomeEmphasis = isWinner === null ? null : isWinner ? 'winner' : 'loser'
-        group.scale.setScalar(isWinner === true ? 1.12 : isWinner === false ? 0.94 : 1)
+        const scale = isWinner === true ? 1.12 : isWinner === false ? 0.94 : 1
+        group.scale.setScalar(scale)
+        effectGroup.scale.setScalar(scale)
       }
 
-      return { group, updateSpin, triggerBoost, setOutcome }
+      return { group, effectGroup, updateSpin, triggerBoost, setOutcome }
     }
 
     /** すり鉢の見た目。物理の高さ場と同じ profile 関数から作る。 */
@@ -1340,9 +1386,13 @@ export function useKomaBattleEngine(
         const rotation = koma.body.rotation()
         visual.group.position.set(translation.x, translation.y, translation.z)
         visual.group.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+        // 演出は傾きだけ本体に合わせる(自転成分は含めない)。
+        effectUp.set(0, 1, 0).applyQuaternion(visual.group.quaternion)
+        visual.effectGroup.position.copy(visual.group.position)
+        visual.effectGroup.quaternion.setFromUnitVectors(WORLD_UP, effectUp)
 
         const reading = readKoma(koma)
-        visual.updateSpin(Math.abs(reading.spinSpeed), dtMs)
+        visual.updateSpin(reading.spinSpeed, dtMs)
 
         // 接地感を出す軽い影。実シャドウマップは使わず、床の高さに沿わせた半透明の円で済ませる。
         const blob = shadowBlobs[index]
@@ -1541,6 +1591,7 @@ export function useKomaBattleEngine(
         const visual = createKomaMesh(koma.spec, geometrySet)
         komaVisuals.push(visual)
         scene.add(visual.group)
+        scene.add(visual.effectGroup)
 
         const blob = new THREE.Mesh(shadowGeometry, shadowMaterial)
         blob.rotation.x = -Math.PI / 2
