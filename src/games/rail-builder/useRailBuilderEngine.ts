@@ -12,8 +12,8 @@ import {
   disconnectRailPiece,
   distanceFromPointToRailPieceVisual,
   findRailLoopClosureCandidate,
+  findRailDragSnapCandidate,
   findRailSnapNearMiss,
-  findRailSnapCandidate,
   getRailConnectorIds,
   railPathLength,
   STATION_LENGTH,
@@ -26,6 +26,7 @@ import {
   worldConnectorForRailPiece,
   worldRailPathPoint,
   worldRailPathTangent,
+  worldRailPieceVisualCenter,
 } from './railModel'
 import {
   findNearestRailTrainCursor,
@@ -144,9 +145,15 @@ export type RailBuilderEngineHandle = {
   removeTrain: (trainId?: string) => void
   focusTrain: (trainId: string) => void
   focusDepot: () => void
+  /** 新しく置いたせんろが画面の端や外にあるとき、見える位置までカメラを寄せる。 */
+  revealPiece: (piece: RailPiece) => void
   /** Phase 3の車両選択UIから、既存列車の見た目(trainType)だけを差し替えるためのAPI。 */
   setTrainType: (trainId: string, trainType: TrainType) => void
 }
+
+/** 新しいせんろが「見えている」とみなす画面範囲（NDC）。上下はUIに隠れやすいので狭め。 */
+const REVEAL_SAFE_NDC_X = 0.8
+const REVEAL_SAFE_NDC_Y = 0.55
 
 type PointerPosition = {
   x: number
@@ -158,6 +165,8 @@ type DragState = {
   pieceId: string
   layout: RailPiece[]
   currentPiece: RailPiece
+  /** 掴んだときの向き。吸いつき中だけ自動で回し、離れたらこの向きへ戻す。 */
+  baseRotationY: number
   offset: RailVec3
   startX: number
   startY: number
@@ -875,6 +884,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
   const removeTrainRef = useRef<((trainId?: string) => void) | null>(null)
   const focusTrainRef = useRef<((trainId: string) => void) | null>(null)
   const focusDepotRef = useRef<(() => void) | null>(null)
+  const revealPieceRef = useRef<((piece: RailPiece) => void) | null>(null)
   const setTrainTypeRef = useRef<((trainId: string, trainType: TrainType) => void) | null>(null)
 
   const registerContainer = useCallback((element: HTMLDivElement | null) => {
@@ -907,6 +917,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     focusDepotRef.current?.()
   }, [])
 
+  const revealPiece = useCallback((piece: RailPiece) => {
+    revealPieceRef.current?.(piece)
+  }, [])
+
   const setTrainType = useCallback((trainId: string, trainType: TrainType) => {
     setTrainTypeRef.current?.(trainId, trainType)
   }, [])
@@ -921,11 +935,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       removeTrain,
       focusTrain,
       focusDepot,
+      revealPiece,
       setTrainType,
     }),
     [
       addTrain,
       focusDepot,
+      revealPiece,
       focusTrain,
       getCameraTarget,
       pauseTrain,
@@ -2485,12 +2501,23 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       setCameraTarget(depotPiece?.position ?? pieces[0]?.position ?? vec3(0, 0, 0))
     }
 
+    function revealPieceNow(piece: RailPiece) {
+      if (camera === null) return
+      const center = worldRailPieceVisualCenter(piece)
+      const projected = new THREE.Vector3(center.x, center.y, center.z).project(camera)
+      // 画面の中ほど(下のパレットや上のボタンに隠れない範囲)に入っていれば動かさない。
+      if (Math.abs(projected.x) <= REVEAL_SAFE_NDC_X && Math.abs(projected.y) <= REVEAL_SAFE_NDC_Y) return
+      followedTrainId = null
+      setCameraTarget(center)
+    }
+
     startTrainRef.current = startTrainNow
     pauseTrainRef.current = pauseTrainNow
     addTrainRef.current = addTrainNow
     removeTrainRef.current = removeTrainNow
     focusTrainRef.current = focusTrainNow
     focusDepotRef.current = focusDepotNow
+    revealPieceRef.current = revealPieceNow
     setTrainTypeRef.current = setTrainTypeNow
 
     function addPieceFacilityDetails(group: THREE.Group, localPiece: RailPiece) {
@@ -3127,6 +3154,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
             pieceId: selectedPieceId,
             layout,
             currentPiece: detachedPiece,
+            baseRotationY: detachedPiece.rotationY,
             offset: ground === null ? vec3(0, 0, 0) : subtract(ground, sourcePiece.position),
             startX: event.clientX,
             startY: event.clientY,
@@ -3178,9 +3206,10 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         const ground = intersectGround(event)
         if (ground === null) return
         const rawPosition = clampRailPosition(subtract(ground, drag.offset), -WORLD_HALF_SIZE + 4, WORLD_HALF_SIZE - 4)
-        const rawPiece: RailPiece = { ...drag.currentPiece, position: rawPosition }
+        const rawPiece: RailPiece = { ...drag.currentPiece, position: rawPosition, rotationY: drag.baseRotationY }
         const snapTargets = drag.layout.filter((piece) => piece.id !== drag?.pieceId)
-        const candidate = findRailSnapCandidate(rawPiece, snapTargets)
+        // 向きが合っていなくても、近くへ持っていけばつながる向きへくるっと回して吸いつく。
+        const candidate = findRailDragSnapCandidate(rawPiece, snapTargets, drag.candidate)
         const nearMiss = candidate === null
           ? findRailSnapNearMiss(rawPiece, snapTargets)
           : null
@@ -3520,6 +3549,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       removeTrainRef.current = null
       focusTrainRef.current = null
       focusDepotRef.current = null
+      revealPieceRef.current = null
       setTrainTypeRef.current = null
       if (rafId !== null) window.cancelAnimationFrame(rafId)
       resizeObserver?.disconnect()

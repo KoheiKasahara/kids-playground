@@ -5,9 +5,9 @@ import {
   createRailPiece,
   deleteRailPiece,
   RAIL_APPEND_LIMIT,
-  rotateRailPiece,
   snapAndConnectRailPiece,
   toggleRailBranch,
+  turnRailPiece,
   type RailBranchSide,
   type RailPiece,
   type RailPieceKind,
@@ -124,6 +124,9 @@ export default function RailBuilderPlay() {
   const [selection, setSelection] = useState<RailBuilderSelection>(null)
   const selectedPieceId = selection?.kind === 'piece' ? selection.id : null
   const selectedTrainId = selection?.kind === 'train' ? selection.id : null
+  // 最後に選んでいた（または置いた）せんろ。地面や電車をタップして選択が外れても、
+  // 次に置くせんろはここへつなぐ。
+  const [lastActivePieceId, setLastActivePieceId] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const [fleetSummaries, setFleetSummaries] = useState<RailFleetTrainSummary[]>(INITIAL_FLEET_SUMMARIES)
   const [occupiedRailIds, setOccupiedRailIds] = useState<string[]>([])
@@ -143,13 +146,14 @@ export default function RailBuilderPlay() {
 
   const handleSelectPiece = useCallback((pieceId: string | null) => {
     setSelection(pieceId === null ? null : { kind: 'piece', id: pieceId })
+    if (pieceId !== null) setLastActivePieceId(pieceId)
   }, [])
 
   const handleSelectTrain = useCallback((trainId: string | null) => {
     setSelection(trainId === null ? null : { kind: 'train', id: trainId })
   }, [])
 
-  const { registerContainer, getCameraTarget, startTrain, pauseTrain, addTrain, removeTrain, setTrainType } = useRailBuilderEngine({
+  const { registerContainer, getCameraTarget, revealPiece, startTrain, pauseTrain, addTrain, removeTrain, setTrainType } = useRailBuilderEngine({
     pieces,
     selectedPieceId,
     selectedTrainId,
@@ -165,27 +169,46 @@ export default function RailBuilderPlay() {
   })
 
   const addPiece = useCallback((kind: RailPieceKind, branchSide?: RailBranchSide) => {
-    // 置いてあるせんろを選んでいるときは、その空き端点へつないだ状態で置く。
-    // つなげないときだけ、これまでどおり見ている場所の空きへ出す。
-    const result = appendRailPiece(pieces, kind, nextPieceId(pieces), selectedPieceId, {
+    // 選んでいるせんろ（選んでいなければ最後に選んだ／置いたせんろ）の空き端点へ
+    // つないだ状態で置く。そのせんろが線路の途中なら、つながった先の近い空き端へ。
+    // どこにもつなげないときだけ、これまでどおり見ている場所の空きへ出す。
+    const anchorId = selectedPieceId
+      ?? (lastActivePieceId !== null && pieces.some((piece) => piece.id === lastActivePieceId)
+        ? lastActivePieceId
+        : pieces[pieces.length - 1]?.id ?? null)
+    const result = appendRailPiece(pieces, kind, nextPieceId(pieces), anchorId, {
       branchSide,
       fallbackPosition: nextSpawnPosition(pieces, getCameraTarget()),
+      searchConnectedEnds: true,
     })
     setPieces(result.pieces)
     setSelection({ kind: 'piece', id: result.piece.id })
+    setLastActivePieceId(result.piece.id)
+    revealPiece(result.piece)
     if (result.connected) playRailSnapSound(soundEnabled)
-  }, [getCameraTarget, pieces, selectedPieceId, soundEnabled])
+  }, [getCameraTarget, lastActivePieceId, pieces, revealPiece, selectedPieceId, soundEnabled])
 
   const rotateSelected = useCallback(() => {
     if (selectedPieceId === null || occupiedRailIdSet.has(selectedPieceId)) return
-    setPieces((current) => rotateRailPiece(current, selectedPieceId))
-  }, [occupiedRailIdSet, selectedPieceId])
+    // つながっているせんろは、つながったまま「つなげる向き」を順番に切りかえる。
+    const result = turnRailPiece(pieces, selectedPieceId)
+    if (!result.changed) return
+    setPieces(result.pieces)
+    if (result.connected.length > 0) playRailSnapSound(soundEnabled)
+  }, [occupiedRailIdSet, pieces, selectedPieceId, soundEnabled])
 
   const deleteSelected = useCallback(() => {
     if (selectedPieceId === null || occupiedRailIdSet.has(selectedPieceId)) return
+    // 消したせんろにつながっていた相手を「最後に選んだせんろ」にして、
+    // 次に置くせんろがそこから続くようにする。
+    const deleted = pieces.find((piece) => piece.id === selectedPieceId)
+    const neighborId = deleted === undefined
+      ? null
+      : Object.values(deleted.connections).find((connection) => connection !== undefined)?.pieceId ?? null
     setPieces((current) => deleteRailPiece(current, selectedPieceId))
     setSelection(null)
-  }, [occupiedRailIdSet, selectedPieceId])
+    setLastActivePieceId(neighborId)
+  }, [occupiedRailIdSet, pieces, selectedPieceId])
 
   const toggleSelectedBranch = useCallback(() => {
     // 先頭車だけでなく後続車もbranchを抜けるまでrouteを固定する。
@@ -257,7 +280,7 @@ export default function RailBuilderPlay() {
     if (trainStatus === 'approachingStation') return 'えきに ちかづいているよ'
     if (trainStatus === 'departing') return 'えきから しゅっぱつしたよ'
     if (trainStatus === 'waiting') return 'まってるよ。せんろを つないで すすもう'
-    return 'でんしゃも せんろも うごかせるよ。ゆびで ひっぱってね'
+    return 'でんしゃも せんろも うごかせるよ。せんろは ちかくへ もっていくと くっつくよ'
   }, [fleetSummaries, selectedPiece, selectedPieceIsOccupied, selectedTrain])
 
   return (
@@ -351,7 +374,7 @@ export default function RailBuilderPlay() {
                     className={styles.rotateActionButton}
                     onClick={rotateSelected}
                     disabled={selectedPieceIsOccupied}
-                    aria-label="せんろを 90ど まわす"
+                    aria-label="せんろの むきを かえる"
                   >
                     <span className={styles.actionIcon} aria-hidden="true">↻</span>
                     <span>まわす</span>
