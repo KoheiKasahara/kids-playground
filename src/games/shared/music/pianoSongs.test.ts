@@ -15,6 +15,12 @@ const PHRASE_END_NOTE_INDEXES: Readonly<Record<string, readonly number[]>> = {
   chocho: [7, 15, 23],
   'jingle-bells': [5, 10],
   'happy-birthday': [5, 11, 18],
+  'going-home': [5, 10, 16],
+  'brahms-lullaby': [],
+  'vivaldi-spring': [6, 14, 22],
+  'eine-kleine-nachtmusik': [],
+  'can-can': [],
+  'fur-elise': [],
 }
 
 const EXPECTED_OPENING_NOTE_IDS: Readonly<Record<string, readonly string[]>> = {
@@ -28,10 +34,16 @@ const EXPECTED_OPENING_NOTE_IDS: Readonly<Record<string, readonly string[]>> = {
   chocho: ['G4', 'E4', 'E4', 'F4', 'D4', 'D4', 'C4'],
   'jingle-bells': ['E4', 'E4', 'E4', 'E4', 'E4', 'E4'],
   'happy-birthday': ['C4', 'C4', 'D4', 'C4', 'F4', 'E4'],
+  'going-home': ['E4', 'G4', 'G4', 'E4', 'D4', 'C4'],
+  'brahms-lullaby': ['E4', 'E4', 'G4', 'E4', 'E4', 'G4'],
+  'vivaldi-spring': ['C4', 'E4', 'E4', 'E4', 'D4', 'C4', 'G4'],
+  'eine-kleine-nachtmusik': ['G4', 'D4', 'G4', 'D4', 'G4', 'D4', 'G4', 'B4', 'D5'],
+  'can-can': ['C4', 'D4', 'F4', 'E4', 'D4', 'G4', 'G4', 'G4'],
+  'fur-elise': ['E5', 'D#5', 'E5', 'D#5', 'E5', 'B4', 'D5', 'C5', 'A4'],
 }
 
 describe('PIANO_SONGS', () => {
-  test('Phase 3の10曲を一意なIDで登録する', () => {
+  test('童謡10曲とクラシック6曲を一意なIDで登録する', () => {
     expect(PIANO_SONGS.map((song) => song.title)).toEqual([
       'きらきらぼし',
       'メリーさんのひつじ',
@@ -43,6 +55,12 @@ describe('PIANO_SONGS', () => {
       'ちょうちょう',
       'ジングルベル',
       'ハッピーバースデー',
+      'とおき山に日はおちて',
+      'ブラームスのこもりうた',
+      'はる（四季）',
+      'アイネ・クライネ・ナハトムジーク',
+      'てんごくとじごく',
+      'エリーゼのために',
     ])
     expect(new Set(PIANO_SONGS.map((song) => song.id)).size).toBe(PIANO_SONGS.length)
   })

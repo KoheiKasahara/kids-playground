@@ -535,6 +535,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'rhythm-pon',
+    slug: 'rhythm-pon',
+    title: 'リズム ぽんぽん',
+    emoji: '🥁',
+    seo: {
+      headline: 'リズム ぽんぽん｜クラシックでたたく幼児向けリズムゲーム',
+      description: 'きらきらぼし・よろこびのうた・エリーゼのためになど有名なクラシック曲にあわせて、流れてくる音符がまるに来たら太鼓をタップする、4〜6歳向けのリズムゲームです。たたいた音がピアノのメロディになり、たいこ1つのかんたんモードから始められます。',
+    },
+    category: 'learning',
+    intro: {
+      howToPlay: [
+        'すきな きょくと たいこの かずを えらんでね',
+        '♪が まるに きたら たいこを ぽん！と たたこう',
+        'たたくと ピアノの メロディに なるよ',
+      ],
+    },
+  },
+  {
     id: 'origami-play',
     slug: 'origami-play',
     title: 'ぱたぱた おりがみ',

@@ -1,5 +1,5 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
-import { BLACK_NOTES, WHITE_NOTES, type PianoNote } from './notes'
+import { BLACK_NOTES, WHITE_NOTES, type PianoNote } from '../shared/music/notes'
 import styles from './PianoPlay.module.css'
 
 type PianoKeyboardProps = {

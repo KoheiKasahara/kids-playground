@@ -40,6 +40,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/piano-play',
   '/games/planet-globe',
   '/games/puni-slime',
+  '/games/rhythm-pon',
   '/games/pukupuka-rescue',
   '/games/putter-golf',
   '/games/pyoko-touch',
