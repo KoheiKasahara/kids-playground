@@ -48,6 +48,8 @@ const MAX_SUBSTEPS = 4
 const PLACE_COOLDOWN_MS = 140
 /** これいじょう うごいたら タップではなく カメラまわし。 */
 const DRAG_THRESHOLD = 8
+/** ゆびを これだけ とめて いたら「ねらう」モード。そのまま ずらすと みほんが ついてきて、はなすと おく。 */
+const AIM_HOLD_MS = 250
 const PITCH_MIN = 0.18
 const PITCH_MAX = 1.35
 const ZOOM_MIN = 0.55
@@ -562,7 +564,7 @@ function startEngine(
   controls.hideCursor = () => { cursor.active = false }
 
   // ---------- ゆび・マウス ----------
-  const pointers = new Map<number, { x: number; y: number; startX: number; startY: number; type: string }>()
+  const pointers = new Map<number, { x: number; y: number; startX: number; startY: number; type: string; downAt: number; aiming: boolean }>()
   let dragging = false
   let tapPointer: number | null = null
   let pinchDistance = 0
@@ -575,7 +577,7 @@ function startEngine(
   function onPointerDown(event: PointerEvent) {
     if (event.pointerType === 'mouse' && event.button !== 0) return
     canvas.setPointerCapture?.(event.pointerId)
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, type: event.pointerType })
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, type: event.pointerType, downAt: event.timeStamp, aiming: false })
     cursor.active = false
     if (pointers.size === 1) {
       tapPointer = event.pointerId
@@ -605,7 +607,12 @@ function startEngine(
       controls.orbit(-dx * 0.004, dy * 0.003)
       return
     }
-    if (!dragging && Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > DRAG_THRESHOLD) {
+    // マウスは ホバーで みほんが でるので、ずらしたら いつも カメラまわし。
+    // じかんは イベントの おきた とき で くらべる（おもい がめんで とどくのが おくれても まちがえない）。
+    if (!pointer.aiming && pointer.type !== 'mouse' && tapPointer === event.pointerId && event.timeStamp - pointer.downAt >= AIM_HOLD_MS) {
+      pointer.aiming = true
+    }
+    if (!dragging && !pointer.aiming && Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > DRAG_THRESHOLD) {
       dragging = true
       tapPointer = null
       hoverPoint = null
@@ -618,7 +625,7 @@ function startEngine(
     if (!pointer) return
     pointers.delete(event.pointerId)
     if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
-    if (event.type === 'pointerup' && tapPointer === event.pointerId && !dragging) {
+    if (event.type === 'pointerup' && tapPointer === event.pointerId && !dragging && insideCanvas(event.clientX, event.clientY)) {
       const placement = placementAtScreen(event.clientX, event.clientY)
       if (placement) place(placement)
     }
@@ -628,6 +635,16 @@ function startEngine(
       hoverPoint = pointer.type === 'mouse' ? { x: event.clientX, y: event.clientY } : null
     }
     pinchDistance = pinchSpan()
+  }
+  /** ねらって いる ゆびを がめんの そとで はなしたら、おかずに やめる。 */
+  function insideCanvas(clientX: number, clientY: number) {
+    const rect = canvas.getBoundingClientRect()
+    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+  }
+  /** ゆびを とめて ねらって いる さいちゅう か（みほんを こく する）。 */
+  function isAiming() {
+    const pointer = tapPointer === null ? undefined : pointers.get(tapPointer)
+    return !!pointer && !dragging && pointer.type !== 'mouse' && (pointer.aiming || performance.now() - pointer.downAt >= AIM_HOLD_MS)
   }
   function onPointerLeave(event: PointerEvent) {
     if (event.pointerType === 'mouse' && !pointers.size) hoverPoint = null
@@ -794,9 +811,10 @@ function startEngine(
       showGhost(null)
     }
     if (ghost.visible && ghostPlacement) {
-      const pulse = 0.5 + Math.sin(elapsed * 5) * 0.12
+      const aiming = isAiming()
+      const pulse = aiming ? 0.72 + Math.sin(elapsed * 9) * 0.06 : 0.5 + Math.sin(elapsed * 5) * 0.12
       visuals.ghostMaterial.opacity = pulse
-      arrow.position.y += Math.abs(Math.sin(elapsed * 4)) * 0.18
+      arrow.position.y += Math.abs(Math.sin(elapsed * (aiming ? 8 : 4))) * 0.18
       targetRingMaterial.opacity = 0.45 + Math.sin(elapsed * 5) * 0.2
     }
 
