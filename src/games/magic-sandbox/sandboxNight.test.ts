@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Cell, Sandbox, renderSandbox } from './sandboxSimulation'
-import { stepCrabs, stepTurtles } from './sandboxCrabs'
+import { stepCrabs, stepHermits, stepTurtles } from './sandboxCrabs'
 
 function flat() {
   const world = new Sandbox(120, 70, () => 0.5)
@@ -8,7 +8,7 @@ function flat() {
   return world
 }
 function tick(world: Sandbox, count = 1) {
-  for (let i = 0; i < count; i++) { stepCrabs(world, () => 0.5); stepTurtles(world, () => 0.5) }
+  for (let i = 0; i < count; i++) { stepCrabs(world, () => 0.5); stepHermits(world, () => 0.5); stepTurtles(world, () => 0.5) }
 }
 describe.each(['crab', 'turtle'] as const)('%s at night', kind => {
   function setup() {
@@ -102,15 +102,16 @@ it('assigns independent bedtimes, permits just one sleeping crab and schedules n
   let value = 0.1
   const world = new Sandbox(120, 70, () => { value = (value + 0.17) % 1; return value })
   world.cells.fill(Cell.Sand, 55 * world.width)
-  world.addCrab(); world.addCrab()
-  world.crabs[0].x = 30; world.crabs[1].x = 85
+  world.addCrab(); world.addHermit()
+  const crabs = [world.crabs[0], world.hermits[0]]
+  crabs[0].x = 30; crabs[1].x = 85
   world.setNight(true)
-  expect(world.crabs[0].sleepDelay).not.toBe(world.crabs[1].sleepDelay)
-  for (const crab of world.crabs) crab.wave = 0
-  const first = world.crabs[0].sleepDelay < world.crabs[1].sleepDelay ? 0 : 1
-  tick(world, world.crabs[first].sleepDelay)
-  expect(world.crabs[first].sleeping).toBeGreaterThan(0)
-  expect(world.crabs[1 - first].sleeping).toBe(0)
+  expect(crabs[0].sleepDelay).not.toBe(crabs[1].sleepDelay)
+  for (const crab of crabs) crab.wave = 0
+  const first = crabs[0].sleepDelay < crabs[1].sleepDelay ? 0 : 1
+  tick(world, crabs[first].sleepDelay)
+  expect(crabs[first].sleeping).toBeGreaterThan(0)
+  expect(crabs[1 - first].sleeping).toBe(0)
   world.addTurtle()
   expect(world.turtles[0].sleepDelay).toBeGreaterThanOrEqual(480)
 })

@@ -95,7 +95,8 @@ function Playground({ back }: { back: () => void }) {
         <div className={styles.scrollWindow}>
           <div className={styles.materials} role="group" aria-label="そざい">
             {MATERIALS.map(m => <button key={m.id} aria-label={m.name} aria-pressed={m.id === material.id} onClick={() => { sandbox.stop(); sandbox.dismissCreatureMessage(); setMaterial(m) }}><span aria-hidden="true">{m.icon}</span><b>{m.id === material.id ? '✓ ' : ''}{m.name}</b></button>)}
-            <button aria-label={`カニを ふやす（${sandbox.crabCount}/2）`} disabled={sandbox.crabCount >= 2} onClick={sandbox.addCrab}><span aria-hidden="true">🦀</span><b>カニ {sandbox.crabCount}/2</b></button>
+            <button aria-label={`カニを ふやす（${sandbox.crabCount}/1）`} disabled={sandbox.crabCount >= 1} onClick={sandbox.addCrab}><span aria-hidden="true">🦀</span><b>カニ {sandbox.crabCount}/1</b></button>
+            <button aria-label={`ヤドカリを ふやす（${sandbox.hermitCount}/1）`} disabled={sandbox.hermitCount >= 1} onClick={sandbox.addHermit}><span aria-hidden="true">🐚</span><b>ヤドカリ {sandbox.hermitCount}/1</b></button>
             <button aria-label={`カメを ふやす（${sandbox.turtleCount}/1）`} disabled={sandbox.turtleCount >= 1} onClick={sandbox.addTurtle}><span aria-hidden="true">🐢</span><b>カメ {sandbox.turtleCount}/1</b></button>
             <button aria-label={`ちょうちょを ふやす（${sandbox.butterflyCount}/1）`} disabled={sandbox.butterflyCount >= 1} onClick={sandbox.addButterfly}><span aria-hidden="true">🦋</span><b>ちょうちょ {sandbox.butterflyCount}/1</b></button>
           </div>

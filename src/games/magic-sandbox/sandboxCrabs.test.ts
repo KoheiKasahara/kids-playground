@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Cell, Sandbox, renderSandbox } from './sandboxSimulation'
-import { stepCrabs } from './sandboxCrabs'
+import { stepCrabs, stepHermits } from './sandboxCrabs'
 
 function flat() {
   const world = new Sandbox(80, 60, () => 0.5)
@@ -9,16 +9,21 @@ function flat() {
 }
 
 describe('sandbox crabs', () => {
-  it('adds at most two, handles a full board, and clears with the world', () => {
+  it('adds one crab and one hermit crab, handles a full board, and clears with the world', () => {
     const world = flat()
     expect(world.addCrab()).toBe(true)
-    expect(world.addCrab()).toBe(true)
     expect(world.addCrab()).toBe(false)
-    expect(world.crabs).toHaveLength(2)
+    expect(world.addHermit()).toBe(true)
+    expect(world.addHermit()).toBe(false)
+    expect(world.crabs).toHaveLength(1)
+    expect(world.hermits).toHaveLength(1)
+    expect(world.hermits[0].kind).toBe('hermit')
     world.clear()
     expect(world.crabs).toHaveLength(0)
+    expect(world.hermits).toHaveLength(0)
     world.cells.fill(Cell.Stone)
     expect(world.addCrab()).toBe(false)
+    expect(world.addHermit()).toBe(false)
   })
 
   it('emerges gradually through settled sand without moving or deleting grains', () => {
@@ -60,24 +65,49 @@ describe('sandbox crabs', () => {
     expect(world.get(x, 48)).toBe(material)
   })
 
-  it('waves on a tap and greets a nearby friend before separating', () => {
+  it('waves on a tap and greets a nearby hermit crab before separating', () => {
     const world = flat()
-    world.addCrab(); world.addCrab()
-    const [a, b] = world.crabs
+    world.addCrab(); world.addHermit()
+    const [a, b] = [world.crabs[0], world.hermits[0]]
     expect(world.tapCrab({ x: a.x, y: a.y - 4 })).toBe(true)
     expect(a.wave).toBe(90)
     expect(world.tapCrab({ x: 0, y: 0 })).toBe(false)
     a.x = 25; b.x = 45
     a.cooldown = b.cooldown = 0
-    stepCrabs(world, () => 0.5)
+    const step = () => { stepCrabs(world, () => 0.5); stepHermits(world, () => 0.5) }
+    step()
     expect(a.direction).toBe(1)
     expect(b.direction).toBe(-1)
     expect(a.wave).toBeGreaterThan(90)
     expect(b.wave).toBeGreaterThan(90)
-    for (let i = 0; i < 115; i++) stepCrabs(world, () => 0.5)
+    for (let i = 0; i < 115; i++) step()
     expect(a.direction).toBe(-1)
     expect(b.direction).toBe(1)
     expect(b.x - a.x).toBeGreaterThan(20)
+  })
+
+  it('draws the hermit crab with its own animation, ducking into its shell when surprised or asleep', () => {
+    const world = flat()
+    world.addHermit()
+    const hermit = world.hermits[0]
+    const pixels = new Uint8ClampedArray(world.cells.length * 4)
+    const drawn = () => {
+      pixels.fill(0)
+      renderSandbox(world, pixels)
+      let count = 0
+      for (let i = 3; i < 50 * world.width * 4; i += 4) if (pixels[i]) count++
+      return count
+    }
+    hermit.wave = 0
+    const out = drawn()
+    expect(out).toBeGreaterThan(0)
+    world.tapHermit({ x: hermit.x, y: hermit.y - 4 })
+    expect(hermit.wave).toBe(90)
+    const hiding = drawn()
+    expect(hiding).toBeGreaterThan(0)
+    expect(hiding).toBeLessThan(out)
+    hermit.wave = 0; hermit.sleeping = 100
+    expect(drawn()).toBeLessThan(out)
   })
 
   it('sometimes chooses nearby water and falls when its support is erased', () => {

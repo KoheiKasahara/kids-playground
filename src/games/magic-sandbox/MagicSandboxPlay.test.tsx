@@ -135,13 +135,12 @@ it('releases a held pour on cancel, outside move, blur, rotation, and hidden tab
   expect(paint).not.toHaveBeenCalled()
 })
 
-it('adds two crabs without changing the brush, pauses them and resets the button after clearing', () => {
+it('adds one crab without changing the brush, pauses it and resets the button after clearing', () => {
   const add = vi.spyOn(Sandbox.prototype, 'addCrab')
   start()
-  fireEvent.click(screen.getByRole('button', { name: 'カニを ふやす（0/2）' }))
-  fireEvent.click(screen.getByRole('button', { name: 'カニを ふやす（1/2）' }))
-  expect(screen.getByRole('button', { name: 'カニを ふやす（2/2）' })).toBeDisabled()
-  expect(add).toHaveBeenCalledTimes(2)
+  fireEvent.click(screen.getByRole('button', { name: 'カニを ふやす（0/1）' }))
+  expect(screen.getByRole('button', { name: 'カニを ふやす（1/1）' })).toBeDisabled()
+  expect(add).toHaveBeenCalledOnce()
   expect(screen.getByRole('button', { name: 'すな' })).toHaveAttribute('aria-pressed', 'true')
   const world = add.mock.instances[0] as Sandbox
   fireEvent.click(screen.getByRole('button', { name: /とめる/ }))
@@ -151,7 +150,33 @@ it('adds two crabs without changing the brush, pauses them and resets the button
   fireEvent.click(screen.getByRole('button', { name: /ぜんぶけす/ }))
   fireEvent.click(screen.getByRole('dialog').querySelectorAll('button')[1])
   expect(world.crabs).toHaveLength(0)
-  expect(screen.getByRole('button', { name: 'カニを ふやす（0/2）' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'カニを ふやす（0/1）' })).toBeEnabled()
+})
+
+it('adds one hermit crab, pauses it, reacts to a tap without painting and resets after clearing', () => {
+  vi.stubGlobal('PointerEvent', MouseEvent)
+  const add = vi.spyOn(Sandbox.prototype, 'addHermit')
+  const paint = vi.spyOn(Sandbox.prototype, 'paint')
+  start()
+  fireEvent.click(screen.getByRole('button', { name: 'ヤドカリを ふやす（0/1）' }))
+  expect(screen.getByRole('button', { name: 'ヤドカリを ふやす（1/1）' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'カニを ふやす（0/1）' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'すな' })).toHaveAttribute('aria-pressed', 'true')
+  const world = add.mock.instances[0] as Sandbox
+  const hermit = world.hermits[0]
+  const canvas = screen.getByLabelText(/^すなば。/)
+  vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, right: 144, bottom: 176, width: 144, height: 176 } as DOMRect)
+  fireEvent.pointerDown(canvas, { clientX: hermit.x, clientY: hermit.y - 4, button: 0 })
+  expect(hermit.wave).toBe(90)
+  expect(paint).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: /とめる/ }))
+  const snapshot = JSON.stringify(world.hermits)
+  frame(100); frame(200)
+  expect(JSON.stringify(world.hermits)).toBe(snapshot)
+  fireEvent.click(screen.getByRole('button', { name: /ぜんぶけす/ }))
+  fireEvent.click(screen.getByRole('dialog').querySelectorAll('button')[1])
+  expect(world.hermits).toHaveLength(0)
+  expect(screen.getByRole('button', { name: 'ヤドカリを ふやす（0/1）' })).toBeEnabled()
 })
 
 it('reacts to a crab tap without starting a material stream', () => {
@@ -159,7 +184,7 @@ it('reacts to a crab tap without starting a material stream', () => {
   const add = vi.spyOn(Sandbox.prototype, 'addCrab')
   const paint = vi.spyOn(Sandbox.prototype, 'paint')
   start()
-  fireEvent.click(screen.getByRole('button', { name: 'カニを ふやす（0/2）' }))
+  fireEvent.click(screen.getByRole('button', { name: 'カニを ふやす（0/1）' }))
   const crab = (add.mock.instances[0] as Sandbox).crabs[0]
   const canvas = screen.getByLabelText(/^すなば。/)
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, right: 144, bottom: 176, width: 144, height: 176 } as DOMRect)
@@ -175,7 +200,7 @@ it('adds one turtle, preserves the brush, pauses its animation and resets after 
   fireEvent.click(screen.getByRole('button', { name: 'カメを ふやす（0/1）' }))
   expect(screen.getByRole('button', { name: 'カメを ふやす（1/1）' })).toBeDisabled()
   expect(add).toHaveBeenCalledOnce()
-  expect(screen.getByRole('button', { name: 'カニを ふやす（0/2）' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'カニを ふやす（0/1）' })).toBeEnabled()
   expect(screen.getByRole('button', { name: 'すな' })).toHaveAttribute('aria-pressed', 'true')
   const world = add.mock.instances[0] as Sandbox
   fireEvent.click(screen.getByRole('button', { name: /とめる/ }))
