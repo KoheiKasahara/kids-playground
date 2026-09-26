@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import { createKomaArmor } from './komaArmor'
+import { createKomaDriver } from './komaDriver'
 import {
   createKomaBattleSoundController,
   type KomaBattleImpactSoundKind,
@@ -14,7 +15,6 @@ import {
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
-  SHAFT_RADIUS,
   START_SPIN_VARIANCE,
 } from './komaPhysics'
 
@@ -195,7 +195,10 @@ type KomaVisual = {
 
 /** 見た目Meshで使い回すgeometry一式。コマごとに寸法は同じなので、色違いのMaterialだけを分ける。 */
 type KomaGeometrySet = {
-  tip: THREE.ConeGeometry
+  /** 円盤より下のドライバー部分。bodyStyleで形が変わる。 */
+  driverPoint: THREE.BufferGeometry
+  driverBody: THREE.BufferGeometry
+  ratchet: THREE.BufferGeometry | null
   diskLower: THREE.CylinderGeometry
   diskUpper: THREE.CylinderGeometry
   groove: THREE.TorusGeometry
@@ -599,11 +602,18 @@ export function useKomaBattleEngine(
       const diskRadius = DISK_RADIUS * visual.diskRadiusScale
       const diskHalfHeight = DISK_HALF_HEIGHT * visual.diskThicknessScale
       const armor = createKomaArmor(visual, diskRadius)
+      const driver = createKomaDriver(
+        visual,
+        diskRadius,
+        DISK_CENTER_Y - diskHalfHeight * 0.5 - diskHalfHeight * 0.8,
+      )
       return {
         armor: track(armor.armor),
         trim: track(armor.trim),
-        // 軸/先端。物理では球+円柱だが、見た目は下向きの円錐にして「コマの軸」に見せる。
-        tip: track(new THREE.ConeGeometry(SHAFT_RADIUS * 1.3, DISK_CENTER_Y - diskHalfHeight, 12)),
+        // 軸/先端。物理では球+円柱だが、見た目はタイプのbodyStyleに応じた太さのある軸にする。
+        driverPoint: track(driver.point),
+        driverBody: track(driver.body),
+        ratchet: driver.ratchet ? track(driver.ratchet) : null,
         // 円盤下段。樹脂パーツの土台。
         diskLower: track(
           new THREE.CylinderGeometry(
@@ -720,10 +730,21 @@ export function useKomaBattleEngine(
       let outcomeEmphasis: 'winner' | 'loser' | null = null
       let boostRemainingMs = 0
 
-      const tip = new THREE.Mesh(geometrySet.tip, metalMaterial)
-      tip.rotation.x = Math.PI
-      tip.position.y = (DISK_CENTER_Y - diskHalfHeight) / 2
-      group.add(tip)
+      group.add(new THREE.Mesh(geometrySet.driverPoint, metalMaterial))
+      group.add(new THREE.Mesh(geometrySet.driverBody, resinMaterial))
+      if (geometrySet.ratchet) {
+        // ラチェットは色の透ける樹脂風にして、本体色との段を目立たせる。
+        const ratchetMaterial = trackMaterial(
+          new THREE.MeshStandardMaterial({
+            color: spec.accentColor,
+            roughness: 0.2,
+            metalness: 0.1,
+            transparent: true,
+            opacity: 0.85,
+          }),
+        )
+        group.add(new THREE.Mesh(geometrySet.ratchet, ratchetMaterial))
+      }
 
       const diskLower = new THREE.Mesh(geometrySet.diskLower, baseMaterial)
       diskLower.position.y = DISK_CENTER_Y - diskHalfHeight * 0.5
