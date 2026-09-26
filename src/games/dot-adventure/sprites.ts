@@ -242,6 +242,53 @@ export const CRAB_FRAMES: readonly SpriteArt[] = [
   },
 ]
 
+// ---- ペンギン ----
+const PENGUIN: Palette = {
+  o: '#10182a', k: '#243048', K: '#3a4a6a', w: '#f4f8ff', W: '#c8d4ea',
+  e: '#10182a', y: '#e08a10', Y: '#ffc848', p: '#ff9ab0', f: '#ff9020',
+}
+/** よちよち あるく 2コマ。 */
+export const PENGUIN_FRAMES: readonly SpriteArt[] = [
+  {
+    palette: PENGUIN, rows: [
+      '.....oooooo.....',
+      '....okKKKKko....',
+      '...okKKKKKKko...',
+      '...okwwKKwwko...',
+      '..okwewwwwewko..',
+      '..okwpwYYwpwko..',
+      '.okkwwwyywwwkko.',
+      'okKkwwwwwwwwkKko',
+      'okKkwwwwwwwwkKko',
+      '.okkwwwwwwwwkko.',
+      '..okWwwwwwwWko..',
+      '..okkWWWWWWkko..',
+      '...ookkkkkkoo...',
+      '...offo..offo...',
+      '...oooo..oooo...',
+    ],
+  },
+  {
+    palette: PENGUIN, rows: [
+      '................',
+      '.....oooooo.....',
+      '....okKKKKko....',
+      '...okKKKKKKko...',
+      '...okwwKKwwko...',
+      '..okwewwwwewko..',
+      '..okwpwYYwpwko..',
+      '.okkwwwyywwwkko.',
+      'okKkwwwwwwwwkKko',
+      'okKkwwwwwwwwkKko',
+      '.okkwwwwwwwwkko.',
+      '..okWwwwwwwWko..',
+      '..okkWWWWWWkko..',
+      '...ookkkkkkoo...',
+      '..offoo..ooffo..',
+    ],
+  },
+]
+
 // ---- たからばこ ----
 const CHEST: Palette = {
   o: '#2a160c', b: '#5a2e14', B: '#8a4a20', c: '#b86a2c', C: '#dc9a4c',
@@ -389,5 +436,23 @@ export const RAINBOW_SHELL: SpriteArt = {
     '..oabccddeo..',
     '...ooooooo...',
     '....oo.oo....',
+  ],
+}
+export const SNOW_CRYSTAL: SpriteArt = {
+  palette: { o: '#1c3a6a', b: '#5aa0e8', B: '#a8dcff', w: '#ffffff' },
+  rows: [
+    '.....oBo.....',
+    '..o..oBo..o..',
+    '.obo.oBo.obo.',
+    '..oboBBBobo..',
+    '...obBwBbo...',
+    'oooooBwBooooo',
+    'oBBBBwwwBBBBo',
+    'oooooBwBooooo',
+    '...obBwBbo...',
+    '..oboBBBobo..',
+    '.obo.oBo.obo.',
+    '..o..oBo..o..',
+    '.....oBo.....',
   ],
 }
