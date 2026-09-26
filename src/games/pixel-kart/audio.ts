@@ -69,7 +69,7 @@ export class KartAudio {
     const notes = kind === 'finish' ? [72, 76, 79, 84, 79, 84, 88] :
       kind === 'hit' ? [48, 43] : kind === 'countdown' ? [76] :
         kind === 'jump' ? [60, 72, 84] : kind === 'bomb' ? [55, 62, 67] :
-          kind === 'puddle' ? [72, 64, 60] : kind === 'lap' ? [79, 84, 88] : [76, 79, 84]
+          kind === 'puddle' ? [72, 64, 60] : kind === 'dash' ? [79, 86, 91] : kind === 'lap' ? [79, 84, 88] : [76, 79, 84]
     notes.forEach((note, i) => this.tone(note, this.context!.currentTime + i * .085, .19, .10))
   }
 
