@@ -153,7 +153,7 @@ export default function RailBuilderPlay() {
     setSelection(trainId === null ? null : { kind: 'train', id: trainId })
   }, [])
 
-  const { registerContainer, getCameraTarget, revealPiece, startTrain, pauseTrain, addTrain, removeTrain, setTrainType } = useRailBuilderEngine({
+  const { registerContainer, getCameraTarget, revealPiece, startTrain, pauseTrain, addTrain, removeTrain, setTrainType, getTrainThumbnails } = useRailBuilderEngine({
     pieces,
     selectedPieceId,
     selectedTrainId,
@@ -238,13 +238,18 @@ export default function RailBuilderPlay() {
     }
   }, [allTrainsRunning, fleetSummaries, pauseTrain, startTrain])
 
+  // 3Dモデルのサムネイルはパネルを開くときに一度だけ描く(以降はエンジン側でキャッシュ)。
+  const [trainThumbnails, setTrainThumbnails] = useState<ReadonlyMap<TrainType, string> | undefined>(undefined)
+
   const openAddTrainPicker = useCallback(() => {
+    setTrainThumbnails(new Map(getTrainThumbnails()))
     setTrainPickerMode('add')
-  }, [])
+  }, [getTrainThumbnails])
 
   const openChangeTrainTypePicker = useCallback(() => {
+    setTrainThumbnails(new Map(getTrainThumbnails()))
     setTrainPickerMode('change')
-  }, [])
+  }, [getTrainThumbnails])
 
   const closeTrainPicker = useCallback(() => {
     setTrainPickerMode(null)
@@ -483,6 +488,7 @@ export default function RailBuilderPlay() {
           selectedType={trainPickerMode === 'change' ? selectedTrain?.trainType ?? null : null}
           onSelect={handleTrainTypeSelect}
           onClose={closeTrainPicker}
+          thumbnails={trainThumbnails}
         />
       )}
     </main>

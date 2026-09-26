@@ -9,6 +9,8 @@ export type TrainTypePickerProps = {
   selectedType: TrainType | null
   onSelect: (trainType: TrainType) => void
   onClose: () => void
+  /** 3Dモデルから描いたサムネイル画像。無い車種(WebGL非対応など)はSVGで描く。 */
+  thumbnails?: ReadonlyMap<TrainType, string>
 }
 
 /**
@@ -16,7 +18,7 @@ export type TrainTypePickerProps = {
  * 車両選択パネル。タップした瞬間に選択が確定して閉じるため、幼児が
  * 「選ぶ→決定」の2段階操作に迷わない(FlagPickerDialogと同じ考え方)。
  */
-export default function TrainTypePicker({ title, ariaLabel, selectedType, onSelect, onClose }: TrainTypePickerProps) {
+export default function TrainTypePicker({ title, ariaLabel, selectedType, onSelect, onClose, thumbnails }: TrainTypePickerProps) {
   return (
     <div className={styles.backdrop} role="presentation">
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-label={ariaLabel}>
@@ -29,6 +31,7 @@ export default function TrainTypePicker({ title, ariaLabel, selectedType, onSele
         <div className={styles.grid} role="group" aria-label="でんしゃの みため">
           {TRAIN_TYPES.map((trainType, index) => {
             const selected = trainType === selectedType
+            const thumbnailSrc = thumbnails?.get(trainType)
             return (
               <button
                 key={trainType}
@@ -39,7 +42,17 @@ export default function TrainTypePicker({ title, ariaLabel, selectedType, onSele
                 onClick={() => onSelect(trainType)}
               >
                 <span className={styles.iconWrap}>
-                  <TrainThumbnail trainType={trainType} />
+                  {thumbnailSrc !== undefined ? (
+                    <img
+                      className={styles.modelThumbnail}
+                      src={thumbnailSrc}
+                      alt=""
+                      draggable={false}
+                      data-train-type={trainType}
+                    />
+                  ) : (
+                    <TrainThumbnail trainType={trainType} />
+                  )}
                   {selected && <span className={styles.check} aria-hidden="true">✓</span>}
                 </span>
               </button>

@@ -32,6 +32,7 @@ vi.mock('./useRailBuilderEngine', async (importOriginal) => ({
       focusDepot: () => {},
       revealPiece: () => {},
       setTrainType: () => {},
+      getTrainThumbnails: () => new Map(),
     }
   },
 }))

@@ -71,6 +71,25 @@ describe('TrainTypePicker', () => {
     }
   })
 
+  test('3Dモデルのサムネイル画像がある車種は画像で、無い車種はSVGで表示する', () => {
+    const { container } = render(
+      <TrainTypePicker
+        title="えらぼう"
+        ariaLabel="でんしゃの みためを えらぶ"
+        selectedType={null}
+        onSelect={() => {}}
+        onClose={() => {}}
+        thumbnails={new Map([['e5', 'data:image/png;base64,AAAA']])}
+      />,
+    )
+
+    const image = container.querySelector('img[data-train-type="e5"]')
+    expect(image).toHaveAttribute('src', 'data:image/png;base64,AAAA')
+    expect(image).toHaveAttribute('alt', '')
+    expect(container.querySelector('svg[data-train-type="e5"]')).toBeNull()
+    expect(container.querySelectorAll('svg[data-train-type]')).toHaveLength(TRAIN_TYPES.length - 1)
+  })
+
   test('車種ごとにノーズ形状と窓数の特徴をサムネイルへ反映する', () => {
     const { container } = render(
       <TrainTypePicker
