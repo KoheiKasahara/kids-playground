@@ -123,7 +123,7 @@ function Game({ onExit }: { onExit: () => void }) {
             className={styles.scene}
             tabIndex={0}
             role="application"
-            aria-label="つみきの マット。さわった ところに つみきが おちるよ。ゆびで ずらすと まわして みられるよ。やじるしキーで えらんで エンターで おけるよ"
+            aria-label="つみきの マット。さわった ところに つみきが おちるよ。ゆびを とめて から ずらすと おく ばしょを ねらえるよ。すぐ ずらすと まわして みられるよ。やじるしキーで えらんで エンターで おけるよ"
             onKeyDown={onKeyDown}
             onBlur={() => controls.current.hideCursor()}
           />
@@ -153,7 +153,7 @@ function Game({ onExit }: { onExit: () => void }) {
           {!placedOnce && status === 'ready' && (
             <div className={styles.hint} aria-hidden="true">
               <span className={styles.hintHand}>👆</span>
-              <span>さわった ところに ぽとん！<br /><small>ゆびで ずらすと まわるよ</small></span>
+              <span>さわった ところに ぽとん！<br /><small>ながおし で ねらえるよ・さっと ずらすと まわるよ</small></span>
             </div>
           )}
 
