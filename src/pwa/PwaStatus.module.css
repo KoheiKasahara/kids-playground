@@ -12,6 +12,19 @@
   pointer-events: none;
 }
 
+/* ゲーム画面ではプレイ中のボタンを覆わないよう、画面上部に小さく出す（Issue #784 A1）。 */
+.top {
+  top: calc(var(--space-sm) + var(--safe-top));
+  bottom: auto;
+}
+
+.top .toast,
+.top .notice {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 14px;
+  animation-name: slide-down;
+}
+
 .toast,
 .notice {
   pointer-events: auto;
@@ -80,6 +93,17 @@
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
   }
   to {
     opacity: 1;

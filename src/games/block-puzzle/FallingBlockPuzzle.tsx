@@ -20,6 +20,8 @@ import {
   type FallingPuzzleState,
 } from './fallingPuzzleState'
 import { playBlockLandSound, playLineClearSound, playStackFullSound } from './sounds'
+import { blockPuzzleProgress, fallingStars, readFallingBest, recordFallingBest } from './progress'
+import { vibrate } from '../../utils/haptics'
 import { primeAudio } from '../../audio/sound'
 import styles from './FallingBlockPuzzle.module.css'
 
@@ -113,6 +115,7 @@ export default function FallingBlockPuzzle({ onBack }: Props) {
   /** 「おとす」で落ちている最中。積むまでのわずかな間、次の操作を受けない。 */
   const [dropping, setDropping] = useState(false)
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
+  const [best, setBest] = useState(readFallingBest)
   /** 直前にそろった段の数。次の操作を始めるまで「そろった！」を出しておく。 */
   const [clearNotice, setClearNotice] = useState(0)
   /** キラキラを作り直すための世代番号。そろえるたびに1つ進める。 */
@@ -146,6 +149,12 @@ export default function FallingBlockPuzzle({ onBack }: Props) {
     if (next.lastClearedRows > 0) {
       playLineClearSound(next.lastClearedRows)
       setClearSeq((current) => current + 1)
+      vibrate('success')
+      setBest(recordFallingBest(next.clearedRows))
+      const stars = fallingStars(next.clearedRows)
+      if (stars > 0) blockPuzzleProgress.record('falling', stars)
+    } else {
+      vibrate('tap')
     }
     if (next.status === 'over') playStackFullSound()
   }, [commit])
@@ -324,6 +333,7 @@ export default function FallingBlockPuzzle({ onBack }: Props) {
         </div>
         <p className={styles.score}>
           <span aria-hidden="true">⭐</span> そろえた: <strong>{state.clearedRows}</strong>
+          {best > 0 ? <small className={styles.best}> いちばん: {best}</small> : null}
         </p>
       </div>
 

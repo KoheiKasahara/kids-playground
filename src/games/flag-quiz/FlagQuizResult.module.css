@@ -28,6 +28,10 @@
 }
 
 .score {
+  /* 「せいか／い」のような単語の途中での改行を防ぐ（Issue #784 A4）。 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
   font-size: 44px;
   font-weight: 800;
   color: var(--color-text);

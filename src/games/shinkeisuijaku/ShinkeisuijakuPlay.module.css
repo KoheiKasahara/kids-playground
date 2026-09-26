@@ -71,7 +71,9 @@
 }
 
 .difficultyName {
-  font-size: var(--font-size-large);
+  /* 「むずかしい」が途中で改行されないよう、せまい画面では少し小さくする（Issue #784 A4）。 */
+  font-size: clamp(22px, 6.4vw, var(--font-size-large));
+  white-space: nowrap;
   font-weight: 900;
 }
 

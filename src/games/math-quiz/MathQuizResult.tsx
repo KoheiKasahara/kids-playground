@@ -5,6 +5,7 @@ import { isQuizResultState } from '../quiz-core/resultState'
 import { MODE_LABEL, MODE_PATH } from './types'
 import type { MathQuizMode } from './types'
 import styles from './MathQuizResult.module.css'
+import QuizStars from '../../components/QuizStars'
 
 function getPraise(correctCount: number, totalCount: number) {
   if (correctCount === totalCount) return { emoji: '🏆', message: 'かんぺき！' }
@@ -39,6 +40,7 @@ export default function MathQuizResult({ mode }: MathQuizResultProps) {
       <p className={styles.modeLabel}>
         {MODE_LABEL[mode]} ・ {LEVEL_LABEL[level]}
       </p>
+      <QuizStars correctCount={correctCount} totalCount={totalCount} />
       <p className={styles.score}>
         {correctCount} / {totalCount}もん せいかい！
       </p>

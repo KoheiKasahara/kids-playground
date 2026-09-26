@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import GameBackButton from '../../components/GameBackButton'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { Cell, isSeed, type Material } from './sandboxSimulation'
 import { useSandbox } from './useSandbox'
+import { primeAudio } from '../../audio/sound'
+import { vibrate } from '../../utils/haptics'
+import { playBloomSound, playMaterialSound, playShakeSound } from './sounds'
 import styles from './MagicSandboxPlay.module.css'
+
+/** なぞっているあいだ、そざいの音を鳴らす間隔[ms]。鳴らしすぎてうるさくならないよう間引く。 */
+const MATERIAL_SOUND_INTERVAL_MS = 110
 
 const MATERIALS: { id: Material; name: string; icon: string; hint: string }[] = [
   { id: Cell.Sand, name: 'すな', icon: '🏜️', hint: 'さらさら おやまを つくろう' },
@@ -30,9 +36,47 @@ function Playground({ back }: { back: () => void }) {
   const [confirmClear, setConfirmClear] = useState(false)
   const [discovery, setDiscovery] = useState(false)
   const [shaking, setShaking] = useState(false)
-  const onFlower = useCallback(() => setDiscovery(true), [])
+  const [soundOn, setSoundOn] = useState(true)
+  const soundOnRef = useRef(soundOn)
+  useEffect(() => { soundOnRef.current = soundOn }, [soundOn])
+  const onFlower = useCallback(() => {
+    setDiscovery(true)
+    if (soundOnRef.current) playBloomSound()
+  }, [])
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sandbox = useSandbox(canvasRef, { material: material.id, radius: isSeed(material.id) ? 0 : wide ? 6 : 3 }, paused || confirmClear, onFlower)
+  // なぞっているあいだだけ、そざいの音を間引いて鳴らす（Issue #784 A8）。
+  const lastSoundAt = useRef(0)
+  const drawing = useRef(false)
+  const sandSound = (force: boolean) => {
+    if (!soundOn) return
+    const now = performance.now()
+    if (!force && now - lastSoundAt.current < MATERIAL_SOUND_INTERVAL_MS) return
+    lastSoundAt.current = now
+    playMaterialSound(material.id)
+  }
+  const canvasProps = {
+    ...sandbox.canvasProps,
+    onPointerDown: (event: PointerEvent<HTMLCanvasElement>) => {
+      primeAudio()
+      drawing.current = true
+      sandSound(true)
+      vibrate('tap')
+      sandbox.canvasProps.onPointerDown(event)
+    },
+    onPointerMove: (event: PointerEvent<HTMLCanvasElement>) => {
+      if (drawing.current) sandSound(false)
+      sandbox.canvasProps.onPointerMove(event)
+    },
+    onPointerUp: (event: PointerEvent<HTMLCanvasElement>) => {
+      drawing.current = false
+      sandbox.canvasProps.onPointerUp(event)
+    },
+    onPointerCancel: (event: PointerEvent<HTMLCanvasElement>) => {
+      drawing.current = false
+      sandbox.canvasProps.onPointerCancel(event)
+    },
+  }
   useEffect(() => {
     if (!shaking) return
     const timer = window.setTimeout(() => setShaking(false), 450)
@@ -66,15 +110,16 @@ function Playground({ back }: { back: () => void }) {
       <section className={`${styles.board} ${shaking ? styles.shaking : ''}`} aria-label="すなば">
         <div className={styles.cloud} aria-hidden="true">☁</div>
         <div className={styles.nightSky} aria-hidden="true"><span className={styles.moon} /><i /><i /><i /><i /><i /></div>
-        <canvas ref={canvasRef} {...sandbox.canvasProps} className={styles.canvas} tabIndex={0} aria-label="すなば。なぞって そざいを ふらせよう。キーボードは やじるしで ばしょ、スペースで そざいを おくよ">
+        <canvas ref={canvasRef} {...canvasProps} className={styles.canvas} tabIndex={0} aria-label="すなば。なぞって そざいを ふらせよう。キーボードは やじるしで ばしょ、スペースで そざいを おくよ">
           すなと みずと たねを まぜて あそぼう。
         </canvas>
         <div className={styles.notice} role="status">{sandbox.unavailable ? 'すなばを ひらけなかったよ。もういちど ひらいてね' : discovery ? '🌸 おはなが さいたよ！' : paused ? '⏸ とまっているよ。かいても OK！' : ''}</div>
       </section>
       <div className={styles.actions}>
-        <button onClick={() => { sandbox.shake(); setShaking(true); setPaused(false) }}>〰 ゆらす</button>
+        <button onClick={() => { primeAudio(); if (soundOn) playShakeSound(); vibrate('impact'); sandbox.shake(); setShaking(true); setPaused(false) }}>〰 ゆらす</button>
         <button aria-pressed={paused} onClick={() => { sandbox.stop(); setPaused(p => !p) }}>{paused ? '▶ うごかす' : '⏸ とめる'}</button>
         <button onClick={() => { sandbox.stop(); setConfirmClear(true) }}>↺ ぜんぶけす</button>
+        <button aria-pressed={soundOn} aria-label={soundOn ? 'おとを けす' : 'おとを だす'} onClick={() => { if (!soundOn) primeAudio(); setSoundOn(on => !on) }}><span aria-hidden="true">{soundOn ? '🔊' : '🔇'}</span> おと</button>
       </div>
     </div>
     {confirmClear && <ClearDialog close={() => setConfirmClear(false)} clear={() => { sandbox.clear(); setDiscovery(false); setConfirmClear(false) }} />}

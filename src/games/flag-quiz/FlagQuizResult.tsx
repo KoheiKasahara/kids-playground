@@ -6,6 +6,7 @@ import { isStringArray, remainingCountryCount } from './continueState'
 import { isQuizLevel, LEVEL_LABEL, MODE_LABEL, MODE_PATH } from './types'
 import type { QuizMode } from './types'
 import styles from './FlagQuizResult.module.css'
+import QuizStars from '../../components/QuizStars'
 
 type ResultState = {
   correctCount: number
@@ -82,6 +83,7 @@ export default function FlagQuizResult({ mode }: FlagQuizResultProps) {
       <p className={styles.modeLabel}>
         {MODE_LABEL[mode]} ・ {LEVEL_LABEL[level]}
       </p>
+      <QuizStars correctCount={correctCount} totalCount={totalCount} />
       <p className={styles.score}>
         {correctCount} / {totalCount}もん せいかい！
       </p>

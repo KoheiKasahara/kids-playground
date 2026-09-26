@@ -606,3 +606,11 @@
     opacity: 0;
   }
 }
+
+/* ハイスコア（Issue #784 A6）。そろえた数より少し控えめにする。 */
+.best {
+  margin-left: 6px;
+  font-size: 0.8em;
+  font-weight: 700;
+  opacity: 0.8;
+}

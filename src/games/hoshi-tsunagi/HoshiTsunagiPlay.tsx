@@ -15,7 +15,17 @@ import {
   type HoshiCourse,
 } from './hoshiGame'
 import { playCompleteSound, playConnectSound, playWrongSound } from './sounds'
+import StageClearBadge from '../../components/StageClearBadge'
+import { createStageProgressStore } from '../shared/progress/stageProgress'
+import { vibrate } from '../../utils/haptics'
 import styles from './HoshiTsunagiPlay.module.css'
+
+/** コースごとの クリア記録と ★（Issue #784 A6）。まちがいが すくないほど ★が ふえる。 */
+const hoshiProgress = createStageProgressStore('hoshi-tsunagi-progress-v1', (id) => Object.hasOwn(COURSE_LABELS, id))
+
+function courseStars(mistakes: number): 1 | 2 | 3 {
+  return mistakes === 0 ? 3 : mistakes <= 3 ? 2 : 1
+}
 
 const COURSE_LABELS: Record<HoshiCourse, { name: string; hint: string }> = {
   easy: { name: 'かんたん', hint: 'ほしが すくない' },
@@ -73,6 +83,8 @@ export default function HoshiTsunagiPlay() {
   // まえ／つぎのボタンで好きな順に遊べるため、できた星座は番号で覚えておく。
   const [cleared, setCleared] = useState<ReadonlySet<number>>(() => new Set())
   const [soundOn, setSoundOn] = useState(true)
+  const mistakesRef = useRef(0)
+  const [progress, setProgress] = useState(hoshiProgress.read)
   // なぞる操作では1回の描画のあいだに複数の星へふれることがあるため、進行の正はrefに持つ。
   const [board, setBoard] = useState<BoardState>(createBoard)
   const boardRef = useRef<BoardState>(board)
@@ -98,6 +110,7 @@ export default function HoshiTsunagiPlay() {
     setCourse(nextCourse)
     setStageIndex(0)
     setCleared(new Set())
+    mistakesRef.current = 0
     commit(createBoard())
     setWrong(null)
     setPhase('play')
@@ -125,6 +138,10 @@ export default function HoshiTsunagiPlay() {
     setPointer(null)
     setWrong(null)
     if (isLastStage) {
+      if (cleared.size >= constellations.length) {
+        setProgress(hoshiProgress.record(course, courseStars(mistakesRef.current)))
+        vibrate('celebrate')
+      }
       setPhase('finished')
       return
     }
@@ -140,6 +157,8 @@ export default function HoshiTsunagiPlay() {
       if (!mistakes) return
       commit(next)
       setWrong((current) => ({ index: starIndex, count: (current?.count ?? 0) + 1 }))
+      mistakesRef.current += 1
+      vibrate('error')
       if (soundOn) playWrongSound()
       return
     }
@@ -147,6 +166,9 @@ export default function HoshiTsunagiPlay() {
     setWrong(null)
     if (result === 'complete') {
       setCleared((current) => new Set(current).add(stageIndex))
+      vibrate('success')
+    } else {
+      vibrate('tap')
     }
     if (!soundOn) return
     if (result === 'complete') playCompleteSound()
@@ -247,6 +269,7 @@ export default function HoshiTsunagiPlay() {
                 </span>
                 <span className={styles.courseName}>{COURSE_LABELS[option].name}</span>
                 <span className={styles.courseHint}>{COURSE_LABELS[option].hint}</span>
+                <StageClearBadge stars={progress[option] ?? 0} />
               </button>
             ))}
           </div>

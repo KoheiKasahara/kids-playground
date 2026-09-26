@@ -2,6 +2,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import { isQuizResultState } from '../quiz-core/resultState'
 import styles from './ColorMixQuizResult.module.css'
+import QuizStars from '../../components/QuizStars'
 
 function praise(score: number, total: number) {
   if (score === total) return ['🏆', 'かんぺき！']
@@ -18,6 +19,7 @@ export default function ColorMixQuizResult() {
   return (
     <main className={styles.page}>
       <h1 className={styles.title}>けっか</h1>
+      <QuizStars correctCount={location.state.correctCount} totalCount={location.state.totalCount} />
       <p className={styles.score}>{location.state.correctCount} / {location.state.totalCount}もん せいかい！</p>
       <p className={styles.praise}><span aria-hidden="true">{emoji}</span> {message}</p>
       <div className={styles.actions}>

@@ -13,34 +13,34 @@
 }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 70px; }
 .header > div { margin-right: auto; }
-.eyebrow { display: block; color: #9cc9bd; font-size: 10px; letter-spacing: .24em; font-weight: 800; }
+.eyebrow { display: block; color: #9cc9bd; font-size: 14px; letter-spacing: .08em; font-weight: 800; }
 .header h1 { margin: 3px 0 0; font-size: clamp(24px, 3vw, 38px); line-height: 1.15; font-weight: 900; letter-spacing: .06em; color: #fff1cc; text-shadow: 0 3px #203030; }
-.header h1 > span { display: inline-block; margin-left: 14px; color: #d2b87d; font-size: 11px; letter-spacing: .3em; vertical-align: middle; }
+.header h1 > span { display: inline-block; margin-left: 14px; color: #d2b87d; font-size: 14px; letter-spacing: .3em; vertical-align: middle; }
 .settingsButton, .secondary { min-height: 48px; border: 1px solid #94b3a575; border-radius: 8px; color: #e2ead3; background: #203c45; padding: 8px 18px; font-size: 14px; font-weight: 800; }
 .courseHeading { display: flex; align-items: baseline; justify-content: space-between; margin: auto 0 16px; padding-top: 12px; }
 .courseHeading h2 { margin: 0; color: #faf1d3; font-size: clamp(18px, 2vw, 24px); }
-.courseHeading > span { color: #a8bdb6; font-size: 12px; letter-spacing: .05em; }
+.courseHeading > span { color: #a8bdb6; font-size: 14px; letter-spacing: .05em; }
 .courses { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1.6vw, 24px); width: 100%; max-width: 1500px; align-self: center; }
 .courseCard { position: relative; padding: 0; overflow: hidden; text-align: left; border: 2px solid #6d877975; border-radius: 9px; background: #112631; box-shadow: 0 6px 0 #091820, 0 16px 30px #06101755; transition: transform .16s, border-color .16s; }
 .courseCard:hover { transform: translateY(-4px); border-color: var(--accent); }
 .courseCard:active { transform: translateY(2px); }
 .preview { display: block; width: 100%; aspect-ratio: 16 / 10; image-rendering: pixelated; object-fit: cover; border-bottom: 3px solid var(--accent); }
-.cardNumber { position: absolute; top: 10px; left: 10px; min-width: 25px; padding: 3px 7px; background: #0d223ac9; color: #fff3d2; font: 800 12px monospace; border: 1px solid #ffffff50; }
+.cardNumber { position: absolute; top: 10px; left: 10px; min-width: 25px; padding: 3px 7px; background: #0d223ac9; color: #fff3d2; font: 800 14px monospace; border: 1px solid #ffffff50; }
 .cardNumber > span { color: #ffe79c; margin-left: 6px; }
 .cardText { padding: clamp(10px, 1.5vw, 21px); display: grid; gap: 8px; }
-.cardText > span { font-size: clamp(8px, 1vw, 11px); color: var(--accent); letter-spacing: .13em; font-weight: 800; }
+.cardText > span { font-size: 14px; color: var(--accent); letter-spacing: .04em; font-weight: 800; }
 .cardText strong { font-size: clamp(14px, 1.7vw, 23px); color: #fff6dc; white-space: nowrap; }
-.cardText > small { display: flex; align-items: center; justify-content: space-between; font-size: 12px; margin-top: 6px; color: #b9cfbf; }
+.cardText > small { display: flex; align-items: center; justify-content: space-between; font-size: 14px; margin-top: 6px; color: #b9cfbf; }
 .cardText b { color: var(--accent); font-size: 21px; line-height: 1; }
 .selectionFooter { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 24px; margin-bottom: auto; }
-.selectionFooter > p { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; color: #ecdfbf; font-size: 13px; }
+.selectionFooter > p { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; color: #ecdfbf; font-size: 14px; }
 .selectionFooter > p > b { color: #f5d993; font-size: 20px; }
 .selectionFooter > p > span { color: #6c998f; }
 .selectionFooter > p > small { width: 100%; color: #88b5a9; padding-left: 5px; }
 .itemLegend { display: flex; gap: 15px; }
 .itemLegend > span { display: grid; justify-items: center; gap: 4px; }
 .itemLegend svg { height: 27px; width: 27px; }
-.itemLegend small { color: #b4c5b5; font-size: 9px; white-space: nowrap; }
+.itemLegend small { color: #b4c5b5; font-size: 14px; white-space: nowrap; }
 .race { position: relative; width: 100%; height: 100%; overflow: hidden; background: #112535; touch-action: none; }
 .raceCanvas { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
 /* Preserve the full kart and road on ultrawide monitors. */
@@ -49,9 +49,9 @@
 .rank { display: flex; align-items: baseline; gap: 3px; color: #fff3ca; }
 .rank b { font: 900 clamp(33px, 4vw, 56px)/1 monospace; color: #ffe391; }
 .rank > span { font-size: 19px; font-weight: 900; }
-.rank small { font: 800 12px monospace; color: #dbecd9; }
+.rank small { font: 800 14px monospace; color: #dbecd9; }
 .lap { display: flex; flex-direction: column; align-items: center; margin-left: auto; padding: 6px 18px; background: #112b3ec4; border: 1px solid #fff4c655; border-radius: 5px; }
-.lap > small { color: #d5e7d8; font-size: 11px; }
+.lap > small { color: #d5e7d8; font-size: 14px; }
 .lap strong { font: 900 26px monospace; }
 .lap strong > span { font: 700 13px sans-serif; }
 .pauseButton { pointer-events: auto; min-width: 48px; min-height: 48px; padding: 0; border: 2px solid #fff1ca8a; background: #173849dc; color: #fff3cc; border-radius: 9px; font-size: 24px; font-weight: 900; }
@@ -64,9 +64,9 @@
 .stickArea { left: max(24px, env(safe-area-inset-left)); }
 .itemArea { right: max(28px, env(safe-area-inset-right)); }
 .stick { position: relative; width: clamp(100px, 15vw, 168px); height: clamp(100px, 15vw, 168px); display: grid; place-items: center; border-radius: 50%; background: #173543a8; border: 2px solid #ffffff8c; box-shadow: inset 0 0 0 8px #17334250, 0 5px 0 #0b283366; touch-action: none; }
-.stickArrows { position: absolute; color: #fff6d597; font-size: 12px; white-space: nowrap; }
+.stickArrows { position: absolute; color: #fff6d597; font-size: 14px; white-space: nowrap; }
 .stickKnob { width: 53%; height: 53%; display: grid; place-items: center; background: linear-gradient(#f4edce, #b9c9b8); border-radius: 50%; border: 3px solid #fff8d9; box-shadow: 0 5px 0 #5b817d, 0 8px 10px #11253550; color: #366a6c; font-size: 32px; pointer-events: none; }
-.controlLabel { display: flex; align-items: center; flex-direction: column; gap: 1px; color: #fff5d9; font-size: 13px; font-weight: 900; text-shadow: 0 2px #152c3b, 2px 0 #152c3b, -2px 0 #152c3b; }
+.controlLabel { display: flex; align-items: center; flex-direction: column; gap: 1px; color: #fff5d9; font-size: 14px; font-weight: 900; text-shadow: 0 2px #152c3b, 2px 0 #152c3b, -2px 0 #152c3b; }
 .controlLabel > small { color: #e0eacb; font: 800 9px monospace; letter-spacing: .16em; }
 .itemButton { width: clamp(82px, 11vw, 130px); height: clamp(82px, 11vw, 130px); padding: 18px; border: 3px solid #c4dbcf; border-radius: 22%; background: #183544bc; box-shadow: 0 5px 0 #0f2834; touch-action: manipulation; }
 .itemButton > svg { width: 100%; height: 100%; filter: drop-shadow(0 3px 0 #0f2834); }
@@ -74,7 +74,7 @@
 .itemReady { border-color: #ffed9e; background: #435448e8; box-shadow: 0 5px 0 #283a33, 0 0 22px #ffdf754a; }
 .itemReady:active { transform: translateY(3px); }
 .speed { position: absolute; bottom: 14px; left: 38%; right: 38%; display: grid; gap: 6px; justify-items: center; pointer-events: none; }
-.speed > span { font-size: 11px; font-weight: 800; color: #fff7d6; text-shadow: 0 2px #102b3c; }
+.speed > span { font-size: 14px; font-weight: 800; color: #fff7d6; text-shadow: 0 2px #102b3c; }
 .speed i { display: block; width: 100%; max-width: 160px; height: 5px; border: 1px solid #ecedc6aa; background: linear-gradient(to right, #a9e4b1 var(--speed), #17344ba8 var(--speed)); }
 .scrim { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px; background: #08182bbc; backdrop-filter: blur(3px); box-sizing: border-box; }
 .dialog { width: min(440px, 75vw); max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 28px; border: 2px solid #f5d99b; border-radius: 9px; background: #173343; box-shadow: inset 0 0 0 4px #254856, 0 9px 0 #091e2b; text-align: center; }
@@ -82,13 +82,13 @@
 .settings { display: grid; gap: 10px; margin-bottom: 20px; }
 .settings > button { display: flex; align-items: center; justify-content: space-between; gap: 18px; text-align: left; border: 1px solid #91b6a656; padding: 12px; min-height: 66px; border-radius: 6px; background: #102a39; color: #f6edce; }
 .settings strong { display: block; font-size: 15px; }
-.settings small { display: block; margin-top: 5px; font-size: 10px; color: #a4c8b9; }
+.settings small { display: block; margin-top: 5px; font-size: 14px; color: #a4c8b9; }
 .switchOn, .switchOff { display: inline-grid; place-items: center; min-width: 45px; height: 29px; border-radius: 20px; font: 900 12px monospace; }
 .switchOn { color: #173f37; background: #b5e0a6; box-shadow: 0 0 0 3px #b5e0a622; }
 .switchOff { color: #bdcbbf; background: #395361; }
 .primary { width: 100%; min-height: 48px; padding: 10px 18px; border: 2px solid #fff0be; border-radius: 6px; background: #eed28e; color: #253e40; box-shadow: 0 4px #ac8857; font-size: 17px; font-weight: 900; }
 .primary:active { transform: translateY(2px); box-shadow: 0 2px #ac8857; }
-.quiet { padding: 10px; min-height: 42px; color: #bdcfc4; background: none; border: 0; font-size: 12px; margin-top: 7px; }
+.quiet { padding: 10px; min-height: 42px; color: #bdcfc4; background: none; border: 0; font-size: 14px; margin-top: 7px; }
 .result { width: min(540px, 80vw); }
 .medal { margin: 12px auto; width: 80px; height: 80px; display: grid; place-items: center; border: 4px double #f9e7a3; border-radius: 50%; background: #b48a4c; color: #ffedac; font-size: 50px; text-shadow: 2px 3px #97734c; box-shadow: 0 6px #786349; }
 .result h2 { margin: 15px 0 12px; }
@@ -106,24 +106,24 @@
   .selection { padding: 8px max(18px, env(safe-area-inset-right)) 10px max(18px, env(safe-area-inset-left)); }
   .header { min-height: 50px; gap: 12px; }
   .header h1 { font-size: 24px; }
-  .header .eyebrow { font-size: 8px; }
-  .header h1 > span { font-size: 9px; }
+  .header .eyebrow { font-size: 14px; }
+  .header h1 > span { font-size: 14px; }
   .settingsButton { min-height: 44px; padding: 6px 12px; }
   .courseHeading { margin-bottom: 9px; padding-top: 6px; }
   .courseHeading h2 { font-size: 17px; }
-  .courseHeading > span { font-size: 10px; }
+  .courseHeading > span { font-size: 14px; }
   .courses { gap: 10px; }
   .preview { aspect-ratio: 1.9; max-height: 31dvh; }
   .cardText { padding: 9px 10px; gap: 5px; }
-  .cardText strong { font-size: clamp(12px, 1.8vw, 17px); }
-  .cardText > small { margin-top: 0; font-size: 10px; }
-  .cardNumber { top: 6px; left: 6px; font-size: 10px; }
+  .cardText strong { font-size: clamp(14px, 1.8vw, 17px); }
+  .cardText > small { margin-top: 0; font-size: 14px; }
+  .cardNumber { top: 6px; left: 6px; font-size: 14px; }
   .selectionFooter { padding-top: 15px; gap: 10px; }
-  .selectionFooter > p { font-size: 11px; gap: 7px; }
-  .selectionFooter > p > small { font-size: 10px; }
+  .selectionFooter > p { font-size: 14px; gap: 7px; }
+  .selectionFooter > p > small { font-size: 14px; }
   .itemLegend { gap: 9px; }
   .itemLegend svg { height: 23px; width: 23px; }
-  .itemLegend small { font-size: 8px; }
+  .itemLegend small { font-size: 14px; }
   .raceTop { top: max(8px, env(safe-area-inset-top)); left: calc(max(8px, env(safe-area-inset-left)) + 110px); gap: 12px; }
   .lap { padding: 3px 10px; }
   .lap strong { font-size: 23px; }
@@ -144,21 +144,24 @@
   .courseHeading { margin: 2px 0 7px; padding: 0; }
   .preview { aspect-ratio: 2; }
   .cardText { padding: 7px; gap: 3px; }
-  .cardText strong { font-size: 12px; }
-  .cardText > span { font-size: 7px; }
+  .cardText strong { font-size: 14px; }
+  .cardText > span { font-size: 14px; }
   .selectionFooter { padding-top: 12px; }
   .itemLegend small { display: none; }
   .itemLegend { gap: 5px; }
-  .selectionFooter > p { font-size: 10px; gap: 5px; }
+  .selectionFooter > p { font-size: 14px; gap: 5px; }
   .stick { width: 88px; height: 88px; }
   .itemButton { width: 72px; height: 72px; padding: 10px; }
-  .controlLabel { font-size: 11px; }
-  .speed > span { font-size: 9px; }
+  .controlLabel { font-size: 14px; }
+  .speed > span { font-size: 14px; }
   .dialog { padding: 12px 22px; }
-  .settings strong { font-size: 13px; }
-  .settings small { font-size: 9px; }
+  .settings strong { font-size: 14px; }
+  .settings small { font-size: 14px; }
   .dialog h2 { font-size: 20px; }
   .quiet { min-height: 35px; margin-top: 4px; padding: 7px; }
 }
 @media (orientation: portrait) { .selection, .race { visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { .courseCard { transition: none; } }
+
+/* 回転案内・選択画面の文字がドラッグで選択されないようにする（Issue #784 A2）。 */
+.orientation, .selection { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

@@ -83,3 +83,21 @@
   text-align: center;
   color: var(--color-text-muted);
 }
+
+.setting {
+  display: block;
+  min-height: 48px;
+  margin: var(--space-lg) auto 0;
+  padding: var(--space-sm) var(--space-lg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.setting[aria-pressed='false'] {
+  color: var(--color-text-muted);
+}

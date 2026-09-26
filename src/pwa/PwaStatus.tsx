@@ -73,11 +73,24 @@ function getIsOnline(): boolean {
   return typeof navigator === 'undefined' ? true : navigator.onLine
 }
 
+type Props = {
+  /** 現在のパス。ゲーム画面ではプレイ中のボタンを覆わないよう、案内の出し方を変える（Issue #784 A1）。 */
+  pathname?: string
+}
+
+/** ゲーム画面（/games/...）かどうか。ここでは完了・更新のお知らせを出さず、ホームへ戻るまで遅らせる。 */
+function isGameRoutePath(pathname: string): boolean {
+  return pathname.startsWith('/games/')
+}
+
 /**
  * Service Worker の登録・オフライン対応・アップデート案内をまとめて扱う UI。
  * 既存の画面レイアウトには影響を与えず、画面下部に控えめなトーストとして表示する。
+ * ゲーム画面では主ボタンや回答ボタンを覆ってしまうため、急ぎでないお知らせ
+ * （オフライン準備完了・新バージョン）はホームへ戻るまで遅らせ、
+ * 遊べなくなる恐れのある案内だけを画面上部に小さく出す。
  */
-export default function PwaStatus() {
+export default function PwaStatus({ pathname = '/' }: Props) {
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh],
@@ -96,17 +109,23 @@ export default function PwaStatus() {
 
   // オフライン準備完了 (offlineReady) を検知したら、フラグを保存し、数秒後に
   // 自分自身（useRegisterSW の offlineReady）を false に戻してトーストを消す。
-  useEffect(() => {
-    if (!offlineReady) return
+  const inGame = isGameRoutePath(pathname)
 
-    writeOfflineReadyFlag()
+  // オフライン準備の完了フラグは、表示を遅らせている間でもすぐ保存する。
+  useEffect(() => {
+    if (offlineReady) writeOfflineReadyFlag()
+  }, [offlineReady])
+
+  // トーストが実際に見えている間だけ、自動で消すタイマーを動かす。
+  useEffect(() => {
+    if (!offlineReady || inGame) return
 
     const timer = setTimeout(() => {
       setOfflineReady(false)
     }, OFFLINE_TOAST_DURATION_MS)
 
     return () => clearTimeout(timer)
-  }, [offlineReady, setOfflineReady])
+  }, [offlineReady, inGame, setOfflineReady])
 
   // online/offline の切り替わりを監視し、初回未キャッシュ時の案内表示に反映する。
   useEffect(() => {
@@ -130,17 +149,18 @@ export default function PwaStatus() {
     void updateServiceWorker(true)
   }
 
-  const showOfflineToast = offlineReady
+  const showOfflineToast = offlineReady && !inGame
+  const showRefresh = needRefresh && !inGame
   const hasOfflineReadyBefore = wasOfflineReadyBefore || offlineReady
   // オフラインかつ、これまでに一度もオフライン準備が完了していない場合の案内。
   const showNotReadyNotice = !isOnline && !hasOfflineReadyBefore
 
-  if (!showOfflineToast && !showNotReadyNotice && !needRefresh) {
+  if (!showOfflineToast && !showNotReadyNotice && !showRefresh) {
     return null
   }
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${inGame ? styles.top : ''}`}>
       {showOfflineToast && (
         <div className={styles.toast} role="status">
           <span className={styles.message}>オフラインでも あそべるように なりました</span>
@@ -164,7 +184,7 @@ export default function PwaStatus() {
         </div>
       )}
 
-      {needRefresh && (
+      {showRefresh && (
         <div className={styles.toast} role="status">
           <span className={styles.message}>あたらしい バージョンが あります</span>
           <button type="button" className={styles.updateButton} onClick={handleUpdateClick}>

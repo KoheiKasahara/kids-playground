@@ -3,7 +3,13 @@ import { PAPERS, PATTERNS, PAPER_WIDTH, ROLLER_COLORS, ROLLER_PAPER_HEIGHT, STAM
 import { advanceStroke, finishStroke, startStroke, type StrokeCursor } from './rollerStroke'
 import { drawPaper, drawStamps } from './rollerDrawing'
 import GameBackButton from '../../components/GameBackButton'
+import { primeAudio } from '../../audio/sound'
+import { vibrate } from '../../utils/haptics'
+import { playDoneSound, playStampSound, resetStampMelody } from './sounds'
 import styles from './OekakiKorokoroPlay.module.css'
+
+/** もようの音を鳴らす最小間隔[ms]。はやく こすっても 音が つぶれないよう間引く。 */
+const STAMP_SOUND_INTERVAL_MS = 70
 
 function Motif({ pattern }: { pattern: Pattern }) {
   return <svg viewBox="-30 -30 60 60" aria-hidden="true"><path d={pattern.path} fill="currentColor" /><path d={pattern.detail} fill="#ffffff99" /></svg>
@@ -25,6 +31,8 @@ export default function OekakiKorokoroPlay() {
   const [canUndo, setCanUndo] = useState(false)
   const [modal, setModal] = useState<'clear' | 'done' | null>(null)
   const [error, setError] = useState('')
+  const [soundOn, setSoundOn] = useState(true)
+  const lastStampSoundAt = useRef(0)
   const ink = useRef<HTMLCanvasElement>(null)
   const background = useRef<HTMLCanvasElement>(null)
   const previous = useRef<HTMLCanvasElement | null>(null)
@@ -84,6 +92,8 @@ export default function OekakiKorokoroPlay() {
     previousHasInk.current = hasInk
     const p = point(event)
     active.current = { pointerId: event.pointerId, cursor: startStroke(p), pattern, color }
+    primeAudio()
+    resetStampMelody()
     canvas.setPointerCapture(event.pointerId)
     setHasInk(true)
     setCanUndo(true)
@@ -100,7 +110,15 @@ export default function OekakiKorokoroPlay() {
     for (const sample of coalesced.length ? coalesced : [event]) {
       const p = point(sample)
       const angle = Math.atan2(p.y - stroke.cursor.point.y, p.x - stroke.cursor.point.x)
-      drawStamps(ctx, advanceStroke(stroke.cursor, p, stroke.pattern.spacing * STAMP_SCALE), stroke.pattern, stroke.color)
+      const stamps = advanceStroke(stroke.cursor, p, stroke.pattern.spacing * STAMP_SCALE)
+      drawStamps(ctx, stamps, stroke.pattern, stroke.color)
+      if (stamps.length > 0 && soundOn) {
+        const now = performance.now()
+        if (now - lastStampSoundAt.current >= STAMP_SOUND_INTERVAL_MS) {
+          lastStampSoundAt.current = now
+          playStampSound(stroke.pattern.id)
+        }
+      }
       showRoller(p.x, p.y, angle)
     }
   }
@@ -140,6 +158,9 @@ export default function OekakiKorokoroPlay() {
     endStroke()
     setModal('done')
     setError('')
+    primeAudio()
+    if (soundOn) playDoneSound()
+    vibrate('celebrate')
   }
 
   return <main className={styles.page} style={{ '--ink': color } as CSSProperties}>
@@ -147,6 +168,7 @@ export default function OekakiKorokoroPlay() {
       <GameBackButton to="/" />
       <h1>おえかきコロコロ</h1>
       <span className={styles.badge} aria-hidden="true">じゆうに あそぼう</span>
+      <button type="button" className={styles.soundButton} aria-pressed={soundOn} aria-label={soundOn ? 'おとを けす' : 'おとを だす'} onClick={() => { if (!soundOn) primeAudio(); setSoundOn(on => !on) }}><span aria-hidden="true">{soundOn ? '🔊' : '🔇'}</span></button>
     </header>
     <div className={`${styles.workspace} ${styles.rollerWorkspace}`}>
       <section className={styles.studio} aria-label="おえかき">

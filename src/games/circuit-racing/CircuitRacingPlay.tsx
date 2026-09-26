@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import {
   DEFAULT_SELECTIONS,
@@ -14,6 +14,9 @@ import {
   type CircuitRacingEngineStatus,
 } from './useCircuitRacingEngine'
 import styles from './CircuitRacingPlay.module.css'
+import { primeAudio } from '../../audio/sound'
+import { vibrate } from '../../utils/haptics'
+import { createEngineHum, playBoostSound, playRaceStartSound, playSpecialSound } from './sounds'
 
 import { SPECIALS, type SpecialState } from './special'
 
@@ -58,6 +61,8 @@ export default function CircuitRacingPlay() {
   const [sceneStatus, setSceneStatus] = useState<CircuitRacingEngineStatus>('loading')
   const [specialStates, setSpecialStates] = useState<readonly SpecialState[]>([])
   const [boostFeedback, setBoostFeedback] = useState(0)
+  const [soundOn, setSoundOn] = useState(true)
+  const humRef = useRef<ReturnType<typeof createEngineHum> | null>(null)
 
   const handleSceneStatus = useCallback((status: CircuitRacingEngineStatus) => {
     setSceneStatus(status)
@@ -72,6 +77,19 @@ export default function CircuitRacingPlay() {
     onSpecialChange: setSpecialStates,
   })
   const { registerContainer, retry, boost, special, adjustCamera } = engine
+
+  // 走っているあいだだけエンジンのうなりを鳴らす（Issue #784 A8）。
+  const racing = phase === 'race' && sceneStatus === 'ready'
+  useEffect(() => {
+    if (!racing || !soundOn) return undefined
+    const hum = createEngineHum()
+    humRef.current = hum
+    hum.start()
+    return () => {
+      hum.stop()
+      humRef.current = null
+    }
+  }, [racing, soundOn])
 
   useEffect(() => {
     if (boostFeedback === 0) return undefined
@@ -100,10 +118,12 @@ export default function CircuitRacingPlay() {
   }, [])
 
   const beginRace = useCallback(() => {
+    primeAudio()
+    if (soundOn) playRaceStartSound()
     setTargetIndex(0)
     setCameraMode(prefersReducedMotion() ? 'trackside' : 'chase')
     setPhase('race')
-  }, [])
+  }, [soundOn])
 
   const backToSelection = useCallback(() => {
     setCameraMode(prefersReducedMotion() ? 'trackside' : 'chase')
@@ -111,9 +131,13 @@ export default function CircuitRacingPlay() {
   }, [])
 
   const handleBoost = useCallback(() => {
+    primeAudio()
+    if (soundOn) playBoostSound()
+    humRef.current?.rev()
+    vibrate('impact')
     boost(targetIndex)
     setBoostFeedback((value) => value + 1)
-  }, [boost, targetIndex])
+  }, [boost, targetIndex, soundOn])
 
   const selectedSpecial = SPECIALS[selections[targetIndex]!.carId]
   const specialState = specialStates[targetIndex]
@@ -240,7 +264,12 @@ export default function CircuitRacingPlay() {
                 disabled={!specialReady || sceneStatus !== 'ready'}
                 data-ready={specialReady}
                 aria-label={`スペシャル：${selectedSpecial.label}`}
-                onClick={() => special(targetIndex)}
+                onClick={() => {
+                  primeAudio()
+                  if (soundOn) playSpecialSound()
+                  vibrate('success')
+                  special(targetIndex)
+                }}
               >
                 <span>{selectedSpecial.icon} スペシャル</span>
                 <span className={styles.specialGauge} role="progressbar" aria-label="スペシャルゲージ" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor((specialState?.charge ?? 0) * 100)}>
@@ -272,6 +301,19 @@ export default function CircuitRacingPlay() {
                     <span aria-hidden="true">{button.icon}</span>{button.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className={styles.cameraButton}
+                  aria-pressed={soundOn}
+                  aria-label={soundOn ? 'おとを けす' : 'おとを だす'}
+                  onClick={() => {
+                    const next = !soundOn
+                    setSoundOn(next)
+                    if (next) primeAudio()
+                  }}
+                >
+                  <span aria-hidden="true">{soundOn ? '🔊' : '🔇'}</span>おと
+                </button>
               </div>
               <div className={styles.targetRow} aria-label="みる くるまを えらぶ">
                 <span>みる くるま</span>

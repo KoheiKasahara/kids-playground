@@ -47,7 +47,7 @@
 .cloud { position: absolute; top: 3%; left: 12%; font-size: clamp(45px, 10vw, 100px); color: #ffffffa6; pointer-events: none; }
 .notice { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 95%; text-align: center; pointer-events: none; font-size: 14px; font-weight: 700; background: #fff9e8ed; border-radius: 20px; padding: 9px 14px; }
 .notice:empty { display: none; }
-.actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .actions button { font-size: 13px; background: #e8eddf; }
 .actions button:first-child { background: #f6d984; }
 .shaking { animation: shake .4s ease-out; }
@@ -89,7 +89,7 @@
   .materials button { flex-direction: row; font-size: 11px; }
   .materials span { font-size: 22px; }
   .materials button:last-child { grid-column: auto; }
-  .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .actions button { font-size: 11px; }
   .intro { margin: 10px auto; }
   .illustration { display: none; }
