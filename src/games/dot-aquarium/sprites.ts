@@ -31,7 +31,8 @@ export const R = {
   skin: ['#1c2c28', '#3a5a4c', '#62866e', '#90b490', '#cce4c0'],
   shark: ['#141c2c', '#2e3e58', '#566c88', '#8aa0b8', '#c2d4e4'],
   seahorse: ['#4a1a04', '#9a4a0a', '#e08a18', '#ffbe3a', '#fff0a0'],
-  octo: ['#3a0818', '#7a1a34', '#c83a58', '#f06a7e', '#ffb0bc'],
+  octo: ['#4a0c16', '#902232', '#d84a58', '#f07a82', '#ffbcbc'],
+  octoLip: ['#8a3a44', '#d07a84', '#f6bcba', '#ffdad6', '#fff2f0'],
   squid: ['#5a3a4a', '#a07888', '#e0c2cc', '#f8e6ec', '#ffffff'],
   squidDot: ['#4a1a10', '#8a3420', '#c85a34', '#e88a58', '#ffc49a'],
   moray: ['#1a1e06', '#3e4610', '#72801c', '#a8b432', '#dce274'],
@@ -420,34 +421,41 @@ function shark(f: number): Model {
   }
 }
 
-/** タコ（まるい あたまと 8ほんの あし）。 */
+/** タコ（しょうめん。まるい あたまに ちょんちょん めと まるい くち、あしを ひろげて 2ほんは くるん）。 */
 function octopus(f: number): Model {
-  const w = 24, h = 22
+  const w = 30, h = 25, cx = 15
   const ph = f / 4 * TAU
   const prims: Prim[] = []
-  const suckers = (s: Sample) => (s.v > .3 && Math.floor(s.u * 5) % 2 === 0 ? { ramp: R.cream, flat: .72 } : undefined)
-  // うしろ（くらい）→ まえ の じゅんに あしを かく。
-  for (let layer = 0; layer < 2; layer++) {
-    for (let i = 0; i < 4; i++) {
-      const bx = 7.5 + i * 3.2 + (layer ? 0 : 1.6), by = 12.5
-      const sway = Math.sin(ph + i * 1.4 + layer * 2)
-      const mx = bx - 1.2 + sway * 1.2, my = 16.4
-      const ex = bx - 2.6 + sway * 2, ey = 19.6 - Math.abs(sway) * .5
-      const tx = ex + 1.6 + sway * .5, ty = ey - 1.3
-      const base = { ramp: R.octo, shift: layer ? 0 : -.22, pat: layer ? suckers : undefined }
-      prims.push(
-        { t: 'cap', x1: bx, y1: by, x2: mx, y2: my, r1: 1.7, r2: 1.2, ...base },
-        { t: 'cap', x1: mx, y1: my, x2: ex, y2: ey, r1: 1.2, r2: .8, ...base },
-        { t: 'cap', x1: ex, y1: ey, x2: tx, y2: ty, r1: .8, r2: .5, ...base },
-      )
+  // したの 6ほん（そとがわほど よこに ひらく）。
+  const legs: [number, number][] = [[-11, 19.5], [-7.5, 22.5], [-2.6, 23.6], [2.6, 23.6], [7.5, 22.5], [11, 19.5]]
+  legs.forEach(([dx, ey], i) => {
+    const sway = Math.sin(ph + i * 1.1) * .9
+    const bx = cx + dx * .32, by = 15.5
+    const mx = cx + dx * .7 + sway * .6, my = (by + ey) / 2 + .4
+    const ex = cx + dx + sway, back = i === 0 || i === 5 ? 0 : i === 1 || i === 4 ? .08 : .14
+    prims.push(
+      { t: 'cap', x1: bx, y1: by, x2: mx, y2: my, r1: 2.1, r2: 1.5, ramp: R.octo, shift: -back, flat: .6 },
+      { t: 'cap', x1: mx, y1: my, x2: ex, y2: ey, r1: 1.5, r2: 1.1, ramp: R.octo, shift: -back, flat: .6, edge: true },
+    )
+  })
+  // うえに くるんと あげた 2ほん（きゅうばん つき）。
+  for (let side = -1; side <= 1; side += 2) {
+    const up = Math.sin(ph + (side > 0 ? Math.PI : 0)) * .8
+    const pts: [number, number][] = [[cx + side * 5, 13.4], [cx + side * 9.5, 15 + up * .4], [cx + side * 12.6, 12.6 + up * .6], [cx + side * 13.2, 8.4 + up], [cx + side * 11.8, 5.6 + up]]
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1]
+      prims.push({ t: 'cap', x1, y1, x2, y2, r1: 2 - i * .25, r2: 1.75 - i * .25, ramp: R.octo, flat: .62 })
     }
+    for (const [x, y] of pts.slice(2)) prims.push({ t: 'px', x: x + side * 1.1, y, color: '#ffe0dc' })
+    prims.push({ t: 'px', x: pts[1][0], y: pts[1][1] + 1.2, color: '#ffe0dc' })
   }
   prims.push(
-    { t: 'ell', x: 11.5, y: 7.2, rx: 7.2, ry: 6.4, rot: -.25, ramp: R.octo, gloss: .55, pat: s => (spots(s, 2.2, .16) && s.v < .3 ? { shift: -.18 } : undefined) },
-    { t: 'ell', x: 14.2, y: 11.2, rx: 5.6, ry: 3.4, ramp: R.octo, edge: true },
-    { t: 'cap', x1: 10.5, y1: 12.2, x2: 7.6, y2: 13.4, r1: 1.1, r2: .8, ramp: R.octo, shift: -.1 },
-    { t: 'eye', x: 16.4, y: 9.8, r: 1.35, iris: '#ffd040' },
-    { t: 'px', x: 18.6, y: 12, color: '#ff8aa0' },
+    { t: 'ell', x: cx, y: 15, rx: 6.2, ry: 3.2, ramp: R.octo, flat: .6 },
+    { t: 'ell', x: cx, y: 8, rx: 8.4, ry: 7.6, ramp: R.octo, gloss: .35, pat: s => ({ flat: .64 - s.nx * .08 - s.ny * .1 }) },
+    { t: 'px', x: cx - 3.2, y: 7.4, color: '#1a0a10' }, { t: 'px', x: cx - 3.2, y: 8.4, color: '#1a0a10' },
+    { t: 'px', x: cx + 3.2, y: 7.4, color: '#1a0a10' }, { t: 'px', x: cx + 3.2, y: 8.4, color: '#1a0a10' },
+    { t: 'ell', x: cx, y: 11.8, rx: 2.3, ry: 2.1, ramp: R.octoLip, flat: .7, edge: true },
+    { t: 'px', x: cx, y: 11.8, color: '#3a0a14' },
   )
   return { w, h, prims }
 }
