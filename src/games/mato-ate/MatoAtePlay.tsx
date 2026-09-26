@@ -50,6 +50,16 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
   const [hud, setHud] = useState<Hud>(() => ({ state: 'play', score: 0, ammo: level.balls, left: level.targets.filter(t => t.kind !== 'gold').length, shots: 0 }))
   const [result, setResult] = useState<Result | null>(null)
   const [tip, setTip] = useState('')
+  /** ステージめいの おおきな かんばん。でている あいだの タップは けすだけで うたない。 */
+  const [banner, setBanner] = useState(true)
+  const bannerRef = useRef(true)
+  const hideBanner = () => { bannerRef.current = false; setBanner(false) }
+
+  useEffect(() => {
+    // アニメが おわらない ときの ための よび（CSSの 2s + .1s より すこし あと）。
+    const timer = setTimeout(hideBanner, 2300)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     const game = createGame(level)
@@ -180,6 +190,7 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
     const game = gameRef.current
     if (!game || game.state !== 'play' || !event.isPrimary || event.button !== 0 || aim.current.pointer !== null) return
     event.preventDefault()
+    if (bannerRef.current) { hideBanner(); return }
     primeAudio()
     event.currentTarget.focus({ preventScroll: true })
     const point = worldPoint(event)
@@ -224,6 +235,7 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
       aim.current.point = keyAimPoint(angle)
     } else if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault()
+      if (bannerRef.current) { hideBanner(); return }
       primeAudio()
       shoot()
     }
@@ -250,10 +262,10 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
       <span className={`${styles.stat} ${styles.score}`} aria-label={`${hud.score}てん`}>{hud.score.toLocaleString('ja-JP')}<small>てん</small></span>
       <button type="button" className={styles.iconButton} onClick={onRetry} aria-label="さいしょから やりなおす">↻</button>
     </div>
-    <div className={styles.banner} aria-hidden="true">
+    {banner && <div className={styles.banner} aria-hidden="true" data-testid="stage-banner" onAnimationEnd={hideBanner}>
       <span className={styles.bannerSub}>{difficulty.label} ・ ステージ {index + 1}</span>
       <span className={styles.bannerTitle}>{level.name}</span>
-    </div>
+    </div>}
     <p className={styles.bubble} role="status" data-show={Boolean(hint) || undefined}>{hint}</p>
     {result && <div className={styles.overlay}>
       {result.kind === 'clear' ? <div className={styles.card} role="dialog" aria-label="クリア">
