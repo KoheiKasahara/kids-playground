@@ -85,6 +85,7 @@ export type WorldEvent =
   | { type: 'hide'; c: Creature }
   | { type: 'breathe'; c: Creature }
   | { type: 'wave'; c: Creature }
+  | { type: 'ink'; c: Creature }
   | { type: 'pearl'; d: Decor }
   | { type: 'clam'; d: Decor }
   | { type: 'chest'; d: Decor }
@@ -332,6 +333,15 @@ export function poke(world: World, c: Creature) {
       c.state = 'wave'; c.timer = 1.4
       world.events.push({ type: 'wave', c })
       break
+    case 'octopus': {
+      // すみを はいて うしろへ ぴゅーっ。
+      world.events.push({ type: 'ink', c })
+      const b = bounds(world, c)
+      c.state = 'flee'; c.timer = .9; c.wait = 0
+      c.tx = clamp(c.x - c.face * 60, b.x0, b.x1)
+      c.ty = clamp(c.y - 18, b.y0, b.y1)
+      break
+    }
     default:
       c.vy -= 14
       c.vx += c.face * 10
@@ -354,6 +364,7 @@ export function startle(world: World, x: number, y: number) {
     if (d > 64 || c.species === 'jelly') continue
     c.sleep = false
     if (c.species === 'puffer') { c.state = 'puff'; c.timer = 2.5; world.events.push({ type: 'puff', c }); n++; continue }
+    if (c.species === 'octopus') world.events.push({ type: 'ink', c })
     const k = (64 - d) / 64
     const dx = (cx - x) / (d || 1), dy = (cy - y) / (d || 1)
     c.vx += dx * 40 * k * (c.species === 'shark' || c.species === 'turtle' ? .3 : 1)
