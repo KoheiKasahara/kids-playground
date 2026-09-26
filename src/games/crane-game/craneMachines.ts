@@ -88,15 +88,15 @@ const CAPSULE_SPECIES: readonly PrizeSpecies[] = [
 ]
 
 const SNACK_SPECIES: readonly PrizeSpecies[] = [
-  { id: 'cookie', label: 'クッキー', emoji: '🍪', color: '#e0a356', accent: '#7a4b22', look: 'snack', body: { form: 'box', half: { x: 0.072, y: 0.048, z: 0.05 }, round: 0.012 }, mass: 0.105, friction: 0.72, restitution: 0.06 },
-  { id: 'chocolate', label: 'チョコ', emoji: '🍫', color: '#7b4a2e', accent: '#f3d9a4', look: 'snack', body: { form: 'box', half: { x: 0.08, y: 0.034, z: 0.046 }, round: 0.01 }, mass: 0.095, friction: 0.68, restitution: 0.05 },
-  { id: 'juice', label: 'ジュース', emoji: '🧃', color: '#ef8340', accent: '#fff1d8', look: 'drink', body: { form: 'box', half: { x: 0.036, y: 0.062, z: 0.036 }, round: 0.008 }, mass: 0.115, friction: 0.62, restitution: 0.04 },
+  { id: 'cookie', label: 'クッキー', emoji: '🍪', color: '#d99a52', accent: '#4a2a17', look: 'snack', body: { form: 'box', half: { x: 0.058, y: 0.018, z: 0.058 }, round: 0.01 }, mass: 0.09, friction: 0.72, restitution: 0.06 },
+  { id: 'chocolate', label: 'チョコ', emoji: '🍫', color: '#5a2e18', accent: '#e2434f', look: 'snack', body: { form: 'box', half: { x: 0.08, y: 0.026, z: 0.046 }, round: 0.01 }, mass: 0.095, friction: 0.68, restitution: 0.05 },
+  { id: 'juice', label: 'ジュース', emoji: '🧃', color: '#f39a3b', accent: '#fff6e6', look: 'drink', body: { form: 'box', half: { x: 0.036, y: 0.062, z: 0.036 }, round: 0.008 }, mass: 0.115, friction: 0.62, restitution: 0.04 },
 ]
 
 const FRUIT_SPECIES: readonly PrizeSpecies[] = [
   { id: 'apple', label: 'りんご', emoji: '🍎', color: '#e5484d', accent: '#5fa347', look: 'fruit', body: { form: 'ball', radius: 0.064 }, mass: 0.085, friction: 0.5, restitution: 0.12 },
   { id: 'orange', label: 'みかん', emoji: '🍊', color: '#f59a2a', accent: '#4f9a3c', look: 'fruit', body: { form: 'ball', radius: 0.056 }, mass: 0.07, friction: 0.55, restitution: 0.12 },
-  { id: 'banana', label: 'バナナ', emoji: '🍌', color: '#f7d54a', accent: '#8a6a2c', look: 'fruit', body: { form: 'capsule', radius: 0.036, half: 0.058 }, mass: 0.06, friction: 0.6, restitution: 0.06 },
+  { id: 'banana', label: 'バナナ', emoji: '🍌', color: '#f7d54a', accent: '#8a6a2c', look: 'fruit', body: { form: 'capsule', radius: 0.034, half: 0.06 }, mass: 0.06, friction: 0.6, restitution: 0.06 },
 ]
 
 /** 穴の上を避けた並べ場所。ケースの内側へ景品の大きさ分の余白を残してある。 */
