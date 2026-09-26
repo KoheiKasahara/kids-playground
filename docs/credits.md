@@ -20,6 +20,10 @@
 
 `src/games/dot-aquarium/` のさかな・カメ・サメ・クラゲ・かいそう・いわ・りゅうぼく・サンゴ・おしろ・たからばこ・水・すな・あわなどのドット絵は、本アプリ用に作成したパーツの組み合わせ（だえん・カプセル・ひれ）とノイズを、Canvasで実行時にドット絵へ焼き付けたオリジナル図形です。効果音・BGMもWeb Audio APIで実行時に合成するオリジナル曲で、外部の画像・音源は使用していません。
 
+## ドットカートのドット絵・効果音・BGM
+
+`src/games/pixel-kart/` のカート・どうぶつ・森・花・波・サンゴ・結晶・お城・路面などは、本アプリ用に作成したオリジナルのドット絵です。`sprites.ts` と `render.ts` で Canvas に描画し、`courses.ts` で4コースの形状を定義しています。`ItemGlyph.tsx` のアイテムもオリジナルの SVG 図形です。`audio.ts` のコース別BGMと効果音は Web Audio API で実行時に合成し、外部の画像・音源は使用していません。
+
 ## 世界地図 (world-atlas / countries-50m.json)
 
 世界地図の国境は [world-atlas](https://github.com/topojson/world-atlas) npmパッケージの [`countries-50m.json`](https://unpkg.com/world-atlas/countries-50m.json) を、ビルド時に静的importしてバンドルしています。実行時のCDN・地図API通信は行いません。

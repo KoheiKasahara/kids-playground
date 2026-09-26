@@ -900,6 +900,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'pixel-kart',
+    slug: 'pixel-kart',
+    title: 'ドットカート',
+    emoji: '🏎️',
+    category: 'learning',
+    seo: {
+      headline: 'ドットカート｜ドット絵の4コースを走るアイテムレース',
+      description:
+        'もり・うみ・クリスタル・そらの4コースを走る、横画面のドット絵カートレース。自動アクセルとドリフトで操作はハンドルとアイテムだけ。コースからはみ出しにくい補助を選べるので、小さな子どもでも気軽に遊べます。',
+    },
+    intro: {
+      howToPlay: [
+        'よこむきで、ひだりの スティックを うごかして まがろう',
+        'みぎの ボタンで アイテム！ 2しゅうで ゴールだよ',
+        'パソコンは ← → か A・D、スペースで アイテムを つかうよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
