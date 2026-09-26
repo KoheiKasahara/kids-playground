@@ -560,3 +560,10 @@ button.window:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .logo h1, .stageCard, .banner, .dialog, .overlay, .resultCard, .treasure, .treasureStage, .rotateIcon, .starOn { animation: none; }
 }
+
+/* 回転案内の文字がドラッグで選択されないようにする（Issue #784 A2）。 */
+.rotateCard {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}

@@ -3,6 +3,7 @@
 .header h1 { font-size: clamp(18px, 2.3vw, 27px); letter-spacing: .04em; }
 .back { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px; background: white; border: 1px solid #e2d8c7; border-radius: 18px; color: inherit; text-decoration: none; font-weight: bold; white-space: nowrap; }
 .badge { margin-left: auto; font-size: 13px; color: #847661; }
+.soundButton { flex: none; min-width: 44px; min-height: 44px; border: 1px solid #e2d8c7; border-radius: 50%; background: white; font-size: 20px; cursor: pointer; }
 .workspace { display: flex; flex: 1; gap: 16px; min-height: 0; max-width: 1400px; width: 100%; margin: auto; }
 .studio { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .caption { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: bold; min-height: 32px; }

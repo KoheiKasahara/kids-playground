@@ -1,4 +1,6 @@
 import GameBackButton from '../../components/GameBackButton'
+import StageClearBadge from '../../components/StageClearBadge'
+import { puzzleProgress } from './puzzleProgress'
 import { PUZZLE_STAGES, type PuzzleStageId } from './puzzleStages'
 import styles from './PuzzleStageSelect.module.css'
 
@@ -8,6 +10,7 @@ type PuzzleStageSelectProps = {
 
 /** 文字が読めなくても個数と絵で区別できる、3枚だけのステージ選択。 */
 export default function PuzzleStageSelect({ onSelect }: PuzzleStageSelectProps) {
+  const progress = puzzleProgress.read()
   return (
     <main className={styles.page} data-testid="puzzle-stage-select">
       <header className={styles.header}>
@@ -33,6 +36,7 @@ export default function PuzzleStageSelect({ onSelect }: PuzzleStageSelectProps) 
               <span className={styles.ballCount} aria-label={`ボール${stage.balls.length}こ`}>
                 {'●'.repeat(stage.balls.length)}
               </span>
+              <StageClearBadge stars={progress[stage.id] ?? 0} corner />
             </button>
           ))}
         </div>

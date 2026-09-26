@@ -76,7 +76,7 @@ export default function App() {
           <GameIntro />
         </GameIntroProvider>
       </GameRouteBoundary>
-      <PwaStatus />
+      <PwaStatus pathname={normalizedPathname} />
     </>
   )
 }

@@ -45,6 +45,18 @@
 
 .correct {
   background-color: var(--color-success);
+  /* 回答後の正解の選択肢を、やさしく数回光らせて「ここが こたえ」と伝える（Issue #784 A9）。 */
+  animation: correct-glow 1.4s ease-in-out 3;
+}
+
+@keyframes correct-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(64 192 87 / 0%);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgb(64 192 87 / 45%);
+  }
 }
 
 .wrong {

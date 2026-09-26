@@ -50,4 +50,11 @@ describe('QuizResultOverlay', () => {
     const status = screen.getByRole('status')
     expect(status).toContainElement(screen.getByRole('button', { name: 'けっかを みる' }))
   })
+
+  test('正解のときは画面中央に大きな○と紙吹雪、不正解のときは×を出す（Issue #784 A9）', () => {
+    const { container, rerender } = render(<QuizResultOverlay result="correct" onNext={() => {}} />)
+    expect(container.querySelector('[data-quiz-burst="correct"]')).toHaveTextContent('◯')
+    rerender(<QuizResultOverlay key="wrong" result="wrong" onNext={() => {}} />)
+    expect(container.querySelector('[data-quiz-burst="wrong"]')).toHaveTextContent('✕')
+  })
 })

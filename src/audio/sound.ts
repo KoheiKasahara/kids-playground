@@ -101,3 +101,39 @@ export function createToneNodes(
   return { oscillator, gain }
 }
 
+
+let noiseBuffer: AudioBuffer | undefined
+
+/**
+ * 「さらさら」「しゃっ」のようなザラついた短い音（ホワイトノイズをフィルタに通したもの）。
+ * すなやローラーのように音程のない音を、音声ファイルなしで鳴らすために使う。
+ * ノイズのバッファは1回だけ作って使い回す。
+ */
+export function playNoiseBurst(
+  ctx: AudioContext,
+  startTime: number,
+  duration: number,
+  volume: number,
+  filterType: BiquadFilterType,
+  frequency: number,
+): void {
+  if (!noiseBuffer || noiseBuffer.sampleRate !== ctx.sampleRate) {
+    noiseBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.5), ctx.sampleRate)
+    const data = noiseBuffer.getChannelData(0)
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+  }
+  const source = ctx.createBufferSource()
+  source.buffer = noiseBuffer
+  const filter = ctx.createBiquadFilter()
+  filter.type = filterType
+  filter.frequency.value = frequency
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0, startTime)
+  gain.gain.linearRampToValueAtTime(volume, startTime + Math.min(0.02, duration / 3))
+  gain.gain.linearRampToValueAtTime(0, startTime + duration)
+  source.connect(filter)
+  filter.connect(gain)
+  gain.connect(ctx.destination)
+  source.start(startTime, Math.random() * 0.3)
+  source.stop(startTime + duration)
+}

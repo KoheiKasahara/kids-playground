@@ -4,6 +4,7 @@ import { isQuizResultState } from '../quiz-core/resultState'
 import { IMAGE_QUIZ_MODE_PATH } from './types'
 import type { ImageQuizConfig, ImageQuizMode } from './types'
 import styles from './ImageQuiz.module.css'
+import QuizStars from '../../components/QuizStars'
 
 type ImageQuizResultProps = {
   config: ImageQuizConfig
@@ -31,6 +32,7 @@ export default function ImageQuizResult({ config, mode }: ImageQuizResultProps) 
     <main className={styles.resultPage}>
       <h1 className={styles.title}>けっか</h1>
       <p className={styles.modeLabel}>{mode === 'imageToName' ? 'イラスト → なまえ' : 'なまえ → イラスト'}</p>
+      <QuizStars correctCount={correctCount} totalCount={totalCount} />
       <p className={styles.score}>{correctCount} / {totalCount}もん せいかい！</p>
       <p className={styles.praise}><span aria-hidden="true">{praise.emoji}</span> {praise.message}</p>
       <div className={styles.actions}>

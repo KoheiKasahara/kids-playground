@@ -87,3 +87,7 @@ docsには次のような、変更頻度が高く陳腐化しやすい情報を�
 - Quickには純粋ロジックの境界と代表DOM遷移（開始・操作・リセット・退出）、資源を持つゲームにはcleanup/再入場の回帰検査。広いseed・完走・分布はFull。ピンボールでは既存網羅試行を `pinballSimulation.full.test.ts` に残す。
 - E2Eはカタログ由来の全入口smokeと、Nightlyの代表3D・横向き実操作。ゲーム追加ごとに全操作E2Eを複製しない。Nightly spec変更PRでは代表2本を先行実行する。
 - CI Summaryの遅いファイル上位は既存Vitest JSONの開始・終了時刻を使う。並列実行のファイル時間を足してCI時間と扱わない。
+- 振動は `utils/haptics` の `vibrate('tap' | 'impact' | 'success' | 'error' | 'celebrate')` を使う。非対応端末・動きを減らす設定・ホームの「ぶるぶる」OFFでは何もしないので、ゲーム側で分岐しない。
+- ステージ制の「クリア済み＋★」は `games/shared/progress/stageProgress` の `createStageProgressStore` で保存し、選択カードには `StageClearBadge` を添える。★の基準はゲームごとに決める。
+- クイズの正誤演出（中央の○×・紙吹雪・振動・不正解時の答えの読み上げ）は `QuizResultOverlay` が持ち、結果画面の★は `QuizStars` を使う。
+- プレイ中の画面（`/games/...`）では、PWAの完了・更新トーストを出さずホームへ戻るまで遅らせる。

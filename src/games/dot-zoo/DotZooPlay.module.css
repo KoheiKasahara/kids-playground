@@ -246,7 +246,8 @@ button.window:focus-visible,
 .status {
   position: absolute;
   top: calc(var(--safe-top) + 8px);
-  left: calc(var(--safe-left) + 72px);
+  /* 共通の「もどる」ボタン（幅108px＋余白8px）の右に並べ、★が隠れないようにする（Issue #784 A3）。 */
+  left: calc(var(--safe-left) + 8px + 108px + 8px);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -527,4 +528,11 @@ button.window:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   .logo h1, .menu, .tray, .message, .info, .item[data-active] { animation: none; }
   .rotateIcon { animation: none; }
+}
+
+/* 回転案内の文字がドラッグで選択されないようにする（Issue #784 A2）。 */
+.rotateCard {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }

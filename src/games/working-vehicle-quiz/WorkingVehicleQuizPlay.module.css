@@ -131,6 +131,11 @@
 
 /* secondary（正解でも選んだ誤答でもない、回答後の「その他」の選択肢）だけ、
    従来どおり枠線の色を見せる。太さは .choiceButton 側で揃えているので高さには影響しない。 */
+.choiceButtonLong {
+  font-size: clamp(14px, 3.9vw, 19px);
+  letter-spacing: -0.02em;
+}
+
 .choiceButtonUnselected {
   border-color: var(--color-border);
 }

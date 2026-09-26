@@ -117,6 +117,7 @@ const domDependentTestTsFiles = [
   'src/games/earth-globe/useReducedMotion.test.ts',
   'src/games/flag-pinball/themeStore.test.ts',
   'src/games/flag-roll-puzzle/useBoardScale.test.ts',
+  'src/games/shared/progress/stageProgress.test.ts',
   'src/games/piano-play/pianoAudio.test.ts',
   'src/games/planet-globe/three/overviewVisual.test.ts',
   'src/games/planet-globe/three/planetRing.test.ts',
@@ -126,6 +127,7 @@ const domDependentTestTsFiles = [
   'src/seo/applyDocumentSeo.test.ts',
   'src/speech/speechEngine.test.ts',
   'src/speech/speechSettingsStore.test.ts',
+  'src/utils/haptics.test.ts',
   'src/utils/quizSound.test.ts',
 ]
 

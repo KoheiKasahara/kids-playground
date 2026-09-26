@@ -17,11 +17,21 @@ import {
   type PyokoState,
 } from './pyokoGame'
 import { playCatchSound, playFinishSound, playOopsSound } from './sounds'
+import StageClearBadge from '../../components/StageClearBadge'
+import { createStageProgressStore } from '../shared/progress/stageProgress'
+import { vibrate } from '../../utils/haptics'
 import styles from './PyokoTouchPlay.module.css'
 
 const DIFFICULTY_LABELS: Record<PyokoDifficulty, { name: string; hint: string }> = {
   easy: { name: 'やさしい', hint: 'ゆっくり でてくる' },
   fast: { name: 'はやい', hint: 'はちも でてくる' },
+}
+
+/** むずかしさごとの いちばん よい ★（Issue #784 A6）。judge() と同じ目安で★をつける。 */
+const pyokoProgress = createStageProgressStore('pyoko-touch-progress-v1', (id) => Object.hasOwn(DIFFICULTY_LABELS, id))
+
+function scoreStars(score: number): 1 | 2 | 3 {
+  return score >= 20 ? 3 : score >= 10 ? 2 : 1
 }
 
 /** 進行の刻み[ms]。のこり時間・顔を出す・引っこむの判定を、この間隔でまとめて進める。 */
@@ -38,6 +48,7 @@ export default function PyokoTouchPlay() {
   const [started, setStarted] = useState(false)
   const [difficulty, setDifficulty] = useState<PyokoDifficulty>('easy')
   const [soundOn, setSoundOn] = useState(true)
+  const [progress, setProgress] = useState(pyokoProgress.read)
   // 描画用のstateと、進行の正となるrefを同じ初期値から持つ。
   // 100msごとの進行とタップが同じrefを読み書きするため、描画を待つあいだの
   // 取りこぼし（タップの直前に進んだぶんの巻き戻り）が起きない。
@@ -59,7 +70,11 @@ export default function PyokoTouchPlay() {
       playRef.current = next
       setPlay(next)
       // じかん切れをまたいだ刻みでだけ鳴らす（そのあとの刻みは上のreturnで止まる）。
-      if (soundOn && isFinished(next, difficulty)) playFinishSound()
+      if (isFinished(next, difficulty)) {
+        setProgress(pyokoProgress.record(difficulty, scoreStars(next.score)))
+        vibrate('celebrate')
+        if (soundOn) playFinishSound()
+      }
     }, TICK_MS)
     return () => clearInterval(timerId)
   }, [started, finished, difficulty, soundOn])
@@ -87,6 +102,7 @@ export default function PyokoTouchPlay() {
     const { state, result } = touchHole(playRef.current, holeIndex)
     if (result === 'none') return
     commit(state)
+    vibrate(result === 'friend' ? 'tap' : 'error')
     if (!soundOn) return
     if (result === 'friend') playCatchSound()
     else playOopsSound()
@@ -122,6 +138,7 @@ export default function PyokoTouchPlay() {
               >
                 <span className={styles.difficultyName}>{DIFFICULTY_LABELS[option].name}</span>
                 <span className={styles.difficultyHint}>{DIFFICULTY_LABELS[option].hint}</span>
+                <StageClearBadge stars={progress[option] ?? 0} />
               </button>
             ))}
           </div>

@@ -144,4 +144,25 @@ describe('PwaStatus', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'とじる' })).toBeInTheDocument()
   })
+
+  test('ゲーム画面ではオフライン準備完了・更新のお知らせを出さず、ホームへ戻ってから出す（Issue #784 A1）', async () => {
+    const { rerender } = render(<PwaStatus pathname="/games/flag-quiz" />)
+
+    act(() => {
+      __setOfflineReady(true)
+      __setNeedRefresh(true)
+    })
+
+    expect(screen.queryByText('オフラインでも あそべるように なりました')).not.toBeInTheDocument()
+    expect(screen.queryByText('あたらしい バージョンが あります')).not.toBeInTheDocument()
+    // 完了フラグ自体は遅らせずに保存しておく。
+    expect(localStorage.getItem('pwa-offline-ready')).toBe('true')
+
+    rerender(<PwaStatus pathname="/" />)
+
+    expect(
+      await screen.findByText('オフラインでも あそべるように なりました'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('あたらしい バージョンが あります')).toBeInTheDocument()
+  })
 })

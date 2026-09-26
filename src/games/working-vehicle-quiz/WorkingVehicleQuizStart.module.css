@@ -18,7 +18,8 @@
 }
 
 .title {
-  font-size: clamp(32px, 9vw, var(--font-size-xlarge));
+  /* 「はたらくくるまクイズ」が1行に収まるよう、せまい画面では文字を小さくする（Issue #784 A4）。 */
+  font-size: clamp(26px, 8vw, var(--font-size-xlarge));
   color: var(--color-primary-dark);
 }
 

@@ -5,7 +5,9 @@
  * 「対応チェック→try/catch」で必ず失敗を吸収し、振動が使えなくてもゲーム進行に
  * 一切影響しないようにする（必須機能ではなく、あくまで手触りの上乗せ）。
  * `prefers-reduced-motion: reduce` のときは、体感を強める演出とみなして振動もしない。
+ * 共通の振動設定（src/utils/haptics.ts）で OFF にされているときも振動しない。
  */
+import { isHapticsEnabled } from '../../utils/haptics'
 
 /** 連続衝突で振動しっぱなしにならないようにする最小間隔[ms]。 */
 const HAPTICS_COOLDOWN_MS = 120
@@ -46,7 +48,7 @@ export function createBowlingHaptics(): BowlingHaptics {
   let lastVibrateAt: number | null = null
 
   function isSupported(): boolean {
-    return canVibrate() && !prefersReducedMotion()
+    return canVibrate() && isHapticsEnabled() && !prefersReducedMotion()
   }
 
   function vibrate(pattern: number | number[]): void {
