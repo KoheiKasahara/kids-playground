@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { COURSES, sampleTrack } from './courses'
-import { activateItem, createRace, getRank, ITEM_STATIONS, stepRace } from './engine'
+import { COURSES, islandAt, sampleTrack } from './courses'
+import { activateItem, createRace, getRank, stepRace } from './engine'
 import type { ItemId, RaceState } from './types'
 
 const neutral = { steer: 0, useItem: false }
+const widthAt = (state: RaceState, distance = state.racers[0].distance) => sampleTrack(state.course, distance).width
 const tick = (state: RaceState, seconds: number, steer = 0) => {
   for (let frame = 0; frame < Math.ceil(seconds * 60); frame++) stepRace(state, { steer, useItem: false }, 1 / 60)
 }
@@ -87,14 +88,20 @@ describe('a forgiving two-lap race', () => {
   it.each(COURSES.flatMap(course => [-1, 1].map(steer => ({ course, steer }))))('keeps a held $steer stick on $course.id road for the whole race', ({ course, steer }) => {
     const state = createRace(course)
     let maximumLane = 0
+    let closestEdge = Infinity
     let maximumDrift = 0
     for (let frame = 0; frame < 60 * 62; frame++) {
       stepRace(state, { steer, useItem: false }, 1 / 60)
-      maximumLane = Math.max(maximumLane, Math.abs(state.racers[0].lane))
-      maximumDrift = Math.max(maximumDrift, Math.abs(state.racers[0].drift))
+      const racer = state.racers[0]
+      maximumLane = Math.max(maximumLane, Math.abs(racer.lane))
+      closestEdge = Math.min(closestEdge, widthAt(state) - Math.abs(racer.lane))
+      const island = islandAt(course, racer.distance)
+      if (island) expect(Math.abs(racer.lane - island.lane)).toBeGreaterThanOrEqual(island.half + 15.9)
+      maximumDrift = Math.max(maximumDrift, Math.abs(racer.drift))
     }
-    expect(maximumLane).toBeLessThanOrEqual(course.halfWidth - 18)
-    expect(maximumLane).toBeGreaterThan(course.halfWidth * 0.5)
+    // The road narrows and widens, but the kart always stays clear of the curb.
+    expect(closestEdge).toBeGreaterThan(8)
+    expect(maximumLane).toBeGreaterThan(60)
     expect(maximumDrift).toBeGreaterThan(0.3)
     expect(state.phase).toBe('finished')
   })
@@ -102,7 +109,7 @@ describe('a forgiving two-lap race', () => {
   it('allows off-road exploration with assist off and lets the stick bring the kart back', () => {
     const state = running(false)
     tick(state, 2, 1)
-    expect(state.racers[0].lane).toBeGreaterThan(state.course.halfWidth)
+    expect(state.racers[0].lane).toBeGreaterThan(widthAt(state))
     expect(state.racers[0].speed).toBeLessThan(150)
     for (let frame = 0; frame < 240 && Math.abs(state.racers[0].lane) > 50; frame++) stepRace(state, { steer: -1, useItem: false }, 1 / 60)
     expect(Math.abs(state.racers[0].lane)).toBeLessThanOrEqual(50)
@@ -125,13 +132,13 @@ describe('a forgiving two-lap race', () => {
     const state = running(false)
     tick(state, 3, 1)
     const outsideLane = state.racers[0].lane
-    expect(outsideLane).toBeGreaterThan(state.course.halfWidth)
+    expect(outsideLane).toBeGreaterThan(widthAt(state))
     state.assist = true
     stepRace(state, { steer: 1, useItem: false }, 1 / 60)
     expect(state.racers[0].lane).toBeLessThan(outsideLane)
     expect(outsideLane - state.racers[0].lane).toBeLessThan(4)
     tick(state, 3, 1)
-    expect(Math.abs(state.racers[0].lane)).toBeLessThan(state.course.halfWidth - 18)
+    expect(Math.abs(state.racers[0].lane)).toBeLessThan(widthAt(state) - 18)
   })
 
   it('produces identical seeded races and freezes final standings', () => {
@@ -151,19 +158,33 @@ describe('a forgiving two-lap race', () => {
 })
 
 describe('items and quick recovery', () => {
-  it('awards each station once per crossing and again on the next lap', () => {
+  it('awards each box once per crossing and again on the next lap', () => {
     const state = running()
     const racer = state.racers[0]
-    racer.distance = ITEM_STATIONS[0] * state.course.length - 1
+    const box = state.course.boxes[1]
+    racer.lane = box.lane
+    racer.distance = box.distance - 1
     stepRace(state, neutral, 1 / 60)
     expect(racer.item).not.toBeNull()
     expect(state.events.some(event => event.kind === 'pickup' && event.racer === 0)).toBe(true)
     racer.item = null
     stepRace(state, neutral, 1 / 60)
     expect(racer.item).toBeNull()
-    racer.distance = (1 + ITEM_STATIONS[0]) * state.course.length - 1
+    racer.lane = box.lane
+    racer.distance = state.course.length + box.distance - 1
     stepRace(state, neutral, 1 / 60)
     expect(racer.item).not.toBeNull()
+  })
+
+  it('only gives an item when the kart drives over a box', () => {
+    const state = running()
+    const racer = state.racers[0]
+    const box = state.course.boxes.find(candidate => !state.course.boxes.some(other => other !== candidate
+      && Math.abs(other.distance - candidate.distance) < 60 && Math.abs(other.lane + 60 - candidate.lane) < 60))!
+    racer.lane = box.lane - 60
+    racer.distance = box.distance - 1
+    stepRace(state, neutral, 1 / 60)
+    expect(racer.item).toBeNull()
   })
 
   it('boosts immediately, jumps over puddles, and lets a star clear a stun', () => {
@@ -270,5 +291,112 @@ describe('items and quick recovery', () => {
     }
     expect(collected).toBe(true)
     expect(used).toBe(true)
+  })
+})
+
+describe('course features', () => {
+  const place = (state: RaceState, distance: number, lane: number) => {
+    const racer = state.racers[0]
+    racer.distance = distance
+    racer.lane = lane
+    state.racers.slice(1).forEach(rival => { rival.distance = distance - 2000 - rival.id * 80 })
+    return racer
+  }
+
+  it('gives every course narrow and wide sections, rough patches, dash panels, an island and scattered boxes', () => {
+    for (const course of COURSES) {
+      const widths = course.points.map(point => point.width)
+      expect(Math.min(...widths)).toBeLessThan(90)
+      expect(Math.max(...widths)).toBeGreaterThan(125)
+      for (const kind of ['rough', 'dash', 'island'] as const) expect(course.zones.some(zone => zone.kind === kind)).toBe(true)
+      for (const zone of course.zones) {
+        expect(zone.start).toBeLessThan(zone.end)
+        const width = Math.min(sampleTrack(course, zone.start).width, sampleTrack(course, zone.end).width)
+        expect(Math.abs(zone.lane) + zone.half).toBeLessThanOrEqual(width)
+      }
+      for (const box of course.boxes) expect(Math.abs(box.lane)).toBeLessThan(sampleTrack(course, box.distance).width - 10)
+      expect(new Set(course.boxes.map(box => box.lane)).size).toBeGreaterThan(6)
+    }
+  })
+
+  it('slows karts on rough ground unless they jump over it', () => {
+    const state = running()
+    const rough = state.course.zones.find(zone => zone.kind === 'rough' && zone.end - zone.start > 120)!
+    place(state, rough.start + 5, rough.lane)
+    state.course = { ...state.course, points: state.course.points.map(point => ({ ...point, curve: 0 })) }
+    tick(state, 0.4)
+    expect(state.racers[0].rough).toBe(true)
+    expect(state.racers[0].speed).toBeLessThan(170)
+    const jumping = running()
+    jumping.course = state.course
+    place(jumping, rough.start + 5, rough.lane)
+    equip(jumping, 'jump')
+    tick(jumping, 0.4)
+    expect(jumping.racers[0].speed).toBeGreaterThan(240)
+  })
+
+  it('boosts a kart that drives over a dash panel', () => {
+    const state = running()
+    const dash = state.course.zones.find(zone => zone.kind === 'dash')!
+    place(state, dash.start - 4, dash.lane)
+    tick(state, 0.1)
+    expect(state.events.some(event => event.kind === 'dash') || state.racers[0].boost > 0).toBe(true)
+    tick(state, 0.3)
+    expect(state.racers[0].speed).toBeGreaterThan(300)
+  })
+
+  it('splits the road at an island that no kart can drive through', () => {
+    for (const assist of [true, false]) {
+      const state = running(assist)
+      const island = state.course.zones.find(zone => zone.kind === 'island')!
+      place(state, island.start - 30, island.lane)
+      for (let frame = 0; frame < 60 * 2; frame++) {
+        stepRace(state, neutral, 1 / 60)
+        const at = islandAt(state.course, state.racers[0].distance)
+        if (at) expect(Math.abs(state.racers[0].lane - at.lane)).toBeGreaterThanOrEqual(at.half + 15.9)
+      }
+      expect(state.racers[0].distance).toBeGreaterThan(island.end)
+      // Glancing off the tip costs a little speed, which comes straight back.
+      expect(state.racers[0].speed).toBeGreaterThan(190)
+      if (assist) {
+        tick(state, 1)
+        expect(state.racers[0].speed).toBeGreaterThan(230)
+      }
+    }
+  })
+
+  it('rewards the inside line of a bend', () => {
+    const progress = (lane: number) => {
+      const state = running()
+      const bend = state.course.points.reduce((best, point, index) => point.curve > state.course.points[best].curve ? index : best, 0)
+      const start = bend / state.course.points.length * state.course.length - 60
+      state.course = { ...state.course, zones: [] }
+      const racer = place(state, start, lane)
+      stepRace(state, neutral, 1 / 60)
+      return racer.distance - start
+    }
+    expect(progress(60)).toBeGreaterThan(progress(0))
+    expect(progress(0)).toBeGreaterThan(progress(-60))
+  })
+
+  it('lets a steering driver beat a hands-off one on every course', () => {
+    for (const course of COURSES) {
+      const idle = createRace(course)
+      tick(idle, 62)
+      const driven = createRace(course)
+      for (let frame = 0; frame < 60 * 62 && driven.phase !== 'finished'; frame++) {
+        const racer = driven.racers[0]
+        const ahead = sampleTrack(course, racer.distance + 120)
+        let target = Math.sign(ahead.curve) * ahead.width * 0.6
+        for (const zone of course.zones) {
+          const gap = zone.start - racer.distance % course.length
+          if (gap < -(zone.end - zone.start) || gap > 200) continue
+          if (zone.kind === 'rough' && Math.abs(target - zone.lane) < zone.half + 20) target = target < zone.lane ? zone.lane - zone.half - 22 : zone.lane + zone.half + 22
+          if (zone.kind === 'dash') target = zone.lane
+        }
+        stepRace(driven, { steer: Math.max(-1, Math.min(1, (target - racer.lane) / 30)), useItem: false }, 1 / 60)
+      }
+      expect(driven.racers[0].finishTime!).toBeLessThan(idle.racers[0].finishTime! - 3)
+    }
   })
 })

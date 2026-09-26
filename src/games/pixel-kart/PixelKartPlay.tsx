@@ -91,7 +91,7 @@ function Race({ course, options, onOptions, portrait, onExit, onReplay, onNext, 
   const onClearRef = useRef(onClear)
   const pausedRef = useRef(false)
   const [paused, setPaused] = useState(false)
-  const [hud, setHud] = useState(() => ({ rank: 4, lap: 1, countdown: 3, item: null as ItemId | null, speed: 0, distance: 0, lane: 0, drift: 0, finished: false, time: 0, message: '', racers: [] as MapRacer[] }))
+  const [hud, setHud] = useState(() => ({ rank: 4, lap: 1, countdown: 3, item: null as ItemId | null, speed: 0, distance: 0, lane: 0, drift: 0, rough: false, finished: false, time: 0, message: '', racers: [] as MapRacer[] }))
   const [stick, setStick] = useState(0)
   const [error, setError] = useState(false)
   useEffect(() => { optionsRef.current = options; if (raceRef.current) raceRef.current.assist = options.assist }, [options])
@@ -146,20 +146,22 @@ function Race({ course, options, onOptions, portrait, onExit, onReplay, onNext, 
     audioRef.current = audio
     if (optionsRef.current.sound && !pausedRef.current) audio.start(course.id)
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-    let frame = 0, previous = 0, accumulator = 0, lastHud = 0, lastCount = 4, messageUntil = 0, message = '', reported = false
+    let frame = 0, previous = 0, accumulator = 0, lastHud = 0, lastCount = 4, messageUntil = 0, message = '', reported = false, keySteer = 0
     const animate = (now: number) => {
       const dt = previous ? Math.min((now - previous) / 1000, .1) : 0
       previous = now
       if (!pausedRef.current && race.phase !== 'finished') {
         accumulator += dt
         while (accumulator >= 1 / 60) {
-          const keySteer = (keys.current.has('ArrowRight') || keys.current.has('d') ? 1 : 0) - (keys.current.has('ArrowLeft') || keys.current.has('a') ? 1 : 0)
+          const keyTarget = (keys.current.has('ArrowRight') || keys.current.has('d') ? 1 : 0) - (keys.current.has('ArrowLeft') || keys.current.has('a') ? 1 : 0)
+          // Keys ease in over ~0.12 s so a quick tap nudges the kart instead of jerking it; release is immediate.
+          keySteer = keyTarget === 0 ? 0 : Math.sign(keyTarget) !== Math.sign(keySteer) ? keyTarget * .25 : Math.max(-1, Math.min(1, keySteer + keyTarget / 7))
           stepRace(race, { steer: stickPointer.current !== null ? input.current.steer : keySteer, useItem: input.current.useItem }, 1 / 60)
           input.current.useItem = false
           accumulator -= 1 / 60
           for (const event of race.events) if (event.racer === 0) {
             if (optionsRef.current.sound) audio.effect(event.kind)
-            message = event.kind === 'hit' ? 'だいじょうぶ！ すぐ はしれるよ' : event.kind === 'lap' ? 'あと 1しゅう！' : event.kind === 'pickup' ? 'アイテム ゲット！' : event.kind === 'finish' ? 'ゴール！' : ITEM_LABELS[event.kind]
+            message = event.kind === 'hit' ? 'だいじょうぶ！ すぐ はしれるよ' : event.kind === 'lap' ? 'あと 1しゅう！' : event.kind === 'pickup' ? 'アイテム ゲット！' : event.kind === 'dash' ? 'ダッシュばん！ びゅーん！' : event.kind === 'finish' ? 'ゴール！' : ITEM_LABELS[event.kind]
             messageUntil = race.elapsed + 1.5
           }
         }
@@ -170,7 +172,7 @@ function Race({ course, options, onOptions, portrait, onExit, onReplay, onNext, 
       renderer.draw(race, race.elapsed, reduced)
       if (!reported && (now - lastHud > 80 || race.phase === 'finished')) {
         const player = race.racers[0]
-        setHud({ rank: getRank(race), lap: Math.min(race.lapCount, Math.floor(player.distance / course.length) + 1), countdown: Math.ceil(race.countdown), item: player.item, speed: player.speed, distance: player.distance, lane: player.lane, drift: player.drift, finished: race.phase === 'finished', time: player.finishTime ?? race.elapsed, message: race.elapsed < messageUntil ? message : '', racers: race.racers.map(({ id, distance, color }) => ({ id, distance, color })) })
+        setHud({ rank: getRank(race), lap: Math.min(race.lapCount, Math.floor(player.distance / course.length) + 1), countdown: Math.ceil(race.countdown), item: player.item, speed: player.speed, distance: player.distance, lane: player.lane, drift: player.drift, rough: player.rough, finished: race.phase === 'finished', time: player.finishTime ?? race.elapsed, message: race.elapsed < messageUntil ? message : '', racers: race.racers.map(({ id, distance, color }) => ({ id, distance, color })) })
         lastHud = now
       }
       if (race.phase === 'finished' && !reported) { reported = true; onClearRef.current(course.id) }
@@ -222,7 +224,7 @@ function Race({ course, options, onOptions, portrait, onExit, onReplay, onNext, 
           <span className={styles.stickArrows} aria-hidden="true">◀{'\u2003\u2003\u2003'}▶</span><span className={styles.stickKnob} style={{ transform: `translateX(${stick * 34}%)` }} aria-hidden="true">✦</span>
         </div><span className={styles.controlLabel}>ハンドル <small>← → / A D</small></span>
       </div>
-      <div className={styles.speed}><span>{Math.abs(hud.drift) > .05 ? '✧ ドリフト！' : 'じどうで はしるよ'}</span><i style={{ '--speed': `${Math.min(100, hud.speed / 3.3)}%` } as CSSProperties} /></div>
+      <div className={styles.speed}><span>{hud.rough ? 'ざらざら… よけてみよう' : Math.abs(hud.drift) > .05 ? '✧ ドリフト！' : 'じどうで はしるよ'}</span><i style={{ '--speed': `${Math.min(100, hud.speed / 3.3)}%` } as CSSProperties} /></div>
       <div className={styles.itemArea}><button type="button" className={`${styles.itemButton} ${hud.item ? styles.itemReady : ''}`} onPointerDown={event => { event.preventDefault(); triggerItem() }} onClick={event => { if (event.detail === 0) triggerItem() }} disabled={!hud.item || hud.countdown > 0} aria-label={hud.item ? `${ITEM_LABELS[hud.item]}を つかう` : 'アイテムを まってね'}><ItemGlyph item={hud.item} /></button><span className={styles.controlLabel}>{hud.item ? ITEM_LABELS[hud.item] : 'はこを とろう'}<small>スペース</small></span></div>
     </>}
     {paused && !portrait && !hud.finished && <div className={styles.scrim}><section role="dialog" aria-modal="true" aria-label="ひとやすみ" className={styles.dialog}><span className={styles.eyebrow}>ひとやすみちゅう</span><h2>ひとやすみ</h2><Settings options={options} onChange={onOptions} /><button type="button" className={styles.primary} onClick={resume} autoFocus>▶ つづける</button><button type="button" className={styles.quiet} onClick={onExit}>コースを えらびなおす</button></section></div>}

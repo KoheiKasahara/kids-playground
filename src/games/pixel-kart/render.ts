@@ -1,5 +1,4 @@
-import { ITEM_LANES, ITEM_STATIONS } from './engine'
-import { sampleTrack } from './courses'
+import { islandAt, sampleTrack } from './courses'
 import { clearSpriteCache, itemSprite, kartSprite, scenerySprite } from './sprites'
 import type { SceneryKind } from './sprites'
 import type { Course, CourseId, ItemId, RaceState, Racer } from './types'
@@ -9,12 +8,12 @@ type Ctx = CanvasRenderingContext2D
 type Projection = { x: number; y: number; z: number; scale: number }
 type Landmark = { distance: number; lane: number; kind: SceneryKind; size: number; variant: number }
 type Sprite = { image: HTMLCanvasElement; x: number; y: number; z: number; width: number; height: number; shadow?: number; alpha?: number; flip?: boolean; racer?: Racer }
-type Palette = { sky: string[]; ground: string[]; road: string[]; edge: string[]; line: string; haze: string }
+type Palette = { sky: string[]; ground: string[]; road: string[]; edge: string[]; line: string; haze: string; rough: string[] }
 const PALETTES: Record<CourseId, Palette> = {
-  forest: { sky: ['#7cbbbd', '#9dceca', '#c1dfcd', '#e6eacb'], ground: ['#75a56b', '#6b9a60', '#67905b'], road: ['#d2b88c', '#d8bf95', '#d3b98e'], edge: ['#f3e3b6', '#9eab77'], line: '#eddbaf', haze: '#d5dfba' },
-  coast: { sky: ['#a080a3', '#cb94a1', '#e8ad95', '#f7d0a1'], ground: ['#deb487', '#d5a77b', '#cb9b71'], road: ['#f0d3a5', '#f3dcb3', '#eecfa2'], edge: ['#fff0c9', '#6eb5b7'], line: '#ffeac5', haze: '#ebc5b0' },
-  crystal: { sky: ['#252840', '#343c58', '#4c647e', '#7394a1'], ground: ['#61758d', '#586981', '#4b5c76'], road: ['#a4bbc7', '#afc5ce', '#a5b8c9'], edge: ['#d7e7e7', '#727da8'], line: '#d0e5e4', haze: '#a7b5cd' },
-  sky: { sky: ['#292d50', '#464b77', '#7d719c', '#bd93ae'], ground: ['#a396b8', '#9182a8', '#84749b'], road: ['#e6d0c4', '#eddbcd', '#e1cbbf'], edge: ['#fff0d3', '#b887a4'], line: '#fff0d5', haze: '#d5b4cf' },
+  forest: { sky: ['#7cbbbd', '#9dceca', '#c1dfcd', '#e6eacb'], ground: ['#75a56b', '#6b9a60', '#67905b'], road: ['#d2b88c', '#d8bf95', '#d3b98e'], edge: ['#f3e3b6', '#9eab77'], line: '#eddbaf', haze: '#d5dfba', rough: ['#9c7a52', '#876846', '#b8966a'] },
+  coast: { sky: ['#a080a3', '#cb94a1', '#e8ad95', '#f7d0a1'], ground: ['#deb487', '#d5a77b', '#cb9b71'], road: ['#f0d3a5', '#f3dcb3', '#eecfa2'], edge: ['#fff0c9', '#6eb5b7'], line: '#ffeac5', haze: '#ebc5b0', rough: ['#8fc9c4', '#79b5b6', '#e3f4ea'] },
+  crystal: { sky: ['#252840', '#343c58', '#4c647e', '#7394a1'], ground: ['#61758d', '#586981', '#4b5c76'], road: ['#a4bbc7', '#afc5ce', '#a5b8c9'], edge: ['#d7e7e7', '#727da8'], line: '#d0e5e4', haze: '#a7b5cd', rough: ['#76819f', '#667090', '#c9d2e8'] },
+  sky: { sky: ['#292d50', '#464b77', '#7d719c', '#bd93ae'], ground: ['#a396b8', '#9182a8', '#84749b'], road: ['#e6d0c4', '#eddbcd', '#e1cbbf'], edge: ['#fff0d3', '#b887a4'], line: '#fff0d5', haze: '#d5b4cf', rough: ['#c2b1d8', '#ae9cc8', '#f6eef8'] },
 }
 const hash = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x) }
 const clamp = (x: number, low: number, high: number) => Math.max(low, Math.min(high, x))
@@ -167,19 +166,31 @@ function buildLandmarks(course: Course): Landmark[] {
   }
   const kinds = sets[course.id]
   for (let i = 0; i < Math.floor(course.length / 58); i++) {
+    const width = sampleTrack(course, i * 58).width
     for (const side of [-1, 1]) {
       const seed = i * 31 + side * 13 + 77
       const kind = kinds[Math.floor(hash(seed) * kinds.length)]
       const distance = i * 58 + hash(seed + 2) * 26
       const near = kind === 'flowers' || kind === 'shell' || kind === 'stump'
-      result.push({ distance, lane: side * (course.halfWidth + (near ? 17 : 45) + hash(seed + 3) * (near ? 35 : 120)), kind, size: near ? 0.45 : 0.9 + hash(seed + 8) * 0.4, variant: i % 3 })
-      if (i % 3 === 0) result.push({ distance: distance + 20, lane: side * (course.halfWidth + 240 + hash(seed + 9) * 200), kind: kinds[i % 2], size: 1.3 + hash(seed) * 0.4, variant: i % 3 })
+      result.push({ distance, lane: side * (width + (near ? 17 : 45) + hash(seed + 3) * (near ? 35 : 120)), kind, size: near ? 0.45 : 0.9 + hash(seed + 8) * 0.4, variant: i % 3 })
+      if (i % 3 === 0) result.push({ distance: distance + 20, lane: side * (width + 240 + hash(seed + 9) * 200), kind: kinds[i % 2], size: 1.3 + hash(seed) * 0.4, variant: i % 3 })
     }
     const point = sampleTrack(course, i * 58)
-    if (Math.abs(point.curve) > 0.022 && i % 3 === 0) result.push({ distance: i * 58, lane: -Math.sign(point.curve) * (course.halfWidth + 22), kind: 'sign', size: 0.68, variant: point.curve < 0 ? 1 : 0 })
+    if (Math.abs(point.curve) > 0.022 && i % 3 === 0) result.push({ distance: i * 58, lane: -Math.sign(point.curve) * (width + 22), kind: 'sign', size: 0.68, variant: point.curve < 0 ? 1 : 0 })
     if (i % 11 === 3) {
-      result.push({ distance: i * 58, lane: -course.halfWidth - 12, kind: 'banner', size: 0.8, variant: 0 })
-      result.push({ distance: i * 58, lane: course.halfWidth + 12, kind: 'banner', size: 0.8, variant: 0 })
+      result.push({ distance: i * 58, lane: -width - 12, kind: 'banner', size: 0.8, variant: 0 })
+      result.push({ distance: i * 58, lane: width + 12, kind: 'banner', size: 0.8, variant: 0 })
+    }
+  }
+  // Small plants and rocks crown each island so the split reads from far away.
+  const islandKinds: Record<CourseId, SceneryKind[]> = {
+    forest: ['tree', 'flowers', 'mushroom'], coast: ['palm', 'coral', 'shell'], crystal: ['crystal', 'ice', 'crystal'], sky: ['cloudtree', 'flowers', 'cloudtree'],
+  }
+  for (const zone of course.zones) {
+    if (zone.kind !== 'island') continue
+    for (let distance = zone.start + 60, i = 0; distance < zone.end - 40; distance += 52, i++) {
+      const kind = islandKinds[course.id][i % 3]
+      result.push({ distance, lane: zone.lane + (i % 2 ? -0.35 : 0.35) * zone.half, kind, size: kind === 'flowers' || kind === 'shell' ? 0.4 : 0.62, variant: i % 3 })
     }
   }
   return result
@@ -236,6 +247,7 @@ export class KartRenderer {
     background(g, course, this.backdropAngle, reducedMotion ? 0 : time)
     this.drawGround(course, player.distance, time)
     this.drawRoad(course, player.distance, palette)
+    this.drawZones(course, player.distance, palette, reducedMotion ? 0 : time)
 
     const sprites: Sprite[] = []
     for (const landmark of this.landmarks) {
@@ -249,16 +261,13 @@ export class KartRenderer {
       if (at.x + width / 2 < -25 || at.x - width / 2 > WIDTH + 25) continue
       sprites.push({ image: scenerySprite(landmark.kind, course.id, landmark.variant), x: at.x, y: at.y, z: at.z, width, height, shadow: landmark.kind === 'balloon' ? 0 : 0.35, flip: landmark.kind === 'sign' && landmark.variant === 1 })
     }
-    for (const fraction of ITEM_STATIONS) {
-      const distance = fraction * course.length
-      const ahead = ((distance - player.distance) % course.length + course.length) % course.length
+    for (const box of course.boxes) {
+      const ahead = ((box.distance - player.distance) % course.length + course.length) % course.length
       if (ahead > 1200) continue
-      for (const lane of ITEM_LANES) {
-        const at = this.at(course, distance, lane * course.halfWidth)
-        if (at.z < 50) continue
-        const bob = reducedMotion ? 0 : Math.sin(time * 3 + lane * 3) * 2
-        sprites.push({ image: itemSprite('pickup'), x: at.x, y: at.y - (8 + bob) * at.scale, z: at.z, width: 27 * at.scale, height: 31 * at.scale, shadow: 0.6 })
-      }
+      const at = this.at(course, box.distance, box.lane)
+      if (at.z < 50) continue
+      const bob = reducedMotion ? 0 : Math.sin(time * 3 + box.lane * 0.05) * 2
+      sprites.push({ image: itemSprite('pickup'), x: at.x, y: at.y - (8 + bob) * at.scale, z: at.z, width: 27 * at.scale, height: 31 * at.scale, shadow: 0.6 })
     }
     for (const hazard of state.hazards) {
       const ahead = ((hazard.distance - player.distance) % course.length + course.length) % course.length
@@ -283,7 +292,9 @@ export class KartRenderer {
       if (at.z < 55) continue
       const jumpHeight = racer.jump > 0 ? Math.sin(clamp(racer.jump / 1.25, 0, 1) * Math.PI) * 47 : 0
       const direction = racer.drift || (racer.id === 0 ? -p.curve * 20 : 0)
-      sprites.push({ image: kartSprite(racer.id, direction, Math.floor(time * (racer.speed > 5 ? 10 : 0)), racer.stun > 0), x: at.x, y: at.y - jumpHeight * at.scale, z: at.z, width: 52 * at.scale, height: 55 * at.scale, racer, shadow: 0.7 })
+      // Rough ground rattles the kart by a pixel.
+      const rattle = racer.rough && !reducedMotion ? Math.floor(time * 24 + racer.id) % 2 : 0
+      sprites.push({ image: kartSprite(racer.id, direction, Math.floor(time * (racer.speed > 5 ? 10 : 0)), racer.stun > 0), x: at.x, y: at.y - (jumpHeight + rattle) * at.scale, z: at.z, width: 52 * at.scale, height: 55 * at.scale, racer, shadow: 0.7 })
     }
     sprites.sort((a, b) => b.z - a.z)
     for (const sprite of sprites) this.drawSprite(sprite, time, reducedMotion)
@@ -297,7 +308,7 @@ export class KartRenderer {
     }
     for (let i = 0; i < 170; i++) {
       const span = 1300, forward = ((i * 81.731 - distance) % span + span) % span - 100
-      const lane = (hash(i + 2) < 0.5 ? -1 : 1) * (course.halfWidth + 20 + hash(i + 17) * 1250)
+      const lane = (hash(i + 2) < 0.5 ? -1 : 1) * (sampleTrack(course, distance + forward).width + 20 + hash(i + 17) * 1250)
       const at = this.at(course, distance + forward, lane)
       if (at.z < 80 || at.y < 121 || at.x < -10 || at.x > WIDTH + 10) continue
       const width = clamp(at.scale * (4 + hash(i) * 9), 1, 16), height = clamp(at.scale * 2, 1, 4)
@@ -315,36 +326,89 @@ export class KartRenderer {
   private drawRoad(course: Course, distance: number, palette: Palette) {
     const g = this.ctx, step = 14, start = Math.floor((distance - 185) / step) * step
     for (let d = start + 1456; d >= start; d -= step) {
-      const n = Math.floor(d / step), near = this.at(course, d, 0), far = this.at(course, d + step + 0.8, 0)
+      const n = Math.floor(d / step), next = d + step + 0.8, near = this.at(course, d, 0), far = this.at(course, next, 0)
       if (near.z < 15 || far.z < 15 || (near.y > HEIGHT + 50 && far.y > HEIGHT + 50)) continue
-      const leftNear = this.at(course, d, -course.halfWidth), rightNear = this.at(course, d, course.halfWidth)
-      const leftFar = this.at(course, d + step + 0.8, -course.halfWidth), rightFar = this.at(course, d + step + 0.8, course.halfWidth)
+      const wn = sampleTrack(course, d).width, wf = sampleTrack(course, next).width
+      const leftNear = this.at(course, d, -wn), rightNear = this.at(course, d, wn)
+      const leftFar = this.at(course, next, -wf), rightFar = this.at(course, next, wf)
       if ([leftNear, rightNear, leftFar, rightFar].some(v => v.z < 15)) continue
       const edge = 8
-      const olN = this.at(course, d, -course.halfWidth - edge), orN = this.at(course, d, course.halfWidth + edge)
-      const olF = this.at(course, d + step + 0.8, -course.halfWidth - edge), orF = this.at(course, d + step + 0.8, course.halfWidth + edge)
+      const olN = this.at(course, d, -wn - edge), orN = this.at(course, d, wn + edge)
+      const olF = this.at(course, next, -wf - edge), orF = this.at(course, next, wf + edge)
       const curb = palette.edge[(Math.floor(n / 3) % 2 + 2) % 2]
       poly(g, curb, [olN.x, olN.y, leftNear.x, leftNear.y, leftFar.x, leftFar.y, olF.x, olF.y])
       poly(g, curb, [rightNear.x, rightNear.y, orN.x, orN.y, orF.x, orF.y, rightFar.x, rightFar.y])
       poly(g, palette.road[(n % 3 + 3) % 3], [leftNear.x, leftNear.y, rightNear.x, rightNear.y, rightFar.x, rightFar.y, leftFar.x, leftFar.y])
-      const inL = this.at(course, d, -course.halfWidth + 5), inLF = this.at(course, d + step + 0.8, -course.halfWidth + 5)
-      const inR = this.at(course, d, course.halfWidth - 5), inRF = this.at(course, d + step + 0.8, course.halfWidth - 5)
+      const inL = this.at(course, d, -wn + 5), inLF = this.at(course, next, -wf + 5)
+      const inR = this.at(course, d, wn - 5), inRF = this.at(course, next, wf - 5)
       poly(g, palette.line, [leftNear.x, leftNear.y, inL.x, inL.y, inLF.x, inLF.y, leftFar.x, leftFar.y])
       poly(g, palette.line, [inR.x, inR.y, rightNear.x, rightNear.y, rightFar.x, rightFar.y, inRF.x, inRF.y])
       // Fine warm cobblestone flecks remain quiet enough for items and turns to read.
       if (near.scale > 0.22) for (let j = 0; j < 4; j++) {
-        const lane = (hash(n * 7 + j * 3) - 0.5) * course.halfWidth * 1.78
+        const lane = (hash(n * 7 + j * 3) - 0.5) * wn * 1.78
         const at = this.at(course, d + hash(n + j) * step, lane)
         rect(g, j % 2 ? palette.line : palette.road[0], at.x, at.y, Math.max(1, 3 * at.scale), Math.max(1, at.scale))
       }
       const wrapped = ((d % course.length) + course.length) % course.length
       if (wrapped < 44) {
         for (let j = 0; j < 12; j++) {
-          const ln = this.at(course, d, -course.halfWidth + j * course.halfWidth / 6)
-          const rn = this.at(course, d, -course.halfWidth + (j + 1) * course.halfWidth / 6)
-          const lf = this.at(course, d + step + 0.8, -course.halfWidth + j * course.halfWidth / 6)
-          const rf = this.at(course, d + step + 0.8, -course.halfWidth + (j + 1) * course.halfWidth / 6)
+          const ln = this.at(course, d, -wn + j * wn / 6)
+          const rn = this.at(course, d, -wn + (j + 1) * wn / 6)
+          const lf = this.at(course, next, -wf + j * wf / 6)
+          const rf = this.at(course, next, -wf + (j + 1) * wf / 6)
           poly(g, (j + Math.floor(wrapped / step)) % 2 ? '#66667b' : '#fff2d7', [ln.x, ln.y, rn.x, rn.y, rf.x, rf.y, lf.x, lf.y])
+        }
+      }
+    }
+  }
+
+  /** Flat road features drawn over the asphalt, far to near: rough patches, dash panels and islands. */
+  private drawZones(course: Course, distance: number, palette: Palette, time: number) {
+    const g = this.ctx
+    const quad = (color: string, d0: number, d1: number, a0: number, b0: number, a1: number, b1: number) => {
+      const p = this.at(course, d0, a0), q = this.at(course, d0, b0), r = this.at(course, d1, b1), s = this.at(course, d1, a1)
+      if (p.z < 15 || q.z < 15 || r.z < 15 || s.z < 15) return
+      poly(g, color, [p.x, p.y, q.x, q.y, r.x, r.y, s.x, s.y])
+    }
+    const visible = course.zones.map(zone => {
+      const ahead = ((zone.start - distance) % course.length + course.length) % course.length
+      return { zone, ahead: ahead > course.length - (zone.end - zone.start) - 185 ? ahead - course.length : ahead }
+    }).filter(({ ahead }) => ahead < 1400).sort((a, b) => b.ahead - a.ahead)
+    for (const { zone, ahead } of visible) {
+      const start = distance + ahead, length = zone.end - zone.start
+      if (zone.kind === 'rough') {
+        // A lumpy blob: rounded ends and jittered sides keep it from reading as a paint stripe.
+        const step = 9, count = Math.max(2, Math.ceil(length / step))
+        const halfAt = (i: number) => {
+          const t = i / count * 2 - 1
+          return zone.half * Math.sqrt(Math.max(0.05, 1 - t ** 4)) * (0.86 + hash(zone.start + i) * 0.14)
+        }
+        for (let i = 0; i < count; i++) {
+          const d0 = start + i * length / count, d1 = start + (i + 1) * length / count, h0 = halfAt(i), h1 = halfAt(i + 1)
+          quad(palette.rough[i % 2], d0, d1 + 0.8, zone.lane - h0, zone.lane + h0, zone.lane - h1, zone.lane + h1)
+          const fleck = this.at(course, d0 + 4, zone.lane + (hash(i * 3 + zone.start) - 0.5) * h0 * 1.4)
+          if (fleck.z > 15) rect(g, palette.rough[2], fleck.x, fleck.y, Math.max(1, 5 * fleck.scale), Math.max(1, 1.5 * fleck.scale))
+        }
+      } else if (zone.kind === 'dash') {
+        quad('#6a5f86', start - 3, zone.end - zone.start + start + 3, zone.lane - zone.half - 3, zone.lane + zone.half + 3, zone.lane - zone.half - 3, zone.lane + zone.half + 3)
+        quad('#f4a35f', start, start + length, zone.lane - zone.half, zone.lane + zone.half, zone.lane - zone.half, zone.lane + zone.half)
+        // Three chevrons pulse forward so the panel reads as "go this way!"
+        for (let i = 0; i < 3; i++) {
+          const d = start + length * (0.12 + i * 0.3), bright = Math.floor(time * 6 - i + 30) % 3 === 0
+          const color = bright ? '#fff6c4' : '#ffd66b', tip = length * 0.24
+          const l = this.at(course, d, zone.lane - zone.half * 0.8), m = this.at(course, d + tip, zone.lane), r = this.at(course, d, zone.lane + zone.half * 0.8)
+          const li = this.at(course, d + tip * 0.45, zone.lane - zone.half * 0.8), mi = this.at(course, d + tip * 1.5, zone.lane), ri = this.at(course, d + tip * 0.45, zone.lane + zone.half * 0.8)
+          if ([l, m, r, li, mi, ri].some(v => v.z < 15)) continue
+          poly(g, color, [l.x, l.y, m.x, m.y, r.x, r.y, ri.x, ri.y, mi.x, mi.y, li.x, li.y])
+        }
+      } else {
+        const step = 10, count = Math.max(2, Math.ceil(length / step))
+        for (let i = 0; i < count; i++) {
+          const d0 = start + i * length / count, d1 = start + (i + 1) * length / count
+          const a = islandAt(course, d0)?.half ?? 0, b = islandAt(course, Math.min(d1, start + length - 0.01))?.half ?? 0
+          if (a < 0.5 && b < 0.5) continue
+          quad(palette.edge[i % 2], d0, d1 + 0.8, zone.lane - a - 6, zone.lane + a + 6, zone.lane - b - 6, zone.lane + b + 6)
+          quad(palette.ground[i % 2], d0, d1 + 0.8, zone.lane - a, zone.lane + a, zone.lane - b, zone.lane + b)
         }
       }
     }
@@ -373,6 +437,16 @@ export class KartRenderer {
         const direction = Math.sign(r.drift), dx = (18 + i * 2) * direction * scale, dy = ((time * 42 + i * 4) % 14) * scale
         rect(g, i % 2 ? '#f9e6ac' : '#82d8df', sprite.x + dx, sprite.y - 6 * scale + dy, 2 * scale, 2 * scale)
       }
+      if (r.rough && r.speed > 40 && !reducedMotion && this.course) {
+        const dust = PALETTES[this.course.id].rough
+        for (let i = 0; i < 6; i++) {
+          const age = (time * 3 + i / 6) % 1, side = i % 2 ? 1 : -1
+          const size = Math.max(1, (2 + age * 4) * scale)
+          g.globalAlpha = 0.85 * (1 - age)
+          rect(g, dust[i % 3], sprite.x + side * (10 + age * 16) * scale - size / 2, sprite.y - (3 + age * 12) * scale, size, size)
+        }
+        g.globalAlpha = 1
+      }
       if (r.protection > 0 && r.stun <= 0) g.globalAlpha = reducedMotion ? 0.82 : 0.72 + Math.sin(time * 9) * 0.16
     }
     if (sprite.flip) { g.save(); g.translate(x + w, y); g.scale(-1, 1); g.drawImage(sprite.image, 0, 0, w, h); g.restore() }
@@ -386,7 +460,8 @@ export class KartRenderer {
   private drawGate(course: Course, distance: number) {
     const ahead = ((-distance % course.length) + course.length) % course.length
     if (ahead > 1050 && ahead < course.length - 80) return
-    const left = this.at(course, 0, -course.halfWidth - 12), right = this.at(course, 0, course.halfWidth + 12)
+    const width = sampleTrack(course, 0).width
+    const left = this.at(course, 0, -width - 12), right = this.at(course, 0, width + 12)
     if (left.z < 60 || right.z < 60 || left.y > HEIGHT + 10 || right.y > HEIGHT + 10) return
     const g = this.ctx, h = 108 * left.scale
     rect(g, '#766381', left.x - 2 * left.scale, left.y - h, 4 * left.scale, h)
