@@ -76,6 +76,8 @@ export const routes: RouteObject[] = [
   { path: '/games/dot-aquarium', element: lazyRoute(() => import('../games/dot-aquarium/DotAquariumPlay')) },
   // コース選択・レース・結果が同一route内で切り替わるため、プレイ面はゲーム内で包む。
   { path: '/games/pixel-kart', element: lazyRoute(() => import('../games/pixel-kart/PixelKartPlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、プレイ面はゲーム内で包む。
+  { path: '/games/tsumiki-3d', element: lazyRoute(() => import('../games/tsumiki-3d/Tsumiki3dPlay')) },
   { path: '/', element: <Home /> },
   { path: '/games/puni-slime', element: playRoute(lazyRoute(() => import('../games/puni-slime/PuniSlimePlay'))) },
   { path: '/games/animal-bath', element: lazyRoute(() => import('../games/animal-bath/AnimalBathPlay')) },

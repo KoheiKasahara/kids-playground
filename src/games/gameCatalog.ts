@@ -919,6 +919,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'tsumiki-3d',
+    slug: 'tsumiki-3d',
+    title: '3Dつみき',
+    emoji: '🧱',
+    category: 'threeD',
+    seo: {
+      headline: '3Dつみき｜木の つみきを 3Dで たかく つむ あそび',
+      description:
+        '木の つみきを さわった ところに ぽとんと おとして つみあげる 3Dの つみきあそび。ほんものの ように ゆれて くずれるので、バランスを かんがえて キリンの たかさを めざそう。',
+    },
+    intro: {
+      howToPlay: [
+        'かたちと いろを えらんで、おきたい ところを さわろう',
+        'ゆびで ずらすと まわして みられるよ。ふたゆびで ちかく・とおく',
+        'どうぶつの たかさを めざして たかく つもう！',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

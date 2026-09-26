@@ -24,6 +24,10 @@
 
 `src/games/pixel-kart/` のカート・どうぶつ・森・花・波・サンゴ・結晶・お城・路面などは、本アプリ用に作成したオリジナルのドット絵です。`sprites.ts` と `render.ts` で Canvas に描画し、`courses.ts` で4コースの形状を定義しています。`ItemGlyph.tsx` のアイテムもオリジナルの SVG 図形です。`audio.ts` のコース別BGMと効果音は Web Audio API で実行時に合成し、外部の画像・音源は使用していません。
 
+## 3Dつみきのテクスチャ・効果音
+
+`src/games/tsumiki-3d/` のつみきの もくめ・ゆかの フローリング・プレイマット・たかさの ものさしの えもじ札は、本アプリ用に Canvas で実行時に描いたオリジナル図形です。つみきの形は Three.js の標準ジオメトリ（RoundedBoxGeometry・ExtrudeGeometry・LatheGeometry）で作り、環境光は Three.js 付属の RoomEnvironment を使っています。選択ボタンのつみきアイコンもオリジナルの SVG 図形です。効果音は Web Audio API で実行時に合成し、外部の画像・音源は使用していません。
+
 ## 世界地図 (world-atlas / countries-50m.json)
 
 世界地図の国境は [world-atlas](https://github.com/topojson/world-atlas) npmパッケージの [`countries-50m.json`](https://unpkg.com/world-atlas/countries-50m.json) を、ビルド時に静的importしてバンドルしています。実行時のCDN・地図API通信は行いません。
