@@ -136,6 +136,12 @@ export type SnapOptions = {
   maxDistance?: number
   maxHeightDifference?: number
   maxAngleDifference?: number
+  /**
+   * trueなら向きが合っていなくても、近くの端点へつながる向きに自動で回して
+   * つなぐ候補を返す（幼児のドラッグ用）。高さは回転で変わらないため従来どおり
+   * 判定し、坂は高さの合う端（上り口／下り口）が自然に選ばれる。
+   */
+  autoRotate?: boolean
 }
 
 /** 主要線路パーツ（直線・短い直線・カーブ・分岐）が共有する基準ユニット長。 */
@@ -172,6 +178,16 @@ export const ELEVATED_HEIGHT = 2
 export const DEFAULT_SNAP_DISTANCE = 1.15
 export const DEFAULT_SNAP_HEIGHT = 0.35
 export const DEFAULT_SNAP_ANGLE = (58 * Math.PI) / 180
+/**
+ * 指でドラッグしているときの吸いつき距離。4歳児の指でも端点をぴったり
+ * 合わせなくてよいよう、通常のsnapより少し広くとる。
+ */
+export const DRAG_SNAP_DISTANCE = 1.6
+/**
+ * autoRotate候補の順位づけで、向きのずれ1ラジアンを何ユニットの距離と
+ * 同じ重さに見るか。向きが合う候補を少しだけ優先する。
+ */
+const AUTO_ROTATE_ANGLE_WEIGHT = 0.35
 
 /**
  * パレットから足したpieceを置ける範囲。100x100の地面からはみ出さないよう、
@@ -796,6 +812,9 @@ export function findRailSnapCandidate(
   movingConnectorId?: RailConnectorId,
   options?: SnapOptions,
 ): SnapCandidate | null {
+  if (options?.autoRotate === true) {
+    return findAutoRotateSnapCandidate(movingPiece, targets, movingConnectorId, options)
+  }
   const thresholds = optionsWithDefaults(options)
   const movingConnectorIds = movingConnectorId === undefined
     ? getRailConnectorIds(movingPiece)
@@ -845,6 +864,132 @@ export function findRailSnapCandidate(
 }
 
 export const findSnapCandidate = findRailSnapCandidate
+
+/**
+ * 向きを問わないsnap候補。
+ *
+ * movingPieceの空き端点のどれかが対象端点の近く（XZ平面でmaxDistance以内）に
+ * 来たら「つなぎたい」と見なし、高さの合う空き端点それぞれについて、その端点が
+ * 対象へぴったり向き合うtransformを作る。候補は「今その端点がどれだけ近いか」
+ * ＋「どれだけ回すか」の小さい順に選ぶので、近い端がそのままつながり、坂のように
+ * 高さの合う端が決まっているパーツは反対の端でもくるっと向きを変えてつながる。
+ * 既存パーツの真上に重なる置き方は選ばない。
+ */
+function findAutoRotateSnapCandidate(
+  movingPiece: RailPiece,
+  targets: readonly RailPiece[],
+  movingConnectorId: RailConnectorId | undefined,
+  options: SnapOptions,
+  onlyTarget?: RailConnection,
+): SnapCandidate | null {
+  const thresholds = optionsWithDefaults(options)
+  const openMovingIds = getRailConnectorIds(movingPiece).filter(
+    (connectorId) => movingPiece.connections[connectorId] === undefined,
+  )
+  const candidateMovingIds = movingConnectorId === undefined
+    ? openMovingIds
+    : openMovingIds.filter((connectorId) => connectorId === movingConnectorId)
+  if (candidateMovingIds.length === 0) return null
+  const movingWorld = new Map<RailConnectorId, WorldRailConnector>()
+  for (const id of openMovingIds) movingWorld.set(id, worldConnectorForRailPiece(movingPiece, id))
+  const others = targets.filter((piece) => piece.id !== movingPiece.id)
+  let otherCenters: RailVec3[] | null = null
+
+  let best: SnapCandidate | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+  for (const targetPiece of others) {
+    if (onlyTarget !== undefined && targetPiece.id !== onlyTarget.pieceId) continue
+    for (const targetConnectorId of getRailConnectorIds(targetPiece)) {
+      if (onlyTarget !== undefined && targetConnectorId !== onlyTarget.connectorId) continue
+      if (targetPiece.connections[targetConnectorId] !== undefined) continue
+      const targetWorld = worldConnectorForRailPiece(targetPiece, targetConnectorId)
+      let triggered = false
+      for (const moving of movingWorld.values()) {
+        const horizontal = Math.hypot(
+          moving.position.x - targetWorld.position.x,
+          moving.position.z - targetWorld.position.z,
+        )
+        if (horizontal <= thresholds.maxDistance) {
+          triggered = true
+          break
+        }
+      }
+      if (!triggered) continue
+
+      for (const currentMovingId of candidateMovingIds) {
+        const currentMoving = movingWorld.get(currentMovingId)
+        if (currentMoving === undefined) continue
+        const heightDifference = Math.abs(currentMoving.position.y - targetWorld.position.y)
+        if (heightDifference > thresholds.maxHeightDifference) continue
+        const distance = distanceBetweenRailPoints(currentMoving.position, targetWorld.position)
+        const angleDifference = angleBetween(currentMoving.outward, scale(targetWorld.outward, -1))
+        const score = distance + angleDifference * AUTO_ROTATE_ANGLE_WEIGHT
+        if (score >= bestScore) continue
+        const transform = snapTransformForConnectors(
+          movingPiece,
+          currentMovingId,
+          targetPiece,
+          targetConnectorId,
+        )
+        const placedCenter = worldRailPieceVisualCenter({
+          ...movingPiece,
+          position: transform.position,
+          rotationY: transform.rotationY,
+        })
+        otherCenters ??= others.map(worldRailPieceVisualCenter)
+        if (otherCenters.some((center) => (
+          distanceBetweenRailPoints(center, placedCenter) < RAIL_APPEND_MIN_CENTER_DISTANCE
+        ))) continue
+        bestScore = score
+        best = {
+          movingPieceId: movingPiece.id,
+          movingConnectorId: currentMovingId,
+          targetPieceId: targetPiece.id,
+          targetConnectorId,
+          transform,
+          distance,
+          heightDifference,
+          angleDifference,
+        }
+      }
+    }
+  }
+  return best
+}
+
+/** 一度吸いついた候補から離れたと見なすまでの距離の倍率（候補のちらつき防止）。 */
+const DRAG_SNAP_KEEP_RATIO = 1.3
+
+/**
+ * ドラッグ中のsnap候補。向きが合っていなくても近くへ持っていけば、
+ * つながる向きへ自動で回してつなぐ（autoRotate）。
+ *
+ * rawPieceはドラッグ開始時の向きのまま指の位置へ動かしたpieceを渡す。
+ * 吸いついたときだけ候補のtransformで回し、離れれば元の向きへ戻るので、
+ * 指を少し動かしただけで向きが次々と変わることはない。previousには直前の
+ * 候補を渡すと、少し離れても同じ相手・同じ端点へのsnapを保つ。
+ */
+export function findRailDragSnapCandidate(
+  rawPiece: RailPiece,
+  targets: readonly RailPiece[],
+  previous: SnapCandidate | null = null,
+  maxDistance = DRAG_SNAP_DISTANCE,
+): SnapCandidate | null {
+  if (previous !== null) {
+    const previousTarget = targets.find((piece) => piece.id === previous.targetPieceId)
+    if (previousTarget !== undefined) {
+      const kept = findAutoRotateSnapCandidate(
+        rawPiece,
+        targets,
+        previous.movingConnectorId,
+        { maxDistance: maxDistance * DRAG_SNAP_KEEP_RATIO, autoRotate: true },
+        { pieceId: previous.targetPieceId, connectorId: previous.targetConnectorId },
+      )
+      if (kept !== null) return kept
+    }
+  }
+  return findRailSnapCandidate(rawPiece, targets, undefined, { maxDistance, autoRotate: true })
+}
 
 export type SnapNearMiss = {
   movingPieceId: string
@@ -1134,6 +1279,11 @@ export type AppendRailPieceOptions = {
   limit?: number
   /** 既存パーツの真上と見なす、パーツ中心どうしの距離。 */
   minCenterDistance?: number
+  /**
+   * trueなら、選択中のpieceに空き端点がない（線路の途中を選んでいる）とき、
+   * つながっている線路をたどって近い順に空き端点を探し、そこへつなぐ。
+   */
+  searchConnectedEnds?: boolean
 }
 
 export type AppendRailPieceResult = {
@@ -1181,6 +1331,83 @@ function stacksOnRailPiece(
 }
 
 /**
+ * 新しいpieceの入口候補。Aから進むのが基本で、Bは坂のように端の高さが違う
+ * パーツを「高さの合う向き」でつなぐためにだけ使う。
+ */
+const APPEND_MOVING_CONNECTOR_ORDER: readonly RailConnectorId[] = ['a', 'b']
+
+type AppendPlacement = {
+  movingConnectorId: RailConnectorId
+  transform: RailTransform
+  placed: RailPiece
+}
+
+/**
+ * anchorの端点へnewPieceをつなぐときの向きを決める。
+ *
+ * 坂は上りの向き(A→B)と下りの向き(B→A)の2通りがあり、どちらでもつなげる。
+ * 地面の線路からは上り、橋や坂の上からは下りになるよう、つないだあとの
+ * パーツの基準高さ(position.y)が地面に近い向きを選ぶ。地面より下へ潜る
+ * 置き方は最後の手段にする。高さが同じならAを使う（従来どおりの向き）。
+ */
+function bestAppendPlacement(
+  newPiece: RailPiece,
+  anchor: RailPiece,
+  targetConnectorId: RailConnectorId,
+  others: readonly RailPiece[],
+  limit: number,
+  minCenterDistance: number,
+): AppendPlacement | null {
+  let best: AppendPlacement | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+  for (const movingConnectorId of APPEND_MOVING_CONNECTOR_ORDER) {
+    const transform = snapTransformForConnectors(newPiece, movingConnectorId, anchor, targetConnectorId)
+    const placed: RailPiece = {
+      ...newPiece,
+      position: cloneVec(transform.position),
+      rotationY: transform.rotationY,
+    }
+    if (!isRailPieceInsideLimit(placed, limit)) continue
+    if (stacksOnRailPiece(placed, others, minCenterDistance)) continue
+    const y = transform.position.y
+    const score = y < -EPSILON_HEIGHT ? 1000 + Math.abs(y) : Math.abs(y)
+    if (score >= bestScore - EPSILON_HEIGHT) continue
+    bestScore = score
+    best = { movingConnectorId, transform, placed }
+  }
+  return best
+}
+
+const EPSILON_HEIGHT = 1e-6
+
+/**
+ * selectedから接続をたどり、近い順にpieceを返す。同じ近さなら出口側(B→C→D→A)を
+ * 先に見るので、線路の途中を選んでいても進行方向の先へのびていく。
+ */
+function connectedPiecesByDistance(
+  pieces: readonly RailPiece[],
+  selected: RailPiece,
+): RailPiece[] {
+  const map = piecesMap(pieces)
+  const order: RailPiece[] = [selected]
+  const seen = new Set([selected.id])
+  for (let index = 0; index < order.length; index += 1) {
+    const current = order[index]!
+    const currentConnectorIds = getRailConnectorIds(current)
+    for (const connectorId of APPEND_CONNECTOR_ORDER) {
+      if (!currentConnectorIds.includes(connectorId)) continue
+      const connection = current.connections[connectorId]
+      if (connection === undefined || seen.has(connection.pieceId)) continue
+      const next = map.get(connection.pieceId)
+      if (next === undefined) continue
+      seen.add(next.id)
+      order.push(next)
+    }
+  }
+  return order
+}
+
+/**
  * パレットで選んだ種類のpieceを1つ足す。
  *
  * 置いてあるpieceを選んでいるときは、その空き端点へ新しいpieceのAをつないだ
@@ -1211,28 +1438,27 @@ export function appendRailPiece(
     ? undefined
     : pieces.find((candidate) => candidate.id === selectedPieceId)
 
-  if (selected !== undefined) {
-    const selectedConnectorIds = getRailConnectorIds(selected)
+  const anchors = selected === undefined
+    ? []
+    : options?.searchConnectedEnds === true
+      ? connectedPiecesByDistance(pieces, selected)
+      : [selected]
+  for (const anchor of anchors) {
+    const anchorConnectorIds = getRailConnectorIds(anchor)
     const openConnectorIds = APPEND_CONNECTOR_ORDER.filter((connectorId) => (
-      selectedConnectorIds.includes(connectorId) && selected.connections[connectorId] === undefined
+      anchorConnectorIds.includes(connectorId) && anchor.connections[connectorId] === undefined
     ))
-    const others = pieces.filter((candidate) => candidate.id !== selected.id)
+    const others = pieces.filter((candidate) => candidate.id !== anchor.id)
     for (const targetConnectorId of openConnectorIds) {
-      const transform = snapTransformForConnectors(piece, 'a', selected, targetConnectorId)
-      const placed: RailPiece = {
-        ...piece,
-        position: cloneVec(transform.position),
-        rotationY: transform.rotationY,
-      }
-      if (!isRailPieceInsideLimit(placed, limit)) continue
-      if (stacksOnRailPiece(placed, others, minCenterDistance)) continue
+      const placement = bestAppendPlacement(piece, anchor, targetConnectorId, others, limit, minCenterDistance)
+      if (placement === null) continue
       const connectedPieces = connectRailPieces(
-        [...pieces, placed],
+        [...pieces, placement.placed],
         id,
-        'a',
-        selected.id,
+        placement.movingConnectorId,
+        anchor.id,
         targetConnectorId,
-        transform,
+        placement.transform,
       )
       const settled = connectRailPieceRemainingEndpoints(connectedPieces, id).pieces
       const appended = settled.find((candidate) => candidate.id === id)
@@ -1242,6 +1468,117 @@ export function appendRailPiece(
 
   const nextPieces = [...pieces.map(clonePiece), piece]
   return { pieces: nextPieces, piece, connected: false }
+}
+
+export type TurnRailPieceResult = {
+  pieces: RailPiece[]
+  /** 見た目が変わったか。つながったまま回せる向きが1つしかないときはfalse。 */
+  changed: boolean
+  /** 回したあと新しくつながった接続。 */
+  connected: SnapCandidate[]
+}
+
+function placementSignature(piece: RailPiece): string {
+  const points = getRailConnectorIds(piece).map((connectorId) => {
+    const { position } = worldConnectorForRailPiece(piece, connectorId)
+    return [position.x, position.y, position.z].map((value) => value.toFixed(3)).join(',')
+  })
+  const center = worldRailPieceVisualCenter(piece)
+  return `${points.sort().join('|')}#${[center.x, center.y, center.z].map((value) => value.toFixed(3)).join(',')}`
+}
+
+/**
+ * 「まわす」ボタンの動き。
+ *
+ * つながっていないpieceは従来どおり見た目の中心で90°回し、回した結果
+ * どこかの端点とぴったり向き合えばそのままつなぐ。
+ *
+ * つながっているpieceは切り離さず、つながっている相手(最初の接続)の端点へ
+ * 「つなげる向き」だけを順番に切りかえる。カーブなら左曲がり⇔右曲がり、
+ * 坂なら上り⇔下り、分岐なら本線／副線の入口…と、つながったまま向きが変わる。
+ * 見た目が同じになる向き（直線の表裏など）は1つにまとめる。
+ */
+export function turnRailPiece(
+  pieces: readonly RailPiece[],
+  pieceId: string,
+  options?: { limit?: number; minCenterDistance?: number },
+): TurnRailPieceResult {
+  const piece = pieces.find((candidate) => candidate.id === pieceId)
+  if (piece === undefined) return { pieces: pieces.map(clonePiece), changed: false, connected: [] }
+  const limit = options?.limit ?? RAIL_APPEND_LIMIT
+  const minCenterDistance = options?.minCenterDistance ?? RAIL_APPEND_MIN_CENTER_DISTANCE
+  const anchorConnectorId = getRailConnectorIds(piece).find(
+    (connectorId) => piece.connections[connectorId] !== undefined,
+  )
+
+  if (anchorConnectorId === undefined) {
+    const rotated = rotateRailPiece(pieces, pieceId)
+    const rotatedPiece = rotated.find((candidate) => candidate.id === pieceId)
+    if (rotatedPiece === undefined) return { pieces: rotated, changed: true, connected: [] }
+    const candidate = findRailSnapCandidate(
+      rotatedPiece,
+      rotated.filter((candidatePiece) => candidatePiece.id !== pieceId),
+    )
+    if (candidate === null) return { pieces: rotated, changed: true, connected: [] }
+    const connectedPieces = connectRailPieces(
+      rotated,
+      pieceId,
+      candidate.movingConnectorId,
+      candidate.targetPieceId,
+      candidate.targetConnectorId,
+      candidate.transform,
+    )
+    const settled = connectRailPieceRemainingEndpoints(connectedPieces, pieceId)
+    return { pieces: settled.pieces, changed: true, connected: [candidate, ...settled.connected] }
+  }
+
+  const anchorConnection = piece.connections[anchorConnectorId]!
+  const detached = disconnectRailPiece(pieces, pieceId)
+  const detachedPiece = detached.find((candidate) => candidate.id === pieceId)!
+  const target = detached.find((candidate) => candidate.id === anchorConnection.pieceId)
+  if (target === undefined) return { pieces: pieces.map(clonePiece), changed: false, connected: [] }
+  const others = detached.filter((candidate) => candidate.id !== pieceId && candidate.id !== target.id)
+
+  type TurnOption = { movingConnectorId: RailConnectorId; transform: RailTransform; signature: string }
+  const turnOptions: TurnOption[] = []
+  let currentIndex = -1
+  for (const movingConnectorId of getRailConnectorIds(detachedPiece)) {
+    const transform = snapTransformForConnectors(
+      detachedPiece,
+      movingConnectorId,
+      target,
+      anchorConnection.connectorId,
+    )
+    const placed: RailPiece = { ...detachedPiece, position: transform.position, rotationY: transform.rotationY }
+    const signature = placementSignature(placed)
+    const isCurrent = movingConnectorId === anchorConnectorId
+    const existingIndex = turnOptions.findIndex((option) => option.signature === signature)
+    if (existingIndex >= 0) {
+      if (isCurrent) currentIndex = existingIndex
+      continue
+    }
+    if (!isCurrent) {
+      if (!isRailPieceInsideLimit(placed, limit)) continue
+      if (stacksOnRailPiece(placed, others, minCenterDistance)) continue
+    }
+    turnOptions.push({ movingConnectorId, transform, signature })
+    if (isCurrent) currentIndex = turnOptions.length - 1
+  }
+  if (turnOptions.length <= 1 || currentIndex < 0) {
+    return { pieces: pieces.map(clonePiece), changed: false, connected: [] }
+  }
+
+  const next = turnOptions[(currentIndex + 1) % turnOptions.length]!
+  const connectedPieces = connectRailPieces(
+    detached,
+    pieceId,
+    next.movingConnectorId,
+    target.id,
+    anchorConnection.connectorId,
+    next.transform,
+  )
+  const settled = connectRailPieceRemainingEndpoints(connectedPieces, pieceId)
+  return { pieces: settled.pieces, changed: true, connected: settled.connected }
 }
 
 export function deleteRailPiece(

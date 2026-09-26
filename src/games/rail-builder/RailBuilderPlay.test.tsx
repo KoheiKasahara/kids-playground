@@ -30,6 +30,7 @@ vi.mock('./useRailBuilderEngine', async (importOriginal) => ({
       removeTrain: () => {},
       focusTrain: () => {},
       focusDepot: () => {},
+      revealPiece: () => {},
       setTrainType: () => {},
     }
   },
@@ -125,14 +126,51 @@ describe('RailBuilderPlay 縦画面の操作UI', () => {
     expect(addedPiece('rail-6').connections.a).toEqual({ pieceId: 'rail-5', connectorId: 'b' })
   })
 
-  test('なにも えらんでいない ときは、これまでどおり 未接続のまま おかれる', async () => {
+  test('えらぶのを やめても、さいごに えらんだ せんろへ つながって ふえる', async () => {
     const user = userEvent.setup()
     renderPlay()
+    selectPiece('rail-4')
     selectPiece(null)
 
     await user.click(screen.getByRole('button', { name: 'ちょくせんを ついか' }))
 
-    expect(addedPiece('rail-5').connections).toEqual({})
+    expect(addedPiece('rail-5').connections.a).toEqual({ pieceId: 'rail-4', connectorId: 'b' })
+  })
+
+  test('いちども えらんでいない ときは、さいごに おいてある せんろへ つながる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'ちょくせんを ついか' }))
+
+    expect(addedPiece('rail-5').connections.a).toEqual({ pieceId: 'rail-4', connectorId: 'b' })
+  })
+
+  test('つながった カーブを まわすと、つながった まま まがる むきが かわる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    selectPiece('rail-4')
+    await user.click(screen.getByRole('button', { name: 'カーブを ついか' }))
+    const before = addedPiece('rail-5')
+
+    await user.click(screen.getByRole('button', { name: 'せんろの むきを かえる' }))
+
+    const after = addedPiece('rail-5')
+    expect(after.rotationY).not.toBeCloseTo(before.rotationY)
+    expect(Object.values(after.connections).map((connection) => connection?.pieceId)).toContain('rail-4')
+  })
+
+  test('せんろを けすと、つながっていた せんろから つづきが のびる', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    selectPiece('rail-4')
+    await user.click(screen.getByRole('button', { name: 'ちょくせんを ついか' }))
+    await user.click(screen.getByRole('button', { name: 'せんろを けす' }))
+
+    await user.click(screen.getByRole('button', { name: 'カーブを ついか' }))
+
+    const added = engine().pieces[engine().pieces.length - 1]!
+    expect(added.connections.a).toEqual({ pieceId: 'rail-4', connectorId: 'b' })
   })
 
   test('音ボタンを押すと aria-pressed が切り替わる', async () => {
