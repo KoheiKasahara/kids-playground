@@ -95,6 +95,15 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
     expect(ruleBody('.boardHit')).toMatch(/touch-action:\s*manipulation/)
   })
 
+  test('くじらのタップ領域は見た目より広く、タップ中にズームしない（幼児向け規約）', () => {
+    const whaleSource = readFileSync(path.join(__dirname, 'PukupukaWhale.tsx'), 'utf-8')
+    const hitWidth = Number(whaleSource.match(/HIT_WIDTH = (\d+)/)?.[1])
+    const hitHeight = Number(whaleSource.match(/HIT_HEIGHT = (\d+)/)?.[1])
+    expect(hitWidth).toBeGreaterThanOrEqual(15)
+    expect(hitHeight).toBeGreaterThanOrEqual(15)
+    expect(ruleBody('.whaleHit')).toMatch(/touch-action:\s*manipulation/)
+  })
+
   test('水車と連動水門の絵は、重なったせんのタップを遮らない', () => {
     const wheelSource = readFileSync(path.join(__dirname, 'PukupukaWaterWheel.tsx'), 'utf-8')
     expect(wheelSource).toMatch(/<g aria-hidden="true" pointerEvents="none">/)
@@ -113,6 +122,16 @@ describe('ぷかぷかレスキューのスマホ縦レイアウト', () => {
       'gateOpenMark',
       'boardFlowMark',
       'waterWheelSpin',
+      'caustics',
+      'lightRay',
+      'joinPop',
+      'floaterCheer',
+      'bellSwing',
+      'whaleJet',
+      'slideStream',
+      'fxRing',
+      'fxDrop',
+      'toast',
     ]) {
       expect(reduced).toContain(`.${animated}`)
     }

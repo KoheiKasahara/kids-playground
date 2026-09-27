@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { activeSolids, createInitialState, isSettled, stepGame, toggleDrain, toggleGate, waterSurfaceYOf } from './pukupukaGame'
-import { PUKUPUKA_STAGES } from './stageDefinitions'
+import { findPukupukaStage, PUKUPUKA_STAGES } from './stageDefinitions'
 import { createWaterField, transferWaterThroughGate, waterSurfaceY } from './waterModel'
 import type { WaterBodyDefinition } from './types'
 
@@ -39,7 +39,7 @@ describe('設置高さと実際の水・扉の動き', () => {
     expect(transferWaterThroughGate(sameDepth, water, 'left', 'right', 1 / 60).direction).toBe(1)
   })
   test('扉は瞬間移動せず、アニメーション途中の実寸で通路をふさぐ。途中反転も連続する', () => {
-    const stage = PUKUPUKA_STAGES[4]
+    const stage = findPukupukaStage('open-the-gate')!
     let state = toggleGate(createInitialState(stage))
     for (let i = 0; i < 15; i++) state = stepGame(stage, state, 1000 / 60).state
     expect(state.gateLift).toBeGreaterThan(0)

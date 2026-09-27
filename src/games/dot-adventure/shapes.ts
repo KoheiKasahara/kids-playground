@@ -233,6 +233,20 @@ export function rockCanvas(style: RockStyle, seed: number) {
   return toCanvas(layer)
 }
 
+/** しかけの おおきな いわ（28x24）。足もとは (14, 22)。 */
+export function boulderCanvas(style: RockStyle) {
+  const layer = newLayer(28, 24)
+  paintBlobs(layer, [
+    { x: 14, y: 12, r: 11.5, ry: 10.5, z: 0 },
+    { x: 18.5, y: 15.5, r: 7, ry: 6, z: 3 },
+    { x: 8.5, y: 16, r: 6.5, ry: 5.5, z: 3 },
+  ], {
+    ramp: style.ramp, outline: style.outline, texture: { scale: 3.5, amount: .28, seed: 7 }, ambient: .2, seams: true,
+    cap: style.moss ? { ramp: style.moss, threshold: .5, seed: 7 } : undefined,
+  })
+  return toCanvas(layer)
+}
+
 // ---------------- スライム ----------------
 
 export type SlimeStyle = { ramp: readonly string[]; outline: string; rim: string }
@@ -467,5 +481,54 @@ export function shadowCanvas(w: number, h: number) {
     if (d > .6 && bayer(x, y) < (d - .6) / .4) continue
     layer.pixels[y * w + x] = c
   }
+  return toCanvas(layer)
+}
+
+const DOOR_STAR = [
+  '...#...',
+  '...#...',
+  '#######',
+  '.#####.',
+  '..###..',
+  '.##.##.',
+  '.#...#.',
+]
+
+/** いせきの いしの とびら（20x32）。まんなかに ほしの もよう。足もとは (10, 30)。 */
+export function doorCanvas(style: StoneStyle) {
+  const W = 20, H = 32
+  const layer = newLayer(W, H)
+  const ramp = style.ramp.map(c => pack(c))
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    // 上は まるい アーチ。
+    if (y < 6) {
+      const dx = (x + .5 - W / 2) / (W / 2 - 1), dy = (6 - y) / 5
+      if (dx * dx + dy * dy > 1) continue
+    }
+    let t = x < 3 ? .82 : x > W - 4 ? .2 : .5 + (fbm(x / 4, y / 4, 31, 2) - .5) * .35
+    if (y > H - 5) t -= .15
+    // いしを つんだ めじ。
+    if (y % 8 === 0 && y > 4) t -= .25
+    layer.pixels[y * W + x] = ramp[rampIndex(t, ramp.length, x, y, .4)]
+  }
+  const gold = pack('#ffe070'), dark = pack('#e0a030')
+  DOOR_STAR.forEach((row, y) => [...row].forEach((c, x) => {
+    if (c !== '#') return
+    layer.pixels[(y + 11) * W + x + 7] = y < 4 ? gold : dark
+  }))
+  outline(layer, style.outline, style.ramp[0])
+  return toCanvas(layer)
+}
+
+/** ふむ スイッチ（16x12）。まわりの いしと まんなかの かいがらいろの ボタン。 */
+export function switchCanvas(pressed: boolean) {
+  const layer = newLayer(16, 12)
+  paintBlobs(layer, [{ x: 8, y: 7.5, r: 7.5, ry: 4 }], { ramp: ['#3a3040', '#5a5064', '#7c748a', '#a49cb0'], outline: '#1a1420', ambient: .3 })
+  const button = newLayer(16, 12)
+  paintBlobs(button, [{ x: 8, y: pressed ? 7.5 : 6, r: 5, ry: pressed ? 2.2 : 3.5 }], {
+    ramp: pressed ? ['#7a3050', '#a04a70', '#c86c90'] : ['#a02460', '#d44488', '#f076a8', '#ffa8c8', '#ffd8e8'],
+    outline: '#4a0c28', spec: pressed ? undefined : '#ffffff',
+  })
+  for (let i = 0; i < button.pixels.length; i++) if (button.pixels[i]) layer.pixels[i] = button.pixels[i]
   return toCanvas(layer)
 }

@@ -253,6 +253,31 @@ function createToothRingShape(
 }
 
 /**
+ * 縁がふわっと消える光のリング。
+ *
+ * ただのRingGeometryだと縁がくっきりした多角形の帯になり、コマと一緒に高速回転すると
+ * 「帯が回っている」ように見えてしまう。分割を細かくし、半径方向に頂点アルファで
+ * 中央だけ明るく内外の縁で0になるグラデーションを付けて、なめらかな光輪に見せる。
+ */
+function createSoftGlowRingGeometry(innerRadius: number, outerRadius: number): THREE.RingGeometry {
+  const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 96, 8)
+  const positions = geometry.getAttribute('position')
+  const colors = new Float32Array(positions.count * 4)
+  for (let i = 0; i < positions.count; i++) {
+    const radius = Math.hypot(positions.getX(i), positions.getY(i))
+    const t = THREE.MathUtils.clamp((radius - innerRadius) / (outerRadius - innerRadius), 0, 1)
+    // 内側寄りをピークにしたなだらかな山形。sinの2乗で縁の傾きも0にし、境目を見せない。
+    const peak = Math.sin(Math.PI * Math.pow(t, 0.8))
+    colors[i * 4] = 1
+    colors[i * 4 + 1] = 1
+    colors[i * 4 + 2] = 1
+    colors[i * 4 + 3] = peak * peak
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4))
+  return geometry
+}
+
+/**
  * タイプ別の外周リング形状。
  *
  * smoothだけ既存どおりTorus(滑らかな輪)を使い、他の3タイプは
@@ -642,14 +667,10 @@ export function useKomaBattleEngine(
         // 低い六角メダリオンと、上から読み取れる大きな紋章。
         cap: track(new THREE.CylinderGeometry(diskRadius * 0.36, diskRadius * 0.41, diskRadius * 0.12, 6)),
         knob: track(armor.emblem),
-        // 回転演出用の半透明リング。高速回転中だけ光る。
-        spinRing: track(
-          new THREE.RingGeometry(diskRadius * 1.15, diskRadius * 1.42, 28),
-        ),
+        // 回転演出用の半透明リング。高速回転中だけ光る。縁をぼかして帯に見えないようにする。
+        spinRing: track(createSoftGlowRingGeometry(diskRadius * 1.08, diskRadius * 1.5)),
         // タップ時だけ一瞬広がるリング。常時描画せず、コマごとに1個を使い回す。
-        boostRing: track(
-          new THREE.RingGeometry(diskRadius * 1.18, diskRadius * 1.72, 32),
-        ),
+        boostRing: track(createSoftGlowRingGeometry(diskRadius * 1.12, diskRadius * 1.8)),
         diskHalfHeight,
       }
     }
@@ -715,6 +736,7 @@ export function useKomaBattleEngine(
           side: THREE.DoubleSide,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
+          vertexColors: true,
         }),
       )
       const boostRingMaterial = trackMaterial(
@@ -725,6 +747,7 @@ export function useKomaBattleEngine(
           side: THREE.DoubleSide,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
+          vertexColors: true,
         }),
       )
       let outcomeEmphasis: 'winner' | 'loser' | null = null
@@ -803,8 +826,8 @@ export function useKomaBattleEngine(
           1,
         )
         spinRingMaterial.opacity = Math.min(
-          0.72,
-          ratio * 0.4 + (outcomeEmphasis === 'winner' ? 0.18 : 0),
+          0.85,
+          ratio * 0.55 + (outcomeEmphasis === 'winner' ? 0.22 : 0),
         )
         const boostRatio = Math.max(0, boostRemainingMs / BOOST_EFFECT_DURATION_MS)
         accentMaterial.emissiveIntensity = Math.max(
@@ -812,8 +835,6 @@ export function useKomaBattleEngine(
           boostRatio * 1.35,
           outcomeEmphasis === 'winner' ? 0.8 : outcomeEmphasis === 'loser' ? 0.05 : 0,
         )
-        // リングは本体よりわずかに速く自転させ、残像のような「滑り」を出す。
-        spinRing.rotation.y += (dtMs / 1000) * spinSpeedAbs * 0.5
 
         if (boostRemainingMs > 0) {
           boostRemainingMs = Math.max(0, boostRemainingMs - dtMs)

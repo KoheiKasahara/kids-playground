@@ -646,6 +646,14 @@ function startEngine(
     const pointer = tapPointer === null ? undefined : pointers.get(tapPointer)
     return !!pointer && !dragging && pointer.type !== 'mouse' && (pointer.aiming || performance.now() - pointer.downAt >= AIM_HOLD_MS)
   }
+  /**
+   * ゆびで さわった ときは、ねらう モードに なるまで みほんを ださない。
+   * さわって すぐ ずらす（カメラまわし）たびに、みほんが いっしゅん でて きえる ちらつきを ふせぐ。
+   */
+  function previewReady() {
+    const pointer = tapPointer === null ? undefined : pointers.get(tapPointer)
+    return !pointer || pointer.type === 'mouse' || isAiming()
+  }
   function onPointerLeave(event: PointerEvent) {
     if (event.pointerType === 'mouse' && !pointers.size) hoverPoint = null
   }
@@ -805,7 +813,7 @@ function startEngine(
     if (cursor.active) {
       const selection = selectionRef.current
       showGhost(landingFor(cursor.x, cursor.z, selection.shape, selection.turns))
-    } else if (hoverPoint && !dragging) {
+    } else if (hoverPoint && !dragging && previewReady()) {
       showGhost(placementAtScreen(hoverPoint.x, hoverPoint.y))
     } else {
       showGhost(null)

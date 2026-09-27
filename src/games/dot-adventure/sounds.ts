@@ -101,6 +101,43 @@ export function playFanfare() {
   ;['E6', 'G6', 'C7'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + 10 * s + i * .03, .6, .025, 'sine', .4))
 }
 
+/** スイッチを ふんだ「カチッ」。 */
+export function playSwitchSound() {
+  const ctx = sfx()
+  if (!ctx) return
+  const t = ctx.currentTime
+  tone(ctx, ctx.destination, 1400, t, .025, .05, 'square')
+  tone(ctx, ctx.destination, 900, t + .05, .03, .04, 'square')
+}
+
+/** たいまつに ひが ついた「ボッ」。 */
+export function playTorchSound() {
+  const ctx = sfx()
+  if (!ctx) return
+  const t = ctx.currentTime
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  osc.type = 'triangle'
+  osc.frequency.setValueAtTime(90, t)
+  osc.frequency.exponentialRampToValueAtTime(260, t + .18)
+  gain.gain.setValueAtTime(.14, t)
+  gain.gain.exponentialRampToValueAtTime(.001, t + .25)
+  osc.connect(gain).connect(ctx.destination)
+  osc.start(t)
+  osc.stop(t + .27)
+  ;['E5', 'B5'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + .12 + i * .08, .12, .045, 'pulse'))
+}
+
+/** しかけが とけて みちが ひらいた「ゴゴゴ… ジャジャーン」。 */
+export function playGateSound() {
+  const ctx = sfx()
+  if (!ctx) return
+  const t = ctx.currentTime
+  for (let i = 0; i < 6; i++) tone(ctx, ctx.destination, 70 + (i % 2) * 12, t + i * .07, .07, .08, 'square')
+  ;['C5', 'E5', 'G5', 'C6', 'E6'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + .45 + i * .07, .16, .06, 'pulse'))
+  tone(ctx, ctx.destination, freq('G6'), t + .8, .4, .03, 'sine', .3)
+}
+
 /** ぶつかった「コツン」。 */
 export function playBumpSound() {
   const ctx = sfx()
