@@ -31,41 +31,71 @@ export default function PukupukaBoard({ board, flowDirection, pushDirection, act
   const color = towardGoal ? '#2f9e44' : '#ff922b'
   const strokeColor = towardGoal ? '#237a37' : '#e8590c'
   const arrowSize = Math.min(board.height * 0.6, 4.5)
+  const floorMounted = centerY > 75
 
   return (
     <g data-testid="pukupuka-board" data-board-flow={flowDirection}>
       <g aria-hidden="true" style={{ pointerEvents: 'none' }}>
-        {board.circulation ? <>
-          <path d={`M${centerX} ${centerY + 5} V122`} stroke="#658e99" strokeWidth="3" />
-          <rect x={centerX - 4} y="120" width="8" height="3" rx="1" fill="#3c6d7c" />
-          <circle cx={centerX} cy={centerY} r="9" fill="#e1f4e8" stroke="#578490" strokeWidth="1" />
-          <g transform={`translate(${centerX} ${centerY})`}>
-            <g className={active ? styles.currentRotor : undefined}>
-              {[0, 90, 180, 270].map((angle) => <path key={angle} transform={`rotate(${angle})`} d="M0 0 Q-6 -9 0 -8 Q4 -7 0 0Z" fill="#78bfc2" />)}
+        {board.circulation ? (
+          <>
+            {/* 流れをつくるプロペラ。水そうの床に立てるか、上のふちからつるす。矢印の向きに水がまわる。 */}
+            {floorMounted ? (
+              <>
+                <path d={`M${centerX} ${centerY + 8} V125`} stroke="#5c7591" strokeWidth="1.8" />
+                <rect x={centerX - 4} y="123.6" width="8" height="2.6" rx="1" fill="#456f7d" />
+              </>
+            ) : (
+              <>
+                <path d={`M${centerX} 21 V${centerY - 8}`} stroke="#5c7591" strokeWidth="1.6" />
+                <rect x={centerX - 3.4} y="19.6" width="6.8" height="2.2" rx="1" fill="#456f7d" />
+              </>
+            )}
+            <circle cx={centerX} cy={centerY} r="8.6" fill="#ffffff" stroke={strokeColor} strokeWidth="1.3" />
+            <circle cx={centerX} cy={centerY} r="7.2" fill={towardGoal ? '#ebfbee' : '#fff4e6'} />
+            <g transform={`translate(${centerX} ${centerY})`}>
+              <g className={active ? styles.currentRotor : undefined}>
+                {[0, 120, 240].map((angle) => (
+                  <path key={angle} transform={`rotate(${angle})`} d="M0 0 Q-4.6 -6.4 0 -6.6 Q3.4 -6 0 0Z" fill="#a5d8ff" opacity="0.9" />
+                ))}
+                <circle r="1.2" fill="#5c7591" />
+              </g>
             </g>
-          </g>
-        </> : null}
-        <rect
-          transform={`rotate(${tilt} ${centerX} ${centerY})`}
-          x={board.x}
-          y={board.y}
-          width={board.width}
-          height={board.height}
-          rx={board.height / 2} opacity="0.94"
-          fill={color}
-          stroke={strokeColor}
-          strokeWidth="0.8"
-        />
-        {/* 押し流す向きの矢印。板の色とあわせて、進む/戻すをひと目で示す。 */}
-        <path
-          className={styles.boardFlowMark}
-          d={
-            pushDirection >= 0
-              ? `M ${centerX - arrowSize} ${centerY - arrowSize} L ${centerX + arrowSize} ${centerY} L ${centerX - arrowSize} ${centerY + arrowSize} Z`
-              : `M ${centerX + arrowSize} ${centerY - arrowSize} L ${centerX - arrowSize} ${centerY} L ${centerX + arrowSize} ${centerY + arrowSize} Z`
-          }
-          fill="#ffffff"
-        />
+            <g transform={`translate(${centerX} ${centerY}) scale(${pushDirection >= 0 ? 1 : -1} 1)`}>
+              <path
+                className={styles.boardFlowMark}
+                d="M-5 -1.6 H0.8 V-4.2 L5.4 0 L0.8 4.2 V1.6 H-5 Z"
+                fill={color}
+                stroke="#ffffff"
+                strokeWidth="0.7"
+                strokeLinejoin="round"
+              />
+            </g>
+          </>
+        ) : (
+          <>
+            <rect
+              transform={`rotate(${tilt} ${centerX} ${centerY})`}
+              x={board.x}
+              y={board.y}
+              width={board.width}
+              height={board.height}
+              rx={board.height / 2} opacity="0.94"
+              fill={color}
+              stroke={strokeColor}
+              strokeWidth="0.8"
+            />
+            {/* 押し流す向きの矢印。板の色とあわせて、進む/戻すをひと目で示す。 */}
+            <path
+              className={styles.boardFlowMark}
+              d={
+                pushDirection >= 0
+                  ? `M ${centerX - arrowSize} ${centerY - arrowSize} L ${centerX + arrowSize} ${centerY} L ${centerX - arrowSize} ${centerY + arrowSize} Z`
+                  : `M ${centerX + arrowSize} ${centerY - arrowSize} L ${centerX - arrowSize} ${centerY} L ${centerX + arrowSize} ${centerY + arrowSize} Z`
+              }
+              fill="#ffffff"
+            />
+          </>
+        )}
       </g>
       <foreignObject
         x={board.x - HIT_MARGIN_X}
@@ -77,7 +107,7 @@ export default function PukupukaBoard({ board, flowDirection, pushDirection, act
           type="button"
           className={styles.boardHit}
           disabled={disabled}
-          aria-label={towardGoal ? 'ながれの いた。みずを ゴールの ほうへ ながします' : 'ながれの いた。みずを ゴールから とおざけます'}
+          aria-label={pushDirection >= 0 ? 'ながれの いた。みずを みぎへ ながします' : 'ながれの いた。みずを ひだりへ ながします'}
           aria-pressed={towardGoal}
           onClick={onToggle}
         />

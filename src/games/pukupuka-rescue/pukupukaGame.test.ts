@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { PUKUPUKA_STAGE, PUKUPUKA_STAGES } from './stageDefinitions'
+import { findPukupukaStage, PUKUPUKA_STAGE } from './stageDefinitions'
 import {
   activeSolids,
   allFloatersAtGoal,
@@ -443,17 +443,22 @@ describe('pukupukaGame: 固定物との関係', () => {
 })
 
 describe('pukupukaGame: ゴール', () => {
-  test('水をためて壁を越え、水を減らすとゴールできる（アヒル・ボート・浮き輪+くまの3体すべて）', () => {
+  test('水をためて壁を越え、水を減らすとゴールできる（アヒルがボート・浮き輪+くまを連れて帰る）', () => {
     const { state, goalCount } = playThrough()
     const duck = duckOf(state)
-    const boat = getFloater(state, 'boat')
-    const ringBear = getFloater(state, 'ringBear')
+    const boat = getFloater(state, 'boat')!
+    const ringBear = getFloater(state, 'ringBear')!
 
     expect(state.phase).toBe('cleared')
     expect(goalCount).toBe(1)
     expect(rectContainsPoint(stage.goal.area, duck.x, duck.y)).toBe(true)
-    expect(rectContainsPoint(stage.goal.area, boat!.x, boat!.y)).toBe(true)
-    expect(rectContainsPoint(stage.goal.area, ringBear!.x, ringBear!.y)).toBe(true)
+    // すぐとなりにいた2人は最初に仲間になり、隊長の後ろに1列で並んでいる。
+    expect([...state.rescuedIds].sort()).toEqual(['boat', 'ringBear'])
+    for (const friend of [boat, ringBear]) {
+      expect(friend.x).toBeLessThan(duck.x)
+      expect(duck.x - friend.x).toBeLessThan(40)
+    }
+    expect(Math.abs(boat.x - ringBear.x)).toBeGreaterThan(9)
   })
 
   test('クリア後に進め続けてもゴールは1回しか発火しない', () => {
@@ -605,8 +610,12 @@ describe('pukupukaGame: 進行の安定性', () => {
 })
 
 describe('pukupukaGame: 水門と放水板(#568)', () => {
-  const gateStage = PUKUPUKA_STAGES[2]
-  const boardStage = PUKUPUKA_STAGES[3]
+  const gateStage = findPukupukaStage('open-the-gate')!
+  // 放水先の右水そうに、流れの向きを変えるプロペラを足した面。
+  const boardStage: StageDefinition = {
+    ...gateStage,
+    board: { id: 'test-board', x: 64, y: 80, width: 16, height: 10, initialFlowDirection: 'back', targetBodyId: 'right', circulation: true },
+  }
 
   function runStage(targetStage: StageDefinition, initial: PukupukaGameState, seconds: number, control: WaterControl = null) {
     let current = initial
@@ -644,11 +653,9 @@ describe('pukupukaGame: 水門と放水板(#568)', () => {
     const filled = runStage(flowStage, createInitialState(flowStage), 8, 'fill')
     const back = runStage(flowStage, toggleGate(filled), 8, 'fill')
     const towardGoal = runStage(flowStage, toggleGate(toggleBoard(filled)), 8, 'fill')
-    const averageX = (state: PukupukaGameState) =>
-      state.floaters.reduce((sum, floater) => sum + floater.x, 0) / state.floaters.length
-
-    expect(averageX(towardGoal)).toBeGreaterThan(averageX(back) + 12)
-    expect(Math.max(...back.floaters.map((floater) => floater.x))).toBeLessThan(70)
+    // 水が運ぶのは隊長（アヒル）。仲間は隊長のあとをついていく。
+    expect(duckOf(towardGoal).x).toBeGreaterThan(duckOf(back).x + 12)
+    expect(duckOf(back).x).toBeLessThan(70)
   })
 
   test('閉じ直すと残流が止まり、右だけ排水して再開門すると放水が再発生する', () => {

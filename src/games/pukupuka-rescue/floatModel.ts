@@ -14,6 +14,11 @@ export type FloaterState = {
   readonly vy: number
   /** 0（完全に水の上）〜1（完全に水中）。表示のしぶき量と水平移動の強さに使う。 */
   readonly submergedRatio: number
+  /** 向いている向き（+1: みぎ、-1: ひだり）。止まっている間は直前の向きを保つ。 */
+  readonly facing?: -1 | 1
+  /** くじらで打ち上げられてからの残り時間(ms)。0より大きい間は carryVx で横へ進み続ける。 */
+  readonly launchMs?: number
+  readonly carryVx?: number
 }
 
 /** 重力加速度（ステージ座標 / 秒^2）。 */
@@ -28,6 +33,10 @@ export const AIR_VERTICAL_DRAG = 0.2
 export const DRIFT_SPEED = 24
 /** 流れに乗るまでの追従の速さ。 */
 export const DRIFT_RESPONSE = 2.2
+/** 向きを切り替える横速度のしきい値。ぷかぷか揺れるだけでは向きを変えない。 */
+export const FACING_SPEED = 3
+/** 打ち上げ後、下りながらこれ以上水に入ったら着水とみなす。 */
+const LAUNCH_SPLASH_RATIO = 0.25
 /** 速度の上限。極端な dt や連続衝突でも吹き飛ばないようにする保険。 */
 export const MAX_SPEED = 240
 /**
@@ -65,7 +74,15 @@ export function createFloaterState(definition: FloaterDefinition): FloaterState 
     vx: 0,
     vy: 0,
     submergedRatio: 0,
+    facing: 1,
   }
+}
+
+/** 横速度から向きを決める。ゆっくりな揺れでは前の向きを保ち、ちらつかせない。 */
+export function facingFromVelocity(vx: number, previous: -1 | 1): -1 | 1 {
+  if (vx > FACING_SPEED) return 1
+  if (vx < -FACING_SPEED) return -1
+  return previous
 }
 
 /** 円が矩形と重なっている（触れている）かどうかだけを見る、押し出しをしない軽い判定。 */
@@ -141,12 +158,17 @@ export function stepFloater(
   let vy = state.vy + (GRAVITY - GRAVITY * BUOYANCY_RATIO * submergedRatio) * deltaSeconds
   vy -= vy * (AIR_VERTICAL_DRAG + WATER_VERTICAL_DRAG * submergedRatio) * deltaSeconds
 
+  const launched = (state.launchMs ?? 0) > 0
   const board = context.board
   const boardPush =
     board && circleOverlapsRect(state.x, state.y, radius, board.rect) ? board.pushSpeed : 0
   const driftTarget =
     (DRIFT_SPEED * context.driftDirection + (context.gateFlowSpeed ?? 0)) * submergedRatio + boardPush
-  let vx = state.vx + (driftTarget - state.vx) * DRIFT_RESPONSE * deltaSeconds
+  // 打ち上げ中は水の流れに関係なく一定の横速度を保つ。壁に当たった回は消えても、
+  // 次の回にまた戻すので、壁ぞいに上がって上端をこえたところで向こうへ進める。
+  let vx = launched
+    ? state.carryVx ?? 0
+    : state.vx + (driftTarget - state.vx) * DRIFT_RESPONSE * deltaSeconds
 
   vx = clamp(vx, -MAX_SPEED, MAX_SPEED)
   vy = clamp(vy, -MAX_SPEED, MAX_SPEED)
@@ -172,5 +194,18 @@ export function stepFloater(
   x = clamp(x, radius, context.bounds.width - radius)
   y = clamp(y, radius, context.bounds.height - radius)
 
-  return { id: state.id, x, y, vx, vy, submergedRatio }
+  let launchMs = launched ? Math.max(0, (state.launchMs ?? 0) - deltaSeconds * 1000) : 0
+  // 下りながら水に入ったら着水。上がり始めの水中では打ち上げを終えない。
+  if (launched && vy > 0 && submergedRatio > LAUNCH_SPLASH_RATIO) launchMs = 0
+
+  return {
+    id: state.id,
+    x,
+    y,
+    vx,
+    vy,
+    submergedRatio,
+    facing: facingFromVelocity(vx, state.facing ?? 1),
+    ...(launchMs > 0 ? { launchMs, carryVx: state.carryVx } : {}),
+  }
 }
