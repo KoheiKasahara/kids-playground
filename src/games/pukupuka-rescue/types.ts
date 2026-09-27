@@ -51,8 +51,11 @@ export type WaterBodyDefinition = {
  * 浮遊物の種類（見た目の描き分けだけに使う。水位判定・壁との衝突・ゴール判定は
  * どの種類も`floatModel.ts`/`pukupukaGame.ts`の共通処理をそのまま使い、種類ごとの
  * 個別実装は持たない #518）。サイズや浮き方の違いは半径（radius）だけで表現する。
+ *
+ * アヒル(duck)がレスキュー隊長で、ほかは足場で待つ仲間。隊長がふれると仲間になり、
+ * 隊長のあとを1列についてくる。
  */
-export type FloaterKind = 'duck' | 'boat' | 'ringBear'
+export type FloaterKind = 'duck' | 'boat' | 'ringBear' | 'chick' | 'frog' | 'penguin'
 
 export type FloaterDefinition = {
   id: string
@@ -152,6 +155,55 @@ export type WaterWheelDefinition = {
   linkedGateBlocksPassage?: boolean
 }
 
+/**
+ * ベル（すず）。隊長がふれると鳴り、つながったとびら(doorId)が開いたままになる。
+ * 「たかい ところで ならす → ひくい ところの とびらが あく」という離れた因果を作る。
+ */
+export type BellDefinition = {
+  id: string
+  x: number
+  y: number
+  doorId: string
+}
+
+/**
+ * ベルで開くさく状のとびら。水は通し、浮遊物だけをふさぐ（水域は分けない）。
+ * 開くときはゲートと同じく下から上へ引き上がり、途中の高さも当たり判定に使う。
+ */
+export type DoorDefinition = Rect & {
+  id: string
+}
+
+/**
+ * くじら。タップすると しおふき が起き、真上の柱(x±halfWidth)で水に浮いている隊長を
+ * 真上へ打ち上げる。打ち上げ中は carryVx で横へ進み続け、壁の上をこえて向こうへ着水する。
+ * 水位が低いと高さが足りず、壁ぞいに落ちてもどる（やり直せる）。
+ */
+export type WhaleDefinition = {
+  id: string
+  /** くじらの体の中心（水そうの底の近く）。 */
+  x: number
+  y: number
+  /** 打ち上げる柱の半分の幅。 */
+  halfWidth: number
+  /** 打ち上げの上向き初速（負の値）。 */
+  launchVy: number
+  /** 打ち上げ中に保つ横向きの速さ。 */
+  carryVx: number
+}
+
+/**
+ * すべりだい（チューブ）。隊長の中心が入口(entry)へ入ると、path に沿って自動ですべり、
+ * 出口から exitVx / exitVy で飛び出して着水する。仲間も同じ道すじをたどる。
+ */
+export type SlideDefinition = {
+  id: string
+  entry: Rect
+  path: readonly { x: number; y: number }[]
+  exitVx: number
+  exitVy: number
+}
+
 export type StageDefinition = {
   id: string
   name: string
@@ -172,6 +224,10 @@ export type StageDefinition = {
   gate?: GateDefinition
   board?: BoardDefinition
   waterWheel?: WaterWheelDefinition
+  bells?: readonly BellDefinition[]
+  doors?: readonly DoorDefinition[]
+  whale?: WhaleDefinition
+  slide?: SlideDefinition
   /** 通常のゴール向きドリフト倍率。水門攻略面では0にして放水を主役にできる。 */
   ambientDriftScale?: number
   /** 水位を合わせる目印。答えを自動操作せず、止める高さを示す。 */

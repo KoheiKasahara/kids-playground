@@ -850,3 +850,131 @@
   .stageOptionIcon { font-size: 34px; min-height: 34px; }
   .stageOptionLabel { font-size: 15px; }
 }
+
+/* ---- 背景・水の演出 ---- */
+.sunGlow { transform-box: fill-box; transform-origin: center; animation: pukupukaSun 4s ease-in-out infinite; }
+.cloudDrift { animation: pukupukaCloud 9s ease-in-out infinite alternate; }
+.cloudDriftSlow { animation: pukupukaCloud 13s ease-in-out infinite alternate-reverse; }
+.caustics { animation: pukupukaCaustics 5s linear infinite; }
+.lightRay { animation: pukupukaRay 3.6s ease-in-out infinite; }
+.starTwinkle { transform-box: fill-box; transform-origin: center; animation: pukupukaStar 1.6s ease-in-out infinite; }
+@keyframes pukupukaSun { 50% { transform: scale(1.12); opacity: 0.85; } }
+@keyframes pukupukaCloud { from { transform: translateX(-3px); } to { transform: translateX(3px); } }
+@keyframes pukupukaCaustics { from { transform: translateX(0); } to { transform: translateX(24px); } }
+@keyframes pukupukaRay { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@keyframes pukupukaStar { 0%, 100% { transform: scale(0.92) rotate(-6deg); } 50% { transform: scale(1.08) rotate(6deg); } }
+
+/* ---- なかま ---- */
+.floaterFly { transform-box: fill-box; transform-origin: center; animation: pukupukaFly 500ms ease-in-out infinite alternate; }
+.floaterCheer { transform-box: fill-box; transform-origin: 50% 100%; animation: pukupukaCheer 700ms ease-in-out infinite alternate; }
+.joinPop { transform-box: fill-box; transform-origin: 50% 100%; animation: pukupukaJoinPop 520ms cubic-bezier(0.3, 1.6, 0.5, 1) 1; }
+.waitingFriend { transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes pukupukaFly { from { transform: rotate(-10deg); } to { transform: rotate(10deg); } }
+@keyframes pukupukaCheer { from { transform: translateY(0) scale(1, 1); } to { transform: translateY(-2.5px) scale(0.96, 1.05); } }
+@keyframes pukupukaJoinPop { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-5px) scale(1.25); } 100% { transform: translateY(0) scale(1); } }
+
+/* ---- ベル・さく ---- */
+.bellIdle { transform-box: view-box; transform-origin: 0 -4.3px; animation: pukupukaBellIdle 2.2s ease-in-out infinite; }
+.bellSwing { transform-box: view-box; transform-origin: 0 -4.3px; animation: pukupukaBellSwing 900ms ease-out 2; }
+.bellHint { transform-box: fill-box; transform-origin: center; animation: pukupukaHintPulse 1.4s ease-in-out infinite; }
+.bellWaves { animation: pukupukaFadeOut 1.2s ease-out 1 forwards; }
+@keyframes pukupukaBellIdle { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes pukupukaBellSwing { 0% { transform: rotate(0); } 20% { transform: rotate(-28deg); } 45% { transform: rotate(22deg); } 70% { transform: rotate(-12deg); } 100% { transform: rotate(0); } }
+@keyframes pukupukaHintPulse { 0%, 100% { transform: scale(0.92); opacity: 0.5; } 50% { transform: scale(1.1); opacity: 1; } }
+@keyframes pukupukaFadeOut { to { opacity: 0; } }
+
+/* ---- くじら ---- */
+.whaleIdle { animation: pukupukaWhaleIdle 2.8s ease-in-out infinite; }
+.whaleBlow { animation: pukupukaWhaleBlow 300ms ease-in-out infinite alternate; }
+.whaleJet { animation: pukupukaJetIn 200ms ease-out 1; }
+.whaleJetStreak { animation: pukupukaStreamUp 300ms linear infinite; }
+.whaleDrops { animation: pukupukaDrops 500ms ease-in-out infinite alternate; }
+.whaleReady { transform-box: fill-box; transform-origin: center; animation: pukupukaHintPulse 900ms ease-in-out infinite; }
+@keyframes pukupukaWhaleIdle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
+@keyframes pukupukaWhaleBlow { from { transform: translateY(0) scale(1); } to { transform: translateY(0.6px) scale(1.04, 0.96); } }
+@keyframes pukupukaJetIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pukupukaStreamUp { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 7; } }
+@keyframes pukupukaDrops { from { transform: translateY(0); } to { transform: translateY(-2px); } }
+.whaleHit {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.whaleHit:disabled { cursor: default; }
+.whaleHit:focus-visible { outline: 3px solid #1c7ed6; outline-offset: 2px; border-radius: var(--radius-md); }
+
+/* ---- すべりだい ---- */
+.slideStream { animation: pukupukaSlideStream 1.2s linear infinite; }
+.slideStreamFast { animation: pukupukaSlideStream 400ms linear infinite; }
+@keyframes pukupukaSlideStream { from { stroke-dashoffset: 9; } to { stroke-dashoffset: 0; } }
+
+/* ---- 一度だけの演出 ---- */
+.fxRing { transform-box: fill-box; transform-origin: center; animation: pukupukaFxRing 700ms ease-out 1 forwards; }
+.fxFloat { animation: pukupukaFxMove 850ms ease-out 1 both; }
+.fxDrop { animation: pukupukaFxMove 620ms cubic-bezier(0.2, 0.7, 0.4, 1) 1 both; }
+@keyframes pukupukaFxRing { from { transform: scale(0.3); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+@keyframes pukupukaFxMove { 0% { transform: translate(0, 0) scale(0.4); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; } }
+
+/* ---- じゃぐち・ゴール ---- */
+.faucetHint { transform-box: fill-box; transform-origin: center; animation: pukupukaHintPulse 1.6s ease-in-out infinite; }
+.goalFlag { transform-box: fill-box; transform-origin: 100% 100%; }
+.goalFlagCleared { transform-box: fill-box; transform-origin: 100% 100%; animation: pukupukaFlagWave 500ms ease-in-out 4 alternate; }
+@keyframes pukupukaFlagWave { from { transform: skewY(0); } to { transform: skewY(-6deg); } }
+
+/* ---- 上部の なかま表示と、できごとのお知らせ ---- */
+.friendChip { position: relative; display: inline-grid; place-items: center; width: 34px; height: 32px; padding: 0; border: 2px solid #d7e9e3; filter: grayscale(0.85) opacity(0.75); }
+.friendChip.rescuedFriend { border-color: #69db7c; filter: none; }
+.friendIcon { width: 30px; height: 26px; overflow: visible; }
+.friendCheck { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #2f9e44; color: #fff; font-size: 11px; font-weight: 900; line-height: 1; }
+.toast {
+  position: absolute;
+  top: 46px;
+  left: 50%;
+  z-index: 2;
+  max-width: 86%;
+  padding: 6px 14px;
+  border: 2px solid #ffd43b;
+  border-radius: var(--radius-round);
+  color: #b35c00;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 3px 0 #f0c14b66;
+  font-size: clamp(14px, 4vw, 19px);
+  font-weight: 900;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: pukupukaToast 1800ms ease-out 1 forwards;
+}
+@keyframes pukupukaToast {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.8); }
+  12% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.05); }
+  20% { transform: translateX(-50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .toast { top: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sunGlow, .cloudDrift, .cloudDriftSlow, .caustics, .lightRay, .starTwinkle,
+  .floaterFly, .floaterCheer, .joinPop, .bellIdle, .bellSwing, .bellHint, .bellWaves,
+  .whaleIdle, .whaleBlow, .whaleJet, .whaleJetStreak, .whaleDrops, .whaleReady,
+  .slideStream, .slideStreamFast, .fxRing, .fxFloat, .fxDrop, .faucetHint, .goalFlagCleared, .toast {
+    animation: none;
+  }
+  .fxRing, .fxFloat, .fxDrop { opacity: 0; }
+  .toast { transform: translateX(-50%); }
+}
+
+/* ---- ステージ選択: 助ける仲間の顔ぶれ ---- */
+.hiddenDefs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.stageFriends { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; min-height: 22px; }
+.stageFriends .friendIcon { width: 24px; height: 21px; }

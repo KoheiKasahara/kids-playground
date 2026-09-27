@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { applyWave, createInitialState, FIXED_STEP_MS, stepGame, toggleDrain, toggleGate, type PukupukaGameState } from './pukupukaGame'
-import { PUKUPUKA_STAGES } from './stageDefinitions'
+import { findPukupukaStage, PUKUPUKA_STAGES } from './stageDefinitions'
 import type { StageDefinition } from './types'
 
 function run(stage: StageDefinition, state: PukupukaGameState, frames = 60) {
@@ -39,7 +39,7 @@ describe('波で運ぶレスキュー', () => {
     expect(applyWave(pool, cleared, 36, 80)).toBe(cleared)
   })
   test('閉じた水門を波の連打で通り抜けず、向こうの水域へ力を伝えない', () => {
-    const stage = PUKUPUKA_STAGES[2]
+    const stage = findPukupukaStage('open-the-gate')!
     let state = createInitialState(stage)
     for (let i = 0; i < 300; i++) state = stepGame(stage, state, FIXED_STEP_MS, 'fill').state
     for (let i = 0; i < 300; i++) {
@@ -60,16 +60,24 @@ describe('波で運ぶレスキュー', () => {
     expect(result.goalReached).toBe(true)
     expect(result.state.collectedStarIds).toHaveLength(0)
   })
-  test('1人ずつ救助して固定し、後の排水・逆向きの波でも取り消さない', () => {
+  test('ふれた仲間は隊長の後ろについてきて、排水や逆向きの波でも仲間のまま', () => {
     const stage = { ...pool, floaters: [...pool.floaters, { id: 'bear', kind: 'ringBear' as const, radius: 7, startX: 20, startY: 74 }], goal: { ...pool.goal, floaterIds: ['duck', 'bear'] } }
-    const initial = createInitialState(stage)
-    let state = run(stage, { ...initial, floaters: initial.floaters.map((item) => item.id === 'duck' ? { ...item, x: 90 } : item) }, 1)
-    expect(state.phase).toBe('playing')
-    expect(state.rescuedIds).toEqual(['duck'])
-    const saved = state.floaters[0]
+    let state = run(stage, createInitialState(stage), 60)
+    // 隊長が遠いうちは、くまはその場で待つ。隊長だけゴールへ運んでもクリアしない。
+    expect(state.rescuedIds).toEqual([])
+    expect(state.floaters[1].x).toBe(20)
+    const alone = stepGame(stage, { ...state, floaters: state.floaters.map((item) => item.id === 'duck' ? { ...item, x: 90, y: 75 } : item) }, FIXED_STEP_MS)
+    expect(alone.goalReached).toBe(false)
+    // 隊長がとなりまで行くと仲間になり、隊長の後ろへ並ぶ。
+    state = run(stage, { ...state, floaters: state.floaters.map((item) => item.id === 'duck' ? { ...item, x: 34 } : item) }, 30)
+    expect(state.rescuedIds).toEqual(['bear'])
+    const [duck, bear] = state.floaters
+    expect(Math.abs(bear.x - duck.x)).toBeGreaterThan(8 + 7)
+    expect(Math.abs(bear.x - duck.x)).toBeLessThan(8 + 7 + 3)
+    // 排水しても、逆向きの波を起こしても仲間のまま。
     state = run(stage, applyWave(stage, toggleDrain(state), 97, 80), 120)
-    expect(state.floaters[0]).toEqual(saved)
-    state = { ...state, floaters: state.floaters.map((item) => item.id === 'bear' ? { ...item, x: 90, y: 75 } : item) }
+    expect(state.rescuedIds).toEqual(['bear'])
+    state = { ...state, floaters: state.floaters.map((item) => item.id === 'duck' ? { ...item, x: 90, y: 75, vx: 0, vy: 0 } : item) }
     const result = stepGame(stage, state, FIXED_STEP_MS)
     expect(result.goalReached).toBe(true)
     expect(stepGame(stage, result.state, FIXED_STEP_MS).goalReached).toBe(false)
