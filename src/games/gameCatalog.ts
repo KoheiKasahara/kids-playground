@@ -993,6 +993,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'jishaku-pitatto',
+    slug: 'jishaku-pitatto',
+    title: 'ぴたっと じしゃく',
+    emoji: '🧲',
+    category: 'learning',
+    seo: {
+      headline: 'ぴたっと じしゃく｜じしゃくで てつを あつめる 幼児向け ものしりゲーム',
+      description:
+        'U字の じしゃくを ゆびで うごかして、クリップや くぎ・さかなの くちの わ など、てつで できた ものを ぴたっと くっつける あそび。つくえ・すなば・うみの なかで、くっつく もの と くっつかない ものを たしかめよう。',
+    },
+    intro: {
+      howToPlay: [
+        'ゆびで じしゃくを うごかそう。てつの ものが ぴたっと くっつくよ',
+        'えんぴつや ゴムは くっつかない。なにが くっつくか ためしてみよう',
+        'すなの なかや うみの なかにも てつが かくれているよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
