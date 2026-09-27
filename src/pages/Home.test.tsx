@@ -15,7 +15,7 @@ describe('Home', () => {
     )
     const links = screen.getAllByRole('link')
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
-    expect(links.slice(-13).map((link) => link.getAttribute('href'))).toEqual(
+    expect(links.slice(-14).map((link) => link.getAttribute('href'))).toEqual(
       [
         'putter-golf',
         'shinkeisuijaku',
@@ -30,6 +30,7 @@ describe('Home', () => {
         'pixel-kart',
         'tsumiki-3d',
         'dot-run',
+        'jishaku-pitatto',
       ].map(gameRoutePath),
     )
   })
