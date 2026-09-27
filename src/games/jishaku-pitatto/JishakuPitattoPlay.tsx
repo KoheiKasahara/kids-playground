@@ -11,7 +11,7 @@ import {
   autoPilot, createWorld, disposeWorld, drainEvents, setMagnetTarget, stepWorld, worldResult, worldSize,
   type Result, type World,
 } from './world'
-import { Painter, createFx, itemIcon, makeView, screenToWorld, spawnFx, updateFx, type View } from './render'
+import { Painter, createFx, itemIcon, makeView, screenToWorld, snapshotMagnet, spawnFx, updateFx, type View } from './render'
 import { progressStore, readMusic, writeMusic } from './progress'
 import * as sfx from './sounds'
 import styles from './JishakuPitattoPlay.module.css'
@@ -48,7 +48,7 @@ function ItemIcon({ kind, variant = 0, className }: { kind: KindId; variant?: nu
 
 function fitCanvas(canvas: HTMLCanvasElement, world: { w: number; h: number }): View {
   const box = canvas.getBoundingClientRect()
-  const dpr = Math.min(2.5, window.devicePixelRatio || 1)
+  const dpr = Math.min(2, window.devicePixelRatio || 1)
   const cssW = box.width || window.innerWidth || 390
   const cssH = box.height || window.innerHeight || 700
   const w = Math.round(cssW * dpr), h = Math.round(cssH * dpr)
@@ -104,7 +104,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
   const [banner, setBanner] = useState(true)
   const [guide, setGuide] = useState(index === 0)
   const [cleared, setCleared] = useState(false)
-  const [result, setResult] = useState<(Result & { best: boolean }) | null>(null)
+  const [result, setResult] = useState<(Result & { best: boolean; photo: string | null; count: number; sand: number }) | null>(null)
 
   useEffect(() => {
     if (!music || result) return undefined
@@ -159,6 +159,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
           for (const k of keysRef.current) { const d = KEY_DIRS[k]; if (d) { dx += d[0]; dy += d[1] } }
           setMagnetTarget(world, m.tx + dx * 5, m.ty + dy * 5)
         }
+        if (import.meta.env.DEV && (window as unknown as { __jishakuAuto?: boolean }).__jishakuAuto) autoPilot(world)
         stepWorld(world)
         updateFx(fx, world, 1 / 60)
         time += 1 / 60
@@ -193,7 +194,12 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
               const res = worldResult(world)
               const before = progressStore.read()[stage.id] ?? 0
               progressStore.record(stage.id, res.stars)
-              setResult({ ...res, best: res.stars > before })
+              setResult({
+                ...res, best: res.stars > before,
+                photo: ctx ? snapshotMagnet(world, time) : null,
+                count: world.stuckOrder.length,
+                sand: world.sand?.stuck ?? 0,
+              })
             }, 2300))
             restAt = time + 9
             break
@@ -305,25 +311,33 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
     {cleared && !result && <p className={styles.cheer} role="status">ぜんぶ くっついた！</p>}
     {result && <div className={styles.overlay}>
       <div className={styles.resultCard} role="dialog" aria-label="クリア">
-        <h2>ぜんぶ くっついた！</h2>
-        <p className={styles.resultStars} role="img" aria-label={`ほし ${result.stars}こ`}>
-          {[0, 1, 2].map((i) => <span key={i} className={i < result.stars ? styles.bigStarOn : styles.bigStarOff} style={{ animationDelay: `${0.25 + i * 0.22}s` }} aria-hidden="true">★</span>)}
-        </p>
-        {result.best && <p className={styles.best}>あたらしい きろく！</p>}
-        <section className={styles.sortBox} aria-label="じしゃくに くっついた もの">
-          <h3><span className={styles.sortMark} aria-hidden="true">🧲</span> くっついた</h3>
-          <ul>{result.stuckKinds.map((k) => <li key={k}><ItemIcon kind={k} className={styles.sortIcon} /><span>{KINDS[k].name}</span></li>)}</ul>
-        </section>
-        <section className={`${styles.sortBox} ${styles.sortNo}`} aria-label="くっつかなかった もの">
-          <h3><span className={styles.sortMark} aria-hidden="true">✕</span> くっつかない</h3>
-          <ul>{result.otherKinds.map((k) => <li key={k}><ItemIcon kind={k} className={styles.sortIcon} /><span>{KINDS[k].name}</span></li>)}</ul>
-        </section>
-        <p className={styles.tip}>{TIPS[stage.id]}</p>
-        {result.starsGot < result.starTotal && <p className={styles.tip}>ほしバッジが まだ かくれているよ（{result.starsGot} / {result.starTotal}）</p>}
-        <div className={styles.cardButtons}>
-          <button type="button" onClick={onExit}>ステージを えらぶ</button>
-          <button type="button" onClick={onRetry}>もういちど</button>
-          {!last && <button type="button" className={styles.primary} autoFocus onClick={onNext}>つぎへ →</button>}
+        <div className={styles.resultMain}>
+          <h2>ぜんぶ くっついた！</h2>
+          <p className={styles.resultStars} role="img" aria-label={`ほし ${result.stars}こ`}>
+            {[0, 1, 2].map((i) => <span key={i} className={i < result.stars ? styles.bigStarOn : styles.bigStarOff} style={{ animationDelay: `${0.25 + i * 0.22}s` }} aria-hidden="true">★</span>)}
+          </p>
+          {result.best && <p className={styles.best}>あたらしい きろく！</p>}
+          {result.photo && <figure className={styles.photo}>
+            <img src={result.photo} alt={`じしゃくに ${result.count}こ くっついた しゃしん`} />
+            <figcaption>{result.count}こ ぴたっ！{result.sand > 20 ? ' さてつも いっぱい' : ''}</figcaption>
+          </figure>}
+        </div>
+        <div className={styles.resultInfo}>
+          <section className={styles.sortBox} aria-label="じしゃくに くっついた もの">
+            <h3><span className={styles.sortMark} aria-hidden="true">🧲</span> くっついた</h3>
+            <ul>{result.stuckKinds.map((k) => <li key={k}><ItemIcon kind={k} className={styles.sortIcon} /><span>{KINDS[k].name}</span></li>)}</ul>
+          </section>
+          <section className={`${styles.sortBox} ${styles.sortNo}`} aria-label="くっつかなかった もの">
+            <h3><span className={styles.sortMark} aria-hidden="true">✕</span> くっつかない</h3>
+            <ul>{result.otherKinds.map((k) => <li key={k}><ItemIcon kind={k} className={styles.sortIcon} /><span>{KINDS[k].name}</span></li>)}</ul>
+          </section>
+          <p className={styles.tip}>{TIPS[stage.id]}</p>
+          {result.starsGot < result.starTotal && <p className={styles.tip}>ほしバッジが まだ かくれているよ（{result.starsGot} / {result.starTotal}）</p>}
+          <div className={styles.cardButtons}>
+            <button type="button" onClick={onExit}>ステージを えらぶ</button>
+            <button type="button" onClick={onRetry}>もういちど</button>
+            {!last && <button type="button" className={styles.primary} autoFocus onClick={onNext}>つぎへ →</button>}
+          </div>
         </div>
       </div>
     </div>}

@@ -349,6 +349,14 @@
   to { opacity: 1; transform: none; }
 }
 
+.resultMain,
+.resultInfo {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
 .resultCard h2 {
   margin: 0;
   font-size: clamp(24px, 6.6vw, 32px);
@@ -359,7 +367,7 @@
   display: flex;
   gap: 6px;
   margin: 0;
-  font-size: 46px;
+  font-size: 42px;
   line-height: 1;
 }
 
@@ -385,6 +393,37 @@
   color: #fff;
   font-size: 15px;
   font-weight: 900;
+}
+
+.photo {
+  position: relative;
+  width: min(100%, 220px);
+  margin: 0;
+  padding: 6px 6px 0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 3px 0 rgb(59 42 74 / 18%), 0 8px 18px rgb(59 42 74 / 16%);
+  transform: rotate(-2deg);
+  animation: photoIn .7s cubic-bezier(.2, 1.5, .4, 1) .2s both;
+}
+
+.photo img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 240 / 190;
+  border-radius: 6px;
+}
+
+.photo figcaption {
+  padding: 4px 0 6px;
+  font-size: 15px;
+  font-weight: 900;
+  color: #ff4d6d;
+}
+
+@keyframes photoIn {
+  from { opacity: 0; transform: rotate(-12deg) scale(.6); }
+  to { opacity: 1; transform: rotate(-2deg); }
 }
 
 .sortBox {
@@ -689,6 +728,19 @@
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
+  .resultCard {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: center;
+    width: min(100%, 720px);
+    column-gap: 14px;
+    padding: 12px 14px;
+  }
+  .resultCard h2 { font-size: 22px; }
+  .resultStars { font-size: 32px; }
+  .photo { width: min(100%, 190px); }
+  .sortBox { padding: 6px 8px 8px; }
+  .sortIcon { width: 30px; height: 30px; }
+  .cardButtons button { min-height: 46px; padding: 6px 12px; font-size: 15px; }
   .titleInner { padding-top: calc(var(--safe-top) + 10px); gap: 8px; }
   .logo h1 { font-size: clamp(30px, 7vh, 44px); }
   .logoSub { margin-bottom: 4px; }
@@ -706,7 +758,8 @@
   .chipDone,
   .starOn,
   .bigStarOn,
-  .bigStarOff {
+  .bigStarOff,
+  .photo {
     animation: none;
   }
 }

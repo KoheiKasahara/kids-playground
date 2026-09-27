@@ -86,6 +86,8 @@ export type Stuck = {
   children: number
   /** ポールに くっついた ときの ふちの いち（ならべる ため）。 */
   s: number
+  /** くっついた じこく。 */
+  at: number
 }
 
 export type SwimState = { cx: number; baseY: number; range: number; speed: number; phase: number; jelly: boolean }
@@ -604,6 +606,11 @@ export function stepWorld(world: World): void {
   if (world.phase === 'play' && remainingTargets(world) === 0) {
     world.phase = 'clear'
     world.events.push({ type: 'clear' })
+    // やったー！ と ゆらゆら。
+    world.magnet.mood = 'happy'
+    world.magnet.moodT = 3.2
+    world.magnet.tiltV += 5
+    world.magnet.jolt = 1
   }
 }
 
@@ -906,7 +913,7 @@ function attach(world: World, it: Item, hit: Hit) {
   const oldX = it.x, oldY = it.y
   it.stuck = {
     parent, anchor, normal, contact, rod0, len, phi, phiV,
-    p1: { ...anchorW }, p2: { ...anchorW }, acc: { x: 0, y: 0 }, depth, children: 0, s,
+    p1: { ...anchorW }, p2: { ...anchorW }, acc: { x: 0, y: 0 }, depth, children: 0, s, at: world.time,
   }
   it.x = anchorW.x + Math.cos(phi) * len
   it.y = anchorW.y + Math.sin(phi) * len
@@ -945,19 +952,23 @@ function updateStuck(world: World) {
     st.p2.x = st.p1.x; st.p2.y = st.p1.y
     st.p1.x = ax; st.p1.y = ay
     const wet = world.waterY !== null && ay > surfaceY(world, ax)
-    const g = wet ? G * Math.max(0.12, 1 - it.kind.buoyancy) : G
+    // みずの なかでは かるく なる（つれた さかなは くちで ぶらさがって みえるように すこし おもめ）。
+    const g = wet ? G * Math.max(it.kind.id === 'fish' ? 0.45 : 0.12, 1 - it.kind.buoyancy) : G
     const leff = Math.max(st.len, 9)
     const normalW = pf.angle + st.normal
     const tx = -Math.sin(st.phi), ty = Math.cos(st.phi)
     let alpha = ((0 - st.acc.x) * tx + (g - st.acc.y) * ty) / leff
-    alpha += angleDiff(normalW, st.phi) * (0.55 * G / leff)
+    // じしゃくの ちからで そとむきに はりつこうと する（さかなは くちだけ なので ぶらんと さがる）。
+    const stiff = it.kind.id === 'fish' ? 0.04 : it.kind.id === 'steelcan' ? 0.3 : 0.55
+    alpha += angleDiff(normalW, st.phi) * (stiff * G / leff)
     alpha -= st.phiV * (wet ? 7 : 2.6)
-    // さかなは つられても ぴちぴち。
-    if (it.kind.id === 'fish') alpha += Math.sin(world.time * 17 + it.id * 2) * 26 * Math.max(0, 1 - (world.time - world.lastStickAt) * 0.05)
+    // さかなは つられても しばらく ぴちぴち。
+    if (it.kind.id === 'fish') alpha += Math.sin(world.time * 17 + it.id * 2) * 26 * Math.max(0, 1 - (world.time - st.at) * 0.06)
     st.phiV += alpha * DT
     st.phi += st.phiV * DT
     const off = angleDiff(st.phi, normalW)
-    const lim = 1.3
+    // じしゃくには めりこまない。てつ どうしは ちいさいので ぐるっと たれさがっても よい。
+    const lim = st.parent < 0 ? 1.5 : 2.8
     if (Math.abs(off) > lim) {
       st.phi = normalW + Math.sign(off) * lim
       st.phiV *= -0.3

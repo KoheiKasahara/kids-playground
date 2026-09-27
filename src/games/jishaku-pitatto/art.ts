@@ -971,6 +971,12 @@ function uPath(g: G, half: number, height: number, arm: number) {
 
 /** U の じしゃく（ローカル: ポールの した まんなかが 0）。 */
 export function drawMagnet(g: G, face: Face) {
+  drawMagnetBody(g)
+  drawMagnetFace(g, face)
+}
+
+/** じしゃくの からだ（かおの ない ところ。かわらないので えを とっておける）。 */
+export function drawMagnetBody(g: G) {
   const half = MAGNET_HALF_W, height = MAGNET_H, arm = ARM_W
   const cy = -height + half
   // からだ（ひだり あか / みぎ あお）
@@ -1030,7 +1036,10 @@ export function drawMagnet(g: G, face: Face) {
   g.fillText('N', -half + arm / 2, -TIP_H - 13)
   g.fillText('S', half - arm / 2, -TIP_H - 13)
   g.restore()
-  drawFace(g, face, cy)
+}
+
+export function drawMagnetFace(g: G, face: Face) {
+  drawFace(g, face, -MAGNET_H + MAGNET_HALF_W)
 }
 
 function drawFace(g: G, face: Face, cy: number) {

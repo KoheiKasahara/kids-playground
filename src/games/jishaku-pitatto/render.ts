@@ -1,4 +1,4 @@
-import { FONT, INK, drawFish, drawItemArt, drawJelly, drawMagnet } from './art'
+import { FONT, INK, drawFish, drawItemArt, drawJelly, drawMagnetBody, drawMagnetFace } from './art'
 import { KINDS, shapePoints, shapeRadius, type KindId } from './items'
 import {
   ARM_W, MAGNET_H, MAGNET_HALF_W, TIP_H, floorAt, fromMagnet, shadowFloorAt, surfaceY,
@@ -839,6 +839,13 @@ function paintPropFront(g: G, p: PropBody) {
   }
 }
 
+function paintBack(g: G, world: World) {
+  if (world.stage.water) paintSeaBack(g, world)
+  else if (world.stage.sand) paintSandBack(g, world)
+  else paintDeskBack(g, world)
+  for (const p of world.props) paintPropBack(g, p)
+}
+
 // ---------------- えの ストック ----------------
 
 type Sprite = { canvas: Canvas; half: number; scale: number }
@@ -884,11 +891,7 @@ export class Painter {
       const canvas = makeCanvas(Math.round(this.world.w * px), Math.round(this.world.h * px))
       const g = ctx2d(canvas)
       g.setTransform(px, 0, 0, px, 0, 0)
-      const stage = this.world.stage
-      if (stage.water) paintSeaBack(g, this.world)
-      else if (stage.sand) paintSandBack(g, this.world)
-      else paintDeskBack(g, this.world)
-      for (const p of this.world.props) paintPropBack(g, p)
+      paintBack(g, this.world)
       this.bg = canvas
       this.bgKey = key
       return canvas
@@ -897,15 +900,23 @@ export class Painter {
     }
   }
 
-  draw(g: G, world: World, view: View, time: number, fx: Fx) {
+  /** direct = けしきを とっておかず その場で かく（しゃしん用。大きく ずーむ しても メモリを つかわない）。 */
+  draw(g: G, world: World, view: View, time: number, fx: Fx, direct = false) {
     this.world = world
     const px = view.scale * view.dpr
     g.setTransform(1, 0, 0, 1, 0, 0)
-    // よはくは けしきの はしの いろで うめる。
-    g.fillStyle = world.stage.water ? '#1d82c4' : world.stage.sand ? '#efcd8c' : '#b57440'
-    g.fillRect(0, 0, view.cssW * view.dpr, view.cssH * view.dpr)
-    const bg = this.background(view)
-    if (bg) g.drawImage(bg as CanvasImageSource, Math.round(view.ox * view.dpr), Math.round(view.oy * view.dpr))
+    // よはくは けしきの はしの いろで うめる（けしきが がめんを ぜんぶ おおう ときは いらない）。
+    if (direct || view.ox > 0.5 || view.oy > 0.5 || world.w * view.scale < view.cssW - 0.5 || world.h * view.scale < view.cssH - 0.5) {
+      g.fillStyle = world.stage.water ? '#1d82c4' : world.stage.sand ? '#efcd8c' : '#b57440'
+      g.fillRect(0, 0, view.cssW * view.dpr, view.cssH * view.dpr)
+    }
+    if (direct) {
+      g.setTransform(px, 0, 0, px, view.ox * view.dpr, view.oy * view.dpr)
+      paintBack(g, world)
+    } else {
+      const bg = this.background(view)
+      if (bg) g.drawImage(bg as CanvasImageSource, Math.round(view.ox * view.dpr), Math.round(view.oy * view.dpr))
+    }
     g.setTransform(px, 0, 0, px, view.ox * view.dpr, view.oy * view.dpr)
 
     if (world.waterY !== null) drawSeaBehind(g, world, time)
@@ -916,7 +927,7 @@ export class Painter {
     for (const p of world.props) paintPropFront(g, p)
     drawFieldLines(g, world, time)
     if (world.waterY !== null) drawLine(g, world)
-    drawMagnetBody(g, world, time)
+    this.drawMagnet(g, world, time, px)
     if (world.sand) drawStuckSand(g, world, time)
     for (const it of world.stuckOrder) this.drawItem(g, it, time, px)
     for (const it of world.items) if (it.star && it.state === 'body') {
@@ -964,6 +975,48 @@ export class Painter {
     }
   }
 
+  /** じしゃく（からだは とっておいた え、かおは まいコマ）。 */
+  private drawMagnet(g: G, world: World, time: number, px: number) {
+    const m = world.magnet
+    const blinkT = time % 3.6
+    const blink = blinkT < 0.14 ? Math.sin((blinkT / 0.14) * Math.PI) : 0
+    g.save()
+    g.translate(m.x, m.y)
+    g.rotate(m.tilt)
+    const j = m.jolt
+    g.scale(1 + j * 0.05, 1 - j * 0.06)
+    const body = this.magnetSprite(px)
+    const pad = 4
+    if (body) g.drawImage(body as CanvasImageSource, -MAGNET_HALF_W - pad, -MAGNET_H - pad, MAGNET_HALF_W * 2 + pad * 2, MAGNET_H + pad * 2)
+    else drawMagnetBody(g)
+    drawMagnetFace(g, {
+      mood: m.mood, blink, time,
+      lookX: clamp((m.lookX - m.x) / 90, -1, 1),
+      lookY: clamp((m.lookY - (m.y - MAGNET_H * 0.6)) / 90, -1, 1),
+    })
+    g.restore()
+  }
+
+  private magnetBody: Canvas | null = null
+  private magnetScale = 0
+
+  private magnetSprite(px: number): Canvas | null {
+    if (this.magnetBody && this.magnetScale === px) return this.magnetBody
+    try {
+      const pad = 4
+      const k = px * 1.1
+      const canvas = makeCanvas(Math.ceil((MAGNET_HALF_W * 2 + pad * 2) * k), Math.ceil((MAGNET_H + pad * 2) * k))
+      const g = ctx2d(canvas)
+      g.setTransform(k, 0, 0, k, (MAGNET_HALF_W + pad) * k, (MAGNET_H + pad) * k)
+      drawMagnetBody(g)
+      this.magnetBody = canvas
+      this.magnetScale = px
+      return canvas
+    } catch {
+      return null
+    }
+  }
+
   private drawItem(g: G, it: Item, time: number, px: number) {
     let x = it.x + it.snapX, y = it.y + it.snapY, angle = it.angle
     // もうすこしで とびつく ときの ぷるぷる・ぴょこぴょこ。
@@ -972,6 +1025,21 @@ export class Painter {
       x += Math.sin(time * 58 + it.id * 3) * 1.4 * k
       y -= Math.abs(Math.sin(time * 16 + it.id)) * 2.6 * k * k
       angle += Math.sin(time * 43 + it.id) * 0.08 * k
+    }
+    // じしゃくへ とんでいく ときの すばやい のこりかげ。
+    const v = it.state === 'body' && it.kind.magnetic && it.body ? it.body.velocity : null
+    if (v && v.x * v.x + v.y * v.y > 16 && it.kind.id !== 'fish') {
+      const sp = this.sprite(it.kind.id, it.variant, px)
+      if (sp) {
+        for (let k = 3; k >= 1; k--) {
+          g.save()
+          g.globalAlpha = 0.22 / k
+          g.translate(x - v.x * k * 0.8, y - v.y * k * 0.8)
+          g.rotate(angle)
+          g.drawImage(sp.canvas as CanvasImageSource, -sp.half, -sp.half, sp.half * 2, sp.half * 2)
+          g.restore()
+        }
+      }
     }
     g.save()
     g.translate(x, y)
@@ -1101,23 +1169,6 @@ function drawFieldLines(g: G, world: World, time: number) {
   g.restore()
 }
 
-function drawMagnetBody(g: G, world: World, time: number) {
-  const m = world.magnet
-  const blinkT = time % 3.6
-  const blink = blinkT < 0.14 ? Math.sin((blinkT / 0.14) * Math.PI) : 0
-  g.save()
-  g.translate(m.x, m.y)
-  g.rotate(m.tilt)
-  const j = m.jolt
-  g.scale(1 + j * 0.05, 1 - j * 0.06)
-  drawMagnet(g, {
-    mood: m.mood, blink, time,
-    lookX: clamp((m.lookX - m.x) / 90, -1, 1),
-    lookY: clamp((m.lookY - (m.y - MAGNET_H * 0.6)) / 90, -1, 1),
-  })
-  g.restore()
-}
-
 function drawLine(g: G, world: World) {
   // つりいと（うえから じしゃくの てっぺんへ）。
   const m = world.magnet
@@ -1140,11 +1191,10 @@ function drawSeaBehind(g: G, world: World, time: number) {
   const { w, groundY } = world
   // ひかりの すじ
   g.save()
-  g.globalCompositeOperation = 'lighter'
   for (let i = 0; i < 5; i++) {
     const x = ((i + 0.5) / 5) * w + Math.sin(time * 0.3 + i * 1.7) * 30
     const sway = Math.sin(time * 0.4 + i) * 40
-    g.fillStyle = lin(g, 0, wy, 0, groundY, [[0, 'rgba(255,255,255,.13)'], [1, 'rgba(255,255,255,0)']])
+    g.fillStyle = lin(g, 0, wy, 0, groundY, [[0, 'rgba(255,255,255,.16)'], [1, 'rgba(255,255,255,0)']])
     g.beginPath()
     g.moveTo(x - 14, wy)
     g.lineTo(x + 14, wy)
@@ -1190,15 +1240,7 @@ function drawWeed(g: G, x: number, base: number, hgt: number, time: number, i: n
 }
 
 function drawSeaFront(g: G, world: World, time: number) {
-  const { w, h } = world
-  // みずの なかを すこし あおく
-  g.fillStyle = 'rgba(30,140,210,.1)'
-  g.beginPath()
-  g.moveTo(0, h)
-  for (let x = 0; x <= w + 8; x += 8) g.lineTo(x, surfaceY(world, x, time))
-  g.lineTo(w, h)
-  g.closePath()
-  g.fill()
+  const { w } = world
   // みずの おもて
   g.beginPath()
   for (let x = 0; x <= w + 8; x += 8) {
@@ -1242,3 +1284,31 @@ function kindPoints(kind: KindId) {
   return shapePoints(KINDS[kind].shape)
 }
 
+/** じしゃくと くっついた もの を おおきく うつした しゃしん（けっか がめん用）。 */
+export function snapshotMagnet(world: World, time: number, w = 240, h = 190, dpr = 2): string | null {
+  try {
+    const m = world.magnet
+    let x0 = m.x - MAGNET_HALF_W - 8, x1 = m.x + MAGNET_HALF_W + 8
+    let y0 = m.y - MAGNET_H - 10, y1 = m.y + 12
+    for (const it of world.stuckOrder) {
+      const r = shapeRadius(it.kind.shape) + 6
+      x0 = Math.min(x0, it.x - r)
+      x1 = Math.max(x1, it.x + r)
+      y0 = Math.min(y0, it.y - r)
+      y1 = Math.max(y1, it.y + r)
+    }
+    if (world.sand && world.sand.stuck > 0) y1 = Math.max(y1, m.y + 26)
+    const scale = Math.min(w / (x1 - x0), h / (y1 - y0), 2.8)
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+    const canvas = document.createElement('canvas')
+    canvas.width = w * dpr
+    canvas.height = h * dpr
+    const g = canvas.getContext('2d')
+    if (!g) return null
+    const view: View = { cssW: w, cssH: h, dpr, scale, ox: w / 2 - cx * scale, oy: h / 2 - cy * scale }
+    new Painter(world).draw(g, world, view, time, createFx(), true)
+    return canvas.toDataURL('image/png')
+  } catch {
+    return null
+  }
+}
