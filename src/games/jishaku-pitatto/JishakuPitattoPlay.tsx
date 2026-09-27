@@ -8,7 +8,7 @@ import { vibrate } from '../../utils/haptics'
 import { KINDS, type KindId } from './items'
 import { STAGES } from './stages'
 import {
-  autoPilot, createWorld, disposeWorld, drainEvents, setMagnetTarget, stepWorld, worldResult, worldSize,
+  autoPilot, carryOver, createWorld, disposeWorld, drainEvents, setMagnetTarget, stepWorld, worldResult, worldSize,
   type Result, type World,
 } from './world'
 import { Painter, createFx, itemIcon, makeView, screenToWorld, snapshotMagnet, spawnFx, updateFx, type View } from './render'
@@ -113,17 +113,34 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
 
   useEffect(() => {
     const canvas = canvasRef.current
-    const world = createWorld(stage, initialSize(canvas))
-    worldRef.current = world
-    // 開発中だけ ブラウザから じょうたいを のぞけるように する（本番の ビルドには はいらない）。
-    if (import.meta.env.DEV) (window as unknown as { __jishakuWorld?: World }).__jishakuWorld = world
+    let world = createWorld(stage, initialSize(canvas))
+    const expose = () => {
+      worldRef.current = world
+      // 開発中だけ ブラウザから じょうたいを のぞけるように する（本番の ビルドには はいらない）。
+      if (import.meta.env.DEV) (window as unknown as { __jishakuWorld?: World }).__jishakuWorld = world
+    }
+    expose()
     setHud(hudFrom(world))
     const ctx = canvas?.getContext('2d') ?? null
-    const painter = new Painter(world)
-    const fx = createFx()
+    let painter = new Painter(world)
+    let fx = createFx()
     const still = reducedMotion()
+    let done = false
     const measure = () => {
       if (!canvas) return
+      // たて↔よこ に まわしたら、その むきに あう 大きさの せかいへ うつす（くっついた ものは そのまま）。
+      const ideal = initialSize(canvas)
+      const ratio = (ideal.w / ideal.h) / (world.w / world.h)
+      if (!done && (ratio > 1.3 || ratio < 1 / 1.3)) {
+        const next = createWorld(stage, ideal)
+        carryOver(world, next)
+        disposeWorld(world)
+        world = next
+        painter = new Painter(world)
+        fx = createFx()
+        expose()
+        setHud(hudFrom(world))
+      }
       const view = fitCanvas(canvas, world)
       viewRef.current = view
       // うえの ボタンや あつめる もの の したまでを じしゃくの うごける ところに する。
@@ -185,6 +202,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
           case 'grains': sfx.playGrains(e.n); break
           case 'hooked': sfx.playHooked(); break
           case 'clear': {
+            done = true
             sfx.playClear()
             vibrate('celebrate')
             setCleared(true)

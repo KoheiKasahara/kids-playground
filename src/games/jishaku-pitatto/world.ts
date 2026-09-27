@@ -1166,3 +1166,44 @@ export function shadowFloorAt(world: World, x: number): number {
   const f = world.shadowFloor
   return f[clamp(Math.round(x / FLOOR_RES), 0, f.length - 1)]
 }
+
+/**
+ * がめんを たて↔よこ に まわした ときに、あたらしい 大きさの せかいへ うつす。
+ * くっついていた もの と さてつは そのまま じしゃくに くっつけなおす（ほかの ものは さいしょの ばしょ）。
+ */
+export function carryOver(from: World, to: World): void {
+  const m = to.magnet
+  from.stuckOrder.forEach((old, k) => {
+    const it = to.items[old.id]
+    if (!it || it.state === 'stuck' || !it.kind.magnetic) return
+    const pole = k % 2
+    const tip = POLE_TIPS[pole]
+    const s = TIP_H + ARM_W / 2
+    const p = tipPoint(tip, s)
+    const anchorW = fromMagnet(m, p.x, p.y)
+    it.x = anchorW.x
+    it.y = anchorW.y + 12
+    it.swim = null
+    if (!it.body) {
+      it.body = makeBody(it.kind, it.x, it.y, it.angle)
+      to.bodyItem.set(it.body.id, it)
+      Matter.Composite.add(to.engine.world, it.body)
+    } else {
+      Matter.Body.setPosition(it.body, { x: it.x, y: it.y })
+    }
+    it.state = 'body'
+    attach(to, it, { d: 0, parent: -1 - pole, hotLocal: it.kind.hot[0], anchorW, s })
+    it.snapX = it.snapY = 0
+  })
+  if (from.sand && to.sand && from.sand.n === to.sand.n) {
+    to.sand.st.set(from.sand.st.map((st) => (st === 1 ? 0 : st)))
+    to.sand.spike.set(from.sand.spike)
+    to.sand.slot.set(from.sand.slot)
+    from.sand.spikes.forEach((sp, i) => { to.sand!.spikes[i].count = sp.count })
+    to.sand.stuck = from.sand.stuck
+  }
+  if (from.phase === 'clear') to.phase = 'clear'
+  to.events.length = 0
+  to.combo = 0
+  m.jolt = 0
+}

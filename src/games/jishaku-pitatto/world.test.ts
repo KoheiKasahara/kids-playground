@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { KINDS } from './items'
 import { STAGES, findStage, type StageDef } from './stages'
 import {
-  MAGNET_HALF_W, autoPilot, createWorld, disposeWorld, drainEvents, fieldAt, floorAt, remainingTargets, setMagnetTarget,
+  MAGNET_HALF_W, autoPilot, carryOver, createWorld, disposeWorld, drainEvents, fieldAt, floorAt, remainingTargets, setMagnetTarget,
   stepWorld, worldResult, worldSize, type World, type WorldEvent,
 } from './world'
 
@@ -146,6 +146,24 @@ describe('ステージの しかけ', () => {
     expect(events.some((e) => e.type === 'hooked' && e.id === fish.id)).toBe(true)
     expect(fish.state).toBe('stuck')
     disposeWorld(world)
+  })
+})
+
+describe('がめんを まわす', () => {
+  test('よこ むきの せかいへ うつしても、くっついた もの と さてつは じしゃくに のこる', () => {
+    const from = createWorld(stage('sand'), PORTRAIT)
+    run(from, 60 * 6, autoPilot)
+    const stuckIds = from.stuckOrder.map((it) => it.id)
+    expect(stuckIds.length).toBeGreaterThan(2)
+    const to = createWorld(stage('sand'), LANDSCAPE)
+    carryOver(from, to)
+    expect(to.stuckOrder.map((it) => it.id).sort()).toEqual([...stuckIds].sort())
+    expect(to.sand!.stuck).toBe(from.sand!.stuck)
+    expect(drainEvents(to)).toHaveLength(0)
+    run(to, 60)
+    for (const it of to.stuckOrder) expect(Math.abs(it.x - to.magnet.x)).toBeLessThan(90)
+    disposeWorld(from)
+    disposeWorld(to)
   })
 })
 

@@ -325,6 +325,15 @@ function twinkle(g: G, x: number, y: number, s: number, a: number) {
 
 // ---------------- けしき ----------------
 
+/** がめんに みえている はんい（せかいの 単位）。けしきは せかいの そとまで のばして かく。 */
+type Ext = { x0: number; x1: number; y0: number; y1: number }
+
+const snap = (v: number, step: number) => Math.floor(v / step) * step
+
+function viewExt(view: View): Ext {
+  return { x0: -view.ox / view.scale, x1: (view.cssW - view.ox) / view.scale, y0: -view.oy / view.scale, y1: (view.cssH - view.oy) / view.scale }
+}
+
 /** かべの たな と とけい（さわれない かざり なので すこし うすめの いろ）。 */
 function paintWallShelf(g: G, w: number, wainY: number) {
   const shelfY = wainY - 64
@@ -462,15 +471,16 @@ function paintWallShelf(g: G, w: number, wainY: number) {
   }
 }
 
-function paintDeskBack(g: G, world: World) {
+function paintDeskBack(g: G, world: World, e: Ext) {
   const { w, h, groundY } = world
+  const ew = e.x1 - e.x0
   // かべ
   g.fillStyle = lin(g, 0, 0, 0, groundY, [[0, '#fff1d9'], [1, '#ffe2bd']])
-  g.fillRect(0, 0, w, groundY)
+  g.fillRect(e.x0, e.y0, ew, groundY - e.y0)
   // かべがみ の みずたま
   g.fillStyle = 'rgba(255,190,140,.22)'
-  for (let y = 18, row = 0; y < groundY; y += 34, row++) {
-    for (let x = (row % 2) * 20 + 10; x < w; x += 40) {
+  for (let row = Math.floor((e.y0 - 18) / 34), y = 18 + row * 34; y < groundY; y += 34, row++) {
+    for (let x = snap(e.x0, 40) + (Math.abs(row) % 2) * 20 + 10; x < e.x1; x += 40) {
       g.beginPath()
       g.arc(x, y, 3.2, 0, Math.PI * 2)
       g.fill()
@@ -479,13 +489,13 @@ function paintDeskBack(g: G, world: World) {
   // こしいた
   const wainY = groundY - Math.min(90, (groundY - 60) * 0.3)
   g.fillStyle = lin(g, 0, wainY, 0, groundY, [[0, '#f7c98f'], [1, '#e9ad6c']])
-  g.fillRect(0, wainY, w, groundY - wainY)
+  g.fillRect(e.x0, wainY, ew, groundY - wainY)
   g.fillStyle = 'rgba(150,80,30,.12)'
-  for (let x = 0; x < w; x += 26) g.fillRect(x, wainY, 1.5, groundY - wainY)
+  for (let x = snap(e.x0, 26); x < e.x1; x += 26) g.fillRect(x, wainY, 1.5, groundY - wainY)
   g.fillStyle = '#fff5e6'
-  g.fillRect(0, wainY - 5, w, 6)
+  g.fillRect(e.x0, wainY - 5, ew, 6)
   g.fillStyle = 'rgba(150,80,30,.2)'
-  g.fillRect(0, wainY + 1, w, 1.2)
+  g.fillRect(e.x0, wainY + 1, ew, 1.2)
   // まど
   const winW = clamp(w * 0.46, 150, 300)
   const winTop = clamp(h * 0.1, 50, 120)
@@ -615,7 +625,7 @@ function paintDeskBack(g: G, world: World) {
   // つくえ
   const top = groundY
   g.fillStyle = lin(g, 0, top, 0, top + 12, [[0, '#e7a867'], [1, '#d18f4e']])
-  g.fillRect(0, top, w, 12)
+  g.fillRect(e.x0, top, ew, 12)
   g.fillStyle = 'rgba(120,60,20,.14)'
   for (let i = 0; i < 9; i++) {
     const y = top + 2 + (i % 4) * 2.6
@@ -623,11 +633,11 @@ function paintDeskBack(g: G, world: World) {
     g.fillRect(x0, y, 60 + hash(i + 9) * 120, 0.9)
   }
   g.fillStyle = lin(g, 0, top + 12, 0, top + 30, [[0, '#b8733a'], [0.4, '#c88449'], [1, '#9b5a28']])
-  g.fillRect(0, top + 12, w, 18)
+  g.fillRect(e.x0, top + 12, ew, 18)
   g.fillStyle = 'rgba(255,255,255,.35)'
-  g.fillRect(0, top + 12, w, 1.5)
-  g.fillStyle = lin(g, 0, top + 30, 0, h, [[0, '#8c5226'], [0.08, '#b57440'], [1, '#a4652f']])
-  g.fillRect(0, top + 30, w, h - top - 30)
+  g.fillRect(e.x0, top + 12, ew, 1.5)
+  g.fillStyle = lin(g, 0, top + 30, 0, e.y1, [[0, '#8c5226'], [0.08, '#b57440'], [1, '#a4652f']])
+  g.fillRect(e.x0, top + 30, ew, e.y1 - top - 30)
   // ひきだし
   const dw = Math.min(260, w * 0.6), dx = w / 2 - dw / 2, dy = top + 42
   const dh = Math.min(h - dy - 16, 90)
@@ -656,10 +666,11 @@ function paintDeskBack(g: G, world: World) {
   g.fill()
 }
 
-function paintSandBack(g: G, world: World) {
+function paintSandBack(g: G, world: World, e: Ext) {
   const { w, h, groundY } = world
+  const ew = e.x1 - e.x0
   g.fillStyle = lin(g, 0, 0, 0, groundY, [[0, '#6cc6ff'], [0.7, '#bfe9ff'], [1, '#e9f8ff']])
-  g.fillRect(0, 0, w, groundY)
+  g.fillRect(e.x0, e.y0, ew, groundY - e.y0)
   // おひさま
   const sx = w * 0.84, sy = Math.max(70, h * 0.13)
   const glow = g.createRadialGradient(sx, sy, 10, sx, sy, 90)
@@ -678,13 +689,12 @@ function paintSandBack(g: G, world: World) {
   const hillY = groundY - Math.min(120, (groundY - 80) * 0.35)
   g.fillStyle = '#a9e08c'
   g.beginPath()
-  g.moveTo(0, groundY)
-  g.lineTo(0, hillY + 20)
-  for (let x = 0; x <= w; x += 20) g.lineTo(x, hillY + 20 - Math.sin(x * 0.012 + 1) * 22 - Math.sin(x * 0.031) * 8)
-  g.lineTo(w, groundY)
+  g.moveTo(snap(e.x0, 20), groundY)
+  for (let x = snap(e.x0, 20); x <= e.x1 + 20; x += 20) g.lineTo(x, hillY + 20 - Math.sin(x * 0.012 + 1) * 22 - Math.sin(x * 0.031) * 8)
+  g.lineTo(e.x1 + 20, groundY)
   g.closePath()
   g.fill()
-  for (let i = 0; i < Math.ceil(w / 110); i++) {
+  for (let i = Math.floor((e.x0 - 100) / 110); i < Math.ceil(e.x1 / 110); i++) {
     const x = 40 + i * 110 + hash(i) * 40
     const ty = hillY + 16 - Math.sin(x * 0.012 + 1) * 22
     g.fillStyle = '#9b6b3f'
@@ -699,41 +709,42 @@ function paintSandBack(g: G, world: World) {
   // さく
   const fy = groundY - 34
   g.fillStyle = '#ffffff'
-  for (let x = 6; x < w; x += 22) {
+  for (let x = snap(e.x0, 22) + 6; x < e.x1; x += 22) {
     rr(g, x, fy - 6, 10, 40, 4)
     g.fill()
   }
-  g.fillRect(0, fy + 4, w, 5)
-  g.fillRect(0, fy + 20, w, 5)
+  g.fillRect(e.x0, fy + 4, ew, 5)
+  g.fillRect(e.x0, fy + 20, ew, 5)
   g.fillStyle = 'rgba(80,120,160,.15)'
-  g.fillRect(0, fy + 9, w, 2)
+  g.fillRect(e.x0, fy + 9, ew, 2)
   // すな
   g.fillStyle = lin(g, 0, groundY, 0, h, [[0, '#f8dea6'], [0.25, '#efcd8c'], [1, '#e2b774']])
-  g.fillRect(0, groundY, w, h - groundY)
+  g.fillRect(e.x0, groundY, ew, e.y1 - groundY)
   g.fillStyle = 'rgba(255,255,255,.35)'
-  g.fillRect(0, groundY, w, 2)
-  for (let i = 0; i < w * (h - groundY) * 0.012; i++) {
-    const x = hash(i * 3.1) * w, y = groundY + 3 + hash(i * 7.7) * (h - groundY)
+  g.fillRect(e.x0, groundY, ew, 2)
+  for (let i = 0; i < ew * (h - groundY) * 0.012; i++) {
+    const x = e.x0 + hash(i * 3.1) * ew, y = groundY + 3 + hash(i * 7.7) * (h - groundY)
     g.fillStyle = hash(i * 1.3) > 0.5 ? 'rgba(160,110,50,.25)' : 'rgba(255,255,255,.35)'
     g.fillRect(x, y, 1.4, 1.4)
   }
   // すなばの わく（まえ）
   const by = groundY + Math.min(60, (h - groundY) * 0.35)
   g.fillStyle = lin(g, 0, by, 0, by + 26, [[0, '#d99456'], [1, '#b8733a']])
-  g.fillRect(0, by, w, 26)
+  g.fillRect(e.x0, by, ew, 26)
   g.fillStyle = 'rgba(255,255,255,.3)'
-  g.fillRect(0, by, w, 2)
+  g.fillRect(e.x0, by, ew, 2)
   g.fillStyle = 'rgba(90,40,10,.25)'
-  for (let x = 60; x < w; x += 120) g.fillRect(x, by + 2, 2, 24)
+  for (let x = snap(e.x0, 120) + 60; x < e.x1; x += 120) g.fillRect(x, by + 2, 2, 24)
   g.fillStyle = lin(g, 0, by + 26, 0, h, [[0, '#9fd27a'], [1, '#7fbf5c']])
-  g.fillRect(0, by + 26, w, h - by - 26)
+  g.fillRect(e.x0, by + 26, ew, e.y1 - by - 26)
 }
 
-function paintSeaBack(g: G, world: World) {
-  const { w, h, groundY } = world
+function paintSeaBack(g: G, world: World, e: Ext) {
+  const { w, groundY } = world
+  const ew = e.x1 - e.x0
   const wy = world.waterY ?? 0
   g.fillStyle = lin(g, 0, 0, 0, wy, [[0, '#7fd0ff'], [1, '#d9f4ff']])
-  g.fillRect(0, 0, w, wy)
+  g.fillRect(e.x0, e.y0, ew, wy - e.y0)
   cloud(g, w * 0.12, wy * 0.45, 0.8, 0.95)
   cloud(g, w * 0.66, wy * 0.3, 0.6, 0.8)
   // とおくの しま
@@ -742,12 +753,12 @@ function paintSeaBack(g: G, world: World) {
   g.ellipse(w * 0.8, wy, 60, 16, 0, Math.PI, 0)
   g.fill()
   g.fillStyle = lin(g, 0, wy - 6, 0, groundY, [[0, '#6fdcf5'], [0.3, '#2fb0e0'], [0.75, '#1d82c4'], [1, '#176aa8']])
-  g.fillRect(0, wy - 6, w, groundY - wy + 6)
+  g.fillRect(e.x0, wy - 6, ew, groundY - wy + 6)
   // うみの そこの さんご
-  for (let i = 0; i < Math.ceil(w / 90); i++) {
+  for (let i = Math.floor((e.x0 - 70) / 90); i < Math.ceil(e.x1 / 90); i++) {
     const x = 30 + i * 90 + hash(i + 3) * 40
     const base = groundY + 2
-    const color = ['#ff8fb1', '#ffb36b', '#c89bff'][i % 3]
+    const color = ['#ff8fb1', '#ffb36b', '#c89bff'][((i % 3) + 3) % 3]
     g.strokeStyle = color
     g.lineCap = 'round'
     g.lineWidth = 5
@@ -768,20 +779,18 @@ function paintSeaBack(g: G, world: World) {
     g.globalAlpha = 1
   }
   // すな
-  g.fillStyle = lin(g, 0, groundY - 4, 0, h, [[0, '#f5dca6'], [0.4, '#e6c283'], [1, '#d3a866']])
+  g.fillStyle = lin(g, 0, groundY - 4, 0, world.h, [[0, '#f5dca6'], [0.4, '#e6c283'], [1, '#d3a866']])
   g.beginPath()
-  g.moveTo(0, h)
-  g.lineTo(0, groundY)
-  for (let x = 0; x <= w; x += 12) g.lineTo(x, groundY + Math.sin(x * 0.05) * 1.2)
-  g.lineTo(w, groundY + Math.sin(w * 0.05) * 1.2)
-  g.lineTo(w, h)
+  g.moveTo(snap(e.x0, 12), e.y1)
+  for (let x = snap(e.x0, 12); x <= e.x1 + 12; x += 12) g.lineTo(x, groundY + Math.sin(x * 0.05) * 1.2)
+  g.lineTo(e.x1 + 12, e.y1)
   g.closePath()
   g.fill()
   g.strokeStyle = 'rgba(160,110,50,.25)'
   g.lineWidth = 1
   for (let k = 0; k < 3; k++) {
     g.beginPath()
-    for (let x = 0; x <= w; x += 8) g.lineTo(x, groundY + 10 + k * 12 + Math.sin(x * 0.08 + k) * 2)
+    for (let x = snap(e.x0, 8); x <= e.x1; x += 8) g.lineTo(x, groundY + 10 + k * 12 + Math.sin(x * 0.08 + k) * 2)
     g.stroke()
   }
 }
@@ -977,10 +986,10 @@ function paintPropFront(g: G, p: PropBody) {
   }
 }
 
-function paintBack(g: G, world: World) {
-  if (world.stage.water) paintSeaBack(g, world)
-  else if (world.stage.sand) paintSandBack(g, world)
-  else paintDeskBack(g, world)
+function paintBack(g: G, world: World, e: Ext) {
+  if (world.stage.water) paintSeaBack(g, world, e)
+  else if (world.stage.sand) paintSandBack(g, world, e)
+  else paintDeskBack(g, world, e)
   for (const p of world.props) paintPropBack(g, p)
 }
 
@@ -1022,14 +1031,15 @@ export class Painter {
   }
 
   private background(view: View): Canvas | null {
-    const px = view.scale * view.dpr
-    const key = `${Math.round(this.world.w * px)}x${Math.round(this.world.h * px)}`
+    const W = Math.round(view.cssW * view.dpr), H = Math.round(view.cssH * view.dpr)
+    const key = `${W}x${H}:${view.scale.toFixed(4)}:${view.ox.toFixed(1)}:${view.oy.toFixed(1)}`
     if (this.bg && this.bgKey === key) return this.bg
     try {
-      const canvas = makeCanvas(Math.round(this.world.w * px), Math.round(this.world.h * px))
+      const canvas = makeCanvas(W, H)
       const g = ctx2d(canvas)
-      g.setTransform(px, 0, 0, px, 0, 0)
-      paintBack(g, this.world)
+      const px = view.scale * view.dpr
+      g.setTransform(px, 0, 0, px, view.ox * view.dpr, view.oy * view.dpr)
+      paintBack(g, this.world, viewExt(view))
       this.bg = canvas
       this.bgKey = key
       return canvas
@@ -1043,17 +1053,12 @@ export class Painter {
     this.world = world
     const px = view.scale * view.dpr
     g.setTransform(1, 0, 0, 1, 0, 0)
-    // よはくは けしきの はしの いろで うめる（けしきが がめんを ぜんぶ おおう ときは いらない）。
-    if (direct || view.ox > 0.5 || view.oy > 0.5 || world.w * view.scale < view.cssW - 0.5 || world.h * view.scale < view.cssH - 0.5) {
-      g.fillStyle = world.stage.water ? '#1d82c4' : world.stage.sand ? '#efcd8c' : '#b57440'
-      g.fillRect(0, 0, view.cssW * view.dpr, view.cssH * view.dpr)
-    }
     if (direct) {
       g.setTransform(px, 0, 0, px, view.ox * view.dpr, view.oy * view.dpr)
-      paintBack(g, world)
+      paintBack(g, world, viewExt(view))
     } else {
       const bg = this.background(view)
-      if (bg) g.drawImage(bg as CanvasImageSource, Math.round(view.ox * view.dpr), Math.round(view.oy * view.dpr))
+      if (bg) g.drawImage(bg as CanvasImageSource, 0, 0)
     }
     g.setTransform(px, 0, 0, px, view.ox * view.dpr, view.oy * view.dpr)
 
