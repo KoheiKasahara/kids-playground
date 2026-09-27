@@ -230,7 +230,8 @@ function clipAxis(poly: Vec2[], axis: 'x' | 'z', limit: number, keepAbove: boole
   return out
 }
 
-function clipToCell(poly: Vec2[], x0: number, z0: number, x1: number, z1: number): Vec2[] {
+/** 多角形を マス目1つ（x0〜x1, z0〜z1）で 切りぬく。床と、見た目の みずの くぼみで 同じ切り方を使う。 */
+export function clipToCell(poly: Vec2[], x0: number, z0: number, x1: number, z1: number): Vec2[] {
   let out = clipAxis(poly, 'x', x0, true)
   if (out.length) out = clipAxis(out, 'x', x1, false)
   if (out.length) out = clipAxis(out, 'z', z0, true)
