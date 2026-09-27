@@ -11,7 +11,7 @@ import {
   shadowCanvas, shardCanvas, slimeCanvas, switchCanvas, treeCanvas,
 } from './shapes'
 import { buildTerrain, castShadow, DYN_WATER, DYN_WET, type Terrain } from './terrain'
-import { BERRY_BUSH, GROUND, LIGHTING, PALM, ROCK, SHARD_OUTLINE, SHARD_RAMP, SLIME, STONE, TREE } from './theme'
+import { BERRY_BUSH, GROUND, ICE_WALL, LIGHTING, PALM, ROCK, SHARD_OUTLINE, SHARD_RAMP, SLIME, STONE, TREE } from './theme'
 import type { FriendDef, StageDef } from './stages'
 import { TILE, tileCenter, type Dir, type Friend, type Point, type World, type WorldEvent } from './world'
 
@@ -25,6 +25,7 @@ type StaticObject = Drawable & {
 /** しかけの え。 */
 type GimmickArt =
   | { kind: 'boulder'; img: Img }
+  | { kind: 'ice'; img: Img }
   | { kind: 'bridge'; planks: { img: Img; x: number; y: number; order: number }[]; switchUp: Img; switchDown: Img }
   | { kind: 'torch'; img: Img }
 /** しかけが ひらく えんしゅつの ながさ（フレーム）。 */
@@ -193,6 +194,7 @@ export class Scene {
     // ---- しかけ ----
     const gk = stage.gimmick.kind
     if (level.gates.length && gk === 'boulder') this.gimmick = { kind: 'boulder', img: need(boulderCanvas(ROCK[stage.id])) }
+    else if (level.gates.length && gk === 'ice') this.gimmick = { kind: 'ice', img: need(boulderCanvas(ICE_WALL)) }
     else if (level.gates.length && gk === 'torch') this.gimmick = { kind: 'torch', img: need(doorCanvas(STONE)) }
     else if (level.gates.length && gk === 'bridge') {
       // はしが かかった ときの じめんを べつに つくって、その マスだけ きりだす。
@@ -473,7 +475,18 @@ export class Scene {
     for (const t of world.level.gates) {
       const c = tileCenter(t.tx, t.ty)
       const foot = t.ty * TILE + 14
-      if (art.kind === 'boulder') {
+      if (art.kind === 'ice') {
+        // ちかづくと きらっと ひかり、われると ぷるぷる ふるえて とけるように きえる。
+        const shake = since >= 0 ? Math.round(Math.sin(since * 2.1) * (1 - k) * 2) : 0
+        const x = Math.round(c.x) + shake, y = foot
+        list.push({
+          sortY: foot, draw: () => {
+            ctx.globalAlpha = 1 - k * k
+            ctx.drawImage(art.img, x - 14 - cam.x, y - 22 - cam.y)
+            ctx.globalAlpha = 1
+          },
+        })
+      } else if (art.kind === 'boulder') {
         // なかまが たりない ときは ちかづくと すこし ぐらぐら。みんなで おすと ころがって きえる。
         const wobble = since < 0 && g.near ? Math.round(Math.sin(time * 30)) : 0
         const slide = k * k * 14

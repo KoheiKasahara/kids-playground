@@ -512,6 +512,11 @@ function updateGimmick(world: World) {
       openGate(world)
       return
     }
+  } else if (def.kind === 'ice') {
+    if (near && penguinJoined(world)) {
+      openGate(world)
+      return
+    }
   } else if (def.kind === 'bridge') {
     const sw = level.switches.find(s => dist(s) < SWITCH_RADIUS)
     if (sw && !g.pressed) {
@@ -574,6 +579,7 @@ function gimmickGoal(world: World): Point | null {
     return best
   }
   if (g.def.kind === 'boulder' && friendsJoined(world) < g.def.need) return nearest(world.friends.filter(f => !f.joined)) ?? nearestGate(level, hero)
+  if (g.def.kind === 'ice' && !penguinJoined(world)) return nearest(world.friends.filter(f => !f.joined && f.def.kind === 'penguin')) ?? nearestGate(level, hero)
   if (g.def.kind === 'bridge') return nearest(level.switches)
   if (g.def.kind === 'torch') return nearest(level.torches.filter((_, i) => !g.lit[i]).map(t => tileCenter(t.tx, t.ty)))
   return nearestGate(level, hero)
@@ -587,6 +593,7 @@ export function drainEvents(world: World): WorldEvent[] {
 
 export const shardsLeft = (world: World) => world.shards.filter(s => !s.taken).length
 export const friendsJoined = (world: World) => world.friends.filter(f => f.joined).length
+const penguinJoined = (world: World) => world.friends.some(f => f.joined && f.def.kind === 'penguin')
 
 /**
  * いちばん ちかい のこりの かけら（たからばこが でたら たからばこ）。

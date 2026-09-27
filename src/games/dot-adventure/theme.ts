@@ -111,6 +111,9 @@ export const ROCK: Record<string, RockStyle> = {
   snow: { ramp: ['#262a3a', '#3e4458', '#5a6278', '#7c849c', '#a2aac0', '#c8cedc'], outline: '#10121c', moss: ['#b8c8e0', '#dce6f4', '#ffffff'] },
 }
 
+/** ゆきのはらの しかけ。すきとおった みずいろの こおりの かたまり。 */
+export const ICE_WALL: RockStyle = { ramp: ['#1e4a7a', '#2e6aa4', '#4a90c8', '#72b4e4', '#a2d4f4', '#dcf2ff'], outline: '#0c2440', moss: ['#c8e4f8', '#e8f6ff', '#ffffff'] }
+
 export const PALM: PalmStyle = {
   trunk: ['#3a2414', '#5e3e22', '#86602e', '#aa8244', '#cca264'],
   trunkOutline: '#1a0e06',

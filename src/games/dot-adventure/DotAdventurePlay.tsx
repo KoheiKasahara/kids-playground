@@ -66,12 +66,14 @@ function gimmickMessage(event: WorldEvent): string | null {
     case 'gimmick-hint':
       if (event.kind === 'boulder') return `おおきな いわだ。なかまが あと ${event.need}にん いれば おせそう`
       if (event.kind === 'bridge') return 'はしが きれている… どこかに スイッチが あるかも'
+      if (event.kind === 'ice') return 'こおりの かべだ。ペンギンの なかまが いれば われそう'
       return `いしの とびらだ。たいまつに ひを ともそう（あと ${event.need}こ）`
     case 'switch': return 'カチッ！ スイッチを ふんだ'
     case 'torch': return event.left > 0 ? `たいまつに ひが ついた！ あと ${event.left}こ` : null
     case 'gate-open':
       if (event.kind === 'boulder') return 'みんなで おしたら いわが どいた！'
       if (event.kind === 'bridge') return 'はしが のびた！ わたれるよ'
+      if (event.kind === 'ice') return 'ペンギンが つついたら こおりが われた！'
       return 'いしの とびらが ひらいた！'
     default: return null
   }
