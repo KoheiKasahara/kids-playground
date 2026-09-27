@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import PianoKeyboard from './PianoKeyboard'
-import { PianoAudioEngine, type PianoVoiceHandle } from './pianoAudio'
-import type { PianoNote } from './notes'
-import { PIANO_SONGS, findPianoSong } from './pianoSongs'
+import { PianoAudioEngine, type PianoVoiceHandle } from '../shared/music/pianoAudio'
+import type { PianoNote } from '../shared/music/notes'
+import { PIANO_SONGS, findPianoSong } from '../shared/music/pianoSongs'
 import { PianoSongPlayer } from './pianoSongPlayer'
-import { INSTRUMENT_SPECS, type InstrumentId } from './pianoSamples'
+import { INSTRUMENT_SPECS, type InstrumentId } from '../shared/music/pianoSamples'
 import styles from './PianoPlay.module.css'
 
 type ActivePointer = { noteId: string; voice: PianoVoiceHandle | null }

@@ -1,6 +1,6 @@
-import type { PianoVoiceHandle } from './pianoAudio'
-import type { PianoSong } from './pianoSongs'
-import { findPianoNote } from './notes'
+import type { PianoVoiceHandle } from '../shared/music/pianoAudio'
+import type { PianoSong } from '../shared/music/pianoSongs'
+import { findPianoNote } from '../shared/music/notes'
 
 type PianoNotePlayer = {
   activate(): void
