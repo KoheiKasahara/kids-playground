@@ -556,8 +556,8 @@ export function fieldAt(world: World, px: number, py: number, out: Vec): number 
 // ---------------- そうさ ----------------
 
 export function setMagnetTarget(world: World, x: number, y: number): void {
-  world.magnet.tx = x
-  world.magnet.ty = y
+  world.magnet.tx = clamp(x, 0, world.w)
+  world.magnet.ty = clamp(y, 0, world.h)
 }
 
 export function drainEvents(world: World): WorldEvent[] {
@@ -629,7 +629,9 @@ function updateMagnet(world: World) {
   m.extR += (Math.min(right, 80) - m.extR) * 0.08
   const minX = m.extL + 4, maxX = world.w - m.extR - 4
   const tx = clamp(m.tx, minX, maxX)
-  const ty = clamp(m.ty, world.topLimit + MAGNET_H, world.groundY + 40)
+  // じっと していても すこし ふわふわ うかぶ（ぶらさがった ものも ゆれる）。
+  const float = Math.sin(world.time * 2.1) * 1.8
+  const ty = clamp(m.ty + float, world.topLimit + MAGNET_H, world.groundY + 40)
   const wetNow = world.waterY !== null && m.y - 6 > surfaceY(world, m.x)
   if (wetNow !== m.wet) {
     if (Math.abs(m.vy) > 90) world.events.push({ type: 'splash', x: m.x, y: surfaceY(world, m.x), power: clamp(Math.abs(m.vy) / 700, 0.2, 1) })

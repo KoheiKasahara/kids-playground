@@ -1003,6 +1003,9 @@ export class Painter {
   private sprites = new Map<string, Sprite>()
   private spriteScale = 0
 
+  /** うごきを へらす せってい（ぷるぷる・のこりかげ・ぷにっ を かかない）。 */
+  calm = false
+
   constructor(private world: World) {}
 
   private sprite(kind: KindId, variant: number, px: number): Sprite | null {
@@ -1127,7 +1130,7 @@ export class Painter {
     g.save()
     g.translate(m.x, m.y)
     g.rotate(m.tilt)
-    const j = m.jolt
+    const j = this.calm ? 0 : m.jolt
     g.scale(1 + j * 0.05, 1 - j * 0.06)
     const body = this.magnetSprite(px)
     const pad = 4
@@ -1164,7 +1167,7 @@ export class Painter {
   private drawItem(g: G, it: Item, time: number, px: number) {
     let x = it.x + it.snapX, y = it.y + it.snapY, angle = it.angle
     // もうすこしで とびつく ときの ぷるぷる・ぴょこぴょこ。
-    if (it.state === 'body' && it.kind.magnetic && !it.swim && it.pull > 0.25 && it.pull < 1.2 && it.body && Math.abs(it.body.velocity.y) < 1.5) {
+    if (!this.calm && it.state === 'body' && it.kind.magnetic && !it.swim && it.pull > 0.25 && it.pull < 1.2 && it.body && Math.abs(it.body.velocity.y) < 1.5) {
       const k = clamp((it.pull - 0.25) / 0.75, 0, 1)
       x += Math.sin(time * 58 + it.id * 3) * 1.4 * k
       y -= Math.abs(Math.sin(time * 16 + it.id)) * 2.6 * k * k
@@ -1172,7 +1175,7 @@ export class Painter {
     }
     // じしゃくへ とんでいく ときの すばやい のこりかげ。
     const v = it.state === 'body' && it.kind.magnetic && it.body ? it.body.velocity : null
-    if (v && v.x * v.x + v.y * v.y > 16 && it.kind.id !== 'fish') {
+    if (!this.calm && v && v.x * v.x + v.y * v.y > 16 && it.kind.id !== 'fish') {
       const sp = this.sprite(it.kind.id, it.variant, px)
       if (sp) {
         for (let k = 3; k >= 1; k--) {

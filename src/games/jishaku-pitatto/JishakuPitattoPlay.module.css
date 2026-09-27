@@ -328,7 +328,8 @@
   inset: 0;
   display: grid;
   place-items: center;
-  padding: calc(var(--safe-top) + 12px) calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 12px) calc(var(--safe-left) + 12px);
+  /* うえは「もどる」ボタンに かさならない ように あける。 */
+  padding: calc(var(--safe-top) + 70px) calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 12px) calc(var(--safe-left) + 12px);
   overflow-y: auto;
   background: rgb(40 24 56 / 38%);
   animation: fadeIn .3s ease both;
@@ -729,7 +730,25 @@
   .stageLead { display: none; }
 }
 
+@media (max-height: 760px) and (orientation: portrait) {
+  .resultCard { gap: 6px; padding: 12px 12px 14px; }
+  .resultMain, .resultInfo { gap: 6px; }
+  .resultCard h2 { font-size: 22px; }
+  .resultStars { font-size: 32px; }
+  .best { font-size: 13px; }
+  .photo { width: min(100%, 150px); padding: 4px 4px 0; }
+  .photo figcaption { padding: 2px 0 4px; font-size: 13px; }
+  .sortBox { padding: 5px 8px 7px; }
+  .sortBox h3 { margin-bottom: 3px; font-size: 15px; }
+  .sortBox li { min-width: 46px; font-size: 11px; }
+  .sortIcon { width: 28px; height: 28px; }
+  .tip { font-size: 13px; }
+  .cardButtons { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; width: 100%; gap: 6px; }
+  .cardButtons button { min-height: 50px; padding: 4px 6px; font-size: 14px; line-height: 1.2; word-break: keep-all; }
+}
+
 @media (max-height: 560px) and (orientation: landscape) {
+  .overlay { padding: calc(var(--safe-top) + 10px) calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 10px) calc(var(--safe-left) + 124px); }
   .resultCard {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     align-items: center;

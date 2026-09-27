@@ -100,6 +100,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
   const pointerRef = useRef<{ id: number; touch: boolean } | null>(null)
   const keysRef = useRef(new Set<string>())
   const trayRef = useRef<HTMLUListElement>(null)
+  const nextRef = useRef<HTMLButtonElement>(null)
   const [hud, setHud] = useState<Hud>({ groups: [], stars: 0, starTotal: 3 })
   const [banner, setBanner] = useState(true)
   const [guide, setGuide] = useState(index === 0)
@@ -122,9 +123,10 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
     expose()
     setHud(hudFrom(world))
     const ctx = canvas?.getContext('2d') ?? null
-    let painter = new Painter(world)
-    let fx = createFx()
     const still = reducedMotion()
+    let painter = new Painter(world)
+    painter.calm = still
+    let fx = createFx()
     let done = false
     const measure = () => {
       if (!canvas) return
@@ -137,6 +139,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
         disposeWorld(world)
         world = next
         painter = new Painter(world)
+        painter.calm = still
         fx = createFx()
         expose()
         setHud(hudFrom(world))
@@ -263,6 +266,9 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
     }
   }, [stage])
 
+  // けっかが でたら「つぎへ」に フォーカス（がめんは うごかさない）。
+  useEffect(() => { if (result) nextRef.current?.focus({ preventScroll: true }) }, [result])
+
   const aim = (event: ReactPointerEvent<HTMLCanvasElement>, touch: boolean) => {
     const world = worldRef.current, view = viewRef.current
     if (!world || !view) return
@@ -355,7 +361,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
           <div className={styles.cardButtons}>
             <button type="button" onClick={onExit}>ステージを えらぶ</button>
             <button type="button" onClick={onRetry}>もういちど</button>
-            {!last && <button type="button" className={styles.primary} autoFocus onClick={onNext}>つぎへ →</button>}
+            {!last && <button ref={nextRef} type="button" className={styles.primary} onClick={onNext}>つぎへ →</button>}
           </div>
         </div>
       </div>
