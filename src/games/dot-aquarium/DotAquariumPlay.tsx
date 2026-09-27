@@ -181,6 +181,9 @@ function Tank({ initial, music, onMusic, onExit }: { initial: World; music: bool
           renderer.burst('bubble', e.c.x, e.c.y, 4)
         } else if (e.type === 'hide') {
           renderer.burst('crumb', e.c.homeX, e.c.y + 8, 4, '#e0c48c')
+        } else if (e.type === 'ink') {
+          playPuffSound()
+          renderer.burst('ink', e.c.x - e.c.face * 6, e.c.y, 6)
         } else if (e.type === 'wave') {
           renderer.burst('bubble', e.c.x, e.c.y - 4, 2)
         } else if (e.type === 'breathe') {
@@ -341,8 +344,9 @@ function Tank({ initial, music, onMusic, onExit }: { initial: World; music: bool
       const def = speciesDef(c.species)
       if (c.species === 'puffer') say('ぷくーっ！ びっくりして ふくらんだ')
       else if (c.species === 'eel') say('チンアナゴが すなに かくれた！')
+      else if (c.species === 'octopus') say('タコが すみを はいて にげた！')
       else say(`${def.name}「${def.act}」`)
-      if (c.species !== 'puffer' && c.species !== 'eel') playTapSound()
+      if (c.species !== 'puffer' && c.species !== 'eel' && c.species !== 'octopus') playTapSound()
       return
     }
     const d = decorAt(world, px, py)

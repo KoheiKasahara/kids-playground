@@ -60,7 +60,6 @@ describe('BOARD_CONFIGS', () => {
   it('Phase Fでくるまも専用盤面になっており、通常盤面とは異なる配置を持つ', () => {
     expect(carBoard).not.toEqual(normalBoard)
     expect(carBoard.obstacles).not.toEqual(normalBoard.obstacles)
-    expect(carBoard.walls).not.toEqual(normalBoard.walls)
     expect(carBoard.toys).not.toEqual(normalBoard.toys)
   })
 

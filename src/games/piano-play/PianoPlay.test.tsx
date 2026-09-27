@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import PianoPlay from './PianoPlay'
 import styles from './PianoPlay.module.css'
-import { PIANO_SONGS, findPianoSong } from './pianoSongs'
+import { PIANO_SONGS, findPianoSong } from '../shared/music/pianoSongs'
 import { PianoSongPlayer } from './pianoSongPlayer'
 
 class MockAudioParam {

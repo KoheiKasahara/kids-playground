@@ -49,3 +49,54 @@ export function playShakeSound(): void {
   playNoiseBurst(ctx, now, 0.45, 0.08, 'lowpass', 320)
   playTone(ctx, 70, now, 0.4, 0.06, 'sawtooth')
 }
+
+function withAudio(play: (ctx: AudioContext, now: number) => void): void {
+  if (!isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
+  if (!ctx) return
+  play(ctx, ctx.currentTime)
+}
+
+/** そざいを えらんだときの「ぽこっ」。 */
+export function playSelectSound(): void {
+  withAudio((ctx, now) => {
+    playTone(ctx, 660, now, 0.06, 0.05, 'sine')
+    playTone(ctx, 990, now + 0.04, 0.06, 0.04, 'sine')
+  })
+}
+
+/** いきものを ふやしたときの音。カニ＝ちょこちょこ、カメ＝のっそり、ちょうちょ＝ひらひら。 */
+export function playCreatureSound(kind: 'crab' | 'turtle' | 'butterfly'): void {
+  withAudio((ctx, now) => {
+    if (kind === 'crab') {
+      ;[0, 0.07, 0.14].forEach(t => playNoiseBurst(ctx, now + t, 0.035, 0.05, 'bandpass', 2000))
+      playTone(ctx, 700, now + 0.2, 0.08, 0.05, 'square')
+    } else if (kind === 'turtle') {
+      playTone(ctx, 220, now, 0.18, 0.07, 'triangle')
+      playTone(ctx, 330, now + 0.16, 0.22, 0.06, 'triangle')
+    } else {
+      ;[1175, 1568, 1319, 1760].forEach((frequency, i) => playTone(ctx, frequency, now + i * 0.06, 0.12, 0.04, 'sine'))
+    }
+  })
+}
+
+/** ひる／よるを きりかえたときの音。よるは さがる、ひるは あがる。 */
+export function playDayNightSound(night: boolean): void {
+  withAudio((ctx, now) => {
+    const notes = night ? [784, 659, 523] : [523, 659, 784]
+    notes.forEach((frequency, i) => playTone(ctx, frequency, now + i * 0.1, 0.22, 0.05, night ? 'sine' : 'triangle'))
+  })
+}
+
+/** とめる／うごかすの「ぴっ」。 */
+export function playPauseSound(paused: boolean): void {
+  withAudio((ctx, now) => playTone(ctx, paused ? 440 : 660, now, 0.1, 0.05, 'square'))
+}
+
+/** ぜんぶけすの「しゅわわ〜」。 */
+export function playClearSound(): void {
+  withAudio((ctx, now) => {
+    playNoiseBurst(ctx, now, 0.5, 0.06, 'highpass', 1800)
+    ;[1047, 784, 523].forEach((frequency, i) => playTone(ctx, frequency, now + 0.1 + i * 0.08, 0.15, 0.04, 'sine'))
+  })
+}

@@ -1,6 +1,7 @@
-import { isValidElement, type ReactNode } from 'react'
+import { render } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import carStyles from './carTheme.module.css'
+import { carBoard } from '../boardConfigs/carBoard'
 import { carTheme } from './carTheme'
 import { DEFAULT_PINBALL_THEME_ID, PINBALL_THEMES, resolvePinballTheme } from './index'
 import type { PinballThemeId } from './types'
@@ -55,29 +56,32 @@ describe('flag-pinball themes', () => {
 })
 
 
-function collectClassNames(node: ReactNode): string[] {
-  if (Array.isArray(node)) return node.flatMap(collectClassNames)
-  if (!isValidElement(node)) return []
-  const props = node.props as { className?: unknown; children?: ReactNode }
-  const ownClassName = typeof props.className === 'string' ? [props.className] : []
-  return [...ownClassName, ...collectClassNames(props.children)]
-}
+test('くるまtoyは車種ごとに描き分けたSVGの車を描く（前後のタイヤ付き）', () => {
+  const base = carBoard.toys.filter((toy) => toy.kind === 'car')
+  for (const toy of base) {
+    const { container, unmount } = render(<>{carTheme.renderToy('car', toy)}</>)
+    const svg = container.querySelector('svg')
+    expect(svg).not.toBeNull()
+    expect(svg!.getAttribute('data-car-variant')).toBe(toy.car!.variant)
+    expect(container.querySelectorAll(`.${carStyles.carWheelSpin}`)).toHaveLength(2)
+    unmount()
+  }
+})
 
-test('くるまtoyは小さくても車と分かる主要パーツを持つ', () => {
-  const classNames = collectClassNames(carTheme.renderToy('car'))
-  expect(classNames).toEqual(
-    expect.arrayContaining([
-      carStyles.carMark,
-      carStyles.carBody,
-      carStyles.carHood,
-      carStyles.carCabin,
-      carStyles.carWindowRear,
-      carStyles.carWindowFront,
-      `${carStyles.carWheel} ${carStyles.carWheelRear}`,
-      `${carStyles.carWheel} ${carStyles.carWheelFront}`,
-      carStyles.carTailLight,
-      carStyles.carLight,
-      carStyles.carGrille,
-    ]),
+test('くるまtoyは配置データがなくても既定の車を描く', () => {
+  const { container } = render(<>{carTheme.renderToy('car')}</>)
+  expect(container.querySelector('svg')?.getAttribute('data-car-variant')).toBe('sedan')
+})
+
+test('同じ盤面に並んだ複数の車でも、SVGのグラデーションidが重複しない', () => {
+  const { container } = render(
+    <>
+      {carBoard.toys.map((toy) => (
+        <span key={toy.id}>{carTheme.renderToy(toy.kind, toy)}</span>
+      ))}
+    </>,
   )
+  const ids = Array.from(container.querySelectorAll('[id]')).map((el) => el.id)
+  expect(ids.length).toBeGreaterThan(0)
+  expect(new Set(ids).size).toBe(ids.length)
 })

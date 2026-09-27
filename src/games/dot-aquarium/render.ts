@@ -23,7 +23,7 @@ export type View = { time: number; still: boolean }
 type Sprite = { canvas: HTMLCanvasElement; flip: HTMLCanvasElement; w: number; h: number }
 
 type Particle = {
-  kind: 'bubble' | 'heart' | 'note' | 'spark' | 'crumb' | 'ring' | 'z' | 'splash'
+  kind: 'bubble' | 'heart' | 'note' | 'spark' | 'crumb' | 'ring' | 'z' | 'splash' | 'ink'
   x: number; y: number; vx: number; vy: number
   life: number; max: number
   size: number
@@ -308,6 +308,7 @@ export class AquaRenderer {
       else if (kind === 'crumb') { p.vx = (r() - .5) * 20; p.vy = (r() - .5) * 14; p.max = .5 + r() * .3 }
       else if (kind === 'ring' || kind === 'splash') { p.max = .6; p.size = n }
       else if (kind === 'z') { p.vy = -5; p.vx = 3; p.max = 2 }
+      else if (kind === 'ink') { p.vx = (r() - .5) * 16; p.vy = (r() - .5) * 10; p.max = 1.4 + r() * .6; p.size = 2 + r() * 2 }
       this.particles.push(p)
       if (kind === 'ring' || kind === 'splash') break
     }
@@ -512,7 +513,7 @@ export class AquaRenderer {
 
   private drawCreature(g: CanvasRenderingContext2D, world: World, c: Creature, t: number) {
     const level = fadeLevel(c.z)
-    const speed = c.species === 'neon' ? 10 : c.species === 'shark' ? 3.2 : c.species === 'turtle' ? 2.4 : c.species === 'seahorse' ? 3 : c.species === 'eel' ? 1.5 : 6.5
+    const speed = c.species === 'neon' ? 10 : c.species === 'shark' ? 3.2 : c.species === 'turtle' ? 2.4 : c.species === 'seahorse' ? 3 : c.species === 'eel' ? 1.5 : c.species === 'octopus' || c.species === 'moray' || c.species === 'ray' ? 3 : 6.5
     let frame = Math.floor(c.phase * speed) % FRAMES
     let variant = ''
     if (c.species === 'jelly') frame = Math.floor(((c.phase % 2.6) / 2.6) * FRAMES) % FRAMES
@@ -538,9 +539,11 @@ export class AquaRenderer {
       return
     }
 
-    const facing = c.species === 'crab' ? 1 : c.turn < .5 ? -c.face : c.face
+    // しょうめんを むいている いきものは ふりむかない。
+    const front = c.species === 'crab' || c.species === 'octopus'
+    const facing = front ? 1 : c.turn < .5 ? -c.face : c.face
     const img = facing > 0 ? s.canvas : s.flip
-    const squash = c.species === 'crab' ? 1 : Math.max(.2, Math.abs(1 - c.turn * 2))
+    const squash = front ? 1 : Math.max(.2, Math.abs(1 - c.turn * 2))
     const w = Math.max(2, Math.round(s.w * squash))
     const bob = c.species === 'seahorse' ? Math.round(Math.sin(c.phase * 1.4) * 1.2) : 0
     const x = Math.round(c.x - w / 2), y = Math.round(c.y - s.h / 2) + bob
@@ -616,6 +619,15 @@ export class AquaRenderer {
       } else if (p.kind === 'crumb') {
         g.fillStyle = p.color ?? '#f0a040'
         g.fillRect(Math.round(p.x), Math.round(p.y), 1, 1)
+      } else if (p.kind === 'ink') {
+        // もやもや ひろがって うすく なる すみ。
+        p.vx *= 1 - dt * 2; p.vy *= 1 - dt * 2
+        const r = p.size + k * 4
+        g.fillStyle = `rgb(20 14 30 / ${((1 - k) * .75).toFixed(3)})`
+        for (let y = -Math.ceil(r); y <= r; y++) for (let x = -Math.ceil(r); x <= r; x++) {
+          if (x * x + y * y > r * r || (k > .5 && ((x + y + Math.floor(p.wob)) & 1))) continue
+          g.fillRect(Math.round(p.x + x), Math.round(p.y + y), 1, 1)
+        }
       } else if (p.kind === 'ring' || p.kind === 'splash') {
         const r = (p.kind === 'splash' ? 2 : 3) + k * (p.kind === 'splash' ? 4 : 14)
         g.fillStyle = `rgb(230 250 255 / ${((1 - k) * .8).toFixed(3)})`

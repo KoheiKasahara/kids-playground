@@ -46,6 +46,8 @@ const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePla
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
+  { path: '/games/rhythm-pon', element: lazyRoute(() => import('../games/rhythm-pon/RhythmPlay')) },
+  { path: '/games/origami-play', element: lazyRoute(() => import('../games/origami-play/OrigamiPlay')) },
   { path: '/games/draw-goal', element: lazyRoute(() => import('../games/draw-goal/DrawGoalPlay')) },
   { path: '/games/magic-sandbox', element: lazyRoute(() => import('../games/magic-sandbox/MagicSandboxPlay')) },
   { path: '/games/treasure-dig', element: lazyRoute(() => import('../games/treasure-dig/TreasureDigPlay')) },
@@ -74,6 +76,12 @@ export const routes: RouteObject[] = [
   // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // DotAquariumPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/dot-aquarium', element: lazyRoute(() => import('../games/dot-aquarium/DotAquariumPlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // DotRunPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/dot-run', element: lazyRoute(() => import('../games/dot-run/DotRunPlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // JishakuPitattoPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/jishaku-pitatto', element: lazyRoute(() => import('../games/jishaku-pitatto/JishakuPitattoPlay')) },
   // コース選択・レース・結果が同一route内で切り替わるため、プレイ面はゲーム内で包む。
   { path: '/games/pixel-kart', element: lazyRoute(() => import('../games/pixel-kart/PixelKartPlay')) },
   // タイトル・プレイ画面が同一route内で切り替わるため、プレイ面はゲーム内で包む。

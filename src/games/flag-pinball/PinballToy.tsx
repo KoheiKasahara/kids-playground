@@ -39,7 +39,7 @@ export default function PinballToy({ toy, theme, registerToy, onActivate }: Pinb
         aria-hidden="true"
         style={{ width: toy.radius * 2, height: toy.radius * 2 }}
       >
-        {theme.renderToy(toy.kind)}
+        {theme.renderToy(toy.kind, toy)}
       </span>
     </button>
   )

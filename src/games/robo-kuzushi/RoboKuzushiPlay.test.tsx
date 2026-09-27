@@ -53,7 +53,7 @@ function drag(canvas: HTMLElement, degrees: number, length: number) {
   fireEvent.pointerDown(canvas, { clientX: 150, clientY: 300, button: 0 })
   fireEvent.pointerMove(canvas, { clientX: 150 + dx / 2, clientY: 300 + dy / 2 })
   fireEvent.pointerMove(canvas, { clientX: 150 + dx, clientY: 300 + dy })
-  expect(screen.getByRole('status')).toHaveTextContent(`かくど ${degrees}°`)
+  expect(screen.getByRole('status')).toBeEmptyDOMElement()
   fireEvent.pointerUp(canvas, { clientX: 150 + dx, clientY: 300 + dy })
 }
 
@@ -107,9 +107,9 @@ describe('robo-kuzushi play', () => {
     const canvas = open(/^7 みっつに わかれる/)
     advance(10)
     fireEvent.keyDown(canvas, { key: 'ArrowUp' })
-    expect(screen.getByRole('status')).toHaveTextContent('かくど 40° ・ つよさ 80%')
+    // ねらっている あいだは かくど・つよさの 文字を ださない（みちすじの てんだけ）。
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
     fireEvent.keyDown(canvas, { key: 'ArrowRight' })
-    expect(screen.getByRole('status')).toHaveTextContent('つよさ 85%')
     fireEvent.keyDown(canvas, { key: ' ' })
     advance(60)
     expect(playLaunchSound).toHaveBeenCalledOnce()

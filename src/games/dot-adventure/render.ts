@@ -1,23 +1,34 @@
 // えを かく ところ。ひくい かいぞうど（ドットの 大きさ そのまま）の バッファに かいてから、
 // 画面へ 整数ばいで ひきのばす ので、どこを とっても ドットが そろう。
 
-import { bayer, hash2, makeCanvas, pack, periodicNoise, rng } from './pixel'
+import { bayer, canvasFromPixels, hash2, makeCanvas, pack, periodicNoise, rng } from './pixel'
 import {
   CHEST_CLOSED, CHEST_OPEN, CROWN, CRAB_FRAMES, HEART, HERO_PALETTE, LILY, LILY_FLOWER, NOTE, RAINBOW_SHELL,
   SHELL, STARFISH, BUTTERFLY, heroRows, spriteCanvas, type Facing,
 } from './sprites'
 import {
-  brazierCanvas, bushCanvas, flameCanvas, gemCanvas, palmCanvas, pillarCanvas, rockCanvas, shadowCanvas, shardCanvas,
-  slimeCanvas, treeCanvas,
+  boulderCanvas, brazierCanvas, bushCanvas, doorCanvas, flameCanvas, gemCanvas, palmCanvas, pillarCanvas, rockCanvas,
+  shadowCanvas, shardCanvas, slimeCanvas, switchCanvas, treeCanvas,
 } from './shapes'
 import { buildTerrain, castShadow, DYN_WATER, DYN_WET, type Terrain } from './terrain'
 import { BERRY_BUSH, GROUND, LIGHTING, PALM, ROCK, SHARD_OUTLINE, SHARD_RAMP, SLIME, STONE, TREE } from './theme'
 import type { FriendDef, StageDef } from './stages'
-import { TILE, type Dir, type Friend, type Point, type World, type WorldEvent } from './world'
+import { TILE, tileCenter, type Dir, type Friend, type Point, type World, type WorldEvent } from './world'
 
 type Img = HTMLCanvasElement
 type Drawable = { img: Img; x: number; y: number; sortY: number }
-type StaticObject = Drawable & { kind: string; light?: { x: number; y: number; r: number; color: string } ; flameX?: number; flameY?: number; seed: number }
+type StaticObject = Drawable & {
+  kind: string; light?: { x: number; y: number; r: number; color: string }; flameX?: number; flameY?: number; seed: number
+  /** しかけの たいまつの ばんごう（ひが ついた ときだけ もえる）。 */
+  torch?: number
+}
+/** しかけの え。 */
+type GimmickArt =
+  | { kind: 'boulder'; img: Img }
+  | { kind: 'bridge'; planks: { img: Img; x: number; y: number; order: number }[]; switchUp: Img; switchDown: Img }
+  | { kind: 'torch'; img: Img }
+/** しかけが ひらく えんしゅつの ながさ（フレーム）。 */
+const GATE_ANIM = 48
 
 type Particle = {
   kind: 'spark' | 'dust' | 'heart' | 'note' | 'ring' | 'mote'
@@ -57,6 +68,22 @@ export function spawnFx(fx: Fx, event: WorldEvent, time: number) {
       const a = -Math.PI / 2 + (r() - .5) * 2.2, s = 1 + r() * 2.6
       fx.parts.push({ kind: 'spark', x: event.x, y: event.y - 12, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: -r() * 20, max: 50 + r() * 40, color: SPARK_COLORS[i % 4] })
     }
+  } else if (event.type === 'gate-open') {
+    for (let i = 0; i < 18; i++) {
+      const a = r() * Math.PI * 2, s = .3 + r() * 1.2
+      fx.parts.push({ kind: 'dust', x: event.x + (r() - .5) * 12, y: event.y - 2, vx: Math.cos(a) * s, vy: Math.sin(a) * s * .5 - .3, life: -r() * 12, max: 26 + r() * 16, color: '#e8e0d0' })
+    }
+    for (let i = 0; i < 24; i++) {
+      const a = r() * Math.PI * 2, s = .5 + r() * 1.8
+      fx.parts.push({ kind: 'spark', x: event.x, y: event.y - 10, vx: Math.cos(a) * s, vy: Math.sin(a) * s - .8, life: -r() * 16, max: 34 + r() * 26, color: SPARK_COLORS[i % 4] })
+    }
+  } else if (event.type === 'torch') {
+    for (let i = 0; i < 16; i++) {
+      const a = -Math.PI / 2 + (r() - .5) * 1.8, s = .6 + r() * 1.4
+      fx.parts.push({ kind: 'spark', x: event.x, y: event.y - 22, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: 26 + r() * 20, color: ['#fff6a0', '#ffd23c', '#ff9a40', '#ffffff'][i % 4] })
+    }
+  } else if (event.type === 'switch') {
+    fx.parts.push({ kind: 'ring', x: event.x, y: event.y - 2, vx: 0, vy: 0, life: 0, max: 24, color: '#ffa8c8' })
   } else if (event.type === 'bump') {
     fx.parts.push({ kind: 'dust', x: event.x, y: event.y - 2, vx: 0, vy: -.2, life: 0, max: 18, color: '#e8e0d0' })
   }
@@ -101,6 +128,7 @@ export class Scene {
   private shadowBig: Img
   private shadowSmall: Img
   private clouds: Img | null = null
+  private gimmick: GimmickArt | null = null
   private buffer: { canvas: Img; ctx: CanvasRenderingContext2D } | null = null
   private light: { canvas: Img; ctx: CanvasRenderingContext2D } | null = null
   private mosaic: { canvas: Img; ctx: CanvasRenderingContext2D } | null = null
@@ -131,6 +159,7 @@ export class Scene {
     const brazier = need(brazierCanvas(STONE))
     const shell = need(spriteCanvas(SHELL)), star = need(spriteCanvas(STARFISH))
     const lily = need(spriteCanvas(LILY)), lilyFlower = need(spriteCanvas(LILY_FLOWER))
+    const torchIndex = (tx: number, ty: number) => level.torches.findIndex(t => t.tx === tx && t.ty === ty)
     for (const o of level.objects) {
       const fx = o.tx * TILE + 8, fy = o.ty * TILE + 14
       const v = Math.floor(hash2(o.tx, o.ty, 5) * 1000)
@@ -150,12 +179,42 @@ export class Scene {
           castShadow(this.terrain, fx + 1, fy, 7, 3, .6)
           add(brazier, 8, 21, { light: { x: fx, y: fy - 16, r: 64, color: '#ffb060' }, flameX: fx - 6, flameY: fy - 27 })
           break
+        case 'u':
+          castShadow(this.terrain, fx + 1, fy, 7, 3, .6)
+          add(brazier, 8, 21, { light: { x: fx, y: fy - 16, r: 64, color: '#ffb060' }, flameX: fx - 6, flameY: fy - 27, torch: torchIndex(o.tx, o.ty) })
+          break
         case 'h': stamp(this.terrain, v % 3 === 0 ? star : shell, fx - 2, fy - 8); break
         case 'L': this.lilies.push({ img: v % 3 === 0 ? lilyFlower : lily, x: fx - 4, y: fy - 11, seed: v }); break
       }
     }
     this.objects.sort((a, b) => a.sortY - b.sortY)
     this.ground = need(canvasOf(this.terrain.pw, this.terrain.ph, this.terrain.pixels))
+
+    // ---- しかけ ----
+    const gk = stage.gimmick.kind
+    if (level.gates.length && gk === 'boulder') this.gimmick = { kind: 'boulder', img: need(boulderCanvas(ROCK[stage.id])) }
+    else if (level.gates.length && gk === 'torch') this.gimmick = { kind: 'torch', img: need(doorCanvas(STONE)) }
+    else if (level.gates.length && gk === 'bridge') {
+      // はしが かかった ときの じめんを べつに つくって、その マスだけ きりだす。
+      const ground = level.ground.slice()
+      for (const g of level.gates) ground[g.ty * level.w + g.tx] = '#'
+      const built = buildTerrain({ ...level, ground }, { palette: pal, waves: !!stage.waves, seed: stage.id.length * 97 })
+      const gateAt = new Map(level.gates.map((g, i) => [`${g.tx},${g.ty}`, i + 1]))
+      const tiles: { tx: number; ty: number; order: number }[] = []
+      for (let ty = 0; ty < level.h; ty++) for (let tx = 0; tx < level.w; tx++) {
+        const order = gateAt.get(`${tx},${ty}`)
+        if (order) { tiles.push({ tx, ty, order }); continue }
+        // もとから ある はしの はしっこも つなぎめが あうように かきなおす。
+        const touches = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => gateAt.has(`${tx + dx},${ty + dy}`))
+        if (touches && ground[ty * level.w + tx] === '#') tiles.push({ tx, ty, order: 0 })
+      }
+      const planks = tiles.map(({ tx, ty, order }) => {
+        const px = new Uint32Array(TILE * TILE)
+        for (let y = 0; y < TILE; y++) px.set(built.pixels.subarray((ty * TILE + y) * built.pw + tx * TILE, (ty * TILE + y) * built.pw + tx * TILE + TILE), y * TILE)
+        return { img: need(canvasFromPixels(TILE, TILE, px)), x: tx * TILE, y: ty * TILE, order }
+      })
+      this.gimmick = { kind: 'bridge', planks, switchUp: need(switchCanvas(false)), switchDown: need(switchCanvas(true)) }
+    }
 
     // ---- キャラクター ----
     const heroFrames = (facing: Facing, flip: boolean) => [0, 1, 2, 3].map(s => need(spriteCanvas({ rows: heroRows(facing, s), palette: HERO_PALETTE }, flip)))
@@ -183,9 +242,9 @@ export class Scene {
     if (stage.theme === 'day') this.clouds = cloudCanvas()
   }
 
-  /** ひかりの でる もの。 */
-  get lights() {
-    return this.objects.filter(o => o.light)
+  /** ひかりの でる もの（ひの きえた たいまつは のぞく）。 */
+  private lights(world: World) {
+    return this.objects.filter(o => o.light && (o.torch === undefined || world.gimmick.lit[o.torch]))
   }
 
   treasureImage() {
@@ -227,6 +286,7 @@ export class Scene {
       const bob = Math.round(Math.sin(time * 1.3 + l.seed) * .6)
       ctx.drawImage(l.img, l.x - cam.x, l.y - cam.y + bob)
     }
+    this.drawGimmickGround(ctx, world, cam)
     this.drawSprites(ctx, world, cam, time, fx)
     this.drawParticles(ctx, fx, cam, time)
     this.drawAtmosphere(ctx, world, cam, time, fx)
@@ -315,7 +375,7 @@ export class Scene {
       list.push({
         sortY: o.sortY, draw: () => {
           ctx.drawImage(o.img, o.x - cam.x, o.y - cam.y)
-          if (o.flameX !== undefined && o.flameY !== undefined) {
+          if (o.flameX !== undefined && o.flameY !== undefined && (o.torch === undefined || world.gimmick.lit[o.torch])) {
             const f = this.flames[Math.floor(time * 10 + o.seed) % this.flames.length]
             ctx.drawImage(f, o.flameX - cam.x, o.flameY - cam.y)
           }
@@ -356,6 +416,7 @@ export class Scene {
         },
       })
     }
+    this.addGimmickSprites(list, ctx, world, cam, time)
     // なかま。
     for (const f of world.friends) list.push({ sortY: f.y, draw: () => this.drawFriend(ctx, f, cam, time) })
     // しゅじんこう。
@@ -379,6 +440,64 @@ export class Scene {
     ctx.drawImage(heroImg(), Math.round(hero.x) - 8 - cam.x, Math.round(hero.y) - 24 - cam.y)
     for (const f of world.friends) if (f.joined) this.drawFriend(ctx, f, cam, time, true)
     ctx.globalAlpha = 1
+  }
+
+  /** じめんに はりつく しかけ（はしの いた・スイッチ）。 */
+  private drawGimmickGround(ctx: CanvasRenderingContext2D, world: World, cam: Point) {
+    const art = this.gimmick
+    if (art?.kind !== 'bridge') return
+    const g = world.gimmick
+    const since = g.open ? world.frame - g.openFrame : -1
+    for (const s of world.level.switches) ctx.drawImage(g.pressed ? art.switchDown : art.switchUp, s.x - 8 - cam.x, s.y - 9 - cam.y)
+    if (since < 0) return
+    // いたが 1まいずつ おちてきて はしが のびる。
+    for (const p of art.planks) {
+      const k = Math.min(1, Math.max(0, (since - p.order * 6) / 10))
+      if (k <= 0) continue
+      ctx.globalAlpha = k
+      ctx.drawImage(p.img, p.x - cam.x, p.y - cam.y - Math.round((1 - k) * 8))
+    }
+    ctx.globalAlpha = 1
+  }
+
+  /** たって いる しかけ（いわ・とびら）を ならびじゅんの リストに いれる。 */
+  private addGimmickSprites(list: { sortY: number; draw: () => void }[], ctx: CanvasRenderingContext2D, world: World, cam: Point, time: number) {
+    const art = this.gimmick
+    const g = world.gimmick
+    if (!art || art.kind === 'bridge') return
+    const since = g.open ? world.frame - g.openFrame : -1
+    if (since >= GATE_ANIM) return
+    const k = since < 0 ? 0 : since / GATE_ANIM
+    for (const t of world.level.gates) {
+      const c = tileCenter(t.tx, t.ty)
+      const foot = t.ty * TILE + 14
+      if (art.kind === 'boulder') {
+        // なかまが たりない ときは ちかづくと すこし ぐらぐら。みんなで おすと ころがって きえる。
+        const wobble = since < 0 && g.near ? Math.round(Math.sin(time * 30)) : 0
+        const slide = k * k * 14
+        const x = Math.round(c.x + g.push.x * slide) + wobble, y = Math.round(foot + g.push.y * slide)
+        list.push({
+          sortY: foot, draw: () => {
+            ctx.globalAlpha = (1 - k) * .4
+            ctx.drawImage(this.shadowBig, x - 7 - cam.x, y - 3 - cam.y)
+            ctx.globalAlpha = 1 - k * k
+            ctx.drawImage(art.img, x - 14 - cam.x, y - 22 - cam.y)
+            ctx.globalAlpha = 1
+          },
+        })
+      } else {
+        // とびらは ゴゴゴと じめんに しずむ。
+        const img = art.img
+        const sink = Math.round(k * img.height)
+        const shake = since >= 0 ? Math.round(Math.sin(since * 1.7)) : 0
+        list.push({
+          sortY: foot, draw: () => {
+            const visible = img.height - sink
+            if (visible > 0) ctx.drawImage(img, 0, 0, img.width, visible, c.x - 10 + shake - cam.x, foot - 30 + sink - cam.y, img.width, visible)
+          },
+        })
+      }
+    }
   }
 
   private drawFriend(ctx: CanvasRenderingContext2D, f: Friend, cam: Point, time: number, ghost = false) {
@@ -555,7 +674,7 @@ export class Scene {
         l.globalAlpha = 1
       }
       if (theme === 'night') {
-        for (const o of this.lights) {
+        for (const o of this.lights(world)) {
           const flick = 1 + Math.sin(time * 9 + o.seed) * .04 + Math.sin(time * 23 + o.seed * 3) * .03
           addLight(o.light!.x, o.light!.y, o.light!.r * flick, o.light!.color, 1)
         }
@@ -579,7 +698,7 @@ export class Scene {
     // ひかる ものの まわりに ぼんやり（ブルーム）。
     if (theme === 'night') {
       ctx.globalCompositeOperation = 'lighter'
-      for (const o of this.lights) glow(ctx, o.light!.x - cam.x, o.light!.y - cam.y, 14, '#ff9a40', .22 + Math.sin(time * 11 + o.seed) * .04)
+      for (const o of this.lights(world)) glow(ctx, o.light!.x - cam.x, o.light!.y - cam.y, 14, '#ff9a40', .22 + Math.sin(time * 11 + o.seed) * .04)
       world.shards.forEach(s => { if (!s.taken) glow(ctx, s.x - cam.x, s.y - 12 - cam.y, 9, '#ffd040', .2) })
       for (const c of fx.critters) {
         if (c.kind !== 'firefly') continue

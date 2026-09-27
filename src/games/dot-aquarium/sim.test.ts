@@ -88,6 +88,15 @@ describe('うごき', () => {
     expect(crab.hunger).toBeLessThan(.9)
   })
 
+  test('タコを さわると すみを はいて にげる', () => {
+    const w = createWorld(3)
+    const c = addCreature(w, 'octopus', 200, 150)
+    drainEvents(w)
+    poke(w, c)
+    expect(drainEvents(w).some(e => e.type === 'ink')).toBe(true)
+    expect(c.state).toBe('flee')
+  })
+
   test('いきものは すいそうの そとに でない', () => {
     const w = createWorld(5)
     for (const s of SPECIES) addCreature(w, s.id, 50 + Math.random() * 300, 40 + Math.random() * 120)

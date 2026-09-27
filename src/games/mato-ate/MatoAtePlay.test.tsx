@@ -43,7 +43,11 @@ function open(name: RegExp) {
   render(<MemoryRouter><MatoAtePlay /></MemoryRouter>)
   expect(screen.getByRole('heading', { name: 'ねらって！まとあて' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name }))
-  return screen.getByLabelText(/ねらう ところを タップすると/)
+  const canvas = screen.getByLabelText(/ねらう ところを タップすると/)
+  // さいしょの タップは ステージめいの かんばんを けすだけ。
+  tap(canvas, 200, 300)
+  expect(screen.queryByTestId('stage-banner')).not.toBeInTheDocument()
+  return canvas
 }
 
 /** せかいの 座標（x, y）を タップする。 */
@@ -106,6 +110,21 @@ describe('mato-ate play', () => {
     fireEvent.click(screen.getByRole('button', { name: '↻ もういちど' }))
     expect(screen.queryByRole('heading', { name: 'おしい！' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('のこりの たま 6こ')).toBeInTheDocument()
+  })
+
+  test('tapping while the stage name banner shows only hides it', () => {
+    render(<MemoryRouter><MatoAtePlay /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /^1 はじめての まと/ }))
+    const canvas = screen.getByLabelText(/ねらう ところを タップすると/)
+    expect(screen.getByTestId('stage-banner')).toBeInTheDocument()
+    tap(canvas, 200, 190)
+    advance(30)
+    expect(playShootSound).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('stage-banner')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('のこりの たま 6こ')).toBeInTheDocument()
+    tap(canvas, 200, 190)
+    advance(2)
+    expect(playShootSound).toHaveBeenCalledOnce()
   })
 
   test('hitting a wall shows a tip', () => {

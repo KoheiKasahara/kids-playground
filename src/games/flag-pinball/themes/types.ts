@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { ToyKind } from '../toyLayout'
+import type { ToyKind, ToyPlacement } from '../toyLayout'
 
 export type PinballThemeId = 'normal' | 'space' | 'ocean' | 'candy' | 'sky' | 'car' | 'forest'
 
@@ -15,6 +15,9 @@ export type PinballThemeDefinition = {
   readonly toyClassName: string
   /** 盤面の軽い背景装飾（星・泡など）。装飾がないテーマは undefined */
   readonly renderBackdrop?: () => ReactNode
-  /** おもちゃの中身の絵。物理は共通なので、ここは見た目だけを返す */
-  readonly renderToy: (kind: ToyKind) => ReactNode
+  /**
+   * おもちゃの中身の絵。物理は共通なので、ここは見た目だけを返す。
+   * toyは配置データ（車種など個体ごとの見た目を変えたいテーマだけが使う。省略されることもある）
+   */
+  readonly renderToy: (kind: ToyKind, toy?: ToyPlacement) => ReactNode
 }

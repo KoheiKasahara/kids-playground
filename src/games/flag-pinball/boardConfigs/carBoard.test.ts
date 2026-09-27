@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BALL_RADIUS, BOARD_HEIGHT, BOARD_WIDTH, ZONE_TOP } from '../boardLayout'
-import { carBoard } from './carBoard'
+import { CAR_ROAD_YS, carBoard } from './carBoard'
 import { normalBoard } from './normalBoard'
 
 const REQUIRED_CLEARANCE_MARGIN = 16
@@ -25,8 +25,14 @@ function distanceToWallSurface(point: Point, wall: Wall): number {
   return Math.hypot(localX - clampedX, localY - clampedY)
 }
 
-const OUTER_WALLS = carBoard.walls.filter((w) => !w.id.startsWith('wall-guide') && !w.id.startsWith('wall-car-guide'))
-const CAR_TOY = carBoard.toys.find((toy) => toy.kind === 'car')
+const OUTER_WALLS = carBoard.walls.filter((w) => !w.id.startsWith('wall-guide'))
+const CAR_TOYS = carBoard.toys.filter((toy) => toy.kind === 'car')
+/** carToy.tsの複合Colliderの外形（胴体の半幅・中心yからの上端/下端）。 */
+const CAR_BODY_HALF_WIDTH = 50
+const CAR_COLLIDER_TOP_OFFSET = -16 - 22 // 円形キャビンの上端
+const CAR_COLLIDER_BOTTOM_OFFSET = 8 + 17 // 胴体の下端
+/** 動く車と固定物の間を、ボールが押しつぶされずに通り抜けられる最小の縦の隙間。 */
+const CAR_VERTICAL_CLEARANCE = BALL_RADIUS * 2 + 8
 
 describe('carBoard.obstacles', () => {
   it('通常盤面よりずっと少ない個数で、idに重複がない（車toyとの遭遇そのものを主役にする）', () => {
@@ -76,10 +82,17 @@ describe('carBoard.obstacles', () => {
     }
   })
 
-  it('道路（車の可動範囲付近、y=440〜480）には物理的な障害物を置いていない', () => {
-    for (const o of carBoard.obstacles) {
-      const overlapsRoadY = o.y + o.radius > 440 && o.y - o.radius < 480
-      expect(overlapsRoadY).toBe(false)
+  it('車の通り道（可動範囲の横幅）にある障害物は、車のColliderから上下にボール直径＋8px以上離れている', () => {
+    for (const car of CAR_TOYS) {
+      const sweepLeft = car.car!.leftX - CAR_BODY_HALF_WIDTH - BALL_RADIUS
+      const sweepRight = car.car!.rightX + CAR_BODY_HALF_WIDTH + BALL_RADIUS
+      const colliderTop = car.y + CAR_COLLIDER_TOP_OFFSET
+      const colliderBottom = car.y + CAR_COLLIDER_BOTTOM_OFFSET
+      for (const o of carBoard.obstacles) {
+        if (o.x + o.radius < sweepLeft || o.x - o.radius > sweepRight) continue
+        const gap = o.y < car.y ? colliderTop - (o.y + o.radius) : o.y - o.radius - colliderBottom
+        expect(gap, `${o.id} と ${car.id}`).toBeGreaterThanOrEqual(CAR_VERTICAL_CLEARANCE)
+      }
     }
   })
 })
@@ -98,16 +111,10 @@ describe('carBoard.walls', () => {
     }
   })
 
-  it('道路の高さ(y=440〜480)を横切る固定壁が存在しない（車が当たらなければ素通りできる）', () => {
-    for (const wall of carBoard.walls) {
-      const halfH = wall.height / 2
-      const spansRoadY = wall.y - halfH < 480 && wall.y + halfH > 440
-      // 上部・下部の短い坂道は道路よりだいぶ上/下（y=300, y=575）にあるため、
-      // ここに該当するのは元から道路と無関係な壁だけのはず。
-      if (spansRoadY) {
-        expect(wall.id).not.toMatch(/^wall-car-guide/)
-      }
-    }
+  it('外壁と射出ガイド壁のほかに固定壁を置かない（道路の間で車と壁にボールが挟まらない）', () => {
+    expect(carBoard.walls.map((w) => w.id).sort()).toEqual(
+      ['wall-bottom', 'wall-guide-left', 'wall-guide-right', 'wall-left', 'wall-right', 'wall-top'],
+    )
   })
 })
 
@@ -123,36 +130,61 @@ describe('carBoard.toys', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('車toy（car）がちょうど1台存在する', () => {
-    expect(carBoard.toys.filter((toy) => toy.kind === 'car')).toHaveLength(1)
+  it('車toy（car）が3台あり、3本の道路に1台ずつ走る', () => {
+    expect(CAR_TOYS).toHaveLength(3)
+    expect(CAR_TOYS.map((toy) => toy.y)).toEqual([...CAR_ROAD_YS])
   })
 
-  it('車toyはcar設定を持ち、leftX < rightX、speedは正の値', () => {
-    expect(CAR_TOY).toBeDefined()
-    expect(CAR_TOY!.car).toBeDefined()
-    expect(CAR_TOY!.car!.leftX).toBeLessThan(CAR_TOY!.car!.rightX)
-    expect(CAR_TOY!.car!.speed).toBeGreaterThan(0)
+  it('3台は車種がすべて違う', () => {
+    const variants = CAR_TOYS.map((toy) => toy.car?.variant)
+    expect(variants.every((variant) => variant !== undefined)).toBe(true)
+    expect(new Set(variants).size).toBe(3)
+  })
+
+  it('隣り合う道路の車のColliderどうしは、上下にボール直径＋8px以上離れている', () => {
+    for (let i = 1; i < CAR_TOYS.length; i += 1) {
+      const upperBottom = CAR_TOYS[i - 1].y + CAR_COLLIDER_BOTTOM_OFFSET
+      const lowerTop = CAR_TOYS[i].y + CAR_COLLIDER_TOP_OFFSET
+      expect(lowerTop - upperBottom).toBeGreaterThanOrEqual(CAR_VERTICAL_CLEARANCE)
+    }
+  })
+
+  it('各車toyはcar設定を持ち、leftX < rightX、speedは正の値', () => {
+    for (const toy of CAR_TOYS) {
+      expect(toy.car).toBeDefined()
+      expect(toy.car!.leftX).toBeLessThan(toy.car!.rightX)
+      expect(toy.car!.speed).toBeGreaterThan(0)
+    }
   })
 
   it('車の初期位置(placement.x)は可動範囲(leftX〜rightX)の内側にある', () => {
-    expect(CAR_TOY!.x).toBeGreaterThanOrEqual(CAR_TOY!.car!.leftX)
-    expect(CAR_TOY!.x).toBeLessThanOrEqual(CAR_TOY!.car!.rightX)
+    for (const toy of CAR_TOYS) {
+      expect(toy.x).toBeGreaterThanOrEqual(toy.car!.leftX)
+      expect(toy.x).toBeLessThanOrEqual(toy.car!.rightX)
+    }
   })
 
-  it('車の可動範囲は数秒で横断できる程度の速さで、極端に速すぎない（1秒あたり6px未満）', () => {
+  it('3台は速さがそろっておらず、上下の車が同じ動きにならない', () => {
+    expect(new Set(CAR_TOYS.map((toy) => toy.car!.speed)).size).toBe(3)
+  })
+
+  it('車の可動範囲は数秒で横断できる程度の速さで、極端に速すぎない', () => {
     // STEP_MSは1000/60msなので、1秒 ≈ 60step。speedはpx/stepなので60倍がpx/秒。
-    const pxPerSecond = CAR_TOY!.car!.speed * 60
-    expect(pxPerSecond).toBeGreaterThan(30)
-    expect(pxPerSecond).toBeLessThan(200)
+    for (const toy of CAR_TOYS) {
+      const pxPerSecond = toy.car!.speed * 60
+      expect(pxPerSecond).toBeGreaterThan(30)
+      expect(pxPerSecond).toBeLessThan(200)
+    }
   })
 
   it('車の可動範囲は、車体の胴体半幅(50px)を足しても外壁の内側面から64px以上離れている（壁との挟まり対策）', () => {
-    const CAR_BODY_HALF_WIDTH = 50
     const WALL_INNER_MARGIN = 15 // wall-left/right の厚み30の半分
-    const leftEdge = CAR_TOY!.car!.leftX - CAR_BODY_HALF_WIDTH
-    const rightEdge = CAR_TOY!.car!.rightX + CAR_BODY_HALF_WIDTH
-    expect(leftEdge - WALL_INNER_MARGIN).toBeGreaterThanOrEqual(REQUIRED_CLEARANCE)
-    expect(BOARD_WIDTH - WALL_INNER_MARGIN - rightEdge).toBeGreaterThanOrEqual(REQUIRED_CLEARANCE)
+    for (const toy of CAR_TOYS) {
+      const leftEdge = toy.car!.leftX - CAR_BODY_HALF_WIDTH
+      const rightEdge = toy.car!.rightX + CAR_BODY_HALF_WIDTH
+      expect(leftEdge - WALL_INNER_MARGIN).toBeGreaterThanOrEqual(REQUIRED_CLEARANCE)
+      expect(BOARD_WIDTH - WALL_INNER_MARGIN - rightEdge).toBeGreaterThanOrEqual(REQUIRED_CLEARANCE)
+    }
   })
 
   it('ボール半径ぶんの余裕を持って盤面内にある', () => {

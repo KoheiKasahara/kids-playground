@@ -118,7 +118,7 @@ const domDependentTestTsFiles = [
   'src/games/flag-pinball/themeStore.test.ts',
   'src/games/flag-roll-puzzle/useBoardScale.test.ts',
   'src/games/shared/progress/stageProgress.test.ts',
-  'src/games/piano-play/pianoAudio.test.ts',
+  'src/games/shared/music/pianoAudio.test.ts',
   'src/games/planet-globe/three/overviewVisual.test.ts',
   'src/games/planet-globe/three/planetRing.test.ts',
   'src/games/planet-globe/three/planetSurface.test.ts',

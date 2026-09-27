@@ -31,6 +31,13 @@ export const R = {
   skin: ['#1c2c28', '#3a5a4c', '#62866e', '#90b490', '#cce4c0'],
   shark: ['#141c2c', '#2e3e58', '#566c88', '#8aa0b8', '#c2d4e4'],
   seahorse: ['#4a1a04', '#9a4a0a', '#e08a18', '#ffbe3a', '#fff0a0'],
+  octo: ['#4a0c16', '#902232', '#d84a58', '#f07a82', '#ffbcbc'],
+  octoLip: ['#8a3a44', '#d07a84', '#f6bcba', '#ffdad6', '#fff2f0'],
+  squid: ['#5a3a4a', '#a07888', '#e0c2cc', '#f8e6ec', '#ffffff'],
+  squidDot: ['#4a1a10', '#8a3420', '#c85a34', '#e88a58', '#ffc49a'],
+  moray: ['#1a1e06', '#3e4610', '#72801c', '#a8b432', '#dce274'],
+  morayDark: ['#0c0e04', '#1e2408', '#34400e', '#4e5c1a', '#6e7c2c'],
+  ray: ['#16181e', '#343c4c', '#5e6a82', '#909eb4', '#cad6e4'],
 } satisfies Record<string, Ramp>
 
 export type Model = { w: number; h: number; prims: Prim[] }
@@ -414,6 +421,130 @@ function shark(f: number): Model {
   }
 }
 
+/** タコ（しょうめん。まるい あたまに ちょんちょん めと まるい くち、あしを ひろげて 2ほんは くるん）。 */
+function octopus(f: number): Model {
+  const w = 30, h = 25, cx = 15
+  const ph = f / 4 * TAU
+  const prims: Prim[] = []
+  // したの 6ほん（そとがわほど よこに ひらく）。
+  const legs: [number, number][] = [[-11, 19.5], [-7.5, 22.5], [-2.6, 23.6], [2.6, 23.6], [7.5, 22.5], [11, 19.5]]
+  legs.forEach(([dx, ey], i) => {
+    const sway = Math.sin(ph + i * 1.1) * .9
+    const bx = cx + dx * .32, by = 15.5
+    const mx = cx + dx * .7 + sway * .6, my = (by + ey) / 2 + .4
+    const ex = cx + dx + sway, back = i === 0 || i === 5 ? 0 : i === 1 || i === 4 ? .08 : .14
+    prims.push(
+      { t: 'cap', x1: bx, y1: by, x2: mx, y2: my, r1: 2.1, r2: 1.5, ramp: R.octo, shift: -back, flat: .6 },
+      { t: 'cap', x1: mx, y1: my, x2: ex, y2: ey, r1: 1.5, r2: 1.1, ramp: R.octo, shift: -back, flat: .6, edge: true },
+    )
+  })
+  // うえに くるんと あげた 2ほん（きゅうばん つき）。
+  for (let side = -1; side <= 1; side += 2) {
+    const up = Math.sin(ph + (side > 0 ? Math.PI : 0)) * .8
+    const pts: [number, number][] = [[cx + side * 5, 13.4], [cx + side * 9.5, 15 + up * .4], [cx + side * 12.6, 12.6 + up * .6], [cx + side * 13.2, 8.4 + up], [cx + side * 11.8, 5.6 + up]]
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1]
+      prims.push({ t: 'cap', x1, y1, x2, y2, r1: 2 - i * .25, r2: 1.75 - i * .25, ramp: R.octo, flat: .62 })
+    }
+    for (const [x, y] of pts.slice(2)) prims.push({ t: 'px', x: x + side * 1.1, y, color: '#ffe0dc' })
+    prims.push({ t: 'px', x: pts[1][0], y: pts[1][1] + 1.2, color: '#ffe0dc' })
+  }
+  prims.push(
+    { t: 'ell', x: cx, y: 15, rx: 6.2, ry: 3.2, ramp: R.octo, flat: .6 },
+    { t: 'ell', x: cx, y: 8, rx: 8.4, ry: 7.6, ramp: R.octo, gloss: .35, pat: s => ({ flat: .64 - s.nx * .08 - s.ny * .1 }) },
+    { t: 'px', x: cx - 3.2, y: 7.4, color: '#1a0a10' }, { t: 'px', x: cx - 3.2, y: 8.4, color: '#1a0a10' },
+    { t: 'px', x: cx + 3.2, y: 7.4, color: '#1a0a10' }, { t: 'px', x: cx + 3.2, y: 8.4, color: '#1a0a10' },
+    { t: 'ell', x: cx, y: 11.8, rx: 2.3, ry: 2.1, ramp: R.octoLip, flat: .7, edge: true },
+    { t: 'px', x: cx, y: 11.8, color: '#3a0a14' },
+  )
+  return { w, h, prims }
+}
+
+/** イカ（うでが まえ・さんかくの ひれが うしろ）。 */
+function squid(f: number): Model {
+  const w = 28, h = 13, cy = 6.5
+  const ph = f / 4 * TAU
+  const fin = Math.sin(ph)
+  const prims: Prim[] = [
+    { t: 'poly', pts: [[9.5, cy], [4.5, cy - 5.6 - fin * .6], [1, cy], [4.5, cy + 5.6 + fin * .6]], ramp: R.squid, flat: .7, alpha: .8 },
+  ]
+  // うで 2ほん（ながい）。
+  for (let i = 0; i < 2; i++) {
+    const sway = Math.sin(ph + i * 2) * .9
+    const ey = cy - .8 + i * 1.6 + sway
+    prims.push(
+      { t: 'cap', x1: 19, y1: cy - .4 + i * .8, x2: 25.6, y2: ey, r1: .5, r2: .45, ramp: R.squid, shift: -.08 },
+      { t: 'ell', x: 26, y: ey, rx: 1.1, ry: .8, ramp: R.squid, flat: .7 },
+    )
+  }
+  prims.push(
+    {
+      t: 'cap', x1: 4, y1: cy, x2: 16.5, y2: cy, r1: 1.4, r2: 3.4, ramp: R.squid, gloss: .65, alpha: .95,
+      pat: s => (hash2(Math.floor(s.px), Math.floor(s.py), 23) < .16 ? { ramp: R.squidDot, shift: .1 } : undefined),
+    },
+    { t: 'ell', x: 18.2, y: cy, rx: 2.6, ry: 2.4, ramp: R.squid, edge: true },
+  )
+  // みじかい うで。
+  for (let i = 0; i < 4; i++) {
+    const sway = Math.sin(ph + i * 1.3) * .7
+    prims.push({ t: 'cap', x1: 19.6, y1: cy - 1.5 + i, x2: 23.8, y2: cy - 2.1 + i * 1.4 + sway, r1: .8, r2: .4, ramp: R.squid, shift: -.04, pat: s => (s.u > .5 && hash2(Math.floor(s.px), Math.floor(s.py), 3) < .3 ? { ramp: R.squidDot } : undefined) })
+  }
+  prims.push({ t: 'eye', x: 18.4, y: cy - .6, r: 1.3, iris: '#60c8ff' })
+  return { w, h, prims }
+}
+
+/** ウツボ（ながい からだを くねくね）。 */
+function moray(f: number): Model {
+  const w = 46, h = 14
+  const ph = f / 4 * TAU
+  const N = 16
+  const pts: [number, number, number][] = []
+  for (let i = 0; i <= N; i++) {
+    const s = i / N
+    pts.push([2 + s * 36, 7.6 + Math.sin(s * 5 - ph) * 2.2 * (1 - s * .8), .9 + Math.min(1, s * 2.2) * 2.6])
+  }
+  const mottle = (s: Sample) => (hash2(Math.floor(s.px / 2), Math.floor(s.py / 2), 13) < .38 ? { ramp: R.morayDark, shift: .1 } : undefined)
+  const prims: Prim[] = []
+  // せびれ。
+  for (let i = 2; i < N - 2; i++) {
+    const [x1, y1, r1] = pts[i], [x2, y2, r2] = pts[i + 1]
+    prims.push({ t: 'cap', x1, y1: y1 - r1 + .2, x2, y2: y2 - r2 + .2, r1: 1, r2: 1, ramp: R.moray, flat: .75, alpha: .9 })
+  }
+  for (let i = 0; i < N; i++) {
+    const [x1, y1, r1] = pts[i], [x2, y2, r2] = pts[i + 1]
+    prims.push({ t: 'cap', x1, y1, x2, y2, r1, r2, ramp: R.moray, gloss: .3, pat: mottle })
+  }
+  const [hx, hy] = pts[N]
+  const open = f % 2 === 0 ? 1.4 : .5
+  prims.push(
+    { t: 'cap', x1: hx, y1: hy + 1.2, x2: hx + 6, y2: hy + 1.4 + open, r1: 1.6, r2: 1, ramp: R.moray, shift: -.1 },
+    { t: 'ell', x: hx + 2.4, y: hy - .4, rx: 4.6, ry: 2.8, ramp: R.moray, gloss: .4, pat: mottle },
+    { t: 'cap', x1: hx + 4, y1: hy - .2, x2: hx + 7, y2: hy + .3, r1: 1.6, r2: 1, ramp: R.moray },
+    { t: 'px', x: hx + 5.4, y: hy + 1.6, color: '#fffce8' },
+    { t: 'px', x: hx + 3.8, y: hy + 1.4, color: '#fffce8' },
+    { t: 'eye', x: hx + 3.4, y: hy - 1.6, r: 1.05, iris: '#e8e060' },
+  )
+  return { w, h, prims }
+}
+
+/** エイ（ななめうえ から みた ひらたい からだ）。 */
+function ray(f: number): Model {
+  const w = 36, h = 16, cy = 8
+  const flap = Math.sin(f / 4 * TAU)
+  const dots = (s: Sample) => (s.v < .2 && hash2(Math.floor(s.px), Math.floor(s.py), 31) < .12 ? { ramp: R.white, flat: .85 } : undefined)
+  return {
+    w, h, prims: [
+      { t: 'cap', x1: 13, y1: cy + .5, x2: 1, y2: cy - 1 + flap * .8, r1: 1, r2: .35, ramp: R.ray, shift: -.12 },
+      { t: 'poly', pts: [[14, cy - .5], [20, cy - 5.5 - flap * 1.8], [26, cy - 1.5]], ramp: R.ray, shift: -.22, pat: dots },
+      { t: 'ell', x: 20.5, y: cy, rx: 9, ry: 3.4, ramp: R.ray, gloss: .45, pat: s => (s.v > .55 ? { ramp: R.cream } : dots(s)) },
+      { t: 'poly', pts: [[13, cy + 1], [21, cy + 5.5 + flap * 1.8], [27.5, cy + 1.5]], ramp: R.ray, edge: true, pat: dots },
+      { t: 'ell', x: 29, y: cy + .3, rx: 3.6, ry: 2.4, ramp: R.ray, gloss: .3 },
+      { t: 'eye', x: 29.8, y: cy - .9, r: 1 },
+      { t: 'px', x: 32.2, y: cy + 1.4, color: '#343c4c' },
+    ],
+  }
+}
+
 export const FRAMES = 4
 
 export function creatureModel(id: SpeciesId, f: number): Model {
@@ -429,5 +560,9 @@ export function creatureModel(id: SpeciesId, f: number): Model {
     case 'eel': return eel(f)
     case 'turtle': return turtle(f)
     case 'shark': return shark(f)
+    case 'octopus': return octopus(f)
+    case 'squid': return squid(f)
+    case 'moray': return moray(f)
+    case 'ray': return ray(f)
   }
 }

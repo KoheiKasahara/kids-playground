@@ -86,7 +86,7 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
   const camera = useRef({ center: level.width, manual: false, intro: INTRO_FRAMES, hold: 0 })
   const [hud, setHud] = useState<Hud>(() => ({ state: 'aim', score: 0, queue: level.balls, robots: level.pieces.filter(p => p.type === 'robot').length, shots: 0 }))
   const [result, setResult] = useState<Result | null>(null)
-  const [aimLabel, setAimLabel] = useState('')
+  const [aiming, setAiming] = useState(false)
   const showHint = useRef(index === 0 && !reducedMotionQuery())
   const portrait = useMobilePortrait()
   /** たてむきの あいだは ゲームを とめておく（よこにしたら つづきから）。 */
@@ -117,7 +117,7 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
     observer?.observe(canvas!)
     window.addEventListener('resize', measure)
     const cancelGesture = () => {
-      if (gesture.current?.mode === 'aim') { pullRef.current = null; pathRef.current = [] ; setAimLabel('') }
+      if (gesture.current?.mode === 'aim') { pullRef.current = null; pathRef.current = [] ; setAiming(false) }
       gesture.current = null
     }
     window.addEventListener('blur', cancelGesture)
@@ -229,11 +229,10 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
     const previous = pullRef.current
     pullRef.current = pull
     pathDirty.current = true
-    if (!pull || !game?.queue.length) { setAimLabel(''); return }
+    if (!pull || !game?.queue.length) { setAiming(false); return }
     const clamped = clampPull(pull)
     const power = Math.round(Math.hypot(clamped.x, clamped.y) / MAX_PULL * 100)
-    const angle = Math.round(Math.atan2(clamped.y, -clamped.x) * 180 / Math.PI)
-    setAimLabel(`かくど ${angle}° ・ つよさ ${power}%`)
+    setAiming(true)
     const before = previous ? Math.floor(Math.hypot(previous.x, previous.y) / 24) : 0
     if (Math.floor(Math.hypot(clamped.x, clamped.y) / 24) > before) playStretchSound(power / 100)
   }
@@ -312,7 +311,7 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
   }
 
   const next = hud.queue[0]
-  const hint = hud.state === 'aim' && hud.shots === 0 && !aimLabel ? level.hint : ''
+  const hint = hud.state === 'aim' && hud.shots === 0 && !aiming ? level.hint : ''
   return <GamePlaySurface><main className={styles.play}>
     <h1 className={styles.srOnly}>{TITLE}</h1>
     <GameBackButton onBack={onExit} />
@@ -329,9 +328,9 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
       </div>
       <button type="button" className={styles.iconButton} onClick={onRetry} aria-label="さいしょから やりなおす">↻</button>
     </div>
-    <p className={styles.bubble} role="status" data-show={Boolean(hint || aimLabel) || undefined}>
-      {aimLabel || hint}
-      {hud.state === 'aim' && next && !aimLabel && hint && <span className={styles.nextBall}>つぎは {BALL_NAMES[next]}の たま</span>}
+    <p className={styles.bubble} role="status" data-show={Boolean(hint) || undefined}>
+      {hint}
+      {hud.state === 'aim' && next && hint && <span className={styles.nextBall}>つぎは {BALL_NAMES[next]}の たま</span>}
     </p>
     {portrait && <section className={styles.orientationGuide} aria-label="よこむきで あそぶ あんない">
       <div className={styles.orientationCard}>

@@ -1,0 +1,118 @@
+.paper {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.foldingFlap {
+  transform-origin: 0 0;
+  animation: paperFold 850ms cubic-bezier(.4, 0, .2, 1) both;
+}
+
+.foldShade {
+  fill: #695049;
+  opacity: 0;
+  animation: foldShade 850ms ease-in-out both;
+}
+
+.guide {
+  pointer-events: none;
+}
+
+.finishingDetails {
+  animation: reveal 500ms ease-out both;
+}
+
+.fox {
+  transform-origin: 200px 280px;
+  animation: foxHello 4.8s ease-in-out infinite;
+}
+
+.eyes {
+  transform-origin: 200px 196px;
+  animation: blink 5.5s linear infinite;
+}
+
+.tulip {
+  transform-origin: 200px 315px;
+  animation: sway 4s ease-in-out infinite;
+}
+
+.boat {
+  transform-origin: 200px 220px;
+  transform: translateY(22px);
+  animation: sail 4s ease-in-out infinite;
+}
+
+.water {
+  animation: ripple 4s ease-in-out infinite;
+}
+
+.groundShadow {
+  animation: shadowBreath 4s ease-in-out infinite;
+}
+
+.preview * {
+  animation: none !important;
+}
+
+@keyframes paperFold {
+  0% { transform: scaleY(1); }
+  43% { transform: scaleY(.05); }
+  55% { transform: scaleY(-.12); }
+  89% { transform: scaleY(-1.015); }
+  100% { transform: scaleY(-1); }
+}
+
+@keyframes foldShade {
+  0%, 100% { opacity: 0; }
+  42% { opacity: .25; }
+  65% { opacity: .12; }
+}
+
+@keyframes reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes foxHello {
+  0%, 52%, 100% { transform: rotate(0deg); }
+  64%, 80% { transform: rotate(-3deg); }
+  72% { transform: rotate(-2deg); }
+}
+
+@keyframes blink {
+  0%, 44%, 48%, 100% { transform: scaleY(1); }
+  46% { transform: scaleY(.08); }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@keyframes sail {
+  0%, 100% { transform: translateY(25px) rotate(-2deg); }
+  50% { transform: translateY(20px) rotate(2deg); }
+}
+
+@keyframes ripple {
+  0%, 100% { transform: translateX(-4px); opacity: .8; }
+  50% { transform: translateX(4px); opacity: 1; }
+}
+
+@keyframes shadowBreath {
+  0%, 100% { opacity: .1; }
+  50% { opacity: .07; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper * {
+    animation: none !important;
+  }
+
+  .foldingFlap {
+    transform: scaleY(-1);
+  }
+}

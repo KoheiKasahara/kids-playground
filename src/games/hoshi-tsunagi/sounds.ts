@@ -1,7 +1,17 @@
 import { getSharedAudioContext, isSoundEnabled, playTone } from '../../audio/sound'
 
-/** ペンタトニック（ド・レ・ミ・ソ・ラ）を上へたどる音。どの順番で鳴っても濁らない。 */
-const PENTATONIC = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51, 1567.98, 1760, 2093]
+/** ペンタトニック（ソ・ラ・ド・レ・ミ）の半音位置。どの順番で鳴っても濁らない。 */
+const PENTATONIC_STEPS = [0, 2, 5, 7, 9]
+const PENTATONIC_ROOT = 196 // G3
+/** いちばん星の多いせいざ（22こ）でも、さいごまで音が上がりつづける数。 */
+const PENTATONIC_LENGTH = 22
+
+/** 低めのソから上へたどる音。 */
+const PENTATONIC = Array.from({ length: PENTATONIC_LENGTH }, (_, index) => {
+  const octave = Math.floor(index / PENTATONIC_STEPS.length)
+  const semitone = PENTATONIC_STEPS[index % PENTATONIC_STEPS.length]! + octave * 12
+  return PENTATONIC_ROOT * 2 ** (semitone / 12)
+})
 
 /** 星をつないだ「きらん」。つないだ数だけ音が上がっていく。 */
 export function playConnectSound(order: number): void {

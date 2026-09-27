@@ -1,32 +1,32 @@
 import type { ReactNode } from 'react'
 import type { PinballThemeDefinition } from './types'
-import type { ToyKind } from '../toyLayout'
+import { CAR_ROAD_YS } from '../boardConfigs/carBoard'
+import type { ToyKind, ToyPlacement } from '../toyLayout'
+import CarToyArt from './CarToyArt'
 import styles from './carTheme.module.css'
 
-function renderCarToy(kind: ToyKind): ReactNode {
+/**
+ * 道路の帯。当たり判定を持たない純粋な装飾で、車toyが往復する高さ（CAR_ROAD_YS）に
+ * 1本ずつ敷く。座標は盤面の論理座標（480×1000）のpxそのまま。
+ */
+function renderCarBackdrop(): ReactNode {
+  return (
+    <div className={styles.carBackdrop}>
+      {CAR_ROAD_YS.map((y) => (
+        <div key={y} className={styles.carRoad} style={{ top: y - ROAD_ABOVE_CAR_CENTER }} />
+      ))}
+    </div>
+  )
+}
+
+/** 車の中心yから道路の上端までの距離。タイヤ（中心y+28付近）が下側の車線に乗るよう少し下へずらす。 */
+const ROAD_ABOVE_CAR_CENTER = 44
+
+function renderCarToy(kind: ToyKind, toy?: ToyPlacement): ReactNode {
   if (kind === 'car') {
-    // 小さな表示でも「前・中央・後ろ」が読み取れる、丸みのあるミニカー。
-    // 物理Collider（carToy.tsの胴体＋円形キャビン）は変更せず、ここでは見た目だけを
-    // ボディ／ボンネット／キャビン／前後の窓／タイヤへ分けて、車の向きを明確にする。
-    return (
-      <span className={styles.carMark}>
-        <span className={styles.carShadow} />
-        <span className={styles.carBody} />
-        <span className={styles.carHood} />
-        <span className={styles.carCabin} />
-        <span className={styles.carWindowRear} />
-        <span className={styles.carWindowFront} />
-        <span className={styles.carWindowPillar} />
-        <span className={styles.carDoor} />
-        <span className={styles.carBumperRear} />
-        <span className={styles.carBumperFront} />
-        <span className={`${styles.carWheel} ${styles.carWheelRear}`} />
-        <span className={`${styles.carWheel} ${styles.carWheelFront}`} />
-        <span className={styles.carTailLight} />
-        <span className={styles.carLight} />
-        <span className={styles.carGrille} />
-      </span>
-    )
+    // 物理Collider（carToy.tsの胴体＋円形キャビン）は車種によらず共通。
+    // 見た目だけを配置データの車種（car.variant）で描き分ける。
+    return <CarToyArt variant={toy?.car?.variant} />
   }
 
   if (kind === 'spinner') {
@@ -102,6 +102,6 @@ export const carTheme: PinballThemeDefinition = {
   emoji: '🚗',
   boardClassName: styles.carBoard,
   toyClassName: styles.carToy,
-  renderBackdrop: () => <div className={styles.carBackdrop} />,
+  renderBackdrop: renderCarBackdrop,
   renderToy: renderCarToy,
 }
