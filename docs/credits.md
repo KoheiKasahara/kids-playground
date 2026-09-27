@@ -35,6 +35,10 @@
 
 `src/games/pixel-kart/` のカート・どうぶつ・森・花・波・サンゴ・結晶・お城・路面などは、本アプリ用に作成したオリジナルのドット絵です。`sprites.ts` と `render.ts` で Canvas に描画し、`courses.ts` で4コースの形状を定義しています。`ItemGlyph.tsx` のアイテムもオリジナルの SVG 図形です。`audio.ts` のコース別BGMと効果音は Web Audio API で実行時に合成し、外部の画像・音源は使用していません。
 
+## ドットの ぴょんぴょんランのドット絵・効果音・BGM
+
+`src/games/dot-run/` のうさぎ・いきもの・にんじん・はてなブロック・ばね・いわのドット絵は、本アプリ用に手で打ったドットデータ（`sprites.ts`）です。そら・やま・うみ・おか・き・じめん・あしば・ほしメダル・あわなどは、`art.ts` と `render.ts` が Canvas で実行時に生成するオリジナル図形です。効果音とステージ別BGMも Web Audio API で実行時に合成するオリジナル曲で、外部の画像・音源は使用していません。
+
 ## 3Dつみきのテクスチャ・効果音
 
 `src/games/tsumiki-3d/` のつみきの もくめ・ゆかの フローリング・プレイマット・たかさの ものさしの えもじ札は、本アプリ用に Canvas で実行時に描いたオリジナル図形です。つみきの形は Three.js の標準ジオメトリ（RoundedBoxGeometry・ExtrudeGeometry・LatheGeometry）で作り、環境光は Three.js 付属の RoomEnvironment を使っています。選択ボタンのつみきアイコンもオリジナルの SVG 図形です。効果音は Web Audio API で実行時に合成し、外部の画像・音源は使用していません。
