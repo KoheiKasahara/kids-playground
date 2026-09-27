@@ -143,10 +143,11 @@ describe('ぱたぱた おりがみのあそび', () => {
       await user.keyboard(step === 0 ? '{Enter}' : ' ')
       await waitFor(() => expect(progress()).toHaveAttribute('aria-valuenow', String(step + 1)))
       if (step < template.steps.length - 1) {
-        expect(screen.getByRole('button', { name: 'ここを おる' })).toHaveFocus()
+        // フォーカスは おりおわった あとの effect で うごくので、つぎの tick まで まつ。
+        await waitFor(() => expect(screen.getByRole('button', { name: 'ここを おる' })).toHaveFocus())
       }
     }
-    expect(screen.getByRole('button', { name: 'もういちど おる' })).toHaveFocus()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'もういちど おる' })).toHaveFocus())
   })
 
   test('音のオンとオフを切り替えられる', () => {
