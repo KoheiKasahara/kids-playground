@@ -1,13 +1,14 @@
 import { Cell, isSeed, type Point, type Sandbox } from './sandboxSimulation'
 
-export const MAX_CRABS = 2
+export const MAX_CRABS = 1
+export const MAX_HERMITS = 1
 export const MAX_TURTLES = 1
 // At 60 steps/second, leave half a minute between meals.
 export const FULL_STEPS = 1800
 export const EATING_STEPS = 90
 export const creatureScale = (creature: Creature) => 1 + creature.growth * 0.25
 export type Creature = Point & {
-  kind: 'crab' | 'turtle'
+  kind: 'crab' | 'hermit' | 'turtle'
   growth: number
   fullness: number
   search: number
@@ -46,11 +47,16 @@ function blocked(world: Sandbox, x: number, y: number, scale = 1) {
   return false
 }
 
+// Hermit crabs share every crab behaviour; only their drawing differs.
+const groundAnimals = (world: Sandbox) => [...world.crabs, ...world.hermits, ...world.turtles]
+const groupOf = (world: Sandbox, kind: Creature['kind']) => kind === 'crab' ? world.crabs : kind === 'hermit' ? world.hermits : world.turtles
+const LIMITS: Record<Creature['kind'], number> = { crab: MAX_CRABS, hermit: MAX_HERMITS, turtle: MAX_TURTLES }
 export const addCrab = (world: Sandbox, random: () => number) => addCreature(world, random, 'crab')
+export const addHermit = (world: Sandbox, random: () => number) => addCreature(world, random, 'hermit')
 export const addTurtle = (world: Sandbox, random: () => number) => addCreature(world, random, 'turtle')
 function addCreature(world: Sandbox, random: () => number, kind: Creature['kind']) {
-  const group = kind === 'crab' ? world.crabs : world.turtles
-  if (group.length >= (kind === 'crab' ? MAX_CRABS : MAX_TURTLES)) return false
+  const group = groupOf(world, kind)
+  if (group.length >= LIMITS[kind]) return false
   // Scan from a random column, so a crowded board cannot cause an unbounded retry.
   const start = Math.floor(random() * world.width)
   for (let i = 0; i < world.width; i++) {
@@ -58,7 +64,7 @@ function addCreature(world: Sandbox, random: () => number, kind: Creature['kind'
     if (x < 7 || x >= world.width - 7) continue
     let y = 8
     while (y < world.height - 1 && !soil(world.get(x, y + 1)) && !blockingCell(world.get(x, y + 1))) y++
-    if (blocked(world, x, y) || [...world.crabs, ...world.turtles].some(c => Math.hypot(c.x - x, c.y - y) < 20)) continue
+    if (blocked(world, x, y) || groundAnimals(world).some(c => Math.hypot(c.x - x, c.y - y) < 20)) continue
     group.push({ kind, growth: 0, fullness: 600, search: 0, target: null, pursuit: 0, eating: 0, celebration: 0, x, y, direction: random() < 0.5 ? -1 : 1, decision: 90, resting: false, wave: 70, cooldown: 300, phase: 0, digging: false, sleeping: 0, sleepDelay: world.night ? nextSleepDelay(random) : 0 })
     return true
   }
@@ -66,6 +72,7 @@ function addCreature(world: Sandbox, random: () => number, kind: Creature['kind'
 }
 
 export const tapCrab = (world: Sandbox, point: Point) => tapCreature(world, point, world.crabs)
+export const tapHermit = (world: Sandbox, point: Point) => tapCreature(world, point, world.hermits)
 export const tapTurtle = (world: Sandbox, point: Point) => tapCreature(world, point, world.turtles)
 function tapCreature(world: Sandbox, point: Point, group: Creature[]) {
   const crab = group.find(c => Math.abs(c.x - point.x) <= 9 * creatureScale(c) && Math.abs(c.y - 4 * creatureScale(c) - point.y) <= 9 * creatureScale(c) &&
@@ -81,6 +88,7 @@ function tapCreature(world: Sandbox, point: Point, group: Creature[]) {
 }
 
 export const stepCrabs = (world: Sandbox, random: () => number) => stepCreatures(world, random, world.crabs)
+export const stepHermits = (world: Sandbox, random: () => number) => stepCreatures(world, random, world.hermits)
 export const stepTurtles = (world: Sandbox, random: () => number) => stepCreatures(world, random, world.turtles)
 function overlap(a: Creature, b: Creature, x = a.x, y = a.y) {
   const sa = creatureScale(a), sb = creatureScale(b)
@@ -89,12 +97,12 @@ function overlap(a: Creature, b: Creature, x = a.x, y = a.y) {
 }
 
 function separate(world: Sandbox, creature: Creature, scale: number) {
-  const others = [...world.crabs, ...world.turtles].filter(c => c !== creature)
+  const others = groundAnimals(world).filter(c => c !== creature)
   const crowd = others.filter(c => overlap(creature, c) > 0)
   if (!crowd.length) return false
   wakeCreature(creature)
   const nearest = crowd.sort((a, b) => Math.abs(a.x - creature.x) - Math.abs(b.x - creature.x))[0]
-  const order = [...world.crabs, ...world.turtles]
+  const order = groundAnimals(world)
   const away = Math.sign(creature.x - nearest.x) || (order.indexOf(creature) < order.indexOf(nearest) ? -1 : 1)
   for (const direction of [away, -away]) {
     const nx = creature.x + direction * 0.12
@@ -177,7 +185,8 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
         }
       }
     }
-    const other = crab.kind === 'crab' && !crab.target ? world.crabs.find(c => c !== crab && !c.target && !c.sleeping) : undefined
+    // Crabs and hermit crabs greet each other; the turtle keeps to itself.
+    const other = crab.kind !== 'turtle' && !crab.target ? [...world.crabs, ...world.hermits].find(c => c !== crab && !c.target && !c.sleeping) : undefined
     if (other && !other.digging && Math.abs(other.y - crab.y) < 5) {
       const distance = Math.abs(other.x - crab.x)
       if (distance < 22 && crab.cooldown === 0 && other.cooldown === 0) {
@@ -199,7 +208,7 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
     let ny = crab.y
     // Small sand slopes are climbed gradually; rocks and ungerminated seeds turn the crab around.
     if (soil(world.get(Math.round(nx + crab.direction * 4), feet))) ny -= 0.12
-    if ([...world.crabs, ...world.turtles].some(c => c !== crab && overlap(crab, c, nx, ny) > overlap(crab, c))) {
+    if (groundAnimals(world).some(c => c !== crab && overlap(crab, c, nx, ny) > overlap(crab, c))) {
       crab.target = null; crab.eating = 0; crab.search = 90
       crab.direction *= -1; crab.decision = 90
       continue
@@ -253,6 +262,64 @@ export function renderCrabs(world: Sandbox, pixels: Uint8ClampedArray) {
   }
 }
 
+// Hermit crabs walk, eat and nap like crabs, but draw their own animation: the shell
+// sways while walking, a surprised hermit ducks inside before waving its big claw,
+// and it naps tucked into the shell.
+export function renderHermits(world: Sandbox, pixels: Uint8ClampedArray) {
+  for (const hermit of world.hermits) {
+    const wobble = hermit.digging ? Math.sin(hermit.phase * 2) * 0.6 : 0
+    const cx = Math.round(hermit.x + wobble), cy = Math.round(hermit.y)
+    const dot = creaturePainter(world, pixels, hermit, cx, cy)
+    const d = hermit.direction
+    const body = [236, 108, 70], leg = [196, 74, 50], shell = [238, 212, 164], stripe = [184, 118, 76], mouth = [112, 64, 46]
+    const walking = !hermit.resting && !hermit.wave && !hermit.eating
+    const tucked = hermit.sleeping > 0 || hermit.wave > 70
+    const bob = walking && Math.sin(hermit.phase * 2) > 0 ? -1 : 0
+    if (!tucked) {
+      const stride = walking ? Math.round(Math.sin(hermit.phase * 1.5)) : 0
+      for (const [lx, step] of [[1, stride], [3, -stride], [5, stride]]) {
+        dot(d * lx, -2, leg); dot(d * (lx + step), -1, leg); dot(d * (lx + step), 0, leg)
+      }
+      for (let dy = -6; dy <= -2; dy++) for (let dx = 2; dx <= 6; dx++) {
+        if ((dx - 4) ** 2 / 6 + (dy + 4) ** 2 / 4 <= 1) dot(d * dx, dy, body)
+      }
+      const peek = hermit.wave ? Math.round(Math.sin(hermit.phase * 2)) : 0
+      for (const ex of [4, 6]) {
+        dot(d * ex, -7, body); dot(d * ex, -8 - peek, body)
+        if (hermit.digging) continue
+        dot(d * ex, -9 - peek, [255, 255, 236]); dot(d * ex + (ex === 6 ? d : 0), -9 - peek, [63, 56, 48])
+      }
+      dot(d * 7, -8, leg); dot(d * 8, -9, leg); dot(d * 9, -9, leg)
+      let kx = d * 8, ky = -3
+      if (hermit.eating && hermit.target) {
+        const scale = creatureScale(hermit)
+        kx = (hermit.target.x - cx) / scale; ky = (hermit.target.y - cy) / scale + 1
+      } else if (hermit.wave > 0 || hermit.digging) ky -= 2 + Math.round(Math.sin(hermit.phase * 2) * 1.5)
+      line(dot, d * 6, -4, kx, ky, body)
+      const pinch = hermit.eating ? (Math.sin(hermit.phase * 3) > 0 ? 1 : 0) : hermit.wave ? (Math.sin(hermit.phase * 2) > 0 ? 1 : 0) : 0
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) dot(kx + dx, ky + dy, body)
+      dot(kx + d * 2, ky - 1 - pinch, body); dot(kx + d * 2, ky + 1 + pinch, body)
+    }
+    // Spiral shell on its back, apex pointing back and up.
+    const sx = -d, sy = -5 + bob
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -5; dx <= 5; dx++) {
+      if (dx * dx / 25 + dy * dy / 16 > 1) continue
+      const r = Math.hypot(dx / 5, dy / 4) * 4
+      const a = (Math.atan2(dy, dx * d) + Math.PI) / (Math.PI * 2)
+      const band = (r + a * 2.4) % 2.4
+      dot(sx + dx, sy + dy, band < 0.75 ? stripe : dy <= -3 ? [252, 236, 204] : shell)
+    }
+    dot(sx - d * 5, sy - 3, stripe); dot(sx - d * 6, sy - 4, shell)
+    dot(sx + d * 3, sy + 2, mouth); dot(sx + d * 4, sy + 1, mouth); dot(sx + d * 4, sy + 2, mouth)
+    if (tucked) {
+      // Only the claw plugs the opening while it hides or sleeps.
+      dot(sx + d * 4, sy + 1, body); dot(sx + d * 5, sy + 1, body); dot(sx + d * 5, sy + 2, body)
+    }
+    renderCelebration(dot, hermit)
+    renderSleep(dot, hermit)
+  }
+}
+
 // Only live blooms are food. Search occasionally, reserve one flower per animal,
 // and abandon unreachable targets so wandering never gets stuck in a chase.
 function feed(world: Sandbox, creature: Creature, random: () => number) {
@@ -264,7 +331,7 @@ function feed(world: Sandbox, creature: Creature, random: () => number) {
   }
   if (!creature.target && --creature.search <= 0) {
     creature.search = 240 + Math.floor(random() * 240)
-    const friends = [...world.crabs, ...world.turtles]
+    const friends = groundAnimals(world)
     creature.target = blooms.filter(p => Math.abs(p.x - creature.x) <= 40 &&
       creature.y - p.y >= 2 && creature.y - p.y <= 18 * scale &&
       !friends.some(c => c !== creature && c.target?.x === p.x && c.target.y === p.y))

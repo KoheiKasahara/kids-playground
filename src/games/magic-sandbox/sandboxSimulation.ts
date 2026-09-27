@@ -1,4 +1,4 @@
-import { addCrab, addTurtle, tapCrab, tapTurtle, stepCrabs, stepTurtles, renderCrabs, renderTurtles, nextSleepDelay, wakeCreature, creatureScale, type Creature } from './sandboxCrabs'
+import { addCrab, addHermit, addTurtle, tapCrab, tapHermit, tapTurtle, stepCrabs, stepHermits, stepTurtles, renderCrabs, renderHermits, renderTurtles, nextSleepDelay, wakeCreature, creatureScale, type Creature } from './sandboxCrabs'
 import { addButterfly, tapButterfly, stepButterflies, renderButterflies, type Butterfly } from './sandboxButterfly'
 import { nextCrowDelay, reshapeCrows, stepCrows, renderCrows, type Crow } from './sandboxCrow'
 
@@ -43,6 +43,7 @@ export class Sandbox {
   private plants: Plant[] = []
   private tick = 0
   readonly crabs: Creature[] = []
+  readonly hermits: Creature[] = []
   readonly turtles: Creature[] = []
   readonly butterflies: Butterfly[] = []
   // Crows only pass overhead; they never land, so the board never holds more than one.
@@ -53,15 +54,17 @@ export class Sandbox {
     if (this.night === night) return
     this.night = night
     if (night) this.crowDelay = nextCrowDelay(this.random)
-    for (const creature of [...this.crabs, ...this.turtles, ...this.butterflies]) {
+    for (const creature of [...this.crabs, ...this.hermits, ...this.turtles, ...this.butterflies]) {
       wakeCreature(creature)
       creature.sleepDelay = night ? nextSleepDelay(this.random) : 0
     }
   }
   addCrab() { return addCrab(this, this.random) }
+  addHermit() { return addHermit(this, this.random) }
   addTurtle() { return addTurtle(this, this.random) }
   addButterfly() { return addButterfly(this, this.random) }
   tapCrab(point: Point) { return tapCrab(this, point) }
+  tapHermit(point: Point) { return tapHermit(this, point) }
   tapTurtle(point: Point) { return tapTurtle(this, point) }
   tapButterfly(point: Point) { return tapButterfly(this, point) }
   // A seed only sprouts clear of the plants already growing around it.
@@ -112,6 +115,7 @@ export class Sandbox {
   }
   clear() {
     this.crabs.length = 0
+    this.hermits.length = 0
     this.turtles.length = 0
     this.butterflies.length = 0
     this.crows.length = 0
@@ -171,12 +175,12 @@ export class Sandbox {
       for (const [index, material] of moved) if (cells[index] === material) cells[index] = Cell.Empty
       return []
     })
-    for (const group of [this.crabs, this.turtles, this.butterflies]) reseat(group, dx, dy, width, height)
+    for (const group of [this.crabs, this.hermits, this.turtles, this.butterflies]) reseat(group, dx, dy, width, height)
     reshapeCrows(this, previous, previousHeight)
     return true
   }
   paint(point: Point, material: Material, radius: number) {
-    for (const creature of [...this.crabs, ...this.turtles]) {
+    for (const creature of [...this.crabs, ...this.hermits, ...this.turtles]) {
       const scale = creatureScale(creature)
       if (Math.abs(point.x - creature.x) <= radius + 8 * scale && Math.abs(point.y - (creature.y - 4 * scale)) <= radius + 5 * scale) wakeCreature(creature)
     }
@@ -246,6 +250,7 @@ export class Sandbox {
     }
     this.grow()
     stepCrabs(this, this.random)
+    stepHermits(this, this.random)
     stepTurtles(this, this.random)
     stepButterflies(this, this.random)
     stepCrows(this, this.random)
@@ -287,7 +292,7 @@ export class Sandbox {
     }
   }
   shake() {
-    for (const creature of [...this.crabs, ...this.turtles, ...this.butterflies]) wakeCreature(creature)
+    for (const creature of [...this.crabs, ...this.hermits, ...this.turtles, ...this.butterflies]) wakeCreature(creature)
     // Lift loose grains into available space; stone walls and rooted flowers stay put.
     for (let y = 1; y < this.height; y++) for (let x = 0; x < this.width; x++) {
       if (!loose(this.get(x, y))) continue
@@ -311,6 +316,7 @@ export function renderSandbox(world: Sandbox, pixels: Uint8ClampedArray) {
     pixels[offset + 3] = material === Cell.Empty ? 0 : 255
   }
   renderCrabs(world, pixels)
+  renderHermits(world, pixels)
   renderTurtles(world, pixels)
   renderButterflies(world, pixels)
   renderCrows(world, pixels)

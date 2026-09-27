@@ -17,12 +17,14 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
       await expect(page.getByText('↔ よこに うごくよ')).toBeVisible()
       expect(await materials.evaluate(strip => strip.scrollWidth - strip.clientWidth)).toBeGreaterThan(40)
     }
-    await page.getByRole('button', { name: 'カニを ふやす（0/2）' }).click()
-    await page.getByRole('button', { name: 'カニを ふやす（1/2）' }).click()
+    await page.getByRole('button', { name: 'カニを ふやす（0/1）' }).click()
+    await expect(page.getByRole('button', { name: 'カニを ふやす（1/1）' })).toBeDisabled()
+    await page.getByRole('button', { name: 'ヤドカリを ふやす（0/1）' }).click()
+    await expect(page.getByRole('button', { name: 'ヤドカリを ふやす（1/1）' })).toBeDisabled()
     await page.getByRole('button', { name: 'カメを ふやす（0/1）' }).click()
     await page.getByRole('button', { name: 'ちょうちょを ふやす（0/1）' }).click()
     await expect(page.getByRole('button', { name: 'ちょうちょを ふやす（1/1）' })).toBeDisabled()
-    // すなつぶが正方形なら、カニもカメもちょうちょも横長に伸びない。
+    // すなつぶが正方形なら、カニもヤドカリもカメもちょうちょも横長に伸びない。
     const grain = await canvas.evaluate((element: HTMLCanvasElement) => {
       const box = element.getBoundingClientRect()
       return { across: box.width / element.width, down: box.height / element.height }
