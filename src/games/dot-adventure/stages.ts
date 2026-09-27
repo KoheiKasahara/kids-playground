@@ -1,22 +1,23 @@
 // ステージの 地図と ようす。地図は 1もじ＝1マス（16ドット）。
 //
-// じめん: '.' くさ  ',' はなばたけ  ':' ふかい くさ  '=' つちの みち  's' すなはま  'o' いしだたみ
+// じめん: '.' くさ（ゆきの ステージでは ゆき）  ',' はなばたけ（きらきら）  ':' ふかい くさ  '=' つちの みち  's' すなはま（こおり）  'o' いしだたみ
 //         '~' みず  '#' はし  'L' はすのは（みず）  'h' かいがら（すな）
 // もの:   'T' 大きな 木  'P' ヤシの木  'b' しげみ  'r' いわ  'I' はしら  'i' おれた はしら  'f' たいまつ
 // ほか:   '*' ほしの かけら  'm' なかまに なる いきもの  'C' たからばこが でる ところ  '@' スタート
-// しかけ: 'G' とおせんぼ（いわ・きれた はし・いしの とびら）  'k' ふむ スイッチ  'u' ひの きえた たいまつ
+// しかけ: 'G' とおせんぼ（いわ・きれた はし・いしの とびら・こおりの かべ）  'k' ふむ スイッチ  'u' ひの きえた たいまつ
 
-export type Theme = 'day' | 'sunset' | 'night'
-export type FriendKind = 'slime' | 'crab'
-export type FriendDef = { kind: FriendKind; name: string; color: 'blue' | 'pink' | 'gold' | 'purple' | 'mint' | 'red' }
+export type Theme = 'day' | 'sunset' | 'night' | 'snow'
+export type FriendKind = 'slime' | 'crab' | 'penguin'
+export type FriendDef = { kind: FriendKind; name: string; color: 'blue' | 'pink' | 'gold' | 'purple' | 'mint' | 'red' | 'ice' }
 
 /**
  * ステージに ひとつ ある しかけ。'G' の マスは しかけを とくまで とおれない。
  * - boulder: なかまを need にん つれて いくと みんなで おして どかせる おおきな いわ
  * - bridge: 'k' の スイッチを ふむと きれた はしが のびる
  * - torch: 'u' の たいまつ ぜんぶに ひを ともすと いしの とびらが ひらく
+ * - ice: ペンギンの なかまを つれて いくと こおりの かべを つついて わる
  */
-export type GimmickDef = { kind: 'boulder'; need: number } | { kind: 'bridge' } | { kind: 'torch' }
+export type GimmickDef = { kind: 'boulder'; need: number } | { kind: 'bridge' } | { kind: 'torch' } | { kind: 'ice' }
 
 export type StageDef = {
   id: string
@@ -151,6 +152,46 @@ export const STAGES: readonly StageDef[] = [
       'TT:.::::....::.:::oooo.::..:.:::...::.:T',
       'T:T:T:T:T:T:T:T:T:ooooT:T:T:T:T:T:T:T:TT',
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+    ],
+  },
+  {
+    id: 'snow',
+    name: 'しろい ゆきのはら',
+    lead: 'ゆきが しんしん ふる まっしろな はら',
+    theme: 'snow',
+    treasure: 'ゆきの けっしょう',
+    gimmick: { kind: 'ice' },
+    friends: [
+      { kind: 'penguin', name: 'ペンタ', color: 'blue' },
+      { kind: 'slime', name: 'ゆきぷる', color: 'ice' },
+    ],
+    map: [
+      'TTTTTTTTTTTTTTTTTTTTTTTTTTT~~~TTTTTTTTTT',
+      'T:T:T:T:T:T:T:T:T:T:T:T:T:T~~~T:T:T:T:TT',
+      'T::::::::::::::.:::.::.:.::~~~:::::G::TT',
+      'TT:....:.s:....:.T..:.:....~~~.foooof:*T',
+      'T::..sssssssss........T....~~~.oooooorTT',
+      'TT:.ssss*ssssss....,.......~~~.oooooo::T',
+      'T::sssssssssssss..,,,.......~~~ooCooo.TT',
+      'TT:sssssssssssss...,........~~~oooooo.:T',
+      'T::.sssssssssrs.............~~~oooooo.TT',
+      'TT...sssssssss..........T...~~~..=..:::T',
+      'T::....sssssm...............~~~..=...:TT',
+      'TT:r...........r....b.......~~~r.=.T:::T',
+      'T:::.......................~~~...=..::TT',
+      'TT=@=======================###====...::T',
+      'T::........................~~~.......:TT',
+      'TT.............b...........~~~......b.:T',
+      'T::...T...............T....~~~.T....::TT',
+      'TT::...............,,,....~~~.......:::T',
+      'T:::..............,*,,,...~~~....,,,::TT',
+      'TT:........T.......,,,....~~~....,,,:.:T',
+      'T:::b...................r.~~~....,,,*:TT',
+      'TT::*............T........~~~.m.......:T',
+      'T::.::.:.r:..:.:....:.:...~~~....T:..:TT',
+      'TT::::.:...::::::..::.::..~~~.:..::.:::T',
+      'TT:T:T:T:T:T:T:T:T:T:T:T:T~~~T:T:T:T:T:T',
+      'TTTTTTTTTTTTTTTTTTTTTTTTTT~~~TTTTTTTTTTT',
     ],
   },
 ]

@@ -17,7 +17,7 @@ const reaches = (level: Level, p: Point) => {
   return Math.hypot(end.x - p.x, end.y - p.y) < TILE * 1.5
 }
 
-/** しかけを とく（なかまを つれて いく・スイッチを ふむ・たいまつを ともす）。 */
+/** しかけを とく（なかまを つれて いく・スイッチを ふむ・たいまつを ともす・ペンギンを つれて いく）。 */
 function solveGimmick(world: World) {
   const level = world.level
   const kind = world.gimmick.def.kind
@@ -30,6 +30,12 @@ function solveGimmick(world: World) {
     expect(walkTo(world, gate)).toBe(true)
   } else if (kind === 'bridge') {
     expect(walkTo(world, level.switches[0])).toBe(true)
+  } else if (kind === 'ice') {
+    const penguin = world.friends.find(f => f.def.kind === 'penguin')!
+    expect(walkTo(world, penguin)).toBe(true)
+    walkUntil(world, () => penguin.joined)
+    const gate = tileCenter(level.gates[0].tx, level.gates[0].ty)
+    expect(walkTo(world, gate)).toBe(true)
   } else {
     for (const t of level.torches) {
       expect(walkTo(world, tileCenter(t.tx, t.ty))).toBe(true)
@@ -75,6 +81,7 @@ describe('dot-adventure stages', () => {
     expect(forest.friendSpawns.length).toBeGreaterThanOrEqual((STAGES.find(s => s.gimmick.kind === 'boulder')!.gimmick as { need: number }).need)
     expect(parseLevel(STAGES.find(s => s.gimmick.kind === 'bridge')!).switches.length).toBeGreaterThan(0)
     expect(parseLevel(STAGES.find(s => s.gimmick.kind === 'torch')!).torches.length).toBeGreaterThan(0)
+    expect(STAGES.find(s => s.gimmick.kind === 'ice')!.friends.some(f => f.kind === 'penguin')).toBe(true)
   })
 })
 
@@ -107,6 +114,17 @@ describe('dot-adventure しかけ', () => {
     const torches = drainEvents(world).filter(e => e.type === 'torch')
     expect(torches.map(e => e.type === 'torch' && e.left)).toEqual([1, 0])
     expect(world.gimmick.lit.every(Boolean)).toBe(true)
+  })
+
+  test('ゆきのはらの こおりは ペンギンが いないと われず、つれて いくと われる', () => {
+    const world = createWorld(STAGES.find(s => s.gimmick.kind === 'ice')!)
+    const gate = tileCenter(world.level.gates[0].tx, world.level.gates[0].ty)
+    expect(walkTo(world, gate)).toBe(true)
+    walkUntil(world, () => world.path.length === 0)
+    expect(world.gimmick.open).toBe(false)
+    expect(drainEvents(world).find(e => e.type === 'gimmick-hint')).toMatchObject({ kind: 'ice' })
+    solveGimmick(world)
+    expect(drainEvents(world).some(e => e.type === 'gate-open' && e.kind === 'ice')).toBe(true)
   })
 
   test('しかけの むこうを タップすると とおせんぼの まえまで あるく', () => {

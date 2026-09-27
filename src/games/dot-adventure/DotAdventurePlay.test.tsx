@@ -39,7 +39,7 @@ describe('dot-adventure play', () => {
   test('タイトルから ステージを えらんで あそび、もどれる', () => {
     render(<MemoryRouter><DotAdventurePlay /></MemoryRouter>)
     expect(screen.getByRole('heading', { name: 'ドットの ぼうけん' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /^ステージ\d/ })).toHaveLength(3)
+    expect(screen.getAllByRole('button', { name: /^ステージ\d/ })).toHaveLength(4)
     fireEvent.click(screen.getByRole('button', { name: /ステージ1 みどりの もり/ }))
     expect(screen.getByLabelText(/みどりの もり。いきたい ところを タップすると/)).toBeInTheDocument()
     expect(startBgm).toHaveBeenCalledWith('forest')

@@ -66,12 +66,14 @@ function gimmickMessage(event: WorldEvent): string | null {
     case 'gimmick-hint':
       if (event.kind === 'boulder') return `おおきな いわだ。なかまが あと ${event.need}にん いれば おせそう`
       if (event.kind === 'bridge') return 'はしが きれている… どこかに スイッチが あるかも'
+      if (event.kind === 'ice') return 'こおりの かべだ。ペンギンの なかまが いれば われそう'
       return `いしの とびらだ。たいまつに ひを ともそう（あと ${event.need}こ）`
     case 'switch': return 'カチッ！ スイッチを ふんだ'
     case 'torch': return event.left > 0 ? `たいまつに ひが ついた！ あと ${event.left}こ` : null
     case 'gate-open':
       if (event.kind === 'boulder') return 'みんなで おしたら いわが どいた！'
       if (event.kind === 'bridge') return 'はしが のびた！ わたれるよ'
+      if (event.kind === 'ice') return 'ペンギンが つついたら こおりが われた！'
       return 'いしの とびらが ひらいた！'
     default: return null
   }
@@ -432,7 +434,8 @@ function TitleScreen({ progress, music, onMusic, onPick }: { progress: Progress;
         const scene = sceneFor(stage, world)
         if (!scene) return
         const w = 200, h = 112
-        const focus = stage.id === 'ruins' ? { x: 320, y: 200 } : stage.id === 'beach' ? { x: 290, y: 250 } : { x: 250, y: 150 }
+        const focus = stage.id === 'ruins' ? { x: 320, y: 200 } : stage.id === 'beach' ? { x: 290, y: 250 }
+          : stage.id === 'snow' ? { x: 190, y: 120 } : { x: 250, y: 150 }
         const img = scene.draw(world, scene.camera(focus, w, h), 3, createFx(), w, h)
         try { const url = img?.toDataURL(); if (url) setThumbs(t => ({ ...t, [stage.id]: url })) } catch { /* え なしで つづける */ }
       }, 120 + i * 90))
