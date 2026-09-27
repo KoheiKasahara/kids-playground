@@ -291,7 +291,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
       </button>
     </div>
     <ul ref={trayRef} className={styles.tray} aria-label={`あと ${remaining}こ`}>
-      {hud.groups.map((g) => <li key={g.kind} className={g.got === g.total ? styles.chipDone : styles.chip} aria-label={`${KINDS[g.kind].name} ${g.got} / ${g.total}`}>
+      {hud.groups.map((g) => <li key={`${g.kind}-${g.got}`} className={`${g.got === g.total ? styles.chipDone : styles.chip} ${g.got > 0 ? styles.bump : ''}`} aria-label={`${KINDS[g.kind].name} ${g.got} / ${g.total}`}>
         <ItemIcon kind={g.kind} variant={g.variant} className={styles.chipIcon} />
         <span className={styles.pips} aria-hidden="true">
           {Array.from({ length: g.total }, (_, i) => <i key={i} className={i < g.got ? styles.pipOn : styles.pipOff} />)}
@@ -333,6 +333,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
           </section>
           <p className={styles.tip}>{TIPS[stage.id]}</p>
           {result.starsGot < result.starTotal && <p className={styles.tip}>ほしバッジが まだ かくれているよ（{result.starsGot} / {result.starTotal}）</p>}
+          {last && <p className={styles.tip}>ぜんぶの ステージを あそんだよ！ じしゃく はかせ だね</p>}
           <div className={styles.cardButtons}>
             <button type="button" onClick={onExit}>ステージを えらぶ</button>
             <button type="button" onClick={onRetry}>もういちど</button>
@@ -371,8 +372,20 @@ function TitleScreen({ progress, music, onMusic, onPick }: {
       view = fitCanvas(canvas, world)
       clearAt = -1
     }
-    const measure = () => { view = fitCanvas(canvas, world) }
-    window.addEventListener('resize', reset)
+    // がめんの 大きさが かわったら おてほんを つくりなおす。
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined
+    let lastSize = `${view.cssW}x${view.cssH}`
+    const onResize = () => {
+      clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(() => {
+        const box = canvas.getBoundingClientRect()
+        const size = `${box.width || window.innerWidth}x${box.height || window.innerHeight}`
+        if (size !== lastSize) { lastSize = size; reset() }
+      }, 120)
+    }
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(onResize) : null
+    observer?.observe(canvas)
+    window.addEventListener('resize', onResize)
     const tick = (now: number) => {
       const elapsed = previous ? Math.min(100, now - previous) : 0
       previous = now
@@ -395,12 +408,17 @@ function TitleScreen({ progress, music, onMusic, onPick }: {
       }
       if (steps === 4) acc = 0
       if (clearAt >= 0 && time - clearAt > 3) reset()
-      measure()
       painter.draw(ctx, world, view, time, fx)
       if (still) cancelAnimationFrame(frame)
     }
     frame = requestAnimationFrame(tick)
-    return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', reset); disposeWorld(world) }
+    return () => {
+      cancelAnimationFrame(frame)
+      clearTimeout(resizeTimer)
+      observer?.disconnect()
+      window.removeEventListener('resize', onResize)
+      disposeWorld(world)
+    }
   }, [])
 
   // ステージの ちいさな え（すこしずつ つくって 画面を かためない）。

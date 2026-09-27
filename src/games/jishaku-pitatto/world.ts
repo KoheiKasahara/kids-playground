@@ -67,6 +67,9 @@ export type Magnet = {
   load: number
   /** くっついた ときの ぷるっ（絵だけ）。 */
   jolt: number
+  /** くっついた ものを ふくめた はば（ひだり・みぎ）。がめんの はしで はみださない ため。 */
+  extL: number
+  extR: number
 }
 
 export type Stuck = {
@@ -456,7 +459,7 @@ export function createWorld(stage: StageDef, size: { w: number; h: number }, see
     stage, w, h, groundY, waterY, engine, items, props,
     magnet: {
       x: w / 2, y: Math.min(groundY - 150, h * 0.42), vx: 0, vy: 0, ax: 0, ay: 0, tilt: 0, tiltV: 0, tx: w / 2, ty: Math.min(groundY - 150, h * 0.42),
-      wet: false, mood: 'idle', moodT: 0, lookX: w / 2, lookY: groundY, activity: 0, load: 0, jolt: 0,
+      wet: false, mood: 'idle', moodT: 0, lookX: w / 2, lookY: groundY, activity: 0, load: 0, jolt: 0, extL: MAGNET_HALF_W, extR: MAGNET_HALF_W,
     },
     floorStatic, floor: new Float32Array(floorStatic), shadowFloor,
     sand: stage.ironSand ? makeIronSand(stage, spanX, groundY, rng, w) : null,
@@ -511,7 +514,7 @@ function makeIronSand(stage: StageDef, spanX: (t: number) => number, groundY: nu
 // ---------------- じしゃくの ちから ----------------
 
 /** (px, py) での じしゃくの ちから（g）。out に むきつきで いれ、おおきさを かえす。 */
-export function fieldAt(world: World, px: number, py: number, out: Vec, skip?: Item): number {
+export function fieldAt(world: World, px: number, py: number, out: Vec): number {
   const m = world.magnet
   let fx = 0, fy = 0
   for (const pp of POLE_POINTS) {
@@ -525,7 +528,7 @@ export function fieldAt(world: World, px: number, py: number, out: Vec, skip?: I
     fy += (dy / d) * f
   }
   for (const it of world.stuckOrder) {
-    if (it === skip || !it.stuck || it.kind.id === 'fish') continue
+    if (!it.stuck || it.kind.id === 'fish') continue
     const strength = INDUCED ** it.stuck.depth / it.kind.hot.length
     const range = RANGE * 0.55
     for (const h of it.kind.hot) {
@@ -616,7 +619,15 @@ export function stepWorld(world: World): void {
 
 function updateMagnet(world: World) {
   const m = world.magnet
-  const minX = MAGNET_HALF_W + 4, maxX = world.w - MAGNET_HALF_W - 4
+  let left = MAGNET_HALF_W, right = MAGNET_HALF_W
+  for (const it of world.stuckOrder) {
+    const r = shapeRadius(it.kind.shape) * 0.6
+    left = Math.max(left, m.x - it.x + r)
+    right = Math.max(right, it.x - m.x + r)
+  }
+  m.extL += (Math.min(left, 80) - m.extL) * 0.08
+  m.extR += (Math.min(right, 80) - m.extR) * 0.08
+  const minX = m.extL + 4, maxX = world.w - m.extR - 4
   const tx = clamp(m.tx, minX, maxX)
   const ty = clamp(m.ty, world.topLimit + MAGNET_H, world.groundY + 40)
   const wetNow = world.waterY !== null && m.y - 6 > surfaceY(world, m.x)
@@ -706,7 +717,7 @@ function applyForces(world: World) {
     }
     it.pull = total
     // はじまって すぐは つれない（あんないを よんでいる あいだ）。
-    if (it.swim && world.time > START_GRACE && total > (it.swim.jelly ? Infinity : 1.05)) {
+    if (it.swim && world.time > START_GRACE && total > 1.05) {
       it.swim = null
       world.events.push({ type: 'hooked', id: it.id, x: it.x, y: it.y })
     }
@@ -885,8 +896,7 @@ function attach(world: World, it: Item, hit: Hit) {
     host.stuck!.children++
   }
   // もの側の さわる てん（ホットスポットから ささえへ むけて hotR）。
-  const hotW = fromItem(it, hit.hotLocal.x, hit.hotLocal.y)
-  const toward = toItem(it, hotW.x + (anchorW.x - hotW.x), hotW.y + (anchorW.y - hotW.y))
+  const toward = toItem(it, anchorW.x, anchorW.y)
   const dl = Math.hypot(toward.x - hit.hotLocal.x, toward.y - hit.hotLocal.y)
   const contact = dl > 1e-6
     ? { x: hit.hotLocal.x + ((toward.x - hit.hotLocal.x) / dl) * it.kind.hotR, y: hit.hotLocal.y + ((toward.y - hit.hotLocal.y) / dl) * it.kind.hotR }

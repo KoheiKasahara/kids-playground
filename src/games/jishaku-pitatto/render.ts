@@ -325,6 +325,143 @@ function twinkle(g: G, x: number, y: number, s: number, a: number) {
 
 // ---------------- けしき ----------------
 
+/** かべの たな と とけい（さわれない かざり なので すこし うすめの いろ）。 */
+function paintWallShelf(g: G, w: number, wainY: number) {
+  const shelfY = wainY - 64
+  const x0 = w * 0.6, x1 = Math.min(w - 12, w * 0.6 + 170)
+  if (shelfY < 150 || x1 - x0 < 110) return
+  // たな
+  g.fillStyle = 'rgba(120,70,30,.18)'
+  g.fillRect(x0 + 4, shelfY + 8, x1 - x0 - 8, 5)
+  rr(g, x0, shelfY, x1 - x0, 8, 3)
+  g.fillStyle = '#e0a468'
+  g.fill()
+  g.fillStyle = 'rgba(255,255,255,.4)'
+  g.fillRect(x0 + 3, shelfY + 1, x1 - x0 - 6, 1.5)
+  for (const bx of [x0 + 14, x1 - 20]) {
+    g.fillStyle = '#c98a4f'
+    g.beginPath()
+    g.moveTo(bx, shelfY + 8)
+    g.lineTo(bx + 6, shelfY + 8)
+    g.lineTo(bx + 6, shelfY + 20)
+    g.closePath()
+    g.fill()
+  }
+  // うえきばち
+  const px = x0 + 26
+  g.fillStyle = '#6cc07a'
+  for (const [dx, dy, r, a] of [[-7, -30, 7, -0.5], [6, -33, 7, 0.4], [0, -40, 7, 0], [-10, -22, 6, -0.9], [10, -24, 6, 0.9]] as [number, number, number, number][]) {
+    g.save()
+    g.translate(px + dx, shelfY + dy)
+    g.rotate(a)
+    g.beginPath()
+    g.ellipse(0, 0, r * 0.6, r * 1.3, 0, 0, Math.PI * 2)
+    g.fill()
+    g.restore()
+  }
+  g.fillStyle = '#e58a6a'
+  g.beginPath()
+  g.moveTo(px - 11, shelfY - 18)
+  g.lineTo(px + 11, shelfY - 18)
+  g.lineTo(px + 8, shelfY)
+  g.lineTo(px - 8, shelfY)
+  g.closePath()
+  g.fill()
+  g.fillStyle = '#f2a386'
+  g.fillRect(px - 12, shelfY - 20, 24, 4)
+  // くまの ぬいぐるみ
+  const bx = x0 + 70, by = shelfY
+  g.fillStyle = '#d9a26b'
+  for (const [dx, dy, r] of [[-8, -30, 4.5], [8, -30, 4.5], [0, -22, 10], [0, -8, 11]] as [number, number, number][]) {
+    g.beginPath()
+    g.arc(bx + dx, by + dy, r, 0, Math.PI * 2)
+    g.fill()
+  }
+  g.fillStyle = '#f3d3ad'
+  g.beginPath()
+  g.ellipse(bx, by - 18, 4.5, 3.4, 0, 0, Math.PI * 2)
+  g.ellipse(bx, by - 6, 6, 6, 0, 0, Math.PI * 2)
+  g.fill()
+  g.fillStyle = '#5b3a2a'
+  for (const dx of [-3.6, 3.6]) {
+    g.beginPath()
+    g.arc(bx + dx, by - 24, 1.2, 0, Math.PI * 2)
+    g.fill()
+  }
+  g.beginPath()
+  g.arc(bx, by - 19.5, 1.3, 0, Math.PI * 2)
+  g.fill()
+  g.fillStyle = '#ff8fa8'
+  g.beginPath()
+  g.moveTo(bx - 5, by - 14)
+  g.lineTo(bx, by - 12)
+  g.lineTo(bx + 5, by - 14)
+  g.lineTo(bx + 5, by - 10)
+  g.lineTo(bx, by - 12)
+  g.lineTo(bx - 5, by - 10)
+  g.closePath()
+  g.fill()
+  // ロケットの おもちゃ
+  const rx = x0 + 112
+  if (rx + 14 < x1) {
+    g.fillStyle = '#9fc9ff'
+    rr(g, rx - 6, by - 34, 12, 26, 6)
+    g.fill()
+    g.fillStyle = '#ff9aa9'
+    g.beginPath()
+    g.moveTo(rx - 6, by - 14)
+    g.lineTo(rx - 11, by)
+    g.lineTo(rx - 4, by - 6)
+    g.moveTo(rx + 6, by - 14)
+    g.lineTo(rx + 11, by)
+    g.lineTo(rx + 4, by - 6)
+    g.fill()
+    g.beginPath()
+    g.arc(rx, by - 25, 3.2, 0, Math.PI * 2)
+    g.fillStyle = '#ffffff'
+    g.fill()
+  }
+  // とけい
+  const cx = (x0 + x1) / 2 + 20, cy = shelfY - 100
+  if (cy > 150) {
+    g.fillStyle = 'rgba(120,70,30,.14)'
+    g.beginPath()
+    g.arc(cx + 2, cy + 3, 24, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#7ec8f2'
+    g.beginPath()
+    g.arc(cx, cy, 24, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#ffffff'
+    g.beginPath()
+    g.arc(cx, cy, 19, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = 'rgba(59,42,74,.55)'
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2
+      g.beginPath()
+      g.arc(cx + Math.cos(a) * 15, cy + Math.sin(a) * 15, i % 3 === 0 ? 1.6 : 0.9, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.strokeStyle = 'rgba(59,42,74,.75)'
+    g.lineCap = 'round'
+    g.lineWidth = 2.2
+    g.beginPath()
+    g.moveTo(cx, cy)
+    g.lineTo(cx + 7, cy - 5)
+    g.stroke()
+    g.lineWidth = 1.5
+    g.beginPath()
+    g.moveTo(cx, cy)
+    g.lineTo(cx - 2, cy - 13)
+    g.stroke()
+    g.fillStyle = '#ff6b7d'
+    g.beginPath()
+    g.arc(cx, cy, 2, 0, Math.PI * 2)
+    g.fill()
+  }
+}
+
 function paintDeskBack(g: G, world: World) {
   const { w, h, groundY } = world
   // かべ
@@ -474,6 +611,7 @@ function paintDeskBack(g: G, world: World) {
     g.fill()
     g.restore()
   }
+  paintWallShelf(g, w, wainY)
   // つくえ
   const top = groundY
   g.fillStyle = lin(g, 0, top, 0, top + 12, [[0, '#e7a867'], [1, '#d18f4e']])
@@ -920,6 +1058,7 @@ export class Painter {
     g.setTransform(px, 0, 0, px, view.ox * view.dpr, view.oy * view.dpr)
 
     if (world.waterY !== null) drawSeaBehind(g, world, time)
+    drawAmbient(g, world, time)
     drawShadows(g, world)
     if (world.sand) this.drawBuried(g, world, time, px)
     for (const it of world.items) if (it.state === 'body') this.drawItem(g, it, time, px)
@@ -1057,6 +1196,76 @@ export class Painter {
     }
     g.restore()
   }
+}
+
+/** けしきの なかの ちいさな いきもの・ひかり（さわれない）。 */
+function drawAmbient(g: G, world: World, time: number) {
+  const { w, h, groundY } = world
+  if (world.waterY !== null) {
+    // とおくを およぐ さかなの むれ
+    const wy = world.waterY
+    g.fillStyle = 'rgba(20,80,140,.22)'
+    for (let school = 0; school < 2; school++) {
+      const span = w + 200
+      const baseX = ((time * (14 + school * 6) + school * 300) % span) - 100
+      const x0 = school ? w - baseX : baseX
+      const y0 = wy + (groundY - wy) * (0.3 + school * 0.25)
+      for (let k = 0; k < 6; k++) {
+        const fx = x0 + (k % 3) * 16 * (school ? 1 : -1) + Math.sin(time * 2 + k) * 2
+        const fy = y0 + Math.floor(k / 3) * 12 + (k % 3) * 4 + Math.sin(time * 1.5 + k * 1.3) * 3
+        g.save()
+        g.translate(fx, fy)
+        if (school) g.scale(-1, 1)
+        g.beginPath()
+        g.ellipse(0, 0, 6, 2.6, 0, 0, Math.PI * 2)
+        g.moveTo(-5, 0)
+        g.lineTo(-10, -3)
+        g.lineTo(-10, 3)
+        g.closePath()
+        g.fill()
+        g.restore()
+      }
+    }
+    return
+  }
+  if (world.stage.sand) {
+    // ちょうちょ
+    for (let i = 0; i < 2; i++) {
+      const t = time * (0.35 + i * 0.1) + i * 2.4
+      const x = w * (0.5 + 0.42 * Math.sin(t * 0.9 + i)) 
+      const y = groundY - 120 - i * 70 + Math.sin(t * 2.3) * 26 + Math.sin(t * 5.1) * 6
+      const flap = Math.abs(Math.sin(time * 14 + i * 3))
+      g.save()
+      g.translate(x, y)
+      g.rotate(Math.cos(t * 0.9 + i) * 0.35)
+      g.fillStyle = i ? '#ffb3d1' : '#ffe066'
+      for (const side of [-1, 1]) {
+        g.beginPath()
+        g.ellipse(side * 4 * flap, -2, 4.5 * flap + 0.8, 5.5, side * 0.4, 0, Math.PI * 2)
+        g.fill()
+        g.beginPath()
+        g.ellipse(side * 3 * flap, 3.5, 3.2 * flap + 0.6, 3.6, side * 0.6, 0, Math.PI * 2)
+        g.fill()
+      }
+      g.fillStyle = INK
+      g.fillRect(-0.8, -5, 1.6, 10)
+      g.restore()
+    }
+    return
+  }
+  // まどから はいる ひかりの ちり
+  g.fillStyle = 'rgba(255,250,220,.75)'
+  for (let i = 0; i < 12; i++) {
+    const t = time * 0.12 + i * 0.618
+    const x = (hash(i) * w * 0.6 + Math.sin(t * 2 + i) * 20 + t * 12) % (w * 0.7)
+    const y = h * 0.2 + ((hash(i + 7) * (groundY - h * 0.2) - t * 18) % (groundY - h * 0.2) + (groundY - h * 0.2)) % (groundY - h * 0.2)
+    const a = 0.3 + 0.7 * Math.abs(Math.sin(time * 1.3 + i))
+    g.globalAlpha = a * 0.6
+    g.beginPath()
+    g.arc(x, y, 1.2 + hash(i + 3), 0, Math.PI * 2)
+    g.fill()
+  }
+  g.globalAlpha = 1
 }
 
 function drawShadows(g: G, world: World) {
