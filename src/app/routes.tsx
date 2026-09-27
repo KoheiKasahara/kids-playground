@@ -76,6 +76,9 @@ export const routes: RouteObject[] = [
   // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // DotAquariumPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/dot-aquarium', element: lazyRoute(() => import('../games/dot-aquarium/DotAquariumPlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // DotRunPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/dot-run', element: lazyRoute(() => import('../games/dot-run/DotRunPlay')) },
   // コース選択・レース・結果が同一route内で切り替わるため、プレイ面はゲーム内で包む。
   { path: '/games/pixel-kart', element: lazyRoute(() => import('../games/pixel-kart/PixelKartPlay')) },
   // タイトル・プレイ画面が同一route内で切り替わるため、プレイ面はゲーム内で包む。

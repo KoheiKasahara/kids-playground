@@ -24,6 +24,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/dot-adventure',
   '/games/dot-zoo',
   '/games/dot-aquarium',
+  '/games/dot-run',
   '/games/pixel-kart',
   '/games/tsumiki-3d',
   '/games/flag-pinball',

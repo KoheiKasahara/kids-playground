@@ -974,6 +974,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'dot-run',
+    slug: 'dot-run',
+    title: 'ドットの ぴょんぴょんラン',
+    emoji: '🐰',
+    category: 'learning',
+    seo: {
+      headline: 'ドットの ぴょんぴょんラン｜うさぎが はしる ドット絵の よこスクロールゲーム',
+      description:
+        'むかしの ゲーム機の ような ドット絵の はらっぱ・ビーチ・ゆきやまを、うさぎが じぶんで はしる よこスクロールゲーム。タップで ジャンプして いわや あなを こえ、にんじんと ほしメダルを あつめよう。',
+    },
+    intro: {
+      howToPlay: [
+        'うさぎは じぶんで はしるよ。タップで ジャンプ！',
+        'ながく おすと たかく、くうちゅうで もう1かい とべるよ',
+        'いきものは うえから ふむと ぽよんと はねるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
