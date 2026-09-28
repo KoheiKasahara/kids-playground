@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { findPianoNote } from '../shared/music/notes'
 import { findPianoSong } from '../shared/music/pianoSongs'
 import {
   MODE_RULES,
@@ -9,6 +10,7 @@ import {
   rhythmAccuracy,
   starsForAccuracy,
   tallyJudgements,
+  type ChartNote,
   type Judgement,
 } from './rhythmChart'
 import { RHYTHM_SONGS, findRhythmSong, melodyForRhythmSong } from './rhythmSongs'
@@ -57,6 +59,49 @@ describe('buildRhythmChart', () => {
     expect(laneOf('C4')).toBe(0)
     expect(laneOf('A4')).toBe(2)
     expect(new Set(chart.notes.map((note) => note.lane))).toEqual(new Set([0, 1, 2]))
+  })
+
+  test.each(RHYTHM_SONGS)('$title の タップする音は 拍の頭だけに置く', (song) => {
+    for (const mode of ['easy', 'normal'] as const) {
+      const chart = buildRhythmChart(melodyForRhythmSong(song), song.tempoBpm, mode)
+      const step = Math.ceil(MODE_RULES[mode].minGapMs / chart.beatMs)
+      const beats = chart.notes.filter((note) => note.target).map((note) => note.timeMs / chart.beatMs)
+      for (const beat of beats) expect(Math.abs(beat - Math.round(beat)), `${mode} ${beat}`).toBeLessThan(0.1)
+      // 間隔は かならず拍の整数倍で、1拍で間に合わない曲は2拍ごとの一定の向きにそろう。
+      for (let index = 1; index < beats.length; index += 1) {
+        expect(Math.round(beats[index] - beats[index - 1]) % step, `${mode} ${beats[index]}`).toBe(0)
+      }
+    }
+  })
+
+  test('短い音より、拍の頭の長い音を叩かせる', () => {
+    const song = findRhythmSong('going-home')!
+    const chart = buildRhythmChart(melodyForRhythmSong(song), song.tempoBpm, 'easy')
+    // 「ミー（1.5拍）・ソ（半拍）・ソー（2拍）」の、裏拍の短いソは自動で鳴らす。
+    expect(chart.notes.slice(0, 3).map((note) => note.target)).toEqual([true, false, true])
+  })
+
+  test('速い曲の かんたん は 2拍ごとにし、さいごの長い音も叩ける', () => {
+    for (const id of ['can-can', 'fur-elise']) {
+      const song = findRhythmSong(id)!
+      const chart = buildRhythmChart(melodyForRhythmSong(song), song.tempoBpm, 'easy')
+      expect(chart.beatMs, id).toBeLessThan(MODE_RULES.easy.minGapMs)
+      expect(chart.notes.at(-1)!.target, id).toBe(true)
+    }
+  })
+
+  test.each(RHYTHM_SONGS)('$title の みっつ たいこ は 音の高さの順を保ち、ひとつの太鼓に偏らない', (song) => {
+    const chart = buildRhythmChart(melodyForRhythmSong(song), song.tempoBpm, 'normal')
+    const targets = chart.notes.filter((note) => note.target)
+    const frequency = (note: ChartNote) => findPianoNote(note.noteId)!.frequency
+    for (const low of targets) {
+      for (const high of targets) {
+        if (frequency(low) < frequency(high)) expect(low.lane).toBeLessThanOrEqual(high.lane)
+      }
+    }
+    const perLane = [0, 1, 2].map((lane) => targets.filter((note) => note.lane === lane).length)
+    expect(Math.min(...perLane), perLane.join('/')).toBeGreaterThan(0)
+    expect(Math.max(...perLane) / targets.length, perLane.join('/')).toBeLessThanOrEqual(0.5)
   })
 
   test('速い音はタップせず自動で鳴らし、メロディを途切れさせない', () => {
