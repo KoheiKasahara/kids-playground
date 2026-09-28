@@ -26,9 +26,7 @@ export type RhythmChart = {
 
 type ModeRule = {
   readonly laneCount: number
-  /** 前のタップ音から、少なくともこの拍数あける。 */
-  readonly minGapBeats: number
-  /** テンポにかかわらず、少なくともこの時間はあける。 */
+  /** タップする音どうしを、少なくともこの時間はあける。1拍では足りない速い曲は2拍ごとにする。 */
   readonly minGapMs: number
   /** 早すぎ・遅すぎの許容幅（ms）。幼児向けに広めにとる。 */
   readonly perfectWindowMs: number
@@ -38,9 +36,12 @@ type ModeRule = {
 }
 
 export const MODE_RULES: Readonly<Record<RhythmMode, ModeRule>> = {
-  easy: { laneCount: 1, minGapBeats: 1, minGapMs: 640, perfectWindowMs: 170, goodWindowMs: 330, approachMs: 2400 },
-  normal: { laneCount: 3, minGapBeats: 0.5, minGapMs: 340, perfectWindowMs: 125, goodWindowMs: 260, approachMs: 1900 },
+  easy: { laneCount: 1, minGapMs: 640, perfectWindowMs: 170, goodWindowMs: 330, approachMs: 2400 },
+  normal: { laneCount: 3, minGapMs: 340, perfectWindowMs: 125, goodWindowMs: 260, approachMs: 1900 },
 }
+
+/** 旋律の時刻の丸め誤差を吸収して、拍の頭とみなす幅（拍）。 */
+const ON_BEAT_TOLERANCE = 0.1
 
 function midiOf(noteId: string): number {
   const note = findPianoNote(noteId)
@@ -49,29 +50,75 @@ function midiOf(noteId: string): number {
 }
 
 /**
+ * 音の高さの順を保ったまま、音の種類を laneCount 個のまとまりに分ける。
+ * 各まとまりの回数の二乗和が最小になる区切り（各まとまりの先頭の番号）を返す。
+ */
+function splitEvenly(counts: readonly number[], laneCount: number, from = 0): { cost: number; starts: number[] } {
+  const sizeOf = (end: number) => counts.slice(from, end).reduce((sum, count) => sum + count, 0)
+  if (laneCount === 1) return { cost: sizeOf(counts.length) ** 2, starts: [from] }
+  let best = { cost: Number.POSITIVE_INFINITY, starts: [] as number[] }
+  for (let end = from; end <= counts.length; end += 1) {
+    const rest = splitEvenly(counts, laneCount - 1, end)
+    const cost = sizeOf(end) ** 2 + rest.cost
+    if (cost < best.cost) best = { cost, starts: [from, ...rest.starts] }
+  }
+  return best
+}
+
+/**
+ * 音の高さ（MIDI）からレーンを決める関数を作る。低い音ほど左。
+ * 音域を三等分すると、低い音ばかりの曲では左の太鼓に偏るため、タップする音の回数がそろうように分ける。
+ * タップしない音は、それ以下でいちばん近いタップ音と同じレーンにする。
+ */
+function pitchLanes(targetMidis: readonly number[], laneCount: number): (midi: number) => number {
+  if (laneCount === 1) return () => 0
+  const pitches = [...new Set(targetMidis)].sort((a, b) => a - b)
+  const counts = pitches.map((pitch) => targetMidis.filter((value) => value === pitch).length)
+  const { starts } = splitEvenly(counts, laneCount)
+  return (midi) => {
+    const rank = Math.max(0, pitches.filter((pitch) => pitch <= midi).length - 1)
+    return starts.reduce((lane, start, index) => (start <= rank ? index : lane), 0)
+  }
+}
+
+/**
  * 共有の旋律データから、リズムゲームの譜面を作る。
- * すべての音を叩かせると幼児には速すぎるため、間隔の詰まった音は「自動で鳴る音」にして
- * メロディは途切れさせず、タップする音だけを間引く。
+ * すべての音を叩かせると幼児には速すぎるため、タップする音を間引き、残りは「自動で鳴る音」にして
+ * メロディは途切れさせない。
+ * タップする音は拍の頭（伴奏の太鼓と同じ時刻）にだけ置き、裏拍や細かい音は叩かせない。
+ * 1拍では間に合わない速い曲は2拍ごとにし、長い音（旋律の山）が多く乗る向きに拍をそろえる。
+ * こうすると、こどもは「どん・どん」という一定の間隔で叩けばよく、次のタイミングを予想しやすい。
  * 3レーンでは、低い音を左・高い音を右に置き、ピアノの鍵盤と同じ向きにする。
  */
 export function buildRhythmChart(melody: PianoSong, tempoBpm: number, mode: RhythmMode): RhythmChart {
   const rule = MODE_RULES[mode]
   const scale = melody.tempoBpm / tempoBpm
   const beatMs = 60_000 / tempoBpm
-  const minGapMs = Math.max(rule.minGapMs, rule.minGapBeats * beatMs - 1)
+  const melodyBeatMs = 60_000 / melody.tempoBpm
+  const stepBeats = Math.ceil(rule.minGapMs / beatMs)
   const melodyNotes = melody.timeline.filter((item) => item.kind === 'note')
   const midis = melodyNotes.map((item) => midiOf(item.noteId))
-  const lowest = Math.min(...midis)
-  const span = Math.max(...midis) - lowest + 1
 
-  let lastTargetMs = Number.NEGATIVE_INFINITY
-  const notes = melodyNotes.map((item, index): ChartNote => {
-    const timeMs = Math.round(item.startMs * scale)
-    const target = timeMs - lastTargetMs >= minGapMs
-    if (target) lastTargetMs = timeMs
-    const lane = rule.laneCount === 1 ? 0 : Math.min(rule.laneCount - 1, Math.floor(((midis[index] - lowest) / span) * rule.laneCount))
-    return { index, noteId: item.noteId, timeMs, durationMs: Math.round(item.durationMs * scale), lane, target }
+  const beatIndexes = melodyNotes.map((item) => {
+    const beat = item.startMs / melodyBeatMs
+    return Math.abs(beat - Math.round(beat)) <= ON_BEAT_TOLERANCE ? Math.round(beat) : null
   })
+  const phaseWeights = Array.from({ length: stepBeats }, () => 0)
+  beatIndexes.forEach((beat, index) => {
+    if (beat !== null) phaseWeights[beat % stepBeats] += melodyNotes[index].durationMs
+  })
+  const phase = phaseWeights.indexOf(Math.max(...phaseWeights))
+  const targets = beatIndexes.map((beat) => beat !== null && beat % stepBeats === phase)
+  const laneOf = pitchLanes(midis.filter((_, index) => targets[index]), rule.laneCount)
+
+  const notes = melodyNotes.map((item, index): ChartNote => ({
+    index,
+    noteId: item.noteId,
+    timeMs: Math.round(item.startMs * scale),
+    durationMs: Math.round(item.durationMs * scale),
+    lane: laneOf(midis[index]),
+    target: targets[index],
+  }))
 
   return {
     mode,

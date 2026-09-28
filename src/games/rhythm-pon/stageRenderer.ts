@@ -513,7 +513,7 @@ function drawEffects(ctx: CanvasRenderingContext2D, frame: StageFrame) {
     const pop = t < 0.18 ? 0.6 + (t / 0.18) * 0.55 : 1.15 - Math.min(1, (t - 0.18) / 0.2) * 0.15
     const style = POPUP_TEXT[popup.judgement]
     const size = (popup.judgement === 'miss' ? 22 : 30) * pop
-    const y = popup.y - 40 - t * 46
+    const y = popup.y - t * 12
     ctx.globalAlpha = t > 0.7 ? (1 - t) / 0.3 : 1
     ctx.font = `900 ${size}px system-ui, sans-serif`
     const fill = ctx.createLinearGradient(0, y - size / 2, 0, y + size / 2)
@@ -558,9 +558,10 @@ export function emitHitEffects(
 ): void {
   const color = laneColors(laneCount)[lane]
   const { x, y } = laneHitPoint(geometry, lane, laneCount)
-  effects.popups.push({ x, y, born: clock, judgement })
-  if (judgement === 'miss') return
   const radius = orbRadius(geometry, laneCount) * 1.18
+  // ことばは受け皿の下に出す。上に出すと、次に落ちてくるノーツと重なって見えにくい。
+  effects.popups.push({ x, y: Math.min(y + radius * 0.76 + 20, geometry.height - 20), born: clock, judgement })
+  if (judgement === 'miss') return
   effects.rings.push({ x, y, born: clock, color: color.light, radius })
   if (judgement === 'perfect') effects.rings.push({ x, y, born: clock + 0.08, color: '#ffffff', radius: radius * 0.8 })
   const count = reducedMotion ? 6 : judgement === 'perfect' ? 26 : 14
