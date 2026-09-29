@@ -297,9 +297,10 @@ function Zoo({ initial, music, onMusic, onExit }: { initial: World; music: boole
 
   function removeTarget(px: number, py: number) {
     const world = worldRef.current
-    const hit = renderer.hitAt(px, py, 'animal') ?? renderer.hitAt(px, py, 'object')
+    const hit = renderer.hitAt(px, py, 'poop') ?? renderer.hitAt(px, py, 'animal') ?? renderer.hitAt(px, py, 'object')
     if (hit) return true
     const [gx, gz] = renderer.pick(viewRef.current, px, py)
+    if (poopAt(world, gx, gz)) return true
     return animalAt(world, gx, gz) ?? (world.objects.some(o => {
       const s = objectDef(o.kind).size
       return gx >= o.x && gx < o.x + s && gz >= o.z && gz < o.z + s
@@ -310,10 +311,10 @@ function Zoo({ initial, music, onMusic, onExit }: { initial: World; music: boole
     const world = worldRef.current
     const view = viewRef.current
     const [gx, gz] = renderer.pick(view, px, py)
-    // うんちは いつでも おそうじ できる。
+    // うんちは いつでも（かたづけモードでも）おそうじ できる。
     const poopHit = renderer.hitAt(px, py, 'poop')
     const poop = poopHit ? world.poops.find(p => p.id === poopHit.id) : poopAt(world, gx, gz)
-    if (poop && tabRef.current !== 'remove') {
+    if (poop) {
       cleanPoop(world, poop)
       playCleanSound()
       renderer.burst('spark', poop.x, .2, poop.z, 4)

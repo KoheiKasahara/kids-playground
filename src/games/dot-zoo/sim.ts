@@ -221,7 +221,7 @@ export function animalAt(world: World, x: number, z: number): Animal | undefined
 }
 
 export function poopAt(world: World, x: number, z: number) {
-  return world.poops.find(p => Math.hypot(p.x - x, p.z - z) < .4)
+  return world.poops.find(p => Math.hypot(p.x - x, p.z - z) < .8)
 }
 
 export function cleanPoop(world: World, poop: Poop) {
