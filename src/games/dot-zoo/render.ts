@@ -585,7 +585,7 @@ export class ZooRenderer {
           const yy = Math.round(py - 6 - ph * 7), xx = Math.round(px - 2 + k * 4 + Math.sin(ph * 6 + k) * 1.2)
           if (ph < .8) ctx.fillRect(xx, yy, 1, 2)
         }
-        this.hits.push({ kind: 'poop', id: p.id, x0: px - 6, y0: py - 10, x1: px + 6, y1: py + 3, depth: depthOf(p.x, p.z, view.rot) })
+        this.hits.push({ kind: 'poop', id: p.id, x0: px - 11, y0: py - 16, x1: px + 11, y1: py + 7, depth: depthOf(p.x, p.z, view.rot) })
       } })
     }
 
