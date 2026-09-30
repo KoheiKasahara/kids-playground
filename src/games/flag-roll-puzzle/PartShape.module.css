@@ -14,18 +14,56 @@
 
 /* 盤面に置いたパーツ。明るい樹脂のおもちゃらしい縁と上下の陰影を共通化する。 */
 .placed {
-  background: linear-gradient(180deg, #ffd166 0%, #ffb703 52%, #f08c00 100%);
-  border: 2px solid #d97706;
+  background: linear-gradient(180deg, #ffe39a 0%, #ffc53d 34%, #ffa91f 66%, #e67e00 100%);
+  border: 2px solid #c86a00;
   box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.48),
-    inset 0 -4px 0 rgba(168, 82, 0, 0.24),
-    0 3px 5px rgba(55, 75, 84, 0.28);
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -3px 0 rgba(150, 68, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+/*
+ * つやのハイライト。樹脂のおもちゃの光沢として、上側に細い白い反射を乗せる。
+ * 盤面へ落ちる影は、回転しても真下へ落ちるよう PartShape の外側（盤面の partSlot・
+ * パーツ置き場の見本・ドラッグ中の分身）で filter: drop-shadow を掛けるので、ここでは内側の陰影だけを描く。
+ */
+.segment:not(.jumpRampDeck):not(.seesawSupport)::before {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 1px;
+  height: 40%;
+  max-height: 7px;
+  border-radius: var(--radius-round);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.05));
+  pointer-events: none;
+}
+
+/* 丸い部品は、左上に丸い照り返しを置いて球面らしく見せる。 */
+.segment.bumper::before,
+.segment.chamber::before,
+.segment.muzzle::before,
+.segment.seesawPivot::before {
+  left: 16%;
+  right: auto;
+  top: 12%;
+  width: 34%;
+  height: 24%;
+  max-height: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.95) 0 30%, rgba(255, 255, 255, 0) 72%);
+  transform: rotate(-28deg);
+}
+
+.segment.ghost::before {
+  display: none;
 }
 
 /* 役割を文字に頼らず見分けられる色。曲線=水色、バンパー=ピンクの円、方向転換=緑。 */
 .curve.placed,
 .curve.dragging {
-  background: linear-gradient(180deg, #66d9e8 0%, #22b8cf 52%, #1098aa 100%);
+  background: linear-gradient(180deg, #a5eef6 0%, #4fd1e3 34%, #1fb0c7 66%, #0c8fa2 100%);
   border-color: #0c8595;
 }
 .curve.selected {
@@ -45,16 +83,18 @@
 }
 .bumper.placed,
 .bumper.dragging {
-  background: radial-gradient(circle, #fff0f6 0 27%, #f783ac 29% 54%, #e64980 56% 100%);
+  background:
+    radial-gradient(circle at 50% 50%, #ffffff 0 12%, #fff0f6 20% 27%, rgba(255, 240, 246, 0) 29%),
+    radial-gradient(circle at 50% 50%, #fbb0cb 29%, #f06595 46% 54%, rgba(240, 101, 149, 0) 56%),
+    radial-gradient(circle at 42% 32%, #f783ac 0%, #e64980 48%, #b3245a 100%);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.72),
     inset 0 0 0 3px #fff0f6,
-    inset 0 -4px 0 rgba(161, 37, 91, 0.24),
-    0 3px 5px rgba(134, 46, 92, 0.35);
+    inset 0 -5px 3px rgba(120, 20, 64, 0.3);
 }
 .bumper.selected {
   background: radial-gradient(circle, #fff0f6 0 27%, #f06595 29% 54%, #c2255c 56% 100%);
-  box-shadow: inset 0 0 0 3px #fff0f6, 0 0 0 3px rgba(255, 255, 255, 0.9), 0 4px 7px rgba(134, 46, 92, 0.4);
+  box-shadow: inset 0 0 0 3px #fff0f6, inset 0 -5px 3px rgba(120, 20, 64, 0.3), 0 0 0 3px rgba(255, 255, 255, 0.9);
 }
 .bumper.ghost {
   background: radial-gradient(circle, rgba(255, 240, 246, 0.48) 0 27%, rgba(247, 131, 172, 0.42) 29% 54%, rgba(230, 73, 128, 0.42) 56% 100%);
@@ -64,7 +104,7 @@
 
 .guide.placed,
 .guide.dragging {
-  background: linear-gradient(180deg, #8ce99a 0%, #51cf66 52%, #2f9e44 100%);
+  background: linear-gradient(180deg, #c3f7cb 0%, #69db7c 34%, #40c057 66%, #2b8a3e 100%);
   border-color: #238b3b;
 }
 .guide.selected {
@@ -80,8 +120,10 @@
 /* ジャンプ台は踏み切り板・土台・ばねを描き、普通の板と形から区別する。 */
 .jumpRamp.placed,
 .jumpRamp.dragging {
-  background: linear-gradient(180deg, #fff3bf 0 18%, #ffd43b 20% 62%, #ff922b 64% 100%);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.58), inset 0 -3px 0 rgba(150, 75, 0, 0.25), 0 3px 5px rgba(126, 68, 0, 0.4);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0 14%, rgba(255, 255, 255, 0) 30%),
+    linear-gradient(180deg, #fff3bf 0 18%, #ffd43b 20% 62%, #ff922b 64% 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -3px 0 rgba(150, 75, 0, 0.28);
 }
 .jumpRamp.selected { background: linear-gradient(180deg, #fff3bf 0 18%, #fcc419 20% 62%, #f76707 64% 100%); }
 .jumpRamp.ghost { background: linear-gradient(180deg, rgba(255, 243, 191, 0.42) 0 18%, rgba(255, 212, 59, 0.42) 20% 62%, rgba(255, 146, 43, 0.42) 64% 100%); }
@@ -124,8 +166,8 @@
   border: 2px solid #d9480f;
   border-radius: 5px;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #ffa94d, #e8590c);
-  box-shadow: 0 2px 3px rgba(112, 44, 0, 0.28);
+  background: linear-gradient(180deg, #ffc078 0%, #ff922b 45%, #d9480f 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -2px 0 rgba(112, 44, 0, 0.25);
 }
 .jumpRampSpring {
   z-index: 1;
@@ -140,9 +182,9 @@
 /* キャノンはチャンバー・筒・発射口を色と形で分け、向きが一目で分かるようにする。 */
 .cannon.placed,
 .cannon.dragging {
-  background: linear-gradient(180deg, #9775fa 0%, #7950e8 56%, #6741cf 100%);
+  background: linear-gradient(180deg, #d0bfff 0%, #9775fa 32%, #7950e8 66%, #5235b8 100%);
   border-color: #4c32ad;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.34), inset 0 -3px 0 rgba(33, 24, 74, 0.3), 0 3px 5px rgba(58, 45, 126, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -3px 0 rgba(33, 24, 74, 0.34);
 }
 .cannon.selected {
   background: linear-gradient(180deg, #b197fc 0%, #845ef7 52%, #5f3dc4 100%);
@@ -152,29 +194,39 @@
 .cannon.chamber {
   z-index: 2;
   border: 3px solid #3b2b8f;
-  background: radial-gradient(circle, #fff9db 0 28%, #ffd43b 31% 57%, #5f3dc4 60% 100%);
+  background:
+    radial-gradient(circle at 50% 50%, #fffbe6 0 20%, #fff3bf 28%, #ffd43b 31% 50%, #f59f00 57%, rgba(95, 61, 196, 0) 60%),
+    radial-gradient(circle at 40% 32%, #9775fa 0%, #6741cf 60%, #3b2b8f 100%);
+  box-shadow: inset 0 -3px 2px rgba(33, 24, 74, 0.35);
   box-sizing: border-box;
 }
 .cannon.barrel { border: 2px solid #4c32ad; border-radius: 5px; }
 .cannon.muzzle {
   z-index: 3;
   border: 3px solid #3b2b8f;
-  background: radial-gradient(circle, #212529 0 34%, #845ef7 37% 100%);
+  background:
+    radial-gradient(circle at 50% 50%, #0b0d10 0 22%, #343a40 34%, rgba(132, 94, 247, 0) 37%),
+    radial-gradient(circle at 40% 32%, #b197fc 0%, #845ef7 55%, #5f3dc4 100%);
+  box-shadow: inset 0 -3px 2px rgba(33, 24, 74, 0.35);
   box-sizing: border-box;
 }
 
 /* 十字羽根は専用の内側ラッパーを実Body角度へ合わせて回す。 */
 .spinner.placed,
 .spinner.dragging {
-  background: linear-gradient(135deg, #f08c00 0 45%, #ffd43b 46% 100%);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.42), inset 0 -3px 0 rgba(124, 75, 0, 0.28), 0 3px 5px rgba(119, 76, 0, 0.3);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 45%),
+    linear-gradient(135deg, #f08c00 0 45%, #ffd43b 46% 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -3px 0 rgba(124, 75, 0, 0.3);
 }
 .spinner.selected { background: linear-gradient(135deg, #e67700 0 45%, #fcc419 46% 100%); }
 .spinner.ghost { background: rgba(245, 159, 0, 0.38); box-shadow: none; }
 .spinner.chamber {
   z-index: 2;
   border: 3px solid #a65f00;
-  background: radial-gradient(circle, #fff3bf 0 38%, #f08c00 40% 100%);
+  background:
+    radial-gradient(circle at 50% 50%, #fffbe6 0 22%, #fff3bf 36%, rgba(240, 140, 0, 0) 40%),
+    radial-gradient(circle at 40% 32%, #ffc078 0%, #f08c00 55%, #b35c00 100%);
   box-sizing: border-box;
 }
 
@@ -230,8 +282,8 @@
 
 .seesawDeck.placed,
 .seesawDeck.dragging {
-  background: linear-gradient(180deg, #ffe08a 0%, #ffb703 52%, #e67700 100%);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.62), inset 0 -3px 0 rgba(137, 70, 0, 0.28), 0 3px 5px rgba(106, 66, 0, 0.32);
+  background: linear-gradient(180deg, #fff0b3 0%, #ffd043 34%, #ffb703 64%, #d96d00 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -3px 0 rgba(137, 70, 0, 0.3);
 }
 
 .seesawDeck.selected {
@@ -249,8 +301,9 @@
   z-index: 1;
   border-radius: 2px;
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  background: linear-gradient(135deg, #c084fc 0%, #8b5cf6 58%, #6d28d9 100%);
-  box-shadow: 0 3px 4px rgba(70, 33, 123, 0.3);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.4) 48%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(135deg, #d8b4fe 0%, #8b5cf6 58%, #5b21b6 100%);
 }
 
 .seesawBase {
@@ -258,8 +311,8 @@
   border: 2px solid #5b21b6;
   border-radius: 5px;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #a78bfa 0%, #7c3aed 100%);
-  box-shadow: 0 2px 3px rgba(70, 33, 123, 0.28);
+  background: linear-gradient(180deg, #c4b5fd 0%, #a78bfa 30%, #7c3aed 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -2px 0 rgba(46, 16, 101, 0.3);
 }
 
 .seesawPivot {
@@ -267,8 +320,10 @@
   box-sizing: border-box;
   border: 3px solid #7c3aed;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff9db 0 30%, #facc15 33% 58%, #7c3aed 61% 100%);
-  box-shadow: 0 2px 3px rgba(70, 33, 123, 0.28);
+  background:
+    radial-gradient(circle at 50% 50%, #fffbe6 0 22%, #fde68a 30%, #facc15 33% 52%, #d69e00 58%, rgba(124, 58, 237, 0) 61%),
+    radial-gradient(circle at 40% 32%, #a78bfa 0%, #7c3aed 60%, #4c1d95 100%);
+  box-shadow: inset 0 -2px 2px rgba(46, 16, 101, 0.35);
 }
 
 .seesawSupport.ghost,
@@ -285,12 +340,14 @@
   border: 2px solid #1864ab;
   box-sizing: border-box;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 40%, rgba(8, 55, 99, 0) 70%, rgba(8, 55, 99, 0.25)),
     repeating-linear-gradient(90deg, #74c0fc 0 8px, #1971c2 8px 16px);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.48), inset 0 -3px 0 rgba(8, 55, 99, 0.28), 0 3px 5px rgba(33, 75, 110, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -3px 0 rgba(8, 55, 99, 0.32);
 }
 .conveyor.selected {
-  background: repeating-linear-gradient(90deg, #a5d8ff 0 8px, #1864ab 8px 16px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 40%, rgba(8, 55, 99, 0) 70%, rgba(8, 55, 99, 0.25)),
+    repeating-linear-gradient(90deg, #a5d8ff 0 8px, #1864ab 8px 16px);
 }
 .conveyor.ghost {
   background: repeating-linear-gradient(90deg, rgba(116, 192, 252, 0.45) 0 8px, rgba(25, 113, 194, 0.45) 8px 16px);
@@ -328,16 +385,15 @@
 .selected {
   background-color: #f76707;
   box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
     inset 0 -3px 0 rgba(0, 0, 0, 0.2),
-    0 0 0 3px rgba(255, 255, 255, 0.9),
-    0 4px 7px rgba(33, 37, 41, 0.35);
+    0 0 0 3px rgba(255, 255, 255, 0.9);
 }
 
 /* 指について動いている最中のパーツ。指の下でも見えるよう少し明るくする */
 .dragging {
   background: linear-gradient(180deg, #ffe8cc, #ffc078);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.62), 0 5px 10px rgba(33, 37, 41, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -3px 0 rgba(168, 82, 0, 0.2);
 }
 
 /* 置ける場所の下書き。まだ置いていないことが分かるよう塗りつぶさない */

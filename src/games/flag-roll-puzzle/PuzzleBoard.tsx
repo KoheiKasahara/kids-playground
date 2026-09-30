@@ -128,7 +128,7 @@ export default function PuzzleBoard({
             className={styles.grid}
             data-highlight={highlightGrid ? 'true' : 'false'}
             aria-hidden="true"
-            style={{ left: GRID_LEFT, top: GRID_TOP, width: GRID_WIDTH, height: GRID_BOTTOM - GRID_TOP, backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px` }}
+            style={{ left: GRID_LEFT, top: GRID_TOP, width: GRID_WIDTH, height: GRID_BOTTOM - GRID_TOP, backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px`, '--cell-size': `${CELL_SIZE}px` } as CSSProperties}
           />
 
           {parts.map((part) => {
