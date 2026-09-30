@@ -20,7 +20,7 @@ for (const viewport of PORTRAIT_VIEWPORTS) {
         await page.goto(`/games/${game.slug}`, { waitUntil: 'domcontentloaded' })
 
         const heading = page.getByRole('heading', { name: game.title, exact: true })
-        const backButton = page.locator('[data-game-back-button]')
+        const backButton = page.locator('[data-game-back-button]:visible')
         await expect(heading).toBeVisible({ timeout: 15_000 })
         await expect(backButton).toBeVisible()
         await expect(backButton).toBeInViewport()
