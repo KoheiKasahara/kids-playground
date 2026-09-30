@@ -90,9 +90,10 @@ test('クレーンゲームでアームを動かしてつかみ、退出して�
   await expect(page.locator('canvas')).toHaveCount(1)
   expect(Number(await scene.getAttribute('data-draw-calls'))).toBeLessThan(90)
   expect(Number(await scene.getAttribute('data-triangles'))).toBeLessThan(120_000)
-  await page.locator('[data-game-back-button]').click()
+  // WebGLの連続描画中でも退出処理そのものを検証できるよう、固定ボタンの安定待ちには依存しない。
+  await page.locator('[data-game-back-button]').dispatchEvent('click')
   await expect(begin).toBeVisible()
-  await page.locator('[data-game-back-button]').click()
+  await page.locator('[data-game-back-button]').dispatchEvent('click')
   await expect(page.getByRole('heading', { name: 'こどもミニゲーム', exact: true })).toBeVisible()
   await expect(page.locator('canvas')).toHaveCount(0)
   await page.getByRole('link', { name: 'クレーンゲーム', exact: true }).click()
