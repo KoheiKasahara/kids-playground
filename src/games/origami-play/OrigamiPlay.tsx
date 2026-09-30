@@ -7,6 +7,7 @@ import { primeAudio } from '../../audio/sound'
 import { vibrate } from '../../utils/haptics'
 import { createStageProgressStore } from '../shared/progress/stageProgress'
 import OrigamiPaper from './OrigamiPaper'
+import { foldHint } from './origamiView'
 import { ORIGAMI_TEMPLATES, PAPER_COLORS, type OrigamiId, type PaperColor } from './origamiTemplates'
 import { initialOrigamiState, origamiReducer } from './origamiState'
 import { playFoldSound, playFinishSound } from './sounds'
@@ -38,6 +39,7 @@ function FoldingDesk({ template, color, sound, toggleSound, onBack, onComplete, 
   const total = template.steps.length
   const finished = state.step === total
   const instruction = template.steps[state.step]
+  const hint = finished ? null : foldHint(template.id, state.step)
 
   useEffect(() => {
     if (!state.folding) return
@@ -77,7 +79,7 @@ function FoldingDesk({ template, color, sound, toggleSound, onBack, onComplete, 
           <OrigamiPaper templateId={template.id} color={color} step={state.step} folding={state.folding} />
           {!finished && <button ref={foldButton} type="button" className={styles.foldTarget} autoFocus={keyboardStart}
             aria-label="ここを おる" aria-describedby="origami-instruction" disabled={state.folding}
-            style={{ left: `${instruction.hint.x / 4}%`, top: `${instruction.hint.y / 3.6}%` }}
+            style={{ left: `${hint!.x / 4}%`, top: `${hint!.y / 3.6}%` }}
             onClick={(event) => {
               if (state.folding) return
               keyboardFolding.current = event.detail === 0
@@ -97,7 +99,7 @@ function FoldingDesk({ template, color, sound, toggleSound, onBack, onComplete, 
       </div>
       <section className={styles.guide} aria-label="おりがみの じゅんばん">
         <div className={styles.progress} role="progressbar" aria-label="おった かず" aria-valuemin={0} aria-valuemax={total} aria-valuenow={state.step}>
-          {template.steps.map((_, index) => <span key={index} className={index < state.step ? styles.folded : ''} aria-hidden="true">{index < state.step ? '✓' : index + 1}</span>)}
+          {template.steps.map((_, index) => <span key={index} className={index < state.step ? styles.folded : index === state.step ? styles.current : ''} aria-hidden="true" />)}
         </div>
         <p className={styles.stepLabel}>{finished ? 'とっても すてき！' : `${state.step + 1} / ${total}`}</p>
         <h2 id="origami-instruction" role="status" className={styles.instruction}>{finished ? 'できた！' : state.folding ? 'ぱたん…' : instruction.instruction}</h2>
@@ -173,6 +175,7 @@ export default function OrigamiPlay() {
         <span className={styles.cardPicture}><OrigamiPaper templateId={template.id} color={color} step={template.steps.length} preview /></span>
         <span className={styles.cardName}>{template.name}</span>
         <span className={styles.cardCaption}>{template.subtitle}</span>
+        <span className={styles.cardSteps}>{template.steps.length}かい おる</span>
         <span className={styles.cardArrow} aria-hidden="true">↗</span>
         <StageClearBadge stars={progress[template.id] ?? 0} corner />
       </button>)}</div>

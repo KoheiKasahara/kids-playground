@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { initialOrigamiState, origamiReducer } from './origamiState'
-import { ORIGAMI_TEMPLATES, PAPER_COLORS } from './origamiTemplates'
+import { foldHint } from './origamiView'
+import { ORIGAMI_TEMPLATES, PAPER_COLORS, origamiSequence } from './origamiTemplates'
 
 test('作品と紙の色は重複せず、すべての手順のヒントが画面内にある', () => {
   for (const entries of [ORIGAMI_TEMPLATES, PAPER_COLORS]) {
@@ -9,13 +10,14 @@ test('作品と紙の色は重複せず、すべての手順のヒントが画�
   }
   for (const template of ORIGAMI_TEMPLATES) {
     expect(template.steps.length).toBeGreaterThan(0)
-    for (const step of template.steps) {
+    template.steps.forEach((step, index) => {
       expect(step.instruction.trim().length).toBeGreaterThan(0)
-      expect(step.hint.x).toBeGreaterThan(0)
-      expect(step.hint.x).toBeLessThan(400)
-      expect(step.hint.y).toBeGreaterThan(0)
-      expect(step.hint.y).toBeLessThan(360)
-    }
+      const hint = foldHint(template.id, index)
+      expect(hint.x).toBeGreaterThan(0)
+      expect(hint.x).toBeLessThan(400)
+      expect(hint.y).toBeGreaterThan(0)
+      expect(hint.y).toBeLessThan(360)
+    })
   }
   for (const color of PAPER_COLORS) {
     for (const tone of [color.main, color.light, color.dark]) expect(tone).toMatch(/^#[0-9a-f]{6}$/i)
@@ -57,5 +59,31 @@ describe('おりがみの進行', () => {
     expect(origamiReducer({ step: 3, folding: true }, { type: 'settle', total: 3 }))
       .toEqual({ step: 3, folding: false })
     expect(origamiReducer(initialOrigamiState, { type: 'fold', total: 0 })).toBe(initialOrigamiState)
+  })
+})
+
+describe('折り紙の手順', () => {
+  test.each(ORIGAMI_TEMPLATES)('$nameは正方形の紙から、すべての手順で紙が動いて作品になる', (template) => {
+    const { states, frames } = origamiSequence(template.id)
+    expect(frames).toHaveLength(template.steps.length)
+    expect(states).toHaveLength(template.steps.length + 1)
+    expect(states[0]).toHaveLength(1)
+    for (const faces of states) {
+      expect(faces.length).toBeGreaterThan(0)
+      for (const face of faces) {
+        expect(face.points.length).toBeGreaterThanOrEqual(3)
+        for (const [x, y] of face.points) {
+          expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true)
+        }
+      }
+    }
+    for (const frame of frames) {
+      if (frame.type === 'reshape') expect(frame.removed.size).toBeGreaterThan(0)
+      else if (frame.type !== 'flip') expect(frame.moving.size).toBeGreaterThan(0)
+    }
+  })
+
+  test('つるは たくさん おる ちょうせんの さくひん', () => {
+    expect(ORIGAMI_TEMPLATES.find((template) => template.id === 'crane')!.steps.length).toBeGreaterThanOrEqual(15)
   })
 })
