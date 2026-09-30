@@ -4,6 +4,8 @@ import {
   isGlobeBodyObject,
   hasGlobePolygons,
   polygonNumericIdFromObject,
+  POLYGON_SIDE_DEPTH_OFFSET,
+  pushGlobePolygonSidesBehindCaps,
 } from './threeGlobeAdapter'
 
 type ThreeGlobeInternals = {
@@ -88,5 +90,22 @@ describe('polygon readiness', () => {
     second.geometry = new THREE.PlaneGeometry()
     expect(hasGlobePolygons(globe, features)).toBe(true)
     globe.traverse((object) => { if (object instanceof THREE.Mesh) object.geometry.dispose() })
+  })
+
+  it('pushes only the polygon side walls slightly behind the caps', () => {
+    const globe = new THREE.Group()
+    const polygon = new THREE.Group()
+    const sideMaterial = new THREE.MeshBasicMaterial()
+    const capMaterial = new THREE.MeshBasicMaterial()
+    setThreeGlobeInternals(polygon, { __globeObjType: 'polygon' })
+    Object.assign(polygon, { __defaultSideMaterial: sideMaterial, __defaultCapMaterial: capMaterial })
+    globe.add(polygon)
+
+    pushGlobePolygonSidesBehindCaps(globe)
+
+    expect(sideMaterial.polygonOffset).toBe(true)
+    expect(sideMaterial.polygonOffsetFactor).toBe(POLYGON_SIDE_DEPTH_OFFSET.factor)
+    expect(sideMaterial.polygonOffsetUnits).toBe(POLYGON_SIDE_DEPTH_OFFSET.units)
+    expect(capMaterial.polygonOffset).toBe(false)
   })
 })

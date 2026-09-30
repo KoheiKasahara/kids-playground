@@ -7,12 +7,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { staticRoutePages } from './src/build/staticRoutePages'
 import { sitemapFile } from './src/build/sitemap'
 import { projectHealthDashboardOutput } from './src/build/projectHealthDashboardOutput'
+import { threeGlobeUnusedDeps } from './src/build/threeGlobeUnusedDeps'
 
 // カスタムドメイン（https://kids.kasapg.com/）直下で公開するため base は常に '/'。
 const base = '/'
 
 const plugins = [
   react(),
+  threeGlobeUnusedDeps(),
   VitePWA({
     // 'autoUpdate' だと新しいSWが有効化された瞬間に自動で window.location.reload() が
     // 走ってしまい、クイズの途中でも進行が消えてしまう。

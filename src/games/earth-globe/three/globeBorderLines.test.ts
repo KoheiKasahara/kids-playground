@@ -4,6 +4,7 @@ import {
   BORDER_LINE_WIDTH,
   createGlobeBorderLines,
   disposeGlobeBorderLines,
+  isAntimeridianSeam,
   MAX_BORDER_SEGMENT_DEGREES,
   setGlobeBorderLinesSize,
 } from './globeBorderLines'
@@ -37,6 +38,36 @@ describe('globe border lines', () => {
     expect(starts.count).toBeGreaterThanOrEqual(20 / MAX_BORDER_SEGMENT_DEGREES)
     expect(borderLines.children).toHaveLength(0)
     expect(radiusAt(borderLines, 0)).toBeCloseTo(BASE_BORDER_RADIUS)
+
+    disposeGlobeBorderLines(borderLines)
+  })
+
+  it('does not draw the seam where a country was split at the antimeridian', () => {
+    const splitCountry: GlobeFeature = {
+      id: 2,
+      geometry: {
+        type: 'MultiPolygon',
+        coordinates: [
+          [[[179, 60], [180, 60], [180, 61], [179, 60]]],
+          [[[-180, 60], [-179, 60], [-180, 61], [-180, 60]]],
+        ],
+      },
+    }
+    const borderLines = createGlobeBorderLines([splitCountry])
+    const starts = borderLines.geometry.getAttribute('instanceStart')
+    const ends = borderLines.geometry.getAttribute('instanceEnd')
+
+    // 経度180度上（x ≈ 0 かつ z < 0）を通る線分が1本も無いこと。
+    for (let index = 0; index < starts.count; index += 1) {
+      const onSeam = [starts, ends].every((attribute) => (
+        Math.abs(attribute.getX(index)) < 1e-6 && attribute.getZ(index) < 0
+      ))
+      expect(onSeam).toBe(false)
+    }
+    expect(isAntimeridianSeam([180, 60], [180, 61])).toBe(true)
+    expect(isAntimeridianSeam([-180, 61], [-180, 60])).toBe(true)
+    expect(isAntimeridianSeam([180, 60], [-180, 61])).toBe(false)
+    expect(isAntimeridianSeam([179, 60], [180, 60])).toBe(false)
 
     disposeGlobeBorderLines(borderLines)
   })
