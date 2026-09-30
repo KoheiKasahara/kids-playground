@@ -24,8 +24,8 @@ describe('FLAG_BALL_IDS / flagBalls', () => {
   it('クイズの全出題国 + 専用追加2か国ぶんある', () => {
     expect(flagBalls).toHaveLength(countries.length + supplementalIds.length)
     expect(FLAG_BALL_IDS).toHaveLength(flagBalls.length)
-    // マスターが150か国になったことに気付けるよう、実数でも固定する。
-    expect(flagBalls).toHaveLength(152)
+    // マスターが152か国になったことに気付けるよう、実数でも固定する。
+    expect(flagBalls).toHaveLength(154)
   })
 
   it('idに重複がない', () => {
