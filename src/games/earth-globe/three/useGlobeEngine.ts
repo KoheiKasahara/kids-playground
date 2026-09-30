@@ -23,6 +23,7 @@ import {
   isGlobeBodyObject,
   hasGlobePolygons,
   polygonNumericIdFromObject,
+  pushGlobePolygonSidesBehindCaps,
 } from './threeGlobeAdapter'
 import {
   createGlobeBorderLines,
@@ -660,6 +661,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
           && hasGlobePolygons(globe, polygonData)
         ) {
           ready = true
+          pushGlobePolygonSidesBehindCaps(globe)
           globe.polygonsTransitionDuration(reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS)
           requestRender(reducedMotion ? 0 : POLYGONS_TRANSITION_DURATION_MS)
           setStatus('ready')

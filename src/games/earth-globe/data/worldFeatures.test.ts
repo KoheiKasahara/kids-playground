@@ -85,6 +85,15 @@ function longitudeWidth(points: readonly Point[]): number {
   return Math.max(...longitudes) - Math.min(...longitudes)
 }
 
+/** 経度180度に接する三角形の頂点が-180度へ正規化されても、同じ側の経度で比べられるようにする。 */
+function unwrapLongitudes(points: readonly Point[]): Point[] {
+  const [firstLongitude] = points[0]
+  return points.map(([longitude, latitude]) => [
+    longitude - 360 * Math.round((longitude - firstLongitude) / 360),
+    latitude,
+  ])
+}
+
 function inversePolar2Cartesian(x: number, y: number, z: number): Point {
   const radius = Math.hypot(x, y, z)
   const latitude = Math.asin(y / radius) / degreesToRadians
@@ -157,7 +166,8 @@ function capAreaInDegrees(polygon: PolygonCoordinates): number {
       triangle.push(inversePolar2Cartesian(x, y, z))
     }
 
-    if (isCap && longitudeWidth(triangle) <= 180) area += planarRingArea(triangle)
+    const unwrappedTriangle = unwrapLongitudes(triangle)
+    if (isCap && longitudeWidth(unwrappedTriangle) <= 180) area += planarRingArea(unwrappedTriangle)
   }
 
   geometry.dispose()
