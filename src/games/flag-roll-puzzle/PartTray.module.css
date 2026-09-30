@@ -132,6 +132,7 @@
   height: 0;
   display: block;
   transform: scale(var(--preview-shape-scale, 1)) translate(var(--preview-shape-x, 0px), var(--preview-shape-y, 0px));
+  filter: drop-shadow(1px 3px 2px rgba(24, 70, 96, 0.26));
 }
 
 .label {

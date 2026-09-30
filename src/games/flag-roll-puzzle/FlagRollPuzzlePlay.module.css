@@ -16,7 +16,10 @@
     calc(var(--space-sm) + var(--safe-right))
     calc(var(--space-sm) + var(--safe-bottom))
     calc(var(--space-sm) + var(--safe-left));
-  background-color: var(--color-background);
+  /* 上からやわらかい空色がさす背景。盤面の青と地続きに見せる */
+  background:
+    radial-gradient(120% 55% at 50% 0%, rgba(214, 240, 255, 0.9) 0%, rgba(214, 240, 255, 0) 70%),
+    linear-gradient(180deg, var(--color-background), #fff6e4);
   /* 盤面の高さ計算が縦スクロールで狂わないよう、この画面は縦に伸ばさない */
   max-height: 100dvh;
   overflow: hidden;
@@ -246,6 +249,8 @@
   height: 0;
   pointer-events: none;
   z-index: 10;
+  /* 指でつまみ上げている分、影を遠く大きく落として浮いて見せる */
+  filter: drop-shadow(5px 14px 6px rgba(24, 50, 70, 0.3));
 }
 
 /* 低い横画面では、ヘッダと文言を詰めて盤面の高さを確保する */
