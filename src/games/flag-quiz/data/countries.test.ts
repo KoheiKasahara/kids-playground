@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { countries, countriesForLevel } from './countries';
 
 describe('countries', () => {
-  it('全部で150か国ある', () => {
-    expect(countries).toHaveLength(150);
+  it('全部で152か国ある', () => {
+    expect(countries).toHaveLength(152);
   });
 
   it('国idに重複がない', () => {
@@ -21,7 +21,7 @@ describe('countries', () => {
     }
   });
 
-  it('150か国すべてのflagはpublic配下に実ファイルがある', () => {
+  it('152か国すべてのflagはpublic配下に実ファイルがある', () => {
     for (const country of countries) {
       expect(existsSync(resolve('public', country.flag))).toBe(true);
     }
@@ -41,13 +41,20 @@ describe('countriesForLevel', () => {
     expect(countriesForLevel('hard')).toHaveLength(105);
   });
 
-  it('おには150か国（全部）', () => {
-    expect(countriesForLevel('oni')).toHaveLength(150);
+  it('おには152か国（全部）', () => {
+    expect(countriesForLevel('oni')).toHaveLength(152);
   });
 
   it('おにでリクエストされたカリブの国が出題される', () => {
     const oniIds = new Set(countriesForLevel('oni').map((c) => c.id));
     for (const id of ['ag', 'kn', 'vc', 'tt']) {
+      expect(oniIds.has(id)).toBe(true);
+    }
+  });
+
+  it('おにでリクエストされたブルネイ・ブルンジ・ブルキナファソが出題される', () => {
+    const oniIds = new Set(countriesForLevel('oni').map((c) => c.id));
+    for (const id of ['bn', 'bi', 'bf']) {
       expect(oniIds.has(id)).toBe(true);
     }
   });
