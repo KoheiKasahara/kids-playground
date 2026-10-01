@@ -82,6 +82,9 @@ export const routes: RouteObject[] = [
   // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // JishakuPitattoPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/jishaku-pitatto', element: lazyRoute(() => import('../games/jishaku-pitatto/JishakuPitattoPlay')) },
+  // あそびかた選択・プレイ・結果が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // ShabonPachinPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/shabon-pachin', element: lazyRoute(() => import('../games/shabon-pachin/ShabonPachinPlay')) },
   // コース選択・レース・結果が同一route内で切り替わるため、プレイ面はゲーム内で包む。
   { path: '/games/pixel-kart', element: lazyRoute(() => import('../games/pixel-kart/PixelKartPlay')) },
   // タイトル・プレイ画面が同一route内で切り替わるため、プレイ面はゲーム内で包む。
