@@ -424,7 +424,6 @@ function TitleScreen({ progress, music, onMusic, onPick, focus }: {
       {!edges.end && <button type="button" className={`${styles.window} ${styles.scrollArrow} ${styles.scrollNext}`} aria-label="つぎの ステージを みる" onClick={() => scrollStages(1)}>▶</button>}
       </div>
       {!(edges.start && edges.end) && <div className={styles.scrollDots} aria-hidden="true">
-        {!edges.end && <span className={styles.scrollHint}>よこに スライド</span>}
         {STAGES.map((stage, i) => <span key={stage.id} className={i === edges.active ? styles.dotOn : styles.dot} />)}
       </div>}
       <p className={styles.titleFoot}><span>タップで ジャンプ！</span> <span>ながく おすと たかく、</span><span>くうちゅうで もう1かい とべるよ</span></p>
