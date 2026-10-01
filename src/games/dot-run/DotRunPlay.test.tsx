@@ -46,7 +46,9 @@ describe('dot-run play', () => {
   test('タイトルから ステージを えらんで あそび、もどれる', () => {
     render(<MemoryRouter><DotRunPlay /></MemoryRouter>)
     expect(screen.getByRole('heading', { name: 'ドットの ぴょんぴょんラン' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /^ステージ\d/ })).toHaveLength(3)
+    expect(screen.getAllByRole('button', { name: /^ステージ\d/ })).toHaveLength(5)
+    expect(screen.getByRole('button', { name: /ステージ4 ごつごつ いわやま/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ステージ5 きらきら ほしぞら/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /ステージ1 はなの はらっぱ/ }))
     expect(screen.getByLabelText(/はなの はらっぱ。タップで ジャンプ/)).toBeInTheDocument()
     expect(startBgm).toHaveBeenCalledWith('meadow')
@@ -95,6 +97,23 @@ describe('dot-run play', () => {
     expect(world()).not.toBe(w)
     fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByRole('button', { name: /ステージ1 はなの はらっぱ クリアずみ ほし2こ/ })).toBeInTheDocument()
+  })
+
+  test('ステージが はばに はいりきらない ときは よこに スクロールする やじるしが でる', () => {
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(1200)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+    const scrollBy = vi.fn()
+    HTMLElement.prototype.scrollBy = scrollBy
+    render(<MemoryRouter><DotRunPlay /></MemoryRouter>)
+    expect(screen.queryByRole('button', { name: 'まえの ステージを みる' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'つぎの ステージを みる' }))
+    expect(scrollBy).toHaveBeenCalledWith(expect.objectContaining({ left: 300 }))
+    const list = screen.getByRole('list', { name: 'ステージを えらぶ' })
+    list.scrollLeft = 800
+    fireEvent.scroll(list)
+    expect(screen.getByRole('button', { name: 'まえの ステージを みる' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'つぎの ステージを みる' })).not.toBeInTheDocument()
+    delete (HTMLElement.prototype as { scrollBy?: unknown }).scrollBy
   })
 
   test('おんがくを けすと おぼえておく', () => {

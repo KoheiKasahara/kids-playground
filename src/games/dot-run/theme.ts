@@ -8,7 +8,7 @@ export type Theme = {
   /** そらの いちばん うえの 色が おわる 高さと、ちへいせんの 高さ（せかいの y）。 */
   skyTop: number
   horizon: number
-  celestial: 'sun' | 'sunset' | 'moon'
+  celestial: 'sun' | 'sunset' | 'moon' | 'crescent'
   /** じめんの うえの 部分（ハイライト・あかるい・ふつう・かげ）。 */
   top: [string, string, string, string]
   /** つちの 部分（あかるい → くらい）。 */
@@ -16,16 +16,16 @@ export type Theme = {
   outline: string
   /** つちに まざる こいし（あかるい・くらい）。 */
   pebble: [string, string]
-  topKind: 'grass' | 'sand' | 'snow'
-  platform: { top: string; light: string; main: string; dark: string; outline: string; kind: 'wood' | 'drift' | 'ice' }
-  rock: { o: string; L: string; l: string; m: string; d: string; cap: 'moss' | 'star' | 'snow' }
-  far: { kind: 'mountains' | 'sea' | 'peaks'; colors: string[]; snow: string[] }
-  mid: { kind: 'hills' | 'palms' | 'pines'; colors: string[]; accent: string[] }
+  topKind: 'grass' | 'sand' | 'snow' | 'rock' | 'cloud'
+  platform: { top: string; light: string; main: string; dark: string; outline: string; kind: 'wood' | 'drift' | 'ice' | 'stone' | 'star' }
+  rock: { o: string; L: string; l: string; m: string; d: string; cap: 'moss' | 'star' | 'snow' | 'none' }
+  far: { kind: 'mountains' | 'sea' | 'peaks' | 'mesas' | 'cloudsea'; colors: string[]; snow: string[] }
+  mid: { kind: 'hills' | 'palms' | 'pines' | 'spires' | 'puffs'; colors: string[]; accent: string[] }
   near: { colors: string[] }
   cloud: [string, string, string] | null
-  weather: 'petals' | 'sparkle' | 'snow'
-  deco: 'flowers' | 'shells' | 'snow'
-  prop: 'tree' | 'palm' | 'pine'
+  weather: 'petals' | 'sparkle' | 'snow' | 'dust' | 'twinkle'
+  deco: 'flowers' | 'shells' | 'snow' | 'pebbles' | 'stars'
+  prop: 'tree' | 'palm' | 'pine' | 'cactus' | 'none'
   /** HUD や タイトルの カードの 色あい。 */
   card: string
 }
@@ -93,5 +93,47 @@ export const THEMES: Record<StageId, Theme> = {
     deco: 'snow',
     prop: 'pine',
     card: '#3a5ab0',
+  },
+  rocky: {
+    sky: ['#4a86d8', '#5c98e0', '#74ace6', '#8ebeea', '#aacdea', '#c8dce6', '#e8e4d8'],
+    skyTop: -140,
+    horizon: 112,
+    celestial: 'sun',
+    top: ['#f4e0c0', '#d8b894', '#b8946e', '#8a6a50'],
+    dirt: ['#b0785a', '#96604a', '#7c4c3c', '#623a30', '#482a24'],
+    outline: '#2a1410',
+    pebble: ['#e8c8a8', '#4a2a20'],
+    topKind: 'rock',
+    platform: { top: '#e8e0d4', light: '#c4b8a8', main: '#9a8e80', dark: '#6a6058', outline: '#2a2220', kind: 'stone' },
+    rock: { o: '#2a1a14', L: '#f4dcc4', l: '#d8b498', m: '#b48a70', d: '#84604c', cap: 'none' },
+    far: { kind: 'mesas', colors: ['#e8a888', '#d08a70', '#b4705e', '#98604e'], snow: ['#f4c8a4', '#dca084', '#c08068'] },
+    mid: { kind: 'spires', colors: ['#c87858', '#ac6048', '#8e4c3c', '#723c30', '#5a3028'], accent: ['#e8a078', '#5a8a44'] },
+    near: { colors: ['#a86c4c', '#8c563c', '#744430', '#5c3426'] },
+    cloud: ['#ffffff', '#eef2f6', '#c8d4e0'],
+    weather: 'dust',
+    deco: 'pebbles',
+    prop: 'cactus',
+    card: '#b0643e',
+  },
+  starry: {
+    sky: ['#0a0628', '#120a3a', '#1c104c', '#2a1860', '#3a2072', '#4c2a82', '#6a3a96'],
+    skyTop: -200,
+    horizon: 130,
+    celestial: 'crescent',
+    top: ['#ffffff', '#f0ecff', '#d4ccf4', '#aaa0dc'],
+    dirt: ['#aaa0dc', '#8c82c8', '#7068b0', '#565096', '#3e3a78'],
+    outline: '#1c1640',
+    pebble: ['#fff6c0', '#c8bcf0'],
+    topKind: 'cloud',
+    platform: { top: '#fff8c8', light: '#ffe070', main: '#f4b830', dark: '#c07a18', outline: '#4a2410', kind: 'star' },
+    rock: { o: '#1c1640', L: '#e0dcff', l: '#b0a8e8', m: '#8a80cc', d: '#645aa8', cap: 'snow' },
+    far: { kind: 'cloudsea', colors: ['#6a5aa8', '#54468e', '#423878', '#342c64'], snow: ['#a898e0', '#8070c0', '#6a5aa8'] },
+    mid: { kind: 'puffs', colors: ['#8a7cc8', '#7062b0', '#584c98', '#443a80', '#34306a'], accent: ['#fff6c0', '#ffffff'] },
+    near: { colors: ['#c4bcf0', '#a498dc', '#8478c4', '#6a60ac'] },
+    cloud: ['#7a70b8', '#5a5098', '#3e3878'],
+    weather: 'twinkle',
+    deco: 'stars',
+    prop: 'none',
+    card: '#5a3aa8',
   },
 }

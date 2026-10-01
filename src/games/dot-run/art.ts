@@ -113,13 +113,13 @@ export function aurora(w: number, h: number): Img | null {
 
 /** おひさま・ゆうひ・おつきさま（ひかりの わ つき）。 */
 export function celestial(theme: Theme): Img | null {
-  const size = theme.celestial === 'sunset' ? 76 : 44
+  const size = theme.celestial === 'sunset' ? 76 : theme.celestial === 'crescent' ? 60 : 44
   const pix = Pix.create(size, size)
   if (!pix) return null
   const c = size / 2 - .5
-  const glow = theme.celestial === 'sun' ? pack('#fff8d0') : theme.celestial === 'sunset' ? pack('#ffd49a') : pack('#6a7cc0')
-  const glow2 = theme.celestial === 'moon' ? pack('#8e9cd8') : glow
-  const radius = theme.celestial === 'sunset' ? 22 : 9
+  const glow = theme.celestial === 'sun' ? pack('#fff8d0') : theme.celestial === 'sunset' ? pack('#ffd49a') : theme.celestial === 'crescent' ? pack('#7a5ab0') : pack('#6a7cc0')
+  const glow2 = theme.celestial === 'moon' ? pack('#8e9cd8') : theme.celestial === 'crescent' ? pack('#a88ad0') : glow
+  const radius = theme.celestial === 'sunset' ? 22 : theme.celestial === 'crescent' ? 14 : 9
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const d = Math.hypot(x - c, y - c)
@@ -138,6 +138,10 @@ export function celestial(theme: Theme): Img | null {
             const gap = Math.floor((rel - 2) / 5) + 1
             if ((Math.floor(rel) + 1) % 6 < Math.min(4, gap)) continue
           }
+        } else if (theme.celestial === 'crescent') {
+          // みかづき：ずらした まるで けずる。
+          if (Math.hypot(x - c - 6, y - c + 4) < radius - 1) continue
+          color = Math.hypot(x - c - 6, y - c + 4) < radius + 1 ? '#ffe070' : '#fff4c0'
         } else {
           color = '#fff6d8'
           if (x - c > 3) color = '#e8dcb4'
@@ -218,7 +222,20 @@ export function farStrip(theme: Theme): Img | null {
   }
   const peaks = kind === 'peaks'
   const ridge = new Float32Array(FAR_W)
-  if (peaks) {
+  if (kind === 'mesas') {
+    // てっぺんが たいらな いわの だいち。
+    for (let x = 0; x < FAR_W; x++) {
+      const n = loopNoise(x / 70, FAR_W / 70, 3)
+      const h = n > .56 ? 56 + loopNoise(x / 9, FAR_W / 9, 4) * 2 : n > .44 ? 18 + (n - .44) / .12 * 38 : 16 + loopNoise(x / 20, FAR_W / 20, 5) * 6
+      ridge[x] = FAR_H - h
+    }
+  } else if (kind === 'cloudsea') {
+    // もこもこの くもの うみ。
+    for (let x = 0; x < FAR_W; x++) {
+      const k = ((x % 32) - 16) / 16
+      ridge[x] = FAR_H - (26 + loopNoise(x / 60, FAR_W / 60, 3) * 22 + Math.sqrt(Math.max(0, 1 - k * k)) * 7)
+    }
+  } else if (peaks) {
     const r = rng(11)
     const list = Array.from({ length: 9 }, () => ({ x: r() * FAR_W, h: 38 + r() * 46, s: .8 + r() * .6 }))
     for (let x = 0; x < FAR_W; x++) {
@@ -339,6 +356,59 @@ export function midStrip(theme: Theme): Img | null {
     }
     return pix.done()
   }
+  if (kind === 'spires') {
+    // にょきにょき たつ いわの はしら。
+    for (let x = 0; x < MID_W; x++) {
+      for (let y = MID_H - 18; y < MID_H; y++) pix.set(x, y, pc[ditherIndex((y - (MID_H - 18)) / 18, 3, x, y) + 2])
+    }
+    const spires = Array.from({ length: 14 }, () => ({ x: Math.floor(r() * MID_W), w: 7 + Math.floor(r() * 9), h: 30 + r() * 56 }))
+    spires.sort((a, b) => b.h - a.h)
+    for (const sp of spires) {
+      const base = MID_H - 12
+      const top = Math.round(base - sp.h)
+      for (let y = top; y < base; y++) {
+        // うえは まるく、ところどころ くびれる。
+        const k = (y - top) / sp.h
+        const pinch = Math.sin(k * 9 + sp.x) * .12
+        const half = sp.w / 2 * (k < .12 ? Math.sqrt(k / .12) : 1) * (1 + pinch)
+        for (let dx = -Math.floor(half); dx <= half; dx++) {
+          const x = (sp.x + dx + MID_W) % MID_W
+          const band = (y + Math.round(sp.x * .3)) % 7 === 0
+          const color = dx < -half * .3 ? pc[0] : dx < half * .4 ? pc[band ? 2 : 1] : pc[band ? 3 : 2]
+          pix.set(x, y, color)
+        }
+      }
+    }
+    for (let i = 0; i < 60; i++) {
+      const x = Math.floor(r() * MID_W), y = MID_H - 14 + Math.floor(r() * 10)
+      pix.set(x, y, pack(accent[1]))
+      pix.set(x, y - 1, pack(accent[1]))
+    }
+    return pix.done()
+  }
+  if (kind === 'puffs') {
+    // よぞらに うかぶ おおきな くも。
+    const puffs = Array.from({ length: 26 }, () => ({ x: r() * MID_W, y: MID_H - 10 - r() * 34, r: 9 + r() * 14 }))
+    for (let y = 0; y < MID_H; y++) {
+      for (let x = 0; x < MID_W; x++) {
+        let best = -1
+        for (const p of puffs) {
+          for (const off of [-MID_W, 0, MID_W]) {
+            const d = Math.hypot(x - p.x - off, (y - p.y) * 1.3)
+            if (d < p.r) best = Math.max(best, 1 - d / p.r + (y < p.y ? .2 : -.1))
+          }
+        }
+        if (y > MID_H - 14) best = Math.max(best, .05)
+        if (best < 0) continue
+        pix.set(x, y, pc[best > .8 ? 0 : best > .55 ? (bayer(x, y) < .5 ? 0 : 1) : best > .3 ? 2 : best > .12 ? 3 : 4])
+      }
+    }
+    for (let i = 0; i < 40; i++) {
+      const x = Math.floor(r() * MID_W), y = Math.floor(r() * (MID_H - 50))
+      if (!pix.has(x, y)) pix.set(x, y, pack(accent[i % 2]))
+    }
+    return pix.done()
+  }
   // pines
   for (let x = 0; x < MID_W; x++) {
     for (let y = MID_H - 20; y < MID_H; y++) pix.set(x, y, pc[ditherIndex((y - (MID_H - 20)) / 20, 3, x, y) + 1])
@@ -371,7 +441,7 @@ export function nearStrip(theme: Theme): Img | null {
   if (!pix) return null
   const pc = theme.near.colors.map(c => pack(c))
   const r = rng(31)
-  if (theme.topKind === 'grass') {
+  if (theme.topKind === 'grass' || theme.topKind === 'cloud') {
     const bushes = Array.from({ length: 22 }, () => ({ x: r() * NEAR_W, r: 7 + r() * 9 }))
     for (let y = 0; y < NEAR_H; y++) {
       for (let x = 0; x < NEAR_W; x++) {
@@ -424,6 +494,9 @@ export function platformTile(theme: Theme, part: 'l' | 'm' | 'r' | 's', seed: nu
       if (p.kind === 'drift' && y > 1 && y < 7 && hash2(x, y, seed) < .18) c = light
       if (p.kind === 'drift' && (x === 5 || x === 12) && y > 0 && y < 7) c = y % 2 ? pack('#e8c880') : pack('#a88050')
       if (p.kind === 'ice' && y > 1 && y < 6 && (x + y * 2) % 9 === 0) c = top
+      if (p.kind === 'stone' && y > 1 && y < 6 && hash2(x, y, seed) < .12) c = dark
+      if (p.kind === 'stone' && x === 8 && y > 1 && y < 7) c = dark
+      if (p.kind === 'star' && y > 1 && y < 6 && ((x === 7 && y > 1) || (y === 3 && x > 5 && x < 10))) c = top
       pix.set(x, y, c)
     }
     if (p.kind === 'ice' && x > 1 && x < 15 && r() < .35) {
@@ -456,7 +529,7 @@ export function rockTile(theme: Theme, seed: number): Img | null {
         ctx.fillRect(x, top + k, 1, 1)
       }
     }
-  } else {
+  } else if (cap === 'star') {
     const star = ['..o..', '.oyo.', 'oyyyo', '.oyo.', 'o...o']
     const img = spriteCanvas(star, { o: '#c04a2a', y: '#ff9a4a' })
     if (img) ctx.drawImage(img, 9, 8)
@@ -482,6 +555,20 @@ export function decoSprites(theme: Theme): Img[] {
     pals.push({ o: '#c05a2a', y: '#ff9a4a' })
     list.push(['.w.', 'wWw'])
     pals.push({ w: '#ffffff', W: '#d8e8f0' })
+  } else if (theme.deco === 'pebbles') {
+    list.push(['.oo.', 'oLlo', 'olmo'])
+    pals.push({ o: '#3a2418', L: '#f0dcc4', l: '#c8a488', m: '#9a7458' })
+    list.push(['..ooo..', '.oLllo.', 'oLllmmo', 'olmmmmo'])
+    pals.push({ o: '#3a2418', L: '#f0dcc4', l: '#c8a488', m: '#9a7458' })
+    list.push(['g.g', '.g.'])
+    pals.push({ g: '#6a9a44' })
+  } else if (theme.deco === 'stars') {
+    list.push(['.y.', 'yWy', '.y.'])
+    pals.push({ y: '#ffe070', W: '#ffffff' })
+    list.push(['..y..', '..y..', 'yyWyy', '..y..', '..y..'])
+    pals.push({ y: '#fff4b0', W: '#ffffff' })
+    list.push(['.c.', 'cCc', 'cCc', '.c.'])
+    pals.push({ c: '#8ae0ff', C: '#e0f8ff' })
   } else {
     list.push(['.ww.', 'wwWw', 'WWWW'])
     pals.push({ w: '#ffffff', W: '#c4d8f4' })
@@ -519,6 +606,29 @@ export function propSprite(theme: Theme, seed: number): Img | null {
       const x = 6 + Math.floor(r() * 22), y = 8 + Math.floor(r() * 18)
       if (pix.has(x, y)) { pix.set(x, y, pack('#ff4a5a')); pix.set(x + 1, y, pack('#c02a3a')); pix.set(x, y - 1, pack('#ffa0a0')) }
     }
+    return pix.done()
+  }
+  if (theme.prop === 'none') return null
+  if (theme.prop === 'cactus') {
+    const w = 22, h = 40
+    const pix = Pix.create(w, h)
+    if (!pix) return null
+    const green = [pack('#a8e070'), pack('#6ab448'), pack('#3e8a38'), pack('#1c4a24')]
+    const trunk = (x0: number, y0: number, x1: number, y1: number) => {
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const edge = x === x0 || x === x1 || y === y0
+          pix.set(x, y, edge ? green[3] : x === x0 + 1 ? green[0] : x === x1 - 1 ? green[2] : (x - x0) % 2 ? green[1] : green[2])
+        }
+      }
+    }
+    const armL = 8 + Math.floor(r() * 8), armR = 6 + Math.floor(r() * 8)
+    trunk(8, 2, 14, h - 1)
+    trunk(2, armL, 6, armL + 12)
+    trunk(3, armL + 10, 9, armL + 14)
+    trunk(16, armR, 20, armR + 10)
+    trunk(13, armR + 8, 19, armR + 12)
+    for (let i = 0; i < 3; i++) pix.set(10 + i, 1, pack(['#ff6a8a', '#ffe070', '#ff6a8a'][i]))
     return pix.done()
   }
   if (theme.prop === 'palm') {
