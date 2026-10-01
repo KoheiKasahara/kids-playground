@@ -1012,6 +1012,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'shabon-pachin',
+    slug: 'shabon-pachin',
+    title: 'しゃぼんだま パチン',
+    emoji: '🫧',
+    category: 'learning',
+    seo: {
+      headline: 'しゃぼんだま パチン｜おだいの いろ・かたちの しゃぼんだまを わる 幼児向けあそび',
+      description:
+        'ふわふわ のぼる しゃぼんだまから、おだいと おなじ いろや かたちを さがして タッチで わる 幼児向けの みわけあそび。じかん せいげんは なく、いろや かたちを たのしく おぼえられます。',
+    },
+    intro: {
+      howToPlay: [
+        'うえに でている おだいと おなじ しゃぼんだまを タッチしよう',
+        'ちがう しゃぼんだまは ぷるぷる ゆれるだけ。あわてなくて だいじょうぶ',
+        '10こ わると クリア！ おだいは とちゅうで かわるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

@@ -49,6 +49,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/rail-builder',
   '/games/robo-kuzushi',
   '/games/snowball-roll',
+  '/games/shabon-pachin',
   '/games/shinkeisuijaku',
   '/games/water-wheel-maze',
   '/games/treasure-dig',
