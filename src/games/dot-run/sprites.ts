@@ -449,6 +449,77 @@ export const OWL = [
   ],
 ]
 
+/** よるの かたつむり（からが ほんのり ひかる）。 */
+export const MOON_SNAIL_PAL: Palette = {
+  o: '#1c1640', s: '#fff4b0', S: '#f0c848', d: '#b08420', y: '#ffffff',
+  b: '#b4c0ff', B: '#7a86d8', e: '#1c1640', w: '#ffffff',
+}
+
+export const BEETLE_PAL: Palette = {
+  o: '#141028', k: '#3a8ac0', K: '#6ac0f0', h: '#e0f8ff', d: '#1c4a78', e: '#2a2040', w: '#ffffff',
+}
+export const BEETLE = [
+  [
+    '................',
+    '......oooooo....',
+    '....ooKhkkkkoo..',
+    '...oKhhkkkkkkko.',
+    '...oKhkkkkkkkkko',
+    '.ooookkkkkkkkkko',
+    'oweeokkkkkkkkkko',
+    'oeeeoddddddddddo',
+    '.oooooooooooooo.',
+    '..o.o...o.o..o..',
+  ],
+  [
+    '................',
+    '......oooooo....',
+    '....ooKhkkkkoo..',
+    '...oKhhkkkkkkko.',
+    '...oKhkkkkkkkkko',
+    '.ooookkkkkkkkkko',
+    'oweeokkkkkkkkkko',
+    'oeeeoddddddddddo',
+    '.oooooooooooooo.',
+    '...o.o...o.o.o..',
+  ],
+]
+
+/** そらを まう とび（かもめと おなじ かたちで いろちがい）。 */
+export const HAWK_PAL: Palette = {
+  o: '#2a1a10', w: '#f0d4a8', W: '#c89868', g: '#7a5030', y: '#ffb020', e: '#1a1008',
+}
+
+export const BAT_PAL: Palette = {
+  o: '#140c2a', b: '#5a3a8a', B: '#8a6ac0', w: '#ffffff', e: '#ff5a8a',
+}
+export const BAT = [
+  [
+    'oo............oo',
+    'obo..o....o..obo',
+    'obbo.oo..oo.obbo',
+    'obbboBBBBBBobbbo',
+    '.obbBwebbewBbbo.',
+    '.obbbBbbbbBbbbo.',
+    '..obbobBBbobbo..',
+    '..oo.obbbbo.oo..',
+    '......oooo......',
+    '................',
+  ],
+  [
+    '................',
+    '.....o....o.....',
+    '.....oo..oo.....',
+    '....oBBBBBBo....',
+    '...oBwebbewBo...',
+    '.oobbBbbbbBbboo.',
+    'obbbbobBBbobbbbo',
+    'obbo.obbbbo.obbo',
+    'obo...oooo...obo',
+    'oo............oo',
+  ],
+]
+
 // ---------------- いわ（とびこえる もの） ----------------
 
 export const ROCK = [

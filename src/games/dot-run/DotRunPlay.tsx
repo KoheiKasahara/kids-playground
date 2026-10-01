@@ -301,11 +301,36 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
 
 // ---------------- タイトル画面 ----------------
 
-function TitleScreen({ progress, music, onMusic, onPick }: {
-  progress: Record<string, number>; music: boolean; onMusic: () => void; onPick: (i: number) => void
+function TitleScreen({ progress, music, onMusic, onPick, focus }: {
+  progress: Record<string, number>; music: boolean; onMusic: () => void; onPick: (i: number) => void; focus: number
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const listRef = useRef<HTMLOListElement>(null)
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
+  // よこに スクロールできる ステージの ならび。はしに いるかどうかで やじるしを だしわける。
+  const [edges, setEdges] = useState({ start: true, end: true, active: 0 })
+  const measureList = useCallback(() => {
+    const list = listRef.current
+    if (!list) return
+    const max = list.scrollWidth - list.clientWidth
+    const ratio = max > 0 ? list.scrollLeft / max : 0
+    const next = { start: list.scrollLeft <= 4, end: list.scrollLeft >= max - 4, active: Math.round(ratio * (STAGES.length - 1)) }
+    setEdges(prev => prev.start === next.start && prev.end === next.end && prev.active === next.active ? prev : next)
+  }, [])
+  const scrollStages = (dir: number) => {
+    const list = listRef.current
+    list?.scrollBy?.({ left: dir * list.clientWidth * .75, behavior: reducedMotion() ? 'auto' : 'smooth' })
+  }
+
+  useEffect(() => {
+    const list = listRef.current
+    // まえに あそんだ ステージが みえる ところから はじめる。
+    const card = list?.children[focus] as HTMLElement | undefined
+    if (list && card && focus > 0) list.scrollLeft = card.offsetLeft - (list.clientWidth - card.offsetWidth) / 2
+    measureList()
+    window.addEventListener('resize', measureList)
+    return () => window.removeEventListener('resize', measureList)
+  }, [focus, measureList])
 
   // うしろで うさぎが じぶんで はしる おてほん。
   useEffect(() => {
@@ -378,7 +403,9 @@ function TitleScreen({ progress, music, onMusic, onPick }: {
         <p className={styles.logoSub}>〜 うさぎの にんじん だいぼうけん 〜</p>
         <h1>{TITLE}</h1>
       </header>
-      <ol className={styles.stageList} aria-label="ステージを えらぶ">
+      <div className={styles.stageScroller} data-start={edges.start} data-end={edges.end}>
+      {!edges.start && <button type="button" className={`${styles.window} ${styles.scrollArrow} ${styles.scrollPrev}`} aria-label="まえの ステージを みる" onClick={() => scrollStages(-1)}>◀</button>}
+      <ol ref={listRef} className={styles.stageList} aria-label="ステージを えらぶ" onScroll={measureList}>
         {STAGES.map((stage, i) => {
           const stars = progress[stage.id] ?? 0
           return <li key={stage.id}>
@@ -394,6 +421,12 @@ function TitleScreen({ progress, music, onMusic, onPick }: {
           </li>
         })}
       </ol>
+      {!edges.end && <button type="button" className={`${styles.window} ${styles.scrollArrow} ${styles.scrollNext}`} aria-label="つぎの ステージを みる" onClick={() => scrollStages(1)}>▶</button>}
+      </div>
+      {!(edges.start && edges.end) && <div className={styles.scrollDots} aria-hidden="true">
+        {!edges.end && <span className={styles.scrollHint}>よこに スライド</span>}
+        {STAGES.map((stage, i) => <span key={stage.id} className={i === edges.active ? styles.dotOn : styles.dot} />)}
+      </div>}
       <p className={styles.titleFoot}><span>タップで ジャンプ！</span> <span>ながく おすと たかく、</span><span>くうちゅうで もう1かい とべるよ</span></p>
     </div>
   </main>
@@ -401,6 +434,7 @@ function TitleScreen({ progress, music, onMusic, onPick }: {
 
 export default function DotRunPlay() {
   const [index, setIndex] = useState<number | null>(null)
+  const [lastIndex, setLastIndex] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const [progress, setProgress] = useState(() => progressStore.read())
   const [music, setMusic] = useState(() => readMusic())
@@ -408,10 +442,11 @@ export default function DotRunPlay() {
   const play = (i: number | null) => {
     setProgress(progressStore.read())
     setAttempt(a => a + 1)
+    if (i !== null) setLastIndex(i)
     setIndex(i)
   }
 
-  if (index === null) return <TitleScreen progress={progress} music={music} onMusic={toggleMusic} onPick={play} />
+  if (index === null) return <TitleScreen progress={progress} music={music} onMusic={toggleMusic} onPick={play} focus={lastIndex} />
   return <Stage key={`${index}-${attempt}`} index={index} music={music} onMusic={toggleMusic}
     onExit={() => play(null)}
     onRetry={() => play(index)}

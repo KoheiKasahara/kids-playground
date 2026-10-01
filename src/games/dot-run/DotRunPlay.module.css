@@ -119,14 +119,104 @@ button.window:focus-visible {
   to { opacity: 1; transform: none; }
 }
 
+.stageScroller {
+  position: relative;
+  width: min(100% + 32px, 1000px);
+  margin: 0 -16px;
+}
+
+/* よこに スクロール。はしが うすく きえて「まだ つづく」ことが わかる。 */
 .stageList {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(8px, 1.6vw, 18px);
-  width: min(100%, 900px);
+  --fade-l: 0px;
+  --fade-r: 0px;
+  display: flex;
+  gap: clamp(10px, 1.6vw, 18px);
   margin: 0;
-  padding: 0;
+  padding: 6px 16px 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
   list-style: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
+}
+
+.stageList::-webkit-scrollbar { display: none; }
+.stageScroller[data-start='false'] .stageList { --fade-l: 44px; }
+.stageScroller[data-end='false'] .stageList { --fade-r: 64px; }
+
+.stageList li {
+  flex: 0 0 clamp(210px, 29%, 280px);
+  scroll-snap-align: start;
+}
+
+.scrollArrow {
+  position: absolute;
+  z-index: 2;
+  top: calc(50% - 26px);
+  width: 48px;
+  height: 52px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.scrollPrev { left: 6px; }
+.scrollNext {
+  right: 6px;
+  background: linear-gradient(180deg, #ffb040 0%, #f07a1e 55%, #c4520e 100%);
+  box-shadow:
+    0 0 0 2px #1c0c30,
+    inset 0 0 0 2px #ffd890,
+    inset 0 -3px 0 2px rgb(90 30 0 / 40%),
+    0 4px 0 2px rgb(0 0 0 / 28%);
+  animation: nudge 1.1s ease-in-out infinite;
+}
+
+@keyframes nudge {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 6px 0; }
+}
+
+.scrollDots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgb(28 12 48 / 55%);
+}
+
+.dot,
+.dotOn {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 45%);
+  box-shadow: 0 0 0 2px #1c0c30;
+  transition: width .2s, background-color .2s;
+}
+
+.dotOn {
+  width: 24px;
+  background: #ffd23c;
+}
+
+.scrollHint {
+  margin-right: 4px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.scrollHint::after {
+  content: ' →';
+  display: inline-block;
+  animation: nudge 1.1s ease-in-out infinite;
 }
 
 .stageCard {
@@ -144,9 +234,13 @@ button.window:focus-visible {
 .stageCard[data-stage='beach'] { background: linear-gradient(180deg, #d4604a 0%, #a83c5a 50%, #6a2458 100%); }
 .stageCard[data-stage='snow'] { background: linear-gradient(180deg, #3c5aa8 0%, #283c80 50%, #182456 100%); }
 .stageCard[data-stage='meadow'] { background: linear-gradient(180deg, #4aa84a 0%, #2e8040 50%, #1c5a30 100%); }
+.stageCard[data-stage='rocky'] { background: linear-gradient(180deg, #c07a50 0%, #97553a 50%, #6a3626 100%); }
+.stageCard[data-stage='starry'] { background: linear-gradient(180deg, #6a48b8 0%, #46288c 50%, #26145a 100%); }
 
 .stageList li:nth-child(2) .stageCard { animation-delay: .08s; }
 .stageList li:nth-child(3) .stageCard { animation-delay: .16s; }
+.stageList li:nth-child(4) .stageCard { animation-delay: .24s; }
+.stageList li:nth-child(5) .stageCard { animation-delay: .32s; }
 
 @keyframes cardIn {
   from { opacity: 0; transform: translateY(16px); }
@@ -166,6 +260,8 @@ button.window:focus-visible {
 
 .thumb[data-stage='beach'] { background: #f08a6a; }
 .thumb[data-stage='snow'] { background: #18244f; }
+.thumb[data-stage='rocky'] { background: #aacdea; }
+.thumb[data-stage='starry'] { background: #1c104c; }
 
 .thumb img {
   display: block;
@@ -223,20 +319,15 @@ button.window:focus-visible {
   .logo h1 { font-size: clamp(26px, 5vw, 42px); }
   .logoSub { font-size: 12px; margin-bottom: 4px; }
   .stageLead { display: none; }
-  .stageList { width: min(100%, 720px); }
+  .stageScroller { width: min(100% + 32px, 820px); }
+  .stageList li { flex-basis: clamp(170px, 26%, 220px); }
   .stageCard { padding: 6px 6px 8px; }
   .titleFoot { display: none; }
 }
 
 @media (max-width: 560px) {
-  .stageList { grid-template-columns: 1fr; width: min(100%, 380px); }
-  .stageCard {
-    grid-template-columns: 116px 1fr;
-    justify-items: start;
-    text-align: left;
-    column-gap: 10px;
-  }
-  .thumb { grid-row: 1 / span 4; margin: 0; }
+  .stageList li { flex-basis: 64%; }
+  .scrollArrow { width: 42px; height: 48px; top: calc(50% - 24px); }
   .titleFoot { font-size: 13px; border-radius: 12px; }
 }
 
@@ -665,7 +756,8 @@ button.window:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .logo h1, .stageCard, .banner, .ready, .go, .hint, .hintHand, .overlay, .resultCard, .resultBunny, .medalOn, .starOn, .best {
+  .logo h1, .stageCard, .banner, .ready, .go, .hint, .hintHand, .overlay, .resultCard, .resultBunny, .medalOn, .starOn, .best,
+  .scrollNext, .scrollHint::after {
     animation: none;
   }
 }

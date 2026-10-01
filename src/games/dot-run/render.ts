@@ -7,8 +7,8 @@ import {
 } from './art'
 import { bayer, hash2, makeCanvas, mixHex, rng, spriteCanvas, type Img } from './pixel'
 import {
-  BEE, BEE_PAL, BLOCK, BLOCK_PAL, BLOCK_USED, BLOCK_USED_PAL, BUNNY, BUNNY_POSES, CARROT, CARROT_PAL, CRAB, CRAB_PAL, GULL,
-  GULL_PAL, OWL, OWL_PAL, PENGUIN, PENGUIN_PAL, SNAIL, SNAIL_PAL, SPRING, SPRING_PAL, SPRING_SQUASH, type BunnyPose,
+  BAT, BAT_PAL, BEE, BEE_PAL, BEETLE, BEETLE_PAL, BLOCK, BLOCK_PAL, BLOCK_USED, BLOCK_USED_PAL, BUNNY, BUNNY_POSES, CARROT, CARROT_PAL, CRAB, CRAB_PAL, GULL,
+  GULL_PAL, HAWK_PAL, MOON_SNAIL_PAL, OWL, OWL_PAL, PENGUIN, PENGUIN_PAL, SNAIL, SNAIL_PAL, SPRING, SPRING_PAL, SPRING_SQUASH, type BunnyPose,
 } from './sprites'
 import { stageRows, GROUND_Y, HERO_H, HERO_W, ROWS, TILE, WORLD_H, cellAt, type World, type WorldEvent } from './world'
 import { THEMES, type Theme } from './theme'
@@ -179,7 +179,7 @@ export class Scene {
     this.mid = midStrip(theme)
     this.near = nearStrip(theme)
     this.sun = celestial(theme)
-    this.stars = theme.celestial === 'moon' ? starField(theme, 320, 260) : { img: null, stars: [] }
+    this.stars = theme.celestial === 'moon' || theme.celestial === 'crescent' ? starField(theme, 320, 260) : { img: null, stars: [] }
     this.aurora = theme.celestial === 'moon' ? aurora(360, 90) : null
     const r = rng(5)
     this.clouds = Array.from({ length: 6 }, (_, i) => ({ img: cloud(theme, 40 + i), x: i * 170 + r() * 60, y: theme.horizon - 150 + r() * 100, speed: 2 + r() * 3 }))
@@ -189,8 +189,10 @@ export class Scene {
     this.block = spriteCanvas(BLOCK, BLOCK_PAL)
     this.blockUsed = spriteCanvas(BLOCK_USED, BLOCK_USED_PAL)
     this.spring = [spriteCanvas(SPRING, SPRING_PAL), spriteCanvas(SPRING_SQUASH, SPRING_PAL)]
-    const walker = { snail: [SNAIL, SNAIL_PAL], crab: [CRAB, CRAB_PAL], penguin: [PENGUIN, PENGUIN_PAL] } as const
-    const flyer = { bee: [BEE, BEE_PAL], gull: [GULL, GULL_PAL], owl: [OWL, OWL_PAL] } as const
+    const walker = {
+      snail: [SNAIL, SNAIL_PAL], crab: [CRAB, CRAB_PAL], penguin: [PENGUIN, PENGUIN_PAL], beetle: [BEETLE, BEETLE_PAL], moonSnail: [SNAIL, MOON_SNAIL_PAL],
+    } as const
+    const flyer = { bee: [BEE, BEE_PAL], gull: [GULL, GULL_PAL], owl: [OWL, OWL_PAL], hawk: [GULL, HAWK_PAL], bat: [BAT, BAT_PAL] } as const
     const [wf, wp] = walker[world.stage.walker]
     const [ff, fp] = flyer[world.stage.flyer]
     this.walker = { left: wf.map(f => spriteCanvas(f, wp)), right: wf.map(f => spriteCanvas(f, wp, true)) }
@@ -249,7 +251,7 @@ export class Scene {
     if (this.sun) {
       const size = this.sun.width
       const sx = Math.round(w * .74 - size / 2 - cx * .015)
-      const sy = theme.celestial === 'sunset' ? theme.horizon - size / 2 - layerY(.12) + 4 : theme.horizon - (theme.celestial === 'moon' ? 150 : 128) - layerY(.08)
+      const sy = theme.celestial === 'sunset' ? theme.horizon - size / 2 - layerY(.12) + 4 : theme.horizon - (theme.celestial === 'moon' || theme.celestial === 'crescent' ? 150 : 128) - layerY(.08)
       ctx.drawImage(this.sun, sx, sy)
     }
     for (const c of this.clouds) {
@@ -522,10 +524,10 @@ export class Scene {
 
   private drawWeather(ctx: CanvasRenderingContext2D, fx: Fx, w: number, h: number, time: number, cx: number) {
     const kind = this.theme.weather
-    const want = kind === 'snow' ? Math.round(w * h / 900) : kind === 'petals' ? Math.round(w * h / 5200) : Math.round(w * h / 4200)
+    const want = kind === 'snow' ? Math.round(w * h / 900) : kind === 'petals' || kind === 'dust' ? Math.round(w * h / 5200) : Math.round(w * h / 4200)
     const r = rng(fx.weather.length * 13 + Math.floor(time * 10))
     while (fx.weather.length < want) {
-      fx.weather.push({ x: r() * (w + 40), y: r() * h, vx: kind === 'snow' ? -.2 - r() * .3 : -.3 - r() * .4, vy: kind === 'snow' ? .25 + r() * .45 : kind === 'petals' ? .15 + r() * .25 : -.05 - r() * .1, phase: r() * 6, size: r() < .3 ? 2 : 1 })
+      fx.weather.push({ x: r() * (w + 40), y: r() * h, vx: kind === 'snow' ? -.2 - r() * .3 : kind === 'dust' ? -.6 - r() * .6 : -.3 - r() * .4, vy: kind === 'snow' ? .25 + r() * .45 : kind === 'petals' ? .15 + r() * .25 : kind === 'dust' ? .02 + r() * .06 : -.05 - r() * .1, phase: r() * 6, size: r() < .3 ? 2 : 1 })
     }
     if (fx.weather.length > want) fx.weather.length = want
     for (const p of fx.weather) {
@@ -542,6 +544,15 @@ export class Scene {
         const flip = Math.sin(time * 3 + p.phase) > 0
         ctx.fillStyle = flip ? '#ffc0d4' : '#ff90b0'
         ctx.fillRect(x, y, flip ? 2 : 1, 1)
+      } else if (kind === 'dust') {
+        ctx.fillStyle = p.size > 1 ? '#f4dcc0' : '#d8b494'
+        ctx.fillRect(x, y, p.size, 1)
+      } else if (kind === 'twinkle') {
+        const tw = Math.sin(time * 2.4 + p.phase)
+        if (tw < .3) continue
+        ctx.fillStyle = tw > .85 ? '#ffffff' : '#fff0a0'
+        ctx.fillRect(x, y, 1, 1)
+        if (tw > .85) { ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3) }
       } else {
         const tw = Math.sin(time * 3 + p.phase)
         if (tw < .2) continue
@@ -549,6 +560,26 @@ export class Scene {
         ctx.fillRect(x, y, 1, 1)
       }
     }
+    if (kind === 'twinkle') this.drawShootingStar(ctx, w, h, time)
+  }
+
+  /** ときどき ながれぼしが すーっと ながれる。 */
+  private drawShootingStar(ctx: CanvasRenderingContext2D, w: number, h: number, time: number) {
+    const period = 4.5
+    const n = Math.floor(time / period)
+    const t = (time % period) / .8
+    if (t > 1) return
+    const r = rng(n * 31 + 7)
+    const x0 = w * (.35 + r() * .6), y0 = h * (.05 + r() * .2)
+    const len = 18
+    for (let i = 0; i < len; i++) {
+      const k = t * 60 - i * 1.4
+      if (k < 0) continue
+      ctx.fillStyle = i < 2 ? '#ffffff' : i < 7 ? '#fff0a0' : '#b8a0ff'
+      ctx.globalAlpha = Math.max(0, 1 - i / len) * (1 - t * .6)
+      ctx.fillRect(Math.round(x0 - k * 1.6), Math.round(y0 + k * .7), 1, 1)
+    }
+    ctx.globalAlpha = 1
   }
 }
 
@@ -655,15 +686,21 @@ function paintGround(world: World, theme: Theme): Img | null {
     while (row > 0 && isGround(c, row - 1)) row--
     surface[c] = row * TILE
   }
-  const topDepth = (x: number) => (kind === 'snow' ? 5 : kind === 'sand' ? 3 : 4) + (hash2(x, 0, 1) < .4 ? 1 : 0) + (hash2(x >> 1, 0, 2) < .2 ? 1 : 0)
+  const soft = kind === 'snow' || kind === 'cloud'
+  const topDepth = (x: number) => (soft ? 5 : kind === 'sand' || kind === 'rock' ? 3 : 4) + (hash2(x, 0, 1) < .4 ? 1 : 0) + (hash2(x >> 1, 0, 2) < .2 ? 1 : 0)
   for (let x = 0; x < world.width; x++) {
     const c = Math.floor(x / TILE)
     const sy = surface[c]
     const gd = topDepth(x)
-    const drip = kind === 'snow' ? Math.max(0, Math.round(Math.sin(x * .55 + hash2(c, 1, 3) * 6) * 2 + hash2(x, 5, 3) * 2)) : 0
+    // ゆきは つららの ように、くもは まるい もこもこに たれる。
+    const puff = ((x % 12) - 5.5) / 6
+    const drip = kind === 'cloud' ? Math.round(Math.sqrt(Math.max(0, 1 - puff * puff)) * 4)
+      : soft ? Math.max(0, Math.round(Math.sin(x * .55 + hash2(c, 1, 3) * 6) * 2 + hash2(x, 5, 3) * 2)) : 0
     for (let y = 0; y < LEVEL_H; y++) {
       const row = Math.floor(y / TILE)
       if (sy < 0 && y >= GROUND_Y + 3) {
+        // くもの すきまからは したの よぞらが みえる。
+        if (kind === 'cloud') continue
         // あな：したへ いくほど くらく なる たてあな。
         const k = (y - GROUND_Y) / 70
         const wall = Math.min(x - c * TILE + (isGround(c - 1, ROWS - 1) ? 0 : 99), (c + 1) * TILE - 1 - x + (isGround(c + 1, ROWS - 1) ? 0 : 99))
@@ -677,7 +714,7 @@ function paintGround(world: World, theme: Theme): Img | null {
           if (kind === 'grass') {
             const tuft = hash2(x, 3, 1) < .3 ? 1 + Math.floor(hash2(x, 4, 1) * 3) : 0
             if (above <= tuft) pix.set(x, y, above === tuft ? top[0] : top[1])
-          } else if (kind === 'snow') {
+          } else if (soft) {
             const bump = Math.round(1 + Math.sin(x * .3 + hash2(c, 2, 1) * 5) * 1.2)
             if (above <= bump) pix.set(x, y, above === bump ? top[1] : top[0])
           } else if (hash2(x, 3, 2) < .12 && above === 1) pix.set(x, y, top[1])
@@ -689,11 +726,11 @@ function paintGround(world: World, theme: Theme): Img | null {
       const dr = isGround(c + 1, row) ? 99 : (c + 1) * TILE - 1 - x
       const edge = Math.min(dl, dr)
       if (edge === 0) { pix.set(x, y, outline); continue }
-      const topLimit = gd + (edge < 2 ? (kind === 'snow' ? 6 : 3) : 0) + drip
+      const topLimit = gd + (edge < 2 ? (soft ? 6 : 3) : 0) + drip
       if (dTop < topLimit) {
         let idx = dTop === 0 ? 0 : dTop === 1 ? 1 : dTop >= topLimit - 1 ? 3 : 2
-        if (kind === 'snow') idx = dTop === 0 ? 0 : dTop >= topLimit - 1 ? 3 : dTop >= topLimit - 2 ? 2 : bayer(x, y) < .8 ? 1 : 0
-        if (kind === 'sand' && idx === 2 && hash2(x, y, 9) < .12) idx = 1
+        if (soft) idx = dTop === 0 ? 0 : dTop >= topLimit - 1 ? 3 : dTop >= topLimit - 2 ? 2 : bayer(x, y) < .8 ? 1 : 0
+        if ((kind === 'sand' || kind === 'rock') && idx === 2 && hash2(x, y, 9) < .12) idx = 1
         if (edge === 1 && idx < 2) idx = 2
         pix.set(x, y, top[idx])
         continue

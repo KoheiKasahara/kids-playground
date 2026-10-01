@@ -6,9 +6,9 @@
 //   c にんじん      M ほしメダル    e あるく いきもの   b とぶ いきもの
 //   S ばね          G ゴール
 
-export type StageId = 'meadow' | 'beach' | 'snow'
-export type WalkerKind = 'snail' | 'crab' | 'penguin'
-export type FlyerKind = 'bee' | 'gull' | 'owl'
+export type StageId = 'meadow' | 'beach' | 'snow' | 'rocky' | 'starry'
+export type WalkerKind = 'snail' | 'crab' | 'penguin' | 'beetle' | 'moonSnail'
+export type FlyerKind = 'bee' | 'gull' | 'owl' | 'hawk' | 'bat'
 
 export type StageDef = {
   id: StageId
@@ -214,6 +214,30 @@ const CHUNK_DEFS = {
     '####################',
     '####################',
   ],
+  rockHole: [
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '.........ccc........',
+    '........c...c.......',
+    '.......c.....c......',
+    '......r.............',
+    '#######...##########',
+    '#######...##########',
+  ],
+  hopHoles: [
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....c....c....c.....',
+    '...c.c..c.c..c.c....',
+    '....................',
+    '....................',
+    '###..###..###..#####',
+    '###..###..###..#####',
+  ],
   // ---- ほしメダルが ある チャンク（1ステージに 3つ） ----
   medalHole: [
     '....................',
@@ -307,5 +331,23 @@ export const STAGES: readonly StageDef[] = [
     walker: 'penguin',
     flyer: 'owl',
     chunks: ['start', 'rock', 'spring', 'holes', 'medalTower', 'walkers', 'wall', 'bridge', 'medalSpring', 'flyer', 'wideHole', 'platformWalker', 'blocks', 'medalHole', 'goal'],
+  },
+  {
+    id: 'rocky',
+    name: 'ごつごつ いわやま',
+    lead: 'いわを つぎつぎ とびこえよう',
+    speed: 1.45,
+    walker: 'beetle',
+    flyer: 'hawk',
+    chunks: ['start', 'rock', 'rocks', 'walker', 'rockHole', 'medalTower', 'wall', 'blocks', 'rocks', 'medalSpring', 'flyer', 'rockHole', 'walkers', 'medalHole', 'goal'],
+  },
+  {
+    id: 'starry',
+    name: 'きらきら ほしぞら',
+    lead: 'くもの うえを ぴょんぴょん',
+    speed: 1.5,
+    walker: 'moonSnail',
+    flyer: 'bat',
+    chunks: ['start', 'run', 'hopHoles', 'spring', 'medalBlocks', 'bridge', 'flyer', 'steps', 'medalSpring', 'wideHole', 'platformWalker', 'hopHoles', 'medalTower', 'walkers', 'goal'],
   },
 ]
