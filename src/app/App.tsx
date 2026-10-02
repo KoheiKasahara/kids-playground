@@ -9,6 +9,7 @@ import ScrollManager from './ScrollManager'
 import SeoManager from '../seo/SeoManager'
 import { installBrowserPageZoomSuppression } from './preventBrowserPageZoom'
 import GameBackButton from '../components/GameBackButton'
+import { recordRecentGameVisit } from '../pages/gameShelfStore'
 
 const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/draw-goal',
@@ -66,6 +67,9 @@ export default function App() {
   // ゲーム機能としてのピンチ操作とは別系統のイベントを止めているだけなので、
   // 各ゲームのジェスチャー処理には影響しない（詳細はpreventBrowserPageZoom.tsのコメントを参照）。
   useEffect(() => installBrowserPageZoomSuppression(), [])
+
+  // ゲームのURLを開いたら、ホームの「さいきん あそんだ」の先頭へ置く（Issue #598）。
+  useEffect(() => recordRecentGameVisit(normalizedPathname), [normalizedPathname])
 
   return (
     <>
