@@ -11,6 +11,7 @@ import { installBrowserPageZoomSuppression } from './preventBrowserPageZoom'
 import GameBackButton from '../components/GameBackButton'
 
 const SELF_MANAGED_GAME_BACK_PATHS = new Set([
+  '/games/forest-delivery',
   '/games/draw-goal',
   '/games/animal-bath',
   '/games/bento-builder',

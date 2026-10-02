@@ -749,6 +749,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'forest-delivery',
+    slug: 'forest-delivery',
+    title: 'もりの おとどけやさん',
+    emoji: '🦊',
+    category: 'learning',
+    seo: {
+      headline: 'もりの おとどけやさん｜きつねと森を歩くおつかい冒険',
+      description:
+        'きつねの配達屋さんになって、絵本のような森を歩く4〜6歳向けの2D冒険ゲーム。荷物をひろい、橋をなおし、畑に水をあげて収穫しながら、どうぶつたちへお届けします。時間制限はなく、ゆっくり考えて遊べます。',
+    },
+    intro: {
+      howToPlay: [
+        'いきたい ところを タップすると、きつねが あるくよ',
+        'にもつを ひろって、どうぶつたちに おとどけしよう',
+        'はしを なおしたり、はたけに みずを あげたりして すすもう',
+      ],
+    },
+  },
+  {
     id: 'putter-golf',
     slug: 'putter-golf',
     title: 'パターゴルフ',
