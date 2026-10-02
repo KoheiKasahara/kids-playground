@@ -31,7 +31,9 @@ export default function Sparkline({ points, width = WIDTH, height = HEIGHT }: Sp
   const toX = (index: number) => PADDING + (index / (lastIndex || 1)) * (width - PADDING * 2)
   const toY = (value: number) => height - PADDING - ((value - min) / span) * (height - PADDING * 2)
 
-  const linePoints = valid.map((entry) => `${toX(entry.index)},${toY(entry.value)}`).join(' ')
+  // 欠測をまたぐ線は描かず、計測されなかった区間を残す。
+  const linePoints = points.map((value, index) => value === null ? ''
+    : `${index === 0 || points[index - 1] === null ? 'M' : 'L'} ${toX(index)} ${toY(value)}`).join(' ')
   const last = valid[valid.length - 1]
 
   return (
@@ -43,7 +45,8 @@ export default function Sparkline({ points, width = WIDTH, height = HEIGHT }: Sp
       role="img"
       aria-label={`直近${valid.length}件の推移`}
     >
-      <polyline points={linePoints} fill="none" strokeWidth={2} className="ph-sparkline__line" />
+      <title>{points.map((value) => value ?? '未計測').join(' → ')}</title>
+      <path d={linePoints} fill="none" strokeWidth={2} className="ph-sparkline__line" />
       <circle cx={toX(last.index)} cy={toY(last.value)} r={2.5} className="ph-sparkline__dot" />
     </svg>
   )

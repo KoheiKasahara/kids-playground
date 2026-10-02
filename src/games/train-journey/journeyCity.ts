@@ -1,5 +1,5 @@
 import { BoxGeometry, Color, Group, InstancedMesh, MeshStandardMaterial, Object3D, Vector3, type CurvePath } from 'three'
-import type { Shape } from './journeyScene'
+import type { Shape } from './journeyParts'
 
 /** Where the town's road cuts across the rails, in metres along the city branch. */
 export const CITY_CROSSING = 13.2

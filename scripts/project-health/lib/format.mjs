@@ -38,6 +38,12 @@ export function ratioIcon(passed, total) {
   return passed === total ? '✅' : '❌'
 }
 
+export function dependencyStatusIcon(dependencies) {
+  if (!dependencies || dependencies.total === null || dependencies.total === undefined) return '❓'
+  if ((dependencies.critical ?? 0) > 0 || (dependencies.high ?? 0) > 0) return '❌'
+  return dependencies.total === 0 ? '✅' : '⚠️'
+}
+
 // Lighthouse等、実行環境で多少揺らぐ指標向けのアイコン。
 // Issue #524: 揺らぎがある指標をいきなりFailure（❌）扱いにはせず、まずは
 // Warning（⚠️）で観測を優先し、安定性が確認できてからゲート化する方針とする。

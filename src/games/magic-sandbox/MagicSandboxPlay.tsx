@@ -1,16 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import GameBackButton from '../../components/GameBackButton'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
-import { Cell, type Material } from './sandboxSimulation'
+import { Cell, isSeed, type Material } from './sandboxSimulation'
 import { useSandbox } from './useSandbox'
+import { primeAudio } from '../../audio/sound'
+import { vibrate } from '../../utils/haptics'
+import { playBloomSound, playClearSound, playCreatureSound, playDayNightSound, playMaterialSound, playPauseSound, playSelectSound, playShakeSound } from './sounds'
 import styles from './MagicSandboxPlay.module.css'
+
+/** なぞっているあいだ、そざいの音を鳴らす間隔[ms]。鳴らしすぎてうるさくならないよう間引く。 */
+const MATERIAL_SOUND_INTERVAL_MS = 110
 
 const MATERIALS: { id: Material; name: string; icon: string; hint: string }[] = [
   { id: Cell.Sand, name: 'すな', icon: '🏜️', hint: 'さらさら おやまを つくろう' },
   { id: Cell.Water, name: 'みず', icon: '💧', hint: 'すなに かけると しっとり！' },
   { id: Cell.Stone, name: 'いし', icon: '🪨', hint: 'かべを かいて みずを ためよう' },
   { id: Cell.Seed, name: 'たね', icon: '🌱', hint: 'ぬれた すなに まいてみよう' },
+  { id: Cell.TulipSeed, name: 'チューリップ', icon: '🌷', hint: 'チューリップの たね。ぬれた すなに まこう' },
   { id: Cell.Empty, name: 'けす', icon: '🧽', hint: 'なぞって けそう。トンネルも つくれるよ' },
 ]
 function ClearDialog({ close, clear }: { close: () => void; clear: () => void }) {
@@ -29,9 +36,53 @@ function Playground({ back }: { back: () => void }) {
   const [confirmClear, setConfirmClear] = useState(false)
   const [discovery, setDiscovery] = useState(false)
   const [shaking, setShaking] = useState(false)
-  const onFlower = useCallback(() => setDiscovery(true), [])
+  const [soundOn, setSoundOn] = useState(true)
+  const soundOnRef = useRef(soundOn)
+  useEffect(() => { soundOnRef.current = soundOn }, [soundOn])
+  const onFlower = useCallback(() => {
+    setDiscovery(true)
+    if (soundOnRef.current) playBloomSound()
+  }, [])
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const sandbox = useSandbox(canvasRef, { material: material.id, radius: material.id === Cell.Seed ? 0 : wide ? 6 : 3 }, paused || confirmClear, onFlower)
+  const sandbox = useSandbox(canvasRef, { material: material.id, radius: isSeed(material.id) ? 0 : wide ? 6 : 3 }, paused || confirmClear, onFlower)
+  // なぞっているあいだだけ、そざいの音を間引いて鳴らす（Issue #784 A8）。
+  const lastSoundAt = useRef(0)
+  const drawing = useRef(false)
+  const sandSound = (force: boolean) => {
+    if (!soundOn) return
+    const now = performance.now()
+    if (!force && now - lastSoundAt.current < MATERIAL_SOUND_INTERVAL_MS) return
+    lastSoundAt.current = now
+    playMaterialSound(material.id)
+  }
+  // ボタンを おしたときの効果音。iOS でも鳴るよう、先に primeAudio しておく。
+  const sfx = (play: () => void) => {
+    if (!soundOn) return
+    primeAudio()
+    play()
+  }
+  const canvasProps = {
+    ...sandbox.canvasProps,
+    onPointerDown: (event: PointerEvent<HTMLCanvasElement>) => {
+      primeAudio()
+      drawing.current = true
+      sandSound(true)
+      vibrate('tap')
+      sandbox.canvasProps.onPointerDown(event)
+    },
+    onPointerMove: (event: PointerEvent<HTMLCanvasElement>) => {
+      if (drawing.current) sandSound(false)
+      sandbox.canvasProps.onPointerMove(event)
+    },
+    onPointerUp: (event: PointerEvent<HTMLCanvasElement>) => {
+      drawing.current = false
+      sandbox.canvasProps.onPointerUp(event)
+    },
+    onPointerCancel: (event: PointerEvent<HTMLCanvasElement>) => {
+      drawing.current = false
+      sandbox.canvasProps.onPointerCancel(event)
+    },
+  }
   useEffect(() => {
     if (!shaking) return
     const timer = window.setTimeout(() => setShaking(false), 450)
@@ -43,21 +94,22 @@ function Playground({ back }: { back: () => void }) {
     return () => window.clearTimeout(timer)
   }, [discovery])
   return <main className={`${styles.page} ${night ? styles.night : ''}`}>
-    <header className={styles.header}><GameBackButton onBack={back} reserveSpace /><h1>まほうのすなば</h1><button className={styles.dayNight} aria-label="よる" aria-pressed={night} title={night ? 'ひるに する' : 'よるに する'} onClick={() => { sandbox.setNight(!night); setNight(!night) }}><i aria-hidden="true" /><span aria-hidden="true">☀️</span><span aria-hidden="true">🌙</span></button></header>
+    <header className={styles.header}><GameBackButton onBack={back} reserveSpace /><h1>まほうのすなば</h1><button className={styles.dayNight} aria-label="よる" aria-pressed={night} title={night ? 'ひるに する' : 'よるに する'} onClick={() => { sfx(() => playDayNightSound(!night)); sandbox.setNight(!night); setNight(!night) }}><i aria-hidden="true" /><span aria-hidden="true">☀️</span><span aria-hidden="true">🌙</span></button></header>
     <div className={styles.workspace}>
       <aside className={styles.tools} aria-label="すなばの どうぐ">
         <span className={styles.scrollHint} aria-hidden="true">↔ よこに うごくよ</span>
         <div className={styles.scrollWindow}>
           <div className={styles.materials} role="group" aria-label="そざい">
-            {MATERIALS.map(m => <button key={m.id} aria-label={m.name} aria-pressed={m.id === material.id} onClick={() => { sandbox.stop(); sandbox.dismissCreatureMessage(); setMaterial(m) }}><span aria-hidden="true">{m.icon}</span><b>{m.id === material.id ? '✓ ' : ''}{m.name}</b></button>)}
-            <button aria-label={`カニを ふやす（${sandbox.crabCount}/2）`} disabled={sandbox.crabCount >= 2} onClick={sandbox.addCrab}><span aria-hidden="true">🦀</span><b>カニ {sandbox.crabCount}/2</b></button>
-            <button aria-label={`カメを ふやす（${sandbox.turtleCount}/1）`} disabled={sandbox.turtleCount >= 1} onClick={sandbox.addTurtle}><span aria-hidden="true">🐢</span><b>カメ {sandbox.turtleCount}/1</b></button>
-            <button aria-label={`ちょうちょを ふやす（${sandbox.butterflyCount}/1）`} disabled={sandbox.butterflyCount >= 1} onClick={sandbox.addButterfly}><span aria-hidden="true">🦋</span><b>ちょうちょ {sandbox.butterflyCount}/1</b></button>
+            {MATERIALS.map(m => <button key={m.id} aria-label={m.name} aria-pressed={m.id === material.id} onClick={() => { sfx(playSelectSound); sandbox.stop(); sandbox.dismissCreatureMessage(); setMaterial(m) }}><span aria-hidden="true">{m.icon}</span><b>{m.id === material.id ? '✓ ' : ''}{m.name}</b></button>)}
+            <button aria-label={`カニを ふやす（${sandbox.crabCount}/1）`} disabled={sandbox.crabCount >= 1} onClick={() => { sfx(() => playCreatureSound('crab')); sandbox.addCrab() }}><span aria-hidden="true">🦀</span><b>カニ {sandbox.crabCount}/1</b></button>
+            <button aria-label={`ヤドカリを ふやす（${sandbox.hermitCount}/1）`} disabled={sandbox.hermitCount >= 1} onClick={() => { sfx(() => playCreatureSound('crab')); sandbox.addHermit() }}><span aria-hidden="true">🐚</span><b>ヤドカリ {sandbox.hermitCount}/1</b></button>
+            <button aria-label={`カメを ふやす（${sandbox.turtleCount}/1）`} disabled={sandbox.turtleCount >= 1} onClick={() => { sfx(() => playCreatureSound('turtle')); sandbox.addTurtle() }}><span aria-hidden="true">🐢</span><b>カメ {sandbox.turtleCount}/1</b></button>
+            <button aria-label={`ちょうちょを ふやす（${sandbox.butterflyCount}/1）`} disabled={sandbox.butterflyCount >= 1} onClick={() => { sfx(() => playCreatureSound('butterfly')); sandbox.addButterfly() }}><span aria-hidden="true">🦋</span><b>ちょうちょ {sandbox.butterflyCount}/1</b></button>
           </div>
         </div>
         <div className={styles.sizes} role="group" aria-label="ふとさ">
-          <button aria-pressed={!wide} onClick={() => { sandbox.stop(); setWide(false) }}>● すこし</button>
-          <button aria-pressed={wide} onClick={() => { sandbox.stop(); setWide(true) }}>⬤ たっぷり</button>
+          <button aria-pressed={!wide} onClick={() => { sfx(playSelectSound); sandbox.stop(); setWide(false) }}>● すこし</button>
+          <button aria-pressed={wide} onClick={() => { sfx(playSelectSound); sandbox.stop(); setWide(true) }}>⬤ たっぷり</button>
         </div>
         <p className={styles.toolHint}>{sandbox.creatureMessage || material.hint}</p>
         <span className={styles.creatureStatus} role="status">{sandbox.creatureMessage}</span>
@@ -65,18 +117,19 @@ function Playground({ back }: { back: () => void }) {
       <section className={`${styles.board} ${shaking ? styles.shaking : ''}`} aria-label="すなば">
         <div className={styles.cloud} aria-hidden="true">☁</div>
         <div className={styles.nightSky} aria-hidden="true"><span className={styles.moon} /><i /><i /><i /><i /><i /></div>
-        <canvas ref={canvasRef} {...sandbox.canvasProps} className={styles.canvas} tabIndex={0} aria-label="すなば。なぞって そざいを ふらせよう。キーボードは やじるしで ばしょ、スペースで そざいを おくよ">
+        <canvas ref={canvasRef} {...canvasProps} className={styles.canvas} tabIndex={0} aria-label="すなば。なぞって そざいを ふらせよう。キーボードは やじるしで ばしょ、スペースで そざいを おくよ">
           すなと みずと たねを まぜて あそぼう。
         </canvas>
         <div className={styles.notice} role="status">{sandbox.unavailable ? 'すなばを ひらけなかったよ。もういちど ひらいてね' : discovery ? '🌸 おはなが さいたよ！' : paused ? '⏸ とまっているよ。かいても OK！' : ''}</div>
       </section>
       <div className={styles.actions}>
-        <button onClick={() => { sandbox.shake(); setShaking(true); setPaused(false) }}>〰 ゆらす</button>
-        <button aria-pressed={paused} onClick={() => { sandbox.stop(); setPaused(p => !p) }}>{paused ? '▶ うごかす' : '⏸ とめる'}</button>
+        <button onClick={() => { primeAudio(); if (soundOn) playShakeSound(); vibrate('impact'); sandbox.shake(); setShaking(true); setPaused(false) }}>〰 ゆらす</button>
+        <button aria-pressed={paused} onClick={() => { sfx(() => playPauseSound(!paused)); sandbox.stop(); setPaused(p => !p) }}>{paused ? '▶ うごかす' : '⏸ とめる'}</button>
         <button onClick={() => { sandbox.stop(); setConfirmClear(true) }}>↺ ぜんぶけす</button>
+        <button aria-pressed={soundOn} aria-label={soundOn ? 'おとを けす' : 'おとを だす'} onClick={() => { if (!soundOn) primeAudio(); setSoundOn(on => !on) }}><span aria-hidden="true">{soundOn ? '🔊' : '🔇'}</span> おと</button>
       </div>
     </div>
-    {confirmClear && <ClearDialog close={() => setConfirmClear(false)} clear={() => { sandbox.clear(); setDiscovery(false); setConfirmClear(false) }} />}
+    {confirmClear && <ClearDialog close={() => setConfirmClear(false)} clear={() => { sfx(playClearSound); sandbox.clear(); setDiscovery(false); setConfirmClear(false) }} />}
   </main>
 }
 export default function MagicSandboxPlay() {

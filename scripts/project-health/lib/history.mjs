@@ -4,6 +4,33 @@
 
 const DEFAULT_MAX_ENTRIES = 180
 
+const NUMERIC_KEYS = [
+  'games', 'unitTests', 'unitTestsPassed', 'e2eSmokePassed', 'e2eSmokeTotal',
+  'e2eSmokeFlaky', 'e2eSmokeSkipped', 'bundleKb', 'initialJsGzipKb', 'initialCssGzipKb',
+  'precacheKb', 'precacheEntries', 'lighthousePerformance', 'accessibility',
+  'vulnerabilities', 'vulnerabilitiesCritical', 'vulnerabilitiesHigh',
+  'vulnerabilitiesModerate', 'vulnerabilitiesLow', 'vulnerabilitiesInfo',
+]
+const STRING_KEYS = ['nightly', 'deploy', 'recordedAt', 'runId', 'lighthouseTarget']
+
+function normalizeEntry(entry) {
+  if (!entry || typeof entry !== 'object' || typeof entry.date !== 'string') return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) return null
+  const date = new Date(`${entry.date}T00:00:00Z`)
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== entry.date) return null
+  const normalized = { date: entry.date }
+  for (const key of NUMERIC_KEYS) {
+    if (!(key in entry)) continue // 古い履歴に新しい指標のゼロ値を捏造しない。
+    const value = entry[key]
+    const max = key === 'lighthousePerformance' || key === 'accessibility' ? 100 : Infinity
+    normalized[key] = typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= max ? value : null
+  }
+  for (const key of STRING_KEYS) {
+    if (key in entry) normalized[key] = typeof entry[key] === 'string' ? entry[key] : null
+  }
+  return normalized
+}
+
 // Nightly の cron（03:00 JST）を「その日」として扱うため、日付はJSTで計算する。
 export function toJstDateString(date = new Date()) {
   const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
@@ -18,7 +45,9 @@ export function parseHistoryFile(raw) {
 
   try {
     const parsed = JSON.parse(raw)
-    return { entries: Array.isArray(parsed?.entries) ? parsed.entries : [] }
+    const entries = Array.isArray(parsed?.entries) ? parsed.entries.map(normalizeEntry).filter(Boolean) : []
+    return { entries: [...new Map(entries.map((entry) => [entry.date, entry])).values()]
+      .sort((a, b) => a.date.localeCompare(b.date)) }
   } catch {
     return { entries: [] }
   }

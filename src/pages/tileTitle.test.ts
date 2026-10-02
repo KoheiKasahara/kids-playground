@@ -33,6 +33,10 @@ describe('splitTileTitle', () => {
     })
   })
 
+  test('「！」のうしろで切れる', () => {
+    expect(splitTileTitle('とばせ！ロボくずし')).toMatchObject({ head: 'とばせ！', tail: 'ロボくずし' })
+  })
+
   test('漢字と送りがなのあいだでは切らない', () => {
     expect(splitTileTitle('遊ぶゲーム')).toMatchObject({ head: '遊ぶ', tail: 'ゲーム' })
   })

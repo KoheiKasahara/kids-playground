@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_FLAGS_LAUNCH_INTERVAL_MS, launchDelaysMs, SCORE_ZONES } from './boardLayout'
-import { candyBoard, oceanBoard, skyBoard, spaceBoard } from './boardConfigs'
+import { candyBoard, forestBoard, oceanBoard, skyBoard, spaceBoard } from './boardConfigs'
 import { PINBALL_FLAG_IDS } from './data/pinballFlags'
 import { SIMULATION_BALL_COUNT, STEP_MS } from './pinballPhysics'
 import { simulatePinballRun } from './pinballSimulation'
 
-// Quickは全5盤面×2入力を固定seedで確認する。分布・中央値・多seedはFullに残す。
-describe.each([undefined, spaceBoard, oceanBoard, candyBoard, skyBoard])('代表盤面 %j', (boardConfig) => {
+// Quickは全6盤面×2入力を固定seedで確認する。分布・中央値・多seedはFullに残す。
+describe.each([undefined, spaceBoard, oceanBoard, candyBoard, skyBoard, forestBoard])('代表盤面 %j', (boardConfig) => {
   it.each([null, 100])('入力間隔 %s msでも全球が安全タイマーなしで得点確定する', (toyTapIntervalMs) => {
     const result = simulatePinballRun(0x1f2e3d4c, { boardConfig, toyTapIntervalMs })
     expect(result.completed).toBe(true)

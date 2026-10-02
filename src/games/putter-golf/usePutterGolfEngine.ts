@@ -8,10 +8,10 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { initializeRapier } from '../../physics/rapierLoader'
-import { aimPose, followPose, lerpPose, overviewPose, type CameraPose } from './golfCamera'
+import { aimPose, followPose, lerpPose, lookTarget, overviewPose, viewHeading, type CameraPose } from './golfCamera'
 import type { CourseDefinition, GolfBallId, Vec2 } from './golfCourses'
 import { buildHoleGeometry, type HoleGeometry } from './golfGeometry'
-import { BALL_RADIUS, BIG_CUP_RADIUS, CUP_RADIUS, MAX_STEPS_PER_FRAME, PHYSICS_STEP, powerForDistance, rollingDecel } from './golfPhysics'
+import { BALL_RADIUS, BIG_CUP_RADIUS, CUP_RADIUS, MAX_STEPS_PER_FRAME, PHYSICS_STEP, powerForDistance, rollingDecel, type Vec3 } from './golfPhysics'
 import { createGolfScene, type GolfScene } from './golfScene'
 import { createGolfWorld, type GolfEvent, type GolfPhase, type GolfWorld } from './golfWorld'
 
@@ -53,6 +53,9 @@ const INTRO_SECONDS = 1.8
 const TURN_STEP = (5 * Math.PI) / 180
 /** 景色を消す範囲の上限。はじまりのカメラ移動中に、遠くの景色まで消さないため。 */
 const MAX_FADE_REACH = 8
+/** いけに しずむまでの 時間と ふかさ。ボールが すっかり 水の下に かくれる ふかさにする。 */
+const SINK_SECONDS = 0.7
+const SINK_DEPTH = BALL_RADIUS * 2.6
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 const ease = (t: number) => t * t * (3 - 2 * t)
@@ -109,8 +112,11 @@ export function usePutterGolfEngine(options: Options) {
     let introTime = 0
     let returnTimer = 0
     let hintTarget: Vec2 | null = null
+    /** いけに おちた ボールが しずんでいくところ。 */
+    let sink: { from: Vec3; drift: Vec2; time: number } | null = null
     let pose: CameraPose | null = null
     let aimKey = ''
+    let look: { key: string; point: Vec2 } | null = null
     let lastFeedback = ''
     let drag: { id: number; x: number; y: number; time: number; moved: boolean; forward: Vec2; saved: { direction: Vec2; power: number } } | null = null
 
@@ -154,6 +160,7 @@ export function usePutterGolfEngine(options: Options) {
       scene.setHole(course, hole, geometry, holeIndex + 1)
       strokes = 0
       returnTimer = 0
+      sink = null
       hintTarget = null
       accumulator = 0
       drag = null
@@ -161,6 +168,7 @@ export function usePutterGolfEngine(options: Options) {
       heading = direction
       introTime = latest.current.active && !latest.current.reducedMotion ? INTRO_SECONDS : 0
       pose = null
+      look = null
       host.dataset.hole = hole.id
       publish()
     }
@@ -176,6 +184,7 @@ export function usePutterGolfEngine(options: Options) {
       for (const event of events) {
         if (event.kind === 'shot') { strokes++; scene.swingClub(); heading = direction }
         if (event.kind === 'bumper') { scene.pulseBumper(event.id); scene.effect('sparkle', event.position) }
+        if (event.kind === 'reflector') { scene.pulseBumper(event.id); scene.effect('sparkle', event.position) }
         if (event.kind === 'critter') scene.effect('sparkle', event.position)
         if (event.kind === 'boost') scene.effect('sparkle', event.position)
         if (event.kind === 'surface') scene.effect(event.surface === 'ice' ? 'sparkle' : 'dust', event.position, 0.7)
@@ -189,7 +198,14 @@ export function usePutterGolfEngine(options: Options) {
           pose = null
         }
         if (event.kind === 'land') scene.effect('dust', event.position, event.strength)
-        if (event.kind === 'splash') { scene.effect('splash', event.position); returnTimer = 1.2 }
+        if (event.kind === 'splash') {
+          scene.effect('splash', event.position)
+          returnTimer = 1.2
+          if (event.pond) {
+            const velocity = event.velocity ?? { x: 0, z: 0 }
+            sink = { from: world.ball().position, drift: { x: velocity.x * 0.12, z: velocity.z * 0.12 }, time: 0 }
+          }
+        }
         if (event.kind === 'lost') returnTimer = 0.6
         if (event.kind === 'cup') scene.effect(strokes === 1 ? 'fireworks' : 'confetti', geometry.cup)
         if (event.kind === 'rest') {
@@ -205,13 +221,27 @@ export function usePutterGolfEngine(options: Options) {
       if (events.length) publish()
     }
 
+    /** ねらうときに見る点。ボールが止まっている間は同じなので、場所ごとに覚えておく。 */
+    function lookAt(ball: Vec3): Vec2 {
+      if (!geometry) return ball
+      const key = `${ball.x.toFixed(2)}:${ball.z.toFixed(2)}`
+      if (look?.key !== key) {
+        const { course, holeIndex } = latest.current
+        const hole = course.holes[holeIndex] ?? course.holes[0]!
+        look = { key, point: lookTarget(ball, geometry.cup, hole.route, geometry) }
+      }
+      return look.point
+    }
+
     function desiredPose(): CameraPose | null {
       if (!scene || !world || !geometry) return null
       const aspect = scene.aspect
       const overview = overviewPose(geometry.bounds, aspect)
       if (!latest.current.active || latest.current.camera === 'overview') return overview
       const ball = world.ball().position
-      const target = world.phase === 'rolling' || world.phase === 'out' ? followPose(ball, heading, aspect) : aimPose(ball, direction, aspect)
+      // ねらうときは カップの ほう（見とおせなければ みちすじの 先）を 見る。
+      // うつ向きに あわせて まわすと、まがりかどや もどった あとに うしろを むいてしまう。
+      const target = world.phase === 'rolling' || world.phase === 'out' ? followPose(ball, heading, aspect) : aimPose(ball, viewHeading(ball, lookAt(ball), direction), aspect)
       return introTime > 0 ? lerpPose(overview, target, ease(1 - introTime / INTRO_SECONDS)) : target
     }
 
@@ -233,6 +263,7 @@ export function usePutterGolfEngine(options: Options) {
           returnTimer -= dt
           if (returnTimer <= 0) {
             returnTimer = 0
+            sink = null
             world.returnToRest()
             aimAtSuggestion()
             pose = null
@@ -240,7 +271,14 @@ export function usePutterGolfEngine(options: Options) {
           }
         }
         const state = world.ball()
-        scene.syncBall(state.position, state.rotation)
+        if (sink) {
+          // ぽちゃん。すこし すすみながら、ゆっくり 水の なかへ しずむ。
+          sink.time += dt
+          const t = Math.min(1, sink.time / SINK_SECONDS)
+          const glide = 1 - (1 - t) * (1 - t)
+          const bob = Math.sin(Math.min(1, sink.time / 0.25) * Math.PI) * 0.03
+          scene.syncBall({ x: sink.from.x + sink.drift.x * glide, y: sink.from.y + bob - SINK_DEPTH * t * t, z: sink.from.z + sink.drift.z * glide }, state.rotation, t < 1)
+        } else scene.syncBall(state.position, state.rotation)
         scene.syncGadgets(world.motion())
         const { cup } = geometry
         scene.setFlagLifted(world.phase === 'holed' || (world.phase === 'rolling' && Math.hypot(state.position.x - cup.x, state.position.z - cup.z) < 2.4))
@@ -408,6 +446,7 @@ export function usePutterGolfEngine(options: Options) {
             if (geometry.surfaceAt(spot.x, spot.z) === 'green') break
           }
           returnTimer = 0
+          sink = null
           world.placeBall(spot)
           const dx = cup.x - spot.x
           const dz = cup.z - spot.z

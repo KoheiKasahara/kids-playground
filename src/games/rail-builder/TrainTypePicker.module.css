@@ -104,6 +104,18 @@
   line-height: 0;
 }
 
+.modelThumbnail {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 6px 5px rgb(31 55 74 / 0.22));
+}
+
 .check {
   position: absolute;
   top: -8px;

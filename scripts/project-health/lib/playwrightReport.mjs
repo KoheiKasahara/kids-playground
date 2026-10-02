@@ -6,15 +6,14 @@ export function parsePlaywrightSummary(report) {
     return null
   }
 
-  const expected = Number(stats.expected) || 0
-  const unexpected = Number(stats.unexpected) || 0
-  const skipped = Number(stats.skipped) || 0
-  const flaky = Number(stats.flaky) || 0
+  const counts = [stats.expected, stats.unexpected, stats.skipped, stats.flaky]
+  if (counts.some((value) => !Number.isInteger(value) || value < 0)) return null
+  const [expected, unexpected, skipped, flaky] = counts
   const total = expected + unexpected + skipped + flaky
 
   if (total === 0) {
     return null
   }
 
-  return { total, passed: expected + flaky }
+  return { total, passed: expected + flaky, skipped, flaky }
 }

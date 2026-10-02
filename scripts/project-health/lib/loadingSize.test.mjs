@@ -40,3 +40,11 @@ test('欠けた成果物を0 bytesの成功として報告しない', () => {
   expect(() => measureLoadingSize(dir)).toThrow()
   expect(renderLoadingSizeMarkdown(null)).toContain('計測なし')
 })
+
+test('マニフェストがdist外のファイルを指定しても読み込まない（Windowsを含む）', () => {
+  fixture()
+  writeFileSync(join(dir, '.vite/manifest.json'), JSON.stringify({
+    'index.html': { src: 'index.html', isEntry: true, file: '../outside.js' },
+  }))
+  expect(() => measureLoadingSize(dir)).toThrow('Asset outside dist')
+})

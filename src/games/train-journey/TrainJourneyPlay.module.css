@@ -34,6 +34,12 @@
 .fitButton { position: absolute; z-index: 2; bottom: 10px; left: 10px; min-height: 44px; border: 2px solid #e2e4d0; border-radius: 14px; background: #fffff1ed; color: #4e6763; padding: 5px 13px; font-size: 12px !important; font-weight: 800 !important; }
 .selection, .controls { flex: 0 0 auto; margin: 8px auto 0; width: 100%; max-width: 740px; border-radius: 22px; background: #fffdf5; padding: 12px; box-shadow: 0 4px 14px #53674410; }
 .selection h2 { font-size: 16px; text-align: center; margin: 0 0 9px; }
+.maps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.maps button { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 8px; min-height: 52px; padding: 4px 10px; border: 3px solid transparent; border-radius: 16px; background: #f2f4ef; color: #41575c; text-align: left; }
+.maps button span { grid-row: 1 / 3; font-size: 25px; line-height: 1; }
+.maps button strong { font-size: 15px; }
+.maps button small { font-size: 10px; color: #6b7c7a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.maps button[aria-pressed='true'] { border-color: #428775; background: #fffdf8; box-shadow: 0 3px 0 #42877540; }
 .trains { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .trainButton { position: relative; display: flex; flex-direction: column; align-items: center; padding: 2px 2px 9px; background: #f2f4ef; border: 3px solid transparent; border-radius: 18px; color: #41575c; min-width: 0; }
 .trainButton[aria-pressed='true'] { border-color: var(--train-color); background: #fffdf8; box-shadow: 0 3px 0 color-mix(in srgb, var(--train-color), transparent 75%); }
@@ -49,6 +55,14 @@
 .routeButton span { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .routeButton strong { font-size: 19px; white-space: nowrap; }
 .routeButton small { font-size: 11px; font-weight: 800; }
+.primaryActions[data-points='2'] { grid-template-columns: 1fr 1fr 0.85fr; gap: 7px; }
+.primaryActions[data-points='2'] .routeButton { flex-direction: column; gap: 1px; padding: 5px 2px; }
+.primaryActions[data-points='2'] .routeButton svg { width: 32px; height: 30px; flex: 0 0 30px; }
+.primaryActions[data-points='2'] .routeButton span { gap: 1px; }
+.primaryActions[data-points='2'] .routeButton strong { font-size: 15px; }
+.primaryActions[data-points='2'] .routeButton small { font-size: 10px; }
+.primaryActions[data-points='2'] .routeButton[data-next='false'] { background: #fbfbf6; border-style: dashed; box-shadow: none; }
+.primaryActions[data-points='2'] .boostButton strong { font-size: 19px; }
 .boostButton { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: #ffe19a; border: 3px solid #f7c664; border-radius: 18px; box-shadow: 0 3px 0 #dea944; color: #78572d; }
 .boostButton > span { font-size: 25px; line-height: 1.1; }
 .boostButton strong { font-size: 23px; }
@@ -83,8 +97,18 @@
   .tools { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
   .tools button { font-size: 9px; }
   .hint { flex-direction: column; text-align: center; font-size: 9px; }
+  .maps { gap: 5px; margin-bottom: 7px; }
+  .maps button { min-height: 46px; padding: 3px 7px; column-gap: 5px; }
+  .maps button span { font-size: 20px; }
+  .maps button strong { font-size: 13px; }
+  .maps button small { font-size: 8px; }
+  .primaryActions[data-points='2'] { grid-template-columns: 1fr 1fr; }
+  .primaryActions[data-points='2'] .boostButton { grid-column: 1 / -1; min-height: 58px; flex-direction: row; gap: 8px; }
+  .primaryActions[data-points='2'] .routeButton { min-height: 96px; }
+  .primaryActions[data-points='2'] .routeButton strong { font-size: 14px; }
   .map { width: 87px; top: 50px; }
   .map svg { height: 76px; }
   .map span { font-size: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .loadingDots { animation: none; } }
+@media (max-width: 480px) { .primaryActions[data-points='2'] .boostButton small { display: none; } }

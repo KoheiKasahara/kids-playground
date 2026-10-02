@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { connectionsForPart, createDefaultPlacedPart, createPlacedPart, exitPortForPart, PART_DEFINITIONS } from './partDefinitions'
+import { connectionsForPart, createDefaultPlacedPart, createPlacedPart, exitPortForPart, PART_DEFINITIONS, rotatePlacedPart } from './partDefinitions'
 
 describe('car road parts', () => {
   test('straight has four unique poses and curves have eight', () => {
@@ -25,16 +25,20 @@ describe('car road parts', () => {
     ).size).toBe(8)
   })
 
-  test('goal exposes one cardinal entrance in four quarter-turn poses', () => {
-    expect(PART_DEFINITIONS.goal.rotationSteps).toEqual([0, 2, 4, 6])
+  test('goal exposes one entrance in all eight 45-degree poses', () => {
+    expect(PART_DEFINITIONS.goal.rotationSteps).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
     expect(PART_DEFINITIONS.goal.rotationSteps.map((step) => connectionsForPart(createPlacedPart('goal', step)))).toEqual([
       ['N'],
+      ['NE'],
       ['E'],
+      ['SE'],
       ['S'],
+      ['SW'],
       ['W'],
+      ['NW'],
     ])
-    expect(createPlacedPart('goal', 5).rotationStep).toBe(6)
-    expect(connectionsForPart(createPlacedPart('goal', 5))).toEqual(['W'])
+    expect(createPlacedPart('goal', 5).rotationStep).toBe(5)
+    expect(rotatePlacedPart(createPlacedPart('goal', 0)).rotationStep).toBe(1)
   })
 
   test('crossroad exposes all cardinal ports and keeps them after rotation', () => {

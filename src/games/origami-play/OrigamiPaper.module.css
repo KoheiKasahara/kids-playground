@@ -1,0 +1,221 @@
+.paper {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The paper zooms in as it gets smaller, so every step stays big enough to tap. */
+.view {
+  transition: transform 650ms cubic-bezier(.4, 0, .2, 1);
+}
+
+.foldingFlap {
+  transform-origin: 0 0;
+  animation: paperFold 850ms cubic-bezier(.4, 0, .2, 1) both;
+}
+
+.firstHalf {
+  animation: showFirst 850ms steps(1, end) both;
+}
+
+.secondHalf {
+  animation: showSecond 850ms steps(1, end) both;
+}
+
+.foldShade path {
+  fill: #695049;
+  opacity: 0;
+  animation: foldShade 850ms ease-in-out both;
+}
+
+.flipOut,
+.flipIn {
+  transform-origin: 0 0;
+}
+
+.flipOut {
+  animation: flipOut 850ms cubic-bezier(.4, 0, .2, 1) both;
+}
+
+.flipIn {
+  animation: flipIn 850ms cubic-bezier(.4, 0, .2, 1) both;
+}
+
+.fadeOut {
+  animation: fadeOut 850ms ease-in-out both;
+}
+
+.fadeIn {
+  animation: fadeIn 850ms ease-in-out both;
+}
+
+.guide {
+  pointer-events: none;
+  animation: reveal 400ms 250ms ease-out both;
+}
+
+.finishingDetails {
+  animation: reveal 500ms ease-out both;
+}
+
+.alive,
+.fox,
+.dog,
+.tulip,
+.boat,
+.cup,
+.cicada,
+.kabuto,
+.crane {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.fox,
+.dog {
+  animation: hello 4.8s ease-in-out infinite;
+}
+
+.tulip,
+.crane {
+  animation: sway 4s ease-in-out infinite;
+}
+
+.boat {
+  animation: sail 4s ease-in-out infinite;
+}
+
+.cup,
+.kabuto,
+.alive {
+  animation: hop 3.6s ease-in-out infinite;
+}
+
+.cicada {
+  animation: buzz 3s ease-in-out infinite;
+}
+
+.eyes {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+.water {
+  animation: ripple 4s ease-in-out infinite;
+}
+
+.groundShadow {
+  animation: shadowBreath 4s ease-in-out infinite;
+}
+
+.preview * {
+  animation: none !important;
+}
+
+@keyframes paperFold {
+  0% { transform: scaleY(1); }
+  43% { transform: scaleY(.05); }
+  55% { transform: scaleY(-.12); }
+  89% { transform: scaleY(-1.015); }
+  100% { transform: scaleY(-1); }
+}
+
+@keyframes showFirst {
+  0% { opacity: 1; }
+  48%, 100% { opacity: 0; }
+}
+
+@keyframes showSecond {
+  0% { opacity: 0; }
+  48%, 100% { opacity: 1; }
+}
+
+@keyframes foldShade {
+  0%, 100% { opacity: 0; }
+  42% { opacity: .25; }
+  65% { opacity: .12; }
+}
+
+@keyframes flipOut {
+  0% { transform: scaleX(1); opacity: 1; }
+  49.9% { transform: scaleX(.02); opacity: 1; }
+  50%, 100% { transform: scaleX(.02); opacity: 0; }
+}
+
+@keyframes flipIn {
+  0%, 49.9% { transform: scaleX(.02); opacity: 0; }
+  50% { transform: scaleX(.02); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 1; }
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+  0%, 35% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes hello {
+  0%, 52%, 100% { transform: rotate(0deg); }
+  64%, 80% { transform: rotate(-3deg); }
+  72% { transform: rotate(-2deg); }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@keyframes sail {
+  0%, 100% { transform: translateY(2px) rotate(-2deg); }
+  50% { transform: translateY(-2px) rotate(2deg); }
+}
+
+@keyframes hop {
+  0%, 60%, 100% { transform: translateY(0) scale(1, 1); }
+  68% { transform: translateY(0) scale(1.04, .95); }
+  78% { transform: translateY(-6px) scale(.98, 1.03); }
+  88% { transform: translateY(0) scale(1, 1); }
+}
+
+@keyframes buzz {
+  0%, 70%, 100% { transform: translateX(0); }
+  74%, 82% { transform: translateX(-1.5px); }
+  78%, 86% { transform: translateX(1.5px); }
+}
+
+@keyframes ripple {
+  0%, 100% { transform: translateX(-4px); opacity: .8; }
+  50% { transform: translateX(4px); opacity: 1; }
+}
+
+@keyframes shadowBreath {
+  0%, 100% { opacity: .1; }
+  50% { opacity: .07; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .foldingFlap {
+    transform: scaleY(-1);
+  }
+
+  .firstHalf,
+  .flipOut,
+  .fadeOut {
+    opacity: 0;
+  }
+}

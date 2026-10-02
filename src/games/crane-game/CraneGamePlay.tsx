@@ -116,7 +116,9 @@ export default function CraneGamePlay() {
           </>}
         </div>
 
-        {phase === 'select' ? <section className={styles.selection} aria-label="きかいを えらぶ">
+        {/* えらぶ画面と あそぶ画面の パネルを 同じ場所に 重ねて置き、高さの大きいほうに そろえる。切り替えても ケースの大きさが かわらず ちらつかない。 */}
+        <div className={styles.panel}>
+        <section className={styles.selection} aria-label="きかいを えらぶ" data-shown={phase === 'select'} aria-hidden={phase !== 'select'} inert={phase !== 'select'}>
           <h2>どの きかいで あそぶ？</h2>
           <div className={styles.machines}>
             {CRANE_MACHINES.map(item => <button
@@ -130,14 +132,17 @@ export default function CraneGamePlay() {
             >
               <span className={styles.check} aria-hidden="true">{machineId === item.id ? '✓' : ''}</span>
               <span className={styles.machineEmoji} aria-hidden="true">{item.emoji}</span>
-              <strong>{item.label}</strong>
-              <small>{item.description}</small>
+              <span className={styles.machineText}>
+                <strong>{item.label}</strong>
+                <small>{item.description}</small>
+              </span>
             </button>)}
           </div>
           <button type="button" className={styles.beginButton} disabled={status !== 'ready'} onClick={begin}>
             <span aria-hidden="true">▶</span> あそぶ！
           </button>
-        </section> : <section className={styles.controls} aria-label="クレーンの そうさ">
+        </section>
+        <section className={styles.controls} aria-label="クレーンの そうさ" data-shown={phase === 'play'} aria-hidden={phase !== 'play'} inert={phase !== 'play'}>
           <div className={styles.axisRow}>
             <button
               type="button"
@@ -181,7 +186,8 @@ export default function CraneGamePlay() {
             {feedback.remaining === 0 ? 'ぜんぶ とれた！ ならべるを おしてね' : machine.hint}
             <span>{machine.emoji} {machine.label}</span>
           </p>
-        </section>}
+        </section>
+        </div>
       </main>
     </GamePlaySurface>
   )

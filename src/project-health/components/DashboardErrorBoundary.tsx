@@ -28,7 +28,7 @@ export default class DashboardErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="ph-page">
-          <p className="ph-error">Project Health Dashboard の表示中にエラーが発生しました。</p>
+          <p className="ph-error">プロジェクトの健康状態を表示中にエラーが発生しました。ページを再読み込みしてください。</p>
         </div>
       )
     }

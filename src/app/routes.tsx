@@ -4,12 +4,9 @@ import Home from '../pages/Home'
 import GamePlaySurface from '../components/GamePlaySurface'
 import FlagQuizStart from '../games/flag-quiz/FlagQuizStart'
 import FlagQuizLevelSelect from '../games/flag-quiz/FlagQuizLevelSelect'
-import FlagQuizPlay from '../games/flag-quiz/FlagQuizPlay'
 import FlagQuizResult from '../games/flag-quiz/FlagQuizResult'
-import PanelFlagQuizPlay from '../games/flag-quiz/PanelFlagQuizPlay'
 import WorkingVehicleQuizStart from '../games/working-vehicle-quiz/WorkingVehicleQuizStart'
 import WorkingVehicleQuizLevelSelect from '../games/working-vehicle-quiz/WorkingVehicleQuizLevelSelect'
-import WorkingVehicleQuizPlay from '../games/working-vehicle-quiz/WorkingVehicleQuizPlay'
 import WorkingVehicleQuizResult from '../games/working-vehicle-quiz/WorkingVehicleQuizResult'
 import { VegetableQuizPlay, VegetableQuizResult, VegetableQuizStart } from '../games/vegetable-quiz/VegetableQuiz'
 import { FruitQuizPlay, FruitQuizResult, FruitQuizStart } from '../games/fruit-quiz/FruitQuiz'
@@ -20,11 +17,10 @@ import MathQuizResult from '../games/math-quiz/MathQuizResult'
 import { MODE_PATH as MATH_QUIZ_MODE_PATH } from '../games/math-quiz/types'
 import type { MathQuizMode } from '../games/math-quiz/types'
 import PrefectureQuizStart from '../games/prefecture-quiz/PrefectureQuizStart'
-import PrefectureQuizPlay from '../games/prefecture-quiz/PrefectureQuizPlay'
 import PrefectureQuizResult from '../games/prefecture-quiz/PrefectureQuizResult'
 import PrefecturePuzzleStart from '../games/prefecture-quiz/PrefecturePuzzleStart'
-import PrefecturePuzzlePlay from '../games/prefecture-quiz/PrefecturePuzzlePlay'
 import { colorMixQuizRoutes } from '../games/color-mix-quiz/routes'
+import { FlagQuizPlay, PanelFlagQuizPlay, WorkingVehicleQuizPlay, PrefectureQuizPlay, PrefecturePuzzlePlay } from './quizRouteComponents'
 
 // 50m世界地図やmatter-js(物理エンジン)など、特定ゲームだけが必要とする重い依存は
 // そのゲームを開くときだけ読込む。Vite PWAは生成されたchunkもprecacheするため、
@@ -50,6 +46,8 @@ const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePla
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
+  { path: '/games/rhythm-pon', element: lazyRoute(() => import('../games/rhythm-pon/RhythmPlay')) },
+  { path: '/games/origami-play', element: lazyRoute(() => import('../games/origami-play/OrigamiPlay')) },
   { path: '/games/draw-goal', element: lazyRoute(() => import('../games/draw-goal/DrawGoalPlay')) },
   { path: '/games/magic-sandbox', element: lazyRoute(() => import('../games/magic-sandbox/MagicSandboxPlay')) },
   { path: '/games/treasure-dig', element: lazyRoute(() => import('../games/treasure-dig/TreasureDigPlay')) },
@@ -60,6 +58,37 @@ export const routes: RouteObject[] = [
   // むずかしさ選択・プレイ・結果が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // PyokoTouchPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/pyoko-touch', element: lazyRoute(() => import('../games/pyoko-touch/PyokoTouchPlay')) },
+  // コース選択・プレイ・結果が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // HoshiTsunagiPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/hoshi-tsunagi', element: lazyRoute(() => import('../games/hoshi-tsunagi/HoshiTsunagiPlay')) },
+  // ステージ選択とプレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // RoboKuzushiPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/robo-kuzushi', element: lazyRoute(() => import('../games/robo-kuzushi/RoboKuzushiPlay')) },
+  // ステージ選択とプレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // MatoAtePlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/mato-ate', element: lazyRoute(() => import('../games/mato-ate/MatoAtePlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // DotAdventurePlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/dot-adventure', element: lazyRoute(() => import('../games/dot-adventure/DotAdventurePlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // DotZooPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/dot-zoo', element: lazyRoute(() => import('../games/dot-zoo/DotZooPlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // DotAquariumPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/dot-aquarium', element: lazyRoute(() => import('../games/dot-aquarium/DotAquariumPlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // DotRunPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/dot-run', element: lazyRoute(() => import('../games/dot-run/DotRunPlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // JishakuPitattoPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/jishaku-pitatto', element: lazyRoute(() => import('../games/jishaku-pitatto/JishakuPitattoPlay')) },
+  // あそびかた選択・プレイ・結果が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // ShabonPachinPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/shabon-pachin', element: lazyRoute(() => import('../games/shabon-pachin/ShabonPachinPlay')) },
+  // コース選択・レース・結果が同一route内で切り替わるため、プレイ面はゲーム内で包む。
+  { path: '/games/pixel-kart', element: lazyRoute(() => import('../games/pixel-kart/PixelKartPlay')) },
+  // タイトル・プレイ画面が同一route内で切り替わるため、プレイ面はゲーム内で包む。
+  { path: '/games/tsumiki-3d', element: lazyRoute(() => import('../games/tsumiki-3d/Tsumiki3dPlay')) },
   { path: '/', element: <Home /> },
   { path: '/games/puni-slime', element: playRoute(lazyRoute(() => import('../games/puni-slime/PuniSlimePlay'))) },
   { path: '/games/animal-bath', element: lazyRoute(() => import('../games/animal-bath/AnimalBathPlay')) },

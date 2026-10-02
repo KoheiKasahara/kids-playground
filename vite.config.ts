@@ -7,12 +7,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { staticRoutePages } from './src/build/staticRoutePages'
 import { sitemapFile } from './src/build/sitemap'
 import { projectHealthDashboardOutput } from './src/build/projectHealthDashboardOutput'
+import { threeGlobeUnusedDeps } from './src/build/threeGlobeUnusedDeps'
 
 // カスタムドメイン（https://kids.kasapg.com/）直下で公開するため base は常に '/'。
 const base = '/'
 
 const plugins = [
   react(),
+  threeGlobeUnusedDeps(),
   VitePWA({
     // 'autoUpdate' だと新しいSWが有効化された瞬間に自動で window.location.reload() が
     // 走ってしまい、クイズの途中でも進行が消えてしまう。
@@ -117,7 +119,8 @@ const domDependentTestTsFiles = [
   'src/games/earth-globe/useReducedMotion.test.ts',
   'src/games/flag-pinball/themeStore.test.ts',
   'src/games/flag-roll-puzzle/useBoardScale.test.ts',
-  'src/games/piano-play/pianoAudio.test.ts',
+  'src/games/shared/progress/stageProgress.test.ts',
+  'src/games/shared/music/pianoAudio.test.ts',
   'src/games/planet-globe/three/overviewVisual.test.ts',
   'src/games/planet-globe/three/planetRing.test.ts',
   'src/games/planet-globe/three/planetSurface.test.ts',
@@ -126,6 +129,7 @@ const domDependentTestTsFiles = [
   'src/seo/applyDocumentSeo.test.ts',
   'src/speech/speechEngine.test.ts',
   'src/speech/speechSettingsStore.test.ts',
+  'src/utils/haptics.test.ts',
   'src/utils/quizSound.test.ts',
 ]
 

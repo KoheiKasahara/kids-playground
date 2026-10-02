@@ -5,7 +5,7 @@
   },
   "lighthouse": {
     "targets": [
-      { "name": "Top", "path": "/" }
+      { "name": "ホーム画面", "path": "/" }
     ]
   },
   "history": {

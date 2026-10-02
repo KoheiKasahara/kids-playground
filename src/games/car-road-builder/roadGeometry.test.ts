@@ -25,8 +25,8 @@ describe('car road geometry', () => {
     expect(goal.sample(1)).toEqual({ x: 0, y: 0 })
   })
 
-  test('rotated goals expose one matching cardinal edge', () => {
-    for (const [rotation, direction] of [[0, 'N'], [2, 'E'], [4, 'S'], [6, 'W']] as const) {
+  test('rotated goals expose one matching edge or corner', () => {
+    for (const [rotation, direction] of [[0, 'N'], [1, 'NE'], [2, 'E'], [3, 'SE'], [4, 'S'], [5, 'SW'], [6, 'W'], [7, 'NW']] as const) {
       const part = createPlacedPart('goal', rotation)
       const path = getPathSpec(part)
       expect(connectionsForPart(part)).toEqual([direction])

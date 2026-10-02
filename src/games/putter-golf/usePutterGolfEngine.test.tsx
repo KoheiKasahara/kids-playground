@@ -1,7 +1,7 @@
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { GOLF_COURSES } from './golfCourses'
-import { aimPose } from './golfCamera'
+import { aimPose, viewHeading } from './golfCamera'
 import type { GolfEvent } from './golfWorld'
 import { aimFromDrag, usePutterGolfEngine, type EngineEvent, type GolfCamera, type GolfFeedback } from './usePutterGolfEngine'
 
@@ -135,7 +135,7 @@ it('「うつ！」はおすすめの向きと、えらんだ強さでうち、�
   expect(app.feedback.at(-1)).toMatchObject({ phase: 'rolling', strokes: 1 })
 })
 
-it('打ち終わったら、次のねらいの後ろへカメラを置き直す', async () => {
+it('打ち終わったら、ボールの後ろから カップの ほうを 見るよう カメラを置き直す', async () => {
   const app = setup()
   await waitFor(() => expect(app.status).toContain('ready'))
   runFrames(2)
@@ -147,7 +147,7 @@ it('打ち終わったら、次のねらいの後ろへカメラを置き直す'
   runFrames(1)
 
   const ball = world().state.position
-  const pose = aimPose(ball, next.direction, 1)
+  const pose = aimPose(ball, viewHeading(ball, GOLF_COURSES[0]!.holes[0]!.cup, next.direction), 1)
   // カメラとボールの距離もわたす。手前の景色だけを消すために使う。
   expect(scene().setCamera).toHaveBeenLastCalledWith(pose, Math.hypot(pose.position.x - ball.x, pose.position.y - ball.y, pose.position.z - ball.z))
 })

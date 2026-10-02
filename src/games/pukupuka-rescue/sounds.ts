@@ -31,8 +31,10 @@ export function playPukupukaWaterSound(direction: 'fill' | 'drain'): void {
   }
 }
 
+export type PukupukaActionSound = 'gate' | 'board' | 'wheel' | 'join' | 'bell' | 'whale' | 'slide' | 'splash'
+
 /** ぷかぷかレスキューの仕掛け操作。仕掛けごとに違う短音で結果を返す。 */
-export function playPukupukaActionSound(kind: 'gate' | 'board' | 'wheel'): void {
+export function playPukupukaActionSound(kind: PukupukaActionSound): void {
   if (!isSoundEnabled()) return
 
   try {
@@ -45,6 +47,29 @@ export function playPukupukaActionSound(kind: 'gate' | 'board' | 'wheel'): void 
     } else if (kind === 'board') {
       playTone(ctx, 659.25, now, 0.08, 0.06, 'triangle')
       playTone(ctx, 523.25, now + 0.055, 0.11, 0.06, 'triangle')
+    } else if (kind === 'join') {
+      // なかまになった: ぴよっと上がる3音。
+      playTone(ctx, 784, now, 0.08, 0.06, 'triangle')
+      playTone(ctx, 987.77, now + 0.07, 0.08, 0.06, 'triangle')
+      playTone(ctx, 1318.51, now + 0.14, 0.16, 0.05, 'sine')
+    } else if (kind === 'bell') {
+      // カラーン: 高い倍音を重ねて長めに響かせる。
+      playTone(ctx, 1046.5, now, 0.7, 0.07, 'sine')
+      playTone(ctx, 1568, now, 0.5, 0.035, 'sine')
+      playTone(ctx, 1046.5, now + 0.22, 0.6, 0.05, 'sine')
+    } else if (kind === 'whale') {
+      // ぶしゅーっ: 低い音から高い音へかけあがる。
+      playTone(ctx, 196, now, 0.14, 0.06, 'triangle')
+      playTone(ctx, 392, now + 0.1, 0.14, 0.06, 'triangle')
+      playTone(ctx, 784, now + 0.2, 0.2, 0.05, 'sine')
+    } else if (kind === 'slide') {
+      // ひゅるる: 下がっていく音。
+      playTone(ctx, 880, now, 0.1, 0.05, 'sine')
+      playTone(ctx, 698.46, now + 0.08, 0.1, 0.05, 'sine')
+      playTone(ctx, 523.25, now + 0.16, 0.16, 0.05, 'sine')
+    } else if (kind === 'splash') {
+      playTone(ctx, 330, now, 0.06, 0.05, 'triangle')
+      playTone(ctx, 247, now + 0.04, 0.1, 0.04, 'sine')
     } else {
       playTone(ctx, 392, now, 0.09, 0.055, 'sine')
       playTone(ctx, 523.25, now + 0.07, 0.14, 0.06, 'sine')

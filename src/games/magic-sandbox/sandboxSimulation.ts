@@ -1,12 +1,16 @@
-import { addCrab, addTurtle, tapCrab, tapTurtle, stepCrabs, stepTurtles, renderCrabs, renderTurtles, nextSleepDelay, wakeCreature, creatureScale, type Creature } from './sandboxCrabs'
+import { addCrab, addHermit, addTurtle, tapCrab, tapHermit, tapTurtle, stepCrabs, stepHermits, stepTurtles, renderCrabs, renderHermits, renderTurtles, nextSleepDelay, wakeCreature, creatureScale, type Creature } from './sandboxCrabs'
 import { addButterfly, tapButterfly, stepButterflies, renderButterflies, type Butterfly } from './sandboxButterfly'
 import { nextCrowDelay, reshapeCrows, stepCrows, renderCrows, type Crow } from './sandboxCrow'
 
 // Original, bounded falling-sand simulation. No external engine or copied OSS code.
-export const Cell = { Empty: 0, Sand: 1, Water: 2, Stone: 3, Seed: 4, Mud: 5, Stem: 6, Petal: 7, Pollen: 8, Root: 9 } as const
-export type Material = 0 | 1 | 2 | 3 | 4
+export const Cell = { Empty: 0, Sand: 1, Water: 2, Stone: 3, Seed: 4, Mud: 5, Stem: 6, Petal: 7, Pollen: 8, Root: 9, TulipSeed: 10, TulipPetal: 11 } as const
+export type Material = 0 | 1 | 2 | 3 | 4 | 10
+/** Both kinds of seed fall, sprout and grow alike; only the bloom looks different. */
+export const isSeed = (cell: number) => cell === Cell.Seed || cell === Cell.TulipSeed
+// Grains that fall and can be shaken loose; stone walls and plants stay put.
+const loose = (cell: number) => (cell >= Cell.Sand && cell <= Cell.Mud && cell !== Cell.Stone) || cell === Cell.TulipSeed
 export type Point = { x: number; y: number }
-type Plant = Point & { height: number; age: number; target: number; cells: Map<number, number> }
+type Plant = Point & { height: number; age: number; target: number; tulip: boolean; cells: Map<number, number> }
 
 // A portrait board is the reference shape: keeping the count of grains steady over
 // every shape keeps a grain - and every animal drawn out of grains - the same size.
@@ -39,6 +43,7 @@ export class Sandbox {
   private plants: Plant[] = []
   private tick = 0
   readonly crabs: Creature[] = []
+  readonly hermits: Creature[] = []
   readonly turtles: Creature[] = []
   readonly butterflies: Butterfly[] = []
   // Crows only pass overhead; they never land, so the board never holds more than one.
@@ -49,15 +54,17 @@ export class Sandbox {
     if (this.night === night) return
     this.night = night
     if (night) this.crowDelay = nextCrowDelay(this.random)
-    for (const creature of [...this.crabs, ...this.turtles, ...this.butterflies]) {
+    for (const creature of [...this.crabs, ...this.hermits, ...this.turtles, ...this.butterflies]) {
       wakeCreature(creature)
       creature.sleepDelay = night ? nextSleepDelay(this.random) : 0
     }
   }
   addCrab() { return addCrab(this, this.random) }
+  addHermit() { return addHermit(this, this.random) }
   addTurtle() { return addTurtle(this, this.random) }
   addButterfly() { return addButterfly(this, this.random) }
   tapCrab(point: Point) { return tapCrab(this, point) }
+  tapHermit(point: Point) { return tapHermit(this, point) }
   tapTurtle(point: Point) { return tapTurtle(this, point) }
   tapButterfly(point: Point) { return tapButterfly(this, point) }
   // A seed only sprouts clear of the plants already growing around it.
@@ -65,6 +72,10 @@ export class Sandbox {
   bloomingFlowers(): Point[] {
     return this.plants.filter(p => p.height === p.target && this.get(p.x, p.y) === Cell.Root &&
       this.get(p.x, p.y - p.height) === Cell.Pollen).map(p => ({ x: p.x, y: p.y - p.height }))
+  }
+  /** The seed a bloom scatters: a tulip sows tulips, any other flower its own kind. */
+  seedOf(point: Point): Material {
+    return this.plants.some(p => p.tulip && p.x === point.x && p.y - p.height === point.y) ? Cell.TulipSeed : Cell.Seed
   }
   eatFlower(point: Point) {
     if (!this.bloomingFlowers().some(p => p.x === point.x && p.y === point.y)) return false
@@ -104,6 +115,7 @@ export class Sandbox {
   }
   clear() {
     this.crabs.length = 0
+    this.hermits.length = 0
     this.turtles.length = 0
     this.butterflies.length = 0
     this.crows.length = 0
@@ -163,12 +175,12 @@ export class Sandbox {
       for (const [index, material] of moved) if (cells[index] === material) cells[index] = Cell.Empty
       return []
     })
-    for (const group of [this.crabs, this.turtles, this.butterflies]) reseat(group, dx, dy, width, height)
+    for (const group of [this.crabs, this.hermits, this.turtles, this.butterflies]) reseat(group, dx, dy, width, height)
     reshapeCrows(this, previous, previousHeight)
     return true
   }
   paint(point: Point, material: Material, radius: number) {
-    for (const creature of [...this.crabs, ...this.turtles]) {
+    for (const creature of [...this.crabs, ...this.hermits, ...this.turtles]) {
       const scale = creatureScale(creature)
       if (Math.abs(point.x - creature.x) <= radius + 8 * scale && Math.abs(point.y - (creature.y - 4 * scale)) <= radius + 5 * scale) wakeCreature(creature)
     }
@@ -191,7 +203,7 @@ export class Sandbox {
     const i = y * this.width + x, j = ny * this.width + nx
     const destination = this.get(nx, ny)
     const material = this.cells[i]
-    if (destination !== Cell.Empty && !(destination === Cell.Water && (material === Cell.Sand || material === Cell.Mud || material === Cell.Seed))) return false
+    if (destination !== Cell.Empty && !(destination === Cell.Water && (material === Cell.Sand || material === Cell.Mud || isSeed(material)))) return false
     const age = this.age[i]
     this.cells[i] = destination
     this.cells[j] = material
@@ -208,16 +220,16 @@ export class Sandbox {
       const x = reverse ? this.width - n - 1 : n
       const i = y * this.width + x
       let material = this.cells[i]
-      if (this.moved[i] || material < Cell.Sand || material > Cell.Mud || material === Cell.Stone) continue
+      if (this.moved[i] || !loose(material)) continue
       if (material === Cell.Sand && (this.get(x - 1, y) === Cell.Water || this.get(x + 1, y) === Cell.Water || this.get(x, y - 1) === Cell.Water || this.get(x, y + 1) === Cell.Water)) {
         material = this.cells[i] = Cell.Mud
       }
       // Seeds need damp soil beneath them; dry sand and stone never germinate.
-      if (material === Cell.Seed && this.get(x, y + 1) === Cell.Mud) {
+      if (isSeed(material) && this.get(x, y + 1) === Cell.Mud) {
         this.age[i]++
         if (this.age[i] >= 18 && y > 12 && (this.get(x, y - 1) === Cell.Empty || this.get(x, y - 1) === Cell.Water) && !this.crowdedForSeed(x, y)) {
           this.set(x, y, Cell.Root)
-          this.plants.push({ x, y, height: 0, age: 0, target: 8 + Math.floor(this.random() * 5), cells: new Map([[i, Cell.Root]]) })
+          this.plants.push({ x, y, height: 0, age: 0, target: 8 + Math.floor(this.random() * 5), tulip: material === Cell.TulipSeed, cells: new Map([[i, Cell.Root]]) })
         }
         continue
       }
@@ -238,6 +250,7 @@ export class Sandbox {
     }
     this.grow()
     stepCrabs(this, this.random)
+    stepHermits(this, this.random)
     stepTurtles(this, this.random)
     stepButterflies(this, this.random)
     stepCrows(this, this.random)
@@ -261,9 +274,17 @@ export class Sandbox {
         if (this.get(plant.x + side, y) === Cell.Empty) this.plantCell(plant, plant.x + side, y, Cell.Stem)
       }
       if (plant.height === plant.target) {
-        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-          if (Math.abs(dx) + Math.abs(dy) > 3) continue
-          if (this.get(plant.x + dx, y + dy) === Cell.Empty) this.plantCell(plant, plant.x + dx, y + dy, Cell.Petal)
+        if (plant.tulip) {
+          // A cup of petals opening upwards, with three pointed tips along its rim.
+          for (let dy = -3; dy <= 0; dy++) for (let dx = -2; dx <= 2; dx++) {
+            if ((dy === -3 && dx % 2 !== 0) || (dy === 0 && Math.abs(dx) === 2)) continue
+            if (this.get(plant.x + dx, y + dy) === Cell.Empty) this.plantCell(plant, plant.x + dx, y + dy, Cell.TulipPetal)
+          }
+        } else {
+          for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+            if (Math.abs(dx) + Math.abs(dy) > 3) continue
+            if (this.get(plant.x + dx, y + dy) === Cell.Empty) this.plantCell(plant, plant.x + dx, y + dy, Cell.Petal)
+          }
         }
         this.plantCell(plant, plant.x, y, Cell.Pollen)
         this.flowers++
@@ -271,11 +292,10 @@ export class Sandbox {
     }
   }
   shake() {
-    for (const creature of [...this.crabs, ...this.turtles, ...this.butterflies]) wakeCreature(creature)
+    for (const creature of [...this.crabs, ...this.hermits, ...this.turtles, ...this.butterflies]) wakeCreature(creature)
     // Lift loose grains into available space; stone walls and rooted flowers stay put.
     for (let y = 1; y < this.height; y++) for (let x = 0; x < this.width; x++) {
-      const material = this.get(x, y)
-      if (material < Cell.Sand || material > Cell.Mud || material === Cell.Stone) continue
+      if (!loose(this.get(x, y))) continue
       let ny = y
       const lift = 4 + Math.floor(this.random() * 12)
       while (y - ny < lift && this.get(x, ny - 1) === Cell.Empty) ny--
@@ -284,7 +304,7 @@ export class Sandbox {
   }
 }
 
-const COLORS = [[0, 0, 0], [239, 187, 92], [62, 164, 225], [118, 131, 151], [126, 81, 44], [153, 105, 64], [67, 148, 76], [246, 132, 172], [255, 226, 97], [71, 125, 63]]
+const COLORS = [[0, 0, 0], [239, 187, 92], [62, 164, 225], [118, 131, 151], [126, 81, 44], [153, 105, 64], [67, 148, 76], [246, 132, 172], [255, 226, 97], [71, 125, 63], [168, 72, 96], [232, 58, 72]]
 export function renderSandbox(world: Sandbox, pixels: Uint8ClampedArray) {
   for (let i = 0; i < world.cells.length; i++) {
     const material = world.cells[i], offset = i * 4
@@ -296,6 +316,7 @@ export function renderSandbox(world: Sandbox, pixels: Uint8ClampedArray) {
     pixels[offset + 3] = material === Cell.Empty ? 0 : 255
   }
   renderCrabs(world, pixels)
+  renderHermits(world, pixels)
   renderTurtles(world, pixels)
   renderButterflies(world, pixels)
   renderCrows(world, pixels)

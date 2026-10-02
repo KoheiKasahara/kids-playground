@@ -9,7 +9,7 @@ const engine = vi.hoisted(() => ({ options: undefined as Options | undefined, re
 vi.mock('./useTrainJourneyEngine', () => ({
   useTrainJourneyEngine: (options: Options) => {
     engine.options = options
-    return { registerContainer: () => {}, registerMapMarker: () => {}, registerSwitchMarker: () => {}, retry: engine.retry, boost: engine.boost, overview: engine.overview }
+    return { registerContainer: () => {}, registerMapMarker: () => {}, registerSwitchMarker: () => () => {}, retry: engine.retry, boost: engine.boost, overview: engine.overview }
   },
 }))
 vi.mock('./journeySound', () => ({ journeySound: vi.fn() }))
@@ -44,9 +44,39 @@ describe('でんしゃの たび controls', () => {
       ['ポイントを きりかえる', 'bridge', 'はし'],
     ] as const) {
       await user.click(screen.getByRole('button', { name: control }))
-      expect(engine.options?.route).toBe(route)
+      expect(engine.options?.routes).toEqual([route])
       expect(screen.getByRole('complementary')).toHaveAccessibleName(`コースマップ。つぎは ${label}`)
     }
+  })
+  test('the city map rebuilds the world and gives each of its two points its own control', async () => {
+    const user = userEvent.setup()
+    ready()
+    const island = engine.options?.course
+    await user.click(screen.getByRole('button', { name: 'とかいの コースを えらぶ' }))
+    expect(screen.getByRole('button', { name: 'とかいの コースを えらぶ' })).toHaveAttribute('aria-pressed', 'true')
+    expect(engine.options?.course).not.toBe(island)
+    expect(engine.options?.course.id).toBe('downtown')
+    expect(engine.options?.routes).toEqual(['skyway', 'tower'])
+    act(() => engine.options?.onStatus('ready'))
+    await user.click(screen.getByRole('button', { name: 'しゅっぱつ！' }))
+    expect(screen.queryByRole('button', { name: 'ポイントを きりかえる' })).toBeNull()
+    for (const expected of [['subway', 'tower'], ['river', 'tower'], ['skyway', 'tower']]) {
+      await user.click(screen.getByRole('button', { name: 'ひとつめの ポイントを きりかえる' }))
+      expect(engine.options?.routes).toEqual(expected)
+    }
+    await user.click(screen.getByRole('button', { name: 'ふたつめの ポイントを きりかえる' }))
+    expect(engine.options?.routes).toEqual(['skyway', 'harbor'])
+    await user.click(screen.getByRole('button', { name: 'コースの ふたつめの ポイントを きりかえる' }))
+    expect(engine.options?.routes).toEqual(['skyway', 'tower'])
+    expect(screen.getByRole('complementary')).toHaveAccessibleName('コースマップ。つぎは こうか')
+    // Once the train is past the first point, the map and hint follow the second.
+    act(() => engine.options?.onFeedback({ location: 'ビルの まちを すすむよ！', boosting: false, atStation: false, nextSwitch: 1 }))
+    expect(screen.getByRole('complementary')).toHaveAccessibleName('コースマップ。つぎは タワー')
+    expect(screen.getByRole('button', { name: 'ふたつめの ポイントを きりかえる' })).toHaveAttribute('data-next', 'true')
+    await user.click(screen.getByRole('button', { name: 'でんしゃを えらびなおす' }))
+    await user.click(screen.getByRole('button', { name: 'しまの コースを えらぶ' }))
+    expect(engine.options?.course).toBe(island)
+    expect(engine.options?.routes).toEqual(['bridge'])
   })
   test('pausing, resuming with boost, camera selection, and mute are independent', async () => {
     const user = userEvent.setup()

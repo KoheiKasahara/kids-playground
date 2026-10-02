@@ -392,6 +392,94 @@ function keepPolygonsByArea(records) {
   })
 }
 
+// three-conic-polygon-geometryは、日付変更線をまたぐポリゴンだけ球面ボロノイ分割と
+// 球面の内外判定(d3-geo geoContains)を使う遅い経路で三角形分割する。ロシア本土1つで
+// 陸地全体の生成時間の約75%（ベンチマークで2130ms中1600ms）を占めていたため、
+// 経度180度で東西に分割してから出力する。分割後は約100msになる。
+// 継ぎ目の辺は経度±180上に乗るので、国境線の描画側（globeBorderLines.ts）で除外する。
+function unwrapRingLongitudes(ring) {
+  const unwrapped = [[...ring[0]]]
+
+  for (let index = 1; index < ring.length; index += 1) {
+    const previousLongitude = unwrapped[index - 1][0]
+    let [longitude, latitude] = ring[index]
+    while (longitude - previousLongitude > 180) longitude -= 360
+    while (longitude - previousLongitude < -180) longitude += 360
+    unwrapped.push([longitude, latitude])
+  }
+
+  return unwrapped
+}
+
+function clipRingAtLongitude(ring, clipLongitude, keepWest) {
+  const isInside = ([longitude]) => (keepWest ? longitude <= clipLongitude : longitude >= clipLongitude)
+  const clipped = []
+
+  for (let index = 1; index < ring.length; index += 1) {
+    const start = ring[index - 1]
+    const end = ring[index]
+    if (isInside(start)) clipped.push(start)
+    if (isInside(start) === isInside(end)) continue
+
+    const ratio = (clipLongitude - start[0]) / (end[0] - start[0])
+    clipped.push([clipLongitude, start[1] + ratio * (end[1] - start[1])])
+  }
+
+  if (clipped.length < 3) return null
+  clipped.push([...clipped[0]])
+  return clipped
+}
+
+function densifySeamEdges(ring) {
+  const densified = [ring[0]]
+
+  for (let index = 1; index < ring.length; index += 1) {
+    const start = ring[index - 1]
+    const end = ring[index]
+    if (Math.abs(start[0]) === 180 && start[0] === end[0]) {
+      // 経線上の辺は緯度の線形補間がそのまま大円上の点になる。
+      const segmentCount = Math.ceil(Math.abs(end[1] - start[1]) / maxArcAngleDegrees)
+      for (let segment = 1; segment < segmentCount; segment += 1) {
+        densified.push([start[0], start[1] + (end[1] - start[1]) * segment / segmentCount])
+      }
+    }
+    densified.push(end)
+  }
+
+  return densified
+}
+
+function splitPolygonAtAntimeridian(polygon) {
+  const unwrapped = unwrapRingLongitudes(polygon.coordinates[0])
+  const longitudes = unwrapped.map(([longitude]) => longitude)
+  const minLongitude = Math.min(...longitudes)
+  const maxLongitude = Math.max(...longitudes)
+  const clipLongitude = maxLongitude > 180 ? 180 : minLongitude < -180 ? -180 : null
+  if (clipLongitude === null) return [polygon]
+  if (polygon.coordinates.length > 1) {
+    throw new Error('穴のあるポリゴンの日付変更線分割には未対応です')
+  }
+
+  return [true, false].flatMap((keepWest) => {
+    const clipped = clipRingAtLongitude(unwrapped, clipLongitude, keepWest)
+    if (clipped === null) return []
+
+    const meanLongitude = clipped.reduce((sum, [longitude]) => sum + longitude, 0) / clipped.length
+    const shift = meanLongitude > 180 ? -360 : meanLongitude < -180 ? 360 : 0
+    const ring = sanitizeRing(densifySeamEdges(
+      clipped.map(([longitude, latitude]) => [longitude + shift, latitude]),
+    ))
+    return [{ coordinates: [ring], area: ringArea(ring) }]
+  })
+}
+
+function splitRecordsAtAntimeridian(records) {
+  return records.map(({ id, polygons }) => ({
+    id,
+    polygons: polygons.flatMap(splitPolygonAtAntimeridian),
+  }))
+}
+
 function toGeoJsonFeatures(records) {
   return records.map(({ id, polygons }) => ({
     id,
@@ -443,7 +531,7 @@ const {
 const simplifiedCollection = feature(simplifiedTopology, simplifiedTopology.objects.countries)
 const cleanedRecords = cleanFeatures(simplifiedCollection)
 const simplifiedStats = summarizeRecords(cleanedRecords)
-const outputFeatures = toGeoJsonFeatures(keepPolygonsByArea(cleanedRecords))
+const outputFeatures = toGeoJsonFeatures(splitRecordsAtAntimeridian(keepPolygonsByArea(cleanedRecords)))
 const outputRecords = outputFeatures.map((outputFeature) => ({
   id: outputFeature.id,
   polygons: polygonsOfGeometry(outputFeature.geometry).map((coordinates) => ({ coordinates })),

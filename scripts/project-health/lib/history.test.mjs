@@ -31,6 +31,21 @@ describe('parseHistoryFile', () => {
     const raw = JSON.stringify({ entries: [{ date: '2026-09-05', bundleKb: 1800 }] })
     expect(parseHistoryFile(raw)).toEqual({ entries: [{ date: '2026-09-05', bundleKb: 1800 }] })
   })
+
+  it('不正な行を除外し、日付順で重複を解消して値の型を検査する', () => {
+    const result = parseHistoryFile(JSON.stringify({ entries: [
+      null, 1, { date: 'invalid' }, { date: '2026-02-30' },
+      { date: '2026-09-05', games: 40 },
+      { date: '2026-09-04', bundleKb: 1500 },
+      { date: '2026-09-05', games: 41, vulnerabilities: -1, nightly: { state: 'success' },
+        unitTestsPassed: '600', lighthousePerformance: 101, initialJsGzipKb: 120.5 },
+    ] }))
+    expect(result.entries).toEqual([
+      { date: '2026-09-04', bundleKb: 1500 },
+      { date: '2026-09-05', games: 41, vulnerabilities: null, nightly: null,
+        unitTestsPassed: null, lighthousePerformance: null, initialJsGzipKb: 120.5 },
+    ])
+  })
 })
 
 describe('upsertHistoryEntry', () => {

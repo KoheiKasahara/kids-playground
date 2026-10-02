@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import type { PianoNote } from './notes'
-import type { PianoVoiceHandle } from './pianoAudio'
+import type { PianoNote } from '../shared/music/notes'
+import type { PianoVoiceHandle } from '../shared/music/pianoAudio'
 import { PianoSongPlayer } from './pianoSongPlayer'
-import { PIANO_SONGS, type PianoSong } from './pianoSongs'
+import { PIANO_SONGS, type PianoSong } from '../shared/music/pianoSongs'
 
 const TEST_SONG: PianoSong = {
   id: 'test-song',

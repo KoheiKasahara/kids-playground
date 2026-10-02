@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import BigButton from '../../components/BigButton'
 import ProgressBar from '../../components/ProgressBar'
 import QuizResultOverlay from '../../components/QuizResultOverlay'
 import PanelFlag, { PANEL_COUNT } from './PanelFlag'
-import { countriesForLevel } from './data/countries'
-import { generateQuestions, shuffle } from './questionGenerator'
+import { shuffle } from './questionGenerator'
+import { createGame } from './continueState'
 import { scoreForPanels } from './panelScore'
 import { isQuizLevel, LEVEL_LABEL, MODE_PATH } from './types'
 import type { Country, QuizLevel } from './types'
@@ -134,7 +134,8 @@ type PanelFlagQuizPlayGameProps = {
 
 function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
   const navigate = useNavigate()
-  const [questions] = useState(() => generateQuestions(countriesForLevel(level)))
+  const location = useLocation()
+  const [{ questions, continueFrom }] = useState(() => createGame(level, location.state))
   // もんだいごとに「パネルを開ける順番」をあらかじめシャッフルしておく
   // （既存の questions と同じく useState の遅延初期化で1回だけ生成し、reducer 自体は
   // 乱数に依存しない純粋な状態遷移だけを行う）。
@@ -142,6 +143,8 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
   const [state, dispatch] = useReducer(reducer, initialState)
 
   const totalCount = questions.length
+  // 「つづける」で来たときは、それまでの問題数を足した通し番号で表示する
+  const baseCount = continueFrom?.totalCount ?? 0
   const question = questions[state.index]
   const isLastQuestion = state.index === totalCount - 1
   const answered = state.selectedId !== null
@@ -186,10 +189,11 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
       navigate(`/games/flag-quiz/${MODE_PATH.panelFlag}/${level}/result`, {
         replace: true,
         state: {
-          correctCount: state.correctCount,
-          totalCount,
-          score: state.score,
-          maxScore: totalCount * MAX_SCORE_PER_QUESTION,
+          correctCount: (continueFrom?.correctCount ?? 0) + state.correctCount,
+          totalCount: baseCount + totalCount,
+          score: (continueFrom?.score ?? 0) + state.score,
+          maxScore: (baseCount + totalCount) * MAX_SCORE_PER_QUESTION,
+          usedIds: [...(continueFrom?.usedIds ?? []), ...questions.map((q) => q.answer.id)],
         },
       })
       return
@@ -255,9 +259,9 @@ function PanelFlagQuizPlayGame({ level }: PanelFlagQuizPlayGameProps) {
         <div className={styles.progressArea}>
           <p className={styles.progressLabel}>
             <span className={styles.levelLabel}>{LEVEL_LABEL[level]}</span>
-            {state.index + 1} / {totalCount}
+            {baseCount + state.index + 1} / {baseCount + totalCount}
           </p>
-          <ProgressBar current={state.index + 1} total={totalCount} />
+          <ProgressBar current={baseCount + state.index + 1} total={baseCount + totalCount} />
         </div>
       </div>
 

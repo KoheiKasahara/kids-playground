@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react'
-import { Cell, Sandbox, renderSandbox, sandboxGrid, type Material, type Point } from './sandboxSimulation'
+import { Sandbox, isSeed, renderSandbox, sandboxGrid, type Material, type Point } from './sandboxSimulation'
 
 type Brush = { material: Material; radius: number }
 type Gesture = Brush & { point: Point; pointerId: number }
 export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush: Brush, paused: boolean, onFlower: () => void) {
   const [world] = useState(() => { const result = new Sandbox(); result.prepare(); return result })
   const [crabCount, setCrabCount] = useState(0)
+  const [hermitCount, setHermitCount] = useState(0)
   const [turtleCount, setTurtleCount] = useState(0)
   const [butterflyCount, setButterflyCount] = useState(0)
   const [creatureMessage, setCreatureMessage] = useState('')
@@ -57,7 +58,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       if (time - last >= 1000 / 30) {
         last = time
         const gesture = active.current
-        if (gesture && (gesture.material !== Cell.Seed || emitted++ % 6 === 0)) world.paint(gesture.point, gesture.material, gesture.radius)
+        if (gesture && (!isSeed(gesture.material) || emitted++ % 6 === 0)) world.paint(gesture.point, gesture.material, gesture.radius)
         if (!paused) { world.step(); world.step() }
         if (world.flowers > flowers) onFlower()
         flowers = world.flowers
@@ -103,7 +104,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
     if (!p) return
     event.preventDefault()
     event.currentTarget.focus({ preventScroll: true })
-    if (world.tapButterfly(p) || world.tapCrab(p) || world.tapTurtle(p)) { draw.current(); return }
+    if (world.tapButterfly(p) || world.tapCrab(p) || world.tapHermit(p) || world.tapTurtle(p)) { draw.current(); return }
     event.currentTarget.setPointerCapture(event.pointerId)
     active.current = { ...brush, point: p, pointerId: event.pointerId }
     world.paint(p, brush.material, brush.radius)
@@ -116,8 +117,8 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
     // End on leaving the play area; never clamp an outside drag into a stream at its edge.
     if (!p) { stop(); return }
     event.preventDefault()
-    if (gesture.material === Cell.Seed) {
-      if (Math.hypot(p.x - gesture.point.x, p.y - gesture.point.y) >= 6) world.paint(p, Cell.Seed, 0)
+    if (isSeed(gesture.material)) {
+      if (Math.hypot(p.x - gesture.point.x, p.y - gesture.point.y) >= 6) world.paint(p, gesture.material, 0)
     } else world.stroke(gesture.point, p, gesture.material, gesture.radius)
     gesture.point = p
     draw.current()
@@ -135,12 +136,12 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       event.currentTarget.style.setProperty('--cursor-y', `${p.y / world.height * 100}%`)
     } else if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault()
-      if (!world.tapButterfly(p) && !world.tapCrab(p) && !world.tapTurtle(p)) world.paint(p, brush.material, brush.radius)
+      if (!world.tapButterfly(p) && !world.tapCrab(p) && !world.tapHermit(p) && !world.tapTurtle(p)) world.paint(p, brush.material, brush.radius)
       draw.current()
     }
   }
   return {
-    unavailable, stop, crabCount, turtleCount, butterflyCount, creatureMessage,
+    unavailable, stop, crabCount, hermitCount, turtleCount, butterflyCount, creatureMessage,
     setNight: (night: boolean) => { stop(); world.setNight(night); draw.current() },
     dismissCreatureMessage: () => setCreatureMessage(''),
     addCrab: () => {
@@ -148,6 +149,13 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       const added = world.addCrab()
       setCrabCount(world.crabs.length)
       setCreatureMessage(added ? '🦀 おはなを たべると おおきくなるよ' : 'カニの はいる ばしょを あけてね')
+      draw.current()
+    },
+    addHermit: () => {
+      stop()
+      const added = world.addHermit()
+      setHermitCount(world.hermits.length)
+      setCreatureMessage(added ? '🐚 おはなを たべると おおきくなるよ' : 'ヤドカリの はいる ばしょを あけてね')
       draw.current()
     },
     addTurtle: () => {
@@ -165,7 +173,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       draw.current()
     },
     canvasProps: { width: bitmap.width, height: bitmap.height, onPointerDown: begin, onPointerMove: move, onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end, onKeyDown: keyDown },
-    clear: () => { stop(); world.clear(); setCrabCount(0); setTurtleCount(0); setButterflyCount(0); setCreatureMessage(''); draw.current() },
+    clear: () => { stop(); world.clear(); setCrabCount(0); setHermitCount(0); setTurtleCount(0); setButterflyCount(0); setCreatureMessage(''); draw.current() },
     shake: () => { stop(); world.shake(); draw.current() },
   }
 }

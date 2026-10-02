@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { prefectureById, prefectures } from '../prefecture-quiz/data/prefectures'
-import { japanTravelCourses } from './data/travelCourses'
+import { japanTravelCourses, japanWestToEastOrder } from './data/travelCourses'
 import { answerPositionBag, generateJapanTravelQuestions } from './questionGenerator'
 
 function seededRandom(seed: number): () => number { let value = seed; return () => { value = (value * 1664525 + 1013904223) >>> 0; return value / 0x100000000 } }
@@ -18,6 +18,19 @@ describe('japan travel courses', () => {
   test('コース全体で47都道府県をすべて少なくとも一度は通る', () => {
     const covered = new Set(japanTravelCourses.flatMap((course) => course.prefectureIds))
     expect(covered).toEqual(new Set(prefectures.map((prefecture) => prefecture.id)))
+  })
+
+  test('西→東の並びは47都道府県を1回ずつ含む', () => {
+    expect(japanWestToEastOrder).toHaveLength(47)
+    expect(new Set(japanWestToEastOrder)).toEqual(new Set(prefectures.map((prefecture) => prefecture.id)))
+  })
+
+  test('各コースは西→東か東→西の一方向に進み、逆もどりしない', () => {
+    for (const course of japanTravelCourses) {
+      const ranks = course.prefectureIds.map((id) => japanWestToEastOrder.indexOf(id))
+      const steps = ranks.slice(1).map((rank, index) => Math.sign(rank - ranks[index]))
+      expect(new Set(steps).size, course.id).toBe(1)
+    }
   })
 })
 

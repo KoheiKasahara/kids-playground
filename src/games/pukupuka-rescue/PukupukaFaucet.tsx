@@ -59,26 +59,27 @@ export default function PukupukaFaucet({
   return (
     <g data-testid="pukupuka-faucet" data-faucet-active={active}>
       <g aria-hidden="true" transform={`translate(${faucet.x} ${faucet.y})`}>
-        {/* 取り付けのパイプ */}
-        <ellipse cx="-8" cy="5" rx="2.5" ry="5" fill="#476d7b" stroke="#c4e5e6" strokeWidth="1" />
-        <path d="M-8 5 H-2 Q0 5 0 8 V12" fill="none" stroke="#426c7d" strokeWidth="5" strokeLinecap="round" />
-        <path d="M-8 3.8 H-2 Q1 3.8 1 8" fill="none" stroke="#d1e9e8" strokeWidth="1.6" />
+        {/* 壁の取り付け座と、L字のパイプ */}
+        <ellipse cx="-8" cy="5" rx="2.6" ry="5.2" fill="url(#pukupuka-chrome)" stroke="#5f7d89" strokeWidth="0.7" />
+        <path d="M-8 5 H-2 Q0 5 0 8 V12" fill="none" stroke="#5f7d89" strokeWidth="5.6" strokeLinecap="round" />
+        <path d="M-8 5 H-2 Q0 5 0 8 V12" fill="none" stroke="url(#pukupuka-chrome)" strokeWidth="4.4" strokeLinecap="round" />
+        <path d="M-7.6 3.6 H-2 Q0.9 3.6 0.9 7.6" fill="none" stroke="#ffffff" strokeWidth="1" strokeLinecap="round" opacity="0.9" />
         {/* 吐水口 */}
-        <rect x="-3.4" y="10" width="6.8" height="4.4" rx="2" fill="#5c7591" />
-        <rect x="-1.2" y="0" width="2.4" height="6" rx="0.8" fill="#698f9b" />
-        {/* ハンドル。ON/OFFで色を変え、押しているあいだだけ動く見た目にする。 */}
-        <circle
-          className={active ? styles.faucetHandleOn : undefined}
-          cx="0"
-          cy="-3"
-          r="3.8"
-          fill={active ? '#51cf66' : '#45bbd2'}
-          stroke="#495057"
-          strokeWidth="0.6"
-        />
-        <path d="M-2.2 -3 H2.2 M0 -5.2 V-0.8" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" />
+        <rect x="-3.6" y="10" width="7.2" height="4.6" rx="2" fill="url(#pukupuka-chrome)" stroke="#5f7d89" strokeWidth="0.6" />
+        <ellipse cx="0" cy="14.4" rx="2.4" ry="0.7" fill="#3b5561" />
+        <rect x="-1.2" y="0" width="2.4" height="6" rx="0.8" fill="#8fa9b4" />
+        {/* ハンドル。ON/OFFで色を変え、押しているあいだだけ回る見た目にする。 */}
+        <g className={active ? styles.faucetHandleOn : undefined}>
+          <path d="M-5.6 -3 H5.6 M0 -8.6 V2.6" stroke="#5f7d89" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M-5.6 -3 H5.6 M0 -8.6 V2.6" stroke={active ? '#69db7c' : '#4dc3e0'} strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="0" cy="-3" r="3.4" fill={active ? '#51cf66' : '#22b8cf'} stroke="#495057" strokeWidth="0.6" />
+          <path d="M-1.6 -3 H1.6 M0 -4.6 V-1.4" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
+          <circle cx="-1" cy="-4.2" r="0.7" fill="#ffffff" opacity="0.7" />
+        </g>
+        {!active && !disabled ? <circle className={styles.faucetHint} cx="0" cy="-3" r="6.6" fill="none" stroke="#22b8cf" strokeWidth="0.8" strokeDasharray="1.8 1.4" /> : null}
         {showStream ? (
           <>
+            <line x1="0" y1="14.6" x2="0" y2={streamBottom - faucet.y} stroke="#a5d8ff" strokeWidth="3.4" strokeLinecap="round" opacity="0.7" />
             <line
               className={styles.faucetStream}
               x1="0"
@@ -93,10 +94,10 @@ export default function PukupukaFaucet({
               className={styles.faucetSplash}
               cx="0"
               cy={streamBottom - faucet.y}
-              rx="3.4"
-              ry="1.1"
+              rx="4"
+              ry="1.3"
               fill="#ffffff"
-              opacity="0.7"
+              opacity="0.75"
             />
           </>
         ) : null}

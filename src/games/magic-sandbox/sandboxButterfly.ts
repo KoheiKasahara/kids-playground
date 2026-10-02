@@ -168,6 +168,7 @@ export function pollinate(world: Sandbox, butterfly: Butterfly, random: () => nu
   // Far enough from the bloom, and from each other, that every seed has room to sprout.
   const offsets = [-18, -12, 12, 18]
   const start = Math.floor(random() * offsets.length)
+  const seed = butterfly.target ? world.seedOf(butterfly.target) : Cell.Seed
   let sown = 0
   // Damp sand first: there a seed really sprouts. Dry sand waits for the watering can.
   for (const damp of [true, false]) {
@@ -175,7 +176,7 @@ export function pollinate(world: Sandbox, butterfly: Butterfly, random: () => nu
       const x = Math.round(butterfly.x + offsets[(start + i) % offsets.length])
       const y = groundAbove(world, x, Math.round(butterfly.y))
       if (y < 0 || world.get(x, y + 1) !== (damp ? Cell.Mud : Cell.Sand) || world.crowdedForSeed(x, y)) continue
-      world.paint({ x, y }, Cell.Seed, 0)
+      world.paint({ x, y }, seed, 0)
       sown++
     }
     if (sown) break

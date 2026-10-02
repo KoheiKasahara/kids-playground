@@ -25,5 +25,8 @@ describe('parseNpmAudit', () => {
     expect(parseNpmAudit(null)).toBeNull()
     expect(parseNpmAudit({})).toBeNull()
     expect(parseNpmAudit({ metadata: {} })).toBeNull()
+    expect(parseNpmAudit({ metadata: { vulnerabilities: { total: -1 } } })).toBeNull()
+    expect(parseNpmAudit({ metadata: { vulnerabilities: { total: 0, high: 1 } } })).toBeNull()
+    expect(parseNpmAudit({ metadata: { vulnerabilities: { total: 1, high: '1' } } })).toBeNull()
   })
 })

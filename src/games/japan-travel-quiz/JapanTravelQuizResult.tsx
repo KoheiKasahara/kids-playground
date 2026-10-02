@@ -5,6 +5,7 @@ import { japanTravelCourses } from './data/travelCourses'
 import JapanTravelMap from './map/JapanTravelMap'
 import type { JapanTravelCourse } from './types'
 import styles from './JapanTravelQuizResult.module.css'
+import QuizStars from '../../components/QuizStars'
 
 type ResultState = { correctCount: number; totalCount: number; courseId: string }
 function isResult(value: unknown): value is ResultState {
@@ -22,5 +23,5 @@ export default function JapanTravelQuizResult() {
   return <Result course={course} score={location.state.correctCount} onAgain={() => navigate('/games/japan-travel-quiz/play', { replace: true })} onHome={() => navigate('/games/japan-travel-quiz')} />
 }
 function Result({ course, score, onAgain, onHome }: { course: JapanTravelCourse; score: number; onAgain: () => void; onHome: () => void }) {
-  return <main className={styles.page}><h1>たびが しゅうりょう！</h1><div className={styles.map}><JapanTravelMap course={course} questionIndex={9} phase="answering" onTravelComplete={() => {}} result /></div><p className={styles.course}>{course.name}</p><p className={styles.score}>{score} / 10 もん せいかい！</p><p className={styles.praise}>{praise(score)}</p><div className={styles.actions}><BigButton variant="primary" onClick={onAgain}>もういちど</BigButton><BigButton variant="secondary" onClick={onHome}>さいしょへ</BigButton></div></main>
+  return <main className={styles.page}><h1>たびが しゅうりょう！</h1><div className={styles.map}><JapanTravelMap course={course} questionIndex={9} phase="answering" onTravelComplete={() => {}} result /></div><p className={styles.course}>{course.name}</p><QuizStars correctCount={score} totalCount={10} /><p className={styles.score}>{score} / 10 もん せいかい！</p><p className={styles.praise}>{praise(score)}</p><div className={styles.actions}><BigButton variant="primary" onClick={onAgain}>もういちど</BigButton><BigButton variant="secondary" onClick={onHome}>さいしょへ</BigButton></div></main>
 }

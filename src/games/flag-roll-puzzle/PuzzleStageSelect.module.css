@@ -6,7 +6,9 @@
   align-items: center;
   gap: var(--space-lg);
   padding: calc(var(--space-md) + var(--safe-top)) calc(var(--space-md) + var(--safe-right)) calc(var(--space-md) + var(--safe-bottom)) calc(var(--space-md) + var(--safe-left));
-  background: var(--color-background);
+  background:
+    radial-gradient(120% 55% at 50% 0%, rgba(214, 240, 255, 0.9) 0%, rgba(214, 240, 255, 0) 70%),
+    linear-gradient(180deg, var(--color-background), #fff6e4);
 }
 
 .header {
@@ -47,6 +49,7 @@
 }
 
 .card {
+  position: relative;
   min-height: 220px;
   display: flex;
   flex-direction: column;
@@ -54,12 +57,42 @@
   justify-content: center;
   gap: var(--space-xs);
   padding: var(--space-md);
-  border: 3px solid var(--color-border);
+  border: 3px solid var(--stage-edge, var(--color-border));
   border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  /* ぷっくりしたおもちゃのボタン。上のつや・下の厚み・ステージごとの淡い色で見分ける */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 45%),
+    linear-gradient(180deg, #ffffff 0%, var(--stage-tint, #f1f3f5) 100%);
   color: var(--color-text);
-  box-shadow: var(--shadow-sm);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.95),
+    0 5px 0 var(--stage-edge, var(--color-border)),
+    0 10px 16px rgba(33, 37, 41, 0.12);
   cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.card[data-stage-id='easy'] {
+  --stage-tint: #e6fcf5;
+  --stage-edge: #96e2c4;
+}
+
+.card[data-stage-id='normal'] {
+  --stage-tint: #fff4e0;
+  --stage-edge: #ffd8a0;
+}
+
+.card[data-stage-id='hard'] {
+  --stage-tint: #f3edff;
+  --stage-edge: #cbb8fb;
+}
+
+.card:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.95),
+    0 2px 0 var(--stage-edge, var(--color-border)),
+    0 4px 8px rgba(33, 37, 41, 0.12);
 }
 
 .card:hover,
@@ -72,6 +105,7 @@
 .emoji {
   font-size: 48px;
   line-height: 1;
+  filter: drop-shadow(1px 3px 2px rgba(33, 37, 41, 0.2));
 }
 
 .name {

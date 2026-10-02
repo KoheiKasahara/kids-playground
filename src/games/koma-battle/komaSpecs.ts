@@ -25,6 +25,11 @@ export type KomaVisualConfig = {
    * シルエットの主役をここで決める(spike=尖った爪, block=厚いブロック, star=星, smooth=滑らかな円)。
    */
   rimStyle: 'smooth' | 'spike' | 'block' | 'star'
+  /**
+   * 円盤より下の形。slim=細めの軸の昔ながらのこま、
+   * stacked=ラチェット層と太いビットを重ねたベイブレードX風で、横から見ても厚みがある。
+   */
+  bodyStyle: 'slim' | 'stacked'
   /** 軸・外周リングに使うメタル風アクセント色。 */
   metalColor: string
 }
@@ -77,6 +82,7 @@ export const KOMA_TYPE_CONFIGS: readonly KomaTypeConfig[] = [
       knobScale: 1,
       ringScale: 1,
       rimStyle: 'star',
+      bodyStyle: 'slim',
       metalColor: '#d9b654',
     },
     densityScale: 1,
@@ -103,6 +109,7 @@ export const KOMA_TYPE_CONFIGS: readonly KomaTypeConfig[] = [
       knobScale: 1.1,
       ringScale: 1.05,
       rimStyle: 'spike',
+      bodyStyle: 'stacked',
       metalColor: '#a9b9cd',
     },
     // 速度と反発は少し上げる一方、軽くして弾かれやすさも残し、常勝を避ける。
@@ -130,6 +137,7 @@ export const KOMA_TYPE_CONFIGS: readonly KomaTypeConfig[] = [
       knobScale: 0.92,
       ringScale: 0.94,
       rimStyle: 'smooth',
+      bodyStyle: 'slim',
       metalColor: '#e9eef2',
     },
     // 減衰を下げて長持ちさせる。初速と周回速度は控え、固定勝利と外周逃走を避ける。
@@ -157,6 +165,7 @@ export const KOMA_TYPE_CONFIGS: readonly KomaTypeConfig[] = [
       knobScale: 0.86,
       ringScale: 1.12,
       rimStyle: 'block',
+      bodyStyle: 'stacked',
       metalColor: '#cfd6dc',
     },
     // 少し重く、少し遅くするが、谷へ動ける範囲に留める。

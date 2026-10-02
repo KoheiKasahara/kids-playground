@@ -57,7 +57,7 @@ test('コースを選んで ひっぱって打ち、3ホールを回ってスコ
   const start = page.getByRole('button', { name: 'スタート！', exact: true })
   await expect(start).toBeEnabled({ timeout: 20_000 })
   const scene = page.getByTestId('golf-scene')
-  for (const [name, hole] of [['うみべ', 'beach-1'], ['おつきさま', 'moon-1'], ['もり', 'forest-1'], ['くだりざか', 'downhill-1'], ['はらっぱ', 'meadow-1']]) {
+  for (const [name, hole] of [['うみべ', 'beach-1'], ['おつきさま', 'moon-1'], ['もり', 'forest-1'], ['くだりざか', 'downhill-1'], ['かわべ', 'river-1'], ['たにま', 'canyon-1'], ['はらっぱ', 'meadow-1']]) {
     await page.getByRole('button', { name: `${name}コースを えらぶ`, exact: true }).click()
     await expect(scene).toHaveAttribute('data-hole', hole)
     // 景色の多い ひろいコースでも、描画の重さを増やしすぎない。

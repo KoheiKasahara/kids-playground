@@ -37,6 +37,14 @@ function positionAt(longitude: number, latitude: number, radius: number): THREE.
   )
 }
 
+/**
+ * 日付変更線をまたぐ陸地は、生成時に経度180度で東西へ分割している
+ * （scripts/build-earth-globe-data.mjs）。その継ぎ目は国境ではないため線を引かない。
+ */
+export function isAntimeridianSeam(start: Position, end: Position): boolean {
+  return Math.abs(start[0]) === 180 && start[0] === end[0]
+}
+
 function segmentCount(start: Position, end: Position): number {
   const longitudeDistance = shortestLongitudeDelta(start[0], end[0])
   const latitudeDistance = end[1] - start[1]
@@ -68,6 +76,7 @@ export function createGlobeBorderLines(
         for (let index = 1; index < ring.length; index += 1) {
           const start = ring[index - 1]
           const end = ring[index]
+          if (isAntimeridianSeam(start, end)) continue
           const segments = segmentCount(start, end)
           const longitudeDelta = shortestLongitudeDelta(start[0], end[0])
           const latitudeDelta = end[1] - start[1]

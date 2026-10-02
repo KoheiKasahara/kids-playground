@@ -6,6 +6,8 @@ describe('parsePlaywrightSummary', () => {
     expect(parsePlaywrightSummary({ stats: { expected: 25, unexpected: 0, skipped: 0, flaky: 0 } })).toEqual({
       total: 25,
       passed: 25,
+      flaky: 0,
+      skipped: 0,
     })
   })
 
@@ -13,6 +15,8 @@ describe('parsePlaywrightSummary', () => {
     expect(parsePlaywrightSummary({ stats: { expected: 23, unexpected: 2, skipped: 0, flaky: 0 } })).toEqual({
       total: 25,
       passed: 23,
+      flaky: 0,
+      skipped: 0,
     })
   })
 
@@ -26,5 +30,12 @@ describe('parsePlaywrightSummary', () => {
     expect(parsePlaywrightSummary(null)).toBeNull()
     expect(parsePlaywrightSummary({})).toBeNull()
     expect(parsePlaywrightSummary({ stats: { expected: 0, unexpected: 0, skipped: 0, flaky: 0 } })).toBeNull()
+    expect(parsePlaywrightSummary({ stats: { expected: 25 } })).toBeNull()
+    expect(parsePlaywrightSummary({ stats: { expected: 25, unexpected: -1, skipped: 0, flaky: 0 } })).toBeNull()
+  })
+
+  it('再試行による成功と未実行も保存する', () => {
+    expect(parsePlaywrightSummary({ stats: { expected: 23, unexpected: 0, skipped: 1, flaky: 1 } }))
+      .toEqual({ total: 25, passed: 24, skipped: 1, flaky: 1 })
   })
 })

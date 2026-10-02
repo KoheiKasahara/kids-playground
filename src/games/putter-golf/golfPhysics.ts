@@ -56,6 +56,10 @@ export const GATE = { halfDepth: 0.13, height: 0.44 } as const
 export const CRITTER = { radius: 0.24, height: 0.46 } as const
 /** コースに はえた きの みき。あたりも 見た目も この高さで作る。 */
 export const TREE = { trunk: 1.05 } as const
+/** はしの てすり。半分の太さと高さ。 */
+export const BRIDGE = { railHalf: 0.05, railHeight: 0.28 } as const
+/** はねかえし いた。半分の厚み・高さと、はねたあとに のこる速さの割合。 */
+export const REFLECTOR = { halfDepth: 0.07, height: 0.4, keep: 0.88 } as const
 /** ワープの どかん。入口の高さと、出てくるときに残る速さの割合。 */
 export const WARP = { height: 0.42, keepSpeed: 0.9, minSpeed: 0.3 } as const
 

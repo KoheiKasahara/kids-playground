@@ -8,6 +8,9 @@ import { playStarSound, playWarpSound } from './sounds'
 import { BALL_RADIUS, HEIGHT, LINE_WIDTH, STAGES, STAR_RADIUS, WARP_RADIUS, WIDTH, type Stage } from './stages'
 import { appendPoint, createWorld, MAX_LINES, type World } from './world'
 import type { Point } from './stroke'
+import StageClearBadge from '../../components/StageClearBadge'
+import { vibrate } from '../../utils/haptics'
+import { drawGoalProgress, drawGoalStars } from './progress'
 import styles from './DrawGoalPlay.module.css'
 
 const path = (points: Point[]) => points.map(p => `${p.x},${p.y}`).join(' ')
@@ -88,7 +91,11 @@ function Board({ index, back, next }: { index: number; back: () => void; next: (
         lastStatus = game.state
         setStatus(game.state)
         // Cheer the moment the ball enters the cup; it keeps rolling until it rests.
-        if (game.state === 'scored') playCorrectSound()
+        if (game.state === 'scored') { playCorrectSound(); vibrate('success') }
+        if (game.state === 'goal') {
+          vibrate('celebrate')
+          drawGoalProgress.record(index, drawGoalStars(game.lines.length, game.collected.filter(Boolean).length, game.collected.length))
+        }
       }
       frame = requestAnimationFrame(tick)
     }
@@ -106,7 +113,7 @@ function Board({ index, back, next }: { index: number; back: () => void; next: (
       game.destroy()
       world.current = null
     }
-  }, [stage])
+  }, [stage, index])
 
   function point(event: PointerEvent<SVGSVGElement>) {
     const box = event.currentTarget.getBoundingClientRect()
@@ -199,11 +206,13 @@ function Board({ index, back, next }: { index: number; back: () => void; next: (
 
 export default function DrawGoalPlay() {
   const [index, setIndex] = useState<number | null>(null)
+  // ステージ選択へ戻るたびに読み直し、クリアした★をすぐ反映する。
+  const progress = index === null ? drawGoalProgress.read() : {}
   if (index !== null) return <Board key={index} index={index} back={() => setIndex(null)} next={() => setIndex(index + 1 < STAGES.length ? index + 1 : null)} />
   return <main className={styles.select}>
     <GameBackButton to="/" />
     <h1>かいてゴール！</h1><p>せんを かいて、ボールを ゴールへ！</p>
-    <div className={styles.stageGrid}>{STAGES.map((s, i) => <button key={s.name} aria-label={`${i + 1} ${s.name}`} onClick={() => { primeAudio(); setIndex(i) }}><span>{i + 1}</span>{s.name}</button>)}</div>
+    <div className={styles.stageGrid}>{STAGES.map((s, i) => <button key={s.name} aria-label={`${i + 1} ${s.name}${progress[i] ? ` クリアずみ ほし ${progress[i]}こ` : ''}`} onClick={() => { primeAudio(); setIndex(i) }}><span>{i + 1}</span>{s.name}<StageClearBadge stars={progress[i] ?? 0} /></button>)}</div>
     <p>せんは そのまま みちに なるよ。<br />なんぼんでも かいてから、スタートで ボールが うごくよ。</p>
     <p className={styles.legend}><span>★ ほしを ひろおう</span><span>💨 かぜで ふわり</span><span>🌀 ワープで ひとっとび</span></p>
   </main>

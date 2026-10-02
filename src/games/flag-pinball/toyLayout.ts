@@ -39,6 +39,9 @@ export type WindConfig = {
   readonly halfHeight: number
 }
 
+/** 車toyの見た目の車種。物理Colliderはどれも同じで、絵（themes/CarToyArt.tsx）だけが変わる。 */
+export type CarVariant = 'sedan' | 'bus' | 'police'
+
 /**
  * 車toy（kind: 'car'）が左右に往復する範囲と速さを決める設定。
  * くるまテーマ専用。車は物理的に実在するColliderを持つ「動く障害物」で、
@@ -53,6 +56,8 @@ export type CarConfig = {
   readonly speed: number
   /** 最初の進行方向。1で右、-1で左 */
   readonly initialDirection: 1 | -1
+  /** 見た目の車種。省略時は 'sedan'（赤い車） */
+  readonly variant?: CarVariant
 }
 
 /**

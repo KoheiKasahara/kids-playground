@@ -33,7 +33,7 @@ it('きかいを えらんで あそびはじめられる', () => {
   show()
   expect(screen.getByRole('button', { name: 'あそぶ！' })).toBeDisabled()
   ready()
-  for (const label of ['ぬいぐるみ', 'カプセル', 'おかし']) {
+  for (const label of ['ぬいぐるみ', 'カプセル', 'おかし', 'フルーツ']) {
     expect(screen.getByRole('button', { name: `${label}の きかいを えらぶ` })).toBeEnabled()
   }
   expect(screen.getByRole('button', { name: 'ぬいぐるみの きかいを えらぶ' })).toHaveAttribute('aria-pressed', 'true')

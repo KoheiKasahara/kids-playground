@@ -27,6 +27,8 @@ import {
   type BlockPuzzleState,
 } from './blockPuzzleState'
 import { playBlockPuzzleCompleteSound, primeAudio } from '../../utils/quizSound'
+import { vibrate } from '../../utils/haptics'
+import { blockPuzzleProgress } from './progress'
 import styles from './FreeBlockPuzzle.module.css'
 
 const HINT_MESSAGE = 'かたちを ひっぱって おこう！ タップでも おけるよ'
@@ -178,6 +180,8 @@ export default function FreeBlockPuzzle({ onBack }: Props) {
     if (isComplete && !wasCompleteRef.current) {
       primeAudio()
       playBlockPuzzleCompleteSound()
+      vibrate('celebrate')
+      blockPuzzleProgress.record('free', 3)
       setCelebrationSeq((current) => current + 1)
     }
     wasCompleteRef.current = isComplete

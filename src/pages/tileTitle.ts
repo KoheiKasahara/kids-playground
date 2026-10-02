@@ -2,8 +2,8 @@
  * ホームのカードでゲーム名を2行に分けるときの区切りを決める。
  *
  * 日本語は1文字ごとに折り返せるため、ブラウザ任せだと「こっきピ／ンボール」のように
- * ことばの途中で切れやすい。ここでは文字種の変わり目（こっき｜ピンボール）か空白だけを
- * 区切り候補にし、長い方が最も短くなる位置を1つ選ぶ。どちらかが1行に収まらない長さに
+ * ことばの途中で切れやすい。ここでは文字種の変わり目（こっき｜ピンボール）、空白、
+ * 「！」「？」のうしろだけを区切り候補にし、長い方が最も短くなる位置を1つ選ぶ。どちらかが1行に収まらない長さに
  * なるときは区切らず、ブラウザの折り返しに任せる。
  */
 
@@ -37,6 +37,7 @@ function displayWidth(text: string): number {
 function isBreakBetween(before: string, after: string): boolean {
   const a = scriptOf(before)
   const b = scriptOf(after)
+  if (/[！？!?]/.test(before)) return b !== 'other'
   if (a === 'other' || b === 'other' || a === b) return false
   // 漢字＋送りがな（「遊ぶ」など）は1つのことばなので切らない。
   return !(a === 'kanji' && b === 'hiragana')

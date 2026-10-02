@@ -20,3 +20,4 @@ export function formatTrendCell(
   trend: HistoryTrendResult | null | undefined,
   options?: { unit?: string; formatMagnitude?: (magnitude: number) => string },
 ): string
+export function dependencyStatusIcon(dependencies: { total: number | null; high?: number | null; critical?: number | null } | null): string

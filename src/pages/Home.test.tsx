@@ -121,18 +121,23 @@ describe('Home', () => {
     )
     const links = screen.getAllByRole('link')
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
-    expect(links.slice(-10).map((link) => link.getAttribute('href'))).toEqual(
+    expect(links.slice(-15).map((link) => link.getAttribute('href'))).toEqual(
       [
-        'train-journey',
-        'circuit-racing',
-        'oekaki-korokoro',
-        'draw-goal',
-        'crane-game',
-        'treasure-dig',
         'putter-golf',
         'shinkeisuijaku',
         'water-wheel-maze',
         'pyoko-touch',
+        'hoshi-tsunagi',
+        'robo-kuzushi',
+        'mato-ate',
+        'dot-adventure',
+        'dot-zoo',
+        'dot-aquarium',
+        'pixel-kart',
+        'tsumiki-3d',
+        'dot-run',
+        'jishaku-pitatto',
+        'shabon-pachin',
       ].map(gameRoutePath),
     )
   })

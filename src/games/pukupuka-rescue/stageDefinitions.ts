@@ -1,4 +1,4 @@
-import type { StageDefinition } from './types'
+import type { FloaterKind, StageDefinition } from './types'
 
 // ステージ座標。スマホ縦画面に合わせて 100 x 150（2:3）の縦長にする。
 export const STAGE_WIDTH = 100
@@ -50,75 +50,140 @@ function dividedWater(boundaryX: number, leftInitialLevel: number, rightInitialL
 // 仕掛けはすべて画面内で直接操作できる。最後の面もカメラ追従を使わず全景を表示。
 const faucet = { id: 'main-faucet', targetBodyId: 'main', x: 22, y: 32 }
 const drain = { id: 'main-drain', sourceBodyId: 'main', x: 30, y: 126 }
-const duck = { id: 'duck', kind: 'duck' as const, radius: 5.5, startX: 26, startY: 119 }
-const bear = (x: number, shelfY: number) => ({ id: 'ringBear', kind: 'ringBear' as const, radius: 5, startX: x, startY: shelfY - 5 })
+const duck = (startX = 20) => ({ id: 'duck', kind: 'duck' as const, radius: 5.5, startX, startY: 119 })
+/** 足場(supportTop)の上で待つ仲間。 */
+const friend = (id: string, kind: FloaterKind, radius: number, x: number, supportTop: number) =>
+  ({ id, kind, radius, startX: x, startY: supportTop - radius })
+const chick = (x: number, top: number) => friend('chick', 'chick', 4, x, top)
+const bear = (x: number, top: number) => friend('ringBear', 'ringBear', 5, x, top)
+const cat = (x: number, top: number) => friend('boat', 'boat', 5.5, x, top)
+const frog = (x: number, top: number) => friend('frog', 'frog', 4.5, x, top)
+const penguin = (x: number, top: number) => friend('penguin', 'penguin', 5, x, top)
 const shelf = (id: string, x: number, y: number, width: number) => ({ id, kind: 'platform' as const, x, y, width, height: 126 - y })
+const wall = (id: string, x: number, y: number, width: number, height: number) => ({ id, kind: 'wall' as const, x, y, width, height })
 const gate = (y: number, height: number, x = 46) => ({ id: 'main-gate', x, y, width: 8, height, leftBodyId: 'left', rightBodyId: 'right' })
-const dock = (x = 66, y = 106, width = 20) => ({ area: { x, y: y - 12, width, height: 12 }, floaterIds: ['duck', 'ringBear'], requiresLanding: true })
-const stars = (x: number, y: number) => [{ id: 'star-1', x: 32, y: 87 }, { id: 'star-2', x, y }, { id: 'star-3', x: 76, y: 96 }]
+const dock = (floaterIds: string[], x = 66, y = 106, width = 20) =>
+  ({ area: { x, y: y - 12, width, height: 12 }, floaterIds, requiresLanding: true })
+const harbor = (floaterIds: string[], area: { x: number; y: number; width: number; height: number }) => ({ area, floaterIds })
+const star = (index: number, x: number, y: number) => ({ id: `star-${index}`, x, y })
 
 export const PUKUPUKA_STAGES: readonly StageDefinition[] = [
   {
+    // じゃぐちだけ。しまの上のひよこにふれると、うしろについてくる。
     id: 'water-rise', name: 'みずで ぷかぷか', icon: '💧', width: STAGE_WIDTH, height: STAGE_HEIGHT,
-    solids: [...tankWalls(), shelf('island', 48, 82, 15), shelf('dock', 68, 58, 18)],
-    waterBodies: [water(8)], floaters: [duck],
-    goal: { area: { x: 66, y: 30, width: 18, height: 22 }, floaterIds: ['duck'] },
-    faucet, drain, stars: [{ id: 'star-1', x: 32, y: 87 }, { id: 'star-2', x: 55, y: 63 }, { id: 'star-3', x: 75, y: 38 }],
-    hint: 'じゃぐちを おして、しまを こえよう',
+    solids: [...tankWalls(), shelf('island', 44, 90, 14), shelf('dock', 68, 58, 18)],
+    waterBodies: [water(8)], floaters: [duck(26), chick(51, 90)],
+    goal: harbor(['duck', 'chick'], { x: 66, y: 30, width: 18, height: 24 }),
+    faucet, drain,
+    stars: [star(1, 32, 96), star(2, 60, 80), star(3, 22, 40)],
+    hint: 'じゃぐちを おして、ひよこを むかえに いこう',
   },
   {
+    // 高いしまのくまをむかえてから、せんで水をぬいて桟橋へおりる。
     id: 'land-on-platform', name: 'くまを おむかえ', icon: '🐻', width: STAGE_WIDTH, height: STAGE_HEIGHT,
     solids: [...tankWalls(), shelf('bear-island', 43, 64, 16), shelf('dock', 66, 106, 20)],
-    waterBodies: [water(8)], floaters: [duck, bear(51, 64)], goal: dock(),
-    faucet, drain: { ...drain, x: 14, y: 120, orientation: 'left-wall' }, stars: stars(51, 51),
-    hint: 'みずで くまを うかせて、せんで ふたりを おろそう',
+    waterBodies: [water(8)], floaters: [duck(26), bear(51, 64)], goal: dock(['duck', 'ringBear']),
+    faucet, drain: { ...drain, x: 14, y: 120, orientation: 'left-wall' },
+    stars: [star(1, 36, 80), star(2, 80, 36), star(3, 76, 96)],
+    hint: 'みずで くまを むかえて、せんで さんばしへ おりよう',
+  },
+  {
+    // 高いところのベルを鳴らすと、下のさくが開く。「ためて→ならして→ぬいて くぐる」。
+    id: 'ring-the-bell', name: 'カランと ベル', icon: '🔔', width: STAGE_WIDTH, height: STAGE_HEIGHT,
+    solids: [...tankWalls(), shelf('cat-rock', 28, 76, 12), wall('divider', 52, 22, 8, 62), shelf('chick-rock', 62, 120, 8)],
+    doors: [{ id: 'fence', x: 52, y: 84, width: 8, height: 42 }],
+    bells: [{ id: 'bell', x: 46, y: 31, doorId: 'fence' }],
+    waterBodies: [water(8)], floaters: [duck(20), cat(34, 76), chick(66, 120)],
+    goal: harbor(['duck', 'boat', 'chick'], { x: 72, y: 90, width: 14, height: 34 }),
+    faucet, drain: { ...drain, x: 14, y: 116, orientation: 'left-wall' },
+    stars: [star(1, 22, 100), star(2, 40, 58), star(3, 64, 100)],
+    hint: 'たかい ベルを カラン！ さくが あいたら みずを ぬこう',
   },
   {
     id: 'open-the-gate', name: 'しまの すいもん', icon: '🚪', width: STAGE_WIDTH, height: STAGE_HEIGHT,
-    solids: [...tankWalls(), shelf('gate-base', 46, 90, 8), shelf('bear-island', 59, 65, 10), shelf('dock', 70, 108, 16)],
-    waterBodies: dividedWater(50, 8, 0), floaters: [duck, bear(64, 65)], goal: dock(70, 108, 16),
+    solids: [...tankWalls(), shelf('frog-rock', 30, 100, 8), shelf('gate-base', 46, 90, 8), shelf('bear-island', 59, 65, 10), shelf('dock', 70, 108, 16)],
+    waterBodies: dividedWater(50, 8, 0), floaters: [duck(20), frog(34, 100), bear(64, 65)],
+    goal: dock(['duck', 'frog', 'ringBear'], 70, 108, 16),
     faucet: { ...faucet, targetBodyId: 'left' },
     drain: { ...drain, x: 54, y: 116, sourceBodyId: 'right', orientation: 'left-wall' },
-    gate: gate(22, 68), ambientDriftScale: 0.8, stars: stars(64, 54),
-    hint: 'すいもんで みずを とどけて、かべの せんで おろそう',
+    gate: gate(22, 68), ambientDriftScale: 0.8,
+    stars: [star(1, 24, 90), star(2, 64, 50), star(3, 78, 96)],
+    hint: 'すいもんを あけて、みぎの しまの くまも むかえよう',
   },
   {
+    // くじらのしおで、高いかべの上のペンギンのところまでジャンプする。
+    id: 'whale-jump', name: 'くじらで ジャンプ', icon: '🐳', width: STAGE_WIDTH, height: STAGE_HEIGHT,
+    solids: [...tankWalls(), shelf('chick-rock', 26, 98, 6), wall('tall-wall', 44, 22, 6, 104)],
+    waterBodies: [
+      { id: 'left', label: 'くじらの いけ', left: 14, right: 44, floorY: 126, ceilingY: 30, initialLevel: 8 },
+      { id: 'right', label: 'ゴールの いけ', left: 50, right: 86, floorY: 126, ceilingY: 30, initialLevel: 32 },
+    ],
+    floaters: [duck(19), chick(29, 98), penguin(47, 22)],
+    goal: harbor(['duck', 'chick', 'penguin'], { x: 64, y: 86, width: 22, height: 38 }),
+    faucet: { ...faucet, targetBodyId: 'left' },
+    drain: { ...drain, x: 14, y: 118, sourceBodyId: 'left', orientation: 'left-wall' },
+    whale: { id: 'whale', x: 36, y: 117, halfWidth: 6.5, launchVy: -100, carryVx: 34 },
+    stars: [star(1, 21, 104), star(2, 38, 60), star(3, 56, 8)],
+    hint: 'みずを いっぱいに して、くじらを タップ！',
+  },
+  {
+    // 水の中のプロペラで流れの向きを変え、左右の仲間をじゅんばんにむかえる。
     id: 'change-the-flow', name: 'くるっと ながれ', icon: '↔️', width: STAGE_WIDTH, height: STAGE_HEIGHT,
-    solids: [...tankWalls(), shelf('gate-base', 46, 90, 8), shelf('bear-island', 59, 65, 10), shelf('dock', 70, 108, 16)],
-    waterBodies: dividedWater(50, 8, 0), floaters: [duck, bear(64, 65)], goal: dock(70, 108, 16),
-    faucet: { ...faucet, targetBodyId: 'left' },
-    drain: { ...drain, x: 54, y: 116, sourceBodyId: 'right', orientation: 'left-wall' },
-    gate: gate(22, 68),
-    board: { id: 'main-board', x: 64, y: 80, width: 16, height: 10, initialFlowDirection: 'back', targetBodyId: 'right', circulation: true },
-    ambientDriftScale: 0.8, stars: stars(64, 54),
-    hint: 'やじるしを くるっ！ ながれを ゴールへ むけよう',
+    solids: [...tankWalls(), shelf('frog-rock', 14, 80, 10), shelf('cat-rock', 40, 88, 10), shelf('dock', 68, 100, 18)],
+    // 水は目もりの高さまで。流れで運ぶ高さを、じゃぐちやプロペラにかぶらない位置へそろえる。
+    waterBodies: [water(8, 58)], floaters: [duck(32), frog(19, 80), cat(45, 88)],
+    goal: harbor(['duck', 'frog', 'boat'], { x: 68, y: 56, width: 18, height: 40 }),
+    faucet, drain: { ...drain, x: 30, y: 126 },
+    board: { id: 'main-board', x: 51, y: 104, width: 16, height: 10, initialFlowDirection: 'goal', targetBodyId: 'main', circulation: true },
+    ambientDriftScale: 0,
+    stars: [star(1, 58, 76), star(2, 28, 70), star(3, 76, 60)],
+    hint: 'プロペラを くるっ！ ながれで ひだりの かえるも むかえよう',
   },
   {
-    id: 'water-wheel-gate', name: 'ひくい トンネル', icon: '🕳️', width: STAGE_WIDTH, height: STAGE_HEIGHT,
-    solids: [...tankWalls(),
-      { id: 'gate-roof', kind: 'wall', x: 46, y: 22, width: 8, height: 46 },
-      shelf('gate-base', 46, 100, 8), { id: 'bear-island', kind: 'platform', x: 24, y: 60, width: 10, height: 4 }, shelf('dock', 66, 108, 20)],
-    waterBodies: dividedWater(50, 8, 0), floaters: [duck, bear(29, 60)], goal: dock(66, 108),
+    // 水をためて入口に届くと、チューブのすべりだいで右のいけへ。仲間もじゅんばんにすべる。
+    id: 'twisty-slide', name: 'ぐるぐる すべりだい', icon: '🌀', width: STAGE_WIDTH, height: STAGE_HEIGHT,
+    solids: [...tankWalls(), shelf('penguin-rock', 26, 96, 6), wall('divider', 44, 22, 6, 104), shelf('bear-rock', 60, 112, 8)],
+    waterBodies: [
+      { id: 'left', label: 'すべりだいの いけ', left: 14, right: 44, floorY: 126, ceilingY: 30, initialLevel: 8 },
+      { id: 'right', label: 'ゴールの いけ', left: 50, right: 86, floorY: 126, ceilingY: 30, initialLevel: 22 },
+    ],
+    floaters: [duck(19), penguin(29, 96), bear(64, 112)],
+    goal: harbor(['duck', 'penguin', 'ringBear'], { x: 76, y: 84, width: 10, height: 40 }),
     faucet: { ...faucet, targetBodyId: 'left' },
-    drain: { ...drain, x: 54, y: 118, sourceBodyId: 'right', orientation: 'left-wall' },
-    gate: gate(68, 32), levelMarkerY: 84, ambientDriftScale: 0.9, stars: stars(35, 48),
-    hint: 'くまを うかせて、みどりの たかさで せんを とめよう',
+    drain: { ...drain, x: 14, y: 118, sourceBodyId: 'left', orientation: 'left-wall' },
+    slide: {
+      id: 'slide',
+      entry: { x: 36, y: 24, width: 12, height: 16 },
+      path: [
+        { x: 42, y: 33 }, { x: 48, y: 33 }, { x: 55, y: 34 }, { x: 63, y: 36 }, { x: 70, y: 40 },
+        { x: 75, y: 47 }, { x: 76, y: 56 }, { x: 72, y: 64 }, { x: 64, y: 67 }, { x: 57, y: 64 },
+        { x: 54, y: 56 }, { x: 56, y: 48 }, { x: 63, y: 45 }, { x: 69, y: 49 }, { x: 71, y: 57 },
+        { x: 69, y: 68 }, { x: 66, y: 80 },
+      ],
+      exitVx: 8,
+      exitVy: 40,
+    },
+    stars: [star(1, 21, 104), star(2, 64, 56), star(3, 22, 40)],
+    hint: 'みずを ためて、すべりだいの いりぐちへ！',
   },
   {
+    // さいごは全部の仕掛けを順番に。4人の仲間を連れて桟橋へ帰る。
     id: 'long-waterway', name: 'みんなで レスキュー', icon: '🚣', width: 140, height: STAGE_HEIGHT,
-    solids: [...tankWalls(140), shelf('boat-island', 42, 76, 16),
-      { id: 'gate-roof', kind: 'wall', x: 74, y: 22, width: 8, height: 36 },
-      shelf('gate-base', 74, 102, 8), { id: 'bear-island', kind: 'platform', x: 93, y: 72, width: 12, height: 4 }, shelf('dock', 110, 110, 16)],
+    solids: [...tankWalls(140), shelf('chick-rock', 28, 100, 8), shelf('cat-rock', 44, 72, 12),
+      wall('gate-roof', 74, 22, 8, 36), shelf('gate-base', 74, 102, 8),
+      shelf('penguin-rock', 86, 76, 8), shelf('frog-rock', 98, 118, 6),
+      wall('fence-roof', 106, 22, 6, 32), shelf('dock', 112, 110, 14)],
+    doors: [{ id: 'fence', x: 106, y: 54, width: 6, height: 72 }],
+    bells: [{ id: 'bell', x: 102, y: 33, doorId: 'fence' }],
     waterBodies: dividedWater(78, 8, 0, 126),
-    floaters: [duck, { id: 'boat', kind: 'boat', radius: 5.5, startX: 50, startY: 70.5 }, bear(99, 72)],
-    goal: { ...dock(110, 110, 16), floaterIds: ['duck', 'boat', 'ringBear'] },
+    floaters: [duck(20), chick(32, 100), cat(50, 72), penguin(90, 76), frog(101, 118)],
+    goal: dock(['duck', 'chick', 'boat', 'penguin', 'frog'], 112, 110, 14),
     faucet: { ...faucet, targetBodyId: 'left' },
     drain: { ...drain, x: 82, y: 119, sourceBodyId: 'right', orientation: 'left-wall' },
     gate: gate(58, 44, 74),
-    board: { id: 'journey-board', x: 104, y: 86, width: 16, height: 10, initialFlowDirection: 'back', targetBodyId: 'right', circulation: true },
     ambientDriftScale: 0.9,
-    stars: [{ id: 'star-1', x: 50, y: 63 }, { id: 'star-2', x: 99, y: 59 }, { id: 'star-3', x: 117, y: 98 }],
-    hint: 'なかまを おむかえ！ みずの たかさと ながれを かえよう',
+    stars: [star(1, 22, 96), star(2, 60, 40), star(3, 99, 52)],
+    hint: 'なかまを みんな つれて、さんばしへ かえろう',
   },
 ]
 

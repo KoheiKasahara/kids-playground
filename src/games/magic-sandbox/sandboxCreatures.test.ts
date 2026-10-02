@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Cell, Sandbox, renderSandbox } from './sandboxSimulation'
-import { EATING_STEPS, FULL_STEPS, stepCrabs, stepTurtles } from './sandboxCrabs'
+import { EATING_STEPS, FULL_STEPS, stepCrabs, stepHermits, stepTurtles } from './sandboxCrabs'
 
 function garden() {
   const world = new Sandbox(100, 70, () => 0.5)
@@ -11,12 +11,12 @@ function garden() {
   return world
 }
 function tick(world: Sandbox, steps = 1) {
-  for (let i = 0; i < steps; i++) { stepCrabs(world, () => 0.5); stepTurtles(world, () => 0.5) }
+  for (let i = 0; i < steps; i++) { stepCrabs(world, () => 0.5); stepHermits(world, () => 0.5); stepTurtles(world, () => 0.5) }
 }
-const kinds = ['crab', 'turtle'] as const
+const kinds = ['crab', 'hermit', 'turtle'] as const
 function add(world: Sandbox, kind: typeof kinds[number]) {
-  expect(kind === 'crab' ? world.addCrab() : world.addTurtle()).toBe(true)
-  return kind === 'crab' ? world.crabs.at(-1)! : world.turtles.at(-1)!
+  expect(kind === 'crab' ? world.addCrab() : kind === 'hermit' ? world.addHermit() : world.addTurtle()).toBe(true)
+  return kind === 'crab' ? world.crabs.at(-1)! : kind === 'hermit' ? world.hermits.at(-1)! : world.turtles.at(-1)!
 }
 
 describe.each(kinds)('%s flower play', kind => {
@@ -144,10 +144,11 @@ describe.each(kinds)('%s flower play', kind => {
   })
 })
 
-it('allows two crabs and one turtle, shares flower reservations and clears both kinds', () => {
+it('allows one crab, one hermit crab and one turtle, shares flower reservations and clears every kind', () => {
   const world = garden()
-  const a = add(world, 'crab'), b = add(world, 'crab'), c = add(world, 'turtle')
+  const a = add(world, 'crab'), b = add(world, 'hermit'), c = add(world, 'turtle')
   expect(world.addCrab()).toBe(false)
+  expect(world.addHermit()).toBe(false)
   expect(world.addTurtle()).toBe(false)
   a.x = 16; b.x = 38; c.x = 60
   for (const creature of [a, b, c]) creature.fullness = 0
@@ -158,6 +159,7 @@ it('allows two crabs and one turtle, shares flower reservations and clears both 
   expect(world.bloomingFlowers()).toHaveLength(0)
   world.clear()
   expect(world.crabs).toHaveLength(0)
+  expect(world.hermits).toHaveLength(0)
   expect(world.turtles).toHaveLength(0)
   world.cells.fill(Cell.Stone)
   expect(world.addTurtle()).toBe(false)
@@ -188,7 +190,7 @@ it('turtles walk more slowly than crabs and react to a tap', () => {
 })
 
 describe.each([0, 2])('creature spacing at growth %s', growth => {
-  it.each(['crab', 'turtle'] as const)('separates a crab and %s even when resting at the same position beside a wall', kind => {
+  it.each(['hermit', 'turtle'] as const)('separates a crab and %s even when resting at the same position beside a wall', kind => {
     const world = garden()
     const a = add(world, 'crab'), b = add(world, kind)
     for (const c of [a, b]) {

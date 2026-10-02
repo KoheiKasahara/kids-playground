@@ -13,6 +13,9 @@ import {
 } from './cardDeck'
 import { THEMES, THEME_ORDER, type CardFace, type ShinkeisuijakuTheme } from './cardFaces'
 import { playAllMatchedSound, playCardFlipSound, playCardMatchSound, playCardMismatchSound } from './sounds'
+import StageClearBadge from '../../components/StageClearBadge'
+import { createStageProgressStore } from '../shared/progress/stageProgress'
+import { vibrate } from '../../utils/haptics'
 import styles from './ShinkeisuijakuPlay.module.css'
 
 type GameState = 'select' | 'playing' | 'complete'
@@ -20,6 +23,13 @@ type GameState = 'select' | 'playing' | 'complete'
 const DIFFICULTY_LABELS: Record<ShinkeisuijakuDifficulty, { name: string; hint: string }> = {
   easy: { name: 'かんたん', hint: '6ペア' },
   hard: { name: 'むずかしい', hint: '8ペア' },
+}
+
+/** むずかしさごとの いちばん よい ★（Issue #784 A6）。まちがえて めくった回数が すくないほど ★が ふえる。 */
+const memoryProgress = createStageProgressStore('shinkeisuijaku-progress-v1', (id) => Object.hasOwn(DIFFICULTY_LABELS, id))
+
+function memoryStars(misses: number, pairs: number): 1 | 2 | 3 {
+  return misses <= pairs / 2 ? 3 : misses <= pairs ? 2 : 1
 }
 
 /** むずかしさごとの列数。カードの縦横比が極端にならない並びを選ぶ。 */
@@ -57,6 +67,8 @@ export default function ShinkeisuijakuPlay() {
   const [locked, setLocked] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
   const resolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const missesRef = useRef(0)
+  const [progress, setProgress] = useState(memoryProgress.read)
 
   useGameIntroPlaying(gameState !== 'select')
 
@@ -76,6 +88,7 @@ export default function ShinkeisuijakuPlay() {
     setCards(createShuffledDeck(nextTheme, nextDifficulty))
     setRevealedIds([])
     setLocked(false)
+    missesRef.current = 0
     setGameState('playing')
   }
 
@@ -135,11 +148,15 @@ export default function ShinkeisuijakuPlay() {
         setCards(finalCards)
         setRevealedIds([])
         setLocked(false)
+        if (!isMatch) missesRef.current += 1
+        const allMatched = isMatch && isDeckComplete(finalCards)
+        vibrate(allMatched ? 'celebrate' : isMatch ? 'success' : 'tap')
         if (soundOn) {
           if (isMatch) playCardMatchSound()
           else playCardMismatchSound()
         }
-        if (isMatch && isDeckComplete(finalCards)) {
+        if (allMatched) {
+          setProgress(memoryProgress.record(difficulty, memoryStars(missesRef.current, DIFFICULTY_PAIR_COUNT[difficulty])))
           setGameState('complete')
           if (soundOn) playAllMatchedSound()
         }
@@ -203,6 +220,7 @@ export default function ShinkeisuijakuPlay() {
               >
                 <span className={styles.difficultyName}>{DIFFICULTY_LABELS[option].name}</span>
                 <span className={styles.difficultyHint}>{DIFFICULTY_LABELS[option].hint}</span>
+                <StageClearBadge stars={progress[option] ?? 0} />
               </button>
             ))}
           </div>

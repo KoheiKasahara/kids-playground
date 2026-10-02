@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { primeAudio } from '../../audio/sound'
-import { findCourse, GOLF_BALLS, GOLF_COURSES, type CourseDefinition, type CourseId, type Gadget, type GolfBallId, type HoleDefinition } from './golfCourses'
+import { findCourse, GOLF_BALLS, GOLF_COURSES, type CourseDefinition, type CourseId, type Gadget, type GolfBallId, type HoleDefinition, type WaterHazard } from './golfCourses'
 import { roundOutline } from './golfGeometry'
 import { createRound, finishHole, loadBestStars, nextHole, recordShot, restartHole, roundTotals, saveBestStars, STAMP_TEXT, stampFor, type RoundState } from './golfRound'
 import { golfSound, type GolfSoundKind } from './golfSound'
@@ -22,7 +22,11 @@ const SPLASH_TEXT: Partial<Record<CourseId, string>> = {
   dino: 'したへ おっこちた！ もとの ばしょに もどるよ',
   forest: 'しげみに ぽふっ！ もとの ばしょに もどるよ',
   downhill: 'さかの したへ ころん！ もとの ばしょに もどるよ',
+  canyon: 'たにへ まっさかさま！ もとの ばしょに もどるよ',
 }
+
+/** ミニマップの みずの色。 */
+const WATER_COLOR = '#4fb3e8'
 
 /** ホールを上から見た線。ミニマップとコースえらびの見本に使う。 */
 function holeShape(hole: HoleDefinition) {
@@ -44,12 +48,19 @@ function HoleMap({ hole, course, markerRef }: { hole: HoleDefinition; course: Co
     <svg viewBox={shape.viewBox} aria-hidden="true" focusable="false">
       {shape.polygons.map(points => <polygon key={points} points={points} fill={course.look.felt} stroke={course.look.wall} strokeWidth="0.32" strokeLinejoin="round" />)}
       {(hole.zones ?? []).map(zone => <circle key={`${zone.kind}:${zone.x}:${zone.z}`} cx={zone.x} cy={zone.z} r={zone.radius} fill={zone.kind === 'sand' ? course.look.sand : zone.kind === 'ice' ? course.look.ice : course.look.rough} />)}
+      {(hole.water ?? []).map((water, index) => <WaterMark key={index} water={water} />)}
       {(hole.gadgets ?? []).map(gadget => <GadgetMark key={gadget.id} gadget={gadget} course={course} />)}
       <circle cx={hole.cup.x} cy={hole.cup.z} r="0.42" fill="#2b332d" stroke="#ffffff" strokeWidth="0.14" />
       <path d={`M${hole.cup.x} ${hole.cup.z}V${hole.cup.z - 1.5}l1 0.35l-1 0.35`} fill="#ff4f5e" stroke="#ffffff" strokeWidth="0.1" />
       {markerRef && <circle ref={markerRef} cx={hole.tee.x} cy={hole.tee.z} r="0.4" fill="#ffffff" stroke="#e8505b" strokeWidth="0.16" />}
     </svg>
   )
+}
+
+/** ミニマップの いけと かわ。 */
+function WaterMark({ water }: { water: WaterHazard }) {
+  if (water.kind === 'pond') return <circle cx={water.x} cy={water.z} r={water.radius} fill={WATER_COLOR} />
+  return <line x1={water.from.x} y1={water.from.z} x2={water.to.x} y2={water.to.z} stroke={WATER_COLOR} strokeWidth={water.halfWidth * 2} />
 }
 
 /** ミニマップの しかけの しるし。しかけの種類ごとに 形を 変える。 */
@@ -74,6 +85,16 @@ function GadgetMark({ gadget, course }: { gadget: Gadget; course: CourseDefiniti
         <circle cx={gadget.x} cy={gadget.z} r={gadget.radius * 2.2} fill="#4f9f52" />
         <circle cx={gadget.x} cy={gadget.z} r={gadget.radius} fill="#7c5334" />
       </g>
+    case 'bridge': {
+      const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
+      const along = { x: (gadget.dir.x / length) * gadget.halfLength, z: (gadget.dir.z / length) * gadget.halfLength }
+      return <line x1={gadget.x - along.x} y1={gadget.z - along.z} x2={gadget.x + along.x} y2={gadget.z + along.z} stroke="#b07a48" strokeWidth={gadget.halfWidth * 2} />
+    }
+    case 'reflector': {
+      const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
+      const along = { x: (gadget.dir.x / length) * gadget.halfLength, z: (gadget.dir.z / length) * gadget.halfLength }
+      return <line x1={gadget.x - along.x} y1={gadget.z - along.z} x2={gadget.x + along.x} y2={gadget.z + along.z} stroke="#7fd8ff" strokeWidth="0.36" strokeLinecap="round" />
+    }
     case 'warp':
       return <g>
         <line x1={gadget.x} y1={gadget.z} x2={gadget.exit.x} y2={gadget.exit.z} stroke={course.look.bumperCap} strokeWidth="0.12" strokeDasharray="0.4 0.4" />
@@ -86,6 +107,51 @@ function GadgetMark({ gadget, course }: { gadget: Gadget; course: CourseDefiniti
 
 function stars(count: number, total = 3) {
   return '★'.repeat(count) + '☆'.repeat(Math.max(0, total - count))
+}
+
+/**
+ * コースえらびの よこスクロール。はしに かげと ◀ ▶ を出して、まだ先に コースが あると わかるようにする。
+ */
+function CourseScroller({ selectedId, children }: { selectedId: CourseId; children: ReactNode }) {
+  const list = useRef<HTMLDivElement | null>(null)
+  const [edges, setEdges] = useState({ start: true, end: false })
+  const update = useCallback(() => {
+    const element = list.current
+    if (!element) return
+    const start = element.scrollLeft <= 4
+    const end = element.scrollLeft + element.clientWidth >= element.scrollWidth - 4
+    setEdges(previous => previous.start === start && previous.end === end ? previous : { start, end })
+  }, [])
+  useEffect(() => {
+    update()
+    const element = list.current
+    if (!element || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [update])
+  // えらんだ コースが 見えるところまで よせる。
+  useEffect(() => {
+    const element = list.current
+    const card = element?.querySelector<HTMLElement>('[aria-pressed="true"]')
+    if (!element || !card) return
+    const left = card.offsetLeft - element.offsetLeft
+    if (left < element.scrollLeft || left + card.offsetWidth > element.scrollLeft + element.clientWidth) {
+      element.scrollTo?.({ left: left - (element.clientWidth - card.offsetWidth) / 2, behavior: 'smooth' })
+    }
+  }, [selectedId])
+  const page = (side: number) => {
+    const element = list.current
+    element?.scrollBy?.({ left: side * element.clientWidth * 0.8, behavior: 'smooth' })
+  }
+  return (
+    <div className={styles.courseScroller} data-at-start={edges.start} data-at-end={edges.end}>
+      <div ref={list} className={styles.courses} onScroll={update} data-testid="golf-course-list">{children}</div>
+      <button type="button" className={`${styles.scrollArrow} ${styles.scrollPrev}`} aria-label="まえの コースを みる" hidden={edges.start} onClick={() => page(-1)}>◀</button>
+      <button type="button" className={`${styles.scrollArrow} ${styles.scrollNext}`} aria-label="つぎの コースを みる" hidden={edges.end} onClick={() => page(1)}>▶</button>
+      <p className={styles.scrollHint} aria-hidden="true">{edges.end ? '◀ ゆびで よこに うごかせるよ' : 'ゆびで よこに うごかせるよ ▶'}</p>
+    </div>
+  )
 }
 
 export default function PutterGolfPlay() {
@@ -119,6 +185,7 @@ export default function PutterGolfPlay() {
       case 'rock': play('rock', event.strength); break
       case 'tree': play('tree', event.strength); setMessage('きに こつん！'); break
       case 'bumper': play('bumper'); setMessage('ぽよーん！'); break
+      case 'reflector': play('reflector', event.strength); setMessage('いたで カキーン！'); break
       case 'gate': play('gate', event.strength); setMessage('とびらに あたった！ あくのを まとう'); break
       case 'critter': play('critter'); setMessage('どうぶつに ぽーん！'); break
       case 'warp': play('warp'); setMessage('しゅーん！ むこうがわへ！'); break
@@ -130,7 +197,7 @@ export default function PutterGolfPlay() {
         if (event.surface === 'ice') { play('ice'); setMessage('つるつる すべるよ！') }
         else { play('sand'); setMessage(event.surface === 'sand' ? 'すなばで ザザッ' : 'ふかふかで とまりやすいよ') }
         break
-      case 'splash': play('splash'); setMessage(SPLASH_TEXT[courseId] ?? 'ぽちゃん！ もとの ばしょに もどるよ'); break
+      case 'splash': play('splash'); setMessage(event.pond ? 'みずに ぽちゃん！ もとの ばしょに もどるよ' : SPLASH_TEXT[courseId] ?? 'ぽちゃん！ もとの ばしょに もどるよ'); break
       case 'lost': setMessage('おっと！ もとの ばしょに もどるよ'); break
       case 'returned': setMessage('ここから もういちど！'); break
       case 'assisted': play('click'); setMessage('カップの ちかくに おいたよ！'); break
@@ -263,7 +330,7 @@ export default function PutterGolfPlay() {
 
         {phase === 'select' && <section className={styles.panel} aria-label="コースを えらぶ">
           <h2>どの コースで あそぶ？</h2>
-          <div className={styles.courses}>
+          <CourseScroller selectedId={courseId}>
             {GOLF_COURSES.map(item => <button
               key={item.id}
               type="button"
@@ -280,7 +347,7 @@ export default function PutterGolfPlay() {
               <span className={styles.holeThumbs} aria-hidden="true">{item.holes.map(entry => <HoleMap key={entry.id} hole={entry} course={item} />)}</span>
               {best[item.id] ? <small className={styles.best}>さいこう {best[item.id]}/{item.holes.length * 3} ★</small> : null}
             </button>)}
-          </div>
+          </CourseScroller>
           <div className={styles.options}>
             <div className={styles.balls} role="group" aria-label="ボールを えらぶ">
               {GOLF_BALLS.map(item => <button key={item.id} type="button" className={styles.ballButton} style={{ '--ball': item.color, '--accent': item.accent } as CSSProperties} aria-label={`${item.label}の ボール`} aria-pressed={ballId === item.id} onClick={() => { setBallId(item.id); play('click') }}>

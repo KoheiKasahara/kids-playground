@@ -114,7 +114,7 @@ export const countries: readonly Country[] = [
   { id: 'vu', nameJa: 'バヌアツ', nameEn: 'Vanuatu', continent: 'oceania', flag: 'flags/vu.svg', level: 'hard' },
   { id: 'fm', nameJa: 'ミクロネシアれんぽう', nameEn: 'Micronesia', continent: 'oceania', flag: 'flags/fm.svg', level: 'hard' },
   { id: 'mh', nameJa: 'マーシャルしょとう', nameEn: 'Marshall Islands', continent: 'oceania', flag: 'flags/mh.svg', level: 'hard' },
-  // ここから「おに」の追加分 (105 → 150か国)
+  // ここから「おに」の追加分 (105 → 152か国)
   { id: 'la', nameJa: 'ラオス', nameEn: 'Laos', continent: 'asia', flag: 'flags/la.svg', level: 'oni' },
   { id: 'bn', nameJa: 'ブルネイ', nameEn: 'Brunei', continent: 'asia', flag: 'flags/bn.svg', level: 'oni' },
   { id: 'mv', nameJa: 'モルディブ', nameEn: 'Maldives', continent: 'asia', flag: 'flags/mv.svg', level: 'oni' },
@@ -155,6 +155,8 @@ export const countries: readonly Country[] = [
   { id: 'zm', nameJa: 'ザンビア', nameEn: 'Zambia', continent: 'africa', flag: 'flags/zm.svg', level: 'oni' },
   { id: 'mz', nameJa: 'モザンビーク', nameEn: 'Mozambique', continent: 'africa', flag: 'flags/mz.svg', level: 'oni' },
   { id: 'rw', nameJa: 'ルワンダ', nameEn: 'Rwanda', continent: 'africa', flag: 'flags/rw.svg', level: 'oni' },
+  { id: 'bi', nameJa: 'ブルンジ', nameEn: 'Burundi', continent: 'africa', flag: 'flags/bi.svg', level: 'oni' },
+  { id: 'bf', nameJa: 'ブルキナファソ', nameEn: 'Burkina Faso', continent: 'africa', flag: 'flags/bf.svg', level: 'oni' },
   { id: 'sd', nameJa: 'スーダン', nameEn: 'Sudan', continent: 'africa', flag: 'flags/sd.svg', level: 'oni' },
   { id: 'so', nameJa: 'ソマリア', nameEn: 'Somalia', continent: 'africa', flag: 'flags/so.svg', level: 'oni' },
   { id: 'ly', nameJa: 'リビア', nameEn: 'Libya', continent: 'africa', flag: 'flags/ly.svg', level: 'oni' },

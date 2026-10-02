@@ -1,4 +1,4 @@
-import { formatBytes, formatTrendCell, ratioIcon, statusIcon, thresholdWarningIcon } from './format.mjs'
+import { dependencyStatusIcon, formatBytes, formatTrendCell, ratioIcon, statusIcon, thresholdWarningIcon } from './format.mjs'
 import { computeTrend, coveragePercent } from './historyTrend.mjs'
 
 const DASH = '—'
@@ -44,19 +44,6 @@ export function buildProjectHealthRows({
     e2eCoverage: computeTrend(currentCoverage, previousCoverage, 'higherIsBetter'),
   }
 
-  const dependencySeverity = (deps) => {
-    if (!deps) {
-      return '❓'
-    }
-    if (deps.total === 0) {
-      return '✅'
-    }
-    if ((deps.critical ?? 0) > 0 || (deps.high ?? 0) > 0) {
-      return '❌'
-    }
-    return '⚠️'
-  }
-
   return [
     {
       metric: 'Games',
@@ -85,7 +72,7 @@ export function buildProjectHealthRows({
     {
       metric: 'Dependencies',
       value: dependencies ? `${dependencies.total} vulnerable` : DASH,
-      status: dependencySeverity(dependencies),
+      status: dependencyStatusIcon(dependencies),
       trend: formatTrendCell(trends.vulnerabilities),
     },
     {

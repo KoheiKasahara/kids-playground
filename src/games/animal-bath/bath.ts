@@ -44,3 +44,10 @@ export function bathReducer(state: BathState, action: BathAction): BathState {
   const added = hits.filter((index) => !state.cleaned.includes(index))
   return added.length ? { ...state, cleaned: [...state.cleaned, ...added] } : state
 }
+
+/** Blends two #rrggbb colours; used to derive fur light/shade from each animal's palette. */
+export function mix(from: string, to: string, amount: number): string {
+  const channel = (hex: string, index: number) => parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16)
+  return `#${[0, 1, 2].map((index) => Math.round(channel(from, index) + (channel(to, index) - channel(from, index)) * amount)
+    .toString(16).padStart(2, '0')).join('')}`
+}

@@ -106,7 +106,8 @@
   text-align: center;
 }
 
-.title { margin: 0; color: var(--color-primary-dark); font-size: clamp(24px, 6vw, var(--font-size-xlarge)); text-shadow: 0 2px 0 var(--color-surface); }
+.titleRow { display: flex; align-items: center; gap: var(--space-sm); align-self: stretch; min-width: 0; }
+.title { flex: 1; min-width: 0; margin: 0; color: var(--color-primary-dark); font-size: clamp(16px, 5vw, var(--font-size-xlarge)); line-height: 1.2; text-shadow: 0 2px 0 var(--color-surface); }
 .stageBadge { display: inline-flex; align-items: center; gap: 4px; margin: var(--space-xs) 0 0; padding: 3px 10px; border: 2px solid color-mix(in srgb, var(--color-primary) 45%, white); border-radius: var(--radius-round); background: color-mix(in srgb, var(--color-surface) 90%, transparent); color: var(--color-primary-dark); font-size: clamp(14px, 3.8vw, 17px); font-weight: 900; line-height: 1.2; box-shadow: var(--shadow-sm); }
 .instruction, .result, .rescue, .keyboardHint { margin: var(--space-xs) 0 0; color: var(--color-text-muted); font-size: clamp(14px, 3.8vw, var(--font-size-base)); text-shadow: 0 1px 0 var(--color-surface); }
 .result { color: var(--color-success-dark); font-size: clamp(22px, 6vw, var(--font-size-large)); font-weight: bold; }
@@ -161,6 +162,9 @@
 @media (orientation: landscape) and (max-height: 600px) {
   .page { grid-template-columns: minmax(104px, .72fr) minmax(0, 2fr) minmax(104px, .72fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-sm); padding-top: calc(var(--space-xs) + var(--safe-top)); padding-bottom: calc(var(--space-xs) + var(--safe-bottom)); }
   .ui { position: absolute; top: calc(var(--space-xs) + var(--safe-top)); left: 50%; z-index: 1; transform: translateX(-50%); padding: 0; }
+  .titleRow { align-self: center; }
+  /* 横画面ではタイトルが盤面の上中央へ浮くので、もどるの席は不要。 */
+  .titleRow > [data-game-back-layout-slot] { display: none; }
   .title { font-size: clamp(18px, 4vw, 24px); }
   .instruction, .rescue, .keyboardHint { display: none; }
   .scene { grid-column: 2; grid-row: 1; }

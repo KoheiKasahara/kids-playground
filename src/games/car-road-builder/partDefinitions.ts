@@ -90,10 +90,10 @@ export const PART_DEFINITIONS: Readonly<Record<PartKind, PartDefinition>> = {
     kind: 'goal',
     label: 'ゴール',
     emoji: '🏁',
-    // The goal has one entrance, just like the start. Its four editor poses
-    // are quarter turns so the visible gate and route check always agree.
+    // The goal has one entrance, just like the start. Like the start it can
+    // face all eight directions, so a diagonal road can finish too.
     baseConnections: ['N'],
-    rotationSteps: [0, 2, 4, 6],
+    rotationSteps: ALL_ROTATIONS,
   },
 } as const
 
@@ -119,15 +119,10 @@ export function allowedRotationSteps(kind: PartKind): readonly number[] {
 export function normalizePartRotation(kind: PartKind, rotationStep: number): number {
   const normalized = normalizeRotationStep(rotationStep)
   if (kind === 'straight' || kind === 'crossroad') return normalized % 4
-  if (kind === 'goal' || kind === 'xroad' || kind === 'double-curve') {
+  if (kind === 'xroad' || kind === 'double-curve') {
     return normalized % 2 === 0 ? normalized : (normalized + 1) % 8
   }
   return normalized
-}
-
-/** Number of internal 45° steps used by one editor rotation. */
-export function rotationStepIncrement(kind: PartKind): number {
-  return kind === 'goal' ? 2 : 1
 }
 
 export function createPlacedPart(kind: PartKind, rotationStep = 0): PlacedPart {
@@ -166,6 +161,7 @@ export function exitPortForPart(part: PlacedPart, entryPort: Direction): Directi
   return ports.find((port) => port !== entryPort) ?? null
 }
 
-export function rotatePlacedPart(part: PlacedPart, amount = rotationStepIncrement(part.kind)): PlacedPart {
+/** One editor rotation turns every part by one internal 45° step. */
+export function rotatePlacedPart(part: PlacedPart, amount = 1): PlacedPart {
   return createPlacedPart(part.kind, part.rotationStep + amount)
 }

@@ -157,6 +157,8 @@ function WorkingVehicleQuizPlayGame({ mode, level }: WorkingVehicleQuizPlayGameP
                   const choiceButtonClassName = [
                     styles.choiceButton,
                     variant === 'secondary' ? styles.choiceButtonUnselected : '',
+                    // 「ごみしゅうしゅうしゃ」など長い名前は、途中で改行されないよう文字を小さくする（Issue #784 A4）。
+                    choice.nameJa.length >= 8 ? styles.choiceButtonLong : '',
                   ]
                     .filter(Boolean)
                     .join(' ')

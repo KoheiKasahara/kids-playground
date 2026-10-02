@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import { createKomaArmor } from './komaArmor'
+import { createKomaDriver } from './komaDriver'
 import {
   createKomaBattleSoundController,
   type KomaBattleImpactSoundKind,
@@ -14,7 +15,6 @@ import {
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
-  SHAFT_RADIUS,
   START_SPIN_VARIANCE,
 } from './komaPhysics'
 
@@ -195,7 +195,10 @@ type KomaVisual = {
 
 /** 見た目Meshで使い回すgeometry一式。コマごとに寸法は同じなので、色違いのMaterialだけを分ける。 */
 type KomaGeometrySet = {
-  tip: THREE.ConeGeometry
+  /** 円盤より下のドライバー部分。bodyStyleで形が変わる。 */
+  driverPoint: THREE.BufferGeometry
+  driverBody: THREE.BufferGeometry
+  ratchet: THREE.BufferGeometry | null
   diskLower: THREE.CylinderGeometry
   diskUpper: THREE.CylinderGeometry
   groove: THREE.TorusGeometry
@@ -247,6 +250,31 @@ function createToothRingShape(
   }
   shape.closePath()
   return shape
+}
+
+/**
+ * 縁がふわっと消える光のリング。
+ *
+ * ただのRingGeometryだと縁がくっきりした多角形の帯になり、コマと一緒に高速回転すると
+ * 「帯が回っている」ように見えてしまう。分割を細かくし、半径方向に頂点アルファで
+ * 中央だけ明るく内外の縁で0になるグラデーションを付けて、なめらかな光輪に見せる。
+ */
+function createSoftGlowRingGeometry(innerRadius: number, outerRadius: number): THREE.RingGeometry {
+  const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 96, 8)
+  const positions = geometry.getAttribute('position')
+  const colors = new Float32Array(positions.count * 4)
+  for (let i = 0; i < positions.count; i++) {
+    const radius = Math.hypot(positions.getX(i), positions.getY(i))
+    const t = THREE.MathUtils.clamp((radius - innerRadius) / (outerRadius - innerRadius), 0, 1)
+    // 内側寄りをピークにしたなだらかな山形。sinの2乗で縁の傾きも0にし、境目を見せない。
+    const peak = Math.sin(Math.PI * Math.pow(t, 0.8))
+    colors[i * 4] = 1
+    colors[i * 4 + 1] = 1
+    colors[i * 4 + 2] = 1
+    colors[i * 4 + 3] = peak * peak
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4))
+  return geometry
 }
 
 /**
@@ -599,11 +627,18 @@ export function useKomaBattleEngine(
       const diskRadius = DISK_RADIUS * visual.diskRadiusScale
       const diskHalfHeight = DISK_HALF_HEIGHT * visual.diskThicknessScale
       const armor = createKomaArmor(visual, diskRadius)
+      const driver = createKomaDriver(
+        visual,
+        diskRadius,
+        DISK_CENTER_Y - diskHalfHeight * 0.5 - diskHalfHeight * 0.8,
+      )
       return {
         armor: track(armor.armor),
         trim: track(armor.trim),
-        // 軸/先端。物理では球+円柱だが、見た目は下向きの円錐にして「コマの軸」に見せる。
-        tip: track(new THREE.ConeGeometry(SHAFT_RADIUS * 1.3, DISK_CENTER_Y - diskHalfHeight, 12)),
+        // 軸/先端。物理では球+円柱だが、見た目はタイプのbodyStyleに応じた太さのある軸にする。
+        driverPoint: track(driver.point),
+        driverBody: track(driver.body),
+        ratchet: driver.ratchet ? track(driver.ratchet) : null,
         // 円盤下段。樹脂パーツの土台。
         diskLower: track(
           new THREE.CylinderGeometry(
@@ -632,14 +667,10 @@ export function useKomaBattleEngine(
         // 低い六角メダリオンと、上から読み取れる大きな紋章。
         cap: track(new THREE.CylinderGeometry(diskRadius * 0.36, diskRadius * 0.41, diskRadius * 0.12, 6)),
         knob: track(armor.emblem),
-        // 回転演出用の半透明リング。高速回転中だけ光る。
-        spinRing: track(
-          new THREE.RingGeometry(diskRadius * 1.15, diskRadius * 1.42, 28),
-        ),
+        // 回転演出用の半透明リング。高速回転中だけ光る。縁をぼかして帯に見えないようにする。
+        spinRing: track(createSoftGlowRingGeometry(diskRadius * 1.08, diskRadius * 1.5)),
         // タップ時だけ一瞬広がるリング。常時描画せず、コマごとに1個を使い回す。
-        boostRing: track(
-          new THREE.RingGeometry(diskRadius * 1.18, diskRadius * 1.72, 32),
-        ),
+        boostRing: track(createSoftGlowRingGeometry(diskRadius * 1.12, diskRadius * 1.8)),
         diskHalfHeight,
       }
     }
@@ -705,6 +736,7 @@ export function useKomaBattleEngine(
           side: THREE.DoubleSide,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
+          vertexColors: true,
         }),
       )
       const boostRingMaterial = trackMaterial(
@@ -715,15 +747,27 @@ export function useKomaBattleEngine(
           side: THREE.DoubleSide,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
+          vertexColors: true,
         }),
       )
       let outcomeEmphasis: 'winner' | 'loser' | null = null
       let boostRemainingMs = 0
 
-      const tip = new THREE.Mesh(geometrySet.tip, metalMaterial)
-      tip.rotation.x = Math.PI
-      tip.position.y = (DISK_CENTER_Y - diskHalfHeight) / 2
-      group.add(tip)
+      group.add(new THREE.Mesh(geometrySet.driverPoint, metalMaterial))
+      group.add(new THREE.Mesh(geometrySet.driverBody, resinMaterial))
+      if (geometrySet.ratchet) {
+        // ラチェットは色の透ける樹脂風にして、本体色との段を目立たせる。
+        const ratchetMaterial = trackMaterial(
+          new THREE.MeshStandardMaterial({
+            color: spec.accentColor,
+            roughness: 0.2,
+            metalness: 0.1,
+            transparent: true,
+            opacity: 0.85,
+          }),
+        )
+        group.add(new THREE.Mesh(geometrySet.ratchet, ratchetMaterial))
+      }
 
       const diskLower = new THREE.Mesh(geometrySet.diskLower, baseMaterial)
       diskLower.position.y = DISK_CENTER_Y - diskHalfHeight * 0.5
@@ -782,8 +826,8 @@ export function useKomaBattleEngine(
           1,
         )
         spinRingMaterial.opacity = Math.min(
-          0.72,
-          ratio * 0.4 + (outcomeEmphasis === 'winner' ? 0.18 : 0),
+          0.85,
+          ratio * 0.55 + (outcomeEmphasis === 'winner' ? 0.22 : 0),
         )
         const boostRatio = Math.max(0, boostRemainingMs / BOOST_EFFECT_DURATION_MS)
         accentMaterial.emissiveIntensity = Math.max(
@@ -791,8 +835,6 @@ export function useKomaBattleEngine(
           boostRatio * 1.35,
           outcomeEmphasis === 'winner' ? 0.8 : outcomeEmphasis === 'loser' ? 0.05 : 0,
         )
-        // リングは本体よりわずかに速く自転させ、残像のような「滑り」を出す。
-        spinRing.rotation.y += (dtMs / 1000) * spinSpeedAbs * 0.5
 
         if (boostRemainingMs > 0) {
           boostRemainingMs = Math.max(0, boostRemainingMs - dtMs)

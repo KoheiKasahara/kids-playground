@@ -22,22 +22,35 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/color-paint-puzzle',
   '/games/crane-game',
   '/games/domino-flag',
+  '/games/dot-adventure',
+  '/games/dot-zoo',
+  '/games/dot-aquarium',
+  '/games/dot-run',
+  '/games/jishaku-pitatto',
+  '/games/pixel-kart',
+  '/games/tsumiki-3d',
   '/games/flag-pinball',
   '/games/flag-roll-maze',
   '/games/flag-roll-maze/play',
   '/games/flag-roll-puzzle',
+  '/games/hoshi-tsunagi',
   '/games/koma-battle',
   '/games/magic-sandbox',
   '/games/marble-course',
+  '/games/mato-ate',
   '/games/oekaki-korokoro',
+  '/games/origami-play',
   '/games/piano-play',
   '/games/planet-globe',
   '/games/puni-slime',
+  '/games/rhythm-pon',
   '/games/pukupuka-rescue',
   '/games/putter-golf',
   '/games/pyoko-touch',
   '/games/rail-builder',
+  '/games/robo-kuzushi',
   '/games/snowball-roll',
+  '/games/shabon-pachin',
   '/games/shinkeisuijaku',
   '/games/water-wheel-maze',
   '/games/treasure-dig',
@@ -72,7 +85,7 @@ export default function App() {
           <GameIntro />
         </GameIntroProvider>
       </GameRouteBoundary>
-      <PwaStatus />
+      <PwaStatus pathname={normalizedPathname} />
     </>
   )
 }

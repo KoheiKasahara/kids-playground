@@ -1,6 +1,6 @@
 import { createToneNodes, getSharedAudioContext, isSoundEnabled } from '../../audio/sound'
 
-export type GolfSoundKind = 'putt' | 'wall' | 'bumper' | 'rock' | 'tree' | 'windmill' | 'gate' | 'critter' | 'warp' | 'boost' | 'jump' | 'land' | 'sand' | 'ice' | 'splash' | 'cup' | 'cheer' | 'hole-in-one' | 'click'
+export type GolfSoundKind = 'putt' | 'wall' | 'bumper' | 'reflector' | 'rock' | 'tree' | 'windmill' | 'gate' | 'critter' | 'warp' | 'boost' | 'jump' | 'land' | 'sand' | 'ice' | 'splash' | 'cup' | 'cheer' | 'hole-in-one' | 'click'
 
 type Voice = { notes: number[]; type: OscillatorType; gap: number; duration: number; volume: number; glide?: number; noise?: { filter: BiquadFilterType; frequency: number; duration: number; volume: number } }
 
@@ -8,6 +8,7 @@ const VOICES: Record<GolfSoundKind, Voice> = {
   putt: { notes: [980], type: 'triangle', gap: 0, duration: 0.07, volume: 0.05 },
   wall: { notes: [320], type: 'triangle', gap: 0, duration: 0.06, volume: 0.035 },
   bumper: { notes: [520], type: 'sine', gap: 0, duration: 0.2, volume: 0.045, glide: 980 },
+  reflector: { notes: [880, 1320], type: 'triangle', gap: 0.04, duration: 0.12, volume: 0.035 },
   rock: { notes: [210], type: 'triangle', gap: 0, duration: 0.08, volume: 0.035 },
   tree: { notes: [300, 190], type: 'triangle', gap: 0.035, duration: 0.07, volume: 0.03 },
   windmill: { notes: [640, 430], type: 'square', gap: 0.05, duration: 0.06, volume: 0.018 },

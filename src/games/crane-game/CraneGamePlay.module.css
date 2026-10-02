@@ -29,14 +29,17 @@
 .tray { position: absolute; z-index: 2; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 6px; border-radius: 18px; padding: 6px 12px; background: #fffdf4e8; box-shadow: 0 3px 10px #6b466022; pointer-events: none; max-width: calc(100% - 24px); }
 .tray strong { font-size: 13px; color: var(--machine-color); white-space: nowrap; }
 .tray span { font-size: 17px; line-height: 1; overflow: hidden; }
-.selection, .controls { flex: 0 0 auto; margin: 8px auto 0; width: 100%; max-width: 740px; border-radius: 22px; background: #fffdf8; padding: 12px; box-shadow: 0 4px 14px #6b466014; }
+.panel { flex: 0 0 auto; display: grid; margin: 8px auto 0; width: 100%; max-width: 740px; }
+.selection, .controls { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; border-radius: 22px; background: #fffdf8; padding: 12px; box-shadow: 0 4px 14px #6b466014; }
+.selection[data-shown='false'], .controls[data-shown='false'] { visibility: hidden; }
 .selection h2 { font-size: 16px; text-align: center; margin: 0 0 9px; }
-.machines { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.machineButton { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 2px 9px; background: #f6f1f4; border: 3px solid transparent; border-radius: 18px; color: #51404e; min-width: 0; }
+.machines { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.machineButton { position: relative; display: flex; align-items: center; gap: 8px; padding: 9px 20px 9px 10px; text-align: left; background: #f6f1f4; border: 3px solid transparent; border-radius: 18px; color: #51404e; min-width: 0; }
 .machineButton[aria-pressed='true'] { border-color: var(--card-color); background: #fffdfa; box-shadow: 0 3px 0 color-mix(in srgb, var(--card-color), transparent 75%); }
-.machineEmoji { font-size: 34px; line-height: 1.1; }
-.machineButton strong { font-size: 13px; white-space: nowrap; }
-.machineButton small { font-size: 10px; color: #7a6472; text-align: center; }
+.machineEmoji { flex: 0 0 auto; font-size: 34px; line-height: 1.1; }
+.machineText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.machineButton strong { font-size: 14px; white-space: nowrap; }
+.machineButton small { font-size: 10px; color: #7a6472; }
 .check { position: absolute; top: 5px; right: 6px; color: var(--card-color); font-size: 16px; font-weight: 900; }
 .beginButton { display: block; width: 100%; min-height: 58px; margin-top: 12px; border: 0; border-radius: 17px; background: #b3527e; color: white; font-size: 23px !important; font-weight: 900 !important; box-shadow: 0 4px 0 #8d3c62; letter-spacing: 0.07em; }
 .beginButton span { margin-right: 12px; font-size: 18px; }
@@ -80,9 +83,10 @@
   .header { grid-column: 1 / -1; height: 60px; }
   .header h1 { text-align: left; margin-left: 10px; font-size: 19px; }
   .scene { grid-column: 1; height: 100%; }
-  .selection, .controls { grid-column: 2; grid-row: 2; width: 100%; margin: 0; align-self: center; max-height: 100%; overflow-y: auto; }
+  .panel { grid-column: 2; grid-row: 2; margin: 0; align-self: center; max-height: 100%; min-height: 0; overflow-y: auto; }
   .selection h2 { font-size: 14px; }
   .machines { gap: 5px; }
+  .machineButton { flex-direction: column; gap: 2px; padding: 8px 2px; text-align: center; }
   .machineEmoji { font-size: 28px; }
   .machineButton strong { font-size: 11px; }
   .machineButton small { display: none; }

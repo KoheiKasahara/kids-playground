@@ -34,7 +34,7 @@ describe('PinballThemePicker', () => {
   })
 
   test('最後のテーマで「つぎ」を押すと最初のテーマへ循環する', async () => {
-    localStorage.setItem(PINBALL_THEME_STORAGE_KEY, 'car')
+    localStorage.setItem(PINBALL_THEME_STORAGE_KEY, 'forest')
     resetPinballThemeCache()
     const user = userEvent.setup()
     render(<PinballThemePicker />)
@@ -51,8 +51,8 @@ describe('PinballThemePicker', () => {
 
     await user.click(screen.getByRole('button', { name: 'まえの ステージ' }))
 
-    expect(getPinballThemeId()).toBe('car')
-    expect(screen.getByRole('status')).toHaveTextContent('くるま')
+    expect(getPinballThemeId()).toBe('forest')
+    expect(screen.getByRole('status')).toHaveTextContent('もり')
   })
 
   test('選んだテーマはlocalStorageの値にも反映される', async () => {
@@ -65,7 +65,7 @@ describe('PinballThemePicker', () => {
     expect(localStorage.getItem(PINBALL_THEME_STORAGE_KEY)).toBe('space')
   })
 
-  test('6テーマを登録順にすべて選べる', async () => {
+  test('7テーマを登録順にすべて選べる', async () => {
     const user = userEvent.setup()
     render(<PinballThemePicker />)
 

@@ -6,12 +6,25 @@ export interface ProjectHealthHistoryEntry {
   date: string
   games: number | null
   unitTests: number | null
+  unitTestsPassed?: number | null
   e2eSmokePassed: number | null
   e2eSmokeTotal: number | null
+  e2eSmokeFlaky?: number | null
+  e2eSmokeSkipped?: number | null
   bundleKb: number | null
+  initialJsGzipKb?: number | null
+  initialCssGzipKb?: number | null
+  precacheKb?: number | null
+  precacheEntries?: number | null
   lighthousePerformance: number | null
   accessibility: number | null
+  lighthouseTarget?: string | null
   vulnerabilities: number | null
+  vulnerabilitiesCritical?: number | null
+  vulnerabilitiesHigh?: number | null
+  vulnerabilitiesModerate?: number | null
+  vulnerabilitiesLow?: number | null
+  vulnerabilitiesInfo?: number | null
   nightly: string | null
   deploy: string | null
   recordedAt: string

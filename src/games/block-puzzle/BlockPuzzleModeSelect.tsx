@@ -1,4 +1,6 @@
 import GameBackButton from '../../components/GameBackButton'
+import StageClearBadge from '../../components/StageClearBadge'
+import { blockPuzzleProgress, readFallingBest } from './progress'
 import BlockPiece from './BlockPiece'
 import { blockShape } from './blockShapes'
 import type { BlockPuzzleMode } from './blockPuzzleModes'
@@ -40,6 +42,8 @@ function FallingPreview() {
  * 文字を読めない子でも選べるように、ボタンごとに形の絵と大きな絵文字を添えている。
  */
 export default function BlockPuzzleModeSelect({ onSelect }: Props) {
+  const progress = blockPuzzleProgress.read()
+  const fallingBest = readFallingBest()
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -64,6 +68,7 @@ export default function BlockPuzzleModeSelect({ onSelect }: Props) {
           <span className={styles.modeName}>じゆうに ならべる</span>
           <FreePreview />
           <span className={styles.modeHint}>すきな かたちを すきな ばしょに おけるよ</span>
+          <StageClearBadge stars={progress.free ?? 0} />
         </button>
 
         <button
@@ -78,6 +83,8 @@ export default function BlockPuzzleModeSelect({ onSelect }: Props) {
           <span className={styles.modeName}>おちてくる ブロック</span>
           <FallingPreview />
           <span className={styles.modeHint}>ばしょを えらんで つんで、よこ1れつを そろえよう</span>
+          <StageClearBadge stars={progress.falling ?? 0} />
+          {fallingBest > 0 ? <span className={styles.modeHint}>いちばん: {fallingBest}れつ</span> : null}
         </button>
       </div>
     </main>

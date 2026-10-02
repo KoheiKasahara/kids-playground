@@ -35,6 +35,8 @@ import type { PuzzleBallSnapshot } from './puzzleState'
 import { useBoardScale } from './useBoardScale'
 import { useLandscapeLayout } from './useLandscapeLayout'
 import { usePuzzleEngine } from './usePuzzleEngine'
+import { puzzleProgress, puzzleStars } from './puzzleProgress'
+import { vibrate } from '../../utils/haptics'
 import styles from './FlagRollPuzzlePlay.module.css'
 
 const INITIAL_BALL_FLAG_ID = 'jp'
@@ -69,6 +71,11 @@ const EDIT_HINT = 'いたを おいて、ゴールまで はこぼう！'
 
 export default function FlagRollPuzzlePlay() {
   const [state, setState] = useState(createPuzzleState)
+  // ゴール通知のコールバックを作り直さずに、クリア時点のパーツ数を読むための最新値。
+  const latestStateRef = useRef(state)
+  useEffect(() => {
+    latestStateRef.current = state
+  }, [state])
   /** null はステージ選択画面。ステージを選ぶと同じroute内でプレイ画面へ進む。 */
   const [selectedStageId, setSelectedStageId] = useState<PuzzleStageId | null>(null)
   /** 国旗選びダイアログを開いているか。ボールが2つでも1つのダイアログで両方選べる。 */
@@ -137,6 +144,9 @@ export default function FlagRollPuzzlePlay() {
     } else {
       setMessage('')
       playCorrectSound()
+      vibrate('celebrate')
+      const latest = latestStateRef.current
+      puzzleProgress.record(latest.stageId, puzzleStars(latest.parts, latest.stageId))
     }
     setState((current) => markBallGoal(current, targetId, snapshots))
   }, [showMessage, state.balls])

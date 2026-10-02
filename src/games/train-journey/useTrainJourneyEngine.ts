@@ -5,17 +5,18 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { chaseCameraPose, overviewCameraPose } from '../circuit-racing/raceCamera'
 import { createRaceEnvironment } from '../circuit-racing/carAppearance'
 import { CITY_CROSSING } from './journeyCity'
-import { advanceJourney, boostJourney, CAR_SPACING, createJourneyMotion, railOrientation, sampleJourney, TRAINS, type JourneyCourse, type JourneyRoute, type TrainId } from './journeyModel'
-import { createJourneyScene, disposeJourneyObject } from './journeyScene'
+import { advanceJourney, boostJourney, CAR_SPACING, createJourneyMotion, MAPS, railOrientation, ROUTES, sampleJourney, TRAINS, upcomingSwitch, type JourneyCourse, type JourneyRoutes, type TrainId } from './journeyModel'
+import { createJourneyScene, disposeJourneyObject, type JourneyWorld } from './journeyScene'
 import { journeySound } from './journeySound'
 
 export type JourneyCamera = 'follow' | 'overview'
 export type JourneyStatus = 'loading' | 'ready' | 'error'
-export type JourneyFeedback = { location: string; boosting: boolean; atStation: boolean }
+/** `nextSwitch` is the point the train meets next, so its button can light up. */
+export type JourneyFeedback = { location: string; boosting: boolean; atStation: boolean; nextSwitch: number }
 type Options = {
   course: JourneyCourse
   train: TrainId
-  route: JourneyRoute
+  routes: JourneyRoutes
   running: boolean
   camera: JourneyCamera
   sound: boolean
@@ -27,26 +28,37 @@ type Commands = { boost: () => void; overview: () => void }
 const ASSET_PATH = `${import.meta.env.BASE_URL}models/train-journey/`
 
 export function useTrainJourneyEngine(options: Options) {
+  // A new map rebuilds the whole world; everything else is read live each frame.
+  const { course } = options
   const [container, registerContainer] = useState<HTMLDivElement | null>(null)
   const [generation, setGeneration] = useState(0)
   const optionsRef = useRef(options)
   const commands = useRef<Commands | null>(null)
   const mapMarker = useRef<SVGCircleElement | null>(null)
-  const switchMarker = useRef<HTMLButtonElement | null>(null)
+  const switchMarkers = useRef<(HTMLButtonElement | null)[]>([])
   useEffect(() => { optionsRef.current = options }, [options])
   const retry = useCallback(() => setGeneration(g => g + 1), [])
   const boost = useCallback(() => commands.current?.boost(), [])
   const overview = useCallback(() => commands.current?.overview(), [])
   const registerMapMarker = useCallback((element: SVGCircleElement | null) => { mapMarker.current = element }, [])
-  const registerSwitchMarker = useCallback((element: HTMLButtonElement | null) => { switchMarker.current = element }, [])
+  // One stable ref callback per point, so markers are not re-registered every render.
+  const markerRefs = useRef(new Map<number, (element: HTMLButtonElement | null) => void>())
+  const registerSwitchMarker = useCallback((index: number) => {
+    let register = markerRefs.current.get(index)
+    if (!register) {
+      register = (element: HTMLButtonElement | null) => { switchMarkers.current[index] = element }
+      markerRefs.current.set(index, register)
+    }
+    return register
+  }, [])
 
   useEffect(() => {
     if (!container) return
     const host = container
-    const course = optionsRef.current.course
+    const map = MAPS[course.id]
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color('#c3e5e9')
-    scene.fog = new THREE.Fog('#c3e5e9', 95, 230)
+    scene.background = new THREE.Color(map.sky)
+    scene.fog = new THREE.Fog(map.sky, 95, 230)
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 400)
     const environment = createRaceEnvironment()
     scene.environment = environment
@@ -62,7 +74,7 @@ export function useTrainJourneyEngine(options: Options) {
     const motion = createJourneyMotion(course)
     let renderer: THREE.WebGLRenderer | undefined
     let controls: OrbitControls | undefined
-    let world: ReturnType<typeof createJourneyScene> | undefined
+    let world: JourneyWorld | undefined
     let released = false
     let lost = false
     let ready = false
@@ -72,7 +84,7 @@ export function useTrainJourneyEngine(options: Options) {
     let feedbackClock = 0
     let feedbackKey = ''
     let lastTrain: TrainId | undefined
-    let lastRoute: JourneyRoute | undefined
+    let lastRoutes: JourneyRoutes | undefined
     let lastCamera: JourneyCamera | undefined
     let dirty = true
     let railSoundDistance = 0
@@ -106,9 +118,9 @@ export function useTrainJourneyEngine(options: Options) {
 
     function showOverview() {
       if (!controls) return
-      const pose = overviewCameraPose({ min: { x: -29, z: -29 }, max: { x: 29, z: 29 } }, camera.aspect, 45)
+      const pose = overviewCameraPose(course.bounds, camera.aspect, 45)
       camera.position.set(pose.position.x, pose.position.y, pose.position.z)
-      controls.target.set(0, 0, 0)
+      controls.target.set(pose.target.x, pose.target.y, pose.target.z)
       const damping = controls.enableDamping
       controls.enableDamping = false
       controls.update()
@@ -146,7 +158,7 @@ export function useTrainJourneyEngine(options: Options) {
       const current = optionsRef.current
       cars.forEach((car, index) => {
         // Bogie samples align long bodies to the chord on bends and gradients.
-        const front = sampleJourney(motion, course, index * CAR_SPACING - 0.52, current.route)
+        const front = sampleJourney(motion, course, index * CAR_SPACING - 0.52, current.routes)
         const back = sampleJourney(motion, course, index * CAR_SPACING + 0.52)
         car.position.copy(front.position).lerp(back.position, 0.5).addScaledVector(localUp, 0.22)
         car.quaternion.copy(railOrientation(front.position.sub(back.position).normalize()))
@@ -160,7 +172,7 @@ export function useTrainJourneyEngine(options: Options) {
       boostEffect.quaternion.copy(lead.quaternion)
       boostEffect.visible = current.running && motion.boostRemaining > 0 && !current.reducedMotion
       boostEffect.children.forEach((streak, i) => { streak.scale.z = 0.6 + ((totalTime * 3 + i * 0.17) % 1) })
-      const inTunnel = motion.edge === 'forest' && motion.distance >= (world?.tunnelStart ?? Infinity) && motion.distance <= (world?.tunnelEnd ?? -Infinity)
+      const inTunnel = world?.tunnels.some(tunnel => tunnel.edge === motion.edge && motion.distance >= tunnel.start && motion.distance <= tunnel.end)
       smoke.visible = current.train === 'steam' && current.running && motion.speed > 0.2 && !current.reducedMotion && !inTunnel
       if (smoke.visible) {
         for (let i = 0; i < 10; i++) {
@@ -180,7 +192,7 @@ export function useTrainJourneyEngine(options: Options) {
       if (!controls || !cars[0]) return
       const changed = lastCamera !== current.camera
       if (changed) {
-        scene.fog = current.camera === 'overview' ? null : new THREE.Fog('#c3e5e9', 95, 230)
+        scene.fog = current.camera === 'overview' ? null : new THREE.Fog(map.sky, 95, 230)
         world?.setOverview(current.camera === 'overview')
       }
       controls.enabled = current.camera === 'overview'
@@ -194,16 +206,16 @@ export function useTrainJourneyEngine(options: Options) {
         // Side offset shows the shape of the whole train, including the last
         // car. The town crowds both shoulders of its avenue, so there the
         // camera stays near the centre line instead of swinging into a block.
-        const shoulder = sample.edge === 'city' ? 1.6 : 5
+        const shoulder = sample.edge === 'city' ? 1.6 : map.shoulder
         desiredPosition.set(pose.position.x - sample.tangent.z * shoulder, pose.position.y, pose.position.z + sample.tangent.x * shoulder)
         // On the lower forest line, stay east of the elevated crossing. A
         // trailing camera on its west side would look through the red truss.
-        const forestView = motion.edge === 'forest' || (motion.edge === 'common' && current.route === 'forest' && course.lengths.common - motion.distance < 8)
+        const forestView = motion.edge === 'forest' || (motion.edge === 'common' && current.routes[0] === 'forest' && course.lengths.common - motion.distance < 8)
         if (forestView) desiredPosition.set(sample.position.x + 12 * factor, sample.position.y + 9 * factor, sample.position.z + 7 * factor)
         // The town line leaves the turnout alongside that same loop, so its
         // first stretch is watched from the open ground east of the rails too.
         const townApproach = (motion.edge === 'city' && motion.distance < 15)
-          || (motion.edge === 'common' && current.route === 'city' && course.lengths.common - motion.distance < 5)
+          || (motion.edge === 'common' && current.routes[0] === 'city' && course.lengths.common - motion.distance < 5)
         if (townApproach) desiredPosition.set(sample.position.x + 9 * factor, sample.position.y + 9.5 * factor, sample.position.z + 7 * factor)
         desiredTarget.set(pose.target.x, pose.target.y, pose.target.z)
         const blend = changed || current.reducedMotion ? 1 : 1 - Math.exp(-dt * 3)
@@ -217,24 +229,24 @@ export function useTrainJourneyEngine(options: Options) {
       const point = sampleJourney(motion, course).position
       mapMarker.current?.setAttribute('cx', point.x.toFixed(2))
       mapMarker.current?.setAttribute('cy', point.z.toFixed(2))
-      if (switchMarker.current) {
-        projected.set(-12, 2.6, -0.7).project(camera)
+      course.switches.forEach((point, index) => {
+        const marker = switchMarkers.current[index]
+        if (!marker) return
+        projected.set(point.lever[0], 2.6, point.lever[1]).project(camera)
         const visible = projected.z > -1 && projected.z < 1 && Math.abs(projected.x) < 0.88 && Math.abs(projected.y) < 0.86
-        switchMarker.current.hidden = !visible
-        switchMarker.current.style.left = `${(projected.x + 1) * 50}%`
-        switchMarker.current.style.top = `${(1 - projected.y) * 50}%`
-      }
+        marker.hidden = !visible
+        marker.style.left = `${(projected.x + 1) * 50}%`
+        marker.style.top = `${(1 - projected.y) * 50}%`
+      })
     }
     function publish() {
       const atStation = motion.dwell > 0
-      const inTunnel = motion.edge === 'forest' && motion.distance > (world?.tunnelStart ?? 0) && motion.distance < (world?.tunnelEnd ?? 0) + 4
-      const location = atStation ? 'にじいろえきで ひとやすみ'
-        : inTunnel ? 'トンネルを くぐるよ！'
-        : motion.edge === 'bridge' ? 'おそらの はしへ！'
-        : motion.edge === 'forest' ? 'もりを はしるよ！'
-        : motion.edge !== 'city' ? 'しゅっぱつ しんこう！'
-        : crossingClosed ? 'ふみきり カンカン！' : 'ビルの まちを はしるよ！'
-      const next = { location, atStation, boosting: motion.boostRemaining > 0 }
+      const tunnel = world?.tunnels.find(t => t.edge === motion.edge && motion.distance > t.start && motion.distance < t.end + 4)
+      const location = atStation ? `${map.station}で ひとやすみ`
+        : tunnel ? tunnel.caption
+        : motion.edge === 'city' && crossingClosed ? 'ふみきり カンカン！'
+        : ROUTES[motion.edge]?.where ?? map.trunks[motion.edge] ?? 'しゅっぱつ しんこう！'
+      const next = { location, atStation, boosting: motion.boostRemaining > 0, nextSwitch: upcomingSwitch(course, motion.edge) }
       const key = JSON.stringify(next)
       if (key !== feedbackKey) { feedbackKey = key; optionsRef.current.onFeedback(next) }
       // Compact observable state for browser regression checks and diagnostics.
@@ -253,10 +265,10 @@ export function useTrainJourneyEngine(options: Options) {
       if (!ready || !renderer || !world) return
       const current = optionsRef.current
       if (lastTrain !== current.train) selectTrain(current.train)
-      if (lastRoute !== current.route) { world.setRoute(current.route); lastRoute = current.route; dirty = true }
+      if (lastRoutes !== current.routes) { world.setRoutes(current.routes); lastRoutes = current.routes; dirty = true }
       if (current.running) {
         const visits = motion.visits
-        advanceJourney(motion, course, dt, current.route, current.train)
+        advanceJourney(motion, course, dt, current.routes, current.train)
         totalTime += dt
         // Barriers drop before the cab reaches the road and lift once it is past.
         const closing = motion.edge === 'city' && motion.distance > CITY_CROSSING - 6.5 && motion.distance < CITY_CROSSING + 2.8
@@ -357,7 +369,7 @@ export function useTrainJourneyEngine(options: Options) {
           world = createJourneyScene(course, templates.get('spline-segment')!)
           scene.add(world.group)
           selectTrain(optionsRef.current.train)
-          world.setRoute(optionsRef.current.route)
+          world.setRoutes(optionsRef.current.routes)
           updateTrain()
           updateCamera(1)
           ready = true
@@ -390,6 +402,6 @@ export function useTrainJourneyEngine(options: Options) {
       renderer?.dispose()
       renderer?.domElement.remove()
     }
-  }, [container, generation])
+  }, [container, generation, course])
   return { registerContainer, registerMapMarker, registerSwitchMarker, retry, boost, overview }
 }

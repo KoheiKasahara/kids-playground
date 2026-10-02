@@ -55,6 +55,17 @@ describe('sandbox butterfly', () => {
     expect(butterfly.target).toBeNull()
   })
 
+  it('sows tulip seeds from a tulip bloom', () => {
+    const world = flat(Cell.Mud)
+    world.paint({ x: 50, y: 54 }, Cell.TulipSeed, 0)
+    for (let i = 0; i < 80; i++) world.step()
+    const butterfly = add(world)
+    butterfly.cooldown = 0
+    for (let i = 0; i < 600 && !butterfly.perch; i++) tick(world)
+    for (const x of [62, 68]) expect(world.get(x, 54)).toBe(Cell.TulipSeed)
+    expect(seeds(world)).toBe(0)
+  })
+
   it('sows fresh seeds beside the bloom that sprout into new flowers', () => {
     const world = garden()
     const butterfly = add(world)

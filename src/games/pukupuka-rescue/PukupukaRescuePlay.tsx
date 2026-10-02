@@ -2,17 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import GameBackButton from '../../components/GameBackButton'
 import PukupukaStage from './PukupukaStage'
+import { CharacterDefs, FriendIcon } from './PukupukaCharacters'
+import { FRIEND_NAMES } from './characterInfo'
 import { findPukupukaStage, PUKUPUKA_STAGES, type PukupukaStageId } from './stageDefinitions'
 import {
   applyWaterTap,
   applyWave,
   waterSurfaceYOf,
   createInitialState,
+  friendIdsOf,
+  getFloater,
   isSettled,
+  leaderAtGoal,
+  leaderIdOf,
   stepGame,
   toggleBoard,
   toggleDrain,
   toggleGate,
+  triggerWhale,
   type PukupukaGameState,
   type WaterControl,
 } from './pukupukaGame'
@@ -29,6 +36,8 @@ import styles from './PukupukaRescuePlay.module.css'
 export function PukupukaStageSelect({ onSelect, onHome, progress = {} }: { onSelect: (id: PukupukaStageId) => void; onHome: () => void; progress?: RescueProgress }) {
   return (
     <main className={`${styles.page} ${styles.selectionPage}`} data-testid="pukupuka-stage-select">
+      {/* カードの仲間アイコンが使う色の定義。 */}
+      <svg className={styles.hiddenDefs} aria-hidden="true" focusable="false"><defs><CharacterDefs /></defs></svg>
       <header className={styles.header}>
         <GameBackButton onBack={onHome} />
         <h1 className={styles.title}>
@@ -57,6 +66,12 @@ export function PukupukaStageSelect({ onSelect, onHome, progress = {} }: { onSel
                 {stage.icon}
               </span>
               <span className={styles.stageOptionLabel}>{stage.name}</span>
+              <span className={styles.stageFriends} aria-hidden="true">
+                {friendIdsOf(stage).map((friendId) => {
+                  const kind = stage.floaters.find((floater) => floater.id === friendId)?.kind
+                  return kind ? <FriendIcon key={friendId} kind={kind} /> : null
+                })}
+              </span>
               {progress[stage.id] !== undefined ? <span className={styles.stageRecord} aria-label={`クリアずみ。ほし ${progress[stage.id]}こ`}>✓ {'★'.repeat(progress[stage.id])}{'☆'.repeat(3 - progress[stage.id])}</span> : null}
             </button>
           ))}
@@ -83,7 +98,14 @@ export default function PukupukaRescuePlay() {
   const controlRef = useRef<WaterControl>(null)
   const [activeControl, setActiveControl] = useState<WaterControl>(null)
   const [feedback, setFeedback] = useState('たすけて！')
+  // 目立たせたい出来事（なかま・ベルなど）だけ、盤面の上に短く出す。番号を変えてアニメーションをやり直す。
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null)
   const [progress, setProgress] = useState(readRescueProgress)
+
+  const announce = useCallback((text: string, visible = false) => {
+    setFeedback(text)
+    if (visible) setToast((current) => ({ id: (current?.id ?? 0) + 1, text }))
+  }, [])
 
   const setControl = useCallback((next: WaterControl) => {
     controlRef.current = next
@@ -99,6 +121,7 @@ export default function PukupukaRescuePlay() {
       stateRef.current = initial
       setGameState(initial)
       setFeedback('たすけて！')
+      setToast(null)
       setSelectedStageId(stageId)
     },
     [setControl],
@@ -115,28 +138,50 @@ export default function PukupukaRescuePlay() {
       const control = controlRef.current
       const previousState = stateRef.current
       const result = stepGame(stage, previousState, delta, control)
-      stateRef.current = result.state
-      const rescued = result.state.rescuedIds.length > previousState.rescuedIds.length
-      const collected = result.state.collectedStarIds.length > previousState.collectedStarIds.length
-      if (result.goalReached || previousState.wave || rescued || collected || control !== null ||
-        result.state.gateLift !== previousState.gateLift || result.state.water !== previousState.water ||
-        !isSettled(stage, result.state)) {
-        setGameState(result.state)
+      const next = result.state
+      stateRef.current = next
+      const rescued = next.rescuedIds.length > previousState.rescuedIds.length
+      const collected = next.collectedStarIds.length > previousState.collectedStarIds.length
+      const rung = next.rungBellIds.length > previousState.rungBellIds.length
+      const slid = !previousState.slide && next.slide !== null
+      const newEffects = next.effects.filter((effect) => !previousState.effects.some((old) => old.id === effect.id))
+      const launched = newEffects.some((effect) => effect.kind === 'launch')
+      const splashed = newEffects.some((effect) => effect.kind === 'splash')
+      const arrivedEarly = next.phase === 'playing' && !leaderAtGoal(stage, previousState) && leaderAtGoal(stage, next)
+      if (result.goalReached || previousState.wave || rescued || collected || rung || control !== null ||
+        newEffects.length > 0 || next.effects.length !== previousState.effects.length ||
+        next.gateLift !== previousState.gateLift || next.water !== previousState.water ||
+        next.doorLifts !== previousState.doorLifts || !isSettled(stage, next)) {
+        setGameState(next)
       }
       if (rescued && !result.goalReached) {
-        setFeedback('たすかったよ！ つぎの なかまへ！')
-        playPukupukaActionSound('wheel')
+        const friendId = next.rescuedIds.at(-1)
+        const kind = stage.floaters.find((floater) => floater.id === friendId)?.kind
+        announce(`${kind ? FRIEND_NAMES[kind] : 'なかま'}が なかまに なったよ！`, true)
+        playPukupukaActionSound('join')
+      } else if (rung) {
+        announce('カラーン！ さくが あいたよ', true)
+        playPukupukaActionSound('bell')
+      } else if (slid) {
+        announce('すべりだい！ しゅーっ', true)
+        playPukupukaActionSound('slide')
+      } else if (launched) {
+        announce('ぴゅーっ！ とんだ！', true)
       } else if (collected) {
-        setFeedback('キラキラ！ ほしを みつけた！')
+        announce('キラキラ！ ほしを みつけた！')
         playPukupukaActionSound('board')
+      } else if (arrivedEarly) {
+        announce('まだ なかまが まってるよ', true)
       }
+      if (splashed && !rescued) playPukupukaActionSound('splash')
       if (result.goalReached) {
         setControl(null)
+        setToast(null)
         playPukupukaGoalSound()
         setProgress((current) => {
-          const next = { ...current, [stage.id]: Math.max(current[stage.id] ?? 0, result.state.collectedStarIds.length) }
-          saveRescueProgress(next)
-          return next
+          const nextProgress = { ...current, [stage.id]: Math.max(current[stage.id] ?? 0, next.collectedStarIds.length) }
+          saveRescueProgress(nextProgress)
+          return nextProgress
         })
       }
       frameId = requestAnimationFrame(frame)
@@ -147,7 +192,7 @@ export default function PukupukaRescuePlay() {
       if (frameId !== null) cancelAnimationFrame(frameId)
       controlRef.current = null
     }
-  }, [selectedStageId, stage, setControl])
+  }, [selectedStageId, stage, setControl, announce])
 
   useEffect(() => {
     const stop = () => setControl(null)
@@ -227,8 +272,8 @@ export default function PukupukaRescuePlay() {
   }
 
   const nudge = (direction: -1 | 1) => {
-    const remaining = stateRef.current.floaters.filter((item) => !stateRef.current.rescuedIds.includes(item.id))
-    const target = remaining[0]
+    // 波は隊長（アヒル）を運ぶ。仲間は隊長のあとをついてくる。
+    const target = getFloater(stateRef.current, leaderIdOf(stage))
     if (!target) return
     const body = stage.waterBodies.find((item) => target.x >= item.left && target.x <= item.right)
     if (!body) return
@@ -248,6 +293,19 @@ export default function PukupukaRescuePlay() {
     stateRef.current = initial
     setGameState(initial)
     setFeedback('たすけて！')
+    setToast(null)
+  }
+
+  const handleWhale = () => {
+    const current = stateRef.current
+    if (current.phase !== 'playing' || !stage.whale) return
+    const next = triggerWhale(stage, current)
+    if (next === current) return
+    primeAudio()
+    playPukupukaActionSound('whale')
+    setFeedback('くじらの しおふき！')
+    stateRef.current = next
+    setGameState(next)
   }
 
   const handleBackToSelection = () => {
@@ -271,6 +329,7 @@ export default function PukupukaRescuePlay() {
 
   const cleared = gameState.phase === 'cleared'
   const faucetOn = activeControl === 'fill'
+  const friendIds = friendIdsOf(stage)
   const isLastStage = PUKUPUKA_STAGES.at(-1)?.id === selectedStageId
 
   return (
@@ -288,14 +347,22 @@ export default function PukupukaRescuePlay() {
       </p>
 
       <div className={styles.stageArea}>
-        <div className={styles.rescueStatus} role="status" aria-label={`なかま ${gameState.rescuedIds.length} / ${stage.goal.floaterIds.length} たすけた`}>
-          {stage.floaters.map((floater) => <span key={floater.id} className={gameState.rescuedIds.includes(floater.id) ? styles.rescuedFriend : undefined}>
-            {floater.kind === 'duck' ? '🦆' : floater.kind === 'boat' ? '⛵' : '🐻'}{gameState.rescuedIds.includes(floater.id) ? '✓' : ''}
-          </span>)}
+        <div className={styles.rescueStatus} role="status" aria-label={`なかま ${gameState.rescuedIds.length} / ${friendIds.length} たすけた`}>
+          {friendIds.map((friendId) => {
+            const kind = stage.floaters.find((floater) => floater.id === friendId)?.kind ?? 'chick'
+            const saved = gameState.rescuedIds.includes(friendId)
+            return (
+              <span key={friendId} className={`${styles.friendChip} ${saved ? styles.rescuedFriend : ''}`} data-saved={saved}>
+                <FriendIcon kind={kind} />
+                {saved ? <span className={styles.friendCheck} aria-hidden="true">✓</span> : null}
+              </span>
+            )
+          })}
           <span className={styles.starScore} aria-label={`ほし ${gameState.collectedStarIds.length} / ${stage.stars?.length ?? 0}`}>
             {'★'.repeat(gameState.collectedStarIds.length)}{'☆'.repeat((stage.stars?.length ?? 0) - gameState.collectedStarIds.length)}
           </span>
         </div>
+        {toast && !cleared ? <div key={toast.id} className={styles.toast} aria-hidden="true">{toast.text}</div> : null}
         <PukupukaStage
           stage={stage}
           state={gameState}
@@ -314,6 +381,7 @@ export default function PukupukaRescuePlay() {
           boardFlowDirection={gameState.boardFlowDirection}
           boardDisabled={cleared}
           onBoardToggle={handleBoardToggle}
+          onWhaleTap={handleWhale}
         />
         {!cleared ? <div className={styles.waveButtons}>
           <button type="button" onClick={() => nudge(-1)} aria-label="ひだりへ なみ">🌊 ←</button>
