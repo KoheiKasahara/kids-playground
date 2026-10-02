@@ -513,7 +513,7 @@ export class AquaRenderer {
 
   private drawCreature(g: CanvasRenderingContext2D, world: World, c: Creature, t: number) {
     const level = fadeLevel(c.z)
-    const speed = c.species === 'neon' ? 10 : c.species === 'shark' ? 3.2 : c.species === 'turtle' ? 2.4 : c.species === 'seahorse' ? 3 : c.species === 'eel' ? 1.5 : c.species === 'octopus' || c.species === 'moray' || c.species === 'ray' ? 3 : 6.5
+    const speed = c.species === 'neon' ? 10 : c.species === 'shark' ? 3.2 : c.species === 'turtle' ? 2.4 : c.species === 'seahorse' ? 3 : c.species === 'eel' ? 1.5 : c.species === 'octopus' || c.species === 'moray' || c.species === 'ray' || c.species === 'sunfish' || c.species === 'lionfish' ? 3 : 6.5
     let frame = Math.floor(c.phase * speed) % FRAMES
     let variant = ''
     if (c.species === 'jelly') frame = Math.floor(((c.phase % 2.6) / 2.6) * FRAMES) % FRAMES

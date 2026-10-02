@@ -1,7 +1,7 @@
 // すいそうに いれられる いきもの・もの・えさ の きまり。
 
 export type SpeciesId = 'clown' | 'neon' | 'angel' | 'tang' | 'puffer' | 'seahorse' | 'jelly' | 'crab' | 'eel' | 'turtle' | 'shark'
-  | 'octopus' | 'squid' | 'moray' | 'ray'
+  | 'octopus' | 'squid' | 'moray' | 'ray' | 'sunfish' | 'butterfly' | 'boxfish' | 'lionfish'
 export type DecorKind = 'kelp' | 'rock' | 'wood' | 'coral' | 'anemone' | 'clam' | 'chest' | 'castle' | 'pot' | 'bubbler'
 export type FoodKind = 'flake' | 'pellet' | 'shrimp'
 
@@ -47,6 +47,10 @@ export const SPECIES: readonly SpeciesDef[] = [
   { id: 'squid', name: 'イカ', limit: 3, w: 24, h: 10, zone: 'high', speed: 16, eats: ['shrimp', 'flake'], likes: ['kelp', 'bubbler'], small: true, act: 'すいすい〜っ' },
   { id: 'moray', name: 'ウツボ', limit: 1, w: 40, h: 10, zone: 'low', speed: 8, eats: ['shrimp'], likes: ['rock', 'castle'], small: false, act: 'くちを パクパク。こわくないよ' },
   { id: 'ray', name: 'エイ', limit: 2, w: 30, h: 12, zone: 'low', speed: 10, eats: ['pellet', 'shrimp'], likes: ['clam', 'rock'], small: false, act: 'つばさみたいに ひらひら' },
+  { id: 'sunfish', name: 'マンボウ', limit: 1, w: 26, h: 30, zone: 'any', speed: 6, eats: ['flake', 'shrimp'], likes: ['bubbler', 'kelp'], small: false, act: 'ぷか〜り のんびり やさんだよ' },
+  { id: 'butterfly', name: 'チョウチョウウオ', short: 'チョウチョウ', limit: 4, w: 18, h: 16, zone: 'mid', speed: 15, eats: ['flake', 'shrimp'], likes: ['coral', 'anemone'], small: true, act: 'ちょうちょ みたいに ひらひら' },
+  { id: 'boxfish', name: 'ハコフグ', limit: 2, w: 18, h: 12, zone: 'low', speed: 9, eats: ['flake', 'pellet'], likes: ['rock', 'coral'], small: true, act: 'しかくい からだで ぷりぷり' },
+  { id: 'lionfish', name: 'ミノカサゴ', limit: 1, w: 26, h: 20, zone: 'mid', speed: 8, eats: ['shrimp'], likes: ['rock', 'castle'], small: false, act: 'ひれが ふわふわ きれいでしょ' },
 ]
 
 export type DecorDef = {

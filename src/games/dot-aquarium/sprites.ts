@@ -38,6 +38,9 @@ export const R = {
   moray: ['#1a1e06', '#3e4610', '#72801c', '#a8b432', '#dce274'],
   morayDark: ['#0c0e04', '#1e2408', '#34400e', '#4e5c1a', '#6e7c2c'],
   ray: ['#16181e', '#343c4c', '#5e6a82', '#909eb4', '#cad6e4'],
+  sunfish: ['#1e2634', '#45566e', '#7a8ca6', '#b0c0d4', '#e2ecf6'],
+  lemon: ['#4a3a04', '#9a7a08', '#e6c218', '#fff060', '#ffffc0'],
+  lion: ['#3a0a06', '#7a1e10', '#c04424', '#e8784a', '#ffb890'],
 } satisfies Record<string, Ramp>
 
 export type Model = { w: number; h: number; prims: Prim[] }
@@ -545,6 +548,126 @@ function ray(f: number): Model {
   }
 }
 
+/** マンボウ（たかい まるい からだに、うえと したの ながい ひれ）。 */
+function sunfish(f: number): Model {
+  const w = 32, h = 38, cy = 19
+  const fl = Math.sin(f / 4 * TAU)
+  const prims: Prim[] = [
+    // せびれ・しりびれ（こうごに ゆっくり ふる）。
+    { t: 'poly', pts: [[12, cy - 8], [13 + fl * 1.6, cy - 18], [16 + fl * 1.6, cy - 18.4], [18.5, cy - 9]], ramp: R.sunfish, shift: -.08 },
+    { t: 'poly', pts: [[12, cy + 8], [13 - fl * 1.6, cy + 18], [16 - fl * 1.6, cy + 18.4], [18.5, cy + 9]], ramp: R.sunfish, shift: -.12, edge: true },
+    // うしろの ひらひら（かじびれ）。
+    {
+      t: 'ell', x: 4.6, y: cy, rx: 3.6, ry: 10, ramp: R.sunfish, flat: .55,
+      pat: s => (s.u < -.55 && Math.floor(s.py) % 3 === 0 ? { skip: true } : undefined),
+    },
+    {
+      t: 'ell', x: 15, y: cy, rx: 11.5, ry: 10.6, ramp: R.sunfish, gloss: .45,
+      pat: s => {
+        if (s.v > .5) return { ramp: R.white, shift: -.15 }
+        if (hash2(Math.floor(s.px / 2), Math.floor(s.py / 2), 41) < .1 && s.v < .3) return { shift: .15 }
+        return undefined
+      },
+    },
+    { t: 'ell', x: 17, y: cy + 2, rx: 1, ry: 2.4 + fl * .6, rot: -.3, ramp: R.sunfish, flat: .45, edge: true },
+    { t: 'eye', x: 21.8, y: cy - 2.8, r: 1.9 },
+    { t: 'ell', x: 26.2, y: cy + .8, rx: 1, ry: 1.1, ramp: R.sunfish, flat: .25 },
+  ]
+  return { w, h, prims }
+}
+
+/** チョウチョウウオ（きいろい まるい からだに くろい めの おび）。 */
+function butterfly(f: number): Model {
+  const w = 23, h = 21, cy = 10.5
+  const wag = Math.sin(f / 4 * TAU)
+  const band = (s: Sample) => {
+    const d = Math.abs(s.px - 16.2 - (s.py - cy) * .15)
+    return d < 1.25 ? { ramp: R.black, flat: .4 } : d < 2 ? { ramp: R.white, flat: .85 } : undefined
+  }
+  return {
+    w, h, prims: [
+      { t: 'poly', pts: [[6, cy - 1.6], [1.4, cy - 4 + wag], [2.6, cy + wag * .3], [1.4, cy + 4 + wag], [6, cy + 1.6]], ramp: R.lemon, flat: .72, alpha: .85 },
+      {
+        t: 'poly', pts: [[7, cy - 4], [8, cy - 8.6], [12.5, cy - 9.6], [16.5, cy - 6.4]], ramp: R.lemon, flat: .66,
+        // せびれの にせものの め。
+        pat: s => (Math.hypot(s.px - 9.6, s.py - (cy - 6.4)) < 1.3 ? { ramp: R.black, flat: .4 } : s.py < cy - 8.4 ? { ramp: R.white, flat: .8 } : undefined),
+      },
+      { t: 'poly', pts: [[7, cy + 4], [8, cy + 8.4], [12, cy + 9], [15.5, cy + 5.8]], ramp: R.lemon, flat: .6, pat: s => (s.py > cy + 7.9 ? { ramp: R.black, flat: .45 } : undefined) },
+      {
+        t: 'ell', x: 12.4, y: cy, rx: 7.2, ry: 6.6, ramp: R.lemon, gloss: .45,
+        pat: s => {
+          const b = band(s)
+          if (b) return b
+          // ななめの ほそい せん。
+          if ((Math.floor(s.px) + Math.floor(s.py)) % 4 === 0 && s.u < .4) return { shift: -.14 }
+          return undefined
+        },
+      },
+      { t: 'cap', x1: 18.6, y1: cy + .2, x2: 21.6, y2: cy + .8, r1: 1.4, r2: .8, ramp: R.lemon, shift: -.05 },
+      { t: 'ell', x: 14.6, y: cy + 2, rx: 1.6, ry: .9, rot: .5 + wag * .3, ramp: R.fin, flat: .8, alpha: .7 },
+      { t: 'eye', x: 16.4, y: cy - 1.4, r: .95, dark: '#08060e' },
+      { t: 'px', x: 22, y: cy + .8, color: '#5a4404' },
+    ],
+  }
+}
+
+/** ハコフグ（しかくい きいろい からだに くろい みずたま）。 */
+function boxfish(f: number): Model {
+  const w = 23, h = 16, cy = 8
+  const wag = Math.sin(f / 4 * TAU)
+  const flick = Math.sin(f / 2 * TAU)
+  return {
+    w, h, prims: [
+      { t: 'poly', pts: [[5, cy - 1.4], [1.2, cy - 3.6 + wag * .8], [1.2, cy + 3.6 + wag * .8], [5, cy + 1.4]], ramp: R.lemon, flat: .7, alpha: .85 },
+      { t: 'cap', x1: 4.5, y1: cy, x2: 7, y2: cy, r1: 1.6, r2: 2.4, ramp: R.lemon },
+      {
+        t: 'rect', x: 6, y: cy - 5.4, w: 12, h: 10.6, bevel: 2.6, ramp: R.lemon, gloss: .45,
+        pat: s => {
+          const cx = Math.floor((s.px - 6) / 3), cyy = Math.floor((s.py - cy + 5.4) / 3)
+          const dx = (s.px - 6) - (cx * 3 + 1.5), dy = (s.py - cy + 5.4) - (cyy * 3 + 1.5)
+          if ((s.u < .08 || s.u > .92) && (s.v < .1 || s.v > .9)) return { skip: true }
+          if ((cx + cyy) % 2 === 0 && dx * dx + dy * dy < .9) return { ramp: R.black, flat: .45 }
+          if (s.v > .82) return { ramp: R.cream, shift: -.1 }
+          return undefined
+        },
+      },
+      { t: 'ell', x: 13, y: cy + 2.2, rx: 1.2, ry: 1.6 + flick * .5, ramp: R.lemon, flat: .78, alpha: .85, edge: true },
+      { t: 'eye', x: 15.6, y: cy - 2.2, r: 1.25 },
+      { t: 'ell', x: 19.2, y: cy + 1.2, rx: 1.2, ry: 1, ramp: R.lemon, flat: .5 },
+      { t: 'px', x: 20, y: cy + 1.2, color: '#5a4404' },
+    ],
+  }
+}
+
+/** ミノカサゴ（しましまの からだと、おうぎの ような ながい ひれ）。 */
+function lionfish(f: number): Model {
+  const w = 34, h = 28, cy = 13
+  const ph = f / 4 * TAU
+  const stripes = (s: Sample) => (Math.floor(s.px / 1.6 + s.py * .25) % 2 === 0 ? { ramp: R.cream, shift: -.05 } : undefined)
+  const prims: Prim[] = [
+    { t: 'poly', pts: [[8, cy - 1.6], [3, cy - 4.6 + Math.sin(ph)], [4, cy + Math.sin(ph) * .3], [3, cy + 4.6 + Math.sin(ph)], [8, cy + 1.6]], ramp: R.lion, flat: .7, alpha: .7, pat: stripes },
+  ]
+  // せなかの とげ。
+  for (let i = 0; i < 6; i++) {
+    const x = 11 + i * 2.2, sway = Math.sin(ph + i * .8) * .6
+    prims.push({ t: 'cap', x1: x, y1: cy - 3.4, x2: x - 2 + sway, y2: cy - 11.5 + Math.abs(i - 2) * .9, r1: .55, r2: .3, ramp: R.lion, flat: .65, pat: s => (Math.floor(s.py) % 3 === 0 ? { ramp: R.cream } : undefined) })
+  }
+  // おうぎの ような むなびれ（うしろ した へ ひろがる）。
+  for (let i = 0; i < 6; i++) {
+    const a = .5 + i * .32 + Math.sin(ph + i * .7) * .07
+    const len = 11 + (i % 2) * 2
+    prims.push({ t: 'cap', x1: 19, y1: cy + 2, x2: 19 - Math.cos(a) * len, y2: cy + 2 + Math.sin(a) * len, r1: 1.1, r2: .4, ramp: R.lion, flat: .7, alpha: .8, pat: s => (Math.floor(s.u * 6) % 2 === 0 ? { ramp: R.cream, flat: .8 } : undefined) })
+  }
+  prims.push(
+    { t: 'ell', x: 17, y: cy, rx: 9.4, ry: 4.6, ramp: R.lion, gloss: .4, pat: stripes },
+    { t: 'ell', x: 24.6, y: cy - .2, rx: 3.6, ry: 3.4, ramp: R.lion, gloss: .3 },
+    { t: 'cap', x1: 24.6, y1: cy - 3, x2: 26.6, y2: cy - 6.2, r1: .4, r2: .3, ramp: R.cream, flat: .8 },
+    { t: 'eye', x: 25.6, y: cy - 1.2, r: 1.1, iris: '#f0a040' },
+    { t: 'px', x: 28, y: cy + 1, color: '#7a1e10' },
+  )
+  return { w, h, prims }
+}
+
 export const FRAMES = 4
 
 export function creatureModel(id: SpeciesId, f: number): Model {
@@ -564,5 +687,9 @@ export function creatureModel(id: SpeciesId, f: number): Model {
     case 'squid': return squid(f)
     case 'moray': return moray(f)
     case 'ray': return ray(f)
+    case 'sunfish': return sunfish(f)
+    case 'butterfly': return butterfly(f)
+    case 'boxfish': return boxfish(f)
+    case 'lionfish': return lionfish(f)
   }
 }
