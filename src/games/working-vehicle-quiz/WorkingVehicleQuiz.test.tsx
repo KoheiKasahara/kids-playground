@@ -26,7 +26,7 @@ function vehicleIdFromImage(image: Element | null): string {
 }
 
 function questionVehicleFromPhoto(): Vehicle {
-  const image = screen.getByAltText('もんだいの くるまの しゃしん')
+  const image = screen.getByAltText('もんだいの くるまの え')
   const vehicle = vehicles.find((item) => item.id === vehicleIdFromImage(image))
   if (!vehicle) throw new Error('question vehicle not found')
   return vehicle
@@ -41,7 +41,7 @@ function questionVehicleFromName(): Vehicle {
 }
 
 function photoChoiceButtons(): HTMLElement[] {
-  return screen.getAllByRole('button', { name: /ばんめ の くるまの しゃしん/ })
+  return screen.getAllByRole('button', { name: /ばんめ の くるまの え/ })
 }
 
 async function answerPhotoToName(user: UserEvent, correct: boolean) {
@@ -72,15 +72,15 @@ describe('はたらくくるまクイズ', () => {
   test('開始画面から2つのモードを選べる', async () => {
     await renderApp('/games/working-vehicle-quiz')
     expect(screen.getByRole('heading', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /しゃしんを みて こたえる/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'えを みて こたえる' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /なまえを みて こたえる/ })).toBeInTheDocument()
   })
 
   test('モード選択後にレベルごとの種類数を選べる', async () => {
     const user = userEvent.setup()
     await renderApp('/games/working-vehicle-quiz')
-    await user.click(screen.getByRole('button', { name: /しゃしんを みて こたえる/ }))
-    expect(screen.getByText('しゃしん → なまえ')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'えを みて こたえる' }))
+    expect(screen.getByText('え → なまえ')).toBeInTheDocument()
     for (const level of ['easy', 'normal', 'hard'] as const satisfies QuizLevel[]) {
       const count = vehiclesForLevel(level).length
       const namePattern = new RegExp(`${LEVEL_LABEL[level]}.*${count}しゅるい`)
@@ -131,7 +131,7 @@ describe('はたらくくるまクイズ', () => {
   test('不正なlevelは同じモードのむずかしさ選択へ安全に戻す', async () => {
     await renderApp('/games/working-vehicle-quiz/name-to-photo/super-hard/play')
     expect(screen.getByRole('heading', { name: 'むずかしさを えらんでね' })).toBeInTheDocument()
-    expect(screen.getByText('なまえ → しゃしん')).toBeInTheDocument()
+    expect(screen.getByText('なまえ → え')).toBeInTheDocument()
   })
 
   test('写真→名前を10問終えると結果を表示する', async () => {

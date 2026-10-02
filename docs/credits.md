@@ -171,6 +171,8 @@ SOFTWARE.
 
 外部素材を新たに採用する場合は、このセクションに素材ごとの出典・ライセンスを追記してください。
 
+2026-10-03に、はたらくくるま全30種を日本で使われる実車の形状・装備を参考にしたデフォルメイラストへ刷新しました。内蔵の画像生成ツールで個別に生成した画像で、参考サイトの写真や添付画像そのものは配布素材へ転用していません。白背景の768×512 WebPとして保存しています。車種別の参考資料と生成プロンプトは [かんたん10種](working-vehicles-easy-art.md)、[ふつう10種](working-vehicles-normal-art.md)、[むずかしい10種](working-vehicles-hard-art.md) に記録しています。
+
 ## 3D車体モデル (public/models/car-builder/*.glb)
 
 「サーキットレース」（`src/games/circuit-racing/`）も、下記の `sports-car.glb`（SportsCar2）、`car.glb`（NormalCar2）、`suv.glb`（SUV）を再利用します。モデルの複製や新しいパックの追加は行っていません。2026-09-08に[公式Cars Pack](https://quaternius.com/packs/cars.html)と[作者の配布ページ](https://quaternius.itch.io/lowpoly-cars)でCC0を再確認しました。[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)は商用利用・改変・再配布を許可しています。既存GLBの車体形状を活かし、実行時にボディの色変更とタイヤの追加・回転を行います。

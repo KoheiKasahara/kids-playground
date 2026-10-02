@@ -191,7 +191,7 @@ describe('Home', () => {
     )
     await user.click(screen.getByRole('link', { name: 'はたらくくるまクイズ' }))
     expect(screen.getByRole('heading', { name: 'はたらくくるまクイズ' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /しゃしんを みて こたえる/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'えを みて こたえる' })).toBeInTheDocument()
   })
 
   test('「さんすうクイズ」を押すと開始画面に遷移する', async () => {
