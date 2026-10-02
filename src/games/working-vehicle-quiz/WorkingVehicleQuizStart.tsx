@@ -15,7 +15,7 @@ export default function WorkingVehicleQuizStart() {
           variant="primary"
           onClick={() => navigate('/games/working-vehicle-quiz/photo-to-name')}
         >
-          <span aria-hidden="true">📷</span> しゃしんを みて こたえる
+          <span aria-hidden="true">🖼️</span> えを みて こたえる
         </BigButton>
         <BigButton
           variant="primary"

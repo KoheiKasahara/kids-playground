@@ -25,7 +25,7 @@ export type Vehicle = {
 
 export type VehicleQuestion = QuizQuestion<Vehicle>
 
-/** photoToName: 写真を見て名前を選ぶ / nameToPhoto: 名前を見て写真を選ぶ。 */
+/** photoToName: 絵を見て名前を選ぶ / nameToPhoto: 名前を見て絵を選ぶ。 */
 export type VehicleQuizMode = 'photoToName' | 'nameToPhoto'
 
 export const MODE_PATH: Record<VehicleQuizMode, string> = {
@@ -34,8 +34,8 @@ export const MODE_PATH: Record<VehicleQuizMode, string> = {
 }
 
 export const MODE_LABEL: Record<VehicleQuizMode, string> = {
-  photoToName: 'しゃしん → なまえ',
-  nameToPhoto: 'なまえ → しゃしん',
+  photoToName: 'え → なまえ',
+  nameToPhoto: 'なまえ → え',
 }
 
 export const LEVEL_DESCRIPTION: Record<QuizLevel, string> = {

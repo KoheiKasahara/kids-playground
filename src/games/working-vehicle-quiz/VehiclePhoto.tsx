@@ -24,7 +24,7 @@ export default function VehiclePhoto({
     <img
       className={`${styles.photo} ${sizeClass[size]}`}
       src={import.meta.env.BASE_URL + vehicle.photo}
-      alt={alt ?? (revealName ? `${vehicle.nameJa}の しゃしん` : '')}
+      alt={alt ?? (revealName ? `${vehicle.nameJa}の え` : '')}
       draggable={false}
     />
   )

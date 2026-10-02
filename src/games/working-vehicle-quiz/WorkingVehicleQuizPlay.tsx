@@ -144,7 +144,7 @@ function WorkingVehicleQuizPlayGame({ mode, level }: WorkingVehicleQuizPlayGameP
               <VehiclePhoto
                 vehicle={question.answer}
                 size="large"
-                alt="もんだいの くるまの しゃしん"
+                alt="もんだいの くるまの え"
               />
             </div>
             <div className={styles.content}>
@@ -199,7 +199,7 @@ function WorkingVehicleQuizPlayGame({ mode, level }: WorkingVehicleQuizPlayGameP
                     type="button"
                     className={photoChoiceClassName(variant)}
                     disabled={answered}
-                    aria-label={`${index + 1}ばんめ の くるまの しゃしん`}
+                    aria-label={`${index + 1}ばんめ の くるまの え`}
                     onClick={() => handleSelect(choice.id)}
                   >
                     <VehiclePhoto vehicle={choice} size="choice" />
