@@ -1,9 +1,115 @@
-import { describe, expect, test } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../app/App'
 import { GAME_CATALOG, gameRoutePath } from '../games/gameCatalog'
+import {
+  FAVORITE_GAMES_STORAGE_KEY,
+  RECENT_GAMES_STORAGE_KEY,
+  resetGameShelfCache,
+} from './gameShelfStore'
+
+// ゲームを開くと「さいきん あそんだ」へ保存されるため、テストごとに保存内容を空へ戻す。
+beforeEach(() => {
+  localStorage.clear()
+  resetGameShelfCache()
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+function renderHome() {
+  return render(
+    <MemoryRouter initialEntries={['/']}>
+      <App />
+    </MemoryRouter>,
+  )
+}
+
+describe('Home の おきにいり・さいきん', () => {
+  test('はじめは棚が空で、ならび方のヒントを出す', () => {
+    renderHome()
+    const favorites = screen.getByRole('region', { name: 'おきにいり' })
+    const recents = screen.getByRole('region', { name: 'さいきん あそんだ' })
+    expect(within(favorites).getByText('☆を おすと ここに ならぶよ')).toBeInTheDocument()
+    expect(within(recents).getByText('あそんだ ゲームが ここに でるよ')).toBeInTheDocument()
+    expect(within(favorites).queryAllByRole('link')).toHaveLength(0)
+    expect(within(recents).queryAllByRole('link')).toHaveLength(0)
+  })
+
+  test('☆を押すと おきにいりに並び、もう一度押すと外れる', async () => {
+    const user = userEvent.setup()
+    renderHome()
+    const star = screen.getByRole('button', { name: 'パターゴルフを おきにいりに する' })
+    expect(star).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(star)
+    expect(star).toHaveAttribute('aria-pressed', 'true')
+    const favorites = screen.getByRole('region', { name: 'おきにいり' })
+    expect(within(favorites).getByRole('link', { name: 'パターゴルフ（おきにいり）' })).toHaveAttribute(
+      'href',
+      gameRoutePath('putter-golf'),
+    )
+    expect(JSON.parse(localStorage.getItem(FAVORITE_GAMES_STORAGE_KEY)!)).toEqual(['putter-golf'])
+    // 一覧のカードは同じ名前のリンクのまま残る。
+    expect(screen.getByRole('link', { name: 'パターゴルフ' })).toBeInTheDocument()
+
+    await user.click(star)
+    expect(star).toHaveAttribute('aria-pressed', 'false')
+    expect(within(favorites).queryAllByRole('link')).toHaveLength(0)
+  })
+
+  test('遊んだゲームは、ホームへ戻ると さいきん あそんだ の先頭に出る', async () => {
+    const user = userEvent.setup()
+    renderHome()
+    await user.click(screen.getByRole('link', { name: 'さんすうクイズ' }))
+    await user.click(screen.getByRole('button', { name: 'もどる' }))
+    await user.click(screen.getByRole('link', { name: 'こっきクイズ' }))
+    await user.click(screen.getByRole('button', { name: 'もどる' }))
+
+    const recents = screen.getByRole('region', { name: 'さいきん あそんだ' })
+    expect(within(recents).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      gameRoutePath('flag-quiz'),
+      gameRoutePath('math-quiz'),
+    ])
+    expect(within(recents).getByRole('link', { name: 'さんすうクイズ（さいきん あそんだ）' })).toBeInTheDocument()
+    // 一覧の並び順は保存内容に左右されない。
+    const allGames = screen.getByRole('region', { name: /ぜんぶの ゲーム/ })
+    expect(within(allGames).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual(
+      GAME_CATALOG.map((game) => gameRoutePath(game.slug)),
+    )
+  })
+
+  test('保存済みの並びを起動時に読み込む', () => {
+    localStorage.setItem(FAVORITE_GAMES_STORAGE_KEY, JSON.stringify(['crane-game']))
+    localStorage.setItem(RECENT_GAMES_STORAGE_KEY, JSON.stringify(['piano-play', 'removed-game']))
+    renderHome()
+    expect(screen.getByRole('link', { name: 'クレーンゲーム（おきにいり）' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'ピアノであそぼう（さいきん あそんだ）' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'クレーンゲームを おきにいりに する' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  test('localStorageが使えなくても、全ゲームを開けて☆も押せる', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('SecurityError')
+    })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError')
+    })
+    const user = userEvent.setup()
+    renderHome()
+    for (const game of GAME_CATALOG) {
+      expect(screen.getByRole('link', { name: game.title })).toHaveAttribute('href', gameRoutePath(game.slug))
+    }
+    await user.click(screen.getByRole('button', { name: 'こっきクイズを おきにいりに する' }))
+    expect(screen.getByRole('link', { name: 'こっきクイズ（おきにいり）' })).toBeInTheDocument()
+  })
+})
 
 describe('Home', () => {
 
