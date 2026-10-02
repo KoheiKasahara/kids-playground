@@ -12,6 +12,7 @@ import GameBackButton from '../components/GameBackButton'
 import { recordRecentGameVisit } from '../pages/gameShelfStore'
 
 const SELF_MANAGED_GAME_BACK_PATHS = new Set([
+  '/games/forest-delivery',
   '/games/draw-goal',
   '/games/animal-bath',
   '/games/bento-builder',

@@ -46,6 +46,8 @@ const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePla
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
+  // タイトルとプレイ画面が同じrouteにあるため、プレイ面はゲーム内で包む。
+  { path: '/games/forest-delivery', element: lazyRoute(() => import('../games/forest-delivery/ForestDeliveryPlay')) },
   { path: '/games/rhythm-pon', element: lazyRoute(() => import('../games/rhythm-pon/RhythmPlay')) },
   { path: '/games/origami-play', element: lazyRoute(() => import('../games/origami-play/OrigamiPlay')) },
   { path: '/games/draw-goal', element: lazyRoute(() => import('../games/draw-goal/DrawGoalPlay')) },
