@@ -23,6 +23,8 @@ const SPLASH_TEXT: Partial<Record<CourseId, string>> = {
   forest: 'しげみに ぽふっ！ もとの ばしょに もどるよ',
   downhill: 'さかの したへ ころん！ もとの ばしょに もどるよ',
   canyon: 'たにへ まっさかさま！ もとの ばしょに もどるよ',
+  factory: 'ゆかへ ころん！ もとの ばしょに もどるよ',
+  sky: 'くもの したへ ひゅーん！ もとの ばしょに もどるよ',
 }
 
 /** ミニマップの みずの色。 */
@@ -94,6 +96,35 @@ function GadgetMark({ gadget, course }: { gadget: Gadget; course: CourseDefiniti
       const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
       const along = { x: (gadget.dir.x / length) * gadget.halfLength, z: (gadget.dir.z / length) * gadget.halfLength }
       return <line x1={gadget.x - along.x} y1={gadget.z - along.z} x2={gadget.x + along.x} y2={gadget.z + along.z} stroke="#7fd8ff" strokeWidth="0.36" strokeLinecap="round" />
+    }
+    case 'conveyor': {
+      const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
+      const along = { x: gadget.dir.x / length, z: gadget.dir.z / length }
+      const tip = { x: gadget.x + along.x * gadget.halfLength, z: gadget.z + along.z * gadget.halfLength }
+      const side = { x: along.z * gadget.halfWidth * 0.8, z: -along.x * gadget.halfWidth * 0.8 }
+      const back = { x: tip.x - along.x * 0.9, z: tip.z - along.z * 0.9 }
+      return <g>
+        <line x1={gadget.x - along.x * gadget.halfLength} y1={gadget.z - along.z * gadget.halfLength} x2={tip.x} y2={tip.z} stroke="#3b3f4a" strokeWidth={gadget.halfWidth * 2} />
+        <polygon points={`${tip.x},${tip.z} ${back.x + side.x},${back.z + side.z} ${back.x - side.x},${back.z - side.z}`} fill="#ffd23f" />
+      </g>
+    }
+    case 'switch': {
+      const length = Math.hypot(gadget.door.dir.x, gadget.door.dir.z) || 1
+      const half = { x: (gadget.door.dir.x / length) * gadget.door.halfLength, z: (gadget.door.dir.z / length) * gadget.door.halfLength }
+      return <g>
+        <line x1={gadget.door.x - half.x} y1={gadget.door.z - half.z} x2={gadget.door.x + half.x} y2={gadget.door.z + half.z} stroke="#ff4f4f" strokeWidth="0.36" />
+        <circle cx={gadget.x} cy={gadget.z} r="0.42" fill="#ff4f4f" stroke="#ffd23f" strokeWidth="0.14" />
+      </g>
+    }
+    case 'trampoline':
+      return <g>
+        <line x1={gadget.x} y1={gadget.z} x2={gadget.to.x} y2={gadget.to.z} stroke="#ffffff" strokeWidth="0.14" strokeDasharray="0.3 0.3" />
+        <circle cx={gadget.x} cy={gadget.z} r={gadget.radius} fill="#3f8fe8" stroke={course.look.bumper} strokeWidth="0.12" />
+      </g>
+    case 'fan': {
+      const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
+      const along = { x: (gadget.dir.x / length) * gadget.halfLength, z: (gadget.dir.z / length) * gadget.halfLength }
+      return <line x1={gadget.x - along.x} y1={gadget.z - along.z} x2={gadget.x + along.x} y2={gadget.z + along.z} stroke="#d9f3ff" strokeOpacity="0.75" strokeWidth={gadget.halfWidth * 2} strokeDasharray="0.5 0.4" />
     }
     case 'warp':
       return <g>
@@ -188,6 +219,11 @@ export default function PutterGolfPlay() {
       case 'reflector': play('reflector', event.strength); setMessage('いたで カキーン！'); break
       case 'gate': play('gate', event.strength); setMessage('とびらに あたった！ あくのを まとう'); break
       case 'critter': play('critter'); setMessage('どうぶつに ぽーん！'); break
+      case 'door': play('gate', event.strength); setMessage('とびらが しまってる！ スイッチを さがそう'); break
+      case 'switch': play('switch'); setMessage('ポチッ！ とびらが ひらいたよ'); break
+      case 'conveyor': play('conveyor'); setMessage('ベルトで はこばれるよ〜'); break
+      case 'trampoline': play('trampoline'); setMessage('ぽよーん！ とんでけ〜'); break
+      case 'wind': play('wind'); setMessage('かぜに おされるよ！'); break
       case 'warp': play('warp'); setMessage('しゅーん！ むこうがわへ！'); break
       case 'windmill': play('windmill'); setMessage('はねに あたった！ タイミングを みて もういちど'); break
       case 'boost': play('boost'); setMessage('びゅーん！'); break

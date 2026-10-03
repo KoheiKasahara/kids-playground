@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { COURSE_IDS, findCourse, GOLF_COURSES, type Vec2 } from './golfCourses'
 import { buildHoleGeometry } from './golfGeometry'
-import { BALL_RADIUS } from './golfPhysics'
+import { BALL_RADIUS, rollDistance, rollingDecel, SWITCH } from './golfPhysics'
 
 const HOLES = GOLF_COURSES.flatMap(course => course.holes)
 
@@ -84,6 +84,70 @@ describe('パターゴルフのコース定義', () => {
         expect(Math.sign(side(point)), `${hole.id} の ${index}ばんめ`).toBe(Math.sign(side(next)))
         expect(Math.hypot(nearest!.x - point.x, nearest!.z - point.z), `${hole.id} の ${index}ばんめ`).toBeLessThan(nearest!.halfLength + 2)
       })
+    }
+  })
+
+  test('トランポリンの ちゃくちてんは ゆかの上で、みちすじは トランポリンの つぎに ちゃくちてんを とおる', () => {
+    for (const hole of HOLES) {
+      const geometry = buildHoleGeometry(hole)
+      for (const pad of hole.gadgets ?? []) {
+        if (pad.kind !== 'trampoline') continue
+        expect(geometry.heightAt(pad.x, pad.z), `${hole.id} の ${pad.id}`).not.toBeNull()
+        // ちゃくちてんの まわりも ゆか（すこし ずれても おちない）。
+        for (const angle of [0, 1, 2, 3, 4, 5].map(k => (k * Math.PI) / 3)) {
+          expect(geometry.heightAt(pad.to.x + Math.cos(angle) * 0.4, pad.to.z + Math.sin(angle) * 0.4), `${hole.id} の ${pad.id}`).not.toBeNull()
+        }
+        const index = hole.route.findIndex(point => point.x === pad.x && point.z === pad.z)
+        expect(index, `${hole.id} の ${pad.id}`).toBeGreaterThan(0)
+        expect(hole.route[index + 1], `${hole.id} の ${pad.id}`).toMatchObject(pad.to)
+      }
+    }
+  })
+
+  test('ベルトコンベアは ゆかの上にあり、はこばれた ボールは ベルトの さきの ゆかで とまる', () => {
+    for (const course of GOLF_COURSES) {
+      for (const hole of course.holes) {
+        const geometry = buildHoleGeometry(hole)
+        for (const belt of hole.gadgets ?? []) {
+          if (belt.kind !== 'conveyor') continue
+          const length = Math.hypot(belt.dir.x, belt.dir.z)
+          const along = { x: belt.dir.x / length, z: belt.dir.z / length }
+          const at = (a: number, side: number) => ({ x: belt.x + along.x * a + along.z * side, z: belt.z + along.z * a - along.x * side })
+          for (const corner of [at(-belt.halfLength, -belt.halfWidth), at(-belt.halfLength, belt.halfWidth), at(belt.halfLength, -belt.halfWidth), at(belt.halfLength, belt.halfWidth)]) {
+            expect(geometry.heightAt(corner.x, corner.z), `${hole.id} の ${belt.id}`).not.toBeNull()
+          }
+          // ベルトの はやさで おりて ころがる ぶんの さきも ゆか（かべに あたって ベルトへ もどらない）。
+          const runout = rollDistance(belt.speed, rollingDecel('green', course.gravity, course.rollingScale))
+          const stop = at(belt.halfLength + runout + BALL_RADIUS, 0)
+          expect(geometry.heightAt(stop.x, stop.z), `${hole.id} の ${belt.id}`).not.toBeNull()
+        }
+      }
+    }
+  })
+
+  test('スイッチの とびらは みちを かべから かべまで ふさぎ、みちすじは とびらより まえに スイッチを とおる', () => {
+    for (const hole of HOLES) {
+      const geometry = buildHoleGeometry(hole)
+      for (const button of hole.gadgets ?? []) {
+        if (button.kind !== 'switch') continue
+        const { door } = button
+        const length = Math.hypot(door.dir.x, door.dir.z)
+        const along = { x: door.dir.x / length, z: door.dir.z / length }
+        expect(geometry.heightAt(button.x, button.z), `${hole.id} の ${button.id}`).not.toBeNull()
+        expect(geometry.heightAt(door.x, door.z), `${hole.id} の ${button.id}`).not.toBeNull()
+        // とびらの はしの すぐ そとは ゆかではない（よこを すりぬけられない）。
+        for (const end of [-1, 1]) {
+          const reach = door.halfLength + BALL_RADIUS
+          expect(geometry.heightAt(door.x + along.x * end * reach, door.z + along.z * end * reach), `${hole.id} の ${button.id}`).toBeNull()
+        }
+        const pressAt = hole.route.findIndex(point => Math.hypot(point.x - button.x, point.z - button.z) < SWITCH.radius)
+        expect(pressAt, `${hole.id} の ${button.id}`).toBeGreaterThan(0)
+        // とびらの むこうがわ（カップの がわ）の 点は、スイッチの 点より あと。
+        const side = (point: Vec2) => Math.sign((point.x - door.x) * along.z - (point.z - door.z) * along.x)
+        hole.route.forEach((point, index) => {
+          if (side(point) === side(hole.cup)) expect(index, `${hole.id} の ${index}ばんめ`).toBeGreaterThan(pressAt)
+        })
+      }
     }
   })
 

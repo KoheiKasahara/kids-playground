@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { CAMERA_FOV, type CameraPose } from './golfCamera'
 import { GOLF_BALLS, type CourseDefinition, type CourseId, type CritterLook, type GolfBallId, type HoleDefinition, type Vec2, type WaterHazard } from './golfCourses'
 import { clipToCell, insideOutline, signedArea, type HoleGeometry, type MeshBuffers } from './golfGeometry'
-import { BALL_RADIUS, BOOSTER, BRIDGE, BUMPER_HEIGHT, CRITTER, GATE, PLATFORM_DEPTH, REFLECTOR, TREE, WALL_HEIGHT, WARP, WINDMILL, type Vec3 } from './golfPhysics'
+import { BALL_RADIUS, BOOSTER, BRIDGE, BUMPER_HEIGHT, CRITTER, GATE, PLATFORM_DEPTH, REFLECTOR, SWITCH, trampolineLaunch, TREE, WALL_HEIGHT, WARP, WINDMILL, type Vec3 } from './golfPhysics'
 import { createTerrainHeight, createWaterDepth, layeredNoise, waterInside, type TerrainStyle } from './golfTerrain'
 import { createGolfTextures, type GolfTextures } from './golfTextures'
 import type { GadgetMotion } from './golfWorld'
@@ -146,7 +146,10 @@ function createBatch() {
       item.colors.push(new THREE.Color(color))
       items.set(shape, item)
     },
-    build(parent: THREE.Object3D, shadows: boolean, fade: { value: number }) {
+    /** style: 光の あたらない がわも あかるく したい もの（くも）は emissive と low で あかるく、smooth で なめらかに する。 */
+    build(parent: THREE.Object3D, shadows: boolean, fade: { value: number }, style: { emissive?: string; low?: number; smooth?: boolean } = {}) {
+      // なにも ない ときは 材質も 作らない（どこにも つながらず、すてられなくなる）。
+      if (!items.size) return
       const shapes: Record<Shape, () => THREE.BufferGeometry> = {
         box: () => new THREE.BoxGeometry(1, 1, 1),
         sphere: () => new THREE.IcosahedronGeometry(0.5, 1),
@@ -160,10 +163,10 @@ function createBatch() {
         blade: () => new THREE.ConeGeometry(0.5, 1, 3, 1, true),
       }
       // 景色は 数が 多いので、光の 計算が かるい Lambert で えがく。
-      const material = new THREE.MeshLambertMaterial({ flatShading: true, vertexColors: true })
+      const material = new THREE.MeshLambertMaterial({ flatShading: !style.smooth, vertexColors: true, emissive: style.emissive ?? '#000000' })
       fadeInFront(material, fade)
       for (const [shape, item] of items) {
-        const mesh = new THREE.InstancedMesh(shadeFromBelow(shapes[shape](), shape === 'blade' ? 0.45 : 0.66), material, item.matrices.length)
+        const mesh = new THREE.InstancedMesh(shadeFromBelow(shapes[shape](), shape === 'blade' ? 0.45 : style.low ?? 0.66), material, item.matrices.length)
         item.matrices.forEach((matrix, index) => { mesh.setMatrixAt(index, matrix); mesh.setColorAt(index, item.colors[index]!) })
         mesh.castShadow = shadows
         mesh.receiveShadow = true
@@ -292,6 +295,7 @@ function ballTexture(id: GolfBallId) {
 
 /** 歩く どうぶつ。コースに合わせて見た目だけ変える（歩き方は同じ）。 */
 function critterModel(look: CritterLook, accent: string): THREE.Group {
+  if (look === 'robot') return robotModel(accent)
   const group = new THREE.Group()
   const skin = { duck: '#ffd94a', crab: '#ff6f5b', penguin: '#3c4560', alien: '#8ee6a8', dino: '#6fc07f', squirrel: '#c9743c', sheep: '#f7f2e6' }[look]
   // ひつじは かおだけ くろいので、かおと めの色は わけておく。
@@ -377,6 +381,44 @@ function critterModel(look: CritterLook, accent: string): THREE.Group {
     }
   }
   return group
+}
+
+/** ぜんまいで あるく おもちゃの ロボット。しかくい からだに ひかる め、あたまに アンテナ、せなかに ぜんまい。 */
+function robotModel(accent: string): THREE.Group {
+  const group = new THREE.Group()
+  const r = CRITTER.radius
+  const metal = new THREE.MeshStandardMaterial({ color: '#c9d3e0', roughness: 0.35, metalness: 0.5 })
+  const paint = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.45 })
+  const glow = new THREE.MeshStandardMaterial({ color: '#7ff3ff', emissive: '#3fd8ff', emissiveIntensity: 0.8, roughness: 0.3 })
+  const body = new THREE.Mesh(new THREE.BoxGeometry(r * 1.6, r * 1.15, r * 1.3), metal)
+  body.position.y = r * 0.95
+  const belly = new THREE.Mesh(new THREE.BoxGeometry(r * 0.9, r * 0.5, 0.02), paint)
+  belly.position.set(0, r * 0.95, r * 0.66)
+  const head = new THREE.Mesh(new THREE.BoxGeometry(r * 1.2, r * 0.8, r * 1.0), metal)
+  head.position.y = CRITTER.height * 0.85
+  group.add(body, belly, head)
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(r * 0.13, 10, 8), glow)
+    eye.position.set(side * r * 0.28, CRITTER.height * 0.88, r * 0.5)
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(r * 0.5, r * 0.36, r * 0.8), paint)
+    foot.position.set(side * r * 0.45, r * 0.18, r * 0.05)
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.12, r * 0.12, r * 0.8, 8), paint)
+    arm.position.set(side * r * 0.95, r * 0.95, 0)
+    group.add(eye, foot, arm)
+  }
+  const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, r * 0.5, 6), metal)
+  stalk.position.y = CRITTER.height * 0.85 + r * 0.6
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(r * 0.15, 10, 8), new THREE.MeshStandardMaterial({ color: '#ff5f5f', emissive: '#ff3030', emissiveIntensity: 0.5 }))
+  bulb.position.y = CRITTER.height * 0.85 + r * 0.9
+  const key = new THREE.Mesh(new THREE.TorusGeometry(r * 0.28, r * 0.07, 6, 16), new THREE.MeshStandardMaterial({ color: '#ffd23f', roughness: 0.3, metalness: 0.6 }))
+  key.position.set(0, r * 1.05, -r * 0.95)
+  group.add(stalk, bulb, key)
+  return group
+}
+
+const unit = (v: Vec2): Vec2 => {
+  const length = Math.hypot(v.x, v.z) || 1
+  return { x: v.x / length, z: v.z / length }
 }
 
 function segmentGap(x: number, z: number, a: Vec2, b: Vec2): number {
@@ -674,15 +716,15 @@ function cliff(points: readonly Vec2[], top: number, bottom: number, strata: rea
 
 /** かべの もよう。木の いたの コースと、いわ・こおり・クッキーの コースがある。 */
 const WALL_PATTERN: Record<CourseId, keyof GolfTextures> = {
-  meadow: 'wood', beach: 'wood', moon: 'rock', snow: 'ice', candy: 'sand', dino: 'rock', forest: 'wood', downhill: 'wood', river: 'wood', canyon: 'rock',
+  meadow: 'wood', beach: 'wood', moon: 'rock', snow: 'ice', candy: 'sand', dino: 'rock', forest: 'wood', downhill: 'wood', river: 'wood', canyon: 'rock', factory: 'powder', sky: 'wood',
 }
 
 /** コースの 床の もよう。芝の コースは 芝、ゆきと 月は こなの ような じめん。 */
 const FLOOR_PATTERN: Record<CourseId, keyof GolfTextures> = {
-  meadow: 'grass', beach: 'grass', moon: 'powder', snow: 'powder', candy: 'grass', dino: 'grass', forest: 'grass', downhill: 'grass', river: 'grass', canyon: 'grass',
+  meadow: 'grass', beach: 'grass', moon: 'powder', snow: 'powder', candy: 'grass', dino: 'grass', forest: 'grass', downhill: 'grass', river: 'grass', canyon: 'grass', factory: 'grass', sky: 'grass',
 }
 
-/** まわりの じめんの もようと もりあがり。うみべと おつきさまは じめんが ない。 */
+/** まわりの じめんの もようと もりあがり。うみべ・おつきさま・そらのしまは じめんが ない。 */
 const TERRAIN: Partial<Record<CourseId, { pattern: keyof GolfTextures; hills: number }>> = {
   meadow: { pattern: 'grass', hills: 1.3 },
   snow: { pattern: 'powder', hills: 1.2 },
@@ -692,6 +734,7 @@ const TERRAIN: Partial<Record<CourseId, { pattern: keyof GolfTextures; hills: nu
   downhill: { pattern: 'grass', hills: 1.3 },
   river: { pattern: 'grass', hills: 1.1 },
   canyon: { pattern: 'rock', hills: 9 },
+  factory: { pattern: 'powder', hills: 0.35 },
 }
 
 /**
@@ -829,6 +872,14 @@ export function createGolfScene(container: HTMLElement) {
     /** すいしゃ。よこむきの じくで まわす。 */
     wheels: THREE.Object3D[]
     floaters: { object: THREE.Object3D; base: number; phase: number }[]
+    /** スイッチの ボタンと シャッター。スイッチの ならび順。 */
+    doors: { panel: THREE.Object3D; button: THREE.Object3D; buttonMaterial: THREE.MeshStandardMaterial }[]
+    /** ながれる もよう（ベルトコンベア・かぜの おび）。rate は 1秒に すすむ くりかえしの 数。 */
+    scrollers: { texture: THREE.Texture; rate: number }[]
+    /** かぜの すじ。かぜの おびの 中を ながれて、はしまで いくと かぜかみへ もどる。 */
+    winds: { mesh: THREE.InstancedMesh; x: number; z: number; along: Vec2; halfLength: number; base: number; pace: number; items: { phase: number; side: number; height: number; speed: number }[] }[]
+    /** じぶんの z の じくで まわる もの（せんぷうきの はね・はぐるま）。 */
+    cogs: { object: THREE.Object3D; speed: number }[]
   }
   let hole: HoleContent | null = null
   // カメラとボールのあいだの景色を消すための距離。ホールが変わっても作り直さない。
@@ -850,6 +901,8 @@ export function createGolfScene(container: HTMLElement) {
     const { look } = course
     const solid = createBatch()
     const soft = createBatch()
+    /** そらのしまの くも。かげの がわも しろく 見えるように、べつの 明るい 材質で かく。 */
+    const clouds = createBatch()
     const { bounds, outlines } = geometry
     const cx = (bounds.minX + bounds.maxX) / 2
     const cz = (bounds.minZ + bounds.maxZ) / 2
@@ -1183,6 +1236,10 @@ export function createGolfScene(container: HTMLElement) {
     const critters: THREE.Object3D[] = []
     const bumpers = new Map<string, THREE.Group>()
     const boosters: THREE.Texture[] = []
+    const doors: HoleContent['doors'] = []
+    const scrollers: HoleContent['scrollers'] = []
+    const winds: HoleContent['winds'] = []
+    const cogs: HoleContent['cogs'] = []
     const groundOf = (x: number, z: number) => geometry.heightAt(x, z) ?? 0
     for (const gadget of definition.gadgets ?? []) {
       const ground = groundOf(gadget.x, gadget.z)
@@ -1289,6 +1346,32 @@ export function createGolfScene(container: HTMLElement) {
             band.position.y = BUMPER_HEIGHT * height
             group.add(band)
           }
+        } else if (course.id === 'factory') {
+          // おもちゃの はぐるま。はの ついた つつに、まん中の ねじ。
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.92, r * 0.92, BUMPER_HEIGHT * 0.8, 20), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.4 }))
+          body.position.y = BUMPER_HEIGHT * 0.4
+          const cap = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.5, 0.08, 6), new THREE.MeshStandardMaterial({ color: look.wallCap, roughness: 0.35, metalness: 0.4 }))
+          cap.position.y = BUMPER_HEIGHT * 0.8 + 0.04
+          group.add(body, cap)
+          for (let i = 0; i < 10; i++) {
+            const angle = (i / 10) * Math.PI * 2
+            const tooth = new THREE.Mesh(new THREE.BoxGeometry(r * 0.3, BUMPER_HEIGHT * 0.8, r * 0.34), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.4 }))
+            tooth.position.set(Math.cos(angle) * r * 0.98, BUMPER_HEIGHT * 0.4, Math.sin(angle) * r * 0.98)
+            tooth.rotation.y = -angle
+            group.add(tooth)
+          }
+        } else if (course.id === 'sky') {
+          // ふうせん。ひもで ゆかの おもりに つながっている。
+          const balloon = new THREE.Mesh(new THREE.SphereGeometry(r * 1.25, 20, 14), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.2, emissive: look.bumper, emissiveIntensity: 0.12 }))
+          balloon.scale.set(1, 1.15, 1)
+          balloon.position.y = r * 1.5
+          const shine = new THREE.Mesh(new THREE.SphereGeometry(r * 0.28, 10, 8), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.2 }))
+          shine.position.set(-r * 0.45, r * 2.1, r * 0.75)
+          const knot = new THREE.Mesh(new THREE.ConeGeometry(r * 0.16, r * 0.24, 8), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.4 }))
+          knot.position.y = r * 0.12
+          const weight = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.6, 0.06, 12), new THREE.MeshStandardMaterial({ color: look.bumperCap, roughness: 0.5 }))
+          weight.position.y = 0.03
+          group.add(balloon, shine, knot, weight)
         } else {
           // ユーフォー
           const saucer = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.25, r * 0.9, 0.12, 24), new THREE.MeshStandardMaterial({ color: '#d7dbe8', roughness: 0.3, metalness: 0.6 }))
@@ -1495,6 +1578,198 @@ export function createGolfScene(container: HTMLElement) {
         group.add(pipe, lip, inside)
         group.traverse(child => { if (child instanceof THREE.Mesh) child.castShadow = true })
         root.add(group)
+      } else if (gadget.kind === 'conveyor') {
+        // ベルトコンベア。くろい ベルトの 上を きいろの やじるしが ながれ、りょうはしに ローラー、ふちに きいろの へり。
+        const along = unit(gadget.dir)
+        const texture = canvasTexture(64, 64, ctx => {
+          ctx.fillStyle = '#3b3f4a'
+          ctx.fillRect(0, 0, 64, 64)
+          ctx.fillStyle = '#484d5a'
+          for (let y = 0; y < 64; y += 8) ctx.fillRect(0, y, 64, 3)
+          ctx.fillStyle = '#ffd23f'
+          ctx.beginPath()
+          ctx.moveTo(12, 44); ctx.lineTo(32, 20); ctx.lineTo(52, 44); ctx.lineTo(52, 54); ctx.lineTo(32, 32); ctx.lineTo(12, 54)
+          ctx.closePath()
+          ctx.fill()
+        })
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+        const tiles = Math.max(1, Math.round((gadget.halfLength * 2) / 0.7))
+        texture.repeat.set(1, tiles)
+        const belt = new THREE.Mesh(new THREE.PlaneGeometry(gadget.halfWidth * 2, gadget.halfLength * 2), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }))
+        // やじるし（テクスチャの上むき）を dir の向きに そろえる。
+        belt.rotation.set(-Math.PI / 2, 0, Math.atan2(-along.x, -along.z))
+        belt.position.set(gadget.x, ground + 0.008, gadget.z)
+        belt.receiveShadow = true
+        root.add(belt)
+        scrollers.push({ texture, rate: (gadget.speed * tiles) / (gadget.halfLength * 2) })
+        const turn = Math.atan2(along.x, along.z)
+        for (const end of [-1, 1]) {
+          const x = gadget.x + along.x * end * (gadget.halfLength + 0.06)
+          const z = gadget.z + along.z * end * (gadget.halfLength + 0.06)
+          solid.add('cylinder', '#9aa3b2', x, groundOf(x, z) + 0.015, z, 0.12, gadget.halfWidth * 2 + 0.08, 0.12, 0, turn, Math.PI / 2)
+        }
+        for (const side of [-1, 1]) {
+          const x = gadget.x + along.z * side * (gadget.halfWidth + 0.04)
+          const z = gadget.z - along.x * side * (gadget.halfWidth + 0.04)
+          solid.add('box', '#ffd23f', x, groundOf(x, z) + 0.012, z, 0.07, 0.024, gadget.halfLength * 2 + 0.2, 0, turn, 0)
+        }
+      } else if (gadget.kind === 'switch') {
+        // おおきな おしボタンと、それで ひらく シャッター。どちらも あかで、ふむと ボタンが みどりに かわって シャッターが しずむ。
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(SWITCH.radius, SWITCH.radius + 0.05, 0.05, 28), new THREE.MeshStandardMaterial({ color: '#ffd23f', roughness: 0.45 }))
+        base.position.set(gadget.x, ground + 0.025, gadget.z)
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(SWITCH.radius - 0.02, 0.025, 6, 28), new THREE.MeshStandardMaterial({ color: '#2f3440', roughness: 0.5 }))
+        ring.rotation.x = Math.PI / 2
+        ring.position.set(gadget.x, ground + 0.05, gadget.z)
+        const buttonMaterial = new THREE.MeshStandardMaterial({ color: '#ff4f4f', emissive: '#ff2a2a', emissiveIntensity: 0.3, roughness: 0.3 })
+        const button = new THREE.Mesh(new THREE.SphereGeometry(SWITCH.radius * 0.7, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2), buttonMaterial)
+        button.scale.y = 0.55
+        button.position.set(gadget.x, ground + 0.05, gadget.z)
+        button.castShadow = true
+        root.add(base, ring, button)
+        const door = gadget.door
+        const doorAxis = unit(door.dir)
+        const doorGround = groundOf(door.x, door.z)
+        const slats = canvasTexture(128, 64, ctx => {
+          ctx.fillStyle = '#ff6a5a'
+          ctx.fillRect(0, 0, 128, 64)
+          ctx.fillStyle = 'rgba(120,20,20,0.35)'
+          for (let y = 6; y < 64; y += 10) ctx.fillRect(0, y, 128, 3)
+          ctx.fillStyle = '#ffffff'
+          for (let x = -16; x < 128; x += 32) {
+            ctx.beginPath(); ctx.moveTo(x, 64); ctx.lineTo(x + 12, 64); ctx.lineTo(x + 28, 40); ctx.lineTo(x + 16, 40); ctx.closePath(); ctx.fill()
+          }
+        })
+        slats.wrapS = THREE.RepeatWrapping
+        slats.repeat.set(Math.max(1, Math.round(door.halfLength)), 1)
+        const shutter = new THREE.Group()
+        shutter.position.set(door.x, doorGround, door.z)
+        shutter.rotation.y = Math.atan2(-doorAxis.z, doorAxis.x)
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(door.halfLength * 2, SWITCH.doorHeight, SWITCH.doorHalfDepth * 2), new THREE.MeshStandardMaterial({ map: slats, roughness: 0.4, metalness: 0.2 }))
+        panel.position.y = SWITCH.doorHeight / 2
+        panel.castShadow = true
+        shutter.add(panel)
+        root.add(shutter)
+        // シャッターの みぞ。しずんだ あとも ここに とびらが あったと わかる。
+        solid.add('box', '#5a6274', door.x, doorGround + 0.004, door.z, door.halfLength * 2, 0.012, SWITCH.doorHalfDepth * 2 + 0.06, 0, Math.atan2(-doorAxis.z, doorAxis.x), 0)
+        doors.push({ panel, button, buttonMaterial })
+      } else if (gadget.kind === 'trampoline') {
+        // トランポリン。わくと ばねの 上に、とぶ むきを さす やじるしの ぬの。
+        const r = gadget.radius
+        const group = new THREE.Group()
+        group.position.set(gadget.x, ground, gadget.z)
+        const frame = new THREE.Mesh(new THREE.TorusGeometry(r, 0.04, 8, 36), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.35 }))
+        frame.rotation.x = Math.PI / 2
+        frame.position.y = 0.035
+        const fabricTexture = canvasTexture(128, 128, ctx => {
+          ctx.fillStyle = '#3f8fe8'
+          ctx.fillRect(0, 0, 128, 128)
+          ctx.strokeStyle = '#ffffff'
+          ctx.lineWidth = 6
+          ctx.beginPath(); ctx.arc(64, 64, 52, 0, Math.PI * 2); ctx.stroke()
+          ctx.fillStyle = '#ffe066'
+          ctx.beginPath()
+          ctx.moveTo(64, 18); ctx.lineTo(98, 58); ctx.lineTo(76, 58); ctx.lineTo(76, 104); ctx.lineTo(52, 104); ctx.lineTo(52, 58); ctx.lineTo(30, 58)
+          ctx.closePath()
+          ctx.fill()
+        })
+        const fabric = new THREE.Mesh(new THREE.CircleGeometry(r - 0.03, 36), new THREE.MeshStandardMaterial({ map: fabricTexture, roughness: 0.55 }))
+        fabric.rotation.set(-Math.PI / 2, 0, Math.atan2(-(gadget.to.x - gadget.x), -(gadget.to.z - gadget.z)))
+        fabric.position.y = 0.02
+        group.add(frame, fabric)
+        // わくの まわりの ばね。
+        for (let k = 0; k < 12; k++) {
+          const angle = (k / 12) * Math.PI * 2
+          solid.add('cylinder', '#d9dee8', gadget.x + Math.cos(angle) * (r + 0.07), ground + 0.03, gadget.z + Math.sin(angle) * (r + 0.07), 0.035, 0.06, 0.035)
+        }
+        group.traverse(child => { if (child instanceof THREE.Mesh) child.receiveShadow = true })
+        root.add(group)
+        bumpers.set(gadget.id, group)
+        // とんでいく みちを てんてんで かく。ちゃくちする ところには くもの まと。
+        const toGround = geometry.heightAt(gadget.to.x, gadget.to.z) ?? ground
+        const flight = trampolineLaunch({ x: gadget.x, y: ground + BALL_RADIUS, z: gadget.z }, { x: gadget.to.x, y: toGround + BALL_RADIUS, z: gadget.to.z }, course.gravity)
+        const time = Math.hypot(gadget.to.x - gadget.x, gadget.to.z - gadget.z) / (Math.hypot(flight.x, flight.z) || 1)
+        for (let k = 1; k < 14; k++) {
+          const t = (time * k) / 14
+          soft.add('sphere', '#ffffff', gadget.x + flight.x * t, ground + BALL_RADIUS + flight.y * t - (course.gravity * t * t) / 2, gadget.z + flight.z * t, 0.07, 0.07, 0.07)
+        }
+        const landsOnPad = (definition.gadgets ?? []).some(other => other.kind === 'trampoline' && Math.hypot(other.x - gadget.to.x, other.z - gadget.to.z) < other.radius)
+        if (!landsOnPad) {
+          const target = new THREE.Mesh(new THREE.RingGeometry(0.26, 0.4, 32), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }))
+          target.rotation.x = -Math.PI / 2
+          target.position.set(gadget.to.x, toGround + 0.006, gadget.to.z)
+          const dot = new THREE.Mesh(new THREE.CircleGeometry(0.12, 20), new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }))
+          dot.rotation.x = -Math.PI / 2
+          dot.position.set(gadget.to.x, toGround + 0.006, gadget.to.z)
+          root.add(target, dot)
+        }
+      } else if (gadget.kind === 'fan') {
+        // かぜの とおる ところ。うすい おびに しろい やじるしが ながれ、かぜかみに せんぷうき。
+        const along = unit(gadget.dir)
+        const texture = canvasTexture(64, 64, ctx => {
+          ctx.clearRect(0, 0, 64, 64)
+          ctx.fillStyle = 'rgba(255,255,255,0.85)'
+          ctx.beginPath()
+          ctx.moveTo(16, 42); ctx.lineTo(32, 24); ctx.lineTo(48, 42); ctx.lineTo(48, 50); ctx.lineTo(32, 34); ctx.lineTo(16, 50)
+          ctx.closePath()
+          ctx.fill()
+        })
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+        const tiles = Math.max(1, Math.round((gadget.halfLength * 2) / 1.1))
+        texture.repeat.set(Math.max(1, Math.round(gadget.halfWidth)), tiles)
+        const strip = new THREE.Mesh(new THREE.PlaneGeometry(gadget.halfWidth * 2, gadget.halfLength * 2), new THREE.MeshBasicMaterial({ map: texture, color: '#d9f3ff', transparent: true, opacity: 0.55, depthWrite: false }))
+        strip.rotation.set(-Math.PI / 2, 0, Math.atan2(-along.x, -along.z))
+        strip.position.set(gadget.x, ground + 0.012, gadget.z)
+        strip.renderOrder = 1
+        root.add(strip)
+        scrollers.push({ texture, rate: 0.5 + gadget.strength * 0.4 })
+        // せんぷうきは、かぜかみの はしから コースの そとへ 出た ところに 立てる。
+        let reach = gadget.halfLength
+        let fanGround = ground
+        for (; reach < gadget.halfLength + 6; reach += 0.2) {
+          const height = geometry.heightAt(gadget.x - along.x * reach, gadget.z - along.z * reach)
+          if (height === null) break
+          fanGround = height
+        }
+        reach += 0.75
+        const fx = gadget.x - along.x * reach
+        const fz = gadget.z - along.z * reach
+        const fan = new THREE.Group()
+        fan.position.set(fx, fanGround, fz)
+        fan.rotation.y = Math.atan2(along.x, along.z)
+        const white = new THREE.MeshStandardMaterial({ color: '#fdfcff', roughness: 0.4 })
+        const tint = new THREE.MeshStandardMaterial({ color: look.bumper, roughness: 0.4 })
+        const cloud = new THREE.Mesh(new THREE.SphereGeometry(0.7, 14, 10), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }))
+        cloud.scale.set(1.2, 0.45, 1.0)
+        cloud.position.y = -0.2
+        const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.8, 10), white)
+        stand.position.y = 0.4
+        const motor = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 10), tint)
+        motor.scale.z = 1.4
+        motor.position.set(0, 0.85, -0.12)
+        const cage = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.025, 6, 32), white)
+        cage.position.set(0, 0.85, 0.05)
+        const rotor = new THREE.Group()
+        rotor.position.set(0, 0.85, 0.04)
+        for (let k = 0; k < 4; k++) {
+          const blade = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.46, 0.02), tint)
+          const angle = (k / 4) * Math.PI * 2
+          blade.position.set(Math.sin(angle) * 0.26, Math.cos(angle) * 0.26, 0)
+          blade.rotation.set(0, 0.35, -angle)
+          rotor.add(blade)
+        }
+        fan.add(cloud, stand, motor, cage, rotor)
+        fan.traverse(child => { if (child instanceof THREE.Mesh) child.castShadow = true })
+        // おいかぜの せんぷうきは ボールの うしろに 立つので、カメラの 手前では 木と 同じように 消す。
+        for (const material of [white, tint, cloud.material]) fadeInFront(material, fade)
+        root.add(fan)
+        cogs.push({ object: rotor, speed: 4 + gadget.strength * 3 })
+        // かぜの すじ。かぜの むきに ながれて、はしまで いくと かぜかみへ もどる。
+        const count = Math.min(24, Math.max(8, Math.round(gadget.halfLength * gadget.halfWidth * 2.2)))
+        const streaks = new THREE.InstancedMesh(new THREE.BoxGeometry(0.025, 0.025, 0.55), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6, depthWrite: false }), count)
+        streaks.frustumCulled = false
+        root.add(streaks)
+        const items = Array.from({ length: count }, (_, k) => ({ phase: hash(k * 3.7 + gadget.x) , side: (hash(k * 5.3 + gadget.z) * 2 - 1) * gadget.halfWidth * 0.9, height: 0.12 + hash(k * 7.1) * 0.5, speed: 0.85 + hash(k * 2.9) * 0.4 }))
+        winds.push({ mesh: streaks, x: gadget.x, z: gadget.z, along, halfLength: gadget.halfLength, base: ground, pace: 1.6 + gadget.strength, items })
       } else {
         const texture = canvasTexture(64, 128, ctx => {
           ctx.fillStyle = '#243a8c'
@@ -2109,9 +2384,196 @@ export function createGolfScene(container: HTMLElement) {
           solid.add('cylinder', '#4f9a58', x - 0.4, y + 1.6, z, 0.28, 0.7, 0.28)
         }
       }
+    } else if (course.id === 'factory') {
+      // おもちゃこうじょう。コンクリートの ゆかに きいろい みちの せん、つみきや ダンボールや くまの ぬいぐるみ。
+      // おくには ギザギザ やねの こうじょうと えんとつ、まわりには まわる 大きな はぐるま。
+      const width = bounds.maxX - bounds.minX
+      const depth = bounds.maxZ - bounds.minZ
+      const toys = ['#ff6b5b', '#ffd23f', '#4a7fd6', '#5fcf8a', '#b98cff', '#ff9ec4']
+      // コースを かこむ きいろい せん。
+      for (const side of [-1, 1]) {
+        const z = cz + side * (depth / 2 + 1.8)
+        solid.add('box', '#ffd23f', cx, groundAt(cx, z) + 0.01, z, width + 3.6, 0.02, 0.14)
+        const x = cx + side * (width / 2 + 1.8)
+        solid.add('box', '#ffd23f', x, groundAt(x, cz) + 0.01, cz, 0.14, 0.02, depth + 3.6)
+      }
+      // つみきの 山と ダンボール。
+      for (let i = 0; i < 70; i++) {
+        const x = cx + (hash(i * 2.3 + 3100) - 0.5) * (width + 34)
+        const z = cz + (hash(i * 3.7 + 3200) - 0.5) * (depth + 34)
+        const size = 0.55 + hash(i + 3300) * 0.5
+        if (!clear(x, z, 1.6 + size)) continue
+        const y = groundAt(x, z)
+        const turn = hash(i + 3400) * Math.PI
+        if (i % 4 === 0) {
+          solid.add('box', '#c89a62', x, y + size * 0.5, z, size * 1.6, size, size * 1.3, 0, turn, 0)
+          solid.add('box', '#b5884f', x, y + size * 1.25, z, size * 1.2, size * 0.5, size * 1.0, 0, turn + 0.3, 0)
+        } else {
+          const levels = 1 + (i % 3)
+          for (let k = 0; k < levels; k++) solid.add('box', toys[(i + k) % toys.length]!, x + (hash(i + k) - 0.5) * 0.2, y + size * (k + 0.5), z, size, size, size, 0, turn + k * 0.4, 0)
+          if (i % 3 === 2) solid.add('pyramid', toys[(i + 3) % toys.length]!, x, y + size * (levels + 0.4), z, size * 1.3, size * 0.8, size * 1.3, 0, turn + Math.PI / 4, 0)
+          else if (i % 3 === 1) solid.add('cylinder', toys[(i + 4) % toys.length]!, x, y + size * (levels + 0.3), z, size * 0.8, size * 0.6, size * 0.8)
+        }
+      }
+      // くまの ぬいぐるみ。コースの そばに すわって 見ている。
+      for (const [k, bear] of [
+        { x: bounds.maxX + 2.6, z: cz - 2.0 },
+        { x: bounds.minX - 2.6, z: cz + 3.0 },
+        { x: cx + 3.0, z: bounds.minZ - 2.8 },
+      ].entries()) {
+        const y = groundAt(bear.x, bear.z)
+        const fur = ['#c98a4b', '#e8b4c8', '#d8c3a5'][k]!
+        const facing = Math.atan2(cx - bear.x, cz - bear.z)
+        const front = { x: Math.sin(facing), z: Math.cos(facing) }
+        solid.add('sphere', fur, bear.x, y + 0.55, bear.z, 1.1, 1.15, 1.0)
+        solid.add('sphere', fur, bear.x, y + 1.35, bear.z, 0.85, 0.8, 0.8)
+        solid.add('sphere', '#f6e3cc', bear.x + front.x * 0.36, y + 1.27, bear.z + front.z * 0.36, 0.34, 0.26, 0.3)
+        solid.add('sphere', '#3b2a2a', bear.x + front.x * 0.5, y + 1.32, bear.z + front.z * 0.5, 0.1, 0.08, 0.08)
+        for (const side of [-1, 1]) {
+          solid.add('sphere', fur, bear.x + front.z * side * 0.32, y + 1.72, bear.z - front.x * side * 0.32, 0.3, 0.3, 0.2)
+          solid.add('sphere', '#2f2a33', bear.x + front.x * 0.38 + front.z * side * 0.16, y + 1.45, bear.z + front.z * 0.38 - front.x * side * 0.16, 0.08, 0.08, 0.08)
+          solid.add('sphere', fur, bear.x + front.x * 0.3 + front.z * side * 0.5, y + 0.25, bear.z + front.z * 0.3 - front.x * side * 0.5, 0.36, 0.32, 0.5)
+        }
+      }
+      // おくの こうじょう。ギザギザの やねと、しまもようの えんとつから もくもく けむり。
+      for (let k = 0; k < 4; k++) {
+        const x = cx + (k - 1.5) * 13
+        const z = bounds.minZ - 22 - (k % 2) * 6
+        const y = groundAt(x, z)
+        solid.add('box', k % 2 ? '#dfe5ee' : '#cdd6e3', x, y + 3, z, 11, 6, 8)
+        for (let t = 0; t < 4; t++) solid.add('box', '#6f7c94', x - 4.1 + t * 2.75, y + 6.9, z, 2.6, 0.18, 3.2, 0.62, 0, 0)
+        for (let w = 0; w < 4; w++) solid.add('box', '#7fd3ff', x - 3.6 + w * 2.4, y + 3.2, z + 4.02, 1.4, 1.2, 0.05)
+      }
+      for (const [k, x] of [cx - 8, cx + 12].entries()) {
+        const z = bounds.minZ - 26
+        const y = groundAt(x, z)
+        for (let t = 0; t < 6; t++) solid.add('cylinder', t % 2 ? '#ffffff' : '#ff6b5b', x, y + 1 + t * 2, z, 1.6, 2, 1.6)
+        for (let t = 0; t < 4; t++) soft.add('sphere', '#eef1f6', x + t * 1.2 + k, y + 13.5 + t * 2.2, z - t * 0.6, 2.4 + t * 0.8, 1.8 + t * 0.5, 2.4 + t * 0.8)
+      }
+      // まわる 大きな はぐるま。コースの ほうを むいて 立っている。
+      const gearMaterial = new THREE.MeshStandardMaterial({ color: '#ffd23f', roughness: 0.35, metalness: 0.45 })
+      const hubMaterial = new THREE.MeshStandardMaterial({ color: '#ff6b5b', roughness: 0.4 })
+      for (const [k, spot] of [
+        { x: bounds.minX - 5.5, z: cz - depth * 0.2, size: 2.2 },
+        { x: bounds.maxX + 6, z: cz + depth * 0.15, size: 1.7 },
+        { x: bounds.minX - 4.2, z: cz - depth * 0.2 - 3.6, size: 1.2 },
+      ].entries()) {
+        const holder = new THREE.Group()
+        holder.position.set(spot.x, groundAt(spot.x, spot.z) + spot.size + 0.3, spot.z)
+        holder.rotation.y = Math.atan2(cx - spot.x, cz - spot.z)
+        const gear = new THREE.Group()
+        const disc = new THREE.Mesh(new THREE.CylinderGeometry(spot.size, spot.size, 0.3, 24), gearMaterial)
+        disc.rotation.x = Math.PI / 2
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(spot.size * 0.3, spot.size * 0.3, 0.42, 12), hubMaterial)
+        hub.rotation.x = Math.PI / 2
+        gear.add(disc, hub)
+        const teeth = 12
+        for (let t = 0; t < teeth; t++) {
+          const angle = (t / teeth) * Math.PI * 2
+          const tooth = new THREE.Mesh(new THREE.BoxGeometry(spot.size * 0.32, spot.size * 0.3, 0.3), gearMaterial)
+          tooth.position.set(Math.cos(angle) * spot.size * 1.08, Math.sin(angle) * spot.size * 1.08, 0)
+          tooth.rotation.z = angle
+          gear.add(tooth)
+        }
+        holder.add(gear)
+        holder.traverse(child => { if (child instanceof THREE.Mesh) child.castShadow = true })
+        root.add(holder)
+        cogs.push({ object: gear, speed: (k % 2 ? -1 : 1) * (0.5 / spot.size) })
+        solid.add('box', '#6f7c94', spot.x, groundAt(spot.x, spot.z) + (spot.size + 0.3) / 2, spot.z, 0.3, spot.size + 0.3, 0.3)
+      }
+      // ころがっている おもちゃの ボール。
+      for (let i = 0; i < 24; i++) {
+        const x = cx + (hash(i * 4.1 + 3500) - 0.5) * (width + 22)
+        const z = cz + (hash(i * 5.9 + 3600) - 0.5) * (depth + 22)
+        if (!clear(x, z, 1.0)) continue
+        solid.add('sphere', toys[i % toys.length]!, x, groundAt(x, z) + 0.25, z, 0.5, 0.5, 0.5)
+      }
+    } else if (course.id === 'sky') {
+      // くもの うみに うかぶ しま。しまの 下には さかさの いわが のび、とおくに にじと ききゅう。
+      const width = bounds.maxX - bounds.minX
+      const depth = bounds.maxZ - bounds.minZ
+      const earth = ['#a87a52', '#94683f', '#b98a5c']
+      for (const [index, outline] of outlines.entries()) {
+        const points = outline.points
+        let low = outline.base
+        for (const point of points) low = Math.min(low, geometry.heightAt(point.x, point.z) ?? low)
+        const top = low - PLATFORM_DEPTH + 0.04
+        const ox = points.reduce((sum, point) => sum + point.x, 0) / points.length
+        const oz = points.reduce((sum, point) => sum + point.z, 0) / points.length
+        const inner = Math.min(...points.map(point => Math.hypot(point.x - ox, point.z - oz)))
+        solid.add('cone', earth[index % earth.length]!, ox, top - inner * 1.1, oz, inner * 2.1, inner * 2.2, inner * 2.1, Math.PI, hash(index + 40) * 3, 0)
+        // 外周に そって さかさの とんがり いわを ならべ、しまの かたちの うらに する。
+        let carry = 0
+        points.forEach((point, k) => {
+          const next = points[(k + 1) % points.length]!
+          const length = Math.hypot(next.x - point.x, next.z - point.z)
+          for (; carry < length; carry += 1.0) {
+            const t = carry / length
+            const x = point.x + (next.x - point.x) * t
+            const z = point.z + (next.z - point.z) * t
+            const pull = Math.min(0.45, Math.hypot(ox - x, oz - z) * 0.2)
+            const size = 0.8 + hash(index * 31 + k + carry) * 0.6
+            const height = 0.9 + hash(index * 17 + k * 3 + carry) * 1.3
+            const ix = x + ((ox - x) / (Math.hypot(ox - x, oz - z) || 1)) * pull
+            const iz = z + ((oz - z) / (Math.hypot(ox - x, oz - z) || 1)) * pull
+            solid.add('cone', earth[(k + index) % earth.length]!, ix, top - height / 2, iz, size, height, size, Math.PI, hash(k + carry) * 3, 0)
+          }
+          carry -= length
+        })
+      }
+      // くもの うみ。しまの ずっと 下に ひろがり、とおくは きりに とけこむ。
+      const seaY = baseY - 9
+      const sea = new THREE.Mesh(new THREE.CircleGeometry(170, 48), new THREE.MeshBasicMaterial({ color: '#f3f8ff' }))
+      sea.rotation.x = -Math.PI / 2
+      sea.position.set(cx, seaY, cz)
+      root.add(sea)
+      for (let i = 0; i < 60; i++) {
+        const angle = hash(i + 4100) * Math.PI * 2
+        const distance = 8 + hash(i + 4110) * 70
+        const x = cx + Math.cos(angle) * (distance + width * 0.3)
+        const z = cz + Math.sin(angle) * (distance + depth * 0.3)
+        const size = 2.5 + hash(i + 4120) * 4
+        clouds.add('sphere', i % 4 ? '#ffffff' : '#eef5ff', x, seaY + size * 0.12, z, size * 2.4, size * 0.7, size * 1.9)
+      }
+      // しまの まわりに ただよう ちいさな くも。
+      for (let i = 0; i < 14; i++) {
+        const x = cx + (hash(i * 3.3 + 4200) - 0.5) * (width + 30)
+        const z = cz + (hash(i * 4.7 + 4300) - 0.5) * (depth + 30)
+        if (!clear(x, z, 3.2)) continue
+        const y = baseY - 2.5 - hash(i + 4400) * 3
+        for (let k = 0; k < 3; k++) clouds.add('sphere', '#ffffff', x + (k - 1) * 0.8, y + (k % 2) * 0.25, z + hash(i + k) * 0.5, 1.3, 0.75, 1.1)
+      }
+      // とおくの にじ。
+      const rainbow = ['#ff6b6b', '#ffa94d', '#ffe066', '#69db7c', '#4dabf7', '#9775fa']
+      rainbow.forEach((color, k) => {
+        const band = new THREE.Mesh(new THREE.TorusGeometry(34 - k * 1.1, 0.56, 6, 64, Math.PI), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 }))
+        band.position.set(cx + 6, baseY - 7, cz - depth / 2 - 48)
+        root.add(band)
+      })
+      // ふわふわ うかぶ ききゅう。
+      for (const [k, spot] of [
+        { x: bounds.maxX + 7, y: 3.5, z: cz - 4, color: '#ff7eb6' },
+        { x: bounds.minX - 8, y: 5.5, z: cz - depth * 0.3, color: '#ffd23f' },
+        { x: cx + 4, y: 8, z: bounds.minZ - 14, color: '#69db7c' },
+      ].entries()) {
+        const balloon = new THREE.Group()
+        const envelope = new THREE.Mesh(new THREE.SphereGeometry(1.4, 18, 14), new THREE.MeshStandardMaterial({ color: spot.color, roughness: 0.5 }))
+        envelope.scale.set(1, 1.15, 1)
+        const stripe = new THREE.Mesh(new THREE.TorusGeometry(1.36, 0.14, 6, 24), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.5 }))
+        stripe.rotation.x = Math.PI / 2
+        const basket = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.6), new THREE.MeshStandardMaterial({ color: '#a8743f', roughness: 0.9 }))
+        basket.position.y = -2.2
+        const ropes = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.26, 1.1, 4, 1, true), new THREE.MeshStandardMaterial({ color: '#7c5334', wireframe: true }))
+        ropes.position.y = -1.5
+        balloon.add(envelope, stripe, basket, ropes)
+        balloon.position.set(spot.x, baseY + spot.y, spot.z)
+        root.add(balloon)
+        floaters.push({ object: balloon, base: balloon.position.y, phase: k * 2.1 })
+      }
     }
     solid.build(root, true, fade)
     soft.build(root, false, fade)
+    clouds.build(root, false, fade, { emissive: '#c9d8ea', low: 0.86, smooth: true })
     root.traverse(child => { if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial && !child.material.transparent) child.receiveShadow = true })
 
     // 影を落とす範囲をホールの大きさに合わせる。
@@ -2123,14 +2585,14 @@ export function createGolfScene(container: HTMLElement) {
     sun.shadow.camera.updateProjectionMatrix()
     const moon = course.id === 'moon'
     hemisphere.color.set(moon ? '#b3b8ff' : '#eef8ff')
-    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : course.id === 'candy' ? '#ffdcc0' : course.id === 'dino' ? '#c08a5e' : course.id === 'forest' ? '#4a7a46' : course.id === 'canyon' ? '#c9865a' : '#7fa35a')
+    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : course.id === 'candy' ? '#ffdcc0' : course.id === 'dino' ? '#c08a5e' : course.id === 'forest' ? '#4a7a46' : course.id === 'canyon' ? '#c9865a' : course.id === 'factory' ? '#a9b3c2' : course.id === 'sky' ? '#cfe8ff' : '#7fa35a')
     // まわりからの 明かりを ひかえめにして、日なたと かげの 差で 立体感を 出す。
     hemisphere.intensity = moon ? 0.8 : 0.75
     sun.color.set(moon ? '#f2f0ff' : '#fff1d6')
     sun.intensity = moon ? 2.2 : 2.75
     scene.environmentIntensity = moon ? 0.28 : 0.3
     scene.add(root)
-    return { root, heightAt: geometry.heightAt, cupY: cup.y, flag, flagBase, cloth, blades, seeThrough, gates, critters, snow, bumpers, boosters, water, spinners, wheels, floaters }
+    return { root, heightAt: geometry.heightAt, cupY: cup.y, flag, flagBase, cloth, blades, seeThrough, gates, critters, snow, bumpers, boosters, water, spinners, wheels, floaters, doors, scrollers, winds, cogs }
   }
 
   function resize() {
@@ -2206,6 +2668,15 @@ export function createGolfScene(container: HTMLElement) {
         if (!at) return
         group.position.set(at.x, hole?.heightAt(at.x, at.z) ?? group.position.y, at.z)
         group.rotation.y = at.facing
+      })
+      hole.doors.forEach((door, index) => {
+        const open = motion.doors[index] ?? 0
+        // シャッターは ゆかの 下へ しずむ。ボタンは おしこまれて みどりに なる。
+        door.panel.position.y = SWITCH.doorHeight / 2 - open * (SWITCH.doorHeight + 0.03)
+        door.panel.visible = open < 1
+        door.button.scale.y = open > 0 ? 0.2 : 0.55
+        door.buttonMaterial.color.set(open > 0 ? '#4fd36b' : '#ff4f4f')
+        door.buttonMaterial.emissive.set(open > 0 ? '#2fae4a' : '#ff2a2a')
       })
     },
     setFlagLifted(lifted: boolean) { flagLifted = lifted },
@@ -2325,6 +2796,8 @@ export function createGolfScene(container: HTMLElement) {
           }
           position.needsUpdate = true
           hole.boosters.forEach(texture => { texture.offset.y = (texture.offset.y - dt * 1.4) % 1 })
+          hole.scrollers.forEach(item => { item.texture.offset.y = (item.texture.offset.y - dt * item.rate) % 1 })
+          hole.cogs.forEach(item => { item.object.rotation.z -= dt * item.speed })
           if (hole.water) hole.water.uniforms.uTime.value = clock
           hole.spinners.forEach((object, index) => { object.rotation.y += dt * (index ? 0.3 : 0.05) })
           hole.wheels.forEach(object => { object.rotation.x -= dt * 0.8 })
@@ -2338,6 +2811,24 @@ export function createGolfScene(container: HTMLElement) {
             flakes.needsUpdate = true
           }
           hole.floaters.forEach(item => { item.object.position.y = item.base + Math.sin(clock * 1.1 + item.phase) * 0.35 })
+        }
+        // かぜの すじ。動きを減らす設定では その場に とめておく。
+        const flow = reducedMotion ? 0 : clock
+        for (const wind of hole.winds) {
+          const turn = Math.atan2(wind.along.x, wind.along.z)
+          for (const [index, item] of wind.items.entries()) {
+            const travel = (((item.phase + (flow * wind.pace * item.speed) / (wind.halfLength * 2)) % 1) + 1) % 1
+            const along = (travel - 0.5) * wind.halfLength * 2
+            const x = wind.x + wind.along.x * along + wind.along.z * item.side
+            const z = wind.z + wind.along.z * along - wind.along.x * item.side
+            dummy.position.set(x, (hole.heightAt(x, z) ?? wind.base) + item.height, z)
+            dummy.rotation.set(0, turn, 0)
+            // はしでは みじかくして、すっと きえるように する。
+            dummy.scale.set(1, 1, Math.max(0.01, Math.min(1, Math.sin(travel * Math.PI) * 2.5)))
+            dummy.updateMatrix()
+            wind.mesh.setMatrixAt(index, dummy.matrix)
+          }
+          wind.mesh.instanceMatrix.needsUpdate = true
         }
         for (const [id, time] of pulses) {
           const group = hole.bumpers.get(id)

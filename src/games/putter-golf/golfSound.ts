@@ -1,6 +1,6 @@
 import { createToneNodes, getSharedAudioContext, isSoundEnabled } from '../../audio/sound'
 
-export type GolfSoundKind = 'putt' | 'wall' | 'bumper' | 'reflector' | 'rock' | 'tree' | 'windmill' | 'gate' | 'critter' | 'warp' | 'boost' | 'jump' | 'land' | 'sand' | 'ice' | 'splash' | 'cup' | 'cheer' | 'hole-in-one' | 'click'
+export type GolfSoundKind = 'putt' | 'wall' | 'bumper' | 'reflector' | 'rock' | 'tree' | 'windmill' | 'gate' | 'critter' | 'warp' | 'boost' | 'jump' | 'land' | 'sand' | 'ice' | 'splash' | 'switch' | 'conveyor' | 'trampoline' | 'wind' | 'cup' | 'cheer' | 'hole-in-one' | 'click'
 
 type Voice = { notes: number[]; type: OscillatorType; gap: number; duration: number; volume: number; glide?: number; noise?: { filter: BiquadFilterType; frequency: number; duration: number; volume: number } }
 
@@ -21,6 +21,10 @@ const VOICES: Record<GolfSoundKind, Voice> = {
   sand: { notes: [], type: 'sine', gap: 0, duration: 0, volume: 0, noise: { filter: 'lowpass', frequency: 1400, duration: 0.22, volume: 0.05 } },
   ice: { notes: [1560, 2090], type: 'sine', gap: 0.05, duration: 0.12, volume: 0.025 },
   splash: { notes: [360], type: 'sine', gap: 0, duration: 0.3, volume: 0.03, glide: 150, noise: { filter: 'bandpass', frequency: 900, duration: 0.45, volume: 0.09 } },
+  switch: { notes: [660, 990, 1320], type: 'square', gap: 0.07, duration: 0.09, volume: 0.022 },
+  conveyor: { notes: [220, 247, 220, 247], type: 'triangle', gap: 0.06, duration: 0.06, volume: 0.025 },
+  trampoline: { notes: [260], type: 'sine', gap: 0, duration: 0.36, volume: 0.05, glide: 1040 },
+  wind: { notes: [], type: 'sine', gap: 0, duration: 0, volume: 0, noise: { filter: 'bandpass', frequency: 600, duration: 0.5, volume: 0.06 } },
   cup: { notes: [1320, 1760, 1320], type: 'sine', gap: 0.07, duration: 0.18, volume: 0.045 },
   cheer: { notes: [523.25, 659.25, 783.99, 1046.5], type: 'triangle', gap: 0.11, duration: 0.22, volume: 0.04 },
   'hole-in-one': { notes: [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98], type: 'triangle', gap: 0.09, duration: 0.24, volume: 0.045 },

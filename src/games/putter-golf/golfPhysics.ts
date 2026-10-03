@@ -62,6 +62,28 @@ export const BRIDGE = { railHalf: 0.05, railHeight: 0.28 } as const
 export const REFLECTOR = { halfDepth: 0.07, height: 0.4, keep: 0.88 } as const
 /** ワープの どかん。入口の高さと、出てくるときに残る速さの割合。 */
 export const WARP = { height: 0.42, keepSpeed: 0.9, minSpeed: 0.3 } as const
+/** ベルトコンベア。grip は ベルトと ちがう速さの ぶんが 1秒で へる はやさ（大きいほど すぐ ベルトの速さに なる）。 */
+export const CONVEYOR = { grip: 5 } as const
+/** スイッチの ボタンの 半径と、ひらく とびらの 半分の厚み・高さ・しずむ 時間。 */
+export const SWITCH = { radius: 0.36, doorHalfDepth: 0.1, doorHeight: 0.42, openSeconds: 0.6 } as const
+/**
+ * トランポリン。lift は とぶ 高さ（ふみきりと ちゃくちの 高いほうから）。
+ * landKeep は ちゃくちで のこる よこの速さの わりあい（ぽすっと おりて、ころがりすぎない）。
+ */
+export const TRAMPOLINE = { lift: 1.1, landKeep: 0.3, minSpeed: 0.1 } as const
+
+/**
+ * トランポリンで from から to へ とぶ 速さ。上へ lift だけ あがって、to の 高さに ちゃくちする。
+ * 空気の ていこうは ないので、とぶ道は この速さと 重力だけで きまる。
+ */
+export function trampolineLaunch(from: Vec3, to: Vec3, gravity: number, lift: number = TRAMPOLINE.lift): Vec3 {
+  const apex = Math.max(from.y, to.y) + lift
+  const up = Math.sqrt(2 * gravity * (apex - from.y))
+  const time = up / gravity + Math.sqrt((2 * (apex - to.y)) / gravity)
+  const dx = to.x - from.x
+  const dz = to.z - from.z
+  return { x: dx / time, y: up, z: dz / time }
+}
 
 /** ふうしゃの はねの角度。物理と見た目で同じ時刻から求める。 */
 export function windmillAngle(speed: number, time: number): number {

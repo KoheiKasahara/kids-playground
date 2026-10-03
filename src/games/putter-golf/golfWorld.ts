@@ -13,6 +13,7 @@ import {
   BOOSTER,
   BRIDGE,
   BUMPER_HEIGHT,
+  CONVEYOR,
   CRITTER,
   cupPull,
   GATE,
@@ -32,6 +33,9 @@ import {
   SHOT_TIMEOUT_SECONDS,
   shotSpeed,
   shotVelocity,
+  SWITCH,
+  TRAMPOLINE,
+  trampolineLaunch,
   TREE,
   WARP,
   WINDMILL,
@@ -53,6 +57,16 @@ export type GolfEvent =
   | { kind: 'reflector'; id: string; strength: number; position: Vec3 }
   /** 歩く どうぶつに あたって はねた。 */
   | { kind: 'critter'; id: string; strength: number; position: Vec3 }
+  /** スイッチで ひらく とびらが、まだ しまっていて あたった。 */
+  | { kind: 'door'; id: string; strength: number; position: Vec3 }
+  /** スイッチを おして、とびらが ひらいた。 */
+  | { kind: 'switch'; id: string; position: Vec3 }
+  /** ベルトコンベアに のった。 */
+  | { kind: 'conveyor'; id: string; position: Vec3 }
+  /** トランポリンで とびあがった。 */
+  | { kind: 'trampoline'; id: string; position: Vec3 }
+  /** せんぷうきの かぜに 入った。 */
+  | { kind: 'wind'; id: string; position: Vec3 }
   /** どかんに入って、to から出てきた。 */
   | { kind: 'warp'; id: string; position: Vec3; to: Vec3 }
   | { kind: 'boost'; id: string; position: Vec3 }
@@ -72,13 +86,15 @@ export type GadgetMotion = {
   windmills: number[]
   gates: Vec2[]
   critters: { x: number; z: number; facing: number }[]
+  /** スイッチの とびらの ひらきぐあい（0 しまっている 〜 1 すっかり しずんだ）。スイッチの ならび順。 */
+  doors: number[]
 }
 
 const BUMPER_KICK = 2.8
 const CRITTER_KICK = 2.1
 
 type Role = {
-  kind: 'floor' | 'wall' | 'bumper' | 'rock' | 'tree' | 'blade' | 'gate' | 'critter' | 'reflector'
+  kind: 'floor' | 'wall' | 'bumper' | 'rock' | 'tree' | 'blade' | 'gate' | 'critter' | 'reflector' | 'door'
   id: string
   x: number
   z: number
@@ -92,6 +108,14 @@ const quatY = (angle: number): Quat => ({ x: 0, y: Math.sin(angle / 2), z: 0, w:
 const quatZ = (angle: number): Quat => ({ x: 0, y: 0, z: Math.sin(angle / 2), w: Math.cos(angle / 2) })
 const IDENTITY: Quat = { x: 0, y: 0, z: 0, w: 1 }
 const ZERO = { x: 0, y: 0, z: 0 }
+
+/** ベルトコンベアや かぜの 四角（dir は 長さ1）の 中か。 */
+type Strip = { x: number; z: number; dir: Vec2; halfLength: number; halfWidth: number }
+function inStrip(p: Vec2, strip: Strip): boolean {
+  const dx = p.x - strip.x
+  const dz = p.z - strip.z
+  return Math.abs(dx * strip.dir.x + dz * strip.dir.z) <= strip.halfLength && Math.abs(dx * strip.dir.z - dz * strip.dir.x) <= strip.halfWidth
+}
 
 function segmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
   const dx = b.x - a.x
@@ -130,6 +154,10 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
   const gates: { x: number; z: number; y: number; axis: Vec2; span: number; speed: number; body: RAPIER.RigidBody }[] = []
   const critters: { from: Vec2; to: Vec2; speed: number; base: number; body: RAPIER.RigidBody }[] = []
   const warps: { id: string; x: number; z: number; radius: number; exit: Vec2; dir: Vec2; inside: boolean }[] = []
+  const conveyors: (Strip & { id: string; speed: number; inside: boolean })[] = []
+  const fans: (Strip & { id: string; strength: number; inside: boolean })[] = []
+  const switches: { id: string; x: number; z: number; door: RAPIER.Collider | null; openedAt: number | null }[] = []
+  const trampolines: { id: string; x: number; z: number; radius: number; to: Vec2; inside: boolean }[] = []
   const unit = (v: Vec2): Vec2 => {
     const length = Math.hypot(v.x, v.z) || 1
     return { x: v.x / length, z: v.z / length }
@@ -199,6 +227,19 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         .setRotation(quatY(Math.atan2(-axis.z, axis.x))).setFriction(0).setRestitution(0.9), { kind: 'reflector', id: gadget.id, x: gadget.x, z: gadget.z, ends })
     } else if (gadget.kind === 'warp') {
       warps.push({ id: gadget.id, x: gadget.x, z: gadget.z, radius: gadget.radius, exit: gadget.exit, dir: unit(gadget.exitDir), inside: false })
+    } else if (gadget.kind === 'conveyor') {
+      conveyors.push({ id: gadget.id, x: gadget.x, z: gadget.z, dir: unit(gadget.dir), halfLength: gadget.halfLength, halfWidth: gadget.halfWidth, speed: gadget.speed, inside: false })
+    } else if (gadget.kind === 'fan') {
+      fans.push({ id: gadget.id, x: gadget.x, z: gadget.z, dir: unit(gadget.dir), halfLength: gadget.halfLength, halfWidth: gadget.halfWidth, strength: gadget.strength, inside: false })
+    } else if (gadget.kind === 'trampoline') {
+      trampolines.push({ id: gadget.id, x: gadget.x, z: gadget.z, radius: gadget.radius, to: gadget.to, inside: false })
+    } else if (gadget.kind === 'switch') {
+      // スイッチで ひらく とびら。ひらくまでは かべと 同じで、ひらくと あたり判定ごと なくす。
+      const axis = unit(gadget.door.dir)
+      const door = add(RAPIER.ColliderDesc.cuboid(gadget.door.halfLength, SWITCH.doorHeight / 2, SWITCH.doorHalfDepth)
+        .setTranslation(gadget.door.x, groundOf(gadget.door.x, gadget.door.z) + SWITCH.doorHeight / 2 - 0.05, gadget.door.z)
+        .setRotation(quatY(Math.atan2(-axis.z, axis.x))).setFriction(0).setRestitution(0.6), { kind: 'door', id: gadget.id, x: gadget.door.x, z: gadget.door.z })
+      switches.push({ id: gadget.id, x: gadget.x, z: gadget.z, door, openedAt: null })
     } else {
       const length = Math.hypot(gadget.dir.x, gadget.dir.z) || 1
       boosters.push({ id: gadget.id, x: gadget.x, z: gadget.z, dir: { x: gadget.dir.x / length, z: gadget.dir.z / length }, speed: gadget.speed, inside: false })
@@ -213,15 +254,22 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
   const outY = Math.min(geometry.bounds.minY, cup.y - cup.depth) - 0.4
   const waterY = Math.min(...geometry.outlines.map(outline => outline.base)) - 0.3
   const decelOf = (surface: Surface) => rollingDecel(surface, course.gravity, course.rollingScale)
-  /** その線の上の ゆかを ならした 転がり抵抗。こおりの上を通る線は、弱く うつ目安になる。 */
+  /**
+   * その線の上の ゆかを ならした 転がり抵抗。こおりの上を通る線は、弱く うつ目安になる。
+   * おいかぜは ブレーキを へらし、むかいかぜは ふやす（かぜの 中を すすむ ぶんだけ）。
+   */
   const decelAlong = (from: Vec2, to: Vec2) => {
     const steps = 6
+    const length = Math.hypot(to.x - from.x, to.z - from.z) || 1
+    const u = { x: (to.x - from.x) / length, z: (to.z - from.z) / length }
     let total = 0
     for (let index = 0; index <= steps; index++) {
       const t = index / steps
-      total += decelOf(geometry.surfaceAt(from.x + (to.x - from.x) * t, from.z + (to.z - from.z) * t) ?? 'green')
+      const point = { x: from.x + (to.x - from.x) * t, z: from.z + (to.z - from.z) * t }
+      total += decelOf(geometry.surfaceAt(point.x, point.z) ?? 'green')
+      for (const fan of fans) if (inStrip(point, fan)) total -= fan.strength * (fan.dir.x * u.x + fan.dir.z * u.z)
     }
-    return total / (steps + 1)
+    return Math.max(decelOf('green') * 0.25, total / (steps + 1))
   }
   const ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 })
   const probe = new RAPIER.Ball(BALL_RADIUS)
@@ -236,6 +284,8 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
   let airTime = 0
   let airborne = false
   let airSpeed = 0
+  /** トランポリンで とんでいる あいだ。ちゃくちで ぽすっと よこの速さを おとす。 */
+  let flight: { time: number } | null = null
   let lastSurface: Surface = 'green'
   let events: GolfEvent[] = []
   const lastEmit = new Map<string, number>()
@@ -258,10 +308,29 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     ball.setAngvel(ZERO, true)
   }
 
+  /** スイッチを おす。とびらの あたり判定を なくし、ねらいの見通しからも はずす。 */
+  function press(item: (typeof switches)[number], at: Vec3) {
+    if (item.openedAt !== null) return
+    item.openedAt = time
+    if (item.door) {
+      roles.delete(item.door.handle)
+      obstacleHandles.delete(item.door.handle)
+      world.removeCollider(item.door, true)
+      item.door = null
+    }
+    emit({ kind: 'switch', id: item.id, position: at })
+  }
+
+  const onSwitch = (item: { x: number; z: number }, p: Vec2) => Math.hypot(p.x - item.x, p.z - item.z) < SWITCH.radius
+
   function place(point: Vec2): Vec3 {
     const ground = geometry.heightAt(point.x, point.z) ?? geometry.tee.y
     rest = clearOfGates({ x: point.x, y: ground + BALL_RADIUS + 0.003, z: point.z })
     for (const warp of warps) warp.inside = false
+    for (const pad of trampolines) pad.inside = false
+    // スイッチの 上に おいた ボールは、スイッチを おしている。
+    for (const item of switches) if (onSwitch(item, rest)) press(item, rest)
+    flight = null
     pin(rest)
     ball.setRotation(IDENTITY, true)
     phase = 'ready'
@@ -302,6 +371,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     if (role.kind === 'tree') emit({ kind: 'tree', strength: Math.max(0.35, strength), position: p }, 'tree', 0.14)
     if (role.kind === 'blade') emit({ kind: 'windmill', strength: Math.max(0.4, strength), position: p }, 'blade', 0.2)
     if (role.kind === 'gate' && speed > 0.3) emit({ kind: 'gate', id: role.id, strength: Math.max(0.4, strength), position: p }, `gate-${role.id}`, 0.15)
+    if (role.kind === 'door' && speed > 0.3) emit({ kind: 'door', id: role.id, strength: Math.max(0.4, strength), position: p }, `door-${role.id}`, 0.4)
     if (role.kind === 'bumper' || role.kind === 'critter') {
       // 反発だけでは遅い球の「ぽよん」が弱いので、外向きの速さを最低限そろえる。
       // 動く どうぶつは、いまの居場所を からだから読む。
@@ -426,7 +496,9 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       emit({ kind: 'warp', id: warp.id, position: p, to })
       return
     }
-    const grounded = ground(p) !== null
+    if (flight) flight.time += PHYSICS_STEP
+    // トランポリンで とびあがった すぐあとは、まだ ゆかが ちかくても ちゃくちとは みない。
+    const grounded = ground(p) !== null && !(flight && flight.time < 0.2)
     let v = ball.linvel()
     if (!grounded) {
       airTime += PHYSICS_STEP
@@ -437,6 +509,14 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       if (airborne) emit({ kind: 'land', strength: Math.min(1, airSpeed / 4), position: p })
       airborne = false
       airTime = 0
+      if (flight) {
+        // トランポリンからの ちゃくちは ぽすっと。よこの速さを おとし、はねかえりも おさえて、ころがりすぎないように する。
+        flight = null
+        const w = ball.angvel()
+        ball.setLinvel({ x: v.x * TRAMPOLINE.landKeep, y: Math.max(v.y, -0.6), z: v.z * TRAMPOLINE.landKeep }, true)
+        ball.setAngvel({ x: w.x * TRAMPOLINE.landKeep, y: w.y * TRAMPOLINE.landKeep, z: w.z * TRAMPOLINE.landKeep }, true)
+        v = ball.linvel()
+      }
       // いけや かわに ころがりこんだ。とんで こえている あいだは おちない。
       if (geometry.waterAt(p.x, p.z)) {
         phase = 'out'
@@ -450,11 +530,31 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       const surface = geometry.surfaceAt(p.x, p.z) ?? 'green'
       if (surface !== 'green' && surface !== lastSurface && speed > 0.3) emit({ kind: 'surface', surface, position: p })
       lastSurface = surface
-      const factor = rollingFactor(speed, decelOf(surface), PHYSICS_STEP)
-      if (factor < 1) {
-        const w = ball.angvel()
-        ball.setLinvel({ x: v.x * factor, y: v.y * factor, z: v.z * factor }, true)
-        ball.setAngvel({ x: w.x * factor, y: w.y * factor, z: w.z * factor }, true)
+      for (const item of switches) if (item.openedAt === null && onSwitch(item, p)) press(item, p)
+      const belt = conveyors.find(item => inStrip(p, item))
+      for (const item of conveyors) {
+        if (item === belt && !item.inside && speed > 0.1) emit({ kind: 'conveyor', id: item.id, position: p }, `conveyor-${item.id}`, 0.6)
+        item.inside = item === belt
+      }
+      if (belt) {
+        // ベルトの上では、ベルトの速さとの ちがいだけが へっていき、やがて ベルトと いっしょに はこばれる。
+        // ころがり抵抗も ベルトに たいして かかる。回転は 床に たいして ころがる向きに そろえる。
+        const ux = belt.dir.x * belt.speed
+        const uz = belt.dir.z * belt.speed
+        const rx = v.x - ux
+        const rz = v.z - uz
+        const keep = Math.exp(-CONVEYOR.grip * PHYSICS_STEP) * rollingFactor(Math.hypot(rx, rz), decelOf(surface), PHYSICS_STEP)
+        const nx = ux + rx * keep
+        const nz = uz + rz * keep
+        ball.setLinvel({ x: nx, y: v.y, z: nz }, true)
+        ball.setAngvel({ x: nz / BALL_RADIUS, y: 0, z: -nx / BALL_RADIUS }, true)
+      } else {
+        const factor = rollingFactor(speed, decelOf(surface), PHYSICS_STEP)
+        if (factor < 1) {
+          const w = ball.angvel()
+          ball.setLinvel({ x: v.x * factor, y: v.y * factor, z: v.z * factor }, true)
+          ball.setAngvel({ x: w.x * factor, y: w.y * factor, z: w.z * factor }, true)
+        }
       }
       for (const booster of boosters) {
         const dx = p.x - booster.x
@@ -473,6 +573,38 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         }
         booster.inside = inside
       }
+      for (const pad of trampolines) {
+        const inside = Math.hypot(p.x - pad.x, p.z - pad.z) < pad.radius
+        if (inside && !pad.inside && speed > TRAMPOLINE.minSpeed) {
+          // どの向きから のっても、to に ちゃくちする はやさで とばす。
+          const to = { x: pad.to.x, y: (geometry.heightAt(pad.to.x, pad.to.z) ?? p.y - BALL_RADIUS) + BALL_RADIUS, z: pad.to.z }
+          const launch = trampolineLaunch(p, to, course.gravity)
+          ball.setLinvel(launch, true)
+          ball.setAngvel({ x: launch.z / BALL_RADIUS, y: 0, z: -launch.x / BALL_RADIUS }, true)
+          flight = { time: 0 }
+          // とびあがりは トランポリンの できごとで しらせ、ジャンプの できごとは 出さない。
+          airborne = true
+          airSpeed = 0
+          emit({ kind: 'trampoline', id: pad.id, position: p })
+        }
+        pad.inside = inside
+      }
+    }
+    // かぜは、ころがっていても とんでいても おす。
+    for (const fan of fans) {
+      const inside = inStrip(p, fan)
+      if (inside) {
+        v = ball.linvel()
+        const push = { x: fan.dir.x * fan.strength * PHYSICS_STEP, z: fan.dir.z * fan.strength * PHYSICS_STEP }
+        ball.setLinvel({ x: v.x + push.x, y: v.y, z: v.z + push.z }, true)
+        // ころがっている ボールは 回転も いっしょに かえる。かえないと 床との まさつで 速さが もどってしまう。
+        if (grounded) {
+          const w = ball.angvel()
+          ball.setAngvel({ x: w.x + push.z / BALL_RADIUS, y: w.y, z: w.z - push.x / BALL_RADIUS }, true)
+        }
+        if (!fan.inside) emit({ kind: 'wind', id: fan.id, position: p }, `wind-${fan.id}`, 1.5)
+      }
+      fan.inside = inside
     }
     v = ball.linvel()
     const speed = Math.hypot(v.x, v.y, v.z)
@@ -547,6 +679,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
           // 行きと帰りで むきを かえる。速さの向き（sin の かたむき）で見分ける。
           return { x: at.x, z: at.z, facing: Math.cos(critter.speed * time) >= 0 ? heading : heading + Math.PI }
         }),
+        doors: switches.map(item => (item.openedAt === null ? 0 : Math.min(1, (time - item.openedAt) / SWITCH.openSeconds))),
       }
     },
     step,
@@ -563,8 +696,10 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       airborne = false
       airTime = 0
       lastSurface = 'green'
-      // どかんの上で止まっていたら、ここから うって そのまま入れる。
+      // どかんや トランポリンの上で止まっていたら、ここから うって そのまま入れる。
       for (const warp of warps) warp.inside = false
+      for (const pad of trampolines) pad.inside = false
+      flight = null
       emit({ kind: 'shot', power, position: position() })
       return true
     },
@@ -575,6 +710,9 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     /** ねらいの道すじ。まっすぐ転がる距離の目安まで、壁で1回はね返るところまでを返す。 */
     aimPath(direction: Vec2, power: number, maxLength = 6): Vec3[] {
       const start = position()
+      // トランポリンの 上では、どこへ うっても ちゃくちてんへ とぶ。
+      const pad = trampolines.find(item => Math.hypot(start.x - item.x, start.z - item.z) < item.radius)
+      if (pad) return [start, { x: pad.to.x, y: (geometry.heightAt(pad.to.x, pad.to.z) ?? start.y - BALL_RADIUS) + BALL_RADIUS, z: pad.to.z }]
       const length = Math.hypot(direction.x, direction.z) || 1
       let d = { x: direction.x / length, z: direction.z / length }
       let remaining = Math.min(maxLength, rollDistance(shotSpeed(power), decelAlong(start, { x: start.x + d.x * maxLength, z: start.z + d.z * maxLength })))
@@ -599,12 +737,25 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     suggestShot(): ShotSuggestion {
       const p = position()
       const route = hole.route
+      // トランポリンの 上からは、どの向きに うっても to へ とぶ。ちゃくちてんの ほうへ やさしく うつ。
+      const pad = trampolines.find(item => Math.hypot(p.x - item.x, p.z - item.z) < item.radius)
+      if (pad) {
+        const dx = pad.to.x - p.x
+        const dz = pad.to.z - p.z
+        const distance = Math.hypot(dx, dz) || 1
+        return { direction: { x: dx / distance, z: dz / distance }, power: 0.15, target: { x: pad.to.x, z: pad.to.z } }
+      }
       let segment = 0
       let nearest = Infinity
       for (let index = 0; index < route.length - 1; index++) {
         const distance = segmentDistance(p, route[index]!, route[index + 1]!)
         if (distance <= nearest + 1e-6) { nearest = distance; segment = index }
       }
+      // スイッチを まだ おしていなければ、スイッチより 先は ねらわない（とびらの むこうへは まだ いけない）。
+      // スイッチを とばして 先へ 来てしまったときも、まず スイッチへ もどる。
+      const gate = route.findIndex(point => switches.some(item => item.openedAt === null && onSwitch(item, point)))
+      if (gate > 0 && gate <= segment) segment = gate - 1
+      const farthest = gate > 0 ? gate : route.length - 1
       const aimAt = (target: Vec2, extra: number, lastPassed: number): ShotSuggestion => {
         const dx = target.x - p.x
         const dz = target.z - p.z
@@ -633,7 +784,7 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         return aimAt(route[index]!, after + (last === route.length - 1 ? 0.6 : 0.25), last)
       }
       // 1. 先の点のうち、見通せる いちばん先の点。途中の点はそこで止まる強さにする（点は次の点が見通せる所に置いてある）。
-      for (let index = route.length - 1; index > segment; index--) {
+      for (let index = farthest; index > segment; index--) {
         if (clearLine(p, route[index]!)) return aimAtIndex(index)
       }
       // 2. 次の点の向きを少しずつ ずらし、バンパーや いわ・とびらの よこを通す。

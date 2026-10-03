@@ -187,6 +187,8 @@ export function usePutterGolfEngine(options: Options) {
         if (event.kind === 'reflector') { scene.pulseBumper(event.id); scene.effect('sparkle', event.position) }
         if (event.kind === 'critter') scene.effect('sparkle', event.position)
         if (event.kind === 'boost') scene.effect('sparkle', event.position)
+        if (event.kind === 'switch') scene.effect('sparkle', event.position)
+        if (event.kind === 'trampoline') { scene.pulseBumper(event.id); scene.effect('ring', event.position) }
         if (event.kind === 'surface') scene.effect(event.surface === 'ice' ? 'sparkle' : 'dust', event.position, 0.7)
         if (event.kind === 'warp') {
           scene.effect('ring', event.position)
