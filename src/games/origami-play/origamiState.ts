@@ -1,3 +1,6 @@
+/** How long one fold animates; a step only counts once it has finished. */
+export const FOLD_MS = 850
+
 export type OrigamiState = { step: number; folding: boolean }
 
 export const initialOrigamiState: OrigamiState = { step: 0, folding: false }

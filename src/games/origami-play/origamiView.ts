@@ -27,9 +27,12 @@ function fit(box: Bounds): View {
 
 /** Frame both the paper and the shape it is about to become, so the guide and the fold stay on the desk. */
 export function paperView(templateId: OrigamiId, step: number): View {
-  const { states } = origamiSequence(templateId)
+  const { states, frames } = origamiSequence(templateId)
   let box = bounds(states[step]!)
   if (step + 1 < states.length) box = merge(box, bounds(states[step + 1]!))
+  // A squash or petal fold passes through in-between shapes; keep those on the desk too.
+  const frame = frames[step]
+  if (frame?.type === 'collapse') for (const part of frame.parts) box = merge(box, bounds(part.before))
   const extra = FINISH_EXTRA[templateId]
   if (step === states.length - 1 && extra) box = merge(box, extra)
   return fit(box)
@@ -44,10 +47,9 @@ export function foldHint(templateId: OrigamiId, step: number): { x: number; y: n
   if (!frame || frame.type === 'flip') {
     const box = bounds(states[step]!)
     point = [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2]
-  } else if (frame.type === 'reshape') {
-    point = centroid(states[step]!.filter((face) => frame.removed.has(face.id)))
   } else {
-    point = centroid(frame.before.filter((face) => frame.moving.has(face.id)))
+    const fold = frame.type === 'collapse' ? frame.parts[0]! : frame
+    point = centroid(fold.before.filter((face) => fold.moving.has(face.id)))
   }
   return { x: view.x + point[0] * view.scale, y: view.y + point[1] * view.scale }
 }

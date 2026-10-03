@@ -1,5 +1,5 @@
 import {
-  buildSequence, faceCenterX, hasTag, lacksTag, reflect, squareSheet,
+  buildSequence, centroid, faceCenterX, fromPaper, hasTag, lacksTag, reflect, squareSheet,
   type FaceFilter, type FaceSpec, type OrigamiOp, type Point, type Sequence,
 } from './origamiEngine'
 
@@ -24,37 +24,66 @@ function lineAt([x, y]: Point, degrees: number): readonly [Point, Point] {
   return [[x - Math.cos(radians) * 20, y - Math.sin(radians) * 20], [x + Math.cos(radians) * 20, y + Math.sin(radians) * 20]]
 }
 
-/** A flap made of two sheets, so folding it over still shows the coloured side. */
-function doubled(points: readonly Point[], tags: readonly string[]): FaceSpec[] {
-  return [{ points, side: 'back', tags }, { points, side: 'front', tags }]
-}
-
-function squareBase(tag: string) {
-  return [
-    ...doubled([[0, 0], [-70, 70], [0, 140]], [tag]),
-    ...doubled([[0, 0], [70, 70], [0, 140]], [tag]),
-  ]
-}
-
-function birdHalf(side: 'A' | 'B') {
-  return [
-    ...doubled([[-41, 41], [41, 41], [0, -58]], ['wing', `wing${side}`]),
-    ...doubled([[-41, 41], [0, 41], [0, 140]], ['leg', `leg${side}`]),
-    ...doubled([[41, 41], [0, 41], [0, 140]], ['leg', `leg${side}`]),
-  ]
-}
+/** Where the kite folds of a square base meet its outer edges: 140 · tan(22.5°) / (1 + tan(22.5°)). */
+const KITE = 140 * (1 - Math.SQRT1_2)
+/** Thinning a bird-base leg halves the kite angle again (11.25°). */
+const THIN = (140 - KITE) * Math.tan(Math.PI / 16)
+const paperRight = fromPaper(([x]) => x > 0)
+const paperLeft = fromPaper(([x]) => x < 0)
+const paperTop = fromPaper(([, y]) => y < 0)
+const paperBottom = fromPaper(([, y]) => y > 0)
+/** The crane's legs below the wings, one on each side of the middle. */
+const legLeft: FaceFilter = (face) => centroid([face])[1] > KITE && faceCenterX(face) < 0
+const legRight: FaceFilter = (face) => centroid([face])[1] > KITE && faceCenterX(face) > 0
 
 const angleOf = ([x, y]: Point) => Math.atan2(y, x) * 180 / Math.PI
-/** The crane's legs are reverse-folded up into a neck and tail; the head bends the neck tip. */
-const NECK = lineAt([-7, 58], -19)
-const TAIL = lineAt([7, 58], 19)
+/** The thin legs are reverse-folded up into a long neck and tail; the head bends the neck tip. */
+const NECK = lineAt([-9, 52], -25)
+const TAIL = lineAt([9, 52], 25)
 const NECK_TIP = reflect([0, 140], NECK)
-const NECK_DIRECTION = angleOf([NECK_TIP[0] + 7, NECK_TIP[1] - 58])
+const NECK_DIRECTION = angleOf([NECK_TIP[0] + 9, NECK_TIP[1] - 52])
 const HEAD_AT: Point = [
-  NECK_TIP[0] - Math.cos(NECK_DIRECTION * Math.PI / 180) * 22,
-  NECK_TIP[1] - Math.sin(NECK_DIRECTION * Math.PI / 180) * 22,
+  NECK_TIP[0] - Math.cos(NECK_DIRECTION * Math.PI / 180) * 20,
+  NECK_TIP[1] - Math.sin(NECK_DIRECTION * Math.PI / 180) * 20,
 ]
 const HEAD = lineAt(HEAD_AT, (NECK_DIRECTION + 165) / 2)
+/** The quarters of the sheet around its left and right corners, split by the creases from edge middle to edge middle. */
+const leftQuarter = fromPaper(([x, y]) => x < -Math.abs(y))
+const rightQuarter = fromPaper(([x, y]) => x > Math.abs(y))
+/** The petal flaps that become the wings; the triangle near the middle of the sheet stays as the crane's back. */
+const leftWing = all(leftQuarter, fromPaper(([x]) => x < -KITE))
+const rightWing = all(rightQuarter, fromPaper(([x]) => x > KITE))
+/** The middle of a quarter, between the kite creases running from its corner. */
+const kiteMiddle = fromPaper(([x, y]) => Math.abs(y) < (140 - Math.abs(x)) * Math.tan(Math.PI / 8))
+
+/**
+ * Petal fold: the middle of the front layer lifts up along the line where the kite folds
+ * meet the edges, and its sides follow and close over it so the edges meet in the middle.
+ */
+function petal(quarter: FaceFilter): OrigamiOp {
+  const line: readonly [Point, Point] = [[-KITE, KITE], [KITE, KITE]]
+  return {
+    type: 'collapse', folds: [
+      { type: 'valley', line, move: [0, 110], select: all(quarter, kiteMiddle) },
+      { type: 'valley', line, move: [0, 110], select: all(quarter, (face) => !kiteMiddle(face)) },
+    ],
+  }
+}
+
+/**
+ * Squash the flap lying on the `from` half of the triangle: its pocket opens, the folded
+ * spine comes down onto the middle and each layer folds its outer corner back over itself,
+ * making one side of a square base.
+ */
+function squash(top: FaceFilter, under: FaceFilter, from: -1 | 1): OrigamiOp {
+  return {
+    type: 'collapse', folds: [
+      { type: 'valley', line: [[0, 0], [0, 140]], move: [from * 60, 40], select: top },
+      { type: 'valley', line: [[0, 0], [-from * 70, 70]], move: [-from * 110, 15], select: top, tuck: true },
+      { type: 'valley', line: [[0, 0], [from * 70, 70]], move: [from * 110, 15], select: under, tuck: true },
+    ],
+  }
+}
 
 const TOP_DOWN: OrigamiOp = { type: 'valley', line: [[-140, 0], [140, 0]], move: [0, -100], tag: 'a' }
 const BOTTOM_UP: OrigamiOp = { type: 'valley', line: [[-140, 0], [140, 0]], move: [0, 100], tag: 'a' }
@@ -167,25 +196,27 @@ export const ORIGAMI_TEMPLATES: readonly Template[] = [
     start: squareSheet('back', 'diamond'),
     steps: [
       { instruction: 'うえを したへ ぱたん！', op: TOP_DOWN },
-      { instruction: 'はんぶんに おろう', op: { type: 'valley', line: [[0, 0], [0, 140]], move: [60, 40], tag: 'half' } },
-      { instruction: 'ふくろを ひらいて しかくに', op: { type: 'reshape', remove: hasTag('half'), add: squareBase('sqA') } },
+      { instruction: 'はんぶんに おろう', op: { type: 'valley', line: [[0, 0], [0, 140]], move: [60, 40] } },
+      { instruction: 'ふくろを ひらいて つぶそう', op: squash(all(paperRight, paperBottom), all(paperRight, paperTop), -1) },
       { instruction: 'くるっと うらがえそう', op: { type: 'flip' } },
-      { instruction: 'こっちも ひらいて しかく', op: { type: 'reshape', remove: lacksTag('sqA'), add: squareBase('sqB') } },
-      { instruction: 'はしを まんなかへ おろう', op: { type: 'valley', line: [[0, 140], [-41, 41]], move: [-60, 70], select: hasTag('sqB') } },
-      { instruction: 'はんたいも まんなかへ', op: { type: 'valley', line: [[0, 140], [41, 41]], move: [60, 70], select: hasTag('sqB') } },
-      { instruction: 'したを もちあげて ほそながく', op: { type: 'reshape', remove: hasTag('sqB'), add: birdHalf('B') } },
+      { instruction: 'こっちも ひらいて つぶそう', op: squash(all(paperLeft, paperBottom), all(paperLeft, paperTop), 1) },
+      { instruction: 'はしを まんなかへ おろう', op: { type: 'valley', line: [[0, 140], [-KITE, KITE]], move: [-45, 75], top: 2 } },
+      { instruction: 'はんたいも まんなかへ', op: { type: 'valley', line: [[0, 140], [KITE, KITE]], move: [45, 75], top: 2 } },
+      { instruction: 'したの かどを うえへ もちあげよう', op: petal(leftQuarter) },
       { instruction: 'くるっと うらがえそう', op: { type: 'flip' } },
-      { instruction: 'はしを まんなかへ おろう', op: { type: 'valley', line: [[0, 140], [-41, 41]], move: [-60, 70], select: hasTag('sqA') } },
-      { instruction: 'はんたいも まんなかへ', op: { type: 'valley', line: [[0, 140], [41, 41]], move: [60, 70], select: hasTag('sqA') } },
-      { instruction: 'もちあげて ほそながく', op: { type: 'reshape', remove: hasTag('sqA'), add: birdHalf('A') } },
-      { instruction: 'あしを ほそく おろう', op: { type: 'valley', line: [[0, 140], [-19.7, 41]], move: [-35, 45], select: hasTag('legA') } },
-      { instruction: 'はんたいも ほそく', op: { type: 'valley', line: [[0, 140], [19.7, 41]], move: [35, 45], select: hasTag('legA') } },
+      { instruction: 'はしを まんなかへ おろう', op: { type: 'valley', line: [[0, 140], [-KITE, KITE]], move: [-45, 75], top: 2 } },
+      { instruction: 'はんたいも まんなかへ', op: { type: 'valley', line: [[0, 140], [KITE, KITE]], move: [45, 75], top: 2 } },
+      { instruction: 'こっちも かどを もちあげよう', op: petal(rightQuarter) },
+      { instruction: 'あしを ほそく おろう', op: { type: 'valley', line: [[0, 140], [-THIN, KITE]], move: [-20, 75], top: 2, tuck: true } },
+      { instruction: 'はんたいも ほそく', op: { type: 'valley', line: [[0, 140], [THIN, KITE]], move: [20, 75], top: 2, tuck: true } },
       { instruction: 'くるっと うらがえそう', op: { type: 'flip' } },
-      { instruction: 'こっちも ほそく おろう', op: { type: 'valley', line: [[0, 140], [-19.7, 41]], move: [-35, 45], select: hasTag('legB') } },
-      { instruction: 'はんたいも ほそく', op: { type: 'valley', line: [[0, 140], [19.7, 41]], move: [35, 45], select: hasTag('legB') } },
-      { instruction: 'なかに おりこんで くび', op: { type: 'reverse', line: NECK, move: [0, 135], select: all(hasTag('leg'), leftHalf), tag: 'neck' } },
-      { instruction: 'はんたいは しっぽ', op: { type: 'reverse', line: TAIL, move: [0, 135], select: all(hasTag('leg'), rightHalf, lacksTag('neck')) } },
+      { instruction: 'こっちも ほそく おろう', op: { type: 'valley', line: [[0, 140], [-THIN, KITE]], move: [-20, 75], top: 2, tuck: true } },
+      { instruction: 'はんたいも ほそく', op: { type: 'valley', line: [[0, 140], [THIN, KITE]], move: [20, 75], top: 2, tuck: true } },
+      { instruction: 'なかに おりこんで くび', op: { type: 'reverse', line: NECK, move: [-4, 130], select: legLeft, tag: 'neck' } },
+      { instruction: 'はんたいは しっぽ', op: { type: 'reverse', line: TAIL, move: [4, 130], select: legRight, tag: 'tail' } },
       { instruction: 'くびの さきを おって あたま', op: { type: 'reverse', line: HEAD, move: NECK_TIP, select: hasTag('neck'), tag: 'head' } },
+      { instruction: 'はねを したへ おろそう', op: { type: 'valley', line: [[-KITE, KITE], [KITE, KITE]], move: [0, 0], select: leftWing } },
+      { instruction: 'うしろの はねも おろそう', op: { type: 'mountain', line: [[-KITE, KITE], [KITE, KITE]], move: [0, 0], select: rightWing } },
     ],
   },
 ]

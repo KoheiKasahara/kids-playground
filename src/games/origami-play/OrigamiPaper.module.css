@@ -12,21 +12,21 @@
 
 .foldingFlap {
   transform-origin: 0 0;
-  animation: paperFold 850ms cubic-bezier(.4, 0, .2, 1) both;
+  animation: paperFold var(--fold-duration, 850ms) cubic-bezier(.4, 0, .2, 1) both;
 }
 
 .firstHalf {
-  animation: showFirst 850ms steps(1, end) both;
+  animation: showFirst var(--fold-duration, 850ms) steps(1, end) both;
 }
 
 .secondHalf {
-  animation: showSecond 850ms steps(1, end) both;
+  animation: showSecond var(--fold-duration, 850ms) steps(1, end) both;
 }
 
 .foldShade path {
   fill: #695049;
   opacity: 0;
-  animation: foldShade 850ms ease-in-out both;
+  animation: foldShade var(--fold-duration, 850ms) ease-in-out both;
 }
 
 .flipOut,
@@ -40,14 +40,6 @@
 
 .flipIn {
   animation: flipIn 850ms cubic-bezier(.4, 0, .2, 1) both;
-}
-
-.fadeOut {
-  animation: fadeOut 850ms ease-in-out both;
-}
-
-.fadeIn {
-  animation: fadeIn 850ms ease-in-out both;
 }
 
 .guide {
@@ -149,16 +141,6 @@
   100% { transform: scaleX(1); opacity: 1; }
 }
 
-@keyframes fadeOut {
-  0% { opacity: 1; }
-  55%, 100% { opacity: 0; }
-}
-
-@keyframes fadeIn {
-  0%, 35% { opacity: 0; }
-  100% { opacity: 1; }
-}
-
 @keyframes reveal {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -214,8 +196,7 @@
   }
 
   .firstHalf,
-  .flipOut,
-  .fadeOut {
+  .flipOut {
     opacity: 0;
   }
 }
