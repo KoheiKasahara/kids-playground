@@ -279,7 +279,7 @@ function KomaBattleScene({
           aria-label="ぼんを ゆらす"
           onClick={shakeField}
         >
-          <span aria-hidden="true">〰️</span>
+          <span aria-hidden="true">↔️</span>
           <span>ゆらす</span>
         </button>
       ) : null}
