@@ -112,6 +112,30 @@
 .normal { background: radial-gradient(circle at 35% 35%, #ff8a80, #e53935 70%, #9e1f1b); }
 .heavy { background: radial-gradient(circle at 35% 35%, #8a939c, #3f464e 70%, #23282d); width: 21px; height: 21px; }
 .split { background: radial-gradient(circle at 35% 35%, #8fd9ff, #2f8fdc 70%, #1b5e9a); width: 15px; height: 15px; }
+.bomb, .drill { position: relative; }
+.bomb { background: radial-gradient(circle at 35% 35%, #6b7280, #2b2f36 70%, #111317); margin-top: 4px; }
+.bomb::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff3a8, #ffb02e 60%, #ff6b2e);
+}
+.drill { background: radial-gradient(circle at 35% 35%, #fff1a8, #ffc61a 70%, #c98a00); width: 16px; height: 16px; margin-right: 6px; }
+.drill::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -8px;
+  transform: translateY(-50%);
+  border-left: 9px solid #9aa8b6;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+.bouncy { background: radial-gradient(circle at 35% 35%, #c4f7a8, #4cc35a 70%, #2b8a3e); }
 
 /* --- ふきだし・ヒント --- */
 .bubble {

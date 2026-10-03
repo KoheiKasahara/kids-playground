@@ -3,12 +3,12 @@ import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
-import { LEVELS, SLING, starsFor, type BallKind } from './levels'
+import { LEVELS, robotCount, SLING, starsFor, type BallKind } from './levels'
 import { follow, makeView, toWorld, type View } from './camera'
 import { createFx, drawScene, spawnFx, updateFx } from './render'
 import { readProgress, recordStars, type RoboProgress } from './progress'
 import { clampPull, createGame, MAX_PULL, predictPath, type Game, type GameState, type Point } from './world'
-import { playBlastSound, playBreakSound, playClearSound, playFailSound, playHitSound, playLaunchSound, playRobotSound, playSplitSound, playStretchSound } from './sounds'
+import { playBlastSound, playBreakSound, playClearSound, playFailSound, playHelmetSound, playHitSound, playLaunchSound, playPierceSound, playPopSound, playRobotSound, playSplitSound, playSpringSound, playStretchSound, playWarpSound } from './sounds'
 import styles from './RoboKuzushiPlay.module.css'
 
 const TITLE = 'とばせ！ロボくずし'
@@ -26,7 +26,16 @@ const CONFETTI: CSSProperties[] = Array.from({ length: 26 }, (_, i) => {
   return { left: `${r(1) * 100}%`, background: `hsl(${Math.round(r(2) * 360)} 90% 62%)`, animationDuration: `${1.8 + r(3) * 1.6}s`, animationDelay: `${-r(4) * 3}s`, width: `${6 + r(5) * 6}px` }
 })
 
-const BALL_NAMES: Record<BallKind, string> = { normal: 'あか', heavy: 'てつ', split: 'あお' }
+const BALL_NAMES: Record<BallKind, string> = { normal: 'あかい たま', heavy: 'てつの たま', split: 'あおい たま', bomb: 'ばくだん', drill: 'ドリル', bouncy: 'ぽよん' }
+/** ステージえらびの せつめい。 */
+const BALL_LEGEND: [BallKind, string][] = [
+  ['normal', 'あか: ふつうの たま'],
+  ['heavy', 'てつ: おもくて つよい'],
+  ['split', 'あお: とちゅうで 3つに'],
+  ['bomb', 'ばくだん: ぶつかると ドッカーン'],
+  ['drill', 'ドリル: きや こおりを つきぬける'],
+  ['bouncy', 'ぽよん: よく はねる'],
+]
 
 type Hud = { state: GameState; score: number; queue: readonly BallKind[]; robots: number; shots: number }
 type Result = { kind: 'clear'; stars: number; score: number } | { kind: 'fail'; robots: number }
@@ -84,7 +93,7 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
   const keyAim = useRef({ angle: 35, power: .8, active: false })
   const gesture = useRef<{ id: number; mode: 'aim' | 'pan'; origin: Point; center: number } | null>(null)
   const camera = useRef({ center: level.width, manual: false, intro: INTRO_FRAMES, hold: 0 })
-  const [hud, setHud] = useState<Hud>(() => ({ state: 'aim', score: 0, queue: level.balls, robots: level.pieces.filter(p => p.type === 'robot').length, shots: 0 }))
+  const [hud, setHud] = useState<Hud>(() => ({ state: 'aim', score: 0, queue: level.balls, robots: robotCount(level), shots: 0 }))
   const [result, setResult] = useState<Result | null>(null)
   const [aiming, setAiming] = useState(false)
   const showHint = useRef(index === 0 && !reducedMotionQuery())
@@ -133,11 +142,11 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
       if (pathDirty.current) {
         pathDirty.current = false
         const pull = pullRef.current
-        pathRef.current = pull && game.queue.length ? predictPath(pull, game.queue[0]) : []
+        pathRef.current = pull && game.queue.length ? predictPath(pull, game.queue[0], undefined, undefined, level) : []
       }
       drawScene(ctx, {
-        view, dpr: size.dpr, time, levelWidth: level.width,
-        pieces: game.pieces, projectiles: game.projectiles, queue: game.queue,
+        view, dpr: size.dpr, time, levelWidth: level.width, sky: level.sky ?? 'day',
+        pieces: game.pieces, projectiles: game.projectiles, portals: game.portals, fans: game.fans, queue: game.queue,
         pull: game.state === 'aim' ? pullRef.current : null, path: pathRef.current,
         trail: game.trail, currentTrail: game.currentTrail, fx, reducedMotion,
         showDragHint: showHint.current && game.state === 'aim' && game.shots === 0 && !pullRef.current && camera.current.intro <= 0,
@@ -165,9 +174,14 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
         if (event.type === 'launch') playLaunchSound()
         else if (event.type === 'robot') playRobotSound()
         else if (event.type === 'break') playBreakSound(event.material)
-        else if (event.type === 'blast') playBlastSound()
+        else if (event.type === 'blast') playBlastSound(event.source === 'bomb')
         else if (event.type === 'split') playSplitSound()
         else if (event.type === 'hit') playHitSound(event.material, event.strength)
+        else if (event.type === 'pop') playPopSound()
+        else if (event.type === 'helmet') playHelmetSound()
+        else if (event.type === 'spring') playSpringSound()
+        else if (event.type === 'warp') playWarpSound()
+        else if (event.type === 'pierce') playPierceSound()
       }
       if (game.state !== lastState) {
         if (lastState === 'flying' && game.state === 'aim') camera.current.hold = RETURN_HOLD
@@ -196,7 +210,8 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
       let target = cam.center
       if (cam.intro > 0) { cam.intro -= frames; target = cam.intro > 30 ? level.width : 0 }
       else if (game.state === 'flying' && game.projectiles.length) target = Math.max(...game.projectiles.map(p => p.body.position.x)) + view.width * .12
-      else if (game.state === 'clear' || game.state === 'fail') target = cam.center
+      // ばくだんが はじけて たまが なくなっても、くずれおわるまで その ばしょを うつす。
+      else if (game.state === 'flying' || game.state === 'clear' || game.state === 'fail') target = cam.center
       else if (cam.hold > 0) cam.hold -= frames
       else if (!cam.manual) target = 0
       cam.center = follow(cam.center, target, frames, game.state === 'flying' ? .1 : .06)
@@ -330,7 +345,7 @@ function Stage({ index, onExit, onRetry, onNext }: { index: number; onExit: () =
     </div>
     <p className={styles.bubble} role="status" data-show={Boolean(hint) || undefined}>
       {hint}
-      {hud.state === 'aim' && next && hint && <span className={styles.nextBall}>つぎは {BALL_NAMES[next]}の たま</span>}
+      {hud.state === 'aim' && next && hint && <span className={styles.nextBall}>つぎは {BALL_NAMES[next]}</span>}
     </p>
     {portrait && <section className={styles.orientationGuide} aria-label="よこむきで あそぶ あんない">
       <div className={styles.orientationCard}>
@@ -421,9 +436,7 @@ function StageSelect({ progress, onPick }: { progress: RoboProgress; onPick: (in
       })}
     </ol>
     <ul className={styles.legend}>
-      <li><i className={`${styles.ballDot} ${styles.normal}`} />あか: ふつうの たま</li>
-      <li><i className={`${styles.ballDot} ${styles.heavy}`} />てつ: おもくて つよい</li>
-      <li><i className={`${styles.ballDot} ${styles.split}`} />あお: とちゅうで 3つに</li>
+      {BALL_LEGEND.map(([kind, text]) => <li key={kind}><i className={`${styles.ballDot} ${styles[kind]}`} />{text}</li>)}
     </ul>
     <p className={styles.tip}>スマホは よこむきに して あそんでね</p>
   </main>
