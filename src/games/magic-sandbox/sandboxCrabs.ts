@@ -25,6 +25,11 @@ export type Creature = Point & {
   digging: boolean
   sleeping: number
   sleepDelay: number
+  // Hermit crabs only: steps left in a dig-hide-pop cycle, how deep the body has sunk
+  // (0 to 1), and whether it is lingering at the water's edge.
+  burrow: number
+  sink: number
+  shore: boolean
 }
 // Simulation runs at 60 steps/second. Each animal gets its own bedtime.
 export const nextSleepDelay = (random: () => number) => 480 + Math.floor(random() * 900)
@@ -47,7 +52,7 @@ function blocked(world: Sandbox, x: number, y: number, scale = 1) {
   return false
 }
 
-// Hermit crabs share every crab behaviour; only their drawing differs.
+// Hermit crabs eat, nap and greet like crabs, but also burrow, stay by the water and hide in their shell.
 const groundAnimals = (world: Sandbox) => [...world.crabs, ...world.hermits, ...world.turtles]
 const groupOf = (world: Sandbox, kind: Creature['kind']) => kind === 'crab' ? world.crabs : kind === 'hermit' ? world.hermits : world.turtles
 const LIMITS: Record<Creature['kind'], number> = { crab: MAX_CRABS, hermit: MAX_HERMITS, turtle: MAX_TURTLES }
@@ -65,7 +70,7 @@ function addCreature(world: Sandbox, random: () => number, kind: Creature['kind'
     let y = 8
     while (y < world.height - 1 && !soil(world.get(x, y + 1)) && !blockingCell(world.get(x, y + 1))) y++
     if (blocked(world, x, y) || groundAnimals(world).some(c => Math.hypot(c.x - x, c.y - y) < 20)) continue
-    group.push({ kind, growth: 0, fullness: 600, search: 0, target: null, pursuit: 0, eating: 0, celebration: 0, x, y, direction: random() < 0.5 ? -1 : 1, decision: 90, resting: false, wave: 70, cooldown: 300, phase: 0, digging: false, sleeping: 0, sleepDelay: world.night ? nextSleepDelay(random) : 0 })
+    group.push({ kind, growth: 0, fullness: 600, search: 0, target: null, pursuit: 0, eating: 0, celebration: 0, x, y, direction: random() < 0.5 ? -1 : 1, decision: 90, resting: false, wave: 70, cooldown: 300, phase: 0, digging: false, sleeping: 0, sleepDelay: world.night ? nextSleepDelay(random) : 0, burrow: 0, sink: 0, shore: false })
     return true
   }
   return false
@@ -78,10 +83,13 @@ function tapCreature(world: Sandbox, point: Point, group: Creature[]) {
   const crab = group.find(c => Math.abs(c.x - point.x) <= 9 * creatureScale(c) && Math.abs(c.y - 4 * creatureScale(c) - point.y) <= 9 * creatureScale(c) &&
     !soil(world.get(Math.round(c.x), Math.round(c.y - 5))))
   if (!crab) return false
+  // A tap on the sand mound wakes a hidden hermit crab, which wriggles up and pops out.
+  if (crab.burrow) { crab.burrow = Math.min(crab.burrow, RISE_STEPS); return true }
   wakeCreature(crab)
   crab.target = null; crab.eating = 0; crab.search = 90
   crab.wave = 90
-  crab.direction *= -1
+  // A hermit crab ducks into its shell where it stands instead of turning away.
+  if (crab.kind !== 'hermit') crab.direction *= -1
   crab.resting = true
   crab.decision = 90
   return true
@@ -91,6 +99,8 @@ export const stepCrabs = (world: Sandbox, random: () => number) => stepCreatures
 export const stepHermits = (world: Sandbox, random: () => number) => stepCreatures(world, random, world.hermits)
 export const stepTurtles = (world: Sandbox, random: () => number) => stepCreatures(world, random, world.turtles)
 function overlap(a: Creature, b: Creature, x = a.x, y = a.y) {
+  // A burrowed hermit crab is under the sand; walkers pass over it until it pops out.
+  if (a.burrow || b.burrow) return 0
   const sa = creatureScale(a), sb = creatureScale(b)
   if (y <= b.y - 9 * sb || b.y <= y - 9 * sa) return 0
   return Math.max(0, 9 * (sa + sb) - Math.abs(x - b.x))
@@ -133,6 +143,7 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
     crab.digging = [-3, 0, 3].some(dx => soil(world.get(x + dx, feet)))
     if (crab.digging) {
       wakeCreature(crab)
+      crab.burrow = 0; crab.sink = 0
       crab.target = null; crab.eating = 0
       // Never snap to a surface: claws, eyes, then legs emerge as the body rises.
       if (!blocked(world, crab.x, crab.y - 0.055, scale)) crab.y = Math.max(8, crab.y - 0.055)
@@ -144,10 +155,11 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
       return !soil(cell) && !blockingCell(cell)
     })) {
       wakeCreature(crab)
-      crab.target = null; crab.eating = 0
+      crab.target = null; crab.eating = 0; crab.burrow = 0; crab.sink = 0
       if (!blocked(world, crab.x, crab.y + 0.35, scale)) crab.y = Math.min(world.height - 1, crab.y + 0.35)
       continue
     }
+    if (crab.burrow) { stepBurrow(crab); continue }
     if (separate(world, crab, scale)) continue
     const feeding = feed(world, crab, random)
     if (feeding || crab.target) wakeCreature(crab)
@@ -174,8 +186,9 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
       crab.resting = random() < 0.35
       crab.direction = random() < 0.5 ? -1 : 1
       if (crab.resting && random() < 0.5) crab.wave = 45
+      if (crab.kind === 'hermit' && hermitDecision(world, crab, random, x, feet)) continue
       // A small, occasional preference, without a destination or pathfinding.
-      if (!crab.resting && random() < 0.3) {
+      if (crab.kind === 'crab' && !crab.resting && random() < 0.3) {
         let nearest = 25
         for (let dx = -24; dx <= 24; dx++) for (let dy = -5; dy <= 3; dy++) {
           if (Math.abs(dx) < nearest && world.get(x + dx, feet + dy) === Cell.Water) {
@@ -186,7 +199,7 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
       }
     }
     // Crabs and hermit crabs greet each other; the turtle keeps to itself.
-    const other = crab.kind !== 'turtle' && !crab.target ? [...world.crabs, ...world.hermits].find(c => c !== crab && !c.target && !c.sleeping) : undefined
+    const other = crab.kind !== 'turtle' && !crab.target ? [...world.crabs, ...world.hermits].find(c => c !== crab && !c.target && !c.sleeping && !c.burrow) : undefined
     if (other && !other.digging && Math.abs(other.y - crab.y) < 5) {
       const distance = Math.abs(other.x - crab.x)
       if (distance < 22 && crab.cooldown === 0 && other.cooldown === 0) {
@@ -208,6 +221,11 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
     let ny = crab.y
     // Small sand slopes are climbed gradually; rocks and ungerminated seeds turn the crab around.
     if (soil(world.get(Math.round(nx + crab.direction * 4), feet))) ny -= 0.12
+    // Hermit crabs stop at the water's edge and linger there instead of wading in.
+    if (crab.kind === 'hermit' && waterAhead(world, nx, feet, crab.direction, scale)) {
+      crab.shore = true; crab.resting = true; crab.decision = 120 + Math.floor(random() * 120)
+      continue
+    }
     if (groundAnimals(world).some(c => c !== crab && overlap(crab, c, nx, ny) > overlap(crab, c))) {
       crab.target = null; crab.eating = 0; crab.search = 90
       crab.direction *= -1; crab.decision = 90
@@ -218,6 +236,45 @@ function stepCreatures(world: Sandbox, random: () => number, group: Creature[]) 
       crab.direction *= -1; crab.resting = true; crab.decision = 35
     } else { crab.x = nx; crab.y = Math.max(8, ny) }
   }
+}
+
+const SINK_STEPS = 70
+const RISE_STEPS = 60
+const POP_STEPS = 12
+const water = (world: Sandbox, x: number, y: number) => world.get(Math.round(x), y) === Cell.Water
+function waterAhead(world: Sandbox, x: number, feet: number, direction: number, scale: number) {
+  for (let dx = 1; dx <= Math.ceil(8 * scale); dx++) for (let dy = -2; dy <= 1; dy++) {
+    if (water(world, x + direction * dx, feet + dy)) return true
+  }
+  return false
+}
+// Burrowing needs loose ground under the whole body, never rock or the board's floor.
+function canBurrow(world: Sandbox, x: number, feet: number) {
+  for (let dy = 1; dy <= 12; dy++) if (!soil(world.get(x, feet + dy))) return false
+  return [-4, 4].every(dx => soil(world.get(x + dx, feet + 1)))
+}
+// Head for the nearest water and rest at the shoreline; sometimes dig in, more often beside the water.
+function hermitDecision(world: Sandbox, hermit: Creature, random: () => number, x: number, feet: number) {
+  let nearest = Infinity
+  for (let dx = -48; dx <= 48; dx++) for (let dy = -5; dy <= 3; dy++) {
+    if (Math.abs(dx) < Math.abs(nearest) && world.get(x + dx, feet + dy) === Cell.Water) nearest = dx
+  }
+  hermit.shore = Math.abs(nearest) <= 10
+  if (hermit.shore) hermit.resting = hermit.resting || random() < 0.4
+  else if (nearest !== Infinity && !hermit.resting) hermit.direction = Math.sign(nearest)
+  if (world.night || random() >= (hermit.shore ? 0.4 : 0.2) || !canBurrow(world, x, feet)) return false
+  hermit.burrow = SINK_STEPS + 180 + Math.floor(random() * 240) + RISE_STEPS
+  hermit.resting = false; hermit.wave = 0; hermit.shore = false
+  return true
+}
+// Wriggle down into the sand, wait hidden, then the sand trembles before the hermit pops back up.
+function stepBurrow(hermit: Creature) {
+  hermit.burrow--
+  if (hermit.burrow > RISE_STEPS) hermit.sink = Math.min(1, hermit.sink + 1 / SINK_STEPS)
+  else hermit.sink = Math.min(hermit.sink, hermit.burrow / POP_STEPS)
+  if (hermit.burrow) return
+  hermit.sink = 0
+  hermit.resting = true; hermit.decision = 60; hermit.wave = 30
 }
 
 export function renderCrabs(world: Sandbox, pixels: Uint8ClampedArray) {
@@ -267,15 +324,23 @@ export function renderCrabs(world: Sandbox, pixels: Uint8ClampedArray) {
 // and it naps tucked into the shell.
 export function renderHermits(world: Sandbox, pixels: Uint8ClampedArray) {
   for (const hermit of world.hermits) {
-    const wobble = hermit.digging ? Math.sin(hermit.phase * 2) * 0.6 : 0
+    const sinking = hermit.burrow > RISE_STEPS
+    const wobble = hermit.digging ? Math.sin(hermit.phase * 2) * 0.6 : sinking && hermit.sink < 1 ? Math.sin(hermit.phase * 4) * 0.8 : 0
     const cx = Math.round(hermit.x + wobble), cy = Math.round(hermit.y)
-    const dot = creaturePainter(world, pixels, hermit, cx, cy)
+    if (hermit.burrow) renderBurrow(world, pixels, hermit, Math.round(hermit.x), cy)
+    if (hermit.sink >= 1) continue
+    // Sinking simply draws the body lower: the sand in front masks it a little more each step.
+    const dot = creaturePainter(world, pixels, hermit, cx, cy + Math.round(hermit.sink * 14 * creatureScale(hermit)))
     const d = hermit.direction
     const body = [236, 108, 70], leg = [196, 74, 50], shell = [238, 212, 164], stripe = [184, 118, 76], mouth = [112, 64, 46]
-    const walking = !hermit.resting && !hermit.wave && !hermit.eating
-    const tucked = hermit.sleeping > 0 || hermit.wave > 70
+    const walking = !hermit.resting && !hermit.wave && !hermit.eating && !hermit.burrow
+    // Tapped: hide in the shell, then peek out with just the eyes before climbing back out.
+    const tucked = hermit.sleeping > 0 || hermit.wave > 40
+    const peeking = !tucked && hermit.wave > 25 && !hermit.burrow
     const bob = walking && Math.sin(hermit.phase * 2) > 0 ? -1 : 0
-    if (!tucked) {
+    if (peeking) {
+      for (const ex of [3, 5]) { dot(d * ex, -6, body); dot(d * ex, -7, [255, 255, 236]); dot(d * ex + d, -7, [63, 56, 48]) }
+    } else if (!tucked) {
       const stride = walking ? Math.round(Math.sin(hermit.phase * 1.5)) : 0
       for (const [lx, step] of [[1, stride], [3, -stride], [5, stride]]) {
         dot(d * lx, -2, leg); dot(d * (lx + step), -1, leg); dot(d * (lx + step), 0, leg)
@@ -315,8 +380,36 @@ export function renderHermits(world: Sandbox, pixels: Uint8ClampedArray) {
       // Only the claw plugs the opening while it hides or sleeps.
       dot(sx + d * 4, sy + 1, body); dot(sx + d * 5, sy + 1, body); dot(sx + d * 5, sy + 2, body)
     }
+    if (hermit.shore && hermit.resting && !tucked && !hermit.sleeping) {
+      // Little bubbles while it relaxes by the water.
+      for (const offset of [0, 40]) {
+        const t = (hermit.phase * 8 + offset) % 80
+        if (t < 50) dot(d * (9 + Math.round(t / 25)), -6 - Math.floor(t / 8), [214, 240, 255])
+      }
+    }
     renderCelebration(dot, hermit)
     renderSleep(dot, hermit)
+  }
+}
+// Sand kicked up while digging, a low mound with peeking eyes while hidden, and a
+// trembling mound that bursts open just before the hermit crab pops out.
+function renderBurrow(world: Sandbox, pixels: Uint8ClampedArray, hermit: Creature, cx: number, cy: number) {
+  const dot = creaturePainter(world, pixels, hermit, cx, cy)
+  const sand = [239, 187, 92], light = [250, 214, 140]
+  const rising = hermit.burrow <= RISE_STEPS, popping = hermit.burrow <= POP_STEPS
+  const shake = rising && !popping ? Math.round(Math.sin(hermit.phase * 6)) : 0
+  const height = hermit.sink < 0.5 ? 0 : rising && !popping ? 2 + (Math.sin(hermit.phase * 4) > 0 ? 1 : 0) : 2
+  for (let dx = -6; dx <= 6; dx++) for (let dy = 0; dy < height; dy++) {
+    if (dx * dx / 36 + dy * dy / (height * height) <= 1) dot(dx + shake, -dy, dy === height - 1 ? light : sand)
+  }
+  const hidden = hermit.sink >= 1 && !rising
+  if (hidden && hermit.burrow % 150 < 24) {
+    for (const ex of [-1, 1]) { dot(ex, -height - 1, [236, 108, 70]); dot(ex, -height - 2, [255, 255, 236]) }
+  }
+  // Grains fly up to the sides while it digs in or bursts out.
+  if ((!hidden && !rising && hermit.sink > 0) || popping || (rising && hermit.burrow % 10 < 4)) {
+    const lift = Math.floor((hermit.phase * 5) % 4)
+    for (const side of [-1, 1]) { dot(side * (7 + lift), -2 - lift, sand); dot(side * (5 + lift), -4 - lift, light) }
   }
 }
 

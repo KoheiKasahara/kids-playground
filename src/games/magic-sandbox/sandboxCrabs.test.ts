@@ -106,8 +106,84 @@ describe('sandbox crabs', () => {
     const hiding = drawn()
     expect(hiding).toBeGreaterThan(0)
     expect(hiding).toBeLessThan(out)
+    expect(hermit.direction).toBe(1)
+    hermit.wave = 30
+    const peeking = drawn()
+    expect(peeking).toBeGreaterThan(hiding)
+    expect(peeking).toBeLessThan(out)
     hermit.wave = 0; hermit.sleeping = 100
     expect(drawn()).toBeLessThan(out)
+  })
+
+  it('burrows into the sand, stays hidden, then pops back out without moving grains', () => {
+    const world = flat()
+    for (let y = 36; y < 60; y++) for (let x = 0; x < 80; x++) world.cells[y * 80 + x] = Cell.Sand
+    world.addHermit()
+    const hermit = world.hermits[0]
+    const { x, y } = hermit
+    hermit.wave = 0; hermit.decision = 0
+    const grains = world.cells.slice()
+    const pixels = new Uint8ClampedArray(world.cells.length * 4)
+    const shellPixels = () => {
+      pixels.fill(0)
+      renderSandbox(world, pixels)
+      let count = 0
+      for (let i = 0; i < pixels.length; i += 4) if (pixels[i] === 184 && pixels[i + 1] === 118) count++
+      return count
+    }
+    expect(shellPixels()).toBeGreaterThan(0)
+    stepHermits(world, () => 0.1)
+    expect(hermit.burrow).toBeGreaterThan(0)
+    const steps = hermit.burrow
+    for (let i = 0; i < 90; i++) stepHermits(world, () => 0.5)
+    expect(hermit.sink).toBe(1)
+    expect(shellPixels()).toBe(0)
+    // Hidden under a mound, not vanished: sand is drawn above the surface.
+    expect(pixels[((y - 1) * 80 + Math.round(x)) * 4 + 3]).toBe(255)
+    // Other animals walk over a hidden hermit crab instead of bumping into it.
+    world.addCrab()
+    world.crabs[0].x = hermit.x; world.crabs[0].y = hermit.y
+    for (let i = 90; i < steps - 1; i++) stepHermits(world, () => 0.5)
+    expect(hermit.burrow).toBe(1)
+    stepHermits(world, () => 0.5)
+    expect(hermit.burrow).toBe(0)
+    expect(hermit.sink).toBe(0)
+    expect(shellPixels()).toBeGreaterThan(0)
+    expect(hermit.x).toBe(x)
+    expect(hermit.y).toBe(y)
+    expect(world.cells).toEqual(grains)
+  })
+
+  it('pops out early when its mound is tapped, and only burrows into deep sand by day', () => {
+    const world = flat()
+    for (let y = 36; y < 60; y++) for (let x = 0; x < 80; x++) world.cells[y * 80 + x] = Cell.Sand
+    world.addHermit()
+    const hermit = world.hermits[0]
+    hermit.wave = 0; hermit.decision = 0
+    stepHermits(world, () => 0.1)
+    for (let i = 0; i < 100; i++) stepHermits(world, () => 0.5)
+    expect(world.tapHermit({ x: hermit.x, y: hermit.y - 2 })).toBe(true)
+    expect(hermit.burrow).toBeLessThanOrEqual(60)
+    for (let i = 0; i < 60; i++) stepHermits(world, () => 0.5)
+    expect(hermit.burrow).toBe(0)
+
+    const shallow = flat()
+    shallow.addHermit()
+    shallow.hermits[0].wave = 0; shallow.hermits[0].decision = 0
+    stepHermits(shallow, () => 0.1)
+    expect(shallow.hermits[0].burrow).toBe(0)
+  })
+
+  it('walks to the water and lingers at the edge instead of wading in', () => {
+    const world = flat()
+    world.addHermit()
+    const hermit = world.hermits[0]
+    hermit.wave = 0; hermit.decision = 0; hermit.x = 20; hermit.direction = -1
+    for (let y = 44; y < 50; y++) for (let x = 60; x < 80; x++) world.cells[y * 80 + x] = Cell.Water
+    for (let i = 0; i < 1200; i++) stepHermits(world, () => 0.5)
+    expect(hermit.x).toBeGreaterThan(40)
+    expect(hermit.x).toBeLessThan(60)
+    expect(hermit.shore).toBe(true)
   })
 
   it('sometimes chooses nearby water and falls when its support is erased', () => {
