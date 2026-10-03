@@ -1050,6 +1050,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'onaji-pon',
+    slug: 'onaji-pon',
+    title: 'おなじで ポン！',
+    emoji: '🎴',
+    category: 'learning',
+    seo: {
+      headline: 'おなじで ポン！｜おなじ いろ・どうぶつの カードを つなげる 幼児向けカードあそび',
+      description:
+        'まんなかのカードと「おなじいろ」か「おなじどうぶつ」のカードをタッチでつなげていく幼児向けのカードあそびです。配られるカードは毎回ランダム。取る順番を考えるほど山札を多く残せて、★3をめざせます。',
+    },
+    intro: {
+      howToPlay: [
+        'まんなかと おなじ いろ か おなじ どうぶつの カードを タッチ！',
+        'つなげられる カードが ないときは、やまを タッチして めくろう',
+        'とる じゅんばんを かんがえて やまを のこすと ★が ふえるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

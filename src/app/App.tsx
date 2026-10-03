@@ -40,6 +40,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/marble-course',
   '/games/mato-ate',
   '/games/oekaki-korokoro',
+  '/games/onaji-pon',
   '/games/origami-play',
   '/games/piano-play',
   '/games/planet-globe',
