@@ -36,25 +36,22 @@ function walk() {
 }
 
 // These are the actual accessible controls: the model is never mocked or mutated by the test.
-function guidedAction(destination: string, action: string) {
-  fireEvent.click(screen.getByRole('button', { name: `${destination}へ` }))
+function guidedAction(destination: string) {
+  fireEvent.click(screen.getByRole('button', { name: `${destination}を タップ` }))
   walk()
-  const actionButton = screen.getByRole('button', { name: action })
-  expect(actionButton).toBeEnabled()
-  fireEvent.click(actionButton)
 }
 
 function finishFirstTwoDeliveries() {
-  guidedAction('ゆうびんやさん', 'にもつを うけとる')
-  guidedAction('きのえだ', 'きのえだを ひろう')
-  guidedAction('はし', 'はしを なおす')
-  guidedAction('りすさん', 'にもつを わたす')
+  guidedAction('ゆうびんやさん')
+  guidedAction('きのえだ')
+  guidedAction('はし')
+  guidedAction('りすさん')
   expect(screen.getByLabelText(/^1 \/ [23] にんに おとどけ$/)).toBeInTheDocument()
-  guidedAction('にんじんばたけ', 'おみずを あげる')
+  guidedAction('にんじんばたけ')
   expect(screen.getByRole('status')).toHaveTextContent('すくすく')
-  fireEvent.click(screen.getByRole('button', { name: 'にんじんを ぬく' }))
+  guidedAction('にんじんばたけ')
   expect(screen.getByLabelText('にんじん', { selector: 'span' })).toBeInTheDocument()
-  guidedAction('うさぎさん', 'にんじんを わたす')
+  guidedAction('うさぎさん')
 }
 
 describe('ForestDeliveryPlay', () => {
@@ -65,6 +62,9 @@ describe('ForestDeliveryPlay', () => {
     expect(screen.getAllByRole('button', { name: 'もどる' })).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'はるの はいたつで あそぶ' }))
     expect(screen.getByLabelText('0 / 2 にんに おとどけ')).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'いきさき' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'にもつを うけとる' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status').closest('[class*=mapArea]')).not.toBeNull()
     expect(vi.getTimerCount()).toBe(1)
     fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByRole('button', { name: 'はるの はいたつで あそぶ' })).toBeInTheDocument()
@@ -81,7 +81,7 @@ describe('ForestDeliveryPlay', () => {
     expect(playDeliverySound).toHaveBeenLastCalledWith('complete')
     fireEvent.click(screen.getByRole('button', { name: 'もういちど あそぶ' }))
     expect(screen.getByLabelText('0 / 2 にんに おとどけ')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'にもつを うけとる' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'ゆうびんやさんを タップ' })).toBeEnabled()
     finishFirstTwoDeliveries()
     fireEvent.click(screen.getByRole('button', { name: 'つぎの もりへ →' }))
     expect(screen.getByLabelText('0 / 3 にんに おとどけ')).toBeInTheDocument()
@@ -97,8 +97,8 @@ describe('ForestDeliveryPlay', () => {
     finishFirstTwoDeliveries()
     expect(screen.queryByRole('heading', { name: 'みんなに とどいた！' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('2 / 3 にんに おとどけ')).toBeInTheDocument()
-    guidedAction('りんごの き', 'りんごを とる')
-    guidedAction('くまさん', 'りんごを わたす')
+    guidedAction('りんごの き')
+    guidedAction('くまさん')
     expect(screen.getByRole('heading', { name: 'みんなに とどいた！' })).toBeInTheDocument()
     expect(screen.getByLabelText('3 / 3 にんに おとどけ')).toBeInTheDocument()
   })
@@ -106,15 +106,14 @@ describe('ForestDeliveryPlay', () => {
   test('未修理の橋を渡ろうとすると手順を案内し、歩行中の連打は荷物を受け取らない', () => {
     renderPlay()
     fireEvent.click(screen.getByRole('button', { name: 'はるの はいたつで あそぶ' }))
-    fireEvent.click(screen.getByRole('button', { name: 'りすさんへ いく' }))
+    fireEvent.click(screen.getByRole('button', { name: 'りすさんを タップ' }))
     expect(screen.getByRole('status')).toHaveTextContent('まずは きのえだを ひろって はしを なおそう')
     expect(screen.getByLabelText('0 / 2 にんに おとどけ')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'にんじんばたけへ いく' }))
-    expect(screen.getByRole('button', { name: 'あるいているよ' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'あるいているよ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'にんじんばたけを タップ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'にんじんばたけを タップ' }))
     expect(playDeliverySound).not.toHaveBeenCalled()
     walk()
-    expect(screen.getByRole('button', { name: 'おみずを あげる' })).toBeEnabled()
+    expect(screen.getByRole('status')).toHaveTextContent('すくすく')
   })
 
   test('拡大された地図のタッチ位置を森の座標へ変換して歩く', () => {
@@ -124,18 +123,18 @@ describe('ForestDeliveryPlay', () => {
     vi.spyOn(map, 'getBoundingClientRect').mockReturnValue({ x: 20, y: 30, left: 20, top: 30, right: 660, bottom: 606, width: 640, height: 576, toJSON: () => ({}) })
     // The garden at logical (72, 136) is displayed at 2x scale, with a page offset.
     fireEvent(map, new MouseEvent('pointerdown', { bubbles: true, clientX: 164, clientY: 302 }))
-    expect(screen.getByRole('button', { name: 'あるいているよ' })).toBeDisabled()
+    expect(playDeliverySound).not.toHaveBeenCalled()
     walk()
-    expect(screen.getByRole('button', { name: 'おみずを あげる' })).toBeEnabled()
+    expect(screen.getByRole('status')).toHaveTextContent('すくすく')
   })
   test('消音中も操作でき、音を戻した後の操作だけ鳴る。退出時に描画が止まる', () => {
     const { unmount } = renderPlay()
     fireEvent.click(screen.getByRole('button', { name: 'おとを けす' }))
     fireEvent.click(screen.getByRole('button', { name: 'はるの はいたつで あそぶ' }))
-    guidedAction('ゆうびんやさん', 'にもつを うけとる')
+    guidedAction('ゆうびんやさん')
     expect(playDeliverySound).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'おとを だす' }))
-    guidedAction('きのえだ', 'きのえだを ひろう')
+    guidedAction('きのえだ')
     expect(playDeliverySound).toHaveBeenCalledExactlyOnceWith('collect')
     unmount()
     const drawCount = vi.mocked(drawScene).mock.calls.length

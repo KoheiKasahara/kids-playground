@@ -5,14 +5,6 @@ const COLUMNS = WORLD_WIDTH / TILE_SIZE
 const ROWS = WORLD_HEIGHT / TILE_SIZE
 const WALK_SPEED = 80
 const INTERACTION_RADIUS = 20
-const BUILDING_FOOTPRINTS = [
-  { left: 2, right: 4, top: 10, bottom: 12 },
-  { left: 14, right: 16, top: 3, bottom: 4 },
-  { left: 14, right: 16, top: 11, bottom: 12 },
-  { left: 15, right: 17, top: 7, bottom: 8 },
-  { left: 6, right: 6, top: 2, bottom: 2 },
-] as const
-
 export type PoiId = 'post' | 'wood' | 'bridge' | 'garden' | 'apple' | 'squirrel' | 'rabbit' | 'bear'
 export type RecipientId = 'squirrel' | 'rabbit' | 'bear'
 export type ItemId = 'parcel' | 'carrot' | 'apple' | 'wood'
@@ -32,8 +24,8 @@ export type Stage = {
 
 export const STAGES: readonly Stage[] = [
   { id: 'spring', name: 'はるの はいたつ', subtitle: 'はしを なおして、はじめての おとどけ', season: 'spring', deliveries: ['squirrel', 'rabbit'] },
-  { id: 'summer', name: 'なつの ごちそう', subtitle: 'もりの みんなに おいしい しあわせ', season: 'summer', deliveries: ['squirrel', 'rabbit', 'bear'] },
-  { id: 'dusk', name: 'ほたるの よる', subtitle: 'やさしい あかりの なかを おさんぽ', season: 'dusk', deliveries: ['squirrel', 'rabbit', 'bear'] },
+  { id: 'summer', name: 'なつの ごちそう', subtitle: 'かわの うえの はしと、ひろい くだものの むら', season: 'summer', deliveries: ['squirrel', 'rabbit', 'bear'] },
+  { id: 'dusk', name: 'ほたるの よる', subtitle: 'もりの おくの はしへ、ほたると よるの ぼうけん', season: 'dusk', deliveries: ['squirrel', 'rabbit', 'bear'] },
 ]
 
 export const POIS: readonly Poi[] = [
@@ -46,6 +38,27 @@ export const POIS: readonly Poi[] = [
   { id: 'rabbit', name: 'うさぎさん', x: 248, y: 216, kind: 'animal' },
   { id: 'bear', name: 'くまさん', x: 264, y: 152, kind: 'animal' },
 ]
+
+/** Village layouts share art, but have distinct geography and routes. */
+export const MAPS = [
+  { riverColumn: 9, bridgeRow: 9, positions: {} },
+  { riverColumn: 7, bridgeRow: 6, positions: {
+    post: [40, 232], wood: [88, 168], bridge: [104, 104], garden: [56, 88],
+    apple: [88, 40], squirrel: [216, 72], rabbit: [264, 232], bear: [200, 168],
+  } },
+  { riverColumn: 11, bridgeRow: 13, positions: {
+    post: [56, 88], wood: [152, 152], bridge: [168, 216], garden: [72, 216],
+    apple: [136, 56], squirrel: [248, 232], rabbit: [264, 72], bear: [248, 152],
+  } },
+] as const
+export function getMap(world: World) { return MAPS[world.stageIndex] }
+export function getPois(world: World): readonly Poi[] {
+  const positions = getMap(world).positions as Partial<Record<PoiId, readonly [number, number]>>
+  return POIS.map(poi => {
+    const position = positions[poi.id]
+    return position ? { ...poi, x: position[0], y: position[1] } : poi
+  })
+}
 
 const REQUESTS: Record<RecipientId, Exclude<ItemId, 'wood'>> = {
   squirrel: 'parcel',
@@ -83,24 +96,30 @@ export type GameEvent = {
 
 export function createWorld(stageIndex = 0): World {
   const validIndex = Number.isInteger(stageIndex) && stageIndex >= 0 && stageIndex < STAGES.length ? stageIndex : 0
+  const start = getPois({ stageIndex: validIndex } as World).find(poi => poi.id === 'post')!
   return {
     stageIndex: validIndex,
-    player: { x: 56, y: 232, facing: 'down', walking: false },
+    player: { x: start.x, y: start.y + 16, facing: 'down', walking: false },
     path: [],
     targetId: null,
     inventory: { parcel: false, carrot: false, apple: false, wood: false },
     flags: { bridgeRepaired: false, carrotWatered: false, carrotHarvested: false, parcelTaken: false, appleTaken: false, woodCollected: false },
     delivered: [],
     completed: false,
-    message: 'もりの みんなに おとどけしよう！',
+    message: 'りすさんに にもつを とどけてくれる？',
   }
 }
 
 /** The river has one crossing. Border cells keep the courier inside the scene. */
 export function isWalkableCell(world: World, column: number, row: number): boolean {
   if (!Number.isInteger(column) || !Number.isInteger(row) || column < 1 || column >= COLUMNS - 1 || row < 1 || row >= ROWS - 1) return false
-  if (BUILDING_FOOTPRINTS.some((area) => column >= area.left && column <= area.right && row >= area.top && row <= area.bottom)) return false
-  if (column === 9 || column === 10) return row === 9 && world.flags.bridgeRepaired
+  if (getPois(world).some(poi => {
+    if (poi.kind !== 'post' && poi.kind !== 'animal' && poi.kind !== 'apple') return false
+    const cx = Math.floor(poi.x / TILE_SIZE), cy = Math.floor(poi.y / TILE_SIZE)
+    return Math.abs(column - cx) <= (poi.kind === 'apple' ? 0 : 1) && row >= cy - (poi.kind === 'post' ? 3 : 2) && row <= cy - 1
+  })) return false
+  const map = getMap(world)
+  if (column === map.riverColumn || column === map.riverColumn + 1) return row === map.bridgeRow && world.flags.bridgeRepaired
   return true
 }
 
@@ -140,18 +159,18 @@ function findPath(world: World, destination: Point): Point[] | null {
 
 export function targetPoint(world: World, x: number, y: number): boolean {
   if (world.completed || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= WORLD_WIDTH || y >= WORLD_HEIGHT) return false
-  const nearby = POIS.filter((point) => Math.hypot(point.x - x, point.y - y) <= 18)
+  const nearby = getPois(world).filter((point) => Math.hypot(point.x - x, point.y - y) <= 18)
     .sort((left, right) => Math.hypot(left.x - x, left.y - y) - Math.hypot(right.x - x, right.y - y))[0]
   // Children can tap the illustrated building as well as its front-door marker.
-  const poi = nearby ?? POIS.find((point) =>
-    (point.kind === 'animal' || point.kind === 'post' || point.kind === 'apple')
+  const poi = nearby ?? getPois(world).find((point) =>
+    (point.kind === 'animal' || point.kind === 'post' || point.kind === 'apple' || point.kind === 'garden')
       && Math.abs(point.x - x) <= 24 && y >= point.y - 56 && y <= point.y,
   )
   // Stop in front of recipients instead of drawing the courier over their sprite.
   const destination = poi?.kind === 'animal' ? { x: poi.x, y: poi.y + TILE_SIZE } : poi ?? { x, y }
   const path = findPath(world, destination)
   if (path === null) {
-    world.message = !world.flags.bridgeRepaired && destination.x >= 144
+    world.message = !world.flags.bridgeRepaired && destination.x >= getMap(world).riverColumn * TILE_SIZE
       ? world.inventory.wood ? 'きのえだで はしを なおそう！' : 'まずは きのえだを ひろって はしを なおそう！'
       : 'くさの みちを タップしてね'
     return false
@@ -163,7 +182,7 @@ export function targetPoint(world: World, x: number, y: number): boolean {
 }
 
 export function targetPoi(world: World, id: PoiId): boolean {
-  const poi = POIS.find((point) => point.id === id)
+  const poi = getPois(world).find((point) => point.id === id)
   return poi ? targetPoint(world, poi.x, poi.y) : false
 }
 
@@ -192,7 +211,7 @@ export function updateWorld(world: World, dtSeconds: number): void {
 }
 
 function nearestPoi(world: World): Poi | undefined {
-  return POIS.filter((poi) => Math.hypot(poi.x - world.player.x, poi.y - world.player.y) <= INTERACTION_RADIUS)
+  return getPois(world).filter((poi) => Math.hypot(poi.x - world.player.x, poi.y - world.player.y) <= INTERACTION_RADIUS)
     .sort((left, right) => Math.hypot(left.x - world.player.x, left.y - world.player.y) - Math.hypot(right.x - world.player.x, right.y - world.player.y))[0]
 }
 
@@ -212,7 +231,7 @@ export function getInteraction(world: World): Interaction {
       if (!STAGES[world.stageIndex].deliveries.includes(poi.id)) return choice('きょうは のんびり おさんぽ', false)
       if (world.delivered.includes(poi.id)) return choice('ありがとう！ また あそぼうね', false)
       const item = REQUESTS[poi.id]
-      return choice(world.inventory[item] ? `${ITEM_NAMES[item]}を わたす` : `${ITEM_NAMES[item]}を もってこよう`, world.inventory[item])
+      return choice(world.inventory[item] ? `${ITEM_NAMES[item]}を わたす` : `${ITEM_NAMES[item]}を もってきてくれる？`, world.inventory[item])
     }
   }
 }
@@ -230,7 +249,7 @@ export function getObjective(world: World): { text: string; targetId: PoiId | nu
   if (!world.flags.bridgeRepaired) return world.inventory.wood
     ? { text: 'きのえだで はしを なおそう', targetId: 'bridge' }
     : { text: 'はしを なおす きのえだを ひろおう', targetId: 'wood' }
-  return { text: `${POIS.find((poi) => poi.id === recipient)!.name}に ${ITEM_NAMES[item]}を とどけよう`, targetId: recipient }
+  return { text: `${getPois(world).find((poi) => poi.id === recipient)!.name}に ${ITEM_NAMES[item]}を とどけよう`, targetId: recipient }
 }
 
 export function interact(world: World): GameEvent {
@@ -241,7 +260,7 @@ export function interact(world: World): GameEvent {
     case 'post':
       world.inventory.parcel = true
       world.flags.parcelTaken = true
-      event = { type: 'collect', text: 'りすさんの にもつを あずかったよ！' }
+      event = { type: 'collect', text: 'りすさんに この にもつを おねがい！' }
       break
     case 'wood':
       world.inventory.wood = true
@@ -273,11 +292,24 @@ export function interact(world: World): GameEvent {
       world.inventory[REQUESTS[recipient]] = false
       world.delivered.push(recipient)
       world.completed = STAGES[world.stageIndex].deliveries.every((id) => world.delivered.includes(id))
-      const name = POIS.find((poi) => poi.id === recipient)!.name
-      event = { type: world.completed ? 'complete' : 'deliver', text: world.completed ? 'みんなに とどいた！ すてきな おとどけやさん！' : `${name}「ありがとう！ とっても うれしいな」` }
+      const thanks = { squirrel: 'ありがとう！ おてがみ、うれしいな！', rabbit: 'ありがとう！ にんじんスープを つくるね！', bear: 'ありがとう！ りんごを いっしょに たべよう！' }
+      event = { type: world.completed ? 'complete' : 'deliver', text: world.completed ? 'みんなに とどいた！ すてきな おとどけやさん！' : thanks[recipient] }
     }
   }
   event.poiId = action.poiId
+  world.message = event.text
+  return event
+}
+
+/** Consume one tap on arrival; another tap is needed for the next gardening action. */
+export function interactOnArrival(world: World): GameEvent | null {
+  if (world.player.walking || !world.targetId || world.completed) return null
+  const id = world.targetId
+  world.targetId = null
+  const action = getInteraction(world)
+  if (action.poiId !== id) return null
+  const event = interact(world)
+  event.poiId = id
   world.message = event.text
   return event
 }

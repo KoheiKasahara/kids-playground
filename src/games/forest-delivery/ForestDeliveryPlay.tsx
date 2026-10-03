@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import StageClearBadge from '../../components/StageClearBadge'
@@ -6,7 +6,7 @@ import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
 import { vibrate } from '../../utils/haptics'
 import { createStageProgressStore } from '../shared/progress/stageProgress'
-import { createWorld, getInteraction, getObjective, interact, POIS, STAGES, targetPoi, targetPoint, updateWorld, type PoiId, type World } from './model'
+import { createWorld, getObjective, interactOnArrival, getPois, STAGES, targetPoi, targetPoint, updateWorld, type PoiId, type World } from './model'
 import { drawScene } from './render'
 import { drawIcon, type IconKind } from './art'
 import { playDeliverySound } from './sounds'
@@ -41,8 +41,20 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
   const resultButton = useRef<HTMLButtonElement>(null)
   const stage = STAGES[index]
   const objective = getObjective(snapshot)
-  const interaction = getInteraction(snapshot)
-  const objectivePoi = POIS.find((poi) => poi.id === objective.targetId)
+  const pois = getPois(snapshot)
+  const [speaker, setSpeaker] = useState<PoiId>('post')
+  const speechPoi = pois.find(poi => poi.id === speaker)!
+  const onArrival = useEffectEvent(() => {
+    const event = interactOnArrival(world.current)
+    if (!event) return false
+    if (event.poiId) setSpeaker(event.poiId)
+    if (event.type !== 'none') {
+      if (sound) playDeliverySound(event.type)
+      vibrate(event.type === 'complete' ? 'celebrate' : event.type === 'deliver' ? 'success' : 'tap')
+    }
+    if (world.current.completed) onComplete(stage.id)
+    return true
+  })
   useGameIntroPlaying(true)
 
   useEffect(() => {
@@ -60,11 +72,8 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
       elapsed += dt
       const walking = world.current.player.walking
       updateWorld(world.current, dt)
-      if (walking !== world.current.player.walking) {
-        const arrival = POIS.find((poi) => poi.id === world.current.targetId)
-        if (arrival) world.current.message = `${arrival.name}に ついたよ！`
-        setSnapshot(structuredClone(world.current))
-      }
+      const arrived = onArrival()
+      if (arrived || walking !== world.current.player.walking) setSnapshot(structuredClone(world.current))
       drawScene(ctx, world.current, elapsed, media?.matches ?? false)
     }
     frame = requestAnimationFrame(animate)
@@ -81,15 +90,6 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
     targetPoi(world.current, id)
     setSnapshot(structuredClone(world.current))
   }
-  const act = () => {
-    primeAudio()
-    const event = interact(world.current)
-    if (event.type === 'none') return
-    if (sound) playDeliverySound(event.type)
-    vibrate(event.type === 'complete' ? 'celebrate' : event.type === 'deliver' ? 'success' : 'tap')
-    setSnapshot(structuredClone(world.current))
-    if (world.current.completed) onComplete(stage.id)
-  }
   const inventory = (['parcel', 'wood', 'carrot', 'apple'] as const).filter((kind) => snapshot.inventory[kind])
 
   return <GamePlaySurface><div className={styles.adventure}>
@@ -104,12 +104,20 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
     </div>
     <div className={styles.playLayout}>
       <div className={styles.mapFrame}>
-        <canvas ref={canvas} width={320} height={288} className={styles.map} role="img" aria-label="もりの ちず。いきたい ところを タッチ。したの ボタンでも いどうできるよ" onPointerDown={(event) => {
+        <div className={styles.mapArea}><canvas ref={canvas} width={320} height={288} className={styles.map} role="img" aria-label="もりの ちず。どうぶつや ものを タップすると おてつだいするよ" onPointerDown={(event) => {
           if (world.current.completed) return
+          primeAudio()
           const rect = event.currentTarget.getBoundingClientRect()
           targetPoint(world.current, (event.clientX - rect.left) / rect.width * 320, (event.clientY - rect.top) / rect.height * 288)
           setSnapshot(structuredClone(world.current))
         }} />
+        {pois.map(poi => <button key={poi.id} className={`${styles.mapSpot} ${objective.targetId === poi.id ? styles.nextSpot : ''}`} style={{ left: `${poi.x / 320 * 100}%`, top: `${poi.y / 288 * 100}%` }} aria-label={`${poi.name}を タップ`} disabled={snapshot.completed} onClick={() => goTo(poi.id)}>
+          {objective.targetId === poi.id && <span className={styles.tapLabel}>ここ！<span aria-hidden="true"> ▼</span></span>}
+        </button>)}
+        <div className={styles.speech} role="status" aria-live="polite" style={{ left: `${Math.max(28, Math.min(72, speechPoi.x / 320 * 100))}%`, top: `${Math.max(3, speechPoi.y / 288 * 100 - 31)}%` }}>
+          <strong>{speechPoi.kind === 'animal' || speechPoi.kind === 'post' ? speechPoi.name : 'こぎつね'}</strong><span>{snapshot.message}</span>
+        </div>
+        </div>
         <div className={styles.mapCaption} aria-hidden="true"><span>FOREST POST</span><span>{index === 2 ? '☾' : '✦'} {String(index + 1).padStart(2, '0')}</span></div>
       </div>
       <div className={styles.controlPanel}>
@@ -125,20 +133,10 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
             <span className={styles.noteIcon}><Icon kind="parcel" /></span>
             <div><span className={styles.eyebrow}>つぎの おてつだい</span><p>{objective.text}</p></div>
           </div>
-          <div className={styles.actionRow}>
-            <button className={styles.guide} disabled={!objective.targetId || snapshot.player.walking} onClick={() => objective.targetId && goTo(objective.targetId)}>
-              <span aria-hidden="true">➜</span><span>{snapshot.player.walking ? 'てくてく…' : `${objectivePoi?.name ?? 'つぎの ばしょ'}へ`}</span>
-            </button>
-            <button className={styles.primary} disabled={!interaction.enabled || snapshot.player.walking} onClick={act}>{snapshot.player.walking ? 'あるいているよ' : interaction.label}</button>
-          </div>
-          <p className={styles.message} role="status" aria-live="polite">{snapshot.message || 'いきたい ところを タッチしてね'}</p>
           <div className={styles.bag} aria-label="かばんの なか">
             <span>かばん</span>{inventory.length ? inventory.map((kind) => <span key={kind} className={styles.bagItem} aria-label={{ parcel: 'こづつみ', wood: 'きざい', carrot: 'にんじん', apple: 'りんご' }[kind]}><Icon kind={kind} /></span>) : <span className={styles.emptyBag}>からっぽ</span>}
           </div>
-          <nav className={styles.destinations} aria-label="いきさき">
-            {POIS.map((poi) => <button key={poi.id} className={styles.destination} aria-label={`${poi.name}へ いく`} onClick={() => goTo(poi.id)}>{poi.name}</button>)}
-          </nav>
-          <p className={styles.helper}>タッチでも ボタンでも あそべるよ</p>
+          <p className={styles.helper}>ひかる ばしょを タップ！ ついたら おてつだいするよ</p>
         </>}
         <button className={styles.textButton} onClick={onExit}>もりを えらびなおす</button>
       </div>
