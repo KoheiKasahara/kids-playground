@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { initialOrigamiState, origamiReducer } from './origamiState'
 import { foldHint } from './origamiView'
+import { area } from './origamiEngine'
 import { ORIGAMI_TEMPLATES, PAPER_COLORS, origamiSequence } from './origamiTemplates'
 
 test('作品と紙の色は重複せず、すべての手順のヒントが画面内にある', () => {
@@ -78,12 +79,48 @@ describe('折り紙の手順', () => {
       }
     }
     for (const frame of frames) {
-      if (frame.type === 'reshape') expect(frame.removed.size).toBeGreaterThan(0)
-      else if (frame.type !== 'flip') expect(frame.moving.size).toBeGreaterThan(0)
+      if (frame.type === 'collapse') {
+        expect(frame.parts.length).toBeGreaterThan(1)
+        for (const part of frame.parts) expect(part.moving.size).toBeGreaterThan(0)
+      } else if (frame.type !== 'flip') expect(frame.moving.size).toBeGreaterThan(0)
     }
   })
 
-  test('つるは たくさん おる ちょうせんの さくひん', () => {
-    expect(ORIGAMI_TEMPLATES.find((template) => template.id === 'crane')!.steps.length).toBeGreaterThanOrEqual(15)
+  test.each(ORIGAMI_TEMPLATES)('$nameは折るだけで、紙が切れたり のびたりしない', (template) => {
+    const { states } = origamiSequence(template.id)
+    const sheet = area(states[0]![0]!.points)
+    for (const faces of states) {
+      // どの手順でも、かさなった紙をぜんぶ たすと もとの 1まいと おなじ ひろさ。
+      expect(faces.reduce((sum, face) => sum + area(face.points), 0)).toBeCloseTo(sheet, 3)
+      for (const face of faces) {
+        // 1まい 1まいは もとの かみの どこかを うごかしただけ（かたちが ゆがまない）。
+        expect(face.paper).toHaveLength(face.points.length)
+        face.points.forEach((point, index) => {
+          const next = (index + 1) % face.points.length
+          const folded = Math.hypot(face.points[next]![0] - point[0], face.points[next]![1] - point[1])
+          const flat = Math.hypot(face.paper[next]![0] - face.paper[index]![0], face.paper[next]![1] - face.paper[index]![1])
+          expect(folded).toBeCloseTo(flat, 6)
+        })
+      }
+    }
+  })
+
+  test('つるは ほんものと おなじ じゅんばんで おる ちょうせんの さくひん', () => {
+    const crane = ORIGAMI_TEMPLATES.find((template) => template.id === 'crane')!
+    expect(crane.steps.length).toBeGreaterThanOrEqual(15)
+    const { states, frames } = origamiSequence('crane')
+    // ふくろを ひらいて つぶす・したの かどを もちあげる は、それぞれ 2かいずつ。
+    expect(frames.filter((frame) => frame.type === 'collapse')).toHaveLength(4)
+    // くび・しっぽ・あたまは なかわりおり。
+    expect(frames.filter((frame) => frame.type === 'reverse')).toHaveLength(3)
+    // しろい めんを うえにして（いろが そとがわの さんかくから）はじめ、できあがりも いろの めんが そとがわ。
+    expect(states[0]![0]!.side).toBe('back')
+    const finished = states.at(-1)!
+    for (const tag of ['neck', 'tail', 'head']) {
+      const part = finished.filter((face) => face.tags.includes(tag))
+      expect(part.length).toBeGreaterThan(0)
+      expect(part.at(-1)!.side).toBe('front')
+    }
+    expect(finished.at(-1)!.side).toBe('front')
   })
 })

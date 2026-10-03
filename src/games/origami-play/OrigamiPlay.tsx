@@ -9,7 +9,7 @@ import { createStageProgressStore } from '../shared/progress/stageProgress'
 import OrigamiPaper from './OrigamiPaper'
 import { foldHint } from './origamiView'
 import { ORIGAMI_TEMPLATES, PAPER_COLORS, type OrigamiId, type PaperColor } from './origamiTemplates'
-import { initialOrigamiState, origamiReducer } from './origamiState'
+import { FOLD_MS, initialOrigamiState, origamiReducer } from './origamiState'
 import { playFoldSound, playFinishSound, playSelectSound } from './sounds'
 import styles from './OrigamiPlay.module.css'
 
@@ -43,7 +43,7 @@ function FoldingDesk({ template, color, sound, toggleSound, onBack, onComplete, 
 
   useEffect(() => {
     if (!state.folding) return
-    const timer = window.setTimeout(() => dispatch({ type: 'settle', total }), 850)
+    const timer = window.setTimeout(() => dispatch({ type: 'settle', total }), FOLD_MS)
     return () => window.clearTimeout(timer)
   }, [state.folding, total])
 

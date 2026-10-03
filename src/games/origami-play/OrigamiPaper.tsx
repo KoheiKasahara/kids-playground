@@ -1,6 +1,7 @@
-import { useId, type ReactNode } from 'react'
+import { useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { bounds, centroid, reflect, type Face, type FoldFrame, type Point } from './origamiEngine'
 import { origamiSequence, type OrigamiId, type PaperColor } from './origamiTemplates'
+import { FOLD_MS } from './origamiState'
 import { paperView } from './origamiView'
 import styles from './OrigamiPaper.module.css'
 
@@ -27,16 +28,39 @@ function FoldingFlap({ frame, fills }: { frame: FoldFrame; fills: Fills }) {
   const flap = frame.before.filter((face) => frame.moving.has(face.id))
   const [[ax, ay], [bx, by]] = frame.axis
   const angle = Math.atan2(by - ay, bx - ax) * 180 / Math.PI
-  const turnsOver = frame.type !== 'reverse'
   return <g transform={`translate(${ax} ${ay}) rotate(${angle})`}>
     <g className={styles.foldingFlap}>
       <g transform={`rotate(${-angle}) translate(${-ax} ${-ay})`}>
         <g className={styles.firstHalf}>{flap.map((face) => <Sheet key={face.id} face={face} fills={fills} />)}</g>
-        <g className={styles.secondHalf}>{(turnsOver ? [...flap].reverse() : flap).map((face) =>
-          <Sheet key={face.id} face={face} fills={fills} side={turnsOver ? (face.side === 'front' ? 'back' : 'front') : face.side} />)}</g>
+        <g className={styles.secondHalf}>{[...flap].reverse().map((face) =>
+          <Sheet key={face.id} face={face} fills={fills} side={face.side === 'front' ? 'back' : 'front'} />)}</g>
         <g className={styles.foldShade}>{flap.map((face) => <path key={face.id} d={path(face.points)} />)}</g>
       </g>
     </g>
+  </g>
+}
+
+/** The still layers with the moving flap drawn where it ends up in the stack. */
+function Folding({ frame, fills }: { frame: FoldFrame; fills: Fills }) {
+  const still = frame.before.filter((face) => !frame.moving.has(face.id))
+  return <>
+    <Sheets faces={still.slice(0, frame.layer)} fills={fills} />
+    <FoldingFlap frame={frame} fills={fills} />
+    <Sheets faces={still.slice(frame.layer)} fills={fills} />
+  </>
+}
+
+/** Several folds made in one movement (a squash or petal fold) play one after another. */
+function Collapsing({ parts, fills }: { parts: readonly FoldFrame[]; fills: Fills }) {
+  const [part, setPart] = useState(0)
+  const duration = FOLD_MS / parts.length
+  useEffect(() => {
+    if (part >= parts.length - 1) return
+    const timer = window.setTimeout(() => setPart(part + 1), duration)
+    return () => window.clearTimeout(timer)
+  }, [part, parts.length, duration])
+  return <g key={part} style={{ '--fold-duration': `${duration}ms` } as CSSProperties}>
+    <Folding frame={parts[part]!} fills={fills} />
   </g>
 }
 
@@ -58,18 +82,16 @@ function Arrow({ from, to, scale }: { from: Point; to: Point; scale: number }) {
 
 function FoldGuide({ templateId, step, scale }: { templateId: OrigamiId; step: number; scale: number }) {
   const { states, frames } = origamiSequence(templateId)
-  const frame = frames[step]!
-  if (frame.type === 'flip') {
+  const next = frames[step]!
+  if (next.type === 'flip') {
     const box = bounds(states[step]!)
     const y = box.minY - 14 / scale
     const x = (box.maxX - box.minX) * .32
     const mid = (box.minX + box.maxX) / 2
     return <g className={styles.guide}><Arrow from={[mid - x, y]} to={[mid + x, y]} scale={scale} /></g>
   }
-  if (frame.type === 'reshape') {
-    return <g className={styles.guide}>{frame.added.map((face) =>
-      <path key={face.id} d={path(face.points)} fill="#fffdf7" fillOpacity=".18" stroke="#78675e" strokeWidth="2" strokeDasharray="4 5" vectorEffect="non-scaling-stroke" />)}</g>
-  }
+  // A squash or petal fold starts with its first movement; show that one.
+  const frame = next.type === 'collapse' ? next.parts[0]! : next
   const flap = frame.before.filter((face) => frame.moving.has(face.id))
   const [a, b] = frame.axis
   const length = Math.hypot(b[0] - a[0], b[1] - a[1])
@@ -88,7 +110,7 @@ function FoldGuide({ templateId, step, scale }: { templateId: OrigamiId; step: n
   const start: Point = [a[0] + direction[0] * low, a[1] + direction[1] * low]
   const end: Point = [a[0] + direction[0] * high, a[1] + direction[1] * high]
   const source = centroid(flap)
-  const dash = frame.type === 'valley' ? '5 6' : '9 4 2 4'
+  const dash = frame.type === 'mountain' ? '9 4 2 4' : '5 6'
   return <g className={styles.guide}>
     {flap.map((face) => <path key={face.id} d={path(face.points.map((point) => reflect(point, frame.axis)))} fill="none" stroke="#fffdf7" opacity=".6" strokeWidth="2" strokeDasharray="3 5" vectorEffect="non-scaling-stroke" />)}
     {Number.isFinite(low) && <>
@@ -156,15 +178,10 @@ export default function OrigamiPaper({ templateId, color, step, folding = false,
       <g className={styles.flipOut}><Sheets faces={faces} fills={fills} /></g>
       <g className={styles.flipIn}><Sheets faces={states[current + 1]!} fills={fills} /></g>
     </>
-  } else if (frame?.type === 'reshape') {
-    paper = <>
-      {faces.map((face) => <g key={face.id} className={frame.removed.has(face.id) ? styles.fadeOut : undefined}><Sheet face={face} fills={fills} /></g>)}
-      <g className={styles.fadeIn}><Sheets faces={frame.added} fills={fills} /></g>
-    </>
+  } else if (frame?.type === 'collapse') {
+    paper = <Collapsing parts={frame.parts} fills={fills} />
   } else if (frame) {
-    const still = <Sheets faces={frame.before.filter((face) => !frame.moving.has(face.id))} fills={fills} />
-    const flap = <FoldingFlap frame={frame} fills={fills} />
-    paper = frame.onTop ? <>{still}{flap}</> : <>{flap}{still}</>
+    paper = <Folding frame={frame} fills={fills} />
   } else {
     paper = <Sheets faces={faces} fills={fills} />
   }
