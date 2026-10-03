@@ -125,7 +125,7 @@ export function countKind(world: World, kind: ObjectKind) {
 }
 
 export function counter(id: SpeciesId) {
-  return id === 'monkey' || id === 'rabbit' || id === 'penguin' ? 'ひき' : 'とう'
+  return id === 'monkey' || id === 'rabbit' || id === 'penguin' || id === 'crocodile' || id === 'flamingo' ? 'ひき' : 'とう'
 }
 
 // ---------------- おく・けす ----------------

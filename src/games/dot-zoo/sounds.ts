@@ -198,6 +198,21 @@ export function playCry(id: SpeciesId) {
       tone(ctx, d, 440, t, .12, .05, 'sawtooth', .04, 1.4)
       tone(ctx, d, 480, t + .14, .16, .05, 'sawtooth', .04, .8)
       break
+    case 'bear':
+      noise(ctx, t, .35, .12, 300)
+      tone(ctx, d, 140, t, .35, .08, 'sawtooth', .12, .75)
+      break
+    case 'kangaroo':
+      for (let i = 0; i < 2; i++) tone(ctx, d, 380, t + i * .16, .08, .05, 'triangle', .02, 1.6)
+      break
+    case 'crocodile':
+      noise(ctx, t, .08, .14, 1800)
+      tone(ctx, d, 70, t + .02, .2, .1, 'square', .02, .7)
+      break
+    case 'flamingo':
+      tone(ctx, d, 620, t, .1, .04, 'square', .02, .85)
+      tone(ctx, d, 560, t + .12, .14, .04, 'square', .02, .8)
+      break
   }
 }
 
