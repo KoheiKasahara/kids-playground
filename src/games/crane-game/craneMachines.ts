@@ -13,7 +13,9 @@ export type PrizeBody =
   | { form: 'capsule'; radius: number; half: number }
   | { form: 'box'; half: Vec3; round: number }
 
-export type PrizeLook = 'bear' | 'bunny' | 'chick' | 'egg' | 'marble' | 'snack' | 'drink' | 'fruit'
+export type PrizeLook =
+  | 'bear' | 'bunny' | 'chick' | 'egg' | 'marble' | 'snack' | 'drink' | 'fruit'
+  | 'penguin' | 'octopus' | 'puffer' | 'planet' | 'rocket' | 'ufo'
 
 export type PrizeSpecies = {
   id: string
@@ -41,6 +43,9 @@ export type MachineGrip = {
 
 export type PrizeSlot = { species: string; x: number; z: number }
 
+/** 筐体の中の かざりつけ。ないときは水玉と星の かべにする。 */
+export type MachineTheme = 'ocean' | 'space'
+
 export type CraneMachine = {
   id: string
   label: string
@@ -48,6 +53,7 @@ export type CraneMachine = {
   color: string
   description: string
   hint: string
+  theme?: MachineTheme
   grip: MachineGrip
   species: readonly PrizeSpecies[]
   slots: readonly PrizeSlot[]
@@ -97,6 +103,18 @@ const FRUIT_SPECIES: readonly PrizeSpecies[] = [
   { id: 'apple', label: 'りんご', emoji: '🍎', color: '#e5484d', accent: '#5fa347', look: 'fruit', body: { form: 'ball', radius: 0.064 }, mass: 0.085, friction: 0.5, restitution: 0.12 },
   { id: 'orange', label: 'みかん', emoji: '🍊', color: '#f59a2a', accent: '#4f9a3c', look: 'fruit', body: { form: 'ball', radius: 0.056 }, mass: 0.07, friction: 0.55, restitution: 0.12 },
   { id: 'banana', label: 'バナナ', emoji: '🍌', color: '#f7d54a', accent: '#8a6a2c', look: 'fruit', body: { form: 'capsule', radius: 0.034, half: 0.06 }, mass: 0.06, friction: 0.6, restitution: 0.06 },
+]
+
+const OCEAN_SPECIES: readonly PrizeSpecies[] = [
+  { id: 'penguin', label: 'ペンギン', emoji: '🐧', color: '#34436a', accent: '#fffaf0', look: 'penguin', body: { form: 'ball', radius: 0.07 }, mass: 0.05, friction: 0.88, restitution: 0.04 },
+  { id: 'octopus', label: 'タコさん', emoji: '🐙', color: '#ff7666', accent: '#ffd3c6', look: 'octopus', body: { form: 'ball', radius: 0.07 }, mass: 0.055, friction: 0.92, restitution: 0.04 },
+  { id: 'puffer', label: 'フグ', emoji: '🐡', color: '#ffd05c', accent: '#fff6dc', look: 'puffer', body: { form: 'ball', radius: 0.064 }, mass: 0.045, friction: 0.8, restitution: 0.08 },
+]
+
+const SPACE_SPECIES: readonly PrizeSpecies[] = [
+  { id: 'planet', label: 'わくせい', emoji: '🪐', color: '#9a7cf0', accent: '#ffd27a', look: 'planet', body: { form: 'ball', radius: 0.055 }, mass: 0.065, friction: 0.36, restitution: 0.22 },
+  { id: 'rocket', label: 'ロケット', emoji: '🚀', color: '#f5f7fc', accent: '#ef4f5f', look: 'rocket', body: { form: 'capsule', radius: 0.04, half: 0.05 }, mass: 0.06, friction: 0.42, restitution: 0.14 },
+  { id: 'ufo', label: 'ユーフォー', emoji: '🛸', color: '#5fd1c3', accent: '#bfeeff', look: 'ufo', body: { form: 'box', half: { x: 0.068, y: 0.024, z: 0.068 }, round: 0.01 }, mass: 0.08, friction: 0.55, restitution: 0.08 },
 ]
 
 /** 穴の上を避けた並べ場所。ケースの内側へ景品の大きさ分の余白を残してある。 */
@@ -158,6 +176,30 @@ export const CRANE_MACHINES: readonly CraneMachine[] = [
     grip: { hold: 1.75, stiffness: 150, damping: 3.3, capture: 0.085 },
     species: FRUIT_SPECIES,
     slots: grid(['apple', 'banana', 'orange', 'apple', 'orange', 'banana']),
+  },
+  {
+    id: 'ocean',
+    label: 'うみの なかま',
+    emoji: '🐙',
+    color: '#2f9fd6',
+    description: 'もちもちで ひっかかるよ',
+    hint: 'タコさんの あしや ヒレに ひっかけよう',
+    theme: 'ocean',
+    grip: { hold: 2.35, stiffness: 150, damping: 3.4, capture: 0.088 },
+    species: OCEAN_SPECIES,
+    slots: grid(['octopus', 'penguin', 'puffer', 'penguin', 'puffer', 'octopus']),
+  },
+  {
+    id: 'space',
+    label: 'うちゅう',
+    emoji: '🚀',
+    color: '#6b5bd6',
+    description: 'ふしぎな うちゅうの おもちゃ',
+    hint: 'ロケットは つるつる。まんなかを ねらおう',
+    theme: 'space',
+    grip: { hold: 1.9, stiffness: 150, damping: 3.3, capture: 0.085 },
+    species: SPACE_SPECIES,
+    slots: grid(['rocket', 'planet', 'ufo', 'planet', 'rocket', 'ufo']),
   },
 ]
 

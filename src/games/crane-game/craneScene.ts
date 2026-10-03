@@ -188,13 +188,15 @@ function cookieGeometry(r: number, h: number) {
 /** 景品の見た目。胴体のほかに耳や顔などの部品を、景品のローカル座標で並べる。 */
 function prizeParts(species: PrizeSpecies): Part[] {
   const look = species.look as PrizeLook
-  const plush = look === 'bear' || look === 'bunny' || look === 'chick'
+  const plush = look === 'bear' || look === 'bunny' || look === 'chick' || look === 'penguin' || look === 'octopus' || look === 'puffer'
   const glossy = look === 'marble' || look === 'egg'
+  /** うちゅうの おもちゃは、つやのある プラスチック。 */
+  const toyPlastic = look === 'planet' || look === 'rocket' || look === 'ufo'
   const body = new THREE.MeshPhysicalMaterial({
     color: species.color,
-    roughness: plush ? 0.92 : glossy ? 0.16 : look === 'fruit' ? 0.38 : look === 'snack' ? 0.62 : 0.5,
-    metalness: 0,
-    clearcoat: glossy ? 1 : look === 'fruit' ? 0.6 : look === 'drink' ? 0.45 : 0,
+    roughness: plush ? 0.92 : glossy ? 0.16 : toyPlastic ? 0.3 : look === 'fruit' ? 0.38 : look === 'snack' ? 0.62 : 0.5,
+    metalness: look === 'ufo' ? 0.35 : 0,
+    clearcoat: glossy ? 1 : toyPlastic ? 0.85 : look === 'fruit' ? 0.6 : look === 'drink' ? 0.45 : 0,
     clearcoatRoughness: 0.18,
     sheen: plush ? 1 : 0,
     sheenRoughness: 0.4,
@@ -366,6 +368,198 @@ function prizeParts(species: PrizeSpecies): Part[] {
       add(new THREE.CylinderGeometry(hx * 0.09, hx * 0.09, hy * 0.4, 10), straw, matrix(hx * 0.22, hy * 1.72, -hz * 0.3, 0, 0, 1.0))
       break
     }
+    case 'penguin': {
+      // すわった まんまる ペンギン。紺の体に 白いおなか、オレンジの くちばしと あし、首に マフラー。
+      const r = reach
+      const beak = new THREE.MeshPhysicalMaterial({ color: '#ffa53a', roughness: 0.5, sheen: 0.6, sheenColor: new THREE.Color('#ffe2b8') })
+      const scarf = new THREE.MeshPhysicalMaterial({ color: '#ff5f7e', roughness: 0.85, sheen: 1, sheenRoughness: 0.5, sheenColor: new THREE.Color('#ffd0da') })
+      add(ball(r * 0.94, 24, 16).scale(1, 1.04, 0.94), body, matrix(0, 0, -r * 0.02))
+      // おなかと 顔の白い ところ。体から すこしだけ 前へ ふくらませる。
+      add(ball(r * 0.78, 18, 12).scale(0.92, 1.0, 0.62), accent, matrix(0, -r * 0.14, r * 0.42))
+      for (const side of [-1, 1]) add(blob(r * 0.3, 1, 1.05, 0.5), accent, matrix(side * r * 0.24, r * 0.4, r * 0.66))
+      eyes(r * 0.085, r * 0.24, r * 0.44, r * 0.8)
+      add(new THREE.ConeGeometry(r * 0.13, r * 0.26, 16, 1).scale(1.25, 1, 0.7), beak, matrix(0, r * 0.26, r * 0.92, Math.PI / 2, 0, 0))
+      cheeks(r * 0.11, r * 0.46, r * 0.2, r * 0.74, 0.62)
+      add(new THREE.TorusGeometry(r * 0.7, r * 0.11, 8, 28), scarf, matrix(0, r * 0.06, -r * 0.02, Math.PI / 2 + 0.1, 0, 0))
+      add(blob(r * 0.16, 0.8, 1.5, 0.45), scarf, matrix(r * 0.42, -r * 0.18, r * 0.62, 0.15, 0.5, 0.3))
+      for (const side of [-1, 1]) {
+        // パタパタの ヒレ（つばさ）と、ちょこんと 前へ 出た あし。
+        add(blob(r * 0.42, 0.28, 1, 0.62), body, matrix(side * r * 0.9, -r * 0.18, 0, 0, 0, side * 0.42))
+        add(blob(r * 0.18, 1, 0.42, 1.5), beak, matrix(side * r * 0.3, -r * 0.88, r * 0.46, 0.15, side * 0.25, 0))
+      }
+      add(blob(r * 0.14, 0.5, 1.4, 0.5), body, matrix(r * 0.04, r * 1.0, -r * 0.05, 0, 0, -0.35))
+      break
+    }
+    case 'octopus': {
+      // はちまきの タコさん。丸い頭の下から 8本の あしが くるんと 出ている。
+      const r = reach
+      const band = new THREE.MeshPhysicalMaterial({ color: '#fffaf4', roughness: 0.82, sheen: 0.8, sheenColor: new THREE.Color('#ffffff') })
+      const knot = new THREE.MeshPhysicalMaterial({ color: '#3d8fe0', roughness: 0.8, sheen: 0.6, sheenColor: new THREE.Color('#cfe6ff') })
+      add(ball(r * 0.72, 24, 16).scale(1, 1.12, 1), body, matrix(0, r * 0.2, -r * 0.04))
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + Math.PI / 8
+        const around = new THREE.Matrix4().makeRotationY(-a)
+        const leg = around.clone().multiply(matrix(r * 0.48, -r * 0.6, 0, 0, 0, 1.0))
+        add(new THREE.CapsuleGeometry(r * 0.14, r * 0.5, 4, 10), body, leg)
+        // あしの さきは くるっと 上へ まく。うらの いぼいぼは 明るい色。
+        add(ball(r * 0.12, 10, 6), body, around.clone().multiply(matrix(r * 0.82, -r * 0.7, 0)))
+        // いぼは 小さいので 粗い球で じゅうぶん。数が多いぶん 三角形を へらす。
+        add(ball(r * 0.06, 8, 5).scale(1, 0.5, 1), accent, around.clone().multiply(matrix(r * 0.6, -r * 0.83, 0)))
+        add(ball(r * 0.055, 8, 5).scale(1, 0.5, 1), accent, around.clone().multiply(matrix(r * 0.74, -r * 0.82, 0)))
+      }
+      add(new THREE.TorusGeometry(r * 0.7, r * 0.075, 8, 32), band, matrix(0, r * 0.44, -r * 0.04, Math.PI / 2 + 0.08, 0, 0))
+      for (const side of [-1, 1]) add(blob(r * 0.12, 1.4, 0.7, 0.5), knot, matrix(side * r * 0.12, r * 0.46, -r * 0.76, 0, 0, side * 0.5))
+      add(ball(r * 0.07, 12, 8), knot, matrix(0, r * 0.46, -r * 0.78))
+      eyes(r * 0.1, r * 0.25, r * 0.18, r * 0.6)
+      // とがった くちもと。
+      add(new THREE.CylinderGeometry(r * 0.09, r * 0.12, r * 0.2, 16).translate(0, r * 0.1, 0), accent, matrix(0, -r * 0.05, r * 0.6, Math.PI / 2, 0, 0))
+      add(new THREE.TorusGeometry(r * 0.08, r * 0.025, 6, 16), body, matrix(0, -r * 0.05, r * 0.81))
+      cheeks(r * 0.12, r * 0.44, r * 0.0, r * 0.54, 0.7)
+      break
+    }
+    case 'puffer': {
+      // ぷっくり フグ。とげとげの まるい体に、白い おなかと 小さな ヒレ。
+      const r = reach
+      const core = r * 0.9
+      const spike = new THREE.MeshPhysicalMaterial({ color: shade(species.color, -0.2), roughness: 0.7, sheen: 0.5, sheenColor: new THREE.Color('#fff0c0') })
+      const fin = new THREE.MeshPhysicalMaterial({ color: '#ff9b4a', roughness: 0.6, sheen: 0.6, sheenColor: new THREE.Color('#ffe0c0'), side: THREE.DoubleSide })
+      const spot = new THREE.MeshStandardMaterial({ color: '#b07a2a', roughness: 0.9 })
+      add(ball(core, 28, 18), body, matrix(0, 0, 0))
+      add(new THREE.SphereGeometry(core * 1.012, 28, 8, 0, Math.PI * 2, Math.PI * 0.56, Math.PI * 0.44), accent, matrix(0, 0, 0))
+      // とげは 球の上へ むらなく 並べる（黄金角）。顔のまわりと おなかの下は さける。
+      const up = new THREE.Vector3(0, 1, 0)
+      const count = 42
+      for (let i = 0; i < count; i++) {
+        const y = 1 - (2 * (i + 0.5)) / count
+        const ring = Math.sqrt(1 - y * y)
+        const a = i * 2.39996
+        const normal = new THREE.Vector3(Math.cos(a) * ring, y, Math.sin(a) * ring)
+        if (normal.z > 0.55 || normal.y < -0.6) continue
+        const local = new THREE.Matrix4().compose(normal.clone().multiplyScalar(core + r * 0.05), new THREE.Quaternion().setFromUnitVectors(up, normal), new THREE.Vector3(1, 1, 1))
+        add(new THREE.ConeGeometry(r * 0.06, r * 0.16, 6, 1), y < -0.1 ? accent : spike, local)
+      }
+      for (const [sx, sy, sz] of [[0.3, 0.75, -0.2], [-0.35, 0.7, -0.3], [0, 0.6, -0.65], [0.6, 0.45, -0.5], [-0.62, 0.4, -0.45]] as const) {
+        const normal = new THREE.Vector3(sx, sy, sz).normalize()
+        add(ball(r * 0.09, 10, 6).scale(1, 0.3, 1), spot, new THREE.Matrix4().compose(normal.clone().multiplyScalar(core * 0.99), new THREE.Quaternion().setFromUnitVectors(up, normal), new THREE.Vector3(1, 1, 1)))
+      }
+      for (const side of [-1, 1]) add(blob(r * 0.26, 0.15, 0.8, 1), fin, matrix(side * core * 0.98, -r * 0.08, r * 0.12, 0, side * 0.5, side * -0.3))
+      add(blob(r * 0.3, 0.14, 1, 0.8), fin, matrix(0, r * 0.05, -core * 1.04))
+      add(blob(r * 0.18, 0.12, 0.7, 1), fin, matrix(0, core * 0.98, -r * 0.3, -0.5, 0, 0))
+      eyes(r * 0.13, r * 0.33, r * 0.26, core * 0.86)
+      add(new THREE.TorusGeometry(r * 0.09, r * 0.04, 8, 20).scale(1, 0.8, 1), fin, matrix(0, -r * 0.14, core * 0.98))
+      cheeks(r * 0.13, r * 0.56, -r * 0.04, core * 0.78, 0.66)
+      break
+    }
+    case 'planet': {
+      // わっかの ある わくせい。しまもようの 帯と、ななめの わっか、にっこり顔。
+      const r = reach
+      const stripe = new THREE.MeshPhysicalMaterial({ color: shade(species.color, 0.45), roughness: 0.32, clearcoat: 0.8, clearcoatRoughness: 0.15 })
+      const ringInner = new THREE.MeshPhysicalMaterial({ color: '#fff1c4', roughness: 0.28, clearcoat: 0.9, clearcoatRoughness: 0.1 })
+      add(ball(r, 30, 20), body, matrix(0, 0, 0))
+      for (const lat of [-0.5, 0.42]) {
+        const ry = Math.sin(lat) * r
+        add(new THREE.TorusGeometry(Math.cos(lat) * r * 0.985, r * 0.075, 6, 36).scale(1, 1, 0.6), stripe, matrix(0, ry, 0, Math.PI / 2, 0, 0))
+      }
+      const tilt = matrix(0, 0, 0, 0, 0, 0.32).multiply(matrix(0, 0, 0, Math.PI / 2 - 0.14, 0, 0))
+      add(new THREE.TorusGeometry(r * 1.42, r * 0.11, 6, 48).scale(1, 1, 0.18), accent, tilt)
+      add(new THREE.TorusGeometry(r * 1.2, r * 0.07, 6, 48).scale(1, 1, 0.2), ringInner, tilt)
+      eyes(r * 0.09, r * 0.28, r * 0.24, r * 0.88)
+      add(new THREE.TorusGeometry(r * 0.12, r * 0.03, 6, 18, Math.PI), eye, matrix(0, r * 0.06, r * 0.96, 0, 0, Math.PI))
+      cheeks(r * 0.13, r * 0.52, r * 0.04, r * 0.82, 0.62)
+      // ちいさな おつきさま（えいせい）が わっかの そばに うかぶ。
+      add(ball(r * 0.16, 14, 10), ringInner, matrix(-r * 0.92, r * 0.72, r * 0.3))
+      break
+    }
+    case 'rocket': {
+      // おもちゃの ロケット。白い胴に 赤い先っぽ、まるい まどから うちゅうひこうしが のぞく。
+      const r = species.body.form === 'capsule' ? species.body.radius : reach
+      const half = species.body.form === 'capsule' ? species.body.half : r
+      const top = half + r * 1.05
+      const bottom = -half - r * 0.85
+      const noseFrom = half * 0.55
+      const profile = (y: number) => {
+        if (y <= noseFrom) return r * (0.84 + 0.14 * Math.sin(((y - bottom) / (noseFrom - bottom)) * Math.PI * 0.62))
+        const t = (y - noseFrom) / (top - noseFrom)
+        return r * 0.972 * Math.sqrt(Math.max(0, 1 - t * t)) * (1 - 0.15 * t)
+      }
+      const lathe = (from: number, to: number, steps: number, closeBottom: boolean) => {
+        const points: THREE.Vector2[] = closeBottom ? [new THREE.Vector2(1e-4, from)] : []
+        for (let i = 0; i <= steps; i++) {
+          const y = from + ((to - from) * i) / steps
+          points.push(new THREE.Vector2(Math.max(profile(y), 1e-4), y))
+        }
+        return smooth(new THREE.LatheGeometry(points, 28))
+      }
+      const red = new THREE.MeshPhysicalMaterial({ color: species.accent, roughness: 0.28, clearcoat: 0.9, clearcoatRoughness: 0.12 })
+      const blue = new THREE.MeshPhysicalMaterial({ color: '#3f7fe8', roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 })
+      const chrome = new THREE.MeshStandardMaterial({ color: '#c9d0da', roughness: 0.2, metalness: 0.9 })
+      const porthole = new THREE.MeshPhysicalMaterial({ color: '#8fd6ff', roughness: 0.05, clearcoat: 1, clearcoatRoughness: 0.03, emissive: '#2a7fc0', emissiveIntensity: 0.35 })
+      add(lathe(bottom, noseFrom, 20, true), body, matrix(0, 0, 0))
+      add(lathe(noseFrom, top, 16, false), red, matrix(0, 0, 0))
+      add(new THREE.TorusGeometry(profile(noseFrom) * 1.0, r * 0.06, 8, 36), chrome, matrix(0, noseFrom, 0, Math.PI / 2, 0, 0))
+      add(new THREE.TorusGeometry(profile(-half * 0.5) * 1.0, r * 0.08, 8, 36), blue, matrix(0, -half * 0.5, 0, Math.PI / 2, 0, 0))
+      // まどと、なかの かお。
+      const windowY = half * 0.02
+      const windowZ = profile(windowY)
+      add(new THREE.CylinderGeometry(r * 0.4, r * 0.4, r * 0.1, 28), porthole, matrix(0, windowY, windowZ * 0.97, Math.PI / 2, 0, 0))
+      add(new THREE.TorusGeometry(r * 0.41, r * 0.08, 10, 32), chrome, matrix(0, windowY, windowZ * 0.99))
+      eyes(r * 0.075, r * 0.13, windowY + r * 0.04, windowZ * 1.03)
+      // 3まいの はね。ねかせて 置いても 床に めりこみすぎない 大きさにする。
+      const finShape = new THREE.Shape()
+      finShape.moveTo(0, 0)
+      finShape.lineTo(r * 0.42, -r * 0.42)
+      finShape.quadraticCurveTo(r * 0.48, -r * 0.62, r * 0.36, -r * 0.66)
+      finShape.lineTo(0, -r * 0.5)
+      finShape.closePath()
+      const finGeometry = new THREE.ExtrudeGeometry(finShape, { depth: r * 0.08, bevelEnabled: true, bevelSize: r * 0.03, bevelThickness: r * 0.03, bevelSegments: 2, curveSegments: 6 }).translate(0, 0, -r * 0.04)
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + Math.PI / 2
+        add(finGeometry.clone(), red, new THREE.Matrix4().makeRotationY(a).multiply(matrix(r * 0.72, bottom + r * 0.62, 0)))
+      }
+      finGeometry.dispose()
+      add(new THREE.CylinderGeometry(r * 0.5, r * 0.62, r * 0.24, 24), chrome, matrix(0, bottom - r * 0.06, 0))
+      add(new THREE.CylinderGeometry(r * 0.36, r * 0.36, r * 0.04, 20), blue, matrix(0, bottom - r * 0.19, 0))
+      break
+    }
+    case 'ufo': {
+      // ユーフォー。ひらたい円ばんに すきとおった ドーム、なかで みどりの うちゅうじんが にっこり。
+      const half = species.body.form === 'box' ? species.body.half : { x: reach, y: reach * 0.4, z: reach }
+      const round = species.body.form === 'box' ? species.body.round : 0
+      const rx = Math.min(half.x, half.z) + round
+      const hy = half.y + round
+      const points: THREE.Vector2[] = [new THREE.Vector2(1e-4, -hy * 0.92)]
+      for (let i = 0; i <= 16; i++) {
+        const t = i / 16
+        points.push(new THREE.Vector2(rx * 0.32 + rx * 0.68 * Math.sin(t * Math.PI / 2), -hy * 0.92 + hy * 0.92 * (1 - Math.cos(t * Math.PI / 2))))
+      }
+      for (let i = 1; i <= 12; i++) {
+        const t = i / 12
+        points.push(new THREE.Vector2(rx * (1 - 0.5 * t), hy * 0.42 * Math.sin(t * Math.PI / 2)))
+      }
+      points.push(new THREE.Vector2(1e-4, hy * 0.42))
+      add(smooth(new THREE.LatheGeometry(points, 36)), body, matrix(0, 0, 0))
+      const chrome = new THREE.MeshStandardMaterial({ color: '#d7dde6', roughness: 0.18, metalness: 0.9 })
+      const lights = new THREE.MeshStandardMaterial({ color: '#fff3b0', emissive: '#ffc93d', emissiveIntensity: 1.4, roughness: 0.3 })
+      const dome = new THREE.MeshPhysicalMaterial({ color: species.accent, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, transparent: true, opacity: 0.38, depthWrite: false })
+      const alien = new THREE.MeshPhysicalMaterial({ color: '#8fe36b', roughness: 0.4, clearcoat: 0.5 })
+      add(new THREE.TorusGeometry(rx * 0.99, hy * 0.12, 8, 48), chrome, matrix(0, 0, 0, Math.PI / 2, 0, 0))
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2
+        add(ball(hy * 0.16, 10, 8), lights, matrix(Math.cos(a) * rx * 0.86, -hy * 0.14, Math.sin(a) * rx * 0.86))
+      }
+      add(new THREE.CylinderGeometry(rx * 0.26, rx * 0.3, hy * 0.2, 24), lights, matrix(0, -hy * 0.94, 0))
+      const domeR = rx * 0.5
+      add(new THREE.SphereGeometry(domeR, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2), dome, matrix(0, hy * 0.3, 0))
+      add(new THREE.TorusGeometry(domeR, hy * 0.08, 8, 32), chrome, matrix(0, hy * 0.32, 0, Math.PI / 2, 0, 0))
+      const head = domeR * 0.5
+      add(ball(head, 22, 16).scale(1.1, 0.95, 1), alien, matrix(0, hy * 0.32 + head * 0.9, 0))
+      for (const side of [-1, 1]) {
+        add(new THREE.CylinderGeometry(head * 0.06, head * 0.06, head * 0.7, 6), alien, matrix(side * head * 0.42, hy * 0.32 + head * 2.0, 0, 0, 0, -side * 0.4))
+        add(ball(head * 0.16, 10, 8), lights, matrix(side * head * 0.58, hy * 0.32 + head * 2.32, 0))
+      }
+      eyes(head * 0.22, head * 0.36, hy * 0.32 + head, head * 0.82)
+      break
+    }
     case 'fruit': {
       if (species.body.form === 'capsule') {
         // バナナ。弓なりの胴に、へたと さきっぽを つける。
@@ -420,6 +614,246 @@ function shade(color: string, amount: number): string {
   return `#${(amount >= 0 ? base.lerp(new THREE.Color('#ffffff'), amount) : base.multiplyScalar(1 + amount)).getHexString()}`
 }
 
+/** 決まった形の乱数。テーマの絵を毎回 同じに描くために使う。 */
+function hash(seed: number): number {
+  const value = Math.sin(seed * 91.37 + 7.13) * 43758.5453
+  return value - Math.floor(value)
+}
+
+function starPath(context: CanvasRenderingContext2D, x: number, y: number, outer: number, inner: number, points = 5) {
+  context.beginPath()
+  for (let i = 0; i < points * 2; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / points
+    const radius = i % 2 ? inner : outer
+    context.lineTo(x + Math.cos(a) * radius, y + Math.sin(a) * radius)
+  }
+  context.closePath()
+}
+
+/** うみの なかまの かべ。光の さしこむ 海の中に、ゆれる海そう・さんご・あわ・小さな魚。 */
+function drawOceanWall(context: CanvasRenderingContext2D, w: number, h: number) {
+  const water = context.createLinearGradient(0, 0, 0, h)
+  water.addColorStop(0, '#a8ecf7')
+  water.addColorStop(0.45, '#4fbfe0')
+  water.addColorStop(1, '#2179b5')
+  context.fillStyle = water
+  context.fillRect(0, 0, w, h)
+  // 水面から さしこむ 光の すじ。
+  context.save()
+  context.globalCompositeOperation = 'lighter'
+  for (let i = 0; i < 6; i++) {
+    const x = 40 + i * 92 + hash(i) * 30
+    const ray = context.createLinearGradient(0, 0, 0, h * 0.9)
+    ray.addColorStop(0, 'rgba(255, 255, 240, 0.22)')
+    ray.addColorStop(1, 'rgba(255, 255, 240, 0)')
+    context.fillStyle = ray
+    context.beginPath()
+    context.moveTo(x - 14, 0)
+    context.lineTo(x + 18, 0)
+    context.lineTo(x + 70 + hash(i + 9) * 40, h * 0.9)
+    context.lineTo(x + 10, h * 0.9)
+    context.closePath()
+    context.fill()
+  }
+  context.restore()
+  // 水面の きらきら。
+  context.strokeStyle = 'rgba(255, 255, 255, 0.55)'
+  context.lineWidth = 3
+  context.lineCap = 'round'
+  for (let i = 0; i < 9; i++) {
+    const x = hash(i + 30) * w
+    const y = 10 + hash(i + 40) * 26
+    context.beginPath()
+    context.moveTo(x, y)
+    context.quadraticCurveTo(x + 12, y - 6, x + 24, y)
+    context.stroke()
+  }
+  // 遠くの 魚の むれ（うすい かげ）。
+  context.fillStyle = 'rgba(30, 96, 150, 0.35)'
+  for (let i = 0; i < 9; i++) {
+    const x = 300 + (i % 3) * 26 + hash(i + 50) * 14
+    const y = 110 + Math.floor(i / 3) * 18 + hash(i + 60) * 8
+    context.beginPath()
+    context.ellipse(x, y, 9, 4, 0, 0, Math.PI * 2)
+    context.moveTo(x + 8, y)
+    context.lineTo(x + 15, y - 5)
+    context.lineTo(x + 15, y + 5)
+    context.fill()
+  }
+  // すなの 海ぞこ。
+  const sand = context.createLinearGradient(0, h - 70, 0, h)
+  sand.addColorStop(0, '#f6e2ae')
+  sand.addColorStop(1, '#e4c68a')
+  context.fillStyle = sand
+  context.beginPath()
+  context.moveTo(0, h - 46)
+  for (let x = 0; x <= w; x += 32) context.quadraticCurveTo(x + 16, h - 60 + Math.sin(x * 0.05) * 8, x + 32, h - 48 + Math.cos(x * 0.04) * 6)
+  context.lineTo(w, h)
+  context.lineTo(0, h)
+  context.closePath()
+  context.fill()
+  // ゆらゆら 海そう。
+  for (let i = 0; i < 7; i++) {
+    const x = 18 + i * 78 + hash(i + 70) * 30
+    const tall = 110 + hash(i + 80) * 120
+    context.strokeStyle = i % 2 ? '#3aa86a' : '#5cc77f'
+    context.lineWidth = 12 + hash(i + 90) * 6
+    context.beginPath()
+    context.moveTo(x, h - 30)
+    for (let k = 1; k <= 6; k++) context.lineTo(x + Math.sin(k * 1.3 + i) * 12, h - 30 - (tall * k) / 6)
+    context.stroke()
+  }
+  // さんごと 石。
+  const coral = (x: number, y: number, size: number, color: string) => {
+    context.strokeStyle = color
+    context.lineWidth = size * 0.22
+    const branch = (bx: number, by: number, angle: number, length: number, depth: number) => {
+      const ex = bx + Math.cos(angle) * length
+      const ey = by + Math.sin(angle) * length
+      context.beginPath()
+      context.moveTo(bx, by)
+      context.lineTo(ex, ey)
+      context.stroke()
+      if (depth > 0) {
+        branch(ex, ey, angle - 0.5, length * 0.72, depth - 1)
+        branch(ex, ey, angle + 0.5, length * 0.72, depth - 1)
+      }
+    }
+    branch(x, y, -Math.PI / 2, size, 3)
+  }
+  coral(118, h - 38, 34, '#ff7f9e')
+  coral(420, h - 36, 40, '#ff9f6b')
+  coral(480, h - 34, 26, '#ff7f9e')
+  context.fillStyle = '#8a9bb0'
+  for (const [x, rw] of [[200, 40], [250, 26], [330, 34]] as const) {
+    context.beginPath()
+    context.ellipse(x, h - 30, rw, rw * 0.55, 0, Math.PI, 0)
+    context.fill()
+  }
+  // ヒトデと 貝がら。
+  context.fillStyle = '#ffb347'
+  starPath(context, 290, h - 22, 13, 5)
+  context.fill()
+  context.fillStyle = '#ffd6e0'
+  context.beginPath()
+  context.arc(60, h - 18, 10, Math.PI, 0)
+  context.fill()
+  // あわ。
+  for (let i = 0; i < 22; i++) {
+    const x = hash(i + 100) * w
+    const y = 40 + hash(i + 120) * (h - 140)
+    const radius = 3 + hash(i + 140) * 9
+    context.strokeStyle = 'rgba(255, 255, 255, 0.7)'
+    context.lineWidth = 2
+    context.beginPath()
+    context.arc(x, y, radius, 0, Math.PI * 2)
+    context.stroke()
+    context.fillStyle = 'rgba(255, 255, 255, 0.8)'
+    context.beginPath()
+    context.arc(x - radius * 0.35, y - radius * 0.35, radius * 0.25, 0, Math.PI * 2)
+    context.fill()
+  }
+}
+
+/** うちゅうの かべ。星雲の かかった 夜空に、わっかの わくせい・三日月・ながれ星。 */
+function drawSpaceWall(context: CanvasRenderingContext2D, w: number, h: number) {
+  const sky = context.createLinearGradient(0, 0, 0, h)
+  sky.addColorStop(0, '#191846')
+  sky.addColorStop(0.55, '#33297a')
+  sky.addColorStop(1, '#5b3b93')
+  context.fillStyle = sky
+  context.fillRect(0, 0, w, h)
+  context.save()
+  context.globalCompositeOperation = 'lighter'
+  for (const [x, y, radius, color] of [[140, 170, 170, 'rgba(255, 110, 190, 0.28)'], [380, 90, 150, 'rgba(90, 200, 255, 0.22)'], [300, 300, 140, 'rgba(160, 120, 255, 0.25)']] as const) {
+    const nebula = context.createRadialGradient(x, y, 0, x, y, radius)
+    nebula.addColorStop(0, color)
+    nebula.addColorStop(1, 'rgba(0, 0, 0, 0)')
+    context.fillStyle = nebula
+    context.fillRect(0, 0, w, h)
+  }
+  context.restore()
+  // 小さな 星を たくさん。
+  for (let i = 0; i < 170; i++) {
+    const x = hash(i + 200) * w
+    const y = hash(i + 400) * h
+    const size = 0.5 + hash(i + 600) ** 3 * 2.2
+    context.fillStyle = `rgba(255, ${235 + Math.floor(hash(i + 700) * 20)}, ${210 + Math.floor(hash(i + 800) * 45)}, ${0.55 + hash(i + 900) * 0.45})`
+    context.beginPath()
+    context.arc(x, y, size, 0, Math.PI * 2)
+    context.fill()
+  }
+  // きらっと 光る 十字の星。
+  context.fillStyle = '#fff8d8'
+  for (const [x, y, size] of [[70, 60, 10], [230, 40, 8], [470, 200, 9], [180, 280, 7], [350, 330, 8]] as const) {
+    starPath(context, x, y, size, size * 0.18, 4)
+    context.fill()
+  }
+  // ながれ星。
+  const trail = context.createLinearGradient(260, 140, 360, 90)
+  trail.addColorStop(0, 'rgba(255, 255, 255, 0)')
+  trail.addColorStop(1, 'rgba(255, 250, 220, 0.9)')
+  context.strokeStyle = trail
+  context.lineWidth = 4
+  context.lineCap = 'round'
+  context.beginPath()
+  context.moveTo(260, 140)
+  context.lineTo(360, 90)
+  context.stroke()
+  context.fillStyle = '#fffbe6'
+  starPath(context, 362, 89, 9, 4)
+  context.fill()
+  // わっかの ある 大きな わくせい（右上）。
+  const planet = context.createRadialGradient(410, 80, 6, 430, 100, 54)
+  planet.addColorStop(0, '#ffd9a0')
+  planet.addColorStop(1, '#f08a5d')
+  context.save()
+  context.translate(430, 100)
+  context.rotate(-0.3)
+  context.strokeStyle = 'rgba(255, 230, 170, 0.9)'
+  context.lineWidth = 7
+  context.beginPath()
+  context.ellipse(0, 0, 84, 20, 0, Math.PI, Math.PI * 2)
+  context.stroke()
+  context.fillStyle = planet
+  context.beginPath()
+  context.arc(0, 0, 46, 0, Math.PI * 2)
+  context.fill()
+  context.fillStyle = 'rgba(200, 90, 70, 0.35)'
+  context.fillRect(-46, -8, 92, 8)
+  context.fillRect(-42, 14, 84, 6)
+  context.beginPath()
+  context.ellipse(0, 0, 84, 20, 0, 0, Math.PI)
+  context.stroke()
+  context.restore()
+  // 三日月（左上）。
+  context.fillStyle = '#fff3b8'
+  context.beginPath()
+  context.arc(78, 140, 30, 0, Math.PI * 2)
+  context.fill()
+  context.fillStyle = '#26205e'
+  context.beginPath()
+  context.arc(92, 130, 27, 0, Math.PI * 2)
+  context.fill()
+  // ちいさな 青い わくせいと、地平線の 月の地面。
+  const small = context.createRadialGradient(150, 255, 2, 155, 260, 22)
+  small.addColorStop(0, '#bdf3ff')
+  small.addColorStop(1, '#3d8be0')
+  context.fillStyle = small
+  context.beginPath()
+  context.arc(155, 260, 20, 0, Math.PI * 2)
+  context.fill()
+  context.fillStyle = '#4b3f86'
+  context.beginPath()
+  context.moveTo(0, h - 40)
+  context.quadraticCurveTo(w * 0.3, h - 72, w * 0.6, h - 46)
+  context.quadraticCurveTo(w * 0.85, h - 28, w, h - 52)
+  context.lineTo(w, h)
+  context.lineTo(0, h)
+  context.closePath()
+  context.fill()
+}
+
 export function createCraneScene(container: HTMLDivElement, machine: CraneMachine) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7))
@@ -466,7 +900,7 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
   rim.position.set(1.6, 1.8, -2.4)
   scene.add(sun, rim, new THREE.HemisphereLight('#fff0f6', '#cdbba6', 0.7))
   // 筐体の中を照らす電球。影は落とさないので負荷は小さい。
-  const lamp = new THREE.PointLight('#ffe6b4', 1.6, 3, 1.6)
+  const lamp = new THREE.PointLight(machine.theme === 'ocean' ? '#d8f4ff' : machine.theme === 'space' ? '#e6dcff' : '#ffe6b4', 1.6, 3, 1.6)
   lamp.position.set(0, MARQUEE_Y - 0.2, 0.1)
   scene.add(lamp)
 
@@ -476,7 +910,7 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
   const frame = new THREE.MeshPhysicalMaterial({ color: machine.color, roughness: 0.36, clearcoat: 0.7, clearcoatRoughness: 0.2 })
   const frameDark = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(machine.color).multiplyScalar(0.72), roughness: 0.45, clearcoat: 0.4, clearcoatRoughness: 0.3 })
   const trim = new THREE.MeshStandardMaterial({ color: '#fff6e4', roughness: 0.4 })
-  const glass = new THREE.MeshPhysicalMaterial({ color: '#eef8ff', roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, transparent: true, opacity: 0.13, depthWrite: false, side: THREE.DoubleSide })
+  const glass = new THREE.MeshPhysicalMaterial({ color: machine.theme === 'ocean' ? '#d6f4ff' : '#eef8ff', roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, transparent: true, opacity: 0.13, depthWrite: false, side: THREE.DoubleSide })
   const bulbOn = new THREE.MeshStandardMaterial({ color: '#fff6d4', emissive: '#ffd36b', emissiveIntensity: 1.3, roughness: 0.25 })
   const bulbOff = new THREE.MeshStandardMaterial({ color: '#fff0f4', emissive: '#ff8fb1', emissiveIntensity: 0.6, roughness: 0.25 })
   const hole = new THREE.MeshStandardMaterial({ color: '#3a2e38', roughness: 0.6, metalness: 0.3 })
@@ -520,6 +954,50 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
 
   // 景品を並べる床。穴の部分だけ抜いた2枚に、やわらかい もようを描く。
   const matTexture = canvasTexture(256, 256, context => {
+    if (machine.theme === 'ocean') {
+      // すなはま。つぶつぶの すなに、ヒトデと 貝がらが ちらばる。
+      context.fillStyle = '#f7e6bd'
+      context.fillRect(0, 0, 256, 256)
+      for (let i = 0; i < 260; i++) {
+        context.fillStyle = hash(i + 1000) > 0.5 ? 'rgba(196, 160, 96, 0.4)' : 'rgba(255, 255, 255, 0.6)'
+        context.fillRect(hash(i + 1300) * 256, hash(i + 1600) * 256, 2, 2)
+      }
+      context.fillStyle = '#ffab5e'
+      starPath(context, 64, 70, 16, 6)
+      context.fill()
+      starPath(context, 196, 200, 12, 5)
+      context.fill()
+      context.fillStyle = '#ffc8d6'
+      for (const [x, y] of [[190, 60], [60, 196]] as const) {
+        context.beginPath()
+        context.arc(x, y, 12, Math.PI, 0)
+        context.closePath()
+        context.fill()
+      }
+      return
+    }
+    if (machine.theme === 'space') {
+      // 月の地面。でこぼこの クレーターを ちらす。
+      context.fillStyle = '#dcd8ec'
+      context.fillRect(0, 0, 256, 256)
+      for (const [x, y, radius] of [[50, 60, 22], [170, 40, 14], [200, 160, 28], [80, 190, 16], [130, 120, 10], [230, 240, 12], [20, 250, 10]] as const) {
+        context.fillStyle = '#c3bdd9'
+        context.beginPath()
+        context.arc(x, y, radius, 0, Math.PI * 2)
+        context.fill()
+        context.fillStyle = '#f3f0fb'
+        context.beginPath()
+        context.arc(x + radius * 0.15, y + radius * 0.15, radius * 0.82, Math.PI * 0.1, Math.PI * 0.9)
+        context.fill()
+        context.fillStyle = '#b2abcd'
+        context.beginPath()
+        context.arc(x - radius * 0.05, y - radius * 0.05, radius * 0.7, 0, Math.PI * 2)
+        context.fill()
+      }
+      context.fillStyle = '#ffffff'
+      for (let i = 0; i < 40; i++) context.fillRect(hash(i + 1900) * 256, hash(i + 2100) * 256, 1.5, 1.5)
+      return
+    }
     context.fillStyle = '#fff4e2'
     context.fillRect(0, 0, 256, 256)
     context.fillStyle = shade(machine.color, 0.5)
@@ -579,6 +1057,8 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
   box(0.024, 0.022, BIN.z * 2, BIN.x + 0.006, 0.011, 0, metal, true, 0.006)
   // うしろの かべは、きかいの色に 水玉と ほしの もよう。
   const backTexture = canvasTexture(512, 384, context => {
+    if (machine.theme === 'ocean') return drawOceanWall(context, 512, 384)
+    if (machine.theme === 'space') return drawSpaceWall(context, 512, 384)
     const gradient = context.createLinearGradient(0, 0, 0, 384)
     gradient.addColorStop(0, shade(machine.color, 0.35))
     gradient.addColorStop(1, shade(machine.color, 0.05))
@@ -603,7 +1083,8 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
     }
   })
   box(BIN.x * 2, BIN.height, 0.016, 0, BIN.height / 2, -BIN.z - 0.016, frameDark, false)
-  panel(BIN.x * 2, BIN.height, backTexture, matrix(0, BIN.height / 2, -BIN.z - 0.007))
+  // うちゅうの夜空は すこし 自分で 光らせて、星が しずまないようにする。
+  panel(BIN.x * 2, BIN.height, backTexture, matrix(0, BIN.height / 2, -BIN.z - 0.007), machine.theme === 'space' ? 0.45 : machine.theme === 'ocean' ? 0.15 : 0)
   // 四隅の柱と天井。
   for (const x of [-BIN.x, BIN.x]) for (const z of [-BIN.z, BIN.z]) {
     place(new THREE.CylinderGeometry(0.026, 0.026, BIN.height + 0.12, 16), metal, matrix(x, BIN.height / 2, z))
@@ -631,9 +1112,15 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
     context.lineJoin = 'round'
     context.lineWidth = 12
     context.strokeStyle = '#ffffff'
-    context.strokeText(machine.label, 256, 68)
+    // 長い名前でも 星かざりの内がわへ おさまるよう、文字の大きさを しぼる。
+    const fit = Math.min(1, 380 / Math.max(1, context.measureText(machine.label).width))
+    context.save()
+    context.translate(256, 68)
+    context.scale(fit, 1)
+    context.strokeText(machine.label, 0, 0)
     context.fillStyle = shade(machine.color, -0.3)
-    context.fillText(machine.label, 256, 68)
+    context.fillText(machine.label, 0, 0)
+    context.restore()
     context.fillStyle = '#ffc43d'
     for (const sx of [44, 468]) {
       context.beginPath()
@@ -734,6 +1221,77 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.008, 6, 32), new THREE.MeshBasicMaterial({ color: '#ff9f43', transparent: true, opacity: 0.85, depthWrite: false }))
   ring.rotation.x = -Math.PI / 2
   scene.add(beam, ring)
+
+  // テーマの うごく かざり。海は うしろの かべぞいに のぼる あわ、うちゅうは かべで またたく 星。
+  // 景品と アームの じゃまを しないよう、奥の かべと 左右の ガラスの そばだけに 置く。
+  type Ambient = { x: number; z: number; size: number; speed: number; phase: number }
+  const ambientSpots: Ambient[] = []
+  let ambient: THREE.InstancedMesh | null = null
+  if (machine.theme === 'ocean') {
+    for (let i = 0; i < 18; i++) {
+      const onSide = i % 3 === 2
+      ambientSpots.push({
+        x: onSide ? (i % 2 ? 1 : -1) * (BIN.x - 0.03) : -BIN.x + 0.06 + hash(i + 3000) * (BIN.x * 2 - 0.12),
+        z: onSide ? -BIN.z * 0.5 + hash(i + 3100) * BIN.z * 0.6 : -BIN.z + 0.025 + hash(i + 3200) * 0.03,
+        size: 0.006 + hash(i + 3300) * 0.01,
+        speed: 0.07 + hash(i + 3400) * 0.07,
+        phase: hash(i + 3500),
+      })
+    }
+    ambient = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(1, 14, 10),
+      new THREE.MeshPhysicalMaterial({ color: '#f4fdff', roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02, transparent: true, opacity: 0.42, depthWrite: false, emissive: '#bfefff', emissiveIntensity: 0.25 }),
+      ambientSpots.length,
+    )
+  } else if (machine.theme === 'space') {
+    for (let i = 0; i < 16; i++) {
+      ambientSpots.push({
+        x: -BIN.x + 0.05 + hash(i + 4000) * (BIN.x * 2 - 0.1),
+        z: -BIN.z - 0.002,
+        size: 0.008 + hash(i + 4100) * 0.009,
+        speed: 1.5 + hash(i + 4200) * 2.2,
+        phase: hash(i + 4300) * Math.PI * 2,
+      })
+    }
+    const sparkleShape = new THREE.Shape()
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4
+      const radius = i % 2 ? 0.26 : 1
+      if (i === 0) sparkleShape.moveTo(Math.sin(a) * radius, Math.cos(a) * radius)
+      else sparkleShape.lineTo(Math.sin(a) * radius, Math.cos(a) * radius)
+    }
+    sparkleShape.closePath()
+    ambient = new THREE.InstancedMesh(new THREE.ShapeGeometry(sparkleShape), new THREE.MeshBasicMaterial({ color: '#fff6c8', transparent: true, opacity: 0.95, depthWrite: false }), ambientSpots.length)
+  }
+  if (ambient) {
+    ambient.frustumCulled = false
+    ambient.renderOrder = 2
+    ambient.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    scene.add(ambient)
+  }
+  const ambientDummy = new THREE.Object3D()
+  function updateAmbient(time: number) {
+    if (!ambient) return
+    ambientSpots.forEach((spot, index) => {
+      if (machine.theme === 'ocean') {
+        // 下から上へ のぼって、てっぺんで また 下から。のぼりながら すこし ゆれる。
+        const travel = (spot.phase + time * spot.speed) % 1
+        ambientDummy.position.set(spot.x + Math.sin(time * 2.2 + spot.phase * 9) * 0.008, 0.04 + travel * (GANTRY_Y - 0.1), spot.z)
+        ambientDummy.scale.setScalar(spot.size * (0.7 + travel * 0.5))
+        ambientDummy.rotation.set(0, 0, 0)
+      } else {
+        // 星の高さは 奥のかべの 上のほう。またたきに あわせて 大きさを かえる。
+        const pulse = 0.55 + 0.45 * Math.sin(time * spot.speed + spot.phase)
+        ambientDummy.position.set(spot.x, 0.36 + hash(index + 4400) * 0.5, spot.z + 0.004)
+        ambientDummy.scale.setScalar(spot.size * (0.4 + pulse))
+        ambientDummy.rotation.set(0, 0, time * 0.4 + spot.phase)
+      }
+      ambientDummy.updateMatrix()
+      ambient!.setMatrixAt(index, ambientDummy.matrix)
+    })
+    ambient.instanceMatrix.needsUpdate = true
+  }
+  updateAmbient(0)
 
   // 景品。種類ごとに、同じ材質の部品を1つの InstancedMesh へまとめる。
   const counts = new Map<string, number>()
@@ -939,6 +1497,7 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
         bulbOn.emissiveIntensity = 1 + wave * 0.6
         bulbOff.emissiveIntensity = 1 - wave * 0.6
         lamp.intensity = 1.55 + Math.sin(twinkle * 2) * 0.12
+        updateAmbient(twinkle)
       }
       renderer.render(scene, camera)
     },

@@ -87,6 +87,20 @@ describe('クレーンゲームの機械', () => {
     }
   })
 
+  it('うみと うちゅうの きかいは、テーマの かざりと 専用の景品を持つ', () => {
+    const ocean = findMachine('ocean')!
+    const space = findMachine('space')!
+    expect(ocean.theme).toBe('ocean')
+    expect(space.theme).toBe('space')
+    expect(ocean.species.map(species => species.look)).toEqual(['penguin', 'octopus', 'puffer'])
+    expect(space.species.map(species => species.look)).toEqual(['planet', 'rocket', 'ufo'])
+    // ふわふわの うみの なかまは、つるつるの うちゅうの おもちゃより つかみやすい。
+    expect(ocean.grip.hold).toBeGreaterThan(space.grip.hold)
+    for (const machine of [ocean, space]) {
+      expect(new Set(machine.slots.map(slot => slot.species))).toEqual(new Set(machine.species.map(species => species.id)))
+    }
+  })
+
   it('知らない機械や景品を引くと undefined になる', () => {
     expect(findMachine('unknown')).toBeUndefined()
     expect(findSpecies(findMachine('plush')!, 'unknown')).toBeUndefined()
