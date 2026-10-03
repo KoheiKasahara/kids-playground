@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
-import { isSoundEnabled, primeAudio, setSoundEnabled } from '../../audio/sound'
+import { primeAudio } from '../../audio/sound'
+import { useSoundToggle } from '../../audio/useSoundToggle'
 import { AUTO_COLOR, BLOCK_COLORS, BLOCK_SHAPES, findColor, resolveColor, type BlockShapeId, type ColorChoice } from './blocks'
 import { HEIGHT_GOALS, heightInCm, MAX_BLOCKS, nextGoal, type HeightGoal } from './placement'
 import { readBestHeight, saveBestHeight } from './record'
@@ -22,7 +23,7 @@ function Game({ onExit }: { onExit: () => void }) {
   const [turns, setTurns] = useState(0)
   const [snapshot, setSnapshot] = useState<TsumikiSnapshot>(INITIAL_SNAPSHOT)
   const [toast, setToast] = useState<Toast | null>(null)
-  const [sound, setSound] = useState(isSoundEnabled)
+  const [sound, toggleSound] = useSoundToggle()
   const [best, setBest] = useState(readBestHeight)
   const [placedOnce, setPlacedOnce] = useState(false)
 
@@ -111,7 +112,7 @@ function Game({ onExit }: { onExit: () => void }) {
             className={styles.iconButton}
             aria-label="こうかおん"
             aria-pressed={sound}
-            onClick={() => { setSoundEnabled(!sound); setSound(!sound) }}
+            onClick={toggleSound}
           >
             {sound ? '🔊' : '🔇'}
           </button>

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import GameRouteBoundary from './GameRouteBoundary'
 import { useLocation, useRoutes } from 'react-router-dom'
 import { routes } from './routes'
@@ -9,7 +9,8 @@ import ScrollManager from './ScrollManager'
 import SeoManager from '../seo/SeoManager'
 import { installBrowserPageZoomSuppression } from './preventBrowserPageZoom'
 import GameBackButton from '../components/GameBackButton'
-import { recordRecentGameVisit } from '../pages/gameShelfStore'
+import { findGameIdByPathname, recordRecentGameVisit } from '../pages/gameShelfStore'
+import { setActiveSoundGame } from '../audio/sound'
 
 const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/forest-delivery',
@@ -69,6 +70,10 @@ export default function App() {
   // ゲーム機能としてのピンチ操作とは別系統のイベントを止めているだけなので、
   // 各ゲームのジェスチャー処理には影響しない（詳細はpreventBrowserPageZoom.tsのコメントを参照）。
   useEffect(() => installBrowserPageZoomSuppression(), [])
+
+  // 遊んでいるゲームの音量補正を共通の出口へ反映する（どのゲームも同じくらいの大きさにそろえる）。
+  // 子の画面がマウント時の useEffect で鳴らす音にも間に合うよう、layout effect で先に切り替える。
+  useLayoutEffect(() => setActiveSoundGame(findGameIdByPathname(normalizedPathname)), [normalizedPathname])
 
   // ゲームのURLを開いたら、ホームの「さいきん あそんだ」の先頭へ置く（Issue #598）。
   useEffect(() => recordRecentGameVisit(normalizedPathname), [normalizedPathname])

@@ -5,15 +5,15 @@ import { getSharedAudioContext, isSoundEnabled, playTone } from '../../audio/sou
  * 音が出せない環境でも遊びは成立するので、失敗しても何もせず先へ進む。
  */
 
-/** ブロックが積まれた瞬間の、みじかい「ことん」。何度も鳴るので低く小さくする。 */
+/** ブロックが積まれた瞬間の、みじかい「ことん」。何度も鳴るので低く短くし、小さすぎて聞こえなくならない音量にする。 */
 export function playBlockLandSound(): void {
   if (!isSoundEnabled()) return
   try {
     const ctx = getSharedAudioContext()
     if (!ctx) return
     const now = ctx.currentTime
-    playTone(ctx, 196, now, 0.07, 0.05, 'triangle')
-    playTone(ctx, 131, now + 0.04, 0.09, 0.04, 'sine')
+    playTone(ctx, 196, now, 0.07, 0.1, 'triangle')
+    playTone(ctx, 131, now + 0.04, 0.09, 0.08, 'sine')
   } catch {
     /* 音が出せなくても ブロックは つめる。 */
   }

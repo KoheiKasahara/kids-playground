@@ -1,4 +1,4 @@
-import { getSharedAudioContext, isSoundEnabled } from '../../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled } from '../../audio/sound'
 
 // 音声ファイルを つかわず、Web Audio で SFC ふうの こうかおん と BGM を その場で つくる。
 // メロディは このゲームの ための オリジナル。
@@ -55,8 +55,8 @@ export function playShardSound(left: number) {
   if (!ctx) return
   const t = ctx.currentTime
   const lift = Math.pow(2, (4 - Math.min(4, left)) / 12 * 2)
-  ;['C6', 'E6', 'G6', 'C7'].forEach((n, i) => tone(ctx, ctx.destination, freq(n) * lift, t + i * .055, .12, .07, 'pulse'))
-  tone(ctx, ctx.destination, freq('G7') * lift, t + .24, .25, .03, 'sine')
+  ;['C6', 'E6', 'G6', 'C7'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n) * lift, t + i * .055, .12, .07, 'pulse'))
+  tone(ctx, getSoundOutput(ctx), freq('G7') * lift, t + .24, .25, .03, 'sine')
 }
 
 /** なかまに なった「ぴょこ♪」。 */
@@ -71,10 +71,10 @@ export function playJoinSound() {
   osc.frequency.exponentialRampToValueAtTime(900, t + .12)
   gain.gain.setValueAtTime(.12, t)
   gain.gain.exponentialRampToValueAtTime(.001, t + .16)
-  osc.connect(gain).connect(ctx.destination)
+  osc.connect(gain).connect(getSoundOutput(ctx))
   osc.start(t)
   osc.stop(t + .18)
-  ;['E5', 'A5', 'C#6'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + .14 + i * .09, .14, .06, 'pulse'))
+  ;['E5', 'A5', 'C#6'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + .14 + i * .09, .14, .06, 'pulse'))
 }
 
 /** たからばこが あらわれた「シャラララン」。 */
@@ -82,8 +82,8 @@ export function playChestAppearSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  ;['C7', 'G6', 'E6', 'C6', 'G5', 'E5', 'C5'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + i * .04, .1, .035, 'triangle'))
-  ;['C5', 'E5', 'G5', 'C6'].forEach(n => tone(ctx, ctx.destination, freq(n), t + .32, .6, .03, 'pulse', .3))
+  ;['C7', 'G6', 'E6', 'C6', 'G5', 'E5', 'C5'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + i * .04, .1, .035, 'triangle'))
+  ;['C5', 'E5', 'G5', 'C6'].forEach(n => tone(ctx, getSoundOutput(ctx), freq(n), t + .32, .6, .03, 'pulse', .3))
 }
 
 /** たからばこを あけた ファンファーレ。 */
@@ -94,11 +94,11 @@ export function playFanfare() {
   const s = .1
   const melody: [string, number, number][] = [['G5', 0, 1], ['G5', 1, 1], ['G5', 2, 1], ['C6', 3, 3], ['A5', 6, 1], ['B5', 7, 1], ['C6', 8, 1], ['D6', 9, 1], ['E6', 10, 6]]
   for (const [n, at, len] of melody) {
-    tone(ctx, ctx.destination, freq(n), t + at * s, len * s, .075, 'pulse')
-    tone(ctx, ctx.destination, freq(n) / 2, t + at * s, len * s, .03, 'pulse')
+    tone(ctx, getSoundOutput(ctx), freq(n), t + at * s, len * s, .075, 'pulse')
+    tone(ctx, getSoundOutput(ctx), freq(n) / 2, t + at * s, len * s, .03, 'pulse')
   }
-  for (const [n, at, len] of [['C4', 3, 3], ['F3', 6, 2], ['G3', 8, 2], ['C4', 10, 6]] as [string, number, number][]) tone(ctx, ctx.destination, freq(n), t + at * s, len * s, .1, 'triangle')
-  ;['E6', 'G6', 'C7'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + 10 * s + i * .03, .6, .025, 'sine', .4))
+  for (const [n, at, len] of [['C4', 3, 3], ['F3', 6, 2], ['G3', 8, 2], ['C4', 10, 6]] as [string, number, number][]) tone(ctx, getSoundOutput(ctx), freq(n), t + at * s, len * s, .1, 'triangle')
+  ;['E6', 'G6', 'C7'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + 10 * s + i * .03, .6, .025, 'sine', .4))
 }
 
 /** スイッチを ふんだ「カチッ」。 */
@@ -106,8 +106,8 @@ export function playSwitchSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  tone(ctx, ctx.destination, 1400, t, .025, .05, 'square')
-  tone(ctx, ctx.destination, 900, t + .05, .03, .04, 'square')
+  tone(ctx, getSoundOutput(ctx), 1400, t, .025, .05, 'square')
+  tone(ctx, getSoundOutput(ctx), 900, t + .05, .03, .04, 'square')
 }
 
 /** たいまつに ひが ついた「ボッ」。 */
@@ -122,10 +122,10 @@ export function playTorchSound() {
   osc.frequency.exponentialRampToValueAtTime(260, t + .18)
   gain.gain.setValueAtTime(.14, t)
   gain.gain.exponentialRampToValueAtTime(.001, t + .25)
-  osc.connect(gain).connect(ctx.destination)
+  osc.connect(gain).connect(getSoundOutput(ctx))
   osc.start(t)
   osc.stop(t + .27)
-  ;['E5', 'B5'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + .12 + i * .08, .12, .045, 'pulse'))
+  ;['E5', 'B5'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + .12 + i * .08, .12, .045, 'pulse'))
 }
 
 /** しかけが とけて みちが ひらいた「ゴゴゴ… ジャジャーン」。 */
@@ -133,30 +133,30 @@ export function playGateSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  for (let i = 0; i < 6; i++) tone(ctx, ctx.destination, 70 + (i % 2) * 12, t + i * .07, .07, .08, 'square')
-  ;['C5', 'E5', 'G5', 'C6', 'E6'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + .45 + i * .07, .16, .06, 'pulse'))
-  tone(ctx, ctx.destination, freq('G6'), t + .8, .4, .03, 'sine', .3)
+  for (let i = 0; i < 6; i++) tone(ctx, getSoundOutput(ctx), 70 + (i % 2) * 12, t + i * .07, .07, .08, 'square')
+  ;['C5', 'E5', 'G5', 'C6', 'E6'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + .45 + i * .07, .16, .06, 'pulse'))
+  tone(ctx, getSoundOutput(ctx), freq('G6'), t + .8, .4, .03, 'sine', .3)
 }
 
 /** ぶつかった「コツン」。 */
 export function playBumpSound() {
   const ctx = sfx()
   if (!ctx) return
-  tone(ctx, ctx.destination, 130, ctx.currentTime, .06, .06, 'square')
+  tone(ctx, getSoundOutput(ctx), 130, ctx.currentTime, .06, .06, 'square')
 }
 
 /** タップの「ピッ」。 */
 export function playTapSound() {
   const ctx = sfx()
   if (!ctx) return
-  tone(ctx, ctx.destination, freq('A6'), ctx.currentTime, .03, .025, 'pulse')
+  tone(ctx, getSoundOutput(ctx), freq('A6'), ctx.currentTime, .03, .065, 'pulse')
 }
 
 /** メッセージの もじおくり「ポポポ」。 */
 export function playTextBlip() {
   const ctx = sfx()
   if (!ctx) return
-  tone(ctx, ctx.destination, freq('E6'), ctx.currentTime, .025, .018, 'pulse')
+  tone(ctx, getSoundOutput(ctx), freq('E6'), ctx.currentTime, .025, .018, 'pulse')
 }
 
 // ---------------- BGM ----------------
@@ -196,7 +196,7 @@ export function startBgm(id: string): () => void {
   if (!song || !ctx) return () => {}
   const master = ctx.createGain()
   master.gain.value = .55
-  master.connect(ctx.destination)
+  master.connect(getSoundOutput(ctx))
   // すこし ひびきを つける（SFC の エコー）。
   const delay = ctx.createDelay(1)
   delay.delayTime.value = 60 / song.bpm * .75

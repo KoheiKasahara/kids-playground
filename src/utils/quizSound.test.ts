@@ -375,7 +375,8 @@ describe('quizSound', () => {
 
     expect(instances).toHaveLength(1)
     expect(instances[0].createOscillator).toHaveBeenCalledTimes(1)
-    expect(instances[0].createGain).toHaveBeenCalledTimes(1)
+    // 回転音の1組 + 共通の出口（音量補正）の1つ。
+    expect(instances[0].createGain).toHaveBeenCalledTimes(2)
     const oscillator = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
     expect(oscillator.frequency.value).toBeGreaterThan(78)
 
@@ -491,7 +492,8 @@ describe('quizSound', () => {
     controller.update(2.4, 'running')
     expect(instances).toHaveLength(1)
     expect(instances[0].createOscillator).toHaveBeenCalledTimes(1)
-    expect(instances[0].createGain).toHaveBeenCalledTimes(1)
+    // 走行音の1組 + 共通の出口（音量補正）の1つ。
+    expect(instances[0].createGain).toHaveBeenCalledTimes(2)
     controller.update(0, 'stoppedAtStation')
     const gainNode = instances[0].createGain.mock.results[0].value as MockGainNode
     const stopRampCount = gainNode.gain.linearRampToValueAtTime.mock.calls.length
@@ -520,8 +522,9 @@ describe('quizSound', () => {
     expect(instances).toHaveLength(1)
     // 出発音2音 + 走行音1音。出発音はクールダウンで間引き、走行の再開では同じ音源を再利用する。
     expect(instances[0].createOscillator).toHaveBeenCalledTimes(3)
-    expect(instances[0].createGain).toHaveBeenCalledTimes(3)
-    const drivingGain = instances[0].createGain.mock.results[2].value as MockGainNode
+    // Gain は上の3音ぶん + 最初の音で作られる共通の出口（音量補正）の1つ。
+    expect(instances[0].createGain).toHaveBeenCalledTimes(4)
+    const drivingGain = instances[0].createGain.mock.results[3].value as MockGainNode
     expect(drivingGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 0.045)
 
     controller.dispose()

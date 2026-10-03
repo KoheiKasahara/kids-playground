@@ -3,7 +3,12 @@
  * 音声ファイルを追加せず標準APIだけで鳴らすことで、アセット追加やライセンスの心配なしに
  * オフライン（PWA）でも確実に再生できるようにする。
  * Web Audio 非対応環境（一部ブラウザやテスト環境の jsdom）では何もしない。
+ *
+ * すべての音は ctx.destination ではなく getSoundOutput(ctx) へつなぐ。
+ * ここでゲームごとの音量補正（gameSoundLevels.ts）と音割れ防止のリミッターをかけ、
+ * どのゲームでも同じくらいの大きさで聞こえるようにしている。
  */
+import { gameSoundLevelDb } from './gameSoundLevels'
 
 type AudioContextConstructor = new () => AudioContext
 
@@ -44,6 +49,71 @@ function getAudioContext(): AudioContext | undefined {
     sharedContext.resume().catch(() => {})
   }
   return sharedContext
+}
+
+// ---- 共通の出口（音量補正 + リミッター） ---------------------------------------
+
+/** 出口のリミッター。重なった音で波形が割れるのを防ぐためのもので、ふだんの音量はほぼ変えない。 */
+const LIMITER = { threshold: -6, knee: 6, ratio: 12, attack: 0.003, release: 0.2 } as const
+
+/** AudioContext ごとの共通の出口（音量補正をかける GainNode）。ピアノのように自前の Context を持つゲームもある。 */
+const soundOutputs = new Map<AudioContext, GainNode>()
+let activeGameId: string | undefined
+
+function dbToGain(db: number): number {
+  return 10 ** (db / 20)
+}
+
+/**
+ * 効果音・BGMをつなぐ共通の出口。ゲーム側は `ctx.destination` へ直接つながず、必ずここへつなぐ。
+ * AudioContextごとに1組だけ作り、遊んでいるゲームの音量補正をここで一括してかける。
+ * 古いブラウザやテスト用のモックでノードを作れないときは destination をそのまま返す。
+ */
+export function getSoundOutput(ctx: AudioContext): AudioNode {
+  const existing = soundOutputs.get(ctx)
+  if (existing) return existing
+  try {
+    const input = ctx.createGain()
+    input.gain.value = dbToGain(gameSoundLevelDb(activeGameId))
+    let limiter: DynamicsCompressorNode | undefined
+    try {
+      limiter = ctx.createDynamicsCompressor()
+      limiter.threshold.value = LIMITER.threshold
+      limiter.knee.value = LIMITER.knee
+      limiter.ratio.value = LIMITER.ratio
+      limiter.attack.value = LIMITER.attack
+      limiter.release.value = LIMITER.release
+    } catch {
+      limiter = undefined
+    }
+    if (limiter) {
+      input.connect(limiter)
+      limiter.connect(ctx.destination)
+    } else {
+      input.connect(ctx.destination)
+    }
+    for (const [context] of soundOutputs) if (context.state === 'closed') soundOutputs.delete(context)
+    soundOutputs.set(ctx, input)
+    return input
+  } catch {
+    return ctx.destination
+  }
+}
+
+/**
+ * 遊んでいるゲームを伝え、そのゲームの音量補正を共通の出口へ反映する。
+ * App が画面遷移のたびに呼ぶので、ゲーム側から呼ぶ必要はない。ゲーム外（ホーム）では undefined。
+ */
+export function setActiveSoundGame(gameId: string | undefined): void {
+  activeGameId = gameId
+  const gain = dbToGain(gameSoundLevelDb(gameId))
+  for (const input of soundOutputs.values()) {
+    try {
+      input.gain.value = gain
+    } catch {
+      // 閉じた Context などで設定できなくても、画面遷移は止めない。
+    }
+  }
 }
 
 /**
@@ -97,7 +167,7 @@ export function createToneNodes(
   gain.gain.linearRampToValueAtTime(volume, startTime + 0.02)
   gain.gain.linearRampToValueAtTime(0, startTime + duration)
   oscillator.connect(gain)
-  gain.connect(ctx.destination)
+  gain.connect(getSoundOutput(ctx))
   return { oscillator, gain }
 }
 
@@ -133,7 +203,7 @@ export function playNoiseBurst(
   gain.gain.linearRampToValueAtTime(0, startTime + duration)
   source.connect(filter)
   filter.connect(gain)
-  gain.connect(ctx.destination)
+  gain.connect(getSoundOutput(ctx))
   source.start(startTime, Math.random() * 0.3)
   source.stop(startTime + duration)
 }

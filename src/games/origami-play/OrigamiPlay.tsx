@@ -10,7 +10,7 @@ import OrigamiPaper from './OrigamiPaper'
 import { foldHint } from './origamiView'
 import { ORIGAMI_TEMPLATES, PAPER_COLORS, type OrigamiId, type PaperColor } from './origamiTemplates'
 import { initialOrigamiState, origamiReducer } from './origamiState'
-import { playFoldSound, playFinishSound } from './sounds'
+import { playFoldSound, playFinishSound, playSelectSound } from './sounds'
 import styles from './OrigamiPlay.module.css'
 
 const progressStore = createStageProgressStore('origami-play-progress', (id) => ORIGAMI_TEMPLATES.some((item) => item.id === id))
@@ -119,7 +119,7 @@ function FoldingDesk({ template, color, sound, toggleSound, onBack, onComplete, 
 export default function OrigamiPlay() {
   const [selected, setSelected] = useState<Template | null>(null)
   const [color, setColor] = useState<PaperColor>(PAPER_COLORS[0])
-  const [sound, setSound] = useState(false)
+  const [sound, setSound] = useState(true)
   const [progress, setProgress] = useState(progressStore.read)
   const selectionHeading = useRef<HTMLHeadingElement>(null)
   const returning = useRef(false)
@@ -161,7 +161,10 @@ export default function OrigamiPlay() {
         <legend>かみの いろ</legend>
         <div className={styles.swatches}>{PAPER_COLORS.map((item) => <button key={item.id} type="button"
           aria-label={item.name} aria-pressed={color.id === item.id} className={styles.swatch}
-          style={{ '--paper-color': item.main } as CSSProperties} onClick={() => setColor(item)}>
+          style={{ '--paper-color': item.main } as CSSProperties} onClick={() => {
+            if (sound) { primeAudio(); playSelectSound() }
+            setColor(item)
+          }}>
           <span aria-hidden="true">{color.id === item.id ? '✓' : ''}</span>
         </button>)}</div>
         <p className={styles.colorName}>{color.name}</p>
@@ -169,6 +172,7 @@ export default function OrigamiPlay() {
       <div className={styles.cards}>{ORIGAMI_TEMPLATES.map((template, index) => <button key={template.id} type="button" className={styles.card}
         aria-label={`${template.name}を おる`} style={{ '--card-index': index } as CSSProperties} onClick={(event) => {
           window.scrollTo(0, 0)
+          if (sound) { primeAudio(); playSelectSound() }
           setKeyboardStart(event.detail === 0)
           setSelected(template)
         }}>

@@ -1,4 +1,4 @@
-import { getSharedAudioContext, isSoundEnabled, playNoiseBurst } from '../../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst } from '../../audio/sound'
 import type { Material } from './items'
 import type { StageId } from './stages'
 
@@ -25,7 +25,7 @@ function voice(c: AudioContext, v: Voice) {
   gn.gain.exponentialRampToValueAtTime(v.vol, t + attack)
   gn.gain.exponentialRampToValueAtTime(0.0001, t + v.dur)
   o.connect(gn)
-  gn.connect(v.dest ?? c.destination)
+  gn.connect(v.dest ?? getSoundOutput(c))
   o.start(t)
   o.stop(t + v.dur + 0.03)
 }
@@ -220,7 +220,7 @@ export function startBgm(stage: StageId): () => void {
   const out = c.createGain()
   out.gain.value = 0
   out.gain.setTargetAtTime(0.5, c.currentTime, 0.4)
-  out.connect(c.destination)
+  out.connect(getSoundOutput(c))
   const eighth = 60 / song.tempo / 2
   let step = 0
   let next = c.currentTime + 0.25

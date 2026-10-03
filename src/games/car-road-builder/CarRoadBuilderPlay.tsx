@@ -21,6 +21,7 @@ import { directionAngle } from './direction'
 import { buildRoute, routeStatusLabel, sampleRouteProgress, type CarRoute } from './routeModel'
 import { createCarRoadSoundController, playCarDepartureSound, playCarGoalSound } from '../../utils/quizSound'
 import type { CarRoadSoundController } from '../../utils/quizSound'
+import { playRoadEditSound } from './sounds'
 import type { VehicleId } from './vehicleDefinitions'
 import styles from './CarRoadBuilder.module.css'
 import { createStageBoard, type StageId } from './stageDefinitions'
@@ -236,8 +237,10 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     const next = placePartAt(board, cell.row, cell.col, createDefaultPlacedPart(kind))
     if (next === board) {
       setStatus(kind === 'start' ? 'スタートは 1こ だけだよ' : kind === 'goal' ? 'ゴールは 1こ だけだよ' : 'そこには おけないよ')
+      playRoadEditSound('nope')
       return
     }
+    playRoadEditSound('place')
     setBoard(next)
     resetAfterEdit()
     setSelectedCellId(cell.id)
@@ -308,6 +311,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
       else if (!cancelled) {
         setSelectedCellId(null)
         setStatus('そこには おけないよ')
+        playRoadEditSound('nope')
       }
       if (!cancelled) {
         // The pointerup on the source button can be followed by a synthetic
@@ -353,6 +357,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     if (selected?.kind !== null && selected !== undefined && cell.kind === null && selected.id !== cell.id) {
       const next = movePart(board, selected.id, cell.id)
       if (next !== board) {
+        playRoadEditSound('move')
         setBoard(next)
         resetAfterEdit()
         setSelectedCellId(cell.id)
@@ -419,6 +424,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     if (source && preview && target && preview.valid && target.id !== source.id) {
       const next = movePart(board, source.id, target.id)
       if (next !== board) {
+        playRoadEditSound('move')
         setBoard(next)
         resetAfterEdit()
         setSelectedCellId(target.id)
@@ -427,6 +433,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     } else if (!preview || !target || !preview.valid) {
       setSelectedCellId(source?.id ?? null)
       setStatus('そこには おけないよ')
+      playRoadEditSound('nope')
     } else {
       // Returning to the origin is a successful no-op; do not rewrite board
       // state or alter the part's orientation.
@@ -461,6 +468,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     if (!selectedCellId || running) return
     const next = rotatePart(board, selectedCellId)
     if (next === board) return
+    playRoadEditSound('rotate')
     setBoard(next)
     resetAfterEdit()
     setStatus('まわしたよ')
@@ -475,6 +483,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     }
     const next = removePart(board, selectedCellId)
     if (next === board) return
+    playRoadEditSound('remove')
     setBoard(next)
     resetAfterEdit()
     setSelectedCellId(null)

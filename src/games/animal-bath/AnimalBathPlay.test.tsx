@@ -41,7 +41,7 @@ function tapPatch(board: HTMLElement, index: number) {
 describe('どうぶつのおふろ', () => {
   test('taps complete soap → shower → towel and another animal starts clean progress', () => {
     const board = openBath()
-    expect(screen.getByRole('button', { name: 'おと' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'おと' })).toHaveAttribute('aria-pressed', 'true')
     for (let step = 0; step < 3; step++) {
       for (let index = 0; index < PATCHES.length; index++) tapPatch(board, index)
       expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '9')

@@ -1,4 +1,4 @@
-import { getSharedAudioContext, isSoundEnabled, playNoiseBurst } from '../../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled, playNoiseBurst } from '../../audio/sound'
 
 /**
  * リズムぽんぽん の打楽器と効果音。すべて共有AudioContextで合成し、音源ファイルは追加しない。
@@ -26,7 +26,7 @@ function voice(context: AudioContext, when: number, options: VoiceOptions): void
   gain.gain.exponentialRampToValueAtTime(options.volume, when + attack)
   gain.gain.exponentialRampToValueAtTime(0.0001, when + options.duration)
   oscillator.connect(gain)
-  gain.connect(context.destination)
+  gain.connect(getSoundOutput(context))
   oscillator.start(when)
   oscillator.stop(when + options.duration + 0.02)
 }

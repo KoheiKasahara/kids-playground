@@ -1,4 +1,4 @@
-import { getSharedAudioContext, isSoundEnabled } from '../../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled } from '../../audio/sound'
 
 // 音声ファイルを つかわず、Web Audio で SFC ふうの こうかおん と BGM を その場で つくる。
 // メロディは このゲームの ための オリジナル。
@@ -56,7 +56,7 @@ function noise(ctx: AudioContext, start: number, dur: number, vol: number, cutof
   filter.frequency.value = cutoff
   const gain = ctx.createGain()
   gain.gain.value = vol
-  src.connect(filter).connect(gain).connect(ctx.destination)
+  src.connect(filter).connect(gain).connect(getSoundOutput(ctx))
   src.start(start)
 }
 
@@ -67,7 +67,7 @@ function sfx() {
 
 /** みずの おと「ぽちゃん」。 */
 function plop(ctx: AudioContext, t: number, f = 520, vol = .1) {
-  tone(ctx, ctx.destination, f, t, .12, vol, 'sine', .06, 2.4)
+  tone(ctx, getSoundOutput(ctx), f, t, .12, vol, 'sine', .06, 2.4)
   noise(ctx, t, .08, .04, 1800)
 }
 
@@ -77,7 +77,7 @@ export function playPlaceSound() {
   if (!ctx) return
   const t = ctx.currentTime
   plop(ctx, t)
-  ;['E6', 'B6'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + .08 + i * .06, .1, .04, 'pulse'))
+  ;['E6', 'B6'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + .08 + i * .06, .1, .04, 'pulse'))
 }
 
 /** かたづけた「すぽっ」。 */
@@ -85,7 +85,7 @@ export function playRemoveSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  tone(ctx, ctx.destination, 900, t, .16, .07, 'sine', .05, .35)
+  tone(ctx, getSoundOutput(ctx), 900, t, .16, .07, 'sine', .05, .35)
   noise(ctx, t, .14, .06, 2600)
 }
 
@@ -94,15 +94,15 @@ export function playNoSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  tone(ctx, ctx.destination, 150, t, .08, .06, 'square')
-  tone(ctx, ctx.destination, 150, t + .11, .1, .06, 'square')
+  tone(ctx, getSoundOutput(ctx), 150, t, .08, .06, 'square')
+  tone(ctx, getSoundOutput(ctx), 150, t + .11, .1, .06, 'square')
 }
 
 /** タップ「ピッ」。 */
 export function playTapSound() {
   const ctx = sfx()
   if (!ctx) return
-  tone(ctx, ctx.destination, freq('A6'), ctx.currentTime, .03, .025, 'pulse')
+  tone(ctx, getSoundOutput(ctx), freq('A6'), ctx.currentTime, .03, .025, 'pulse')
 }
 
 /** えさを いれた「ぽとぽと」。 */
@@ -118,7 +118,7 @@ export function playMunchSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  tone(ctx, ctx.destination, 320, t, .06, .08, 'square', .02, .5)
+  tone(ctx, getSoundOutput(ctx), 320, t, .06, .08, 'square', .02, .5)
   noise(ctx, t, .05, .05, 1200)
 }
 
@@ -127,7 +127,7 @@ export function playHappySound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  ;['C6', 'E6', 'G6', 'C7'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + i * .06, .12, .045, 'pulse'))
+  ;['C6', 'E6', 'G6', 'C7'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + i * .06, .12, .045, 'pulse'))
 }
 
 /** ガラスを ふく「きゅっ」。 */
@@ -135,7 +135,7 @@ export function playWipeSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  tone(ctx, ctx.destination, 1400, t, .08, .03, 'triangle', .03, 1.6)
+  tone(ctx, getSoundOutput(ctx), 1400, t, .08, .03, 'triangle', .03, 1.6)
   noise(ctx, t, .06, .035, 5000, 'highpass')
 }
 
@@ -144,7 +144,7 @@ export function playCleanSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  ;['E6', 'G#6', 'B6', 'E7'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + i * .04, .1, .04, 'triangle'))
+  ;['E6', 'G#6', 'B6', 'E7'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + i * .04, .1, .04, 'triangle'))
   noise(ctx, t, .12, .04, 6000)
 }
 
@@ -154,8 +154,8 @@ export function playKnockSound() {
   if (!ctx) return
   const t = ctx.currentTime
   for (let i = 0; i < 2; i++) {
-    tone(ctx, ctx.destination, 1900, t + i * .12, .05, .06, 'sine', .03, .8)
-    tone(ctx, ctx.destination, 620, t + i * .12, .06, .05, 'triangle', .03, .9)
+    tone(ctx, getSoundOutput(ctx), 1900, t + i * .12, .05, .06, 'sine', .03, .8)
+    tone(ctx, getSoundOutput(ctx), 620, t + i * .12, .06, .05, 'triangle', .03, .9)
   }
 }
 
@@ -164,8 +164,8 @@ export function playPuffSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  tone(ctx, ctx.destination, 180, t, .35, .09, 'triangle', .08, 3.2)
-  tone(ctx, ctx.destination, 360, t + .02, .3, .03, 'pulse', .08, 3)
+  tone(ctx, getSoundOutput(ctx), 180, t, .35, .09, 'triangle', .08, 3.2)
+  tone(ctx, getSoundOutput(ctx), 360, t + .02, .3, .03, 'pulse', .08, 3)
 }
 
 /** しんじゅ「キラリーン」。 */
@@ -173,7 +173,7 @@ export function playPearlSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  ;['G5', 'C6', 'E6', 'G6', 'C7', 'E7'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + i * .055, .22, .045, i % 2 ? 'triangle' : 'pulse', .12))
+  ;['G5', 'C6', 'E6', 'G6', 'C7', 'E7'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + i * .055, .22, .045, i % 2 ? 'triangle' : 'pulse', .12))
 }
 
 /** たからばこ・ぶくぶく「ごぽぽ」。 */
@@ -181,7 +181,7 @@ export function playBubbleSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  for (let i = 0; i < 4; i++) tone(ctx, ctx.destination, 300 + Math.random() * 400, t + i * .07, .07, .04, 'sine', .03, 1.8)
+  for (let i = 0; i < 4; i++) tone(ctx, getSoundOutput(ctx), 300 + Math.random() * 400, t + i * .07, .07, .04, 'sine', .03, 1.8)
 }
 
 /** シャコガイが ぱかっ。 */
@@ -189,8 +189,8 @@ export function playClamSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  tone(ctx, ctx.destination, 260, t, .18, .05, 'triangle', .06, 1.6)
-  tone(ctx, ctx.destination, freq('E6'), t + .15, .2, .03, 'sine', .1)
+  tone(ctx, getSoundOutput(ctx), 260, t, .18, .05, 'triangle', .06, 1.6)
+  tone(ctx, getSoundOutput(ctx), freq('E6'), t + .15, .2, .03, 'sine', .1)
 }
 
 /** あさ・よるの おしらせ。 */
@@ -199,7 +199,7 @@ export function playTimeSound(night: boolean) {
   if (!ctx) return
   const t = ctx.currentTime
   const notes = night ? ['G5', 'E5', 'C5', 'G4'] : ['C5', 'E5', 'G5', 'C6']
-  notes.forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + i * .14, .3, .045, night ? 'triangle' : 'pulse', .2))
+  notes.forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + i * .14, .3, .045, night ? 'triangle' : 'pulse', .2))
 }
 
 // ---------------- BGM ----------------
@@ -232,7 +232,7 @@ export function startBgm(id: 'day' | 'night'): () => void {
   const master = ctx.createGain()
   master.gain.setValueAtTime(0, ctx.currentTime)
   master.gain.linearRampToValueAtTime(.5, ctx.currentTime + 1.2)
-  master.connect(ctx.destination)
+  master.connect(getSoundOutput(ctx))
   // みずの なかの ような ひびき（ディレイ＋こもり）。
   const delay = ctx.createDelay(1)
   delay.delayTime.value = 60 / song.bpm * .75

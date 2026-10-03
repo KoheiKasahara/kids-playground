@@ -2,14 +2,15 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
-import { isSoundEnabled, primeAudio, setSoundEnabled } from '../../audio/sound'
+import { primeAudio } from '../../audio/sound'
+import { useSoundToggle } from '../../audio/useSoundToggle'
 import { INITIAL_SNAPSHOT, useSnowballEngine } from './useSnowballEngine'
 import { ITEM_TYPES } from './snowballWorld'
 import styles from './SnowballRoll.module.css'
 
 function SnowballGame({ onBack, onRestart }: { onBack: () => void; onRestart: () => void }) {
   const [snapshot, setSnapshot] = useState(INITIAL_SNAPSHOT)
-  const [sound, setSound] = useState(isSoundEnabled)
+  const [sound, toggleSound] = useSoundToggle()
   const { registerContainer, status, directionRef } = useSnowballEngine(setSnapshot)
   const pointer = useRef<{ id: number; x: number; y: number } | null>(null)
   const keys = useRef(new Set<string>())
@@ -72,7 +73,7 @@ function SnowballGame({ onBack, onRestart }: { onBack: () => void; onRestart: ()
       <header className={styles.header}>
         <GameBackButton onBack={onBack} />
         <h1>ゆきだまころころ</h1>
-        <button className={styles.sound} type="button" aria-label="こうかおん" aria-pressed={sound} onClick={() => { setSoundEnabled(!sound); setSound(!sound) }}>{sound ? '🔊' : '🔇'}</button>
+        <button className={styles.sound} type="button" aria-label="こうかおん" aria-pressed={sound} onClick={toggleSound}>{sound ? '🔊' : '🔇'}</button>
       </header>
       <div className={styles.hud}>
         <span aria-hidden="true">❄️</span>

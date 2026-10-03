@@ -5,11 +5,11 @@
  * 3Dの組み立てと走行は useCarDriveScene が受け持ち、この画面はカメラ・加速・
  * 一時停止のUIと、周回数の表示だけを持つ。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import type { CarConfig } from './carConfig'
 import { DRIVE_COURSE } from './driveCourse'
-import { playDriveBoostSound } from './sounds'
+import { playCarLapSound, playDriveBoostSound } from './sounds'
 import {
   useCarDriveScene,
   type CarDriveCameraMode,
@@ -45,7 +45,12 @@ export default function CarDrivePlay({ config, onBack }: Props) {
   const [boostFeedback, setBoostFeedback] = useState(0)
 
   const handleStatus = useCallback((next: CarDriveSceneStatus) => setStatus(next), [])
-  const handleLap = useCallback((next: number) => setLaps(next), [])
+  const lapsRef = useRef(0)
+  const handleLap = useCallback((next: number) => {
+    if (next > lapsRef.current) playCarLapSound()
+    lapsRef.current = next
+    setLaps(next)
+  }, [])
 
   const { registerContainer, boost, retry } = useCarDriveScene({
     config,
@@ -70,6 +75,7 @@ export default function CarDrivePlay({ config, onBack }: Props) {
   const handleRetry = useCallback(() => {
     setStatus('loading')
     // 作り直したコースは1周目から始まるので、表示もそろえる。
+    lapsRef.current = 0
     setLaps(0)
     retry()
   }, [retry])

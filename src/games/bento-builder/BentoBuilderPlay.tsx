@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
-import { isSoundEnabled, setSoundEnabled } from '../../audio/sound'
+import { useSoundToggle } from '../../audio/useSoundToggle'
 import { bentoReducer, BOXES, COLORS, CUPS, FOODS, foodDefinition, initialBentoState, type BentoState, type BoxKind, type Point } from './bentoState'
 import { createBentoScene, type SceneCallbacks } from './bentoScene'
 import { playBentoSound } from './sounds'
@@ -45,7 +45,7 @@ export default function BentoBuilderPlay() {
   const [state, dispatch] = useReducer(bentoReducer, initialBentoState)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [generation, setGeneration] = useState(0)
-  const [sound, setSound] = useState(isSoundEnabled)
+  const [sound, toggleSound] = useSoundToggle()
   const choose = state.mode === 'choose'
   const editing = state.mode === 'edit'
   const finished = state.mode === 'done'
@@ -60,10 +60,7 @@ export default function BentoBuilderPlay() {
     <header className={styles.header}>
       {choose ? <GameBackButton to="/" /> : <GameBackButton onBack={() => dispatch({ type: 'back' })} />}
       <h1>3Dおべんとうづくり</h1>
-      <button type="button" className={styles.sound} aria-label="おと" aria-pressed={sound} onClick={() => {
-        setSoundEnabled(!sound)
-        setSound(!sound)
-      }}>{sound ? '🔊' : '🔇'}</button>
+      <button type="button" className={styles.sound} aria-label="おと" aria-pressed={sound} onClick={toggleSound}>{sound ? '🔊' : '🔇'}</button>
     </header>
     <section className={styles.stage} aria-label="おべんとう">
       <BentoCanvas key={generation} state={state} callbacks={{ select, move, status: setStatus }} />
