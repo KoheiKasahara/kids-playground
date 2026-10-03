@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { initializeRapier } from '../../physics/rapierLoader'
-import { aimPose, followPose, lerpPose, lookTarget, overviewPose, viewHeading, type CameraPose } from './golfCamera'
+import { aimPose, followPose, lerpPose, lookHeading, lookTarget, overviewPose, viewHeading, type CameraPose } from './golfCamera'
 import type { CourseDefinition, GolfBallId, Vec2 } from './golfCourses'
 import { buildHoleGeometry, type HoleGeometry } from './golfGeometry'
 import { BALL_RADIUS, BIG_CUP_RADIUS, CUP_RADIUS, MAX_STEPS_PER_FRAME, PHYSICS_STEP, powerForDistance, rollingDecel, type Vec3 } from './golfPhysics'
@@ -117,6 +117,8 @@ export function usePutterGolfEngine(options: Options) {
     let pose: CameraPose | null = null
     let aimKey = ''
     let look: { key: string; point: Vec2 } | null = null
+    /** いまの 場所からの おすすめの うつ むき。ねらう カメラの むきの もとに つかう。 */
+    let suggested: Vec2 | null = null
     let lastFeedback = ''
     let drag: { id: number; x: number; y: number; time: number; moved: boolean; forward: Vec2; saved: { direction: Vec2; power: number } } | null = null
 
@@ -146,6 +148,7 @@ export function usePutterGolfEngine(options: Options) {
     function aimAtSuggestion() {
       if (!world) return
       direction = world.suggestShot().direction
+      suggested = direction
       aimKey = ''
     }
 
@@ -226,11 +229,13 @@ export function usePutterGolfEngine(options: Options) {
     /** ねらうときに見る点。ボールが止まっている間は同じなので、場所ごとに覚えておく。 */
     function lookAt(ball: Vec3): Vec2 {
       if (!geometry) return ball
-      const key = `${ball.x.toFixed(2)}:${ball.z.toFixed(2)}`
+      const key = `${ball.x.toFixed(2)}:${ball.z.toFixed(2)}:${suggested?.x.toFixed(3)}:${suggested?.z.toFixed(3)}`
       if (look?.key !== key) {
         const { course, holeIndex } = latest.current
         const hole = course.holes[holeIndex] ?? course.holes[0]!
-        look = { key, point: lookTarget(ball, geometry.cup, hole.route, geometry) }
+        const point = lookTarget(ball, geometry.cup, hole.route, geometry)
+        const heading = lookHeading(ball, point, suggested)
+        look = { key, point: { x: ball.x + heading.x, z: ball.z + heading.z } }
       }
       return look.point
     }
@@ -241,7 +246,7 @@ export function usePutterGolfEngine(options: Options) {
       const overview = overviewPose(geometry.bounds, aspect)
       if (!latest.current.active || latest.current.camera === 'overview') return overview
       const ball = world.ball().position
-      // ねらうときは カップの ほう（見とおせなければ みちすじの 先）を 見る。
+      // ねらうときは カップの ほう（見とおせなければ みちすじの 先、おすすめが 大きく それるなら その むき）を 見る。
       // うつ向きに あわせて まわすと、まがりかどや もどった あとに うしろを むいてしまう。
       const target = world.phase === 'rolling' || world.phase === 'out' ? followPose(ball, heading, aspect) : aimPose(ball, viewHeading(ball, lookAt(ball), direction), aspect)
       return introTime > 0 ? lerpPose(overview, target, ease(1 - introTime / INTRO_SECONDS)) : target

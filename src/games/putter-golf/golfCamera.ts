@@ -2,7 +2,8 @@
  * パターゴルフのカメラの置き場所。Three.js にもブラウザにも依存しない計算だけを置く。
  *
  * - ねらう: ボールのうしろ上から、カップの ほう（ねらいが 大きく それたら ねらいの ほう）を見る。
- *   コの字の みちなど カップが 見とおせないときは、みちすじに そって 先の点を 見る
+ *   コの字の みちなど カップが 見とおせないときは、みちすじに そって 先の点を 見る。
+ *   おすすめの うつ むきが カップの ほうから 大きく ずれるときは、おすすめの むきを 見る
  * - おいかける: 転がるボールを、進む向きのうしろから追う
  * - ぜんたい: ホール全体がちょうど入る高さから見下ろす
  */
@@ -105,6 +106,23 @@ export function lookTarget(ball: Vec3, cup: Vec2, route: readonly Vec2[], geomet
   const from = route[segment] ?? ball
   // すぐ先の点も 見えなければ、いまの みちの 向きを 見る。
   return Math.hypot(next.x - from.x, next.z - from.z) > 0.05 ? { x: ball.x + next.x - from.x, z: ball.z + next.z - from.z } : next
+}
+
+/** カップの ほうと おすすめの むきが これより ずれたら、おすすめの むきを 見る。 */
+export const MAX_LOOK_GAP = (30 * Math.PI) / 180
+
+/**
+ * ねらうときに カメラが 見る むきの もと。ふだんは lookTarget の 点（カップや みちすじの 先）の ほう。
+ * バンパーや ふうしゃを よける・トランポリンの まうしろへ まわる などで、おすすめの うつ むきが
+ * そこから 大きく ずれるときは、おすすめの むきを 見る（カップと うつ むきの あいだの なにもない ほうを 見ない）。
+ */
+export function lookHeading(ball: Vec2, look: Vec2, suggested: Vec2 | null, maxGap = MAX_LOOK_GAP): Vec2 {
+  const toLook = { x: look.x - ball.x, z: look.z - ball.z }
+  if (!suggested || Math.hypot(suggested.x, suggested.z) < 1e-6) return normalize(toLook)
+  const s = normalize(suggested)
+  if (Math.hypot(toLook.x, toLook.z) < 0.3) return s
+  const l = normalize(toLook)
+  return Math.acos(Math.max(-1, Math.min(1, l.x * s.x + l.z * s.z))) > maxGap ? s : l
 }
 
 function segmentDistance(p: Vec2, a: Vec2, b: Vec2): number {

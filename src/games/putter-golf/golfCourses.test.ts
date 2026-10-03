@@ -117,6 +117,10 @@ describe('パターゴルフのコース定義', () => {
             expect(geometry.heightAt(corner.x, corner.z), `${hole.id} の ${belt.id}`).not.toBeNull()
           }
           // ベルトの はやさで おりて ころがる ぶんの さきも ゆか（かべに あたって ベルトへ もどらない）。
+          // おりた すぐ先が つぎの ベルトなら、そのベルトが はこぶ。
+          const next = at(belt.halfLength + 0.6, 0)
+          const handedOver = (hole.gadgets ?? []).some(other => other !== belt && other.kind === 'conveyor' && Math.abs((next.x - other.x) * other.dir.x + (next.z - other.z) * other.dir.z) <= other.halfLength && Math.abs((next.x - other.x) * other.dir.z - (next.z - other.z) * other.dir.x) <= other.halfWidth)
+          if (handedOver) continue
           const runout = rollDistance(belt.speed, rollingDecel('green', course.gravity, course.rollingScale))
           const stop = at(belt.halfLength + runout + BALL_RADIUS, 0)
           expect(geometry.heightAt(stop.x, stop.z), `${hole.id} の ${belt.id}`).not.toBeNull()
