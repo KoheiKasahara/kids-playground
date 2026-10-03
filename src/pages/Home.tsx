@@ -1,3 +1,4 @@
+import { HOME_INTRO_DESCRIPTION } from '../seo/siteMeta'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { GAME_CATALOG, gameRoutePath, type GameCatalogEntry } from '../games/gameCatalog'
@@ -217,9 +218,7 @@ export default function Home() {
         </section>
 
         <HapticsSetting />
-        <p className={styles.description}>
-          息子に遊ばせるために作ったミニゲーム集です。国旗や都道府県のクイズ、3Dの線路づくり・クルマづくり、すなばやスライムをさわる物理あそび、地球儀や太陽系の宇宙あそび、ピアノやおえかきまで、幼児・子ども向けのミニゲームを無料で遊べます。スマホやタブレットのブラウザですぐ遊べて、PWAに対応しているのでホーム画面に追加すればオフラインでも遊べます。
-        </p>
+        <p className={styles.description}>{HOME_INTRO_DESCRIPTION}</p>
       </main>
     </div>
   )

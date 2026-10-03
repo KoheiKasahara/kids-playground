@@ -28,3 +28,7 @@ export function absoluteUrl(pathname: string): string {
   const trimmedPath = normalizedPath.endsWith('/') ? normalizedPath.slice(0, -1) : normalizedPath
   return `${SITE_ORIGIN}${trimmedPath}`
 }
+
+// Shared visible home introduction for the initial document and the live page.
+export const HOME_INTRO_DESCRIPTION =
+  "息子に遊ばせるために作ったミニゲーム集です。国旗や都道府県のクイズ、3Dの線路づくり・クルマづくり、すなばやスライムをさわる物理あそび、地球儀や太陽系の宇宙あそび、ピアノやおえかきまで、幼児・子ども向けのミニゲームを無料で遊べます。スマホやタブレットのブラウザですぐ遊べて、PWAに対応しているのでホーム画面に追加すればオフラインでも遊べます。"
