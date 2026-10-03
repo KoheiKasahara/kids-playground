@@ -493,6 +493,155 @@ function penguin(pose: Pose, t: number) {
   })
 }
 
+function bear(pose: Pose, t: number) {
+  const b = quad({
+    body: { c: [-.04, .6, 0], r: [.44, .3, .28] },
+    chest: { c: [.22, .62, 0], r: [.26, .3, .27] },
+    hind: { c: [-.3, .6, 0], r: [.24, .29, .27] },
+    hipY: .46, legLen: .46, legR: .11, fx: .26, bx: -.3, lz: .16,
+    legMat: 'body', footMat: 'paw', footK: 1.1,
+    pivot: [.4, .72, 0], eatAngle: -deg(30), stride: 22, sleepHead: deg(14),
+    head: (b, o) => {
+      const head: V3 = [.56, .84, 0], hr: V3 = [.22, .21, .22]
+      b.e(head, hr, 'body', { fuzz: .2 })
+      const mz: V3 = [.74, .78, 0], mr: V3 = [.1, .08, .1]
+      b.e(mz, mr, 'muzzle')
+      b.mark(mz, mr, [.85, .55, 0], 'dot', '#2a1a14')
+      if (o.open) b.e([.78, .7, 0], [.06, .04, .06], 'mouth')
+      for (const z of [-1, 1]) {
+        b.e([.48, 1.02, z * .14], [.06, .06, .04], 'body')
+        b.e([.5, 1.02, z * .14], [.035, .035, .03], 'muzzle')
+      }
+      for (const z of [-.5, .5]) b.mark(head, hr, [.75, .35, z], o.closed ? 'closedEye' : 'eye')
+    },
+    tail: (b) => b.e([-.54, .7, 0], [.06, .06, .06], 'body'),
+  }, pose, t)
+  return b.model({
+    body: mat('#8a5a3a', { pattern: (_p, n) => n[1] < -.5 ? 'under' : null }),
+    under: mat('#6e4630'),
+    muzzle: mat('#e2c29a'),
+    paw: mat('#5a3826'),
+    mouth: mat('#b83a4a'),
+  })
+}
+
+function kangaroo(pose: Pose, t: number) {
+  const b = new Builder()
+  const hop = pose === 'walk' ? Math.max(0, Math.sin(t * TAU)) * .2 : pose === 'act' ? Math.max(0, Math.sin(t * TAU)) * .34 : 0
+  const sleep = pose === 'sleep'
+  const lean = pose === 'walk' ? -deg(24) - Math.sin(t * TAU) * deg(8) : pose === 'eat' ? -deg(40) : sleep ? -deg(8) : 0
+  const y = hop + (sleep ? -.08 : 0)
+  // しっぽ（じめんに つく）と おおきな あしは グループの そと。
+  b.e([-.36, .14 + y * .6, 0], [.26, .06, .06], 'body', { m: rotZ(deg(14)) })
+  for (const z of [-1, 1]) {
+    b.e([.04, .04 + y, z * .1], [.18, .04, .05], 'body')
+    b.e([-.06, .2 + y, z * .12], [.14, .14, .08], 'body', { m: rotZ(deg(-30)) })
+  }
+  b.group([-.04, .2 + y, 0], rotZ(lean), bb => {
+    bb.e([-.02, .44 + y, 0], [.16, .28, .16], 'body')
+    const head: V3 = [.06, .82 + y, 0], hr: V3 = [.11, .1, .1]
+    const arm = pose === 'act' ? deg(-50) : deg(-20)
+    for (const z of [-1, 1]) bb.e([.14, .52 + y, z * .08], [.03, .1, .03], 'body', { m: rotZ(arm) })
+    bb.group([.02, .72 + y, 0], rotZ(pose === 'eat' ? -deg(30) : 0), hb => {
+      hb.e(head, hr, 'body')
+      hb.e([.18, .79 + y, 0], [.08, .055, .06], 'muzzle')
+      hb.mark([.18, .79 + y, 0], [.08, .055, .06], [.9, .4, 0], 'dot', '#2a1a14')
+      const earTilt = sleep ? deg(-60) : deg(-14)
+      for (const z of [-1, 1]) {
+        hb.e([.0, .96 + y, z * .06], [.035, .09, .025], 'body', { m: mulM(rotZ(earTilt), rotX(z * deg(18))) })
+        hb.e([.005, .96 + y, z * .066], [.018, .06, .015], 'earIn', { m: mulM(rotZ(earTilt), rotX(z * deg(18))) })
+      }
+      for (const z of [-.5, .5]) hb.mark(head, hr, [.6, .35, z], sleep ? 'closedEye' : 'eye')
+    })
+  })
+  return b.model({
+    body: mat('#c88a5a', { pattern: (_p, n) => n[0] > .55 && n[1] < .3 ? 'belly' : null }),
+    belly: mat('#f0d4b0'),
+    muzzle: mat('#e0b088'),
+    earIn: mat('#e8a0a0'),
+  })
+}
+
+function crocodile(pose: Pose, t: number) {
+  const b = quad({
+    body: { c: [-.05, .24, 0], r: [.5, .12, .2] },
+    chest: { c: [.3, .24, 0], r: [.22, .11, .18] },
+    hipY: .2, legLen: .2, legR: .055, fx: .3, bx: -.32, lz: .2,
+    legMat: 'body', footMat: 'body', footK: 1.3,
+    pivot: [.48, .26, 0], eatAngle: -deg(10), stride: 30, sleepHead: deg(2),
+    head: (b, o) => {
+      const head: V3 = [.6, .28, 0], hr: V3 = [.14, .1, .14]
+      b.e(head, hr, 'body')
+      b.group([.6, .26, 0], o.open ? rotZ(deg(28)) : I3, bb => {
+        bb.e([.88, .27, 0], [.24, .045, .1], 'body')
+        for (const z of [-1, 1]) for (const x of [.74, .86, .98]) bb.e([x, .23, z * .085], [.012, .02, .012], 'tooth')
+        bb.mark([1.08, .27, 0], [.06, .045, .08], [.6, .8, 0], 'dot', '#1e2a1a')
+      })
+      b.e([.86, .2, 0], [.22, .035, .09], o.open ? 'mouth' : 'body')
+      for (const z of [-1, 1]) {
+        b.e([.6, .38, z * .07], [.04, .04, .04], 'body')
+        b.mark([.6, .38, z * .07], [.04, .04, .04], [.6, .6, z * .5], o.closed ? 'closedEye' : 'eye')
+      }
+    },
+    tail: (b, wag) => {
+      b.group([-.5, .24, 0], rotY(wag * .4), bb => {
+        bb.e([-.72, .2, 0], [.26, .08, .12], 'body')
+        bb.e([-1.02, .16, 0], [.18, .05, .07], 'body')
+      })
+    },
+  }, pose, t)
+  return b.model({
+    body: mat('#5a8a48', { pattern: (p, n) => n[1] < -.3 ? 'belly' : n[1] > .7 && Math.sin(p[0] * 40) > .5 ? 'scute' : null }),
+    belly: mat('#c8d0a0'),
+    scute: mat('#3e6634'),
+    tooth: mat('#fff8ec'),
+    mouth: mat('#d0607a'),
+  })
+}
+
+function flamingo(pose: Pose, t: number) {
+  const b = new Builder()
+  const walk = pose === 'walk'
+  const oneLeg = pose === 'sleep' || pose === 'act' || pose === 'idle'
+  const swing = walk ? Math.sin(t * TAU) * deg(24) : 0
+  const bob = walk ? Math.abs(Math.cos(t * TAU)) * .02 : 0
+  const hip = .66 + bob
+  b.leg([0, hip, -.05], .66, .022, swing, 'leg', 'leg', 1.6)
+  if (oneLeg) b.group([0, hip, .05], rotZ(deg(70)), bb => {
+    bb.e([0, hip - .14, .05], [.022, .15, .022], 'leg')
+    bb.e([-.02, hip - .24, .05], [.022, .12, .022], 'leg', { m: rotZ(deg(-140)) })
+  })
+  else b.leg([0, hip, .05], .66, .022, -swing, 'leg', 'leg', 1.6)
+  b.e([-.02, hip + .14, 0], [.22, .13, .13], 'body', { fuzz: .2 })
+  b.e([-.22, hip + .16, 0], [.1, .06, .08], 'wing', { m: rotZ(deg(-20)) })
+  for (const z of [-1, 1]) b.e([-.06, hip + .16, z * .11], [.15, .08, .03], 'wing', { m: rotZ(deg(-10)) })
+  const sleep = pose === 'sleep'
+  const eat = pose === 'eat'
+  // くび（S じ）と あたま
+  const neck: [V3, number][] = sleep
+    ? [[[.12, hip + .22, 0], .04], [[.04, hip + .3, .06], .035]]
+    : eat
+      ? [[[.2, hip + .14, 0], .035], [[.3, hip, 0], .032], [[.34, hip - .2, 0], .03], [[.36, hip - .4, 0], .03]]
+      : [[[.16, hip + .26, 0], .035], [[.12, hip + .42, 0], .032], [[.18, hip + .56, 0], .03], [[.14, hip + .68, 0], .03]]
+  for (const [c, r] of neck) b.e(c, [r, r * 1.6, r], 'body')
+  const head: V3 = sleep ? [-.04, hip + .3, .08] : eat ? [.38, hip - .52, 0] : [.18, hip + .78, 0]
+  const hr: V3 = [.06, .05, .05]
+  b.e(head, hr, 'body')
+  const beakM = sleep ? rotZ(deg(160)) : eat ? rotZ(deg(-70)) : rotZ(deg(-35))
+  b.group(head, beakM, bb => {
+    bb.e([head[0] + .08, head[1], head[2]], [.05, .025, .025], 'beak')
+    bb.e([head[0] + .13, head[1] - .01, head[2]], [.025, .02, .02], 'tip')
+  })
+  for (const z of [-.6, .6]) b.mark(head, hr, [.4, .4, z], sleep ? 'closedEye' : 'eye')
+  return b.model({
+    body: mat('#f49ab0'),
+    wing: mat('#e8708e'),
+    leg: mat('#e88aa0'),
+    beak: mat('#f8eee4'),
+    tip: mat('#2a2230', {}, .6),
+  })
+}
+
 export function animalModel(id: SpeciesId, pose: Pose, t: number): Model {
   switch (id) {
     case 'lion': return lion(pose, t)
@@ -505,6 +654,10 @@ export function animalModel(id: SpeciesId, pose: Pose, t: number): Model {
     case 'monkey': return monkey(pose, t)
     case 'rabbit': return rabbit(pose, t)
     case 'penguin': return penguin(pose, t)
+    case 'bear': return bear(pose, t)
+    case 'kangaroo': return kangaroo(pose, t)
+    case 'crocodile': return crocodile(pose, t)
+    case 'flamingo': return flamingo(pose, t)
   }
 }
 

@@ -59,6 +59,17 @@ describe('おく ルール', () => {
     expect(checkAnimal(world, 'lion', 4, 4).ok).toBe(false)
   })
 
+  test('ワニと フラミンゴは いけが なくても おけて、いけの なかにも はいれる', () => {
+    const world = createWorld()
+    expect(checkAnimal(world, 'crocodile', 2, 2).ok).toBe(true)
+    expect(checkAnimal(world, 'flamingo', 2, 2).ok).toBe(true)
+    addObject(world, 'pond', 5, 5)
+    expect(checkAnimal(world, 'crocodile', 6, 6).ok).toBe(true)
+    expect(checkAnimal(world, 'flamingo', 6, 6).ok).toBe(true)
+    expect(checkAnimal(world, 'bear', 6, 6).ok).toBe(false)
+    expect(checkAnimal(world, 'kangaroo', 6, 6).ok).toBe(false)
+  })
+
   test('ものは かさねられず、かこいから はみだせない', () => {
     const world = createWorld()
     addObject(world, 'tree', 1, 1)

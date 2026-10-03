@@ -182,7 +182,7 @@ function Zoo({ initial, music, onMusic, onExit }: { initial: World; music: boole
         } else if (e.type === 'act') {
           if (view.time - lastCry > 5) { lastCry = view.time; playCry(e.animal.species) }
           if (e.animal.species === 'elephant') renderer.burst('drop', e.animal.x + Math.cos(e.animal.facing) * .9, 1.2, e.animal.z - Math.sin(e.animal.facing) * .9, 14)
-          if (e.animal.species === 'rabbit' || e.animal.species === 'monkey') e.animal.hop = 1
+          if (e.animal.species === 'rabbit' || e.animal.species === 'monkey' || e.animal.species === 'kangaroo') e.animal.hop = 1
         } else if (e.type === 'react') {
           playCry(e.animal.species)
           renderer.burst('note', e.animal.x, 1, e.animal.z, 2)

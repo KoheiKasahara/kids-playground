@@ -597,7 +597,7 @@ export class ZooRenderer {
       const frame = view.still ? 0 : Math.floor(a.anim * fps * speed) % n
       const img = this.animalSprite(a.species, a.pose, frame, dir)
       const water = isWater(world, Math.floor(a.x), Math.floor(a.z))
-      const sink = water ? (a.species === 'hippo' ? .5 : a.species === 'penguin' ? (a.pose === 'swim' ? .12 : .25) : 0) : 0
+      const sink = water ? (a.species === 'hippo' ? .5 : a.species === 'penguin' ? (a.pose === 'swim' ? .12 : .25) : a.species === 'crocodile' ? .22 : a.species === 'flamingo' ? .18 : 0) : 0
       const hopY = Math.sin(Math.min(1, a.hop) * Math.PI) * .35
       items.push({ depth: depthOf(a.x, a.z, view.rot) + .01, draw: () => {
         const p = S(a.x, hopY - sink, a.z)
