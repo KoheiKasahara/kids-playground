@@ -30,6 +30,8 @@
 
 .play[data-stage='sand'] { background: #bfe9ff; }
 .play[data-stage='sea'] { background: #2fb0e0; }
+.play[data-stage='factory'] { background: #b4cddd; }
+.play[data-stage='park'] { background: #c8eeff; }
 
 .canvas {
   position: absolute;
@@ -237,9 +239,89 @@
 }
 
 .banner strong {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   font-size: clamp(26px, 7vw, 38px);
   letter-spacing: .06em;
 }
+
+.bannerMission {
+  margin-top: 4px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: #fff3c4;
+  color: #8a5a00;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+/* ---------------- チャレンジ ---------------- */
+
+.mission {
+  position: absolute;
+  z-index: 4;
+  bottom: calc(var(--safe-bottom) + 12px);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  margin: 0;
+  padding: 6px 14px 6px 8px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 90%);
+  box-shadow: 0 3px 0 rgb(59 42 74 / 18%), 0 6px 14px rgb(59 42 74 / 12%);
+  color: #3b2a4a;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.missionMedal { font-size: 20px; line-height: 1; }
+
+.missionText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mission b {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #3b2a4a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.missionDone {
+  background: #fff3c4;
+  box-shadow: 0 0 0 3px #ffc21a, 0 3px 0 3px rgb(59 42 74 / 15%);
+  animation: chipDone .5s cubic-bezier(.2, 1.6, .4, 1);
+}
+
+.missionDone b { background: #2fc27a; }
+
+.missionFailed { opacity: .7; }
+.missionFailed .missionMedal { filter: grayscale(1); }
+
+.medalGot,
+.medalMiss {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.medalGot { background: #fff3c4; color: #8a5a00; box-shadow: 0 0 0 2px #ffc21a; }
+.medalMiss { background: #eef0f5; color: #5b4a6b; font-size: 13px; }
 
 .banner span {
   word-break: keep-all;
@@ -260,7 +342,7 @@
 .guide {
   position: absolute;
   z-index: 5;
-  bottom: calc(var(--safe-bottom) + 18px);
+  bottom: calc(var(--safe-bottom) + 64px);
   left: 50%;
   display: flex;
   align-items: center;
@@ -657,11 +739,27 @@
 
 .stageList li:nth-child(2) .stageCard { animation-delay: .08s; }
 .stageList li:nth-child(3) .stageCard { animation-delay: .16s; }
+.stageList li:nth-child(4) .stageCard { animation-delay: .24s; }
+.stageList li:nth-child(5) .stageCard { animation-delay: .32s; }
+
+@media (orientation: landscape) and (min-width: 720px) {
+  .stageList { grid-template-columns: repeat(5, minmax(0, 1fr)); width: min(100%, 1100px); }
+}
+
+.stageMedal {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  font-size: 26px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 0 rgb(59 42 74 / 25%));
+}
 
 .stageCard:hover { transform: translateY(-2px); }
 .stageCard:active { transform: translateY(3px); box-shadow: 0 2px 0 rgb(59 42 74 / 22%); }
 
 .thumb {
+  position: relative;
   display: block;
   width: 100%;
   aspect-ratio: 13 / 10;
@@ -672,6 +770,8 @@
 
 .thumb[data-stage='sand'] { background: #bfe9ff; }
 .thumb[data-stage='sea'] { background: #2fb0e0; }
+.thumb[data-stage='factory'] { background: #b4cddd; }
+.thumb[data-stage='park'] { background: #c8eeff; }
 
 .thumb img {
   display: block;
@@ -777,6 +877,7 @@
   .stageCard,
   .logo,
   .chipDone,
+  .missionDone,
   .bump,
   .chipDone.bump,
   .starOn,

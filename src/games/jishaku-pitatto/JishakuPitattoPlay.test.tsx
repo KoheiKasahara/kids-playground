@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import JishakuPitattoPlay from './JishakuPitattoPlay'
 import { playClear, playStick, startBgm } from './sounds'
+import { STAGES } from './stages'
 import { autoPilot, type World } from './world'
 
 vi.mock('./sounds', async (importOriginal) => {
@@ -59,13 +60,14 @@ describe('ぴたっと じしゃく', () => {
   test('タイトルから ステージを えらんで あそび、もどれる', () => {
     render(<MemoryRouter><JishakuPitattoPlay /></MemoryRouter>)
     expect(screen.getByRole('heading', { name: 'ぴたっと じしゃく' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /^ステージ\d/ })).toHaveLength(3)
+    expect(screen.getAllByRole('button', { name: /^ステージ\d/ })).toHaveLength(STAGES.length)
     fireEvent.click(screen.getByRole('button', { name: /ステージ1 つくえの うえ/ }))
     expect(screen.getByLabelText(/つくえの うえ。ゆびで じしゃくを うごかして/)).toBeInTheDocument()
     expect(startBgm).toHaveBeenCalledWith('desk')
     advance(3)
     expect(screen.getByLabelText('クリップ 0 / 2')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'ほしバッジ 0 / 3' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'チャレンジ てつを 3だん つなげよう 0 / 3' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByRole('heading', { name: 'ぴたっと じしゃく' })).toBeInTheDocument()
   })
@@ -104,6 +106,9 @@ describe('ぴたっと じしゃく', () => {
     expect(dialog).toHaveTextContent('ぜんぶ くっついた！')
     expect(dialog).toHaveTextContent('くぎ')
     expect(dialog).toHaveTextContent('えんぴつ')
+    // おてほんは 3だん つなげるので メダルも とれる。
+    expect(dialog).toHaveTextContent('メダル ゲット！')
+    expect(JSON.parse(store.get('jishaku-pitatto-medal-v1') ?? '{}')).toEqual({ desk: 1 })
     const saved = JSON.parse(store.get('jishaku-pitatto-progress-v1') ?? '{}') as Record<string, number>
     expect(saved.desk).toBeGreaterThanOrEqual(1)
     fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
@@ -111,7 +116,7 @@ describe('ぴたっと じしゃく', () => {
     advance(2)
     expect(world()).not.toBe(w)
     fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
-    expect(screen.getByRole('button', { name: new RegExp(`ステージ1 つくえの うえ クリアずみ ほし${saved.desk}こ`) })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: new RegExp(`ステージ1 つくえの うえ クリアずみ ほし${saved.desk}こ メダル あり`) })).toBeInTheDocument()
   })
 
   test('おんがくを けすと おぼえておく', () => {

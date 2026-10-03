@@ -1,7 +1,7 @@
 import { FONT, INK, drawFish, drawItemArt, drawJelly, drawMagnetBody, drawMagnetFace } from './art'
 import { KINDS, shapePoints, shapeRadius, type KindId } from './items'
 import {
-  ARM_W, MAGNET_H, MAGNET_HALF_W, TIP_H, floorAt, fromMagnet, shadowFloorAt, surfaceY,
+  ARM_W, MAGNET_H, MAGNET_HALF_W, TIP_H, balloonLift, chuteMouthY, floorAt, fromMagnet, shadowFloorAt, surfaceY,
   type Item, type PropBody, type World, type WorldEvent,
 } from './world'
 
@@ -85,7 +85,7 @@ function cloud(g: G, x: number, y: number, s: number, alpha = 1) {
 
 type Particle = {
   x: number; y: number; vx: number; vy: number; life: number; max: number; size: number
-  color: string; kind: 'spark' | 'dot' | 'drop' | 'bubble' | 'confetti' | 'star' | 'dust'
+  color: string; kind: 'spark' | 'dot' | 'drop' | 'bubble' | 'confetti' | 'star' | 'dust' | 'balloon'
   rot: number; vr: number; g: number
 }
 type Popup = { x: number; y: number; text: string; life: number; max: number; color: string; size: number; follow: boolean; rise: number }
@@ -159,6 +159,20 @@ export function spawnFx(fx: Fx, e: WorldEvent, world: World) {
     case 'hooked':
       popup(fx, e.x, e.y - 22, 'あっ！', '#3f8cff', 14, 0.8)
       break
+    case 'balloon':
+      // ふうせんだけ そらへ とんでいく。
+      fx.parts.push({
+        x: e.x, y: e.y, vx: (Math.random() - 0.5) * 30, vy: -40, life: 3, max: 3, size: 15,
+        color: BALLOON_COLORS[e.color % BALLOON_COLORS.length], kind: 'balloon', rot: Math.random() * 6, vr: 0, g: -60,
+      })
+      popup(fx, e.x, e.y - 26, 'ふわっ', '#ff7eb6', 14, 0.9)
+      break
+    case 'mission':
+      burst(fx, world.magnet.x, world.magnet.y - MAGNET_H - 10, 14, { speed: 160, size: 5, max: 1, kind: 'star', color: '#ffc21a', g: 120 })
+      // ほし・つれた の もじと かさならないよう、じしゃくの したに だす。
+      popup(fx, 0, 70, 'チャレンジ せいこう！', '#ff7a00', 17, 1.6, true)
+      fx.lastPopAt = world.time
+      break
     case 'clink':
       if (e.power > 0.45 && e.material !== 'glass') burst(fx, e.x, e.y, 3, { speed: 40, dir: -Math.PI / 2, spread: 2, size: 4, max: 0.35, kind: 'dust', color: 'rgba(255,255,255,.5)' })
       break
@@ -189,10 +203,11 @@ export function updateFx(fx: Fx, world: World, dt: number) {
       if (world.waterY !== null && p.y < surfaceY(world, p.x) + 2) p.life = Math.min(p.life, 0.05)
     }
     if (p.kind === 'confetti') p.vx += Math.sin(p.life * 4 + p.rot) * 30 * dt
+    if (p.kind === 'balloon') p.vx += Math.sin((p.max - p.life) * 3 + p.rot) * 40 * dt
     p.x += p.vx * dt
     p.y += p.vy * dt
     p.rot += p.vr * dt
-    if (p.kind !== 'confetti' && p.kind !== 'bubble') { p.vx *= 0.96; if (p.g === 0) p.vy *= 0.96 }
+    if (p.kind !== 'confetti' && p.kind !== 'bubble' && p.kind !== 'balloon') { p.vx *= 0.96; if (p.g === 0) p.vy *= 0.96 }
   }
   fx.parts = fx.parts.filter((p) => p.life > 0)
   for (const p of fx.pops) { p.life -= dt; p.rise += dt * 26 }
@@ -244,6 +259,9 @@ function drawFx(g: G, fx: Fx, world: World) {
       g.fillStyle = p.color
       g.scale(1, Math.cos(p.rot * 1.7))
       g.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2)
+    } else if (p.kind === 'balloon') {
+      g.globalAlpha = Math.min(1, a * 3)
+      drawBalloon(g, 0, 0, 0, 30, p.color, Math.sin((p.max - p.life) * 4 + p.rot) * 6)
     } else if (p.kind === 'bubble') {
       g.globalAlpha = Math.min(1, a * 3) * 0.8
       g.beginPath()
@@ -319,6 +337,42 @@ function twinkle(g: G, x: number, y: number, s: number, a: number) {
   g.quadraticCurveTo(0, 0, 0, s)
   g.quadraticCurveTo(0, 0, -s, 0)
   g.quadraticCurveTo(0, 0, 0, -s)
+  g.fill()
+  g.restore()
+}
+
+const BALLOON_COLORS = ['#ff5d73', '#3fb6ff', '#ffc233', '#56d26a', '#b57bff', '#ff8a3d']
+
+/** ふうせん（まんなか x,y）と、したへ のびる ひも（ながさ len、さきは sway だけ よこへ）。 */
+function drawBalloon(g: G, x: number, y: number, tilt: number, len: number, color: string, sway: number) {
+  const r = 15
+  g.beginPath()
+  g.moveTo(x, y + r * 1.15 + 3)
+  g.quadraticCurveTo(x + sway * 1.4, y + r + len * 0.5, x + sway, y + r + len)
+  g.lineWidth = 1.2
+  g.strokeStyle = 'rgba(80,70,90,.75)'
+  g.stroke()
+  g.save()
+  g.translate(x, y)
+  g.rotate(tilt)
+  g.beginPath()
+  g.ellipse(0, 0, r, r * 1.15, 0, 0, Math.PI * 2)
+  g.fillStyle = color
+  g.fill()
+  g.lineWidth = 1.5
+  g.strokeStyle = INK
+  g.stroke()
+  g.beginPath()
+  g.moveTo(-3.5, r * 1.15 + 3.5)
+  g.lineTo(0, r * 1.15 - 1)
+  g.lineTo(3.5, r * 1.15 + 3.5)
+  g.closePath()
+  g.fillStyle = color
+  g.fill()
+  g.stroke()
+  g.fillStyle = 'rgba(255,255,255,.6)'
+  g.beginPath()
+  g.ellipse(-r * 0.38, -r * 0.45, r * 0.2, r * 0.34, -0.5, 0, Math.PI * 2)
   g.fill()
   g.restore()
 }
@@ -795,6 +849,142 @@ function paintSeaBack(g: G, world: World, e: Ext) {
   }
 }
 
+function paintFactoryBack(g: G, world: World, e: Ext) {
+  const { w, h, groundY } = world
+  const ew = e.x1 - e.x0
+  // かべ（こうじょうの なか）
+  g.fillStyle = lin(g, 0, 0, 0, groundY, [[0, '#cfe3ef'], [1, '#b4cddd']])
+  g.fillRect(e.x0, e.y0, ew, groundY - e.y0)
+  g.fillStyle = 'rgba(70,100,130,.1)'
+  for (let x = snap(e.x0, 48); x < e.x1; x += 48) g.fillRect(x, e.y0, 2, groundY - e.y0)
+  // たかい まど
+  const winY = Math.max(e.y0 + 20, h * 0.12)
+  for (let x = snap(e.x0, 120) + 30; x < e.x1; x += 120) {
+    rr(g, x, winY, 60, 44, 6)
+    g.fillStyle = '#eaf7ff'
+    g.fill()
+    g.lineWidth = 3
+    g.strokeStyle = '#7f9bb0'
+    g.stroke()
+    g.fillStyle = '#7f9bb0'
+    g.fillRect(x + 29, winY, 2, 44)
+    g.fillRect(x, winY + 21, 60, 2)
+  }
+  // うしろで まわっている はぐるま（かざり）
+  const gear = (cx: number, cy: number, r: number, color: string) => {
+    g.save()
+    g.translate(cx, cy)
+    g.fillStyle = color
+    g.beginPath()
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2
+      const rad = i % 2 === 0 ? r : r * 0.82
+      g.lineTo(Math.cos(a) * rad, Math.sin(a) * rad)
+    }
+    g.closePath()
+    g.fill()
+    g.fillStyle = 'rgba(255,255,255,.35)'
+    g.beginPath()
+    g.arc(0, 0, r * 0.3, 0, Math.PI * 2)
+    g.fill()
+    g.restore()
+  }
+  const gy = groundY - Math.min(150, (groundY - winY) * 0.55)
+  gear(w * 0.78, gy, 46, 'rgba(90,120,150,.22)')
+  gear(w * 0.78 + 58, gy + 34, 26, 'rgba(90,120,150,.18)')
+  gear(w * 0.2, gy + 20, 34, 'rgba(90,120,150,.16)')
+  // パイプ
+  g.fillStyle = 'rgba(255,170,60,.35)'
+  g.fillRect(e.x0, winY + 70, ew, 9)
+  // ベルトの だい
+  g.fillStyle = lin(g, 0, groundY + 14, 0, h, [[0, '#5f6f82'], [0.1, '#7d8ea3'], [1, '#56657a']])
+  g.fillRect(e.x0, groundY + 14, ew, e.y1 - groundY - 14)
+  g.fillStyle = '#ffc233'
+  for (let x = snap(e.x0, 40); x < e.x1; x += 40) {
+    g.beginPath()
+    g.moveTo(x, groundY + 30)
+    g.lineTo(x + 20, groundY + 30)
+    g.lineTo(x + 34, groundY + 42)
+    g.lineTo(x + 14, groundY + 42)
+    g.closePath()
+    g.fill()
+  }
+  g.fillStyle = '#3b2a4a'
+  for (let x = snap(e.x0, 40) + 20; x < e.x1; x += 40) {
+    g.beginPath()
+    g.moveTo(x, groundY + 30)
+    g.lineTo(x + 20, groundY + 30)
+    g.lineTo(x + 34, groundY + 42)
+    g.lineTo(x + 14, groundY + 42)
+    g.closePath()
+    g.fill()
+  }
+  g.fillStyle = 'rgba(0,0,0,.2)'
+  g.fillRect(e.x0, groundY + 42, ew, 3)
+}
+
+function paintParkBack(g: G, world: World, e: Ext) {
+  const { w, h, groundY } = world
+  const ew = e.x1 - e.x0
+  g.fillStyle = lin(g, 0, 0, 0, groundY, [[0, '#78cfff'], [0.75, '#c8eeff'], [1, '#effbff']])
+  g.fillRect(e.x0, e.y0, ew, groundY - e.y0)
+  cloud(g, w * 0.06, h * 0.14, 1, 0.95)
+  cloud(g, w * 0.58, h * 0.22, 0.75, 0.85)
+  cloud(g, w * 0.86, h * 0.1, 0.6, 0.8)
+  // とおくの まち と き
+  const far = groundY - Math.min(70, (groundY - 80) * 0.25)
+  g.fillStyle = 'rgba(150,180,220,.45)'
+  for (let i = Math.floor(e.x0 / 46) - 1; i < Math.ceil(e.x1 / 46); i++) {
+    const bh = 24 + hash(i + 40) * 40
+    g.fillRect(i * 46 + 4, far - bh, 34, bh + 4)
+  }
+  g.fillStyle = '#8fd77a'
+  g.beginPath()
+  g.moveTo(snap(e.x0, 16), groundY)
+  for (let x = snap(e.x0, 16); x <= e.x1 + 16; x += 16) g.lineTo(x, far + 6 - Math.sin(x * 0.02) * 8 - Math.sin(x * 0.05 + 2) * 4)
+  g.lineTo(e.x1 + 16, groundY)
+  g.closePath()
+  g.fill()
+  for (let i = Math.floor((e.x0 - 100) / 150); i < Math.ceil(e.x1 / 150); i++) {
+    const x = 70 + i * 150 + hash(i + 5) * 50
+    const ty = far + 10
+    g.fillStyle = '#9b6b3f'
+    g.fillRect(x - 4, ty - 26, 8, 34)
+    for (const [dx, dy, r, c] of [[0, -42, 24, '#4fb35f'], [-16, -30, 17, '#5cc56c'], [16, -32, 18, '#46a656'], [0, -58, 14, '#6ad079']] as [number, number, number, string][]) {
+      g.fillStyle = c
+      g.beginPath()
+      g.arc(x + dx, ty + dy, r, 0, Math.PI * 2)
+      g.fill()
+    }
+  }
+  // しばふ
+  g.fillStyle = lin(g, 0, groundY, 0, h, [[0, '#7ccc5a'], [0.3, '#6cbf4c'], [1, '#5aa83e']])
+  g.fillRect(e.x0, groundY, ew, e.y1 - groundY)
+  g.fillStyle = 'rgba(255,255,255,.3)'
+  g.fillRect(e.x0, groundY, ew, 2)
+  g.strokeStyle = 'rgba(40,110,40,.35)'
+  g.lineWidth = 1.2
+  for (let i = 0; i < ew / 7; i++) {
+    const x = e.x0 + hash(i * 2.3) * ew, y = groundY + 6 + hash(i * 5.1) * Math.max(10, h - groundY - 10)
+    g.beginPath()
+    g.moveTo(x, y)
+    g.lineTo(x - 2, y - 5)
+    g.moveTo(x, y)
+    g.lineTo(x + 2, y - 5)
+    g.stroke()
+  }
+  // こみち
+  const py = groundY + Math.min(50, (h - groundY) * 0.4)
+  g.fillStyle = '#ecd9b0'
+  g.fillRect(e.x0, py, ew, 22)
+  g.fillStyle = 'rgba(160,120,60,.25)'
+  for (let x = snap(e.x0, 30); x < e.x1; x += 30) {
+    g.beginPath()
+    g.ellipse(x + 10, py + 11, 7, 3, 0, 0, Math.PI * 2)
+    g.fill()
+  }
+}
+
 function paintPropBack(g: G, p: PropBody) {
   const { def, cx, x0, top, bottom } = p
   if (def.kind === 'books') {
@@ -905,6 +1095,44 @@ function paintPropBack(g: G, p: PropBody) {
     g.restore()
     return
   }
+  if (def.kind === 'planter') {
+    // かだん（れんが ＋ はな）
+    for (let i = 0; i < 5; i++) {
+      const fx = x0 + 10 + i * ((def.w - 20) / 4)
+      g.strokeStyle = '#3f9a4a'
+      g.lineWidth = 2
+      g.beginPath()
+      g.moveTo(fx, top)
+      g.lineTo(fx, top - 14 - (i % 2) * 5)
+      g.stroke()
+      g.fillStyle = ['#ff7eb6', '#ffd43b', '#ffffff', '#ff8a3d'][(i + (def.variant ?? 0)) % 4]
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2
+        g.beginPath()
+        g.arc(fx + Math.cos(a) * 3.4, top - 16 - (i % 2) * 5 + Math.sin(a) * 3.4, 2.6, 0, Math.PI * 2)
+        g.fill()
+      }
+      g.fillStyle = '#ffb000'
+      g.beginPath()
+      g.arc(fx, top - 16 - (i % 2) * 5, 1.8, 0, Math.PI * 2)
+      g.fill()
+    }
+    rr(g, x0, top, def.w, def.h, 4)
+    g.fillStyle = lin(g, 0, top, 0, bottom, [[0, '#d9785a'], [1, '#b85c40']])
+    g.fill()
+    g.lineWidth = 1.5
+    g.strokeStyle = INK
+    g.stroke()
+    g.fillStyle = 'rgba(255,255,255,.28)'
+    for (let row = 0; row < 3; row++) {
+      const y = top + 4 + row * (def.h / 3)
+      g.fillRect(x0 + 2, y + def.h / 3 - 5, def.w - 4, 1.2)
+      for (let x = x0 + (row % 2) * 9 + 9; x < x0 + def.w - 4; x += 18) g.fillRect(x, y - 1, 1.2, def.h / 3 - 4)
+    }
+    g.fillStyle = '#6b4a2b'
+    g.fillRect(x0 + 3, top + 1, def.w - 6, 3)
+    return
+  }
   if (def.kind === 'frame') {
     rr(g, x0, top, def.w, def.h + 30, 3)
     g.fillStyle = lin(g, x0, 0, x0 + def.w, 0, [[0, '#c98246'], [0.5, '#e0a064'], [1, '#b0703a']])
@@ -989,6 +1217,8 @@ function paintPropFront(g: G, p: PropBody) {
 function paintBack(g: G, world: World, e: Ext) {
   if (world.stage.water) paintSeaBack(g, world, e)
   else if (world.stage.sand) paintSandBack(g, world, e)
+  else if (world.stage.id === 'factory') paintFactoryBack(g, world, e)
+  else if (world.stage.id === 'park') paintParkBack(g, world, e)
   else paintDeskBack(g, world, e)
   for (const p of world.props) paintPropBack(g, p)
 }
@@ -1067,11 +1297,14 @@ export class Painter {
 
     if (world.waterY !== null) drawSeaBehind(g, world, time)
     drawAmbient(g, world, time)
+    if (world.stage.belt) drawBelt(g, world, time)
     drawShadows(g, world)
+    drawBalloons(g, world, time)
     if (world.sand) this.drawBuried(g, world, time, px)
     for (const it of world.items) if (it.state === 'body') this.drawItem(g, it, time, px)
     if (world.sand) drawLyingSand(g, world)
     for (const p of world.props) paintPropFront(g, p)
+    if (world.stage.belt) drawMachine(g, world, time)
     drawFieldLines(g, world, time)
     if (world.waterY !== null) drawLine(g, world)
     this.drawMagnet(g, world, time, px)
@@ -1206,6 +1439,97 @@ export class Painter {
   }
 }
 
+/** うごく ベルトコンベア（しまもようが みぎへ ながれる）。 */
+function drawBelt(g: G, world: World, time: number) {
+  const { w, groundY } = world
+  const speed = (world.stage.belt ?? 0) * 60
+  g.fillStyle = '#3e4756'
+  rr(g, -20, groundY, w + 40, 14, 7)
+  g.fill()
+  g.fillStyle = 'rgba(255,255,255,.18)'
+  g.fillRect(-20, groundY, w + 40, 2)
+  const off = (time * speed) % 24
+  g.fillStyle = 'rgba(255,255,255,.14)'
+  for (let x = -24 + off; x < w + 24; x += 24) {
+    g.beginPath()
+    g.moveTo(x, groundY + 3)
+    g.lineTo(x + 6, groundY + 7)
+    g.lineTo(x, groundY + 11)
+    g.lineTo(x - 3, groundY + 11)
+    g.lineTo(x + 3, groundY + 7)
+    g.lineTo(x - 3, groundY + 3)
+    g.closePath()
+    g.fill()
+  }
+  // ローラー
+  for (let x = 10; x < w; x += 44) {
+    g.save()
+    g.translate(x, groundY + 7)
+    g.rotate(time * speed / 6)
+    g.fillStyle = '#9aa7b8'
+    g.beginPath()
+    g.arc(0, 0, 4.5, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#5c6879'
+    g.fillRect(-0.8, -4.5, 1.6, 9)
+    g.restore()
+  }
+}
+
+/** ひだりの つつ と みぎの きかい（ものが はいって また でてくる）。 */
+function drawMachine(g: G, world: World, time: number) {
+  const { w, groundY } = world
+  const chute = world.props.find((p) => p.def.kind === 'chute')
+  if (chute) {
+    const mouth = chuteMouthY(world)
+    const cw = chute.def.w
+    g.fillStyle = lin(g, chute.x0, 0, chute.x1, 0, [[0, '#8e9cad'], [0.45, '#c7d2de'], [1, '#7a889a']])
+    g.fillRect(chute.x0, -40, cw, mouth + 40)
+    g.lineWidth = 1.6
+    g.strokeStyle = INK
+    g.strokeRect(chute.x0, -40, cw, mouth + 40)
+    rr(g, chute.x0 - 4, mouth - 10, cw + 8, 12, 4)
+    g.fillStyle = '#ff8a3d'
+    g.fill()
+    g.stroke()
+    g.fillStyle = 'rgba(0,0,0,.35)'
+    g.beginPath()
+    g.ellipse(chute.cx, mouth + 1, cw / 2 - 2, 3, 0, 0, Math.PI * 2)
+    g.fill()
+  }
+  // みぎの きかい（はいりぐち）
+  const mw = 34, mh = 64
+  const x0 = w - mw + 6
+  rr(g, x0, groundY - mh, mw + 20, mh + 16, 8)
+  g.fillStyle = lin(g, 0, groundY - mh, 0, groundY, [[0, '#ffb03a'], [1, '#f08a1c']])
+  g.fill()
+  g.lineWidth = 1.6
+  g.strokeStyle = INK
+  g.stroke()
+  g.fillStyle = 'rgba(0,0,0,.4)'
+  rr(g, x0 + 4, groundY - 30, mw, 30, 4)
+  g.fill()
+  // ランプ
+  const on = Math.sin(time * 6) > 0
+  g.fillStyle = on ? '#56d26a' : '#2e8a3f'
+  g.beginPath()
+  g.arc(x0 + 14, groundY - mh + 14, 5, 0, Math.PI * 2)
+  g.fill()
+  g.stroke()
+}
+
+/** ふうせんで とんでいる ものの ふうせん。 */
+function drawBalloons(g: G, world: World, time: number) {
+  for (const it of world.items) {
+    const color = it.swim?.balloon
+    if (color === undefined || color === null || it.state !== 'body') continue
+    const lift = balloonLift(it)
+    const sway = Math.sin(time * 1.3 + it.id) * 4
+    const top = shapeRadius(it.kind.shape) * 0.5
+    drawBalloon(g, it.x + sway, it.y - lift, sway * 0.02, lift - 15 * 1.15 - top - 4, BALLOON_COLORS[color % BALLOON_COLORS.length], -sway)
+  }
+}
+
 /** けしきの なかの ちいさな いきもの・ひかり（さわれない）。 */
 function drawAmbient(g: G, world: World, time: number) {
   const { w, h, groundY } = world
@@ -1236,7 +1560,8 @@ function drawAmbient(g: G, world: World, time: number) {
     }
     return
   }
-  if (world.stage.sand) {
+  if (world.stage.id === 'factory') return
+  if (world.stage.sand || world.stage.id === 'park') {
     // ちょうちょ
     for (let i = 0; i < 2; i++) {
       const t = time * (0.35 + i * 0.1) + i * 2.4

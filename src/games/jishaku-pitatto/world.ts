@@ -1,6 +1,6 @@
 import * as Matter from 'matter-js'
 import { KINDS, shapePoints, shapeRadius, type ItemKind, type KindId, type Material, type Vec } from './items'
-import type { Placement, PropDef, StageDef } from './stages'
+import type { Mission, Placement, PropDef, StageDef } from './stages'
 
 /**
  * ぴたっと じしゃく の せかい。
@@ -8,6 +8,8 @@ import type { Placement, PropDef, StageDef } from './stages'
  * - じしゃくに くっついた ものは からだを はずし、くっついた てんを ささえに した ふりこ として うごかす。
  *   くっついた てつ も すこし じしゃくに なり（誘導）、ほかの てつを ひきよせて つながる。
  * - さてつ（すなばの くろい つぶ）は かるい つぶの まとまり として べつに うごかす。
+ * - ベルトコンベアの うえの ものは みぎへ はこばれ、はしまで いくと ひだりの つつから また でてくる。
+ * - ふうせんに ぶらさがった ものは ふわふわ とび、じしゃくが ちかづくと ふうせんが はなれる。
  * 画面（React）は この せかいの すうじだけを よむ。
  */
 
@@ -93,7 +95,11 @@ export type Stuck = {
   at: number
 }
 
-export type SwimState = { cx: number; baseY: number; range: number; speed: number; phase: number; jelly: boolean }
+export type SwimState = {
+  cx: number; baseY: number; range: number; speed: number; phase: number; jelly: boolean
+  /** ふうせんの いろ（ふうせんで とんでいる とき）。 */
+  balloon: number | null
+}
 
 export type Item = {
   id: number
@@ -143,6 +149,9 @@ export type WorldEvent =
   | { type: 'shiin'; id: number; x: number; y: number }
   | { type: 'pop'; id: number; x: number; y: number }
   | { type: 'hooked'; id: number; x: number; y: number }
+  | { type: 'balloon'; id: number; x: number; y: number; color: number }
+  | { type: 'loop'; id: number }
+  | { type: 'mission' }
   | { type: 'splash'; x: number; y: number; power: number }
   | { type: 'grains'; n: number; x: number; y: number }
   | { type: 'clear' }
@@ -167,6 +176,7 @@ export type World = {
   frame: number
   phase: 'play' | 'clear'
   stuckOrder: Item[]
+  /** つづけて くっついた かず − 1。 */
   combo: number
   lastStickAt: number
   bodyItem: Map<number, Item>
@@ -176,7 +186,16 @@ export type World = {
   /** じしゃくの てっぺんが これより うえに いかない（うえの ボタンに かくれない）。 */
   topLimit: number
   lastShiinAt: number
+  /** いちばん ながく つながった だんの かず。 */
+  maxDepth: number
+  /** いちばん おおく いっきに くっついた かず。 */
+  maxCombo: number
+  /** クリアした じこく（まだなら null）。 */
+  clearTime: number | null
+  missionDone: boolean
 }
+
+export type MissionProgress = { value: number; goal: number; done: boolean; failed: boolean }
 
 export type Result = {
   stars: number
@@ -391,10 +410,12 @@ export function createWorld(stage: StageDef, size: { w: number; h: number }, see
   }
 
   const props: PropBody[] = stage.props.map((def) => {
-    const cx = def.kind === 'frame' ? (def.x < 0.5 ? def.w / 2 : w - def.w / 2) : spanX(def.x)
+    const cx = def.kind === 'frame' || def.kind === 'chute' ? (def.x < 0.5 ? def.w / 2 : w - def.w / 2) : spanX(def.x)
     const x0 = cx - def.w / 2, x1 = cx + def.w / 2, top = groundY - def.h
     let poly: Vec[] | null = null
-    if (def.kind === 'cup' || def.kind === 'bucket' || def.kind === 'chest') {
+    if (def.kind === 'chute') {
+      // え だけ（うえから ものが おちてくる つつ）。
+    } else if (def.kind === 'cup' || def.kind === 'bucket' || def.kind === 'chest') {
       const t = def.kind === 'chest' ? 7 : WALL_T
       statics.push(Matter.Bodies.rectangle(x0 + t / 2, groundY - def.h / 2, t, def.h, staticOpts))
       statics.push(Matter.Bodies.rectangle(x1 - t / 2, groundY - def.h / 2, t, def.h, staticOpts))
@@ -437,7 +458,17 @@ export function createWorld(stage: StageDef, size: { w: number; h: number }, see
     if (pl.float && waterY !== null) y = waterY - 2
     if (pl.swim && waterY !== null) {
       const baseY = waterY + 26 + pl.swim.depth * (groundY - waterY - 70)
-      swim = { cx: x, baseY, range: pl.swim.range * (w - pad * 2), speed: pl.swim.speed, phase: pl.swim.phase ?? 0, jelly: pl.kind === 'jelly' }
+      swim = { cx: x, baseY, range: pl.swim.range * (w - pad * 2), speed: pl.swim.speed, phase: pl.swim.phase ?? 0, jelly: pl.kind === 'jelly', balloon: null }
+      y = baseY
+    }
+    if (pl.balloon) {
+      // じしゃくが とどく たかさの あいだで とぶ。
+      const lo = groundY - 80, hi = Math.min(lo, Math.max(groundY - 330, 210))
+      const baseY = lo - pl.balloon.height * (lo - hi)
+      swim = {
+        cx: x, baseY, range: pl.balloon.range * (w - pad * 2), speed: pl.balloon.speed, phase: pl.balloon.phase ?? 0,
+        jelly: false, balloon: pl.balloon.color ?? id,
+      }
       y = baseY
     }
     const item: Item = {
@@ -465,6 +496,7 @@ export function createWorld(stage: StageDef, size: { w: number; h: number }, see
     sand: stage.ironSand ? makeIronSand(stage, spanX, groundY, rng, w) : null,
     events: [], time: 0, frame: 0, phase: 'play', stuckOrder: [], combo: 0, lastStickAt: -9,
     bodyItem, lastClinkAt: -9, pendingClinks: [], rng, topLimit: 40, lastShiinAt: -9,
+    maxDepth: 0, maxCombo: 0, clearTime: null, missionDone: false,
   }
   if (waterY !== null) world.magnet.ty = world.magnet.y = waterY + 30
 
@@ -570,6 +602,23 @@ export function remainingTargets(world: World): number {
   return world.items.filter((it) => it.target && it.state !== 'stuck').length
 }
 
+/** チャレンジの すすみぐあい。 */
+export function missionProgress(world: World, mission: Mission = world.stage.mission): MissionProgress {
+  switch (mission.type) {
+    case 'chain': return { value: world.maxDepth, goal: mission.n, done: world.maxDepth >= mission.n, failed: false }
+    case 'combo': return { value: world.maxCombo, goal: mission.n, done: world.maxCombo >= mission.n, failed: false }
+    case 'sand': {
+      const got = world.sand?.stuck ?? 0
+      return { value: got, goal: mission.n, done: got >= mission.n, failed: false }
+    }
+    case 'time': {
+      // あんないを よんでいる あいだは かぞえない。
+      const t = Math.max(0, (world.clearTime ?? world.time) - START_GRACE)
+      return { value: Math.floor(t), goal: mission.sec, done: world.clearTime !== null && t <= mission.sec, failed: t > mission.sec }
+    }
+  }
+}
+
 export function worldResult(world: World): Result {
   const starTotal = world.items.filter((it) => it.star).length
   const starsGot = world.items.filter((it) => it.star && it.state === 'stuck').length
@@ -606,8 +655,17 @@ export function stepWorld(world: World): void {
   updateStuck(world)
   if (world.sand) updateSand(world)
   updateMood(world)
-  if (world.phase === 'play' && remainingTargets(world) === 0) {
+  const playing = world.phase === 'play'
+  if (playing && remainingTargets(world) === 0) {
     world.phase = 'clear'
+    world.clearTime = world.time
+  }
+  // クリアの おいわいの あいだも チャレンジは かぞえる（けっかが でるまで）。
+  if (!world.missionDone && missionProgress(world).done) {
+    world.missionDone = true
+    world.events.push({ type: 'mission' })
+  }
+  if (playing && world.phase === 'clear') {
     world.events.push({ type: 'clear' })
     // やったー！ と ゆらゆら。
     world.magnet.mood = 'happy'
@@ -707,6 +765,10 @@ function applyForces(world: World) {
       }
     }
     if (it.swim) swimSteer(world, it, body)
+    else if (world.stage.belt && body.bounds.max.y > world.groundY - 3) {
+      // ベルトに のっている ものは ベルトと いっしょに うごく（はやさは かえずに ずらす）。
+      Matter.Body.translate(body, { x: world.stage.belt, y: 0 })
+    }
     if (!it.kind.magnetic) continue
     let total = 0
     const k = it.kind.pull / it.kind.hot.length
@@ -720,8 +782,10 @@ function applyForces(world: World) {
     it.pull = total
     // はじまって すぐは つれない（あんないを よんでいる あいだ）。
     if (it.swim && world.time > START_GRACE && total > 1.05) {
+      const balloon = it.swim.balloon
       it.swim = null
-      world.events.push({ type: 'hooked', id: it.id, x: it.x, y: it.y })
+      if (balloon !== null) world.events.push({ type: 'balloon', id: it.id, x: it.x, y: it.y - balloonLift(it), color: balloon })
+      else world.events.push({ type: 'hooked', id: it.id, x: it.x, y: it.y })
     }
     activity = Math.max(activity, total)
     const d = Math.hypot(it.x - m.x, it.y - m.y)
@@ -745,14 +809,19 @@ function swimSteer(world: World, it: Item, body: Matter.Body) {
   const sw = it.swim!
   const t = world.time * sw.speed * Math.PI * 2
   const tx = sw.cx + Math.sin(t * 0.5 + sw.phase) * sw.range * 0.5
-  const ty = sw.baseY + Math.sin(t * 1.3 + sw.phase * 1.7) * (sw.jelly ? 22 : 12)
+  const ty = sw.baseY + Math.sin(t * 1.3 + sw.phase * 1.7) * (sw.jelly ? 22 : sw.balloon !== null ? 26 : 12)
   const mass = body.mass
   const ax = clamp((tx - body.position.x) * 0.0045 - body.velocity.x * 0.22, -0.5, 0.5)
   const ay = clamp((ty - body.position.y) * 0.0045 - body.velocity.y * 0.25, -0.5, 0.5) - 1
   // じしゃくが ちかいと あばれる（でも まだ にげられる）。
   const wiggle = it.pull > 0.4 ? Math.sin(world.time * 40 + it.id) * 0.25 * it.pull : 0
   Matter.Body.applyForce(body, body.position, { x: ax * mass * FORCE_1G, y: (ay + wiggle) * mass * FORCE_1G })
-  if (!sw.jelly) {
+  if (sw.balloon !== null) {
+    // ひもで ぶらさがって ゆらゆら。
+    const want = Math.sin(world.time * 1.7 + sw.phase) * 0.18 - clamp(body.velocity.x * 0.12, -0.3, 0.3)
+    Matter.Body.setAngle(body, body.angle + angleDiff(want, body.angle) * 0.1)
+    Matter.Body.setAngularVelocity(body, 0)
+  } else if (!sw.jelly) {
     const vx = body.velocity.x
     if (Math.abs(vx) > 0.15) it.flip = vx < 0
     const want = (it.flip ? Math.PI : 0) + clamp(body.velocity.y * 0.25, -0.35, 0.35) * (it.flip ? -1 : 1)
@@ -780,6 +849,17 @@ function afterPhysics(world: World) {
       Matter.Body.setPosition(body, it.home)
       Matter.Body.setVelocity(body, { x: 0, y: 0 })
       Matter.Body.setAngle(body, it.home.angle)
+    }
+    // ベルトの みぎはしまで いったら、ひだりの つつから また おちてくる。
+    if (world.stage.belt && !it.swim && it.x > world.w - 26 && body.bounds.max.y > world.groundY - 60) {
+      const chute = world.props.find((p) => p.def.kind === 'chute')
+      const x = chute ? chute.cx : 24
+      Matter.Body.setPosition(body, { x, y: chuteMouthY(world) - shapeRadius(it.kind.shape) })
+      Matter.Body.setVelocity(body, { x: 1.2, y: 1 })
+      Matter.Body.setAngularVelocity(body, 0)
+      it.x = body.position.x
+      it.y = body.position.y
+      world.events.push({ type: 'loop', id: it.id })
     }
     if (it.kind.magnetic && !it.lifted && it.pull > 1 && v.y < -1.2) {
       it.lifted = true
@@ -938,6 +1018,8 @@ function attach(world: World, it: Item, hit: Hit) {
   m.moodT = 0.7
   world.combo = world.time - world.lastStickAt < 0.9 ? world.combo + 1 : 0
   world.lastStickAt = world.time
+  world.maxCombo = Math.max(world.maxCombo, world.combo + 1)
+  world.maxDepth = Math.max(world.maxDepth, depth)
   world.events.push({
     type: 'stick', id: it.id, kind: it.kind.id, x: anchorW.x, y: anchorW.y, depth, combo: world.combo, star: it.star,
     remaining: remainingTargets(world),
@@ -1163,6 +1245,16 @@ export function autoPilot(world: World): void {
   setMagnetTarget(world, tx, ty)
 }
 
+/** ふうせんの ひもの ながさ（ものの まんなかから ふうせんの まんなかまで）。 */
+export function balloonLift(it: Item): number {
+  return shapeRadius(it.kind.shape) * 0.6 + 46
+}
+
+/** こうじょうの つつの でぐち（ものが おちてくる たかさ）。 */
+export function chuteMouthY(world: World): number {
+  return world.groundY - Math.min(130, (world.groundY - world.topLimit) * 0.4)
+}
+
 /** かげを おとす ゆかの たかさ。 */
 export function shadowFloorAt(world: World, x: number): number {
   const f = world.shadowFloor
@@ -1205,6 +1297,11 @@ export function carryOver(from: World, to: World): void {
     to.sand.stuck = from.sand.stuck
   }
   if (from.phase === 'clear') to.phase = 'clear'
+  to.time = from.time
+  to.clearTime = from.clearTime
+  to.maxDepth = from.maxDepth
+  to.maxCombo = from.maxCombo
+  to.missionDone = from.missionDone
   to.events.length = 0
   to.combo = 0
   m.jolt = 0

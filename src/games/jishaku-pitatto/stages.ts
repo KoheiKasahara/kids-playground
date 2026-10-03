@@ -1,9 +1,9 @@
 import type { KindId } from './items'
 
-export type StageId = 'desk' | 'sand' | 'sea'
+export type StageId = 'desk' | 'sand' | 'sea' | 'factory' | 'park'
 
-/** うごかない どうぐ（いれもの・だい・いわ）。 */
-export type PropKind = 'cup' | 'books' | 'bucket' | 'rock' | 'chest' | 'frame'
+/** うごかない どうぐ（いれもの・だい・いわ）。chute は え だけ（ぶつからない）。 */
+export type PropKind = 'cup' | 'books' | 'bucket' | 'rock' | 'chest' | 'frame' | 'chute' | 'planter'
 
 export type PropDef = {
   id: string
@@ -33,9 +33,33 @@ export type Placement = {
   swim?: { depth: number; range: number; speed: number; phase?: number }
   /** みずに うかぶ。 */
   float?: boolean
+  /** ふうせんで ふわふわ とぶ（0 = ひくい、1 = たかい）。 */
+  balloon?: { height: number; range: number; speed: number; phase?: number; color?: number }
 }
 
 export type IronSandPatch = { x: number; spread: number; count: number }
+
+/**
+ * チャレンジ（できたら メダル）。
+ * - chain: くっついた てつに てつを つなげて n だん に する
+ * - combo: つづけて n こ いっきに くっつける
+ * - sand: さてつを n つぶ あつめる
+ * - time: sec びょう いないに クリア
+ */
+export type Mission =
+  | { type: 'chain'; n: number }
+  | { type: 'combo'; n: number }
+  | { type: 'sand'; n: number }
+  | { type: 'time'; sec: number }
+
+export function missionText(m: Mission): string {
+  switch (m.type) {
+    case 'chain': return `てつを ${m.n}だん つなげよう`
+    case 'combo': return `いっきに ${m.n}こ くっつけよう`
+    case 'sand': return `さてつを ${m.n}つぶ あつめよう`
+    case 'time': return `${m.sec}びょうで ぜんぶ あつめよう`
+  }
+}
 
 export type StageDef = {
   id: StageId
@@ -45,6 +69,9 @@ export type StageDef = {
   hint: string
   sand?: boolean
   water?: boolean
+  /** ゆかが ベルトコンベア（みぎむきの はやさ。Matter の 1コマ あたり）。 */
+  belt?: number
+  mission: Mission
   props: readonly PropDef[]
   items: readonly Placement[]
   ironSand?: readonly IronSandPatch[]
@@ -56,6 +83,7 @@ export const STAGES: readonly StageDef[] = [
     name: 'つくえの うえ',
     lead: 'クリップや くぎを あつめよう',
     hint: 'じしゃくを うごかして てつを くっつけよう',
+    mission: { type: 'chain', n: 3 },
     props: [
       { id: 'cup', kind: 'cup', x: 0.13, w: 46, h: 58 },
       { id: 'books', kind: 'books', x: 0.88, w: 86, h: 42 },
@@ -82,6 +110,7 @@ export const STAGES: readonly StageDef[] = [
     lead: 'すなの なかにも かくれているよ',
     hint: 'すなの うえを なぞって さがそう',
     sand: true,
+    mission: { type: 'sand', n: 200 },
     props: [
       { id: 'frameL', kind: 'frame', x: 0, w: 16, h: 26 },
       { id: 'frameR', kind: 'frame', x: 1, w: 16, h: 26 },
@@ -113,6 +142,7 @@ export const STAGES: readonly StageDef[] = [
     lead: 'およぐ さかなを つりあげよう',
     hint: 'くちに わが ある さかなは くっつくよ',
     water: true,
+    mission: { type: 'time', sec: 30 },
     props: [
       { id: 'rockL', kind: 'rock', x: 0.1, w: 74, h: 30 },
       { id: 'chest', kind: 'chest', x: 0.52, w: 60, h: 32 },
@@ -133,6 +163,56 @@ export const STAGES: readonly StageDef[] = [
       { kind: 'star', x: 0.1, on: 'rockL', dx: -18 },
       { kind: 'starfish', x: 0.1, on: 'rockL', dx: 16 },
       { kind: 'star', x: 0.93, on: 'rockR', dx: 2 },
+    ],
+  },
+  {
+    id: 'factory',
+    name: 'こうじょう',
+    lead: 'ながれてくる てつを ひろおう',
+    hint: 'ベルトに のって ながれてくるよ',
+    belt: 0.85,
+    mission: { type: 'combo', n: 4 },
+    props: [
+      { id: 'chute', kind: 'chute', x: 0, w: 44, h: 0 },
+    ],
+    items: [
+      { kind: 'bolt', x: 0.08, angle: 0.2 },
+      { kind: 'alcan', x: 0.17 },
+      { kind: 'nut', x: 0.25 },
+      { kind: 'star', x: 0.33, angle: 0.2 },
+      { kind: 'gear', x: 0.42 },
+      { kind: 'block', x: 0.5, variant: 1 },
+      { kind: 'screw', x: 0.57, angle: -0.1 },
+      { kind: 'spring', x: 0.66 },
+      { kind: 'coin', x: 0.73 },
+      { kind: 'star', x: 0.8 },
+      { kind: 'steelcan', x: 0.88 },
+      { kind: 'star', x: 0.96 },
+    ],
+  },
+  {
+    id: 'park',
+    name: 'ふうせんの こうえん',
+    lead: 'とんでいく てつを つかまえよう',
+    hint: 'ふうせんに ぶらさがった てつを ねらおう',
+    mission: { type: 'time', sec: 25 },
+    props: [
+      { id: 'planterL', kind: 'planter', x: 0.14, w: 76, h: 30 },
+      { id: 'planterR', kind: 'planter', x: 0.86, w: 76, h: 30, variant: 1 },
+    ],
+    items: [
+      { kind: 'clip', x: 0.3, variant: 1, balloon: { height: 0.15, range: 0.3, speed: 0.12, phase: 0, color: 0 } },
+      { kind: 'spring', x: 0.6, balloon: { height: 0.3, range: 0.4, speed: 0.1, phase: 2, color: 1 } },
+      { kind: 'nail', x: 0.45, balloon: { height: 0.9, range: 0.5, speed: 0.09, phase: 4.2, color: 2 } },
+      { kind: 'star', x: 0.72, balloon: { height: 0.75, range: 0.3, speed: 0.13, phase: 1, color: 3 } },
+      { kind: 'duck', x: 0.4, balloon: { height: 0.45, range: 0.35, speed: 0.11, phase: 3, color: 4 } },
+      { kind: 'acorn', x: 0.14, on: 'planterL', dx: -20 },
+      { kind: 'pin', x: 0.14, on: 'planterL', dx: 16 },
+      { kind: 'ball', x: 0.36 },
+      { kind: 'shovel', x: 0.5 },
+      { kind: 'star', x: 0.64 },
+      { kind: 'marble', x: 0.86, on: 'planterR', dx: -20 },
+      { kind: 'star', x: 0.86, on: 'planterR', dx: 14 },
     ],
   },
 ]
