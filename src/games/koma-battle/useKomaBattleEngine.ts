@@ -12,6 +12,7 @@ import {
   DISK_CENTER_Y,
   DISK_HALF_HEIGHT,
   DISK_RADIUS,
+  KOMA_SHAKE_COOLDOWN_MS,
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
@@ -63,9 +64,11 @@ import {
   applyKomaBoost,
   applyKomaContactAssist,
   applyKomaFieldBelts,
+  applyKomaShake,
   clampKomaMotion,
   createKomaBattleWorld,
   readKoma,
+  updateKomaStagnation,
   type KomaBattleWorld,
 } from './komaWorld'
 import { STABLE_SPIN_SPEED } from './komaSpin'
@@ -101,7 +104,18 @@ export type KomaBattleEngineOptions = {
 
 export type KomaBattleEngineHandle = {
   registerContainer: (element: HTMLDivElement | null) => void
+  /** 盆をゆらして、止まりがちなコマをもう一度ぶつかりに行かせる。連打は間隔で間引く。 */
+  shakeField: () => void
 }
+
+// ---------------------------------------------------------------------------
+// 盆ゆらし演出。物理のimpulseとは別に、カメラを短く揺らして「盆が揺れた」と伝える。
+// ---------------------------------------------------------------------------
+
+/** カメラが揺れる時間[ms]。 */
+const SHAKE_EFFECT_DURATION_MS = 420
+/** カメラの揺れ幅[m]。 */
+const SHAKE_EFFECT_AMPLITUDE = 0.09
 
 // ---------------------------------------------------------------------------
 // 回転演出。物理のしきい値定数と揃え、判定上「速い/止まった」と表示が食い違わないようにする。
@@ -334,12 +348,14 @@ export function useKomaBattleEngine(
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const activeRunRef = useRef<symbol | null>(null)
+  const shakeRef = useRef<(() => void) | null>(null)
 
   const handle = useMemo<KomaBattleEngineHandle>(
     () => ({
       registerContainer: (element) => {
         containerRef.current = element
       },
+      shakeField: () => shakeRef.current?.(),
     }),
     [],
   )
@@ -366,6 +382,9 @@ export function useKomaBattleEngine(
     let accumulator = 0
     let elapsedMs = 0
     let judgeStates: KomaJudgeState[] = specs.map(() => createKomaJudgeState())
+    /** 最後に盆をゆらした時刻（試合内の経過時間[ms]）。 */
+    let lastShakeAtMs = Number.NEGATIVE_INFINITY
+    let shakeEffectRemainingMs = 0
     let impactCursor = 0
     const activeImpactContacts = new Set<string>()
     const impactThrottle = createKomaImpactThrottle()
@@ -400,6 +419,7 @@ export function useKomaBattleEngine(
       released = true
 
       if (activeRunRef.current === runToken) activeRunRef.current = null
+      if (shakeRef.current === shakeField) shakeRef.current = null
 
       soundController.dispose()
       impactThrottle.reset()
@@ -476,14 +496,49 @@ export function useKomaBattleEngine(
 
     const cameraTarget = new THREE.Vector3()
 
+    const cameraBasePosition = new THREE.Vector3()
+
     /** 固定カメラ。画面比が変わったときだけ位置を計算し直す。 */
     function applyCamera() {
       if (!camera) return
       const setup = komaCameraSetup(camera.aspect)
-      camera.position.set(setup.position.x, setup.position.y, setup.position.z)
+      cameraBasePosition.set(setup.position.x, setup.position.y, setup.position.z)
+      camera.position.copy(cameraBasePosition)
       cameraTarget.set(setup.target.x, setup.target.y, setup.target.z)
       camera.lookAt(cameraTarget)
     }
+
+    /** 盆ゆらし中だけ、カメラを基準位置のまわりで小刻みに揺らす。向きは変えない。 */
+    function updateShakeEffect(dtMs: number) {
+      if (!camera || shakeEffectRemainingMs <= 0) return
+      shakeEffectRemainingMs = Math.max(0, shakeEffectRemainingMs - dtMs)
+      if (shakeEffectRemainingMs <= 0 || prefersReducedMotion) {
+        camera.position.copy(cameraBasePosition)
+        return
+      }
+      const progress = 1 - shakeEffectRemainingMs / SHAKE_EFFECT_DURATION_MS
+      const amplitude = SHAKE_EFFECT_AMPLITUDE * (1 - progress)
+      const phase = progress * Math.PI * 2 * 5
+      camera.position.set(
+        cameraBasePosition.x + Math.sin(phase) * amplitude,
+        cameraBasePosition.y + Math.sin(phase * 1.7) * amplitude * 0.35,
+        cameraBasePosition.z + Math.cos(phase * 1.3) * amplitude * 0.5,
+      )
+    }
+
+    /**
+     * 盆をゆらす。ボタンからも、2個が止まりがちなときの自動ゆらしからも呼ぶ。
+     * 決着後と、前回から間もない連打は何もしない。
+     */
+    function shakeField() {
+      if (released || finished || battle === null) return
+      if (elapsedMs - lastShakeAtMs < KOMA_SHAKE_COOLDOWN_MS) return
+      lastShakeAtMs = elapsedMs
+      applyKomaShake(battle)
+      shakeEffectRemainingMs = SHAKE_EFFECT_DURATION_MS
+      soundController.playImpact('wall', 0.75)
+    }
+    shakeRef.current = shakeField
 
     function attachViewportListeners() {
       if (typeof window === 'undefined') return
@@ -1374,6 +1429,7 @@ export function useKomaBattleEngine(
       })
       updateImpactEffects(dtMs)
       updateBeltArrows(dtMs)
+      updateShakeEffect(dtMs)
     }
 
     /**
@@ -1433,6 +1489,7 @@ export function useKomaBattleEngine(
         if (!finished) {
           for (const koma of battle.komas) applyKomaFieldBelts(koma, selectedField, PHYSICS_TIMESTEP)
         }
+        if (!finished && updateKomaStagnation(battle, PHYSICS_TIMESTEP * 1000)) shakeField()
         applyKomaContactAssist(battle, !finished)
         battle.world.step()
         for (const koma of battle.komas) clampKomaMotion(koma)

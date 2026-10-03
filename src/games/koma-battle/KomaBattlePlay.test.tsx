@@ -11,6 +11,7 @@ import type { MatchOutcome } from './komaOutcome'
 const engineMock = vi.hoisted(() => ({
   options: undefined as KomaBattleEngineOptions | undefined,
   registerContainer: vi.fn(),
+  shakeField: vi.fn(),
   /** エンジンが何回作り直されたか。もういちどでの作り直しを数える。 */
   mountCount: 0,
 }))
@@ -26,7 +27,7 @@ vi.mock('./useKomaBattleEngine', () => ({
   useKomaBattleEngine: (options: KomaBattleEngineOptions) => {
     engineMock.options = options
     engineMock.mountCount += 1
-    return { registerContainer: engineMock.registerContainer }
+    return { registerContainer: engineMock.registerContainer, shakeField: engineMock.shakeField }
   },
 }))
 
@@ -49,6 +50,7 @@ beforeEach(() => {
   engineMock.options = undefined
   engineMock.mountCount = 0
   engineMock.registerContainer.mockClear()
+  engineMock.shakeField.mockClear()
   soundMock.primeAudio.mockClear()
   soundMock.playKomaBattleStartSound.mockClear()
 })
@@ -174,6 +176,16 @@ describe('KomaBattlePlay', () => {
     renderGame()
     await user.click(screen.getByRole('button', { name: 'まわせ！' }))
     expect(screen.queryByRole('button', { name: 'もういちど' })).not.toBeInTheDocument()
+  })
+
+  it('対戦中は盆をゆらすボタンがあり、押すとエンジンへ伝え、決着後は消える', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await user.click(screen.getByRole('button', { name: 'まわせ！' }))
+    await user.click(screen.getByRole('button', { name: 'ぼんを ゆらす' }))
+    expect(engineMock.shakeField).toHaveBeenCalledTimes(1)
+    finishWith({ kind: 'draw', reason: 'timeLimit' })
+    expect(screen.queryByRole('button', { name: 'ぼんを ゆらす' })).not.toBeInTheDocument()
   })
 
   it('勝敗が決まると勝ったコマと負けた理由を表示する', async () => {

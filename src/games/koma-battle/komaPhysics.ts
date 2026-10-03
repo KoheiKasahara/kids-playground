@@ -231,3 +231,23 @@ export const KOMA_BELT_MAX_FORWARD_SPEED = 3.2
  * 弾かれた勢いは残る（速度を直接固定してしまわない）。
  */
 export const KOMA_BELT_LATERAL_GRIP = 0.62
+
+// ---------------------------------------------------------------------------
+// 盆ゆらし。すり鉢の底で2個が止まりがちになるのを防ぎ、もう一度ぶつかりに行かせる。
+// ---------------------------------------------------------------------------
+
+/** ゆらした直後に、相手へ向かう水平速度をここまで引き上げる[m/s]。 */
+export const KOMA_SHAKE_TARGET_SPEED = 2.6
+/** 1回のゆらしで1体へ加えるimpulseの上限。重いタイプほど動きにくさが残る。 */
+export const KOMA_SHAKE_MAX_IMPULSE = 1.1
+/**
+ * 相手へまっすぐではなく、少し横へずらして押し出す最大角[rad]。
+ * 毎回正面衝突だけにならず、すれ違いざまにこすれる当たりも出る。
+ */
+export const KOMA_SHAKE_ANGLE_JITTER = 0.45
+/** ボタン連打で速度を積み上げないための間隔[ms]。 */
+export const KOMA_SHAKE_COOLDOWN_MS = 1200
+/** 2個ともこの水平速度[m/s]未満なら「あまり動いていない」とみなす。 */
+export const KOMA_STAGNANT_SPEED = 1
+/** 動いていない状態がこれだけ続いたら、自動で盆をゆらす[ms]。 */
+export const KOMA_AUTO_SHAKE_AFTER_MS = 1500

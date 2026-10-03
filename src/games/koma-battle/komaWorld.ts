@@ -27,6 +27,11 @@ import {
   KOMA_BELT_FORCE,
   KOMA_BELT_LATERAL_GRIP,
   KOMA_BELT_MAX_FORWARD_SPEED,
+  KOMA_SHAKE_ANGLE_JITTER,
+  KOMA_SHAKE_MAX_IMPULSE,
+  KOMA_SHAKE_TARGET_SPEED,
+  KOMA_STAGNANT_SPEED,
+  KOMA_AUTO_SHAKE_AFTER_MS,
   BUMPER_KNOCKBACK_INCOMING_SPEED_SCALE,
   BUMPER_KNOCKBACK_MAX_IMPULSE,
   BUMPER_KNOCKBACK_MAX_OUTGOING_SPEED,
@@ -103,6 +108,8 @@ export type KomaBattleWorld = {
   field: KomaField
   /** 接触開始時だけ補正するための試合単位状態。世界の再生成で必ず初期化される。 */
   contactAssist: KomaContactAssistState
+  /** 2個とも動きが小さい状態が続いている時間[ms]。自動の盆ゆらしに使う。 */
+  stagnantMs: number
 }
 
 export type KomaContactAssistState = {
@@ -332,6 +339,7 @@ export function createKomaBattleWorld(
       activeWalls: new Set<number>(),
       activeBumpers: new Set<string>(),
     },
+    stagnantMs: 0,
   }
 }
 
@@ -731,4 +739,96 @@ export function clampKomaMotion(entry: KomaEntry): void {
   if (linear !== null) body.setLinvel(linear, true)
   const angular = clampedVector(body.angvel(), MAX_ANGULAR_SPEED)
   if (angular !== null) body.setAngvel(angular, true)
+}
+
+export type KomaShakeResult = {
+  /** impulseを加えたコマの数。 */
+  pushedKomas: number
+  maxAppliedImpulse: number
+}
+
+/**
+ * 盆をゆらす。2個なら互いの方へ（少し横へずらして）押し出し、もう一度ぶつからせる。
+ *
+ * 位置や姿勢は書き換えず、水平impulseを1回だけ加える。目標速度へ届かない分だけを足すので、
+ * すでに相手へ向かって速く動いているコマには何もしない。自転速度は変えないため、
+ * 何度ゆらしても回転の勝負（どちらが長く回るか）には影響しない。
+ * 1個モードでは中央付近を横切る向きへ押し、すり鉢の中を転がり回らせる。
+ */
+export function applyKomaShake(
+  battle: KomaBattleWorld,
+  random: () => number = Math.random,
+): KomaShakeResult {
+  const result: KomaShakeResult = { pushedKomas: 0, maxAppliedImpulse: 0 }
+  battle.stagnantMs = 0
+  const komas = battle.komas
+  komas.forEach((koma, index) => {
+    const body = koma.body
+    const position = body.translation()
+    const velocity = body.linvel()
+    if (
+      !Number.isFinite(velocity.x) ||
+      !Number.isFinite(velocity.z) ||
+      !Number.isFinite(position.x) ||
+      !Number.isFinite(position.z)
+    ) return
+
+    let base: { x: number; z: number } | null
+    if (komas.length >= 2) {
+      const other = komas[index === 0 ? 1 : 0]!.body.translation()
+      base = finiteUnitOrNull(other.x - position.x, other.z - position.z)
+    } else {
+      // 1個モードは中心の向きを基準に、大きめに横へ振って中央付近を横切らせる。
+      base = finiteUnitOrNull(-position.x, -position.z)
+    }
+    if (base === null) {
+      const angle = random() * Math.PI * 2
+      base = { x: Math.cos(angle), z: Math.sin(angle) }
+    }
+    const jitterRange = komas.length >= 2 ? KOMA_SHAKE_ANGLE_JITTER : KOMA_SHAKE_ANGLE_JITTER * 2
+    const jitter = (random() * 2 - 1) * jitterRange
+    const cos = Math.cos(jitter)
+    const sin = Math.sin(jitter)
+    const direction = { x: base.x * cos - base.z * sin, z: base.x * sin + base.z * cos }
+
+    const alongSpeed = velocity.x * direction.x + velocity.z * direction.z
+    const mass = body.mass()
+    if (!Number.isFinite(mass) || mass <= 0) return
+    const impulse = Math.min(
+      KOMA_SHAKE_MAX_IMPULSE,
+      Math.max(0, (KOMA_SHAKE_TARGET_SPEED - alongSpeed) * mass),
+    )
+    if (!Number.isFinite(impulse) || impulse <= 0) return
+    body.applyImpulse({ x: direction.x * impulse, y: 0, z: direction.z * impulse }, true)
+    clampKomaMotion(koma)
+    result.pushedKomas += 1
+    result.maxAppliedImpulse = Math.max(result.maxAppliedImpulse, impulse)
+  })
+  return result
+}
+
+/**
+ * 2個とも水平速度が小さい状態の継続時間を数え、自動でゆらす時が来たらtrueを返す。
+ *
+ * 1個モードは失速までを眺めるモードなので自動ではゆらさない。
+ * trueを返した時点でカウントは0へ戻るため、呼び出し側はそのままapplyKomaShakeを呼べばよい。
+ */
+export function updateKomaStagnation(battle: KomaBattleWorld, dtMs: number): boolean {
+  if (battle.komas.length < 2 || !Number.isFinite(dtMs) || dtMs <= 0) {
+    battle.stagnantMs = 0
+    return false
+  }
+  const allSlow = battle.komas.every((koma) => {
+    const velocity = koma.body.linvel()
+    const speed = Math.hypot(velocity.x, velocity.z)
+    return Number.isFinite(speed) && speed < KOMA_STAGNANT_SPEED
+  })
+  if (!allSlow) {
+    battle.stagnantMs = 0
+    return false
+  }
+  battle.stagnantMs += dtMs
+  if (battle.stagnantMs < KOMA_AUTO_SHAKE_AFTER_MS) return false
+  battle.stagnantMs = 0
+  return true
 }

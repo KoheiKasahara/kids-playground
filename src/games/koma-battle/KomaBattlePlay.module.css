@@ -658,3 +658,31 @@
 @media (orientation: landscape) and (min-height: 601px) {
   .fieldChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: center; overflow: visible; }
 }
+
+/* 対戦中に盆をゆらすボタン。親指で届く右下へ置き、コマのタップ範囲と重なりにくくする。 */
+.shakeButton {
+  position: absolute;
+  right: var(--space-sm);
+  bottom: var(--space-sm);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 96px;
+  min-height: 56px;
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-round);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: clamp(17px, 4.6vw, 22px);
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--color-primary) 60%, #000);
+}
+
+.shakeButton:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--color-primary) 60%, #000);
+}

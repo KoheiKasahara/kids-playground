@@ -242,7 +242,7 @@ function KomaBattleScene({
   onRematch,
   onChangeKoma,
 }: SceneProps) {
-  const { registerContainer } = useKomaBattleEngine({
+  const { registerContainer, shakeField } = useKomaBattleEngine({
     runId,
     komaCount,
     specs,
@@ -271,6 +271,18 @@ function KomaBattleScene({
           </span>
         ))}
       </div>
+
+      {outcome === null ? (
+        <button
+          type="button"
+          className={styles.shakeButton}
+          aria-label="ぼんを ゆらす"
+          onClick={shakeField}
+        >
+          <span aria-hidden="true">↔️</span>
+          <span>ゆらす</span>
+        </button>
+      ) : null}
 
       {outcome !== null ? (
         <div className={styles.resultOverlay} role="status" aria-live="polite">

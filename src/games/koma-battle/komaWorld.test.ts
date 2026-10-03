@@ -5,10 +5,12 @@ import {
   applyKomaBoost,
   applyKomaContactAssist,
   applyKomaFieldBelts,
+  applyKomaShake,
   clampKomaMotion,
   createKomaBattleWorld,
   readKoma,
   startPlacement,
+  updateKomaStagnation,
   type KomaBattleWorld,
 } from './komaWorld'
 import { KOMA_TYPE_CONFIGS, komaSpecsForCount, komaSpecsForSelection } from './komaSpecs'
@@ -22,6 +24,9 @@ import {
   KOMA_BELT_MAX_FORWARD_SPEED,
   KOMA_BOOST_MAX_SPIN_SPEED,
   KOMA_BOOST_MIN_SPIN_SPEED,
+  KOMA_AUTO_SHAKE_AFTER_MS,
+  KOMA_SHAKE_MAX_IMPULSE,
+  KOMA_SHAKE_TARGET_SPEED,
   MAX_ANGULAR_SPEED,
   MAX_LINEAR_SPEED,
   PHYSICS_TIMESTEP,
@@ -1291,6 +1296,101 @@ describe('安全弁', () => {
       if (state.defeatReason !== null) break
     }
     expect(state.defeatReason).toBe('outOfArena')
+    world.world.free()
+  })
+})
+
+describe('盆ゆらし', () => {
+  beforeAll(async () => {
+    await RAPIER.init()
+  })
+
+  /** 2個をすり鉢の底近くで止めた状態を作る。 */
+  function stalledWorld(): KomaBattleWorld {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(2))
+    world.komas.forEach((koma, index) => {
+      const x = index === 0 ? -0.8 : 0.8
+      koma.body.setTranslation({ x, y: fieldHeightAt(getKomaField('basic'), 0.8) + 0.02, z: 0 }, true)
+      koma.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    })
+    return world
+  }
+
+  it('止まっている2個を互いの方へ押し出し、自転速度は変えない', () => {
+    const world = stalledWorld()
+    const spinsBefore = world.komas.map((koma) => readKoma(koma).spinSpeed)
+    const result = applyKomaShake(world, () => 0.5)
+    expect(result.pushedKomas).toBe(2)
+    expect(result.maxAppliedImpulse).toBeLessThanOrEqual(KOMA_SHAKE_MAX_IMPULSE)
+
+    const [a, b] = world.komas
+    // 中央値の乱数ではずらし角0なので、まっすぐ相手へ向かう。
+    expect(a!.body.linvel().x).toBeGreaterThan(1)
+    expect(b!.body.linvel().x).toBeLessThan(-1)
+    for (const koma of world.komas) {
+      const velocity = koma.body.linvel()
+      expect(Math.hypot(velocity.x, velocity.z)).toBeLessThanOrEqual(KOMA_SHAKE_TARGET_SPEED + 1e-6)
+    }
+    world.komas.forEach((koma, index) => {
+      expect(readKoma(koma).spinSpeed).toBeCloseTo(spinsBefore[index]!, 6)
+    })
+    world.world.free()
+  })
+
+  it('ゆらすと止まっていた2個がぶつかる', () => {
+    const world = stalledWorld()
+    applyKomaShake(world, () => 0.5)
+    let knockbacks = 0
+    for (let step = 0; step < 120; step += 1) {
+      for (const koma of world.komas) applyKomaAssist(koma, PHYSICS_TIMESTEP)
+      knockbacks += applyKomaContactAssist(world).komaKnockbacks
+      world.world.step()
+      for (const koma of world.komas) clampKomaMotion(koma)
+    }
+    expect(knockbacks).toBeGreaterThan(0)
+    world.world.free()
+  })
+
+  it('すでに相手へ速く向かっているコマへは追加しない', () => {
+    const world = stalledWorld()
+    world.komas[0]!.body.setLinvel({ x: KOMA_SHAKE_TARGET_SPEED + 1, y: 0, z: 0 }, true)
+    const result = applyKomaShake(world, () => 0.5)
+    expect(result.pushedKomas).toBe(1)
+    expect(world.komas[0]!.body.linvel().x).toBeCloseTo(KOMA_SHAKE_TARGET_SPEED + 1, 6)
+    world.world.free()
+  })
+
+  it('2個とも動きが小さい状態が続いたときだけ自動ゆらしの合図を出す', () => {
+    const world = stalledWorld()
+    const stepMs = PHYSICS_TIMESTEP * 1000
+    let fired = 0
+    let elapsedMs = 0
+    while (elapsedMs < KOMA_AUTO_SHAKE_AFTER_MS - stepMs) {
+      if (updateKomaStagnation(world, stepMs)) fired += 1
+      elapsedMs += stepMs
+    }
+    expect(fired).toBe(0)
+    // 片方が動き出すとカウントは0へ戻る。
+    world.komas[0]!.body.setLinvel({ x: 2, y: 0, z: 0 }, true)
+    expect(updateKomaStagnation(world, stepMs)).toBe(false)
+    expect(world.stagnantMs).toBe(0)
+    world.komas[0]!.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    elapsedMs = 0
+    while (elapsedMs <= KOMA_AUTO_SHAKE_AFTER_MS) {
+      if (updateKomaStagnation(world, stepMs)) fired += 1
+      elapsedMs += stepMs
+    }
+    expect(fired).toBe(1)
+    world.world.free()
+  })
+
+  it('1個モードでは自動ではゆらさないが、ボタンのゆらしは効く', () => {
+    const world = createKomaBattleWorld(RAPIER, komaSpecsForCount(1))
+    world.komas[0]!.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    for (let step = 0; step < 1000; step += 1) {
+      expect(updateKomaStagnation(world, PHYSICS_TIMESTEP * 1000)).toBe(false)
+    }
+    expect(applyKomaShake(world, () => 0.5).pushedKomas).toBe(1)
     world.world.free()
   })
 })
