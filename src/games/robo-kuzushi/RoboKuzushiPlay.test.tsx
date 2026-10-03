@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import RoboKuzushiPlay from './RoboKuzushiPlay'
-import { playClearSound, playLaunchSound, playSplitSound } from './sounds'
+import { LEVELS } from './levels'
+import { playBlastSound, playClearSound, playLaunchSound, playSplitSound } from './sounds'
 
 vi.mock('./sounds', async importOriginal => {
   const actual = await importOriginal<typeof import('./sounds')>()
@@ -77,7 +78,7 @@ describe('robo-kuzushi play', () => {
     expect(screen.getByText('きの おしろ')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByRole('button', { name: '1 はじめの いっぽ ほし3こ' })).toBeInTheDocument()
-    expect(screen.getByLabelText('あつめた ほし 3 / 30')).toBeInTheDocument()
+    expect(screen.getByLabelText(`あつめた ほし 3 / ${LEVELS.length * 3}`)).toBeInTheDocument()
     expect(cancelAnimationFrame).toHaveBeenCalled()
   })
 
@@ -115,6 +116,25 @@ describe('robo-kuzushi play', () => {
     expect(playLaunchSound).toHaveBeenCalledOnce()
     expect(playSplitSound).toHaveBeenCalledOnce()
     expect(screen.queryByRole('button', { name: /わける/ })).not.toBeInTheDocument()
+  })
+
+  test('the bomb stage introduces the bomb, and a keyboard shot blows up the stone hut', () => {
+    const canvas = open(/^11 ドッカン ばくだん/)
+    advance(10)
+    expect(screen.getByRole('status')).toHaveTextContent('つぎは ばくだん')
+    for (let i = 0; i < 3; i++) fireEvent.keyDown(canvas, { key: 'ArrowDown' })
+    fireEvent.keyDown(canvas, { key: 'ArrowLeft' })
+    fireEvent.keyDown(canvas, { key: ' ' })
+    advance(400)
+    expect(playBlastSound).toHaveBeenCalledWith(true)
+    expect(screen.getByLabelText('のこりの ロボット 1たい')).toBeInTheDocument()
+    expect(screen.getByLabelText('のこりの たま 2こ')).toBeInTheDocument()
+  })
+
+  test('the stage list explains every kind of ball', () => {
+    render(<MemoryRouter><RoboKuzushiPlay /></MemoryRouter>)
+    for (const text of ['ばくだん: ぶつかると ドッカーン', 'ドリル: きや こおりを つきぬける', 'ぽよん: よく はねる']) expect(screen.getByText(text)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '20 おやぶんロボの しろ' })).toBeInTheDocument()
   })
 
   test('a phone held upright is asked to turn sideways, and the stage waits', () => {

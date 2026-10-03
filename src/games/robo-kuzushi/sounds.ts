@@ -65,12 +65,14 @@ export function playLaunchSound() {
 }
 
 /** ものに ぶつかった 音。ざいりょうで ちがう 音に する。 */
-export function playHitSound(material: Material | 'robot' | 'ground' | 'ball', strength: number) {
+export function playHitSound(material: Material | 'robot' | 'ground' | 'ball' | 'steel' | 'bouncy', strength: number) {
   const ctx = context()
   if (!ctx) return
   const now = ctx.currentTime
   const v = .04 + strength * .1
   if (material === 'ice') { playTone(ctx, 1760, now, .08, v * .6, 'triangle'); playTone(ctx, 2349, now + .03, .1, v * .4, 'sine') }
+  else if (material === 'steel') { playTone(ctx, 620, now, .18, v * .7, 'square'); playTone(ctx, 931, now, .22, v * .4, 'triangle') }
+  else if (material === 'bouncy') slide(ctx, 220, 520, now, .14, v, 'sine')
   else if (material === 'stone') { noise(ctx, now, .16, v * 1.4, 500); playTone(ctx, 110, now, .12, v, 'sine') }
   else if (material === 'robot') slide(ctx, 520, 380, now, .12, v, 'square')
   else if (material === 'wood') { noise(ctx, now, .09, v, 1400); playTone(ctx, 240, now, .08, v * .8, 'triangle') }
@@ -88,14 +90,59 @@ export function playBreakSound(material: Material | 'box') {
   else playBlastSound()
 }
 
-/** びっくりばこの「ボワーン」。 */
-export function playBlastSound() {
+/** びっくりばこの「ボワーン」と ばくだんの「ドッカーン」。 */
+export function playBlastSound(big = false) {
   const ctx = context()
   if (!ctx) return
   const now = ctx.currentTime
-  noise(ctx, now, .6, .25, 600)
-  slide(ctx, 160, 40, now, .5, .16, 'sine')
-  slide(ctx, 300, 900, now + .05, .3, .06, 'triangle')
+  noise(ctx, now, big ? .9 : .6, big ? .32 : .25, big ? 420 : 600)
+  slide(ctx, big ? 120 : 160, big ? 30 : 40, now, big ? .7 : .5, .16, 'sine')
+  if (!big) slide(ctx, 300, 900, now + .05, .3, .06, 'triangle')
+}
+
+/** ふうせんが われる「パン」。 */
+export function playPopSound() {
+  const ctx = context()
+  if (!ctx) return
+  const now = ctx.currentTime
+  noise(ctx, now, .09, .2, 3200, 'highpass')
+  playTone(ctx, 1320, now, .05, .05, 'square')
+}
+
+/** ヘルメットが とれる「カーン」。 */
+export function playHelmetSound() {
+  const ctx = context()
+  if (!ctx) return
+  const now = ctx.currentTime
+  playTone(ctx, 1480, now, .25, .08, 'triangle')
+  playTone(ctx, 2217, now, .2, .05, 'sine')
+}
+
+/** トランポリンの「ぴょーん」。 */
+export function playSpringSound() {
+  const ctx = context()
+  if (!ctx) return
+  const now = ctx.currentTime
+  slide(ctx, 180, 900, now, .3, .09, 'triangle')
+  slide(ctx, 260, 1200, now + .04, .25, .04, 'sine')
+}
+
+/** ワープの「ひゅいん」。 */
+export function playWarpSound() {
+  const ctx = context()
+  if (!ctx) return
+  const now = ctx.currentTime
+  slide(ctx, 1600, 300, now, .18, .07, 'sine')
+  slide(ctx, 300, 1800, now + .16, .22, .07, 'sine')
+}
+
+/** ドリルが つきぬける「ギュイン」。 */
+export function playPierceSound() {
+  const ctx = context()
+  if (!ctx) return
+  const now = ctx.currentTime
+  slide(ctx, 700, 1400, now, .12, .05, 'sawtooth')
+  noise(ctx, now, .1, .06, 2600, 'bandpass')
 }
 
 /** ロボットが ポンと きえる 音。 */
