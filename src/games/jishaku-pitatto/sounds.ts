@@ -138,6 +138,24 @@ export function playHooked() {
   voice(c, { type: 'square', f: 1100, f2: 1700, dur: 0.05, vol: 0.025, at: now + 0.07 })
 }
 
+/** ふうせんが はなれて とんでいく「ぽわん」。 */
+export function playBalloon() {
+  const c = ctx()
+  if (!c) return
+  const now = c.currentTime
+  voice(c, { type: 'sine', f: 520, f2: 1250, dur: 0.22, vol: 0.07, attack: 0.01 })
+  voice(c, { type: 'triangle', f: 1250, f2: 1700, dur: 0.18, vol: 0.025, at: now + 0.12 })
+}
+
+/** チャレンジ せいこう「ぱんぱかぱーん」。 */
+export function playMedal() {
+  const c = ctx()
+  if (!c) return
+  const now = c.currentTime
+  ;[0, 0, 0, 5, 9].forEach((s, i) => voice(c, { type: 'square', f: hz(s, 783.99), dur: i === 4 ? 0.45 : 0.1, vol: 0.035, at: now + [0, 0.1, 0.2, 0.3, 0.45][i] }))
+  voice(c, { type: 'sine', f: hz(21, 783.99), dur: 0.6, vol: 0.03, at: now + 0.45 })
+}
+
 /** はじめの「ぽろん」。 */
 export function playStart() {
   const c = ctx()
@@ -181,6 +199,16 @@ const SONGS: Record<StageId, Song> = {
     tempo: 88, wave: 'sine', base: 493.88,
     melody: [4, null, 7, null, 11, null, 9, 7, 4, null, null, null, 2, 4, 7, null, 9, null, 7, null, 4, null, 2, null, 0, 2, 4, null, null, null, null, null],
     bass: [0, null, null, null, 7, null, null, null, -3, null, null, null, 4, null, null, null, -7, null, null, null, 0, null, null, null, -5, null, null, null, 0, null, null, null],
+  },
+  factory: {
+    tempo: 120, wave: 'square', base: 440,
+    melody: [0, null, 0, 7, null, 7, 5, 4, 2, null, 2, 5, null, 4, 2, null, 0, null, 0, 7, null, 9, 7, 5, 4, null, 2, null, 0, null, null, null],
+    bass: [0, null, 0, null, 0, null, 0, null, -5, null, -5, null, -5, null, -5, null, -3, null, -3, null, -7, null, -7, null, -5, null, -5, null, 0, null, null, null],
+  },
+  park: {
+    tempo: 96, wave: 'triangle', base: 523.25,
+    melody: [7, null, 4, 5, 7, null, 12, null, 9, null, 7, null, 4, null, null, null, 5, null, 2, 4, 5, null, 9, null, 7, 5, 4, 2, 0, null, null, null],
+    bass: [0, null, 4, null, 7, null, 4, null, -3, null, 0, null, 4, null, 0, null, -7, null, -3, null, 0, null, -3, null, -5, null, -1, null, 0, null, null, null],
   },
 }
 

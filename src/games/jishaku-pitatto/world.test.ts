@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { KINDS } from './items'
 import { STAGES, findStage, type StageDef } from './stages'
 import {
-  MAGNET_HALF_W, autoPilot, carryOver, createWorld, disposeWorld, drainEvents, fieldAt, floorAt, remainingTargets, setMagnetTarget,
-  stepWorld, worldResult, worldSize, type World, type WorldEvent,
+  MAGNET_HALF_W, autoPilot, carryOver, createWorld, disposeWorld, drainEvents, fieldAt, floorAt, missionProgress, remainingTargets,
+  setMagnetTarget, stepWorld, worldResult, worldSize, type World, type WorldEvent,
 } from './world'
 
 const PORTRAIT = { w: 360, h: 780 }
@@ -41,6 +41,7 @@ describe('ステージの データ', () => {
       expect(kinds.some((k) => !k.magnetic)).toBe(true)
       const propIds = new Set(s.props.map((p) => p.id))
       for (const p of s.items) if (p.on) expect(propIds.has(p.on)).toBe(true)
+      expect(s.mission).toBeDefined()
     }
   })
 
@@ -146,6 +147,77 @@ describe('ステージの しかけ', () => {
     expect(events.some((e) => e.type === 'hooked' && e.id === fish.id)).toBe(true)
     expect(fish.state).toBe('stuck')
     disposeWorld(world)
+  })
+})
+
+describe('あたらしい ステージの しかけ', () => {
+  test('こうじょうでは ベルトに のった ものが みぎへ ながれ、はしまで いくと ひだりの つつから でてくる', () => {
+    const world = createWorld(stage('factory'), PORTRAIT)
+    // じしゃくは とおくの うえに おいておく。
+    const away = (w: World) => setMagnetTarget(w, w.w / 2, w.topLimit)
+    const block = world.items.find((it) => it.kind.id === 'block')!
+    const x0 = block.x
+    run(world, 90, away)
+    expect(block.x).toBeGreaterThan(x0 + 30)
+    const events = run(world, 60 * 12, away)
+    expect(events.some((e) => e.type === 'loop' && e.id === block.id)).toBe(true)
+    for (const it of world.items) expect(it.x).toBeLessThan(world.w)
+    disposeWorld(world)
+  })
+
+  test('こうえんでは ふうせんで とぶ てつに じしゃくを ちかづけると ふうせんが はなれて くっつく', () => {
+    const world = createWorld(stage('park'), PORTRAIT)
+    const clip = world.items.find((it) => it.kind.id === 'clip')!
+    expect(clip.swim?.balloon).not.toBeNull()
+    expect(clip.y).toBeLessThan(world.groundY - 40)
+    run(world, 60 * 3, (w) => setMagnetTarget(w, w.w / 2, w.topLimit))
+    expect(clip.y).toBeLessThan(world.groundY - 40)
+    const events = run(world, 240, (w) => setMagnetTarget(w, clip.x, clip.y - 14))
+    expect(events.some((e) => e.type === 'balloon' && e.id === clip.id)).toBe(true)
+    expect(clip.state).toBe('stuck')
+    // くっつかない アヒルは ふうせんで とんだまま。
+    const duck = world.items.find((it) => it.kind.id === 'duck')!
+    run(world, 240, (w) => setMagnetTarget(w, duck.x, duck.y - 14))
+    expect(duck.swim?.balloon).not.toBeNull()
+    expect(duck.state).toBe('body')
+    disposeWorld(world)
+  })
+})
+
+describe('チャレンジ', () => {
+  test('てつを つなげた だんの かずで せいこうし、いちどだけ しらせる', () => {
+    const world = createWorld(stage('desk'), LANDSCAPE)
+    const events = run(world, 60 * 40, autoPilot)
+    expect(world.maxDepth).toBeGreaterThanOrEqual(3)
+    expect(missionProgress(world)).toMatchObject({ goal: 3, done: true })
+    expect(events.filter((e) => e.type === 'mission')).toHaveLength(1)
+    disposeWorld(world)
+  })
+
+  test('さてつの チャレンジは あつめた つぶの かずで すすむ', () => {
+    const world = createWorld(stage('sand'), PORTRAIT)
+    expect(missionProgress(world)).toMatchObject({ value: 0, done: false })
+    const events = run(world, 60 * 12, (w) => setMagnetTarget(w, 30 + Math.abs(((w.frame * 2) % (2 * (w.w - 60))) - (w.w - 60)), w.groundY - 2))
+    expect(missionProgress(world).value).toBe(world.sand!.stuck)
+    expect(missionProgress(world)).toMatchObject({ goal: 200, done: true })
+    expect(events.some((e) => e.type === 'mission')).toBe(true)
+    disposeWorld(world)
+  })
+
+  test('じかんの チャレンジは まにあえば せいこう、すぎたら しっぱい', () => {
+    const fast = createWorld(stage('sea'), PORTRAIT)
+    run(fast, 60 * 60, autoPilot)
+    expect(fast.phase).toBe('clear')
+    expect(missionProgress(fast)).toMatchObject({ done: true, failed: false })
+    disposeWorld(fast)
+    const slow = createWorld(stage('sea'), PORTRAIT)
+    run(slow, 60 * 33, (w) => setMagnetTarget(w, w.w / 2, w.topLimit))
+    expect(missionProgress(slow)).toMatchObject({ done: false, failed: true })
+    const events = run(slow, 60 * 60, autoPilot)
+    expect(slow.phase).toBe('clear')
+    expect(missionProgress(slow).done).toBe(false)
+    expect(events.some((e) => e.type === 'mission')).toBe(false)
+    disposeWorld(slow)
   })
 })
 

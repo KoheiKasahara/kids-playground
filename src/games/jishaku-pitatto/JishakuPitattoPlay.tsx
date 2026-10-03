@@ -6,13 +6,13 @@ import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
 import { vibrate } from '../../utils/haptics'
 import { KINDS, type KindId } from './items'
-import { STAGES } from './stages'
+import { STAGES, missionText } from './stages'
 import {
-  autoPilot, carryOver, createWorld, disposeWorld, drainEvents, setMagnetTarget, stepWorld, worldResult, worldSize,
-  type Result, type World,
+  autoPilot, carryOver, createWorld, disposeWorld, drainEvents, missionProgress, setMagnetTarget, stepWorld, worldResult, worldSize,
+  type MissionProgress, type Result, type World,
 } from './world'
 import { Painter, createFx, itemIcon, makeView, screenToWorld, snapshotMagnet, spawnFx, updateFx, type View } from './render'
-import { progressStore, readMusic, writeMusic } from './progress'
+import { medalStore, progressStore, readMusic, writeMusic } from './progress'
 import * as sfx from './sounds'
 import styles from './JishakuPitattoPlay.module.css'
 
@@ -87,6 +87,20 @@ const TIPS: Record<string, string> = {
   desk: 'てつで できた ものは じしゃくに くっつくよ',
   sand: 'すなの なかの くろい つぶは「さてつ」。てつの つぶ だよ',
   sea: 'おなじ かんでも、スチールは くっつく。アルミは くっつかないよ',
+  factory: 'ほんとうの こうじょうでも、じしゃくで てつだけを よりわけて いるよ',
+  park: 'ふうせんの ゴムや どんぐりは くっつかない。てつだけ ひっぱれるよ',
+}
+
+/** よみあげ用の チャレンジの のこり。 */
+function missionLabel(type: string, p: MissionProgress): string {
+  if (type === 'time') return `のこり ${Math.max(0, p.goal - p.value)}びょう`
+  return missionCount(type, p)
+}
+
+/** チャレンジの のこり（じかんは のこり びょう、それいがいは「いま / めあて」）。 */
+function missionCount(type: string, p: MissionProgress): string {
+  if (type === 'time') return `⏱ ${Math.max(0, p.goal - p.value)}`
+  return `${Math.min(p.value, p.goal)} / ${p.goal}`
 }
 
 function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
@@ -105,7 +119,8 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
   const [banner, setBanner] = useState(true)
   const [guide, setGuide] = useState(index === 0)
   const [cleared, setCleared] = useState(false)
-  const [result, setResult] = useState<(Result & { best: boolean; photo: string | null; count: number; sand: number }) | null>(null)
+  const [result, setResult] = useState<(Result & { best: boolean; photo: string | null; count: number; sand: number; medal: boolean; newMedal: boolean }) | null>(null)
+  const [mission, setMission] = useState<MissionProgress>({ value: 0, goal: 1, done: false, failed: false })
 
   useEffect(() => {
     if (!music || result) return undefined
@@ -122,6 +137,13 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
     }
     expose()
     setHud(hudFrom(world))
+    let missionSig = ''
+    const syncMission = () => {
+      const p = missionProgress(world)
+      const sig = `${p.value}:${p.done}:${p.failed}`
+      if (sig !== missionSig) { missionSig = sig; setMission(p) }
+    }
+    syncMission()
     const ctx = canvas?.getContext('2d') ?? null
     const still = reducedMotion()
     let painter = new Painter(world)
@@ -204,6 +226,8 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
           case 'splash': sfx.playSplash(e.power); break
           case 'grains': sfx.playGrains(e.n); break
           case 'hooked': sfx.playHooked(); break
+          case 'balloon': sfx.playBalloon(); break
+          case 'mission': sfx.playMedal(); vibrate('success'); break
           case 'clear': {
             done = true
             sfx.playClear()
@@ -215,8 +239,11 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
               const res = worldResult(world)
               const before = progressStore.read()[stage.id] ?? 0
               progressStore.record(stage.id, res.stars)
+              const medalBefore = (medalStore.read()[stage.id] ?? 0) > 0
+              if (world.missionDone) medalStore.record(stage.id, 1)
               setResult({
                 ...res, best: res.stars > before,
+                medal: world.missionDone, newMedal: world.missionDone && !medalBefore,
                 photo: ctx ? snapshotMagnet(world, time) : null,
                 count: world.stuckOrder.length,
                 sand: world.sand?.stuck ?? 0,
@@ -229,6 +256,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
         }
       }
       if (hudDirty) setHud(hudFrom(world))
+      if (steps) syncMission()
       if (steps) draw()
       // けっかを だして しばらく したら 絵を とめて 電池を まもる。
       if (restAt >= 0 && time > restAt) cancelAnimationFrame(frame)
@@ -327,7 +355,14 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
       <small>ステージ {index + 1}</small>
       <strong>{stage.name}</strong>
       <span>{stage.hint}</span>
+      <em className={styles.bannerMission}>🏅 {missionText(stage.mission)}</em>
     </div>}
+    <p className={`${styles.mission} ${mission.done ? styles.missionDone : mission.failed ? styles.missionFailed : ''}`}
+      role="img" aria-label={`チャレンジ ${missionText(stage.mission)} ${mission.done ? 'せいこう' : missionLabel(stage.mission.type, mission)}`}>
+      <span className={styles.missionMedal} aria-hidden="true">{mission.done ? '🏅' : mission.failed ? '⌛' : '🏅'}</span>
+      <span className={styles.missionText} aria-hidden="true">{missionText(stage.mission)}</span>
+      <b aria-hidden="true">{mission.done ? '✓' : missionCount(stage.mission.type, mission)}</b>
+    </p>
     {guide && !banner && <p className={styles.guide} role="status">
       <span className={styles.guideHand} aria-hidden="true">👆</span>
       じしゃくを うごかしてね
@@ -341,6 +376,10 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
             {[0, 1, 2].map((i) => <span key={i} className={i < result.stars ? styles.bigStarOn : styles.bigStarOff} style={{ animationDelay: `${0.25 + i * 0.22}s` }} aria-hidden="true">★</span>)}
           </p>
           {result.best && <p className={styles.best}>あたらしい きろく！</p>}
+          <p className={result.medal ? styles.medalGot : styles.medalMiss}>
+            <span aria-hidden="true">{result.medal ? '🏅' : '⌛'}</span>
+            {result.medal ? (result.newMedal ? 'メダル ゲット！' : 'チャレンジ せいこう！') : `チャレンジ「${missionText(stage.mission)}」に また ちょうせんしよう`}
+          </p>
           {result.photo && <figure className={styles.photo}>
             <img src={result.photo} alt={`じしゃくに ${result.count}こ くっついた しゃしん`} />
             <figcaption>{result.count}こ ぴたっ！{result.sand > 20 ? ' さてつも いっぱい' : ''}</figcaption>
@@ -371,8 +410,8 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
 
 // ---------------- タイトル画面 ----------------
 
-function TitleScreen({ progress, music, onMusic, onPick }: {
-  progress: Record<string, number>; music: boolean; onMusic: () => void; onPick: (i: number) => void
+function TitleScreen({ progress, medals, music, onMusic, onPick }: {
+  progress: Record<string, number>; medals: Record<string, number>; music: boolean; onMusic: () => void; onPick: (i: number) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
@@ -487,11 +526,15 @@ function TitleScreen({ progress, music, onMusic, onPick }: {
       <ol className={styles.stageList} aria-label="ステージを えらぶ">
         {STAGES.map((stage, i) => {
           const stars = progress[stage.id] ?? 0
+          const medal = (medals[stage.id] ?? 0) > 0
           return <li key={stage.id}>
             <button type="button" className={styles.stageCard} data-stage={stage.id}
-              aria-label={`ステージ${i + 1} ${stage.name}${stars ? ` クリアずみ ほし${stars}こ` : ''}`}
+              aria-label={`ステージ${i + 1} ${stage.name}${stars ? ` クリアずみ ほし${stars}こ` : ''}${medal ? ' メダル あり' : ''}`}
               onClick={() => { primeAudio(); onPick(i) }}>
-              <span className={styles.thumb} data-stage={stage.id}>{thumbs[stage.id] && <img src={thumbs[stage.id]} alt="" />}</span>
+              <span className={styles.thumb} data-stage={stage.id}>
+                {thumbs[stage.id] && <img src={thumbs[stage.id]} alt="" />}
+                {medal && <span className={styles.stageMedal} aria-hidden="true">🏅</span>}
+              </span>
               <span className={styles.stageNo}>ステージ {i + 1}</span>
               <span className={styles.stageName}>{stage.name}</span>
               <span className={styles.stageLead}>{stage.lead}</span>
@@ -509,15 +552,17 @@ export default function JishakuPitattoPlay() {
   const [index, setIndex] = useState<number | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [progress, setProgress] = useState(() => progressStore.read())
+  const [medals, setMedals] = useState(() => medalStore.read())
   const [music, setMusic] = useState(() => readMusic())
   const toggleMusic = useCallback(() => setMusic((m) => { writeMusic(!m); if (!m) primeAudio(); return !m }), [])
   const play = (i: number | null) => {
     setProgress(progressStore.read())
+    setMedals(medalStore.read())
     setAttempt((a) => a + 1)
     setIndex(i)
   }
 
-  if (index === null) return <TitleScreen progress={progress} music={music} onMusic={toggleMusic} onPick={play} />
+  if (index === null) return <TitleScreen progress={progress} medals={medals} music={music} onMusic={toggleMusic} onPick={play} />
   return <Stage key={`${index}-${attempt}`} index={index} music={music} onMusic={toggleMusic}
     onExit={() => play(null)}
     onRetry={() => play(index)}
