@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { CAMERA_FOV, type CameraPose } from './golfCamera'
 import { GOLF_BALLS, type CourseDefinition, type CourseId, type CritterLook, type GolfBallId, type HoleDefinition, type Vec2, type WaterHazard } from './golfCourses'
 import { clipToCell, insideOutline, signedArea, type HoleGeometry, type MeshBuffers } from './golfGeometry'
-import { BALL_RADIUS, BOOSTER, BRIDGE, BUMPER_HEIGHT, CRITTER, GATE, PLATFORM_DEPTH, REFLECTOR, SWITCH, trampolineLaunch, TREE, WALL_HEIGHT, WARP, WINDMILL, type Vec3 } from './golfPhysics'
+import { BALL_RADIUS, BOOSTER, BRIDGE, BUMPER_HEIGHT, CRITTER, GATE, PLATFORM_DEPTH, REFLECTOR, SWITCH, trampolineFlight, TREE, WALL_HEIGHT, WARP, WINDMILL, type Vec3 } from './golfPhysics'
 import { createTerrainHeight, createWaterDepth, layeredNoise, waterInside, type TerrainStyle } from './golfTerrain'
 import { createGolfTextures, type GolfTextures } from './golfTextures'
 import type { GadgetMotion } from './golfWorld'
@@ -1684,13 +1684,13 @@ export function createGolfScene(container: HTMLElement) {
         group.traverse(child => { if (child instanceof THREE.Mesh) child.receiveShadow = true })
         root.add(group)
         bumpers.set(gadget.id, group)
-        // とんでいく みちを てんてんで かく。ちゃくちする ところには くもの まと。
+        // ちょうどよい つよさで のったときの とぶ みちを てんてんで かく。ちゃくちする ところには くもの まと。
         const toGround = geometry.heightAt(gadget.to.x, gadget.to.z) ?? ground
-        const flight = trampolineLaunch({ x: gadget.x, y: ground + BALL_RADIUS, z: gadget.z }, { x: gadget.to.x, y: toGround + BALL_RADIUS, z: gadget.to.z }, course.gravity)
-        const time = Math.hypot(gadget.to.x - gadget.x, gadget.to.z - gadget.z) / (Math.hypot(flight.x, flight.z) || 1)
+        const flight = trampolineFlight(ground + BALL_RADIUS, toGround + BALL_RADIUS, course.gravity)
         for (let k = 1; k < 14; k++) {
-          const t = (time * k) / 14
-          soft.add('sphere', '#ffffff', gadget.x + flight.x * t, ground + BALL_RADIUS + flight.y * t - (course.gravity * t * t) / 2, gadget.z + flight.z * t, 0.07, 0.07, 0.07)
+          const s = k / 14
+          const t = flight.time * s
+          soft.add('sphere', '#ffffff', gadget.x + (gadget.to.x - gadget.x) * s, ground + BALL_RADIUS + flight.up * t - (course.gravity * t * t) / 2, gadget.z + (gadget.to.z - gadget.z) * s, 0.07, 0.07, 0.07)
         }
         const landsOnPad = (definition.gadgets ?? []).some(other => other.kind === 'trampoline' && Math.hypot(other.x - gadget.to.x, other.z - gadget.to.z) < other.radius)
         if (!landsOnPad) {

@@ -22,12 +22,11 @@ import {
   patrolOffset,
   patrolPhase,
   PHYSICS_STEP,
-  powerForDistance,
+  powerForSpeed,
   REST_SECONDS,
   REST_SPEED,
   REST_SPIN,
   REFLECTOR,
-  rollDistance,
   rollingDecel,
   rollingFactor,
   SHOT_TIMEOUT_SECONDS,
@@ -35,9 +34,12 @@ import {
   shotVelocity,
   SWITCH,
   TRAMPOLINE,
-  trampolineLaunch,
+  trampolineFlight,
+  trampolineSpeedFor,
+  trampolineVelocity,
   TREE,
   WARP,
+  windGrip,
   WINDMILL,
   windmillAngle,
   type Surface,
@@ -271,6 +273,121 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     }
     return Math.max(decelOf('green') * 0.25, total / (steps + 1))
   }
+  const groundY = (point: Vec2, fallback: number) => (geometry.heightAt(point.x, point.z) ?? fallback - BALL_RADIUS) + BALL_RADIUS
+  /**
+   * トランポリン pad から よこの速さ velocity で とんだときに おりる ところ。まず ちゃくちてんの 高さで 見つもり、
+   * おりる ところに ゆかが あれば その高さで みなおす。
+   */
+  function jumpLanding(from: Vec3, velocity: Vec2, pad: { to: Vec2 }): Vec3 {
+    let y = groundY(pad.to, from.y)
+    let landing: Vec3 = from
+    for (let pass = 0; pass < 2; pass++) {
+      const time = trampolineFlight(from.y, y, course.gravity).time
+      landing = { x: from.x + velocity.x * time, y, z: from.z + velocity.z * time }
+      const floor = geometry.heightAt(landing.x, landing.z)
+      if (floor === null) break
+      y = floor + BALL_RADIUS
+      landing.y = y
+    }
+    return landing
+  }
+  /**
+   * from から d の むきへ speed で ころがしたときの ようすを、まっすぐの 線の上で 見つもる。
+   * ゆかの ころがり抵抗・ベルト・かぜを 入れて、止まるまでの きょり（limit まで）と、
+   * とちゅうで トランポリンに のれば のった ところと 速さを かえす。
+   */
+  function glide(from: Vec2, d: Vec2, speed: number, limit: number): { distance: number; pad: { id: string; at: Vec2; speed: number } | null } {
+    const ds = 0.04
+    let v = speed
+    let travel = 0
+    while (travel < limit) {
+      const point = { x: from.x + d.x * travel, z: from.z + d.z * travel }
+      const pad = trampolines.find(item => Math.hypot(point.x - item.x, point.z - item.z) < item.radius)
+      // 止まっている トランポリンの 上から うつときは、はじめの いちで とぶ。
+      if (pad && v > TRAMPOLINE.minSpeed) return { distance: travel, pad: { id: pad.id, at: point, speed: v } }
+      const decel = decelOf(geometry.surfaceAt(point.x, point.z) ?? 'green')
+      let wind = 0
+      for (const fan of fans) if (inStrip(point, fan)) wind += fan.strength * windGrip(v, true) * (fan.dir.x * d.x + fan.dir.z * d.z)
+      const belt = conveyors.find(item => inStrip(point, item))
+      if (belt) {
+        // ベルトの はやさ（この線の むきの ぶん）へ むかって、ベルトに たいする ころがり抵抗で ちかづく。
+        // ベルトより おそければ すぐ ベルトの はやさに なり、はやければ ころがり抵抗で ゆっくり ちかづく。
+        const carry = belt.speed * (belt.dir.x * d.x + belt.dir.z * d.z)
+        const next = Math.sqrt(Math.max(0, v * v + 2 * (wind - decel * CONVEYOR.slip) * ds))
+        v = v <= carry ? carry : Math.max(carry, next)
+      } else {
+        v = Math.sqrt(Math.max(0, v * v + 2 * (wind - decel) * ds))
+      }
+      if (v < 0.02) break
+      travel += ds
+    }
+    return { distance: Math.min(travel, limit), pad: null }
+  }
+
+  /** そこから d の むきへ distance だけ ころがして止める 強さ（0〜1）。ベルトや かぜも 入れて さがす。 */
+  function powerToReach(from: Vec2, d: Vec2, distance: number): number {
+    // とちゅうの トランポリンで とんでいくなら、そこまで とどいた ことにする。
+    const short = (power: number) => {
+      const run = glide(from, d, shotSpeed(power), distance + 0.01)
+      return !run.pad && run.distance < distance
+    }
+    if (short(1)) return 1
+    let low = 0
+    let high = 1
+    for (let i = 0; i < 18; i++) {
+      const middle = (low + high) / 2
+      if (short(middle)) low = middle
+      else high = middle
+    }
+    return high
+  }
+
+  /** トランポリン pad に d の むきから speed で のったときの とぶ よこの速さ。 */
+  function jumpVelocity(pad: { x: number; z: number; to: Vec2 }, d: Vec2, speed: number): Vec2 {
+    return trampolineVelocity({ x: d.x * speed, z: d.z * speed }, { x: pad.to.x - pad.x, z: pad.to.z - pad.z })
+  }
+
+  /** そこから d の むきへ うって、トランポリン pad で to へ とぶ 強さ。とどかなければ null。 */
+  function powerToJump(from: Vec3, d: Vec2, pad: { id: string; x: number; z: number; to: Vec2 }): { power: number; miss: number } | null {
+    const jumpOf = (power: number) => {
+      const hit = glide(from, d, shotSpeed(power), 12).pad
+      if (!hit || hit.id !== pad.id) return null
+      const at = { x: hit.at.x, y: groundY(hit.at, from.y), z: hit.at.z }
+      return { at, landing: jumpLanding(at, jumpVelocity(pad, d, hit.speed), pad) }
+    }
+    // ちゃくちてんの むきに どれだけ とびすぎたか（たりなければ マイナス）。
+    const miss = (power: number) => {
+      const jump = jumpOf(power)
+      if (!jump) return null
+      const { at, landing } = jump
+      const reach = Math.hypot(pad.to.x - at.x, pad.to.z - at.z) || 1
+      return ((landing.x - at.x) * (pad.to.x - at.x) + (landing.z - at.z) * (pad.to.z - at.z)) / reach - reach
+    }
+    let low = 0
+    let high = 1
+    if ((miss(high) ?? -1) < 0) return null
+    for (let i = 0; i < 18; i++) {
+      const middle = (low + high) / 2
+      const error = miss(middle)
+      if (error === null || error < 0) low = middle
+      else high = middle
+    }
+    const landing = jumpOf(high)?.landing
+    return landing ? { power: high, miss: Math.hypot(landing.x - pad.to.x, landing.z - pad.to.z) } : null
+  }
+
+  /** トランポリンの まうしろ（ちゃくちてんと はんたいがわ）で、いまの 場所から まっすぐ ころがして いける ところ。 */
+  function launchSpot(from: Vec3, pad: { x: number; z: number; radius: number; to: Vec2 }): Vec2 | null {
+    const length = Math.hypot(pad.to.x - pad.x, pad.to.z - pad.z) || 1
+    const u = { x: (pad.to.x - pad.x) / length, z: (pad.to.z - pad.z) / length }
+    for (const back of [1.1, 1.5, 0.8]) {
+      const spot = { x: pad.x - u.x * back, z: pad.z - u.z * back }
+      const solid = [0, 0.3, -0.3].every(side => geometry.heightAt(spot.x + u.z * side, spot.z - u.x * side) !== null)
+      if (solid && segmentDistance(pad, from, spot) > pad.radius + 0.15 && clearLine(from, spot)) return spot
+    }
+    return null
+  }
+
   const ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 })
   const probe = new RAPIER.Ball(BALL_RADIUS)
   const isFloor = (collider: RAPIER.Collider) => floorHandles.has(collider.handle)
@@ -286,6 +403,8 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
   let airSpeed = 0
   /** トランポリンで とんでいる あいだ。ちゃくちで ぽすっと よこの速さを おとす。 */
   let flight: { time: number } | null = null
+  /** トランポリンから とんで きて、いま ちゃくちした ところ。つぎの トランポリンに のれば そのまま ぽよんと とぶ。 */
+  let chained = false
   let lastSurface: Surface = 'green'
   let events: GolfEvent[] = []
   const lastEmit = new Map<string, number>()
@@ -509,7 +628,12 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       if (airborne) emit({ kind: 'land', strength: Math.min(1, airSpeed / 4), position: p })
       airborne = false
       airTime = 0
-      if (flight) {
+      chained = false
+      if (flight && trampolines.some(pad => Math.hypot(p.x - pad.x, p.z - pad.z) < pad.radius)) {
+        // トランポリンの 上に おりたら、いきおいを おとさずに また とぶ。
+        flight = null
+        chained = true
+      } else if (flight) {
         // トランポリンからの ちゃくちは ぽすっと。よこの速さを おとし、はねかえりも おさえて、ころがりすぎないように する。
         flight = null
         const w = ball.angvel()
@@ -537,15 +661,17 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         item.inside = item === belt
       }
       if (belt) {
-        // ベルトの上では、ベルトの速さとの ちがいだけが へっていき、やがて ベルトと いっしょに はこばれる。
-        // ころがり抵抗も ベルトに たいして かかる。回転は 床に たいして ころがる向きに そろえる。
-        const ux = belt.dir.x * belt.speed
-        const uz = belt.dir.z * belt.speed
-        const rx = v.x - ux
-        const rz = v.z - uz
-        const keep = Math.exp(-CONVEYOR.grip * PHYSICS_STEP) * rollingFactor(Math.hypot(rx, rz), decelOf(surface), PHYSICS_STEP)
-        const nx = ux + rx * keep
-        const nz = uz + rz * keep
+        // ベルトの上では、ボールは ベルトに たいして ころがる。ベルトより はやい ぶんは ころがり抵抗だけで ゆっくり へるので、
+        // つよく うった ぶんは ベルトの はやさに たされて のこる。ベルトより おそい ボールと よこの ずれは、ベルトが すぐ そろえる。
+        // 回転は 床に たいして ころがる向きに そろえる。
+        const grab = Math.exp(-CONVEYOR.grip * PHYSICS_STEP)
+        const along = (v.x - belt.dir.x * belt.speed) * belt.dir.x + (v.z - belt.dir.z * belt.speed) * belt.dir.z
+        const across = (v.x * belt.dir.z - v.z * belt.dir.x) * grab
+        const slide = decelOf(surface) * CONVEYOR.slip * PHYSICS_STEP
+        const relative = along < 0 ? along * grab : Math.max(0, along - slide)
+        const forward = belt.speed + relative
+        const nx = belt.dir.x * forward + belt.dir.z * across
+        const nz = belt.dir.z * forward - belt.dir.x * across
         ball.setLinvel({ x: nx, y: v.y, z: nz }, true)
         ball.setAngvel({ x: nz / BALL_RADIUS, y: 0, z: -nx / BALL_RADIUS }, true)
       } else {
@@ -576,9 +702,11 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
       for (const pad of trampolines) {
         const inside = Math.hypot(p.x - pad.x, p.z - pad.z) < pad.radius
         if (inside && !pad.inside && speed > TRAMPOLINE.minSpeed) {
-          // どの向きから のっても、to に ちゃくちする はやさで とばす。
-          const to = { x: pad.to.x, y: (geometry.heightAt(pad.to.x, pad.to.z) ?? p.y - BALL_RADIUS) + BALL_RADIUS, z: pad.to.z }
-          const launch = trampolineLaunch(p, to, course.gravity)
+          // のった むきへ、のった いきおいに おうじて とばす。つよすぎても よわすぎても ちゃくちてんから それる。
+          v = ball.linvel()
+          const across = trampolineVelocity(v, { x: pad.to.x - pad.x, z: pad.to.z - pad.z }, chained)
+          const landing = jumpLanding(p, across, pad)
+          const launch = { x: across.x, y: trampolineFlight(p.y, landing.y, course.gravity).up, z: across.z }
           ball.setLinvel(launch, true)
           ball.setAngvel({ x: launch.z / BALL_RADIUS, y: 0, z: -launch.x / BALL_RADIUS }, true)
           flight = { time: 0 }
@@ -590,12 +718,13 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         pad.inside = inside
       }
     }
-    // かぜは、ころがっていても とんでいても おす。
+    // かぜは、ころがっていても とんでいても おす。止まりかけの ボールは おさないので、かぜの 中でも すぐ止まる。
     for (const fan of fans) {
       const inside = inStrip(p, fan)
       if (inside) {
         v = ball.linvel()
-        const push = { x: fan.dir.x * fan.strength * PHYSICS_STEP, z: fan.dir.z * fan.strength * PHYSICS_STEP }
+        const strength = fan.strength * windGrip(Math.hypot(v.x, v.z), grounded) * PHYSICS_STEP
+        const push = { x: fan.dir.x * strength, z: fan.dir.z * strength }
         ball.setLinvel({ x: v.x + push.x, y: v.y, z: v.z + push.z }, true)
         // ころがっている ボールは 回転も いっしょに かえる。かえないと 床との まさつで 速さが もどってしまう。
         if (grounded) {
@@ -710,13 +839,19 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     /** ねらいの道すじ。まっすぐ転がる距離の目安まで、壁で1回はね返るところまでを返す。 */
     aimPath(direction: Vec2, power: number, maxLength = 6): Vec3[] {
       const start = position()
-      // トランポリンの 上では、どこへ うっても ちゃくちてんへ とぶ。
-      const pad = trampolines.find(item => Math.hypot(start.x - item.x, start.z - item.z) < item.radius)
-      if (pad) return [start, { x: pad.to.x, y: (geometry.heightAt(pad.to.x, pad.to.z) ?? start.y - BALL_RADIUS) + BALL_RADIUS, z: pad.to.z }]
       const length = Math.hypot(direction.x, direction.z) || 1
       let d = { x: direction.x / length, z: direction.z / length }
-      let remaining = Math.min(maxLength, rollDistance(shotSpeed(power), decelAlong(start, { x: start.x + d.x * maxLength, z: start.z + d.z * maxLength })))
+      const run = glide(start, d, shotSpeed(power), maxLength)
+      let remaining = run.distance
       const points: Vec3[] = [start]
+      // トランポリンに のるなら、のる ところと、その つよさで おりる ところを しめす。
+      if (run.pad && !cast(start, d, run.distance)) {
+        const at = { x: run.pad.at.x, y: groundY(run.pad.at, start.y), z: run.pad.at.z }
+        if (run.distance > 0.05) points.push(at)
+        const pad = trampolines.find(item => item.id === run.pad!.id)!
+        points.push(jumpLanding(at, jumpVelocity(pad, d, run.pad.speed), pad))
+        return points
+      }
       let from = start
       for (let bounce = 0; bounce < 2 && remaining > 0.05; bounce++) {
         const hit = cast(from, d, remaining)
@@ -737,13 +872,14 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
     suggestShot(): ShotSuggestion {
       const p = position()
       const route = hole.route
-      // トランポリンの 上からは、どの向きに うっても to へ とぶ。ちゃくちてんの ほうへ やさしく うつ。
+      // トランポリンの 上からは、うった むきと つよさで とぶ。ちゃくちてんへ とどく つよさで うつ。
       const pad = trampolines.find(item => Math.hypot(p.x - item.x, p.z - item.z) < item.radius)
       if (pad) {
         const dx = pad.to.x - p.x
         const dz = pad.to.z - p.z
         const distance = Math.hypot(dx, dz) || 1
-        return { direction: { x: dx / distance, z: dz / distance }, power: 0.15, target: { x: pad.to.x, z: pad.to.z } }
+        const speed = trampolineSpeedFor(distance, p.y, groundY(pad.to, p.y), course.gravity)
+        return { direction: { x: dx / distance, z: dz / distance }, power: Math.max(0.05, powerForSpeed(speed)), target: { x: pad.to.x, z: pad.to.z } }
       }
       let segment = 0
       let nearest = Infinity
@@ -766,9 +902,18 @@ export function createGolfWorld(course: CourseDefinition, hole: HoleDefinition, 
         // ボールは床からほんの少しうかせて置くので、わずかな高さの差は平らとみなす。
         const rise = (geometry.heightAt(target.x, target.z) ?? p.y - BALL_RADIUS) - (p.y - BALL_RADIUS)
         const climb = Math.abs(rise) < 0.02 ? 0 : (course.gravity * rise * (rise > 0 ? 1.4 : 0.7)) / decel
-        let power = powerForDistance(distance + extra + climb, decel)
+        const direction = { x: dx / distance, z: dz / distance }
+        // トランポリンを ねらうときは、のって ちゃくちてんへ とぶ つよさ。
+        const pad = trampolines.find(item => Math.hypot(target.x - item.x, target.z - item.z) < 0.05)
+        const jump = pad ? powerToJump(p, direction, pad) : null
+        if (pad && (!jump || jump.miss > 0.7)) {
+          // のる むきが ずれすぎて ちゃくちてんへ とべないときは、まず トランポリンの まうしろへ ころがす。
+          const spot = launchSpot(p, pad)
+          if (spot) return aimAt(spot, 0, segment)
+        }
+        let power = jump?.power ?? powerToReach(p, direction, distance + extra + climb)
         for (let index = segment + 1; index <= lastPassed; index++) power = Math.max(power, route[index]!.minPower ?? 0)
-        return { direction: { x: dx / distance, z: dz / distance }, power: Math.min(1, Math.max(0.12, power)), target: { x: target.x, z: target.z } }
+        return { direction, power: Math.min(1, Math.max(0.12, power)), target: { x: target.x, z: target.z } }
       }
       // はねかえし いたの手前の点は、いたで はねて その先の点まで ころがる強さにする。
       // はねると すこし おそくなるので、はねたあとの きょりは REFLECTOR.keep で わって 見つもる。

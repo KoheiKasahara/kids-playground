@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { initializeRapier } from '../../physics/rapierLoader'
 import { GOLF_COURSES, type CourseDefinition, type HoleDefinition } from './golfCourses'
 import { buildHoleGeometry } from './golfGeometry'
-import { BALL_RADIUS, rollDistance, rollingDecel, shotSpeed, SWITCH, trampolineLaunch } from './golfPhysics'
+import { BALL_RADIUS, rollDistance, rollingDecel, shotSpeed, SWITCH, TRAMPOLINE, trampolineFlight, trampolineVelocity } from './golfPhysics'
 import { createGolfWorld, type GolfEvent, type GolfWorld } from './golfWorld'
 
 beforeAll(async () => { await initializeRapier() })
@@ -435,25 +435,34 @@ describe('パターゴルフの物理', () => {
     })
   })
 
-  it('ベルトコンベアに のると、よわく うっても ベルトの はやさで さきまで はこばれる', () => {
+  it('ベルトコンベアに のると、よわく うっても すぐ ベルトの はやさで はこばれ、つよく うつと もっと とおくまで いく', () => {
     const hole = holeById('factory-1')
     const belt = hole.gadgets!.find(gadget => gadget.kind === 'conveyor')!
     if (belt.kind !== 'conveyor') throw new Error('conveyor')
-    withWorld(open(FACTORY, hole), world => {
+    const ride = (power: number) => withWorld(open(FACTORY, hole), world => {
       world.placeBall({ x: belt.x - belt.halfLength - 0.6, z: belt.z })
-      // ベルトに やっと とどくくらいの よわさ。
-      world.shoot({ x: 1, z: 0 }, 0.12)
+      world.shoot({ x: 1, z: 0 }, power)
       let onBelt: number | null = null
+      let time = 0
       const events = roll(world, () => {
+        time++
         const ball = world.ball()
         if (onBelt === null && ball.position.x > belt.x) onBelt = Math.hypot(ball.velocity.x, ball.velocity.z)
       })
-      expect(events.some(event => event.kind === 'conveyor')).toBe(true)
-      // ベルトの まんなかでは ベルトと おなじ はやさで はこばれている。
-      expect(onBelt).toBeCloseTo(belt.speed, 1)
-      // ベルトの おわりを こえて、カップの そばまで ころがる。
-      expect(world.ball().position.x).toBeGreaterThan(belt.x + belt.halfLength + 0.8)
+      return { onBelt: onBelt ?? 0, seconds: time / 120, events, x: world.ball().position.x, phase: world.phase }
     })
+    // ベルトに やっと とどくくらいの よわさ。
+    const weak = ride(0.12)
+    expect(weak.events.some(event => event.kind === 'conveyor')).toBe(true)
+    // ベルトの まんなかでは ほぼ ベルトと おなじ はやさで はこばれている。
+    expect(Math.abs(weak.onBelt - belt.speed)).toBeLessThan(0.15)
+    // ベルトの おわりを こえて、カップの そばまで ころがる。まちくたびれる ほど かからない。
+    expect(weak.x).toBeGreaterThan(belt.x + belt.halfLength + 0.8)
+    expect(weak.seconds).toBeLessThan(6)
+    // つよく うつと、ベルトの はやさに たされて はやく すすみ、もっと とおくまで いく。
+    const strong = ride(0.7)
+    expect(strong.onBelt).toBeGreaterThan(belt.speed + 0.8)
+    if (strong.phase !== 'holed') expect(strong.x).toBeGreaterThan(weak.x)
   })
 
   it('ベルトに さからって よわく うつと、おしもどされる', () => {
@@ -496,22 +505,49 @@ describe('パターゴルフの物理', () => {
     })
   })
 
-  it('トランポリンに のると、どの むきから のっても ちゃくちてんへ とぶ', () => {
+  it('トランポリンは、のる つよさで とぶ きょりが、のる むきで とぶ むきが かわる', () => {
     const hole = holeById('sky-1')
     const pad = hole.gadgets!.find(gadget => gadget.kind === 'trampoline')!
     if (pad.kind !== 'trampoline') throw new Error('trampoline')
-    for (const from of [{ x: 0, z: 6.4 }, { x: -1.4, z: 5.0 }, { x: 1.2, z: 3.9 }]) {
+    const jump = (from: { x: number; z: number }, power: number) => withWorld(open(SKY, hole), world => {
+      world.placeBall(from)
+      world.shoot({ x: pad.x - from.x, z: pad.z - from.z }, power)
+      const events = roll(world)
+      expect(events.some(event => event.kind === 'trampoline')).toBe(true)
+      // とびあがりは ジャンプの できごとに しない。
+      expect(events.some(event => event.kind === 'takeoff')).toBe(false)
+      const end = events.find(event => event.kind === 'land' || event.kind === 'splash' || event.kind === 'cup')
+      expect(end, `${from.x},${from.z} ${power}`).toBeDefined()
+      return end!
+    })
+    const tee = { x: 0, z: 6.4 }
+    const soft = jump(tee, 0.7)
+    const hard = jump(tee, 0.78)
+    expect(soft.kind).toBe('land')
+    expect(hard.kind).toBe('land')
+    // つよく のるほど とおくへ とぶ。
+    expect(hard.position.z).toBeLessThan(soft.position.z - 0.8)
+    // ななめに のると、そちらへ それて とぶ（すこしだけ ちゃくちてんの ほうへ まがる）。
+    const slanted = jump({ x: -0.5, z: 6.3 }, 0.75)
+    expect(slanted.kind).toBe('land')
+    expect(slanted.position.x).toBeGreaterThan(pad.to.x + 0.4)
+    // おおきく ななめに のると、しまから それて くもの 下へ おちる。
+    expect(jump({ x: -1.2, z: 5.6 }, 0.62).kind).toBe('splash')
+    // よわすぎると とどかず、くもの 下へ おちる。
+    expect(jump(tee, 0.5).kind).toBe('splash')
+  })
+
+  it('トランポリンの おすすめの つよさで のると、ちゃくちてんの ちかくに おりる', () => {
+    for (const id of ['sky-1', 'sky-2']) {
+      const hole = holeById(id)
       withWorld(open(SKY, hole), world => {
-        world.placeBall(from)
-        world.shoot({ x: pad.x - from.x, z: pad.z - from.z }, 0.32)
-        const events = roll(world)
-        expect(events.some(event => event.kind === 'trampoline')).toBe(true)
-        // とびあがりは ジャンプの できごとに しない。
-        expect(events.some(event => event.kind === 'takeoff')).toBe(false)
-        const land = events.find(event => event.kind === 'land')
-        expect(land).toBeDefined()
-        expect(Math.hypot(land!.position.x - pad.to.x, land!.position.z - pad.to.z)).toBeLessThan(0.3)
-        expect(events.some(event => event.kind === 'splash')).toBe(false)
+        const shot = world.suggestShot()
+        const pad = hole.gadgets!.find(gadget => gadget.kind === 'trampoline' && gadget.x === shot.target.x && gadget.z === shot.target.z)!
+        if (pad.kind !== 'trampoline') throw new Error('trampoline')
+        world.shoot(shot.direction, shot.power)
+        const land = roll(world).find(event => event.kind === 'land')
+        expect(land, id).toBeDefined()
+        expect(Math.hypot(land!.position.x - pad.to.x, land!.position.z - pad.to.z), id).toBeLessThan(0.5)
       })
     }
   })
@@ -521,24 +557,42 @@ describe('パターゴルフの物理', () => {
     const pad = hole.gadgets!.find(gadget => gadget.kind === 'trampoline')!
     if (pad.kind !== 'trampoline') throw new Error('trampoline')
     withWorld(open(SKY, hole), world => {
-      world.placeBall({ x: pad.x, z: pad.z + 1.2 })
-      world.shoot({ x: 0, z: -1 }, 0.3)
+      world.placeBall(hole.tee)
+      const shot = world.suggestShot()
+      world.shoot(shot.direction, shot.power)
       roll(world)
       const ball = world.ball().position
       expect(world.phase).toBe('ready')
       expect(ball.y).toBeGreaterThan(0.9)
-      expect(Math.hypot(ball.x - pad.to.x, ball.z - pad.to.z)).toBeLessThan(1.6)
+      expect(Math.hypot(ball.x - pad.to.x, ball.z - pad.to.z)).toBeLessThan(1.8)
     })
   })
 
-  it('トランポリンの とぶ はやさは、重力だけで ちゃくちてんに とどく', () => {
-    const from = { x: 0, y: 0.15, z: 4 }
-    const to = { x: 1.5, y: 1.05, z: -2 }
-    const v = trampolineLaunch(from, to, 9.81)
-    const time = Math.hypot(to.x - from.x, to.z - from.z) / Math.hypot(v.x, v.z)
-    expect(from.x + v.x * time).toBeCloseTo(to.x, 6)
-    expect(from.z + v.z * time).toBeCloseTo(to.z, 6)
-    expect(from.y + v.y * time - (9.81 * time * time) / 2).toBeCloseTo(to.y, 6)
+  it('トランポリンから トランポリンへ おりると、いきおいを おとさずに また とぶ', () => {
+    const hole = holeById('sky-4')
+    withWorld(open(SKY, hole), world => {
+      const shot = world.suggestShot()
+      world.shoot(shot.direction, shot.power)
+      const events = roll(world)
+      expect(events.filter(event => event.kind === 'trampoline').map(event => event.kind === 'trampoline' && event.id)).toEqual(['hop-1', 'hop-2'])
+      expect(events.some(event => event.kind === 'splash')).toBe(false)
+    })
+  })
+
+  it('トランポリンの とぶ はやさは、のる はやさの carry ばいで、ちゃくちてんの ほうへ すこしだけ まがる', () => {
+    const straight = trampolineVelocity({ x: 0, z: -2 }, { x: 0, z: -1 })
+    expect(straight.x).toBeCloseTo(0, 6)
+    expect(straight.z).toBeCloseTo(-2 * TRAMPOLINE.carry, 6)
+    // 40ど ずれて のると、まがるのは maxSteer まで。
+    const slant = trampolineVelocity({ x: Math.sin((40 * Math.PI) / 180), z: -Math.cos((40 * Math.PI) / 180) }, { x: 0, z: -1 })
+    expect(Math.atan2(slant.x, -slant.z)).toBeCloseTo((40 * Math.PI) / 180 - TRAMPOLINE.maxSteer, 6)
+    // つづけて とぶときは はやさを ふやさない。
+    expect(Math.hypot(trampolineVelocity({ x: 0, z: -3 }, { x: 0, z: -1 }, true).z)).toBeCloseTo(3, 6)
+    // lift だけ あがって、toY に おりる。
+    const flight = trampolineFlight(0.15, 1.05, 9.81)
+    const apex = 0.15 + (flight.up * flight.up) / (2 * 9.81)
+    expect(apex).toBeCloseTo(1.05 + TRAMPOLINE.lift, 6)
+    expect(0.15 + flight.up * flight.time - (9.81 * flight.time * flight.time) / 2).toBeCloseTo(1.05, 6)
   })
 
   it('おいかぜは とおくまで、むかいかぜは ちかくまでしか ころがさない', () => {
@@ -567,6 +621,34 @@ describe('パターゴルフの物理', () => {
     const still = power()
     expect(power([{ kind: 'fan', id: 'head', x: 0, z: -7, dir: { x: 0, z: 1 }, halfLength: 7, halfWidth: 1.5, strength: 0.4 }])).toBeGreaterThan(still + 0.05)
     expect(power([{ kind: 'fan', id: 'tail', x: 0, z: -7, dir: { x: 0, z: -1 }, halfLength: 7, halfWidth: 1.5, strength: 0.4 }])).toBeLessThan(still - 0.05)
+  })
+
+  it('かぜの 中でも、止まりかけた ボールは すぐ止まり、かぜに おしもどされない', () => {
+    const lane: HoleDefinition = {
+      id: 'lane', name: 'lane', par: 1, tee: { x: 0, z: 14 }, cup: { x: 0, z: -14 },
+      floors: [{ corners: [{ x: -1.5, z: 15 }, { x: -1.5, z: -15 }, { x: 1.5, z: -15 }, { x: 1.5, z: 15 }] }],
+      // おいかぜも むかいかぜも、ころがり抵抗より つよい。
+      gadgets: [{ kind: 'fan', id: 'strong', x: 0, z: 0, dir: { x: 0, z: 1 }, halfLength: 15, halfWidth: 1.5, strength: 1.4 }],
+      route: [{ x: 0, z: 14 }, { x: 0, z: -14 }], tip: '',
+    }
+    withWorld(open(MEADOW, lane), world => {
+      world.placeBall({ x: 0, z: 0 })
+      // むかいかぜに さからって よわく うつ。
+      world.shoot({ x: 0, z: -1 }, 0.2)
+      let time = 0
+      let farthest = 0
+      roll(world, () => { time++; farthest = Math.min(farthest, world.ball().position.z) })
+      expect(world.phase).toBe('ready')
+      expect(time / 120).toBeLessThan(2.5)
+      // かぜに おされて うしろへ もどりつづけない。
+      expect(world.ball().position.z - farthest).toBeLessThan(0.3)
+      // おいかぜの むきへ よわく うっても、止まりかけたら すぐ止まる。
+      world.shoot({ x: 0, z: 1 }, 0.1)
+      time = 0
+      roll(world, () => { time++ })
+      expect(world.phase).toBe('ready')
+      expect(time / 120).toBeLessThan(3)
+    })
   })
 
   it('ねらいの道すじは、壁で1回はね返る', () => {

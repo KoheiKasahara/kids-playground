@@ -62,27 +62,56 @@ export const BRIDGE = { railHalf: 0.05, railHeight: 0.28 } as const
 export const REFLECTOR = { halfDepth: 0.07, height: 0.4, keep: 0.88 } as const
 /** ワープの どかん。入口の高さと、出てくるときに残る速さの割合。 */
 export const WARP = { height: 0.42, keepSpeed: 0.9, minSpeed: 0.3 } as const
-/** ベルトコンベア。grip は ベルトと ちがう速さの ぶんが 1秒で へる はやさ（大きいほど すぐ ベルトの速さに なる）。 */
-export const CONVEYOR = { grip: 5 } as const
+/**
+ * ベルトコンベア。ボールは ベルトに たいして ころがる。ベルトより はやい ぶんは slip 倍の ころがり抵抗で
+ * ゆっくり へる（ベルトは つるつる）ので、つよく うつほど はやく すすむ。ベルトより おそい ぶんと よこの ずれは、
+ * grip の はやさで すぐ そろう（よわく うっても すぐ はこばれる）。
+ */
+export const CONVEYOR = { slip: 0.6, grip: 5 } as const
 /** スイッチの ボタンの 半径と、ひらく とびらの 半分の厚み・高さ・しずむ 時間。 */
 export const SWITCH = { radius: 0.36, doorHalfDepth: 0.1, doorHeight: 0.42, openSeconds: 0.6 } as const
 /**
  * トランポリン。lift は とぶ 高さ（ふみきりと ちゃくちの 高いほうから）。
+ * carry は のったときの よこの速さを 何倍に して とばすか。つよく のるほど とおくへ とぶ。
+ * steer は のった むきを ちゃくちてんの ほうへ まげる わりあいで、maxSteer まで（すこしの ずれだけ たすける）。
  * landKeep は ちゃくちで のこる よこの速さの わりあい（ぽすっと おりて、ころがりすぎない）。
  */
-export const TRAMPOLINE = { lift: 1.1, landKeep: 0.3, minSpeed: 0.1 } as const
+export const TRAMPOLINE = { lift: 1.1, carry: 2, steer: 0.5, maxSteer: (15 * Math.PI) / 180, landKeep: 0.3, minSpeed: 0.1 } as const
+/**
+ * せんぷうきの かぜ。かぜは いきおいよく ころがる ボールを おし、ゆっくりの ボールは しばに すわって おされない
+ * （calm より おそいと おさず、full の はやさで めいっぱい）。止まりかけた ボールが かぜで いつまでも じわじわ うごかない。
+ */
+export const WIND = { calm: 0.6, full: 1.8 } as const
+
+/** その速さの ボールを かぜが おす わりあい（0〜1）。とんでいる ボールは いつも めいっぱい。 */
+export function windGrip(speed: number, grounded: boolean): number {
+  if (!grounded) return 1
+  return clamp((speed - WIND.calm) / (WIND.full - WIND.calm), 0, 1)
+}
+
+/** トランポリンで fromY から とびあがり、lift だけ あがって toY に おりるまでの 時間と、上むきの 速さ。 */
+export function trampolineFlight(fromY: number, toY: number, gravity: number, lift: number = TRAMPOLINE.lift): { time: number; up: number } {
+  const apex = Math.max(fromY, toY) + lift
+  const up = Math.sqrt(2 * gravity * (apex - fromY))
+  return { time: up / gravity + Math.sqrt((2 * (apex - toY)) / gravity), up }
+}
 
 /**
- * トランポリンで from から to へ とぶ 速さ。上へ lift だけ あがって、to の 高さに ちゃくちする。
- * 空気の ていこうは ないので、とぶ道は この速さと 重力だけで きまる。
+ * トランポリンで とぶ よこの速さ。のった むきを ちゃくちてん（toward）の ほうへ すこし まげ、carry 倍に する。
+ * chained は トランポリンから とんで きて そのまま つぎの トランポリンに のったとき。とんできた 速さの まま とぶ。
  */
-export function trampolineLaunch(from: Vec3, to: Vec3, gravity: number, lift: number = TRAMPOLINE.lift): Vec3 {
-  const apex = Math.max(from.y, to.y) + lift
-  const up = Math.sqrt(2 * gravity * (apex - from.y))
-  const time = up / gravity + Math.sqrt((2 * (apex - to.y)) / gravity)
-  const dx = to.x - from.x
-  const dz = to.z - from.z
-  return { x: dx / time, y: up, z: dz / time }
+export function trampolineVelocity(incoming: { x: number; z: number }, toward: { x: number; z: number }, chained = false): { x: number; z: number } {
+  const speed = Math.hypot(incoming.x, incoming.z) * (chained ? 1 : TRAMPOLINE.carry)
+  const from = Math.atan2(incoming.z, incoming.x)
+  let gap = Math.atan2(toward.z, toward.x) - from
+  gap = Math.atan2(Math.sin(gap), Math.cos(gap))
+  const angle = from + Math.sign(gap) * Math.min(Math.abs(gap) * TRAMPOLINE.steer, TRAMPOLINE.maxSteer)
+  return { x: Math.cos(angle) * speed, z: Math.sin(angle) * speed }
+}
+
+/** トランポリンで distance だけ とぶのに いる、のる ときの よこの速さ。 */
+export function trampolineSpeedFor(distance: number, fromY: number, toY: number, gravity: number): number {
+  return distance / (trampolineFlight(fromY, toY, gravity).time * TRAMPOLINE.carry)
 }
 
 /** ふうしゃの はねの角度。物理と見た目で同じ時刻から求める。 */
@@ -117,6 +146,11 @@ export function shotSpeed(power: number): number {
 export function rollDistance(speed: number, decel: number): number {
   if (decel <= 0) return Infinity
   return (speed * speed) / (2 * decel)
+}
+
+/** その初速で うつ 強さ（0〜1）。shotSpeed の ぎゃく。 */
+export function powerForSpeed(speed: number): number {
+  return clamp((speed - SHOT_SPEED_MIN) / (SHOT_SPEED_MAX - SHOT_SPEED_MIN), 0, 1) ** (1 / SHOT_CURVE)
 }
 
 /** 平らな面で distance だけ転がす強さ（0〜1）。最初のねらいの強さに使う。 */

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { aimPose, canSee, followPose, lerpPose, lookTarget, MAX_VIEW_OFFSET, overviewPose, projectPoint, viewHeading } from './golfCamera'
+import { aimPose, canSee, followPose, lerpPose, lookHeading, lookTarget, MAX_LOOK_GAP, MAX_VIEW_OFFSET, overviewPose, projectPoint, viewHeading } from './golfCamera'
 import { GOLF_COURSES } from './golfCourses'
 import { buildHoleGeometry } from './golfGeometry'
 
@@ -109,5 +109,23 @@ describe('パターゴルフのカメラ', () => {
     const geometry = buildHoleGeometry(hole)
     const ball = onFloor(geometry, { x: 2.55, z: -2.0 })
     expect(lookTarget(ball, hole.cup, hole.route, geometry)).toEqual(hole.cup)
+  })
+
+  test('おすすめの うつ むきが カップの ほうから 大きく ずれるときは、おすすめの むきを 見る', () => {
+    const ball = { x: 0, z: 0 }
+    const cup = { x: 0, z: -6 }
+    // すこしの ずれなら カップの ほう。
+    const near = lookHeading(ball, cup, { x: Math.sin(MAX_LOOK_GAP * 0.8), z: -Math.cos(MAX_LOOK_GAP * 0.8) })
+    expect(near.x).toBeCloseTo(0, 6)
+    expect(near.z).toBeCloseTo(-1, 6)
+    // バンパーを よけて よこへ うつときは、よこを 見る（カップと うつ むきの あいだの なにもない ほうを 見ない）。
+    const side = lookHeading(ball, cup, { x: 1, z: 0.2 })
+    expect(side.x).toBeCloseTo(1 / Math.hypot(1, 0.2), 6)
+    // おすすめが まだ ないときは カップの ほう。
+    expect(lookHeading(ball, cup, null)).toEqual({ x: 0, z: -1 })
+    // そのまま おすすめの むきへ ねらえば、カメラは ねらいの まっすぐ うしろ。
+    const view = viewHeading(ball, { x: ball.x + side.x, z: ball.z + side.z }, { x: 1, z: 0.2 })
+    expect(view.x).toBeCloseTo(side.x, 6)
+    expect(view.z).toBeCloseTo(side.z, 6)
   })
 })
