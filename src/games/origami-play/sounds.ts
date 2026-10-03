@@ -16,3 +16,12 @@ export function playFinishSound() {
     playTone(context, frequency, context.currentTime + index * 0.14, 0.3, 0.035, 'sine')
   }
 }
+
+/** いろや おりがみを えらんだときの、かみを めくるような かるい「ぱさっ」。 */
+export function playSelectSound() {
+  if (!isSoundEnabled()) return
+  const context = getSharedAudioContext()
+  if (!context) return
+  playNoiseBurst(context, context.currentTime, 0.08, 0.05, 'bandpass', 2600)
+  playTone(context, 784, context.currentTime + 0.03, 0.1, 0.03, 'sine')
+}

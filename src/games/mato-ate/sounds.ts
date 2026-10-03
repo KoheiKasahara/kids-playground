@@ -1,4 +1,4 @@
-import { getSharedAudioContext, isSoundEnabled, playTone } from '../../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled, playTone } from '../../audio/sound'
 import type { TargetKind } from './levels'
 
 // 音声ファイルを ふやさず、Web Audio で その場で つくる みじかい こうかおん。
@@ -23,7 +23,7 @@ function noise(ctx: AudioContext, start: number, duration: number, volume: numbe
   const gain = ctx.createGain()
   gain.gain.setValueAtTime(volume, start)
   gain.gain.exponentialRampToValueAtTime(.001, start + duration)
-  source.connect(biquad).connect(gain).connect(ctx.destination)
+  source.connect(biquad).connect(gain).connect(getSoundOutput(ctx))
   source.start(start, Math.random() * (1 - duration))
   source.stop(start + duration)
 }
@@ -37,7 +37,7 @@ function slide(ctx: AudioContext, from: number, to: number, start: number, durat
   gain.gain.setValueAtTime(0, start)
   gain.gain.linearRampToValueAtTime(volume, start + .012)
   gain.gain.exponentialRampToValueAtTime(.001, start + duration)
-  osc.connect(gain).connect(ctx.destination)
+  osc.connect(gain).connect(getSoundOutput(ctx))
   osc.start(start)
   osc.stop(start + duration)
 }

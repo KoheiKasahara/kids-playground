@@ -1,4 +1,4 @@
-import { getSharedAudioContext, isSoundEnabled, playTone } from '../../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled, playTone } from '../../audio/sound'
 
 /**
  * サーキットレースの効果音（Issue #784 A8）。音声ファイルを使わず Web Audio で合成する。
@@ -31,7 +31,7 @@ export function playBoostSound(): void {
   gain.gain.linearRampToValueAtTime(0.07, now + 0.03)
   gain.gain.linearRampToValueAtTime(0, now + 0.4)
   oscillator.connect(gain)
-  gain.connect(ctx.destination)
+  gain.connect(getSoundOutput(ctx))
   oscillator.start(now)
   oscillator.stop(now + 0.42)
 }
@@ -76,7 +76,7 @@ export function createEngineHum(): EngineHum {
     filter.type = 'lowpass'
     filter.frequency.value = 420
     filter.connect(gain)
-    gain.connect(ctx.destination)
+    gain.connect(getSoundOutput(ctx))
 
     const oscillators = [72, 108].map((frequency) => {
       const oscillator = ctx.createOscillator()

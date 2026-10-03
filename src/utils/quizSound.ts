@@ -1,5 +1,5 @@
-import { getSharedAudioContext, isSoundEnabled, playTone, createToneNodes } from '../audio/sound'
-export { getSharedAudioContext, isSoundEnabled, primeAudio, setSoundEnabled } from '../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled, playTone, createToneNodes } from '../audio/sound'
+export { getSharedAudioContext, getSoundOutput, isSoundEnabled, primeAudio, setSoundEnabled } from '../audio/sound'
 
 export type KomaBattleImpactSoundKind = 'koma' | 'bumper' | 'wall'
 type KomaBattleDefeatReason = 'toppled' | 'stopped' | 'outOfArena'
@@ -70,7 +70,7 @@ function playKomaBattleImpactSound(
       : 0
     const baseFrequency = kind === 'bumper' ? 360 : kind === 'wall' ? 230 : 155
     const frequency = baseFrequency + safeIntensity * (kind === 'koma' ? 45 : 85)
-    const volume = Math.min(0.085, 0.024 + safeIntensity * 0.061)
+    const volume = Math.min(0.11, 0.03 + safeIntensity * 0.08)
     const duration = kind === 'koma' ? 0.11 : 0.08
     playTrackedKomaTone(
       ctx,
@@ -185,7 +185,10 @@ export function createKomaBattleSoundController(): KomaBattleSoundController {
       spinContext = ctx
       oscillator.type = 'triangle'
       oscillator.connect(gain)
-      gain.connect(ctx.destination)
+      gain.connect(getSoundOutput(ctx))
+      // value も 0 にしておく。直後の cancelScheduledValues で下の予約が消えると、
+      // 既定値 1 から音量が下がり始めて出だしに大きな「ボッ」が鳴ってしまうため。
+      gain.gain.value = 0
       gain.gain.setValueAtTime(0, ctx.currentTime)
       oscillator.start(ctx.currentTime)
     }
@@ -650,7 +653,7 @@ function playDominoClick(
   gain.gain.exponentialRampToValueAtTime(DOMINO_CLICK_MIN_GAIN, stopTime)
   gain.gain.setValueAtTime(0, stopTime)
   oscillator.connect(gain)
-  gain.connect(ctx.destination)
+  gain.connect(getSoundOutput(ctx))
   oscillator.start(startTime)
   oscillator.stop(stopTime)
 }
@@ -980,7 +983,9 @@ export function createRailTrainSoundController(initialEnabled = true): RailTrain
       gain = ctx.createGain()
       oscillator.type = profile.oscillatorType
       oscillator.connect(gain)
-      gain.connect(ctx.destination)
+      gain.connect(getSoundOutput(ctx))
+      // value も 0 にしておく（コマバトルの回転音と同じく、出だしの大きな「ボッ」を防ぐ）。
+      gain.gain.value = 0
       gain.gain.setValueAtTime(0, ctx.currentTime)
       oscillator.start(ctx.currentTime)
     }

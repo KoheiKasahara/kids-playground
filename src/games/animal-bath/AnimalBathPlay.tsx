@@ -2,15 +2,16 @@ import { useEffect, useReducer, useRef, useState, type PointerEvent } from 'reac
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
-import { getSharedAudioContext, isSoundEnabled, playTone, primeAudio } from '../../audio/sound'
+import { primeAudio } from '../../audio/sound'
 import { ANIMALS, PATCHES, STEPS, bathReducer, initialBath, type Animal, type Point } from './bath'
 import AnimalPicture, { Mud } from './AnimalPicture'
 import { Backdrop, BathDefs, Foam, Sparkle, ToolArt, ToolCursor, TubBack, TubFront, Wet } from './BathArt'
+import { playBathCleanSound, playBathFinishSound, playBathRubSound, playBathSelectSound, playBathStepDoneSound } from './sounds'
 import styles from './AnimalBathPlay.module.css'
 
 function Bath({ animal, onBack }: { animal: Animal; onBack: () => void }) {
   const [state, dispatch] = useReducer(bathReducer, initialBath)
-  const [sound, setSound] = useState(false)
+  const [sound, setSound] = useState(true)
   const [tool, setTool] = useState<Point | null>(null)
   const pointer = useRef<{ id: number; last: Point } | null>(null)
   const scene = useRef<SVGSVGElement>(null)
@@ -22,15 +23,13 @@ function Bath({ animal, onBack }: { animal: Animal; onBack: () => void }) {
   const finished = ready && state.step === STEPS.length - 1
 
   useEffect(() => {
-    if (state.cleaned.length > previousCount.current && sound && isSoundEnabled()) {
-      const context = getSharedAudioContext()
-      if (context) {
-        playTone(context, finished ? 784 : 440 + state.cleaned.length * 35, context.currentTime, 0.12, 0.045, 'sine')
-        if (finished) playTone(context, 1047, context.currentTime + 0.15, 0.25, 0.045, 'sine')
-      }
+    if (state.cleaned.length > previousCount.current && sound) {
+      if (finished) playBathFinishSound()
+      else if (ready) playBathStepDoneSound()
+      else playBathCleanSound(state.step, state.cleaned.length)
     }
     previousCount.current = state.cleaned.length
-  }, [state.cleaned.length, finished, sound])
+  }, [state.cleaned.length, state.step, ready, finished, sound])
 
   // Keyboard users land on the next action when their last dab finishes a step.
   useEffect(() => {
@@ -69,6 +68,8 @@ function Bath({ animal, onBack }: { animal: Animal; onBack: () => void }) {
           if (ready || pointer.current || event.button !== 0) return
           const to = point(event)
           if (!to) return
+          // 最初のタッチで iOS でも音が出せるようにしておく。
+          if (sound) primeAudio()
           event.currentTarget.setPointerCapture?.(event.pointerId)
           pointer.current = { id: event.pointerId, last: to }
           setTool(to)
@@ -80,6 +81,7 @@ function Bath({ animal, onBack }: { animal: Animal; onBack: () => void }) {
           const to = point(event)
           if (!to) return
           dispatch({ type: 'stroke', from: active.last, to })
+          if (sound) playBathRubSound(state.step)
           pointer.current = { ...active, last: to }
           setTool(to)
         }}
@@ -117,6 +119,7 @@ function Bath({ animal, onBack }: { animal: Animal; onBack: () => void }) {
         {ready ? <button ref={nextButton} className={styles.primary} type="button" onClick={() => {
           pointer.current = null
           setTool(null)
+          if (sound) playBathSelectSound()
           if (finished) onBack()
           else {
             dispatch({ type: 'next' })
@@ -138,6 +141,8 @@ export default function AnimalBathPlay() {
     <div className={styles.welcome}><span aria-hidden="true">🧼 🫧 🚿</span><h2>だれを あらう？</h2><p>ごしごし、じゃぶじゃぶ、ぴかぴか！</p></div>
     <div className={styles.animals}>{ANIMALS.map((item) => <button key={item.id} className={styles.animal} type="button" onClick={() => {
       window.scrollTo(0, 0)
+      primeAudio()
+      playBathSelectSound()
       setAnimal(item)
     }} aria-label={`${item.name}を あらう`}>
       <svg viewBox="0 0 400 370" aria-hidden="true"><AnimalPicture animal={item} /><g transform="translate(132 150) scale(.85)"><Mud seed={1} /></g><g transform="translate(236 280) scale(.9)"><Mud seed={4} /></g></svg>

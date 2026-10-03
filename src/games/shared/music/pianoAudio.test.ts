@@ -137,7 +137,8 @@ describe('PianoAudioEngine', () => {
     await engine.prepare()
     const handle = engine.startNote(PIANO_NOTES[0])
     const source = contexts[0].createBufferSource.mock.results[0].value
-    const gain = contexts[0].createGain.mock.results[1].value as MockGain
+    // [0] はピアノ全体の音量、[1] は共通の出口（音量補正）、[2] がこの鍵盤の音。
+    const gain = contexts[0].createGain.mock.results[2].value as MockGain
 
     contexts[0].currentTime = 1.003 // 6msのattack途中
     engine.stopNote(handle!)

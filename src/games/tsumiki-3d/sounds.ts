@@ -1,4 +1,4 @@
-import { getSharedAudioContext, isSoundEnabled, playTone } from '../../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled, playTone } from '../../audio/sound'
 
 /**
  * 3Dつみきの こうかおん。木と 木が ぶつかる「コトッ」を、みじかい サインはと
@@ -31,7 +31,7 @@ function ping(ctx: AudioContext, frequency: number, start: number, decay: number
   gain.gain.setValueAtTime(0.0001, start)
   gain.gain.exponentialRampToValueAtTime(volume, start + 0.004)
   gain.gain.exponentialRampToValueAtTime(0.0001, start + decay)
-  oscillator.connect(gain).connect(ctx.destination)
+  oscillator.connect(gain).connect(getSoundOutput(ctx))
   oscillator.start(start)
   oscillator.stop(start + decay + 0.02)
 }
@@ -46,7 +46,7 @@ function click(ctx: AudioContext, start: number, frequency: number, duration: nu
   const gain = ctx.createGain()
   gain.gain.setValueAtTime(volume, start)
   gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
-  source.connect(filter).connect(gain).connect(ctx.destination)
+  source.connect(filter).connect(gain).connect(getSoundOutput(ctx))
   source.start(start, Math.random() * 0.2)
   source.stop(start + duration + 0.02)
 }
@@ -76,7 +76,7 @@ export function playPlaceSound(pitch: number) {
   gain.gain.setValueAtTime(0.0001, now)
   gain.gain.exponentialRampToValueAtTime(0.09, now + 0.01)
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14)
-  oscillator.connect(gain).connect(ctx.destination)
+  oscillator.connect(gain).connect(getSoundOutput(ctx))
   oscillator.start(now)
   oscillator.stop(now + 0.16)
 }
@@ -129,7 +129,7 @@ export function playShakeSound() {
   gain.gain.setValueAtTime(0.0001, now)
   gain.gain.exponentialRampToValueAtTime(0.35, now + 0.08)
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9)
-  source.connect(filter).connect(gain).connect(ctx.destination)
+  source.connect(filter).connect(gain).connect(getSoundOutput(ctx))
   source.start(now)
   source.stop(now + 0.95)
 }

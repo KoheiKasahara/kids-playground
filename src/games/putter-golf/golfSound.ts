@@ -1,4 +1,4 @@
-import { createToneNodes, getSharedAudioContext, isSoundEnabled } from '../../audio/sound'
+import { createToneNodes, getSharedAudioContext, getSoundOutput, isSoundEnabled } from '../../audio/sound'
 
 export type GolfSoundKind = 'putt' | 'wall' | 'bumper' | 'reflector' | 'rock' | 'tree' | 'windmill' | 'gate' | 'critter' | 'warp' | 'boost' | 'jump' | 'land' | 'sand' | 'ice' | 'splash' | 'switch' | 'conveyor' | 'trampoline' | 'wind' | 'cup' | 'cheer' | 'hole-in-one' | 'click'
 
@@ -51,7 +51,7 @@ function noise(ctx: AudioContext, voice: NonNullable<Voice['noise']>, start: num
   gain.gain.exponentialRampToValueAtTime(0.0001, start + voice.duration)
   source.connect(filter)
   filter.connect(gain)
-  gain.connect(ctx.destination)
+  gain.connect(getSoundOutput(ctx))
   source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect() }
   source.start(start)
   source.stop(start + voice.duration)

@@ -16,8 +16,8 @@ export function playDigSound(): void {
     const ctx = getSharedAudioContext()
     if (!ctx) return
     const now = ctx.currentTime
-    playTone(ctx, 150, now, 0.06, 0.05, 'triangle')
-    playTone(ctx, 98, now + 0.03, 0.07, 0.04, 'sine')
+    playTone(ctx, 150, now, 0.06, 0.065, 'triangle')
+    playTone(ctx, 98, now + 0.03, 0.07, 0.05, 'sine')
   } catch { /* 音が出せなくても ほれる。 */ }
 }
 

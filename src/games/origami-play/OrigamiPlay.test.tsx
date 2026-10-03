@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import App from '../../app/App'
 import OrigamiPlay from './OrigamiPlay'
 import { ORIGAMI_TEMPLATES, PAPER_COLORS } from './origamiTemplates'
-import { playFinishSound, playFoldSound } from './sounds'
+import { playFinishSound, playFoldSound, playSelectSound } from './sounds'
 
-vi.mock('./sounds', () => ({ playFinishSound: vi.fn(), playFoldSound: vi.fn() }))
+vi.mock('./sounds', () => ({ playFinishSound: vi.fn(), playFoldSound: vi.fn(), playSelectSound: vi.fn() }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -150,19 +150,22 @@ describe('ぱたぱた おりがみのあそび', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'もういちど おる' })).toHaveFocus())
   })
 
-  test('音のオンとオフを切り替えられる', () => {
+  test('音は最初から鳴り、オンとオフを切り替えられる', () => {
     renderGame()
     const sound = screen.getByRole('button', { name: 'おと' })
+    expect(sound).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: PAPER_COLORS[1]!.name }))
+    expect(playSelectSound).toHaveBeenCalledOnce()
+    fireEvent.click(sound)
     expect(sound).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('button', { name: PAPER_COLORS[0]!.name }))
+    expect(playSelectSound).toHaveBeenCalledOnce()
     fireEvent.click(sound)
     expect(sound).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(sound)
-    expect(sound).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('完成の音は最後の折りが終わってから一度だけ鳴る', () => {
     renderGame()
-    fireEvent.click(screen.getByRole('button', { name: 'おと' }))
     const template = ORIGAMI_TEMPLATES[0]!
     fireEvent.click(screen.getByRole('button', { name: `${template.name}を おる` }))
     for (let step = 0; step < template.steps.length; step += 1) {

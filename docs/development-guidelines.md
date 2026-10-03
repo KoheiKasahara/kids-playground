@@ -37,6 +37,17 @@
 - 音が出ない・無効化されている環境でもゲームが成立することを確認する。
 - 音量設定など、ユーザーが制御できる手段を用意する。
 
+## 効果音と音量のそろえ方
+
+- 音のないゲームは作らない。主な操作（タップ・おく・せいかい・クリアなど）には効果音をつけ、音は最初から ON にする。
+- 効果音は `audio/sound` の共有 AudioContext で鳴らし、`ctx.destination` ではなく `getSoundOutput(ctx)` へつなぐ。共通の出口で、ゲームごとの音量補正と音割れ防止のリミッターがかかる（直接 `destination` へつなぐとテストで失敗する）。
+- ゲーム内の「おと」ボタンで全体の ON/OFF を切り替えるときは `useSoundToggle` を使い、画面を離れたら ON に戻す。ほかのゲームまで無音にしない。
+- ゲームを追加したら、よく鳴る代表音を `src/test/audio/gameSoundSamples.ts` に登録する。`src/audio/gameSoundLevels.test.ts` が実際に描き起こして騒音計と同じ方法で大きさを測り、次を確かめる。
+  - そのゲームでいちばん大きい代表音が、ほかのゲームと同じくらいの大きさであること（ずれていたら、失敗メッセージに出る補正値を `src/audio/gameSoundLevels.ts` に書く）。
+  - 代表音が小さすぎて聞こえないものがないこと（そのときは効果音の音量を上げる）。
+  - BGM・走行音などの鳴り続ける音が、効果音より小さいこと。
+- 目標の大きさ・許容幅などの数値はここに書かず、`gameSoundLevels.ts` とテストを正とする。
+
 ## 2D / 3D物理を使うゲームでの共通注意
 
 - 物理エンジンの内部状態を画面コンポーネントへ直接持ち込まず、フックなどの層を挟んで結果だけを受け取る構造にする。
@@ -83,7 +94,7 @@ docsには次のような、変更頻度が高く陳腐化しやすい情報を�
 - 戻る導線は `GameBackButton` に `to` または `onBack` で一階層上を明示する。safe-area付きの既存ヘッダーの左端へ配置する（ボタン側ではsafe-areaを重ねない）。先行導入はレスキューとボウリング。他ゲームは #558 で段階移行する。
 - `useGameIntroPlaying` は単一路線の選択→プレイ切替に利用できる。ボウリングではプレイ中のみ共通説明を隠し、「もどる」で選択画面と説明を復元する。初期表示と静的HTMLの本文は維持する。
 - Rapierはlazy側から `physics/rapierLoader` で初期化。初期化失敗は呼出元に伝え、次の呼出しで再試行する。world・step・free、RAF、イベント、GPU資源はゲームが所有し、effect cleanupで対応する資源を解放する。非同期完了は退出済みなら新しいworldを開始しない。
-- 新しいSEはゲーム内へ。`audio/sound` の共有Context・mute・primeAudio・短音を利用し、ゲーム退出時に共有Contextをcloseしない。既存 `quizSound` の未移行SEは次に触るときに移す。
+- 新しいSEはゲーム内へ。`audio/sound` の共有Context・mute・primeAudio・短音・共通の出口（`getSoundOutput`）を利用し、ゲーム退出時に共有Contextをcloseしない。既存 `quizSound` の未移行SEは次に触るときに移す。音量のそろえ方は「効果音と音量のそろえ方」を参照する。
 - Quickには純粋ロジックの境界と代表DOM遷移（開始・操作・リセット・退出）、資源を持つゲームにはcleanup/再入場の回帰検査。広いseed・完走・分布はFull。ピンボールでは既存網羅試行を `pinballSimulation.full.test.ts` に残す。
 - E2Eはカタログ由来の全入口smokeと、Nightlyの代表3D・横向き実操作。ゲーム追加ごとに全操作E2Eを複製しない。Nightly spec変更PRでは代表2本を先行実行する。
 - CI Summaryの遅いファイル上位は既存Vitest JSONの開始・終了時刻を使う。並列実行のファイル時間を足してCI時間と扱わない。

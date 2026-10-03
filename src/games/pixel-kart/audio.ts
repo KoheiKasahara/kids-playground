@@ -1,4 +1,4 @@
-import { getSharedAudioContext, isSoundEnabled } from '../../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled } from '../../audio/sound'
 import type { CourseId, RaceEvent } from './types'
 
 const MELODIES: Record<CourseId, number[]> = {
@@ -22,7 +22,7 @@ export class KartAudio {
     if (!this.bus) {
       this.bus = this.context.createGain()
       this.bus.gain.value = .65
-      this.bus.connect(this.context.destination)
+      this.bus.connect(getSoundOutput(this.context))
     }
     return true
   }

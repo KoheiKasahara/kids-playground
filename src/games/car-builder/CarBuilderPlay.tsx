@@ -16,6 +16,7 @@ import {
   type WheelType,
 } from './carConfig'
 import CarDrivePlay from './CarDrivePlay'
+import { playCarDriveStartSound, playCarMenuSound, playCarPartSelectSound } from './sounds'
 import { useCarBuilderScene } from './useCarBuilderScene'
 import styles from './CarBuilderPlay.module.css'
 
@@ -203,9 +204,13 @@ export default function CarBuilderPlay() {
   const handleSelectOption = useCallback((categoryId: CarCategoryId, optionId: string) => {
     // 決定ボタンは置かない。選んだ瞬間にCarConfigが変わり、3D側がそれを受け取る。
     setConfig((current) => selectCarOption(current, categoryId, optionId))
+    playCarPartSelectSound()
   }, [])
 
-  const closeCategory = useCallback(() => setOpenCategoryId(null), [])
+  const closeCategory = useCallback(() => {
+    playCarMenuSound()
+    setOpenCategoryId(null)
+  }, [])
 
   const openCategory =
     openCategoryId === null
@@ -240,7 +245,10 @@ export default function CarBuilderPlay() {
                   key={category.id}
                   type="button"
                   className={styles.categoryButton}
-                  onClick={() => setOpenCategoryId(category.id)}
+                  onClick={() => {
+                    playCarMenuSound()
+                    setOpenCategoryId(category.id)
+                  }}
                   aria-label={category.ariaLabel}
                 >
                   <span className={styles.categoryEmoji} aria-hidden="true">
@@ -262,7 +270,10 @@ export default function CarBuilderPlay() {
             <button
               type="button"
               className={styles.driveButton}
-              onClick={() => setDriving(true)}
+              onClick={() => {
+                playCarDriveStartSound()
+                setDriving(true)
+              }}
               aria-label="つくった くるまを はしらせる"
             >
               <span aria-hidden="true">🏁</span> はしる！

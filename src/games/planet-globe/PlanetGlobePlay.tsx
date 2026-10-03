@@ -11,6 +11,7 @@ import BodySelector from './ui/BodySelector'
 import ModeToggle from './ui/ModeToggle'
 import { SpeechToggle } from '../../speech'
 import { playPlanetSpotSelectSound } from '../../utils/quizSound'
+import { playPlanetUiSound } from './sounds'
 import SatelliteToggle from './ui/SatelliteToggle'
 
 const SINGLE_MODE_INSTRUCTION = 'ひかる ところを さわってみよう'
@@ -48,6 +49,7 @@ export default function PlanetGlobePlay() {
   }, [])
 
   const handleSelectBody = useCallback((id: CelestialBodyId) => {
+    playPlanetUiSound('body')
     setBodyId(id)
     // 切り替え直後は必ず天体全体が見える状態に戻す。別天体の説明カードも残さない。
     setZoomLevel(DEFAULT_ZOOM_LEVEL)
@@ -81,12 +83,18 @@ export default function PlanetGlobePlay() {
             onSatelliteSelect={handleSatelliteSelect}
             satellites={satellites}
             showSatellites={showSatellites}
-            onZoomChange={setZoomLevel}
+            onZoomChange={(level) => {
+              playPlanetUiSound(level > zoomLevel ? 'zoom-in' : 'zoom-out')
+              setZoomLevel(level)
+            }}
           />
         ) : (
           <SolarSystemOverviewStage
             playing={overviewPlaying}
-            onTogglePlaying={() => setOverviewPlaying((playing) => !playing)}
+            onTogglePlaying={() => {
+              playPlanetUiSound('toggle')
+              setOverviewPlaying((playing) => !playing)
+            }}
             onSelectBody={handleSelectFromOverview}
           />
         )}
@@ -106,6 +114,7 @@ export default function PlanetGlobePlay() {
             <SatelliteToggle
               pressed={showSatellites}
               onToggle={() => {
+                playPlanetUiSound('toggle')
                 setShowSatellites((visible) => {
                   const nextVisible = !visible
                   if (!nextVisible) {
@@ -126,7 +135,13 @@ export default function PlanetGlobePlay() {
          */}
         <div className={styles.topRightSlot}>
           <SpeechToggle />
-          <ModeToggle mode={mode} onChange={setMode} />
+          <ModeToggle
+            mode={mode}
+            onChange={(next) => {
+              if (next !== mode) playPlanetUiSound('mode')
+              setMode(next)
+            }}
+          />
         </div>
       </div>
 

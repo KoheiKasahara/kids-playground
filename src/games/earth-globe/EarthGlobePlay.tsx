@@ -9,6 +9,7 @@ import ZoomControls from './ui/ZoomControls'
 import { useReducedMotion } from './useReducedMotion'
 import { zoomIn, zoomOut } from './zoomState'
 import { playGlobeCountrySelectSound } from '../../utils/quizSound'
+import { playGlobeZoomSound } from './sounds'
 
 export default function EarthGlobePlay() {
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(MIN_ZOOM_LEVEL)
@@ -36,6 +37,7 @@ export default function EarthGlobePlay() {
   })
 
   const handleReset = () => {
+    playGlobeZoomSound('reset')
     setZoomLevel(MIN_ZOOM_LEVEL)
     setSelectedCountryId(null)
   }
@@ -67,8 +69,8 @@ export default function EarthGlobePlay() {
           />
           <ZoomControls
             zoomLevel={zoomLevel}
-            onZoomIn={() => setZoomLevel((level) => zoomIn(level))}
-            onZoomOut={() => setZoomLevel((level) => zoomOut(level))}
+            onZoomIn={() => { playGlobeZoomSound('in'); setZoomLevel((level) => zoomIn(level)) }}
+            onZoomOut={() => { playGlobeZoomSound('out'); setZoomLevel((level) => zoomOut(level)) }}
             onReset={handleReset}
           />
         </>}

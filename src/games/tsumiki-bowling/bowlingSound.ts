@@ -15,7 +15,7 @@
  * 「カラカラ」（clatterTones）も、何十個倒れても音を重ねすぎない（最大2音）。
  */
 
-import { getSharedAudioContext, isSoundEnabled } from '../../utils/quizSound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled } from '../../utils/quizSound'
 import type { BowlingBallId } from './bowlingBalls'
 
 export type BowlingTone = {
@@ -42,7 +42,7 @@ export function launchTones(ballId: BowlingBallId, power: number): BowlingTone[]
   switch (ballId) {
     case 'heavy':
       // どっしり: 低い「ドッ」を1発。パワーで基音と音量がわずかに上がる。
-      return [{ frequency: 96 + p * 26, delay: 0, duration: 110, volume: 0.05 + p * 0.05, type: 'triangle' }]
+      return [{ frequency: 96 + p * 26, delay: 0, duration: 110, volume: 0.075 + p * 0.075, type: 'triangle' }]
     case 'bouncy':
       // はずむ: 軽い「ポンッ」を2音重ねて、跳ねる予感を出す。
       return [
@@ -245,7 +245,7 @@ export function createBowlingSoundController(): BowlingSoundController {
         gain.gain.linearRampToValueAtTime(tone.volume, startTime + 0.012)
         gain.gain.linearRampToValueAtTime(0, stopTime)
         oscillator.connect(gain)
-        gain.connect(ctx.destination)
+        gain.connect(getSoundOutput(ctx))
         const tracked: TrackedNode = { oscillator, gain }
         activeNodes.add(tracked)
         oscillator.onended = () => {

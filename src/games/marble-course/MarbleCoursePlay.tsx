@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
-import { getSharedAudioContext, isSoundEnabled, playTone, primeAudio } from '../../audio/sound'
+import { primeAudio } from '../../audio/sound'
 import { appendPart, BOARD_LIMIT, GADGET_HINTS, hasConnectedInput, initialCourse, isGadget, MAX_PARTS, needsMoreHeight, PARTS, removePart, snapPart, type Course, type PartKind } from './marbleModel'
-import type { RunStatus } from './marbleWorld'
+import type { MarbleEvent, RunStatus } from './marbleWorld'
 import { useMarbleEngine } from './useMarbleEngine'
 import PartIcon from './PartIcon'
+import { playMarbleEraseSound, playMarbleEventSound, playMarbleGoalSound, playMarbleMissSound, playMarblePlaceSound, playMarbleRollSound, playMarbleRotateSound, playMarbleSnapSound } from './sounds'
 import styles from './MarbleCoursePlay.module.css'
 
 export default function MarbleCoursePlay() {
@@ -25,12 +26,12 @@ export default function MarbleCoursePlay() {
     const timer = window.setTimeout(() => setConfirmingClear(false), 4000)
     return () => window.clearTimeout(timer)
   }, [confirmingClear])
-  const play = useCallback((success: boolean) => {
-    if (!sound || !isSoundEnabled()) return
-    const ctx = getSharedAudioContext()
-    if (!ctx) return
-    for (const [i, note] of (success ? [660, 830, 990] : [750]).entries()) playTone(ctx, note, ctx.currentTime + i * 0.11, 0.15, 0.06, 'sine')
-  }, [sound])
+  const soundRef = useRef(sound)
+  useEffect(() => { soundRef.current = sound }, [sound])
+  /** おとボタンが ON のときだけ鳴らす。物理エンジンのコールバックからも最新の設定を見る。 */
+  const sfx = useCallback((play: () => void) => { if (soundRef.current) play() }, [])
+  const phaseRef = useRef<RunStatus>('ready')
+  const manualStop = useRef(false)
   const commit = useCallback((next: Course) => {
     if (next === course) return
     setHistory(previous => [...previous.slice(-49), course])
@@ -39,6 +40,8 @@ export default function MarbleCoursePlay() {
     setConfirmingClear(false)
     setHint('つづきを つなごう！')
     const added = next.parts.find(part => !course.parts.some(previous => previous.id === part.id))
+    // つながった音（onSnap）は呼び出し側で鳴らすので、ここでは つながらずに おいたときだけ鳴らす。
+    if (added && !hasConnectedInput(added, next.parts)) sfx(playMarblePlaceSound)
     if (added && isGadget(added.kind) && !seen.current.has(added.kind)) {
       seen.current.add(added.kind)
       setHint(GADGET_HINTS[added.kind])
@@ -47,15 +50,23 @@ export default function MarbleCoursePlay() {
     if (added && course.parts.length && !hasConnectedInput(added, next.parts)) {
       setHint(needsMoreHeight(course, added.kind, selectedId) ? 'たかさが いっぱい！ べつの ところに おいたよ' : 'ここに おいたよ。みちを つなぎなおそう！')
     }
-  }, [course, selectedId])
+  }, [course, selectedId, sfx])
   const onPhase = useCallback((next: RunStatus) => {
+    const previous = phaseRef.current
+    phaseRef.current = next
     setPhase(next)
-    if (next === 'goal') play(true)
+    if (next === 'goal') sfx(playMarbleGoalSound)
+    if (next === 'ready' && previous === 'rolling' && !manualStop.current) sfx(playMarbleMissSound)
     if (next === 'ready') setHint('みちを つないで また ころがそう！')
-  }, [play])
-  const onSnap = useCallback(() => { play(false) }, [play])
-  const onEvent = useCallback(() => play(false), [play])
-  const { registerContainer, status, roll, stop, palette, nextId, retry, zoom, overview } = useMarbleEngine({ course, selectedId, onCommit: commit, onSelect: setSelectedId, onPhase, onSnap, onHint: setHint, onEvent })
+  }, [sfx])
+  const onSnap = useCallback(() => sfx(playMarbleSnapSound), [sfx])
+  const onEvent = useCallback((event: MarbleEvent) => sfx(() => playMarbleEventSound(event.kind)), [sfx])
+  const { registerContainer, status, roll, stop: stopRun, palette, nextId, retry, zoom, overview } = useMarbleEngine({ course, selectedId, onCommit: commit, onSelect: setSelectedId, onPhase, onSnap, onHint: setHint, onEvent })
+  /** 「つくる」やけす操作で止めたときは、おちた音を鳴らさない。 */
+  const stop = () => {
+    manualStop.current = true
+    try { stopRun() } finally { manualStop.current = false }
+  }
   const selected = course.parts.find(part => part.id === selectedId)
   const rolling = phase === 'rolling'
   const locked = status !== 'ready' || rolling
@@ -72,11 +83,13 @@ export default function MarbleCoursePlay() {
     const result = snapPart(turned, course.parts)
     commit({ ...course, parts: course.parts.map(part => part.id === selectedId ? result.part : part) })
     if (result.snapped) onSnap()
+    else sfx(playMarbleRotateSound)
   }
   const undo = () => {
     const previous = history.at(-1)
     if (!previous) return
     stop()
+    sfx(playMarbleEraseSound)
     setCourse(previous)
     setHistory(items => items.slice(0, -1))
     setSelectedId(previous.parts.at(-1)?.id ?? null)
@@ -86,6 +99,7 @@ export default function MarbleCoursePlay() {
   const erase = () => {
     if (!selected) return
     stop()
+    sfx(playMarbleEraseSound)
     const index = course.parts.findIndex(part => part.id === selectedId)
     const next = removePart(course, selectedId)
     commit(next)
@@ -99,6 +113,7 @@ export default function MarbleCoursePlay() {
       return
     }
     stop()
+    sfx(playMarbleEraseSound)
     commit({ parts: [], startId: null })
     setSelectedId(null)
     setHint('ぜんぶ けしたよ。もどすで もどせるよ！')
@@ -178,7 +193,7 @@ export default function MarbleCoursePlay() {
       </div>}
       <div className={styles.playRow}>
         {rolling && <button type="button" className={styles.edit} onClick={stop} aria-label="つくるに もどる">✎ つくる</button>}
-        <button type="button" className={styles.roll} disabled={status !== 'ready' || !course.startId} onClick={() => { if (sound) primeAudio(); roll() }}><span className={styles.marbleIcon} aria-hidden="true" />{rolling ? 'もういちど ころがす！' : 'ビーだま ころがす！'}<span aria-hidden="true">▶</span></button>
+        <button type="button" className={styles.roll} disabled={status !== 'ready' || !course.startId} onClick={() => { if (sound) { primeAudio(); playMarbleRollSound() } roll() }}><span className={styles.marbleIcon} aria-hidden="true" />{rolling ? 'もういちど ころがす！' : 'ビーだま ころがす！'}<span aria-hidden="true">▶</span></button>
       </div>
     </section>
   </main>

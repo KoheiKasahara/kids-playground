@@ -1,4 +1,4 @@
-import { getSharedAudioContext, isSoundEnabled } from '../../audio/sound'
+import { getSharedAudioContext, getSoundOutput, isSoundEnabled } from '../../audio/sound'
 import type { StageId } from './stages'
 
 // 音声ファイルを つかわず、Web Audio で むかしの ゲーム機 ふうの こうかおん と BGM を その場で つくる。
@@ -91,7 +91,7 @@ function sfx() {
 export function playJump() {
   const ctx = sfx()
   if (!ctx) return
-  slide(ctx, ctx.destination, 280, 760, ctx.currentTime, .13, .07, 'pulse')
+  slide(ctx, getSoundOutput(ctx), 280, 760, ctx.currentTime, .13, .07, 'pulse')
 }
 
 /** くうちゅうで もう1かい「ぴょーん」。 */
@@ -99,8 +99,8 @@ export function playDoubleJump() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  slide(ctx, ctx.destination, 480, 1200, t, .14, .06, 'pulse')
-  tone(ctx, ctx.destination, freq('E7'), t + .08, .06, .02, 'sine')
+  slide(ctx, getSoundOutput(ctx), 480, 1200, t, .14, .06, 'pulse')
+  tone(ctx, getSoundOutput(ctx), freq('E7'), t + .08, .06, .02, 'sine')
 }
 
 /** にんじんを とった「ピコッ」。つづけて とると すこしずつ 高く なる。 */
@@ -109,8 +109,8 @@ export function playCarrot(combo: number) {
   if (!ctx) return
   const t = ctx.currentTime
   const lift = Math.pow(2, (combo % 8) / 24)
-  tone(ctx, ctx.destination, freq('B5') * lift, t, .05, .05, 'pulse')
-  tone(ctx, ctx.destination, freq('E6') * lift, t + .05, .12, .05, 'pulse')
+  tone(ctx, getSoundOutput(ctx), freq('B5') * lift, t, .05, .05, 'pulse')
+  tone(ctx, getSoundOutput(ctx), freq('E6') * lift, t + .05, .12, .05, 'pulse')
 }
 
 /** ほしメダル「キラリラーン」。 */
@@ -118,8 +118,8 @@ export function playMedal() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  ;['C6', 'E6', 'G6', 'C7', 'E7', 'G7'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + i * .055, .16, .05, 'pulse'))
-  ;['G6', 'C7', 'E7'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + .36 + i * .04, .5, .025, 'sine', .35))
+  ;['C6', 'E6', 'G6', 'C7', 'E7', 'G7'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + i * .055, .16, .05, 'pulse'))
+  ;['G6', 'C7', 'E7'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + .36 + i * .04, .5, .025, 'sine', .35))
 }
 
 /** はてなブロックを たたいた「コン」。 */
@@ -127,8 +127,8 @@ export function playBlock() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  tone(ctx, ctx.destination, 190, t, .05, .09, 'square')
-  tone(ctx, ctx.destination, 380, t + .01, .04, .03, 'square')
+  tone(ctx, getSoundOutput(ctx), 190, t, .05, .09, 'square')
+  tone(ctx, getSoundOutput(ctx), 380, t + .01, .04, .03, 'square')
 }
 
 /** ふんだ「ぽよん」。 */
@@ -136,8 +136,8 @@ export function playStomp() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  slide(ctx, ctx.destination, 700, 220, t, .09, .12, 'sine')
-  slide(ctx, ctx.destination, 300, 900, t + .08, .12, .07, 'triangle')
+  slide(ctx, getSoundOutput(ctx), 700, 220, t, .09, .12, 'sine')
+  slide(ctx, getSoundOutput(ctx), 300, 900, t + .08, .12, .07, 'triangle')
 }
 
 /** ぶつかった「ぷぇ〜」。 */
@@ -145,8 +145,8 @@ export function playHurt() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  slide(ctx, ctx.destination, 620, 160, t, .32, .07, 'square')
-  noise(ctx, ctx.destination, t, .12, .08, 'lowpass', 1800)
+  slide(ctx, getSoundOutput(ctx), 620, 160, t, .32, .07, 'square')
+  noise(ctx, getSoundOutput(ctx), t, .12, .08, 'lowpass', 1800)
 }
 
 /** ばね「びよよーん」。 */
@@ -166,7 +166,7 @@ export function playSpring() {
   lfo.connect(lfoGain).connect(osc.frequency)
   gain.gain.setValueAtTime(.12, t)
   gain.gain.exponentialRampToValueAtTime(.001, t + .5)
-  osc.connect(gain).connect(ctx.destination)
+  osc.connect(gain).connect(getSoundOutput(ctx))
   osc.start(t)
   lfo.start(t)
   osc.stop(t + .52)
@@ -177,7 +177,7 @@ export function playSpring() {
 export function playFall() {
   const ctx = sfx()
   if (!ctx) return
-  slide(ctx, ctx.destination, 1000, 200, ctx.currentTime, .45, .05, 'sine')
+  slide(ctx, getSoundOutput(ctx), 1000, 200, ctx.currentTime, .45, .05, 'sine')
 }
 
 /** あわで たすけて もらった「ぽわん」。 */
@@ -185,8 +185,8 @@ export function playRescue() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  slide(ctx, ctx.destination, 300, 700, t, .18, .08, 'sine')
-  ;['C6', 'G6'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + .16 + i * .07, .1, .035, 'pulse'))
+  slide(ctx, getSoundOutput(ctx), 300, 700, t, .18, .08, 'sine')
+  ;['C6', 'G6'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + .16 + i * .07, .1, .035, 'pulse'))
 }
 
 /** よーい の「ピッ」と どん！ の「ピーッ」。 */
@@ -195,9 +195,9 @@ export function playReady(go: boolean) {
   if (!ctx) return
   const t = ctx.currentTime
   if (go) {
-    tone(ctx, ctx.destination, freq('C6'), t, .32, .06, 'pulse')
-    tone(ctx, ctx.destination, freq('C5'), t, .32, .04, 'pulse')
-  } else tone(ctx, ctx.destination, freq('C5'), t, .12, .05, 'pulse')
+    tone(ctx, getSoundOutput(ctx), freq('C6'), t, .32, .06, 'pulse')
+    tone(ctx, getSoundOutput(ctx), freq('C5'), t, .32, .04, 'pulse')
+  } else tone(ctx, getSoundOutput(ctx), freq('C5'), t, .12, .05, 'pulse')
 }
 
 /** ゴールの ファンファーレ。 */
@@ -208,13 +208,13 @@ export function playGoal() {
   const s = .09
   const melody: [string, number, number][] = [['C5', 0, 1], ['E5', 1, 1], ['G5', 2, 1], ['C6', 3, 2], ['G5', 5, 1], ['C6', 6, 4], ['D6', 11, 1], ['E6', 12, 8]]
   for (const [n, at, len] of melody) {
-    tone(ctx, ctx.destination, freq(n), t + at * s, len * s, .07, 'pulse')
-    tone(ctx, ctx.destination, freq(n) / 2, t + at * s, len * s, .025, 'pulse')
+    tone(ctx, getSoundOutput(ctx), freq(n), t + at * s, len * s, .07, 'pulse')
+    tone(ctx, getSoundOutput(ctx), freq(n) / 2, t + at * s, len * s, .025, 'pulse')
   }
   for (const [n, at, len] of [['C3', 0, 3], ['G3', 3, 3], ['C3', 6, 5], ['G3', 11, 1], ['C3', 12, 8]] as [string, number, number][]) {
-    tone(ctx, ctx.destination, freq(n), t + at * s, len * s, .1, 'triangle')
+    tone(ctx, getSoundOutput(ctx), freq(n), t + at * s, len * s, .1, 'triangle')
   }
-  ;['G6', 'C7', 'E7'].forEach((n, i) => tone(ctx, ctx.destination, freq(n), t + 12 * s + i * .04, .7, .02, 'sine', .5))
+  ;['G6', 'C7', 'E7'].forEach((n, i) => tone(ctx, getSoundOutput(ctx), freq(n), t + 12 * s + i * .04, .7, .02, 'sine', .5))
 }
 
 // ---------------- BGM ----------------
@@ -267,7 +267,7 @@ export function startBgm(id: StageId): () => void {
   if (!song || !ctx) return () => {}
   const master = ctx.createGain()
   master.gain.value = .5
-  master.connect(ctx.destination)
+  master.connect(getSoundOutput(ctx))
   const delay = ctx.createDelay(1)
   delay.delayTime.value = 60 / song.bpm * .75
   const feedback = ctx.createGain()

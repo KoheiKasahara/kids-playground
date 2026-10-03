@@ -1,3 +1,4 @@
+import { getSoundOutput } from '../../../audio/sound'
 import type { PianoNote, PianoNoteId } from './notes'
 import {
   getInstrumentSpec,
@@ -140,7 +141,7 @@ export class PianoAudioEngine {
         this.output = this.context.createGain()
         // 4鍵程度の和音でも過大になりにくいよう、masterを抑えて各voiceの自然な音量を残す。
         this.output.gain.value = 0.5
-        this.output.connect(this.context.destination)
+        this.output.connect(getSoundOutput(this.context))
       } catch {
         this.context = undefined
         this.output = undefined
