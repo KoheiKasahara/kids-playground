@@ -64,8 +64,25 @@ export type Gadget =
    * かべと ちがい、当たっても いきおいが ほとんど へらないので、ラフや いけを よけて まがれる。
    */
   | { kind: 'reflector'; id: string; x: number; z: number; dir: Vec2; halfLength: number }
+  /**
+   * のった ボールを dir の向きへ speed で はこぶ ベルトコンベア。(x,z) を中心に dir の向きへ ±halfLength、よこ ±halfWidth。
+   * おわりの さきは かべに しない（はこばれた ボールが かべと ベルトの あいだを 行き来しない）。
+   */
+  | { kind: 'conveyor'; id: string; x: number; z: number; dir: Vec2; halfLength: number; halfWidth: number; speed: number }
+  /**
+   * ふむと door の とびらが ゆかへ しずんで ひらく スイッチ。いちど ひらくと そのホールの あいだは ひらいたまま。
+   * door は (x,z) を中心に dir の向きへ ±halfLength のびる かべ。
+   */
+  | { kind: 'switch'; id: string; x: number; z: number; door: { x: number; z: number; dir: Vec2; halfLength: number } }
+  /** のると ぽーんと とんで、to に ちゃくちする トランポリン。どの向きから のっても to へ とぶ。 */
+  | { kind: 'trampoline'; id: string; x: number; z: number; radius: number; to: Vec2 }
+  /**
+   * せんぷうきの かぜ。(x,z) を中心に dir の向きへ ±halfLength、よこ ±halfWidth の 中の ボールを dir の向きへ おす。
+   * strength は おす つよさ[m/s²]。せんぷうきは かぜかみ（-dir の はし）に 立つ。
+   */
+  | { kind: 'fan'; id: string; x: number; z: number; dir: Vec2; halfLength: number; halfWidth: number; strength: number }
 
-export type CritterLook = 'duck' | 'crab' | 'alien' | 'penguin' | 'dino' | 'squirrel' | 'sheep'
+export type CritterLook = 'duck' | 'crab' | 'alien' | 'penguin' | 'dino' | 'squirrel' | 'sheep' | 'robot'
 /** きの見た目。とがった もみの木と、まるい 広葉樹。 */
 export type TreeLook = 'pine' | 'broadleaf'
 
@@ -83,6 +100,8 @@ export type WaterHazard =
 /**
  * みちすじの点。minPower は「ここを通るなら最低この強さ」（ジャンプ台の手前など）。
  * bank は はねかえし いたの手前の点。ここを ねらうと いたで はねて、つぎの点まで すすむ。
+ * スイッチの 上の点は、スイッチを おすまで その先を ねらわない。
+ * トランポリンの 上の点の つぎは、その トランポリンの ちゃくちてん（to）にする。
  */
 export type RoutePoint = Vec2 & { minPower?: number; bank?: boolean }
 
@@ -104,7 +123,7 @@ export type HoleDefinition = {
 }
 
 /** コースの並び順。★の保存やコース選びは、この一覧を正とする。 */
-export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow', 'candy', 'dino', 'forest', 'downhill', 'river', 'canyon'] as const
+export const COURSE_IDS = ['meadow', 'beach', 'moon', 'snow', 'candy', 'dino', 'forest', 'downhill', 'river', 'canyon', 'factory', 'sky'] as const
 export type CourseId = (typeof COURSE_IDS)[number]
 
 export type CourseLook = {
@@ -151,6 +170,37 @@ function rect(minX: number, minZ: number, maxX: number, maxZ: number, near: numb
     { x: maxX, z: minZ, r: far },
     { x: maxX, z: maxZ, r: near },
   ]
+}
+
+/** まるい しま。角を steps こ ならべた 円。 */
+function circle(cx: number, cz: number, radius: number, steps = 28): Corner[] {
+  return Array.from({ length: steps }, (_, index) => {
+    const angle = (index / steps) * Math.PI * 2
+    return { x: cx + Math.sin(angle) * radius, z: cz + Math.cos(angle) * radius }
+  })
+}
+
+/** ほしの かたちの しま。とがった 先と へこみは 角を まるめる。 */
+function starShape(cx: number, cz: number, outer: number, inner: number, points = 5): Corner[] {
+  return Array.from({ length: points * 2 }, (_, index) => {
+    const angle = (index / (points * 2)) * Math.PI * 2 + Math.PI
+    const radius = index % 2 ? inner : outer
+    return { x: cx + Math.sin(angle) * radius, z: cz + Math.cos(angle) * radius, r: index % 2 ? 0.5 : 0.7 }
+  })
+}
+
+/**
+ * ハートの かたちの しま。まるい ふくらみが おく（-z）、とがった 先が てまえ（+z）。size は はばの 半分くらい。
+ * ふくらみの あいだの とがった へこみは、かべが となりの ふくらみに めりこむので あさく まっすぐに する。
+ */
+function heartShape(cx: number, cz: number, size: number, steps = 36): Corner[] {
+  return Array.from({ length: steps }, (_, index) => (index / steps) * Math.PI * 2)
+    .filter(t => Math.min(t, Math.PI * 2 - t) > 0.45)
+    .map(t => {
+      const x = 16 * Math.sin(t) ** 3
+      const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)
+      return { x: cx + (x / 16) * size, z: cz - (y / 16) * size }
+    })
 }
 
 const CRATER_R = 3.7
@@ -1120,6 +1170,240 @@ export const GOLF_COURSES: readonly CourseDefinition[] = [
         ],
         route: [{ x: -2.0, z: 20.0 }, { x: -4.9, z: 13.0 }, { x: -4.9, z: -5.0, bank: true }, { x: 3.4, z: -6.0 }, { x: 4.0, z: -16.5 }],
         tip: 'さかを くだって いたに あてよう',
+      },
+    ],
+  },
+  {
+    id: 'factory',
+    label: 'こうじょう',
+    icon: '🧸',
+    description: 'おもちゃの ベルトと スイッチ',
+    color: '#e39b16',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#6cc3a0', wall: '#4a7fd6', wallCap: '#ffd23f', skirt: '#5a6274', sand: '#f0d49a', ice: '#d4eef6', rough: '#f2b35c', ground: '#b9c2cf', sky: '#cfe6ff', horizon: '#f4f7fb', bumper: '#ff6b5b', bumperCap: '#fff4e0', rock: '#8f96a3' },
+    holes: [
+      {
+        id: 'factory-1',
+        name: 'ベルトに のろう',
+        par: 2,
+        tee: { x: 0, z: 6.6 },
+        cup: { x: 10.3, z: -3.3 },
+        // Lの字。かどを まがった 先の ベルトコンベアに のせると、カップの そばまで はこんでくれる。
+        floors: [{
+          corners: [
+            { x: -1.2, z: 7.8, r: 0.6 },
+            { x: -1.2, z: -4.6, r: 1.0 },
+            { x: 12.4, z: -4.6, r: 0.8 },
+            { x: 12.4, z: -2.0, r: 0.8 },
+            { x: 1.2, z: -2.0, r: 0.5 },
+            { x: 1.2, z: 7.8, r: 0.6 },
+          ],
+        }],
+        gadgets: [{ kind: 'conveyor', id: 'belt', x: 5.2, z: -3.3, dir: { x: 1, z: 0 }, halfLength: 3.6, halfWidth: 0.75, speed: 1.7 }],
+        route: [{ x: 0, z: 6.6 }, { x: 0, z: -3.2 }, { x: 10.3, z: -3.3 }],
+        tip: 'ベルトに のせると はこんでくれるよ',
+      },
+      {
+        id: 'factory-2',
+        name: 'ポチッと スイッチ',
+        par: 3,
+        tee: { x: 0, z: 4.4 },
+        cup: { x: 0, z: -4.4 },
+        // カップは シャッターの おく。へやの すみの スイッチを ふむと、シャッターが ひらく。
+        floors: [{
+          corners: [
+            { x: -3.6, z: 5.4, r: 1.0 },
+            { x: -3.6, z: -1.0, r: 0.6 },
+            { x: -1.0, z: -1.0, r: 0.3 },
+            { x: -1.0, z: -5.6, r: 0.8 },
+            { x: 1.0, z: -5.6, r: 0.8 },
+            { x: 1.0, z: -1.0, r: 0.3 },
+            { x: 3.6, z: -1.0, r: 0.6 },
+            { x: 3.6, z: 5.4, r: 1.0 },
+          ],
+        }],
+        gadgets: [
+          { kind: 'switch', id: 'button', x: 2.7, z: -0.1, door: { x: 0, z: -1.6, dir: { x: 1, z: 0 }, halfLength: 1.0 } },
+          { kind: 'bumper', id: 'gear', x: -1.9, z: 1.5, radius: 0.32 },
+        ],
+        route: [{ x: 0, z: 4.4 }, { x: 2.7, z: -0.1 }, { x: 0, z: 0.2 }, { x: 0, z: -4.4 }],
+        tip: 'スイッチを ふむと とびらが ひらくよ',
+      },
+      {
+        id: 'factory-3',
+        name: 'ベルトの のりつぎ',
+        par: 3,
+        tee: { x: -4.0, z: 4.6 },
+        cup: { x: 3.7, z: 4.0 },
+        // さかさの Uの字。3本の ベルトが つぎつぎ ボールを はこび、ぐるっと まわって カップへ。
+        // おりぐちの まえを ロボットが あるいている。
+        floors: [{
+          corners: [
+            { x: -5.2, z: 6.0, r: 0.8 },
+            { x: -5.2, z: -8.0, r: 1.2 },
+            { x: 5.2, z: -8.0, r: 1.2 },
+            { x: 5.2, z: 6.0, r: 0.8 },
+            { x: 2.8, z: 6.0, r: 0.8 },
+            { x: 2.8, z: -5.6, r: 0.6 },
+            { x: -2.8, z: -5.6, r: 0.6 },
+            { x: -2.8, z: 6.0, r: 0.8 },
+          ],
+        }],
+        gadgets: [
+          { kind: 'conveyor', id: 'belt-up', x: -4.0, z: -1.55, dir: { x: 0, z: -1 }, halfLength: 4.05, halfWidth: 0.75, speed: 1.8 },
+          { kind: 'conveyor', id: 'belt-across', x: -0.825, z: -6.8, dir: { x: 1, z: 0 }, halfLength: 4.075, halfWidth: 0.75, speed: 1.8 },
+          { kind: 'conveyor', id: 'belt-down', x: 4.0, z: -2.7, dir: { x: 0, z: 1 }, halfLength: 4.7, halfWidth: 0.75, speed: 1.8 },
+          { kind: 'critter', id: 'robot', x: 3.1, z: 2.9, to: { x: 4.9, z: 2.9 }, speed: 0.9, look: 'robot' },
+        ],
+        route: [{ x: -4.0, z: 4.6 }, { x: -4.0, z: 1.6 }, { x: -4.0, z: -6.6 }, { x: 4.0, z: -6.6 }, { x: 3.7, z: 4.0 }],
+        tip: 'ベルトを のりついで ぐるっと！',
+      },
+      {
+        id: 'factory-4',
+        name: 'おもちゃの ライン',
+        par: 4,
+        tee: { x: 0.8, z: 15.8 },
+        cup: { x: 11.6, z: -7.8 },
+        // ながい こうじょう。のぼりと くだりの ベルトが ならんでいて、のる ベルトを えらぶ。
+        // シャッターを ひらく スイッチは スタートの へやに。さいごは ながい ベルトで カップへ。
+        floors: [{
+          corners: [
+            { x: -3.2, z: 17.4, r: 1.2 },
+            { x: -3.2, z: -9.6, r: 1.2 },
+            { x: 12.4, z: -9.6, r: 1.0 },
+            { x: 12.4, z: -6.0, r: 1.0 },
+            { x: -0.4, z: -6.0, r: 0.5 },
+            { x: -0.4, z: 0, r: 0.4 },
+            { x: 3.2, z: 0, r: 0.8 },
+            { x: 3.2, z: 17.4, r: 1.2 },
+          ],
+        }],
+        gadgets: [
+          { kind: 'switch', id: 'start-button', x: -2.4, z: 12.6, door: { x: -1.8, z: -1.0, dir: { x: 1, z: 0 }, halfLength: 1.4 } },
+          { kind: 'conveyor', id: 'belt-go', x: -1.8, z: 6.0, dir: { x: 0, z: -1 }, halfLength: 4.6, halfWidth: 0.9, speed: 1.9 },
+          { kind: 'conveyor', id: 'belt-back', x: 1.6, z: 6.0, dir: { x: 0, z: 1 }, halfLength: 4.6, halfWidth: 0.9, speed: 1.9 },
+          { kind: 'conveyor', id: 'belt-last', x: 5.4, z: -7.8, dir: { x: 1, z: 0 }, halfLength: 4.4, halfWidth: 0.8, speed: 1.9 },
+          { kind: 'critter', id: 'robot', x: -2.4, z: 14.2, to: { x: 2.4, z: 14.2 }, speed: 0.7, look: 'robot' },
+        ],
+        route: [{ x: 0.8, z: 15.8 }, { x: -2.4, z: 12.6 }, { x: -1.8, z: 10.2 }, { x: -1.8, z: -0.6 }, { x: -1.8, z: -7.8 }, { x: 11.6, z: -7.8 }],
+        tip: 'スイッチを ふんでから のぼりの ベルトへ',
+      },
+    ],
+  },
+  {
+    id: 'sky',
+    label: 'そらのしま',
+    icon: '☁️',
+    description: 'トランポリンと かぜ',
+    color: '#3fb7e6',
+    gravity: EARTH_GRAVITY,
+    rollingScale: 1,
+    look: { felt: '#86d66f', wall: '#fdfcff', wallCap: '#ffc6de', skirt: '#b88a5e', sand: '#f8e6b4', ice: '#e2f6ff', rough: '#f4f6ff', ground: '#ffffff', sky: '#6fc3ff', horizon: '#e6f6ff', bumper: '#ff7eb6', bumperCap: '#ffffff', rock: '#b9b2cc' },
+    holes: [
+      {
+        id: 'sky-1',
+        name: 'ぽよんと トランポリン',
+        par: 2,
+        tee: { x: 0, z: 6.4 },
+        cup: { x: 0, z: -4.8 },
+        // くもに うかぶ ふたつの まるい しま。トランポリンに のせると むこうの しまへ ぽーんと とぶ。
+        floors: [{ corners: circle(0, 5.4, 2.3) }, { corners: circle(0, -4.4, 2.6) }],
+        gadgets: [{ kind: 'trampoline', id: 'pad', x: 0, z: 4.2, radius: 0.45, to: { x: 0, z: -2.8 } }],
+        route: [{ x: 0, z: 6.4 }, { x: 0, z: 4.2 }, { x: 0, z: -2.8 }, { x: 0, z: -4.8 }],
+        tip: 'トランポリンで むこうの しまへ！',
+      },
+      {
+        id: 'sky-2',
+        name: 'くもの かいだん',
+        par: 3,
+        tee: { x: -0.6, z: 8.4 },
+        cup: { x: 0, z: -8.4 },
+        // だんだん たかくなる しまを、トランポリンで のぼっていく。いちばん うえは ハートの しま。
+        floors: [
+          { corners: rect(-2.2, 5.6, 1.4, 9.6, 1.0, 1.0) },
+          { corners: circle(1.4, 0.4, 2.3), y: 0.9 },
+          { corners: heartShape(0, -8.6, 3.4), y: 1.8 },
+        ],
+        gadgets: [
+          { kind: 'trampoline', id: 'step-1', x: -0.2, z: 6.5, radius: 0.45, to: { x: 1.2, z: 1.8 } },
+          { kind: 'trampoline', id: 'step-2', x: 1.6, z: -0.9, radius: 0.45, to: { x: 0, z: -7.0 } },
+          { kind: 'bumper', id: 'balloon', x: 2.7, z: 0.9, radius: 0.3 },
+        ],
+        route: [{ x: -0.6, z: 8.4 }, { x: -0.2, z: 6.5 }, { x: 1.2, z: 1.8 }, { x: 1.6, z: -0.9 }, { x: 0, z: -7.0 }, { x: 0, z: -8.4 }],
+        tip: 'トランポリンで うえの しまへ',
+      },
+      {
+        id: 'sky-3',
+        name: 'かぜの みち',
+        par: 3,
+        tee: { x: -3.8, z: 8.6 },
+        cup: { x: 3.8, z: -12.6 },
+        // くねくねの くもの みち。おいかぜが さかの うえまで おしてくれて、よこみちは むかいかぜ。
+        floors: [{
+          corners: [
+            { x: -5.0, z: 10.0, r: 0.8 },
+            { x: -5.0, z: -4.4, r: 0.8 },
+            { x: 2.6, z: -4.4, r: 0.5 },
+            { x: 2.6, z: -14.0, r: 0.8 },
+            { x: 5.0, z: -14.0, r: 0.8 },
+            { x: 5.0, z: -2.0, r: 0.8 },
+            { x: -2.6, z: -2.0, r: 0.5 },
+            { x: -2.6, z: 10.0, r: 0.8 },
+          ],
+        }],
+        features: [{ kind: 'slope', from: { x: 0, z: 2.0 }, to: { x: 0, z: 6.0 }, drop: 0.6 }],
+        gadgets: [
+          { kind: 'fan', id: 'tailwind', x: -3.8, z: 3.8, dir: { x: 0, z: -1 }, halfLength: 4.6, halfWidth: 1.2, strength: 1.4 },
+          { kind: 'fan', id: 'headwind', x: 0.2, z: -3.2, dir: { x: -1, z: 0 }, halfLength: 2.4, halfWidth: 1.2, strength: 1.0 },
+          { kind: 'bumper', id: 'balloon-a', x: 3.2, z: -8.0, radius: 0.3 },
+          { kind: 'bumper', id: 'balloon-b', x: 4.4, z: -10.0, radius: 0.3 },
+        ],
+        route: [{ x: -3.8, z: 8.6 }, { x: -3.8, z: -3.2 }, { x: 3.8, z: -3.2 }, { x: 3.8, z: -12.6 }],
+        tip: 'かぜに のって すすもう',
+      },
+      {
+        id: 'sky-4',
+        name: 'にじの しま',
+        par: 3,
+        tee: { x: 0, z: 15.6 },
+        cup: { x: 0.6, z: -15.6 },
+        // ほしの しまから トランポリンを 2かい ぽよんぽよん。かぜの ふく くもの みちを ぬけて、おくの しまの カップへ。
+        floors: [
+          { corners: starShape(0, 15.0, 4.2, 2.3) },
+          { corners: circle(0, 6.4, 1.6, 20), y: 0.7 },
+          {
+            corners: [
+              { x: -1.4, z: 1.8, r: 0.8 },
+              { x: -1.4, z: -9.0 },
+              { x: 1.4, z: -9.0 },
+              { x: 1.4, z: 1.8, r: 0.8 },
+            ],
+            y: 0.3,
+            open: [1],
+          },
+          {
+            corners: [
+              { x: -1.4, z: -9.0 },
+              { x: -4.2, z: -9.0, r: 0.8 },
+              { x: -4.2, z: -18.8, r: 1.8 },
+              { x: 4.2, z: -18.8, r: 1.8 },
+              { x: 4.2, z: -9.0, r: 0.8 },
+              { x: 1.4, z: -9.0 },
+            ],
+            y: 0.3,
+            open: [5],
+          },
+        ],
+        gadgets: [
+          { kind: 'trampoline', id: 'hop-1', x: 0, z: 12.4, radius: 0.5, to: { x: 0, z: 6.4 } },
+          { kind: 'trampoline', id: 'hop-2', x: 0, z: 6.4, radius: 0.5, to: { x: 0, z: 0.6 } },
+          { kind: 'fan', id: 'breeze', x: 0, z: -3.6, dir: { x: 0, z: -1 }, halfLength: 4.6, halfWidth: 1.4, strength: 0.7 },
+          { kind: 'bumper', id: 'balloon-left', x: -2.0, z: -13.2, radius: 0.3 },
+          { kind: 'bumper', id: 'balloon-right', x: 2.4, z: -12.0, radius: 0.3 },
+        ],
+        route: [{ x: 0, z: 15.6 }, { x: 0, z: 12.4 }, { x: 0, z: 6.4 }, { x: 0, z: 0.6 }, { x: 0.6, z: -15.6 }],
+        tip: 'トランポリンを ぽよん ぽよん！',
       },
     ],
   },

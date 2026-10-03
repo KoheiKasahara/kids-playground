@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { initializeRapier } from '../../physics/rapierLoader'
 import { GOLF_COURSES, type CourseDefinition, type HoleDefinition } from './golfCourses'
 import { buildHoleGeometry } from './golfGeometry'
-import { BALL_RADIUS, rollDistance, rollingDecel, shotSpeed } from './golfPhysics'
+import { BALL_RADIUS, rollDistance, rollingDecel, shotSpeed, SWITCH, trampolineLaunch } from './golfPhysics'
 import { createGolfWorld, type GolfEvent, type GolfWorld } from './golfWorld'
 
 beforeAll(async () => { await initializeRapier() })
@@ -13,6 +13,8 @@ const FOREST = courseById('forest')
 const DOWNHILL = courseById('downhill')
 const RIVER = courseById('river')
 const CANYON = courseById('canyon')
+const FACTORY = courseById('factory')
+const SKY = courseById('sky')
 const holeById = (id: string) => GOLF_COURSES.flatMap(course => course.holes).find(hole => hole.id === id)!
 
 function open(course: CourseDefinition, hole: HoleDefinition): GolfWorld {
@@ -431,6 +433,140 @@ describe('パターゴルフの物理', () => {
       // ティーから つりばしの むこうは まっすぐ見えるが、ななめに わたると おちるので まず はしの まえへ。
       expect(world.suggestShot().target).toEqual({ x: 0, z: 9.0 })
     })
+  })
+
+  it('ベルトコンベアに のると、よわく うっても ベルトの はやさで さきまで はこばれる', () => {
+    const hole = holeById('factory-1')
+    const belt = hole.gadgets!.find(gadget => gadget.kind === 'conveyor')!
+    if (belt.kind !== 'conveyor') throw new Error('conveyor')
+    withWorld(open(FACTORY, hole), world => {
+      world.placeBall({ x: belt.x - belt.halfLength - 0.6, z: belt.z })
+      // ベルトに やっと とどくくらいの よわさ。
+      world.shoot({ x: 1, z: 0 }, 0.12)
+      let onBelt: number | null = null
+      const events = roll(world, () => {
+        const ball = world.ball()
+        if (onBelt === null && ball.position.x > belt.x) onBelt = Math.hypot(ball.velocity.x, ball.velocity.z)
+      })
+      expect(events.some(event => event.kind === 'conveyor')).toBe(true)
+      // ベルトの まんなかでは ベルトと おなじ はやさで はこばれている。
+      expect(onBelt).toBeCloseTo(belt.speed, 1)
+      // ベルトの おわりを こえて、カップの そばまで ころがる。
+      expect(world.ball().position.x).toBeGreaterThan(belt.x + belt.halfLength + 0.8)
+    })
+  })
+
+  it('ベルトに さからって よわく うつと、おしもどされる', () => {
+    const hole = holeById('factory-1')
+    const belt = hole.gadgets!.find(gadget => gadget.kind === 'conveyor')!
+    if (belt.kind !== 'conveyor') throw new Error('conveyor')
+    withWorld(open(FACTORY, hole), world => {
+      const start = belt.x + belt.halfLength - 0.5
+      world.placeBall({ x: start, z: belt.z })
+      world.shoot({ x: -1, z: 0 }, 0.3)
+      roll(world)
+      expect(world.ball().position.x).toBeGreaterThan(start)
+    })
+  })
+
+  it('シャッターは スイッチを ふむまで とおれず、ふむと ひらいて とおれる', () => {
+    const hole = holeById('factory-2')
+    const button = hole.gadgets!.find(gadget => gadget.kind === 'switch')!
+    if (button.kind !== 'switch') throw new Error('switch')
+    withWorld(open(FACTORY, hole), world => {
+      // ひらく まえは、おすすめも まず スイッチを ねらう。
+      expect(world.suggestShot().target).toEqual({ x: button.x, z: button.z })
+      world.placeBall({ x: 0, z: 0.4 })
+      world.shoot({ x: 0, z: -1 }, 0.6)
+      const blocked = roll(world)
+      expect(blocked.some(event => event.kind === 'door')).toBe(true)
+      expect(world.ball().position.z).toBeGreaterThan(button.door.z)
+      expect(world.motion().doors).toEqual([0])
+      // スイッチを ふむ。
+      world.placeBall({ x: button.x, z: button.z + 1.2 })
+      world.shoot({ x: 0, z: -1 }, 0.25)
+      const pressed = roll(world)
+      expect(pressed.some(event => event.kind === 'switch')).toBe(true)
+      for (let i = 0; i < 120 * SWITCH.openSeconds + 2; i++) world.step()
+      expect(world.motion().doors).toEqual([1])
+      world.placeBall({ x: 0, z: 0.4 })
+      world.shoot({ x: 0, z: -1 }, 0.6)
+      roll(world)
+      expect(world.phase).toBe('holed')
+    })
+  })
+
+  it('トランポリンに のると、どの むきから のっても ちゃくちてんへ とぶ', () => {
+    const hole = holeById('sky-1')
+    const pad = hole.gadgets!.find(gadget => gadget.kind === 'trampoline')!
+    if (pad.kind !== 'trampoline') throw new Error('trampoline')
+    for (const from of [{ x: 0, z: 6.4 }, { x: -1.4, z: 5.0 }, { x: 1.2, z: 3.9 }]) {
+      withWorld(open(SKY, hole), world => {
+        world.placeBall(from)
+        world.shoot({ x: pad.x - from.x, z: pad.z - from.z }, 0.32)
+        const events = roll(world)
+        expect(events.some(event => event.kind === 'trampoline')).toBe(true)
+        // とびあがりは ジャンプの できごとに しない。
+        expect(events.some(event => event.kind === 'takeoff')).toBe(false)
+        const land = events.find(event => event.kind === 'land')
+        expect(land).toBeDefined()
+        expect(Math.hypot(land!.position.x - pad.to.x, land!.position.z - pad.to.z)).toBeLessThan(0.3)
+        expect(events.some(event => event.kind === 'splash')).toBe(false)
+      })
+    }
+  })
+
+  it('トランポリンで たかい しまへ のぼり、ぽすっと おりて ころがりすぎない', () => {
+    const hole = holeById('sky-2')
+    const pad = hole.gadgets!.find(gadget => gadget.kind === 'trampoline')!
+    if (pad.kind !== 'trampoline') throw new Error('trampoline')
+    withWorld(open(SKY, hole), world => {
+      world.placeBall({ x: pad.x, z: pad.z + 1.2 })
+      world.shoot({ x: 0, z: -1 }, 0.3)
+      roll(world)
+      const ball = world.ball().position
+      expect(world.phase).toBe('ready')
+      expect(ball.y).toBeGreaterThan(0.9)
+      expect(Math.hypot(ball.x - pad.to.x, ball.z - pad.to.z)).toBeLessThan(1.6)
+    })
+  })
+
+  it('トランポリンの とぶ はやさは、重力だけで ちゃくちてんに とどく', () => {
+    const from = { x: 0, y: 0.15, z: 4 }
+    const to = { x: 1.5, y: 1.05, z: -2 }
+    const v = trampolineLaunch(from, to, 9.81)
+    const time = Math.hypot(to.x - from.x, to.z - from.z) / Math.hypot(v.x, v.z)
+    expect(from.x + v.x * time).toBeCloseTo(to.x, 6)
+    expect(from.z + v.z * time).toBeCloseTo(to.z, 6)
+    expect(from.y + v.y * time - (9.81 * time * time) / 2).toBeCloseTo(to.y, 6)
+  })
+
+  it('おいかぜは とおくまで、むかいかぜは ちかくまでしか ころがさない', () => {
+    const lane = (gadgets?: HoleDefinition['gadgets']): HoleDefinition => ({
+      id: 'lane', name: 'lane', par: 1, tee: { x: 0, z: 14 }, cup: { x: 0, z: -14 },
+      floors: [{ corners: [{ x: -1.5, z: 15 }, { x: -1.5, z: -15 }, { x: 1.5, z: -15 }, { x: 1.5, z: 15 }] }],
+      gadgets, route: [{ x: 0, z: 14 }, { x: 0, z: -14 }], tip: '',
+    })
+    const travel = (gadgets?: HoleDefinition['gadgets']) => withWorld(open(MEADOW, lane(gadgets)), world => {
+      world.shoot({ x: 0, z: -1 }, 0.5)
+      const events = roll(world)
+      return { distance: 14 - world.ball().position.z, wind: events.some(event => event.kind === 'wind') }
+    })
+    const calm = travel()
+    const tail = travel([{ kind: 'fan', id: 'tail', x: 0, z: 6, dir: { x: 0, z: -1 }, halfLength: 7, halfWidth: 1.5, strength: 0.6 }])
+    const head = travel([{ kind: 'fan', id: 'head', x: 0, z: 6, dir: { x: 0, z: 1 }, halfLength: 7, halfWidth: 1.5, strength: 0.6 }])
+    expect(calm.wind).toBe(false)
+    expect(tail.wind && head.wind).toBe(true)
+    expect(tail.distance).toBeGreaterThan(calm.distance * 1.4)
+    expect(head.distance).toBeLessThan(calm.distance * 0.8)
+    // おすすめの つよさも、かぜを かんがえて かわる。
+    const power = (gadgets?: HoleDefinition['gadgets']) => withWorld(open(MEADOW, lane(gadgets)), world => {
+      world.placeBall({ x: 0, z: 0 })
+      return world.suggestShot().power
+    })
+    const still = power()
+    expect(power([{ kind: 'fan', id: 'head', x: 0, z: -7, dir: { x: 0, z: 1 }, halfLength: 7, halfWidth: 1.5, strength: 0.4 }])).toBeGreaterThan(still + 0.05)
+    expect(power([{ kind: 'fan', id: 'tail', x: 0, z: -7, dir: { x: 0, z: -1 }, halfLength: 7, halfWidth: 1.5, strength: 0.4 }])).toBeLessThan(still - 0.05)
   })
 
   it('ねらいの道すじは、壁で1回はね返る', () => {
