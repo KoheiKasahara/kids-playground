@@ -1,3 +1,4 @@
+import { applyInitialPageHtml } from './initialPageHtml'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Plugin } from 'vite'
@@ -183,7 +184,7 @@ export function staticRoutePages(): Plugin {
 
       for (const entry of GAME_CATALOG) {
         const pagePath = gameRoutePath(entry.slug)
-        const pageHtml = applyPageSeoToHtml(indexHtml, resolvePageSeo(pagePath))
+        const pageHtml = applyInitialPageHtml(applyPageSeoToHtml(indexHtml, resolvePageSeo(pagePath)), pagePath)
 
         // /games/<slug> と /games/<slug>/ の両方をリダイレクトなしで200配信するため、
         // ディレクトリ形式(index.html)とファイル形式(.html)の両方を書き出す。
@@ -197,7 +198,7 @@ export function staticRoutePages(): Plugin {
       // JSON-LDだけはindex.html（ビルドの入力）に書かれていないため、ここを通すことで
       // トップと404フォールバックにも同じ経路でJSON-LDが焼き込まれる。
       const homeHtml = applyPageSeoToHtml(indexHtml, resolvePageSeo('/'))
-      await writeFile(indexHtmlPath, homeHtml)
+      await writeFile(indexHtmlPath, applyInitialPageHtml(homeHtml, '/'))
 
       // むずかしさ選択・プレイ・結果画面など、静的ページを持たないより深いURLへの
       // 直接アクセスやリロードは、404.htmlをSPAフォールバックとしてGitHub Pagesが返し、
