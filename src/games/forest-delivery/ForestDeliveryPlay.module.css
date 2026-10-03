@@ -57,22 +57,14 @@
 .objective { display: flex; align-items: center; gap: 10px; padding: 13px; border: 1px solid #d7d7be; border-radius: 5px; background: var(--paper); }
 .objective p { margin: 5px 0 0; font-size: 16px; font-weight: 900; line-height: 1.5; }
 .noteIcon { padding: 6px; background: #f0e9cc; border-radius: 6px; }
-.actionRow { display: grid; grid-template-columns: .95fr 1.05fr; gap: 9px; }
-.primary, .guide, .secondary { min-height: 56px; border-radius: 7px; padding: 10px 8px; font-weight: 900; font-size: 14px; line-height: 1.4; }
+.primary, .secondary { min-height: 56px; border-radius: 7px; padding: 10px 8px; font-weight: 900; font-size: 14px; line-height: 1.4; }
 .primary { border: 1px solid #375946; border-bottom: 4px solid #294736; background: #527b56; color: #fffef1; }
 .primary:hover:not(:disabled) { background: #416c47; }
 .primary:disabled { background: #dce1d0; color: #7b866e; border-color: #c6ceb8; }
-.guide { background: #fff4cf; color: #67552c; border: 1px solid #d9c88f; border-bottom: 4px solid #cbbb85; display: flex; align-items: center; justify-content: center; gap: 5px; }
-.guide:disabled { color: #918b72; background: #ece8d8; border-color: #d6d1bf; }
-.guide > span:first-child { font-size: 22px; }
-.primary:active:not(:disabled), .guide:active:not(:disabled) { transform: translateY(2px); }
-.message { min-height: 20px; margin: 0; font-size: 12px; font-weight: 700; text-align: center; line-height: 1.6; color: #617652; }
+.primary:active:not(:disabled) { transform: translateY(2px); }
 .bag { display: flex; align-items: center; min-height: 42px; gap: 8px; padding: 5px 10px; border-top: 1px solid #d0d2ba; border-bottom: 1px solid #d0d2ba; font-size: 11px; font-weight: 800; }
 .emptyBag { color: #929780; font-size: 11px; font-weight: 400; }
 .bagItem { display: inline-flex; background: #fff8e4; border-radius: 4px; padding: 2px; }
-.destinations { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.destination { min-height: 44px; padding: 5px 2px; border: 1px solid #cbd0bc; border-radius: 5px; color: #566746; background: #fffaf0; font-size: 11px; font-weight: 800; }
-.destination:hover { background: #f0f5df; }
 .helper { margin: 0; font-size: 10px; color: #7e886f; text-align: center; }
 .textButton { align-self: center; min-height: 44px; padding: 8px 12px; background: transparent; border: none; color: #637257; font-size: 11px; text-decoration: underline; text-underline-offset: 4px; }
 .result { display: flex; flex-direction: column; gap: 13px; text-align: center; padding: 22px 15px; background: #fff8e4; border: 2px solid #d1bb76; border-radius: 8px; }
@@ -101,7 +93,6 @@
   .objective { padding: 8px 11px; }
   .objective p { font-size: 15px; margin-top: 3px; }
   .noteIcon { padding: 4px; }
-  .destinations { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .result { gap: 9px; padding: 12px; }
   .resultStars { font-size: 26px; }
 }
@@ -115,7 +106,7 @@
   .bag { min-height: 29px; padding: 2px 8px; }
   .helper { display: none; }
   .textButton { min-height: 32px; padding: 4px; }
-  .primary, .guide { min-height: 48px; }
+  .primary { min-height: 48px; }
   .start { margin-top: 4px; }
   .intro { margin-bottom: 12px; }
   .intro h2 { font-size: 24px; }
@@ -126,4 +117,25 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .page button { transform: none !important; }
+}
+
+/* Map targets are the controls: pointer, touch and keyboard share one interaction. */
+.mapArea { position: relative; }
+.mapSpot { position: absolute; width: 13%; height: 14%; min-width: 32px; min-height: 32px; transform: translate(-50%, -70%); border: 0; border-radius: 50%; background: transparent; padding: 0; }
+.mapSpot:hover { background: #fff5b93d; }
+.nextSpot { outline: 3px solid #fff1a0; box-shadow: 0 0 0 5px #ad7332a6, 0 0 22px #fff8b9; }
+.tapLabel { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); white-space: nowrap; color: #604321; background: #fff5c4; border-radius: 12px; padding: 2px 7px; font-size: clamp(10px, 2.5vw, 14px); font-weight: 900; }
+.speech { position: absolute; transform: translateX(-50%); width: 46%; box-sizing: border-box; padding: 7px 9px; border: 2px solid #806649; border-radius: 13px; background: #fffdf0f5; color: #493d2b; font-size: clamp(10px, 2.7vw, 14px); line-height: 1.5; pointer-events: none; box-shadow: 0 3px 0 #48392222; }
+.speech::after { content: ''; position: absolute; bottom: -9px; left: 50%; border-top: 9px solid #806649; border-left: 7px solid transparent; border-right: 7px solid transparent; }
+.speech strong { display: block; color: #926341; font-size: .8em; }
+.playLayout { grid-template-columns: 1fr; max-width: 640px; margin: auto; }
+.journey { max-width: 640px; margin: auto; }
+.controlPanel { gap: 8px; }
+@media (min-width: 700px) and (max-height: 620px) {
+  .playLayout { grid-template-columns: minmax(0, 1fr) minmax(240px, .8fr); max-width: 980px; }
+  .journey { max-width: 980px; }
+  .speech { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page .mapSpot { transform: translate(-50%, -70%) !important; }
 }

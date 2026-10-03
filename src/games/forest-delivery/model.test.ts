@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import {
-  POIS,
+  getPois,
+  getMap,
+  interactOnArrival,
   STAGES,
   createWorld,
   getInteraction,
@@ -20,7 +22,7 @@ function arrive(world: World, id: PoiId): void {
     updateWorld(world, 0.1)
     expect(isWalkableCell(world, Math.floor(world.player.x / 16), Math.floor(world.player.y / 16))).toBe(true)
   }
-  const point = POIS.find((poi) => poi.id === id)!
+  const point = getPois(world).find((poi) => poi.id === id)!
   expect(world.player).toMatchObject({ x: point.x, y: point.y + (point.kind === 'animal' ? 16 : 0), walking: false })
   expect(world.path).toEqual([])
 }
@@ -86,7 +88,7 @@ describe('森のおとどけやさんの冒険', () => {
     interact(world)
     visit(world, 'apple')
     for (const id of ['squirrel', 'rabbit', 'bear'] as const) {
-      const point = POIS.find((poi) => poi.id === id)!
+      const point = getPois(world).find((poi) => poi.id === id)!
       arrive(world, id)
       expect(Math.hypot(world.player.x - point.x, world.player.y - point.y)).toBe(16)
       expect(getInteraction(world)).toMatchObject({ enabled: true, poiId: id })
@@ -188,4 +190,44 @@ describe('森のおとどけやさんの冒険', () => {
     for (const index of [-1, 3, 1.5, NaN, Infinity]) expect(createWorld(index).stageIndex).toBe(0)
     expect(createWorld(2).stageIndex).toBe(2)
   })
+})
+
+
+test.each([0, 1, 2])('森 %i はマップのタップと到着処理だけでクリアできる', index => {
+  const world = createWorld(index)
+  for (let step = 0; !world.completed && step < 20; step++) {
+    const id = getObjective(world).targetId!
+    arrive(world, id)
+    const event = interactOnArrival(world)
+    expect(event?.type).not.toBe('none')
+    expect(interactOnArrival(world)).toBeNull()
+  }
+  expect(world.completed).toBe(true)
+})
+
+test('各マップは川・橋・建物の位置が異なり、到達可能な道がつながる', () => {
+  const worlds = [0, 1, 2].map(createWorld)
+  expect(new Set(worlds.map(w => JSON.stringify(getPois(w)))).size).toBe(3)
+  expect(new Set(worlds.map(w => getMap(w).riverColumn)).size).toBe(3)
+  expect(new Set(worlds.map(w => getMap(w).bridgeRow)).size).toBe(3)
+  for (const world of worlds) {
+    expect(targetPoi(world, 'squirrel')).toBe(false)
+    visit(world, 'wood')
+    visit(world, 'bridge')
+    for (const poi of getPois(world)) arrive(world, poi.id)
+  }
+})
+
+test('地面への移動ではおてつだいせず、目的地を変えると最後のタップだけ実行する', () => {
+  const world = createWorld()
+  targetPoi(world, 'post')
+  targetPoint(world, 72, 232)
+  for (let i = 0; i < 50; i++) updateWorld(world, .1)
+  expect(interactOnArrival(world)).toBeNull()
+  expect(world.inventory.parcel).toBe(false)
+  targetPoi(world, 'post')
+  arrive(world, 'garden')
+  expect(interactOnArrival(world)?.type).toBe('water')
+  expect(world.inventory.parcel).toBe(false)
+  expect(world.inventory.carrot).toBe(false)
 })

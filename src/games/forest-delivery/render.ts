@@ -1,5 +1,5 @@
 import type { World, PoiId } from './model'
-import { POIS, STAGES, getObjective } from './model'
+import { getPois, getMap, STAGES, getObjective } from './model'
 import {
   PALETTES, rect, oval, tree, flower, item, fox, animal, bubble,
   type Palette, type AnimalKind, type ItemKind,
@@ -30,11 +30,12 @@ function grass(ctx: CanvasRenderingContext2D, palette: Palette) {
   }
 }
 
-function trails(ctx: CanvasRenderingContext2D, p: Palette) {
-  const strips = [
-    [47, 81, 20, 156], [56, 126, 62, 20], [94, 51, 20, 111],
-    [104, 142, 147, 20], [238, 76, 20, 146], [248, 143, 23, 18],
-  ]
+function trails(ctx: CanvasRenderingContext2D, p: Palette, world: World) {
+  const crossing = getMap(world).bridgeRow * 16 + 8
+  const strips = getPois(world).flatMap(poi => [
+    [poi.x - 8, Math.min(poi.y, crossing), 16, Math.abs(poi.y - crossing) + 16],
+    [Math.min(poi.x, 160), crossing - 8, Math.abs(poi.x - 160) + 16, 16],
+  ])
   for (const [x, y, w, h] of strips) rect(ctx, p.pathDark, x - 1, y, w + 2, h + 2)
   for (const [x, y, w, h] of strips) {
     rect(ctx, p.path, x, y, w, h)
@@ -332,7 +333,7 @@ function targetKind(id: PoiId, world: World): ItemKind {
 
 function guidance(ctx: CanvasRenderingContext2D, world: World, time: number, p: Palette) {
   const objective = getObjective(world)
-  const target = POIS.find(poi => poi.id === objective.targetId)
+  const target = getPois(world).find(poi => poi.id === objective.targetId)
   for (let i = 0; i < world.path.length; i += 2) {
     const point = world.path[i]
     rect(ctx, '#f8e4ac', point.x - 1, point.y - 1, 3, 3)
@@ -349,7 +350,7 @@ function guidance(ctx: CanvasRenderingContext2D, world: World, time: number, p: 
   rect(ctx, color, x - 12 - phase, y + 5, 5, 2)
   rect(ctx, color, x + 8 + phase, y + 5, 5, 2)
   const bubbleX = target.id === 'apple' ? x + 21 : target.id === 'post' ? x - 4 : x
-  const bubbleY = target.id === 'post' ? y - 63 : target.id === 'apple' ? 28 : y - 39
+  const bubbleY = target.id === 'post' ? y - 63 : target.id === 'apple' ? Math.max(18, y - 28) : y - 39
   bubble(ctx, bubbleX, bubbleY + phase, targetKind(target.id, world), true, p)
 }
 
@@ -360,10 +361,16 @@ export function drawScene(ctx: CanvasRenderingContext2D, world: World, timeSecon
   ctx.save()
   ctx.imageSmoothingEnabled = false
   grass(ctx, p)
-  trails(ctx, p)
-  river(ctx, p, time)
-  bridge(ctx, world.flags.bridgeRepaired, p)
-  garden(ctx, world, p)
+  trails(ctx, p, world)
+  const map = getMap(world)
+  const pois = getPois(world)
+  const at = (id: PoiId) => pois.find(poi => poi.id === id)!
+  const moved = (dx: number, dy: number, draw: () => void) => {
+    ctx.save(); ctx.translate(dx, dy); draw(); ctx.restore()
+  }
+  moved((map.riverColumn - 9) * 16, 0, () => river(ctx, p, time))
+  moved((map.riverColumn - 9) * 16, (map.bridgeRow - 9) * 16, () => bridge(ctx, world.flags.bridgeRepaired, p))
+  moved(at('garden').x - 72, at('garden').y - 136, () => garden(ctx, world, p))
   smallDetails(ctx, p, time, season)
   const scenery: { y: number; draw: () => void }[] = []
   // Border trees create a sheltered, miniature woodland village.
@@ -376,11 +383,11 @@ export function drawScene(ctx: CanvasRenderingContext2D, world: World, timeSecon
   for (const [x, y, size] of [[38, 25, 34], [73, 21, 32], [127, 16, 31], [193, 22, 35], [225, 17, 33], [266, 18, 32], [292, 29, 35], [33, 287, 35], [73, 292, 39], [113, 286, 34], [201, 287, 38], [240, 293, 39], [280, 287, 35]]) {
     scenery.push({ y, draw: () => tree(ctx, x, y, size, p) })
   }
-  scenery.push({ y: 44, draw: () => tree(ctx, 104, 44, 35, p, !world.flags.appleTaken) })
-  scenery.push({ y: 84, draw: () => woodpile(ctx, world.flags.woodCollected, p) })
-  scenery.push({ y: 199, draw: () => postOffice(ctx, 56, 199, p, season === 'dusk') })
+  scenery.push({ y: at('apple').y - 12, draw: () => tree(ctx, at('apple').x, at('apple').y - 12, 35, p, !world.flags.appleTaken) })
+  scenery.push({ y: at('wood').y - 4, draw: () => moved(at('wood').x - 104, at('wood').y - 88, () => woodpile(ctx, world.flags.woodCollected, p)) })
+  scenery.push({ y: at('post').y - 17, draw: () => postOffice(ctx, at('post').x, at('post').y - 17, p, season === 'dusk') })
   for (const kind of ['squirrel', 'rabbit', 'bear'] as const) {
-    const poi = POIS.find(candidate => candidate.id === kind)
+    const poi = getPois(world).find(candidate => candidate.id === kind)
     if (!poi) continue
     scenery.push({ y: poi.y - 17, draw: () => cottage(ctx, poi.x, poi.y - 17, kind, p, season === 'dusk') })
     scenery.push({ y: poi.y + 1, draw: () => animal(ctx, kind, poi.x, poi.y + 1, time, world.delivered.includes(kind), p) })
@@ -394,7 +401,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, world: World, timeSecon
   const objectiveId = getObjective(world).targetId
   for (const recipient of STAGES[world.stageIndex].deliveries) {
     if (world.delivered.includes(recipient) || objectiveId === recipient) continue
-    const poi = POIS.find(candidate => candidate.id === recipient)!
+    const poi = getPois(world).find(candidate => candidate.id === recipient)!
     const x = poi.x - 31, y = poi.y - 10
     rect(ctx, '#897b61', x - 10, y - 10, 21, 20)
     rect(ctx, p.cream, x - 9, y - 9, 19, 18)
