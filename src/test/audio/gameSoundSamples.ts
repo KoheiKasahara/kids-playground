@@ -20,6 +20,7 @@ import { playRoadEditSound } from '../../games/car-road-builder/sounds'
 import { craneSound } from '../../games/crane-game/craneSound'
 import * as dotAdventure from '../../games/dot-adventure/sounds'
 import * as dotAquarium from '../../games/dot-aquarium/sounds'
+import * as dotMonsterFarm from '../../games/dot-monster-farm/sounds'
 import * as dotRun from '../../games/dot-run/sounds'
 import * as dotZoo from '../../games/dot-zoo/sounds'
 import { playStarSound as playDrawGoalStarSound, playWarpSound as playDrawGoalWarpSound } from '../../games/draw-goal/sounds'
@@ -322,5 +323,13 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     background('BGM', 3, () => jishaku.startBgm('desk')),
   ],
   'shabon-pachin': [sample('ぱちん', shabon.playPopSound), sample('ぼよん', shabon.playBoingSound), sample('クリア', shabon.playClearSound)],
+  'dot-monster-farm': [
+    sample('だいせいこう', dotMonsterFarm.playGreat),
+    sample('おうえん', () => dotMonsterFarm.playCheer(4)),
+    sample('あたった', () => dotMonsterFarm.playHit(false, false)),
+    sample('かった', dotMonsterFarm.playWin),
+    background('ぼくじょうの BGM', 3, () => dotMonsterFarm.startBgm('ranch')),
+    background('たいかいの BGM', 3, () => dotMonsterFarm.startBgm('battle')),
+  ],
   'onaji-pon': [sample('つなぐ', () => onaji.playConnectSound(1)), sample('ひく', onaji.playDrawSound), sample('だめ', onaji.playNopeSound), sample('クリア', onaji.playClearSound)],
 }
