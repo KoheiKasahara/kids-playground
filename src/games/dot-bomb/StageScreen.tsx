@@ -84,6 +84,69 @@ function DPad({ onDir }: { onDir: (d: Dir | null) => void }) {
   </div>
 }
 
+// ---------------- どこでも スティック ----------------
+
+/** ボタンや じゅうじ、ダイアログの うえでは スティックを はじめない（ボタンの うごきを じゃましない）。 */
+const STICK_SKIP = 'button, a, input, select, textarea, [role="group"], [role="dialog"]'
+const STICK_RADIUS = 44
+const STICK_DEAD = 10
+
+type Stick = { id: number; ox: number; oy: number; kx: number; ky: number }
+
+/** さわった ところを まんなかに して うごく スティック。ゆびが とおくへ いくと まんなかも ついていく。 */
+function useFloatStick(onDir: (d: Dir | null) => void, enabled: boolean) {
+  const stick = useRef<Stick | null>(null)
+  const current = useRef<Dir | null>(null)
+  const [view, setView] = useState<Stick | null>(null)
+  const apply = (d: Dir | null) => {
+    if (current.current === d) return
+    current.current = d
+    onDir(d)
+  }
+  const move = (s: Stick, x: number, y: number) => {
+    let dx = x - s.ox, dy = y - s.oy
+    const dist = Math.hypot(dx, dy)
+    if (dist > STICK_RADIUS) {
+      // まんなかを ゆびの ほうへ ひっぱって、はんたいに うごかしたい ときも すぐ きりかわるように する
+      s.ox = x - dx / dist * STICK_RADIUS
+      s.oy = y - dy / dist * STICK_RADIUS
+      dx = x - s.ox; dy = y - s.oy
+    }
+    s.kx = dx; s.ky = dy
+    setView({ ...s })
+    if (Math.hypot(dx, dy) < STICK_DEAD) apply(null)
+    else apply(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0))
+  }
+  const end = (e: PointerEvent<HTMLElement>) => {
+    if (stick.current?.id !== e.pointerId) return
+    stick.current = null
+    setView(null)
+    apply(null)
+  }
+  const stop = useCallback(() => {
+    stick.current = null
+    current.current = null
+    setView(null)
+  }, [])
+  const handlers = {
+    onPointerDown: (e: PointerEvent<HTMLElement>) => {
+      if (!enabled || stick.current) return
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      if (e.target instanceof Element && e.target.closest(STICK_SKIP)) return
+      e.preventDefault()
+      primeAudio()
+      stick.current = { id: e.pointerId, ox: e.clientX, oy: e.clientY, kx: 0, ky: 0 }
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+      move(stick.current, e.clientX, e.clientY)
+    },
+    onPointerMove: (e: PointerEvent<HTMLElement>) => {
+      if (stick.current?.id === e.pointerId) move(stick.current, e.clientX, e.clientY)
+    },
+    onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end,
+  }
+  return { handlers, view, stop }
+}
+
 /** ゆびを おいた しゅんかんに うごく ボタン（キーボードの Enter・スペースでも おせる）。 */
 function PressButton({ className, label, onPress, children, disabled, ride }: { className: string; label: string; onPress: () => void; children: ReactNode; disabled?: boolean; ride?: string }) {
   return <button type="button" className={className} aria-label={label} aria-disabled={disabled || undefined} data-ride={ride}
@@ -112,6 +175,7 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<World | null>(null)
   const padDir = useRef<Dir | null>(null)
+  const stickDir = useRef<Dir | null>(null)
   const keyDirs = useRef<Dir[]>([])
   const pausedRef = useRef(false)
   const [hud, setHud] = useState<Hud>(() => readHud(createWorld(stage)))
@@ -122,6 +186,9 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
   const [missed, setMissed] = useState(false)
   const [song, setSong] = useState<snd.SongId | null>(stage.boss ? 'boss' : stage.world)
   const [bump, setBump] = useState<string | null>(null)
+  const stickOn = !paused && !result && !missed
+  const float = useFloatStick(d => { stickDir.current = d }, stickOn)
+  const stopStick = float.stop
 
   useEffect(() => {
     if (!music || !song) return undefined
@@ -133,8 +200,8 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
     if (on && (!w || w.state === 'clear' || w.state === 'miss')) return
     pausedRef.current = on
     setPaused(on)
-    if (on) { padDir.current = null; keyDirs.current = [] }
-  }, [])
+    if (on) { padDir.current = null; stickDir.current = null; keyDirs.current = []; stopStick() }
+  }, [stopStick])
 
   useEffect(() => {
     const world = createWorld(stage)
@@ -273,7 +340,7 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
       if (!ctx || !scene || !view) return
       blit(ctx, scene.draw(world, fx, time, view.w, view.h), view)
     }
-    const currentDir = () => padDir.current ?? keyDirs.current[keyDirs.current.length - 1] ?? null
+    const currentDir = () => padDir.current ?? stickDir.current ?? keyDirs.current[keyDirs.current.length - 1] ?? null
     const tick = (now: number) => {
       const elapsed = previous ? Math.min(100, now - previous) : 0
       previous = now
@@ -321,7 +388,7 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key
       if (key in DIR_KEYS) keyDirs.current = keyDirs.current.filter(k => k !== DIR_KEYS[key])
     }
-    const blur = () => { keyDirs.current = []; padDir.current = null; if (world.state === 'play') pause(true) }
+    const blur = () => { keyDirs.current = []; padDir.current = null; stickDir.current = null; if (world.state === 'play') pause(true) }
     const visibility = () => { if (document.hidden) blur() }
     window.addEventListener('keydown', keyDown)
     window.addEventListener('keyup', keyUp)
@@ -346,7 +413,7 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
   const last = index === STAGES.length - 1
   const ride = hud.ride ? RIDES[hud.ride] : null
 
-  return <GamePlaySurface><main className={styles.play} data-world={stage.world}>
+  return <GamePlaySurface><main className={styles.play} data-world={stage.world} data-stick={stickOn ? 'on' : 'off'} {...float.handlers}>
     <h1 className={styles.srOnly}>ドットの ボンボンぼうけん {stage.no} {stage.name}</h1>
     <div className={styles.board}>
       <canvas ref={canvasRef} className={styles.canvas} tabIndex={0}
@@ -395,6 +462,9 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
         </PressButton>
       </div>
     </div>
+    {float.view && <div className={styles.floatStick} style={{ left: float.view.ox, top: float.view.oy }} data-testid="float-stick" aria-hidden="true">
+      <span className={styles.floatKnob} style={{ transform: `translate(${float.view.kx}px, ${float.view.ky}px)` }} />
+    </div>}
     {banner === 'ready' && <div className={`${styles.window} ${styles.banner}`} aria-hidden="true">
       <small>{stage.no}</small>
       <strong>{stage.name}</strong>

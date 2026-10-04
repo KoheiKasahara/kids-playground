@@ -117,6 +117,26 @@ describe('dot-bomb の がめん', () => {
     expect(world().bombs).toHaveLength(1)
   })
 
+  test('ボードの どこを さわっても そこから スティックで うごける。ボタンは じゃましない', () => {
+    startAt({})
+    const canvas = document.querySelector('canvas[aria-label]')!
+    const x0 = world().hero.x
+    fireEvent.pointerDown(canvas, { pointerId: 7, clientX: 200, clientY: 200 })
+    expect(screen.getByTestId('float-stick')).toBeInTheDocument()
+    fireEvent.pointerMove(canvas, { pointerId: 7, clientX: 240, clientY: 205 })
+    advance(20)
+    expect(world().hero.x).toBeGreaterThan(x0)
+    fireEvent.pointerUp(canvas, { pointerId: 7 })
+    expect(screen.queryByTestId('float-stick')).not.toBeInTheDocument()
+    const x1 = world().hero.x
+    advance(10)
+    expect(world().hero.x).toBe(x1)
+    fireEvent.pointerDown(screen.getByRole('button', { name: /ボンを おく/ }), { pointerId: 8, button: 0 })
+    expect(screen.queryByTestId('float-stick')).not.toBeInTheDocument()
+    advance(2)
+    expect(world().bombs).toHaveLength(1)
+  })
+
   test('とびらに はいって クリアすると ★が きろくされ、つぎへで つぎの ステージ', () => {
     startAt({})
     const w = world()
