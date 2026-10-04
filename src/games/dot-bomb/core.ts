@@ -97,7 +97,7 @@ export type Bomb = {
 
 export type BombOwner = 'hero' | 'boss' | 'ally'
 
-export type Blast = { tx: number; ty: number; arms: [number, number, number, number]; t: number; power: number }
+export type Blast = { tx: number; ty: number; arms: [number, number, number, number]; t: number; power: number; owner?: FireOwner }
 
 export type Item = { id: number; tx: number; ty: number; kind: ItemKind; color?: RideColor; age: number }
 
@@ -356,7 +356,7 @@ export function explodeAt(w: World, tx: number, ty: number, range: number, owner
       if (other) { if (other.chain < 0) other.chain = CHAIN_DELAY; break }
     }
   }
-  w.blasts.push({ tx, ty, arms, t: 0, power: range })
+  w.blasts.push({ tx, ty, arms, t: 0, power: range, owner })
   emit(w, { type: 'boom', x: center(tx), y: center(ty), power: range, owner })
 }
 

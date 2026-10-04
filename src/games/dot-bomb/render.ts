@@ -110,7 +110,8 @@ function backPattern(th: Theme) {
 
 // ---------------- ほのお ----------------
 
-type FireCell = { h: boolean; v: boolean; center: boolean; end: number; k: number }
+// ally: ロボンの ひだけで できた マス（ほかの ひと かさなったら ふつうの いろ）。
+type FireCell = { h: boolean; v: boolean; center: boolean; end: number; k: number; ally: boolean }
 
 function fireStrength(b: Blast) {
   if (b.t < 4) return (b.t + 1) / 5
@@ -120,16 +121,19 @@ function fireStrength(b: Blast) {
 
 function collectFire(w: World) {
   const cells = new Map<number, FireCell>()
+  let ally = false
   const put = (tx: number, ty: number, k: number, f: (c: FireCell) => void) => {
     const key = ty * w.cols + tx
     let c = cells.get(key)
-    if (!c) { c = { h: false, v: false, center: false, end: -1, k: 0 }; cells.set(key, c) }
+    if (!c) { c = { h: false, v: false, center: false, end: -1, k: 0, ally }; cells.set(key, c) }
+    else if (!ally) c.ally = false
     c.k = Math.max(c.k, k)
     f(c)
   }
   for (const b of w.blasts) {
     const k = fireStrength(b)
     if (k <= 0) continue
+    ally = b.owner === 'ally'
     const isLine = b.arms.filter(a => a > 0).length === 1 && b.power === 2 && w.boss?.kind === 'dragon'
     put(b.tx, b.ty, k, c => { if (isLine) { c.h = true } else c.center = true })
     b.arms.forEach((len, d) => {
@@ -145,13 +149,16 @@ function collectFire(w: World) {
 }
 
 const FIRE_COLORS = ['#ff3a1e', '#ff8a1e', '#ffd23c', '#fff8d8']
+/** ロボンの ひは あおい でんきの ほのお。ポンの ひと ひとめで みわけられるように。 */
+const ALLY_FIRE_COLORS = ['#1e5aff', '#28b4ff', '#7deaff', '#f0ffff']
 
 function drawFireCell(ctx: CanvasRenderingContext2D, x0: number, y0: number, c: FireCell, frame: number, tx: number, ty: number) {
   const k = c.k
   const cross = c.center || (c.h && c.v)
   const layers = [1, .78, .52, .26]
+  const colors = c.ally ? ALLY_FIRE_COLORS : FIRE_COLORS
   for (let li = 0; li < 4; li++) {
-    ctx.fillStyle = FIRE_COLORS[li]
+    ctx.fillStyle = colors[li]
     const full = (cross ? 15 : 13) * k * layers[li]
     if (c.h || cross) {
       for (let x = 0; x < TILE; x++) {
@@ -171,7 +178,7 @@ function drawFireCell(ctx: CanvasRenderingContext2D, x0: number, y0: number, c: 
         ctx.fillRect(Math.round(x0 + 8 - half), y0 + y, Math.max(1, Math.round(half * 2)), 1)
       }
     }
-    if (cross) disc(ctx, x0 + 8, y0 + 8, (cross ? 8 : 6) * k * layers[li] + (li === 0 ? (frame >> 2) % 2 : 0), FIRE_COLORS[li])
+    if (cross) disc(ctx, x0 + 8, y0 + 8, (cross ? 8 : 6) * k * layers[li] + (li === 0 ? (frame >> 2) % 2 : 0), colors[li])
   }
 }
 
@@ -273,7 +280,11 @@ export class Scene {
     // ひかり
     ctx.globalCompositeOperation = 'lighter'
     const g = glowSprite(14, 'rgba(255,140,40,.32)')
-    if (g) for (const [key] of fire) ctx.drawImage(g, ox + (key % world.cols) * TILE - 6, oy + Math.floor(key / world.cols) * TILE - 6)
+    const ag = glowSprite(14, 'rgba(60,170,255,.32)')
+    for (const [key, c] of fire) {
+      const img = c.ally ? ag : g
+      if (img) ctx.drawImage(img, ox + (key % world.cols) * TILE - 6, oy + Math.floor(key / world.cols) * TILE - 6)
+    }
     const doorGlow = glowSprite(18, 'rgba(255,230,140,.4)')
     if (world.door?.open && doorGlow) ctx.drawImage(doorGlow, ox + world.door.tx * TILE - 10, oy + world.door.ty * TILE - 12)
     ctx.globalCompositeOperation = 'source-over'

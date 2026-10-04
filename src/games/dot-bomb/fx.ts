@@ -42,6 +42,7 @@ export function createFx(): Fx {
 const SPARK = ['#ffffff', '#fff6a0', '#ffd23c', '#ffb0c8']
 const CONFETTI = ['#ff5a6a', '#ffd23c', '#5ad0ff', '#7ce06a', '#ff9ad8', '#ffffff']
 const FIRE = ['#fff6c0', '#ffd23c', '#ff8a1e', '#ff4a1e']
+const ALLY_FIRE = ['#f0ffff', '#7deaff', '#28b4ff', '#1e5aff']
 
 function rand(fx: Fx) {
   fx.seed = (fx.seed * 16807) % 2147483647
@@ -75,9 +76,10 @@ export function spawnFx(fx: Fx, e: WorldEvent, world: World, theme: Theme) {
     case 'boom': {
       fx.shake = Math.min(9, Math.max(fx.shake, 3 + e.power * .7))
       fx.flash = Math.max(fx.flash, 3)
-      fx.flashColor = '#fff4d0'
-      burst(fx, e.x, e.y, 10, 'spark', FIRE, 2.4, 22)
-      for (let i = 0; i < 6; i++) add(fx, { kind: 'ember', x: e.x + (rand(fx) - .5) * 12, y: e.y + (rand(fx) - .5) * 8, vx: (rand(fx) - .5) * .8, vy: -.6 - rand(fx) * .8, max: 40 + rand(fx) * 30, color: FIRE[1 + (i % 3)], size: 1 })
+      const fire = e.owner === 'ally' ? ALLY_FIRE : FIRE
+      fx.flashColor = e.owner === 'ally' ? '#e0f6ff' : '#fff4d0'
+      burst(fx, e.x, e.y, 10, 'spark', fire, 2.4, 22)
+      for (let i = 0; i < 6; i++) add(fx, { kind: 'ember', x: e.x + (rand(fx) - .5) * 12, y: e.y + (rand(fx) - .5) * 8, vx: (rand(fx) - .5) * .8, vy: -.6 - rand(fx) * .8, max: 40 + rand(fx) * 30, color: fire[1 + (i % 3)], size: 1 })
       // あとから けむりが のこる
       for (let i = 0; i < 4; i++) add(fx, { kind: 'smoke', x: e.x + (rand(fx) - .5) * 10, y: e.y + (rand(fx) - .5) * 6, vx: (rand(fx) - .5) * .4, vy: -.35 - rand(fx) * .3, max: 46 + rand(fx) * 20, color: '#6a6478', size: 4 + rand(fx) * 3 })
       const tx = Math.floor(e.x / TILE), ty = Math.floor(e.y / TILE)
