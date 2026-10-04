@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import {
-  F_WARP, FIRE_FRAMES, FUSE, MAX_HEARTS, READY_FRAMES, T_FLOOR, T_HARD, T_SOFT, T_WALL, T_WATER, TILE, bombAt, center, idx, tileAt,
+  F_WARP, FIRE_FRAMES, FUSE, MAX_HEARTS, READY_FRAMES, T_FLOOR, T_HARD, T_SOFT, T_WALL, T_WATER, TILE, bombAt, center, hurtsHero, idx, ignite, isHeroFire, placeBombAt, tileAt,
   type World, type WorldEvent,
 } from './core'
-import { createWorld, drainEvents, pressBomb, pressSkill, setDir, stageResult, stepWorld } from './world'
+import { createWorld, dismissAlly, drainEvents, pressBomb, pressSkill, setDir, stageResult, stepWorld, summonAlly } from './world'
 import { STAGES, WORLDS, type StageDef } from './stages'
 
 function make(map: string[], extra: Partial<StageDef> = {}): World {
@@ -478,5 +478,80 @@ describe('dot-bomb の しかけ', () => {
     expect(w.hero.hearts).toBe(MAX_HEARTS)
     expect(bombAt(w, 1, 1)).toBeUndefined()
     expect(FIRE_FRAMES).toBeGreaterThan(0)
+  })
+})
+
+describe('dot-bomb の なかま', () => {
+  const FIELD = [
+    '###########',
+    '#P........#',
+    '#.........#',
+    '#.......a.#',
+    '###########',
+  ]
+
+  test('よぶと ポンの そばに でて、かえすと いなくなる', () => {
+    const w = make(FIELD)
+    const events = run(w, 0)
+    summonAlly(w)
+    expect(w.ally).not.toBeNull()
+    expect(Math.abs(Math.floor(w.ally!.x / TILE) - 1) + Math.abs(Math.floor(w.ally!.y / TILE) - 1)).toBeLessThanOrEqual(1)
+    dismissAlly(w)
+    run(w, 1, events)
+    expect(w.ally).toBeNull()
+    expect(events.map(e => e.type)).toEqual(expect.arrayContaining(['allyIn', 'allyOut']))
+  })
+
+  test('なかまの ひは てきを たおすが、ポンは いたくなく、アイテムも きえず、なかまも へいき', () => {
+    const w = make(OPEN)
+    summonAlly(w)
+    w.ally!.cool = 9999
+    w.enemies.push({ id: 5, kind: 'puni', x: center(3), y: center(1), fx: 3, fy: 1, tx: 3, ty: 1, dir: 0, hp: 1, inv: 0, speed: .4, behave: 'wander', flying: false, dead: 0, wait: 9999, stun: 0, age: 0 })
+    w.items.push({ id: 7, tx: 2, ty: 1, kind: 'fire', age: 0 })
+    w.items.push({ id: 8, tx: 1, ty: 2, kind: 'heart', age: 0 })
+    w.ally!.x = center(1); w.ally!.y = center(2); w.ally!.tx = 1; w.ally!.ty = 2
+    placeBombAt(w, 1, 1, 2, 'ally', 1)
+    run(w, 6)
+    expect(w.stats.defeated).toBe(1)
+    expect(w.hero.hearts).toBe(3)
+    expect(w.stats.damage).toBe(0)
+    expect(w.items.map(i => i.id).sort()).toEqual([7, 8])
+    expect(w.ally).not.toBeNull()
+  })
+
+  test('なかまの ひに あぶない ひが かさなると、ポンは いたい', () => {
+    const w = make(OPEN)
+    ignite(w, 3, 2, 'ally')
+    expect(hurtsHero(w, 3, 2)).toBe(false)
+    expect(isHeroFire(w, 3, 2)).toBe(true)
+    ignite(w, 3, 2, 'vent')
+    expect(hurtsHero(w, 3, 2)).toBe(true)
+  })
+
+  test('なかまは じぶんで てきを さがして ボンで たおす', () => {
+    const w = make(FIELD)
+    w.enemies[0].wait = 99999
+    summonAlly(w)
+    const events: WorldEvent[] = []
+    for (let i = 0; i < 1200 && w.stats.defeated === 0; i++) run(w, 1, events)
+    expect(events.some(e => e.type === 'allyBomb')).toBe(true)
+    expect(w.stats.defeated).toBe(1)
+    expect(w.stats.damage).toBe(0)
+  })
+
+  test('とじこめられても なかまが ブロックを こわして みちを ひらく', () => {
+    const w = make([
+      '#########',
+      '#P.s....#',
+      '#..s..a.#',
+      '#sss....#',
+      '#########',
+    ])
+    w.enemies[0].wait = 99999
+    summonAlly(w)
+    const events: WorldEvent[] = []
+    for (let i = 0; i < 2400 && w.stats.defeated === 0; i++) run(w, 1, events)
+    expect(events.some(e => e.type === 'break')).toBe(true)
+    expect(w.stats.defeated).toBe(1)
   })
 })

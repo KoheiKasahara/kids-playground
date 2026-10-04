@@ -89,11 +89,13 @@ export type Bomb = {
   kicked: boolean
   fuse: number
   range: number
-  owner: 'hero' | 'boss'
+  owner: BombOwner
   /** ひが うつって ばくはつするまで（-1 は まだ）。 */
   chain: number
   age: number
 }
+
+export type BombOwner = 'hero' | 'boss' | 'ally'
 
 export type Blast = { tx: number; ty: number; arms: [number, number, number, number]; t: number; power: number }
 
@@ -152,10 +154,25 @@ export type Shot = {
   gx?: number; gy?: number
 }
 
+/** なかまの ロボン。マスから マスへ ふわふわ うごき、なにが あっても へいき。 */
+export type Ally = {
+  x: number; y: number
+  /** むかっている マス。 */
+  tx: number; ty: number
+  dir: Dir
+  moving: boolean
+  /** つぎの ボンまでの まち。 */
+  cool: number
+  age: number
+}
+
 export type Runaway = { x: number; y: number; vx: number; vy: number; t: number; color: RideColor }
 
 export type WorldEvent =
   | { type: 'go' }
+  | { type: 'allyIn'; x: number; y: number }
+  | { type: 'allyOut'; x: number; y: number }
+  | { type: 'allyBomb'; x: number; y: number }
   | { type: 'place'; x: number; y: number }
   | { type: 'boom'; x: number; y: number; power: number; owner: FireOwner }
   | { type: 'break'; x: number; y: number }
@@ -197,7 +214,7 @@ export type World = {
   /** もえている ブロック（マスばんごう → のこり）。 */
   burning: Map<number, number>
   fire: Uint8Array
-  /** だれの ひか（1 ポン / 2 ボス・ひの あな）。ボスは ポンの ひでだけ いたがる。 */
+  /** だれの ひか（1 ポン / 2 ボス・ひの あな / 3 なかま）。ボスは ポンと なかまの ひでだけ いたがり、ポンは なかまの ひでは いたくない。 */
   fireOwner: Uint8Array
   blasts: Blast[]
   bombs: Bomb[]
@@ -207,6 +224,7 @@ export type World = {
   shots: Shot[]
   runaways: Runaway[]
   hero: Hero
+  ally: Ally | null
   door: { tx: number; ty: number; open: boolean } | null
   warps: Map<number, number>
   vents: Vent[]
@@ -286,20 +304,32 @@ export function emit(w: World, event: WorldEvent) {
   w.events.push(event)
 }
 
-export type FireOwner = 'hero' | 'boss' | 'vent'
+export type FireOwner = 'hero' | 'boss' | 'vent' | 'ally'
+
+const OWNER_HERO = 1, OWNER_DANGER = 2, OWNER_ALLY = 3
 
 /** ひを つける。 */
 export function ignite(w: World, tx: number, ty: number, owner: FireOwner) {
   if (!inside(w, tx, ty)) return
   const i = idx(w, tx, ty)
-  // ポンの ひと かさなったら ポンの ひと して あつかう。
-  if (owner === 'hero' || w.fire[i] <= FIRE_SAFE) w.fireOwner[i] = owner === 'hero' ? 1 : 2
+  // ポンの ひと かさなったら ポンの ひと して あつかう。なかまの ひは ほかの ひが ないときだけ（あぶない ひを かくさない）。
+  const cold = w.fire[i] <= FIRE_SAFE
+  if (owner === 'hero') w.fireOwner[i] = OWNER_HERO
+  else if (owner === 'ally') { if (cold) w.fireOwner[i] = OWNER_ALLY }
+  else if (cold || w.fireOwner[i] === OWNER_ALLY) w.fireOwner[i] = OWNER_DANGER
   w.fire[i] = FIRE_FRAMES
 }
 
-/** ポンの ひ（ボスに きく ひ）。 */
+/** ボスに きく ひ（ポンと なかまの ひ）。 */
 export function isHeroFire(w: World, tx: number, ty: number) {
-  return isHot(w, tx, ty) && w.fireOwner[idx(w, tx, ty)] === 1
+  if (!isHot(w, tx, ty)) return false
+  const o = w.fireOwner[idx(w, tx, ty)]
+  return o === OWNER_HERO || o === OWNER_ALLY
+}
+
+/** ポンが いたい ひ（なかまの ひは あたっても へいき）。 */
+export function hurtsHero(w: World, tx: number, ty: number) {
+  return isHot(w, tx, ty) && w.fireOwner[idx(w, tx, ty)] !== OWNER_ALLY
 }
 
 /** こわれる ブロックを もやしはじめる。 */
@@ -338,7 +368,7 @@ export function explodeBomb(w: World, b: Bomb) {
   explodeAt(w, tx, ty, b.range, b.owner)
 }
 
-export function placeBombAt(w: World, tx: number, ty: number, range: number, owner: 'hero' | 'boss', fuse = FUSE): Bomb | null {
+export function placeBombAt(w: World, tx: number, ty: number, range: number, owner: BombOwner, fuse = FUSE): Bomb | null {
   if (!inside(w, tx, ty) || isSolid(w, tx, ty) || bombAt(w, tx, ty)) return null
   const b: Bomb = { id: w.nextId++, tx, ty, off: 0, slide: null, speed: 0, belt: false, kicked: false, fuse, range, owner, chain: -1, age: 0 }
   w.bombs.push(b)

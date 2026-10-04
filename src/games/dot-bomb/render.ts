@@ -9,13 +9,13 @@ import {
 import { BOSS_FOOT_Y, BOSS_W, dragonArt, kingMechArt, kingPodArt, penguinArt, puniKingArt, wormArt } from './bossArt'
 import {
   BURN_FRAMES, DX, DY, F_BELT, F_DOOR, F_ICE, F_WARP, FIRE_FRAMES, T_HARD, T_SOFT, T_WALL, TILE, bombPos, bombTile, isBelt,
-  type Blast, type Boss, type Enemy, type Hero, type World,
+  type Ally, type Blast, type Boss, type Enemy, type Hero, type World,
 } from './core'
 import { ventCharge } from './world'
 import { shakeOffset, type Fx, type Particle } from './fx'
 import { disc, hash2, makeCanvas, mixHex, oval, rect, shadedOval, silhouette, spriteCanvas, type Img } from './pixel'
 import {
-  ENEMY_ART, HERO_CHEER, HERO_OUCH, HERO_PAL, ITEM_ICONS, ITEM_PAL, RIDE_BACK, RIDE_FRONT, RIDE_SIDE, RIDE_SIDE_HOP, heroRows, ridePalette,
+  ALLY_PAL, ALLY_ROBO, ENEMY_ART, HERO_CHEER, HERO_OUCH, HERO_PAL, ITEM_ICONS, ITEM_PAL, RIDE_BACK, RIDE_FRONT, RIDE_SIDE, RIDE_SIDE_HOP, heroRows, ridePalette,
   type HeroFacing, type HeroStep,
 } from './sprites'
 import { THEMES, type Theme } from './theme'
@@ -65,6 +65,10 @@ export function itemIconImage(kind: keyof typeof ITEM_ICONS) {
 }
 export function rideImage(color: RideColor) {
   return rideSprite(color, 'side', false, false)
+}
+const allySprite = () => cached('ally', () => spriteCanvas(ALLY_ROBO, ALLY_PAL))
+export function allyImage() {
+  return allySprite()
 }
 export function enemyImage(kind: EnemyKind) {
   return enemySprite(kind, false)
@@ -494,9 +498,22 @@ export class Scene {
       const b = w.boss
       push(b.y + 14, () => this.drawBoss(ctx, b, w.frame, ox, oy, time))
     }
+    const a = w.ally
+    if (a) push(a.y + 7, () => this.drawAlly(ctx, a, ox, oy))
     const h = w.hero
     push(h.y + 7, () => this.drawHero(ctx, w, ox, oy))
     return rows
+  }
+
+  private drawAlly(ctx: CanvasRenderingContext2D, a: Ally, ox: number, oy: number) {
+    const x = Math.round(ox + a.x), y = Math.round(oy + a.y)
+    const float = Math.round(Math.sin(a.age * .09) * 1.5) - 3
+    const sh = shadowSprite(10)
+    if (sh) ctx.drawImage(sh, x - 5, y + 5)
+    const img = allySprite()
+    if (img) ctx.drawImage(img, x - 8, y - 9 + float)
+    // あしもとの ジェットが ちらちら ひかる
+    if ((a.age >> 2) % 2) rect(ctx, x - 1, y + 7 + float, 2, 1, '#ffffff')
   }
 
   private drawTrail(ctx: CanvasRenderingContext2D, h: Hero, x: number, y: number, life: number, ox: number, oy: number) {

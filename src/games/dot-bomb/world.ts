@@ -4,14 +4,16 @@
 import {
   CHAIN_DELAY, DIRS, DX, DY, F_BELT, F_DOOR, F_ICE, F_VENT, F_WARP, FIRE_FRAMES, MAX_BOMBS, MAX_FIRE,
   MAX_HEARTS, MAX_SPEED, READY_FRAMES, START_HEARTS, T_FLOOR, T_HARD, T_SOFT, T_WALL, T_WATER, TILE, aliveEnemies, beltDir,
-  bombAt, bombTile, center, emit, explodeBomb, explodeAt, floorAt, hashString, heroAirborne, heroTile, hurtHero, idx, inside,
+  bombAt, bombTile, center, emit, explodeBomb, explodeAt, floorAt, hashString, heroAirborne, heroTile, hurtHero, hurtsHero, idx, inside,
   isBelt, isHot, isSolid, placeBombAt, rng, tileAt, tileOf, type Bomb, type Dir, type Hero, type ItemKind, type World,
 } from './core'
 import { hitEnemy, spawnEnemy, updateEnemies } from './enemies'
 import { createBoss, updateBoss, updateShots } from './boss'
+import { updateAlly } from './ally'
 import type { RideColor, StageDef } from './stages'
 
 export { READY_FRAMES } from './core'
+export { dismissAlly, summonAlly } from './ally'
 export type { World, WorldEvent } from './core'
 
 /** ポンの からだの はんぶん（マスより すこし ちいさく して すきまに はいりやすく）。 */
@@ -117,7 +119,7 @@ export function createWorld(stage: StageDef, seed = 0): World {
 
   const w: World = {
     stage, cols, rows, tiles, floor, hidden, burning: new Map(), fire: new Uint8Array(cols * rows), fireOwner: new Uint8Array(cols * rows),
-    blasts: [], bombs: [], items: [], enemies: [], boss: null, shots: [], runaways: [], hero, door, warps, vents,
+    blasts: [], bombs: [], items: [], enemies: [], boss: null, shots: [], runaways: [], hero, ally: null, door, warps, vents,
     state: 'ready', stateT: 0, frame: 0, hitStop: 0, input: { dir: null, bomb: 0, skill: 0 }, events: [],
     stats: { damage: 0, star: false, frames: 0, defeated: 0, bombs: 0 }, nextId: 1, rand,
   }
@@ -457,7 +459,7 @@ function updateHero(w: World) {
       h.slide = 0
     }
   }
-  if (!heroAirborne(h) && isHot(w, tileOf(h.x), tileOf(h.y))) hurtHero(w)
+  if (!heroAirborne(h) && hurtsHero(w, tileOf(h.x), tileOf(h.y))) hurtHero(w)
   if (w.state !== 'play') return
   const door = w.door
   if (door?.open && !heroAirborne(h) && tileOf(h.x) === door.tx && tileOf(h.y) === door.ty
@@ -594,6 +596,7 @@ export function stepWorld(w: World) {
       w.stats.frames++
       updateHero(w)
       if (w.state !== 'play') break
+      updateAlly(w)
       updateBombs(w)
       updateFire(w)
       updateVents(w)
