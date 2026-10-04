@@ -545,3 +545,29 @@ export const ENEMY_ART: Record<EnemyKind, EnemyArt> = {
     ],
   },
 }
+
+// ---------------- なかま（ロボン） ----------------
+
+export const ALLY_PAL = {
+  k: OUTLINE, a: '#dff3ff', b: '#8fc4ea', c: '#ffffff', s: '#26324f', g: '#7dffb0', p: '#ff8aa8', y: '#ffd23c', f: '#5ad0ff',
+}
+
+/** ふわふわ うかぶ ロボット（ひとの かたちに しない）。 */
+export const ALLY_ROBO = [
+  '......kkkk......',
+  '......kyyk......',
+  '.......kk.......',
+  '.......kk.......',
+  '...kkkkkkkkkk...',
+  '..kccaaaaaaaak..',
+  '.kcassssssssaak.',
+  '.kaasggssggsaak.',
+  '.kaasggssggsaak.',
+  '.kpasssggsssapk.',
+  '.kaassssssssaak.',
+  '.kbaaaaaaaaaabk.',
+  '..kbbbbbbbbbbk..',
+  '...kkkkkkkkkk...',
+  '.....kffffk.....',
+  '......kffk......',
+]

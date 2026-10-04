@@ -661,6 +661,10 @@ button:focus-visible {
   font-size: 20px;
 }
 
+/* なかまを よんでいない ときは うすく して「おすと くる」と わかるように。 */
+.allyButton { display: grid; place-items: center; }
+.allyButton[data-on='off'] .hudIcon { opacity: .4; filter: grayscale(1); }
+
 /* そうさ */
 
 .controls {

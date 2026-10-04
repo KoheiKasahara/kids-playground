@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  EGG, ENEMY_ART, HERO_CHEER, HERO_OUCH, HERO_PAL, ITEM_ICONS, ITEM_PAL, RIDE_BACK, RIDE_FRONT, RIDE_SIDE, RIDE_SIDE_HOP, heroRows, ridePalette,
+  ALLY_PAL, ALLY_ROBO, EGG, ENEMY_ART, HERO_CHEER, HERO_OUCH, HERO_PAL, ITEM_ICONS, ITEM_PAL, RIDE_BACK, RIDE_FRONT, RIDE_SIDE, RIDE_SIDE_HOP, heroRows, ridePalette,
 } from './sprites'
 
 function check(name: string, rows: readonly string[], pal: Record<string, string>, size?: [number, number]) {
@@ -25,5 +25,6 @@ describe('dot-bomb の ドット絵', () => {
     check('egg', EGG, { ...pal, W: '#ccc' })
     for (const [name, rows] of Object.entries(ITEM_ICONS)) check(name, rows, ITEM_PAL, [10, 10])
     for (const [name, art] of Object.entries(ENEMY_ART)) check(name, art.rows, art.pal, [16, 16])
+    check('ally', ALLY_ROBO, ALLY_PAL, [16, 16])
   })
 })

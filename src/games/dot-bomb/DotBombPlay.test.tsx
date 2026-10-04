@@ -117,6 +117,24 @@ describe('dot-bomb の がめん', () => {
     expect(world().bombs).toHaveLength(1)
   })
 
+  test('なかまの ボタンで ロボンを よんだり かえしたり でき、やりなおしても おぼえている', () => {
+    startAt({})
+    expect(world().ally).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'なかまの ロボンを よぶ' }))
+    expect(world().ally).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'なかまの ロボンに かえって もらう' })).toHaveAttribute('aria-pressed', 'true')
+    expect(store.get('dot-bomb-ally-v1')).toBe('on')
+    advance(60)
+    expect(world().ally).not.toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'さいしょから' }))
+    advance(2)
+    expect(world().ally).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'なかまの ロボンに かえって もらう' }))
+    expect(world().ally).toBeNull()
+    expect(store.get('dot-bomb-ally-v1')).toBe('off')
+  })
+
   test('ボードの どこを さわっても そこから スティックで うごける。ボタンは じゃましない', () => {
     startAt({})
     const canvas = document.querySelector('canvas[aria-label]')!

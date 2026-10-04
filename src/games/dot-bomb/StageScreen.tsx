@@ -5,11 +5,11 @@ import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
 import { vibrate } from '../../utils/haptics'
 import type { Dir, World, WorldEvent } from './core'
-import { createWorld, drainEvents, pressBomb, pressSkill, setDir, stageResult, stepWorld, type StageResult } from './world'
-import { Scene, eggSprite, heroImage, heroOuchImage, itemIconImage, rideImage } from './render'
+import { createWorld, dismissAlly, drainEvents, pressBomb, pressSkill, setDir, stageResult, stepWorld, summonAlly, type StageResult } from './world'
+import { Scene, allyImage, eggSprite, heroImage, heroOuchImage, itemIconImage, rideImage } from './render'
 import { createFx, spawnFx, updateFx } from './fx'
 import { BOSS_NAMES, RIDES, STAGES, type RideColor } from './stages'
-import { progressStore } from './progress'
+import { progressStore, readAlly, writeAlly } from './progress'
 import * as snd from './sounds'
 import { blit, fitCanvas, reducedMotion } from './view'
 import PixelIcon from './PixelIcon'
@@ -47,6 +47,7 @@ const rideIcons: Record<RideColor, () => ReturnType<typeof rideImage>> = {
   green: () => rideImage('green'), blue: () => rideImage('blue'), pink: () => rideImage('pink'), yellow: () => rideImage('yellow'),
 }
 const goldEggIcon = () => eggSprite('gold')
+const allyIcon = () => allyImage()
 
 // ---------------- じゅうじキー ----------------
 
@@ -186,6 +187,8 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
   const [missed, setMissed] = useState(false)
   const [song, setSong] = useState<snd.SongId | null>(stage.boss ? 'boss' : stage.world)
   const [bump, setBump] = useState<string | null>(null)
+  const [ally, setAlly] = useState(readAlly)
+  const allyRef = useRef(ally)
   const stickOn = !paused && !result && !missed
   const float = useFloatStick(d => { stickDir.current = d }, stickOn)
   const stopStick = float.stop
@@ -206,6 +209,7 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
   useEffect(() => {
     const world = createWorld(stage)
     worldRef.current = world
+    if (allyRef.current) summonAlly(world)
     // 開発中だけ ブラウザから じょうたいを のぞけるように する（本番の ビルドには はいらない）。
     if (import.meta.env.DEV) (window as unknown as { __dotBombWorld?: World }).__dotBombWorld = world
     const fx = createFx()
@@ -249,6 +253,12 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
             if (tutorial) showHint('move', 'じゅうじで うごいて、ボンボタンで ボンを おこう！', 4200)
             else if (stage.boss) showHint('boss', `${BOSS_NAMES[stage.boss]}が あらわれた！`, 2600)
             break
+          case 'allyIn':
+            snd.playHatch()
+            showHint('ally', 'なかまの ロボンが きたよ！ てきを ボンで やっつけて くれる', 3400)
+            break
+          case 'allyOut': snd.playWarp(); break
+          case 'allyBomb': snd.playPlace(); break
           case 'place':
             snd.playPlace()
             vibrate('tap')
@@ -410,6 +420,14 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
 
   const bomb = () => { const w = worldRef.current; if (w && !pausedRef.current) pressBomb(w) }
   const skill = () => { const w = worldRef.current; if (w && !pausedRef.current) pressSkill(w) }
+  const toggleAlly = () => {
+    const on = !allyRef.current
+    allyRef.current = on
+    setAlly(on)
+    writeAlly(on)
+    const w = worldRef.current
+    if (w && w.state !== 'clear' && w.state !== 'miss') { if (on) summonAlly(w); else dismissAlly(w) }
+  }
   const last = index === STAGES.length - 1
   const ride = hud.ride ? RIDES[hud.ride] : null
 
@@ -445,6 +463,10 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
       )}
     </div>
     <div className={styles.hudRight}>
+      <button type="button" className={`${styles.window} ${styles.iconButton} ${styles.allyButton}`} onClick={toggleAlly} aria-pressed={ally}
+        aria-label={ally ? 'なかまの ロボンに かえって もらう' : 'なかまの ロボンを よぶ'} data-on={ally ? 'on' : 'off'}>
+        <PixelIcon make={allyIcon} className={styles.hudIcon} />
+      </button>
       <button type="button" className={`${styles.window} ${styles.iconButton}`} onClick={() => pause(true)} aria-label="ひとやすみ">Ⅱ</button>
       <button type="button" className={`${styles.window} ${styles.iconButton}`} onClick={onMusic} aria-pressed={music} aria-label={music ? 'おんがくを けす' : 'おんがくを ながす'}>{music ? '♪' : '×'}</button>
     </div>

@@ -63,6 +63,12 @@ function burst(fx: Fx, x: number, y: number, n: number, kind: ParticleKind, colo
 
 export function spawnFx(fx: Fx, e: WorldEvent, world: World, theme: Theme) {
   switch (e.type) {
+    case 'allyIn':
+    case 'allyOut':
+      add(fx, { kind: 'ring', x: e.x, y: e.y, vx: 0, vy: 0, max: 18, color: '#7dffb0', size: 1 })
+      burst(fx, e.x, e.y - 4, 10, 'star', SPARK, 1.6, 24)
+      break
+    case 'allyBomb':
     case 'place':
       for (let i = 0; i < 6; i++) add(fx, { kind: 'dust', x: e.x + (i - 2.5) * 2.4, y: e.y + 6, vx: (i - 2.5) * .25, vy: -.15, max: 16, color: '#ffffff', size: 2 })
       break

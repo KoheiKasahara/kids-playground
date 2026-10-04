@@ -6,6 +6,7 @@ export const progressStore = createStageProgressStore('dot-bomb-progress-v1', id
 
 const SEEN_KEY = 'dot-bomb-seen-v1'
 const MUSIC_KEY = 'dot-bomb-music-v1'
+const ALLY_KEY = 'dot-bomb-ally-v1'
 
 /** もう みた おはなし。 */
 export function readSeen(): Set<string> {
@@ -29,6 +30,15 @@ export function readMusic(): boolean {
 
 export function writeMusic(on: boolean) {
   try { localStorage.setItem(MUSIC_KEY, on ? 'on' : 'off') } catch { /* 保存できなくても つづけられる。 */ }
+}
+
+/** なかまの ロボンを つれていくか（さいしょは つれていかない）。 */
+export function readAlly(): boolean {
+  try { return localStorage.getItem(ALLY_KEY) === 'on' } catch { return false }
+}
+
+export function writeAlly(on: boolean) {
+  try { localStorage.setItem(ALLY_KEY, on ? 'on' : 'off') } catch { /* 保存できなくても つづけられる。 */ }
 }
 
 /** まだ クリアしていない さいしょの ステージ（ぜんぶ クリアなら -1）。 */
