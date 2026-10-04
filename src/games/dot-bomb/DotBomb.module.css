@@ -528,6 +528,9 @@ button:focus-visible {
   user-select: none;
 }
 
+/* あそんでいる あいだは どこを さわっても スティックに する（ダイアログの スクロールは じゃましない） */
+.play[data-stick='on'] { touch-action: none; }
+
 .board {
   position: absolute;
   inset: 0;
@@ -727,6 +730,30 @@ button:focus-visible {
 .padKnob[data-dir='1'] { transform: translateX(38%); }
 .padKnob[data-dir='2'] { transform: translateY(38%); }
 .padKnob[data-dir='3'] { transform: translateX(-38%); }
+
+/* さわった ところに でる スティック */
+.floatStick {
+  position: fixed;
+  z-index: 3;
+  width: 104px;
+  height: 104px;
+  margin: -52px 0 0 -52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, rgb(80 100 190 / 45%), rgb(20 26 70 / 55%));
+  box-shadow: 0 0 0 3px rgb(255 248 236 / 70%), 0 0 0 5px rgb(13 18 56 / 60%);
+  pointer-events: none;
+}
+
+.floatKnob {
+  position: absolute;
+  top: 26px;
+  left: 26px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0 18%, #c8d4ff 19%, #7a8ee0 100%);
+  box-shadow: 0 0 0 3px #0d1238, 0 3px 0 2px rgb(0 0 0 / 30%);
+}
 
 .buttons {
   display: flex;
