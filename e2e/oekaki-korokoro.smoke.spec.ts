@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { boxesOverlap, visibleTextBox } from './support/layout'
 
 const drawing = (page: Page) => page.getByLabel('おえかきの かみ。ゆびや マウスで なぞってね')
 const pixels = (page: Page) => drawing(page).evaluate(el => (el as HTMLCanvasElement).toDataURL())
@@ -111,6 +112,29 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
       await first.click()
       await expect(first).toHaveAttribute('aria-pressed', 'true')
     }
+    const paperChoices = page.getByRole('group', { name: 'かみを えらぶ' }).getByRole('button')
+    await expect(paperChoices).toHaveCount(4)
+    const paperButtons = await paperChoices.all()
+    const paperBoxes = await Promise.all(paperButtons.map(button => button.boundingBox()))
+    const toolsBox = await page.getByRole('complementary', { name: 'おえかきの どうぐ' }).boundingBox()
+    expect(toolsBox).not.toBeNull()
+    for (const [index, button] of paperButtons.entries()) {
+      const label = await visibleTextBox(button.locator('small'))
+      const bounds = paperBoxes[index]!
+      expect(label).not.toBeNull()
+      expect(label!.x).toBeGreaterThanOrEqual(bounds.x)
+      expect(label!.y).toBeGreaterThanOrEqual(bounds.y)
+      expect(label!.x + label!.width).toBeLessThanOrEqual(bounds.x + bounds.width)
+      expect(label!.y + label!.height).toBeLessThanOrEqual(bounds.y + bounds.height)
+      expect(boxesOverlap(label, toolsBox)).toBe(false)
+      for (const [otherIndex, otherBounds] of paperBoxes.entries()) {
+        if (otherIndex !== index) expect(boxesOverlap(label, otherBounds)).toBe(false)
+      }
+      await button.click()
+      await expect(button).toHaveAttribute('aria-pressed', 'true')
+    }
+    await paperChoices.first().click()
+    await expect(paperChoices.first()).toHaveAttribute('aria-pressed', 'true')
     expect(await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }))).toEqual({ x: 0, y: 0 })
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
     const box = (await drawing(page).boundingBox())!
