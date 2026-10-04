@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Cell, Sandbox, renderSandbox, sandboxGrid } from './sandboxSimulation'
+import { Cell, DRY_STEPS, Sandbox, renderSandbox, sandboxGrid } from './sandboxSimulation'
 const advance = (world: Sandbox, steps = 100) => { for (let i = 0; i < steps; i++) world.step() }
 const count = (world: Sandbox, material: number) => world.cells.filter(c => c === material).length
 function seeded() {
@@ -37,15 +37,49 @@ describe('falling sand play loop', () => {
     expect(world.get(10, 29)).toBe(Cell.Water)
     expect(world.get(28, 29)).toBe(Cell.Water)
   })
-  it('sand sinks through water, becomes damp, and preserves water', () => {
+  it('sand sinks through water, becomes damp, and soaks up a grain of water each', () => {
     const world = new Sandbox(24, 24, seeded())
     world.cells.fill(Cell.Water, 12 * 24)
     world.paint({ x: 12, y: 3 }, Cell.Sand, 2)
     const water = count(world, Cell.Water), sand = count(world, Cell.Sand)
     advance(world, 160)
-    expect(count(world, Cell.Water)).toBe(water)
-    expect(count(world, Cell.Mud)).toBe(sand)
-    expect(world.cells.slice(23 * 24).some(c => c === Cell.Mud)).toBe(true)
+    expect(count(world, Cell.Water)).toBe(water - sand)
+    expect(count(world, Cell.Mud) + count(world, Cell.Sand)).toBe(sand)
+    expect(count(world, Cell.Mud)).toBeGreaterThan(0)
+  })
+  it('water poured on dry sand soaks into its surface only', () => {
+    const world = new Sandbox(32, 32, seeded())
+    world.cells.fill(Cell.Sand, 20 * 32)
+    world.paint({ x: 16, y: 10 }, Cell.Water, 2)
+    const water = count(world, Cell.Water)
+    advance(world, 60)
+    expect(count(world, Cell.Water)).toBeLessThan(water)
+    expect(count(world, Cell.Mud)).toBe(water - count(world, Cell.Water))
+    // The damp skin does not wick the water on down into the sand below it.
+    expect(world.cells.slice(24 * 32).every(c => c === Cell.Sand)).toBe(true)
+  })
+  it('damp sand dries back into sand unless water lies on it', () => {
+    const world = new Sandbox(32, 32, seeded())
+    world.cells.fill(Cell.Mud, 28 * 32)
+    world.stroke({ x: 0, y: 27 }, { x: 31, y: 27 }, Cell.Stone, 0)
+    world.stroke({ x: 10, y: 22 }, { x: 10, y: 26 }, Cell.Stone, 0)
+    for (let y = 24; y < 27; y++) for (let x = 0; x < 10; x++) world.cells[y * 32 + x] = Cell.Mud
+    for (let y = 22; y < 24; y++) for (let x = 0; x < 10; x++) world.cells[y * 32 + x] = Cell.Water
+    advance(world, DRY_STEPS - 10)
+    expect(world.get(20, 30)).toBe(Cell.Mud)
+    advance(world, 400)
+    expect(world.get(20, 30)).toBe(Cell.Sand)
+    // Under the pond only the layer the water lies on stays damp.
+    for (let x = 0; x < 10; x++) expect(world.get(x, 24)).toBe(Cell.Mud)
+    expect(world.get(5, 26)).toBe(Cell.Sand)
+  })
+  it('seeds sown on dry sand sprout once they are watered', () => {
+    const world = bed(Cell.Sand)
+    advance(world, 60)
+    expect(count(world, Cell.Stem)).toBe(0)
+    world.paint({ x: 24, y: 30 }, Cell.Water, 2)
+    advance(world, 200)
+    expect(world.flowers).toBe(1)
   })
   it('seeds grow gradually into flowers only on damp sand', () => {
     const wet = bed(Cell.Mud), dry = bed(Cell.Sand), stone = bed(Cell.Stone)

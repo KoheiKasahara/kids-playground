@@ -15,6 +15,10 @@ type Plant = Point & { height: number; age: number; target: number; tulip: boole
 // A portrait board is the reference shape: keeping the count of grains steady over
 // every shape keeps a grain - and every animal drawn out of grains - the same size.
 const GRAINS = 144 * 176
+// At 60 steps/second damp sand dries in 12 to 18 seconds once no water lies on it;
+// the spread makes a patch dry grain by grain instead of all at once.
+export const DRY_STEPS = 720
+const DRY_SPREAD = 360
 /** The grid that fills a board of this size with square grains. */
 export function sandboxGrid(boxWidth: number, boxHeight: number) {
   if (!(boxWidth > 0) || !(boxHeight > 0)) return null
@@ -212,6 +216,13 @@ export class Sandbox {
     this.moved[i] = this.moved[j] = 1
     return true
   }
+  /** Take up one cell of water touching this grain, if any touches it. */
+  private soak(x: number, y: number) {
+    for (const [nx, ny] of [[x, y - 1], [x - 1, y], [x + 1, y], [x, y + 1]]) {
+      if (this.get(nx, ny) === Cell.Water) { this.set(nx, ny, Cell.Empty); return true }
+    }
+    return false
+  }
   step() {
     this.tick++
     this.moved.fill(0)
@@ -221,8 +232,24 @@ export class Sandbox {
       const i = y * this.width + x
       let material = this.cells[i]
       if (this.moved[i] || !loose(material)) continue
-      if (material === Cell.Sand && (this.get(x - 1, y) === Cell.Water || this.get(x + 1, y) === Cell.Water || this.get(x, y - 1) === Cell.Water || this.get(x, y + 1) === Cell.Water)) {
+      // A grain touching water soaks one cell of it up, so sand poured into a pond
+      // thins it out. Only that grain gets damp: the dry sand beneath stays dry.
+      if (material === Cell.Sand && this.soak(x, y)) {
         material = this.cells[i] = Cell.Mud
+        this.age[i] = 0
+      } else if (material === Cell.Mud) {
+        // Damp sand stays damp under water and slowly dries out everywhere else.
+        if (this.get(x, y - 1) === Cell.Water) this.age[i] = 0
+        else if (++this.age[i] >= DRY_STEPS + (x * 7 + y * 13) % DRY_SPREAD) {
+          material = this.cells[i] = Cell.Sand
+          this.age[i] = 0
+        }
+      }
+      // A seed lets the water it touches through to the dry sand it lies on,
+      // so watering after sowing works as well as sowing on damp sand.
+      if (isSeed(material) && this.get(x, y + 1) === Cell.Sand && this.soak(x, y)) {
+        this.cells[i + this.width] = Cell.Mud
+        this.age[i + this.width] = 0
       }
       // Seeds need damp soil beneath them; dry sand and stone never germinate.
       if (isSeed(material) && this.get(x, y + 1) === Cell.Mud) {
