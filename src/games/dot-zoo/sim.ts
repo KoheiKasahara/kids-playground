@@ -20,7 +20,7 @@ export type Animal = {
   z: number
   /** むき（ラジアン。0 で +X）。 */
   facing: number
-  state: 'idle' | 'walk' | 'toFood' | 'eat' | 'sleep' | 'act' | 'react'
+  state: 'idle' | 'walk' | 'toFood' | 'eat' | 'sleep' | 'act' | 'react' | 'fly'
   pose: Pose
   /** アニメの じかん。 */
   anim: number
@@ -37,7 +37,15 @@ export type Animal = {
   hop: number
   poopIn: number
   seed: number
+  /** じめんからの たかさ（とぶ どうぶつ だけ）。 */
+  alt: number
+  /** とまっている き・いわ（Placed の id）。 */
+  perch: number | null
+  /** とんでいく さき。 */
+  fly: FlyGoal | null
 }
+
+export type FlyGoal = { x: number; z: number; alt: number; perch: number | null }
 
 export type Food = { id: number; kind: FoodKind; x: number; z: number; left: number; age: number; eater: number | null; drop: number }
 export type Poop = { id: number; x: number; z: number; age: number }
@@ -50,6 +58,7 @@ export type ZooEvent =
   | { type: 'react'; animal: Animal }
   | { type: 'poop'; x: number; z: number }
   | { type: 'friends'; x: number; z: number }
+  | { type: 'takeoff'; animal: Animal; from: ObjectKind | null }
   | { type: 'morning' }
   | { type: 'night' }
 
@@ -72,6 +81,11 @@ export type World = {
 /** 1日の ながさ（びょう）。 */
 export const DAY_SECONDS = 300
 const MAX_POOPS = 8
+/** とぶ ときの たかさ。 */
+const CRUISE = 2.4
+
+/** とまれる もの と、とまった ときの たかさ。 */
+export const PERCH_ALT: Partial<Record<ObjectKind, number>> = { tree: 1.7, palm: 1.66, rock: .5 }
 
 export type Check = { ok: true } | { ok: false; reason: string }
 
@@ -125,7 +139,8 @@ export function countKind(world: World, kind: ObjectKind) {
 }
 
 export function counter(id: SpeciesId) {
-  return id === 'monkey' || id === 'rabbit' || id === 'penguin' || id === 'crocodile' || id === 'flamingo' ? 'ひき' : 'とう'
+  if (id === 'eagle') return 'わ'
+  return id === 'monkey' || id === 'rabbit' || id === 'penguin' || id === 'crocodile' || id === 'flamingo' || id === 'koala' || id === 'capybara' ? 'ひき' : 'とう'
 }
 
 // ---------------- おく・けす ----------------
@@ -136,6 +151,7 @@ export function checkAnimal(world: World, id: SpeciesId, tx: number, tz: number)
   if (world.animals.length >= MAX_ANIMALS) return { ok: false, reason: `どうぶつは ぜんぶで ${MAX_ANIMALS}とう までだよ` }
   if (def.needsPond && countKind(world, 'pond') === 0) return { ok: false, reason: `${def.name}には いけが ひつようだよ。さきに いけを つくってね` }
   if (!inside(tx, tz)) return { ok: false, reason: 'かこいの なかに おいてね' }
+  if (def.flies && freePerch(world, tx, tz)) return { ok: true }
   if (!walkable(world, tx, tz, !!def.swims)) {
     return isWater(world, tx, tz) ? { ok: false, reason: `${def.name}は いけの なかに おけないよ` } : { ok: false, reason: 'そこは ものが あって おけないよ' }
   }
@@ -147,10 +163,36 @@ export function addAnimal(world: World, id: SpeciesId, tx: number, tz: number, r
     id: world.nextId++, species: id, x: tx + .5, z: tz + .5, facing: world.rand() * Math.PI * 2,
     state: 'idle', pose: 'idle', anim: world.rand(), timer: 1 + world.rand() * 2, path: [], food: null,
     hunger: .45, mood: .6, bubble: 'heart', bubbleTime: 1.6, hop: .6, poopIn: -1, seed: Math.floor(world.rand() * 1e6),
+    alt: 0, perch: null, fly: null,
     ...restore,
   }
+  // とぶ どうぶつは き・いわの うえに おくと そこに とまる。
+  const o = speciesDef(id).flies ? freePerch(world, Math.floor(a.x), Math.floor(a.z)) : undefined
+  if (o) sitOn(a, o)
   world.animals.push(a)
   return a
+}
+
+/** tx,tz に ある、まだ だれも とまっていない き・いわ。 */
+export function freePerch(world: World, tx: number, tz: number, self?: Animal): Placed | undefined {
+  const o = objectAt(world, tx, tz)
+  if (!o || PERCH_ALT[o.kind] === undefined) return undefined
+  if (world.animals.some(b => b !== self && (b.perch === o.id || b.fly?.perch === o.id))) return undefined
+  return o
+}
+
+function sitOn(a: Animal, o: Placed) {
+  a.perch = o.id
+  a.alt = PERCH_ALT[o.kind]!
+  a.x = o.x + .5
+  a.z = o.z + .5
+  a.fly = null
+  a.path = []
+}
+
+/** とんでいる、または き・いわに とまっている。 */
+export function isAirborne(a: Animal) {
+  return a.state === 'fly' || a.perch !== null
 }
 
 export function checkObject(world: World, kind: ObjectKind, tx: number, tz: number): Check {
@@ -160,7 +202,7 @@ export function checkObject(world: World, kind: ObjectKind, tx: number, tz: numb
   for (let x = tx; x < tx + def.size; x++) for (let z = tz; z < tz + def.size; z++) {
     if (!inside(x, z)) return { ok: false, reason: def.size > 1 ? 'かこいから はみだしちゃうよ' : 'かこいの なかに おいてね' }
     if (objectAt(world, x, z)) return { ok: false, reason: 'ここには もう なにか あるよ' }
-    if (world.animals.some(a => Math.floor(a.x) === x && Math.floor(a.z) === z)) return { ok: false, reason: 'どうぶつが いるよ。すこし まってね' }
+    if (world.animals.some(a => !isAirborne(a) && Math.floor(a.x) === x && Math.floor(a.z) === z)) return { ok: false, reason: 'どうぶつが いるよ。すこし まってね' }
   }
   return { ok: true }
 }
@@ -180,7 +222,7 @@ export function removeObject(world: World, o: Placed) {
   world.objects = world.objects.filter(p => p !== o)
   if (o.kind === 'pond') {
     // いけが なくなったら、いけに いた どうぶつを りくへ。
-    for (const a of world.animals) if (!walkable(world, Math.floor(a.x), Math.floor(a.z), false)) moveToLand(world, a)
+    for (const a of world.animals) if (!isAirborne(a) && !walkable(world, Math.floor(a.x), Math.floor(a.z), false)) moveToLand(world, a)
   }
 }
 
@@ -206,7 +248,7 @@ function moveToLand(world: World, a: Animal) {
     const d = Math.hypot(x - start[0], z - start[1])
     if (d < bd) { bd = d; best = [x, z] }
   }
-  if (best) { a.x = best[0] + .5; a.z = best[1] + .5; a.path = []; a.state = 'idle' }
+  if (best) { a.x = best[0] + .5; a.z = best[1] + .5; a.path = []; a.state = 'idle'; a.alt = 0 }
 }
 
 /** その ばしょに いる どうぶつ（まえに いる ものを ゆうせん）。 */
@@ -269,6 +311,13 @@ export function pokeAnimal(world: World, a: Animal) {
   if (a.state === 'sleep') {
     setBubble(a, 'zzz', 1.5)
     a.hop = .25
+    return
+  }
+  if (a.state === 'fly') {
+    // とんでいる ときは そのまま「ピィ」と こたえる。
+    setBubble(a, 'note', 1.4)
+    a.mood = Math.min(1, a.mood + .04)
+    world.events.push({ type: 'react', animal: a })
     return
   }
   releaseFood(world, a)
@@ -410,6 +459,18 @@ function claimFoods(world: World) {
       if (d < bd) { bd = d; best = a }
     }
     if (!best) continue
+    if (speciesDef(best.species).flies) {
+      // とんで いって すこし てまえに おりる。いけの さかなは とびながら つかまえる。
+      const d = Math.hypot(f.x - best.x, f.z - best.z) || 1
+      const back = Math.min(.25, d)
+      const x = f.x - (f.x - best.x) / d * back, z = f.z - (f.z - best.z) / d * back
+      const water = isWater(world, Math.floor(f.x), Math.floor(f.z)) || !walkable(world, Math.floor(x), Math.floor(z), false)
+      takeOff(world, best, { x: water ? f.x : x, z: water ? f.z : z, alt: water ? .3 : 0, perch: null })
+      best.food = f.id
+      f.eater = best.id
+      setBubble(best, 'food', 1.2)
+      continue
+    }
     const path = findPath(world, best, Math.floor(f.x), Math.floor(f.z))
     if (!path) continue
     path.push([f.x, f.z])
@@ -421,8 +482,104 @@ function claimFoods(world: World) {
   }
 }
 
+// ---------------- とぶ ----------------
+
+function takeOff(world: World, a: Animal, goal: FlyGoal) {
+  const from = a.perch !== null ? world.objects.find(o => o.id === a.perch)?.kind ?? null : null
+  if (a.state !== 'fly') world.events.push({ type: 'takeoff', animal: a, from })
+  a.state = 'fly'
+  a.fly = goal
+  a.perch = null
+  a.path = []
+  a.anim = 0
+}
+
+/** つぎに とんでいく ところを きめる（き・いわ か じめん）。 */
+function flyAway(world: World, a: Animal) {
+  const perches = world.objects.filter(o => o.id !== a.perch && freePerch(world, o.x, o.z, a) === o)
+  if (perches.length && world.rand() < .5) {
+    const o = perches[Math.floor(world.rand() * perches.length)]
+    takeOff(world, a, { x: o.x + .5, z: o.z + .5, alt: PERCH_ALT[o.kind]!, perch: o.id })
+    return
+  }
+  const ground = landingSpot(world, a.x, a.z, 6)
+  if (ground) takeOff(world, a, { x: ground[0], z: ground[1], alt: 0, perch: null })
+}
+
+/** x,z の まわりで おりられる ばしょ。 */
+function landingSpot(world: World, x: number, z: number, spread: number): [number, number] | null {
+  for (let tries = 0; tries < 20; tries++) {
+    const tx = Math.floor(x + (world.rand() - .5) * spread), tz = Math.floor(z + (world.rand() - .5) * spread)
+    if (walkable(world, tx, tz, false)) return [tx + .3 + world.rand() * .4, tz + .3 + world.rand() * .4]
+  }
+  for (let tx = 0; tx < GRID; tx++) for (let tz = 0; tz < GRID; tz++) if (walkable(world, tx, tz, false)) return [tx + .5, tz + .5]
+  return null
+}
+
+function stepFly(world: World, a: Animal, dt: number) {
+  const g = a.fly
+  if (!g) { a.state = 'idle'; a.timer = 1; return }
+  const food = a.food !== null ? world.foods.find(f => f.id === a.food) : undefined
+  // とまる つもりの きが なくなった、えさが なくなった ときは べつの ところへ。
+  const lostPerch = g.perch !== null && !world.objects.some(o => o.id === g.perch)
+  if (lostPerch || (a.food !== null && !food)) {
+    a.food = null
+    const ground = landingSpot(world, a.x, a.z, 5)
+    if (!ground) return
+    a.fly = { x: ground[0], z: ground[1], alt: 0, perch: null }
+    return
+  }
+  const dx = g.x - a.x, dz = g.z - a.z
+  const d = Math.hypot(dx, dz)
+  const high = Math.max(CRUISE, g.alt + .7)
+  const want = d > 1.6 ? high : g.alt + (high - g.alt) * (d / 1.6)
+  a.alt += (want - a.alt) * Math.min(1, dt * 2.6)
+  if (d > .001) {
+    const step = Math.min(d, speciesDef(a.species).speed * 3 * dt)
+    a.x += dx / d * step
+    a.z += dz / d * step
+    if (d > .05) turnTo(a, Math.atan2(-dz, dx), dt)
+  }
+  if (d > .02 || Math.abs(a.alt - g.alt) > .05) return
+  // おりた。
+  a.fly = null
+  a.alt = g.alt
+  if (g.perch !== null) {
+    const o = world.objects.find(p => p.id === g.perch)!
+    sitOn(a, o)
+    a.state = 'idle'
+    a.timer = 3 + world.rand() * 5
+    return
+  }
+  if (food) {
+    a.state = 'eat'
+    a.timer = 2.6
+    a.anim = 0
+    turnTo(a, Math.atan2(-(food.z - a.z), food.x - a.x), 1)
+    world.events.push({ type: 'eat', animal: a, food: food.kind })
+    return
+  }
+  if (!walkable(world, Math.floor(a.x), Math.floor(a.z), false)) {
+    // おりる まえに なにか おかれた。
+    const ground = landingSpot(world, a.x, a.z, 4)
+    if (ground) { a.state = 'fly'; a.fly = { x: ground[0], z: ground[1], alt: 0, perch: null } }
+    return
+  }
+  a.alt = 0
+  a.state = 'idle'
+  a.timer = 1 + world.rand() * 2
+}
+
 function stepAnimal(world: World, a: Animal, dt: number) {
   const def = speciesDef(a.species)
+  // とまっていた き・いわが かたづけられたら とびたつ。
+  if (a.perch !== null && !world.objects.some(o => o.id === a.perch)) {
+    a.perch = null
+    if (a.state === 'eat') releaseFood(world, a)
+    const ground = landingSpot(world, a.x, a.z, 4)
+    if (ground) takeOff(world, a, { x: ground[0], z: ground[1], alt: 0, perch: null })
+    else { a.alt = 0; a.state = 'idle' }
+  }
   a.anim += dt
   a.hop = Math.max(0, a.hop - dt * 2.2)
   a.hunger = Math.min(1, a.hunger + dt / 170)
@@ -444,7 +601,7 @@ function stepAnimal(world: World, a: Animal, dt: number) {
 
   if (a.poopIn > 0) {
     a.poopIn -= dt
-    if (a.poopIn <= 0 && world.poops.length < MAX_POOPS && walkable(world, Math.floor(a.x), Math.floor(a.z), false)) {
+    if (a.poopIn <= 0 && a.alt === 0 && world.poops.length < MAX_POOPS && walkable(world, Math.floor(a.x), Math.floor(a.z), false)) {
       const back = def.radius * .8
       const px = a.x - Math.cos(a.facing) * back, pz = a.z + Math.sin(a.facing) * back
       if (inside(Math.floor(px), Math.floor(pz))) {
@@ -456,7 +613,7 @@ function stepAnimal(world: World, a: Animal, dt: number) {
 
   const swimming = def.swims && isWater(world, Math.floor(a.x), Math.floor(a.z))
   const moving = a.state === 'walk' || a.state === 'toFood'
-  a.pose = a.state === 'eat' ? 'eat' : a.state === 'sleep' ? 'sleep' : a.state === 'act' || a.state === 'react' ? 'act'
+  a.pose = a.state === 'fly' || (a.state === 'eat' && a.alt > 0 && a.perch === null) ? 'fly' : a.state === 'eat' ? 'eat' : a.state === 'sleep' ? 'sleep' : a.state === 'act' || a.state === 'react' ? 'act'
     : swimming && a.species === 'penguin' ? 'swim' : moving ? 'walk' : 'idle'
 
   switch (a.state) {
@@ -470,6 +627,18 @@ function stepAnimal(world: World, a: Animal, dt: number) {
         break
       }
       const r = world.rand()
+      if (def.flies && a.perch !== null) {
+        // き・いわの うえ：はねを ひろげたり、とびたったり、ひとやすみ したり。
+        if (r < .2) {
+          a.state = 'act'
+          a.timer = 1.6
+          a.anim = 0
+          world.events.push({ type: 'act', animal: a })
+        } else if (r < .55) flyAway(world, a)
+        else a.timer = 3 + world.rand() * 4
+        break
+      }
+      if (def.flies && r > .45 && r < .8) { flyAway(world, a); break }
       if (r < .16) {
         a.state = 'act'
         a.timer = 1.6
@@ -512,6 +681,18 @@ function stepAnimal(world: World, a: Animal, dt: number) {
       if (food) food.left = Math.max(.01, a.timer / 2.6)
       if (a.timer <= 0) {
         if (food) world.foods = world.foods.filter(f => f !== food)
+        // いけの うえで たべたら そのまま とんでいく。
+        if (a.alt > 0 && a.perch === null) {
+          a.food = null
+          a.hunger = Math.max(0, a.hunger - .6)
+          a.mood = Math.min(1, a.mood + .3)
+          setBubble(a, 'heart', 2)
+          world.events.push({ type: 'ate', animal: a })
+          const ground = landingSpot(world, a.x, a.z, 6)
+          a.state = 'idle'
+          if (ground) { a.state = 'fly'; a.fly = { x: ground[0], z: ground[1], alt: 0, perch: null } }
+          break
+        }
         a.food = null
         a.hunger = Math.max(0, a.hunger - .6)
         a.mood = Math.min(1, a.mood + .3)
@@ -530,6 +711,9 @@ function stepAnimal(world: World, a: Animal, dt: number) {
         a.bubble = null
       }
       break
+    case 'fly':
+      stepFly(world, a, dt)
+      break
     case 'act':
     case 'react':
       a.timer -= dt
@@ -543,6 +727,7 @@ function separate(world: World) {
   const list = world.animals
   for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
     const a = list[i], b = list[j]
+    if (a.alt > 0 || b.alt > 0) continue
     const min = (speciesDef(a.species).radius + speciesDef(b.species).radius) * .55
     const dx = b.x - a.x, dz = b.z - a.z
     const d = Math.hypot(dx, dz)

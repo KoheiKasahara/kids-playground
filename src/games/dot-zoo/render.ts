@@ -300,7 +300,7 @@ function buildTerrain(world: World, r: number): Terrain | null {
 const ANIMAL_SCALE = 1.2
 const FOOD_SCALE = 1.6
 
-const FRAMES: Record<Pose, [number, number]> = { idle: [2, 1.4], walk: [4, 7], eat: [2, 5], sleep: [2, .7], act: [4, 6], swim: [2, 2.5] }
+const FRAMES: Record<Pose, [number, number]> = { idle: [2, 1.4], walk: [4, 7], eat: [2, 5], sleep: [2, .7], act: [4, 6], swim: [2, 2.5], fly: [4, 5] }
 
 export class ZooRenderer {
   private sprites = new Map<string, SpriteImage>()
@@ -518,7 +518,9 @@ export class ZooRenderer {
     }
     for (const a of world.animals) {
       if (isWater(world, Math.floor(a.x), Math.floor(a.z)) && speciesDef(a.species).swims) continue
-      const r = speciesDef(a.species).radius
+      // き・いわに とまっている ときは かげを かかない。とんでいる ときは たかいほど ちいさく。
+      if (a.perch !== null) continue
+      const r = speciesDef(a.species).radius * (a.alt > 0 ? Math.max(.5, 1.6 - a.alt * .4) : 1)
       shadowAt(a.x, a.z, Math.max(3, Math.round(r * 20 * sq)), Math.max(2, Math.round(r * 9)))
     }
     for (const o of world.objects) {
@@ -597,10 +599,12 @@ export class ZooRenderer {
       const frame = view.still ? 0 : Math.floor(a.anim * fps * speed) % n
       const img = this.animalSprite(a.species, a.pose, frame, dir)
       const water = isWater(world, Math.floor(a.x), Math.floor(a.z))
-      const sink = water ? (a.species === 'hippo' ? .5 : a.species === 'penguin' ? (a.pose === 'swim' ? .12 : .25) : a.species === 'crocodile' ? .22 : a.species === 'flamingo' ? .18 : 0) : 0
+      const sink = water ? (a.species === 'hippo' ? .5 : a.species === 'penguin' ? (a.pose === 'swim' ? .12 : .25) : a.species === 'crocodile' ? .22 : a.species === 'flamingo' ? .18 : a.species === 'capybara' ? .3 : 0) : 0
       const hopY = Math.sin(Math.min(1, a.hop) * Math.PI) * .35
-      items.push({ depth: depthOf(a.x, a.z, view.rot) + .01, draw: () => {
-        const p = S(a.x, hopY - sink, a.z)
+      // そらを とんでいる ときは いちばん てまえに かく。
+      const air = a.state === 'fly' || (a.alt > 0 && a.perch === null) ? 50 : 0
+      items.push({ depth: depthOf(a.x, a.z, view.rot) + .01 + air, draw: () => {
+        const p = S(a.x, hopY - sink + a.alt, a.z)
         if (sink > 0) {
           const [, wy] = S(a.x, 0, a.z)
           ctx.save()
@@ -784,7 +788,7 @@ export class ZooRenderer {
 
   private drawBubble(ctx: CanvasRenderingContext2D, view: View, a: Animal) {
     const img = this.animalSprite(a.species, a.pose, 0, viewDir(a.facing, view.rot))
-    const [px, py] = this.screen(view, a.x, 0, a.z)
+    const [px, py] = this.screen(view, a.x, a.alt, a.z)
     const top = Math.round(py - img.oy - 4 - (a.bubble === 'zzz' ? 0 : Math.sin(view.time * 4) * 1))
     const cx = Math.round(px + 4)
     const bubble: Bubble = a.bubble!

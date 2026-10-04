@@ -14,7 +14,7 @@ import {
 import { ZooRenderer, type Ghost, type Hover, type View } from './render'
 import { clearZoo, readMusic, readZoo, starterZoo, writeMusic, writeZoo } from './save'
 import {
-  playCleanSound, playCry, playDropSound, playHappySound, playMunchSound, playNoSound, playPlaceSound, playPoopSound,
+  playCleanSound, playCry, playDropSound, playFlapSound, playHappySound, playMunchSound, playNoSound, playPlaceSound, playPoopSound,
   playRemoveSound, playSpinSound, playTapSound, playTimeSound, startBgm,
 } from './sounds'
 import styles from './DotZooPlay.module.css'
@@ -178,18 +178,24 @@ function Zoo({ initial, music, onMusic, onExit }: { initial: World; music: boole
           renderer.burst('crumb', e.animal.x, .2, e.animal.z, 6, e.food === 'grass' ? '#7cc050' : e.food === 'meat' ? '#c04040' : e.food === 'fish' ? '#a0d0f0' : '#f0c040')
         } else if (e.type === 'ate') {
           playHappySound()
-          renderer.burst('heart', e.animal.x, 1, e.animal.z, 3)
+          renderer.burst('heart', e.animal.x, 1 + e.animal.alt, e.animal.z, 3)
         } else if (e.type === 'act') {
           if (view.time - lastCry > 5) { lastCry = view.time; playCry(e.animal.species) }
           if (e.animal.species === 'elephant') renderer.burst('drop', e.animal.x + Math.cos(e.animal.facing) * .9, 1.2, e.animal.z - Math.sin(e.animal.facing) * .9, 14)
           if (e.animal.species === 'rabbit' || e.animal.species === 'monkey' || e.animal.species === 'kangaroo') e.animal.hop = 1
+          if (e.animal.species === 'eagle') renderer.burst('spark', e.animal.x, .8 + e.animal.alt, e.animal.z, 3)
         } else if (e.type === 'react') {
           playCry(e.animal.species)
-          renderer.burst('note', e.animal.x, 1, e.animal.z, 2)
+          renderer.burst('note', e.animal.x, 1 + e.animal.alt, e.animal.z, 2)
         } else if (e.type === 'poop') {
           playPoopSound()
           renderer.burst('dust', e.x, .1, e.z, 4, '#b8a070')
           if (!toldPoop.current) { toldPoop.current = true; say('うんちを タップして おそうじ しよう') }
+        } else if (e.type === 'takeoff') {
+          playFlapSound()
+          // きから とびたつと はっぱが ひらひら。
+          if (e.from === 'tree' || e.from === 'palm') renderer.burst('leaf', e.animal.x, e.animal.alt + .3, e.animal.z, 6)
+          else renderer.burst('dust', e.animal.x, .1 + e.animal.alt, e.animal.z, 5)
         } else if (e.type === 'friends') renderer.burst('heart', e.x, .9, e.z, 2)
         else if (e.type === 'night') { playTimeSound(true); say('よるに なったよ。みんな おやすみ…'); setNight(true) }
         else if (e.type === 'morning') { playTimeSound(false); say('あさだよ！ みんな おきてきた'); setNight(false) }
