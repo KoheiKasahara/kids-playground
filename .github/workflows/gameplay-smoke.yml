@@ -23,7 +23,7 @@ jobs:
   gameplay:
     runs-on: ubuntu-latest
     env:
-      E2E_DIAGNOSTICS_MAX_BYTES: 12582912
+      E2E_DIAGNOSTICS_MAX_BYTES: 8388608
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -53,10 +53,21 @@ jobs:
           if-no-files-found: ignore
 
   newly-enabled-regressions:
+    name: regressions-${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: oekaki
+            specs: e2e/oekaki-korokoro.smoke.spec.ts
+            pattern: usable paper and controls
+          - name: vehicles
+            specs: e2e/circuit-racing.smoke.spec.ts e2e/putter-golf.smoke.spec.ts e2e/train-journey.smoke.spec.ts
+            pattern: 車を選んで走行|コースを選ぶと景色|全4ホール|three trains
     env:
-      # 2つのjobの保存対象を合計24MiB以内に抑え、ZIP管理情報の余裕も残す。
-      E2E_DIAGNOSTICS_MAX_BYTES: 12582912
+      # 全件+2つの反復jobの保存対象を合計24MiB以内に抑える。
+      E2E_DIAGNOSTICS_MAX_BYTES: 8388608
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -69,7 +80,7 @@ jobs:
       # 全件の終了を待たず、今回復旧した実操作をリトライなしで反復して確認する。
       - name: Repeat newly enabled regressions without retries
         id: e2e
-        run: npx playwright test e2e/circuit-racing.smoke.spec.ts e2e/oekaki-korokoro.smoke.spec.ts e2e/putter-golf.smoke.spec.ts e2e/train-journey.smoke.spec.ts --grep '車を選んで走行|usable paper and controls|全4ホール|three trains' --workers=1 --retries=0 --repeat-each=2 --reporter=list
+        run: npx playwright test ${{ matrix.specs }} --grep '${{ matrix.pattern }}' --workers=1 --retries=0 --repeat-each=2 --reporter=list
       - name: Prepare bounded failure diagnostics
         if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
         run: node scripts/e2e/prepare-diagnostics.mjs
@@ -77,7 +88,15 @@ jobs:
         if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
         continue-on-error: true
         with:
-          name: newly-enabled-e2e-failures-${{ github.run_attempt }}
+          name: ${{ matrix.name }}-e2e-failures-${{ github.run_attempt }}
           path: e2e-diagnostics/
           retention-days: 3
           if-no-files-found: ignore
+      - name: Upload compact drawing layout review
+        if: success() && github.event_name == 'pull_request' && matrix.name == 'oekaki'
+        uses: actions/upload-artifact@v7
+        with:
+          name: oekaki-layout-review-${{ github.run_attempt }}
+          path: test-results/oekaki-*.png
+          retention-days: 1
+          if-no-files-found: error
