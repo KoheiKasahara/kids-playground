@@ -1,9 +1,11 @@
 .tray {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   justify-content: flex-start;
-  gap: var(--space-sm);
+  gap: 6px;
   width: 100%;
-  padding: var(--space-sm) var(--space-sm);
+  padding: 6px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.72)),
     #f5fbff;
@@ -23,18 +25,19 @@
 /*
  * パーツ1つ。幼児がスマホの指で掴めるよう、主操作の目安(64px)より大きく取る。
  * 横方向は置き場の自然なスクロールを優先し、盤面方向への移動だけをドラッグにする。
+ * 縦画面では盤面（配置ゾーン）へ高さを回すため、見本と名前を詰めて低めに収める。
  */
 .part {
   position: relative;
   flex: 0 0 auto;
-  width: 82px;
-  min-height: 82px;
+  width: 76px;
+  min-height: 76px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs);
+  gap: 2px;
+  padding: 4px 3px;
   background:
     linear-gradient(180deg, #ffffff 0%, #f2f8fb 100%);
   border: 3px solid #d7e7ed;
@@ -81,10 +84,13 @@
 }
 
 .tray[data-layout='landscape'] .preview {
+  margin: 0;
   transform: scale(min(var(--preview-scale, 1.1), 1));
 }
 
 .tray[data-layout='landscape'] .label {
+  display: block;
+  overflow: visible;
   font-size: 14px;
 }
 
@@ -117,7 +123,9 @@
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.9),
     inset 0 -3px 0 rgba(91, 151, 176, 0.12);
-  transform: scale(var(--preview-scale, 1.1));
+  /* 見本の枠はどのパーツも同じ52pxの見本を縮めて使い、縮めた分の余白は詰める */
+  margin: -5px;
+  transform: scale(calc(var(--preview-scale, 1.1) * 0.8));
 }
 
 /*
@@ -136,9 +144,14 @@
 }
 
 .label {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
   line-height: 1.1;
   color: #36515d;
   text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .part[aria-pressed='true'] .label {
@@ -147,13 +160,12 @@
 
 @media (max-width: 360px) {
   .part {
-    width: 74px;
-    min-height: 74px;
-    font-size: 13px;
+    width: 70px;
+    min-height: 72px;
   }
 
-  .preview {
-    transform: scale(min(var(--preview-scale, 1.1), 1));
+  .label {
+    font-size: 11px;
   }
 }
 

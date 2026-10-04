@@ -1,0 +1,108 @@
+.backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding:
+    calc(var(--space-md) + var(--safe-top))
+    calc(var(--space-md) + var(--safe-right))
+    calc(var(--space-md) + var(--safe-bottom))
+    calc(var(--space-md) + var(--safe-left));
+  background: rgb(24 39 64 / 52%);
+  animation: fade-in 140ms ease-out;
+}
+
+.dialog {
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-md) var(--space-md);
+  border: 3px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  background: var(--color-background);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+  animation: pop-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+
+.icon {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.title {
+  color: var(--color-primary-dark);
+  font-size: 24px;
+}
+
+.text {
+  color: var(--color-text-muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.buttons {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.cancel,
+.confirm {
+  min-height: 56px;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-round);
+  font-size: 19px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cancel {
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.confirm {
+  border: none;
+  background: var(--color-danger);
+  color: var(--color-text-on-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.cancel:focus-visible,
+.confirm:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.cancel:active,
+.confirm:active {
+  transform: scale(0.97);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .dialog {
+    animation: none;
+  }
+}

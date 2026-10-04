@@ -5,6 +5,7 @@ import GamePlaySurface from '../../components/GamePlaySurface'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { findFlagBall, type FlagBallData } from '../../components/flag-ball/flagBalls'
 import { playCorrectSound, playPanelOpenSound, primeAudio } from '../../utils/quizSound'
+import ClearAllConfirmDialog from './ClearAllConfirmDialog'
 import FlagPickerDialog, { type FlagPickerBall } from './FlagPickerDialog'
 import PartShape from './PartShape'
 import PartTray from './PartTray'
@@ -80,6 +81,8 @@ export default function FlagRollPuzzlePlay() {
   const [selectedStageId, setSelectedStageId] = useState<PuzzleStageId | null>(null)
   /** 国旗選びダイアログを開いているか。ボールが2つでも1つのダイアログで両方選べる。 */
   const [flagPickerOpen, setFlagPickerOpen] = useState(false)
+  /** 「ぜんぶ けす」の確認を出しているか。押し間違いで作ったコースを失わないようにする */
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [selectedTypeId, setSelectedTypeId] = useState<PartTypeId | null>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [ghostCell, setGhostCell] = useState<GridCell | null>(null)
@@ -379,11 +382,25 @@ export default function FlagRollPuzzlePlay() {
     setState((current) => returnBall(current))
   }
 
-  const handleClearAll = () => {
+  const clearEverything = () => {
+    setClearConfirmOpen(false)
     setSelectedTypeId(null)
     setGhostCell(null)
     goalHandledRef.current.clear()
     setState((current) => clearAll(current))
+  }
+
+  /**
+   * 「ぜんぶ けす」。置いたパーツがあるときは、いきなり消さずに確認を出す。
+   * まだ何も置いていなければ失うものがないので、確認なしでそのまま戻す。
+   */
+  const handleClearAll = () => {
+    primeAudio()
+    if (state.parts.length === 0) {
+      clearEverything()
+      return
+    }
+    setClearConfirmOpen(true)
   }
 
   const handleFlagSelect = (ballId: string, flagId: string) => {
@@ -535,30 +552,38 @@ export default function FlagRollPuzzlePlay() {
               ) : null}
             </div>
 
-            <PartTray
-              selectedTypeId={selectedTypeId}
-              disabled={!editing}
-              isLandscapeLayout={isLandscapeLayout}
-              availablePartTypeIds={stage.availablePartTypeIds}
-              onPartPointerDown={handlePartPointerDown}
-              onPartPointerMove={handleDragMove}
-              onPartPointerUp={handleDragEnd}
-              onPartClick={handlePartClick}
-            />
+            {/*
+              パーツ置き場と操作ボタンを1つの「どっく」にまとめる。縦画面では横に並べて
+              1段に収め、そのぶんの高さを盤面（配置ゾーン）へ回す。
+            */}
+            <div className={styles.dock} data-testid="puzzle-dock">
+              <PartTray
+                selectedTypeId={selectedTypeId}
+                disabled={!editing}
+                isLandscapeLayout={isLandscapeLayout}
+                availablePartTypeIds={stage.availablePartTypeIds}
+                onPartPointerDown={handlePartPointerDown}
+                onPartPointerMove={handleDragMove}
+                onPartPointerUp={handleDragEnd}
+                onPartClick={handlePartClick}
+              />
 
-            <div className={styles.controls}>
-              {editing ? (
-                <BigButton className={styles.dropButton} onClick={handleDrop}>
-                  ボールを おとす！
-                </BigButton>
-              ) : (
-                <BigButton className={styles.dropButton} variant="secondary" onClick={handleReturnBall}>
-                  ボールを もどす
-                </BigButton>
-              )}
-              <button type="button" className={styles.clearButton} onClick={handleClearAll}>
-                ぜんぶ けす
-              </button>
+              <div className={styles.controls}>
+                {editing ? (
+                  <BigButton className={styles.dropButton} onClick={handleDrop}>
+                    <span className={styles.dropButtonLine}>ボールを</span>{' '}
+                    <span className={styles.dropButtonLine}>おとす！</span>
+                  </BigButton>
+                ) : (
+                  <BigButton className={styles.dropButton} variant="secondary" onClick={handleReturnBall}>
+                    <span className={styles.dropButtonLine}>ボールを</span>{' '}
+                    <span className={styles.dropButtonLine}>もどす</span>
+                  </BigButton>
+                )}
+                <button type="button" className={styles.clearButton} onClick={handleClearAll}>
+                  ぜんぶ けす
+                </button>
+              </div>
             </div>
           </aside>
         </div>
@@ -580,6 +605,10 @@ export default function FlagRollPuzzlePlay() {
             onSelect={handleFlagSelect}
             onClose={() => setFlagPickerOpen(false)}
           />
+        ) : null}
+
+        {clearConfirmOpen ? (
+          <ClearAllConfirmDialog onConfirm={clearEverything} onCancel={() => setClearConfirmOpen(false)} />
         ) : null}
       </main>
     </GamePlaySurface>
