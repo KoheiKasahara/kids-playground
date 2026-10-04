@@ -259,6 +259,19 @@ export default function FlagRollPuzzlePlay() {
     })
   }
 
+  const handleRotateSelectedPart = () => {
+    // UI側で可否を先に見て、Reactのstate更新関数を副作用のないままに保つ。
+    // （停止中のボールに食い込む向きなどは、現在の向きをそのまま残す。）
+    if (rotateSelectedPart(state) === state) {
+      showMessage('ここでは まわせないよ')
+      flashInvalidDrop()
+      return
+    }
+    setState((current) => rotateSelectedPart(current))
+    setRotatingPartId(state.selectedPartId)
+    playPanelOpenSound()
+  }
+
   /** ドラッグの終了。動かしていなければタップとして扱う */
   const handleDragEnd = (event: PointerEvent<Element>) => {
     const active = drag
@@ -273,6 +286,13 @@ export default function FlagRollPuzzlePlay() {
       if (active.source === 'board' && active.partId) {
         setSelectedTypeId(null)
         const partId = active.partId
+        // 選んであるパーツをもう一度タップしたら「まわす」と同じ。
+        // 幼児が小さなボタンまで指を運ばなくても、パーツそのものを押して向きを変えられる。
+        // まわせないパーツは従来どおり選択を解く。
+        if (state.selectedPartId === partId && isRotatablePart(active.typeId)) {
+          handleRotateSelectedPart()
+          return
+        }
         setState((current) => selectPart(current, partId))
       }
       return
@@ -337,19 +357,6 @@ export default function FlagRollPuzzlePlay() {
   /** 選んでいるパーツを1つだけ消す */
   const handleRemoveSelectedPart = () => {
     setState((current) => removeSelectedPart(current))
-    playPanelOpenSound()
-  }
-
-  const handleRotateSelectedPart = () => {
-    // UI側で可否を先に見て、Reactのstate更新関数を副作用のないままに保つ。
-    // （停止中のボールに食い込む向きなどは、現在の向きをそのまま残す。）
-    if (rotateSelectedPart(state) === state) {
-      showMessage('ここでは まわせないよ')
-      flashInvalidDrop()
-      return
-    }
-    setState((current) => rotateSelectedPart(current))
-    setRotatingPartId(state.selectedPartId)
     playPanelOpenSound()
   }
 
