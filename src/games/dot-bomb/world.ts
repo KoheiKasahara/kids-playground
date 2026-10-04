@@ -158,7 +158,7 @@ function overlapsTile(x: number, y: number, half: number, tx: number, ty: number
   return x + half > tx * TILE && x - half < (tx + 1) * TILE && y + half > ty * TILE && y - half < (ty + 1) * TILE
 }
 
-/** その いちに ポンが いられないか。いま かさなっている ボンは ぬけられる（おいた ばかりの ボンから にげられる）。 */
+/** その いちに ポンが いられないか。いま かさなっている ボンと なかまの ボンは ぬけられる（おいた ばかりの ボンから にげられる）。 */
 function heroBlocked(w: World, x: number, y: number) {
   const h = w.hero
   const x0 = tileOf(x - HERO_HALF), x1 = tileOf(x + HERO_HALF - .01)
@@ -166,7 +166,7 @@ function heroBlocked(w: World, x: number, y: number) {
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
       if (isSolid(w, tx, ty)) return true
-      if (bombAt(w, tx, ty) && !overlapsTile(h.x, h.y, HERO_HALF, tx, ty)) return true
+      if (w.bombs.some(b => b.owner !== 'ally' && bombTile(b)[0] === tx && bombTile(b)[1] === ty) && !overlapsTile(h.x, h.y, HERO_HALF, tx, ty)) return true
     }
   }
   return false

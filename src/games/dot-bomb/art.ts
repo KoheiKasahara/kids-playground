@@ -1,7 +1,7 @@
 // その場で かく ドット絵（ゆか・ブロック・ボン・アイテム・とびら・しかけ）。
 // どれも いちど かいたら おぼえておき、まいコマ かきなおさない。
 
-import { F_ICE, T_HARD, T_WALL, T_WATER, TILE, type ItemKind, type World } from './core'
+import { F_ICE, T_HARD, T_WALL, T_WATER, TILE, type BombOwner, type ItemKind, type World } from './core'
 import { bayer, disc, hash2, makeCanvas, mixHex, outlined, oval, rect, shadedOval, spriteCanvas, type Img } from './pixel'
 import { EGG, ITEM_ICONS, ITEM_PAL, OUTLINE, RIDE_PALS } from './sprites'
 import type { RideColor } from './stages'
@@ -393,13 +393,17 @@ export function softBurnSprite(th: Theme, stage: number) {
 // ---------------- ボン ----------------
 
 /** ボン（size 0〜2 で ふくらむ、hot で あかく ひかる）。 */
-export function bombSprite(size: number, hot: boolean, boss: boolean) {
-  return cached(`bomb:${size}:${hot}:${boss}`, () => {
+/** ボンの え。なかまの ボンは ロボンいろの シャボンだまのような みためで、ポンが すりぬけられると わかるように。 */
+export function bombSprite(size: number, hot: boolean, owner: BombOwner = 'hero') {
+  const boss = owner === 'boss', ally = owner === 'ally'
+  return cached(`bomb:${size}:${hot}:${owner}`, () => {
     const made = makeCanvas(18, 19)
     if (!made) return null
     const { ctx } = made
     const r = 6.2 + size * .55
-    const ramp = boss
+    const ramp = ally
+      ? (hot ? ['#ffffff', '#c8ffe8', '#7ae0bc', '#3a9a80'] : ['#e8fff6', '#a8f4d4', '#5cc8a8', '#2e8a78'])
+      : boss
       ? (hot ? ['#ffb0d8', '#e060a8', '#a03080', '#601850'] : ['#b48ae8', '#7a4ec0', '#4e2a8a', '#2a1250'])
       : (hot ? ['#ffb0a0', '#e85a5a', '#a02a3a', '#5a1020'] : ['#6c78a8', '#3e4670', '#262a48', '#14162a'])
     shadedOval(ctx, 9, 11, r, r * .96, ramp)
@@ -413,6 +417,15 @@ export function bombSprite(size: number, hot: boolean, boss: boolean) {
     rect(ctx, 13, 1, 1, 2, '#d8a050')
     rect(ctx, 14, 0, 1, 2, '#d8a050')
     if (boss) { rect(ctx, 7, 11, 1, 1, '#ffffff'); rect(ctx, 10, 11, 1, 1, '#ffffff'); rect(ctx, 8, 13, 2, 1, '#ffffff') }
+    if (ally) {
+      // ロボンと おなじ かお（くろい まどに みどりの め）
+      rect(ctx, 5, 10, 8, 4, '#26324f')
+      rect(ctx, 6, 11, 2, 2, '#7dffb0')
+      rect(ctx, 10, 11, 2, 2, '#7dffb0')
+      // シャボンだまの ひかり
+      rect(ctx, 12, 14, 1, 1, '#ffffff')
+      rect(ctx, 11, 15, 1, 1, '#ffffff')
+    }
     return outlined(made.canvas, OUTLINE)
   })
 }
