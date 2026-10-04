@@ -729,7 +729,7 @@ describe('こっきコロコロパズル', () => {
     expect(engineMock.options?.running).toBe(true)
   })
 
-  test('「ぜんぶ けす」でパーツを外して最初からやり直せる', async () => {
+  test('「ぜんぶ けす」は確認してからパーツを外し、最初からやり直せる', async () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('ひだりへ'))
@@ -737,8 +737,43 @@ describe('こっきコロコロパズル', () => {
     tapBoard(4, 5)
     expect(placedParts()).toHaveLength(2)
 
+    // 押しただけでは消えず、確認が出る
     await user.click(screen.getByRole('button', { name: 'ぜんぶ けす' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'ぜんぶ けす？' })
+    expect(dialog).toBeInTheDocument()
+    expect(placedParts()).toHaveLength(2)
+    // 押し間違いを重ねにくいよう、最初は「やめる」にフォーカスがある
+    expect(screen.getByRole('button', { name: 'やめる' })).toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: 'けす' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(placedParts()).toHaveLength(0)
+  })
+
+  test('「ぜんぶ けす」の確認で「やめる」を選ぶと、パーツはそのまま残る', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('ひだりへ'))
+    tapBoard(2, 3)
+    expect(placedParts()).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'ぜんぶ けす' }))
+    await user.click(screen.getByRole('button', { name: 'やめる' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(placedParts()).toHaveLength(1)
+
+    // Escキーでも消さずに閉じる
+    await user.click(screen.getByRole('button', { name: 'ぜんぶ けす' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(placedParts()).toHaveLength(1)
+  })
+
+  test('パーツを置いていなければ「ぜんぶ けす」は確認を出さない', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(screen.getByRole('button', { name: 'ぜんぶ けす' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
 
   test('「もどる」はステージ選択、さらにホームの順に一画面ずつ戻る', async () => {
