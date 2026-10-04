@@ -589,10 +589,33 @@ describe('こっきコロコロパズル', () => {
     expect(placedParts()[0]).toHaveAttribute('data-cell', '2,3')
   })
 
-  test('選んだパーツをもう一度タップする・別の場所をタップすると選択が解ける', async () => {
+  test('選んだパーツをもう一度タップすると、まわせるパーツは回転し選択は残る', async () => {
     const user = userEvent.setup()
     await renderGame()
     await user.click(trayPart('ひだりへ'))
+    tapBoard(2, 3)
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'slopeLeft')
+
+    // 1回目のタップは選ぶだけで、向きは変えない。
+    tapBoard(2, 3)
+    expect(placedParts()[0]).toHaveAttribute('data-selected', 'true')
+    expect(placedParts()[0]).toHaveAttribute('data-part-type', 'slopeLeft')
+
+    // 選んである状態でもう一度タップすると「まわす」と同じく回転する。
+    tapBoard(2, 3)
+    expect(placedParts()[0]).not.toHaveAttribute('data-part-type', 'slopeLeft')
+    expect(placedParts()[0]).toHaveAttribute('data-selected', 'true')
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
+
+    // 何もないマスをタップすれば選択は解ける。
+    tapBoard(0, 0)
+    expect(screen.queryByRole('button', { name: 'けす' })).not.toBeInTheDocument()
+  })
+
+  test('まわせないパーツはもう一度タップする・別の場所をタップすると選択が解ける', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('バンパー'))
     tapBoard(2, 3)
 
     tapBoard(2, 3)
