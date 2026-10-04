@@ -1069,6 +1069,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'dot-bomb',
+    slug: 'dot-bomb',
+    title: 'ドットの ボンボンぼうけん',
+    emoji: '💣',
+    category: 'learning',
+    seo: {
+      headline: 'ドットの ボンボンぼうけん｜ボンで ブロックを こわす ドット絵の ストーリーアクション',
+      description:
+        'ボンで ブロックと てきを ドカーンと ふきとばす ドット絵の ストーリーアクション。5つの ワールドで ボスと たたかい、たまごから うまれる ピョンタに のって ダッシュや ジャンプも できるよ。',
+    },
+    intro: {
+      howToPlay: [
+        'じゅうじで うごいて、ボンボタンで ボンを おこう',
+        'ブロックの なかの たまごから ピョンタが うまれて のれるよ',
+        'パソコンは やじるしで いどう、スペースで ボン、X で とくぎ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
