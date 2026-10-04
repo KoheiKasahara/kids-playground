@@ -223,6 +223,7 @@ export default defineConfig({
             'src/**/*.test.ts',
             ...domIndependentTestTsxFiles,
             'scripts/project-health/**/*.test.mjs',
+            'scripts/e2e/**/*.test.mjs',
           ],
           exclude: [...domDependentTestTsFiles, ...slowTestFiles],
         },

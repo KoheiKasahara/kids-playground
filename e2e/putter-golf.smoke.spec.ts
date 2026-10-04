@@ -1,9 +1,20 @@
+import { writeFile } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { capturePageErrors } from './support/runtimeErrors'
 import { findCourse, type CourseId } from '../src/games/putter-golf/golfCourses'
 import { powerForDistance, rollingDecel } from '../src/games/putter-golf/golfPhysics'
 
 const DRAG_DEAD_ZONE = 14
+const MEADOW = findCourse('meadow')!
+
+// テスト全体の時間切れでも、最後にどのホール・何打目で止まったかを小さく残す。
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus || page.isClosed()) return
+  const state = await page.getByTestId('golf-scene').evaluate(element => ({ ...(element as HTMLElement).dataset }), undefined, { timeout: 1_000 }).catch(() => null)
+  const path = testInfo.outputPath('golf-failure-state.json')
+  await writeFile(path, JSON.stringify({ test: testInfo.title, state }, null, 2))
+  await testInfo.attach('golf-scene-state', { path, contentType: 'application/json' })
+})
 
 function watchShaderErrors(page: Page, errors: string[]) {
   page.on('console', message => {
@@ -38,17 +49,42 @@ async function dragTowardCup(page: Page, scene: Locator, courseId: CourseId, hol
 
 async function playHole(page: Page, courseId: CourseId, holeIndex: number) {
   const scene = page.getByTestId('golf-scene')
+  await expect(scene, `${courseId}-${holeIndex + 1}: 前の打球が止まるかカップインする`).toHaveAttribute('data-phase', /^(ready|holed)$/, { timeout: 30_000 })
   for (let shot = 0; shot < 12; shot++) {
-    await expect.poll(() => scene.getAttribute('data-phase'), { timeout: 30_000 }).toMatch(/^(ready|holed)$/)
     if (await scene.getAttribute('data-phase') === 'holed') break
     const strokes = Number(await scene.getAttribute('data-strokes'))
-    await dragTowardCup(page, scene, courseId, holeIndex)
-    await expect.poll(async () => Number(await scene.getAttribute('data-strokes'))).toBe(strokes + 1)
+    await test.step(`${courseId}-${holeIndex + 1}: ${strokes + 1}打目をひっぱって打つ`, async () => {
+      await dragTowardCup(page, scene, courseId, holeIndex)
+      await expect(scene).toHaveAttribute('data-strokes', String(strokes + 1))
+      await expect(scene, `${strokes + 1}打目が止まるかカップインする`).toHaveAttribute('data-phase', /^(ready|holed)$/, { timeout: 30_000 })
+    })
   }
   await expect(page.getByRole('region', { name: 'カップイン', exact: true })).toBeVisible({ timeout: 10_000 })
+  return Number(await scene.getAttribute('data-strokes'))
 }
 
-test('コースを選んで ひっぱって打ち、3ホールを回ってスコアカードまで進める', async ({ page }) => {
+// コースごとの景色の作り直しは、実打で全ホールを回るシナリオと独立させる。
+// WebGL の再構築時間を、同じラウンドの打球待ち時間に積み重ねない。
+test('コースを選ぶと景色が切り替わり、描画量が上限に収まる', async ({ page }) => {
+  const errors = capturePageErrors(page)
+  watchShaderErrors(page, errors)
+  await page.goto('/games/putter-golf')
+  await expect(page.getByRole('button', { name: 'スタート！', exact: true })).toBeEnabled({ timeout: 20_000 })
+  const scene = page.getByTestId('golf-scene')
+  for (const [name, hole] of [['うみべ', 'beach-1'], ['おつきさま', 'moon-1'], ['もり', 'forest-1'], ['くだりざか', 'downhill-1'], ['かわべ', 'river-1'], ['たにま', 'canyon-1'], ['こうじょう', 'factory-1'], ['そらのしま', 'sky-1'], ['はらっぱ', 'meadow-1']]) {
+    await test.step(`${name}コースの景色を読み込む`, async () => {
+      const choice = page.getByRole('button', { name: `${name}コースを えらぶ`, exact: true })
+      await choice.click()
+      await expect(choice).toHaveAttribute('aria-pressed', 'true')
+      await expect(scene).toHaveAttribute('data-hole', hole)
+      // 景色の多い ひろいコースでも、描画の重さを増やしすぎない。
+      await expect.poll(async () => Number(await scene.getAttribute('data-triangles'))).toBeLessThan(150_000)
+    })
+  }
+  expect(errors).toEqual([])
+})
+
+test('ひっぱって打ち、はらっぱの全4ホールを回ってスコアカードと再挑戦まで進める', async ({ page }) => {
   test.setTimeout(180_000)
   const errors = capturePageErrors(page)
   watchShaderErrors(page, errors)
@@ -57,12 +93,7 @@ test('コースを選んで ひっぱって打ち、3ホールを回ってスコ
   const start = page.getByRole('button', { name: 'スタート！', exact: true })
   await expect(start).toBeEnabled({ timeout: 20_000 })
   const scene = page.getByTestId('golf-scene')
-  for (const [name, hole] of [['うみべ', 'beach-1'], ['おつきさま', 'moon-1'], ['もり', 'forest-1'], ['くだりざか', 'downhill-1'], ['かわべ', 'river-1'], ['たにま', 'canyon-1'], ['こうじょう', 'factory-1'], ['そらのしま', 'sky-1'], ['はらっぱ', 'meadow-1']]) {
-    await page.getByRole('button', { name: `${name}コースを えらぶ`, exact: true }).click()
-    await expect(scene).toHaveAttribute('data-hole', hole)
-    // 景色の多い ひろいコースでも、描画の重さを増やしすぎない。
-    await expect.poll(async () => Number(await scene.getAttribute('data-triangles'))).toBeLessThan(150_000)
-  }
+  await expect(scene).toHaveAttribute('data-hole', MEADOW.holes[0]!.id)
   await page.getByRole('button', { name: 'きいろの ボール', exact: true }).click()
   await start.click()
   await expect(page.getByRole('region', { name: 'ゴルフの そうさ', exact: true })).toBeVisible()
@@ -87,24 +118,41 @@ test('コースを選んで ひっぱって打ち、3ホールを回ってスコ
   await expect(scene).toHaveAttribute('data-camera', 'overview')
   await page.getByRole('button', { name: 'ボールを みる', exact: true }).click()
 
-  for (const [index, next] of [[1, 'meadow-2'], [2, 'meadow-3'], [3, 'meadow-4'], [4, null]] as const) {
-    await playHole(page, 'meadow', index - 1)
-    await page.screenshot({ path: `test-results/putter-golf-hole${index}.png` })
-    if (next) {
-      await page.getByRole('button', { name: 'つぎの ホールへ ▶', exact: true }).click()
-      await expect(scene).toHaveAttribute('data-hole', next)
-      await expect(page.getByLabel('うった かず 0')).toBeVisible()
-    } else {
-      await page.getByRole('button', { name: 'けっかを みる ▶', exact: true }).click()
-    }
+  const strokesByHole: number[] = []
+  for (const [index, hole] of MEADOW.holes.entries()) {
+    await test.step(`${hole.id}をカップインして次へ進む`, async () => {
+      const strokes = await playHole(page, 'meadow', index)
+      expect(strokes).toBeGreaterThan(0)
+      strokesByHole.push(strokes)
+      await page.screenshot({ path: `test-results/putter-golf-hole${index + 1}.png` })
+      const next = MEADOW.holes[index + 1]
+      if (next) {
+        await page.getByRole('button', { name: 'つぎの ホールへ ▶', exact: true }).click()
+        await expect(scene).toHaveAttribute('data-hole', next.id)
+        await expect(page.getByLabel('うった かず 0')).toBeVisible()
+      } else {
+        await page.getByRole('button', { name: 'けっかを みる ▶', exact: true }).click()
+      }
+    })
   }
   const card = page.getByRole('region', { name: 'けっか', exact: true })
   await expect(card.getByText(/はらっぱコース クリア/)).toBeVisible()
-  await expect(card.getByRole('row')).toHaveCount(5)
+  await expect(card.getByRole('row')).toHaveCount(MEADOW.holes.length + 1)
+  for (const [index, hole] of MEADOW.holes.entries()) {
+    const row = card.getByRole('row').filter({ has: page.getByRole('rowheader', { name: `${index + 1} ${hole.name}`, exact: true }) })
+    await expect(row.getByRole('cell').first()).toHaveText(String(strokesByHole[index]))
+  }
   expect(Number(await scene.getAttribute('data-draw-calls'))).toBeLessThan(80)
   expect(Number(await scene.getAttribute('data-triangles'))).toBeLessThan(150_000)
   await card.getByRole('button', { name: 'コースを えらぶ', exact: true }).click()
   await expect(page.getByText(/さいこう \d+\/12 ★/)).toBeVisible()
+  // 保存済みの結果から同じコースをもう一度始めても、ホールと打数は新しいラウンドになる。
+  await start.click()
+  await expect(scene).toHaveAttribute('data-hole', MEADOW.holes[0]!.id)
+  await expect(scene).toHaveAttribute('data-phase', 'ready')
+  await expect(scene).toHaveAttribute('data-strokes', '0')
+  await expect(card).toBeHidden()
+  await expect(page.getByLabel('うった かず 0')).toBeVisible()
   expect(errors).toEqual([])
 })
 

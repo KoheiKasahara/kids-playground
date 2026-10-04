@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'e2e/**'
+      - 'scripts/e2e/**'
       - 'package.json'
       - 'package-lock.json'
       - 'playwright.config.ts'
@@ -21,6 +22,8 @@ concurrency:
 jobs:
   gameplay:
     runs-on: ubuntu-latest
+    env:
+      E2E_DIAGNOSTICS_MAX_BYTES: 12582912
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -37,17 +40,44 @@ jobs:
       - name: Repeat affected reliability scenarios without retries
         if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
         run: npx playwright test e2e/representative-3d.nightly.spec.ts e2e/all-games-landscape.nightly.spec.ts --grep 'crane-game|pixel-kart' --workers=1 --retries=0 --repeat-each=3 --reporter=list --output=test-results-repeat
+      - name: Prepare bounded failure diagnostics
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        run: node scripts/e2e/prepare-diagnostics.mjs
       - uses: actions/upload-artifact@v7
         if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
         continue-on-error: true
         with:
           name: full-e2e-failures-${{ github.run_attempt }}
-          path: |
-            test-results/**/trace.zip
-            test-results/**/test-failed-*.png
-            test-results/**/error-context.md
-            test-results-repeat/**/trace.zip
-            test-results-repeat/**/test-failed-*.png
-            test-results-repeat/**/error-context.md
+          path: e2e-diagnostics/
+          retention-days: 3
+          if-no-files-found: ignore
+
+  newly-enabled-regressions:
+    runs-on: ubuntu-latest
+    env:
+      # 2つのjobの保存対象を合計24MiB以内に抑え、ZIP管理情報の余裕も残す。
+      E2E_DIAGNOSTICS_MAX_BYTES: 12582912
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      # 全件の終了を待たず、今回復旧した実操作をリトライなしで反復して確認する。
+      - name: Repeat newly enabled regressions without retries
+        id: e2e
+        run: npx playwright test e2e/circuit-racing.smoke.spec.ts e2e/oekaki-korokoro.smoke.spec.ts e2e/putter-golf.smoke.spec.ts e2e/train-journey.smoke.spec.ts --grep '車を選んで走行|usable paper and controls|全4ホール|three trains' --workers=1 --retries=0 --repeat-each=2 --reporter=list
+      - name: Prepare bounded failure diagnostics
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        run: node scripts/e2e/prepare-diagnostics.mjs
+      - uses: actions/upload-artifact@v7
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        continue-on-error: true
+        with:
+          name: newly-enabled-e2e-failures-${{ github.run_attempt }}
+          path: e2e-diagnostics/
           retention-days: 3
           if-no-files-found: ignore

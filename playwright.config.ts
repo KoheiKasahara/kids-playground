@@ -14,7 +14,8 @@ export default defineConfig({
   reporter: process.env.CI ? 'line' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:4173',
-    trace: 'retain-on-failure',
+    // 動き続ける3D画面のfilmstripを保存しない。DOM・操作・ソースと失敗時PNGは残す。
+    trace: { mode: 'retain-on-failure', screenshots: false, snapshots: true, sources: true, attachments: false },
     screenshot: 'only-on-failure',
     video: 'off',
   },

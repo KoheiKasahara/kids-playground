@@ -10,6 +10,7 @@ dev-dist
 coverage
 playwright-report
 test-results
+test-results-repeat
 
 # Project Health Dashboard がCI実行時にリポジトリ直下へ書き出す一時取得データ
 # （集計ロジック本体は scripts/project-health/ にあり、これは対象外）
@@ -31,3 +32,6 @@ npm-debug.log*
 
 # asset conversion cache (scripts/build-car-builder-models.py)
 .cache
+
+# Bounded generated Playwright diagnostics
+e2e-diagnostics/

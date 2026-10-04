@@ -3,6 +3,7 @@ import { capturePageErrors } from './support/runtimeErrors'
 
 test('車を選んで走行・加速・カメラ変更・選び直しができる', async ({ page }) => {
   const errors = capturePageErrors(page)
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
   page.on('console', message => {
     if (message.type() === 'error' && /THREE.WebGLProgram|VALIDATE_STATUS|shader error/i.test(message.text())) {
       errors.push(message.text())
@@ -22,10 +23,17 @@ test('車を選んで走行・加速・カメラ変更・選び直しができ�
   const moving = await canvas.screenshot()
   await expect.poll(async () => (await canvas.screenshot()).equals(moving)).toBe(false)
   await page.getByRole('button', { name: '3だいめ', exact: true }).click()
-  await page.getByRole('button', { name: '3だいめを かそく', exact: true }).click()
-  await expect(page.getByRole('button', { name: '3だいめを かそく', exact: true })).toHaveAttribute('data-active', 'true')
+  // The button's 420 ms pulse is shorter than a slow CI round trip. Control time
+  // before the real click, rather than polling for a pulse that already ended.
+  await page.clock.pauseAt(new Date('2026-01-01T01:00:00Z'))
+  const boost = page.getByRole('button', { name: '3だいめを かそく', exact: true })
+  await boost.click()
+  await expect(boost).toHaveAttribute('data-active', 'true')
   const boosted = await canvas.screenshot()
+  await page.clock.runFor(500)
+  await expect(boost).toHaveAttribute('data-active', 'false')
   await expect.poll(async () => (await canvas.screenshot()).equals(boosted)).toBe(false)
+  await page.clock.resume()
   await expect(page.getByRole('button', { name: 'やすむ', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'みちばた', exact: true }).click()
   await expect.poll(async () => (await canvas.screenshot()).equals(boosted)).toBe(false)

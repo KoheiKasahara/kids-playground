@@ -62,14 +62,37 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
     await page.setViewportSize(viewport)
     await page.goto('/games/oekaki-korokoro')
     await expect(drawing(page)).toBeVisible()
+    const pickers = [page.getByTestId('pattern-picker'), page.getByTestId('color-picker')]
+    for (const picker of pickers) {
+      await expect(picker).toBeInViewport({ ratio: 1 })
+      expect(await picker.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
     for (const control of await page.locator('main button:visible, main a:visible').all()) {
+      // :visible includes options clipped by the intentionally scrollable pickers.
+      // Keep fixed controls in place; every picker option must be fully reachable.
+      const isPickerOption = await control.evaluate(element => Boolean(element.closest('[data-testid="pattern-picker"], [data-testid="color-picker"]')))
+      if (isPickerOption) await control.scrollIntoViewIfNeeded()
+      await expect(control).toBeInViewport({ ratio: 1 })
       const box = (await control.boundingBox())!
       expect(box.width).toBeGreaterThanOrEqual(44)
       expect(box.height).toBeGreaterThanOrEqual(44)
       expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.y).toBeGreaterThanOrEqual(0)
       expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1)
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1)
+      if (isPickerOption) {
+        await control.click()
+        await expect(control).toHaveAttribute('aria-pressed', 'true')
+      }
     }
+    // Returning to the first choices also exercises scrolling back from the end.
+    for (const picker of pickers) {
+      await picker.getByRole('button').first().click()
+      await expect(picker.getByRole('button').first()).toHaveAttribute('aria-pressed', 'true')
+    }
+    expect(await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }))).toEqual({ x: 0, y: 0 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
     const box = (await drawing(page).boundingBox())!
     expect(box.width).toBeGreaterThan(200)
     expect(box.height).toBeGreaterThan(150)
