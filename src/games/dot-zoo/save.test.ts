@@ -14,6 +14,16 @@ describe('save', () => {
     expect(back.animals.map(a => a.species)).toEqual(['penguin', 'giraffe'])
   })
 
+  test('きに とまった ワシも もとの きに もどる', () => {
+    const world = createWorld()
+    addObject(world, 'tree', 4, 4)
+    addAnimal(world, 'eagle', 4, 4)
+    addAnimal(world, 'capybara', 1, 1)
+    const back = restore(JSON.parse(JSON.stringify(serialize(world))))
+    expect(back.animals.map(a => a.species)).toEqual(['eagle', 'capybara'])
+    expect(back.animals[0].perch).toBe(back.objects[0].id)
+  })
+
   test('こわれた データや ルールいはんは すてる', () => {
     expect(restore(null).animals).toHaveLength(0)
     expect(restore('x').objects).toHaveLength(0)

@@ -1,7 +1,7 @@
 // どうぶつえんの データ（どうぶつ・おくもの・えさ・おける かず）。
 
 export type SpeciesId = 'lion' | 'tiger' | 'elephant' | 'giraffe' | 'zebra' | 'hippo' | 'panda' | 'monkey' | 'rabbit' | 'penguin'
-  | 'bear' | 'kangaroo' | 'crocodile' | 'flamingo'
+  | 'bear' | 'kangaroo' | 'crocodile' | 'flamingo' | 'eagle' | 'koala' | 'rhino' | 'capybara'
 export type ObjectKind = 'tree' | 'palm' | 'bamboo' | 'bush' | 'rock' | 'flowers' | 'lamp' | 'pond'
 export type FoodKind = 'meat' | 'grass' | 'fish' | 'fruit'
 
@@ -16,6 +16,8 @@ export type SpeciesDef = {
   likes: readonly ObjectKind[]
   /** いけに はいれる。 */
   swims?: boolean
+  /** そらを とべる（ときどき はばたいて、きや いわに とまる）。 */
+  flies?: boolean
   /** いけが ないと おけない。 */
   needsPond?: boolean
   /** あるく はやさ（マス/びょう）。 */
@@ -41,6 +43,10 @@ export const SPECIES: readonly SpeciesDef[] = [
   { id: 'kangaroo', name: 'カンガルー', limit: 2, eats: ['grass'], likes: ['bush', 'flowers'], speed: .95, radius: .35, act: 'ぴょんぴょん' },
   { id: 'crocodile', name: 'ワニ', limit: 2, eats: ['meat', 'fish'], likes: ['pond', 'rock'], swims: true, speed: .35, radius: .5, act: 'パクッ！' },
   { id: 'flamingo', name: 'フラミンゴ', limit: 4, eats: ['fish'], likes: ['pond', 'flowers'], swims: true, speed: .6, radius: .25, act: 'かたあし' },
+  { id: 'eagle', name: 'ワシ', limit: 2, eats: ['meat', 'fish'], likes: ['tree', 'palm', 'rock'], flies: true, speed: .6, radius: .3, act: 'ピーヒョロロ！' },
+  { id: 'koala', name: 'コアラ', limit: 2, eats: ['grass'], likes: ['tree'], speed: .3, radius: .3, act: 'ぎゅっ' },
+  { id: 'rhino', name: 'サイ', limit: 1, eats: ['grass'], likes: ['rock', 'pond'], speed: .45, radius: .55, act: 'ドスン！' },
+  { id: 'capybara', name: 'カピバラ', limit: 3, eats: ['grass', 'fruit'], likes: ['pond', 'flowers'], swims: true, speed: .45, radius: .38, act: 'まったり' },
 ]
 
 export type ObjectDef = {
