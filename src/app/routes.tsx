@@ -90,6 +90,9 @@ export const routes: RouteObject[] = [
   // ステージ選択・プレイ・結果が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // OnajiPonPlay内でプレイ側の描画だけを条件付きに包んでいる。
   { path: '/games/onaji-pon', element: lazyRoute(() => import('../games/onaji-pon/OnajiPonPlay')) },
+  // タイトル・よびだし・ぼくじょう・とっくん・たいかいが同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
+  // DotMonsterFarmPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/dot-monster-farm', element: lazyRoute(() => import('../games/dot-monster-farm/DotMonsterFarmPlay')) },
   // コース選択・レース・結果が同一route内で切り替わるため、プレイ面はゲーム内で包む。
   { path: '/games/pixel-kart', element: lazyRoute(() => import('../games/pixel-kart/PixelKartPlay')) },
   // タイトル・マップ・おはなし・プレイが同一route内で切り替わるため、プレイ面はゲーム内で包む。

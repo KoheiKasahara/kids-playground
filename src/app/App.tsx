@@ -27,6 +27,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/dot-adventure',
   '/games/dot-zoo',
   '/games/dot-aquarium',
+  '/games/dot-monster-farm',
   '/games/dot-run',
   '/games/dot-bomb',
   '/games/jishaku-pitatto',

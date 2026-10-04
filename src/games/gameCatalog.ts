@@ -1088,6 +1088,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'dot-monster-farm',
+    slug: 'dot-monster-farm',
+    title: 'ドットの モンスターぼくじょう',
+    emoji: '🐲',
+    category: 'learning',
+    seo: {
+      headline: 'ドットの モンスターぼくじょう｜モンスターを そだてて たいかいに でる 育成ゲーム',
+      description:
+        'ふしぎな いしや すきな ことばから うまれた モンスターを、とっくん・おやつ・おやすみで そだてる ドット絵の 子ども向け 育成ゲーム。つよく なったら たいかいに でて、Eランクから Sランクの チャンピオンを めざそう。',
+    },
+    intro: {
+      howToPlay: [
+        'いしを えらぶか ことばを いれて モンスターを よぼう',
+        'とっくんで つよく して、つかれたら やすませよう',
+        'つきの おわりは たいかい！ わざを えらんで たたかおう',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
