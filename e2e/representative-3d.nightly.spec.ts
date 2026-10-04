@@ -107,6 +107,8 @@ test('クレーンゲームを実際の戻る操作で退出し、同じペー�
 
   await gameLink.click()
   await expect(begin).toBeEnabled({ timeout: 20_000 })
+  await page.getByRole('button', { name: 'カプセルの きかいを えらぶ', exact: true }).click()
+  await expect(begin).toBeEnabled({ timeout: 20_000 })
   await begin.click()
   await expect(scene).toHaveAttribute('data-ready', 'true', { timeout: 20_000 })
   await expect(page.locator('canvas')).toHaveCount(1)

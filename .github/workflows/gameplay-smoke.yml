@@ -35,9 +35,10 @@ jobs:
         id: e2e
         run: npm run test:e2e:nightly -- --reporter=list
       - name: Repeat affected reliability scenarios without retries
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
         run: npx playwright test e2e/representative-3d.nightly.spec.ts e2e/all-games-landscape.nightly.spec.ts --grep 'crane-game|pixel-kart' --workers=1 --retries=0 --repeat-each=3 --reporter=list --output=test-results-repeat
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
         continue-on-error: true
         with:
           name: full-e2e-failures-${{ github.run_attempt }}

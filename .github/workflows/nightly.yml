@@ -101,9 +101,9 @@ jobs:
           echo "Nightly E2E route smoke duration: $((end - start))s"
           exit "$status"
 
-      # trace/screenshotはPlaywright側で失敗時だけ生成する。大きな成果物の常時保存を避ける。
+      # trace/screenshotはPlaywright側で失敗時だけ生成する。retry成功時も初回失敗の証跡を残す。
       - name: Upload failed Nightly E2E diagnostics
-        if: failure() && steps.e2e.outcome == 'failure'
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
