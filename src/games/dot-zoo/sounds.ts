@@ -133,6 +133,14 @@ export function playPoopSound() {
   tone(ctx, getSoundOutput(ctx), 110, t, .18, .08, 'sawtooth', .05, .7)
 }
 
+/** はばたき「バサッ」。 */
+export function playFlapSound() {
+  const ctx = sfx()
+  if (!ctx) return
+  const t = ctx.currentTime
+  for (let i = 0; i < 2; i++) noise(ctx, t + i * .13, .09, .07, 900)
+}
+
 /** そうじ「キラリン」。 */
 export function playCleanSound() {
   const ctx = sfx()
@@ -212,6 +220,21 @@ export function playCry(id: SpeciesId) {
     case 'flamingo':
       tone(ctx, d, 620, t, .1, .04, 'square', .02, .85)
       tone(ctx, d, 560, t + .12, .14, .04, 'square', .02, .8)
+      break
+    case 'eagle':
+      tone(ctx, d, 1700, t, .22, .035, 'triangle', .05, 1.15)
+      for (let i = 0; i < 3; i++) tone(ctx, d, 1500 - i * 120, t + .26 + i * .1, .09, .03, 'triangle', .03, .85)
+      break
+    case 'koala':
+      noise(ctx, t, .3, .06, 260)
+      tone(ctx, d, 120, t, .3, .06, 'sawtooth', .1, .9)
+      break
+    case 'rhino':
+      noise(ctx, t, .25, .14, 220)
+      tone(ctx, d, 75, t, .3, .1, 'square', .1, .7)
+      break
+    case 'capybara':
+      for (let i = 0; i < 2; i++) tone(ctx, d, 820, t + i * .15, .08, .035, 'sine', .03, 1.2)
       break
   }
 }

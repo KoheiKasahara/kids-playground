@@ -25,6 +25,7 @@ export const GAME_SOUND_LEVEL_DB: Readonly<Record<string, number>> = {
   'domino-flag': -1,
   'dot-adventure': 4.5,
   'dot-aquarium': 7.5,
+  'dot-bomb': 5,
   'dot-monster-farm': 9,
   'dot-run': 6.5,
   'dot-zoo': 10,

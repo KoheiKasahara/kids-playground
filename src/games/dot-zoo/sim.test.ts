@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { FOODS, GRID, MAX_ANIMALS, OBJECTS, SPECIES } from './data'
 import {
-  addAnimal, addObject, checkAnimal, checkFood, checkObject, createWorld, dropFood, drainEvents, isNightClock, removeAt,
+  addAnimal, addObject, checkAnimal, checkFood, checkObject, createWorld, dropFood, drainEvents, isNightClock, removeAt, removeObject,
   ringPoint, stepWorld, zooRating, DAY_SECONDS, RING, type World,
 } from './sim'
 import { fromView, groundAt, toScreen, toView, viewDir } from './iso'
@@ -119,6 +119,71 @@ describe('えさ', () => {
     expect(seen.some(s => s.endsWith('zebra'))).toBe(false)
     expect(lion.hunger).toBeLessThan(lionHunger)
     expect(zebra.state).not.toBe('eat')
+  })
+})
+
+describe('ワシ', () => {
+  test('きの うえに おくと とまり、ときどき とびたって また とまる', () => {
+    const world = createWorld(11)
+    world.clock = .25
+    const tree = addObject(world, 'tree', 3, 3)
+    addObject(world, 'palm', 8, 8)
+    addObject(world, 'rock', 2, 9)
+    expect(checkAnimal(world, 'eagle', 3, 3).ok).toBe(true)
+    // いわや き いがいの ものの うえ（しげみ）には おけない。
+    addObject(world, 'bush', 6, 2)
+    expect(checkAnimal(world, 'eagle', 6, 2).ok).toBe(false)
+    const eagle = addAnimal(world, 'eagle', 3, 3)
+    expect(eagle.perch).toBe(tree.id)
+    expect(eagle.alt).toBeGreaterThan(1)
+    // おなじ きには 2わめは とまれない。
+    expect(checkAnimal(world, 'eagle', 3, 3).ok).toBe(false)
+    const seen = new Set<string>()
+    let maxAlt = 0
+    for (let t = 0; t < 240; t += .05) {
+      stepWorld(world, .05)
+      maxAlt = Math.max(maxAlt, eagle.alt)
+      seen.add(eagle.state === 'fly' ? 'fly' : eagle.perch !== null ? 'perch' : eagle.alt === 0 ? 'ground' : 'other')
+      for (const e of drainEvents(world)) if (e.type === 'takeoff') seen.add('takeoff')
+    }
+    expect(seen).toContain('takeoff')
+    expect(seen).toContain('fly')
+    expect(seen).toContain('perch')
+    expect(seen).toContain('ground')
+    expect(maxAlt).toBeGreaterThan(2)
+  })
+
+  test('とまっている きを かたづけると とんで じめんに おりる', () => {
+    const world = createWorld(4)
+    world.clock = .25
+    const tree = addObject(world, 'tree', 5, 5)
+    const eagle = addAnimal(world, 'eagle', 5, 5)
+    removeObject(world, tree)
+    stepWorld(world, .05)
+    expect(eagle.perch).toBeNull()
+    expect(eagle.state).toBe('fly')
+    for (let t = 0; t < 20 && eagle.state === 'fly'; t += .05) stepWorld(world, .05)
+    expect(eagle.state).not.toBe('fly')
+    expect(eagle.alt).toBe(0)
+  })
+
+  test('いけの さかなを とびながら つかまえる', () => {
+    const world = createWorld(9)
+    world.clock = .25
+    addObject(world, 'pond', 6, 6)
+    const eagle = addAnimal(world, 'eagle', 1, 1)
+    dropFood(world, 'fish', 7.5, 7.5)
+    const seen: string[] = []
+    for (let t = 0; t < 30 && world.foods.length; t += .05) {
+      stepWorld(world, .05)
+      for (const e of drainEvents(world)) if (e.type === 'eat' || e.type === 'ate') seen.push(e.type)
+    }
+    expect(world.foods).toHaveLength(0)
+    expect(seen).toEqual(['eat', 'ate'])
+    run(world, 15)
+    // いけの なかに おりたままに ならない。
+    if (eagle.state !== 'fly' && eagle.perch === null) expect(eagle.alt).toBe(0)
+    expect(world.animals.every(a => a.alt > 0 || a.state === 'fly' || !(a.x >= 6 && a.x < 9 && a.z >= 6 && a.z < 9))).toBe(true)
   })
 })
 

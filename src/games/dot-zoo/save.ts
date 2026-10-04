@@ -17,7 +17,11 @@ const objectKinds = new Set<string>(OBJECTS.map(o => o.kind))
 
 export function serialize(world: World): Saved {
   return {
-    animals: world.animals.map(a => ({ s: a.species, x: Math.round(a.x * 100) / 100, z: Math.round(a.z * 100) / 100, h: Math.round(a.hunger * 100) / 100 })),
+    animals: world.animals.map(a => {
+      // とんでいる ときは おりる ところで ほぞんする。
+      const [x, z] = a.fly ? [a.fly.x, a.fly.z] : [a.x, a.z]
+      return { s: a.species, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, h: Math.round(a.hunger * 100) / 100 }
+    }),
     objects: world.objects.map(o => ({ k: o.kind, x: o.x, z: o.z, seed: o.seed })),
     clock: Math.round(world.clock * 1000) / 1000,
   }

@@ -123,7 +123,6 @@ describe('Home', () => {
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
     expect(links.slice(-15).map((link) => link.getAttribute('href'))).toEqual(
       [
-        'water-wheel-maze',
         'pyoko-touch',
         'hoshi-tsunagi',
         'robo-kuzushi',
@@ -137,6 +136,7 @@ describe('Home', () => {
         'jishaku-pitatto',
         'shabon-pachin',
         'onaji-pon',
+        'dot-bomb',
         'dot-monster-farm',
       ].map(gameRoutePath),
     )
