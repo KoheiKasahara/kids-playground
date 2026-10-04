@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { GAME_CATALOG } from '../src/games/gameCatalog'
 import { capturePageErrors } from './support/runtimeErrors'
+import { expectLiveApp } from './support/liveApp'
 
 /**
  * Nightly-only route smoke coverage.
@@ -15,14 +16,16 @@ for (const game of GAME_CATALOG) {
     const pageErrors = capturePageErrors(page)
 
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page.getByRole('heading', { name: 'こどもミニゲーム', exact: true })).toBeVisible()
+    const app = await expectLiveApp(page)
+    await expect(app.getByRole('heading', { name: 'こどもミニゲーム', exact: true })).toBeVisible()
 
-    const gameLink = page.getByRole('link', { name: game.title, exact: true })
+    const gameLink = app.getByRole('link', { name: game.title, exact: true })
     await expect(gameLink).toBeVisible()
     await gameLink.click()
 
     await expect(page).toHaveURL(new RegExp(`/games/${game.slug}/?$`))
-    await expect(page.getByRole('heading', { name: game.title, exact: true })).toBeVisible()
+    await expectLiveApp(page)
+    await expect(app.getByRole('heading', { name: game.title, exact: true })).toBeVisible()
 
     // `pageerror` covers uncaught exceptions. Harmless console warnings are
     // intentionally ignored so routine browser/library warnings do not flake Nightly.

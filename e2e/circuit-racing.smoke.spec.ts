@@ -56,7 +56,7 @@ test('WebGL初期化失敗後もレンダラーを作り直せる', async ({ pag
     Object.defineProperty(window, '__restoreRaceContext', {
       value: () => { HTMLCanvasElement.prototype.getContext = original },
     })
-    HTMLCanvasElement.prototype.getContext = function (...args: Parameters<typeof original>) {
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: Parameters<typeof original>) {
       if (String(args[0]).startsWith('webgl')) return null
       return original.apply(this, args)
     } as typeof original

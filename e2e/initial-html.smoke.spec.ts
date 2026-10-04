@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { GAME_CATALOG, gameRoutePath } from '../src/games/gameCatalog'
 import { absoluteUrl } from '../src/seo/siteMeta'
+import { expectLiveApp } from './support/liveApp'
 
 test('built documents contain visible body, links and canonical without JavaScript', async ({ browser, request, baseURL }) => {
   const sitemap = await (await request.get('/sitemap.xml')).text()
@@ -36,9 +37,10 @@ test('initial content survives delayed JavaScript and is replaced by the live ro
   await page.goto('/games/rail-builder', { waitUntil: 'commit' })
   await expect(page.locator('#initial-page')).toBeVisible()
   await expect(page.getByRole('link', { name: 'ほかのゲームを みる' })).toHaveCount(1)
+  await expect(page.locator('#root')).toHaveAttribute('inert', '')
+  await expect(page.locator('#root').getByRole('heading', { name: '3Dせんろづくり', exact: true })).not.toBeVisible()
   release()
-  await expect(page.locator('#initial-page')).toHaveCount(0)
-  await expect(page.locator('#root')).not.toHaveAttribute('inert', '')
-  await expect(page.getByRole('heading', { name: 'このゲームについて' })).toBeVisible()
+  const app = await expectLiveApp(page)
+  await expect(app.getByRole('heading', { name: 'このゲームについて' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'ほかのゲームを みる' })).toHaveCount(1)
 })

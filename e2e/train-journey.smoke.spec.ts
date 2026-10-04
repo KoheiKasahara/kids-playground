@@ -130,7 +130,7 @@ test('WebGL initialization failure can be retried and leaving the game removes i
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext
     Object.defineProperty(window, '__restoreJourneyInit', { value: () => { HTMLCanvasElement.prototype.getContext = original } })
-    HTMLCanvasElement.prototype.getContext = function (...args: Parameters<typeof original>) {
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: Parameters<typeof original>) {
       if (String(args[0]).startsWith('webgl')) return null
       return original.apply(this, args)
     } as typeof original

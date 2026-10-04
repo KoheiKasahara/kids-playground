@@ -1,11 +1,14 @@
-name: Representative Gameplay Smoke
+name: Full E2E Validation
 
 on:
   pull_request:
     paths:
-      - 'e2e/*.nightly.spec.ts'
+      - 'e2e/**'
+      - 'package.json'
+      - 'package-lock.json'
       - 'playwright.config.ts'
       - '.github/workflows/gameplay-smoke.yml'
+      - '.github/workflows/nightly.yml'
   workflow_dispatch:
 
 permissions:
@@ -27,10 +30,23 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      # テスト定義を変えたPRだけ先行検証する。普段はNightlyで実行。
-      - run: npx playwright test e2e/representative-3d.nightly.spec.ts e2e/piano-landscape.nightly.spec.ts --workers=1
+      # E2E/設定変更PRではNightlyと同じ全件を先行検証する。通常のソース変更PRは既存smokeを維持。
+      - name: Test all Nightly E2E scenarios
+        id: e2e
+        run: npm run test:e2e:nightly -- --reporter=list
+      - name: Repeat affected reliability scenarios without retries
+        run: npx playwright test e2e/representative-3d.nightly.spec.ts e2e/all-games-landscape.nightly.spec.ts --grep 'crane-game|pixel-kart' --workers=1 --retries=0 --repeat-each=3 --reporter=list --output=test-results-repeat
       - uses: actions/upload-artifact@v7
         if: failure()
+        continue-on-error: true
         with:
-          name: representative-gameplay-results
-          path: test-results/
+          name: full-e2e-failures-${{ github.run_attempt }}
+          path: |
+            test-results/**/trace.zip
+            test-results/**/test-failed-*.png
+            test-results/**/error-context.md
+            test-results-repeat/**/trace.zip
+            test-results-repeat/**/test-failed-*.png
+            test-results-repeat/**/error-context.md
+          retention-days: 3
+          if-no-files-found: ignore
