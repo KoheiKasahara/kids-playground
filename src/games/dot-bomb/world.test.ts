@@ -519,6 +519,22 @@ describe('dot-bomb の なかま', () => {
     expect(w.ally).not.toBeNull()
   })
 
+  test('ポンは なかまの ボンを すりぬけられるが、じぶんの ボンは とおれない', () => {
+    const w = make(OPEN)
+    run(w, 0)
+    placeBombAt(w, 2, 1, 2, 'ally', 9999)
+    setDir(w, 1)
+    run(w, 30)
+    expect(Math.floor(w.hero.x / TILE)).toBeGreaterThanOrEqual(3)
+
+    const w2 = make(OPEN)
+    run(w2, 0)
+    placeBombAt(w2, 2, 1, 2, 'hero', 9999)
+    setDir(w2, 1)
+    run(w2, 30)
+    expect(Math.floor(w2.hero.x / TILE)).toBe(1)
+  })
+
   test('なかまの ひに あぶない ひが かさなると、ポンは いたい', () => {
     const w = make(OPEN)
     ignite(w, 3, 2, 'ally')

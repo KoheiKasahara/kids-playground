@@ -205,7 +205,7 @@ export class Scene {
     this.ground = groundLayer(world, this.theme)
     // はじめて つかう ときに え を つくると いっしゅん とまるので、さきに つくっておく。
     for (let i = 0; i < 4; i++) softBurnSprite(this.theme, i)
-    for (const hot of [false, true]) for (let size = 0; size < 3; size++) { bombSprite(size, hot, false); if (world.boss) bombSprite(size, hot, true) }
+    for (const hot of [false, true]) for (let size = 0; size < 3; size++) { bombSprite(size, hot, 'hero'); bombSprite(size, hot, 'ally'); if (world.boss) bombSprite(size, hot, 'boss') }
     for (const kind of ['bomb', 'fire', 'speed', 'heart', 'star'] as const) { itemSprite(kind); itemIconImage(kind) }
     if (world.stage.egg) eggSprite(world.stage.egg)
     for (const e of world.enemies) { const img = enemySprite(e.kind, false); whiteOf(`enemy:${e.kind}:false`, img); whiteOf(`enemy:${e.kind}:true`, enemySprite(e.kind, true)) }
@@ -462,13 +462,18 @@ export class Scene {
       const phase = (b.age % beat) / beat
       const size = phase < .5 ? 2 : phase < .75 ? 1 : 0
       const hot = urgent && (b.age >> 2) % 2 === 0
-      const img = bombSprite(b.age < 6 ? 2 - Math.floor(b.age / 3) : size, hot, b.owner === 'boss')
-      const sh = shadowSprite(14)
-      if (sh) ctx.drawImage(sh, ox + px - 7, oy + py + 4)
+      const img = bombSprite(b.age < 6 ? 2 - Math.floor(b.age / 3) : size, hot, b.owner)
+      const ally = b.owner === 'ally'
+      const sh = shadowSprite(ally ? 10 : 14)
+      if (sh) ctx.drawImage(sh, ox + px - (ally ? 5 : 7), oy + py + 4)
       const squash = b.age < 4 ? 2 : 0
-      if (img) ctx.drawImage(img, ox + px - 9, oy + py - 12 + squash)
+      // なかまの ボンは すけて ふわふわ うかぶ（ポンは すりぬけられる）
+      const lift = ally ? Math.round(Math.sin(b.age * .12) * 1.2) - 2 : 0
+      if (ally) ctx.globalAlpha = .72
+      if (img) ctx.drawImage(img, ox + px - 9, oy + py - 12 + squash + lift)
+      if (ally) ctx.globalAlpha = 1
       // みちびの ひばな
-      const fx0 = ox + px + 5, fy0 = oy + py - 12 + squash
+      const fx0 = ox + px + 5, fy0 = oy + py - 12 + squash + lift
       const flick = (b.age >> 1) % 3
       rect(ctx, fx0, fy0 - 1, 1, 1, '#fff6a0')
       rect(ctx, fx0 - 1 + flick, fy0 - 2 - (flick % 2), 1, 1, flick === 1 ? '#ffffff' : '#ff8a1e')
