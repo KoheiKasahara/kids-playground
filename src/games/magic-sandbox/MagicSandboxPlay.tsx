@@ -16,8 +16,8 @@ const MATERIALS: { id: Material; name: string; icon: string; hint: string }[] = 
   { id: Cell.Sand, name: 'すな', icon: '🏜️', hint: 'さらさら おやまを つくろう' },
   { id: Cell.Water, name: 'みず', icon: '💧', hint: 'すなに かけると しっとり！' },
   { id: Cell.Stone, name: 'いし', icon: '🪨', hint: 'かべを かいて みずを ためよう' },
-  { id: Cell.Seed, name: 'たね', icon: '🌱', hint: 'ぬれた すなに まいてみよう' },
-  { id: Cell.TulipSeed, name: 'チューリップ', icon: '🌷', hint: 'チューリップの たね。ぬれた すなに まこう' },
+  { id: Cell.Seed, name: 'たね', icon: '🌱', hint: 'まいて みずを かけてみよう' },
+  { id: Cell.TulipSeed, name: 'チューリップ', icon: '🌷', hint: 'チューリップの たね。まいて みずを かけよう' },
   { id: Cell.Empty, name: 'けす', icon: '🧽', hint: 'なぞって けそう。トンネルも つくれるよ' },
 ]
 function ClearDialog({ close, clear }: { close: () => void; clear: () => void }) {
