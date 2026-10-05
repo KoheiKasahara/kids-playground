@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { GAME_CATALOG } from '../src/games/gameCatalog'
 import { boxesOverlap, visibleTextBox } from './support/layout'
 import { capturePageErrors } from './support/runtimeErrors'
+import { expectLiveApp } from './support/liveApp'
 
 const PORTRAIT_VIEWPORTS = [
   { width: 390, height: 844 },
@@ -18,8 +19,9 @@ for (const viewport of PORTRAIT_VIEWPORTS) {
         const pageErrors = capturePageErrors(page)
 
         await page.goto(`/games/${game.slug}`, { waitUntil: 'domcontentloaded' })
+        const app = await expectLiveApp(page)
 
-        const heading = page.getByRole('heading', { name: game.title, exact: true })
+        const heading = app.getByRole('heading', { name: game.title, exact: true })
         const backButton = page.locator('[data-game-back-button]:visible')
         await expect(heading).toBeVisible({ timeout: 15_000 })
         await expect(backButton).toBeVisible()

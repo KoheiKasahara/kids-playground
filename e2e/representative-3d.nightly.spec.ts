@@ -64,7 +64,7 @@ test('つくった車を走らせ、つくりかえ画面へ戻って入り直�
   expect(errors).toEqual([])
 })
 
-test('クレーンゲームでアームを動かしてつかみ、退出して再入場できる [crane-game]', async ({ page }) => {
+test('クレーンゲームでアームを動かして一巡し、描画予算を守る [crane-game]', async ({ page }) => {
   test.setTimeout(90_000)
   const errors = capturePageErrors(page)
   await page.goto('/')
@@ -90,16 +90,49 @@ test('クレーンゲームでアームを動かしてつかみ、退出して�
   await expect(page.locator('canvas')).toHaveCount(1)
   expect(Number(await scene.getAttribute('data-draw-calls'))).toBeLessThan(90)
   expect(Number(await scene.getAttribute('data-triangles'))).toBeLessThan(120_000)
-  // WebGLの連続描画中でも退出処理そのものを検証できるよう、固定ボタンの安定待ちには依存しない。
-  await page.locator('[data-game-back-button]').dispatchEvent('click')
+  expect(errors).toEqual([])
+})
+
+test('クレーンゲームを実際の戻る操作で退出し、同じページで再入場できる [crane-game]', async ({ page }) => {
+  // 長いアームの一巡・描画予算とは別の時間枠で、WebGLのcleanupと再初期化を確認する。
+  // page.goto/reloadで分断するとリークを見逃すため、ホームへの退出から再入場まで同じpageを使う。
+  test.setTimeout(90_000)
+  const errors = capturePageErrors(page)
+  await page.goto('/')
+  const gameLink = page.getByRole('link', { name: 'クレーンゲーム', exact: true })
+  const begin = page.getByRole('button', { name: 'あそぶ！', exact: true })
+  const scene = page.getByTestId('crane-scene')
+  const backButton = page.locator('header [data-game-back-button]')
+  const move = page.getByRole('button', { name: 'よこに うごかす', exact: true })
+
+  await gameLink.click()
+  await expect(begin).toBeEnabled({ timeout: 20_000 })
+  await page.getByRole('button', { name: 'カプセルの きかいを えらぶ', exact: true }).click()
+  await expect(begin).toBeEnabled({ timeout: 20_000 })
+  await begin.click()
+  await expect(scene).toHaveAttribute('data-ready', 'true', { timeout: 20_000 })
+  await expect(page.locator('canvas')).toHaveCount(1)
+  await expect(move).toBeEnabled()
+  const parked = await scene.getAttribute('data-claw-x')
+  await move.click()
+  await expect.poll(() => scene.getAttribute('data-claw-x')).not.toBe(parked)
+
+  // 動作中のシーンから、ユーザーと同じclickで選択画面→ホームへ戻る。
+  await backButton.click()
   await expect(begin).toBeVisible()
-  await page.locator('[data-game-back-button]').dispatchEvent('click')
+  await backButton.click()
   await expect(page.getByRole('heading', { name: 'こどもミニゲーム', exact: true })).toBeVisible()
   await expect(page.locator('canvas')).toHaveCount(0)
-  await page.getByRole('link', { name: 'クレーンゲーム', exact: true }).click()
+
+  await gameLink.click()
   await expect(begin).toBeEnabled({ timeout: 20_000 })
   await begin.click()
   await expect(page.getByRole('region', { name: 'クレーンの そうさ', exact: true })).toBeVisible()
+  await expect(scene).toHaveAttribute('data-ready', 'true', { timeout: 20_000 })
   await expect(page.locator('canvas')).toHaveCount(1)
+  await expect(move).toBeEnabled()
+  const restarted = await scene.getAttribute('data-claw-x')
+  await move.click()
+  await expect.poll(() => scene.getAttribute('data-claw-x')).not.toBe(restarted)
   expect(errors).toEqual([])
 })

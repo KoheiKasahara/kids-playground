@@ -1,11 +1,15 @@
-name: Representative Gameplay Smoke
+name: Full E2E Validation
 
 on:
   pull_request:
     paths:
-      - 'e2e/*.nightly.spec.ts'
+      - 'e2e/**'
+      - 'scripts/e2e/**'
+      - 'package.json'
+      - 'package-lock.json'
       - 'playwright.config.ts'
       - '.github/workflows/gameplay-smoke.yml'
+      - '.github/workflows/nightly.yml'
   workflow_dispatch:
 
 permissions:
@@ -18,6 +22,8 @@ concurrency:
 jobs:
   gameplay:
     runs-on: ubuntu-latest
+    env:
+      E2E_DIAGNOSTICS_MAX_BYTES: 8388608
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -27,10 +33,70 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      # テスト定義を変えたPRだけ先行検証する。普段はNightlyで実行。
-      - run: npx playwright test e2e/representative-3d.nightly.spec.ts e2e/piano-landscape.nightly.spec.ts --workers=1
+      # E2E/設定変更PRではNightlyと同じ全件を先行検証する。通常のソース変更PRは既存smokeを維持。
+      - name: Test all Nightly E2E scenarios
+        id: e2e
+        run: npm run test:e2e:nightly -- --reporter=list
+      - name: Repeat affected reliability scenarios without retries
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        run: npx playwright test e2e/representative-3d.nightly.spec.ts e2e/all-games-landscape.nightly.spec.ts --grep 'crane-game|pixel-kart' --workers=1 --retries=0 --repeat-each=3 --reporter=list --output=test-results-repeat
+      - name: Prepare bounded failure diagnostics
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        run: node scripts/e2e/prepare-diagnostics.mjs
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        continue-on-error: true
         with:
-          name: representative-gameplay-results
-          path: test-results/
+          name: full-e2e-failures-${{ github.run_attempt }}
+          path: e2e-diagnostics/
+          retention-days: 3
+          if-no-files-found: ignore
+
+  newly-enabled-regressions:
+    name: regressions-${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: oekaki
+            specs: e2e/oekaki-korokoro.smoke.spec.ts
+            pattern: usable paper and controls
+          - name: vehicles
+            specs: e2e/circuit-racing.smoke.spec.ts e2e/putter-golf.smoke.spec.ts e2e/train-journey.smoke.spec.ts
+            pattern: 車を選んで走行|コースを選ぶと景色|全4ホール|three trains
+    env:
+      # 全件+2つの反復jobの保存対象を合計24MiB以内に抑える。
+      E2E_DIAGNOSTICS_MAX_BYTES: 8388608
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      # 全件の終了を待たず、今回復旧した実操作をリトライなしで反復して確認する。
+      - name: Repeat newly enabled regressions without retries
+        id: e2e
+        run: npx playwright test ${{ matrix.specs }} --grep '${{ matrix.pattern }}' --workers=1 --retries=0 --repeat-each=2 --reporter=list
+      - name: Prepare bounded failure diagnostics
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        run: node scripts/e2e/prepare-diagnostics.mjs
+      - uses: actions/upload-artifact@v7
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        continue-on-error: true
+        with:
+          name: ${{ matrix.name }}-e2e-failures-${{ github.run_attempt }}
+          path: e2e-diagnostics/
+          retention-days: 3
+          if-no-files-found: ignore
+      - name: Upload compact drawing layout review
+        if: success() && github.event_name == 'pull_request' && matrix.name == 'oekaki'
+        uses: actions/upload-artifact@v7
+        with:
+          name: oekaki-layout-review-${{ github.run_attempt }}
+          path: test-results/oekaki-*.png
+          retention-days: 1
+          if-no-files-found: error

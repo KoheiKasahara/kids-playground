@@ -10,6 +10,7 @@ async function depart(page: Page) {
 test('three trains, both point controls, temporary boost, pause and cameras work in portrait and landscape', async ({ page }) => {
   test.setTimeout(90_000)
   const errors = capturePageErrors(page)
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
   page.on('console', m => { if (m.type() === 'error' && /THREE.WebGLProgram|shader error/i.test(m.text())) errors.push(m.text()) })
   await page.goto('/')
   await page.getByRole('link', { name: 'でんしゃの たび', exact: true }).click()
@@ -22,13 +23,25 @@ test('three trains, both point controls, temporary boost, pause and cameras work
     await expect(scene).toHaveAttribute('data-train', id)
     await expect(page.locator('canvas')).toHaveCount(1)
   }
+  // Boost lasts 2.4 seconds of animation time. The engine caps each frame at
+  // 50 ms, so slow software WebGL cannot be timed with a wall-clock deadline.
+  // runFor delivers every RAF without skipping the real movement/render loop.
+  await page.clock.pauseAt(new Date('2026-01-01T01:00:00Z'))
   await start.click()
   const initial = await scene.getAttribute('data-distance')
-  await page.getByRole('button', { name: 'かそく！', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'かそく！', exact: true })).toHaveAttribute('data-active', 'true')
+  const boost = page.getByRole('button', { name: 'かそく！', exact: true })
+  await boost.click()
+  await expect(boost).toHaveAttribute('data-active', 'true')
+  await page.clock.runFor(1_000)
   await expect.poll(() => scene.getAttribute('data-distance')).not.toBe(initial)
   await expect.poll(async () => Number(await scene.getAttribute('data-speed'))).toBeGreaterThan(5)
-  await expect(page.getByRole('button', { name: 'かそく！', exact: true })).toHaveAttribute('data-active', 'false', { timeout: 12_000 })
+  await page.clock.runFor(1_000)
+  await expect(boost).toHaveAttribute('data-active', 'true')
+  // Include the engine's 120 ms feedback publication interval after expiry.
+  await page.clock.runFor(600)
+  await expect(boost).toHaveAttribute('data-active', 'false')
+  await expect(scene).toHaveAttribute('data-boost', '0.00')
+  await page.clock.resume()
   await page.getByRole('button', { name: 'ポイントを きりかえる', exact: true }).click()
   await expect(page.getByRole('complementary')).toHaveAccessibleName('コースマップ。つぎは トンネル')
   await page.getByRole('button', { name: 'ぜんたい', exact: true }).click()
@@ -130,7 +143,7 @@ test('WebGL initialization failure can be retried and leaving the game removes i
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext
     Object.defineProperty(window, '__restoreJourneyInit', { value: () => { HTMLCanvasElement.prototype.getContext = original } })
-    HTMLCanvasElement.prototype.getContext = function (...args: Parameters<typeof original>) {
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: Parameters<typeof original>) {
       if (String(args[0]).startsWith('webgl')) return null
       return original.apply(this, args)
     } as typeof original

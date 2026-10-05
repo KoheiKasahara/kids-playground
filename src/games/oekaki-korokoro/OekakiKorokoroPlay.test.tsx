@@ -64,6 +64,19 @@ describe('おえかきコロコロのあそび', () => {
     expect(screen.getByTestId('pattern-picker').children).toHaveLength(8)
     expect(screen.getByTestId('color-picker').children).toHaveLength(10)
   })
+  test('keeps the full square paper and ink buffers when the display is resized', () => {
+    const canvas = open()
+    const layers = canvas.parentElement!.querySelectorAll('canvas')
+    expect(layers).toHaveLength(2)
+    tap(canvas)
+    fireEvent(window, new Event('resize'))
+    for (const layer of layers) {
+      expect(layer).toHaveAttribute('width', '960')
+      expect(layer).toHaveAttribute('height', '960')
+    }
+    expect(ctx.clearRect).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '1かい もどす' })).toBeEnabled()
+  })
   test('clearing requires confirmation, cancel preserves ink, confirmed clear is recoverable', async () => {
     const user = userEvent.setup()
     tap(open())

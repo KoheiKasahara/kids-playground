@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { boxesOverlap, visibleTextBox } from './support/layout'
 
 const drawing = (page: Page) => page.getByLabel('おえかきの かみ。ゆびや マウスで なぞってね')
 const pixels = (page: Page) => drawing(page).evaluate(el => (el as HTMLCanvasElement).toDataURL())
@@ -62,17 +63,84 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
     await page.setViewportSize(viewport)
     await page.goto('/games/oekaki-korokoro')
     await expect(drawing(page)).toBeVisible()
+    const pickers = [page.getByTestId('pattern-picker'), page.getByTestId('color-picker')]
+    const touch = await page.context().newCDPSession(page)
+    for (const picker of pickers) {
+      await expect(picker).toBeInViewport({ ratio: 1 })
+      await expect(picker).toHaveCSS('overflow-x', 'auto')
+      await expect(picker).toHaveCSS('touch-action', 'pan-x')
+      expect(await picker.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+      // Prove native finger scrolling works before using centered scrolling to
+      // inspect each option. No DOM event dispatch or hidden overflow bypass.
+      const pickerBox = (await picker.boundingBox())!
+      const y = pickerBox.y + pickerBox.height / 2
+      const x = pickerBox.x + pickerBox.width * .85
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 0 }] })
+      for (let step = 1; step <= 5; step++) {
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - pickerBox.width * .65 * step / 5, y, id: 0 }] })
+      }
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      await expect.poll(() => picker.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    }
+    await touch.detach()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
     for (const control of await page.locator('main button:visible, main a:visible').all()) {
+      // :visible includes options clipped by the intentionally scrollable pickers.
+      // Keep fixed controls in place; every picker option must be fully reachable.
+      const isPickerOption = await control.evaluate(element => Boolean(element.closest('[data-testid="pattern-picker"], [data-testid="color-picker"]')))
+      // Explicit centering avoids a minimum scroll snapping back to the previous
+      // option and leaving this one clipped at the edge of the horizontal strip.
+      if (isPickerOption) await control.evaluate(element => element.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' }))
+      await expect(control).toBeInViewport({ ratio: 1 })
       const box = (await control.boundingBox())!
       expect(box.width).toBeGreaterThanOrEqual(44)
       expect(box.height).toBeGreaterThanOrEqual(44)
       expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.y).toBeGreaterThanOrEqual(0)
       expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1)
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1)
+      if (isPickerOption) {
+        await control.click()
+        await expect(control).toHaveAttribute('aria-pressed', 'true')
+      }
     }
+    // Returning to the first choices also exercises scrolling back from the end.
+    for (const picker of pickers) {
+      const first = picker.getByRole('button').first()
+      await first.evaluate(element => element.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' }))
+      await expect(first).toBeInViewport({ ratio: 1 })
+      await first.click()
+      await expect(first).toHaveAttribute('aria-pressed', 'true')
+    }
+    const paperChoices = page.getByRole('group', { name: 'かみを えらぶ' }).getByRole('button')
+    await expect(paperChoices).toHaveCount(4)
+    const paperButtons = await paperChoices.all()
+    const paperBoxes = await Promise.all(paperButtons.map(button => button.boundingBox()))
+    const toolsBox = await page.getByRole('complementary', { name: 'おえかきの どうぐ' }).boundingBox()
+    expect(toolsBox).not.toBeNull()
+    for (const [index, button] of paperButtons.entries()) {
+      const label = await visibleTextBox(button.locator('small'))
+      const bounds = paperBoxes[index]!
+      expect(label).not.toBeNull()
+      expect(label!.x).toBeGreaterThanOrEqual(bounds.x)
+      expect(label!.y).toBeGreaterThanOrEqual(bounds.y)
+      expect(label!.x + label!.width).toBeLessThanOrEqual(bounds.x + bounds.width)
+      expect(label!.y + label!.height).toBeLessThanOrEqual(bounds.y + bounds.height)
+      expect(boxesOverlap(label, toolsBox)).toBe(false)
+      for (const [otherIndex, otherBounds] of paperBoxes.entries()) {
+        if (otherIndex !== index) expect(boxesOverlap(label, otherBounds)).toBe(false)
+      }
+      await button.click()
+      await expect(button).toHaveAttribute('aria-pressed', 'true')
+    }
+    await paperChoices.first().click()
+    await expect(paperChoices.first()).toHaveAttribute('aria-pressed', 'true')
+    expect(await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }))).toEqual({ x: 0, y: 0 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
     const box = (await drawing(page).boundingBox())!
     expect(box.width).toBeGreaterThan(200)
     expect(box.height).toBeGreaterThan(150)
+    expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1)
     await stroke(page)
     const before = await pixels(page)
     await page.screenshot({ path: `test-results/oekaki-${viewport.width}x${viewport.height}.png` })

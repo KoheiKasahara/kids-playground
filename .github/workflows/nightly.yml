@@ -101,6 +101,20 @@ jobs:
           echo "Nightly E2E route smoke duration: $((end - start))s"
           exit "$status"
 
+      # trace/screenshotはPlaywright側で失敗時だけ生成する。retry成功時も初回失敗の証跡を残す。
+      - name: Prepare bounded failure diagnostics
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        run: node scripts/e2e/prepare-diagnostics.mjs
+      - name: Upload failed Nightly E2E diagnostics
+        if: always() && !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure')
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-e2e-failures-${{ github.run_attempt }}
+          path: e2e-diagnostics/
+          retention-days: 3
+          if-no-files-found: ignore
+
       - name: Upload Nightly E2E report for Project Health
         if: always()
         continue-on-error: true
