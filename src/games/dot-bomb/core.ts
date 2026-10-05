@@ -332,6 +332,12 @@ export function hurtsHero(w: World, tx: number, ty: number) {
   return isHot(w, tx, ty) && w.fireOwner[idx(w, tx, ty)] !== OWNER_ALLY
 }
 
+/** その ひで ボンに ひが うつるか（なかまの ひは ポンの ボンに うつらない）。 */
+export function ignitesBomb(w: World, b: Bomb, tx: number, ty: number) {
+  if (!isHot(w, tx, ty)) return false
+  return !(b.owner === 'hero' && w.fireOwner[idx(w, tx, ty)] === OWNER_ALLY)
+}
+
 /** こわれる ブロックを もやしはじめる。 */
 export function burnSoft(w: World, tx: number, ty: number) {
   const i = idx(w, tx, ty)
@@ -353,7 +359,7 @@ export function explodeAt(w: World, tx: number, ty: number, range: number, owner
       ignite(w, x, y, owner)
       if (t === T_SOFT) { burnSoft(w, x, y); break }
       const other = bombAt(w, x, y)
-      if (other) { if (other.chain < 0) other.chain = CHAIN_DELAY; break }
+      if (other) { if (other.chain < 0 && !(owner === 'ally' && other.owner === 'hero')) other.chain = CHAIN_DELAY; break }
     }
   }
   w.blasts.push({ tx, ty, arms, t: 0, power: range, owner })

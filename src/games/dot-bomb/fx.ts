@@ -74,7 +74,6 @@ export function spawnFx(fx: Fx, e: WorldEvent, world: World, theme: Theme) {
       for (let i = 0; i < 6; i++) add(fx, { kind: 'dust', x: e.x + (i - 2.5) * 2.4, y: e.y + 6, vx: (i - 2.5) * .25, vy: -.15, max: 16, color: '#ffffff', size: 2 })
       break
     case 'boom': {
-      fx.shake = Math.min(9, Math.max(fx.shake, 3 + e.power * .7))
       fx.flash = Math.max(fx.flash, 3)
       const fire = e.owner === 'ally' ? ALLY_FIRE : FIRE
       fx.flashColor = e.owner === 'ally' ? '#e0f6ff' : '#fff4d0'
