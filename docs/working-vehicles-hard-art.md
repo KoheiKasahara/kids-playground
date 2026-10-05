@@ -1,91 +1,32 @@
-# Working vehicle hard illustrations
+# Working vehicle illustrations: hard level
 
-Generated 2026-10-03 with the built-in image_gen tool, one original image per asset. No source photographs were copied into the project. The user's attachment informed the Japanese children's vehicle-encyclopedia direction. Official sources informed recognizable vehicle categories and equipment; these are simplified illustrations, not exact model reproductions.
+## Provenance
 
-All final files: `public/images/working-vehicles/<id>.webp`, 768 × 512 pixels, opaque white background, WebP quality 86. Original 1536 × 1024 PNG outputs were downscaled with Pillow Lanczos and encoded to WebP; no image content was painted or composited programmatically.
+Replaced 2026-10-05 with approved original flat illustrations, generated individually using the built-in image generation tool. Official manufacturer, operator or government photographs were inspected as form references during production. The reference photographs are not redistributed as project assets. Model names below identify the references; the simplified illustrations are not exact technical reproductions or official manufacturer artwork.
 
-Visual QA: all ten images inspected at full generation resolution for full vehicle visibility, left-facing orientation, recognizable working equipment, and absence of people, lettering, and logos. Bookmobile shelves, carrier loading decks, combine crawler/head, transplanter seedlings, sweeper brushes, airport fire monitor, and rotary auger are visible. Art uses a consistent gouache treatment and simplified proportions; narrow margins in some generated images are retained because the full vehicle remains visible.
+Final files are `public/images/working-vehicles/<id>.webp`. The approved PNG frames are preserved without cropping or subject/content edits, resized proportionally to a maximum dimension of 768 pixels, and encoded as opaque white-background RGB WebP (quality 90, method 6). This record describes the replacement assets; the previous artwork's prompts and gouache-style notes do not apply.
 
-## Final prompts and references
+## References and qualifications
 
-### aerial-work-platform
+| Asset | Model or vehicle reference | Official source | Qualification |
+| --- | --- | --- | --- |
+| `airport-fire-truck.webp` | Morita MAF-60A | [Reference](https://www.morita119.jp/fire_engine/airport/002.html) | Three axles, red hubs, angular cab, roof and bumper monitors. |
+| `street-sweeper.webp` | Kato Street-Master HS-800W standard hopper | [Reference](https://www.kato-works.co.jp/profile/news/html/HS800W_STD.html) | Standard hopper, two axles and two visible brushes. Hopper illustrated lowered rather than raised as in the source photo. |
+| `airport-tug.webp` | Komatsu WT500 | [Reference](https://www.komatsu.jp/en/-/media/home/aboutus/locations/ibaraki_plant.pdf) | Official factory brochure, PDF page 4. Low white heavy body, two axles, raised cab and towing hitch. |
+| `rotary-snowplow.webp` | NICHIJO HTR265 | [Reference](https://www.nichijo.jp/english/pdf/htr265_e.pdf) | Official brochure, PDF page 1. Two axles, red rotary cutter and tall discharge chute. |
+| `bookmobile.webp` | Hino City 11th Himawari-go | [Reference](https://www.lib.city.hino.lg.jp/sisetu/himawarigo/himawarigo.html) | Named municipal vehicle with open side bookshelves. Hino is the city name; chassis manufacturer is not claimed. |
+| `combine-harvester.webp` | Kubota DIONITH DR472, enclosed cab | [Reference](https://agriculture.kubota.co.jp/product/combine/DR-472/?nav=catalog) | Four-row self-feeding rice combine with crawler tracks and folded unloading auger. Catalog reference: pages 1–2. |
+| `car-carrier.webp` | Hamana Works Mini Carrier | [Reference](https://hamana-works.co.jp/develop/products-category04-01.html) | Two-axle rigid, two-deck carrier. Three kei cars are illustrated, consistent with the official capacity. |
+| `rice-transplanter.webp` | Kubota NAVIWEL NW6S-R | [Reference](https://agriculture.kubota.co.jp/img_sys/catalog/3-20-2-0020-07.pdf) | NW6S-R photo in PDF page 19 (printed pages 35–36). Six-row planter; mechanical parts simplified. |
+| `container-trailer.webp` | UD Quon GK with 40ft container semitrailer | [Reference](https://www.udtrucks.com/japan/trucks/quon) | Official-photo combination: two-axle tractor plus three-axle trailer (five total). Trailer manufacturer unspecified; no TREX claim. |
+| `aerial-work-platform.webp` | Aichi SKYMASTER SH15B | [Reference](https://www.aichi-corp.co.jp/en/products/trackmount/skymaster_sh_sn_sk_sj_ss/sh15b) | Two-axle truck, straight telescoping boom, bucket and deployed outriggers. Working pose interpreted from a stowed official photo. |
 
-Reference: [Truck-mounted aerial platforms; raised boom, basket and outriggers.](https://www.aichi-corp.co.jp/)
+## Specific image references
 
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese Aichi-style truck-mounted aerial work platform: white Japanese cab-over compact truck, teal-blue lower utility bed and yellow telescopic articulated boom lifted diagonally to an empty white safety bucket above the truck. Stabilizer outriggers deployed on ground, recognizable bucket and hydraulic arm. No crane hook.
-```
-
-### container-trailer
-
-Reference: [Container semi-trailer construction and corrugated container silhouette.](https://www.trex.co.jp/products/catalog/)
-
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese port container trailer truck: white modern Japanese cab-over tractor unit with broad windscreen and short flat nose, attached long black semi-trailer carrying one dark red corrugated shipping container; trailer rear twin axles, visible separation between tractor and container. No lettering anywhere.
-```
-
-### street-sweeper
-
-Reference: [Japanese truck-mounted vacuum sweeper with side brushes and collection hopper.](https://kato-works.co.jp/profile/news/html/HS800W_LU.html)
-
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese Kato HS-style street sweeper mounted on a compact cab-over truck. Yellow cab and yellow/cream hopper body, orange roof beacon; conspicuous dark bristled circular sweeping brushes lowered to road level between front and rear tires, visible suction unit and collection box. Brushes must be easy for children to identify.
-```
-
-### airport-fire-truck
-
-Reference: [Japanese airport chemical fire tender, wide cab, large tires and roof monitor.](https://www.morita119.jp/fire_engine/airport/)
-
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese Morita-style airport chemical fire engine: squat wide red body, panoramic dark windshield, three axles with six large black off-road tires, silver side equipment shutters and distinct roof-mounted foam water cannon pointed left. Airport crash tender profile, no ladder, no words.
-```
-
-### airport-tug
-
-Reference: [Aircraft pushback tractor operated in Japan; low heavy chassis and towing role.](https://www.ana.co.jp/ja/jp/brand/ana-future-promise/co2-reduction/2021-09-14-01/)
-
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese airport aircraft pushback towing tractor: very low heavy wide white chassis, short square white enclosed center cab with large blue-gray windows, orange beacon, four thick black tires, prominent rear tow coupling. Stubby heavy airport tug, much lower than a normal truck. No airplane, luggage carts or other objects.
-```
-
-### bookmobile
-
-Reference: [Japanese municipal mobile library as the vehicle class reference; open book shelving emphasized.](https://www.lib.city.hino.lg.jp/sisetu/himawarigo/himawarigo.html)
-
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese municipal mobile library truck: compact white and pale blue Japanese cab-over truck, box body with its long side hatch lifted upward like an awning, clearly visible three tidy rows of colorful book spines in built-in shelves beneath the open hatch. No writing on books. Recognizable as a bookmobile, not food truck.
-```
-
-### car-carrier
-
-Reference: [Japanese three-car truck carrier with open multi-level decks.](https://hamana-works.co.jp/develop/products-category04-01.html)
-
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese vehicle transporter: blue Japanese cab-over carrier truck, open two-level steel loading frame carrying three small colorful Japanese passenger cars (one red, one white, one pale blue), all securely resting on the decks; rear loading ramps folded, realistic simplified structure. Entire carrier and load visible.
-```
-
-### combine-harvester
-
-Reference: [Japanese rice-combine class, crawler tracks and front crop dividers.](https://www.jnouki.kubota.co.jp/product/combine/)
-
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese Kubota-style rice combine harvester: orange and cream compact body on two black rubber crawler tracks, enclosed dark-glass operator cab, distinctive front rice harvesting head with four narrow pointed cream crop dividers, grain tank and folded discharge auger visible. Recognizable Japanese rice combine, not tractor or wide Western reel combine.
-```
-
-### rice-transplanter
-
-Reference: [Japanese riding rice transplanter, seedling trays and planting mechanism.](https://agriculture.kubota.co.jp/agriinfo/useful/einou_magazine/file/u_hokkaido/u_hokkaido42.pdf)
-
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese Kubota-style ride-on rice transplanter: compact orange and cream hood at front left, open empty black driver's seat and steering wheel, narrow agricultural wheels with large rear paddle-like tires, broad sloping green seedling mat tray at rear right and delicate rice planting fingers underneath. Rear loaded with vivid green rice seedlings in neat rectangular mats. No harvesting cutter or crawler tracks.
-```
-
-### rotary-snowplow
-
-Reference: [Japanese rotary snowplow, front rotary intake and discharge chute.](https://nichijo.jp/catalog_pdf/rotary.pdf)
-
-```text
-Use case: illustration-story. Asset type: Japanese preschool working-vehicle quiz, one vehicle illustration. Original clean hand-painted gouache children's vehicle encyclopedia art, flat color shapes with gentle subtle shading and light paper texture on the vehicle only. Slightly chubby and simplified/deformed proportions but mechanically identifiable real Japanese working vehicle. Pure white background. Single centered full vehicle, front facing LEFT in three-quarter view; clear silhouette and every wheel/attachment fully visible, generous minimum 10% white margins on all sides. Landscape canvas 3:2. No people, faces, eyes, anthropomorphism, words, letters, numbers, logos, badges, watermarks, road or landscape.  Subject: A Japanese Nichijo-style rotary snow blower vehicle: chunky yellow/orange body, high enclosed dark-window cab, four rugged large black tires, large wide front rotary snow-blower housing at left with clearly visible dark spiral auger inside and a tall curved upward snow discharge chute. No snow spray, no flat plow blade; rotary mechanism unmistakable.
-```
-
-
+- Morita MAF-60A: [official vehicle photograph](https://www.morita119.jp/fire_engine/airport/img/002a.jpg).
+- Kato HS-800W standard hopper: [official vehicle photograph](https://www.kato-works.co.jp/profile/news/html/img/HS800w_std.jpg).
+- Hino City Himawari-go: [first official photograph](https://www.lib.city.hino.lg.jp/sisetu/himawarigo/himawarigo-1.jpg) and [fifth official photograph](https://www.lib.city.hino.lg.jp/sisetu/himawarigo/himawarigo-5.jpg).
+- Kubota DR472: [official catalog](https://agriculture.kubota.co.jp/img_sys/catalog/5-10-2-0032-03.pdf), pages 1–2.
+- Hamana Works Mini Carrier: [official vehicle photograph](https://hamana-works.co.jp/develop/image/products-category04/li02.jpg).
+- UD Quon GK and container semitrailer: [official combination photograph](https://udtrucks.co.jp/sites/default/files/styles/truck_specification_images_main/public/2025-12/%E6%B5%B7%E3%82%B3%E3%83%B3_0.jpg).
+- Aichi SH15B: [official stowed-boom photograph](https://www.aichi-corp.co.jp/hubfs/aichi-corp.co.jp/files/locales/en/products/trackmount/SH15B/SH15B_main_001.jpg).
