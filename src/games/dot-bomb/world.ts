@@ -5,7 +5,7 @@ import {
   CHAIN_DELAY, DIRS, DX, DY, F_BELT, F_DOOR, F_ICE, F_VENT, F_WARP, FIRE_FRAMES, MAX_BOMBS, MAX_FIRE,
   MAX_HEARTS, MAX_SPEED, READY_FRAMES, START_HEARTS, T_FLOOR, T_HARD, T_SOFT, T_WALL, T_WATER, TILE, aliveEnemies, beltDir,
   bombAt, bombTile, center, emit, explodeBomb, explodeAt, floorAt, hashString, heroAirborne, heroTile, hurtHero, hurtsHero, idx, inside,
-  isBelt, isHot, isSolid, placeBombAt, rng, tileAt, tileOf, type Bomb, type Dir, type Hero, type ItemKind, type World,
+  ignitesBomb, isBelt, isSolid, placeBombAt, rng, tileAt, tileOf, type Bomb, type Dir, type Hero, type ItemKind, type World,
 } from './core'
 import { hitEnemy, spawnEnemy, updateEnemies } from './enemies'
 import { createBoss, updateBoss, updateShots } from './boss'
@@ -508,7 +508,7 @@ function updateBombs(w: World) {
     }
     if (b.slide !== null) slideBomb(w, b)
     const [tx, ty] = bombTile(b)
-    if (b.chain < 0 && isHot(w, tx, ty)) b.chain = CHAIN_DELAY
+    if (b.chain < 0 && ignitesBomb(w, b, tx, ty)) b.chain = CHAIN_DELAY
     if (b.chain >= 0) {
       if (b.chain-- <= 0) explodeBomb(w, b)
     } else if (--b.fuse <= 0) explodeBomb(w, b)
