@@ -7,6 +7,7 @@ import { drawScene } from './render'
 
 vi.mock('./render', () => ({ drawScene: vi.fn() }))
 vi.mock('./art', () => ({ drawIcon: vi.fn() }))
+vi.mock('./portraits', () => ({ drawConversation: vi.fn(), SCENE_WIDTH: 320, SCENE_HEIGHT: 288 }))
 vi.mock('./sounds', () => ({ playDeliverySound: vi.fn() }))
 vi.mock('../../audio/sound', () => ({ primeAudio: vi.fn() }))
 vi.mock('../../utils/haptics', () => ({ vibrate: vi.fn() }))
@@ -35,10 +36,24 @@ function walk() {
   act(() => { vi.advanceTimersByTime(12_000) })
 }
 
+/** Taps through a conversation: the first tap shows the whole line, the next turns the page. */
+function talkThrough() {
+  for (let taps = 0; taps < 40; taps += 1) {
+    const next = screen.queryByRole('button', { name: /^(つぎへ|おわる)$/ })
+    if (!next) return
+    fireEvent.click(next)
+  }
+  throw new Error('the conversation never ended')
+}
+
 // These are the actual accessible controls: the model is never mocked or mutated by the test.
 function guidedAction(destination: string) {
   fireEvent.click(screen.getByRole('button', { name: `${destination}を タップ` }))
   walk()
+  if (screen.queryByTestId('conversation')) {
+    talkThrough()
+    act(() => { vi.advanceTimersByTime(4_000) })
+  }
 }
 
 function finishFirstTwoDeliveries() {
@@ -167,5 +182,69 @@ describe('ForestDeliveryPlay', () => {
     walk()
     expect(vi.getTimerCount()).toBe(0)
     expect(drawScene).toHaveBeenCalledTimes(drawCount)
+  })
+
+  test('ゆうびんやさんに着くと会話モードに切り替わり、話し終えてから にもつが かばんに入る', () => {
+    renderPlay()
+    fireEvent.click(screen.getByRole('button', { name: 'はるの はいたつで あそぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ゆうびんやさんを タップ' }))
+    walk()
+    const talk = screen.getByRole('group', { name: 'ゆうびんやさんと おはなし' })
+    expect(within(talk).getByText(/まってたよ/, { selector: '[aria-live]' })).toHaveTextContent('ゆうびんやさん「おはよう、こぎつねさん！ まってたよ。」')
+    expect(playDeliverySound).toHaveBeenCalledExactlyOnceWith('talk')
+    // The map waits underneath: nothing can be tapped and the parcel is not handed over yet.
+    expect(screen.getByRole('button', { name: 'りすさんを タップ' })).toBeDisabled()
+    expect(screen.queryByLabelText('こづつみ', { selector: 'span' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('delivery-toast')).not.toBeInTheDocument()
+    // Typing finishes, then each tap turns the page while the faces change.
+    fireEvent.click(screen.getByRole('button', { name: 'つぎへ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'つぎへ' }))
+    expect(within(talk).getByText(/はしが こわれて/, { selector: '[aria-live]' })).toBeInTheDocument()
+    talkThrough()
+    expect(screen.queryByTestId('conversation')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('こづつみ', { selector: 'span' })).toBeInTheDocument()
+    expect(screen.getByTestId('delivery-toast')).toHaveTextContent('にもつ ゲット！')
+    expect(playDeliverySound).toHaveBeenLastCalledWith('collect')
+    expect(screen.getByRole('button', { name: 'りすさんを タップ' })).toBeEnabled()
+  })
+
+  test('品物を持たずに会いに行くと お願いを聞き、とばすと すぐ地図へ戻る', () => {
+    renderPlay()
+    fireEvent.click(screen.getByRole('button', { name: 'はるの はいたつで あそぶ' }))
+    guidedAction('きのえだ')
+    guidedAction('はし')
+    fireEvent.click(screen.getByRole('button', { name: 'うさぎさんを タップ' }))
+    walk()
+    expect(screen.getByRole('group', { name: 'うさぎさんと おはなし' })).toHaveTextContent('にんじんが たべたいなあ')
+    fireEvent.click(screen.getByRole('button', { name: 'とばす' }))
+    expect(screen.queryByTestId('conversation')).not.toBeInTheDocument()
+    // Only a request was heard: no new banner, nothing delivered.
+    expect(screen.getByTestId('delivery-toast')).toHaveTextContent('はしが なおった！')
+    expect(screen.getByLabelText('0 / 2 にんに おとどけ')).toBeInTheDocument()
+  })
+
+  test('とどけると会話のあとで スタンプが押され、最後の会話が終わるまで結果は出ない', () => {
+    renderPlay()
+    fireEvent.click(screen.getByRole('button', { name: 'はるの はいたつで あそぶ' }))
+    guidedAction('ゆうびんやさん')
+    guidedAction('きのえだ')
+    guidedAction('はし')
+    fireEvent.click(screen.getByRole('button', { name: 'りすさんを タップ' }))
+    walk()
+    expect(screen.getByRole('group', { name: 'りすさんと おはなし' })).toHaveTextContent('おとどけものです')
+    expect(screen.getByLabelText('0 / 2 にんに おとどけ')).toBeInTheDocument()
+    talkThrough()
+    expect(screen.getByLabelText('1 / 2 にんに おとどけ')).toBeInTheDocument()
+    guidedAction('にんじんばたけ')
+    guidedAction('にんじんばたけ')
+    fireEvent.click(screen.getByRole('button', { name: 'うさぎさんを タップ' }))
+    walk()
+    expect(screen.getByRole('group', { name: 'うさぎさんと おはなし' })).toBeInTheDocument()
+    // Progress is saved straight away, but the result waits for the goodbye.
+    expect(JSON.parse(localStorage.getItem('forest-delivery-progress-v1') ?? '{}')).toEqual({ spring: 3 })
+    expect(screen.queryByRole('heading', { name: 'みんなに とどいた！' })).not.toBeInTheDocument()
+    talkThrough()
+    expect(screen.getByRole('heading', { name: 'みんなに とどいた！' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'つぎの もりへ →' })).toHaveFocus()
   })
 })
