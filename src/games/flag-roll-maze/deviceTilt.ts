@@ -11,8 +11,17 @@ export type ScreenOrientationAngle = 0 | 90 | 180 | 270
 
 /** 最大入力まで少し多く傾ける必要を作り、中間の細かい方向修正をしやすくする。 */
 export const DEVICE_TILT_RANGE_DEGREES = 22
-/** 約3.1°ぶんの手ぶれと持ち替え時のドリフトを吸収し、止めたときに動かないようにする。 */
-export const DEVICE_TILT_DEADZONE = 0.14
+/**
+ * 約2.4°ぶんの手ぶれと持ち替え時のドリフトを吸収し、止めたときに動かないようにする。
+ * 以前の0.14（約3.1°）では傾け始めてから転がり出すまでの遅れが目立ったため、少し狭めた。
+ */
+export const DEVICE_TILT_DEADZONE = 0.11
+/**
+ * ジャイロ入力へ追従する速さ（1/秒）。スティック用の9だと63%まで約110msかかり、
+ * 傾けてから動くまでの遅れとして感じられたため、約60msで追いつく値にする。
+ * センサー値の細かな揺れはデッドゾーンが吸収する。
+ */
+export const DEVICE_TILT_SMOOTHING_LAMBDA = 16
 
 /** DeviceOrientation の軸を、現在見えている画面の右・下方向へ揃える。 */
 export function deviceOrientationToScreenTilt(

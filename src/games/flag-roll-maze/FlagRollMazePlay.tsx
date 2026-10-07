@@ -10,13 +10,14 @@ import { useMazeEngine } from './useMazeEngine'
 import { findMazeStageDefinition, nextMazeStageId } from './mazeStages'
 import MazeGoalBurst from './MazeGoalBurst'
 import {
-  DEFAULT_MAZE_ZOOM_INDEX,
+  initialMazeZoomIndex,
   MAX_MAZE_ZOOM_INDEX,
   MIN_MAZE_ZOOM_INDEX,
 } from './mazeCamera'
 import { isTiltKeyCode, tiltFromPressedKeys, type TiltInput } from './tiltInput'
 import {
   calibrateDeviceTilt,
+  DEVICE_TILT_SMOOTHING_LAMBDA,
   deviceTiltToInput,
   getScreenOrientationAngle,
   supportsDeviceOrientation,
@@ -67,7 +68,8 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
   const calibrationRef = useRef<DeviceTiltCalibration | null>(null)
   const [inputMode, setInputMode] = useState<'stick' | 'gyro'>('stick')
   // 端末の大きさや持ち方で好みが分かれるので、遊びながら距離だけを選べるようにする。
-  const [zoomIndex, setZoomIndex] = useState(DEFAULT_MAZE_ZOOM_INDEX)
+  // スマホは短辺が狭いので、最初から少し引いた段で始める。
+  const [zoomIndex, setZoomIndex] = useState(initialMazeZoomIndex)
   const [gyroMessage, setGyroMessage] = useState('')
   const stageDefinition = findMazeStageDefinition(stageId)
   const followingStageId = nextMazeStageId(stageId)
@@ -96,6 +98,7 @@ function MazeGame({ flag, initialStageId }: { flag: FlagBallData; initialStageId
     onGoal: handleGoal,
     onRescue: handleRescue,
     onStarCollected: handleStarCollected,
+    tiltSmoothingLambda: inputMode === 'gyro' ? DEVICE_TILT_SMOOTHING_LAMBDA : undefined,
   })
 
   useEffect(

@@ -3,6 +3,7 @@ import {
   calibrateDeviceTilt,
   DEVICE_TILT_DEADZONE,
   DEVICE_TILT_RANGE_DEGREES,
+  DEVICE_TILT_SMOOTHING_LAMBDA,
   deviceOrientationToScreenTilt,
   deviceTiltToInput,
 } from './deviceTilt'
@@ -12,7 +13,8 @@ describe('device tilt conversion', () => {
 
   it('子どもが細かく向きを直しやすい新しい調整値を使う', () => {
     expect(DEVICE_TILT_RANGE_DEGREES).toBe(22)
-    expect(DEVICE_TILT_DEADZONE).toBe(0.14)
+    expect(DEVICE_TILT_DEADZONE).toBe(0.11)
+    expect(DEVICE_TILT_SMOOTHING_LAMBDA).toBe(16)
   })
 
   it('portrait maps sensor axes to screen axes', () => {
@@ -34,7 +36,7 @@ describe('device tilt conversion', () => {
 
   it('applies deadzone, normalization and clamping', () => {
     const calibration = { x: 0, y: 0 }
-    expect(deviceTiltToInput({ beta: 22 * 0.14 * 0.9, gamma: 0 }, 0, calibration)).toEqual({ x: 0, y: 0 })
+    expect(deviceTiltToInput({ beta: 22 * DEVICE_TILT_DEADZONE * 0.9, gamma: 0 }, 0, calibration)).toEqual({ x: 0, y: 0 })
     const result = deviceTiltToInput({ beta: 100, gamma: 100 }, 0, calibration)
     expect(Math.hypot(result.x, result.y)).toBeCloseTo(1)
   })

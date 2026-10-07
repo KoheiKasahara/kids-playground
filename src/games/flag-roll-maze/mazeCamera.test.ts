@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   BALL_SCREEN_DIAMETER_RATIO,
   clampMazeZoomIndex,
   DEFAULT_MAZE_ZOOM_INDEX,
   followZoomScale,
+  initialMazeZoomIndex,
+  PHONE_DEFAULT_MAZE_ZOOM_INDEX,
   MAX_MAZE_ZOOM_INDEX,
   MAZE_ZOOM_SCALES,
   mazeZoomScale,
@@ -362,5 +364,44 @@ describe('followZoomScale', () => {
   it('経過時間が0や不正でも現在値を保つ', () => {
     expect(followZoomScale(1, 0.84, 0)).toBe(1)
     expect(followZoomScale(1, 0.84, Number.NaN)).toBe(1)
+  })
+})
+
+describe('開始時のズーム段', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  // unit（node環境）で動くので、判定に使うwindowの一部だけを差し替える。
+  function stubViewport(width: number, height: number, coarsePointer: boolean) {
+    vi.stubGlobal('window', {
+      innerWidth: width,
+      innerHeight: height,
+      matchMedia: (query: string) => ({ matches: query === '(pointer: coarse)' && coarsePointer }),
+    })
+  }
+
+  it('スマホは標準より2段引いた位置から始める', () => {
+    expect(DEFAULT_MAZE_ZOOM_INDEX - PHONE_DEFAULT_MAZE_ZOOM_INDEX).toBe(2)
+    expect(mazeZoomScale(PHONE_DEFAULT_MAZE_ZOOM_INDEX)).toBeGreaterThan(1)
+    stubViewport(390, 844, true)
+    expect(initialMazeZoomIndex()).toBe(PHONE_DEFAULT_MAZE_ZOOM_INDEX)
+  })
+
+  it('横持ちのスマホも短辺で判定する', () => {
+    stubViewport(844, 390, true)
+    expect(initialMazeZoomIndex()).toBe(PHONE_DEFAULT_MAZE_ZOOM_INDEX)
+  })
+
+  it('matchMediaが無い環境では標準のまま', () => {
+    vi.stubGlobal('window', { innerWidth: 390, innerHeight: 844 })
+    expect(initialMazeZoomIndex()).toBe(DEFAULT_MAZE_ZOOM_INDEX)
+  })
+
+  it('タブレットやPCは標準のまま', () => {
+    stubViewport(820, 1180, true)
+    expect(initialMazeZoomIndex()).toBe(DEFAULT_MAZE_ZOOM_INDEX)
+    stubViewport(390, 844, false)
+    expect(initialMazeZoomIndex()).toBe(DEFAULT_MAZE_ZOOM_INDEX)
   })
 })

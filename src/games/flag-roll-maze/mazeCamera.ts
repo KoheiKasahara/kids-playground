@@ -74,6 +74,33 @@ export const MAX_MAZE_ZOOM_INDEX = MAZE_ZOOM_SCALES.length - 1
 /** ゲーム開始時のズーム。実機で決めた標準のカメラ距離をそのまま使う。 */
 export const DEFAULT_MAZE_ZOOM_INDEX = 7
 
+/**
+ * スマホで遊ぶときの開始ズーム。標準（1.0）から2段引いた1.19倍。
+ * 縦持ちのスマホは短辺が狭く、標準距離だと進む先の通路が見えにくいという
+ * 実機確認の結果から、スマホだけ最初から少し引いた位置で始める。
+ */
+export const PHONE_DEFAULT_MAZE_ZOOM_INDEX = 5
+
+/** これ以下の短辺（CSS px）をタッチ操作で使っていればスマホとみなす。タブレットは標準のまま。 */
+export const PHONE_MAX_SHORT_SIDE_PX = 600
+
+/**
+ * 開始時のズーム段を画面から選ぶ。
+ * matchMediaが無い環境（テストや古いブラウザ）では標準の段を使う。
+ */
+export function initialMazeZoomIndex(): number {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return DEFAULT_MAZE_ZOOM_INDEX
+  }
+  const shortSide = Math.min(window.innerWidth, window.innerHeight)
+  const isPhone =
+    window.matchMedia('(pointer: coarse)').matches &&
+    Number.isFinite(shortSide) &&
+    shortSide > 0 &&
+    shortSide <= PHONE_MAX_SHORT_SIDE_PX
+  return isPhone ? PHONE_DEFAULT_MAZE_ZOOM_INDEX : DEFAULT_MAZE_ZOOM_INDEX
+}
+
 /** ズームを切り替えたとき、距離が跳ねずに寄る・引く速さ（1/秒）。 */
 export const CAMERA_ZOOM_LAMBDA = 8
 

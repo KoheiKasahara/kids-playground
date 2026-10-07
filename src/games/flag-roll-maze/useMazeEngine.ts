@@ -143,6 +143,11 @@ export type MazeEngineOptions = {
    * 1ステージ3個までしか呼ばれないので、React state更新の頻度は問題にならない。
    */
   onStarCollected?: (collectedCount: number, totalCount: number) => void
+  /**
+   * 傾き入力へ追従する速さ（1/秒）。省略時はスティック向けの標準値。
+   * ジャイロは手の動きそのものが滑らかなので、速めて傾けてからの遅れを減らす。
+   */
+  tiltSmoothingLambda?: number
 }
 
 export type MazeEngineHandle = {
@@ -875,7 +880,12 @@ export function useMazeEngine(options: MazeEngineOptions): MazeEngineHandle {
       respawnGraceRemainingMs = Math.max(0, respawnGraceRemainingMs - deltaMs)
       // ゴール後は入力を無視し、その場でゆっくり止まるようにする。
       const target = goalNotified ? NEUTRAL_TILT : targetTiltRef.current
-      currentTilt = smoothTilt(currentTilt, target, deltaSeconds)
+      currentTilt = smoothTilt(
+        currentTilt,
+        target,
+        deltaSeconds,
+        optionsRef.current.tiltSmoothingLambda,
+      )
       if (world !== null) applyTiltToGravity(world, currentTilt)
 
       const settlingAfterRespawn = respawnSettleRemainingMs > 0
