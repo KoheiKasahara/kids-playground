@@ -6,11 +6,13 @@ import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
 import { vibrate } from '../../utils/haptics'
 import { createStageProgressStore } from '../shared/progress/stageProgress'
-import { createWorld, getObjective, interactOnArrival, getPois, STAGES, targetPoi, targetPoint, updateWorld, type PoiId, type World } from './model'
+import { createWorld, getObjective, interactOnArrival, getPois, STAGES, targetPoi, targetPoint, updateWorld, type GameEvent, type PoiId, type World } from './model'
 import { drawScene } from './render'
 import { drawIcon, type IconKind } from './art'
 import { celebrationFor, createEffects, pruneEffects, type Celebration, type Effect } from './effects'
 import { playDeliverySound } from './sounds'
+import { conversationFor, type Conversation } from './dialogue'
+import ConversationScene from './ConversationScene'
 import styles from './ForestDeliveryPlay.module.css'
 
 const progressStore = createStageProgressStore('forest-delivery-progress-v1', (id) => STAGES.some((stage) => stage.id === id))
@@ -42,35 +44,53 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
   const resultButton = useRef<HTMLButtonElement>(null)
   const speech = useRef<HTMLDivElement>(null)
   const stage = STAGES[index]
-  const objective = getObjective(snapshot)
   const pois = getPois(snapshot)
   const [speaker, setSpeaker] = useState<PoiId>('post')
   const [celebration, setCelebration] = useState<Celebration & { id: number } | null>(null)
+  // While someone is talking, the bag, stamps and result wait until the conversation is over.
+  const [talk, setTalk] = useState<{ conversation: Conversation; event: GameEvent; before: World } | null>(null)
+  const shown = talk?.before ?? snapshot
+  const objective = getObjective(shown)
   const effects = useRef<Effect[]>([])
   const clock = useRef(0)
   const speechPoi = pois.find(poi => poi.id === speaker)!
+  const celebrate = (event: GameEvent) => {
+    if (event.type === 'none') return
+    if (sound) playDeliverySound(event.type)
+    vibrate(event.type === 'complete' ? 'celebrate' : event.type === 'deliver' ? 'success' : 'tap')
+    effects.current = [...pruneEffects(effects.current, clock.current), ...createEffects(world.current, event, clock.current)]
+    const next = celebrationFor(event)
+    if (next) setCelebration((previous) => ({ ...next, id: (previous?.id ?? 0) + 1 }))
+    // The bubble sits right where the show happens, so the words follow once it has played.
+    // The live region itself stays put, so the message is still announced straight away.
+    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      speech.current?.animate?.([
+        { opacity: 0, transform: 'translateX(-50%) translateY(8px) scale(.92)' },
+        { opacity: 1, transform: 'translateX(-50%)' },
+      ], { duration: 260, delay: 1000, easing: 'ease-out', fill: 'backwards' })
+    }
+  }
   const onArrival = useEffectEvent(() => {
+    if (world.current.player.walking || !world.current.targetId) return false
+    const before = structuredClone(world.current)
     const event = interactOnArrival(world.current)
     if (!event) return false
     if (event.poiId) setSpeaker(event.poiId)
-    if (event.type !== 'none') {
-      if (sound) playDeliverySound(event.type)
-      vibrate(event.type === 'complete' ? 'celebrate' : event.type === 'deliver' ? 'success' : 'tap')
-      effects.current = [...pruneEffects(effects.current, clock.current), ...createEffects(world.current, event, clock.current)]
-      const next = celebrationFor(event)
-      if (next) setCelebration((previous) => ({ ...next, id: (previous?.id ?? 0) + 1 }))
-      // The bubble sits right where the show happens, so the words follow once it has played.
-      // The live region itself stays put, so the message is still announced straight away.
-      if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        speech.current?.animate?.([
-          { opacity: 0, transform: 'translateX(-50%) translateY(8px) scale(.92)' },
-          { opacity: 1, transform: 'translateX(-50%)' },
-        ], { duration: 260, delay: 1000, easing: 'ease-out', fill: 'backwards' })
-      }
-    }
+    const conversation = conversationFor(world.current, event)
+    if (conversation) {
+      // Meeting someone switches the map over to the conversation; the show plays afterwards.
+      setTalk({ conversation, event, before })
+      if (sound) playDeliverySound('talk')
+      vibrate('tap')
+    } else celebrate(event)
     if (world.current.completed) onComplete(stage.id)
     return true
   })
+  const finishTalk = () => {
+    if (!talk) return
+    setTalk(null)
+    celebrate(talk.event)
+  }
   useGameIntroPlaying(true)
 
   useEffect(() => {
@@ -96,38 +116,39 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
     return () => cancelAnimationFrame(frame)
   }, [])
 
+  const finished = shown.completed
   useEffect(() => {
-    if (snapshot.completed) resultButton.current?.focus()
-  }, [snapshot.completed])
+    if (finished) resultButton.current?.focus()
+  }, [finished])
 
   const goTo = (id: PoiId) => {
-    if (world.current.completed) return
+    if (world.current.completed || talk) return
     primeAudio()
     targetPoi(world.current, id)
     setSnapshot(structuredClone(world.current))
   }
-  const inventory = (['parcel', 'wood', 'carrot', 'apple'] as const).filter((kind) => snapshot.inventory[kind])
+  const inventory = (['parcel', 'wood', 'carrot', 'apple'] as const).filter((kind) => shown.inventory[kind])
 
   return <GamePlaySurface><div className={styles.adventure}>
     <div className={styles.journey}>
       <span className={styles.stageLabel}>{stage.name}</span>
-      <div className={styles.stamps} aria-label={`${snapshot.delivered.length} / ${stage.deliveries.length} にんに おとどけ`}>
-        {stage.deliveries.map((id) => <span key={id} className={`${styles.stamp} ${snapshot.delivered.includes(id) ? styles.delivered : ''}`}>
+      <div className={styles.stamps} aria-label={`${shown.delivered.length} / ${stage.deliveries.length} にんに おとどけ`}>
+        {stage.deliveries.map((id) => <span key={id} className={`${styles.stamp} ${shown.delivered.includes(id) ? styles.delivered : ''}`}>
           <Icon kind={id} />
-          <span aria-hidden="true">{snapshot.delivered.includes(id) ? '♥' : '·'}</span>
+          <span aria-hidden="true">{shown.delivered.includes(id) ? '♥' : '·'}</span>
         </span>)}
       </div>
     </div>
     <div className={styles.playLayout}>
       <div className={styles.mapFrame}>
         <div className={styles.mapArea}><canvas ref={canvas} width={320} height={288} className={styles.map} role="img" aria-label="もりの ちず。どうぶつや ものを タップすると おてつだいするよ" onPointerDown={(event) => {
-          if (world.current.completed) return
+          if (world.current.completed || talk) return
           primeAudio()
           const rect = event.currentTarget.getBoundingClientRect()
           targetPoint(world.current, (event.clientX - rect.left) / rect.width * 320, (event.clientY - rect.top) / rect.height * 288)
           setSnapshot(structuredClone(world.current))
         }} />
-        {pois.map(poi => <button key={poi.id} className={`${styles.mapSpot} ${objective.targetId === poi.id ? styles.nextSpot : ''}`} style={{ left: `${poi.x / 320 * 100}%`, top: `${poi.y / 288 * 100}%` }} aria-label={`${poi.name}を タップ`} disabled={snapshot.completed} onClick={() => goTo(poi.id)}>
+        {pois.map(poi => <button key={poi.id} className={`${styles.mapSpot} ${objective.targetId === poi.id ? styles.nextSpot : ''}`} style={{ left: `${poi.x / 320 * 100}%`, top: `${poi.y / 288 * 100}%` }} aria-label={`${poi.name}を タップ`} disabled={snapshot.completed || talk !== null} onClick={() => goTo(poi.id)}>
           {objective.targetId === poi.id && <span className={styles.tapLabel}>ここ！<span aria-hidden="true"> ▼</span></span>}
         </button>)}
         <div ref={speech} className={styles.speech} role="status" aria-live="polite" style={{ left: `${Math.max(28, Math.min(72, speechPoi.x / 320 * 100))}%`, top: `${Math.max(3, speechPoi.y / 288 * 100 - 31)}%` }}>
@@ -137,11 +158,12 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
         {celebration && <div key={celebration.id} className={styles.toast} aria-hidden="true" data-testid="delivery-toast">
           <span className={styles.toastIcon}><Icon kind={celebration.icon} /></span><span>{celebration.text}</span>
         </div>}
+        {talk && <ConversationScene conversation={talk.conversation} season={stage.season} onLine={() => { if (sound) playDeliverySound('talk') }} onDone={finishTalk} />}
         </div>
-        <div className={styles.mapCaption} aria-hidden="true"><span>FOREST POST</span><span>{index === 2 ? '☾' : '✦'} {String(index + 1).padStart(2, '0')}</span></div>
+        <div className={styles.mapCaption} aria-hidden="true"><span>{talk ? 'TALK · おはなし' : 'FOREST POST'}</span><span>{index === 2 ? '☾' : '✦'} {String(index + 1).padStart(2, '0')}</span></div>
       </div>
       <div className={styles.controlPanel}>
-        {snapshot.completed ? <section className={styles.result} aria-labelledby="delivery-result">
+        {finished ? <section className={styles.result} aria-labelledby="delivery-result">
           <div className={styles.resultStars} aria-label="ほし 3こ"><span aria-hidden="true">★</span><span aria-hidden="true">★</span><span aria-hidden="true">★</span></div>
           <h2 id="delivery-result">みんなに とどいた！</h2>
           <p>やさしい おてつだい、ありがとう。</p>

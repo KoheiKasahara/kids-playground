@@ -1,12 +1,12 @@
 import { getSharedAudioContext, isSoundEnabled, playTone } from '../../audio/sound'
 
-export function playDeliverySound(kind: 'step' | 'collect' | 'water' | 'harvest' | 'repair' | 'deliver' | 'complete'): void {
+export function playDeliverySound(kind: 'step' | 'talk' | 'collect' | 'water' | 'harvest' | 'repair' | 'deliver' | 'complete'): void {
   if (!isSoundEnabled()) return
   try {
     const context = getSharedAudioContext()
     if (!context) return
     const melodies: Record<typeof kind, number[]> = {
-      step: [392], collect: [523, 659], water: [784, 659, 523],
+      step: [392], talk: [784, 988], collect: [523, 659], water: [784, 659, 523],
       harvest: [523, 784, 1047], repair: [330, 440, 659],
       deliver: [523, 659, 784, 1047], complete: [523, 659, 784, 1047, 988, 1319],
     }

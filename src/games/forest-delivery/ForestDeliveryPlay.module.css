@@ -200,3 +200,31 @@
   0%, 100% { opacity: 0; transform: translateX(-50%); }
   10%, 80% { opacity: 1; transform: translateX(-50%); }
 }
+
+/* Conversation mode: meeting someone swaps the map for a picture-book scene with big
+   pixel faces and a text box, like a visual novel. Tapping anywhere turns the page. */
+.talk { position: absolute; inset: 0; z-index: 3; background: #2e3846; animation: talkIn .42s steps(6) both; }
+.talkScene { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.talkBox { position: absolute; left: 3%; right: 3%; bottom: 3%; min-height: 25%; box-sizing: border-box; padding: 1.1em .9em .6em; background: #fffaf0; border: 3px solid #51413d; border-radius: 4px; box-shadow: inset 0 0 0 3px #f1dcae, 0 4px 0 #2b231f55; color: #493d2b; animation: talkBoxIn .35s .2s cubic-bezier(.2, .9, .3, 1.2) both; }
+.talkBox p { margin: 0; font-size: clamp(15px, 4.3vw, 21px); font-weight: 800; line-height: 1.6; letter-spacing: .03em; }
+.talkRest { visibility: hidden; }
+.talkName { position: absolute; top: 0; left: 4%; transform: translateY(-58%); padding: 3px 12px; background: #d49c4e; border: 3px solid #51413d; border-radius: 4px; color: #fffaf0; font-size: clamp(12px, 3.3vw, 16px); font-weight: 900; letter-spacing: .06em; }
+.talkNamePartner { left: auto; right: 4%; background: #6f9a6a; }
+.talkNext { position: absolute; right: .7em; bottom: .3em; color: #c07a33; font-size: 14px; animation: talkNext .8s steps(2) infinite; }
+.talkAdvance { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
+.page .talkAdvance:focus-visible { outline-offset: -6px; }
+.talkSkip { position: absolute; top: 3%; right: 3%; z-index: 1; min-height: 40px; padding: 4px 12px; border: 2px solid #51413d; border-radius: 999px; background: #fffaf0e6; color: #51413d; font-size: 12px; font-weight: 900; }
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@keyframes talkIn {
+  from { clip-path: circle(0% at 50% 55%); }
+  to { clip-path: circle(80% at 50% 55%); }
+}
+@keyframes talkBoxIn { from { transform: translateY(30%); opacity: 0; } }
+@keyframes talkNext { 50% { transform: translateY(3px); } }
+@media (min-width: 600px) and (max-height: 620px) {
+  .talkBox { padding: 1.1em .8em .5em; }
+  .talkBox p { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .talk, .talkBox, .talkNext { animation: none; }
+}
