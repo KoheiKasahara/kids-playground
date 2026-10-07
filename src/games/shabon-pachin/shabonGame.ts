@@ -50,6 +50,8 @@ export const TARGET_RATE = 0.45
 export const POP_EFFECT_MS = 450
 /** ちがう しゃぼんだまを さわったときに ぷるぷる ゆれる時間[ms]。 */
 export const WOBBLE_MS = 500
+/** おだいが かわったことを 空に うっすら しらせる時間[ms]。あそびは とめない。 */
+export const TARGET_NOTICE_MS = 1600
 
 export type Bubble = {
   id: number
@@ -70,6 +72,8 @@ export type ShabonState = {
   nextSpawnAt: number
   nextId: number
   targetIndex: number
+  /** おだいが さいごに かわった時刻。まだ かわっていなければnull。 */
+  targetChangedAt: number | null
   popped: number
   mistakes: number
 }
@@ -92,6 +96,7 @@ export function createInitialState(mode: ShabonMode): ShabonState {
     nextSpawnAt: 200,
     nextId: 0,
     targetIndex: randomIndex(MODE_KINDS[mode].length),
+    targetChangedAt: null,
     popped: 0,
     mistakes: 0,
   }
@@ -166,13 +171,19 @@ export function touchBubble(
 
   const popped = state.popped + 1
   const bubbles = state.bubbles.map((b) => (b.id === bubbleId ? { ...b, poppedAt: state.elapsedMs } : b))
-  let targetIndex = state.targetIndex
+  let { targetIndex, targetChangedAt } = state
   if (popped < GOAL_COUNT && popped % POPS_PER_TARGET === 0) {
     const kindCount = MODE_KINDS[mode].length
     // つぎの おだいは いまと ちがうものにして、かわったことが わかるようにする。
     targetIndex = (targetIndex + 1 + randomIndex(kindCount - 1)) % kindCount
+    targetChangedAt = state.elapsedMs
   }
-  return { state: { ...state, bubbles, popped, targetIndex }, result: 'hit' }
+  return { state: { ...state, bubbles, popped, targetIndex, targetChangedAt }, result: 'hit' }
+}
+
+/** おだいが かわった しらせを いま 出すかどうか。 */
+export function isTargetNoticeVisible(state: ShabonState): boolean {
+  return state.targetChangedAt !== null && state.elapsedMs - state.targetChangedAt < TARGET_NOTICE_MS
 }
 
 /** まちがいの少なさで★をつける。じかん制限は つけず、ゆっくり さがしても よい。 */

@@ -5,9 +5,11 @@ import {
   MAX_FLOATING,
   POPS_PER_TARGET,
   SHAPE_KINDS,
+  TARGET_NOTICE_MS,
   advance,
   createInitialState,
   isFinished,
+  isTargetNoticeVisible,
   riseProgress,
   scoreStars,
   touchBubble,
@@ -92,6 +94,35 @@ describe('shabonGame', () => {
     state = { ...state, bubbles: [{ id: 1, kindIndex: 2, x: 0.5, bornAt: 0, riseMs: 6000, poppedAt: null, wobbleUntil: 0 }] }
     const touched = touchBubble(state, 'shape', 1)
     expect(touched.state.targetIndex).not.toBe(2)
+  })
+
+  test('おだいが かわると しらせが出て、あそびを とめずに すこしで きえる', () => {
+    const state = stateWith({
+      elapsedMs: 3000,
+      targetIndex: 0,
+      popped: POPS_PER_TARGET - 1,
+      bubbles: [{ id: 1, kindIndex: 0, x: 0.5, bornAt: 2000, riseMs: 6000, poppedAt: null, wobbleUntil: 0 }],
+    })
+    expect(isTargetNoticeVisible(state)).toBe(false)
+    const touched = touchBubble(state, 'color', 1).state
+    expect(touched.targetChangedAt).toBe(3000)
+    expect(isTargetNoticeVisible(touched)).toBe(true)
+
+    // しらせが出ているあいだも しゃぼんだまは のぼりつづける。
+    const during = run(touched, 500)
+    expect(isTargetNoticeVisible(during)).toBe(true)
+    expect(during.bubbles.length).toBeGreaterThan(0)
+    expect(during.nextSpawnAt).toBeGreaterThan(touched.nextSpawnAt)
+
+    expect(isTargetNoticeVisible(run(touched, TARGET_NOTICE_MS))).toBe(false)
+  })
+
+  test('おだいが かわらない わりかたでは しらせは出ない', () => {
+    const state = stateWith({
+      targetIndex: 0,
+      bubbles: [{ id: 1, kindIndex: 0, x: 0.5, bornAt: 0, riseMs: 6000, poppedAt: null, wobbleUntil: 0 }],
+    })
+    expect(isTargetNoticeVisible(touchBubble(state, 'color', 1).state)).toBe(false)
   })
 
   test(`${GOAL_COUNT}こ わると おわり、それ以上は すすまない`, () => {

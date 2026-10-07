@@ -110,6 +110,10 @@
   --bubble-size: 44px;
 }
 
+.target {
+  animation: shabon-target-bounce 0.6s ease-out;
+}
+
 .targetName {
   color: var(--color-primary-dark);
   font-size: 1.2em;
@@ -221,6 +225,64 @@
   animation: shabon-burst 0.45s ease-out forwards;
 }
 
+.targetNotice {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  pointer-events: none;
+  --bubble-size: clamp(72px, 22vw, 110px);
+  animation: shabon-notice 1.6s ease-out forwards;
+}
+
+.targetNoticeText {
+  padding: 2px var(--space-md);
+  border-radius: var(--radius-round);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--color-primary-dark);
+  font-size: clamp(24px, 7vw, 40px);
+  font-weight: 900;
+}
+
+@keyframes shabon-notice {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  15% {
+    opacity: 0.75;
+    transform: scale(1.05);
+  }
+  25% {
+    transform: scale(1);
+  }
+  70% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes shabon-target-bounce {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.18);
+  }
+  60% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @keyframes shabon-sway {
   from {
     transform: translateX(-10%);
@@ -260,8 +322,24 @@
 @media (prefers-reduced-motion: reduce) {
   .sway,
   .wobble .sway,
-  .burst {
+  .burst,
+  .target {
     animation: none;
+  }
+
+  /* 動きは けしても、しらせ そのものは うっすら のこして 消す。 */
+  .targetNotice {
+    animation: shabon-notice-fade 1.6s linear forwards;
+  }
+}
+
+@keyframes shabon-notice-fade {
+  0%,
+  70% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
   }
 }
 
