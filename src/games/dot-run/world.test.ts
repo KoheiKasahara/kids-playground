@@ -211,6 +211,21 @@ describe('dot-run world', () => {
     expect(events.filter(e => e.type === 'carrot').length).toBeGreaterThanOrEqual(9)
   })
 
+  test('ばねで とんだ すぐ あとでも 2だんジャンプが できる', () => {
+    for (const wait of [1, 3, 6, 20]) {
+      const world = createWorld(stageWith(['start', 'spring', 'goal']))
+      start(world)
+      const events: WorldEvent[] = []
+      for (let i = 0; i < 60 * 6 && !events.some(e => e.type === 'spring'); i++) run(world, 1, events)
+      expect(events.some(e => e.type === 'spring')).toBe(true)
+      run(world, wait)
+      const after = tap(world)
+      expect(after.map(e => e.type)).toContain('double')
+      expect(after.some(e => e.type === 'jump')).toBe(false)
+      expect(world.hero.flip).toBeGreaterThan(0)
+    }
+  })
+
   test('ばねの ほしメダルは ばねで とると とれる', () => {
     const world = createWorld(stageWith(['start', 'medalSpring', 'goal']))
     start(world)
