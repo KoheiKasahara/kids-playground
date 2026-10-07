@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import ShabonPachinPlay from './ShabonPachinPlay'
-import { COLOR_KINDS, GOAL_COUNT } from './shabonGame'
+import { COLOR_KINDS, GOAL_COUNT, POPS_PER_TARGET, TARGET_NOTICE_MS } from './shabonGame'
 
 // Math.randomを0に固定すると、おだいは さいしょの いろ（あか）、出る しゃぼんだまは
 // いつも おだい になるため、どれを タッチすれば われるかを決め打ちで検証できる。
@@ -86,6 +86,24 @@ describe('ShabonPachinPlay', () => {
 
     selectColor()
     expect(screen.getByLabelText(`0こ わった（ぜんぶで ${GOAL_COUNT}こ）`)).toBeInTheDocument()
+  })
+
+  test(`${POPS_PER_TARGET}こ わると 空に つぎの おだいが うっすら出て、すこしで きえる`, () => {
+    const { container } = renderPlay()
+    selectColor()
+    for (let i = 0; i < POPS_PER_TARGET; i += 1) {
+      advance(1_200)
+      const targetName = container.querySelector('strong')!.textContent
+      expect(screen.queryByText(/つぎは/)).not.toBeInTheDocument()
+      fireEvent.pointerDown(screen.getAllByRole('button', { name: `${targetName}の しゃぼんだま` })[0]!)
+    }
+
+    const nextName = container.querySelector('strong')!.textContent
+    expect(nextName).not.toBe(RED.name)
+    expect(screen.getByText(`つぎは ${nextName}！`)).toBeInTheDocument()
+
+    advance(TARGET_NOTICE_MS + 100)
+    expect(screen.queryByText(/つぎは/)).not.toBeInTheDocument()
   })
 
   test('プレイ中に「やめる」で選択画面に戻ると、進行が止まる', () => {

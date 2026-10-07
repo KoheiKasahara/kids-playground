@@ -14,6 +14,22 @@ export function playPopSound(): void {
   }
 }
 
+/** おだいが かわった「きらりん」。ぱちんより のびやかに上がり、かわったことを 耳でも しらせる。 */
+export function playTargetChangeSound(): void {
+  if (!isSoundEnabled()) return
+  try {
+    const ctx = getSharedAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+    const frequencies = [783.99, 1046.5, 1567.98]
+    frequencies.forEach((frequency, index) => {
+      playTone(ctx, frequency, now + index * 0.07, 0.18, 0.08, 'triangle')
+    })
+  } catch {
+    /* 音が出せなくても、空に つぎの おだいが うっすら出る。 */
+  }
+}
+
 /** ちがう しゃぼんだまを さわったときの「ぽよん」。責めない柔らかさにする。 */
 export function playBoingSound(): void {
   if (!isSoundEnabled()) return

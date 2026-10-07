@@ -12,6 +12,7 @@ import {
   advance,
   createInitialState,
   isFinished,
+  isTargetNoticeVisible,
   riseProgress,
   scoreStars,
   touchBubble,
@@ -19,7 +20,7 @@ import {
   type ShabonMode,
   type ShabonState,
 } from './shabonGame'
-import { playBoingSound, playClearSound, playPopSound } from './sounds'
+import { playBoingSound, playClearSound, playPopSound, playTargetChangeSound } from './sounds'
 import styles from './ShabonPachinPlay.module.css'
 
 const MODE_LABELS: Record<ShabonMode, { name: string; hint: string; emoji: string }> = {
@@ -83,6 +84,7 @@ export default function ShabonPachinPlay() {
   const handleTouch = (bubbleId: number) => {
     if (!mode || finished) return
     primeAudio()
+    const previousTarget = playRef.current.targetIndex
     const { state, result } = touchBubble(playRef.current, mode, bubbleId)
     if (result === 'none') return
     commit(state)
@@ -98,7 +100,10 @@ export default function ShabonPachinPlay() {
       return
     }
     vibrate('tap')
-    if (soundOn) playPopSound()
+    if (!soundOn) return
+    // おだいが かわったときは ぱちんの かわりに きらりんを鳴らし、耳でも気づけるようにする。
+    if (state.targetIndex !== previousTarget) playTargetChangeSound()
+    else playPopSound()
   }
 
   const kinds = mode ? MODE_KINDS[mode] : MODE_KINDS.color
@@ -140,7 +145,8 @@ export default function ShabonPachinPlay() {
 
       {started && !finished ? (
         <>
-          <p className={styles.target} aria-live="polite">
+          {/* おだいが かわるたびに key を かえて、ぽよんと はずむ アニメーションを やりなおす。 */}
+          <p key={play.targetIndex} className={styles.target} aria-live="polite">
             <BubbleFace kind={target} />
             <span>
               <strong className={styles.targetName}>{target.name}</strong> を わろう！
@@ -190,6 +196,14 @@ export default function ShabonPachinPlay() {
                 </button>
               )
             })}
+            {isTargetNoticeVisible(play) ? (
+              // 子どもの目は空を追っているので、空のまんなかに うっすら出す。
+              // あそびは とめず、タッチは 下の しゃぼんだまに とおす。
+              <div key={play.targetChangedAt} className={styles.targetNotice} aria-hidden="true">
+                <BubbleFace kind={target} />
+                <span className={styles.targetNoticeText}>つぎは {target.name}！</span>
+              </div>
+            ) : null}
           </div>
 
           <div className={styles.actions}>
