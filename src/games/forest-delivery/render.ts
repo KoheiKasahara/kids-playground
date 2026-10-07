@@ -1,24 +1,28 @@
 import type { World, PoiId } from './model'
-import { getPois, getMap, STAGES, getObjective } from './model'
+import { getPois, getMap, STAGES, getObjective, TILE_SIZE } from './model'
+import { COLUMNS, ROWS, bridgeCells, isWater, tileAt, type MapLayout } from './maps'
 import {
-  PALETTES, rect, oval, tree, flower, item, fox, animal, bubble,
+  PALETTES, rect, oval, tree, flower, item, fox, animal, bubble, bush, boulder, sunflower, melon,
+  lantern, lightPool, glowcap, duck,
   type Palette, type AnimalKind, type ItemKind,
 } from './art'
+import { activeAge, GET_HOLD, type Effect } from './effects'
+import { drawEffects } from './drawEffects'
 
 export { drawIcon } from './art'
 export type { IconKind } from './art'
 
 const W = 320, H = 288
+const BANK = '#a4a185'
 
 function hash(n: number) {
   const value = Math.sin(n * 127.1 + 311.7) * 43758.5453
   return value - Math.floor(value)
 }
 
-function grass(ctx: CanvasRenderingContext2D, palette: Palette) {
+function grass(ctx: CanvasRenderingContext2D, palette: Palette, map: MapLayout) {
   rect(ctx, palette.grass, 0, 0, W, H)
-  oval(ctx, palette.grassLight, 17, 22, 116, 220)
-  oval(ctx, palette.grassLight, 188, 38, 116, 205)
+  for (const [x, y, w, h] of map.meadows) oval(ctx, palette.grassLight, x, y, w, h)
   for (let i = 0; i < 480; i++) {
     const x = Math.floor(hash(i * 2) * W), y = Math.floor(hash(i * 2 + 1) * H)
     const shade = i % 4 === 0 ? palette.grassDark : palette.grass
@@ -30,87 +34,261 @@ function grass(ctx: CanvasRenderingContext2D, palette: Palette) {
   }
 }
 
-function trails(ctx: CanvasRenderingContext2D, p: Palette, world: World) {
-  const crossing = getMap(world).bridgeRow * 16 + 8
-  const strips = getPois(world).flatMap(poi => [
-    [poi.x - 8, Math.min(poi.y, crossing), 16, Math.abs(poi.y - crossing) + 16],
-    [Math.min(poi.x, 160), crossing - 8, Math.abs(poi.x - 160) + 16, 16],
-  ])
-  for (const [x, y, w, h] of strips) rect(ctx, p.pathDark, x - 1, y, w + 2, h + 2)
-  for (const [x, y, w, h] of strips) {
-    rect(ctx, p.path, x, y, w, h)
-    rect(ctx, p.pathLight, x + 1, y + 1, w - 2, 2)
+function cellsOf(map: MapLayout, match: (tile: string) => boolean) {
+  const cells: { column: number; row: number; x: number; y: number }[] = []
+  for (let row = 0; row < ROWS; row++) {
+    for (let column = 0; column < COLUMNS; column++) {
+      if (match(tileAt(map, column, row))) cells.push({ column, row, x: column * TILE_SIZE, y: row * TILE_SIZE })
+    }
   }
-  for (let i = 0; i < 160; i++) {
-    const s = strips[i % strips.length]
-    const x = s[0] + 2 + Math.floor(hash(i + 1000) * (s[2] - 4))
-    const y = s[1] + 3 + Math.floor(hash(i + 2000) * (s[3] - 6))
-    rect(ctx, i % 3 ? p.pathLight : p.pathDark, x, y, i % 4 === 0 ? 2 : 1, 1)
+  return cells
+}
+
+/** Sandy footpaths follow the `:` cells, with a soft rim and rounded outer corners. */
+function trails(ctx: CanvasRenderingContext2D, p: Palette, map: MapLayout) {
+  const trail = (column: number, row: number) => {
+    const tile = tileAt(map, column, row)
+    return tile === ':' || tile === '='
   }
-  // Gently stepped edges keep the trails organic while preserving a crisp pixel grid.
-  for (const [x, y] of [[46, 100], [47, 187], [66, 205], [95, 66], [114, 108], [236, 122], [257, 187]]) {
-    rect(ctx, p.grass, x, y, 2, 5)
-    rect(ctx, p.grassDark, x - 1, y + 3, 2, 2)
+  const cells = cellsOf(map, (tile) => tile === ':')
+  for (const { x, y } of cells) rect(ctx, p.pathDark, x - 1, y, TILE_SIZE + 2, TILE_SIZE + 2)
+  for (const { x, y } of cells) rect(ctx, p.path, x, y, TILE_SIZE, TILE_SIZE)
+  for (const { column, row, x, y } of cells) {
+    if (!trail(column, row - 1)) {
+      const left = trail(column - 1, row) && !trail(column - 1, row - 1) ? 0 : 1
+      const right = trail(column + 1, row) && !trail(column + 1, row - 1) ? 0 : 1
+      rect(ctx, p.pathLight, x + left, y + 1, TILE_SIZE - left - right, 2)
+    }
+    for (let i = 0; i < 3; i++) {
+      const seed = column * 31 + row * 17 + i * 7
+      rect(ctx, i ? p.pathLight : p.pathDark, x + 2 + Math.floor(hash(seed) * 12), y + 3 + Math.floor(hash(seed + 1) * 10), i === 0 ? 2 : 1, 1)
+    }
+    // Round off outer corners so paths read as trodden earth rather than tiles.
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+      if (trail(column + dx, row) || trail(column, row + dy)) continue
+      const cx = dx < 0 ? x - 1 : x + TILE_SIZE - 1
+      const cy = dy < 0 ? y : y + TILE_SIZE + 1
+      rect(ctx, p.grass, cx, cy - (dy < 0 ? 0 : 1), 2, 1)
+      rect(ctx, p.grass, dx < 0 ? cx : cx + 1, dy < 0 ? cy + 1 : cy - 2, 1, 1)
+    }
   }
 }
 
-function river(ctx: CanvasRenderingContext2D, p: Palette, time: number) {
-  rect(ctx, p.grassDeep, 136, 0, 47, H)
-  rect(ctx, '#a4a185', 139, 0, 42, H)
-  rect(ctx, p.waterDark, 142, 0, 36, H)
-  rect(ctx, p.water, 145, 0, 31, H)
-  rect(ctx, p.waterLight, 145, 0, 2, H)
-  for (let i = 0; i < 29; i++) {
-    const y = (i * 11 + Math.floor(time * 3)) % H
-    const x = 149 + Math.floor(hash(i + 40) * 19)
-    rect(ctx, i % 3 === 0 ? p.foam : p.waterLight, x, y, 4 + i % 5, 1)
-    if (i % 3 === 0) rect(ctx, p.waterDark, x - 1, y + 3, 4, 1)
+const BANK_LAYERS = (p: Palette) => [[p.grassDeep, 8], [BANK, 5], [p.waterDark, 2], [p.water, 0]] as const
+/** Radius used to round the land's corners where water wraps around them. */
+const SHORE_CURVE = 12
+
+/** Water is assembled cell by cell: grassy bank, sand, a dark lip, then the surface. */
+function waterBody(ctx: CanvasRenderingContext2D, p: Palette, map: MapLayout) {
+  const cells = cellsOf(map, (tile) => tile === '~' || tile === '=')
+  const wet = (column: number, row: number) => isWater(map, column, row)
+  // Land corners poking into the water (inside of a bend) are rounded off too.
+  const capes = cellsOf(map, (tile) => tile !== '~' && tile !== '=').flatMap(({ column, row, x, y }) =>
+    ([[-1, -1], [1, -1], [-1, 1], [1, 1]] as const)
+      .filter(([dx, dy]) => wet(column + dx, row) && wet(column, row + dy))
+      .map(([dx, dy]) => ({ x: dx < 0 ? x : x + TILE_SIZE, y: dy < 0 ? y : y + TILE_SIZE, dx, dy })))
+  for (const [color, grow] of BANK_LAYERS(p)) {
+    for (const { column, row, x, y } of cells) {
+      const left = wet(column - 1, row) ? 0 : grow
+      const right = wet(column + 1, row) ? 0 : grow
+      const top = wet(column, row - 1) ? 0 : grow
+      const bottom = wet(column, row + 1) ? 0 : grow
+      const width = TILE_SIZE + left + right, height = TILE_SIZE + top + bottom
+      // Convex corners are cut into quarter circles so ponds and bends look soft.
+      for (let line = 0; line < height; line++) {
+        const fromTop = line < top ? top - line : 0
+        const fromBottom = line >= height - bottom ? line - (height - bottom) + 1 : 0
+        const inset = (edge: number, depth: number) => {
+          if (!edge || !depth) return 0
+          const d = depth - 0.5
+          return Math.round(edge - Math.sqrt(Math.max(0, edge * edge - d * d)))
+        }
+        const insetLeft = left ? inset(left, top ? fromTop : 0) + inset(left, bottom ? fromBottom : 0) : 0
+        const insetRight = right ? inset(right, top ? fromTop : 0) + inset(right, bottom ? fromBottom : 0) : 0
+        rect(ctx, color, x - left + insetLeft, y - top + line, width - insetLeft - insetRight, 1)
+      }
+    }
+    const reach = SHORE_CURVE - grow
+    for (const cape of capes) {
+      for (let line = 0; line < SHORE_CURVE; line++) {
+        const dy = SHORE_CURVE - line - 0.5
+        const span = reach * reach - dy * dy
+        const count = span < 0 ? SHORE_CURVE : Math.ceil(SHORE_CURVE - Math.sqrt(span) - 0.5)
+        if (count <= 0) continue
+        const py = cape.dy < 0 ? cape.y + line : cape.y - line - 1
+        rect(ctx, color, cape.dx < 0 ? cape.x : cape.x - count, py, count, 1)
+      }
+    }
   }
-  for (let i = 0; i < 24; i++) {
-    const y = i * 13
-    rect(ctx, p.grassDark, 137 + (i % 3), y, 4, 7)
-    rect(ctx, p.grassLight, 137 + (i % 3), y, 3, 2)
-    rect(ctx, p.grassDark, 179, y + 5, 4, 8)
-    rect(ctx, p.grassLight, 180, y + 5, 3, 2)
+  for (const { column, row, x, y } of cells) {
+    const seed = column * 13 + row * 29
+    if (!wet(column - 1, row)) rect(ctx, p.waterLight, x, y, 2, TILE_SIZE)
+    if (!wet(column, row - 1)) rect(ctx, p.waterLight, x, y, TILE_SIZE, 1)
+    // Grass tufts overhang the banks.
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+      if (wet(column + dx, row + dy) || hash(seed + dx * 3 + dy * 5) < 0.35) continue
+      const offset = 2 + Math.floor(hash(seed + dx + dy * 7) * 9)
+      const bx = dx < 0 ? x - 7 : dx > 0 ? x + TILE_SIZE + 3 : x + offset
+      const by = dy < 0 ? y - 7 : dy > 0 ? y + TILE_SIZE + 2 : y + offset
+      rect(ctx, p.grassDark, bx, by, dx ? 4 : 5, dx ? 6 : 4)
+      rect(ctx, p.grassLight, bx, by, 3, 2)
+    }
   }
-  for (const [x, y] of [[151, 41], [165, 108], [152, 220], [165, 267]]) {
+}
+
+/** Ripples drift with the current; wide still water twinkles in place instead. */
+function waterRipples(ctx: CanvasRenderingContext2D, p: Palette, map: MapLayout, time: number) {
+  const wet = (column: number, row: number) => isWater(map, column, row)
+  for (const { column, row, x, y } of cellsOf(map, (tile) => tile === '~')) {
+    const run = (dx: number, dy: number) => {
+      let length = 1
+      for (const sign of [-1, 1]) for (let step = 1; step < 3 && wet(column + dx * step * sign, row + dy * step * sign); step++) length++
+      return length
+    }
+    const across = run(1, 0), down = run(0, 1)
+    const seed = column * 13 + row * 29
+    if (across >= 3 && down >= 3) {
+      for (let i = 0; i < 2; i++) {
+        if (Math.sin(time * 1.3 + seed + i * 2.1) < 0.2) continue
+        rect(ctx, i ? p.foam : p.waterLight, x + 2 + Math.floor(hash(seed + i) * 10), y + 3 + Math.floor(hash(seed + i + 5) * 10), 3 + i, 1)
+      }
+      continue
+    }
+    const flowsDown = down >= across
+    for (let i = 0; i < 2; i++) {
+      const along = Math.floor((hash(seed + i * 3) * TILE_SIZE + time * 4) % TILE_SIZE)
+      const side = 2 + Math.floor(hash(seed + i * 3 + 1) * 9)
+      const length = 3 + Math.floor(hash(seed + i) * 4)
+      const color = (seed + i) % 3 === 0 ? p.foam : p.waterLight
+      if (flowsDown) {
+        rect(ctx, color, x + side, y + along, length, 1)
+        if (i === 0) rect(ctx, p.waterDark, x + side - 1, y + (along + 3) % TILE_SIZE, 4, 1)
+      } else {
+        rect(ctx, color, x + (along + side) % (TILE_SIZE - length), y + side + 2, length, 1)
+      }
+    }
+  }
+}
+
+const terrainCache = new Map<number, HTMLCanvasElement>()
+
+/** Meadow, paths and banks never move, so each village paints them once and reuses the picture. */
+function terrain(ctx: CanvasRenderingContext2D, world: World, p: Palette, map: MapLayout) {
+  const paint = (target: CanvasRenderingContext2D) => {
+    grass(target, p, map)
+    trails(target, p, map)
+    waterBody(target, p, map)
+  }
+  let cached = terrainCache.get(world.stageIndex)
+  if (!cached && typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = H
+    const target = canvas.getContext('2d')
+    if (target) {
+      target.imageSmoothingEnabled = false
+      paint(target)
+      terrainCache.set(world.stageIndex, canvas)
+      cached = canvas
+    }
+  }
+  if (cached) ctx.drawImage(cached, 0, 0)
+  else paint(ctx)
+}
+
+function waterLife(ctx: CanvasRenderingContext2D, p: Palette, map: MapLayout, time: number) {
+  if (map.moon) {
+    const [x, y] = map.moon
+    oval(ctx, '#7d97a3', x - 9, y - 5, 19, 10)
+    oval(ctx, '#efe7bd', x - 7, y - 4, 15, 8)
+    oval(ctx, '#fff7d8', x - 5, y - 3, 7, 4)
+    for (let i = 0; i < 4; i++) {
+      const shift = Math.round(Math.sin(time * 1.5 + i) * 2)
+      rect(ctx, '#d9d2a8', x - 8 + shift + i * 2, y + 6 + i * 2, 12 - i * 3, 1)
+    }
+  }
+  map.lilies.forEach(([x, y], index) => {
     oval(ctx, p.waterDark, x - 3, y + 2, 10, 5)
     oval(ctx, p.leaf, x - 4, y, 10, 5)
     rect(ctx, p.leafLight, x - 2, y, 6, 1)
     rect(ctx, p.water, x + 3, y + 2, 3, 2)
-    if (y === 220) flower(ctx, x, y, '#e8afb7', p)
-  }
-  for (const [x, y] of [[134, 34], [181, 73], [134, 193], [181, 243]]) {
+    if (index % 3 === 2) flower(ctx, x, y, '#e8afb7', p)
+  })
+  for (const [x, y] of map.reeds) {
     rect(ctx, p.grassDeep, x, y - 6, 1, 9)
     rect(ctx, p.leafLight, x + 2, y - 9, 1, 11)
     rect(ctx, '#a38353', x + 2, y - 11, 2, 4)
     rect(ctx, p.grassDeep, x + 4, y - 5, 1, 8)
   }
+  if (map.ducks) {
+    // A duck family paddles up and down the river, ducklings in tow.
+    const [x0, x1, y] = map.ducks
+    const span = x1 - x0
+    const at = (offset: number) => {
+      const s = ((time * 9 - offset) % (span * 2) + span * 2) % (span * 2)
+      return { x: s < span ? x0 + s : x1 - (s - span), left: s >= span }
+    }
+    for (const [index, offset] of [[2, 18], [1, 10], [0, 0]] as const) {
+      const spot = at(offset)
+      duck(ctx, Math.round(spot.x), y + (index ? 2 : 0), spot.left, time + index, p, index > 0)
+    }
+  }
 }
 
-function bridge(ctx: CanvasRenderingContext2D, repaired: boolean, p: Palette) {
-  rect(ctx, p.waterDark, 138, 161, 44, 4)
-  const planks = repaired ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : [0, 1, 8, 9]
-  for (const n of planks) {
-    const x = 135 + n * 5
-    rect(ctx, '#735744', x, 144, 5, 18)
-    rect(ctx, '#d0a677', x, 145, 4, 15)
-    rect(ctx, '#e6c38b', x, 145, 4, 2)
-    rect(ctx, '#b2865c', x + 1, 152 + n % 3, 2, 1)
-    rect(ctx, '#806248', x + 1, 148, 1, 1)
-    rect(ctx, '#806248', x + 1, 158, 1, 1)
+/** Planks are laid across the gap; while being mended they drop in one by one. */
+function bridge(ctx: CanvasRenderingContext2D, world: World, map: MapLayout, buildAge: number | null, p: Palette) {
+  const repaired = world.flags.bridgeRepaired
+  const cells = bridgeCells(map)
+  if (cells.length === 0) return
+  const x0 = Math.min(...cells.map((cell) => cell.column)) * TILE_SIZE
+  const x1 = (Math.max(...cells.map((cell) => cell.column)) + 1) * TILE_SIZE
+  const y0 = Math.min(...cells.map((cell) => cell.row)) * TILE_SIZE
+  const y1 = (Math.max(...cells.map((cell) => cell.row)) + 1) * TILE_SIZE
+  const across = x1 - x0 >= y1 - y0
+  // Local frame: u runs along the walkway, v across it.
+  const u0 = across ? x0 : y0, v0 = across ? y0 : x0, length = across ? x1 - x0 : y1 - y0
+  const r = (color: string, u: number, v: number, du: number, dv: number) => across
+    ? rect(ctx, color, u, v, du, dv)
+    : rect(ctx, color, v, u, dv, du)
+  r(p.waterDark, u0 - 6, v0 + 17, length + 12, 4)
+  const count = Math.round((length + 18) / 5)
+  // Mending starts on the courier's side of the gap.
+  const site = getPois(world).find((poi) => poi.id === 'bridge')!
+  const fromFar = (across ? site.x : site.y) > u0 + length / 2
+  for (let n = 0; n < count; n++) {
+    const end = n < 2 || n >= count - 2
+    let drop = 0
+    if (!end) {
+      if (!repaired) continue
+      if (buildAge !== null) {
+        const order = fromFar ? count - 1 - n : n
+        const t = (buildAge - 0.12 - (order - 2) / Math.max(1, count - 5) * 0.72) / 0.16
+        if (t < 0) continue
+        drop = t < 1 ? -Math.round(12 * (1 - t) * (1 - t)) : 0
+      }
+    }
+    const u = u0 - 9 + n * 5
+    ctx.save()
+    ctx.translate(0, drop)
+    r('#735744', u, v0, 5, 18)
+    r('#d0a677', u, v0 + 1, 4, 15)
+    r('#e6c38b', u, v0 + 1, 4, 2)
+    r('#b2865c', u + 1, v0 + 8 + n % 3, 2, 1)
+    r('#806248', u + 1, v0 + 4, 1, 1)
+    r('#806248', u + 1, v0 + 14, 1, 1)
+    ctx.restore()
   }
-  if (repaired) {
-    rect(ctx, '#795b46', 133, 137, 53, 3)
-    rect(ctx, '#d7b985', 133, 137, 53, 1)
-    rect(ctx, '#795b46', 133, 159, 53, 3)
-    rect(ctx, '#d7b985', 133, 159, 53, 1)
+  if (repaired && (buildAge === null || buildAge > 0.95)) {
+    for (const v of [v0 - 7, v0 + 15]) {
+      r('#795b46', u0 - 11, v, length + 21, 3)
+      r('#d7b985', u0 - 11, v, length + 21, 1)
+    }
   }
-  for (const x of [134, 182]) {
-    rect(ctx, '#735744', x, 133, 3, 13)
-    rect(ctx, '#e2be85', x, 133, 2, 2)
-    rect(ctx, '#735744', x, 155, 3, 12)
-    rect(ctx, '#e2be85', x, 155, 2, 2)
+  for (const u of [u0 - 10, u0 + length + 6]) {
+    r('#735744', u, v0 - 11, 3, 13)
+    r('#e2be85', u, v0 - 11, 2, 2)
+    r('#735744', u, v0 + 11, 3, 12)
+    r('#e2be85', u, v0 + 11, 2, 2)
   }
 }
 
@@ -267,6 +445,23 @@ function woodpile(ctx: CanvasRenderingContext2D, collected: boolean, p: Palette)
   rect(ctx, '#729155', 119, 80, 2, 4)
 }
 
+/** Decorations stay off paths, water, and the footprint of every building. */
+function isOpenMeadow(world: World, map: MapLayout, x: number, y: number) {
+  const column = Math.floor(x / TILE_SIZE), row = Math.floor(y / TILE_SIZE)
+  if (tileAt(map, column, row) !== '.') return false
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (isWater(map, column + dx, row + dy)) return false
+  return getPois(world).every((poi) => {
+    const dx = x - poi.x, dy = y - poi.y
+    switch (poi.kind) {
+      case 'post': return !(Math.abs(dx - 5) < 38 && dy > -76 && dy < 12)
+      case 'animal': return !(dx > -42 && dx < 34 && dy > -64 && dy < 10)
+      case 'garden': return !(dx > -32 && dx < 40 && dy > -46 && dy < 6)
+      case 'apple': return !(Math.abs(dx) < 22 && dy > -60 && dy < 6)
+      default: return !(Math.abs(dx) < 20 && dy > -24 && dy < 6)
+    }
+  })
+}
+
 function fence(ctx: CanvasRenderingContext2D, x: number, y: number, count: number) {
   rect(ctx, '#9e835e', x, y - 8, count * 8, 2)
   rect(ctx, '#d0b78a', x, y - 8, count * 8, 1)
@@ -278,39 +473,45 @@ function fence(ctx: CanvasRenderingContext2D, x: number, y: number, count: numbe
   }
 }
 
-function smallDetails(ctx: CanvasRenderingContext2D, p: Palette, time: number, season: string) {
-  for (let i = 0; i < 42; i++) {
-    const left = i % 2 === 0
-    const x = left ? 23 + Math.floor(hash(i + 400) * 104) : 193 + Math.floor(hash(i + 400) * 106)
-    const y = 22 + Math.floor(hash(i + 700) * 234)
-    if ((left && x > 44 && x < 117 && y < 238) || (!left && x > 222 && y < 224)) continue
+function groundDetails(ctx: CanvasRenderingContext2D, world: World, map: MapLayout, p: Palette, time: number) {
+  for (const [x, y] of map.lanterns) lightPool(ctx, x, y, p)
+  let placed = 0
+  for (let i = 0; placed < map.flowers && i < map.flowers * 4; i++) {
+    const x = 20 + Math.floor(hash(i + 400) * 280)
+    const y = 22 + Math.floor(hash(i + 700) * 240)
+    if (!isOpenMeadow(world, map, x, y)) continue
     flower(ctx, x, y, i % 3 === 0 ? '#f1ddb0' : p.flower, p)
+    placed++
   }
-  for (const [x, y] of [[26, 72], [124, 204], [202, 97], [288, 230], [87, 249]]) {
+  for (const [x, y] of map.mushrooms) {
     oval(ctx, p.shadow, x - 4, y - 1, 9, 3)
     rect(ctx, '#e3d1aa', x, y - 4, 2, 5)
     oval(ctx, '#b67659', x - 3, y - 7, 8, 4)
     rect(ctx, '#f2d4a7', x - 1, y - 7, 2, 1)
     rect(ctx, '#f2d4a7', x + 2, y - 5, 1, 1)
   }
-  for (const [x, y] of [[129, 62], [193, 197], [120, 243], [294, 125]]) {
+  for (const [x, y] of map.stones) {
     oval(ctx, '#6e7961', x - 3, y - 3, 8, 5)
     rect(ctx, '#b3b69a', x - 2, y - 3, 5, 2)
     rect(ctx, '#89947c', x + 2, y - 2, 2, 2)
   }
-  fence(ctx, 23, 245, 10)
-  fence(ctx, 208, 242, 10)
-  // Two tiny butterflies drift over unoccupied meadow clearings.
-  for (let i = 0; i < 2; i++) {
-    const x = Math.round(27 + i * 176 + Math.sin(time * 0.7 + i * 2) * 5)
-    const y = Math.round(155 + i * 69 + Math.sin(time + i) * 4)
+  for (const [x, y] of map.melons) melon(ctx, x, y, p)
+  for (const [x, y] of map.glowcaps) glowcap(ctx, x, y, time)
+  for (const [x, y, count] of map.fences) fence(ctx, x, y, count)
+}
+
+function airLife(ctx: CanvasRenderingContext2D, map: MapLayout, p: Palette, time: number, season: string) {
+  // Tiny butterflies drift over unoccupied meadow clearings.
+  map.butterflies.forEach(([bx, by], i) => {
+    const x = Math.round(bx + Math.sin(time * 0.7 + i * 2) * 5)
+    const y = Math.round(by + Math.sin(time + i) * 4)
     rect(ctx, p.outline, x, y, 1, 3)
     const open = Math.floor(time * 5 + i) % 2 === 0
-    rect(ctx, i ? '#f4daa1' : '#efb7b2', x - (open ? 2 : 1), y - 1, open ? 2 : 1, 3)
-    rect(ctx, i ? '#f4daa1' : '#efb7b2', x + 1, y - 1, open ? 2 : 1, 3)
-  }
+    rect(ctx, i % 2 ? '#f4daa1' : '#efb7b2', x - (open ? 2 : 1), y - 1, open ? 2 : 1, 3)
+    rect(ctx, i % 2 ? '#f4daa1' : '#efb7b2', x + 1, y - 1, open ? 2 : 1, 3)
+  })
   if (season === 'dusk') {
-    for (let i = 0; i < 13; i++) {
+    for (let i = 0; i < 16; i++) {
       const x = Math.round(25 + hash(i + 900) * 270 + Math.sin(time * 0.4 + i) * 4)
       const y = Math.round(28 + hash(i + 950) * 229 + Math.cos(time * 0.6 + i) * 3)
       if (Math.sin(time * 1.7 + i) > -0.3) {
@@ -354,54 +555,70 @@ function guidance(ctx: CanvasRenderingContext2D, world: World, time: number, p: 
   bubble(ctx, bubbleX, bubbleY + phase, targetKind(target.id, world), true, p)
 }
 
-export function drawScene(ctx: CanvasRenderingContext2D, world: World, timeSeconds: number, reducedMotion = false) {
+export function drawScene(ctx: CanvasRenderingContext2D, world: World, timeSeconds: number, reducedMotion = false, effects: readonly Effect[] = []) {
   const time = reducedMotion ? 0 : timeSeconds
+  // Celebrations are motion by nature; with reduced motion the world simply updates.
+  const fx = reducedMotion ? [] : effects
+  const now = timeSeconds
   const season = STAGES[world.stageIndex]?.season ?? 'spring'
   const p = PALETTES[season]
-  ctx.save()
-  ctx.imageSmoothingEnabled = false
-  grass(ctx, p)
-  trails(ctx, p, world)
+  const dusk = season === 'dusk'
   const map = getMap(world)
   const pois = getPois(world)
   const at = (id: PoiId) => pois.find(poi => poi.id === id)!
   const moved = (dx: number, dy: number, draw: () => void) => {
     ctx.save(); ctx.translate(dx, dy); draw(); ctx.restore()
   }
-  moved((map.riverColumn - 9) * 16, 0, () => river(ctx, p, time))
-  moved((map.riverColumn - 9) * 16, (map.bridgeRow - 9) * 16, () => bridge(ctx, world.flags.bridgeRepaired, p))
+  ctx.save()
+  ctx.imageSmoothingEnabled = false
+  terrain(ctx, world, p, map)
+  waterRipples(ctx, p, map, time)
+  waterLife(ctx, p, map, time)
+  bridge(ctx, world, map, activeAge(fx, now, 'repair'), p)
   moved(at('garden').x - 72, at('garden').y - 136, () => garden(ctx, world, p))
-  smallDetails(ctx, p, time, season)
+  groundDetails(ctx, world, map, p, time)
+
   const scenery: { y: number; draw: () => void }[] = []
-  // Border trees create a sheltered, miniature woodland village.
-  for (let i = 0; i < 9; i++) {
-    const y = 20 + i * 33
-    for (const x of [7 + (i % 2) * 3, 314 - (i % 2) * 3]) {
-      scenery.push({ y, draw: () => tree(ctx, x, y, 30 + i % 3 * 3, p) })
-    }
+  for (const [x, y, size] of map.trees) scenery.push({ y, draw: () => tree(ctx, x, y, size, p) })
+  for (const { column, row, x, y } of cellsOf(map, (tile) => 'TPbr'.includes(tile))) {
+    const tile = tileAt(map, column, row)
+    const cx = x + TILE_SIZE / 2, base = y + TILE_SIZE - 2
+    const size = 31 + Math.floor(hash(column * 7 + row) * 3) * 3
+    scenery.push({
+      y: base,
+      draw: () => tile === 'b' ? bush(ctx, cx, base, p, hash(column + row * 3) > 0.5)
+        : tile === 'r' ? boulder(ctx, cx, base, p)
+          : tree(ctx, cx, base, size, p, tile === 'P' ? 'pear' : false),
+    })
   }
-  for (const [x, y, size] of [[38, 25, 34], [73, 21, 32], [127, 16, 31], [193, 22, 35], [225, 17, 33], [266, 18, 32], [292, 29, 35], [33, 287, 35], [73, 292, 39], [113, 286, 34], [201, 287, 38], [240, 293, 39], [280, 287, 35]]) {
-    scenery.push({ y, draw: () => tree(ctx, x, y, size, p) })
-  }
-  scenery.push({ y: at('apple').y - 12, draw: () => tree(ctx, at('apple').x, at('apple').y - 12, 35, p, !world.flags.appleTaken) })
+  for (const [x, y] of map.sunflowers) scenery.push({ y, draw: () => sunflower(ctx, x, y, time) })
+  for (const [x, y] of map.lanterns) scenery.push({ y, draw: () => lantern(ctx, x, y, time) })
+  const appleAge = activeAge(fx, now, 'get', 'apple')
+  const shake = appleAge !== null && appleAge < 0.4 ? Math.round(Math.sin(appleAge * 55) * 1.5) : 0
+  scenery.push({ y: at('apple').y - 12, draw: () => tree(ctx, at('apple').x + shake, at('apple').y - 12, 35, p, world.flags.appleTaken ? false : 'apple') })
   scenery.push({ y: at('wood').y - 4, draw: () => moved(at('wood').x - 104, at('wood').y - 88, () => woodpile(ctx, world.flags.woodCollected, p)) })
-  scenery.push({ y: at('post').y - 17, draw: () => postOffice(ctx, at('post').x, at('post').y - 17, p, season === 'dusk') })
+  scenery.push({ y: at('post').y - 17, draw: () => postOffice(ctx, at('post').x, at('post').y - 17, p, dusk) })
   for (const kind of ['squirrel', 'rabbit', 'bear'] as const) {
-    const poi = getPois(world).find(candidate => candidate.id === kind)
-    if (!poi) continue
-    scenery.push({ y: poi.y - 17, draw: () => cottage(ctx, poi.x, poi.y - 17, kind, p, season === 'dusk') })
-    scenery.push({ y: poi.y + 1, draw: () => animal(ctx, kind, poi.x, poi.y + 1, time, world.delivered.includes(kind), p) })
+    const poi = at(kind)
+    const giftAge = activeAge(fx, now, 'deliver', kind)
+    const jump = giftAge !== null && giftAge > 0.5 && giftAge < 0.9 ? Math.round(Math.sin((giftAge - 0.5) / 0.4 * Math.PI) * 6) : 0
+    scenery.push({ y: poi.y - 17, draw: () => cottage(ctx, poi.x, poi.y - 17, kind, p, dusk) })
+    scenery.push({ y: poi.y + 1, draw: () => animal(ctx, kind, poi.x, poi.y + 1 - jump, time, world.delivered.includes(kind), p) })
   }
+  const getAge = activeAge(fx, now, 'get')
+  // The courier hops and turns to face us while holding up a new find.
+  const hop = getAge !== null && getAge < 0.3 ? Math.round(Math.sin(getAge / 0.3 * Math.PI) * 4) : 0
+  const facing = getAge !== null && getAge < GET_HOLD ? 'down' : world.player.facing
   scenery.push({
     y: world.player.y,
-    draw: () => fox(ctx, world.player.x, world.player.y, world.player.facing, world.player.walking && !reducedMotion, time, p),
+    draw: () => fox(ctx, world.player.x, world.player.y - hop, facing, world.player.walking && !reducedMotion, time, p),
   })
   scenery.sort((a, b) => a.y - b.y).forEach(object => object.draw())
   // Compact picture requests let non-readers match their bag to each animal.
   const objectiveId = getObjective(world).targetId
   for (const recipient of STAGES[world.stageIndex].deliveries) {
     if (world.delivered.includes(recipient) || objectiveId === recipient) continue
-    const poi = getPois(world).find(candidate => candidate.id === recipient)!
+    const poi = at(recipient)
     const x = poi.x - 31, y = poi.y - 10
     rect(ctx, '#897b61', x - 10, y - 10, 21, 20)
     rect(ctx, p.cream, x - 9, y - 9, 19, 18)
@@ -415,5 +632,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, world: World, timeSecon
     rect(ctx, '#e4b674', world.player.x + (world.player.facing === 'left' ? -9 : 5), world.player.y - 9, 5, 5)
     rect(ctx, '#c47b52', world.player.x + (world.player.facing === 'left' ? -7 : 7), world.player.y - 9, 1, 5)
   }
+  airLife(ctx, map, p, time, season)
+  drawEffects(ctx, fx, now)
   ctx.restore()
 }

@@ -76,6 +76,7 @@ describe('ForestDeliveryPlay', () => {
     fireEvent.click(screen.getByRole('button', { name: 'はるの はいたつで あそぶ' }))
     finishFirstTwoDeliveries()
     expect(screen.getByRole('heading', { name: 'みんなに とどいた！' })).toBeInTheDocument()
+    expect(screen.getByTestId('delivery-toast')).toHaveTextContent('ぜんぶ とどいた！')
     expect(screen.getByRole('button', { name: 'つぎの もりへ →' })).toHaveFocus()
     expect(JSON.parse(localStorage.getItem('forest-delivery-progress-v1') ?? '{}')).toEqual({ spring: 3 })
     expect(playDeliverySound).toHaveBeenLastCalledWith('complete')
@@ -101,6 +102,31 @@ describe('ForestDeliveryPlay', () => {
     guidedAction('くまさん')
     expect(screen.getByRole('heading', { name: 'みんなに とどいた！' })).toBeInTheDocument()
     expect(screen.getByLabelText('3 / 3 にんに おとどけ')).toBeInTheDocument()
+  })
+
+  test('拾ったり届けたりするたびに地図の上に見出しが出て、お祝いの演出が描かれる', () => {
+    renderPlay()
+    fireEvent.click(screen.getByRole('button', { name: 'はるの はいたつで あそぶ' }))
+    expect(screen.queryByTestId('delivery-toast')).not.toBeInTheDocument()
+    guidedAction('ゆうびんやさん')
+    const toast = screen.getByTestId('delivery-toast')
+    expect(toast).toHaveTextContent('にもつ ゲット！')
+    // The status bubble already speaks the change, so the banner stays out of the accessibility tree.
+    expect(toast).toHaveAttribute('aria-hidden', 'true')
+    const drawnEffects = () => vi.mocked(drawScene).mock.calls.flatMap((call) => call[4] ?? [])
+    expect(drawnEffects()).toContainEqual(expect.objectContaining({ kind: 'get', item: 'parcel' }))
+    guidedAction('きのえだ')
+    expect(screen.getByTestId('delivery-toast')).toHaveTextContent('きのえだ ゲット！')
+    // A fresh banner element replays its pop-in animation.
+    expect(toast).not.toBeInTheDocument()
+    guidedAction('はし')
+    expect(screen.getByTestId('delivery-toast')).toHaveTextContent('はしが なおった！')
+    expect(drawnEffects()).toContainEqual(expect.objectContaining({ kind: 'repair' }))
+    guidedAction('りすさん')
+    expect(screen.getByTestId('delivery-toast')).toHaveTextContent('おとどけ できた！')
+    expect(drawnEffects()).toContainEqual(expect.objectContaining({ kind: 'deliver', poiId: 'squirrel' }))
+    // Once the show is over the scene is drawn without leftovers.
+    expect(vi.mocked(drawScene).mock.lastCall?.[4]).toEqual([])
   })
 
   test('未修理の橋を渡ろうとすると手順を案内し、歩行中の連打は荷物を受け取らない', () => {
