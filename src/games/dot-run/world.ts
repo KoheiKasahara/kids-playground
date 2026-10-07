@@ -404,6 +404,8 @@ function stepPickups(world: World) {
     hero.vy = -SPRING_V
     hero.boost = true
     hero.onGround = false
+    // じめんの すぐ うえでも ばねで とんだら くうちゅう。つぎの ボタンは 2だんジャンプに する。
+    hero.coyote = 0
     hero.airJumps = 1
     hero.flip = 0
     s.t = 14
