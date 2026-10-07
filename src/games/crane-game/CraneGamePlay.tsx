@@ -5,6 +5,7 @@ import { primeAudio } from '../../audio/sound'
 import { BIN, CHUTE, CRANE_MACHINES, findMachine } from './craneMachines'
 import { craneSound, type CraneSoundKind } from './craneSound'
 import type { CraneView } from './craneScene'
+import { MAX_ZOOM } from './craneZoom'
 import type { CraneEvent } from './craneWorld'
 import { useCraneGameEngine, type CraneAction, type CraneFeedback, type CraneStatus } from './useCraneGameEngine'
 import styles from './CraneGamePlay.module.css'
@@ -12,6 +13,8 @@ import styles from './CraneGamePlay.module.css'
 const EMPTY: CraneFeedback = { phase: 'idle', axis: null, holding: false, ready: false, remaining: 0, collected: 0 }
 /** 取れた景品の表示はこの数まで。増えすぎても画面がくずれないようにする。 */
 const TRAY_LIMIT = 10
+/** ＋－ボタン1回で変わる倍率。ピンチやホイールなら細かく変えられる。 */
+const ZOOM_STEP = 0.35
 
 function caption(feedback: CraneFeedback, message: string | null, selecting: boolean): string {
   if (!feedback.ready) return 'けいひんを ならべているよ…'
@@ -33,6 +36,7 @@ export default function CraneGamePlay() {
   const machine = useMemo(() => findMachine(machineId) ?? CRANE_MACHINES[0]!, [machineId])
   const [phase, setPhase] = useState<'select' | 'play'>('select')
   const [view, setView] = useState<CraneView>('front')
+  const [zoom, setZoom] = useState(1)
   const [round, setRound] = useState(0)
   const [sound, setSound] = useState(true)
   const [status, setStatus] = useState<CraneStatus>('loading')
@@ -60,7 +64,7 @@ export default function CraneGamePlay() {
   }, [play])
 
   const { registerContainer, registerMapMarker, retry, move, grab } = useCraneGameEngine({
-    machine, round, view, reducedMotion, onStatus: setStatus, onFeedback: setFeedback, onEvent, onAction,
+    machine, round, view, zoom, reducedMotion, onStatus: setStatus, onFeedback: setFeedback, onEvent, onAction, onZoom: setZoom,
   })
 
   const busy = feedback.phase !== 'idle'
@@ -70,6 +74,7 @@ export default function CraneGamePlay() {
     setMessage(null)
     setPhase('play')
     setView('front')
+    setZoom(1)
     play('clack')
   }
   const refill = () => {
@@ -109,6 +114,10 @@ export default function CraneGamePlay() {
               </svg>
               <span>のこり {feedback.remaining}こ</span>
             </aside>
+            {phase === 'play' && <div className={styles.zoomPad} role="group" aria-label="ズーム">
+              <button type="button" aria-label="ちかづける" disabled={zoom >= MAX_ZOOM} onClick={() => setZoom(value => Math.min(MAX_ZOOM, value + ZOOM_STEP))}>＋</button>
+              <button type="button" aria-label="とおざける" disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - ZOOM_STEP))}>－</button>
+            </div>}
             {tray.length > 0 && <div className={styles.tray} aria-label={`とれた けいひん ${tray.length}こ`}>
               <strong>{tray.length}こ</strong>
               <span aria-hidden="true">{tray.slice(-TRAY_LIMIT).map(item => item.emoji).join('')}</span>
@@ -116,7 +125,7 @@ export default function CraneGamePlay() {
           </>}
         </div>
 
-        {/* えらぶ画面と あそぶ画面の パネルを 同じ場所に 重ねて置き、高さの大きいほうに そろえる。切り替えても ケースの大きさが かわらず ちらつかない。 */}
+        {/* えらぶ画面と あそぶ画面の パネルは 見えているほうだけ 場所をとる。あそぶときは そうさパネルが ひくいぶん ケースを 大きく見せる。 */}
         <div className={styles.panel}>
         <section className={styles.selection} aria-label="きかいを えらぶ" data-shown={phase === 'select'} aria-hidden={phase !== 'select'} inert={phase !== 'select'}>
           <h2>どの きかいで あそぶ？</h2>
