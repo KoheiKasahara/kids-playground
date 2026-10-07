@@ -265,7 +265,12 @@ export function animal(ctx: CanvasRenderingContext2D, kind: AnimalKind, x: numbe
   if (happy) item(ctx, 'heart', x - 7, y - rows.length - 19 - bounce)
 }
 
-export function tree(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, palette: Palette, fruit = false) {
+const FRUIT_COLORS = {
+  apple: ['#d87558', '#f0b27f', '#b75c49'],
+  pear: ['#d8d46a', '#f6f2b0', '#aea644'],
+} as const
+
+export function tree(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, palette: Palette, fruit: false | keyof typeof FRUIT_COLORS = false) {
   oval(ctx, palette.shadow, x - size / 2 + 1, y - 5, size - 2, 9)
   rect(ctx, '#664f3e', x - 3, y - 20, 7, 20)
   rect(ctx, '#99734d', x - 2, y - 19, 3, 18)
@@ -282,13 +287,98 @@ export function tree(ctx: CanvasRenderingContext2D, x: number, y: number, size: 
   rect(ctx, palette.leafDark, x - 6, top + size - 8, 7, 2)
   rect(ctx, palette.leaf, x + 2, top + size - 10, 4, 2)
   if (fruit) {
+    const [body, light, dark] = FRUIT_COLORS[fruit]
     for (const [dx, dy] of [[-8, 13], [8, 8], [3, 23]]) {
       rect(ctx, '#7a4b3c', x + dx + 1, top + dy - 1, 1, 2)
-      rect(ctx, '#d87558', x + dx, top + dy, 4, 4)
-      rect(ctx, '#f0b27f', x + dx, top + dy, 2, 1)
-      rect(ctx, '#b75c49', x + dx + 2, top + dy + 3, 2, 1)
+      rect(ctx, body, x + dx, top + dy, 4, 4)
+      rect(ctx, light, x + dx, top + dy, 2, 1)
+      rect(ctx, dark, x + dx + 2, top + dy + 3, 2, 1)
     }
   }
+}
+
+export function bush(ctx: CanvasRenderingContext2D, x: number, y: number, palette: Palette, berries = false) {
+  oval(ctx, palette.shadow, x - 10, y - 4, 21, 7)
+  oval(ctx, palette.leafDeep, x - 10, y - 15, 21, 15)
+  oval(ctx, palette.leafDark, x - 9, y - 16, 19, 13)
+  oval(ctx, palette.leaf, x - 7, y - 16, 13, 9)
+  rect(ctx, palette.leafLight, x - 4, y - 14, 5, 2)
+  if (berries) for (const [dx, dy] of [[-5, -8], [3, -11], [5, -5]]) {
+    rect(ctx, '#c9566a', x + dx, y + dy, 2, 2)
+    rect(ctx, '#f2a0a8', x + dx, y + dy, 1, 1)
+  }
+}
+
+export function boulder(ctx: CanvasRenderingContext2D, x: number, y: number, palette: Palette) {
+  oval(ctx, palette.shadow, x - 10, y - 4, 21, 7)
+  oval(ctx, '#5f655c', x - 9, y - 14, 19, 14)
+  oval(ctx, '#8f9583', x - 8, y - 14, 15, 11)
+  oval(ctx, '#b4b79f', x - 6, y - 13, 8, 4)
+  rect(ctx, '#6e7466', x + 1, y - 7, 4, 1)
+}
+
+export function sunflower(ctx: CanvasRenderingContext2D, x: number, y: number, time: number) {
+  const sway = Math.round(Math.sin(time * 1.4 + x * 0.3) * 0.6)
+  rect(ctx, '#4f7a3f', x, y - 15, 1, 15)
+  rect(ctx, '#6f9a4b', x - 3, y - 8, 3, 2)
+  rect(ctx, '#6f9a4b', x + 1, y - 11, 3, 2)
+  const hx = x + sway, hy = y - 19
+  rect(ctx, '#c98a2a', hx - 3, hy - 2, 7, 5)
+  rect(ctx, '#c98a2a', hx - 2, hy - 3, 5, 7)
+  rect(ctx, '#f7c843', hx - 2, hy - 2, 5, 5)
+  rect(ctx, '#ffe17a', hx - 2, hy - 2, 2, 1)
+  rect(ctx, '#7a4c2c', hx - 1, hy - 1, 3, 3)
+  rect(ctx, '#a06a3a', hx - 1, hy - 1, 1, 1)
+}
+
+export function melon(ctx: CanvasRenderingContext2D, x: number, y: number, palette: Palette) {
+  oval(ctx, palette.shadow, x - 6, y - 1, 13, 4)
+  oval(ctx, '#2f6b3c', x - 6, y - 9, 13, 10)
+  for (const dx of [-3, 0, 3]) rect(ctx, '#7fb35b', x + dx, y - 8, 1, 8)
+  rect(ctx, '#a6d27c', x - 3, y - 8, 3, 1)
+  rect(ctx, '#7a5a3a', x, y - 11, 1, 2)
+}
+
+export function lantern(ctx: CanvasRenderingContext2D, x: number, y: number, time: number) {
+  const flicker = Math.sin(time * 6 + x) > 0.85 ? '#ffe9b0' : '#ffd479'
+  rect(ctx, '#3d342f', x, y - 18, 2, 18)
+  rect(ctx, '#3d342f', x - 3, y - 25, 8, 2)
+  rect(ctx, '#3d342f', x - 2, y - 23, 6, 6)
+  rect(ctx, flicker, x - 1, y - 22, 4, 4)
+  rect(ctx, '#fff6d6', x, y - 21, 1, 1)
+  rect(ctx, '#3d342f', x - 1, y - 17, 4, 1)
+}
+
+/** Warm pool of light under a lantern, drawn on the ground before upright scenery. */
+export function lightPool(ctx: CanvasRenderingContext2D, x: number, y: number, palette: Palette) {
+  ctx.save()
+  ctx.globalAlpha = 0.28
+  oval(ctx, '#ffe2a3', x - 18, y - 9, 37, 16)
+  ctx.globalAlpha = 0.25
+  oval(ctx, palette.grassLight, x - 11, y - 5, 23, 9)
+  ctx.restore()
+}
+
+export function glowcap(ctx: CanvasRenderingContext2D, x: number, y: number, time: number) {
+  const pulse = 0.18 + Math.max(0, Math.sin(time * 1.6 + x * 0.17)) * 0.18
+  ctx.save()
+  ctx.globalAlpha = pulse
+  oval(ctx, '#9ff2e0', x - 7, y - 9, 15, 11)
+  ctx.restore()
+  rect(ctx, '#d7e6d4', x, y - 4, 2, 4)
+  oval(ctx, '#56c1b0', x - 3, y - 7, 8, 4)
+  rect(ctx, '#c8fff3', x - 1, y - 7, 2, 1)
+  rect(ctx, '#c8fff3', x + 2, y - 5, 1, 1)
+}
+
+const DUCK = ['...ww..', '..wwkbb', 'w.wwww.', 'wwwwww.', '.wwww..']
+const DUCKLING = ['.yy.', 'yyko', 'yyy.']
+
+export function duck(ctx: CanvasRenderingContext2D, x: number, y: number, facingLeft: boolean, time: number, palette: Palette, little = false) {
+  const bob = Math.round(Math.sin(time * 3 + x * 0.2) * 0.6)
+  const rows = little ? DUCKLING : DUCK
+  rect(ctx, palette.waterLight, x - (little ? 3 : 5), y + 1, little ? 7 : 11, 1)
+  sprite(ctx, rows, { w: '#fbf7ea', k: '#3a3330', b: '#f0a541', y: '#f6d867', o: '#f0a541' }, x - (little ? 2 : 3), y - rows.length + 1 + bob, facingLeft)
 }
 
 export function flower(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, palette: Palette) {

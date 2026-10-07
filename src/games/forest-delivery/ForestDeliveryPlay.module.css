@@ -142,3 +142,61 @@
 @media (prefers-reduced-motion: reduce) {
   .page .mapSpot { transform: translate(-50%, -70%) !important; }
 }
+
+/* Celebrations: a banner pops up from the bottom of the map, new things bounce into the bag,
+   and stamps thump down when a delivery lands. */
+.toast { position: absolute; left: 50%; bottom: 4%; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 5px 16px 5px 6px; transform: translateX(-50%); background: #fffbea; border: 3px solid #d49c4e; border-radius: 999px; box-shadow: 0 4px 0 #a8743a66, 0 0 0 5px #fff3c299; color: #6a4520; font-size: clamp(14px, 3.9vw, 20px); font-weight: 900; letter-spacing: .04em; white-space: nowrap; pointer-events: none; opacity: 0; animation: toastPop 1.9s cubic-bezier(.2, .9, .3, 1.2) forwards; }
+.toast::before, .toast::after { content: '✦'; position: absolute; top: -14px; color: #f2b64a; font-size: 16px; animation: toastTwinkle .5s steps(2) 3; }
+.toast::before { left: 8px; }
+.toast::after { right: 6px; top: -10px; animation-delay: .25s; }
+.toastIcon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: #fff0c4; animation: toastIcon .7s cubic-bezier(.2, .9, .3, 1.5) both; }
+.toastIcon .icon { width: 30px; height: 30px; }
+@keyframes toastPop {
+  0% { opacity: 0; transform: translate(-50%, 60%) scale(.5); }
+  12% { opacity: 1; transform: translate(-50%, -8%) scale(1.12); }
+  22% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -40%) scale(.96); }
+}
+@keyframes toastIcon {
+  0% { transform: scale(0) rotate(-40deg); }
+  60% { transform: scale(1.3) rotate(10deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes toastTwinkle { 50% { opacity: 0; } }
+.bagItem { animation: bagPop .7s cubic-bezier(.2, .9, .3, 1.5) both; }
+@keyframes bagPop {
+  0% { transform: translateY(-14px) scale(0); box-shadow: 0 0 0 0 #ffd98a00; }
+  55% { transform: translateY(0) scale(1.35); box-shadow: 0 0 0 6px #ffd98a99; }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 #ffd98a00; }
+}
+.stamp.delivered { animation: stampIn .55s cubic-bezier(.3, 1.4, .5, 1) both; }
+@keyframes stampIn {
+  0% { transform: scale(2) rotate(-14deg); opacity: 0; }
+  60% { transform: scale(.88) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+.result { animation: resultIn .5s cubic-bezier(.2, .9, .3, 1.3) both; }
+@keyframes resultIn { from { transform: translateY(18px) scale(.92); opacity: 0; } }
+.resultStars span { display: inline-block; margin: 0 4px; animation: starPop .5s cubic-bezier(.2, .9, .3, 1.6) both; }
+.resultStars span:nth-child(2) { animation-delay: .25s; }
+.resultStars span:nth-child(3) { animation-delay: .5s; }
+@keyframes starPop {
+  0% { transform: scale(0) rotate(-90deg); opacity: 0; }
+  70% { transform: scale(1.4) rotate(10deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+.resultAnimals .icon { animation: animalHop .6s ease-in-out .7s 3 both; }
+.resultAnimals .icon:nth-child(2) { animation-delay: .8s; }
+.resultAnimals .icon:nth-child(3) { animation-delay: .9s; }
+.resultAnimals .icon:nth-child(4) { animation-delay: 1s; }
+@keyframes animalHop { 40% { transform: translateY(-8px); } }
+@media (prefers-reduced-motion: reduce) {
+  /* No bouncing: the banner simply fades in and out, everything else appears in place. */
+  .toast { animation: toastFade 1.9s linear forwards; }
+  .toast::before, .toast::after, .toastIcon, .bagItem, .stamp.delivered, .result, .resultStars span, .resultAnimals .icon { animation: none; }
+}
+@keyframes toastFade {
+  0%, 100% { opacity: 0; transform: translateX(-50%); }
+  10%, 80% { opacity: 1; transform: translateX(-50%); }
+}

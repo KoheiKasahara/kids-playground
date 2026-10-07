@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { bridgeCells } from './maps'
 import {
   getPois,
   getMap,
@@ -208,8 +209,8 @@ test.each([0, 1, 2])('森 %i はマップのタップと到着処理だけでク
 test('各マップは川・橋・建物の位置が異なり、到達可能な道がつながる', () => {
   const worlds = [0, 1, 2].map(createWorld)
   expect(new Set(worlds.map(w => JSON.stringify(getPois(w)))).size).toBe(3)
-  expect(new Set(worlds.map(w => getMap(w).riverColumn)).size).toBe(3)
-  expect(new Set(worlds.map(w => getMap(w).bridgeRow)).size).toBe(3)
+  expect(new Set(worlds.map(w => getMap(w).tiles.join('\n'))).size).toBe(3)
+  expect(new Set(worlds.map(w => JSON.stringify(bridgeCells(getMap(w))))).size).toBe(3)
   for (const world of worlds) {
     expect(targetPoi(world, 'squirrel')).toBe(false)
     visit(world, 'wood')

@@ -9,6 +9,7 @@ import { createStageProgressStore } from '../shared/progress/stageProgress'
 import { createWorld, getObjective, interactOnArrival, getPois, STAGES, targetPoi, targetPoint, updateWorld, type PoiId, type World } from './model'
 import { drawScene } from './render'
 import { drawIcon, type IconKind } from './art'
+import { celebrationFor, createEffects, pruneEffects, type Celebration, type Effect } from './effects'
 import { playDeliverySound } from './sounds'
 import styles from './ForestDeliveryPlay.module.css'
 
@@ -39,10 +40,14 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
   const [snapshot, setSnapshot] = useState(() => createWorld(index))
   const canvas = useRef<HTMLCanvasElement>(null)
   const resultButton = useRef<HTMLButtonElement>(null)
+  const speech = useRef<HTMLDivElement>(null)
   const stage = STAGES[index]
   const objective = getObjective(snapshot)
   const pois = getPois(snapshot)
   const [speaker, setSpeaker] = useState<PoiId>('post')
+  const [celebration, setCelebration] = useState<Celebration & { id: number } | null>(null)
+  const effects = useRef<Effect[]>([])
+  const clock = useRef(0)
   const speechPoi = pois.find(poi => poi.id === speaker)!
   const onArrival = useEffectEvent(() => {
     const event = interactOnArrival(world.current)
@@ -51,6 +56,17 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
     if (event.type !== 'none') {
       if (sound) playDeliverySound(event.type)
       vibrate(event.type === 'complete' ? 'celebrate' : event.type === 'deliver' ? 'success' : 'tap')
+      effects.current = [...pruneEffects(effects.current, clock.current), ...createEffects(world.current, event, clock.current)]
+      const next = celebrationFor(event)
+      if (next) setCelebration((previous) => ({ ...next, id: (previous?.id ?? 0) + 1 }))
+      // The bubble sits right where the show happens, so the words follow once it has played.
+      // The live region itself stays put, so the message is still announced straight away.
+      if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        speech.current?.animate?.([
+          { opacity: 0, transform: 'translateX(-50%) translateY(8px) scale(.92)' },
+          { opacity: 1, transform: 'translateX(-50%)' },
+        ], { duration: 260, delay: 1000, easing: 'ease-out', fill: 'backwards' })
+      }
     }
     if (world.current.completed) onComplete(stage.id)
     return true
@@ -63,18 +79,18 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
     const media = window.matchMedia?.('(prefers-reduced-motion: reduce)')
     let frame = 0
     let previous = 0
-    let elapsed = 0
     const animate = (now: number) => {
       frame = requestAnimationFrame(animate)
       const dt = previous ? Math.min((now - previous) / 1000, 0.05) : 0
       previous = now
       if (document.hidden) return
-      elapsed += dt
+      clock.current += dt
       const walking = world.current.player.walking
       updateWorld(world.current, dt)
       const arrived = onArrival()
       if (arrived || walking !== world.current.player.walking) setSnapshot(structuredClone(world.current))
-      drawScene(ctx, world.current, elapsed, media?.matches ?? false)
+      if (effects.current.length) effects.current = pruneEffects(effects.current, clock.current)
+      drawScene(ctx, world.current, clock.current, media?.matches ?? false, effects.current)
     }
     frame = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(frame)
@@ -114,15 +130,19 @@ function Adventure({ index, sound, onExit, onComplete, onNext, onRetry }: {
         {pois.map(poi => <button key={poi.id} className={`${styles.mapSpot} ${objective.targetId === poi.id ? styles.nextSpot : ''}`} style={{ left: `${poi.x / 320 * 100}%`, top: `${poi.y / 288 * 100}%` }} aria-label={`${poi.name}を タップ`} disabled={snapshot.completed} onClick={() => goTo(poi.id)}>
           {objective.targetId === poi.id && <span className={styles.tapLabel}>ここ！<span aria-hidden="true"> ▼</span></span>}
         </button>)}
-        <div className={styles.speech} role="status" aria-live="polite" style={{ left: `${Math.max(28, Math.min(72, speechPoi.x / 320 * 100))}%`, top: `${Math.max(3, speechPoi.y / 288 * 100 - 31)}%` }}>
+        <div ref={speech} className={styles.speech} role="status" aria-live="polite" style={{ left: `${Math.max(28, Math.min(72, speechPoi.x / 320 * 100))}%`, top: `${Math.max(3, speechPoi.y / 288 * 100 - 31)}%` }}>
           <strong>{speechPoi.kind === 'animal' || speechPoi.kind === 'post' ? speechPoi.name : 'こぎつね'}</strong><span>{snapshot.message}</span>
         </div>
+        {/* The spoken status above already announces each change; this banner is for the eyes. */}
+        {celebration && <div key={celebration.id} className={styles.toast} aria-hidden="true" data-testid="delivery-toast">
+          <span className={styles.toastIcon}><Icon kind={celebration.icon} /></span><span>{celebration.text}</span>
+        </div>}
         </div>
         <div className={styles.mapCaption} aria-hidden="true"><span>FOREST POST</span><span>{index === 2 ? '☾' : '✦'} {String(index + 1).padStart(2, '0')}</span></div>
       </div>
       <div className={styles.controlPanel}>
         {snapshot.completed ? <section className={styles.result} aria-labelledby="delivery-result">
-          <div className={styles.resultStars} aria-label="ほし 3こ">★ ★ ★</div>
+          <div className={styles.resultStars} aria-label="ほし 3こ"><span aria-hidden="true">★</span><span aria-hidden="true">★</span><span aria-hidden="true">★</span></div>
           <h2 id="delivery-result">みんなに とどいた！</h2>
           <p>やさしい おてつだい、ありがとう。</p>
           <div className={styles.resultAnimals}><Icon kind="fox" /><Icon kind="rabbit" /><Icon kind="squirrel" /><Icon kind="bear" /></div>

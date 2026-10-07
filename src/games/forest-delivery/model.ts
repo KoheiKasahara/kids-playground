@@ -1,8 +1,8 @@
+import { COLUMNS, MAPS, ROWS, tileAt, type MapLayout } from './maps'
+
 export const WORLD_WIDTH = 320
 export const WORLD_HEIGHT = 288
 export const TILE_SIZE = 16
-const COLUMNS = WORLD_WIDTH / TILE_SIZE
-const ROWS = WORLD_HEIGHT / TILE_SIZE
 const WALK_SPEED = 80
 const INTERACTION_RADIUS = 20
 export type PoiId = 'post' | 'wood' | 'bridge' | 'garden' | 'apple' | 'squirrel' | 'rabbit' | 'bear'
@@ -24,8 +24,8 @@ export type Stage = {
 
 export const STAGES: readonly Stage[] = [
   { id: 'spring', name: 'はるの はいたつ', subtitle: 'はしを なおして、はじめての おとどけ', season: 'spring', deliveries: ['squirrel', 'rabbit'] },
-  { id: 'summer', name: 'なつの ごちそう', subtitle: 'かわの うえの はしと、ひろい くだものの むら', season: 'summer', deliveries: ['squirrel', 'rabbit', 'bear'] },
-  { id: 'dusk', name: 'ほたるの よる', subtitle: 'もりの おくの はしへ、ほたると よるの ぼうけん', season: 'dusk', deliveries: ['squirrel', 'rabbit', 'bear'] },
+  { id: 'summer', name: 'なつの ごちそう', subtitle: 'ひまわりの むらと、よこに ながれる かわ', season: 'summer', deliveries: ['squirrel', 'rabbit', 'bear'] },
+  { id: 'dusk', name: 'ほたるの よる', subtitle: 'つきの いけを まわって、もりの おくの はしへ', season: 'dusk', deliveries: ['squirrel', 'rabbit', 'bear'] },
 ]
 
 export const POIS: readonly Poi[] = [
@@ -39,33 +39,18 @@ export const POIS: readonly Poi[] = [
   { id: 'bear', name: 'くまさん', x: 264, y: 152, kind: 'animal' },
 ]
 
-/** Village layouts share art, but have distinct geography and routes. */
-export const MAPS = [
-  { riverColumn: 9, bridgeRow: 9, positions: {} },
-  { riverColumn: 7, bridgeRow: 6, positions: {
-    post: [40, 232], wood: [88, 168], bridge: [104, 104], garden: [56, 88],
-    apple: [88, 40], squirrel: [216, 72], rabbit: [264, 232], bear: [200, 168],
-  } },
-  { riverColumn: 11, bridgeRow: 13, positions: {
-    post: [56, 88], wood: [152, 152], bridge: [168, 216], garden: [72, 216],
-    apple: [136, 56], squirrel: [248, 232], rabbit: [264, 72], bear: [248, 152],
-  } },
-] as const
-export function getMap(world: World) { return MAPS[world.stageIndex] }
-export function getPois(world: World): readonly Poi[] {
-  const positions = getMap(world).positions as Partial<Record<PoiId, readonly [number, number]>>
-  return POIS.map(poi => {
-    const position = positions[poi.id]
-    return position ? { ...poi, x: position[0], y: position[1] } : poi
-  })
+export function getMap(world: Pick<World, 'stageIndex'>): MapLayout { return MAPS[world.stageIndex] ?? MAPS[0] }
+export function getPois(world: Pick<World, 'stageIndex'>): readonly Poi[] {
+  const positions = getMap(world).positions
+  return POIS.map(poi => ({ ...poi, x: positions[poi.id][0], y: positions[poi.id][1] }))
 }
 
-const REQUESTS: Record<RecipientId, Exclude<ItemId, 'wood'>> = {
+export const REQUESTS: Record<RecipientId, Exclude<ItemId, 'wood'>> = {
   squirrel: 'parcel',
   rabbit: 'carrot',
   bear: 'apple',
 }
-const ITEM_NAMES: Record<ItemId, string> = {
+export const ITEM_NAMES: Record<ItemId, string> = {
   parcel: 'にもつ', carrot: 'にんじん', apple: 'りんご', wood: 'きのえだ',
 }
 
@@ -96,7 +81,7 @@ export type GameEvent = {
 
 export function createWorld(stageIndex = 0): World {
   const validIndex = Number.isInteger(stageIndex) && stageIndex >= 0 && stageIndex < STAGES.length ? stageIndex : 0
-  const start = getPois({ stageIndex: validIndex } as World).find(poi => poi.id === 'post')!
+  const start = getPois({ stageIndex: validIndex }).find(poi => poi.id === 'post')!
   return {
     stageIndex: validIndex,
     player: { x: start.x, y: start.y + 16, facing: 'down', walking: false },
@@ -110,27 +95,27 @@ export function createWorld(stageIndex = 0): World {
   }
 }
 
-/** The river has one crossing. Border cells keep the courier inside the scene. */
-export function isWalkableCell(world: World, column: number, row: number): boolean {
+/** The water has one crossing. Border cells keep the courier inside the scene. */
+export function isWalkableCell(world: World, column: number, row: number, assumeRepaired = false): boolean {
   if (!Number.isInteger(column) || !Number.isInteger(row) || column < 1 || column >= COLUMNS - 1 || row < 1 || row >= ROWS - 1) return false
   if (getPois(world).some(poi => {
     if (poi.kind !== 'post' && poi.kind !== 'animal' && poi.kind !== 'apple') return false
     const cx = Math.floor(poi.x / TILE_SIZE), cy = Math.floor(poi.y / TILE_SIZE)
     return Math.abs(column - cx) <= (poi.kind === 'apple' ? 0 : 1) && row >= cy - (poi.kind === 'post' ? 3 : 2) && row <= cy - 1
   })) return false
-  const map = getMap(world)
-  if (column === map.riverColumn || column === map.riverColumn + 1) return row === map.bridgeRow && world.flags.bridgeRepaired
-  return true
+  const tile = tileAt(getMap(world), column, row)
+  if (tile === '=') return world.flags.bridgeRepaired || assumeRepaired
+  return tile === '.' || tile === ':'
 }
 
 function cellCenter(column: number, row: number): Point {
   return { x: column * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2 }
 }
 
-function findPath(world: World, destination: Point): Point[] | null {
+function findPath(world: World, destination: Point, assumeRepaired = false): Point[] | null {
   const from = Math.floor(world.player.y / TILE_SIZE) * COLUMNS + Math.floor(world.player.x / TILE_SIZE)
   const to = Math.floor(destination.y / TILE_SIZE) * COLUMNS + Math.floor(destination.x / TILE_SIZE)
-  if (!isWalkableCell(world, to % COLUMNS, Math.floor(to / COLUMNS))) return null
+  if (!isWalkableCell(world, to % COLUMNS, Math.floor(to / COLUMNS), assumeRepaired)) return null
   const queue = [from]
   const previous = new Map<number, number>([[from, -1]])
   for (let index = 0; index < queue.length && !previous.has(to); index += 1) {
@@ -141,7 +126,7 @@ function findPath(world: World, destination: Point): Point[] | null {
       const nextColumn = column + dx
       const nextRow = row + dy
       const next = nextRow * COLUMNS + nextColumn
-      if (previous.has(next) || !isWalkableCell(world, nextColumn, nextRow)) continue
+      if (previous.has(next) || !isWalkableCell(world, nextColumn, nextRow, assumeRepaired)) continue
       previous.set(next, current)
       queue.push(next)
     }
@@ -157,6 +142,15 @@ function findPath(world: World, destination: Point): Point[] | null {
   return path.reverse().filter((point, index) => index !== 0 || Math.hypot(point.x - world.player.x, point.y - world.player.y) > 0.01)
 }
 
+/** Stop in front of recipients instead of drawing the courier over their sprite. */
+function standingPoint(poi: Poi): Point {
+  return poi.kind === 'animal' ? { x: poi.x, y: poi.y + TILE_SIZE } : poi
+}
+
+function canReach(world: World, id: PoiId): boolean {
+  return findPath(world, standingPoint(getPois(world).find((poi) => poi.id === id)!)) !== null
+}
+
 export function targetPoint(world: World, x: number, y: number): boolean {
   if (world.completed || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= WORLD_WIDTH || y >= WORLD_HEIGHT) return false
   const nearby = getPois(world).filter((point) => Math.hypot(point.x - x, point.y - y) <= 18)
@@ -166,11 +160,10 @@ export function targetPoint(world: World, x: number, y: number): boolean {
     (point.kind === 'animal' || point.kind === 'post' || point.kind === 'apple' || point.kind === 'garden')
       && Math.abs(point.x - x) <= 24 && y >= point.y - 56 && y <= point.y,
   )
-  // Stop in front of recipients instead of drawing the courier over their sprite.
-  const destination = poi?.kind === 'animal' ? { x: poi.x, y: poi.y + TILE_SIZE } : poi ?? { x, y }
+  const destination = poi ? standingPoint(poi) : { x, y }
   const path = findPath(world, destination)
   if (path === null) {
-    world.message = !world.flags.bridgeRepaired && destination.x >= getMap(world).riverColumn * TILE_SIZE
+    world.message = !world.flags.bridgeRepaired && findPath(world, destination, true) !== null
       ? world.inventory.wood ? 'きのえだで はしを なおそう！' : 'まずは きのえだを ひろって はしを なおそう！'
       : 'くさの みちを タップしてね'
     return false
@@ -241,14 +234,18 @@ export function getObjective(world: World): { text: string; targetId: PoiId | nu
   const recipient = STAGES[world.stageIndex].deliveries.find((id) => !world.delivered.includes(id))
   if (!recipient) return { text: 'みんなに とどいた！', targetId: null }
   const item = REQUESTS[recipient]
+  const bridgeStep = () => world.inventory.wood
+    ? { text: 'きのえだで はしを なおそう', targetId: 'bridge' as const }
+    : { text: 'はしを なおす きのえだを ひろおう', targetId: 'wood' as const }
   if (!world.inventory[item]) {
+    const source = item === 'parcel' ? 'post' : item === 'carrot' ? 'garden' : 'apple'
+    // Some villages grow their fruit across the water: mend the bridge first.
+    if (!world.flags.bridgeRepaired && !canReach(world, source)) return bridgeStep()
     if (item === 'parcel') return { text: 'ゆうびんやさんで にもつを うけとろう', targetId: 'post' }
     if (item === 'carrot') return { text: world.flags.carrotWatered ? 'おおきな にんじんを ぬこう' : 'はたけに おみずを あげよう', targetId: 'garden' }
     return { text: 'まっかな りんごを とろう', targetId: 'apple' }
   }
-  if (!world.flags.bridgeRepaired) return world.inventory.wood
-    ? { text: 'きのえだで はしを なおそう', targetId: 'bridge' }
-    : { text: 'はしを なおす きのえだを ひろおう', targetId: 'wood' }
+  if (!world.flags.bridgeRepaired) return bridgeStep()
   return { text: `${getPois(world).find((poi) => poi.id === recipient)!.name}に ${ITEM_NAMES[item]}を とどけよう`, targetId: recipient }
 }
 
