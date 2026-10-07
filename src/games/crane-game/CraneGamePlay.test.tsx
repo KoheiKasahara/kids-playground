@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import CraneGamePlay from './CraneGamePlay'
+import { MAX_ZOOM } from './craneZoom'
 import type { CraneFeedback } from './useCraneGameEngine'
 
 type EngineOptions = Parameters<typeof import('./useCraneGameEngine').useCraneGameEngine>[0]
@@ -109,6 +110,18 @@ it('見る向きを まえ・よこに 切り替えられる', () => {
   click('よこから みる')
   expect(engine.options.view).toBe('side')
   expect(screen.getByRole('button', { name: 'よこから みる' })).toHaveAttribute('aria-pressed', 'true')
+})
+
+it('＋－ボタンで ちかづけたり もどしたり できる', () => {
+  start()
+  expect(engine.options.zoom).toBe(1)
+  expect(screen.getByRole('button', { name: 'とおざける' })).toBeDisabled()
+  click('ちかづける')
+  expect(engine.options.zoom).toBeGreaterThan(1)
+  click('とおざける')
+  expect(engine.options.zoom).toBe(1)
+  act(() => engine.options.onZoom(MAX_ZOOM))
+  expect(screen.getByRole('button', { name: 'ちかづける' })).toBeDisabled()
 })
 
 it('きかいボタンと もどるで、えらびなおしに戻れる', () => {

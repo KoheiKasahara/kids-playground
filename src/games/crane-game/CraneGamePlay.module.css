@@ -12,7 +12,7 @@
 .page button:focus-visible { outline: 4px solid #f3a82c; outline-offset: 3px; }
 .page button:disabled { opacity: 0.5; cursor: default; }
 .page button:active:not(:disabled) { transform: translateY(2px); }
-.header { height: 66px; flex: 0 0 66px; display: flex; align-items: center; gap: 6px; }
+.header { height: 58px; flex: 0 0 58px; display: flex; align-items: center; gap: 6px; }
 .header h1 { flex: 1; margin: 0; text-align: center; font-size: clamp(15px, 4.5vw, 22px); font-weight: 900; white-space: nowrap; }
 .soundButton { border: 0; border-radius: 16px; background: #fffdf8; width: 46px; height: 48px; flex: 0 0 46px; font-size: 23px !important; box-shadow: 0 2px 0 #dfcdd8; }
 .scene { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 22px; background: linear-gradient(#f7e3ee, #efdce6); touch-action: none; isolation: isolate; }
@@ -26,12 +26,14 @@
 .map { position: absolute; z-index: 2; right: 10px; top: 10px; width: 104px; border-radius: 16px; padding: 5px; background: #fffdf4e0; box-shadow: 0 3px 10px #6b466022; pointer-events: none; }
 .map svg { display: block; width: 100%; height: 66px; }
 .map span { display: block; text-align: center; font-size: 10px; font-weight: 800; white-space: nowrap; }
-.tray { position: absolute; z-index: 2; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 6px; border-radius: 18px; padding: 6px 12px; background: #fffdf4e8; box-shadow: 0 3px 10px #6b466022; pointer-events: none; max-width: calc(100% - 24px); }
+.tray { position: absolute; z-index: 2; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 6px; border-radius: 18px; padding: 6px 12px; background: #fffdf4e8; box-shadow: 0 3px 10px #6b466022; pointer-events: none; max-width: calc(100% - 82px); }
+.zoomPad { position: absolute; z-index: 3; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+.zoomPad button { width: 50px; height: 50px; border: 0; border-radius: 50%; background: #fffdf6ec; color: #8d3c62; font-size: 26px !important; font-weight: 900; line-height: 1; box-shadow: 0 3px 0 #dfcdd8, 0 3px 10px #6b466022; }
 .tray strong { font-size: 13px; color: var(--machine-color); white-space: nowrap; }
 .tray span { font-size: 17px; line-height: 1; overflow: hidden; }
-.panel { flex: 0 0 auto; display: grid; margin: 8px auto 0; width: 100%; max-width: 740px; }
-.selection, .controls { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; border-radius: 22px; background: #fffdf8; padding: 12px; box-shadow: 0 4px 14px #6b466014; }
-.selection[data-shown='false'], .controls[data-shown='false'] { visibility: hidden; }
+.panel { flex: 0 0 auto; display: grid; margin: 6px auto 0; width: 100%; max-width: 740px; }
+.selection, .controls { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; border-radius: 22px; background: #fffdf8; padding: 10px; box-shadow: 0 4px 14px #6b466014; }
+.selection[data-shown='false'], .controls[data-shown='false'] { display: none; }
 .selection h2 { font-size: 16px; text-align: center; margin: 0 0 9px; }
 .machines { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .machineButton { position: relative; display: flex; align-items: center; gap: 8px; padding: 9px 20px 9px 10px; text-align: left; background: #f6f1f4; border: 3px solid transparent; border-radius: 18px; color: #51404e; min-width: 0; }
@@ -44,20 +46,20 @@
 .beginButton { display: block; width: 100%; min-height: 58px; margin-top: 12px; border: 0; border-radius: 17px; background: #b3527e; color: white; font-size: 23px !important; font-weight: 900 !important; box-shadow: 0 4px 0 #8d3c62; letter-spacing: 0.07em; }
 .beginButton span { margin-right: 12px; font-size: 18px; }
 .axisRow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.axisButton { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 78px; background: #f2f6f5; border: 3px solid #cfdcd9; border-radius: 18px; box-shadow: 0 3px 0 #d7e1de; color: #43605f; }
-.axisButton > span { font-size: 26px; line-height: 1; }
+.axisButton { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 64px; background: #f2f6f5; border: 3px solid #cfdcd9; border-radius: 18px; box-shadow: 0 3px 0 #d7e1de; color: #43605f; }
+.axisButton > span { font-size: 24px; line-height: 1; }
 .axisButton strong { font-size: 19px; }
 .axisButton small { font-size: 10px; font-weight: 800; }
 .axisButton[data-active='true'] { background: #d8f0ea; border-color: #5aa99a; box-shadow: 0 0 0 3px #c3ebe0; color: #2f6b60; }
-.grabButton { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 74px; margin-top: 10px; border: 0; border-radius: 18px; background: var(--machine-color); color: white; box-shadow: 0 4px 0 color-mix(in srgb, var(--machine-color), black 25%); }
+.grabButton { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 62px; margin-top: 8px; border: 0; border-radius: 18px; background: var(--machine-color); color: white; box-shadow: 0 4px 0 color-mix(in srgb, var(--machine-color), black 25%); }
 .grabButton > span { font-size: 27px; line-height: 1; }
 .grabButton strong { font-size: 25px; font-weight: 900; letter-spacing: 0.06em; }
 .grabButton small { font-size: 11px; font-weight: 800; opacity: 0.92; }
-.tools { margin-top: 10px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
-.tools button { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-height: 53px; padding: 3px 1px; border: 2px solid #e6dfe3; border-radius: 13px; color: #5c4a57; background: #f7f3f5; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.tools { margin-top: 8px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.tools button { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-height: 48px; padding: 3px 1px; border: 2px solid #e6dfe3; border-radius: 13px; color: #5c4a57; background: #f7f3f5; font-size: 10px; font-weight: 800; white-space: nowrap; }
 .tools button span { font-size: 20px; line-height: 1; }
 .tools button[aria-pressed='true'] { border-color: #b3527e; color: #8d3c62; background: #fbe9f1; }
-.hint { display: flex; justify-content: center; flex-wrap: wrap; gap: 3px 10px; font-size: 10px; font-weight: 700; margin: 9px 0 0; color: #7a6472; }
+.hint { display: flex; justify-content: center; flex-wrap: wrap; gap: 3px 10px; font-size: 10px; font-weight: 700; margin: 6px 0 0; color: #7a6472; }
 .hint span { font-weight: 800; color: var(--machine-color); }
 @keyframes breathe { to { opacity: 0.35; } }
 @media (min-width: 700px) and (orientation: portrait) {
@@ -70,17 +72,19 @@
   .header h1 { font-size: 14px; }
   .soundButton { flex-basis: 40px; width: 40px; }
   .selection, .controls { padding: 9px; }
-  .axisButton { min-height: 70px; }
+  .axisButton { min-height: 58px; }
   .axisButton strong { font-size: 17px; }
+  .grabButton { min-height: 56px; }
   .grabButton strong { font-size: 22px; }
   .machineButton strong { font-size: 11px; }
   .machineButton small { font-size: 9px; }
   .map { width: 88px; }
   .map svg { height: 56px; }
+  .zoomPad button { width: 44px; height: 44px; font-size: 22px !important; }
 }
 @media (orientation: landscape) and (min-width: 600px) {
-  .page { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: 60px minmax(0, 1fr); gap: 0 8px; }
-  .header { grid-column: 1 / -1; height: 60px; }
+  .page { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: 56px minmax(0, 1fr); gap: 0 8px; }
+  .header { grid-column: 1 / -1; height: 56px; }
   .header h1 { text-align: left; margin-left: 10px; font-size: 19px; }
   .scene { grid-column: 1; height: 100%; }
   .panel { grid-column: 2; grid-row: 2; margin: 0; align-self: center; max-height: 100%; min-height: 0; overflow-y: auto; }
@@ -90,8 +94,8 @@
   .machineEmoji { font-size: 28px; }
   .machineButton strong { font-size: 11px; }
   .machineButton small { display: none; }
-  .axisButton { min-height: 70px; }
-  .grabButton { min-height: 68px; }
+  .axisButton { min-height: 62px; }
+  .grabButton { min-height: 60px; }
   .tools { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
   .tools button { font-size: 9px; }
   .map { width: 90px; }

@@ -10,12 +10,15 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { BIN, CHUTE, prizeReach, type CraneMachine, type PrizeLook, type PrizeSpecies } from './craneMachines'
 import { CLAW } from './craneRig'
+import { clampZoom, MAX_ZOOM } from './craneZoom'
 import type { FingerView, PrizeView } from './craneWorld'
 
 export type CraneView = 'front' | 'side'
 /** タップした場所を拾う高さ。景品の山のてっぺんあたり。 */
 export const PICK_Y = 0.12
 const GANTRY_Y = 0.88
+/** 寄ったときに見る高さ。景品の山とアームの両方が入る。 */
+const ZOOM_FOCUS_Y = 0.4
 const MARQUEE_Y = 1.0
 /** 看板の まんなかの高さ。天井の前へ 出して 文字が かくれないようにする。 */
 const SIGN_Y = MARQUEE_Y + 0.07
@@ -1346,22 +1349,42 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
   ))
   const projected = new THREE.Vector3()
 
+  /** カメラが筐体ぜんたいを収めるために下がった距離。ズームはここから寄せる。 */
+  let fitDistance = 3
+  let zoom = 1
+  const aim = new THREE.Vector3()
+  const follow = new THREE.Vector3(0, ZOOM_FOCUS_Y, 0)
+
   /**
    * 画面の形がどうであれ機械が丸ごと入る位置までカメラを下げる。
    * 縦横比ごとの式を書き分けず、筐体の8隅が画面に収まるまで距離を広げて決める。
    */
-  function applyCamera() {
+  function fitCamera() {
     const fit = FIT[view]
-    target.copy(fit.target)
-    for (let distance = 1.8; distance <= 6; distance += 0.06) {
-      camera.position.copy(fit.target).addScaledVector(fit.direction, distance)
-      camera.lookAt(target)
+    for (fitDistance = 1.8; fitDistance <= 6; fitDistance += 0.06) {
+      camera.position.copy(fit.target).addScaledVector(fit.direction, fitDistance)
+      camera.lookAt(fit.target)
       camera.updateMatrixWorld()
       if (corners.every(corner => {
         projected.copy(corner).project(camera)
         return Math.abs(projected.x) < 0.98 && Math.abs(projected.y) < 0.98 && projected.z < 1
-      })) return
+      })) break
     }
+    placeCamera(1)
+  }
+
+  /**
+   * ズームに合わせてカメラを置く。寄るほど、見る先を筐体の中心からアームのほうへずらす。
+   * blend は今の見る先から目標へ近づける割合（1で即座に合わせる）。
+   */
+  function placeCamera(blend: number) {
+    const fit = FIT[view]
+    const closeness = (zoom - 1) / (MAX_ZOOM - 1)
+    aim.copy(fit.target).lerp(follow, closeness)
+    target.lerp(aim, blend)
+    camera.position.copy(target).addScaledVector(fit.direction, fitDistance / zoom)
+    camera.lookAt(target)
+    camera.updateMatrixWorld()
   }
 
   function resize() {
@@ -1372,7 +1395,7 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
     camera.updateProjectionMatrix()
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7))
     renderer.setSize(width, height, false)
-    applyCamera()
+    fitCamera()
   }
   resize()
 
@@ -1387,7 +1410,13 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
     get view() { return view },
     setView(next: CraneView) {
       view = next
-      applyCamera()
+      fitCamera()
+    },
+    get zoom() { return zoom },
+    /** 1でぜんたい、MAX_ZOOMまで寄る。 */
+    setZoom(next: number) {
+      zoom = clampZoom(next)
+      placeCamera(1)
     },
     resize,
     /** 画面をタップした場所を、ケースの中の座標へ変換する。 */
@@ -1419,6 +1448,8 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
       beam.position.set(position.x, PICK_Y + drop / 2, position.z)
       beam.scale.y = drop
       ring.position.set(position.x, 0.012, position.z)
+      // 寄っているときに見る先。左右と奥はアームについていき、高さはケースの中ほどに保つ。
+      follow.set(position.x * 0.75, ZOOM_FOCUS_Y, position.z * 0.5)
     },
     syncPrizes(prizes: readonly PrizeView[]) {
       for (const [id, entry] of prizeMeshes) {
@@ -1499,6 +1530,7 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
         lamp.intensity = 1.55 + Math.sin(twinkle * 2) * 0.12
         updateAmbient(twinkle)
       }
+      if (zoom > 1) placeCamera(reducedMotion ? 1 : 1 - Math.exp(-dt * 6))
       renderer.render(scene, camera)
     },
     stats() {

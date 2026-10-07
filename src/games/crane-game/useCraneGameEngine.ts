@@ -22,6 +22,7 @@ import {
   type RigPhase,
 } from './craneRig'
 import { createCraneScene, type CraneScene, type CraneView } from './craneScene'
+import { clampZoom } from './craneZoom'
 import { createCraneWorld, type CraneEvent, type CraneWorld } from './craneWorld'
 
 export type CraneStatus = 'loading' | 'ready' | 'error'
@@ -41,11 +42,15 @@ type Options = {
   /** 並べ直した回数。変わると景品を並べ直す。 */
   round: number
   view: CraneView
+  /** カメラの寄り具合。1でぜんたい。 */
+  zoom: number
   reducedMotion: boolean
   onStatus: (status: CraneStatus) => void
   onFeedback: (feedback: CraneFeedback) => void
   onEvent: (event: CraneEvent) => void
   onAction: (action: CraneAction) => void
+  /** ピンチやホイールで寄り具合が変わったとき。 */
+  onZoom: (zoom: number) => void
 }
 
 const STEP = 1 / 120
@@ -86,6 +91,11 @@ export function useCraneGameEngine(options: Options) {
     const rt = runtime.current
     rt?.scene.setView(options.view)
   }, [options.view])
+
+  useEffect(() => {
+    const rt = runtime.current
+    rt?.scene.setZoom(options.zoom)
+  }, [options.zoom])
 
   useEffect(() => {
     if (!container) return
@@ -185,11 +195,43 @@ export function useCraneGameEngine(options: Options) {
     function contextRestored() { if (!released) setGeneration(value => value + 1) }
 
     let press: { x: number; y: number; time: number; id: number } | null = null
+    // 画面に触れている指。2本になったらピンチで寄り具合を変える。
+    const touches = new Map<number, { x: number; y: number }>()
+    let pinch: { distance: number; zoom: number } | null = null
+    function spread() {
+      const [a, b] = [...touches.values()]
+      return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0
+    }
+    function zoomTo(next: number) {
+      if (!scene) return
+      scene.setZoom(clampZoom(next))
+      latest.current.onZoom(scene.zoom)
+    }
     function pointerDown(event: PointerEvent) {
       if (event.button !== 0) return
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (touches.size === 2 && scene) {
+        // 2本目の指が来たら、タップではなくピンチとして扱う。
+        press = null
+        pinch = { distance: spread(), zoom: scene.zoom }
+        return
+      }
+      if (touches.size > 2) return
       press = { x: event.clientX, y: event.clientY, time: performance.now(), id: event.pointerId }
     }
+    function pointerMove(event: PointerEvent) {
+      if (!touches.has(event.pointerId)) return
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (pinch && touches.size === 2 && pinch.distance > 0) zoomTo(pinch.zoom * (spread() / pinch.distance))
+    }
+    function wheel(event: WheelEvent) {
+      if (!scene) return
+      event.preventDefault()
+      zoomTo(scene.zoom * Math.exp(-event.deltaY * 0.0015))
+    }
     function pointerUp(event: PointerEvent) {
+      touches.delete(event.pointerId)
+      if (touches.size < 2) pinch = null
       const start = press
       press = null
       if (!start || start.id !== event.pointerId || !scene) return
@@ -210,9 +252,12 @@ export function useCraneGameEngine(options: Options) {
     try {
       scene = createCraneScene(host, machine)
       scene.setView(latest.current.view)
+      scene.setZoom(latest.current.zoom)
       scene.renderer.domElement.addEventListener('webglcontextlost', contextLost)
       scene.renderer.domElement.addEventListener('webglcontextrestored', contextRestored)
       scene.renderer.domElement.addEventListener('pointerdown', pointerDown)
+      scene.renderer.domElement.addEventListener('pointermove', pointerMove)
+      scene.renderer.domElement.addEventListener('wheel', wheel, { passive: false })
     } catch {
       queueMicrotask(() => { if (!released) latest.current.onStatus('error') })
       return () => { released = true }
@@ -243,6 +288,8 @@ export function useCraneGameEngine(options: Options) {
       scene?.renderer.domElement.removeEventListener('webglcontextlost', contextLost)
       scene?.renderer.domElement.removeEventListener('webglcontextrestored', contextRestored)
       scene?.renderer.domElement.removeEventListener('pointerdown', pointerDown)
+      scene?.renderer.domElement.removeEventListener('pointermove', pointerMove)
+      scene?.renderer.domElement.removeEventListener('wheel', wheel)
       world?.dispose()
       scene?.dispose()
       runtime.current = null

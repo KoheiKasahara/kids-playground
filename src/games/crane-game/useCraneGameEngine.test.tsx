@@ -22,11 +22,13 @@ beforeEach(() => {
   mocks.createScene.mockReset().mockImplementation((host: HTMLDivElement) => {
     const canvas = document.createElement('canvas')
     host.appendChild(canvas)
-    return {
+    const scene = {
       renderer: { domElement: canvas },
       camera: {},
       view: 'front',
       setView: vi.fn(),
+      zoom: 1,
+      setZoom: vi.fn((value: number) => { scene.zoom = value }),
       resize: vi.fn(),
       pick: vi.fn(() => ({ x: 0.2, z: -0.1 })),
       syncClaw: vi.fn(),
@@ -37,6 +39,7 @@ beforeEach(() => {
       stats: () => ({ calls: 42, triangles: 1000 }),
       dispose: vi.fn(() => canvas.remove()),
     }
+    return scene
   })
   mocks.createWorld.mockReset().mockImplementation(() => ({
     ready: true,
@@ -62,21 +65,24 @@ type Harness = {
   feedback: CraneFeedback[]
   actions: CraneAction[]
   status: string[]
-  rerenderWith: (options: { round?: number; view?: 'front' | 'side' }) => void
+  zooms: number[]
+  rerenderWith: (options: { round?: number; view?: 'front' | 'side'; zoom?: number }) => void
 }
 
 function setup(): Harness {
-  const harness = { feedback: [] as CraneFeedback[], actions: [] as CraneAction[], status: [] as string[] } as Harness
-  function Screen({ round = 0, view = 'front' as 'front' | 'side' }) {
+  const harness = { feedback: [] as CraneFeedback[], actions: [] as CraneAction[], status: [] as string[], zooms: [] as number[] } as Harness
+  function Screen({ round = 0, view = 'front' as 'front' | 'side', zoom = 1 }) {
     const engine = useCraneGameEngine({
       machine: CRANE_MACHINES[0]!,
       round,
       view,
+      zoom,
       reducedMotion: false,
       onStatus: status => harness.status.push(status),
       onFeedback: feedback => harness.feedback.push(feedback),
       onEvent: () => {},
       onAction: action => harness.actions.push(action),
+      onZoom: value => harness.zooms.push(value),
     })
     harness.engine = engine
     return <div data-testid="host" ref={element => { harness.host = element as HTMLDivElement; engine.registerContainer(element) }} />
@@ -176,6 +182,44 @@ it('ならべ直しと見る向きの切り替えを世界と見た目へ伝え�
   expect(world.refill).toHaveBeenCalledWith(1)
   app.rerenderWith({ round: 1, view: 'side' })
   expect(scene.setView).toHaveBeenCalledWith('side')
+})
+
+it('ズームの倍率を見た目へ伝える', async () => {
+  const app = setup()
+  await waitFor(() => expect(app.status).toContain('ready'))
+  const scene = mocks.createScene.mock.results[0]!.value
+  expect(scene.setZoom).toHaveBeenCalledWith(1)
+  app.rerenderWith({ zoom: 1.7 })
+  expect(scene.setZoom).toHaveBeenLastCalledWith(1.7)
+})
+
+const pointer = (type: string, pointerId: number, clientX: number, clientY: number) =>
+  Object.assign(new Event(type, { bubbles: true }), { pointerId, button: 0, clientX, clientY })
+
+it('2本ゆびで広げると寄り、タップとしては扱わない', async () => {
+  const app = setup()
+  await waitFor(() => expect(app.status).toContain('ready'))
+  const scene = mocks.createScene.mock.results[0]!.value
+  const canvas = document.querySelector('canvas')!
+  act(() => {
+    canvas.dispatchEvent(pointer('pointerdown', 1, 100, 100))
+    canvas.dispatchEvent(pointer('pointerdown', 2, 140, 100))
+    canvas.dispatchEvent(pointer('pointermove', 2, 180, 100))
+    window.dispatchEvent(pointer('pointerup', 2, 180, 100))
+    window.dispatchEvent(pointer('pointerup', 1, 100, 100))
+  })
+  expect(app.zooms.at(-1)).toBeCloseTo(2, 5)
+  expect(scene.pick).not.toHaveBeenCalled()
+})
+
+it('ホイールで寄ったり離れたりでき、倍率は範囲に収まる', async () => {
+  const app = setup()
+  await waitFor(() => expect(app.status).toContain('ready'))
+  const canvas = document.querySelector('canvas')!
+  act(() => { canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: -200, cancelable: true })) })
+  expect(app.zooms.at(-1)).toBeGreaterThan(1)
+  act(() => { canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: 5000, cancelable: true })) })
+  expect(app.zooms.at(-1)).toBe(1)
 })
 
 it('読み込みに失敗しても、もういちどで作り直せる', async () => {
