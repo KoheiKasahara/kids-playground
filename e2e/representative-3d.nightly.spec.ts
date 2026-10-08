@@ -64,15 +64,19 @@ test('つくった車を走らせ、つくりかえ画面へ戻って入り直�
   expect(errors).toEqual([])
 })
 
-test('クレーンゲームでアームを動かして一巡し、描画予算を守る [crane-game]', async ({ page }) => {
+// 同一runnerの診断では、trace有効時にDOM操作の待ち時間が増えていた。
+// この2件だけtraceを止める。時計・物理・90秒/30秒枠は変えず、失敗時PNGは残す。
+const craneTest = test.extend({ trace: 'off' })
+
+craneTest('クレーンゲームでアームを動かして一巡し、描画予算を守る [crane-game]', async ({ page }) => {
   test.setTimeout(90_000)
   const errors = capturePageErrors(page)
   await page.goto('/')
   await page.getByRole('link', { name: 'クレーンゲーム', exact: true }).click()
   const begin = page.getByRole('button', { name: 'あそぶ！', exact: true })
-  // WebGLとRapierの初期化を示す実際のready状態を待つ。景品が取れたかどうかには依存しない。
-  await expect(begin).toBeEnabled({ timeout: 20_000 })
   await page.getByRole('button', { name: 'カプセルの きかいを えらぶ', exact: true }).click()
+  // 遊ばない初期台を待たず、選んだ台のWebGLとRapierのready状態を待つ。
+  await expect(begin).toBeEnabled({ timeout: 20_000 })
   await begin.click()
   const scene = page.getByTestId('crane-scene')
   await expect.poll(() => scene.getAttribute('data-ready'), { timeout: 20_000 }).toBe('true')
@@ -86,14 +90,50 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   await expect.poll(() => scene.getAttribute('data-phase'), { timeout: 30_000 }).toBe('idle')
   expect(Number(await scene.getAttribute('data-claw-x'))).toBeCloseTo(-0.46, 2)
   await page.getByRole('button', { name: 'よこから みる', exact: true }).click()
-  await expect(scene).toHaveAttribute('data-view', 'side')
-  await expect(page.locator('canvas')).toHaveCount(1)
-  expect(Number(await scene.getAttribute('data-draw-calls'))).toBeLessThan(90)
-  expect(Number(await scene.getAttribute('data-triangles'))).toBeLessThan(120_000)
+  // view公開と描画は別周期。2回のside公開を待ち、間に実描画があったことを保証する。
+  // publishは100ms超、描画は20ms以上の間隔で、描画→公開の順に動く。
+  const renderBudget = await scene.evaluate(element => new Promise<{
+    view: string | null
+    canvasCount: number
+    calls: string | null
+    triangles: string | null
+  }>((resolve, reject) => {
+    let sidePublications = 0
+    const observer = new MutationObserver(records => {
+      if (!records.some(record => record.attributeName === 'data-view')) return
+      if (element.getAttribute('data-view') !== 'side') { sidePublications = 0; return }
+      if (++sidePublications < 2) return
+      observer.disconnect()
+      clearTimeout(deadline)
+      resolve({
+        view: element.getAttribute('data-view'),
+        canvasCount: document.querySelectorAll('canvas').length,
+        calls: element.getAttribute('data-draw-calls'),
+        triangles: element.getAttribute('data-triangles'),
+      })
+    })
+    const deadline = setTimeout(() => {
+      observer.disconnect()
+      reject(new Error('横視点の新しい描画統計が20秒以内に公開されませんでした'))
+    }, 20_000)
+    observer.observe(element, { attributes: true, attributeFilter: ['data-view'] })
+  }))
+  expect(renderBudget.view).toBe('side')
+  expect(renderBudget.canvasCount).toBe(1)
+  expect(renderBudget.calls).not.toBeNull()
+  expect(renderBudget.triangles).not.toBeNull()
+  const calls = Number(renderBudget.calls)
+  const triangles = Number(renderBudget.triangles)
+  expect(Number.isFinite(calls)).toBe(true)
+  expect(Number.isFinite(triangles)).toBe(true)
+  expect(calls).toBeGreaterThan(0)
+  expect(triangles).toBeGreaterThan(0)
+  expect(calls).toBeLessThan(90)
+  expect(triangles).toBeLessThan(120_000)
   expect(errors).toEqual([])
 })
 
-test('クレーンゲームを実際の戻る操作で退出し、同じページで再入場できる [crane-game]', async ({ page }) => {
+craneTest('クレーンゲームを実際の戻る操作で退出し、同じページで再入場できる [crane-game]', async ({ page }) => {
   // 長いアームの一巡・描画予算とは別の時間枠で、WebGLのcleanupと再初期化を確認する。
   // page.goto/reloadで分断するとリークを見逃すため、ホームへの退出から再入場まで同じpageを使う。
   test.setTimeout(90_000)
@@ -106,7 +146,6 @@ test('クレーンゲームを実際の戻る操作で退出し、同じペー�
   const move = page.getByRole('button', { name: 'よこに うごかす', exact: true })
 
   await gameLink.click()
-  await expect(begin).toBeEnabled({ timeout: 20_000 })
   await page.getByRole('button', { name: 'カプセルの きかいを えらぶ', exact: true }).click()
   await expect(begin).toBeEnabled({ timeout: 20_000 })
   await begin.click()

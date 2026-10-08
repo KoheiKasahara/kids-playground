@@ -49,13 +49,16 @@ test('three trains, both point controls, temporary boost, pause and cameras work
   await expect(page.getByRole('complementary')).toHaveAccessibleName('コースマップ。つぎは まち')
   await page.getByRole('button', { name: 'コースの ポイントを きりかえる', exact: true }).click()
   await expect(page.getByRole('complementary')).toHaveAccessibleName('コースマップ。つぎは はし')
+  await page.clock.pauseAt(new Date('2026-01-01T02:00:00Z'))
   await page.getByRole('button', { name: 'とまる', exact: true }).click()
   await expect(page.getByRole('button', { name: 'はしる', exact: true })).toBeVisible()
-  // Allow one queued animation callback before observing the paused distance.
-  await page.waitForTimeout(250)
+  // Distance is published after 120 ms of capped animation time, not wall time.
+  // Deliver the real queued frames before sampling, then keep checking it stays stopped.
+  await page.clock.runFor(250)
   const stopped = await scene.getAttribute('data-distance')
-  await page.waitForTimeout(450)
+  await page.clock.runFor(450)
   expect(await scene.getAttribute('data-distance')).toBe(stopped)
+  await page.clock.resume()
   await page.getByRole('button', { name: 'ふえを ならす', exact: true }).click()
   await page.screenshot({ path: 'test-results/train-journey-portrait.png' })
   for (const viewport of [{ width: 844, height: 390 }, { width: 667, height: 375 }, { width: 320, height: 568 }]) {
