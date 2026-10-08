@@ -29,6 +29,7 @@ import { playGlobeZoomSound } from '../../games/earth-globe/sounds'
 import { playDeliverySound } from '../../games/forest-delivery/sounds'
 import * as hoshi from '../../games/hoshi-tsunagi/sounds'
 import * as jishaku from '../../games/jishaku-pitatto/sounds'
+import * as rokuro from '../../games/kurukuru-rokuro/sounds'
 import * as sandbox from '../../games/magic-sandbox/sounds'
 import * as marble from '../../games/marble-course/sounds'
 import * as mato from '../../games/mato-ate/sounds'
@@ -339,6 +340,15 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('かった', dotMonsterFarm.playWin),
     background('ぼくじょうの BGM', 3, () => dotMonsterFarm.startBgm('ranch')),
     background('たいかいの BGM', 3, () => dotMonsterFarm.startBgm('battle')),
+  ],
+  'kurukuru-rokuro': [
+    sample('ねんどを おす', () => rokuro.playSculptSound(true)),
+    sample('のばす', () => rokuro.playStretchSound(1)),
+    sample('うわぐすり', rokuro.playDipSound),
+    sample('ふで', rokuro.playPaintSound),
+    sample('かま', rokuro.playKilnSound),
+    sample('やきあがり', () => rokuro.playDoneSound(3)),
+    sample('たなに かざる', rokuro.playShelfSound),
   ],
   'onaji-pon': [sample('つなぐ', () => onaji.playConnectSound(1)), sample('ひく', onaji.playDrawSound), sample('だめ', onaji.playNopeSound), sample('クリア', onaji.playClearSound)],
 }

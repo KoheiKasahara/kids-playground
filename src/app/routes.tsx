@@ -97,6 +97,8 @@ export const routes: RouteObject[] = [
   { path: '/games/pixel-kart', element: lazyRoute(() => import('../games/pixel-kart/PixelKartPlay')) },
   // タイトル・マップ・おはなし・プレイが同一route内で切り替わるため、プレイ面はゲーム内で包む。
   { path: '/games/dot-bomb', element: lazyRoute(() => import('../games/dot-bomb/DotBombPlay')) },
+  // メニュー・かたち・いろ・やく・できあがりが同一route内で切り替わるため、プレイ面はゲーム内で包む。
+  { path: '/games/kurukuru-rokuro', element: lazyRoute(() => import('../games/kurukuru-rokuro/KurukuruRokuroPlay')) },
   // タイトル・プレイ画面が同一route内で切り替わるため、プレイ面はゲーム内で包む。
   { path: '/games/tsumiki-3d', element: lazyRoute(() => import('../games/tsumiki-3d/Tsumiki3dPlay')) },
   { path: '/', element: <Home /> },

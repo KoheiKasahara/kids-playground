@@ -1107,6 +1107,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'kurukuru-rokuro',
+    slug: 'kurukuru-rokuro',
+    title: 'くるくる ろくろ',
+    emoji: '🏺',
+    category: 'threeD',
+    seo: {
+      headline: 'くるくる ろくろ｜まわる ねんどを ゆびで おして うつわを つくる 3Dとうげい',
+      description:
+        'まわる ろくろの ねんどを ゆびで おして、コップや おちゃわん・はないれを つくる 3Dの とうげいあそび。うわぐすりと ふでで いろを ぬり、かまで やくと つやつやに。おだいの かたちに にせて ★も あつめられます。',
+    },
+    intro: {
+      howToPlay: [
+        'ねんどを ゆびで おそう。うちへ ほそく、そとへ ふとく なるよ',
+        'ふでを あてると くるっと せんが かけるよ',
+        'かまで やいたら できあがり！ たなに かざろう',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

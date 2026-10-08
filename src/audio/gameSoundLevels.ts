@@ -34,6 +34,7 @@ export const GAME_SOUND_LEVEL_DB: Readonly<Record<string, number>> = {
   'hoshi-tsunagi': 2.5,
   'jishaku-pitatto': 7.5,
   'koma-battle': 2.5,
+  'kurukuru-rokuro': 4,
   'magic-sandbox': 8,
   'mato-ate': 7.5,
   'oekaki-korokoro': 8.5,
