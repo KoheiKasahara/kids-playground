@@ -39,6 +39,7 @@ const SELF_MANAGED_GAME_BACK_PATHS = new Set([
   '/games/flag-roll-puzzle',
   '/games/hoshi-tsunagi',
   '/games/koma-battle',
+  '/games/kurukuru-rokuro',
   '/games/magic-sandbox',
   '/games/marble-course',
   '/games/mato-ate',
