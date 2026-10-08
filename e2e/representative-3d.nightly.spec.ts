@@ -64,10 +64,13 @@ test('つくった車を走らせ、つくりかえ画面へ戻って入り直�
   expect(errors).toEqual([])
 })
 
-test('クレーンゲームでアームを動かして一巡し、描画予算を守る [crane-game]', async ({ page }) => {
+// 同一runnerの診断では、trace有効時にDOM操作の待ち時間が増えていた。
+// この2件だけtraceを止める。時計・物理・90秒/30秒枠は変えず、失敗時PNGは残す。
+const craneTest = test.extend({ trace: 'off' })
+
+craneTest('クレーンゲームでアームを動かして一巡し、描画予算を守る [crane-game]', async ({ page }) => {
   test.setTimeout(90_000)
   const errors = capturePageErrors(page)
-  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
   await page.goto('/')
   await page.getByRole('link', { name: 'クレーンゲーム', exact: true }).click()
   const begin = page.getByRole('button', { name: 'あそぶ！', exact: true })
@@ -77,34 +80,46 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   await begin.click()
   const scene = page.getByTestId('crane-scene')
   await expect.poll(() => scene.getAttribute('data-ready'), { timeout: 20_000 }).toBe('true')
-  // 操作・読み取り中の背景描画は止め、移動・視点の観測時に実RAFを進める。
-  // 一巡そのものは下で実時間に戻し、物理・描画を通して確認する。
-  await page.clock.pauseAt(new Date('2026-01-01T01:00:00Z'))
-  const readAfterFrames = async (attribute: string) => {
-    await page.clock.runFor(100)
-    return scene.getAttribute(attribute)
-  }
   const parked = await scene.getAttribute('data-claw-x')
   await page.getByRole('button', { name: 'よこに うごかす', exact: true }).click()
-  await expect.poll(() => readAfterFrames('data-claw-x'), { intervals: [0] }).not.toBe(parked)
+  await expect.poll(() => scene.getAttribute('data-claw-x')).not.toBe(parked)
   await page.getByRole('button', { name: 'よこに うごくのを とめる', exact: true }).click()
   await page.getByRole('button', { name: 'つかむ', exact: true }).click()
-  // 一巡は元の実時間の30秒枠で確認する。runForで高頻度の描画を追加しない。
-  await page.clock.resume()
   await expect.poll(() => scene.getAttribute('data-phase')).not.toBe('idle')
   // 降ろす・つかむ・運ぶ・放すまで一巡し、穴の上へ戻ってくる。
   await expect.poll(() => scene.getAttribute('data-phase'), { timeout: 30_000 }).toBe('idle')
-  await page.clock.pauseAt(new Date('2026-01-01T02:00:00Z'))
   expect(Number(await scene.getAttribute('data-claw-x'))).toBeCloseTo(-0.46, 2)
   await page.getByRole('button', { name: 'よこから みる', exact: true }).click()
-  await expect.poll(() => readAfterFrames('data-view'), { intervals: [0] }).toBe('side')
-  // viewの変更と描画統計の公開は別周期。横向きの実描画と、その後の公開まで進める。
-  await page.clock.runFor(150)
-  await expect(page.locator('canvas')).toHaveCount(1)
-  const renderBudget = await scene.evaluate(element => ({
-    calls: element.getAttribute('data-draw-calls'),
-    triangles: element.getAttribute('data-triangles'),
+  // view公開と描画は別周期。2回のside公開を待ち、間に実描画があったことを保証する。
+  // publishは100ms超、描画は20ms以上の間隔で、描画→公開の順に動く。
+  const renderBudget = await scene.evaluate(element => new Promise<{
+    view: string | null
+    canvasCount: number
+    calls: string | null
+    triangles: string | null
+  }>((resolve, reject) => {
+    let sidePublications = 0
+    const observer = new MutationObserver(records => {
+      if (!records.some(record => record.attributeName === 'data-view')) return
+      if (element.getAttribute('data-view') !== 'side') { sidePublications = 0; return }
+      if (++sidePublications < 2) return
+      observer.disconnect()
+      clearTimeout(deadline)
+      resolve({
+        view: element.getAttribute('data-view'),
+        canvasCount: document.querySelectorAll('canvas').length,
+        calls: element.getAttribute('data-draw-calls'),
+        triangles: element.getAttribute('data-triangles'),
+      })
+    })
+    const deadline = setTimeout(() => {
+      observer.disconnect()
+      reject(new Error('横視点の新しい描画統計が20秒以内に公開されませんでした'))
+    }, 20_000)
+    observer.observe(element, { attributes: true, attributeFilter: ['data-view'] })
   }))
+  expect(renderBudget.view).toBe('side')
+  expect(renderBudget.canvasCount).toBe(1)
   expect(renderBudget.calls).not.toBeNull()
   expect(renderBudget.triangles).not.toBeNull()
   const calls = Number(renderBudget.calls)
@@ -115,11 +130,10 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   expect(triangles).toBeGreaterThan(0)
   expect(calls).toBeLessThan(90)
   expect(triangles).toBeLessThan(120_000)
-  await page.clock.resume()
   expect(errors).toEqual([])
 })
 
-test('クレーンゲームを実際の戻る操作で退出し、同じページで再入場できる [crane-game]', async ({ page }) => {
+craneTest('クレーンゲームを実際の戻る操作で退出し、同じページで再入場できる [crane-game]', async ({ page }) => {
   // 長いアームの一巡・描画予算とは別の時間枠で、WebGLのcleanupと再初期化を確認する。
   // page.goto/reloadで分断するとリークを見逃すため、ホームへの退出から再入場まで同じpageを使う。
   test.setTimeout(90_000)
