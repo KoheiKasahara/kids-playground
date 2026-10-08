@@ -70,9 +70,9 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   await page.goto('/')
   await page.getByRole('link', { name: 'クレーンゲーム', exact: true }).click()
   const begin = page.getByRole('button', { name: 'あそぶ！', exact: true })
-  // WebGLとRapierの初期化を示す実際のready状態を待つ。景品が取れたかどうかには依存しない。
-  await expect(begin).toBeEnabled({ timeout: 20_000 })
   await page.getByRole('button', { name: 'カプセルの きかいを えらぶ', exact: true }).click()
+  // 遊ばない初期台を待たず、選んだ台のWebGLとRapierのready状態を待つ。
+  await expect(begin).toBeEnabled({ timeout: 20_000 })
   await begin.click()
   const scene = page.getByTestId('crane-scene')
   await expect.poll(() => scene.getAttribute('data-ready'), { timeout: 20_000 }).toBe('true')
@@ -88,8 +88,12 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   await page.getByRole('button', { name: 'よこから みる', exact: true }).click()
   await expect(scene).toHaveAttribute('data-view', 'side')
   await expect(page.locator('canvas')).toHaveCount(1)
-  expect(Number(await scene.getAttribute('data-draw-calls'))).toBeLessThan(90)
-  expect(Number(await scene.getAttribute('data-triangles'))).toBeLessThan(120_000)
+  const renderBudget = await scene.evaluate(element => ({
+    calls: Number(element.getAttribute('data-draw-calls')),
+    triangles: Number(element.getAttribute('data-triangles')),
+  }))
+  expect(renderBudget.calls).toBeLessThan(90)
+  expect(renderBudget.triangles).toBeLessThan(120_000)
   expect(errors).toEqual([])
 })
 
@@ -106,7 +110,6 @@ test('クレーンゲームを実際の戻る操作で退出し、同じペー�
   const move = page.getByRole('button', { name: 'よこに うごかす', exact: true })
 
   await gameLink.click()
-  await expect(begin).toBeEnabled({ timeout: 20_000 })
   await page.getByRole('button', { name: 'カプセルの きかいを えらぶ', exact: true }).click()
   await expect(begin).toBeEnabled({ timeout: 20_000 })
   await begin.click()

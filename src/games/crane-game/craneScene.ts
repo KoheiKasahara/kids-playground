@@ -11,7 +11,6 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 import { BIN, CHUTE, prizeReach, type CraneMachine, type PrizeLook, type PrizeSpecies } from './craneMachines'
 import { CLAW } from './craneRig'
 import { clampZoom, MAX_ZOOM } from './craneZoom'
-import { resizeCraneShadowMap } from './craneRenderBudget'
 import type { FingerView, PrizeView } from './craneWorld'
 
 export type CraneView = 'front' | 'side'
@@ -893,6 +892,7 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
   const sun = new THREE.DirectionalLight('#fff4e2', 2.2)
   sun.position.set(-1.3, 3.2, 2.1)
   sun.castShadow = true
+  sun.shadow.mapSize.set(2048, 2048)
   Object.assign(sun.shadow.camera, { left: -1.2, right: 1.2, top: 1.4, bottom: -1.2, near: 0.6, far: 6.5 })
   sun.shadow.camera.updateProjectionMatrix()
   sun.shadow.normalBias = 0.015
@@ -1390,7 +1390,6 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
   function resize() {
     const width = Math.max(1, container.clientWidth)
     const height = Math.max(1, container.clientHeight)
-    resizeCraneShadowMap(sun.shadow, width, height)
     aspect = width / height
     camera.aspect = aspect
     camera.updateProjectionMatrix()
