@@ -95,13 +95,23 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   expect(Number(await scene.getAttribute('data-claw-x'))).toBeCloseTo(-0.46, 2)
   await page.getByRole('button', { name: 'よこから みる', exact: true }).click()
   await expect.poll(() => readAfterFrames('data-view'), { intervals: [0] }).toBe('side')
+  // viewの変更と描画統計の公開は別周期。横向きの実描画と、その後の公開まで進める。
+  await page.clock.runFor(150)
   await expect(page.locator('canvas')).toHaveCount(1)
   const renderBudget = await scene.evaluate(element => ({
-    calls: Number(element.getAttribute('data-draw-calls')),
-    triangles: Number(element.getAttribute('data-triangles')),
+    calls: element.getAttribute('data-draw-calls'),
+    triangles: element.getAttribute('data-triangles'),
   }))
-  expect(renderBudget.calls).toBeLessThan(90)
-  expect(renderBudget.triangles).toBeLessThan(120_000)
+  expect(renderBudget.calls).not.toBeNull()
+  expect(renderBudget.triangles).not.toBeNull()
+  const calls = Number(renderBudget.calls)
+  const triangles = Number(renderBudget.triangles)
+  expect(Number.isFinite(calls)).toBe(true)
+  expect(Number.isFinite(triangles)).toBe(true)
+  expect(calls).toBeGreaterThan(0)
+  expect(triangles).toBeGreaterThan(0)
+  expect(calls).toBeLessThan(90)
+  expect(triangles).toBeLessThan(120_000)
   await page.clock.resume()
   expect(errors).toEqual([])
 })
