@@ -77,8 +77,8 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   await begin.click()
   const scene = page.getByTestId('crane-scene')
   await expect.poll(() => scene.getAttribute('data-ready'), { timeout: 20_000 }).toBe('true')
-  // 初期化後は観測する区間だけ全RAFを進める。遅いsoftware WebGLの背景描画で
-  // 操作・読み取りが詰まらないようにし、物理・描画そのものは省略しない。
+  // 操作・読み取り中の背景描画は止め、移動・視点の観測時に実RAFを進める。
+  // 一巡そのものは下で実時間に戻し、物理・描画を通して確認する。
   await page.clock.pauseAt(new Date('2026-01-01T01:00:00Z'))
   const readAfterFrames = async (attribute: string) => {
     await page.clock.runFor(100)
@@ -89,9 +89,12 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   await expect.poll(() => readAfterFrames('data-claw-x'), { intervals: [0] }).not.toBe(parked)
   await page.getByRole('button', { name: 'よこに うごくのを とめる', exact: true }).click()
   await page.getByRole('button', { name: 'つかむ', exact: true }).click()
-  await expect.poll(() => readAfterFrames('data-phase'), { intervals: [0] }).not.toBe('idle')
+  // 一巡は元の実時間の30秒枠で確認する。runForで高頻度の描画を追加しない。
+  await page.clock.resume()
+  await expect.poll(() => scene.getAttribute('data-phase')).not.toBe('idle')
   // 降ろす・つかむ・運ぶ・放すまで一巡し、穴の上へ戻ってくる。
-  await expect.poll(() => readAfterFrames('data-phase'), { timeout: 30_000, intervals: [0] }).toBe('idle')
+  await expect.poll(() => scene.getAttribute('data-phase'), { timeout: 30_000 }).toBe('idle')
+  await page.clock.pauseAt(new Date('2026-01-01T02:00:00Z'))
   expect(Number(await scene.getAttribute('data-claw-x'))).toBeCloseTo(-0.46, 2)
   await page.getByRole('button', { name: 'よこから みる', exact: true }).click()
   await expect.poll(() => readAfterFrames('data-view'), { intervals: [0] }).toBe('side')
