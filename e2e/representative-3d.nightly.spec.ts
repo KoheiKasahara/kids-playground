@@ -67,6 +67,7 @@ test('つくった車を走らせ、つくりかえ画面へ戻って入り直�
 test('クレーンゲームでアームを動かして一巡し、描画予算を守る [crane-game]', async ({ page }) => {
   test.setTimeout(90_000)
   const errors = capturePageErrors(page)
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
   await page.goto('/')
   await page.getByRole('link', { name: 'クレーンゲーム', exact: true }).click()
   const begin = page.getByRole('button', { name: 'あそぶ！', exact: true })
@@ -76,17 +77,24 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   await begin.click()
   const scene = page.getByTestId('crane-scene')
   await expect.poll(() => scene.getAttribute('data-ready'), { timeout: 20_000 }).toBe('true')
+  // 初期化後は観測する区間だけ全RAFを進める。遅いsoftware WebGLの背景描画で
+  // 操作・読み取りが詰まらないようにし、物理・描画そのものは省略しない。
+  await page.clock.pauseAt(new Date('2026-01-01T01:00:00Z'))
+  const readAfterFrames = async (attribute: string) => {
+    await page.clock.runFor(100)
+    return scene.getAttribute(attribute)
+  }
   const parked = await scene.getAttribute('data-claw-x')
   await page.getByRole('button', { name: 'よこに うごかす', exact: true }).click()
-  await expect.poll(() => scene.getAttribute('data-claw-x')).not.toBe(parked)
+  await expect.poll(() => readAfterFrames('data-claw-x'), { intervals: [0] }).not.toBe(parked)
   await page.getByRole('button', { name: 'よこに うごくのを とめる', exact: true }).click()
   await page.getByRole('button', { name: 'つかむ', exact: true }).click()
-  await expect.poll(() => scene.getAttribute('data-phase')).not.toBe('idle')
+  await expect.poll(() => readAfterFrames('data-phase'), { intervals: [0] }).not.toBe('idle')
   // 降ろす・つかむ・運ぶ・放すまで一巡し、穴の上へ戻ってくる。
-  await expect.poll(() => scene.getAttribute('data-phase'), { timeout: 30_000 }).toBe('idle')
+  await expect.poll(() => readAfterFrames('data-phase'), { timeout: 30_000, intervals: [0] }).toBe('idle')
   expect(Number(await scene.getAttribute('data-claw-x'))).toBeCloseTo(-0.46, 2)
   await page.getByRole('button', { name: 'よこから みる', exact: true }).click()
-  await expect(scene).toHaveAttribute('data-view', 'side')
+  await expect.poll(() => readAfterFrames('data-view'), { intervals: [0] }).toBe('side')
   await expect(page.locator('canvas')).toHaveCount(1)
   const renderBudget = await scene.evaluate(element => ({
     calls: Number(element.getAttribute('data-draw-calls')),
@@ -94,6 +102,7 @@ test('クレーンゲームでアームを動かして一巡し、描画予算�
   }))
   expect(renderBudget.calls).toBeLessThan(90)
   expect(renderBudget.triangles).toBeLessThan(120_000)
+  await page.clock.resume()
   expect(errors).toEqual([])
 })
 
