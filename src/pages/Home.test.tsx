@@ -123,7 +123,6 @@ describe('Home', () => {
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
     expect(links.slice(-15).map((link) => link.getAttribute('href'))).toEqual(
       [
-        'pyoko-touch',
         'hoshi-tsunagi',
         'robo-kuzushi',
         'mato-ate',
@@ -138,6 +137,7 @@ describe('Home', () => {
         'onaji-pon',
         'dot-bomb',
         'dot-monster-farm',
+        'kurukuru-rokuro',
       ].map(gameRoutePath),
     )
   })
