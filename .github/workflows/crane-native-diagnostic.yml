@@ -1,0 +1,31 @@
+name: Temporary native crane diagnosis
+on:
+  push:
+    branches: [dot/diagnose-crane-native-20261008]
+permissions:
+  contents: read
+jobs:
+  native-crane:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Record versions and comparison caveat
+        run: |
+          git rev-parse HEAD
+          node --version
+          npm --version
+          npx playwright --version
+          echo "Viewport390x844, DPR1, mobile/touch; native clocks;90s/test;30s/cycle;retry0."
+          echo "Section timings are elapsed performance.now durations of actual callbacks, not hardware CPU or GPU timestamps."
+          echo "Trace-on runs first. Same runner but cache/order and instrumentation overhead confound one pair; no causal claim from timing alone."
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Compare native baseline, tracing cost and batched observations
+        run: npx playwright test --config=playwright.crane-diagnostic.config.ts --workers=1 --retries=0
+      # Intentionally no artifact upload, deploy, PR creation, secrets or write permissions.

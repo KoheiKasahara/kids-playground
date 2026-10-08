@@ -112,6 +112,17 @@ export function useCraneGameEngine(options: Options) {
     let publishClock = 0
     const rig = createRig()
     let blocked = false
+    // TEMPORARY DIAGNOSTIC BRANCH ONLY. Counters observe the unchanged native loop.
+    const diagnostic = {
+      machine: machine.id, created: performance.now(), disposed: 0, disposeMs: 0, sceneInitMs: 0, readyAt: 0, webglRenderer: '', hiddenFrames: 0,
+      firstRaf: 0, lastRaf: 0, rafCount: 0, intervals: [] as number[],
+      wallAdvanceMs: 0, simulatedMs: 0, clampedMs: 0, discardedMs: 0,
+      physicsMs: 0, syncMs: 0, renderMs: 0, publishMs: 0, frameCallbackMs: 0,
+      maxPhysicsMs: 0, maxRenderMs: 0, renders: 0, steps: 0, renderedViews: { front: 0, side: 0 },
+      phases: [] as { phase: string; at: number; simulatedMs: number }[],
+    }
+    const diagnosticWindow = window as typeof window & { __craneNativeDiagnostics?: (typeof diagnostic)[] }
+    ;(diagnosticWindow.__craneNativeDiagnostics ??= []).push(diagnostic)
 
     function publish() {
       if (!world) return
@@ -122,6 +133,10 @@ export function useCraneGameEngine(options: Options) {
         ready: world.ready,
         remaining: world.remaining,
         collected: world.collected,
+      }
+      if (feedback.ready && !diagnostic.readyAt) diagnostic.readyAt = performance.now()
+      if (diagnostic.phases.at(-1)?.phase !== rig.phase) {
+        diagnostic.phases.push({ phase: rig.phase, at: performance.now(), simulatedMs: diagnostic.simulatedMs })
       }
       latest.current.onFeedback(feedback)
       host.dataset.phase = feedback.phase
@@ -148,11 +163,22 @@ export function useCraneGameEngine(options: Options) {
     function animate(now: number) {
       frame = requestAnimationFrame(animate)
       if (!scene || !world) return
+      const frameStart = performance.now()
+      diagnostic.firstRaf ||= now
+      diagnostic.lastRaf = now
+      diagnostic.rafCount++
+      if (previous) {
+        const interval = now - previous
+        diagnostic.intervals.push(interval)
+        diagnostic.wallAdvanceMs += interval
+        diagnostic.clampedMs += Math.max(0, interval - 100)
+      }
       const dt = previous ? Math.min((now - previous) / 1000, 0.1) : 0
       previous = now
-      if (document.hidden) { accumulator = 0; return }
+      if (document.hidden) { diagnostic.hiddenFrames++; accumulator = 0; return }
       accumulator += dt
       let steps = 0
+      const physicsStart = performance.now()
       while (accumulator >= STEP && steps < MAX_STEPS) {
         const rigEvents = advanceRig(rig, STEP, { blocked })
         for (const event of rigEvents) latest.current.onAction(event)
@@ -161,7 +187,13 @@ export function useCraneGameEngine(options: Options) {
         accumulator -= STEP
         steps++
       }
-      if (steps === MAX_STEPS) accumulator = 0
+      const physicsMs = performance.now() - physicsStart
+      diagnostic.physicsMs += physicsMs
+      diagnostic.maxPhysicsMs = Math.max(diagnostic.maxPhysicsMs, physicsMs)
+      diagnostic.steps += steps
+      diagnostic.simulatedMs += steps * STEP * 1000
+      if (steps === MAX_STEPS) { diagnostic.discardedMs += accumulator * 1000; accumulator = 0 }
+      const syncStart = performance.now()
       for (const event of world.consumeEvents()) {
         if (event.kind === 'caught') scene.burst(event.position, 22)
         if (event.kind === 'slip') scene.dust(event.position, 1)
@@ -171,12 +203,24 @@ export function useCraneGameEngine(options: Options) {
       const pose = world.clawPose()
       scene.syncClaw(pose.position, pose.fingers, rig.phase === 'idle')
       scene.syncPrizes(world.prizes())
+      diagnostic.syncMs += performance.now() - syncStart
       if (now - lastDraw >= 1000 / 50) {
+        const renderStart = performance.now()
         scene.render(dt, latest.current.reducedMotion)
+        const renderMs = performance.now() - renderStart
+        diagnostic.renderMs += renderMs
+        diagnostic.maxRenderMs = Math.max(diagnostic.maxRenderMs, renderMs)
+        diagnostic.renders++
+        diagnostic.renderedViews[scene.view]++
         lastDraw = now
       }
       publishClock += dt
-      if (publishClock > 0.1) { publish(); publishClock = 0 }
+      if (publishClock > 0.1) {
+        const publishStart = performance.now()
+        publish(); publishClock = 0
+        diagnostic.publishMs += performance.now() - publishStart
+      }
+      diagnostic.frameCallbackMs += performance.now() - frameStart
     }
 
     function resize() { scene?.resize() }
@@ -250,7 +294,12 @@ export function useCraneGameEngine(options: Options) {
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(resize)
     latest.current.onStatus('loading')
     try {
+      const sceneStart = performance.now()
       scene = createCraneScene(host, machine)
+      diagnostic.sceneInitMs = performance.now() - sceneStart
+      const gl = scene.renderer.getContext()
+      const debugRenderer = gl.getExtension('WEBGL_debug_renderer_info')
+      diagnostic.webglRenderer = String(gl.getParameter(debugRenderer?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER))
       scene.setView(latest.current.view)
       scene.setZoom(latest.current.zoom)
       scene.renderer.domElement.addEventListener('webglcontextlost', contextLost)
@@ -278,6 +327,7 @@ export function useCraneGameEngine(options: Options) {
     }).catch(() => { if (!released) latest.current.onStatus('error') })
 
     return () => {
+      diagnostic.disposed = performance.now()
       released = true
       cancelAnimationFrame(frame)
       observer?.disconnect()
@@ -292,6 +342,7 @@ export function useCraneGameEngine(options: Options) {
       scene?.renderer.domElement.removeEventListener('wheel', wheel)
       world?.dispose()
       scene?.dispose()
+      diagnostic.disposeMs = performance.now() - diagnostic.disposed
       runtime.current = null
     }
   }, [container, generation, options.machine.id])
