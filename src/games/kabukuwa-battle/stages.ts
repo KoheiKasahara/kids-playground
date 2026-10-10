@@ -15,9 +15,9 @@ export type Stage = {
   elevation: number
   /** たたかう すじ（u）が 画面の どちらを むくか [rad]。 */
   axis: number
-  /** この 大きさ（ドット）が 画面に かならず おさまる。 */
-  minW: number
-  minH: number
+  /** カメラの まど。この 大きさ（ばしょの たんい）が 画面に かならず おさまる。カメラは たたかいに ついていく。 */
+  viewW: number
+  viewH: number
   /** はじめの いち（u）。 */
   startU: number
 }
@@ -27,15 +27,15 @@ const DEG = Math.PI / 180
 export const STAGES: readonly Stage[] = [
   {
     id: 'branch', name: 'よるの き の えだ', view: 'よこから', lead: 'じゅえきの でる えだの うえ。なげられると したへ おちるよ',
-    elevation: 6 * DEG, axis: 0, minW: 210, minH: 170, startU: 62,
+    elevation: 6 * DEG, axis: 0, viewW: 200, viewH: 108, startU: 62,
   },
   {
     id: 'log', name: 'もりの まるた', view: 'ななめから', lead: 'よこたわった まるたの うえ。はしや よこから おちたら まけ',
-    elevation: 36 * DEG, axis: 28 * DEG, minW: 250, minH: 190, startU: 52,
+    elevation: 36 * DEG, axis: 28 * DEG, viewW: 210, viewH: 120, startU: 52,
   },
   {
     id: 'stump', name: 'きりかぶ どひょう', view: 'うえから', lead: 'まるい きりかぶの うえ。そとへ おしだせ！',
-    elevation: 90 * DEG, axis: 0, minW: 236, minH: 236, startU: 52,
+    elevation: 90 * DEG, axis: 0, viewW: 200, viewH: 132, startU: 52,
   },
 ]
 

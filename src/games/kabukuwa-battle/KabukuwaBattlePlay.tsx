@@ -8,7 +8,7 @@ import { vibrate } from '../../utils/haptics'
 import { createBattle, drainEvents, DT, stepBattle, type Battle, type BattleEvent, type EndReason } from './battle'
 import { ambient, createFx, spawnFx, updateFx } from './fx'
 import { makeCanvas } from './pixel'
-import { portraitSprite, Scene, TEAM_COLORS, viewSize, type ViewSize } from './render'
+import { portraitSprite, Scene, stageDots, TEAM_COLORS, viewSize, warmSprites, type ViewSize } from './render'
 import {
   GROUP_LABEL, SPECIES, STAT_KEYS, STAT_LABEL, STAT_MAX, speciesById, speciesOfGroup,
   type BeetleGroup, type Species,
@@ -32,7 +32,7 @@ function randomSeed() {
 
 // ---------------- ドット絵の 小さな 絵 ----------------
 
-/** むしの 絵（ななめ まえから）。size は 1ドットの 大きさ（CSS px）。fit なら わくに あわせる。 */
+/** むしの 絵（ななめ まえから）。dot は 1ドットの 大きさ（CSS px）。なければ わくに あわせる。 */
 function BeetlePicture({ sp, dot, className }: { sp: Species; dot?: number; className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [box, setBox] = useState<{ w: number; h: number } | null>(null)
@@ -47,7 +47,8 @@ function BeetlePicture({ sp, dot, className }: { sp: Species; dot?: number; clas
     ctx.drawImage(sprite.canvas, 0, 0)
     setBox({ w: sprite.w, h: sprite.h })
   }, [sp])
-  const style = dot && box ? { width: box.w * dot, height: box.h * dot } : undefined
+  // はばだけ きめて、たかさは 絵の わりあいの まま（せまい がめんでは ちぢむ）。
+  const style = dot && box ? { width: box.w * dot } : undefined
   return <canvas ref={ref} className={`${styles.pixel} ${className ?? ''}`} style={style} aria-hidden="true" />
 }
 
@@ -77,7 +78,7 @@ function SoundButton({ sound: on, onToggle }: { sound: boolean; onToggle: () => 
 const Dex = forwardRef<HTMLElement, { sp: Species }>(function Dex({ sp }, ref) {
   return <section ref={ref} className={`${styles.window} ${styles.dex}`} aria-labelledby="kabukuwa-dex-name" data-group={sp.group}>
     <div className={styles.dexPicture}>
-      <BeetlePicture key={sp.id} sp={sp} dot={3} className={styles.dexCanvas} />
+      <BeetlePicture key={sp.id} sp={sp} dot={2} className={styles.dexCanvas} />
     </div>
     <div className={styles.dexBody}>
       <p className={styles.dexGroup}>{GROUP_LABEL[sp.group]}</p>
@@ -148,13 +149,14 @@ function PickScreen({ step, mine, focus, onFocus, onPick, onRandom, onBack, soun
 
 /** ステージの みほん（はじまる まえの すがた）を 1まい かく。 */
 function stageThumbnail(stage: Stage, a: Species, b: Species): string | null {
-  const made = makeCanvas(stage.minW, stage.minH)
+  const size = stageDots(stage)
+  const made = makeCanvas(size.w, size.h)
   if (!made) return null
   const battle = createBattle(a, b, stage.id, 7, stage.startU)
   const scene = new Scene(stage)
   setSpriteBudget(Infinity)
   try {
-    scene.draw(made.ctx, battle, createFx(), 0, stage.minW, stage.minH, 1, false)
+    scene.draw(made.ctx, battle, createFx(), 0, size.w, size.h, 1, false)
     return made.canvas.toDataURL()
   } catch {
     return null
@@ -217,12 +219,16 @@ function StageScreen({ mine, foe, onPick, onBack, soundOn, onSound }: {
 type Hud = { st: [number, number] }
 type Banner = 'ready' | 'go' | 'end' | null
 type Result = { winner: 0 | 1; reason: EndReason }
+/** わざが きまった ときの「ドカーン！」などの もじ。x・y は キャンバスに たいする %。 */
+type Pop = { id: number; text: string; x: number; y: number; big: boolean; tone: 'hit' | 'clash' | 'special' | 'soft' }
 
-/** canvas を 画面の 大きさに あわせる。 */
+/**
+ * canvas を 画面の 大きさに あわせる。たてむきの ときは たたかいの 画面ごと 90° まわして いるので、
+ * getBoundingClientRect（まわした あとの 大きさ）ではなく、まわす まえの 大きさ（clientWidth）を つかう。
+ */
 function fitCanvas(canvas: HTMLCanvasElement, minW: number, minH: number): ViewSize {
-  const box = canvas.getBoundingClientRect()
   const dpr = Math.min(3, window.devicePixelRatio || 1)
-  const view = viewSize(box.width || 360, box.height || 300, dpr, minW, minH)
+  const view = viewSize(canvas.clientWidth || 640, canvas.clientHeight || 360, dpr, minW, minH)
   if (canvas.width !== view.dw) canvas.width = view.dw
   if (canvas.height !== view.dh) canvas.height = view.dh
   return view
@@ -243,30 +249,43 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
   const [message, setMessage] = useState('はっけよい…')
   const [result, setResult] = useState<Result | null>(null)
   const [showResult, setShowResult] = useState(false)
+  const [pops, setPops] = useState<Pop[]>([])
   const mirror = mine.id === foe.id
 
   useEffect(() => {
     const battle = createBattle(mine, foe, stage.id, seed, stage.startU)
     if (import.meta.env.DEV) (window as unknown as { __kabukuwaBattle?: Battle }).__kabukuwaBattle = battle
     const scene = new Scene(stage)
-    const fx = createFx(seed)
+    const still = reducedMotion()
+    const fx = createFx(seed, still)
     const name = (side: 0 | 1) => (mirror ? (side === 0 ? 'じぶんの ' : 'あいての ') : '') + battle.f[side].sp.short
     const timers: ReturnType<typeof setTimeout>[] = []
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d') ?? null
     const buffer = { canvas: null as HTMLCanvasElement | null, g: null as CanvasRenderingContext2D | null, w: 0, h: 0 }
-    let view: ViewSize = canvas ? fitCanvas(canvas, stage.minW, stage.minH) : viewSize(360, 300, 1, stage.minW, stage.minH)
-    const measure = () => { if (canvas) view = fitCanvas(canvas, stage.minW, stage.minH) }
+    const dots = stageDots(stage)
+    let view: ViewSize = canvas ? fitCanvas(canvas, dots.w, dots.h) : viewSize(640, 360, 1, dots.w, dots.h)
+    const measure = () => { if (canvas) view = fitCanvas(canvas, dots.w, dots.h) }
     const observer = typeof ResizeObserver === 'function' && canvas ? new ResizeObserver(measure) : null
     if (canvas) observer?.observe(canvas)
     window.addEventListener('resize', measure)
     sound.playReady()
+    /** わざが きまった ときの ひとやすみ（ヒットストップ）と、しょうぶが ついた ときの スロー。 */
+    let stop = 0, slow = 0, popId = 0
+    const pop = (text: string, u: number, v: number, z: number, big: boolean, tone: Pop['tone']) => {
+      const at = scene.toScreen(u, v, z)
+      if (!at) return
+      const id = ++popId
+      setPops(list => [...list.slice(-3), { id, text, x: Math.max(8, Math.min(92, at[0] * 100)), y: Math.max(14, Math.min(90, at[1] * 100)), big, tone }])
+      timers.push(setTimeout(() => setPops(list => list.filter(p => p.id !== id)), 900))
+    }
+    const at = (side: 0 | 1, up = 30) => [battle.f[side].u, battle.f[side].v, battle.f[side].z + up] as const
 
     const onEvent = (e: BattleEvent) => {
       spawnFx(fx, e, battle)
       switch (e.type) {
         case 'go': sound.playGo(); setBanner('go'); setMessage('のこった！'); timers.push(setTimeout(() => setBanner(b => (b === 'go' ? null : b)), 900)); break
-        case 'clash': sound.playClash(); vibrate('tap'); setMessage('ガシッ！ くみあった！'); break
+        case 'clash': sound.playClash(); vibrate('tap'); setMessage('ガシッ！ くみあった！'); pop('ガシッ！', e.u, e.v, 34, false, 'clash'); break
         case 'windup':
           sound.playWindup(e.move === 'utchari')
           setMessage(e.move === 'utchari' ? `${name(e.side)}、うっちゃりを ねらう！` : `${name(e.side)}の ${battle.f[e.side].sp.move.name}！`)
@@ -275,22 +294,27 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
           sound.playHit(e.big)
           vibrate('impact')
           const def = name((1 - e.side) as 0 | 1)
-          setMessage(e.move === 'utchari' ? 'うっちゃり！ ぎゃくてんの なげ！' : e.move === 'pinch' ? `${def}を はさんだ！` : e.move === 'charge' ? `${def}を ふっとばした！` : `${def}を なげた！`)
+          const special = e.move === 'utchari'
+          setMessage(special ? 'うっちゃり！ ぎゃくてんの なげ！' : e.move === 'pinch' ? `${def}を はさんだ！` : e.move === 'charge' ? `${def}を ふっとばした！` : `${def}を なげた！`)
+          const word = special ? 'うっちゃり！' : e.move === 'pinch' ? 'ギリギリッ！' : e.move === 'charge' ? 'ドスーン！' : e.big ? 'ドカーン！' : 'ブンッ！'
+          pop(word, e.u, e.v, 40, e.big || special, special ? 'special' : 'hit')
+          if ((e.big || special) && !still) stop = .16
           break
         }
-        case 'block': sound.playBlock(); setMessage(`${name(e.side)}は ふんばった！`); break
-        case 'dodge': sound.playBlock(); setMessage(`${name(e.side)}は ひらりと かわした！`); break
-        case 'land': sound.playLand(); if (e.flipped) setMessage(`${name(e.side)}が ひっくりかえった！`); break
+        case 'block': sound.playBlock(); setMessage(`${name(e.side)}は ふんばった！`); pop('ガッ！', ...at(e.side), false, 'soft'); break
+        case 'dodge': sound.playBlock(); setMessage(`${name(e.side)}は ひらりと かわした！`); pop('ひらり', ...at(e.side), false, 'soft'); break
+        case 'land': sound.playLand(); if (e.flipped) { setMessage(`${name(e.side)}が ひっくりかえった！`); pop('ドサッ！', e.u, e.v, 20, false, 'soft') } break
         case 'recover': setMessage(`${name(e.side)}は おきあがった！`); break
-        case 'cling': sound.playCling(); setMessage(`${name(e.side)}は えだに しがみついた！`); break
+        case 'cling': sound.playCling(); setMessage(`${name(e.side)}は えだに しがみついた！`); pop('ぎゅっ！', ...at(e.side, -10), false, 'soft'); break
         case 'climb': setMessage(`${name(e.side)}は えだに もどった！`); break
         case 'slip': setMessage(`${name(e.side)}の あしが すべった！`); break
         case 'edge': setMessage(`${name(e.side)}、あぶない！ はしっこだ！`); break
         case 'push': setMessage(`${name(e.side)}が ぐいぐい おしている！`); break
-        case 'fall': sound.playFall(); setMessage(`${name(e.side)}が おちた！`); break
+        case 'fall': sound.playFall(); setMessage(`${name(e.side)}が おちた！`); pop('ひゅ〜', ...at(e.side, 10), true, 'soft'); break
         case 'flee': sound.playFall(); setMessage(`${name(e.side)}は にげだした！`); break
         case 'timeup': sound.playGo(); setMessage('じかんぎれ！'); break
         case 'end':
+          if (!still) slow = 1.2
           setResult({ winner: e.winner, reason: e.reason })
           setBanner('end')
           timers.push(setTimeout(() => setMessage(`${name(e.winner)}の かち！`), 1400))
@@ -304,14 +328,15 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
     }
 
     let raf = 0, previous = 0, acc = 0, time = 0
-    const still = reducedMotion()
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick)
       const dt = previous ? Math.min(.1, (now - previous) / 1000) : 0
       previous = now
       if (typeof document !== 'undefined' && document.hidden) return
       time += dt
-      acc += dt
+      if (stop > 0) stop -= dt
+      else acc += dt * (slow > 0 ? .35 : 1)
+      slow = Math.max(0, slow - dt)
       let steps = 0
       while (acc >= DT && steps < 6) {
         stepBattle(battle)
@@ -332,7 +357,13 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
         buffer.w = view.w; buffer.h = view.h
       }
       if (!buffer.g || !buffer.canvas) return
-      setSpriteBudget(3)
+      if (battle.state === 'ready') {
+        // はっけよい の あいだに よく つかう 絵を つくって おく。
+        setSpriteBudget(8)
+        warmSprites(stage, battle, 64)
+      }
+      // あたらしい むきの 絵は 1フレームに すこしずつ つくる（スマホでも カクカク しないように）。
+      setSpriteBudget(2)
       scene.draw(buffer.g, battle, fx, time, view.w, view.h, dt)
       ctx.imageSmoothingEnabled = false
       ctx.drawImage(buffer.canvas, 0, 0, view.w * view.scale, view.h * view.scale)
@@ -354,34 +385,36 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
 
   return <GamePlaySurface><main className={styles.battle} data-stage={stage.id}>
     <h1 className={styles.srOnly}>{TITLE} {stage.name}</h1>
-    <header className={styles.battleHeader}>
-      <GameBackButton onBack={onQuit} />
-      <p className={styles.stageTag}><span>{stage.view}</span>{stage.name}</p>
-      <SoundButton sound={soundOn} onToggle={onSound} />
-    </header>
-    <div className={styles.plates}>
-      {([0, 1] as const).map(side => <div key={side} className={`${styles.window} ${styles.plate}`} data-side={side} style={{ '--team': TEAM_COLORS[side] } as CSSProperties}>
-        <span className={styles.plateTag}>{side === 0 ? 'じぶん' : 'あいて'}</span>
-        <strong className={styles.plateName}>{(side === 0 ? mine : foe).short}</strong>
-        <span className={styles.meter} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={hud.st[side]} aria-label={`${label(side)}の げんき`}>
-          <span style={{ width: `${hud.st[side]}%` }} data-low={hud.st[side] < 30} />
-        </span>
-      </div>)}
-    </div>
     <div className={styles.arena}>
       <canvas ref={canvasRef} className={styles.arenaCanvas} aria-label={`${mine.name} たい ${foe.name}`} />
-      {banner === 'ready' && <p className={styles.banner} aria-hidden="true">はっけよい…</p>}
+      <div className={styles.pops} aria-hidden="true">
+        {pops.map(p => <span key={p.id} className={styles.pop} data-tone={p.tone} data-big={p.big} style={{ left: `${p.x}%`, top: `${p.y}%` }}>{p.text}</span>)}
+      </div>
+      {banner === 'ready' && <p className={styles.banner} aria-hidden="true">はっけよい…<small>{stage.view}・{stage.name}</small></p>}
       {banner === 'go' && <p className={`${styles.banner} ${styles.bannerGo}`} aria-hidden="true">のこった！</p>}
       {banner === 'end' && result && !showResult && <p className={`${styles.banner} ${styles.bannerEnd}`} style={{ '--team': TEAM_COLORS[result.winner] } as CSSProperties} aria-hidden="true">
         {label(result.winner)}の かち！
       </p>}
     </div>
+    <header className={styles.battleHeader}>
+      <GameBackButton onBack={onQuit} />
+      <div className={styles.plates}>
+        {([0, 1] as const).map(side => <div key={side} className={styles.plate} data-side={side} style={{ '--team': TEAM_COLORS[side] } as CSSProperties}>
+          <span className={styles.plateTag}>{side === 0 ? 'じぶん' : 'あいて'}</span>
+          <strong className={styles.plateName}>{(side === 0 ? mine : foe).short}</strong>
+          <span className={styles.meter} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={hud.st[side]} aria-label={`${label(side)}の げんき`}>
+            <span style={{ width: `${hud.st[side]}%` }} data-low={hud.st[side] < 30} />
+          </span>
+        </div>)}
+      </div>
+      <SoundButton sound={soundOn} onToggle={onSound} />
+    </header>
     <p className={`${styles.window} ${styles.message}`} role="status" aria-live="polite">{message}</p>
     {result && showResult && winnerSp && <div className={styles.resultLayer}>
       <section className={`${styles.window} ${styles.result}`} aria-labelledby="kabukuwa-result" style={{ '--team': TEAM_COLORS[result.winner] } as CSSProperties}>
         <p className={styles.resultLabel}>{result.winner === 0 ? 'やったね！' : 'ざんねん…'}</p>
         <h2 id="kabukuwa-result" className={styles.resultTitle}>{label(result.winner)}の かち！</h2>
-        <BeetlePicture sp={winnerSp} dot={3} className={styles.resultCanvas} />
+        <BeetlePicture sp={winnerSp} dot={1.6} className={styles.resultCanvas} />
         <p className={styles.resultReason}>{resultText(stage.id, loserName, result.reason)}</p>
         <div className={styles.resultButtons}>
           <button type="button" className={`${styles.window} ${styles.primary}`} autoFocus onClick={onRetry}>もういちど</button>
@@ -390,7 +423,10 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
         </div>
       </section>
     </div>}
-  </main></GamePlaySurface>
+  </main>
+  {/* たてむきの ときは たたかいを よこむきに まわして みせるので、さいしょに ひとこと しらせる。 */}
+  <p className={styles.rotateHint} aria-hidden="true"><span>📱</span>よこむきに すると おおきく みられるよ</p>
+  </GamePlaySurface>
 }
 
 // ---------------- ぜんたい ----------------
