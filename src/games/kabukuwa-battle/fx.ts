@@ -4,7 +4,7 @@
 import type { Battle, BattleEvent } from './battle'
 import type { StageId } from './stages'
 
-export type ParticleKind = 'spark' | 'dust' | 'leaf' | 'star' | 'confetti' | 'ring' | 'drop' | 'glow'
+export type ParticleKind = 'spark' | 'dust' | 'leaf' | 'star' | 'confetti' | 'ring' | 'drop' | 'glow' | 'burst' | 'lines' | 'flash'
 
 export type Particle = {
   kind: ParticleKind
@@ -17,13 +17,16 @@ export type Particle = {
 }
 
 export type Fx = {
+  /** うごきを へらす せってい（フラッシュ・しゅうちゅうせんを ださない）。 */
+  calm: boolean
   parts: Particle[]
   random: () => number
 }
 
-export function createFx(seed = 1): Fx {
+export function createFx(seed = 1, calm = false): Fx {
   let s = seed >>> 0
   return {
+    calm,
     parts: [],
     random: () => {
       s = (s * 1664525 + 1013904223) >>> 0
@@ -59,20 +62,29 @@ export function spawnFx(fx: Fx, e: BattleEvent, battle: Battle) {
   const stage: StageId = battle.stage
   switch (e.type) {
     case 'clash':
-      burst(fx, 'spark', e.u, e.v, 8, 10, SPARK, 70, .35, 20)
-      add(fx, { kind: 'ring', u: e.u, v: e.v, z: 8, vu: 0, vv: 0, vz: 0, life: .25, color: '#ffffff', size: 4 })
+      burst(fx, 'spark', e.u, e.v, 8, 14, SPARK, 80, .4, 24)
+      add(fx, { kind: 'ring', u: e.u, v: e.v, z: 8, vu: 0, vv: 0, vz: 0, life: .25, color: '#ffffff', size: 7 })
+      add(fx, { kind: 'burst', u: e.u, v: e.v, z: 8, vu: 0, vv: 0, vz: 0, life: .22, color: '#ffffff', size: 18 })
       break
-    case 'hit':
-      burst(fx, 'spark', e.u, e.v, e.z, e.big ? 18 : 10, SPARK, e.big ? 110 : 80, .45, 30)
-      burst(fx, 'star', e.u, e.v, e.z + 6, e.big ? 6 : 3, ['#ffe060', '#ffffff'], 60, .7, 40)
-      add(fx, { kind: 'ring', u: e.u, v: e.v, z: e.z, vu: 0, vv: 0, vz: 0, life: .3, color: '#fff6c0', size: e.big ? 9 : 6 })
+    case 'hit': {
+      const big = e.big || e.move === 'utchari'
+      burst(fx, 'spark', e.u, e.v, e.z, big ? 24 : 12, SPARK, big ? 130 : 90, .5, 34)
+      burst(fx, 'star', e.u, e.v, e.z + 6, big ? 8 : 4, ['#ffe060', '#ffffff'], 70, .8, 46)
+      add(fx, { kind: 'ring', u: e.u, v: e.v, z: e.z, vu: 0, vv: 0, vz: 0, life: .3, color: '#fff6c0', size: big ? 14 : 9 })
+      add(fx, { kind: 'burst', u: e.u, v: e.v, z: e.z, vu: 0, vv: 0, vz: 0, life: .28, color: '#fffbe8', size: big ? 34 : 22 })
+      if (big && !fx.calm) {
+        add(fx, { kind: 'lines', u: e.u, v: e.v, z: e.z, vu: 0, vv: 0, vz: 0, life: .45, color: 'rgba(255,255,255,.75)', size: 26 })
+        add(fx, { kind: 'flash', u: e.u, v: e.v, z: e.z, vu: 0, vv: 0, vz: 0, life: .14, color: '#ffffff', size: 1 })
+      }
       if (stage === 'branch') burst(fx, 'leaf', e.u, e.v, 4, 4, LEAF, 40, 1.6, 10)
       break
+    }
     case 'block':
-      burst(fx, 'spark', e.u, e.v, 8, 5, SPARK, 50, .25, 15)
+      burst(fx, 'spark', e.u, e.v, 8, 8, SPARK, 60, .3, 18)
+      add(fx, { kind: 'burst', u: e.u, v: e.v, z: 10, vu: 0, vv: 0, vz: 0, life: .18, color: '#d8e8ff', size: 12 })
       break
     case 'land':
-      burst(fx, 'dust', e.u, e.v, 0, 10, DUST, 40, .55, 12)
+      burst(fx, 'dust', e.u, e.v, 0, 16, DUST, 55, .6, 14)
       break
     case 'fall':
       if (stage === 'branch') {
