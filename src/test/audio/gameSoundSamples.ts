@@ -29,6 +29,7 @@ import { playGlobeZoomSound } from '../../games/earth-globe/sounds'
 import { playDeliverySound } from '../../games/forest-delivery/sounds'
 import * as hoshi from '../../games/hoshi-tsunagi/sounds'
 import * as jishaku from '../../games/jishaku-pitatto/sounds'
+import * as kabukuwa from '../../games/kabukuwa-battle/sounds'
 import * as rokuro from '../../games/kurukuru-rokuro/sounds'
 import * as sandbox from '../../games/magic-sandbox/sounds'
 import * as marble from '../../games/marble-course/sounds'
@@ -349,6 +350,15 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('かま', rokuro.playKilnSound),
     sample('やきあがり', () => rokuro.playDoneSound(3)),
     sample('たなに かざる', rokuro.playShelfSound),
+  ],
+  'kabukuwa-battle': [
+    sample('むしを えらぶ', () => kabukuwa.playBuzz(330)),
+    sample('はっけよい', kabukuwa.playReady),
+    sample('のこった', kabukuwa.playGo),
+    sample('ガシッ', kabukuwa.playClash),
+    sample('なげた', () => kabukuwa.playHit(true)),
+    sample('おちた', kabukuwa.playFall),
+    sample('かった', kabukuwa.playWin),
   ],
   'onaji-pon': [sample('つなぐ', () => onaji.playConnectSound(1)), sample('ひく', onaji.playDrawSound), sample('だめ', onaji.playNopeSound), sample('クリア', onaji.playClearSound)],
 }
