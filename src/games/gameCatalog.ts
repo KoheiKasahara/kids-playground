@@ -1126,6 +1126,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'kabukuwa-battle',
+    slug: 'kabukuwa-battle',
+    title: 'カブクワ バトル',
+    emoji: '🪲',
+    category: 'learning',
+    seo: {
+      headline: 'カブクワ バトル｜せかいの カブトムシ・クワガタが たたかう ドット絵ゲーム',
+      description:
+        'ヘラクレスオオカブトや ノコギリクワガタなど、日本と せかいの カブトムシ・クワガタ 12しゅるいを たたかわせる ドット絵ゲーム。ずかんの 大きさで きまる ちからくらべを、えだ・まるた・きりかぶで ながめよう。',
+    },
+    intro: {
+      howToPlay: [
+        'むしを えらぶと おおきさ・ちから・はやさが みられるよ',
+        'たたかう ばしょを えらぶと、あとは みているだけで しょうぶが すすむよ',
+        'なげとばしたり、おしだしたり、にげだしたら しょうぶ あり！',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
