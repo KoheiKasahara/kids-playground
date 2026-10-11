@@ -523,9 +523,15 @@ button.window:focus-visible,
   }
 }
 
+/*
+ * まいフレーム かきかえる canvas の うえに なまえ・げんき・じっきょうを かさねる。
+ * Safari などでは canvas の そうが うえに かぶさり、かさねた ものが きえる ことが あるので、
+ * arena は z-index 0 の なかに とじこめ、かさねる ものは それぞれ じぶんの そうに して うえに だす。
+ */
 .arena {
   position: absolute;
   inset: 0;
+  z-index: 0;
 }
 
 .arenaCanvas {
@@ -544,6 +550,12 @@ button.window:focus-visible,
   display: flex;
   align-items: flex-start;
   gap: 8px;
+}
+
+/* もどる ボタンは position: fixed なので、header じたいには transform を つけない。 */
+.battleHeader > :not([data-game-back-button]) {
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .plates {
@@ -715,7 +727,8 @@ button.window:focus-visible,
   min-height: 0;
   margin: 0;
   padding: 4px 12px;
-  transform: translateX(-50%);
+  transform: translate3d(-50%, 0, 0);
+  will-change: transform;
   background: linear-gradient(180deg, rgb(47 106 58 / 80%) 0%, rgb(26 64 34 / 80%) 100%);
   font-size: clamp(14px, 4.2vmin, 22px);
   line-height: 1.3;
