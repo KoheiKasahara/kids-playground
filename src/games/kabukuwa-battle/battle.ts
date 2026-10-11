@@ -797,6 +797,37 @@ export function stepBattle(b: Battle) {
   }
 }
 
+/** カットインを いれる ところ: step かいめの stepBattle の あと。 */
+export type CutInPlan = { step: number; winner: 0 | 1; kind: CutInKind }
+
+/**
+ * おなじ たねの たたかいを さきに さいごまで すすめて、カットインを いれる ところを さがす。
+ * とばされて そのまま おちたなら きめての わざ（hit）の ところ、
+ * ちゃくちや しがみつきを はさんだら おちはじめ（fall）、にげだしたら おわり（end）の ところ。
+ * カットインが ない しあいは null。
+ */
+export function planCutIn(b: Battle, maxSeconds = TIME_LIMIT + READY_SECONDS + 5): CutInPlan | null {
+  const steps = Math.ceil(maxSeconds / DT)
+  /** いまも とばされつづけて いる わざ（hit）の ステップと、とばされた ほう。 */
+  let hit: { step: number; side: 0 | 1 } | null = null
+  let fallStep = 0
+  for (let step = 1; step <= steps && b.state !== 'over'; step++) {
+    stepBattle(b)
+    for (const e of drainEvents(b)) {
+      if (e.type === 'hit') hit = { step, side: (1 - e.side) as 0 | 1 }
+      else if ((e.type === 'land' || e.type === 'cling') && e.side === hit?.side) hit = null
+      else if (e.type === 'fall') fallStep = hit?.side === e.side ? hit.step : step
+      else if (e.type === 'end') return e.cutIn ? { step: fallStep || step, winner: e.winner, kind: e.cutIn } : null
+    }
+    // ふらついた あと たちなおったら、その わざは きめてでは ない。
+    if (hit) {
+      const s = b.f[hit.side].state
+      if (s !== 'thrown' && s !== 'stagger' && s !== 'fall' && s !== 'out') hit = null
+    }
+  }
+  return null
+}
+
 /** さいごまで すすめる（テスト・ためし用）。 */
 export function runToEnd(b: Battle, maxSeconds = TIME_LIMIT + READY_SECONDS + 5) {
   const steps = Math.ceil(maxSeconds / DT)

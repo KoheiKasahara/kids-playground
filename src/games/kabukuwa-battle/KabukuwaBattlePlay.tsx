@@ -5,7 +5,7 @@ import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { vibrate } from '../../utils/haptics'
-import { createBattle, drainEvents, DT, stepBattle, type Battle, type BattleEvent, type CutInKind, type EndReason } from './battle'
+import { createBattle, drainEvents, DT, planCutIn, stepBattle, type Battle, type BattleEvent, type CutInKind, type EndReason } from './battle'
 import { ambient, createFx, spawnFx, updateFx } from './fx'
 import { makeCanvas } from './pixel'
 import { portraitSprite, Scene, stageDots, TEAM_COLORS, viewSize, warmSprites, type ViewSize } from './render'
@@ -277,6 +277,8 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
 
   useEffect(() => {
     const battle = createBattle(mine, foe, stage.id, seed, stage.startU)
+    // おなじ たねで さきに すすめて おき、きめての わざが きまった ところで カットイン → とばす。
+    const plan = planCutIn(createBattle(mine, foe, stage.id, seed, stage.startU))
     if (import.meta.env.DEV) (window as unknown as { __kabukuwaBattle?: Battle }).__kabukuwaBattle = battle
     const scene = new Scene(stage)
     const still = reducedMotion()
@@ -303,6 +305,19 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
       timers.push(setTimeout(() => setPops(list => list.filter(p => p.id !== id)), 900))
     }
     const at = (side: 0 | 1, up = 30) => [battle.f[side].u, battle.f[side].v, battle.f[side].z + up] as const
+    // ぎゃくてん・せっせんの ときは（じぶんでも あいてでも）とめて カットインを いれる。あっしょうは いれない。
+    let cutInShown = false
+    const showCutIn = (winner: 0 | 1, kind: CutInKind) => {
+      cutInShown = true
+      stop = CUT_IN_SECONDS
+      // スローは カットインの あいだ（とまって いる あいだ）も へるので、そのぶん ながく する。
+      if (!still) slow = CUT_IN_SECONDS + 1.2
+      sound.playCutIn()
+      vibrate('impact')
+      setCutIn({ side: winner, kind })
+      setMessage(kind === 'comeback' ? `${name(winner)}の ぎゃくてん！ ウオリャアアアア！` : `${name(winner)}が せっせんを せいした！ ウオリャアアアア！`)
+      timers.push(setTimeout(() => setCutIn(null), CUT_IN_SECONDS * 1000))
+    }
 
     const onEvent = (e: BattleEvent) => {
       spawnFx(fx, e, battle)
@@ -337,22 +352,13 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
         case 'flee': sound.playFall(); setMessage(`${name(e.side)}は にげだした！`); break
         case 'timeup': sound.playGo(); setMessage('じかんぎれ！'); break
         case 'end': {
-          // ぎゃくてん・せっせんの ときは（じぶんでも あいてでも）とめて カットインを いれる。あっしょうは いれない。
-          const kind = e.cutIn
-          const comeback = kind !== null
-          const lag = comeback ? CUT_IN_SECONDS * 1000 : 0
-          if (kind) {
-            stop = CUT_IN_SECONDS
-            sound.playCutIn()
-            vibrate('impact')
-            setCutIn({ side: e.winner, kind })
-            setMessage(kind === 'comeback' ? `${name(e.winner)}の ぎゃくてん！ ウオリャアアアア！` : `${name(e.winner)}が せっせんを せいした！ ウオリャアアアア！`)
-            timers.push(setTimeout(() => setCutIn(null), lag))
-          }
-          // スローは カットインの あいだ（とまって いる あいだ）も へるので、そのぶん ながく する。
-          if (!still) slow = lag / 1000 + 1.2
+          // ふつうは きめての わざの ところで もう いれて いる。まだなら（さきよみと ずれた とき）ここで いれる。
+          const late = e.cutIn !== null && !cutInShown
+          if (late) showCutIn(e.winner, e.cutIn!)
+          const lag = late ? CUT_IN_SECONDS * 1000 : 0
+          if (!still) slow = Math.max(slow, lag / 1000 + 1.2)
           setResult({ winner: e.winner, reason: e.reason })
-          if (comeback) timers.push(setTimeout(() => setBanner('end'), lag))
+          if (late) timers.push(setTimeout(() => setBanner('end'), lag))
           else setBanner('end')
           timers.push(setTimeout(() => setMessage(`${name(e.winner)}の かち！`), lag + 1400))
           timers.push(setTimeout(() => {
@@ -365,7 +371,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
       }
     }
 
-    let raf = 0, previous = 0, acc = 0, time = 0
+    let raf = 0, previous = 0, acc = 0, time = 0, count = 0
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick)
       const dt = previous ? Math.min(.1, (now - previous) / 1000) : 0
@@ -380,9 +386,16 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
         stepBattle(battle)
         acc -= DT
         steps++
+        // きめての ところで とめて、とんで いく まえに カットインを みせる。
+        if (++count === plan?.step) { acc = 0; break }
       }
       if (steps === 6) acc = 0
-      for (const e of drainEvents(battle)) onEvent(e)
+      const events = drainEvents(battle)
+      for (const e of events) onEvent(e)
+      if (plan && count === plan.step && !cutInShown && events.some(e =>
+        (e.type === 'hit' && e.side === plan.winner) || (e.type === 'fall' && e.side !== plan.winner) || e.type === 'end')) {
+        showCutIn(plan.winner, plan.kind)
+      }
       if (!still) ambient(fx, stage.id, dt, scene.camU)
       updateFx(fx, dt)
       const pct = (side: 0 | 1) => Math.max(0, Math.round(battle.f[side].st / battle.f[side].maxSt * 100))
