@@ -248,6 +248,31 @@ describe('カブクワ バトル', () => {
     expect(playCutIn).toHaveBeenCalledTimes(1)
   })
 
+  test('なげで ぎゃくてんする ときは、きめての わざで カットイン → とんで いく', () => {
+    renderGame()
+    chooseHerculesVsCaucasus()
+    // この たねでは ヘラクレスが ぎゃくてんして コーカサスを なげおとす。
+    vi.spyOn(Math, 'random').mockReturnValueOnce(.495)
+    fireEvent.click(screen.getByRole('button', { name: 'もりの まるた（ななめから みる）' }))
+    for (let i = 0; i < 400 && !screen.queryByTestId('kabukuwa-cut-in'); i++) advance(.1)
+    expect(screen.getByTestId('kabukuwa-cut-in')).toHaveTextContent('ぎゃくてん！')
+    expect(playCutIn).toHaveBeenCalledTimes(1)
+    // まだ おちて いない（とんで いく まえ）で、カットインの あいだは とまって いる。
+    expect(battle()?.state).toBe('fight')
+    expect(battle()?.f[1].state).toBe('thrown')
+    const t = battle()!.time
+    advance(1.5)
+    expect(battle()!.time).toBe(t)
+
+    advance(.5)
+    expect(screen.queryByTestId('kabukuwa-cut-in')).not.toBeInTheDocument()
+    advance(5)
+    expect(battle()?.state).toBe('over')
+    expect(playCutIn).toHaveBeenCalledTimes(1)
+    expect(playWin).toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'ヘラクレスの かち！' })).toBeInTheDocument()
+  })
+
   test('せっせんで かった ときは「せっせん！」、あっしょうの ときは カットインを ださない', () => {
     renderGame()
     chooseHerculesVsCaucasus()

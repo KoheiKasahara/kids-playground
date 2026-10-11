@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { CLOSE_LOW, COMEBACK_BEHIND, COMEBACK_LOW, createBattle, cutInKind, drainEvents, DT, isComeback, READY_SECONDS, runToEnd, stepBattle, strikeChance, TIME_LIMIT, type Battle, type BattleEvent } from './battle'
+import { CLOSE_LOW, COMEBACK_BEHIND, COMEBACK_LOW, createBattle, cutInKind, drainEvents, DT, isComeback, planCutIn, READY_SECONDS, runToEnd, stepBattle, strikeChance, TIME_LIMIT, type Battle, type BattleEvent } from './battle'
 import { SPECIES, speciesById, type Species } from './species'
 import { STAGES, type StageId } from './stages'
 
@@ -221,5 +221,36 @@ describe('ぎゃくてん', () => {
     }
     expect(cutIns / games).toBeGreaterThan(.15)
     expect(cutIns / games).toBeLessThan(.25)
+  })
+
+  test('カットインは きめての わざの ところで いれる（とんで いく まえ）', () => {
+    let planned = 0, early = 0
+    for (const stage of STAGES) {
+      for (const [i, a] of SPECIES.entries()) {
+        for (let k = 0; k < 2; k++) {
+          const b = SPECIES[(i * 7 + k * 3 + 1) % SPECIES.length]
+          const seed = 300 + i * 31 + k * 7
+          const plan = planCutIn(createBattle(a, b, stage.id, seed, stage.startU))
+          const battle = createBattle(a, b, stage.id, seed, stage.startU)
+          let step = 0, at: BattleEvent[] = []
+          while (battle.state !== 'over' && step < (TIME_LIMIT + READY_SECONDS + 5) * 60) {
+            stepBattle(battle)
+            const events = drainEvents(battle)
+            if (++step === plan?.step) at = events
+          }
+          const kind = cutInKind(battle, battle.winner!, battle.reason!)
+          expect(plan?.kind ?? null, `${stage.id} ${a.id} vs ${b.id}`).toBe(kind)
+          if (!plan) continue
+          planned++
+          expect(plan.winner).toBe(battle.winner)
+          expect(plan.step).toBeLessThanOrEqual(step)
+          expect(at.some(e => (e.type === 'hit' && e.side === plan.winner) || (e.type === 'fall' && e.side !== plan.winner) || e.type === 'end')).toBe(true)
+          if (plan.step < step) early++
+        }
+      }
+    }
+    expect(planned).toBeGreaterThan(5)
+    // なげで きまる ときは おちる まえ（わざの ところ）に いれる。
+    expect(early / planned).toBeGreaterThan(.5)
   })
 })
