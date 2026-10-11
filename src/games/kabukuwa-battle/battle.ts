@@ -180,6 +180,9 @@ export function contactDistance(a: Fighter, b: Fighter) {
   return (a.front + b.front) * .52 + 4
 }
 
+/** くみあう きょりの あそび（ドット）。 */
+const CONTACT_SLOP = .5
+
 function turnToward(f: Fighter, angle: number, rate: number) {
   let d = angle - f.heading
   while (d > Math.PI) d -= Math.PI * 2
@@ -247,7 +250,9 @@ function approach(b: Battle, f: Fighter) {
     return
   }
   f.pose.lift = Math.max(0, f.pose.lift - DT * 2)
-  if (d <= contact) {
+  // ちょうど contact まで あるくと けいさんの ごさで ほんの すこし とどかず、
+  // どちらも うごかない まま とまって しまう。すこし てまえで くみあう。
+  if (d <= contact + CONTACT_SLOP) {
     startClash(b, f, o)
     return
   }

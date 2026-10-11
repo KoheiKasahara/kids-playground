@@ -55,6 +55,25 @@ describe('たたかいの すすみかた', () => {
     }
   })
 
+  // くみあう きょりの すこし てまえで 2ひきとも とまり、じかんぎれまで うごかなく なった ことが あった。
+  test.each([
+    ['branch', 'kabutomushi', 'caucasus', 7919],
+    ['log', 'elephas', 'ookuwa', 7919 * 3],
+    ['stump', 'atlas', 'grantii', 7919 * 6],
+  ] as const)('%s: %s と %s が ちかづいた まま とまらない', (stage, a, b, seed) => {
+    const battle = createBattle(sp(a), sp(b), stage, seed, STAGES.find(s => s.id === stage)?.startU)
+    let quiet = 0, longest = 0
+    for (let i = 0; i < (TIME_LIMIT + READY_SECONDS + 5) * 60 && battle.state !== 'over'; i++) {
+      stepBattle(battle)
+      const happened = drainEvents(battle).length > 0
+      if (battle.state !== 'fight') continue
+      quiet = happened ? 0 : quiet + DT
+      longest = Math.max(longest, quiet)
+    }
+    expect(longest).toBeLessThan(8)
+    expect(battle.reason).not.toBe('judge')
+  })
+
   test('くみあうと ツノ・あごが ぶつかり、わざを だす', () => {
     const { events } = play(sp('caucasus'), sp('atlas'), 'stump', 3)
     const types = new Set(events.map(e => e.type))
