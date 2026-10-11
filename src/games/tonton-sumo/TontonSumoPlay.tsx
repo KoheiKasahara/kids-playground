@@ -221,7 +221,7 @@ export default function TontonSumoPlay() {
             <div className={styles.characters} role="group" aria-label={`${SIDE_NAMES[picking]}の おすもうさん`}>
               {WRESTLERS.map((wrestler, index) => (
                 <button key={wrestler.key} type="button" aria-label={wrestler.name} aria-pressed={fighters[picking] === index} onClick={() => pick(index)}>
-                  <svg viewBox="-4 0 168 182" aria-hidden="true"><PaperSheet index={index} belt={fighters[picking] === index ? SIDE_COLORS[picking].belt : undefined} /></svg>
+                  <svg viewBox="72 0 100 182" aria-hidden="true"><PaperSheet index={index} belt={fighters[picking] === index ? SIDE_COLORS[picking].belt : undefined} /></svg>
                   <span>{wrestler.name}</span>
                   <small>{wrestler.trait}</small>
                   {(['left', 'right'] as const).filter((side) => fighters[side] === index).map((side) => (

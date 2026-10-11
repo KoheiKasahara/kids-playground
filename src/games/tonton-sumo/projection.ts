@@ -12,8 +12,8 @@ export const RING_PX = 205
 export const DEPTH_PX = 112
 /** Farther things are drawn a little smaller. */
 const PERSPECTIVE = 0.1
-/** A wrestler sheet (160 px wide) shown at this size in the scene. */
-export const FIGURE_SCALE = 1.02
+/** A wrestler sheet shown at this size in the scene; only its folded half (80 px) faces the viewer. */
+export const FIGURE_SCALE = 1.2
 
 export const perspective = (z: number) => 1 - PERSPECTIVE * z
 

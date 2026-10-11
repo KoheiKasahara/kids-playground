@@ -48,6 +48,11 @@ describe('TontonSumoPlay', () => {
     expect(container.querySelector(`.${surfaceStyles.surface}`)).not.toBeNull()
     expect(screen.getByRole('status')).toHaveTextContent('はっけよい')
     expect(screen.getByRole('button', { name: /はこを トントン/ })).toHaveFocus()
+    // Folded along the back: the near half shows the printed wrestler, the far half its blank inside.
+    for (const side of ['left', 'right']) {
+      expect(scene().querySelectorAll(`[data-side="${side}"] [data-face="print"]`)).toHaveLength(1)
+      expect(scene().querySelectorAll(`[data-side="${side}"] [data-face="blank"]`)).toHaveLength(1)
+    }
     tapBox(-1.25, 0)
     expect(screen.getByRole('status')).toHaveTextContent('のこった')
     tapUntilDecided(-1.25)
