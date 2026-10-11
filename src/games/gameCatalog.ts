@@ -1032,6 +1032,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'tonton-sumo',
+    slug: 'tonton-sumo',
+    title: 'トントンずもう',
+    emoji: '🙌',
+    category: 'learning',
+    seo: {
+      headline: 'トントンずもう｜紙のおすもうさんを動かすタップあそび',
+      description:
+        'かわいい紙のおすもうさんを選んで、箱をトントンたたく相撲あそびです。ボタンをたたくとおすもうさんが跳ねて、相手を土俵の外へ押し出します。ひとりでも、同じ画面でふたりでも遊べます。',
+    },
+    intro: {
+      howToPlay: [
+        'おすもうさんと、ひとり・ふたりを えらぼう',
+        'じぶんの ボタンを トントン！ そとへ おしだすと かち',
+        'パソコンは A が ひだり、L が みぎ。ひとりは スペースも！',
+      ],
+    },
+  },
+  {
     id: 'shabon-pachin',
     slug: 'shabon-pachin',
     title: 'しゃぼんだま パチン',

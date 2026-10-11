@@ -86,6 +86,7 @@ export const routes: RouteObject[] = [
   { path: '/games/jishaku-pitatto', element: lazyRoute(() => import('../games/jishaku-pitatto/JishakuPitattoPlay')) },
   // あそびかた選択・プレイ・結果が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // ShabonPachinPlay内でプレイ側の描画だけを条件付きに包んでいる。
+  { path: '/games/tonton-sumo', element: lazyRoute(() => import('../games/tonton-sumo/TontonSumoPlay')) },
   { path: '/games/shabon-pachin', element: lazyRoute(() => import('../games/shabon-pachin/ShabonPachinPlay')) },
   // ステージ選択・プレイ・結果が同一route内で切り替わるため、GamePlaySurfaceはここでは包まず
   // OnajiPonPlay内でプレイ側の描画だけを条件付きに包んでいる。
