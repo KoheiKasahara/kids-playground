@@ -222,6 +222,28 @@ type Result = { winner: 0 | 1; reason: EndReason }
 /** わざが きまった ときの「ドカーン！」などの もじ。x・y は キャンバスに たいする %。 */
 type Pop = { id: number; text: string; x: number; y: number; big: boolean; tone: 'hit' | 'clash' | 'special' | 'soft' }
 
+/** ぎゃくてんの カットインを みせる じかん（たたかいは とまる）。 */
+const CUT_IN_SECONDS = 1.8
+const SHOUT = 'ウオリャアアアアア！'
+
+/** ぎゃくてん した ときの カットイン。ななめの おびが ひだりから スワイプで はいり、ゆれながら むしが さけぶ。 */
+function ComebackCutIn({ sp, side }: { sp: Species; side: 0 | 1 }) {
+  return <div className={styles.cutIn} style={{ '--team': TEAM_COLORS[side] } as CSSProperties} aria-hidden="true" data-testid="kabukuwa-cut-in">
+    <span className={styles.cutInFlash} />
+    <span className={styles.cutInSwipe} />
+    <div className={styles.cutInRumble}>
+      <div className={styles.cutInBand}>
+        <span className={styles.cutInLines} />
+        <BeetlePicture sp={sp} className={styles.cutInBeetle} />
+        <p className={styles.cutInShout}>
+          {[...SHOUT].map((ch, i) => <span key={i} style={{ '--i': i } as CSSProperties}>{ch}</span>)}
+        </p>
+      </div>
+      <p className={styles.cutInLabel}>ぎゃくてん！</p>
+    </div>
+  </div>
+}
+
 /**
  * canvas を 画面の 大きさに あわせる。たてむきの ときは たたかいの 画面ごと 90° まわして いるので、
  * getBoundingClientRect（まわした あとの 大きさ）ではなく、まわす まえの 大きさ（clientWidth）を つかう。
@@ -250,6 +272,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
   const [result, setResult] = useState<Result | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [pops, setPops] = useState<Pop[]>([])
+  const [cutIn, setCutIn] = useState<0 | 1 | null>(null)
   const mirror = mine.id === foe.id
 
   useEffect(() => {
@@ -313,16 +336,30 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
         case 'fall': sound.playFall(); setMessage(`${name(e.side)}が おちた！`); pop('ひゅ〜', ...at(e.side, 10), true, 'soft'); break
         case 'flee': sound.playFall(); setMessage(`${name(e.side)}は にげだした！`); break
         case 'timeup': sound.playGo(); setMessage('じかんぎれ！'); break
-        case 'end':
-          if (!still) slow = 1.2
+        case 'end': {
+          // じぶんの むしが れっせいから ぎゃくてんした ときだけ、とめて カットインを いれる（たまにしか でない）。
+          const comeback = e.comeback && e.winner === 0
+          const lag = comeback ? CUT_IN_SECONDS * 1000 : 0
+          if (comeback) {
+            stop = CUT_IN_SECONDS
+            sound.playCutIn()
+            vibrate('impact')
+            setCutIn(e.winner)
+            setMessage(`${name(e.winner)}の ぎゃくてん！ ウオリャアアアア！`)
+            timers.push(setTimeout(() => setCutIn(null), lag))
+          }
+          // スローは カットインの あいだ（とまって いる あいだ）も へるので、そのぶん ながく する。
+          if (!still) slow = lag / 1000 + 1.2
           setResult({ winner: e.winner, reason: e.reason })
-          setBanner('end')
-          timers.push(setTimeout(() => setMessage(`${name(e.winner)}の かち！`), 1400))
+          if (comeback) timers.push(setTimeout(() => setBanner('end'), lag))
+          else setBanner('end')
+          timers.push(setTimeout(() => setMessage(`${name(e.winner)}の かち！`), lag + 1400))
           timers.push(setTimeout(() => {
             if (e.winner === 0) { sound.playWin(); vibrate('celebrate') } else sound.playLose()
-          }, 500))
-          timers.push(setTimeout(() => setShowResult(true), 2600))
+          }, lag + 500))
+          timers.push(setTimeout(() => setShowResult(true), lag + 2600))
           break
+        }
         default: break
       }
     }
@@ -390,6 +427,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
       <div className={styles.pops} aria-hidden="true">
         {pops.map(p => <span key={p.id} className={styles.pop} data-tone={p.tone} data-big={p.big} style={{ left: `${p.x}%`, top: `${p.y}%` }}>{p.text}</span>)}
       </div>
+      {cutIn !== null && <ComebackCutIn sp={cutIn === 0 ? mine : foe} side={cutIn} />}
       {banner === 'ready' && <p className={styles.banner} aria-hidden="true">はっけよい…<small>{stage.view}・{stage.name}</small></p>}
       {banner === 'go' && <p className={`${styles.banner} ${styles.bannerGo}`} aria-hidden="true">のこった！</p>}
       {banner === 'end' && result && !showResult && <p className={`${styles.banner} ${styles.bannerEnd}`} style={{ '--team': TEAM_COLORS[result.winner] } as CSSProperties} aria-hidden="true">

@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import KabukuwaBattlePlay from './KabukuwaBattlePlay'
 import type { Battle } from './battle'
 import { SPECIES } from './species'
-import { playBuzz, playGo, playReady, playWin } from './sounds'
+import { playBuzz, playCutIn, playGo, playReady, playWin } from './sounds'
 
 vi.mock('./sounds', async importOriginal => {
   const actual = await importOriginal<typeof import('./sounds')>()
@@ -154,6 +154,8 @@ describe('カブクワ バトル', () => {
     expect(playWin).toHaveBeenCalled()
     expect(screen.getByRole('heading', { name: 'ヘラクレスの かち！' })).toBeInTheDocument()
     expect(screen.getByText('コーカサスは かなわないと おもって にげだした！')).toBeInTheDocument()
+    expect(screen.queryByTestId('kabukuwa-cut-in')).not.toBeInTheDocument()
+    expect(playCutIn).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
     expect(screen.queryByRole('heading', { name: 'ヘラクレスの かち！' })).not.toBeInTheDocument()
@@ -206,6 +208,43 @@ describe('カブクワ バトル', () => {
     advance(1)
     unmount()
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  test('じぶんの むしが れっせいから ぎゃくてんした ときだけ カットインが はいり、たたかいが とまる', () => {
+    renderGame()
+    chooseHerculesVsCaucasus()
+    fireEvent.click(screen.getByRole('button', { name: 'きりかぶ どひょう（うえから みる）' }))
+    advance(2.4)
+    // げんきで おおきく まけていた ことに して、あいてを つかれきらせる。
+    act(() => { battle()!.lowest[0] = .3; battle()!.behind[0] = .4; battle()!.f[1].st = 0 })
+    advance(.2)
+    expect(battle()?.state).toBe('over')
+    expect(screen.getByTestId('kabukuwa-cut-in')).toHaveTextContent('ウオリャア')
+    expect(screen.getByRole('status')).toHaveTextContent('ヘラクレスの ぎゃくてん！')
+    expect(playCutIn).toHaveBeenCalledTimes(1)
+    // カットインの あいだは とまって いる。
+    const t = battle()!.stateT
+    advance(1)
+    expect(battle()!.stateT).toBe(t)
+    expect(playWin).not.toHaveBeenCalled()
+
+    advance(1)
+    expect(screen.queryByTestId('kabukuwa-cut-in')).not.toBeInTheDocument()
+    advance(3)
+    expect(playWin).toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'ヘラクレスの かち！' })).toBeInTheDocument()
+  })
+
+  test('あいてが ぎゃくてんして かった ときは カットインを ださない', () => {
+    renderGame()
+    chooseHerculesVsCaucasus()
+    fireEvent.click(screen.getByRole('button', { name: 'もりの まるた（ななめから みる）' }))
+    advance(2.4)
+    act(() => { battle()!.lowest[1] = .3; battle()!.behind[1] = .4; battle()!.f[0].st = 0 })
+    advance(.5)
+    expect(battle()?.state).toBe('over')
+    expect(screen.queryByTestId('kabukuwa-cut-in')).not.toBeInTheDocument()
+    expect(playCutIn).not.toHaveBeenCalled()
   })
 
   test('おとの ON/OFF を きりかえられる', () => {

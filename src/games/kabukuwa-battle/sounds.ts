@@ -217,6 +217,48 @@ export function playCling() {
   slide(ctx, 900, 600, t + .1, .1, .1, 'square')
 }
 
+/** きらきら ふるえながら きえていく たかい おと（「ピーーン」の ぶぶん）。 */
+function ring(ctx: AudioContext, f: number, start: number, dur: number, vol: number) {
+  const osc = ctx.createOscillator()
+  const lfo = ctx.createOscillator()
+  const depth = ctx.createGain()
+  const shimmer = ctx.createGain()
+  const gain = ctx.createGain()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(f, start)
+  // ふるえ（トレモロ）で キラキラ させる。
+  lfo.frequency.value = 17
+  depth.gain.value = .45
+  shimmer.gain.value = .55
+  lfo.connect(depth).connect(shimmer.gain)
+  gain.gain.setValueAtTime(0, start)
+  gain.gain.linearRampToValueAtTime(vol, start + .008)
+  gain.gain.exponentialRampToValueAtTime(.001, start + dur)
+  osc.connect(shimmer).connect(gain).connect(getSoundOutput(ctx))
+  osc.start(start); lfo.start(start)
+  osc.stop(start + dur + .02); lfo.stop(start + dur + .02)
+}
+
+/** ぎゃくてんの カットイン「シュッ（スワイプ）… キュピーン！」。 */
+export function playCutIn() {
+  const ctx = sfx()
+  if (!ctx) return
+  const t = ctx.currentTime
+  // シュッ（おびが ひだりから はいる）。
+  noise(ctx, t, .2, .3, 'bandpass', 700, 5000)
+  // キュ（いっきに かけあがる）。
+  const kyu = t + .17
+  slide(ctx, 900, 3400, kyu, .07, .09, 'square')
+  slide(ctx, 1400, 4200, kyu + .02, .06, .05, 'pulse')
+  // ピーーン（きらきら ひびいて きえる）。
+  const pin = kyu + .07
+  tone(ctx, freq('B6'), pin, .05, .08, 'pulse')
+  ring(ctx, freq('E7'), pin, 1, .16)
+  ring(ctx, freq('B6'), pin, .8, .1)
+  ring(ctx, freq('E6'), pin, .6, .08)
+  noise(ctx, pin, .3, .08, 'highpass', 7000)
+}
+
 /** かった ときの ファンファーレ。 */
 export function playWin() {
   const ctx = sfx()
