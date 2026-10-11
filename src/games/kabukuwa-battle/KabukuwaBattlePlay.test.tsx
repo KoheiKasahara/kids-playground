@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import KabukuwaBattlePlay from './KabukuwaBattlePlay'
 import type { Battle } from './battle'
 import { SPECIES } from './species'
-import { playBuzz, playGo, playReady, playShout, playWin } from './sounds'
+import { playBuzz, playCutIn, playGo, playReady, playWin } from './sounds'
 
 vi.mock('./sounds', async importOriginal => {
   const actual = await importOriginal<typeof import('./sounds')>()
@@ -131,7 +131,7 @@ describe('カブクワ バトル', () => {
     expect(screen.getByRole('heading', { name: 'ヘラクレスの かち！' })).toBeInTheDocument()
     expect(screen.getByText('コーカサスは かなわないと おもって にげだした！')).toBeInTheDocument()
     expect(screen.queryByTestId('kabukuwa-cut-in')).not.toBeInTheDocument()
-    expect(playShout).not.toHaveBeenCalled()
+    expect(playCutIn).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
     expect(screen.queryByRole('heading', { name: 'ヘラクレスの かち！' })).not.toBeInTheDocument()
@@ -197,7 +197,7 @@ describe('カブクワ バトル', () => {
     expect(battle()?.state).toBe('over')
     expect(screen.getByTestId('kabukuwa-cut-in')).toHaveTextContent('ウオリャア')
     expect(screen.getByRole('status')).toHaveTextContent('ヘラクレスの ぎゃくてん！')
-    expect(playShout).toHaveBeenCalledTimes(1)
+    expect(playCutIn).toHaveBeenCalledTimes(1)
     // カットインの あいだは とまって いる。
     const t = battle()!.stateT
     advance(1)
@@ -220,7 +220,7 @@ describe('カブクワ バトル', () => {
     advance(.5)
     expect(battle()?.state).toBe('over')
     expect(screen.queryByTestId('kabukuwa-cut-in')).not.toBeInTheDocument()
-    expect(playShout).not.toHaveBeenCalled()
+    expect(playCutIn).not.toHaveBeenCalled()
   })
 
   test('おとの ON/OFF を きりかえられる', () => {

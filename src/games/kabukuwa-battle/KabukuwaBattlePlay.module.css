@@ -724,6 +724,28 @@ button.window:focus-visible,
   animation: cutInFlash .3s steps(3);
 }
 
+/* おびの さきを はしる しろい すじ（スワイプの いきおい）。 */
+.cutInSwipe {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 40%;
+  height: clamp(130px, 52vmin, 300px);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 85%) 70%, #fff);
+  opacity: 0;
+  transform: translate(-100%, -50%) rotate(-7deg) skewX(-30deg);
+  animation: cutInSwipe .32s cubic-bezier(.3, .7, .4, 1) forwards;
+}
+
+/* おびが とまって いる あいだ ずっと ガタガタ ゆれる。 */
+.cutInRumble {
+  position: absolute;
+  inset: 0;
+  animation:
+    cutInJolt .18s ease-out .2s,
+    cutInRumble .11s linear .38s 11;
+}
+
 .cutInBand {
   position: absolute;
   left: -10%;
@@ -739,7 +761,7 @@ button.window:focus-visible,
   background: var(--team);
   box-shadow: 0 0 0 4px #0c2010, 0 10px 0 4px rgb(0 0 0 / 35%);
   transform: translateY(-50%) rotate(-7deg);
-  animation: cutInBand 1.8s steps(36) forwards;
+  animation: cutInBand 1.8s linear forwards;
 }
 
 /* チカチカ する スピードせん。 */
@@ -757,7 +779,7 @@ button.window:focus-visible,
   height: 80%;
   width: auto;
   filter: drop-shadow(4px 4px 0 #0c2010);
-  animation: cutInBeetle 1.8s steps(36) forwards;
+  animation: cutInBeetle 1.8s linear forwards;
 }
 
 .cutInShout {
@@ -822,10 +844,34 @@ button.window:focus-visible,
   100% { opacity: 0; }
 }
 
+@keyframes cutInSwipe {
+  0% { opacity: 1; transform: translate(-100%, -50%) rotate(-7deg) skewX(-30deg); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(260%, -50%) rotate(-7deg) skewX(-30deg); }
+}
+
+/* ひだりから シュッと はいって すこし いきすぎ、ピタッと とまる。でる ときは みぎへ ぬける。 */
 @keyframes cutInBand {
-  0% { transform: translate(-110%, -50%) rotate(-7deg); }
-  10%, 86% { transform: translate(0, -50%) rotate(-7deg); }
-  100% { transform: translate(110%, -50%) rotate(-7deg); }
+  0% { transform: translate(-130%, -50%) rotate(-7deg) skewX(-24deg); animation-timing-function: cubic-bezier(.2, .8, .3, 1); }
+  12% { transform: translate(4%, -50%) rotate(-7deg) skewX(6deg); animation-timing-function: ease-out; }
+  17% { transform: translate(0, -50%) rotate(-7deg) skewX(0); }
+  86% { transform: translate(0, -50%) rotate(-7deg) skewX(0); animation-timing-function: cubic-bezier(.6, 0, .9, .4); }
+  100% { transform: translate(130%, -50%) rotate(-7deg) skewX(-24deg); }
+}
+
+/* とまった しゅんかんの ドンッ。 */
+@keyframes cutInJolt {
+  0% { transform: translate(10px, 6px) scale(1.04); }
+  40% { transform: translate(-6px, -4px) scale(.99); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes cutInRumble {
+  0% { transform: translate(0, 0) rotate(0); }
+  25% { transform: translate(calc(max(5px, 1.1vmin) * -1), max(4px, .8vmin)) rotate(-.8deg); }
+  50% { transform: translate(max(5px, 1.1vmin), calc(max(4px, .8vmin) * -1)) rotate(.6deg); }
+  75% { transform: translate(calc(max(4px, .8vmin) * -1), calc(max(5px, 1.1vmin) * -1)) rotate(-.4deg); }
+  100% { transform: translate(0, 0) rotate(0); }
 }
 
 @keyframes cutInLines {
@@ -833,10 +879,11 @@ button.window:focus-visible,
   100% { background-position: 0 13px; }
 }
 
+/* おびより すこし おくれて とびこむ。 */
 @keyframes cutInBeetle {
-  0% { transform: translateX(-60%) scale(.8); }
-  14% { transform: translateX(8%) scale(1.08); }
-  20%, 100% { transform: translateX(0) scale(1); }
+  0%, 6% { transform: translateX(-80%) scale(.8); animation-timing-function: cubic-bezier(.2, .8, .3, 1); }
+  16% { transform: translateX(10%) scale(1.1); animation-timing-function: ease-out; }
+  22%, 100% { transform: translateX(0) scale(1); }
 }
 
 @keyframes cutInShake {
@@ -1001,6 +1048,8 @@ button.window:focus-visible,
   .rotateHint span,
   .cutIn,
   .cutInFlash,
+  .cutInSwipe,
+  .cutInRumble,
   .cutInBand,
   .cutInLines,
   .cutInBeetle,

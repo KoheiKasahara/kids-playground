@@ -226,18 +226,21 @@ type Pop = { id: number; text: string; x: number; y: number; big: boolean; tone:
 const CUT_IN_SECONDS = 1.8
 const SHOUT = 'ウオリャアアアアア！'
 
-/** ぎゃくてん した ときの カットイン。ななめの おびに むしが とびこんで さけぶ。 */
+/** ぎゃくてん した ときの カットイン。ななめの おびが ひだりから スワイプで はいり、ゆれながら むしが さけぶ。 */
 function ComebackCutIn({ sp, side }: { sp: Species; side: 0 | 1 }) {
   return <div className={styles.cutIn} style={{ '--team': TEAM_COLORS[side] } as CSSProperties} aria-hidden="true" data-testid="kabukuwa-cut-in">
     <span className={styles.cutInFlash} />
-    <div className={styles.cutInBand}>
-      <span className={styles.cutInLines} />
-      <BeetlePicture sp={sp} className={styles.cutInBeetle} />
-      <p className={styles.cutInShout}>
-        {[...SHOUT].map((ch, i) => <span key={i} style={{ '--i': i } as CSSProperties}>{ch}</span>)}
-      </p>
+    <span className={styles.cutInSwipe} />
+    <div className={styles.cutInRumble}>
+      <div className={styles.cutInBand}>
+        <span className={styles.cutInLines} />
+        <BeetlePicture sp={sp} className={styles.cutInBeetle} />
+        <p className={styles.cutInShout}>
+          {[...SHOUT].map((ch, i) => <span key={i} style={{ '--i': i } as CSSProperties}>{ch}</span>)}
+        </p>
+      </div>
+      <p className={styles.cutInLabel}>ぎゃくてん！</p>
     </div>
-    <p className={styles.cutInLabel}>ぎゃくてん！</p>
   </div>
 }
 
@@ -339,7 +342,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
           const lag = comeback ? CUT_IN_SECONDS * 1000 : 0
           if (comeback) {
             stop = CUT_IN_SECONDS
-            sound.playShout()
+            sound.playCutIn()
             vibrate('impact')
             setCutIn(e.winner)
             setMessage(`${name(e.winner)}の ぎゃくてん！ ウオリャアアアア！`)

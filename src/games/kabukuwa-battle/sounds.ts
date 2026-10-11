@@ -217,45 +217,46 @@ export function playCling() {
   slide(ctx, 900, 600, t + .1, .1, .1, 'square')
 }
 
-/** ぎゃくてんの カットイン「シャキーン！ ウオリャアアア！」。こえ ふうに ふるえながら たかく なる。 */
-export function playShout() {
-  const ctx = sfx()
-  if (!ctx) return
-  const t = ctx.currentTime
-  // シャキーン（カットインが はいる おと）。
-  noise(ctx, t, .12, .35, 'highpass', 3000)
-  slide(ctx, 600, 2400, t, .18, .1, 'pulse')
-  tone(ctx, freq('E6'), t + .12, .1, .07, 'pulse')
-  tone(ctx, freq('B6'), t + .2, .16, .07, 'pulse')
-  // ウオリャアアア（のこぎり波を 口の かたちの フィルターに とおす）。
-  const s = t + .25, dur = 1.25
+/** きらきら ふるえながら きえていく たかい おと（「ピーーン」の ぶぶん）。 */
+function ring(ctx: AudioContext, f: number, start: number, dur: number, vol: number) {
   const osc = ctx.createOscillator()
   const lfo = ctx.createOscillator()
   const depth = ctx.createGain()
-  const mouth = ctx.createBiquadFilter()
+  const shimmer = ctx.createGain()
   const gain = ctx.createGain()
-  osc.type = 'sawtooth'
-  osc.frequency.setValueAtTime(150, s)
-  osc.frequency.exponentialRampToValueAtTime(260, s + .3)
-  osc.frequency.exponentialRampToValueAtTime(330, s + dur)
-  lfo.frequency.setValueAtTime(7, s)
-  lfo.frequency.linearRampToValueAtTime(13, s + dur)
-  depth.gain.value = 16
-  lfo.connect(depth).connect(osc.frequency)
-  // ウ → オ → ア と 口が ひらいて いく。
-  mouth.type = 'bandpass'
-  mouth.Q.value = 2.2
-  mouth.frequency.setValueAtTime(380, s)
-  mouth.frequency.linearRampToValueAtTime(600, s + .25)
-  mouth.frequency.linearRampToValueAtTime(950, s + .45)
-  gain.gain.setValueAtTime(0, s)
-  gain.gain.linearRampToValueAtTime(.3, s + .05)
-  gain.gain.setValueAtTime(.3, s + dur - .25)
-  gain.gain.linearRampToValueAtTime(0, s + dur)
-  osc.connect(mouth).connect(gain).connect(getSoundOutput(ctx))
-  osc.start(s); lfo.start(s)
-  osc.stop(s + dur + .02); lfo.stop(s + dur + .02)
-  noise(ctx, s, .6, .06, 'bandpass', 1200)
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(f, start)
+  // ふるえ（トレモロ）で キラキラ させる。
+  lfo.frequency.value = 17
+  depth.gain.value = .45
+  shimmer.gain.value = .55
+  lfo.connect(depth).connect(shimmer.gain)
+  gain.gain.setValueAtTime(0, start)
+  gain.gain.linearRampToValueAtTime(vol, start + .008)
+  gain.gain.exponentialRampToValueAtTime(.001, start + dur)
+  osc.connect(shimmer).connect(gain).connect(getSoundOutput(ctx))
+  osc.start(start); lfo.start(start)
+  osc.stop(start + dur + .02); lfo.stop(start + dur + .02)
+}
+
+/** ぎゃくてんの カットイン「シュッ（スワイプ）… キュピーン！」。 */
+export function playCutIn() {
+  const ctx = sfx()
+  if (!ctx) return
+  const t = ctx.currentTime
+  // シュッ（おびが ひだりから はいる）。
+  noise(ctx, t, .2, .3, 'bandpass', 700, 5000)
+  // キュ（いっきに かけあがる）。
+  const kyu = t + .17
+  slide(ctx, 900, 3400, kyu, .07, .09, 'square')
+  slide(ctx, 1400, 4200, kyu + .02, .06, .05, 'pulse')
+  // ピーーン（きらきら ひびいて きえる）。
+  const pin = kyu + .07
+  tone(ctx, freq('B6'), pin, .05, .08, 'pulse')
+  ring(ctx, freq('E7'), pin, 1, .16)
+  ring(ctx, freq('B6'), pin, .8, .1)
+  ring(ctx, freq('E6'), pin, .6, .08)
+  noise(ctx, pin, .3, .08, 'highpass', 7000)
 }
 
 /** かった ときの ファンファーレ。 */
