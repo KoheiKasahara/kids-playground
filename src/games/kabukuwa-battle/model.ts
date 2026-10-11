@@ -202,11 +202,14 @@ function limb(spec: Limb, anchor: V3, side: 1 | -1, mat: MatKey, out: Prim[], sc
     out.push(segment(p, add(p, mul(norm(add(d, mul(dir, .25))), tooth.len)), r, mat))
   }
   if (spec.hair) {
-    for (let i = 0; i < 6; i++) {
-      const t = .25 + i * .1
+    const thick = spec.hair === 'thick'
+    for (let i = 0; i < (thick ? 9 : 6); i++) {
+      const t = thick ? .1 + i * .09 : .25 + i * .1
       const p = spline(pts, t)
       const r = r0 + (r1 - r0) * t
-      out.push({ c: add(p, [0, 0, -r * .75]), r: [.035, r * .75, r * .5], m: I3, mat: 'hair' })
+      out.push(thick
+        ? { c: add(p, [0, 0, -r * .85]), r: [.05, r * .9, r * .72], m: I3, mat: 'hair' }
+        : { c: add(p, [0, 0, -r * .75]), r: [.035, r * .75, r * .5], m: I3, mat: 'hair' })
     }
   }
 }

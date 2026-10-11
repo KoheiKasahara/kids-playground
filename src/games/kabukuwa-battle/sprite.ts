@@ -45,7 +45,7 @@ function materialsOf(sp: Species): Record<MatKey, Mat> {
     leg: { ramp: rampRgb(look.leg), gloss: .3 },
     belly: { ramp: rampRgb(look.leg), gloss: .2 },
     eye: { ramp: rampRgb(EYE), gloss: 1 },
-    hair: { ramp: rampRgb(HAIR), gloss: 0 },
+    hair: { ramp: rampRgb(look.hair ?? HAIR), gloss: 0 },
   }
 }
 

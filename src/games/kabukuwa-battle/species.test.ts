@@ -16,6 +16,16 @@ describe('カブクワの しゅるい', () => {
     expect(new Set(SPECIES.filter(sp => sp.area !== 'japan').map(sp => sp.area)).size).toBeGreaterThanOrEqual(3)
   })
 
+  test('カブトムシ 8しゅるい・クワガタ 8しゅるい。あとから くわえた 4しゅるいは なかまの さいごに ならぶ', () => {
+    expect(SPECIES).toHaveLength(16)
+    expect(speciesOfGroup('kabuto').map(sp => sp.id).slice(-2)).toEqual(['neptunus', 'satanas'])
+    expect(speciesOfGroup('kuwagata').map(sp => sp.id).slice(-2)).toEqual(['allotopus', 'titanus'])
+    expect(speciesById('neptunus')?.lengthMm[1]).toBe(160)
+    expect(speciesById('satanas')?.lengthMm[1]).toBe(115)
+    expect(speciesById('allotopus')?.lengthMm[1]).toBe(80)
+    expect(speciesById('titanus')?.lengthMm[1]).toBe(100)
+  })
+
   test('おおきさは ずかんの 最大体長から きまり、ちから・はやさは 1〜10', () => {
     for (const sp of SPECIES) {
       const [min, max] = sp.lengthMm
