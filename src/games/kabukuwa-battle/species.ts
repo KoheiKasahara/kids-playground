@@ -8,21 +8,28 @@
 //   - アトラスオオカブト: オス 約 60〜120mm
 //   - ゾウカブト: ふつう 70〜120mm、最大の オスで 137mm
 //   - グラントシロカブト: オス 50〜85mm
+//   - ネプチューンオオカブト: オス 最大 約160mm
+//   - サタンオオカブト: オス 最大 約115mm
 //   - ノコギリクワガタ: オス 26〜74mm（野外の 最大記録 74.7mm）
 //   - ミヤマクワガタ: オス 42〜78mm（野外の 最大記録 78.6mm）
 //   - オオクワガタ: 野外の 最大記録 77.0mm
 //   - ギラファノコギリクワガタ: オス 最大 119mm（世界で いちばん ながい クワガタ）
 //   - パラワンオオヒラタクワガタ: 野外の オス 最大 111.3mm
 //   - ニジイロクワガタ: オス 24〜70mm
+//   - オウゴンオニクワガタ（モーレンカンプ）: オス 最大 約80mm
+//   - スマトラオオヒラタクワガタ: オス 最大 約100mm
 //   ゲームの「おおきさ」は、この 最大体長を ヘラクレス（172mm）が 10 に なるように わりふった（sizeScore）。
 //
 // ■ ちから・はやさ
 //   図鑑や 飼育書で よく いわれる とくちょうから きめた。
 //   ちから: 「アジア最大で 気性が あらく 最強の こえも ある」コーカサス、「はさむ力が とても つよい」パラワンオオヒラタ、
-//           「ながい ツノで はさんで もちあげる」ヘラクレス、「おもくて どっしり」ゾウカブト などを たかく、
+//           「ながい ツノで はさんで もちあげる」ヘラクレス、「おもくて どっしり」ゾウカブト、
+//           「ふとい 大あごで 気性が あらい」スマトラオオヒラタ などを たかく、
 //           「おだやかな せいかく」の ニジイロクワガタを ひくく した。
 //   はやさ: 「動きが すばやく 攻撃的」な アトラス、「ちいさく 活発」な ニジイロ などを たかく、
 //           「しんちょうで 動きが ゆっくり」な オオクワガタ、「のんびり おもい」ゾウカブトを ひくく した。
+//   あとから くわえた 4しゅるいは、にている なかまに あわせた: ネプチューンは ヘラクレスより すこし ひかえめ、
+//   サタンは ツノが ふとく みじかい ぶん ちゅうくらい、オウゴンオニは ミヤマくらい、スマトラは パラワンより すこし ひかえめ。
 
 export type BeetleGroup = 'kabuto' | 'kuwagata'
 /** わざの かた。すくいなげ（したから すくう）・はさみあげ（はさんで もちあげる）・はさみ（しめつける）・たいあたり。 */
@@ -50,8 +57,8 @@ export type Limb = {
   fork?: number
   /** こぶ・は（path の どこ 0〜1、ながさ、むき）。 */
   teeth?: readonly { at: number; len: number; dir: 'up' | 'down' | 'in' }[]
-  /** ツノの したがわの 毛（ヘラクレス）。 */
-  hair?: boolean
+  /** ツノの したがわの 毛（ヘラクレス）。'thick' は ツノの ねもとから びっしり（サタン）。 */
+  hair?: boolean | 'thick'
 }
 
 export type Pattern = 'spots' | 'fuzz' | 'gold' | 'rainbow' | 'metal'
@@ -73,6 +80,8 @@ export type Look = {
   horns?: readonly Limb[]
   /** クワガタの 大あご（ひだりがわ）。 */
   jaw?: Limb
+  /** ツノの 毛の 色（なければ ちゃいろ）。 */
+  hair?: Ramp
   /** ミヤマの みみ（あたまの よこの でっぱり）。 */
   ears?: boolean
   /** ぜんぶの ながさに たいする からだ（ツノ・あごを のぞく）の わりあいの めやす。 */
@@ -111,6 +120,9 @@ export function sizeScore(maxMm: number) {
 const BLACK_GLOSS: Ramp = ['#07070a', '#16161c', '#2a2a34', '#4a4a58', '#8a8a9c']
 const LEG_BLACK: Ramp = ['#060608', '#141418', '#26262e', '#44444e']
 const MAHOGANY: Ramp = ['#170804', '#311108', '#521c0e', '#7a2e18', '#aa4c2c']
+/** ネプチューン・サタン: こげちゃが かった くろ。 */
+const NEPTUNE_BLACK: Ramp = ['#050304', '#0f0a08', '#1e1510', '#362a20', '#70604e']
+const SATAN_BLACK: Ramp = ['#060404', '#130d0a', '#241a13', '#3e3024', '#7e6a54']
 
 const s = (size: number, power: number, speed: number): Stats => ({ size, power, speed })
 
@@ -254,6 +266,51 @@ export const SPECIES: readonly Species[] = [
     },
   },
   {
+    id: 'neptunus',
+    name: 'ネプチューンオオカブト',
+    short: 'ネプチューン',
+    group: 'kabuto',
+    home: 'みなみアメリカ（アンデスの やま）',
+    area: 'america',
+    lengthMm: [60, 160],
+    stats: s(sizeScore(160), 8, 4),
+    move: { name: 'ながヅノ はさみあげ', kind: 'lift' },
+    fact: 'ヘラクレスの なかま。むねから のびる とても ながい ツノと、その よこの みじかい 2ほんの ツノが めじるし。',
+    build: 1,
+    voice: 200,
+    look: {
+      width: .52, height: .4, head: 1, pron: 1.05, bodyShare: .46,
+      elytra: NEPTUNE_BLACK, pronotum: NEPTUNE_BLACK, horn: NEPTUNE_BLACK, leg: LEG_BLACK,
+      horns: [
+        { root: 'pron', path: [[0, 0, .03], [.34, 0, .13], [.74, 0, .13], [1.02, 0, .01]], r: [.06, .022], hair: true },
+        { root: 'pron', path: [[-.02, .15, .02], [.09, .18, .05], [.21, .17, .06]], r: [.038, .013] },
+        { root: 'head', path: [[0, 0, 0], [.2, 0, -.01], [.42, 0, .07], [.56, 0, .25]], r: [.045, .02], teeth: [{ at: .3, len: .04, dir: 'up' }, { at: .52, len: .035, dir: 'up' }] },
+      ],
+    },
+  },
+  {
+    id: 'satanas',
+    name: 'サタンオオカブト',
+    short: 'サタン',
+    group: 'kabuto',
+    home: 'みなみアメリカ（ボリビア）',
+    area: 'america',
+    lengthMm: [50, 115],
+    stats: s(sizeScore(115), 7, 5),
+    move: { name: 'あくまの はさみあげ', kind: 'lift' },
+    fact: 'ボリビアの 山に すむ めずらしい ヘラクレスの なかま。ふとい ツノの したに きいろっぽい 毛が びっしり はえる。',
+    build: 1.15,
+    voice: 240,
+    look: {
+      width: .56, height: .44, head: 1, pron: 1.1, bodyShare: .6,
+      elytra: SATAN_BLACK, pronotum: SATAN_BLACK, horn: SATAN_BLACK, leg: LEG_BLACK, hair: ['#5e3e12', '#946a24', '#c49a3c', '#e8c66a'],
+      horns: [
+        { root: 'pron', path: [[0, 0, .03], [.2, 0, .1], [.42, 0, .1], [.55, 0, -.01]], r: [.085, .032], hair: 'thick' },
+        { root: 'head', path: [[0, 0, 0], [.14, 0, 0], [.27, 0, .07], [.33, 0, .2]], r: [.058, .028], teeth: [{ at: .45, len: .045, dir: 'up' }] },
+      ],
+    },
+  },
+  {
     id: 'nokogiri',
     name: 'ノコギリクワガタ',
     short: 'ノコギリ',
@@ -368,6 +425,45 @@ export const SPECIES: readonly Species[] = [
       elytra: ['#0a2a14', '#14562a', '#2a8a3a', '#7cc040', '#e8e070'], accent: ['#3a0c2a', '#7a1a4a', '#c43a5a', '#ff8a5a', '#ffd070'],
       pronotum: ['#0a2a14', '#14562a', '#2a8a3a', '#7cc040', '#e8e070'], horn: ['#2a0c18', '#5a1830', '#8a2a3c', '#c0604a', '#f0a070'], leg: ['#081a10', '#123a20', '#1e5a30', '#3a8a48'],
       jaw: { root: 'head', path: [[0, .07, 0], [.1, .1, .04], [.17, .11, .12], [.2, .07, .2]], r: [.035, .016] },
+    },
+  },
+  {
+    id: 'allotopus',
+    name: 'オウゴンオニクワガタ',
+    short: 'オウゴンオニ',
+    group: 'kuwagata',
+    home: 'マレーシア・インドネシア',
+    area: 'asia',
+    lengthMm: [40, 80],
+    stats: s(sizeScore(80), 4, 6),
+    move: { name: 'きんいろ はさみなげ', kind: 'lift' },
+    fact: 'からだが きんいろに ぴかぴか かがやく クワガタ。したむきに まがった 大あごで はさむ。',
+    build: .85,
+    voice: 460,
+    look: {
+      width: .5, height: .3, head: 1.3, pron: 1, bodyShare: .66, pattern: 'metal',
+      elytra: ['#3a2604', '#7a560a', '#b8880e', '#e6c232', '#fff4a8'], pronotum: ['#2e1c04', '#684608', '#a4780e', '#d8b02a', '#fae890'],
+      horn: ['#241604', '#5a3c08', '#946a10', '#c89a26', '#f2d26a'], leg: ['#0c0804', '#20160a', '#3a2a12', '#5a4420'],
+      jaw: { root: 'head', path: [[0, .07, 0], [.14, .12, .005], [.29, .11, -.025], [.39, .03, -.055]], r: [.038, .015], teeth: [{ at: .16, len: .03, dir: 'in' }, { at: .32, len: .022, dir: 'in' }] },
+    },
+  },
+  {
+    id: 'titanus',
+    name: 'スマトラオオヒラタクワガタ',
+    short: 'スマトラ',
+    group: 'kuwagata',
+    home: 'インドネシア（スマトラとう）',
+    area: 'asia',
+    lengthMm: [40, 100],
+    stats: s(sizeScore(100), 8, 5),
+    move: { name: 'ふとあご はさみ', kind: 'pinch' },
+    fact: 'パラワンと おなじ ヒラタクワガタの なかま。はばの ひろい からだと、ふとくて ギザギザの 大あごで しめつける。',
+    build: 1.05,
+    voice: 280,
+    look: {
+      width: .64, height: .26, head: 1.42, pron: 1.08, bodyShare: .66,
+      elytra: BLACK_GLOSS, pronotum: BLACK_GLOSS, horn: BLACK_GLOSS, leg: LEG_BLACK,
+      jaw: { root: 'head', path: [[0, .09, 0], [.14, .15, .01], [.3, .13, .02], [.4, .04, .02]], r: [.062, .024], teeth: [{ at: .2, len: .06, dir: 'in' }, { at: .44, len: .03, dir: 'in' }, { at: .58, len: .026, dir: 'in' }, { at: .72, len: .02, dir: 'in' }] },
     },
   },
 ]

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import KabukuwaBattlePlay from './KabukuwaBattlePlay'
 import type { Battle } from './battle'
@@ -57,7 +57,7 @@ function chooseHerculesVsCaucasus() {
 }
 
 describe('カブクワ バトル', () => {
-  test('はじめは じぶんの むしを えらぶ。12しゅるいの ずかんと つよさが みられる', () => {
+  test('はじめは じぶんの むしを えらぶ。16しゅるいの ずかんと つよさが みられる', () => {
     renderGame()
     expect(screen.getByRole('heading', { level: 1, name: 'カブクワ バトル' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
@@ -96,6 +96,30 @@ describe('カブクワ バトル', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByRole('heading', { name: 'ミヤマクワガタ' })).toBeInTheDocument()
+  })
+
+  test('カブトムシ・クワガタ 8しゅるいずつ。あたらしい 4しゅるいは それぞれの さいごに ならび、たたかえる', () => {
+    renderGame()
+    const names = (group: string) => within(screen.getByRole('region', { name: group })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
+    const kabuto = names('カブトムシの なかま'), kuwagata = names('クワガタの なかま')
+    expect(kabuto).toHaveLength(8)
+    expect(kuwagata).toHaveLength(8)
+    expect(kabuto.slice(-2).map(n => n?.split('（')[0])).toEqual(['ネプチューンオオカブト', 'サタンオオカブト'])
+    expect(kuwagata.slice(-2).map(n => n?.split('（')[0])).toEqual(['オウゴンオニクワガタ', 'スマトラオオヒラタクワガタ'])
+
+    fireEvent.click(screen.getByRole('button', { name: /^ネプチューンオオカブト/ }))
+    expect(screen.getByRole('heading', { name: 'ネプチューンオオカブト' })).toBeInTheDocument()
+    expect(screen.getByText('60〜160mm')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'ネプチューンに けってい！' }))
+    fireEvent.click(screen.getByRole('button', { name: /^スマトラオオヒラタクワガタ/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'スマトラと たたかう！' }))
+    expect(screen.getByLabelText('ネプチューンオオカブト たい スマトラオオヒラタクワガタ')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'きりかぶ どひょう（うえから みる）' }))
+    expect(screen.getByRole('meter', { name: 'ネプチューンの げんき' })).toBeInTheDocument()
+    expect(screen.getByRole('meter', { name: 'スマトラの げんき' })).toBeInTheDocument()
+    advance(2.4)
+    expect(battle()?.state).toBe('fight')
+    expect(battle()?.f.map(f => f.sp.id)).toEqual(['neptunus', 'titanus'])
   })
 
   test('おまかせで あいてを えらぶと、じぶんと ちがう むしに なる', () => {

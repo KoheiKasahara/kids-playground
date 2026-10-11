@@ -321,9 +321,10 @@ button.window:focus-visible,
   list-style: none;
 }
 
+/* 8しゅるいが 4こずつ 2だんに ならぶ。 */
 @media (min-width: 560px) {
   .grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -364,7 +365,8 @@ button.window:focus-visible,
 }
 
 .pickCanvas {
-  max-width: 100%;
+  /* 1.4ばいに しても カードから はみださない はば（ツノ・あごの ながい むし）。 */
+  max-width: calc(100% / 1.4);
   max-height: 54px;
   width: auto;
   height: auto;
