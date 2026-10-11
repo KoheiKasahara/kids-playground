@@ -121,7 +121,7 @@ describe('Home', () => {
     )
     const links = screen.getAllByRole('link')
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
-    expect(links.slice(-15).map((link) => link.getAttribute('href'))).toEqual(
+    expect(links.slice(-16).map((link) => link.getAttribute('href'))).toEqual(
       [
         'robo-kuzushi',
         'mato-ate',
@@ -132,6 +132,7 @@ describe('Home', () => {
         'tsumiki-3d',
         'dot-run',
         'jishaku-pitatto',
+        'tonton-sumo',
         'shabon-pachin',
         'onaji-pon',
         'dot-bomb',
