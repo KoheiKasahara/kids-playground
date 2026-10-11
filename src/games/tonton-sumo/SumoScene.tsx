@@ -67,7 +67,7 @@ export default function SumoScene({ state, ripples = [], label, svgRef, idle = f
             <ellipse cx={base.x} cy={base.y} rx={52 * scale} ry={52 * scale * (DEPTH_PX / RING_PX)} fill="#7a5a36" opacity={0.2 / (1 + body.y * 12)} />
             <g transform={`translate(${base.x.toFixed(1)} ${(base.y - body.y * RING_PX).toFixed(1)}) scale(${scale.toFixed(3)}) rotate(${lean.toFixed(1)})`}>
               <g className={motion}>
-                <PaperWrestler index={state.fighters[side]} belt={SIDE_COLORS[side].belt} turn={0.62 * facing} />
+                <PaperWrestler index={state.fighters[side]} belt={SIDE_COLORS[side].belt} heading={body.heading} />
               </g>
             </g>
           </g>

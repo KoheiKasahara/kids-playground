@@ -87,6 +87,21 @@ describe('paper sumo physics', () => {
     expect(state.bodies.left.lean).toBeCloseTo(state.bodies.right.lean, 5)
   })
 
+  test('figures that meet lean on each other and push as a pair instead of bouncing apart', () => {
+    const state = createSumoState(0, 0)
+    const reach = WRESTLERS[0]!.stats.width * 2
+    let pair: SumoState = { ...state, bodies: {
+      left: { ...state.bodies.left, x: -reach / 2, vx: 3 },
+      right: { ...state.bodies.right, x: reach / 2 },
+    } }
+    for (let n = 0; n < 30; n++) {
+      pair = stepSumo(pair)
+      expect(pair.bodies.right.x - pair.bodies.left.x).toBeLessThan(reach + 0.005)
+    }
+    expect(pair.bodies.right.x).toBeGreaterThan(reach / 2 + 0.02)
+    expect(pair.winner).toBeNull()
+  })
+
   test('knocked far enough over, a figure falls and loses', () => {
     const state = createSumoState()
     const wobbling = { ...state, bodies: { ...state.bodies, right: { ...state.bodies.right, leanVel: -12 } } }

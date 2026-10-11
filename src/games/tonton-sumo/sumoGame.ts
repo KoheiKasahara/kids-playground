@@ -94,8 +94,12 @@ const GROUND_FRICTION = 15
 const AIR_FRICTION = 0.8
 const LEAN_SPRING = 34
 const LEAN_DAMPING = 5.5
-const BUMP_RESTITUTION = 0.2
-const BUMP_LEAN = 3.8
+/** Paper figures that meet lean on each other instead of bouncing apart. */
+const BUMP_RESTITUTION = 0
+const BUMP_LEAN = 2
+/** How far the hands may press past each other before the bodies are nudged apart. */
+const CONTACT_SLOP = 0.05
+const CONTACT_CORRECTION = 0.3
 const FALL_ACCEL = 14
 const LYING = 1.5
 
@@ -221,7 +225,11 @@ function stepBody(body: Body, opponent: Body, stability: number, grip: number, d
   return { x, z, y, vx, vz, vy, lean, leanVel, heading, fallen }
 }
 
-/** Paper figures shove each other when their bodies meet; the lighter one rocks back more. */
+/**
+ * Paper figures shove each other when their bodies meet; the lighter one rocks back more.
+ * They stay locked together and push as a pair rather than being thrown apart, and a
+ * little overlap is only eased out slowly so they can grapple at close range.
+ */
 function bump(state: SumoState, left: Body, right: Body): [Body, Body] {
   const a = statsFor(state, 'left')
   const b = statsFor(state, 'right')
@@ -235,7 +243,7 @@ function bump(state: SumoState, left: Body, right: Body): [Body, Body] {
   const overlap = reach - distance
   const inverseA = left.fallen ? 0.2 / a.mass : 1 / a.mass
   const inverseB = right.fallen ? 0.2 / b.mass : 1 / b.mass
-  const share = overlap / (inverseA + inverseB)
+  const share = (Math.max(0, overlap - CONTACT_SLOP) * CONTACT_CORRECTION) / (inverseA + inverseB)
   const l = { ...left, x: left.x - nx * share * inverseA, z: left.z - nz * share * inverseA }
   const r = { ...right, x: right.x + nx * share * inverseB, z: right.z + nz * share * inverseB }
   const closing = (r.vx - l.vx) * nx + (r.vz - l.vz) * nz
