@@ -17,6 +17,10 @@ export const READY_SECONDS = 2.2
 /** これを すぎたら げんきの のこりで はんてい。 */
 export const TIME_LIMIT = 75
 const GRAVITY = 300
+/** ぎゃくてんと いえる: げんきが これより へった ことが あって、
+ * あいてより COMEBACK_BEHIND いじょう げんきが すくない ときが あった。 */
+export const COMEBACK_LOW = .6
+export const COMEBACK_BEHIND = .2
 
 export type FighterState =
   | 'ready' | 'approach' | 'circle' | 'clash' | 'windup' | 'strike' | 'stagger'
@@ -91,7 +95,8 @@ export type BattleEvent =
   | { type: 'fall'; side: 0 | 1; reason: EndReason }
   | { type: 'flee'; side: 0 | 1 }
   | { type: 'timeup' }
-  | { type: 'end'; winner: 0 | 1; reason: EndReason }
+  /** comeback: れっせいから ぎゃくてんして かった（たまにしか ない）。 */
+  | { type: 'end'; winner: 0 | 1; reason: EndReason; comeback: boolean }
 
 export type Battle = {
   stage: StageId
@@ -109,6 +114,10 @@ export type Battle = {
   pushRun: number
   /** つぎに「おしている」と いえるまで。 */
   pushQuiet: number
+  /** たたかいの なかで げんきが いちばん へった ときの のこり（0〜1）。 */
+  lowest: [number, number]
+  /** あいてより げんきが すくなかった ときの いちばん 大きい さ（0〜1）。 */
+  behind: [number, number]
 }
 
 /** おしあいで つかう ちから。 */
@@ -140,6 +149,7 @@ export function createBattle(a: Species, b: Species, stage: StageId, seed: numbe
     f: [makeFighter(a, 0, startU, random), makeFighter(b, 1, startU, random)],
     time: 0, state: 'ready', stateT: 0, winner: null, reason: null, loserReason: null,
     events: [{ type: 'ready' }], random, pushRun: 0, pushQuiet: 0,
+    lowest: [1, 1], behind: [0, 0],
   }
 }
 
@@ -644,6 +654,23 @@ function win(b: Battle, f: Fighter) {
 
 // ---------------- ぜんたい ----------------
 
+/** げんきの へりかたを おぼえて おく（ぎゃくてんの はんてい用）。 */
+function track(b: Battle) {
+  const r = b.f.map(f => Math.max(0, f.st) / f.maxSt)
+  for (const side of [0, 1] as const) {
+    b.lowest[side] = Math.min(b.lowest[side], r[side])
+    b.behind[side] = Math.max(b.behind[side], r[1 - side] - r[side])
+  }
+}
+
+/**
+ * げんきで まけていた ところから ぎゃくてんして かったか（かった しあいの 1わり くらい）。
+ * じかんぎれの はんていがちは ふくめない。
+ */
+export function isComeback(b: Pick<Battle, 'lowest' | 'behind'>, winner: 0 | 1, reason: EndReason) {
+  return reason !== 'judge' && b.lowest[winner] <= COMEBACK_LOW && b.behind[winner] >= COMEBACK_BEHIND
+}
+
 function finish(b: Battle, winner: 0 | 1, reason: EndReason) {
   b.state = 'over'
   b.stateT = 0
@@ -653,7 +680,7 @@ function finish(b: Battle, winner: 0 | 1, reason: EndReason) {
   w.pose.flipped = false
   w.pose.hang = false
   if (w.state !== 'out' && w.state !== 'fall') set(w, 'win')
-  b.events.push({ type: 'end', winner, reason })
+  b.events.push({ type: 'end', winner, reason, comeback: isComeback(b, winner, reason) })
 }
 
 export function stepBattle(b: Battle) {
@@ -720,6 +747,7 @@ export function stepBattle(b: Battle) {
     return
   }
   if (b.state !== 'fight') return
+  track(b)
   // つかれきったら にげだす。
   for (const f of b.f) {
     if (f.st <= 0 && (f.state === 'clash' || f.state === 'approach' || f.state === 'circle')) {
