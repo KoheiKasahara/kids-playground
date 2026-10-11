@@ -45,6 +45,7 @@ import { golfSound } from '../../games/putter-golf/golfSound'
 import * as pyoko from '../../games/pyoko-touch/sounds'
 import * as rhythm from '../../games/rhythm-pon/sounds'
 import * as robo from '../../games/robo-kuzushi/sounds'
+import * as sumo from '../../games/tonton-sumo/sounds'
 import * as shabon from '../../games/shabon-pachin/sounds'
 import * as shinkei from '../../games/shinkeisuijaku/sounds'
 import { playSnowSound } from '../../games/snowball-roll/sounds'
@@ -325,6 +326,7 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('クリア', jishaku.playClear),
     background('BGM', 3, () => jishaku.startBgm('desk')),
   ],
+  'tonton-sumo': [sample('トン', sumo.playTapSound), sample('はっけよい', sumo.playStartSound), sample('きまり', sumo.playFinishSound)],
   'shabon-pachin': [sample('ぱちん', shabon.playPopSound), sample('ぼよん', shabon.playBoingSound), sample('クリア', shabon.playClearSound)],
   'dot-bomb': [
     sample('ボンを おく', dotBomb.playPlace),

@@ -6,6 +6,7 @@ import App from './App'
 
 describe('直接アクセス（URL直入力を想定）', () => {
   test.each([
+    ['/games/tonton-sumo', 'トントンずもう', 'ふたりで いっしょに トントン'],
     ['/games/shinkeisuijaku', 'しんけいすいじゃく', 'かんたん 6ペア'],
     ['/games/water-wheel-maze', 'ぐるぐる すいしゃ', '1 はじめての みずみち'],
   ])('%s の選択画面とプレイ画面に戻るボタンを重複表示しない', async (path, title, start) => {
