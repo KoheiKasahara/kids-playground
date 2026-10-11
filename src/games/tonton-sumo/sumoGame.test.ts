@@ -1,36 +1,127 @@
 import { describe, expect, test } from 'vitest'
-import { createSumoState, RING_EDGE, TAP_COOLDOWN_MS, tapSumo, type Side } from './sumoGame'
+import {
+  BOX_HALF, RING_RADIUS, START_X, TAP_COOLDOWN_MS, WRESTLERS,
+  behindPoint, clampToBox, computerTapPoint, createSumoState, isSettled, stepSumo, tapSide, tapSumo,
+  type Side, type SumoState,
+} from './sumoGame'
+import { clientToView, project, unproject, WIDE_VIEW } from './projection'
 
-describe('paper sumo', () => {
-  test.each<Side>(['left', 'right'])('%s pushes the other wrestler out and ends the match', (side) => {
-    let state = createSumoState()
-    for (let n = 0; n < RING_EDGE - 1; n++) state = tapSumo(state, side, n * 200)
-    expect(state.winner).toBeNull()
-    state = tapSumo(state, side, RING_EDGE * 200)
-    expect(state.winner).toBe(side)
-    expect(Math.abs(state.position)).toBe(RING_EDGE)
-    expect(tapSumo(state, side === 'left' ? 'right' : 'left', 10000)).toBe(state)
-    expect(createSumoState().position).toBe(0)
-  })
+const steady = () => 0.5
+function settle(state: SumoState, seconds = 2) {
+  for (let n = 0; n < seconds * 60 && !isSettled(state); n++) state = stepSumo(state)
+  return state
+}
+/** Taps just behind one wrestler until the bout is decided. */
+function driveOut(side: Side, left = 0, right = 1) {
+  let state = createSumoState(left, right)
+  for (let tap = 0, frame = 0; tap < 200 && !state.winner; frame++) {
+    if (frame % 15 === 0) state = tapSumo(state, behindPoint(state, side), side, frame * 1000 / 60, steady)
+    state = stepSumo(state)
+    if (frame % 15 === 0) tap++
+  }
+  return state
+}
 
-  test('equal taps from both sides stay balanced, including simultaneous touches', () => {
-    let state = createSumoState()
-    for (let n = 0; n < 30; n++) {
-      state = tapSumo(state, 'left', n * 200)
-      state = tapSumo(state, 'right', n * 200)
+describe('paper sumo physics', () => {
+  test('characters have unique keys and names and sensible stats', () => {
+    expect(new Set(WRESTLERS.map((w) => w.key)).size).toBe(WRESTLERS.length)
+    expect(new Set(WRESTLERS.map((w) => w.name)).size).toBe(WRESTLERS.length)
+    expect(WRESTLERS.length).toBeGreaterThanOrEqual(8)
+    for (const { stats } of WRESTLERS) {
+      for (const value of Object.values(stats)) expect(value).toBeGreaterThan(0)
+      expect(stats.width * 2).toBeLessThan(START_X * 2 + 0.2)
     }
-    expect(state.position).toBe(0)
-    expect(state.winner).toBeNull()
-    expect(state.taps).toEqual({ left: 30, right: 30 })
   })
 
-  test('debounces rapid taps per player without blocking the other player', () => {
-    const initial = createSumoState()
-    const first = tapSumo(initial, 'left', 0)
-    expect(tapSumo(first, 'left', TAP_COOLDOWN_MS - 1)).toBe(first)
-    expect(tapSumo(first, 'left', TAP_COOLDOWN_MS).taps.left).toBe(2)
-    expect(tapSumo(first, 'right', 0).position).toBe(0)
-    expect(initial.position).toBe(0)
-    expect(initial.taps.left).toBe(0)
+  test('a fresh bout is at rest, face to face, and nothing moves without a tap', () => {
+    const state = createSumoState(2, 5)
+    expect(state.fighters).toEqual({ left: 2, right: 5 })
+    expect(state.bodies.left.x).toBeLessThan(0)
+    expect(state.bodies.right.x).toBeGreaterThan(0)
+    expect(isSettled(state)).toBe(true)
+    const later = settle(stepSumo(state))
+    expect(later.bodies.left.x).toBeCloseTo(state.bodies.left.x)
+    expect(later.winner).toBeNull()
+  })
+
+  test.each<Side>(['left', 'right'])('tapping behind %s drives it forward and pushes the other out', (side) => {
+    const state = driveOut(side)
+    expect(state.winner).toBe(side)
+    expect(state.finish).not.toBeNull()
+    const loser = state.bodies[side === 'left' ? 'right' : 'left']
+    expect(loser.fallen || Math.hypot(loser.x, loser.z) > RING_RADIUS).toBe(true)
+    expect(tapSumo(state, { x: 0, z: 0 }, 'left', 1e9)).toBe(state)
+  })
+
+  test('the tap position changes how the figures move', () => {
+    const start = createSumoState(0, 0)
+    const fromBehind = settle(tapSumo(start, { x: -1.2, z: 0 }, 'left', 0, steady))
+    const fromFront = settle(tapSumo(start, { x: start.bodies.left.x, z: -0.9 }, 'left', 0, steady))
+    const fromMiddle = settle(tapSumo(start, { x: 0, z: 0 }, 'left', 0, steady))
+    expect(fromBehind.bodies.left.x).toBeGreaterThan(start.bodies.left.x + 0.05)
+    expect(fromFront.bodies.left.z).toBeGreaterThan(0.03)
+    // A tap between them makes both hop apart.
+    expect(fromMiddle.bodies.right.x).toBeGreaterThan(start.bodies.right.x)
+    expect(fromMiddle.bodies.left.x - start.bodies.left.x).toBeLessThan(fromBehind.bodies.left.x - start.bodies.left.x)
+    // Every tap bounces the paper.
+    expect(stepSumo(tapSumo(start, { x: 1.2, z: 0.8 }, 'left', 0, steady)).bodies.right.y).toBeGreaterThan(0)
+  })
+
+  test('cooldown is per player, so two players can tap at the same moment', () => {
+    const first = tapSumo(createSumoState(), { x: -1, z: 0 }, 'left', 0, steady)
+    expect(tapSumo(first, { x: -1, z: 0 }, 'left', TAP_COOLDOWN_MS - 1, steady)).toBe(first)
+    expect(tapSumo(first, { x: -1, z: 0 }, 'left', TAP_COOLDOWN_MS, steady).taps).toBe(2)
+    expect(tapSumo(first, { x: 1, z: 0 }, 'right', 0, steady).taps).toBe(2)
+  })
+
+  test('a mirrored bout stays mirrored', () => {
+    let state = createSumoState(3, 3)
+    for (let frame = 0; frame < 600 && !state.winner; frame++) {
+      if (frame % 20 === 0) {
+        state = tapSumo(state, behindPoint(state, 'left'), 'left', frame * 17, steady)
+        state = tapSumo(state, behindPoint(state, 'right'), 'right', frame * 17, steady)
+      }
+      state = stepSumo(state)
+    }
+    expect(state.bodies.left.x).toBeCloseTo(-state.bodies.right.x, 5)
+    expect(state.bodies.left.lean).toBeCloseTo(state.bodies.right.lean, 5)
+  })
+
+  test('knocked far enough over, a figure falls and loses', () => {
+    const state = createSumoState()
+    const wobbling = { ...state, bodies: { ...state.bodies, right: { ...state.bodies.right, leanVel: -12 } } }
+    const after = settle(wobbling)
+    expect(after.winner).toBe('left')
+    expect(after.finish).toBe('fall')
+    expect(after.bodies.right.fallen).toBe(true)
+    expect(Math.abs(after.bodies.right.lean)).toBeCloseTo(1.5)
+  })
+
+  test('figures cannot leave the box and topple over its rim', () => {
+    const state = createSumoState()
+    const flung = { ...state, bodies: { ...state.bodies, left: { ...state.bodies.left, vx: -40 } } }
+    const after = settle(flung)
+    expect(after.bodies.left.x).toBeGreaterThanOrEqual(-BOX_HALF.x)
+    expect(after.bodies.left.fallen).toBe(true)
+    expect(after.winner).toBe('right')
+  })
+
+  test('taps off the box land on its rim; each half belongs to one player', () => {
+    expect(clampToBox({ x: -9, z: 9 })).toEqual({ x: -BOX_HALF.x, z: BOX_HALF.z })
+    expect(tapSide({ x: -0.1, z: 0 })).toBe('left')
+    expect(tapSide({ x: 0.1, z: 0 })).toBe('right')
+    const state = createSumoState()
+    const cpu = computerTapPoint(state, steady)
+    expect(cpu.x).toBeGreaterThan(state.bodies.right.x)
+  })
+
+  test('screen ↔ box projection round-trips through the letterboxed SVG', () => {
+    const p = project(0.4, -0.3)
+    const back = unproject(p.x, p.y)
+    expect(back.x).toBeCloseTo(0.4)
+    expect(back.z).toBeCloseTo(-0.3)
+    const rect = { left: 10, top: 0, width: WIDE_VIEW.width, height: WIDE_VIEW.height + 200 }
+    expect(clientToView(WIDE_VIEW, rect, 10, 100)).toEqual({ x: WIDE_VIEW.x, y: WIDE_VIEW.y })
+    expect(clientToView(WIDE_VIEW, { left: 0, top: 0, width: 0, height: 0 }, 1, 1)).toBeNull()
   })
 })

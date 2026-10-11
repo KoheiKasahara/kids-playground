@@ -4,75 +4,99 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { isSoundEnabled } from '../../audio/sound'
 import surfaceStyles from '../../components/GamePlaySurface.module.css'
-import TontonSumoPlay from './TontonSumoPlay'
-import { COMPUTER_INTERVAL_MS, RING_EDGE } from './sumoGame'
+import TontonSumoPlay, { RESULT_DELAY_MS } from './TontonSumoPlay'
+import { COMPUTER_INTERVAL_MS } from './sumoGame'
+import { WIDE_VIEW, project } from './projection'
 
 function renderGame() {
   return render(<StrictMode><MemoryRouter><TontonSumoPlay /></MemoryRouter></StrictMode>)
 }
 function advance(ms: number) { act(() => { vi.advanceTimersByTime(ms) }) }
-function leftTap() { fireEvent.click(screen.getByRole('button', { name: 'ひだりの トン！' })) }
+function scene() { return document.querySelector('svg[role="img"]') as SVGSVGElement }
+/** Pointer-down on the box at ring coordinates; the SVG is laid out 1:1 with its viewBox. */
+function tapBox(x: number, z: number, target: Element = scene()) {
+  const p = project(x, z)
+  fireEvent.pointerDown(target, { button: 0, clientX: p.x - WIDE_VIEW.x, clientY: p.y - WIDE_VIEW.y })
+}
+function tapUntilDecided(x: number, z = 0) {
+  for (let n = 0; n < 120 && !screen.getByRole('status').textContent?.includes('かち'); n++) {
+    tapBox(x, z)
+    advance(200)
+  }
+}
 
-beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] }))
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame'] })
+  vi.spyOn(Math, 'random').mockReturnValue(0.5)
+  vi.spyOn(SVGElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    { left: 0, top: 0, width: WIDE_VIEW.width, height: WIDE_VIEW.height, right: WIDE_VIEW.width, bottom: WIDE_VIEW.height, x: 0, y: 0, toJSON: () => ({}) } as DOMRect)
+})
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('TontonSumoPlay', () => {
-  test('the winning touch cannot activate replay with its following compatibility click', () => {
-    renderGame()
-    fireEvent.click(screen.getByRole('button', { name: /ふたりで/ }))
-    for (let n = 0; n < RING_EDGE; n++) {
-      advance(150)
-      const pointer = new Event('pointerdown', { bubbles: true, cancelable: true })
-      Object.defineProperty(pointer, 'button', { value: 0 })
-      fireEvent(screen.getByRole('button', { name: 'ひだりの トン！' }), pointer)
-    }
-    const replay = screen.getByRole('button', { name: 'もういちど' })
-    fireEvent.click(replay, { detail: 1 })
-    expect(screen.getByRole('status')).toHaveTextContent('おもちの かち！')
-    fireEvent.pointerDown(replay)
-    fireEvent.click(replay, { detail: 1 })
-    expect(screen.getByRole('status')).toHaveTextContent('はっけよい')
-  })
-
-  test('selection → two-player match → winner → replay → selection', () => {
+  test('pick both wrestlers → two-player bout decided by taps → replay → back to selection', () => {
     const { container } = renderGame()
     expect(container.querySelector(`.${surfaceStyles.surface}`)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'まめ' }))
-    expect(screen.getByRole('button', { name: 'まめ' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'えんぴつ' }))
+    expect(screen.getByRole('button', { name: 'えんぴつ' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: /あお/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'ロボット' }))
+    expect(screen.getByRole('button', { name: /あお/ })).toHaveTextContent('ロボット')
+    expect(screen.getByRole('button', { name: /あか/ })).toHaveTextContent('えんぴつ')
+
     fireEvent.click(screen.getByRole('button', { name: /ふたりで/ }))
     expect(container.querySelector(`.${surfaceStyles.surface}`)).not.toBeNull()
     expect(screen.getByRole('status')).toHaveTextContent('はっけよい')
-    for (let n = 0; n < RING_EDGE; n++) { advance(150); leftTap() }
-    expect(screen.getByRole('status')).toHaveTextContent('まめの かち！')
+    expect(screen.getByRole('button', { name: /はこを トントン/ })).toHaveFocus()
+    tapBox(-1.25, 0)
+    expect(screen.getByRole('status')).toHaveTextContent('のこった')
+    tapUntilDecided(-1.25)
+    expect(screen.getByRole('status')).toHaveTextContent('えんぴつの かち！')
+    expect(screen.queryByRole('button', { name: 'もういちど' })).toBeNull()
+    advance(RESULT_DELAY_MS)
     expect(screen.getByRole('button', { name: 'もういちど' })).toHaveFocus()
-    expect(screen.queryByRole('button', { name: 'ひだりの トン！' })).toBeNull()
+
     fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
     expect(screen.getByRole('status')).toHaveTextContent('はっけよい')
-    expect(screen.getByRole('button', { name: 'ひだりの トン！' })).toHaveFocus()
-    fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
+    // The right player wins from their own half.
+    tapUntilDecided(1.25)
+    expect(screen.getByRole('status')).toHaveTextContent('ロボットの かち！')
+    advance(RESULT_DELAY_MS)
+    fireEvent.click(screen.getByRole('button', { name: 'えらびなおす' }))
     expect(screen.getByRole('button', { name: /ひとりで/ })).toBeInTheDocument()
     expect(container.querySelector(`.${surfaceStyles.surface}`)).toBeNull()
+    advance(1) // jsdom queues a selectionchange after focus moves
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  test('solo waits for the first tap, then plays slowly and can win', () => {
+  test('taps anywhere on the play area count, but not on the header buttons', () => {
+    renderGame()
+    fireEvent.click(screen.getByRole('button', { name: /ふたりで/ }))
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'おとを けす' }), { button: 0, clientX: 10, clientY: 10 })
+    expect(screen.getByRole('status')).toHaveTextContent('はっけよい')
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'おとを けす' }).closest('main')!.querySelector('section')!, { button: 0, clientX: 600, clientY: 900 })
+    expect(screen.getByRole('status')).toHaveTextContent('のこった')
+  })
+
+  test('solo waits for the first tap, then the computer taps slowly and can win', () => {
     renderGame()
     fireEvent.click(screen.getByRole('button', { name: /ひとりで/ }))
     advance(30000)
     expect(screen.getByRole('status')).toHaveTextContent('はっけよい')
-    leftTap()
-    advance(COMPUTER_INTERVAL_MS * (RING_EDGE + 1))
-    expect(screen.getByRole('status')).toHaveTextContent('そらの かち！')
+    tapBox(0.2, 0)
+    for (let n = 0; n < 120 && !screen.getByRole('status').textContent?.includes('かち'); n++) advance(COMPUTER_INTERVAL_MS)
+    expect(screen.getByRole('status')).toHaveTextContent('おにぎりの かち！')
+    advance(RESULT_DELAY_MS + 3000)
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  test('keyboard A/L supports either player, ignores repeat and removes handlers on exit', () => {
+  test('keyboard A/L tap behind either wrestler, ignore repeat and remove handlers on exit', () => {
     const { unmount } = renderGame()
     fireEvent.click(screen.getByRole('button', { name: /ふたりで/ }))
-    for (let n = 0; n < RING_EDGE + 2; n++) { advance(150); fireEvent.keyDown(window, { key: 'l', repeat: true }) }
+    for (let n = 0; n < 20; n++) { advance(150); fireEvent.keyDown(window, { key: 'l', repeat: true }) }
     expect(screen.getByRole('status')).toHaveTextContent('はっけよい')
-    for (let n = 0; n < RING_EDGE; n++) { advance(150); fireEvent.keyDown(window, { key: 'l' }) }
-    expect(screen.getByRole('status')).toHaveTextContent('そらの かち！')
+    for (let n = 0; n < 120 && !screen.getByRole('status').textContent?.includes('かち'); n++) { advance(200); fireEvent.keyDown(window, { key: 'l' }) }
+    expect(screen.getByRole('status')).toHaveTextContent('おにぎりの かち！')
     unmount()
     fireEvent.keyDown(window, { key: 'a' })
     expect(vi.getTimerCount()).toBe(0)
@@ -81,7 +105,7 @@ describe('TontonSumoPlay', () => {
   test('hidden tabs pause the computer; returning and unmounting cleans up sound and timers', () => {
     const { unmount } = renderGame()
     fireEvent.click(screen.getByRole('button', { name: /ひとりで/ }))
-    leftTap()
+    fireEvent.keyDown(window, { key: ' ', code: 'Space' })
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
     advance(30000)
     expect(screen.getByRole('status')).toHaveTextContent('のこった')

@@ -1,52 +1,108 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { vibrate } from '../../utils/haptics'
-import PaperWrestler from './PaperWrestler'
-import { COMPUTER_INTERVAL_MS, WRESTLERS, createSumoState, tapSumo, type Mode, type Side } from './sumoGame'
+import { PaperSheet } from './PaperWrestler'
+import SumoScene, { type Ripple } from './SumoScene'
+import {
+  COMPUTER_INTERVAL_MS, COMPUTER_STRENGTH, STEP_SECONDS, WRESTLERS,
+  behindPoint, clampToBox, computerTapPoint, createSumoState, isSettled, other, stepSumo, tapSide, tapSumo,
+  type Mode, type Point, type Side,
+} from './sumoGame'
+import { SIDE_COLORS, TALL_VIEW, WIDE_VIEW, clientToView, unproject } from './projection'
 import { playFinishSound, playStartSound, playTapSound } from './sounds'
 import styles from './TontonSumoPlay.module.css'
 
+/** Leave the fall on screen for a moment before the replay buttons appear. */
+export const RESULT_DELAY_MS = 900
+
+const SIDE_NAMES: Record<Side, string> = { left: 'あか', right: 'あお' }
+
+const PORTRAIT_QUERY = '(orientation: portrait)'
+function subscribePortrait(onChange: () => void) {
+  const query = window.matchMedia?.(PORTRAIT_QUERY)
+  query?.addEventListener('change', onChange)
+  return () => query?.removeEventListener('change', onChange)
+}
+const isPortrait = () => window.matchMedia?.(PORTRAIT_QUERY).matches ?? false
+
 export default function TontonSumoPlay() {
   const [mode, setMode] = useState<Mode | null>(null)
-  const [selected, setSelected] = useState(0)
+  const [fighters, setFighters] = useState<Record<Side, number>>({ left: 0, right: 1 })
+  const [picking, setPicking] = useState<Side>('left')
   const [sound, toggleSound] = useSoundToggle()
-  const [match, setMatch] = useState(createSumoState)
+  const [match, setMatch] = useState(() => createSumoState(0, 1))
   const matchRef = useRef(match)
-  const tapGestureRef = useRef(false)
-  const [lastSide, setLastSide] = useState<Side | null>(null)
+  const [ripples, setRipples] = useState<Ripple[]>([])
+  const [resultReady, setResultReady] = useState(false)
+  const frameRef = useRef<number | null>(null)
+  const clockRef = useRef<{ last: number | null; carry: number }>({ last: null, carry: 0 })
+  const resultTimerRef = useRef<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const arenaRef = useRef<HTMLDivElement>(null)
   const replayRef = useRef<HTMLButtonElement>(null)
-  const leftButtonRef = useRef<HTMLButtonElement>(null)
-  const opponent = (selected + 1) % WRESTLERS.length
-  const totalTaps = match.taps.left + match.taps.right
   const started = mode !== null
+  const view = useSyncExternalStore(subscribePortrait, isPortrait) ? TALL_VIEW : WIDE_VIEW
   useGameIntroPlaying(started)
 
-  const tap = useCallback((side: Side) => {
+  const stopTimers = useCallback(() => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
+    frameRef.current = null
+    if (resultTimerRef.current !== null) window.clearTimeout(resultTimerRef.current)
+    resultTimerRef.current = null
+  }, [])
+  useEffect(() => stopTimers, [stopTimers])
+
+  /** Runs the paper physics until everything on the box has come to rest. */
+  const runPhysics = useCallback(() => {
+    if (frameRef.current !== null) return
+    clockRef.current = { last: null, carry: 0 }
+    const frame = (time: number) => {
+      const clock = clockRef.current
+      clock.carry += clock.last === null ? STEP_SECONDS : Math.min(0.1, Math.max(0, time - clock.last) / 1000)
+      clock.last = time
+      const before = matchRef.current
+      let next = before
+      while (clock.carry >= STEP_SECONDS) {
+        next = stepSumo(next)
+        clock.carry -= STEP_SECONDS
+      }
+      matchRef.current = next
+      setMatch(next)
+      if (!before.winner && next.winner) {
+        playFinishSound()
+        vibrate('celebrate')
+        resultTimerRef.current = window.setTimeout(() => {
+          resultTimerRef.current = null
+          setResultReady(true)
+        }, RESULT_DELAY_MS)
+      }
+      frameRef.current = isSettled(next) ? null : requestAnimationFrame(frame)
+    }
+    frameRef.current = requestAnimationFrame(frame)
+  }, [])
+
+  const tap = useCallback((point: Point, player: Side, strength = 1) => {
     if (document.hidden) return
     const previous = matchRef.current
-    const next = tapSumo(previous, side, performance.now())
+    const next = tapSumo(previous, point, player, performance.now(), Math.random, strength)
     if (previous === next) return
     matchRef.current = next
     setMatch(next)
-    setLastSide(side)
+    setRipples((list) => [...list.slice(-3), { id: next.taps, ...clampToBox(point), player }])
     primeAudio()
-    if (next.winner) {
-      playFinishSound()
-      vibrate('celebrate')
-    } else {
-      playTapSound()
-      vibrate('tap')
-    }
-  }, [])
+    playTapSound()
+    vibrate('tap')
+    runPhysics()
+  }, [runPhysics])
 
-  const computerActive = mode === 'solo' && totalTaps > 0 && !match.winner
+  const computerActive = mode === 'solo' && match.taps > 0 && !match.winner
   useEffect(() => {
     if (!computerActive) return
-    const timer = window.setInterval(() => tap('right'), COMPUTER_INTERVAL_MS)
+    const timer = window.setInterval(() => tap(computerTapPoint(matchRef.current), 'right', COMPUTER_STRENGTH), COMPUTER_INTERVAL_MS)
     return () => window.clearInterval(timer)
   }, [computerActive, tap])
 
@@ -56,26 +112,39 @@ export default function TontonSumoPlay() {
       // Enter / Space on focused buttons keep their native action. A / L work anywhere.
       const buttonFocused = event.target instanceof HTMLElement && Boolean(event.target.closest('button'))
       const key = event.key.toLowerCase()
-      const side = key === 'a' || (event.code === 'Space' && mode === 'solo' && !buttonFocused)
+      const player = key === 'a' || (event.code === 'Space' && mode === 'solo' && !buttonFocused)
         ? 'left' : key === 'l' && mode === 'duo' ? 'right' : null
-      if (!side || event.altKey || event.ctrlKey || event.metaKey) return
+      if (!player || event.altKey || event.ctrlKey || event.metaKey) return
       event.preventDefault()
-      if (!event.repeat) tap(side)
+      if (!event.repeat) tap(behindPoint(matchRef.current, player, Math.random), player)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [mode, match.winner, tap])
 
   useEffect(() => {
-    if (match.winner) replayRef.current?.focus()
-    else if (mode) leftButtonRef.current?.focus()
-  }, [mode, match.winner])
+    if (resultReady) replayRef.current?.focus()
+    else if (mode) arenaRef.current?.focus()
+  }, [mode, resultReady])
 
-  const resetMatch = () => {
-    const fresh = createSumoState()
+  const onArenaPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!mode || event.button !== 0) return
+    if (event.target instanceof Element && event.target.closest('button')) return
+    const svg = svgRef.current
+    const at = svg ? clientToView(view, svg.getBoundingClientRect(), event.clientX, event.clientY) : null
+    if (!at) return
+    event.preventDefault()
+    const point = clampToBox(unproject(at.x, at.y))
+    tap(point, mode === 'solo' ? 'left' : tapSide(point))
+  }
+
+  const resetMatch = (next = fighters) => {
+    stopTimers()
+    const fresh = createSumoState(next.left, next.right)
     matchRef.current = fresh
     setMatch(fresh)
-    setLastSide(null)
+    setRipples([])
+    setResultReady(false)
   }
 
   const start = (nextMode: Mode) => {
@@ -90,21 +159,26 @@ export default function TontonSumoPlay() {
     setMode(null)
   }
 
-  const winnerName = match.winner === 'left' ? WRESTLERS[selected]!.name : WRESTLERS[opponent]!.name
-  const message = match.winner ? `${winnerName}の かち！`
-    : totalTaps === 0 ? 'はっけよい、のこった！' : 'のこった、のこった！'
+  const pick = (index: number) => {
+    const next = { ...fighters, [picking]: index }
+    setFighters(next)
+    resetMatch(next)
+    primeAudio()
+    playTapSound()
+  }
+
+  const preview = useMemo(() => createSumoState(fighters.left, fighters.right), [fighters])
+  const scene = started ? match : preview
+  const nameOf = (side: Side) => WRESTLERS[fighters[side]]!.name
+  const loser = match.winner ? other(match.winner) : null
+  const message = match.winner ? `${nameOf(match.winner)}の かち！`
+    : match.taps === 0 ? 'はっけよい、のこった！' : 'のこった、のこった！'
+  const detail = loser
+    ? (match.finish === 'fall' ? `${nameOf(loser)}が ころん！` : `${nameOf(loser)}が まるの そとへ！`)
+    : mode === 'solo' ? 'どこでも トントン！ うしろを たたくと まえへ' : 'じぶんの がわを トントン！'
 
   const page = (
-    <main className={`${styles.page} ${started ? styles.playing : ''}`}
-      onPointerDownCapture={() => { tapGestureRef.current = false }}
-      onClickCapture={(event) => {
-        // A winning pointerdown replaces the pad with replay controls before the
-        // compatibility click arrives. Consume that click until a new gesture begins.
-        if (event.detail > 0 && tapGestureRef.current) {
-          event.preventDefault()
-          event.stopPropagation()
-        }
-      }}>
+    <main className={`${styles.page} ${started ? styles.playing : ''}`}>
       <header className={styles.header}>
         {started ? <GameBackButton onBack={backToSelect} /> : <GameBackButton to="/" />}
         <h1>トントンずもう</h1>
@@ -113,58 +187,46 @@ export default function TontonSumoPlay() {
         </button>
       </header>
 
-      <div className={styles.content}>
+      <div className={styles.content} onPointerDown={started ? onArenaPointerDown : undefined}>
         <div className={styles.caption}>
-          <span className={styles.eyebrow}>{started ? (mode === 'solo' ? 'ひとりで おすもう' : 'ふたりで おすもう') : 'ちいさな かみの おすもう'}</span>
+          <span className={styles.eyebrow}>{started ? (mode === 'solo' ? 'ひとりで おすもう' : 'ふたりで おすもう') : 'おりがみの かみずもう'}</span>
           <h2 role={started ? 'status' : undefined}>{started ? message : 'トントン、ころん。'}</h2>
-          <p>{started ? (match.winner ? 'ふたりとも よく がんばったね' : 'じぶんの ボタンを たたこう') : 'たたくと はずむ。おすと すすむ。'}</p>
+          <p>{started ? detail : 'はこを たたくと、ぴょこぴょこ うごくよ'}</p>
         </div>
 
-        <div className={styles.arena}>
-          <svg viewBox="0 0 720 440" role="img" aria-label={`${WRESTLERS[selected]!.name}と ${WRESTLERS[opponent]!.name}の かみずもう${match.winner ? `。${message}` : ''}`}>
-            <path d="M64 50 Q360 118 656 50" fill="none" stroke="#c9b991" strokeWidth="2" />
-            {[120, 200, 280, 360, 440, 520, 600].map((x, index) => <path key={x} d={`M${x - 15} ${index < 2 || index > 4 ? 64 : 78} l30 4 -16 30Z`} fill={['#dd8b76', '#85b5ae', '#e1c16e'][index % 3]} />)}
-            <g fill="#e7dcca"><circle cx="80" cy="172" r="5" /><circle cx="654" cy="213" r="7" /><path d="M124 115 l6 12 -12 0Z M601 130 l8 16 -16 0Z" /></g>
-            <ellipse cx="360" cy="384" rx="268" ry="24" fill="#c1a886" opacity=".18" />
-            <g key={`box-${totalTaps}`} className={totalTaps && !match.winner ? styles.boxBounce : undefined}>
-              <path d="M62 260 L360 189 L658 260 L641 362 L360 416 L79 362Z" fill="#c69b6a" stroke="#99754f" strokeWidth="3" />
-              <path d="M62 260 L360 325 L658 260 L641 362 L360 416 L79 362Z" fill="#d5b184" />
-              <path d="M360 325 L360 416 L641 362 L658 260Z" fill="#c69b6a" />
-              <path d="M62 260 L360 189 L658 260 L360 332Z" fill="#f5e4c5" stroke="#a98a60" strokeWidth="3" />
-              <ellipse cx="360" cy="259" rx="238" ry="56" fill="#faedd5" stroke="#c29a5f" strokeWidth="9" />
-              <ellipse cx="360" cy="259" rx="238" ry="56" fill="none" stroke="#efce8d" strokeWidth="5" strokeDasharray="4 7" />
-              <path d="M333 250 l0 20 M387 250 l0 20" stroke="#faf7ed" strokeWidth="7" strokeLinecap="round" />
-              <path d="M112 304 l80 18 M112 320 l48 11 M540 328 l60 -13" stroke="#b58c5e" strokeWidth="2" opacity=".5" />
-              <g transform="translate(328 350)"><rect width="64" height="40" rx="6" fill="#f4e9d0" /><text x="32" y="28" textAnchor="middle" fill="#916846" fontSize="22" fontWeight="800">福</text></g>
-            </g>
-            {(['left', 'right'] as const).map((side) => {
-              const losing = Boolean(match.winner && match.winner !== side)
-              const x = (side === 'left' ? 206 : 354) + match.position * 15
-              return (
-                <g key={side} transform={`translate(${x} 105)`} className={styles.wrestlerPosition}>
-                  <ellipse cx="80" cy="170" rx="67" ry="12" fill="#9d774e" opacity=".17" />
-                  <g transform={losing ? `rotate(${side === 'left' ? -72 : 72} 80 169)` : `rotate(${side === 'left' ? 5 : -5} 80 169)`} className={styles.paperTilt}>
-                    <g key={`${side}-${totalTaps}`} className={match.winner ? (losing ? undefined : styles.cheer) : totalTaps ? styles.hop : styles.idle}>
-                      <PaperWrestler index={side === 'left' ? selected : opponent} belt={side === 'left' ? '#c65b4b' : '#438c91'} />
-                    </g>
-                  </g>
-                </g>
-              )
-            })}
-            {lastSide && !match.winner && <text key={`tap-${totalTaps}`} x={lastSide === 'left' ? 160 : 560} y="175" className={styles.tapWord} textAnchor="middle" fill={lastSide === 'left' ? '#b94e3f' : '#367b80'}>トン!</text>}
-            {match.winner && <g className={styles.confetti} aria-hidden="true">{[110, 180, 265, 360, 440, 530, 600].map((x, i) => <path key={x} d={`M${x} ${115 + (i % 3) * 26} l7 -12 7 12 -7 12Z`} fill={['#dba44b', '#dd8b76', '#85b5ae'][i % 3]} />)}</g>}
-          </svg>
+        <div ref={arenaRef} className={styles.arena}
+          tabIndex={started ? 0 : undefined}
+          role={started ? 'button' : undefined}
+          aria-label={started ? `はこを トントン（${mode === 'solo' ? 'A か スペース' : 'あかは A、あおは L'}）` : undefined}
+          onKeyDown={started ? (event) => {
+            if (event.key !== 'Enter' || event.repeat || match.winner) return
+            event.preventDefault()
+            if (mode === 'solo') tap(behindPoint(matchRef.current, 'left', Math.random), 'left')
+            else tap({ x: 0, z: 0 }, 'left')
+          } : undefined}>
+          <SumoScene state={scene} ripples={ripples} svgRef={svgRef} idle={!started} view={view}
+            label={`${nameOf('left')}と ${nameOf('right')}の かみずもう${match.winner && started ? `。${message}` : ''}`} />
         </div>
 
         {!started ? (
           <section className={styles.selection} aria-label="あそびかたを えらぶ">
-            <p id="wrestler-label">きみの おすもうさん</p>
-            <div className={styles.characters} role="group" aria-labelledby="wrestler-label">
+            <div className={styles.corners} role="group" aria-label="どちらの おすもうさんを えらぶ">
+              {(['left', 'right'] as const).map((side) => (
+                <button key={side} type="button" aria-pressed={picking === side} onClick={() => setPicking(side)}
+                  className={`${styles.corner} ${side === 'left' ? styles.redCorner : styles.blueCorner}`}>
+                  <span className={styles.dot} aria-hidden="true" />{SIDE_NAMES[side]}<strong>{nameOf(side)}</strong>
+                </button>
+              ))}
+            </div>
+            <div className={styles.characters} role="group" aria-label={`${SIDE_NAMES[picking]}の おすもうさん`}>
               {WRESTLERS.map((wrestler, index) => (
-                <button key={wrestler.name} type="button" aria-pressed={selected === index} onClick={() => { setSelected(index); primeAudio(); playTapSound() }}>
-                  <svg viewBox="0 0 160 180" aria-hidden="true"><PaperWrestler index={index} /></svg>
+                <button key={wrestler.key} type="button" aria-label={wrestler.name} aria-pressed={fighters[picking] === index} onClick={() => pick(index)}>
+                  <svg viewBox="-4 0 168 182" aria-hidden="true"><PaperSheet index={index} belt={fighters[picking] === index ? SIDE_COLORS[picking].belt : undefined} /></svg>
                   <span>{wrestler.name}</span>
-                  <span className={styles.check} aria-hidden="true">{selected === index ? '✓' : ''}</span>
+                  <small>{wrestler.trait}</small>
+                  {(['left', 'right'] as const).filter((side) => fighters[side] === index).map((side) => (
+                    <span key={side} className={`${styles.badge} ${side === 'left' ? styles.redBadge : styles.blueBadge}`} aria-hidden="true">{SIDE_NAMES[side]}</span>
+                  ))}
                 </button>
               ))}
             </div>
@@ -175,37 +237,19 @@ export default function TontonSumoPlay() {
           </section>
         ) : (
           <section className={styles.controls} aria-label="おすもうの そうさ">
-            {match.winner ? (
+            {resultReady ? (
               <div className={styles.result}>
                 <button ref={replayRef} type="button" className={styles.solo} onClick={() => start(mode)}>もういちど</button>
                 <button type="button" className={styles.secondary} onClick={backToSelect}>えらびなおす</button>
               </div>
-            ) : (
-              <div className={styles.pads}>
-                {(['left', 'right'] as const).map((side) => {
-                  const computer = side === 'right' && mode === 'solo'
-                  const name = WRESTLERS[side === 'left' ? selected : opponent]!.name
-                  return computer ? (
-                    <div key={side} className={styles.computer}><span>{name}</span><strong>おまかせ</strong><small>ゆっくり トントン</small></div>
-                  ) : (
-                    <button key={side} ref={side === 'left' ? leftButtonRef : undefined} type="button"
-                      className={`${styles.pad} ${side === 'left' ? styles.redPad : styles.bluePad}`}
-                      aria-label={`${side === 'left' ? 'ひだり' : 'みぎ'}の トン！`}
-                      onPointerDown={(event) => {
-                        if (event.button !== 0) return
-                        tapGestureRef.current = true
-                        event.preventDefault()
-                        tap(side)
-                      }}
-                      onClick={(event) => { if (event.detail === 0) tap(side) }}
-                      onKeyDown={(event) => { if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault() }}>
-                      <span>{name}</span><strong>トン！</strong><small>{side === 'left' ? (mode === 'solo' ? 'A / スペース' : 'A') : 'L'}</small>
-                    </button>
-                  )
-                })}
+            ) : mode === 'duo' ? (
+              <div className={styles.halves} aria-hidden="true">
+                <span className={styles.redHalf}>{nameOf('left')}<small>ひだりがわを トントン</small></span>
+                <span className={styles.blueHalf}>{nameOf('right')}<small>みぎがわを トントン</small></span>
               </div>
+            ) : (
+              <p className={styles.hint}>{match.winner ? 'きまった！' : `${nameOf('right')}は ゆっくり トントン`}</p>
             )}
-            <p className={styles.hint}>{match.winner ? 'なんどでも あそぼう' : 'まるの そとへ おしだすと かち！'}</p>
           </section>
         )}
       </div>
