@@ -21,6 +21,8 @@ const GRAVITY = 300
  * あいてより COMEBACK_BEHIND いじょう げんきが すくない ときが あった。 */
 export const COMEBACK_LOW = .6
 export const COMEBACK_BEHIND = .2
+/** せっせん: かった ほうも げんきが これ いかに なる ほど おいこまれた（あっしょうは ふくめない）。 */
+export const CLOSE_LOW = .6
 
 export type FighterState =
   | 'ready' | 'approach' | 'circle' | 'clash' | 'windup' | 'strike' | 'stagger'
@@ -95,8 +97,8 @@ export type BattleEvent =
   | { type: 'fall'; side: 0 | 1; reason: EndReason }
   | { type: 'flee'; side: 0 | 1 }
   | { type: 'timeup' }
-  /** comeback: れっせいから ぎゃくてんして かった（たまにしか ない）。 */
-  | { type: 'end'; winner: 0 | 1; reason: EndReason; comeback: boolean }
+  /** cutIn: カットインを いれる しあい。comeback=れっせいから ぎゃくてん、close=せっせん（あっしょうは null）。 */
+  | { type: 'end'; winner: 0 | 1; reason: EndReason; cutIn: CutInKind | null }
 
 export type Battle = {
   stage: StageId
@@ -668,12 +670,23 @@ function track(b: Battle) {
   }
 }
 
+export type CutInKind = 'comeback' | 'close'
+
 /**
- * げんきで まけていた ところから ぎゃくてんして かったか（かった しあいの 1わり くらい）。
+ * げんきで まけていた ところから ぎゃくてんして かったか。
  * じかんぎれの はんていがちは ふくめない。
  */
 export function isComeback(b: Pick<Battle, 'lowest' | 'behind'>, winner: 0 | 1, reason: EndReason) {
   return reason !== 'judge' && b.lowest[winner] <= COMEBACK_LOW && b.behind[winner] >= COMEBACK_BEHIND
+}
+
+/**
+ * カットインを いれるか（ぜんしあいの 2わり くらい）。ぎゃくてんなら comeback、
+ * かった ほうも げんきが CLOSE_LOW いかに へった せっせんなら close、あっしょうは null。
+ */
+export function cutInKind(b: Pick<Battle, 'lowest' | 'behind'>, winner: 0 | 1, reason: EndReason): CutInKind | null {
+  if (isComeback(b, winner, reason)) return 'comeback'
+  return reason !== 'judge' && b.lowest[winner] <= CLOSE_LOW ? 'close' : null
 }
 
 function finish(b: Battle, winner: 0 | 1, reason: EndReason) {
@@ -685,7 +698,7 @@ function finish(b: Battle, winner: 0 | 1, reason: EndReason) {
   w.pose.flipped = false
   w.pose.hang = false
   if (w.state !== 'out' && w.state !== 'fall') set(w, 'win')
-  b.events.push({ type: 'end', winner, reason, comeback: isComeback(b, winner, reason) })
+  b.events.push({ type: 'end', winner, reason, cutIn: cutInKind(b, winner, reason) })
 }
 
 export function stepBattle(b: Battle) {

@@ -5,7 +5,7 @@ import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { vibrate } from '../../utils/haptics'
-import { createBattle, drainEvents, DT, stepBattle, type Battle, type BattleEvent, type EndReason } from './battle'
+import { createBattle, drainEvents, DT, stepBattle, type Battle, type BattleEvent, type CutInKind, type EndReason } from './battle'
 import { ambient, createFx, spawnFx, updateFx } from './fx'
 import { makeCanvas } from './pixel'
 import { portraitSprite, Scene, stageDots, TEAM_COLORS, viewSize, warmSprites, type ViewSize } from './render'
@@ -222,12 +222,12 @@ type Result = { winner: 0 | 1; reason: EndReason }
 /** わざが きまった ときの「ドカーン！」などの もじ。x・y は キャンバスに たいする %。 */
 type Pop = { id: number; text: string; x: number; y: number; big: boolean; tone: 'hit' | 'clash' | 'special' | 'soft' }
 
-/** ぎゃくてんの カットインを みせる じかん（たたかいは とまる）。 */
+/** カットインを みせる じかん（たたかいは とまる）。 */
 const CUT_IN_SECONDS = 1.8
 const SHOUT = 'ウオリャアアアアア！'
 
-/** ぎゃくてん した ときの カットイン。ななめの おびが ひだりから スワイプで はいり、ゆれながら むしが さけぶ。 */
-function ComebackCutIn({ sp, side }: { sp: Species; side: 0 | 1 }) {
+/** ぎゃくてん・せっせんの カットイン。ななめの おびが ひだりから スワイプで はいり、ゆれながら むしが さけぶ。 */
+function ComebackCutIn({ sp, side, kind }: { sp: Species; side: 0 | 1; kind: CutInKind }) {
   return <div className={styles.cutIn} style={{ '--team': TEAM_COLORS[side] } as CSSProperties} aria-hidden="true" data-testid="kabukuwa-cut-in">
     <span className={styles.cutInFlash} />
     <span className={styles.cutInSwipe} />
@@ -239,7 +239,7 @@ function ComebackCutIn({ sp, side }: { sp: Species; side: 0 | 1 }) {
           {[...SHOUT].map((ch, i) => <span key={i} style={{ '--i': i } as CSSProperties}>{ch}</span>)}
         </p>
       </div>
-      <p className={styles.cutInLabel}>ぎゃくてん！</p>
+      <p className={styles.cutInLabel}>{kind === 'comeback' ? 'ぎゃくてん！' : 'せっせん！'}</p>
     </div>
   </div>
 }
@@ -272,7 +272,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
   const [result, setResult] = useState<Result | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [pops, setPops] = useState<Pop[]>([])
-  const [cutIn, setCutIn] = useState<0 | 1 | null>(null)
+  const [cutIn, setCutIn] = useState<{ side: 0 | 1; kind: CutInKind } | null>(null)
   const mirror = mine.id === foe.id
 
   useEffect(() => {
@@ -337,15 +337,16 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
         case 'flee': sound.playFall(); setMessage(`${name(e.side)}は にげだした！`); break
         case 'timeup': sound.playGo(); setMessage('じかんぎれ！'); break
         case 'end': {
-          // じぶんの むしが れっせいから ぎゃくてんした ときだけ、とめて カットインを いれる（たまにしか でない）。
-          const comeback = e.comeback && e.winner === 0
+          // ぎゃくてん・せっせんの ときは（じぶんでも あいてでも）とめて カットインを いれる。あっしょうは いれない。
+          const kind = e.cutIn
+          const comeback = kind !== null
           const lag = comeback ? CUT_IN_SECONDS * 1000 : 0
-          if (comeback) {
+          if (kind) {
             stop = CUT_IN_SECONDS
             sound.playCutIn()
             vibrate('impact')
-            setCutIn(e.winner)
-            setMessage(`${name(e.winner)}の ぎゃくてん！ ウオリャアアアア！`)
+            setCutIn({ side: e.winner, kind })
+            setMessage(kind === 'comeback' ? `${name(e.winner)}の ぎゃくてん！ ウオリャアアアア！` : `${name(e.winner)}が せっせんを せいした！ ウオリャアアアア！`)
             timers.push(setTimeout(() => setCutIn(null), lag))
           }
           // スローは カットインの あいだ（とまって いる あいだ）も へるので、そのぶん ながく する。
@@ -427,7 +428,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
       <div className={styles.pops} aria-hidden="true">
         {pops.map(p => <span key={p.id} className={styles.pop} data-tone={p.tone} data-big={p.big} style={{ left: `${p.x}%`, top: `${p.y}%` }}>{p.text}</span>)}
       </div>
-      {cutIn !== null && <ComebackCutIn sp={cutIn === 0 ? mine : foe} side={cutIn} />}
+      {cutIn !== null && <ComebackCutIn sp={cutIn.side === 0 ? mine : foe} side={cutIn.side} kind={cutIn.kind} />}
       {banner === 'ready' && <p className={styles.banner} aria-hidden="true">はっけよい…<small>{stage.view}・{stage.name}</small></p>}
       {banner === 'go' && <p className={`${styles.banner} ${styles.bannerGo}`} aria-hidden="true">のこった！</p>}
       {banner === 'end' && result && !showResult && <p className={`${styles.banner} ${styles.bannerEnd}`} style={{ '--team': TEAM_COLORS[result.winner] } as CSSProperties} aria-hidden="true">

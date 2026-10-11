@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { COMEBACK_BEHIND, COMEBACK_LOW, createBattle, drainEvents, DT, isComeback, READY_SECONDS, runToEnd, stepBattle, strikeChance, TIME_LIMIT, type Battle, type BattleEvent } from './battle'
+import { CLOSE_LOW, COMEBACK_BEHIND, COMEBACK_LOW, createBattle, cutInKind, drainEvents, DT, isComeback, READY_SECONDS, runToEnd, stepBattle, strikeChance, TIME_LIMIT, type Battle, type BattleEvent } from './battle'
 import { SPECIES, speciesById, type Species } from './species'
 import { STAGES, type StageId } from './stages'
 
@@ -50,7 +50,7 @@ describe('たたかいの すすみかた', () => {
       expect(battle.winner).not.toBeNull()
       expect(battle.time).toBeLessThanOrEqual(TIME_LIMIT + DT)
       const end = events.find(e => e.type === 'end')
-      expect(end).toEqual({ type: 'end', winner: battle.winner, reason: battle.reason, comeback: isComeback(battle, battle.winner!, battle.reason!) })
+      expect(end).toEqual({ type: 'end', winner: battle.winner, reason: battle.reason, cutIn: cutInKind(battle, battle.winner!, battle.reason!) })
       expect(events.filter(e => e.type === 'end')).toHaveLength(1)
     }
   })
@@ -197,21 +197,29 @@ describe('ぎゃくてん', () => {
     expect(isComeback({ lowest: [.1, 1], behind: [COMEBACK_BEHIND - .05, 0] }, 0, 'push')).toBe(false)
   })
 
-  test('ぎゃくてんがちは たまにしか おきない（まいかい でると うるさい）', () => {
-    let wins = 0, comebacks = 0
+  test('カットインは ぎゃくてん・せっせんで でて、あっしょうでは でない', () => {
+    const base = { lowest: [1, 1] as [number, number], behind: [0, 0] as [number, number] }
+    expect(cutInKind({ lowest: [COMEBACK_LOW, 1], behind: [COMEBACK_BEHIND, 0] }, 0, 'throw')).toBe('comeback')
+    expect(cutInKind({ lowest: [CLOSE_LOW, 1], behind: [0, 0] }, 0, 'throw')).toBe('close')
+    expect(cutInKind({ lowest: [CLOSE_LOW + .05, 1], behind: [0, 0] }, 0, 'throw')).toBeNull()
+    expect(cutInKind(base, 0, 'flee')).toBeNull()
+    expect(cutInKind({ lowest: [.2, 1], behind: [.5, 0] }, 0, 'judge')).toBeNull()
+  })
+
+  test('カットインは ぜんしあいの 15〜25% くらい（まいかい でると うるさい）', () => {
+    let games = 0, cutIns = 0
     for (const stage of STAGES) {
       for (const [i, a] of SPECIES.entries()) {
         for (let k = 0; k < 4; k++) {
           const b = SPECIES[(i * 7 + k * 3 + 1) % SPECIES.length]
           const battle = runToEnd(createBattle(a, b, stage.id, 300 + i * 31 + k * 7, stage.startU))
           if (battle.winner === null || battle.reason === null) continue
-          wins++
-          if (isComeback(battle, battle.winner, battle.reason)) comebacks++
+          games++
+          if (cutInKind(battle, battle.winner, battle.reason)) cutIns++
         }
       }
     }
-    expect(comebacks).toBeGreaterThan(0)
-    expect(comebacks / wins).toBeGreaterThan(.02)
-    expect(comebacks / wins).toBeLessThan(.2)
+    expect(cutIns / games).toBeGreaterThan(.15)
+    expect(cutIns / games).toBeLessThan(.25)
   })
 })
