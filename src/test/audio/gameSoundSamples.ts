@@ -366,6 +366,7 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('なげた', () => kabukuwa.playHit(true)),
     sample('おちた', kabukuwa.playFall),
     sample('かった', kabukuwa.playWin),
+    background('BGM', 3, kabukuwa.startBgm),
   ],
   'onaji-pon': [sample('つなぐ', () => onaji.playConnectSound(1)), sample('ひく', onaji.playDrawSound), sample('だめ', onaji.playNopeSound), sample('クリア', onaji.playClearSound)],
 }

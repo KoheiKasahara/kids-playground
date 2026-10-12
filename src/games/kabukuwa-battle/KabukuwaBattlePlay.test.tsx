@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import KabukuwaBattlePlay from './KabukuwaBattlePlay'
 import type { Battle } from './battle'
 import { SPECIES } from './species'
-import { playBuzz, playCutIn, playGo, playReady, playWin } from './sounds'
+import { playBuzz, playCutIn, playGo, playReady, playWin, startBgm } from './sounds'
 
 vi.mock('./sounds', async importOriginal => {
   const actual = await importOriginal<typeof import('./sounds')>()
@@ -282,6 +282,35 @@ describe('カブクワ バトル', () => {
     advance(.5)
     expect(screen.getByTestId('kabukuwa-cut-in')).toHaveTextContent('せっせん！')
     expect(playCutIn).toHaveBeenCalledTimes(1)
+  })
+
+  test('BGM は たたかい ちゅうだけ ながれ、おとの ON/OFF に したがう', () => {
+    const stopBgm = vi.fn()
+    vi.mocked(startBgm).mockImplementation(() => stopBgm)
+    renderGame()
+    chooseHerculesVsCaucasus()
+    expect(startBgm).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'きりかぶ どひょう（うえから みる）' }))
+    expect(startBgm).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'おとを けす' }))
+    expect(stopBgm).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'おとを だす' }))
+    expect(startBgm).toHaveBeenCalledTimes(2)
+
+    advance(2.4)
+    act(() => { battle()!.f[1].st = 0 })
+    advance(.5)
+    // しょうぶが ついたら とめて、かった おとを きかせる。
+    expect(stopBgm).toHaveBeenCalledTimes(2)
+    advance(3)
+    expect(playWin).toHaveBeenCalled()
+    expect(startBgm).toHaveBeenCalledTimes(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
+    expect(startBgm).toHaveBeenCalledTimes(3)
+    fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
+    expect(stopBgm).toHaveBeenCalledTimes(3)
   })
 
   test('おとの ON/OFF を きりかえられる', () => {
