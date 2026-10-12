@@ -217,11 +217,17 @@ function wobble(f: Fighter, time: number) {
   return .65 * Math.sin(f1 * time + p1) + .35 * Math.sin(f2 * time + p2)
 }
 
+/** クワガタの 大あごの かみつき。ひらたくて かるい ぶん、がっちり はさむ・はさんで ふんばる ちからで おぎなう（せめ・まもり りょうほうに つくので、クワガタどうしでは さしひき なし）。 */
+const JAW_GRIP = 3
+function jawGrip(f: Fighter) {
+  return f.sp.group === 'kuwagata' ? JAW_GRIP : 0
+}
+
 /** ひとことで いうと どれくらい わざが きまりやすいか（0〜1）。 */
 export function strikeChance(att: Fighter, def: Fighter) {
   const reach = (att.front - def.front) / 22
-  const a = att.power * att.form + att.weight * 2.5 + reach
-  const d = def.power * def.form * .55 + def.weight * 3 + def.speed * .25
+  const a = att.power * att.form + att.weight * 2.5 + reach + jawGrip(att)
+  const d = def.power * def.form * .55 + def.weight * 3 + def.speed * .25 + jawGrip(def)
   const tired = 1 - def.st / def.maxSt
   return Math.max(.1, Math.min(.85, .2 + (a - d) * .045 + tired * .5))
 }
@@ -465,7 +471,7 @@ function resolveStrike(b: Battle, att: Fighter, def: Fighter) {
     b.events.push({ type: 'block', side: def.side, u: def.u, v: def.v })
     return
   }
-  const edge = (att.power * att.form + att.weight * 2.5) - (def.power * def.form * .55 + def.weight * 3)
+  const edge = (att.power * att.form + att.weight * 2.5 + jawGrip(att)) - (def.power * def.form * .55 + def.weight * 3 + jawGrip(def))
   const damage = (8 + Math.max(0, edge) * 1 + att.power * .6) * (move === 'pinch' ? 1.15 : move === 'charge' ? .85 : 1) / (.6 + .4 * def.weight)
   def.st -= damage
   const big = damage > 22
