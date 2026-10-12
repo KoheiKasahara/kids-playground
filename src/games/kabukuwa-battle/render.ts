@@ -716,7 +716,7 @@ function drawSprite(g: G, s: Sprite, x: number, y: number, scale: number, rot: n
 /** えらぶ がめんの むしの 絵（ななめ まえから）。たたかいより こまかく かく。 */
 export const PORTRAIT_ZOOM = 2
 export function portraitSprite(sp: Species, leg = 0, lift = 0) {
-  return beetleSprite(sp, { leg, lift, jaw: sp.group === 'kuwagata' ? lift : 0, flipped: false }, -.42, .38, lengthPx(sp) * PORTRAIT_ZOOM, true)
+  return beetleSprite(sp, { leg, lift, jaw: sp.group === 'kuwagata' ? 1 : 0, flipped: false }, -.42, .38, lengthPx(sp) * PORTRAIT_ZOOM, true)
 }
 
 /** はじまる まえに よく つかう 絵を つくって おく（たたかいの とちゅうで カクカク しないように）。 */
