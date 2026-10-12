@@ -22,7 +22,7 @@ const GRAVITY = 300
 export const COMEBACK_LOW = .6
 export const COMEBACK_BEHIND = .2
 /** せっせん: かった ほうも げんきが これ いかに なる ほど おいこまれた（あっしょうは ふくめない）。 */
-export const CLOSE_LOW = .6
+export const CLOSE_LOW = .56
 
 export type FighterState =
   | 'ready' | 'approach' | 'circle' | 'clash' | 'windup' | 'strike' | 'stagger'
