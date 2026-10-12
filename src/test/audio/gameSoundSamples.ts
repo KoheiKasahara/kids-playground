@@ -326,7 +326,12 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('クリア', jishaku.playClear),
     background('BGM', 3, () => jishaku.startBgm('desk')),
   ],
-  'tonton-sumo': [sample('トン', sumo.playTapSound), sample('はっけよい', sumo.playStartSound), sample('きまり', sumo.playFinishSound)],
+  'tonton-sumo': [
+    sample('トン', sumo.playTapSound),
+    sample('はっけよい', sumo.playStartSound),
+    sample('きまり', sumo.playFinishSound),
+    background('BGM', 3, sumo.startBgm),
+  ],
   'shabon-pachin': [sample('ぱちん', shabon.playPopSound), sample('ぼよん', shabon.playBoingSound), sample('クリア', shabon.playClearSound)],
   'dot-bomb': [
     sample('ボンを おく', dotBomb.playPlace),

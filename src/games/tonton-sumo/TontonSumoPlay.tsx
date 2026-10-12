@@ -13,7 +13,7 @@ import {
   type Mode, type Point, type Side,
 } from './sumoGame'
 import { SIDE_COLORS, TALL_VIEW, WIDE_VIEW, clientToView, unproject } from './projection'
-import { playFinishSound, playStartSound, playTapSound } from './sounds'
+import { playFinishSound, playStartSound, playTapSound, startBgm } from './sounds'
 import styles from './TontonSumoPlay.module.css'
 
 /** Leave the fall on screen for a moment before the replay buttons appear. */
@@ -98,6 +98,13 @@ export default function TontonSumoPlay() {
     vibrate('tap')
     runPhysics()
   }, [runPhysics])
+
+  // とりくみ ちゅうだけ 8ビットの BGM。きまったら とめて、きまりの おとを きかせる。
+  const bouting = started && !match.winner
+  useEffect(() => {
+    if (!sound || !bouting) return undefined
+    return startBgm()
+  }, [sound, bouting])
 
   const computerActive = mode === 'solo' && match.taps > 0 && !match.winner
   useEffect(() => {

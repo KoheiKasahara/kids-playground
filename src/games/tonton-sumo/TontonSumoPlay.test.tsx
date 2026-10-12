@@ -7,6 +7,13 @@ import surfaceStyles from '../../components/GamePlaySurface.module.css'
 import TontonSumoPlay, { RESULT_DELAY_MS } from './TontonSumoPlay'
 import { COMPUTER_INTERVAL_MS } from './sumoGame'
 import { WIDE_VIEW, project } from './projection'
+import { startBgm } from './sounds'
+
+const stopBgm = vi.hoisted(() => vi.fn())
+vi.mock('./sounds', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./sounds')>()
+  return { ...actual, startBgm: vi.fn(() => stopBgm) }
+})
 
 function renderGame() {
   return render(<StrictMode><MemoryRouter><TontonSumoPlay /></MemoryRouter></StrictMode>)
@@ -31,7 +38,7 @@ beforeEach(() => {
   vi.spyOn(SVGElement.prototype, 'getBoundingClientRect').mockReturnValue(
     { left: 0, top: 0, width: WIDE_VIEW.width, height: WIDE_VIEW.height, right: WIDE_VIEW.width, bottom: WIDE_VIEW.height, x: 0, y: 0, toJSON: () => ({}) } as DOMRect)
 })
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.mocked(startBgm).mockClear(); stopBgm.mockClear() })
 
 describe('TontonSumoPlay', () => {
   test('pick both wrestlers → two-player bout decided by taps → replay → back to selection', () => {
@@ -72,6 +79,28 @@ describe('TontonSumoPlay', () => {
     expect(container.querySelector(`.${surfaceStyles.surface}`)).toBeNull()
     advance(1) // jsdom queues a selectionchange after focus moves
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  test('8-bit BGM plays only during the bout and follows the sound toggle', () => {
+    renderGame()
+    expect(startBgm).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /ふたりで/ }))
+    expect(startBgm).toHaveBeenCalled()
+    const started = vi.mocked(startBgm).mock.calls.length
+    const stopped = stopBgm.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'おとを けす' }))
+    expect(stopBgm).toHaveBeenCalledTimes(stopped + 1)
+    fireEvent.click(screen.getByRole('button', { name: 'おとを だす' }))
+    expect(startBgm).toHaveBeenCalledTimes(started + 1)
+
+    tapUntilDecided(-1.25)
+    expect(stopBgm).toHaveBeenCalledTimes(stopped + 2)
+    advance(RESULT_DELAY_MS)
+    fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
+    expect(startBgm).toHaveBeenCalledTimes(started + 2)
+    fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
+    expect(screen.getByRole('button', { name: /ひとりで/ })).toBeInTheDocument()
+    expect(stopBgm).toHaveBeenCalledTimes(stopped + 3)
   })
 
   test('taps anywhere on the play area count, but not on the header buttons', () => {
