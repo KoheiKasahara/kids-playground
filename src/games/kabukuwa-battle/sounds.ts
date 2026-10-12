@@ -28,7 +28,7 @@ function pulseWave(ctx: AudioContext) {
 
 type Voice = 'pulse' | 'triangle' | 'sine' | 'square' | 'sawtooth'
 
-function tone(ctx: AudioContext, f: number, start: number, dur: number, vol: number, voice: Voice) {
+function tone(ctx: AudioContext, f: number, start: number, dur: number, vol: number, voice: Voice, dest: AudioNode = getSoundOutput(ctx)) {
   if (!f) return
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
@@ -39,13 +39,13 @@ function tone(ctx: AudioContext, f: number, start: number, dur: number, vol: num
   gain.gain.linearRampToValueAtTime(vol, start + .006)
   gain.gain.setValueAtTime(vol * .8, start + Math.max(.01, dur - .05))
   gain.gain.linearRampToValueAtTime(0, start + dur)
-  osc.connect(gain).connect(getSoundOutput(ctx))
+  osc.connect(gain).connect(dest)
   osc.start(start)
   osc.stop(start + dur + .02)
 }
 
 /** 音の 高さが すーっと かわる 音。 */
-function slide(ctx: AudioContext, from: number, to: number, start: number, dur: number, vol: number, voice: Voice) {
+function slide(ctx: AudioContext, from: number, to: number, start: number, dur: number, vol: number, voice: Voice, dest: AudioNode = getSoundOutput(ctx)) {
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
   if (voice === 'pulse') osc.setPeriodicWave(pulseWave(ctx))
@@ -54,13 +54,13 @@ function slide(ctx: AudioContext, from: number, to: number, start: number, dur: 
   osc.frequency.exponentialRampToValueAtTime(to, start + dur)
   gain.gain.setValueAtTime(vol, start)
   gain.gain.exponentialRampToValueAtTime(.001, start + dur)
-  osc.connect(gain).connect(getSoundOutput(ctx))
+  osc.connect(gain).connect(dest)
   osc.start(start)
   osc.stop(start + dur + .02)
 }
 
 const noiseCache = new WeakMap<AudioContext, AudioBuffer>()
-function noise(ctx: AudioContext, start: number, dur: number, vol: number, filter: BiquadFilterType, hz: number, toHz?: number) {
+function noise(ctx: AudioContext, start: number, dur: number, vol: number, filter: BiquadFilterType, hz: number, toHz?: number, dest: AudioNode = getSoundOutput(ctx)) {
   let buffer = noiseCache.get(ctx)
   if (!buffer) {
     buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * .6), ctx.sampleRate)
@@ -77,7 +77,7 @@ function noise(ctx: AudioContext, start: number, dur: number, vol: number, filte
   const gain = ctx.createGain()
   gain.gain.setValueAtTime(vol, start)
   gain.gain.exponentialRampToValueAtTime(.001, start + dur)
-  src.connect(f).connect(gain).connect(getSoundOutput(ctx))
+  src.connect(f).connect(gain).connect(dest)
   src.start(start)
   src.stop(start + dur + .02)
 }
@@ -277,4 +277,135 @@ export function playLose() {
   const step = .16
   const t = ctx.currentTime
   for (const [n, at, len] of [['E5', 0, 1], ['D#5', 1, 1], ['D5', 2, 1], ['C#5', 3, 3]] as [string, number, number][]) tone(ctx, freq(n), t + at * step, len * step, .08, 'pulse')
+}
+
+// ---------------- BGM（スーファミ ふうの バトル きょく） ----------------
+
+/** メロディ。すうじは A4 から なんはんおん うえか、`-` は のばす、`.` は やすみ（1つ = 8ぶおんぷ）。 */
+const BGM_MELODY = (
+  '12 - 7 - 12 14 15 - | 14 12 8 - 7 - 5 7 | 10 - 7 - 10 12 14 - | 7 - - - . 7 10 12 | '
+  + '15 - 14 12 14 - 12 10 | 12 - 8 - 12 15 17 - | 19 - 17 15 14 - 10 14 | 11 - - - 14 - 11 -'
+).split(/\s+/).filter(s => s !== '|')
+/** 1しょうせつ ごとの コード（A から なんはんおん）。Am F G Em Am F G E */
+const BGM_CHORDS: [number, number, number][] = [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -2, 2], [0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -1, 2]]
+const BGM_BPM = 152
+const semi = (base: number, n: number) => base * Math.pow(2, n / 12)
+
+/** ビブラートの かかった ブラス ふうの リード（のこぎり波を すこし まるめる）。 */
+function brass(ctx: AudioContext, dest: AudioNode, f: number, start: number, dur: number, vol: number) {
+  const osc = ctx.createOscillator()
+  const lfo = ctx.createOscillator()
+  const depth = ctx.createGain()
+  const lp = ctx.createBiquadFilter()
+  const gain = ctx.createGain()
+  osc.type = 'sawtooth'
+  osc.frequency.setValueAtTime(f, start)
+  // ながい おとだけ あとから ゆらす。
+  lfo.frequency.value = 5.5
+  depth.gain.setValueAtTime(0, start)
+  depth.gain.linearRampToValueAtTime(dur > .3 ? f * .012 : 0, start + Math.min(.25, dur))
+  lfo.connect(depth).connect(osc.frequency)
+  lp.type = 'lowpass'
+  lp.frequency.setValueAtTime(900, start)
+  lp.frequency.linearRampToValueAtTime(2600, start + .04)
+  lp.frequency.linearRampToValueAtTime(1800, start + dur)
+  gain.gain.setValueAtTime(0, start)
+  gain.gain.linearRampToValueAtTime(vol, start + .015)
+  gain.gain.setValueAtTime(vol * .85, start + Math.max(.02, dur - .04))
+  gain.gain.linearRampToValueAtTime(0, start + dur)
+  osc.connect(lp).connect(gain).connect(dest)
+  osc.start(start); lfo.start(start)
+  osc.stop(start + dur + .02); lfo.stop(start + dur + .02)
+}
+
+/** はじく ような シンセ ベース。 */
+function bassNote(ctx: AudioContext, dest: AudioNode, f: number, start: number, dur: number, vol: number) {
+  const osc = ctx.createOscillator()
+  const lp = ctx.createBiquadFilter()
+  const gain = ctx.createGain()
+  osc.type = 'sawtooth'
+  osc.frequency.setValueAtTime(f, start)
+  lp.type = 'lowpass'
+  lp.Q.value = 4
+  lp.frequency.setValueAtTime(1400, start)
+  lp.frequency.exponentialRampToValueAtTime(300, start + dur)
+  gain.gain.setValueAtTime(vol, start)
+  gain.gain.exponentialRampToValueAtTime(vol * .3, start + dur)
+  gain.gain.linearRampToValueAtTime(0, start + dur + .01)
+  osc.connect(lp).connect(gain).connect(dest)
+  osc.start(start)
+  osc.stop(start + dur + .03)
+}
+
+/** たたかい ちゅうの BGM を ながす。とめる かんすうを かえす。 */
+export function startBgm(): () => void {
+  const ctx = sfx()
+  if (!ctx) return () => {}
+  const out = getSoundOutput(ctx)
+  const master = ctx.createGain()
+  master.gain.value = .5
+  master.connect(out)
+  // スーファミ らしい ひびき（エコー）。
+  const echo = ctx.createDelay(1)
+  const echoTone = ctx.createBiquadFilter()
+  const feedback = ctx.createGain()
+  const echoOut = ctx.createGain()
+  echo.delayTime.value = 60 / BGM_BPM * .75
+  echoTone.type = 'lowpass'
+  echoTone.frequency.value = 2400
+  feedback.gain.value = .32
+  echoOut.gain.value = .35
+  master.connect(echo).connect(echoTone).connect(feedback).connect(echo)
+  echoTone.connect(echoOut).connect(out)
+
+  const step = 60 / BGM_BPM / 2
+  const lead = 440, low = 110
+  let index = 0
+  let next = ctx.currentTime + .1
+  const schedule = () => {
+    while (next < ctx.currentTime + .25) {
+      const i = index % BGM_MELODY.length
+      const bar = Math.floor(i / 8), beat = i % 8
+      const chord = BGM_CHORDS[bar]
+      const s = BGM_MELODY[i]
+      if (s !== '-' && s !== '.') {
+        let len = 1
+        while (BGM_MELODY[(i + len) % BGM_MELODY.length] === '-' && len < 8) len++
+        brass(ctx, master, semi(lead, Number(s)), next, len * step * .92, .05)
+        // 1オクターブ したで うすく かさねて あつみを だす。
+        tone(ctx, semi(lead / 2, Number(s)), next, len * step * .9, .018, 'pulse', master)
+      }
+      // ベースは オクターブで かけまわる。
+      bassNote(ctx, master, semi(low, chord[0] + (beat % 2 ? 12 : 0)), next, step * .8, .09)
+      // うらで コードを きざむ。
+      if (beat % 2 === 1) for (const n of chord) tone(ctx, semi(lead / 2, n + 12), next, step * .45, .012, 'square', master)
+      // ドラム（キック・スネア・ハイハット）。さいごの しょうせつの おわりは フィルイン。
+      const fill = bar === 7 && beat >= 6
+      if (beat === 0 || beat === 3 || beat === 4) slide(ctx, 160, 45, next, .18, .28, 'sine', master)
+      if (beat === 2 || beat === 6 || fill) {
+        noise(ctx, next, .12, .14, 'bandpass', 1800, undefined, master)
+        slide(ctx, 260, 160, next, .07, .07, 'triangle', master)
+      }
+      if (fill) noise(ctx, next + step / 2, .1, .12, 'bandpass', 1500, undefined, master)
+      else noise(ctx, next, .03, beat % 2 ? .035 : .05, 'highpass', 7500, undefined, master)
+      index++
+      next += step
+    }
+  }
+  schedule()
+  const timer = setInterval(schedule, 60)
+  return () => {
+    clearInterval(timer)
+    try {
+      const t = ctx.currentTime
+      master.gain.setValueAtTime(master.gain.value, t)
+      master.gain.linearRampToValueAtTime(0, t + .25)
+      // エコーが きえるのを まってから きりはなす。
+      setTimeout(() => {
+        try { master.disconnect(); feedback.disconnect(); echoOut.disconnect() } catch { /* もう きれている */ }
+      }, 1500)
+    } catch {
+      // とめられなくても たたかいは つづく。
+    }
+  }
 }

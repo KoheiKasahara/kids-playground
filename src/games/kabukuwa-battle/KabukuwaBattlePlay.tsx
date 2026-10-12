@@ -275,6 +275,13 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
   const [cutIn, setCutIn] = useState<{ side: 0 | 1; kind: CutInKind } | null>(null)
   const mirror = mine.id === foe.id
 
+  // しょうぶが つくまで BGM。ついたら とめて、かった・まけたの おとを きかせる。
+  const fighting = result === null
+  useEffect(() => {
+    if (!soundOn || !fighting) return undefined
+    return sound.startBgm()
+  }, [soundOn, fighting])
+
   useEffect(() => {
     const battle = createBattle(mine, foe, stage.id, seed, stage.startU)
     // おなじ たねで さきに すすめて おき、きめての わざが きまった ところで カットイン → とばす。
