@@ -64,6 +64,10 @@
 .characters svg { height: 46px; max-width: 100%; margin: 0 auto 2px; display: block; overflow: visible; }
 .characters button > span { display: block; font-size: 13px; font-weight: 800; white-space: nowrap; }
 .characters small { display: block; font-size: 10px; color: #998067; }
+.characters .stats { display: grid; gap: 1px; margin-top: 3px; font-size: 9px; font-weight: 700; color: #8a6f55; white-space: nowrap; }
+.stat { display: flex; justify-content: center; align-items: center; gap: 3px; }
+.stat b { color: #c4654f; font-size: 7px; letter-spacing: 0; }
+.stat i { color: #e6d9c0; font-style: normal; }
 .badge { position: absolute; top: 3px; padding: 1px 5px; border-radius: 8px; color: #fff9ed; font-size: 10px !important; font-weight: 800; }
 .redBadge { left: 4px; background: var(--red); }
 .blueBadge { right: 4px; background: var(--blue); }

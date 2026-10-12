@@ -8,7 +8,7 @@ import { vibrate } from '../../utils/haptics'
 import { PaperSheet } from './PaperWrestler'
 import SumoScene, { type Ripple } from './SumoScene'
 import {
-  COMPUTER_INTERVAL_MS, COMPUTER_STRENGTH, STEP_SECONDS, WRESTLERS,
+  COMPUTER_INTERVAL_MS, COMPUTER_STRENGTH, STAT_LEVELS, STEP_SECONDS, WRESTLERS,
   behindPoint, clampToBox, computerTapPoint, createSumoState, isSettled, other, stepSumo, tapSide, tapSumo,
   type Mode, type Point, type Side,
 } from './sumoGame'
@@ -20,6 +20,16 @@ import styles from './TontonSumoPlay.module.css'
 export const RESULT_DELAY_MS = 900
 
 const SIDE_NAMES: Record<Side, string> = { left: 'あか', right: 'あお' }
+/** The biggest wrestler fills the picker card; smaller ones are drawn smaller. */
+const LARGEST = Math.max(...WRESTLERS.map((wrestler) => wrestler.stats.scale))
+
+function StatDots({ label, value }: { label: string; value: number }) {
+  return (
+    <span className={styles.stat}>
+      {label}<b>{'●'.repeat(value)}<i>{'●'.repeat(STAT_LEVELS - value)}</i></b>
+    </span>
+  )
+}
 
 const PORTRAIT_QUERY = '(orientation: portrait)'
 function subscribePortrait(onChange: () => void) {
@@ -227,10 +237,19 @@ export default function TontonSumoPlay() {
             </div>
             <div className={styles.characters} role="group" aria-label={`${SIDE_NAMES[picking]}の おすもうさん`}>
               {WRESTLERS.map((wrestler, index) => (
-                <button key={wrestler.key} type="button" aria-label={wrestler.name} aria-pressed={fighters[picking] === index} onClick={() => pick(index)}>
-                  <svg viewBox="72 0 100 182" aria-hidden="true"><PaperSheet index={index} belt={fighters[picking] === index ? SIDE_COLORS[picking].belt : undefined} /></svg>
+                <button key={wrestler.key} type="button" aria-label={`${wrestler.name}（おおきさ ${wrestler.size}、おもさ ${wrestler.weight}）`}
+                  aria-pressed={fighters[picking] === index} onClick={() => pick(index)}>
+                  <svg viewBox="72 0 100 182" aria-hidden="true">
+                    <g transform={`translate(80 172) scale(${(wrestler.stats.scale / LARGEST).toFixed(3)}) translate(-80 -172)`}>
+                      <PaperSheet index={index} belt={fighters[picking] === index ? SIDE_COLORS[picking].belt : undefined} />
+                    </g>
+                  </svg>
                   <span>{wrestler.name}</span>
                   <small>{wrestler.trait}</small>
+                  <span className={styles.stats} aria-hidden="true">
+                    <StatDots label="おおきさ" value={wrestler.size} />
+                    <StatDots label="おもさ" value={wrestler.weight} />
+                  </span>
                   {(['left', 'right'] as const).filter((side) => fighters[side] === index).map((side) => (
                     <span key={side} className={`${styles.badge} ${side === 'left' ? styles.redBadge : styles.blueBadge}`} aria-hidden="true">{SIDE_NAMES[side]}</span>
                   ))}

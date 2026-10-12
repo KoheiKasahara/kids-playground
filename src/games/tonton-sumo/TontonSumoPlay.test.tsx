@@ -44,10 +44,10 @@ describe('TontonSumoPlay', () => {
   test('pick both wrestlers → two-player bout decided by taps → replay → back to selection', () => {
     const { container } = renderGame()
     expect(container.querySelector(`.${surfaceStyles.surface}`)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'えんぴつ' }))
-    expect(screen.getByRole('button', { name: 'えんぴつ' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: /^えんぴつ（おおきさ 5、おもさ 2）/ }))
+    expect(screen.getByRole('button', { name: /^えんぴつ（おおきさ 5、おもさ 2）/ })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: /あお/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'ロボット' }))
+    fireEvent.click(screen.getByRole('button', { name: /^ロボット/ }))
     expect(screen.getByRole('button', { name: /あお/ })).toHaveTextContent('ロボット')
     expect(screen.getByRole('button', { name: /あか/ })).toHaveTextContent('えんぴつ')
 

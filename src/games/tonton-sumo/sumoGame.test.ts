@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  BOX_HALF, RING_RADIUS, START_X, TAP_COOLDOWN_MS, WRESTLERS,
+  BOX_HALF, RING_RADIUS, START_X, STAT_LEVELS, TAP_COOLDOWN_MS, WRESTLERS,
   behindPoint, clampToBox, computerTapPoint, createSumoState, isSettled, stepSumo, tapSide, tapSumo,
   type Side, type SumoState,
 } from './sumoGame'
@@ -32,6 +32,54 @@ describe('paper sumo physics', () => {
       expect(stats.width * 2).toBeLessThan(START_X * 2 + 0.2)
     }
   })
+
+  test('size and weight are shown as levels and shape how each figure moves', () => {
+    for (const { size, weight } of WRESTLERS) {
+      for (const level of [size, weight]) expect(Number.isInteger(level) && level >= 1 && level <= STAT_LEVELS).toBe(true)
+    }
+    const index = (key: string) => WRESTLERS.findIndex((w) => w.key === key)
+    const frog = WRESTLERS[index('frog')]!
+    const bear = WRESTLERS[index('bear')]!
+    expect(bear.stats.scale).toBeGreaterThan(frog.stats.scale)
+    expect(bear.stats.mass).toBeGreaterThan(frog.stats.mass)
+    // The same tap sends a light figure farther and higher than a heavy one.
+    const tapped = (who: number) => settle(tapSumo(createSumoState(who, who), { x: -1.2, z: 0 }, 'left', 0, steady), 0.15).bodies.left
+    const light = tapped(index('frog'))
+    const heavy = tapped(index('bear'))
+    expect(light.x).toBeGreaterThan(heavy.x)
+    expect(light.y).toBeGreaterThan(heavy.y)
+    // A heavy figure shoves a light one back harder than the other way round.
+    const shove = (a: number, b: number) => {
+      const state = createSumoState(a, b)
+      const reach = WRESTLERS[a]!.stats.width + WRESTLERS[b]!.stats.width
+      let pair: SumoState = { ...state, bodies: {
+        left: { ...state.bodies.left, x: -reach / 2, vx: 2 },
+        right: { ...state.bodies.right, x: reach / 2 },
+      } }
+      for (let n = 0; n < 20; n++) pair = stepSumo(pair)
+      return pair.bodies.right.x - reach / 2
+    }
+    expect(shove(index('bear'), index('frog'))).toBeGreaterThan(shove(index('frog'), index('bear')))
+  })
+
+  test('bouts end both by falling over and by being pushed out', () => {
+    const finishes = { out: 0, fall: 0 }
+    let seed = 7
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    for (let left = 0; left < WRESTLERS.length; left += 2) {
+      for (let right = 1; right < WRESTLERS.length; right += 2) {
+        let state = createSumoState(left, right)
+        for (let frame = 0; frame < 60 * 40 && !state.winner; frame++) {
+          if (frame % 14 === 0) state = tapSumo(state, behindPoint(state, 'left', random, 2), 'left', frame * 1000 / 60, random)
+          if (frame % 14 === 7) state = tapSumo(state, behindPoint(state, 'right', random, 2), 'right', frame * 1000 / 60, random)
+          state = stepSumo(state)
+        }
+        if (state.finish) finishes[state.finish]++
+      }
+    }
+    expect(finishes.fall).toBeGreaterThanOrEqual(6)
+    expect(finishes.out).toBeGreaterThanOrEqual(6)
+  }, 30_000)
 
   test('a fresh bout is at rest, face to face, and nothing moves without a tap', () => {
     const state = createSumoState(2, 5)
