@@ -127,6 +127,9 @@ export function pushStrength(f: Pick<Fighter, 'power' | 'weight' | 'form'>) {
   return f.power * f.form + f.weight * 3
 }
 
+/** クワガタは ふだん あごを ひらいて かまえる。 */
+function restJaw(sp: Species) { return sp.group === 'kuwagata' ? 1 : 0 }
+
 function makeFighter(sp: Species, side: 0 | 1, startU: number, random: () => number): Fighter {
   const size = beetleSize(sp)
   const mass = Math.pow(sp.lengthMm[1] / 100, 2) * sp.build
@@ -138,7 +141,7 @@ function makeFighter(sp: Species, side: 0 | 1, startU: number, random: () => num
     u: side === 0 ? -startU : startU, v: 0, z: 0, vu: 0, vv: 0, vz: 0,
     heading: side === 0 ? 0 : Math.PI,
     state: 'ready', t: 0, cd: 0, move: null,
-    pose: { leg: random(), lift: 0, jaw: 0, flipped: false, spin: 0, hang: false },
+    pose: { leg: random(), lift: 0, jaw: restJaw(sp), flipped: false, spin: 0, hang: false },
     wobble: [1.2 + random() * 1.1, random() * 6.28, 3 + random() * 2, random() * 6.28],
     orbit: random() < .5 ? 1 : -1, pushed: 0, warned: false,
   }
@@ -356,8 +359,7 @@ function clash(b: Battle, a: Fighter, c: Fighter) {
     f.pose.leg += DT * Math.abs(vel) * .08 + DT * .6
     if (f.state === 'clash') {
       f.pose.lift += ((.25 + .2 * Math.sin(b.time * 5 + f.side * 2)) - f.pose.lift) * .1
-      f.pose.jaw += ((f.sp.group === 'kuwagata' ? .55 : 0) - f.pose.jaw) * .1
-    }
+          }
     // つかれ: まけている ほうが たくさん つかれる。
     const over = Math.max(0, theirs - mine) / theirs
     f.st -= DT * (.6 + over * 5)
@@ -732,6 +734,8 @@ export function stepBattle(b: Battle) {
     clash(b, a, c)
   }
   for (const f of b.f) {
+    // はさむ とき いがいは あごを ひらいた かまえに もどす。
+    if (f.state !== 'windup' && f.state !== 'strike' && f.state !== 'win') f.pose.jaw += (restJaw(f.sp) - f.pose.jaw) * .1
     switch (f.state) {
       case 'approach': approach(b, f); break
       case 'circle': circle(b, f); break
