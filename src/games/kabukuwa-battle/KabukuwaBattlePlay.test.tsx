@@ -75,6 +75,25 @@ describe('カブクワ バトル', () => {
     expect(playBuzz).toHaveBeenCalledWith(SPECIES.find(sp => sp.id === 'hercules')!.voice)
   })
 
+  test('つよさ ランキングで、いまいる むし ぜんぶの じゅんいと 絵が みられる', () => {
+    renderGame()
+    fireEvent.click(screen.getByRole('button', { name: /つよさ ランキング/ }))
+    expect(screen.getByRole('heading', { level: 1, name: /つよさ ランキング/ })).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: 'たいかいの すすみぐあい' })).toBeInTheDocument()
+
+    for (let i = 0; i < 200 && !screen.queryByRole('list', { name: 'ランキング' }); i++) act(() => { vi.advanceTimersByTime(1) })
+    const rows = within(screen.getByRole('list', { name: 'ランキング' })).getAllByRole('listitem')
+    expect(rows).toHaveLength(SPECIES.length)
+    for (const sp of SPECIES) expect(rows.filter(row => row.getAttribute('aria-label')?.includes(` ${sp.name} `))).toHaveLength(1)
+    for (const row of rows) expect(row.querySelector('canvas')).not.toBeNull()
+    expect(rows[0]).toHaveAttribute('aria-label', expect.stringMatching(/^1い /))
+    const ranks = rows.map(row => Number(row.getAttribute('data-rank')))
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b))
+
+    fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
+    expect(screen.getByText('たたかわせる むしを えらぼう')).toBeInTheDocument()
+  })
+
   test('じぶん → あいて → ばしょ の じゅんに えらび、もどるで ひとつ まえへ', () => {
     renderGame()
     fireEvent.click(screen.getByRole('button', { name: /^ノコギリクワガタ/ }))

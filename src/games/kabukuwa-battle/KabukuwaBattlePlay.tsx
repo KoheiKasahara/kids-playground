@@ -8,6 +8,7 @@ import { vibrate } from '../../utils/haptics'
 import { createBattle, drainEvents, DT, planCutIn, stepBattle, type Battle, type BattleEvent, type CutInKind, type EndReason } from './battle'
 import { ambient, createFx, spawnFx, updateFx } from './fx'
 import { makeCanvas } from './pixel'
+import { leagueMatches, playMatch, rankTable, type RankRow } from './ranking'
 import { portraitSprite, Scene, stageDots, TEAM_COLORS, viewSize, warmSprites, type ViewSize } from './render'
 import {
   GROUP_LABEL, SPECIES, STAT_KEYS, STAT_LABEL, STAT_MAX, speciesById, speciesOfGroup,
@@ -24,6 +25,7 @@ const GROUPS: readonly BeetleGroup[] = ['kabuto', 'kuwagata']
 type Screen =
   | { kind: 'pick'; step: 'mine' | 'foe' }
   | { kind: 'stage' }
+  | { kind: 'ranking' }
   | { kind: 'battle'; stage: Stage; seed: number }
 
 function randomSeed() {
@@ -94,9 +96,9 @@ const Dex = forwardRef<HTMLElement, { sp: Species }>(function Dex({ sp }, ref) {
   </section>
 })
 
-function PickScreen({ step, mine, focus, onFocus, onPick, onRandom, onBack, soundOn, onSound }: {
+function PickScreen({ step, mine, focus, onFocus, onPick, onRandom, onBack, onRanking, soundOn, onSound }: {
   step: 'mine' | 'foe'; mine: Species | null; focus: Species; onFocus: (sp: Species) => void; onPick: (sp: Species) => void
-  onRandom: () => void; onBack: (() => void) | null; soundOn: boolean; onSound: () => void
+  onRandom: () => void; onBack: (() => void) | null; onRanking: () => void; soundOn: boolean; onSound: () => void
 }) {
   const dexRef = useRef<HTMLElement>(null)
   const focusOn = (sp: Species) => {
@@ -116,6 +118,9 @@ function PickScreen({ step, mine, focus, onFocus, onPick, onRandom, onBack, soun
       <li aria-current={step === 'foe' ? 'step' : undefined}>あいて</li>
       <li>ばしょ</li>
     </ol>
+    {step === 'mine' && <button type="button" className={`${styles.window} ${styles.rankingButton}`} onClick={onRanking}>
+      <span aria-hidden="true">🏆</span> つよさ ランキング
+    </button>}
     <p className={styles.lead}>
       {step === 'mine' ? 'たたかわせる むしを えらぼう' : <>{mine?.short}と たたかう <strong>あいて</strong>を えらぼう</>}
     </p>
@@ -142,6 +147,71 @@ function PickScreen({ step, mine, focus, onFocus, onPick, onRandom, onBack, soun
         {step === 'mine' ? `${focus.short}に けってい！` : `${focus.short}と たたかう！`}
       </button>
     </div>
+  </main>
+}
+
+// ---------------- つよさ ランキング ----------------
+
+/** いちど した たいかいの けっか（なんど ひらいても おなじ なので とっておく）。 */
+let rankingCache: RankRow[] | null = null
+/** 1かいに すすめる しあいの かず（スマホでも がめんが かたまらないように すこしずつ）。 */
+const LEAGUE_CHUNK = 24
+const MEDALS = ['🥇', '🥈', '🥉']
+
+function RankingScreen({ onBack, soundOn, onSound }: { onBack: () => void; soundOn: boolean; onSound: () => void }) {
+  const [rows, setRows] = useState<RankRow[] | null>(rankingCache)
+  const [done, setDone] = useState(0)
+  const [all] = useState(() => (rankingCache ? 0 : leagueMatches().length))
+  useEffect(() => {
+    if (rankingCache) return undefined
+    const matches = leagueMatches()
+    const winners: Species[] = []
+    let timer: ReturnType<typeof setTimeout>
+    const run = () => {
+      const end = Math.min(matches.length, winners.length + LEAGUE_CHUNK)
+      for (let i = winners.length; i < end; i++) winners.push(playMatch(matches[i]))
+      setDone(winners.length)
+      if (winners.length < matches.length) timer = setTimeout(run, 0)
+      else { rankingCache = rankTable(winners); setRows(rankingCache) }
+    }
+    timer = setTimeout(run, 0)
+    return () => clearTimeout(timer)
+  }, [])
+
+  return <main className={styles.page}>
+    <header className={styles.header}>
+      <GameBackButton onBack={onBack} />
+      <h1 className={styles.title}><span aria-hidden="true">🏆</span> つよさ ランキング</h1>
+      <SoundButton sound={soundOn} onToggle={onSound} />
+    </header>
+    <p className={styles.rankingLead}>
+      {SPECIES.length}しゅるい ぜんぶが、ぜんぶの あいてと {STAGES.length}つの ばしょで たたかった「そうあたり たいかい」の かった かずの じゅん。
+    </p>
+    {rows === null
+      ? <div className={`${styles.window} ${styles.rankingLoading}`} role="status">
+        <p>たいかい ちゅう… {done} / {all} しあい</p>
+        <span className={styles.meter} role="progressbar" aria-label="たいかいの すすみぐあい" aria-valuemin={0} aria-valuemax={all} aria-valuenow={done}>
+          <span style={{ width: `${all ? done / all * 100 : 0}%` }} />
+        </span>
+      </div>
+      : <ol className={styles.rankingList} aria-label="ランキング">
+        {rows.map(row => <li key={row.sp.id} className={`${styles.window} ${styles.rankingRow}`} data-rank={row.rank} data-group={row.sp.group}
+          aria-label={`${row.rank}い ${row.sp.name} ${row.wins}しょう ${row.losses}はい`}>
+          <span className={styles.rankBadge} aria-hidden="true">
+            {row.rank <= MEDALS.length && <span className={styles.rankMedal}>{MEDALS[row.rank - 1]}</span>}
+            <span className={styles.rankNumber}>{row.rank}</span><small>い</small>
+          </span>
+          <span className={styles.rankPicture} aria-hidden="true"><BeetlePicture sp={row.sp} className={styles.rankCanvas} /></span>
+          <span className={styles.rankBody} aria-hidden="true">
+            <strong className={styles.rankName}>{row.sp.name}</strong>
+            <span className={styles.rankGroup}>{GROUP_LABEL[row.sp.group]}・{row.sp.home}</span>
+            <span className={styles.rankScore}>
+              <span className={styles.rankBar}><span style={{ width: `${Math.round(row.rate * 100)}%` }} /></span>
+              {row.wins}しょう {row.losses}はい
+            </span>
+          </span>
+        </li>)}
+      </ol>}
   </main>
 }
 
@@ -541,8 +611,12 @@ export default function KabukuwaBattlePlay() {
     return <StageScreen mine={mine} foe={foe} onPick={startBattle} {...soundProps}
       onBack={() => { tap(); setFocusId(foe.id); setScreen({ kind: 'pick', step: 'foe' }) }} />
   }
+  if (screen.kind === 'ranking') {
+    return <RankingScreen {...soundProps} onBack={() => { tap(); setScreen({ kind: 'pick', step: 'mine' }) }} />
+  }
   const step = screen.kind === 'pick' && mine ? screen.step : 'mine'
   return <PickScreen step={step} mine={mine} focus={focus} onFocus={choose} onRandom={randomFoe} {...soundProps}
+    onRanking={() => { tap(); setScreen({ kind: 'ranking' }) }}
     onPick={step === 'mine' ? pickMine : pickFoe}
     onBack={step === 'foe' ? () => { tap(); if (mine) setFocusId(mine.id); setScreen({ kind: 'pick', step: 'mine' }) } : null} />
 }
