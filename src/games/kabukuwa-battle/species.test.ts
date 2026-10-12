@@ -16,10 +16,16 @@ describe('カブクワの しゅるい', () => {
     expect(new Set(SPECIES.filter(sp => sp.area !== 'japan').map(sp => sp.area)).size).toBeGreaterThanOrEqual(3)
   })
 
-  test('カブトムシ 8しゅるい・クワガタ 8しゅるい。あとから くわえた 4しゅるいは なかまの さいごに ならぶ', () => {
-    expect(SPECIES).toHaveLength(16)
-    expect(speciesOfGroup('kabuto').map(sp => sp.id).slice(-2)).toEqual(['neptunus', 'satanas'])
-    expect(speciesOfGroup('kuwagata').map(sp => sp.id).slice(-2)).toEqual(['allotopus', 'titanus'])
+  test('カブトムシ 11しゅるい・クワガタ 11しゅるい。あとから くわえた むしは なかまの さいごに ならぶ', () => {
+    expect(SPECIES).toHaveLength(22)
+    expect(speciesOfGroup('kabuto').map(sp => sp.id).slice(-5)).toEqual(['neptunus', 'satanas', 'gideon', 'eupatorus', 'centaurus'])
+    expect(speciesOfGroup('kuwagata').map(sp => sp.id).slice(-5)).toEqual(['allotopus', 'titanus', 'hirata', 'antaeus', 'tarandus'])
+    expect(speciesById('gideon')?.lengthMm[1]).toBe(80)
+    expect(speciesById('eupatorus')?.look.horns?.filter(h => h.path[0][1] > 0).length).toBe(2)
+    expect(speciesById('centaurus')?.area).toBe('africa')
+    expect(speciesById('hirata')?.lengthMm[1]).toBe(78)
+    expect(speciesById('antaeus')?.lengthMm[1]).toBe(89)
+    expect(speciesById('tarandus')?.stats.power).toBe(speciesById('palawan')?.stats.power)
     expect(speciesById('neptunus')?.lengthMm[1]).toBe(160)
     expect(speciesById('satanas')?.lengthMm[1]).toBe(115)
     expect(speciesById('allotopus')?.lengthMm[1]).toBe(80)

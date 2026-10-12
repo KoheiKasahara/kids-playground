@@ -18,6 +18,12 @@
 //   - ニジイロクワガタ: オス 24〜70mm
 //   - オウゴンオニクワガタ（モーレンカンプ）: オス 最大 約80mm
 //   - スマトラオオヒラタクワガタ: オス 最大 約100mm
+//   - ヒメカブト: オス 35〜80mm
+//   - ゴホンヅノカブト: オス 60〜96.5mm
+//   - ケンタウルスオオカブト: オス 40〜85mm（ツノを ふくむ。飼育では 99.6mm の 記録も ある）
+//   - ヒラタクワガタ（本土）: オス 28〜73mm ほど。野外の 最大記録 77.6mm（BE-KUWA）
+//   - アンタエウスオオクワガタ: 野外の オス 35〜89mm
+//   - タランドゥスオオツヤクワガタ: オス 46〜92mm（アフリカで いちばん 大きい クワガタ）
 //   ゲームの「おおきさ」は、この 最大体長を ヘラクレス（172mm）が 10 に なるように わりふった（sizeScore）。
 //
 // ■ ちから・はやさ
@@ -30,6 +36,13 @@
 //           「しんちょうで 動きが ゆっくり」な オオクワガタ、「のんびり おもい」ゾウカブトを ひくく した。
 //   あとから くわえた 4しゅるいは、にている なかまに あわせた: ネプチューンは ヘラクレスより すこし ひかえめ、
 //   サタンは ツノが ふとく みじかい ぶん ちゅうくらい、オウゴンオニは ミヤマくらい、スマトラは パラワンより すこし ひかえめ。
+//   さらに くわえた 6しゅるい:
+//     ヒメカブトは「タイの むしずもう（メンクワン）で たたかう 気性の あらさ」で はやさを たかく、
+//     ゴホンヅノは「みための わりに おとなしいが、たけに しがみつく ちからは 大型の カブトに まけない」ので ちから ちゅうくらい・はやさ ひくめ、
+//     ケンタウルスは「アフリカの もりで タランドゥスとも たたかう」ので ちから たかめ、
+//     ヒラタクワガタは「気性が とても あらく、はさむ ちからが 強烈」で オオクワより うえ・スマトラより した、
+//     アンタエウスは「オオクワガタの なかまで いちばん 重厚」なので ちから たかめ・はやさは オオクワと おなじ ひくめ、
+//     タランドゥスは「はさむ ちからは 大型の ヒラタクワガタ いじょう」なので パラワンと ならぶ 9 に した。
 
 export type BeetleGroup = 'kabuto' | 'kuwagata'
 /** わざの かた。すくいなげ（したから すくう）・はさみあげ（はさんで もちあげる）・はさみ（しめつける）・たいあたり。 */
@@ -97,7 +110,7 @@ export type Species = {
   /** すんでいる ところ。 */
   home: string
   /** 地図の くぎり（アイコン用）。 */
-  area: 'japan' | 'asia' | 'america' | 'oceania'
+  area: 'japan' | 'asia' | 'america' | 'africa' | 'oceania'
   /** ずかんの オスの 体長 [さいしょう, さいだい] mm。 */
   lengthMm: readonly [number, number]
   stats: Stats
@@ -123,6 +136,12 @@ const MAHOGANY: Ramp = ['#170804', '#311108', '#521c0e', '#7a2e18', '#aa4c2c']
 /** ネプチューン・サタン: こげちゃが かった くろ。 */
 const NEPTUNE_BLACK: Ramp = ['#050304', '#0f0a08', '#1e1510', '#362a20', '#70604e']
 const SATAN_BLACK: Ramp = ['#060404', '#130d0a', '#241a13', '#3e3024', '#7e6a54']
+/** ケンタウルス: あかちゃいろが かった くろ。 */
+const RED_BLACK: Ramp = ['#0e0504', '#220c08', '#3c1810', '#5c281a', '#8c4430']
+/** ヒメカブト: ツヤの ある くろちゃ。 */
+const HIME_BLACK: Ramp = ['#060403', '#140c08', '#261a12', '#40301f', '#86705a']
+/** タランドゥス: うるしを ぬった ような つよい ツヤの くろ。 */
+const LACQUER: Ramp = ['#040405', '#0e0e12', '#202028', '#3e3e4c', '#a4a4b8']
 
 const s = (size: number, power: number, speed: number): Stats => ({ size, power, speed })
 
@@ -311,6 +330,74 @@ export const SPECIES: readonly Species[] = [
     },
   },
   {
+    id: 'gideon',
+    name: 'ヒメカブト',
+    short: 'ヒメカブト',
+    group: 'kabuto',
+    home: 'とうなんアジア',
+    area: 'asia',
+    lengthMm: [35, 80],
+    stats: s(sizeScore(80), 6, 7),
+    move: { name: 'むしずもう はさみあげ', kind: 'lift' },
+    fact: 'タイでは むしの すもう「メンクワン」の せんしゅ。むねと あたまの ツノで あいてを はさむ、きしょうの あらい カブトムシ。',
+    build: 1.1,
+    voice: 340,
+    look: {
+      width: .54, height: .42, head: 1, pron: 1.05, bodyShare: .62,
+      elytra: HIME_BLACK, pronotum: HIME_BLACK, horn: HIME_BLACK, leg: LEG_BLACK,
+      horns: [
+        { root: 'pron', path: [[0, 0, .03], [.12, 0, .09], [.24, 0, .07], [.31, 0, -.01]], r: [.045, .02], fork: .03 },
+        { root: 'head', path: [[0, 0, 0], [.12, 0, .03], [.22, 0, .13], [.26, 0, .26]], r: [.045, .022], fork: .04 },
+      ],
+    },
+  },
+  {
+    id: 'eupatorus',
+    name: 'ゴホンヅノカブト',
+    short: 'ゴホンヅノ',
+    group: 'kabuto',
+    home: 'インドシナはんとう',
+    area: 'asia',
+    lengthMm: [60, 96],
+    stats: s(sizeScore(96), 6, 3),
+    move: { name: '5ほんヅノ おしだし', kind: 'charge' },
+    fact: 'あたまに 1ぽん、むねに 4ほん、あわせて 5ほんの ツノ。みための わりに おとなしいが、ながい あしで しがみつく ちからは つよい。',
+    build: 1.15,
+    voice: 230,
+    look: {
+      width: .58, height: .46, head: 1, pron: 1.12, bodyShare: .66,
+      elytra: ['#5a4a2a', '#8c7848', '#b8a46c', '#d8c896', '#f0e6c0'], pronotum: BLACK_GLOSS, horn: BLACK_GLOSS, leg: LEG_BLACK,
+      horns: [
+        { root: 'head', path: [[0, 0, 0], [.14, 0, .04], [.26, 0, .18], [.3, 0, .36]], r: [.045, .02] },
+        { root: 'pron', path: [[0, .07, .04], [.08, .08, .16], [.16, .07, .3]], r: [.04, .016] },
+        { root: 'pron', path: [[0, .19, .02], [.1, .25, .07], [.18, .27, .12]], r: [.035, .014] },
+      ],
+    },
+  },
+  {
+    id: 'centaurus',
+    name: 'ケンタウルスオオカブト',
+    short: 'ケンタウルス',
+    group: 'kabuto',
+    home: 'アフリカ（カメルーンなど）',
+    area: 'africa',
+    lengthMm: [40, 85],
+    stats: s(sizeScore(85), 7, 4),
+    move: { name: 'ふたまたヅノ なげ', kind: 'scoop' },
+    fact: 'アフリカの もりに すむ 大きな カブトムシ。むねの ツノの さきが ふたまた。タランドゥスと けんか する ことも ある。',
+    build: 1.2,
+    voice: 260,
+    look: {
+      width: .56, height: .44, head: 1, pron: 1.1, bodyShare: .6,
+      elytra: RED_BLACK, pronotum: RED_BLACK, horn: RED_BLACK, leg: LEG_BLACK,
+      horns: [
+        { root: 'pron', path: [[0, 0, .03], [.14, 0, .1], [.3, 0, .16], [.4, 0, .18]], r: [.05, .022], fork: .05 },
+        { root: 'pron', path: [[0, .12, .03], [.04, .14, .07]], r: [.025, .012] },
+        { root: 'head', path: [[0, 0, 0], [.14, 0, .02], [.28, 0, .12], [.36, 0, .26]], r: [.045, .022], teeth: [{ at: .5, len: .035, dir: 'up' }] },
+      ],
+    },
+  },
+  {
     id: 'nokogiri',
     name: 'ノコギリクワガタ',
     short: 'ノコギリ',
@@ -464,6 +551,63 @@ export const SPECIES: readonly Species[] = [
       width: .64, height: .26, head: 1.42, pron: 1.08, bodyShare: .66,
       elytra: BLACK_GLOSS, pronotum: BLACK_GLOSS, horn: BLACK_GLOSS, leg: LEG_BLACK,
       jaw: { root: 'head', path: [[0, .09, 0], [.14, .15, .01], [.3, .13, .02], [.4, .04, .02]], r: [.062, .024], teeth: [{ at: .2, len: .06, dir: 'in' }, { at: .44, len: .03, dir: 'in' }, { at: .58, len: .026, dir: 'in' }, { at: .72, len: .02, dir: 'in' }] },
+    },
+  },
+  {
+    id: 'hirata',
+    name: 'ヒラタクワガタ',
+    short: 'ヒラタ',
+    group: 'kuwagata',
+    home: 'にほん',
+    area: 'japan',
+    lengthMm: [28, 78],
+    stats: s(sizeScore(78), 7, 5),
+    move: { name: 'ヒラタ はさみ', kind: 'pinch' },
+    fact: 'きしょうが とても あらく、はさむ ちからが つよい にほんの クワガタ。パラワンや スマトラと おなじ なかま。',
+    build: .95,
+    voice: 340,
+    look: {
+      width: .54, height: .26, head: 1.25, pron: 1, bodyShare: .66,
+      elytra: BLACK_GLOSS, pronotum: BLACK_GLOSS, horn: BLACK_GLOSS, leg: LEG_BLACK,
+      jaw: { root: 'head', path: [[0, .08, 0], [.16, .12, .01], [.32, .11, .02], [.4, .03, .02]], r: [.04, .016], teeth: [{ at: .2, len: .035, dir: 'in' }, { at: .4, len: .02, dir: 'in' }, { at: .55, len: .02, dir: 'in' }] },
+    },
+  },
+  {
+    id: 'antaeus',
+    name: 'アンタエウスオオクワガタ',
+    short: 'アンタエウス',
+    group: 'kuwagata',
+    home: 'インド・とうなんアジア',
+    area: 'asia',
+    lengthMm: [35, 89],
+    stats: s(sizeScore(89), 7, 3),
+    move: { name: 'どっしり はさみ', kind: 'pinch' },
+    fact: 'オオクワガタの なかまで いちばん 大きい。はばも あつみも ある どっしりした からだと、ふとい 大あごが じまん。',
+    build: 1.1,
+    voice: 270,
+    look: {
+      width: .62, height: .32, head: 1.38, pron: 1.1, bodyShare: .72,
+      elytra: BLACK_GLOSS, pronotum: BLACK_GLOSS, horn: BLACK_GLOSS, leg: LEG_BLACK,
+      jaw: { root: 'head', path: [[0, .09, 0], [.1, .15, .01], [.2, .12, .02], [.25, .04, .02]], r: [.062, .026], teeth: [{ at: .45, len: .07, dir: 'in' }] },
+    },
+  },
+  {
+    id: 'tarandus',
+    name: 'タランドゥスオオツヤクワガタ',
+    short: 'タランドゥス',
+    group: 'kuwagata',
+    home: 'アフリカ（コンゴなど）',
+    area: 'africa',
+    lengthMm: [46, 92],
+    stats: s(sizeScore(92), 9, 4),
+    move: { name: 'くの字あご はさみ', kind: 'pinch' },
+    fact: 'アフリカで いちばん 大きい クワガタ。うるしを ぬった ような ツヤ。くの字に まがった 大あごで はさむ ちからは ヒラタクワガタ いじょう と いわれる。',
+    build: 1.15,
+    voice: 250,
+    look: {
+      width: .6, height: .34, head: 1.35, pron: 1.08, bodyShare: .7, pattern: 'metal',
+      elytra: LACQUER, pronotum: LACQUER, horn: LACQUER, leg: LEG_BLACK,
+      jaw: { root: 'head', path: [[0, .08, 0], [.16, .18, .01], [.28, .16, .02], [.38, .07, .03], [.42, .02, .03]], r: [.055, .02], teeth: [{ at: .22, len: .045, dir: 'in' }] },
     },
   },
 ]

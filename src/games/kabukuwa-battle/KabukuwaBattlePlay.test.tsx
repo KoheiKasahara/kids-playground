@@ -57,7 +57,7 @@ function chooseHerculesVsCaucasus() {
 }
 
 describe('カブクワ バトル', () => {
-  test('はじめは じぶんの むしを えらぶ。16しゅるいの ずかんと つよさが みられる', () => {
+  test('はじめは じぶんの むしを えらぶ。22しゅるいの ずかんと つよさが みられる', () => {
     renderGame()
     expect(screen.getByRole('heading', { level: 1, name: 'カブクワ バトル' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'もどる' })).toBeInTheDocument()
@@ -98,28 +98,28 @@ describe('カブクワ バトル', () => {
     expect(screen.getByRole('heading', { name: 'ミヤマクワガタ' })).toBeInTheDocument()
   })
 
-  test('カブトムシ・クワガタ 8しゅるいずつ。あたらしい 4しゅるいは それぞれの さいごに ならび、たたかえる', () => {
+  test('カブトムシ・クワガタ 11しゅるいずつ。あたらしい むしは それぞれの さいごに ならび、たたかえる', () => {
     renderGame()
     const names = (group: string) => within(screen.getByRole('region', { name: group })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
     const kabuto = names('カブトムシの なかま'), kuwagata = names('クワガタの なかま')
-    expect(kabuto).toHaveLength(8)
-    expect(kuwagata).toHaveLength(8)
-    expect(kabuto.slice(-2).map(n => n?.split('（')[0])).toEqual(['ネプチューンオオカブト', 'サタンオオカブト'])
-    expect(kuwagata.slice(-2).map(n => n?.split('（')[0])).toEqual(['オウゴンオニクワガタ', 'スマトラオオヒラタクワガタ'])
+    expect(kabuto).toHaveLength(11)
+    expect(kuwagata).toHaveLength(11)
+    expect(kabuto.slice(-5).map(n => n?.split('（')[0])).toEqual(['ネプチューンオオカブト', 'サタンオオカブト', 'ヒメカブト', 'ゴホンヅノカブト', 'ケンタウルスオオカブト'])
+    expect(kuwagata.slice(-5).map(n => n?.split('（')[0])).toEqual(['オウゴンオニクワガタ', 'スマトラオオヒラタクワガタ', 'ヒラタクワガタ', 'アンタエウスオオクワガタ', 'タランドゥスオオツヤクワガタ'])
 
-    fireEvent.click(screen.getByRole('button', { name: /^ネプチューンオオカブト/ }))
-    expect(screen.getByRole('heading', { name: 'ネプチューンオオカブト' })).toBeInTheDocument()
-    expect(screen.getByText('60〜160mm')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'ネプチューンに けってい！' }))
-    fireEvent.click(screen.getByRole('button', { name: /^スマトラオオヒラタクワガタ/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'スマトラと たたかう！' }))
-    expect(screen.getByLabelText('ネプチューンオオカブト たい スマトラオオヒラタクワガタ')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^ケンタウルスオオカブト/ }))
+    expect(screen.getByRole('heading', { name: 'ケンタウルスオオカブト' })).toBeInTheDocument()
+    expect(screen.getByText('40〜85mm')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'ケンタウルスに けってい！' }))
+    fireEvent.click(screen.getByRole('button', { name: /^タランドゥスオオツヤクワガタ/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'タランドゥスと たたかう！' }))
+    expect(screen.getByLabelText('ケンタウルスオオカブト たい タランドゥスオオツヤクワガタ')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'きりかぶ どひょう（うえから みる）' }))
-    expect(screen.getByRole('meter', { name: 'ネプチューンの げんき' })).toBeInTheDocument()
-    expect(screen.getByRole('meter', { name: 'スマトラの げんき' })).toBeInTheDocument()
+    expect(screen.getByRole('meter', { name: 'ケンタウルスの げんき' })).toBeInTheDocument()
+    expect(screen.getByRole('meter', { name: 'タランドゥスの げんき' })).toBeInTheDocument()
     advance(2.4)
     expect(battle()?.state).toBe('fight')
-    expect(battle()?.f.map(f => f.sp.id)).toEqual(['neptunus', 'titanus'])
+    expect(battle()?.f.map(f => f.sp.id)).toEqual(['centaurus', 'tarandus'])
   })
 
   test('おまかせで あいてを えらぶと、じぶんと ちがう むしに なる', () => {
