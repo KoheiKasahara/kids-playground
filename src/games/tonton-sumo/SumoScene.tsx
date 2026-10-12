@@ -1,6 +1,6 @@
 import type { Ref } from 'react'
 import PaperWrestler from './PaperWrestler'
-import { BOX_HALF, type Side, type SumoState } from './sumoGame'
+import { BOX_HALF, statsFor, type Side, type SumoState } from './sumoGame'
 import { CENTER, DEPTH_PX, FIGURE_SCALE, RING_PX, SIDE_COLORS, perspective, type View, project, ringPath } from './projection'
 import styles from './TontonSumoPlay.module.css'
 
@@ -57,7 +57,7 @@ export default function SumoScene({ state, ripples = [], label, svgRef, idle = f
       {order.map((side) => {
         const body = state.bodies[side]
         const base = project(body.x, body.z)
-        const scale = FIGURE_SCALE * perspective(body.z)
+        const scale = FIGURE_SCALE * statsFor(state, side).scale * perspective(body.z)
         const facing = Math.cos(body.heading)
         const lean = (body.lean * 180 / Math.PI) * (facing < 0 ? -1 : 1)
         const losing = Boolean(state.winner && state.winner !== side)

@@ -285,7 +285,7 @@ export default function PaperWrestler({ index, belt, heading = 0 }: { index: num
   const wrestler = WRESTLERS[index]!
   const art = ART[wrestler.key]!
   const id = clean(useId())
-  const back = (art.reach - CREASE) * Math.cos(SPREAD) - (wrestler.stats.width * RING_PX) / FIGURE_SCALE
+  const back = (art.reach - CREASE) * Math.cos(SPREAD) - (wrestler.stats.width * RING_PX) / (FIGURE_SCALE * wrestler.stats.scale)
   const crease = { x: -back * Math.cos(heading), z: -back * Math.sin(heading) }
   const halves = ([1, -1] as const).map((side) => {
     const angle = heading + side * SPREAD

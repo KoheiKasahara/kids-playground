@@ -5,6 +5,8 @@ export type Finish = 'out' | 'fall'
 export type WrestlerStats = {
   /** Heavier figures move less from a tap but shove harder when they bump. */
   mass: number
+  /** Drawn size of the figure; taller paper has a higher middle and tips over more easily. */
+  scale: number
   /** Floor friction while touching the box. */
   grip: number
   /** How high a tap bounces the paper. */
@@ -17,31 +19,67 @@ export type WrestlerStats = {
   width: number
 }
 
+/** Size and weight are shown to players as levels from 1 to STAT_LEVELS. */
+export const STAT_LEVELS = 5
+
 export type Wrestler = {
   key: string
   name: string
   /** A short hiragana hint about how it moves. */
   trait: string
+  /** おおきさ: 1 (ちいさい) – 5 (おおきい). */
+  size: number
+  /** おもさ: 1 (かるい) – 5 (おもい). */
+  weight: number
   stats: WrestlerStats
 }
 
-const stats = (mass: number, grip: number, hop: number, lunge: number, stability: number, width: number): WrestlerStats =>
-  ({ mass, grip, hop, lunge, stability, width })
+type Flavor = {
+  /** Contact half-width of the art at its normal size. */
+  width: number
+  grip?: number
+  hop?: number
+  lunge?: number
+  /** Extra steadiness on top of what size and weight give. */
+  balance?: number
+}
+
+/**
+ * Size and weight decide most of how a figure moves. Big ones reach farther and are
+ * hard to shift, but stand tall and tip over easily; heavy ones barely bounce, shove
+ * hard and sit steady; small light ones hop about and get knocked around.
+ */
+function wrestler(key: string, name: string, trait: string, size: number, weight: number, flavor: Flavor): Wrestler {
+  const scale = 0.8 + 0.1 * size
+  const mass = 0.75 + 0.1 * weight
+  return {
+    key, name, trait, size, weight,
+    stats: {
+      mass,
+      scale,
+      grip: flavor.grip ?? 1,
+      hop: (flavor.hop ?? 1) / Math.sqrt(mass),
+      lunge: flavor.lunge ?? 1,
+      stability: ((flavor.balance ?? 1) * (0.95 + 0.05 * weight)) / Math.sqrt(scale),
+      width: flavor.width * scale,
+    },
+  }
+}
 
 /** Everyday things folded into paper wrestlers. Their art lives in PaperWrestler.tsx. */
 export const WRESTLERS: readonly Wrestler[] = [
-  { key: 'mochi', name: 'おもち', trait: 'もちもち', stats: stats(1.04, 1.25, 0.9, 1, 1.04, 0.27) },
-  { key: 'onigiri', name: 'おにぎり', trait: 'どっしり', stats: stats(1.06, 1.05, 0.85, 0.95, 1.08, 0.27) },
-  { key: 'pencil', name: 'えんぴつ', trait: 'のっぽ', stats: stats(1, 1.08, 0.95, 1.1, 1.06, 0.25) },
-  { key: 'penguin', name: 'ペンギン', trait: 'すべる', stats: stats(1.02, 0.75, 0.92, 1.1, 1.04, 0.26) },
-  { key: 'robot', name: 'ロボット', trait: 'おもたい', stats: stats(1.08, 1.05, 0.82, 0.92, 1.04, 0.27) },
-  { key: 'daikon', name: 'だいこん', trait: 'ねばる', stats: stats(1.04, 1.1, 0.9, 1.05, 1.05, 0.26) },
-  { key: 'octopus', name: 'たこ', trait: 'くねくね', stats: stats(1.02, 1.04, 0.92, 1.05, 1.06, 0.27) },
-  { key: 'pudding', name: 'プリン', trait: 'ぷるぷる', stats: stats(1.03, 1.05, 0.98, 1.2, 1.06, 0.26) },
-  { key: 'bread', name: 'しょくパン', trait: 'ふわふわ', stats: stats(1.02, 1.05, 0.95, 1.15, 1.03, 0.26) },
-  { key: 'frog', name: 'かえる', trait: 'ぴょんぴょん', stats: stats(1.03, 1.05, 1, 1.15, 1.06, 0.26) },
-  { key: 'rocket', name: 'ロケット', trait: 'とっしん', stats: stats(1, 0.98, 0.95, 1.15, 1.05, 0.25) },
-  { key: 'bear', name: 'くま', trait: 'ちからもち', stats: stats(1.06, 1.08, 0.86, 0.95, 1.03, 0.27) },
+  wrestler('mochi', 'おもち', 'もちもち', 3, 3, { width: 0.25, grip: 1.25 }),
+  wrestler('onigiri', 'おにぎり', 'どっしり', 3, 4, { width: 0.25, balance: 1.08 }),
+  wrestler('pencil', 'えんぴつ', 'のっぽ', 5, 2, { width: 0.2, lunge: 1.3 }),
+  wrestler('penguin', 'ペンギン', 'すべる', 2, 3, { width: 0.25, grip: 0.7, lunge: 1.1 }),
+  wrestler('robot', 'ロボット', 'おもたい', 4, 5, { width: 0.24, lunge: 0.9 }),
+  wrestler('daikon', 'だいこん', 'ねばる', 4, 3, { width: 0.22, balance: 1.15 }),
+  wrestler('octopus', 'たこ', 'くねくね', 3, 2, { width: 0.25, balance: 1.12 }),
+  wrestler('pudding', 'プリン', 'ぷるぷる', 2, 2, { width: 0.25, hop: 1.05, lunge: 1.2 }),
+  wrestler('bread', 'しょくパン', 'ふわふわ', 3, 1, { width: 0.24, lunge: 1.15, balance: 1.08 }),
+  wrestler('frog', 'かえる', 'ぴょんぴょん', 1, 1, { width: 0.27, hop: 1.1, lunge: 1.2 }),
+  wrestler('rocket', 'ロケット', 'とっしん', 4, 2, { width: 0.21, lunge: 1.3 }),
+  wrestler('bear', 'くま', 'ちからもち', 5, 5, { width: 0.22 }),
 ]
 
 export type Point = { x: number; z: number }
@@ -88,7 +126,7 @@ const TAP_PUSH = 0.4
 const TAP_LUNGE = 0.12
 const TAP_DRIVE = 0.16
 const TAP_HOP = 1.25
-const TAP_WOBBLE = 3.2
+const TAP_WOBBLE = 3.6
 const TAP_LEAN = 1.1
 const GROUND_FRICTION = 15
 const AIR_FRICTION = 0.8
@@ -96,7 +134,11 @@ const LEAN_SPRING = 34
 const LEAN_DAMPING = 5.5
 /** Paper figures that meet lean on each other instead of bouncing apart. */
 const BUMP_RESTITUTION = 0
-const BUMP_LEAN = 2
+const BUMP_LEAN = 2.2
+/** The figure doing the pushing tips forward onto its opponent. */
+const PUSH_LEAN = 0.4
+/** Gravity pulling a leaning figure further over; tall paper feels it more. */
+const TOPPLE = 6
 /** How far the hands may press past each other before the bodies are nudged apart. */
 const CONTACT_SLOP = 0.05
 const CONTACT_CORRECTION = 0.3
@@ -172,8 +214,8 @@ export function tapSumo(state: SumoState, rawPoint: Point, player: Side, now: nu
     const airborne = body.y > 0.02
     const force = clamp(1.25 - distance * 0.62, 0.2, 1) * strength * (airborne ? 0.5 : 1)
     const push = (TAP_PUSH * force * (0.85 + random() * 0.3)) / (0.5 + 0.5 * stat.mass)
-    // The player tapping their own half puts their wrestler's weight forward.
-    const lunge = TAP_LUNGE * stat.lunge * force + (who === player ? TAP_DRIVE * stat.lunge * strength : 0)
+    // The player tapping their own half puts their wrestler's weight forward; light ones dart in.
+    const lunge = TAP_LUNGE * stat.lunge * force + (who === player ? TAP_DRIVE * stat.lunge * strength / stat.mass : 0)
     const along = Math.cos(angle - body.heading)
     bodies[who] = {
       ...body,
@@ -188,7 +230,7 @@ export function tapSumo(state: SumoState, rawPoint: Point, player: Side, now: nu
   return { ...state, bodies, taps: state.taps + 1, lastTap: { ...state.lastTap, [player]: now } }
 }
 
-function stepBody(body: Body, opponent: Body, stability: number, grip: number, dt: number): Body {
+function stepBody(body: Body, opponent: Body, { stability, grip, scale }: WrestlerStats, dt: number): Body {
   let { x, z, y, vx, vz, vy, lean, leanVel, heading, fallen } = body
   if (!fallen) heading += angleDiff(Math.atan2(opponent.z - z, opponent.x - x), heading) * Math.min(1, 4 * dt)
   if (y > 0 || vy > 0) {
@@ -208,7 +250,7 @@ function stepBody(body: Body, opponent: Body, stability: number, grip: number, d
     if (Math.abs(lean) >= LYING) { lean = Math.sign(lean) * LYING; leanVel = 0 }
   } else {
     const spring = LEAN_SPRING * stability * (grounded ? 1 : 0.35)
-    leanVel += (-spring * lean - LEAN_DAMPING * leanVel) * dt
+    leanVel += (-spring * lean + TOPPLE * scale * Math.sin(lean) - LEAN_DAMPING * leanVel) * dt
     lean += leanVel * dt
     if (Math.abs(lean) > tipAngle(stability)) fallen = true
   }
@@ -253,9 +295,14 @@ function bump(state: SumoState, left: Body, right: Body): [Body, Body] {
     l.vz -= nz * impulse * inverseA
     r.vx += nx * impulse * inverseB
     r.vz += nz * impulse * inverseB
-    // A push on the chest rocks each figure back along its own facing.
-    if (!l.fallen) l.leanVel -= impulse * inverseA * BUMP_LEAN * Math.max(0, nx * Math.cos(l.heading) + nz * Math.sin(l.heading)) / a.stability
-    if (!r.fallen) r.leanVel -= impulse * inverseB * BUMP_LEAN * Math.max(0, -nx * Math.cos(r.heading) - nz * Math.sin(r.heading)) / b.stability
+    // A push on the chest rocks each figure back along its own facing, the lighter one
+    // more. Whoever came in faster tips forward and leans on the other.
+    const facingA = Math.max(0, nx * Math.cos(l.heading) + nz * Math.sin(l.heading))
+    const facingB = Math.max(0, -nx * Math.cos(r.heading) - nz * Math.sin(r.heading))
+    const driveA = Math.max(0, left.vx * nx + left.vz * nz)
+    const driveB = Math.max(0, -(right.vx * nx + right.vz * nz))
+    if (!l.fallen) l.leanVel += (-impulse * inverseA * BUMP_LEAN + driveA * PUSH_LEAN) * facingA / a.stability
+    if (!r.fallen) r.leanVel += (-impulse * inverseB * BUMP_LEAN + driveB * PUSH_LEAN) * facingB / b.stability
   }
   return [l, r]
 }
@@ -270,8 +317,8 @@ function lost(body: Body, width: number) {
 export function stepSumo(state: SumoState, dt = STEP_SECONDS): SumoState {
   const a = statsFor(state, 'left')
   const b = statsFor(state, 'right')
-  let left = stepBody(state.bodies.left, state.bodies.right, a.stability, a.grip, dt)
-  let right = stepBody(state.bodies.right, state.bodies.left, b.stability, b.grip, dt)
+  let left = stepBody(state.bodies.left, state.bodies.right, a, dt)
+  let right = stepBody(state.bodies.right, state.bodies.left, b, dt)
   ;[left, right] = bump(state, left, right)
   const next = { ...state, bodies: { left, right } }
   if (state.winner) return next
