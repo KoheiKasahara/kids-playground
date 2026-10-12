@@ -385,6 +385,152 @@ button.window:focus-visible,
   font-size: 12px;
 }
 
+/* ---------------- つよさ ランキング ---------------- */
+
+.rankingButton {
+  min-height: 48px;
+  padding: 6px 18px;
+  font-size: 17px;
+}
+
+.rankingLead {
+  width: min(100%, 720px);
+  margin: 0;
+  color: #d8f0c8;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.5;
+  text-align: center;
+  text-shadow: 2px 2px 0 #0c2010;
+}
+
+.rankingLoading {
+  width: min(100%, 520px);
+  padding: 12px 16px 16px;
+  display: grid;
+  gap: 10px;
+  text-align: center;
+}
+
+.rankingLoading p {
+  margin: 0;
+  font-size: 17px;
+}
+
+.rankingList {
+  width: min(100%, 720px);
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  list-style: none;
+}
+
+.rankingRow {
+  min-width: 0;
+  padding: 6px 10px 6px 6px;
+  display: grid;
+  grid-template-columns: 56px 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.rankingRow[data-rank='1'] {
+  border-color: #ffd23a;
+  background: linear-gradient(180deg, #6a5a1c 0%, #4a3e10 55%, #322a08 100%);
+}
+
+.rankingRow[data-rank='2'] {
+  border-color: #e0e8f0;
+  background: linear-gradient(180deg, #4a5560 0%, #353d46 55%, #252b32 100%);
+}
+
+.rankingRow[data-rank='3'] {
+  border-color: #e8a060;
+  background: linear-gradient(180deg, #6a3e1c 0%, #4e2c12 55%, #361e0a 100%);
+}
+
+.rankBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.rankMedal {
+  font-size: 22px;
+}
+
+.rankNumber {
+  color: #ffe9a8;
+  font-size: 26px;
+}
+
+.rankBadge small {
+  font-size: 12px;
+}
+
+.rankPicture {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rankCanvas {
+  max-width: calc(100% / 1.4);
+  max-height: 56px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  transform: scale(1.4);
+}
+
+.rankBody {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.rankName {
+  font-size: 17px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.rankGroup {
+  color: #b8e0a8;
+  font-size: 12px;
+}
+
+.rankScore {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.rankBar {
+  flex: 1;
+  height: 8px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 55%);
+  overflow: hidden;
+}
+
+.rankBar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(180deg, #ffe88a, #f0a020);
+}
+
+@media (max-width: 380px) {
+  .rankingRow {
+    grid-template-columns: 44px 72px minmax(0, 1fr);
+  }
+}
+
 /* ---------------- ばしょを えらぶ ---------------- */
 
 .matchup {
