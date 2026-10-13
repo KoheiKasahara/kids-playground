@@ -16,6 +16,7 @@ export const SOUND_LOUDNESS_TARGET_DB = -21
 export const SOUND_LOUDNESS_TOLERANCE_DB = 1.5
 
 export const GAME_SOUND_LEVEL_DB: Readonly<Record<string, number>> = {
+  'venom-lab': 9,
   'bento-builder': 9,
   'block-puzzle': 3,
   'car-road-builder': 3.5,

@@ -83,6 +83,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'venom-lab',
+    slug: 'venom-lab',
+    title: 'どくの いきものラボ',
+    emoji: '🦂',
+    category: 'learning',
+    seo: {
+      headline: 'どくの いきものラボ｜ドット絵の生き物を観察',
+      description: '日本と世界の毒をもつ生き物40種類を、8つのエリアで観察するドット絵ミニゲームです。ヘビやサソリなど環境の近い仲間を複数匹ながめ、解説や絞り込み付きの毒の強さランキングからひみつを学べます。',
+    },
+    intro: {
+      howToPlay: [
+        'エリアを えらんで いきものを タップしよう',
+        '「＋ なかまにする」で おなじ なかまも ふやせるよ',
+        'かいせつと 毒のつよさの めやすを みてみよう',
+      ],
+    },
+  },
+  {
     id: 'flag-pinball',
     slug: 'flag-pinball',
     title: 'こっきピンボール',
