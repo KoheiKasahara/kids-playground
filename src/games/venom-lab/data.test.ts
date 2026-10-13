@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { HABITATS, MAX_RESIDENTS, RANKING, SPECIES, addResident, createExhibits, matchesRankFilter } from './data'
-import { renderCreature, SPRITE_H, SPRITE_W } from './sprite'
+import { renderFrame, SPRITE_H, SPRITE_W } from './sprite'
 
 describe('venom lab exhibits', () => {
   test('40 domestic and international kinds span eight environments with multiple snakes and scorpions', () => {
@@ -29,11 +29,22 @@ describe('venom lab exhibits', () => {
       expect(new URL(s.source.url).protocol).toBe('https:')
       expect(s.fact.length).toBeGreaterThan(10)
       expect(s.venom.length).toBeGreaterThan(10)
-      const image = renderCreature(s.sprite, s.colors)
-      expect(image.pixels).toHaveLength(SPRITE_W * SPRITE_H)
-      // ちゃんと からだが えがかれ、まわりに よゆうが ある。
-      expect(image.pixels.filter(Boolean).length, s.id).toBeGreaterThan(SPRITE_W * SPRITE_H * .15)
-      expect(new Set(image.pixels.filter(Boolean)).size, s.id).toBeGreaterThan(12)
+      for (const clip of ['idle', 'move', 'act'] as const) {
+        for (const t of [0, .5]) {
+          const image = renderFrame(s, { clip, t })
+          expect(image.data).toHaveLength(SPRITE_W * SPRITE_H * 4)
+          const opaque: number[] = []
+          const colors = new Set<number>()
+          for (let k = 0; k < SPRITE_W * SPRITE_H; k++) {
+            if (image.data[k * 4 + 3] < 255) continue
+            opaque.push(k)
+            colors.add((image.data[k * 4] << 16) | (image.data[k * 4 + 1] << 8) | image.data[k * 4 + 2])
+          }
+          // ちゃんと からだが えがかれ、かげの だんかいが たくさん ある。
+          expect(opaque.length, `${s.id} ${clip}`).toBeGreaterThan(SPRITE_W * SPRITE_H * .1)
+          expect(colors.size, `${s.id} ${clip}`).toBeGreaterThan(12)
+        }
+      }
     }
   })
 
