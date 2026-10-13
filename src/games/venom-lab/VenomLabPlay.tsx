@@ -140,13 +140,13 @@ export default function VenomLabPlay() {
               <dl className={styles.facts}><dt>すむところ</dt><dd>{selected.home}</dd><dt>たべもの</dt><dd>{selected.food}</dd></dl>
               <details className={styles.more} key={selected.id}><summary>毒のひみつ・出典をみる</summary><p>{selected.venom}</p><p className={styles.note}>毒のつよさは ゲーム内のめやす。詳しくは ランキングをみてね。</p><a href={selected.source.url} target="_blank" rel="noreferrer">{selected.source.label} ↗</a></details>
               {selectedId !== null && <button type="button" className={styles.removeButton} onClick={removeSelected}>− この1ぴきを もどす</button>}
-            </> : <div className={styles.detailEmpty}><span className={styles.eyebrow}>YOUR FIELD NOTES</span><div className={styles.emptyPortrait}><PixelCreature species={speciesInHabitat[0]} live /></div><h2>どんな ひみつが<br />あるのかな？</h2><p>エリアの いきものを タップ！<br />ここに かいせつが でるよ。</p><span className={styles.emptyArrow}>← みつけてみよう</span></div>}
+            </> : <div className={styles.detailEmpty}><span className={styles.eyebrow}>YOUR FIELD NOTES</span><div className={styles.emptyPortrait}><PixelCreature species={speciesInHabitat[0]} live small /></div><h2>どんな ひみつが<br />あるのかな？</h2><p>エリアの いきものを タップ！<br />ここに かいせつが でるよ。</p><span className={styles.emptyArrow}>← みつけてみよう</span></div>}
           </aside>
 
           <section className={styles.residentPicker} aria-label="いきものを ふやす">
             <div className={styles.pickerHeading}><h2>なかまを ふやそう</h2><span>{residents.length >= MAX_RESIDENTS ? 'いっぱい！ 1ぴき もどすと よべるよ' : 'おなじ なかまも よべるよ'}</span></div>
             <div className={styles.speciesCards}>{speciesInHabitat.map(s => <div key={s.id} className={styles.speciesCard}>
-              <div className={styles.cardArt}><PixelCreature species={s} /><span className={styles.seen}>{observed.includes(s.id) ? '✓' : '?'}</span></div>
+              <div className={styles.cardArt}><PixelCreature species={s} small /><span className={styles.seen}>{observed.includes(s.id) ? '✓' : '?'}</span></div>
               <b>{s.name}</b><span className={styles.inArea}>{residents.filter(r => r.speciesId === s.id).length}ひき かんさつ中</span>
               <button type="button" onClick={() => add(s)} disabled={residents.length >= MAX_RESIDENTS} aria-label={`${s.name}を ふやす`}>＋ なかまにする</button>
             </div>)}</div>
@@ -163,7 +163,7 @@ export default function VenomLabPlay() {
           return entries.length > 0 && <section key={group.level} className={styles.rankGroup} aria-label={`${index + 1}位 ${LEVEL_LABELS[group.level]}`}>
           <div className={styles.rankGroupTitle}><strong>{String(index + 1).padStart(2, '0')}<small>同順位</small></strong><div><h3>{LEVEL_LABELS[group.level]}</h3><span>ゲーム内のめやす {group.level} / 5</span></div></div>
           <div className={styles.rankCards}>{entries.map(s => <button type="button" key={s.id} onClick={() => { revealNote.current = true; setHabitatId(s.habitat); setTab('observe'); inspect(s, exhibits[s.habitat].find(r => r.speciesId === s.id)?.id ?? null) }} aria-label={`${s.name}の かいせつをみる`}>
-            <PixelCreature species={s} /><span><b>{s.name}</b><small>{s.delivery}</small></span><span className={styles.rankGo}>↗</span>
+            <PixelCreature species={s} small /><span><b>{s.name}</b><small>{s.delivery}</small></span><span className={styles.rankGo}>↗</span>
           </button>)}</div>
         </section>})}
         <div className={styles.rankExplanation}><h3>「毒がある」にも ちがいがあるよ</h3><p>ヘビやサソリは かんだり さしたりして 毒を入れる。ヤドクガエルは 皮ふの毒で「食べないで」と 身をまもる。同じ「毒」でも つかい方が ちがうんだね。</p><p>実際の毒の強さは、毒の種類や動物・測定条件をそろえて調べます。この展示の段階は学習用の分類で、死亡数や実験値の順位ではありません。</p></div>

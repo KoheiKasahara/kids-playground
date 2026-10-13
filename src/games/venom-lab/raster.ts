@@ -1,15 +1,19 @@
 // いきものの ドット絵を、だえんたい（たまご形）を くみあわせた 立体から やきつける。
 // スーパーファミコン後期の 絵に ちかづける ための しあげ:
-// ・パレットは かげを あお むらさきへ、ひかりを きいろへ ずらした 6だん（色相シフト）。
+// ・パレットは かげを あお むらさきへ、ひかりを きいろへ ずらした 8だん（色相シフト）。
 // ・あみかけ（ディザ）は つかわず、だんの さかいめの はぐれドットを そうじして かたまりで ぬる。
 // ・ひかりの ほうから レイを とばして、てまえの 部品が おとす かげを つける。
 // ・ふちどりは まっくろに せず、となりの いろの いちばん くらい いろ（あかるい がわは すこし うすく）。
 // ・はねは すけて みえる ガラス、こうかの 線や つぶは さいごに うえから かく。
 //
-// ざひょうは x が みぎ、y が した（ドット）、z が てまえ。
+// ざひょうは x が みぎ、y が した、z が てまえ。もけいは 64×48 の ます目で くみたて、
+// やきつける ときに scale ばいの こまかさ（DETAIL なら 128×96 ドット）で しらべる。
 
+/** もけいの ます目の おおきさ。 */
 export const SPRITE_W = 64
 export const SPRITE_H = 48
+/** ふつうの こまかさ（1ます を なんドットに するか）。 */
+export const DETAIL = 2
 
 /**
  * A/B/C は いきものごとの いろ。
@@ -18,9 +22,14 @@ export const SPRITE_H = 48
  */
 export type Mat = 'A' | 'B' | 'C' | 'E' | 'W' | 'T' | 'M' | 'K' | 'F' | 'P' | 'G' | 'S'
 
-/** もようを きめる ための ばしょ。くだ では l が ながさ方向の きょり（ドット）、s が よこ（-1〜1、+ が おなか がわ）。 */
-export type Ctx = { t: number; l: number; s: number; u: number; v: number; w: number }
-export type Pattern = (c: Ctx) => Mat | null
+/**
+ * もようを きめる ための ばしょ。くだ では l が ながさ方向の きょり（ます）、s が よこ（-1〜1、+ が おなか がわ）。
+ * fine は こまかく かく とき（うろこの すじ など、こまかい もようを たす）。
+ */
+export type Ctx = { t: number; l: number; s: number; u: number; v: number; w: number; fine: boolean }
+/** いろの しゅるい。うしろに - を つけると 1だん くらく（うろこの すじ など）。 */
+export type Paint = Mat | `${Mat}-` | null
+export type Pattern = (c: Ctx) => Paint
 
 type Prim = {
   x: number; y: number; z: number
@@ -110,14 +119,17 @@ function towards(h: number, target: number, deg: number) {
   return (h + Math.sign(d) * Math.min(Math.abs(d), deg) + 360) % 360
 }
 
-/** 1つの いろから 6だんの パレットを つくる（0 くらい → 5 ひかり）。かげは あお むらさき、ひかりは きいろへ ずらす。 */
+/** 1つの いろから 8だんの パレットを つくる（0 くらい → 6 あかるい、7 は つやの ひかり）。かげは あお むらさき、ひかりは きいろへ ずらす。 */
 export function makeRamp(base: string): Rgb[] {
   const [h, s, v] = rgbHsv(hexRgb(base))
   // いろみの ない いろは、かげだけ すこし あおく する。
   const hue = s < .06 ? 235 : h
-  const dark = (k: number, amt: number, hueDeg: number) => hsvRgb(towards(hue, 250, hueDeg), clamp(s * (1 + .1 * k) + .045 * k), v * amt)
+  const dark = (k: number, amt: number, hueDeg: number) => hsvRgb(towards(hue, 250, hueDeg), clamp(s * (1 + .08 * k) + .035 * k), v * amt)
   const light = (amt: number, hueDeg: number, sat: number) => hsvRgb(towards(h, 52, hueDeg), clamp(s * sat), v + (1 - v) * amt)
-  return [dark(3, .4, 22), dark(2, .6, 13), dark(1, .8, 6), hexRgb(base), light(.35, 6, .82), light(.7, 10, .55)]
+  return [
+    dark(4, .34, 24), dark(3, .48, 17), dark(2, .63, 11), dark(1, .81, 5), hexRgb(base),
+    light(.24, 4, .9), light(.48, 8, .74), light(.74, 11, .52),
+  ]
 }
 
 const FIXED: Record<Exclude<Mat, 'A' | 'B' | 'C'>, string> = {
@@ -200,16 +212,31 @@ const HALF = (() => { const h = [LIGHT[0], LIGHT[1], LIGHT[2] + 1]; const k = Ma
 const INK = hexRgb('#140f1d')
 const SPARK = hexRgb('#fffdf2')
 
-export type Frame = { w: number; h: number; data: Uint8ClampedArray<ArrayBuffer> }
+/** ドット絵の 1コマ。index は いろばんごう（0 は とうめい）、palette は RGBA を 1つの かずに まとめた もの。 */
+export type Frame = { w: number; h: number; index: Uint8Array | Uint16Array; palette: Uint32Array }
+
+const pack = (c: readonly number[], a: number) => ((Math.round(a * 255) << 24) | (Math.round(c[2]) << 16) | (Math.round(c[1]) << 8) | Math.round(c[0])) >>> 0
+
+/** コマを RGBA の ならびに ひろげる。 */
+export function rgbaOf(frame: Frame, out = new Uint8ClampedArray(frame.w * frame.h * 4)) {
+  const view = new Uint32Array(out.buffer, out.byteOffset, frame.w * frame.h)
+  for (let k = 0; k < view.length; k++) view[k] = frame.palette[frame.index[k]]
+  return out
+}
+
+const LEVELS = 7
+const SPEC = 7
 
 /** もけいを ドット絵に する。colors は A/B/C の いろ。tint は からだ ぜんたいを すこし かえる（きせつの いろ など）。 */
-export function rasterize(model: Model, colors: readonly [string, string, string], tint?: { color: string; amount: number }): Frame {
-  const w = SPRITE_W, h = SPRITE_H, n = w * h
+export function rasterize(model: Model, colors: readonly [string, string, string], tint?: { color: string; amount: number }, scale = DETAIL): Frame {
+  const w = SPRITE_W * scale, h = SPRITE_H * scale, n = w * h
   const base = (c: string) => tint && tint.amount > 0 ? makeRamp(c).map(rgb => mixRgb(rgb, hexRgb(tint.color), tint.amount * .6 * (rgb[0] + rgb[1] + rgb[2]) / 765 + tint.amount * .25)) : makeRamp(c)
   const ramps = {
     A: base(colors[0]), B: base(colors[1]), C: base(colors[2]),
     ...Object.fromEntries(Object.entries(FIXED).map(([k, c]) => [k, makeRamp(c)])),
   } as Record<Mat, Rgb[]>
+  /** ドットの まんなかの、もけいの ます目での いち。 */
+  const at = (i: number) => (i + .5) / scale
 
   const prims = model.prims
   const depth = new Float32Array(n).fill(-Infinity)
@@ -220,11 +247,12 @@ export function rasterize(model: Model, colors: readonly [string, string, string
 
   prims.forEach((p, index) => {
     const reach = Math.max(p.rx, p.ry)
-    const i0 = Math.max(0, Math.floor(p.x - reach)), i1 = Math.min(w - 1, Math.ceil(p.x + reach))
-    const j0 = Math.max(0, Math.floor(p.y - reach)), j1 = Math.min(h - 1, Math.ceil(p.y + reach))
+    const i0 = Math.max(0, Math.floor((p.x - reach) * scale)), i1 = Math.min(w - 1, Math.ceil((p.x + reach) * scale))
+    const j0 = Math.max(0, Math.floor((p.y - reach) * scale)), j1 = Math.min(h - 1, Math.ceil((p.y + reach) * scale))
     for (let j = j0; j <= j1; j++) {
+      const dy = at(j) - p.y
       for (let i = i0; i <= i1; i++) {
-        const dx = i + .5 - p.x, dy = j + .5 - p.y
+        const dx = at(i) - p.x
         const u = (dx * p.ca + dy * p.sa) / p.rx, v = (-dx * p.sa + dy * p.ca) / p.ry
         const d = 1 - u * u - v * v
         if (d <= 0) continue
@@ -254,20 +282,21 @@ export function rasterize(model: Model, colors: readonly [string, string, string
     const nx = nx0 * p.ca - ny0 * p.sa, ny = nx0 * p.sa + ny0 * p.ca
     const nl = Math.hypot(nx, ny, nz0) || 1
     const N = [nx / nl, ny / nl, nz0 / nl]
-    let mat = p.mat
+    let mat = p.mat, darker = 0
     if (p.pat) {
-      const dx = i + .5 - p.x, dy = j + .5 - p.y
+      const dx = at(i) - p.x, dy = at(j) - p.y
       // よこ方向: ねている くだは 面の むき（した むきが +）、たっている くだは すすむ むきの みぎが +。
       const side = (-dx * p.dy + dy * p.dx) / Math.max(p.rx, p.ry)
       const up = Math.max(0, Math.min(1, (Math.abs(p.dy) - .45) / .35))
       const s = N[1] * (1 - up) + side * up
-      mat = p.pat({ t: p.t, l: p.l, s, u, v, w: ww }) ?? mat
+      const hit = p.pat({ t: p.t, l: p.l, s, u, v, w: ww, fine: scale > 1 })
+      if (hit) { mat = hit[0] as Mat; darker = hit.length > 1 ? 1 : 0 }
     }
     mats[k] = mat
-    if (p.glow || mat === 'W') { level[k] = 4; continue }
+    if (p.glow || mat === 'W') { level[k] = LEVELS - 1; continue }
     const lambert = (N[0] * LIGHT[0] + N[1] * LIGHT[1] + N[2] * LIGHT[2] + .3) / 1.3
     const value = .14 + .9 * Math.max(0, lambert) + (1 - N[2]) * .05
-    level[k] = value < .3 ? 0 : value < .5 ? 1 : value < .68 ? 2 : value < .87 ? 3 : 4
+    level[k] = Math.max(0, (value < .27 ? 0 : value < .39 ? 1 : value < .51 ? 2 : value < .63 ? 3 : value < .76 ? 4 : value < .89 ? 5 : 6) - darker)
     spec[k] = Math.pow(Math.max(0, N[0] * HALF[0] + N[1] * HALF[1] + N[2] * HALF[2]), 22) * p.gloss
   }
 
@@ -280,16 +309,17 @@ export function rasterize(model: Model, colors: readonly [string, string, string
     return pa.part === pb.part && Math.abs(pa.l - pb.l) < (pa.rx + pb.rx) * 1.6
   }
   const shade = new Int8Array(n)
+  const reach = 7 * scale
   for (let k = 0; k < n; k++) {
     if (owner[k] < 0 || prims[owner[k]].glow) continue
     const i = k % w, j = (k - i) / w
     const d = depth[k]
-    for (let s = 1; s <= 7; s++) {
+    for (let s = 1; s <= reach; s++) {
       const qi = Math.round(i + stepX * s), qj = Math.round(j + stepY * s)
       if (qi < 0 || qj < 0 || qi >= w || qj >= h) break
       const q = qj * w + qi
       if (owner[q] < 0 || isPart(owner[q], owner[k])) continue
-      if (depth[q] > d + stepZ * s + .8) { shade[k] = s <= 3 ? 2 : 1; break }
+      if (depth[q] > d + stepZ * (s / scale) + .8) { shade[k] = s <= 3 * scale ? 3 : 2; break }
     }
   }
   for (let k = 0; k < n; k++) {
@@ -302,12 +332,13 @@ export function rasterize(model: Model, colors: readonly [string, string, string
     for (let i = 1; i < w - 1; i++) {
       const k = j * w + i
       if (level[k] < 0 || mats[k] === 'W' || mats[k] === 'E') continue
-      const near = [k - 1, k + 1, k - w, k + w]
-      if (near.some(q => level[q] < 0 || mats[q] !== mats[k] || level[q] === level[k])) continue
-      const counts = new Map<number, number>()
-      for (const q of near) counts.set(level[q], (counts.get(level[q]) ?? 0) + 1)
-      const [best, count] = [...counts].sort((a, b) => b[1] - a[1])[0]
-      if (count >= 3) cleaned[k] = best
+      const a = level[k - 1], b = level[k + 1], c = level[k - w], d = level[k + w]
+      if (a < 0 || b < 0 || c < 0 || d < 0) continue
+      if (mats[k - 1] !== mats[k] || mats[k + 1] !== mats[k] || mats[k - w] !== mats[k] || mats[k + w] !== mats[k]) continue
+      if (a === level[k] || b === level[k] || c === level[k] || d === level[k]) continue
+      // 4つの うち 3つ いじょう おなじ なら、それに そろえる。
+      if ((a === b && (a === c || a === d)) || (a === c && a === d)) cleaned[k] = a
+      else if (b === c && b === d) cleaned[k] = b
     }
   }
 
@@ -316,9 +347,10 @@ export function rasterize(model: Model, colors: readonly [string, string, string
   for (let k = 0; k < n; k++) {
     if (cleaned[k] < 0) continue
     const ramp = ramps[mats[k]]
-    let c = ramp[Math.max(0, Math.min(5, cleaned[k]))]
-    if (spec[k] > .55) c = mixRgb(ramp[5], SPARK, .55)
-    else if (spec[k] > .3) c = ramp[5]
+    let c = ramp[Math.max(0, Math.min(LEVELS - 1, cleaned[k]))]
+    if (spec[k] > .55) c = mixRgb(ramp[SPEC], SPARK, .55)
+    else if (spec[k] > .3) c = ramp[SPEC]
+    else if (spec[k] > .2) c = ramp[LEVELS - 1]
     color[k] = c
   }
 
@@ -347,7 +379,7 @@ export function rasterize(model: Model, colors: readonly [string, string, string
       const q = lit ?? dim
       if (q === undefined) continue
       const ramp = ramps[mats[q]]
-      out[k] = lit !== undefined && dim === undefined && cleaned[q] >= 3 ? mixRgb(ramp[0], INK, .25) : mixRgb(ramp[0], INK, .62)
+      out[k] = lit !== undefined && dim === undefined && cleaned[q] >= 4 ? mixRgb(ramp[0], INK, .25) : mixRgb(ramp[0], INK, .62)
     }
   }
 
@@ -360,32 +392,42 @@ export function rasterize(model: Model, colors: readonly [string, string, string
     const p = prims[gi]
     if (owner[k] >= 0 && depth[k] > glassDepth[k]) continue
     const i = k % w, j = (k - i) / w
-    const dx = i + .5 - p.x, dy = j + .5 - p.y
+    const dx = at(i) - p.x, dy = at(j) - p.y
     const u = (dx * p.ca + dy * p.sa) / p.rx, v = (-dx * p.sa + dy * p.ca) / p.ry
-    const mat = p.pat?.({ t: p.t, l: p.l, s: 0, u, v, w: 0 }) ?? p.mat
+    const mat = (p.pat?.({ t: p.t, l: p.l, s: 0, u, v, w: 0, fine: scale > 1 })?.[0] as Mat | undefined) ?? p.mat
     const ramp = ramps[mat]
-    const edge = u * u + v * v > .72
-    const tone = mat !== p.mat ? ramp[1] : edge ? ramp[2] : ramp[4]
+    const edge = u * u + v * v > .78
+    const tone = mat !== p.mat ? ramp[1] : edge ? ramp[3] : ramp[6]
     const a = mat !== p.mat || edge ? Math.min(1, p.glass + .35) : p.glass
     if (out[k]) { out[k] = mixRgb(out[k]!, tone, a); continue }
     out[k] = tone
     alpha[k] = a
   }
 
-  // 8. こうか。
+  // 8. こうか（1ます ぶんの ドットで）。
   for (const f of model.fx) {
-    if (f.x < 0 || f.y < 0 || f.x >= w || f.y >= h) continue
-    const k = f.y * w + f.x
-    if (out[k] && alpha[k] >= 1) { out[k] = mixRgb(out[k]!, f.c, f.a); continue }
-    out[k] = f.c
-    alpha[k] = Math.max(alpha[k], f.a)
+    for (let dj = 0; dj < scale; dj++) {
+      for (let di = 0; di < scale; di++) {
+        const i = f.x * scale + di, j = f.y * scale + dj
+        if (i < 0 || j < 0 || i >= w || j >= h) continue
+        const k = j * w + i
+        if (out[k] && alpha[k] >= 1) { out[k] = mixRgb(out[k]!, f.c, f.a); continue }
+        out[k] = f.c
+        alpha[k] = Math.max(alpha[k], f.a)
+      }
+    }
   }
 
-  const data = new Uint8ClampedArray(n * 4)
+  // 9. いろばんごうに まとめる。
+  const colorsIn = new Map<number, number>([[0, 0]])
+  const keys = new Uint32Array(n)
   for (let k = 0; k < n; k++) {
     const c = out[k]
-    if (!c) continue
-    data[k * 4] = c[0]; data[k * 4 + 1] = c[1]; data[k * 4 + 2] = c[2]; data[k * 4 + 3] = Math.round(alpha[k] * 255)
+    const key = c ? pack(c, alpha[k]) : 0
+    keys[k] = key
+    if (!colorsIn.has(key)) colorsIn.set(key, colorsIn.size)
   }
-  return { w, h, data }
+  const index = colorsIn.size > 256 ? new Uint16Array(n) : new Uint8Array(n)
+  for (let k = 0; k < n; k++) index[k] = colorsIn.get(keys[k])!
+  return { w, h, index, palette: Uint32Array.from(colorsIn.keys()) }
 }

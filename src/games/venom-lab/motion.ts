@@ -68,25 +68,25 @@ export const SIGNATURE_MOVES: Record<string, string> = {
   'mangrove-viper': 'えだから とびかかる',
 }
 
-const STD = { frames: { idle: 16, move: 16, act: 24 }, fps: { idle: 10, move: 14, act: 12 } }
+const STD = { frames: { idle: 24, move: 20, act: 32 }, fps: { idle: 12, move: 16, act: 16 } }
 
 function base(kind: SpriteKind): Omit<Profile, 'frames' | 'fps'> & Partial<Pick<Profile, 'frames' | 'fps'>> {
   switch (kind) {
     case 'octopus': return { gait: 'walk', speed: 5, stride: 12, range: 14, shadow: 40 }
     case 'stonefish': return { gait: 'sit', speed: 0, stride: 0, range: 0, shadow: 52 }
-    case 'lionfish': return { gait: 'swim', speed: 5, stride: 0, range: 18, shadow: 0, hover: 0, fps: { idle: 8, move: 10, act: 12 } }
-    case 'frog': return { gait: 'hop', speed: 0, stride: 10, range: 16, shadow: 36, frames: { idle: 16, move: 14, act: 24 }, fps: { idle: 10, move: 22, act: 12 } }
+    case 'lionfish': return { gait: 'swim', speed: 5, stride: 0, range: 18, shadow: 0, hover: 0, fps: { idle: 10, move: 12, act: 16 } }
+    case 'frog': return { gait: 'hop', speed: 0, stride: 10, range: 16, shadow: 36, frames: { idle: 24, move: 20, act: 32 }, fps: { idle: 12, move: 30, act: 16 } }
     case 'toad': return { gait: 'walk', speed: 4, stride: 9, range: 12, shadow: 40 }
     case 'newt': return { gait: 'walk', speed: 6, stride: 10, range: 14, shadow: 46 }
     case 'spider': return { gait: 'walk', speed: 11, stride: 7, range: 16, shadow: 44 }
-    case 'hornet': return { gait: 'fly', speed: 14, stride: 0, range: 18, shadow: 20, hover: 9, fps: { idle: 24, move: 24, act: 14 } }
+    case 'hornet': return { gait: 'fly', speed: 14, stride: 0, range: 18, shadow: 20, hover: 9, frames: { idle: 16, move: 16, act: 24 }, fps: { idle: 24, move: 24, act: 12 } }
     case 'centipede': return { gait: 'walk', speed: 9, stride: 9, range: 16, shadow: 50 }
     case 'scorpion': return { gait: 'walk', speed: 8, stride: 8, range: 16, shadow: 44 }
     case 'lizard': return { gait: 'walk', speed: 5, stride: 11, range: 14, shadow: 50 }
-    case 'cone': return { gait: 'walk', speed: 1.6, stride: 5, range: 6, shadow: 46, fps: { idle: 8, move: 8, act: 12 } }
-    case 'starfish': return { gait: 'walk', speed: 1.4, stride: 5, range: 6, shadow: 50, fps: { idle: 6, move: 8, act: 12 } }
-    case 'urchin': return { gait: 'sit', speed: 0, stride: 0, range: 0, shadow: 30, fps: { idle: 6, move: 6, act: 12 } }
-    case 'sea-snake': return { gait: 'swim', speed: 7, stride: 0, range: 16, shadow: 0, fps: { idle: 10, move: 12, act: 12 } }
+    case 'cone': return { gait: 'walk', speed: 1.6, stride: 5, range: 6, shadow: 46, fps: { idle: 10, move: 10, act: 16 } }
+    case 'starfish': return { gait: 'walk', speed: 1.4, stride: 5, range: 6, shadow: 50, fps: { idle: 8, move: 10, act: 16 } }
+    case 'urchin': return { gait: 'sit', speed: 0, stride: 0, range: 0, shadow: 30, fps: { idle: 8, move: 8, act: 16 } }
+    case 'sea-snake': return { gait: 'swim', speed: 7, stride: 0, range: 16, shadow: 0, fps: { idle: 12, move: 16, act: 16 } }
     default: return { gait: 'slither', speed: 7, stride: 18, range: 16, shadow: 48 }
   }
 }
