@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { HABITATS, MAX_RESIDENTS, RANKING, SPECIES, addResident, createExhibits, matchesRankFilter } from './data'
-import { PIXELS } from './pixelArt'
+import { renderCreature, SPRITE_H, SPRITE_W } from './sprite'
 
 describe('venom lab exhibits', () => {
   test('40 domestic and international kinds span eight environments with multiple snakes and scorpions', () => {
@@ -29,11 +29,11 @@ describe('venom lab exhibits', () => {
       expect(new URL(s.source.url).protocol).toBe('https:')
       expect(s.fact.length).toBeGreaterThan(10)
       expect(s.venom.length).toBeGreaterThan(10)
-      expect(PIXELS[s.sprite]).toHaveLength(16)
-      for (const row of PIXELS[s.sprite]) {
-        expect(row, s.sprite).toHaveLength(20)
-        expect(row).toMatch(/^[.ABCEW]+$/)
-      }
+      const image = renderCreature(s.sprite, s.colors)
+      expect(image.pixels).toHaveLength(SPRITE_W * SPRITE_H)
+      // ちゃんと からだが えがかれ、まわりに よゆうが ある。
+      expect(image.pixels.filter(Boolean).length, s.id).toBeGreaterThan(SPRITE_W * SPRITE_H * .15)
+      expect(new Set(image.pixels.filter(Boolean)).size, s.id).toBeGreaterThan(12)
     }
   })
 
