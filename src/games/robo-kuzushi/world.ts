@@ -20,10 +20,12 @@ const SLOW_BALL_FRAMES = 90
 const AUTO_SPLIT_MIN_FRAMES = 12
 /** やまなりに ならない まっすぐな うちかたでも、この フレームで かならず わかれる。 */
 const AUTO_SPLIT_MAX_FRAMES = 36
-/** トランポリンが はねかえす はやさと むき（すこし まえへ たおす）、よこむきの はやさを のこす わりあい。 */
+/**
+ * トランポリンが はねかえす はやさと むき（まえへ たおす）。のる まえの はやさは のこさず、
+ * どんな のりかたでも おなじ やまなりで かべを こえて、むこうの ロボットへ とどく。
+ */
 const SPRING_SPEED = 16
-const SPRING_TILT = .2
-const SPRING_KEEP = .5
+const SPRING_TILT = .28
 /** おなじ ものを 1ターンに トランポリンで はねかえす さいだいの かいすう（ずっと はねつづけない）。 */
 const SPRING_LIMIT = 2
 /** かぜは たまを この はやさで ななめ うえへ はこぶ。grip は 1こまで どれだけ その はやさに ちかづくか。 */
@@ -460,11 +462,7 @@ export function createGame(level: Level) {
   /** トランポリン・ドリル・ばくだん・ワープの しあげ。ぶつかる けいさんが おわってから はやさを かえる。 */
   function afterSubstep() {
     for (const [body, spring] of bounces) {
-      const n = { x: Math.sin(SPRING_TILT), y: -Math.cos(SPRING_TILT) }
-      const v = Body.getVelocity(body)
-      const along = v.x * n.x + v.y * n.y
-      const tx = (v.x - n.x * along) * SPRING_KEEP, ty = (v.y - n.y * along) * SPRING_KEEP
-      Body.setVelocity(body, { x: tx + n.x * SPRING_SPEED, y: ty + n.y * SPRING_SPEED })
+      Body.setVelocity(body, { x: Math.sin(SPRING_TILT) * SPRING_SPEED, y: -Math.cos(SPRING_TILT) * SPRING_SPEED })
       springCount.set(body, (springCount.get(body) ?? 0) + 1)
       spring.pulse = 16
       events.push({ type: 'spring', x: spring.body.position.x, y: spring.body.position.y })
