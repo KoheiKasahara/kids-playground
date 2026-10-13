@@ -18,8 +18,8 @@ export const BURN_FRAMES = 24
 export const MAX_BOMBS = 8
 export const MAX_FIRE = 8
 export const MAX_SPEED = 4
-export const MAX_HEARTS = 5
-export const START_HEARTS = 3
+export const MAX_HEARTS = 7
+export const START_HEARTS = 5
 
 export type Dir = 0 | 1 | 2 | 3
 export const DX = [0, 1, 0, -1] as const
