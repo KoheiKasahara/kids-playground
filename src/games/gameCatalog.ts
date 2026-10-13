@@ -90,7 +90,7 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     category: 'learning',
     seo: {
       headline: 'どくの いきものラボ｜ドット絵の生き物を観察',
-      description: '海・森・砂漠の毒をもつ生き物をドット絵で観察するミニゲームです。同じ環境の仲間を増やしてながめ、解説やゲーム内の毒の強さランキングから生き物のひみつを学べます。',
+      description: '日本と世界の毒をもつ生き物40種類を、8つのエリアで観察するドット絵ミニゲームです。ヘビやサソリなど環境の近い仲間を複数匹ながめ、解説や絞り込み付きの毒の強さランキングからひみつを学べます。',
     },
     intro: {
       howToPlay: [

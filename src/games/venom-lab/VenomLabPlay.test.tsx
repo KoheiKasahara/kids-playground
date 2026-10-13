@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import VenomLabPlay from './VenomLabPlay'
 import App from '../../app/App'
 import { isSoundEnabled } from '../../audio/sound'
-import { SPECIES } from './data'
+import { HABITATS, SPECIES } from './data'
 
 beforeEach(() => { localStorage.clear(); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
@@ -19,13 +19,13 @@ describe('どくの いきものラボ', () => {
     expect(animalButtons()).toHaveLength(3)
     fireEvent.click(animalButtons()[0])
     expect(screen.getByRole('heading', { name: 'ヒョウモンダコのなかま' })).toBeVisible()
-    expect(screen.getByLabelText('かんさつずかん 1 / 9')).toBeVisible()
+    expect(screen.getByLabelText('かんさつずかん 1 / 40')).toBeVisible()
     fireEvent.click(screen.getByText('毒のひみつ・出典をみる'))
     expect(screen.getByRole('link', { name: /海洋科学研究所/ })).toHaveAttribute('href', SPECIES[0].source.url)
     fireEvent.click(screen.getByRole('button', { name: 'ヒョウモンダコのなかまを ふやす' }))
     expect(animalButtons()).toHaveLength(4)
     fireEvent.click(animalButtons()[3])
-    expect(screen.getByLabelText('かんさつずかん 1 / 9')).toBeVisible()
+    expect(screen.getByLabelText('かんさつずかん 1 / 40')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: /この1ぴきを もどす/ }))
     expect(animalButtons()).toHaveLength(3)
     fireEvent.click(screen.getByRole('button', { name: /AREA 02 あめのもり/ }))
@@ -57,21 +57,61 @@ describe('どくの いきものラボ', () => {
     const entries = screen.getAllByRole('button', { name: /の かいせつをみる/ })
     expect(entries).toHaveLength(SPECIES.length)
     fireEvent.click(screen.getByRole('button', { name: 'アメリカドクトカゲの かいせつをみる' }))
-    expect(screen.getByRole('heading', { name: 'ソノラのさばく' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: '世界のさばく' })).toBeVisible()
     expect(screen.getByRole('heading', { name: 'アメリカドクトカゲ' })).toBeVisible()
-    expect(screen.getByLabelText('かんさつずかん 1 / 9')).toBeVisible()
+    expect(screen.getByLabelText('かんさつずかん 1 / 40')).toBeVisible()
   })
 
-  test('all habitats can be observed to complete the notebook, which survives reopening', () => {
-    const view = openLab()
-    for (const name of [/AREA 01 サンゴのうみ/, /AREA 02 あめのもり/, /AREA 03 ソノラのさばく/]) {
-      fireEvent.click(screen.getByRole('button', { name }))
-      for (const button of animalButtons()) fireEvent.click(button)
+  test('all eight habitats are available and each retains multiple resident kinds', () => {
+    openLab()
+    for (const habitat of HABITATS) {
+      fireEvent.click(screen.getByRole('button', { name: `AREA ${habitat.number} ${habitat.name}` }))
+      expect(animalButtons()).toHaveLength(3)
+      expect(screen.getByRole('heading', { name: habitat.name })).toBeVisible()
     }
+  })
+
+  test('different snakes and repeated individuals can share the Japanese exhibit', () => {
+    openLab()
+    fireEvent.click(screen.getByRole('button', { name: /AREA 04 日本のさとやま/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'ニホンマムシを ふやす' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ヤマカガシを ふやす' }))
+    expect(within(area()).getAllByRole('button', { name: /ニホンマムシを かんさつ/ })).toHaveLength(2)
+    expect(within(area()).getAllByRole('button', { name: /ヤマカガシを かんさつ/ })).toHaveLength(2)
+    expect(animalButtons()).toHaveLength(5)
+    for (const button of animalButtons()) fireEvent.click(button)
+    expect(screen.getByText('「＋」で アカハライモリを よんでみよう')).toBeVisible()
+  })
+
+  test('ranking filters domestic animals and families, retaining filter on return', () => {
+    openLab()
+    fireEvent.click(screen.getByRole('button', { name: /毒のつよさランキング/ }))
+    fireEvent.click(screen.getByRole('button', { name: '日本にもいる17' }))
+    expect(screen.getAllByRole('button', { name: /の かいせつをみる/ })).toHaveLength(17)
+    expect(screen.queryByRole('button', { name: 'ブラックマンバの かいせつをみる' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'ヘビ21' }))
+    expect(screen.getAllByRole('button', { name: /の かいせつをみる/ })).toHaveLength(21)
+    fireEvent.click(screen.getByRole('button', { name: 'ガンガサヘビの かいせつをみる' }))
+    expect(screen.getByRole('heading', { name: 'アジアのもり' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'ガンガサヘビ' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /毒のつよさランキング/ }))
+    expect(screen.getByRole('button', { name: 'ヘビ21' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'サソリ3' }))
+    expect(screen.getAllByRole('button', { name: /の かいせつをみる/ })).toHaveLength(3)
+  })
+
+  test('existing discoveries survive expansion, and the last added species completes the notebook', () => {
+    localStorage.setItem('venom-lab-observed-v1', JSON.stringify(SPECIES.slice(0, -1).map(s => s.id)))
+    const view = openLab()
+    expect(screen.getByLabelText('かんさつずかん 39 / 40')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /AREA 08 アジアのもり/ }))
+    expect(screen.queryByText('ずかん かんせい')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'マングローブクサリヘビを ふやす' }))
+    fireEvent.click(within(area()).getByRole('button', { name: /マングローブクサリヘビを かんさつ/ }))
     expect(screen.getByRole('status')).toHaveTextContent('ずかん かんせい')
     view.unmount()
     openLab()
-    expect(screen.getByLabelText('かんさつずかん 9 / 9')).toBeVisible()
+    expect(screen.getByLabelText('かんさつずかん 40 / 40')).toBeVisible()
   })
 
   test('empty exhibit can be repopulated, and pause and mute are controllable', () => {
@@ -96,13 +136,13 @@ describe('どくの いきものラボ', () => {
   test('damaged or unavailable storage does not prevent observation', () => {
     localStorage.setItem('venom-lab-observed-v1', '{broken')
     const view = openLab()
-    expect(screen.getByLabelText('かんさつずかん 0 / 9')).toBeVisible()
+    expect(screen.getByLabelText('かんさつずかん 0 / 40')).toBeVisible()
     view.unmount()
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
     openLab()
     fireEvent.click(animalButtons()[0])
-    expect(screen.getByLabelText('かんさつずかん 1 / 9')).toBeVisible()
+    expect(screen.getByLabelText('かんさつずかん 1 / 40')).toBeVisible()
   })
 
   test('direct route has one back button and returns to the home catalog', async () => {

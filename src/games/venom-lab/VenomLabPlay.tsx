@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useSoundToggle } from '../../audio/useSoundToggle'
-import { HABITATS, LEVEL_LABELS, MAX_RESIDENTS, RANKING, RANKING_NOTE, SPECIES, addResident, createExhibits, type HabitatId, type Resident, type Species } from './data'
+import { HABITATS, LEVEL_LABELS, MAX_RESIDENTS, RANKING, RANKING_NOTE, RANK_FILTERS, SPECIES, addResident, createExhibits, matchesRankFilter, type HabitatId, type RankFilter, type Resident, type Species } from './data'
 import PixelCreature from './PixelCreature'
 import HabitatScene from './HabitatScene'
 import { playLabSound } from './sounds'
@@ -32,6 +32,7 @@ export default function VenomLabPlay() {
   const [observed, setObserved] = useState(readNotebook)
   const [paused, setPaused] = useState(false)
   const [tab, setTab] = useState<'observe' | 'ranking'>('observe')
+  const [rankFilter, setRankFilter] = useState<RankFilter>('all')
   const [message, setMessage] = useState('いきものを タップして かんさつしよう！')
   const [sound, toggleSound] = useSoundToggle()
   const detailRef = useRef<HTMLElement>(null)
@@ -97,7 +98,7 @@ export default function VenomLabPlay() {
       </header>
 
       <div className={styles.hero}>
-        <div><p className={styles.eyebrow}>ちいさな体に、ふしぎな ちから。</p><h1>どくの いきものラボ</h1><p className={styles.lead}>みつけて、ながめて、ひみつを しろう。</p></div>
+        <div><p className={styles.eyebrow}>日本から 世界へ。{HABITATS.length}つの エリアを たんけん。</p><h1>どくの いきものラボ</h1><p className={styles.lead}>{SPECIES.length}種類の なかまを みつけて、ひみつを しろう。</p></div>
         <div className={styles.notebook} aria-label={`かんさつずかん ${observed.length} / ${SPECIES.length}`}><span>かんさつずかん</span><strong>{String(observed.length).padStart(2, '0')}<small> / {String(SPECIES.length).padStart(2, '0')}</small></strong><div className={styles.progress}><i style={{ width: `${observed.length / SPECIES.length * 100}%` }} /></div></div>
       </div>
 
@@ -109,7 +110,7 @@ export default function VenomLabPlay() {
       {tab === 'observe' ? <>
         <nav className={styles.habitats} aria-label="かんさつエリアを えらぶ">
           {HABITATS.map(h => <button type="button" key={h.id} onClick={() => changeHabitat(h.id)} aria-label={`AREA ${h.number} ${h.name}`} aria-pressed={h.id === habitatId}>
-            <span className={styles.habitatIcon}>{h.icon}</span><span><small>AREA {h.number}</small><b>{h.name}</b></span><span className={styles.habitatArrow}>↗</span>
+            <span className={styles.habitatIcon}>{h.icon}</span><span><small>AREA {h.number}</small><b>{h.name}</b><em>{SPECIES.filter(s => s.habitat === h.id && observed.includes(s.id)).length} / {SPECIES.filter(s => s.habitat === h.id).length} 種類 はっけん</em></span><span className={styles.habitatArrow}>↗</span>
           </button>)}
         </nav>
 
@@ -118,7 +119,7 @@ export default function VenomLabPlay() {
             <div className={styles.exhibitHeader}><div><p className={styles.eyebrow}>AREA {habitat.number}</p><h2>{habitat.name}</h2></div><button type="button" className={styles.smallButton} aria-pressed={paused} onClick={() => { setPaused(!paused); playLabSound() }}>{paused ? '▶ うごかす' : 'Ⅱ とめてみる'}</button></div>
             <HabitatScene habitat={habitatId} residents={residents} selectedId={selectedId} paused={paused} onObserve={observe} />
             <div className={styles.sceneFooter}><span>{habitat.subtitle}</span><b>{residents.length}<small> / {MAX_RESIDENTS} ひき</small></b></div>
-            <div className={styles.mission}><span className={styles.missionIcon}>{nextDiscovery ? '⌕' : '✓'}</span><div><small>{nextDiscovery ? 'かんさつミッション' : 'このエリアは ぜんぶ はっけん！'}</small><p>{nextDiscovery ? nextDiscovery.clue : 'すきな なかまを ふやして ながめよう。'}</p></div></div>
+            <div className={styles.mission}><span className={styles.missionIcon}>{nextDiscovery ? '⌕' : '✓'}</span><div><small>{nextDiscovery ? 'かんさつミッション' : 'このエリアは ぜんぶ はっけん！'}</small><p>{nextDiscovery ? residents.some(r => r.speciesId === nextDiscovery.id) ? nextDiscovery.clue : `「＋」で ${nextDiscovery.name}を よんでみよう` : 'すきな なかまを ふやして ながめよう。'}</p></div></div>
           </section>
 
           <aside ref={detailRef} className={styles.detail} aria-label="いきものの かいせつ" aria-live="polite">
@@ -127,7 +128,7 @@ export default function VenomLabPlay() {
               <div className={styles.portrait}><PixelCreature species={selected} /></div>
               <h2>{selected.name}</h2><p className={styles.scientific}>{selected.scientific}</p>
               <div className={styles.venomLine}><span>毒のつよさ <small>めやす</small></span><VenomMeter species={selected} /></div>
-              <span className={styles.delivery}>{selected.delivery}</span>
+              <span className={styles.delivery}>{selected.delivery}</span>{selected.inJapan && <span className={styles.japanBadge}>日本にもいる</span>}
               <p className={styles.fact}>{selected.fact}</p>
               <dl className={styles.facts}><dt>すむところ</dt><dd>{selected.home}</dd><dt>たべもの</dt><dd>{selected.food}</dd></dl>
               <details className={styles.more} key={selected.id}><summary>毒のひみつ・出典をみる</summary><p>{selected.venom}</p><p className={styles.note}>毒のつよさは ゲーム内のめやす。詳しくは ランキングをみてね。</p><a href={selected.source.url} target="_blank" rel="noreferrer">{selected.source.label} ↗</a></details>
@@ -148,12 +149,16 @@ export default function VenomLabPlay() {
       </> : <section className={styles.rankPanel} aria-labelledby="ranking-title">
         <div className={styles.rankHeading}><span className={styles.eyebrow}>VENOM GUIDE</span><h2 id="ranking-title">毒のつよさランキング</h2><p>ふしぎな毒を くらべてみよう</p></div>
         <p className={styles.rankNote}>{RANKING_NOTE}</p>
-        {RANKING.map((group, index) => <section key={group.level} className={styles.rankGroup} aria-label={`${index + 1}位 ${LEVEL_LABELS[group.level]}`}>
+        <nav className={styles.rankFilters} aria-label="ランキングを しぼりこむ">{RANK_FILTERS.map(filter => <button key={filter.id} type="button" aria-pressed={rankFilter === filter.id} onClick={() => { setRankFilter(filter.id); playLabSound() }}>{filter.label}<small>{SPECIES.filter(s => matchesRankFilter(s, filter.id)).length}</small></button>)}</nav>
+        <p className={styles.filterSummary}>{SPECIES.filter(s => matchesRankFilter(s, rankFilter)).length}種類を 表示中{rankFilter === 'japan' ? ' · 日本に定着した 外来種も ふくむよ' : ' · タップで かいせつへ'}</p>
+        {RANKING.map((group, index) => {
+          const entries = group.species.filter(s => matchesRankFilter(s, rankFilter))
+          return entries.length > 0 && <section key={group.level} className={styles.rankGroup} aria-label={`${index + 1}位 ${LEVEL_LABELS[group.level]}`}>
           <div className={styles.rankGroupTitle}><strong>{String(index + 1).padStart(2, '0')}<small>同順位</small></strong><div><h3>{LEVEL_LABELS[group.level]}</h3><span>ゲーム内のめやす {group.level} / 5</span></div></div>
-          <div className={styles.rankCards}>{group.species.map(s => <button type="button" key={s.id} onClick={() => { revealNote.current = true; setHabitatId(s.habitat); setTab('observe'); inspect(s, exhibits[s.habitat].find(r => r.speciesId === s.id)?.id ?? null) }} aria-label={`${s.name}の かいせつをみる`}>
+          <div className={styles.rankCards}>{entries.map(s => <button type="button" key={s.id} onClick={() => { revealNote.current = true; setHabitatId(s.habitat); setTab('observe'); inspect(s, exhibits[s.habitat].find(r => r.speciesId === s.id)?.id ?? null) }} aria-label={`${s.name}の かいせつをみる`}>
             <PixelCreature species={s} /><span><b>{s.name}</b><small>{s.delivery}</small></span><span className={styles.rankGo}>↗</span>
           </button>)}</div>
-        </section>)}
+        </section>})}
         <div className={styles.rankExplanation}><h3>「毒がある」にも ちがいがあるよ</h3><p>ヘビやサソリは かんだり さしたりして 毒を入れる。ヤドクガエルは 皮ふの毒で「食べないで」と 身をまもる。同じ「毒」でも つかい方が ちがうんだね。</p><p>実際の毒の強さは、毒の種類や動物・測定条件をそろえて調べます。この展示の段階は学習用の分類で、死亡数や実験値の順位ではありません。</p></div>
       </section>}
 

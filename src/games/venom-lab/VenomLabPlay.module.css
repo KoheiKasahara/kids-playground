@@ -21,12 +21,13 @@
 .modeNav { display: flex; gap: 28px; border-bottom: 1px solid #36474f; margin-bottom: 23px; }
 .modeNav button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 13px 0; font-size: 14px; color: #a8bdbf; }
 .modeNav button[aria-pressed='true'] { color: #ddf796; border-bottom-color: #ddf796; }
-.habitats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
-.habitats button { display: flex; align-items: center; gap: 14px; text-align: left; border: 1px solid #3d525a; padding: 15px 17px; border-radius: 12px; background: #1b3039; }
+.habitats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 20px; }
+.habitats button { display: flex; align-items: center; gap: 10px; text-align: left; border: 1px solid #3d525a; padding: 12px; border-radius: 12px; background: #1b3039; }
 .habitats button[aria-pressed='true'] { background: #31493e; border-color: #d3eb98; box-shadow: inset 0 0 0 1px #d3eb98; }
 .habitatIcon { font-size: 28px; color: #d6e7ba; }
 .habitats small { display: block; font-size: 9px; color: #a9bebc; letter-spacing: .13em; margin-bottom: 4px; }
 .habitats b { font-size: 14px; }
+.habitats em { display: block; font-style: normal; font-size: 9px; color: #c3cfae; margin-top: 5px; }
 .habitatArrow { margin-left: auto; color: #c9db9a; }
 .observationGrid { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 20px; align-items: start; }
 .exhibit { border: 1px solid #425760; border-radius: 15px; overflow: hidden; background: #1a2d37; }
@@ -77,6 +78,7 @@
 .meter b { margin-left: 5px; color: #65415b; font-size: 19px; }
 .meter small { font-size: 11px; }
 .delivery { display: inline-block; padding: 4px 8px; color: #78576c; background: #e4dce0; border-radius: 5px; font-size: 10px; margin-top: 10px; }
+.japanBadge { display: inline-block; margin: 10px 0 0 6px; padding: 4px 8px; border-radius: 5px; font-size: 10px; color: #49653d; background: #dce5c9; }
 .fact { font-size: 13px; line-height: 1.95; margin: 15px 0; }
 .facts { border-top: 1px solid #ccd3bf; padding-top: 12px; }
 .facts dt { color: #607664; font-size: 10px; margin-bottom: 3px; }
@@ -114,6 +116,11 @@
 .rankHeading h2 { margin: 10px 0; font-size: 27px; }
 .rankHeading > p { color: #aec3be; font-size: 13px; }
 .rankNote { background: #30403d; border-left: 3px solid #bdd693; padding: 14px 18px; color: #d4ddc9; font-size: 12px; line-height: 1.95; margin: 23px 0; }
+.rankFilters { display: flex; flex-wrap: wrap; gap: 8px; }
+.rankFilters button { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 13px; border: 1px solid #526861; border-radius: 22px; background: #263e46; font-size: 12px; }
+.rankFilters button[aria-pressed='true'] { color: #203b31; background: #d5e6a7; border-color: #d5e6a7; }
+.rankFilters small { opacity: .75; font-variant-numeric: tabular-nums; }
+.filterSummary { font-size: 11px; color: #becfc4; margin: 14px 0; line-height: 1.8; }
 .rankGroup { border-top: 1px solid #42555b; padding: 22px 0; }
 .rankGroupTitle { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; }
 .rankGroupTitle > strong { font-size: 31px; line-height: 1.2; color: #e2edae; }
@@ -132,6 +139,8 @@
 .rankExplanation p { font-size: 12px; color: #bbcfca; line-height: 2; }
 .rankExplanation p + p { margin-top: 12px; font-size: 11px; }
 @media (max-width: 850px) {
+  .habitatIcon, .habitatArrow { display: none; }
+  .habitats b { font-size: 12px; }
   .observationGrid { grid-template-columns: minmax(0, 1fr) 270px; gap: 14px; }
   .detail { padding: 17px; }
   .rankCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -151,11 +160,12 @@
   .notebook small { font-size: 12px; }
   .modeNav { gap: 22px; margin-bottom: 17px; }
   .modeNav button { font-size: 12px; padding: 12px 0; }
-  .habitats { gap: 7px; margin-bottom: 14px; }
-  .habitats button { flex-direction: column; align-items: flex-start; gap: 5px; padding: 10px; }
+  .habitats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-bottom: 14px; }
+  .habitats button { align-items: center; gap: 9px; padding: 9px 10px; }
+  .habitatIcon { display: block; }
   .habitatIcon { font-size: 23px; }
   .habitats small { font-size: 8px; }
-  .habitats b { font-size: clamp(9px, 2.6vw, 11px); }
+  .habitats b { font-size: 11px; }
   .habitatArrow { display: none; }
   .observationGrid { display: flex; flex-direction: column; gap: 16px; }
   .exhibit, .detail, .residentPicker { width: 100%; }

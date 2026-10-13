@@ -1,8 +1,27 @@
 import { describe, expect, test } from 'vitest'
-import { HABITATS, MAX_RESIDENTS, RANKING, SPECIES, addResident, createExhibits } from './data'
+import { HABITATS, MAX_RESIDENTS, RANKING, SPECIES, addResident, createExhibits, matchesRankFilter } from './data'
 import { PIXELS } from './pixelArt'
 
 describe('venom lab exhibits', () => {
+  test('40 domestic and international kinds span eight environments with multiple snakes and scorpions', () => {
+    expect(SPECIES).toHaveLength(40)
+    expect(HABITATS).toHaveLength(8)
+    expect(SPECIES.filter(s => matchesRankFilter(s, 'snake'))).toHaveLength(21)
+    expect(SPECIES.filter(s => matchesRankFilter(s, 'scorpion'))).toHaveLength(3)
+    expect(SPECIES.filter(s => matchesRankFilter(s, 'japan'))).toHaveLength(17)
+    const exhibits = createExhibits()
+    for (const habitat of HABITATS) {
+      expect(exhibits[habitat.id]).toHaveLength(3)
+      expect(new Set(exhibits[habitat.id].map(r => r.slot)).size).toBe(3)
+      for (const resident of exhibits[habitat.id]) {
+        expect(resident.slot).toBeGreaterThanOrEqual(0)
+        expect(resident.slot).toBeLessThan(MAX_RESIDENTS)
+        expect(SPECIES.find(s => s.id === resident.speciesId)?.habitat).toBe(habitat.id)
+      }
+    }
+    expect(SPECIES.filter(s => s.habitat === 'ryukyu').every(s => matchesRankFilter(s, 'snake'))).toBe(true)
+    expect(SPECIES.filter(s => matchesRankFilter(s, 'sea')).every(s => s.habitat === 'reef')).toBe(true)
+  })
   test('every creature has a habitat, a complete pixel sprite and a source', () => {
     expect(new Set(SPECIES.map(s => s.id)).size).toBe(SPECIES.length)
     for (const s of SPECIES) {
