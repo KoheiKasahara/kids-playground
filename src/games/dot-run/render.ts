@@ -3,15 +3,17 @@
 
 import {
   FAR_H, FAR_W, MID_H, MID_W, NEAR_H, NEAR_W, Pix, SKY_H, SKY_Y0, aurora, bubbleSprite, celestial, cloud, decoSprites,
-  farStrip, medalFrames, midStrip, nearStrip, pack, platformTile, propSprite, rockTile, skyStrip, starField, type Star,
+  farStrip, helmetSprite, medalFrames, midStrip, nearStrip, pack, platformTile, propSprite, rockTile, skyStrip, starField, type Star,
 } from './art'
 import { bayer, hash2, makeCanvas, mixHex, rng, spriteCanvas, type Img } from './pixel'
 import {
-  BAT, BAT_PAL, BEE, BEE_PAL, BEETLE, BEETLE_PAL, BLOCK, BLOCK_PAL, BLOCK_USED, BLOCK_USED_PAL, BUNNY, BUNNY_POSES, CARROT, CARROT_PAL, CRAB, CRAB_PAL, GULL,
-  GULL_PAL, HAWK_PAL, MOON_SNAIL_PAL, OWL, OWL_PAL, PENGUIN, PENGUIN_PAL, SNAIL, SNAIL_PAL, SPRING, SPRING_PAL, SPRING_SQUASH, type BunnyPose,
+  ALIEN, ALIEN_PAL, BAT, BAT_PAL, BEE, BEE_PAL, BEETLE, BEETLE_PAL, BLOCK, BLOCK_PAL, BLOCK_USED, BLOCK_USED_PAL, BUNNY, BUNNY_POSES, CARROT, CARROT_PAL, CRAB,
+  CRAB_PAL, FISH, FISH_PAL, GULL, GULL_PAL, HAWK_PAL, MOON_SNAIL_PAL, OCTOPUS, OCTOPUS_PAL, OWL, OWL_PAL, PENGUIN, PENGUIN_PAL, SNAIL, SNAIL_PAL, SPRING,
+  SPRING_PAL, SPRING_SQUASH, UFO, UFO_PAL, type BunnyPose,
 } from './sprites'
 import { stageRows, GROUND_Y, HERO_H, HERO_W, ROWS, TILE, WORLD_H, cellAt, type World, type WorldEvent } from './world'
 import { THEMES, type Theme } from './theme'
+import type { StageEnv } from './stages'
 
 /** 画面の ドットの 大きさ（せかいの 1ドットを 画面の なんドットで かくか）。 */
 export function viewSize(cssW: number, cssH: number, dpr: number) {
@@ -40,15 +42,15 @@ function baseTop(h: number) {
 // ---------------- こうか（つぶ） ----------------
 
 type Particle = {
-  kind: 'dust' | 'spark' | 'star' | 'ring' | 'confetti' | 'carrot' | 'puff' | 'line'
+  kind: 'dust' | 'spark' | 'star' | 'ring' | 'confetti' | 'carrot' | 'puff' | 'line' | 'bubble'
   x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; size: number
 }
 type Weather = { x: number; y: number; vx: number; vy: number; phase: number; size: number }
 
-export type Fx = { parts: Particle[]; weather: Weather[]; lastRun: number; flagRaise: number; shake: number }
+export type Fx = { parts: Particle[]; weather: Weather[]; lastRun: number; flagRaise: number; shake: number; env: StageEnv }
 
-export function createFx(): Fx {
-  return { parts: [], weather: [], lastRun: 0, flagRaise: 0, shake: 0 }
+export function createFx(env: StageEnv = 'land'): Fx {
+  return { parts: [], weather: [], lastRun: 0, flagRaise: 0, shake: 0, env }
 }
 
 const SPARK = ['#ffffff', '#fff6a0', '#ffd23c', '#ffb0c8']
@@ -59,15 +61,22 @@ export function spawnFx(fx: Fx, event: WorldEvent, frame: number) {
   const add = (p: Omit<Particle, 'life'>) => fx.parts.push({ ...p, life: 0 })
   switch (event.type) {
     case 'jump':
-      for (let i = 0; i < 4; i++) add({ kind: 'dust', x: event.x - 3 + i * 2, y: event.y - 1, vx: -.6 - r() * .6, vy: -.2 - r() * .3, max: 18 + r() * 8, color: '#ffffff', size: 2 })
+      for (let i = 0; i < 4; i++) add({ kind: 'dust', x: event.x - 3 + i * 2, y: event.y - 1, vx: -.6 - r() * .6, vy: -.2 - r() * .3, max: (18 + r() * 8) * (fx.env === 'moon' ? 1.8 : 1), color: '#ffffff', size: 2 })
+      // うみの なかでは あしもとから あわが ぽこぽこ。
+      if (fx.env === 'water') for (let i = 0; i < 4; i++) add({ kind: 'bubble', x: event.x - 4 + r() * 8, y: event.y - 2, vx: (r() - .5) * .4, vy: -.5 - r() * .5, max: 50 + r() * 30, color: '', size: r() < .4 ? 2 : 1 })
       break
     case 'double':
       for (let i = 0; i < 8; i++) {
         const a = i / 8 * Math.PI * 2
-        add({ kind: 'puff', x: event.x, y: event.y - 2, vx: Math.cos(a) * 1.1, vy: Math.sin(a) * .6 + .3, max: 16, color: '#ffffff', size: 2 })
+        add({ kind: fx.env === 'water' ? 'bubble' : 'puff', x: event.x, y: event.y - 2, vx: Math.cos(a) * 1.1, vy: Math.sin(a) * .6 + .3, max: fx.env === 'water' ? 40 : 16, color: '#ffffff', size: i % 3 ? 1 : 2 })
       }
       break
     case 'land':
+      // つきの うえでは どこに おりても すなけむりが ふわっと まう。
+      if (fx.env === 'moon') {
+        for (let i = 0; i < 6; i++) add({ kind: 'dust', x: event.x + (i < 3 ? -4 : 4), y: event.y - 1, vx: (i < 3 ? -1 : 1) * (.3 + r() * .5), vy: -.25 - r() * .35, max: 40, color: '#ffffff', size: 2 })
+        break
+      }
       if (!event.hard) break
       for (let i = 0; i < 6; i++) add({ kind: 'dust', x: event.x + (i < 3 ? -4 : 4), y: event.y - 1, vx: (i < 3 ? -1 : 1) * (.4 + r() * .8), vy: -.3 - r() * .3, max: 18, color: '#ffffff', size: 2 })
       break
@@ -131,16 +140,22 @@ export function updateFx(fx: Fx, world: World) {
     fx.parts.push({ kind: 'dust', x: hero.x + 1, y: hero.y + HERO_H - 1, vx: -.4, vy: -.25, life: 0, max: 14, color: '#ffffff', size: 1 })
   }
   if (!hero.onGround) fx.lastRun = hero.run
+  // うみの なかでは ときどき くちから あわが でる。
+  if (fx.env === 'water' && !hero.bubble && world.frame % 70 === 0) {
+    for (let i = 0; i < 2; i++) fx.parts.push({ kind: 'bubble', x: hero.x + HERO_W + 1, y: hero.y + 5 - i * 3, vx: .1, vy: -.45 - i * .1, life: -i * 8, max: 70, color: '', size: i ? 1 : 2 })
+  }
   if (fx.flagRaise > 0 && fx.flagRaise < 60) fx.flagRaise++
   if (fx.shake > 0) fx.shake--
   for (const p of fx.parts) {
     p.life++
     p.x += p.vx
     p.y += p.vy
+    if (p.life <= 0) { p.x -= p.vx; p.y -= p.vy; continue }
     if (p.kind === 'confetti') { p.vy = Math.min(1.1, p.vy + .06); p.vx *= .97 }
     else if (p.kind === 'spark' || p.kind === 'star') { p.vx *= .93; p.vy = p.vy * .93 + .03 }
     else if (p.kind === 'dust' || p.kind === 'puff') { p.vx *= .9; p.vy *= .9 }
     else if (p.kind === 'carrot') p.vy += .12
+    else if (p.kind === 'bubble') { p.vx = p.vx * .96 + Math.sin((p.life + p.max) * .2) * .06; p.vy = Math.max(-.9, p.vy - .01) }
   }
   fx.parts = fx.parts.filter(p => p.life < p.max)
 }
@@ -169,6 +184,7 @@ export class Scene {
   private flyer: { left: (Img | null)[]; right: (Img | null)[] }
   private medal: Img[]
   private bubble: Img | null
+  private helmet: Img | null
   private buffer: { canvas: Img; ctx: CanvasRenderingContext2D } | null = null
 
   constructor(world: World) {
@@ -179,7 +195,7 @@ export class Scene {
     this.mid = midStrip(theme)
     this.near = nearStrip(theme)
     this.sun = celestial(theme)
-    this.stars = theme.celestial === 'moon' || theme.celestial === 'crescent' ? starField(theme, 320, 260) : { img: null, stars: [] }
+    this.stars = theme.celestial === 'moon' || theme.celestial === 'crescent' || theme.celestial === 'earth' ? starField(theme, 320, 260) : { img: null, stars: [] }
     this.aurora = theme.celestial === 'moon' ? aurora(360, 90) : null
     const r = rng(5)
     this.clouds = Array.from({ length: 6 }, (_, i) => ({ img: cloud(theme, 40 + i), x: i * 170 + r() * 60, y: theme.horizon - 150 + r() * 100, speed: 2 + r() * 3 }))
@@ -191,14 +207,18 @@ export class Scene {
     this.spring = [spriteCanvas(SPRING, SPRING_PAL), spriteCanvas(SPRING_SQUASH, SPRING_PAL)]
     const walker = {
       snail: [SNAIL, SNAIL_PAL], crab: [CRAB, CRAB_PAL], penguin: [PENGUIN, PENGUIN_PAL], beetle: [BEETLE, BEETLE_PAL], moonSnail: [SNAIL, MOON_SNAIL_PAL],
+      octopus: [OCTOPUS, OCTOPUS_PAL], alien: [ALIEN, ALIEN_PAL],
     } as const
-    const flyer = { bee: [BEE, BEE_PAL], gull: [GULL, GULL_PAL], owl: [OWL, OWL_PAL], hawk: [GULL, HAWK_PAL], bat: [BAT, BAT_PAL] } as const
+    const flyer = {
+      bee: [BEE, BEE_PAL], gull: [GULL, GULL_PAL], owl: [OWL, OWL_PAL], hawk: [GULL, HAWK_PAL], bat: [BAT, BAT_PAL], fish: [FISH, FISH_PAL], ufo: [UFO, UFO_PAL],
+    } as const
     const [wf, wp] = walker[world.stage.walker]
     const [ff, fp] = flyer[world.stage.flyer]
     this.walker = { left: wf.map(f => spriteCanvas(f, wp)), right: wf.map(f => spriteCanvas(f, wp, true)) }
     this.flyer = { left: ff.map(f => spriteCanvas(f, fp)), right: ff.map(f => spriteCanvas(f, fp, true)) }
     this.medal = medalFrames()
     this.bubble = bubbleSprite()
+    this.helmet = world.stage.env === 'moon' ? helmetSprite() : null
     this.level = buildLevel(world, theme)
   }
 
@@ -251,7 +271,7 @@ export class Scene {
     if (this.sun) {
       const size = this.sun.width
       const sx = Math.round(w * .74 - size / 2 - cx * .015)
-      const sy = theme.celestial === 'sunset' ? theme.horizon - size / 2 - layerY(.12) + 4 : theme.horizon - (theme.celestial === 'moon' || theme.celestial === 'crescent' ? 150 : 128) - layerY(.08)
+      const sy = theme.celestial === 'sunset' ? theme.horizon - size / 2 - layerY(.12) + 4 : theme.horizon - (theme.celestial === 'sun' ? 128 : theme.celestial === 'earth' ? 122 : 150) - layerY(.08)
       ctx.drawImage(this.sun, sx, sy)
     }
     for (const c of this.clouds) {
@@ -259,6 +279,8 @@ export class Scene {
       const x = ((c.x - cx * .2 - time * c.speed) % period + period) % period - 90
       ctx.drawImage(c.img, Math.round(x), c.y - layerY(.15))
     }
+
+    if (theme.weather === 'bubbles') this.drawLightRays(ctx, w, h, time, cx, layerY(.1))
 
     // とおくの けしき
     if (this.far) {
@@ -271,6 +293,7 @@ export class Scene {
         this.drawSunGlitter(ctx, w, time, top + 30, cx)
       }
     }
+    if (theme.weather === 'bubbles') this.drawFishSchool(ctx, w, time, cx, theme.horizon - 70 - layerY(.25))
     if (this.mid) {
       const top = 152 - MID_H - layerY(.35)
       const mx = -((cx * .35) % MID_W)
@@ -325,6 +348,42 @@ export class Scene {
       ctx.fillStyle = i < 4 ? '#fff0a0' : i < 9 ? '#ffc070' : '#ff9a70'
       ctx.fillRect(Math.round(center - len / 2 + wob), y, len, 1)
       if (i % 2 === 0) ctx.fillRect(Math.round(center + spread * Math.sin(time * 2 + i) - 1), y + 1, 2, 1)
+    }
+  }
+
+  /** うみの おもてから さしこむ ひかりの すじ（ゆっくり ゆれる）。 */
+  private drawLightRays(ctx: CanvasRenderingContext2D, w: number, h: number, time: number, cx: number, offY: number) {
+    const top = this.theme.skyTop - offY
+    const span = w + 160
+    ctx.fillStyle = '#e8ffff'
+    for (let i = 0; i < 6; i++) {
+      const width = 8 + (i * 7) % 15
+      const x0 = ((i * 151 - cx * .08 + Math.sin(time * .35 + i * 1.7) * 14) % span + span) % span - 80
+      const len = 150 + (i * 37) % 70
+      for (let y = 0; y < len; y += 2) {
+        const sy = top + y
+        if (sy + 2 < 0 || sy > h) continue
+        ctx.globalAlpha = (1 - y / len) * (.15 + .06 * Math.sin(time * .8 + i * 2.1))
+        ctx.fillRect(Math.round(x0 + y * .32), sy, width, 2)
+      }
+    }
+    ctx.globalAlpha = 1
+  }
+
+  /** とおくを およぐ さかなの むれ。 */
+  private drawFishSchool(ctx: CanvasRenderingContext2D, w: number, time: number, cx: number, y0: number) {
+    const span = w + 260
+    for (let g = 0; g < 2; g++) {
+      const gx = ((g * 330 - cx * .25 - time * (6 + g * 3)) % span + span) % span - 120
+      const gy = y0 + g * 34
+      ctx.fillStyle = g ? '#2a6aa0' : '#3a82b8'
+      for (let i = 0; i < 9; i++) {
+        const fx = Math.round(gx + (i % 3) * 11 + Math.floor(i / 3) * 6 + Math.sin(time * 1.3 + i) * 2)
+        const fy = Math.round(gy + Math.floor(i / 3) * 6 + (i % 3) * 2 + Math.sin(time * 2 + i * 1.3) * 1.5)
+        ctx.fillRect(fx, fy, 3, 2)
+        ctx.fillRect(fx + 3, fy - (Math.floor(time * 6 + i) % 2), 1, 1)
+        ctx.fillRect(fx + 3, fy + 1 + (Math.floor(time * 6 + i) % 2), 1, 1)
+      }
     }
   }
 
@@ -458,10 +517,17 @@ export class Scene {
     const bottom = Math.round(hero.y + HERO_H)
     const bob = pose === 'run1' || pose === 'run3' ? -1 : 0
     const x = cxp - 8, y = bottom - img.height + bob
+    // つきでは ヘルメットを かぶる（あたまの まんなかは え の (9, 7)）。
+    const helmet = this.helmet
     if (hero.flip > 0) {
       const k = Math.floor((24 - hero.flip) / 6) % 4
-      drawRotated(ctx, img, cxp, bottom - 9, k * Math.PI / 2)
-    } else ctx.drawImage(img, x, y)
+      const angle = k * Math.PI / 2
+      drawRotated(ctx, img, cxp, bottom - 9, angle)
+      if (helmet) drawRotated(ctx, helmet, cxp + Math.round(Math.cos(angle) * 1 + Math.sin(angle) * 2), bottom - 9 + Math.round(Math.sin(angle) * 1 - Math.cos(angle) * 2), 0)
+    } else {
+      ctx.drawImage(img, x, y)
+      if (helmet) ctx.drawImage(helmet, x + 9 - 11, y + 7 - 11)
+    }
     if (hero.bubble && this.bubble) {
       const wob = Math.round(Math.sin(time * 6) * 1)
       ctx.drawImage(this.bubble, cxp - 15 + wob, bottom - 22 - wob)
@@ -518,16 +584,25 @@ export class Scene {
           ctx.fillStyle = p.color
           ctx.fillRect(x, y, 1, 3)
           break
+        case 'bubble':
+          if (p.life <= 0) break
+          drawBubble(ctx, x, y, p.size)
+          break
       }
     }
   }
 
   private drawWeather(ctx: CanvasRenderingContext2D, fx: Fx, w: number, h: number, time: number, cx: number) {
     const kind = this.theme.weather
-    const want = kind === 'snow' ? Math.round(w * h / 900) : kind === 'petals' || kind === 'dust' ? Math.round(w * h / 5200) : Math.round(w * h / 4200)
+    const want = kind === 'snow' ? Math.round(w * h / 900) : kind === 'petals' || kind === 'dust' || kind === 'bubbles' ? Math.round(w * h / 5200) : Math.round(w * h / 4200)
     const r = rng(fx.weather.length * 13 + Math.floor(time * 10))
     while (fx.weather.length < want) {
-      fx.weather.push({ x: r() * (w + 40), y: r() * h, vx: kind === 'snow' ? -.2 - r() * .3 : kind === 'dust' ? -.6 - r() * .6 : -.3 - r() * .4, vy: kind === 'snow' ? .25 + r() * .45 : kind === 'petals' ? .15 + r() * .25 : kind === 'dust' ? .02 + r() * .06 : -.05 - r() * .1, phase: r() * 6, size: r() < .3 ? 2 : 1 })
+      fx.weather.push({
+        x: r() * (w + 40), y: r() * h,
+        vx: kind === 'snow' ? -.2 - r() * .3 : kind === 'dust' ? -.6 - r() * .6 : kind === 'bubbles' ? -.05 : kind === 'stardust' ? -.08 - r() * .1 : -.3 - r() * .4,
+        vy: kind === 'snow' ? .25 + r() * .45 : kind === 'petals' ? .15 + r() * .25 : kind === 'dust' ? .02 + r() * .06 : kind === 'bubbles' ? -.25 - r() * .45 : kind === 'stardust' ? -.02 - r() * .04 : -.05 - r() * .1,
+        phase: r() * 6, size: kind === 'bubbles' ? 1 + Math.floor(r() * r() * 3) : r() < .3 ? 2 : 1,
+      })
     }
     if (fx.weather.length > want) fx.weather.length = want
     for (const p of fx.weather) {
@@ -547,6 +622,13 @@ export class Scene {
       } else if (kind === 'dust') {
         ctx.fillStyle = p.size > 1 ? '#f4dcc0' : '#d8b494'
         ctx.fillRect(x, y, p.size, 1)
+      } else if (kind === 'bubbles') {
+        drawBubble(ctx, x, y, p.size)
+      } else if (kind === 'stardust') {
+        const tw = Math.sin(time * 1.6 + p.phase)
+        if (tw < -.2) continue
+        ctx.fillStyle = tw > .8 ? '#ffffff' : p.size > 1 ? '#c8d4ff' : '#8a96c8'
+        ctx.fillRect(x, y, 1, 1)
       } else if (kind === 'twinkle') {
         const tw = Math.sin(time * 2.4 + p.phase)
         if (tw < .3) continue
@@ -560,7 +642,7 @@ export class Scene {
         ctx.fillRect(x, y, 1, 1)
       }
     }
-    if (kind === 'twinkle') this.drawShootingStar(ctx, w, h, time)
+    if (kind === 'twinkle' || kind === 'stardust') this.drawShootingStar(ctx, w, h, time)
   }
 
   /** ときどき ながれぼしが すーっと ながれる。 */
@@ -581,6 +663,23 @@ export class Scene {
     }
     ctx.globalAlpha = 1
   }
+}
+
+/** ちいさな あわ（size 1〜3）。 */
+function drawBubble(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  if (size <= 1) {
+    ctx.fillStyle = '#c8f4ff'
+    ctx.fillRect(x, y, 1, 1)
+    return
+  }
+  const d = size + 1
+  ctx.fillStyle = '#bff0ff'
+  ctx.fillRect(x + 1, y, d - 2, 1)
+  ctx.fillRect(x + 1, y + d - 1, d - 2, 1)
+  ctx.fillRect(x, y + 1, 1, d - 2)
+  ctx.fillRect(x + d - 1, y + 1, 1, d - 2)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(x + 1, y + 1, 1, 1)
 }
 
 function drawRotated(ctx: CanvasRenderingContext2D, img: Img, cx: number, cy: number, angle: number) {
@@ -687,7 +786,8 @@ function paintGround(world: World, theme: Theme): Img | null {
     surface[c] = row * TILE
   }
   const soft = kind === 'snow' || kind === 'cloud'
-  const topDepth = (x: number) => (soft ? 5 : kind === 'sand' || kind === 'rock' ? 3 : 4) + (hash2(x, 0, 1) < .4 ? 1 : 0) + (hash2(x >> 1, 0, 2) < .2 ? 1 : 0)
+  const sandy = kind === 'sand' || kind === 'rock' || kind === 'seabed' || kind === 'moon'
+  const topDepth = (x: number) => (soft ? 5 : sandy ? 3 : 4) + (hash2(x, 0, 1) < .4 ? 1 : 0) + (hash2(x >> 1, 0, 2) < .2 ? 1 : 0)
   for (let x = 0; x < world.width; x++) {
     const c = Math.floor(x / TILE)
     const sy = surface[c]
@@ -730,7 +830,9 @@ function paintGround(world: World, theme: Theme): Img | null {
       if (dTop < topLimit) {
         let idx = dTop === 0 ? 0 : dTop === 1 ? 1 : dTop >= topLimit - 1 ? 3 : 2
         if (soft) idx = dTop === 0 ? 0 : dTop >= topLimit - 1 ? 3 : dTop >= topLimit - 2 ? 2 : bayer(x, y) < .8 ? 1 : 0
-        if ((kind === 'sand' || kind === 'rock') && idx === 2 && hash2(x, y, 9) < .12) idx = 1
+        if (sandy && idx === 2 && hash2(x, y, 9) < .12) idx = 1
+        // うみの そこの すなの なみもよう。
+        if (kind === 'seabed' && dTop === 2 && (x + Math.round(Math.sin(x * .25) * 2)) % 9 < 3) idx = 1
         if (edge === 1 && idx < 2) idx = 2
         pix.set(x, y, top[idx])
         continue
@@ -749,6 +851,17 @@ function paintGround(world: World, theme: Theme): Img | null {
         const dx = x - px, dy = y - py
         if (dx >= 0 && dx < 3 && dy >= 0 && dy < 2) color = dy === 0 && dx < 2 ? pebL : pebD
         else if (dx >= 0 && dx < 3 && dy === 2) color = dirt[Math.min(dirt.length - 1, idx + 1)]
+      }
+      // つきの じめんの ちいさな クレーター。
+      if (kind === 'moon' && depth < 12) {
+        const block = Math.floor(x / 26)
+        if (hash2(block, c, 8) < .45) {
+          const ccx = block * 26 + 6 + Math.floor(hash2(block, 0, 9) * 14), rx = 3 + hash2(block, 1, 9) * 4
+          const ddx = (x - ccx) / rx, ddy = (dTop - topLimit - 2) / 2
+          const d = Math.hypot(ddx, ddy)
+          if (d < 1) color = ddx < .2 ? dirt[Math.min(dirt.length - 1, idx + 2)] : dirt[Math.max(0, idx - 1)]
+          else if (d < 1.35 && ddy > 0) color = pebL
+        }
       }
       // ちそうの すじ
       if ((y + Math.round(Math.sin(x * .19 + c) * 1.5)) % 17 === 0 && hash2(x >> 2, y, 7) < .55 && depth > 4) color = dirt[Math.min(dirt.length - 1, idx + 1)]

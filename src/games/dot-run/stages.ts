@@ -6,9 +6,11 @@
 //   c にんじん      M ほしメダル    e あるく いきもの   b とぶ いきもの
 //   S ばね          G ゴール
 
-export type StageId = 'meadow' | 'beach' | 'snow' | 'rocky' | 'starry'
-export type WalkerKind = 'snail' | 'crab' | 'penguin' | 'beetle' | 'moonSnail'
-export type FlyerKind = 'bee' | 'gull' | 'owl' | 'hawk' | 'bat'
+export type StageId = 'meadow' | 'beach' | 'snow' | 'rocky' | 'starry' | 'sea' | 'moon'
+export type WalkerKind = 'snail' | 'crab' | 'penguin' | 'beetle' | 'moonSnail' | 'octopus' | 'alien'
+export type FlyerKind = 'bee' | 'gull' | 'owl' | 'hawk' | 'bat' | 'fish' | 'ufo'
+/** うごきかたの ちがう ばしょ（うみの なか・つきの うえは ふわっと ゆっくり）。 */
+export type StageEnv = 'land' | 'water' | 'moon'
 
 export type StageDef = {
   id: StageId
@@ -18,6 +20,8 @@ export type StageDef = {
   speed: number
   walker: WalkerKind
   flyer: FlyerKind
+  /** ない ときは ふつうの じめん（land）。 */
+  env?: StageEnv
   chunks: readonly ChunkName[]
 }
 
@@ -287,6 +291,31 @@ const CHUNK_DEFS = {
     '####################',
     '####################',
   ],
+  // ---- ふわっと たかく とべる ステージ むけ ----
+  highArc: [
+    '....................',
+    '....................',
+    '.........c..........',
+    '.......c...c........',
+    '......c.....c.......',
+    '.....c.......c......',
+    '....................',
+    '.........r..........',
+    '####################',
+    '####################',
+  ],
+  floatSteps: [
+    '....................',
+    '....................',
+    '............cccc....',
+    '...........=====....',
+    '....................',
+    '....ccc.............',
+    '...=====............',
+    '....................',
+    '####################',
+    '####################',
+  ],
   goal: [
     '............................',
     '............................',
@@ -349,5 +378,25 @@ export const STAGES: readonly StageDef[] = [
     walker: 'moonSnail',
     flyer: 'bat',
     chunks: ['start', 'run', 'hopHoles', 'spring', 'medalBlocks', 'bridge', 'flyer', 'steps', 'medalSpring', 'wideHole', 'platformWalker', 'hopHoles', 'medalTower', 'walkers', 'goal'],
+  },
+  {
+    id: 'sea',
+    name: 'ぶくぶく うみのなか',
+    lead: 'ゆっくり ふわーっと およごう',
+    speed: 1.1,
+    walker: 'octopus',
+    flyer: 'fish',
+    env: 'water',
+    chunks: ['start', 'run', 'highArc', 'walker', 'medalBlocks', 'hole', 'flyer', 'floatSteps', 'rocks', 'medalSpring', 'wideHole', 'platformWalker', 'medalHole', 'walkers', 'goal'],
+  },
+  {
+    id: 'moon',
+    name: 'ふわふわ おつきさま',
+    lead: 'ながく おして たかーく とぼう',
+    speed: 1.15,
+    walker: 'alien',
+    flyer: 'ufo',
+    env: 'moon',
+    chunks: ['start', 'run', 'rock', 'highArc', 'medalTower', 'hopHoles', 'flyer', 'floatSteps', 'walkers', 'medalSpring', 'wideHole', 'spring', 'platformWalker', 'medalHole', 'goal'],
   },
 ]

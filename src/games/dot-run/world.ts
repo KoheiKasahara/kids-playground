@@ -1,7 +1,7 @@
 // ゲームの なかみ（うごきと あたりはんてい）。DOM も canvas も さわらない 純粋な 計算だけ。
 // 1かい よぶと 1/60 びょう すすむ。うさぎは じぶんで みぎへ はしり、プレイヤーは ジャンプだけ する。
 
-import { CHUNKS, type StageDef } from './stages'
+import { CHUNKS, type StageDef, type StageEnv } from './stages'
 
 export const TILE = 16
 export const ROWS = 10
@@ -23,6 +23,20 @@ const G_FALL = .3
 const MAX_FALL = 5
 const COYOTE = 7
 const JUMP_BUFFER = 8
+/**
+ * うみの なかと つきの うえでは、おちる のが ゆっくりで（g）、とびだしが すこし よわい（jump）。
+ * そのぶん ながく ういていられて、ぜんたいでは すこし たかく とべる（たかさは jump² / g ばい）。
+ */
+export const ENV_PHYSICS: Record<StageEnv, { g: number; jump: number; maxFall: number }> = {
+  land: { g: 1, jump: 1, maxFall: 1 },
+  water: { g: .7, jump: .9, maxFall: .6 },
+  moon: { g: .62, jump: .87, maxFall: .75 },
+}
+
+function physics(world: World) {
+  return ENV_PHYSICS[world.stage.env ?? 'land']
+}
+
 /** よーい どん！ までの フレーム。 */
 export const READY_FRAMES = 96
 /** ゴールしてから おわるまでの フレーム。 */
@@ -253,10 +267,11 @@ function stepHero(world: World) {
   }
 
   // ---- ジャンプ ----
+  const phys = physics(world)
   const canAct = world.state === 'play' && hero.stun === 0
   if (world.pressBuffer > 0) {
     if (canAct && (hero.onGround || hero.coyote > 0)) {
-      hero.vy = -JUMP_V
+      hero.vy = -JUMP_V * phys.jump
       hero.onGround = false
       hero.coyote = 0
       hero.airJumps = 1
@@ -265,7 +280,7 @@ function stepHero(world: World) {
       world.pressBuffer = 0
       emit(world, { type: 'jump', x: hero.x + HERO_W / 2, y: hero.y + HERO_H })
     } else if (canAct && hero.airJumps > 0) {
-      hero.vy = -AIR_JUMP_V
+      hero.vy = -AIR_JUMP_V * phys.jump
       hero.airJumps = 0
       hero.boost = false
       hero.flip = 24
@@ -300,9 +315,9 @@ function stepHero(world: World) {
 
   // ---- たて ----
   const rising = hero.vy < 0
-  const gravity = rising && (hero.boost || world.held) ? G_HOLD : G_FALL
+  const gravity = (rising && (hero.boost || world.held) ? G_HOLD : G_FALL) * phys.g
   if (!rising) hero.boost = false
-  hero.vy = Math.min(MAX_FALL, hero.vy + gravity)
+  hero.vy = Math.min(MAX_FALL * phys.maxFall, hero.vy + gravity)
   const prevBottom = hero.y + HERO_H
   hero.y += hero.vy
   const wasGround = hero.onGround
@@ -380,9 +395,10 @@ function stepPickups(world: World) {
     world.got.medals++
     emit(world, { type: 'medal', x: m.x, y: m.y, count: world.got.medals })
   }
+  const phys = physics(world)
   world.loose = world.loose.filter(l => {
     l.age++
-    l.vy = Math.min(4, l.vy + .25)
+    l.vy = Math.min(4 * phys.maxFall, l.vy + .25 * phys.g)
     l.x += l.vx
     l.y += l.vy
     l.vx *= .985
@@ -401,7 +417,7 @@ function stepPickups(world: World) {
   for (const s of world.springs) {
     if (s.t > 0) s.t--
     if (hero.vy < 0 || !overlaps(hero.x, hero.y, HERO_W, HERO_H, s.x + 2, s.y + 7, 12, 9)) continue
-    hero.vy = -SPRING_V
+    hero.vy = -SPRING_V * phys.jump
     hero.boost = true
     hero.onGround = false
     // じめんの すぐ うえでも ばねで とんだら くうちゅう。つぎの ボタンは 2だんジャンプに する。
@@ -422,7 +438,7 @@ function hurt(world: World, from: Enemy) {
   }
   hero.stun = HURT_STUN
   hero.invincible = INVINCIBLE
-  hero.vy = Math.min(hero.vy, -2.6)
+  hero.vy = Math.min(hero.vy, -2.6 * physics(world).jump)
   hero.onGround = false
   hero.airJumps = 0
   emit(world, { type: 'hurt', x: (hero.x + from.x) / 2 + HERO_W / 2, y: hero.y + HERO_H / 2, dropped })
@@ -437,7 +453,7 @@ function stepEnemies(world: World) {
       else continue
     }
     if (e.state === 'bye') {
-      e.vy += .3
+      e.vy += .3 * physics(world).g
       e.x += e.vx
       e.y += e.vy
       continue
@@ -461,7 +477,7 @@ function stepEnemies(world: World) {
       e.vx = 1.2
       e.vy = -3.5
       e.t = 0
-      hero.vy = world.held ? -STOMP_V_HELD : -STOMP_V
+      hero.vy = (world.held ? -STOMP_V_HELD : -STOMP_V) * physics(world).jump
       hero.y = e.y - HERO_H
       hero.airJumps = 1
       hero.boost = world.held
@@ -493,7 +509,7 @@ export function stepWorld(world: World) {
   } else if (world.state === 'goal') {
     // ゴールしたら とまって、ぴょんぴょん よろこぶ。
     if (world.stateT > 56 && hero.onGround && world.stateT % 34 === 0 && world.stateT < GOAL_FRAMES - 20) {
-      hero.vy = -3.2
+      hero.vy = -3.2 * physics(world).jump
       hero.onGround = false
     }
     if (world.stateT >= GOAL_FRAMES) {

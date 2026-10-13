@@ -131,6 +131,37 @@ describe('dot-run world', () => {
     expect(world.hero.vy).toBeGreaterThan(vy)
   })
 
+  test('うみのなかと つきでは すすむのも とぶのも ゆっくりで、すこし たかく とべる', () => {
+    /** ジャンプして おりるまでの たかさ・じかん・すすんだ きょり。 */
+    const measure = (stage: StageDef, hold: number) => {
+      const world = createWorld(stageWith(['start', 'run', 'run', 'goal'], stage))
+      start(world)
+      const x0 = world.hero.x
+      let top = world.hero.y, frames = 0
+      pressJump(world)
+      do {
+        if (frames === hold) releaseJump(world)
+        stepWorld(world)
+        top = Math.min(top, world.hero.y)
+        frames++
+      } while (!world.hero.onGround && frames < 300)
+      return { height: GROUND_Y - HERO_H - top, frames, perFrame: (world.hero.x - x0) / frames }
+    }
+    const land = STAGES.find(s => s.id === 'meadow')!
+    for (const id of ['sea', 'moon']) {
+      const stage = STAGES.find(s => s.id === id)!
+      expect(stage.env, id).not.toBe('land')
+      for (const hold of [6, 60]) {
+        const normal = measure(land, hold), floaty = measure(stage, hold)
+        expect(floaty.height, `${id} ${hold}`).toBeGreaterThan(normal.height * 1.05)
+        expect(floaty.height, `${id} ${hold}`).toBeLessThan(normal.height * 1.4)
+        expect(floaty.frames, `${id} ${hold}`).toBeGreaterThan(normal.frames * 1.15)
+      }
+      // ふつうの ステージより すこし ゆっくり はしる。
+      expect(stage.speed, id).toBeLessThan(Math.min(...STAGES.filter(s => !s.env).map(s => s.speed)))
+    }
+  })
+
   test('にんじんを とると かずが ふえる', () => {
     const world = createWorld(stageWith(['start', 'goal']))
     start(world)
