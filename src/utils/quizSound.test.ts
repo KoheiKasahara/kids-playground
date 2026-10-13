@@ -9,10 +9,27 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 class MockOscillatorNode {
   type = 'sine'
-  frequency = { value: 0 }
+  frequency = { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }
   connect = vi.fn()
   start = vi.fn()
   stop = vi.fn()
+}
+
+class MockBufferSourceNode {
+  buffer: unknown = null
+  loop = false
+  connect = vi.fn()
+  disconnect = vi.fn()
+  start = vi.fn()
+  stop = vi.fn()
+}
+
+class MockBiquadFilterNode {
+  type = 'lowpass'
+  frequency = { value: 0, linearRampToValueAtTime: vi.fn() }
+  Q = { value: 1 }
+  connect = vi.fn()
+  disconnect = vi.fn()
 }
 
 class MockGainNode {
@@ -32,6 +49,13 @@ class MockAudioContext {
   resume = vi.fn().mockResolvedValue(undefined)
   createOscillator = vi.fn(() => new MockOscillatorNode())
   createGain = vi.fn(() => new MockGainNode())
+  createBufferSource = vi.fn(() => new MockBufferSourceNode())
+  createBiquadFilter = vi.fn(() => new MockBiquadFilterNode())
+  createBuffer = vi.fn((_channels: number, length: number, sampleRate: number) => {
+    const data = new Float32Array(length)
+    return { sampleRate, getChannelData: () => data }
+  })
+  sampleRate = 8000
   destination = {}
 
   constructor() {
@@ -482,28 +506,55 @@ describe('quizSound', () => {
     expect(instances[0].createOscillator).toHaveBeenCalledTimes(7)
   })
 
-  test('レール走行音は1組だけ生成し、停止・disposeできる', async () => {
+  test('レール走行音は鳴り続ける音を1組だけ生成し、停止・disposeできる', async () => {
     ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
     vi.resetModules()
     const { createRailTrainSoundController } = await import('./quizSound')
 
     const controller = createRailTrainSoundController()
     controller.update(1.2, 'running')
-    controller.update(2.4, 'running')
+    controller.update(2.4, 'running', false, 'shinkansen')
     expect(instances).toHaveLength(1)
+    // ゴー（ノイズ）とモーター音の1組 + 共通の出口（音量補正）の1つ。
+    expect(instances[0].createBufferSource).toHaveBeenCalledTimes(1)
     expect(instances[0].createOscillator).toHaveBeenCalledTimes(1)
-    // 走行音の1組 + 共通の出口（音量補正）の1つ。
-    expect(instances[0].createGain).toHaveBeenCalledTimes(2)
+    expect(instances[0].createGain).toHaveBeenCalledTimes(3)
     controller.update(0, 'stoppedAtStation')
-    const gainNode = instances[0].createGain.mock.results[0].value as MockGainNode
+    const gainNode = instances[0].createGain.mock.results[1].value as MockGainNode
     const stopRampCount = gainNode.gain.linearRampToValueAtTime.mock.calls.length
     const stopRamp = gainNode.gain.linearRampToValueAtTime.mock.lastCall
     expect(stopRamp?.[0]).toBe(0)
     controller.update(0, 'stoppedAtStation')
     expect(gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledTimes(stopRampCount)
     controller.dispose()
+    expect((instances[0].createBufferSource.mock.results[0].value as MockBufferSourceNode).stop).toHaveBeenCalledTimes(1)
     expect((instances[0].createOscillator.mock.results[0].value as MockOscillatorNode).stop).toHaveBeenCalledTimes(1)
     expect(() => controller.update(1, 'running')).not.toThrow()
+  })
+
+  test('ふつうの電車は速度に合わせて継ぎ目の「ガタンゴトン」を刻み、新幹線は刻まない', async () => {
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
+    vi.resetModules()
+    const { createRailTrainSoundController } = await import('./quizSound')
+
+    const runForOneSecond = (kind: 'local' | 'shinkansen') => {
+      const controller = createRailTrainSoundController()
+      controller.update(4.2, 'running', false, kind)
+      const ctx = instances[0]
+      const before = ctx.createBufferSource.mock.calls.length - 1
+      for (let i = 0; i < 60; i++) {
+        controller.update(4.2, 'running', false, kind)
+        ctx.currentTime += 1 / 60
+      }
+      controller.dispose()
+      // 最初の1つは鳴り続ける「ゴー」のノイズ。残りが継ぎ目の打音（1回につき車輪2つぶん）。
+      return ctx.createBufferSource.mock.calls.length - before - 1
+    }
+
+    const localHits = runForOneSecond('local')
+    expect(localHits).toBeGreaterThanOrEqual(4)
+    expect(localHits % 2).toBe(0)
+    expect(runForOneSecond('shinkansen')).toBe(0)
   })
 
   test('くるまの出発音と走行音は、再走行しても音源を重ねず停止できる', async () => {

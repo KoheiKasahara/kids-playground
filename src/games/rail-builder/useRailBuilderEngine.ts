@@ -3660,6 +3660,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           representative?.motion.speed ?? 0,
           soundStatus,
           leadPiece?.kind === 'tunnel',
+          representative === undefined || representative.trainType === 'basic' ? 'local' : 'shinkansen',
         )
         updateTrainSelectionRing(optionsRef.current.selectedTrainId)
         renderer.render(scene, camera)
