@@ -1,9 +1,10 @@
 // ドット絵の コマを canvas に うつす どうぐ と、ぜんぶの いきもので つかう 1本の アニメーション ループ。
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { SPRITE_H, SPRITE_W, type Frame } from './sprite'
+import { rgbaOf, setRenderBudget, SPRITE_W, type Frame } from './sprite'
 
-const images = new WeakMap<Frame, ImageData>()
+/** canvas ごとに 1まい つかいまわす がぞう。 */
+const images = new WeakMap<CanvasRenderingContext2D, ImageData>()
 
 /** jsdom など 2D が つかえない ところでは null。 */
 export function context2d(canvas: HTMLCanvasElement | null) {
@@ -12,11 +13,12 @@ export function context2d(canvas: HTMLCanvasElement | null) {
 }
 
 export function drawFrame(ctx: CanvasRenderingContext2D, frame: Frame) {
-  let image = images.get(frame)
-  if (!image) {
-    image = new ImageData(frame.data, frame.w, frame.h)
-    images.set(frame, image)
+  let image = images.get(ctx)
+  if (!image || image.width !== frame.w || image.height !== frame.h) {
+    image = new ImageData(frame.w, frame.h)
+    images.set(ctx, image)
   }
+  rgbaOf(frame, image.data)
   ctx.putImageData(image, 0, 0)
 }
 
@@ -28,7 +30,10 @@ let last = 0
 function loop(now: number) {
   const dt = last ? (now - last) / 1000 : 0
   last = now
+  // あたらしい コマづくりは 1フレームで すこしだけ。
+  setRenderBudget(performance.now() + 6)
   for (const tick of [...ticks]) tick(dt)
+  setRenderBudget(Infinity)
   raf = ticks.size ? requestAnimationFrame(loop) : 0
   if (!raf) last = 0
 }
@@ -57,7 +62,7 @@ export function useReducedMotion() {
 /**
  * canvas を はこ（box）の はばに いちばん ちかい「せいすう ばい」の おおきさに する。
  * 1ドットが いつも おなじ かずの がめんの てんに なるので、ドットの おおきさが そろう。
- * unit.current は 1ドットの CSS での おおきさ（アニメーションの なかで よむ）。
+ * unit.current は もけいの 1ます（64×48 の ます目）の CSS での おおきさ（アニメーションの なかで よむ）。
  */
 export function usePixelCanvas() {
   const box = useRef<HTMLSpanElement>(null)
@@ -71,11 +76,11 @@ export function usePixelCanvas() {
       const width = el.clientWidth
       if (!cv || !width) return
       const dpr = window.devicePixelRatio || 1
-      const k = Math.max(1, Math.round((width * dpr) / SPRITE_W))
+      const k = Math.max(1, Math.round((width * dpr) / cv.width))
       const px = k / dpr
-      cv.style.width = `${px * SPRITE_W}px`
-      cv.style.height = `${px * SPRITE_H}px`
-      unit.current = px
+      cv.style.width = `${px * cv.width}px`
+      cv.style.height = `${px * cv.height}px`
+      unit.current = (px * cv.width) / SPRITE_W
     }
     const observer = new ResizeObserver(fit)
     observer.observe(el)

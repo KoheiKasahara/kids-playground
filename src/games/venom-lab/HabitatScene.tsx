@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { SPECIES, type HabitatId, type Resident, type Species } from './data'
 import { context2d, drawFrame, onTick, usePixelCanvas, useReducedMotion } from './canvas'
 import { createActor, frameAt, profileOf, stepActor, triggerAct, type Actor } from './motion'
-import { frameOf, prewarm, SPRITE_H, SPRITE_W } from './sprite'
+import { detailScale, frameOf, prewarm, readyFrame, SPRITE_H, SPRITE_W } from './sprite'
 import styles from './VenomLabPlay.module.css'
 
 function Scenery({ habitat }: { habitat: HabitatId }) {
@@ -83,17 +83,21 @@ function ResidentActor({ resident, species, paused, selected, onObserve }: {
   const { box, canvas, unit } = usePixelCanvas()
   const reduced = useReducedMotion()
   const profile = useMemo(() => profileOf(species), [species])
+  const [scale] = useState(detailScale)
   const actor = useRef<Actor | null>(null)
 
   useEffect(() => {
     const ctx = context2d(canvas.current)
-    if (ctx && !reduced) prewarm(species, profile.frames)
+    if (ctx && !reduced) prewarm(species, profile.frames, scale)
     const a = actor.current ?? (actor.current = createActor(resident.id * 7 + 3))
     let shown = ''
-    const draw = () => {
+    const draw = (force = false) => {
       const f = frameAt(a, profile)
       const key = `${f.clip}${f.index}/${f.count}`
-      if (ctx && key !== shown) { shown = key; drawFrame(ctx, frameOf(species, f.clip, f.index, f.count)) }
+      if (ctx && key !== shown) {
+        const frame = force ? frameOf(species, f.clip, f.index, f.count, scale) : readyFrame(species, f.clip, f.index, f.count, scale)
+        if (frame) { shown = key; drawFrame(ctx, frame) }
+      }
       // 1ドットの おおきさで ずらし、がめんの てんに そろえる。
       const px = unit.current
       const dpr = window.devicePixelRatio || 1
@@ -106,16 +110,16 @@ function ResidentActor({ resident, species, paused, selected, onObserve }: {
       // うごきを へらす: その ばで じっと。
       a.mode = 'idle'
       a.time = 0
-      draw()
+      draw(true)
       return
     }
-    draw()
+    draw(true)
     if (paused) return
     return onTick(dt => {
       stepActor(a, profile, dt)
       draw()
     })
-  }, [species, profile, paused, reduced, resident.id, unit, canvas])
+  }, [species, profile, paused, reduced, resident.id, unit, canvas, scale])
 
   const row = Math.floor(resident.slot / 3)
   const isBottom = profile.gait === 'sit' || species.sprite === 'octopus'
@@ -133,7 +137,7 @@ function ResidentActor({ resident, species, paused, selected, onObserve }: {
     <span ref={box} className={styles.residentBox}>
       <span className={styles.stage}>
         {profile.shadow > 0 && <span ref={shadow} className={styles.shadow}><Shadow width={profile.shadow} /></span>}
-        <span ref={lift} className={styles.lift}><canvas ref={canvas} width={SPRITE_W} height={SPRITE_H} /></span>
+        <span ref={lift} className={styles.lift}><canvas ref={canvas} width={SPRITE_W * scale} height={SPRITE_H * scale} /></span>
       </span>
     </span>
     <span className={styles.creatureName}>{species.name}</span>

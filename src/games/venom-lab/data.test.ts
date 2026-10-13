@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { HABITATS, MAX_RESIDENTS, RANKING, SPECIES, addResident, createExhibits, matchesRankFilter } from './data'
-import { renderFrame, SPRITE_H, SPRITE_W } from './sprite'
+import { DETAIL, renderFrame, rgbaOf, SPRITE_H, SPRITE_W } from './sprite'
 
 describe('venom lab exhibits', () => {
   test('40 domestic and international kinds span eight environments with multiple snakes and scorpions', () => {
@@ -30,19 +30,22 @@ describe('venom lab exhibits', () => {
       expect(s.fact.length).toBeGreaterThan(10)
       expect(s.venom.length).toBeGreaterThan(10)
       for (const clip of ['idle', 'move', 'act'] as const) {
-        for (const t of [0, .5]) {
-          const image = renderFrame(s, { clip, t })
-          expect(image.data).toHaveLength(SPRITE_W * SPRITE_H * 4)
+        for (const [t, scale] of [[0, DETAIL], [.5, 1]] as const) {
+          const frame = renderFrame(s, { clip, t }, scale)
+          const size = SPRITE_W * SPRITE_H * scale * scale
+          expect([frame.w, frame.h]).toEqual([SPRITE_W * scale, SPRITE_H * scale])
+          const data = rgbaOf(frame)
+          expect(data).toHaveLength(size * 4)
           const opaque: number[] = []
           const colors = new Set<number>()
-          for (let k = 0; k < SPRITE_W * SPRITE_H; k++) {
-            if (image.data[k * 4 + 3] < 255) continue
+          for (let k = 0; k < size; k++) {
+            if (data[k * 4 + 3] < 255) continue
             opaque.push(k)
-            colors.add((image.data[k * 4] << 16) | (image.data[k * 4 + 1] << 8) | image.data[k * 4 + 2])
+            colors.add((data[k * 4] << 16) | (data[k * 4 + 1] << 8) | data[k * 4 + 2])
           }
           // ちゃんと からだが えがかれ、かげの だんかいが たくさん ある。
-          expect(opaque.length, `${s.id} ${clip}`).toBeGreaterThan(SPRITE_W * SPRITE_H * .1)
-          expect(colors.size, `${s.id} ${clip}`).toBeGreaterThan(12)
+          expect(opaque.length, `${s.id} ${clip}`).toBeGreaterThan(size * .1)
+          expect(colors.size, `${s.id} ${clip}`).toBeGreaterThan(scale === DETAIL ? 20 : 12)
         }
       }
     }

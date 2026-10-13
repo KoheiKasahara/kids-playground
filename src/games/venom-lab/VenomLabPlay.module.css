@@ -33,12 +33,12 @@
 .exhibit { border: 1px solid #425760; border-radius: 15px; overflow: hidden; background: #1a2d37; }
 .exhibitHeader { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
 .exhibitHeader h2 { font-size: 21px; margin-top: 4px; }
-.scene { position: relative; height: clamp(305px, 30vw, 380px); overflow: hidden; isolation: isolate; }
+.scene { position: relative; height: clamp(340px, 42vw, 480px); overflow: hidden; isolation: isolate; }
 .scenery { position: absolute; width: 100%; height: 100%; inset: 0; }
 .sceneLabel { display: flex; align-items: center; gap: 7px; position: absolute; top: 14px; left: 16px; right: 16px; font-size: 10px; letter-spacing: .06em; color: #e0eee0; }
 .sceneLabel > span:first-child { width: 6px; height: 6px; background: #d9f898; border-radius: 50%; }
 .pixelLabel { margin-left: auto; font-size: 8px; opacity: .65; letter-spacing: .16em; }
-.resident { position: absolute; width: clamp(96px, 13vw, 136px); padding: 2px; margin-left: -60px; margin-top: -42px; border: 2px solid transparent; border-radius: 13px; background: transparent; z-index: 2; }
+.resident { --w: clamp(116px, 16vw, 184px); position: absolute; width: var(--w); padding: 2px; margin-left: calc(var(--w) / -2); margin-top: calc(var(--w) * -.4); border: 2px solid transparent; border-radius: 13px; background: transparent; z-index: 2; }
 .resident:hover, .resident:focus-visible, .resident[aria-pressed='true'] { border-color: #eff4b3; background: #d9f89813; }
 .residentBox { display: block; width: 100%; }
 .stage { position: relative; display: block; width: fit-content; margin: 0 auto; }
@@ -62,8 +62,8 @@
 .detailTop { display: flex; justify-content: space-between; gap: 5px; }
 .detail .eyebrow { color: #5f7867; font-size: 9px; }
 .recorded { color: #507347; font-size: 10px; }
-.portrait { display: grid; place-items: center; margin: 16px 0; height: 160px; background-color: #dde3cb; background-image: linear-gradient(#526b4620 1px, transparent 1px), linear-gradient(90deg, #526b4620 1px, transparent 1px); background-size: 14px 14px; border-radius: 10px; }
-.portrait .pixelBox { width: 192px; max-width: 100%; }
+.portrait { display: grid; place-items: center; margin: 16px 0; height: 210px; background-color: #dde3cb; background-image: linear-gradient(#526b4620 1px, transparent 1px), linear-gradient(90deg, #526b4620 1px, transparent 1px); background-size: 14px 14px; border-radius: 10px; }
+.portrait .pixelBox { width: 256px; max-width: 100%; }
 .detail h2 { font-size: 20px; line-height: 1.5; }
 .scientific { font-size: 10px; color: #697d71; margin-top: 5px; overflow-wrap: anywhere; font-style: italic; }
 .venomLine { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid #ccd3bf; margin-top: 18px; padding-top: 15px; font-size: 11px; }
@@ -171,8 +171,8 @@
   .exhibit, .detail, .residentPicker { width: 100%; }
   .exhibitHeader { padding: 13px 14px; }
   .exhibitHeader h2 { font-size: 18px; }
-  .scene { height: 310px; }
-  .resident { width: 92px; margin-left: -46px; margin-top: -36px; }
+  .scene { height: 420px; }
+  .resident { --w: 150px; }
   .sceneFooter { padding: 10px 12px; font-size: 9px; }
   .mission { padding: 12px; gap: 9px; }
   .mission p { font-size: 11px; }
@@ -192,7 +192,7 @@
   .seen { right: -3px; }
   .pickerHeading h2 { font-size: 13px; }
   .pickerHeading > span { font-size: 9px; }
-  .portrait { height: 150px; }
+  .portrait { height: 200px; }
   .rankPanel { padding: 20px 15px; }
   .rankHeading h2 { font-size: 22px; }
   .rankCards { grid-template-columns: 1fr; }

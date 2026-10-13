@@ -4,7 +4,7 @@
 
 import { key, wave } from './keys'
 import type { Builder, Pose } from './pose'
-import { bump, clamp, frac, hash, lerp, TAU, type Mat, type Model, type P3, type Pattern } from './raster'
+import { bump, clamp, frac, hash, lerp, TAU, type Mat, type Model, type P3, type Paint, type Pattern } from './raster'
 
 type Posture = 'crawl' | 'coil' | 'ambush' | 'branch' | 'hood' | 'swim'
 type HeadKind = 'pit' | 'slim' | 'cobra'
@@ -180,9 +180,22 @@ function head(m: Model, look: SnakeLook, h: HeadPose) {
 const GY = 42.5
 const ground = (X: number, D: number, H: number, k = .48): P3 => [X, GY + D * k - H, D + H * .7]
 
-function body(m: Model, look: SnakeLook, f: (t: number) => P3, r: (t: number) => number, length: number, glossy = .75, swap?: (l: number, s: number) => Mat | null) {
-  const pattern = swap ?? look.pattern
-  m.path(f, r, { pat: c => pattern(c.t * length, c.s), gloss: glossy, step: .45 })
+/** こまかく かく ときの うろこ: せなかは ひしがたの あみめ、おなかは よこの すじ（はら板）。 */
+export function scales(l: number, s: number, mat: Mat | null, base: Mat = 'A'): Paint {
+  const m = mat ?? base
+  if (s > .55) return frac(l / 1.25) < .2 ? `${m}-` : m
+  const a = frac(l / 1.7 + s * 1.9), b = frac(l / 1.7 - s * 1.9)
+  return a < .1 || b < .1 ? `${m}-` : mat
+}
+
+function body(m: Model, look: SnakeLook, f: (t: number) => P3, r: (t: number) => number, length: number, glossy = .75) {
+  m.path(f, r, {
+    pat: c => {
+      const l = c.t * length, mat = look.pattern(l, c.s)
+      return c.fine ? scales(l, c.s, mat) : mat
+    },
+    gloss: glossy, step: .45,
+  })
 }
 
 function taper(look: SnakeLook, t: number, neck = .07, tail = .32) {
@@ -481,7 +494,7 @@ function hood(m: Model, look: SnakeLook, pose: Pose, sp: string) {
     const H = look.girth * .9 + (u > .9 ? (u - .9) * 20 : 0)
     return ground(baseX + 2 + Math.cos(th) * R * 1.25, Math.sin(th) * R, H, .36)
   }
-  m.path(cf, u => look.girth * (u > .75 ? lerp(1, .4, (u - .75) / .25) : 1), { pat: c => look.pattern(30 + c.t * coilLen, c.s), gloss: .7, step: .45 })
+  m.path(cf, u => look.girth * (u > .75 ? lerp(1, .4, (u - .75) / .25) : 1), { pat: c => { const l = 30 + c.t * coilLen, mat = look.pattern(l, c.s); return c.fine ? scales(l, c.s, mat) : mat }, gloss: .7, step: .45 })
   // たちあがった くび。
   const lean = sway * 2.2
   const neck = (u: number): P3 => {
@@ -490,7 +503,7 @@ function hood(m: Model, look: SnakeLook, pose: Pose, sp: string) {
     const Y = lerp(top + 9, GY - look.girth, u ** 1.1)
     return [X, Y, 6 - u * 2]
   }
-  m.path(neck, u => look.girth * lerp(1.05, 1, u), { pat: c => back ? null : (c.s > .2 ? 'C' : null), gloss: .7, step: .45 })
+  m.path(neck, u => look.girth * lerp(1.05, 1, u), { pat: c => { const mat: Mat | null = back ? null : (c.s > .2 ? 'C' : null); return c.fine ? scales(c.t * 30, back ? -.3 : c.s, mat) : mat }, gloss: .7, step: .45 })
   // フード（ひらたく ひろげた くび）。
   const [nx, ny, nz] = neck(0)
   const hw = 9.5 * spread, hh = 10.5

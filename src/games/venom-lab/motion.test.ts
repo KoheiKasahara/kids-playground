@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import { SPECIES } from './data'
 import { actSeconds, createActor, frameAt, profileOf, SIGNATURE_MOVES, stepActor, triggerAct } from './motion'
-import { renderFrame } from './sprite'
+import { renderFrame, rgbaOf } from './sprite'
+import type { Pose } from './pose'
 
+/** くらべる だけ なので あらい こまかさで かく。 */
+const pixels = (s: (typeof SPECIES)[number], pose: Pose) => rgbaOf(renderFrame(s, pose, 1))
 const opaqueDiff = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
   let diff = 0
   for (let k = 0; k < a.length; k += 4) if (a[k] !== b[k] || a[k + 1] !== b[k + 1] || a[k + 2] !== b[k + 2] || a[k + 3] !== b[k + 3]) diff++
@@ -14,8 +17,8 @@ describe('venom lab creature motion', () => {
     expect(Object.keys(SIGNATURE_MOVES).sort()).toEqual(SPECIES.map(s => s.id).sort())
     expect(new Set(Object.values(SIGNATURE_MOVES)).size).toBe(SPECIES.length)
     for (const s of SPECIES) {
-      const rest = renderFrame(s, { clip: 'idle', t: 0 }).data
-      const most = Math.max(...[.3, .4, .5, .6, .7].map(t => opaqueDiff(rest, renderFrame(s, { clip: 'act', t }).data)))
+      const rest = pixels(s, { clip: 'idle', t: 0 })
+      const most = Math.max(...[.3, .4, .5, .6, .7].map(t => opaqueDiff(rest, pixels(s, { clip: 'act', t }))))
       expect(most, s.id).toBeGreaterThan(20)
     }
   })
@@ -24,8 +27,8 @@ describe('venom lab creature motion', () => {
     for (const s of SPECIES) {
       const p = profileOf(s)
       for (const clip of ['idle', 'move'] as const) {
-        const a = renderFrame(s, { clip, t: 0 }).data
-        const most = Math.max(...[.125, .25, .375, .5, .625].map(t => opaqueDiff(a, renderFrame(s, { clip, t }).data)))
+        const a = pixels(s, { clip, t: 0 })
+        const most = Math.max(...[.125, .25, .375, .5, .625].map(t => opaqueDiff(a, pixels(s, { clip, t }))))
         expect(most, `${s.id} ${clip}`).toBeGreaterThan(2)
       }
       expect(p.frames.idle).toBeGreaterThanOrEqual(12)

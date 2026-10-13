@@ -261,9 +261,16 @@ export const lizard: Builder = (m, pose) => {
     tongue = Math.max(bump(t, .2, .34), bump(t, .38, .52), bump(t, .56, .7), bump(t, .74, .88))
   }
   const beads: Pattern = c => {
-    if (c.s > .55) return null
+    if (c.s > .55) return c.fine && frac(c.l / 1.2) < .22 ? 'A-' : null
     const n = noise(c.l / 4.2 + 3, (c.s + 1) * 2.2, 11) + (hash(Math.floor(c.l), Math.floor(c.s * 3 + 5), 2) - .5) * .12
-    return n < .48 ? 'B' : null
+    const mat: Mat = n < .48 ? 'B' : 'A'
+    // つぶつぶの うろこ（こまかく かく とき）: ずらして ならべた つぶの、した・みぎ がわに かげ。
+    if (c.fine) {
+      const gy = (c.s + 1) * 3.2, row = Math.floor(gy)
+      const gx = c.l / 1.3 + (row % 2) * .5
+      if (frac(gx) > .74 || frac(gy) > .74) return `${mat}-`
+    }
+    return mat === 'B' ? 'B' : null
   }
   const spine = (u: number): Pt => {
     const x = lerp(11, 62, u)
