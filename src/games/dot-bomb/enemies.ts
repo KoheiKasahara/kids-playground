@@ -8,6 +8,9 @@ import type { EnemyKind } from './stages'
 
 type Spec = { speed: number; hp: number; behave: Behave; flying: boolean; smart?: boolean; radius?: number }
 
+/** スマホでも あそびやすいように てき ぜんたいの はやさを ゆっくりめに する。 */
+export const ENEMY_SPEED_SCALE = .8
+
 export const ENEMY_SPECS: Record<EnemyKind, Spec> = {
   puni: { speed: .42, hp: 1, behave: 'wander', flying: false },
   tentou: { speed: .7, hp: 1, behave: 'straight', flying: false },
@@ -27,7 +30,7 @@ export function spawnEnemy(w: World, kind: EnemyKind, tx: number, ty: number, wa
   const spec = ENEMY_SPECS[kind]
   const e: Enemy = {
     id: w.nextId++, kind, x: center(tx), y: center(ty), fx: tx, fy: ty, tx, ty,
-    dir: Math.floor(w.rand() * 4) as Dir, hp: spec.hp, inv: 0, speed: spec.speed, behave: spec.behave, flying: spec.flying,
+    dir: Math.floor(w.rand() * 4) as Dir, hp: spec.hp, inv: 0, speed: spec.speed * ENEMY_SPEED_SCALE, behave: spec.behave, flying: spec.flying,
     dead: 0, wait: wait + Math.floor(w.rand() * 40), stun: 0, age: Math.floor(w.rand() * 60),
   }
   w.enemies.push(e)
@@ -98,9 +101,7 @@ function chooseDir(w: World, e: Enemy, danger: Uint8Array | null): Dir | null {
   let options = DIRS.filter(d => enemyCanEnter(w, e, e.fx + DX[d], e.fy + DY[d]))
   if (danger) {
     const safe = options.filter(d => !danger[idx(w, e.fx + DX[d], e.fy + DY[d])])
-    const here = danger[idx(w, e.fx, e.fy)]
     if (safe.length) options = safe
-    else if (!here) return null
   }
   if (!options.length) return null
   const back = reverse(e.dir)

@@ -5,6 +5,7 @@ import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { primeAudio } from '../../audio/sound'
 import { vibrate } from '../../utils/haptics'
 import type { Dir, World, WorldEvent } from './core'
+import { START_HEARTS } from './core'
 import { createWorld, dismissAlly, drainEvents, pressBomb, pressSkill, setDir, stageResult, stepWorld, summonAlly, type StageResult } from './world'
 import { Scene, allyImage, eggSprite, heroImage, heroOuchImage, itemIconImage, rideImage } from './render'
 import { createFx, spawnFx, updateFx } from './fx'
@@ -440,7 +441,7 @@ export default function StageScreen({ index, music, onMusic, onExit, onRetry, on
     <GameBackButton onBack={onExit} />
     <div className={styles.hudLeft}>
       <div className={`${styles.window} ${styles.hearts} ${bump === 'heart' ? styles.bump : ''}`} role="img" aria-label={`ハート ${hud.hearts}こ`}>
-        {Array.from({ length: Math.max(3, hud.hearts) }, (_, i) => <span key={i} className={i < hud.hearts ? styles.heartOn : styles.heartOff}><PixelIcon make={heartIcon} className={styles.hudIcon} /></span>)}
+        {Array.from({ length: Math.max(START_HEARTS, hud.hearts) }, (_, i) => <span key={i} className={i < hud.hearts ? styles.heartOn : styles.heartOff}><PixelIcon make={heartIcon} className={styles.hudIcon} /></span>)}
       </div>
       <div className={`${styles.window} ${styles.stats}`}>
         <span className={bump === 'bomb' ? styles.bump : ''} aria-label={`ボン ${hud.bombs}こ`}><PixelIcon make={bombIcon} className={styles.hudIcon} />{hud.bombs}</span>

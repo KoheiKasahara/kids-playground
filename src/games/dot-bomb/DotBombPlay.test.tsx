@@ -60,7 +60,7 @@ describe('dot-bomb の がめん', () => {
     fireEvent.click(screen.getByRole('button', { name: /スキップ/ }))
     expect(screen.getByLabelText(/1-1 はじまりの もり。/)).toBeInTheDocument()
     expect(startBgm).toHaveBeenCalledWith('forest')
-    expect(screen.getByRole('img', { name: 'ハート 3こ' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'ハート 5こ' })).toBeInTheDocument()
     expect(screen.getByLabelText('てき のこり 3')).toBeInTheDocument()
     expect(JSON.parse(store.get('dot-bomb-seen-v1') ?? '[]')).toContain('prologue')
     fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
@@ -183,7 +183,7 @@ describe('dot-bomb の がめん', () => {
     fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
     advance(2)
     expect(world()).not.toBe(w)
-    expect(world().hero.hearts).toBe(3)
+    expect(world().hero.hearts).toBe(5)
   })
 
   test('ピョンタに のると とくぎボタンが つかえるように なる', () => {
