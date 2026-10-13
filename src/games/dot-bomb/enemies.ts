@@ -9,7 +9,7 @@ import type { EnemyKind } from './stages'
 type Spec = { speed: number; hp: number; behave: Behave; flying: boolean; smart?: boolean; radius?: number }
 
 /** スマホでも あそびやすいように てき ぜんたいの はやさを ゆっくりめに する。 */
-export const ENEMY_SPEED_SCALE = .8
+export const ENEMY_SPEED_SCALE = .7
 
 export const ENEMY_SPECS: Record<EnemyKind, Spec> = {
   puni: { speed: .42, hp: 1, behave: 'wander', flying: false },
