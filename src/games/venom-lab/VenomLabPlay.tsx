@@ -5,6 +5,7 @@ import { useSoundToggle } from '../../audio/useSoundToggle'
 import { HABITATS, LEVEL_LABELS, MAX_RESIDENTS, RANKING, RANKING_NOTE, RANK_FILTERS, SPECIES, addResident, createExhibits, matchesRankFilter, type HabitatId, type RankFilter, type Resident, type Species } from './data'
 import PixelCreature from './PixelCreature'
 import HabitatScene from './HabitatScene'
+import { SIGNATURE_MOVES } from './motion'
 import { playLabSound } from './sounds'
 import styles from './VenomLabPlay.module.css'
 
@@ -34,6 +35,7 @@ export default function VenomLabPlay() {
   const [tab, setTab] = useState<'observe' | 'ranking'>('observe')
   const [rankFilter, setRankFilter] = useState<RankFilter>('all')
   const [message, setMessage] = useState('いきものを タップして かんさつしよう！')
+  const [actSignal, setActSignal] = useState(0)
   const [sound, toggleSound] = useSoundToggle()
   const detailRef = useRef<HTMLElement>(null)
   const revealNote = useRef(false)
@@ -58,6 +60,7 @@ export default function VenomLabPlay() {
     playLabSound(fresh ? 'discover' : 'tap')
     setSelected(species)
     setSelectedId(residentId)
+    setActSignal(n => n + 1)
     setObserved(current => current.includes(species.id) ? current : [...current, species.id])
     setMessage(fresh ? `${species.name}を はっけん！ ずかんに きろくしたよ。` : `${species.name}を かんさつ中。`)
   }
@@ -125,15 +128,19 @@ export default function VenomLabPlay() {
           <aside ref={detailRef} className={styles.detail} aria-label="いきものの かいせつ" aria-live="polite">
             {selected ? <>
               <div className={styles.detailTop}><span className={styles.eyebrow}>FIELD NOTE / {String(SPECIES.indexOf(selected) + 1).padStart(2, '0')}</span><span className={styles.recorded}>✓ きろくずみ</span></div>
-              <div className={styles.portrait}><PixelCreature species={selected} /></div>
+              <div className={styles.portrait}><PixelCreature species={selected} live actSignal={actSignal} /></div>
               <h2>{selected.name}</h2><p className={styles.scientific}>{selected.scientific}</p>
               <div className={styles.venomLine}><span>毒のつよさ <small>めやす</small></span><VenomMeter species={selected} /></div>
+              <div className={styles.signature}>
+                <span><small>とくいわざ</small>{SIGNATURE_MOVES[selected.id]}</span>
+                <button type="button" onClick={() => { setActSignal(n => n + 1); playLabSound() }} aria-label={`${selected.name}の とくいわざを みる`}>▶ みる</button>
+              </div>
               <span className={styles.delivery}>{selected.delivery}</span>{selected.inJapan && <span className={styles.japanBadge}>日本にもいる</span>}
               <p className={styles.fact}>{selected.fact}</p>
               <dl className={styles.facts}><dt>すむところ</dt><dd>{selected.home}</dd><dt>たべもの</dt><dd>{selected.food}</dd></dl>
               <details className={styles.more} key={selected.id}><summary>毒のひみつ・出典をみる</summary><p>{selected.venom}</p><p className={styles.note}>毒のつよさは ゲーム内のめやす。詳しくは ランキングをみてね。</p><a href={selected.source.url} target="_blank" rel="noreferrer">{selected.source.label} ↗</a></details>
               {selectedId !== null && <button type="button" className={styles.removeButton} onClick={removeSelected}>− この1ぴきを もどす</button>}
-            </> : <div className={styles.detailEmpty}><span className={styles.eyebrow}>YOUR FIELD NOTES</span><div className={styles.emptyPortrait}><PixelCreature species={speciesInHabitat[0]} /></div><h2>どんな ひみつが<br />あるのかな？</h2><p>エリアの いきものを タップ！<br />ここに かいせつが でるよ。</p><span className={styles.emptyArrow}>← みつけてみよう</span></div>}
+            </> : <div className={styles.detailEmpty}><span className={styles.eyebrow}>YOUR FIELD NOTES</span><div className={styles.emptyPortrait}><PixelCreature species={speciesInHabitat[0]} live /></div><h2>どんな ひみつが<br />あるのかな？</h2><p>エリアの いきものを タップ！<br />ここに かいせつが でるよ。</p><span className={styles.emptyArrow}>← みつけてみよう</span></div>}
           </aside>
 
           <section className={styles.residentPicker} aria-label="いきものを ふやす">

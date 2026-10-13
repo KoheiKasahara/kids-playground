@@ -1,6 +1,8 @@
-import type { CSSProperties } from 'react'
-import { SPECIES, type HabitatId, type Resident } from './data'
-import PixelCreature from './PixelCreature'
+import { useEffect, useMemo, useRef, type CSSProperties } from 'react'
+import { SPECIES, type HabitatId, type Resident, type Species } from './data'
+import { context2d, drawFrame, onTick, usePixelCanvas, useReducedMotion } from './canvas'
+import { createActor, frameAt, profileOf, stepActor, triggerAct, type Actor } from './motion'
+import { frameOf, prewarm, SPRITE_H, SPRITE_W } from './sprite'
 import styles from './VenomLabPlay.module.css'
 
 function Scenery({ habitat }: { habitat: HabitatId }) {
@@ -61,29 +63,91 @@ function Scenery({ habitat }: { habitat: HabitatId }) {
   </svg>
 }
 
+/** じめんの かげ（ドットの だえん）。 */
+function Shadow({ width }: { width: number }) {
+  const rows = [.55, .9, 1, .9, .55]
+  const d = rows.map((k, y) => {
+    const half = Math.round((width / 2) * k)
+    return `M${SPRITE_W / 2 - half} ${y}h${half * 2}v1h${-half * 2}z`
+  }).join('')
+  return <svg className={styles.shadowArt} viewBox={`0 0 ${SPRITE_W} 5`} shapeRendering="crispEdges" aria-hidden="true"><path d={d} /></svg>
+}
+
+/** かんさつエリアの 1ぴき。じぶんの きもちで うろうろ して、タップで とくいわざ。 */
+function ResidentActor({ resident, species, paused, selected, onObserve }: {
+  resident: Resident; species: Species; paused: boolean; selected: boolean; onObserve: (resident: Resident) => void
+}) {
+  const button = useRef<HTMLButtonElement>(null)
+  const lift = useRef<HTMLSpanElement>(null)
+  const shadow = useRef<HTMLSpanElement>(null)
+  const { box, canvas, unit } = usePixelCanvas()
+  const reduced = useReducedMotion()
+  const profile = useMemo(() => profileOf(species), [species])
+  const actor = useRef<Actor | null>(null)
+
+  useEffect(() => {
+    const ctx = context2d(canvas.current)
+    if (ctx && !reduced) prewarm(species, profile.frames)
+    const a = actor.current ?? (actor.current = createActor(resident.id * 7 + 3))
+    let shown = ''
+    const draw = () => {
+      const f = frameAt(a, profile)
+      const key = `${f.clip}${f.index}/${f.count}`
+      if (ctx && key !== shown) { shown = key; drawFrame(ctx, frameOf(species, f.clip, f.index, f.count)) }
+      // 1ドットの おおきさで ずらし、がめんの てんに そろえる。
+      const px = unit.current
+      const dpr = window.devicePixelRatio || 1
+      const snap = (v: number) => Math.round(v * px * dpr) / dpr
+      if (button.current) button.current.style.transform = `translate(${snap(a.x)}px, 0)`
+      if (lift.current) lift.current.style.transform = `translate(0, ${-snap(a.y)}px) scaleX(${a.facing})`
+      if (shadow.current) shadow.current.style.transform = `scale(${Math.max(.55, 1 - a.y / 26)})`
+    }
+    if (reduced) {
+      // うごきを へらす: その ばで じっと。
+      a.mode = 'idle'
+      a.time = 0
+      draw()
+      return
+    }
+    draw()
+    if (paused) return
+    return onTick(dt => {
+      stepActor(a, profile, dt)
+      draw()
+    })
+  }, [species, profile, paused, reduced, resident.id, unit, canvas])
+
+  const row = Math.floor(resident.slot / 3)
+  const isBottom = profile.gait === 'sit' || species.sprite === 'octopus'
+  const style = {
+    left: `${19 + (resident.slot % 3) * 30}%`,
+    top: `${isBottom ? 36 + row * 23 : 28 + row * 24}%`,
+    zIndex: selected ? 6 : 2 + row,
+  } as CSSProperties
+  return <button ref={button} type="button" className={styles.resident}
+    style={style} aria-label={`${species.name}を かんさつ ${resident.id}`} aria-pressed={selected}
+    onClick={() => {
+      if (actor.current && !reduced && !paused) triggerAct(actor.current)
+      onObserve(resident)
+    }}>
+    <span ref={box} className={styles.residentBox}>
+      <span className={styles.stage}>
+        {profile.shadow > 0 && <span ref={shadow} className={styles.shadow}><Shadow width={profile.shadow} /></span>}
+        <span ref={lift} className={styles.lift}><canvas ref={canvas} width={SPRITE_W} height={SPRITE_H} /></span>
+      </span>
+    </span>
+    <span className={styles.creatureName}>{species.name}</span>
+  </button>
+}
+
 export default function HabitatScene({ habitat, residents, paused, selectedId, onObserve }: {
   habitat: HabitatId; residents: Resident[]; paused: boolean; selectedId: number | null; onObserve: (resident: Resident) => void
 }) {
   return <div className={styles.scene} data-paused={paused} role="group" aria-label="かんさつエリア">
     <Scenery habitat={habitat} />
     <div className={styles.sceneLabel}><span /> {paused ? 'いちじていし中' : 'かんさつ中'}<span className={styles.pixelLabel}>PIXEL HABITAT</span></div>
-    {residents.map(resident => {
-      const species = SPECIES.find(s => s.id === resident.speciesId)!
-      const row = Math.floor(resident.slot / 3)
-      const isBottom = species.motion === 'still' || species.sprite === 'octopus'
-      const style = {
-        left: `${19 + (resident.slot % 3) * 30}%`,
-        top: `${isBottom ? 36 + row * 23 : 28 + row * 24}%`,
-        '--delay': `${-(resident.id * 1.7)}s`,
-        '--duration': `${species.motion === 'swim' ? 10 : 7 + resident.id % 5}s`,
-      } as CSSProperties
-      return <button key={resident.id} type="button" className={`${styles.resident} ${styles[species.motion]}`}
-        style={style} aria-label={`${species.name}を かんさつ ${resident.id}`} aria-pressed={selectedId === resident.id}
-        onClick={() => onObserve(resident)}>
-        <PixelCreature species={species} />
-        <span className={styles.creatureName}>{species.name}</span>
-      </button>
-    })}
+    {residents.map(resident => <ResidentActor key={resident.id} resident={resident} species={SPECIES.find(s => s.id === resident.speciesId)!}
+      paused={paused} selected={selectedId === resident.id} onObserve={onObserve} />)}
     {residents.length === 0 && <p className={styles.emptyScene}>下の「＋」で<br />いきものを いれてみよう</p>}
     <div className={styles.sceneHint}>いきものを タップして しらべよう</div>
   </div>

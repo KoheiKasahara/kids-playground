@@ -5,6 +5,7 @@ import VenomLabPlay from './VenomLabPlay'
 import App from '../../app/App'
 import { isSoundEnabled } from '../../audio/sound'
 import { HABITATS, SPECIES } from './data'
+import { SIGNATURE_MOVES } from './motion'
 
 beforeEach(() => { localStorage.clear(); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
@@ -35,6 +36,21 @@ describe('どくの いきものラボ', () => {
     expect(animalButtons()).toHaveLength(3)
     fireEvent.click(screen.getByRole('button', { name: /AREA 02 あめのもり/ }))
     expect(animalButtons()).toHaveLength(4)
+  })
+
+  test('tapping a creature shows its own signature move, which can be replayed', () => {
+    openLab()
+    fireEvent.click(screen.getByRole('button', { name: /AREA 03 世界のさばく/ }))
+    fireEvent.click(within(area()).getByRole('button', { name: /ニシダイヤガラガラヘビを かんさつ/ }))
+    expect(screen.getByText(SIGNATURE_MOVES.rattlesnake)).toBeVisible()
+    const replay = screen.getByRole('button', { name: 'ニシダイヤガラガラヘビの とくいわざを みる' })
+    fireEvent.click(replay)
+    expect(replay).toBeEnabled()
+    fireEvent.click(within(area()).getByRole('button', { name: /アメリカドクトカゲを かんさつ/ }))
+    expect(screen.getByText(SIGNATURE_MOVES.gila)).toBeVisible()
+    expect(screen.queryByText(SIGNATURE_MOVES.rattlesnake)).not.toBeInTheDocument()
+    // うごく いきものも、ふつうの ボタンとして えらべる。
+    expect(within(area()).getAllByRole('button').every(button => button.tagName === 'BUTTON')).toBe(true)
   })
 
   test('capacity prevents adding, and removing the selected animal opens a place', () => {
