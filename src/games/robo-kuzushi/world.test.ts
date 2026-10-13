@@ -316,12 +316,32 @@ describe('robo-kuzushi world', () => {
     expect(rebound('normal')).toBeLessThan(.5)
   })
 
+  test('the trampoline sends the ball over the wall however it lands on it', () => {
+    const level = LEVELS.find(l => l.name === 'トランポリン')!
+    let landed = 0
+    for (const [deg, len] of [[-20, 50], [-10, 60], [0, 75], [5, 90], [30, 70], [60, 80]] as const) {
+      const game = createGame(level)
+      game.launch(pullAt(deg, len))
+      let bounced = false, farthest = 0
+      for (let i = 0; i < 300 && game.state === 'flying'; i++) {
+        game.step()
+        if (game.drainEvents().some(e => e.type === 'spring')) bounced = true
+        if (bounced && game.projectiles[0]) farthest = Math.max(farthest, game.projectiles[0].body.position.x)
+      }
+      game.destroy()
+      if (!bounced) continue
+      landed++
+      expect(farthest).toBeGreaterThan(1100)
+    }
+    expect(landed).toBeGreaterThan(3)
+  })
+
   // 新しい ステージは ねらった とおりに うてば しかけを つかって クリアできる。
   const SOLUTIONS: Record<string, { shots: [number, number, number?][]; uses?: GameEvent['type'] }> = {
     'ドッカン ばくだん': { shots: [[20, 90], [-20, 120]], uses: 'blast' },
     'ふうせん ロボ': { shots: [[30, 120], [-20, 105]], uses: 'pop' },
     'つきぬけ ドリル': { shots: [[10, 105], [-20, 120]], uses: 'pierce' },
-    'トランポリン': { shots: [[0, 75], [-20, 75]], uses: 'spring' },
+    'トランポリン': { shots: [[-20, 75], [-10, 70]], uses: 'spring' },
     'ワープ ゲート': { shots: [[35, 105], [60, 75]], uses: 'warp' },
     'かぜの エレベーター': { shots: [[10, 90], [30, 120]] },
     'ヘルメット ロボ': { shots: [[-20, 105], [-20, 75]], uses: 'helmet' },
