@@ -83,6 +83,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'venom-lab',
+    slug: 'venom-lab',
+    title: 'どくの いきものラボ',
+    emoji: '🦂',
+    category: 'learning',
+    seo: {
+      headline: 'どくの いきものラボ｜ドット絵の生き物を観察',
+      description: '海・森・砂漠の毒をもつ生き物をドット絵で観察するミニゲームです。同じ環境の仲間を増やしてながめ、解説やゲーム内の毒の強さランキングから生き物のひみつを学べます。',
+    },
+    intro: {
+      howToPlay: [
+        'エリアを えらんで いきものを タップしよう',
+        '「＋ なかまにする」で おなじ なかまも ふやせるよ',
+        'かいせつと 毒のつよさの めやすを みてみよう',
+      ],
+    },
+  },
+  {
     id: 'flag-pinball',
     slug: 'flag-pinball',
     title: 'こっきピンボール',
