@@ -10,6 +10,7 @@ import {
   SELECTED_POLYGON_POP_BORDER_RADIUS,
 } from './globeLayers'
 import { cameraDistanceForZoom, GLOBE_RADIUS } from './zoomLevels'
+import { MAX_ZOOM_LEVEL } from '../types'
 
 // iPhone相当の縦画面（カメラのfovは45度）。壁の見え方をpxで見積もるために使う。
 const VIEWPORT_HEIGHT_PX = 844
@@ -62,9 +63,9 @@ describe('earth-globe layers', () => {
     // 全体表示では1px未満に収め、最大ズームでは立体感が残る高さにする。
     const wallHeight = GLOBE_RADIUS * BASE_POLYGON_ALTITUDE
 
-    expect(wallHeight / worldUnitsPerPixel(cameraDistanceForZoom(0, true)))
+    expect(wallHeight / worldUnitsPerPixel(cameraDistanceForZoom(0, 390 / 844)))
       .toBeLessThan(1)
-    expect(wallHeight / worldUnitsPerPixel(cameraDistanceForZoom(3)))
+    expect(wallHeight / worldUnitsPerPixel(cameraDistanceForZoom(MAX_ZOOM_LEVEL)))
       .toBeGreaterThan(2)
   })
 })

@@ -13,11 +13,13 @@ import type {
 import {
   CAMERA_FAR,
   CAMERA_NEAR,
+  CLOSEST_CAMERA_DISTANCE,
   cameraDistanceForZoom,
-  cameraDistanceForAspect,
   easeOutCubic,
-  rotateSpeedForZoom,
+  farthestCameraDistance,
+  rotateSpeedForDistance,
   ZOOM_ANIMATION_DURATION_MS,
+  zoomLevelForDistance,
 } from './zoomLevels'
 import {
   isGlobeBodyObject,
@@ -58,6 +60,8 @@ const SELECTED_SIDE_COLOR = '#f59f00'
 const ATMOSPHERE_COLOR = '#74c0fc'
 const POLYGON_DATA_FALLBACK_DELAY_MS = 250
 const POINTER_CLICK_DISTANCE_PX = 8
+// ピンチ後の段階がこれ未満しか変わらなければ、親へ通知しない。
+const ZOOM_CHANGE_EPSILON = 0.001
 // world units（地球半径100あたり）。cameraDistanceForZoom等と同じ単位系。
 const POLYGON_HIT_TOLERANCE = 2
 
@@ -67,8 +71,6 @@ type ZoomAnimation = {
   from: number
   to: number
   startedAt: number
-  fromRotateSpeed: number
-  toRotateSpeed: number
 }
 
 type GlobeEngine = {
@@ -198,12 +200,18 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       cameraDirection.copy(camera.position).sub(controls.target)
       if (cameraDirection.lengthSq() === 0) cameraDirection.set(0, 0, 1)
       camera.position.copy(controls.target).add(cameraDirection.normalize().multiplyScalar(distance))
+      // ズーム中に操作感が急変しないよう、回転感度はカメラ距離から連続的に決める。
+      controls.rotateSpeed = rotateSpeedForDistance(distance)
       controls.update()
     }
 
-    function cameraDistanceForViewport(level: ZoomLevel) {
+    function viewportAspect() {
       const rect = container?.getBoundingClientRect()
-      return cameraDistanceForAspect(level, rect && rect.height > 0 ? rect.width / rect.height : 1)
+      return rect && rect.height > 0 ? rect.width / rect.height : 1
+    }
+
+    function cameraDistanceForViewport(level: ZoomLevel) {
+      return cameraDistanceForZoom(level, viewportAspect())
     }
 
     function updatePointOfView() {
@@ -309,7 +317,6 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       ) {
         zoomAnimation = null
         setCameraDistance(targetDistance)
-        controls.rotateSpeed = rotateSpeedForZoom(level)
         updatePointOfView()
         requestRender()
         return
@@ -319,8 +326,6 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         from: currentDistance,
         to: targetDistance,
         startedAt: performance.now(),
-        fromRotateSpeed: controls.rotateSpeed,
-        toRotateSpeed: rotateSpeedForZoom(level),
       }
       requestRender(ZOOM_ANIMATION_DURATION_MS)
     }
@@ -460,10 +465,8 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
 
       if (nextReducedMotion && zoomAnimation !== null) {
         const targetDistance = zoomAnimation.to
-        const targetRotateSpeed = zoomAnimation.toRotateSpeed
         zoomAnimation = null
         setCameraDistance(targetDistance)
-        if (controls !== null) controls.rotateSpeed = targetRotateSpeed
         updatePointOfView()
       }
 
@@ -513,17 +516,9 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       setCameraDistance(
         zoomAnimation.from + (zoomAnimation.to - zoomAnimation.from) * easedProgress,
       )
-      // ズーム中に操作感が急変しないよう、カメラ距離と同じイージングで補間する。
-      if (controls !== null) {
-        controls.rotateSpeed = zoomAnimation.fromRotateSpeed
-          + (zoomAnimation.toRotateSpeed - zoomAnimation.fromRotateSpeed) * easedProgress
-      }
       updatePointOfView()
 
-      if (progress >= 1) {
-        if (controls !== null) controls.rotateSpeed = zoomAnimation.toRotateSpeed
-        zoomAnimation = null
-      }
+      if (progress >= 1) zoomAnimation = null
     }
 
     function selectCountryAt(event: PointerEvent) {
@@ -576,7 +571,14 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
     }
 
     function handlePointerDown(event: PointerEvent) {
-      if (!event.isPrimary || event.button !== 0) return
+      if (!event.isPrimary) {
+        // 2本目の指が触れたらピンチ操作。指を離したときに国を選ばず、
+        // ボタンによるズームのアニメーションもピンチを優先して止める。
+        pointerStart = null
+        zoomAnimation = null
+        return
+      }
+      if (event.button !== 0) return
       pointerStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
     }
 
@@ -594,6 +596,11 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       pointerStart = null
     }
 
+    function handleWheel() {
+      // ホイール操作をボタンのズームアニメーションで上書きしない。
+      zoomAnimation = null
+    }
+
     function resizeRenderer() {
       if (container === null || renderer === null || camera === null) return
 
@@ -607,7 +614,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         Math.floor(rect.height || container.clientHeight || window.innerHeight || 1),
       )
 
-      if (controls !== null) controls.maxDistance = cameraDistanceForAspect(0, width / height) + 10
+      if (controls !== null) controls.maxDistance = farthestCameraDistance(width / height)
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height, false)
@@ -619,15 +626,32 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       if (departingBorderLines !== null) {
         setGlobeBorderLinesSize(departingBorderLines, width, height)
       }
-      // 向きが変わった場合も、最小ズームだけはその画面比に合う表示範囲へ戻す。
-      if (activeZoomLevel === 0) setCameraDistance(cameraDistanceForViewport(activeZoomLevel))
+      // 向きが変わった場合も、同じズーム段階をその画面比に合う距離で表示し直す。
+      if (zoomAnimation === null) setCameraDistance(cameraDistanceForViewport(activeZoomLevel))
       updatePointOfView()
       requestRender()
     }
 
     function handleControlsChange() {
+      if (camera !== null && controls !== null && zoomAnimation === null) {
+        controls.rotateSpeed = rotateSpeedForDistance(camera.position.distanceTo(controls.target))
+      }
       updatePointOfView()
       requestRender()
+    }
+
+    function handleControlsEnd() {
+      if (camera === null || controls === null || zoomAnimation !== null) return
+
+      // ピンチ・ホイールで距離が変わった場合だけ、操作後の段階を親へ返す。
+      // 親から同じ段階が戻ってきても、setZoomは距離差が小さいため何もしない。
+      const level = zoomLevelForDistance(
+        camera.position.distanceTo(controls.target),
+        viewportAspect(),
+      )
+      if (Math.abs(level - activeZoomLevel) < ZOOM_CHANGE_EPSILON) return
+      activeZoomLevel = level
+      optionsRef.current.onZoomChange(level)
     }
 
     function tick(now: number) {
@@ -698,8 +722,10 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
         canvas.removeEventListener('pointerdown', handlePointerDown)
         canvas.removeEventListener('pointerup', handlePointerUp)
         canvas.removeEventListener('pointercancel', handlePointerCancel)
+        canvas.removeEventListener('wheel', handleWheel)
       }
       controls?.removeEventListener('change', handleControlsChange)
+      controls?.removeEventListener('end', handleControlsEnd)
       controls?.dispose()
       controls = null
 
@@ -761,6 +787,7 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
       canvas.addEventListener('pointerdown', handlePointerDown)
       canvas.addEventListener('pointerup', handlePointerUp)
       canvas.addEventListener('pointercancel', handlePointerCancel)
+      canvas.addEventListener('wheel', handleWheel, { passive: true })
       container.appendChild(canvas)
 
       scene = new THREE.Scene()
@@ -818,18 +845,21 @@ export function useGlobeEngine(options: UseGlobeEngineOptions): UseGlobeEngineHa
 
       controls = new OrbitControls(camera, renderer.domElement)
       controls.target.set(0, 0, 0)
-      controls.enableZoom = false
+      // 二本指ピンチ(TOUCH.DOLLY_PAN のうちパンは無効)とマウスホイールでズームする。
+      controls.enableZoom = true
       controls.enablePan = false
       controls.enableRotate = true
-      controls.rotateSpeed = rotateSpeedForZoom(initialOptions.zoomLevel)
+      controls.rotateSpeed = rotateSpeedForDistance(camera.position.length())
       configureGlobeRotationControls(controls)
       controls.enableDamping = !reducedMotion
       controls.dampingFactor = reducedMotion ? 1 : 0.22
       controls.touches.ONE = THREE.TOUCH.ROTATE
-      controls.minDistance = cameraDistanceForZoom(3) - 10
-      controls.maxDistance = cameraDistanceForViewport(0) + 10
+      controls.touches.TWO = THREE.TOUCH.DOLLY_PAN
+      controls.minDistance = CLOSEST_CAMERA_DISTANCE
+      controls.maxDistance = farthestCameraDistance(viewportAspect())
       controls.update()
       controls.addEventListener('change', handleControlsChange)
+      controls.addEventListener('end', handleControlsEnd)
 
       updatePointOfView()
       resizeRenderer()
