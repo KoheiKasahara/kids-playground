@@ -393,7 +393,7 @@ export const STAGES: readonly StageDef[] = [
     id: 'moon',
     name: 'ふわふわ おつきさま',
     lead: 'ながく おして たかーく とぼう',
-    speed: 1.15,
+    speed: 1.1,
     walker: 'alien',
     flyer: 'ufo',
     env: 'moon',

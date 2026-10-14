@@ -30,7 +30,7 @@ const JUMP_BUFFER = 8
 export const ENV_PHYSICS: Record<StageEnv, { g: number; jump: number; maxFall: number }> = {
   land: { g: 1, jump: 1, maxFall: 1 },
   water: { g: .7, jump: .9, maxFall: .6 },
-  moon: { g: .62, jump: .87, maxFall: .75 },
+  moon: { g: .66, jump: .86, maxFall: .75 },
 }
 
 function physics(world: World) {
