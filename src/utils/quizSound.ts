@@ -926,20 +926,251 @@ export type RailTrainSoundStatus =
   | 'stoppedAtStation'
   | 'departing'
 
+/** 走行音の種類。ふつうの電車は「ガタンゴトン」、新幹線は「ヒューン」となめらかに走る。 */
+export type RailTrainSoundKind = 'local' | 'shinkansen'
+
 export type RailTrainSoundController = {
   /** RAFから毎フレーム呼ぶ。オーディオノードは走行開始時にだけ遅延生成する。 */
+  update: (speed: number, status: RailTrainSoundStatus, inTunnel?: boolean, kind?: RailTrainSoundKind) => void
+  setEnabled: (enabled: boolean) => void
+  dispose: () => void
+}
+
+/** 電車の最高速度（railTrainModel の TRAIN_MAX_SPEED と同じ）。音の変化はこの速さで頭打ちにする。 */
+const RAIL_SOUND_MAX_SPEED = 4.2
+/** これより遅いときは止まっているとみなして無音にする。 */
+const RAIL_SOUND_MIN_SPEED = 0.015
+/** レールの継ぎ目の間隔（速度×秒）。最高速で約0.4秒ごとに「ガタン」「ゴトン」が交互に鳴る。 */
+const RAIL_JOINT_SPACING = 1.6
+/** 毎フレームの update で同じ値を予約し直さないための差分しきい値。 */
+const RAIL_PARAM_EPSILON = 0.0004
+
+let railNoiseBuffer: AudioBuffer | undefined
+
+/** 走行音・継ぎ目音で使い回すノイズ（2秒ぶんを1回だけ作る）。 */
+function getRailNoiseBuffer(ctx: AudioContext): AudioBuffer {
+  if (!railNoiseBuffer || railNoiseBuffer.sampleRate !== ctx.sampleRate) {
+    railNoiseBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 2), ctx.sampleRate)
+    const data = railNoiseBuffer.getChannelData(0)
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+  }
+  return railNoiseBuffer
+}
+
+/**
+ * 車輪がレールの継ぎ目を叩く「タタン」。
+ * 2つの車輪が続けて叩くので、短い打音を2回鳴らす。bright=false は少し低い「ゴトン」。
+ */
+function playRailJointClack(
+  ctx: AudioContext,
+  when: number,
+  speedRatio: number,
+  bright: boolean,
+  inTunnel: boolean,
+): void {
+  const output = getSoundOutput(ctx)
+  const buffer = getRailNoiseBuffer(ctx)
+  // 速いほど2つの車輪の間隔が詰まり、少しだけ強く叩く。
+  const wheelGap = Math.min(0.17, Math.max(0.075, 0.075 / Math.max(0.35, speedRatio)))
+  const volume = 0.022 + speedRatio * 0.026
+  const tone = (bright ? 1 : 0.78) * (inTunnel ? 0.75 : 1)
+  for (let wheel = 0; wheel < 2; wheel++) {
+    const start = when + wheel * wheelGap
+    const hit = volume * (wheel === 0 ? 0.8 : 1)
+
+    // 金属っぽい「カッ」：短いノイズを低域だけ通す。
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 1200 * tone
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0, start)
+    gain.gain.linearRampToValueAtTime(hit, start + 0.004)
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.07)
+    source.connect(filter)
+    filter.connect(gain)
+    gain.connect(output)
+    source.start(start, Math.random() * 1.5)
+    source.stop(start + 0.08)
+
+    // 車体に響く「ドン」：低い音程がすっと下がる短いサイン波。
+    const body = ctx.createOscillator()
+    const bodyGain = ctx.createGain()
+    body.type = 'sine'
+    body.frequency.setValueAtTime(130 * tone, start)
+    body.frequency.exponentialRampToValueAtTime(70 * tone, start + 0.09)
+    bodyGain.gain.setValueAtTime(0, start)
+    bodyGain.gain.linearRampToValueAtTime(hit * 1.3, start + 0.005)
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12)
+    body.connect(bodyGain)
+    bodyGain.connect(output)
+    body.start(start)
+    body.stop(start + 0.13)
+  }
+}
+
+/**
+ * 電車の走行音。鳴り続ける音（ノイズの「ゴー」とモーター音）は1組のノードだけで管理し、
+ * ふつうの電車は継ぎ目の「ガタンゴトン」を速度に合わせて刻む。
+ * 新幹線はロングレールで継ぎ目音がないので、風切りの「ヒュー」とモーターの「ウィーン」だけにする。
+ * ready/waiting/stoppedAtStation では音を小さくして止める。
+ */
+export function createRailTrainSoundController(initialEnabled = true): RailTrainSoundController {
+  let enabled = initialEnabled
+  let disposed = false
+  let nodes: {
+    noise: AudioBufferSourceNode
+    filter: BiquadFilterNode
+    noiseGain: GainNode
+    motor: OscillatorNode
+    motorGain: GainNode
+  } | undefined
+  const lastValues = new Map<AudioParam, number>()
+  let lastTime: number | undefined
+  let jointPhase = 0
+  let jointCount = 0
+  let filterKind: RailTrainSoundKind | undefined
+
+  const setParam = (parameter: AudioParam, value: number, now: number, timeConstant: number) => {
+    const last = lastValues.get(parameter)
+    // engineはRAFごとにupdate/setEnabledを呼ぶため、同じ目標値を再予約しない。
+    if (last !== undefined && Math.abs(last - value) < Math.max(RAIL_PARAM_EPSILON, Math.abs(value) * 0.01)) return
+    lastValues.set(parameter, value)
+    setSmoothedAudioParam(parameter, value, now, timeConstant)
+  }
+
+  const silence = () => {
+    lastTime = undefined
+    if (nodes === undefined) return
+    const now = getSharedAudioContext()?.currentTime ?? 0
+    setParam(nodes.noiseGain.gain, 0, now, 0.08)
+    setParam(nodes.motorGain.gain, 0, now, 0.08)
+  }
+
+  const ensureNodes = (): AudioContext | undefined => {
+    if (disposed || !enabled || !isSoundEnabled()) return undefined
+    const ctx = getSharedAudioContext()
+    if (!ctx) return undefined
+    if (nodes === undefined) {
+      const output = getSoundOutput(ctx)
+      const noise = ctx.createBufferSource()
+      noise.buffer = getRailNoiseBuffer(ctx)
+      noise.loop = true
+      const filter = ctx.createBiquadFilter()
+      const noiseGain = ctx.createGain()
+      const motor = ctx.createOscillator()
+      const motorGain = ctx.createGain()
+      motor.type = 'sine'
+      // value も 0 にしておく（出だしの大きな「ボッ」を防ぐ）。
+      noiseGain.gain.value = 0
+      noiseGain.gain.setValueAtTime(0, ctx.currentTime)
+      motorGain.gain.value = 0
+      motorGain.gain.setValueAtTime(0, ctx.currentTime)
+      noise.connect(filter)
+      filter.connect(noiseGain)
+      noiseGain.connect(output)
+      motor.connect(motorGain)
+      motorGain.connect(output)
+      noise.start(ctx.currentTime)
+      motor.start(ctx.currentTime)
+      nodes = { noise, filter, noiseGain, motor, motorGain }
+    }
+    return ctx
+  }
+
+  return {
+    update(speed, status, inTunnel = false, kind = 'local') {
+      if (disposed) return
+      const isMoving = status === 'running'
+        || status === 'approachingStation'
+        || status === 'departing'
+      const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0
+      if (!isMoving || safeSpeed <= RAIL_SOUND_MIN_SPEED) {
+        silence()
+        return
+      }
+      const ctx = ensureNodes()
+      if (ctx === undefined || nodes === undefined) {
+        silence()
+        return
+      }
+      const now = ctx.currentTime
+      const ratio = Math.min(1, safeSpeed / RAIL_SOUND_MAX_SPEED)
+      const tunnel = inTunnel ? 1 : 0
+
+      if (filterKind !== kind) {
+        filterKind = kind
+        nodes.filter.type = kind === 'shinkansen' ? 'bandpass' : 'lowpass'
+        nodes.filter.Q.value = kind === 'shinkansen' ? 0.6 : 0.7
+        lastValues.delete(nodes.filter.frequency)
+      }
+
+      if (kind === 'shinkansen') {
+        // 風を切る「ヒュー」：速いほど高く、トンネルではこもって少し大きく響く。
+        setParam(nodes.filter.frequency, (520 + ratio * 1300) * (1 - tunnel * 0.35), now, 0.12)
+        setParam(nodes.noiseGain.gain, (0.0045 + ratio * 0.012) * (1 + tunnel * 0.2), now, 0.12)
+        // モーターの「ウィーン」：加速で音程が上がっていく。
+        setParam(nodes.motor.frequency, 240 + ratio * 560, now, 0.12)
+        setParam(nodes.motorGain.gain, 0.0008 + ratio * 0.0024, now, 0.12)
+      } else {
+        // レールを転がる「ゴー」：低くこもった音。
+        setParam(nodes.filter.frequency, (170 + ratio * 380) * (1 - tunnel * 0.3), now, 0.12)
+        setParam(nodes.noiseGain.gain, (0.01 + ratio * 0.018) * (1 + tunnel * 0.2), now, 0.12)
+        setParam(nodes.motor.frequency, 110 + ratio * 300, now, 0.12)
+        setParam(nodes.motorGain.gain, 0.0008 + ratio * 0.0018, now, 0.12)
+      }
+
+      const delta = lastTime === undefined ? 0 : Math.min(0.1, Math.max(0, now - lastTime))
+      lastTime = now
+      if (kind !== 'local') return
+      jointPhase += (safeSpeed * delta) / RAIL_JOINT_SPACING
+      if (jointPhase >= 1) {
+        jointPhase %= 1
+        try {
+          // 「ガタン」と「ゴトン」を交互に鳴らす。
+          playRailJointClack(ctx, now + 0.01, ratio, jointCount % 2 === 0, inTunnel)
+        } catch {
+          // 継ぎ目音が鳴らせなくても走行は止めない。
+        }
+        jointCount += 1
+      }
+    },
+    setEnabled(nextEnabled) {
+      if (enabled === nextEnabled) return
+      enabled = nextEnabled
+      if (!enabled) silence()
+    },
+    dispose() {
+      if (disposed) return
+      disposed = true
+      if (nodes !== undefined) {
+        const { noise, filter, noiseGain, motor, motorGain } = nodes
+        for (const source of [noise, motor]) {
+          try { source.stop() } catch { /* 既に停止済み */ }
+        }
+        for (const node of [noise, filter, noiseGain, motor, motorGain]) {
+          try { node.disconnect() } catch { /* Web Audioモックや解放済みノード */ }
+        }
+      }
+      nodes = undefined
+      lastValues.clear()
+    },
+  }
+}
+
+type DroneSoundController = {
   update: (speed: number, status: RailTrainSoundStatus, inTunnel?: boolean) => void
-  /** Optional shared profile hook used by the car-road adapter. */
   setVehicleProfile: (profile: CarRoadSoundProfile) => void
   setEnabled: (enabled: boolean) => void
   dispose: () => void
 }
 
 /**
- * 電車の走行音を1組のノードだけで管理する。
+ * くるまの走行音を1組のノードだけで管理する（1つのオシレーターを速度へ追従させる）。
  * ready/waiting/stoppedAtStation ではゲインを0にし、running系だけ速度へ追従させる。
  */
-export function createRailTrainSoundController(initialEnabled = true): RailTrainSoundController {
+function createDroneSoundController(initialEnabled = true): DroneSoundController {
   let enabled = initialEnabled
   let profile: CarRoadSoundProfile = {
     oscillatorType: 'triangle',
@@ -1088,7 +1319,7 @@ const CAR_ROAD_SOUND_PROFILES: Record<CarRoadSoundVehicleId, CarRoadSoundProfile
  * 既存の走行音controllerを再利用し、ゲーム側が複雑な音声状態を持たないようにする。
  */
 export function createCarRoadSoundController(initialEnabled = true): CarRoadSoundController {
-  const controller = createRailTrainSoundController(initialEnabled)
+  const controller = createDroneSoundController(initialEnabled)
   let vehicleId: CarRoadSoundVehicleId = 'car'
   return {
     setRunning(running) {

@@ -205,7 +205,7 @@ describe('dot-bomb の うごき', () => {
     const w = make(OPEN)
     pressBomb(w)
     const events = run(w, FUSE + 5)
-    expect(w.hero.hearts).toBe(2)
+    expect(w.hero.hearts).toBe(4)
     expect(events.some(e => e.type === 'hurt')).toBe(true)
     expect(w.hero.inv).toBeGreaterThan(0)
     w.hero.hearts = 1
@@ -336,7 +336,7 @@ describe('dot-bomb の てき・とびら・ボス', () => {
     const w = make(OPEN)
     w.enemies.push({ id: 5, kind: 'puni', x: center(1) + 8, y: center(1), fx: 2, fy: 1, tx: 2, ty: 1, dir: 0, hp: 1, inv: 0, speed: .4, behave: 'wander', flying: false, dead: 0, wait: 999, stun: 0, age: 0 })
     run(w, 4)
-    expect(w.hero.hearts).toBe(2)
+    expect(w.hero.hearts).toBe(4)
   })
 
   test('ボスは ポンの ひで いたがり、たおすと きんの たまごが でて ひろうと クリア', () => {
@@ -513,7 +513,7 @@ describe('dot-bomb の なかま', () => {
     placeBombAt(w, 1, 1, 2, 'ally', 1)
     run(w, 6)
     expect(w.stats.defeated).toBe(1)
-    expect(w.hero.hearts).toBe(3)
+    expect(w.hero.hearts).toBe(5)
     expect(w.stats.damage).toBe(0)
     expect(w.items.map(i => i.id).sort()).toEqual([7, 8])
     expect(w.ally).not.toBeNull()

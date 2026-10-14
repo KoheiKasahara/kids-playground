@@ -145,7 +145,7 @@ function updatePuni(w: World, b: Boss) {
   const h = w.hero
   switch (b.state) {
     case 'wait': if (b.t > 50) setState(b, 'rest'); break
-    case 'rest': if (b.t > (angry ? 38 : 72)) setState(b, 'crouch'); break
+    case 'rest': if (b.t > (angry ? 50 : 90)) setState(b, 'crouch'); break
     case 'crouch':
       if (b.t >= 18) {
         const [gx, gy] = landingSpot(w, h.x + (w.rand() - .5) * 28, h.y + (w.rand() - .5) * 28)
@@ -157,7 +157,7 @@ function updatePuni(w: World, b: Boss) {
       }
       break
     case 'hop': {
-      const dur = angry ? 44 : 56
+      const dur = angry ? 56 : 70
       const p = Math.min(1, b.t / dur)
       const e = p * p * (3 - 2 * p)
       b.x = b.vx + (b.gx - b.vx) * e
@@ -188,8 +188,8 @@ function updateWorm(w: World, b: Boss) {
       b.hidden = true
       const d = distance(h.x, h.y, b.x, b.y)
       if (d > 2) {
-        b.x += (h.x - b.x) / d * 1.05
-        b.y += (h.y - b.y) / d * 1.05
+        b.x += (h.x - b.x) / d * .8
+        b.y += (h.y - b.y) / d * .8
       }
       b.x = Math.max(2 * TILE, Math.min((w.cols - 2) * TILE, b.x))
       b.y = Math.max(2 * TILE, Math.min((w.rows - 2) * TILE, b.y))
@@ -215,7 +215,7 @@ function updateWorm(w: World, b: Boss) {
     case 'up':
       b.face = h.x < b.x ? -1 : 1
       if (b.t === 45 || b.t === 105) {
-        for (const s of [-.4, 0, .4]) aimShot(w, b, 'sand', 1.45, s)
+        for (const s of [-.4, 0, .4]) aimShot(w, b, 'sand', 1.15, s)
         emit(w, { type: 'bossAct', x: b.x, y: b.y, act: 'shoot' })
       }
       if (b.t >= 150) { setState(b, 'dive'); emit(w, { type: 'bossAct', x: b.x, y: b.y, act: 'dive' }) }
@@ -235,8 +235,8 @@ function updatePenguin(w: World, b: Boss) {
       const dx = h.x - b.x, dy = h.y - b.y
       if (Math.abs(dx) > 2) b.face = Math.sign(dx)
       if (Math.abs(dx) >= Math.abs(dy)) { b.gx = Math.sign(dx) || b.face; b.gy = 0 } else { b.gx = 0; b.gy = Math.sign(dy) }
-      if (b.t >= (angry ? 32 : 46)) {
-        const speed = angry ? 3.6 : 3.1
+      if (b.t >= (angry ? 42 : 58)) {
+        const speed = angry ? 2.9 : 2.5
         b.vx = b.gx * speed; b.vy = b.gy * speed
         setState(b, 'slide')
         emit(w, { type: 'bossAct', x: b.x, y: b.y, act: 'charge' })
@@ -267,7 +267,7 @@ function updatePenguin(w: World, b: Boss) {
     case 'throw':
       b.face = h.x < b.x ? -1 : 1
       if (b.t === 12 || b.t === 32 || b.t === 52) {
-        aimShot(w, b, 'snow', 1.7, 0)
+        aimShot(w, b, 'snow', 1.35, 0)
         emit(w, { type: 'bossAct', x: b.x, y: b.y, act: 'shoot' })
       }
       if (b.t >= 72) setState(b, 'aim')
@@ -287,7 +287,7 @@ function updateDragon(w: World, b: Boss) {
       const tx = Math.max(3 * TILE, Math.min((w.cols - 3) * TILE, h.x))
       const ty = Math.max(3 * TILE, Math.min((w.rows - 3) * TILE, h.y - 20))
       const d = distance(tx, ty, b.x, b.y)
-      if (d > 1) { b.x += (tx - b.x) / d * Math.min(d, .85); b.y += (ty - b.y) / d * Math.min(d, .85) }
+      if (d > 1) { b.x += (tx - b.x) / d * Math.min(d, .65); b.y += (ty - b.y) / d * Math.min(d, .65) }
       if (Math.abs(tx - b.x) > 4) b.face = Math.sign(tx - b.x)
       b.z = 34 + Math.sin(b.t / 9) * 3
       if (b.t % 52 === 26) {
@@ -303,7 +303,7 @@ function updateDragon(w: World, b: Boss) {
       break
     }
     case 'descend': {
-      const p = Math.min(1, b.t / 34)
+      const p = Math.min(1, b.t / 44)
       b.x = b.vx + (b.gx - b.vx) * p
       b.y = b.vy + (b.gy - b.vy) * p
       b.z = 34 * (1 - p * p)
@@ -357,9 +357,9 @@ function updateKing(w: World, b: Boss) {
         const dx = h.x - b.x, dy = h.y - b.y
         const d = Math.hypot(dx, dy) || 1
         if (Math.abs(dx) > 3) b.face = Math.sign(dx)
-        const { hitX, hitY } = moveBox(w, b, dx / d * .42, dy / d * .42)
-        if (hitX && !hitY) moveBox(w, b, 0, (dy >= 0 ? 1 : -1) * .42)
-        if (hitY && !hitX) moveBox(w, b, (dx >= 0 ? 1 : -1) * .42, 0)
+        const { hitX, hitY } = moveBox(w, b, dx / d * .32, dy / d * .32)
+        if (hitX && !hitY) moveBox(w, b, 0, (dy >= 0 ? 1 : -1) * .32)
+        if (hitY && !hitX) moveBox(w, b, (dx >= 0 ? 1 : -1) * .32, 0)
         crush(w, b)
         if (b.t >= 150) { b.count++; setState(b, b.count % 2 ? 'drop' : 'shoot') }
         break
@@ -373,7 +373,7 @@ function updateKing(w: World, b: Boss) {
         break
       case 'shoot':
         if (b.t === 14 || b.t === 30 || b.t === 46) {
-          aimShot(w, b, 'bolt', 1.6, (b.t - 30) / 80)
+          aimShot(w, b, 'bolt', 1.3, (b.t - 30) / 80)
           emit(w, { type: 'bossAct', x: b.x, y: b.y, act: 'shoot' })
         }
         if (b.t >= 62) setState(b, 'walk')
@@ -382,8 +382,8 @@ function updateKing(w: World, b: Boss) {
         if (b.t % 8 === 0) emit(w, { type: 'bossPop', x: b.x + (w.rand() - .5) * 28, y: b.y + (w.rand() - .5) * 24 })
         if (b.t >= 100) {
           b.phase = 2
-          b.vx = (h.x < b.x ? -1 : 1) * 1.15
-          b.vy = (h.y < b.y ? -1 : 1) * .95
+          b.vx = (h.x < b.x ? -1 : 1) * .9
+          b.vy = (h.y < b.y ? -1 : 1) * .75
           spawnNear(w, 'robo', b.x, b.y, 2)
           setState(b, 'zoom')
           emit(w, { type: 'bossAct', x: b.x, y: b.y, act: 'roar' })

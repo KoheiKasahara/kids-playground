@@ -173,13 +173,13 @@ describe('dot-run world', () => {
   test('はてなブロックを したから たたくと にんじんが でて、からっぽに なる', () => {
     const world = createWorld(stageWith(['start', 'blocks', 'goal']))
     start(world)
-    const blockX = (20 + 6) * TILE
+    const blockX = (20 + 5) * TILE
     const events: WorldEvent[] = []
     while (world.hero.x + HERO_W / 2 < blockX - 4) run(world, 1, events)
     tap(world, events)
     run(world, 30, events)
     expect(events.some(e => e.type === 'block')).toBe(true)
-    expect(cellAt(world, 26, 5)).toBe('u')
+    expect(cellAt(world, 25, 5)).toBe('u')
     const before = world.got.carrots
     // からっぽの ブロックは もう でない。
     world.hero.x = blockX - 2
@@ -254,6 +254,40 @@ describe('dot-run world', () => {
       expect(after.map(e => e.type)).toContain('double')
       expect(after.some(e => e.type === 'jump')).toBe(false)
       expect(world.hero.flip).toBeGreaterThan(0)
+    }
+  })
+
+  test('ばねに のるだけで ばねの うえの にんじんと ほしメダルが ぜんぶ とれる（どの はやさでも）', () => {
+    for (const stage of STAGES) {
+      for (const chunk of ['spring', 'medalSpring'] as const) {
+        const world = createWorld(stageWith(['start', chunk, 'goal'], stage))
+        start(world)
+        run(world, 60 * 8)
+        const inChunk = world.carrots.filter(c => c.x > 20 * TILE && c.x < 40 * TILE)
+        expect(inChunk.every(c => c.got), `${stage.id} ${chunk}`).toBe(true)
+        expect(world.got.medals, `${stage.id} ${chunk}`).toBe(world.medals.length)
+      }
+    }
+  })
+
+  test('はてなブロックの ほしメダルは ブロックも にんじんも いっしょに とれる', () => {
+    for (const stage of STAGES) {
+      const world = createWorld(stageWith(['start', 'medalBlocks', 'goal'], stage))
+      start(world)
+      const front = () => world.hero.x + HERO_W - 20 * TILE
+      // ブロックの したで 1かいずつ ぽんと とび、さいごは 2だんジャンプで ほしメダルへ。
+      for (const x of [62, 110]) {
+        while (front() < x) run(world, 1)
+        tap(world)
+      }
+      while (front() < 168) run(world, 1)
+      tap(world)
+      run(world, 4)
+      tap(world)
+      run(world, 90)
+      expect(world.cells.flat().filter(c => c === 'u'), stage.id).toHaveLength(2)
+      expect(world.carrots.filter(c => c.x > 20 * TILE && c.x < 40 * TILE).every(c => c.got), stage.id).toBe(true)
+      expect(world.got.medals, stage.id).toBe(1)
     }
   })
 

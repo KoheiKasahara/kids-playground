@@ -322,7 +322,7 @@ export const LEVELS: readonly Level[] = [
   { name: 'ドッカン ばくだん', hint: 'ばくだんは ぶつかると ドッカーン！', width: 1450, balls: ['bomb', 'normal', 'bomb'], pieces: level11(), sky: 'evening' },
   { name: 'ふうせん ロボ', hint: 'ふうせんを わると ロボットが おちるよ', width: 1450, balls: ['normal', 'split', 'normal'], pieces: level12(), sky: 'evening' },
   { name: 'つきぬけ ドリル', hint: 'ドリルは きや こおりを つきぬけるよ', width: 1500, balls: ['drill', 'normal', 'drill'], pieces: level13(), sky: 'evening' },
-  { name: 'トランポリン', hint: 'トランポリンに のせると ぴょーんと とぶよ', width: 1400, balls: ['normal', 'normal', 'heavy'], pieces: level14(), sky: 'evening' },
+  { name: 'トランポリン', hint: 'よわく ひっぱって トランポリンに おとすと、かべを こえて とんでいくよ', width: 1400, balls: ['normal', 'normal', 'heavy', 'normal'], pieces: level14(), sky: 'evening' },
   { name: 'ワープ ゲート', hint: 'オレンジの わに はいると あおい わから でるよ', width: 1400, balls: ['normal', 'normal', 'split'], pieces: level15(), sky: 'evening' },
   { name: 'かぜの エレベーター', hint: 'かぜに のせると ふわっと あがるよ', width: 1400, balls: ['normal', 'normal', 'heavy'], pieces: level16(), sky: 'night' },
   { name: 'ヘルメット ロボ', hint: 'ヘルメットの ロボは かたいよ。ちょくせつ ぶつけよう', width: 1450, balls: ['heavy', 'normal', 'heavy', 'drill'], pieces: level17(), sky: 'night' },
