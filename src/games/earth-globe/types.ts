@@ -24,10 +24,13 @@ export type GlobeCountry = {
   numericId: number
 }
 
-/** 有限4段階のズーム。0=地球全体, 3=国の形が識別できる最大ズーム。 */
-export type ZoomLevel = 0 | 1 | 2 | 3
+/**
+ * ズーム段階。0=地球全体, MAX_ZOOM_LEVEL=国の形が識別できる最大ズーム。
+ * ＋/−ボタンは整数の段で刻み、ピンチ操作後は段の間の小数値もとる。
+ */
+export type ZoomLevel = number
 export const MIN_ZOOM_LEVEL: ZoomLevel = 0
-export const MAX_ZOOM_LEVEL: ZoomLevel = 3
+export const MAX_ZOOM_LEVEL: ZoomLevel = 6
 
 /**
  * 3Dエンジンを React から操作するためのフック契約。
@@ -45,6 +48,8 @@ export type UseGlobeEngineOptions = {
   features: readonly GlobeFeature[]
   /** 現在のズーム段階。変化したらカメラを短いアニメーションで遷移させる。 */
   zoomLevel: ZoomLevel
+  /** 二本指ピンチやマウスホイールでズームが変わったら、操作後の段階(小数)を通知する。 */
+  onZoomChange: (level: ZoomLevel) => void
   /** 現在選択中の国（alpha-2）。null は未選択。変化したらハイライト表示を更新する。 */
   selectedCountryId: string | null
   /**

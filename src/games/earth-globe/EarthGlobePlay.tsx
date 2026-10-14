@@ -33,6 +33,7 @@ export default function EarthGlobePlay() {
     selectedCountryId,
     selectionFeedbackKey,
     onCountrySelect: handleGlobeCountrySelect,
+    onZoomChange: setZoomLevel,
     reducedMotion,
   })
 

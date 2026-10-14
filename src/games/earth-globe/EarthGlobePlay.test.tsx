@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UseGlobeEngineOptions } from './types'
+import { MAX_ZOOM_LEVEL, type UseGlobeEngineOptions } from './types'
 import App from '../../app/App'
 
 const globeEngineMock = vi.hoisted(() => ({
@@ -86,7 +86,7 @@ describe('EarthGlobePlay', () => {
     expect(globeEngineMock.options?.zoomLevel).toBe(0)
   })
 
-  it('clamps zoom controls at both ends of the four-level range', async () => {
+  it('clamps zoom controls at both ends of the zoom range', async () => {
     const user = userEvent.setup()
     renderApp('/games/earth-globe')
 
@@ -96,17 +96,43 @@ describe('EarthGlobePlay', () => {
     expect(zoomOutButton).toBeDisabled()
 
     await user.click(zoomInButton)
+    expect(globeEngineMock.options?.zoomLevel).toBe(1)
     expect(zoomOutButton).toBeEnabled()
-    await user.click(zoomInButton)
-    await user.click(zoomInButton)
-    expect(globeEngineMock.options?.zoomLevel).toBe(3)
+    for (let level = 2; level <= MAX_ZOOM_LEVEL; level += 1) await user.click(zoomInButton)
+    expect(globeEngineMock.options?.zoomLevel).toBe(MAX_ZOOM_LEVEL)
     expect(zoomInButton).toBeDisabled()
 
     await user.click(zoomInButton)
-    expect(globeEngineMock.options?.zoomLevel).toBe(3)
+    expect(globeEngineMock.options?.zoomLevel).toBe(MAX_ZOOM_LEVEL)
 
     await user.click(zoomOutButton)
+    expect(globeEngineMock.options?.zoomLevel).toBe(MAX_ZOOM_LEVEL - 1)
+  })
+
+  it('continues button zoom from the level a pinch left behind', async () => {
+    const user = userEvent.setup()
+    renderApp('/games/earth-globe')
+
+    const zoomInButton = await screen.findByRole('button', { name: 'もっと ちかづく' })
+    const zoomOutButton = screen.getByRole('button', { name: 'もっと はなれる' })
+
+    act(() => {
+      globeEngineMock.options?.onZoomChange(2.4)
+    })
+    expect(globeEngineMock.options?.zoomLevel).toBe(2.4)
+    expect(zoomOutButton).toBeEnabled()
+
+    await user.click(zoomInButton)
+    expect(globeEngineMock.options?.zoomLevel).toBe(3)
+
+    act(() => {
+      globeEngineMock.options?.onZoomChange(2.4)
+    })
+    await user.click(zoomOutButton)
     expect(globeEngineMock.options?.zoomLevel).toBe(2)
+
+    await user.click(screen.getByRole('button', { name: 'ぜんたいに もどる' }))
+    expect(globeEngineMock.options?.zoomLevel).toBe(0)
   })
 
   it('shows the selected country flag and name when the engine selects a country', async () => {
