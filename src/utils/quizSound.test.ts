@@ -571,23 +571,25 @@ describe('quizSound', () => {
     controller.setRunning(true)
 
     expect(instances).toHaveLength(1)
-    // 出発音2音 + 走行音1音。出発音はクールダウンで間引き、走行の再開では同じ音源を再利用する。
-    expect(instances[0].createOscillator).toHaveBeenCalledTimes(3)
-    // Gain は上の3音ぶん + 最初の音で作られる共通の出口（音量補正）の1つ。
-    expect(instances[0].createGain).toHaveBeenCalledTimes(4)
-    const drivingGain = instances[0].createGain.mock.results[3].value as MockGainNode
-    expect(drivingGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 0.045)
+    // 出発音2音 + 走行音（エンジン・脈打ち・路面の脈打ち・サイレン2つ）の5つ。
+    // 出発音はクールダウンで間引き、走行の再開では同じ音源を再利用する。
+    expect(instances[0].createOscillator).toHaveBeenCalledTimes(7)
+    expect(instances[0].createBufferSource).toHaveBeenCalledTimes(1)
+    const engine = instances[0].createOscillator.mock.results[2].value as MockOscillatorNode
+    // 止めて再出発するたびに、エンジンが回り上がる。
+    expect(engine.frequency.exponentialRampToValueAtTime).toHaveBeenCalledTimes(2)
 
     controller.dispose()
-    expect((instances[0].createOscillator.mock.results[2].value as MockOscillatorNode).stop).toHaveBeenCalledTimes(1)
+    expect(engine.stop).toHaveBeenCalledTimes(1)
+    expect((instances[0].createBufferSource.mock.results[0].value as MockBufferSourceNode).stop).toHaveBeenCalledTimes(1)
   })
 
   test.each([
-    ['car', 'triangle', 144],
-    ['police-car', 'sawtooth', 175],
-    ['bus', 'triangle', 102],
-    ['bulldozer', 'square', 77],
-  ] as const)('車種 %s は専用の走行音プロファイルを使う', async (vehicleId, oscillatorType, expectedFrequency) => {
+    ['car', 'sawtooth', 72, false],
+    ['police-car', 'sawtooth', 80, true],
+    ['bus', 'sawtooth', 48, false],
+    ['bulldozer', 'square', 38, false],
+  ] as const)('車種 %s は専用の走行音プロファイルを使う', async (vehicleId, oscillatorType, cruiseFrequency, siren) => {
     ;(window as unknown as { AudioContext: unknown }).AudioContext = MockAudioContext
     vi.resetModules()
     const { createCarRoadSoundController } = await import('./quizSound')
@@ -597,9 +599,15 @@ describe('quizSound', () => {
     controller.setRunning(true)
 
     expect(instances).toHaveLength(1)
-    const oscillator = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
-    expect(oscillator.type).toBe(oscillatorType)
-    expect(oscillator.frequency.value).toBe(expectedFrequency)
+    const engine = instances[0].createOscillator.mock.results[0].value as MockOscillatorNode
+    expect(engine.type).toBe(oscillatorType)
+    // 低い回転から巡航の回転へ「ブォーン」と上がる。
+    expect(engine.frequency.value).toBeCloseTo(cruiseFrequency * 0.6)
+    expect(engine.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(cruiseFrequency, 0.7)
+    // サイレンはパトカーだけ。Gain は エンジン系3つ・路面系3つ・サイレン系2つの順に作られる。
+    const sirenGain = instances[0].createGain.mock.results.at(-1)?.value as MockGainNode
+    const lastSirenTarget = sirenGain.gain.linearRampToValueAtTime.mock.calls.at(-1)?.[0] as number
+    expect(lastSirenTarget > 0).toBe(siren)
 
     controller.setRunning(false)
     controller.dispose()

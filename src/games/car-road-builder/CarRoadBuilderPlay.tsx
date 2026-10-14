@@ -244,7 +244,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     setBoard(next)
     resetAfterEdit()
     setSelectedCellId(cell.id)
-    setStatus('おいたよ。つなぎめを みてみよう')
+    setStatus('おいたよ。おすと まわるよ')
   }, [board, resetAfterEdit])
 
   const previewAt = useCallback((part: Readonly<{ kind: PartKind; rotationStep: number }>, clientX: number, clientY: number, sourceCellId?: string): DropPreview => {
@@ -333,10 +333,27 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
     finishPalettePointer(kind, event, true)
   }, [finishPalettePointer])
 
+  const rotateCell = useCallback((cellId: string) => {
+    if (running) return
+    const next = rotatePart(board, cellId)
+    if (next === board) return
+    playRoadEditSound('rotate')
+    setBoard(next)
+    resetAfterEdit()
+    setStatus('まわしたよ')
+  }, [board, resetAfterEdit, running])
+
   const handleCellClick = useCallback((cell: BoardCell) => {
     if (running) return
     if (suppressClick.current) {
       suppressClick.current = false
+      return
+    }
+    if (cell.kind !== null && cell.id === selectedCellId) {
+      // Tapping the part that is already selected (including the one that was
+      // just placed) turns it, so small fingers do not have to reach the
+      // separate rotate button. The palette tool stays active for more placing.
+      rotateCell(cell.id)
       return
     }
     if (selectedKind !== null) {
@@ -347,7 +364,7 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
       if (cell.kind !== null) {
         setSelectedCellId(cell.id)
         setSelectedKind(null)
-        setStatus('えらんだよ。あきセルを おすと うごかせるよ')
+        setStatus('えらんだよ。もういちど おすと まわるよ')
         return
       }
       place(cell, selectedKind)
@@ -366,7 +383,8 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
       }
     }
     setSelectedCellId(cell.id)
-  }, [board, place, resetAfterEdit, running, selectedCellId, selectedKind])
+    if (cell.kind !== null) setStatus('えらんだよ。もういちど おすと まわるよ')
+  }, [board, place, resetAfterEdit, rotateCell, running, selectedCellId, selectedKind])
 
   const handleCellPointerDown = useCallback((cell: BoardCell, event: ReactPointerEvent<HTMLButtonElement>) => {
     if (running || selectedKind !== null || cell.kind === null) return
@@ -465,14 +483,9 @@ export default function CarRoadBuilderPlay({ stageId }: CarRoadBuilderPlayProps 
   }, [])
 
   const rotateSelected = useCallback(() => {
-    if (!selectedCellId || running) return
-    const next = rotatePart(board, selectedCellId)
-    if (next === board) return
-    playRoadEditSound('rotate')
-    setBoard(next)
-    resetAfterEdit()
-    setStatus('まわしたよ')
-  }, [board, resetAfterEdit, running, selectedCellId])
+    if (!selectedCellId) return
+    rotateCell(selectedCellId)
+  }, [rotateCell, selectedCellId])
 
   const deleteSelected = useCallback(() => {
     if (!selectedCellId || running) return
