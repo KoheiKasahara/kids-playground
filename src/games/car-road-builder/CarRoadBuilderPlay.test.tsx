@@ -220,6 +220,31 @@ describe('CarRoadBuilderPlay', () => {
     expect(screen.getByRole('button', { name: 'くるま' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  test('rotates a placed part by tapping it again', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+
+    await user.click(screen.getByRole('button', { name: 'カーブを おく' }))
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、2ぎょう 2れつ' }))
+    const curve = () => screen.getByRole('gridcell', { name: /^カーブ、2ぎょう 2れつ/ })
+    const initialRotation = curve().style.getPropertyValue('--rotation')
+
+    // The just-placed part is already selected, so one tap turns it.
+    await user.click(curve())
+    expect(curve().style.getPropertyValue('--rotation')).not.toBe(initialRotation)
+
+    // The palette tool stays active so more parts can be placed right away.
+    await user.click(screen.getByRole('gridcell', { name: 'あきセル、3ぎょう 3れつ' }))
+    expect(screen.getByRole('gridcell', { name: /^カーブ、3ぎょう 3れつ/ })).toBeInTheDocument()
+
+    // A part that is not selected yet is selected first, then turned on the next tap.
+    const start = () => screen.getByRole('gridcell', { name: 'スタート、1ぎょう 1れつ' })
+    await user.click(start())
+    expect(start()).toHaveStyle('--rotation: 2')
+    await user.click(start())
+    expect(start()).toHaveStyle('--rotation: 3')
+  })
+
   test('keeps start and goal movable/rotatable but not deletable', async () => {
     const user = userEvent.setup()
     renderPlay()

@@ -1159,129 +1159,6 @@ export function createRailTrainSoundController(initialEnabled = true): RailTrain
   }
 }
 
-type DroneSoundController = {
-  update: (speed: number, status: RailTrainSoundStatus, inTunnel?: boolean) => void
-  setVehicleProfile: (profile: CarRoadSoundProfile) => void
-  setEnabled: (enabled: boolean) => void
-  dispose: () => void
-}
-
-/**
- * くるまの走行音を1組のノードだけで管理する（1つのオシレーターを速度へ追従させる）。
- * ready/waiting/stoppedAtStation ではゲインを0にし、running系だけ速度へ追従させる。
- */
-function createDroneSoundController(initialEnabled = true): DroneSoundController {
-  let enabled = initialEnabled
-  let profile: CarRoadSoundProfile = {
-    oscillatorType: 'triangle',
-    baseFrequency: 92,
-    speedFrequency: 28,
-    gainBase: 0.008,
-    gainSpeed: 0.006,
-    maxGain: 0.04,
-  }
-  let oscillator: OscillatorNode | undefined
-  let gain: GainNode | undefined
-  let disposed = false
-  let targetGain = 0
-
-  const setGain = (value: number, now: number) => {
-    if (gain === undefined) return
-    const safeValue = Math.min(0.045, Math.max(0, value))
-    // engineはRAFごとにupdate/setEnabledを呼ぶため、同じ目標値を再予約しない。
-    if (Math.abs(safeValue - targetGain) < 0.0005) return
-    targetGain = safeValue
-    const parameter = gain.gain as AudioParam & {
-      cancelScheduledValues?: (time: number) => void
-      setTargetAtTime?: (nextValue: number, startTime: number, timeConstant: number) => void
-    }
-    parameter.cancelScheduledValues?.(now)
-    if (parameter.setTargetAtTime !== undefined) {
-      parameter.setTargetAtTime(safeValue, now, 0.045)
-    } else if (parameter.linearRampToValueAtTime !== undefined) {
-      parameter.linearRampToValueAtTime(safeValue, now + 0.045)
-    } else {
-      parameter.value = safeValue
-    }
-  }
-
-  const ensureNodes = (): AudioContext | undefined => {
-    if (disposed || !enabled || !isSoundEnabled()) return undefined
-    const ctx = getSharedAudioContext()
-    if (!ctx) return undefined
-    if (oscillator === undefined || gain === undefined) {
-      oscillator = ctx.createOscillator()
-      gain = ctx.createGain()
-      oscillator.type = profile.oscillatorType
-      oscillator.connect(gain)
-      gain.connect(getSoundOutput(ctx))
-      // value も 0 にしておく（コマバトルの回転音と同じく、出だしの大きな「ボッ」を防ぐ）。
-      gain.gain.value = 0
-      gain.gain.setValueAtTime(0, ctx.currentTime)
-      oscillator.start(ctx.currentTime)
-    }
-    return ctx
-  }
-
-  return {
-    update(speed, status, inTunnel = false) {
-      if (disposed) return
-      const isMoving = status === 'running'
-        || status === 'approachingStation'
-        || status === 'departing'
-      const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0
-      if (!isMoving || safeSpeed <= 0.015) {
-        if (gain !== undefined) {
-          const ctx = getSharedAudioContext()
-          if (ctx !== undefined) setGain(0, ctx.currentTime)
-        }
-        return
-      }
-      const ctx = isMoving && safeSpeed > 0.015 ? ensureNodes() : undefined
-      if (ctx === undefined || gain === undefined || oscillator === undefined) {
-        if (gain !== undefined && !isSoundEnabled()) setGain(0, getSharedAudioContext()?.currentTime ?? 0)
-        return
-      }
-      const now = ctx.currentTime
-      const tunnelFactor = inTunnel ? 0.86 : 1
-      const frequency = (profile.baseFrequency + Math.min(220, safeSpeed * profile.speedFrequency)) * (inTunnel ? 0.9 : 1)
-      const frequencyParameter = oscillator.frequency as AudioParam & {
-        setTargetAtTime?: (nextValue: number, startTime: number, timeConstant: number) => void
-      }
-      if (frequencyParameter.setTargetAtTime !== undefined) {
-        frequencyParameter.setTargetAtTime(frequency, now, 0.06)
-      } else {
-        frequencyParameter.value = frequency
-      }
-      setGain(Math.min(profile.maxGain, (profile.gainBase + safeSpeed * profile.gainSpeed) * tunnelFactor), now)
-    },
-    setVehicleProfile(nextProfile) {
-      profile = nextProfile
-      if (oscillator !== undefined) oscillator.type = profile.oscillatorType
-    },
-    setEnabled(nextEnabled) {
-      if (enabled === nextEnabled) return
-      enabled = nextEnabled
-      if (!enabled && gain !== undefined) {
-        setGain(0, getSharedAudioContext()?.currentTime ?? 0)
-      }
-    },
-    dispose() {
-      if (disposed) return
-      disposed = true
-      if (gain !== undefined) {
-        try { gain.disconnect() } catch { /* Web Audioモックや解放済みノード */ }
-      }
-      if (oscillator !== undefined) {
-        try { oscillator.stop() } catch { /* 既に停止済み */ }
-        try { oscillator.disconnect() } catch { /* Web Audioモックや解放済みノード */ }
-      }
-      gain = undefined
-      oscillator = undefined
-    },
-  }
-}
-
 export const createRailSoundController = createRailTrainSoundController
 
 export type CarRoadSoundController = {
@@ -1295,52 +1172,239 @@ export type CarRoadSoundController = {
 export type CarRoadSoundVehicleId = 'car' | 'police-car' | 'bus' | 'bulldozer'
 
 type CarRoadSoundProfile = Readonly<{
-  oscillatorType: OscillatorType
-  baseFrequency: number
-  speedFrequency: number
-  gainBase: number
-  gainSpeed: number
-  maxGain: number
+  /** エンジンの基音。 */
+  engineType: OscillatorType
+  engineFrequency: number
+  /** エンジン音を丸めるローパスの上限。低いほど「ドドド」とこもる。 */
+  engineFilter: number
+  /** 「ブルルル」と脈打つ速さ（Hz）と深さ（0〜1）。 */
+  pulseRate: number
+  pulseDepth: number
+  engineGain: number
+  /** タイヤ・キャタピラの「ザー」。 */
+  roadFilter: number
+  roadGain: number
+  /** キャタピラの「ガチャガチャ」のように、路面音も脈打たせる速さ（0で一定）。 */
+  roadPulseRate: number
+  /** パトカーだけ小さな「ピーポー」を重ねる。 */
+  siren: boolean
 }>
 
 /**
  * 幼児向けに違いが聞き取りやすい、控えめな合成走行音の設定。
- * 外部音源を使わず、既存の1つのオシレーターを車種ごとに調整する。
+ * 外部音源は使わず、エンジン音（脈打つ低音）と路面ノイズの組み合わせで車種ごとの「はしってる感」を出す。
  */
 const CAR_ROAD_SOUND_PROFILES: Record<CarRoadSoundVehicleId, CarRoadSoundProfile> = {
-  car: { oscillatorType: 'triangle', baseFrequency: 118, speedFrequency: 26, gainBase: 0.004, gainSpeed: 0.004, maxGain: 0.018 },
-  'police-car': { oscillatorType: 'sawtooth', baseFrequency: 145, speedFrequency: 30, gainBase: 0.004, gainSpeed: 0.0045, maxGain: 0.022 },
-  bus: { oscillatorType: 'triangle', baseFrequency: 82, speedFrequency: 20, gainBase: 0.004, gainSpeed: 0.004, maxGain: 0.021 },
-  bulldozer: { oscillatorType: 'square', baseFrequency: 62, speedFrequency: 15, gainBase: 0.0045, gainSpeed: 0.0045, maxGain: 0.024 },
+  car: {
+    engineType: 'sawtooth', engineFrequency: 72, engineFilter: 520, pulseRate: 22, pulseDepth: 0.55, engineGain: 0.03,
+    roadFilter: 900, roadGain: 0.012, roadPulseRate: 0, siren: false,
+  },
+  'police-car': {
+    engineType: 'sawtooth', engineFrequency: 80, engineFilter: 560, pulseRate: 24, pulseDepth: 0.5, engineGain: 0.026,
+    roadFilter: 950, roadGain: 0.011, roadPulseRate: 0, siren: true,
+  },
+  bus: {
+    engineType: 'sawtooth', engineFrequency: 48, engineFilter: 380, pulseRate: 13, pulseDepth: 0.65, engineGain: 0.034,
+    roadFilter: 650, roadGain: 0.014, roadPulseRate: 0, siren: false,
+  },
+  bulldozer: {
+    engineType: 'square', engineFrequency: 38, engineFilter: 300, pulseRate: 8, pulseDepth: 0.8, engineGain: 0.03,
+    roadFilter: 1500, roadGain: 0.018, roadPulseRate: 5, siren: false,
+  },
+}
+
+/** 出発時にエンジンが「ブォーン」と回り上がる時間（秒）。 */
+const CAR_ROAD_REV_UP_SECONDS = 0.7
+/** 出発直後の回転数（巡航時に対する比率）。 */
+const CAR_ROAD_REV_START_RATIO = 0.6
+const CAR_ROAD_SIREN_HIGH = 960
+const CAR_ROAD_SIREN_LOW = 770
+
+type CarRoadSoundNodes = {
+  engine: OscillatorNode
+  engineFilter: BiquadFilterNode
+  pulse: OscillatorNode
+  pulseDepth: GainNode
+  engineAmp: GainNode
+  engineGain: GainNode
+  road: AudioBufferSourceNode
+  roadFilter: BiquadFilterNode
+  roadPulse: OscillatorNode
+  roadPulseDepth: GainNode
+  roadAmp: GainNode
+  roadGain: GainNode
+  siren: OscillatorNode
+  sirenSwitch: OscillatorNode
+  sirenDepth: GainNode
+  sirenGain: GainNode
+}
+
+function setAudioParamNow(parameter: AudioParam, value: number, now: number): void {
+  const target = parameter as AudioParam & { cancelScheduledValues?: (time: number) => void }
+  target.cancelScheduledValues?.(now)
+  parameter.value = value
+  parameter.setValueAtTime?.(value, now)
 }
 
 /**
- * くるまのみちづくり用の走行音adapter。
- * 既存の走行音controllerを再利用し、ゲーム側が複雑な音声状態を持たないようにする。
+ * くるまのみちづくり用の走行音。
+ * 低いエンジン音を小刻みに脈打たせた「ブルルル」と、タイヤの「ザー」を重ねて、動いている感じを出す。
+ * 出発のたびにエンジンが回り上がり、止まると音量だけを下げる。AudioNodeは1組だけ作って使い回す。
  */
 export function createCarRoadSoundController(initialEnabled = true): CarRoadSoundController {
-  const controller = createDroneSoundController(initialEnabled)
+  const enabled = initialEnabled
   let vehicleId: CarRoadSoundVehicleId = 'car'
+  let nodes: CarRoadSoundNodes | undefined
+  let running = false
+  let disposed = false
+
+  const ensureNodes = (ctx: AudioContext): CarRoadSoundNodes => {
+    if (nodes !== undefined) return nodes
+    const output = getSoundOutput(ctx)
+    const now = ctx.currentTime
+    const silentGain = () => {
+      const gain = ctx.createGain()
+      gain.gain.value = 0
+      gain.gain.setValueAtTime(0, now)
+      return gain
+    }
+
+    // エンジン：ノコギリ波をローパスで丸め、LFOで音量を脈打たせる。
+    const engine = ctx.createOscillator()
+    const engineFilter = ctx.createBiquadFilter()
+    engineFilter.type = 'lowpass'
+    const engineAmp = ctx.createGain()
+    const engineGain = silentGain()
+    const pulse = ctx.createOscillator()
+    pulse.type = 'sine'
+    const pulseDepth = ctx.createGain()
+    engine.connect(engineFilter)
+    engineFilter.connect(engineAmp)
+    engineAmp.connect(engineGain)
+    engineGain.connect(output)
+    pulse.connect(pulseDepth)
+    pulseDepth.connect(engineAmp.gain)
+
+    // 路面：ノイズを帯域で絞った「ザー」。ブルドーザーはキャタピラらしく脈打たせる。
+    const road = ctx.createBufferSource()
+    road.buffer = getRailNoiseBuffer(ctx)
+    road.loop = true
+    const roadFilter = ctx.createBiquadFilter()
+    roadFilter.type = 'bandpass'
+    roadFilter.Q.value = 0.8
+    const roadAmp = ctx.createGain()
+    const roadGain = silentGain()
+    const roadPulse = ctx.createOscillator()
+    roadPulse.type = 'square'
+    const roadPulseDepth = ctx.createGain()
+    road.connect(roadFilter)
+    roadFilter.connect(roadAmp)
+    roadAmp.connect(roadGain)
+    roadGain.connect(output)
+    roadPulse.connect(roadPulseDepth)
+    roadPulseDepth.connect(roadAmp.gain)
+
+    // サイレン：1秒周期の矩形波で高い音と低い音を切り替える「ピーポー」。
+    const siren = ctx.createOscillator()
+    siren.type = 'triangle'
+    siren.frequency.value = (CAR_ROAD_SIREN_HIGH + CAR_ROAD_SIREN_LOW) / 2
+    const sirenSwitch = ctx.createOscillator()
+    sirenSwitch.type = 'square'
+    sirenSwitch.frequency.value = 0.9
+    const sirenDepth = ctx.createGain()
+    sirenDepth.gain.value = (CAR_ROAD_SIREN_HIGH - CAR_ROAD_SIREN_LOW) / 2
+    const sirenGain = silentGain()
+    sirenSwitch.connect(sirenDepth)
+    sirenDepth.connect(siren.frequency)
+    siren.connect(sirenGain)
+    sirenGain.connect(output)
+
+    for (const source of [engine, pulse, roadPulse, siren, sirenSwitch]) source.start(now)
+    road.start(now, Math.random() * 1.5)
+
+    nodes = {
+      engine, engineFilter, pulse, pulseDepth, engineAmp, engineGain,
+      road, roadFilter, roadPulse, roadPulseDepth, roadAmp, roadGain,
+      siren, sirenSwitch, sirenDepth, sirenGain,
+    }
+    return nodes
+  }
+
+  const applyProfile = (target: CarRoadSoundNodes, now: number) => {
+    const profile = CAR_ROAD_SOUND_PROFILES[vehicleId]
+    target.engine.type = profile.engineType
+    setAudioParamNow(target.engineFilter.frequency, profile.engineFilter, now)
+    setAudioParamNow(target.pulse.frequency, profile.pulseRate, now)
+    // 音量 = (1 - depth/2) ± depth/2 で、0〜1 の間を脈打つ。
+    setAudioParamNow(target.engineAmp.gain, 1 - profile.pulseDepth / 2, now)
+    setAudioParamNow(target.pulseDepth.gain, profile.pulseDepth / 2, now)
+    setAudioParamNow(target.roadFilter.frequency, profile.roadFilter, now)
+    const roadDepth = profile.roadPulseRate > 0 ? 0.45 : 0
+    setAudioParamNow(target.roadPulse.frequency, Math.max(0.1, profile.roadPulseRate), now)
+    setAudioParamNow(target.roadAmp.gain, 1 - roadDepth, now)
+    setAudioParamNow(target.roadPulseDepth.gain, roadDepth, now)
+  }
+
+  const start = () => {
+    if (disposed || !enabled || !isSoundEnabled()) return
+    const ctx = getSharedAudioContext()
+    if (!ctx) return
+    const target = ensureNodes(ctx)
+    const now = ctx.currentTime
+    const profile = CAR_ROAD_SOUND_PROFILES[vehicleId]
+    applyProfile(target, now)
+
+    // 「ブォーン」：低い回転から巡航の回転へ上げる。
+    const frequency = target.engine.frequency
+    const cruise = profile.engineFrequency
+    ;(frequency as AudioParam & { cancelScheduledValues?: (time: number) => void }).cancelScheduledValues?.(now)
+    frequency.value = cruise * CAR_ROAD_REV_START_RATIO
+    frequency.setValueAtTime(cruise * CAR_ROAD_REV_START_RATIO, now)
+    frequency.exponentialRampToValueAtTime(cruise, now + CAR_ROAD_REV_UP_SECONDS)
+
+    setSmoothedAudioParam(target.engineGain.gain, profile.engineGain, now, 0.08)
+    setSmoothedAudioParam(target.roadGain.gain, profile.roadGain, now, 0.2)
+    setSmoothedAudioParam(target.sirenGain.gain, profile.siren ? 0.008 : 0, now, 0.1)
+  }
+
+  const stop = () => {
+    if (nodes === undefined) return
+    const now = getSharedAudioContext()?.currentTime ?? 0
+    setSmoothedAudioParam(nodes.engineGain.gain, 0, now, 0.06)
+    setSmoothedAudioParam(nodes.roadGain.gain, 0, now, 0.06)
+    setSmoothedAudioParam(nodes.sirenGain.gain, 0, now, 0.06)
+  }
+
   return {
-    setRunning(running) {
+    setRunning(nextRunning) {
       try {
-        const profile = CAR_ROAD_SOUND_PROFILES[vehicleId]
-        controller.setVehicleProfile(profile)
-        controller.update(running ? 1 : 0, running ? 'running' : 'ready')
+        // engine側がstateの変化ごとに呼ぶため、同じ状態では回り上がりをやり直さない。
+        if (nextRunning === running && (nodes !== undefined || !nextRunning)) return
+        running = nextRunning
+        if (running) start()
+        else stop()
       } catch {
         // Web Audio実装が壊れていても、走行状態や画面操作を止めない。
       }
     },
     setVehicle(nextVehicleId) {
       vehicleId = nextVehicleId
-      controller.setVehicleProfile(CAR_ROAD_SOUND_PROFILES[nextVehicleId])
     },
     dispose() {
-      try {
-        controller.dispose()
-      } catch {
-        // 解放処理の失敗も画面離脱を妨げない。
+      if (disposed) return
+      disposed = true
+      running = false
+      if (nodes === undefined) return
+      const all = Object.values(nodes) as AudioNode[]
+      for (const node of all) {
+        if ('stop' in node) {
+          try { (node as AudioScheduledSourceNode).stop() } catch { /* 既に停止済み */ }
+        }
       }
+      for (const node of all) {
+        try { node.disconnect() } catch { /* Web Audioモックや解放済みノード */ }
+      }
+      nodes = undefined
     },
   }
 }
