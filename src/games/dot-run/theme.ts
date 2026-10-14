@@ -8,7 +8,7 @@ export type Theme = {
   /** そらの いちばん うえの 色が おわる 高さと、ちへいせんの 高さ（せかいの y）。 */
   skyTop: number
   horizon: number
-  celestial: 'sun' | 'sunset' | 'moon' | 'crescent'
+  celestial: 'sun' | 'sunset' | 'moon' | 'crescent' | 'earth' | 'none'
   /** じめんの うえの 部分（ハイライト・あかるい・ふつう・かげ）。 */
   top: [string, string, string, string]
   /** つちの 部分（あかるい → くらい）。 */
@@ -16,16 +16,16 @@ export type Theme = {
   outline: string
   /** つちに まざる こいし（あかるい・くらい）。 */
   pebble: [string, string]
-  topKind: 'grass' | 'sand' | 'snow' | 'rock' | 'cloud'
-  platform: { top: string; light: string; main: string; dark: string; outline: string; kind: 'wood' | 'drift' | 'ice' | 'stone' | 'star' }
-  rock: { o: string; L: string; l: string; m: string; d: string; cap: 'moss' | 'star' | 'snow' | 'none' }
-  far: { kind: 'mountains' | 'sea' | 'peaks' | 'mesas' | 'cloudsea'; colors: string[]; snow: string[] }
-  mid: { kind: 'hills' | 'palms' | 'pines' | 'spires' | 'puffs'; colors: string[]; accent: string[] }
+  topKind: 'grass' | 'sand' | 'snow' | 'rock' | 'cloud' | 'seabed' | 'moon'
+  platform: { top: string; light: string; main: string; dark: string; outline: string; kind: 'wood' | 'drift' | 'ice' | 'stone' | 'star' | 'coral' | 'metal' }
+  rock: { o: string; L: string; l: string; m: string; d: string; cap: 'moss' | 'star' | 'snow' | 'weed' | 'crater' | 'none' }
+  far: { kind: 'mountains' | 'sea' | 'peaks' | 'mesas' | 'cloudsea' | 'reef' | 'lunar'; colors: string[]; snow: string[] }
+  mid: { kind: 'hills' | 'palms' | 'pines' | 'spires' | 'puffs' | 'kelp' | 'craters'; colors: string[]; accent: string[] }
   near: { colors: string[] }
   cloud: [string, string, string] | null
-  weather: 'petals' | 'sparkle' | 'snow' | 'dust' | 'twinkle'
-  deco: 'flowers' | 'shells' | 'snow' | 'pebbles' | 'stars'
-  prop: 'tree' | 'palm' | 'pine' | 'cactus' | 'none'
+  weather: 'petals' | 'sparkle' | 'snow' | 'dust' | 'twinkle' | 'bubbles' | 'stardust'
+  deco: 'flowers' | 'shells' | 'snow' | 'pebbles' | 'stars' | 'reef' | 'moonrocks'
+  prop: 'tree' | 'palm' | 'pine' | 'cactus' | 'seaweed' | 'space' | 'none'
   /** HUD や タイトルの カードの 色あい。 */
   card: string
 }
@@ -135,5 +135,48 @@ export const THEMES: Record<StageId, Theme> = {
     deco: 'stars',
     prop: 'none',
     card: '#5a3aa8',
+  },
+  sea: {
+    // うえ（うみの おもて）ほど あかるく、ちへいせんの ほうは ふかい あお。
+    sky: ['#8af0f4', '#5cd4ec', '#3cb4e0', '#2894cc', '#1e76b4', '#185a98', '#14467c'],
+    skyTop: -150,
+    horizon: 118,
+    celestial: 'none',
+    top: ['#fff4cc', '#f4dca0', '#d8bc80', '#a89068'],
+    dirt: ['#c8a878', '#a88c64', '#887254', '#6a5844', '#4c4034'],
+    outline: '#1e2a3a',
+    pebble: ['#ffe8f0', '#5a6a7a'],
+    topKind: 'seabed',
+    platform: { top: '#ffd4e4', light: '#ff9ab8', main: '#f06a94', dark: '#b8406e', outline: '#4a1430', kind: 'coral' },
+    rock: { o: '#142838', L: '#a8d0d8', l: '#7aa8b8', m: '#5a8498', d: '#3e6078', cap: 'weed' },
+    far: { kind: 'reef', colors: ['#2c7ab0', '#22689c', '#1c5888', '#164a76'], snow: ['#3e94c4', '#2a80b4'] },
+    mid: { kind: 'kelp', colors: ['#1c8a7a', '#167064', '#105a54', '#0c4646', '#0a383c'], accent: ['#ff7aa0', '#ffb04a', '#b890ff'] },
+    near: { colors: ['#e8cc94', '#c8aa78', '#a88c64', '#8a7254'] },
+    cloud: null,
+    weather: 'bubbles',
+    deco: 'reef',
+    prop: 'seaweed',
+    card: '#1e86c0',
+  },
+  moon: {
+    sky: ['#02020c', '#040616', '#080c22', '#0c1230', '#121a3e', '#1a244c'],
+    skyTop: -180,
+    horizon: 116,
+    celestial: 'earth',
+    top: ['#f4f4f8', '#d8d8e2', '#b4b4c4', '#8c8ca2'],
+    dirt: ['#a4a4b8', '#8a8aa0', '#727288', '#5a5a70', '#444458'],
+    outline: '#1a1a2a',
+    pebble: ['#e4e4ee', '#3e3e52'],
+    topKind: 'moon',
+    platform: { top: '#f0f4fa', light: '#c8d0dc', main: '#98a4b4', dark: '#68748a', outline: '#1e2230', kind: 'metal' },
+    rock: { o: '#1a1a2a', L: '#ececf4', l: '#c4c4d4', m: '#9a9ab0', d: '#6c6c86', cap: 'crater' },
+    far: { kind: 'lunar', colors: ['#7c7c94', '#646480', '#50506c', '#40405a'], snow: ['#a8a8c0', '#8c8ca8'] },
+    mid: { kind: 'craters', colors: ['#b0b0c4', '#9696ae', '#7e7e98', '#686884', '#545470'], accent: ['#d8d8e8', '#3e3e56'] },
+    near: { colors: ['#c4c4d4', '#a6a6ba', '#8a8aa2', '#70708a'] },
+    cloud: null,
+    weather: 'stardust',
+    deco: 'moonrocks',
+    prop: 'space',
+    card: '#4a4a78',
   },
 }

@@ -540,3 +540,138 @@ export const ROCK = [
   '..oddddddddddo..',
   '...oooooooooo...',
 ]
+
+// ---------------- うみの なか・つきの いきもの ----------------
+
+export const OCTOPUS_PAL: Palette = {
+  o: '#4a1030', r: '#ff6a80', R: '#d03a62', y: '#ffb4c0', w: '#ffffff', e: '#2a0818', p: '#ff9ab0',
+}
+/** たこ（あしを くねくね うごかして あるく）。 */
+export const OCTOPUS = [
+  [
+    '.....oooooo.....',
+    '...oorrrrrroo...',
+    '..oyyrrrrrrrro..',
+    '.oyyrrrrrrrrrRo.',
+    '.oyrrrrrrrrrrRo.',
+    '.orwwrrrwwrrrRo.',
+    '.orewrrrewrrRRo.',
+    '.oprrrooorprRRo.',
+    '..orrrrrrrrRRo..',
+    '.orRrRrrRrRrRRo.',
+    '.oRo.oRo.oRo.oRo',
+    '.oo..oo..oo...oo',
+  ],
+  [
+    '................',
+    '.....oooooo.....',
+    '...oorrrrrroo...',
+    '..oyyrrrrrrrro..',
+    '.oyyrrrrrrrrrRo.',
+    '.orwwrrrwwrrrRo.',
+    '.orewrrrewrrRRo.',
+    '.oprrrooorprRRo.',
+    '..orrrrrrrrRRo..',
+    'oRrRrrRrRrrRrRRo',
+    'oRo.oRo.oRo.oRo.',
+    '.oo..oo..oo..oo.',
+  ],
+]
+
+export const FISH_PAL: Palette = {
+  o: '#3a1408', c: '#ff8a2a', C: '#d85a10', y: '#ffc070', w: '#ffffff', W: '#d8e8f4', e: '#1a0804', k: '#2a1408',
+}
+/** くまのみ（ひだり むきに およぐ。しっぽを ふる）。 */
+export const FISH = [
+  [
+    '.....ooooo......',
+    '...ooycwwcoo..oo',
+    '..oyccwWccwcooco',
+    '.oweccwWccwWcoco',
+    '.occccwWccwWccco',
+    'okcCccwWCcwWccco',
+    '.oCCCcwWCCwWCoco',
+    '..oCCCwWCCoooCco',
+    '...oooooooo..ooo',
+  ],
+  [
+    '.....ooooo......',
+    '...ooycwwcoo....',
+    '..oyccwWccwco...',
+    '.oweccwWccwWcooo',
+    '.occccwWccwWccco',
+    'okcCccwWCcwWccco',
+    '.oCCCcwWCCwWCooo',
+    '..oCCCwWCCoooCco',
+    '...oooooooo...oo',
+  ],
+]
+
+export const ALIEN_PAL: Palette = {
+  o: '#14301a', g: '#7ae070', G: '#3aa04a', y: '#e8ff90', w: '#ffffff', e: '#14301a', a: '#ffe040', p: '#ff8ab0',
+}
+/** つきの うちゅうじん（ひとつめで アンテナが ぴこぴこ）。 */
+export const ALIEN = [
+  [
+    '......oo........',
+    '.....oaao.......',
+    '......oo........',
+    '.......o........',
+    '....oooooo......',
+    '...oyggggggo....',
+    '..oygwwwwggGo...',
+    '..ogweewwggGo...',
+    '..ogweewwggGo...',
+    '..oggwwwwgGGo...',
+    '..opggggggpGo...',
+    '...oGGGGGGGo....',
+    '...oGo.oGo......',
+    '...oo..oo.......',
+  ],
+  [
+    '.......oo.......',
+    '......oaao......',
+    '.......oo.......',
+    '.......o........',
+    '....oooooo......',
+    '...oyggggggo....',
+    '..oygwwwwggGo...',
+    '..ogweewwggGo...',
+    '..ogweewwggGo...',
+    '..oggwwwwgGGo...',
+    '..opggggggpGo...',
+    '...oGGGGGGGo....',
+    '....oGo.oGo.....',
+    '....oo..oo......',
+  ],
+]
+
+export const UFO_PAL: Palette = {
+  o: '#1a1630', c: '#c8f4ff', C: '#7ad0f0', g: '#7ae070', s: '#e4e8f4', S: '#9aa0bc', d: '#6a7090',
+  r: '#ff5a6a', y: '#ffe040', b: '#5ad0ff', k: '#14301a',
+}
+/** UFO（まどから うちゅうじんが みている。ライトが じゅんばんに ひかる）。 */
+export const UFO = [
+  [
+    '.....oooooo.....',
+    '....occcCCCo....',
+    '...occgggCCCo...',
+    '...ocgkgkgCCo...',
+    '.oooooooooooooo.',
+    'osssssssssssssSo',
+    'oSrSSySSbSSrSSdo',
+    '.oddddddddddddo.',
+    '...oooooooooo...',
+  ],
+  [
+    '.....oooooo.....',
+    '....occcCCCo....',
+    '...occgggCCCo...',
+    '...ocgkgkgCCo...',
+    '.oooooooooooooo.',
+    'osssssssssssssSo',
+    'oSbSSrSSySSbSSdo',
+    '.oddddddddddddo.',
+    '...oooooooooo...',
+  ],
+]

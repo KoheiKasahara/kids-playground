@@ -222,11 +222,15 @@ button.window:focus-visible {
 .stageCard[data-stage='meadow'] { background: linear-gradient(180deg, #4aa84a 0%, #2e8040 50%, #1c5a30 100%); }
 .stageCard[data-stage='rocky'] { background: linear-gradient(180deg, #c07a50 0%, #97553a 50%, #6a3626 100%); }
 .stageCard[data-stage='starry'] { background: linear-gradient(180deg, #6a48b8 0%, #46288c 50%, #26145a 100%); }
+.stageCard[data-stage='sea'] { background: linear-gradient(180deg, #2a9ad0 0%, #1a6aa8 50%, #12407a 100%); }
+.stageCard[data-stage='moon'] { background: linear-gradient(180deg, #5a5a86 0%, #34345a 50%, #16162e 100%); }
 
 .stageList li:nth-child(2) .stageCard { animation-delay: .08s; }
 .stageList li:nth-child(3) .stageCard { animation-delay: .16s; }
 .stageList li:nth-child(4) .stageCard { animation-delay: .24s; }
 .stageList li:nth-child(5) .stageCard { animation-delay: .32s; }
+.stageList li:nth-child(6) .stageCard { animation-delay: .4s; }
+.stageList li:nth-child(7) .stageCard { animation-delay: .48s; }
 
 @keyframes cardIn {
   from { opacity: 0; transform: translateY(16px); }
@@ -248,6 +252,8 @@ button.window:focus-visible {
 .thumb[data-stage='snow'] { background: #18244f; }
 .thumb[data-stage='rocky'] { background: #aacdea; }
 .thumb[data-stage='starry'] { background: #1c104c; }
+.thumb[data-stage='sea'] { background: #2894cc; }
+.thumb[data-stage='moon'] { background: #080c22; }
 
 .thumb img {
   display: block;

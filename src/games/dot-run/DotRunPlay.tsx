@@ -99,7 +99,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
     worldRef.current = world
     // 開発中だけ ブラウザから じょうたいを のぞけるように する（本番の ビルドには はいらない）。
     if (import.meta.env.DEV) (window as unknown as { __dotRunWorld?: World }).__dotRunWorld = world
-    const fx: Fx = createFx()
+    const fx: Fx = createFx(stage.env)
     const scene = sceneFor(stage, world)
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d') ?? null

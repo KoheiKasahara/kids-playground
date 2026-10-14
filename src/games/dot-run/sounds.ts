@@ -258,6 +258,20 @@ const SONGS: Record<StageId, Song> = {
     lead: 'triangle',
     drums: 'bell',
   },
+  sea: {
+    bpm: 108,
+    melody: 'F4 A4 C5 F5 - - E5 D5 | C5 - A4 - C5 - - - | D5 F5 A5 - G5 F5 E5 F5 | G5 - - - . . C5 . | F5 - E5 F5 G5 - A5 - | Bb5 - A5 G5 F5 - D5 - | C5 - D5 E5 G5 - E5 - | F5 - - - . . . .',
+    bass: ['F2', 'F2', 'D3', 'C3', 'F2', 'Bb2', 'C3', 'F2'],
+    lead: 'triangle',
+    drums: 'soft',
+  },
+  moon: {
+    bpm: 100,
+    melody: 'A4 - E5 - A5 - G5 - | E5 - - - D5 - C5 - | B4 - D5 - G5 - F5 - | E5 - - - . . . . | F5 - A5 - C6 - B5 - | A5 - - - E5 - G5 - | F5 - E5 - D5 - B4 - | A4 - - - . . . .',
+    bass: ['A2', 'A2', 'G2', 'E2', 'F2', 'A2', 'D3', 'E2'],
+    lead: 'triangle',
+    drums: 'bell',
+  },
 }
 
 /** ステージの BGM を ながす。とめる 関数を かえす。 */

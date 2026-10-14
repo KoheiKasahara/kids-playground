@@ -113,6 +113,8 @@ export function aurora(w: number, h: number): Img | null {
 
 /** おひさま・ゆうひ・おつきさま（ひかりの わ つき）。 */
 export function celestial(theme: Theme): Img | null {
+  if (theme.celestial === 'none') return null
+  if (theme.celestial === 'earth') return earth()
   const size = theme.celestial === 'sunset' ? 76 : theme.celestial === 'crescent' ? 60 : 44
   const pix = Pix.create(size, size)
   if (!pix) return null
@@ -156,6 +158,71 @@ export function celestial(theme: Theme): Img | null {
       }
     }
   }
+  return pix.done()
+}
+
+/** 2じげんの なめらかな ノイズ（0〜1）。 */
+function noise2(x: number, y: number, seed: number) {
+  const x0 = Math.floor(x), y0 = Math.floor(y)
+  const sx = x - x0, sy = y - y0
+  const fx = sx * sx * (3 - 2 * sx), fy = sy * sy * (3 - 2 * sy)
+  const a = hash2(x0, y0, seed), b = hash2(x0 + 1, y0, seed), c = hash2(x0, y0 + 1, seed), d = hash2(x0 + 1, y0 + 1, seed)
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy
+}
+
+/** つきから みた ちきゅう（あおい うみ・みどりの りく・しろい くも。みぎがわは よる）。 */
+function earth(): Img | null {
+  const size = 48
+  const pix = Pix.create(size, size)
+  if (!pix) return null
+  const c = size / 2 - .5
+  const radius = 13
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x - c, dy = y - c
+      const d = Math.hypot(dx, dy)
+      if (d < radius) {
+        // まるい ほしに みえるように、ふちほど もようを ちぢめる。
+        const nz = Math.sqrt(Math.max(0, 1 - (d / radius) ** 2))
+        const u = dx / (radius * (.6 + nz * .4)), v = dy / radius
+        const land = noise2(u * 2.4 + 3, v * 2.4 + 1, 41) * .7 + noise2(u * 6, v * 6, 42) * .3
+        const cloudN = noise2(u * 3 + 7, v * 7, 43) * .6 + noise2(u * 8, v * 8, 44) * .4
+        const lightK = -dx / radius * .8 - dy / radius * .35 + nz * .5
+        const night = lightK < -.05 + (bayer(x, y) - .5) * .25
+        let color: string
+        if (cloudN > .66) color = night ? '#6a7aa0' : '#ffffff'
+        else if (land > .58) color = night ? '#1c3a2a' : land > .7 ? '#b8a060' : land > .64 ? '#5ab04a' : '#3a8a3e'
+        else color = night ? '#102654' : lightK > .55 ? '#5aa8f4' : '#2a6ad8'
+        if (d > radius - 1.2) color = night ? '#0c1a40' : '#8ad0ff'
+        pix.set(x, y, pack(color))
+      } else {
+        const halo = radius + 9
+        const k = 1 - (d - radius) / (halo - radius)
+        if (k > 0 && k * k * .85 > bayer(x, y)) pix.set(x, y, pack(k > .6 ? '#4a7ad0' : '#24407a'))
+      }
+    }
+  }
+  return pix.done()
+}
+
+/** うちゅうふくの ヘルメット（つきの ステージで うさぎに かぶせる）。 */
+export function helmetSprite(): Img | null {
+  const size = 22
+  const pix = Pix.create(size, size)
+  if (!pix) return null
+  const c = size / 2 - .5
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = Math.hypot(x - c, y - c)
+      if (d > 10.5) continue
+      const ang = Math.atan2(y - c, x - c)
+      if (d > 9.6) pix.set(x, y, pack('#3a4a6a'))
+      else if (d > 8.7) pix.set(x, y, pack(ang > -.4 && ang < 2.2 ? '#9ab0d0' : '#e8f4ff'))
+      else if (d > 5.5 && d < 7.8 && ang > -2.7 && ang < -1.9) pix.set(x, y, pack('#ffffff', 220))
+      else pix.set(x, y, pack('#bfe4ff', 46))
+    }
+  }
+  pix.set(Math.round(c + 5), Math.round(c + 4), pack('#ffffff'))
   return pix.done()
 }
 
@@ -220,7 +287,9 @@ export function farStrip(theme: Theme): Img | null {
     }
     return pix.done()
   }
+  if (kind === 'reef') return reefStrip(pix, pc, snow.map(c => pack(c)), haze)
   const peaks = kind === 'peaks'
+  const lunar = kind === 'lunar'
   const ridge = new Float32Array(FAR_W)
   if (kind === 'mesas') {
     // てっぺんが たいらな いわの だいち。
@@ -234,6 +303,18 @@ export function farStrip(theme: Theme): Img | null {
     for (let x = 0; x < FAR_W; x++) {
       const k = ((x % 32) - 16) / 16
       ridge[x] = FAR_H - (26 + loopNoise(x / 60, FAR_W / 60, 3) * 22 + Math.sqrt(Math.max(0, 1 - k * k)) * 7)
+    }
+  } else if (lunar) {
+    // まるく なだらかな つきの やま。
+    const r = rng(13)
+    const list = Array.from({ length: 8 }, () => ({ x: r() * FAR_W, h: 26 + r() * 40, w: 50 + r() * 60 }))
+    for (let x = 0; x < FAR_W; x++) {
+      let h = 14 + loopNoise(x / 24, FAR_W / 24, 3) * 6
+      for (const p of list) {
+        const dx = Math.min(Math.abs(x - p.x), FAR_W - Math.abs(x - p.x)) / p.w
+        if (dx < 1) h = Math.max(h, p.h * (1 - dx * dx) + loopNoise(x / 7, FAR_W / 7, 4) * 3)
+      }
+      ridge[x] = FAR_H - h
     }
   } else if (peaks) {
     const r = rng(11)
@@ -267,7 +348,9 @@ export function farStrip(theme: Theme): Img | null {
       let color = lit ? (depth < 2 ? pc[0] : bayer(x, y) < .3 ? pc[0] : pc[1]) : depth < 1 ? pc[1] : bayer(x, y) < .25 ? pc[1] : pc[2]
       const snowLine = peaks ? FAR_H * .62 : FAR_H * .52
       const capDepth = (snowLine - top) * (peaks ? .7 : .35) + loopNoise(x / 5, FAR_W / 5, 7) * 5
-      if (top < snowLine && depth < capDepth) {
+      if (lunar) {
+        if (lit && depth < 1) color = pack(snow[0])
+      } else if (top < snowLine && depth < capDepth) {
         color = pack(lit ? snow[0] : snow[1])
         if (peaks && !lit && depth > capDepth - 3 && bayer(x, y) > .5) color = pack(snow[2])
       }
@@ -275,6 +358,60 @@ export function farStrip(theme: Theme): Img | null {
         const k = (y - (FAR_H - 16)) / 16
         if (k > bayer(x, y)) color = haze
       }
+      pix.set(x, y, color)
+    }
+  }
+  if (lunar) {
+    // やまはだの クレーター。
+    const r = rng(17)
+    for (let i = 0; i < 26; i++) {
+      const cx = Math.floor(r() * FAR_W), rx = 3 + r() * 6
+      const cy = Math.round(ridge[cx] + rx * .6 + 2 + r() * 20)
+      paintCrater(pix, cx, cy, rx, rx * .4, pc[3], pack(snow[1]), FAR_W)
+    }
+  }
+  return pix.done()
+}
+
+/** だえんの クレーター（ひだりうえが かげ、みぎしたの ふちが ひかる）。 */
+function paintCrater(pix: Pix, cx: number, cy: number, rx: number, ry: number, shadow: number, rim: number, wrap = 0) {
+  for (let y = Math.floor(cy - ry - 1); y <= cy + ry + 1; y++) {
+    for (let x = Math.floor(cx - rx - 1); x <= cx + rx + 1; x++) {
+      const wx = wrap ? (x + wrap) % wrap : x
+      if (!pix.has(wx, y)) continue
+      const d = Math.hypot((x - cx) / rx, (y - cy) / ry)
+      if (d < 1) {
+        if ((x - cx) / rx + (y - cy) / ry * .6 < .25) pix.set(wx, y, shadow)
+      } else if (d < 1 + 1.4 / ry && y > cy) pix.set(wx, y, rim)
+    }
+  }
+}
+
+/** うみの そこの いわの さんごしょう（うえから ひかりが さす）。 */
+function reefStrip(pix: Pix, pc: number[], light: number[], haze: number): Img {
+  const r = rng(19)
+  const ridge = new Float32Array(FAR_W)
+  for (let x = 0; x < FAR_W; x++) {
+    ridge[x] = FAR_H - (16 + loopNoise(x / 46, FAR_W / 46, 5) * 26 + loopNoise(x / 11, FAR_W / 11, 6) * 6)
+  }
+  // ところどころに たかい いわの はしら。
+  for (let i = 0; i < 6; i++) {
+    const px = Math.floor(r() * FAR_W), half = 5 + r() * 7, h = 50 + r() * 34
+    for (let dx = -Math.ceil(half) - 3; dx <= half + 3; dx++) {
+      const x = (px + dx + FAR_W) % FAR_W
+      const k = Math.abs(dx) / half
+      const top = FAR_H - h * (k < 1 ? 1 - k * k * .35 : Math.max(0, .65 - (k - 1) * .5))
+      ridge[x] = Math.min(ridge[x], top + loopNoise(x / 3, FAR_W / 3, 8) * 3)
+    }
+  }
+  for (let x = 0; x < FAR_W; x++) {
+    const top = Math.round(ridge[x])
+    for (let y = Math.max(0, top); y < FAR_H; y++) {
+      const depth = y - top
+      let color = depth < 1 ? light[0] : depth < 3 ? (bayer(x, y) < .5 ? light[1] : pc[0]) : pc[Math.min(3, ditherIndex(depth / 50, 3, x, y))]
+      // あなぼこ。
+      if (depth > 6 && hash2(x >> 2, y >> 2, 3) < .06 && ((x & 3) + (y & 3)) % 3 === 0) color = pc[3]
+      if (y > FAR_H - 18 && (y - (FAR_H - 18)) / 18 > bayer(x, y)) color = haze
       pix.set(x, y, color)
     }
   }
@@ -409,6 +546,65 @@ export function midStrip(theme: Theme): Img | null {
     }
     return pix.done()
   }
+  if (kind === 'kelp') {
+    // うみの そこの すなと、ゆらゆら のびる こんぶ・まるい さんご。
+    const floor = (x: number) => MID_H - (12 + loopNoise(x / 50, MID_W / 50, 3) * 10)
+    const water = theme.sky.at(-1)!
+    const kelp = Array.from({ length: 22 }, () => ({ x: r() * MID_W, h: 30 + r() * 56, phase: r() * 6, lean: (r() - .5) * .3 }))
+    kelp.sort((a, b) => b.h - a.h)
+    for (const k of kelp) {
+      const base = floor(k.x) + 2
+      for (let i = 0; i < k.h; i++) {
+        const y = Math.round(base - i)
+        const x = k.x + Math.sin(i * .12 + k.phase) * 3 + i * k.lean
+        const wide = i % 9 < 4 && i > 6 ? 2 : 1
+        for (let dx = -wide; dx <= wide; dx++) pix.set((Math.round(x) + dx + MID_W) % MID_W, y, dx < 0 ? pc[1] : dx > 0 ? pc[3] : pc[2])
+      }
+    }
+    const corals = Array.from({ length: 12 }, () => ({ x: r() * MID_W, rad: 5 + r() * 7, color: accent[Math.floor(r() * accent.length)] }))
+    for (const c of corals) {
+      const base = floor(c.x)
+      const shades = [mixHex(c.color, water, .35), mixHex(c.color, water, .55), mixHex(c.color, water, .72)].map(v => pack(v))
+      for (let y = Math.floor(base - c.rad * 1.4); y <= base + 1; y++) {
+        for (let x = Math.floor(c.x - c.rad); x <= c.x + c.rad; x++) {
+          const d = Math.hypot(x - c.x, (y - base) * .75)
+          if (d > c.rad) continue
+          const lightK = (c.x - x) / c.rad * .4 + (base - y) / c.rad
+          const idx = lightK > .9 ? 0 : lightK > .4 ? (bayer(x, y) < .5 ? 0 : 1) : lightK > 0 ? 1 : 2
+          pix.set((x + MID_W) % MID_W, y, (x + y * 3) % 5 === 0 && d < c.rad - 1 ? shades[2] : shades[idx])
+        }
+      }
+    }
+    for (let x = 0; x < MID_W; x++) {
+      const top = Math.round(floor(x))
+      for (let y = top; y < MID_H; y++) pix.set(x, y, y - top < 1 ? pc[1] : pc[Math.min(4, ditherIndex((y - top) / 16, 3, x, y) + 2)])
+    }
+    return pix.done()
+  }
+  if (kind === 'craters') {
+    // なだらかな つきの じめんと、たくさんの クレーター。
+    const hill = (x: number) => MID_H - (18 + loopNoise(x / 80, MID_W / 80, 4) * 22 + loopNoise(x / 24, MID_W / 24, 6) * 5)
+    for (let x = 0; x < MID_W; x++) {
+      const top = Math.round(hill(x))
+      const slope = hill(x + 2) - hill(x - 2)
+      for (let y = top; y < MID_H; y++) {
+        const d = y - top
+        const idx = d < 1 ? 0 : ditherIndex(Math.min(1, d / 40) * .75 + (slope > 0 ? 0 : .2), 4, x, y) + 1
+        pix.set(x, y, pc[Math.min(4, idx)])
+      }
+    }
+    for (let i = 0; i < 22; i++) {
+      const cx = Math.floor(r() * MID_W), rx = 3 + r() * 9
+      const cy = Math.round(hill(cx) + rx * .35 + 2 + r() * 14)
+      paintCrater(pix, cx, cy, rx, Math.max(1.5, rx * .32), pc[4], pack(accent[0]), MID_W)
+    }
+    for (let i = 0; i < 70; i++) {
+      const x = Math.floor(r() * MID_W)
+      const y = Math.round(hill(x)) + 3 + Math.floor(r() * 30)
+      if (y < MID_H) pix.set(x, y, pack(accent[1]))
+    }
+    return pix.done()
+  }
   // pines
   for (let x = 0; x < MID_W; x++) {
     for (let y = MID_H - 20; y < MID_H; y++) pix.set(x, y, pc[ditherIndex((y - (MID_H - 20)) / 20, 3, x, y) + 1])
@@ -469,6 +665,18 @@ export function nearStrip(theme: Theme): Img | null {
     if (theme.topKind === 'sand' && hash2(x, 0, 5) < .08) {
       for (let k = 1; k < 5; k++) pix.set(x + (k > 2 ? 1 : 0), Math.round(top) - k, pack('#6a8a3a'))
     }
+    // うみくさの しげみ。
+    if (theme.topKind === 'seabed' && hash2(x >> 1, 0, 6) < .16) {
+      const len = 4 + Math.floor(hash2(x, 1, 6) * 9)
+      for (let k = 1; k < len; k++) pix.set(x + Math.round(Math.sin(k * .5 + x) * 1), Math.round(top) - k, pack(k > len - 3 ? '#5ad08a' : '#2a8a5a'))
+    }
+  }
+  if (theme.topKind === 'moon') {
+    for (let i = 0; i < 18; i++) {
+      const cx = Math.floor(r() * NEAR_W), rx = 2.5 + r() * 5
+      const top = NEAR_H - (10 + loopNoise(cx / 40, NEAR_W / 40, 12) * 18)
+      paintCrater(pix, cx, Math.round(top + rx * .5 + 2 + r() * 6), rx, Math.max(1.2, rx * .35), pc[3], pack('#e4e4ee'), NEAR_W)
+    }
   }
   return pix.done()
 }
@@ -497,7 +705,20 @@ export function platformTile(theme: Theme, part: 'l' | 'm' | 'r' | 's', seed: nu
       if (p.kind === 'stone' && y > 1 && y < 6 && hash2(x, y, seed) < .12) c = dark
       if (p.kind === 'stone' && x === 8 && y > 1 && y < 7) c = dark
       if (p.kind === 'star' && y > 1 && y < 6 && ((x === 7 && y > 1) || (y === 3 && x > 5 && x < 10))) c = top
+      // さんごの ぶつぶつ。
+      if (p.kind === 'coral' && y > 1 && y < 6 && (x * 3 + y * 5 + seed) % 7 === 0) c = c === main ? dark : light
+      if (p.kind === 'coral' && y > 1 && y < 6 && (x * 3 + y * 5 + seed) % 7 === 1 && c === main) c = top
+      // てつの いたと ネジ、したに きいろと くろの しましま。
+      if (p.kind === 'metal' && y === 3 && (x === 3 || x === 12)) c = outline
+      if (p.kind === 'metal' && y === 2 && (x === 3 || x === 12)) c = top
+      if (p.kind === 'metal' && x === 8 && y > 1 && y < 5) c = dark
+      if (p.kind === 'metal' && (y === 5 || y === 6) && c !== outline) c = ((x + y) >> 1) % 2 ? pack('#ffc830') : pack('#2a2a3a')
       pix.set(x, y, c)
+    }
+    if (p.kind === 'coral' && x > 1 && x < 15 && hash2(x, seed, 4) < .22) {
+      const len = 1 + Math.floor(hash2(x, seed, 5) * 3)
+      for (let k = 0; k < len; k++) pix.set(x, 8 + k, k === len - 1 ? light : main)
+      pix.set(x, 8 + len, outline)
     }
     if (p.kind === 'ice' && x > 1 && x < 15 && r() < .35) {
       const len = 1 + Math.floor(r() * 5)
@@ -505,7 +726,7 @@ export function platformTile(theme: Theme, part: 'l' | 'm' | 'r' | 's', seed: nu
       pix.set(x, 8 + len, outline)
     }
   }
-  if (p.kind !== 'ice') for (let x = 1; x < 15; x++) if (hash2(x, 1, seed) < .5) pix.set(x, 8, pack(mixHex(p.outline, '#000000', .2), 90))
+  if (p.kind !== 'ice' && p.kind !== 'coral') for (let x = 1; x < 15; x++) if (hash2(x, 1, seed) < .5) pix.set(x, 8, pack(mixHex(p.outline, '#000000', .2), 90))
   return pix.done()
 }
 
@@ -528,6 +749,32 @@ export function rockTile(theme: Theme, seed: number): Img | null {
         ctx.fillStyle = k === 0 ? colors[0] : k === depth - 1 ? colors[2] : colors[1]
         ctx.fillRect(x, top + k, 1, 1)
       }
+    }
+  } else if (cap === 'weed') {
+    // いわの うえから のびる うみくさ。
+    for (const [x0, len] of [[4, 5 + Math.floor(r() * 3)], [7, 7 + Math.floor(r() * 3)], [11, 4 + Math.floor(r() * 3)]]) {
+      let top = 0
+      while (top < 16 && ROCK[top][x0] === '.') top++
+      for (let k = 0; k < len; k++) {
+        const y = top - 1 - k
+        if (y < 0) break
+        const sx = x0 + (Math.floor(k / 2) % 2)
+        ctx.fillStyle = '#0e3a2a'
+        ctx.fillRect(sx + 1, y, 1, 1)
+        ctx.fillStyle = k >= len - 2 ? '#8af0a0' : '#3ab86a'
+        ctx.fillRect(sx, y, 1, 1)
+      }
+    }
+    ctx.fillStyle = '#ff8ab0'
+    ctx.fillRect(10, 9, 2, 1)
+    ctx.fillRect(11, 8, 1, 1)
+  } else if (cap === 'crater') {
+    for (const [cx, cy, rr] of [[5, 7, 2], [10, 11, 1.5]]) {
+      ctx.fillStyle = theme.rock.d
+      ctx.fillRect(cx - Math.floor(rr), cy - 1, Math.ceil(rr * 2), 1)
+      ctx.fillRect(cx - Math.floor(rr) + 1, cy, Math.ceil(rr * 2) - 1, 1)
+      ctx.fillStyle = theme.rock.L
+      ctx.fillRect(cx - Math.floor(rr) + 1, cy + 1, Math.ceil(rr * 2) - 1, 1)
     }
   } else if (cap === 'star') {
     const star = ['..o..', '.oyo.', 'oyyyo', '.oyo.', 'o...o']
@@ -569,6 +816,22 @@ export function decoSprites(theme: Theme): Img[] {
     pals.push({ y: '#fff4b0', W: '#ffffff' })
     list.push(['.c.', 'cCc', 'cCc', '.c.'])
     pals.push({ c: '#8ae0ff', C: '#e0f8ff' })
+  } else if (theme.deco === 'reef') {
+    list.push(['g..g.', 'g.g.g', '.gg.g', '.g.g.', '..g..'])
+    pals.push({ g: '#2a9a5a' })
+    list.push(['p.p.p', 'ppPpp', '.pPp.', '..P..'])
+    pals.push({ p: '#ff7aa0', P: '#c84a7a' })
+    list.push(['..o..', '.oyo.', 'oyyyo', '.o.o.'])
+    pals.push({ o: '#b8302a', y: '#ff6a4a' })
+    list.push(['.oo.', 'owWo', 'oWWo', '.oo.'])
+    pals.push({ o: '#8a7aa8', w: '#fff0f4', W: '#e0d0f0' })
+  } else if (theme.deco === 'moonrocks') {
+    list.push(['.oo.', 'oLlo', 'olmo'])
+    pals.push({ o: '#2a2a3c', L: '#f0f0f6', l: '#c4c4d4', m: '#8a8aa2' })
+    list.push(['..ooo..', '.oLllo.', 'oLllmmo', 'olmmmmo'])
+    pals.push({ o: '#2a2a3c', L: '#f0f0f6', l: '#c4c4d4', m: '#8a8aa2' })
+    list.push(['.c.', 'cCc', 'cCc', 'oco'])
+    pals.push({ c: '#7ae0ff', C: '#e0fbff', o: '#3a5a8a' })
   } else {
     list.push(['.ww.', 'wwWw', 'WWWW'])
     pals.push({ w: '#ffffff', W: '#c4d8f4' })
@@ -609,6 +872,8 @@ export function propSprite(theme: Theme, seed: number): Img | null {
     return pix.done()
   }
   if (theme.prop === 'none') return null
+  if (theme.prop === 'seaweed') return seed % 3 === 0 ? coralSprite(r) : kelpSprite(r)
+  if (theme.prop === 'space') return seed % 2 === 0 ? landerSprite() : flagSprite()
   if (theme.prop === 'cactus') {
     const w = 22, h = 40
     const pix = Pix.create(w, h)
@@ -687,6 +952,120 @@ export function propSprite(theme: Theme, seed: number): Img | null {
     for (let x = Math.round(15 - (8 + t * 2.4)); x < 15 + 8 + t * 2.4; x++) if (hash2(x, t, 9) < .3) pix.set(x, bottom, snow[2])
   }
   return pix.done()
+}
+
+/** ゆらゆら のびる こんぶ（3〜4ほん）。 */
+function kelpSprite(r: () => number): Img | null {
+  const w = 26, h = 56
+  const pix = Pix.create(w, h)
+  if (!pix) return null
+  const green = ['#8af0a0', '#4ac070', '#2a9058', '#1a6040', '#0e3a2a'].map(c => pack(c))
+  const count = 3 + Math.floor(r() * 2)
+  for (let s = 0; s < count; s++) {
+    const bx = 6 + s * (14 / (count - 1)), len = 30 + r() * 24, phase = r() * 6
+    for (let i = 0; i < len; i++) {
+      const y = h - 1 - i
+      const x = Math.round(bx + Math.sin(i * .14 + phase) * 3)
+      pix.set(x - 1, y, green[4])
+      pix.set(x, y, green[2])
+      pix.set(x + 1, y, green[4])
+      // は（ひだりと みぎに こうごに）。
+      if (i > 5 && i % 7 === 0) {
+        const dir = (i / 7) % 2 ? 1 : -1
+        for (let k = 1; k < 5; k++) {
+          pix.set(x + dir * k, y - Math.floor(k / 2), k === 4 ? green[3] : green[1])
+          pix.set(x + dir * k, y - Math.floor(k / 2) + 1, green[3])
+        }
+        pix.set(x + dir, y - 1, green[0])
+      }
+    }
+    const top = Math.round(h - len)
+    pix.set(Math.round(bx + Math.sin(len * .14 + phase) * 3), top, green[0])
+  }
+  return pix.done()
+}
+
+/** えだわかれした さんご。 */
+function coralSprite(r: () => number): Img | null {
+  const w = 34, h = 38
+  const pix = Pix.create(w, h)
+  if (!pix) return null
+  const palettes = [['#ffd0e0', '#ff8ab0', '#e05a8a', '#8a2a50'], ['#ffe0a0', '#ffb04a', '#e07a20', '#8a3a10'], ['#e8d8ff', '#b890ff', '#8a5ad8', '#4a2a8a']]
+  const [L, m, d, o] = palettes[Math.floor(r() * palettes.length)].map(c => pack(c))
+  const branch = (x: number, y: number, ang: number, len: number, depth: number) => {
+    for (let i = 0; i < len; i++) {
+      const px = Math.round(x + Math.cos(ang) * i), py = Math.round(y + Math.sin(ang) * i)
+      const thick = depth === 0 ? 2 : 1
+      for (let t = -thick; t <= thick; t++) pix.set(px + t, py, t === -thick || t === thick ? o : t < 0 ? L : t > 0 ? d : m)
+    }
+    const ex = x + Math.cos(ang) * len, ey = y + Math.sin(ang) * len
+    if (depth < 2) {
+      branch(ex, ey, ang - .5 - r() * .3, len * .7, depth + 1)
+      branch(ex, ey, ang + .5 + r() * .3, len * .7, depth + 1)
+    } else {
+      pix.set(Math.round(ex), Math.round(ey) - 1, o)
+      pix.set(Math.round(ex), Math.round(ey), L)
+    }
+  }
+  branch(17, h - 1, -Math.PI / 2, 11, 0)
+  return pix.done()
+}
+
+/** つきに おりた ちいさな ちゃくりくせん。 */
+function landerSprite(): Img | null {
+  return spriteCanvas([
+    '...........o..........',
+    '..........oyo.........',
+    '...........o..........',
+    '........ooooooo.......',
+    '.......oCccccCCo......',
+    '......oCcwcccCCCo.....',
+    '......occcccccCCo.....',
+    '....oooooooooooooo....',
+    '...oGgggYgggYgggGGo...',
+    '...oGggygggygggGGGo...',
+    '...oGgggggggggggGGo...',
+    '...oGGGGGGGGGGGGGGo...',
+    '....oooooooooooooo....',
+    '....o.o...oo...o.o....',
+    '...o..o..oddo..o..o...',
+    '..o...o..oddo..o...o..',
+    '.o....o...oo...o....o.',
+    'ooo...o........o...ooo',
+  ], { o: '#1a1a2a', y: '#ff5a6a', c: '#c8f0ff', C: '#7ab0d8', w: '#ffffff', G: '#c08a10', g: '#ffd23c', Y: '#fff0a0', d: '#4a4a62' })
+}
+
+/** つきに たてた うさぎの はた（にんじんの もよう）。 */
+function flagSprite(): Img | null {
+  return spriteCanvas([
+    '.oo............',
+    'oYyoooooooooooo',
+    'oSsowwwwwwwwwWo',
+    'oSsowwwwgGwwwWo',
+    'oSsowwwwwgwwwWo',
+    'oSsowwwOOOwwwWo',
+    'oSsowwwOOqwwwWo',
+    'oSsowwwwOOwwwWo',
+    'oSsowwwwOqwwwWo',
+    'oSsowwwwwOwwwWo',
+    'oSsoWWWWWWWWWWo',
+    'oSsooooooooooo.',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oSso...........',
+    'oooooo.........',
+  ], { o: '#1e2230', S: '#f0f4fa', s: '#8a94a8', Y: '#fff0a0', y: '#ffc830', w: '#ffffff', W: '#c8d0e4', O: '#ff8a1e', q: '#d8560c', g: '#1f7a32', G: '#5ed05a' })
 }
 
 // ---------------- メダル・あわ ----------------

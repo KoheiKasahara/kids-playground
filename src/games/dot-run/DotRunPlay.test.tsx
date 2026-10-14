@@ -46,9 +46,11 @@ describe('dot-run play', () => {
   test('タイトルから ステージを えらんで あそび、もどれる', () => {
     render(<MemoryRouter><DotRunPlay /></MemoryRouter>)
     expect(screen.getByRole('heading', { name: 'ドットの ぴょんぴょんラン' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /^ステージ\d/ })).toHaveLength(5)
+    expect(screen.getAllByRole('button', { name: /^ステージ\d/ })).toHaveLength(7)
     expect(screen.getByRole('button', { name: /ステージ4 ごつごつ いわやま/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /ステージ5 きらきら ほしぞら/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ステージ6 ぶくぶく うみのなか/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ステージ7 ふわふわ おつきさま/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /ステージ1 はなの はらっぱ/ }))
     expect(screen.getByLabelText(/はなの はらっぱ。タップで ジャンプ/)).toBeInTheDocument()
     expect(startBgm).toHaveBeenCalledWith('meadow')
@@ -70,6 +72,19 @@ describe('dot-run play', () => {
     advance(60 * 5)
     expect(world().got.carrots).toBeGreaterThan(0)
     expect(screen.getByLabelText(`にんじん ${world().got.carrots}こ`)).toBeInTheDocument()
+  })
+
+  test('うみのなかと おつきさまは ふわっと うごく ステージとして はじまる', () => {
+    render(<MemoryRouter><DotRunPlay /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /ステージ6 ぶくぶく うみのなか/ }))
+    expect(startBgm).toHaveBeenCalledWith('sea')
+    advance(READY_FRAMES + 4)
+    expect(world().stage.env).toBe('water')
+    fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
+    fireEvent.click(screen.getByRole('button', { name: /ステージ7 ふわふわ おつきさま/ }))
+    expect(startBgm).toHaveBeenCalledWith('moon')
+    advance(READY_FRAMES + 4)
+    expect(world().stage.env).toBe('moon')
   })
 
   test('スペースキーでも ジャンプできる', () => {
