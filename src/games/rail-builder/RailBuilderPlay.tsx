@@ -472,6 +472,10 @@ export default function RailBuilderPlay() {
               <RailPreview kind="tunnel" />
               <span>トンネル</span>
             </button>
+            <button type="button" className={styles.toolButton} onClick={() => addPiece('crossing')} aria-label="ふみきりを ついか">
+              <RailPreview kind="crossing" />
+              <span>ふみきり</span>
+            </button>
             <button type="button" className={styles.toolButton} onClick={() => addPiece('depot')} aria-label="しゃこを ついか">
               <RailPreview kind="depot" />
               <span>しゃこ</span>

@@ -116,6 +116,17 @@ describe('RailBuilderPlay 縦画面の操作UI', () => {
     expect(addedPiece('rail-4').connections.b).toEqual({ pieceId: 'rail-5', connectorId: 'a' })
   })
 
+  test('ふみきりを えらんだ せんろへ つないで おける', async () => {
+    const user = userEvent.setup()
+    renderPlay()
+    selectPiece('rail-4')
+
+    await user.click(screen.getByRole('button', { name: 'ふみきりを ついか' }))
+
+    expect(addedPiece('rail-5').kind).toBe('crossing')
+    expect(addedPiece('rail-5').connections.a).toEqual({ pieceId: 'rail-4', connectorId: 'b' })
+  })
+
   test('つないだパーツが えらばれた ままなので、つづけて タップすると 線路が のびていく', async () => {
     const user = userEvent.setup()
     renderPlay()

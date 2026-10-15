@@ -75,6 +75,7 @@ import {
 } from './railTrainVisuals'
 import {
   createRailTrainSoundController,
+  playRailCrossingBellSound,
   playRailDepartureSound,
   playRailSnapSound,
   playRailStationDepartureSound,
@@ -82,6 +83,11 @@ import {
   primeAudio,
   type RailTrainSoundController,
 } from '../../utils/quizSound'
+import {
+  isRailCrossingApproached,
+  railCrossingLitLamp,
+  stepRailCrossingGate,
+} from './railCrossingModel'
 import {
   calculateRailCameraFit,
   RAIL_CAMERA_CLIP_FAR,
@@ -98,6 +104,19 @@ export const ZOOM_STEP = 0.14
 export const MIN_ZOOM = 0.72 - ZOOM_STEP * 4
 export const MAX_ZOOM = 1.75 + ZOOM_STEP * 3
 const DEFAULT_ZOOM = 1
+/** 遮断機が下りている間に「カン」を鳴らす間隔（秒）。 */
+const CROSSING_BELL_INTERVAL = 0.42
+
+type CrossingGateVisual = {
+  /** 遮断機の回転軸。armDirectionは竿が倒れる向き（ローカルX）。 */
+  arms: { pivot: THREE.Object3D, armDirection: 1 | -1 }[]
+  /** 左右交互に点滅させる警報灯。index 0/1 が交互に点く。 */
+  lamps: [THREE.Mesh[], THREE.Mesh[]]
+  /** 0=あいている、1=さがりきった。 */
+  closedAmount: number
+  /** 走っている電車が近い間だけtrue。警報灯の点滅と警報音に使う。 */
+  alarm: boolean
+}
 const BASE_VIEW_SIZE = 15
 const CAMERA_OFFSET = { x: 18, y: 23, z: 20 } as const
 const CAMERA_OVERVIEW_TARGET = { x: 0, y: 0, z: 0 } as const
@@ -997,6 +1016,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const selectionRings = new Map<string, THREE.Mesh>()
     const connectorCaps = new Map<string, Partial<Record<RailConnectorId, THREE.Mesh>>>()
     const stationPulseTargets = new Map<string, THREE.Object3D>()
+    const crossingGates = new Map<string, CrossingGateVisual>()
+    /** 直近のupdateTrainVisualsで置いた全車両の中心（踏切の判定に使う）。 */
+    let trainCarPositions: RailVec3[] = []
+    /** そのうち走らせている電車の車両だけ。警報灯と警報音に使う。 */
+    let runningTrainCarPositions: RailVec3[] = []
+    let crossingBlinkElapsed = 0
+    let crossingBellElapsed = Number.POSITIVE_INFINITY
     const marker = new THREE.Group()
     marker.name = 'snap-marker'
     marker.visible = false // 起動直後は原点にリングを出さない（setMarker() が呼ばれるまで非表示）
@@ -1305,6 +1331,14 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const tunnelTopGeometry = new THREE.BoxGeometry(1, 0.34, 2.75)
     const tunnelWallGeometry = new THREE.BoxGeometry(1, 1.25, 0.26)
     const tunnelRingGeometry = new THREE.TorusGeometry(1.4, 0.13, 8, 18)
+    // 踏切。道路は線路と直交する向き(ローカルZ)にのび、遮断機の竿はローカルXへ倒れる。
+    const crossingRoadGeometry = new THREE.BoxGeometry(2.4, 0.12, 6.2)
+    const crossingRoadLineGeometry = new THREE.BoxGeometry(0.1, 0.02, 6.2)
+    const crossingPostGeometry = new THREE.CylinderGeometry(0.09, 0.11, 2.3, 10)
+    const crossingCrossbuckGeometry = new THREE.BoxGeometry(0.92, 0.15, 0.05)
+    const crossingLampBoardGeometry = new THREE.BoxGeometry(0.66, 0.26, 0.08)
+    const crossingLampGeometry = new THREE.SphereGeometry(0.1, 12, 8)
+    const crossingArmSegmentGeometry = new THREE.BoxGeometry(0.66, 0.12, 0.08)
     const treeTrunkGeometry = new THREE.CylinderGeometry(0.18, 0.24, 1.45, 8)
     const treeFoliageGeometry = new RoundedBoxGeometry(1.35, 1.55, 1.35, 2, 0.42)
     const shrubGeometry = new THREE.SphereGeometry(0.58, 8, 6)
@@ -1407,6 +1441,13 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       tunnelTopGeometry,
       tunnelWallGeometry,
       tunnelRingGeometry,
+      crossingRoadGeometry,
+      crossingRoadLineGeometry,
+      crossingPostGeometry,
+      crossingCrossbuckGeometry,
+      crossingLampBoardGeometry,
+      crossingLampGeometry,
+      crossingArmSegmentGeometry,
       treeTrunkGeometry,
       treeFoliageGeometry,
       shrubGeometry,
@@ -1572,6 +1613,17 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
     const stationBenchMaterial = new THREE.MeshStandardMaterial({ color: '#b45309', roughness: 0.8 })
     const tunnelMaterial = new THREE.MeshStandardMaterial({ color: '#818cf8', roughness: 0.8 })
     const tunnelInnerMaterial = new THREE.MeshStandardMaterial({ color: '#6366f1', roughness: 0.86 })
+    const crossingRoadMaterial = new THREE.MeshStandardMaterial({ color: '#64707d', roughness: 0.9 })
+    const crossingWhiteMaterial = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.6 })
+    const crossingYellowMaterial = new THREE.MeshStandardMaterial({ color: '#facc15', roughness: 0.55 })
+    const crossingBlackMaterial = new THREE.MeshStandardMaterial({ color: '#1f2937', roughness: 0.6 })
+    const crossingLampOffMaterial = new THREE.MeshStandardMaterial({ color: '#7f1d1d', roughness: 0.5 })
+    const crossingLampOnMaterial = new THREE.MeshStandardMaterial({
+      color: '#ef4444',
+      emissive: '#ff2d2d',
+      emissiveIntensity: 1.4,
+      roughness: 0.4,
+    })
     ;[
       railMaterial,
       branchSelectedRailMaterial,
@@ -1626,6 +1678,12 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       stationBenchMaterial,
       tunnelMaterial,
       tunnelInnerMaterial,
+      crossingRoadMaterial,
+      crossingWhiteMaterial,
+      crossingYellowMaterial,
+      crossingBlackMaterial,
+      crossingLampOffMaterial,
+      crossingLampOnMaterial,
     ].forEach((material) => sharedMaterials.add(material))
 
     const specialTrainVisualDefinitions: ReadonlyMap<Exclude<TrainType, 'basic'>, SpecialTrainVisualDefinition> = new Map([
@@ -2457,6 +2515,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
       ensureTrainVisuals()
       trainRoot.visible = fleet.length > 0
       let anyTrainInTunnel = false
+      trainCarPositions = []
+      runningTrainCarPositions = []
       for (const train of fleet) {
         const runtime = trainVisuals.get(train.id)
         if (runtime === undefined) continue
@@ -2481,6 +2541,8 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           }
           car.visible = true
           car.position.set(pose.position.x, pose.position.y, pose.position.z)
+          trainCarPositions.push(pose.position)
+          if (train.wantsToRun) runningTrainCarPositions.push(pose.position)
           trainForwardVector.set(pose.forward.x, pose.forward.y, pose.forward.z).normalize()
           // yawとpitchだけに分解し、坂や分岐でも車体へrollを混ぜない。
           const yaw = Math.atan2(-trainForwardVector.z, trainForwardVector.x)
@@ -2543,6 +2605,53 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           const pulse = Math.sin(progress * Math.PI)
           target.scale.setScalar(1 + pulse * 0.08)
         }
+      }
+    }
+
+    function applyCrossingGatePose(gate: CrossingGateVisual) {
+      for (const { pivot, armDirection } of gate.arms) {
+        // 0で竿が真上、1で水平に道路をふさぐ。
+        pivot.rotation.z = armDirection * (Math.PI / 2) * (1 - gate.closedAmount)
+      }
+    }
+
+    function updateCrossings(delta: number) {
+      if (crossingGates.size === 0) return
+      let anyActive = false
+      for (const [pieceId, gate] of crossingGates) {
+        const piece = trainPieces.find((candidate) => candidate.id === pieceId)
+        const center = piece === undefined ? null : worldRailPathPoint(piece, 0.5)
+        // 遮断機は止まっている電車にも下りたままにし（踏切の上で止まっても道をふさぐ）、
+        // 灯りと音は走っている電車のときだけにして、置いただけで鳴り続けないようにする。
+        const shouldClose = center !== null && isRailCrossingApproached(center, trainCarPositions)
+        gate.alarm = center !== null && isRailCrossingApproached(center, runningTrainCarPositions)
+        if (gate.alarm) anyActive = true
+        const next = stepRailCrossingGate(gate.closedAmount, shouldClose, delta, reducedMotion)
+        if (next !== gate.closedAmount) {
+          gate.closedAmount = next
+          applyCrossingGatePose(gate)
+        }
+      }
+      crossingBlinkElapsed = anyActive ? crossingBlinkElapsed + delta : 0
+      // reduced-motionでは点滅させず、両方の灯りを点けたままにする。
+      const litLamp = railCrossingLitLamp(crossingBlinkElapsed)
+      for (const gate of crossingGates.values()) {
+        gate.lamps.forEach((lamps, index) => {
+          const lit = gate.alarm && (reducedMotion || index === litLamp)
+          const material = lit ? crossingLampOnMaterial : crossingLampOffMaterial
+          for (const lamp of lamps) lamp.material = material
+        })
+      }
+      if (!anyActive) {
+        crossingBellElapsed = Number.POSITIVE_INFINITY
+        return
+      }
+      crossingBellElapsed += delta
+      if (crossingBellElapsed >= CROSSING_BELL_INTERVAL) {
+        crossingBellElapsed = crossingBellElapsed === Number.POSITIVE_INFINITY
+          ? 0
+          : crossingBellElapsed % CROSSING_BELL_INTERVAL
+        playRailCrossingBellSound(optionsRef.current.soundEnabled ?? true)
       }
     }
 
@@ -2680,6 +2789,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           || geometry === tunnelTopGeometry
           || geometry === tunnelRingGeometry
           || geometry === depotRoofGeometry
+          || geometry === crossingPostGeometry
         group.add(mesh)
         return mesh
       }
@@ -2823,6 +2933,59 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
             { x: 0, y: Math.PI / 2, z: 0 },
           )
         }
+      }
+
+      if (localPiece.kind === 'crossing') {
+        const roadTop = 0.32
+        addMesh(crossingRoadGeometry, crossingRoadMaterial, { x: 0, y: roadTop - 0.06, z: 0 })
+        for (const x of [-1.05, 1.05]) {
+          addMesh(crossingRoadLineGeometry, crossingWhiteMaterial, { x, y: roadTop + 0.01, z: 0 })
+        }
+        const gate: CrossingGateVisual = { arms: [], lamps: [[], []], closedAmount: 0, alarm: false }
+        // 道路の左右の端に1本ずつ。手前と奥で対角に置き、竿は道路の幅だけ倒れる。
+        for (const side of [-1, 1] as const) {
+          const postX = side * 1.5
+          const postZ = -side * 2.2
+          const towardTrack = side
+          addMesh(crossingPostGeometry, crossingWhiteMaterial, { x: postX, y: 1.15, z: postZ })
+          for (const tilt of [-Math.PI / 4, Math.PI / 4]) {
+            addMesh(
+              crossingCrossbuckGeometry,
+              crossingYellowMaterial,
+              { x: postX, y: 2.2, z: postZ },
+              undefined,
+              { x: 0, y: 0, z: tilt },
+            )
+          }
+          addMesh(crossingLampBoardGeometry, crossingBlackMaterial, { x: postX, y: 1.7, z: postZ })
+          for (const lampIndex of [0, 1] as const) {
+            const lamp = addMesh(
+              crossingLampGeometry,
+              crossingLampOffMaterial,
+              { x: postX + (lampIndex === 0 ? -0.2 : 0.2), y: 1.7, z: postZ },
+            )
+            gate.lamps[lampIndex].push(lamp)
+          }
+          const pivot = new THREE.Group()
+          pivot.position.set(postX, 0.95, postZ + towardTrack * 0.17)
+          const armDirection: 1 | -1 = side === 1 ? -1 : 1
+          const segmentCount = 4
+          const segmentLength = 0.66
+          for (let index = 0; index < segmentCount; index += 1) {
+            const segment = new THREE.Mesh(
+              crossingArmSegmentGeometry,
+              index % 2 === 0 ? crossingYellowMaterial : crossingBlackMaterial,
+            )
+            segment.position.set(armDirection * (index + 0.5) * segmentLength, 0, 0)
+            segment.castShadow = true
+            segment.userData.pieceId = pieceId
+            pivot.add(segment)
+          }
+          group.add(pivot)
+          gate.arms.push({ pivot, armDirection })
+        }
+        applyCrossingGatePose(gate)
+        crossingGates.set(pieceId, gate)
       }
 
       if (localPiece.kind === 'depot') {
@@ -3066,6 +3229,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
         connectorCaps.delete(pieceId)
         branchRouteVisuals.delete(pieceId)
         stationPulseTargets.delete(pieceId)
+        crossingGates.delete(pieceId)
       }
       for (const piece of pieces) {
         let object = pieceObjects.get(piece.id)
@@ -3648,6 +3812,7 @@ export function useRailBuilderEngine(options: RailBuilderEngineOptions): RailBui
           }
         }
         updateFeedbackAnimations(delta)
+        updateCrossings(delta)
         trainSound.setEnabled(optionsRef.current.soundEnabled ?? true)
         const representative = fleet.find((train) => train.id === followedTrainId)
           ?? fleet.find((train) => train.wantsToRun)

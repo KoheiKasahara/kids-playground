@@ -152,6 +152,7 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('レールを つなぐ', () => quiz.playRailSnapSound()),
     sample('しゅっぱつ', () => quiz.playRailDepartureSound()),
     sample('えきに とまる', () => quiz.playRailStationStopSound()),
+    sample('ふみきり', () => quiz.playRailCrossingBellSound()),
     background('はしる', 2, ({ advance }) => {
       const controller = quiz.createRailTrainSoundController()
       for (let i = 0; i < 120; i++) {

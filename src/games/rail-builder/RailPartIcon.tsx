@@ -134,6 +134,24 @@ export default function RailPartIcon({ kind, branchSide = DEFAULT_BRANCH_SIDE }:
         </svg>
       )
 
+    case 'crossing':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <rect x="2" y="40" width="60" height="14" fill="#64707d" />
+          <line x1="2" y1="44" x2="62" y2="44" stroke={RAIL_COLOR} strokeWidth="3" />
+          <line x1="2" y1="50" x2="62" y2="50" stroke={RAIL_COLOR} strokeWidth="3" />
+          <rect x="10" y="10" width="4" height="44" rx="2" fill="#f8fafc" stroke="#9fb0ba" strokeWidth="1" />
+          <line x1="3" y1="5" x2="21" y2="17" stroke="#facc15" strokeWidth="4" strokeLinecap="round" />
+          <line x1="21" y1="5" x2="3" y2="17" stroke="#facc15" strokeWidth="4" strokeLinecap="round" />
+          <rect x="4" y="21" width="16" height="7" rx="2" fill="#1f2937" />
+          <circle cx="8" cy="24.5" r="2.6" fill="#ef4444" />
+          <circle cx="16" cy="24.5" r="2.6" fill="#7f1d1d" />
+          <line x1="16" y1="34" x2="34" y2="34" stroke="#facc15" strokeWidth="5" />
+          <line x1="34" y1="34" x2="46" y2="34" stroke="#1f2937" strokeWidth="5" />
+          <line x1="46" y1="34" x2="60" y2="34" stroke="#facc15" strokeWidth="5" strokeLinecap="round" />
+        </svg>
+      )
+
     case 'depot':
       return (
         <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">

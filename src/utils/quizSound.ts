@@ -794,6 +794,17 @@ export function playRailStationDepartureSound(enabled = true): void {
   playTone(ctx, 620, now + 0.085, 0.16, 0.035, 'sine')
 }
 
+/** 踏切の警報音「カン」1打ぶん。遮断機が下りている間、一定間隔で呼ぶ。 */
+export function playRailCrossingBellSound(enabled = true): void {
+  if (!enabled || !isSoundEnabled()) return
+  const ctx = getSharedAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  // 実物の踏切に近い、少しずらした2音の金属的な響き。
+  playTone(ctx, 740, now, 0.16, 0.03, 'triangle')
+  playTone(ctx, 1180, now, 0.12, 0.016, 'sine')
+}
+
 // 呼び出し側で役割を読みやすくする別名（音色・実装は上の共有関数と同じ）。
 export const playRailSnapClickSound = playRailSnapSound
 export const playRailStartSound = playRailDepartureSound
