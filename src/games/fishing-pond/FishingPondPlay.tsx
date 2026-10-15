@@ -7,7 +7,7 @@ import { vibrate } from '../../utils/haptics'
 import FishArt from './FishArt'
 import { FISH, findFish, fishingReducer, initialFishingState, type FishId, type FishingAction, type FishingState } from './fishingGame'
 import {
-  SURFACE_Y, createPond, homeHook, lureNearest, nudgeHookTarget, setHookTarget, stepPond, syncPond,
+  SURFACE_Y, castHook, createPond, homeHook, lureNearest, nudgeHookTarget, setHookTarget, stepPond, syncPond,
   type Pond, type Point, type SwimMode,
 } from './pondSim'
 import SeaScenery from './SeaScenery'
@@ -16,12 +16,17 @@ import { playFishingSound } from './sounds'
 import styles from './FishingPondPlay.module.css'
 
 type FishView = { id: FishId; x: number; y: number; dir: 1 | -1; mode: SwimMode }
-type PondView = { fish: FishView[]; hook: Point }
+type PondView = { fish: FishView[]; hook: Point; target: Point; leftRecently: boolean }
+
+/** 釣れたあとは連打の勢いで次へ進まないよう、しばらくボタンを受け付けない[ms]。 */
+export const LANDING_LOCK_MS = 1500
 
 function snapshot(pond: Pond): PondView {
   return {
     fish: pond.fish.map(({ id, x, y, dir, mode }) => ({ id, x, y, dir, mode })),
     hook: { ...pond.hook },
+    target: { ...pond.target },
+    leftRecently: pond.time - pond.leftAt < 2.5,
   }
 }
 
@@ -43,10 +48,13 @@ export default function FishingPondPlay() {
   // ループやイベントからも最新の状態を読めるよう、同じreducerで同期して持つ。
   const gameRef = useRef<FishingState>(game)
   const pondRef = useRef<Pond | null>(null)
-  const [view, setView] = useState<PondView>({ fish: [], hook: homeHook() })
+  const [view, setView] = useState<PondView>({ fish: [], hook: homeHook(), target: homeHook(), leftRecently: false })
   const [seaSize, setSeaSize] = useState({ width: 400, height: 300 })
   const [reelCount, setReelCount] = useState(0)
-  const [lureCount, setLureCount] = useState(0)
+  const [bobber, setBobber] = useState<{ key: number; anim: 'cast' | 'jiggle' | null }>({ key: 0, anim: null })
+  const [locked, setLocked] = useState(false)
+  const lockedRef = useRef(false)
+  const lockTimerRef = useRef<number | undefined>(undefined)
   const [soundOn, setSoundOn] = useState(true)
   const soundOnRef = useRef(true)
   const draggingRef = useRef(false)
@@ -92,7 +100,7 @@ export default function FishingPondPlay() {
         vibrate('impact')
       } else if (g.phase === 'hooked') {
         g = send({ type: 'tick', ms: dt * 1000 })
-        if (g.phase === 'fishing') {
+        if (g.phase === 'ready') {
           sound('escape')
           vibrate('tap')
         }
@@ -121,11 +129,14 @@ export default function FishingPondPlay() {
     }
   }, [])
 
-  // 矢印キーでも針を動かせる。
+  useEffect(() => () => window.clearTimeout(lockTimerRef.current), [])
+
+  // 矢印キーでも、投げる場所や針を動かせる。
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const step = KEY_STEP[event.key]
-      if (!step || gameRef.current.phase !== 'fishing' || !pondRef.current) return
+      const phase = gameRef.current.phase
+      if (!step || (phase !== 'fishing' && phase !== 'ready') || !pondRef.current) return
       event.preventDefault()
       nudgeHookTarget(pondRef.current, step[0], step[1])
     }
@@ -149,6 +160,13 @@ export default function FishingPondPlay() {
         syncPond(pondRef.current, next.caught, null)
         setView(snapshot(pondRef.current))
       }
+      lockedRef.current = true
+      setLocked(true)
+      window.clearTimeout(lockTimerRef.current)
+      lockTimerRef.current = window.setTimeout(() => {
+        lockedRef.current = false
+        setLocked(false)
+      }, LANDING_LOCK_MS)
       sound(next.phase === 'complete' ? 'complete' : 'catch')
       vibrate(next.phase === 'complete' ? 'celebrate' : 'success')
     }
@@ -159,27 +177,36 @@ export default function FishingPondPlay() {
     setView(snapshot(pondRef.current))
   }
 
+  function cast(point: Point) {
+    if (gameRef.current.phase !== 'ready' || !pondRef.current) return
+    send({ type: 'cast' })
+    castHook(pondRef.current, point)
+    setView(snapshot(pondRef.current))
+    setBobber((current) => ({ key: current.key + 1, anim: 'cast' }))
+    sound('cast')
+    vibrate('tap')
+  }
+
   function handleAction() {
     primeAudio()
     const phase = gameRef.current.phase
+    if (lockedRef.current && (phase === 'caught' || phase === 'complete')) return
     if (phase === 'title' || phase === 'complete') {
       send({ type: 'start' })
       resetPond([])
-      sound('cast')
       vibrate('tap')
+    } else if (phase === 'ready') {
+      if (pondRef.current) cast(pondRef.current.target)
     } else if (phase === 'fishing') {
-      if (pondRef.current && lureNearest(pondRef.current)) sound('cast')
-      setLureCount((count) => count + 1)
+      if (pondRef.current && lureNearest(pondRef.current)) sound('nibble')
+      setBobber((current) => ({ key: current.key + 1, anim: 'jiggle' }))
       vibrate('tap')
     } else if (phase === 'hooked') {
       reel()
     } else if (phase === 'caught') {
       send({ type: 'next' })
-      if (pondRef.current) {
-        pondRef.current.hook = homeHook()
-        pondRef.current.target = homeHook()
-      }
-      sound('cast')
+      if (pondRef.current) pondRef.current.target = homeHook()
+      vibrate('tap')
     }
   }
 
@@ -194,6 +221,12 @@ export default function FishingPondPlay() {
     if (phase === 'hooked') {
       primeAudio()
       reel()
+      return
+    }
+    if (phase === 'ready') {
+      primeAudio()
+      const point = pointerToSea(event)
+      if (point) cast(point)
       return
     }
     if (phase !== 'fishing' || !pondRef.current) return
@@ -214,25 +247,27 @@ export default function FishingPondPlay() {
   const hooked = findFish(game.hookedId)
   const landed = (game.phase === 'caught' || game.phase === 'complete') && hooked
   const hasLine = game.phase === 'fishing' || game.phase === 'hooked'
-  const approaching = view.fish.some((fish) => fish.mode === 'approach' || fish.mode === 'nibble')
+  const approaching = view.fish.some((fish) => fish.mode === 'approach' || fish.mode === 'inspect' || fish.mode === 'nibble')
   const nibbling = view.fish.some((fish) => fish.mode === 'nibble')
   const message = {
-    title: 'はりを うごかして おさかなを つろう！',
+    title: 'いとを なげて おさかなを つろう！',
+    ready: game.escaped ? 'にげちゃった… もういちど なげよう！' : 'なげたい ところを タップしてね',
     fishing: approaching
       ? 'おさかなが きたよ… まってね'
-      : game.escaped ? 'にげちゃった… もういちど！' : 'うみを さわって はりを うごかそう',
+      : view.leftRecently ? 'あれれ… いっちゃった' : 'うみを さわって はりを うごかそう',
     hooked: 'かかった！ れんだで まきあげよう！',
     caught: `${hooked?.name ?? ''}が つれた！`,
     complete: 'ぜんぶ つれた！ おめでとう！',
   }[game.phase]
   const actionLabel = {
     title: 'つりを はじめる',
+    ready: 'なげる！',
     fishing: 'えさを ゆらす',
     hooked: 'まく！',
     caught: 'つぎの おさかな',
     complete: 'もういちど',
   }[game.phase]
-  const actionIcon = { title: '🎣', fishing: '🪱', hooked: '💪', caught: '🐟', complete: '↻' }[game.phase]
+  const actionIcon = { title: '🎣', ready: '🎯', fishing: '🪱', hooked: '💪', caught: '🐟', complete: '↻' }[game.phase]
 
   const { width: seaW, height: seaH } = seaSize
   const tip = rodTipPx(seaW, seaH)
@@ -268,7 +303,7 @@ export default function FishingPondPlay() {
       <div className={styles.layout}>
         <div
           ref={observeSea}
-          className={`${styles.sea} ${game.phase === 'fishing' ? styles.seaAim : ''} ${game.phase === 'hooked' ? styles.seaReel : ''}`}
+          className={`${styles.sea} ${game.phase === 'fishing' || game.phase === 'ready' ? styles.seaAim : ''} ${game.phase === 'hooked' ? styles.seaReel : ''}`}
           role="group"
           aria-label="おさかなの うみ"
           onPointerDown={handleSeaDown}
@@ -294,6 +329,18 @@ export default function FishingPondPlay() {
             )
           })}
 
+          {game.phase === 'ready' ? (
+            <>
+              <svg className={styles.line} viewBox={`0 0 ${seaW} ${seaH}`} aria-hidden="true" focusable="false">
+                <path d={`M${tip.x} ${tip.y} Q${tip.x + 4} ${tip.y + 16} ${tip.x + 2} ${tip.y + 30}`} fill="none" stroke="#fffdf0" strokeWidth="1.6" strokeLinecap="round" />
+                <ellipse cx={tip.x + 2} cy={tip.y + 36} rx="6" ry="7.5" fill="#ff6a5c" stroke="#fffdf5" strokeWidth="1.6" />
+              </svg>
+              <div className={styles.aim} style={{ left: `${view.target.x}%`, top: `${SURFACE_Y}%` }} data-testid="aim" aria-hidden="true">
+                <span />
+              </div>
+            </>
+          ) : null}
+
           {hasLine ? (
             <>
               <svg className={styles.line} viewBox={`0 0 ${seaW} ${seaH}`} aria-hidden="true" focusable="false">
@@ -301,8 +348,8 @@ export default function FishingPondPlay() {
               </svg>
               {game.phase === 'fishing' ? (
                 <div
-                  key={`bobber-${lureCount}`}
-                  className={`${styles.float} ${nibbling ? styles.nibbling : ''} ${lureCount > 0 ? styles.jiggle : ''}`}
+                  key={`bobber-${bobber.key}`}
+                  className={`${styles.float} ${nibbling ? styles.nibbling : ''} ${bobber.anim ? styles[bobber.anim] : ''}`}
                   style={{ left: `${view.hook.x}%` }}
                   aria-hidden="true"
                 >
@@ -359,7 +406,8 @@ export default function FishingPondPlay() {
           <button
             ref={actionRef}
             type="button"
-            className={`${styles.action} ${game.phase === 'hooked' ? styles.reel : ''}`}
+            className={`${styles.action} ${game.phase === 'hooked' ? styles.reel : ''} ${locked ? styles.locked : ''}`}
+            aria-disabled={locked || undefined}
             onClick={handleAction}
           >
             <span aria-hidden="true">{actionIcon}</span>

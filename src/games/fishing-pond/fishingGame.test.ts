@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { DECAY_GRACE_MS, ESCAPE_MS, FISH, fishingReducer, initialFishingState, reelStep, type FishingState } from './fishingGame'
 
 function hooked(fishId: (typeof FISH)[number]['id'], from: FishingState = fishingReducer(initialFishingState(), { type: 'start' })) {
-  return fishingReducer(from, { type: 'bite', fishId })
+  return fishingReducer(fishingReducer(from, { type: 'cast' }), { type: 'bite', fishId })
 }
 
 function reelTimes(state: FishingState, times: number) {
@@ -27,11 +27,17 @@ describe('fishingGame', () => {
   test('かかる前の巻き上げ・タイトルでの合図は無視する', () => {
     const title = initialFishingState()
     expect(fishingReducer(title, { type: 'bite', fishId: 'puffer' })).toBe(title)
-    const fishing = fishingReducer(title, { type: 'start' })
+    const ready = fishingReducer(title, { type: 'start' })
+    expect(ready.phase).toBe('ready')
+    // 糸を投げるまでは食いつかない。
+    expect(fishingReducer(ready, { type: 'bite', fishId: 'puffer' })).toBe(ready)
+    const fishing = fishingReducer(ready, { type: 'cast' })
+    expect(fishing.phase).toBe('fishing')
+    expect(fishingReducer(fishing, { type: 'cast' })).toBe(fishing)
     expect(fishingReducer(fishing, { type: 'reel' })).toBe(fishing)
     expect(fishingReducer(fishing, { type: 'next' })).toBe(fishing)
     expect(fishingReducer(fishing, { type: 'tick', ms: 99_999 })).toBe(fishing)
-    const biting = hooked('puffer', fishing)
+    const biting = fishingReducer(fishing, { type: 'bite', fishId: 'puffer' })
     expect(fishingReducer(biting, { type: 'bite', fishId: 'tang' })).toBe(biting)
   })
 
@@ -58,7 +64,8 @@ describe('fishingGame', () => {
     state = fishingReducer(state, { type: 'tick', ms: ESCAPE_MS - 1 })
     expect(state.phase).toBe('hooked')
     state = fishingReducer(state, { type: 'tick', ms: 1 })
-    expect(state).toMatchObject({ phase: 'fishing', hookedId: null, progress: 0, escaped: true, caught: [] })
+    // 逃げたら、糸を投げるところからやり直す。
+    expect(state).toMatchObject({ phase: 'ready', hookedId: null, progress: 0, escaped: true, caught: [] })
     expect(hooked('sunfish', state).escaped).toBe(false)
   })
 
@@ -69,13 +76,14 @@ describe('fishingGame', () => {
       expect(fishingReducer(state, { type: 'reel' })).toBe(state)
       if (state.caught.length < FISH.length) {
         state = fishingReducer(state, { type: 'next' })
-        expect(fishingReducer(state, { type: 'bite', fishId: fish.id })).toBe(state)
+        expect(state.phase).toBe('ready')
+        expect(fishingReducer(fishingReducer(state, { type: 'cast' }), { type: 'bite', fishId: fish.id }).phase).toBe('fishing')
       }
     }
     expect(state.phase).toBe('complete')
     expect(new Set(state.caught).size).toBe(6)
     expect(fishingReducer(state, { type: 'next' })).toBe(state)
-    expect(fishingReducer(state, { type: 'start' })).toMatchObject({ phase: 'fishing', caught: [], hookedId: null })
+    expect(fishingReducer(state, { type: 'start' })).toMatchObject({ phase: 'ready', caught: [], hookedId: null })
   })
 
   test('タイトルへ戻ると釣果も合図も持ち越さない', () => {

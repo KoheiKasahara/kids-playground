@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import { FISH } from './fishingGame'
 import {
-  HOOK_BOUNDS, LURE_AFTER_SEC, MOUTH_OFFSET, SWIM_BOUNDS, createPond, lureNearest, setHookTarget, stepPond, syncPond,
+  CAST_SETTLE_SEC, HOOK_BOUNDS, LURE_AFTER_SEC, MAX_REFUSALS, MOUTH_OFFSET, NIBBLE_SEC, SURFACE_Y, SWIM_BOUNDS,
+  castHook, createPond, lureNearest, setHookTarget, stepPond, syncPond,
   type Pond, type StepInput,
 } from './pondSim'
 
@@ -23,6 +24,12 @@ function runUntilBite(pond: Pond, seconds: number, random = seeded()) {
     if (bite) return { bite, at: t }
   }
   return null
+}
+
+/** 食いつく・戻っていくの抽選を外し、必ず食いつかせる。 */
+function eager(pond: Pond) {
+  for (const fish of pond.fish) fish.refusals = MAX_REFUSALS
+  return pond
 }
 
 describe('pondSim', () => {
@@ -54,19 +61,54 @@ describe('pondSim', () => {
   })
 
   test('針を魚の近くへ動かすと、その魚が寄ってきて食いつく', () => {
-    const random = seeded(3)
-    const pond = createPond([], random)
+    const pond = eager(createPond([], seeded(3)))
     const target = pond.fish.find((fish) => fish.id === 'puffer')!
     setHookTarget(pond, { x: target.x + target.dir * (MOUTH_OFFSET + 4), y: target.y })
-    const result = runUntilBite(pond, 6, random)
+    // 気づく抽選はいつも当たりにする。
+    const result = runUntilBite(pond, LURE_AFTER_SEC, () => 0)
     expect(result).not.toBeNull()
     expect(result!.at).toBeLessThan(LURE_AFTER_SEC)
+    // つんつんしてから食いつくまで、少し間がある。
+    expect(result!.at).toBeGreaterThan(NIBBLE_SEC)
     expect(pond.fish.filter((fish) => fish.mode === 'hooked')).toHaveLength(1)
+  })
+
+  test('近くまで来ても食いつかずに戻っていく魚がいて、何度か戻ると次は必ず食いつく', () => {
+    const pond = createPond([], seeded(2))
+    const never = () => 0.99
+    expect(lureNearest(pond, never, 0.5)).toBe(true)
+    const fish = pond.fish.find((entry) => entry.mode === 'approach')!
+    expect(fish.willBite).toBe(false)
+    let inspected = false
+    for (let i = 0; i < 60 * 30 && fish.mode !== 'swim'; i++) {
+      expect(stepPond(pond, DT, FISHING, never)).toBeNull()
+      if (fish.mode === 'inspect') inspected = true
+    }
+    expect(inspected).toBe(true)
+    expect(fish.mode).toBe('swim')
+    expect(fish.refusals).toBe(1)
+    expect(pond.time - pond.leftAt).toBeLessThan(0.1)
+    fish.refusals = MAX_REFUSALS
+    for (const other of pond.fish) if (other !== fish) other.mode = 'flee'
+    expect(lureNearest(pond, never, 0)).toBe(true)
+    expect(fish.willBite).toBe(true)
+  })
+
+  test('糸を投げ込むと、うきは水面から沈み、しばらく魚は寄ってこない', () => {
+    const random = seeded(4)
+    const pond = createPond([], random)
+    castHook(pond, { x: 30, y: 70 })
+    expect(pond.hook).toEqual({ x: 30, y: SURFACE_Y + 2 })
+    expect(pond.target).toEqual({ x: 30, y: 70 })
+    for (const fish of pond.fish) expect(fish.cooldown).toBeGreaterThanOrEqual(CAST_SETTLE_SEC)
+    for (let t = 0; t < CAST_SETTLE_SEC - 0.1; t += DT) stepPond(pond, DT, FISHING, random)
+    expect(pond.fish.every((fish) => fish.mode === 'swim')).toBe(true)
+    expect(pond.hook.y).toBeCloseTo(70, 0)
   })
 
   test('針を動かさなくても、しばらくすると近くの魚が自分から寄ってくる', () => {
     const random = seeded(11)
-    const pond = createPond([], random)
+    const pond = eager(createPond([], random))
     // 誰も自分からは気づかない状態で待つ。
     for (const fish of pond.fish) fish.cooldown = 999
     const result = runUntilBite(pond, LURE_AFTER_SEC + 20, random)
@@ -83,8 +125,8 @@ describe('pondSim', () => {
 
   test('かかった魚は進み具合に合わせて水面へ上がり、逃げると泳ぎ去る', () => {
     const random = seeded(5)
-    const pond = createPond([], random)
-    lureNearest(pond)
+    const pond = eager(createPond([], random))
+    lureNearest(pond, random)
     const result = runUntilBite(pond, 30, random)!
     const fish = pond.fish.find((entry) => entry.id === result.bite)!
     const depth = fish.y

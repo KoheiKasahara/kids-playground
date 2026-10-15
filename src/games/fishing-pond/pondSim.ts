@@ -14,17 +14,30 @@ export const MOUTH_OFFSET = 7
 /** 釣り針にこの距離まで近いと魚が気づく（判定は緩め）。 */
 export const NOTICE_RADIUS = 24
 /** 誰も寄ってこないまま、この秒数たつと近い魚が自分から寄ってくる。 */
-export const LURE_AFTER_SEC = 5
+export const LURE_AFTER_SEC = 9
+/** 針の近くにいる魚が、1秒あたりに気づく確率。すぐには寄ってこない。 */
+const NOTICE_PER_SEC = 0.3
+/** 投げ込んだ直後は、しばらく魚が寄ってこない（水がおちつくまで）。 */
+export const CAST_SETTLE_SEC = 4
+/** 寄ってきた魚が食いつく確率（自分で気づいた・待っていたら来た・えさを揺らした）。 */
+export const BITE_CHANCE = { notice: 0.5, waited: 0.65, lured: 0.8 } as const
+/** この回数そっぽを向いた魚は、次は必ず食いつく（判定は緩め）。 */
+export const MAX_REFUSALS = 2
 /** 口が針にこの距離まで来たら、つんつん（あたり前）になる。 */
 const NIBBLE_RADIUS = 3
-const NIBBLE_SEC = 0.9
+/** つんつんしてから食いつくまで[秒]。 */
+export const NIBBLE_SEC = 3
+/** 食いつかない魚が、針の手前で様子を見る距離と時間。 */
+const INSPECT_RADIUS = 10
+const INSPECT_SEC = 1.4
+const LEAVE_COOLDOWN_SEC = 6
 const HOOK_SPEED = 55
 const FLEE_SEC = 1.6
 const GIVE_UP_COOLDOWN_SEC = 1.5
 const FLEE_COOLDOWN_SEC = 4
 const ESCAPE_PAUSE_SEC = 2
 
-export type SwimMode = 'swim' | 'approach' | 'nibble' | 'hooked' | 'flee'
+export type SwimMode = 'swim' | 'approach' | 'inspect' | 'nibble' | 'hooked' | 'flee'
 export type SwimFish = {
   id: FishId
   x: number
@@ -40,6 +53,10 @@ export type SwimFish = {
   cooldown: number
   /** 寄せ餌などで呼ばれた魚は、少し離れても諦めない。 */
   lured: boolean
+  /** 今回寄ってきたときに食いつくか（false なら近くまで来て戻っていく）。 */
+  willBite: boolean
+  /** そっぽを向いた回数。 */
+  refusals: number
 }
 export type Point = { x: number; y: number }
 export type Pond = {
@@ -49,6 +66,8 @@ export type Pond = {
   /** 誰も寄ってこない時間[秒]。 */
   quietSec: number
   time: number
+  /** 最後に魚が針の前で戻っていった時刻[秒]。 */
+  leftAt: number
 }
 export type StepInput = {
   /** 針を下ろして魚を待っている間だけ true。 */
@@ -83,13 +102,32 @@ export function createPond(caught: readonly FishId[], random: Random = Math.rand
         timer: 0,
         cooldown: 1 + index * 0.4,
         lured: false,
+        willBite: true,
+        refusals: 0,
       }
     }),
     hook: homeHook(),
     target: homeHook(),
     quietSec: 0,
     time: 0,
+    leftAt: -Infinity,
   }
+}
+
+/** 糸を投げ込む。うきは指した場所の水面に落ち、針はそこから沈んでいく。 */
+export function castHook(pond: Pond, point: Point): void {
+  setHookTarget(pond, point)
+  pond.hook = { x: pond.target.x, y: SURFACE_Y + 2 }
+  pond.quietSec = 0
+  for (const fish of pond.fish) {
+    if (fish.mode === 'approach' || fish.mode === 'inspect' || fish.mode === 'nibble') fish.mode = 'swim'
+    fish.cooldown = Math.max(fish.cooldown, CAST_SETTLE_SEC)
+  }
+}
+
+function startApproach(fish: SwimFish, chance: number, random: Random): void {
+  fish.mode = 'approach'
+  fish.willBite = fish.refusals >= MAX_REFUSALS || random() < chance
 }
 
 export function setHookTarget(pond: Pond, point: Point): void {
@@ -112,20 +150,19 @@ function distance(a: Point, b: Point): number {
 }
 
 function isBusy(pond: Pond): boolean {
-  return pond.fish.some((fish) => fish.mode === 'approach' || fish.mode === 'nibble' || fish.mode === 'hooked')
+  return pond.fish.some((fish) => fish.mode === 'approach' || fish.mode === 'inspect' || fish.mode === 'nibble' || fish.mode === 'hooked')
 }
 
 /** 針にいちばん近い、寄ってこられる魚を呼ぶ。呼べたら true。 */
-export function lureNearest(pond: Pond, maxDistance = Infinity): boolean {
+export function lureNearest(pond: Pond, random: Random = Math.random, chance: number = BITE_CHANCE.lured): boolean {
   if (isBusy(pond)) return false
   const candidates = pond.fish
     .filter((fish) => fish.mode === 'swim')
     .map((fish) => ({ fish, d: distance(mouthOf(fish), pond.hook) }))
-    .filter(({ d }) => d <= maxDistance)
     .sort((a, b) => a.d - b.d)
   const chosen = candidates[0]?.fish
   if (!chosen) return false
-  chosen.mode = 'approach'
+  startApproach(chosen, chance, random)
   chosen.lured = true
   chosen.cooldown = 0
   return true
@@ -206,7 +243,7 @@ export function stepPond(pond: Pond, dt: number, input: StepInput, random: Rando
         fish.cooldown = GIVE_UP_COOLDOWN_SEC
         continue
       }
-      const speed = fish.speed * 1.8 + 4
+      const speed = fish.speed * 1.2 + 2.5
       const ddx = goal.x - fish.x
       const ddy = goal.y - fish.y
       const dd = Math.hypot(ddx, ddy)
@@ -215,9 +252,26 @@ export function stepPond(pond: Pond, dt: number, input: StepInput, random: Rando
         fish.x += (ddx / dd) * move
         fish.y += (ddy / dd) * move
       }
-      if (distance(mouthOf(fish), pond.hook) <= NIBBLE_RADIUS) {
+      const near = distance(mouthOf(fish), pond.hook)
+      if (!fish.willBite && near <= INSPECT_RADIUS) {
+        fish.mode = 'inspect'
+        fish.timer = INSPECT_SEC
+      } else if (near <= NIBBLE_RADIUS) {
         fish.mode = 'nibble'
         fish.timer = NIBBLE_SEC
+      }
+    } else if (fish.mode === 'inspect') {
+      // 針の手前でじっと見て…やっぱりやめて戻っていく。
+      fish.x += (pond.hook.x - fish.dir * (MOUTH_OFFSET + INSPECT_RADIUS - 2) - fish.x) * Math.min(1, dt * 3)
+      fish.y += (pond.hook.y - fish.y) * Math.min(1, dt * 3)
+      fish.timer -= dt
+      if (fish.timer <= 0) {
+        fish.mode = 'swim'
+        fish.dir = fish.dir === 1 ? -1 : 1
+        fish.cooldown = LEAVE_COOLDOWN_SEC
+        fish.refusals += 1
+        fish.lured = false
+        pond.leftAt = pond.time
       }
     } else if (fish.mode === 'nibble') {
       if (gap > NIBBLE_RADIUS * 3) {
@@ -232,6 +286,7 @@ export function stepPond(pond: Pond, dt: number, input: StepInput, random: Rando
         fish.mode = 'hooked'
         fish.baseY = fish.y
         fish.lured = false
+        fish.refusals = 0
         pond.target = { ...pond.hook }
         bite = fish.id
       }
@@ -247,12 +302,12 @@ export function stepPond(pond: Pond, dt: number, input: StepInput, random: Rando
         .map((fish) => ({ fish, d: distance(mouthOf(fish), pond.hook) }))
         .filter(({ d }) => d <= NOTICE_RADIUS)
         .sort((a, b) => a.d - b.d)[0]
-      if (noticed) {
-        noticed.fish.mode = 'approach'
+      if (noticed && random() < dt * NOTICE_PER_SEC) {
+        startApproach(noticed.fish, BITE_CHANCE.notice, random)
         pond.quietSec = 0
       } else {
         pond.quietSec += dt
-        if (pond.quietSec >= LURE_AFTER_SEC && lureNearest(pond)) pond.quietSec = 0
+        if (pond.quietSec >= LURE_AFTER_SEC && lureNearest(pond, random, BITE_CHANCE.waited)) pond.quietSec = 0
       }
     }
   } else {
