@@ -85,6 +85,7 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
   'fishing-pond': [
     sample('うきを なげる', () => playFishingSound('cast')),
     sample('あたり', () => playFishingSound('bite')),
+    sample('まく', () => playFishingSound('reel')),
     sample('つれた', () => playFishingSound('catch')),
     sample('ぜんぶ つれた', () => playFishingSound('complete')),
   ],
