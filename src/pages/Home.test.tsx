@@ -121,7 +121,7 @@ describe('Home', () => {
     )
     const links = screen.getAllByRole('link')
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
-    expect(links.slice(-17).map((link) => link.getAttribute('href'))).toEqual(
+    expect(links.slice(-18).map((link) => link.getAttribute('href'))).toEqual(
       [
         'robo-kuzushi',
         'mato-ate',
@@ -140,6 +140,7 @@ describe('Home', () => {
         'kurukuru-rokuro',
         'kabukuwa-battle',
         'venom-lab',
+        'fishing-pond',
       ].map(gameRoutePath),
     )
   })

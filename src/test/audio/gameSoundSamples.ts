@@ -8,6 +8,7 @@
  * BGM や走行音のように鳴り続ける音は background: true にする（効果音より小さいことだけ確かめる）。
  */
 import type { SoundSample } from './soundMeter'
+import { playFishingSound } from '../../games/fishing-pond/sounds'
 import { playLabSound } from '../../games/venom-lab/sounds'
 import * as quiz from '../../utils/quizSound'
 import { PianoAudioEngine } from '../../games/shared/music/pianoAudio'
@@ -81,6 +82,12 @@ function pianoNotes(count: number): SoundSample['play'] {
 }
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
+  'fishing-pond': [
+    sample('うきを なげる', () => playFishingSound('cast')),
+    sample('あたり', () => playFishingSound('bite')),
+    sample('つれた', () => playFishingSound('catch')),
+    sample('ぜんぶ つれた', () => playFishingSound('complete')),
+  ],
   'venom-lab': [sample('かんさつ', () => playLabSound('tap')), sample('なかま', () => playLabSound('add')), sample('はっけん', () => playLabSound('discover'))],
   'flag-quiz': [...QUIZ_ANSWER, sample('パネルを めくる', quiz.playPanelOpenSound), sample('のこりを めくる', () => quiz.playPanelRevealSound(3, 6))],
   'flag-pinball': [

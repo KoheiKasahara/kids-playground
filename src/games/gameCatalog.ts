@@ -1182,6 +1182,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'fishing-pond',
+    slug: 'fishing-pond',
+    title: 'のんびり さかなつり',
+    emoji: '🎣',
+    category: 'learning',
+    seo: {
+      headline: 'のんびり さかなつり｜浮きの合図で魚を釣り上げよう',
+      description: '泳いでいる魚をえらび、浮きに「！」が出たら釣り上げる、幼児向けの魚つりゲームです。くまのみやふぐなど6種類を集めましょう。制限時間がないので、自分のペースで遊べます。',
+    },
+    intro: {
+      howToPlay: [
+        'つりたい おさかなを タップしよう',
+        'うきに「！」が でたら「つる！」を おそう',
+        '6しゅるい あつめたら できあがり！ なんどでも あそべるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

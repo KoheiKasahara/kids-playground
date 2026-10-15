@@ -13,6 +13,7 @@ import { findGameIdByPathname, recordRecentGameVisit } from '../pages/gameShelfS
 import { setActiveSoundGame } from '../audio/sound'
 
 const SELF_MANAGED_GAME_BACK_PATHS = new Set([
+  '/games/fishing-pond',
   '/games/venom-lab',
   '/games/forest-delivery',
   '/games/draw-goal',
