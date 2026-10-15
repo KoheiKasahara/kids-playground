@@ -60,7 +60,7 @@ npm run typecheck
 npm run test:quick
 ```
 
-すべてのテスト（時間のかかるものを含む）を実行する場合は次を使います。`npm test` は常にこちらと同じ範囲を実行します。
+すべてのVitestテスト（時間のかかるものを含む）を実行する場合は次を使います。E2Eと依存境界検査は別コマンドです。
 
 ```bash
 npm test
@@ -72,7 +72,28 @@ npm test
 npm run test:watch
 ```
 
-lint・型チェック・軽量テスト・buildをまとめて確認したいときは、専用のコマンドを使います。実行するコマンドの詳しい使い分けは [development-guidelines.md](./development-guidelines.md) を参照してください。
+lint（依存境界検査を含む）・型チェック・Quick・buildをまとめて実行するコマンドは `npm run verify`、QuickをFullに置き換えたものは `npm run verify:full` です。**どちらもE2Eを含みません。**
+
+### 変更別の検証
+
+作業中は `npm run test:game -- src/games/<game-id>` などで対象を絞って確認し、完了前には次の表を適用します。複数行に該当する変更は必要な検証を合わせ、同じ検証を重複実行しません。関連テストはファイル名だけでなく参照元への影響から選びます。
+
+| 変更内容 | 完了前の検証 |
+| --- | --- |
+| Markdownのみ | 記述と実装・コマンドの整合、リンク先、`git diff --check`。実行コードに変更がなければアプリテストは不要 |
+| 単独ゲームのロジック・データ・保存・UI | `npm run verify`。既存例外で他ゲームから参照されている場合は参照元も対象にする。表示・操作の変更は狭い縦画面で確認し、該当する既存E2Eがあれば実行 |
+| ゲーム追加・カタログ・ルート | `npm run verify` と `npm run test:e2e`。追加ゲームは `npx playwright test e2e/all-games.smoke.spec.ts --grep <game-id>` で実ブラウザの入口も確認 |
+| 共通UI・音声・保存・共通ロジック | `npm run verify` と `npm run test:e2e`。利用側の代表操作を確認。音の変更は既存の音量テストも対象にする |
+| 物理・シミュレーション・3D資源管理 | `npm run verify` に加え、影響するゲームのFullテストを `npm run test:game -- src/games/<game-id>` で実行。該当する実操作E2Eと退出・再入場を確認。共通物理基盤への影響が広い場合は `npm run verify:full` を使う |
+| PWA・静的ページ生成・素材キャッシュ | `npm run verify` と `npm run test:e2e`。ビルド後のpreviewで、対象素材のオフライン利用と更新時の進行維持を確認 |
+| 依存境界検査・例外定義 | `npm run verify`（検査器自身のテストを含む）。例外変更時は参照元・参照先の関連テストも確認 |
+| E2E・テスト設定・検証を変えるCIやpackage scripts・依存更新 | `npm run verify:full` と `npm run test:e2e:nightly`。Nightlyと同じ全E2Eを変更の公開前に先行確認 |
+
+E2Eは **最新の `npm run build` の後** に実行します。初回は `npx playwright install chromium` でブラウザを用意します。`npm run test:e2e` は通常CIの選抜smoke、`npm run test:e2e:nightly` は全E2Eです。既存previewを再利用する場合も最新の成果物であることを確認してください。
+
+依存境界だけを確認するときは `npm run check:boundaries`、検査器の回帰テストは `npm run test:boundaries` です。規則と例外の扱いは [開発規約](./development-guidelines.md#依存境界と既存例外) を参照してください。
+
+環境上実行できない検証があれば、未実施のコマンド・理由・残る確認事項を報告します。テスト削除・skip・検査範囲の縮小で成功扱いにしません。
 
 ## ビルドとプレビュー
 

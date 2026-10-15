@@ -39,6 +39,7 @@ npm run dev
 
 ## ドキュメント
 
+- [AGENTS.md](AGENTS.md): リポジトリ共通の作業ルール
 - [docs/setup.md](docs/setup.md): 開発環境・コマンド
 - [docs/architecture.md](docs/architecture.md): アーキテクチャ方針
 - [docs/development-guidelines.md](docs/development-guidelines.md): ミニゲーム開発の共通規約

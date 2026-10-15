@@ -1,0 +1,150 @@
+[
+  {
+    "edge": "src/components/flag-ball/flagBalls.ts -> src/games/flag-quiz/data/countries.ts",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/components/flag-ball/flagBalls.ts -> src/games/flag-quiz/types.ts",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/driveCourse.test.ts -> src/games/circuit-racing/circuit.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/driveCourse.test.ts -> src/games/circuit-racing/motion.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/driveCourse.ts -> src/games/circuit-racing/circuit.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/driveCourse.ts -> src/games/circuit-racing/motion.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/useCarDriveScene.ts -> src/games/circuit-racing/atmosphere.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/useCarDriveScene.ts -> src/games/circuit-racing/boostEffect.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/useCarDriveScene.ts -> src/games/circuit-racing/carAppearance.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/useCarDriveScene.ts -> src/games/circuit-racing/circuit.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/useCarDriveScene.ts -> src/games/circuit-racing/motion.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/useCarDriveScene.ts -> src/games/circuit-racing/raceCamera.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/useCarDriveScene.ts -> src/games/circuit-racing/scenery.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/useCarDriveScene.ts -> src/games/circuit-racing/sceneryShadows.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/car-builder/useCarDriveScene.ts -> src/games/circuit-racing/trackVisuals.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/circuit-racing/raceConfig.test.ts -> src/games/car-builder/carVehicles.ts",
+    "reason": "既存の車種定義・車体ロードを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/circuit-racing/useCircuitRacingEngine.ts -> src/games/car-builder/carVehicles.ts",
+    "reason": "既存の車種定義・車体ロードを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/circuit-racing/useCircuitRacingEngine.ts -> src/games/car-builder/vehicleBody.ts",
+    "reason": "既存の車種定義・車体ロードを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/domino-flag/flagDefinitions.test.ts -> src/games/flag-quiz/data/countries.ts",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/draw-goal/DrawGoalPlay.tsx -> src/games/domino-flag/DominoCompleteConfetti.tsx",
+    "reason": "既存のクリア演出を再利用しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/earth-globe/data/globeCountries.test.ts -> src/games/flag-quiz/data/countries.ts",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/japan-travel-quiz/JapanTravelQuiz.test.tsx -> src/games/prefecture-quiz/data/prefectures.ts",
+    "reason": "既存の都道府県データ・地図表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/japan-travel-quiz/data/travelCourses.ts -> src/games/prefecture-quiz/data/prefectures.ts",
+    "reason": "既存の都道府県データ・地図表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/japan-travel-quiz/map/JapanTravelMap.tsx -> src/games/prefecture-quiz/data/prefectures.ts",
+    "reason": "既存の都道府県データ・地図表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/japan-travel-quiz/map/JapanTravelMap.tsx -> src/games/prefecture-quiz/map/features.ts",
+    "reason": "既存の都道府県データ・地図表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/japan-travel-quiz/map/JapanTravelMap.tsx -> src/games/prefecture-quiz/map/geometry.ts",
+    "reason": "既存の都道府県データ・地図表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/japan-travel-quiz/questionGenerator.test.ts -> src/games/prefecture-quiz/data/prefectures.ts",
+    "reason": "既存の都道府県データ・地図表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/japan-travel-quiz/questionGenerator.ts -> src/games/prefecture-quiz/data/prefectures.ts",
+    "reason": "既存の都道府県データ・地図表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/japan-travel-quiz/types.ts -> src/games/prefecture-quiz/data/prefectures.ts",
+    "reason": "既存の都道府県データ・地図表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/train-journey/useTrainJourneyEngine.ts -> src/games/circuit-racing/carAppearance.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/train-journey/useTrainJourneyEngine.ts -> src/games/circuit-racing/raceCamera.ts",
+    "reason": "既存のコース・走行・景観表現を共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/world-travel-quiz/WorldTravelQuizPlay.tsx -> src/games/flag-quiz/FlagChoiceGrid.tsx",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/world-travel-quiz/WorldTravelQuizPlay.tsx -> src/games/flag-quiz/data/countries.ts",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/world-travel-quiz/data/travelCountries.ts -> src/games/flag-quiz/data/countries.ts",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/world-travel-quiz/questionGenerator.test.ts -> src/games/flag-quiz/data/countries.ts",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/world-travel-quiz/questionGenerator.ts -> src/games/flag-quiz/types.ts",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  },
+  {
+    "edge": "src/games/world-travel-quiz/types.ts -> src/games/flag-quiz/types.ts",
+    "reason": "既存の国旗データ・型・選択UIを共有しているため維持。共通領域へ抽出して依存を解消した際に削除する。"
+  }
+]
