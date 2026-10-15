@@ -100,6 +100,9 @@
   .paperPicker button { min-height: 44px; }
 }
 @media (max-width: 360px) and (orientation: portrait) {
+  /* Keep the full title on one line so the header does not take space from the paper. */
+  .header { gap: 6px; }
+  .header h1 { font-size: 15px; letter-spacing: .02em; }
   .colors { gap: 3px; }
   .actions button { flex-direction: column; line-height: 1.2; padding: 3px 0; }
   .actions button > span { font-size: 20px; }
@@ -130,4 +133,12 @@
   .studio { gap: 4px; }
   .mat { padding: 4px; }
   .tools { gap: 4px; padding: 4px; }
+}
+
+@media (orientation: landscape) and (max-height: 360px) {
+  /* Fit the scroll hints and actions inside the panel, keeping every tap target at 44px. */
+  .tools { padding: 6px; gap: 5px; }
+  .patterns button { padding: 0; }
+  .patterns svg { width: 24px; height: 24px; }
+  .patterns small { line-height: 13px; }
 }

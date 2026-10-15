@@ -12,6 +12,82 @@ async function stroke(page: Page, y = .45) {
   await page.mouse.up()
 }
 
+async function expectUsableLayout(page: Page, viewport: { width: number; height: number }) {
+  const pickers = [page.getByTestId('pattern-picker'), page.getByTestId('color-picker')]
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
+  for (const control of await page.locator('main button:visible, main a:visible').all()) {
+    // :visible includes options clipped by the intentionally scrollable pickers.
+    // Keep fixed controls in place; every picker option must be fully reachable.
+    const isPickerOption = await control.evaluate(element => Boolean(element.closest('[data-testid="pattern-picker"], [data-testid="color-picker"]')))
+    // Explicit centering avoids a minimum scroll snapping back to the previous
+    // option and leaving this one clipped at the edge of the horizontal strip.
+    if (isPickerOption) await control.evaluate(element => element.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' }))
+    await expect(control).toBeInViewport({ ratio: 1 })
+    const box = (await control.boundingBox())!
+    expect(box.width).toBeGreaterThanOrEqual(44)
+    expect(box.height).toBeGreaterThanOrEqual(44)
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.y).toBeGreaterThanOrEqual(0)
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1)
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1)
+    if (isPickerOption) {
+      await control.click()
+      await expect(control).toHaveAttribute('aria-pressed', 'true')
+    }
+  }
+  // Returning to the first choices also exercises scrolling back from the end.
+  for (const picker of pickers) {
+    const first = picker.getByRole('button').first()
+    await first.evaluate(element => element.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' }))
+    await expect(first).toBeInViewport({ ratio: 1 })
+    await first.click()
+    await expect(first).toHaveAttribute('aria-pressed', 'true')
+  }
+  const paperChoices = page.getByRole('group', { name: 'かみを えらぶ' }).getByRole('button')
+  await expect(paperChoices).toHaveCount(4)
+  const paperButtons = await paperChoices.all()
+  const paperBoxes = await Promise.all(paperButtons.map(button => button.boundingBox()))
+  const tools = page.getByRole('complementary', { name: 'おえかきの どうぐ' })
+  const toolsBox = await tools.boundingBox()
+  expect(toolsBox).not.toBeNull()
+  // Short landscape screens must not push hints/actions outside their panel.
+  const fixedTools = [
+    ...await tools.getByText('↔ よこに うごくよ').all(),
+    tools.getByRole('button', { name: '1かい もどす' }),
+    tools.getByRole('button', { name: 'ぜんぶ けす' }),
+    tools.getByRole('button', { name: 'できた！' }),
+  ]
+  for (const control of fixedTools) {
+    const bounds = (await control.boundingBox())!
+    expect(bounds.y).toBeGreaterThanOrEqual(toolsBox!.y)
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(toolsBox!.y + toolsBox!.height)
+  }
+  for (const [index, button] of paperButtons.entries()) {
+    const label = await visibleTextBox(button.locator('small'))
+    const bounds = paperBoxes[index]!
+    expect(label).not.toBeNull()
+    expect(label!.x).toBeGreaterThanOrEqual(bounds.x)
+    expect(label!.y).toBeGreaterThanOrEqual(bounds.y)
+    expect(label!.x + label!.width).toBeLessThanOrEqual(bounds.x + bounds.width)
+    expect(label!.y + label!.height).toBeLessThanOrEqual(bounds.y + bounds.height)
+    expect(boxesOverlap(label, toolsBox)).toBe(false)
+    for (const [otherIndex, otherBounds] of paperBoxes.entries()) {
+      if (otherIndex !== index) expect(boxesOverlap(label, otherBounds)).toBe(false)
+    }
+    await button.click()
+    await expect(button).toHaveAttribute('aria-pressed', 'true')
+  }
+  await paperChoices.first().click()
+  await expect(paperChoices.first()).toHaveAttribute('aria-pressed', 'true')
+  expect(await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }))).toEqual({ x: 0, y: 0 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
+  const box = (await drawing(page).boundingBox())!
+  expect(box.width).toBeGreaterThan(200)
+  expect(box.height).toBeGreaterThan(150)
+  expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1)
+  await expect(drawing(page)).toBeInViewport({ ratio: 1 })
+}
+
 test('home → drawing → pattern/color → undo → paper → guarded clear → celebration → home', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -83,70 +159,17 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }
       await expect.poll(() => picker.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
     }
     await touch.detach()
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
-    for (const control of await page.locator('main button:visible, main a:visible').all()) {
-      // :visible includes options clipped by the intentionally scrollable pickers.
-      // Keep fixed controls in place; every picker option must be fully reachable.
-      const isPickerOption = await control.evaluate(element => Boolean(element.closest('[data-testid="pattern-picker"], [data-testid="color-picker"]')))
-      // Explicit centering avoids a minimum scroll snapping back to the previous
-      // option and leaving this one clipped at the edge of the horizontal strip.
-      if (isPickerOption) await control.evaluate(element => element.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' }))
-      await expect(control).toBeInViewport({ ratio: 1 })
-      const box = (await control.boundingBox())!
-      expect(box.width).toBeGreaterThanOrEqual(44)
-      expect(box.height).toBeGreaterThanOrEqual(44)
-      expect(box.x).toBeGreaterThanOrEqual(0)
-      expect(box.y).toBeGreaterThanOrEqual(0)
-      expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1)
-      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1)
-      if (isPickerOption) {
-        await control.click()
-        await expect(control).toHaveAttribute('aria-pressed', 'true')
-      }
-    }
-    // Returning to the first choices also exercises scrolling back from the end.
-    for (const picker of pickers) {
-      const first = picker.getByRole('button').first()
-      await first.evaluate(element => element.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' }))
-      await expect(first).toBeInViewport({ ratio: 1 })
-      await first.click()
-      await expect(first).toHaveAttribute('aria-pressed', 'true')
-    }
-    const paperChoices = page.getByRole('group', { name: 'かみを えらぶ' }).getByRole('button')
-    await expect(paperChoices).toHaveCount(4)
-    const paperButtons = await paperChoices.all()
-    const paperBoxes = await Promise.all(paperButtons.map(button => button.boundingBox()))
-    const toolsBox = await page.getByRole('complementary', { name: 'おえかきの どうぐ' }).boundingBox()
-    expect(toolsBox).not.toBeNull()
-    for (const [index, button] of paperButtons.entries()) {
-      const label = await visibleTextBox(button.locator('small'))
-      const bounds = paperBoxes[index]!
-      expect(label).not.toBeNull()
-      expect(label!.x).toBeGreaterThanOrEqual(bounds.x)
-      expect(label!.y).toBeGreaterThanOrEqual(bounds.y)
-      expect(label!.x + label!.width).toBeLessThanOrEqual(bounds.x + bounds.width)
-      expect(label!.y + label!.height).toBeLessThanOrEqual(bounds.y + bounds.height)
-      expect(boxesOverlap(label, toolsBox)).toBe(false)
-      for (const [otherIndex, otherBounds] of paperBoxes.entries()) {
-        if (otherIndex !== index) expect(boxesOverlap(label, otherBounds)).toBe(false)
-      }
-      await button.click()
-      await expect(button).toHaveAttribute('aria-pressed', 'true')
-    }
-    await paperChoices.first().click()
-    await expect(paperChoices.first()).toHaveAttribute('aria-pressed', 'true')
-    expect(await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }))).toEqual({ x: 0, y: 0 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1)
-    const box = (await drawing(page).boundingBox())!
-    expect(box.width).toBeGreaterThan(200)
-    expect(box.height).toBeGreaterThan(150)
-    expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1)
+    await expectUsableLayout(page, viewport)
     await stroke(page)
     const before = await pixels(page)
     await page.screenshot({ path: `test-results/oekaki-${viewport.width}x${viewport.height}.png` })
-    await page.setViewportSize({ width: viewport.height, height: viewport.width })
-    await expect(drawing(page)).toBeVisible()
-    expect(await pixels(page)).toBe(before)
+    for (const size of [{ width: viewport.height, height: viewport.width }, viewport]) {
+      await page.setViewportSize(size)
+      await expect(drawing(page)).toBeVisible()
+      await expectUsableLayout(page, size)
+      expect(await pixels(page)).toBe(before)
+      await page.screenshot({ path: `test-results/oekaki-${viewport.width}x${viewport.height}-rotated-${size.width}x${size.height}.png` })
+    }
     await page.getByRole('button', { name: '1かい もどす' }).click()
     expect(await pixels(page)).not.toBe(before)
   })

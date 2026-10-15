@@ -1,11 +1,19 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { lstat, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { prepareDiagnostics, selectDiagnostics } from './prepare-diagnostics.mjs'
 
+vi.mock('node:fs/promises', async importOriginal => {
+  const actual = await importOriginal()
+  return { ...actual, readdir: vi.fn(actual.readdir) }
+})
+
 const temporaryDirectories = []
-afterEach(async () => { await Promise.all(temporaryDirectories.splice(0).map(directory => rm(directory, { recursive: true, force: true }))) })
+afterEach(async () => {
+  vi.mocked(readdir).mockReset()
+  await Promise.all(temporaryDirectories.splice(0).map(directory => rm(directory, { recursive: true, force: true })))
+})
 async function workspace() {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'e2e-diagnostics-'))
   temporaryDirectories.push(directory)
@@ -38,13 +46,39 @@ describe('bounded failure diagnostics', () => {
     await add(cwd, 'test-results/failure/golf-failure-state.json', '{"hole":4}')
     await add(cwd, 'test-results-repeat/failure/test-failed-1.png', 'failure png')
     await add(cwd, 'test-results/passed/success.png', 'do not upload')
-    await add(cwd, 'outside.md', 'do not follow')
-    await symlink(path.join(cwd, 'outside.md'), path.join(cwd, 'test-results/failure/test-failed-2.png'))
+    await add(cwd, 'outside/trace.zip', 'do not follow')
+    const linkedDirectory = path.join(cwd, 'test-results/failure/linked-output')
+    // Junctions exercise real link traversal on Windows without administrator or
+    // Developer Mode privileges. POSIX uses a directory symlink for the same case.
+    await symlink(path.join(cwd, 'outside'), linkedDirectory, process.platform === 'win32' ? 'junction' : 'dir')
+    expect((await lstat(linkedDirectory)).isSymbolicLink()).toBe(true)
+    expect(await readFile(path.join(linkedDirectory, 'trace.zip'), 'utf8')).toBe('do not follow')
     const result = await prepareDiagnostics(cwd)
     expect(result.files).toHaveLength(4)
     expect(await readFile(path.join(cwd, 'e2e-diagnostics/test-results/failure/trace.zip'), 'utf8')).toBe('complete trace')
     expect(await readFile(path.join(cwd, 'test-results/failure/trace.zip'), 'utf8')).toBe('complete trace')
     expect(JSON.parse(await readFile(path.join(cwd, 'e2e-diagnostics/manifest.json'), 'utf8')).files).toHaveLength(4)
+    expect(await readFile(path.join(cwd, 'outside/trace.zip'), 'utf8')).toBe('do not follow')
+  })
+
+  it('excludes file-link entries even when their name matches a failure screenshot', async () => {
+    const cwd = await workspace()
+    await add(cwd, 'test-results/error-context.md', 'keep')
+    await add(cwd, 'test-results/test-failed-9.png', 'do not copy')
+    const actual = await vi.importActual('node:fs/promises')
+    // Only the link's Dirent metadata is simulated: stat/copy and the other
+    // entries use real files. Accidentally collecting the link would copy the
+    // sentinel and fail the assertions, on every OS without elevated privileges.
+    vi.mocked(readdir).mockImplementationOnce(async (...args) => {
+      const entries = await actual.readdir(...args)
+      return entries.map(entry => entry.name === 'test-failed-9.png'
+        ? { name: entry.name, isSymbolicLink: () => true, isDirectory: () => false, isFile: () => false }
+        : entry)
+    })
+    const result = await prepareDiagnostics(cwd)
+    expect(result.files.map(file => file.path)).toEqual(['test-results/error-context.md'])
+    expect(await readdir(path.join(cwd, 'e2e-diagnostics/test-results'))).toEqual(['error-context.md'])
+    expect(await readFile(path.join(cwd, 'test-results/test-failed-9.png'), 'utf8')).toBe('do not copy')
   })
 
   it('leaves no upload directory when tests produce no failures, including stale staging from a prior run', async () => {
