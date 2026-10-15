@@ -273,6 +273,26 @@
 }
 
 .nibbling .bobber { animation: nibble 0.28s ease-in-out infinite alternate; }
+.cast { animation: castIn 0.55s cubic-bezier(0.3, 0.6, 0.4, 1) both; }
+.cast .ripple { animation: splashRing 0.6s ease-out 0.45s both, ripple 1.5s ease-out 1.05s infinite; }
+
+.aim {
+  position: absolute;
+  z-index: 6;
+  width: 54px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.aim span {
+  position: absolute;
+  inset: 0;
+  border: 3px dashed #fffbe0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px #ff9d5c55;
+  animation: aimPulse 0.9s ease-in-out infinite alternate;
+}
 .nibbling .ripple { animation-duration: 0.6s; }
 .jiggle .bobber { animation: jiggle 0.5s ease-in-out, bob 1.4s ease-in-out 0.5s infinite; }
 
@@ -448,6 +468,7 @@
 }
 
 .action:not(:disabled):active { transform: translateY(3px); box-shadow: 0 2px 0 #d9a44e; }
+.locked { filter: saturate(0.4); opacity: 0.7; cursor: default; }
 .reel { min-height: 76px; background: #ff9d5c; color: #5a2a0c; outline: 3px solid #fff8c0; font-size: clamp(24px, 7vw, 32px); animation: reelPulse 0.5s ease-in-out infinite alternate; }
 .page button:focus-visible { outline: 4px solid #7454b6; outline-offset: 2px; }
 
@@ -482,7 +503,8 @@
   .panel { gap: 8px; }
   .message { font-size: 17px; }
   .action { min-height: 56px; font-size: 20px; padding: 8px; }
-  .reel { min-height: 60px; font-size: 24px; }
+  .locked { filter: saturate(0.4); opacity: 0.7; cursor: default; }
+.reel { min-height: 60px; font-size: 24px; }
   .album { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .album svg { height: 32px; }
   .collection { padding: 6px 8px; }
@@ -506,6 +528,9 @@
 @keyframes ripple { from { scale: 0.7; opacity: 1; } to { scale: 1.25; opacity: 0.25; } }
 @keyframes nibble { from { translate: 0 0; rotate: -6deg; } to { translate: 0 7px; rotate: 10deg; } }
 @keyframes jiggle { 25% { rotate: -18deg; } 50% { rotate: 14deg; translate: 0 4px; } 75% { rotate: -8deg; } }
+@keyframes castIn { from { translate: -140px -110px; scale: 0.5; } 60% { translate: -30px -40px; scale: 0.9; } to { translate: 0 0; scale: 1; } }
+@keyframes splashRing { from { scale: 0.3; opacity: 1; border-width: 6px; } to { scale: 1.6; opacity: 0; } }
+@keyframes aimPulse { from { scale: 0.85; } to { scale: 1.1; } }
 @keyframes pop { from { scale: 0.4; } 70% { scale: 1.15; } }
 @keyframes droplet { from { translate: 0 0; opacity: 1; scale: 1; } to { translate: 0 -22px; opacity: 0; scale: 0.5; } }
 @keyframes burstUp { from { translate: -50% -60%; scale: 0.6; opacity: 1; } to { translate: -50% -190%; scale: 1.1; opacity: 0; } }

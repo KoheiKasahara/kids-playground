@@ -16,7 +16,8 @@ export const FISH = [
 export type Fish = (typeof FISH)[number]
 export type FishId = Fish['id']
 
-export type FishingPhase = 'title' | 'fishing' | 'hooked' | 'caught' | 'complete'
+/** ready: 糸を投げる前。fishing: 糸を投げて魚を待っている。 */
+export type FishingPhase = 'title' | 'ready' | 'fishing' | 'hooked' | 'caught' | 'complete'
 export type FishingState = {
   phase: FishingPhase
   /** かかった魚（hooked/caught/complete で有効）。 */
@@ -30,7 +31,7 @@ export type FishingState = {
   caught: readonly FishId[]
 }
 export type FishingAction =
-  | { type: 'start' | 'back' | 'reel' | 'next' }
+  | { type: 'start' | 'back' | 'cast' | 'reel' | 'next' }
   | { type: 'bite'; fishId: FishId }
   | { type: 'tick'; ms: number }
 
@@ -58,7 +59,10 @@ export function reelStep(fish: Fish): number {
 export function fishingReducer(state: FishingState, action: FishingAction): FishingState {
   switch (action.type) {
     case 'start':
-      return { ...initialFishingState(), phase: 'fishing' }
+      return { ...initialFishingState(), phase: 'ready' }
+    case 'cast':
+      if (state.phase !== 'ready') return state
+      return { ...state, phase: 'fishing', escaped: false }
     case 'back':
       return initialFishingState()
     case 'bite':
@@ -75,13 +79,13 @@ export function fishingReducer(state: FishingState, action: FishingAction): Fish
     case 'tick': {
       if (state.phase !== 'hooked' || action.ms <= 0) return state
       const idleMs = state.idleMs + action.ms
-      if (idleMs >= ESCAPE_MS) return { ...state, phase: 'fishing', hookedId: null, progress: 0, idleMs: 0, escaped: true }
+      if (idleMs >= ESCAPE_MS) return { ...state, phase: 'ready', hookedId: null, progress: 0, idleMs: 0, escaped: true }
       const decayMs = Math.max(0, idleMs - Math.max(DECAY_GRACE_MS, state.idleMs))
       const progress = Math.max(0, state.progress - (decayMs / 1000) * PROGRESS_DECAY_PER_SEC)
       return { ...state, idleMs, progress }
     }
     case 'next':
       if (state.phase !== 'caught') return state
-      return { ...state, phase: 'fishing', hookedId: null, progress: 0, idleMs: 0 }
+      return { ...state, phase: 'ready', hookedId: null, progress: 0, idleMs: 0, escaped: false }
   }
 }
