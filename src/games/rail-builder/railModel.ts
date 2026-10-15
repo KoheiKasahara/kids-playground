@@ -27,6 +27,7 @@ export type RailPieceKind =
   | 'tunnel'
   | 'branch'
   | 'depot'
+  | 'crossing'
 export type CurveDirection = 'left' | 'right'
 export type RailConnectorId = 'a' | 'b' | 'c' | 'd'
 export type RailBranchDirection = 'b' | 'c'
@@ -156,6 +157,8 @@ export const ELEVATED_LENGTH = RAIL_UNIT_LENGTH
 export const STATION_LENGTH = RAIL_UNIT_LENGTH * 2
 /** トンネルは「屋根の付いた直線」。基準ユニット1つ分。 */
 export const TUNNEL_LENGTH = RAIL_UNIT_LENGTH
+/** 踏切は「道路と遮断機の付いた直線」。基準ユニット1つ分。 */
+export const CROSSING_LENGTH = RAIL_UNIT_LENGTH
 export const BRANCH_LENGTH = RAIL_UNIT_LENGTH
 export const CURVE_RADIUS = RAIL_UNIT_LENGTH
 export const CURVE_ANGLE = Math.PI / 2
@@ -497,6 +500,8 @@ export function createRailPiece(
             ? { kind: 'straight', length: STATION_LENGTH }
             : kind === 'tunnel'
               ? { kind: 'straight', length: TUNNEL_LENGTH }
+              : kind === 'crossing'
+                ? { kind: 'straight', length: CROSSING_LENGTH }
               : kind === 'branch'
                 ? { kind: 'straight', length: BRANCH_LENGTH }
                 : kind === 'depot'

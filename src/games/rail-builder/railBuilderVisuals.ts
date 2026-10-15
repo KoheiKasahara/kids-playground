@@ -17,6 +17,7 @@ export const RAIL_HIT_AREA_WIDTH_SCALE_BY_KIND: Readonly<Record<RailPieceKind, n
   station: 1.8,
   tunnel: 1.8,
   depot: 1.8,
+  crossing: 1.8,
 }
 
 export function getRailHitAreaWidthScale(kind: RailPieceKind): number {
