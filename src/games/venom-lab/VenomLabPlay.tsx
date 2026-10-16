@@ -3,9 +3,9 @@ import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { HABITATS, LEVEL_LABELS, MAX_RESIDENTS, RANKING, RANKING_NOTE, RANK_FILTERS, SPECIES, addResident, createExhibits, matchesRankFilter, type HabitatId, type RankFilter, type Resident, type Species } from './data'
-import PixelCreature from './PixelCreature'
+import PixelCreature, { type Cue } from './PixelCreature'
 import HabitatScene from './HabitatScene'
-import { SIGNATURE_MOVES } from './motion'
+import { HABITS, SIGNATURE_MOVES } from './motion'
 import { playLabSound } from './sounds'
 import styles from './VenomLabPlay.module.css'
 
@@ -35,7 +35,7 @@ export default function VenomLabPlay() {
   const [tab, setTab] = useState<'observe' | 'ranking'>('observe')
   const [rankFilter, setRankFilter] = useState<RankFilter>('all')
   const [message, setMessage] = useState('いきものを タップして かんさつしよう！')
-  const [actSignal, setActSignal] = useState(0)
+  const [cue, setCue] = useState<Cue>({ clip: 'act', n: 0 })
   const [sound, toggleSound] = useSoundToggle()
   const detailRef = useRef<HTMLElement>(null)
   const revealNote = useRef(false)
@@ -60,7 +60,7 @@ export default function VenomLabPlay() {
     playLabSound(fresh ? 'discover' : 'tap')
     setSelected(species)
     setSelectedId(residentId)
-    setActSignal(n => n + 1)
+    setCue(c => ({ clip: 'act', n: c.n + 1 }))
     setObserved(current => current.includes(species.id) ? current : [...current, species.id])
     setMessage(fresh ? `${species.name}を はっけん！ ずかんに きろくしたよ。` : `${species.name}を かんさつ中。`)
   }
@@ -128,12 +128,16 @@ export default function VenomLabPlay() {
           <aside ref={detailRef} className={styles.detail} aria-label="いきものの かいせつ" aria-live="polite">
             {selected ? <>
               <div className={styles.detailTop}><span className={styles.eyebrow}>FIELD NOTE / {String(SPECIES.indexOf(selected) + 1).padStart(2, '0')}</span><span className={styles.recorded}>✓ きろくずみ</span></div>
-              <div className={styles.portrait}><PixelCreature species={selected} live actSignal={actSignal} /></div>
+              <div className={styles.portrait}><PixelCreature species={selected} live cue={cue} /></div>
               <h2>{selected.name}</h2><p className={styles.scientific}>{selected.scientific}</p>
               <div className={styles.venomLine}><span>毒のつよさ <small>めやす</small></span><VenomMeter species={selected} /></div>
               <div className={styles.signature}>
                 <span><small>とくいわざ</small>{SIGNATURE_MOVES[selected.id]}</span>
-                <button type="button" onClick={() => { setActSignal(n => n + 1); playLabSound() }} aria-label={`${selected.name}の とくいわざを みる`}>▶ みる</button>
+                <button type="button" onClick={() => { setCue(c => ({ clip: 'act', n: c.n + 1 })); playLabSound() }} aria-label={`${selected.name}の とくいわざを みる`}>▶ みる</button>
+              </div>
+              <div className={styles.signature}>
+                <span><small>くらしの ようす</small>{HABITS[selected.id]}</span>
+                <button type="button" onClick={() => { setCue(c => ({ clip: 'habit', n: c.n + 1 })); playLabSound() }} aria-label={`${selected.name}の くらしの ようすを みる`}>▶ みる</button>
               </div>
               <span className={styles.delivery}>{selected.delivery}</span>{selected.inJapan && <span className={styles.japanBadge}>日本にもいる</span>}
               <p className={styles.fact}>{selected.fact}</p>
