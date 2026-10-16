@@ -54,7 +54,7 @@ export function detailScale() {
   return typeof window !== 'undefined' && (window.devicePixelRatio || 1) < 1.5 ? 3 : DETAIL
 }
 
-const poseAt = (clip: ClipName, index: number, count: number) => ({ clip, t: count <= 1 ? 0 : clip === 'act' ? index / (count - 1) : index / count })
+const poseAt = (clip: ClipName, index: number, count: number) => ({ clip, t: count <= 1 ? 0 : clip === 'act' || clip === 'habit' ? index / (count - 1) : index / count })
 
 /** clip の count コマの うち index ばんめ。 */
 export function frameOf(sp: Species, clip: ClipName, index: number, count: number, scale = DETAIL): Frame {
@@ -112,12 +112,12 @@ function schedule() {
 
 /**
  * うごきはじめて すぐ カクッと しない ように、ひまな ときに コマを つくっておく。
- * いきづかい・あるく → とくいわざ の じゅん。
+ * いきづかい・あるく → とくいわざ → くらしの ようす の じゅん。
  */
 export function prewarm(sp: Species, counts: Record<ClipName, number>, scale = DETAIL) {
   if (queued.has(sp.id)) return
   queued.add(sp.id)
-  for (const clip of ['idle', 'move', 'act'] as const) {
+  for (const clip of ['idle', 'move', 'act', 'habit'] as const) {
     for (let i = 0; i < counts[clip]; i++) queue.push(() => { if (queued.has(sp.id)) frameOf(sp, clip, i, counts[clip], scale) })
   }
   schedule()

@@ -29,7 +29,7 @@ describe('venom lab exhibits', () => {
       expect(new URL(s.source.url).protocol).toBe('https:')
       expect(s.fact.length).toBeGreaterThan(10)
       expect(s.venom.length).toBeGreaterThan(10)
-      for (const clip of ['idle', 'move', 'act'] as const) {
+      for (const clip of ['idle', 'move', 'act', 'habit'] as const) {
         for (const [t, scale] of [[0, DETAIL], [.5, 1]] as const) {
           const frame = renderFrame(s, { clip, t }, scale)
           const size = SPRITE_W * SPRITE_H * scale * scale

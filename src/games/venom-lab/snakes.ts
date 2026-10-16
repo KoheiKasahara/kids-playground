@@ -2,15 +2,24 @@
 // じめんの うえの くねりは、おくゆき（z）と がめんの たて（y）に うつして かく。
 // からだの もようは あたま からの きょりで きめるので、くねっても ずれない。
 
-import { key, wave } from './keys'
-import type { Builder, Pose } from './pose'
-import { bump, clamp, frac, hash, lerp, TAU, type Mat, type Model, type P3, type Paint, type Pattern } from './raster'
+import { key, span, wave } from './keys'
+import type { Builder, Look, Pose } from './pose'
+import { bubbles, edgeFade, egg, flower, frogling, hummingbird, leaf, lizardling, moon, mouse, munch, puddle, ripple, snakelet, sun, waterline } from './props'
+import { bump, clamp, ease, frac, hash, lerp, spline, TAU, type Mat, type Model, type P3, type Paint, type Pattern, type Pt } from './raster'
 
 type Posture = 'crawl' | 'coil' | 'ambush' | 'branch' | 'hood' | 'swim'
 type HeadKind = 'pit' | 'slim' | 'cobra'
 type Act =
   | 'rattle' | 'strike' | 'dangle' | 'buzz' | 'guard' | 'neck' | 'reach' | 'yawn' | 'tongue' | 'shade'
   | 'rear' | 'lure' | 'gape' | 'puff' | 'throat' | 'spit' | 'rise' | 'flare' | 'hide' | 'paddle'
+/** くらしの ようす（すがた ごとに できる もの）。 */
+type Habit =
+  | 'birth' | 'toad' | 'bite' | 'drink' | 'crack' | 'chase' | 'bask' | 'swallow' // crawl
+  | 'heat' | 'shed' // coil
+  | 'still' | 'miss' | 'leaves' | 'ambush' // ambush
+  | 'bird' | 'nest' | 'tide' // branch
+  | 'frog' | 'rat' | 'build' // hood
+  | 'breathe' // swim
 
 type SnakeLook = {
   posture: Posture
@@ -22,6 +31,7 @@ type SnakeLook = {
   /** もようを きめる。l は あたまからの きょり、s は よこ（+ が おなか）。 */
   pattern: (l: number, s: number) => Mat | null
   act: Act
+  habit: Habit
   tail?: 'rattle' | 'paddle' | 'lure'
   eye?: number
   lash?: boolean
@@ -61,30 +71,30 @@ const speckle = (seed: number, amount: number, mat: Mat = 'B') => (l: number, s:
 const plain = (_l: number, s: number): Mat | null => belly(s) ? 'C' : null
 
 const LOOKS: Record<string, SnakeLook> = {
-  rattlesnake: { posture: 'coil', head: 'pit', girth: 3.3, pattern: coonTail(diamonds(6.5), 104, 3), act: 'rattle', tail: 'rattle', stripe: 'C' },
-  'mojave-rattlesnake': { posture: 'coil', head: 'pit', girth: 3.1, pattern: coonTail(diamonds(6, 'C', 'B'), 100, 4.5), act: 'strike', tail: 'rattle', stripe: 'C' },
-  'eyelash-viper': { posture: 'branch', head: 'pit', girth: 2.6, headSize: 1.08, pattern: speckle(4, .14), act: 'dangle', lash: true, eye: 1.5 },
-  bushmaster: { posture: 'ambush', head: 'pit', girth: 3.7, pattern: diamonds(8, 'C', 'B'), act: 'buzz' },
-  mamushi: { posture: 'crawl', head: 'pit', girth: 3.6, pattern: blotches(6, 2.2, 'B', 'C'), act: 'guard', stripe: 'B' },
+  rattlesnake: { posture: 'coil', head: 'pit', girth: 3.3, pattern: coonTail(diamonds(6.5), 104, 3), act: 'rattle', habit: 'heat', tail: 'rattle', stripe: 'C' },
+  'mojave-rattlesnake': { posture: 'coil', head: 'pit', girth: 3.1, pattern: coonTail(diamonds(6, 'C', 'B'), 100, 4.5), act: 'strike', habit: 'shed', tail: 'rattle', stripe: 'C' },
+  'eyelash-viper': { posture: 'branch', head: 'pit', girth: 2.6, headSize: 1.08, pattern: speckle(4, .14), act: 'dangle', habit: 'bird', lash: true, eye: 1.5 },
+  bushmaster: { posture: 'ambush', head: 'pit', girth: 3.7, pattern: diamonds(8, 'C', 'B'), act: 'buzz', habit: 'still' },
+  mamushi: { posture: 'crawl', head: 'pit', girth: 3.6, pattern: blotches(6, 2.2, 'B', 'C'), act: 'guard', habit: 'birth', stripe: 'B' },
   'tiger-keelback': {
-    posture: 'crawl', head: 'slim', girth: 3.2, act: 'neck', lip: 'C',
+    posture: 'crawl', head: 'slim', girth: 3.2, act: 'neck', habit: 'toad', lip: 'C',
     pattern: (l, s) => belly(s) ? 'C' : l > 7 && l < 11 && s < .1 ? 'E' : l < 40 ? (frac(l / 5) < .45 ? (s < -.1 ? 'C' : 'B') : null) : frac(l / 6) < .32 ? 'C' : null,
   },
-  habu: { posture: 'crawl', head: 'pit', girth: 3.2, headSize: 1.05, pattern: blotches(5.5, 2.6, 'B'), act: 'reach', stripe: 'B' },
-  'hime-habu': { posture: 'ambush', head: 'pit', girth: 3.4, headSize: 1.08, pattern: blotches(5, 2.4, 'B'), act: 'yawn' },
-  'sakishima-habu': { posture: 'crawl', head: 'pit', girth: 3.1, pattern: (l, s) => belly(s) ? 'C' : frac(l / 5) < .4 && Math.abs(s + .2) < .55 ? 'B' : null, act: 'tongue', stripe: 'B' },
-  'inland-taipan': { posture: 'crawl', head: 'slim', girth: 3.1, pattern: (l, s) => belly(s) ? 'C' : l < 9 ? 'B' : speckle(8, .1)(l, s), act: 'shade' },
-  'eastern-brown': { posture: 'crawl', head: 'slim', girth: 3, pattern: plain, act: 'rear' },
-  'death-adder': { posture: 'ambush', head: 'pit', girth: 3.6, pattern: bands(6, .4), act: 'lure', tail: 'lure' },
-  'black-mamba': { posture: 'crawl', head: 'slim', girth: 2.9, headSize: 1.1, pattern: plain, act: 'gape', eye: 1.35 },
-  'puff-adder': { posture: 'ambush', head: 'pit', girth: 4.2, headSize: 1.1, pattern: chevrons(6.5), act: 'puff' },
-  boomslang: { posture: 'branch', head: 'slim', girth: 2.1, pattern: (l, s) => belly(s) ? 'C' : hash(Math.floor(l), Math.floor(s * 3 + 7), 3) < .2 ? 'B' : null, act: 'throat', eye: 2 },
-  'spitting-cobra': { posture: 'hood', head: 'cobra', girth: 2.8, headSize: .95, pattern: plain, act: 'spit' },
-  'king-cobra': { posture: 'hood', head: 'cobra', girth: 3.1, headSize: 1.05, pattern: (l, s) => belly(s) ? 'C' : frac(l / 7) < .14 ? 'C' : null, act: 'rise' },
-  'monocled-cobra': { posture: 'hood', head: 'cobra', girth: 2.9, headSize: .95, pattern: plain, act: 'flare' },
-  'banded-krait': { posture: 'crawl', head: 'slim', girth: 3.3, pattern: bands(7, .5, 'B', true), act: 'hide' },
-  'mangrove-viper': { posture: 'branch', head: 'pit', girth: 3.2, headSize: 1.08, pattern: blotches(5, 2, 'C'), act: 'strike' },
-  'sea-krait': { posture: 'swim', head: 'slim', girth: 2.6, pattern: bands(6.5, .38, 'B', true), act: 'paddle', tail: 'paddle', lip: 'C' },
+  habu: { posture: 'crawl', head: 'pit', girth: 3.2, headSize: 1.05, pattern: blotches(5.5, 2.6, 'B'), act: 'reach', habit: 'bite', stripe: 'B' },
+  'hime-habu': { posture: 'ambush', head: 'pit', girth: 3.4, headSize: 1.08, pattern: blotches(5, 2.4, 'B'), act: 'yawn', habit: 'miss' },
+  'sakishima-habu': { posture: 'crawl', head: 'pit', girth: 3.1, pattern: (l, s) => belly(s) ? 'C' : frac(l / 5) < .4 && Math.abs(s + .2) < .55 ? 'B' : null, act: 'tongue', habit: 'drink', stripe: 'B' },
+  'inland-taipan': { posture: 'crawl', head: 'slim', girth: 3.1, pattern: (l, s) => belly(s) ? 'C' : l < 9 ? 'B' : speckle(8, .1)(l, s), act: 'shade', habit: 'crack' },
+  'eastern-brown': { posture: 'crawl', head: 'slim', girth: 3, pattern: plain, act: 'rear', habit: 'chase' },
+  'death-adder': { posture: 'ambush', head: 'pit', girth: 3.6, pattern: bands(6, .4), act: 'lure', habit: 'leaves', tail: 'lure' },
+  'black-mamba': { posture: 'crawl', head: 'slim', girth: 2.9, headSize: 1.1, pattern: plain, act: 'gape', habit: 'bask', eye: 1.35 },
+  'puff-adder': { posture: 'ambush', head: 'pit', girth: 4.2, headSize: 1.1, pattern: chevrons(6.5), act: 'puff', habit: 'ambush' },
+  boomslang: { posture: 'branch', head: 'slim', girth: 2.1, pattern: (l, s) => belly(s) ? 'C' : hash(Math.floor(l), Math.floor(s * 3 + 7), 3) < .2 ? 'B' : null, act: 'throat', habit: 'nest', eye: 2 },
+  'spitting-cobra': { posture: 'hood', head: 'cobra', girth: 2.8, headSize: .95, pattern: plain, act: 'spit', habit: 'frog' },
+  'king-cobra': { posture: 'hood', head: 'cobra', girth: 3.1, headSize: 1.05, pattern: (l, s) => belly(s) ? 'C' : frac(l / 7) < .14 ? 'C' : null, act: 'rise', habit: 'build' },
+  'monocled-cobra': { posture: 'hood', head: 'cobra', girth: 2.9, headSize: .95, pattern: plain, act: 'flare', habit: 'rat' },
+  'banded-krait': { posture: 'crawl', head: 'slim', girth: 3.3, pattern: bands(7, .5, 'B', true), act: 'hide', habit: 'swallow' },
+  'mangrove-viper': { posture: 'branch', head: 'pit', girth: 3.2, headSize: 1.08, pattern: blotches(5, 2, 'C'), act: 'strike', habit: 'tide' },
+  'sea-krait': { posture: 'swim', head: 'slim', girth: 2.6, pattern: bands(6.5, .38, 'B', true), act: 'paddle', habit: 'breathe', tail: 'paddle', lip: 'C' },
 }
 
 // ---------------- あたま ----------------
@@ -101,9 +111,12 @@ type HeadPose = {
   throat?: number
   /** うしろむき（フードの うらがわを みせる コブラ）。 */
   back?: boolean
+  /** かわを ぬぐ まえの にごった め。 */
+  cloudy?: boolean
 }
 
-function head(m: Model, look: SnakeLook, h: HeadPose) {
+/** あたまを かいて、くちさき と ピット（ねつを かんじる あな）の いちを かえす。 */
+function head(m: Model, look: SnakeLook, h: HeadPose): { mouth: Pt; pit: Pt } {
   const S = (look.headSize ?? 1) * (look.head === 'pit' ? 1.12 : look.head === 'cobra' ? 1.04 : .95)
   const d = [Math.cos(h.dir), Math.sin(h.dir)], n = [d[1], -d[0]]
   const P = (f: number, v: number): [number, number] => [h.x + (d[0] * f + n[0] * v) * S, h.y + (d[1] * f + n[1] * v) * S]
@@ -116,7 +129,7 @@ function head(m: Model, look: SnakeLook, h: HeadPose) {
     // うしろから みた あたま。
     const [x, y] = P(0, 0)
     m.ell(x, y, 3.6 * S, 2.8 * S, { z: z + 1, a, gloss: .8 })
-    return
+    return { mouth: P(4, 1), pit: P(3.9, .2) }
   }
   // した あご（ひらくと した へ まわる）。
   const jawA = a - gape * 1.1
@@ -170,9 +183,13 @@ function head(m: Model, look: SnakeLook, h: HeadPose) {
     m.dot(px, py, '#1b1f2e')
   }
   if (look.stripe) m.tube([P(.6, -.1), P(-1.6, .55), P(-4.4, 1.3)], .62, { z: z + 3.3, mat: look.stripe, gloss: .2 })
-  m.eye(ex, ey, er, z + 3.6)
+  m.eye(ex, ey, er, z + 3.6, h.cloudy ? 'Q' : 'E')
   if (look.lash) for (let i = 0; i < 3; i++) m.tube([P(.6 + i * 1.1, -2.6), P(.2 + i * 1.6, -4.4 - (i % 2) * .6)], t => lerp(.75, .45, t), { z: z + 4, mat: 'C', gloss: .6 })
+  return { mouth: P(5.2, 1.3), pit: P(3.9, .2) }
 }
+
+/** のみこんだ えものの ふくらみ（からだの はんけいに たす）。at は あたまからの いち（0〜1）。 */
+const bulge = (u: number, at: number, size = 1.3) => at < 0 ? 0 : Math.max(0, 1 - Math.abs(u - at) / .06) ** 1.5 * size
 
 // ---------------- からだ ----------------
 
@@ -210,9 +227,9 @@ function dirOf(f: (t: number) => P3) {
   return Math.atan2(a[1] - b[1], a[0] - b[0])
 }
 
-function rattle(m: Model, x: number, y: number, z: number, dir: number, shake: number) {
+function rattle(m: Model, x: number, y: number, z: number, dir: number, shake: number, segs = 4) {
   const d = [Math.cos(dir), Math.sin(dir)]
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < segs; i++) {
     const k = i * 1.5
     m.ell(x + d[0] * k + shake, y + d[1] * k, 1.7 - i * .15, 1.35 - i * .1, { z: z + .1 * i, a: dir, mat: i % 2 ? 'B' : 'C', gloss: .5 })
   }
@@ -224,14 +241,56 @@ function idleTongue(t: number, at: number) {
   return { tongue: out, flick: wave(t, 18) }
 }
 
-function crawl(m: Model, look: SnakeLook, pose: Pose, sp: string) {
+function crawl(m: Model, look: SnakeLook, pose: Pose): Look {
   const { clip, t } = pose
   const len = 112
-  const phase = clip === 'move' ? t : 0
-  const breath = clip === 'idle' ? wave(t, 1) * .06 : 0
+  let phase = clip === 'move' ? t : 0
+  const breath = clip === 'idle' || clip === 'habit' ? wave(t, 1) * .06 : 0
   let rise = 0, neckBack = 0, gape = 0, tongue = 0, flick = 0, throat = 0, hide = 0, lookUp = 0, sway = 0, amp = 1
+  // くらしの ようす: lunge は あたまを まえへ、dip は あたまを さげる、lump は のみこんだ えものの いち。
+  let lunge = 0, dip = 0, lump = -1, swell = -1
   let tint: { color: string; amount: number } | undefined
   if (clip === 'idle') ({ tongue, flick } = idleTongue(t, .55))
+  if (clip === 'habit') {
+    ;({ tongue, flick } = idleTongue(t, .9))
+    const h = look.habit
+    if (h === 'birth') {
+      // おなかの なかで そだった あかちゃんが、しっぽの つけねから うまれて はいだす。
+      swell = Math.max(bump(t, .04, .22), bump(t, .34, .52))
+      ;({ tongue, flick } = idleTongue(t, .62))
+    } else if (h === 'toad' || h === 'bite') {
+      if (h === 'bite') { rise = key(t, [[0, 0], [.2, 0], [.36, .4], [.44, .4], [.5, .1], [.8, .1], [.92, 0]]); neckBack = rise * 1.6 }
+      lunge = key(t, [[0, 0], [.3, 0], [.36, -.4], [.42, 1], [.5, .7], [.62, .3], [.8, 0]])
+      dip = key(t, [[0, 0], [.36, 0], [.44, .6], [.62, .6], [.75, 0]])
+      gape = key(t, [[0, 0], [.36, 0], [.42, 1], [.48, .6], [.58, .5], [.64, 0]])
+      lump = t > .6 && t < .86 ? lerp(.04, .36, span(t, .6, .86)) : -1
+      if (h === 'toad') throat = key(t, [[0, 0], [.84, 0], [.9, .8], [.96, .8], [1, 0]])
+    } else if (h === 'drink') {
+      dip = key(t, [[0, 0], [.12, 0], [.28, 1], [.8, 1], [.92, 0]])
+      lookUp = -.35 * dip
+      gape = t > .3 && t < .78 ? Math.max(0, wave(t, 6)) * .18 : 0
+    } else if (h === 'crack') {
+      dip = key(t, [[0, 0], [.16, 0], [.3, 1.4], [.66, 1.4], [.78, 0]])
+      lookUp = -.5 * Math.min(1, dip)
+      lunge = .5 * Math.min(1, dip)
+      ;({ tongue, flick } = idleTongue(t, .8))
+    } else if (h === 'chase') {
+      // まえを はしる トカゲを、くねくねと すばやく おう。
+      phase = t * 2.5
+      rise = key(t, [[0, 0], [.12, .3], [.5, .3], [.6, .1], [.9, 0]])
+      lunge = key(t, [[0, 0], [.46, 0], [.54, 1.2], [.66, 0]])
+      gape = key(t, [[0, 0], [.48, 0], [.53, .8], [.6, 0]])
+    } else if (h === 'bask') {
+      // おひさまに むけて からだを ひろげ、あたためる。
+      amp = 1 + key(t, [[0, 0], [.2, .45], [.85, .45], [1, 0]])
+      tint = { color: '#ffcf7a', amount: key(t, [[0, 0], [.3, 0], [.6, .28], [.85, .28], [1, 0]]) }
+      ;({ tongue, flick } = idleTongue(t, .86))
+    } else if (h === 'swallow') {
+      dip = key(t, [[0, 0], [.14, 0], [.26, .8], [.84, .8], [.94, 0]])
+      gape = t > .26 && t < .84 ? .35 + Math.max(0, wave(t, 5)) * .25 : key(t, [[0, 0], [.2, 0], [.26, .7], [.84, .6], [.88, 0]])
+      lump = t > .3 && t < .9 ? lerp(.04, .3, span(t, .3, .9)) : -1
+    }
+  }
   if (clip === 'act') {
     const a = look.act
     if (a === 'guard') {
@@ -283,9 +342,9 @@ function crawl(m: Model, look: SnakeLook, pose: Pose, sp: string) {
   const raisedTo = .32
   const f = (u: number): P3 => {
     // ちぢめると くねりが ふかく なる。
-    let X = X0 + u * 48 + hide * Math.sin(u * Math.PI) * -4
+    let X = X0 + u * 48 + hide * Math.sin(u * Math.PI) * -4 - (u < .3 ? lunge * 2.6 * (1 - u / .3) ** 2 : 0)
     let D = amplitude(u) * Math.sin(TAU * ((u * 48) / 26 - phase)) + hide * Math.sin(u * TAU * 1.5) * 4
-    let H = 0
+    let H = u < .14 ? -dip * 2.6 * (1 - u / .14) ** 1.5 : 0
     if (rise > 0 && u < raisedTo) {
       const k = 1 - u / raisedTo
       const s = k * k * (3 - 2 * k)
@@ -297,6 +356,7 @@ function crawl(m: Model, look: SnakeLook, pose: Pose, sp: string) {
     return ground(X, D, H + taper(look, u) + .2, .62)
   }
   const r = (u: number) => taper(look, u) * (1 + breath * Math.sin(u * Math.PI)) + (throat && u < .12 ? throat * 2 * (1 - u / .12) : 0)
+    + bulge(u, lump) + (swell > 0 ? swell * Math.max(0, 1 - Math.abs(u - .68) / .1) * 1.2 : 0)
   if (hide > .5) {
     // あたまを うしろの まきに かくす。
     body(m, look, f, r, len)
@@ -305,15 +365,110 @@ function crawl(m: Model, look: SnakeLook, pose: Pose, sp: string) {
   body(m, look, f, r, len)
   const [hx, hy, hz] = f(0)
   const dir = dirOf(f) - lookUp - (rise > .6 ? -.25 * rise : 0)
-  head(m, look, { x: hx - Math.cos(dir) * 1.5, y: hy - Math.sin(dir) * 1.5 - hide * 3, z: hz + 2, dir, gape, tongue, flick, throat: throat * .6 })
-  void sp
+  const { mouth } = head(m, look, { x: hx - Math.cos(dir) * 1.5, y: hy - Math.sin(dir) * 1.5 - hide * 3, z: hz + 2, dir, gape, tongue, flick, throat: throat * .6 })
+  if (clip === 'habit') crawlHabit(m, look.habit, t, f, mouth)
   return { tint }
+}
+
+/** はう ヘビの くらしの ようすに でてくる もの。f は からだの みち、mouth は くちさき。 */
+function crawlHabit(m: Model, habit: Habit, t: number, f: (u: number) => P3, mouth: Pt) {
+  const [mx, my] = mouth
+  if (habit === 'birth') {
+    // あかちゃんは しっぽの つけねから うまれて、みぎへ はって いく。
+    for (let i = 0; i < 2; i++) {
+      const k = span(t, .14 + i * .32, .7 + i * .26)
+      if (k <= 0 || k >= 1) continue
+      const [sx, sy] = f(.7)
+      const hx = lerp(sx + 2, 72, ease(k)), hy = lerp(sy + 2, 45.5, Math.min(1, k * 3))
+      const n = Math.min(1, k * 4)
+      const pts: Pt[] = [0, .25, .5, .75, 1].map(q => [hx - q * 12 * n, hy - Math.sin((q * 1.6 - t * 5) * TAU) * 1.3 * n])
+      snakelet(m, pts, 1.3, 12, 'B')
+    }
+    return
+  }
+  if (habit === 'toad' || habit === 'bite') {
+    const toad = habit === 'toad'
+    if (t < .42) {
+      const x = lerp(-5, 6.5, ease(span(t, 0, .3)))
+      if (toad) frogling(m, x, 46, 12, bump(t, .02, .14) + bump(t, .16, .28), 1, 'P')
+      else mouse(m, x, 46.5, 12, t < .3 ? t * 6 : -1, 1, 1.1)
+    } else if (t < .6) {
+      // くわえた えもの。
+      if (toad) frogling(m, mx - 1, my + 3.5, 14, 0, 1, 'P')
+      else mouse(m, mx - 1, my + 3.5, 14, -1, 1, 1.05)
+    }
+    if (t > .56 && t < .8) munch(m, mx, my, t)
+    if (toad && t > .86) {
+      // ヒキガエルの どくを くびの ふくろに ためた しるし。
+      const [nx, ny] = f(.07)
+      for (const [dx, dy] of [[-3, -5], [0, -7], [3, -5], [-5, -2], [5, -2]] as const) m.dot(nx + dx, ny + dy - (Math.floor(t * 20) % 2), '#fff2a0', .95)
+    }
+    return
+  }
+  if (habit === 'drink') {
+    const pool = key(t, [[0, 0], [.1, 1], [.9, 1], [1, 0]])
+    if (pool > 0) puddle(m, 8, 46, 9 * pool, -4)
+    if (t > .3 && t < .8) { ripple(m, mx, 46, frac(t * 2.2)); ripple(m, mx, 46, frac(t * 2.2 + .5)) }
+    return
+  }
+  if (habit === 'crack') {
+    // じめんの われめ（あたまを いれると みえなく なる）。
+    const show = key(t, [[0, 0], [.08, 1], [.92, 1], [1, 0]])
+    if (show <= 0) return
+    m.ell(7, 46, 5.5 * show, 1.6 * show, { z: -6, rz: .3, mat: 'K', gloss: 0 })
+    const inside = t > .28 && t < .7
+    m.ell(7, 47.6, 7 * show, inside ? 2.4 : 1.2, { z: inside ? 16 : -5, rz: .5, mat: 'P', gloss: .1, pat: c => c.v < -.4 ? 'P-' : null })
+    if (inside) for (let i = 0; i < 3; i++) m.dot(2 + i * 4, 44 - frac(t * 3 + i / 3) * 4, '#b39462', .8)
+    return
+  }
+  if (habit === 'chase') {
+    const k = span(t, .06, .74)
+    if (k > 0 && k < 1) lizardling(m, lerp(70, -10, k), 46.8, 14, t * 8, 1, 'P')
+    for (let i = 0; i < 4; i++) {
+      // はしった あとの すなぼこり。
+      const q = frac(t * 3 + i / 4)
+      m.dot(58 + q * 5, 44 - q * 3 + (i % 2), '#d8c79c', .8 - q * .6)
+    }
+    return
+  }
+  if (habit === 'bask') {
+    const shine = key(t, [[0, 0], [.15, .6], [.5, 1], [.85, .8], [1, 0]])
+    if (shine > .05) sun(m, 8, 7, wave(t, 3) * .3 + shine * .7)
+    if (shine > .5) for (let i = 0; i < 5; i++) {
+      // かげろう（あたたまった ゆらゆら）。
+      const q = frac(t * 1.5 + i / 5)
+      const [bx, by] = f(.25 + i * .14)
+      m.dot(bx + Math.sin(q * 9) * 1, by - 5 - q * 6, '#fff1c0', .7 - q * .5)
+    }
+    return
+  }
+  if (habit === 'swallow') {
+    // まえに ねている ほかの ヘビを、あたまから のみこむ。
+    const left = 1 - span(t, .3, .86)
+    if (left <= 0) return
+    const L = 22 * left
+    const pts: Pt[] = [0, .25, .5, .75, 1].map(q => [mx - .5 + q * L, lerp(my + 1.6, 46.5, Math.min(1, q * 3)) + Math.sin((q * 2 + t * .5) * TAU) * .6])
+    snakelet(m, pts, 1.15, 13, 'S')
+  }
 }
 
 function coil(m: Model, look: SnakeLook, pose: Pose) {
   const { clip, t } = pose
   let neck = 0, strike = 0, shake = 0, tongue = 0, flick = 0, gape = 0, tailUp = 0
-  if (clip === 'idle' || clip === 'move') {
+  // くらしの ようす: aim は ネズミの ほうへ あたまを むける、peel は ぬげた かわの すすみ。
+  let aim = 0, peel = -1, cloudy = false, segs = 4
+  if (clip === 'habit' && look.habit === 'heat') {
+    aim = key(t, [[0, 0], [.22, 0], [.34, 1], [.7, 1], [.82, 0]])
+    neck = wave(t, 1) * .3
+    ;({ tongue, flick } = idleTongue(t, .4))
+  } else if (clip === 'habit') {
+    // かわを ぬぐ まえは めが あおく にごる。ぬぐと ガラガラが 1こ ふえる。
+    cloudy = t < .22
+    peel = t > .05 && t < .96 ? span(t, .22, .74) : -1
+    segs = t > .76 && t < .97 ? 5 : 4
+    neck = wave(t, 1) * .3
+    ;({ tongue, flick } = idleTongue(t, .82))
+  } else if (clip === 'idle' || clip === 'move') {
     ;({ tongue, flick } = idleTongue(t, .3))
     neck = wave(t, 1) * .5
   } else if (look.act === 'rattle') {
@@ -333,8 +488,8 @@ function coil(m: Model, look: SnakeLook, pose: Pose) {
     if (u < neckEnd) {
       const k = u / neckEnd // 0 が あたま
       const reach = Math.max(0, strike) * 15, back = Math.max(0, -strike) * 4
-      const X = lerp(17 - reach + back + neck * 1.2, cx - 1, k) + Math.sin(k * Math.PI) * (5 + back)
-      const H = lerp(19 - reach * .5 + back * .3 - neck * .6, g * 2.6, k ** .85) + Math.sin(k * Math.PI) * 1.5
+      const X = lerp(17 - reach + back + neck * 1.2 - aim * 3, cx - 1, k) + Math.sin(k * Math.PI) * (5 + back)
+      const H = lerp(19 - reach * .5 + back * .3 - neck * .6 - aim * 7, g * 2.6, k ** .85) + Math.sin(k * Math.PI) * 1.5
       return ground(X, lerp(4, 0, k), H + g)
     }
     const k = (u - neckEnd) / (1 - neckEnd)
@@ -346,20 +501,69 @@ function coil(m: Model, look: SnakeLook, pose: Pose) {
   }
   const r = (u: number) => u < neckEnd ? g * lerp(.75, 1, Math.min(1, u / .06)) : taper(look, u, 0, .14)
   body(m, look, f, r, len)
+  if (peel >= 0 && peel < 1) {
+    // まだ ぬげていない ふるい かわ（すけて みえる）。
+    m.path(u => f(lerp(peel, 1, u)), u => r(lerp(peel, 1, u)) * 1.16 + .35, { mat: 'S', glass: .45, gloss: 0, step: .45, pat: c => frac(c.l / 1.7) < .18 ? 'F' : null })
+  }
+  if (peel > 0) {
+    // ぬげた かわ（うらがえしに なって じめんに のこる）。
+    const n = Math.min(1, peel * 1.4)
+    m.path(u => [3 + u * 22 * n, 46.2 - Math.abs(Math.sin(u * 9)) * 1.1, 12], u => lerp(1.5, .7, u), { mat: 'S', glass: .55, gloss: 0, pat: c => frac(c.l / 1.7) < .18 ? 'F' : null })
+  }
   const [tx, ty, tz] = f(1)
   const [ax, ay] = f(.985)
-  if (look.tail === 'rattle') rattle(m, tx, ty, tz + .5, Math.atan2(ty - ay, tx - ax), shake)
+  if (look.tail === 'rattle') rattle(m, tx, ty, tz + .5, Math.atan2(ty - ay, tx - ax), shake, segs)
   if (shake) {
     for (const [dx, dy] of [[4, -3], [5, -1], [4, 1], [-4, -3], [-5, -1], [-4, 1]] as const) m.dot(tx + dx, ty + dy, '#fffbe0', .85)
   }
+  if (segs > 4 && t < .96) for (const [dx, dy] of [[4, -4], [7, -1], [5, 3], [1, -6]] as const) m.dot(tx + dx, ty + dy - (Math.floor(t * 16) % 2), '#fffbe0', .95)
   const [hx, hy, hz] = f(0)
-  head(m, look, { x: hx - 1, y: hy, z: hz + 2, dir: Math.PI + .12 - Math.max(0, strike) * .35 - Math.max(0, -strike) * .2, gape, tongue, flick })
+  const { pit } = head(m, look, { x: hx - 1, y: hy, z: hz + 2, dir: Math.PI + .12 - Math.max(0, strike) * .35 - Math.max(0, -strike) * .2 - aim * .6, gape, tongue, flick, cloudy })
+  if (clip === 'habit' && look.habit === 'heat') heatSense(m, t, pit, aim)
 }
 
-function ambush(m: Model, look: SnakeLook, pose: Pose) {
+/** ネズミの からだの ねつを、めと はなの あいだの ピットで かんじとる。 */
+function heatSense(m: Model, t: number, pit: Pt, aim: number) {
+  const coming = t < .26, leaving = t > .72
+  const x = coming ? lerp(-6, 7, ease(span(t, 0, .26))) : leaving ? lerp(7, -10, span(t, .72, .92)) : 7
+  mouse(m, x, 46.5, 14, coming || leaving ? t * 7 : -1, leaving ? 1 : -1, 1.15)
+  if (aim < .5 || leaving) return
+  // ネズミから ピットへ とどく ねつの なみ。
+  const from: Pt = [x + 1, 41]
+  const dx = pit[0] - from[0], dy = pit[1] - from[1], L = Math.hypot(dx, dy) || 1
+  const nx = -dy / L, ny = dx / L
+  for (let j = 0; j < 3; j++) {
+    const k = frac(t * 2.2 + j / 3)
+    const cx = from[0] + dx * k, cy = from[1] + dy * k
+    for (const q of [-1.5, -.5, .5, 1.5]) m.dot(cx + nx * q - dx / L * Math.abs(q) * .5, cy + ny * q - dy / L * Math.abs(q) * .5, k < .5 ? '#ff9d57' : '#ffc46e', .9 - k * .3)
+  }
+  if (Math.floor(t * 12) % 2) m.dot(pit[0], pit[1], '#ff5a2a').dot(pit[0] - 1, pit[1], '#ff8a4a', .8)
+}
+
+function ambush(m: Model, look: SnakeLook, pose: Pose): Look {
   const { clip, t } = pose
   let tongue = 0, flick = 0, lure = 0, lureUp = 0, buzz = 0, puff = 0, gape = 0, headUp = 0
-  if (clip !== 'act') {
+  // くらしの ようす: lunge は とびかかり、wiggle は からだを ゆすって おちばに もぐる。
+  let lunge = 0, wiggle = 0
+  let tint: Look['tint']
+  if (clip === 'habit') {
+    ;({ tongue, flick } = idleTongue(t, .3))
+    if (look.tail === 'lure') lure = .25 * wave(t, 2)
+    const h = look.habit
+    if (h === 'still') {
+      // ひるが すぎて よるに なっても、おなじ ばしょで じっと まつ。
+      tint = { color: '#1f2c58', amount: key(t, [[0, 0], [.42, 0], [.54, .55], [.9, .55], [1, 0]]) }
+      const a = idleTongue(t, .3), b = idleTongue(t, .74)
+      tongue = Math.max(a.tongue, b.tongue)
+    } else if (h === 'miss' || h === 'ambush') {
+      const at = h === 'miss' ? .5 : .5
+      lunge = key(t, [[0, 0], [at - .08, 0], [at - .03, -.4], [at + .03, 1], [at + .12, h === 'miss' ? .6 : .7], [at + .3, 0]])
+      gape = key(t, [[0, 0], [at - .02, 0], [at + .03, 1], [at + .08, .5], [at + .25, h === 'miss' ? 0 : .35], [at + .3, 0]])
+      if (h === 'ambush' && t > .58 && t < .8) gape = .35
+    } else if (h === 'leaves') {
+      wiggle = (t > .06 && t < .5) || t > .86 ? 1 : 0
+    }
+  } else if (clip !== 'act') {
     ;({ tongue, flick } = idleTongue(t, .6))
     if (look.tail === 'lure') lure = .25 * wave(t, 2)
   } else if (look.act === 'lure') {
@@ -384,7 +588,8 @@ function ambush(m: Model, look: SnakeLook, pose: Pose) {
     // あたまは とぐろの うえに のせて、ひだりを むく。
     if (u < neckEnd) {
       const k = u / neckEnd
-      return ground(lerp(18 + puff * 3, cx - 2, k) + Math.sin(k * Math.PI) * 2, lerp(5, 1, k), lerp(g * 1.9 + headUp * 3, g * 2.3, k) + g)
+      const reach = Math.max(0, lunge) * 10 * (1 - k) ** 1.4 - Math.max(0, -lunge) * 3 * (1 - k)
+      return ground(lerp(18 + puff * 3, cx - 2, k) + Math.sin(k * Math.PI) * 2 - reach, lerp(5, 1, k), lerp(g * 1.9 + headUp * 3, g * 2.3, k) + g - reach * .25)
     }
     const k = (u - neckEnd) / (1 - neckEnd)
     const th = -Math.PI * .4 + k * TAU * 1.35
@@ -392,7 +597,7 @@ function ambush(m: Model, look: SnakeLook, pose: Pose) {
     const tip = look.tail === 'lure' && k > .88 ? (k - .88) / .12 : 0
     const H = g * (1 + (1 - k) ** 2 * 1.3) + tip * 2
     const X = cx + Math.cos(th) * R * 1.2 + (k > .85 ? buzz * (k - .85) * 8 : 0)
-    const D = Math.sin(th) * R
+    const D = Math.sin(th) * R + (wiggle ? Math.sin(t * 70 + k * 20) * .5 : 0)
     if (tip) return ground(X - tip * (10 + lureUp * 3) + lure * tip * 2.5, D + tip * (2 + lureUp * 3), H + tip * lureUp * 5 + lure * tip * 3)
     return ground(X, D, H)
   }
@@ -405,7 +610,47 @@ function ambush(m: Model, look: SnakeLook, pose: Pose) {
   }
   const [hx, hy, hz] = f(0)
   if (puff > .5) for (const [dx, dy] of [[-9, -3], [-10, 0], [-9, 3]] as const) m.dot(hx + dx, hy + dy, '#fffbe0', .85)
-  head(m, look, { x: hx - 1, y: hy - headUp, z: hz + 3, dir: Math.PI - .05 - headUp * .3 - gape * .25, gape, tongue, flick })
+  const { mouth } = head(m, look, { x: hx - 1, y: hy - headUp, z: hz + 3, dir: Math.PI - .05 - headUp * .3 - gape * .25 + Math.max(0, lunge) * .3, gape, tongue, flick })
+  if (clip === 'habit') ambushHabit(m, look.habit, t, mouth)
+  return { tint }
+}
+
+/** まちぶせする ヘビの くらしの ようすに でてくる もの。 */
+function ambushHabit(m: Model, habit: Habit, t: number, mouth: Pt) {
+  if (habit === 'still') {
+    // そらを たいようが わたり、つぎに おつきさまが のぼる。
+    const day = span(t, .02, .46), night = span(t, .54, .98)
+    if (day > 0 && day < 1) sun(m, lerp(58, 6, day), 12 - Math.sin(day * Math.PI) * 7, .4)
+    if (night > 0 && night < 1) moon(m, lerp(58, 6, night), 12 - Math.sin(night * Math.PI) * 7)
+    return
+  }
+  if (habit === 'miss') {
+    // カエルが ちかづいて、とびかかると ぴょんと にげる。
+    const escape = span(t, .5, .7)
+    if (escape >= 1) return
+    const x = escape > 0 ? lerp(7, -10, escape) : lerp(-5, 7, ease(span(t, .04, .4)))
+    const hop = escape > 0 ? Math.sin(escape * Math.PI) * 2.6 : bump(t, .04, .18) + bump(t, .24, .38)
+    frogling(m, x, 46.5, 14, hop, escape > 0 ? 1 : -1, 'L')
+    if (escape > 0 && escape < .5) m.dot(x + 4, 38, '#fffbe0').dot(x + 5, 40, '#fffbe0').dot(x + 3, 36, '#fffbe0')
+    return
+  }
+  if (habit === 'ambush') {
+    // ゆっくり ちかづく ネズミを、まちぶせして つかまえる。
+    if (t < .53) mouse(m, lerp(-6, 7.5, span(t, 0, .44)), 46.5, 14, t < .44 ? t * 5 : -1, -1, 1.15)
+    else if (t < .8) mouse(m, mouth[0] + 1, mouth[1] + 3.6, 14, -1, -1, 1.05)
+    if (t > .6 && t < .82) munch(m, mouth[0], mouth[1], t)
+    return
+  }
+  // おちばを からだに かぶせて、かくれる。さいごは ゆすって おとす。
+  const LEAVES: [number, number, number][] = [[26, 34, .4], [33, 31, -.5], [40, 33, .2], [47, 35, -.3], [29, 39, -.2], [37, 38, .6], [45, 40, -.6], [52, 39, .3], [22, 40, .5], [34, 43, -.1], [42, 44, .4], [50, 44, -.4]]
+  const out = span(t, .86, 1)
+  LEAVES.forEach(([x, y, a], i) => {
+    const land = span(t, .08 + i * .03, .14 + i * .03)
+    if (land <= 0) return
+    const fall = (1 - ease(land)) * 7
+    const ox = (x - 37) * out * .9, oy = out * 6
+    leaf(m, x + ox + Math.sin(land * 6 + i) * fall * .3, y - fall + oy, 16 + (i % 3), a + (1 - land) * 1.2, 1.15 * (1 - out * .6), i % 3 === 1 ? 'O' : 'P')
+  })
 }
 
 function branch(m: Model, look: SnakeLook, pose: Pose) {
@@ -420,9 +665,20 @@ function branch(m: Model, look: SnakeLook, pose: Pose) {
   m.tube([[58, twig(58) - 1], [59.5, 39], [60, 46]], t2 => lerp(2.4, 3.2, t2), { z: -3, mat: 'P', gloss: .1, pat: c => frac(c.l / 5) < .15 ? 'S' : null })
   m.tube([[60, 44], [55, 46.5]], 1.2, { z: -2, mat: 'P', gloss: .1 }).tube([[60.5, 44], [63.5, 46.5]], 1.1, { z: -2, mat: 'P', gloss: .1 })
   let tongue = 0, flick = 0, drop = 0, strike = 0, gape = 0, throat = 0, slide = 0
+  // くらしの ようす: peek は すを のぞきこむ、gaze は とりを みあげる、lump は のみこんだ たまご。
+  let peek = 0, gaze = 0, lump = -1
   if (clip === 'idle') ({ tongue, flick } = idleTongue(t, .5))
   else if (clip === 'move') slide = t
-  else if (look.act === 'dangle') drop = key(t, [[0, 0], [.35, 1], [.7, 1], [1, 0]])
+  else if (clip === 'habit') {
+    ;({ tongue, flick } = idleTongue(t, .52))
+    if (look.habit === 'bird') gaze = key(t, [[0, 0], [.28, 0], [.4, 1], [.68, 1], [.82, 0]])
+    else if (look.habit === 'nest') {
+      peek = key(t, [[0, 0], [.12, 0], [.28, 1], [.42, 1], [.54, 0]])
+      gape = key(t, [[0, 0], [.3, 0], [.35, .8], [.4, .55], [.54, .4], [.6, 0]])
+      lump = t > .54 && t < .92 ? lerp(.04, .3, span(t, .54, .92)) : -1
+      ;({ tongue, flick } = idleTongue(t, .02))
+    }
+  } else if (look.act === 'dangle') drop = key(t, [[0, 0], [.35, 1], [.7, 1], [1, 0]])
   else if (look.act === 'strike') {
     strike = key(t, [[0, 0], [.25, -1], [.36, -1], [.46, 1], [.6, 1], [.86, 0]])
     gape = key(t, [[0, 0], [.36, 0], [.44, 1], [.62, 1], [.72, 0]])
@@ -439,9 +695,11 @@ function branch(m: Model, look: SnakeLook, pose: Pose) {
       // えだから のりだした まえの からだ。
       const k = u / front // 0 が あたま
       const reach = Math.max(0, strike) * 10, back = Math.max(0, -strike) * 4
-      let X = lerp(slender ? 6 : 12, 28, k) - reach + back * (1 - k) + Math.sin(k * Math.PI) * back
+      let X = lerp(slender ? 10 : 12, 28, k) - reach + back * (1 - k) + Math.sin(k * Math.PI) * back
       let Y = by - (slender ? 5 : 7) * (1 - k) ** 1.2 - Math.sin(k * Math.PI) * 2 + reach * .25 * (1 - k)
       if (slender && clip !== 'act') Y += wave(slide + k * .8, 1) * 1.2 * (1 - k)
+      X += peek * 3.5 * (1 - k) ** 1.2 + gaze * 1.5 * (1 - k)
+      Y += peek * 3 * (1 - k) ** 1.2 - gaze * 4.5 * (1 - k) ** 1.4
       if (drop) {
         // あたまを したに たらす。
         X = lerp(X, 22 + Math.sin(k * Math.PI) * 3, drop)
@@ -456,18 +714,75 @@ function branch(m: Model, look: SnakeLook, pose: Pose) {
     const Y = twig(X) - Math.cos(ph) * (look.girth + 1.6) * .9 + (slender ? 0 : Math.max(0, Math.sin(ph)) * 2.5)
     return [X, Y, Math.sin(ph) * 4.5]
   }
-  const r = (u: number) => taper(look, u, .06, .25)
+  const r = (u: number) => taper(look, u, .06, .25) + bulge(u, lump, 1.1)
+  if (clip === 'habit' && look.habit === 'tide') tide(m, t, false)
+  if (clip === 'habit' && look.habit === 'nest') nest(m, t, false)
   body(m, look, f, r, len)
   const [hx, hy, hz] = f(0)
-  const dir = dirOf(f)
-  head(m, look, { x: hx, y: hy, z: hz + 2, dir: drop > .5 ? dir : Math.PI + (dir - Math.PI) * .6 + Math.max(0, strike) * .3, gape, tongue, flick, throat })
+  // あたまが くびより うえに くると ±π を またぐので、0〜2π に そろえる。
+  const raw = dirOf(f), dir = raw < 0 ? raw + TAU : raw
+  const { mouth } = head(m, look, { x: hx, y: hy, z: hz + 2, dir: (drop > .5 ? dir : Math.PI + (dir - Math.PI) * .6 + Math.max(0, strike) * .3) - peek * .5 + gaze * .55, gape, tongue, flick, throat })
+  if (clip !== 'habit') return
+  if (look.habit === 'tide') tide(m, t, true)
+  else if (look.habit === 'nest') {
+    nest(m, t, true)
+    if (t > .35 && t < .54) egg(m, mouth[0] + .5, mouth[1] + 2.2, hz + 6, .75)
+  } else hummingbirdVisit(m, t)
+}
+
+/** えだの さきの はなに ハチドリが きて、みつを すって とんでいく。 */
+function hummingbirdVisit(m: Model, t: number) {
+  m.tube([[2, 30.5], [1.5, 24], [3.5, 17], [5, 13.5]], .5, { z: 6, mat: 'L', gloss: .2 })
+  leaf(m, 2.5, 22, 7, -.9, .9, 'L')
+  flower(m, 5, 12.5, 8)
+  const come = span(t, .06, .32), go = span(t, .7, .86)
+  if (go >= 1 || come <= 0) return
+  const x = go > 0 ? lerp(11.5, -8, go) : lerp(26, 11.5, ease(come))
+  const y = go > 0 ? lerp(11.5, -2, go) : lerp(-3, 11.5, ease(come)) + (come >= 1 ? Math.sin(t * 40) * .4 : 0)
+  hummingbird(m, x, y, 9, t * 6, 1)
+}
+
+/** えだの うえの とりの すと たまご。front で てまえの ふちを かく。 */
+function nest(m: Model, t: number, front: boolean) {
+  const show = key(t, [[0, 0], [.08, 1], [.92, 1], [1, 0]])
+  if (show <= 0) return
+  const pat: Pattern = c => frac((c.u + c.v * .5 + 2) * 3) < .3 ? 'P-' : frac((c.u - c.v * .4 + 2) * 2.5) < .2 ? 'S' : null
+  if (!front) {
+    m.ell(13, 28.4, 6.4 * show, 3.2 * show, { z: -2, rz: 2, mat: 'P', gloss: .1, pat })
+    egg(m, 15.5, 27.6, 0, .8 * show)
+    if (t < .35) egg(m, 12, 27.4, .2, .8 * show)
+  } else m.ell(13, 29.6, 6.6 * show, 1.8 * show, { z: 5, rz: 1, mat: 'P', gloss: .1, pat })
+}
+
+/** マングローブの みずが みちて くる（まえに すけた みず、うしろに みずの おもて）。 */
+function tide(m: Model, t: number, front: boolean) {
+  const k = key(t, [[0, 0], [.08, 0], [.45, 1], [.75, 1], [1, 0]])
+  if (k <= 0) return
+  const level = lerp(49, 37, k)
+  if (!front) return
+  for (let y = Math.ceil(level) + 1; y < 48; y++) for (let x = 0; x < 64; x++) m.dot(x, y, '#3f8fb6', .4 * edgeFade(x))
+  waterline(m, level, t, .85, 1, false)
+  if (k > .9) { ripple(m, 59.5, level, frac(t * 2.4)); ripple(m, 59.5, level, frac(t * 2.4 + .5)) }
 }
 
 function hood(m: Model, look: SnakeLook, pose: Pose, sp: string) {
   const { clip, t } = pose
   const back = sp === 'monocled-cobra'
   let spread = .95, sway: number, tall = 0, spit = -1, tongue = 0, flick = 0, hiss = 0
-  if (clip !== 'act') {
+  // くらしの ようす: bow は くびを まえへ たおして じめんへ とどかせる。
+  let bow = 0, bite = 0
+  if (clip === 'habit') {
+    sway = wave(t, 1) * .4
+    ;({ tongue, flick } = idleTongue(t, .16))
+    if (look.habit === 'build') {
+      // くびで おちばを かきあつめて すを つくり、たまごを うんで みはる。
+      bow = .8 * Math.max(bump(t, .08, .3), bump(t, .3, .52))
+      spread = .95 + key(t, [[0, 0], [.56, 0], [.66, .3], [.9, .3], [1, 0]])
+    } else {
+      bow = key(t, [[0, 0], [.3, 0], [.42, 1], [.58, 1], [.74, 0]])
+      bite = key(t, [[0, 0], [.36, 0], [.42, .9], [.47, .45], [.62, .4], [.68, 0]])
+    }
+  } else if (clip !== 'act') {
     sway = wave(t, 1)
     ;({ tongue, flick } = idleTongue(t, .6))
   } else if (look.act === 'spit') {
@@ -499,14 +814,19 @@ function hood(m: Model, look: SnakeLook, pose: Pose, sp: string) {
   const lean = sway * 2.2
   const neck = (u: number): P3 => {
     // u=0 が フードの なか、u=1 が じめん。
-    const X = baseX - 2 + lean * (1 - u) ** 1.4 + Math.sin(u * Math.PI) * -1.5
-    const Y = lerp(top + 9, GY - look.girth, u ** 1.1)
+    let X = baseX - 2 + lean * (1 - u) ** 1.4 + Math.sin(u * Math.PI) * -1.5
+    let Y = lerp(top + 9, GY - look.girth, u ** 1.1)
+    if (bow > 0) {
+      const [bx, by] = spline([[8, 40.5], [12, 30], [22, 24], [30, 29], [baseX - 2, GY - look.girth]], u)
+      X = lerp(X, bx, bow)
+      Y = lerp(Y, by, bow)
+    }
     return [X, Y, 6 - u * 2]
   }
   m.path(neck, u => look.girth * lerp(1.05, 1, u), { pat: c => { const mat: Mat | null = back ? null : (c.s > .2 ? 'C' : null); return c.fine ? scales(c.t * 30, back ? -.3 : c.s, mat) : mat }, gloss: .7, step: .45 })
   // フード（ひらたく ひろげた くび）。
   const [nx, ny, nz] = neck(0)
-  const hw = 9.5 * spread, hh = 10.5
+  const hw = 9.5 * spread * (1 - .7 * bow), hh = 10.5 * (1 - .62 * bow)
   const front: Pattern = c => {
     if (Math.abs(c.u) > .84) return 'B'
     if (Math.abs(c.u) < .34 + c.v * .08) {
@@ -524,13 +844,19 @@ function hood(m: Model, look: SnakeLook, pose: Pose, sp: string) {
     if (d < .38) return 'E'
     return Math.abs(c.u) > .86 ? 'B' : null
   }
-  const hoodY = ny - 1.5
-  m.ell(nx + lean * .15, hoodY, hw, hh, { z: nz + (back ? 3.5 : 1), rz: 2.4, gloss: .55, pat: back ? backPat : front, a: sway * .04 })
-  const hx = nx + lean * .2 - 1, hy = hoodY - hh + 2.5
-  if (back) {
-    head(m, look, { x: hx - 1, y: hy, z: nz - 1, dir: Math.PI + .25, tongue, flick })
+  const hoodY = ny - 1.5 * (1 - bow)
+  if (clip === 'habit' && look.habit === 'build') kingNest(m, t, false)
+  m.ell(nx + lean * .15, hoodY, hw, hh, { z: nz + (back ? 3.5 : 1), rz: 2.4, gloss: .55, pat: back ? backPat : front, a: sway * .04 + bow * .5 })
+  const hx = lerp(nx + lean * .2 - 1, nx - .5, bow), hy = lerp(hoodY - hh + 2.5, ny + .5, bow)
+  let mouth: Pt
+  if (back && bow < .4) {
+    ;({ mouth } = head(m, look, { x: hx - 1, y: hy, z: nz - 1, dir: Math.PI + .25, tongue, flick }))
   } else {
-    head(m, look, { x: hx - 2, y: hy, z: nz + 6, dir: Math.PI + .3 + (spit >= 0 ? .15 : 0), tongue, flick, gape: spit >= 0 && spit < .8 ? .35 : 0 })
+    ;({ mouth } = head(m, look, { x: hx - 2, y: hy, z: nz + 6, dir: lerp(Math.PI + .3 + (spit >= 0 ? .15 : 0), Math.PI - .8, bow), tongue, flick, gape: spit >= 0 && spit < .8 ? .35 : bite }))
+  }
+  if (clip === 'habit') {
+    if (look.habit === 'build') kingNest(m, t, true)
+    else cobraCatch(m, t, look.habit === 'frog', mouth)
   }
   if (spit >= 0) {
     // どくの しぶき（きりの ように ひろがる つぶ）。
@@ -547,15 +873,47 @@ function hood(m: Model, look: SnakeLook, pose: Pose, sp: string) {
   if (hiss > .5) for (const [dx, dy] of [[-9, -4], [-10, -1], [-9, 2]] as const) m.dot(hx + dx, hy + dy, '#fffbe0', .85)
 }
 
+/** コブラが くびを たおして、ちかづいた カエル（または ネズミ）を つかまえる。 */
+function cobraCatch(m: Model, t: number, frog: boolean, mouth: Pt) {
+  if (t < .44) {
+    const x = lerp(-5, 6, ease(span(t, .02, .32)))
+    if (frog) frogling(m, x, 46.5, 14, bump(t, .02, .16) + bump(t, .18, .32), -1, 'L')
+    else mouse(m, x, 46.5, 14, t < .32 ? t * 6 : -1, -1, 1.15)
+  } else if (t < .74) {
+    if (frog) frogling(m, mouth[0], mouth[1] + 3.2, 14, 0, -1, 'L')
+    else mouse(m, mouth[0] + .5, mouth[1] + 3.6, 14, -1, -1, 1.05)
+  }
+  if (t > .6 && t < .82) munch(m, mouth[0], mouth[1], t)
+}
+
+/** キングコブラの おちばの す と たまご。front で てまえの はっぱを かく。 */
+function kingNest(m: Model, t: number, front: boolean) {
+  const LEAVES: [number, number, number][] = [[6, 45, .3], [12, 46, -.4], [18, 45.5, .2], [9, 42.5, -.6], [15, 43, .5], [21, 43.5, -.2], [4, 42, .8], [12, 40, .1], [18, 40.8, -.7], [24, 46, .6], [7, 39, -.3], [16, 38, .4]]
+  const out = span(t, .93, 1)
+  LEAVES.forEach(([x, y, a], i) => {
+    if ((i % 2 === 0) !== front) return
+    const k = ease(span(t, .1 + i * .035, .16 + i * .035))
+    if (k <= 0) return
+    leaf(m, x + (1 - k) * 6, y - (1 - k) * 3, front ? 16 : 8, a, 1.25 * k * (1 - out), i % 3 === 1 ? 'O' : 'P')
+  })
+  if (front) {
+    const k = ease(span(t, .58, .66)) * (1 - out)
+    if (k > 0) for (const [x, y] of [[10, 41], [14, 40.4], [18, 41.2]] as const) egg(m, x, y, 13, .85 * k)
+  }
+}
+
 function swim(m: Model, look: SnakeLook, pose: Pose) {
   const { clip, t } = pose
   const fast = clip === 'act' ? key(t, [[0, 0], [.15, 1], [.85, 1], [1, 0]]) : 0
-  const phase = clip === 'idle' ? t : clip === 'move' ? t : t * 3
+  // くらし: いきを すいに うみの おもてまで あがり、また もぐる。
+  const up = clip === 'habit' ? key(t, [[0, 0], [.12, 0], [.4, 1], [.6, 1], [.86, 0]]) : 0
+  const phase = clip === 'idle' || clip === 'move' ? t : clip === 'habit' ? t * 2 : t * 3
   const len = 100
   const f = (u: number): P3 => {
-    const X = 7 + u * 52
-    const A = (u < .2 ? .35 + u * 3.2 : 1) * (5 + fast * 2)
-    return [X, 25 + A * Math.sin(TAU * (u * 52 / 30 - phase)) * .7, A * Math.cos(TAU * (u * 52 / 30 - phase)) * .6]
+    const X = 7 + u * 52 + up * 4 * (1 - u)
+    const A = (u < .2 ? .35 + u * 3.2 : 1) * (5 + fast * 2) * (1 - up * .5 * Math.max(0, 1 - u / .5))
+    const lift = u < .55 ? up * 19 * (1 - u / .55) ** 2 : 0
+    return [X, 25 + A * Math.sin(TAU * (u * 52 / 30 - phase)) * .7 - lift, A * Math.cos(TAU * (u * 52 / 30 - phase)) * .6]
   }
   const r = (u: number) => u < .06 ? look.girth * (.8 + u * 3) : u > .7 ? look.girth * lerp(1, .75, (u - .7) / .3) : look.girth + Math.sin(u * Math.PI) * .5
   body(m, look, f, r, len, .85)
@@ -569,13 +927,22 @@ function swim(m: Model, look: SnakeLook, pose: Pose) {
   const { tongue, flick } = clip === 'idle' ? idleTongue(t, .55) : { tongue: 0, flick: 0 }
   head(m, look, { x: hx - 1, y: hy, z: hz + 2, dir, tongue, flick })
   if (fast > .5) for (let i = 0; i < 3; i++) m.dot(62 - i * 2, ty - 4 + i * 4, '#d8f4f4', .7)
+  if (clip === 'habit') {
+    const sea = key(t, [[0, 0], [.08, 1], [.92, 1], [1, 0]])
+    if (sea > 0) waterline(m, 5, t, .8 * sea)
+    if (up > .9) {
+      ripple(m, hx, 5, frac(t * 3))
+      m.dot(hx - 3, 2, '#fffbe0').dot(hx - 1, 1, '#fffbe0').dot(hx + 1, 2, '#fffbe0')
+    }
+    if (t > .6 && t < .9) bubbles(m, hx + 2, hy - 1, t, 4, 9)
+  }
 }
 
 export const snake: Builder = (m, pose, sp) => {
   const look = LOOKS[sp.id]
   if (!look) throw new Error(`no snake look: ${sp.id}`)
   switch (look.posture) {
-    case 'crawl': return crawl(m, look, pose, sp.id)
+    case 'crawl': return crawl(m, look, pose)
     case 'coil': return coil(m, look, pose)
     case 'ambush': return ambush(m, look, pose)
     case 'branch': return branch(m, look, pose)

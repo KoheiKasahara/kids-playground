@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { SPECIES } from './data'
-import { actSeconds, createActor, frameAt, profileOf, SIGNATURE_MOVES, stepActor, triggerAct } from './motion'
+import { actSeconds, clipSeconds, createActor, frameAt, HABITS, profileOf, SIGNATURE_MOVES, stepActor, triggerAct } from './motion'
 import { renderFrame, rgbaOf } from './sprite'
 import type { Pose } from './pose'
 
@@ -23,6 +23,22 @@ describe('venom lab creature motion', () => {
     }
   })
 
+  test('every creature also has its own everyday habit, drawn differently from its signature move', () => {
+    expect(Object.keys(HABITS).sort()).toEqual(SPECIES.map(s => s.id).sort())
+    expect(new Set(Object.values(HABITS)).size).toBe(SPECIES.length)
+    for (const s of SPECIES) {
+      expect(HABITS[s.id], s.id).not.toBe(SIGNATURE_MOVES[s.id])
+      const rest = pixels(s, { clip: 'idle', t: 0 })
+      const times = [.3, .4, .5, .6, .7]
+      const most = Math.max(...times.map(t => opaqueDiff(rest, pixels(s, { clip: 'habit', t }))))
+      expect(most, `${s.id} habit vs idle`).toBeGreaterThan(20)
+      const apart = Math.max(...times.map(t => opaqueDiff(pixels(s, { clip: 'act', t }), pixels(s, { clip: 'habit', t }))))
+      expect(apart, `${s.id} habit vs act`).toBeGreaterThan(20)
+      // はじまりと おわりは ふだんの すがたに ちかく、つなぎめで とばない。
+      for (const t of [0, 1]) expect(opaqueDiff(rest, pixels(s, { clip: 'habit', t })), `${s.id} habit t=${t}`).toBeLessThan(opaqueDiff(rest, pixels(s, { clip: 'habit', t: .5 })) + 1)
+    }
+  })
+
   test('idle and move loops animate frame by frame', () => {
     for (const s of SPECIES) {
       const p = profileOf(s)
@@ -33,6 +49,7 @@ describe('venom lab creature motion', () => {
       }
       expect(p.frames.idle).toBeGreaterThanOrEqual(12)
       expect(p.frames.act).toBeGreaterThanOrEqual(16)
+      expect(p.frames.habit).toBeGreaterThanOrEqual(24)
     }
   })
 
@@ -40,20 +57,22 @@ describe('venom lab creature motion', () => {
     for (const s of SPECIES) {
       const p = profileOf(s)
       const a = createActor(SPECIES.indexOf(s) + 1)
-      let moved = false, acted = false
-      for (let i = 0; i < 60 * 40; i++) {
+      let moved = false, acted = false, habit = false
+      for (let i = 0; i < 60 * 60; i++) {
         stepActor(a, p, 1 / 60)
         if (a.mode === 'move') {
           moved = true
           if (Math.abs(a.target - a.x) > .01) expect(a.facing, s.id).toBe(a.target < a.x ? 1 : -1)
         }
         if (a.mode === 'act') acted = true
+        if (a.mode === 'habit') habit = true
         expect(Math.abs(a.x), s.id).toBeLessThanOrEqual(p.range + p.stride + .01)
         const f = frameAt(a, p)
         expect(f.index, s.id).toBeGreaterThanOrEqual(0)
         expect(f.index, s.id).toBeLessThan(f.count)
       }
       expect(acted, s.id).toBe(true)
+      expect(habit, s.id).toBe(true)
       expect(moved, s.id).toBe(p.gait !== 'sit')
       if (p.gait === 'sit') expect(a.x).toBe(0)
     }
@@ -67,6 +86,22 @@ describe('venom lab creature motion', () => {
     triggerAct(a)
     expect(frameAt(a, p)).toEqual({ clip: 'act', index: 0, count: p.frames.act })
     for (let t = 0; t < actSeconds(p) + .2; t += .05) stepActor(a, p, .05)
+    expect(a.mode).toBe('idle')
+  })
+
+  test('the everyday habit can be started on demand, plays every frame once, and returns to rest', () => {
+    const toad = SPECIES.find(s => s.id === 'japanese-toad')!
+    const p = profileOf(toad)
+    const a = createActor(5)
+    triggerAct(a, 'habit')
+    expect(frameAt(a, p)).toEqual({ clip: 'habit', index: 0, count: p.frames.habit })
+    const seen = new Set<number>()
+    for (let t = 0; t < clipSeconds(p, 'habit') - .01; t += 1 / 60) {
+      seen.add(frameAt(a, p).index)
+      stepActor(a, p, 1 / 60)
+    }
+    expect(seen.size).toBe(p.frames.habit)
+    for (let i = 0; i < 30; i++) stepActor(a, p, 1 / 60)
     expect(a.mode).toBe('idle')
   })
 

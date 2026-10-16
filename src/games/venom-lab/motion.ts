@@ -1,5 +1,5 @@
-// いきもの ごとの うごきかた（あるく・はねる・およぐ・とぶ・じっと する）と、とくいわざ。
-// かんさつエリアでは 1ぴきずつ ちいさな「きもち」を もって、やすむ → うごく → わざ を くりかえす。
+// いきもの ごとの うごきかた（あるく・はねる・およぐ・とぶ・じっと する）と、とくいわざ・くらしの ようす。
+// かんさつエリアでは 1ぴきずつ ちいさな「きもち」を もって、やすむ → うごく → わざ か くらしの ようす を くりかえす。
 // すすんだ きょりで あしの コマを すすめるので、あしが すべって みえない。
 
 import type { Species, SpriteKind } from './data'
@@ -68,25 +68,72 @@ export const SIGNATURE_MOVES: Record<string, string> = {
   'mangrove-viper': 'えだから とびかかる',
 }
 
-const STD = { frames: { idle: 24, move: 20, act: 32 }, fps: { idle: 12, move: 16, act: 16 } }
+/**
+ * いきもの ごとの くらしの ようす（えさの とりかた・こそだて・からだの ひみつ など）。
+ * とくいわざとは べつの、じっさいの くらしに もとづく うごき。
+ */
+export const HABITS: Record<string, string> = {
+  'blue-ring': 'うでを のばして カニを つかまえる',
+  stonefish: 'むなびれで すなを かけて からだを うめる',
+  lionfish: 'ひれで エビを おいこんで ぱくっ',
+  'golden-frog': 'せなかに オタマジャクシを のせて はこぶ',
+  'blue-frog': 'みずたまりで 皮ふから みずを すう',
+  'strawberry-frog': 'オタマジャクシに ごはんの たまごを とどける',
+  rattlesnake: 'ピットで ネズミの ねつを みつける',
+  'bark-scorpion': 'ブラックライトで てらすと あおく ひかる',
+  gila: 'たまごを みつけて まるのみ',
+  'sea-krait': 'うみの うえへ いきを すいに いく',
+  'geography-cone': 'はなの ような くだで さかなの においを さがす',
+  'crown-of-thorns': 'サンゴに のって たべる。たべた あとは しろく なる',
+  'long-spined-urchin': 'したの くちで 海そうを かじる',
+  'eyelash-viper': 'はなに くる ハチドリを じっと まつ',
+  bushmaster: 'ひるも よるも うごかずに まちぶせ',
+  'wandering-spider': 'よるの もりで コオロギに とびつく',
+  'mojave-rattlesnake': 'かわを ぬぐ たびに ガラガラが 1こ ふえる',
+  deathstalker: 'はさみで むしを つかまえて たべる',
+  'hairy-scorpion': 'せなかに あかちゃんを のせて まもる',
+  mamushi: 'たまごでは なく あかちゃんを うむ',
+  'tiger-keelback': 'ヒキガエルを たべて その どくを くびに ためる',
+  'japanese-toad': 'ミミズを ぱくっ。まえあしで くちに おしこむ',
+  'fire-bellied-newt': 'しっぽを くねらせて すいすい およぐ',
+  'giant-hornet': 'きの じゅえきを なめる',
+  'red-headed-centipede': 'からだを まるめて たまごを まもる',
+  habu: 'ネズミを みつけて すばやく かみつく',
+  'hime-habu': 'みずべで カエルを まちぶせ',
+  'sakishima-habu': 'みずたまりで みずを のむ',
+  'inland-taipan': 'じめんの われめで ネズミを さがす',
+  'eastern-brown': 'すばやく トカゲを おいかける',
+  'death-adder': 'おちばに もぐって かくれる',
+  redback: 'ぐちゃぐちゃの あみを はって むしを まつ',
+  'black-mamba': 'ひなたぼっこで からだを あたためる',
+  'puff-adder': 'ネズミが とおるのを まちぶせ',
+  boomslang: 'とりの すを みつけて たまごを のむ',
+  'spitting-cobra': 'よるの くさむらで カエルを つかまえる',
+  'king-cobra': 'おちばを あつめて たまごの すを つくる',
+  'monocled-cobra': 'たんぼの ネズミを つかまえる',
+  'banded-krait': 'ほかの ヘビを まるのみ',
+  'mangrove-viper': 'しおが みちても えだの うえで やすむ',
+}
+
+const STD = { frames: { idle: 24, move: 20, act: 32, habit: 36 }, fps: { idle: 12, move: 16, act: 16, habit: 12 } }
 
 function base(kind: SpriteKind): Omit<Profile, 'frames' | 'fps'> & Partial<Pick<Profile, 'frames' | 'fps'>> {
   switch (kind) {
     case 'octopus': return { gait: 'walk', speed: 5, stride: 12, range: 14, shadow: 40 }
     case 'stonefish': return { gait: 'sit', speed: 0, stride: 0, range: 0, shadow: 52 }
-    case 'lionfish': return { gait: 'swim', speed: 5, stride: 0, range: 18, shadow: 0, hover: 0, fps: { idle: 10, move: 12, act: 16 } }
-    case 'frog': return { gait: 'hop', speed: 0, stride: 10, range: 16, shadow: 36, frames: { idle: 24, move: 20, act: 32 }, fps: { idle: 12, move: 30, act: 16 } }
+    case 'lionfish': return { gait: 'swim', speed: 5, stride: 0, range: 18, shadow: 0, hover: 0, fps: { idle: 10, move: 12, act: 16, habit: 12 } }
+    case 'frog': return { gait: 'hop', speed: 0, stride: 10, range: 16, shadow: 36, fps: { idle: 12, move: 30, act: 16, habit: 12 } }
     case 'toad': return { gait: 'walk', speed: 4, stride: 9, range: 12, shadow: 40 }
     case 'newt': return { gait: 'walk', speed: 6, stride: 10, range: 14, shadow: 46 }
     case 'spider': return { gait: 'walk', speed: 11, stride: 7, range: 16, shadow: 44 }
-    case 'hornet': return { gait: 'fly', speed: 14, stride: 0, range: 18, shadow: 20, hover: 9, frames: { idle: 16, move: 16, act: 24 }, fps: { idle: 24, move: 24, act: 12 } }
+    case 'hornet': return { gait: 'fly', speed: 14, stride: 0, range: 18, shadow: 20, hover: 9, frames: { idle: 16, move: 16, act: 24, habit: 36 }, fps: { idle: 24, move: 24, act: 12, habit: 12 } }
     case 'centipede': return { gait: 'walk', speed: 9, stride: 9, range: 16, shadow: 50 }
     case 'scorpion': return { gait: 'walk', speed: 8, stride: 8, range: 16, shadow: 44 }
     case 'lizard': return { gait: 'walk', speed: 5, stride: 11, range: 14, shadow: 50 }
-    case 'cone': return { gait: 'walk', speed: 1.6, stride: 5, range: 6, shadow: 46, fps: { idle: 10, move: 10, act: 16 } }
-    case 'starfish': return { gait: 'walk', speed: 1.4, stride: 5, range: 6, shadow: 50, fps: { idle: 8, move: 10, act: 16 } }
-    case 'urchin': return { gait: 'sit', speed: 0, stride: 0, range: 0, shadow: 30, fps: { idle: 8, move: 8, act: 16 } }
-    case 'sea-snake': return { gait: 'swim', speed: 7, stride: 0, range: 16, shadow: 0, fps: { idle: 12, move: 16, act: 16 } }
+    case 'cone': return { gait: 'walk', speed: 1.6, stride: 5, range: 6, shadow: 46, fps: { idle: 10, move: 10, act: 16, habit: 12 } }
+    case 'starfish': return { gait: 'walk', speed: 1.4, stride: 5, range: 6, shadow: 50, fps: { idle: 8, move: 10, act: 16, habit: 12 } }
+    case 'urchin': return { gait: 'sit', speed: 0, stride: 0, range: 0, shadow: 30, fps: { idle: 8, move: 8, act: 16, habit: 12 } }
+    case 'sea-snake': return { gait: 'swim', speed: 7, stride: 0, range: 16, shadow: 0, fps: { idle: 12, move: 16, act: 16, habit: 12 } }
     default: return { gait: 'slither', speed: 7, stride: 18, range: 16, shadow: 48 }
   }
 }
@@ -118,12 +165,17 @@ export type Actor = {
   wait: number
   /** つぎの わざまでに やすむ かいすう。 */
   calm: number
+  /** つぎに じぶんから みせる もの（とくいわざ と くらしの ようすを かわりばんこに）。 */
+  next: Special
   /** うまれてからの じかん（ふわふわ うく ゆれに つかう）。 */
   clock: number
   /** いまの ジャンプで とぶ きょり。 */
   leap: number
   rand: () => number
 }
+
+/** じぶんから みせる 1かいきりの うごき。 */
+export type Special = 'act' | 'habit'
 
 export function createActor(seed: number): Actor {
   let s = (seed * 2654435761) >>> 0 || 1
@@ -134,18 +186,20 @@ export function createActor(seed: number): Actor {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
-  return { x: 0, y: 0, facing: 1, mode: 'idle', time: rand() * 2, phase: rand(), target: 0, wait: 1 + rand() * 3, calm: 1 + Math.floor(rand() * 3), clock: rand() * 10, leap: 0, rand }
+  return { x: 0, y: 0, facing: 1, mode: 'idle', time: rand() * 2, phase: rand(), target: 0, wait: 1 + rand() * 3, calm: 1 + Math.floor(rand() * 3), next: rand() < .5 ? 'habit' : 'act', clock: rand() * 10, leap: 0, rand }
 }
 
+/** 1かいきりの うごきの ながさ（びょう）。 */
+export const clipSeconds = (p: Profile, clip: Special) => p.frames[clip] / p.fps[clip]
 /** わざの ながさ（びょう）。 */
-export const actSeconds = (p: Profile) => p.frames.act / p.fps.act
+export const actSeconds = (p: Profile) => clipSeconds(p, 'act')
 
 const HOP_SECONDS = .62
 const HOP_HEIGHT = 7
 
-/** タップされたら すぐに とくいわざ。 */
-export function triggerAct(a: Actor) {
-  a.mode = 'act'
+/** タップされたら すぐに とくいわざ（clip が habit なら くらしの ようす）。 */
+export function triggerAct(a: Actor, clip: Special = 'act') {
+  a.mode = clip
   a.time = 0
 }
 
@@ -162,8 +216,8 @@ export function stepActor(a: Actor, p: Profile, dt: number) {
   if (p.gait === 'fly') a.y = (p.hover ?? 0) + Math.sin(a.clock * 2.6) * 1.6
   else if (p.gait === 'swim') a.y = Math.sin(a.clock * 1.3) * 1.2
   else if (a.mode !== 'move') a.y = 0
-  if (a.mode === 'act') {
-    if (a.time >= actSeconds(p)) rest(a, p)
+  if (a.mode === 'act' || a.mode === 'habit') {
+    if (a.time >= clipSeconds(p, a.mode)) rest(a, p)
     return
   }
   if (a.mode === 'idle') {
@@ -172,7 +226,8 @@ export function stepActor(a: Actor, p: Profile, dt: number) {
     if (a.wait > 0) return
     if (--a.calm <= 0) {
       a.calm = 2 + Math.floor(a.rand() * 3)
-      triggerAct(a)
+      triggerAct(a, a.next)
+      a.next = a.next === 'act' ? 'habit' : 'act'
       return
     }
     if (p.gait === 'sit' || p.range <= 0) { rest(a, p); return }
@@ -216,9 +271,9 @@ export function stepActor(a: Actor, p: Profile, dt: number) {
 
 /** いまの コマ。 */
 export function frameAt(a: Actor, p: Profile): { clip: ClipName; index: number; count: number } {
-  if (a.mode === 'act') {
-    const count = p.frames.act
-    return { clip: 'act', index: Math.min(count - 1, Math.floor((a.time / actSeconds(p)) * count)), count }
+  if (a.mode === 'act' || a.mode === 'habit') {
+    const count = p.frames[a.mode]
+    return { clip: a.mode, index: Math.min(count - 1, Math.floor((a.time / clipSeconds(p, a.mode)) * count)), count }
   }
   if (a.mode === 'move') {
     const count = p.frames.move

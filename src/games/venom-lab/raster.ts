@@ -18,9 +18,9 @@ export const DETAIL = 2
 /**
  * A/B/C は いきものごとの いろ。
  * E め、W ひかり、T した、M くちの なか、K くろい くちの なか、F きば・ほね、
- * P えだ、G ひかる あお、S いと・すな。
+ * P えだ、G ひかる あお、S いと・すな、L はっぱ・海そう、N けもの（ネズミ）、O カニ・じゅえき、Q みず。
  */
-export type Mat = 'A' | 'B' | 'C' | 'E' | 'W' | 'T' | 'M' | 'K' | 'F' | 'P' | 'G' | 'S'
+export type Mat = 'A' | 'B' | 'C' | 'E' | 'W' | 'T' | 'M' | 'K' | 'F' | 'P' | 'G' | 'S' | 'L' | 'N' | 'O' | 'Q'
 
 /**
  * もようを きめる ための ばしょ。くだ では l が ながさ方向の きょり（ます）、s が よこ（-1〜1、+ が おなか がわ）。
@@ -134,13 +134,14 @@ export function makeRamp(base: string): Rgb[] {
 
 const FIXED: Record<Exclude<Mat, 'A' | 'B' | 'C'>, string> = {
   E: '#1b1f2e', W: '#fffdf0', T: '#d9475f', M: '#e0879b', K: '#2c2633', F: '#efe7cf', P: '#7d5b3e', G: '#5fd8ff', S: '#e3dccb',
+  L: '#6b9a4b', N: '#9c8a78', O: '#d9733f', Q: '#86cbe0',
 }
 
 // ---------------- もけいを くみたてる ----------------
 
 export class Model {
   prims: Prim[] = []
-  fx: { x: number; y: number; c: Rgb; a: number }[] = []
+  fx: { x: number; y: number; c: Rgb; a: number; behind: boolean }[] = []
   private parts = 0
 
   ell(x: number, y: number, rx: number, ry: number, o: Opt = {}) {
@@ -192,15 +193,15 @@ export class Model {
     return this.ell(x, y, r, r, { z, mat, gloss: 0, pat: c => c.u < -.05 && c.v < -.05 && c.u * c.u + c.v * c.v < .55 ? 'W' : null })
   }
 
-  /** こうかの ドット（ふちどりの うえに かく）。 */
-  dot(x: number, y: number, color: string, alpha = 1) {
-    this.fx.push({ x: Math.round(x), y: Math.round(y), c: hexRgb(color), a: alpha })
+  /** こうかの ドット（ふちどりの うえに かく）。behind なら からだの うしろ（なにも ない ところ）だけに かく。 */
+  dot(x: number, y: number, color: string, alpha = 1, behind = false) {
+    this.fx.push({ x: Math.round(x), y: Math.round(y), c: hexRgb(color), a: alpha, behind })
     return this
   }
 
-  line(x0: number, y0: number, x1: number, y1: number, color: string, alpha = 1) {
+  line(x0: number, y0: number, x1: number, y1: number, color: string, alpha = 1, behind = false) {
     const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))))
-    for (let i = 0; i <= n; i++) this.dot(lerp(x0, x1, i / n), lerp(y0, y1, i / n), color, alpha)
+    for (let i = 0; i <= n; i++) this.dot(lerp(x0, x1, i / n), lerp(y0, y1, i / n), color, alpha, behind)
     return this
   }
 }
@@ -411,6 +412,7 @@ export function rasterize(model: Model, colors: readonly [string, string, string
         const i = f.x * scale + di, j = f.y * scale + dj
         if (i < 0 || j < 0 || i >= w || j >= h) continue
         const k = j * w + i
+        if (f.behind && out[k]) continue
         if (out[k] && alpha[k] >= 1) { out[k] = mixRgb(out[k]!, f.c, f.a); continue }
         out[k] = f.c
         alpha[k] = Math.max(alpha[k], f.a)
