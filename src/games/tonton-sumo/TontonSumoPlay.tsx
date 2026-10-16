@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
@@ -8,7 +8,7 @@ import { vibrate } from '../../utils/haptics'
 import { PaperSheet } from './PaperWrestler'
 import SumoScene, { type Ripple } from './SumoScene'
 import {
-  COMPUTER_INTERVAL_MS, COMPUTER_STRENGTH, STAT_LEVELS, STEP_SECONDS, WRESTLERS,
+  COMPUTER_INTERVAL_MS, COMPUTER_STRENGTH, STEP_SECONDS, WRESTLERS,
   behindPoint, clampToBox, computerTapPoint, createSumoState, isSettled, other, stepSumo, tapSide, tapSumo,
   type Mode, type Point, type Side,
 } from './sumoGame'
@@ -23,12 +23,25 @@ const SIDE_NAMES: Record<Side, string> = { left: 'あか', right: 'あお' }
 /** The biggest wrestler fills the picker card; smaller ones are drawn smaller. */
 const LARGEST = Math.max(...WRESTLERS.map((wrestler) => wrestler.stats.scale))
 
-function StatDots({ label, value }: { label: string; value: number }) {
-  return (
-    <span className={styles.stat}>
-      {label}<b>{'●'.repeat(value)}<i>{'●'.repeat(STAT_LEVELS - value)}</i></b>
-    </span>
-  )
+/** Tracks whether the picker row hides more cards on either side, so the edges can hint at scrolling. */
+function useScrollEdges(ref: RefObject<HTMLElement | null>, active: boolean) {
+  const [edges, setEdges] = useState({ before: false, after: false })
+  useEffect(() => {
+    const element = ref.current
+    if (!active || !element) return undefined
+    const update = () => {
+      const max = element.scrollWidth - element.clientWidth
+      setEdges({ before: element.scrollLeft > 2, after: element.scrollLeft < max - 2 })
+    }
+    update()
+    element.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      element.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [ref, active])
+  return edges
 }
 
 const PORTRAIT_QUERY = '(orientation: portrait)'
@@ -54,7 +67,9 @@ export default function TontonSumoPlay() {
   const svgRef = useRef<SVGSVGElement>(null)
   const arenaRef = useRef<HTMLDivElement>(null)
   const replayRef = useRef<HTMLButtonElement>(null)
+  const rosterRef = useRef<HTMLDivElement>(null)
   const started = mode !== null
+  const edges = useScrollEdges(rosterRef, !started)
   const view = useSyncExternalStore(subscribePortrait, isPortrait) ? TALL_VIEW : WIDE_VIEW
   useGameIntroPlaying(started)
 
@@ -184,6 +199,11 @@ export default function TontonSumoPlay() {
     playTapSound()
   }
 
+  const scrollRoster = (direction: 1 | -1) => {
+    const element = rosterRef.current
+    element?.scrollBy?.({ left: direction * element.clientWidth * 0.8, behavior: 'smooth' })
+  }
+
   const preview = useMemo(() => createSumoState(fighters.left, fighters.right), [fighters])
   const scene = started ? match : preview
   const nameOf = (side: Side) => WRESTLERS[fighters[side]]!.name
@@ -235,26 +255,28 @@ export default function TontonSumoPlay() {
                 </button>
               ))}
             </div>
-            <div className={styles.characters} role="group" aria-label={`${SIDE_NAMES[picking]}の おすもうさん`}>
-              {WRESTLERS.map((wrestler, index) => (
-                <button key={wrestler.key} type="button" aria-label={`${wrestler.name}（おおきさ ${wrestler.size}、おもさ ${wrestler.weight}）`}
-                  aria-pressed={fighters[picking] === index} onClick={() => pick(index)}>
-                  <svg viewBox="72 0 100 182" aria-hidden="true">
-                    <g transform={`translate(80 172) scale(${(wrestler.stats.scale / LARGEST).toFixed(3)}) translate(-80 -172)`}>
-                      <PaperSheet index={index} belt={fighters[picking] === index ? SIDE_COLORS[picking].belt : undefined} />
-                    </g>
-                  </svg>
-                  <span>{wrestler.name}</span>
-                  <small>{wrestler.trait}</small>
-                  <span className={styles.stats} aria-hidden="true">
-                    <StatDots label="おおきさ" value={wrestler.size} />
-                    <StatDots label="おもさ" value={wrestler.weight} />
-                  </span>
-                  {(['left', 'right'] as const).filter((side) => fighters[side] === index).map((side) => (
-                    <span key={side} className={`${styles.badge} ${side === 'left' ? styles.redBadge : styles.blueBadge}`} aria-hidden="true">{SIDE_NAMES[side]}</span>
-                  ))}
-                </button>
-              ))}
+            <div className={`${styles.roster} ${edges.before ? styles.moreBefore : ''} ${edges.after ? styles.moreAfter : ''}`}>
+              <div ref={rosterRef} className={styles.characters} role="group" aria-label={`${SIDE_NAMES[picking]}の おすもうさん`}>
+                {WRESTLERS.map((wrestler, index) => (
+                  <button key={wrestler.key} type="button" aria-label={wrestler.name}
+                    aria-pressed={fighters[picking] === index} onClick={() => pick(index)}>
+                    <svg viewBox="72 0 100 182" aria-hidden="true">
+                      <g transform={`translate(80 172) scale(${(wrestler.stats.scale / LARGEST).toFixed(3)}) translate(-80 -172)`}>
+                        <PaperSheet index={index} belt={fighters[picking] === index ? SIDE_COLORS[picking].belt : undefined} />
+                      </g>
+                    </svg>
+                    <span>{wrestler.name}</span>
+                    <small>{wrestler.trait}</small>
+                    {(['left', 'right'] as const).filter((side) => fighters[side] === index).map((side) => (
+                      <span key={side} className={`${styles.badge} ${side === 'left' ? styles.redBadge : styles.blueBadge}`} aria-hidden="true">{SIDE_NAMES[side]}</span>
+                    ))}
+                  </button>
+                ))}
+              </div>
+              <button type="button" className={`${styles.scrollArrow} ${styles.arrowBefore}`} tabIndex={-1} aria-hidden="true"
+                onClick={() => scrollRoster(-1)}>‹</button>
+              <button type="button" className={`${styles.scrollArrow} ${styles.arrowAfter}`} tabIndex={-1} aria-hidden="true"
+                onClick={() => scrollRoster(1)}>›</button>
             </div>
             <div className={styles.modes}>
               <button type="button" className={styles.solo} aria-label="ひとりで ゆっくり あいてと" onClick={() => start('solo')}><span>ひとりで</span><small>ゆっくり あいてと</small></button>
