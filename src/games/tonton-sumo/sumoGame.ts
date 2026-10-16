@@ -19,7 +19,7 @@ export type WrestlerStats = {
   width: number
 }
 
-/** Size and weight are shown to players as levels from 1 to STAT_LEVELS. */
+/** Size and weight are rated as levels from 1 to STAT_LEVELS. */
 export const STAT_LEVELS = 5
 
 export type Wrestler = {
