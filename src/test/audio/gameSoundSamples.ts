@@ -9,6 +9,7 @@
  */
 import type { SoundSample } from './soundMeter'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
+import * as gochiso from '../../games/gochiso-race/sounds'
 import { playDerbySound } from '../../games/homerun-derby/sounds'
 import { playSushiSound } from '../../games/kaiten-sushi/sounds'
 import { playLabSound } from '../../games/venom-lab/sounds'
@@ -84,6 +85,15 @@ function pianoNotes(count: number): SoundSample['play'] {
 }
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
+  'gochiso-race': [
+    sample('ジャンプ', () => gochiso.playJump()),
+    sample('ぱくっ', () => gochiso.playEat(1)),
+    sample('ケーキ', () => gochiso.playEat(5)),
+    sample('ぺったん', () => gochiso.playBump('pounder')),
+    sample('ゴール', () => gochiso.playGoal(true)),
+    sample('かち', gochiso.playWin),
+    background('BGM', 3, gochiso.startBgm),
+  ],
   'homerun-derby': [
     sample('バットを ふる', () => playDerbySound('swing')),
     sample('カキーン', () => playDerbySound('hit')),
