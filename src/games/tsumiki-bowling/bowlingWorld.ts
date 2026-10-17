@@ -342,6 +342,32 @@ export function resetForNextThrow(bowling: BowlingWorld): void {
   parkBall(bowling, null)
 }
 
+/**
+ * 次の投球のために、倒れた積み木だけを片付けて玉を発射位置へ戻す。
+ *
+ * 立っている積み木は組み直さず、その場に残す（前の投球の続きから投げる）。
+ * toppled[i] が true の積み木はシミュレーションから外し、見た目も消す。
+ * 残った積み木は速度だけ0へ戻し、片付けた直後に滑り続けないようにする。
+ * 戻り値は残っている（片付けていない）積み木の数。
+ */
+export function clearToppledBlocks(bowling: BowlingWorld, toppled: readonly boolean[]): number {
+  let remaining = 0
+  bowling.blocks.forEach((block, index) => {
+    if (!block.removed && toppled[index]) {
+      block.body.setEnabled(false)
+      block.removed = true
+    }
+    if (block.removed) return
+    remaining += 1
+    block.body.setLinvel(ZERO, true)
+    block.body.setAngvel(ZERO, true)
+    block.body.resetForces(true)
+    block.body.resetTorques(true)
+  })
+  parkBall(bowling, null)
+  return remaining
+}
+
 /** 倒れ判定へ渡す、いまの積み木の姿勢。 */
 export function readBlockSamples(bowling: BowlingWorld): BlockSample[] {
   return bowling.blocks.map((block) => {

@@ -39,14 +39,14 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
   const [aimPower, setAimPower] = useState<number | null>(null)
   const [lastThrow, setLastThrow] = useState<ThrowSettledResult | null>(null)
   // 投球中に増えていく、その投球ぶんの倒した数。
-  // 1投が落ち着いたあとは、積み木を組み直すまで最終値を表示する
-  // （積み木は毎投組み直されるので、累計を全体数と比べても意味がないため）。
+  // 積み木は組み直さず続きから投げるので、HUDにはこれまでの合計へ足した数を出す。
+  // 1投が落ち着いたら合計（game.toppledTotal）へ入るので、ここは0へ戻す。
   const [liveToppled, setLiveToppled] = useState(0)
   // 1投目を投げ終えたら、操作説明は出しっぱなしにしない。
   const [hasThrown, setHasThrown] = useState(false)
   // 次に投げる玉。毎投選び直せる（「もういちど」をまたいでも選択は引き継ぐ）。
   const [ballId, setBallIdState] = useState<BowlingBallId>(DEFAULT_BOWLING_BALL_ID)
-  // 3投のうち1回でも全部倒したか（パーフェクトの定義）。結果画面でだけ使う。
+  // 全部倒し切ったか（パーフェクトの定義）。結果画面でだけ使う。
   const [hadPerfectThrow, setHadPerfectThrow] = useState(false)
   const handleThrowStart = useCallback(() => {
     setAimPower(null)
@@ -67,11 +67,11 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
 
   const handleThrowSettled = useCallback((result: ThrowSettledResult) => {
     setLastThrow(result)
-    // 崩れている最中に増えていった数を、この投球の最終値として確定させる
-    // （積み木を組み直すまではこの値を出し続ける）。
-    setLiveToppled(result.toppled)
+    // この投球ぶんは合計へ入るので、二重に足さないよう0へ戻す。
+    setLiveToppled(0)
     if (result.isPerfect) setHadPerfectThrow(true)
-    setGame((current) => finishThrow(current, result.toppled))
+    // 全部倒し切ったら投げるものが残らないので、3投を待たずに結果へ進む。
+    setGame((current) => finishThrow(current, result.toppled, result.isPerfect))
   }, [])
 
   const handleAimChange = useCallback((power: number | null) => {
@@ -92,6 +92,7 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
   const throwNumber = currentThrowNumber(game)
   const isFinished = game.phase === 'finished'
   const isAiming = game.phase === 'aiming'
+  const toppledSoFar = game.toppledTotal + (game.phase === 'flying' ? liveToppled : 0)
   // 投球待機中だけ切り替えられる。飛行中・組み直し中の切替は
   // useTsumikiBowlingEngine側でも無視されるが、ここでも二重に防ぐ。
   const canSelectBall = isAiming && !isFinished
@@ -154,7 +155,7 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
             </div>
             <p className={styles.score} role="status" aria-live="polite">
               <span className={styles.scoreLabel}>たおした つみき</span>
-              <span className={styles.scoreValue}>{liveToppled}</span>
+              <span className={styles.scoreValue}>{toppledSoFar}</span>
               <span className={styles.scoreSeparator}> / </span>
               <span className={styles.scoreTotal}>{stage.blocks.length}</span>
               <span className={styles.scoreUnit}>こ</span>
@@ -233,7 +234,7 @@ export default function TsumikiBowlingGame({ stageId, onBackToStages }: TsumikiB
                 </div>
               </>
             ) : null}
-            <p className={styles.resultTitle}>{THROWS_PER_GAME}かい なげて</p>
+            <p className={styles.resultTitle}>{game.throwResults.length}かい なげて</p>
             <p className={styles.resultCount}>
               <span className={styles.resultNumber}>{game.toppledTotal}</span>
               <span className={styles.resultUnit}>こ</span>

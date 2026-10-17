@@ -119,9 +119,9 @@ describe('固定玉プロフィール', () => {
   it('gateでは、重い玉は奥の門を倒し、小さい玉はすき間の宝箱へ届く', () => {
     const heavy = runAutomaticProfile('heavy', 'gate')
     const small = runAutomaticProfile('small', 'gate')
-    // gateの0〜5が手前の門、6〜10が奥の門、11〜12が宝箱の連鎖。
+    // gateの0〜5が手前の門、6〜10が奥の門、11〜12が宝箱の連鎖。13以降は追加の積み木。
     expect(heavy.movedBlockIndices.some((index) => index >= 6 && index <= 10)).toBe(true)
-    expect(small.movedBlockIndices.filter((index) => index >= 11)).toHaveLength(2)
+    expect(small.movedBlockIndices.filter((index) => index >= 11 && index <= 12)).toHaveLength(2)
     expect(small.movedBlockIndices.some((index) => index < 11)).toBe(false)
   })
 })

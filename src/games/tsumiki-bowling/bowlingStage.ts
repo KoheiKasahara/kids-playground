@@ -187,6 +187,9 @@ export const TOWER_CENTER_Z = TOWER_Z
 const BASE_PILLAR_X = [-1.8, -0.9, 0, 0.9, 1.8] as const
 /** 1段目の板と2段目の柱の左右位置。板は柱2本ぶんにだけ載る。 */
 const PLANK_X = [-1.35, 1.35] as const
+/** てっぺんのキューブの並び。長い板(幅3.2・奥行き1)からはみ出さず、隣どうし重ならない。 */
+const TOP_CUBE_X = [-1.3, -0.45, 0.45, 1.3] as const
+const TOP_CUBE_Z = [TOWER_Z + 0.24, TOWER_Z - 0.24] as const
 
 /**
  * Phase 1 の固定ステージ「つみきタワー」（既定ステージ）。
@@ -211,8 +214,14 @@ const TOWER_STAGE: BowlingStage = {
     // 壁の上に載せたキューブ。速い玉は壁の上のあたりを通るので、
     // まずこれが弾け飛んで「当たった！」が分かる。
     // 弱い発射で壁の下側に当たったときは、揺れて落ちる。
-    { x: -0.9, z: FRONT_WALL_Z, height: FRONT_WALL[1] + BIG_CUBE[1] / 2, size: BIG_CUBE, color: ORANGE },
-    { x: 0.9, z: FRONT_WALL_Z, height: FRONT_WALL[1] + BIG_CUBE[1] / 2, size: BIG_CUBE, color: PURPLE },
+    // 壁の幅いっぱいに5個並べ、どこへ当てても何かが弾け飛ぶようにする。
+    ...([-1.8, -0.9, 0, 0.9, 1.8] as const).map((x, index) => ({
+      x,
+      z: FRONT_WALL_Z,
+      height: FRONT_WALL[1] + BIG_CUBE[1] / 2,
+      size: BIG_CUBE,
+      color: [GREEN, ORANGE, RED, PURPLE, GREEN][index]!,
+    })),
 
     // 1段目の柱（手前列）。
     ...BASE_PILLAR_X.map((x, index) => ({
@@ -253,13 +262,21 @@ const TOWER_STAGE: BowlingStage = {
     { x: 0, z: TOWER_Z, height: 2.18, size: WIDE_PLANK, color: BLUE },
 
     // てっぺんのキューブ。崩壊の最後に転がり落ちて「ガラガラ」の締めになる。
-    { x: -0.55, z: TOWER_Z, height: 2.51, size: CUBE, color: YELLOW },
-    { x: 0.55, z: TOWER_Z, height: 2.51, size: CUBE, color: RED },
+    // 長い板の上に前後2列×4個並べ、崩れたときに降ってくる数を多くしてある。
+    ...TOP_CUBE_Z.flatMap((z, row) =>
+      TOP_CUBE_X.map((x, index) => ({
+        x,
+        z,
+        height: 2.51,
+        size: CUBE,
+        color: (row === 0 ? [YELLOW, RED, GREEN, PURPLE] : [ORANGE, BLUE, YELLOW, RED])[index]!,
+      })),
+    ),
   ],
 }
 
 /**
- * さんかくタワー。奥行き1列だけの、入門向けの三角形。
+ * さんかくタワー。同じ三角形を前後2列に並べた、入門向けのステージ。
  *
  * 下から 5-4-3-2-1 の段組みで、どの段も下の段2個へまたがって載る。
  * 段差はすべて積み木の高さぴったり（隙間0）、隣どうしは0.1のすき間で
@@ -274,6 +291,8 @@ const TOWER_STAGE: BowlingStage = {
  * 転がってきた球は最下段へ当たって三角形ごと後ろへ倒れ込む。
  */
 const TRIANGLE_BRICK: readonly [number, number, number] = [0.9, 0.5, 0.7]
+/** 前後2列のZ。列のあいだは0.3あけ、重ならないようにする。 */
+const TRIANGLE_ROW_Z = [-7.0, -8.0] as const
 const TRIANGLE_STAGE: BowlingStage = {
   id: 'triangle',
   name: 'さんかくタワー',
@@ -287,13 +306,16 @@ const TRIANGLE_STAGE: BowlingStage = {
       { height: 2.25, xs: [0], color: RED },
     ] as const
   ).flatMap((row) =>
-    row.xs.map((x) => ({
-      x,
-      z: -7.0,
-      height: row.height,
-      size: TRIANGLE_BRICK,
-      color: row.color,
-    })),
+    // 手前の三角形が倒れ込むと、すぐ後ろの三角形も巻き込んで崩れる。
+    TRIANGLE_ROW_Z.flatMap((z) =>
+      row.xs.map((x) => ({
+        x,
+        z,
+        height: row.height,
+        size: TRIANGLE_BRICK,
+        color: row.color,
+      })),
+    ),
   ),
 }
 
@@ -333,8 +355,19 @@ const CASTLE_STAGE: BowlingStage = {
 
     // 奥の壁。中央の壁と塔の隙間をすり抜けた玉だけが当たる。
     { x: 0, z: -8.3, height: 0.275, size: [2.6, 0.55, 0.7], color: BLUE },
+    { x: -1.1, z: -8.3, height: 0.75, size: [0.4, 0.4, 0.4], color: YELLOW },
     { x: -0.6, z: -8.3, height: 0.75, size: [0.4, 0.4, 0.4], color: RED },
+    { x: 0, z: -8.3, height: 0.75, size: [0.4, 0.4, 0.4], color: GREEN },
     { x: 0.6, z: -8.3, height: 0.75, size: [0.4, 0.4, 0.4], color: RED },
+    { x: 1.1, z: -8.3, height: 0.75, size: [0.4, 0.4, 0.4], color: YELLOW },
+
+    // 奥の小さな塔。手前の塔が倒れ込むと、続けてこちらも崩れる。
+    { x: -2.0, z: -8.3, height: 0.35, size: CASTLE_TOWER_BODY, color: PURPLE },
+    { x: -2.22, z: -8.3, height: 0.85, size: CASTLE_TOWER_TOP, color: GREEN },
+    { x: -1.78, z: -8.3, height: 0.85, size: CASTLE_TOWER_TOP, color: GREEN },
+    { x: 2.0, z: -8.3, height: 0.35, size: CASTLE_TOWER_BODY, color: PURPLE },
+    { x: 2.22, z: -8.3, height: 0.85, size: CASTLE_TOWER_TOP, color: GREEN },
+    { x: 1.78, z: -8.3, height: 0.85, size: CASTLE_TOWER_TOP, color: GREEN },
   ],
 }
 
@@ -376,8 +409,17 @@ const HEART_STAGE: BowlingStage = {
     { x: -0.8, z: -7.2, height: 2.62, size: [0.48, 0.48, 0.48], color: ORANGE },
     { x: 0.8, z: -7.2, height: 2.62, size: [0.48, 0.48, 0.48], color: ORANGE },
 
+    // ハートのそとがわの小さな柱。柱へ当てた崩れが横へも広がる。
+    { x: -1.75, z: -7.2, height: 0.25, size: [0.5, 0.5, 0.6], color: ORANGE },
+    { x: -1.75, z: -7.2, height: 0.75, size: [0.5, 0.5, 0.6], color: YELLOW },
+    { x: 1.75, z: -7.2, height: 0.25, size: [0.5, 0.5, 0.6], color: ORANGE },
+    { x: 1.75, z: -7.2, height: 0.75, size: [0.5, 0.5, 0.6], color: YELLOW },
+
     // 奥のしん。穴をすり抜けた玉だけが当たる。
     { x: 0, z: -8.4, height: 0.45, size: [0.9, 0.9, 0.7], color: PURPLE },
+    { x: 0, z: -8.4, height: 1.15, size: [0.5, 0.5, 0.5], color: RED },
+    { x: -0.75, z: -8.4, height: 0.2, size: [0.4, 0.4, 0.4], color: GREEN },
+    { x: 0.75, z: -8.4, height: 0.2, size: [0.4, 0.4, 0.4], color: GREEN },
   ],
 }
 
@@ -390,6 +432,8 @@ const HEART_STAGE: BowlingStage = {
  * 最下段を抜いて全部落とす。
  */
 const TALL_Z = -7.3
+/** うしろの小さいタワーのZ。前の塔（奥行き0.9）とは0.3あけて重ならない。 */
+const TALL_BACK_Z = -8.4
 const TALL_STAGE: BowlingStage = {
   id: 'tall',
   name: 'たかいタワー',
@@ -409,6 +453,15 @@ const TALL_STAGE: BowlingStage = {
     { x: 0, z: TALL_Z, height: 2.86, size: [1.0, 0.22, 0.7], color: BLUE },
     { x: 0, z: TALL_Z, height: 3.195, size: [0.45, 0.45, 0.45], color: PURPLE },
     { x: 0, z: TALL_Z, height: 3.595, size: [0.35, 0.35, 0.35], color: RED },
+
+    // うしろの小さいタワー。前の塔が倒れ込むと、続けてこちらも崩れる。
+    { x: -0.35, z: TALL_BACK_Z, height: 0.25, size: [0.6, 0.5, 0.7], color: GREEN },
+    { x: 0.35, z: TALL_BACK_Z, height: 0.25, size: [0.6, 0.5, 0.7], color: GREEN },
+    { x: 0, z: TALL_BACK_Z, height: 0.625, size: [1.4, 0.25, 0.7], color: ORANGE },
+    { x: -0.3, z: TALL_BACK_Z, height: 1.0, size: [0.5, 0.5, 0.6], color: PURPLE },
+    { x: 0.3, z: TALL_BACK_Z, height: 1.0, size: [0.5, 0.5, 0.6], color: PURPLE },
+    { x: 0, z: TALL_BACK_Z, height: 1.375, size: [1.1, 0.25, 0.6], color: ORANGE },
+    { x: 0, z: TALL_BACK_Z, height: 1.7, size: [0.4, 0.4, 0.4], color: YELLOW },
   ],
 }
 
@@ -452,6 +505,21 @@ const GATE_STAGE: BowlingStage = {
     // （初期状態で重なると、Rapierが弾き飛ばして勝手に崩れる）。
     { x: 0, z: -9.1, height: 0.25, size: [0.6, 0.5, 0.6], color: YELLOW },
     { x: 0, z: -9.75, height: 0.19, size: [0.48, 0.38, 0.48], color: ORANGE },
+
+    // ここから下は、崩れる量を増やすための追加の積み木。
+    // 上の並び（手前の門→奥の門→たからもの）の順番はテストが番号で見ているので、
+    // 追加するときは必ず末尾へ足す。
+
+    // 手前の門の2段目の短い板。下のキューブ2個にまたがって載る。
+    { x: -0.475, z: -7.0, height: 2.55, size: [0.8, 0.3, 0.45], color: RED },
+    { x: 0.475, z: -7.0, height: 2.55, size: [0.8, 0.3, 0.45], color: RED },
+    // 奥の門のまん中のキューブ。
+    { x: 0, z: -8.5, height: 1.6, size: [0.4, 0.4, 0.4], color: RED },
+    // 門の外の見張り台。横へ大きく狙っても何かが崩れる。
+    { x: -2.0, z: -7.0, height: 0.25, size: [0.5, 0.5, 0.5], color: BLUE },
+    { x: -2.0, z: -7.0, height: 0.75, size: [0.5, 0.5, 0.5], color: GREEN },
+    { x: 2.0, z: -7.0, height: 0.25, size: [0.5, 0.5, 0.5], color: BLUE },
+    { x: 2.0, z: -7.0, height: 0.75, size: [0.5, 0.5, 0.5], color: GREEN },
   ],
 }
 
@@ -460,8 +528,8 @@ const GATE_STAGE: BowlingStage = {
  * 隣どうしの隙間は0.02（重ねない）で、上の段は必ず下の段2個へまたがって載る。
  *
  * 狙い: 前面へ当たると衝撃が奥まで伝わり、上の段がまとめて崩れ落ちる。
- * 30個は既定ステージの1.6倍だが、Rapierの剛体数としては十分軽い。
- * これ以上増やさないこと。
+ * 5段55個はいちばん多いステージだが、Rapierの剛体数としてはまだ軽い。
+ * ステージの上限（bowlingStage.testの個数の範囲）を超えて増やさないこと。
  */
 const PYRAMID_STAGE: BowlingStage = {
   id: 'pyramid',
@@ -469,10 +537,11 @@ const PYRAMID_STAGE: BowlingStage = {
   hint: 'いっぱい くずれる！',
   blocks: (
     [
-      { height: 0.3, xs: [-0.93, -0.31, 0.31, 0.93], zs: [-6.75, -7.37, -7.99, -8.61], color: BLUE },
-      { height: 0.9, xs: [-0.62, 0, 0.62], zs: [-7.06, -7.68, -8.30], color: GREEN },
-      { height: 1.5, xs: [-0.31, 0.31], zs: [-7.37, -7.99], color: YELLOW },
-      { height: 2.1, xs: [0], zs: [-7.68], color: RED },
+      { height: 0.3, xs: [-1.24, -0.62, 0, 0.62, 1.24], zs: [-6.13, -6.75, -7.37, -7.99, -8.61], color: BLUE },
+      { height: 0.9, xs: [-0.93, -0.31, 0.31, 0.93], zs: [-6.44, -7.06, -7.68, -8.30], color: GREEN },
+      { height: 1.5, xs: [-0.62, 0, 0.62], zs: [-6.75, -7.37, -7.99], color: YELLOW },
+      { height: 2.1, xs: [-0.31, 0.31], zs: [-7.06, -7.68], color: ORANGE },
+      { height: 2.7, xs: [0], zs: [-7.37], color: RED },
     ] as const
   ).flatMap((row) =>
     row.xs.flatMap((x) =>

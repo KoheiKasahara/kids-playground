@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import {
   ballOutOfPlay,
   clampBowlingMotion,
+  clearToppledBlocks,
   createBowlingWorld,
   launchBall,
   parkBall,
@@ -87,6 +88,23 @@ function runThrow(
     }
   }
   return { toppled: tracker.count, settledAtMs, minBallY, ballSpeedAfterImpact, ballPassedTower }
+}
+
+/** 既にある倒れ判定を使って1投ぶん回す（続けて投げるときの判定を引き継がない）。 */
+function runThrowWithTracker(
+  bowling: BowlingWorld,
+  tracker: ReturnType<typeof createToppleTracker>,
+  launchAim: LaunchAim,
+): void {
+  launchBall(bowling, launchAim)
+  const steps = Math.round(5 / PHYSICS_TIMESTEP)
+  for (let index = 0; index < steps; index += 1) {
+    bowling.world.step()
+    clampBowlingMotion(bowling)
+    removeFallenBlocks(bowling)
+    parkFallenBall(bowling)
+    updateToppleTracker(tracker, readBlockSamples(bowling), STEP_MS)
+  }
 }
 
 describe('つみきボウリングの世界', () => {
@@ -283,6 +301,53 @@ describe('つみきボウリングの世界', () => {
     for (const count of counts) {
       expect(count).toBeGreaterThanOrEqual(Math.ceil(bowling.blocks.length / 2))
     }
+    bowling.world.free()
+  })
+
+  it('次の投球では倒れた積み木だけが片付き、立っている積み木はその場に残る', () => {
+    const bowling = createBowlingWorld(RAPIER)
+    const tracker = createToppleTracker(readBlockSamples(bowling))
+    runThrowWithTracker(bowling, tracker, aim(0, 0.09))
+    const toppled = tracker.entries.map((entry) => entry.toppled)
+    const beforeClear = readBlockSamples(bowling)
+    const remaining = clearToppledBlocks(bowling, toppled)
+
+    expect(remaining).toBe(toppled.filter((value) => !value).length)
+    bowling.blocks.forEach((block, index) => {
+      if (toppled[index]) {
+        expect(block.removed, `${index}番目は倒れたので片付く`).toBe(true)
+        return
+      }
+      // 組み直さない。その投球のあとの位置のまま残る。
+      expect(block.removed).toBe(false)
+      const now = block.body.translation()
+      expect(now.x).toBeCloseTo(beforeClear[index]!.position.x, 5)
+      expect(now.z).toBeCloseTo(beforeClear[index]!.position.z, 5)
+    })
+    for (const sample of readSettleSamples(bowling)) {
+      expect(sample.linearSpeed).toBe(0)
+      expect(sample.angularSpeed).toBe(0)
+    }
+    expect(bowling.launched).toBe(false)
+    bowling.world.free()
+  })
+
+  it('倒れた積み木を片付けながら続けて投げると、倒した数がたまっていく', () => {
+    const bowling = createBowlingWorld(RAPIER)
+    let toppledSoFar = 0
+    for (let index = 0; index < 3; index += 1) {
+      const tracker = createToppleTracker(readBlockSamples(bowling))
+      bowling.blocks.forEach((block, blockIndex) => {
+        if (block.removed) tracker.entries[blockIndex]!.toppled = true
+      })
+      if (bowling.blocks.every((block) => block.removed)) break
+      runThrowWithTracker(bowling, tracker, aim(1))
+      toppledSoFar += tracker.count
+      clearToppledBlocks(bowling, tracker.entries.map((entry) => entry.toppled))
+    }
+    // 片付けた積み木を二度数えず、全体の数を超えない。
+    expect(toppledSoFar).toBeGreaterThanOrEqual(Math.ceil(bowling.blocks.length / 2))
+    expect(toppledSoFar).toBeLessThanOrEqual(bowling.blocks.length)
     bowling.world.free()
   })
 

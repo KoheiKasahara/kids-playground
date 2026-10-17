@@ -58,13 +58,14 @@ function settleThrow(result: Partial<ThrowSettledResult> & { toppled: number }) 
   })
 }
 
-/** 1投ぶんを通しで進める。 */
-function playThrow(toppled: number, throwNumber: number) {
+/** 1投ぶんを通しで進める。isPerfectはこれまでの合計で全部倒し切ったときに渡す。 */
+function playThrow(toppled: number, throwNumber: number, isPerfect = toppled >= TOWER_TOTAL) {
   startThrow()
   settleThrow({
     toppled,
     throwNumber,
-    isLastThrow: throwNumber >= THROWS_PER_GAME,
+    isLastThrow: throwNumber >= THROWS_PER_GAME || isPerfect,
+    isPerfect,
   })
 }
 
@@ -126,7 +127,7 @@ describe('TsumikiBowlingGame', () => {
     expect(screen.getByText('たまを すこし ひっぱって はなそう！')).toBeInTheDocument()
   })
 
-  it('崩れている最中も、いま倒れている数がその投球ぶんとして増えていく', () => {
+  it('崩れている最中も、いま倒れている数が増えていく', () => {
     renderGame()
     startThrow()
     act(() => engineMock.options?.onToppledProgress(3, 3))
@@ -135,7 +136,7 @@ describe('TsumikiBowlingGame', () => {
     expect(screen.getByRole('status')).toHaveTextContent(`9 / ${TOWER_TOTAL}こ`)
   })
 
-  it('1投終わると、その投球で倒した数を知らせ、HUDにもその投球ぶんの数が残る', () => {
+  it('1投終わると、その投球で倒した数を知らせ、HUDにも倒した数が残る', () => {
     renderGame()
     playThrow(7, 1)
     expect(screen.getByText('7こ たおれた！')).toBeInTheDocument()
@@ -149,31 +150,45 @@ describe('TsumikiBowlingGame', () => {
     expect(screen.getAllByRole('status')[0]).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
   })
 
-  it('全部倒すと「ぜんぶ たおれた！」になる', () => {
+  it('1投で全部倒すと、3投を待たずに「パーフェクト！」の結果になる', () => {
     renderGame()
     playThrow(TOWER_TOTAL, 1)
-    expect(screen.getByText('ぜんぶ たおれた！')).toBeInTheDocument()
+    const result = screen.getByRole('dialog', { name: 'けっか' })
+    expect(result).toHaveTextContent('パーフェクト！')
+    expect(result).toHaveTextContent('1かい なげて')
+    expect(result).toHaveTextContent(String(TOWER_TOTAL))
   })
 
-  it.each([0, 7, TOWER_TOTAL])('組み直したら前の結果とスコアを消し、次を狙える（%iこ）', (toppled) => {
+  it.each([0, 7])('倒れた積み木を片付けたら前の結果を消し、倒した数は続きから数える（%iこ）', (toppled) => {
     renderGame()
     playThrow(toppled, 1)
     expect(screen.getAllByRole('status')).toHaveLength(2)
     act(() => engineMock.options?.onBigCollapse?.(6))
     act(() => engineMock.options?.onStageRebuilt())
-    expect(screen.getByRole('status')).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
-    expect(screen.queryByText('ぜんぶ たおれた！')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(`${toppled} / ${TOWER_TOTAL}こ`)
+    expect(screen.queryByText(`${toppled}こ たおれた！`)).not.toBeInTheDocument()
     expect(screen.queryByText('ガラガラー！')).not.toBeInTheDocument()
     expect(screen.getByLabelText(`${THROWS_PER_GAME}かい なげるうちの 2かいめ`)).toBeInTheDocument()
     act(() => engineMock.options?.onAimChange(0.9))
-    expect(screen.getByRole('status')).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
-    playThrow(0, 2)
+    expect(screen.getByRole('status')).toHaveTextContent(`${toppled} / ${TOWER_TOTAL}こ`)
+    playThrow(2, 2)
     act(() => engineMock.options?.onStageRebuilt())
     playThrow(0, 3)
     const result = screen.getByRole('dialog', { name: 'けっか' })
-    expect(result).toHaveTextContent(String(toppled))
-    if (toppled === TOWER_TOTAL) expect(result).toHaveTextContent('パーフェクト！')
-    else expect(result).not.toHaveTextContent('パーフェクト！')
+    expect(result).toHaveTextContent(`${THROWS_PER_GAME}かい なげて`)
+    expect(result).toHaveTextContent(String(toppled + 2))
+    expect(result).not.toHaveTextContent('パーフェクト！')
+  })
+
+  it('何投かに分けて全部倒し切っても「パーフェクト！」で結果へ進む', () => {
+    renderGame()
+    playThrow(TOWER_TOTAL - 3, 1)
+    act(() => engineMock.options?.onStageRebuilt())
+    playThrow(3, 2, true)
+    const result = screen.getByRole('dialog', { name: 'けっか' })
+    expect(result).toHaveTextContent('パーフェクト！')
+    expect(result).toHaveTextContent('2かい なげて')
+    expect(result).toHaveTextContent(String(TOWER_TOTAL))
   })
 
   it('2投目からは案内の文が変わる', () => {
@@ -182,12 +197,14 @@ describe('TsumikiBowlingGame', () => {
     expect(screen.getByText('つぎも ひっぱって はなしてね')).toBeInTheDocument()
   })
 
-  it('次の投球が始まると、HUDのその投球ぶんの数字が0へ戻る', () => {
+  it('次の投球では、HUDの数字が前の投球までの合計から増えていく', () => {
     renderGame()
     playThrow(5, 1)
     expect(screen.getAllByRole('status')[0]).toHaveTextContent(`5 / ${TOWER_TOTAL}こ`)
     startThrow()
-    expect(screen.getAllByRole('status')[0]).toHaveTextContent(`0 / ${TOWER_TOTAL}こ`)
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent(`5 / ${TOWER_TOTAL}こ`)
+    act(() => engineMock.options?.onToppledProgress(2, 2))
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent(`7 / ${TOWER_TOTAL}こ`)
   })
 
   it('大崩壊でも画面下部に「ガラガラー！」を表示しない', () => {
@@ -251,17 +268,15 @@ describe('TsumikiBowlingGame', () => {
 })
 
 describe('パーフェクト', () => {
-  it('1回でも全部倒した投球があれば、結果画面に「パーフェクト！」が出る', () => {
+  it('全部倒し切れば、結果画面に「パーフェクト！」が出る', () => {
     renderGame()
     playThrow(TOWER_TOTAL, 1)
-    playThrow(0, 2)
-    playThrow(0, 3)
 
     const result = screen.getByRole('dialog', { name: 'けっか' })
     expect(result).toHaveTextContent('パーフェクト！')
   })
 
-  it('全部倒した投球が1回もなければ、「パーフェクト！」は出ない', () => {
+  it('倒し残しがあれば、「パーフェクト！」は出ない', () => {
     renderGame()
     playThrow(2, 1)
     playThrow(3, 2)
@@ -275,8 +290,6 @@ describe('パーフェクト', () => {
     const user = userEvent.setup()
     renderGame()
     playThrow(TOWER_TOTAL, 1)
-    playThrow(0, 2)
-    playThrow(0, 3)
     expect(screen.getByRole('dialog', { name: 'けっか' })).toHaveTextContent('パーフェクト！')
 
     await user.click(screen.getByRole('button', { name: 'もういちど' }))

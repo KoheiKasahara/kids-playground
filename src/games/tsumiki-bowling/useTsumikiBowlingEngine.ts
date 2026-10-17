@@ -42,8 +42,8 @@ import {
   readBall,
   readBlockSamples,
   readSettleSamples,
+  clearToppledBlocks,
   removeFallenBlocks,
-  resetForNextThrow,
   setBowlingBall,
   type BowlingWorld,
 } from './bowlingWorld'
@@ -75,11 +75,11 @@ export type ThrowSettledResult = {
   throwNumber: number
   /** その投球で倒した積み木の数。 */
   toppled: number
-  /** これが最後の投球だったか。 */
+  /** これが最後の投球だったか（3投目か、全部倒して残りがなくなったとき）。 */
   isLastThrow: boolean
   /** そのステージの積み木の総数。 */
   total: number
-  /** その投球で全部倒したか（toppled >= total）。 */
+  /** その投球までに全部倒し切ったか（前の投球までの数＋toppled >= total）。 */
   isPerfect: boolean
 }
 
@@ -92,7 +92,7 @@ export type TsumikiBowlingEngineOptions = {
   onThrowStart: (throwNumber: number) => void
   /** 1投が落ち着いたときに1回だけ呼ばれる。 */
   onThrowSettled: (result: ThrowSettledResult) => void
-  /** 積み木を組み直し、次の投球の盤面へ戻したときに呼ぶ。 */
+  /** 倒れた積み木を片付け、次の投球の盤面へ移ったときに呼ぶ。 */
   onStageRebuilt: () => void
   /**
    * 引っ張っている間は見た目の引き量(0〜1)、離したときはnull。
@@ -125,9 +125,9 @@ export type TsumikiBowlingEngineHandle = {
   setBallId: (ballId: BowlingBallId) => void
 }
 
-/** 1投が落ち着いてから、積み木を組み直すまでの間。崩れた形を見せる時間。 */
+/** 1投が落ち着いてから、倒れた積み木を片付けるまでの間。崩れた形を見せる時間。 */
 const REBUILD_DELAY_MS = 700
-/** 組み直しの見た目（小さい状態から元の大きさへ戻す）にかける時間。 */
+/** 片付けの見た目（倒れた積み木が小さくなって消える）にかける時間。 */
 const REBUILD_POP_MS = 260
 
 /**
@@ -289,10 +289,14 @@ export function useTsumikiBowlingEngine(
     let flying = false
     /** 3投終わったか。終わったら物理も描画も止める。 */
     let finished = false
-    /** 落ち着いてから組み直すまでの残り時間。 */
+    /** これまでの投球で倒した数の合計。全部倒し切ったかの判定に使う。 */
+    let toppledSoFar = 0
+    /** 落ち着いてから倒れた積み木を片付けるまでの残り時間。 */
     let rebuildRemainingMs = 0
-    /** 組み直しの見た目に使う残り時間。 */
+    /** 片付けの見た目に使う残り時間。 */
     let popRemainingMs = 0
+    /** いま片付けの演出中（小さくなって消えている途中）の積み木。 */
+    let clearingBlocks: boolean[] = []
     let tracker: ToppleTracker | null = null
     let settle: SettleState | null = null
 
@@ -1052,9 +1056,22 @@ export function useTsumikiBowlingEngine(
 
     function startThrow(aim: LaunchAim) {
       if (!bowling || flying || finished) return
-      // 判定の基準はこの投球の直前の姿勢。組み直し直後のごくわずかな沈み込みを
-      // 「倒れた」と数えないよう、投球ごとに取り直す。
-      tracker = createToppleTracker(readBlockSamples(bowling))
+      // 位置の基準はこの投球の直前の姿勢。前の投球の続きから投げるので、
+      // 押されて少しずれただけの積み木を、投げた瞬間に「倒れた」と数えない。
+      // 傾きの基準だけは最初の置き方にする。片付けのあとに支えを失って
+      // 寝転んだ積み木も、次の投球で倒れた数に入り、片付けられるようにするため。
+      const placements = bowling.placements
+      tracker = createToppleTracker(
+        readBlockSamples(bowling).map((sample, index) => ({
+          position: sample.position,
+          rotation: placements[index]?.rotation ?? sample.rotation,
+        })),
+      )
+      // 片付け済みの積み木は二度数えない（数には入れず、確定済みとして扱う）。
+      bowling.blocks.forEach((block, index) => {
+        const entry = tracker?.entries[index]
+        if (block.removed && entry) entry.toppled = true
+      })
       settle = createSettleState()
       resetFeedbackState(feedbackState)
       flying = true
@@ -1074,9 +1091,11 @@ export function useTsumikiBowlingEngine(
       flying = false
       const toppled = tracker?.count ?? 0
       const total = stage.blocks.length
-      const isPerfect = toppled >= total
+      toppledSoFar += toppled
+      // 倒れた積み木は次の投球までに片付けるので、全部倒し切ったら投げるものが残らない。
+      const isPerfect = toppledSoFar >= total
       const throwNumber = throwIndex + 1
-      const isLastThrow = throwNumber >= THROWS_PER_GAME
+      const isLastThrow = throwNumber >= THROWS_PER_GAME || isPerfect
       throwIndex += 1
       if (isLastThrow) {
         finished = true
@@ -1092,11 +1111,17 @@ export function useTsumikiBowlingEngine(
       optionsRef.current.onThrowSettled({ throwNumber, toppled, isLastThrow, total, isPerfect })
     }
 
+    /**
+     * 次の投球の盤面へ移る。積み木は組み直さず、この投球で倒れたものだけを片付ける。
+     * 立っている積み木はその場に残り、次の投球はその続きから狙う。
+     */
     function rebuildStage() {
       if (!bowling) return
-      resetForNextThrow(bowling)
+      const toppledFlags = tracker?.entries.map((entry) => entry.toppled) ?? []
+      clearingBlocks = bowling.blocks.map((block, index) => !block.removed && toppledFlags[index] === true)
+      clearToppledBlocks(bowling, toppledFlags)
       if (tracker) resetToppleTracker(tracker, readBlockSamples(bowling))
-      popRemainingMs = REBUILD_POP_MS
+      popRemainingMs = prefersReducedMotion ? 0 : REBUILD_POP_MS
       optionsRef.current.onStageRebuilt()
     }
 
@@ -1187,11 +1212,8 @@ export function useTsumikiBowlingEngine(
     function writeVisuals(deltaMs: number) {
       if (!bowling) return
 
-      // 組み直しの「ぽん」と出る演出。
-      const popScale =
-        popRemainingMs > 0
-          ? 0.35 + 0.65 * (1 - popRemainingMs / REBUILD_POP_MS)
-          : 1
+      // 片付けの演出。倒れた積み木が倒れた場所で小さくなって消える。
+      const clearScale = popRemainingMs > 0 ? popRemainingMs / REBUILD_POP_MS : 0
       if (popRemainingMs > 0) popRemainingMs = Math.max(0, popRemainingMs - deltaMs)
 
       bowling.blocks.forEach((block, index) => {
@@ -1201,8 +1223,9 @@ export function useTsumikiBowlingEngine(
         const rotation = block.body.rotation()
         mesh.position.set(position.x, position.y, position.z)
         mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
-        mesh.scale.setScalar(popScale)
-        mesh.visible = !block.removed
+        const clearing = block.removed && clearingBlocks[index] === true && clearScale > 0
+        mesh.scale.setScalar(clearing ? clearScale : 1)
+        mesh.visible = !block.removed || clearing
       })
 
       // 発射直後の一瞬の伸び演出（山型: 1.0→1.22→1.0）。物理には一切影響しない。

@@ -120,9 +120,11 @@ describe('全ステージ共通の制約', () => {
     expect(new Set(names).size).toBe(names.length)
   })
 
-  it.each(BOWLING_STAGES)('$name: ブロック数が8〜32個の範囲にある', (stage) => {
-    expect(stage.blocks.length).toBeGreaterThanOrEqual(8)
-    expect(stage.blocks.length).toBeLessThanOrEqual(32)
+  it.each(BOWLING_STAGES)('$name: ブロック数が20〜56個の範囲にある', (stage) => {
+    // 倒れた積み木は片付けて続きから投げるので、3投ぶん崩して楽しめる数を置く。
+    // 多すぎるとRapierの剛体数が増えて端末で重くなるため、上限も持つ。
+    expect(stage.blocks.length).toBeGreaterThanOrEqual(20)
+    expect(stage.blocks.length).toBeLessThanOrEqual(56)
   })
 
   it.each(BOWLING_STAGES)('$name: 積み木どうしが初期状態で重なっていない', (stage) => {
