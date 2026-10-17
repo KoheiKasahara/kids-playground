@@ -156,6 +156,44 @@ export function playMedal() {
   voice(c, { type: 'sine', f: hz(21, 783.99), dur: 0.6, vol: 0.03, at: now + 0.45 })
 }
 
+/** はこの うえで はなす「ぱっ」。 */
+export function playRelease() {
+  const c = ctx()
+  if (!c) return
+  const now = c.currentTime
+  voice(c, { type: 'triangle', f: 880, f2: 330, dur: 0.16, vol: 0.08 })
+  playNoiseBurst(c, now + 0.02, 0.06, 0.05, 'highpass', 2600)
+}
+
+/** はこに はいった「ころん」。はいった かずで おとが たかく なる。 */
+export function playBoxed(count: number, star = false) {
+  const c = ctx()
+  if (!c) return
+  const now = c.currentTime
+  const note = PENTA[count % PENTA.length]
+  playNoiseBurst(c, now, 0.05, 0.08, 'bandpass', 2400)
+  voice(c, { type: 'triangle', f: hz(note, 659.25), dur: 0.18, vol: 0.09, at: now + 0.01 })
+  voice(c, { type: 'sine', f: hz(note + 7, 659.25), dur: 0.22, vol: 0.05, at: now + 0.07 })
+  if (star) voice(c, { type: 'sine', f: hz(note + 19, 659.25), dur: 0.3, vol: 0.03, at: now + 0.12 })
+}
+
+/** いっぱいに なった「うーん」。 */
+export function playFull() {
+  const c = ctx()
+  if (!c) return
+  const now = c.currentTime
+  voice(c, { type: 'triangle', f: 330, f2: 247, dur: 0.22, vol: 0.08, attack: 0.02 })
+  voice(c, { type: 'triangle', f: 294, f2: 220, dur: 0.3, vol: 0.07, attack: 0.02, at: now + 0.2 })
+}
+
+/** つぎの なかまが くる「ぴろりろ」。 */
+export function playWave() {
+  const c = ctx()
+  if (!c) return
+  const now = c.currentTime
+  ;[0, 4, 7, 4, 12].forEach((s, i) => voice(c, { type: 'triangle', f: hz(s, 587.33), dur: 0.16, vol: 0.07, at: now + i * 0.08 }))
+}
+
 /** はじめの「ぽろん」。 */
 export function playStart() {
   const c = ctx()
@@ -164,7 +202,7 @@ export function playStart() {
   ;[0, 7, 12].forEach((s, i) => voice(c, { type: 'triangle', f: hz(s, 523.25), dur: 0.4, vol: 0.07, at: now + i * 0.08 }))
 }
 
-/** ぜんぶ くっついた！ */
+/** ぜんぶ あつめた！ */
 export function playClear() {
   const c = ctx()
   if (!c) return

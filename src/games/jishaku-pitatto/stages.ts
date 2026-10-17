@@ -2,8 +2,8 @@ import type { KindId } from './items'
 
 export type StageId = 'desk' | 'sand' | 'sea' | 'factory' | 'park'
 
-/** うごかない どうぐ（いれもの・だい・いわ）。chute は え だけ（ぶつからない）。 */
-export type PropKind = 'cup' | 'books' | 'bucket' | 'rock' | 'chest' | 'frame' | 'chute' | 'planter'
+/** うごかない どうぐ（いれもの・だい・いわ）。chute は え だけ（ぶつからない）。box は あつめる はこ（どの ステージにも みぎはしに おく）。 */
+export type PropKind = 'cup' | 'books' | 'bucket' | 'rock' | 'chest' | 'frame' | 'chute' | 'planter' | 'box'
 
 export type PropDef = {
   id: string
@@ -35,6 +35,8 @@ export type Placement = {
   float?: boolean
   /** ふうせんで ふわふわ とぶ（0 = ひくい、1 = たかい）。 */
   balloon?: { height: number; range: number; speed: number; phase?: number; color?: number }
+  /** あとから でてくる（1 = はじめの てつを ぜんぶ はこに いれたら でてくる）。 */
+  wave?: number
 }
 
 export type IronSandPatch = { x: number; spread: number; count: number }
@@ -82,7 +84,7 @@ export const STAGES: readonly StageDef[] = [
     id: 'desk',
     name: 'つくえの うえ',
     lead: 'クリップや くぎを あつめよう',
-    hint: 'じしゃくを うごかして てつを くっつけよう',
+    hint: 'てつを くっつけて みぎの はこに いれよう',
     mission: { type: 'chain', n: 3 },
     props: [
       { id: 'cup', kind: 'cup', x: 0.13, w: 46, h: 58 },
@@ -102,6 +104,10 @@ export const STAGES: readonly StageDef[] = [
       { kind: 'block', x: 0.88, on: 'books', dx: -26, variant: 0 },
       { kind: 'star', x: 0.88, on: 'books', dx: 2 },
       { kind: 'nut', x: 0.88, on: 'books', dx: 28 },
+      { kind: 'clip', x: 0.33, variant: 2, angle: -0.3, wave: 1 },
+      { kind: 'crayon', x: 0.46, wave: 1 },
+      { kind: 'ball', x: 0.56, wave: 1 },
+      { kind: 'nail', x: 0.75, angle: -0.1, wave: 1 },
     ],
   },
   {
@@ -128,6 +134,9 @@ export const STAGES: readonly StageDef[] = [
       { kind: 'star', x: 0.81, on: 'bucket', dx: 0 },
       { kind: 'acorn', x: 0.925 },
       { kind: 'star', x: 0.99, buried: 6, angle: -0.4 },
+      { kind: 'screw', x: 0.3, buried: 4, angle: -0.3, wave: 1 },
+      { kind: 'nut', x: 0.52, buried: 3, wave: 1 },
+      { kind: 'pin', x: 0.72, buried: 2, variant: 2, angle: 0.2, wave: 1 },
     ],
     ironSand: [
       { x: 0.16, spread: 0.07, count: 90 },
@@ -142,7 +151,7 @@ export const STAGES: readonly StageDef[] = [
     lead: 'およぐ さかなを つりあげよう',
     hint: 'くちに わが ある さかなは くっつくよ',
     water: true,
-    mission: { type: 'time', sec: 30 },
+    mission: { type: 'time', sec: 90 },
     props: [
       { id: 'rockL', kind: 'rock', x: 0.1, w: 74, h: 30 },
       { id: 'chest', kind: 'chest', x: 0.52, w: 60, h: 32 },
@@ -163,6 +172,10 @@ export const STAGES: readonly StageDef[] = [
       { kind: 'star', x: 0.1, on: 'rockL', dx: -18 },
       { kind: 'starfish', x: 0.1, on: 'rockL', dx: 16 },
       { kind: 'star', x: 0.93, on: 'rockR', dx: 2 },
+      { kind: 'fish', x: 0.5, variant: 2, swim: { depth: 0.52, range: 0.34, speed: 0.32, phase: 3 }, wave: 1 },
+      { kind: 'nut', x: 0.22, wave: 1 },
+      { kind: 'boot', x: 0.6, wave: 1 },
+      { kind: 'steelcan', x: 0.84, wave: 1 },
     ],
   },
   {
@@ -188,6 +201,10 @@ export const STAGES: readonly StageDef[] = [
       { kind: 'star', x: 0.8 },
       { kind: 'steelcan', x: 0.88 },
       { kind: 'star', x: 0.96 },
+      { kind: 'clip', x: 0.2, variant: 3, wave: 1 },
+      { kind: 'block', x: 0.4, variant: 0, wave: 1 },
+      { kind: 'ball', x: 0.6, wave: 1 },
+      { kind: 'nail', x: 0.8, wave: 1 },
     ],
   },
   {
@@ -195,7 +212,7 @@ export const STAGES: readonly StageDef[] = [
     name: 'ふうせんの こうえん',
     lead: 'とんでいく てつを つかまえよう',
     hint: 'ふうせんに ぶらさがった てつを ねらおう',
-    mission: { type: 'time', sec: 25 },
+    mission: { type: 'time', sec: 60 },
     props: [
       { id: 'planterL', kind: 'planter', x: 0.14, w: 76, h: 30 },
       { id: 'planterR', kind: 'planter', x: 0.86, w: 76, h: 30, variant: 1 },
@@ -213,6 +230,9 @@ export const STAGES: readonly StageDef[] = [
       { kind: 'star', x: 0.64 },
       { kind: 'marble', x: 0.86, on: 'planterR', dx: -20 },
       { kind: 'star', x: 0.86, on: 'planterR', dx: 14 },
+      { kind: 'pin', x: 0.5, variant: 2, balloon: { height: 0.55, range: 0.4, speed: 0.12, phase: 0.6, color: 1 }, wave: 1 },
+      { kind: 'screw', x: 0.25, balloon: { height: 0.2, range: 0.3, speed: 0.1, phase: 2.6, color: 3 }, wave: 1 },
+      { kind: 'gear', x: 0.62, wave: 1 },
     ],
   },
 ]

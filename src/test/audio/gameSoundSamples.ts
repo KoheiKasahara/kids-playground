@@ -342,6 +342,7 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('くっつく', () => jishaku.playStick(1, 'metal')),
     sample('とびあがる', jishaku.playLift),
     sample('ほし', jishaku.playStar),
+    sample('はこに はいる', () => jishaku.playBoxed(0)),
     sample('クリア', jishaku.playClear),
     background('BGM', 3, () => jishaku.startBgm('desk')),
   ],

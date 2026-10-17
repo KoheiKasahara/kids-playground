@@ -8,7 +8,7 @@ import { vibrate } from '../../utils/haptics'
 import { KINDS, type KindId } from './items'
 import { STAGES, missionText } from './stages'
 import {
-  autoPilot, carryOver, createWorld, disposeWorld, drainEvents, missionProgress, setMagnetTarget, stepWorld, worldResult, worldSize,
+  autoPilot, carryOver, createWorld, disposeWorld, drainEvents, magnetFull, missionProgress, setMagnetTarget, stepWorld, worldResult, worldSize,
   type MissionProgress, type Result, type World,
 } from './world'
 import { Painter, createFx, itemIcon, makeView, screenToWorld, snapshotMagnet, spawnFx, updateFx, type View } from './render'
@@ -69,19 +69,23 @@ type Hud = { groups: Group[]; stars: number; starTotal: number }
 
 function hudFrom(world: World): Hud {
   const groups: Group[] = []
+  // まだ でてきていない なかまは かぞえない（でてきたら ふえる）。はこに いれたら あつめた ことに なる。
   for (const it of world.items) {
-    if (!it.target) continue
+    if (!it.target || it.state === 'hidden') continue
     let g = groups.find((x) => x.kind === it.kind.id)
     if (!g) groups.push((g = { kind: it.kind.id, variant: it.variant, total: 0, got: 0 }))
     g.total++
-    if (it.state === 'stuck') g.got++
+    if (it.boxed) g.got++
   }
   return {
     groups,
-    stars: world.items.filter((it) => it.star && it.state === 'stuck').length,
+    stars: world.items.filter((it) => it.star && (it.boxed || it.state === 'stuck')).length,
     starTotal: world.items.filter((it) => it.star).length,
   }
 }
+
+/** じしゃくを もっている ときの あんない。 */
+type Hint = 'none' | 'carry' | 'full'
 
 const TIPS: Record<string, string> = {
   desk: 'てつで できた ものは じしゃくに くっつくよ',
@@ -119,6 +123,10 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
   const [banner, setBanner] = useState(true)
   const [guide, setGuide] = useState(index === 0)
   const [cleared, setCleared] = useState(false)
+  const [doneReady, setDoneReady] = useState(false)
+  const [hint, setHint] = useState<Hint>('none')
+  const [notice, setNotice] = useState<string | null>(null)
+  const finishRef = useRef<(() => void) | null>(null)
   const [result, setResult] = useState<(Result & { best: boolean; photo: string | null; count: number; sand: number; medal: boolean; newMedal: boolean }) | null>(null)
   const [mission, setMission] = useState<MissionProgress>({ value: 0, goal: 1, done: false, failed: false })
 
@@ -142,6 +150,12 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
       const p = missionProgress(world)
       const sig = `${p.value}:${p.done}:${p.failed}`
       if (sig !== missionSig) { missionSig = sig; setMission(p) }
+    }
+    let hintSig: Hint = 'none'
+    const syncHint = () => {
+      // はじめて もったとき と いっぱいの ときだけ「はこへ」と おしえる。
+      const next: Hint = done ? 'none' : magnetFull(world) ? 'full' : world.stuckOrder.length && !world.boxedCount ? 'carry' : 'none'
+      if (next !== hintSig) { hintSig = next; setHint(next) }
     }
     syncMission()
     const ctx = canvas?.getContext('2d') ?? null
@@ -182,6 +196,30 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
     sfx.playStart()
 
     let frame = 0, previous = 0, acc = 0, time = 0, restAt = -1
+    // クリアした ときの きろく（けっかは「できた」を おしてから だす）。
+    let clearInfo: { res: Result; best: boolean; newMedal: boolean } | null = null
+    const recordMedal = () => {
+      if (!world.missionDone || !clearInfo) return
+      const had = (medalStore.read()[stage.id] ?? 0) > 0
+      medalStore.record(stage.id, 1)
+      if (!had) clearInfo.newMedal = true
+    }
+    finishRef.current = () => {
+      if (!clearInfo) return
+      const res = worldResult(world)
+      const before = progressStore.read()[stage.id] ?? 0
+      // ほめている あいだに とった ほしも かぞえる。
+      if (res.stars > clearInfo.res.stars) progressStore.record(stage.id, res.stars)
+      recordMedal()
+      setResult({
+        ...res, best: clearInfo.best || res.stars > before,
+        medal: world.missionDone, newMedal: clearInfo.newMedal,
+        photo: ctx ? snapshotMagnet(world, time) : null,
+        count: world.boxedCount,
+        sand: world.sand?.stuck ?? 0,
+      })
+      restAt = time + 9
+    }
     const draw = () => {
       const view = viewRef.current
       if (!ctx || !view) return
@@ -219,6 +257,20 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
             if (e.star) { sfx.playStar(); vibrate('success') } else vibrate('tap')
             setGuide(false)
             break
+          case 'release': sfx.playRelease(); break
+          case 'boxed':
+            hudDirty = true
+            sfx.playBoxed(world.boxedCount, e.star)
+            vibrate('tap')
+            break
+          case 'full': sfx.playFull(); vibrate('impact'); break
+          case 'wave':
+            hudDirty = true
+            sfx.playWave()
+            setNotice('つぎの てつが きたよ！')
+            timers.push(setTimeout(() => setNotice(null), 2600))
+            break
+          case 'spawn': hudDirty = true; sfx.playLift(); break
           case 'lift': sfx.playLift(); break
           case 'clink': sfx.playClink(e.material, e.power); break
           case 'shiin': sfx.playShiin(); break
@@ -227,36 +279,29 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
           case 'grains': sfx.playGrains(e.n); break
           case 'hooked': sfx.playHooked(); break
           case 'balloon': sfx.playBalloon(); break
-          case 'mission': sfx.playMedal(); vibrate('success'); break
+          case 'mission': sfx.playMedal(); vibrate('success'); recordMedal(); break
           case 'clear': {
             done = true
             sfx.playClear()
             vibrate('celebrate')
             setCleared(true)
             setGuide(false)
-            // ほめている あいだに とった ほしも かぞえる。
-            timers.push(setTimeout(() => {
-              const res = worldResult(world)
-              const before = progressStore.read()[stage.id] ?? 0
-              progressStore.record(stage.id, res.stars)
-              const medalBefore = (medalStore.read()[stage.id] ?? 0) > 0
-              if (world.missionDone) medalStore.record(stage.id, 1)
-              setResult({
-                ...res, best: res.stars > before,
-                medal: world.missionDone, newMedal: world.missionDone && !medalBefore,
-                photo: ctx ? snapshotMagnet(world, time) : null,
-                count: world.stuckOrder.length,
-                sand: world.sand?.stuck ?? 0,
-              })
-            }, 2300))
-            restAt = time + 9
+            setNotice(null)
+            // ここで きろくする（「できた」を おさずに もどっても のこる）。
+            const res = worldResult(world)
+            const before = progressStore.read()[stage.id] ?? 0
+            progressStore.record(stage.id, res.stars)
+            clearInfo = { res, best: res.stars > before, newMedal: false }
+            recordMedal()
+            // クリアの あとも そのまま あそべる。「できた」で けっかを だす。
+            timers.push(setTimeout(() => setDoneReady(true), 1600))
             break
           }
           default: break
         }
       }
       if (hudDirty) setHud(hudFrom(world))
-      if (steps) syncMission()
+      if (steps) { syncMission(); syncHint() }
       if (steps) draw()
       // けっかを だして しばらく したら 絵を とめて 電池を まもる。
       if (restAt >= 0 && time > restAt) cancelAnimationFrame(frame)
@@ -291,6 +336,7 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
       window.removeEventListener('blur', blur)
       disposeWorld(world)
       worldRef.current = null
+      finishRef.current = null
     }
   }, [stage])
 
@@ -367,11 +413,19 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
       <span className={styles.guideHand} aria-hidden="true">👆</span>
       じしゃくを うごかしてね
     </p>}
-    {cleared && !result && <p className={styles.cheer} role="status">ぜんぶ くっついた！</p>}
+    {!guide && !banner && !cleared && !notice && hint !== 'none' && <p className={`${styles.guide} ${hint === 'full' ? styles.guideFull : ''}`} role="status">
+      {hint === 'full' ? 'いっぱい！ はこに いれよう' : 'みぎの はこに いれよう'}
+      <span className={styles.guideArrow} aria-hidden="true">→</span>
+    </p>}
+    {notice && !cleared && <p className={styles.notice} role="status">{notice}</p>}
+    {cleared && !result && !doneReady && <p className={styles.cheer} role="status">ぜんぶ あつめた！</p>}
+    {cleared && !result && doneReady && <button type="button" className={styles.doneButton} onClick={() => finishRef.current?.()}>
+      できた！ <span aria-hidden="true">→</span>
+    </button>}
     {result && <div className={styles.overlay}>
       <div className={styles.resultCard} role="dialog" aria-label="クリア">
         <div className={styles.resultMain}>
-          <h2>ぜんぶ くっついた！</h2>
+          <h2>ぜんぶ あつめた！</h2>
           <p className={styles.resultStars} role="img" aria-label={`ほし ${result.stars}こ`}>
             {[0, 1, 2].map((i) => <span key={i} className={i < result.stars ? styles.bigStarOn : styles.bigStarOff} style={{ animationDelay: `${0.25 + i * 0.22}s` }} aria-hidden="true">★</span>)}
           </p>
@@ -381,8 +435,8 @@ function Stage({ index, music, onMusic, onExit, onRetry, onNext }: {
             {result.medal ? (result.newMedal ? 'メダル ゲット！' : 'チャレンジ せいこう！') : `チャレンジ「${missionText(stage.mission)}」に また ちょうせんしよう`}
           </p>
           {result.photo && <figure className={styles.photo}>
-            <img src={result.photo} alt={`じしゃくに ${result.count}こ くっついた しゃしん`} />
-            <figcaption>{result.count}こ ぴたっ！{result.sand > 20 ? ' さてつも いっぱい' : ''}</figcaption>
+            <img src={result.photo} alt={`はこに ${result.count}こ あつめた しゃしん`} />
+            <figcaption>{result.count}こ あつめた！{result.sand > 20 ? ' さてつも いっぱい' : ''}</figcaption>
           </figure>}
         </div>
         <div className={styles.resultInfo}>
