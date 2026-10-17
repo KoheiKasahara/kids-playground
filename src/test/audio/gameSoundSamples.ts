@@ -9,6 +9,7 @@
  */
 import type { SoundSample } from './soundMeter'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
+import { playDerbySound } from '../../games/homerun-derby/sounds'
 import { playSushiSound } from '../../games/kaiten-sushi/sounds'
 import { playLabSound } from '../../games/venom-lab/sounds'
 import * as quiz from '../../utils/quizSound'
@@ -83,6 +84,13 @@ function pianoNotes(count: number): SoundSample['play'] {
 }
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
+  'homerun-derby': [
+    sample('バットを ふる', () => playDerbySound('swing')),
+    sample('カキーン', () => playDerbySound('hit')),
+    sample('ホームラン', () => playDerbySound('homerun')),
+    sample('ストライク', () => playDerbySound('miss')),
+    sample('かち', () => playDerbySound('clear')),
+  ],
   'kaiten-sushi': [
     sample('えらぶ', () => playSushiSound('pick')),
     sample('できあがり', () => playSushiSound('make')),

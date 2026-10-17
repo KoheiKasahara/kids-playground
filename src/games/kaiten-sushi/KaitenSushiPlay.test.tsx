@@ -164,12 +164,12 @@ describe('にぎにぎ かいてんずし', () => {
     expect(screen.getAllByRole('button', { name: /を みる$/ }).length).toBeGreaterThan(0)
   })
 
-  test('ホーム末尾から遅延ルートへ入り、つくる→タイトル→ホームへ一階層ずつ戻る', async () => {
+  test('ホームから遅延ルートへ入り、つくる→タイトル→ホームへ一階層ずつ戻る', async () => {
     resetGameShelfCache()
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     const shelf = screen.getByRole('region', { name: /ぜんぶの ゲーム/ })
-    expect(within(shelf).getAllByRole('link').at(-1)).toHaveAccessibleName('にぎにぎ かいてんずし')
+    expect(within(shelf).getByRole('link', { name: 'にぎにぎ かいてんずし' })).toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'にぎにぎ かいてんずし' }))
     expect(await screen.findByRole('heading', { name: 'にぎにぎ かいてんずし' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'このゲームについて' })).toBeInTheDocument()

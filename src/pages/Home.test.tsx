@@ -123,7 +123,6 @@ describe('Home', () => {
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
     expect(links.slice(-18).map((link) => link.getAttribute('href'))).toEqual(
       [
-        'mato-ate',
         'dot-adventure',
         'dot-zoo',
         'dot-aquarium',
@@ -141,6 +140,7 @@ describe('Home', () => {
         'venom-lab',
         'fishing-pond',
         'kaiten-sushi',
+        'homerun-derby',
       ].map(gameRoutePath),
     )
   })

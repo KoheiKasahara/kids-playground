@@ -1218,6 +1218,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'homerun-derby',
+    slug: 'homerun-derby',
+    title: 'かっとばせ！ホームランダービー',
+    emoji: '⚾',
+    category: 'learning',
+    seo: {
+      headline: 'かっとばせ！ホームランダービー｜タイミングよく うって ホームランを ねらおう',
+      description: 'ピッチャーが なげる ボールを タイミングよく タップして うち、ホームランを ねらう幼児向けのバッティングゲーム。ペンギンやタコ、ロボットなど6人の あいてが、はねる・まがる・とまる・きえる ふしぎな ボールを なげてきます。',
+    },
+    intro: {
+      howToPlay: [
+        'ボールが ちかくに きたら がめんを タップして うとう',
+        'ぴったりの タイミングだと とおくまで とんで ホームラン！',
+        'ホームランを めあての かず うつと つぎの あいてと しょうぶ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
