@@ -10,6 +10,9 @@ import type { Mission, Placement, PropDef, StageDef } from './stages'
  * - さてつ（すなばの くろい つぶ）は かるい つぶの まとまり として べつに うごかす。
  * - ベルトコンベアの うえの ものは みぎへ はこばれ、はしまで いくと ひだりの つつから また でてくる。
  * - ふうせんに ぶらさがった ものは ふわふわ とび、じしゃくが ちかづくと ふうせんが はなれる。
+ * - くっつけた てつは みぎはしの はこの うえへ はこぶと はなれて はこに はいる。ぜんぶ はこに いれると クリア。
+ * - じしゃくが もてるのは MAGNET_CAP こ まで。いっぱいに なったら はこへ はこぶ。
+ * - wave の ある ものは、まえの なかまを ぜんぶ はこに いれると あとから でてくる。
  * 画面（React）は この せかいの すうじだけを よむ。
  */
 
@@ -41,7 +44,7 @@ const TIP_PERIMETER = TIP_H * 2 + ARM_W
 
 /** この きょりで 1g（おもさと おなじ ちから）に なる。 */
 const LIFT_D = 50
-const RANGE = 150
+const RANGE = 100
 const P_CAP = 24
 const INDUCED = 0.55
 const ATTACH_GAP = 2.5
@@ -52,6 +55,16 @@ const MAX_SPEED = 15
 const FLOOR_RES = 2
 const START_GRACE = 2.4
 const WALL_T = 5
+/** じしゃくが いちどに もてる かず。 */
+export const MAGNET_CAP = 4
+/** あつめる はこ（みぎはし）。 */
+const BOX_W = 64
+const BOX_H = 50
+const BOX_MARGIN = 6
+/** はこの うえで はなした ものは しばらく じしゃくに ひっぱられない。 */
+const DROP_GRACE = 1.2
+/** つぎの なかまが でてくる あいだ（びょう）。 */
+const SPAWN_GAP = 0.35
 
 // ---------------- かた ----------------
 
@@ -108,7 +121,8 @@ export type Item = {
   /** これを ぜんぶ あつめると クリア。 */
   target: boolean
   star: boolean
-  state: 'body' | 'buried' | 'stuck'
+  /** hidden = まだ でてきていない（あとの wave）。boxed = はこに しまった（からだは もたない）。 */
+  state: 'body' | 'buried' | 'stuck' | 'hidden' | 'boxed'
   body: Matter.Body | null
   swim: SwimState | null
   x: number; y: number; angle: number
@@ -124,6 +138,12 @@ export type Item = {
   clinkAt: number
   home: { x: number; y: number; angle: number }
   wet: boolean
+  /** なんばんめに でてくるか（0 = はじめから）。 */
+  wave: number
+  /** はこに はいった（いちど はいれば あつめた ことに なる）。 */
+  boxed: boolean
+  /** はこの うえで はなした じこく。 */
+  droppedAt: number
 }
 
 export type PropBody = { def: PropDef; cx: number; x0: number; x1: number; top: number; bottom: number; poly: Vec[] | null }
@@ -154,6 +174,11 @@ export type WorldEvent =
   | { type: 'mission' }
   | { type: 'splash'; x: number; y: number; power: number }
   | { type: 'grains'; n: number; x: number; y: number }
+  | { type: 'release'; n: number; x: number; y: number }
+  | { type: 'boxed'; id: number; kind: KindId; x: number; y: number; star: boolean; remaining: number }
+  | { type: 'full'; x: number; y: number }
+  | { type: 'wave'; wave: number }
+  | { type: 'spawn'; id: number; x: number; y: number }
   | { type: 'clear' }
 
 export type World = {
@@ -193,6 +218,15 @@ export type World = {
   /** クリアした じこく（まだなら null）。 */
   clearTime: number | null
   missionDone: boolean
+  /** あつめる はこ。 */
+  goal: PropBody
+  /** いま でている いちばん あとの wave。 */
+  wave: number
+  waves: number
+  /** これから でてくる もの（id と でてくる じこく）。 */
+  spawnQueue: { id: number; at: number }[]
+  /** はこに しまった かず（ならべる ばしょに つかう）。 */
+  boxedCount: number
 }
 
 export type MissionProgress = { value: number; goal: number; done: boolean; failed: boolean }
@@ -391,7 +425,9 @@ export function createWorld(stage: StageDef, size: { w: number; h: number }, see
   const waterY = stage.water ? Math.max(h * 0.2, 112) : null
   const engine = Matter.Engine.create({ gravity: { x: 0, y: GRAVITY, scale: 0.001 }, positionIterations: 10, velocityIterations: 8 })
   const pad = 24
-  const spanX = (t: number) => pad + t * (w - pad * 2)
+  // みぎはしは はこの ばしょ。ほかの ものは のこりの はばに ならべる。
+  const playW = w - BOX_W - BOX_MARGIN * 2
+  const spanX = (t: number) => pad + t * (playW - pad * 2)
   const statics: Matter.Body[] = []
   const staticOpts = { isStatic: true, friction: 0.7, restitution: 0.1, label: 'static' }
   statics.push(Matter.Bodies.rectangle(w / 2, groundY + 150, w + 600, 300, staticOpts))
@@ -409,13 +445,15 @@ export function createWorld(stage: StageDef, size: { w: number; h: number }, see
     }
   }
 
-  const props: PropBody[] = stage.props.map((def) => {
-    const cx = def.kind === 'frame' || def.kind === 'chute' ? (def.x < 0.5 ? def.w / 2 : w - def.w / 2) : spanX(def.x)
+  const goalDef: PropDef = { id: 'goal', kind: 'box', x: 1, w: BOX_W, h: BOX_H }
+  const props: PropBody[] = [...stage.props, goalDef].map((def) => {
+    const cx = def === goalDef ? w - BOX_MARGIN - BOX_W / 2
+      : def.kind === 'frame' || def.kind === 'chute' ? (def.x < 0.5 ? def.w / 2 : playW - def.w / 2) : spanX(def.x)
     const x0 = cx - def.w / 2, x1 = cx + def.w / 2, top = groundY - def.h
     let poly: Vec[] | null = null
     if (def.kind === 'chute') {
       // え だけ（うえから ものが おちてくる つつ）。
-    } else if (def.kind === 'cup' || def.kind === 'bucket' || def.kind === 'chest') {
+    } else if (def.kind === 'cup' || def.kind === 'bucket' || def.kind === 'chest' || def.kind === 'box') {
       const t = def.kind === 'chest' ? 7 : WALL_T
       statics.push(Matter.Bodies.rectangle(x0 + t / 2, groundY - def.h / 2, t, def.h, staticOpts))
       statics.push(Matter.Bodies.rectangle(x1 - t / 2, groundY - def.h / 2, t, def.h, staticOpts))
@@ -458,7 +496,7 @@ export function createWorld(stage: StageDef, size: { w: number; h: number }, see
     if (pl.float && waterY !== null) y = waterY - 2
     if (pl.swim && waterY !== null) {
       const baseY = waterY + 26 + pl.swim.depth * (groundY - waterY - 70)
-      swim = { cx: x, baseY, range: pl.swim.range * (w - pad * 2), speed: pl.swim.speed, phase: pl.swim.phase ?? 0, jelly: pl.kind === 'jelly', balloon: null }
+      swim = { cx: x, baseY, range: pl.swim.range * (playW - pad * 2), speed: pl.swim.speed, phase: pl.swim.phase ?? 0, jelly: pl.kind === 'jelly', balloon: null }
       y = baseY
     }
     if (pl.balloon) {
@@ -466,17 +504,18 @@ export function createWorld(stage: StageDef, size: { w: number; h: number }, see
       const lo = groundY - 80, hi = Math.min(lo, Math.max(groundY - 330, 210))
       const baseY = lo - pl.balloon.height * (lo - hi)
       swim = {
-        cx: x, baseY, range: pl.balloon.range * (w - pad * 2), speed: pl.balloon.speed, phase: pl.balloon.phase ?? 0,
+        cx: x, baseY, range: pl.balloon.range * (playW - pad * 2), speed: pl.balloon.speed, phase: pl.balloon.phase ?? 0,
         jelly: false, balloon: pl.balloon.color ?? id,
       }
       y = baseY
     }
+    const wave = pl.wave ?? 0
     const item: Item = {
       id, kind, variant: (pl.variant ?? 0) % kind.variants,
       target: kind.magnetic && kind.id !== 'star', star: kind.id === 'star',
-      state: pl.buried !== undefined ? 'buried' : 'body',
+      state: wave > 0 ? 'hidden' : pl.buried !== undefined ? 'buried' : 'body',
       body: null, swim, x, y, angle, flip: false, pull: 0, lifted: false, stuck: null, snapX: 0, snapY: 0,
-      near: 0, shiinAt: -99, clinkAt: -99, home: { x, y, angle }, wet: false,
+      near: 0, shiinAt: -99, clinkAt: -99, home: { x, y, angle }, wet: false, wave, boxed: false, droppedAt: -99,
     }
     if (item.state === 'body') {
       item.body = makeBody(kind, x, y, angle)
@@ -497,6 +536,7 @@ export function createWorld(stage: StageDef, size: { w: number; h: number }, see
     events: [], time: 0, frame: 0, phase: 'play', stuckOrder: [], combo: 0, lastStickAt: -9,
     bodyItem, lastClinkAt: -9, pendingClinks: [], rng, topLimit: 40, lastShiinAt: -9,
     maxDepth: 0, maxCombo: 0, clearTime: null, missionDone: false,
+    goal: props[props.length - 1], wave: 0, waves: 1 + Math.max(0, ...items.map((it) => it.wave)), spawnQueue: [], boxedCount: 0,
   }
   if (waterY !== null) world.magnet.ty = world.magnet.y = waterY + 30
 
@@ -599,7 +639,17 @@ export function drainEvents(world: World): WorldEvent[] {
 }
 
 export function remainingTargets(world: World): number {
-  return world.items.filter((it) => it.target && it.state !== 'stuck').length
+  return world.items.filter((it) => it.target && !it.boxed).length
+}
+
+/** じしゃくが いっぱい（もう くっつかない）。 */
+export function magnetFull(world: World): boolean {
+  return world.stuckOrder.length >= MAGNET_CAP
+}
+
+/** じしゃくが この ものを ひっぱらない（はなした ばかり・いっぱい）。 */
+function ignored(world: World, it: Item): boolean {
+  return world.time - it.droppedAt < DROP_GRACE || magnetFull(world)
 }
 
 /** チャレンジの すすみぐあい。 */
@@ -621,7 +671,7 @@ export function missionProgress(world: World, mission: Mission = world.stage.mis
 
 export function worldResult(world: World): Result {
   const starTotal = world.items.filter((it) => it.star).length
-  const starsGot = world.items.filter((it) => it.star && it.state === 'stuck').length
+  const starsGot = world.items.filter((it) => it.star && (it.boxed || it.state === 'stuck')).length
   const stuckKinds: KindId[] = []
   const otherKinds: KindId[] = []
   for (const it of world.items) {
@@ -653,6 +703,8 @@ export function stepWorld(world: World): void {
   checkAttach(world)
   updateBuried(world)
   updateStuck(world)
+  updateGoal(world)
+  updateWaves(world)
   if (world.sand) updateSand(world)
   updateMood(world)
   const playing = world.phase === 'play'
@@ -685,7 +737,8 @@ function updateMagnet(world: World) {
   }
   m.extL += (Math.min(left, 80) - m.extL) * 0.08
   m.extR += (Math.min(right, 80) - m.extR) * 0.08
-  const minX = m.extL + 4, maxX = world.w - m.extR - 4
+  // はこの うえには いつでも いける（ぶらさがった ものが すこし はみだしても よい）。
+  const minX = m.extL + 4, maxX = Math.max(world.w - m.extR - 4, world.goal.cx)
   const tx = clamp(m.tx, minX, maxX)
   // じっと していても すこし ふわふわ うかぶ（ぶらさがった ものも ゆれる）。
   const float = Math.sin(world.time * 2.1) * 1.8
@@ -695,7 +748,8 @@ function updateMagnet(world: World) {
     if (Math.abs(m.vy) > 90) world.events.push({ type: 'splash', x: m.x, y: surfaceY(world, m.x), power: clamp(Math.abs(m.vy) / 700, 0.2, 1) })
     m.wet = wetNow
   }
-  const heavy = 1 / Math.sqrt(1 + m.load * 0.015)
+  // もつ かずが ふえると すこし おもたく なる。
+  const heavy = 1 / Math.sqrt(1 + m.load * 0.06)
   const omega = (m.wet ? 8.5 : 16) * heavy
   const zeta = m.wet ? 1.05 : 0.82
   const ax = omega * omega * (tx - m.x) - 2 * zeta * omega * m.vx
@@ -711,7 +765,9 @@ function updateMagnet(world: World) {
   if (m.x < minX) { m.x = minX; m.vx = Math.max(0, m.vx) }
   if (m.x > maxX) { m.x = maxX; m.vx = Math.min(0, m.vx) }
   // ゆかや どうぐには めりこまない（ふわっと もちあがる）。
-  const lim = floorAt(world, m.x - MAGNET_HALF_W + 3, m.x + MAGNET_HALF_W - 3) - 0.5
+  // はこの ひだりでは、はこの かべに じゃまされずに ゆかまで おりられる（はこの まえを とおる）。
+  const reach = m.x < world.goal.x0 + 4 ? Math.min(m.x + MAGNET_HALF_W - 3, world.goal.x0 - 1) : m.x + MAGNET_HALF_W - 3
+  const lim = floorAt(world, m.x - MAGNET_HALF_W + 3, reach) - 0.5
   if (m.y > lim) {
     // ちいさな めりこみは すぐ もどし、たかい ものに のりあげる ときは すこし ずつ もちあげる。
     m.y = Math.max(lim, m.y - 9)
@@ -769,7 +825,14 @@ function applyForces(world: World) {
       // ベルトに のっている ものは ベルトと いっしょに うごく（はやさは かえずに ずらす）。
       Matter.Body.translate(body, { x: world.stage.belt, y: 0 })
     }
+    if (world.time - it.droppedAt < DROP_GRACE * 1.5) {
+      // はなした ものは はこへ すいこまれるように おちる（みずの なかでも とどく）。
+      const g = world.goal
+      const ax = clamp((g.cx - body.position.x) * 0.006 - body.velocity.x * 0.12, -0.8, 0.8)
+      Matter.Body.applyForce(body, body.position, { x: ax * mass * FORCE_1G, y: world.waterY !== null ? mass * FORCE_1G * 0.6 : 0 })
+    }
     if (!it.kind.magnetic) continue
+    if (ignored(world, it)) { it.pull = 0; continue }
     let total = 0
     const k = it.kind.pull / it.kind.hot.length
     for (const h of it.kind.hot) {
@@ -850,8 +913,9 @@ function afterPhysics(world: World) {
       Matter.Body.setVelocity(body, { x: 0, y: 0 })
       Matter.Body.setAngle(body, it.home.angle)
     }
-    // ベルトの みぎはしまで いったら、ひだりの つつから また おちてくる。
-    if (world.stage.belt && !it.swim && it.x > world.w - 26 && body.bounds.max.y > world.groundY - 60) {
+    // ベルトの みぎはし（はこの てまえ）まで いったら、ひだりの つつから また おちてくる。
+    // （はこへ おちていく ものは のぞく）
+    if (world.stage.belt && !it.swim && it.x > world.goal.x0 - 16 && it.x < world.goal.x0 + WALL_T && body.bounds.max.y > world.groundY - 20) {
       const chute = world.props.find((p) => p.def.kind === 'chute')
       const x = chute ? chute.cx : 24
       Matter.Body.setPosition(body, { x, y: chuteMouthY(world) - shapeRadius(it.kind.shape) })
@@ -890,7 +954,7 @@ function checkAttach(world: World) {
   const m = world.magnet
   for (const it of world.items) {
     if (it.state !== 'body' || !it.kind.magnetic || it.swim || !it.body) continue
-    if (it.pull < 0.3) continue
+    if (it.pull < 0.3 || ignored(world, it)) continue
     let best: Hit | null = null
     for (const h of it.kind.hot) {
       const hw = fromItem(it, h.x, h.y)
@@ -1024,6 +1088,7 @@ function attach(world: World, it: Item, hit: Hit) {
     type: 'stick', id: it.id, kind: it.kind.id, x: anchorW.x, y: anchorW.y, depth, combo: world.combo, star: it.star,
     remaining: remainingTargets(world),
   })
+  if (world.stuckOrder.length === MAGNET_CAP) world.events.push({ type: 'full', x: m.x, y: m.y })
 }
 
 function parentFrame(world: World, st: Stuck): { x: number; y: number; angle: number } {
@@ -1106,9 +1171,137 @@ function foldAgainstFloor(world: World, it: Item, ax: number, ay: number) {
   st.phiV = 0
 }
 
+// ---------------- はこ ----------------
+
+/** じしゃくが はこの うえに いるか。 */
+function overGoal(world: World): boolean {
+  const g = world.goal, m = world.magnet
+  return m.x > g.x0 + 4 && m.y > g.top - 90
+}
+
+function updateGoal(world: World) {
+  const g = world.goal
+  for (const it of world.items) if (it.state === 'boxed') { it.snapX *= 0.8; it.snapY *= 0.8 }
+  if (world.stuckOrder.length && overGoal(world)) release(world)
+  for (const it of world.items) {
+    if (it.state !== 'body' || !it.kind.magnetic || !it.body) continue
+    if (it.x > g.x0 + WALL_T && it.x < g.x1 - WALL_T && it.y > g.top - 12 && it.y < g.bottom) store(world, it)
+  }
+}
+
+/** はこに はいった ものを しまう（からだを はずして、はこの なかに ならべる）。 */
+function store(world: World, it: Item) {
+  const oldX = it.x, oldY = it.y
+  if (it.body) {
+    Matter.Composite.remove(world.engine.world, it.body)
+    world.bodyItem.delete(it.body.id)
+    it.body = null
+  }
+  it.state = 'boxed'
+  it.boxed = true
+  it.swim = null
+  placeInBox(world, it, world.boxedCount++)
+  it.snapX = oldX - it.x
+  it.snapY = oldY - it.y
+  world.events.push({ type: 'boxed', id: it.id, kind: it.kind.id, x: oldX, y: oldY, star: it.star, remaining: remainingTargets(world) })
+}
+
+/** はこの なかの k ばんめの ばしょ（したから じゅんに つむ）。 */
+function placeInBox(world: World, it: Item, k: number) {
+  const g = world.goal
+  const inner = g.def.w - WALL_T * 2
+  const col = k % 3, row = Math.floor(k / 3)
+  it.x = g.x0 + WALL_T + inner * (0.2 + col * 0.3) + ((row % 2) * 2 - 1) * 3
+  it.y = Math.max(g.top + 10, g.bottom - WALL_T - 7 - row * 9)
+  it.angle = (((k * 1.7) % 1) - 0.5) * 0.9
+}
+
+/** くっついた ものを ぜんぶ はなして、はこの なかへ おとす。 */
+function release(world: World) {
+  const g = world.goal, m = world.magnet
+  const gFrame = G / (FPS * FPS)
+  const inner = g.def.w - WALL_T * 2
+  for (const it of world.stuckOrder) {
+    const r = shapeRadius(it.kind.shape)
+    // ふちに ひっかからないよう、ふちより うえから おとす。
+    const y = Math.min(it.y, g.top - r - 1)
+    const frames = Math.sqrt((2 * Math.max(10, g.bottom - WALL_T - y)) / gFrame)
+    const tx = g.cx + (world.rng() - 0.5) * Math.max(0, inner - r * 2) * 0.6
+    const body = makeBody(it.kind, it.x, y, it.angle)
+    Matter.Body.setVelocity(body, { x: clamp((tx - it.x) / frames, -7, 7), y: 0 })
+    it.stuck = null
+    it.state = 'body'
+    it.body = body
+    it.y = y
+    it.lifted = false
+    it.droppedAt = world.time
+    it.snapX = it.snapY = 0
+    world.bodyItem.set(body.id, it)
+    Matter.Composite.add(world.engine.world, body)
+  }
+  const n = world.stuckOrder.length
+  world.stuckOrder.length = 0
+  m.load = 0
+  m.jolt = 1
+  m.tiltV -= 3
+  world.combo = 0
+  world.events.push({ type: 'release', n, x: m.x, y: m.y })
+}
+
+// ---------------- あとから でてくる なかま ----------------
+
+function updateWaves(world: World) {
+  if (world.phase === 'play' && world.wave < world.waves - 1 && !world.spawnQueue.length
+    && world.items.every((it) => !it.target || it.wave > world.wave || it.boxed)) {
+    world.wave++
+    let k = 0
+    for (const it of world.items) if (it.wave === world.wave) world.spawnQueue.push({ id: it.id, at: world.time + 0.8 + k++ * SPAWN_GAP })
+    world.events.push({ type: 'wave', wave: world.wave })
+  }
+  while (world.spawnQueue.length && world.spawnQueue[0].at <= world.time) {
+    const it = world.items[world.spawnQueue.shift()!.id]
+    reveal(world, it, true)
+    world.events.push({ type: 'spawn', id: it.id, x: it.x, y: it.y })
+  }
+}
+
+/**
+ * まだ でていない ものを だす（drop = うえから おちてくる。こうじょうは つつから）。
+ * surface = すなに うまる ものも すなの うえに だす（がめんを まわす まえに もう でていた とき）。
+ */
+function reveal(world: World, it: Item, drop: boolean, surface = false) {
+  if (it.state !== 'hidden') return
+  const pl = world.stage.items[it.id]
+  it.x = it.home.x
+  it.y = it.home.y
+  it.angle = it.home.angle
+  if (pl.buried !== undefined) {
+    if (!surface) {
+      it.state = 'buried'
+      return
+    }
+    it.y = world.groundY - rotatedHalfHeight(it.kind, it.angle) - 1
+  }
+  if (drop && !it.swim) {
+    if (world.stage.belt) {
+      const chute = world.props.find((p) => p.def.kind === 'chute')
+      it.x = chute ? chute.cx : 24
+      it.y = chuteMouthY(world) - shapeRadius(it.kind.shape)
+    } else {
+      it.y = Math.max(world.topLimit + 30, it.home.y - 260)
+    }
+  }
+  it.state = 'body'
+  it.body = makeBody(it.kind, it.x, it.y, it.angle)
+  if (drop && world.stage.belt) Matter.Body.setVelocity(it.body, { x: 1.2, y: 1 })
+  world.bodyItem.set(it.body.id, it)
+  Matter.Composite.add(world.engine.world, it.body)
+}
+
 // ---------------- すなに うまった もの ----------------
 
 function updateBuried(world: World) {
+  if (magnetFull(world)) return
   for (const it of world.items) {
     if (it.state !== 'buried') continue
     let total = 0
@@ -1225,14 +1418,33 @@ function updateMood(world: World) {
 
 // ---------------- おてほん（タイトル・テスト用） ----------------
 
-/** いちばん ちかい てつへ じしゃくを はこぶ。 */
+/** おてほんが ねらっている もの（とれない ものは しばらく あきらめる）。 */
+const pilotFocus = new WeakMap<World, { id: number; since: number; skip: Map<number, number> }>()
+
+/** いちばん ちかい てつへ じしゃくを はこび、いっぱいに なったら はこへ はこぶ。 */
 export function autoPilot(world: World): void {
   const m = world.magnet
+  let focus = pilotFocus.get(world)
+  if (!focus) pilotFocus.set(world, (focus = { id: -1, since: 0, skip: new Map() }))
   let best: Item | null = null, bestD = Infinity
-  for (const it of world.items) {
-    if (!it.kind.magnetic || it.state === 'stuck') continue
-    const d = Math.abs(it.x - m.x) + Math.abs(it.y - m.y) * 0.4
-    if (d < bestD) { bestD = d; best = it }
+  if (!magnetFull(world)) {
+    for (const it of world.items) {
+      if (!it.kind.magnetic || (it.state !== 'body' && it.state !== 'buried') || world.time - it.droppedAt < DROP_GRACE) continue
+      if ((focus.skip.get(it.id) ?? -1) > world.time) continue
+      const d = Math.abs(it.x - m.x) + Math.abs(it.y - m.y) * 0.4
+      if (d < bestD) { bestD = d; best = it }
+    }
+  }
+  if (best && best.id !== focus.id) { focus.id = best.id; focus.since = world.time }
+  if (best && world.time - focus.since > 5) {
+    focus.skip.set(best.id, world.time + 8)
+    focus.id = -1
+    best = null
+  }
+  if (world.stuckOrder.length && !best) {
+    const g = world.goal
+    setMagnetTarget(world, g.cx, Math.abs(m.x - g.cx) > 60 ? g.top - 120 : g.top - 30)
+    return
   }
   if (!best) {
     setMagnetTarget(world, world.w / 2 + Math.sin(world.time * 0.7) * world.w * 0.25, world.groundY - 190 + Math.sin(world.time * 1.3) * 30)
@@ -1267,6 +1479,26 @@ export function shadowFloorAt(world: World, x: number): number {
  */
 export function carryOver(from: World, to: World): void {
   const m = to.magnet
+  // でてきた もの・はこに はいった もの を うつす。
+  to.wave = from.wave
+  to.spawnQueue = from.spawnQueue.map((q) => ({ ...q }))
+  for (const old of from.items) {
+    const it = to.items[old.id]
+    if (!it || old.state === 'hidden') continue
+    if (old.state === 'boxed') {
+      if (it.body) {
+        Matter.Composite.remove(to.engine.world, it.body)
+        to.bodyItem.delete(it.body.id)
+        it.body = null
+      }
+      it.state = 'boxed'
+      it.boxed = true
+      it.swim = null
+      placeInBox(to, it, to.boxedCount++)
+      continue
+    }
+    if (it.state === 'hidden') reveal(to, it, false, old.state !== 'buried')
+  }
   from.stuckOrder.forEach((old, k) => {
     const it = to.items[old.id]
     if (!it || it.state === 'stuck' || !it.kind.magnetic) return

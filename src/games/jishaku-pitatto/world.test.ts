@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { KINDS } from './items'
 import { STAGES, findStage, type StageDef } from './stages'
 import {
-  MAGNET_HALF_W, autoPilot, carryOver, createWorld, disposeWorld, drainEvents, fieldAt, floorAt, missionProgress, remainingTargets,
-  setMagnetTarget, stepWorld, worldResult, worldSize, type World, type WorldEvent,
+  MAGNET_CAP, MAGNET_HALF_W, autoPilot, carryOver, createWorld, disposeWorld, drainEvents, fieldAt, floorAt, magnetFull, missionProgress,
+  remainingTargets, setMagnetTarget, stepWorld, worldResult, worldSize, type World, type WorldEvent,
 } from './world'
 
 const PORTRAIT = { w: 360, h: 780 }
@@ -28,6 +28,11 @@ function run(world: World, frames: number, each?: (w: World) => void): WorldEven
 /** じしゃくを ものの ま上へ はこんで しばらく まつ。 */
 function hoverOver(world: World, x: number, y: number, frames = 90) {
   return run(world, frames, (w) => setMagnetTarget(w, x, y))
+}
+
+/** じしゃくを はこの うえへ はこぶ。 */
+function toGoal(world: World, frames = 120) {
+  return run(world, frames, (w) => setMagnetTarget(w, w.goal.cx, w.goal.top - 30))
 }
 
 describe('ステージの データ', () => {
@@ -78,6 +83,8 @@ describe('じしゃくの ちから', () => {
     expect(near).toBeGreaterThan(mid)
     expect(mid).toBeGreaterThan(0)
     expect(far).toBe(0)
+    // ちかくまで もっていかないと ひっぱらない。
+    expect(fieldAt(world, m.x, m.y + 110, out)).toBe(0)
     disposeWorld(world)
   })
 
@@ -114,7 +121,7 @@ describe('じしゃくの ちから', () => {
   test('くっついた てつも じしゃくに なって、つぎの てつが つながる', () => {
     const world = createWorld(stage('desk'), LANDSCAPE)
     run(world, 60 * 40, autoPilot)
-    expect(world.stuckOrder.some((it) => (it.stuck?.depth ?? 0) >= 2)).toBe(true)
+    expect(world.maxDepth).toBeGreaterThanOrEqual(2)
     disposeWorld(world)
   })
 })
@@ -211,7 +218,7 @@ describe('チャレンジ', () => {
     expect(missionProgress(fast)).toMatchObject({ done: true, failed: false })
     disposeWorld(fast)
     const slow = createWorld(stage('sea'), PORTRAIT)
-    run(slow, 60 * 33, (w) => setMagnetTarget(w, w.w / 2, w.topLimit))
+    run(slow, 60 * 93, (w) => setMagnetTarget(w, w.w / 2, w.topLimit))
     expect(missionProgress(slow)).toMatchObject({ done: false, failed: true })
     const events = run(slow, 60 * 60, autoPilot)
     expect(slow.phase).toBe('clear')
@@ -221,10 +228,90 @@ describe('チャレンジ', () => {
   })
 })
 
+describe('はこに あつめる', () => {
+  test('くっつけた だけでは あつめた ことに ならず、はこの うえで はなすと はこに しまわれる', () => {
+    const world = createWorld(stage('desk'), PORTRAIT)
+    const clip = world.items.find((it) => it.kind.id === 'clip')!
+    const before = remainingTargets(world)
+    hoverOver(world, clip.x, clip.y - 12)
+    expect(clip.state).toBe('stuck')
+    expect(remainingTargets(world)).toBe(before)
+    const events = toGoal(world)
+    expect(events.some((e) => e.type === 'release')).toBe(true)
+    expect(events.some((e) => e.type === 'boxed' && e.id === clip.id)).toBe(true)
+    expect(clip.state).toBe('boxed')
+    expect(world.stuckOrder).toHaveLength(0)
+    expect(remainingTargets(world)).toBeLessThan(before)
+    // はこの なかの ものは もう ひっぱらない。
+    run(world, 60, (w) => setMagnetTarget(w, w.goal.cx, w.goal.top - 30))
+    expect(clip.state).toBe('boxed')
+    disposeWorld(world)
+  })
+
+  test(`じしゃくが もてるのは ${MAGNET_CAP}こ まで。いっぱいだと ほかの てつは くっつかない`, () => {
+    const world = createWorld(stage('desk'), LANDSCAPE)
+    const events: WorldEvent[] = []
+    for (let i = 0; i < 60 * 30 && !magnetFull(world); i++) {
+      // おてほんは いっぱいに なるまで はこへ いかない ように、くっついた ものが あっても てつを さがす。
+      const loose = world.items.filter((it) => it.kind.magnetic && it.state === 'body')
+      const near = loose.sort((a, b) => Math.abs(a.x - world.magnet.x) - Math.abs(b.x - world.magnet.x))[0]
+      if (near) setMagnetTarget(world, near.x, near.y - 6)
+      stepWorld(world)
+      events.push(...drainEvents(world))
+    }
+    expect(world.stuckOrder).toHaveLength(MAGNET_CAP)
+    expect(events.filter((e) => e.type === 'full')).toHaveLength(1)
+    const other = world.items.find((it) => it.kind.magnetic && it.state === 'body')!
+    hoverOver(world, other.x, other.y - 8, 120)
+    expect(other.state).toBe('body')
+    expect(world.stuckOrder).toHaveLength(MAGNET_CAP)
+    disposeWorld(world)
+  })
+
+  test('はじめの てつを ぜんぶ はこに いれると、つぎの なかまが でてくる', () => {
+    for (const s of STAGES) {
+      expect(s.items.some((p) => (p.wave ?? 0) > 0 && KINDS[p.kind].magnetic && p.kind !== 'star')).toBe(true)
+    }
+    const world = createWorld(stage('desk'), PORTRAIT)
+    const later = world.items.filter((it) => it.wave > 0)
+    expect(later.every((it) => it.state === 'hidden')).toBe(true)
+    const events: WorldEvent[] = []
+    for (let i = 0; i < 60 * 90 && world.phase === 'play'; i++) {
+      autoPilot(world)
+      stepWorld(world)
+      events.push(...drainEvents(world))
+    }
+    const wave = events.findIndex((e) => e.type === 'wave')
+    const clear = events.findIndex((e) => e.type === 'clear')
+    expect(wave).toBeGreaterThanOrEqual(0)
+    expect(clear).toBeGreaterThan(wave)
+    expect(events.filter((e) => e.type === 'spawn')).toHaveLength(later.length)
+    expect(later.filter((it) => it.target).every((it) => it.state === 'boxed')).toBe(true)
+    disposeWorld(world)
+  })
+
+  test('こうじょうの はこに はいった ものは ベルトで ながされない', () => {
+    const world = createWorld(stage('factory'), PORTRAIT)
+    const events: WorldEvent[] = []
+    for (let i = 0; i < 60 * 30 && !events.some((e) => e.type === 'boxed'); i++) {
+      autoPilot(world)
+      stepWorld(world)
+      events.push(...drainEvents(world))
+    }
+    const boxed = events.find((e) => e.type === 'boxed')
+    expect(boxed).toBeDefined()
+    const it = world.items[(boxed as { id: number }).id]
+    run(world, 60 * 3, (w) => setMagnetTarget(w, w.w / 2, w.topLimit))
+    expect(it.state).toBe('boxed')
+    expect(events.some((e) => e.type === 'loop' && e.id === it.id && events.indexOf(e) > events.indexOf(boxed!))).toBe(false)
+    disposeWorld(world)
+  })
+})
+
 describe('がめんを まわす', () => {
   test('よこ むきの せかいへ うつしても、くっついた もの と さてつは じしゃくに のこる', () => {
     const from = createWorld(stage('sand'), PORTRAIT)
-    run(from, 60 * 6, autoPilot)
+    for (let i = 0; i < 60 * 20 && from.stuckOrder.length < 3; i++) run(from, 1, autoPilot)
     const stuckIds = from.stuckOrder.map((it) => it.id)
     expect(stuckIds.length).toBeGreaterThan(2)
     const to = createWorld(stage('sand'), LANDSCAPE)
@@ -234,6 +321,27 @@ describe('がめんを まわす', () => {
     expect(drainEvents(to)).toHaveLength(0)
     run(to, 60)
     for (const it of to.stuckOrder) expect(Math.abs(it.x - to.magnet.x)).toBeLessThan(90)
+    disposeWorld(from)
+    disposeWorld(to)
+  })
+
+  test('はこに しまった もの と あとから でてきた なかまも うつる', () => {
+    const from = createWorld(stage('desk'), PORTRAIT)
+    for (let i = 0; i < 60 * 60 && from.wave === 0; i++) run(from, 1, autoPilot)
+    run(from, 60 * 3)
+    const boxed = from.items.filter((it) => it.state === 'boxed').map((it) => it.id)
+    expect(boxed.length).toBeGreaterThan(3)
+    const to = createWorld(stage('desk'), LANDSCAPE)
+    carryOver(from, to)
+    expect(to.wave).toBe(1)
+    expect(to.items.filter((it) => it.state === 'boxed').map((it) => it.id)).toEqual(boxed)
+    expect(to.items.some((it) => it.state === 'hidden')).toBe(false)
+    expect(remainingTargets(to)).toBe(remainingTargets(from))
+    for (const id of boxed) {
+      const it = to.items[id]
+      expect(it.x).toBeGreaterThan(to.goal.x0)
+      expect(it.x).toBeLessThan(to.goal.x1)
+    }
     disposeWorld(from)
     disposeWorld(to)
   })

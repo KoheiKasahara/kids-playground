@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import JishakuPitattoPlay from './JishakuPitattoPlay'
-import { playClear, playStick, startBgm } from './sounds'
+import { playBoxed, playClear, playStick, startBgm } from './sounds'
 import { STAGES } from './stages'
 import { autoPilot, type World } from './world'
 
@@ -72,7 +72,7 @@ describe('ぴたっと じしゃく', () => {
     expect(screen.getByRole('heading', { name: 'ぴたっと じしゃく' })).toBeInTheDocument()
   })
 
-  test('ゆびで さわった ところの すこし うえへ じしゃくが うごき、てつが くっつく', () => {
+  test('ゆびで さわった ところの すこし うえへ じしゃくが うごき、てつが くっついて、はこに いれると かぞえる', () => {
     openStage(1)
     const canvas = screen.getByLabelText(/ゆびで じしゃくを うごかして/, { selector: 'canvas' })
     const w = world()
@@ -84,6 +84,14 @@ describe('ぴたっと じしゃく', () => {
     advance(90)
     expect(clip.state).toBe('stuck')
     expect(playStick).toHaveBeenCalled()
+    // くっつけた だけでは まだ。はこへ はこぶよう あんないする。
+    act(() => { vi.advanceTimersByTime(2700) })
+    expect(screen.getByLabelText('クリップ 0 / 2')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('はこに いれよう')
+    act(() => { w.magnet.tx = w.goal.cx; w.magnet.ty = w.goal.top - 30 })
+    advance(120)
+    expect(clip.state).toBe('boxed')
+    expect(playBoxed).toHaveBeenCalled()
     expect(screen.getByLabelText(/^クリップ [12] \/ 2$/)).toBeInTheDocument()
   })
 
@@ -96,14 +104,21 @@ describe('ぴたっと じしゃく', () => {
     expect(world().magnet.tx).toBeGreaterThan(before + 50)
   })
 
-  test('ぜんぶ くっつけると けっかが でて、ほしが きろくされ、もういちど あそべる', () => {
+  test('ぜんぶ はこに いれると きろくされ、そのまま あそべて、「できた」で けっかが でて、もういちど あそべる', () => {
     openStage(1)
     const w = world()
-    advance(60 * 60, autoPilot)
+    for (let i = 0; i < 60 && !vi.mocked(playClear).mock.calls.length; i++) advance(60, autoPilot)
     expect(playClear).toHaveBeenCalled()
-    act(() => { vi.advanceTimersByTime(2600) })
+    expect(w.phase).toBe('clear')
+    // すぐには おわらない。きろくは もう のこっている。
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(JSON.parse(store.get('jishaku-pitatto-progress-v1') ?? '{}').desk).toBeGreaterThanOrEqual(1)
+    act(() => { vi.advanceTimersByTime(1700) })
+    advance(60)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /できた/ }))
     const dialog = screen.getByRole('dialog', { name: 'クリア' })
-    expect(dialog).toHaveTextContent('ぜんぶ くっついた！')
+    expect(dialog).toHaveTextContent('ぜんぶ あつめた！')
     expect(dialog).toHaveTextContent('くぎ')
     expect(dialog).toHaveTextContent('えんぴつ')
     // おてほんは 3だん つなげるので メダルも とれる。

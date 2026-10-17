@@ -1,7 +1,7 @@
 import { FONT, INK, drawFish, drawItemArt, drawJelly, drawMagnetBody, drawMagnetFace } from './art'
 import { KINDS, shapePoints, shapeRadius, type KindId } from './items'
 import {
-  ARM_W, MAGNET_H, MAGNET_HALF_W, TIP_H, balloonLift, chuteMouthY, floorAt, fromMagnet, shadowFloorAt, surfaceY,
+  ARM_W, MAGNET_CAP, MAGNET_H, MAGNET_HALF_W, TIP_H, balloonLift, chuteMouthY, floorAt, fromMagnet, shadowFloorAt, surfaceY,
   type Item, type PropBody, type World, type WorldEvent,
 } from './world'
 
@@ -172,6 +172,30 @@ export function spawnFx(fx: Fx, e: WorldEvent, world: World) {
       // ほし・つれた の もじと かさならないよう、じしゃくの したに だす。
       popup(fx, 0, 70, 'チャレンジ せいこう！', '#ff7a00', 17, 1.6, true)
       fx.lastPopAt = world.time
+      break
+    case 'release':
+      if (world.time - fx.lastPopAt > 0.6) {
+        popup(fx, 0, -MAGNET_H - 22, 'ぽいっ', '#3f8cff', 15, 0.8, true)
+        fx.lastPopAt = world.time
+      }
+      break
+    case 'boxed': {
+      const g = world.goal
+      burst(fx, g.cx, g.top, e.star ? 14 : 8, { speed: 110, dir: -Math.PI / 2, spread: 1.8, size: e.star ? 4 : 2.6, max: 0.6, kind: e.star ? 'star' : 'spark', color: e.star ? '#ffd43b' : undefined, g: 200 })
+      fx.rings.push({ x: g.cx, y: g.top, r: 6, vr: 120, life: 0.35, max: 0.35, color: 'rgba(255,240,150,.95)', width: 2.6 })
+      if (world.time - fx.lastPopAt > 0.35) {
+        popup(fx, g.cx, g.top - 18, 'はいった！', '#ff8a1e', 14, 0.9)
+        fx.lastPopAt = world.time
+      }
+      break
+    }
+    case 'full':
+      popup(fx, 0, -MAGNET_H - 24, 'いっぱい！', '#ff4d6d', 17, 1.4, true)
+      fx.lastPopAt = world.time
+      break
+    case 'spawn':
+      burst(fx, e.x, e.y, 8, { speed: 90, size: 2.4, max: 0.45 })
+      fx.rings.push({ x: e.x, y: e.y, r: 4, vr: 80, life: 0.3, max: 0.3, color: 'rgba(255,255,255,.9)', width: 2 })
       break
     case 'clink':
       if (e.power > 0.45 && e.material !== 'glass') burst(fx, e.x, e.y, 3, { speed: 40, dir: -Math.PI / 2, spread: 2, size: 4, max: 0.35, kind: 'dust', color: 'rgba(255,255,255,.5)' })
@@ -1133,6 +1157,19 @@ function paintPropBack(g: G, p: PropBody) {
     g.fillRect(x0 + 3, top + 1, def.w - 6, 3)
     return
   }
+  if (def.kind === 'box') {
+    // あつめる はこ の うちがわ
+    rr(g, x0, top - 4, def.w, def.h + 4, 6)
+    g.fillStyle = lin(g, 0, top, 0, bottom, [[0, '#b4743a'], [1, '#8a5428']])
+    g.fill()
+    g.lineWidth = 1.5
+    g.strokeStyle = INK
+    g.stroke()
+    g.fillStyle = 'rgba(0,0,0,.18)'
+    rr(g, x0 + 4, top, def.w - 8, def.h - 4, 4)
+    g.fill()
+    return
+  }
   if (def.kind === 'frame') {
     rr(g, x0, top, def.w, def.h + 30, 3)
     g.fillStyle = lin(g, x0, 0, x0 + def.w, 0, [[0, '#c98246'], [0.5, '#e0a064'], [1, '#b0703a']])
@@ -1193,6 +1230,51 @@ function paintPropFront(g: G, p: PropBody) {
     g.arc(cx, top + 2, def.w / 2 + 2, Math.PI, 0)
     g.lineWidth = 1.8
     g.strokeStyle = 'rgba(30,100,200,.6)'
+    g.stroke()
+    return
+  }
+  if (def.kind === 'box') {
+    // まえの いた（すこし すけて、なかの ものが みえる）＋ じしゃくの しるし
+    const fh = def.h * 0.62
+    rr(g, x0, bottom - fh, def.w, fh, 5)
+    g.fillStyle = 'rgba(232,170,96,.55)'
+    g.fill()
+    g.lineWidth = 1.6
+    g.strokeStyle = INK
+    g.stroke()
+    g.fillStyle = 'rgba(255,255,255,.35)'
+    g.fillRect(x0 + 3, bottom - fh + 3, def.w - 6, 2.5)
+    g.fillStyle = 'rgba(120,70,30,.35)'
+    g.fillRect(x0 + 3, bottom - fh * 0.45, def.w - 6, 1.6)
+    // しるし（U の じしゃく）
+    const mx = cx, my = bottom - fh * 0.5, r = Math.min(7, fh * 0.26)
+    g.beginPath()
+    g.arc(mx, my, r + 5, 0, Math.PI * 2)
+    g.fillStyle = '#fff8e8'
+    g.fill()
+    g.lineWidth = 3.4
+    g.lineCap = 'butt'
+    g.beginPath()
+    g.arc(mx, my - 1, r * 0.6, Math.PI, 0, true)
+    g.strokeStyle = '#3b2a4a'
+    g.stroke()
+    g.lineWidth = 3
+    g.strokeStyle = '#ff4d5a'
+    g.beginPath()
+    g.moveTo(mx - r * 0.6, my - 1)
+    g.lineTo(mx - r * 0.6, my - r * 0.75)
+    g.stroke()
+    g.strokeStyle = '#3d8bff'
+    g.beginPath()
+    g.moveTo(mx + r * 0.6, my - 1)
+    g.lineTo(mx + r * 0.6, my - r * 0.75)
+    g.stroke()
+    // ふち
+    rr(g, x0 - 2, top - 5, def.w + 4, 6, 3)
+    g.fillStyle = '#c98246'
+    g.fill()
+    g.lineWidth = 1.4
+    g.strokeStyle = INK
     g.stroke()
     return
   }
@@ -1302,14 +1384,17 @@ export class Painter {
     drawBalloons(g, world, time)
     if (world.sand) this.drawBuried(g, world, time, px)
     for (const it of world.items) if (it.state === 'body') this.drawItem(g, it, time, px)
+    for (const it of world.items) if (it.state === 'boxed') this.drawItem(g, it, time, px)
     if (world.sand) drawLyingSand(g, world)
     for (const p of world.props) paintPropFront(g, p)
+    drawGoalHint(g, world, time, this.calm)
     if (world.stage.belt) drawMachine(g, world, time)
     drawFieldLines(g, world, time)
     if (world.waterY !== null) drawLine(g, world)
     this.drawMagnet(g, world, time, px)
     if (world.sand) drawStuckSand(g, world, time)
     for (const it of world.stuckOrder) this.drawItem(g, it, time, px)
+    drawLoad(g, world, time)
     for (const it of world.items) if (it.star && it.state === 'body') {
       const t = (time * 0.9 + it.id * 0.37) % 1
       if (t < 0.3) twinkle(g, it.x + 9, it.y - 9, 4 * Math.sin((t / 0.3) * Math.PI), 0.9)
@@ -1424,6 +1509,8 @@ export class Painter {
     g.save()
     g.translate(x, y)
     g.rotate(angle)
+    // はこに しまった ものは すこし ちいさく つむ。
+    if (it.state === 'boxed') g.scale(0.72, 0.72)
     if (it.kind.id === 'fish') {
       if (it.flip) g.scale(1, -1)
       const fast = it.state === 'stuck' ? 2.4 : it.pull > 0.4 ? 1.8 : 1
@@ -1437,6 +1524,58 @@ export class Painter {
     }
     g.restore()
   }
+}
+
+/** なにか もっている ときは、はこの うえで やじるしが ぴょこぴょこ。 */
+function drawGoalHint(g: G, world: World, time: number, calm: boolean) {
+  if (world.phase !== 'play' || !world.stuckOrder.length) return
+  const { cx, top } = world.goal
+  const full = world.stuckOrder.length >= MAGNET_CAP
+  const bob = calm ? 0 : Math.abs(Math.sin(time * (full ? 7 : 4.5))) * 8
+  const y = top - 26 - bob
+  g.save()
+  g.beginPath()
+  g.ellipse(cx, top - 2, world.goal.def.w / 2 + 6, 7, 0, 0, Math.PI * 2)
+  g.fillStyle = `rgba(255,230,120,${calm ? 0.35 : 0.25 + 0.2 * Math.sin(time * 6) ** 2})`
+  g.fill()
+  g.beginPath()
+  g.moveTo(cx - 7, y - 16)
+  g.lineTo(cx + 7, y - 16)
+  g.lineTo(cx + 7, y - 6)
+  g.lineTo(cx + 14, y - 6)
+  g.lineTo(cx, y + 8)
+  g.lineTo(cx - 14, y - 6)
+  g.lineTo(cx - 7, y - 6)
+  g.closePath()
+  g.fillStyle = full ? '#ff4d6d' : '#ff8a1e'
+  g.fill()
+  g.lineWidth = 2.2
+  g.lineJoin = 'round'
+  g.strokeStyle = '#fff'
+  g.stroke()
+  g.restore()
+}
+
+/** じしゃくの うえに、いま もっている かず（まるが MAGNET_CAP こ）。 */
+function drawLoad(g: G, world: World, time: number) {
+  const n = world.stuckOrder.length
+  if (!n) return
+  const m = world.magnet
+  const full = n >= MAGNET_CAP
+  const gap = 12
+  const y = Math.max(world.topLimit + 8, m.y - MAGNET_H - 12)
+  const x0 = m.x - ((MAGNET_CAP - 1) * gap) / 2
+  g.save()
+  rr(g, x0 - 9, y - 7, (MAGNET_CAP - 1) * gap + 18, 14, 7)
+  g.fillStyle = full ? `rgba(255,236,240,${0.85 + 0.15 * Math.sin(time * 8)})` : 'rgba(255,255,255,.85)'
+  g.fill()
+  for (let i = 0; i < MAGNET_CAP; i++) {
+    g.beginPath()
+    g.arc(x0 + i * gap, y, 4, 0, Math.PI * 2)
+    g.fillStyle = i < n ? '#ff4d6d' : '#d9dde5'
+    g.fill()
+  }
+  g.restore()
 }
 
 /** うごく ベルトコンベア（しまもようが みぎへ ながれる）。 */
@@ -1478,7 +1617,7 @@ function drawBelt(g: G, world: World, time: number) {
 
 /** ひだりの つつ と みぎの きかい（ものが はいって また でてくる）。 */
 function drawMachine(g: G, world: World, time: number) {
-  const { w, groundY } = world
+  const { groundY } = world
   const chute = world.props.find((p) => p.def.kind === 'chute')
   if (chute) {
     const mouth = chuteMouthY(world)
@@ -1497,17 +1636,17 @@ function drawMachine(g: G, world: World, time: number) {
     g.ellipse(chute.cx, mouth + 1, cw / 2 - 2, 3, 0, 0, Math.PI * 2)
     g.fill()
   }
-  // みぎの きかい（はいりぐち）
+  // みぎの きかい（はいりぐち。はこの てまえ）
   const mw = 34, mh = 64
-  const x0 = w - mw + 6
-  rr(g, x0, groundY - mh, mw + 20, mh + 16, 8)
+  const x0 = world.goal.x0 - mw - 4
+  rr(g, x0, groundY - mh, mw, mh + 16, 8)
   g.fillStyle = lin(g, 0, groundY - mh, 0, groundY, [[0, '#ffb03a'], [1, '#f08a1c']])
   g.fill()
   g.lineWidth = 1.6
   g.strokeStyle = INK
   g.stroke()
   g.fillStyle = 'rgba(0,0,0,.4)'
-  rr(g, x0 + 4, groundY - 30, mw, 30, 4)
+  rr(g, x0 + 4, groundY - 30, mw - 8, 30, 4)
   g.fill()
   // ランプ
   const on = Math.sin(time * 6) > 0
@@ -1623,7 +1762,7 @@ function drawShadows(g: G, world: World) {
     g.restore()
   }
   for (const it of world.items) {
-    if (it.state === 'buried') continue
+    if (it.state === 'buried' || it.state === 'hidden' || it.state === 'boxed') continue
     const r = shapeRadius(it.kind.shape)
     const f = shadowFloorAt(world, it.x)
     const hgt = Math.max(0, f - (it.y + r * 0.6))
@@ -1829,17 +1968,22 @@ function kindPoints(kind: KindId) {
 /** じしゃくと くっついた もの を おおきく うつした しゃしん（けっか がめん用）。 */
 export function snapshotMagnet(world: World, time: number, w = 240, h = 190, dpr = 2): string | null {
   try {
-    const m = world.magnet
-    let x0 = m.x - MAGNET_HALF_W - 8, x1 = m.x + MAGNET_HALF_W + 8
-    let y0 = m.y - MAGNET_H - 10, y1 = m.y + 12
-    for (const it of world.stuckOrder) {
-      const r = shapeRadius(it.kind.shape) + 6
-      x0 = Math.min(x0, it.x - r)
-      x1 = Math.max(x1, it.x + r)
-      y0 = Math.min(y0, it.y - r)
-      y1 = Math.max(y1, it.y + r)
+    // はこ（あつめた もの）を まんなかに。じしゃくが なにか もって ちかくに いれば いっしょに うつす。
+    const m = world.magnet, goal = world.goal
+    let x0 = goal.x0 - 16, x1 = goal.x1 + 16
+    let y0 = goal.top - 34, y1 = goal.bottom + 8
+    if (world.stuckOrder.length && Math.abs(m.x - goal.cx) < 120 && goal.top - m.y < 160) {
+      x0 = Math.min(x0, m.x - MAGNET_HALF_W - 8)
+      x1 = Math.max(x1, m.x + MAGNET_HALF_W + 8)
+      y0 = Math.min(y0, m.y - MAGNET_H - 10)
+      for (const it of world.stuckOrder) {
+        const r = shapeRadius(it.kind.shape) + 6
+        x0 = Math.min(x0, it.x - r)
+        x1 = Math.max(x1, it.x + r)
+        y0 = Math.min(y0, it.y - r)
+        y1 = Math.max(y1, it.y + r)
+      }
     }
-    if (world.sand && world.sand.stuck > 0) y1 = Math.max(y1, m.y + 26)
     const scale = Math.min(w / (x1 - x0), h / (y1 - y0), 2.8)
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
     const canvas = document.createElement('canvas')
