@@ -9,6 +9,7 @@
  */
 import type { SoundSample } from './soundMeter'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
+import { playSushiSound } from '../../games/kaiten-sushi/sounds'
 import { playLabSound } from '../../games/venom-lab/sounds'
 import * as quiz from '../../utils/quizSound'
 import { PianoAudioEngine } from '../../games/shared/music/pianoAudio'
@@ -82,6 +83,13 @@ function pianoNotes(count: number): SoundSample['play'] {
 }
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
+  'kaiten-sushi': [
+    sample('えらぶ', () => playSushiSound('pick')),
+    sample('できあがり', () => playSushiSound('make')),
+    sample('おいしい', () => playSushiSound('yummy')),
+    sample('しんかんせん', () => playSushiSound('train')),
+    sample('たからもの', () => playSushiSound('prize')),
+  ],
   'fishing-pond': [
     sample('うきを なげる', () => playFishingSound('cast')),
     sample('あたり', () => playFishingSound('bite')),

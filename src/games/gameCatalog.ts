@@ -1200,6 +1200,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'kaiten-sushi',
+    slug: 'kaiten-sushi',
+    title: 'にぎにぎ かいてんずし',
+    emoji: '🍣',
+    category: 'learning',
+    seo: {
+      headline: 'にぎにぎ かいてんずし｜おすしを くみあわせて 回転レーンで ながそう',
+      description: 'にぎり・ぐんかん・まきもの・てまきに、シャリやネタ、トッピング、おさらを組み合わせて自分だけのおすしを作る幼児向けゲーム。回転レーンに流すと、どうぶつのおきゃくさんが食べてくれます。',
+    },
+    intro: {
+      howToPlay: [
+        'かたち・シャリ・ネタ・のせる・おさらを えらんで つくろう',
+        'できたら レーンに ながして、くるくる ながめよう',
+        'おきゃくさんの ちゅうもんを つくると たべてくれるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
