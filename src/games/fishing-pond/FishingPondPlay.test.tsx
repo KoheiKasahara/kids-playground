@@ -291,14 +291,14 @@ describe('fishing route integration', () => {
     expect(screen.getByRole('button', { name: 'なげる！' })).toHaveFocus()
   })
 
-  test('ホーム末尾から遅延ルートへ入り、プレイ→タイトル→ホームへ一階層ずつ戻る', async () => {
+  test('ホームから遅延ルートへ入り、プレイ→タイトル→ホームへ一階層ずつ戻る', async () => {
     vi.useRealTimers()
     localStorage.clear()
     resetGameShelfCache()
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     const shelf = screen.getByRole('region', { name: /ぜんぶの ゲーム/ })
-    expect(within(shelf).getAllByRole('link').at(-1)).toHaveAccessibleName('のんびり さかなつり')
+    expect(within(shelf).getByRole('link', { name: 'のんびり さかなつり' })).toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'のんびり さかなつり' }))
     expect(await screen.findByRole('heading', { name: 'のんびり さかなつり' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'このゲームについて' })).toBeInTheDocument()

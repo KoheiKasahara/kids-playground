@@ -1,0 +1,901 @@
+/* にぎにぎ かいてんずし: あい色の せいがいは と もくめの おすしやさん。ボタンは ドットふうの かくばった ふち。 */
+
+.page {
+  --ink: #2a1626;
+  --indigo: #1e2850;
+  --indigo-deep: #141a38;
+  --cream: #fff6e4;
+  --paper: #fffdf6;
+  --wood: #c8884c;
+  --wood-dark: #7a4220;
+  --red: #d8343a;
+  --gold: #ffd040;
+  --leaf: #4c9a2a;
+
+  min-height: 100dvh;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  padding: calc(8px + var(--safe-top)) calc(10px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(10px + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  /* せいがいは（なみの もよう）。 */
+  background-color: var(--indigo);
+  background-image:
+    radial-gradient(circle at 50% 100%, transparent 38%, #ffffff12 39% 43%, transparent 44% 52%, #ffffff12 53% 57%, transparent 58% 66%, #ffffff12 67% 71%, transparent 72%),
+    radial-gradient(circle at 0% 50%, transparent 38%, #ffffff12 39% 43%, transparent 44% 52%, #ffffff12 53% 57%, transparent 58% 66%, #ffffff12 67% 71%, transparent 72%),
+    radial-gradient(circle at 100% 50%, transparent 38%, #ffffff12 39% 43%, transparent 44% 52%, #ffffff12 53% 57%, transparent 58% 66%, #ffffff12 67% 71%, transparent 72%);
+  background-size: 48px 24px;
+  background-position: 0 0, 24px 12px, 24px 12px;
+}
+
+.header {
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--cream);
+  font-size: clamp(18px, 5vw, 30px);
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: .04em;
+  text-align: center;
+  text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 3px 3px 0 #d8343a;
+}
+
+.soundButton {
+  flex: 0 0 52px;
+  height: 52px;
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  background: var(--cream);
+  box-shadow: inset -3px -3px 0 #0000001f, inset 3px 3px 0 #ffffff, 0 4px 0 var(--ink);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.pixel {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.pixelFallback {
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+}
+
+/* ---------- ボタン ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 8px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: inset -3px -3px 0 #0000001f, inset 3px 3px 0 #ffffff, 0 4px 0 var(--ink);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.2;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .08s;
+}
+
+.btn:active,
+.option:active,
+.chip:active,
+.thumb:active,
+.order:active {
+  transform: translateY(3px);
+  box-shadow: inset -3px -3px 0 #0000001f, inset 3px 3px 0 #ffffff66, 0 1px 0 var(--ink);
+}
+
+.btn:focus-visible,
+.option:focus-visible,
+.stepTab:focus-visible,
+.chip:focus-visible,
+.thumb:focus-visible,
+.order:focus-visible,
+.soundButton:focus-visible {
+  outline: 4px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.btnPrimary {
+  background: var(--red);
+  color: #fff;
+  text-shadow: 0 2px 0 #7a0a14;
+  box-shadow: inset -3px -3px 0 #00000038, inset 3px 3px 0 #ff9a90, 0 4px 0 var(--ink);
+}
+
+.btnGacha {
+  background: var(--gold);
+  box-shadow: inset -3px -3px 0 #b07010, inset 3px 3px 0 #fff6b0, 0 4px 0 var(--ink);
+  animation: wiggle 1.6s ease-in-out infinite;
+}
+
+.btnTrain {
+  background: #e8f2ff;
+  color: #14306e;
+  box-shadow: inset -3px -3px 0 #8aa8d8, inset 3px 3px 0 #ffffff, 0 4px 0 var(--ink);
+}
+
+.btnBig {
+  min-height: 64px;
+  font-size: 21px;
+  padding: 10px 22px;
+}
+
+.btnWide {
+  flex: 1 1 160px;
+}
+
+/* ---------- ばめん（canvas） ---------- */
+
+.sceneWrap {
+  position: relative;
+  width: min(100%, calc((100dvh - 250px) * 256 / 264), 640px);
+  min-width: min(100%, 300px);
+  aspect-ratio: 256 / 264;
+  flex-shrink: 0;
+  border: 4px solid var(--ink);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #3a1e0e;
+  box-shadow: 0 0 0 4px var(--wood), 0 0 0 7px var(--ink), 0 10px 0 7px #00000040;
+}
+
+.scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.reaction {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 3px 8px;
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--red);
+  font-size: clamp(11px, 3.2vw, 18px);
+  font-weight: 900;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 3px 0 var(--ink);
+  animation: popUp 1.8s ease-out both;
+}
+
+.reactionSpicy {
+  color: #2e7a10;
+  background: #f0ffd8;
+}
+
+/* ---------- タイトル ---------- */
+
+.titleLayout,
+.laneLayout {
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.titlePanel,
+.lanePanel {
+  width: min(100%, 640px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px;
+  border: 4px solid var(--ink);
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(90deg, #00000008 0 2px, transparent 2px 9px),
+    var(--cream);
+  box-shadow: 0 6px 0 #00000040;
+}
+
+.lead {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.titleRow,
+.laneButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.titleRow > .btn,
+.laneButtons > .btn {
+  flex: 1 1 140px;
+}
+
+.laneButtons > .btnGacha {
+  order: -1;
+  flex-basis: 100%;
+}
+
+/* ---------- レーン ---------- */
+
+.message {
+  min-height: 2.8em;
+  margin: 0;
+  padding: 6px 10px;
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+}
+
+.meter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 900;
+}
+
+.meterLabel {
+  font-size: 15px;
+}
+
+.meterDots {
+  display: flex;
+  gap: 5px;
+}
+
+.dot,
+.dotOn {
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: #fff;
+}
+
+.dotOn {
+  background: radial-gradient(circle at 35% 35%, #fff 0 18%, transparent 20%), var(--red);
+}
+
+.speed {
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
+  flex: 1;
+  min-height: 44px;
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--indigo);
+  color: var(--cream);
+}
+
+.thumbs {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 2px 6px;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.thumb {
+  width: 76px;
+  height: 66px;
+  padding: 2px;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  background: #f2dcaa;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.thumb img {
+  width: 64px;
+  height: 56px;
+}
+
+.empty {
+  margin: 0;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* ---------- つくる ---------- */
+
+.buildLayout {
+  width: 100%;
+  max-width: 1100px;
+  display: grid;
+  gap: 10px;
+  align-items: start;
+}
+
+.previewCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 10px;
+  border: 4px solid var(--ink);
+  border-radius: 8px;
+  background: var(--cream);
+  box-shadow: 0 6px 0 #00000040;
+  text-align: center;
+}
+
+.preview {
+  width: min(62vw, 300px, calc((100dvh - 520px) * 64 / 50));
+  min-width: 160px;
+  border: 3px solid var(--ink);
+  border-radius: 4px;
+  overflow: hidden;
+  animation: plop .35s cubic-bezier(.3, 1.6, .5, 1);
+}
+
+.previewImg {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 64 / 50;
+}
+
+.dishName {
+  margin: 4px 0 0;
+  font-size: clamp(18px, 5vw, 24px);
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.dishDetail {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6a4a3a;
+}
+
+.orders {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.ordersLabel {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--red);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.order {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 48px;
+  padding: 2px 6px 2px 2px;
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.order[aria-pressed='true'] {
+  background: #fff1a8;
+}
+
+.orderFace {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  object-position: top;
+}
+
+.orderChip {
+  width: 32px;
+  height: 24px;
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.stepTab {
+  min-height: 48px;
+  padding: 4px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: 3px solid var(--ink);
+  border-radius: 6px 6px 2px 2px;
+  background: #e8d8b8;
+  color: var(--ink);
+  font: inherit;
+  font-size: clamp(13px, 3.6vw, 16px);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.stepTab[aria-selected='true'] {
+  background: var(--red);
+  color: #fff;
+  transform: translateY(-3px);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.stepNum {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 12px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--cream);
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 4px solid var(--ink);
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(0deg, #00000010 0 1px, transparent 1px 7px),
+    var(--wood);
+}
+
+.option {
+  position: relative;
+  min-height: 84px;
+  padding: 4px 2px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  box-shadow: inset -3px -3px 0 #0000001a, inset 3px 3px 0 #ffffff, 0 4px 0 var(--ink);
+}
+
+.option[aria-pressed='true'] {
+  background: #fff1a8;
+  box-shadow: inset -3px -3px 0 #e0b020, inset 3px 3px 0 #ffffff, 0 4px 0 var(--ink), 0 0 0 3px var(--gold);
+}
+
+.optionIcon {
+  width: 64px;
+  height: 51px;
+}
+
+.optionIconSmall {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 3px;
+}
+
+.optionLabel {
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.check {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--leaf);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.buildActions {
+  position: sticky;
+  bottom: calc(6px + var(--safe-bottom));
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border: 4px solid var(--ink);
+  border-radius: 8px;
+  background: var(--indigo-deep);
+  box-shadow: 0 6px 0 #00000040;
+}
+
+.buildActions > .btn {
+  flex: 1 1 120px;
+}
+
+/* ---------- まど（ダイアログ） ---------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom));
+  background: #0e1028b8;
+  animation: fadeIn .2s ease-out;
+}
+
+.card {
+  position: relative;
+  width: min(100%, 440px);
+  max-height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 4px solid var(--ink);
+  border-radius: 10px;
+  background: var(--cream);
+  box-shadow: 0 0 0 4px var(--wood), 0 0 0 7px var(--ink), 0 12px 0 7px #00000050;
+  text-align: center;
+  animation: plop .35s cubic-bezier(.3, 1.6, .5, 1);
+}
+
+.cardKicker {
+  margin: 0;
+  padding: 2px 12px;
+  border-radius: 4px;
+  background: var(--red);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.cardText {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #6a4a3a;
+}
+
+.viewStage,
+.doneStage {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 0 4px;
+  border-radius: 6px;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(ellipse at 50% 70%, #ffffff 0 30%, transparent 70%), #f2dcaa;
+}
+
+.bigDish {
+  width: min(70vw, 288px);
+  height: auto;
+  aspect-ratio: 48 / 42;
+}
+
+.doneCard {
+  overflow: hidden;
+}
+
+.doneChef {
+  position: absolute;
+  left: 4px;
+  bottom: 0;
+  width: 80px;
+  height: 96px;
+  animation: hop 1s ease-in-out infinite;
+}
+
+.doneButtons {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.burst {
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  background: repeating-conic-gradient(from 0deg, #ffe07a66 0deg 10deg, transparent 10deg 24deg);
+  animation: spin 14s linear infinite;
+  pointer-events: none;
+}
+
+.prizeShow {
+  isolation: isolate;
+}
+
+/* ---------- ガチャ ---------- */
+
+.gachaCard {
+  overflow: hidden;
+}
+
+.gachaStage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 230px;
+  border-radius: 6px;
+  background: radial-gradient(circle at 50% 60%, #fff8d8 0 35%, #f2dcaa 70%);
+}
+
+.gachaImg {
+  width: 176px;
+  height: 224px;
+}
+
+.shake {
+  animation: shake .14s linear infinite;
+}
+
+.capsuleDrop {
+  position: absolute;
+  left: calc(50% + 12px);
+  bottom: 18px;
+  width: 60px;
+  height: 60px;
+  animation: drop .7s cubic-bezier(.3, 1.4, .6, 1) both;
+}
+
+.prizeShow {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 230px;
+  overflow: hidden;
+}
+
+.prizeImg {
+  width: 144px;
+  height: auto;
+  animation: plop .5s cubic-bezier(.3, 1.6, .5, 1) both;
+}
+
+.capsuleOpen {
+  position: absolute;
+  right: 12%;
+  bottom: 10px;
+  width: 56px;
+  height: 56px;
+  transform: rotate(18deg);
+}
+
+.prizeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prizeGot,
+.prizeMissing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.prizeMissing {
+  background: #e8dcc8;
+  color: #8a7a68;
+}
+
+.prizeGot img,
+.prizeMissing img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+}
+
+/* ---------- ひろい がめん ---------- */
+
+/* よこながの がめん（パソコン・よこむきの スマホ）では ばめんと そうさを よこに ならべる。 */
+@media (min-width: 640px) and (min-aspect-ratio: 5 / 4) {
+  .titleLayout,
+  .laneLayout {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .sceneWrap {
+    width: min(60vw, calc((100dvh - 110px) * 256 / 264), 680px);
+    min-width: 0;
+  }
+
+  .titlePanel,
+  .lanePanel {
+    width: min(360px, 40vw);
+    flex-shrink: 0;
+  }
+
+  .buildLayout {
+    grid-template-columns: minmax(260px, 420px) 1fr;
+  }
+
+  .preview {
+    width: min(100%, 340px, calc((100dvh - 250px) * 64 / 50));
+    min-width: 140px;
+  }
+}
+
+@media (max-width: 380px) {
+  .options {
+    grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .optionIcon {
+    width: 56px;
+    height: 45px;
+  }
+
+  .optionLabel {
+    font-size: 13px;
+  }
+}
+
+@keyframes plop {
+  0% { transform: scale(.85); }
+  100% { transform: scale(1); }
+}
+
+@keyframes popUp {
+  0% { opacity: 0; transform: translate(-50%, -60%) scale(.6); }
+  15% { opacity: 1; transform: translate(-50%, -110%) scale(1.1); }
+  30% { transform: translate(-50%, -100%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -140%); }
+}
+
+@keyframes hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes wiggle {
+  0%, 80%, 100% { transform: rotate(0); }
+  85% { transform: rotate(-3deg); }
+  90% { transform: rotate(3deg); }
+  95% { transform: rotate(-2deg); }
+}
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-3px) rotate(-1deg); }
+  75% { transform: translateX(3px) rotate(1deg); }
+}
+
+@keyframes drop {
+  0% { transform: translateY(-50px) rotate(-90deg); opacity: 0; }
+  60% { opacity: 1; }
+  100% { transform: translateY(0) rotate(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btnGacha,
+  .burst,
+  .doneChef,
+  .shake {
+    animation: none;
+  }
+}

@@ -46,6 +46,8 @@ const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePla
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
+  // タイトル・つくる・レーンが同じrouteにあるため、プレイ面はゲーム内で包む。
+  { path: '/games/kaiten-sushi', element: lazyRoute(() => import('../games/kaiten-sushi/KaitenSushiPlay')) },
   // タイトルとプレイが同じrouteにあるため、プレイ面はゲーム内で包む。
   { path: '/games/fishing-pond', element: lazyRoute(() => import('../games/fishing-pond/FishingPondPlay')) },
   { path: '/games/venom-lab', element: lazyRoute(() => import('../games/venom-lab/VenomLabPlay')) },
