@@ -1,5 +1,5 @@
 /**
- * 3投で1プレイのゲーム進行。
+ * 最大3投で1プレイのゲーム進行。
  *
  * 物理にもThree.jsにも依存しない小さな状態遷移だけを持つ。
  * 正解・不正解や失敗はなく、「何投目か」と「いくつ倒したか」だけを数える。
@@ -13,7 +13,7 @@ export type BowlingPhase =
   | 'aiming'
   /** 発射して、玉と積み木が動いている。 */
   | 'flying'
-  /** 3投終わって結果を出している。 */
+  /** 3投終わったか、全部倒し切って結果を出している。 */
   | 'finished'
 
 export type BowlingGameState = {
@@ -22,7 +22,7 @@ export type BowlingGameState = {
   throwIndex: number
   /** 投球ごとに倒した数。 */
   throwResults: readonly number[]
-  /** 3投の合計。 */
+  /** これまでの投球の合計。 */
   toppledTotal: number
 }
 
@@ -39,17 +39,22 @@ export function startThrow(state: BowlingGameState): BowlingGameState {
 /**
  * 1投が落ち着いたとき。倒した数を記録し、次の投球か結果へ進む。
  *
- * 各投のはじめに積み木は組み直すので、合計は「3回ぶんの倒した数の和」になる。
- * 1投目で全部倒しても、2投目・3投目がつまらなくならないための決まり。
+ * 積み木は組み直さず、倒れたものだけを片付けて続きから投げる。
+ * そのため合計は「そのステージの積み木のうち、いくつ倒したか」になる。
+ * 全部倒し切った（allCleared）ら、投げるものが残らないので3投を待たずに結果へ進む。
  */
-export function finishThrow(state: BowlingGameState, toppled: number): BowlingGameState {
+export function finishThrow(
+  state: BowlingGameState,
+  toppled: number,
+  allCleared = false,
+): BowlingGameState {
   if (state.phase !== 'flying') return state
   const safeToppled = Number.isFinite(toppled) ? Math.max(0, Math.floor(toppled)) : 0
   const throwResults = [...state.throwResults, safeToppled]
   const toppledTotal = throwResults.reduce((sum, value) => sum + value, 0)
   const nextThrowIndex = state.throwIndex + 1
-  if (nextThrowIndex >= THROWS_PER_GAME) {
-    return { phase: 'finished', throwIndex: THROWS_PER_GAME, throwResults, toppledTotal }
+  if (nextThrowIndex >= THROWS_PER_GAME || allCleared) {
+    return { phase: 'finished', throwIndex: nextThrowIndex, throwResults, toppledTotal }
   }
   return { phase: 'aiming', throwIndex: nextThrowIndex, throwResults, toppledTotal }
 }

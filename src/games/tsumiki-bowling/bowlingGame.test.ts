@@ -8,7 +8,7 @@ import {
   THROWS_PER_GAME,
 } from './bowlingGame'
 
-describe('3投で1プレイ', () => {
+describe('最大3投で1プレイ', () => {
   it('はじめは1投目で、まだ何も倒していない', () => {
     const state = createBowlingGameState()
     expect(state.phase).toBe('aiming')
@@ -63,6 +63,16 @@ describe('3投で1プレイ', () => {
     state = finishThrow(startThrow(state), Number.NaN)
     expect(state.throwResults).toEqual([0, 2, 0])
     expect(state.toppledTotal).toBe(2)
+  })
+
+  it('全部倒し切ったら、3投を待たずに結果へ進む', () => {
+    let state = finishThrow(startThrow(createBowlingGameState()), 12)
+    state = finishThrow(startThrow(state), 8, true)
+    expect(state.phase).toBe('finished')
+    expect(state.throwResults).toEqual([12, 8])
+    expect(state.toppledTotal).toBe(20)
+    expect(currentThrowNumber(state)).toBe(2)
+    expect(startThrow(state)).toBe(state)
   })
 
   it('もういちどで、前のプレイの記録を引き継がない', () => {
