@@ -130,4 +130,19 @@ describe('ステージが クリアできる', () => {
     game.settle(3000)
     expect(game.world.cleared).toBe(true)
   }, 60_000)
+  test('11 あなに いしで ふたを する', () => {
+    // ふたが なければ みずは あなへ きえて、たからは うごかない。
+    const open = playable(10)
+    open.settle(2400)
+    expect(open.world.collected).toBe(0)
+    expect(open.world.gems).toBe(open.world.total)
+
+    // ふたが でこぼこでも、みずは あふれて のりこえていく。
+    for (const radius of [3, 6]) {
+      const game = playable(10)
+      game.dig([6, 15], [7, 15], 'stone', radius)
+      game.settle(2400)
+      expect(game.world.cleared, `radius ${radius}`).toBe(true)
+    }
+  }, 60_000)
 })

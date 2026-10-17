@@ -39,7 +39,7 @@ const canvas = () => screen.getByLabelText(/^たからやま。/)
 
 test('ステージを えらんで ほると、ばんめんが かわり、とめると すすまない', () => {
   const { step, world } = openStage(/^1 はじめての あな/)
-  expect(screen.getByText('1 / 10')).toBeVisible()
+  expect(screen.getByText('1 / 11')).toBeVisible()
   expect(screen.getByText('💎 0 / 24')).toBeVisible()
   const carved = () => world.cells.filter(cell => cell === Cell.Empty).length
 
@@ -88,7 +88,7 @@ test('あつめきると クリアが出て、きろくが のこり、つぎの
   expect(localStorage.getItem('treasure-dig-progress-v1')).toContain(STAGES[0].id)
 
   fireEvent.click(screen.getByRole('button', { name: 'つぎへ →' }))
-  expect(screen.getByText('2 / 10')).toBeVisible()
+  expect(screen.getByText('2 / 11')).toBeVisible()
   expect(screen.getByText(STAGES[1].name)).toBeVisible()
 
   // もどると ステージ一覧に クリアの しるしが つく。
@@ -119,7 +119,7 @@ test('すなが とまったら、つぎの ひとほりを うながす', () =>
   expect(screen.getByRole('status')).toHaveTextContent('すなが とまったよ')
 })
 
-test('ステージ一覧には 10めんと あそびかたが ならぶ', () => {
+test('ステージ一覧には 11めんと あそびかたが ならぶ', () => {
   render(<MemoryRouter><TreasureDigPlay /></MemoryRouter>)
   expect(screen.getByRole('heading', { name: 'ざくざく たからほり' })).toBeVisible()
   expect(screen.getAllByRole('button', { name: /^\d+ / })).toHaveLength(STAGES.length)
