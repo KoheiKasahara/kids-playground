@@ -1236,6 +1236,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'gochiso-race',
+    slug: 'gochiso-race',
+    title: 'ぱくぱく ごちそうレース',
+    emoji: '🍙',
+    category: 'learning',
+    seo: {
+      headline: 'ぱくぱく ごちそうレース｜ジャンプと ストップで はしって ごちそうを たべよう',
+      description: 'ドット絵の どうぶつを ジャンプと ストップで うごかす幼児向けレースゲーム。12しゅるいから えらんで ライバルと きそい、ごちそうの てんすうと ゴールの じゅんばんの ごうけいで しょうぶします。',
+    },
+    intro: {
+      howToPlay: [
+        'どうぶつは じぶんで はしるよ。ジャンプで あなを こえよう',
+        'ストップを おしている あいだ とまれるよ',
+        'ごちそうの てんすう ＋ さきに ゴールで しょうぶ！',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

@@ -157,12 +157,12 @@ describe('homerun-derby play', () => {
     expect(screen.getByLabelText('クリアずみ ほし 2こ')).toBeInTheDocument()
   })
 
-  test('ホーム末尾から遅延ルートへ入り、しょうぶ→あいて えらび→ホームへ一階層ずつ戻る', async () => {
+  test('ホームから遅延ルートへ入り、しょうぶ→あいて えらび→ホームへ一階層ずつ戻る', async () => {
     resetGameShelfCache()
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     const shelf = screen.getByRole('region', { name: /ぜんぶの ゲーム/ })
-    expect(within(shelf).getAllByRole('link').at(-1)).toHaveAccessibleName('かっとばせ！ホームランダービー')
+    expect(within(shelf).getByRole('link', { name: 'かっとばせ！ホームランダービー' })).toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'かっとばせ！ホームランダービー' }))
     expect(await screen.findByRole('heading', { name: 'かっとばせ！ホームランダービー' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'このゲームについて' })).toBeInTheDocument()
