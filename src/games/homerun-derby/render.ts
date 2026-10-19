@@ -1,8 +1,9 @@
-import { drawBatter, drawPitcher, type PitcherPose } from './characters'
+import { drawBatter, drawPitcher } from './characters'
 import {
   CONTACT, FENCE_HEIGHT, FOUL_ANGLE, MITT_PROGRESS, STOP_AT, fenceDistance, flightDuration, flightPoint, pitchKind, pitchPoint,
   pitchProgress, standHeight, windupTime, type Derby, type DerbyEvent, type Vec3,
 } from './derby'
+import { pitcherMotion, smoothstep, type BatterPose, type PitcherPose } from './motion'
 import { PITCH_LABELS, type SkyId } from './stages'
 
 // canvas への 絵の かきかただけを もつ。すすみかたは derby.ts が きめる。
@@ -615,24 +616,39 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: Scene) {
 
 // ---- ピッチャーの がめん ------------------------------------------------------
 
-/** なげる うでの うごき。 */
+function lastResult(derby: Derby) {
+  return derby.phase === 'result' ? derby.results[derby.results.length - 1] : undefined
+}
+
+/** ピッチャーの かたち。ボールを はなす しゅんかんに あわせて うごく。 */
 function pitcherPose(derby: Derby, time: number): PitcherPose {
-  const idle = 1.95, raised = 4.05, thrown = 6.95
   const kind = pitchKind(derby)
-  const holding = derby.phase === 'windup'
-  let arm = idle, fire = 0
-  if (derby.phase === 'windup') {
-    const w = derby.t / windupTime(derby)
-    const lift = Math.max(0, Math.min(1, (w - .45) / .55))
-    arm = idle + (raised - idle) * (1 - (1 - lift) ** 2)
-  } else if (derby.phase === 'pitch') {
-    const t = derby.t
-    if (t < .16) arm = raised + (thrown - raised) * (1 - (1 - t / .16) ** 2)
-    else if (t < .6) arm = thrown + (idle + Math.PI * 2 - thrown) * ((t - .16) / .44)
-    if (kind === 'fast' && derby.stage.pitcher === 'dragon') fire = Math.max(0, 1 - t / .5)
-  }
+  const since = derby.phase === 'windup' ? derby.t - windupTime(derby) : derby.phase === 'pitch' ? derby.t : null
+  // ストライクを とったら よろこぶ。
+  const cheer = lastResult(derby) === 'miss' ? derby.t : null
+  const motion = pitcherMotion(since, cheer)
+  // かまえている あいだは ゆっくり いきを する。
+  if (since === null || since < -.9) motion.stretch += Math.sin(time * 2.5) * .012
+  const fire = derby.phase === 'pitch' && kind === 'fast' && derby.stage.pitcher === 'dragon' ? Math.max(0, 1 - derby.t / .5) : 0
   const stopped = derby.phase === 'pitch' && kind === 'stop' && pitchProgress(kind, derby.stage.travel, derby.t) === STOP_AT
-  return { arm, holding, time, fire, stopped }
+  return { ...motion, holding: derby.phase === 'windup', time, fire, stopped }
+}
+
+/** バッターの かたち。ピッチャーが あしを あげたら バットを ひき、まえあしを あげて まつ。 */
+function batterPose(derby: Derby, fx: Fx, time: number): BatterPose {
+  const u = fx.swingAt === null ? null : Math.min(1, (time - fx.swingAt) / SWING_TIME)
+  let load = 0, step = 0
+  if (derby.phase === 'windup') load = step = smoothstep(windupTime(derby) - .7, windupTime(derby) - .1, derby.t)
+  else if (derby.phase === 'pitch') {
+    // バットは ひいた まま、あげた あしは ボールが くる まえに ふみこんで おろす。
+    load = 1
+    step = 1 - smoothstep(.15, .5, derby.t)
+  } else if (lastResult(derby) === 'miss' && !derby.swing) {
+    // みのがした ときは ゆっくり かまえに もどる。
+    load = 1 - smoothstep(0, .5, derby.t)
+  }
+  const wobble = lastResult(derby) === 'miss' && derby.swing ? derby.t : null
+  return { swing: u, load, step, wobble, time }
 }
 
 function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, spin: number) {
@@ -768,11 +784,10 @@ function drawPitch(ctx: CanvasRenderingContext2D, scene: Scene) {
 
   // バッター。
   const feet = project(view, BATTER_FEET)
-  const u = fx.swingAt === null ? null : (time - fx.swingAt) / SWING_TIME
   ctx.save()
   ctx.translate(feet.x, feet.y)
   ctx.scale(feet.k / 100, feet.k / 100)
-  drawBatter(ctx, u === null ? null : Math.min(1, u), time)
+  drawBatter(ctx, batterPose(derby, fx, time))
   ctx.restore()
 
   // ボールの なまえ。
