@@ -9,6 +9,7 @@ import { vibrate } from '../../utils/haptics'
 import { totalStageStars, type StageProgress } from '../shared/progress/stageProgress'
 import { PITCHER_HEIGHT, drawPitcher } from './characters'
 import { createDerby, drainEvents, stepDerby, swingBat, type Derby, type DerbyEvent, type Outcome } from './derby'
+import { restingPitcherPose } from './motion'
 import { createFx, drawScene, makeFlyView, makeView, spawnFx, updateFx } from './render'
 import { isUnlocked, progressStore } from './progress'
 import { playDerbySound } from './sounds'
@@ -68,7 +69,7 @@ function PitcherPortrait({ pitcher, size = 84 }: { pitcher: PitcherId; size?: nu
     canvas.height = size * dpr
     const scale = (size * .86) / PITCHER_HEIGHT[pitcher]
     ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * size / 2, dpr * size * .95)
-    drawPitcher(ctx, pitcher, { arm: 1.95, holding: true, time: 0, fire: 0, stopped: false })
+    drawPitcher(ctx, pitcher, restingPitcherPose())
   }, [pitcher, size])
   return <canvas ref={ref} className={styles.portrait} style={{ width: size, height: size }} aria-hidden="true" />
 }
