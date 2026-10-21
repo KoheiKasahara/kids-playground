@@ -11,6 +11,7 @@ import type { SoundSample } from './soundMeter'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
 import * as gochiso from '../../games/gochiso-race/sounds'
 import { playDerbySound } from '../../games/homerun-derby/sounds'
+import * as house from '../../games/house-builder/sounds'
 import { playSushiSound } from '../../games/kaiten-sushi/sounds'
 import { playLabSound } from '../../games/venom-lab/sounds'
 import * as quiz from '../../utils/quizSound'
@@ -85,6 +86,16 @@ function pianoNotes(count: number): SoundSample['play'] {
 }
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
+  'house-builder': [
+    sample('えらぶ', () => house.playHouseSound('tap')),
+    sample('へやを おく', () => house.playHouseSound('place')),
+    sample('はいらない', () => house.playHouseSound('blocked')),
+    sample('そとがわを えらぶ', () => house.playHouseSound('paint')),
+    sample('かんせい', () => house.playHouseSound('complete')),
+    sample('ピンポーン', () => house.playHouseSound('bell')),
+    sample('おふろ', () => house.playHouseSound('splash')),
+    background('BGM', 3, house.startBgm),
+  ],
   'gochiso-race': [
     sample('ジャンプ', () => gochiso.playJump()),
     sample('ぱくっ', () => gochiso.playEat(1)),

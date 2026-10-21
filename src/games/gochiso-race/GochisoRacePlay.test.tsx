@@ -182,7 +182,7 @@ describe('gochiso-race play', () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     const shelf = screen.getByRole('region', { name: /ぜんぶの ゲーム/ })
-    expect(within(shelf).getAllByRole('link').at(-1)).toHaveAccessibleName('ぱくぱく ごちそうレース')
+    expect(within(shelf).getByRole('link', { name: 'ぱくぱく ごちそうレース' })).toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'ぱくぱく ごちそうレース' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'ぱくぱく ごちそうレース' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'このゲームについて' })).toBeInTheDocument()

@@ -1254,6 +1254,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'house-builder',
+    slug: 'house-builder',
+    title: 'おうちづくり',
+    emoji: '🏠',
+    category: 'learning',
+    seo: {
+      headline: 'おうちづくり｜まどりと そとがわを えらんで じぶんの いえを つくろう',
+      description: 'へやの しゅるいや みため・おおきさを えらんで まどりずに ならべる、幼児向けの いえづくりゲーム。かべ・やね・ちゅうしゃじょう・いぬごやも えらび、できた おうちの そとと なかを みられます。',
+    },
+    intro: {
+      howToPlay: [
+        'いえの しゅるいと かたちを えらんでね',
+        'へやを えらんで まどりずを タップすると おけるよ',
+        'そとがわも きめたら、できた おうちの そとと なかを みよう',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
