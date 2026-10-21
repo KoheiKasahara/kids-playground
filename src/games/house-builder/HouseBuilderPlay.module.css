@@ -423,6 +423,22 @@
   background: #ff8a3d1f;
 }
 
+.roomHit[data-draggable] {
+  /* ひっぱって うごかす ので、へやの うえでは がめんを スクロールさせない。 */
+  touch-action: none;
+  cursor: grab;
+}
+
+.board[data-dragging],
+.board[data-dragging] .roomHit {
+  cursor: grabbing;
+}
+
+.dragGhost {
+  opacity: .85;
+  pointer-events: none;
+}
+
 .roomHit:focus-visible,
 .cellHit:focus-visible {
   outline: 4px solid #3b82f6;

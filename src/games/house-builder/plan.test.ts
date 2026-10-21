@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { SHAPES } from './data'
 import {
-  addRoom, changeRoom, clearFloor, createDesign, facadeOpenings, findSpot, fits, frontEdge, removeRoom, reshape, roomAt, roomCounts, roomSize,
+  addRoom, changeRoom, clearFloor, createDesign, facadeOpenings, findSpot, fits, frontEdge, moveRoom, removeRoom, reshape, roomAt, roomCounts, roomSize,
   type HouseDesign, type RoomPick,
 } from './plan'
 
@@ -15,6 +15,20 @@ function place(design: HouseDesign, floor: number, pick: RoomPick, x: number, y:
 }
 
 describe('house-builder plan', () => {
+  test('へやを ひっぱって うごかせる。はみだす・かさなる ところへは うごかせない', () => {
+    let design = createDesign('hiraya', 'square') // 6×6
+    design = place(design, 0, living, 0, 0).design
+    design = place(design, 0, toilet, 5, 0).design // id 2: (5,0)〜(5,1)
+    const moved = moveRoom(design, 1, { x: 1, y: 3 })
+    expect(moved?.rooms.find((r) => r.id === 1)).toMatchObject({ x: 1, y: 3, floor: 0 })
+    // じぶんと かさなる だけなら うごかせる。
+    expect(moveRoom(design, 1, { x: 1, y: 0 })?.rooms[0]).toMatchObject({ x: 1, y: 0 })
+    expect(moveRoom(design, 1, { x: 2, y: 0 })).toBeNull()
+    expect(moveRoom(design, 1, { x: 3, y: 3 })).toBeNull()
+    expect(moveRoom(design, 1, { x: -1, y: 0 })).toBeNull()
+    expect(moveRoom(design, 99, { x: 0, y: 3 })).toBeNull()
+  })
+
   test('へやの おおきさは しゅるい・おおきさ・むきで きまる', () => {
     expect(roomSize(living)).toEqual({ w: 4, h: 3 })
     expect(roomSize({ ...living, turned: true })).toEqual({ w: 3, h: 4 })

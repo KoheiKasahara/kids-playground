@@ -11,7 +11,7 @@ import {
   type Exterior, type ExteriorOption, type ExtraId, type HouseTypeId, type RoomSizeId, type RoomTypeId, type Shape, type ShapeId,
 } from './data'
 import {
-  addRoom, changeRoom, createDesign, findSpot, floorCount, removeRoom, reshape, roomCounts, roomSize, roomsOn,
+  addRoom, changeRoom, createDesign, findSpot, floorCount, moveRoom, removeRoom, reshape, roomCounts, roomSize, roomsOn,
   type Cell, type HouseDesign, type PlacedRoom, type RoomPick,
 } from './plan'
 import { readDesign, writeDesign } from './save'
@@ -341,7 +341,7 @@ function StylePicker({ type, value, w, h, onPick }: { type: RoomTypeId; value: s
   )
 }
 
-const MESSAGE_START = 'へやを えらんで、おきたい ところを タップしてね'
+const MESSAGE_START = 'へやを えらんで、おきたい ところを タップしてね。おいた へやは ひっぱると うごかせるよ'
 
 function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChange: (design: HouseDesign) => void; onNext: () => void }) {
   const floors = floorCount(design)
@@ -397,6 +397,19 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
     setPopId(null)
     sfx('tap', 'tap')
     setMessage(`${findRoomStyle(room.type, room.style).name}。みためや おおきさを かえられるよ`)
+  }
+
+  function moveTo(room: PlacedRoom, to: Cell) {
+    const next = moveRoom(design, room.id, to)
+    if (!next) {
+      sfx('blocked', 'error')
+      setMessage('そこには うごかせないよ。あいている ところに もっていってね')
+      return
+    }
+    onChange(next)
+    setPopId(room.id)
+    sfx('place', 'tap')
+    setMessage(`${findRoomType(room.type).name}を うごかしたよ`)
   }
 
   function edit(patch: Partial<RoomPick>, okSound: HouseSound) {
@@ -456,6 +469,7 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
           ghost={ghost}
           onCell={placeAt}
           onRoom={selectRoom}
+          onMove={moveTo}
           onHover={setHover}
         />
         {needsStairs && <p className={styles.hint}>かいだんを おくと うえと したが つながるよ</p>}
