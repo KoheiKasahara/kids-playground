@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
@@ -19,7 +19,10 @@ import { ROOM_VOICE, playHouseSound, startBgm, type HouseSound } from './sounds'
 import PlanBoard, { type Ghost } from './PlanBoard'
 import { RoomSwatch } from './RoomArt'
 import { ExteriorSwatch, HouseFront, type ExteriorCategory, type Hotspot } from './HouseFront'
+import type { HouseView, SceneSpot } from './three/houseScene'
 import styles from './HouseBuilderPlay.module.css'
+
+const House3D = lazy(() => import('./House3D'))
 
 const TITLE = 'おうちづくり'
 
@@ -652,11 +655,26 @@ function RoofCap({ design }: { design: HouseDesign }) {
   )
 }
 
+/** なかを みる じゅんばん（1かいから、おくから、ひだりから）。 */
+function orderedRooms(design: HouseDesign): PlacedRoom[] {
+  return [...design.rooms].sort((a, b) => a.floor - b.floor || a.y - b.y || a.x - b.x)
+}
+
+const roomTitle = (room: PlacedRoom) => `${room.floor + 1}かいの ${findRoomStyle(room.type, room.style).name}`
+
 function DoneScreen({ design, onEditPlan, onEditOutside, onRestart }: { design: HouseDesign; onEditPlan: () => void; onEditOutside: () => void; onRestart: () => void }) {
   const [view, setView] = useState<'outside' | 'inside'>('outside')
   const [bubble, setBubble] = useState<{ key: number; text: string } | null>(null)
+  const [roomId, setRoomId] = useState<number | null>(null)
+  const [status, setStatus] = useState<'ready' | 'error'>('ready')
+  const [generation, setGeneration] = useState(0)
   const floors = floorCount(design)
   const total = design.rooms.length
+  const rooms = useMemo(() => orderedRooms(design), [design])
+  const room = rooms.find((r) => r.id === roomId) ?? rooms[0] ?? null
+  const roomKey = room?.id ?? null
+  const scene = useMemo<HouseView>(() => (view === 'inside' && roomKey !== null ? { kind: 'room', roomId: roomKey } : { kind: 'outside' }), [view, roomKey])
+  const show3d = status === 'ready' && (view === 'outside' || room !== null)
 
   const say = (text: string, sound: HouseSound) => {
     sfx(sound, 'tap')
@@ -667,6 +685,78 @@ function DoneScreen({ design, onEditPlan, onEditOutside, onRestart }: { design: 
     setView(next)
     setBubble(null)
     sfx(next === 'inside' ? 'bell' : 'tap', 'tap')
+  }
+
+  const pickRoom = (next: PlacedRoom) => {
+    setRoomId(next.id)
+    sfx('floor', 'tap')
+    setBubble(null)
+  }
+
+  const stepRoom = (step: number) => {
+    if (!room) return
+    const at = rooms.findIndex((r) => r.id === room.id)
+    pickRoom(rooms[(at + step + rooms.length) % rooms.length])
+  }
+
+  const talk = (target: PlacedRoom) => say(`${findRoomStyle(target.type, target.style).name}「${ROOM_TALK[target.type]}」`, ROOM_VOICE[target.type])
+
+  const onSpot = (spot: SceneSpot) => {
+    if (spot === 'room') {
+      if (room) talk(room)
+      return
+    }
+    say(HOTSPOT[spot].text, HOTSPOT[spot].sound)
+  }
+
+  const hint = view === 'outside'
+    ? 'ゆびで うごかすと まわるよ。ドアや いぬ、くるまを タップしてみてね'
+    : room ? 'ゆびで うごかすと まわるよ。へやを タップしてみてね' : 'へやを タップしてみてね'
+
+  let stage: ReactNode
+  if (show3d) {
+    stage = (
+      <div className={styles.stage3d} data-view={scene.kind}>
+        <Suspense fallback={<p className={styles.stageLoading} role="status">じゅんびちゅう…</p>}>
+          <House3D
+            key={generation}
+            design={design}
+            view={scene}
+            label={scene.kind === 'room' && room ? `${roomTitle(room)}（3D）` : 'できあがった おうち（3D）'}
+            onSpot={onSpot}
+            onStatus={setStatus}
+          />
+        </Suspense>
+      </div>
+    )
+  } else if (view === 'inside' && !room) {
+    stage = <p className={styles.hint}>へやが まだ ないよ。「まどりを なおす」で へやを おいてね</p>
+  } else if (view === 'outside') {
+    stage = (
+      <div className={styles.frontWrap} data-big>
+        <HouseFront design={design} lively title="できあがった おうちの そとがわ" onHotspot={(spot) => say(HOTSPOT[spot].text, HOTSPOT[spot].sound)} />
+      </div>
+    )
+  } else {
+    stage = (
+      <div className={styles.inside}>
+        <RoofCap design={design} />
+        {Array.from({ length: floors }, (_, i) => floors - 1 - i).map((floor) => (
+          <div key={floor} className={styles.insideFloor}>
+            <p className={styles.insideLabel}>{floor + 1}かい</p>
+            {roomsOn(design, floor).length === 0 && <p className={styles.hint}>この かいは まだ からっぽ</p>}
+            <PlanBoard
+              design={design}
+              floor={floor}
+              label={`${floor + 1}かいの なか`}
+              onRoom={talk}
+              roomLabel={(r) => `${floor + 1}かいの ${findRoomStyle(r.type, r.style).name}`}
+            />
+          </div>
+        ))}
+        <div className={styles.insideGround} aria-hidden="true" />
+      </div>
+    )
   }
 
   return (
@@ -682,29 +772,47 @@ function DoneScreen({ design, onEditPlan, onEditOutside, onRestart }: { design: 
         <button type="button" className={styles.tab} aria-pressed={view === 'inside'} onClick={() => switchView('inside')}>なかを みる</button>
       </div>
       <p className={styles.bubble} role="status" aria-live="polite" key={bubble?.key ?? 0} data-show={bubble ? true : undefined}>
-        {bubble?.text ?? (view === 'outside' ? 'ドアや いぬ、くるまを タップしてみてね' : 'へやを タップしてみてね')}
+        {bubble?.text ?? hint}
       </p>
-      {view === 'outside' ? (
-        <div className={styles.frontWrap} data-big>
-          <HouseFront design={design} lively title="できあがった おうちの そとがわ" onHotspot={(spot) => say(HOTSPOT[spot].text, HOTSPOT[spot].sound)} />
+      {view === 'inside' && room && status === 'ready' && (
+        <div className={styles.roomNav}>
+          <button type="button" className={styles.navButton} aria-label="まえの へや" onClick={() => stepRoom(-1)}><span aria-hidden="true">◀</span></button>
+          <p className={styles.roomNow}>{roomTitle(room)}</p>
+          <button type="button" className={styles.navButton} aria-label="つぎの へや" onClick={() => stepRoom(1)}><span aria-hidden="true">▶</span></button>
         </div>
-      ) : (
-        <div className={styles.inside}>
-          <RoofCap design={design} />
-          {Array.from({ length: floors }, (_, i) => floors - 1 - i).map((floor) => (
-            <div key={floor} className={styles.insideFloor}>
-              <p className={styles.insideLabel}>{floor + 1}かい</p>
-              {roomsOn(design, floor).length === 0 && <p className={styles.hint}>この かいは まだ からっぽ</p>}
-              <PlanBoard
-                design={design}
-                floor={floor}
-                label={`${floor + 1}かいの なか`}
-                onRoom={(room) => say(`${findRoomStyle(room.type, room.style).name}「${ROOM_TALK[room.type]}」`, ROOM_VOICE[room.type])}
-                roomLabel={(room) => `${floor + 1}かいの ${findRoomStyle(room.type, room.style).name}`}
-              />
+      )}
+      {stage}
+      {status === 'error' && (
+        <div className={styles.fallbackNote}>
+          <p className={styles.hint}>3Dで みられない ので、えで みせているよ</p>
+          <button
+            type="button"
+            className={styles.btn}
+            onClick={() => {
+              sfx('tap')
+              setStatus('ready')
+              setGeneration((g) => g + 1)
+            }}
+          >もういちど 3Dで みる</button>
+        </div>
+      )}
+      {view === 'inside' && room && status === 'ready' && (
+        <div className={styles.roomPicker} role="group" aria-label="みる へや">
+          {Array.from({ length: floors }, (_, floor) => floor).filter((floor) => rooms.some((r) => r.floor === floor)).map((floor) => (
+            <div key={floor} className={styles.pickerFloor}>
+              <span className={styles.pickerLabel}>{floor + 1}かい</span>
+              <ul className={styles.scrollRow} aria-label={`${floor + 1}かいの へや`}>
+                {rooms.filter((r) => r.floor === floor).map((r) => (
+                  <li key={r.id}>
+                    <button type="button" className={styles.roomChip} aria-pressed={r.id === room.id} aria-label={roomTitle(r)} onClick={() => pickRoom(r)}>
+                      <span className={styles.roomChipArt}><RoomSwatch type={r.type} style={r.style} {...roomSize(r)} /></span>
+                      <span aria-hidden="true">{findRoomType(r.type).short}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
-          <div className={styles.insideGround} aria-hidden="true" />
         </div>
       )}
       <div className={styles.doneButtons}>

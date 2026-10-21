@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
@@ -12,12 +12,34 @@ vi.mock('./sounds', async (importOriginal) => {
   return { ...actual, playHouseSound: vi.fn(), startBgm: vi.fn(() => stopBgm) }
 })
 
+// 3D の がめんは jsdom で かけないので、よばれかた だけを みる。
+const scene = vi.hoisted(() => ({
+  create: vi.fn(),
+  show: vi.fn(),
+  turn: vi.fn(),
+  zoom: vi.fn(),
+  dispose: vi.fn(),
+  status: 'ready' as 'ready' | 'error',
+  callbacks: null as null | { status: (status: 'ready' | 'error') => void; spot: (spot: 'door' | 'dog' | 'car' | 'room') => void },
+}))
+
+vi.mock('./three/houseScene', () => ({
+  createHouseScene: (_host: HTMLElement, design: unknown, view: unknown, callbacks: NonNullable<typeof scene.callbacks>) => {
+    scene.create(design, view)
+    scene.callbacks = callbacks
+    callbacks.status(scene.status)
+    return { show: scene.show, turn: scene.turn, zoom: scene.zoom, dispose: scene.dispose }
+  },
+}))
+
 const stopBgm = vi.fn()
 const KEY = 'house-builder-v1'
 
 beforeEach(() => {
   window.localStorage.clear()
   vi.clearAllMocks()
+  scene.status = 'ready'
+  scene.callbacks = null
 })
 
 afterEach(() => {
@@ -31,6 +53,27 @@ const sounds = () => vi.mocked(playHouseSound).mock.calls.map(([kind]) => kind)
 
 function renderGame() {
   return render(<MemoryRouter><HouseBuilderPlay /></MemoryRouter>)
+}
+
+const spot = (kind: 'door' | 'dog' | 'car' | 'room') => act(() => scene.callbacks!.spot(kind))
+
+/** ほぞんした おうちから かんせい がめんへ すすむ。 */
+function openDone(design: object) {
+  window.localStorage.setItem(KEY, JSON.stringify(design))
+  renderGame()
+  click('つづきから つくる')
+  click(/そとがわを つくる/)
+  click('かんせい！')
+}
+
+const SAVED_HOUSE = {
+  houseType: 'nikai',
+  shape: 'square',
+  rooms: [
+    { id: 1, floor: 0, type: 'toilet', style: 'flower', size: 'm', turned: false, x: 5, y: 0 },
+    { id: 2, floor: 1, type: 'kids', style: 'space', size: 'm', turned: false, x: 0, y: 0 },
+  ],
+  exterior: { wall: 'brick', roof: 'kawara', window: 'square', door: 'wood', parking: 'two', doghouse: 'red', garden: 'none', extras: [] },
 }
 
 function startHouse(type: RegExp, shape: RegExp) {
@@ -140,7 +183,7 @@ describe('house-builder play', () => {
     expect(screen.getByRole('button', { name: cell(2, 2) })).toHaveAttribute('tabindex', '0')
   })
 
-  test('そとがわを えらんで かんせいさせ、そとと なかを みられる', () => {
+  test('そとがわを えらんで かんせいさせ、そとと へやごとの なかを 3D で みられる', async () => {
     startHouse(/^2かいだて/, /^しかく/)
     pickRoom('げんかん', 'いしだたみの げんかん')
     fireEvent.click(screen.getByRole('button', { name: cell(3, 6) }))
@@ -172,25 +215,55 @@ describe('house-builder play', () => {
     expect(sounds()).toContain('complete')
     expect(screen.getByRole('heading', { name: /かんせい！ すてきな おうちが できたね/ })).toBeInTheDocument()
     expect(screen.getByText('2かいだて・しかく・へや 3こ')).toBeInTheDocument()
-    // そとの え: いぬ・くるま・ドアを タップすると こえが でる。
-    const front = screen.getByRole('group', { name: 'できあがった おうちの そとがわ' })
-    fireEvent.click(within(front).getByRole('button', { name: 'いぬ' }))
+    // そと: 3D の おうちを ゆびや ボタンで まわし、いぬ・くるま・ドアを タップすると こえが でる。
+    const stage = await screen.findByRole('group', { name: /^できあがった おうち（3D）/ })
+    expect(scene.create).toHaveBeenCalledWith(expect.objectContaining({ houseType: 'nikai', shape: 'square' }), { kind: 'outside' })
+    spot('dog')
     expect(screen.getByText('わん わん！')).toBeInTheDocument()
-    fireEvent.click(within(front).getByRole('button', { name: 'くるま 2' }))
+    spot('car')
     expect(screen.getByText('ブッブー！ おでかけ しよう')).toBeInTheDocument()
-    fireEvent.keyDown(within(front).getByRole('button', { name: 'げんかんの ドア' }), { key: 'Enter' })
+    fireEvent.keyDown(stage, { key: 'Enter' })
     expect(screen.getByText('ピンポーン！ おかえりなさい')).toBeInTheDocument()
+    expect(sounds()).toEqual(expect.arrayContaining(['bark', 'horn', 'bell']))
+    fireEvent.keyDown(stage, { key: 'ArrowRight' })
+    expect(scene.turn).toHaveBeenLastCalledWith(1)
+    click('ひだりに まわす')
+    expect(scene.turn).toHaveBeenLastCalledWith(-1)
+    click('ちかづく')
+    expect(scene.zoom).toHaveBeenLastCalledWith(1)
+    click('はなれる')
+    expect(scene.zoom).toHaveBeenLastCalledWith(-1)
 
-    // なか: かいごとの まどりで へやを タップできる。
+    // なか: 1かいから じゅんに へやを ひとつずつ 3D で みる。
+    const ids = Object.fromEntries(saved().rooms.map((r: { type: string; id: number }) => [r.type, r.id]))
     click('なかを みる')
-    expect(screen.getAllByText(/^[12]かい$/).map((e) => e.textContent)).toEqual(['2かい', '1かい'])
-    fireEvent.click(screen.getByRole('button', { name: '2かいの うちゅうの こどもべや' }))
-    expect(screen.getByText('うちゅうの こどもべや「なにして あそぶ？」')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '1かいの おはなの トイレ' }))
+    expect(scene.show).toHaveBeenLastCalledWith(expect.anything(), { kind: 'room', roomId: ids.toilet })
+    expect(screen.getByRole('group', { name: /^1かいの おはなの トイレ（3D）/ })).toBe(stage)
+    spot('room')
+    expect(screen.getByText('おはなの トイレ「じゃー！ すっきり」')).toBeInTheDocument()
     expect(sounds()).toContain('flush')
+    click('つぎの へや')
+    expect(scene.show).toHaveBeenLastCalledWith(expect.anything(), { kind: 'room', roomId: ids.entrance })
+    spot('room')
+    expect(screen.getByText('いしだたみの げんかん「ただいま！」')).toBeInTheDocument()
+    const picker = screen.getByRole('group', { name: 'みる へや' })
+    expect(within(picker).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
+      '1かいの おはなの トイレ', '1かいの いしだたみの げんかん', '2かいの うちゅうの こどもべや',
+    ])
+    fireEvent.click(within(picker).getByRole('button', { name: '2かいの うちゅうの こどもべや' }))
+    expect(scene.show).toHaveBeenLastCalledWith(expect.anything(), { kind: 'room', roomId: ids.kids })
+    expect(within(picker).getByRole('button', { name: '2かいの うちゅうの こどもべや' })).toHaveAttribute('aria-pressed', 'true')
+    click('つぎの へや')
+    expect(scene.show).toHaveBeenLastCalledWith(expect.anything(), { kind: 'room', roomId: ids.toilet })
+    click('まえの へや')
+    expect(scene.show).toHaveBeenLastCalledWith(expect.anything(), { kind: 'room', roomId: ids.kids })
+    click('そとから みる')
+    expect(scene.show).toHaveBeenLastCalledWith(expect.anything(), { kind: 'outside' })
+    expect(scene.create).toHaveBeenCalledTimes(1)
 
-    // なおす と さいしょから。
+    // なおす と さいしょから。3D は がめんを はなれると すてる。
     click('まどりを なおす')
+    expect(scene.dispose).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('region', { name: 'まどりを つくる' })).toBeInTheDocument()
     click(/そとがわを つくる/)
     click('かんせい！')
@@ -223,6 +296,42 @@ describe('house-builder play', () => {
     expect(screen.getByRole('button', { name: /^L の かたち/ })).toHaveAttribute('aria-pressed', 'true')
     click(/^せまい/)
     expect(saved()).toMatchObject({ shape: 'narrow', rooms: [{ type: 'washitsu', style: 'kotatsu' }] })
+  })
+
+  test('3D で みられない ときは そと と かいごとの まどりを え で みせ、もういちど 3D に できる', async () => {
+    scene.status = 'error'
+    openDone(SAVED_HOUSE)
+    expect(await screen.findByText('3Dで みられない ので、えで みせているよ')).toBeInTheDocument()
+    const front = screen.getByRole('group', { name: 'できあがった おうちの そとがわ' })
+    fireEvent.click(within(front).getByRole('button', { name: 'いぬ' }))
+    expect(screen.getByText('わん わん！')).toBeInTheDocument()
+    fireEvent.click(within(front).getByRole('button', { name: 'くるま 2' }))
+    expect(screen.getByText('ブッブー！ おでかけ しよう')).toBeInTheDocument()
+    fireEvent.keyDown(within(front).getByRole('button', { name: 'げんかんの ドア' }), { key: 'Enter' })
+    expect(screen.getByText('ピンポーン！ おかえりなさい')).toBeInTheDocument()
+
+    click('なかを みる')
+    expect(screen.getAllByText(/^[12]かい$/).map((e) => e.textContent)).toEqual(['2かい', '1かい'])
+    expect(screen.queryByRole('group', { name: 'みる へや' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '2かいの うちゅうの こどもべや' }))
+    expect(screen.getByText('うちゅうの こどもべや「なにして あそぶ？」')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '1かいの おはなの トイレ' }))
+    expect(sounds()).toContain('flush')
+
+    scene.status = 'ready'
+    click('もういちど 3Dで みる')
+    expect(await screen.findByRole('group', { name: /^1かいの おはなの トイレ（3D）/ })).toBeInTheDocument()
+    expect(scene.create).toHaveBeenLastCalledWith(expect.anything(), { kind: 'room', roomId: 1 })
+    expect(screen.queryByText('3Dで みられない ので、えで みせているよ')).not.toBeInTheDocument()
+  })
+
+  test('へやが ない おうちの なかは まどりを なおすように おしえる', async () => {
+    openDone({ ...SAVED_HOUSE, rooms: [] })
+    await screen.findByRole('group', { name: /^できあがった おうち（3D）/ })
+    click('なかを みる')
+    expect(screen.getByText('へやが まだ ないよ。「まどりを なおす」で へやを おいてね')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: /（3D）/ })).not.toBeInTheDocument()
+    expect(scene.dispose).toHaveBeenCalledTimes(1)
   })
 
   test('こわれた ほぞんデータは つかわずに はじめから', () => {
