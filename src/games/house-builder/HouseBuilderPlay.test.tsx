@@ -172,6 +172,44 @@ describe('house-builder play', () => {
     expect(screen.getAllByLabelText('へや 1こ')).toHaveLength(2)
   })
 
+  test('おいた へやを ひっぱって うごかし、はいらない ところでは もとの まま', () => {
+    startHouse(/^ひらや/, /^しかく/)
+    pickRoom('トイレ', 'シンプルな トイレ', /^ちいさい/)
+    fireEvent.click(screen.getByRole('button', { name: cell(1, 1) }))
+    fireEvent.click(screen.getByRole('button', { name: cell(3, 1) }))
+    // 6×6 の ばんを 600px に みたてる（1マス 100px）。
+    const board = screen.getByRole('group', { name: '1かいの まどり' })
+    vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 600, height: 600, right: 600, bottom: 600, x: 0, y: 0, toJSON: () => ({}) })
+    const drag = (from: [number, number], to: [number, number]) => {
+      const room = screen.getAllByRole('button', { name: 'おいた シンプルな トイレ' })[0]
+      const at = (p: [number, number]) => ({ clientX: p[0], clientY: p[1], pointerId: 1, isPrimary: true, button: 0 })
+      fireEvent.pointerDown(room, at(from))
+      fireEvent.pointerMove(room, at([(from[0] + to[0]) / 2, (from[1] + to[1]) / 2]))
+      fireEvent.pointerMove(room, at(to))
+      fireEvent.pointerUp(room, at(to))
+      fireEvent.click(room)
+    }
+
+    drag([50, 50], [150, 350])
+    expect(saved().rooms[0]).toMatchObject({ id: 1, x: 1, y: 3 })
+    expect(screen.getByRole('status')).toHaveTextContent('トイレを うごかしたよ')
+    // ひっぱった あとは えらんだ ことに しない。
+    expect(screen.getAllByRole('button', { name: 'おいた シンプルな トイレ' })[0]).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: cell(1, 1) })).toBeInTheDocument()
+
+    // ほかの へやの うえには うごかせない。
+    drag([150, 350], [250, 50])
+    expect(screen.getByRole('status')).toHaveTextContent('そこには うごかせないよ')
+    expect(sounds()).toContain('blocked')
+    expect(saved().rooms[0]).toMatchObject({ x: 1, y: 3 })
+
+    // ひっぱらずに タップすれば いつもどおり えらべる。
+    fireEvent.pointerDown(screen.getAllByRole('button', { name: 'おいた シンプルな トイレ' })[0], { clientX: 150, clientY: 350, pointerId: 2, isPrimary: true, button: 0 })
+    fireEvent.pointerUp(screen.getAllByRole('button', { name: 'おいた シンプルな トイレ' })[0], { clientX: 150, clientY: 350, pointerId: 2, isPrimary: true, button: 0 })
+    fireEvent.click(screen.getAllByRole('button', { name: 'おいた シンプルな トイレ' })[0])
+    expect(screen.getAllByRole('button', { name: 'おいた シンプルな トイレ' })[0]).toHaveAttribute('aria-pressed', 'true')
+  })
+
   test('やじるしキーで マスを うごき、Enter で おける', () => {
     startHouse(/^ひらや/, /^せまい/)
     const first = screen.getByRole('button', { name: cell(1, 1) })

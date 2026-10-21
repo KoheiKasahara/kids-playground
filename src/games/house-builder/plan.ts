@@ -120,6 +120,15 @@ export function changeRoom(design: HouseDesign, id: number, patch: Partial<RoomP
   return { ...design, rooms: design.rooms.map((r) => (r.id === id ? placed : r)) }
 }
 
+/** へやを ひっぱって うごかす。to は へやの ひだりうえの マス。はみだす・かさなる ときは null。 */
+export function moveRoom(design: HouseDesign, id: number, to: Cell): HouseDesign | null {
+  const room = design.rooms.find((r) => r.id === id)
+  if (!room) return null
+  const moved = { ...room, ...to }
+  if (!fits(design, moved)) return null
+  return { ...design, rooms: design.rooms.map((r) => (r.id === id ? moved : r)) }
+}
+
 export function removeRoom(design: HouseDesign, id: number): HouseDesign {
   return { ...design, rooms: design.rooms.filter((room) => room.id !== id) }
 }

@@ -1,10 +1,11 @@
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { findRoomStyle, findShape, type RoomTypeId } from './data'
-import { roomSize, roomsOn, type Cell, type HouseDesign, type PlacedRoom } from './plan'
+import { fits, roomSize, roomsOn, type Cell, type HouseDesign, type PlacedRoom } from './plan'
 import { CELL, RoomArt } from './RoomArt'
 import styles from './HouseBuilderPlay.module.css'
 
 // まどりずの ばん。え（svg）の うえに おなじ マスめの ボタンを かさねて、タップと キーボードで うごかせる。
+// onMove を わたすと、おいた へやを ひっぱって うごかせる。
 
 export type Ghost = { x: number; y: number; w: number; h: number; type: RoomTypeId; style: string }
 
@@ -19,8 +20,13 @@ type Props = {
   onCell?: (cell: Cell) => void
   onRoom?: (room: PlacedRoom) => void
   onHover?: (cell: Cell | null) => void
+  /** へやを ひっぱって はなした とき。to は うごかした さきの ひだりうえの マス（はいるか どうかは よびだしがわで みる）。 */
+  onMove?: (room: PlacedRoom, to: Cell) => void
   roomLabel?: (room: PlacedRoom) => string
 }
+
+/** ひっぱっている へや。grab は へやの なかで つかんだ マス。 */
+type Drag = { id: number; pointerId: number; grab: Cell; to: Cell; moved: boolean }
 
 const ARROWS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
 
@@ -36,11 +42,14 @@ function GardenCell({ x, y }: { x: number; y: number }) {
   )
 }
 
-export default function PlanBoard({ design, floor, label, selectedId = null, popId = null, ghost = null, onCell, onRoom, onHover, roomLabel }: Props) {
+export default function PlanBoard({ design, floor, label, selectedId = null, popId = null, ghost = null, onCell, onRoom, onHover, onMove, roomLabel }: Props) {
   const shape = findShape(design.shape)
   const rooms = roomsOn(design, floor)
   const boardRef = useRef<HTMLDivElement>(null)
   const [cursor, setCursor] = useState<Cell | null>(null)
+  const [drag, setDrag] = useState<Drag | null>(null)
+  // ひっぱった あとの click で へやを えらばない ように する。
+  const dragged = useRef(false)
   const readOnly = !onCell
 
   const covering = (x: number, y: number) => rooms.find((r) => {
@@ -78,6 +87,49 @@ export default function PlanBoard({ design, floor, label, selectedId = null, pop
     boardRef.current?.querySelector<HTMLButtonElement>(selector)?.focus()
   }
 
+  /** ゆびの いちに ある マス（ばんの そとでも はしの マスに よせない）。 */
+  function cellAt(event: PointerEvent): Cell | null {
+    const rect = boardRef.current?.getBoundingClientRect()
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null
+    return {
+      x: Math.floor(((event.clientX - rect.left) / rect.width) * shape.width),
+      y: Math.floor(((event.clientY - rect.top) / rect.height) * shape.height),
+    }
+  }
+
+  function startDrag(event: PointerEvent<HTMLButtonElement>, room: PlacedRoom) {
+    dragged.current = false
+    if (!onMove || !event.isPrimary || event.button !== 0) return
+    const at = cellAt(event)
+    if (!at) return
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    setDrag({ id: room.id, pointerId: event.pointerId, grab: { x: at.x - room.x, y: at.y - room.y }, to: { x: room.x, y: room.y }, moved: false })
+  }
+
+  function moveDrag(event: PointerEvent, room: PlacedRoom) {
+    if (!drag || drag.id !== room.id || drag.pointerId !== event.pointerId) return
+    const at = cellAt(event)
+    if (!at) return
+    const { w, h } = roomSize(room)
+    const to = {
+      x: Math.max(0, Math.min(shape.width - w, at.x - drag.grab.x)),
+      y: Math.max(0, Math.min(shape.height - h, at.y - drag.grab.y)),
+    }
+    if (to.x === drag.to.x && to.y === drag.to.y) return
+    setDrag({ ...drag, to, moved: true })
+  }
+
+  function endDrag(event: PointerEvent, room: PlacedRoom) {
+    if (!drag || drag.id !== room.id || drag.pointerId !== event.pointerId) return
+    setDrag(null)
+    if (!drag.moved) return
+    dragged.current = true
+    if (drag.to.x !== room.x || drag.to.y !== room.y) {
+      setCursor(drag.to)
+      onMove?.(room, drag.to)
+    }
+  }
+
   const buttons: ReactNode[] = []
   for (const room of rooms) {
     const { w, h } = roomSize(room)
@@ -90,14 +142,23 @@ export default function PlanBoard({ design, floor, label, selectedId = null, pop
         style={{ gridColumn: `${room.x + 1} / span ${w}`, gridRow: `${room.y + 1} / span ${h}` }}
         data-room={room.id}
         data-selected={room.id === selectedId || undefined}
+        data-draggable={onMove ? true : undefined}
         aria-label={roomLabel ? roomLabel(room) : `おいた ${findRoomStyle(room.type, room.style).name}`}
         aria-pressed={readOnly ? undefined : room.id === selectedId}
         tabIndex={isActive ? 0 : -1}
         onClick={() => {
+          if (dragged.current) {
+            dragged.current = false
+            return
+          }
           setCursor({ x: room.x, y: room.y })
           onRoom?.(room)
         }}
         onPointerEnter={() => onHover?.(null)}
+        onPointerDown={(event) => startDrag(event, room)}
+        onPointerMove={(event) => moveDrag(event, room)}
+        onPointerUp={(event) => endDrag(event, room)}
+        onPointerCancel={() => setDrag(null)}
       />,
     )
   }
@@ -141,6 +202,8 @@ export default function PlanBoard({ design, floor, label, selectedId = null, pop
   }
 
   const selected = rooms.find((r) => r.id === selectedId)
+  const dragRoom = drag?.moved ? rooms.find((r) => r.id === drag.id) : undefined
+  const dragOk = dragRoom && drag ? fits(design, { ...dragRoom, ...drag.to }) : false
   const boardStyle = {
     aspectRatio: `${shape.width} / ${shape.height}`,
     gridTemplateColumns: `repeat(${shape.width}, 1fr)`,
@@ -149,7 +212,7 @@ export default function PlanBoard({ design, floor, label, selectedId = null, pop
   } as CSSProperties
 
   return (
-    <div className={styles.board} style={boardStyle} ref={boardRef} role="group" aria-label={label} onKeyDown={handleKey} onPointerLeave={() => onHover?.(null)}>
+    <div className={styles.board} style={boardStyle} ref={boardRef} role="group" aria-label={label} data-dragging={dragRoom ? true : undefined} onKeyDown={handleKey} onPointerLeave={() => onHover?.(null)}>
       <svg className={styles.boardArt} viewBox={`0 0 ${shape.width * CELL} ${shape.height * CELL}`} aria-hidden="true" focusable="false">
         {shape.mask.map((row, y) => row.map((on, x) => (on
           ? <rect key={`${x}-${y}`} x={x * CELL} y={y * CELL} width={CELL} height={CELL} fill="#f7fbff" stroke="#c9dcf0" strokeWidth={2} strokeDasharray="6 6" />
@@ -157,7 +220,7 @@ export default function PlanBoard({ design, floor, label, selectedId = null, pop
         {rooms.map((room) => {
           const { w, h } = roomSize(room)
           return (
-            <g key={room.id} className={room.id === popId ? styles.pop : undefined} style={{ transformOrigin: `${(room.x + w / 2) * CELL}px ${(room.y + h / 2) * CELL}px` }}>
+            <g key={room.id} className={room.id === popId ? styles.pop : undefined} opacity={room === dragRoom ? .35 : undefined} style={{ transformOrigin: `${(room.x + w / 2) * CELL}px ${(room.y + h / 2) * CELL}px` }}>
               <RoomArt type={room.type} style={room.style} x={room.x} y={room.y} w={w} h={h} />
             </g>
           )
@@ -167,6 +230,20 @@ export default function PlanBoard({ design, floor, label, selectedId = null, pop
             <RoomArt type={ghost.type} style={ghost.style} x={ghost.x} y={ghost.y} w={ghost.w} h={ghost.h} label={false} />
           </g>
         )}
+        {dragRoom && drag && (() => {
+          const { w, h } = roomSize(dragRoom)
+          return (
+            <g className={styles.dragGhost} data-ok={dragOk || undefined}>
+              <RoomArt type={dragRoom.type} style={dragRoom.style} x={drag.to.x} y={drag.to.y} w={w} h={h} label={false} />
+              {!dragOk && (
+                <g stroke="#e53935" strokeWidth={10} strokeLinecap="round" fill="none">
+                  <rect x={drag.to.x * CELL + 6} y={drag.to.y * CELL + 6} width={w * CELL - 12} height={h * CELL - 12} rx={10} fill="#e5393533" />
+                  <path d={`M${(drag.to.x + w / 2) * CELL - 24} ${(drag.to.y + h / 2) * CELL - 24}l48 48m0 -48l-48 48`} />
+                </g>
+              )}
+            </g>
+          )
+        })()}
         <path d={walls.join('')} stroke="#4a3b30" strokeWidth={12} strokeLinecap="square" fill="none" />
         {selected && (() => {
           const { w, h } = roomSize(selected)
