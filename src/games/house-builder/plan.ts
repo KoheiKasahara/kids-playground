@@ -156,7 +156,7 @@ export type OpeningKind = 'door' | 'big' | 'window' | 'small' | 'slim'
 /** おもての かべに あける まど・ドア。center と span は れつ（マス）の たんい。 */
 export type Opening = { kind: OpeningKind; center: number; span: number; roomId?: number }
 
-const OPENING_BY_ROOM: Record<RoomTypeId, OpeningKind> = {
+export const OPENING_BY_ROOM: Readonly<Record<RoomTypeId, OpeningKind>> = {
   living: 'big', dining: 'big', kitchen: 'window', bath: 'small', toilet: 'small', washroom: 'small',
   bedroom: 'window', kids: 'window', washitsu: 'big', entrance: 'door', stairs: 'slim', hall: 'slim',
 }
