@@ -86,7 +86,7 @@ describe('earth-globe data', () => {
     }
   })
 
-  it('flag-quizの既存国にはnumeric IDがある', () => {
+  it('共通の国マスタの既存国にはnumeric IDがある', () => {
     for (const country of countries) {
       expect(countryNumericIds[country.id]).toEqual(expect.any(Number))
     }

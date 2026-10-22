@@ -63,7 +63,7 @@ const flagIds: DominoFlagId[] = [
   'ar',
 ]
 /**
- * flag-quizのcountriesマスターに存在しない国旗ID。
+ * 共通の国マスタ (shared/countries) に存在しない国旗ID。
  * 北マケドニアとブルガリアは、こっきドミノ限定の追加国。
  */
 const idsWithoutFlagQuizMaster = new Set<DominoFlagId>(['mk', 'bg'])
@@ -431,7 +431,7 @@ describe('dominoFlags', () => {
     expect(turkey[5]!.slice(9, 12)).toEqual(['white', 'white', 'white'])
   })
 
-  it('id・nameJa・画像パスがflag-quizのマスターと一致する（北マケドニア・ブルガリアを除く）', () => {
+  it('id・nameJa・画像パスが共通の国マスタと一致する（北マケドニア・ブルガリアを除く）', () => {
     for (const definition of dominoFlags) {
       if (idsWithoutFlagQuizMaster.has(definition.id)) continue
       const country = countries.find((candidate) => candidate.id === definition.id)

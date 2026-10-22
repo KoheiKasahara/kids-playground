@@ -1,5 +1,5 @@
 /*
- * フレームの大きさは FlagImage.module.css の .large と同じ考え方を踏襲する。
+ * フレームの大きさは components/flag/FlagImage.module.css の .large と同じ考え方を踏襲する。
  * height を親（flagArea, flex: 1）に追従させ、aspect-ratio: 4/3 で幅を自動計算することで、
  * 国旗画像（flag-icons の 4x3 セット）とぴったり同じ縦横比のまま伸縮する。
  * max-height で肥大化を防ぐのも FlagImage と同じ。

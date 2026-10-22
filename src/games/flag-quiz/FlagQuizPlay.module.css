@@ -6,7 +6,7 @@
  * body がさらに flagArea / content に分かれ、flagArea だけが縦方向に伸縮する（flex: 1）。
  * 他の要素は決まった高さを持つ。これにより iPhone SE などの小型スマホ縦画面でも
  * スクロールなしに収まり、逆に画面が高い端末では国旗エリアが自然に大きくなる
- * （国旗自体は FlagImage.module.css 側で max-height を上限にして肥大化を防ぐ）。
+ * （国旗自体は components/flag/FlagImage.module.css 側で max-height を上限にして肥大化を防ぐ）。
  *
  * 「つぎのもんだい」ボタンは通常フローに置かず、回答後に QuizResultOverlay として
  * 画面下部へ固定表示する。画面の高さに関係なく常に可視・操作可能にするためで、
@@ -302,7 +302,7 @@
   }
 
   /* 左カラム（国旗）: 300〜360px程度の固定幅。高さは body の伸縮に追従し、
-     FlagImage.module.css 側の max-height: 280px を上限とする */
+     components/flag/FlagImage.module.css 側の max-height: 280px を上限とする */
   .flagArea {
     flex: 0 0 320px;
     max-width: 320px;

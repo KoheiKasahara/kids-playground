@@ -10,11 +10,11 @@ export type GlobeFeature = { id: number; geometry: Geometry }
 
 /**
  * 地球儀上でタップ対象になる1か国。
- * `flag-quiz` の国マスタ(`Country`)と world-atlas の数値IDを紐付けたもの。
+ * 共通の国マスタ(`shared/countries` の `Country`)と world-atlas の数値IDを紐付けたもの。
  * 数値IDが world-atlas 側に存在しない国は、この一覧から除外する（フォールバックなし）。
  */
 export type GlobeCountry = {
-  /** ISO 3166-1 alpha-2 の小文字コード (例: 'jp')。flag-quiz の Country.id と一致する。 */
+  /** ISO 3166-1 alpha-2 の小文字コード (例: 'jp')。shared/countries の Country.id と一致する。 */
   id: string
   /** 子ども向けの日本語表記 */
   nameJa: string
