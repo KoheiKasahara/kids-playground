@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from 'react'
+import { useId, type KeyboardEvent, type ReactNode } from 'react'
 import {
   findDoor, findRoof, findShape, findWall,
   type DoghouseId, type DoorId, type Exterior, type ExtraId, type GardenId, type ParkingId, type RoofId, type WallId, type WindowId,
@@ -584,6 +584,8 @@ type HouseFrontProps = {
 }
 
 export function HouseFront({ design, lively = false, onHotspot, title }: HouseFrontProps) {
+  // ほぞんした おうちを ならべる ときも そらの いろが まざらない ように、え ごとに べつの id に する。
+  const skyId = `house-sky-${useId().replace(/[^\w-]/g, '')}`
   const lay = layout(design)
   const ex = design.exterior
   const shape = findShape(design.shape)
@@ -715,12 +717,12 @@ export function HouseFront({ design, lively = false, onHotspot, title }: HouseFr
       data-lively={lively || undefined}
     >
       <defs>
-        <linearGradient id="house-sky" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={skyId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#8fd3ff" />
           <stop offset="1" stopColor="#e6f7ff" />
         </linearGradient>
       </defs>
-      <rect x={0} y={0} width={lay.width} height={lay.height} fill="url(#house-sky)" />
+      <rect x={0} y={0} width={lay.width} height={lay.height} fill={`url(#${skyId})`} />
       <circle cx={lay.width - 70} cy={60} r={34} fill="#ffe066" />
       <g className={styles.cloud}>
         <ellipse cx={120} cy={70} rx={50} ry={20} fill="#ffffff" />

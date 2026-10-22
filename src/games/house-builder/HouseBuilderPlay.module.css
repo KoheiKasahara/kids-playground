@@ -295,6 +295,166 @@
   gap: 10px;
 }
 
+/* ---------- ほぞんした おうち ---------- */
+
+.album {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 4px 0 var(--ink);
+}
+
+.albumTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.albumGrid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.albumItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.albumCard,
+.swapCard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: 0 4px 0 var(--ink);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.albumItem .albumCard {
+  flex: 1;
+}
+
+/* たかさの ちがう おうちも おなじ おおきさの わくに おさめる。 */
+.albumArt,
+.swapArt {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #e6f7ff;
+  line-height: 0;
+}
+
+.albumArt .front,
+.swapArt .front {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+}
+
+.dialogArt .front {
+  max-height: none;
+}
+
+.albumName {
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.albumRemove {
+  min-height: 44px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: #ffe5e3;
+  color: #b3261e;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.albumCard:active,
+.swapCard:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.albumCard:focus-visible,
+.swapCard:focus-visible,
+.albumRemove:focus-visible {
+  outline: 4px solid #3b82f6;
+  outline-offset: 3px;
+}
+
+.saveBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.saveNote {
+  margin: 0;
+  font-weight: 900;
+  text-align: center;
+}
+
+.btn:disabled {
+  background: #e8f5e9;
+  color: #1b5e20;
+  text-shadow: none;
+  cursor: default;
+}
+
+.btn:disabled:active {
+  transform: none;
+  box-shadow: 0 4px 0 var(--ink);
+}
+
+.dialogArt {
+  width: 100%;
+  max-width: 240px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  line-height: 0;
+}
+
+.swapGrid {
+  width: 100%;
+  max-height: 50dvh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  box-sizing: border-box;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 /* ---------- まどり ---------- */
 
 .planLayout {

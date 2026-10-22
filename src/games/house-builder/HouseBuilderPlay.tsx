@@ -14,7 +14,7 @@ import {
   addRoom, changeRoom, createDesign, findSpot, floorCount, moveRoom, removeRoom, reshape, roomCounts, roomSize, roomsOn,
   type Cell, type HouseDesign, type PlacedRoom, type RoomPick,
 } from './plan'
-import { readDesign, writeDesign } from './save'
+import { ALBUM_LIMIT, putHouse, readAlbum, readDraft, removeHouse, sameDesign, writeAlbum, writeDraft, type SavedHouse } from './save'
 import { ROOM_VOICE, playHouseSound, startBgm, type HouseSound } from './sounds'
 import PlanBoard, { type Ghost } from './PlanBoard'
 import { RoomSwatch } from './RoomArt'
@@ -27,6 +27,15 @@ const House3D = lazy(() => import('./House3D'))
 const TITLE = 'おうちづくり'
 
 type Screen = 'type' | 'shape' | 'plan' | 'outside' | 'done'
+
+/** たしかめる ダイアログ。 */
+type Ask =
+  | { kind: 'restart' }
+  | { kind: 'open'; id: number }
+  | { kind: 'remove'; id: number }
+  | { kind: 'full' }
+
+const SAVE_FAILED = 'この ブラウザでは ほぞん できないよ'
 
 const BACK: Record<Exclude<Screen, 'type'>, Screen> = { shape: 'type', plan: 'shape', outside: 'plan', done: 'outside' }
 
@@ -45,10 +54,14 @@ function sfx(kind: HouseSound, haptic?: Parameters<typeof vibrate>[0]) {
 
 export default function HouseBuilderPlay() {
   const [screen, setScreen] = useState<Screen>('type')
-  const [design, setDesign] = useState<HouseDesign | null>(readDesign)
+  const [draft] = useState(readDraft)
+  const [design, setDesign] = useState<HouseDesign | null>(draft?.design ?? null)
+  const [savedId, setSavedId] = useState<number | null>(draft?.savedId ?? null)
+  const [album, setAlbum] = useState<SavedHouse[]>(readAlbum)
   const [pendingType, setPendingType] = useState<HouseTypeId>(() => design?.houseType ?? 'nikai')
   const [begun, setBegun] = useState(false)
-  const [confirmRestart, setConfirmRestart] = useState(false)
+  const [ask, setAsk] = useState<Ask | null>(null)
+  const [saveNote, setSaveNote] = useState<string | null>(null)
   const [sound, toggleSound] = useSoundToggle()
   const current: Screen = screen !== 'type' && screen !== 'shape' && !design ? 'type' : screen
   const playing = current !== 'type'
@@ -59,7 +72,10 @@ export default function HouseBuilderPlay() {
     return startBgm()
   }, [sound, begun])
 
-  useEffect(() => writeDesign(design), [design])
+  const linked = album.find((house) => house.id === savedId) ?? null
+  const isSaved = useMemo(() => !!design && !!linked && sameDesign(linked.design, design), [design, linked])
+
+  useEffect(() => writeDraft(design ? { design, savedId } : null), [design, savedId])
 
   useEffect(() => {
     // がめんを きりかえたら いちばん うえから みせる。
@@ -69,6 +85,7 @@ export default function HouseBuilderPlay() {
 
   const go = (next: Screen) => {
     setBegun(true)
+    setSaveNote(null)
     setScreen(next)
   }
 
@@ -92,10 +109,60 @@ export default function HouseBuilderPlay() {
 
   function restart() {
     sfx('remove', 'tap')
-    setConfirmRestart(false)
+    setAsk(null)
     setDesign(null)
+    setSavedId(null)
     setPendingType('nikai')
     go('type')
+  }
+
+  /** いちらんを かきかえる。ほぞん できなかったら そのまま に して おしえる。 */
+  function commitAlbum(next: SavedHouse[]): boolean {
+    if (!writeAlbum(next)) {
+      sfx('blocked', 'error')
+      setSaveNote(SAVE_FAILED)
+      return false
+    }
+    setAlbum(next)
+    return true
+  }
+
+  function saveAs(id: number | null) {
+    if (!design) return
+    const result = putHouse(album, design, id, Date.now())
+    if (!result) {
+      sfx('tap')
+      setAsk({ kind: 'full' })
+      return
+    }
+    setAsk(null)
+    if (!commitAlbum(result.album)) return
+    setSavedId(result.id)
+    sfx('place', 'success')
+    setSaveNote('ほぞんしたよ！ さいしょの がめんから また ひらけるよ')
+  }
+
+  function openSaved(id: number, confirmed = false) {
+    const house = album.find((h) => h.id === id)
+    if (!house) return
+    if (!confirmed && design && !isSaved) {
+      sfx('tap')
+      setAsk({ kind: 'open', id })
+      return
+    }
+    setAsk(null)
+    setDesign(house.design)
+    setSavedId(house.id)
+    setPendingType(house.design.houseType)
+    sfx('bell', 'tap')
+    go('done')
+  }
+
+  function removeSaved(id: number) {
+    setAsk(null)
+    if (!commitAlbum(removeHouse(album, id))) return
+    sfx('remove', 'tap')
+    setSaveNote('ほぞんした おうちを けしたよ')
   }
 
   let body: ReactNode
@@ -106,6 +173,8 @@ export default function HouseBuilderPlay() {
         <TypeScreen
           draft={design}
           current={design?.houseType}
+          album={album}
+          note={saveNote}
           onPick={pickType}
           onContinue={() => {
             sfx('tap', 'tap')
@@ -113,7 +182,12 @@ export default function HouseBuilderPlay() {
           }}
           onRestart={() => {
             sfx('tap')
-            setConfirmRestart(true)
+            setAsk({ kind: 'restart' })
+          }}
+          onOpen={(id) => openSaved(id)}
+          onRemove={(id) => {
+            sfx('tap')
+            setAsk({ kind: 'remove', id })
           }}
         />
       )
@@ -145,6 +219,9 @@ export default function HouseBuilderPlay() {
     body = (
       <DoneScreen
         design={design}
+        saved={isSaved}
+        note={saveNote}
+        onSave={() => saveAs(savedId)}
         onEditPlan={() => {
           sfx('tap')
           go('plan')
@@ -155,9 +232,53 @@ export default function HouseBuilderPlay() {
         }}
         onRestart={() => {
           sfx('tap')
-          setConfirmRestart(true)
+          setAsk({ kind: 'restart' })
         }}
       />
+    )
+  }
+
+  const cancelAsk = () => setAsk(null)
+  let dialog: ReactNode = null
+  if (ask?.kind === 'restart') {
+    dialog = (
+      <Dialog title={isSaved ? 'あたらしい おうちを つくる？ ほぞんした おうちは のこるよ' : 'いまの おうちを けして、さいしょから つくる？'}>
+        <button type="button" className={`${styles.btn} ${isSaved ? styles.btnPrimary : styles.btnDanger}`} onClick={restart}>{isSaved ? 'あたらしく つくる' : 'けして つくる'}</button>
+        <button type="button" className={styles.btn} onClick={cancelAsk} autoFocus>やめる</button>
+      </Dialog>
+    )
+  } else if (ask?.kind === 'open') {
+    const id = ask.id
+    dialog = (
+      <Dialog title="つくりかけの おうちは きえるよ。ほぞんした おうちを ひらく？">
+        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => openSaved(id, true)}>ひらく</button>
+        <button type="button" className={styles.btn} onClick={cancelAsk} autoFocus>やめる</button>
+      </Dialog>
+    )
+  } else if (ask?.kind === 'remove') {
+    const id = ask.id
+    const house = album.find((h) => h.id === id)
+    dialog = (
+      <Dialog title="この おうちを けす？">
+        {house && <div className={styles.dialogArt}><HouseFront design={house.design} title="けす おうち" /></div>}
+        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => removeSaved(id)}>けす</button>
+        <button type="button" className={styles.btn} onClick={cancelAsk} autoFocus>やめる</button>
+      </Dialog>
+    )
+  } else if (ask?.kind === 'full') {
+    dialog = (
+      <Dialog title={`ほぞんは ${ALBUM_LIMIT}こ まで。どの おうちと いれかえる？`}>
+        <ul className={styles.swapGrid} aria-label="いれかえる おうち">
+          {album.map((house, i) => (
+            <li key={house.id}>
+              <button type="button" className={styles.swapCard} aria-label={`${i + 1}ばんめの おうちと いれかえる`} onClick={() => saveAs(house.id)}>
+                <span className={styles.swapArt}><HouseFront design={house.design} /></span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <button type="button" className={styles.btn} onClick={cancelAsk} autoFocus>やめる</button>
+      </Dialog>
     )
   }
 
@@ -183,21 +304,22 @@ export default function HouseBuilderPlay() {
         })}
       </ol>
       {body}
-      {confirmRestart && (
-        <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="house-restart-title">
-          <div className={styles.dialog}>
-            <h2 id="house-restart-title" className={styles.dialogTitle}>いまの おうちを けして、さいしょから つくる？</h2>
-            <div className={styles.dialogButtons}>
-              <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={restart}>けして つくる</button>
-              <button type="button" className={styles.btn} onClick={() => setConfirmRestart(false)} autoFocus>やめる</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {dialog}
     </main>
   )
 
   return playing ? <GamePlaySurface>{content}</GamePlaySurface> : content
+}
+
+function Dialog({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="house-dialog-title">
+      <div className={styles.dialog}>
+        <h2 id="house-dialog-title" className={styles.dialogTitle}>{title}</h2>
+        <div className={styles.dialogButtons}>{children}</div>
+      </div>
+    </div>
+  )
 }
 
 // ---------------- いえの しゅるい ----------------
@@ -222,12 +344,18 @@ function TypeIcon({ floors }: { floors: number }) {
   )
 }
 
-function TypeScreen({ draft, current, onPick, onContinue, onRestart }: {
+const houseSummary = (design: HouseDesign) => `${findHouseType(design.houseType).name}・へや ${design.rooms.length}こ`
+
+function TypeScreen({ draft, current, album, note, onPick, onContinue, onRestart, onOpen, onRemove }: {
   draft: HouseDesign | null
   current?: HouseTypeId
+  album: readonly SavedHouse[]
+  note: string | null
   onPick: (type: HouseTypeId) => void
   onContinue: () => void
   onRestart: () => void
+  onOpen: (id: number) => void
+  onRemove: (id: number) => void
 }) {
   return (
     <section className={styles.section} aria-labelledby="house-type-title">
@@ -240,6 +368,27 @@ function TypeScreen({ draft, current, onPick, onContinue, onRestart }: {
             <button type="button" className={styles.btn} onClick={onRestart}>さいしょから</button>
           </div>
         </div>
+      )}
+      {note && <p className={styles.message} role="status">{note}</p>}
+      {album.length > 0 && (
+        <section className={styles.album} aria-labelledby="house-album-title">
+          <h2 id="house-album-title" className={styles.albumTitle}>
+            <span aria-hidden="true">📒 </span>ほぞんした おうち（{album.length}/{ALBUM_LIMIT}）
+          </h2>
+          <ul className={styles.albumGrid} aria-label="ほぞんした おうち">
+            {album.map((house, i) => (
+              <li key={house.id} className={styles.albumItem}>
+                <button type="button" className={styles.albumCard} aria-label={`${i + 1}ばんめの おうちを ひらく（${houseSummary(house.design)}）`} onClick={() => onOpen(house.id)}>
+                  <span className={styles.albumArt}><HouseFront design={house.design} /></span>
+                  <span className={styles.albumName} aria-hidden="true">{houseSummary(house.design)}</span>
+                </button>
+                <button type="button" className={styles.albumRemove} aria-label={`${i + 1}ばんめの おうちを けす`} onClick={() => onRemove(house.id)}>
+                  <span aria-hidden="true">けす</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       <h2 id="house-type-title" className={styles.lead}>どんな おうちに する？</h2>
       <ul className={styles.cardGrid} aria-label="いえの しゅるい">
@@ -676,7 +825,15 @@ function orderedRooms(design: HouseDesign): PlacedRoom[] {
 
 const roomTitle = (room: PlacedRoom) => `${room.floor + 1}かいの ${findRoomStyle(room.type, room.style).name}`
 
-function DoneScreen({ design, onEditPlan, onEditOutside, onRestart }: { design: HouseDesign; onEditPlan: () => void; onEditOutside: () => void; onRestart: () => void }) {
+function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, onRestart }: {
+  design: HouseDesign
+  saved: boolean
+  note: string | null
+  onSave: () => void
+  onEditPlan: () => void
+  onEditOutside: () => void
+  onRestart: () => void
+}) {
   const [view, setView] = useState<'outside' | 'inside'>('outside')
   const [bubble, setBubble] = useState<{ key: number; text: string } | null>(null)
   const [roomId, setRoomId] = useState<number | null>(null)
@@ -829,6 +986,12 @@ function DoneScreen({ design, onEditPlan, onEditOutside, onRestart }: { design: 
           ))}
         </div>
       )}
+      <div className={styles.saveBox}>
+        <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} disabled={saved} onClick={onSave}>
+          {saved ? <><span aria-hidden="true">✓ </span>ほぞんずみ</> : <><span aria-hidden="true">📒 </span>おうちを ほぞんする</>}
+        </button>
+        {note && <p className={styles.saveNote} role="status">{note}</p>}
+      </div>
       <div className={styles.doneButtons}>
         <button type="button" className={styles.btn} onClick={onEditPlan}>まどりを なおす</button>
         <button type="button" className={styles.btn} onClick={onEditOutside}>そとがわを なおす</button>
