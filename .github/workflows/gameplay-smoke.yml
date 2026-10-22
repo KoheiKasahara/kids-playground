@@ -7,6 +7,7 @@ on:
       - 'scripts/e2e/**'
       - 'package.json'
       - 'package-lock.json'
+      - '.nvmrc'
       - 'playwright.config.ts'
       - 'vite.config.ts'
       - 'tsconfig*.json'
@@ -29,9 +30,11 @@ jobs:
       E2E_DIAGNOSTICS_MAX_BYTES: 8388608
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run build
@@ -73,9 +76,11 @@ jobs:
       E2E_DIAGNOSTICS_MAX_BYTES: 8388608
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run build

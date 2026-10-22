@@ -8,7 +8,9 @@ on:
 
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  # PR は古い実行を取り消す。main への push は取り消さずに順番待ちさせ、
+  # 実行中の GitHub Pages デプロイを途中で止めない。
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -22,13 +24,17 @@ jobs:
       # から読み取るために必要な最小権限（書き込みは行わない）。
       actions: read
     steps:
+      # git の認証操作は行わないため、トークンを .git/config に残さない。
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node
+        id: setup-node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -109,7 +115,7 @@ jobs:
           CI_LINT_OUTCOME: ${{ steps.lint.outcome }}
           CI_TEST_OUTCOME: ${{ steps.test.outcome }}
           CI_BUILD_OUTCOME: ${{ steps.build.outcome }}
-          CI_NODE_VERSION: '22'
+          CI_NODE_VERSION: ${{ steps.setup-node.outputs.node-version }}
           CI_PACKAGE_MANAGER: npm
           CI_CACHE: setup-node npm cache
         run: node scripts/ci-summary.mjs

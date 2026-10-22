@@ -6,7 +6,7 @@
 
 ## 前提環境
 
-- Node.js（CIが使用するメジャーバージョンに合わせる。`node -v` で確認）
+- Node.js（CIと同じメジャーバージョンを `.nvmrc` に、対応範囲を `package.json` の `engines` に記載。`node -v` で確認）
 - npm（Nodeに同梱。`npm -v` で確認）
 - Git
 

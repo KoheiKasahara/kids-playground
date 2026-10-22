@@ -11,23 +11,27 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  # Project Health 履歴（Issue #525）を public/project-health/history.json へ
-  # コミットするための書き込み権限と、Nightly/Deploy の直近状態を取得するための
-  # Actions API 読み取り権限。書き込みはこのファイル1つに限定する。
-  contents: write
+  # 既定は読み取りのみ。Nightly/Deploy の直近状態を取得するための Actions API 読み取り権限を含む。
+  # Project Health 履歴（Issue #525）を書き込む権限は、依存パッケージのコードを実行しない
+  # history job にだけ付与する（下記）。
+  contents: read
   actions: read
 
 jobs:
   full:
     runs-on: ubuntu-24.04
     steps:
+      # npm ci 以降は依存パッケージのコードを実行するため、トークンを .git/config に残さない。
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node
+        id: setup-node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -157,7 +161,7 @@ jobs:
           CI_LINT_OUTCOME: ${{ steps.lint.outcome }}
           CI_TEST_OUTCOME: ${{ steps.test.outcome }}
           CI_BUILD_OUTCOME: ${{ steps.build.outcome }}
-          CI_NODE_VERSION: '22'
+          CI_NODE_VERSION: ${{ steps.setup-node.outputs.node-version }}
           CI_PACKAGE_MANAGER: npm
           CI_CACHE: setup-node npm cache
         run: node scripts/ci-summary.mjs
@@ -181,19 +185,32 @@ jobs:
 
       # main は PR と build check を必須にしているため、履歴は専用ブランチに保存する。
       # 前回値を復元してから当日分を追記し、Dashboard はこのブランチの raw JSON を読む。
+      # 公開リポジトリのため認証なしで取得できる。ブランチが無い場合（終了コード2）だけ
+      # リポジトリ内の初期値から始め、通信・認証の失敗では止める（初期値で履歴を上書きしないため）。
       - name: Project Health - restore history
+        id: restore-history
         if: always()
         shell: bash
         run: |
-          if git ls-remote --exit-code --heads origin project-health-history >/dev/null 2>&1; then
-            git fetch --no-tags origin project-health-history:refs/remotes/origin/project-health-history
-            git show origin/project-health-history:public/project-health/history.json > public/project-health/history.json
-          else
-            echo "No existing Project Health history branch; starting from the repository seed."
-          fi
+          status=0
+          git ls-remote --exit-code --heads origin project-health-history >/dev/null || status=$?
+          case "$status" in
+            0)
+              git fetch --no-tags origin project-health-history:refs/remotes/origin/project-health-history
+              git show origin/project-health-history:public/project-health/history.json > public/project-health/history.json
+              ;;
+            2)
+              echo "No existing Project Health history branch; starting from the repository seed."
+              ;;
+            *)
+              echo "::error::Failed to query the project-health-history branch (git ls-remote exit status $status)."
+              exit "$status"
+              ;;
+          esac
 
+      # 復元に失敗した場合は書き込みも受け渡しもせず、history job でも保存させない。
       - name: Project Health - write history
-        if: always()
+        if: always() && steps.restore-history.outcome == 'success'
         env:
           PROJECT_HEALTH_NIGHTLY_LINT_OUTCOME: ${{ steps.lint.outcome }}
           PROJECT_HEALTH_NIGHTLY_TEST_OUTCOME: ${{ steps.test.outcome }}
@@ -201,30 +218,68 @@ jobs:
           PROJECT_HEALTH_NIGHTLY_E2E_OUTCOME: ${{ steps.e2e.outcome }}
         run: node scripts/project-health/write-history.mjs
 
+      # コミットと push は書き込み権限を持つ history job が行う。この job は成果物として渡すだけ。
+      - name: Project Health - upload history
+        if: always() && steps.restore-history.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: project-health-history
+          path: public/project-health/history.json
+          retention-days: 1
+          if-no-files-found: error
+
+  # 履歴の保存だけを担う job。contents: write はここにだけ付与する。
+  # full job は npm ci・テスト・build・Lighthouse などで依存パッケージのコードを実行するため、
+  # 書き込み可能なトークンを渡さない。この job は checkout・成果物の受け取り・git 操作だけを行い、
+  # npm やリポジトリ内のスクリプトを実行しない。
+  history:
+    needs: full
+    # テストが失敗した日も履歴を残す（従来の if: always() と同じ）。キャンセル時は保存しない。
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Project Health - download history
+        uses: actions/download-artifact@v7
+        with:
+          name: project-health-history
+          path: ${{ runner.temp }}/project-health-history
+
       # 履歴は専用の project-health-history ブランチへ fast-forward push する。
       # main の ruleset を迂回せず、履歴保存に失敗した場合も握りつぶさない。
       - name: Project Health - commit history
-        if: always()
         shell: bash
         run: |
           history_file=public/project-health/history.json
-          history_copy="$RUNNER_TEMP/project-health-history.json"
-          cp "$history_file" "$history_copy"
-          git restore --worktree "$history_file"
+          history_copy="$RUNNER_TEMP/project-health-history/history.json"
 
-          if git show-ref --verify --quiet refs/remotes/origin/project-health-history; then
-            git switch --force-create project-health-history origin/project-health-history
-          else
-            git switch --create project-health-history
-          fi
+          status=0
+          git ls-remote --exit-code --heads origin project-health-history >/dev/null || status=$?
+          case "$status" in
+            0)
+              git fetch --no-tags origin project-health-history:refs/remotes/origin/project-health-history
+              git switch --force-create project-health-history origin/project-health-history
+              ;;
+            2)
+              git switch --create project-health-history
+              ;;
+            *)
+              echo "::error::Failed to query the project-health-history branch (git ls-remote exit status $status)."
+              exit "$status"
+              ;;
+          esac
           cp "$history_copy" "$history_file"
 
-          if [ -z "$(git status --porcelain public/project-health/history.json)" ]; then
+          if [ -z "$(git status --porcelain "$history_file")" ]; then
             echo "No history changes to commit"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/project-health/history.json
+          git add "$history_file"
           git commit -m "chore(project-health): update history $(date -u +%Y-%m-%d)"
           git push origin HEAD:project-health-history
