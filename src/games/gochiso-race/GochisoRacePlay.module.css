@@ -192,16 +192,17 @@
 /* --- ボタン --- */
 .controls {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
   padding: 10px calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 12px) calc(var(--safe-left) + 12px);
   background: rgba(30, 40, 70, .82);
 }
-.stopButton, .jumpButton {
+.slideButton, .jumpButton {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 2px;
   min-height: 96px;
   padding: 0 10px;
   border: 4px solid #fff;
@@ -219,11 +220,17 @@
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.stopButton { background: linear-gradient(#ff8787, #f03e3e); box-shadow: 0 6px 0 #a61e1e; }
+.slideButton {
+  /* 「スライディング」は ながいので せまい がめんでも 1ぎょうに おさめる。 */
+  font-size: clamp(15px, 4.4vw, 24px);
+  letter-spacing: 0;
+  background: linear-gradient(#74c0fc, #1c7ed6);
+  box-shadow: 0 6px 0 #1864ab;
+}
 .jumpButton { background: linear-gradient(#69db7c, #2f9e44); box-shadow: 0 6px 0 #1f6e2f; }
-.stopButton:active, .stopButton[aria-pressed='true'] { transform: translateY(4px); box-shadow: 0 2px 0 #a61e1e; filter: brightness(.95); }
+.slideButton:active { transform: translateY(4px); box-shadow: 0 2px 0 #1864ab; }
 .jumpButton:active { transform: translateY(4px); box-shadow: 0 2px 0 #1f6e2f; }
-.stopButton:focus-visible, .jumpButton:focus-visible { outline: 4px solid #ffd43b; outline-offset: 2px; }
+.slideButton:focus-visible, .jumpButton:focus-visible { outline: 4px solid #ffd43b; outline-offset: 2px; }
 .controlIcon { width: 34px; height: 34px; flex-shrink: 0; }
 
 .status {
@@ -499,7 +506,8 @@
     background: transparent;
     pointer-events: none;
   }
-  .stopButton, .jumpButton { min-height: 80px; width: min(26vw, 190px); pointer-events: auto; opacity: .94; }
+  .slideButton, .jumpButton { min-height: 80px; width: min(26vw, 190px); pointer-events: auto; opacity: .94; }
+  .slideButton { font-size: clamp(15px, 2.6vw, 20px); }
   .hud { flex-direction: row; align-items: center; }
   .hudRow { order: 2; }
   .scores { flex: 0 1 auto; }

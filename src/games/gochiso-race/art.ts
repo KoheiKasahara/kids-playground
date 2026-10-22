@@ -5,7 +5,7 @@ import { Grid, outlinedSprite, shade, type Img, type Palette } from './pixel'
 // どうぶつ・ごちそう・はち などの ドット絵。画像ファイルは つかわず、1ドットずつ コードで かく オリジナル。
 // どうぶつは みぎむき。あしもとの まんなか（ANCHOR_X, ANCHOR_Y）を じめんに あわせて かく。
 
-export type AnimalState = 'stand' | 'run' | 'jump' | 'brake' | 'hurt' | 'squash' | 'cheer' | 'sad'
+export type AnimalState = 'stand' | 'run' | 'jump' | 'slide' | 'hurt' | 'cheer' | 'sad'
 export type EyeMode = 'open' | 'happy' | 'dizzy' | 'closed'
 
 export type SpritePose = {
@@ -58,8 +58,9 @@ function limbsFor(state: AnimalState, frame: number): Limbs {
       return RUN[((frame % RUN_FRAMES) + RUN_FRAMES) % RUN_FRAMES]
     case 'jump':
       return { front: [16, 29], back: [10.5, 29.6], armF: [19.2, 20.6], armB: [8.2, 20.6], bob: -1, lean: 0, droop: 0 }
-    case 'brake':
-      return { front: [18.5, 30.2], back: [14, 30.2], armF: [19.6, 22.4], armB: [9.4, 22.4], bob: 0, lean: -2, droop: 0 }
+    case 'slide':
+      // あしを まえに だして、てを うしろに のばす（え は たてに ちぢめて かく）。
+      return { front: [21, 30.2], back: [18, 30.4], armF: [8.2, 23.4], armB: [6.6, 22.6], bob: 0, lean: -2, droop: 0 }
     case 'hurt':
       return { front: [16, 29.6], back: [10, 29.6], armF: [20.2, 21.2], armB: [7, 21.2], bob: 0, lean: -1, droop: 0 }
     case 'cheer':
@@ -212,7 +213,7 @@ function buildAnimal(a: Animal, pose: SpritePose): Grid {
       pointyEars(g, hx, hy, body, a.belly, a.accent)
       break
     case 'rabbit': {
-      const back = pose.state === 'run' || pose.state === 'jump' ? 2 : 0
+      const back = pose.state === 'run' || pose.state === 'jump' || pose.state === 'slide' ? 2 : 0
       for (const [dx, up] of [[-2.6, 10], [2.4, 10.6]]) {
         g.ellipse(hx + dx - back, hy - up, 1.9, 5.2, body)
         g.ellipse(hx + dx - back, hy - up + .6, .8, 3.6, a.accent)
