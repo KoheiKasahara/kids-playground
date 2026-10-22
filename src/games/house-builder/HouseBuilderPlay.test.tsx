@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
 import { resetGameShelfCache } from '../../pages/gameShelfStore'
 import HouseBuilderPlay from './HouseBuilderPlay'
+import { ALBUM_LIMIT } from './save'
 import { playHouseSound, startBgm } from './sounds'
 
 vi.mock('./sounds', async (importOriginal) => {
@@ -34,6 +35,7 @@ vi.mock('./three/houseScene', () => ({
 
 const stopBgm = vi.fn()
 const KEY = 'house-builder-v1'
+const ALBUM_KEY = 'house-builder-album-v1'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -49,6 +51,7 @@ afterEach(() => {
 const click = (name: string | RegExp) => fireEvent.click(screen.getByRole('button', { name }))
 const cell = (x: number, y: number) => `よこ ${x}・たて ${y} に おく`
 const saved = () => JSON.parse(window.localStorage.getItem(KEY) ?? 'null')
+const album = () => JSON.parse(window.localStorage.getItem(ALBUM_KEY) ?? '[]')
 const sounds = () => vi.mocked(playHouseSound).mock.calls.map(([kind]) => kind)
 
 function renderGame() {
@@ -370,6 +373,101 @@ describe('house-builder play', () => {
     expect(screen.getByText('へやが まだ ないよ。「まどりを なおす」で へやを おいてね')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: /（3D）/ })).not.toBeInTheDocument()
     expect(scene.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  test('かんせいした おうちを ほぞんし、つぎに ひらくと いちらんから ひらいて なおせる', async () => {
+    openDone(SAVED_HOUSE)
+    await screen.findByRole('group', { name: /^できあがった おうち（3D）/ })
+    click(/おうちを ほぞんする/)
+    expect(screen.getByText('ほぞんしたよ！ さいしょの がめんから また ひらけるよ')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ほぞんずみ/ })).toBeDisabled()
+    expect(album()).toEqual([{ id: 1, savedAt: expect.any(Number), design: SAVED_HOUSE }])
+    expect(saved()).toMatchObject({ savedId: 1 })
+    cleanup()
+
+    // つくりかけを けしても、ほぞんした おうちは のこる。
+    window.localStorage.removeItem(KEY)
+    renderGame()
+    const list = screen.getByRole('list', { name: 'ほぞんした おうち' })
+    fireEvent.click(within(list).getByRole('button', { name: '1ばんめの おうちを ひらく（2かいだて・へや 2こ）' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /かんせい！/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ほぞんずみ/ })).toBeDisabled()
+
+    // なおすと また ほぞん できて、おなじ ところに うわがき する。
+    click('そとがわを なおす')
+    fireEvent.click(within(screen.getByRole('list', { name: 'えらぶ もの' })).getByRole('button', { name: 'かべ' }))
+    fireEvent.click(within(screen.getByRole('list', { name: 'かべ' })).getAllByRole('button').find((b) => b.getAttribute('aria-pressed') === 'false')!)
+    click('かんせい！')
+    click(/おうちを ほぞんする/)
+    expect(album()).toHaveLength(1)
+    expect(album()[0].design.exterior.wall).not.toBe('brick')
+
+    // ほぞんした おうちを えらんで いても、さいしょからは けさずに のこす。
+    click('さいしょから つくる')
+    expect(screen.getByRole('dialog')).toHaveTextContent('ほぞんした おうちは のこるよ')
+    click('あたらしく つくる')
+    expect(window.localStorage.getItem(KEY)).toBeNull()
+    expect(within(screen.getByRole('list', { name: 'ほぞんした おうち' })).getAllByRole('listitem')).toHaveLength(1)
+  })
+
+  test('ほぞんしていない つくりかけが ある ときは たしかめてから ひらき、けす ときも たしかめる', () => {
+    window.localStorage.setItem(ALBUM_KEY, JSON.stringify([{ id: 4, savedAt: 1, design: SAVED_HOUSE }, { id: 7, savedAt: 2, design: { ...SAVED_HOUSE, rooms: [] } }]))
+    startHouse(/^ひらや/, /^しかく/)
+    click('もどる')
+    click('もどる')
+    const list = () => screen.getByRole('list', { name: 'ほぞんした おうち' })
+    fireEvent.click(within(list()).getByRole('button', { name: /^2ばんめの おうちを ひらく/ }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('つくりかけの おうちは きえるよ')
+    click('やめる')
+    expect(saved()).toMatchObject({ houseType: 'hiraya', savedId: null })
+    fireEvent.click(within(list()).getByRole('button', { name: /^2ばんめの おうちを ひらく/ }))
+    click('ひらく')
+    expect(screen.getByRole('heading', { name: /かんせい！/ })).toBeInTheDocument()
+    expect(saved()).toMatchObject({ houseType: 'nikai', rooms: [], savedId: 7 })
+
+    click('もどる')
+    click('もどる')
+    click('もどる')
+    click('もどる')
+    fireEvent.click(within(list()).getByRole('button', { name: '1ばんめの おうちを けす' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('この おうちを けす？')
+    click('やめる')
+    expect(album()).toHaveLength(2)
+    fireEvent.click(within(list()).getByRole('button', { name: '1ばんめの おうちを けす' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'けす' }))
+    expect(screen.getByRole('status')).toHaveTextContent('ほぞんした おうちを けしたよ')
+    expect(album().map((h: { id: number }) => h.id)).toEqual([7])
+    // ひらいて いた おうちは そのまま ひらける。
+    fireEvent.click(within(list()).getByRole('button', { name: /^1ばんめの おうちを ひらく/ }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  test('ほぞんが いっぱいの ときは どれと いれかえるか えらぶ', () => {
+    const full = Array.from({ length: ALBUM_LIMIT }, (_, i) => ({ id: i + 1, savedAt: i, design: { ...SAVED_HOUSE, rooms: [] } }))
+    window.localStorage.setItem(ALBUM_KEY, JSON.stringify(full))
+    openDone(SAVED_HOUSE)
+    click(/おうちを ほぞんする/)
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveTextContent(`ほぞんは ${ALBUM_LIMIT}こ まで`)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'やめる' }))
+    expect(album()).toEqual(full)
+
+    click(/おうちを ほぞんする/)
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '3ばんめの おうちと いれかえる' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(album()).toHaveLength(ALBUM_LIMIT)
+    expect(album()[2]).toMatchObject({ id: 3, design: SAVED_HOUSE })
+    expect(saved()).toMatchObject({ savedId: 3 })
+  })
+
+  test('ブラウザに ほぞん できない ときは おしえて、そのまま あそべる', () => {
+    openDone(SAVED_HOUSE)
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError') })
+    click(/おうちを ほぞんする/)
+    expect(screen.getByText('この ブラウザでは ほぞん できないよ')).toBeInTheDocument()
+    expect(sounds()).toContain('blocked')
+    expect(screen.getByRole('button', { name: /おうちを ほぞんする/ })).toBeEnabled()
   })
 
   test('こわれた ほぞんデータは つかわずに はじめから', () => {

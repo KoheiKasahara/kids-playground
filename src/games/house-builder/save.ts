@@ -57,20 +57,96 @@ export function parseDesign(data: unknown): HouseDesign | null {
   return design
 }
 
-export function readDesign(): HouseDesign | null {
+/** つくりかけの おうちと、それが どの ほぞんした おうちから きたか。 */
+export type Draft = { design: HouseDesign; savedId: number | null }
+
+export function readDraft(): Draft | null {
   try {
     const raw = window.localStorage.getItem(KEY)
-    return raw ? parseDesign(JSON.parse(raw)) : null
+    if (!raw) return null
+    const data: unknown = JSON.parse(raw)
+    const design = parseDesign(data)
+    if (!design) return null
+    const savedId = (data as Record<string, unknown>).savedId
+    return { design, savedId: isInt(savedId) ? savedId : null }
   } catch {
     return null
   }
 }
 
-export function writeDesign(design: HouseDesign | null): void {
+export function writeDraft(draft: Draft | null): void {
   try {
-    if (design) window.localStorage.setItem(KEY, JSON.stringify(design))
+    if (draft) window.localStorage.setItem(KEY, JSON.stringify({ ...draft.design, savedId: draft.savedId }))
     else window.localStorage.removeItem(KEY)
   } catch {
     // ほぞん できなくても その ばで あそべる。
   }
+}
+
+// ---------------- ほぞんした おうち ----------------
+
+const ALBUM_KEY = 'house-builder-album-v1'
+
+/** ほぞん できる おうちの かず。 */
+export const ALBUM_LIMIT = 6
+
+export type SavedHouse = { id: number; savedAt: number; design: HouseDesign }
+
+/** ほぞんした おうちの いちらんを もどす。こわれた ものや かぶった ものは すてる。 */
+export function parseAlbum(data: unknown): SavedHouse[] {
+  if (!Array.isArray(data)) return []
+  const album: SavedHouse[] = []
+  for (const raw of data) {
+    if (album.length >= ALBUM_LIMIT) break
+    if (!raw || typeof raw !== 'object') continue
+    const v = raw as Record<string, unknown>
+    const design = parseDesign(v.design)
+    if (!design || !isInt(v.id) || album.some((h) => h.id === v.id)) continue
+    album.push({ id: v.id, savedAt: typeof v.savedAt === 'number' && Number.isFinite(v.savedAt) ? v.savedAt : 0, design })
+  }
+  return album
+}
+
+export function readAlbum(): SavedHouse[] {
+  try {
+    const raw = window.localStorage.getItem(ALBUM_KEY)
+    return raw ? parseAlbum(JSON.parse(raw)) : []
+  } catch {
+    return []
+  }
+}
+
+/** ほぞん できたら true。できない ブラウザでは false を かえす。 */
+export function writeAlbum(album: readonly SavedHouse[]): boolean {
+  try {
+    window.localStorage.setItem(ALBUM_KEY, JSON.stringify(album))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * おうちを いちらんに いれる。id の おうちが あれば そこを うわがきし、なければ あたらしく ふやす。
+ * いっぱいで ふやせない ときは null。
+ */
+export function putHouse(album: readonly SavedHouse[], design: HouseDesign, id: number | null, savedAt: number): { album: SavedHouse[]; id: number } | null {
+  if (id !== null && album.some((h) => h.id === id)) {
+    return { album: album.map((h) => (h.id === id ? { id, savedAt, design } : h)), id }
+  }
+  if (album.length >= ALBUM_LIMIT) return null
+  const next = Math.max(0, ...album.map((h) => h.id)) + 1
+  return { album: [...album, { id: next, savedAt, design }], id: next }
+}
+
+export function removeHouse(album: readonly SavedHouse[], id: number): SavedHouse[] {
+  return album.filter((h) => h.id !== id)
+}
+
+/** ならびじゅんの ちがいに まどわされない ように、もどす ときと おなじ かたちに そろえて くらべる。 */
+const canonical = (design: HouseDesign) => JSON.stringify(parseDesign(JSON.parse(JSON.stringify(design))))
+
+/** ほぞんした ときから かわって いないか。 */
+export function sameDesign(a: HouseDesign, b: HouseDesign): boolean {
+  return canonical(a) === canonical(b)
 }

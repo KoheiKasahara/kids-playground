@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { DEFAULT_EXTERIOR } from './data'
 import { addRoom, createDesign, type HouseDesign } from './plan'
-import { parseDesign, readDesign, writeDesign } from './save'
+import {
+  ALBUM_LIMIT, parseAlbum, parseDesign, putHouse, readAlbum, readDraft, removeHouse, sameDesign, writeAlbum, writeDraft,
+} from './save'
 
 function sample(): HouseDesign {
   const design = { ...createDesign('nikai', 'lshape'), exterior: { ...DEFAULT_EXTERIOR, wall: 'brick', parking: 'two', extras: ['chimney', 'fence'] } } as HouseDesign
@@ -48,20 +50,19 @@ describe('house-builder save', () => {
   })
 
   test('ブラウザに かいて よめる。ほぞん できない ときも とまらない', () => {
-    const store = new Map<string, string>()
-    vi.stubGlobal('window', {
-      localStorage: {
-        getItem: (k: string) => store.get(k) ?? null,
-        setItem: (k: string, v: string) => { store.set(k, v) },
-        removeItem: (k: string) => { store.delete(k) },
-      },
-    })
-    expect(readDesign()).toBeNull()
+    stubStorage()
+    expect(readDraft()).toBeNull()
+    expect(readAlbum()).toEqual([])
     const design = sample()
-    writeDesign(design)
-    expect(readDesign()).toEqual(design)
-    writeDesign(null)
-    expect(readDesign()).toBeNull()
+    writeDraft({ design, savedId: 3 })
+    expect(readDraft()).toEqual({ design, savedId: 3 })
+    writeDraft({ design, savedId: null })
+    expect(readDraft()).toEqual({ design, savedId: null })
+    writeDraft(null)
+    expect(readDraft()).toBeNull()
+    const album = putHouse([], design, null, 100)!.album
+    expect(writeAlbum(album)).toBe(true)
+    expect(readAlbum()).toEqual(album)
 
     vi.stubGlobal('window', {
       localStorage: {
@@ -70,7 +71,67 @@ describe('house-builder save', () => {
         removeItem: () => { throw new Error('denied') },
       },
     })
-    expect(() => writeDesign(design)).not.toThrow()
-    expect(readDesign()).toBeNull()
+    expect(() => writeDraft({ design, savedId: null })).not.toThrow()
+    expect(readDraft()).toBeNull()
+    expect(writeAlbum(album)).toBe(false)
+    expect(readAlbum()).toEqual([])
+  })
+
+  test('ほぞんした おうちを ふやし、おなじ おうちは うわがきし、いっぱいなら ふやさない', () => {
+    const design = sample()
+    const first = putHouse([], design, null, 1)!
+    expect(first).toEqual({ id: 1, album: [{ id: 1, savedAt: 1, design }] })
+
+    const changed = { ...design, exterior: { ...design.exterior, wall: 'white' } } as HouseDesign
+    const over = putHouse(first.album, changed, 1, 2)!
+    expect(over.album).toEqual([{ id: 1, savedAt: 2, design: changed }])
+
+    // けした おうちに つながって いたら、あたらしく ふやす。
+    const second = putHouse(over.album, design, 9, 3)!
+    expect(second.id).toBe(2)
+
+    let album = second.album
+    while (album.length < ALBUM_LIMIT) album = putHouse(album, design, null, 4)!.album
+    expect(putHouse(album, design, null, 5)).toBeNull()
+    expect(putHouse(album, changed, 2, 5)!.album.find((h) => h.id === 2)?.design).toEqual(changed)
+
+    const removed = removeHouse(album, 1)
+    expect(removed.map((h) => h.id)).toEqual(album.slice(1).map((h) => h.id))
+    expect(putHouse(removed, design, null, 6)!.id).toBe(ALBUM_LIMIT + 1)
+  })
+
+  test('ほぞんした いちらんの こわれた ものは すてる', () => {
+    const design = JSON.parse(JSON.stringify(sample()))
+    expect(parseAlbum(null)).toEqual([])
+    expect(parseAlbum({ id: 1 })).toEqual([])
+    const parsed = parseAlbum([
+      { id: 1, savedAt: 10, design },
+      { id: 1, savedAt: 11, design }, // id が かぶる
+      { id: 2, savedAt: 'きのう', design }, // ひづけは なくても よい
+      { id: 3, savedAt: 12, design: { houseType: 'castle' } },
+      { id: 'x', savedAt: 13, design },
+      null,
+      ...Array.from({ length: ALBUM_LIMIT }, (_, i) => ({ id: 10 + i, savedAt: 1, design })),
+    ])
+    expect(parsed.map((h) => h.id)).toEqual([1, 2, 10, 11, 12, 13].slice(0, ALBUM_LIMIT))
+    expect(parsed[1].savedAt).toBe(0)
+  })
+
+  test('ならびじゅんが ちがっても おなじ おうちと みなす', () => {
+    const design = sample()
+    const shuffled = JSON.parse(JSON.stringify({ exterior: design.exterior, rooms: design.rooms.map((r) => ({ ...r })), shape: design.shape, houseType: design.houseType }))
+    expect(sameDesign(design, shuffled)).toBe(true)
+    expect(sameDesign(design, { ...design, rooms: design.rooms.slice(1) })).toBe(false)
   })
 })
+
+function stubStorage() {
+  const store = new Map<string, string>()
+  vi.stubGlobal('window', {
+    localStorage: {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v) },
+      removeItem: (k: string) => { store.delete(k) },
+    },
+  })
+}
