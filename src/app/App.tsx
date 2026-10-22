@@ -11,65 +11,7 @@ import { installBrowserPageZoomSuppression } from './preventBrowserPageZoom'
 import GameBackButton from '../components/GameBackButton'
 import { findGameIdByPathname, recordRecentGameVisit } from '../pages/gameShelfStore'
 import { setActiveSoundGame } from '../audio/sound'
-
-const SELF_MANAGED_GAME_BACK_PATHS = new Set([
-  '/games/house-builder',
-  '/games/gochiso-race',
-  '/games/homerun-derby',
-  '/games/kaiten-sushi',
-  '/games/fishing-pond',
-  '/games/venom-lab',
-  '/games/forest-delivery',
-  '/games/draw-goal',
-  '/games/animal-bath',
-  '/games/bento-builder',
-  '/games/block-puzzle',
-  '/games/car-builder',
-  '/games/car-road-builder',
-  '/games/car-road-builder/play',
-  '/games/color-paint-puzzle',
-  '/games/crane-game',
-  '/games/domino-flag',
-  '/games/dot-adventure',
-  '/games/dot-zoo',
-  '/games/dot-aquarium',
-  '/games/dot-monster-farm',
-  '/games/dot-run',
-  '/games/dot-bomb',
-  '/games/jishaku-pitatto',
-  '/games/kabukuwa-battle',
-  '/games/pixel-kart',
-  '/games/tsumiki-3d',
-  '/games/flag-pinball',
-  '/games/flag-roll-maze',
-  '/games/flag-roll-maze/play',
-  '/games/flag-roll-puzzle',
-  '/games/hoshi-tsunagi',
-  '/games/koma-battle',
-  '/games/kurukuru-rokuro',
-  '/games/magic-sandbox',
-  '/games/marble-course',
-  '/games/mato-ate',
-  '/games/oekaki-korokoro',
-  '/games/onaji-pon',
-  '/games/origami-play',
-  '/games/piano-play',
-  '/games/planet-globe',
-  '/games/puni-slime',
-  '/games/rhythm-pon',
-  '/games/pukupuka-rescue',
-  '/games/putter-golf',
-  '/games/pyoko-touch',
-  '/games/rail-builder',
-  '/games/robo-kuzushi',
-  '/games/snowball-roll',
-  '/games/tonton-sumo',
-  '/games/shabon-pachin',
-  '/games/shinkeisuijaku',
-  '/games/water-wheel-maze',
-  '/games/treasure-dig',
-  '/games/tsumiki-bowling',
-])
+import { showsAppGameBackButton } from './appGameBackButton'
 
 export default function App() {
   const element = useRoutes(routes)
@@ -94,8 +36,7 @@ export default function App() {
       <ScrollManager />
       <SeoManager />
       {/* 画面内状態をひとつ戻すゲームは、同じ共通部品へ onClick を渡して自前で表示する。 */}
-      {normalizedPathname.startsWith('/games/') &&
-        !SELF_MANAGED_GAME_BACK_PATHS.has(normalizedPathname) && <GameBackButton />}
+      {showsAppGameBackButton(normalizedPathname) && <GameBackButton />}
       {/* ゲームと説明を同じSuspenseで待ち、説明だけを先行表示しない。 */}
       <GameRouteBoundary>
         <GameIntroProvider>
