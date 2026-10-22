@@ -12,12 +12,13 @@ import { RUN_FRAMES, animalSprite, foodSprite, type AnimalState } from './art'
 import { COURSES, type Course } from './courses'
 import { progressStore, isUnlocked, readAnimal, writeAnimal } from './progress'
 import {
-  GOAL_BONUS, createRace, drainEvents, pressJump, progressOf, setStop, stepRace,
+  GOAL_BONUS, createRace, drainEvents, pressJump, pressSlide, progressOf, stepRace,
   type Race, type RaceEvent, type RaceResult, type Score,
 } from './race'
 import { createFx, drawPortrait, drawScene, followCamera, makeView, cameraTarget, spawnFx, updateFx, type Cam, type View } from './render'
 import {
-  playBump, playEat, playFall, playGoal, playJump, playLose, playReady, playRespawn, playRivalEat, playTap, playWin, startBgm,
+  playBoost, playBump, playEat, playFall, playGoal, playJump, playLose, playReady, playRespawn, playRivalEat, playSlide, playSpring,
+  playTap, playWin, startBgm,
 } from './sounds'
 import styles from './GochisoRacePlay.module.css'
 
@@ -26,7 +27,7 @@ const FRAME_MS = 1000 / 60
 /** おわってから この じかん[s] たったら 絵を とめて 電池を まもる。 */
 const REST_AFTER_DONE = 3
 const JUMP_KEYS = new Set(['ArrowUp', 'w', 'W'])
-const STOP_KEYS = new Set(['ArrowDown', 'ArrowLeft', 's', 'S'])
+const SLIDE_KEYS = new Set(['ArrowDown', 's', 'S'])
 
 type Banner = 'ready' | 'go' | null
 type Callout = { key: number; text: string; tone: 'win' | 'info' }
@@ -95,9 +96,10 @@ function JumpIcon() {
   </svg>
 }
 
-function StopIcon() {
+function SlideIcon() {
   return <svg viewBox="0 0 48 48" aria-hidden="true" className={styles.controlIcon}>
-    <path d="M16 10 a3 3 0 0 1 6 0 V22 h1 V7 a3 3 0 0 1 6 0 V22 h1 V10 a3 3 0 0 1 6 0 V30 c0 8 -5 13 -12 13 c-6 0 -9 -3 -12 -8 L8 26 a3 3 0 0 1 5 -3 l3 4 Z" fill="currentColor" />
+    <path d="M6 24 L24 24 L24 16 L42 30 L24 44 L24 36 L6 36 Z" fill="currentColor" />
+    <path d="M6 10 H42" stroke="currentColor" strokeWidth="4" strokeLinecap="round" opacity=".6" />
   </svg>
 }
 
@@ -126,16 +128,12 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
   const meMarkerRef = useRef<HTMLSpanElement>(null)
   const rivalMarkerRef = useRef<HTMLSpanElement>(null)
   const raceRef = useRef<Race | null>(null)
-  const stopPointers = useRef(new Set<number>())
-  const stopKeys = useRef(new Set<string>())
-  const stopLatch = useRef(false)
-  const lastKeyJump = useRef(-1e9)
+  const lastKeyPress = useRef(-1e9)
   const [banner, setBanner] = useState<Banner>('ready')
   const [running, setRunning] = useState(false)
   const [scores, setScores] = useState({ player: 0, rival: 0 })
   const [callout, setCallout] = useState<Callout | null>(null)
   const [message, setMessage] = useState(`よーい… ${course.name}`)
-  const [stopping, setStopping] = useState(false)
   const [result, setResult] = useState<RaceResult | null>(null)
   const me = findAnimal(animal)
   const them = findAnimal(rival)
@@ -192,6 +190,21 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
         case 'jump':
           if (event.who === 'player') playJump(event.air)
           break
+        case 'slide':
+          if (event.who === 'player') playSlide()
+          break
+        case 'spring':
+          if (event.who === 'player') {
+            playSpring()
+            vibrate('tap')
+          }
+          break
+        case 'boost':
+          if (event.who === 'player') {
+            playBoost()
+            setMessage('びゅーん！ かそく！')
+          }
+          break
         case 'eat':
           if (event.who === 'player') {
             playEat(event.points)
@@ -203,7 +216,7 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
           if (event.who === 'player') {
             playBump(event.cause)
             vibrate('impact')
-            setMessage(event.cause === 'pounder' ? 'ぺちゃん！ ぺったんが あがったら すすもう' : 'いたっ！ はちに きをつけて')
+            setMessage(event.cause === 'bonk' ? 'ごつん！ スライディングで くぐろう' : 'いたっ！ はちに きをつけて')
           }
           break
         case 'fall':
@@ -234,7 +247,6 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
           const { stars, outcome } = event.result
           if (stars > 0) progressStore.record(course.id, stars)
           setRunning(false)
-          setStop(race, false)
           if (outcome === 'win') {
             playWin()
             vibrate('celebrate')
@@ -275,13 +287,6 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
     }
     frame = requestAnimationFrame(tick)
 
-    const releaseAll = () => {
-      stopPointers.current.clear()
-      stopKeys.current.clear()
-      stopLatch.current = false
-      setStop(race, false)
-      setStopping(false)
-    }
     const isOwnControl = (target: EventTarget | null) => target instanceof HTMLElement && target.dataset.raceControl !== undefined
     const isOtherControl = (target: EventTarget | null) =>
       target instanceof HTMLElement && !isOwnControl(target) && Boolean(target.closest('button, a, input, select, textarea'))
@@ -289,87 +294,53 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
       if (race.phase === 'done' || isOtherControl(event.target)) return
       const own = isOwnControl(event.target) ? (event.target as HTMLElement).dataset.raceControl : null
       const activate = event.key === ' ' || event.key === 'Enter'
-      if (STOP_KEYS.has(event.key) || (activate && own === 'stop')) {
-        event.preventDefault()
-        stopKeys.current.add(event.key)
-        setStop(race, true)
-        setStopping(true)
-      } else if (JUMP_KEYS.has(event.key) || activate) {
-        event.preventDefault()
-        if (event.repeat) return
-        primeAudio()
-        lastKeyJump.current = performance.now()
-        pressJump(race)
-      }
+      const slide = SLIDE_KEYS.has(event.key) || (activate && own === 'slide')
+      if (!slide && !JUMP_KEYS.has(event.key) && !activate) return
+      event.preventDefault()
+      if (event.repeat) return
+      primeAudio()
+      lastKeyPress.current = performance.now()
+      if (slide) pressSlide(race)
+      else pressJump(race)
     }
     const onKeyUp = (event: KeyboardEvent) => {
       if (isOwnControl(event.target) && (event.key === ' ' || event.key === 'Enter')) event.preventDefault()
-      if (!stopKeys.current.delete(event.key)) return
-      if (stopKeys.current.size === 0 && stopPointers.current.size === 0 && !stopLatch.current) {
-        setStop(race, false)
-        setStopping(false)
-      }
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
-    window.addEventListener('blur', releaseAll)
     return () => {
       cancelAnimationFrame(frame)
       observer?.disconnect()
       window.removeEventListener('resize', measure)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
-      window.removeEventListener('blur', releaseAll)
       for (const timer of timers) clearTimeout(timer)
       raceRef.current = null
     }
   }, [course, animal, rival, seed])
 
-  function jump() {
+  function press(action: typeof pressJump) {
     const race = raceRef.current
     if (!race) return
     primeAudio()
-    pressJump(race)
+    action(race)
   }
 
-  function syncStop() {
-    const race = raceRef.current
-    const on = stopPointers.current.size > 0 || stopKeys.current.size > 0 || stopLatch.current
-    if (race) setStop(race, on)
-    setStopping(on)
-  }
-
-  function stopDown(event: PointerEvent<HTMLButtonElement>) {
-    if (event.button > 0) return
-    event.preventDefault()
-    primeAudio()
-    try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* つかえない ときも ある */ }
-    stopPointers.current.add(event.pointerId)
-    syncStop()
-  }
-
-  function stopUp(event: PointerEvent<HTMLButtonElement>) {
-    if (!stopPointers.current.delete(event.pointerId)) return
-    syncStop()
-  }
-
-  function stopClick(event: MouseEvent<HTMLButtonElement>) {
-    // よみあげ ソフトなどの そうさでは、おすたびに とまる・はしるを きりかえる。
-    if (event.detail !== 0 || performance.now() - lastKeyJump.current < 400 || stopKeys.current.size > 0) return
-    stopLatch.current = !stopLatch.current
-    syncStop()
-  }
-
-  function jumpDown(event: PointerEvent<HTMLElement>) {
+  function pointerPress(event: PointerEvent<HTMLElement>, action: typeof pressJump) {
     if (!event.isPrimary && event.pointerType === 'mouse') return
     if (event.button > 0) return
     event.preventDefault()
-    jump()
+    press(action)
   }
 
-  function jumpClick(event: MouseEvent<HTMLButtonElement>) {
-    if (event.detail !== 0 || performance.now() - lastKeyJump.current < 400) return
-    jump()
+  function clickPress(event: MouseEvent<HTMLButtonElement>, action: typeof pressJump) {
+    // よみあげ ソフトなどの そうさ（detail が 0 の クリック）だけ ここで うける。
+    if (event.detail !== 0 || performance.now() - lastKeyPress.current < 400) return
+    press(action)
+  }
+
+  function jumpDown(event: PointerEvent<HTMLElement>) {
+    pointerPress(event, pressJump)
   }
 
   function stageDown(event: PointerEvent<HTMLDivElement>) {
@@ -421,14 +392,13 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
       {callout && !result && <div key={callout.key} className={styles.callout} data-tone={callout.tone} aria-hidden="true">{callout.text}</div>}
     </div>
     <div className={styles.controls}>
-      <button type="button" className={styles.stopButton} data-race-control="stop" aria-pressed={stopping}
-        aria-label="ストップ。おしている あいだ とまる"
-        onPointerDown={stopDown} onPointerUp={stopUp} onPointerCancel={stopUp} onLostPointerCapture={stopUp} onClick={stopClick}>
-        <StopIcon />
-        <span>ストップ</span>
+      <button type="button" className={styles.slideButton} data-race-control="slide" aria-label="スライディング。ひくく すべって トンネルを くぐる"
+        onPointerDown={event => pointerPress(event, pressSlide)} onClick={event => clickPress(event, pressSlide)}>
+        <SlideIcon />
+        <span>スライディング</span>
       </button>
       <button type="button" className={styles.jumpButton} data-race-control="jump" aria-label="ジャンプ。くうちゅうで もう1かい とべる"
-        onPointerDown={jumpDown} onClick={jumpClick}>
+        onPointerDown={jumpDown} onClick={event => clickPress(event, pressJump)}>
         <JumpIcon />
         <span>ジャンプ</span>
       </button>
@@ -454,7 +424,7 @@ function RaceScreen({ course, index, animal, rival, seed, onExit, onRetry, onNex
           {[0, 1, 2].map(i => <span key={i} className={i < result.stars ? styles.starOn : styles.starOff} style={{ animationDelay: `${.3 + i * .28}s` }}>★</span>)}
         </div>}
         <p className={styles.resultNote}>{
-          result.outcome !== 'win' ? (result.player.place === 1 ? 'ごちそうを もっと たべよう！' : 'あなや ぺったんに きをつけて、さきに ゴールを めざそう！')
+          result.outcome !== 'win' ? (result.player.place === 1 ? 'ごちそうを もっと たべよう！' : 'あなや トンネルに きをつけて、さきに ゴールを めざそう！')
             : result.stars === 3 ? (last ? 'ぜんぶの コースで かったよ！ ごちそう チャンピオン！' : 'すごい！ ぱーふぇくと！')
               : result.player.place !== 1 ? 'さきに ゴールすると ★が ふえるよ' : 'ごちそうを たくさん たべると ★が ふえるよ'
         }</p>
@@ -480,7 +450,7 @@ function AnimalSelect({ current, onPick }: { current: AnimalId | null; onPick: (
     <header className={styles.selectHeader}>
       <TitleArt />
       <h1>{TITLE}</h1>
-      <p>ジャンプと ストップで はしって、ごちそうを たべながら ゴール！</p>
+      <p>ジャンプと スライディングで はしって、ごちそうを たべながら ゴール！</p>
     </header>
     <h2 className={styles.selectTitle}>はしる どうぶつを えらぼう</h2>
     <ul className={styles.animalGrid} aria-label="どうぶつを えらぶ">

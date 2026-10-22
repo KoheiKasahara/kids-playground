@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { COURSES, buildCourse, type Piece, type RivalStyle } from './courses'
 import { FOODS } from './foods'
 import {
-  GOAL_BONUS, READY_TIME, RIVAL_GOAL_LIMIT, RUNNER_W, RUN_SPEED,
-  createRace, drainEvents, pounderGap, pressJump, raceResult, setStop, stepRace,
+  BOOST_MUL, BOOST_TIME, GOAL_BONUS, READY_TIME, RIVAL_GOAL_LIMIT, RUNNER_H, RUNNER_W, RUN_SPEED, SLIDE_H, SLIDE_TIME,
+  createRace, drainEvents, heightOf, pressJump, pressSlide, raceResult, stepRace,
   type Race, type RaceEvent,
 } from './race'
 
@@ -42,9 +42,17 @@ function untilDone(race: Race, limit = 300): RaceEvent[] {
   return events
 }
 
+/** プレイヤーの まえはしが x の てまえ d に くるまで すすめる。 */
+function runUntilFront(race: Race, x: number, d = 0) {
+  for (let i = 0; i < 1200 && race.player.x + RUNNER_W < x - d; i++) run(race, DT)
+}
+
+/** じっと して いると ここで とまる（ジャンプ しないと こえられない だん）。 */
+const WALL: Piece = { t: 'hurdle', h: 60 }
+
 const ofType = <T extends RaceEvent['type']>(events: RaceEvent[], type: T) => events.filter((e): e is Extract<RaceEvent, { type: T }> => e.type === type)
 
-describe('gochiso-race: はしる・とぶ・とまる', () => {
+describe('gochiso-race: はしる・とぶ・すべる', () => {
   test('waits during よーい and starts running by itself on どん', () => {
     const race = newRace([{ t: 'run', len: 2000 }])
     run(race, READY_TIME - .1)
@@ -79,20 +87,130 @@ describe('gochiso-race: はしる・とぶ・とまる', () => {
     expect(race.player.y).toBe(0)
   })
 
-  test('holding stop brakes to a halt, and letting go runs again', () => {
+  test('sliding keeps running low for a moment, then stands up again', () => {
     const race = newRace([{ t: 'run', len: 2000 }])
+    pressSlide(race)
+    expect(race.player.slideBuffer).toBe(0)
     go(race)
     run(race, .5)
-    setStop(race, true)
-    run(race, .4)
-    expect(race.player.vx).toBe(0)
-    expect(race.player.braking).toBe(true)
-    const x = race.player.x
-    run(race, 1)
-    expect(race.player.x).toBe(x)
-    setStop(race, false)
-    run(race, .5)
-    expect(race.player.vx).toBeGreaterThan(RUN_SPEED * .9)
+    pressSlide(race)
+    expect(ofType(run(race, DT), 'slide')).toEqual([{ type: 'slide', who: 'player' }])
+    expect(heightOf(race.player)).toBe(SLIDE_H)
+    run(race, SLIDE_TIME / 2)
+    expect(race.player.slide).toBeGreaterThan(0)
+    expect(race.player.vx).toBeCloseTo(RUN_SPEED)
+    run(race, SLIDE_TIME / 2 + .05)
+    expect(heightOf(race.player)).toBe(RUNNER_H)
+  })
+
+  test('a slide pressed just before landing starts when the feet touch the ground', () => {
+    const race = newRace([{ t: 'run', len: 2000 }])
+    go(race)
+    pressJump(race)
+    run(race, .6)
+    expect(race.player.onGround).toBe(false)
+    pressSlide(race)
+    const events = run(race, .3)
+    expect(ofType(events, 'slide')).toHaveLength(1)
+    expect(race.player.onGround).toBe(true)
+  })
+
+  test('a tunnel bonks a runner who is standing, and sliding goes under it', () => {
+    const race = newRace([{ t: 'run', len: 300 }, { t: 'tunnel', len: 300 }, { t: 'run', len: 800 }])
+    const tunnel = race.course.blocks[0]
+    go(race)
+    const events = run(race, 2.5)
+    expect(ofType(events, 'bump')).toEqual([{ type: 'bump', who: 'player', cause: 'bonk' }])
+    expect(race.player.x + RUNNER_W).toBeLessThanOrEqual(tunnel.x0)
+    // ぶつかった あとは とまって まつ（なんども ごつんと しない）。
+    expect(ofType(run(race, 2), 'bump')).toEqual([])
+    expect(race.player.x + RUNNER_W).toBeLessThanOrEqual(tunnel.x0)
+
+    pressSlide(race)
+    run(race, .3)
+    expect(race.player.x + RUNNER_W).toBeGreaterThan(tunnel.x0 + 10)
+    // トンネルは スライディングより ながいので、なかでは でるまで すべりつづける。ジャンプも できない。
+    run(race, SLIDE_TIME)
+    expect(race.player.x).toBeLessThan(tunnel.x1)
+    expect(race.player.slide).toBeGreaterThan(0)
+    pressJump(race)
+    const inside = run(race, 2)
+    expect(ofType(inside, 'jump')).toEqual([])
+    expect(ofType(inside, 'bump')).toEqual([])
+    expect(race.player.x).toBeGreaterThan(tunnel.x1)
+    expect(heightOf(race.player)).toBe(RUNNER_H)
+  })
+
+  test('a slide started in time passes a tunnel without stopping', () => {
+    const race = newRace([{ t: 'run', len: 400 }, { t: 'tunnel', len: 160, row: 'cake', n: 1 }, { t: 'run', len: 800 }])
+    const tunnel = race.course.blocks[0]
+    go(race)
+    runUntilFront(race, tunnel.x0, 40)
+    pressSlide(race)
+    const events = run(race, 1.5)
+    expect(ofType(events, 'bump')).toEqual([])
+    expect(ofType(events, 'eat')).toEqual([expect.objectContaining({ who: 'player', kind: 'cake' })])
+    expect(race.player.x).toBeGreaterThan(tunnel.x1)
+    expect(race.player.vx).toBeCloseTo(RUN_SPEED)
+  })
+
+  test('a spring throws the runner up high, but sliding over it does not', () => {
+    const pieces: Piece[] = [{ t: 'run', len: 200 }, { t: 'spring', at: 100 }, { t: 'run', len: 1200 }]
+    const race = newRace(pieces)
+    go(race)
+    let top = 0
+    const events: RaceEvent[] = []
+    for (let i = 0; i < 150; i++) {
+      events.push(...run(race, DT))
+      top = Math.max(top, race.player.y)
+    }
+    expect(ofType(events, 'spring').map(e => e.who)).toContain('player')
+    expect(top).toBeGreaterThan(200)
+
+    const slid = newRace(pieces)
+    const spring = slid.course.springs[0]
+    go(slid)
+    runUntilFront(slid, spring.x0, 30)
+    pressSlide(slid)
+    const passed = run(slid, 1)
+    expect(ofType(passed, 'spring').filter(e => e.who === 'player')).toEqual([])
+    expect(slid.player.x).toBeGreaterThan(spring.x1)
+    expect(slid.player.y).toBe(0)
+  })
+
+  test('a boost pad makes the runner faster for a while, then it eases back', () => {
+    const race = newRace([{ t: 'run', len: 200 }, { t: 'boost', at: 100 }, { t: 'run', len: 2000 }])
+    go(race)
+    runUntilFront(race, race.course.boosts[0].x0)
+    const events = run(race, .5)
+    expect(ofType(events, 'boost').filter(e => e.who === 'player')).toHaveLength(1)
+    expect(race.player.vx).toBeCloseTo(RUN_SPEED * BOOST_MUL)
+    run(race, BOOST_TIME + .6)
+    expect(race.player.vx).toBeCloseTo(RUN_SPEED)
+  })
+
+  test('at a fork the spring leads up to the cloud road, and sliding stays on the road below', () => {
+    const pieces: Piece[] = [{ t: 'run', len: 300 }, { t: 'fork', len: 600, row: 'cake', n: 3 }, { t: 'run', len: 900, row: 'apple', n: 3 }]
+    const up = newRace(pieces)
+    const road = up.course.clouds[0]
+    go(up)
+    runUntilFront(up, road.x0 + 200)
+    expect(up.player.y).toBe(road.top)
+    run(up, 2.5)
+    expect(up.player.food).toBe(15)
+
+    const down = newRace(pieces)
+    const spring = down.course.springs[0]
+    expect(spring.fork).toBe(true)
+    go(down)
+    runUntilFront(down, spring.x0, 20)
+    pressSlide(down)
+    const events = run(down, 4.5)
+    expect(ofType(events, 'spring').filter(e => e.who === 'player')).toEqual([])
+    expect(ofType(events, 'bump')).toEqual([])
+    expect(down.player.y).toBe(0)
+    expect(down.player.x).toBeGreaterThan(road.x1)
+    expect(down.player.food).toBe(3)
   })
 
   test('a step that is too high blocks the way until you jump over it', () => {
@@ -123,40 +241,7 @@ describe('gochiso-race: はしる・とぶ・とまる', () => {
   })
 })
 
-describe('gochiso-race: ぺったん と はち', () => {
-  test('the pounder is open at first, then drops to the ground', () => {
-    const race = newRace([{ t: 'run', len: 200 }, { t: 'pounder', tempo: 'slow' }, { t: 'run', len: 600 }])
-    const p = race.course.pounders[0]
-    expect(pounderGap(p, 0)).toBe(p.height)
-    expect(pounderGap(p, p.up + p.drop + p.down / 2)).toBe(0)
-    expect(pounderGap(p, p.up + p.drop + p.down + p.rise / 2)).toBeCloseTo(p.height / 2)
-  })
-
-  test('the pounder squashes a runner under it and works as a wall while it is down', () => {
-    const race = newRace([{ t: 'run', len: 200 }, { t: 'pounder', tempo: 'slow' }, { t: 'run', len: 600 }])
-    const p = race.course.pounders[0]
-    go(race)
-    const cycle = p.up + p.drop + p.down + p.rise
-    // つぎに おちる すこし まえに、した に いる ことに する。
-    race.clock = Math.ceil(race.clock / cycle) * cycle + p.up - .05
-    race.player.x = p.x + 10
-    race.player.vx = 0
-    setStop(race, true)
-    const events = run(race, .3)
-    expect(ofType(events, 'bump')).toEqual([{ type: 'bump', who: 'player', cause: 'pounder' }])
-    expect(race.player.x + RUNNER_W).toBeLessThanOrEqual(p.x + 3)
-    expect(race.player.stun).toBeGreaterThan(0)
-
-    // じめんに おりている あいだは とおれない（ぶつかっても いたくない）。
-    race.player.stun = 0
-    race.player.invuln = 0
-    setStop(race, false)
-    const before = run(race, .4)
-    expect(pounderGap(p, race.clock)).toBe(0)
-    expect(ofType(before, 'bump')).toEqual([])
-    expect(race.player.x + RUNNER_W).toBeLessThanOrEqual(p.x + 3)
-  })
-
+describe('gochiso-race: はち', () => {
   test('a bee makes the runner dizzy for a moment, then it cannot hurt again right away', () => {
     const race = newRace([{ t: 'run', len: 200 }, { t: 'bee', y: 20, amp: .01 }, { t: 'run', len: 600 }])
     go(race)
@@ -183,21 +268,20 @@ describe('gochiso-race: ごちそう と かちまけ', () => {
     expect(race.rival.food).toBe(0)
   })
 
-  test('the rival eats food in front of a stopped player, unless it is picky', () => {
-    const hungry = newRace([{ t: 'run', len: 600, row: 'apple', n: 3 }, { t: 'run', len: 1200 }])
-    setStop(hungry, true)
+  test('the rival eats food in front of a player who is stuck, unless it is picky', () => {
+    const pieces: Piece[] = [{ t: 'run', len: 200 }, WALL, { t: 'run', len: 600, row: 'apple', n: 3 }, { t: 'run', len: 1200 }]
+    const hungry = newRace(pieces)
     go(hungry)
-    run(hungry, 6)
+    run(hungry, 8)
     expect(hungry.rival.food).toBe(3)
-    setStop(hungry, false)
+    hungry.player.x = hungry.course.spans[2].x0 + 10
     expect(ofType(run(hungry, 3), 'eat').filter(e => e.who === 'player')).toEqual([])
 
-    const picky = newRace([{ t: 'run', len: 600, row: 'apple', n: 3 }, { t: 'run', len: 1200 }], { ...SLOW_RIVAL, appetite: 0 })
-    setStop(picky, true)
+    const picky = newRace(pieces, { ...SLOW_RIVAL, appetite: 0 })
     go(picky)
-    run(picky, 6)
+    run(picky, 8)
     expect(picky.rival.food).toBe(0)
-    setStop(picky, false)
+    picky.player.x = picky.course.spans[2].x0 + 10
     run(picky, 3)
     expect(picky.player.food).toBe(3)
   })
@@ -236,8 +320,7 @@ describe('gochiso-race: ごちそう と かちまけ', () => {
   })
 
   test('the race ends a while after the rival finishes, even if the player never gets there', () => {
-    const race = newRace([{ t: 'run', len: 600 }])
-    setStop(race, true)
+    const race = newRace([{ t: 'run', len: 200 }, WALL, { t: 'run', len: 600 }])
     go(race)
     const events = untilDone(race)
     const goal = ofType(events, 'goal')
@@ -251,8 +334,8 @@ describe('gochiso-race: ごちそう と かちまけ', () => {
 describe('gochiso-race: コンピューターの はしりかた', () => {
   test.each(COURSES.map(c => [c.id, c] as const))('%s: the rival finishes the course without getting stuck', (_, c) => {
     for (const seed of [1, 2, 3]) {
+      // プレイヤーは なにも しないので さいしょの だんで とまっている。
       const race = createRace(c, { player: 'dog', rival: 'cat', seed })
-      setStop(race, true)
       const events = untilDone(race)
       const fell = ofType(events, 'fall').filter(e => e.who === 'rival').length
       const back = ofType(events, 'respawn').filter(e => e.who === 'rival').length
@@ -270,6 +353,18 @@ describe('gochiso-race: コンピューターの はしりかた', () => {
       expect(ofType(events, 'fall').filter(e => e.who === 'player'), `seed ${seed}`).toEqual([])
       expect(race.result, `seed ${seed}`).toEqual(expect.objectContaining({ outcome: 'win' }))
       expect(race.result!.stars, `seed ${seed}`).toBeGreaterThanOrEqual(2)
+    }
+  })
+
+  test('at a fork the computer takes the upper road when greedy, and slides into the lower road otherwise', () => {
+    const pieces: Piece[] = [{ t: 'run', len: 300 }, { t: 'fork', len: 600, row: 'cake', n: 3 }, { t: 'run', len: 900, row: 'apple', n: 3 }]
+    for (const greed of [0, 1]) {
+      const race = createRace(course(pieces), { player: 'dog', rival: 'cat', seed: 3, autoPlayer: { speed: 1, greed, hesitate: 0 } })
+      const events = untilDone(race)
+      const mine = <T extends RaceEvent['type']>(type: T) => ofType(events, type).filter(e => 'who' in e && e.who === 'player')
+      expect(mine('spring'), `greed ${greed}`).toHaveLength(greed)
+      expect(mine('bump'), `greed ${greed}`).toEqual([])
+      expect(race.player.food, `greed ${greed}`).toBe(greed ? 15 : 3)
     }
   })
 

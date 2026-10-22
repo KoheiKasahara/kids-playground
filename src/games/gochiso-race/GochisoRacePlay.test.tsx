@@ -6,10 +6,11 @@ import App from '../../app/App'
 import { resetGameShelfCache } from '../../pages/gameShelfStore'
 import GochisoRacePlay from './GochisoRacePlay'
 import { READY_TIME } from './race'
-import { playJump, playLose, playReady, playWin, startBgm } from './sounds'
+import { playBump, playJump, playLose, playReady, playSlide, playWin, startBgm } from './sounds'
 
 vi.mock('./sounds', () => ({
-  playTap: vi.fn(), playReady: vi.fn(), playJump: vi.fn(), playEat: vi.fn(), playRivalEat: vi.fn(), playBump: vi.fn(),
+  playTap: vi.fn(), playReady: vi.fn(), playJump: vi.fn(), playSlide: vi.fn(), playSpring: vi.fn(), playBoost: vi.fn(),
+  playEat: vi.fn(), playRivalEat: vi.fn(), playBump: vi.fn(),
   playFall: vi.fn(), playRespawn: vi.fn(), playGoal: vi.fn(), playWin: vi.fn(), playLose: vi.fn(),
   startBgm: vi.fn(() => vi.fn()),
 }))
@@ -23,7 +24,7 @@ vi.mock('./courses', async importOriginal => {
     COURSES: [
       actual.buildCourse({ id: 'meadow', name: 'れんしゅう コース', lead: 'まっすぐ はしろう', rival, pieces: [{ t: 'run', len: 700, row: 'banana', n: 6 }] }),
       actual.buildCourse({ id: 'sweets', name: 'だんの コース', lead: 'だんを ジャンプ', rival, pieces: [{ t: 'run', len: 300 }, { t: 'hurdle', h: 60 }, { t: 'run', len: 400 }] }),
-      actual.buildCourse({ id: 'starry', name: 'さいごの コース', lead: 'さいご', rival, pieces: [{ t: 'run', len: 500 }] }),
+      actual.buildCourse({ id: 'starry', name: 'トンネルの コース', lead: 'くぐろう', rival, pieces: [{ t: 'run', len: 300 }, { t: 'tunnel', len: 200 }, { t: 'run', len: 400 }] }),
     ],
   }
 })
@@ -60,7 +61,7 @@ function advance(frames: number) {
 
 const seconds = (s: number) => Math.round(s * 60)
 const jumpButton = () => screen.getByRole('button', { name: /^ジャンプ/ })
-const stopButton = () => screen.getByRole('button', { name: /^ストップ/ })
+const slideButton = () => screen.getByRole('button', { name: /^スライディング/ })
 
 function startRace(course: RegExp, animal = 'パンダ') {
   render(<MemoryRouter><GochisoRacePlay /></MemoryRouter>)
@@ -85,13 +86,13 @@ describe('gochiso-race play', () => {
     expect(screen.getByLabelText('あつめた ほし 0 / 9')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '1 れんしゅう コース' })).toBeEnabled()
     expect(screen.getByRole('button', { name: '2 だんの コース まだ あそべないよ' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '3 さいごの コース まだ あそべないよ' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '3 トンネルの コース まだ あそべないよ' })).toBeDisabled()
 
     fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
     expect(screen.getByRole('button', { name: 'パンダ' })).toHaveAttribute('data-current', 'true')
   })
 
-  test('よーい→どん, then the buttons jump and stop, and winning saves stars and opens the next course', () => {
+  test('よーい→どん, then the buttons jump and slide, and winning saves stars and opens the next course', () => {
     startRace(/^1 れんしゅう/)
     expect(screen.getByTestId('race-banner')).toHaveTextContent('よーい…')
     expect(screen.getByTestId('race-banner')).toHaveTextContent('さきに ゴールで +30てん')
@@ -113,10 +114,10 @@ describe('gochiso-race play', () => {
     advance(1)
     expect(playJump).toHaveBeenCalledWith(false)
 
-    fireEvent.pointerDown(stopButton(), { button: 0, pointerId: 3 })
-    expect(stopButton()).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.pointerUp(stopButton(), { pointerId: 3 })
-    expect(stopButton()).toHaveAttribute('aria-pressed', 'false')
+    advance(seconds(1.2))
+    fireEvent.pointerDown(slideButton(), { button: 0, pointerId: 3 })
+    advance(1)
+    expect(playSlide).toHaveBeenCalledTimes(1)
 
     untilDialog(20)
     expect(screen.getByRole('dialog', { name: 'かち' })).toBeInTheDocument()
@@ -153,7 +154,7 @@ describe('gochiso-race play', () => {
     expect(screen.getByTestId('race-banner')).toHaveTextContent('よーい…')
   })
 
-  test('keys jump and stop too, and the sound button turns the music off', () => {
+  test('keys jump and slide too, and the sound button turns the music off', () => {
     startRace(/^1 れんしゅう/)
     advance(seconds(READY_TIME) + 4)
     fireEvent.keyDown(window, { key: 'ArrowUp' })
@@ -164,10 +165,17 @@ describe('gochiso-race play', () => {
     advance(1)
     expect(playJump).toHaveBeenCalledTimes(2)
 
+    advance(seconds(1.5))
     fireEvent.keyDown(window, { key: 'ArrowDown' })
-    expect(stopButton()).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.keyUp(window, { key: 'ArrowDown' })
-    expect(stopButton()).toHaveAttribute('aria-pressed', 'false')
+    advance(1)
+    expect(playSlide).toHaveBeenCalledTimes(1)
+    expect(playJump).toHaveBeenCalledTimes(2)
+    // スライディングボタンに フォーカスが ある ときの スペースは スライディング。
+    advance(seconds(1))
+    fireEvent.keyDown(slideButton(), { key: ' ' })
+    advance(1)
+    expect(playSlide).toHaveBeenCalledTimes(2)
+    expect(playJump).toHaveBeenCalledTimes(2)
 
     const stopMusic = vi.mocked(startBgm).mock.results[0].value as ReturnType<typeof vi.fn>
     fireEvent.click(screen.getByRole('button', { name: 'おとを けす' }))
@@ -175,6 +183,20 @@ describe('gochiso-race play', () => {
     expect(screen.getByRole('button', { name: 'おとを だす' })).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(screen.getByRole('button', { name: 'おとを だす' }))
     expect(startBgm).toHaveBeenCalledTimes(2)
+  })
+
+  test('a tunnel bonks a standing runner, and the slide button gets under it', () => {
+    store.set('gochiso-race-progress-v1', JSON.stringify({ meadow: 1, sweets: 1 }))
+    startRace(/^3 トンネルの/)
+    advance(seconds(READY_TIME) + 4)
+    advance(seconds(2.5))
+    expect(playBump).toHaveBeenCalledWith('bonk')
+    expect(screen.getByRole('status')).toHaveTextContent('ごつん！ スライディングで くぐろう')
+
+    fireEvent.click(slideButton(), { detail: 0 })
+    untilDialog(20)
+    expect(playSlide).toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'かち' })).toBeInTheDocument()
   })
 
   test('opens from home, and もどる goes back one screen at a time', async () => {

@@ -1,9 +1,9 @@
 import { findAnimal } from './animals'
 import { ANCHOR_X, ANCHOR_Y, RUN_FRAMES, animalSprite, beeSprite, foodSprite, goalSign, numberSprite, type AnimalState, type EyeMode } from './art'
-import type { Course, Pounder, ThemeId } from './courses'
+import { TUNNEL_GAP, type Block, type Course, type Pad, type Sign, type Spring, type ThemeId } from './courses'
 import { FOODS } from './foods'
 import { Grid, bayer, disc, hash2, makeCanvas, shade, type Img } from './pixel'
-import { RUNNER_H, RUNNER_W, beeY, pounderDropping, pounderGap, type Race, type RaceEvent, type Runner, type Who } from './race'
+import { RUNNER_H, RUNNER_W, SLIDE_H, beeY, heightOf, type Race, type RaceEvent, type Runner, type Who } from './race'
 
 // ごちそうレースの がめん。ちいさな ドットの がめん（バッファ）に かいてから、ぼかさずに おおきく うつす。
 // race.ts の ようすを かくだけで、すすみかたは かえない。せかいの y は うえむき、がめんは したむき。
@@ -19,7 +19,6 @@ const MIN_DOTS_TALL = 130
 const GROUND_AT = .8
 /** はしる ひとを がめんの ひだりから この わりあいの ところに おく。 */
 const PLAYER_AT = .3
-const POUNDER_HEAD_H = 23
 /** あなの そこ（みず など）の たかさ（せかい）。 */
 const UNDER_Y = -64
 
@@ -143,10 +142,19 @@ export function spawnFx(fx: Fx, event: RaceEvent, race: Race, time: number): voi
       break
     }
     case 'land':
+    case 'spring':
     case 'jump': {
       if (fx.reducedMotion) break
       const r = runnerOf(event.who)
       for (let i = 0; i < 4; i++) add({ kind: 'dust', x: r.x + RUNNER_W / 2 + (i - 1.5) * 7, y: r.y + 2, vx: (i - 1.5) * 34, vy: 16, life: .35, color: '#ffffff', size: 2 })
+      break
+    }
+    case 'slide':
+    case 'boost': {
+      if (fx.reducedMotion) break
+      const r = runnerOf(event.who)
+      const color = event.type === 'boost' ? '#ffd43b' : '#ffffff'
+      for (let i = 0; i < 5; i++) add({ kind: 'dust', x: r.x + 4 - i * 5, y: r.y + 3 + (i % 2) * 4, vx: -60 - i * 24, vy: 20 + i * 6, life: .4, color, size: 2 })
       break
     }
     case 'respawn': {
@@ -459,80 +467,141 @@ function drawStart(ctx: CanvasRenderingContext2D, course: Course) {
   ctx.fillRect(x - 19, -30, 11, 2)
 }
 
-function drawPounder(ctx: CanvasRenderingContext2D, p: Pounder, clock: number, topRow: number) {
-  const gap = pounderGap(p, clock)
-  const cycle = p.up + p.drop + p.down + p.rise
-  const u = (((clock + p.phase) % cycle) + cycle) % cycle
-  // おちる まえに ぷるぷる する（あいず）。
-  const shake = u > p.up - .45 && u < p.up ? (Math.floor(clock * 30) % 2 ? 1 : -1) : 0
-  const w = X(p.w)
-  const x0 = X(p.x) + shake
-  const bottom = Y(p.base + gap)
-  const base = Y(p.base)
-  // かげ。
-  const near = 1 - Math.min(1, gap / p.height)
-  ctx.fillStyle = `rgba(0, 0, 0, ${.15 + near * .2})`
-  const sw = Math.round(w * (.5 + near * .4))
-  ctx.fillRect(X(p.x) + Math.floor((w - sw) / 2), base - 1, sw, 2)
-  // え。
-  const cx = x0 + Math.floor(w / 2)
-  const headTop = bottom - POUNDER_HEAD_H
-  if (headTop > topRow) {
-    ctx.fillStyle = '#5a3a1e'
-    ctx.fillRect(cx - 4, topRow, 8, headTop - topRow + 1)
-    ctx.fillStyle = '#c48a52'
-    ctx.fillRect(cx - 3, topRow, 6, headTop - topRow + 1)
-    ctx.fillStyle = '#a06a36'
-    ctx.fillRect(cx + 1, topRow, 2, headTop - topRow + 1)
+/** トンネル。したの すきまは くらく して、てんじょうの ふちに しましまの めじるし。 */
+function drawBlock(ctx: CanvasRenderingContext2D, block: Block, pal: Palette, theme: ThemeId) {
+  const x0 = X(block.x0), x1 = X(block.x1)
+  const top = Y(block.y1), bottom = Y(block.y0), floor = Y(block.y0 - TUNNEL_GAP)
+  const w = x1 - x0
+  // なかの かげ。
+  ctx.fillStyle = 'rgba(20, 10, 40, .28)'
+  ctx.fillRect(x0, bottom, w, floor - bottom)
+  // かたまり。
+  ctx.fillStyle = pal.line
+  ctx.fillRect(x0 - 1, top - 1, w + 2, bottom - top + 2)
+  ctx.fillStyle = pal.body
+  ctx.fillRect(x0, top, w, bottom - top)
+  ctx.fillStyle = pal.stripe
+  for (let y = top + 12; y < bottom - 6; y += 12) ctx.fillRect(x0 + 1, y, w - 2, theme === 'sweets' ? 2 : 1)
+  ctx.fillStyle = pal.top
+  ctx.fillRect(x0, top, w, 4)
+  ctx.fillStyle = pal.topDark
+  ctx.fillRect(x0, top + 4, w, 1)
+  // てんじょうの しましま（ここは スライディングで くぐる）。
+  for (let x = x0; x < x1; x++) {
+    ctx.fillStyle = Math.floor((x - x0) / 3) % 2 ? '#2b2b33' : '#ffd43b'
+    ctx.fillRect(x, bottom - 3, 1, 3)
   }
-  // きねの あたま。
-  ctx.fillStyle = '#5a3a1e'
-  ctx.fillRect(x0 + 1, headTop, w - 2, POUNDER_HEAD_H)
-  ctx.fillRect(x0, headTop + 1, w, POUNDER_HEAD_H - 2)
-  ctx.fillStyle = '#e0a868'
-  ctx.fillRect(x0 + 1, headTop + 1, w - 2, POUNDER_HEAD_H - 2)
-  ctx.fillStyle = '#f3c48c'
-  ctx.fillRect(x0 + 2, headTop + 1, w - 4, 2)
+  // いりぐちの あおい めじるし（スライディング ボタンと おなじ いろ）。
+  const bx = x0 + 3, by = bottom - 16
+  if (bottom - top >= 22) {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(bx - 1, by - 1, 13, 11)
+    ctx.fillStyle = '#1c7ed6'
+    ctx.fillRect(bx, by, 11, 9)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(bx + 2, by + 5, 4, 2)
+    for (let i = 0; i < 3; i++) ctx.fillRect(bx + 6 + i, by + 3 + i, 1, 5 - i * 2)
+  }
+}
+
+/** ジャンプだい。だれかが のっていると ちぢむ。うえに ▲ を ちかちか させる。 */
+function drawSpring(ctx: CanvasRenderingContext2D, spring: Spring, race: Race, time: number, reducedMotion: boolean) {
+  const x0 = X(spring.x0), x1 = X(spring.x1)
+  const base = Y(spring.top)
+  const w = x1 - x0
+  const pressed = [race.player, race.rival].some(r => r.x + RUNNER_W > spring.x0 && r.x < spring.x1 && r.y - spring.top < 24 && r.y >= spring.top - 1)
+  const h = pressed ? 3 : 6
+  ctx.fillStyle = '#3b2a1e'
+  ctx.fillRect(x0, base - 2, w, 3)
+  // ばね。
+  ctx.fillStyle = '#adb5bd'
+  for (let x = x0 + 3; x < x1 - 3; x += 6) {
+    for (let y = 0; y < h - 1; y++) ctx.fillRect(x + (y % 2), base - 2 - y, 3, 1)
+  }
+  // うえの いた。
+  ctx.fillStyle = '#7a2410'
+  ctx.fillRect(x0 - 1, base - h - 4, w + 2, 4)
+  ctx.fillStyle = '#ff6b6b'
+  ctx.fillRect(x0, base - h - 3, w, 2)
+  ctx.fillStyle = '#ffd43b'
+  for (let x = x0 + 2; x < x1 - 2; x += 8) ctx.fillRect(x, base - h - 3, 3, 1)
+  // ▲ ▲
+  const blink = reducedMotion || Math.floor(time * 3) % 2 === 0
+  if (!blink) return
+  ctx.fillStyle = spring.fork ? '#fff3a0' : '#ffffff'
+  const lift = reducedMotion ? 0 : Math.floor(time * 6) % 3
+  for (const cx of [x0 + Math.floor(w / 3), x0 + Math.floor((w * 2) / 3)]) {
+    for (let i = 0; i < 3; i++) ctx.fillRect(cx - i, base - h - 12 - lift + i, i * 2 + 1, 1)
+  }
+}
+
+/** かそくそうち。>>> が はしる。 */
+function drawBoost(ctx: CanvasRenderingContext2D, pad: Pad, time: number, reducedMotion: boolean) {
+  const x0 = X(pad.x0), x1 = X(pad.x1)
+  const y = Y(pad.top) - 3
+  const w = x1 - x0
+  ctx.fillStyle = '#7a2410'
+  ctx.fillRect(x0 - 1, y - 1, w + 2, 9)
+  ctx.fillStyle = '#ff922b'
+  ctx.fillRect(x0, y, w, 7)
+  ctx.fillStyle = '#ffc078'
+  ctx.fillRect(x0, y, w, 1)
+  const shift = reducedMotion ? 0 : Math.floor(time * 24) % 8
+  ctx.fillStyle = '#fff3a0'
+  for (let x = x0 + shift - 8; x < x1 - 4; x += 8) {
+    if (x < x0) continue
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(x + i, y + 1 + i, 2, 1)
+      ctx.fillRect(x + i, y + 5 - i, 2, 1)
+    }
+  }
+}
+
+/** わかれみちの かんばん（うえ と まっすぐ）。 */
+function drawSign(ctx: CanvasRenderingContext2D, sign: Sign) {
+  const x = X(sign.x)
+  const base = Y(sign.top)
+  ctx.fillStyle = '#3b2a1e'
+  ctx.fillRect(x - 1, base - 28, 4, 28)
   ctx.fillStyle = '#c48a52'
-  ctx.fillRect(x0 + 1, headTop + 5, w - 2, 1)
-  ctx.fillRect(x0 + 1, bottom - 5, w - 2, 1)
-  ctx.fillRect(x0 + w - 4, headTop + 1, 3, POUNDER_HEAD_H - 2)
-  // かお。
-  const ey = headTop + 10
-  ctx.fillStyle = '#3a2620'
-  if (gap < 2 || pounderDropping(p, clock)) {
-    ctx.fillRect(cx - 7, ey, 3, 1)
-    ctx.fillRect(cx - 6, ey + 1, 2, 1)
-    ctx.fillRect(cx + 4, ey, 3, 1)
-    ctx.fillRect(cx + 4, ey + 1, 2, 1)
-    ctx.fillRect(cx - 2, ey + 5, 4, 2)
-  } else {
-    ctx.fillRect(cx - 6, ey, 2, 2)
-    ctx.fillRect(cx + 4, ey, 2, 2)
-    ctx.fillRect(cx - 1, ey + 5, 2, 1)
+  ctx.fillRect(x, base - 27, 2, 27)
+  for (const [py, up] of [[base - 30, true], [base - 18, false]] as const) {
+    ctx.fillStyle = '#3b2a1e'
+    ctx.fillRect(x - 8, py - 1, 18, 10)
+    ctx.fillStyle = up ? '#ff8787' : '#74c0fc'
+    ctx.fillRect(x - 7, py, 16, 8)
+    ctx.fillStyle = '#ffffff'
+    if (up) {
+      // ↗
+      for (let i = 0; i < 6; i++) ctx.fillRect(x - 3 + i, py + 6 - i, 1, 1)
+      ctx.fillRect(x, py + 1, 3, 1)
+      ctx.fillRect(x + 2, py + 1, 1, 3)
+    } else {
+      // →
+      ctx.fillRect(x - 4, py + 4, 8, 1)
+      ctx.fillRect(x + 1, py + 2, 1, 5)
+      ctx.fillRect(x + 2, py + 3, 1, 3)
+      ctx.fillRect(x + 3, py + 4, 1, 1)
+    }
   }
-  ctx.fillStyle = '#ff8fa3'
-  ctx.fillRect(cx - 10, ey + 3, 3, 1)
-  ctx.fillRect(cx + 7, ey + 3, 3, 1)
 }
 
 // ---------------- はしる ひと ----------------
 
 function poseState(race: Race, r: Runner): AnimalState {
-  if (r.fall > 0) return 'hurt'
-  if (r.stun > 0) return r.hurt === 'pounder' ? 'squash' : 'hurt'
+  if (r.fall > 0 || r.stun > 0) return 'hurt'
+  if (r.slide > 0) return 'slide'
   if (race.result && Math.abs(r.vx) < 30 && r.onGround) {
     const won = race.result.outcome === 'win' ? r.who === 'player' : race.result.outcome === 'lose' ? r.who === 'rival' : true
     return won ? 'cheer' : 'sad'
   }
   if (r.finishedAt !== null && Math.abs(r.vx) < 40 && r.onGround) return 'cheer'
   if (!r.onGround) return 'jump'
-  if (r.braking) return Math.abs(r.vx) > 20 ? 'brake' : 'stand'
   return Math.abs(r.vx) > 15 ? 'run' : 'stand'
 }
 
 function eyesFor(state: AnimalState, munch: boolean, time: number): EyeMode {
-  if (state === 'hurt' || state === 'squash') return 'dizzy'
+  if (state === 'hurt') return 'dizzy'
   if (state === 'cheer' || munch) return 'happy'
   if (state === 'sad') return 'closed'
   return time % 3.4 < .12 ? 'closed' : 'open'
@@ -546,6 +615,9 @@ function groundBelow(course: Course, x: number, y: number): number | null {
   }
   for (const c of course.clouds) {
     if (c.x0 <= x && c.x1 > x && c.top <= y + 1 && (best === null || c.top > best)) best = c.top
+  }
+  for (const b of course.blocks) {
+    if (b.x0 <= x && b.x1 > x && b.y1 <= y + 1 && (best === null || b.y1 > best)) best = b.y1
   }
   return best
 }
@@ -587,9 +659,17 @@ function drawRunner(ctx: CanvasRenderingContext2D, race: Race, r: Runner, fx: Fx
   if (img && !blinkOut) {
     const x = cx - ANCHOR_X
     const y = feet - ANCHOR_Y - 1
-    if (state === 'squash') {
-      const h = Math.round(img.height * .6)
-      ctx.drawImage(img, x - 2, y + img.height - h, img.width + 4, h)
+    if (state === 'slide') {
+      // ひくく すべる（せの たかさに あわせて たてに ちぢめる）。
+      const h = Math.round(img.height * (SLIDE_H + 2) / RUNNER_H)
+      ctx.drawImage(img, x - 1, y + img.height - h, img.width + 6, h)
+      if (!fx.reducedMotion) {
+        ctx.fillStyle = 'rgba(255, 255, 255, .85)'
+        for (let i = 0; i < 3; i++) {
+          const k = Math.floor((time * 12 + i * .4) % 3)
+          ctx.fillRect(cx - 12 - i * 4 - k, feet - 2 - (i % 2) * 2, 2, 1)
+        }
+      }
     } else ctx.drawImage(img, x, y)
   }
   // ふらふら の ほし。
@@ -601,7 +681,7 @@ function drawRunner(ctx: CanvasRenderingContext2D, race: Race, r: Runner, fx: Fx
   }
   // じぶんの めじるし。
   if (mine && r.fall <= 0) {
-    const y = feet - 34 + (Math.floor(time * 4) % 2)
+    const y = feet - Math.round(heightOf(r) / PX) - 14 + (Math.floor(time * 4) % 2)
     ctx.fillStyle = '#7a2410'
     ctx.fillRect(cx - 4, y - 1, 9, 1)
     ctx.fillRect(cx - 4, y, 1, 1)
@@ -662,9 +742,13 @@ export function drawScene(ctx: CanvasRenderingContext2D, { view, cam, race, fx, 
   const left = camX - 8
   const right = camX + view.bw + 8
   const bottom = view.bh - view.ground - camY + 2
-  const topRow = -view.ground - camY - 2
   drawStart(b, course)
   drawGround(b, course, pal, left, right, bottom, course.theme, time)
+  const visible = (x0: number, x1: number) => X(x1) >= left && X(x0) <= right
+  for (const pad of course.boosts) if (visible(pad.x0, pad.x1)) drawBoost(b, pad, time, fx.reducedMotion)
+  for (const spring of course.springs) if (visible(spring.x0, spring.x1)) drawSpring(b, spring, race, time, fx.reducedMotion)
+  for (const sign of course.signs) if (visible(sign.x - 20, sign.x + 20)) drawSign(b, sign)
+  for (const block of course.blocks) if (visible(block.x0, block.x1)) drawBlock(b, block, pal, course.theme)
   drawClouds(b, course, pal, left, right)
   drawGoal(b, course, time)
 
@@ -685,10 +769,6 @@ export function drawScene(ctx: CanvasRenderingContext2D, { view, cam, race, fx, 
     }
   }
 
-  for (const p of course.pounders) {
-    if (X(p.x + p.w) < left || X(p.x) > right) continue
-    drawPounder(b, p, race.clock, topRow)
-  }
   const beeFrame = Math.floor(time * 16) % 2
   for (const bee of course.bees) {
     const img = beeSprite(beeFrame)

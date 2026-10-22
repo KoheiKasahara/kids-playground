@@ -1,7 +1,7 @@
 import { FOODS, type FoodKind } from './foods'
 
 // レースの コース。ならべた「パーツ」を ひだりから じゅんに つないで、じめん・あな・だん・
-// ぺったん（うえから おちてくる きね）・はち・くも・ごちそうの ばしょを つくる。
+// トンネル（スライディングで くぐる）・ジャンプだい・かそくそうち・わかれみち・はち・くも・ごちそうの ばしょを つくる。
 // きょりの たんいは がめんの 1ドットくらい。y は じめんから うえへの たかさ。
 
 export type ThemeId = 'meadow' | 'sweets' | 'starry'
@@ -10,11 +10,14 @@ export type ThemeId = 'meadow' | 'sweets' | 'starry'
 export type Span = { x0: number; x1: number; top: number }
 /** うえに のれる くも。したからは すりぬける。 */
 export type Cloud = { x0: number; x1: number; top: number }
-/**
- * ぺったん。うえで まつ → どすんと おちる → じめんで まつ → ゆっくり あがる を くりかえす。
- * base は したの じめんの たかさ、height は あがった ときの すきまの たかさ。
- */
-export type Pounder = { x: number; w: number; base: number; height: number; up: number; drop: number; down: number; rise: number; phase: number }
+/** かたい ブロック。y0 より したは あいていて（スライディングで くぐる）、y1 の うえには のれる。 */
+export type Block = { x0: number; x1: number; y0: number; y1: number }
+/** じめん（top）の うえに おく いた。ジャンプだい・かそくそうち。 */
+export type Pad = { x0: number; x1: number; top: number }
+/** ジャンプだい。fork は わかれみちの いりぐち（スライディングで とおりすぎると したの みち）。 */
+export type Spring = Pad & { fork: boolean }
+/** わかれみちの かんばん。 */
+export type Sign = { x: number; top: number }
 /** うえ・したに ゆれて とぶ はち。 */
 export type Bee = { x: number; y: number; amp: number; period: number; phase: number }
 export type FoodSpot = { id: number; kind: FoodKind; x: number; y: number }
@@ -40,7 +43,10 @@ export type Course = {
   rival: RivalStyle
   spans: readonly Span[]
   clouds: readonly Cloud[]
-  pounders: readonly Pounder[]
+  blocks: readonly Block[]
+  springs: readonly Spring[]
+  boosts: readonly Pad[]
+  signs: readonly Sign[]
   bees: readonly Bee[]
   foods: readonly FoodSpot[]
   /** スタートの いち（はしる ひとの ひだりはし）。 */
@@ -53,9 +59,6 @@ export type Course = {
   foodTotal: number
 }
 
-/** ぺったんの はやさ。 */
-export type PounderTempo = 'slow' | 'normal' | 'quick'
-
 export type Piece =
   /** たいらな みち。row が あれば じめんの ちかくに n こ（なければ ぜんぶ）ごちそうを ならべる。 */
   | { t: 'run'; len: number; row?: FoodKind; n?: number; y?: number }
@@ -65,8 +68,17 @@ export type Piece =
   | { t: 'step'; h: number; len: number; row?: FoodKind; n?: number }
   /** ジャンプで こえる ちいさな やま。top が あれば うえに ごちそう。 */
   | { t: 'hurdle'; h: number; w?: number; top?: FoodKind }
-  /** ぺったん。food が あれば したに ごちそう（とまって まってから とろう）。 */
-  | { t: 'pounder'; tempo?: PounderTempo; food?: FoodKind; phase?: number }
+  /** トンネル。スライディングで くぐる（row は なかの ごちそう、top は うえの ごちそう）。h は うえの たかさ。 */
+  | { t: 'tunnel'; len: number; h?: number; row?: FoodKind; n?: number; top?: FoodKind }
+  /** ジャンプだい（すすまない）。のると たかく とぶ。 */
+  | { t: 'spring'; at?: number }
+  /** かそくそうち（すすまない）。のると しばらく はやく なる。 */
+  | { t: 'boost'; at?: number }
+  /**
+   * わかれみち。ジャンプだいで うえの くもの みちへ、スライディングで とおりすぎると トンネルを くぐって したの みちへ。
+   * うえの みちは len の ながさで y の たかさ。このあとに ならべる パーツが したの みち。
+   */
+  | { t: 'fork'; len: number; y?: number; row?: FoodKind; n?: number }
   /** はち。y の たかさを まんなかに ゆれる。 */
   | { t: 'bee'; y: number; amp?: number; period?: number; phase?: number; len?: number; row?: FoodKind; n?: number }
   /** くもの あしば。いまの ばしょから at さきに おく（すすまない）。 */
@@ -90,19 +102,30 @@ const AFTER_GOAL = 700
 const BEFORE_GOAL = 240
 const ROW_GAP = 44
 const ROW_Y = 20
-const POUNDER_W = 64
-const POUNDER_ROOM = 120
-const POUNDER_TEMPO: Record<PounderTempo, Pick<Pounder, 'up' | 'drop' | 'down' | 'rise'>> = {
-  slow: { up: 1.6, drop: .22, down: .6, rise: .6 },
-  normal: { up: 1.25, drop: .2, down: .55, rise: .55 },
-  quick: { up: 1, drop: .18, down: .45, rise: .5 },
-}
-export const POUNDER_HEIGHT = 150
+/** トンネルの てんじょうの たかさ（たっていると ぶつかり、スライディングなら くぐれる）。 */
+export const TUNNEL_GAP = 30
+/** トンネルの うえの たかさ（ふつうの ジャンプでは とどかない）。 */
+const TUNNEL_TOP = 150
+/** トンネルの なかの ごちそうの たかさ。 */
+const TUNNEL_ROW_Y = 14
+/** ジャンプだいは どうぶつ 2ひきぶん より ひろく して ふみやすく する。 */
+export const SPRING_W = 88
+export const BOOST_W = 96
+/** わかれみちの ジャンプだいの あとの トンネル。 */
+const FORK_ROOM = 16
+const FORK_GATE = 120
+const FORK_GATE_TOP = 120
+/** わかれみちの うえの みちの たかさ と はじまり（ジャンプだいの ひだりはしから）。 */
+const FORK_Y = 170
+const FORK_PATH_AT = 100
 
 export function buildCourse(def: CourseDef): Course {
   const spans: Span[] = []
   const clouds: Cloud[] = []
-  const pounders: Pounder[] = []
+  const blocks: Block[] = []
+  const springs: Spring[] = []
+  const boosts: Pad[] = []
+  const signs: Sign[] = []
   const bees: Bee[] = []
   const foods: FoodSpot[] = []
   let x = 0
@@ -128,6 +151,12 @@ export function buildCourse(def: CourseDef): Course {
     top = newTop
     x = at
     open = { x0: x, x1: x, top }
+  }
+  const tunnel = (len: number, h: number, inside?: FoodKind, n?: number, onTop?: FoodKind) => {
+    blocks.push({ x0: x, x1: x + len, y0: top + TUNNEL_GAP, y1: top + h })
+    if (inside) row(inside, x, len, top + TUNNEL_ROW_Y, n)
+    if (onTop) food(onTop, x + len / 2, top + h + ROW_Y)
+    run(len)
   }
 
   for (const piece of def.pieces) {
@@ -162,12 +191,28 @@ export function buildCourse(def: CourseDef): Course {
         restart(base, x)
         break
       }
-      case 'pounder': {
-        const tempo = POUNDER_TEMPO[piece.tempo ?? 'normal']
-        const px = x + POUNDER_ROOM
-        pounders.push({ x: px, w: POUNDER_W, base: top, height: POUNDER_HEIGHT, ...tempo, phase: piece.phase ?? 0 })
-        if (piece.food) food(piece.food, px + POUNDER_W / 2, top + ROW_Y)
-        run(POUNDER_ROOM * 2 + POUNDER_W)
+      case 'tunnel':
+        tunnel(piece.len, piece.h ?? TUNNEL_TOP, piece.row, piece.n, piece.top)
+        break
+      case 'spring': {
+        const from = x + (piece.at ?? 0)
+        springs.push({ x0: from, x1: from + SPRING_W, top, fork: false })
+        break
+      }
+      case 'boost': {
+        const from = x + (piece.at ?? 0)
+        boosts.push({ x0: from, x1: from + BOOST_W, top })
+        break
+      }
+      case 'fork': {
+        const from = x
+        const y = top + (piece.y ?? FORK_Y)
+        signs.push({ x: from - 36, top })
+        springs.push({ x0: from, x1: from + SPRING_W, top, fork: true })
+        clouds.push({ x0: from + FORK_PATH_AT, x1: from + FORK_PATH_AT + piece.len, top: y })
+        if (piece.row) row(piece.row, from + FORK_PATH_AT, piece.len, y + ROW_Y, piece.n)
+        run(SPRING_W + FORK_ROOM)
+        tunnel(FORK_GATE, FORK_GATE_TOP)
         break
       }
       case 'bee': {
@@ -205,7 +250,10 @@ export function buildCourse(def: CourseDef): Course {
     rival: def.rival,
     spans,
     clouds,
-    pounders,
+    blocks: blocks.sort((a, b) => a.x0 - b.x0),
+    springs: springs.sort((a, b) => a.x0 - b.x0),
+    boosts: boosts.sort((a, b) => a.x0 - b.x0),
+    signs,
     bees,
     foods,
     start: RUNNER_START,
@@ -218,7 +266,7 @@ export function buildCourse(def: CourseDef): Course {
 const MEADOW: CourseDef = {
   id: 'meadow',
   name: 'はらっぱ コース',
-  lead: 'はじめての レース。ジャンプで あなを こえよう',
+  lead: 'はじめての レース。ジャンプと スライディングで すすもう',
   rival: { speed: .84, greed: .3, hesitate: .35, appetite: .5 },
   pieces: [
     { t: 'run', len: 520, row: 'apple', n: 4 },
@@ -227,29 +275,36 @@ const MEADOW: CourseDef = {
     { t: 'gap', w: 70, arc: 'strawberry' },
     { t: 'high', kind: 'onigiri', y: 112, at: 170 },
     { t: 'run', len: 340 },
-    { t: 'step', h: 50, len: 360, row: 'banana', n: 4 },
-    { t: 'step', h: -50, len: 240 },
-    { t: 'pounder', tempo: 'slow', food: 'donut' },
+    { t: 'tunnel', len: 180, row: 'donut', n: 1 },
     { t: 'run', len: 300, row: 'strawberry', n: 3 },
-    { t: 'cloud', y: 84, len: 220, at: 60, row: 'onigiri', n: 3 },
-    { t: 'run', len: 340, row: 'apple', n: 2 },
+    { t: 'boost', at: 40 },
+    { t: 'run', len: 420, row: 'apple', n: 3 },
     { t: 'gap', w: 86, arc: 'banana' },
     { t: 'run', len: 280 },
     { t: 'bee', y: 48, amp: 34, row: 'strawberry', n: 3 },
-    { t: 'run', len: 260 },
+    { t: 'run', len: 300 },
+    // うえは ごちそう、したは かそくそうち。
+    { t: 'fork', len: 760, row: 'onigiri', n: 5 },
+    { t: 'run', len: 80 },
+    { t: 'boost' },
+    { t: 'run', len: 300, row: 'banana', n: 2 },
+    { t: 'tunnel', len: 160, row: 'pudding', n: 1 },
+    { t: 'run', len: 300 },
     { t: 'hurdle', h: 60, top: 'donut' },
     { t: 'run', len: 300, row: 'onigiri', n: 2 },
     { t: 'gap', w: 80, arc: 'apple' },
     { t: 'high', kind: 'cake', y: 130, at: 180 },
     { t: 'run', len: 340, row: 'banana', n: 3 },
-    { t: 'pounder', tempo: 'slow', food: 'pudding' },
-    { t: 'run', len: 280 },
+    { t: 'spring', at: 40 },
+    { t: 'cloud', y: 200, len: 180, at: 140, row: 'parfait', n: 1 },
+    { t: 'run', len: 440 },
     { t: 'step', h: 60, len: 280, row: 'strawberry', n: 3 },
     { t: 'gap', w: 80, arc: 'banana' },
     { t: 'run', len: 220 },
     { t: 'step', h: -60, len: 300, row: 'apple', n: 2 },
     { t: 'tower', kind: 'apple', n: 3, at: 150 },
-    { t: 'cloud', y: 96, len: 180, at: 360, row: 'burger', n: 2 },
+    { t: 'tunnel', len: 220, row: 'strawberry', n: 3 },
+    { t: 'boost', at: 60 },
     { t: 'run', len: 600, row: 'banana', n: 3 },
     { t: 'high', kind: 'cake', y: 120, at: 100 },
     { t: 'run', len: 260 },
@@ -259,7 +314,7 @@ const MEADOW: CourseDef = {
 const SWEETS: CourseDef = {
   id: 'sweets',
   name: 'おかしの もり コース',
-  lead: 'ぺったんと はちに きをつけて。とまって まつのも だいじ',
+  lead: 'わかれみちは うえと した、どっちに する？',
   rival: { speed: .89, greed: .45, hesitate: .25, appetite: .6 },
   pieces: [
     { t: 'run', len: 520, row: 'strawberry', n: 4 },
@@ -267,20 +322,27 @@ const SWEETS: CourseDef = {
     { t: 'run', len: 300 },
     { t: 'hurdle', h: 50, top: 'onigiri' },
     { t: 'run', len: 260, row: 'apple', n: 2 },
-    { t: 'pounder', tempo: 'normal', food: 'cake' },
+    { t: 'tunnel', len: 200, row: 'cake', n: 1 },
     { t: 'run', len: 240 },
     { t: 'step', h: 70, len: 300, row: 'strawberry', n: 3 },
     { t: 'gap', w: 96, arc: 'banana' },
     { t: 'run', len: 260 },
     { t: 'step', h: -70, len: 200 },
     { t: 'bee', y: 40, amp: 24, period: 1.6, row: 'apple', n: 3 },
-    { t: 'cloud', y: 80, len: 200, at: 80 },
-    { t: 'cloud', y: 160, len: 120, at: 220, row: 'burger', n: 2 },
+    { t: 'boost', at: 60 },
     { t: 'run', len: 420, row: 'banana', n: 3 },
+    { t: 'fork', len: 820, row: 'burger', n: 4 },
+    { t: 'run', len: 60 },
+    { t: 'boost' },
+    { t: 'run', len: 260, row: 'apple', n: 2 },
+    { t: 'tunnel', len: 140, row: 'onigiri', n: 1 },
+    { t: 'run', len: 120 },
+    { t: 'boost' },
+    { t: 'run', len: 300 },
     { t: 'gap', w: 104, arc: 'strawberry' },
     { t: 'high', kind: 'pudding', y: 120, at: 140 },
     { t: 'run', len: 300 },
-    { t: 'pounder', tempo: 'normal', food: 'pudding', phase: .6 },
+    { t: 'tunnel', len: 240, row: 'strawberry', n: 3 },
     { t: 'run', len: 200, row: 'apple', n: 2 },
     { t: 'hurdle', h: 70, w: 60, top: 'donut' },
     { t: 'run', len: 260 },
@@ -292,14 +354,13 @@ const SWEETS: CourseDef = {
     { t: 'gap', w: 90, arc: 'donut' },
     { t: 'run', len: 240 },
     { t: 'step', h: -100, len: 260 },
-    { t: 'cloud', y: 70, len: 160, at: 120 },
-    { t: 'cloud', y: 140, len: 160, at: 300 },
-    { t: 'cloud', y: 210, len: 100, at: 480, row: 'parfait', n: 1 },
-    { t: 'run', len: 700, row: 'strawberry', n: 4 },
+    { t: 'spring', at: 40 },
+    { t: 'cloud', y: 210, len: 160, at: 140, row: 'parfait', n: 1 },
+    { t: 'run', len: 440, row: 'strawberry', n: 2 },
+    { t: 'tunnel', len: 160, row: 'burger', n: 1 },
+    { t: 'run', len: 300, row: 'strawberry', n: 2 },
     { t: 'gap', w: 100, arc: 'banana' },
-    { t: 'run', len: 240 },
-    { t: 'pounder', tempo: 'quick', food: 'burger' },
-    { t: 'run', len: 260, row: 'apple', n: 2 },
+    { t: 'run', len: 300 },
     { t: 'bee', y: 50, amp: 34, period: 1.5, phase: 1.5 },
     { t: 'run', len: 260, row: 'banana', n: 3 },
     { t: 'hurdle', h: 60, top: 'cake' },
@@ -317,7 +378,7 @@ const STARRY: CourseDef = {
     { t: 'gap', w: 96, arc: 'strawberry' },
     { t: 'run', len: 260 },
     { t: 'bee', y: 44, amp: 28, period: 1.4, row: 'apple', n: 3 },
-    { t: 'pounder', tempo: 'quick', food: 'cake' },
+    { t: 'tunnel', len: 200, row: 'cake', n: 1 },
     { t: 'run', len: 220 },
     { t: 'step', h: 90, len: 280, row: 'donut', n: 3 },
     { t: 'gap', w: 110, arc: 'banana' },
@@ -326,13 +387,18 @@ const STARRY: CourseDef = {
     { t: 'hurdle', h: 60, top: 'onigiri' },
     { t: 'run', len: 160 },
     { t: 'hurdle', h: 80, top: 'onigiri' },
-    { t: 'run', len: 280, row: 'strawberry', n: 3 },
-    { t: 'cloud', y: 80, len: 180, at: 60 },
-    { t: 'cloud', y: 170, len: 140, at: 240, row: 'pudding', n: 2 },
+    { t: 'run', len: 300, row: 'strawberry', n: 3 },
+    { t: 'fork', len: 700, row: 'pudding', n: 3 },
+    { t: 'run', len: 60 },
+    { t: 'boost' },
+    { t: 'run', len: 200 },
+    { t: 'tunnel', len: 120, row: 'apple', n: 1 },
+    { t: 'run', len: 80 },
+    { t: 'tunnel', len: 120, row: 'apple', n: 1 },
+    { t: 'run', len: 220 },
     { t: 'gap', w: 120, arc: 'apple' },
     { t: 'run', len: 340 },
-    { t: 'pounder', tempo: 'quick', food: 'pudding', phase: .4 },
-    { t: 'pounder', tempo: 'quick', phase: 1.1 },
+    { t: 'tunnel', len: 260, row: 'pudding', n: 2 },
     { t: 'run', len: 240, row: 'banana', n: 2 },
     { t: 'bee', y: 70, amp: 50, period: 1.3, phase: 2 },
     { t: 'bee', y: 38, amp: 22, period: 1.5, row: 'strawberry', n: 3 },
@@ -348,7 +414,13 @@ const STARRY: CourseDef = {
     { t: 'gap', w: 130, arc: 'strawberry' },
     { t: 'high', kind: 'parfait', y: 190, at: -65 },
     { t: 'run', len: 300 },
-    { t: 'pounder', tempo: 'normal', food: 'burger' },
+    { t: 'fork', len: 760, y: 190, row: 'cake', n: 2 },
+    { t: 'run', len: 60 },
+    { t: 'boost' },
+    { t: 'run', len: 160, row: 'apple', n: 2 },
+    { t: 'tunnel', len: 200, row: 'burger', n: 1 },
+    { t: 'boost', at: 40 },
+    { t: 'run', len: 360, row: 'strawberry', n: 2 },
     { t: 'bee', y: 62, amp: 46, period: 1.2, row: 'apple', n: 3 },
     { t: 'run', len: 200 },
     { t: 'hurdle', h: 90, w: 60, top: 'cake' },
@@ -359,7 +431,7 @@ const STARRY: CourseDef = {
     { t: 'run', len: 700, row: 'banana', n: 4 },
     { t: 'gap', w: 110, arc: 'donut' },
     { t: 'run', len: 300 },
-    { t: 'pounder', tempo: 'quick', food: 'cake', phase: .8 },
+    { t: 'tunnel', len: 200, row: 'cake', n: 1 },
     { t: 'run', len: 400, row: 'strawberry', n: 4 },
   ],
 }

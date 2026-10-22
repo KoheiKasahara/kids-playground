@@ -153,20 +153,65 @@ export function playRivalEat(): void {
   tone(ctx, getSoundOutput(ctx), freq('E5'), t + .05, .07, .025, 'pulse')
 }
 
-/** ぶつかった。はちは「ぷすっ」、ぺったんは「ぺたん！」。 */
+/** ぶつかった。はちは「ぷすっ」、トンネルは「ごつん！」。 */
 export function playBump(cause: Hurt): void {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
   const out = getSoundOutput(ctx)
-  if (cause === 'pounder') {
+  if (cause === 'bonk') {
     slide(ctx, out, 180, 50, t, .22, .2, 'sine')
-    noise(ctx, out, t, .16, .14, 'lowpass', 900)
-    slide(ctx, out, 700, 240, t + .08, .25, .06, 'square')
+    noise(ctx, out, t, .12, .12, 'lowpass', 900)
+    tone(ctx, out, freq('C5'), t + .06, .08, .05, 'square')
   } else {
     slide(ctx, out, 900, 300, t, .2, .07, 'square')
     noise(ctx, out, t, .08, .06, 'bandpass', 2500)
   }
+}
+
+/** スライディングの「ずさーっ」。 */
+export function playSlide(): void {
+  const ctx = sfx()
+  if (!ctx) return
+  const t = ctx.currentTime
+  const out = getSoundOutput(ctx)
+  noise(ctx, out, t, .35, .12, 'bandpass', 1400)
+  slide(ctx, out, 520, 220, t, .2, .07, 'triangle')
+}
+
+/** ジャンプだいの「びよーん」。 */
+export function playSpring(): void {
+  const ctx = sfx()
+  if (!ctx) return
+  const t = ctx.currentTime
+  const out = getSoundOutput(ctx)
+  const osc = ctx.createOscillator()
+  const vibrato = ctx.createOscillator()
+  const depth = ctx.createGain()
+  const gain = ctx.createGain()
+  osc.type = 'square'
+  osc.frequency.setValueAtTime(220, t)
+  osc.frequency.exponentialRampToValueAtTime(880, t + .35)
+  vibrato.frequency.value = 18
+  depth.gain.value = 40
+  vibrato.connect(depth).connect(osc.frequency)
+  gain.gain.setValueAtTime(.1, t)
+  gain.gain.exponentialRampToValueAtTime(.001, t + .45)
+  osc.connect(gain).connect(out)
+  osc.start(t)
+  vibrato.start(t)
+  osc.stop(t + .47)
+  vibrato.stop(t + .47)
+}
+
+/** かそくそうちの「ぎゅいーん」。 */
+export function playBoost(): void {
+  const ctx = sfx()
+  if (!ctx) return
+  const t = ctx.currentTime
+  const out = getSoundOutput(ctx)
+  slide(ctx, out, 300, 1200, t, .3, .08, 'sawtooth')
+  ;['C6', 'E6', 'G6'].forEach((n, i) => tone(ctx, out, freq(n), t + .08 + i * .05, .08, .05, 'pulse'))
 }
 
 /** あなに おちた「ひゅ〜」。 */

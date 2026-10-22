@@ -1,31 +1,44 @@
 import type { AnimalId } from './animals'
-import type { Bee, Course, Pounder, RivalStyle, Span } from './courses'
+import type { Bee, Block, Course, Pad, RivalStyle, Span } from './courses'
 import { FOODS, type FoodKind } from './foods'
 
-// ごちそうレースの すすみかた。かってに はしる 2ひきが、ジャンプ と ストップ だけで コースを すすみ、
+// ごちそうレースの すすみかた。かってに はしる 2ひきが、ジャンプ と スライディング だけで コースを すすみ、
 // とちゅうの ごちそうを たべながら ゴールを めざす。絵も 音も もたない ので canvas なしで テストできる。
 // きょりは コースと おなじ たんい、じかんは びょう、y は うえむき。
 
 export const RUNNER_W = 34
 export const RUNNER_H = 40
+/** スライディング している ときの せの たかさ（トンネルの てんじょうより ひくい）。 */
+export const SLIDE_H = 20
 export const RUN_SPEED = 220
 export const GRAVITY = 2000
 export const JUMP_SPEED = 720
 export const AIR_JUMP_SPEED = 620
+/** ジャンプだいで とぶ いきおい。 */
+export const SPRING_SPEED = 960
+/** かそくそうちの はやさの かけざん と つづく じかん[s]。 */
+export const BOOST_MUL = 1.6
+export const BOOST_TIME = 1.4
+/** スライディングの じかん[s]（トンネルの なかでは でるまで つづく）。 */
+export const SLIDE_TIME = .7
 const ACCEL = 720
 const STOP_DECEL = 1700
-const AIR_STOP_DECEL = 650
+/** かそくそうちの あと ふつうの はやさに もどる ゆるさ。 */
+const EASE_DECEL = 380
 const AFTER_GOAL_DECEL = 260
 /** これくらいの だんさは ジャンプ しなくても のぼれる。 */
 const STEP_UP = 8
 /** じめんから はなれても すこしの あいだは ジャンプ できる[s]。 */
 const COYOTE = .1
-/** ちゃくちの すこし まえに おしても ジャンプ する[s]。 */
+/** ちゃくちの すこし まえに おしても ジャンプ・スライディング する[s]。 */
 const JUMP_BUFFER = .15
+const SLIDE_BUFFER = .35
 /** 「よーい」から「どん！」までの じかん[s]。 */
 export const READY_TIME = 2.4
 const STUN_TIME = .75
-const SQUASH_TIME = 1
+const BONK_TIME = .5
+/** これより はやく トンネルに ぶつかると「ごつん」。 */
+const BONK_SPEED = 150
 const INVULN_TIME = 1.5
 const FALL_Y = -150
 const FALL_TIME = 1
@@ -44,7 +57,8 @@ export const GOOD_FOOD_RATIO = .8
 
 export type Who = 'player' | 'rival'
 export type Phase = 'ready' | 'run' | 'done'
-export type Hurt = 'bee' | 'pounder'
+/** はちに さされた・トンネルに ぶつかった。 */
+export type Hurt = 'bee' | 'bonk'
 
 export type Runner = {
   who: Who
@@ -60,12 +74,20 @@ export type Runner = {
   air: number
   airJumps: number
   jumpBuffer: number
+  slideBuffer: number
+  /** 0より 大きい あいだは スライディング している。 */
+  slide: number
+  /** 0より 大きい あいだは かそくそうちで はやい。 */
+  boost: number
+  /** いま のっている かそくそうち（おなじ いたで なんども ならさない）。 */
+  onBoost: boolean
   stun: number
   hurt: Hurt | null
   invuln: number
   /** 0より 大きい あいだは あなに おちている。 */
   fall: number
-  braking: boolean
+  /** コンピューターが まよって たちどまっている。 */
+  waiting: boolean
   /** はしった きょり（あしの うごきに つかう）。 */
   stride: number
   /** はやさの かけざん（あいては すこし おそい）。 */
@@ -85,6 +107,9 @@ export type RaceResult = { player: Score; rival: Score; outcome: Outcome; stars:
 export type RaceEvent =
   | { type: 'go' }
   | { type: 'jump'; who: Who; air: boolean }
+  | { type: 'slide'; who: Who }
+  | { type: 'spring'; who: Who }
+  | { type: 'boost'; who: Who }
   | { type: 'land'; who: Who }
   | { type: 'eat'; who: Who; kind: FoodKind; points: number; x: number; y: number }
   | { type: 'bump'; who: Who; cause: Hurt }
@@ -98,7 +123,9 @@ export type RaceEvent =
 export type Ai = {
   /** たかい ところの ごちそうを とりに いくか（ごちそうの id ごと）。 */
   greedy: boolean[]
-  /** まよって たちどまる あな・だんの いち。 */
+  /** わかれみちで うえの みちへ いくか（ジャンプだいの ばんごう ごと）。 */
+  upper: boolean[]
+  /** まよって たちどまる あな・だん・トンネルの いち。 */
   hesitant: number[]
   waitUntil: number
   lastX: number
@@ -108,7 +135,7 @@ export type Ai = {
 export type Race = {
   course: Course
   phase: Phase
-  /** つくってからの じかん（ぺったん・はちは これで うごく）。 */
+  /** つくってからの じかん（はちは これで うごく）。 */
   clock: number
   /** 「どん！」からの じかん。 */
   t: number
@@ -116,8 +143,6 @@ export type Race = {
   rival: Runner
   /** だれが たべたか（ごちそうの id ごと）。 */
   eatenBy: (Who | null)[]
-  /** プレイヤーが ストップを おしているか。 */
-  stop: boolean
   ai: Ai
   /** プレイヤーも コンピューターに まかせる（テストと デモ用）。 */
   autoPlayer: Ai | null
@@ -154,12 +179,13 @@ export function seededRandom(seed: number): () => number {
 function createRunner(who: Who, animal: AnimalId, course: Course, speed: number, skips: readonly boolean[] | null): Runner {
   return {
     who, animal, x: course.start, y: 0, vx: 0, vy: 0, onGround: true, air: 0, airJumps: 1, jumpBuffer: 0,
-    stun: 0, hurt: null, invuln: 0, fall: 0, braking: false, stride: 0, speed,
+    slideBuffer: 0, slide: 0, boost: 0, onBoost: false,
+    stun: 0, hurt: null, invuln: 0, fall: 0, waiting: false, stride: 0, speed,
     food: 0, eaten: 0, finishedAt: null, place: null, skips,
   }
 }
 
-/** あなの はじまり と のぼる だんの いち。あいてが まよう ばしょの こうほ。 */
+/** あなの はじまり・のぼる だん・トンネルの いりぐち。あいてが まよう ばしょの こうほ。 */
 export function obstacleEdges(course: Course): number[] {
   const edges: number[] = []
   course.spans.forEach((span, i) => {
@@ -168,12 +194,14 @@ export function obstacleEdges(course: Course): number[] {
     if (next.x0 > span.x1 + .5) edges.push(span.x1)
     else if (next.top > span.top + STEP_UP) edges.push(next.x0)
   })
-  return edges
+  for (const block of course.blocks) edges.push(block.x0)
+  return edges.sort((a, b) => a - b)
 }
 
 export function createAi(course: Course, style: AutoStyle, random: () => number): Ai {
   return {
     greedy: course.foods.map(() => random() < style.greed),
+    upper: course.springs.map(spring => !spring.fork || random() < style.greed),
     hesitant: obstacleEdges(course).filter(() => random() < style.hesitate),
     waitUntil: 0,
     lastX: course.start,
@@ -192,7 +220,6 @@ export function createRace(course: Course, options: RaceOptions): Race {
     player: createRunner('player', options.player, course, options.autoPlayer?.speed ?? 1, null),
     rival: createRunner('rival', options.rival, course, course.rival.speed, skips),
     eatenBy: course.foods.map(() => null),
-    stop: false,
     ai: createAi(course, course.rival, random),
     autoPlayer: options.autoPlayer ? createAi(course, options.autoPlayer, random) : null,
     rivalDoneAt: null,
@@ -214,35 +241,15 @@ export function pressJump(race: Race): void {
   race.player.jumpBuffer = JUMP_BUFFER
 }
 
-/** ストップボタン。おしている あいだ とまる。 */
-export function setStop(race: Race, stop: boolean): void {
-  race.stop = stop
+/** スライディングボタン。しばらく ひくく すべって、トンネルを くぐれる。 */
+export function pressSlide(race: Race): void {
+  if (race.phase !== 'run') return
+  race.player.slideBuffer = SLIDE_BUFFER
 }
 
-// ---------------- ぺったん・はち ----------------
-
-function cycleOf(p: Pounder) {
-  return p.up + p.drop + p.down + p.rise
-}
-
-/** ぺったんの したの すきまの たかさ（じめんから）。 */
-export function pounderGap(p: Pounder, clock: number): number {
-  const cycle = cycleOf(p)
-  let u = (((clock + p.phase) % cycle) + cycle) % cycle
-  if (u < p.up) return p.height
-  u -= p.up
-  if (u < p.drop) return p.height * (1 - (u / p.drop) ** 2)
-  u -= p.drop
-  if (u < p.down) return 0
-  u -= p.down
-  return p.height * (u / p.rise)
-}
-
-/** いま どすんと おちている ところか。 */
-export function pounderDropping(p: Pounder, clock: number): boolean {
-  const cycle = cycleOf(p)
-  const u = (((clock + p.phase) % cycle) + cycle) % cycle
-  return u >= p.up && u < p.up + p.drop
+/** いまの せの たかさ。 */
+export function heightOf(r: Runner): number {
+  return r.slide > 0 ? SLIDE_H : RUNNER_H
 }
 
 export function beeY(bee: Bee, clock: number): number {
@@ -258,12 +265,31 @@ function supportAt(course: Course, left: number, right: number, prevY: number, f
     if (span.x0 >= right) break
     if (span.x1 > left && span.top <= prevY + STEP_UP) support = Math.max(support, span.top)
   }
+  for (const block of course.blocks) {
+    if (block.x0 >= right) break
+    if (block.x1 > left && block.y1 <= prevY + STEP_UP) support = Math.max(support, block.y1)
+  }
   if (falling) {
     for (const cloud of course.clouds) {
       if (cloud.x0 < right && cloud.x1 > left && cloud.top <= prevY + .5) support = Math.max(support, cloud.top)
     }
   }
   return support
+}
+
+/** たちあがると あたまが トンネルに ぶつかるか。 */
+export function roofOver(course: Course, x: number, y: number): Block | undefined {
+  for (const block of course.blocks) {
+    if (block.x0 >= x + RUNNER_W) break
+    if (block.x1 > x && block.y0 < y + RUNNER_H && block.y1 > y + STEP_UP) return block
+  }
+  return undefined
+}
+
+/** あしもとの まんなかが のっている いた。 */
+function padUnder<T extends Pad>(pads: readonly T[], r: Runner): number {
+  const cx = r.x + RUNNER_W / 2
+  return pads.findIndex(pad => pad.x0 <= cx && pad.x1 > cx && Math.abs(pad.top - r.y) < 1)
 }
 
 function emit(race: Race, event: RaceEvent) {
@@ -284,18 +310,23 @@ function respawn(race: Race, r: Runner) {
   r.stun = 0
   r.hurt = null
   r.invuln = INVULN_TIME
+  r.boost = 0
+  // トンネルの なかに もどったら そのまま すべって でる。
+  r.slide = roofOver(race.course, r.x, r.y) ? SLIDE_TIME : 0
   emit(race, { type: 'respawn', who: r.who })
 }
 
 function hit(race: Race, r: Runner, cause: Hurt) {
-  r.stun = cause === 'pounder' ? SQUASH_TIME : STUN_TIME
+  r.stun = cause === 'bonk' ? BONK_TIME : STUN_TIME
   r.hurt = cause
   r.invuln = INVULN_TIME
   r.jumpBuffer = 0
+  r.slideBuffer = 0
+  r.boost = 0
   emit(race, { type: 'bump', who: r.who, cause })
 }
 
-function stepRunner(race: Race, r: Runner, stop: boolean, dt: number) {
+function stepRunner(race: Race, r: Runner, wait: boolean, dt: number) {
   const { course } = race
   if (r.fall > 0) {
     r.fall -= dt
@@ -311,21 +342,39 @@ function stepRunner(race: Race, r: Runner, stop: boolean, dt: number) {
     if (r.stun <= 0) r.hurt = null
   }
   const stunned = r.stun > 0
-  r.braking = stop && !finished && !stunned
-  const target = finished || stunned || r.braking ? 0 : RUN_SPEED * r.speed
+  r.waiting = wait && !finished && !stunned
+  r.boost = Math.max(0, r.boost - dt)
+  const target = finished || stunned || r.waiting ? 0 : RUN_SPEED * r.speed * (r.boost > 0 ? BOOST_MUL : 1)
   if (r.vx < target) r.vx = Math.min(target, r.vx + ACCEL * dt)
   else {
-    const decel = finished && !r.braking ? AFTER_GOAL_DECEL : r.onGround ? STOP_DECEL : AIR_STOP_DECEL
+    const decel = finished ? AFTER_GOAL_DECEL : stunned || r.waiting ? STOP_DECEL : EASE_DECEL
     r.vx = Math.max(target, r.vx - decel * dt)
+  }
+
+  // スライディング。トンネルの なかでは たちあがれないので でるまで つづける。
+  r.slideBuffer = Math.max(0, r.slideBuffer - dt)
+  if (r.slideBuffer > 0 && r.onGround && !stunned && !finished && r.slide <= 0) {
+    r.slide = SLIDE_TIME
+    r.slideBuffer = 0
+    r.jumpBuffer = 0
+    emit(race, { type: 'slide', who: r.who })
+  }
+  if (r.slide > 0) {
+    r.slide -= dt
+    const roof = roofOver(course, r.x, r.y)
+    if ((r.slide <= 0 || !r.onGround || finished) && roof) r.slide = Math.max(r.slide, dt)
+    else if (!r.onGround || finished) r.slide = 0
   }
 
   r.jumpBuffer = Math.max(0, r.jumpBuffer - dt)
   if (r.jumpBuffer > 0 && !stunned && !finished) {
-    if (r.onGround || r.air < COYOTE) {
+    if (r.slide > 0 && roofOver(course, r.x, r.y)) r.jumpBuffer = 0
+    else if (r.onGround || r.air < COYOTE) {
       r.vy = JUMP_SPEED
       r.onGround = false
       r.air = COYOTE
       r.jumpBuffer = 0
+      r.slide = 0
       emit(race, { type: 'jump', who: r.who, air: false })
     } else if (r.airJumps > 0) {
       r.vy = AIR_JUMP_SPEED
@@ -335,8 +384,10 @@ function stepRunner(race: Race, r: Runner, stop: boolean, dt: number) {
     }
   }
 
-  // よこに すすむ（たかい だんには ぶつかる）。
+  // よこに すすむ（たかい だん・トンネルの かべには ぶつかる）。
+  const h = heightOf(r)
   const prevX = r.x
+  const grounded = r.onGround
   r.x += r.vx * dt
   for (const span of course.spans) {
     if (span.x0 >= r.x + RUNNER_W) break
@@ -349,12 +400,38 @@ function stepRunner(race: Race, r: Runner, stop: boolean, dt: number) {
       r.vx = Math.max(r.vx, 0)
     }
   }
+  for (const block of course.blocks) {
+    if (block.x0 >= r.x + RUNNER_W) break
+    if (block.x1 <= r.x || block.y1 <= r.y + STEP_UP || block.y0 >= r.y + h) continue
+    if (prevX + RUNNER_W <= block.x0 + 1) {
+      const fast = r.vx > BONK_SPEED
+      r.x = block.x0 - RUNNER_W
+      r.vx = Math.min(r.vx, 0)
+      if (fast && grounded && r.invuln <= 0 && race.phase === 'run' && !finished) {
+        hit(race, r, 'bonk')
+        r.vx = -90
+      }
+    } else if (prevX >= block.x1 - 1) {
+      r.x = block.x1
+      r.vx = Math.max(r.vx, 0)
+    }
+  }
   if (r.onGround) r.stride += Math.max(0, r.x - prevX)
 
   // たてに うごく。
   const prevY = r.y
   r.vy -= GRAVITY * dt
   r.y += r.vy * dt
+  if (r.vy > 0) {
+    // トンネルの したがわに あたまを ぶつけた。
+    for (const block of course.blocks) {
+      if (block.x0 >= r.x + RUNNER_W - 4) break
+      if (block.x1 > r.x + 4 && prevY + h <= block.y0 + .5 && r.y + h > block.y0) {
+        r.y = block.y0 - h
+        r.vy = 0
+      }
+    }
+  }
   const support = supportAt(course, r.x + 4, r.x + RUNNER_W - 4, prevY, r.vy <= 0)
   if (r.y <= support) {
     if (!r.onGround && r.vy < -420) emit(race, { type: 'land', who: r.who })
@@ -368,40 +445,33 @@ function stepRunner(race: Race, r: Runner, stop: boolean, dt: number) {
     r.air += dt
   }
 
-  // ぺったん。
-  for (const p of course.pounders) {
-    const over = r.x + RUNNER_W > p.x + 3 && r.x < p.x + p.w - 3
-    if (!over) continue
-    const bottom = p.base + pounderGap(p, race.clock)
-    if (bottom >= r.y + RUNNER_H) continue
-    const wasUnder = prevX + RUNNER_W > p.x + 3 && prevX < p.x + p.w - 3
-    if (wasUnder && (pounderDropping(p, race.clock) || bottom - RUNNER_H < p.base)) {
-      // うえから おちてきた。ひだりへ おしだす。
-      r.x = p.x + 3 - RUNNER_W - 1
-      r.vx = 0
-      if (r.invuln <= 0 && race.phase === 'run') hit(race, r, 'pounder')
-    } else if (wasUnder) {
-      // ジャンプして あたまを ぶつけた。
-      r.y = bottom - RUNNER_H
-      r.vy = Math.min(r.vy, 0)
-    } else if (prevX < p.x) {
-      r.x = p.x + 3 - RUNNER_W
-      r.vx = Math.min(r.vx, 0)
-    } else {
-      r.x = p.x + p.w - 3
-      r.vx = Math.max(r.vx, 0)
+  // ジャンプだい（スライディングで とおると とばない）と かそくそうち。
+  if (r.onGround && !finished) {
+    if (r.slide <= 0 && padUnder(course.springs, r) >= 0) {
+      r.vy = SPRING_SPEED
+      r.onGround = false
+      r.air = COYOTE
+      r.airJumps = 1
+      r.jumpBuffer = 0
+      emit(race, { type: 'spring', who: r.who })
     }
-  }
+    const onBoost = !stunned && padUnder(course.boosts, r) >= 0
+    if (onBoost) {
+      if (!r.onBoost) emit(race, { type: 'boost', who: r.who })
+      r.boost = BOOST_TIME
+      r.vx = Math.max(r.vx, RUN_SPEED * r.speed * BOOST_MUL)
+    }
+    r.onBoost = onBoost
+  } else if (!r.onGround) r.onBoost = false
 
   // はち。
   if (r.invuln <= 0 && race.phase === 'run') {
+    const hh = heightOf(r)
     for (const bee of course.bees) {
       if (Math.abs(bee.x - (r.x + RUNNER_W / 2)) > RUNNER_W + BEE_R) continue
-      const by = beeY(bee, race.clock)
-      const cx = Math.max(r.x + 4, Math.min(bee.x, r.x + RUNNER_W - 4))
-      const cy = Math.max(r.y + 2, Math.min(by, r.y + RUNNER_H - 4))
-      if ((bee.x - cx) ** 2 + (by - cy) ** 2 < BEE_R ** 2) {
+      if (beeHits(bee, race.clock, r.x, r.y, hh, 0)) {
         hit(race, r, 'bee')
+        r.slide = roofOver(course, r.x, r.y) ? r.slide : 0
         r.vx = -110
         r.vy = Math.max(r.vy, 360)
         r.onGround = false
@@ -412,13 +482,14 @@ function stepRunner(race: Race, r: Runner, stop: boolean, dt: number) {
 
   // ごちそう。
   if (race.phase === 'run') {
+    const hh = heightOf(r)
     const cx = r.x + RUNNER_W / 2
-    const cy = r.y + RUNNER_H / 2
+    const cy = r.y + hh / 2
     for (const spot of course.foods) {
       if (spot.x < cx - 60) continue
       if (spot.x > cx + 60) break
       if (race.eatenBy[spot.id] !== null || r.skips?.[spot.id]) continue
-      if (Math.abs(spot.x - cx) < RUNNER_W / 2 + FOOD_R - 4 && Math.abs(spot.y - cy) < RUNNER_H / 2 + FOOD_R - 4) {
+      if (Math.abs(spot.x - cx) < RUNNER_W / 2 + FOOD_R - 4 && Math.abs(spot.y - cy) < hh / 2 + FOOD_R - 4) {
         race.eatenBy[spot.id] = r.who
         const points = FOODS[spot.kind].points
         r.food += points
@@ -432,7 +503,9 @@ function stepRunner(race: Race, r: Runner, stop: boolean, dt: number) {
     r.fall = FALL_TIME
     r.stun = 0
     r.hurt = null
-    r.braking = false
+    r.slide = 0
+    r.boost = 0
+    r.waiting = false
     emit(race, { type: 'fall', who: r.who })
   }
 
@@ -453,6 +526,14 @@ function travelTime(d: number, v0: number, vmax: number): number {
   const accelDist = (vmax * vmax - v * v) / (2 * ACCEL)
   if (d <= accelDist) return (-v + Math.sqrt(v * v + 2 * ACCEL * d)) / ACCEL
   return (vmax - v) / ACCEL + (d - accelDist) / vmax
+}
+
+/** v0 から vmax まで はやく なりながら t びょう で すすむ きょり。 */
+function travelDistance(t: number, v0: number, vmax: number): number {
+  const v = Math.max(0, Math.min(v0, vmax))
+  const accelTime = (vmax - v) / ACCEL
+  if (t <= accelTime) return v * t + ACCEL * t * t / 2
+  return v * accelTime + ACCEL * accelTime * accelTime / 2 + vmax * (t - accelTime)
 }
 
 /** じめんから dy の たかさまで ジャンプで あがる じかん（とどかなければ null）。 */
@@ -476,6 +557,10 @@ function predictLanding(course: Course, r: Runner): 'ok' | 'pit' | 'wall' {
       if (span.x0 >= x + RUNNER_W) break
       if (span.x1 > x && span.top > y + STEP_UP && span.top > prevY + STEP_UP) return 'wall'
     }
+    for (const block of course.blocks) {
+      if (block.x0 >= x + RUNNER_W) break
+      if (block.x1 > x && block.y1 > y + STEP_UP && block.y1 > prevY + STEP_UP && block.y0 < y + RUNNER_H) return 'wall'
+    }
     const support = supportAt(course, x + 4, x + RUNNER_W - 4, prevY, vy <= 0)
     if (y <= support) return 'ok'
     if (y < -40) return 'pit'
@@ -483,52 +568,33 @@ function predictLanding(course: Course, r: Runner): 'ok' | 'pit' | 'wall' {
   return 'pit'
 }
 
-function beeHits(bee: Bee, clock: number, x: number, y: number): boolean {
+function beeHits(bee: Bee, clock: number, x: number, y: number, h: number, margin: number): boolean {
   const by = beeY(bee, clock)
   const cx = Math.max(x + 4, Math.min(bee.x, x + RUNNER_W - 4))
-  const cy = Math.max(y + 2, Math.min(by, y + RUNNER_H - 4))
-  return (bee.x - cx) ** 2 + (by - cy) ** 2 < (BEE_R + 4) ** 2
-}
-
-/** そのまま すすむと ぺったんに つぶされそうか。 */
-function pounderAhead(race: Race, r: Runner, vmax: number): boolean {
-  const front = r.x + RUNNER_W
-  for (const p of race.course.pounders) {
-    const d = p.x + 3 - front
-    if (d > 52) break
-    if (d < 0) continue
-    const enter = travelTime(d, r.vx, vmax)
-    const exit = travelTime(d + p.w + RUNNER_W, r.vx, vmax) + .08
-    for (let s = enter; s <= exit; s += .04) {
-      if (pounderGap(p, race.clock + s) < RUNNER_H + 10) return true
-    }
-  }
-  return false
+  const cy = Math.max(y + 2, Math.min(by, y + h - 4))
+  return (bee.x - cx) ** 2 + (by - cy) ** 2 < (BEE_R + margin) ** 2
 }
 
 /** はしって とおると あたりそうな はち。 */
-function beeAhead(race: Race, r: Runner, vmax: number): { bee: Bee; d: number } | null {
+function beeAhead(race: Race, r: Runner, vmax: number, h: number): { bee: Bee; d: number } | null {
   const front = r.x + RUNNER_W
   for (const bee of race.course.bees) {
     const d = bee.x - BEE_R - front
     if (d > 130 || d < -RUNNER_W - BEE_R * 2) continue
-    if (bee.y - bee.amp - BEE_R > r.y + RUNNER_H + 4) continue
-    const from = travelTime(Math.max(0, d - 4), r.vx, vmax)
-    const to = travelTime(Math.max(0, d) + BEE_R * 2 + RUNNER_W + 8, r.vx, vmax) + .05
-    for (let s = from; s <= to; s += 1 / 60) {
-      const x = r.x + Math.max(0, travelDistance(s, r.vx, vmax))
-      if (beeHits(bee, race.clock + s, x, r.y)) return { bee, d }
-    }
+    if (bee.y - bee.amp - BEE_R > r.y + h + 4) continue
+    if (beeOnPath(race, r, bee, vmax, h, d)) return { bee, d }
   }
   return null
 }
 
-/** v0 から vmax まで はやく なりながら t びょう で すすむ きょり。 */
-function travelDistance(t: number, v0: number, vmax: number): number {
-  const v = Math.max(0, Math.min(v0, vmax))
-  const accelTime = (vmax - v) / ACCEL
-  if (t <= accelTime) return v * t + ACCEL * t * t / 2
-  return v * accelTime + ACCEL * accelTime * accelTime / 2 + vmax * (t - accelTime)
+function beeOnPath(race: Race, r: Runner, bee: Bee, vmax: number, h: number, d: number): boolean {
+  const from = travelTime(Math.max(0, d - 4), r.vx, vmax)
+  const to = travelTime(Math.max(0, d) + BEE_R * 2 + RUNNER_W + 8, r.vx, vmax) + .05
+  for (let s = from; s <= to; s += 1 / 60) {
+    const x = r.x + Math.max(0, travelDistance(s, r.vx, vmax))
+    if (beeHits(bee, race.clock + s, x, r.y, h, 4)) return true
+  }
+  return false
 }
 
 /** いま ジャンプ すれば はちの うえを とびこせるか。 */
@@ -536,9 +602,15 @@ function jumpClearsBee(race: Race, r: Runner, bee: Bee): boolean {
   if (r.vx < 110) return false
   for (let s = 0; s < .9; s += 1 / 60) {
     const y = r.y + Math.max(0, JUMP_SPEED * s - GRAVITY * s * s / 2)
-    if (beeHits(bee, race.clock + s, r.x + r.vx * s, y)) return false
+    if (beeHits(bee, race.clock + s, r.x + r.vx * s, y, RUNNER_H, 4)) return false
   }
   return true
+}
+
+/** いま スライディング すれば はちの したを くぐれるか。 */
+function slideClearsBee(race: Race, r: Runner, bee: Bee, vmax: number, d: number): boolean {
+  const end = travelTime(Math.max(0, d) + BEE_R * 2 + RUNNER_W + 8, r.vx, vmax) + .05
+  return end < SLIDE_TIME && !beeOnPath(race, r, bee, vmax, SLIDE_H, d)
 }
 
 function spanUnder(course: Course, r: Runner): Span | undefined {
@@ -553,18 +625,30 @@ function spanUnder(course: Course, r: Runner): Span | undefined {
   return best
 }
 
+/** まえに ある、たったままだと ぶつかる トンネル。 */
+function tunnelAhead(course: Course, r: Runner, reach: number): { block: Block; d: number } | null {
+  const front = r.x + RUNNER_W
+  for (const block of course.blocks) {
+    if (block.x0 > front + reach) break
+    if (block.x0 < front - 1) continue
+    if (block.y0 < r.y + RUNNER_H && block.y1 > r.y + STEP_UP) return { block, d: block.x0 - front }
+  }
+  return null
+}
+
 function wantsGroundJump(race: Race, r: Runner, ai: Ai): boolean {
   const { course } = race
   const front = r.x + RUNNER_W
   const v = Math.max(r.vx, 40)
-  // あなの まえ。
-  const cloud = course.clouds.find(c => Math.abs(c.top - r.y) < 1 && c.x0 < front && c.x1 > r.x)
-  const span = cloud ? undefined : spanUnder(course, r)
-  const floor = cloud ?? span
+  // あなの まえ。くもや トンネルの うえからは したに じめんが あれば おりる。
+  const shelf = course.clouds.find(c => Math.abs(c.top - r.y) < 1 && c.x0 < front && c.x1 > r.x)
+    ?? course.blocks.find(b => Math.abs(b.y1 - r.y) < 1 && b.x0 < front && b.x1 > r.x)
+  const span = shelf ? undefined : spanUnder(course, r)
+  const floor = shelf ?? span
   if (floor) {
     const edge = floor.x1
     const ahead = edge - front
-    const continues = cloud
+    const continues = shelf
       ? supportAt(course, edge, edge + RUNNER_W, r.y, true) > -Infinity
       : course.spans.some(s => s.x0 <= edge + .5 && s.x1 > edge + 1)
     if (!continues && ahead < 4 + v * .05 && ahead > -RUNNER_W + 6) return true
@@ -578,7 +662,8 @@ function wantsGroundJump(race: Race, r: Runner, ai: Ai): boolean {
     if (s.x0 - front <= lead) return true
     break
   }
-  // たかい ところの ごちそう。
+  // たかい ところの ごちそう（トンネルや ジャンプだいの ちかくでは とばない）。
+  if (tunnelAhead(course, r, 200) || course.springs.some(p => p.x0 - front < 140 && p.x1 > r.x)) return false
   const cx = r.x + RUNNER_W / 2
   for (const spot of course.foods) {
     if (spot.x < cx) continue
@@ -588,12 +673,22 @@ function wantsGroundJump(race: Race, r: Runner, ai: Ai): boolean {
     if (dy < 24) continue
     const rise = riseTime(dy)
     if (rise === null) continue
-    if (Math.abs(spot.x - cx - rise * v) < 8 && !course.pounders.some(p => p.x - front < 150 && p.x + p.w > r.x)) return true
+    if (Math.abs(spot.x - cx - rise * v) < 8) return true
   }
   return false
 }
 
-/** コンピューターが ストップを おすか きめ、ジャンプ したい ときは ジャンプを おす。 */
+/** わかれみちで したの みちを えらんだ ときに、ジャンプだいを スライディングで とおりすぎる。 */
+function wantsSlidePastSpring(race: Race, r: Runner, ai: Ai): boolean {
+  const front = r.x + RUNNER_W
+  return race.course.springs.some((spring, i) => !ai.upper[i] && Math.abs(spring.top - r.y) < 1
+    && spring.x0 - front < 24 && spring.x0 - front > -RUNNER_W / 2)
+}
+
+/**
+ * コンピューターの そうさ。ジャンプ・スライディングを おし、まよって たちどまる ときは true を かえす。
+ * プレイヤーと おなじ ボタンしか つかわない（たちどまるのは あいての まよい だけ）。
+ */
 export function aiControl(race: Race, r: Runner, ai: Ai): boolean {
   if (r.fall > 0 || r.stun > 0 || r.finishedAt !== null) return false
   if (Math.abs(r.x - ai.lastX) > 4) {
@@ -607,26 +702,36 @@ export function aiControl(race: Race, r: Runner, ai: Ai): boolean {
     return false
   }
   if (race.clock < ai.waitUntil) return true
+  const { course } = race
   const front = r.x + RUNNER_W
-  const vmax = RUN_SPEED * r.speed
-  if (r.onGround) {
-    const edge = ai.hesitant.findIndex(x => x - front < 30 && x - front > 0)
-    if (edge >= 0) {
-      ai.hesitant.splice(edge, 1)
-      ai.waitUntil = race.clock + .5
-      return true
-    }
-    if (pounderAhead(race, r, vmax)) return true
-    const threat = beeAhead(race, r, vmax)
-    if (threat) {
-      if (jumpClearsBee(race, r, threat.bee)) r.jumpBuffer = JUMP_BUFFER
-      else if (threat.d < 46) return true
-      return false
-    }
-    if (wantsGroundJump(race, r, ai)) r.jumpBuffer = JUMP_BUFFER
-  } else if (r.airJumps > 0 && r.vy < 140 && predictLanding(race.course, r) !== 'ok') {
-    r.jumpBuffer = JUMP_BUFFER
+  const vmax = RUN_SPEED * r.speed * (r.boost > 0 ? BOOST_MUL : 1)
+  if (!r.onGround) {
+    if (r.airJumps > 0 && r.vy < 140 && predictLanding(course, r) !== 'ok') r.jumpBuffer = JUMP_BUFFER
+    return false
   }
+  if (r.slide > 0) return false
+  const edge = ai.hesitant.findIndex(x => x - front < 30 && x - front > 0)
+  if (edge >= 0) {
+    ai.hesitant.splice(edge, 1)
+    ai.waitUntil = race.clock + .5
+    return true
+  }
+  if (wantsSlidePastSpring(race, r, ai)) {
+    r.slideBuffer = SLIDE_BUFFER
+    return false
+  }
+  const tunnel = tunnelAhead(course, r, 60)
+  if (tunnel && tunnel.d < 12 + r.vx * .06) {
+    r.slideBuffer = SLIDE_BUFFER
+    return false
+  }
+  const threat = beeAhead(race, r, vmax, RUNNER_H)
+  if (threat) {
+    if (jumpClearsBee(race, r, threat.bee)) r.jumpBuffer = JUMP_BUFFER
+    else if (threat.d < 30 && slideClearsBee(race, r, threat.bee, vmax, threat.d)) r.slideBuffer = SLIDE_BUFFER
+    return false
+  }
+  if (wantsGroundJump(race, r, ai)) r.jumpBuffer = JUMP_BUFFER
   return false
 }
 
@@ -669,10 +774,10 @@ export function stepRace(race: Race, dt: number): void {
     const gap = player.x - rival.x
     rival.speed = race.course.rival.speed * (gap > 420 ? 1.08 : gap < -520 ? .92 : 1)
   }
-  const playerStop = race.autoPlayer ? aiControl(race, player, race.autoPlayer) : race.stop
-  const rivalStop = race.phase === 'run' ? aiControl(race, rival, race.ai) : false
-  stepRunner(race, player, playerStop, dt)
-  stepRunner(race, rival, rivalStop, dt)
+  const playerWait = race.autoPlayer && race.phase === 'run' ? aiControl(race, player, race.autoPlayer) : false
+  const rivalWait = race.phase === 'run' ? aiControl(race, rival, race.ai) : false
+  stepRunner(race, player, playerWait, dt)
+  stepRunner(race, rival, rivalWait, dt)
   if (race.phase !== 'run') return
 
   if (rival.finishedAt !== null && race.rivalDoneAt === null) race.rivalDoneAt = race.t
