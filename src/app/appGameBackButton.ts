@@ -32,7 +32,9 @@ export const LEGACY_BACK_BUTTON_PATHS: ReadonlySet<string> = new Set([
 
 /** 末尾の「/」を落としたパスを受け取り、App が共通の戻るボタンを出す画面かどうかを返す。 */
 export function showsAppGameBackButton(pathname: string): boolean {
-  if (LEGACY_BACK_BUTTON_PATHS.has(pathname)) return true
-  const [, root, slug] = pathname.split('/')
+  // React Router は大文字・小文字を区別せずにルートを一致させるため、判定もそろえる。
+  const path = pathname.toLowerCase()
+  if (LEGACY_BACK_BUTTON_PATHS.has(path)) return true
+  const [, root, slug] = path.split('/')
   return root === 'games' && slug !== undefined && LEGACY_BACK_BUTTON_GAME_SLUGS.has(slug)
 }

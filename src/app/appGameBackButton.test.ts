@@ -31,6 +31,11 @@ describe('showsAppGameBackButton', () => {
     ['/games/car-road-builder/play', false],
     ['/games/flag-roll-maze', false],
     ['/games/flag-roll-maze/play', false],
+    // ルートは大文字・小文字を区別せずに一致するため、判定も同じにする。
+    ['/games/Flag-Quiz', true],
+    ['/games/Flag-Pinball', false],
+    ['/games/Flag-Pinball/Play', true],
+    ['/games/House-Builder', false],
     // ゲーム以外の画面。
     ['/', false],
     ['/games', false],
