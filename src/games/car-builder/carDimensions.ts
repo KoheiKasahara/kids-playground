@@ -12,7 +12,7 @@
  *   - 原点は車体の中心（前後・左右の中心）で、車は常に原点に置く。
  */
 import type { BodyType, CarConfig, RideHeight, WheelType } from './carConfig'
-import { CAR_VEHICLES, type CarVehicleDefinition } from './carVehicles'
+import { CAR_VEHICLES, type CarVehicleDefinition } from '../shared/vehicles/carVehicles'
 
 export type CarVec3 = { x: number; y: number; z: number }
 

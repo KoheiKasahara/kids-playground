@@ -1,5 +1,5 @@
 import { shuffle } from '../quiz-core/questionGenerator'
-import type { Country } from '../flag-quiz/types'
+import type { Country } from '../shared/countries/countries'
 import { countryById } from './data/travelCountries'
 import type { TravelCourse, TravelQuestion } from './types'
 import { CHOICE_COUNT, QUESTION_COUNT } from './types'

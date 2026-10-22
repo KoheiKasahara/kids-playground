@@ -1,5 +1,5 @@
 import FlagImage from './FlagImage'
-import type { Country } from './types'
+import type { Country } from '../../games/shared/countries/countries'
 import styles from './FlagChoiceGrid.module.css'
 
 type FlagChoiceGridProps = {

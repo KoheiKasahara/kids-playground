@@ -10,7 +10,7 @@ import * as THREE from 'three'
 import type { CircuitDefinition } from '../circuit-racing/circuit'
 import type { MotionCarPerformance } from '../circuit-racing/motion'
 import type { CarConfig, RideHeight, WheelType } from './carConfig'
-import type { CarVehicleId } from './carVehicles'
+import type { CarVehicleId } from '../shared/vehicles/carVehicles'
 
 /**
  * コース中心線の制御点（メートル、xz平面の閉じた輪）。

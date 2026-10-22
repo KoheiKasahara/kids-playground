@@ -14,7 +14,7 @@ import type {
   CarWheelAttachment,
   CarWheelAttachmentId,
 } from './carDimensions'
-import type { CarHeadlightMount } from './vehicleBody'
+import type { CarHeadlightMount } from '../shared/vehicles/vehicleBody'
 
 export type CarPartContext = {
   config: CarConfig

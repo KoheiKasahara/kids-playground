@@ -3,7 +3,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { countries } from '../../flag-quiz/data/countries'
+import { countries } from '../../shared/countries/countries'
 import { countryNumericIds } from './countryNumericIds'
 import {
   globeCountries,

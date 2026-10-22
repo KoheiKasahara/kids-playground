@@ -10,7 +10,7 @@ import {
   selectCarOption,
   type CarCategoryId,
 } from './carConfig'
-import { CAR_VEHICLE_ORDER } from './carVehicles'
+import { CAR_VEHICLE_ORDER } from '../shared/vehicles/carVehicles'
 
 describe('カテゴリのカタログ', () => {
   test('Issue #401 の8カテゴリが定義されている', () => {

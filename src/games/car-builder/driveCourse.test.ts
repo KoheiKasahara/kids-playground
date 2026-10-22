@@ -4,7 +4,7 @@ import { CIRCUITS } from '../circuit-racing/circuit'
 import { createMotionProfile } from '../circuit-racing/motion'
 import { CAR_CATEGORIES, DEFAULT_CAR_CONFIG, selectCarOption, type CarConfig } from './carConfig'
 import { createDriveCourse, driveCarTuning, DRIVE_COURSE } from './driveCourse'
-import { CAR_VEHICLE_ORDER } from './carVehicles'
+import { CAR_VEHICLE_ORDER } from '../shared/vehicles/carVehicles'
 
 function courseSize(curve: THREE.Curve<THREE.Vector3>): { x: number; z: number } {
   const bounds = new THREE.Box3().setFromPoints(curve.getPoints(512))

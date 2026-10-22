@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import CarBuilderPlay from './CarBuilderPlay'
-import { CAR_VEHICLES, CAR_VEHICLE_ORDER } from './carVehicles'
+import { CAR_VEHICLES, CAR_VEHICLE_ORDER } from '../shared/vehicles/carVehicles'
 
 // 3D描画(three.js/WebGL)はjsdomでは動かせないため、シーンhookだけを差し替える。
 // 代わりにhookへ渡されたCarConfigを記録し、「UI操作 → CarConfig更新 → 3Dへ反映」の

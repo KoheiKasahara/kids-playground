@@ -1,19 +1,22 @@
-import type { QuizLevel as CoreQuizLevel, QuizQuestion } from '../quiz-core/types'
+import type { QuizQuestion } from '../quiz-core/types'
 import {
   isQuizLevel as isCoreQuizLevel,
   LEVEL_LABEL as CORE_LEVEL_LABEL,
   LEVEL_RANK as CORE_LEVEL_RANK,
   LEVEL_STARS as CORE_LEVEL_STARS,
 } from '../quiz-core/types'
+import type { Country, CountryLevel } from '../shared/countries/countries'
 
 export { CHOICE_COUNT, QUESTION_COUNT } from '../quiz-core/types'
+export type { Continent, Country } from '../shared/countries/countries'
 
 /**
  * こっきクイズの むずかしさ。共通の3段階に、このゲームだけの最上位「おに」を足す。
  * 「おに」は国数がとびぬけて多く、他のクイズには対応するデータがないため、
- * 共通レイヤー (`quiz-core`) の QuizLevel は増やさずここで拡張する。
+ * 共通レイヤー (`quiz-core`) の QuizLevel は増やさず、国のマスタデータ側
+ * (`shared/countries`) の CountryLevel として拡張したものをそのまま使う。
  */
-export type QuizLevel = CoreQuizLevel | 'oni';
+export type QuizLevel = CountryLevel;
 
 /** 出題プールを累積させるためのむずかしさ順。おにが最上位。 */
 export const LEVEL_RANK: Record<QuizLevel, number> = {
@@ -38,27 +41,6 @@ export const LEVEL_STARS: Record<QuizLevel, string> = {
 export function isQuizLevel(value: unknown): value is QuizLevel {
   return isCoreQuizLevel(value) || value === 'oni';
 }
-
-export type Continent =
-  | 'asia'
-  | 'europe'
-  | 'northAmerica'
-  | 'southAmerica'
-  | 'africa'
-  | 'oceania';
-
-export type Country = {
-  /** ISO 3166-1 alpha-2 の小文字コード (例: 'jp') */
-  id: string;
-  /** 子ども向けの日本語表記。漢字を使わない (例: 'にほん') */
-  nameJa: string;
-  nameEn: string;
-  continent: Continent;
-  /** base からの相対パス (例: 'flags/jp.svg')。先頭にスラッシュを付けない */
-  flag: string;
-  /** この国が最初に出題対象になる むずかしさ */
-  level: QuizLevel;
-};
 
 export type Question = QuizQuestion<Country>;
 

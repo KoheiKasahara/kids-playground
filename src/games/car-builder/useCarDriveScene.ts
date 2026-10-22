@@ -30,7 +30,7 @@ import { CAR_CATEGORY_ORDER, type CarConfig } from './carConfig'
 import { computeCarDimensions } from './carDimensions'
 import { createCarModel } from './carModel'
 import { createDriveCourse, driveCarTuning, driveTracksideAnchor } from './driveCourse'
-import { clearCarVehicleModelCache } from './vehicleBody'
+import { clearCarVehicleModelCache } from '../shared/vehicles/vehicleBody'
 
 export type CarDriveCameraMode = 'chase' | 'trackside' | 'overview'
 export type CarDriveSceneStatus = 'loading' | 'ready' | 'error'

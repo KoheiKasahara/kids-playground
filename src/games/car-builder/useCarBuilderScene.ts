@@ -13,7 +13,7 @@ import * as THREE from 'three'
 import type { CarConfig } from './carConfig'
 import { carBoundingRadius } from './carDimensions'
 import { createCarModel } from './carModel'
-import { clearCarVehicleModelCache } from './vehicleBody'
+import { clearCarVehicleModelCache } from '../shared/vehicles/vehicleBody'
 
 export const MIN_CAR_ZOOM = 0.65
 export const MAX_CAR_ZOOM = 1.8

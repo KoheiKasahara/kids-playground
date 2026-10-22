@@ -8,7 +8,7 @@ import worldTopology from 'world-atlas/countries-50m.json' with { type: 'json' }
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const sourceCountriesPath = path.join(
   projectRoot,
-  'src/games/flag-quiz/data/countries.ts',
+  'src/games/shared/countries/countries.ts',
 )
 const generatedCountriesPath = path.join(
   projectRoot,
