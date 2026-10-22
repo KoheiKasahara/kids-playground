@@ -1,8 +1,7 @@
-import { countries } from '../../games/flag-quiz/data/countries'
-import type { Continent, Country } from '../../games/flag-quiz/types'
+import { countries, type Continent, type Country } from '../../games/shared/countries/countries'
 
 /**
- * flag-quizのcountriesマスターに含まれない、国旗ボール専用の追加国。
+ * 共通の国マスタ (shared/countries) に含まれない、国旗ボール専用の追加国。
  * 北マケドニアはこっきドミノで先に同じ扱い(flag-icons@7.5.0のflags/4x3/mk.svgを個別追加)を
  * しており、その前例にならう。ブルガリアも同じ配布物からflags/bg.svgを追加した。
  * クイズの出題国を増やす判断とは切り離したいため、この2か国はここでだけ持つ。
@@ -14,7 +13,7 @@ const SUPPLEMENTAL_COUNTRIES: readonly Country[] = [
 
 /**
  * 国旗を使う4つのミニゲーム（ピンボール・ころころ3種）で共有する国旗ボールのデータ。
- * 国旗クイズの Country をそのまま使い、円形ボールにしたときだけ必要になる
+ * 共通の国マスタの Country をそのまま使い、円形ボールにしたときだけ必要になる
  * 横方向の表示調整を任意プロパティとして足す。ゲーム固有の得点や物理値は持たせない。
  */
 export type FlagBallData = Country & {
@@ -39,7 +38,7 @@ const CONTINENT_ORDER: readonly Continent[] = [
 ]
 
 /**
- * 国旗クイズの countries は他ゲームのマスターなので、円形表示の調整だけをここで持つ。
+ * 共通の国マスタの countries は複数ゲームで共有するので、円形表示の調整だけをここで持つ。
  * 中央クロップでは左右が各12.5%切れるため、旗竿側(左)や旗尾側(右)に意匠が寄っている
  * 国旗だけ寄せ位置を指定する。
  * ('id' は インドネシア、'in' は インド。取り違えに注意)
@@ -70,7 +69,7 @@ const BALL_ADJUSTMENTS: Record<string, { positionX: number }> = {
 }
 
 /**
- * 国旗クイズのマスター(152か国)＋ボール専用の追加国を、大陸順に並べた国旗ボール一覧。
+ * 共通の国マスタ(152か国)＋ボール専用の追加国を、大陸順に並べた国旗ボール一覧。
  * ピンボール・ころころ3種の選択肢はこの一覧をそのまま使うため、
  * マスターへ国が増えれば4ゲームの選択肢もそのまま増える。
  * 並びは大陸ごとにまとめたうえで、大陸の中ではマスターの並び（よく知られた国が先）を保つ。

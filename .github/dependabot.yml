@@ -1,0 +1,43 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    # 公開から1週間未満の版は採用しない。乗っ取られた版が公開直後に取り下げられる間を待つ、
+    # サプライチェーン対策。
+    cooldown:
+      default-days: 7
+    groups:
+      # 開発用依存の minor / patch は1つのPRにまとめ、CIで一括確認する。
+      development-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      # 本番依存は patch だけをまとめる。minor / major は個別PRのまま残す
+      # （three や @dimforge/rapier3d-compat は 0.x で、minor 更新に破壊的変更を含むため）。
+      production-dependencies:
+        dependency-type: production
+        update-types:
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    cooldown:
+      default-days: 7
+    # ワークフローで使う Actions の更新は1つのPRにまとめる。
+    groups:
+      github-actions:
+        patterns:
+          - '*'

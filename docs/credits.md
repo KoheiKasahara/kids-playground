@@ -151,7 +151,7 @@ SOFTWARE.
 
 （`npm pack flag-icons` で取得した配布物に含まれる `LICENSE` ファイルの内容をそのまま転記しています。）
 
-収録している国旗ファイルの一覧は `public/flags/` を、収録国の一覧は `src/games/flag-quiz/data/countries.ts` を正としてください。
+収録している国旗ファイルの一覧は `public/flags/` を、収録国の一覧は `src/games/shared/countries/countries.ts` を正としてください。
 
 ## 楽器の音源 (public/audio/)
 

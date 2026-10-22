@@ -17,8 +17,8 @@ import {
   CAR_PART_CATEGORY_IDS,
 } from './carParts'
 import { createCarModel, type CarModelOptions } from './carModel'
-import { CAR_VEHICLES, type CarVehicleId } from './carVehicles'
-import type { CarVehicleBody } from './vehicleBody'
+import { CAR_VEHICLES, type CarVehicleId } from '../shared/vehicles/carVehicles'
+import type { CarVehicleBody } from '../shared/vehicles/vehicleBody'
 
 function layerOf(root: THREE.Object3D, category: string): THREE.Object3D {
   const layer = root.children.find((child) => child.name === 'car-layer-' + category)

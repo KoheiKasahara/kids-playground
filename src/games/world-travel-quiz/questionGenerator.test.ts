@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { countries } from '../flag-quiz/data/countries'
+import { countries } from '../shared/countries/countries'
 import { countryById, travelCountries, travelCountryIdsForRegion, travelRegionForCountry } from './data/travelCountries'
 import { travelCourses } from './data/travelCourses'
 import { answerPositionBag, generateTravelQuestions } from './questionGenerator'

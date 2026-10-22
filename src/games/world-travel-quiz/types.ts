@@ -1,4 +1,4 @@
-import type { Country } from '../flag-quiz/types'
+import type { Country } from '../shared/countries/countries'
 
 export const QUESTION_COUNT = 10
 export const CHOICE_COUNT = 4

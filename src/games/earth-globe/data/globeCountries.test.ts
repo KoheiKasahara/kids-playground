@@ -3,7 +3,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { countries } from '../../flag-quiz/data/countries'
+import { countries } from '../../shared/countries/countries'
 import { countryNumericIds } from './countryNumericIds'
 import {
   globeCountries,
@@ -86,7 +86,7 @@ describe('earth-globe data', () => {
     }
   })
 
-  it('flag-quizの既存国にはnumeric IDがある', () => {
+  it('共通の国マスタの既存国にはnumeric IDがある', () => {
     for (const country of countries) {
       expect(countryNumericIds[country.id]).toEqual(expect.any(Number))
     }

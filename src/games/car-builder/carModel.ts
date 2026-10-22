@@ -22,8 +22,8 @@ import {
   type CarPartCategoryId,
   type CarPartContext,
 } from './carParts'
-import type { CarVehicleId } from './carVehicles'
-import { loadCarVehicleBody, type CarVehicleBody } from './vehicleBody'
+import type { CarVehicleId } from '../shared/vehicles/carVehicles'
+import { loadCarVehicleBody, type CarVehicleBody } from '../shared/vehicles/vehicleBody'
 
 /** 車体GLBの読み込み状況。UIやテストが「まだ来ていない」を区別するために使う。 */
 export type CarBodyStatus = 'loading' | 'ready' | 'failed'

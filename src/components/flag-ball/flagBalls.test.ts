@@ -3,11 +3,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { countries } from '../../games/flag-quiz/data/countries'
-import type { Continent } from '../../games/flag-quiz/types'
+import { countries, type Continent } from '../../games/shared/countries/countries'
 import { findFlagBall, FLAG_BALL_IDS, flagBalls } from './flagBalls'
 
-/** flag-quizのcountriesマスターに存在しない国旗id。国旗ボール専用の追加国。 */
+/** 共通の国マスタ (shared/countries) に存在しない国旗id。国旗ボール専用の追加国。 */
 const supplementalIds = ['mk', 'bg']
 
 /** flagBalls.ts が並べ替えに使う大陸の順。 */

@@ -7,7 +7,7 @@ import {
   computeCarDimensions,
   resolveWheelSpec,
 } from './carDimensions'
-import { CAR_VEHICLES, CAR_VEHICLE_ORDER } from './carVehicles'
+import { CAR_VEHICLES, CAR_VEHICLE_ORDER } from '../shared/vehicles/carVehicles'
 
 /** 寸法に効く3カテゴリ（ボディ・タイヤ・車高）の全組み合わせ。 */
 function dimensionCombinations(): CarConfig[] {

@@ -1,4 +1,4 @@
-import { countries } from '../../flag-quiz/data/countries'
+import { countries } from '../../shared/countries/countries'
 import type { TravelCountry, TravelRegion } from '../types'
 
 type Entry = readonly [string, number, readonly [number, number], ('primary' | 'all')?]

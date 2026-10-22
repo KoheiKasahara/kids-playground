@@ -100,7 +100,7 @@ docsには次のような、変更頻度が高く陳腐化しやすい情報を�
 
 - 登録は `gameCatalog.ts` のデータと中央 `routes.tsx` の入口。複数画面がある新ゲームは `color-mix-quiz/routes.tsx` の相対ルート＋画面ごとのlazy importを参考にする。既存URLは維持し、全ゲームをまとめて移行しない。
 - ディレクトリは `src/games/<slug>/` に入口、必要に応じて `routes.tsx`、画面、ゲーム固有 `sounds.ts` / physics / data を置き、テストを対象ファイルの隣に置く。短いゲームを形式のために分割しない。
-- 戻る導線は `GameBackButton` に `to` または `onBack` で一階層上を明示する。safe-area付きの既存ヘッダーの左端へ配置する（ボタン側ではsafe-areaを重ねない）。先行導入はレスキューとボウリング。他ゲームは #558 で段階移行する。
+- 戻る導線は各画面が自分のヘッダーへ `GameBackButton` を置き、`to` または `onBack` で一階層上を明示する。safe-area付きの既存ヘッダーの左端へ配置する（ボタン側ではsafe-areaを重ねない）。Appが重ねる共通の戻るボタンは `src/app/appGameBackButton.ts` に挙げた未移行の既存画面にだけ残し、新しいゲームはそこへ追加しない。ヘッダーへ移した画面は同じ変更で一覧から外す。
 - `useGameIntroPlaying` は単一路線の選択→プレイ切替に利用できる。ボウリングではプレイ中のみ共通説明を隠し、「もどる」で選択画面と説明を復元する。初期表示と静的HTMLの本文は維持する。
 - Rapierはlazy側から `physics/rapierLoader` で初期化。初期化失敗は呼出元に伝え、次の呼出しで再試行する。world・step・free、RAF、イベント、GPU資源はゲームが所有し、effect cleanupで対応する資源を解放する。非同期完了は退出済みなら新しいworldを開始しない。
 - 新しいSEはゲーム内へ。`audio/sound` の共有Context・mute・primeAudio・短音・共通の出口（`getSoundOutput`）を利用し、ゲーム退出時に共有Contextをcloseしない。既存 `quizSound` の未移行SEは次に触るときに移す。音量のそろえ方は「効果音と音量のそろえ方」を参照する。

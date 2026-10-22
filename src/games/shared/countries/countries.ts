@@ -1,0 +1,204 @@
+/**
+ * 国旗を使う複数のゲーム（こっきクイズ・せかい旅行クイズ・国旗ボール・ちきゅうぎ など）で
+ * 共有する国のマスタデータ。ゲーム固有の出題ルールや表示調整はここに持たせない。
+ *
+ * `scripts/build-earth-globe-countries.mjs` が各国の行を1行ずつ正規表現で読み取るため、
+ * 1か国を1行で書く形を崩さない。
+ */
+import type { QuizLevel } from '../../quiz-core/types';
+
+export type Continent =
+  | 'asia'
+  | 'europe'
+  | 'northAmerica'
+  | 'southAmerica'
+  | 'africa'
+  | 'oceania';
+
+/**
+ * 国が最初に出題対象になる むずかしさ。共通の3段階に「おに」を足したもの。
+ * 「おに」は こっきクイズだけが持つ追加の最上位で、他のクイズには対応するデータがないため、
+ * 共通レイヤー (`quiz-core`) の QuizLevel は意図して増やさずここで拡張する。
+ */
+export type CountryLevel = QuizLevel | 'oni';
+
+export type Country = {
+  /** ISO 3166-1 alpha-2 の小文字コード (例: 'jp') */
+  id: string;
+  /** 子ども向けの日本語表記。漢字を使わない (例: 'にほん') */
+  nameJa: string;
+  nameEn: string;
+  continent: Continent;
+  /** base からの相対パス (例: 'flags/jp.svg')。先頭にスラッシュを付けない */
+  flag: string;
+  /** この国が最初に出題対象になる むずかしさ */
+  level: CountryLevel;
+};
+
+export const countries: readonly Country[] = [
+  { id: 'jp', nameJa: 'にほん', nameEn: 'Japan', continent: 'asia', flag: 'flags/jp.svg', level: 'easy' },
+  { id: 'kr', nameJa: 'かんこく', nameEn: 'South Korea', continent: 'asia', flag: 'flags/kr.svg', level: 'easy' },
+  { id: 'cn', nameJa: 'ちゅうごく', nameEn: 'China', continent: 'asia', flag: 'flags/cn.svg', level: 'easy' },
+  { id: 'th', nameJa: 'タイ', nameEn: 'Thailand', continent: 'asia', flag: 'flags/th.svg', level: 'easy' },
+  { id: 'in', nameJa: 'インド', nameEn: 'India', continent: 'asia', flag: 'flags/in.svg', level: 'easy' },
+  { id: 'ph', nameJa: 'フィリピン', nameEn: 'Philippines', continent: 'asia', flag: 'flags/ph.svg', level: 'normal' },
+  { id: 'vn', nameJa: 'ベトナム', nameEn: 'Vietnam', continent: 'asia', flag: 'flags/vn.svg', level: 'normal' },
+  { id: 'id', nameJa: 'インドネシア', nameEn: 'Indonesia', continent: 'asia', flag: 'flags/id.svg', level: 'normal' },
+  { id: 'tr', nameJa: 'トルコ', nameEn: 'Turkey', continent: 'asia', flag: 'flags/tr.svg', level: 'normal' },
+  { id: 'gb', nameJa: 'イギリス', nameEn: 'United Kingdom', continent: 'europe', flag: 'flags/gb.svg', level: 'easy' },
+  { id: 'fr', nameJa: 'フランス', nameEn: 'France', continent: 'europe', flag: 'flags/fr.svg', level: 'easy' },
+  { id: 'de', nameJa: 'ドイツ', nameEn: 'Germany', continent: 'europe', flag: 'flags/de.svg', level: 'easy' },
+  { id: 'it', nameJa: 'イタリア', nameEn: 'Italy', continent: 'europe', flag: 'flags/it.svg', level: 'easy' },
+  { id: 'es', nameJa: 'スペイン', nameEn: 'Spain', continent: 'europe', flag: 'flags/es.svg', level: 'easy' },
+  { id: 'ch', nameJa: 'スイス', nameEn: 'Switzerland', continent: 'europe', flag: 'flags/ch.svg', level: 'easy' },
+  { id: 'se', nameJa: 'スウェーデン', nameEn: 'Sweden', continent: 'europe', flag: 'flags/se.svg', level: 'normal' },
+  { id: 'ru', nameJa: 'ロシア', nameEn: 'Russia', continent: 'europe', flag: 'flags/ru.svg', level: 'easy' },
+  { id: 'gr', nameJa: 'ギリシャ', nameEn: 'Greece', continent: 'europe', flag: 'flags/gr.svg', level: 'normal' },
+  { id: 'nl', nameJa: 'オランダ', nameEn: 'Netherlands', continent: 'europe', flag: 'flags/nl.svg', level: 'normal' },
+  { id: 'us', nameJa: 'アメリカ', nameEn: 'United States', continent: 'northAmerica', flag: 'flags/us.svg', level: 'easy' },
+  { id: 'ca', nameJa: 'カナダ', nameEn: 'Canada', continent: 'northAmerica', flag: 'flags/ca.svg', level: 'easy' },
+  { id: 'mx', nameJa: 'メキシコ', nameEn: 'Mexico', continent: 'northAmerica', flag: 'flags/mx.svg', level: 'easy' },
+  { id: 'br', nameJa: 'ブラジル', nameEn: 'Brazil', continent: 'southAmerica', flag: 'flags/br.svg', level: 'easy' },
+  { id: 'ar', nameJa: 'アルゼンチン', nameEn: 'Argentina', continent: 'southAmerica', flag: 'flags/ar.svg', level: 'easy' },
+  { id: 'pe', nameJa: 'ペルー', nameEn: 'Peru', continent: 'southAmerica', flag: 'flags/pe.svg', level: 'normal' },
+  { id: 'eg', nameJa: 'エジプト', nameEn: 'Egypt', continent: 'africa', flag: 'flags/eg.svg', level: 'easy' },
+  { id: 'za', nameJa: 'みなみアフリカ', nameEn: 'South Africa', continent: 'africa', flag: 'flags/za.svg', level: 'normal' },
+  { id: 'ke', nameJa: 'ケニア', nameEn: 'Kenya', continent: 'africa', flag: 'flags/ke.svg', level: 'normal' },
+  { id: 'ng', nameJa: 'ナイジェリア', nameEn: 'Nigeria', continent: 'africa', flag: 'flags/ng.svg', level: 'hard' },
+  { id: 'au', nameJa: 'オーストラリア', nameEn: 'Australia', continent: 'oceania', flag: 'flags/au.svg', level: 'easy' },
+  { id: 'nz', nameJa: 'ニュージーランド', nameEn: 'New Zealand', continent: 'oceania', flag: 'flags/nz.svg', level: 'easy' },
+
+  // ここから追加分 (30 → 105か国)
+  { id: 'sg', nameJa: 'シンガポール', nameEn: 'Singapore', continent: 'asia', flag: 'flags/sg.svg', level: 'normal' },
+  { id: 'my', nameJa: 'マレーシア', nameEn: 'Malaysia', continent: 'asia', flag: 'flags/my.svg', level: 'normal' },
+  { id: 'mm', nameJa: 'ミャンマー', nameEn: 'Myanmar', continent: 'asia', flag: 'flags/mm.svg', level: 'hard' },
+  { id: 'kh', nameJa: 'カンボジア', nameEn: 'Cambodia', continent: 'asia', flag: 'flags/kh.svg', level: 'hard' },
+  { id: 'np', nameJa: 'ネパール', nameEn: 'Nepal', continent: 'asia', flag: 'flags/np.svg', level: 'hard' },
+  { id: 'lk', nameJa: 'スリランカ', nameEn: 'Sri Lanka', continent: 'asia', flag: 'flags/lk.svg', level: 'hard' },
+  { id: 'pk', nameJa: 'パキスタン', nameEn: 'Pakistan', continent: 'asia', flag: 'flags/pk.svg', level: 'hard' },
+  { id: 'mn', nameJa: 'モンゴル', nameEn: 'Mongolia', continent: 'asia', flag: 'flags/mn.svg', level: 'hard' },
+  { id: 'tw', nameJa: 'たいわん', nameEn: 'Taiwan', continent: 'asia', flag: 'flags/tw.svg', level: 'normal' },
+  { id: 'sa', nameJa: 'サウジアラビア', nameEn: 'Saudi Arabia', continent: 'asia', flag: 'flags/sa.svg', level: 'normal' },
+  { id: 'ae', nameJa: 'アラブしゅちょうこくれんぽう', nameEn: 'United Arab Emirates', continent: 'asia', flag: 'flags/ae.svg', level: 'hard' },
+  { id: 'il', nameJa: 'イスラエル', nameEn: 'Israel', continent: 'asia', flag: 'flags/il.svg', level: 'hard' },
+  { id: 'ir', nameJa: 'イラン', nameEn: 'Iran', continent: 'asia', flag: 'flags/ir.svg', level: 'hard' },
+  { id: 'kp', nameJa: 'きたちょうせん', nameEn: 'North Korea', continent: 'asia', flag: 'flags/kp.svg', level: 'hard' },
+  { id: 'qa', nameJa: 'カタール', nameEn: 'Qatar', continent: 'asia', flag: 'flags/qa.svg', level: 'hard' },
+  { id: 'kw', nameJa: 'クウェート', nameEn: 'Kuwait', continent: 'asia', flag: 'flags/kw.svg', level: 'hard' },
+  { id: 'jo', nameJa: 'ヨルダン', nameEn: 'Jordan', continent: 'asia', flag: 'flags/jo.svg', level: 'hard' },
+  { id: 'lb', nameJa: 'レバノン', nameEn: 'Lebanon', continent: 'asia', flag: 'flags/lb.svg', level: 'hard' },
+  { id: 'kz', nameJa: 'カザフスタン', nameEn: 'Kazakhstan', continent: 'asia', flag: 'flags/kz.svg', level: 'hard' },
+  { id: 'bd', nameJa: 'バングラデシュ', nameEn: 'Bangladesh', continent: 'asia', flag: 'flags/bd.svg', level: 'hard' },
+
+  { id: 'pt', nameJa: 'ポルトガル', nameEn: 'Portugal', continent: 'europe', flag: 'flags/pt.svg', level: 'normal' },
+  { id: 'be', nameJa: 'ベルギー', nameEn: 'Belgium', continent: 'europe', flag: 'flags/be.svg', level: 'normal' },
+  { id: 'at', nameJa: 'オーストリア', nameEn: 'Austria', continent: 'europe', flag: 'flags/at.svg', level: 'normal' },
+  { id: 'no', nameJa: 'ノルウェー', nameEn: 'Norway', continent: 'europe', flag: 'flags/no.svg', level: 'normal' },
+  { id: 'dk', nameJa: 'デンマーク', nameEn: 'Denmark', continent: 'europe', flag: 'flags/dk.svg', level: 'normal' },
+  { id: 'fi', nameJa: 'フィンランド', nameEn: 'Finland', continent: 'europe', flag: 'flags/fi.svg', level: 'normal' },
+  { id: 'is', nameJa: 'アイスランド', nameEn: 'Iceland', continent: 'europe', flag: 'flags/is.svg', level: 'hard' },
+  { id: 'ie', nameJa: 'アイルランド', nameEn: 'Ireland', continent: 'europe', flag: 'flags/ie.svg', level: 'hard' },
+  { id: 'pl', nameJa: 'ポーランド', nameEn: 'Poland', continent: 'europe', flag: 'flags/pl.svg', level: 'normal' },
+  { id: 'cz', nameJa: 'チェコ', nameEn: 'Czech Republic', continent: 'europe', flag: 'flags/cz.svg', level: 'hard' },
+  { id: 'hu', nameJa: 'ハンガリー', nameEn: 'Hungary', continent: 'europe', flag: 'flags/hu.svg', level: 'hard' },
+  { id: 'ro', nameJa: 'ルーマニア', nameEn: 'Romania', continent: 'europe', flag: 'flags/ro.svg', level: 'hard' },
+  { id: 'ua', nameJa: 'ウクライナ', nameEn: 'Ukraine', continent: 'europe', flag: 'flags/ua.svg', level: 'hard' },
+  { id: 'hr', nameJa: 'クロアチア', nameEn: 'Croatia', continent: 'europe', flag: 'flags/hr.svg', level: 'hard' },
+  { id: 'rs', nameJa: 'セルビア', nameEn: 'Serbia', continent: 'europe', flag: 'flags/rs.svg', level: 'hard' },
+  { id: 'lu', nameJa: 'ルクセンブルク', nameEn: 'Luxembourg', continent: 'europe', flag: 'flags/lu.svg', level: 'hard' },
+  { id: 'mt', nameJa: 'マルタ', nameEn: 'Malta', continent: 'europe', flag: 'flags/mt.svg', level: 'hard' },
+  { id: 'mc', nameJa: 'モナコ', nameEn: 'Monaco', continent: 'europe', flag: 'flags/mc.svg', level: 'hard' },
+  { id: 'va', nameJa: 'バチカン', nameEn: 'Vatican City', continent: 'europe', flag: 'flags/va.svg', level: 'hard' },
+  { id: 'sk', nameJa: 'スロバキア', nameEn: 'Slovakia', continent: 'europe', flag: 'flags/sk.svg', level: 'hard' },
+
+  { id: 'cu', nameJa: 'キューバ', nameEn: 'Cuba', continent: 'northAmerica', flag: 'flags/cu.svg', level: 'normal' },
+  { id: 'pa', nameJa: 'パナマ', nameEn: 'Panama', continent: 'northAmerica', flag: 'flags/pa.svg', level: 'hard' },
+  { id: 'cr', nameJa: 'コスタリカ', nameEn: 'Costa Rica', continent: 'northAmerica', flag: 'flags/cr.svg', level: 'hard' },
+  { id: 'jm', nameJa: 'ジャマイカ', nameEn: 'Jamaica', continent: 'northAmerica', flag: 'flags/jm.svg', level: 'hard' },
+  { id: 'do', nameJa: 'ドミニカきょうわこく', nameEn: 'Dominican Republic', continent: 'northAmerica', flag: 'flags/do.svg', level: 'hard' },
+  { id: 'gt', nameJa: 'グアテマラ', nameEn: 'Guatemala', continent: 'northAmerica', flag: 'flags/gt.svg', level: 'hard' },
+  { id: 'bs', nameJa: 'バハマ', nameEn: 'Bahamas', continent: 'northAmerica', flag: 'flags/bs.svg', level: 'hard' },
+
+  { id: 'cl', nameJa: 'チリ', nameEn: 'Chile', continent: 'southAmerica', flag: 'flags/cl.svg', level: 'normal' },
+  { id: 'co', nameJa: 'コロンビア', nameEn: 'Colombia', continent: 'southAmerica', flag: 'flags/co.svg', level: 'normal' },
+  { id: 've', nameJa: 'ベネズエラ', nameEn: 'Venezuela', continent: 'southAmerica', flag: 'flags/ve.svg', level: 'hard' },
+  { id: 'ec', nameJa: 'エクアドル', nameEn: 'Ecuador', continent: 'southAmerica', flag: 'flags/ec.svg', level: 'hard' },
+  { id: 'bo', nameJa: 'ボリビア', nameEn: 'Bolivia', continent: 'southAmerica', flag: 'flags/bo.svg', level: 'hard' },
+  { id: 'py', nameJa: 'パラグアイ', nameEn: 'Paraguay', continent: 'southAmerica', flag: 'flags/py.svg', level: 'hard' },
+  { id: 'uy', nameJa: 'ウルグアイ', nameEn: 'Uruguay', continent: 'southAmerica', flag: 'flags/uy.svg', level: 'hard' },
+
+  { id: 'ma', nameJa: 'モロッコ', nameEn: 'Morocco', continent: 'africa', flag: 'flags/ma.svg', level: 'normal' },
+  { id: 'tn', nameJa: 'チュニジア', nameEn: 'Tunisia', continent: 'africa', flag: 'flags/tn.svg', level: 'hard' },
+  { id: 'dz', nameJa: 'アルジェリア', nameEn: 'Algeria', continent: 'africa', flag: 'flags/dz.svg', level: 'hard' },
+  { id: 'et', nameJa: 'エチオピア', nameEn: 'Ethiopia', continent: 'africa', flag: 'flags/et.svg', level: 'hard' },
+  { id: 'gh', nameJa: 'ガーナ', nameEn: 'Ghana', continent: 'africa', flag: 'flags/gh.svg', level: 'hard' },
+  { id: 'tz', nameJa: 'タンザニア', nameEn: 'Tanzania', continent: 'africa', flag: 'flags/tz.svg', level: 'hard' },
+  { id: 'ug', nameJa: 'ウガンダ', nameEn: 'Uganda', continent: 'africa', flag: 'flags/ug.svg', level: 'hard' },
+  { id: 'sn', nameJa: 'セネガル', nameEn: 'Senegal', continent: 'africa', flag: 'flags/sn.svg', level: 'hard' },
+  { id: 'ci', nameJa: 'コートジボワール', nameEn: 'Ivory Coast', continent: 'africa', flag: 'flags/ci.svg', level: 'hard' },
+  { id: 'cm', nameJa: 'カメルーン', nameEn: 'Cameroon', continent: 'africa', flag: 'flags/cm.svg', level: 'hard' },
+  { id: 'mg', nameJa: 'マダガスカル', nameEn: 'Madagascar', continent: 'africa', flag: 'flags/mg.svg', level: 'hard' },
+  { id: 'zw', nameJa: 'ジンバブエ', nameEn: 'Zimbabwe', continent: 'africa', flag: 'flags/zw.svg', level: 'hard' },
+
+  { id: 'fj', nameJa: 'フィジー', nameEn: 'Fiji', continent: 'oceania', flag: 'flags/fj.svg', level: 'hard' },
+  { id: 'pg', nameJa: 'パプアニューギニア', nameEn: 'Papua New Guinea', continent: 'oceania', flag: 'flags/pg.svg', level: 'hard' },
+  { id: 'ws', nameJa: 'サモア', nameEn: 'Samoa', continent: 'oceania', flag: 'flags/ws.svg', level: 'hard' },
+  { id: 'to', nameJa: 'トンガ', nameEn: 'Tonga', continent: 'oceania', flag: 'flags/to.svg', level: 'hard' },
+  { id: 'sb', nameJa: 'ソロモンしょとう', nameEn: 'Solomon Islands', continent: 'oceania', flag: 'flags/sb.svg', level: 'hard' },
+  { id: 'vu', nameJa: 'バヌアツ', nameEn: 'Vanuatu', continent: 'oceania', flag: 'flags/vu.svg', level: 'hard' },
+  { id: 'fm', nameJa: 'ミクロネシアれんぽう', nameEn: 'Micronesia', continent: 'oceania', flag: 'flags/fm.svg', level: 'hard' },
+  { id: 'mh', nameJa: 'マーシャルしょとう', nameEn: 'Marshall Islands', continent: 'oceania', flag: 'flags/mh.svg', level: 'hard' },
+  // ここから「おに」の追加分 (105 → 152か国)
+  { id: 'la', nameJa: 'ラオス', nameEn: 'Laos', continent: 'asia', flag: 'flags/la.svg', level: 'oni' },
+  { id: 'bn', nameJa: 'ブルネイ', nameEn: 'Brunei', continent: 'asia', flag: 'flags/bn.svg', level: 'oni' },
+  { id: 'mv', nameJa: 'モルディブ', nameEn: 'Maldives', continent: 'asia', flag: 'flags/mv.svg', level: 'oni' },
+  { id: 'bt', nameJa: 'ブータン', nameEn: 'Bhutan', continent: 'asia', flag: 'flags/bt.svg', level: 'oni' },
+  { id: 'af', nameJa: 'アフガニスタン', nameEn: 'Afghanistan', continent: 'asia', flag: 'flags/af.svg', level: 'oni' },
+  { id: 'iq', nameJa: 'イラク', nameEn: 'Iraq', continent: 'asia', flag: 'flags/iq.svg', level: 'oni' },
+  { id: 'sy', nameJa: 'シリア', nameEn: 'Syria', continent: 'asia', flag: 'flags/sy.svg', level: 'oni' },
+  { id: 'om', nameJa: 'オマーン', nameEn: 'Oman', continent: 'asia', flag: 'flags/om.svg', level: 'oni' },
+  { id: 'uz', nameJa: 'ウズベキスタン', nameEn: 'Uzbekistan', continent: 'asia', flag: 'flags/uz.svg', level: 'oni' },
+  { id: 'ge', nameJa: 'ジョージア', nameEn: 'Georgia', continent: 'asia', flag: 'flags/ge.svg', level: 'oni' },
+
+  { id: 'ee', nameJa: 'エストニア', nameEn: 'Estonia', continent: 'europe', flag: 'flags/ee.svg', level: 'oni' },
+  { id: 'lv', nameJa: 'ラトビア', nameEn: 'Latvia', continent: 'europe', flag: 'flags/lv.svg', level: 'oni' },
+  { id: 'lt', nameJa: 'リトアニア', nameEn: 'Lithuania', continent: 'europe', flag: 'flags/lt.svg', level: 'oni' },
+  { id: 'by', nameJa: 'ベラルーシ', nameEn: 'Belarus', continent: 'europe', flag: 'flags/by.svg', level: 'oni' },
+  { id: 'si', nameJa: 'スロベニア', nameEn: 'Slovenia', continent: 'europe', flag: 'flags/si.svg', level: 'oni' },
+  { id: 'ba', nameJa: 'ボスニア', nameEn: 'Bosnia and Herzegovina', continent: 'europe', flag: 'flags/ba.svg', level: 'oni' },
+  { id: 'al', nameJa: 'アルバニア', nameEn: 'Albania', continent: 'europe', flag: 'flags/al.svg', level: 'oni' },
+  { id: 'li', nameJa: 'リヒテンシュタイン', nameEn: 'Liechtenstein', continent: 'europe', flag: 'flags/li.svg', level: 'oni' },
+  { id: 'sm', nameJa: 'サンマリノ', nameEn: 'San Marino', continent: 'europe', flag: 'flags/sm.svg', level: 'oni' },
+
+  { id: 'ag', nameJa: 'アンティグアバーブーダ', nameEn: 'Antigua and Barbuda', continent: 'northAmerica', flag: 'flags/ag.svg', level: 'oni' },
+  { id: 'kn', nameJa: 'セントクリストファーネービス', nameEn: 'Saint Kitts and Nevis', continent: 'northAmerica', flag: 'flags/kn.svg', level: 'oni' },
+  { id: 'vc', nameJa: 'セントビンセント', nameEn: 'Saint Vincent and the Grenadines', continent: 'northAmerica', flag: 'flags/vc.svg', level: 'oni' },
+  { id: 'tt', nameJa: 'トリニダードトバゴ', nameEn: 'Trinidad and Tobago', continent: 'northAmerica', flag: 'flags/tt.svg', level: 'oni' },
+  { id: 'lc', nameJa: 'セントルシア', nameEn: 'Saint Lucia', continent: 'northAmerica', flag: 'flags/lc.svg', level: 'oni' },
+  { id: 'gd', nameJa: 'グレナダ', nameEn: 'Grenada', continent: 'northAmerica', flag: 'flags/gd.svg', level: 'oni' },
+  { id: 'bb', nameJa: 'バルバドス', nameEn: 'Barbados', continent: 'northAmerica', flag: 'flags/bb.svg', level: 'oni' },
+  { id: 'ht', nameJa: 'ハイチ', nameEn: 'Haiti', continent: 'northAmerica', flag: 'flags/ht.svg', level: 'oni' },
+  { id: 'bz', nameJa: 'ベリーズ', nameEn: 'Belize', continent: 'northAmerica', flag: 'flags/bz.svg', level: 'oni' },
+
+  { id: 'gy', nameJa: 'ガイアナ', nameEn: 'Guyana', continent: 'southAmerica', flag: 'flags/gy.svg', level: 'oni' },
+  { id: 'sr', nameJa: 'スリナム', nameEn: 'Suriname', continent: 'southAmerica', flag: 'flags/sr.svg', level: 'oni' },
+
+  { id: 'ao', nameJa: 'アンゴラ', nameEn: 'Angola', continent: 'africa', flag: 'flags/ao.svg', level: 'oni' },
+  { id: 'bw', nameJa: 'ボツワナ', nameEn: 'Botswana', continent: 'africa', flag: 'flags/bw.svg', level: 'oni' },
+  { id: 'na', nameJa: 'ナミビア', nameEn: 'Namibia', continent: 'africa', flag: 'flags/na.svg', level: 'oni' },
+  { id: 'zm', nameJa: 'ザンビア', nameEn: 'Zambia', continent: 'africa', flag: 'flags/zm.svg', level: 'oni' },
+  { id: 'mz', nameJa: 'モザンビーク', nameEn: 'Mozambique', continent: 'africa', flag: 'flags/mz.svg', level: 'oni' },
+  { id: 'rw', nameJa: 'ルワンダ', nameEn: 'Rwanda', continent: 'africa', flag: 'flags/rw.svg', level: 'oni' },
+  { id: 'bi', nameJa: 'ブルンジ', nameEn: 'Burundi', continent: 'africa', flag: 'flags/bi.svg', level: 'oni' },
+  { id: 'bf', nameJa: 'ブルキナファソ', nameEn: 'Burkina Faso', continent: 'africa', flag: 'flags/bf.svg', level: 'oni' },
+  { id: 'sd', nameJa: 'スーダン', nameEn: 'Sudan', continent: 'africa', flag: 'flags/sd.svg', level: 'oni' },
+  { id: 'so', nameJa: 'ソマリア', nameEn: 'Somalia', continent: 'africa', flag: 'flags/so.svg', level: 'oni' },
+  { id: 'ly', nameJa: 'リビア', nameEn: 'Libya', continent: 'africa', flag: 'flags/ly.svg', level: 'oni' },
+  { id: 'ml', nameJa: 'マリ', nameEn: 'Mali', continent: 'africa', flag: 'flags/ml.svg', level: 'oni' },
+  { id: 'ls', nameJa: 'レソト', nameEn: 'Lesotho', continent: 'africa', flag: 'flags/ls.svg', level: 'oni' },
+  { id: 'sc', nameJa: 'セーシェル', nameEn: 'Seychelles', continent: 'africa', flag: 'flags/sc.svg', level: 'oni' },
+
+  { id: 'pw', nameJa: 'パラオ', nameEn: 'Palau', continent: 'oceania', flag: 'flags/pw.svg', level: 'oni' },
+  { id: 'ki', nameJa: 'キリバス', nameEn: 'Kiribati', continent: 'oceania', flag: 'flags/ki.svg', level: 'oni' },
+  { id: 'nr', nameJa: 'ナウル', nameEn: 'Nauru', continent: 'oceania', flag: 'flags/nr.svg', level: 'oni' },
+];

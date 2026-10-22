@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { CAR_VEHICLES } from '../car-builder/carVehicles'
+import { CAR_VEHICLES } from '../shared/vehicles/carVehicles'
 import { DEFAULT_SELECTIONS, RACE_CARS, RACE_COLORS } from './raceConfig'
 
 describe('raceConfig', () => {

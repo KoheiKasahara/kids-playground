@@ -9,7 +9,7 @@
  * の3か所だけで完結する。カテゴリごとの巨大な条件分岐をUIや3D側に増やさないための構造。
  */
 
-import { CAR_VEHICLES, CAR_VEHICLE_ORDER, type CarVehicleId } from './carVehicles'
+import { CAR_VEHICLES, CAR_VEHICLE_ORDER, type CarVehicleId } from '../shared/vehicles/carVehicles'
 
 /** ボディ＝採用したQuaternius車種。実体の定義は carVehicles.ts が持つ。 */
 export type BodyType = CarVehicleId

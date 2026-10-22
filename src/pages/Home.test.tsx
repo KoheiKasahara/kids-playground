@@ -113,7 +113,7 @@ describe('Home の おきにいり・さいきん', () => {
 
 describe('Home', () => {
 
-  test('こっきクイズが先頭で、先頭にあったゲームは末尾へ移動する', () => {
+  test('こっきクイズが先頭で、ゲームカードはカタログの順に並ぶ', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -121,27 +121,8 @@ describe('Home', () => {
     )
     const links = screen.getAllByRole('link')
     expect(links[0]).toHaveAccessibleName('こっきクイズ')
-    expect(links.slice(-18).map((link) => link.getAttribute('href'))).toEqual(
-      [
-        'dot-aquarium',
-        'pixel-kart',
-        'tsumiki-3d',
-        'dot-run',
-        'jishaku-pitatto',
-        'tonton-sumo',
-        'shabon-pachin',
-        'onaji-pon',
-        'dot-bomb',
-        'dot-monster-farm',
-        'kurukuru-rokuro',
-        'kabukuwa-battle',
-        'venom-lab',
-        'fishing-pond',
-        'kaiten-sushi',
-        'homerun-derby',
-        'gochiso-race',
-        'house-builder',
-      ].map(gameRoutePath),
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(
+      GAME_CATALOG.map((game) => gameRoutePath(game.slug)),
     )
   })
   test('サーキットレースをホームから開ける', async () => {
