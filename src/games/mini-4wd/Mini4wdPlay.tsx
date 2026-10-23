@@ -7,7 +7,7 @@ import { primeAudio } from '../../audio/sound'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { vibrate } from '../../utils/haptics'
 import { COLORS, COURSES, PARTS, getStats } from './data'
-import { drawCoursePreview, drawGarage } from './render'
+import { drawCoursePreview, drawGarage, drawPartPreview } from './render'
 import { progressStore, readBuild, writeBuild } from './save'
 import { playMiniSound, startMiniBgm, stopMiniSounds } from './sounds'
 import { useMiniRace } from './useMiniRace'
@@ -23,7 +23,12 @@ const CATEGORIES: { id: PartCategory; name: string; icon: string }[] = [
 function GarageArt({ build, selected }: { build: Build; selected: PartCategory }) {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => { if (ref.current) drawGarage(ref.current, build, selected) }, [build, selected])
-  return <canvas ref={ref} width={640} height={380} className={styles.garageCanvas} role="img" aria-label="くみたてた マシン。えらんだ パーツと いろが かわるよ" />
+  return <canvas ref={ref} width={640} height={420} className={styles.garageCanvas} role="img" aria-label="くみたてた マシン。えらんだ パーツと いろが かわるよ" />
+}
+function PartArt({ build, category }: { build: Build; category: PartCategory }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => { if (ref.current) drawPartPreview(ref.current, build, category) }, [build, category])
+  return <canvas ref={ref} width={160} height={110} className={styles.partArt} aria-hidden="true" />
 }
 function CourseArt({ course }: { course: Course }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -58,7 +63,12 @@ function RaceScreen({ course, build, sound, active, onBack, onRetry, onNext, onF
   }, [sound, active, paused, hud.finished, course.theme])
   useEffect(() => { if (paused) stopMiniSounds() }, [paused])
   useEffect(() => () => stopMiniSounds(), [])
-  const encourage = () => { if (!paused && !hud.finished) { cheer(); playMiniSound('cheer'); vibrate('tap') } }
+  const encourage = () => {
+    if (paused || hud.finished || !cheer()) return
+    playMiniSound('cheer')
+    vibrate('impact')
+  }
+  const cheerState = hud.boosting ? 'boost' : hud.charge < 1 ? 'charge' : 'ready'
   return <div className={styles.raceLayout}>
     <div className={styles.trackPanel}>
       <div className={styles.raceHud}><strong>★ {hud.rank} い</strong><span>{hud.lap} / 3 しゅう</span><time>{hud.time.toFixed(1)}<small>びょう</small></time></div>
@@ -80,7 +90,11 @@ function RaceScreen({ course, build, sound, active, onBack, onRetry, onNext, onF
       </div> : <>
         <div><span className={styles.eyebrow}>RACE DAY</span><h2>{course.name}</h2><p className={styles.hint}>じどうで はしるよ。おうえんしよう！</p></div>
         <p className={styles.callout} aria-live="polite">{hud.message}</p>
-        <button className={styles.cheer} disabled={paused || hud.countdown > 0} onClick={encourage}>⚑ がんばれー！<small>おうえんを とどけよう</small></button>
+        <button className={styles.cheer} data-state={cheerState} disabled={paused || hud.countdown > 0} onClick={encourage} style={{ '--charge': hud.charge } as CSSProperties}>
+          <span className={styles.cheerFill} aria-hidden="true" />
+          {cheerState === 'boost' ? '🔥 パワーアップ！' : '⚑ がんばれー！'}
+          <small>{cheerState === 'boost' ? 'ぐーんと はやく なったよ' : cheerState === 'charge' ? 'パワーを ためてるよ…' : 'おすと はやく なるよ'}</small>
+        </button>
         <button className={styles.secondary} onClick={() => setPaused(true)} disabled={paused}>Ⅱ ひとやすみ</button>
       </>}
     </aside>
@@ -129,7 +143,6 @@ export default function Mini4wdPlay() {
         <Stats build={build} />
       </section>
       <section className={styles.partsPanel} aria-label="パーツを えらぶ">
-        <div className={styles.sectionHeading}><span className={styles.eyebrow}>BUILD YOUR MACHINE</span><h2>パチッと、じぶんの 1だい。</h2><p>パーツを えらんで つけかえよう</p></div>
         <div className={styles.categories} role="tablist" aria-label="パーツの しゅるい">{CATEGORIES.map((item, index) => <button key={item.id} role="tab" tabIndex={category === item.id ? 0 : -1} aria-selected={category === item.id} aria-controls="mini-parts" id={`mini-tab-${item.id}`} onClick={() => { interact(); setCategory(item.id) }} onKeyDown={event => {
           const next = event.key === 'ArrowRight' ? (index + 1) % 4 : event.key === 'ArrowLeft' ? (index + 3) % 4 : event.key === 'Home' ? 0 : event.key === 'End' ? 3 : null
           if (next === null) return
@@ -137,8 +150,8 @@ export default function Mini4wdPlay() {
           event.currentTarget.parentElement?.querySelectorAll('button')[next]?.focus()
         }}><span aria-hidden="true">{item.icon}</span>{item.name}</button>)}</div>
         <div className={styles.parts} role="tabpanel" id="mini-parts" aria-labelledby={`mini-tab-${category}`}>
-          {PARTS[category].map((part, index) => <button className={styles.part} key={part.id} aria-pressed={build[category] === part.id} onClick={() => updateBuild({ ...build, [category]: part.id })}>
-            <span className={styles.partNumber}>{String(index + 1).padStart(2, '0')}</span><span className={styles.partName}>{part.name}<small>{part.description}</small></span><span className={styles.partCheck}>{build[category] === part.id ? '✓' : '+'}</span>
+          {PARTS[category].map(part => <button className={styles.part} key={part.id} aria-pressed={build[category] === part.id} onClick={() => updateBuild({ ...build, [category]: part.id })}>
+            <PartArt build={{ ...build, [category]: part.id }} category={category} /><span className={styles.partName}>{part.name}<small>{part.description}</small></span>
           </button>)}
         </div>
         <button className={styles.primary} onClick={() => { interact(); setStage('courses') }}>できた！ コースへ →</button>

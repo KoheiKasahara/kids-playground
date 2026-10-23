@@ -18,7 +18,7 @@ describe('mini-4wd parts and courses', () => {
   test('unknown saved selections fall back individually and known selections survive', () => {
     expect(normalizeBuild(null)).toEqual(DEFAULT_BUILD)
     expect(normalizeBuild([])).toEqual(DEFAULT_BUILD)
-    expect(normalizeBuild({ body: 'buggy', motor: 'rocket', tires: 7, color: 'mint' })).toEqual({
+    expect(normalizeBuild({ body: 'buggy', motor: 'jet', tires: 7, color: 'mint' })).toEqual({
       ...DEFAULT_BUILD, body: 'buggy', color: 'mint',
     })
     const valid = normalizeBuild(DEFAULT_BUILD)

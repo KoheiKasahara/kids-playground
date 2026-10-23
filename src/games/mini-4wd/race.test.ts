@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { COURSES, DEFAULT_BUILD, PARTS } from './data'
-import { COUNTDOWN_SECONDS, createRace, getRank, stepRace } from './race'
+import { CHEER_COOLDOWN_SECONDS, cheerRace, COUNTDOWN_SECONDS, createRace, getRank, stepRace } from './race'
 import type { Build, RaceEvent, RaceState } from './types'
 
 const SAFE: Build = { body: 'buggy', motor: 'torque', tires: 'sponge', rollers: 'wide', color: 'mint' }
@@ -63,6 +63,30 @@ describe('mini-4wd automatic race', () => {
     }
     expect(ranks, 'At least one available parts combination must be able to win').toContain(1)
     expect(ranks.size, 'Parts choices must affect the outcome, rather than always winning or losing').toBeGreaterThan(1)
+  })
+
+  test('cheering boosts the player, shakes off a bump and must charge before the next boost', () => {
+    const quiet = createRace(COURSES[0], DEFAULT_BUILD)
+    const cheered = createRace(COURSES[0], DEFAULT_BUILD)
+    expect(cheerRace(cheered)).toBe(false)
+    let accepted = 0
+    for (let frame = 0; frame < 80 * 60 && cheered.phase !== 'finished'; frame++) {
+      if (cheered.phase === 'racing' && cheerRace(cheered)) accepted++
+      stepRace(cheered, 1 / 60)
+    }
+    finish(quiet)
+    expect(cheered.racers[0].finishTime!).toBeLessThan(quiet.racers[0].finishTime! - 1)
+    expect(accepted).toBeLessThanOrEqual(Math.ceil(cheered.elapsed / CHEER_COOLDOWN_SECONDS) + 1)
+    expect(cheerRace(cheered)).toBe(false)
+
+    const bumped = createRace(COURSES[0], DEFAULT_BUILD)
+    bumped.phase = 'racing'
+    bumped.racers[0].recovery = .5
+    expect(cheerRace(bumped)).toBe(true)
+    expect(bumped.racers[0].recovery).toBe(0)
+    expect(cheerRace(bumped)).toBe(false)
+    stepRace(bumped, .1)
+    expect(bumped.racers[0].boost).toBeGreaterThan(0)
   })
 
   test('completed times determine the result, even when cars cross in the same step', () => {
