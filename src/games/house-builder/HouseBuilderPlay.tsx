@@ -6,7 +6,7 @@ import { primeAudio } from '../../audio/sound'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { vibrate } from '../../utils/haptics'
 import {
-  DOGHOUSES, DOORS, EXTRAS, GARDENS, HOUSE_TYPES, PARKINGS, ROOFS, ROOM_SIZES, ROOM_TYPES, SHAPES, WALLS, WINDOWS,
+  DEFAULT_EXTERIOR, DOGHOUSES, DOORS, EXTERIOR_STYLES, EXTRAS, GARDENS, HOUSE_TYPES, PARKINGS, POOLS, ROOFS, ROOM_SIZES, ROOM_TYPES, SHAPES, WALLS, WINDOWS,
   findHouseType, findRoof, findRoomStyle, findRoomType, findShape,
   type Exterior, type ExteriorOption, type ExtraId, type HouseTypeId, type RoomSizeId, type RoomTypeId, type Shape, type ShapeId,
 } from './data'
@@ -710,7 +710,8 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
 
 // ---------------- そとがわ ----------------
 
-const CATEGORIES: readonly { id: ExteriorCategory; name: string; options: readonly ExteriorOption<string>[] }[] = [
+const CATEGORIES: readonly { id: ExteriorCategory | 'style'; name: string; options: readonly ExteriorOption<string>[] }[] = [
+  { id: 'style', name: 'おうちセット', options: EXTERIOR_STYLES },
   { id: 'wall', name: 'かべ', options: WALLS },
   { id: 'roof', name: 'やね', options: ROOFS },
   { id: 'window', name: 'まど', options: WINDOWS },
@@ -718,11 +719,12 @@ const CATEGORIES: readonly { id: ExteriorCategory; name: string; options: readon
   { id: 'parking', name: 'ちゅうしゃじょう', options: PARKINGS },
   { id: 'doghouse', name: 'いぬごや', options: DOGHOUSES },
   { id: 'garden', name: 'にわ', options: GARDENS },
+  { id: 'pool', name: 'プール', options: POOLS },
   { id: 'extras', name: 'おまけ', options: EXTRAS },
 ]
 
 function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onChange: (design: HouseDesign) => void; onDone: () => void }) {
-  const [category, setCategory] = useState<ExteriorCategory>('wall')
+  const [category, setCategory] = useState<ExteriorCategory | 'style'>('style')
   const [message, setMessage] = useState('かべや やねを えらんで、おうちの そとがわを つくろう')
   const ex = design.exterior
   const options = CATEGORIES.find((c) => c.id === category)!.options
@@ -730,7 +732,11 @@ function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onCh
   function choose(id: string, name: string) {
     let exterior: Exterior
     let kind: HouseSound = 'paint'
-    if (category === 'extras') {
+    if (category === 'style') {
+      const style = EXTERIOR_STYLES.find((s) => s.id === id)!
+      exterior = { ...ex, ...style.facade }
+      setMessage(`${name}に きがえたよ！`)
+    } else if (category === 'extras') {
       const on = ex.extras.includes(id as ExtraId)
       const extras = EXTRAS.map((e) => e.id).filter((e) => (e === id ? !on : ex.extras.includes(e)))
       exterior = { ...ex, extras }
@@ -747,7 +753,13 @@ function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onCh
     sfx(kind, 'tap')
   }
 
-  const isOn = (id: string) => (category === 'extras' ? ex.extras.includes(id as ExtraId) : ex[category] === id)
+  const isOn = (id: string) => {
+    if (category === 'style') {
+      const facade = EXTERIOR_STYLES.find((s) => s.id === id)!.facade
+      return ex.wall === facade.wall && ex.roof === facade.roof && ex.window === facade.window && ex.door === facade.door
+    }
+    return category === 'extras' ? ex.extras.includes(id as ExtraId) : ex[category] === id
+  }
 
   return (
     <section className={styles.outsideLayout} aria-label="そとがわを つくる">
@@ -771,17 +783,23 @@ function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onCh
             </li>
           ))}
         </ul>
-        <ul className={styles.optionGrid} aria-label={CATEGORIES.find((c) => c.id === category)!.name}>
+        <ul className={`${styles.optionGrid} ${category === 'style' ? styles.styleGrid : ''}`} aria-label={CATEGORIES.find((c) => c.id === category)!.name}>
           {options.map((option) => (
             <li key={option.id}>
               <button type="button" className={styles.optionCard} aria-pressed={isOn(option.id)} onClick={() => choose(option.id, option.name)}>
-                <span className={styles.optionArt}><ExteriorSwatch category={category} id={option.id} /></span>
+                <span className={styles.optionArt} aria-hidden="true">
+                  {category === 'style'
+                    ? <HouseFront design={{ ...createDesign('nikai', 'square'), exterior: { ...DEFAULT_EXTERIOR, ...EXTERIOR_STYLES.find((s) => s.id === option.id)!.facade } }} />
+                    : <ExteriorSwatch category={category} id={option.id} />}
+                </span>
                 <span className={styles.optionName}>{option.name}</span>
               </button>
             </li>
           ))}
         </ul>
         {category === 'extras' && <p className={styles.hint}>おまけは いくつでも つけられるよ</p>}
+        {category === 'style' && <p className={styles.hint}>セットを えらんだ あとに、かべや やねを かえても いいよ</p>}
+        {(category === 'garden' || category === 'pool') && <p className={styles.hint}>にわと プールは いっしょに おけるよ</p>}
       </div>
       <div className={styles.footer}>
         <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} onClick={onDone}>
@@ -813,7 +831,7 @@ function RoofCap({ design }: { design: HouseDesign }) {
     <svg className={styles.roofCap} viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true" focusable="false">
       {flat
         ? <rect x={6} y={36} width={388} height={22} fill={roof.color} stroke={roof.dark} strokeWidth={4} />
-        : <path d="M2 58 L 200 4 L 398 58 Z" fill={roof.color} stroke={roof.dark} strokeWidth={4} strokeLinejoin="round" />}
+        : <path d={roof.kind === 'shed' ? 'M2 58 L 2 4 L 398 44 L 398 58 Z' : 'M2 58 L 200 4 L 398 58 Z'} fill={roof.color} stroke={roof.dark} strokeWidth={4} strokeLinejoin="round" />}
     </svg>
   )
 }

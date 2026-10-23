@@ -919,6 +919,19 @@
   height: 66px;
 }
 
+.styleGrid {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.styleGrid .optionArt {
+  height: 104px;
+}
+
+.optionArt .front {
+  height: 100%;
+  max-height: none;
+}
+
 .optionName {
   font-size: 13px;
   font-weight: 900;

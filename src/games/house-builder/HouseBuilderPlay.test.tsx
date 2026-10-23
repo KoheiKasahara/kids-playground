@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
 import { resetGameShelfCache } from '../../pages/gameShelfStore'
 import HouseBuilderPlay from './HouseBuilderPlay'
+import { EXTERIOR_STYLES, EXTRAS, GARDENS } from './data'
 import { ALBUM_LIMIT } from './save'
 import { playHouseSound, startBgm } from './sounds'
 
@@ -76,7 +77,7 @@ const SAVED_HOUSE = {
     { id: 1, floor: 0, type: 'toilet', style: 'flower', size: 'm', turned: false, x: 5, y: 0 },
     { id: 2, floor: 1, type: 'kids', style: 'space', size: 'm', turned: false, x: 0, y: 0 },
   ],
-  exterior: { wall: 'brick', roof: 'kawara', window: 'square', door: 'wood', parking: 'two', doghouse: 'red', garden: 'none', extras: [] },
+  exterior: { wall: 'brick', roof: 'kawara', window: 'square', door: 'wood', parking: 'two', doghouse: 'red', garden: 'none', pool: 'none', extras: [] },
 }
 
 function startHouse(type: RegExp, shape: RegExp) {
@@ -337,6 +338,49 @@ describe('house-builder play', () => {
     expect(screen.getByRole('button', { name: /^L の かたち/ })).toHaveAttribute('aria-pressed', 'true')
     click(/^せまい/)
     expect(saved()).toMatchObject({ shape: 'narrow', rooms: [{ type: 'washitsu', style: 'kotatsu' }] })
+  })
+
+  test('プールと はたけを いっしょに おき、セットで いえの みためだけを かえて ほぞんできる', async () => {
+    window.localStorage.setItem(KEY, JSON.stringify(SAVED_HOUSE))
+    const first = renderGame()
+    click('つづきから つくる')
+    click(/そとがわを つくる/)
+    const choose = (category: string, option: string) => {
+      fireEvent.click(within(screen.getByRole('list', { name: 'えらぶ もの' })).getByRole('button', { name: category }))
+      fireEvent.click(within(screen.getByRole('list', { name: category })).getByRole('button', { name: option }))
+    }
+    const crop = GARDENS.find((option) => option.id === 'strawberries')!
+    choose('にわ', crop.name)
+    choose('プール', 'まるい プール')
+    expect(saved().exterior).toMatchObject({ garden: 'strawberries', pool: 'round' })
+    choose('プール', 'なし')
+    expect(saved().exterior).toMatchObject({ garden: 'strawberries', pool: 'none' })
+    choose('プール', 'おおきな プール')
+    for (const id of ['picnic', 'fountain']) choose('おまけ', EXTRAS.find((option) => option.id === id)!.name)
+
+    const beforeStyle = saved()
+    for (const style of EXTERIOR_STYLES) {
+      choose('おうちセット', style.name)
+      expect(saved()).toEqual({ ...beforeStyle, exterior: { ...beforeStyle.exterior, ...style.facade } })
+      expect(within(screen.getByRole('list', { name: 'おうちセット' })).getByRole('button', { name: style.name })).toHaveAttribute('aria-pressed', 'true')
+    }
+    expect(sounds()).toContain('paint')
+    const finished = saved()
+    click('かんせい！')
+    await screen.findByRole('group', { name: /^できあがった おうち（3D）/ })
+    expect(scene.create).toHaveBeenLastCalledWith(expect.objectContaining({ exterior: finished.exterior, rooms: SAVED_HOUSE.rooms }), { kind: 'outside' })
+    click(/おうちを ほぞんする/)
+    first.unmount()
+
+    window.localStorage.removeItem(KEY)
+    renderGame()
+    click('1ばんめの おうちを ひらく（2かいだて・へや 2こ）')
+    await screen.findByRole('group', { name: /^できあがった おうち（3D）/ })
+    expect(scene.create).toHaveBeenLastCalledWith(expect.objectContaining({ exterior: finished.exterior, rooms: SAVED_HOUSE.rooms }), { kind: 'outside' })
+    click('そとがわを なおす')
+    fireEvent.click(within(screen.getByRole('list', { name: 'えらぶ もの' })).getByRole('button', { name: 'プール' }))
+    expect(within(screen.getByRole('list', { name: 'プール' })).getByRole('button', { name: 'おおきな プール' })).toHaveAttribute('aria-pressed', 'true')
+    expect(saved().exterior).toMatchObject({ garden: 'strawberries', pool: 'rectangle', extras: ['picnic', 'fountain'] })
   })
 
   test('3D で みられない ときは そと と かいごとの まどりを え で みせ、もういちど 3D に できる', async () => {
