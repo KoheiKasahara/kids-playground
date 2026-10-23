@@ -42,6 +42,7 @@ export const GAME_SOUND_LEVEL_DB: Readonly<Record<string, number>> = {
   'kurukuru-rokuro': 4,
   'magic-sandbox': 8,
   'mato-ate': 7.5,
+  'mini-4wd': 11,
   'oekaki-korokoro': 8.5,
   'onaji-pon': 1.5,
   'origami-play': 14,

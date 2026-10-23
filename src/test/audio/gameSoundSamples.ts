@@ -40,6 +40,7 @@ import * as rokuro from '../../games/kurukuru-rokuro/sounds'
 import * as sandbox from '../../games/magic-sandbox/sounds'
 import * as marble from '../../games/marble-course/sounds'
 import * as mato from '../../games/mato-ate/sounds'
+import { playMiniSound, startMiniBgm } from '../../games/mini-4wd/sounds'
 import * as oekaki from '../../games/oekaki-korokoro/sounds'
 import * as onaji from '../../games/onaji-pon/sounds'
 import * as origami from '../../games/origami-play/sounds'
@@ -86,6 +87,22 @@ function pianoNotes(count: number): SoundSample['play'] {
 }
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
+  'mini-4wd': [
+    sample('えらぶ', () => playMiniSound('select')),
+    sample('くみたて', () => playMiniSound('assemble')),
+    sample('レースへ', () => playMiniSound('start')),
+    sample('カウントダウン', () => playMiniSound('countdown')),
+    sample('スタート', () => playMiniSound('go')),
+    sample('つぎの しゅう', () => playMiniSound('lap')),
+    sample('カーブ', () => playMiniSound('bump')),
+    sample('おうえん', () => playMiniSound('cheer')),
+    sample('ゴール', () => playMiniSound('finish')),
+    background('ガレージ BGM', 3, () => startMiniBgm('garage')),
+    background('こうえん BGM', 3, () => startMiniBgm('race', 'park')),
+    background('もり BGM', 3, () => startMiniBgm('race', 'forest')),
+    background('うみ BGM', 3, () => startMiniBgm('race', 'coast')),
+    background('よぞら BGM', 3, () => startMiniBgm('race', 'night')),
+  ],
   'house-builder': [
     sample('えらぶ', () => house.playHouseSound('tap')),
     sample('へやを おく', () => house.playHouseSound('place')),
