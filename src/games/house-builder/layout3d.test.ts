@@ -101,12 +101,15 @@ describe('house-builder 3D layout', () => {
       for (const parking of ['none', 'red', 'two', 'garage'] as const) {
         const design: HouseDesign = {
           ...createDesign('nikai', shape.id),
-          exterior: { wall: 'white', roof: 'red', window: 'square', door: 'wood', parking, doghouse: 'red', garden: parking === 'two' ? 'pond' : 'veggies', extras: ['bike', 'mailbox', 'swing', 'koinobori'] },
+          exterior: { wall: 'white', roof: 'red', window: 'square', door: 'wood', parking, doghouse: 'red', garden: parking === 'two' ? 'orchard' : 'strawberries', pool: parking === 'garage' ? 'round' : 'rectangle', extras: ['bike', 'mailbox', 'swing', 'koinobori', 'picnic', 'fountain'] },
         }
         const yard = yardLayout(design)
         const boxes: [string, Box2][] = [['house', yard.house], ['path', { ...yard.path, minZ: yard.frontZ + .1 }]]
         if (yard.parking) boxes.push(['parking', yard.parking])
         if (yard.plot) boxes.push(['plot', yard.plot])
+        if (yard.pool) boxes.push(['pool', yard.pool])
+        if (yard.picnic) boxes.push(['picnic', yard.picnic])
+        if (yard.fountain) boxes.push(['fountain', yard.fountain])
         if (yard.bike) boxes.push(['bike', { minX: yard.bike.x - .8, maxX: yard.bike.x + .8, minZ: yard.bike.z - .2, maxZ: yard.bike.z + .2 }])
         if (yard.mailbox) boxes.push(['mailbox', around(yard.mailbox, .3)])
         if (yard.doghouse) boxes.push(['doghouse', { minX: yard.doghouse.x - .7, maxX: yard.doghouse.x + 1.6, minZ: yard.doghouse.z - .7, maxZ: yard.doghouse.z + .9 }])
@@ -116,13 +119,26 @@ describe('house-builder 3D layout', () => {
           for (let j = i + 1; j < boxes.length; j++) expect(overlaps(boxes[i][1], boxes[j][1]), `${shape.id}/${parking}: ${boxes[i][0]} × ${boxes[j][0]}`).toBe(false)
           if (i > 0) {
             const b = boxes[i][1]
-            expect(b.minX >= yard.yard.minX && b.maxX <= yard.yard.maxX && b.maxZ <= yard.yard.maxZ, `${shape.id}/${parking}: ${boxes[i][0]}`).toBe(true)
+            expect(b.minX >= yard.yard.minX && b.maxX <= yard.yard.maxX && b.minZ >= yard.yard.minZ && b.maxZ <= yard.yard.maxZ, `${shape.id}/${parking}: ${boxes[i][0]}`).toBe(true)
           }
         }
         expect(yard.parking?.cars.length ?? 0).toBe(parking === 'none' ? 0 : parking === 'two' ? 2 : 1)
+        expect(yard.plot).toBeDefined()
+        expect(yard.pool).toBeDefined()
+        expect(yard.picnic).toBeDefined()
+        expect(yard.fountain).toBeDefined()
         expect(yard.door.z).toBeCloseTo(yard.path.minZ)
         expect(yard.house.maxX - yard.house.minX).toBeCloseTo(shape.width * CELL)
       }
     }
+  })
+
+  test('プールだけを はずしても はたけは のこる', () => {
+    const base = createDesign('hiraya', 'square')
+    const garden = { ...base.exterior, garden: 'veggies' as const }
+    expect(yardLayout({ ...base, exterior: { ...garden, pool: 'round' } })).toMatchObject({ pool: expect.any(Object), plot: expect.any(Object) })
+    const withoutPool = yardLayout({ ...base, exterior: { ...garden, pool: 'none' } })
+    expect(withoutPool.plot).toBeDefined()
+    expect(withoutPool.pool).toBeUndefined()
   })
 })

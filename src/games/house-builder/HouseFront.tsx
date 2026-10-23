@@ -1,7 +1,7 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react'
 import {
   findDoor, findRoof, findShape, findWall,
-  type DoghouseId, type DoorId, type Exterior, type ExtraId, type GardenId, type ParkingId, type RoofId, type WallId, type WindowId,
+  type DoghouseId, type DoorId, type Exterior, type ExtraId, type GardenId, type ParkingId, type PoolId, type RoofId, type WallId, type WindowId,
 } from './data'
 import { facadeOpenings, floorCount, frontEdge, type HouseDesign, type Opening } from './plan'
 import styles from './HouseBuilderPlay.module.css'
@@ -19,7 +19,7 @@ const SKY = 46
 export type Hotspot = 'door' | 'dog' | 'car'
 
 const roofHeight = (kind: string, hw: number) =>
-  kind === 'flat' ? 26 : kind === 'steep' ? Math.min(300, Math.max(150, hw * .55)) : kind === 'kawara' ? Math.min(150, Math.max(84, hw * .26)) : Math.min(170, Math.max(92, hw * .3))
+  kind === 'flat' ? 26 : kind === 'shed' ? Math.min(125, Math.max(76, hw * .22)) : kind === 'steep' ? Math.min(300, Math.max(150, hw * .55)) : kind === 'kawara' ? Math.min(150, Math.max(84, hw * .26)) : Math.min(170, Math.max(92, hw * .3))
 
 const OVERHANG = 24
 
@@ -39,6 +39,9 @@ type Spots = {
   koinobori?: number
   swing?: number
   trees?: [number, number]
+  pool?: number
+  picnic?: number
+  fountain?: number
 }
 
 type Layout = {
@@ -57,6 +60,8 @@ type Layout = {
   backY: number
   /** まえの にわ（てまえ）の ものを おく じめん。 */
   frontY: number
+  /** にわの いちばん てまえの ものを おく じめん。 */
+  leisureY: number
   spots: Spots
 }
 
@@ -74,16 +79,18 @@ function layout(design: HouseDesign): Layout {
   const has = (id: ExtraId) => ex.extras.includes(id)
   const door = facadeOpenings(design, 0).find((o) => o.kind === 'door')
   const doorOff = (door?.center ?? shape.width / 2) * CW
-  const trees = ex.garden === 'trees'
+  const trees = ex.garden === 'trees' || ex.garden === 'orchard'
   const cars = ex.parking === 'none' ? 0 : ex.parking === 'two' ? 2 : 1
   const parkingW = cars ? cars * (CAR_W + 14) + 20 : 0
-  const gardenW = ex.garden === 'veggies' || ex.garden === 'pond' ? 170 : 0
+  const gardenW = ex.garden === 'veggies' || ex.garden === 'strawberries' || ex.garden === 'pond' ? 170 : 0
   const dogW = ex.doghouse !== 'none' ? 175 : 0
+  const poolW = ex.pool && ex.pool !== 'none' ? 210 : 0
+  const leisure = poolW > 0 || has('picnic') || has('fountain')
 
   const sideLeft = 40 + (has('koinobori') ? 90 : 0) + (trees ? 110 : 0)
   const sideRight = 40 + (has('swing') ? 150 : 0) + (trees ? 110 : 0)
-  const frontLeft = PATH + (has('bike') ? 120 : 0) + parkingW + 24
-  const frontRight = PATH + (has('mailbox') ? 60 : 0) + gardenW + dogW + 24
+  const frontLeft = PATH + Math.max((has('bike') ? 120 : 0) + parkingW, poolW) + 24
+  const frontRight = PATH + Math.max((has('mailbox') ? 60 : 0) + gardenW + dogW, (has('picnic') ? 170 : 0) + (has('fountain') ? 130 : 0)) + 24
   let houseX = Math.max(sideLeft, frontLeft - doorOff)
   let width = Math.max(houseX + houseW + sideRight, houseX + doorOff + frontRight)
   if (width < MIN_WIDTH) {
@@ -114,7 +121,7 @@ function layout(design: HouseDesign): Layout {
   if (dogW) spots.doghouse = at + 10
   at = houseX - 30
   if (has('koinobori')) {
-    spots.koinobori = at - 40
+    spots.koinobori = at - 60
     at -= 90
   }
   const leftTree = at - 50
@@ -123,14 +130,19 @@ function layout(design: HouseDesign): Layout {
     spots.swing = at
     at += 150
   }
-  if (trees) spots.trees = [leftTree, at + 50]
+  if (trees) {
+    spots.trees = [leftTree, at + 50]
+  }
+  if (poolW) spots.pool = doorX - PATH - 202
+  if (has('picnic')) spots.picnic = doorX + PATH + 12
+  if (has('fountain')) spots.fountain = doorX + PATH + 12 + (has('picnic') ? 170 : 0)
 
   // えんとつの けむりや こいのぼりが そらから はみださない たかさ。
-  const chimneyRoom = has('chimney') ? (roof.kind === 'flat' ? 150 : 60) : 0
+  const chimneyRoom = has('chimney') ? (roof.kind === 'flat' || roof.kind === 'shed' ? 150 : 60) : 0
   const tall = Math.max(roofH + floors * FH + BASE + chimneyRoom, has('koinobori') ? 310 : 0, 200)
   const groundY = SKY + tall
   const frontYard = cars > 0 || has('bike') || has('mailbox') || gardenW > 0 || dogW > 0
-  const ground = frontYard ? YARD : GROUND
+  const ground = leisure ? 390 : frontYard ? YARD : GROUND
   return {
     width,
     height: groundY + ground,
@@ -144,6 +156,7 @@ function layout(design: HouseDesign): Layout {
     doorX,
     backY: groundY + 22,
     frontY: groundY + 150,
+    leisureY: groundY + 330,
     spots,
   }
 }
@@ -202,6 +215,33 @@ const GLASS = '#bfe6fb'
 
 function WindowArt({ style, x, y, w, h, frame = '#ffffff' }: { style: WindowId; x: number; y: number; w: number; h: number; frame?: string }) {
   const cx = x + w / 2, cy = y + h / 2
+  if (style === 'shutters') {
+    const shutter = w * .2
+    return (
+      <g>
+        <rect x={x + shutter} y={y} width={w - shutter * 2} height={h} rx={2} fill={GLASS} stroke={frame} strokeWidth={4} />
+        <line x1={cx} y1={y} x2={cx} y2={y + h} stroke={frame} strokeWidth={3} />
+        <line x1={x + shutter} y1={cy} x2={x + w - shutter} y2={cy} stroke={frame} strokeWidth={3} />
+        {[x, x + w - shutter].map((sx) => (
+          <g key={sx}>
+            <rect x={sx} y={y - 2} width={shutter} height={h + 4} rx={2} fill="#67a382" stroke="#35684d" strokeWidth={2} />
+            {[.2, .4, .6, .8].map((p) => <line key={p} x1={sx + 2} y1={y + h * p} x2={sx + shutter - 2} y2={y + h * p} stroke="#35684d" strokeWidth={2} />)}
+          </g>
+        ))}
+      </g>
+    )
+  }
+  if (style === 'wide') {
+    const height = h * .65, top = cy - height / 2
+    return (
+      <g>
+        <rect x={x} y={top} width={w} height={height} rx={2} fill={GLASS} stroke="#455a64" strokeWidth={5} />
+        {[1, 2].map((i) => <line key={i} x1={x + w * i / 3} y1={top} x2={x + w * i / 3} y2={top + height} stroke="#455a64" strokeWidth={3} />)}
+        <path d={`M${x + w * .12} ${top + height * .45} l ${w * .12} ${-height * .24} M${x + w * .72} ${top + height * .6} l ${w * .12} ${-height * .24}`} stroke="#ffffff" strokeWidth={3} />
+        <rect x={x - 2} y={top + height + 3} width={w + 4} height={4} fill="#90a4ae" />
+      </g>
+    )
+  }
   if (style === 'round') {
     const r = Math.min(w, h) / 2
     const rect = Math.abs(w - h) > 10
@@ -258,6 +298,32 @@ function WindowArt({ style, x, y, w, h, frame = '#ffffff' }: { style: WindowId; 
 function DoorArt({ door, x, y, w, h }: { door: DoorId; x: number; y: number; w: number; h: number }) {
   const d = findDoor(door)
   const knob = <circle cx={x + w - 10} cy={y + h * .55} r={4} fill="#ffd54f" stroke="#a67c00" strokeWidth={1.5} />
+  if (door === 'double') {
+    return (
+      <g>
+        <rect x={x} y={y} width={w} height={h} rx={3} fill={d.color} stroke="#4e342e" strokeWidth={3} />
+        <line x1={x + w / 2} y1={y} x2={x + w / 2} y2={y + h} stroke="#4e342e" strokeWidth={3} />
+        {[0, 1].map((i) => (
+          <g key={i}>
+            <rect x={x + i * w / 2 + 5} y={y + 7} width={w / 2 - 10} height={h * .36} rx={3} fill={GLASS} stroke="#f0d7a9" strokeWidth={2} />
+            <rect x={x + i * w / 2 + 5} y={y + h * .62} width={w / 2 - 10} height={h * .27} rx={2} fill="none" stroke="#4e342e" strokeWidth={2} />
+            <rect x={x + w / 2 + (i ? 4 : -7)} y={y + h * .48} width={3} height={13} rx={1.5} fill="#ffd54f" />
+          </g>
+        ))}
+      </g>
+    )
+  }
+  if (door === 'blue') {
+    return (
+      <g>
+        <rect x={x} y={y} width={w} height={h} rx={4} fill={d.color} stroke="#17466c" strokeWidth={3} />
+        <circle cx={x + w / 2} cy={y + h * .25} r={w * .2} fill={GLASS} stroke="#fff4d2" strokeWidth={4} />
+        <line x1={x + w * .24} y1={y + h * .74} x2={x + w * .76} y2={y + h * .74} stroke="#17466c" strokeWidth={3} />
+        <rect x={x + w * .3} y={y + h * .48} width={w * .4} height={4} rx={2} fill="#fff4d2" />
+        {knob}
+      </g>
+    )
+  }
   if (door === 'slide') {
     return (
       <g>
@@ -335,9 +401,9 @@ function RoofArt({ roof, lay, extras }: { roof: RoofId; lay: Layout; extras: rea
   const hasSolar = extras.includes('solar')
   // えんとつは やねの うしろに たてる。
   if (hasChimney) {
-    const chx = r.kind === 'flat' ? x1 - 90 : cx + half * .45
-    const roofAt = r.kind === 'flat' ? base - lay.roofH : base - lay.roofH * (1 - (chx + 15 - cx) / half)
-    const top = r.kind === 'flat' ? base - lay.roofH - 60 : Math.min(roofAt - 34, peak + 10)
+    const chx = r.kind === 'flat' || r.kind === 'shed' ? x1 - 90 : cx + half * .45
+    const roofAt = r.kind === 'flat' ? peak : r.kind === 'shed' ? peak + ((chx - x0) / (x1 - x0)) * (lay.roofH - 18) : base - lay.roofH * (1 - (chx + 15 - cx) / half)
+    const top = r.kind === 'flat' || r.kind === 'shed' ? roofAt - 60 : Math.min(roofAt - 34, peak + 10)
     parts.push(
       <g key="chimney">
         <rect x={chx} y={top} width={30} height={roofAt - top + 10} fill="#a5523a" stroke="#6d2f1f" strokeWidth={3} />
@@ -362,6 +428,27 @@ function RoofArt({ roof, lay, extras }: { roof: RoofId; lay: Layout; extras: rea
       for (let i = 0; i < n; i++) {
         const px = lay.houseX + 20 + i * ((lay.houseW - 40) / n)
         parts.push(<path key={`sol${i}`} d={`M${px} ${peak} l 14 -34 h ${(lay.houseW - 40) / n - 24} l -14 34 z`} fill="#1a3d7c" stroke="#90caf9" strokeWidth={2} />)
+      }
+    }
+    return <g>{parts}</g>
+  }
+  if (r.kind === 'shed') {
+    const roofY = (x: number) => peak + (x - x0) / (x1 - x0) * (lay.roofH - 18)
+    parts.push(
+      <g key="roof">
+        <path d={`M${x0} ${peak} L${x1} ${base - 18} V${base} H${x0} Z`} fill={r.color} stroke={r.dark} strokeWidth={4} strokeLinejoin="round" />
+        {Array.from({ length: Math.floor(lay.roofH / 16) }, (_, i) => {
+          const yy = base - 12 - i * 16
+          const end = x0 + (yy - peak) / (lay.roofH - 18) * (x1 - x0)
+          return <line key={i} x1={x0} y1={yy} x2={Math.min(x1, end)} y2={yy} stroke={r.dark} strokeWidth={2} opacity={.5} />
+        })}
+        <line x1={x0} y1={peak} x2={x1} y2={base - 18} stroke={r.dark} strokeWidth={8} strokeLinecap="round" />
+      </g>,
+    )
+    if (hasSolar) {
+      for (let i = 0; i < 3; i++) {
+        const sx = x0 + (x1 - x0) * (.12 + i * .16), end = sx + (x1 - x0) * .13
+        parts.push(<polygon key={`sol${i}`} points={`${sx},${roofY(sx) - 5} ${end},${roofY(end) - 5} ${end + 5},${roofY(end) - 23} ${sx + 5},${roofY(sx) - 23}`} fill="#1a3d7c" stroke="#90caf9" strokeWidth={2} />)
       }
     }
     return <g>{parts}</g>
@@ -484,6 +571,109 @@ const Tree = ({ x, y, s = 1 }: { x: number; y: number; s?: number }) => (
   </g>
 )
 
+function OrchardTree({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
+  return (
+    <g aria-label="くだものの き" transform={`translate(${x} ${y}) scale(${s})`}>
+      <rect x={-8} y={-84} width={16} height={84} rx={4} fill="#88532e" />
+      <path d="M0 -48 L-25 -82 M0 -65 L22 -96" fill="none" stroke="#88532e" strokeWidth={9} strokeLinecap="round" />
+      <path d="M-55 -75 Q-66 -108 -37 -121 Q-28 -157 0 -147 Q31 -160 44 -123 Q67 -106 52 -77 Q24 -57 0 -65 Q-30 -54 -55 -75Z" fill="#40964f" stroke="#2e7d32" strokeWidth={3} />
+      {[[-34, -101], [2, -126], [34, -99], [-6, -82]].map(([fx, fy], i) => (
+        <g key={fx}>
+          <circle cx={fx} cy={fy} r={10} fill={i % 2 ? '#ffb332' : '#ef5350'} />
+          <path d={`M${fx} ${fy - 8} q 2 -9 8 -7`} fill="none" stroke="#66452d" strokeWidth={3} />
+          <circle cx={fx - 3} cy={fy - 3} r={2.5} fill="#ffffff88" />
+        </g>
+      ))}
+    </g>
+  )
+}
+
+function CropBed({ id, x, y }: { id: 'veggies' | 'strawberries'; x: number; y: number }) {
+  const strawberries = id === 'strawberries'
+  return (
+    <g aria-label={strawberries ? 'いちごばたけ' : 'やさいばたけ'}>
+      <rect x={x} y={y - 50} width={150} height={50} rx={8} fill="#805838" stroke="#b98c59" strokeWidth={5} />
+      {[0, 1].map((row) => (
+        <g key={row}>
+          <line x1={x + 10} y1={y - 33 + row * 24} x2={x + 140} y2={y - 33 + row * 24} stroke="#5f402a" strokeWidth={3} />
+          {[0, 1, 2, 3, 4].map((i) => {
+            const cx = x + 18 + i * 28, cy = y - 38 + row * 24
+            return strawberries ? (
+              <g key={i}>
+                <ellipse cx={cx - 5} cy={cy - 5} rx={7} ry={4} fill="#56a754" transform={`rotate(25 ${cx - 5} ${cy - 5})`} />
+                <ellipse cx={cx + 5} cy={cy - 5} rx={7} ry={4} fill="#388e3c" transform={`rotate(-25 ${cx + 5} ${cy - 5})`} />
+                <path d={`M${cx - 6} ${cy} Q${cx} ${cy - 6} ${cx + 6} ${cy} Q${cx + 6} ${cy + 7} ${cx} ${cy + 10} Q${cx - 6} ${cy + 7} ${cx - 6} ${cy}Z`} fill="#ef476f" />
+                <path d={`M${cx - 2} ${cy + 2} v 2 M${cx + 3} ${cy + 3} v 2`} stroke="#ffe391" strokeWidth={1.5} />
+              </g>
+            ) : (
+              <g key={i}>
+                <path d={`M${cx} ${cy} q -10 -18 -2 -24 q 4 10 2 24 q 6 -16 14 -18 q -2 12 -14 18z`} fill="#43a047" />
+                <circle cx={cx} cy={cy + 3} r={i % 2 ? 7 : 5} fill={i % 2 ? '#e53935' : '#ff9800'} />
+              </g>
+            )
+          })}
+        </g>
+      ))}
+    </g>
+  )
+}
+
+function PoolArt({ id, x, y }: { id: Exclude<PoolId, 'none'>; x: number; y: number }) {
+  const round = id === 'round'
+  return (
+    <g aria-label={round ? 'まるい プール' : 'しかくい プール'}>
+      {round ? (
+        <g>
+          <ellipse cx={x + 90} cy={y - 20} rx={85} ry={31} fill="#f5c74e" stroke="#dca72b" strokeWidth={4} />
+          <ellipse cx={x + 90} cy={y - 31} rx={85} ry={31} fill="#ffe37a" stroke="#dca72b" strokeWidth={4} />
+          <ellipse cx={x + 90} cy={y - 33} rx={73} ry={23} fill="#57c9e9" stroke="#fff0af" strokeWidth={3} />
+          <ellipse cx={x + 119} cy={y - 38} rx={14} ry={7} fill="none" stroke="#ff8c9d" strokeWidth={7} />
+        </g>
+      ) : (
+        <g>
+          <path d={`M${x} ${y - 14} L${x + 18} ${y - 63} H${x + 174} L${x + 186} ${y - 14} Z`} fill="#fbf4e4" stroke="#c1baa9" strokeWidth={3} />
+          <path d={`M${x + 12} ${y - 22} L${x + 26} ${y - 55} H${x + 166} L${x + 176} ${y - 22} Z`} fill="#4fc3e5" stroke="#2e9ec0" strokeWidth={3} />
+          <path d={`M${x + 22} ${y - 25} L${x + 34} ${y - 52} M${x + 161} ${y - 25} L${x + 155} ${y - 52}`} stroke="#d4f8ff" strokeWidth={2} />
+          <path d={`M${x + 132} ${y - 14} v -26 q 0 -8 8 -8 M${x + 148} ${y - 14} v -26 q 0 -8 8 -8 M${x + 132} ${y - 24} h 16 M${x + 132} ${y - 32} h 16`} fill="none" stroke="#7a949f" strokeWidth={4} strokeLinecap="round" />
+        </g>
+      )}
+      <path d={`M${x + 43} ${y - 38} q 12 -5 24 0 t 24 0 M${x + 55} ${y - 28} q 10 -4 20 0`} fill="none" stroke="#d9f9ff" strokeWidth={3} strokeLinecap="round" />
+    </g>
+  )
+}
+
+function Picnic({ x, y }: { x: number; y: number }) {
+  return (
+    <g aria-label="ピクニック テーブル">
+      <path d={`M${x + 75} ${y - 151} V${y - 51}`} stroke="#a18053" strokeWidth={5} strokeLinecap="round" />
+      <path d={`M${x + 4} ${y - 112} Q${x + 34} ${y - 145} ${x + 75} ${y - 148} Q${x + 116} ${y - 145} ${x + 145} ${y - 112} Z`} fill="#ff9f78" stroke="#d87551" strokeWidth={3} />
+      <path d={`M${x + 44} ${y - 112} Q${x + 55} ${y - 140} ${x + 75} ${y - 148} Q${x + 95} ${y - 140} ${x + 106} ${y - 112} Z`} fill="#fff2c9" />
+      <path d={`M${x + 38} ${y - 54} L${x + 20} ${y} M${x + 110} ${y - 54} L${x + 128} ${y} M${x + 27} ${y - 22} H${x + 122}`} fill="none" stroke="#805131" strokeWidth={7} strokeLinecap="round" />
+      <rect x={x + 4} y={y - 27} width={140} height={9} rx={3} fill="#b87842" stroke="#805131" strokeWidth={2} />
+      <path d={`M${x + 16} ${y - 61} L${x + 32} ${y - 78} H${x + 117} L${x + 133} ${y - 61} V${y - 52} H${x + 16} Z`} fill="#c99155" stroke="#805131" strokeWidth={3} />
+      <path d={`M${x + 53} ${y - 78} H${x + 96} L${x + 103} ${y - 59} V${y - 44} H${x + 47} V${y - 59} Z`} fill="#fff1d2" />
+      {[0, 1, 2].map((i) => <path key={i} d={`M${x + 55 + i * 15} ${y - 77} L${x + 51 + i * 22} ${y - 45}`} stroke="#ed7777" strokeWidth={5} opacity={.8} />)}
+      <path d={`M${x + 48} ${y - 58} H${x + 102} M${x + 49} ${y - 49} H${x + 102}`} stroke="#ed7777" strokeWidth={4} opacity={.8} />
+      <ellipse cx={x + 76} cy={y - 70} rx={10} ry={4} fill="#ffffff" stroke="#e5c28c" strokeWidth={2} />
+      <circle cx={x + 77} cy={y - 74} r={5} fill="#ef5350" />
+    </g>
+  )
+}
+
+function Fountain({ x, y }: { x: number; y: number }) {
+  return (
+    <g aria-label="ふんすい">
+      <ellipse cx={x + 50} cy={y - 7} rx={49} ry={15} fill="#b2bfc7" stroke="#78909c" strokeWidth={3} />
+      <ellipse cx={x + 50} cy={y - 14} rx={45} ry={12} fill="#69d5ed" stroke="#e5eef1" strokeWidth={5} />
+      <path d={`M${x + 41} ${y - 18} L${x + 45} ${y - 61} H${x + 55} L${x + 59} ${y - 18} Z`} fill="#d7e1e5" stroke="#90a4ae" strokeWidth={2} />
+      <path d={`M${x + 27} ${y - 62} Q${x + 50} ${y - 36} ${x + 73} ${y - 62} Z`} fill="#d7e1e5" stroke="#90a4ae" strokeWidth={3} />
+      <ellipse cx={x + 50} cy={y - 63} rx={22} ry={5} fill="#78dcf3" />
+      <path d={`M${x + 50} ${y - 63} v -28 M${x + 50} ${y - 83} Q${x + 21} ${y - 104} ${x + 14} ${y - 34} M${x + 50} ${y - 83} Q${x + 79} ${y - 104} ${x + 86} ${y - 34}`} fill="none" stroke="#9deaff" strokeWidth={5} strokeLinecap="round" />
+      <circle cx={x + 50} cy={y - 97} r={4} fill="#d8f8ff" />
+    </g>
+  )
+}
+
 function Swing({ x, y }: { x: number; y: number }) {
   return (
     <g>
@@ -560,7 +750,7 @@ function GardenFront({ garden, lay, doorXs }: { garden: GardenId; lay: Layout; d
 function Fence({ lay }: { lay: Layout }) {
   const y = lay.groundY + lay.ground - 8
   const items: ReactNode[] = []
-  for (let x = 14; x < lay.width - 10; x += 26) {
+  for (let x = 14; x < lay.width - 28; x += 26) {
     if (Math.abs(lay.doorX - x - 9) < PATH + 4) continue
     items.push(<path key={x} d={`M${x} ${y} v -30 l 9 -9 l 9 9 v 30 z`} fill="#ffffff" stroke="#9e9e9e" strokeWidth={2} />)
   }
@@ -651,7 +841,8 @@ export function HouseFront({ design, lively = false, onHotspot, title }: HouseFr
   // いえの よこ（おく）: き・こいのぼり・ブランコ。
   const backItems: ReactNode[] = []
   if (spots.trees) {
-    backItems.push(<Tree key="treeL" x={spots.trees[0]} y={lay.backY} />, <Tree key="treeR" x={spots.trees[1]} y={lay.backY} s={.9} />)
+    const GardenTree = ex.garden === 'orchard' ? OrchardTree : Tree
+    backItems.push(<GardenTree key="treeL" x={spots.trees[0]} y={lay.backY} />, <GardenTree key="treeR" x={spots.trees[1]} y={lay.backY} s={.9} />)
   }
   if (spots.koinobori !== undefined) backItems.push(<Koinobori key="koi" x={spots.koinobori} y={lay.backY} />)
   if (spots.swing !== undefined) backItems.push(<Swing key="swing" x={spots.swing} y={lay.backY} />)
@@ -684,16 +875,8 @@ export function HouseFront({ design, lively = false, onHotspot, title }: HouseFr
   if (spots.mailbox !== undefined) frontItems.push(<Mailbox key="mail" x={spots.mailbox} y={fy} />)
   if (spots.garden !== undefined) {
     const gx = spots.garden
-    frontItems.push(ex.garden === 'veggies' ? (
-      <g key="veg">
-        <rect x={gx} y={fy - 44} width={150} height={44} rx={10} fill="#8d6e63" />
-        {[0, 1, 2, 3, 4].map((i) => (
-          <g key={i}>
-            <path d={`M${gx + 18 + i * 28} ${fy - 30} q -10 -18 -2 -24 q 4 10 2 24 q 6 -16 14 -18 q -2 12 -14 18z`} fill="#43a047" />
-            <circle cx={gx + 18 + i * 28} cy={fy - 22} r={i % 2 ? 7 : 5} fill={i % 2 ? '#e53935' : '#ff9800'} />
-          </g>
-        ))}
-      </g>
+    frontItems.push(ex.garden === 'veggies' || ex.garden === 'strawberries' ? (
+      <CropBed key="crop" id={ex.garden} x={gx} y={fy} />
     ) : (
       <g key="pond">
         <ellipse cx={gx + 75} cy={fy - 22} rx={74} ry={22} fill="#4fc3f7" stroke="#90a4ae" strokeWidth={6} />
@@ -705,6 +888,9 @@ export function HouseFront({ design, lively = false, onHotspot, title }: HouseFr
   if (spots.doghouse !== undefined && ex.doghouse !== 'none') {
     frontItems.push(<Doghouse key="dog" id={ex.doghouse} x={spots.doghouse} y={fy} onHit={hit('dog')} />)
   }
+  if (spots.pool !== undefined && ex.pool !== 'none') frontItems.push(<PoolArt key="pool" id={ex.pool} x={spots.pool} y={lay.leisureY} />)
+  if (spots.picnic !== undefined) frontItems.push(<Picnic key="picnic" x={spots.picnic} y={lay.leisureY} />)
+  if (spots.fountain !== undefined) frontItems.push(<Fountain key="fountain" x={spots.fountain} y={lay.leisureY} />)
 
   const label = title ?? 'おうちの そとがわ'
 
@@ -762,7 +948,7 @@ export function HouseFront({ design, lively = false, onHotspot, title }: HouseFr
 
 // ---------------- えらぶ ボタンの みほん ----------------
 
-export type ExteriorCategory = 'wall' | 'roof' | 'window' | 'door' | 'parking' | 'doghouse' | 'garden' | 'extras'
+export type ExteriorCategory = 'wall' | 'roof' | 'window' | 'door' | 'parking' | 'doghouse' | 'garden' | 'pool' | 'extras'
 
 const None = () => (
   <g>
@@ -781,7 +967,7 @@ export function ExteriorSwatch({ category, id }: { category: ExteriorCategory; i
       const r = findRoof(id as RoofId)
       const lay: Layout = {
         width: 120, height: 90, houseX: 30, houseW: 60, groundY: 88, ground: 2, wallTop: 60, roofH: r.kind === 'flat' ? 10 : r.kind === 'steep' ? 50 : 32,
-        floors: 1, doorX: 60, backY: 88, frontY: 88, spots: {},
+        floors: 1, doorX: 60, backY: 88, frontY: 88, leisureY: 88, spots: {},
       }
       art = (
         <g>
@@ -817,6 +1003,9 @@ export function ExteriorSwatch({ category, id }: { category: ExteriorCategory; i
     case 'garden':
       art = id === 'none' ? <None /> : <GardenSwatch id={id as GardenId} />
       break
+    case 'pool':
+      art = id === 'none' ? <None /> : <g transform="translate(4 8) scale(.6)"><PoolArt id={id as Exclude<PoolId, 'none'>} x={0} y={110} /></g>
+      break
     case 'extras':
       art = <ExtraSwatch id={id as ExtraId} />
       break
@@ -827,20 +1016,15 @@ export function ExteriorSwatch({ category, id }: { category: ExteriorCategory; i
 function RoofArtMini({ kind, color, dark, lay }: { kind: string; color: string; dark: string; lay: Layout }) {
   const x0 = lay.houseX - 10, x1 = lay.houseX + lay.houseW + 10, base = lay.wallTop, peak = base - lay.roofH, cx = (x0 + x1) / 2
   if (kind === 'flat') return <rect x={lay.houseX - 4} y={peak} width={lay.houseW + 8} height={lay.roofH} fill={color} stroke={dark} strokeWidth={3} />
+  if (kind === 'shed') return <path d={`M${x0} ${peak} L${x1} ${base - 8} V${base} H${x0}Z`} fill={color} stroke={dark} strokeWidth={3} strokeLinejoin="round" />
   if (kind === 'kawara') return <path d={`M${x0 - 6} ${base + 2} Q ${x0 + 20} ${base - lay.roofH * .4} ${cx} ${peak} Q ${x1 - 20} ${base - lay.roofH * .4} ${x1 + 6} ${base + 2} Z`} fill={color} stroke={dark} strokeWidth={3} />
   return <path d={`M${x0} ${base} L ${cx} ${peak} L ${x1} ${base} Z`} fill={color} stroke={dark} strokeWidth={3} strokeLinejoin="round" />
 }
 
 function GardenSwatch({ id }: { id: GardenId }) {
-  if (id === 'trees') return <g><Tree x={40} y={86} s={.55} /><Tree x={84} y={86} s={.6} /></g>
-  if (id === 'veggies') {
-    return (
-      <g>
-        <rect x={10} y={50} width={100} height={32} rx={8} fill="#8d6e63" />
-        {[0, 1, 2, 3].map((i) => <g key={i}><path d={`M${24 + i * 24} ${60} q -8 -14 -2 -20 q 4 8 2 20 q 5 -12 12 -14 q -2 10 -12 14z`} fill="#43a047" /><circle cx={24 + i * 24} cy={68} r={6} fill={i % 2 ? '#e53935' : '#ff9800'} /></g>)}
-      </g>
-    )
-  }
+  if (id === 'trees') return <g><Tree x={40} y={86} s={.55} /><Tree x={84} y={86} s={.57} /></g>
+  if (id === 'orchard') return <g><OrchardTree x={31} y={86} s={.46} /><OrchardTree x={89} y={86} s={.46} /></g>
+  if (id === 'veggies' || id === 'strawberries') return <g transform="translate(8 14) scale(.69)"><CropBed id={id} x={0} y={96} /></g>
   if (id === 'pond') {
     return (
       <g>
@@ -867,6 +1051,8 @@ function ExtraSwatch({ id }: { id: ExtraId }) {
     case 'mailbox': return <Mailbox x={44} y={86} />
     case 'bike': return <Bike x={10} y={78} />
     case 'swing': return <g transform="translate(-4 4) scale(.7)"><Swing x={20} y={118} /></g>
+    case 'picnic': return <g transform="translate(19 5) scale(.55)"><Picnic x={0} y={146} /></g>
+    case 'fountain': return <g transform="translate(21 6) scale(.76)"><Fountain x={0} y={94} /></g>
     case 'chimney':
       return (
         <g>
@@ -890,7 +1076,7 @@ function ExtraSwatch({ id }: { id: ExtraId }) {
           {[10, 32, 54, 76, 98].map((x) => <path key={x} d={`M${x} 84 v -40 l 8 -10 l 8 10 v 40 z`} fill="#ffffff" stroke="#9e9e9e" strokeWidth={2} />)}
         </g>
       )
-    case 'koinobori': return <g transform="translate(0 -4) scale(.3)"><Koinobori x={60} y={300} /></g>
+    case 'koinobori': return <g transform="translate(30 5) scale(.27)"><Koinobori x={60} y={300} /></g>
     case 'balcony':
       return (
         <g>
