@@ -43,6 +43,8 @@ export type Racer = {
   wobble: number
   stats: CarStats
   recovery: number
+  /** Seconds left of the cheer boost. */
+  boost: number
   zoneKey: string | null
 }
 
@@ -58,6 +60,8 @@ export type RaceState = {
   countdown: number
   elapsed: number
   lapCount: number
+  /** Seconds until the next cheer can boost the player again. */
+  cheerCooldown: number
   /** Events from the most recent step. Consume before the next step. */
   events: RaceEvent[]
 }

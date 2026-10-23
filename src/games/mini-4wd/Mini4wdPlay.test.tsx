@@ -3,13 +3,13 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { isSoundEnabled } from '../../audio/sound'
 import Mini4wdPlay from './Mini4wdPlay'
-import { COURSES } from './data'
+import { COURSES, PARTS } from './data'
 import { progressStore, readBuild } from './save'
-import { drawRace } from './render'
-import { startMiniBgm, stopMiniSounds } from './sounds'
+import { drawPartPreview, drawRace } from './render'
+import { playMiniSound, startMiniBgm, stopMiniSounds } from './sounds'
 
 const audio = vi.hoisted(() => ({ stop: vi.fn() }))
-vi.mock('./render', () => ({ drawGarage: vi.fn(), drawCoursePreview: vi.fn(), drawRace: vi.fn() }))
+vi.mock('./render', () => ({ drawGarage: vi.fn(), drawCoursePreview: vi.fn(), drawPartPreview: vi.fn(), drawRace: vi.fn() }))
 vi.mock('./sounds', () => ({ playMiniSound: vi.fn(), startMiniBgm: vi.fn(() => audio.stop), stopMiniSounds: vi.fn() }))
 
 let callbacks = new Map<number, FrameRequestCallback>()
@@ -82,6 +82,40 @@ describe('mini-4wd play loop', () => {
     click('🔧 くみかえる')
     expect(screen.getByRole('region', { name: 'パーツを えらぶ' })).toBeInTheDocument()
     expect(callbacks.size).toBe(0)
+  })
+
+  test('cheering visibly boosts the car, then charges before the next boost', () => {
+    openGame()
+    startRace()
+    expect(screen.getByRole('button', { name: /がんばれー/ })).toBeDisabled()
+    runFor(4)
+    click(/がんばれー/)
+    expect(playMiniSound).toHaveBeenCalledWith('cheer')
+    runFor(.2)
+    expect(vi.mocked(drawRace).mock.lastCall![1].racers[0].boost).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /パワーアップ！/ })).toHaveAttribute('data-state', 'boost')
+    expect(screen.getByText('ぐぐーんと パワーアップ！')).toBeInTheDocument()
+    runFor(1.5)
+    const charging = screen.getByRole('button', { name: /パワーを ためてるよ/ })
+    vi.mocked(playMiniSound).mockClear()
+    fireEvent.click(charging)
+    expect(playMiniSound).not.toHaveBeenCalledWith('cheer')
+    runFor(1.2)
+    expect(screen.getByRole('button', { name: /がんばれー/ })).toHaveAttribute('data-state', 'ready')
+  })
+
+  test('every part card shows a preview of that part on the machine', () => {
+    openGame()
+    for (const category of ['body', 'motor', 'tires', 'rollers'] as const) {
+      fireEvent.click(screen.getByRole('tab', { name: { body: 'ボディ', motor: 'モーター', tires: 'タイヤ', rollers: 'ローラー' }[category] }))
+      const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
+      expect(cards).toHaveLength(PARTS[category].length)
+      expect(cards.filter(card => card.getAttribute('aria-pressed') === 'true')).toHaveLength(1)
+      for (const part of PARTS[category]) expect(drawPartPreview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ [category]: part.id }), category)
+    }
+    fireEvent.click(screen.getByRole('tab', { name: 'ボディ' }))
+    click(/トラック/)
+    expect(readBuild().body).toBe('truck')
   })
 
   test('pause and window blur freeze the simulation until explicit resume', () => {

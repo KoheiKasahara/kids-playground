@@ -1,4 +1,5 @@
-import { COLORS, sampleTrack } from './data'
+import { COLORS, PARTS, sampleTrack } from './data'
+import { CHEER_BOOST_SECONDS } from './race'
 import type { Build, Course, PartCategory, RaceState } from './types'
 
 type Context = CanvasRenderingContext2D
@@ -16,7 +17,7 @@ const THEMES: Record<Course['theme'], Palette> = {
 }
 
 const scenes = new WeakMap<Course, HTMLCanvasElement>()
-const sprites = new Map<string, HTMLCanvasElement>()
+const sprites = new Map<string, HTMLCanvasElement[]>()
 type MonitorBox = { x: number; y: number; width: number; height: number }
 const monitorBoxes = new WeakMap<Course, MonitorBox>()
 const random = (n: number) => { const value = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return value - Math.floor(value) }
@@ -64,153 +65,276 @@ function carColor(build: Build) {
   return COLORS.find((color) => color.id === build.color)?.hex ?? '#ed684d'
 }
 
-/** A 96 × 140 original sprite. Its rollers, tread, motor and body are separate layers. */
-function carSprite(build: Build) {
+/**
+ * The car is a small voxel model: a stack of 48 × 60 pixel slices, one per unit of height.
+ * Drawing the slices with a small vertical offset keeps the pixel art and adds real volume
+ * at every angle, so the same model works on the turntable, the part cards and the track.
+ */
+const SLICE_WIDTH = 48
+const SLICE_LENGTH = 60
+const SLICE_COUNT = 18
+const AXLES = [-15, 15]
+
+type Slices = Context[]
+
+function block(slices: Slices, color: string | ((z: number) => string), x: number, y: number, width: number, length: number, z0: number, z1: number) {
+  for (let z = Math.max(0, z0); z < Math.min(SLICE_COUNT, z1); z++) {
+    rect(slices[z], typeof color === 'string' ? color : color(z), x + SLICE_WIDTH / 2, y + SLICE_LENGTH / 2, width, length)
+  }
+}
+
+function slab(slices: Slices, z: number, color: string, points: number[]) {
+  if (z < 0 || z >= SLICE_COUNT) return
+  polygon(slices[z], color, points.map((value, index) => value + (index % 2 ? SLICE_LENGTH / 2 : SLICE_WIDTH / 2)))
+}
+
+function disc(slices: Slices, color: string, x: number, y: number, radius: number, z: number) {
+  if (z < 0 || z >= SLICE_COUNT) return
+  oval(slices[z], color, x - radius + SLICE_WIDTH / 2, y - radius + SLICE_LENGTH / 2, radius * 2, radius * 2)
+}
+
+const TIRES: Record<string, { radius: number; width: number; rubber: string; wall: string; rim: string; tread: string | null }> = {
+  normal: { radius: 5, width: 6, rubber: '#263443', wall: '#3e5262', rim: '#d9ddc4', tread: '#4f6271' },
+  sponge: { radius: 5, width: 7, rubber: '#6f7f9a', wall: '#93a3ba', rim: '#fff4d6', tread: '#a9b7c9' },
+  slick: { radius: 5, width: 6, rubber: '#1b2531', wall: '#2c3a48', rim: '#ef6f6c', tread: null },
+  big: { radius: 7, width: 7, rubber: '#273240', wall: '#3d4b5a', rim: '#f6c650', tread: '#56687a' },
+  spike: { radius: 5, width: 6, rubber: '#2f3b33', wall: '#465748', rim: '#9fe0a9', tread: '#c9d6c4' },
+}
+
+const ROLLERS: Record<string, { radius: number; color: string; tiers: [number, number][] }> = {
+  standard: { radius: 2.5, color: '#dfe7dc', tiers: [[3, 6]] },
+  bearing: { radius: 2.5, color: '#9cc2e3', tiers: [[3, 6]] },
+  wide: { radius: 3.5, color: '#72c6c5', tiers: [[3, 6]] },
+  double: { radius: 2.5, color: '#f3a3b5', tiers: [[2, 5], [7, 10]] },
+  gold: { radius: 3, color: '#ffd34d', tiers: [[3, 7]] },
+}
+
+const MOTORS: Record<string, { color: string; stripe: string; big?: boolean }> = {
+  balance: { color: '#bac7ca', stripe: '#5b7380' },
+  dash: { color: '#f0a14f', stripe: '#ffe27a' },
+  torque: { color: '#6fc48f', stripe: '#e9f7d9' },
+  rocket: { color: '#e6505d', stripe: '#ffe08a', big: true },
+  eco: { color: '#78c4e6', stripe: '#5fbf6a' },
+}
+
+function wheel(slices: Slices, build: Build, x: number, axle: number, outward: number) {
+  const tire = TIRES[build.tires] ?? TIRES.normal
+  const { radius, width } = tire
+  const left = outward > 0 ? x : x - width
+  const outer = outward > 0 ? left + width - 1 : left
+  for (let z = 0; z < radius * 2; z++) {
+    const dz = z + .5 - radius
+    const half = Math.round(Math.sqrt(Math.max(0, radius * radius - dz * dz)))
+    if (half < 1) continue
+    block(slices, tire.rubber, left, axle - half, width, half * 2, z, z + 1)
+    // Tread across the top and the round tire wall facing outward.
+    if (tire.tread) for (let y = axle - half + 1; y < axle + half; y += 2) block(slices, tire.tread, left, y, width, 1, z, z + 1)
+    block(slices, tire.wall, outer, axle - half, 1, half * 2, z, z + 1)
+    if (Math.abs(dz) < radius * .62) {
+      const rim = Math.max(1, Math.round(half * .62))
+      block(slices, tire.rim, outer, axle - rim, 1, rim * 2, z, z + 1)
+      if (Math.abs(dz) < 1) block(slices, '#2a3a46', outer, axle - 1, 1, 2, z, z + 1)
+    }
+    if (build.tires === 'spike' && z % 2 === 0) {
+      block(slices, tire.tread!, left + 1, axle - half - 1, width - 2, 1, z, z + 1)
+      block(slices, tire.tread!, left + 1, axle + half, width - 2, 1, z, z + 1)
+    }
+  }
+}
+
+function roller(slices: Slices, build: Build, x: number, y: number) {
+  const part = ROLLERS[build.rollers] ?? ROLLERS.standard
+  block(slices, '#3d5260', x - 1, y - 1, 2, 2, 3, part.tiers[part.tiers.length - 1][1] + 1)
+  for (const [from, to] of part.tiers) {
+    for (let z = from; z < to; z++) {
+      disc(slices, '#1d2f3c', x, y, part.radius + .5, z)
+      disc(slices, z === to - 1 ? shade(part.color, 30) : z === from ? shade(part.color, -40) : part.color, x, y, part.radius, z)
+    }
+    disc(slices, '#47717f', x, y, 1, to - 1)
+    if (build.rollers === 'gold') block(slices, '#fffbe0', x - 1, y - 2, 1, 1, to - 1, to)
+  }
+}
+
+function motor(slices: Slices, build: Build) {
+  const part = MOTORS[build.motor] ?? MOTORS.balance
+  const big = part.big ? 1 : 0
+  const x = -5 - big, y = 13 - big, width = 10 + big * 2, length = 9 + big * 2
+  block(slices, '#1c2c39', x - 1, y - 1, width + 2, length + 2, 4, 5)
+  block(slices, z => z === 8 + big ? shade(part.color, 32) : z < 6 ? shade(part.color, -38) : part.color, x, y, width, length, 4, 9 + big)
+  block(slices, part.stripe, x, y + 3, width, 2, 8 + big, 9 + big)
+  block(slices, '#dcc572', -1, y + length, 2, 2, 5, 7)
+  if (build.motor === 'eco') {
+    block(slices, '#3f9a52', -1, y + 1, 3, 2, 9, 10)
+    block(slices, '#7fd38a', 0, y + 2, 2, 3, 9, 10)
+  }
+  if (build.motor === 'dash' || build.motor === 'rocket') {
+    // Exhaust flames make the faster motors read at a glance.
+    const flame = build.motor === 'rocket' ? 5 : 3
+    block(slices, '#f07a43', -3, y + length, 6, flame, 5, 8)
+    block(slices, '#ffd56b', -2, y + length, 4, flame - 1, 6, 8)
+    block(slices, '#fff3c0', -1, y + length, 2, flame - 2, 6, 7)
+  }
+}
+
+function body(slices: Slices, build: Build) {
+  const color = carColor(build)
+  const tone = (h: number, top: number) => shade(color, Math.round(-46 + 64 * Math.min(1, h / top)))
+  const outline = '#1b2d3d'
+  const glass = (z: number, points: number[], top: number) => slab(slices, z, z === top ? '#8fd0dc' : '#3c6d7d', points)
+  if (build.body === 'buggy') {
+    for (let h = 0; h <= 5; h++) {
+      const z = 4 + h
+      if (h === 0) slab(slices, z, outline, [-10, -24, 10, -24, 11, -22, 11, 13, -11, 13, -11, -22])
+      else slab(slices, z, tone(h, 9), [-8, -23, 8, -23, 10, -21, 10, 12, -10, 12, -10, -21])
+    }
+    for (const axle of AXLES) for (const side of [-1, 1]) {
+      const x = side < 0 ? -20 : 11
+      block(slices, z => tone(z - 4, 9), x, axle - 7, 9, 14, 9, 11)
+      block(slices, shade(color, 28), x, axle - 7, 9, 2, 11, 12)
+    }
+    for (let h = 0; h < 4; h++) {
+      const z = 10 + h
+      if (h < 3) glass(z, [-6, -10, 6, -10, 7, -8, 7, 6, -7, 6, -7, -8], 12)
+      else slab(slices, z, tone(9, 9), [-7, -9, 7, -9, 7, 6, -7, 6])
+    }
+    block(slices, '#2b3d4a', -8, 7, 16, 2, 10, 15)
+    block(slices, '#ffe8a8', -9, -24, 3, 2, 7, 9)
+    block(slices, '#ffe8a8', 6, -24, 3, 2, 7, 9)
+  } else if (build.body === 'truck') {
+    for (let h = 0; h <= 10; h++) {
+      const z = 4 + h
+      slab(slices, z, h === 0 ? outline : tone(h, 10), [-11, -25, 11, -25, 12, -23, 12, -5, -12, -5, -12, -23])
+      if (h >= 6 && h <= 9) slab(slices, z, '#3c6d7d', [-10, -26, 10, -26, 10, -24, -10, -24])
+    }
+    slab(slices, 14, shade(color, 30), [-10, -24, 10, -24, 11, -22, 11, -6, -11, -6, -11, -22])
+    block(slices, '#fff3c7', -9, -26, 4, 1, 6, 8)
+    block(slices, '#fff3c7', 5, -26, 4, 1, 6, 8)
+    block(slices, '#2b3d4a', -5, -27, 10, 1, 5, 7)
+    for (let h = 0; h <= 4; h++) {
+      const z = 4 + h
+      slab(slices, z, h === 0 ? outline : tone(h + 3, 10), [-12, -5, 12, -5, 12, 12, -12, 12])
+    }
+    // Open cargo bed with a lighter rim, so it reads as a pickup from above.
+    slab(slices, 8, shade(color, -60), [-10, -3, 10, -3, 10, 10, -10, 10])
+    for (const x of [-12, 10]) block(slices, shade(color, 26), x, -5, 2, 17, 9, 10)
+    block(slices, shade(color, 26), -12, 10, 24, 2, 9, 10)
+  } else {
+    // The three low racers share a wedge, then differ by nose, fin and wing.
+    const shark = build.body === 'shark'
+    const wing = build.body === 'wing'
+    const top = shark ? 6 : wing ? 4 : 5
+    for (let h = 0; h <= top; h++) {
+      const z = 4 + h
+      const nose = shark ? -30 + h * 2 : -27 + h * 3
+      const half = Math.max(4, (shark ? 10 : 11) - Math.round(h * .9))
+      const rear = 12 - Math.max(0, h - 3) * 3
+      const points = shark
+        ? [0, nose, half, nose + 14, half, rear, -half, rear, -half, nose + 14]
+        : [-2, nose, 2, nose, half, nose + 9, half, rear, -half, rear, -half, nose + 9]
+      slab(slices, z, h === 0 ? outline : tone(h, top), points)
+    }
+    const canopyTop = 4 + top + 2
+    for (let z = 4 + top - 1; z <= canopyTop; z++) {
+      const shrink = z - (4 + top - 1)
+      glass(z, [-4 + shrink, -7 + shrink, 4 - shrink, -7 + shrink, 5 - shrink, -3, 5 - shrink, 4 - shrink, -5 + shrink, 4 - shrink, -5 + shrink, -3], canopyTop)
+    }
+    // A bright racing stripe and headlights on top.
+    for (let z = 5; z <= 4 + top; z++) block(slices, shade('#fff4d8', -(4 + top - z) * 18), -1, shark ? -26 + (z - 4) * 2 : -24 + (z - 4) * 3, 2, 3, z, z + 1)
+    block(slices, '#fff3c7', -7, -18, 2, 2, 6, 7)
+    block(slices, '#fff3c7', 5, -18, 2, 2, 6, 7)
+    if (shark) {
+      for (let z = 4 + top + 1; z < 4 + top + 8; z++) {
+        const rise = z - (4 + top + 1)
+        block(slices, z % 2 ? shade(color, -20) : color, -1, 2 + rise, 2, 8 - rise, z, z + 1)
+      }
+      for (const x of [-8, 6]) for (const y of [-6, -3, 0]) block(slices, '#22394a', x, y, 2, 1, 4 + top - 2, 4 + top - 1)
+      block(slices, '#fff9ec', -4, -26, 1, 2, 5, 6)
+      block(slices, '#fff9ec', 3, -26, 1, 2, 5, 6)
+    }
+    if (wing) {
+      for (const x of [-6, 5]) block(slices, '#2b3d4a', x, 17, 1, 2, 9, 13)
+      for (let z = 13; z <= 14; z++) slab(slices, z, z === 14 ? shade(color, 34) : shade(color, -24), [-17, 14, 17, 14, 18, 16, 18, 21, -18, 21, -17, 16])
+      for (const x of [-18, 17]) block(slices, shade(color, -40), x, 13, 2, 9, 11, 15)
+    }
+  }
+}
+
+function buildSlices(build: Build): HTMLCanvasElement[] {
+  const canvases = Array.from({ length: SLICE_COUNT }, () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = SLICE_WIDTH
+    canvas.height = SLICE_LENGTH
+    return canvas
+  })
+  const slices = canvases.map(canvas => canvas.getContext('2d')).filter((g): g is Context => g !== null)
+  if (slices.length !== SLICE_COUNT) return canvases
+  // Chassis plate, axles and bumpers carry everything else.
+  block(slices, '#1f2e3b', -11, -24, 22, 48, 2, 3)
+  block(slices, '#43586a', -11, -24, 22, 48, 3, 4)
+  const tire = TIRES[build.tires] ?? TIRES.normal
+  for (const axle of AXLES) block(slices, '#8aa0a6', -14, axle - 1, 28, 2, tire.radius - 1, tire.radius)
+  for (const y of [-28, 23]) {
+    block(slices, '#22323f', -18, y, 36, 5, 3, 4)
+    block(slices, '#5d7480', -18, y, 36, 5, 4, 5)
+    block(slices, '#9fb3b4', -16, y + 2, 32, 1, 4, 5)
+  }
+  for (const axle of AXLES) {
+    wheel(slices, build, -13, axle, -1)
+    wheel(slices, build, 13, axle, 1)
+  }
+  motor(slices, build)
+  body(slices, build)
+  for (const x of [-20, 20]) for (const y of [-26, 26]) roller(slices, build, x, y)
+  return canvases
+}
+
+function carSlices(build: Build) {
   const key = [build.body, build.motor, build.tires, build.rollers, build.color].join(':')
   const cached = sprites.get(key)
   if (cached) return cached
-  const canvas = document.createElement('canvas')
-  canvas.width = 96
-  canvas.height = 140
-  const g = canvas.getContext('2d')
-  if (!g) return canvas
-  const color = carColor(build), light = shade(color, 43), dark = shade(color, -39)
-  const tire = build.tires === 'sponge' ? '#556278' : '#253342'
-  const roller = build.rollers === 'bearing' ? '#f1c56d' : build.rollers === 'wide' ? '#72c6c5' : '#d7e2d7'
-  const rollerRadius = build.rollers === 'wide' ? 9 : 7
-  const rollerX = build.rollers === 'wide' ? 8 : 12
-
-  // Carbon chassis, four axles, and the independently visible drive motor.
-  polygon(g, '#172736', [30, 20, 66, 20, 73, 31, 73, 111, 66, 122, 30, 122, 23, 111, 23, 31])
-  rect(g, '#405461', 29, 27, 38, 88)
-  rect(g, '#6a7e83', 32, 29, 2, 82)
-  rect(g, '#182a39', 61, 29, 3, 84)
-  for (const y of [40, 91]) {
-    rect(g, '#718a8f', 16, y + 9, 64, 5)
-    rect(g, '#c9d8cf', 17, y + 9, 62, 1)
-    for (const x of [13, 71]) {
-      const width = build.tires === 'sponge' ? 13 : 12
-      rect(g, '#172535', x - 1, y - 1, width + 2, 26)
-      rect(g, tire, x, y, width, 24)
-      rect(g, '#70838a', x + 3, y + 2, width - 6, 20)
-      rect(g, '#d9ddc4', x + 4, y + 4, width - 8, 16)
-      rect(g, '#6b7f84', x + 4, y + 10, width - 8, 4)
-      if (build.tires !== 'slick') for (let step = 0; step < 6; step++) {
-        rect(g, build.tires === 'sponge' ? '#85919f' : '#526371', x, y + step * 4, 3, 1)
-        rect(g, '#182839', x + width - 3, y + step * 4 + 2, 3, 1)
-      }
-      else rect(g, '#697684', x + 1, y + 1, 1, 21)
-    }
-  }
-  const motorColor = build.motor === 'dash' ? '#e9aa5c' : build.motor === 'torque' ? '#9acfc1' : '#bac7ca'
-  rect(g, '#1d2d3b', 32, 102, 32, 13)
-  rect(g, motorColor, 34, 103, 28, 10)
-  rect(g, '#edf0d7', 36, 103, 22, 2)
-  rect(g, shade(motorColor, -35), 34, 111, 28, 2)
-  rect(g, '#dcc572', 31, 106, 4, 4)
-  rect(g, '#cf805c', 61, 105, 4, 5)
-  for (let x = 40; x < 58; x += 5) rect(g, '#536e79', x, 107, 2, 4)
-  rect(g, '#ef8267', 65, 96, 2, 10)
-  rect(g, '#ef8267', 60, 95, 7, 2)
-  rect(g, '#ead68c', 29, 95, 2, 13)
-
-  // Raised front/rear bumpers and their small outboard roller bearings.
-  for (const y of [17, 122]) {
-    polygon(g, '#1c2d3b', [9, y - 4, 32, y - 2, 38, y - 5, 58, y - 5, 64, y - 2, 87, y - 4, 87, y + 4, 64, y + 6, 32, y + 6, 9, y + 4])
-    rect(g, '#768f92', 15, y - 1, 66, 2)
-    for (let x = 30; x < 67; x += 9) rect(g, '#121f2c', x, y + 3, 4, 2)
-    for (const x of [rollerX, 96 - rollerX]) {
-      oval(g, '#182b3b', x - rollerRadius, y - rollerRadius, rollerRadius * 2, rollerRadius * 2)
-      oval(g, roller, x - rollerRadius + 2, y - rollerRadius + 1, rollerRadius * 2 - 4, rollerRadius * 2 - 4)
-      rect(g, '#f8f5d9', x - rollerRadius + 3, y - rollerRadius + 2, rollerRadius * 2 - 6, 2)
-      rect(g, '#47717f', x - 3, y - 2, 6, 5)
-      screw(g, x - 1, y - 1, 2)
-    }
-    screw(g, 35, y - 1, 2)
-    screw(g, 59, y - 1, 2)
-  }
-
-  if (build.body === 'buggy') {
-    polygon(g, '#192f3e', [35, 23, 61, 23, 68, 31, 68, 49, 64, 56, 67, 99, 61, 104, 35, 104, 29, 99, 32, 56, 28, 49, 28, 31])
-    polygon(g, color, [36, 25, 60, 25, 65, 32, 65, 47, 61, 55, 64, 98, 58, 101, 38, 101, 32, 98, 35, 55, 31, 47, 31, 32])
-    rect(g, light, 35, 28, 25, 3)
-    rect(g, dark, 58, 33, 6, 13)
-    rect(g, '#fff0cd', 38, 33, 20, 5)
-    rect(g, '#d9a269', 39, 38, 18, 2)
-    for (const x of [25, 61]) {
-      rect(g, '#1d3140', x, 40, 11, 25)
-      rect(g, color, x + 1, 41, 9, 22)
-      rect(g, light, x + 1, 41, 3, 19)
-      rect(g, dark, x + 7, 44, 3, 19)
-      rect(g, '#fff0cf', x + 1, 55, 8, 3)
-    }
-    rect(g, '#283b47', 35, 78, 26, 19)
-    rect(g, '#526a6c', 38, 81, 20, 13)
-    for (let x = 38; x <= 56; x += 6) rect(g, '#273e4b', x, 82, 2, 11)
-    rect(g, '#ead8ac', 32, 93, 32, 4)
-  } else if (build.body === 'wing') {
-    polygon(g, '#1b2d3d', [44, 21, 52, 21, 59, 38, 66, 49, 63, 70, 73, 83, 73, 101, 57, 105, 39, 105, 23, 101, 23, 83, 33, 70, 30, 49, 37, 38])
-    polygon(g, color, [45, 23, 51, 23, 56, 39, 63, 50, 60, 72, 70, 85, 70, 98, 56, 102, 40, 102, 26, 98, 26, 85, 36, 72, 33, 50, 40, 39])
-    polygon(g, light, [45, 25, 48, 25, 43, 46, 37, 53, 37, 69, 33, 75, 34, 50, 41, 39])
-    polygon(g, dark, [51, 25, 58, 43, 63, 51, 60, 70, 69, 86, 69, 97, 59, 99, 58, 77, 57, 48])
-    polygon(g, '#ffedc7', [47, 27, 50, 27, 53, 44, 50, 50, 44, 50])
-    rect(g, '#1b3041', 24, 89, 48, 12)
-    rect(g, color, 22, 87, 52, 10)
-    rect(g, light, 23, 87, 50, 2)
-    rect(g, dark, 23, 95, 50, 3)
-    rect(g, '#fff1ce', 26, 90, 44, 3)
-    rect(g, '#1b3041', 21, 84, 4, 16)
-    rect(g, '#1b3041', 71, 84, 4, 16)
-  } else {
-    polygon(g, '#1b2d3d', [42, 22, 54, 22, 61, 42, 65, 60, 72, 87, 69, 99, 58, 105, 38, 105, 27, 99, 24, 87, 31, 60, 35, 42])
-    polygon(g, color, [43, 24, 53, 24, 58, 43, 62, 61, 69, 87, 66, 97, 57, 102, 39, 102, 30, 97, 27, 87, 34, 61, 38, 43])
-    polygon(g, light, [43, 26, 46, 26, 41, 44, 37, 65, 31, 86, 33, 94, 29, 91, 29, 86, 35, 62, 39, 42])
-    polygon(g, dark, [52, 27, 58, 46, 63, 69, 68, 87, 65, 96, 57, 100, 57, 86, 58, 60])
-    polygon(g, '#fff1d2', [46, 26, 50, 26, 54, 47, 52, 52, 44, 52, 42, 47])
-    polygon(g, '#f9e4b7', [30, 82, 38, 86, 43, 99, 37, 98, 31, 92])
-    polygon(g, '#f9e4b7', [66, 82, 58, 86, 53, 99, 59, 98, 65, 92])
-    rect(g, '#243846', 39, 91, 18, 9)
-    for (let y = 92; y < 100; y += 3) rect(g, '#718e92', 40, y, 16, 1)
-  }
-
-  // Glass canopy: no driver, because this is a miniature electric car.
-  polygon(g, '#142c3c', [42, 45, 54, 45, 60, 57, 58, 77, 54, 82, 42, 82, 38, 77, 36, 57])
-  polygon(g, '#416977', [43, 47, 53, 47, 57, 57, 55, 76, 41, 76, 39, 57])
-  polygon(g, '#78afba', [43, 48, 51, 48, 54, 56, 53, 66, 41, 66, 41, 56])
-  polygon(g, '#c2e9dd', [43, 48, 47, 48, 44, 63, 41, 63, 41, 56])
-  rect(g, '#214553', 40, 68, 16, 3)
-  rect(g, '#173747', 41, 75, 14, 3)
-  rect(g, '#cbdace', 44, 79, 8, 1)
-  for (const x of [33, 59]) {
-    rect(g, '#243c48', x, 39, 4, 5)
-    rect(g, '#f9ebae', x, 39, 3, 2)
-  }
-  screw(g, 45, 28, 2)
-  screw(g, 45, 99, 2)
-  // Tiny side vents and contrasting number decal complete the miniature.
-  for (let y = 70; y < 80; y += 3) {
-    rect(g, '#213644', 32, y, 3, 1)
-    rect(g, '#213644', 61, y, 3, 1)
-  }
-  rect(g, '#fff1d5', 44, 84, 8, 7)
-  rect(g, '#293c47', 47, 85, 2, 5)
-  rect(g, '#293c47', 46, 85, 1, 1)
-  if (sprites.size >= 48) sprites.delete(sprites.keys().next().value as string)
-  sprites.set(key, canvas)
-  return canvas
+  const slices = buildSlices(build)
+  if (sprites.size >= 64) sprites.delete(sprites.keys().next().value as string)
+  sprites.set(key, slices)
+  return slices
 }
 
-function car(g: Context, build: Build, x: number, y: number, scale: number, angle: number, shadow = true) {
-  g.save()
-  g.translate(Math.round(x), Math.round(y))
-  g.rotate(angle)
-  if (shadow) {
-    g.globalAlpha = 0.22
-    oval(g, '#162b3b', -43 * scale + 3, -55 * scale + 5, 89 * scale, 117 * scale)
-    g.globalAlpha = 1
+type View = { scale: number; angle: number; squash?: number; height?: number; lift?: number; shadow?: boolean }
+
+/** Screen offset of a point on the model, relative to the car's ground position. */
+function project(view: View, x: number, y: number, z: number) {
+  const squash = view.squash ?? 1
+  const cos = Math.cos(view.angle), sin = Math.sin(view.angle)
+  return {
+    x: (x * cos - y * sin) * view.scale,
+    y: (x * sin + y * cos) * view.scale * squash - z * (view.height ?? view.scale * .5) - (view.lift ?? 0),
   }
-  g.drawImage(carSprite(build), -48 * scale, -70 * scale, 96 * scale, 140 * scale)
-  g.restore()
+}
+
+function car(g: Context, build: Build, x: number, y: number, view: View) {
+  const squash = view.squash ?? 1
+  const height = view.height ?? view.scale * .5
+  const lift = view.lift ?? 0
+  if (view.shadow !== false) {
+    g.save()
+    g.translate(Math.round(x + view.scale * 2), Math.round(y + view.scale * 2))
+    g.scale(1, squash)
+    g.rotate(view.angle)
+    g.globalAlpha = lift > 0 ? .16 : .26
+    oval(g, '#142836', -21 * view.scale, -29 * view.scale, 42 * view.scale, 58 * view.scale)
+    g.restore()
+  }
+  const slices = carSlices(build)
+  const repeats = Math.max(1, Math.ceil(height))
+  for (let z = 0; z < slices.length; z++) {
+    for (let step = 0; step < repeats; step++) {
+      g.save()
+      g.translate(Math.round(x), Math.round(y - lift - z * height - step * height / repeats))
+      g.scale(1, squash)
+      g.rotate(view.angle)
+      g.drawImage(slices[z], -SLICE_WIDTH / 2 * view.scale, -SLICE_LENGTH / 2 * view.scale, SLICE_WIDTH * view.scale, SLICE_LENGTH * view.scale)
+      g.restore()
+    }
+  }
 }
 
 function setup(canvas: HTMLCanvasElement, width: number, height: number) {
@@ -233,149 +357,97 @@ function wrench(g: Context, x: number, y: number, angle = 0, scale = 1) {
   g.restore()
 }
 
-function driver(g: Context, x: number, y: number, angle = 0) {
-  g.save()
-  g.translate(x, y)
-  g.rotate(angle)
-  rect(g, '#d7e0cf', -1, -30, 3, 30)
-  rect(g, '#5c7780', -1, -31, 1, 34)
-  rect(g, '#243a47', -5, 1, 11, 23)
-  rect(g, '#eb9b5f', -4, 3, 8, 19)
-  rect(g, '#f9cd82', -3, 5, 2, 14)
-  rect(g, '#be734f', 2, 5, 2, 16)
-  g.restore()
+/** Showroom angle: the nose points right and slightly toward the viewer. */
+const SHOWROOM_ANGLE = 2.1
+const SHOWROOM_SQUASH = .62
+/** Where each part sits on the model, for close-ups and the garage pointer. */
+const FOCUS: Record<PartCategory, [number, number, number]> = {
+  body: [0, -4, 8], motor: [0, 17, 7], tires: [16, -15, 5], rollers: [20, -26, 5],
 }
 
-function tireIcon(g: Context, x: number, y: number, build: Build) {
-  oval(g, '#233743', x, y, 34, 34)
-  oval(g, build.tires === 'sponge' ? '#63768b' : '#394a58', x + 2, y + 2, 30, 29)
-  oval(g, '#c3d1c6', x + 8, y + 8, 18, 18)
-  oval(g, '#526f7b', x + 13, y + 13, 8, 8)
-  rect(g, '#edf1d3', x + 11, y + 9, 12, 2)
-  if (build.tires !== 'slick') for (let i = 0; i < 4; i++) rect(g, '#7c8c91', x + 4 + i * 7, y + 4, 2, 3)
+function turntable(g: Context, x: number, y: number, width: number, height: number) {
+  oval(g, '#203a43', x - width / 2, y - height / 2 + 10, width, height)
+  oval(g, '#5d8b86', x - width / 2, y - height / 2, width, height)
+  oval(g, '#6f9d95', x - width / 2 + 10, y - height / 2 + 5, width - 20, height - 12)
+  oval(g, '#7aaa9f', x - width / 4, y - height / 4, width / 2, height / 2)
+  for (let i = 0; i < 12; i++) {
+    const angle = i * Math.PI / 6
+    rect(g, '#93bfb1', x + Math.cos(angle) * width * .4, y + Math.sin(angle) * height * .38, 4, 2)
+  }
 }
 
-/** The assembly mat shows the actual selected components, including the exposed motor. */
+/** The garage is a big turntable showroom for the assembled machine. */
 export function drawGarage(canvas: HTMLCanvasElement, build: Build, selected: PartCategory = 'body') {
-  const g = setup(canvas, 640, 380)
+  const g = setup(canvas, 640, 420)
   if (!g) return
-  rect(g, '#365e63', 0, 0, 640, 380)
-  rect(g, '#426d70', 0, 0, 640, 95)
-  for (let x = 14; x < 640; x += 16) for (let y = 12; y < 91; y += 16) rect(g, '#2e555a', x, y, 2, 2)
-  rect(g, '#27474f', 0, 88, 640, 13)
-  rect(g, '#f3d9aa', 0, 91, 640, 5)
-  rect(g, '#d4b082', 0, 101, 640, 279)
-  for (let y = 110; y < 380; y += 48) {
-    rect(g, '#c5a075', 0, y + 28, 640, 2)
-    rect(g, '#e0bd8f', 0, y + 31, 640, 1)
-    for (let x = 8; x < 640; x += 84) rect(g, '#cea97b', x + random(x + y) * 30, y + 12, 22, 1)
+  rect(g, '#365e63', 0, 0, 640, 420)
+  rect(g, '#426d70', 0, 0, 640, 150)
+  for (let x = 14; x < 640; x += 16) for (let y = 12; y < 140; y += 16) rect(g, '#3a6467', x, y, 2, 2)
+  rect(g, '#27474f', 0, 146, 640, 10)
+  rect(g, '#f3d9aa', 0, 150, 640, 4)
+  rect(g, '#d4b082', 0, 156, 640, 264)
+  for (let y = 170; y < 420; y += 42) {
+    rect(g, '#c5a075', 0, y + 24, 640, 2)
+    rect(g, '#e0bd8f', 0, y + 27, 640, 1)
+    for (let x = 8; x < 640; x += 84) rect(g, '#cea97b', x + random(x + y) * 30, y + 10, 22, 1)
   }
-  // Pegboard: miniature parts cartons, dangling tools and warm task lamp.
-  for (const [x, color] of [[29, '#e7ae67'], [72, '#9dc0a6'], [115, '#d98564']] as const) {
-    rect(g, '#29494f', x + 3, 44, 35, 41)
-    rect(g, color, x, 41, 34, 40)
-    rect(g, '#fff0c7', x + 5, 50, 24, 17)
-    rect(g, '#5c6b64', x + 9, 55, 16, 2)
-    rect(g, '#899b84', x + 9, 60, 11, 2)
-    rect(g, shade(color, -25), x, 73, 34, 8)
-    rect(g, '#fae7b7', x + 2, 43, 30, 2)
+  // Spotlights over the turntable.
+  for (const x of [170, 470]) {
+    rect(g, '#22383f', x - 2, 0, 4, 18)
+    polygon(g, '#2b444b', [x - 16, 18, x + 16, 18, x + 12, 34, x - 12, 34])
+    rect(g, '#fff0bd', x - 10, 32, 20, 4)
   }
-  wrench(g, 513, 49, -0.12, 1.1)
-  driver(g, 555, 47, 0.1)
-  rect(g, '#b8c7ab', 586, 27, 5, 48)
-  rect(g, '#213c46', 585, 28, 7, 4)
-  rect(g, '#d9e2c4', 587, 34, 2, 28)
-  rect(g, '#e8c792', 194, 18, 251, 52)
-  rect(g, '#fff0c8', 197, 21, 245, 44)
-  text(g, 'MINI 4WD LAB', 319, 39, 20, INK, 'center')
-  text(g, 'BUILD  ·  TUNE  ·  RACE', 319, 56, 8, '#6d847d', 'center')
-  for (const x of [202, 434]) screw(g, x, 27, 3)
+  g.globalAlpha = .14
+  polygon(g, '#fff3cf', [150, 36, 190, 36, 300, 330, 60, 330])
+  polygon(g, '#fff3cf', [450, 36, 490, 36, 580, 330, 340, 330])
+  g.globalAlpha = 1
+  wrench(g, 38, 60, -0.12, 1.2)
+  wrench(g, 600, 66, 0.3, 1)
+  rect(g, '#e8c792', 230, 14, 180, 34)
+  rect(g, '#fff0c8', 233, 17, 174, 28)
+  text(g, 'MINI 4WD LAB', 320, 31, 16, INK, 'center')
+  turntable(g, 320, 300, 520, 150)
 
-  // Dark gridded cutting mat makes the tiny individual pixels and silhouette read.
-  rect(g, '#9b8063', 125, 116, 388, 248)
-  rect(g, '#284b50', 119, 109, 388, 248)
-  rect(g, '#456f6b', 123, 113, 380, 240)
-  rect(g, '#365f5e', 128, 118, 370, 230)
-  for (let x = 130; x < 498; x += 16) rect(g, '#416c67', x, 118, 1, 230)
-  for (let y = 118; y < 348; y += 16) rect(g, '#416c67', 128, y, 370, 1)
-  for (let x = 132; x < 495; x += 8) rect(g, '#96b2a1', x, 118, 1, x % 16 === 4 ? 5 : 3)
-  for (let y = 132; y < 345; y += 8) rect(g, '#96b2a1', 128, y, y % 16 === 4 ? 5 : 3, 1)
-  text(g, 'DESIGN / 01', 141, 337, 8, '#a6bfa9')
-  rect(g, '#75978b', 454, 322, 28, 16)
-  text(g, '4WD', 468, 330, 9, '#244b50', 'center')
+  const view: View = { scale: 6.4, angle: SHOWROOM_ANGLE, squash: SHOWROOM_SQUASH, height: 4.6 }
+  const carX = 314, carY = 300
+  car(g, build, carX, carY, view)
 
-  // Fine technical outline beneath the assembled model.
-  g.strokeStyle = '#72978a'
-  g.lineWidth = 1
-  g.strokeRect(224, 142, 163, 181)
-  for (const [x, y] of [[224, 142], [387, 142], [224, 323], [387, 323]]) {
-    rect(g, '#abc2a6', x - 4, y, 9, 1)
-    rect(g, '#abc2a6', x, y - 4, 1, 9)
-  }
-  car(g, build, 307, 232, 1.53, -0.28)
+  // A pointer to the part currently being chosen.
+  const [fx, fy, fz] = FOCUS[selected]
+  const point = project(view, fx, fy, fz)
+  const px = carX + point.x, py = carY + point.y
+  const part = PARTS[selected].find((item) => item.id === build[selected])
+  const label = part?.name ?? ''
+  const labelX = Math.max(80, Math.min(560, px + (px < 320 ? -110 : 110)))
+  const labelY = Math.max(76, Math.min(380, py - 74))
+  g.strokeStyle = '#fff4cf'
+  g.lineWidth = 3
+  g.beginPath()
+  g.moveTo(Math.round(px), Math.round(py))
+  g.lineTo(Math.round(labelX), Math.round(labelY + 16))
+  g.stroke()
+  for (const [size, color] of [[18, '#fff4cf'], [12, '#e8784f'], [6, '#fff4cf']] as const) oval(g, color, px - size / 2, py - size / 2, size, size)
+  g.font = '800 22px "Trebuchet MS", sans-serif'
+  const width = Math.max(96, g.measureText(label).width + 32)
+  rect(g, '#1d3340', labelX - width / 2 + 3, labelY - 17, width, 38)
+  rect(g, '#fff0c6', labelX - width / 2, labelY - 20, width, 38)
+  rect(g, '#e8784f', labelX - width / 2, labelY - 20, 5, 38)
+  text(g, label, labelX + 2, labelY - 1, 22, INK, 'center')
+}
 
-  // Each part has a real component swatch rather than an unrelated decorative icon.
-  const rows: { category: PartCategory; y: number; name: string; value: string }[] = [
-    { category: 'body', y: 126, name: 'BODY', value: build.body.toUpperCase() },
-    { category: 'motor', y: 180, name: 'MOTOR', value: build.motor.toUpperCase() },
-    { category: 'tires', y: 234, name: 'TIRES', value: build.tires.toUpperCase() },
-    { category: 'rollers', y: 288, name: 'ROLLERS', value: build.rollers.toUpperCase() },
-  ]
-  for (const item of rows) {
-    const active = item.category === selected
-    rect(g, active ? '#f6d18a' : '#c3cbb1', 395, item.y, 92, 42)
-    rect(g, active ? '#ffedbb' : '#dce1c7', 397, item.y + 2, 88, 36)
-    rect(g, active ? '#dc855b' : '#88a295', 397, item.y + 2, 3, 36)
-    text(g, item.name, 406, item.y + 12, 9, '#456265')
-    text(g, item.value, 406, item.y + 27, 9, '#283e4a')
-    if (active) {
-      rect(g, '#f3d39a', 376, item.y + 19, 19, 1)
-      rect(g, '#f3d39a', 372, item.y + 17, 4, 4)
-    }
-  }
+const PREVIEW_ZOOM: Record<PartCategory, number> = { body: 2.1, motor: 4.2, tires: 4, rollers: 5 }
 
-  // Component tray to the left, hardware dishes and tools to the right.
-  rect(g, '#967b60', 17, 123, 86, 221)
-  rect(g, '#3c5761', 14, 119, 86, 221)
-  rect(g, '#708b88', 18, 123, 78, 213)
-  for (const y of [129, 196, 263]) {
-    rect(g, '#35515b', 22, y, 70, 61)
-    rect(g, '#29444e', 25, y + 3, 64, 55)
-  }
-  tireIcon(g, 39, 139, build)
-  text(g, 'TIRE SET', 57, 181, 7, '#bbd0ba', 'center')
-  rect(g, '#172d3e', 33, 215, 48, 23)
-  rect(g, build.motor === 'dash' ? '#dda15a' : build.motor === 'torque' ? '#93c9b5' : '#a8bcba', 36, 211, 41, 23)
-  rect(g, '#eaf1d5', 39, 211, 32, 4)
-  rect(g, '#657e82', 44, 222, 3, 9)
-  rect(g, '#657e82', 51, 222, 3, 9)
-  rect(g, '#657e82', 58, 222, 3, 9)
-  rect(g, '#edd081', 29, 219, 7, 7)
-  rect(g, '#dc906a', 77, 217, 7, 10)
-  text(g, 'MOTOR', 57, 248, 7, '#bbd0ba', 'center')
-  for (const [x, y] of [[35, 278], [61, 278], [35, 302], [61, 302]]) {
-    oval(g, '#182e3d', x - 1, y - 1, 19, 19)
-    oval(g, build.rollers === 'bearing' ? '#e4bc76' : build.rollers === 'wide' ? '#78c7bf' : '#b3c8c5', x, y, 17, 17)
-    oval(g, '#527783', x + 5, y + 5, 7, 7)
-    screw(g, x + 7, y + 7, 2)
-  }
-  driver(g, 544, 207, 0.25)
-  wrench(g, 585, 237, -0.4, 1.5)
-  rect(g, '#a88c6a', 527, 282, 92, 57)
-  rect(g, '#efe0bb', 523, 278, 92, 57)
-  rect(g, '#c5b895', 529, 284, 80, 45)
-  for (let i = 0; i < 8; i++) screw(g, 536 + random(i + 1) * 61, 289 + random(i + 20) * 28, 3)
-  text(g, 'SMALL PARTS', 570, 348, 8, '#765f4a', 'center')
-  // Two small batteries on their charging pad.
-  rect(g, '#38515b', 530, 119, 76, 43)
-  for (const y of [127, 143]) {
-    rect(g, '#6e9291', 537, y, 56, 10)
-    rect(g, '#eac67f', 537, y, 14, 10)
-    rect(g, '#e3e6c5', 593, y + 3, 4, 4)
-    rect(g, '#bdd0b7', 555, y + 2, 30, 2)
-    rect(g, '#35565f', 558, y + 6, 18, 2)
-  }
-  rect(g, '#80d4a1', 599, 151, 3, 3)
+/** A close-up of one part on the assembled car, for the part cards. */
+export function drawPartPreview(canvas: HTMLCanvasElement, build: Build, category: PartCategory) {
+  const g = setup(canvas, 160, 110)
+  if (!g) return
+  rect(g, '#2a4a52', 0, 0, 160, 110)
+  oval(g, '#335a60', 4, 46, 152, 60)
+  const scale = PREVIEW_ZOOM[category]
+  const view: View = { scale, angle: SHOWROOM_ANGLE, squash: SHOWROOM_SQUASH, height: scale * .75 }
+  const [fx, fy, fz] = FOCUS[category]
+  const point = project(view, fx, fy, fz)
+  car(g, build, 80 - point.x, (category === 'body' ? 64 : 58) - point.y, view)
 }
 
 function tree(g: Context, x: number, y: number, size: number, palette: Palette, pine = false) {
@@ -503,9 +575,10 @@ function liveMonitor(g: Context, race: RaceState, reducedMotion: boolean) {
   for (let yy = y + 24; yy < y + height - 8; yy += 10) rect(g, '#31545d', x + 7, yy, width - 15, 1)
   text(g, '★', x + 14, y + 14, 13, '#ffe6a2')
   text(g, 'MY MACHINE', x + 27, y + 14, width < 100 ? 6 : 8, '#e5e9cf')
-  const scale = Math.min((width - 19) / 140, (height - 29) / 96)
-  const bounce = !reducedMotion && race.phase === 'racing' ? Math.sin(race.elapsed * 17) * 0.5 : 0
-  car(g, player.build, x + width / 2, y + 22 + (height - 29) / 2 + bounce, scale, Math.PI / 2, false)
+  // The player's machine spins on a little turntable, showing off its parts in 3D.
+  const scale = Math.min((width - 16) / 58, (height - 28) / 44)
+  const spin = reducedMotion ? SHOWROOM_ANGLE : SHOWROOM_ANGLE + race.elapsed * 1.2
+  car(g, player.build, x + width / 2, y + height - 14, { scale, angle: spin, squash: SHOWROOM_SQUASH, height: scale * .7, shadow: false })
   rect(g, '#89cfb0', x + width - 10, y + height - 4, 3, 2)
   rect(g, '#b29e76', x + 7, y + height - 4, width - 26, 1)
   for (const [xx, yy] of [[x + 2, y + 7], [x + width - 4, y + 7], [x + 2, y + height - 5]]) screw(g, xx, yy, 1)
@@ -624,7 +697,9 @@ function scene(course: Course) {
   checkeredFlag(g, 687, 366)
 
   // Plastic rails: a raised shadow, graphite backing, colored lanes, polished lips.
-  trackPath(g, course, 0, night ? '#1e2c40' : '#688977', 105, 7)
+  trackPath(g, course, 0, night ? '#1e2c40' : '#688977', 107, 10)
+  // The raised plastic track has a visible side wall below its running surface.
+  for (let shift = 7; shift > 0; shift--) trackPath(g, course, 0, shift > 3 ? '#2c3f4b' : '#36505c', 101, shift)
   trackPath(g, course, 0, '#3b515b', 101)
   trackPath(g, course, 0, '#f6e7c5', 96)
   trackPath(g, course, 0, '#859b9c', 90)
@@ -645,9 +720,11 @@ function scene(course: Course) {
     g.restore()
   }
   for (const lane of [-45, -15, 15, 45]) {
-    trackPath(g, course, lane, '#455e69', 5)
-    trackPath(g, course, lane, night ? '#adc6c3' : '#fff1cf', 3, -2)
-    trackPath(g, course, lane + 1.5, night ? '#738ba0' : '#ccd9c7', 1, -1)
+    // Outer guard walls stand taller than the lane dividers.
+    const wall = Math.abs(lane) > 30 ? 5 : 2
+    for (let shift = 0; shift < wall; shift++) trackPath(g, course, lane, shift ? '#3f5864' : '#2f4550', 5, -shift)
+    trackPath(g, course, lane, night ? '#adc6c3' : '#fff1cf', 3, -wall - 1)
+    trackPath(g, course, lane + 1.5, night ? '#738ba0' : '#ccd9c7', 1, -wall)
   }
   for (const zone of course.zones) {
     if (zone.kind === 'curve') continue
@@ -717,7 +794,42 @@ export function drawCoursePreview(canvas: HTMLCanvasElement, course: Course) {
   podium(g, course)
 }
 
-export function drawRace(canvas: HTMLCanvasElement, race: RaceState, options: { cheer?: number; reducedMotion?: boolean } = {}) {
+/** Cheer power: a long flame trail and speed lines behind the boosted car. */
+function boostBehind(g: Context, race: RaceState, distance: number, lane: number, boost: number, reducedMotion: boolean) {
+  const flicker = reducedMotion ? 0 : race.elapsed * 30
+  const strength = Math.min(1, boost / .4)
+  for (let i = 0; i < 10; i++) {
+    const trail = sampleTrack(race.course, distance - 22 - i * 6)
+    const size = Math.max(2, Math.round((9 - i * .7) * strength + Math.sin(flicker + i) * 1.5))
+    const px = trail.x - Math.sin(trail.angle) * lane
+    const py = trail.y + Math.cos(trail.angle) * lane
+    rect(g, ['#fff5c2', '#ffd56b', '#f59a4a', '#e8644e'][Math.min(3, Math.floor(i / 2.5))], px - size / 2, py - size / 2, size, size)
+  }
+  for (const side of [-13, 13]) for (let i = 0; i < 3; i++) {
+    const trail = sampleTrack(race.course, distance - 30 - i * 14 - (flicker % 14))
+    rect(g, '#fffbe6', trail.x - Math.sin(trail.angle) * (lane + side), trail.y + Math.cos(trail.angle) * (lane + side), 6, 2)
+  }
+}
+
+/** A burst when the cheer arrives, then sparkles that orbit the car while the boost lasts. */
+function boostAround(g: Context, race: RaceState, x: number, y: number, boost: number, reducedMotion: boolean) {
+  const age = CHEER_BOOST_SECONDS - boost
+  if (age < .45 && !reducedMotion) {
+    const radius = 14 + age * 110
+    for (let i = 0; i < 12; i++) {
+      const angle = i * Math.PI / 6
+      rect(g, i % 2 ? '#fff0b4' : '#ff9b5c', x + Math.cos(angle) * radius - 3, y + Math.sin(angle) * radius - 3, 6, 6)
+    }
+  }
+  const step = reducedMotion ? 0 : race.elapsed * 6
+  for (let i = 0; i < 8; i++) {
+    const angle = i * Math.PI / 4 + step
+    const radius = 26 + Math.sin(step * 2 + i) * 3
+    rect(g, i % 2 ? '#fff6c8' : '#ffc45e', x + Math.cos(angle) * radius - 2, y + Math.sin(angle) * radius - 2, 4, 4)
+  }
+}
+
+export function drawRace(canvas: HTMLCanvasElement, race: RaceState, options: { reducedMotion?: boolean } = {}) {
   const g = setup(canvas, WIDTH, HEIGHT)
   if (!g) return
   g.drawImage(scene(race.course), 0, 0)
@@ -737,22 +849,18 @@ export function drawRace(canvas: HTMLCanvasElement, race: RaceState, options: { 
         rect(g, i % 2 ? '#fff0c1' : '#dce4cb', trail.x - Math.sin(trail.angle) * lane, trail.y + Math.cos(trail.angle) * lane, 3 - Math.floor(i / 2), 2)
       }
     }
-    car(g, racer.build, x, y - lift, 0.345 + lift * 0.0015, point.angle + Math.PI / 2 + wobble)
+    const boosted = racer.boost > 0 && race.phase === 'racing'
+    if (boosted) boostBehind(g, race, racer.distance, lane, racer.boost, options.reducedMotion ?? false)
+    car(g, racer.build, x, y, { scale: .7, angle: point.angle + Math.PI / 2 + wobble, height: .42, lift })
     if (racer.id === 0) {
-      const markerY = y - lift - 38
+      const markerY = y - lift - 40
+      const marker = boosted ? '#ffb35c' : '#ffedab'
       rect(g, '#263d4b', x - 23, markerY - 10, 46, 16)
-      rect(g, '#ffedab', x - 21, markerY - 9, 42, 13)
+      rect(g, marker, x - 21, markerY - 9, 42, 13)
       text(g, '★', x, markerY - 2, 14, '#283f4c', 'center')
       polygon(g, '#263d4b', [x - 6, markerY + 5, x + 6, markerY + 5, x, markerY + 13])
-      polygon(g, '#ffedab', [x - 4, markerY + 5, x + 4, markerY + 5, x, markerY + 10])
-      if ((options.cheer ?? 0) > 0 && !options.reducedMotion) {
-        const step = race.elapsed * 8
-        for (let i = 0; i < 6; i++) {
-          const angle = i * Math.PI / 3 + step * 0.1
-          const radius = 24 + Math.sin(step + i) * 4
-          rect(g, i % 2 ? '#fff0b4' : '#efb75e', x + Math.cos(angle) * radius, y - lift + Math.sin(angle) * radius, 3, 3)
-        }
-      }
+      polygon(g, marker, [x - 4, markerY + 5, x + 4, markerY + 5, x, markerY + 10])
+      if (boosted) boostAround(g, race, x, y - lift, racer.boost, options.reducedMotion ?? false)
     }
   }
   if (race.phase === 'finished' && !options.reducedMotion) {

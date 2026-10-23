@@ -5,6 +5,9 @@ export type { RaceEvent, Racer, RaceState } from './types'
 
 export const LAP_COUNT = 3
 export const COUNTDOWN_SECONDS = 3
+export const CHEER_BOOST_SECONDS = 1.5
+export const CHEER_COOLDOWN_SECONDS = 2.5
+const CHEER_SPEEDUP = 1.22
 const SUBSTEP = 1 / 120
 
 export function createRace(course: Course, build: Build): RaceState {
@@ -14,10 +17,10 @@ export function createRace(course: Course, build: Build): RaceState {
     { ...DEFAULT_BUILD, body: 'wing', motor: 'balance', tires: 'sponge', rollers: 'bearing', color: 'yellow' },
   ]
   return {
-    course, phase: 'countdown', countdown: COUNTDOWN_SECONDS, elapsed: 0, lapCount: LAP_COUNT, events: [],
+    course, phase: 'countdown', countdown: COUNTDOWN_SECONDS, elapsed: 0, lapCount: LAP_COUNT, cheerCooldown: 0, events: [],
     racers: builds.map((car, id) => ({
       id, name: ['きみのマシン', 'アオくん', 'キイちゃん'][id], build: car, stats: getStats(car),
-      distance: 0, speed: 0, finishTime: null, wobble: 0, recovery: 0, zoneKey: null,
+      distance: 0, speed: 0, finishTime: null, wobble: 0, recovery: 0, boost: 0, zoneKey: null,
     })),
   }
 }
@@ -32,6 +35,7 @@ function advance(race: RaceState, dt: number) {
   const totalDistance = race.course.length * race.lapCount
   const previousElapsed = race.elapsed
   race.elapsed += dt
+  race.cheerCooldown = Math.max(0, race.cheerCooldown - dt)
   for (const racer of race.racers) {
     if (racer.finishTime !== null) continue
     const previousDistance = racer.distance
@@ -54,6 +58,8 @@ function advance(race: RaceState, dt: number) {
       target *= 1 - zone.severity * (5 - control) * .045
     }
     if (racer.recovery > 0) target *= .4
+    if (racer.boost > 0) target *= CHEER_SPEEDUP
+    racer.boost = Math.max(0, racer.boost - dt)
     racer.recovery = Math.max(0, racer.recovery - dt)
     racer.wobble = Math.max(0, racer.wobble - dt * 1.6)
     // Smooth acceleration, with enough traction to always recover and finish.
@@ -65,6 +71,7 @@ function advance(race: RaceState, dt: number) {
       racer.finishTime = previousElapsed + (totalDistance - previousDistance) / racer.speed
       racer.speed = 0
       racer.wobble = 0
+      racer.boost = 0
       race.events.push({ kind: 'finish', racer: racer.id })
     }
   }
@@ -96,6 +103,16 @@ export function stepRace(race: RaceState, dt: number): void {
     advance(race, step)
     remaining -= step
   }
+}
+
+/** A cheer speeds up the player's car and shakes off a bump, then needs to charge again. */
+export function cheerRace(race: RaceState): boolean {
+  const player = race.racers[0]
+  if (race.phase !== 'racing' || player.finishTime !== null || race.cheerCooldown > 0) return false
+  player.boost = CHEER_BOOST_SECONDS
+  player.recovery = 0
+  race.cheerCooldown = CHEER_COOLDOWN_SECONDS
+  return true
 }
 
 export function getRank(race: RaceState): number {

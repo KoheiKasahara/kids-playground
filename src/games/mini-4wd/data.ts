@@ -5,21 +5,29 @@ export const PARTS: Record<PartCategory, Part[]> = {
     { id: 'arrow', name: 'アロー', description: 'かるくて すいすい', icon: '⚡', stats: { speed: .6, grip: 0, stability: -.3 } },
     { id: 'buggy', name: 'バギー', description: 'カーブも おまかせ', icon: '🛞', stats: { speed: -.3, grip: .5, stability: .5 } },
     { id: 'wing', name: 'ウイング', description: 'ジャンプも しっかり', icon: '🪽', stats: { speed: -.2, grip: 0, stability: .8 } },
+    { id: 'shark', name: 'シャーク', description: 'とがった はなで ぐんぐん', icon: '🦈', stats: { speed: .4, grip: .3, stability: -.2 } },
+    { id: 'truck', name: 'トラック', description: 'どっしり おもたい', icon: '🚚', stats: { speed: -.5, grip: .2, stability: 1.1 } },
   ],
   motor: [
     { id: 'balance', name: 'バランス', description: 'はじめてに ぴったり', icon: '⚙️', stats: { speed: 0, grip: 0, stability: .3 } },
     { id: 'dash', name: 'ダッシュ', description: 'はやい！ でも ゆれやすい', icon: '⚡', stats: { speed: 1, grip: 0, stability: -.8 } },
     { id: 'torque', name: 'パワー', description: 'ゆっくり ぐんぐん', icon: '💪', stats: { speed: -.4, grip: .35, stability: .45 } },
+    { id: 'rocket', name: 'ロケット', description: 'びゅーん！ でも あばれんぼう', icon: '🚀', stats: { speed: 1.4, grip: -.2, stability: -1.2 } },
+    { id: 'eco', name: 'エコ', description: 'しずかで やさしい', icon: '🍃', stats: { speed: -.2, grip: .15, stability: .8 } },
   ],
   tires: [
     { id: 'normal', name: 'ノーマル', description: 'どこでも はしれる', icon: '🛞', stats: { speed: 0, grip: .2, stability: 0 } },
     { id: 'sponge', name: 'スポンジ', description: 'やわらか すべりにくい', icon: '☁️', stats: { speed: -.25, grip: .9, stability: .4 } },
     { id: 'slick', name: 'スリック', description: 'まっすぐが とくい', icon: '💨', stats: { speed: .45, grip: -.6, stability: -.2 } },
+    { id: 'big', name: 'ビッグ', description: 'おおきくて がたがたも へっちゃら', icon: '🌕', stats: { speed: -.3, grip: .2, stability: .9 } },
+    { id: 'spike', name: 'スパイク', description: 'とげとげで ぴたっ', icon: '✳️', stats: { speed: -.15, grip: 1.2, stability: 0 } },
   ],
   rollers: [
     { id: 'standard', name: 'ノーマル', description: 'こつこつ あんてい', icon: '🔩', stats: { speed: 0, grip: 0, stability: 0 } },
     { id: 'bearing', name: 'ベアリング', description: 'くるくる なめらか', icon: '✨', stats: { speed: .3, grip: .1, stability: -.2 } },
     { id: 'wide', name: 'ワイド', description: 'ひろくて ゆれにくい', icon: '↔️', stats: { speed: -.35, grip: .4, stability: .9 } },
+    { id: 'double', name: 'ダブル', description: '2だんで しっかり ガード', icon: '🔗', stats: { speed: -.15, grip: .3, stability: .6 } },
+    { id: 'gold', name: 'ゴールド', description: 'きらきら すべすべ', icon: '🌟', stats: { speed: .45, grip: .15, stability: -.35 } },
   ],
 }
 
