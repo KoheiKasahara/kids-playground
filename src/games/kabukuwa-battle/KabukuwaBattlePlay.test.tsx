@@ -4,7 +4,8 @@ import { MemoryRouter } from 'react-router-dom'
 import KabukuwaBattlePlay from './KabukuwaBattlePlay'
 import type { Battle } from './battle'
 import { SPECIES } from './species'
-import { playBuzz, playCutIn, playGo, playReady, playWin, startBgm } from './sounds'
+import { moveRepertoire, techniqueFor } from './techniques'
+import { playBuzz, playCutIn, playGo, playHit, playReady, playWindup, playWin, startBgm } from './sounds'
 
 vi.mock('./sounds', async importOriginal => {
   const actual = await importOriginal<typeof import('./sounds')>()
@@ -57,6 +58,59 @@ function chooseHerculesVsCaucasus() {
 }
 
 describe('カブクワ バトル', () => {
+  test('ずかんで えらんだ むしの とくいわざと ほかの わざを みられる', () => {
+    renderGame()
+    for (const sp of SPECIES.filter(sp => ['kabutomushi', 'hercules', 'nokogiri', 'palawan'].includes(sp.id))) {
+      fireEvent.click(screen.getByRole('button', { name: `${sp.name}（${sp.home}）` }))
+      const list = within(screen.getByRole('list', { name: 'つかえる わざ' }))
+      expect(list.getAllByRole('listitem')).toHaveLength(moveRepertoire(sp).length)
+      expect(list.getByText(sp.move.name)).toBeInTheDocument()
+      for (const move of moveRepertoire(sp)) {
+        const technique = techniqueFor(sp, move)
+        expect(list.getByText(technique.name)).toBeInTheDocument()
+        expect(list.getByText(technique.description)).toBeInTheDocument()
+      }
+    }
+  })
+
+  test.each([
+    ['sweep', 'よこに なげた'], ['rush', 'れんぞくで おした'], ['toss', 'たかく あげた'],
+  ] as const)('%s: いま だした わざの なまえと じっきょうが あい、おとも なる', (move, action) => {
+    renderGame()
+    chooseHerculesVsCaucasus()
+    fireEvent.click(screen.getByRole('button', { name: 'よるの き の えだ（よこから みる）' }))
+    const b = battle()!
+    const technique = techniqueFor(b.f[0].sp, move)
+    // できごとの ひょうじを、たたかいの ランダムな ながれから きりはなして たしかめる。
+    act(() => { b.events.push({ type: 'windup', side: 0, move }) })
+    advance(.05)
+    expect(screen.getByRole('status')).toHaveTextContent(`ヘラクレスの ${technique.name}！`)
+    expect(screen.getByLabelText('ヘラクレスの わざ')).toHaveTextContent(technique.name)
+    expect(playWindup).toHaveBeenCalled()
+    act(() => { b.events.push({ type: 'hit', side: 0, move, u: 0, v: 0, z: 10, big: false }) })
+    advance(.05)
+    expect(screen.getByRole('status')).toHaveTextContent(action)
+    expect(screen.getByRole('status')).toHaveTextContent(technique.name)
+    expect(playHit).toHaveBeenCalledWith(false)
+    advance(1.6)
+    expect(screen.getByLabelText('ヘラクレスの わざ')).toBeEmptyDOMElement()
+  })
+
+  test('わざの ひょうじちゅうに もどっても タイマーが のこらず、さいにゅうじょうで リセットされる', () => {
+    const { unmount } = renderGame()
+    chooseHerculesVsCaucasus()
+    fireEvent.click(screen.getByRole('button', { name: 'よるの き の えだ（よこから みる）' }))
+    act(() => { battle()!.events.push({ type: 'windup', side: 0, move: 'toss' }) })
+    advance(.05)
+    expect(screen.getByLabelText('ヘラクレスの わざ')).not.toBeEmptyDOMElement()
+    fireEvent.click(screen.getByRole('button', { name: 'もどる' }))
+    expect(battle()).toBeUndefined()
+    fireEvent.click(screen.getByRole('button', { name: 'もりの まるた（ななめから みる）' }))
+    expect(screen.getByLabelText('ヘラクレスの わざ')).toBeEmptyDOMElement()
+    unmount()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   test('はじめは じぶんの むしを えらぶ。22しゅるいの ずかんと つよさが みられる', () => {
     renderGame()
     expect(screen.getByRole('heading', { level: 1, name: 'カブクワ バトル' })).toBeInTheDocument()
@@ -271,7 +325,7 @@ describe('カブクワ バトル', () => {
     renderGame()
     chooseHerculesVsCaucasus()
     // この たねでは ヘラクレスが ぎゃくてんして コーカサスを なげおとす。
-    vi.spyOn(Math, 'random').mockReturnValueOnce(.495)
+    vi.spyOn(Math, 'random').mockReturnValueOnce(305 / 2 ** 31)
     fireEvent.click(screen.getByRole('button', { name: 'もりの まるた（ななめから みる）' }))
     for (let i = 0; i < 400 && !screen.queryByTestId('kabukuwa-cut-in'); i++) advance(.1)
     expect(screen.getByTestId('kabukuwa-cut-in')).toHaveTextContent('ぎゃくてん！')

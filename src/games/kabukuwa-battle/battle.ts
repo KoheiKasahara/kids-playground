@@ -8,8 +8,11 @@
 
 import { beetleSize } from './model'
 import { rng } from './pixel'
-import type { MoveKind, Species } from './species'
+import type { Species } from './species'
 import { BRANCH_RUN_OFF, edgeRoom, fallFloor, groundHeight, hasGround, type StageId } from './stages'
+import { moveRepertoire, RUSH_HIT_INTERVAL, strikeDuration, windupDuration, type Technique } from './techniques'
+
+export type { Technique } from './techniques'
 
 export const DT = 1 / 60
 /** はっけよい から のこった までの じかん。 */
@@ -64,6 +67,8 @@ export type Fighter = {
   cd: number
   /** いまの わざ。 */
   move: Technique | null
+  /** れんぞくづきが あたった かいすう。はずした ときは 0。 */
+  rushHits: number
   pose: FighterPose
   /** おしあいの ゆらぎ。 */
   wobble: readonly [number, number, number, number]
@@ -73,9 +78,6 @@ export type Fighter = {
   /** はしで あぶない と いった あと。 */
   warned: boolean
 }
-
-/** わざ。どの むしも はしで こらえた ときだけ「うっちゃり」を だせる。 */
-export type Technique = MoveKind | 'utchari'
 
 export type EndReason = 'throw' | 'push' | 'slip' | 'flee' | 'judge'
 
@@ -140,7 +142,7 @@ function makeFighter(sp: Species, side: 0 | 1, startU: number, random: () => num
     power: sp.stats.power, speed: sp.stats.speed, form: .8 + random() * .4, maxSt, st: maxSt,
     u: side === 0 ? -startU : startU, v: 0, z: 0, vu: 0, vv: 0, vz: 0,
     heading: side === 0 ? 0 : Math.PI,
-    state: 'ready', t: 0, cd: 0, move: null,
+    state: 'ready', t: 0, cd: 0, move: null, rushHits: 0,
     pose: { leg: random(), lift: 0, jaw: restJaw(sp), flipped: false, spin: 0, hang: false },
     wobble: [1.2 + random() * 1.1, random() * 6.28, 3 + random() * 2, random() * 6.28],
     orbit: random() < .5 ? 1 : -1, pushed: 0, warned: false,
@@ -171,6 +173,7 @@ const other = (b: Battle, f: Fighter) => b.f[1 - f.side]
 function set(f: Fighter, state: FighterState) {
   f.state = state
   f.t = 0
+  f.rushHits = 0
 }
 
 /** a から b への きょりと むき。 */
@@ -396,7 +399,10 @@ function clash(b: Battle, a: Fighter, c: Fighter) {
     f.cd -= DT
     if (f.cd <= 0) {
       set(f, 'windup')
-      f.move = f.sp.move.kind
+      // とくいわざを すこし だしやすくし、ひとつ まえと おなじ わざは さける。
+      const choices = moveRepertoire(f.sp).filter(move => move !== f.move)
+      const weighted = choices.includes(f.sp.move.kind) ? [...choices, f.sp.move.kind] : choices
+      f.move = weighted[Math.floor(b.random() * weighted.length)]
       b.events.push({ type: 'windup', side: f.side, move: f.move })
       break
     }
@@ -435,7 +441,7 @@ function force(b: Battle, f: Fighter) {
 
 function windup(b: Battle, f: Fighter) {
   const o = other(b, f)
-  const length = .5 * (1.3 - f.speed * .045)
+  const length = windupDuration(f.sp, f.move ?? f.sp.move.kind)
   const k = Math.min(1, f.t / length)
   if (f.sp.group === 'kuwagata') { f.pose.jaw = .55 + .45 * k; f.pose.lift = k * .6 }
   else f.pose.lift = .3 + .7 * k
@@ -472,6 +478,10 @@ function resolveStrike(b: Battle, att: Fighter, def: Fighter) {
     return
   }
   const edge = (att.power * att.form + att.weight * 2.5 + jawGrip(att)) - (def.power * def.form * .55 + def.weight * 3 + jawGrip(def))
+  if (move === 'rush') {
+    rushHit(b, att, def)
+    return
+  }
   const damage = (8 + Math.max(0, edge) * 1 + att.power * .6) * (move === 'pinch' ? 1.15 : move === 'charge' ? .85 : 1) / (.6 + .4 * def.weight)
   def.st -= damage
   const big = damage > 22
@@ -492,7 +502,8 @@ function resolveStrike(b: Battle, att: Fighter, def: Fighter) {
   // なげる: ツノで すくう（まえへ）・あごで はさんで よこへ。
   let du = nu, dv = nv
   if (b.stage !== 'branch') {
-    const spread = move === 'lift' || move === 'pinch' ? (.25 + b.random() * .45) * (b.random() < .5 ? 1 : -1) : (b.random() - .5) * .3
+    const spread = move === 'sweep' ? (1.05 + b.random() * .3) * att.orbit
+      : move === 'lift' || move === 'pinch' ? (.25 + b.random() * .45) * (b.random() < .5 ? 1 : -1) : (b.random() - .5) * .3
     const cs = Math.cos(spread), sn = Math.sin(spread)
     du = nu * cs - nv * sn; dv = nu * sn + nv * cs
   }
@@ -502,8 +513,11 @@ function resolveStrike(b: Battle, att: Fighter, def: Fighter) {
   const early = b.time < 8 ? .7 : 1
   const reachOut = (.5 + .65 * tired) * early
   const out = Math.max(26, Math.min(110, (46 + edge * 5) * reachOut))
-  def.vu = du * out; def.vv = dv * out
-  def.vz = Math.max(80, Math.min(150, 104 + edge * 4)) * (.8 + .3 * tired)
+  const height = Math.max(80, Math.min(150, 104 + edge * 4)) * (.8 + .3 * tired)
+  // かちあげは たかく・ちかく、よこなげは ひくく・よこへ。とぶ きょりの 総量は そろえる。
+  const arc = move === 'toss' ? 1.3 : move === 'sweep' ? .85 : 1
+  def.vu = du * out / arc; def.vv = dv * out / arc
+  def.vz = height * arc
   def.z = Math.max(def.z, 2)
   def.pose.spin = 0
   def.pose.flipped = false
@@ -511,10 +525,34 @@ function resolveStrike(b: Battle, att: Fighter, def: Fighter) {
 }
 
 function strike(b: Battle, f: Fighter) {
-  const k = f.t / .35
+  const move = f.move ?? f.sp.move.kind
+  const length = strikeDuration(move)
+  const k = f.t / length
   if (f.sp.group === 'kuwagata') f.pose.jaw = Math.max(0, 1 - k)
   f.pose.lift = Math.max(0, 1 - k * .8)
-  if (f.t >= .35) set(f, canEngage(other(b, f)) ? 'clash' : 'approach')
+  if (move === 'rush' && f.rushHits > 0 && f.rushHits < 3) {
+    const o = other(b, f)
+    const { d, nu, nv } = toward(f, o)
+    if (o.state === 'stagger' && d <= contactDistance(f, o) + 24) {
+      const step = Math.min(walkSpeed(f) * DT, Math.max(0, d - contactDistance(f, o)))
+      f.u += nu * step; f.v += nv * step
+      if (f.t >= f.rushHits * RUSH_HIT_INTERVAL) rushHit(b, f, o)
+    } else f.rushHits = 0
+  }
+  if (f.t >= length) set(f, canEngage(other(b, f)) ? 'clash' : 'approach')
+}
+
+/** 3かいに わけて おす。はじめを よけられたり、あいてが はなれたら つづかない。 */
+function rushHit(b: Battle, att: Fighter, def: Fighter) {
+  const edge = (att.power * att.form + att.weight * 2.5 + jawGrip(att)) - (def.power * def.form * .55 + def.weight * 3 + jawGrip(def))
+  const damage = (8 + Math.max(0, edge) + att.power * .6) * .3 / (.6 + .4 * def.weight)
+  const { nu, nv } = toward(att, def)
+  att.rushHits++
+  def.st -= damage
+  set(def, 'stagger')
+  const push = att.rushHits === 3 ? 65 + Math.max(0, edge) * 7 : 35 + Math.max(0, edge) * 4
+  def.vu = nu * push; def.vv = nv * push
+  b.events.push({ type: 'hit', side: att.side, move: 'rush', u: def.u, v: def.v, z: 10, big: att.rushHits === 3 && damage * 3 > 22 })
 }
 
 function stagger(b: Battle, f: Fighter) {
@@ -813,21 +851,29 @@ export type CutInPlan = { step: number; winner: 0 | 1; kind: CutInKind }
 /**
  * おなじ たねの たたかいを さきに さいごまで すすめて、カットインを いれる ところを さがす。
  * とばされて そのまま おちたなら きめての わざ（hit）の ところ、
- * ちゃくちや しがみつきを はさんだら おちはじめ（fall）、にげだしたら おわり（end）の ところ。
+ * ちゃくちや しがみつきを はさんだら おちはじめ（fall）、げんきを つかいきらせた わざも きめてに する。
+ * わざ いがいで つかれきって にげだしたら おわり（end）の ところ。
  * カットインが ない しあいは null。
  */
 export function planCutIn(b: Battle, maxSeconds = TIME_LIMIT + READY_SECONDS + 5): CutInPlan | null {
   const steps = Math.ceil(maxSeconds / DT)
   /** いまも とばされつづけて いる わざ（hit）の ステップと、とばされた ほう。 */
   let hit: { step: number; side: 0 | 1 } | null = null
+  let exhausted: { step: number; side: 0 | 1 } | null = null
   let fallStep = 0
   for (let step = 1; step <= steps && b.state !== 'over'; step++) {
     stepBattle(b)
     for (const e of drainEvents(b)) {
-      if (e.type === 'hit') hit = { step, side: (1 - e.side) as 0 | 1 }
+      if (e.type === 'hit') {
+        hit = { step, side: (1 - e.side) as 0 | 1 }
+        if (b.f[hit.side].st <= 0) exhausted = hit
+      }
       else if ((e.type === 'land' || e.type === 'cling') && e.side === hit?.side) hit = null
       else if (e.type === 'fall') fallStep = hit?.side === e.side ? hit.step : step
-      else if (e.type === 'end') return e.cutIn ? { step: fallStep || step, winner: e.winner, kind: e.cutIn } : null
+      else if (e.type === 'end') {
+        const finishStep = exhausted?.side === 1 - e.winner ? exhausted.step : step
+        return e.cutIn ? { step: fallStep || finishStep, winner: e.winner, kind: e.cutIn } : null
+      }
     }
     // ふらついた あと たちなおったら、その わざは きめてでは ない。
     if (hit) {
