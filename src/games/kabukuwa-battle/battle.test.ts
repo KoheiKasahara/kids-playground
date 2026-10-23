@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import { CLOSE_LOW, COMEBACK_BEHIND, COMEBACK_LOW, createBattle, cutInKind, drainEvents, DT, isComeback, planCutIn, READY_SECONDS, runToEnd, stepBattle, strikeChance, TIME_LIMIT, type Battle, type BattleEvent } from './battle'
+import { CLOSE_LOW, COMEBACK_BEHIND, COMEBACK_LOW, contactDistance, createBattle, cutInKind, drainEvents, DT, isComeback, planCutIn, READY_SECONDS, runToEnd, stepBattle, strikeChance, TIME_LIMIT, type Battle, type BattleEvent } from './battle'
 import { SPECIES, speciesById, type Species } from './species'
 import { STAGES, type StageId } from './stages'
+import { moveRepertoire, RUSH_HIT_INTERVAL, strikeDuration, windupDuration, type Technique } from './techniques'
 
 const sp = (id: string) => speciesById(id) as Species
 
@@ -184,6 +185,128 @@ describe('その日の ちょうし', () => {
       }
     }
     expect(forms.size).toBeGreaterThan(10)
+  })
+})
+
+describe('ふえた わざの うごき', () => {
+  /** まんなかで ためおわる ところから、よけずに あたる おなじ じょうけんで くらべる。 */
+  function atStrike(move: Technique, stage: StageId = 'stump') {
+    const battle = createBattle(sp('kabutomushi'), sp('kabutomushi'), stage, 91)
+    battle.state = 'fight'
+    battle.time = 12
+    battle.random = () => 0
+    const contact = contactDistance(...battle.f)
+    for (const f of battle.f) {
+      f.u = (f.side === 0 ? -1 : 1) * contact / 2
+      f.state = f.side === 0 ? 'windup' : 'clash'
+      f.form = 1
+      f.wobble = [1, 0, 1, 0]
+      f.cd = 100
+    }
+    battle.f[0].move = move
+    battle.f[0].t = windupDuration(battle.f[0].sp, move)
+    drainEvents(battle)
+    return battle
+  }
+
+  test('よこなげは よこへ、かちあげは すくいなげより たかく とばす', () => {
+    const scoop = atStrike('scoop'), sweep = atStrike('sweep'), toss = atStrike('toss')
+    for (const battle of [scoop, sweep, toss]) {
+      stepBattle(battle)
+      expect(battle.f[1].state).toBe('thrown')
+      expect(battle.f[1].st).toBeLessThan(battle.f[1].maxSt)
+      expect(drainEvents(battle)).toEqual([expect.objectContaining({ type: 'hit', side: 0, move: battle.f[0].move })])
+    }
+    expect(Math.abs(sweep.f[1].vv)).toBeGreaterThan(Math.abs(sweep.f[1].vu))
+    expect(toss.f[1].vz).toBeGreaterThan(scoop.f[1].vz * 1.2)
+    expect(Math.hypot(toss.f[1].vu, toss.f[1].vv)).toBeLessThan(Math.hypot(scoop.f[1].vu, scoop.f[1].vv))
+  })
+
+  test.each(STAGES.map(stage => stage.id))('%s: れんぞくづきは じかんを あけて 3かい おし、さいごが いちばん つよい', stage => {
+    const battle = atStrike('rush', stage)
+    const hits: { time: number; stamina: number; push: number }[] = []
+    const startU = battle.f[1].u
+    for (let i = 0; i <= Math.ceil(strikeDuration('rush') / DT); i++) {
+      stepBattle(battle)
+      for (const event of drainEvents(battle)) {
+        if (event.type === 'hit') {
+          expect(event.move).toBe('rush')
+          expect(battle.f[1].state).toBe('stagger')
+          hits.push({ time: battle.time, stamina: battle.f[1].st, push: Math.hypot(battle.f[1].vu, battle.f[1].vv) })
+        }
+      }
+    }
+    expect(hits).toHaveLength(3)
+    for (let i = 1; i < hits.length; i++) {
+      expect(hits[i].time - hits[i - 1].time).toBeCloseTo(RUSH_HIT_INTERVAL, 1)
+      expect(hits[i].stamina).toBeLessThan(hits[i - 1].stamina)
+    }
+    expect(hits[2].push).toBeGreaterThan(hits[0].push)
+    expect(battle.f[1].u - startU).toBeGreaterThan(10)
+    expect(battle.f[0].state).not.toBe('strike')
+  })
+
+  test('れんぞくづきは ふせがれたり、あいてが はなれたら つづかない', () => {
+    const blocked = atStrike('rush')
+    blocked.random = () => .999
+    stepBattle(blocked)
+    expect(drainEvents(blocked)).toEqual([expect.objectContaining({ type: 'block' })])
+    const separated = atStrike('rush')
+    stepBattle(separated)
+    expect(drainEvents(separated)).toEqual([expect.objectContaining({ type: 'hit' })])
+    separated.f[1].u += 60
+    for (const battle of [blocked, separated]) {
+      for (let i = 0; i < 30; i++) stepBattle(battle)
+      expect(drainEvents(battle).some(event => event.type === 'hit')).toBe(false)
+    }
+  })
+
+  test('れんぞくづきで げんきを つかいきらせたら、にげだす まえの わざで カットインする', () => {
+    const make = () => {
+      const battle = atStrike('rush')
+      battle.f[1].st = 1
+      battle.lowest = [.3, 1]
+      battle.behind = [.4, 0]
+      return battle
+    }
+    const plan = planCutIn(make())
+    expect(plan).toEqual(expect.objectContaining({ kind: 'comeback', winner: 0 }))
+    const battle = make()
+    let at: BattleEvent[] = []
+    for (let step = 1; step <= plan!.step; step++) {
+      stepBattle(battle)
+      at = drainEvents(battle)
+    }
+    expect(at).toContainEqual(expect.objectContaining({ type: 'hit', move: 'rush', side: 0 }))
+    expect(battle.f[1].st).toBeLessThanOrEqual(0)
+    expect(battle.state).toBe('fight')
+    runToEnd(battle)
+    expect(battle.reason).toBe('flee')
+    expect(battle.winner).toBe(0)
+  })
+
+  test('たねで わざの えらびかたも きまり、どの むしも 3しゅるいを くりかえさず つかう', () => {
+    for (const species of SPECIES) {
+      const seen = new Set<Technique>()
+      for (const seed of [71, 239, 517, 977]) {
+        const a = play(species, species, 'branch', seed)
+        const b = play(species, species, 'branch', seed)
+        const moves = (events: BattleEvent[]) => events.filter(e => e.type === 'windup')
+        expect(moves(a.events)).toEqual(moves(b.events))
+        expect(a.battle.state).toBe('over')
+        for (const side of [0, 1]) {
+          let previous: Technique | null = null
+          for (const event of moves(a.events)) {
+            if (event.side !== side) continue
+            expect(moveRepertoire(species)).toContain(event.move)
+            expect(event.move).not.toBe(previous)
+            seen.add(event.move)
+            previous = event.move
+          }
+        }
+      }
+      expect(seen, species.id).toEqual(new Set(moveRepertoire(species)))
+    }
   })
 })
 
