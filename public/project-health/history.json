@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-24T20:47:36.607Z",
+  "updatedAt": "2026-10-24T23:43:06.325Z",
   "entries": [
     {
       "date": "2026-09-13",
@@ -1050,8 +1050,8 @@
     {
       "date": "2026-10-25",
       "games": 69,
-      "unitTests": 8331,
-      "unitTestsPassed": 8330,
+      "unitTests": 8348,
+      "unitTestsPassed": 8347,
       "e2eSmokePassed": null,
       "e2eSmokeTotal": null,
       "e2eSmokeFlaky": null,
@@ -1064,16 +1064,16 @@
       "lighthousePerformance": null,
       "accessibility": null,
       "lighthouseTarget": "ホーム画面",
-      "vulnerabilities": 6,
+      "vulnerabilities": 5,
       "vulnerabilitiesCritical": 0,
-      "vulnerabilitiesHigh": 4,
+      "vulnerabilitiesHigh": 3,
       "vulnerabilitiesModerate": 1,
       "vulnerabilitiesLow": 1,
       "vulnerabilitiesInfo": 0,
       "nightly": "failure",
       "deploy": "success",
-      "recordedAt": "2026-10-24T20:47:36.607Z",
-      "runId": "40130349093"
+      "recordedAt": "2026-10-24T23:43:06.325Z",
+      "runId": "40143069099"
     }
   ]
 }
