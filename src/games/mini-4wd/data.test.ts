@@ -3,6 +3,18 @@ import { COLORS, COURSES, DEFAULT_BUILD, getStats, normalizeBuild, PARTS, sample
 import type { PartCategory } from './types'
 
 describe('mini-4wd parts and courses', () => {
+  test.each(COURSES)('$id: every bend is wide enough that the outside lane has no sharp spike', course => {
+    const { points } = course
+    const count = points.length
+    for (let i = 0; i < count; i++) {
+      const a = points[(i + count - 3) % count], b = points[i], c = points[(i + 3) % count]
+      const cross = Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2
+      if (cross < 1e-6) continue
+      const radius = Math.hypot(b.x - a.x, b.y - a.y) * Math.hypot(c.x - b.x, c.y - b.y) * Math.hypot(c.x - a.x, c.y - a.y) / (4 * cross)
+      expect(radius).toBeGreaterThan(60)
+    }
+  })
+
   test('each selectable part is unique and makes a real performance choice', () => {
     for (const category of Object.keys(PARTS) as PartCategory[]) {
       const parts = PARTS[category]

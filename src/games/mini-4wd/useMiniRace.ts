@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CHEER_COOLDOWN_SECONDS, cheerRace, createRace, getRank, laneAfterChanges, stepRace } from './race'
+import { CHEER_COOLDOWN_SECONDS, cheerRace, createRace, getRank, isRaceSettled, laneAfterChanges, stepRace } from './race'
 import { drawRace } from './render'
 import { playMiniSound } from './sounds'
 import type { Build, Course } from './types'
@@ -40,13 +40,13 @@ export function useMiniRace(course: Course, build: Build, paused: boolean) {
         }
       }
       if (canvasRef.current) drawRace(canvasRef.current, race, { reducedMotion })
-      if (now - lastHud > 80 || race.phase === 'finished' || forceHud) {
+      if (now - lastHud > 80 || isRaceSettled(race) || forceHud) {
         forceHud = false
         const me = race.racers[0]
         setHud({ countdown: Math.ceil(race.countdown), lap: Math.min(race.lapCount, Math.floor(me.distance / course.length) + 1), rank: getRank(race), time: me.finishTime ?? race.elapsed, finished: race.phase === 'finished', message: race.elapsed < messageUntil || race.phase !== 'racing' ? message : 'きみの マシンは「★」だよ', progress: Math.min(1, me.distance / (course.length * race.lapCount)), boosting: me.boost > 0 && race.phase === 'racing', charge: 1 - race.cheerCooldown / CHEER_COOLDOWN_SECONDS })
         lastHud = now
       }
-      if (race.phase !== 'finished') frame = requestAnimationFrame(tick)
+      if (!isRaceSettled(race)) frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     cheerRef.current = () => {

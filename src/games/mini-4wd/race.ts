@@ -61,7 +61,7 @@ export function createRace(course: Course, build: Build): RaceState {
     { ...DEFAULT_BUILD, body: 'wing', motor: 'balance', tires: 'sponge', rollers: 'bearing', color: 'yellow' },
   ]
   return {
-    course, phase: 'countdown', countdown: COUNTDOWN_SECONDS, elapsed: 0, lapCount: LAP_COUNT, cheerCooldown: 0, events: [],
+    course, phase: 'countdown', countdown: COUNTDOWN_SECONDS, elapsed: 0, lapCount: LAP_COUNT, cheerCooldown: 0, events: [], clock: 0,
     racers: builds.map((car, id) => ({
       id, name: ['きみのマシン', 'アオくん', 'キイちゃん'][id], startLane: START_LANES[id], build: car, stats: getStats(car),
       distance: 0, speed: 0, finishTime: null, wobble: 0, recovery: 0, boost: 0, zoneKey: null,
@@ -77,8 +77,9 @@ function strainFor(racer: Racer, zone: TrackZone): number {
 
 function advance(race: RaceState, dt: number) {
   const totalDistance = race.course.length * race.lapCount
-  const previousElapsed = race.elapsed
-  race.elapsed += dt
+  const previousClock = race.clock
+  race.clock += dt
+  if (race.racers[0].finishTime === null) race.elapsed = race.clock
   race.cheerCooldown = Math.max(0, race.cheerCooldown - dt)
   for (const racer of race.racers) {
     if (racer.finishTime !== null) continue
@@ -116,7 +117,7 @@ function advance(race: RaceState, dt: number) {
     const nextProgress = racer.distance / race.course.length - lap
     if (progress < laneChange.start && nextProgress >= laneChange.start) race.events.push({ kind: 'lane', racer: racer.id })
     if (racer.distance >= totalDistance) {
-      racer.finishTime = previousElapsed + (totalDistance - previousDistance) / rate
+      racer.finishTime = previousClock + (totalDistance - previousDistance) / rate
       racer.speed = 0
       racer.wobble = 0
       racer.boost = 0
@@ -124,18 +125,23 @@ function advance(race: RaceState, dt: number) {
     }
   }
   const player = race.racers[0]
-  if (player.finishTime !== null) {
+  if (player.finishTime !== null && race.phase === 'racing') {
     race.phase = 'finished'
     race.elapsed = player.finishTime
     // The last substep can finish two cars. A rival crossing after the player
-    // still belongs behind them, and cannot acquire a later result after freeze.
+    // still belongs behind them, and the clock keeps running for cars still on track.
   }
+}
+
+/** Once the player is home the rivals keep driving to the line; the result does not wait for them. */
+export function isRaceSettled(race: RaceState): boolean {
+  return race.phase === 'finished' && race.racers.every(racer => racer.finishTime !== null)
 }
 
 /** Advances at most 100 ms, so returning from a background tab cannot skip a race. */
 export function stepRace(race: RaceState, dt: number): void {
   race.events = []
-  if (race.phase === 'finished' || !Number.isFinite(dt) || dt <= 0) return
+  if (isRaceSettled(race) || !Number.isFinite(dt) || dt <= 0) return
   let remaining = Math.min(.1, dt)
   if (race.phase === 'countdown') {
     const consumed = Math.min(race.countdown, remaining)
@@ -146,7 +152,7 @@ export function stepRace(race: RaceState, dt: number): void {
     race.phase = 'racing'
     race.events.push({ kind: 'go', racer: 0 })
   }
-  while (remaining > 1e-9 && race.phase === 'racing') {
+  while (remaining > 1e-9 && !isRaceSettled(race)) {
     const step = Math.min(SUBSTEP, remaining)
     advance(race, step)
     remaining -= step

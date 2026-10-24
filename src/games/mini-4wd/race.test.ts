@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { COURSES, DEFAULT_BUILD, getStats, PARTS } from './data'
-import { CHEER_COOLDOWN_SECONDS, cheerRace, COUNTDOWN_SECONDS, createRace, getRank, LANE_OFFSETS, laneAfterChanges, lanePosition, stepRace } from './race'
+import { CHEER_COOLDOWN_SECONDS, cheerRace, COUNTDOWN_SECONDS, createRace, getRank, LANE_OFFSETS, isRaceSettled, laneAfterChanges, lanePosition, stepRace } from './race'
 import type { Build, RaceEvent, RaceState } from './types'
 
 const SAFE: Build = { body: 'buggy', motor: 'torque', tires: 'sponge', rollers: 'wide', color: 'mint' }
@@ -101,11 +101,37 @@ describe('mini-4wd automatic race', () => {
     stepRace(race, 1 / 60)
     expect(race.phase).toBe('finished')
     expect(getRank(race)).toBe(2)
-    const frozen = structuredClone(race)
+    const player = structuredClone(race.racers[0])
+    for (let frame = 0; frame < 600 && !isRaceSettled(race); frame++) stepRace(race, .1)
+    expect(race.elapsed).toBe(player.finishTime)
+    expect(race.racers[0]).toEqual(player)
+    expect(getRank(race)).toBe(2)
+    const settled = structuredClone(race)
     stepRace(race, 60)
-    expect(race.elapsed).toBe(frozen.elapsed)
-    expect(race.racers).toEqual(frozen.racers)
-    expect(race.events).toEqual([])
+    expect(race).toEqual({ ...settled, events: [] })
+  })
+
+  test('rivals keep driving to the goal after the player finishes', () => {
+    const race = createRace(COURSES[0], DEFAULT_BUILD)
+    race.phase = 'racing'
+    const finishLine = race.course.length * race.lapCount
+    race.racers[0].distance = finishLine - .5
+    race.racers[0].speed = 100
+    race.racers[1].distance = finishLine - 300
+    race.racers[2].distance = finishLine - 500
+    stepRace(race, .1)
+    expect(race.phase).toBe('finished')
+    expect(isRaceSettled(race)).toBe(false)
+    const playerTime = race.racers[0].finishTime!
+    const before = race.racers[1].distance
+    stepRace(race, .1)
+    expect(race.racers[1].distance).toBeGreaterThan(before)
+    expect(race.elapsed).toBe(playerTime)
+    for (let frame = 0; frame < 600 && !isRaceSettled(race); frame++) stepRace(race, .1)
+    expect(race.racers.every(racer => racer.finishTime !== null)).toBe(true)
+    expect(race.racers[1].finishTime!).toBeGreaterThan(playerTime)
+    expect(race.racers[2].finishTime!).toBeGreaterThan(playerTime)
+    expect(getRank(race)).toBe(1)
   })
 
   test('large, negative and non-finite deltas cannot skip or corrupt a race', () => {
