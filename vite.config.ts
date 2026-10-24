@@ -210,6 +210,7 @@ export default defineConfig({
     },
     projects: [
       {
+        extends: false,
         plugins,
         test: {
           name: 'unit',
@@ -229,6 +230,7 @@ export default defineConfig({
         },
       },
       {
+        extends: false,
         plugins,
         test: {
           name: 'dom',
@@ -243,6 +245,7 @@ export default defineConfig({
         },
       },
       {
+        extends: false,
         plugins,
         test: {
           name: 'slow',
