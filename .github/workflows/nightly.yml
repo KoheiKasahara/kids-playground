@@ -75,7 +75,7 @@ jobs:
 
       - name: Cache Playwright Chromium
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -244,7 +244,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Project Health - download history
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: project-health-history
           path: ${{ runner.temp }}/project-health-history
