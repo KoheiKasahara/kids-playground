@@ -46,6 +46,8 @@ const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePla
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
+  // コース・にんずう えらびと すごろくが 同じrouteにあるため、プレイ面はゲーム内で包む。
+  { path: '/games/sugoroku', element: lazyRoute(() => import('../games/sugoroku/SugorokuPlay')) },
   // しゅるい えらび・まどり・そとがわ・かんせいが 同じrouteにあるため、プレイ面はゲーム内で包む。
   { path: '/games/house-builder', element: lazyRoute(() => import('../games/house-builder/HouseBuilderPlay')) },
   // どうぶつ・コース えらびと レースが 同じrouteにあるため、プレイ面はゲーム内で包む。
