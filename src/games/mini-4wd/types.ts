@@ -62,7 +62,10 @@ export type RaceState = {
   racers: Racer[]
   phase: 'countdown' | 'racing' | 'finished'
   countdown: number
+  /** Seconds of racing until the player crosses the line; it stops there. */
   elapsed: number
+  /** Seconds since the start, running until every car has finished. */
+  clock: number
   lapCount: number
   /** Seconds until the next cheer can boost the player again. */
   cheerCooldown: number

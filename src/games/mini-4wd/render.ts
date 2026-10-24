@@ -936,7 +936,7 @@ export function drawRace(canvas: HTMLCanvasElement, race: RaceState, options: { 
       const fraction = ((racer.distance % race.course.length) + race.course.length) % race.course.length / race.course.length
       const jump = race.course.zones.find((zone) => zone.kind === 'jump' && fraction >= zone.start && fraction <= zone.end)
       const lift = jump && !reducedMotion ? Math.sin((fraction - jump.start) / (jump.end - jump.start) * Math.PI) * 8 : 0
-      const wobble = reducedMotion ? 0 : Math.sin(race.elapsed * 29 + racer.id) * Math.min(0.14, racer.wobble * 0.08)
+      const wobble = reducedMotion ? 0 : Math.sin(race.clock * 29 + racer.id) * Math.min(0.14, racer.wobble * 0.08)
       if (racer.speed > 12 && race.phase === 'racing' && !reducedMotion) {
         for (let i = 0; i < 3; i++) {
           const trail = lanePoint(race.course, racer, racer.distance - 25 - i * 8)
@@ -964,7 +964,7 @@ export function drawRace(canvas: HTMLCanvasElement, race: RaceState, options: { 
   if (race.phase === 'finished' && !options.reducedMotion) {
     for (let index = 0; index < 55; index++) {
       const x = random(index + 501) * WIDTH
-      const y = (random(index + 1001) * HEIGHT + race.elapsed * (12 + index % 4 * 4)) % HEIGHT
+      const y = (random(index + 1001) * HEIGHT + race.clock * (12 + index % 4 * 4)) % HEIGHT
       rect(g, ['#f3cc77', '#e99175', '#b3d7c0', '#fcf0bc'][index % 4], x, y, index % 2 ? 4 : 2, index % 2 ? 2 : 5)
     }
   }
