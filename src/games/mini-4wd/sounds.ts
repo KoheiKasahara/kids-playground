@@ -1,6 +1,6 @@
 import { getSharedAudioContext, getSoundOutput, isSoundEnabled } from '../../audio/sound'
 
-export type MiniSound = 'select' | 'assemble' | 'start' | 'countdown' | 'go' | 'lap' | 'bump' | 'cheer' | 'finish'
+export type MiniSound = 'select' | 'assemble' | 'start' | 'countdown' | 'go' | 'lap' | 'lane' | 'bump' | 'cheer' | 'finish'
 type Theme = 'park' | 'forest' | 'coast' | 'night'
 type Voice = 'pulse' | 'triangle' | 'sine'
 
@@ -142,6 +142,10 @@ export function playMiniSound(kind: MiniSound): void {
       break
     case 'lap':
       notes([84, 88, 91], .065)
+      break
+    case 'lane':
+      voices.tone(64, at, .26, .09, 'triangle', 76)
+      notes([79, 83], .07, .055)
       break
     case 'bump':
       voices.percussion(at, .1, .13)

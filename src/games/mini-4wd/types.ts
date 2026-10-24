@@ -30,12 +30,16 @@ export type Course = {
   points: TrackPoint[]
   length: number
   zones: TrackZone[]
+  /** Fractions of a lap where the bridge moves every car to its next lane. */
+  laneChange: { start: number; end: number }
 }
 
 export type Racer = {
   /** Zero is the player; one and two are the rival cars. */
   id: number
   name: string
+  /** Lane at the start line; 0 is the outside lane and 2 is the inside lane. */
+  startLane: number
   build: Build
   distance: number
   speed: number
@@ -49,7 +53,7 @@ export type Racer = {
 }
 
 export type RaceEvent = {
-  kind: 'go' | 'lap' | 'bump' | 'finish'
+  kind: 'go' | 'lap' | 'lane' | 'bump' | 'finish'
   racer: number
 }
 

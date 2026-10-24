@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { COLORS, COURSES, DEFAULT_BUILD, getStats, normalizeBuild, PARTS, sampleTrack } from './data'
+import { COLORS, COURSES, DEFAULT_BUILD, getStats, normalizeBuild, PARTS, sampleTrack, trackCurvature } from './data'
 import type { PartCategory } from './types'
 
 describe('mini-4wd parts and courses', () => {
@@ -48,5 +48,22 @@ describe('mini-4wd parts and courses', () => {
       expect(zone.end).toBeLessThanOrEqual(1)
       expect(zone.end).toBeGreaterThan(zone.start)
     }
+  })
+
+  test.each(COURSES)('$id: the lane changer sits on a straight before the start, clear of every zone', course => {
+    const { start, end } = course.laneChange
+    expect(start).toBeGreaterThan(.8)
+    expect(end).toBeLessThan(1)
+    expect((end - start) * course.length).toBeGreaterThan(60)
+    for (const zone of course.zones) expect(zone.end <= start || zone.start >= end, JSON.stringify(zone)).toBe(true)
+    const from = sampleTrack(course, start * course.length)
+    const to = sampleTrack(course, end * course.length)
+    expect(Math.abs(to.angle - from.angle)).toBeLessThan(.15)
+  })
+
+  test.each(COURSES)('$id: the course turns once clockwise, so offsets toward the infield are shorter', course => {
+    let turning = 0
+    for (let distance = 0; distance < course.length; distance++) turning += trackCurvature(course, distance)
+    expect(turning).toBeCloseTo(Math.PI * 2, 1)
   })
 })

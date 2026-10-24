@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { COURSES, DEFAULT_BUILD, PARTS } from './data'
-import { CHEER_COOLDOWN_SECONDS, cheerRace, COUNTDOWN_SECONDS, createRace, getRank, stepRace } from './race'
+import { COURSES, DEFAULT_BUILD, getStats, PARTS } from './data'
+import { CHEER_COOLDOWN_SECONDS, cheerRace, COUNTDOWN_SECONDS, createRace, getRank, LANE_OFFSETS, laneAfterChanges, lanePosition, stepRace } from './race'
 import type { Build, RaceEvent, RaceState } from './types'
 
 const SAFE: Build = { body: 'buggy', motor: 'torque', tires: 'sponge', rollers: 'wide', color: 'mint' }
@@ -129,5 +129,59 @@ describe('mini-4wd automatic race', () => {
     expect(a).toEqual(b)
     expect(painted.elapsed).toBeCloseTo(a.elapsed, 7)
     expect(getRank(painted)).toBe(getRank(a))
+  })
+  test('the lane changer sends the outside car over the bridge and every car through every lane', () => {
+    expect([0, 1, 2].map(lane => laneAfterChanges(lane, 1))).toEqual([2, 0, 1])
+    const race = createRace(COURSES[0], DEFAULT_BUILD)
+    expect(race.racers.map(racer => racer.startLane).sort()).toEqual([0, 1, 2])
+    for (const racer of race.racers) {
+      expect(new Set([0, 1, 2].map(changes => laneAfterChanges(racer.startLane, changes))).size).toBe(LANE_OFFSETS.length)
+    }
+
+    const course = COURSES[0]
+    const { start, end } = course.laneChange
+    const at = (startLane: number, progress: number) => lanePosition(course, startLane, progress * course.length)
+    for (const startLane of [0, 1, 2]) {
+      expect(at(startLane, start - .001).offset).toBe(LANE_OFFSETS[startLane])
+      expect(at(startLane, start).offset).toBeCloseTo(LANE_OFFSETS[startLane])
+      expect(at(startLane, end - 1e-6).offset).toBeCloseTo(LANE_OFFSETS[laneAfterChanges(startLane, 1)])
+      expect(at(startLane, end).offset).toBe(LANE_OFFSETS[laneAfterChanges(startLane, 1)])
+      expect(at(startLane, 1 + start - .001).offset).toBe(LANE_OFFSETS[laneAfterChanges(startLane, 1)])
+      expect(at(startLane, 3).offset).toBe(LANE_OFFSETS[startLane])
+    }
+    const middle = (start + end) / 2
+    expect(at(0, middle).bridge).toBeCloseTo(1)
+    expect(at(0, middle).slope).toBeGreaterThan(0)
+    expect(at(1, middle).bridge).toBe(0)
+    expect(at(2, middle).bridge).toBe(0)
+    expect(at(0, start - .001).bridge).toBe(0)
+  })
+
+  test.each(COURSES)('$id: the inside lane is shorter, and the lane changer makes identical cars finish together', course => {
+    const race = createRace(course, DEFAULT_BUILD)
+    for (const racer of race.racers) {
+      racer.build = { ...DEFAULT_BUILD }
+      racer.stats = getStats(DEFAULT_BUILD)
+    }
+    const lanes = race.racers.map(racer => racer.startLane)
+    let laneEvents = 0
+    while (Math.max(...race.racers.map(racer => racer.distance)) < course.length * (course.laneChange.start - .02)) {
+      stepRace(race, 1 / 60)
+      laneEvents += race.events.filter(event => event.kind === 'lane').length
+    }
+    expect(laneEvents).toBe(0)
+    const byLane = (lane: number) => race.racers[lanes.indexOf(lane)].distance
+    // Before the first change, the inside car is clearly ahead and the outside car behind.
+    expect(byLane(2) - byLane(1)).toBeGreaterThan(course.length * .05)
+    expect(byLane(1) - byLane(0)).toBeGreaterThan(course.length * .05)
+
+    const events = finish(race)
+    for (const racer of race.racers) racer.finishTime ??= Infinity
+    expect(events.filter(event => event.kind === 'lane' && event.racer === 0)).toHaveLength(3)
+    const player = race.racers[0].finishTime!
+    for (const rival of race.racers.slice(1)) {
+      if (rival.finishTime === Infinity) expect(rival.distance).toBeGreaterThan(course.length * 3 - 12)
+      else expect(Math.abs(rival.finishTime! - player)).toBeLessThan(.15)
+    }
   })
 })

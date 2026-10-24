@@ -7,7 +7,7 @@ import { playMiniSound, startMiniBgm, stopMiniSounds, type MiniSound } from './s
 let ctx: FakeAudioContext
 let firstSource = 0
 const cleanups: (() => void)[] = []
-const effects: MiniSound[] = ['select', 'assemble', 'start', 'countdown', 'go', 'lap', 'bump', 'cheer', 'finish']
+const effects: MiniSound[] = ['select', 'assemble', 'start', 'countdown', 'go', 'lap', 'lane', 'bump', 'cheer', 'finish']
 
 function advance(ms: number) {
   for (let elapsed = 0; elapsed < ms; elapsed += 25) {

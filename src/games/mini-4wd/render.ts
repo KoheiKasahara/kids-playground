@@ -1,6 +1,6 @@
 import { COLORS, PARTS, sampleTrack } from './data'
-import { CHEER_BOOST_SECONDS } from './race'
-import type { Build, Course, PartCategory, RaceState } from './types'
+import { CHEER_BOOST_SECONDS, LANE_GAP, LANE_OFFSETS, lanePosition } from './race'
+import type { Build, Course, PartCategory, RaceState, Racer } from './types'
 
 type Context = CanvasRenderingContext2D
 type Palette = { ground: string; light: string; dark: string; leaf: string; leafLight: string; trunk: string; edge: string }
@@ -8,7 +8,11 @@ type Palette = { ground: string; light: string; dark: string; leaf: string; leaf
 const WIDTH = 720
 const HEIGHT = 440
 const INK = '#263848'
-const LANES = [-30, 0, 30]
+const LANES = LANE_OFFSETS
+/** Sideways distance from the centreline to the outer guard walls. */
+const EDGE = LANE_GAP * 1.5
+/** How high the lane-change bridge carries a car over the other lanes. */
+const BRIDGE_HEIGHT = 15
 const THEMES: Record<Course['theme'], Palette> = {
   park: { ground: '#abc99a', light: '#b8d5a6', dark: '#95b786', leaf: '#4d8b65', leafLight: '#81b16b', trunk: '#92744f', edge: '#d7e8b5' },
   forest: { ground: '#809f80', light: '#8dab8a', dark: '#6d8e75', leaf: '#33685b', leafLight: '#63906a', trunk: '#8b7052', edge: '#b9ceaa' },
@@ -17,6 +21,7 @@ const THEMES: Record<Course['theme'], Palette> = {
 }
 
 const scenes = new WeakMap<Course, HTMLCanvasElement>()
+const bridges = new WeakMap<Course, HTMLCanvasElement>()
 const sprites = new Map<string, HTMLCanvasElement[]>()
 type MonitorBox = { x: number; y: number; width: number; height: number }
 const monitorBoxes = new WeakMap<Course, MonitorBox>()
@@ -548,7 +553,7 @@ function monitorBox(course: Course): MonitorBox {
       let fits = true
       // Check the whole footprint; different courses leave very different infields.
       for (let col = 0; col <= 6 && fits; col++) for (let row = 0; row <= 4 && fits; row++) {
-        if (trackDistance(course, x + width * col / 6, y + height * row / 4) < 57) fits = false
+        if (trackDistance(course, x + width * col / 6, y + height * row / 4) < EDGE + 12) fits = false
       }
       if (fits) {
         const result = { x, y, width, height }
@@ -584,21 +589,87 @@ function liveMonitor(g: Context, race: RaceState, reducedMotion: boolean) {
   for (const [xx, yy] of [[x + 2, y + 7], [x + width - 4, y + 7], [x + 2, y + height - 5]]) screw(g, xx, yy, 1)
 }
 
-function trackPath(g: Context, course: Course, lane: number, color: string, width: number, shiftY = 0) {
+type Along = number | ((distance: number) => number)
+
+/** Strokes a whole lap at a sideways offset, or only the stretch between two distances along it. */
+function trackPath(g: Context, course: Course, lane: Along, color: string, width: number, shiftY: Along = 0, from = 0, to = course.length) {
+  const whole = to - from >= course.length
+  const steps = Math.max(2, Math.ceil(300 * (to - from) / course.length))
   g.beginPath()
-  for (let index = 0; index <= 300; index++) {
-    const point = sampleTrack(course, course.length * index / 300)
-    const x = Math.round(point.x - Math.sin(point.angle) * lane)
-    const y = Math.round(point.y + Math.cos(point.angle) * lane + shiftY)
+  let lastX = 0, lastY = 0
+  for (let index = 0; index <= steps; index++) {
+    const distance = from + (to - from) * index / steps
+    const point = sampleTrack(course, distance)
+    const offset = typeof lane === 'number' ? lane : lane(distance)
+    const x = Math.round(point.x - Math.sin(point.angle) * offset)
+    const y = Math.round(point.y + Math.cos(point.angle) * offset + (typeof shiftY === 'number' ? shiftY : shiftY(distance)))
+    // Beside a tight bend an offset line can run backwards and knot itself; wait until it moves forward again.
+    if (index > 0 && index < steps && (x - lastX) * Math.cos(point.angle) + (y - lastY) * Math.sin(point.angle) <= 0) continue
     if (index === 0) g.moveTo(x, y)
     else g.lineTo(x, y)
+    lastX = x
+    lastY = y
   }
-  g.closePath()
+  if (whole) g.closePath()
   g.strokeStyle = color
   g.lineWidth = width
   g.lineJoin = 'round'
-  g.lineCap = 'round'
+  g.lineCap = whole ? 'round' : 'butt'
   g.stroke()
+}
+
+/** Distances along the lap where the lane changer starts and ends, and its eased progress between them. */
+function laneChanger(course: Course) {
+  const from = course.laneChange.start * course.length
+  const to = course.laneChange.end * course.length
+  const ease = (distance: number) => {
+    const t = Math.max(0, Math.min(1, (distance - from) / (to - from)))
+    return { t, eased: t * t * (3 - 2 * t) }
+  }
+  return { from, to, ease }
+}
+
+/**
+ * The raised crossover of a real three-lane circuit: the outside lane climbs over the
+ * others and lands on the inside. It is drawn above the cars passing underneath.
+ */
+function bridgeLayer(course: Course) {
+  const cached = bridges.get(course)
+  if (cached) return cached
+  const canvas = document.createElement('canvas')
+  canvas.width = WIDTH
+  canvas.height = HEIGHT
+  const g = canvas.getContext('2d')
+  if (!g) return canvas
+  const night = course.theme === 'night'
+  const { from, to, ease } = laneChanger(course)
+  const deck = (side: number) => (distance: number) => LANES[0] + (LANES[2] - LANES[0]) * ease(distance).eased + side
+  const height = (extra: number) => (distance: number) => -Math.sin(ease(distance).t * Math.PI) * BRIDGE_HEIGHT + extra
+  // Pillars hold the deck up where it passes over the lower lanes.
+  for (const t of [.3, .5, .7]) {
+    const distance = from + (to - from) * t
+    const point = sampleTrack(course, distance)
+    const offset = deck(0)(distance)
+    const x = point.x - Math.sin(point.angle) * offset
+    const y = point.y + Math.cos(point.angle) * offset
+    const top = height(0)(distance)
+    rect(g, '#2b3f4a', x - 4, y + top, 8, -top + 2)
+    rect(g, night ? '#7b8fa3' : '#9cb2b0', x - 3, y + top, 3, -top)
+  }
+  for (let shift = 6; shift > 0; shift--) trackPath(g, course, deck(0), shift > 3 ? '#2c3f4b' : '#36505c', LANE_GAP + 8, height(shift), from, to)
+  trackPath(g, course, deck(0), '#3b515b', LANE_GAP + 8, height(0), from, to)
+  trackPath(g, course, deck(0), night ? '#6c7ba1' : '#a5c5cf', LANE_GAP - 3, height(0), from, to)
+  for (const side of [-LANE_GAP / 2, LANE_GAP / 2]) {
+    for (let shift = 0; shift < 4; shift++) trackPath(g, course, deck(side), shift ? '#3f5864' : '#2f4550', 5, height(-shift), from, to)
+    trackPath(g, course, deck(side), night ? '#adc6c3' : '#fff1cf', 3, height(-5), from, to)
+    // Red and white guard stripes, like the bridge on a real lane changer.
+    const stripes = Math.ceil((to - from) / 9)
+    for (let stripe = 0; stripe < stripes; stripe += 2) {
+      trackPath(g, course, deck(side), '#e5574f', 3, height(-5), from + (to - from) * stripe / stripes, from + (to - from) * (stripe + 1) / stripes)
+    }
+  }
+  bridges.set(course, canvas)
+  return canvas
 }
 
 function checkeredFlag(g: Context, x: number, y: number, scale = 1) {
@@ -608,7 +679,7 @@ function checkeredFlag(g: Context, x: number, y: number, scale = 1) {
 }
 
 function podium(g: Context, course: Course) {
-  if (trackDistance(course, 360, 225) <= 70) return
+  if (trackDistance(course, 360, 225) <= EDGE + 25) return
   oval(g, THEMES[course.theme].dark, 298, 227, 124, 26)
   rect(g, '#6f8e83', 316, 215, 88, 25)
   rect(g, '#e6dfb4', 315, 210, 90, 22)
@@ -664,7 +735,7 @@ function scene(course: Course) {
     }
     for (let i = 0; i < 35; i++) {
       const x = random(i + 50) * WIDTH, y = random(i + 300) * HEIGHT
-      if (trackDistance(course, x, y) > 67) {
+      if (trackDistance(course, x, y) > EDGE + 22) {
         rect(g, i % 3 ? '#779795' : '#c6d7ad', x, y, 2, 2)
         if (i % 4 === 0) rect(g, '#627c80', x - 2, y + 1, 6, 1)
       }
@@ -673,7 +744,7 @@ function scene(course: Course) {
   // Small diorama trees keep away from every track route, including different hairpins.
   for (let index = 0; index < 36; index++) {
     const x = 22 + random(index + 700) * 676, y = 48 + random(index + 1500) * 370
-    if (trackDistance(course, x, y - 18) > 82 && !(x > 245 && x < 475 && y > 175 && y < 270)) {
+    if (trackDistance(course, x, y - 18) > EDGE + 37 && !(x > 245 && x < 475 && y > 175 && y < 270)) {
       tree(g, x, y, 0.55 + random(index + 66) * 0.35, palette, course.theme === 'forest')
     }
   }
@@ -683,7 +754,7 @@ function scene(course: Course) {
   }
   for (let index = 0; index < 45; index++) {
     const x = 35 + random(index + 2600) * 650, y = 35 + random(index + 3600) * 350
-    if (trackDistance(course, x, y) > 66 && !(x > 288 && x < 432 && y > 157 && y < 248)) flowerbed(g, x, y, palette, night)
+    if (trackDistance(course, x, y) > EDGE + 21 && !(x > 288 && x < 432 && y > 157 && y < 248)) flowerbed(g, x, y, palette, night)
   }
   fence(g, 24, 412, 172, night)
   fence(g, 524, 412, 172, night)
@@ -697,35 +768,44 @@ function scene(course: Course) {
   checkeredFlag(g, 687, 366)
 
   // Plastic rails: a raised shadow, graphite backing, colored lanes, polished lips.
-  trackPath(g, course, 0, night ? '#1e2c40' : '#688977', 107, 10)
+  trackPath(g, course, 0, night ? '#1e2c40' : '#688977', EDGE * 2 + 17, 10)
   // The raised plastic track has a visible side wall below its running surface.
-  for (let shift = 7; shift > 0; shift--) trackPath(g, course, 0, shift > 3 ? '#2c3f4b' : '#36505c', 101, shift)
-  trackPath(g, course, 0, '#3b515b', 101)
-  trackPath(g, course, 0, '#f6e7c5', 96)
-  trackPath(g, course, 0, '#859b9c', 90)
+  for (let shift = 7; shift > 0; shift--) trackPath(g, course, 0, shift > 3 ? '#2c3f4b' : '#36505c', EDGE * 2 + 11, shift)
+  trackPath(g, course, 0, '#3b515b', EDGE * 2 + 11)
+  trackPath(g, course, 0, '#f6e7c5', EDGE * 2 + 6)
+  trackPath(g, course, 0, '#859b9c', EDGE * 2)
   const surfaces = night ? ['#6c7ba1', '#9f8a9d', '#6c999a'] : ['#a5c5cf', '#e8c4a9', '#a9cabe']
-  LANES.forEach((lane, index) => trackPath(g, course, lane, surfaces[index], 27))
+  const changer = laneChanger(course)
+  LANES.forEach((lane, index) => trackPath(g, course, lane, surfaces[index], LANE_GAP - 3))
+  // Under the bridge the middle and inside lanes bend outward, making room for the car landing inside.
+  const stepOut = (lane: number) => (distance: number) => lane - LANE_GAP * changer.ease(distance).eased
+  trackPath(g, course, 0, '#859b9c', EDGE * 2, 0, changer.from, changer.to)
+  trackPath(g, course, stepOut(LANES[1]), surfaces[1], LANE_GAP - 3, 0, changer.from, changer.to)
+  trackPath(g, course, stepOut(LANES[2]), surfaces[2], LANE_GAP - 3, 0, changer.from, changer.to)
   // Molded sectional joints every few centimetres of the miniature circuit.
   for (let distance = 0; distance < course.length; distance += 41) {
     const point = sampleTrack(course, distance)
     g.save()
     g.translate(Math.round(point.x), Math.round(point.y))
     g.rotate(point.angle)
-    rect(g, night ? '#a0abb1' : '#e7e4ce', -1, -44, 1, 88)
-    rect(g, night ? '#526779' : '#8ba3a4', 0, -44, 1, 88)
+    rect(g, night ? '#a0abb1' : '#e7e4ce', -1, 1 - EDGE, 1, EDGE * 2 - 2)
+    rect(g, night ? '#526779' : '#8ba3a4', 0, 1 - EDGE, 1, EDGE * 2 - 2)
     for (const lane of LANES) {
       rect(g, '#6c888c', 1, lane - 8, 2, 2)
       rect(g, '#e5e5c9', 1, lane + 7, 2, 2)
     }
     g.restore()
   }
-  for (const lane of [-45, -15, 15, 45]) {
-    // Outer guard walls stand taller than the lane dividers.
-    const wall = Math.abs(lane) > 30 ? 5 : 2
-    for (let shift = 0; shift < wall; shift++) trackPath(g, course, lane, shift ? '#3f5864' : '#2f4550', 5, -shift)
-    trackPath(g, course, lane, night ? '#adc6c3' : '#fff1cf', 3, -wall - 1)
-    trackPath(g, course, lane + 1.5, night ? '#738ba0' : '#ccd9c7', 1, -wall)
+  const wall = (lane: Along, height: number, from = 0, to = course.length) => {
+    const lip = typeof lane === 'number' ? lane + 1.5 : (distance: number) => lane(distance) + 1.5
+    for (let shift = 0; shift < height; shift++) trackPath(g, course, lane, shift ? '#3f5864' : '#2f4550', 5, -shift, from, to)
+    trackPath(g, course, lane, night ? '#adc6c3' : '#fff1cf', 3, -height - 1, from, to)
+    trackPath(g, course, lip, night ? '#738ba0' : '#ccd9c7', 1, -height, from, to)
   }
+  // Outer guard walls stand taller than the lane dividers.
+  for (const lane of [-EDGE, EDGE]) wall(lane, 5)
+  for (const lane of [-LANE_GAP / 2, LANE_GAP / 2]) wall(lane, 2, changer.to, changer.from + course.length)
+  for (const lane of [-LANE_GAP / 2, LANE_GAP / 2, EDGE]) wall(stepOut(lane), 2, changer.from, changer.to)
   for (const zone of course.zones) {
     if (zone.kind === 'curve') continue
     if (zone.kind === 'wave') {
@@ -763,7 +843,7 @@ function scene(course: Course) {
   g.save()
   g.translate(Math.round(start.x), Math.round(start.y))
   g.rotate(start.angle)
-  for (let y = -43; y < 44; y += 6) for (let x = -6; x < 7; x += 6) rect(g, ((y + 43) / 6 + (x + 6) / 6) % 2 ? '#fbefd0' : '#344b57', x, y, 6, 6)
+  for (let y = 2 - EDGE; y < EDGE - 1; y += 6) for (let x = -6; x < 7; x += 6) rect(g, ((y + EDGE - 2) / 6 + (x + 6) / 6) % 2 ? '#fbefd0' : '#344b57', x, y, 6, 6)
   for (const lane of LANES) {
     polygon(g, '#fdf1cd', [23, lane - 5, 31, lane, 23, lane + 5, 25, lane, 23, lane - 5])
     rect(g, '#597b85', -37, lane - 10, 1, 20)
@@ -772,10 +852,10 @@ function scene(course: Course) {
   }
   g.restore()
 
-  rect(g, night ? '#283c51' : '#315f63', 260, 393, 200, 34)
-  rect(g, '#e9d6a0', 263, 396, 194, 2)
-  text(g, 'MINI 4WD GRAND PRIX', 360, 408, 11, '#fff0c5', 'center')
-  text(g, '01  /  02  /  03', 360, 420, 7, '#b3d1c1', 'center')
+  rect(g, night ? '#283c51' : '#315f63', 260, 401, 200, 34)
+  rect(g, '#e9d6a0', 263, 404, 194, 2)
+  text(g, 'MINI 4WD GRAND PRIX', 360, 416, 11, '#fff0c5', 'center')
+  text(g, '01  /  02  /  03', 360, 428, 7, '#b3d1c1', 'center')
   if (night) for (const x of [22, 697]) {
     rect(g, '#b8b9a0', x, 109, 3, 48)
     rect(g, '#1e3044', x - 9, 103, 21, 10)
@@ -791,23 +871,34 @@ export function drawCoursePreview(canvas: HTMLCanvasElement, course: Course) {
   const g = setup(canvas, WIDTH, HEIGHT)
   if (!g) return
   g.drawImage(scene(course), 0, 0)
+  g.drawImage(bridgeLayer(course), 0, 0)
   podium(g, course)
 }
 
+/** Screen position of a car's lane at a distance, including the climb over the lane-change bridge. */
+function lanePoint(course: Course, racer: Racer, distance: number, side = 0) {
+  const point = sampleTrack(course, distance)
+  const { offset, bridge, slope } = lanePosition(course, racer.startLane, distance)
+  return {
+    x: point.x - Math.sin(point.angle) * (offset + side),
+    y: point.y + Math.cos(point.angle) * (offset + side) - bridge * BRIDGE_HEIGHT,
+    angle: point.angle + Math.atan(slope),
+    bridge,
+  }
+}
+
 /** Cheer power: a long flame trail and speed lines behind the boosted car. */
-function boostBehind(g: Context, race: RaceState, distance: number, lane: number, boost: number, reducedMotion: boolean) {
+function boostBehind(g: Context, race: RaceState, racer: Racer, reducedMotion: boolean) {
   const flicker = reducedMotion ? 0 : race.elapsed * 30
-  const strength = Math.min(1, boost / .4)
+  const strength = Math.min(1, racer.boost / .4)
   for (let i = 0; i < 10; i++) {
-    const trail = sampleTrack(race.course, distance - 22 - i * 6)
+    const trail = lanePoint(race.course, racer, racer.distance - 22 - i * 6)
     const size = Math.max(2, Math.round((9 - i * .7) * strength + Math.sin(flicker + i) * 1.5))
-    const px = trail.x - Math.sin(trail.angle) * lane
-    const py = trail.y + Math.cos(trail.angle) * lane
-    rect(g, ['#fff5c2', '#ffd56b', '#f59a4a', '#e8644e'][Math.min(3, Math.floor(i / 2.5))], px - size / 2, py - size / 2, size, size)
+    rect(g, ['#fff5c2', '#ffd56b', '#f59a4a', '#e8644e'][Math.min(3, Math.floor(i / 2.5))], trail.x - size / 2, trail.y - size / 2, size, size)
   }
   for (const side of [-13, 13]) for (let i = 0; i < 3; i++) {
-    const trail = sampleTrack(race.course, distance - 30 - i * 14 - (flicker % 14))
-    rect(g, '#fffbe6', trail.x - Math.sin(trail.angle) * (lane + side), trail.y + Math.cos(trail.angle) * (lane + side), 6, 2)
+    const trail = lanePoint(race.course, racer, racer.distance - 30 - i * 14 - (flicker % 14), side)
+    rect(g, '#fffbe6', trail.x, trail.y, 6, 2)
   }
 }
 
@@ -834,34 +925,41 @@ export function drawRace(canvas: HTMLCanvasElement, race: RaceState, options: { 
   if (!g) return
   g.drawImage(scene(race.course), 0, 0)
   liveMonitor(g, race, options.reducedMotion ?? false)
-  for (const racer of [...race.racers].sort((a, b) => Number(a.id === 0) - Number(b.id === 0))) {
-    const point = sampleTrack(race.course, racer.distance)
-    const lane = racer.id === 0 ? 0 : racer.id === 1 ? -30 : 30
-    const x = point.x - Math.sin(point.angle) * lane
-    const y = point.y + Math.cos(point.angle) * lane
-    const fraction = ((racer.distance % race.course.length) + race.course.length) % race.course.length / race.course.length
-    const jump = race.course.zones.find((zone) => zone.kind === 'jump' && fraction >= zone.start && fraction <= zone.end)
-    const lift = jump && !options.reducedMotion ? Math.sin((fraction - jump.start) / (jump.end - jump.start) * Math.PI) * 8 : 0
-    const wobble = options.reducedMotion ? 0 : Math.sin(race.elapsed * 29 + racer.id) * Math.min(0.14, racer.wobble * 0.08)
-    if (racer.speed > 12 && race.phase === 'racing' && !options.reducedMotion) {
-      for (let i = 0; i < 3; i++) {
-        const trail = sampleTrack(race.course, racer.distance - 25 - i * 8)
-        rect(g, i % 2 ? '#fff0c1' : '#dce4cb', trail.x - Math.sin(trail.angle) * lane, trail.y + Math.cos(trail.angle) * lane, 3 - Math.floor(i / 2), 2)
+  const reducedMotion = options.reducedMotion ?? false
+  const placed = race.racers.map(racer => ({ racer, ...lanePoint(race.course, racer, racer.distance) }))
+  // Cars under the bridge go first, then the bridge, then the car crossing over it; the player stays on top of its group.
+  const order = (on: boolean) => placed.filter(item => (item.bridge > 0) === on).sort((a, b) => Number(a.racer.id === 0) - Number(b.racer.id === 0))
+  let marker: { x: number; y: number; boosted: boolean; boost: number } | null = null
+  for (const [index, group] of [order(false), order(true)].entries()) {
+    if (index === 1) g.drawImage(bridgeLayer(race.course), 0, 0)
+    for (const { racer, x, y, angle } of group) {
+      const fraction = ((racer.distance % race.course.length) + race.course.length) % race.course.length / race.course.length
+      const jump = race.course.zones.find((zone) => zone.kind === 'jump' && fraction >= zone.start && fraction <= zone.end)
+      const lift = jump && !reducedMotion ? Math.sin((fraction - jump.start) / (jump.end - jump.start) * Math.PI) * 8 : 0
+      const wobble = reducedMotion ? 0 : Math.sin(race.elapsed * 29 + racer.id) * Math.min(0.14, racer.wobble * 0.08)
+      if (racer.speed > 12 && race.phase === 'racing' && !reducedMotion) {
+        for (let i = 0; i < 3; i++) {
+          const trail = lanePoint(race.course, racer, racer.distance - 25 - i * 8)
+          rect(g, i % 2 ? '#fff0c1' : '#dce4cb', trail.x, trail.y, 3 - Math.floor(i / 2), 2)
+        }
       }
+      const boosted = racer.boost > 0 && race.phase === 'racing'
+      if (boosted) boostBehind(g, race, racer, reducedMotion)
+      car(g, racer.build, x, y, { scale: .7, angle: angle + Math.PI / 2 + wobble, height: .42, lift })
+      if (racer.id === 0) marker = { x, y: y - lift, boosted, boost: racer.boost }
     }
-    const boosted = racer.boost > 0 && race.phase === 'racing'
-    if (boosted) boostBehind(g, race, racer.distance, lane, racer.boost, options.reducedMotion ?? false)
-    car(g, racer.build, x, y, { scale: .7, angle: point.angle + Math.PI / 2 + wobble, height: .42, lift })
-    if (racer.id === 0) {
-      const markerY = y - lift - 40
-      const marker = boosted ? '#ffb35c' : '#ffedab'
-      rect(g, '#263d4b', x - 23, markerY - 10, 46, 16)
-      rect(g, marker, x - 21, markerY - 9, 42, 13)
-      text(g, '★', x, markerY - 2, 14, '#283f4c', 'center')
-      polygon(g, '#263d4b', [x - 6, markerY + 5, x + 6, markerY + 5, x, markerY + 13])
-      polygon(g, marker, [x - 4, markerY + 5, x + 4, markerY + 5, x, markerY + 10])
-      if (boosted) boostAround(g, race, x, y - lift, racer.boost, options.reducedMotion ?? false)
-    }
+  }
+  if (marker) {
+    // The ★ stays visible even while the player's car passes under the bridge.
+    const { x, y, boosted, boost } = marker
+    const markerY = y - 40
+    const color = boosted ? '#ffb35c' : '#ffedab'
+    rect(g, '#263d4b', x - 23, markerY - 10, 46, 16)
+    rect(g, color, x - 21, markerY - 9, 42, 13)
+    text(g, '★', x, markerY - 2, 14, '#283f4c', 'center')
+    polygon(g, '#263d4b', [x - 6, markerY + 5, x + 6, markerY + 5, x, markerY + 13])
+    polygon(g, color, [x - 4, markerY + 5, x + 4, markerY + 5, x, markerY + 10])
+    if (boosted) boostAround(g, race, x, y, boost, reducedMotion)
   }
   if (race.phase === 'finished' && !options.reducedMotion) {
     for (let index = 0; index < 55; index++) {

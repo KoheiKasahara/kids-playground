@@ -1,4 +1,4 @@
-import { DEFAULT_BUILD, getStats, normalizeBuild } from './data'
+import { DEFAULT_BUILD, getStats, normalizeBuild, trackCurvature } from './data'
 import type { Build, Course, Racer, RaceState, TrackZone } from './types'
 
 export type { RaceEvent, Racer, RaceState } from './types'
@@ -9,6 +9,50 @@ export const CHEER_BOOST_SECONDS = 1.5
 export const CHEER_COOLDOWN_SECONDS = 2.5
 const CHEER_SPEEDUP = 1.22
 const SUBSTEP = 1 / 120
+/** Distance between lane centres, wide enough for a car with room on both sides. */
+export const LANE_GAP = 36
+/** Lane centres from the outside in. Every course runs clockwise, so positive offsets face the infield. */
+export const LANE_OFFSETS = [-LANE_GAP, 0, LANE_GAP]
+const START_LANES = [1, 0, 2]
+
+/**
+ * Like a real circuit's lane changer, the outside lane crosses the bridge to the inside
+ * while the other two step outward. Three laps give every car one lap in every lane.
+ */
+export function laneAfterChanges(startLane: number, changes: number): number {
+  return (startLane + changes * 2) % LANE_OFFSETS.length
+}
+
+const smooth = (t: number) => t * t * (3 - 2 * t)
+
+/**
+ * Where a car runs across the track. `bridge` rises from 0 to 1 and back while the car
+ * is crossing over the other lanes; `slope` is the sideways offset per pixel travelled.
+ */
+export function lanePosition(course: Course, startLane: number, distance: number) {
+  const lap = Math.floor((distance + 1e-7) / course.length)
+  const progress = Math.max(0, distance / course.length - lap)
+  const { start, end } = course.laneChange
+  if (progress < start || progress >= end) {
+    const lane = laneAfterChanges(startLane, lap + (progress >= end ? 1 : 0))
+    return { offset: LANE_OFFSETS[lane], bridge: 0, slope: 0 }
+  }
+  const from = laneAfterChanges(startLane, lap)
+  const to = laneAfterChanges(startLane, lap + 1)
+  const t = (progress - start) / (end - start)
+  const shift = LANE_OFFSETS[to] - LANE_OFFSETS[from]
+  return {
+    offset: LANE_OFFSETS[from] + shift * smooth(t),
+    bridge: from === 0 ? Math.sin(t * Math.PI) : 0,
+    slope: shift * 6 * t * (1 - t) / ((end - start) * course.length),
+  }
+}
+
+/** Centreline progress per pixel driven: inside lanes are shorter through a bend, outside lanes longer. */
+function laneScale(course: Course, startLane: number, distance: number): number {
+  const { offset } = lanePosition(course, startLane, distance)
+  return 1 / Math.max(.35, 1 - trackCurvature(course, distance) * offset)
+}
 
 export function createRace(course: Course, build: Build): RaceState {
   const builds = [
@@ -19,7 +63,7 @@ export function createRace(course: Course, build: Build): RaceState {
   return {
     course, phase: 'countdown', countdown: COUNTDOWN_SECONDS, elapsed: 0, lapCount: LAP_COUNT, cheerCooldown: 0, events: [],
     racers: builds.map((car, id) => ({
-      id, name: ['きみのマシン', 'アオくん', 'キイちゃん'][id], build: car, stats: getStats(car),
+      id, name: ['きみのマシン', 'アオくん', 'キイちゃん'][id], startLane: START_LANES[id], build: car, stats: getStats(car),
       distance: 0, speed: 0, finishTime: null, wobble: 0, recovery: 0, boost: 0, zoneKey: null,
     })),
   }
@@ -64,11 +108,15 @@ function advance(race: RaceState, dt: number) {
     racer.wobble = Math.max(0, racer.wobble - dt * 1.6)
     // Smooth acceleration, with enough traction to always recover and finish.
     racer.speed += (target - racer.speed) * Math.min(1, dt * 4)
-    racer.distance = Math.min(totalDistance, previousDistance + racer.speed * dt)
+    const rate = racer.speed * laneScale(race.course, racer.startLane, previousDistance)
+    racer.distance = Math.min(totalDistance, previousDistance + rate * dt)
     const nextLap = Math.floor((racer.distance + 1e-7) / race.course.length)
     if (nextLap > lap && nextLap < race.lapCount) race.events.push({ kind: 'lap', racer: racer.id })
+    const { laneChange } = race.course
+    const nextProgress = racer.distance / race.course.length - lap
+    if (progress < laneChange.start && nextProgress >= laneChange.start) race.events.push({ kind: 'lane', racer: racer.id })
     if (racer.distance >= totalDistance) {
-      racer.finishTime = previousElapsed + (totalDistance - previousDistance) / racer.speed
+      racer.finishTime = previousElapsed + (totalDistance - previousDistance) / rate
       racer.speed = 0
       racer.wobble = 0
       racer.boost = 0
