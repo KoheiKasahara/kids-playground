@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { addRoom, createDesign, type HouseDesign } from '../plan'
 import { createHouseScene } from './houseScene'
 
-const mock = vi.hoisted(() => ({ render: vi.fn(), dispose: vi.fn(), disconnect: vi.fn(), fail: false }))
+const mock = vi.hoisted(() => ({ render: vi.fn(), dispose: vi.fn(), disconnect: vi.fn(), fail: false, resize: null as (() => void) | null }))
 
 vi.mock('three', async (importOriginal) => {
   const real = await importOriginal<typeof import('three')>()
@@ -30,10 +30,15 @@ let serial = 0
 beforeEach(() => {
   vi.clearAllMocks()
   mock.fail = false
+  mock.resize = null
   frames = new Map()
   vi.stubGlobal('requestAnimationFrame', vi.fn((fn: FrameRequestCallback) => { frames.set(++serial, fn); return serial }))
   vi.stubGlobal('cancelAnimationFrame', vi.fn((id: number) => frames.delete(id)))
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect = mock.disconnect })
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: () => void) { mock.resize = callback }
+    observe() {}
+    disconnect = mock.disconnect
+  })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 })
 
@@ -56,10 +61,14 @@ function flush(time: number) {
 function setup(design: HouseDesign, view: Parameters<typeof createHouseScene>[2] = { kind: 'outside' }) {
   const host = document.createElement('div')
   document.body.append(host)
-  Object.defineProperties(host, { clientWidth: { value: 400 }, clientHeight: { value: 500 } })
+  const dimensions = { width: 400, height: 500 }
+  Object.defineProperties(host, { clientWidth: { get: () => dimensions.width }, clientHeight: { get: () => dimensions.height } })
   host.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 500, x: 0, y: 0, right: 400, bottom: 500, toJSON() {} })
   const callbacks = { status: vi.fn(), spot: vi.fn() }
-  return { host, callbacks, scene: createHouseScene(host, design, view, callbacks) }
+  return {
+    host, callbacks, scene: createHouseScene(host, design, view, callbacks),
+    resize: (width: number, height: number) => { Object.assign(dimensions, { width, height }); mock.resize!() },
+  }
 }
 
 function pointer(host: HTMLElement, type: string, x: number, y: number, id = 1) {
@@ -210,4 +219,73 @@ test('へやに きりかえると まえの いえを すて、カメラに ち
   scene.show(design, { kind: 'room', roomId: entrance.id })
   expect(geo.mock.calls.length).toBe(count)
   scene.dispose()
+})
+
+test('ひろい にわを みせたまま まわせて、ズームと がめんの たてよこ きりかえが きく', () => {
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+  const base = createDesign('hiraya', 'narrow')
+  const design: HouseDesign = { ...base, exterior: { ...base.exterior, roof: 'shed', pool: 'rectangle', garden: 'orchard', parking: 'two', extras: ['picnic', 'fountain'] } }
+  const active = setup(design)
+  const projected = (name: string) => {
+    lastScene().updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(lastScene().getObjectByName(name)!)
+    const points: THREE.Vector3[] = []
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) points.push(new THREE.Vector3(x, y, z).project(lastCamera()))
+    return points
+  }
+  const expectVisible = () => {
+    for (const name of ['house', 'roof-main', 'pool-rectangle', 'orchard', 'picnic', 'fountain', 'car-1', 'car-2']) {
+      expect(projected(name).every((point) => Math.abs(point.x) < 1 && Math.abs(point.y) < 1 && point.z > -1 && point.z < 1), name).toBe(true)
+    }
+  }
+  const poolWidth = () => {
+    const points = projected('pool-rectangle')
+    return Math.max(...points.map((point) => point.x)) - Math.min(...points.map((point) => point.x))
+  }
+  flush(performance.now())
+  expectVisible()
+  const initialWidth = poolWidth()
+  active.scene.zoom(1)
+  flush(performance.now())
+  expect(poolWidth()).toBeGreaterThan(initialWidth)
+  active.scene.zoom(-1)
+  flush(performance.now())
+  expect(poolWidth()).toBeCloseTo(initialWidth)
+  const beforeTurn = lastCamera().position.clone()
+  active.scene.turn(3)
+  flush(performance.now())
+  expect(lastCamera().position.distanceTo(beforeTurn)).toBeGreaterThan(1)
+  expectVisible()
+  active.resize(700, 400)
+  flush(performance.now())
+  expect(lastCamera().aspect).toBe(1.75)
+  expectVisible()
+  active.resize(280, 600)
+  flush(performance.now())
+  expect(lastCamera().aspect).toBeCloseTo(280 / 600)
+  expectVisible()
+  active.scene.dispose()
+})
+
+test('そとで ズームして まわしても、へやに はいると いつもの みえかたに もどる', () => {
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+  const { design, living } = designWithRooms()
+  const direct = setup(design, { kind: 'room', roomId: living.id })
+  flush(performance.now())
+  const expectedPosition = lastCamera().position.clone()
+  const expectedRotation = lastCamera().quaternion.clone()
+  direct.scene.dispose()
+
+  const withYard = { ...design, exterior: { ...design.exterior, pool: 'rectangle' as const, extras: ['picnic', 'fountain'] as const } }
+  const active = setup(withYard)
+  active.scene.zoom(1)
+  active.scene.turn(4)
+  flush(performance.now())
+  active.scene.show(withYard, { kind: 'room', roomId: living.id })
+  flush(performance.now())
+  expect(lastCamera().position.distanceTo(expectedPosition)).toBeLessThan(1e-6)
+  expect(lastCamera().quaternion.angleTo(expectedRotation)).toBeLessThan(1e-6)
+  expect(lastScene().getObjectByName('house-outside')).toBeUndefined()
+  expect(lastScene().getObjectByName(`room-${living.id}`)).toBeDefined()
+  active.scene.dispose()
 })

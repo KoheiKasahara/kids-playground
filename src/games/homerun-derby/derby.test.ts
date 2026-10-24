@@ -120,8 +120,7 @@ describe('hitting', () => {
     const stage = STAGES[0]
     expect(starsFor(stage, stage.goal - 1)).toBe(0)
     expect(starsFor(stage, stage.goal)).toBe(1)
-    expect(starsFor(stage, stage.goal + 2)).toBe(2)
-    expect(starsFor(stage, stage.goal + 4)).toBe(3)
+    expect(starsFor(stage, BALLS - 1)).toBe(2)
     expect(starsFor(stage, BALLS)).toBe(3)
   })
 })

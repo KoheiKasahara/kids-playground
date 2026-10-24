@@ -15,6 +15,7 @@ import {
   type BeetleGroup, type Species,
 } from './species'
 import { setSpriteBudget } from './sprite'
+import { moveRepertoire, techniqueFor, type Technique } from './techniques'
 import { resultText, STAGES, stageById, type Stage } from './stages'
 import * as sound from './sounds'
 import styles from './KabukuwaBattlePlay.module.css'
@@ -90,6 +91,15 @@ const Dex = forwardRef<HTMLElement, { sp: Species }>(function Dex({ sp }, ref) {
         <div><dt>からだの ながさ（オス）</dt><dd>{sp.lengthMm[0]}〜{sp.lengthMm[1]}mm</dd></div>
         <div><dt>とくいわざ</dt><dd>{sp.move.name}</dd></div>
       </dl>
+      <ul className={styles.moveList} aria-label="つかえる わざ">
+        {moveRepertoire(sp).map(move => {
+          const technique = techniqueFor(sp, move)
+          return <li key={move}>
+            <strong>{technique.name}</strong>
+            <span>{technique.description}</span>
+          </li>
+        })}
+      </ul>
       <StatBars sp={sp} />
       <p className={styles.dexFact}>{sp.fact}</p>
     </div>
@@ -343,6 +353,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
   const [showResult, setShowResult] = useState(false)
   const [pops, setPops] = useState<Pop[]>([])
   const [cutIn, setCutIn] = useState<{ side: 0 | 1; kind: CutInKind } | null>(null)
+  const [activeMoves, setActiveMoves] = useState<[Technique | null, Technique | null]>([null, null])
   const mirror = mine.id === foe.id
 
   // しょうぶが つくまで BGM。ついたら とめて、かった・まけたの おとを きかせる。
@@ -362,6 +373,14 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
     const fx = createFx(seed, still)
     const name = (side: 0 | 1) => (mirror ? (side === 0 ? 'じぶんの ' : 'あいての ') : '') + battle.f[side].sp.short
     const timers: ReturnType<typeof setTimeout>[] = []
+    const moveTimers: Partial<Record<0 | 1, ReturnType<typeof setTimeout>>> = {}
+    const showMove = (side: 0 | 1, move: Technique) => {
+      clearTimeout(moveTimers[side])
+      setActiveMoves(previous => side === 0 ? [move, previous[1]] : [previous[0], move])
+      moveTimers[side] = setTimeout(() => {
+        setActiveMoves(previous => side === 0 ? [null, previous[1]] : [previous[0], null])
+      }, 1500)
+    }
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d') ?? null
     const buffer = { canvas: null as HTMLCanvasElement | null, g: null as CanvasRenderingContext2D | null, w: 0, h: 0 }
@@ -403,16 +422,22 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
         case 'clash': sound.playClash(); vibrate('tap'); setMessage('ガシッ！ くみあった！'); pop('ガシッ！', e.u, e.v, 34, false, 'clash'); break
         case 'windup':
           sound.playWindup(e.move === 'utchari')
-          setMessage(e.move === 'utchari' ? `${name(e.side)}、うっちゃりを ねらう！` : `${name(e.side)}の ${battle.f[e.side].sp.move.name}！`)
+          showMove(e.side, e.move)
+          setMessage(`${name(e.side)}の ${techniqueFor(battle.f[e.side].sp, e.move).name}！`)
           break
         case 'hit': {
           sound.playHit(e.big)
           vibrate('impact')
           const def = name((1 - e.side) as 0 | 1)
           const special = e.move === 'utchari'
-          setMessage(special ? 'うっちゃり！ ぎゃくてんの なげ！' : e.move === 'pinch' ? `${def}を はさんだ！` : e.move === 'charge' ? `${def}を ふっとばした！` : `${def}を なげた！`)
-          const word = special ? 'うっちゃり！' : e.move === 'pinch' ? 'ギリギリッ！' : e.move === 'charge' ? 'ドスーン！' : e.big ? 'ドカーン！' : 'ブンッ！'
-          pop(word, e.u, e.v, 40, e.big || special, special ? 'special' : 'hit')
+          const technique = techniqueFor(battle.f[e.side].sp, e.move)
+          const action = e.move === 'sweep' ? 'を よこに なげた！'
+            : e.move === 'rush' ? 'を れんぞくで おした！'
+            : e.move === 'toss' ? 'を たかく あげた！'
+            : e.move === 'pinch' ? 'を はさんだ！'
+            : e.move === 'charge' ? 'を ふっとばした！' : 'を なげた！'
+          setMessage(special ? 'うっちゃり！ ぎゃくてんの なげ！' : `${technique.name}！ ${def}${action}`)
+          pop(technique.cue, e.u, e.v, 40, e.big || special, special ? 'special' : 'hit')
           if ((e.big || special) && !still) stop = .16
           break
         }
@@ -435,6 +460,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
           const lag = late ? CUT_IN_SECONDS * 1000 : 0
           if (!still) slow = Math.max(slow, lag / 1000 + 1.2)
           setResult({ winner: e.winner, reason: e.reason })
+          setActiveMoves([null, null])
           if (late) timers.push(setTimeout(() => setBanner('end'), lag))
           else setBanner('end')
           timers.push(setTimeout(() => setMessage(`${name(e.winner)}の かち！`), lag + 1400))
@@ -502,6 +528,7 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
       observer?.disconnect()
       window.removeEventListener('resize', measure)
       timers.forEach(clearTimeout)
+      Object.values(moveTimers).forEach(clearTimeout)
       setSpriteBudget(Infinity)
       if (import.meta.env.DEV) delete (window as unknown as { __kabukuwaBattle?: Battle }).__kabukuwaBattle
     }
@@ -533,6 +560,9 @@ function BattleScreen({ mine, foe, stage, seed, soundOn, onSound, onQuit, onRetr
           <strong className={styles.plateName}>{(side === 0 ? mine : foe).short}</strong>
           <span className={styles.meter} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={hud.st[side]} aria-label={`${label(side)}の げんき`}>
             <span style={{ width: `${hud.st[side]}%` }} data-low={hud.st[side] < 30} />
+          </span>
+          <span className={styles.plateMove} aria-label={`${label(side)}の わざ`}>
+            {activeMoves[side] && techniqueFor(side === 0 ? mine : foe, activeMoves[side]).name}
           </span>
         </div>)}
       </div>

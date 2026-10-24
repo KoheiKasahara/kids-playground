@@ -1,7 +1,7 @@
 // つくりかけの おうちを ブラウザに ほぞんする。ほぞん できなくても（プライベートモードなど）その ばで あそべる。
 
 import {
-  DEFAULT_EXTERIOR, DOGHOUSES, DOORS, EXTRAS, GARDENS, HOUSE_TYPES, PARKINGS, ROOFS, ROOM_SIZES, ROOM_TYPES, SHAPES, WALLS, WINDOWS,
+  DEFAULT_EXTERIOR, DOGHOUSES, DOORS, EXTRAS, GARDENS, HOUSE_TYPES, PARKINGS, POOLS, ROOFS, ROOM_SIZES, ROOM_TYPES, SHAPES, WALLS, WINDOWS,
   type Exterior, type ExteriorOption,
 } from './data'
 import { createDesign, fits, type HouseDesign, type PlacedRoom } from './plan'
@@ -23,6 +23,7 @@ function parseExterior(data: unknown): Exterior {
     parking: pickId(PARKINGS, v.parking, d.parking),
     doghouse: pickId(DOGHOUSES, v.doghouse, d.doghouse),
     garden: pickId(GARDENS, v.garden, d.garden),
+    pool: pickId(POOLS, v.pool, d.pool),
     extras: Array.isArray(v.extras) ? EXTRAS.filter((e) => v.extras && (v.extras as unknown[]).includes(e.id)).map((e) => e.id) : [],
   }
 }
@@ -74,12 +75,14 @@ export function readDraft(): Draft | null {
   }
 }
 
-export function writeDraft(draft: Draft | null): void {
+/** ほぞん できたら true。できない ブラウザでも その ばで あそべる ように、なげずに false を かえす。 */
+export function writeDraft(draft: Draft | null): boolean {
   try {
     if (draft) window.localStorage.setItem(KEY, JSON.stringify({ ...draft.design, savedId: draft.savedId }))
     else window.localStorage.removeItem(KEY)
+    return true
   } catch {
-    // ほぞん できなくても その ばで あそべる。
+    return false
   }
 }
 
