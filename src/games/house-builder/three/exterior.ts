@@ -10,11 +10,13 @@ import { floorCount, type HouseDesign } from '../plan'
 import { Kit, ball, block, disposeObject, group, mesh, mix, tube, type Built, type Tick, type V3 } from './kit'
 import { openingPanel } from './openings'
 import { roofTexture, wallTexture } from './textures'
+import { fountain, gardenPlot, orchard, picnic, swimmingPool } from './yardObjects'
+import { exteriorFramePoints } from './framing'
 
 const T = .22
 const EAVE = .5
 const GABLE_EAVE = .3
-const PITCH: Readonly<Record<Exclude<RoofKind, 'flat'>, number>> = { gable: .56, kawara: .48, steep: 1 }
+const PITCH: Readonly<Record<Exclude<RoofKind, 'flat' | 'shed'>, number>> = { gable: .56, kawara: .48, steep: 1 }
 
 type Ctx = { k: Kit; root: THREE.Group; ticks: Tick[]; ex: Exterior }
 
@@ -85,6 +87,7 @@ function doghouse(c: Ctx, at: V3, id: Exclude<DoghouseId, 'none'>) {
 
 function tree(k: Kit, parent: THREE.Object3D, at: V3, s: number) {
   const t = group(parent, at)
+  t.name = 'tree'
   t.scale.setScalar(s)
   tube(k, t, .2, 1.6, '#8d6e63', [0, 0, 0], { top: .14 })
   ball(k, t, 1.1, '#4caf50', [0, 2.4, 0])
@@ -158,24 +161,6 @@ function mailbox(k: Kit, parent: THREE.Object3D, at: V3) {
   tube(k, m, .05, 1, '#6d4c41', [0, 0, 0])
   block(k, m, [.42, .34, .5], '#e53935', [0, 1, 0], { round: .1 })
   block(k, m, [.26, .03, .02], '#9a2018', [0, 1.22, .26], { noShadow: true })
-}
-
-function veggies(k: Kit, parent: THREE.Object3D, box: { minX: number; maxX: number; minZ: number; maxZ: number }) {
-  const g = group(parent, [(box.minX + box.maxX) / 2, 0, (box.minZ + box.maxZ) / 2])
-  g.name = 'veggies'
-  const w = box.maxX - box.minX
-  const d = box.maxZ - box.minZ
-  block(k, g, [w, .22, d], '#8d6e63', [0, 0, 0], { round: .05 })
-  for (let r = 0; r < 3; r++) {
-    for (let i = 0; i < 5; i++) {
-      const x = -w / 2 + .35 + (i * (w - .7)) / 4
-      const z = -d / 2 + .45 + (r * (d - .9)) / 2
-      g.add(mesh(k, k.cyl(0, .16, .42, 8), '#43a047', [x, .43, z], { noShadow: true }))
-      if (r === 0) ball(k, g, .09, '#e53935', [x + .1, .4, z + .08], { noShadow: true })
-      if (r === 1) g.add(mesh(k, k.cyl(.06, 0, .22, 8), '#fb8c00', [x, .3, z + .1], { rot: [.4, 0, 0], noShadow: true }))
-      if (r === 2) ball(k, g, .13, '#c0ca33', [x, .32, z], { scale: [1, .8, 1], noShadow: true })
-    }
-  }
 }
 
 function pond(c: Ctx, box: { minX: number; maxX: number; minZ: number; maxZ: number }) {
@@ -312,6 +297,39 @@ function roofWing(c: Ctx, rect: Rect, wx: (n: number) => number, wz: (n: number)
       }
     }
     if (main && has('chimney')) chimney(c, wing, [long / 2 - .9, .26, -span / 4], 1.5)
+    return
+  }
+  if (roof.kind === 'shed') {
+    const pitch = .24
+    const rise = span * Math.tan(pitch)
+    const len = long + GABLE_EAVE * 2
+    const depth = (span + EAVE * 2) / Math.cos(pitch)
+    const map = k.tex(`roof-${roof.id}`, () => roofTexture(roof.kind, roof.color, roof.dark), [len / 2, depth / 2])
+    wing.add(mesh(k, k.box(len, .14, depth), k.mat(map ? '#ffffff' : roof.color, { map }), [0, rise / 2 + .25, 0], { rot: [pitch, 0, 0] }))
+    for (const z of [-1, 1]) block(k, wing, [len, .14, .1], roof.dark, [0, rise / 2 + .17 - z * (span / 2 + EAVE) * Math.tan(pitch), z * (span / 2 + EAVE)])
+    const wedge = k.custom(`shed-gable-${span.toFixed(2)}`, () => {
+      const shape = new THREE.Shape()
+      shape.moveTo(-span / 2, 0)
+      shape.lineTo(span / 2, 0)
+      shape.lineTo(span / 2, rise + .18)
+      shape.lineTo(-span / 2, .18)
+      shape.closePath()
+      return new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false })
+    })
+    for (const x of [-1, 1]) wing.add(mesh(k, wedge, wall.base, [x * long / 2 - (x > 0 ? T : 0), 0, 0], { rot: [0, Math.PI / 2, 0] }))
+    block(k, wing, [long, rise + .18, T], wall.base, [0, 0, -span / 2 + T / 2])
+    if (main && has('solar')) {
+      const count = Math.max(1, Math.min(4, Math.floor(long / 1.8)))
+      for (let i = 0; i < count; i++) {
+        const z = span / 4
+        const p = group(wing, [-long / 2 + ((i + .5) * long) / count, rise / 2 + .37 - z * Math.tan(pitch), z])
+        p.name = 'solar'
+        p.rotation.x = pitch
+        block(k, p, [Math.min(1.4, long / count - .3), .05, Math.min(1.6, span / 2)], k.mat('#1a3d7c', { rough: .25, metal: .4 }), [0, 0, 0])
+        block(k, p, [.025, .055, Math.min(1.6, span / 2)], '#90caf9', [0, 0, 0], { noShadow: true })
+      }
+    }
+    if (main && has('chimney')) chimney(c, wing, [long / 2 - .9, rise * .75 + .25, -span / 4], 1.4)
     return
   }
   const kind = roof.kind
@@ -509,9 +527,13 @@ export function buildExterior(design: HouseDesign): Built {
   if (yard.bike) bike(k, root, [yard.bike.x, 0, yard.bike.z])
   if (yard.mailbox) mailbox(k, root, [yard.mailbox.x, 0, yard.mailbox.z])
   if (yard.plot) {
-    if (ex.garden === 'veggies') veggies(k, root, yard.plot)
+    if (ex.garden === 'veggies' || ex.garden === 'strawberries') gardenPlot(k, root, yard.plot, ex.garden === 'strawberries')
+    else if (ex.garden === 'orchard') orchard(k, root, yard.plot)
     else pond(c, yard.plot)
   }
+  if (yard.pool && ex.pool !== 'none') swimmingPool(c, yard.pool, ex.pool)
+  if (yard.picnic) picnic(k, root, yard.picnic)
+  if (yard.fountain) fountain(c, yard.fountain)
   if (yard.doghouse && ex.doghouse !== 'none') doghouse(c, [yard.doghouse.x, 0, yard.doghouse.z], ex.doghouse)
   if (yard.koinobori) koinobori(c, [yard.koinobori.x, 0, yard.koinobori.z])
   if (yard.swing) swing(c, [yard.swing.x, 0, yard.swing.z])
@@ -523,15 +545,18 @@ export function buildExterior(design: HouseDesign): Built {
     if (!blocked) bush(k, root, [x, 0, z])
   }
   if (has('fence')) fence(c, yard.yard, { minX: yard.path.minX - .1, maxX: yard.path.maxX + .1 }, yard.house.minZ - 1)
+  // おうち・やね・えらんだ にわの ものを じっさいの おおきさで おさめる。ひろい じめん・くもは のぞく。
+  root.updateMatrixWorld(true)
+  const framing = exteriorFramePoints(root.children.filter((object) => object.name))
+  framing.push(new THREE.Vector3(yard.path.minX, 0, yard.path.maxZ), new THREE.Vector3(yard.path.maxX, 0, yard.path.maxZ))
+  const target = new THREE.Box3().setFromPoints(framing).getCenter(new THREE.Vector3())
+  const radius = Math.max(...framing.map((p) => p.distanceTo(target)))
   clouds(c, reach + 22, top + 16)
-
-  const hx = (shape.width * CELL) / 2
-  const hz = (shape.height * CELL) / 2
-  const height = top + Math.min(hx, hz) * .9
   return {
     root,
-    target: new THREE.Vector3(0, height * .42, yard.frontZ * .25),
-    radius: Math.hypot(Math.max(hx, hz) + 1, height / 2) + 1.5,
+    target,
+    radius,
+    framing,
     cutaways: [],
     ticks,
     dispose: () => {

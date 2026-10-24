@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { DOGHOUSES, DOORS, EXTRAS, GARDENS, HOUSE_TYPES, PARKINGS, ROOFS, ROOM_SIZES, ROOM_TYPES, SHAPES, WALLS, WINDOWS } from './data'
+import { DOGHOUSES, DOORS, EXTERIOR_STYLES, EXTRAS, GARDENS, HOUSE_TYPES, PARKINGS, POOLS, ROOFS, ROOM_SIZES, ROOM_TYPES, SHAPES, WALLS, WINDOWS } from './data'
 
 const unique = (ids: readonly string[]) => new Set(ids).size === ids.length
 
@@ -54,12 +54,24 @@ describe('house-builder data', () => {
   })
 
   test('そとがわの えらべる ものは なまえも id も かぶらない', () => {
-    for (const options of [WALLS, ROOFS, WINDOWS, DOORS, PARKINGS, DOGHOUSES, GARDENS, EXTRAS] as const) {
+    for (const options of [WALLS, ROOFS, WINDOWS, DOORS, PARKINGS, DOGHOUSES, GARDENS, POOLS, EXTRAS] as const) {
       expect(unique(options.map((o) => o.id))).toBe(true)
       expect(unique(options.map((o) => o.name))).toBe(true)
       expect(options.length).toBeGreaterThanOrEqual(3)
     }
-    // ちゅうしゃじょう・いぬごや・にわは「なし」も えらべる。
-    for (const options of [PARKINGS, DOGHOUSES, GARDENS]) expect(options[0].id).toBe('none')
+    // ちゅうしゃじょう・いぬごや・にわ・プールは「なし」も えらべる。
+    for (const options of [PARKINGS, DOGHOUSES, GARDENS, POOLS]) expect(options[0].id).toBe('none')
+  })
+
+  test('おうちセットは それぞれ ちがう くみあわせで、えらべる そとがわを つかう', () => {
+    expect(unique(EXTERIOR_STYLES.map((style) => style.id))).toBe(true)
+    expect(unique(EXTERIOR_STYLES.map((style) => style.name))).toBe(true)
+    expect(unique(EXTERIOR_STYLES.map((style) => JSON.stringify(style.facade)))).toBe(true)
+    for (const style of EXTERIOR_STYLES) {
+      expect(Object.keys(style.facade).sort(), style.id).toEqual(['door', 'roof', 'wall', 'window'])
+      for (const [key, options] of Object.entries({ wall: WALLS, roof: ROOFS, window: WINDOWS, door: DOORS })) {
+        expect(options.map((option) => option.id), `${style.id}/${key}`).toContain(style.facade[key as keyof typeof style.facade])
+      }
+    }
   })
 })

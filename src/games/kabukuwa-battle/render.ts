@@ -8,6 +8,7 @@
 import type { Battle, Fighter } from './battle'
 import type { Fx, Particle } from './fx'
 import { lengthPx } from './model'
+import { fighterMotion, motionPosition } from './motion'
 import { bayer, ditherIndex, hash2, hex, makeCanvas, packRgb, type Img, type Rgb } from './pixel'
 import type { Species } from './species'
 import { beetleSprite, type Sprite } from './sprite'
@@ -431,17 +432,17 @@ export class Scene {
     this.lastCam = cam
     this.lastW = w
     this.lastH = h
-    if (this.stage.id === 'branch') this.drawBranchBackground(g, layers, cam, time)
+    if (this.stage.id === 'branch') this.drawBranchBackground(g, layers, cam, fx.calm ? 0 : time)
     else this.drawGround(g, cam, w, h)
     const fighters = [...battle.f].sort((a, b) => project(cam, a.u, a.v, a.z)[2] < project(cam, b.u, b.v, b.z)[2] ? 1 : -1)
     // まるたの むこうがわへ おちた むしは、まるたより さきに かく。
     const behind = (f: Fighter) => this.stage.id === 'log' && f.z < -4 && f.v > 0
     this.drawProp(g, cam, this.props?.shadow)
-    for (const f of fighters) if (behind(f)) this.drawFighter(g, cam, f, time, labels)
+    for (const f of fighters) if (behind(f)) this.drawFighter(g, cam, f, time, labels, fx.calm)
     this.drawProp(g, cam, this.props?.body)
-    this.drawShadows(g, cam, battle)
+    this.drawShadows(g, cam, battle, fx.calm)
     this.drawParticles(g, cam, fx.parts, true, w, h)
-    for (const f of fighters) if (!behind(f)) this.drawFighter(g, cam, f, time, labels)
+    for (const f of fighters) if (!behind(f)) this.drawFighter(g, cam, f, time, labels, fx.calm)
     this.drawParticles(g, cam, fx.parts, false, w, h)
     if (this.stage.id === 'branch') this.drawBranchFront(g, cam, w)
   }
@@ -567,14 +568,15 @@ export class Scene {
     }
   }
 
-  private drawShadows(g: G, cam: Cam, battle: Battle) {
+  private drawShadows(g: G, cam: Cam, battle: Battle, calm: boolean) {
     if (this.stage.id === 'branch') return
     const top = this.stage.id === 'stump'
     for (const f of battle.f) {
       if (f.state === 'out' || f.state === 'fall') continue
+      const pos = motionPosition(f, fighterMotion(f, calm))
       const ground = this.stage.id === 'log' ? Math.min(0, f.z) : 0
-      const [x, y] = project(cam, f.u, f.v, ground)
-      const air = Math.max(0, f.z - ground)
+      const [x, y] = project(cam, pos.u, pos.v, ground)
+      const air = Math.max(0, pos.z - ground)
       const k = Math.max(.4, 1 - air / 120)
       // からだ（ツノ・あごを のぞく）くらいの まるい かげ。
       const body = f.rear * 1.15 * k * ZOOM
@@ -584,27 +586,30 @@ export class Scene {
     }
   }
 
-  private drawFighter(g: G, cam: Cam, f: Fighter, time: number, labels: boolean) {
+  private drawFighter(g: G, cam: Cam, f: Fighter, time: number, labels: boolean, calm: boolean) {
     const top = this.stage.id === 'stump'
-    const yaw = f.heading + this.stage.axis + (top ? f.pose.spin : 0)
-    const sprite = beetleSprite(f.sp, f.pose, yaw, this.stage.elevation, lengthPx(f.sp) * ZOOM)
+    const motion = fighterMotion(f, calm)
+    const pos = motionPosition(f, motion)
+    const yaw = f.heading + this.stage.axis + motion.yaw + (top ? f.pose.spin : 0)
+    const sprite = beetleSprite(f.sp, motion.pose, yaw, this.stage.elevation, lengthPx(f.sp) * ZOOM)
     if (!sprite?.canvas) return
-    const [x, y] = project(cam, f.u, f.v, f.z)
+    const [x, y] = project(cam, pos.u, pos.v, pos.z)
+    const lean = -motion.pitch * Math.cos(yaw) * cam.ce
     let scale = 1
     if (top) {
-      if (f.z > 0) scale = 1 + f.z / 160
-      else if (f.z < 0) scale = Math.max(.35, 1 + f.z / 90)
+      if (pos.z > 0) scale = 1 + pos.z / 160
+      else if (pos.z < 0) scale = Math.max(.35, 1 + pos.z / 90)
     }
     if (f.pose.hang) {
       // えだの したに さかさに ぶらさがる。
-      drawSprite(g, sprite, x - sprite.ox, y + BRANCH_T - Math.round(5 * ZOOM), 1, 0, 0, 0)
+      drawSprite(g, sprite, x, y + BRANCH_T - Math.round(5 * ZOOM), 1, spriteRotation(0, lean), sprite.ox, 0)
     } else {
-      drawSprite(g, sprite, x, y, scale, top ? 0 : f.pose.spin, sprite.ox, sprite.oy)
+      drawSprite(g, sprite, x, y, scale, top ? 0 : spriteRotation(f.pose.spin, lean), sprite.ox, sprite.oy)
     }
     if (!labels || f.state === 'out') return
     // チームの めじるし（▼）。
-    const [, headY] = project(cam, f.u, f.v, f.z + (f.pose.flipped ? 16 : 26))
-    const bob = Math.round(Math.sin(time * 5 + f.side) * 2)
+    const [, headY] = project(cam, pos.u, pos.v, pos.z + (f.pose.flipped ? 16 : 26))
+    const bob = calm ? 0 : Math.round(Math.sin(time * 5 + f.side) * 2)
     const mx = Math.round(x), my = Math.round((top ? y - (f.rear + 16) * ZOOM : headY - 6) + bob)
     g.fillStyle = '#0c0806'
     for (let i = 0; i < 6; i++) g.fillRect(mx - 6 + i, my - 1 + i, 13 - i * 2, 1)
@@ -696,6 +701,12 @@ function line(g: G, x0: number, y0: number, x1: number, y1: number, size: number
   }
 }
 
+/** なげられた 回転は あらい コマ、わざの 小さな かたむきは こまかい コマで のこす。 */
+export function spriteRotation(spin: number, lean: number) {
+  const spinStep = Math.PI / 8, leanStep = Math.PI / 64
+  return Math.round(spin / spinStep) * spinStep + Math.round(lean / leanStep) * leanStep
+}
+
 function drawSprite(g: G, s: Sprite, x: number, y: number, scale: number, rot: number, ox: number, oy: number) {
   if (!s.canvas) return
   if (!rot && scale === 1) {
@@ -706,7 +717,7 @@ function drawSprite(g: G, s: Sprite, x: number, y: number, scale: number, rot: n
   // まわすときは からだの まんなか あたりを ささえに する。
   const pivotY = s.h * .5
   g.translate(Math.round(x), Math.round(y - (oy - pivotY) * scale))
-  g.rotate(Math.round(rot / (Math.PI / 8)) * (Math.PI / 8))
+  g.rotate(rot)
   g.drawImage(s.canvas, -ox * scale, -pivotY * scale, s.w * scale, s.h * scale)
   g.restore()
 }

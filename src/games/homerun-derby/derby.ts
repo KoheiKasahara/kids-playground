@@ -186,8 +186,8 @@ export function flightDuration(hit: Hit): number {
 /** ホームランの かずで ほしを きめる。めあてに とどかなければ 0。 */
 export function starsFor(stage: Stage, homeruns: number): number {
   if (homeruns < stage.goal) return 0
-  if (homeruns < stage.goal + 2) return 1
-  if (homeruns < stage.goal + 4) return 2
+  if (homeruns < BALLS - 1) return 1
+  if (homeruns < BALLS) return 2
   return 3
 }
 

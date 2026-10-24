@@ -76,7 +76,7 @@ describe('homerun-derby play', () => {
 
   test('hit home runs on time → win card with stars → next opponent → back to the list', () => {
     open(/^1 ペンギンの ペンタ/)
-    expect(screen.getByTestId('stage-banner')).toHaveTextContent('ホームラン 3ほんで かち！')
+    expect(screen.getByTestId('stage-banner')).toHaveTextContent('ホームラン 2ほんで かち！')
     // なげる まえに おしても バットは ふらない（かんばんは きえる）。
     fireEvent.pointerDown(swingButton(), { isPrimary: true, button: 0 })
     expect(screen.queryByTestId('stage-banner')).not.toBeInTheDocument()
@@ -86,15 +86,15 @@ describe('homerun-derby play', () => {
     expect(playPitch(0, 0)).toHaveTextContent('ホームラン！')
     expect(playDerbySound).toHaveBeenCalledWith('hit')
     expect(screen.getByRole('status')).toHaveTextContent(/ホームラン！ \d+メートル/)
-    expect(screen.getByLabelText('ホームラン 1ほん。めあては 3ほん')).toBeInTheDocument()
-    expect(screen.getByLabelText('のこりの ボール 9こ')).toBeInTheDocument()
+    expect(screen.getByLabelText('ホームラン 1ほん。めあては 2ほん')).toBeInTheDocument()
+    expect(screen.getByLabelText('のこりの ボール 4こ')).toBeInTheDocument()
     expect(screen.getByLabelText('1きゅうめ ホームラン')).toBeInTheDocument()
-    for (let i = 1; i < 10; i++) expect(playPitch(0, i), `${i + 1}きゅうめ`).toHaveTextContent('ホームラン！')
+    for (let i = 1; i < 5; i++) expect(playPitch(0, i), `${i + 1}きゅうめ`).toHaveTextContent('ホームラン！')
 
     for (let n = 0; n < 600 && !screen.queryByRole('dialog'); n++) advance(5)
     expect(screen.getByRole('dialog', { name: 'かち' })).toBeInTheDocument()
     expect(screen.getByLabelText('ほし 3こ')).toBeInTheDocument()
-    expect(screen.getByText('ホームラン 10ほん')).toBeInTheDocument()
+    expect(screen.getByText('ホームラン 5ほん')).toBeInTheDocument()
     expect(playDerbySound).toHaveBeenCalledWith('clear')
     expect(JSON.parse(store.get('homerun-derby-progress-v1')!)).toEqual({ penguin: 3 })
 
@@ -116,13 +116,13 @@ describe('homerun-derby play', () => {
     // あとは ふらずに みおくる。
     advance(seconds(60))
     expect(screen.getByRole('dialog', { name: 'おしい' })).toBeInTheDocument()
-    expect(screen.getByText('あと 3ほんで かちだったよ')).toBeInTheDocument()
+    expect(screen.getByText('あと 2ほんで かちだったよ')).toBeInTheDocument()
     expect(playDerbySound).toHaveBeenCalledWith('fail')
     expect(store.has('homerun-derby-progress-v1')).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: '↻ もういちど' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('のこりの ボール 10こ')).toBeInTheDocument()
+    expect(screen.getByLabelText('のこりの ボール 5こ')).toBeInTheDocument()
     expect(screen.getByTestId('stage-banner')).toBeInTheDocument()
   })
 
@@ -132,7 +132,7 @@ describe('homerun-derby play', () => {
     expect(result).toHaveAttribute('data-outcome', 'foul')
     expect(result).toHaveTextContent('ちょっと おそかった')
     expect(screen.getByLabelText('1きゅうめ ファウル')).toBeInTheDocument()
-    expect(screen.getByLabelText('ホームラン 0ほん。めあては 3ほん')).toBeInTheDocument()
+    expect(screen.getByLabelText('ホームラン 0ほん。めあては 2ほん')).toBeInTheDocument()
   })
 
   test('the space key swings too, and the sound button turns sound off and on', () => {
