@@ -94,6 +94,7 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('カウントダウン', () => playMiniSound('countdown')),
     sample('スタート', () => playMiniSound('go')),
     sample('つぎの しゅう', () => playMiniSound('lap')),
+    sample('レーンチェンジ', () => playMiniSound('lane')),
     sample('カーブ', () => playMiniSound('bump')),
     sample('おうえん', () => playMiniSound('cheer')),
     sample('ゴール', () => playMiniSound('finish')),

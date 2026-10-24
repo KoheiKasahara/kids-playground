@@ -96,6 +96,7 @@ function makeCourse(definition: Omit<Course, 'points' | 'length'>, corners: [num
 export const COURSES: Course[] = [
   makeCourse({
     id: 'park', name: 'はじめてパーク', subtitle: 'ながい まっすぐを すいすい', theme: 'park', accent: '#83dcb3',
+    laneChange: { start: .92, end: .975 },
     zones: [
       { start: .1, end: .32, kind: 'curve', severity: .65 },
       { start: .61, end: .82, kind: 'curve', severity: .65 },
@@ -103,6 +104,7 @@ export const COURSES: Course[] = [
   }, [[360, 100], [520, 100], [620, 165], [620, 275], [520, 340], [200, 340], [100, 275], [100, 165], [200, 100]]),
   makeCourse({
     id: 'forest', name: 'もりのくねくね', subtitle: 'タイヤで カーブを クリア', theme: 'forest', accent: '#a6cd6c',
+    laneChange: { start: .925, end: .975 },
     zones: [
       { start: .11, end: .29, kind: 'curve', severity: 1.2 },
       { start: .35, end: .55, kind: 'curve', severity: 1.8 },
@@ -111,6 +113,7 @@ export const COURSES: Course[] = [
   }, [[360, 95], [510, 95], [615, 155], [610, 270], [510, 340], [445, 320], [420, 225], [300, 225], [275, 325], [180, 340], [100, 265], [110, 160], [220, 100]]),
   makeCourse({
     id: 'coast', name: 'うみかぜジャンプ', subtitle: 'ふわっと とんで ちゃくち', theme: 'coast', accent: '#78d1ee',
+    laneChange: { start: .915, end: .972 },
     zones: [
       { start: .07, end: .12, kind: 'jump', severity: 1.6 },
       { start: .19, end: .35, kind: 'curve', severity: .9 },
@@ -121,6 +124,7 @@ export const COURSES: Course[] = [
   }, [[360, 100], [540, 100], [625, 170], [595, 280], [470, 340], [355, 300], [240, 340], [125, 295], [100, 195], [165, 110]]),
   makeCourse({
     id: 'night', name: 'ネオンシティ', subtitle: 'はやさと あんていの しょうぶ', theme: 'night', accent: '#c2a1ff',
+    laneChange: { start: .925, end: .975 },
     zones: [
       { start: .11, end: .24, kind: 'curve', severity: 1.6 },
       { start: .29, end: .35, kind: 'jump', severity: 1.8 },
@@ -146,7 +150,7 @@ function distancesFor(course: Course): number[] {
   return distances
 }
 
-export function sampleTrack(course: Course, distance: number): TrackPoint & { angle: number } {
+function segmentAt(course: Course, distance: number) {
   const distances = distancesFor(course)
   const wrapped = ((distance % course.length) + course.length) % course.length
   const at = wrapped < 1e-7 || course.length - wrapped < 1e-7 ? 0 : wrapped
@@ -157,8 +161,47 @@ export function sampleTrack(course: Course, distance: number): TrackPoint & { an
     if (distances[middle] <= at) low = middle
     else high = middle - 1
   }
+  return { index: low, at, distances }
+}
+
+export function sampleTrack(course: Course, distance: number): TrackPoint & { angle: number } {
+  const { index: low, at, distances } = segmentAt(course, distance)
   const from = course.points[low]
   const to = course.points[(low + 1) % course.points.length]
   const t = (at - distances[low]) / (distances[low + 1] - distances[low])
   return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t, angle: Math.atan2(to.y - from.y, to.x - from.x) }
+}
+
+const trackCurvatures = new WeakMap<Course, number[]>()
+
+/** Turning per pixel of each segment, averaged with its neighbours. Positive bends toward the infield. */
+function curvaturesFor(course: Course): number[] {
+  const cached = trackCurvatures.get(course)
+  if (cached) return cached
+  const { points } = course
+  const count = points.length
+  const distances = distancesFor(course)
+  const angles = points.map((point, i) => {
+    const next = points[(i + 1) % count]
+    return Math.atan2(next.y - point.y, next.x - point.x)
+  })
+  const turns = angles.map((angle, i) => {
+    const turn = angles[(i + 1) % count] - angle
+    return turn - Math.round(turn / (Math.PI * 2)) * Math.PI * 2
+  })
+  const curvatures = points.map((_, i) => {
+    let turn = 0, length = 0
+    for (let j = i - 2; j <= i + 2; j++) {
+      const k = (j + count) % count
+      turn += turns[(k + count - 1) % count] * .5 + turns[k] * .5
+      length += distances[k + 1] - distances[k]
+    }
+    return turn / length
+  })
+  trackCurvatures.set(course, curvatures)
+  return curvatures
+}
+
+export function trackCurvature(course: Course, distance: number): number {
+  return curvaturesFor(course)[segmentAt(course, distance).index]
 }

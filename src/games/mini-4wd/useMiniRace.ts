@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { CHEER_COOLDOWN_SECONDS, cheerRace, createRace, getRank, stepRace } from './race'
+import { CHEER_COOLDOWN_SECONDS, cheerRace, createRace, getRank, laneAfterChanges, stepRace } from './race'
 import { drawRace } from './render'
 import { playMiniSound } from './sounds'
 import type { Build, Course } from './types'
+
+const LANE_NAMES = ['そとがわ', 'まんなか', 'うちがわ']
+
+function laneMessage(race: ReturnType<typeof createRace>) {
+  const me = race.racers[0]
+  const lane = laneAfterChanges(me.startLane, Math.floor(me.distance / race.course.length) + 1)
+  return `レーンチェンジ！ つぎは ${LANE_NAMES[lane]}`
+}
 
 export function useMiniRace(course: Course, build: Build, paused: boolean) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -27,7 +35,7 @@ export function useMiniRace(course: Course, build: Build, paused: boolean) {
         for (const event of race.events) {
           if (event.racer !== 0) continue
           playMiniSound(event.kind)
-          message = event.kind === 'go' ? 'いけー！' : event.kind === 'lap' ? 'いいぞ！ そのちょうし！' : event.kind === 'bump' ? 'おっとっと！ すぐに はしるよ' : 'ゴール！ よく はしったね！'
+          message = event.kind === 'go' ? 'いけー！' : event.kind === 'lap' ? 'いいぞ！ そのちょうし！' : event.kind === 'lane' ? laneMessage(race) : event.kind === 'bump' ? 'おっとっと！ すぐに はしるよ' : 'ゴール！ よく はしったね！'
           messageUntil = race.elapsed + 2
         }
       }
