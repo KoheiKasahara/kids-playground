@@ -49,6 +49,8 @@ export default function SugorokuPlay() {
   const [view, setView] = useState<View | null>(null)
   const [busy, setBusy] = useState(false)
   const [resultReady, setResultReady] = useState(false)
+  /** ばんめん ぜんたいを みせる。はじめは ぜんたいを みせ、サイコロを ふると コマへ ちかづく。 */
+  const [overview, setOverview] = useState(true)
   const [sound, toggleSound] = useSoundToggle()
   const timersRef = useRef<number[]>([])
   const busyRef = useRef(false)
@@ -77,6 +79,7 @@ export default function SugorokuPlay() {
     if (busyRef.current || state.winner !== null || mustRest(state)) return
     busyRef.current = true
     setBusy(true)
+    setOverview(false)
     primeAudio()
     const plan = playTurn(state, rollDie())
     const { frames, duration } = turnTimeline(plan, state)
@@ -143,6 +146,7 @@ export default function SugorokuPlay() {
     setView(freshView(fresh))
     setBusy(false)
     setResultReady(false)
+    setOverview(true)
     playSugorokuSound('start')
     vibrate('tap')
   }
@@ -167,6 +171,13 @@ export default function SugorokuPlay() {
   }
 
   const course = courseById(game?.course ?? setup.course)
+  // カメラは うごいている コマ、いなければ いまの ばんの ひと（ゴールしたら かった ひと）を おいかける。
+  const focusPlayer = view?.mover?.player ?? active ?? game?.winner ?? 0
+  const toggleOverview = () => {
+    primeAudio()
+    playSugorokuSound('select')
+    setOverview((previous) => !previous)
+  }
   const status = !game ? '' : game.winner !== null && !busy ? `${nameOf(game, game.winner)}が ゴール！`
     : busy && view?.message ? view.message
       : resting ? `${nameOf(game, game.turn)}は おやすみ`
@@ -236,8 +247,11 @@ export default function SugorokuPlay() {
           <div className={styles.boardWrap}>
             <SugorokuBoard course={course} className={styles.board}
               pieces={game.players.map((player) => player.piece)} positions={view.positions}
-              turn={active} mover={view.mover}
+              turn={active} mover={view.mover} focus={view.positions[focusPlayer] ?? 0} overview={overview}
               label={`${course.name}。${game.players.map((_, player) => `${nameOf(game, player)}は ${placeText({ ...game, positions: view.positions }, player)}`).join('、')}`} />
+            <button type="button" className={styles.mapButton} aria-pressed={overview} onClick={toggleOverview}>
+              {overview ? 'ちかくで みる' : 'ぜんたいを みる'}
+            </button>
           </div>
 
           <section className={styles.panel} aria-label="サイコロと じゅんばん">

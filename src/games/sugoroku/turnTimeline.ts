@@ -18,6 +18,8 @@ export const TIMING = {
   eventMs: 1000,
   /** ワープで とんでいく じかん。 */
   warpMs: 700,
+  /** ワープで ついた さきを よろこぶ（ざんねんがる）じかん。 */
+  warpResultMs: 900,
   /** うごきおわってから つぎの ひとの ばんに なるまで。 */
   settleMs: 450,
 } as const
@@ -39,11 +41,16 @@ export function eventMessage(event: SquareEvent): string {
     case 'back': return `あらら、${event.steps} もどる`
     case 'rest': return 'ひとやすみ。つぎは 1かい やすみ'
     case 'again': return 'もう1かい ふれるよ！'
-    case 'warp': return 'ワープ！ びゅーん'
+    case 'warp': return 'ワープ！ どこへ いくかな？'
   }
 }
 
-const isGood = (event: SquareEvent) => event.kind === 'forward' || event.kind === 'again' || event.kind === 'warp'
+/** ワープで ついた あとの ことば。とびさきは くじびきなので、うしろへ もどる ことも ある。 */
+export function warpResultMessage(ahead: boolean): string {
+  return ahead ? 'びゅーん！ さきへ ワープ' : 'あれれ、うしろへ ワープ'
+}
+
+const isGood = (event: SquareEvent) => event.kind === 'forward' || event.kind === 'again'
 
 /** サイコロを ふってから つぎの ひとの ばんに なるまでの、がめんの うごきを じかんじゅんに ならべる。 */
 export function turnTimeline(plan: TurnPlan, before: GameState, timing: typeof TIMING = TIMING): { frames: TimelineFrame[]; duration: number } {
@@ -78,14 +85,26 @@ export function turnTimeline(plan: TurnPlan, before: GameState, timing: typeof T
       at,
       mover: { player, hop, count: null, flying: false },
       message: eventMessage(plan.event),
-      sound: { kind: plan.event.kind === 'rest' ? 'rest' : isGood(plan.event) ? 'good' : 'bad' },
-      haptic: isGood(plan.event) ? 'success' : 'impact',
+      // ワープは とびさきが わかるまで よしあしを きめない。
+      sound: { kind: plan.event.kind === 'rest' ? 'rest' : plan.event.kind === 'warp' ? 'select' : isGood(plan.event) ? 'good' : 'bad' },
+      haptic: plan.event.kind === 'warp' ? 'tap' : isGood(plan.event) ? 'success' : 'impact',
     })
     at += timing.eventMs
     if (plan.eventWalk.length > 0) {
       const flying = plan.event.kind === 'warp'
       walk(plan.eventWalk, flying)
       at += flying ? timing.warpMs : timing.stepMs
+      if (flying) {
+        const ahead = plan.eventWalk[0]! > plan.walk.at(-1)!
+        frames.push({
+          at,
+          mover: { player, hop, count: null, flying: false },
+          message: warpResultMessage(ahead),
+          sound: { kind: ahead ? 'good' : 'bad' },
+          haptic: ahead ? 'success' : 'impact',
+        })
+        at += timing.warpResultMs
+      }
     }
   }
 
