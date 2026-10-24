@@ -14,8 +14,8 @@ describe('homerun-derby stages', () => {
     for (const stage of STAGES) {
       expect(stage.pitches, stage.id).toHaveLength(BALLS)
       expect(stage.goal).toBeGreaterThanOrEqual(1)
-      // ★3 まで とどく よう、めあて + 4 が なげる かず いないに おさまる。
-      expect(stage.goal + 4).toBeLessThanOrEqual(BALLS)
+      // ★1 と ★2 を わけられる よう、めあては ぜんぶ-2 いない。
+      expect(stage.goal).toBeLessThanOrEqual(BALLS - 2)
       expect(stage.travel).toBeGreaterThan(.8)
       expect(stage.assist).toBeGreaterThanOrEqual(1)
       expect(PITCHER_HEIGHT[stage.pitcher]).toBeGreaterThan(0)
