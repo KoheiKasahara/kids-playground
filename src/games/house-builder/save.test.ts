@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { DEFAULT_EXTERIOR } from './data'
+import { DEFAULT_EXTERIOR, DOORS, EXTRAS, GARDENS, POOLS, ROOFS, WALLS, WINDOWS } from './data'
 import { addRoom, createDesign, type HouseDesign } from './plan'
 import {
   ALBUM_LIMIT, parseAlbum, parseDesign, putHouse, readAlbum, readDraft, removeHouse, sameDesign, writeAlbum, writeDraft,
@@ -19,6 +19,41 @@ describe('house-builder save', () => {
   test('ほぞんした おうちを そのまま もどせる', () => {
     const design = sample()
     expect(parseDesign(JSON.parse(JSON.stringify(design)))).toEqual(design)
+  })
+
+  test('えらべる かべ・やね・まど・ドア・にわ・プール・おまけを すべて ほぞんできる', () => {
+    const design = sample()
+    // カテゴリごとに検査し、選択肢を増やしても保存側の登録漏れを見つける。
+    for (const [key, options] of Object.entries({ wall: WALLS, roof: ROOFS, window: WINDOWS, door: DOORS, garden: GARDENS, pool: POOLS })) {
+      for (const option of options) {
+        const changed = { ...design, exterior: { ...design.exterior, [key]: option.id, extras: EXTRAS.map((extra) => extra.id) } }
+        expect(parseDesign(JSON.parse(JSON.stringify(changed))), `${key}/${option.id}`).toEqual(changed)
+      }
+    }
+  })
+
+  test('プールが なかった ころの つくりかけ・アルバムを のこし、しらない プールだけ はずす', () => {
+    stubStorage()
+    const design = sample()
+    const oldExterior = Object.fromEntries(Object.entries(design.exterior).filter(([key]) => key !== 'pool'))
+    const legacy = { ...design, exterior: oldExterior }
+    window.localStorage.setItem('house-builder-v1', JSON.stringify({ ...legacy, savedId: 9 }))
+    window.localStorage.setItem('house-builder-album-v1', JSON.stringify([{ id: 9, savedAt: 1, design: legacy }]))
+    const migrated: HouseDesign = { ...design, exterior: { ...design.exterior, pool: 'none' } }
+    expect(readDraft()).toEqual({ design: migrated, savedId: 9 })
+    expect(readAlbum()).toEqual([{ id: 9, savedAt: 1, design: migrated }])
+    expect(parseDesign({ ...legacy, exterior: { ...oldExterior, pool: 'ocean' } })).toEqual(migrated)
+    expect(sameDesign(design, migrated)).toBe(true)
+  })
+
+  test('プールと はたけを いっしょに ほぞんし、プールの へんこうも みわける', () => {
+    stubStorage()
+    const design: HouseDesign = { ...sample(), exterior: { ...DEFAULT_EXTERIOR, garden: 'strawberries', pool: 'rectangle', extras: ['picnic', 'fountain'] } }
+    writeDraft({ design, savedId: 1 })
+    writeAlbum([{ id: 1, savedAt: 10, design }])
+    expect(readDraft()).toEqual({ design, savedId: 1 })
+    expect(readAlbum()[0].design).toEqual(design)
+    expect(sameDesign(design, { ...design, exterior: { ...design.exterior, pool: 'round' } })).toBe(false)
   })
 
   test('こわれた データは つかわない', () => {
@@ -54,7 +89,7 @@ describe('house-builder save', () => {
     expect(readDraft()).toBeNull()
     expect(readAlbum()).toEqual([])
     const design = sample()
-    writeDraft({ design, savedId: 3 })
+    expect(writeDraft({ design, savedId: 3 })).toBe(true)
     expect(readDraft()).toEqual({ design, savedId: 3 })
     writeDraft({ design, savedId: null })
     expect(readDraft()).toEqual({ design, savedId: null })
@@ -71,7 +106,7 @@ describe('house-builder save', () => {
         removeItem: () => { throw new Error('denied') },
       },
     })
-    expect(() => writeDraft({ design, savedId: null })).not.toThrow()
+    expect(writeDraft({ design, savedId: null })).toBe(false)
     expect(readDraft()).toBeNull()
     expect(writeAlbum(album)).toBe(false)
     expect(readAlbum()).toEqual([])

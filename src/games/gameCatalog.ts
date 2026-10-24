@@ -1272,6 +1272,42 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'mini-4wd',
+    slug: 'mini-4wd',
+    title: 'ドット ミニよんく',
+    emoji: '🏎️',
+    category: 'learning',
+    seo: {
+      headline: 'ドット ミニよんく｜パーツをくみたてて、じぶんのマシンでレース！',
+      description: '細かなドット絵のミニ四駆を、ボディ・モーター・タイヤ・ローラーと好きな色で組み立てる子ども向けゲーム。特徴の違うコースで3台の自動レースを楽しみ、パーツを組み替えて走りの違いを試せます。',
+    },
+    intro: {
+      howToPlay: [
+        'ボディ・モーター・タイヤ・ローラーを えらんで つくろう',
+        'すきな コースで レース！ マシンは じどうで はしるよ',
+        'パーツを くみかえて、いろいろな はしりを ためそう',
+      ],
+    },
+  },
+  {
+    id: 'sugoroku',
+    slug: 'sugoroku',
+    title: 'わくわく すごろく',
+    emoji: '🎲',
+    category: 'learning',
+    seo: {
+      headline: 'わくわく すごろく｜サイコロを ふって どうぶつの コマで ゴールを めざそう',
+      description: 'サイコロを ふって、でた めの かずだけ どうぶつの コマを すすめる 幼児向けの すごろく。もり・おかし・うみの 3コースに「すすむ」「もどる」「やすみ」「ワープ」の マスがあり、コンピュータとも 4にんまでの みんなとも あそべます。',
+    },
+    intro: {
+      howToPlay: [
+        'コースと あそぶ にんずうを えらんで はじめよう',
+        'サイコロを ふると、でた かずだけ 1マスずつ すすむよ',
+        'とまった マスの しかけで すすんだり もどったり！',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

@@ -209,6 +209,9 @@ export type YardLayout = {
   bike?: { x: number; z: number }
   mailbox?: { x: number; z: number }
   plot?: Box2
+  pool?: Box2
+  picnic?: Box2
+  fountain?: Box2
   doghouse?: { x: number; z: number }
   koinobori?: { x: number; z: number }
   swing?: { x: number; z: number }
@@ -239,7 +242,9 @@ export function yardLayout(design: HouseDesign): YardLayout {
   const doorLine = door3d?.line ?? Math.max(...front)
   const door = { x: (doorCenter - shape.width / 2) * CELL, z: (doorLine - shape.height / 2) * CELL }
 
-  const yardFront = frontZ + 6.6
+  // みずあそび・ピクニックは 2れつめ。はたけや くるまを けさずに いっしょに おける。
+  const secondRow = ex.pool !== 'none' || has('picnic') || has('fountain')
+  const yardFront = frontZ + (secondRow ? 12 : 6.6)
   const path: Box2 = { minX: door.x - PATH_HALF, maxX: door.x + PATH_HALF, minZ: door.z, maxZ: yardFront }
   const layout: YardLayout = { house, door, frontZ, path, trees: [], yard: { ...house } }
 
@@ -258,17 +263,27 @@ export function yardLayout(design: HouseDesign): YardLayout {
   // こみちの みぎ。
   at = path.maxX + .5
   if (has('mailbox')) {
-    layout.mailbox = { x: at + .3, z: yardFront - 1 }
+    layout.mailbox = { x: at + .3, z: frontZ + 5.6 }
     at += 1.1
   }
-  if (ex.garden === 'veggies' || ex.garden === 'pond') {
-    layout.plot = { minX: at, maxX: at + 3.2, minZ: frontZ + 1.8, maxZ: frontZ + 4.4 }
-    at += 3.7
+  if (['veggies', 'pond', 'strawberries', 'orchard'].includes(ex.garden)) {
+    layout.plot = { minX: at, maxX: at + 3.6, minZ: frontZ + 1.8, maxZ: frontZ + 4.8 }
+    at += 4.2
   }
   if (ex.doghouse !== 'none') layout.doghouse = { x: at + .9, z: frontZ + 2.6 }
 
+  if (ex.pool !== 'none') {
+    layout.pool = { minX: path.minX - 5.4, maxX: path.minX - .6, minZ: frontZ + 7, maxZ: frontZ + 11.2 }
+  }
+  at = path.maxX + .6
+  if (has('picnic')) {
+    layout.picnic = { minX: at, maxX: at + 3, minZ: frontZ + 7.1, maxZ: frontZ + 10.3 }
+    at += 3.6
+  }
+  if (has('fountain')) layout.fountain = { minX: at, maxX: at + 2.8, minZ: frontZ + 7.2, maxZ: frontZ + 10 }
+
   // いえの よこ。
-  let left = house.minX - 1.6
+  let left = house.minX - 2.4
   let right = house.maxX + 1.6
   if (has('koinobori')) {
     layout.koinobori = { x: left, z: frontZ - 1.2 }
@@ -286,6 +301,9 @@ export function yardLayout(design: HouseDesign): YardLayout {
   if (layout.parking) xs.push(layout.parking.minX)
   if (layout.bike) xs.push(layout.bike.x - .8)
   if (layout.plot) xs.push(layout.plot.maxX)
+  if (layout.pool) xs.push(layout.pool.minX, layout.pool.maxX)
+  if (layout.picnic) xs.push(layout.picnic.minX, layout.picnic.maxX)
+  if (layout.fountain) xs.push(layout.fountain.minX, layout.fountain.maxX)
   if (layout.doghouse) xs.push(layout.doghouse.x + 1.8)
   if (layout.mailbox) xs.push(layout.mailbox.x + .5)
   if (layout.koinobori) xs.push(layout.koinobori.x - 1)
