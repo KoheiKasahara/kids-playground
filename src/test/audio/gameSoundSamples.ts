@@ -13,6 +13,7 @@ import * as gochiso from '../../games/gochiso-race/sounds'
 import { playDerbySound } from '../../games/homerun-derby/sounds'
 import * as house from '../../games/house-builder/sounds'
 import { playSushiSound } from '../../games/kaiten-sushi/sounds'
+import { playSugorokuSound } from '../../games/sugoroku/sounds'
 import { playLabSound } from '../../games/venom-lab/sounds'
 import * as quiz from '../../utils/quizSound'
 import { PianoAudioEngine } from '../../games/shared/music/pianoAudio'
@@ -87,6 +88,18 @@ function pianoNotes(count: number): SoundSample['play'] {
 }
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
+  sugoroku: [
+    sample('えらぶ', () => playSugorokuSound('select')),
+    sample('はじめる', () => playSugorokuSound('start')),
+    sample('サイコロ ころころ', () => playSugorokuSound('roll')),
+    sample('でた め', () => playSugorokuSound('dice')),
+    sample('1マス すすむ', () => playSugorokuSound('step', 4)),
+    sample('すすむ マス', () => playSugorokuSound('good')),
+    sample('もどる マス', () => playSugorokuSound('bad')),
+    sample('ワープ', () => playSugorokuSound('warp')),
+    sample('おやすみ', () => playSugorokuSound('rest')),
+    sample('ゴール', () => playSugorokuSound('goal')),
+  ],
   'mini-4wd': [
     sample('えらぶ', () => playMiniSound('select')),
     sample('くみたて', () => playMiniSound('assemble')),

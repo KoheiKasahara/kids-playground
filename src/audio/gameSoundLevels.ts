@@ -58,6 +58,7 @@ export const GAME_SOUND_LEVEL_DB: Readonly<Record<string, number>> = {
   'shabon-pachin': 1.5,
   shinkeisuijaku: -1,
   'snowball-roll': 8,
+  sugoroku: 2,
   'train-journey': 15,
   'treasure-dig': 10.5,
   'tsumiki-3d': 9,
