@@ -75,12 +75,14 @@ export function readDraft(): Draft | null {
   }
 }
 
-export function writeDraft(draft: Draft | null): void {
+/** ほぞん できたら true。できない ブラウザでも その ばで あそべる ように、なげずに false を かえす。 */
+export function writeDraft(draft: Draft | null): boolean {
   try {
     if (draft) window.localStorage.setItem(KEY, JSON.stringify({ ...draft.design, savedId: draft.savedId }))
     else window.localStorage.removeItem(KEY)
+    return true
   } catch {
-    // ほぞん できなくても その ばで あそべる。
+    return false
   }
 }
 

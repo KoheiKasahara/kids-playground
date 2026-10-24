@@ -89,7 +89,7 @@ describe('house-builder save', () => {
     expect(readDraft()).toBeNull()
     expect(readAlbum()).toEqual([])
     const design = sample()
-    writeDraft({ design, savedId: 3 })
+    expect(writeDraft({ design, savedId: 3 })).toBe(true)
     expect(readDraft()).toEqual({ design, savedId: 3 })
     writeDraft({ design, savedId: null })
     expect(readDraft()).toEqual({ design, savedId: null })
@@ -106,7 +106,7 @@ describe('house-builder save', () => {
         removeItem: () => { throw new Error('denied') },
       },
     })
-    expect(() => writeDraft({ design, savedId: null })).not.toThrow()
+    expect(writeDraft({ design, savedId: null })).toBe(false)
     expect(readDraft()).toBeNull()
     expect(writeAlbum(album)).toBe(false)
     expect(readAlbum()).toEqual([])
