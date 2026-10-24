@@ -35,6 +35,10 @@ test('おちてくる ブロックで、ばしょをえらんで おとせる', 
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
 
+  // Select the L piece: its first cell is not its leftmost cell.
+  await page.addInitScript(() => {
+    Math.random = () => 0.8
+  })
   await page.goto('/games/block-puzzle', { waitUntil: 'domcontentloaded' })
   await page.getByRole('button', { name: 'おちてくる ブロック を えらぶ' }).click()
   await expect(page.getByRole('heading', { name: /おちてくる ブロック/ })).toBeVisible()
@@ -46,11 +50,16 @@ test('おちてくる ブロックで、ばしょをえらんで おとせる', 
 
   // 置きたい列をえらぶと着地予定が見え、おとすと積まれる。
   await page.getByRole('button', { name: /^よこ1 に うごかす/ }).click()
-  await expect(page.getByTestId('falling-ghost')).toHaveAttribute('data-cells', /^0,/)
+  const ghost = page.getByTestId('falling-ghost')
+  const expectedCells = ['0,11', '1,11', '2,10', '2,11']
+  await expect(ghost).toHaveAttribute('data-shape-id', 'l')
+  await expect.poll(async () => (await ghost.getAttribute('data-cells'))?.split(' ').sort()).toEqual(expectedCells)
 
   await page.getByRole('button', { name: 'おとす' }).click()
   await expect(page.getByTestId('falling-settled')).toHaveCount(1)
-  await expect(page.getByTestId('falling-settled')).toHaveAttribute('data-cells', /^0,/)
+  await expect.poll(async () => (
+    await page.getByTestId('falling-settled').getAttribute('data-cells')
+  )?.split(' ').sort()).toEqual(expectedCells)
 
   expect(pageErrors).toEqual([])
 })
