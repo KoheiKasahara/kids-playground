@@ -340,6 +340,40 @@ describe('house-builder play', () => {
     expect(saved()).toMatchObject({ shape: 'narrow', rooms: [{ type: 'washitsu', style: 'kotatsu' }] })
   })
 
+  test('とちゅうで「いったん ほぞんして もどる」と さいしょの がめんへ もどり、つづきから つくれる', () => {
+    startHouse(/^ひらや/, /^L の かたち/)
+    pickRoom('わしつ', 'こたつの わしつ')
+    fireEvent.click(screen.getByRole('button', { name: cell(1, 1) }))
+    click(/そとがわを つくる/)
+    fireEvent.click(within(screen.getByRole('list', { name: 'えらぶ もの' })).getByRole('button', { name: 'やね' }))
+    fireEvent.click(within(screen.getByRole('list', { name: 'やね' })).getAllByRole('button')[1])
+    const roof = saved().exterior.roof
+
+    click('いったん ほぞんして もどる')
+    expect(screen.getByRole('status')).toHaveTextContent('とちゅうまで ほぞんしたよ')
+    expect(screen.getByText('つくりかけの おうちが あるよ')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'いったん ほぞんして もどる' })).not.toBeInTheDocument()
+    expect(sounds().at(-1)).toBe('place')
+    expect(saved()).toMatchObject({ shape: 'lshape', rooms: [{ type: 'washitsu' }], exterior: { roof } })
+
+    click('つづきから つくる')
+    expect(screen.queryByText(/とちゅうまで ほぞんしたよ/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'おいた こたつの わしつ' })).toBeInTheDocument()
+  })
+
+  test('いったん もどる ときに ほぞん できなければ おしえて、つくりかけは その ばに のこる', () => {
+    startHouse(/^ひらや/, /^L の かたち/)
+    pickRoom('わしつ', 'こたつの わしつ')
+    fireEvent.click(screen.getByRole('button', { name: cell(1, 1) }))
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError') })
+
+    click('いったん ほぞんして もどる')
+    expect(screen.getByText('この ブラウザでは ほぞん できないよ')).toBeInTheDocument()
+    expect(sounds().at(-1)).toBe('blocked')
+    click('つづきから つくる')
+    expect(screen.getByRole('button', { name: 'おいた こたつの わしつ' })).toBeInTheDocument()
+  })
+
   test('プールと はたけを いっしょに おき、セットで いえの みためだけを かえて ほぞんできる', async () => {
     window.localStorage.setItem(KEY, JSON.stringify(SAVED_HOUSE))
     const first = renderGame()

@@ -179,6 +179,36 @@
   outline-offset: 3px;
 }
 
+/* ---------- いったん やめる ---------- */
+
+.pauseButton {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.pauseButton:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+.pauseButton:focus-visible {
+  outline: 4px solid #3b82f6;
+  outline-offset: 3px;
+}
+
 /* ---------- しゅるい・かたち ---------- */
 
 .section {

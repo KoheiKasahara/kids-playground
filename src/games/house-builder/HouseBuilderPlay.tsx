@@ -38,6 +38,7 @@ type Ask =
   | { kind: 'full' }
 
 const SAVE_FAILED = 'この ブラウザでは ほぞん できないよ'
+const PAUSED = 'とちゅうまで ほぞんしたよ。「つづきから つくる」で また つくれるよ'
 
 const BACK: Record<Exclude<Screen, 'type'>, Screen> = { shape: 'type', plan: 'shape', outside: 'plan', done: 'outside' }
 
@@ -77,7 +78,9 @@ export default function HouseBuilderPlay() {
   const linked = album.find((house) => house.id === savedId) ?? null
   const isSaved = useMemo(() => !!design && !!linked && sameDesign(linked.design, design), [design, linked])
 
-  useEffect(() => writeDraft(design ? { design, savedId } : null), [design, savedId])
+  useEffect(() => {
+    writeDraft(design ? { design, savedId } : null)
+  }, [design, savedId])
 
   useEffect(() => {
     // がめんを きりかえたら いちばん うえから みせる。
@@ -95,6 +98,15 @@ export default function HouseBuilderPlay() {
     if (current === 'type') return
     sfx('tap')
     go(BACK[current])
+  }
+
+  /** つくりかけを いったん ほぞんして、さいしょの がめんへ もどる。つぎは「つづきから つくる」で ひらける。 */
+  function pause() {
+    if (!design) return
+    const ok = writeDraft({ design, savedId })
+    sfx(ok ? 'place' : 'blocked', ok ? 'success' : 'error')
+    go('type')
+    setSaveNote(ok ? PAUSED : SAVE_FAILED)
   }
 
   function pickType(type: HouseTypeId) {
@@ -330,6 +342,11 @@ export default function HouseBuilderPlay() {
           )
         })}
       </ol>
+      {(current === 'plan' || current === 'outside') && (
+        <button type="button" className={styles.pauseButton} onClick={pause}>
+          <span aria-hidden="true">🏠 </span>いったん ほぞんして もどる
+        </button>
+      )}
       {body}
       {dialog}
     </main>
