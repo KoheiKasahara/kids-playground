@@ -206,9 +206,8 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
 
 .boardWrap {
   grid-area: board;
-  display: flex;
-  justify-content: center;
-  padding: 6px;
+  position: relative;
+  overflow: hidden;
   border-radius: 22px;
   background:
     radial-gradient(circle at 20% 30%, var(--board-dot) 0 6px, transparent 7px) 0 0 / 46px 46px,
@@ -216,13 +215,34 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
   box-shadow: inset 0 0 0 3px rgb(255 255 255 / .5);
 }
 
+/* コースは がめんより おおきいので、たかさを きめて コマの まわりだけを うつす。 */
 .board {
   display: block;
   width: 100%;
-  height: auto;
-  max-height: max(260px, calc(100dvh - 330px - var(--safe-top) - var(--safe-bottom)));
-  overflow: visible;
+  height: max(260px, calc(100dvh - 330px - var(--safe-top) - var(--safe-bottom)));
 }
+
+.camera { transition: transform 620ms cubic-bezier(.4, 0, .2, 1); }
+.ground { fill: rgb(255 255 255 / .18); }
+
+.mapButton {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 3px solid rgb(255 255 255 / .9);
+  border-radius: 16px;
+  background: rgb(255 253 248 / .92);
+  box-shadow: 0 3px 0 rgb(74 58 51 / .18);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mapButton[aria-pressed='true'] { border-color: #e0873a; background: #fff3e0; }
 
 .road { fill: none; stroke: var(--road); stroke-linecap: round; stroke-linejoin: round; }
 .square { fill: var(--square); stroke: var(--square-edge); stroke-width: 4; }
@@ -246,7 +266,6 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
 
 .squareNumber { fill: var(--number); }
 .squareBig { letter-spacing: -.02em; }
-.warpLine { fill: none; stroke: #d6458f; stroke-dasharray: 10 9; stroke-linecap: round; opacity: .85; }
 
 .piece { transition: transform 260ms cubic-bezier(.3, .7, .4, 1); }
 .flying { transition: transform 680ms cubic-bezier(.45, 0, .25, 1); }
@@ -438,7 +457,7 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
   }
 
   .status { min-height: 40px; margin-top: 0; font-size: 16px; }
-  .board { max-height: calc(100dvh - 100px - var(--safe-top) - var(--safe-bottom)); }
+  .board { height: max(240px, calc(100dvh - 100px - var(--safe-top) - var(--safe-bottom))); }
   .panel { flex-direction: column; }
   .players { flex: 0 0 auto; }
   .diceButton { order: -1; flex-direction: row; gap: 12px; width: 100%; min-height: 0; height: 84px; }
@@ -447,7 +466,8 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
 
 @media (prefers-reduced-motion: reduce) {
   .piece,
-  .flying { transition: none; }
+  .flying,
+  .camera { transition: none; }
 
   .hop,
   .fly,

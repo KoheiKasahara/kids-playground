@@ -55,8 +55,17 @@ function walkBetween(from: number, to: number): number[] {
   return path
 }
 
-/** サイコロの め（1〜6）で いまの ひとを うごかす。ゴールを こえる めでも ゴールで とまる。 */
-export function playTurn(state: GameState, roll: number, course: Course = courseById(state.course)): TurnPlan {
+/** ワープの とびさきを くじびきで えらぶ。 */
+export function drawWarp(to: readonly number[], random: () => number = Math.random): number {
+  const index = Math.min(to.length - 1, Math.max(0, Math.floor(random() * to.length)))
+  return to[index]!
+}
+
+/**
+ * サイコロの め（1〜6）で いまの ひとを うごかす。ゴールを こえる めでも ゴールで とまる。
+ * ワープの とびさきは random で きめる。
+ */
+export function playTurn(state: GameState, roll: number, course: Course = courseById(state.course), random: () => number = Math.random): TurnPlan {
   const player = state.turn
   const goal = goalIndex(course)
   const from = state.positions[player]!
@@ -73,7 +82,7 @@ export function playTurn(state: GameState, roll: number, course: Course = course
     final = Math.max(0, landed - event.steps)
     eventWalk = walkBetween(landed, final)
   } else if (event?.kind === 'warp') {
-    final = Math.min(goal, Math.max(0, event.to))
+    final = Math.min(goal, Math.max(0, drawWarp(event.to, random)))
     eventWalk = [final]
   }
 
