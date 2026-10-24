@@ -514,6 +514,35 @@ describe('house-builder play', () => {
     expect(screen.getByRole('button', { name: /おうちを ほぞんする/ })).toBeEnabled()
   })
 
+  test('おまかせで つくると、まどりも そとがわも きまった おうちが できあがり、もういちど おまかせ できる', () => {
+    renderGame()
+    click(/おまかせで つくる/)
+    expect(screen.getByRole('heading', { name: /かんせい！ すてきな おうちが できたね/ })).toBeInTheDocument()
+    const first = saved()
+    expect(first.rooms.some((r: { type: string }) => r.type === 'entrance')).toBe(true)
+    expect(sounds()).toContain('complete')
+
+    // ほぞんしていない おうちは たしかめてから けす。
+    click(/もういちど おまかせ/)
+    expect(screen.getByRole('dialog', { name: 'いまの おうちを けして、おまかせで つくる？' })).toBeInTheDocument()
+    click('やめる')
+    expect(saved()).toEqual(first)
+
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    click(/もういちど おまかせ/)
+    click('けして つくる')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(saved()).toMatchObject({ houseType: 'hiraya', shape: 'square', savedId: null })
+
+    // ほぞんした あとなら たしかめずに つくりなおす。
+    click(/おうちを ほぞんする/)
+    vi.mocked(Math.random).mockReturnValue(0.99)
+    click(/もういちど おまかせ/)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(saved()).toMatchObject({ houseType: 'yonkai', shape: 'ushape', savedId: null })
+    expect(album()).toHaveLength(1)
+  })
+
   test('こわれた ほぞんデータは つかわずに はじめから', () => {
     window.localStorage.setItem(KEY, '{broken')
     renderGame()

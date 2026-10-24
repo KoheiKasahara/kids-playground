@@ -14,6 +14,7 @@ import {
   addRoom, changeRoom, createDesign, findSpot, floorCount, moveRoom, removeRoom, reshape, roomCounts, roomSize, roomsOn,
   type Cell, type HouseDesign, type PlacedRoom, type RoomPick,
 } from './plan'
+import { randomDesign } from './random'
 import { ALBUM_LIMIT, putHouse, readAlbum, readDraft, removeHouse, sameDesign, writeAlbum, writeDraft, type SavedHouse } from './save'
 import { ROOM_VOICE, playHouseSound, startBgm, type HouseSound } from './sounds'
 import PlanBoard, { type Ghost } from './PlanBoard'
@@ -31,6 +32,7 @@ type Screen = 'type' | 'shape' | 'plan' | 'outside' | 'done'
 /** たしかめる ダイアログ。 */
 type Ask =
   | { kind: 'restart' }
+  | { kind: 'random' }
   | { kind: 'open'; id: number }
   | { kind: 'remove'; id: number }
   | { kind: 'full' }
@@ -116,6 +118,22 @@ export default function HouseBuilderPlay() {
     go('type')
   }
 
+  /** おまかせで おうちを つくって、できあがりを みせる。ほぞんしていない おうちが あれば さきに たしかめる。 */
+  function makeRandom(confirmed = false) {
+    if (!confirmed && design && !isSaved) {
+      sfx('tap')
+      setAsk({ kind: 'random' })
+      return
+    }
+    const next = randomDesign()
+    setAsk(null)
+    setDesign(next)
+    setSavedId(null)
+    setPendingType(next.houseType)
+    sfx('complete', 'celebrate')
+    go('done')
+  }
+
   /** いちらんを かきかえる。ほぞん できなかったら そのまま に して おしえる。 */
   function commitAlbum(next: SavedHouse[]): boolean {
     if (!writeAlbum(next)) {
@@ -184,6 +202,7 @@ export default function HouseBuilderPlay() {
             sfx('tap')
             setAsk({ kind: 'restart' })
           }}
+          onRandom={() => makeRandom()}
           onOpen={(id) => openSaved(id)}
           onRemove={(id) => {
             sfx('tap')
@@ -234,6 +253,7 @@ export default function HouseBuilderPlay() {
           sfx('tap')
           setAsk({ kind: 'restart' })
         }}
+        onRandom={() => makeRandom()}
       />
     )
   }
@@ -244,6 +264,13 @@ export default function HouseBuilderPlay() {
     dialog = (
       <Dialog title={isSaved ? 'あたらしい おうちを つくる？ ほぞんした おうちは のこるよ' : 'いまの おうちを けして、さいしょから つくる？'}>
         <button type="button" className={`${styles.btn} ${isSaved ? styles.btnPrimary : styles.btnDanger}`} onClick={restart}>{isSaved ? 'あたらしく つくる' : 'けして つくる'}</button>
+        <button type="button" className={styles.btn} onClick={cancelAsk} autoFocus>やめる</button>
+      </Dialog>
+    )
+  } else if (ask?.kind === 'random') {
+    dialog = (
+      <Dialog title="いまの おうちを けして、おまかせで つくる？">
+        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => makeRandom(true)}>けして つくる</button>
         <button type="button" className={styles.btn} onClick={cancelAsk} autoFocus>やめる</button>
       </Dialog>
     )
@@ -346,7 +373,7 @@ function TypeIcon({ floors }: { floors: number }) {
 
 const houseSummary = (design: HouseDesign) => `${findHouseType(design.houseType).name}・へや ${design.rooms.length}こ`
 
-function TypeScreen({ draft, current, album, note, onPick, onContinue, onRestart, onOpen, onRemove }: {
+function TypeScreen({ draft, current, album, note, onPick, onContinue, onRestart, onRandom, onOpen, onRemove }: {
   draft: HouseDesign | null
   current?: HouseTypeId
   album: readonly SavedHouse[]
@@ -354,6 +381,7 @@ function TypeScreen({ draft, current, album, note, onPick, onContinue, onRestart
   onPick: (type: HouseTypeId) => void
   onContinue: () => void
   onRestart: () => void
+  onRandom: () => void
   onOpen: (id: number) => void
   onRemove: (id: number) => void
 }) {
@@ -402,6 +430,10 @@ function TypeScreen({ draft, current, album, note, onPick, onContinue, onRestart
           </li>
         ))}
       </ul>
+      <button type="button" className={`${styles.btn} ${styles.btnBig}`} onClick={onRandom}>
+        <span aria-hidden="true">🎲 </span>おまかせで つくる
+      </button>
+      <p className={styles.hint}>まどりも そとがわも ぜんぶ きめて くれるよ</p>
     </section>
   )
 }
@@ -843,7 +875,7 @@ function orderedRooms(design: HouseDesign): PlacedRoom[] {
 
 const roomTitle = (room: PlacedRoom) => `${room.floor + 1}かいの ${findRoomStyle(room.type, room.style).name}`
 
-function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, onRestart }: {
+function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, onRestart, onRandom }: {
   design: HouseDesign
   saved: boolean
   note: string | null
@@ -851,6 +883,7 @@ function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, on
   onEditPlan: () => void
   onEditOutside: () => void
   onRestart: () => void
+  onRandom: () => void
 }) {
   const [view, setView] = useState<'outside' | 'inside'>('outside')
   const [bubble, setBubble] = useState<{ key: number; text: string } | null>(null)
@@ -1014,6 +1047,7 @@ function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, on
         <button type="button" className={styles.btn} onClick={onEditPlan}>まどりを なおす</button>
         <button type="button" className={styles.btn} onClick={onEditOutside}>そとがわを なおす</button>
         <button type="button" className={styles.btn} onClick={onRestart}>さいしょから つくる</button>
+        <button type="button" className={styles.btn} onClick={onRandom}><span aria-hidden="true">🎲 </span>もういちど おまかせ</button>
       </div>
     </section>
   )
