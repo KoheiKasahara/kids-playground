@@ -222,7 +222,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
 
 export type ExteriorOption<Id extends string> = { id: Id; name: string }
 
-export type WallId = 'white' | 'brick' | 'wood' | 'pink' | 'sky' | 'log' | 'wa' | 'stone'
+export type WallId = 'white' | 'brick' | 'wood' | 'pink' | 'sky' | 'log' | 'wa' | 'stone' | 'mint' | 'cream' | 'navy' | 'lavender'
 export type WallKind = 'plain' | 'brick' | 'siding' | 'log' | 'wa' | 'stone'
 export const WALLS: readonly (ExteriorOption<WallId> & { kind: WallKind; base: string; line: string })[] = [
   { id: 'white', name: 'しろい かべ', kind: 'plain', base: '#fbf8f0', line: '#e2dccd' },
@@ -233,10 +233,14 @@ export const WALLS: readonly (ExteriorOption<WallId> & { kind: WallKind; base: s
   { id: 'log', name: 'まるたの かべ', kind: 'log', base: '#b07440', line: '#7a4a24' },
   { id: 'wa', name: 'わふうの かべ', kind: 'wa', base: '#f6f1e4', line: '#3b3330' },
   { id: 'stone', name: 'いしづみの かべ', kind: 'stone', base: '#d8d3ca', line: '#a39d93' },
+  { id: 'mint', name: 'ミントいろの かべ', kind: 'siding', base: '#c6e8ce', line: '#7fb99b' },
+  { id: 'cream', name: 'クリームいろの かべ', kind: 'plain', base: '#ffe9b4', line: '#d9bd83' },
+  { id: 'navy', name: 'こんいろの かべ', kind: 'siding', base: '#385571', line: '#23394e' },
+  { id: 'lavender', name: 'むらさきの かべ', kind: 'plain', base: '#dfd0f1', line: '#ae94cc' },
 ]
 
-export type RoofId = 'red' | 'blue' | 'choco' | 'kawara' | 'flat' | 'tongari'
-export type RoofKind = 'gable' | 'kawara' | 'flat' | 'steep'
+export type RoofId = 'red' | 'blue' | 'choco' | 'kawara' | 'flat' | 'tongari' | 'green' | 'orange' | 'shed'
+export type RoofKind = 'gable' | 'kawara' | 'flat' | 'steep' | 'shed'
 export const ROOFS: readonly (ExteriorOption<RoofId> & { kind: RoofKind; color: string; dark: string })[] = [
   { id: 'red', name: 'あかい さんかく やね', kind: 'gable', color: '#d9493b', dark: '#a3302a' },
   { id: 'blue', name: 'あおい さんかく やね', kind: 'gable', color: '#3f7cc8', dark: '#2a5893' },
@@ -244,24 +248,31 @@ export const ROOFS: readonly (ExteriorOption<RoofId> & { kind: RoofKind; color: 
   { id: 'kawara', name: 'かわらの やね', kind: 'kawara', color: '#5d6771', dark: '#3a424b' },
   { id: 'flat', name: 'たいらな やね', kind: 'flat', color: '#8a939b', dark: '#5f676e' },
   { id: 'tongari', name: 'とんがり やね', kind: 'steep', color: '#4caf7a', dark: '#2f8256' },
+  { id: 'green', name: 'もりいろの やね', kind: 'gable', color: '#4d826c', dark: '#315b4a' },
+  { id: 'orange', name: 'オレンジの やね', kind: 'gable', color: '#e9954a', dark: '#ae5c2d' },
+  { id: 'shed', name: 'ななめの やね', kind: 'shed', color: '#566b7f', dark: '#314456' },
 ]
 
-export type WindowId = 'square' | 'round' | 'arch' | 'shoji' | 'flowerbox'
+export type WindowId = 'square' | 'round' | 'arch' | 'shoji' | 'flowerbox' | 'shutters' | 'wide'
 export const WINDOWS: readonly ExteriorOption<WindowId>[] = [
   { id: 'square', name: 'しかくい まど' },
   { id: 'round', name: 'まるい まど' },
   { id: 'arch', name: 'アーチの まど' },
   { id: 'shoji', name: 'しょうじの まど' },
   { id: 'flowerbox', name: 'はなかざりの まど' },
+  { id: 'shutters', name: 'よろいどの まど' },
+  { id: 'wide', name: 'おおきな よこなが まど' },
 ]
 
-export type DoorId = 'wood' | 'red' | 'white' | 'slide' | 'round'
+export type DoorId = 'wood' | 'red' | 'white' | 'slide' | 'round' | 'blue' | 'double'
 export const DOORS: readonly (ExteriorOption<DoorId> & { color: string })[] = [
   { id: 'wood', name: 'きの ドア', color: '#a0673a' },
   { id: 'red', name: 'あかい ドア', color: '#d64545' },
   { id: 'white', name: 'しろい ドア', color: '#f4f4f4' },
   { id: 'slide', name: 'がらがら ひきど', color: '#8b6b4a' },
   { id: 'round', name: 'まるい ドア', color: '#3f8f5a' },
+  { id: 'blue', name: 'あおい ドア', color: '#438cb8' },
+  { id: 'double', name: 'りょうびらきの ドア', color: '#8457a1' },
 ]
 
 export type ParkingId = 'none' | 'red' | 'blue' | 'two' | 'garage'
@@ -281,16 +292,25 @@ export const DOGHOUSES: readonly ExteriorOption<DoghouseId>[] = [
   { id: 'log', name: 'まるたの いぬごや' },
 ]
 
-export type GardenId = 'none' | 'flowers' | 'trees' | 'veggies' | 'pond'
+export type GardenId = 'none' | 'flowers' | 'trees' | 'veggies' | 'pond' | 'strawberries' | 'orchard'
 export const GARDENS: readonly ExteriorOption<GardenId>[] = [
   { id: 'none', name: 'なし' },
   { id: 'flowers', name: 'おはなばたけ' },
   { id: 'trees', name: 'きが いっぱい' },
   { id: 'veggies', name: 'やさいの はたけ' },
   { id: 'pond', name: 'おさかなの いけ' },
+  { id: 'strawberries', name: 'いちごの はたけ' },
+  { id: 'orchard', name: 'くだものの にわ' },
 ]
 
-export type ExtraId = 'mailbox' | 'bike' | 'swing' | 'chimney' | 'solar' | 'fence' | 'koinobori' | 'balcony'
+export type PoolId = 'none' | 'round' | 'rectangle'
+export const POOLS: readonly ExteriorOption<PoolId>[] = [
+  { id: 'none', name: 'なし' },
+  { id: 'round', name: 'まるい プール' },
+  { id: 'rectangle', name: 'おおきな プール' },
+]
+
+export type ExtraId = 'mailbox' | 'bike' | 'swing' | 'chimney' | 'solar' | 'fence' | 'koinobori' | 'balcony' | 'picnic' | 'fountain'
 export const EXTRAS: readonly ExteriorOption<ExtraId>[] = [
   { id: 'mailbox', name: 'ポスト' },
   { id: 'bike', name: 'じてんしゃ' },
@@ -300,6 +320,8 @@ export const EXTRAS: readonly ExteriorOption<ExtraId>[] = [
   { id: 'fence', name: 'さく' },
   { id: 'koinobori', name: 'こいのぼり' },
   { id: 'balcony', name: 'ベランダ' },
+  { id: 'picnic', name: 'パラソルと テーブル' },
+  { id: 'fountain', name: 'ふんすい' },
 ]
 
 export type Exterior = {
@@ -310,12 +332,29 @@ export type Exterior = {
   parking: ParkingId
   doghouse: DoghouseId
   garden: GardenId
+  pool: PoolId
   extras: readonly ExtraId[]
 }
 
 export const DEFAULT_EXTERIOR: Exterior = {
-  wall: 'white', roof: 'red', window: 'square', door: 'wood', parking: 'none', doghouse: 'none', garden: 'none', extras: [],
+  wall: 'white', roof: 'red', window: 'square', door: 'wood', parking: 'none', doghouse: 'none', garden: 'none', pool: 'none', extras: [],
 }
+
+/** かべ・やね・まど・ドアを まとめて きがえる。まどりや にわは そのまま。 */
+export type ExteriorStyle = {
+  id: string
+  name: string
+  facade: Pick<Exterior, 'wall' | 'roof' | 'window' | 'door'>
+}
+
+export const EXTERIOR_STYLES: readonly ExteriorStyle[] = [
+  { id: 'cottage', name: 'はなの コテージ', facade: { wall: 'cream', roof: 'orange', window: 'flowerbox', door: 'wood' } },
+  { id: 'forest', name: 'もりの ログハウス', facade: { wall: 'log', roof: 'green', window: 'shutters', door: 'round' } },
+  { id: 'japanese', name: 'わふうの おうち', facade: { wall: 'wa', roof: 'kawara', window: 'shoji', door: 'slide' } },
+  { id: 'seaside', name: 'うみべの おうち', facade: { wall: 'mint', roof: 'blue', window: 'shutters', door: 'blue' } },
+  { id: 'modern', name: 'モダンな おうち', facade: { wall: 'navy', roof: 'shed', window: 'wide', door: 'white' } },
+  { id: 'storybook', name: 'ものがたりの おうち', facade: { wall: 'lavender', roof: 'tongari', window: 'arch', door: 'double' } },
+]
 
 // ---------------- さがす ----------------
 

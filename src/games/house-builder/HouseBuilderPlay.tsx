@@ -6,7 +6,7 @@ import { primeAudio } from '../../audio/sound'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { vibrate } from '../../utils/haptics'
 import {
-  DOGHOUSES, DOORS, EXTRAS, GARDENS, HOUSE_TYPES, PARKINGS, ROOFS, ROOM_SIZES, ROOM_TYPES, SHAPES, WALLS, WINDOWS,
+  DEFAULT_EXTERIOR, DOGHOUSES, DOORS, EXTERIOR_STYLES, EXTRAS, GARDENS, HOUSE_TYPES, PARKINGS, POOLS, ROOFS, ROOM_SIZES, ROOM_TYPES, SHAPES, WALLS, WINDOWS,
   findHouseType, findRoof, findRoomStyle, findRoomType, findShape,
   type Exterior, type ExteriorOption, type ExtraId, type HouseTypeId, type RoomSizeId, type RoomTypeId, type Shape, type ShapeId,
 } from './data'
@@ -14,6 +14,7 @@ import {
   addRoom, changeRoom, createDesign, findSpot, floorCount, moveRoom, removeRoom, reshape, roomCounts, roomSize, roomsOn,
   type Cell, type HouseDesign, type PlacedRoom, type RoomPick,
 } from './plan'
+import { randomDesign } from './random'
 import { ALBUM_LIMIT, putHouse, readAlbum, readDraft, removeHouse, sameDesign, writeAlbum, writeDraft, type SavedHouse } from './save'
 import { ROOM_VOICE, playHouseSound, startBgm, type HouseSound } from './sounds'
 import PlanBoard, { type Ghost } from './PlanBoard'
@@ -31,11 +32,13 @@ type Screen = 'type' | 'shape' | 'plan' | 'outside' | 'done'
 /** たしかめる ダイアログ。 */
 type Ask =
   | { kind: 'restart' }
+  | { kind: 'random' }
   | { kind: 'open'; id: number }
   | { kind: 'remove'; id: number }
   | { kind: 'full' }
 
 const SAVE_FAILED = 'この ブラウザでは ほぞん できないよ'
+const PAUSED = 'とちゅうまで ほぞんしたよ。「つづきから つくる」で また つくれるよ'
 
 const BACK: Record<Exclude<Screen, 'type'>, Screen> = { shape: 'type', plan: 'shape', outside: 'plan', done: 'outside' }
 
@@ -75,7 +78,9 @@ export default function HouseBuilderPlay() {
   const linked = album.find((house) => house.id === savedId) ?? null
   const isSaved = useMemo(() => !!design && !!linked && sameDesign(linked.design, design), [design, linked])
 
-  useEffect(() => writeDraft(design ? { design, savedId } : null), [design, savedId])
+  useEffect(() => {
+    writeDraft(design ? { design, savedId } : null)
+  }, [design, savedId])
 
   useEffect(() => {
     // がめんを きりかえたら いちばん うえから みせる。
@@ -93,6 +98,15 @@ export default function HouseBuilderPlay() {
     if (current === 'type') return
     sfx('tap')
     go(BACK[current])
+  }
+
+  /** つくりかけを いったん ほぞんして、さいしょの がめんへ もどる。つぎは「つづきから つくる」で ひらける。 */
+  function pause() {
+    if (!design) return
+    const ok = writeDraft({ design, savedId })
+    sfx(ok ? 'place' : 'blocked', ok ? 'success' : 'error')
+    go('type')
+    setSaveNote(ok ? PAUSED : SAVE_FAILED)
   }
 
   function pickType(type: HouseTypeId) {
@@ -114,6 +128,22 @@ export default function HouseBuilderPlay() {
     setSavedId(null)
     setPendingType('nikai')
     go('type')
+  }
+
+  /** おまかせで おうちを つくって、できあがりを みせる。ほぞんしていない おうちが あれば さきに たしかめる。 */
+  function makeRandom(confirmed = false) {
+    if (!confirmed && design && !isSaved) {
+      sfx('tap')
+      setAsk({ kind: 'random' })
+      return
+    }
+    const next = randomDesign()
+    setAsk(null)
+    setDesign(next)
+    setSavedId(null)
+    setPendingType(next.houseType)
+    sfx('complete', 'celebrate')
+    go('done')
   }
 
   /** いちらんを かきかえる。ほぞん できなかったら そのまま に して おしえる。 */
@@ -184,6 +214,7 @@ export default function HouseBuilderPlay() {
             sfx('tap')
             setAsk({ kind: 'restart' })
           }}
+          onRandom={() => makeRandom()}
           onOpen={(id) => openSaved(id)}
           onRemove={(id) => {
             sfx('tap')
@@ -234,6 +265,7 @@ export default function HouseBuilderPlay() {
           sfx('tap')
           setAsk({ kind: 'restart' })
         }}
+        onRandom={() => makeRandom()}
       />
     )
   }
@@ -244,6 +276,13 @@ export default function HouseBuilderPlay() {
     dialog = (
       <Dialog title={isSaved ? 'あたらしい おうちを つくる？ ほぞんした おうちは のこるよ' : 'いまの おうちを けして、さいしょから つくる？'}>
         <button type="button" className={`${styles.btn} ${isSaved ? styles.btnPrimary : styles.btnDanger}`} onClick={restart}>{isSaved ? 'あたらしく つくる' : 'けして つくる'}</button>
+        <button type="button" className={styles.btn} onClick={cancelAsk} autoFocus>やめる</button>
+      </Dialog>
+    )
+  } else if (ask?.kind === 'random') {
+    dialog = (
+      <Dialog title="いまの おうちを けして、おまかせで つくる？">
+        <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => makeRandom(true)}>けして つくる</button>
         <button type="button" className={styles.btn} onClick={cancelAsk} autoFocus>やめる</button>
       </Dialog>
     )
@@ -303,6 +342,11 @@ export default function HouseBuilderPlay() {
           )
         })}
       </ol>
+      {(current === 'plan' || current === 'outside') && (
+        <button type="button" className={styles.pauseButton} onClick={pause}>
+          <span aria-hidden="true">🏠 </span>いったん ほぞんして もどる
+        </button>
+      )}
       {body}
       {dialog}
     </main>
@@ -346,7 +390,7 @@ function TypeIcon({ floors }: { floors: number }) {
 
 const houseSummary = (design: HouseDesign) => `${findHouseType(design.houseType).name}・へや ${design.rooms.length}こ`
 
-function TypeScreen({ draft, current, album, note, onPick, onContinue, onRestart, onOpen, onRemove }: {
+function TypeScreen({ draft, current, album, note, onPick, onContinue, onRestart, onRandom, onOpen, onRemove }: {
   draft: HouseDesign | null
   current?: HouseTypeId
   album: readonly SavedHouse[]
@@ -354,6 +398,7 @@ function TypeScreen({ draft, current, album, note, onPick, onContinue, onRestart
   onPick: (type: HouseTypeId) => void
   onContinue: () => void
   onRestart: () => void
+  onRandom: () => void
   onOpen: (id: number) => void
   onRemove: (id: number) => void
 }) {
@@ -402,6 +447,10 @@ function TypeScreen({ draft, current, album, note, onPick, onContinue, onRestart
           </li>
         ))}
       </ul>
+      <button type="button" className={`${styles.btn} ${styles.btnBig}`} onClick={onRandom}>
+        <span aria-hidden="true">🎲 </span>おまかせで つくる
+      </button>
+      <p className={styles.hint}>まどりも そとがわも ぜんぶ きめて くれるよ</p>
     </section>
   )
 }
@@ -710,7 +759,8 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
 
 // ---------------- そとがわ ----------------
 
-const CATEGORIES: readonly { id: ExteriorCategory; name: string; options: readonly ExteriorOption<string>[] }[] = [
+const CATEGORIES: readonly { id: ExteriorCategory | 'style'; name: string; options: readonly ExteriorOption<string>[] }[] = [
+  { id: 'style', name: 'おうちセット', options: EXTERIOR_STYLES },
   { id: 'wall', name: 'かべ', options: WALLS },
   { id: 'roof', name: 'やね', options: ROOFS },
   { id: 'window', name: 'まど', options: WINDOWS },
@@ -718,11 +768,12 @@ const CATEGORIES: readonly { id: ExteriorCategory; name: string; options: readon
   { id: 'parking', name: 'ちゅうしゃじょう', options: PARKINGS },
   { id: 'doghouse', name: 'いぬごや', options: DOGHOUSES },
   { id: 'garden', name: 'にわ', options: GARDENS },
+  { id: 'pool', name: 'プール', options: POOLS },
   { id: 'extras', name: 'おまけ', options: EXTRAS },
 ]
 
 function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onChange: (design: HouseDesign) => void; onDone: () => void }) {
-  const [category, setCategory] = useState<ExteriorCategory>('wall')
+  const [category, setCategory] = useState<ExteriorCategory | 'style'>('style')
   const [message, setMessage] = useState('かべや やねを えらんで、おうちの そとがわを つくろう')
   const ex = design.exterior
   const options = CATEGORIES.find((c) => c.id === category)!.options
@@ -730,7 +781,11 @@ function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onCh
   function choose(id: string, name: string) {
     let exterior: Exterior
     let kind: HouseSound = 'paint'
-    if (category === 'extras') {
+    if (category === 'style') {
+      const style = EXTERIOR_STYLES.find((s) => s.id === id)!
+      exterior = { ...ex, ...style.facade }
+      setMessage(`${name}に きがえたよ！`)
+    } else if (category === 'extras') {
       const on = ex.extras.includes(id as ExtraId)
       const extras = EXTRAS.map((e) => e.id).filter((e) => (e === id ? !on : ex.extras.includes(e)))
       exterior = { ...ex, extras }
@@ -747,7 +802,13 @@ function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onCh
     sfx(kind, 'tap')
   }
 
-  const isOn = (id: string) => (category === 'extras' ? ex.extras.includes(id as ExtraId) : ex[category] === id)
+  const isOn = (id: string) => {
+    if (category === 'style') {
+      const facade = EXTERIOR_STYLES.find((s) => s.id === id)!.facade
+      return ex.wall === facade.wall && ex.roof === facade.roof && ex.window === facade.window && ex.door === facade.door
+    }
+    return category === 'extras' ? ex.extras.includes(id as ExtraId) : ex[category] === id
+  }
 
   return (
     <section className={styles.outsideLayout} aria-label="そとがわを つくる">
@@ -771,17 +832,23 @@ function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onCh
             </li>
           ))}
         </ul>
-        <ul className={styles.optionGrid} aria-label={CATEGORIES.find((c) => c.id === category)!.name}>
+        <ul className={`${styles.optionGrid} ${category === 'style' ? styles.styleGrid : ''}`} aria-label={CATEGORIES.find((c) => c.id === category)!.name}>
           {options.map((option) => (
             <li key={option.id}>
               <button type="button" className={styles.optionCard} aria-pressed={isOn(option.id)} onClick={() => choose(option.id, option.name)}>
-                <span className={styles.optionArt}><ExteriorSwatch category={category} id={option.id} /></span>
+                <span className={styles.optionArt} aria-hidden="true">
+                  {category === 'style'
+                    ? <HouseFront design={{ ...createDesign('nikai', 'square'), exterior: { ...DEFAULT_EXTERIOR, ...EXTERIOR_STYLES.find((s) => s.id === option.id)!.facade } }} />
+                    : <ExteriorSwatch category={category} id={option.id} />}
+                </span>
                 <span className={styles.optionName}>{option.name}</span>
               </button>
             </li>
           ))}
         </ul>
         {category === 'extras' && <p className={styles.hint}>おまけは いくつでも つけられるよ</p>}
+        {category === 'style' && <p className={styles.hint}>セットを えらんだ あとに、かべや やねを かえても いいよ</p>}
+        {(category === 'garden' || category === 'pool') && <p className={styles.hint}>にわと プールは いっしょに おけるよ</p>}
       </div>
       <div className={styles.footer}>
         <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} onClick={onDone}>
@@ -813,7 +880,7 @@ function RoofCap({ design }: { design: HouseDesign }) {
     <svg className={styles.roofCap} viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true" focusable="false">
       {flat
         ? <rect x={6} y={36} width={388} height={22} fill={roof.color} stroke={roof.dark} strokeWidth={4} />
-        : <path d="M2 58 L 200 4 L 398 58 Z" fill={roof.color} stroke={roof.dark} strokeWidth={4} strokeLinejoin="round" />}
+        : <path d={roof.kind === 'shed' ? 'M2 58 L 2 4 L 398 44 L 398 58 Z' : 'M2 58 L 200 4 L 398 58 Z'} fill={roof.color} stroke={roof.dark} strokeWidth={4} strokeLinejoin="round" />}
     </svg>
   )
 }
@@ -825,7 +892,7 @@ function orderedRooms(design: HouseDesign): PlacedRoom[] {
 
 const roomTitle = (room: PlacedRoom) => `${room.floor + 1}かいの ${findRoomStyle(room.type, room.style).name}`
 
-function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, onRestart }: {
+function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, onRestart, onRandom }: {
   design: HouseDesign
   saved: boolean
   note: string | null
@@ -833,6 +900,7 @@ function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, on
   onEditPlan: () => void
   onEditOutside: () => void
   onRestart: () => void
+  onRandom: () => void
 }) {
   const [view, setView] = useState<'outside' | 'inside'>('outside')
   const [bubble, setBubble] = useState<{ key: number; text: string } | null>(null)
@@ -996,6 +1064,7 @@ function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, on
         <button type="button" className={styles.btn} onClick={onEditPlan}>まどりを なおす</button>
         <button type="button" className={styles.btn} onClick={onEditOutside}>そとがわを なおす</button>
         <button type="button" className={styles.btn} onClick={onRestart}>さいしょから つくる</button>
+        <button type="button" className={styles.btn} onClick={onRandom}><span aria-hidden="true">🎲 </span>もういちど おまかせ</button>
       </div>
     </section>
   )

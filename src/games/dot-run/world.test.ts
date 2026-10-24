@@ -228,18 +228,66 @@ describe('dot-run world', () => {
     expect(regained).toBeGreaterThan(0)
   })
 
-  test('ばねに のると たかく とびあがる', () => {
+  test('ばねは ふむだけで いちばん たかい 2だんジャンプより たかく とぶ（どの ステージでも）', () => {
+    for (const stage of STAGES) {
+      // ながおしで とび、てっぺんで もう1かい ながおし した 2だんジャンプ。
+      const jump = createWorld(stageWith(['start', 'run', 'run', 'goal'], stage))
+      start(jump)
+      let jumpTop = jump.hero.y
+      pressJump(jump)
+      let pressed = false
+      for (let i = 0; i < 200 && !(pressed && jump.hero.onGround); i++) {
+        if (!pressed && !jump.hero.onGround && jump.hero.vy >= 0) {
+          releaseJump(jump)
+          pressJump(jump)
+          pressed = true
+        }
+        stepWorld(jump)
+        jumpTop = Math.min(jumpTop, jump.hero.y)
+      }
+      expect(drainEvents(jump).map(e => e.type), stage.id).toContain('double')
+
+      // ばねは なにも おさない。
+      const spring = createWorld(stageWith(['start', 'spring', 'goal'], stage))
+      start(spring)
+      const events: WorldEvent[] = []
+      let springTop = spring.hero.y
+      for (let i = 0; i < 60 * 6; i++) {
+        run(spring, 1, events)
+        springTop = Math.min(springTop, spring.hero.y)
+      }
+      expect(events.some(e => e.type === 'spring'), stage.id).toBe(true)
+      expect(events.some(e => e.type === 'jump' || e.type === 'double'), stage.id).toBe(false)
+      expect(GROUND_Y - HERO_H - springTop, stage.id).toBeGreaterThan(GROUND_Y - HERO_H - jumpTop + 12)
+    }
+  })
+
+  test('ばねの てまえで ジャンプしても ばねに ふれれば ばねで たかく とぶ', () => {
+    const world = createWorld(stageWith(['start', 'spring', 'goal']))
+    start(world)
+    const springX = world.springs[0].x
+    // つぎの 1フレームで ばねの はしに ふれる ところで ジャンプする。
+    while (world.hero.x + HERO_W < springX + 1) run(world, 1)
+    const events = tap(world)
+    expect(events.map(e => e.type).slice(0, 2)).toEqual(['jump', 'spring'])
+    let top = world.hero.y
+    for (let i = 0; i < 90; i++) {
+      stepWorld(world)
+      top = Math.min(top, world.hero.y)
+    }
+    expect(GROUND_Y - HERO_H - top).toBeGreaterThan(130)
+  })
+
+  test('ばねで のぼっている とちゅうに おしても いきおいは へらない', () => {
     const world = createWorld(stageWith(['start', 'spring', 'goal']))
     start(world)
     const events: WorldEvent[] = []
-    let top = world.hero.y
-    for (let i = 0; i < 60 * 6; i++) {
-      run(world, 1, events)
-      top = Math.min(top, world.hero.y)
-    }
-    expect(events.some(e => e.type === 'spring')).toBe(true)
-    expect(GROUND_Y - HERO_H - top).toBeGreaterThan(80)
-    expect(events.filter(e => e.type === 'carrot').length).toBeGreaterThanOrEqual(9)
+    while (!events.some(e => e.type === 'spring')) run(world, 1, events)
+    const vy = world.hero.vy
+    pressJump(world)
+    stepWorld(world)
+    expect(drainEvents(world).map(e => e.type)).toContain('double')
+    expect(world.hero.vy).toBeLessThan(vy + 1)
   })
 
   test('ばねで とんだ すぐ あとでも 2だんジャンプが できる', () => {

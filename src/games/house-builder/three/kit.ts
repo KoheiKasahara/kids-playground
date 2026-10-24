@@ -38,6 +38,8 @@ export type Built = {
   yaw?: number
   target: THREE.Vector3
   radius: number
+  /** そとの ものを いまの カメラの むきで おさめる ための、かべ・やね・にわの はし。 */
+  framing?: readonly THREE.Vector3[]
   cutaways: Cutaway[]
   ticks: Tick[]
   dispose: () => void

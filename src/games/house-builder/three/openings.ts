@@ -80,6 +80,27 @@ function windowPanel(k: Kit, g: THREE.Group, style: WindowId, size: OpeningSize,
     case 'shoji':
       shojiGrid(k, g, w, h, 3, 4)
       return
+    case 'wide': {
+      pane(k, g, w, h, glass(k, inside))
+      frame(k, g, w, h, '#3e626b')
+      for (const side of [-1, 1]) block(k, g, [.035, h, .04], '#3e626b', [side * w / 6, 0, .05], { noShadow: true })
+      block(k, g, [w + .2, .06, .15], '#e8e5db', [0, -.12, .08])
+      return
+    }
+    case 'shutters': {
+      // よろいどを ふくめて w に おさめ、せまい かべでも はみださない。
+      const glassWidth = w * .62
+      pane(k, g, glassWidth, h, glass(k, inside))
+      frame(k, g, glassWidth, h, white)
+      block(k, g, [.035, h, .03], white, [0, 0, .04], { noShadow: true })
+      if (!inside) for (const side of [-1, 1]) {
+        const shutter = group(g, [side * (w * .42 + .035), 0, .06])
+        shutter.name = 'shutter'
+        block(k, shutter, [w * .17, h + .1, .07], '#529486', [0, -.05, 0])
+        for (let row = 0; row < 6; row++) block(k, shutter, [w * .14, .025, .03], '#b7dbc8', [0, (row + .5) * h / 6, .05], { noShadow: true })
+      }
+      return
+    }
     case 'square':
     case 'flowerbox': {
       pane(k, g, w, h, glass(k, inside))
@@ -105,17 +126,22 @@ function windowPanel(k: Kit, g: THREE.Group, style: WindowId, size: OpeningSize,
 /** ゆかまで ある おおきな ひきちがいの まど。 */
 function bigPanel(k: Kit, g: THREE.Group, style: WindowId, size: OpeningSize, inside: boolean) {
   const { w, h } = size
+  if (style === 'shutters') {
+    windowPanel(k, g, style, size, inside)
+    return
+  }
   if (style === 'shoji') {
     shojiGrid(k, g, w, h, 6, 5)
     block(k, g, [.03, h, .05], '#8b6b4a', [0, 0, .04], { noShadow: true })
     return
   }
-  const color = '#e9edf0'
+  const color = style === 'wide' ? '#3e626b' : '#e9edf0'
   pane(k, g, w, h, glass(k, inside))
   frame(k, g, w, h, color, .1)
   block(k, g, [.06, h, .06], color, [0, 0, .05], { noShadow: true })
   block(k, g, [.03, .22, .04], '#90a4ae', [-.08, h * .45, .08], { noShadow: true })
   block(k, g, [.03, .22, .04], '#90a4ae', [.08, h * .45, .08], { noShadow: true })
+  if (style === 'wide') for (const side of [-1, 1]) block(k, g, [.035, h, .06], color, [side * w / 3, 0, .05], { noShadow: true })
   if (style === 'arch' || style === 'round') {
     // うえに まるい らんま。
     const r = Math.min(.5, w / 4)
@@ -143,6 +169,19 @@ function doorPanel(k: Kit, g: THREE.Group, door: DoorId, size: OpeningSize, insi
     frame(k, g, w, h, trim, .1)
     return
   }
+  if (door === 'double') {
+    for (const side of [-1, 1]) {
+      const leaf = group(g, [side * w / 4, 0, 0])
+      leaf.name = 'door-leaf'
+      block(k, leaf, [w / 2 - .02, h, .06], d.color, [0, 0, .03])
+      block(k, leaf, [w * .32, h * .3, .025], '#9a734d', [0, h * .12, .075], { noShadow: true })
+      leaf.add(mesh(k, k.plane(w * .3, h * .35), glass(k, inside), [0, h * .71, .065], { noShadow: true }))
+      block(k, leaf, [.025, h * .35, .025], '#edd1a0', [0, h * .535, .08], { noShadow: true })
+      ball(k, leaf, .045, knob, [-side * w * .16, h * .48, .1])
+    }
+    frame(k, g, w, h, '#f5e3c4', .1)
+    return
+  }
   if (door === 'round') {
     const r = w / 2
     const body = h - r
@@ -158,7 +197,12 @@ function doorPanel(k: Kit, g: THREE.Group, door: DoorId, size: OpeningSize, insi
   block(k, g, [w, h, .06], d.color, [0, 0, .03])
   frame(k, g, w, h, trim, .1)
   const panelColor = door === 'white' ? '#e3e3e3' : new THREE.Color(d.color).multiplyScalar(.82).getStyle()
-  if (door === 'white') {
+  if (door === 'blue') {
+    const porthole = group(g, [0, h * .73, .07])
+    porthole.add(mesh(k, k.circle(w * .19, 24), glass(k, inside), [0, 0, 0], { noShadow: true }))
+    porthole.add(mesh(k, k.torus(w * .19, .035, Math.PI * 2, 24), '#f7f1dc', [0, 0, .02]))
+    block(k, g, [w * .62, h * .24, .025], panelColor, [0, h * .13, .07], { noShadow: true })
+  } else if (door === 'white') {
     g.add(mesh(k, k.plane(.2, h * .7), glass(k, inside), [-w * .22, h * .5, .065], { noShadow: true }))
   } else {
     block(k, g, [w * .62, h * .3, .03], panelColor, [0, h * .58, .07], { noShadow: true })
@@ -173,7 +217,10 @@ function doorPanel(k: Kit, g: THREE.Group, door: DoorId, size: OpeningSize, insi
  * width を わたすと はばを せまく できる（かべが みじかい とき）。
  */
 export function openingPanel(k: Kit, kind: OpeningKind, span: number, look: PanelLook, width?: number): THREE.Group {
-  const base = openingSize(kind, span)
+  let base = openingSize(kind, span)
+  if (kind === 'door' && look.door === 'double') base = { ...base, w: 1.5 }
+  if (kind === 'window' && look.window === 'wide') base = { w: Math.min(2.1, span * CELL - .35), h: .85, bottom: 1.05 }
+  if (kind === 'window' && look.window === 'shutters') base = { ...base, w: 1.7 }
   const size = width ? { ...base, w: Math.min(base.w, width) } : base
   const g = new THREE.Group()
   const inner = group(g, [0, size.bottom, 0])

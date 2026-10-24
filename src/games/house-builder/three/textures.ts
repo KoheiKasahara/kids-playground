@@ -295,6 +295,14 @@ export function roofTexture(kind: RoofKind, color: string, dark: string): THREE.
       }
       g.fillStyle = dark
       for (let y = 0; y < S; y += S / 6) g.fillRect(0, y, S, 2)
+    } else if (kind === 'shed') {
+      // かたながれの きんぞくやね。ながい たての つなぎめ。
+      for (let x = 0; x < S; x += S / 5) {
+        g.fillStyle = dark
+        g.fillRect(x, 0, 4, S)
+        g.fillStyle = shade(color, .22)
+        g.fillRect(x + 4, 0, 2, S)
+      }
     } else if (kind === 'flat') {
       for (let i = 0; i < 1400; i++) {
         g.fillStyle = rnd() < .5 ? shade(color, -.12) : shade(color, .15)

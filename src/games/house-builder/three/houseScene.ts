@@ -4,6 +4,7 @@
 import * as THREE from 'three'
 import type { HouseDesign } from '../plan'
 import { buildExterior } from './exterior'
+import { fitExterior } from './framing'
 import type { Built } from './kit'
 import { buildRoom } from './rooms'
 
@@ -108,9 +109,10 @@ export function createHouseScene(host: HTMLDivElement, design: HouseDesign, view
     const o = current(time)
     const vfov = THREE.MathUtils.degToRad(camera.fov)
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect)
-    const fit = built.radius / Math.sin(Math.min(vfov, hfov) / 2)
+    const framing = built.framing ? fitExterior(built.framing, o.yaw, o.pitch, vfov, hfov) : null
+    const fit = framing?.distance ?? built.radius / Math.sin(Math.min(vfov, hfov) / 2)
     const dist = fit / o.zoom
-    const t = built.target
+    const t = framing?.target ?? built.target
     camera.position.set(
       t.x + Math.sin(o.yaw) * Math.cos(o.pitch) * dist,
       t.y + Math.sin(o.pitch) * dist,

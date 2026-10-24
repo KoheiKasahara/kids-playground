@@ -29,7 +29,7 @@ export type Stage = {
 }
 
 /** 1かいの しょうぶで なげる ボールの かず。 */
-export const BALLS = 10
+export const BALLS = 5
 
 /** ボールの しゅるいごとの はやさ（travel に かける）。 */
 export const PITCH_SPEED: Record<PitchKind, number> = {
@@ -53,33 +53,33 @@ const s = 'straight', f = 'fast', w = 'slow', h = 'hop', v = 'wave', c = 'curve'
 export const STAGES: readonly Stage[] = [
   {
     id: 'penguin', pitcher: 'penguin', name: 'ペンギンの ペンタ', specialty: 'まっすぐ ボール',
-    lead: 'まずは まっすぐ。よーく みて うとう！', travel: 1.35, assist: 1.3, goal: 3, sky: 'morning',
-    pitches: [s, s, s, s, s, s, s, s, s, s],
+    lead: 'まずは まっすぐ。よーく みて うとう！', travel: 1.35, assist: 1.3, goal: 2, sky: 'morning',
+    pitches: [s, s, s, s, s],
   },
   {
     id: 'frog', pitcher: 'frog', name: 'カエルの ケロスケ', specialty: 'ぴょんぴょん ボール',
-    lead: 'ボールが はねるよ。さいごまで よく みて！', travel: 1.25, assist: 1.2, goal: 3, sky: 'noon',
-    pitches: [s, h, s, h, h, s, h, h, s, h],
+    lead: 'ボールが はねるよ。さいごまで よく みて！', travel: 1.25, assist: 1.2, goal: 2, sky: 'noon',
+    pitches: [s, h, s, h, h],
   },
   {
     id: 'octopus', pitcher: 'octopus', name: 'タコの タコハチ', specialty: 'くねくね ボール',
-    lead: 'くねくね まがっても、くるのは まんなか！', travel: 1.2, assist: 1.1, goal: 4, sky: 'afternoon',
-    pitches: [s, v, c, v, s, c, v, v, c, v],
+    lead: 'くねくね まがっても、くるのは まんなか！', travel: 1.2, assist: 1.1, goal: 3, sky: 'afternoon',
+    pitches: [s, v, c, v, c],
   },
   {
     id: 'robot', pitcher: 'robot', name: 'ロボの ガッチャン', specialty: 'ピタッと とまる ボール',
-    lead: 'とまったり はやかったり。あわてないでね', travel: 1.1, assist: 1, goal: 4, sky: 'sunset',
-    pitches: [s, p, f, p, s, f, p, p, f, p],
+    lead: 'とまったり はやかったり。あわてないでね', travel: 1.1, assist: 1, goal: 3, sky: 'sunset',
+    pitches: [s, p, f, p, f],
   },
   {
     id: 'ghost', pitcher: 'ghost', name: 'おばけの フワリ', specialty: 'きえる ボール',
-    lead: 'とちゅうで きえるよ。また でてくるから まってね', travel: 1.2, assist: 1, goal: 5, sky: 'evening',
-    pitches: [s, g, g, w, g, s, g, w, g, g],
+    lead: 'とちゅうで きえるよ。また でてくるから まってね', travel: 1.2, assist: 1, goal: 3, sky: 'evening',
+    pitches: [s, g, g, w, g],
   },
   {
     id: 'dragon', pitcher: 'dragon', name: 'ドラゴンの ドラコ', specialty: 'なんでも なげる',
-    lead: 'さいごの あいて！ いろんな ボールが くるよ', travel: 1.05, assist: 1, goal: 5, sky: 'night',
-    pitches: [f, h, v, p, f, g, c, w, h, f],
+    lead: 'さいごの あいて！ いろんな ボールが くるよ', travel: 1.05, assist: 1, goal: 3, sky: 'night',
+    pitches: [f, h, v, p, g],
   },
 ]
 

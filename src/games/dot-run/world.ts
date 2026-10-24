@@ -17,7 +17,8 @@ const JUMP_V = 4.7
 const AIR_JUMP_V = 4.3
 const STOMP_V = 3.9
 const STOMP_V_HELD = 4.9
-const SPRING_V = 5.8
+/** ばねは ふむだけで いちばん たかい 2だんジャンプより たかく とぶ。 */
+const SPRING_V = 7
 const G_HOLD = .17
 const G_FALL = .3
 const MAX_FALL = 5
@@ -280,9 +281,13 @@ function stepHero(world: World) {
       world.pressBuffer = 0
       emit(world, { type: 'jump', x: hero.x + HERO_W / 2, y: hero.y + HERO_H })
     } else if (canAct && hero.airJumps > 0) {
-      hero.vy = -AIR_JUMP_V * phys.jump
+      // ばねで いきおいよく のぼっている とちゅうでも、2だんジャンプで おそく ならない。
+      const vy = -AIR_JUMP_V * phys.jump
+      if (hero.vy > vy) {
+        hero.vy = vy
+        hero.boost = false
+      }
       hero.airJumps = 0
-      hero.boost = false
       hero.flip = 24
       world.pressBuffer = 0
       emit(world, { type: 'double', x: hero.x + HERO_W / 2, y: hero.y + HERO_H })
@@ -416,7 +421,8 @@ function stepPickups(world: World) {
   })
   for (const s of world.springs) {
     if (s.t > 0) s.t--
-    if (hero.vy < 0 || !overlaps(hero.x, hero.y, HERO_W, HERO_H, s.x + 2, s.y + 7, 12, 9)) continue
+    // ばねの まえで ジャンプしても、あしが ばねに ふれたら ばねで とぶ。
+    if (s.t > 0 || !overlaps(hero.x, hero.y, HERO_W, HERO_H, s.x + 2, s.y + 7, 12, 9)) continue
     hero.vy = -SPRING_V * phys.jump
     hero.boost = true
     hero.onGround = false
