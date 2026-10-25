@@ -194,11 +194,13 @@ const RACE = [
   76, 79, 84, -1, 83, 79, 74, 71,
 ] as const
 const BASS = [48, 43, 45, 43, 41, 48, 43, 48] as const
-const THEMES: Record<Theme, { shift: number; bpm: number; lead: Voice }> = {
-  park: { shift: 0, bpm: 156, lead: 'pulse' },
-  forest: { shift: 2, bpm: 148, lead: 'triangle' },
-  coast: { shift: 5, bpm: 162, lead: 'pulse' },
-  night: { shift: -3, bpm: 168, lead: 'pulse' },
+// level evens out each song's loudness and keeps the music under the effects (select, countdown).
+const GARAGE_LEVEL = .36
+const THEMES: Record<Theme, { shift: number; bpm: number; lead: Voice; level: number }> = {
+  park: { shift: 0, bpm: 156, lead: 'pulse', level: .77 },
+  forest: { shift: 2, bpm: 148, lead: 'triangle', level: .5 },
+  coast: { shift: 5, bpm: 162, lead: 'pulse', level: .62 },
+  night: { shift: -3, bpm: 168, lead: 'pulse', level: .81 },
 }
 
 /** Start only after the first interaction. Cleanup stops even the already scheduled notes. */
@@ -212,6 +214,7 @@ export function startMiniBgm(mode: 'garage' | 'race', theme: Theme = 'park'): ()
   const melody = race ? RACE : GARAGE
   const step = 30 / (race ? profile.bpm : 112)
   const shift = race ? profile.shift : 0
+  const level = race ? profile.level : GARAGE_LEVEL
   let next = ctx.currentTime + .025
   let index = 0
   let stopped = false
@@ -238,14 +241,14 @@ export function startMiniBgm(mode: 'garage' | 'race', theme: Theme = 'park'): ()
       if (note > 0) {
         let length = 1
         while (length < 8 && melody[(position + length) % melody.length] === -1) length++
-        voices.tone(note + shift, next, step * length * .86, race ? .023 : .036, race ? profile.lead : 'triangle')
-        if (race && beat % 2 === 0) voices.tone(note + shift - 12, next + step * .5, step * .35, .008)
+        voices.tone(note + shift, next, step * length * .86, (race ? .023 : .036) * level, race ? profile.lead : 'triangle')
+        if (race && beat % 2 === 0) voices.tone(note + shift - 12, next + step * .5, step * .35, .008 * level)
       }
       const bass = BASS[Math.floor(position / 8)] + shift
-      if (race || beat % 2 === 0) voices.tone(bass + (beat % 4 === 2 ? 7 : beat % 4 === 3 ? 12 : 0), next, step * .72, .045, 'triangle')
-      if (beat % 4 === 0) voices.tone(43, next, .095, .075, 'sine', 26)
-      if (race && beat % 4 === 2) voices.percussion(next, .065, .028)
-      if (race || beat % 2 === 1) voices.percussion(next, .025, race ? .012 : .008, true)
+      if (race || beat % 2 === 0) voices.tone(bass + (beat % 4 === 2 ? 7 : beat % 4 === 3 ? 12 : 0), next, step * .72, .045 * level, 'triangle')
+      if (beat % 4 === 0) voices.tone(43, next, .095, .075 * level, 'sine', 26)
+      if (race && beat % 4 === 2) voices.percussion(next, .065, .028 * level)
+      if (race || beat % 2 === 1) voices.percussion(next, .025, (race ? .012 : .008) * level, true)
       index++
       next += step
     }

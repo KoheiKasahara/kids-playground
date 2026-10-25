@@ -9,8 +9,8 @@ import { GAME_SOUND_LEVEL_DB, SOUND_LOUDNESS_TARGET_DB, SOUND_LOUDNESS_TOLERANCE
 
 /** 代表音のうち小さい音も、目標からこれ以上は小さくしない（小さすぎて「音がない」と感じさせない）。 */
 const QUIETEST_SOUND_BELOW_TARGET_DB = 20
-/** BGM・走行音は効果音を邪魔しないよう、目標よりこれ以上小さくする。 */
-const BACKGROUND_BELOW_TARGET_DB = 3
+/** BGM・走行音は効果音を邪魔しないよう、目標よりこれ以上小さくする（ふだんの操作音より下に置く）。 */
+const BACKGROUND_BELOW_TARGET_DB = 8
 /** 補正後もリミッターに頼らず波形が割れないこと [dBFS]。 */
 const MAX_PEAK_DBFS = -1
 
@@ -76,9 +76,11 @@ describe('game sound loudness', () => {
   const gameIds = GAME_CATALOG.map((game) => game.id)
 
   for (const gameId of gameIds) {
-    // Rendering all 15 mini-4wd samples (including five BGMs) takes about 23s
-    // under V8 coverage locally; allow bounded headroom on shared CI runners.
-    const timeout = gameId === 'mini-4wd' ? 60_000 : undefined
+    // Rendering BGMs dominates this case: all 15 mini-4wd samples with five BGMs
+    // took about 23s under V8 coverage locally and 42s in Nightly. Games register
+    // every song, so give each BGM bounded headroom on shared CI runners.
+    const backgroundCount = (GAME_SOUND_SAMPLES[gameId] ?? []).filter((sample) => sample.background).length
+    const timeout = 30_000 + backgroundCount * 10_000
     it(`${gameId} registers representative sounds that actually play`, () => {
       const samples = GAME_SOUND_SAMPLES[gameId]
       expect(samples, `${gameId} の代表的な効果音を src/test/audio/gameSoundSamples.ts に登録してください（音のないゲームはつくらない）`).toBeDefined()
@@ -116,11 +118,17 @@ describe('game sound loudness', () => {
 
   it.each(gameIds)('%s keeps music and engine sounds under the sound effects', (gameId) => {
     const report = measureGame(gameId)
+    // 補正はゲーム全体に同じだけかかるので、効果音との比べっこは補正前の値でよい。
+    const quietest = report.sounds.reduce((a, b) => (a.level <= b.level ? a : b))
     for (const sound of report.background) {
       expect(
         sound.level + report.trim,
         `${gameId}「${sound.name}」（鳴り続ける音）が大きすぎます`,
       ).toBeLessThanOrEqual(SOUND_LOUDNESS_TARGET_DB - BACKGROUND_BELOW_TARGET_DB)
+      expect(
+        sound.level,
+        `${gameId}「${sound.name}」（鳴り続ける音）に「${quietest.name}」がうもれます。BGM を下げるか、効果音を上げてください。`,
+      ).toBeLessThanOrEqual(quietest.level)
     }
   })
 

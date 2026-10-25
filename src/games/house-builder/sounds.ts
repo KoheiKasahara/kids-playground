@@ -228,7 +228,7 @@ export function startBgm(): () => void {
   const ctx = isSoundEnabled() ? getSharedAudioContext() : undefined
   if (!ctx) return () => {}
   const master = ctx.createGain()
-  master.gain.value = 1
+  master.gain.value = .62
   master.connect(getSoundOutput(ctx))
 
   const sixteenth = 60 / BPM / 4

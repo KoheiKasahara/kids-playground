@@ -114,7 +114,7 @@ export function playMunchSound() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  for (let i = 0; i < 4; i++) noise(ctx, t + i * .16, .06, .09, 900)
+  for (let i = 0; i < 4; i++) noise(ctx, t + i * .16, .06, .16, 900)
 }
 
 /** たべおわって うれしい「ピロリン♪」。 */
@@ -255,7 +255,7 @@ export const SONGS: Record<'day' | 'night', Song> = {
   night: {
     bpm: 72,
     voice: 'triangle',
-    vol: .06,
+    vol: .025,
     melody: 'E5 - - - G5 - - - | A5 - G5 - E5 - - - | D5 - - - E5 - C5 - | A4 - - - - - . . | C5 - - - D5 - - - | E5 - G5 - E5 - - - | D5 - C5 - A4 - - - | C5 - - - - - . .',
     bass: ['A2', 'F2', 'G2', 'A2', 'F2', 'C3', 'G2', 'C3'],
   },
@@ -268,7 +268,7 @@ export function startBgm(id: 'day' | 'night'): () => void {
   if (!song || !ctx) return () => {}
   const master = ctx.createGain()
   master.gain.setValueAtTime(0, ctx.currentTime)
-  master.gain.linearRampToValueAtTime(.5, ctx.currentTime + 1)
+  master.gain.linearRampToValueAtTime(.33, ctx.currentTime + 1)
   master.connect(getSoundOutput(ctx))
   const delay = ctx.createDelay(1)
   delay.delayTime.value = 60 / song.bpm * .75

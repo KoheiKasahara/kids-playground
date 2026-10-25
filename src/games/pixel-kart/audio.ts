@@ -53,9 +53,10 @@ export class KartAudio {
       if (!ctx) return
       while (next < ctx.currentTime + .18) {
         const note = melody[beat % melody.length]
-        this.tone(note, next, .21, .042, 'square')
-        if (beat % 2 === 0) this.tone(melody[Math.floor(beat / 8) * 8 % melody.length] - 24, next, .3, .10)
-        if (beat % 4 === 3) this.tone(note + 12, next + .1, .12, .027, 'sine')
+        // Keep the music under the effects (countdown, jump) so they stay audible during a race.
+        this.tone(note, next, .21, .017, 'square')
+        if (beat % 2 === 0) this.tone(melody[Math.floor(beat / 8) * 8 % melody.length] - 24, next, .3, .04)
+        if (beat % 4 === 3) this.tone(note + 12, next + .1, .12, .011, 'sine')
         next += .215
         beat++
       }

@@ -149,7 +149,7 @@ export function playBumpSound() {
 export function playTapSound() {
   const ctx = sfx()
   if (!ctx) return
-  tone(ctx, getSoundOutput(ctx), freq('A6'), ctx.currentTime, .03, .065, 'pulse')
+  tone(ctx, getSoundOutput(ctx), freq('A6'), ctx.currentTime, .03, .17, 'pulse')
 }
 
 /** メッセージの もじおくり「ポポポ」。 */
@@ -195,7 +195,7 @@ export function startBgm(id: string): () => void {
   const ctx = isSoundEnabled() ? getSharedAudioContext() : undefined
   if (!song || !ctx) return () => {}
   const master = ctx.createGain()
-  master.gain.value = .55
+  master.gain.value = .37
   master.connect(getSoundOutput(ctx))
   // すこし ひびきを つける（SFC の エコー）。
   const delay = ctx.createDelay(1)

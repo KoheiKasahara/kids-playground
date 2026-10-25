@@ -14,7 +14,7 @@ function notes(frequencies: number[], duration: number, volume: number) {
 }
 
 export function playTapSound() {
-  notes([260, 180], 0.07, 0.18)
+  notes([260, 180], 0.07, 0.24)
 }
 
 export function playStartSound() {
@@ -78,7 +78,7 @@ export function startBgm(): () => void {
   const ctx = isSoundEnabled() ? getSharedAudioContext() : undefined
   if (!ctx) return () => {}
   const master = ctx.createGain()
-  master.gain.value = 0.5
+  master.gain.value = 0.38
   master.connect(getSoundOutput(ctx))
   const step = 60 / BPM / 2
   let index = 0
