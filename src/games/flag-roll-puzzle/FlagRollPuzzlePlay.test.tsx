@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -14,6 +14,17 @@ vi.mock('./usePuzzleEngine', () => ({
   usePuzzleEngine: (options: PuzzleEngineOptions) => {
     engineMock.options = options
     return { registerBall: () => {} }
+  },
+}))
+
+// 効果音・BGMは鳴らさず、どの場面で何を鳴らしたかだけを記録する。
+const soundMock = vi.hoisted(() => ({ play: vi.fn(), startBgm: vi.fn(), stopBgm: vi.fn() }))
+vi.mock('./sounds', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./sounds')>()),
+  playPuzzleSound: soundMock.play,
+  startBgm: () => {
+    soundMock.startBgm()
+    return soundMock.stopBgm
   },
 }))
 
@@ -60,6 +71,9 @@ const placedParts = () => screen.queryAllByTestId('puzzle-part')
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  soundMock.play.mockClear()
+  soundMock.startBgm.mockClear()
+  soundMock.stopBgm.mockClear()
 })
 
 /** 盤面のマスをタップする（押して、動かさずに離す） */
@@ -239,7 +253,7 @@ describe('こっきコロコロパズル', () => {
     expect(trayPart('たいほう みぎ')).toBeEnabled()
     expect(trayPart('かいてんばん')).toBeEnabled()
     expect(trayPart('おおきい かいてんばん')).toBeEnabled()
-    expect(trayPart('ベルトコンベア')).toBeEnabled()
+    expect(trayPart('ベルト コンベア')).toBeEnabled()
     expect(trayPart('シーソー')).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'よこいた' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'ながい いた' })).not.toBeInTheDocument()
@@ -405,7 +419,7 @@ describe('こっきコロコロパズル', () => {
   test('ベルトコンベアは配置・移動・4方向回転・削除ができる', async () => {
     const user = userEvent.setup()
     await renderGame()
-    await user.click(trayPart('ベルトコンベア'))
+    await user.click(trayPart('ベルト コンベア'))
     tapBoard(2, 3)
     expect(placedParts()[0]).toHaveAttribute('data-part-type', 'conveyorRight')
     tapBoard(2, 3)
@@ -820,4 +834,79 @@ test('新しいしかけを選んで置け、せんぷうきを回せる', async
   expect(engineMock.options?.parts.map(p => p.typeId)).toEqual(['fanLeft', 'bubbleLift', 'warpIn', 'warpOut'])
   tapBoard(3, 7)
   expect(engineMock.options?.parts).toHaveLength(4)
+})
+
+describe('こっきコロコロパズル: おと と そうさの だん', () => {
+  const played = () => soundMock.play.mock.calls.map(([kind]) => kind)
+
+  test('おく・おとす・ゴールで こうかおんを ならし、おわった ときは ファンファーレ', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('ひだりへ'))
+    tapBoard(2, 3)
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    act(() => engineMock.options?.onGoal())
+    expect(played()).toEqual(['pick', 'pick', 'place', 'drop', 'clear'])
+
+    // ころがっている あいだの パーツの おとは、エンジンから そのまま こうかおんへ つなぐ。
+    act(() => engineMock.options?.onPartSound?.('cannonFire'))
+    expect(played().at(-1)).toBe('cannonFire')
+  })
+
+  test('おけない ところ・とちゅうで とまった ときも おとで しらせる', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('おおきい かいてんばん'))
+    tapBoard(GRID_COLS - 1, 3)
+    expect(played()).toContain('blocked')
+
+    await user.click(screen.getByRole('button', { name: 'ボールを おとす！' }))
+    act(() => engineMock.options?.onStopped('ball-a'))
+    expect(played().at(-1)).toBe('stopped')
+  })
+
+  test('ばんめんでは BGM が ながれ、「おと」ボタンで とめたり もどしたり できる', async () => {
+    const user = userEvent.setup()
+    await renderStageSelect()
+    expect(soundMock.startBgm).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'かんたん' }))
+    expect(soundMock.startBgm).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: 'おとを けす' }))
+    expect(soundMock.stopBgm).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'おとを だす' })).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'おとを だす' }))
+    expect(soundMock.startBgm).toHaveBeenCalledTimes(2)
+
+    // ステージ選択へ もどると BGM は とまる。
+    await user.click(screen.getByRole('button', { name: 'もどる' }))
+    expect(soundMock.stopBgm).toHaveBeenCalledTimes(2)
+  })
+
+  test('いつもの ひとことは ださず、「ぜんぶ けす」と「ボールを おとす！」を ひとことの だんに ならべる', async () => {
+    await renderGame()
+    expect(screen.queryByText('いたを おいて、ゴールまで はこぼう！')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    const actions = screen.getByTestId('puzzle-actions')
+    expect(within(actions).getByRole('button', { name: 'ぜんぶ けす' })).toBeInTheDocument()
+    expect(within(actions).getByRole('button', { name: 'ボールを おとす！' })).toBeInTheDocument()
+    expect(within(actions).getByRole('status')).toBeInTheDocument()
+    expect(within(screen.getByTestId('part-tray')).queryAllByRole('button').length).toBeGreaterThanOrEqual(10)
+  })
+
+  test('パーツを えらんでいる ときの あんないは「まわす」「けす」を けさずに かさねて だす', async () => {
+    const user = userEvent.setup()
+    await renderGame()
+    await user.click(trayPart('ひだりへ'))
+    tapBoard(2, 3)
+    tapBoard(2, 3)
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
+    dragBoardPart([2, 3], [2, -1])
+    expect(screen.getByRole('status')).toHaveTextContent('ここには おけないよ')
+    expect(screen.getByRole('status')).toHaveAttribute('data-floating', 'true')
+    expect(screen.getByRole('button', { name: 'まわす' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'けす' })).toBeInTheDocument()
+  })
 })

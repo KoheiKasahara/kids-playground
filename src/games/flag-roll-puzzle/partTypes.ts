@@ -270,7 +270,7 @@ function conveyorDefinition(
 ): PartDefinition {
   return {
     id,
-    label: 'ベルトコンベア',
+    label: 'ベルト コンベア',
     inTray,
     appearance: 'conveyor',
     cells: SINGLE_CELL,

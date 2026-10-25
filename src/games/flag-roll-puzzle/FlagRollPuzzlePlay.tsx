@@ -4,7 +4,8 @@ import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { findFlagBall, type FlagBallData } from '../../components/flag-ball/flagBalls'
-import { playCorrectSound, playPanelOpenSound, primeAudio } from '../../utils/quizSound'
+import { primeAudio } from '../../audio/sound'
+import { useSoundToggle } from '../../audio/useSoundToggle'
 import ClearAllConfirmDialog from './ClearAllConfirmDialog'
 import FlagPickerDialog, { type FlagPickerBall } from './FlagPickerDialog'
 import PartShape from './PartShape'
@@ -37,6 +38,7 @@ import { useBoardScale } from './useBoardScale'
 import { useLandscapeLayout } from './useLandscapeLayout'
 import { usePuzzleEngine } from './usePuzzleEngine'
 import { puzzleProgress, puzzleStars } from './puzzleProgress'
+import { playPuzzleSound, startBgm } from './sounds'
 import { vibrate } from '../../utils/haptics'
 import styles from './FlagRollPuzzlePlay.module.css'
 
@@ -68,7 +70,8 @@ type DragState = {
   readonly moved: boolean
 }
 
-const EDIT_HINT = 'いたを おいて、ゴールまで はこぼう！'
+/** 置き場でパーツを選んだのに、そのパーツに専用の説明がないときのひとこと。 */
+const PLACE_HINT = 'おきたい ところを タップ！'
 
 export default function FlagRollPuzzlePlay() {
   const [state, setState] = useState(createPuzzleState)
@@ -90,6 +93,13 @@ export default function FlagRollPuzzlePlay() {
   const [justPlacedPartId, setJustPlacedPartId] = useState<string | null>(null)
   const [rotatingPartId, setRotatingPartId] = useState<string | null>(null)
   const [invalidDrop, setInvalidDrop] = useState(false)
+  const [sound, toggleSound] = useSoundToggle()
+
+  // BGMは盤面で遊んでいるあいだだけ流す（ステージ選択では止める）。
+  useEffect(() => {
+    if (!sound || selectedStageId === null) return undefined
+    return startBgm()
+  }, [sound, selectedStageId])
 
   const { containerRef, scale, width, height } = useBoardScale()
   const isLandscapeLayout = useLandscapeLayout()
@@ -129,6 +139,7 @@ export default function FlagRollPuzzlePlay() {
   }, [])
 
   const flashInvalidDrop = useCallback(() => {
+    playPuzzleSound('blocked')
     setInvalidDrop(true)
     if (feedbackTimeoutRef.current !== null) clearTimeout(feedbackTimeoutRef.current)
     feedbackTimeoutRef.current = setTimeout(() => setInvalidDrop(false), 240)
@@ -144,9 +155,10 @@ export default function FlagRollPuzzlePlay() {
     const allBallsReached = goalHandledRef.current.size >= state.balls.length
     if (!allBallsReached) {
       showMessage('あと 1こ！')
+      playPuzzleSound('goalOne')
     } else {
       setMessage('')
-      playCorrectSound()
+      playPuzzleSound('clear')
       vibrate('celebrate')
       const latest = latestStateRef.current
       puzzleProgress.record(latest.stageId, puzzleStars(latest.parts, latest.stageId))
@@ -157,6 +169,7 @@ export default function FlagRollPuzzlePlay() {
   const handleStopped = useCallback((ballId?: string, snapshots?: readonly PuzzleBallSnapshot[]) => {
     const targetId = ballId ?? state.balls.find((ball) => ball.status === 'moving')?.id
     if (!targetId) return
+    playPuzzleSound('stopped')
     setState((current) => markBallStopped(current, targetId, snapshots))
   }, [state.balls])
 
@@ -173,6 +186,7 @@ export default function FlagRollPuzzlePlay() {
     runId: state.runId,
     onGoal: handleGoal,
     onStopped: handleStopped,
+    onPartSound: playPuzzleSound,
   })
 
   /** 画面上のポインタ位置を、盤面のマスへ変換する */
@@ -198,7 +212,7 @@ export default function FlagRollPuzzlePlay() {
       }
       setState(next)
       setJustPlacedPartId(next.parts.at(-1)?.id ?? null)
-      playPanelOpenSound()
+      playPuzzleSound('place')
     },
     [state, showMessage, flashInvalidDrop],
   )
@@ -213,7 +227,7 @@ export default function FlagRollPuzzlePlay() {
         return
       }
       setState(next)
-      playPanelOpenSound()
+      playPuzzleSound('place')
     },
     [state, showMessage, flashInvalidDrop],
   )
@@ -272,7 +286,7 @@ export default function FlagRollPuzzlePlay() {
     }
     setState((current) => rotateSelectedPart(current))
     setRotatingPartId(state.selectedPartId)
-    playPanelOpenSound()
+    playPuzzleSound('rotate')
   }
 
   /** ドラッグの終了。動かしていなければタップとして扱う */
@@ -296,6 +310,7 @@ export default function FlagRollPuzzlePlay() {
           handleRotateSelectedPart()
           return
         }
+        if (state.selectedPartId !== partId) playPuzzleSound('pick')
         setState((current) => selectPart(current, partId))
       }
       return
@@ -324,6 +339,7 @@ export default function FlagRollPuzzlePlay() {
     primeAudio()
     // パーツ置き場の選択と、盤面のパーツの選択は同時に持たない（操作の対象を1つに保つ）
     setState((current) => clearPartSelection(current))
+    if (selectedTypeId !== typeId) playPuzzleSound('pick')
     setSelectedTypeId((current) => (current === typeId ? null : typeId))
   }
 
@@ -360,7 +376,7 @@ export default function FlagRollPuzzlePlay() {
   /** 選んでいるパーツを1つだけ消す */
   const handleRemoveSelectedPart = () => {
     setState((current) => removeSelectedPart(current))
-    playPanelOpenSound()
+    playPuzzleSound('remove')
   }
 
   const handleDrop = () => {
@@ -374,10 +390,13 @@ export default function FlagRollPuzzlePlay() {
       .map((ball) => ball.id)
     goalHandledRef.current.clear()
     for (const ballId of reachedBallIds) goalHandledRef.current.add(ballId)
+    playPuzzleSound('drop')
     setState((current) => startRun(current))
   }
 
   const handleReturnBall = () => {
+    primeAudio()
+    playPuzzleSound('return')
     goalHandledRef.current.clear()
     setState((current) => returnBall(current))
   }
@@ -387,6 +406,7 @@ export default function FlagRollPuzzlePlay() {
     setSelectedTypeId(null)
     setGhostCell(null)
     goalHandledRef.current.clear()
+    playPuzzleSound('clearAll')
     setState((current) => clearAll(current))
   }
 
@@ -400,12 +420,19 @@ export default function FlagRollPuzzlePlay() {
       clearEverything()
       return
     }
+    playPuzzleSound('pick')
     setClearConfirmOpen(true)
+  }
+
+  const openFlagPicker = () => {
+    primeAudio()
+    playPuzzleSound('pick')
+    setFlagPickerOpen(true)
   }
 
   const handleFlagSelect = (ballId: string, flagId: string) => {
     setState((current) => setBallFlag(current, ballId, flagId))
-    playPanelOpenSound()
+    playPuzzleSound('flag')
   }
 
   const defaultFlag: FlagBallData = findFlagBall(INITIAL_BALL_FLAG_ID)!
@@ -431,7 +458,7 @@ export default function FlagRollPuzzlePlay() {
   const selectedPart = state.parts.find((part) => part.id === state.selectedPartId) ?? null
   // パーツを選んでいるあいだは、同じ行に出る「けす」がそのまま案内になるため
   // ひとことは出さない（同じことを2つ並べて書かない）。
-  const editHint = partSelected ? '' : selectedTypeId ? (partDefinition(selectedTypeId).hint ?? EDIT_HINT) : EDIT_HINT
+  const editHint = partSelected || !selectedTypeId ? '' : (partDefinition(selectedTypeId).hint ?? PLACE_HINT)
   const status =
     message ||
     (state.phase === 'cleared'
@@ -443,6 +470,8 @@ export default function FlagRollPuzzlePlay() {
           : 'ころころ ころがってるよ！')
 
   const handleSelectStage = (stageId: PuzzleStageId) => {
+    primeAudio()
+    playPuzzleSound('pick')
     goalHandledRef.current.clear()
     setState((current) => changeStage(current, stageId))
     setSelectedStageId(stageId)
@@ -468,7 +497,7 @@ export default function FlagRollPuzzlePlay() {
               className={[styles.flagButton, styles.headerFlagButton].join(' ')}
               aria-label={`こっきを かえる（${flagButtonLabel}）`}
               disabled={!editing}
-              onClick={() => setFlagPickerOpen(true)}
+              onClick={openFlagPicker}
             >
               <span className={styles.flagButtonLabel}>こっき</span>
               <span className={styles.flagButtonBalls}>
@@ -478,6 +507,15 @@ export default function FlagRollPuzzlePlay() {
               </span>
             </button>
           ) : null}
+          <button
+            type="button"
+            className={styles.soundButton}
+            aria-label={sound ? 'おとを けす' : 'おとを だす'}
+            aria-pressed={sound}
+            onClick={toggleSound}
+          >
+            <span aria-hidden="true">{sound ? '🔊' : '🔇'}</span>
+          </button>
         </header>
 
         <div className={styles.body} data-testid="puzzle-layout">
@@ -519,7 +557,7 @@ export default function FlagRollPuzzlePlay() {
                 className={[styles.flagButton, styles.panelFlagButton].join(' ')}
                 aria-label={`こっきを かえる（${flagButtonLabel}）`}
                 disabled={!editing}
-                onClick={() => setFlagPickerOpen(true)}
+                onClick={openFlagPicker}
               >
                 <span className={styles.flagButtonLabel}>こっき</span>
                 <span className={styles.flagButtonBalls}>
@@ -531,60 +569,64 @@ export default function FlagRollPuzzlePlay() {
               </button>
             ) : null}
             {/*
-              ひとことと「けす」を同じ行に置き、選択中でも行の高さが変わらないようにする
-              （盤面の高さが選択のたびに動くと、置いたパーツの位置が見た目で動いてしまう）。
+              操作の段。「ぜんぶ けす」・ひとこと（パーツを選んでいるときは「まわす」「けす」）・
+              「ボールを おとす！」を1段にまとめ、パーツ置き場には画面の横幅をまるごと使わせる。
+              選択の有無で段の高さが変わらないようにし、盤面の大きさが動かないようにする。
             */}
-            <div className={styles.statusRow}>
-              <p className={styles.status} role="status" aria-live="polite" data-cleared={state.phase === 'cleared'}>
-                {status}
-              </p>
-              {partSelected ? (
-                <div className={styles.partActions}>
-                  {selectedPart && isRotatablePart(selectedPart.typeId) ? (
-                    <button type="button" className={styles.rotateButton} onClick={handleRotateSelectedPart}>
-                      まわす
+            <div className={styles.actionRow} data-testid="puzzle-actions">
+              <button type="button" className={styles.clearButton} onClick={handleClearAll}>
+                <span className={styles.clearButtonLine}>ぜんぶ</span>{' '}
+                <span className={styles.clearButtonLine}>けす</span>
+              </button>
+
+              <div className={styles.actionCenter}>
+                {partSelected ? (
+                  <div className={styles.partActions}>
+                    {selectedPart && isRotatablePart(selectedPart.typeId) ? (
+                      <button type="button" className={styles.rotateButton} onClick={handleRotateSelectedPart}>
+                        まわす
+                      </button>
+                    ) : null}
+                    <button type="button" className={styles.removeButton} onClick={handleRemoveSelectedPart}>
+                      けす
                     </button>
-                  ) : null}
-                  <button type="button" className={styles.removeButton} onClick={handleRemoveSelectedPart}>
-                    けす
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            {/*
-              パーツ置き場と操作ボタンを1つの「どっく」にまとめる。縦画面では横に並べて
-              1段に収め、そのぶんの高さを盤面（配置ゾーン）へ回す。
-            */}
-            <div className={styles.dock} data-testid="puzzle-dock">
-              <PartTray
-                selectedTypeId={selectedTypeId}
-                disabled={!editing}
-                isLandscapeLayout={isLandscapeLayout}
-                availablePartTypeIds={stage.availablePartTypeIds}
-                onPartPointerDown={handlePartPointerDown}
-                onPartPointerMove={handleDragMove}
-                onPartPointerUp={handleDragEnd}
-                onPartClick={handlePartClick}
-              />
-
-              <div className={styles.controls}>
-                {editing ? (
-                  <BigButton className={styles.dropButton} onClick={handleDrop}>
-                    <span className={styles.dropButtonLine}>ボールを</span>{' '}
-                    <span className={styles.dropButtonLine}>おとす！</span>
-                  </BigButton>
-                ) : (
-                  <BigButton className={styles.dropButton} variant="secondary" onClick={handleReturnBall}>
-                    <span className={styles.dropButtonLine}>ボールを</span>{' '}
-                    <span className={styles.dropButtonLine}>もどす</span>
-                  </BigButton>
-                )}
-                <button type="button" className={styles.clearButton} onClick={handleClearAll}>
-                  ぜんぶ けす
-                </button>
+                  </div>
+                ) : null}
+                <p
+                  className={styles.status}
+                  role="status"
+                  aria-live="polite"
+                  data-cleared={state.phase === 'cleared'}
+                  data-floating={partSelected}
+                >
+                  {status}
+                </p>
               </div>
+
+              {editing ? (
+                <BigButton className={styles.dropButton} onClick={handleDrop}>
+                  <span className={styles.dropButtonLine}>ボールを</span>{' '}
+                  <span className={styles.dropButtonLine}>おとす！</span>
+                </BigButton>
+              ) : (
+                <BigButton className={styles.dropButton} variant="secondary" onClick={handleReturnBall}>
+                  <span className={styles.dropButtonLine}>ボールを</span>{' '}
+                  <span className={styles.dropButtonLine}>もどす</span>
+                </BigButton>
+              )}
             </div>
+
+            <PartTray
+              selectedTypeId={selectedTypeId}
+              disabled={!editing}
+              isLandscapeLayout={isLandscapeLayout}
+              availablePartTypeIds={stage.availablePartTypeIds}
+              className={styles.tray}
+              onPartPointerDown={handlePartPointerDown}
+              onPartPointerMove={handleDragMove}
+              onPartPointerUp={handleDragEnd}
+              onPartClick={handlePartClick}
+            />
           </aside>
         </div>
 

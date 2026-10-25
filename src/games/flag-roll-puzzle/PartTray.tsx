@@ -11,6 +11,8 @@ type PartTrayProps = {
   /** 横画面の右ペインでは縦スクロール、左向きドラッグで盤面へ出す */
   isLandscapeLayout: boolean
   availablePartTypeIds?: readonly PartTypeId[]
+  /** 置き場を並べる側（親のレイアウト）から足すclass */
+  className?: string
   onPartPointerDown: (typeId: PartTypeId, event: PointerEvent<HTMLButtonElement>) => void
   onPartPointerMove: (event: PointerEvent<HTMLButtonElement>) => void
   onPartPointerUp: (event: PointerEvent<HTMLButtonElement>) => void
@@ -37,7 +39,7 @@ function previewShapeStyle(definition: PartDefinition): CSSProperties {
  * パーツ置き場。パーツ定義の一覧をそのまま並べるので、種類が増えても
  * ここを書き足す必要はない。
  *
- * 幼児がスマホの指で扱えるよう、1つ1つを大きく（88px以上）取り、
+ * 幼児がスマホの指で扱えるよう、1つ1つをタップの目安以上の大きさに取り、
  * 見本は盤面に置いたときと同じ形（PartShape）で見せる。
  * Phase 1では使える数に制限を設けないので、何度でも同じパーツを取り出せる。
  */
@@ -46,6 +48,7 @@ export default function PartTray({
   disabled,
   isLandscapeLayout,
   availablePartTypeIds,
+  className,
   onPartPointerDown,
   onPartPointerMove,
   onPartPointerUp,
@@ -114,7 +117,7 @@ export default function PartTray({
 
   return (
     <section
-      className={styles.tray}
+      className={[styles.tray, className].filter(Boolean).join(' ')}
       aria-label="パーツおきば"
       data-testid="part-tray"
       data-layout={isLandscapeLayout ? 'landscape' : 'portrait'}
