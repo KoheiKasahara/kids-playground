@@ -91,7 +91,7 @@ function sfx() {
 export function playJump() {
   const ctx = sfx()
   if (!ctx) return
-  slide(ctx, getSoundOutput(ctx), 280, 760, ctx.currentTime, .13, .07, 'pulse')
+  slide(ctx, getSoundOutput(ctx), 280, 760, ctx.currentTime, .13, .19, 'pulse')
 }
 
 /** くうちゅうで もう1かい「ぴょーん」。 */
@@ -99,7 +99,7 @@ export function playDoubleJump() {
   const ctx = sfx()
   if (!ctx) return
   const t = ctx.currentTime
-  slide(ctx, getSoundOutput(ctx), 480, 1200, t, .14, .06, 'pulse')
+  slide(ctx, getSoundOutput(ctx), 480, 1200, t, .14, .16, 'pulse')
   tone(ctx, getSoundOutput(ctx), freq('E7'), t + .08, .06, .02, 'sine')
 }
 
@@ -280,7 +280,7 @@ export function startBgm(id: StageId): () => void {
   const ctx = isSoundEnabled() ? getSharedAudioContext() : undefined
   if (!song || !ctx) return () => {}
   const master = ctx.createGain()
-  master.gain.value = .5
+  master.gain.value = .35
   master.connect(getSoundOutput(ctx))
   const delay = ctx.createDelay(1)
   delay.delayTime.value = 60 / song.bpm * .75
@@ -300,7 +300,7 @@ export function startBgm(id: StageId): () => void {
       if (s !== '-' && s !== '.') {
         let len = 1
         while (steps[(index + len) % steps.length] === '-' && len < 8) len++
-        const vol = song.lead === 'triangle' ? .1 : .042
+        const vol = song.lead === 'triangle' ? .03 : .042
         tone(ctx, master, freq(s), next, len * step * .9, vol, song.lead)
         tone(ctx, delay, freq(s), next, len * step * .9, vol * .6, song.lead)
         if (song.drums === 'bell') tone(ctx, master, freq(s) * 2, next, .08, .012, 'sine')

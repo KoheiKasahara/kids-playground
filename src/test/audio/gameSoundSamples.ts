@@ -6,6 +6,7 @@
  * ゲームを追加したら、そのゲームでよく鳴る音（タップ・せいかい・クリアなど）をここへ足す。
  * かべ・バンパー・ドミノのカタカタのように連打で鳴る細かい音は、わざと控えめなので入れない。
  * BGM や走行音のように鳴り続ける音は background: true にする（効果音より小さいことだけ確かめる）。
+ * ステージや場面で曲が変わるゲームは、1曲だけ大きいのを見逃さないよう、すべての曲を登録する。
  */
 import type { SoundSample } from './soundMeter'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
@@ -28,14 +29,17 @@ import { craneSound } from '../../games/crane-game/craneSound'
 import * as dotAdventure from '../../games/dot-adventure/sounds'
 import * as dotAquarium from '../../games/dot-aquarium/sounds'
 import * as dotBomb from '../../games/dot-bomb/sounds'
+import { WORLDS as DOT_BOMB_WORLDS } from '../../games/dot-bomb/stages'
 import * as dotMonsterFarm from '../../games/dot-monster-farm/sounds'
 import * as dotRun from '../../games/dot-run/sounds'
+import { STAGES as DOT_RUN_STAGES } from '../../games/dot-run/stages'
 import * as dotZoo from '../../games/dot-zoo/sounds'
 import { playStarSound as playDrawGoalStarSound, playWarpSound as playDrawGoalWarpSound } from '../../games/draw-goal/sounds'
 import { playGlobeZoomSound } from '../../games/earth-globe/sounds'
 import { playDeliverySound } from '../../games/forest-delivery/sounds'
 import * as hoshi from '../../games/hoshi-tsunagi/sounds'
 import * as jishaku from '../../games/jishaku-pitatto/sounds'
+import { STAGES as JISHAKU_STAGES } from '../../games/jishaku-pitatto/stages'
 import * as kabukuwa from '../../games/kabukuwa-battle/sounds'
 import * as rokuro from '../../games/kurukuru-rokuro/sounds'
 import * as sandbox from '../../games/magic-sandbox/sounds'
@@ -46,6 +50,7 @@ import * as oekaki from '../../games/oekaki-korokoro/sounds'
 import * as onaji from '../../games/onaji-pon/sounds'
 import * as origami from '../../games/origami-play/sounds'
 import { KartAudio } from '../../games/pixel-kart/audio'
+import { COURSES as KART_COURSES } from '../../games/pixel-kart/courses'
 import * as pukupuka from '../../games/pukupuka-rescue/sounds'
 import { playPlanetUiSound } from '../../games/planet-globe/sounds'
 import { playSlimeSound } from '../../games/puni-slime/slimeSound'
@@ -70,6 +75,8 @@ export type GameSoundSample = SoundSample & {
 
 const sample = (name: string, play: SoundSample['play']): GameSoundSample => ({ name, play })
 const background = (name: string, seconds: number, play: SoundSample['play']): GameSoundSample => ({ name, play, seconds, background: true })
+const songs = <T extends string>(ids: readonly T[], start: (id: T) => () => void): GameSoundSample[] =>
+  ids.map((id) => background(`BGM ${id}`, 3, () => start(id)))
 
 /** クイズ共通の「ピンポーン」「ブブー」。 */
 const QUIZ_ANSWER = [sample('せいかい', quiz.playCorrectSound), sample('ふせいかい', quiz.playIncorrectSound)]
@@ -370,29 +377,29 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('かけら', () => dotAdventure.playShardSound(2)),
     sample('スイッチ', dotAdventure.playSwitchSound),
     sample('ファンファーレ', dotAdventure.playFanfare),
-    background('BGM', 3, () => dotAdventure.startBgm('forest')),
+    ...songs(Object.keys(dotAdventure.SONGS), dotAdventure.startBgm),
   ],
   'dot-zoo': [
     sample('おく', dotZoo.playPlaceSound),
     sample('ごはん', dotZoo.playMunchSound),
     sample('なきごえ', () => dotZoo.playCry('lion')),
     sample('よろこぶ', dotZoo.playHappySound),
-    background('BGM', 3, () => dotZoo.startBgm('day')),
+    ...songs(['day', 'night'] as const, dotZoo.startBgm),
   ],
   'dot-aquarium': [
     sample('おく', dotAquarium.playPlaceSound),
     sample('ごはん', dotAquarium.playMunchSound),
     sample('よろこぶ', dotAquarium.playHappySound),
     sample('しんじゅ', dotAquarium.playPearlSound),
-    background('BGM', 3, () => dotAquarium.startBgm('day')),
+    ...songs(['day', 'night'] as const, dotAquarium.startBgm),
   ],
   'pixel-kart': [
     sample('カウントダウン', () => new KartAudio().effect('countdown')),
     sample('ジャンプ', () => new KartAudio().effect('jump')),
     sample('ゴール', () => new KartAudio().effect('finish')),
-    background('BGM', 3, () => {
+    ...songs(KART_COURSES.map((course) => course.id), (id) => {
       const audio = new KartAudio()
-      audio.start('forest')
+      audio.start(id)
       return () => audio.stop()
     }),
   ],
@@ -407,7 +414,7 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('にんじん', () => dotRun.playCarrot(0)),
     sample('ふむ', dotRun.playStomp),
     sample('ゴール', dotRun.playGoal),
-    background('BGM', 3, () => dotRun.startBgm('meadow')),
+    ...songs(DOT_RUN_STAGES.map((stage) => stage.id), dotRun.startBgm),
   ],
   'jishaku-pitatto': [
     sample('くっつく', () => jishaku.playStick(1, 'metal')),
@@ -415,7 +422,7 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('ほし', jishaku.playStar),
     sample('はこに はいる', () => jishaku.playBoxed(0)),
     sample('クリア', jishaku.playClear),
-    background('BGM', 3, () => jishaku.startBgm('desk')),
+    ...songs(JISHAKU_STAGES.map((stage) => stage.id), jishaku.startBgm),
   ],
   'tonton-sumo': [
     sample('トン', sumo.playTapSound),
@@ -430,15 +437,14 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('アイテム', () => dotBomb.playItem('bomb')),
     sample('てきを たおす', dotBomb.playEnemyDown),
     sample('クリア', dotBomb.playClear),
-    background('BGM', 3, () => dotBomb.startBgm('forest')),
+    ...songs([...DOT_BOMB_WORLDS.map((world) => world.id), 'title', 'map', 'boss', 'ending'] as const, dotBomb.startBgm),
   ],
   'dot-monster-farm': [
     sample('だいせいこう', dotMonsterFarm.playGreat),
     sample('おうえん', () => dotMonsterFarm.playCheer(4)),
     sample('あたった', () => dotMonsterFarm.playHit(false, false)),
     sample('かった', dotMonsterFarm.playWin),
-    background('ぼくじょうの BGM', 3, () => dotMonsterFarm.startBgm('ranch')),
-    background('たいかいの BGM', 3, () => dotMonsterFarm.startBgm('battle')),
+    ...songs(['ranch', 'battle', 'shrine'] as const, dotMonsterFarm.startBgm),
   ],
   'kurukuru-rokuro': [
     sample('ねんどを おす', () => rokuro.playSculptSound(true)),

@@ -829,6 +829,23 @@
   }
 }
 
+/*
+ * よこむきの スマホ（ひくい がめん）では みほんを ほそくして、えらぶ がわを ひろく とる。
+ * せまいままだと タブの もじが たてに くずれ、3だんに なった ボタンが えらぶ ばしょに かさなる。
+ */
+@media (min-width: 640px) and (min-aspect-ratio: 5 / 4) and (max-height: 500px) {
+  .buildLayout {
+    grid-template-columns: minmax(180px, 34%) minmax(0, 1fr);
+  }
+
+  .buildActions > .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 15px;
+  }
+}
+
 @media (max-width: 380px) {
   .options {
     grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));

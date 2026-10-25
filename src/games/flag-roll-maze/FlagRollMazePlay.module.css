@@ -161,7 +161,11 @@
 
 @media (orientation: landscape) and (max-height: 600px) {
   .page { grid-template-columns: minmax(104px, .72fr) minmax(0, 2fr) minmax(104px, .72fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-sm); padding-top: calc(var(--space-xs) + var(--safe-top)); padding-bottom: calc(var(--space-xs) + var(--safe-bottom)); }
-  .ui { position: absolute; top: calc(var(--space-xs) + var(--safe-top)); left: 50%; z-index: 1; transform: translateX(-50%); padding: 0; }
+  /*
+   * transform で中央へ寄せると、中の固定「もどる」がビューポートではなく .ui 基準になり、
+   * タイトルの上へ重なる。左右いっぱいに広げて中身を中央へそろえる（.ui は操作を通す）。
+   */
+  .ui { position: absolute; top: calc(var(--space-xs) + var(--safe-top)); right: 0; left: 0; z-index: 1; padding: 0; }
   .titleRow { align-self: center; }
   /* 横画面ではタイトルが盤面の上中央へ浮くので、もどるの席は不要。 */
   .titleRow > [data-game-back-layout-slot] { display: none; }

@@ -374,7 +374,7 @@ export function startBgm(id: SongId): () => void {
   const ctx = isSoundEnabled() ? getSharedAudioContext() : undefined
   if (!song || !ctx) return () => {}
   const master = ctx.createGain()
-  master.gain.value = .5
+  master.gain.value = .33
   master.connect(getSoundOutput(ctx))
   const delay = ctx.createDelay(1)
   delay.delayTime.value = 60 / song.bpm * .75
@@ -394,7 +394,7 @@ export function startBgm(id: SongId): () => void {
       if (s !== '-' && s !== '.') {
         let len = 1
         while (steps[(index + len) % steps.length] === '-' && len < 8) len++
-        const vol = song.lead === 'triangle' ? .1 : song.lead === 'square' ? .028 : .042
+        const vol = song.lead === 'triangle' ? .03 : song.lead === 'square' ? .02 : .042
         tone(ctx, master, freq(s), next, len * step * .9, vol, song.lead)
         tone(ctx, delay, freq(s), next, len * step * .9, vol * .6, song.lead)
         if (song.drums === 'bell') tone(ctx, master, freq(s) * 2, next, .08, .012, 'sine')

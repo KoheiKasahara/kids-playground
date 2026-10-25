@@ -123,7 +123,7 @@ export function playJump(air = false): void {
   if (!ctx) return
   const t = ctx.currentTime
   if (air) slide(ctx, getSoundOutput(ctx), 520, 1300, t, .15, .13, 'pulse')
-  else slide(ctx, getSoundOutput(ctx), 300, 820, t, .14, .15, 'pulse')
+  else slide(ctx, getSoundOutput(ctx), 300, 820, t, .14, .2, 'pulse')
 }
 
 /** ごちそうを たべた「ぱくっ」。てんすうが おおきいほど きらきら する。 */
@@ -299,7 +299,7 @@ export function startBgm(): () => void {
   const ctx = isSoundEnabled() ? getSharedAudioContext() : undefined
   if (!ctx) return () => {}
   const master = ctx.createGain()
-  master.gain.value = .5
+  master.gain.value = .38
   master.connect(getSoundOutput(ctx))
   const delay = ctx.createDelay(1)
   delay.delayTime.value = (60 / BPM) * .75

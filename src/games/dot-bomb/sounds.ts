@@ -516,7 +516,7 @@ export function startBgm(id: SongId): () => void {
       if (s !== '-' && s !== '.') {
         let len = 1
         while (steps[(index + len) % steps.length] === '-' && len < 8) len++
-        const vol = song.lead === 'triangle' ? .1 : .042
+        const vol = song.lead === 'triangle' ? .03 : .042
         tone(ctx, master, freq(s), next, len * step * .9, vol, song.lead)
         tone(ctx, delay, freq(s), next, len * step * .9, vol * .55, song.lead)
         if (song.drums === 'bell') tone(ctx, master, freq(s) * 2, next, .08, .012, 'sine')

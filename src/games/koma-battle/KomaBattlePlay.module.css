@@ -658,6 +658,18 @@
 @media (orientation: landscape) and (min-height: 601px) {
   .fieldChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: center; overflow: visible; }
 }
+/*
+ * 低い横画面では ばしょ を3列の小さなカードで並べる。46%幅の横スクロールのままだと
+ * 3つめ以降が列の外へ隠れ、右の コマのタイプ との境目で切れて重なって見える。
+ * 狭い縦画面と同じく説明文は省き、入りきらない段は列の中で縦にスクロールする。
+ */
+@media (orientation: landscape) and (max-height: 600px) {
+  .fieldChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-content: start; overflow-x: hidden; overflow-y: auto; }
+  .fieldButton { min-height: 0; padding: 4px 3px; gap: 2px; }
+  .fieldPreview { width: min(54px, 100%); flex-basis: auto; }
+  .fieldName { font-size: 14px; }
+  .fieldDescription { display: none; }
+}
 
 /* 対戦中に盆をゆらすボタン。親指で届く右下へ置き、コマのタップ範囲と重なりにくくする。 */
 .shakeButton {

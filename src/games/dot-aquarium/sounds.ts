@@ -218,7 +218,7 @@ export const SONGS: Record<'day' | 'night', Song> = {
   night: {
     bpm: 64,
     voice: 'sine',
-    vol: .06,
+    vol: .03,
     melody: 'A5 - - - E5 - - - | F5 - E5 - C5 - - - | D5 - - - E5 - C5 - | B4 - - - - - . . | A5 - - - G5 - - - | F5 - E5 - D5 - - - | C5 - B4 - A4 - - - | A4 - - - - - . .',
     chords: [['A3', 'C4', 'E4', 'A4'], ['F3', 'A3', 'C4', 'F4'], ['D3', 'F3', 'A3', 'D4'], ['E3', 'G#3', 'B3', 'E4'], ['A3', 'C4', 'E4', 'A4'], ['D3', 'F3', 'A3', 'D4'], ['F3', 'A3', 'C4', 'E4'], ['E3', 'A3', 'C4', 'E4']],
   },
@@ -231,7 +231,7 @@ export function startBgm(id: 'day' | 'night'): () => void {
   if (!song || !ctx) return () => {}
   const master = ctx.createGain()
   master.gain.setValueAtTime(0, ctx.currentTime)
-  master.gain.linearRampToValueAtTime(.5, ctx.currentTime + 1.2)
+  master.gain.linearRampToValueAtTime(.3, ctx.currentTime + 1.2)
   master.connect(getSoundOutput(ctx))
   // みずの なかの ような ひびき（ディレイ＋こもり）。
   const delay = ctx.createDelay(1)

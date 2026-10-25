@@ -63,7 +63,7 @@ export function playStar() {
 export function playLift() {
   const c = ctx()
   if (!c) return
-  voice(c, { type: 'sine', f: 380, f2: 1150, dur: 0.13, vol: 0.05, attack: 0.02 })
+  voice(c, { type: 'sine', f: 380, f2: 1150, dur: 0.13, vol: 0.08, attack: 0.02 })
 }
 
 let lastClinkAt = 0
@@ -257,7 +257,7 @@ export function startBgm(stage: StageId): () => void {
   const song = SONGS[stage]
   const out = c.createGain()
   out.gain.value = 0
-  out.gain.setTargetAtTime(0.5, c.currentTime, 0.4)
+  out.gain.setTargetAtTime(0.4, c.currentTime, 0.4)
   out.connect(getSoundOutput(c))
   const eighth = 60 / song.tempo / 2
   let step = 0

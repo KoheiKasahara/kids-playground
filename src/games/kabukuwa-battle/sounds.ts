@@ -113,7 +113,7 @@ export function playBuzz(voice: number) {
     depth.gain.value = voice * .25
     lfo.connect(depth).connect(osc.frequency)
     gain.gain.setValueAtTime(0, s)
-    gain.gain.linearRampToValueAtTime(.08, s + .01)
+    gain.gain.linearRampToValueAtTime(.16, s + .01)
     gain.gain.exponentialRampToValueAtTime(.001, s + .09)
     osc.connect(gain).connect(getSoundOutput(ctx))
     osc.start(s); lfo.start(s)
@@ -343,7 +343,7 @@ export function startBgm(): () => void {
   if (!ctx) return () => {}
   const out = getSoundOutput(ctx)
   const master = ctx.createGain()
-  master.gain.value = .5
+  master.gain.value = .42
   master.connect(out)
   // スーファミ らしい ひびき（エコー）。
   const echo = ctx.createDelay(1)

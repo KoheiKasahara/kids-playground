@@ -74,7 +74,7 @@ export default function DominoFlagPlay() {
   }
 
   const page = (
-    <main className={styles.page}>
+    <main className={gameState === 'select' ? styles.page : `${styles.page} ${styles.pagePlaying}`}>
       <GameBackButton to="/" />
       <div ref={registerContainer} className={styles.scene} aria-hidden="true" />
       {gameState === 'complete' && flagId !== null && (

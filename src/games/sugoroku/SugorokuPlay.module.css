@@ -499,6 +499,9 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
   .board { height: max(240px, calc(100dvh - 100px - var(--safe-top) - var(--safe-bottom))); }
   .panel { flex-direction: column; }
   .players { flex: 0 0 auto; }
+  /* 2れつの ちいさな札では「コンピュータ」が「コ…」に切れるので、入らないときは名前の下へ折り返す。 */
+  .chipName { white-space: normal; line-height: 1.15; }
+  .cpuTag { display: inline-block; white-space: nowrap; }
   .diceButton { order: -1; flex-direction: row; gap: 12px; width: 100%; min-height: 0; height: 84px; }
   .routes { order: -1; width: 100%; grid-template-columns: 1fr 1fr; }
   .dice { width: 58px; height: 58px; }
