@@ -30,6 +30,8 @@ type Props = {
   /** ばんめん ぜんたいを ちぢめて みせる。 */
   overview?: boolean
   label: string
+  /** わかれみちで えらべる みちの さいしょの マスに だす なふだ。 */
+  routeHints?: readonly { square: number; label: string }[]
   /** コースえらびの ちいさな みほん。ぜんたいを みせ、もじは かかない。 */
   compact?: boolean
   className?: string
@@ -61,7 +63,31 @@ function Star() {
   )
 }
 
-function SquareLabel({ square, index }: { square: Square; index: number }) {
+function TwoDice() {
+  return (
+    <g>
+      {[-11, 11].map((x) => (
+        <g key={x} transform={`translate(${x} ${x === -11 ? -14 : -6}) rotate(${x === -11 ? -10 : 10})`}>
+          <rect x={-10} y={-10} width={20} height={20} rx={5} fill="#fffdf8" stroke="#4a3a33" strokeWidth={2.2} />
+          <circle cx={-4} cy={-4} r={2.4} fill="#4a3a33" />
+          <circle cx={4} cy={4} r={2.4} fill="#4a3a33" />
+        </g>
+      ))}
+    </g>
+  )
+}
+
+function Signpost() {
+  return (
+    <g>
+      <path d="M0 -4 L0 -36" stroke="#7a5534" strokeWidth={4} strokeLinecap="round" />
+      <path d="M-2 -34 L-24 -34 L-30 -28 L-24 -22 L-2 -22 Z" fill="#ffe08a" stroke="#7a5534" strokeWidth={2.4} strokeLinejoin="round" />
+      <path d="M2 -20 L24 -20 L30 -14 L24 -8 L2 -8 Z" fill="#bfe6ff" stroke="#7a5534" strokeWidth={2.4} strokeLinejoin="round" />
+    </g>
+  )
+}
+
+function SquareLabel({ square, index, branch }: { square: Square; index: number; branch: boolean }) {
   switch (square.kind) {
     case 'start':
       return <text className={styles.squareWord} y={7} fontSize={17}>スタート</text>
@@ -74,7 +100,30 @@ function SquareLabel({ square, index }: { square: Square; index: number }) {
         </g>
       )
     case 'normal':
-      return <text className={styles.squareNumber} y={9} fontSize={24}>{index}</text>
+      // わきみちの マスには おおどおりと かぶる ばんごうを かかない。
+      return branch ? <circle r={7} className={styles.branchDot} /> : <text className={styles.squareNumber} y={9} fontSize={24}>{index}</text>
+    case 'fork':
+      return (
+        <g>
+          <Signpost />
+          <text className={styles.squareWord} y={22} fontSize={13}>わかれみち</text>
+        </g>
+      )
+    case 'double':
+      return (
+        <g>
+          <TwoDice />
+          <text className={styles.squareWord} y={28} fontSize={13}>サイコロ2こ</text>
+        </g>
+      )
+    case 'swap':
+      return (
+        <g>
+          <path d="M-15 -20 H13 M5 -27 L13 -20 L5 -13 M15 -2 H-13 M-5 -9 L-13 -2 L-5 5" fill="none" stroke="#4a3a33"
+            strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+          <text className={styles.squareWord} y={28} fontSize={13}>いれかわり</text>
+        </g>
+      )
     case 'forward':
       return (
         <g>
@@ -140,10 +189,10 @@ function useAspect(enabled: boolean) {
  * すごろくの ばんめん。コースは がめんより おおきいので、ふだんは コマの まわりだけを
  * うつし、うごきに あわせて カメラが ついていく。compact と overview は ぜんたいを みせる。
  */
-export default function SugorokuBoard({ course, pieces = [], positions = [], turn = null, mover = null, focus = 0, overview = false, label, compact = false, className }: Props) {
+export default function SugorokuBoard({ course, pieces = [], positions = [], turn = null, mover = null, focus = 0, overview = false, routeHints = [], label, compact = false, className }: Props) {
   const [svgRef, aspect] = useAspect(!compact)
   const board = boardSize(course)
-  const road = useMemo(() => roadPath(course), [course])
+  const roads = useMemo(() => course.roads.map((squares) => roadPath(course, squares)), [course])
   const scenery = useMemo(() => scatterScenery(course), [course])
   const squares = Array.from({ length: course.length }, (_, index) => index)
 
@@ -171,7 +220,7 @@ export default function SugorokuBoard({ course, pieces = [], positions = [], tur
             <SceneryArt kind={item.kind} />
           </g>
         ))}
-        <path className={styles.road} d={road} strokeWidth={compact ? 46 : 34} />
+        {roads.map((road) => <path key={road} className={styles.road} d={road} strokeWidth={compact ? 46 : 34} />)}
         {squares.map((index) => {
           const square = squareAt(course, index)
           const { x, y } = squareCenter(course, index)
@@ -179,7 +228,16 @@ export default function SugorokuBoard({ course, pieces = [], positions = [], tur
             <g key={index} transform={`translate(${x} ${y})`} data-square={index} data-kind={square.kind}>
               <rect className={`${styles.square} ${styles[`kind-${square.kind}`] ?? ''}`}
                 x={-SQUARE / 2} y={-SQUARE / 2} width={SQUARE} height={SQUARE} rx={18} />
-              {!compact && <SquareLabel square={square} index={index} />}
+              {!compact && <SquareLabel square={square} index={index} branch={index in course.routeOf} />}
+            </g>
+          )
+        })}
+        {routeHints.map(({ square, label: hint }) => {
+          const { x, y } = squareCenter(course, square)
+          return (
+            <g key={square} className={styles.routeHint} transform={`translate(${x} ${y})`} data-route-hint={square}>
+              <rect x={-SQUARE / 2 - 4} y={-SQUARE / 2 - 4} width={SQUARE + 8} height={SQUARE + 8} rx={22} />
+              <text y={-SQUARE / 2 - 12} fontSize={20}>{hint}</text>
             </g>
           )
         })}

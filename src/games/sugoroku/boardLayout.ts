@@ -11,8 +11,8 @@ export type Point = { x: number; y: number }
 export type Size = { width: number; height: number }
 
 function gridBounds(course: Course): { minX: number; minY: number; columns: number; rows: number } {
-  const xs = course.path.map((cell) => cell.x)
-  const ys = course.path.map((cell) => cell.y)
+  const xs = course.cells.map((cell) => cell.x)
+  const ys = course.cells.map((cell) => cell.y)
   const minX = Math.min(...xs)
   const minY = Math.min(...ys)
   return { minX, minY, columns: Math.max(...xs) - minX + 1, rows: Math.max(...ys) - minY + 1 }
@@ -31,14 +31,14 @@ export function gridToBoard(course: Course, cell: GridPoint): Point {
 
 /** マスの まんなか。 */
 export function squareCenter(course: Course, index: number): Point {
-  const cell = course.path[Math.min(Math.max(0, index), course.path.length - 1)]!
+  const cell = course.cells[Math.min(Math.max(0, index), course.cells.length - 1)]!
   const corner = gridToBoard(course, cell)
   return { x: corner.x + CELL / 2, y: corner.y + CELL / 2 }
 }
 
-/** マスを むすぶ みち。まがりかどは まるく つなぐ。 */
-export function roadPath(course: Course): string {
-  const points = course.path.map((_, index) => squareCenter(course, index))
+/** squares の じゅんに マスを むすぶ みち。まがりかどは まるく つなぐ。 */
+export function roadPath(course: Course, squares: readonly number[]): string {
+  const points = squares.map((index) => squareCenter(course, index))
   const mid = (a: Point, b: Point) => `${(a.x + b.x) / 2} ${(a.y + b.y) / 2}`
   let d = `M${points[0]!.x} ${points[0]!.y}`
   for (let index = 1; index < points.length - 1; index++) {
@@ -61,7 +61,7 @@ export type SceneryItem = { kind: SceneryKind; x: number; y: number; flip: boole
 /** みちも めじるしも ない マスに、いつも おなじ ならびで こものを ちらす。 */
 export function scatterScenery(course: Course): SceneryItem[] {
   const { minX, minY, columns, rows } = gridBounds(course)
-  const taken = new Set([...course.path, ...course.landmarks.flatMap(landmarkCells)].map((cell) => `${cell.x},${cell.y}`))
+  const taken = new Set([...course.cells, ...course.landmarks.flatMap(landmarkCells)].map((cell) => `${cell.x},${cell.y}`))
   const items: SceneryItem[] = []
   for (let y = minY; y < minY + rows; y++) {
     for (let x = minX; x < minX + columns; x++) {
