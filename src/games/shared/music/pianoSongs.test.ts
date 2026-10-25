@@ -10,10 +10,10 @@ const PHRASE_END_NOTE_INDEXES: Readonly<Record<string, readonly number[]>> = {
   'london-bridge': [6, 12, 19],
   // 反復音の途中（音符15→16）は、意図した半拍休符のため監査対象から除く。
   'kaeru-no-uta': [7],
-  'row-row-row-your-boat': [5, 11],
-  'old-macdonald-had-a-farm': [6, 11, 16, 21, 33, 40],
-  chocho: [7, 15, 23],
-  'jingle-bells': [5, 10],
+  'row-row-row-your-boat': [9, 21],
+  'old-macdonald-had-a-farm': [6, 11, 19, 24, 34, 46, 53],
+  chocho: [12, 27, 34, 41, 47],
+  'jingle-bells': [5, 10, 25, 31, 36],
   'happy-birthday': [5, 11, 18],
   'going-home': [5, 10, 16],
   'brahms-lullaby': [],
@@ -21,6 +21,33 @@ const PHRASE_END_NOTE_INDEXES: Readonly<Record<string, readonly number[]>> = {
   'eine-kleine-nachtmusik': [],
   'can-can': [],
   'fur-elise': [],
+}
+
+/**
+ * 各曲の拍子（1小節の拍数）と弱起の拍数。拍はその曲の`tempoBpm`の1拍で数える。
+ * 小節線をまたぐ音があれば、音価の書き間違いでリズムがずれているとみなす。
+ */
+const SONG_METERS: Readonly<Record<string, { readonly beatsPerBar: number; readonly pickupBeats: number }>> = {
+  'twinkle-twinkle-little-star': { beatsPerBar: 4, pickupBeats: 0 },
+  'mary-had-a-little-lamb': { beatsPerBar: 4, pickupBeats: 0 },
+  'ode-to-joy': { beatsPerBar: 4, pickupBeats: 0 },
+  'london-bridge': { beatsPerBar: 4, pickupBeats: 0 },
+  'kaeru-no-uta': { beatsPerBar: 4, pickupBeats: 0 },
+  // 8分の6拍子を、付点4分音符2拍で数える。
+  'row-row-row-your-boat': { beatsPerBar: 2, pickupBeats: 0 },
+  'old-macdonald-had-a-farm': { beatsPerBar: 4, pickupBeats: 0 },
+  // 4分の2拍子を、8分音符4拍で数える。
+  chocho: { beatsPerBar: 4, pickupBeats: 0 },
+  'jingle-bells': { beatsPerBar: 4, pickupBeats: 0 },
+  'happy-birthday': { beatsPerBar: 3, pickupBeats: 1 },
+  'going-home': { beatsPerBar: 4, pickupBeats: 0 },
+  'brahms-lullaby': { beatsPerBar: 3, pickupBeats: 1 },
+  'vivaldi-spring': { beatsPerBar: 4, pickupBeats: 1 },
+  'eine-kleine-nachtmusik': { beatsPerBar: 4, pickupBeats: 0 },
+  // 4分の2拍子を、4分音符2拍で数える。
+  'can-can': { beatsPerBar: 2, pickupBeats: 0 },
+  // 8分の3拍子を、16分音符を半拍として3拍で数える。
+  'fur-elise': { beatsPerBar: 3, pickupBeats: 1 },
 }
 
 const EXPECTED_OPENING_NOTE_IDS: Readonly<Record<string, readonly string[]>> = {
@@ -106,17 +133,43 @@ describe('PIANO_SONGS', () => {
     expect(notes.slice(-6).map((item) => item.noteId)).toEqual(['A#4', 'A#4', 'A4', 'F4', 'G4', 'F4'])
   })
 
-  test('かえるのうたの最後の反復音は半拍の休符で区切る', () => {
-    const timeline = findPianoSong('kaeru-no-uta')!.timeline.slice(14)
-    const repeatedPart = timeline.slice(0, 28)
+  test('すべての曲で、音符が小節線をまたがず拍子どおりに並ぶ', () => {
+    expect(Object.keys(SONG_METERS).sort()).toEqual(PIANO_SONGS.map((song) => song.id).sort())
 
-    expect(repeatedPart).toHaveLength(28)
-    expect(repeatedPart.filter((item) => item.kind === 'rest')).toHaveLength(14)
-    for (let index = 0; index < repeatedPart.length; index += 2) {
-      expect(repeatedPart[index]).toMatchObject({ kind: 'note', durationMs: 268 })
-      expect(repeatedPart[index + 1]).toMatchObject({ kind: 'rest', durationMs: 268 })
+    for (const song of PIANO_SONGS) {
+      const { beatsPerBar, pickupBeats } = SONG_METERS[song.id]
+      const beatMs = 60_000 / song.tempoBpm
+      // 音価をmsへ丸めた誤差が曲の後半で積み重なる分を吸収する幅（拍）。半拍のずれは検出できる。
+      const tolerance = 0.05
+      const barOffset = (ms: number) => {
+        const beats = ms / beatMs - pickupBeats
+        return beats - Math.floor(beats / beatsPerBar + tolerance) * beatsPerBar
+      }
+      // 最後の音は余韻として小節の終わりより長く伸ばしてよい。
+      for (const item of song.timeline.slice(0, -1)) {
+        const end = barOffset(item.startMs) + item.durationMs / beatMs
+        expect(end, `${song.title} ${item.startMs}ms`).toBeLessThanOrEqual(beatsPerBar + tolerance)
+      }
+      const last = song.timeline.at(-1)!
+      expect(barOffset(last.startMs), `${song.title} の最後の音は小節の途中から始まらない`).toBeLessThan(beatsPerBar)
     }
-    expect(timeline[28]).toMatchObject({ kind: 'note', noteId: 'C4', durationMs: 1_071 })
+  })
+
+  test('かえるのうたは「くわっ」4回を半拍休符で区切り、「けけけけ けけけけ」を8分音符で鳴らす', () => {
+    const timeline = findPianoSong('kaeru-no-uta')!.timeline.slice(14)
+    const detachedPart = timeline.slice(0, 8)
+
+    for (let index = 0; index < detachedPart.length; index += 2) {
+      expect(detachedPart[index]).toMatchObject({ kind: 'note', noteId: 'C4', durationMs: 268 })
+      expect(detachedPart[index + 1]).toMatchObject({ kind: 'rest', durationMs: 268 })
+    }
+    const rest = timeline.slice(8)
+    expect(rest.every((item) => item.kind === 'note')).toBe(true)
+    expect(rest.map((item) => (item.kind === 'note' ? item.noteId : 'rest'))).toEqual([
+      'C4', 'C4', 'D4', 'D4', 'E4', 'E4', 'F4', 'F4', 'E4', 'D4', 'C4',
+    ])
+    expect(rest.slice(0, 8).every((item) => item.durationMs === 268)).toBe(true)
+    expect(rest.at(-1)).toMatchObject({ noteId: 'C4', durationMs: 1_071 })
   })
 
   test('ゆかいな牧場は低いソへ下がり、高いミ・レからドへ戻る', () => {
