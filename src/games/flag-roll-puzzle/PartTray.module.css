@@ -1,12 +1,22 @@
+/*
+ * 縦画面のパーツ置き場。画面の横幅をまるごと使い、2段に並べて一度に多くのパーツを見せる。
+ * 並びきらないぶんは横へスクロールする。右端には「まだ つづく」ことを示す影を出し、
+ * いちばん右までスクロールすると影が消える（背景の local / scroll の重ね合わせ）。
+ */
 .tray {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
-  display: flex;
-  justify-content: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  grid-auto-columns: 70px;
+  justify-content: start;
+  gap: 4px;
   width: 100%;
-  padding: 6px;
+  padding: 4px;
   background:
+    linear-gradient(to left, #f5fbff 40%, rgba(245, 251, 255, 0)) right center / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 100% 50%, rgba(36, 92, 122, 0.28), rgba(36, 92, 122, 0)) right center / 14px 100% no-repeat scroll,
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.72)),
     #f5fbff;
   border: 2px solid #d5e8f1;
@@ -23,24 +33,23 @@
 }
 
 /*
- * パーツ1つ。幼児がスマホの指で掴めるよう、主操作の目安(64px)より大きく取る。
+ * パーツ1つ。幼児がスマホの指で掴めるよう、主操作の目安(64px)以上を確保する。
  * 横方向は置き場の自然なスクロールを優先し、盤面方向への移動だけをドラッグにする。
- * 縦画面では盤面（配置ゾーン）へ高さを回すため、見本と名前を詰めて低めに収める。
+ * 縦画面では2段に並べるため、見本と名前を詰めて低めに収め、盤面（配置ゾーン）へ高さを回す。
  */
 .part {
   position: relative;
-  flex: 0 0 auto;
-  width: 76px;
-  min-height: 76px;
+  width: 100%;
+  min-height: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 4px 3px;
+  gap: 1px;
+  padding: 2px 1px;
   background:
     linear-gradient(180deg, #ffffff 0%, #f2f8fb 100%);
-  border: 3px solid #d7e7ed;
+  border: 2px solid #d7e7ed;
   border-radius: var(--radius-md);
   color: var(--color-text);
   font-size: 14px;
@@ -64,7 +73,14 @@
 .tray[data-layout='landscape'] {
   flex: 1 1 auto;
   display: grid;
+  grid-template-rows: none;
+  grid-auto-flow: row;
+  grid-auto-columns: auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 6px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.72)),
+    #f5fbff;
   align-content: start;
   gap: var(--space-sm);
   min-height: 0;
@@ -79,6 +95,9 @@
   width: 100%;
   min-width: 0;
   min-height: 72px;
+  gap: 2px;
+  padding: 4px 3px;
+  border-width: 3px;
   touch-action: pan-y;
   scroll-snap-align: start;
 }
@@ -124,8 +143,8 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.9),
     inset 0 -3px 0 rgba(91, 151, 176, 0.12);
   /* 見本の枠はどのパーツも同じ52pxの見本を縮めて使い、縮めた分の余白は詰める */
-  margin: -5px;
-  transform: scale(calc(var(--preview-scale, 1.1) * 0.8));
+  margin: -8px;
+  transform: scale(calc(var(--preview-scale, 1.1) * 0.7));
 }
 
 /*
@@ -146,7 +165,9 @@
 .label {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 12px;
+  /* 「かいてんばん」のような6文字の名前が1行に収まる大きさ */
+  font-size: 10.5px;
+  letter-spacing: -0.02em;
   line-height: 1.1;
   color: #36515d;
   text-align: center;
@@ -159,13 +180,13 @@
 }
 
 @media (max-width: 360px) {
-  .part {
-    width: 70px;
-    min-height: 72px;
+  .tray {
+    grid-auto-columns: 66px;
   }
 
   .label {
-    font-size: 11px;
+    font-size: 10px;
+    letter-spacing: -0.04em;
   }
 }
 

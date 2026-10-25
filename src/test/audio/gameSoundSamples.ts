@@ -37,6 +37,7 @@ import * as dotZoo from '../../games/dot-zoo/sounds'
 import { playStarSound as playDrawGoalStarSound, playWarpSound as playDrawGoalWarpSound } from '../../games/draw-goal/sounds'
 import { playGlobeZoomSound } from '../../games/earth-globe/sounds'
 import { playDeliverySound } from '../../games/forest-delivery/sounds'
+import * as flagPuzzle from '../../games/flag-roll-puzzle/sounds'
 import * as hoshi from '../../games/hoshi-tsunagi/sounds'
 import * as jishaku from '../../games/jishaku-pitatto/sounds'
 import { STAGES as JISHAKU_STAGES } from '../../games/jishaku-pitatto/stages'
@@ -186,7 +187,15 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('ゴール', quiz.playMazeGoalSound),
     sample('ジャンプだい', quiz.playPinballJumppadSound),
   ],
-  'flag-roll-puzzle': [sample('パーツ', quiz.playPanelOpenSound), sample('せいかい', quiz.playCorrectSound)],
+  'flag-roll-puzzle': [
+    sample('パーツを おく', () => flagPuzzle.playPuzzleSound('place')),
+    sample('ボールを おとす', () => flagPuzzle.playPuzzleSound('drop')),
+    sample('バンパー', () => flagPuzzle.playPuzzleSound('bumper')),
+    sample('ジャンプ台', () => flagPuzzle.playPuzzleSound('jump')),
+    sample('たいほう', () => flagPuzzle.playPuzzleSound('cannonFire')),
+    sample('ゴール', () => flagPuzzle.playPuzzleSound('clear')),
+    background('BGM', 3, flagPuzzle.startBgm),
+  ],
   'vegetable-quiz': QUIZ_ANSWER,
   'fruit-quiz': QUIZ_ANSWER,
   'working-vehicle-quiz': QUIZ_ANSWER,

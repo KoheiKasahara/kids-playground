@@ -51,6 +51,7 @@ import {
   spinnerSpec,
 } from './spinnerPhysics'
 import type { PlacedPart } from './placement'
+import type { PuzzleSound } from './sounds'
 import type { PuzzleBallSnapshot, PuzzleBallState } from './puzzleState'
 import {
   SEESAW_CONSTRAINT_DAMPING,
@@ -83,6 +84,25 @@ export const CANNON_SENSOR_RADIUS = 10
 /** 連続接触で画面がちらつかないよう、同じ球とパーツの反応を短く間引く。 */
 const PART_IMPACT_COOLDOWN_MS = 120
 
+/** ころがっている あいだに パーツが はんのうした ことを しらせる おとの しゅるい。 */
+export type PuzzlePartSound = Extract<
+  PuzzleSound,
+  'wood' | 'bumper' | 'jump' | 'cannonLoad' | 'cannonFire' | 'spinner' | 'conveyor' | 'seesaw' | 'fan' | 'bubble' | 'warp'
+>
+
+/** 接触したパーツの種類から、鳴らす音を決める。専用の音を別の場所で鳴らすものは null。 */
+export function partImpactSound(typeId: PlacedPart['typeId']): PuzzlePartSound | null {
+  // バンパー・ジャンプ台・キャノンは、はじく／とばす／こめる瞬間に専用の音を鳴らす。
+  if (typeId === 'bumper' || isJumpRampPart(typeId) || isCannonPart(typeId)) return null
+  if (isSpinnerPart(typeId)) return 'spinner'
+  if (isConveyorPart(typeId)) return 'conveyor'
+  if (isSeesawPart(typeId)) return 'seesaw'
+  if (typeId === 'fanRight' || typeId === 'fanLeft') return 'fan'
+  if (typeId === 'bubbleLift') return 'bubble'
+  if (typeId === 'warpIn' || typeId === 'warpOut') return 'warp'
+  return 'wood'
+}
+
 export type PuzzleEngineOptions = {
   parts: readonly PlacedPart[]
   /** stage条件に基づく全ボール。旧呼び出し互換のため省略時はBALL_START相当を使う。 */
@@ -92,6 +112,8 @@ export type PuzzleEngineOptions = {
   runId: number
   onGoal: (ballId?: string, snapshots?: readonly PuzzleBallSnapshot[]) => void
   onStopped: (ballId?: string, snapshots?: readonly PuzzleBallSnapshot[]) => void
+  /** パーツが球に反応したとき。効果音だけに使い、React stateは更新しない。 */
+  onPartSound?: (kind: PuzzlePartSound) => void
 }
 
 export type PuzzleEngineHandle = {
@@ -414,6 +436,10 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
     const partIdByBodyId = new Map(partBodyEntries.map((entry) => [entry.body.id, entry.partId]))
     const runtimeBallByBodyId = new Map(runtimeBalls.map((runtime) => [runtime.body.id, runtime]))
     const runtimeBallById = new Map(runtimeBalls.map((runtime) => [runtime.id, runtime]))
+    const partTypeById = new Map(current.parts.map((part) => [part.id, part.typeId]))
+    const emitSound = (kind: PuzzlePartSound | null) => {
+      if (kind) optionsRef.current.onPartSound?.(kind)
+    }
     Composite.add(engine.world, [
       ...wallBodies(goalArea),
       ...partBodyEntries.map(({ body }) => body),
@@ -441,6 +467,8 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
       const key = `${partId}:${ballId}`
       if (simulationTime - (lastPartImpactAt.get(key) ?? -Infinity) < PART_IMPACT_COOLDOWN_MS) return
       lastPartImpactAt.set(key, simulationTime)
+      const typeId = partTypeById.get(partId)
+      if (typeId) emitSound(partImpactSound(typeId))
       if (prefersReducedMotion) return
 
       const element = elementsRef.current.get(`part:${partId}`)
@@ -522,6 +550,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
           if (now - (lastBumperHitAt.get(cooldownKey) ?? -Infinity) >= BUMPER_HIT_COOLDOWN_MS) {
             lastBumperHitAt.set(cooldownKey, now)
             Body.setVelocity(hitBall, bumperBoostVelocity(hitBall.position, bumper.position, hitBall.velocity))
+            emitSound('bumper')
           }
         }
 
@@ -542,6 +571,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
               lastJumpRampHitAt.set(cooldownKey, simulationTime)
               Body.setVelocity(hitBall, nextVelocity)
               animateJumpRamp(partId, typeId)
+              emitSound('jump')
             }
           }
         }
@@ -577,6 +607,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
         cannonBall.stopObservation = createStopObservation()
         cannonBall.stopped = false
         cannonBall.status = 'moving'
+        emitSound('cannonLoad')
       }
     }
     Events.on(engine, 'collisionStart', handleCollisionStart)
@@ -682,6 +713,7 @@ export function usePuzzleEngine(options: PuzzleEngineOptions): PuzzleEngineHandl
         ball.status = 'moving'
         cannonCaptureRecords.delete(key)
         capturedCannonByBall.delete(capture.ballId)
+        emitSound('cannonFire')
       }
     }
 
