@@ -94,4 +94,6 @@
 @media (orientation: landscape) and (max-height: 600px) {
   .panel > .actions, .panel > .message, .panel > .placed { flex-shrink: 0; }
   .panel .foods { min-height: 76px; }
+  /* 低い横画面では はこが高さいっぱいに映り「おべんとう できた！」が ふちに重なる。完成中は文字の下から描く。 */
+  .stage:has(.celebration) .canvas { top: 72px; }
 }

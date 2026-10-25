@@ -105,6 +105,20 @@
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
+  /*
+   * 低い横画面では地球儀の大きさが高さで決まり、全画面のままだとタイトルと説明が
+   * 地球儀の上へ重なる。シーンをタイトルの下から始め、背景はページ側で途切れずに見せる。
+   */
+  .page {
+    background: linear-gradient(160deg, #e7f5ff 0%, var(--color-background) 60%, #fff3bf 100%);
+  }
+
+  .scene {
+    top: calc(var(--safe-top) + 64px);
+    height: auto;
+    background: none;
+  }
+
   .ui {
     padding-block: var(--space-sm);
   }

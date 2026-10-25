@@ -440,6 +440,21 @@
     font-size: clamp(18px, 3vw, 24px);
   }
 
+  /*
+   * 左の列は「もどる」の席でほぼ埋まり、横に並べるとタイトルが字ごとに折り返して
+   * 絵文字が「もどる」へ重なる。タイトルは「もどる」の下の段へ1行で置く。
+   */
+  .page:not(.pageCelebrating) .header {
+    flex-wrap: wrap;
+    /* 固定の「もどる」は席より少し下（ページ余白との差ぶん）まで出るので、そのぶん空ける。 */
+    row-gap: var(--space-sm);
+  }
+
+  .page:not(.pageCelebrating) .title {
+    flex: 1 0 100%;
+    white-space: nowrap;
+  }
+
   .home {
     min-height: 40px;
     padding: 4px var(--space-xs);

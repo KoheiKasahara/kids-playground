@@ -382,6 +382,41 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
   }
+
+  /*
+   * 低い横画面ではドミノ全体が高さいっぱいに映り、上の見出し・国名・コース名が
+   * 旗やドミノの上へ重なる。遊ぶ画面では文字を詰め、シーンを文字の下から始める。
+   */
+  .selectionStatus {
+    margin: 2px 0 0;
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .courseStatus {
+    margin-top: 0;
+    font-size: 14px;
+  }
+
+  .runningStatus {
+    margin: var(--space-xs) 0 0;
+  }
+
+  .result {
+    margin-top: var(--space-xs);
+    padding-block: 4px;
+    font-size: 22px;
+  }
+
+  .pagePlaying {
+    background: linear-gradient(160deg, #e7f5ff 0%, var(--color-background) 58%, #fff3bf 100%);
+  }
+
+  .pagePlaying .scene {
+    top: calc(var(--safe-top) + 92px);
+    height: auto;
+    background: none;
+  }
 }
 
 

@@ -165,6 +165,12 @@
     --top-right-slot-height: 124px;
   }
 
+  /* 天体の大きさが高さで決まるので、描画領域をタイトル群の下から始めて文字と重ねない。 */
+  .singleScene {
+    top: calc(var(--safe-top) + 60px);
+    height: auto;
+  }
+
   .title {
     font-size: 24px;
   }

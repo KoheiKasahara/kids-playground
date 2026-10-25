@@ -49,7 +49,8 @@
 .pixelBox canvas, .stage canvas { display: block; margin: 0 auto; width: 100%; image-rendering: crisp-edges; image-rendering: pixelated; }
 .creatureName { position: absolute; display: none; top: 100%; left: 50%; transform: translateX(-50%); min-width: 90px; max-width: 115px; font-size: 10px; padding: 4px 6px; border-radius: 4px; background: #142530ee; color: #fff8df; line-height: 1.5; }
 .resident:hover .creatureName, .resident:focus-visible .creatureName, .resident[aria-pressed='true'] .creatureName { display: block; }
-.sceneHint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10px; padding: 5px 11px; border-radius: 20px; background: #142530bf; color: #e8eddf; pointer-events: none; }
+/* 狭い水槽（横画面など）で下の段の いきもの（z-index 2〜4）に隠れないよう手前へ。えらんだ いきもの（6）よりは奥。 */
+.sceneHint { position: absolute; z-index: 5; bottom: 10px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10px; padding: 5px 11px; border-radius: 20px; background: #142530bf; color: #e8eddf; pointer-events: none; }
 .emptyScene { position: absolute; inset: 35% 10% auto; text-align: center; font-size: 17px; line-height: 1.9; text-shadow: 0 2px 5px #000; }
 .sceneFooter { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 18px; border-bottom: 1px solid #3d5159; color: #b4c8c7; font-size: 11px; }
 .sceneFooter b { font-size: 18px; color: #f0edcf; white-space: nowrap; }
