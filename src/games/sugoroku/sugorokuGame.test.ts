@@ -87,6 +87,8 @@ describe('courses', () => {
       expect(routes).toHaveLength(2)
       expect(routes.map((route) => route.first)).toEqual(course.next[fork])
       expect(new Set(routes.map((route) => route.label)).size).toBe(2)
+      // どちらの みちも ゴールまで おなじ ながさ。
+      expect(new Set(routes.map((route) => course.toGoal[route.first])).size).toBe(1)
       expect(course.events[fork], `${course.id}:${fork}`).toBeUndefined()
       // わかれみちの すぐ となりには わかれみちを おかない。
       for (const route of routes) expect(course.forks[route.first]).toBeUndefined()
@@ -286,18 +288,18 @@ describe('sugorokuGame', () => {
   })
 
   test('でた めの かずだけ 1マスずつ すすみ、つぎの ひとの ばんに なる', () => {
-    const plan = playTurn(createGame('mori', 2), 3)
-    expect(plan).toMatchObject({ player: 0, roll: 3, walk: [1, 2, 3], event: null, eventWalk: [], goal: false })
-    expect(plan.next.positions).toEqual([3, 0])
+    const plan = playTurn(at(createGame('mori', 2), [6, 0]), 3)
+    expect(plan).toMatchObject({ player: 0, roll: 3, walk: [7, 8, 9], event: null, eventWalk: [], goal: false })
+    expect(plan.next.positions).toEqual([9, 0])
     expect(plan.next.turn).toBe(1)
     expect(playTurn(plan.next, 1).next.turn).toBe(0)
   })
 
   test('すすむ・もどる・ワープは とまった あとに うごき、つぎの しかけは よばない', () => {
     const game = createGame('mori', 2)
-    const forward = playTurn(game, 2)
-    expect(forward).toMatchObject({ walk: [1, 2], event: { kind: 'forward', steps: 2 }, eventWalk: [3, 4] })
-    expect(forward.next.positions[0]).toBe(4)
+    const forward = playTurn(at(game, [2, 0]), 2)
+    expect(forward).toMatchObject({ walk: [3, 4], event: { kind: 'forward', steps: 2 }, eventWalk: [5, 6] })
+    expect(forward.next.positions[0]).toBe(6)
 
     const back = playTurn(at(game, [5, 0]), 3)
     expect(back).toMatchObject({ walk: [6, 7, 8], event: { kind: 'back', steps: 1 }, eventWalk: [7] })
@@ -338,9 +340,7 @@ describe('sugorokuGame', () => {
     expect(plan).toMatchObject({ goal: true, event: null })
     expect(plan.next).toMatchObject({ winner: 1, turn: 1 })
     expect(remainingSquares(plan.next, 1)).toBe(0)
-    // のこりは いちばん ちかい みち（けものみち）で かぞえる。
-    expect(remainingSquares(plan.next, 0)).toBe(mori.toGoal[0])
-    expect(mori.toGoal[0]).toBeLessThan(goal)
+    expect(remainingSquares(plan.next, 0)).toBe(goal)
     expect(mustRest({ ...plan.next, resting: [false, true, false] })).toBe(false)
   })
 
@@ -356,51 +356,45 @@ describe('sugorokuGame', () => {
     expect(forward.next.winner).toBe(0)
   })
 
-  test('わきみちが もどらない コースは つくれない', () => {
-    const base = { id: 'mori' as const, name: 'test', tagline: '', route: 'R9', events: {}, landmarks: [], scenery: ['tree' as const] }
+  test('わきみちは もとの みちへ もどり、おおどおりと おなじ ながさで ないと つくれない', () => {
+    const base = { id: 'mori' as const, name: 'test', tagline: '', route: 'R3 D3', events: {}, landmarks: [], scenery: ['tree' as const] }
     const branch = { label: 'a', hint: '', mainLabel: 'b', mainHint: '' }
-    expect(() => defineCourse({ ...base, branches: [{ ...branch, from: 2, to: 6, route: 'D1 R3' }] })).toThrow()
-    expect(() => defineCourse({ ...base, branches: [{ ...branch, from: 2, to: 3, route: 'R1' }] })).toThrow()
-    const ok = defineCourse({ ...base, branches: [{ ...branch, from: 2, to: 6, route: 'D1 R4 U1', events: { 2: { kind: 'rest' } } }] })
-    expect(ok.length).toBe(15)
-    expect(ok.next[2]).toEqual([3, 10])
-    expect(ok.next[14]).toEqual([6])
-    expect(ok.prev[10]).toBe(2)
-    expect(ok.events[11]).toEqual({ kind: 'rest' })
-    expect(ok.toGoal[2]).toBe(7)
-    expect(ok.toGoal[10]).toBe(8)
+    expect(() => defineCourse({ ...base, branches: [{ ...branch, from: 1, to: 5, route: 'D1 R3' }] })).toThrow()
+    expect(() => defineCourse({ ...base, branches: [{ ...branch, from: 1, to: 3, route: 'D1 R2 U1' }] })).toThrow()
+    const ok = defineCourse({ ...base, branches: [{ ...branch, from: 1, to: 5, route: 'D2 R2', events: { 2: { kind: 'rest' } } }] })
+    expect(ok.length).toBe(10)
+    expect(ok.next[1]).toEqual([2, 7])
+    expect(ok.next[9]).toEqual([5])
+    expect(ok.prev[7]).toBe(1)
+    expect(ok.events[8]).toEqual({ kind: 'rest' })
+    expect(ok.toGoal[2]).toBe(ok.toGoal[7])
   })
 
   test('わかれみちを とおりかかると、めが のこっていても そこで とまる', () => {
     const game = createGame('mori', 2)
-    const stop = playTurn(at(game, [15, 0]), 5)
-    expect(squareAt(mori, 18)).toEqual({ kind: 'fork' })
-    expect(stop).toMatchObject({ walk: [16, 17, 18], forkStop: true, event: null, eventWalk: [] })
-    expect(stop.next).toMatchObject({ positions: [18, 0], turn: 1 })
+    expect(squareAt(mori, 2)).toEqual({ kind: 'fork' })
+    const stop = playTurn(game, 5)
+    expect(stop).toMatchObject({ walk: [1, 2], forkStop: true, event: null, eventWalk: [] })
+    expect(stop.next).toMatchObject({ positions: [2, 0], turn: 1 })
     // ちょうど とまっても、わかれみちの しかけは ない。
-    expect(playTurn(at(game, [15, 0]), 3)).toMatchObject({ walk: [16, 17, 18], forkStop: false, event: null })
-    // スタートからでも ふつうに すすむ。
+    expect(playTurn(game, 2)).toMatchObject({ walk: [1, 2], forkStop: false, event: null })
     expect(routeChoices(game)).toBeNull()
   })
 
   test('わかれみちからは えらんだ みちへ すすみ、わきみちを とおって もとの みちへ もどる', () => {
-    const game = at(createGame('mori', 2), [18, 0])
-    expect(routeChoices(game)?.map((route) => route.label)).toEqual(['もりの みち', 'けものみち'])
-    expect(playTurn(game, 1, mori, Math.random, 0).walk).toEqual([19])
-    const branch = mori.forks[18]![1]!.first
+    const game = at(createGame('mori', 2), [2, 0])
+    expect(routeChoices(game)?.map((route) => route.label)).toEqual(['たにの みち', 'おかの みち'])
+    expect(playTurn(game, 1, mori, Math.random, 0).walk).toEqual([3])
+    const branch = mori.forks[2]![1]!.first
     expect(playTurn(game, 1, mori, Math.random, 1).walk).toEqual([branch])
-    expect(mori.toGoal[18]).toBeLessThan(mori.toGoal[19]!)
 
-    // けものみちの わな：やすみと 2もどる。もどる ときも わきみちを とおる。
-    expect(playTurn(game, 2, mori, Math.random, 1)).toMatchObject({ walk: [branch, branch + 1], event: { kind: 'rest' } })
-    expect(playTurn(game, 3, mori, Math.random, 1)).toMatchObject({ event: { kind: 'back', steps: 2 }, eventWalk: [branch + 1, branch] })
-    const finish = playTurn(at(game, [branch + 3, 0]), 3)
-    expect(finish).toMatchObject({ walk: [31, 32], goal: true })
+    // おかの みちの しかけ：サイコロ 2こと 2もどる。もどる ときも わきみちを とおる。
+    expect(playTurn(game, 2, mori, Math.random, 1)).toMatchObject({ walk: [branch, branch + 1], event: { kind: 'double' } })
+    expect(playTurn(game, 5, mori, Math.random, 1)).toMatchObject({ event: { kind: 'back', steps: 2 }, eventWalk: [branch + 3, branch + 2] })
+    expect(playTurn(at(game, [branch + 7, 0]), 2)).toMatchObject({ walk: [11, 12] })
 
-    // おかしの くにの キャンディの おかは とおいけれど サイコロ 2こと すすむが ある。
-    const candy = okashi.forks[2]![1]!.first
-    expect(playTurn(at(createGame('okashi', 2), [2, 0]), 2, okashi, Math.random, 1)).toMatchObject({ walk: [candy, candy + 1], event: { kind: 'double' } })
-    expect(okashi.toGoal[candy]).toBeGreaterThan(okashi.toGoal[3]!)
+    const candy = okashi.forks[5]![1]!.first
+    expect(playTurn(at(createGame('okashi', 2), [5, 0]), 2, okashi, Math.random, 1)).toMatchObject({ walk: [candy, candy + 1], event: { kind: 'double' } })
   })
 
   test('コンピュータの みちは くじびき', () => {
@@ -417,8 +411,8 @@ describe('sugorokuGame', () => {
     expect(rollDice(plan.next, () => 0)).toEqual([1])
     const mine = { ...plan.next, turn: 0 }
     expect(rollDice(mine, () => 0.5)).toEqual([4, 4])
-    const twice = playTurn(at(mine, [0, 0]), [3, 4])
-    expect(twice).toMatchObject({ rolls: [3, 4], roll: 7, walk: [1, 2, 3, 4, 5, 6, 7] })
+    const twice = playTurn(at(mine, [12, 0]), [3, 4])
+    expect(twice).toMatchObject({ rolls: [3, 4], roll: 7, walk: [13, 14, 15, 16, 17, 18, 19] })
     expect(twice.next.doubles).toEqual([false, false])
   })
 
@@ -439,9 +433,9 @@ describe('sugorokuGame', () => {
     expect(ranking(state)).toEqual([
       { player: 1, place: 1 }, { player: 3, place: 2 }, { player: 0, place: 3 }, { player: 2, place: 3 },
     ])
-    // わきみちに いても、のこりの マスで くらべる。
-    const branch = mori.forks[18]![1]!.first
-    const mixed: GameState = { ...createGame('mori', 2), positions: [22, branch], winner: null }
-    expect(ranking(mixed).map((entry) => entry.player)).toEqual([1, 0])
+    // わきみちに いても、のこりの マスで くらべる（おなじ ながさの みちなので おなじ くらい）。
+    const branch = mori.forks[2]![1]!.first
+    const mixed: GameState = { ...createGame('mori', 2), positions: [4, branch + 1], winner: null }
+    expect(ranking(mixed)).toEqual([{ player: 0, place: 1 }, { player: 1, place: 1 }])
   })
 })

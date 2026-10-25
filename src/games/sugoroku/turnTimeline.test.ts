@@ -8,7 +8,7 @@ const at = (positions: number[], turn = 0, players = 2): GameState => ({ ...crea
 
 describe('turnTimeline', () => {
   test('ころころ → でた め → 1マスずつ かぞえて すすむ → しかけ の じゅんに ならぶ', () => {
-    const before = createGame('mori', 2)
+    const before = at([2, 0])
     const plan = playTurn(before, 2)
     const { frames, duration } = turnTimeline(plan, before)
     expect(frames[0]).toMatchObject({ at: 0, rolling: true, message: 'ころころ…', sound: { kind: 'roll' } })
@@ -17,7 +17,7 @@ describe('turnTimeline', () => {
     expect(frames.filter((frame) => frame.dice).every((frame) => frame.dice!.length === 1)).toBe(true)
 
     const moves = frames.filter((frame) => frame.positions)
-    expect(moves.map((frame) => frame.positions![0])).toEqual([1, 2, 3, 4])
+    expect(moves.map((frame) => frame.positions![0])).toEqual([3, 4, 5, 6])
     expect(moves.map((frame) => frame.mover?.count)).toEqual([1, 2, 1, 2])
     expect(new Set(moves.map((frame) => frame.mover?.hop)).size).toBe(moves.length)
     expect(moves.every((frame) => frame.positions![1] === 0)).toBe(true)
@@ -56,23 +56,23 @@ describe('turnTimeline', () => {
   test('サイコロ 2こは ふたつの めと たしざんを みせる', () => {
     expect(rollMessage([3])).toBe('3が でた！')
     expect(rollMessage([3, 5])).toBe('3と 5で 8！')
-    const before = { ...at([0, 0]), doubles: [true, false] }
+    const before = { ...at([12, 0]), doubles: [true, false] }
     const { frames } = turnTimeline(playTurn(before, [2, 5]), before)
     expect(frames.filter((frame) => frame.dice).every((frame) => frame.dice!.length === 2)).toBe(true)
     expect(frames.find((frame) => frame.rolling === false)).toMatchObject({ dice: [2, 5], message: '2と 5で 7！' })
-    expect(frames.filter((frame) => frame.positions).at(-1)?.positions).toEqual([7, 0])
+    expect(frames.filter((frame) => frame.positions).at(-1)?.positions).toEqual([19, 0])
 
     const land = turnTimeline(playTurn(at([15, 0]), 1), at([15, 0]))
     expect(land.frames.find((frame) => frame.message === eventMessage({ kind: 'double' }))).toMatchObject({ sound: { kind: 'good' }, haptic: 'success' })
   })
 
   test('わかれみちで とまると、めが のこっていても とまった ことを しらせる', () => {
-    const stop = turnTimeline(playTurn(at([15, 0]), 5), at([15, 0]))
-    expect(stop.frames.filter((frame) => frame.positions).map((frame) => frame.positions![0])).toEqual([16, 17, 18])
+    const stop = turnTimeline(playTurn(at([0, 0]), 5), at([0, 0]))
+    expect(stop.frames.filter((frame) => frame.positions).map((frame) => frame.positions![0])).toEqual([1, 2])
     const notice = stop.frames.find((frame) => frame.message === FORK_STOP_MESSAGE)
     expect(notice).toMatchObject({ sound: { kind: 'select' } })
     expect(notice!.at).toBeGreaterThan(stop.frames.filter((frame) => frame.positions).at(-1)!.at)
-    const exact = turnTimeline(playTurn(at([15, 0]), 3), at([15, 0]))
+    const exact = turnTimeline(playTurn(at([0, 0]), 2), at([0, 0]))
     expect(exact.frames.some((frame) => frame.message === FORK_STOP_MESSAGE)).toBe(false)
   })
 

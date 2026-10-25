@@ -74,7 +74,7 @@ export function traceRoute(route: string, from: GridPoint = { x: 0, y: 0 }): Gri
   return path
 }
 
-/** わきみち。from の マスで おおどおりから わかれ、route を たどって to の マスへ もどる。 */
+/** わきみち。from の マスで おおどおりから わかれ、route を たどって to の マスへ もどる。おおどおりと おなじ ながさ。 */
 export type BranchSource = {
   from: number
   to: number
@@ -113,7 +113,8 @@ export function defineCourse({ route, branches = [], events, ...course }: Course
       cells.push(cell)
       return cells.length - 1
     })
-    if (ids.length === 0) throw new Error(`empty branch from ${branch.from}`)
+    // みじかい ほうばかり えらばれない ように、おおどおりと おなじ ながさに する。
+    if (ids.length + 1 !== branch.to - branch.from) throw new Error(`branch from ${branch.from} must be as long as the main road`)
     ids.forEach((id, index) => {
       next[id] = [ids[index + 1] ?? branch.to]
       prev[id] = ids[index - 1] ?? branch.from
@@ -146,6 +147,10 @@ export function defineCourse({ route, branches = [], events, ...course }: Course
   return { ...course, path, cells, length: cells.length, next, prev, forks, routeOf, toGoal, roads, events: allEvents }
 }
 
+/**
+ * わかれみちの ふたつの みちは かならず おなじ ながさに する（みじかい ほうばかり えらばれない ように）。
+ * ちがいは とちゅうの しかけだけ。
+ */
 export const COURSES: readonly Course[] = [
   defineCourse({
     id: 'mori',
@@ -154,7 +159,7 @@ export const COURSES: readonly Course[] = [
     // もりの なかを くねくね あるき、いけの まわりを とおって くまさんの いえへ。
     route: 'R2 D2 R2 U2 R3 D4 L7 D3 R2 D2 R3',
     events: {
-      2: { kind: 'forward', steps: 2 },
+      4: { kind: 'forward', steps: 2 },
       5: { kind: 'again' },
       8: { kind: 'back', steps: 1 },
       11: { kind: 'rest' },
@@ -167,20 +172,20 @@ export const COURSES: readonly Course[] = [
     },
     branches: [
       {
-        // いけの よこを まっすぐ くだる けものみち。みじかいけれど わなが ある。
-        from: 18,
-        to: 31,
-        route: 'D5',
-        label: 'けものみち',
-        hint: 'ちかい けど わなが ある',
-        mainLabel: 'もりの みち',
-        mainHint: 'とおい けど あんしん',
-        events: { 2: { kind: 'rest' }, 3: { kind: 'back', steps: 2 } },
+        // たにを くだらずに、おかの うえを まっすぐ わたる。
+        from: 2,
+        to: 11,
+        route: 'U2 R5 D2',
+        label: 'おかの みち',
+        hint: 'サイコロ2こが ある',
+        mainLabel: 'たにの みち',
+        mainHint: 'もう1かいが ある',
+        events: { 2: { kind: 'double' }, 5: { kind: 'back', steps: 2 }, 7: { kind: 'forward', steps: 1 } },
       },
     ],
     landmarks: [
       { kind: 'bigTree', x: 0, y: 1, w: 2, h: 2 },
-      { kind: 'pond', x: 1, y: 5, w: 3, h: 2 },
+      { kind: 'pond', x: 3, y: 5, w: 3, h: 2 },
       { kind: 'bearHouse', x: 6, y: 7, w: 2, h: 2 },
     ],
     scenery: ['tree', 'pine', 'flower', 'mushroom'],
@@ -189,38 +194,38 @@ export const COURSES: readonly Course[] = [
     id: 'okashi',
     name: 'おかしの くに',
     tagline: 'ぐるぐる うずまき',
-    // そとがわから ぐるぐる まわって、まんなかの おかしの おしろへ。
-    route: 'R8 D7 L7 U5 R5 D3 L3',
+    // かいだんを おりてから そとがわを ぐるぐる まわって、まんなかの おかしの おしろへ。
+    route: 'R5 D3 R3 D7 L7 U5 R5 D3 L3',
     events: {
-      3: { kind: 'again' },
-      5: { kind: 'forward', steps: 3 },
+      2: { kind: 'forward', steps: 2 },
+      7: { kind: 'again' },
       9: { kind: 'rest' },
-      12: { kind: 'back', steps: 2 },
-      15: { kind: 'warp', to: [22, 27, 6] },
-      18: { kind: 'swap' },
-      20: { kind: 'forward', steps: 2 },
-      23: { kind: 'double' },
-      24: { kind: 'back', steps: 3 },
-      26: { kind: 'rest' },
-      29: { kind: 'warp', to: [33, 35, 19] },
-      32: { kind: 'forward', steps: 2 },
-      36: { kind: 'back', steps: 3 },
+      14: { kind: 'back', steps: 2 },
+      16: { kind: 'warp', to: [24, 28, 10] },
+      19: { kind: 'swap' },
+      21: { kind: 'forward', steps: 2 },
+      26: { kind: 'double' },
+      30: { kind: 'back', steps: 3 },
+      32: { kind: 'rest' },
+      34: { kind: 'warp', to: [37, 39, 23] },
+      35: { kind: 'forward', steps: 2 },
+      38: { kind: 'back', steps: 2 },
     },
     branches: [
       {
-        // うえへ まわりみちして キャンディの おかを とおる。とおいけれど いいことが いっぱい。
-        from: 2,
-        to: 6,
-        route: 'U2 R4 D2',
+        // かいだんを おりずに、キャンディの おかを まわる。
+        from: 5,
+        to: 11,
+        route: 'R3 D3',
         label: 'キャンディの おか',
-        hint: 'とおい けど いいこと いっぱい',
-        mainLabel: 'まっすぐ みち',
-        mainHint: 'ちかい',
-        events: { 2: { kind: 'double' }, 4: { kind: 'forward', steps: 2 } },
+        hint: 'サイコロ2こが ある',
+        mainLabel: 'かいだん',
+        mainHint: 'もう1かいが ある',
+        events: { 2: { kind: 'double' }, 4: { kind: 'back', steps: 1 } },
       },
     ],
     landmarks: [
-      { kind: 'castle', x: 2, y: 3, w: 4, h: 2 },
+      { kind: 'castle', x: 2, y: 6, w: 4, h: 2 },
     ],
     scenery: ['lollipop', 'donut', 'candy', 'cupcake'],
   }),
@@ -231,7 +236,7 @@ export const COURSES: readonly Course[] = [
     // はまべから しまを めぐって、とおくの とうだいを めざす。
     route: 'D2 R2 D2 R3 D2 R2 U6 R2 D9 L4 D2 L4 D3 R3 D2 R4 U2',
     events: {
-      2: { kind: 'forward', steps: 2 },
+      4: { kind: 'forward', steps: 2 },
       5: { kind: 'again' },
       8: { kind: 'back', steps: 2 },
       10: { kind: 'warp', to: [18, 25, 3] },
@@ -242,37 +247,36 @@ export const COURSES: readonly Course[] = [
       26: { kind: 'warp', to: [31, 36, 14] },
       29: { kind: 'rest' },
       32: { kind: 'double' },
-      33: { kind: 'forward', steps: 2 },
-      37: { kind: 'back', steps: 3 },
+      37: { kind: 'back', steps: 2 },
       39: { kind: 'again' },
-      42: { kind: 'warp', to: [45, 50, 30] },
+      42: { kind: 'warp', to: [46, 50, 30] },
       44: { kind: 'rest' },
       47: { kind: 'forward', steps: 3 },
       49: { kind: 'swap' },
-      51: { kind: 'back', steps: 6 },
+      51: { kind: 'back', steps: 5 },
     },
     branches: [
       {
-        // そとうみへ ふねで ぐるっと まわる。とおいけれど いいことが ある。
-        from: 24,
-        to: 28,
-        route: 'R2 D4 L2',
-        label: 'そとうみ',
-        hint: 'とおい けど いいこと ある',
-        mainLabel: 'はまべ',
-        mainHint: 'ちかい',
-        events: { 2: { kind: 'double' }, 4: { kind: 'forward', steps: 2 } },
+        // おかを のぼらずに、すなはまを まっすぐ あるく。
+        from: 2,
+        to: 11,
+        route: 'D4 R5',
+        label: 'すなはま',
+        hint: 'すすむが ある',
+        mainLabel: 'おかの うえ',
+        mainHint: 'ワープが ある',
+        events: { 2: { kind: 'forward', steps: 2 }, 5: { kind: 'rest' }, 7: { kind: 'double' } },
       },
       {
-        // とうだいへ まっすぐ わたる いわの みち。ちかいけれど ひとやすみ する ことも。
-        from: 46,
-        to: 54,
-        route: 'R4',
-        label: 'いわの みち',
-        hint: 'ちかい けど やすみが ある',
-        mainLabel: 'すなはま',
-        mainHint: 'とおい けど あんしん',
-        events: { 2: { kind: 'rest' } },
+        // しまの よこを ふねで わたる。
+        from: 34,
+        to: 40,
+        route: 'L4 D2',
+        label: 'ふねの みち',
+        hint: 'すすむが ある',
+        mainLabel: 'いわば',
+        mainHint: 'もう1かいが ある',
+        events: { 2: { kind: 'forward', steps: 2 }, 5: { kind: 'back', steps: 2 } },
       },
     ],
     landmarks: [
