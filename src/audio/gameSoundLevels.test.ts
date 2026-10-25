@@ -75,15 +75,20 @@ afterAll(() => {
 describe('game sound loudness', () => {
   const gameIds = GAME_CATALOG.map((game) => game.id)
 
-  it.each(gameIds)('%s registers representative sounds that actually play', (gameId) => {
-    const samples = GAME_SOUND_SAMPLES[gameId]
-    expect(samples, `${gameId} の代表的な効果音を src/test/audio/gameSoundSamples.ts に登録してください（音のないゲームはつくらない）`).toBeDefined()
-    expect(samples!.filter((sample) => !sample.background).length).toBeGreaterThan(0)
-    const report = measureGame(gameId)
-    for (const sound of [...report.sounds, ...report.background]) {
-      expect(sound.level, `${gameId}「${sound.name}」が鳴っていません`).toBeGreaterThan(-80)
-    }
-  })
+  for (const gameId of gameIds) {
+    // Rendering all 15 mini-4wd samples (including five BGMs) takes about 23s
+    // under V8 coverage locally; allow bounded headroom on shared CI runners.
+    const timeout = gameId === 'mini-4wd' ? 60_000 : undefined
+    it(`${gameId} registers representative sounds that actually play`, () => {
+      const samples = GAME_SOUND_SAMPLES[gameId]
+      expect(samples, `${gameId} の代表的な効果音を src/test/audio/gameSoundSamples.ts に登録してください（音のないゲームはつくらない）`).toBeDefined()
+      expect(samples!.filter((sample) => !sample.background).length).toBeGreaterThan(0)
+      const report = measureGame(gameId)
+      for (const sound of [...report.sounds, ...report.background]) {
+        expect(sound.level, `${gameId}「${sound.name}」が鳴っていません`).toBeGreaterThan(-80)
+      }
+    }, timeout)
+  }
 
   it.each(gameIds)('%s sounds about as loud as the other games', (gameId) => {
     const report = measureGame(gameId)
