@@ -107,23 +107,34 @@ describe('SugorokuPlay', () => {
     expect(positionOf(0)).toBe(9)
     roll(6)
     expect(positionOf(1)).toBe(10)
-    // 「ワープ」は とまって から とびさきが きまる（ここでは くじが 20 を ひく）。
+    // 「ワープ」は とまって から とびさきが きまる（ここでは くじが 24 を ひく）。
     rolls.push(5)
     fireEvent.click(dice())
     for (let n = 0; n < 60 && !/どこへ いくかな/.test(status().textContent ?? ''); n++) advance(100)
     expect(status()).toHaveTextContent('ワープ！ どこへ いくかな？')
     expect(positionOf(0)).toBe(14)
     for (let n = 0; n < 60 && !/さきへ ワープ/.test(status().textContent ?? ''); n++) advance(100)
-    expect(positionOf(0)).toBe(20)
+    expect(positionOf(0)).toBe(24)
     waitForTurn()
+    // 「サイコロ 2こ」に とまると、つぎの ばんは 2こ ふる。
     roll(6)
     expect(positionOf(1)).toBe(16)
-    expect(screen.getAllByRole('listitem')[1]).toHaveTextContent('のこり 16')
-
-    roll(6)
+    expect(screen.getAllByRole('listitem')[1]).toHaveTextContent('サイコロ2こ')
+    roll(2)
     expect(positionOf(0)).toBe(26)
-    roll(6)
-    expect(positionOf(1)).toBe(22)
+    expect(status()).toHaveTextContent('くまさんの ばん！ サイコロ 2こで ふってね')
+    expect(dice()).toHaveAttribute('data-dice-count', '2')
+    // 3と 3で 6 だが、わかれみちを とおりかかるので そこで とまる。
+    rolls.push(3, 3)
+    fireEvent.click(dice())
+    for (let n = 0; n < 60 && !/3と 3で 6/.test(status().textContent ?? ''); n++) advance(100)
+    expect(status()).toHaveTextContent('3と 3で 6！')
+    for (let n = 0; n < 60 && !/わかれみち！/.test(status().textContent ?? ''); n++) advance(100)
+    expect(positionOf(1)).toBe(18)
+    waitForTurn()
+    expect(positionOf(1)).toBe(18)
+    expect(dice()).toHaveAttribute('data-dice-count', '1')
+
     roll(6)
     expect(positionOf(0)).toBe(32)
     expect(status()).toHaveTextContent('うさぎさんが ゴール！')
@@ -133,7 +144,7 @@ describe('SugorokuPlay', () => {
     const result = screen.getByRole('region', { name: 'うさぎさんの かち！' })
     const places = within(result).getAllByRole('listitem')
     expect(places[0]).toHaveTextContent('1いうさぎさんゴール！')
-    expect(places[1]).toHaveTextContent('2いくまさんのこり 10マス')
+    expect(places[1]).toHaveTextContent('2いくまさんのこり 6マス')
     expect(screen.getByRole('button', { name: 'もういちど' })).toHaveFocus()
 
     fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
@@ -197,7 +208,8 @@ describe('SugorokuPlay', () => {
     waitForTurn()
     expect(positionOf(1)).toBe(6)
     expect(status()).toHaveTextContent('うさぎさんの ばん！')
-    expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('のこり 41')
+    // のこりは いちばん ちかい みち（いわの みち）で かぞえる。
+    expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('のこり 37')
   })
 
   test('とちゅうで もどったり ぬけたり すると、タイマーと おとを かたづける', () => {
@@ -227,7 +239,11 @@ describe('SugorokuPlay', () => {
     fireEvent.click(screen.getByRole('button', { name: 'はじめる！' }))
     const board = screen.getByRole('img', { name: /^おかしの くに。/ })
     expect(board).toHaveAccessibleName('おかしの くに。うさぎさんは スタート、くまさんは スタート、ねこさんは スタート')
-    expect(board.querySelectorAll('[data-square]')).toHaveLength(39)
+    expect(board.querySelectorAll('[data-square]')).toHaveLength(46)
+    expect(board.querySelector('[data-square="2"]')).toHaveTextContent('わかれみち')
+    expect(board.querySelector('[data-square="18"]')).toHaveTextContent('いれかわり')
+    expect(board.querySelector('[data-square="23"]')).toHaveTextContent('サイコロ2こ')
+    expect(board.querySelectorAll('path[d]').length).toBeGreaterThanOrEqual(2)
     expect(board.querySelector('[data-square="3"]')).toHaveTextContent('もう1かい')
     expect(board.querySelector('[data-square="5"]')).toHaveTextContent('+3すすむ')
     expect(board.querySelector('[data-square="9"]')).toHaveTextContent('やすみ')
@@ -238,6 +254,62 @@ describe('SugorokuPlay', () => {
     expect(board.querySelector('[data-landmark="castle"]')).not.toBeNull()
     roll(1)
     expect(screen.getByRole('img', { name: /^おかしの くに。/ })).toHaveAccessibleName(/うさぎさんは 1ばんめの マス/)
+  })
+
+  test('わかれみちでは みちを えらぶ ボタンを だし、えらんだ みちへ すすむ', () => {
+    renderGame()
+    fireEvent.click(screen.getByRole('button', { name: 'ふたり' }))
+    fireEvent.click(screen.getByRole('button', { name: 'はじめる！' }))
+    roll(6)
+    roll(3)
+    roll(6)
+    roll(3)
+    // 12 から 6 で ちょうど わかれみちに とまる。
+    roll(6)
+    expect(positionOf(0)).toBe(18)
+    roll(3)
+    expect(positionOf(1)).toBe(9)
+
+    expect(status()).toHaveTextContent('うさぎさんの ばん！ どっちの みちに する？')
+    expect(screen.queryByRole('button', { name: 'サイコロを ふる' })).toBeNull()
+    const group = screen.getByRole('group', { name: 'どっちの みちに する？' })
+    const [main, shortcut] = within(group).getAllByRole('button')
+    expect(main).toHaveAccessibleName('もりの みちへ すすむ（とおい けど あんしん）')
+    expect(shortcut).toHaveAccessibleName('けものみちへ すすむ（ちかい けど わなが ある）')
+    expect(main).toHaveFocus()
+    const board = () => screen.getByRole('img', { name: /^もりの こみち。/ })
+    expect(board()).toHaveAccessibleName(/うさぎさんは わかれみち/)
+    expect(board().querySelectorAll('[data-route-hint]')).toHaveLength(2)
+    expect(board().querySelector('[data-route-hint="19"]')).toHaveTextContent('もりの みち')
+
+    rolls.push(1)
+    fireEvent.click(shortcut!)
+    waitForTurn()
+    expect(positionOf(0)).toBe(33)
+    expect(board()).toHaveAccessibleName(/うさぎさんは けものみちの マス/)
+    expect(board().querySelectorAll('[data-route-hint]')).toHaveLength(0)
+    expect(status()).toHaveTextContent('くまさんの ばん！')
+    expect(dice()).toHaveFocus()
+  })
+
+  test('コンピュータは わかれみちで じぶんで みちを えらぶ', () => {
+    renderGame()
+    fireEvent.click(screen.getByRole('button', { name: 'はじめる！' }))
+    // うさぎさん・くまさん（コンピュータ）が こうたいで すすみ、くまさんが わかれみちに とまる。
+    for (const [human, computer] of [[1, 6], [2, 6], [3, 6]] as const) {
+      roll(human)
+      rolls.push(computer)
+      advance(COMPUTER_DELAY_MS)
+      waitForTurn()
+    }
+    expect(positionOf(1)).toBe(18)
+    roll(1)
+    expect(screen.queryByRole('group', { name: 'どっちの みちに する？' })).toBeNull()
+    // くじは 6（うしろの みち）→ サイコロは 1。
+    rolls.push(6, 1)
+    advance(COMPUTER_DELAY_MS)
+    waitForTurn()
+    expect(positionOf(1)).toBe(33)
   })
 
   test('はじめは コース ぜんたいを みせ、サイコロを ふると コマに ちかづく。ボタンで いつでも きりかえる', () => {

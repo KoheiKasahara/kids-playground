@@ -253,6 +253,21 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
 .kind-rest { fill: #e2dcfa; stroke: #7c6bd0; }
 .kind-again { fill: #fff1a6; stroke: #d1a400; }
 .kind-warp { fill: #ffd6ef; stroke: #d6458f; }
+.kind-double { fill: #d4ecff; stroke: #3f88c9; }
+.kind-swap { fill: #ffe3c2; stroke: #d8862a; }
+.kind-fork { fill: #fff6d6; stroke: #7a5534; stroke-dasharray: 10 6; }
+.branchDot { fill: var(--number); opacity: .55; }
+
+.routeHint rect { fill: none; stroke: #e0473f; stroke-width: 6; stroke-dasharray: 14 8; animation: ring 1s ease-in-out infinite; }
+.routeHint text {
+  fill: #fff;
+  stroke: #e0473f;
+  stroke-width: 6;
+  paint-order: stroke;
+  font-weight: 900;
+  text-anchor: middle;
+  pointer-events: none;
+}
 
 .squareWord,
 .squareBig,
@@ -365,7 +380,29 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
 .diceButton[aria-disabled='false']:active { transform: translateY(4px); box-shadow: 0 2px 0 color-mix(in srgb, var(--player) 60%, #000 10%); }
 .diceButton[aria-disabled='false'] .dice { animation: nudge 1.4s ease-in-out infinite; }
 .dice { width: 66px; height: 66px; }
+.diceRow { display: flex; justify-content: center; gap: 2px; }
+.diceButton[data-dice-count='2'] .dice { width: 50px; height: 50px; }
 .rolling .dice { animation: tumble 180ms linear infinite; }
+
+/* わかれみちでは サイコロの かわりに みちを えらぶ ボタンを だす。おすと そのまま ふる。 */
+.routes { flex: 0 0 auto; display: grid; gap: 6px; width: 140px; }
+.routeButton {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 6px 8px;
+  border: 4px solid var(--player);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--player) 60%, #000 10%);
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.routeButton strong { font-size: 15px; font-weight: 900; }
+.routeButton small { color: var(--muted); font-size: 10px; font-weight: 800; }
+.routeButton:active { transform: translateY(3px); box-shadow: 0 1px 0 color-mix(in srgb, var(--player) 60%, #000 10%); }
 
 @keyframes nudge {
   0%, 70%, 100% { transform: rotate(0); }
@@ -440,6 +477,8 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
 @media (max-width: 360px) {
   .diceButton { width: 100px; min-height: 100px; }
   .dice { width: 56px; height: 56px; }
+  .diceButton[data-dice-count='2'] .dice { width: 44px; height: 44px; }
+  .routes { width: 120px; }
   .playerChip { grid-template-columns: 28px minmax(0, 1fr); padding-right: 4px; }
   .chipIcon { width: 28px; height: 40px; }
   .chipName { font-size: 13px; }
@@ -461,6 +500,7 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
   .panel { flex-direction: column; }
   .players { flex: 0 0 auto; }
   .diceButton { order: -1; flex-direction: row; gap: 12px; width: 100%; min-height: 0; height: 84px; }
+  .routes { order: -1; width: 100%; grid-template-columns: 1fr 1fr; }
   .dice { width: 58px; height: 58px; }
 }
 
@@ -473,6 +513,7 @@ button:focus-visible { outline: 3px solid #6a5bd0; outline-offset: 3px; }
   .fly,
   .turnRing,
   .countBubble,
+  .routeHint rect,
   .diceButton .dice,
   .winnerIcon,
   .confetti i,

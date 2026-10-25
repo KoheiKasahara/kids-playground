@@ -10,7 +10,7 @@ import DiceFace from './DiceFace'
 import { PieceIcon } from './PieceArt'
 import SugorokuBoard, { type BoardMover } from './SugorokuBoard'
 import { playSugorokuSound } from './sounds'
-import { createGame, createPlayers, mustRest, playTurn, ranking, remainingSquares, rollDie, skipRest, type GameState } from './sugorokuGame'
+import { createGame, createPlayers, drawRoute, mustRest, playTurn, ranking, remainingSquares, rollDice, routeChoices, skipRest, type GameState } from './sugorokuGame'
 import { turnTimeline } from './turnTimeline'
 import styles from './SugorokuPlay.module.css'
 
@@ -28,19 +28,22 @@ const nameOf = (game: GameState, player: number) => `${pieceOf(game.players[play
 
 type View = {
   positions: readonly number[]
-  dice: number
+  dice: readonly number[]
   rolling: boolean
   mover: BoardMover | null
   message: string | null
 }
 
-const freshView = (game: GameState): View => ({ positions: game.positions, dice: 1, rolling: false, mover: null, message: null })
+const freshView = (game: GameState): View => ({ positions: game.positions, dice: [1], rolling: false, mover: null, message: null })
 
 function placeText(game: GameState, player: number): string {
+  const course = courseById(game.course)
   const position = game.positions[player]!
   if (position === 0) return 'スタート'
-  if (position >= goalIndex(courseById(game.course))) return 'ゴール'
-  return `${position}ばんめの マス`
+  if (position === goalIndex(course)) return 'ゴール'
+  if (course.forks[position]) return 'わかれみち'
+  const route = course.routeOf[position]
+  return route ? `${route}の マス` : `${position}ばんめの マス`
 }
 
 export default function SugorokuPlay() {
@@ -56,6 +59,7 @@ export default function SugorokuPlay() {
   const busyRef = useRef(false)
   const diceRef = useRef<HTMLButtonElement>(null)
   const replayRef = useRef<HTMLButtonElement>(null)
+  const routeRef = useRef<HTMLButtonElement>(null)
   const started = game !== null
   useGameIntroPlaying(started)
 
@@ -74,14 +78,14 @@ export default function SugorokuPlay() {
   }, [])
   useEffect(() => stopTimers, [stopTimers])
 
-  /** サイコロを ふって、すすむ・しかけ・つぎの ばん までを じゅんばんに みせる。 */
-  const takeTurn = useCallback((state: GameState) => {
+  /** サイコロを ふって、すすむ・しかけ・つぎの ばん までを じゅんばんに みせる。わかれみちでは route の みちへ。 */
+  const takeTurn = useCallback((state: GameState, route = 0) => {
     if (busyRef.current || state.winner !== null || mustRest(state)) return
     busyRef.current = true
     setBusy(true)
     setOverview(false)
     primeAudio()
-    const plan = playTurn(state, rollDie())
+    const plan = playTurn(state, rollDice(state), undefined, undefined, route)
     const { frames, duration } = turnTimeline(plan, state)
     for (const frame of frames) {
       const show = () => {
@@ -117,6 +121,9 @@ export default function SugorokuPlay() {
   const waiting = active !== null && !busy
   const resting = waiting && mustRest(game!)
   const computerTurn = waiting && !resting && game!.players[active]!.computer
+  /** いまの ひとが わかれみちで えらべる みち。 */
+  const routes = waiting && !resting ? routeChoices(game!) : null
+  const doubleTurn = waiting && !resting && Boolean(game!.doubles[active])
 
   // おやすみの ひとは しばらく まってから とばす。
   useEffect(() => {
@@ -129,14 +136,19 @@ export default function SugorokuPlay() {
   // コンピュータの ばんは すこし まってから じぶんで ふる。
   useEffect(() => {
     if (!game || !computerTurn) return undefined
-    const timer = window.setTimeout(() => takeTurn(game), COMPUTER_DELAY_MS)
+    const timer = window.setTimeout(() => {
+      const choices = routeChoices(game)
+      takeTurn(game, choices ? drawRoute(choices.length) : 0)
+    }, COMPUTER_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [game, computerTurn, takeTurn])
 
+  const choosing = routes !== null && !computerTurn
   useEffect(() => {
     if (resultReady) replayRef.current?.focus()
+    else if (choosing) routeRef.current?.focus()
     else if (started) diceRef.current?.focus()
-  }, [started, resultReady])
+  }, [started, resultReady, choosing])
 
   const start = () => {
     stopTimers()
@@ -165,10 +177,15 @@ export default function SugorokuPlay() {
     setSetup((previous) => ({ ...previous, ...next }))
   }
 
-  const canRoll = waiting && !resting && !computerTurn
+  const canRoll = waiting && !resting && !computerTurn && !choosing
   const roll = () => {
     if (game && canRoll) takeTurn(game)
   }
+  const chooseRoute = (route: number) => {
+    if (game && choosing) takeTurn(game, route)
+  }
+  // まって いる あいだは、つぎに ふる サイコロの かずだけ ならべる。
+  const shownDice = busy || !view ? view?.dice ?? [1] : Array.from({ length: doubleTurn ? 2 : 1 }, (_, die) => view.dice[die] ?? view.dice[0] ?? 1)
 
   const course = courseById(game?.course ?? setup.course)
   // カメラは うごいている コマ、いなければ いまの ばんの ひと（ゴールしたら かった ひと）を おいかける。
@@ -182,7 +199,9 @@ export default function SugorokuPlay() {
     : busy && view?.message ? view.message
       : resting ? `${nameOf(game, game.turn)}は おやすみ`
         : computerTurn ? `${nameOf(game, game.turn)}の ばん`
-          : `${nameOf(game, game.turn)}の ばん！ サイコロを ふってね`
+          : choosing ? `${nameOf(game, game.turn)}の ばん！ どっちの みちに する？`
+            : doubleTurn ? `${nameOf(game, game.turn)}の ばん！ サイコロ 2こで ふってね`
+              : `${nameOf(game, game.turn)}の ばん！ サイコロを ふってね`
 
   const page = (
     <main className={styles.page} data-course={course.id}>
@@ -206,14 +225,14 @@ export default function SugorokuPlay() {
             <div className={styles.courses} role="group" aria-labelledby="sugoroku-course">
               {COURSES.map((option) => (
                 <button key={option.id} type="button" className={styles.courseCard} data-course={option.id}
-                  aria-pressed={setup.course === option.id} aria-label={`${option.name}（${option.length}マス）`}
+                  aria-pressed={setup.course === option.id} aria-label={`${option.name}（${option.path.length}マス）`}
                   onClick={() => choose({ course: option.id })}>
                   <span className={styles.coursePreview} aria-hidden="true">
                     <SugorokuBoard course={option} label="" compact />
                   </span>
                   <strong>{option.name}</strong>
                   <small>{option.tagline}</small>
-                  <small className={styles.courseLength}>{option.length}マス</small>
+                  <small className={styles.courseLength}>{option.path.length}マス</small>
                 </button>
               ))}
             </div>
@@ -248,6 +267,7 @@ export default function SugorokuPlay() {
             <SugorokuBoard course={course} className={styles.board}
               pieces={game.players.map((player) => player.piece)} positions={view.positions}
               turn={active} mover={view.mover} focus={view.positions[focusPlayer] ?? 0} overview={overview}
+              routeHints={routes?.map((route) => ({ square: route.first, label: route.label })) ?? []}
               label={`${course.name}。${game.players.map((_, player) => `${nameOf(game, player)}は ${placeText({ ...game, positions: view.positions }, player)}`).join('、')}`} />
             <button type="button" className={styles.mapButton} aria-pressed={overview} onClick={toggleOverview}>
               {overview ? 'ちかくで みる' : 'ぜんたいを みる'}
@@ -267,18 +287,33 @@ export default function SugorokuPlay() {
                       {piece.name}{player.computer && <small className={styles.cpuTag}>コンピュータ</small>}
                     </span>
                     <span className={styles.chipLeft}>
-                      {left === 0 ? 'ゴール！' : game.resting[index] ? 'おやすみ' : `のこり ${left}`}
+                      {left === 0 ? 'ゴール！' : game.resting[index] ? 'おやすみ' : game.doubles[index] ? 'サイコロ2こ' : `のこり ${left}`}
                     </span>
                   </li>
                 )
               })}
             </ul>
-            <button ref={diceRef} type="button" className={`${styles.diceButton} ${view.rolling ? styles.rolling : ''}`}
-              aria-label="サイコロを ふる" aria-disabled={!canRoll} onClick={roll}
-              style={{ '--player': pieceOf(game.players[active ?? game.winner ?? 0]!.piece).color } as CSSProperties}>
-              <DiceFace value={view.dice} className={styles.dice} />
-              <span aria-hidden="true">{canRoll ? 'ふる！' : 'まってね'}</span>
-            </button>
+            {choosing ? (
+              <div className={styles.routes} role="group" aria-label="どっちの みちに する？"
+                style={{ '--player': pieceOf(game.players[active!]!.piece).color } as CSSProperties}>
+                {routes.map((route, index) => (
+                  <button key={route.first} ref={index === 0 ? routeRef : undefined} type="button" className={styles.routeButton}
+                    aria-label={`${route.label}へ すすむ（${route.hint}）`} onClick={() => chooseRoute(index)}>
+                    <strong>{route.label}</strong>
+                    <small>{route.hint}</small>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <button ref={diceRef} type="button" className={`${styles.diceButton} ${view.rolling ? styles.rolling : ''}`}
+                aria-label="サイコロを ふる" aria-disabled={!canRoll} onClick={roll} data-dice-count={shownDice.length}
+                style={{ '--player': pieceOf(game.players[active ?? game.winner ?? 0]!.piece).color } as CSSProperties}>
+                <span className={styles.diceRow}>
+                  {shownDice.map((value, die) => <DiceFace key={die} value={value} className={styles.dice} />)}
+                </span>
+                <span aria-hidden="true">{canRoll ? 'ふる！' : 'まってね'}</span>
+              </button>
+            )}
           </section>
 
           {resultReady && game.winner !== null && (

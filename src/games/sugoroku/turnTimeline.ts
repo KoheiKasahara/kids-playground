@@ -2,6 +2,7 @@ import type { HapticKind } from '../../utils/haptics'
 import type { BoardMover } from './SugorokuBoard'
 import type { SquareEvent } from './courses'
 import type { SugorokuSound } from './sounds'
+import { courseById, type Course } from './courses'
 import type { GameState, TurnPlan } from './sugorokuGame'
 
 /** 1かいの ばんの ながれの はやさ [ms]。こどもが めで おえる ように ゆっくりめ。 */
@@ -18,8 +19,10 @@ export const TIMING = {
   eventMs: 1000,
   /** ワープで とんでいく じかん。 */
   warpMs: 700,
-  /** ワープで ついた さきを よろこぶ（ざんねんがる）じかん。 */
+  /** ワープ・いれかわりで ついた さきを よろこぶ（ざんねんがる）じかん。 */
   warpResultMs: 900,
+  /** わかれみちで とまった ことを しらせる じかん。 */
+  forkMs: 900,
   /** うごきおわってから つぎの ひとの ばんに なるまで。 */
   settleMs: 450,
 } as const
@@ -27,7 +30,7 @@ export const TIMING = {
 export type TimelineFrame = {
   at: number
   positions?: readonly number[]
-  dice?: number
+  dice?: readonly number[]
   rolling?: boolean
   mover?: BoardMover | null
   message?: string
@@ -42,7 +45,22 @@ export function eventMessage(event: SquareEvent): string {
     case 'rest': return 'ひとやすみ。つぎは 1かい やすみ'
     case 'again': return 'もう1かい ふれるよ！'
     case 'warp': return 'ワープ！ どこへ いくかな？'
+    case 'double': return 'サイコロ 2こ！ つぎは 2こで ふれるよ'
+    case 'swap': return 'いれかわり！ いちばん まえの ひとと こうたい'
   }
+}
+
+/** でた めの ことば。2こ なら たしざんも みせる。 */
+export function rollMessage(rolls: readonly number[]): string {
+  if (rolls.length === 1) return `${rolls[0]}が でた！`
+  return `${rolls.join('と ')}で ${rolls.reduce((sum, value) => sum + value, 0)}！`
+}
+
+export const FORK_STOP_MESSAGE = 'わかれみち！ ここで とまって みちを えらぼう'
+
+/** いれかわりの あとの ことば。まえに だれも いなければ そのまま。 */
+export function swapResultMessage(swapped: boolean): string {
+  return swapped ? 'しゅっ！ いれかわった' : 'いちばん まえだから そのまま'
 }
 
 /** ワープで ついた あとの ことば。とびさきは くじびきなので、うしろへ もどる ことも ある。 */
@@ -50,16 +68,23 @@ export function warpResultMessage(ahead: boolean): string {
   return ahead ? 'びゅーん！ さきへ ワープ' : 'あれれ、うしろへ ワープ'
 }
 
-const isGood = (event: SquareEvent) => event.kind === 'forward' || event.kind === 'again'
+const isGood = (event: SquareEvent) => event.kind === 'forward' || event.kind === 'again' || event.kind === 'double' || event.kind === 'swap'
 
 /** サイコロを ふってから つぎの ひとの ばんに なるまでの、がめんの うごきを じかんじゅんに ならべる。 */
-export function turnTimeline(plan: TurnPlan, before: GameState, timing: typeof TIMING = TIMING): { frames: TimelineFrame[]; duration: number } {
+export function turnTimeline(
+  plan: TurnPlan,
+  before: GameState,
+  timing: typeof TIMING = TIMING,
+  course: Course = courseById(before.course),
+): { frames: TimelineFrame[]; duration: number } {
   const { player } = plan
   const frames: TimelineFrame[] = [{ at: 0, rolling: true, mover: null, message: 'ころころ…', sound: { kind: 'roll' }, haptic: 'tap' }]
   const faces = Math.floor(timing.rollMs / timing.faceMs)
-  for (let face = 1; face < faces; face++) frames.push({ at: face * timing.faceMs, dice: ((plan.roll + face) % 6) + 1 })
+  for (let face = 1; face < faces; face++) {
+    frames.push({ at: face * timing.faceMs, dice: plan.rolls.map((value, die) => ((value + face + die * 2) % 6) + 1) })
+  }
   let at = timing.rollMs
-  frames.push({ at, rolling: false, dice: plan.roll, message: `${plan.roll}が でた！`, sound: { kind: 'dice' } })
+  frames.push({ at, rolling: false, dice: plan.rolls, message: rollMessage(plan.rolls), sound: { kind: 'dice' } })
 
   let positions = before.positions
   let hop = 0
@@ -80,6 +105,11 @@ export function turnTimeline(plan: TurnPlan, before: GameState, timing: typeof T
   walk(plan.walk, false)
   at += timing.stepMs
 
+  if (plan.forkStop) {
+    frames.push({ at, mover: { player, hop, count: null, flying: false }, message: FORK_STOP_MESSAGE, sound: { kind: 'select' }, haptic: 'tap' })
+    at += timing.forkMs
+  }
+
   if (plan.event) {
     frames.push({
       at,
@@ -90,12 +120,26 @@ export function turnTimeline(plan: TurnPlan, before: GameState, timing: typeof T
       haptic: plan.event.kind === 'warp' ? 'tap' : isGood(plan.event) ? 'success' : 'impact',
     })
     at += timing.eventMs
-    if (plan.eventWalk.length > 0) {
+    if (plan.event.kind === 'swap') {
+      const landed = plan.walk.at(-1)!
+      if (plan.swapWith !== null) {
+        positions = positions.map((position, who) => (who === player ? plan.eventWalk[0]! : who === plan.swapWith ? landed : position))
+        frames.push({ at, positions, mover: { player, hop: ++hop, count: null, flying: true }, sound: { kind: 'warp' } })
+        at += timing.warpMs
+      }
+      frames.push({
+        at,
+        mover: { player, hop, count: null, flying: false },
+        message: swapResultMessage(plan.swapWith !== null),
+        sound: { kind: 'good' },
+      })
+      at += timing.warpResultMs
+    } else if (plan.eventWalk.length > 0) {
       const flying = plan.event.kind === 'warp'
       walk(plan.eventWalk, flying)
       at += flying ? timing.warpMs : timing.stepMs
       if (flying) {
-        const ahead = plan.eventWalk[0]! > plan.walk.at(-1)!
+        const ahead = course.toGoal[plan.eventWalk[0]!]! < course.toGoal[plan.walk.at(-1)!]!
         frames.push({
           at,
           mover: { player, hop, count: null, flying: false },
