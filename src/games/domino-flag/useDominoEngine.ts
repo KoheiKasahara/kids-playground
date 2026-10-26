@@ -36,9 +36,6 @@ import {
   MAX_FRAME_DELTA_MS,
   MAX_PHYSICS_SUBSTEPS,
   PHYSICS_TIMESTEP,
-  SETTLE_SLEEP_ANGULAR_SPEED_SQUARED_MAX,
-  SETTLE_SLEEP_LINEAR_SPEED_SQUARED_MAX,
-  SETTLE_SLEEP_TILT_RAD,
 } from './dominoPhysics'
 import {
   applyShepherdImpulse,
@@ -581,41 +578,10 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
       beginStart()
     }
 
-    function settleSleepingDominoes() {
-      if (!course.settleSleepEnabled || world === null) return
-
-      // active rigid bodyだけを走査するため、開始前や連鎖後の1,600個全走査を避けられる。
-      world.forEachActiveRigidBody((body) => {
-        // ボールはコースをまたいで再利用されるため、条件にかかわらずsleep対象から除外する。
-        if (dominoBall !== null && body.handle === dominoBall.body.handle) return
-        if (secondDominoBall !== null && body.handle === secondDominoBall.body.handle) return
-        if (!body.isDynamic()) return
-
-        const linearVelocity = body.linvel()
-        const angularVelocity = body.angvel()
-        const linearSpeedSquared =
-          linearVelocity.x * linearVelocity.x +
-          linearVelocity.y * linearVelocity.y +
-          linearVelocity.z * linearVelocity.z
-        const angularSpeedSquared =
-          angularVelocity.x * angularVelocity.x +
-          angularVelocity.y * angularVelocity.y +
-          angularVelocity.z * angularVelocity.z
-        if (
-          isTiltAtLeast(body, SETTLE_SLEEP_TILT_RAD) &&
-          linearSpeedSquared < SETTLE_SLEEP_LINEAR_SPEED_SQUARED_MAX &&
-          angularSpeedSquared < SETTLE_SLEEP_ANGULAR_SPEED_SQUARED_MAX
-        ) {
-          body.sleep()
-        }
-      })
-      // awakeなドミノとの接触が発生すればRapierが自動で再びwakeするため、
-      // 後から届いた連鎖を明示sleepが遮断することはない。
-    }
-
     function inspectPhysics(now: number) {
       if (!started || startedAt === null) return
-      settleSleepingDominoes()
+      // Rapier 0.21 sleeps connected islands together. Keep contacts simulated
+      // until the island settles; forcing one member asleep can drop it through the floor.
       const states: DominoRuntimeState[] = bodies.map((entry) => ({
         tilt: tiltOf(entry.body),
         sleeping: entry.body.isSleeping(),
@@ -841,7 +807,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
               const floorGeometry = new THREE.BoxGeometry(
                 BALL_RAIL_WIDTH,
                 BALL_RAIL_THICKNESS,
-                piece.length + 0.14,
+                piece.length + piece.padding * 2,
               )
               railGeometries.push(floorGeometry)
               const floor = new THREE.Mesh(floorGeometry, railFloorMaterial!)
@@ -869,7 +835,7 @@ export function useDominoEngine(options: DominoEngineOptions): DominoEngineHandl
                 const wallGeometry = new THREE.BoxGeometry(
                   BALL_RAIL_WALL_THICKNESS,
                   BALL_RAIL_WALL_HEIGHT,
-                  piece.length + 0.14,
+                  piece.length + piece.padding * 2,
                 )
                 railGeometries.push(wallGeometry)
                 const wall = new THREE.Mesh(wallGeometry, railWallMaterial!)

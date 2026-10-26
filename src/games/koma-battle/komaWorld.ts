@@ -7,6 +7,7 @@
  */
 
 import type { RigidBody, World } from '@dimforge/rapier3d-compat'
+import { configureGameContacts } from '../../physics/rapierWorld'
 import {
   ANGULAR_DAMPING,
   DISK_CENTER_Y,
@@ -194,6 +195,10 @@ export function createKomaBattleWorld(
 ): KomaBattleWorld {
   const world = new rapier.World({ x: 0, y: GRAVITY_Y, z: 0 })
   world.timestep = PHYSICS_TIMESTEP
+  configureGameContacts(world)
+  // Rapier 0.21 rewrote CCD. Resolve impacts across several substeps so its
+  // end-of-step restitution preserves both knockback and bumper recollisions.
+  world.integrationParameters.maxCcdSubsteps = 4
 
   const selectedField = getKomaField(options.field ?? options.fieldId)
 

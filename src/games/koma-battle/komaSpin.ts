@@ -179,6 +179,11 @@ export function clampedVector(vector: Vector3, maxLength: number): Vector3 | nul
   }
   const length = Math.hypot(x, y, z)
   if (length <= maxLength || length === 0) return null
-  const scale = maxLength / length
+  let scale = maxLength / length
+  // Rapier stores velocities as f32. Rounding a diagonal vector at the exact
+  // limit can put it outside the cap again; leave one f32 ULP only when needed.
+  if (Math.hypot(Math.fround(x * scale), Math.fround(y * scale), Math.fround(z * scale)) > maxLength) {
+    scale *= 1 - 2 ** -23
+  }
   return { x: x * scale, y: y * scale, z: z * scale }
 }

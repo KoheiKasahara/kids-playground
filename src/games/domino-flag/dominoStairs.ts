@@ -10,7 +10,9 @@ export const STAIR_STEP_RISE = 0.22
 export const STAIR_TOP_BASE_Y = STAIR_STEP_COUNT * STAIR_STEP_RISE
 
 export const STAIR_PLATFORM_WIDTH = 1.0
-export const STAIR_PLATFORM_DEPTH = 0.7
+// Leave 16 cm between treads: 0.21's firmer fixed contacts otherwise catch a
+// toppling plate against the next riser just short of a complete fall.
+export const STAIR_PLATFORM_DEPTH = 0.66
 
 export type StairPlatform = {
   center: { x: number; y: number; z: number }

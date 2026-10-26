@@ -143,6 +143,8 @@ describe('domino ball section headless physics', () => {
     )
     expect(result.ballStartStep).not.toBeNull()
     expect(result.triggerTippedStep).not.toBeNull()
+    expect(result.anyMotionStep).not.toBeNull()
+    expect(result.anyMotionStep!).toBeGreaterThanOrEqual(result.triggerTippedStep!)
     expect(result.ballStartStep!).toBeGreaterThanOrEqual(result.triggerTippedStep!)
     expect(result.exitStep).not.toBeNull()
     expect(result.receiverStep).not.toBeNull()
@@ -163,6 +165,8 @@ describe('domino ball section headless physics', () => {
           `speed=${result.maxSpeed.toFixed(3)}, railOut=${result.railOutCount}`,
       )
       expect(result.ballStartStep, `seed=${seed}`).not.toBeNull()
+      expect(result.anyMotionStep, `seed=${seed}`).not.toBeNull()
+      expect(result.anyMotionStep!, `seed=${seed}`).toBeGreaterThanOrEqual(result.triggerTippedStep!)
       expect(result.exitStep, `seed=${seed}`).not.toBeNull()
       expect(result.receiverStep, `seed=${seed}`).not.toBeNull()
       expect(result.receiverFallen, `seed=${seed}`).toBe(true)

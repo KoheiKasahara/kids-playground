@@ -37,8 +37,6 @@ export type DominoCourse = {
   flagLayout: FlagLayoutSpec
   /** nullならRapierの既定値を使い、既存モードの物理パラメータに触れない。 */
   solverIterations: number | null
-  /** 大量の静止剛体を明示的にsleepさせるのはビッグだけに限定する。 */
-  settleSleepEnabled: boolean
   cameraMode: DominoCameraMode
   placements: DominoPlacement[]
   /** 最初に押すドミノのid。normalはline-0、longは道中の先頭。 */
@@ -209,7 +207,6 @@ function createNormalCourse(flagId: DominoFlagId): DominoCourse {
     type: 'normal',
     flagLayout: NORMAL_FLAG_LAYOUT,
     solverIterations: null,
-    settleSleepEnabled: false,
     cameraMode: 'fixed',
     placements,
     startId: 'line-0',
@@ -345,7 +342,6 @@ function createLongCourse(flagId: DominoFlagId): DominoCourse {
     type: 'long',
     flagLayout: NORMAL_FLAG_LAYOUT,
     solverIterations: null,
-    settleSleepEnabled: false,
     cameraMode: 'longRail',
     placements,
     startId: 'approach-0',
@@ -403,7 +399,6 @@ export function createBigCourse(
     type: 'big',
     flagLayout: bigLayout,
     solverIterations: 2,
-    settleSleepEnabled: true,
     cameraMode: 'bigPullout',
     placements,
     startId: 'line-0',

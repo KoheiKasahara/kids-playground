@@ -9,9 +9,6 @@ import {
 import {
   INSPECTION_INTERVAL_MS,
   PHYSICS_TIMESTEP,
-  SETTLE_SLEEP_ANGULAR_SPEED_SQUARED_MAX,
-  SETTLE_SLEEP_LINEAR_SPEED_SQUARED_MAX,
-  SETTLE_SLEEP_TILT_RAD,
 } from './dominoPhysics'
 import {
   createShepherdMemory,
@@ -54,31 +51,6 @@ const AWAKE_SAMPLE_STEP_INTERVAL = 4
 
 function entryIsFallen(entry: DominoBodyEntry): boolean {
   return isTiltAtLeast(entry.body, FALLEN_TILT_RAD)
-}
-
-function settleActiveDominoes(dominoWorld: DominoWorld): void {
-  const ballHandle = dominoWorld.ball?.body.handle
-  dominoWorld.world.forEachActiveRigidBody((body) => {
-    if (body.handle === ballHandle || !body.isDynamic()) return
-
-    const linearVelocity = body.linvel()
-    const angularVelocity = body.angvel()
-    const linearSpeedSquared =
-      linearVelocity.x * linearVelocity.x +
-      linearVelocity.y * linearVelocity.y +
-      linearVelocity.z * linearVelocity.z
-    const angularSpeedSquared =
-      angularVelocity.x * angularVelocity.x +
-      angularVelocity.y * angularVelocity.y +
-      angularVelocity.z * angularVelocity.z
-    if (
-      isTiltAtLeast(body, SETTLE_SLEEP_TILT_RAD) &&
-      linearSpeedSquared < SETTLE_SLEEP_LINEAR_SPEED_SQUARED_MAX &&
-      angularSpeedSquared < SETTLE_SLEEP_ANGULAR_SPEED_SQUARED_MAX
-    ) {
-      body.sleep()
-    }
-  })
 }
 
 function createShepherdInputs(dominoWorld: DominoWorld) {
@@ -231,7 +203,6 @@ function runBigChainSimulation(
       const elapsedMs = step * PHYSICS_TIMESTEP * 1_000
 
       if (elapsedMs >= nextInspectionMs) {
-        settleActiveDominoes(dominoWorld)
         const states = dominoWorld.bodies.map((entry) => ({
           tilt: tiltOf(entry.body),
           sleeping: entry.body.isSleeping(),
@@ -291,6 +262,9 @@ function runBigChainSimulation(
     for (const entry of flags) {
       if (entryIsFallen(entry)) flagFallenCount += 1
     }
+    // A fallen-count assertion alone can accidentally accept bodies that fell
+    // through the floor after an individual sleep() inside a still-active island.
+    expect(dominoWorld.bodies.every(entry => entry.body.translation().y > -0.1)).toBe(true)
     return {
       flagCount: flags.length,
       flagFallenCount,

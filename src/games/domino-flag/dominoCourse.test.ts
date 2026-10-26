@@ -48,7 +48,6 @@ describe('createDominoCourse', () => {
     expect(course.seesawSection).toBeNull()
     expect(course.cameraProgressCount).toBe(0)
     expect(course.solverIterations).toBe(2)
-    expect(course.settleSleepEnabled).toBe(true)
     expect(course.cameraMode).toBe('bigPullout')
     expect(course.hardTimeoutMs).toBe(BIG_HARD_TIMEOUT_MS)
     expect(course.groundSize).toBeGreaterThanOrEqual(80)

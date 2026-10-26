@@ -32,6 +32,8 @@ export type BallRailPiece = {
   /** ローカルX軸まわり。正なら+Zへ進むほど下がる。 */
   pitch: number
   length: number
+  /** Join padding, omitted at the first slope so it cannot protrude into the resting ball. */
+  padding: number
   surfaceY: number
 }
 
@@ -186,10 +188,11 @@ export function getBallRailPieces(section: DominoBallSection): BallRailPiece[] {
       yaw: firstYaw,
       pitch: 0,
       length: BALL_START_DECK_LENGTH,
+      padding: 0.07,
       surfaceY: deckSurfaceY,
     },
   ]
-  for (const segment of section.railSegments) {
+  for (const [index, segment] of section.railSegments.entries()) {
     const dx = segment.end.x - segment.start.x
     const dy = segment.end.y - segment.start.y
     const dz = segment.end.z - segment.start.z
@@ -206,6 +209,7 @@ export function getBallRailPieces(section: DominoBallSection): BallRailPiece[] {
       yaw: Math.atan2(dx, dz),
       pitch: Math.atan2(-dy, horizontalLength),
       length,
+      padding: index === 0 ? 0 : 0.07,
       surfaceY: (segment.start.y + segment.end.y) / 2,
     })
   }

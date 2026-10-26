@@ -1,4 +1,5 @@
 import type { RigidBody, World } from '@dimforge/rapier3d-compat'
+import { configureGameContacts } from '../../physics/rapierWorld'
 import {
   DOMINO_DEPTH,
   DOMINO_HEIGHT,
@@ -98,8 +99,10 @@ function createBallSectionBody(
       .setLinearDamping(0.025)
       .setAngularDamping(0.02)
       .setCcdEnabled(true)
-      .setCanSleep(true)
-      .setSleeping(true),
+      // 0.21 wakes initially sleeping bodies when their first fixed contact is
+      // created, one step after constraints are built. Start awake so the deck
+      // supports the ball immediately, then let normal sleeping settle it.
+      .setCanSleep(true),
   )
   world.createCollider(
     rapier.ColliderDesc.ball(BALL_RADIUS)
@@ -123,7 +126,7 @@ function createBallSectionBody(
       rapier.ColliderDesc.cuboid(
         BALL_RAIL_WIDTH / 2,
         BALL_RAIL_THICKNESS / 2,
-        piece.length / 2 + 0.07,
+        piece.length / 2 + piece.padding,
       )
         .setTranslation(piece.center.x, piece.center.y - BALL_RAIL_THICKNESS / 2, piece.center.z)
         .setRotation(rotation)
@@ -145,7 +148,7 @@ function createBallSectionBody(
         rapier.ColliderDesc.cuboid(
           BALL_RAIL_WALL_THICKNESS / 2,
           BALL_RAIL_WALL_HEIGHT / 2,
-          piece.length / 2 + 0.07,
+          piece.length / 2 + piece.padding,
         )
           .setTranslation(
             piece.center.x + side * sideX,
@@ -175,6 +178,9 @@ export function createDominoWorld(
 ): DominoWorld {
   const world = new rapier.World({ x: 0, y: GRAVITY_Y, z: 0 })
   world.timestep = PHYSICS_TIMESTEP
+  configureGameContacts(world)
+  // Restore the pre-0.21 contact ERP at this world's 120 Hz timestep.
+  world.integrationParameters.contact_natural_frequency = 60
   if (options.solverIterations !== undefined && options.solverIterations !== null) {
     // 1,600個が同時にawakeになるビッグだけ反復回数を2へ下げると、実測で物理コストが約3割減り、
     // 倒れ切る割合は100%を維持した。未指定時は既存モードのRapier既定値を変更しない。
