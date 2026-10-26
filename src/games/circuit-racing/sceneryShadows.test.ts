@@ -6,6 +6,7 @@ import { createSceneryShadows, RACE_SUN_OFFSET } from './sceneryShadows'
 
 function sample(texture: THREE.DataTexture, x: number, z: number) {
   const { width, height, data } = texture.image
+  if (!data) throw new Error('Shadow texture has no pixel data')
   const u = Math.floor((x / 700 + 0.5) * width)
   const v = Math.floor((z / 700 + 0.5) * height)
   return data[(v * width + u) * 4]!
@@ -51,6 +52,7 @@ describe('static scenery shadows', () => {
     const children = [...scenery.group.children]
     const shadows = createSceneryShadows(scenery.group)
     const data = shadows.texture.image.data
+    if (!data) throw new Error('Shadow texture has no pixel data')
     let covered = 0
     for (let i = 0; i < data.length; i += 4) if (data[i]! > 0) covered++
     expect(covered).toBeGreaterThan(1000)
