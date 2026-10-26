@@ -214,14 +214,14 @@ for (const definition of MAZE_STAGES) {
       visited[startSample.index] = 1
 
       while (queueHead < queueTail) {
-        const current = queue[queueHead]
+        const current: number = queue[queueHead]
         queueHead += 1
         exploredSampleCount += 1
         if (current === goalSample.index) break
 
-        const column = current % sampleColumnCount
+        const column: number = current % sampleColumnCount
         const row = Math.floor(current / sampleColumnCount)
-        const neighbors = [
+        const neighbors: readonly (readonly [number, number])[] = [
           [column - 1, row],
           [column + 1, row],
           [column, row - 1],

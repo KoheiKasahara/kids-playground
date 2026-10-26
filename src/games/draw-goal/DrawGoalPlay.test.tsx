@@ -7,7 +7,7 @@ import { playCorrectSound } from '../../utils/quizSound'
 
 vi.mock('../../utils/quizSound', () => ({ primeAudio: vi.fn(), playCorrectSound: vi.fn() }))
 let frame: FrameRequestCallback
-let time: number
+let time = 0
 beforeEach(() => {
   // クリア記録（★）はlocalStorageに残るため、テストごとに消して選択画面の名前をそろえる。
   localStorage.clear()
