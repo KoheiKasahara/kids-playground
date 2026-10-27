@@ -1,4 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat'
+import { configureGameContacts } from '../../physics/rapierWorld'
 import type { BufferGeometry } from 'three'
 import { BALL_RADIUS, launchPose, rotate, SEESAW_ANGLE, SEESAW_PIVOT, SPINNER_ANGLE, SPINNER_BAR_HALF, SPINNER_BAR_RADIUS, SPINNER_BAR_Y, toLocal, toWorld, type Course, type MarblePart, type PartKind, type Vec3 } from './marbleModel'
 
@@ -15,6 +16,7 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
   if (!pose) return null
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
   world.timestep = 1 / 120
+  configureGameContacts(world)
   const surfaces = new Map<string, RAPIER.Collider>()
   const mechanisms = new Map<string, RAPIER.RigidBody>()
   const bars = new Map<string, RAPIER.Collider>()
@@ -80,10 +82,14 @@ export function createMarbleWorld(course: Course, geometries: Record<PartKind, B
   const emit = (part: MarblePart, kind: MarbleEvent['kind']) => events.push({ id: part.id, kind, position: { ...ball.translation() } })
   const touching = (collider: RAPIER.Collider, topOf?: MarblePart): boolean => {
     let contact = false
-    world.contactPair(ballCollider, collider, manifold => {
-      for (let i = 0; i < manifold.numSolverContacts(); i++) {
+    world.contactPair(ballCollider, collider, (manifold, flipped) => {
+      // Rapier 0.21 clears transient solver contacts after step(). Persistent shape
+      // contacts remain available; use the surface's local point for the top test.
+      for (let i = 0; i < manifold.numContacts(); i++) {
+        if (manifold.contactDist(i) > 0.001) continue
         if (!topOf) { contact = true; break }
-        const p = toLocal(topOf, manifold.solverContactPoint(i))
+        const p = flipped ? manifold.localContactPoint1(i) : manifold.localContactPoint2(i)
+        if (!p) continue
         // The narrow, level center floor excludes the sidewalls and underside.
         if (Math.abs(p.z) < 0.6 && Math.abs(p.x) < 1.85 && p.y > -0.025 && p.y < 0.06) contact = true
       }

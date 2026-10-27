@@ -161,6 +161,13 @@ describe('clampedVector', () => {
     expect(clamped).toEqual({ x: 9, y: 0, z: 0 })
   })
 
+  it('斜めの速度もRapierのf32へ渡した後で上限を超えない', () => {
+    for (const vector of [{ x: 8, y: 3, z: 3 }, { x: 17, y: 11, z: 5 }]) {
+      const value = clampedVector(vector, 9)!
+      expect(Math.hypot(Math.fround(value.x), Math.fround(value.y), Math.fround(value.z))).toBeLessThanOrEqual(9)
+    }
+  })
+
   it('NaNやInfinityは0へ落として伝播を止める', () => {
     expect(clampedVector({ x: Number.NaN, y: 0, z: 0 }, 9)).toEqual({ x: 0, y: 0, z: 0 })
     expect(clampedVector({ x: 0, y: Number.POSITIVE_INFINITY, z: 0 }, 9)).toEqual({

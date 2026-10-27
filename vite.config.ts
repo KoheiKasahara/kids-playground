@@ -8,6 +8,7 @@ import { staticRoutePages } from './src/build/staticRoutePages'
 import { sitemapFile } from './src/build/sitemap'
 import { projectHealthDashboardOutput } from './src/build/projectHealthDashboardOutput'
 import { threeGlobeUnusedDeps } from './src/build/threeGlobeUnusedDeps'
+import { rapierWasmAsset } from './src/build/rapierWasmAsset'
 
 // カスタムドメイン（https://kids.kasapg.com/）直下で公開するため base は常に '/'。
 const base = '/'
@@ -15,6 +16,7 @@ const base = '/'
 const plugins = [
   react(),
   threeGlobeUnusedDeps(),
+  rapierWasmAsset(base),
   VitePWA({
     // 'autoUpdate' だと新しいSWが有効化された瞬間に自動で window.location.reload() が
     // 走ってしまい、クイズの途中でも進行が消えてしまう。
@@ -57,12 +59,12 @@ const plugins = [
       ],
     },
     workbox: {
-      // Rapierのwasmはbase64でrapier.mjsへ埋め込まれており、約2.24MiBあります。
-      // この構造上これ以上の圧縮が難しいため、理由を明示して3MiBへ引き上げます。
+      // Rapier 0.21はbase64込みだと4.33MBになるため、同じWASMを独立素材へ出す。
+      // 実バイナリは約2.94MiB。WASMも他の素材も既存の3MiB上限を維持する。
       maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       // 車体GLB（約550KB / 7車種）もprecacheへ含める。オフラインでも
       // 「3Dクルマづくり」の車種切替が今までどおり成立するようにするため。
-      globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,mp3,glb,webmanifest}'],
+      globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,mp3,glb,wasm,webmanifest}'],
       // Project Health Dashboard（Issue #526）は開発者向けの別ページであり、
       // 本体ゲームを遊ぶ子ども向け端末のPWAキャッシュを不要に増やさないため、
       // precache対象から明示的に除外する。VitePWAのcloseBundleは
