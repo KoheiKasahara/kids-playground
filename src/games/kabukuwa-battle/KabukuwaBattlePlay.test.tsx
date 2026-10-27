@@ -13,7 +13,7 @@ vi.mock('./sounds', async importOriginal => {
 })
 
 let frame: FrameRequestCallback | null
-let time: number
+let time = 0
 
 beforeEach(() => {
   time = 0
