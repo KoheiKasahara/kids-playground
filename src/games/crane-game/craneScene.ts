@@ -12,6 +12,7 @@ import { BIN, CHUTE, prizeReach, type CraneMachine, type PrizeLook, type PrizeSp
 import { CLAW } from './craneRig'
 import { clampZoom, MAX_ZOOM } from './craneZoom'
 import type { FingerView, PrizeView } from './craneWorld'
+import { createMainPassStats } from '../../utils/mainPassStats'
 
 export type CraneView = 'front' | 'side'
 /** タップした場所を拾う高さ。景品の山のてっぺんあたり。 */
@@ -1404,6 +1405,7 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
   const pickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -PICK_Y)
   const hitPoint = new THREE.Vector3()
 
+  const frameStats = createMainPassStats(renderer)
   return {
     renderer,
     camera,
@@ -1531,10 +1533,10 @@ export function createCraneScene(container: HTMLDivElement, machine: CraneMachin
         updateAmbient(twinkle)
       }
       if (zoom > 1) placeCamera(reducedMotion ? 1 : 1 - Math.exp(-dt * 6))
-      renderer.render(scene, camera)
+      frameStats.render(scene, camera)
     },
     stats() {
-      return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }
+      return frameStats.stats()
     },
     dispose() {
       disposeObject(scene)

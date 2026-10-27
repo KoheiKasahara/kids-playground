@@ -19,8 +19,10 @@ export const WALL_THICKNESS = 0.2
 export const PLATFORM_DEPTH = 0.35
 export const EARTH_GRAVITY = 9.81
 export const PHYSICS_STEP = 1 / 120
-/** 1フレームで進める物理の上限。タブ復帰などで一気に進めないようにする。 */
-export const MAX_STEPS_PER_FRAME = 8
+/** Match the engine's 100ms elapsed-time cap at 120 Hz. Eight steps discarded
+ * a third of elapsed time below 15 FPS, slowing shots as rendering got heavier.
+ * Tab resume still advances at most 100ms, with the same fixed physics step. */
+export const MAX_STEPS_PER_FRAME = 12
 
 export const SHOT_SPEED_MIN = 0.9
 export const SHOT_SPEED_MAX = 6.8
