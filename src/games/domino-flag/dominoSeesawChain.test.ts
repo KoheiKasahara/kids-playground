@@ -88,6 +88,17 @@ function runSeesawSection(placements?: DominoPlacement[]): SeesawRun {
       ) {
         strikeStep = step
       }
+
+      // 区間の受け渡しを確認したら終了する。コース全体の完走はdominoLongChain.test.tsで検証する。
+      // イベントが欠ける場合は従来どおりMAX_STEPSまで試行し、後段のassertionで失敗させる。
+      if (
+        triggerTippedStep !== null &&
+        ballMovedStep !== null &&
+        seesawTippedStep !== null &&
+        strikeStep !== null
+      ) {
+        break
+      }
     }
     return {
       triggerTippedStep,
@@ -146,16 +157,21 @@ describe('domino seesaw section headless physics', () => {
     expect(result.strikeStep!).toBeGreaterThanOrEqual(result.seesawTippedStep!)
   })
 
-  it('12シードで補助なしにシーソーが作動し、後段ドミノを始動する', { timeout: 30_000 }, () => {
-    const seeds = [11, 22, 33, 44, 55, 66, 77, 88, 99, 111, 222, 333]
-    for (const seed of seeds) {
+  it.each([11, 22, 33, 44, 55, 66, 77, 88, 99, 111, 222, 333])(
+    'seed=%i: 補助なしにシーソーが作動し、後段ドミノを始動する',
+    { timeout: 30_000 },
+    (seed) => {
       const result = runSeesawSection(createPerturbedPlacements(seed))
       console.log(
         `[domino-seesaw] seed=${seed}: seesawTipped=${result.seesawTippedStep}, ` +
           `strike=${result.strikeStep}, maxTilt=${((result.maxTiltRad * 180) / Math.PI).toFixed(1)}deg`,
       )
+      expect(result.triggerTippedStep, `seed=${seed}`).not.toBeNull()
+      expect(result.ballMovedStep, `seed=${seed}`).not.toBeNull()
+      expect(result.ballMovedStep!, `seed=${seed}`).toBeGreaterThanOrEqual(result.triggerTippedStep!)
       expect(result.seesawTippedStep, `seed=${seed}`).not.toBeNull()
       expect(result.strikeStep, `seed=${seed}`).not.toBeNull()
-    }
-  })
+      expect(result.strikeStep!, `seed=${seed}`).toBeGreaterThanOrEqual(result.seesawTippedStep!)
+    },
+  )
 })
