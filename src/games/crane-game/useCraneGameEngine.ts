@@ -142,6 +142,8 @@ export function useCraneGameEngine(options: Options) {
         host.dataset.view = scene.view
         host.dataset.drawCalls = String(stats.calls)
         host.dataset.triangles = String(stats.triangles)
+        host.dataset.totalDrawCalls = String(stats.totalCalls)
+        host.dataset.totalTriangles = String(stats.totalTriangles)
       }
     }
 

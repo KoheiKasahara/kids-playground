@@ -89,6 +89,20 @@ function setup(initial: Props = {}) {
 const world = (index = 0) => mocks.createWorld.mock.results[index]!.value as FakeWorld
 const scene = () => mocks.createScene.mock.results[0]!.value
 
+it('100ms間隔の描画でも実時間の物理を進め、長い中断は100msまでに制限する', async () => {
+  const app = setup()
+  await waitFor(() => expect(app.status).toContain('ready'))
+  runFrames(1, 100)
+  world().step.mockClear()
+  runFrames(10, 100)
+  // One second at 120 Hz, allowing one retained fractional tick.
+  expect(world().step.mock.calls.length).toBeGreaterThanOrEqual(119)
+  expect(world().step.mock.calls.length).toBeLessThanOrEqual(120)
+  world().step.mockClear()
+  runFrames(1, 1000)
+  expect(world().step.mock.calls.length).toBeLessThanOrEqual(12)
+})
+
 function pointer(type: string, x: number, y: number) {
   return Object.assign(new Event(type, { bubbles: true, cancelable: true }), { pointerId: 7, button: 0, clientX: x, clientY: y })
 }

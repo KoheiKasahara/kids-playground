@@ -10,7 +10,7 @@ import {
   VERTICAL_SOFT_LIMIT_START_DEGREES,
 } from './rotationControls'
 
-type OrbitControlsInternals = OrbitControls & {
+type OrbitControlsInternals = OrbitControls<THREE.PerspectiveCamera> & {
   _handleMouseDownRotate: (event: MouseEvent) => void
   _handleMouseMoveRotate: (event: MouseEvent) => void
   _sphericalDelta: THREE.Spherical

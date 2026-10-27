@@ -11,7 +11,7 @@ vi.mock('./sounds', () => ({ playSushiSound: vi.fn() }))
 
 const KEY = 'kaiten-sushi-v1'
 let frame: FrameRequestCallback | null
-let time: number
+let time = 0
 const store = new Map<string, string>()
 
 beforeEach(() => {

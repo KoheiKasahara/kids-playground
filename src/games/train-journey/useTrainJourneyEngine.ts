@@ -8,6 +8,7 @@ import { CITY_CROSSING } from './journeyCity'
 import { advanceJourney, boostJourney, CAR_SPACING, createJourneyMotion, MAPS, railOrientation, ROUTES, sampleJourney, TRAINS, upcomingSwitch, type JourneyCourse, type JourneyRoutes, type TrainId } from './journeyModel'
 import { createJourneyScene, disposeJourneyObject, type JourneyWorld } from './journeyScene'
 import { journeySound } from './journeySound'
+import { createMainPassStats } from '../../utils/mainPassStats'
 
 export type JourneyCamera = 'follow' | 'overview'
 export type JourneyStatus = 'loading' | 'ready' | 'error'
@@ -73,6 +74,7 @@ export function useTrainJourneyEngine(options: Options) {
     scene.add(sun, new THREE.HemisphereLight('#e5f7ff', '#899863', 1.0))
     const motion = createJourneyMotion(course)
     let renderer: THREE.WebGLRenderer | undefined
+    let frameStats: ReturnType<typeof createMainPassStats> | undefined
     let controls: OrbitControls | undefined
     let world: JourneyWorld | undefined
     let released = false
@@ -254,8 +256,11 @@ export function useTrainJourneyEngine(options: Options) {
       host.dataset.distance = motion.distance.toFixed(3)
       host.dataset.speed = motion.speed.toFixed(2)
       host.dataset.boost = motion.boostRemaining.toFixed(2)
-      host.dataset.drawCalls = String(renderer?.info.render.calls ?? 0)
-      host.dataset.triangles = String(renderer?.info.render.triangles ?? 0)
+      const stats = frameStats?.stats()
+      host.dataset.drawCalls = String(stats?.calls ?? 0)
+      host.dataset.triangles = String(stats?.triangles ?? 0)
+      host.dataset.totalDrawCalls = String(stats?.totalCalls ?? 0)
+      host.dataset.totalTriangles = String(stats?.totalTriangles ?? 0)
     }
     function frame(now: number) {
       if (released || lost || document.hidden) return
@@ -286,7 +291,7 @@ export function useTrainJourneyEngine(options: Options) {
       updateCamera(dt)
       updateMarkers()
       if ((dirty || current.camera === 'follow') && now - lastDraw >= 1000 / 40) {
-        renderer.render(scene, camera)
+        frameStats!.render(scene, camera)
         lastDraw = now
         dirty = false
       }
@@ -309,6 +314,7 @@ export function useTrainJourneyEngine(options: Options) {
     optionsRef.current.onStatus('loading')
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
+      frameStats = createMainPassStats(renderer)
       renderer.outputColorSpace = THREE.SRGBColorSpace
       renderer.toneMapping = THREE.ACESFilmicToneMapping
       renderer.toneMappingExposure = 1.08
