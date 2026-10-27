@@ -30,7 +30,7 @@ vi.mock('./courses', async importOriginal => {
 })
 
 let frame: FrameRequestCallback | null
-let time: number
+let time = 0
 const store = new Map<string, string>()
 beforeEach(() => {
   time = 0

@@ -48,6 +48,10 @@ npm run lint
 
 ## 型チェック
 
+`tsc` は `@typescript/native` の別名で導入した TypeScript 7 を使います。
+TypeScript 6 の Compiler API が必要な ESLint と依存境界検査には、
+[Microsoft の移行手順](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)に従い `typescript` を `@typescript/typescript6` の別名として残しています。
+
 ```bash
 npm run typecheck
 ```
