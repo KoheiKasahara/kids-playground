@@ -9,6 +9,7 @@
  * ステージや場面で曲が変わるゲームは、1曲だけ大きいのを見逃さないよう、すべての曲を登録する。
  */
 import type { SoundSample } from './soundMeter'
+import { playGardenSound } from '../../games/pixel-garden/sounds'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
 import * as gochiso from '../../games/gochiso-race/sounds'
 import { playDerbySound } from '../../games/homerun-derby/sounds'
@@ -401,6 +402,13 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('よろこぶ', dotAquarium.playHappySound),
     sample('しんじゅ', dotAquarium.playPearlSound),
     ...songs(['day', 'night'] as const, dotAquarium.startBgm),
+  ],
+  'pixel-garden': [
+    sample('たねまき', () => playGardenSound('plant')),
+    sample('みずやり', () => playGardenSound('water')),
+    sample('さく', () => playGardenSound('bloom')),
+    sample('つむ', () => playGardenSound('pick')),
+    sample('はなたば', () => playGardenSound('complete')),
   ],
   'pixel-kart': [
     sample('カウントダウン', () => new KartAudio().effect('countdown')),

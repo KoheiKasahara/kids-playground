@@ -1308,6 +1308,23 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'pixel-garden',
+    slug: 'pixel-garden',
+    title: 'ドットの おはなばたけ',
+    emoji: '🌷',
+    seo: {
+      headline: 'ドットの おはなばたけ｜タッチで育てて花束づくり',
+      description: 'ドット絵の小さな花壇で、種まき・水やり・花つみを楽しむ幼児向けミニゲームです。花壇をタッチして花を育て、うさぎさんへの花束をつくりましょう。時間制限はなく、自分のペースで遊べます。',
+    },
+    category: 'learning',
+    intro: {
+      howToPlay: [
+        'はなだんを タッチして たねを まき、めに おみずを あげよう',
+        'さいた おはなを つんで、はなたばに しよう',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
