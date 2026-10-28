@@ -47,6 +47,7 @@ export const GAME_SOUND_LEVEL_DB: Readonly<Record<string, number>> = {
   'onaji-pon': 1.5,
   'origami-play': 14,
   'piano-play': 9,
+  'pixel-garden': 2,
   'pixel-kart': 14,
   'planet-globe': 12,
   'pukupuka-rescue': 5,
