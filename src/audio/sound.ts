@@ -59,6 +59,17 @@ const LIMITER = { threshold: -6, knee: 6, ratio: 12, attack: 0.003, release: 0.2
 /** AudioContext ごとの共通の出口（音量補正をかける GainNode）。ピアノのように自前の Context を持つゲームもある。 */
 const soundOutputs = new Map<AudioContext, GainNode>()
 let activeGameId: string | undefined
+let soundSuspended = false
+
+function outputGain(): number {
+  return soundSuspended ? 0 : dbToGain(gameSoundLevelDb(activeGameId))
+}
+
+/** 中断中は既に鳴っている音も止める。ユーザーのON/OFF設定とContextは維持する。 */
+export function setSoundSuspended(suspended: boolean): void {
+  soundSuspended = suspended
+  updateOutputGains()
+}
 
 function dbToGain(db: number): number {
   return 10 ** (db / 20)
@@ -74,7 +85,7 @@ export function getSoundOutput(ctx: AudioContext): AudioNode {
   if (existing) return existing
   try {
     const input = ctx.createGain()
-    input.gain.value = dbToGain(gameSoundLevelDb(activeGameId))
+    input.gain.value = outputGain()
     let limiter: DynamicsCompressorNode | undefined
     try {
       limiter = ctx.createDynamicsCompressor()
@@ -106,7 +117,11 @@ export function getSoundOutput(ctx: AudioContext): AudioNode {
  */
 export function setActiveSoundGame(gameId: string | undefined): void {
   activeGameId = gameId
-  const gain = dbToGain(gameSoundLevelDb(gameId))
+  updateOutputGains()
+}
+
+function updateOutputGains(): void {
+  const gain = outputGain()
   for (const input of soundOutputs.values()) {
     try {
       input.gain.value = gain

@@ -38,6 +38,19 @@ function selectColor() {
 const RED = COLOR_KINDS[0]!
 
 describe('ShabonPachinPlay', () => {
+  test('中断中はしゃぼんだまが進まず、復帰で再開する', () => {
+    const { container } = renderPlay()
+    selectColor()
+    advance(500)
+    const before = container.innerHTML
+    act(() => window.dispatchEvent(new Event('blur')))
+    advance(10_000)
+    expect(container.innerHTML).toBe(before)
+    act(() => window.dispatchEvent(new Event('focus')))
+    advance(500)
+    expect(container.innerHTML).not.toBe(before)
+  })
+
   test('初期表示: タイトル・もどる・あそびかた選択が出る', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'しゃぼんだま パチン' })).toBeInTheDocument()

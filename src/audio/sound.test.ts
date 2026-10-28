@@ -1,11 +1,27 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { FakeAudioContext, FakeDynamicsCompressorNode, FakeGainNode } from '../test/audio/fakeAudioContext'
 import { GAME_SOUND_LEVEL_DB } from './gameSoundLevels'
-import { getSoundOutput, setActiveSoundGame } from './sound'
+import { getSoundOutput, isSoundEnabled, setSoundEnabled, setSoundSuspended, setActiveSoundGame } from './sound'
 
 const asAudioContext = (ctx: FakeAudioContext) => ctx as unknown as AudioContext
 
 describe('shared sound output', () => {
+  afterEach(() => { setSoundSuspended(false); setSoundEnabled(true); setActiveSoundGame(undefined) })
+
+  it('中断中は既存・新規の出口を無音にし、復帰してもユーザーのOFFを変更しない', () => {
+    const ctx = new FakeAudioContext()
+    const output = getSoundOutput(asAudioContext(ctx)) as unknown as FakeGainNode
+    setSoundEnabled(false)
+    setSoundSuspended(true)
+    setActiveSoundGame('flag-quiz')
+    expect(output.gain.value).toBe(0)
+    const later = getSoundOutput(asAudioContext(new FakeAudioContext())) as unknown as FakeGainNode
+    expect(later.gain.value).toBe(0)
+    setSoundSuspended(false)
+    expect(output.gain.value).toBeGreaterThan(0)
+    expect(later.gain.value).toBe(output.gain.value)
+    expect(isSoundEnabled()).toBe(false)
+  })
   it('reuses one gain + limiter chain per AudioContext and only the limiter reaches the speakers', () => {
     const ctx = new FakeAudioContext()
     const output = getSoundOutput(asAudioContext(ctx)) as unknown as FakeGainNode

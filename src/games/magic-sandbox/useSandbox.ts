@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react'
 import { Sandbox, isSeed, renderSandbox, sandboxGrid, type Material, type Point } from './sandboxSimulation'
+import { observeGameActivity } from '../../utils/gameActivity'
 
 type Brush = { material: Material; radius: number }
 type Gesture = Brush & { point: Point; pointerId: number }
@@ -66,17 +67,15 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       }
       request = requestAnimationFrame(frame)
     }
-    const suspend = () => {
+    const activity = (active: boolean) => {
       stop()
       cancelAnimationFrame(request)
-      if (!document.hidden) { last = 0; request = requestAnimationFrame(frame) }
+      if (active) { last = 0; request = requestAnimationFrame(frame) }
     }
     const reshape = () => { stop(); fit() }
     fit()
     draw.current()
-    if (!document.hidden) request = requestAnimationFrame(frame)
-    document.addEventListener('visibilitychange', suspend)
-    window.addEventListener('blur', stop)
+    const unsubscribe = observeGameActivity(activity)
     window.addEventListener('resize', reshape)
     // jsdom has no ResizeObserver; there the window resize above carries the change.
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(fit)
@@ -86,8 +85,7 @@ export function useSandbox(canvasRef: RefObject<HTMLCanvasElement | null>, brush
       cancelAnimationFrame(request)
       draw.current = () => {}
       observer?.disconnect()
-      document.removeEventListener('visibilitychange', suspend)
-      window.removeEventListener('blur', stop)
+      unsubscribe()
       window.removeEventListener('resize', reshape)
     }
   }, [canvasRef, world, paused, onFlower, stop])

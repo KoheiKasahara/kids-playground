@@ -10,7 +10,9 @@ import SeoManager from '../seo/SeoManager'
 import { installBrowserPageZoomSuppression } from './preventBrowserPageZoom'
 import GameBackButton from '../components/GameBackButton'
 import { findGameIdByPathname, recordRecentGameVisit } from '../pages/gameShelfStore'
-import { setActiveSoundGame } from '../audio/sound'
+import { setActiveSoundGame, setSoundSuspended } from '../audio/sound'
+import { observeGameActivity } from '../utils/gameActivity'
+import { stopSpeaking } from '../speech/speechEngine'
 import { showsAppGameBackButton } from './appGameBackButton'
 
 export default function App() {
@@ -23,6 +25,14 @@ export default function App() {
   // ゲーム機能としてのピンチ操作とは別系統のイベントを止めているだけなので、
   // 各ゲームのジェスチャー処理には影響しない（詳細はpreventBrowserPageZoom.tsのコメントを参照）。
   useEffect(() => installBrowserPageZoomSuppression(), [])
+
+  useEffect(() => {
+    const unsubscribe = observeGameActivity((active) => {
+      setSoundSuspended(!active)
+      if (!active) stopSpeaking()
+    })
+    return () => { unsubscribe(); setSoundSuspended(false) }
+  }, [])
 
   // 遊んでいるゲームの音量補正を共通の出口へ反映する（どのゲームも同じくらいの大きさにそろえる）。
   // 子の画面がマウント時の useEffect で鳴らす音にも間に合うよう、layout effect で先に切り替える。

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import styles from './PwaStatus.module.css'
 
@@ -35,7 +35,8 @@ function setupUpdateChecks(registration: ServiceWorkerRegistration | undefined) 
   updateWatcherRegistration = registration
 
   const checkForUpdate = () => {
-    void registration.update()
+    // 通信断は更新確認の失敗にとどめ、遊んでいるページへ未処理例外を出さない。
+    void registration.update().catch(() => {})
   }
 
   // 起動時（登録直後）に1回確認する。
@@ -91,15 +92,31 @@ function isGameRoutePath(pathname: string): boolean {
  * 遊べなくなる恐れのある案内だけを画面上部に小さく出す。
  */
 export default function PwaStatus({ pathname = '/' }: Props) {
+  const updateRequested = useRef(false)
+  const reloadWhenRequested = useCallback(() => {
+    if (!updateRequested.current) return
+    updateRequested.current = false
+    window.location.reload()
+  }, [])
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
+    // 他タブでの更新による再読込も、ここでの明示操作がある場合に限る。
+    onNeedReload: reloadWhenRequested,
     onRegisteredSW(_swUrl, registration) {
       setupUpdateChecks(registration)
     },
   })
+
+  useEffect(() => {
+    // 初回インストール後の同じページではWorkboxのisUpdateがfalseのままになる。
+    // その場合も、ユーザーが更新を選んだ後の実際のcontroller切替で再読込する。
+    const sw = navigator.serviceWorker
+    sw?.addEventListener('controllerchange', reloadWhenRequested)
+    return () => sw?.removeEventListener('controllerchange', reloadWhenRequested)
+  }, [reloadWhenRequested])
 
   // localStorage の「過去にオフライン準備が完了したか」フラグは、初回マウント時に一度だけ読む。
   // offlineReady が今回のセッションで true になった場合は、これに OR して即座に反映する
@@ -146,7 +163,16 @@ export default function PwaStatus({ pathname = '/' }: Props) {
   }
 
   const handleUpdateClick = () => {
-    void updateServiceWorker(true)
+    updateRequested.current = true
+    void (async () => {
+      const registration = await navigator.serviceWorker?.getRegistration()
+      if (registration?.active && !registration.waiting && !registration.installing) {
+        // 別タブが先に更新した場合は、現在のSWで読み直せばよい。
+        reloadWhenRequested()
+      } else {
+        await updateServiceWorker(true)
+      }
+    })().catch(() => { updateRequested.current = false })
   }
 
   const showOfflineToast = offlineReady && !inGame

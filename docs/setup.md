@@ -108,6 +108,8 @@ npm run preview   # ビルド結果をローカルで配信
 
 PWA（Service Worker・インストール）の挙動確認は、開発サーバーではなく `npm run preview` 側で行ってください。開発サーバーでは Service Worker が有効化されないため、PWA固有の挙動を確認できません。
 
+`build` は生成後に `check:loading` も実行します。初期JS/CSSのgzip換算容量が `.project-health.json` の予算を超えたら失敗し、PWA保存容量の総量・比較基準からの増加は警告します。容量だけを再確認する場合は、最新ビルドの後に `npm run check:loading` を実行してください。通常E2Eでは、代表素材のオフライン読込と、実際のService Worker更新がプレイを中断しないことも確認します。
+
 ## デバッグ時の注意
 
 - ソースマップが有効なため、DevTools の Sources タブから `src/` 配下のファイルへ直接ブレークポイントを置けます。

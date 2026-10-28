@@ -35,9 +35,14 @@ describe('gochiso-race progress', () => {
   })
 
   test('still works when storage is not available', () => {
+    progressStore.record(COURSES[0].id, 2)
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') } })
     expect(() => writeAnimal('cat')).not.toThrow()
     expect(readAnimal()).toBeNull()
-    expect(progressStore.read()).toEqual({})
+    expect(progressStore.read()).toEqual({ [COURSES[0].id]: 2 })
+    const result = progressStore.recordWithStatus(COURSES[1].id, 3)
+    expect(result.persisted).toBe(false)
+    expect(progressStore.read()).toEqual({ [COURSES[0].id]: 2, [COURSES[1].id]: 3 })
+    expect(isUnlocked(progressStore.read(), 2)).toBe(true)
   })
 })

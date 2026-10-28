@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useGameInterval } from '../../utils/useGameInterval'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
@@ -49,6 +50,7 @@ export default function PyokoTouchPlay() {
   const [difficulty, setDifficulty] = useState<PyokoDifficulty>('easy')
   const [soundOn, setSoundOn] = useState(true)
   const [progress, setProgress] = useState(pyokoProgress.read)
+  const [persisted, setPersisted] = useState(true)
   // 描画用のstateと、進行の正となるrefを同じ初期値から持つ。
   // 100msごとの進行とタップが同じrefを読み書きするため、描画を待つあいだの
   // 取りこぼし（タップの直前に進んだぶんの巻き戻り）が起きない。
@@ -60,24 +62,21 @@ export default function PyokoTouchPlay() {
 
   useGameIntroPlaying(started)
 
-  useEffect(() => {
-    if (!started || finished) return
-    // soundOnを切り替えると作り直されるが、経過時間はrefが持っているため進行は巻き戻らない。
-    const timerId = setInterval(() => {
-      const current = playRef.current
-      if (isFinished(current, difficulty)) return
-      const next = advance(current, difficulty, TICK_MS)
-      playRef.current = next
-      setPlay(next)
-      // じかん切れをまたいだ刻みでだけ鳴らす（そのあとの刻みは上のreturnで止まる）。
-      if (isFinished(next, difficulty)) {
-        setProgress(pyokoProgress.record(difficulty, scoreStars(next.score)))
-        vibrate('celebrate')
-        if (soundOn) playFinishSound()
-      }
-    }, TICK_MS)
-    return () => clearInterval(timerId)
-  }, [started, finished, difficulty, soundOn])
+  useGameInterval(() => {
+    const current = playRef.current
+    if (isFinished(current, difficulty)) return
+    const next = advance(current, difficulty, TICK_MS)
+    playRef.current = next
+    setPlay(next)
+    // じかん切れをまたいだ刻みでだけ鳴らす（そのあとの刻みは上のreturnで止まる）。
+    if (isFinished(next, difficulty)) {
+      const saved = pyokoProgress.recordWithStatus(difficulty, scoreStars(next.score))
+      setProgress(saved.progress)
+      setPersisted(saved.persisted)
+      vibrate('celebrate')
+      if (soundOn) playFinishSound()
+    }
+  }, started && !finished ? TICK_MS : null)
 
   const commit = (next: PyokoState) => {
     playRef.current = next
@@ -194,6 +193,7 @@ export default function PyokoTouchPlay() {
           <p className={styles.resultMessage} role="status">
             {play.score}てん！ {verdict.message}
           </p>
+          {!persisted && <p role="status">きろくを ほぞんできませんでした。いまは このまま あそべるよ。</p>}
           <div className={styles.actions}>
             <button type="button" className={`${styles.button} ${styles.start}`} onClick={() => startGame(difficulty)}>
               もういちど
