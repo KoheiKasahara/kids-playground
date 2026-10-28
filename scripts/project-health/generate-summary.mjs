@@ -5,6 +5,7 @@ import { countGames } from './lib/gameCatalog.mjs'
 import { parseVitestSummary } from './lib/vitestReport.mjs'
 import { measureBundleSize } from './lib/bundleSize.mjs'
 import { measureLoadingSize, renderLoadingSizeMarkdown } from './lib/loadingSize.mjs'
+import { parseLoadingBudgets, renderLoadingBudgetMarkdown } from './lib/loadingBudgets.mjs'
 import { parseNpmAudit } from './lib/npmAudit.mjs'
 import { parsePlaywrightSummary } from './lib/playwrightReport.mjs'
 import { parseLighthouseSummary } from './lib/lighthouseReport.mjs'
@@ -133,3 +134,9 @@ const markdown = renderProjectHealthMarkdown(rows, { links })
 appendFileSync(summaryPath, `${markdown}\n`)
 const loading = safe('loading size', () => measureLoadingSize(distDir))
 appendFileSync(summaryPath, renderLoadingSizeMarkdown(loading))
+if (loading) {
+  const budgetSummary = safe('loading budgets', () => renderLoadingBudgetMarkdown(
+    loading, parseLoadingBudgets(readFileSync(configPath, 'utf8')),
+  ))
+  if (budgetSummary) appendFileSync(summaryPath, budgetSummary)
+}

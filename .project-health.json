@@ -1,4 +1,11 @@
 {
+  "loadingBudgets": {
+    "initialJsGzipKb": 160,
+    "initialCssGzipKb": 12,
+    "precacheWarnKb": 40960,
+    "precacheBaselineKb": 30873,
+    "precacheGrowthWarnKb": 2048
+  },
   "thresholds": {
     "lighthousePerformance": 90,
     "accessibility": 90

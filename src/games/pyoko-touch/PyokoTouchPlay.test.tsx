@@ -49,6 +49,30 @@ function selectFast() {
 }
 
 describe('PyokoTouchPlay', () => {
+  test('タブを離れても残り時間が減らず、復帰してから続きを遊べる', () => {
+    renderPlay()
+    selectEasy()
+    advance(5_000)
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    advance(60_000)
+    expect(screen.getByText('のこり 25びょう')).toBeInTheDocument()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    advance(1_000)
+    expect(screen.getByText('のこり 24びょう')).toBeInTheDocument()
+  })
+
+  test('保存できないと結果で知らせ、選択画面には今回の★を残す', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
+    renderPlay()
+    selectEasy()
+    advance(DIFFICULTY_SETTINGS.easy.durationMs)
+    expect(screen.getByText(/きろくを ほぞんできませんでした/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'むずかしさをかえる' }))
+    expect(screen.getByRole('button', { name: 'やさしい ゆっくり でてくる' }).textContent).toContain('★')
+  })
+
   test('初期表示: タイトル・もどる・むずかしさ選択が出る', () => {
     renderPlay()
     expect(screen.getByRole('heading', { name: 'ぴょこぴょこタッチ' })).toBeInTheDocument()

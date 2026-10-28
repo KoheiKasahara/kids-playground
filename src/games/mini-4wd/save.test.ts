@@ -36,13 +36,16 @@ describe('mini-4wd saved car and trophies', () => {
   })
 
   test('blocked storage never prevents play or recording an in-memory result', () => {
+    storage()
+    progressStore.record('park', 2)
     vi.stubGlobal('localStorage', {
       getItem: () => { throw new Error('blocked') },
       setItem: () => { throw new Error('blocked') },
     })
     expect(readBuild()).toEqual(DEFAULT_BUILD)
     expect(() => writeBuild(DEFAULT_BUILD)).not.toThrow()
-    expect(progressStore.read()).toEqual({})
-    expect(progressStore.record('forest', 3)).toEqual({ forest: 3 })
+    expect(progressStore.read()).toEqual({ park: 2 })
+    expect(progressStore.record('forest', 3)).toEqual({ park: 2, forest: 3 })
+    expect(progressStore.read()).toEqual({ park: 2, forest: 3 })
   })
 })

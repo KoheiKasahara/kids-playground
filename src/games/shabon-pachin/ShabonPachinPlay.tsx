@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
+import { useGameInterval } from '../../utils/useGameInterval'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
@@ -46,6 +47,7 @@ export default function ShabonPachinPlay() {
   const [mode, setMode] = useState<ShabonMode | null>(null)
   const [soundOn, setSoundOn] = useState(true)
   const [progress, setProgress] = useState(shabonProgress.read)
+  const [persisted, setPersisted] = useState(true)
   // 描画用のstateと、進行の正となるrefを同じ初期値から持つ。
   // 刻みごとの進行とタップが同じrefを読み書きするため、描画待ちのあいだの巻き戻りが起きない。
   const [play, setPlay] = useState<ShabonState>(() => createInitialState('color'))
@@ -56,15 +58,12 @@ export default function ShabonPachinPlay() {
 
   useGameIntroPlaying(started)
 
-  useEffect(() => {
-    if (!mode || finished) return
-    const timerId = setInterval(() => {
-      const next = advance(playRef.current, mode, TICK_MS)
-      playRef.current = next
-      setPlay(next)
-    }, TICK_MS)
-    return () => clearInterval(timerId)
-  }, [mode, finished])
+  useGameInterval(() => {
+    if (!mode) return
+    const next = advance(playRef.current, mode, TICK_MS)
+    playRef.current = next
+    setPlay(next)
+  }, mode && !finished ? TICK_MS : null)
 
   const commit = (next: ShabonState) => {
     playRef.current = next
@@ -94,7 +93,9 @@ export default function ShabonPachinPlay() {
       return
     }
     if (isFinished(state)) {
-      setProgress(shabonProgress.record(mode, scoreStars(state.mistakes)))
+      const saved = shabonProgress.recordWithStatus(mode, scoreStars(state.mistakes))
+      setProgress(saved.progress)
+      setPersisted(saved.persisted)
       vibrate('celebrate')
       if (soundOn) playClearSound()
       return
@@ -220,6 +221,7 @@ export default function ShabonPachinPlay() {
           <p className={styles.resultMessage} role="status">
             ぜんぶ われたね！ すごい！
           </p>
+          {!persisted && <p role="status">きろくを ほぞんできませんでした。いまは このまま あそべるよ。</p>}
           <p className={styles.resultStars} role="img" aria-label={`ほし ${stars}こ`}>
             {Array.from({ length: 3 }, (_, i) => (
               <span key={i} className={i < stars ? styles.starOn : styles.starOff} aria-hidden="true">★</span>

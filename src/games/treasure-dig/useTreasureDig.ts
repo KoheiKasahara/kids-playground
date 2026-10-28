@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Poin
 import { TreasureWorld, renderWorld, type Point, type Tool } from './treasureWorld'
 import { buildLayout, type Stage } from './stages'
 import { playDigClearSound, playDigSound, playTreasureSound } from './sounds'
+import { observeGameActivity } from '../../utils/gameActivity'
 
 export type Brush = { tool: Tool; radius: number }
 export type DigStatus = 'playing' | 'cleared' | 'stuck'
@@ -79,22 +80,19 @@ export function useTreasureDig(
       }
       request = requestAnimationFrame(frame)
     }
-    const suspend = () => {
+    const activity = (active: boolean) => {
       stop()
       cancelAnimationFrame(request)
-      if (!document.hidden) { last = 0; request = requestAnimationFrame(frame) }
+      if (active) { last = 0; request = requestAnimationFrame(frame) }
     }
     draw.current()
-    if (!document.hidden) request = requestAnimationFrame(frame)
-    document.addEventListener('visibilitychange', suspend)
-    window.addEventListener('blur', stop)
+    const unsubscribe = observeGameActivity(activity)
     window.addEventListener('resize', stop)
     return () => {
       stop()
       cancelAnimationFrame(request)
       draw.current = () => {}
-      document.removeEventListener('visibilitychange', suspend)
-      window.removeEventListener('blur', stop)
+      unsubscribe()
       window.removeEventListener('resize', stop)
     }
   }, [canvasRef, world, paused, onCleared, stop])

@@ -109,5 +109,8 @@ docsには次のような、変更頻度が高く陳腐化しやすい情報を�
 - CI Summaryの遅いファイル上位は既存Vitest JSONの開始・終了時刻を使う。並列実行のファイル時間を足してCI時間と扱わない。
 - 振動は `utils/haptics` の `vibrate('tap' | 'impact' | 'success' | 'error' | 'celebrate')` を使う。非対応端末・動きを減らす設定・ホームの「ぶるぶる」OFFでは何もしないので、ゲーム側で分岐しない。
 - ステージ制の「クリア済み＋★」は `games/shared/progress/stageProgress` の `createStageProgressStore` で保存し、選択カードには `StageClearBadge` を添える。★の基準はゲームごとに決める。
+- `createStageProgressStore` は保存不可でも未保存の記録をセッション中保持し、次の記録操作で保存を再試行する。保存結果を表示する画面では `recordWithStatus` の `persisted` を使い、一時保持を永続保存済みとして案内しない。既存キー・保存形式は維持する。
+- ゲームの定周期処理には `utils/useGameInterval`、描画ループや押しっぱなし入力の中断には `utils/gameActivity` の `observeGameActivity` を利用できる。非表示・フォーカス喪失・pagehideで停止し、復帰時に時計の基準を取り直す。通知の解除と所有資源の解放は呼出元が行う。音の共通出口と読み上げの中断はAppが扱い、共有AudioContextを閉じない。
 - クイズの正誤演出（中央の○×・紙吹雪・振動・不正解時の答えの読み上げ）は `QuizResultOverlay` が持ち、結果画面の★は `QuizStars` を使う。
 - プレイ中の画面（`/games/...`）では、PWAの完了・更新トーストを出さずホームへ戻るまで遅らせる。
+- 初期読込容量の予算とPWA保存容量の警告基準は `.project-health.json` に集約する。予算や比較基準を変更するときは、初期静的依存・追加素材の内訳とオフライン検証を確認し、検査を通すためだけに引き上げない。

@@ -132,6 +132,16 @@ describe('PwaStatus', () => {
     expect(() => render(<PwaStatus />)).not.toThrow()
   })
 
+  test('オフラインで更新確認が失敗しても未処理例外にせず遊びを維持する', async () => {
+    const registration = createMockRegistration()
+    vi.mocked(registration.update).mockRejectedValue(new Error('offline'))
+    __setMockRegistration(registration)
+    const { container } = render(<PwaStatus pathname="/games/pyoko-touch" />)
+    await act(async () => { await Promise.resolve() })
+    expect(registration.update).toHaveBeenCalled()
+    expect(container).toBeEmptyDOMElement()
+  })
+
   test('オフライン準備完了トーストが表示される（既存挙動）', async () => {
     render(<PwaStatus />)
 
