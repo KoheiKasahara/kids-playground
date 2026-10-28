@@ -152,12 +152,14 @@ describe('domino ball section headless physics', () => {
     expect(result.railOutCount).toBe(0)
   })
 
-  it('20シードで補助なしにレールを完走し、後段ドミノを始動する', { timeout: 30_000 }, () => {
-    const seeds = [
-      101, 202, 303, 404, 505, 606, 707, 808, 909, 1001,
-      1102, 1203, 1304, 1405, 1506, 1607, 1708, 1809, 1910, 2001,
-    ]
-    for (const seed of seeds) {
+  // 各シードは独立したworldで検証する。終端のreceiverFallen判定までの2,600ステップは維持する。
+  it.each([
+    101, 202, 303, 404, 505, 606, 707, 808, 909, 1001,
+    1102, 1203, 1304, 1405, 1506, 1607, 1708, 1809, 1910, 2001,
+  ])(
+    'seed=%i: 補助なしにレールを完走し、後段ドミノを始動する',
+    { timeout: 30_000 },
+    (seed) => {
       const result = runBallSection(createPerturbedPlacements(seed))
       console.log(
         `[domino-ball] seed=${seed}: start=${result.ballStartStep}, ` +
@@ -171,8 +173,8 @@ describe('domino ball section headless physics', () => {
       expect(result.receiverStep, `seed=${seed}`).not.toBeNull()
       expect(result.receiverFallen, `seed=${seed}`).toBe(true)
       expect(result.railOutCount, `seed=${seed}`).toBe(0)
-    }
-  })
+    },
+  )
 })
 
 export { runBallSection }
