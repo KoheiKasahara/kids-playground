@@ -1,10 +1,11 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  findDoor, findRoof, findShape, findWall,
+  OUTDOOR_EXTRAS, findDoor, findRoof, findShape, findWall, type OutdoorExtraId,
   type DoghouseId, type DoorId, type Exterior, type ExtraId, type GardenId, type ParkingId, type PoolId, type RoofId, type WallId, type WindowId,
 } from './data'
 import { facadeOpenings, floorCount, frontEdge, type HouseDesign, type Opening } from './plan'
 import styles from './HouseBuilderPlay.module.css'
+import { OutdoorArt } from './OutdoorArt'
 
 // おうちを おもてから みた え。かべ・やね・まど・ドア・にわの ものは すべて コードで かいた オリジナル。
 
@@ -63,6 +64,7 @@ type Layout = {
   /** にわの いちばん てまえの ものを おく じめん。 */
   leisureY: number
   spots: Spots
+  outdoor: { id: OutdoorExtraId; x: number; y: number }[]
 }
 
 /**
@@ -86,11 +88,14 @@ function layout(design: HouseDesign): Layout {
   const dogW = ex.doghouse !== 'none' ? 175 : 0
   const poolW = ex.pool && ex.pool !== 'none' ? 210 : 0
   const leisure = poolW > 0 || has('picnic') || has('fountain')
+  const outdoor = OUTDOOR_EXTRAS.filter((item) => has(item.id))
+  const outdoorLeft = Math.min(2, Math.ceil(outdoor.length / 2)) * 180
+  const outdoorRight = Math.min(2, Math.floor(outdoor.length / 2)) * 180
 
   const sideLeft = 40 + (has('koinobori') ? 90 : 0) + (trees ? 110 : 0)
   const sideRight = 40 + (has('swing') ? 150 : 0) + (trees ? 110 : 0)
-  const frontLeft = PATH + Math.max((has('bike') ? 120 : 0) + parkingW, poolW) + 24
-  const frontRight = PATH + Math.max((has('mailbox') ? 60 : 0) + gardenW + dogW, (has('picnic') ? 170 : 0) + (has('fountain') ? 130 : 0)) + 24
+  const frontLeft = PATH + Math.max((has('bike') ? 120 : 0) + parkingW, poolW, outdoorLeft) + 24
+  const frontRight = PATH + Math.max((has('mailbox') ? 60 : 0) + gardenW + dogW, (has('picnic') ? 170 : 0) + (has('fountain') ? 130 : 0), outdoorRight) + 24
   let houseX = Math.max(sideLeft, frontLeft - doorOff)
   let width = Math.max(houseX + houseW + sideRight, houseX + doorOff + frontRight)
   if (width < MIN_WIDTH) {
@@ -142,7 +147,8 @@ function layout(design: HouseDesign): Layout {
   const tall = Math.max(roofH + floors * FH + BASE + chimneyRoom, has('koinobori') ? 310 : 0, 200)
   const groundY = SKY + tall
   const frontYard = cars > 0 || has('bike') || has('mailbox') || gardenW > 0 || dogW > 0
-  const ground = leisure ? 390 : frontYard ? YARD : GROUND
+  const outdoorStart = leisure ? 390 : frontYard ? YARD : GROUND
+  const ground = outdoorStart + Math.ceil(outdoor.length / 4) * 170
   return {
     width,
     height: groundY + ground,
@@ -158,6 +164,11 @@ function layout(design: HouseDesign): Layout {
     frontY: groundY + 150,
     leisureY: groundY + 330,
     spots,
+    outdoor: outdoor.map(({ id }, i) => ({
+      id,
+      x: doorX + (i % 2 === 0 ? -PATH - 170 - Math.floor((i % 4) / 2) * 180 : PATH + 10 + Math.floor((i % 4) / 2) * 180),
+      y: groundY + outdoorStart + Math.floor(i / 4) * 170,
+    })),
   }
 }
 
@@ -891,6 +902,7 @@ export function HouseFront({ design, lively = false, onHotspot, title }: HouseFr
   if (spots.pool !== undefined && ex.pool !== 'none') frontItems.push(<PoolArt key="pool" id={ex.pool} x={spots.pool} y={lay.leisureY} />)
   if (spots.picnic !== undefined) frontItems.push(<Picnic key="picnic" x={spots.picnic} y={lay.leisureY} />)
   if (spots.fountain !== undefined) frontItems.push(<Fountain key="fountain" x={spots.fountain} y={lay.leisureY} />)
+  for (const { id, x, y } of lay.outdoor) frontItems.push(<g key={id} transform={`translate(${x} ${y})`}><OutdoorArt id={id} /></g>)
 
   const label = title ?? 'おうちの そとがわ'
 
@@ -967,7 +979,7 @@ export function ExteriorSwatch({ category, id }: { category: ExteriorCategory; i
       const r = findRoof(id as RoofId)
       const lay: Layout = {
         width: 120, height: 90, houseX: 30, houseW: 60, groundY: 88, ground: 2, wallTop: 60, roofH: r.kind === 'flat' ? 10 : r.kind === 'steep' ? 50 : 32,
-        floors: 1, doorX: 60, backY: 88, frontY: 88, leisureY: 88, spots: {},
+        floors: 1, doorX: 60, backY: 88, frontY: 88, leisureY: 88, spots: {}, outdoor: [],
       }
       art = (
         <g>
@@ -1053,6 +1065,12 @@ function ExtraSwatch({ id }: { id: ExtraId }) {
     case 'swing': return <g transform="translate(-4 4) scale(.7)"><Swing x={20} y={118} /></g>
     case 'picnic': return <g transform="translate(19 5) scale(.55)"><Picnic x={0} y={146} /></g>
     case 'fountain': return <g transform="translate(21 6) scale(.76)"><Fountain x={0} y={94} /></g>
+    case 'tent':
+    case 'teepee':
+    case 'gazebo':
+    case 'slide':
+    case 'sandbox':
+    case 'hammock': return <g transform="translate(12 0) scale(.6)"><OutdoorArt id={id} /></g>
     case 'chimney':
       return (
         <g>

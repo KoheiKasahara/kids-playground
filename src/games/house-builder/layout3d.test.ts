@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { SHAPES, findShape, type ShapeId } from './data'
+import { EXTRAS, OUTDOOR_EXTRAS, SHAPES, findShape, type ShapeId } from './data'
 import { CELL, footprintRects, innerDoor, isOutsideEdge, roomOpenings, sideOpenings, wallRuns, yardLayout, type Box2 } from './layout3d'
 import { addRoom, createDesign, facadeOpenings, type HouseDesign, type RoomPick } from './plan'
 
@@ -101,7 +101,7 @@ describe('house-builder 3D layout', () => {
       for (const parking of ['none', 'red', 'two', 'garage'] as const) {
         const design: HouseDesign = {
           ...createDesign('nikai', shape.id),
-          exterior: { wall: 'white', roof: 'red', window: 'square', door: 'wood', parking, doghouse: 'red', garden: parking === 'two' ? 'orchard' : 'strawberries', pool: parking === 'garage' ? 'round' : 'rectangle', extras: ['bike', 'mailbox', 'swing', 'koinobori', 'picnic', 'fountain'] },
+          exterior: { wall: 'white', roof: 'red', window: 'square', door: 'wood', parking, doghouse: 'red', garden: parking === 'two' ? 'orchard' : 'strawberries', pool: parking === 'garage' ? 'round' : 'rectangle', extras: EXTRAS.map((item) => item.id) },
         }
         const yard = yardLayout(design)
         const boxes: [string, Box2][] = [['house', yard.house], ['path', { ...yard.path, minZ: yard.frontZ + .1 }]]
@@ -110,6 +110,8 @@ describe('house-builder 3D layout', () => {
         if (yard.pool) boxes.push(['pool', yard.pool])
         if (yard.picnic) boxes.push(['picnic', yard.picnic])
         if (yard.fountain) boxes.push(['fountain', yard.fountain])
+        for (const { id, box } of yard.outdoor) boxes.push([id, box])
+        expect(yard.outdoor.map((item) => item.id)).toEqual(OUTDOOR_EXTRAS.map((item) => item.id))
         if (yard.bike) boxes.push(['bike', { minX: yard.bike.x - .8, maxX: yard.bike.x + .8, minZ: yard.bike.z - .2, maxZ: yard.bike.z + .2 }])
         if (yard.mailbox) boxes.push(['mailbox', around(yard.mailbox, .3)])
         if (yard.doghouse) boxes.push(['doghouse', { minX: yard.doghouse.x - .7, maxX: yard.doghouse.x + 1.6, minZ: yard.doghouse.z - .7, maxZ: yard.doghouse.z + .9 }])
@@ -140,5 +142,24 @@ describe('house-builder 3D layout', () => {
     const withoutPool = yardLayout({ ...base, exterior: { ...garden, pool: 'none' } })
     expect(withoutPool.plot).toBeDefined()
     expect(withoutPool.pool).toBeUndefined()
+  })
+
+  test('あそびばの くみあわせに あわせて にわを ひろげ、ぜんぶ はずすと もどる', () => {
+    const base = createDesign('hiraya', 'narrow')
+    const plain = yardLayout(base)
+    // 2れつめの プールが ないときも、すべての くみあわせで おさめる。
+    for (let mask = 0; mask < 2 ** OUTDOOR_EXTRAS.length; mask++) {
+      const extras = OUTDOOR_EXTRAS.filter((_, i) => mask & (1 << i)).map((item) => item.id)
+      const yard = yardLayout({ ...base, exterior: { ...base.exterior, extras } })
+      expect(yard.outdoor.map((item) => item.id)).toEqual(extras)
+      const boxes = [yard.house, yard.path, ...yard.outdoor.map((item) => item.box)]
+      boxes.forEach((a, i) => boxes.slice(i + 1).forEach((b) => expect(overlaps(a, b)).toBe(false)))
+      for (const { box } of yard.outdoor) {
+        expect(box.minX).toBeGreaterThan(yard.yard.minX)
+        expect(box.maxX).toBeLessThan(yard.yard.maxX)
+        expect(box.maxZ).toBeLessThan(yard.yard.maxZ)
+      }
+      expect(yard.yard.maxZ > plain.yard.maxZ).toBe(extras.length > 0)
+    }
   })
 })

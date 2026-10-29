@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
 import { resetGameShelfCache } from '../../pages/gameShelfStore'
 import HouseBuilderPlay from './HouseBuilderPlay'
-import { EXTERIOR_STYLES, EXTRAS, GARDENS } from './data'
+import { EXTERIOR_STYLES, EXTRAS, GARDENS, OUTDOOR_EXTRAS } from './data'
 import { ALBUM_LIMIT } from './save'
 import { playHouseSound, startBgm } from './sounds'
 
@@ -93,6 +93,39 @@ function pickRoom(type: string, style?: string, size?: RegExp) {
 }
 
 describe('house-builder play', () => {
+  test('あたらしい へやと キャンプの おうちを ほぞんし、よみなおして なおせる', () => {
+    startHouse(/^ひらや/, /^しかく/)
+    pickRoom('リビング', 'うみいろの リビング')
+    click(cell(1, 1))
+    click(/そとがわを つくる/)
+    click('おうちセット')
+    click('まほうの おうち')
+    click('おまけ')
+    const options = within(screen.getByRole('list', { name: 'おまけ' }))
+    for (const item of OUTDOOR_EXTRAS) {
+      fireEvent.click(options.getByRole('button', { name: item.name }))
+      expect(options.getByRole('button', { name: item.name })).toHaveAttribute('aria-pressed', 'true')
+    }
+    click('かんせい！')
+    click(/おうちを ほぞんする/)
+    const design = album()[0].design
+    expect(design.rooms[0]).toMatchObject({ type: 'living', style: 'coastal' })
+    expect(design.exterior).toMatchObject({ wall: 'whitebrick', roof: 'purple', extras: OUTDOOR_EXTRAS.map((item) => item.id) })
+    cleanup()
+    renderGame()
+    click('つづきから つくる')
+    click(/そとがわを つくる/)
+    click('おまけ')
+    for (const item of OUTDOOR_EXTRAS) expect(screen.getByRole('button', { name: item.name })).toHaveAttribute('aria-pressed', 'true')
+    click('さんかく テント')
+    expect(saved().exterior.extras).toEqual(OUTDOOR_EXTRAS.filter((item) => item.id !== 'tent').map((item) => item.id))
+    click('かんせい！')
+    click(/おうちを ほぞんする/)
+    expect(album()).toHaveLength(1)
+    expect(album()[0].design.exterior.extras).not.toContain('tent')
+    expect(album()[0].design.exterior.extras).toContain('teepee')
+  })
+
   test('いえの しゅるい → かたち の じゅんに えらぶと、まどりが はじまり BGM が ながれる', () => {
     renderGame()
     expect(screen.getByRole('heading', { level: 1, name: 'おうちづくり' })).toBeInTheDocument()

@@ -11,6 +11,7 @@ import { Kit, ball, block, disposeObject, group, mesh, mix, tube, type Built, ty
 import { openingPanel } from './openings'
 import { roofTexture, wallTexture } from './textures'
 import { fountain, gardenPlot, orchard, picnic, swimmingPool } from './yardObjects'
+import { outdoorObject } from './outdoorObjects'
 import { exteriorFramePoints } from './framing'
 
 const T = .22
@@ -534,6 +535,7 @@ export function buildExterior(design: HouseDesign): Built {
   if (yard.pool && ex.pool !== 'none') swimmingPool(c, yard.pool, ex.pool)
   if (yard.picnic) picnic(k, root, yard.picnic)
   if (yard.fountain) fountain(c, yard.fountain)
+  for (const { id, box } of yard.outdoor) outdoorObject(k, root, box, id)
   if (yard.doghouse && ex.doghouse !== 'none') doghouse(c, [yard.doghouse.x, 0, yard.doghouse.z], ex.doghouse)
   if (yard.koinobori) koinobori(c, [yard.koinobori.x, 0, yard.koinobori.z])
   if (yard.swing) swing(c, [yard.swing.x, 0, yard.swing.z])
