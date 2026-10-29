@@ -51,7 +51,10 @@ test('drag previews without dropping, release drops once, animates a chain, and 
   fireEvent.pointerUp(board, touch(250))
   fireEvent.pointerDown(board, touch(250))
   fireEvent.pointerUp(board, touch(250))
-  finish()
+  for (let step = 0; step < 60 && board.getAttribute('data-busy') === 'true'; step++) {
+    act(() => { vi.advanceTimersToNextTimer() })
+  }
+  expect(board).toHaveAttribute('data-busy', 'false')
   expect(board).toHaveAttribute('data-turn', '1')
   expect(playJellySound).toHaveBeenCalledWith('merge', expect.any(Number))
   expect(screen.queryByLabelText('てんすう 0')).not.toBeInTheDocument()
