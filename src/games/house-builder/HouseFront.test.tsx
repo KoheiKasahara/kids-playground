@@ -1,10 +1,23 @@
 import { describe, expect, test } from 'vitest'
 import { render } from '@testing-library/react'
-import { DOORS, EXTRAS, GARDENS, POOLS, ROOFS, WALLS, WINDOWS, type Exterior } from './data'
+import { DOORS, EXTRAS, GARDENS, OUTDOOR_EXTRAS, POOLS, ROOFS, WALLS, WINDOWS, type Exterior } from './data'
 import { ExteriorSwatch, HouseFront, type ExteriorCategory } from './HouseFront'
 import { createDesign } from './plan'
 
 describe('house-builder 2D exterior', () => {
+  test('キャンプと あそびばを いっしょに かき、テントだけ はずせる', () => {
+    const base = createDesign('hiraya', 'narrow')
+    const exterior = { ...base.exterior, extras: OUTDOOR_EXTRAS.map((item) => item.id) }
+    const view = render(<HouseFront design={{ ...base, exterior }} />)
+    for (const item of OUTDOOR_EXTRAS) {
+      expect(view.container.querySelector(`[data-outdoor="${item.id}"]`)).toHaveAttribute('aria-label', item.name)
+    }
+    view.rerender(<HouseFront design={{ ...base, exterior: { ...exterior, extras: exterior.extras.filter((id) => id !== 'tent') } }} />)
+    expect(view.container.querySelector('[data-outdoor="tent"]')).toBeNull()
+    expect(view.container.querySelectorAll('[data-outdoor]')).toHaveLength(OUTDOOR_EXTRAS.length - 1)
+    expect(view.container.innerHTML).not.toMatch(/NaN|Infinity/)
+  })
+
   test('えらべる かべ・やね・まど・ドア・にわ・プール・おまけは それぞれ みほんの えが ちがう', () => {
     const categories = { wall: WALLS, roof: ROOFS, window: WINDOWS, door: DOORS, garden: GARDENS, pool: POOLS, extras: EXTRAS }
     const view = render(<ExteriorSwatch category="wall" id="white" />)

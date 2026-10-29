@@ -1,7 +1,7 @@
 // 3Dで みる おうちの ならべかた。マスの へりに たてる かべ、やねを かける しかく、
 // かべの まど・ドアの いち、にわに おく ものの ばしょを きめる。three.js を つかわないので そのまま テストできる。
 
-import { findShape, type ExtraId, type Shape } from './data'
+import { OUTDOOR_EXTRAS, findShape, type ExtraId, type OutdoorExtraId, type Shape } from './data'
 import {
   OPENING_BY_ROOM, facadeOpenings, frontEdge, isFloorCell, roomSize, roomsOn,
   type HouseDesign, type OpeningKind, type PlacedRoom,
@@ -212,6 +212,7 @@ export type YardLayout = {
   pool?: Box2
   picnic?: Box2
   fountain?: Box2
+  outdoor: { id: OutdoorExtraId; box: Box2 }[]
   doghouse?: { x: number; z: number }
   koinobori?: { x: number; z: number }
   swing?: { x: number; z: number }
@@ -244,9 +245,18 @@ export function yardLayout(design: HouseDesign): YardLayout {
 
   // みずあそび・ピクニックは 2れつめ。はたけや くるまを けさずに いっしょに おける。
   const secondRow = ex.pool !== 'none' || has('picnic') || has('fountain')
-  const yardFront = frontZ + (secondRow ? 12 : 6.6)
+  const outdoor = OUTDOOR_EXTRAS.filter((item) => has(item.id))
+  const outdoorStart = frontZ + (secondRow ? 12 : 6.6)
+  const yardFront = outdoorStart + Math.ceil(outdoor.length / 4) * 4.2
   const path: Box2 = { minX: door.x - PATH_HALF, maxX: door.x + PATH_HALF, minZ: door.z, maxZ: yardFront }
-  const layout: YardLayout = { house, door, frontZ, path, trees: [], yard: { ...house } }
+  const layout: YardLayout = { house, door, frontZ, path, trees: [], outdoor: [], yard: { ...house } }
+  // 4こずつ、こみちの りょうがわに ならべる。さきに えらんだ ものを けさない。
+  outdoor.forEach(({ id }, i) => {
+    const offset = .6 + Math.floor((i % 4) / 2) * 3.8
+    const minX = i % 2 === 0 ? path.minX - offset - 3.2 : path.maxX + offset
+    const minZ = outdoorStart + .2 + Math.floor(i / 4) * 4.2
+    layout.outdoor.push({ id, box: { minX, maxX: minX + 3.2, minZ, maxZ: minZ + 3.4 } })
+  })
 
   // こみちの ひだり。
   let at = path.minX - .5
@@ -304,6 +314,7 @@ export function yardLayout(design: HouseDesign): YardLayout {
   if (layout.pool) xs.push(layout.pool.minX, layout.pool.maxX)
   if (layout.picnic) xs.push(layout.picnic.minX, layout.picnic.maxX)
   if (layout.fountain) xs.push(layout.fountain.minX, layout.fountain.maxX)
+  for (const { box } of layout.outdoor) xs.push(box.minX, box.maxX)
   if (layout.doghouse) xs.push(layout.doghouse.x + 1.8)
   if (layout.mailbox) xs.push(layout.mailbox.x + .5)
   if (layout.koinobori) xs.push(layout.koinobori.x - 1)

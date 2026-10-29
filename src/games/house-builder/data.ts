@@ -109,6 +109,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'modern', name: 'しろくて モダンな リビング', floor: 'tile', base: '#f3f3f1', line: '#d9d9d5', main: '#4a4e69', accent: '#22a6b3' },
       { id: 'pop', name: 'カラフル ポップな リビング', floor: 'carpet', base: '#ffe3ec', line: '#ffc2d4', main: '#ff6b9a', accent: '#4dc9ff', variant: 'pop' },
       { id: 'log', name: 'だんろの ある ログハウス リビング', floor: 'wood', base: '#c08a57', line: '#8e5f36', main: '#c0392b', accent: '#f39c12', variant: 'fireplace' },
+      { id: 'coastal', name: 'うみいろの リビング', floor: 'wood', base: '#f2e3cc', line: '#ceb998', main: '#5bafbd', accent: '#fff1ba' },
     ],
   },
   {
@@ -118,6 +119,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'wood', name: 'もくめの ダイニング', floor: 'wood', base: '#f0d6aa', line: '#cfa874', main: '#a0673a', accent: '#f6e7c8' },
       { id: 'round', name: 'まるい テーブルの ダイニング', floor: 'tile', base: '#fdf6e3', line: '#e6dcc0', main: '#ffffff', accent: '#e07a5f', variant: 'round' },
       { id: 'cafe', name: 'カフェみたいな ダイニング', floor: 'checker', base: '#f5f5f5', line: '#3a3a3a', main: '#6f4e37', accent: '#e9c46a', variant: 'cafe' },
+      { id: 'berry', name: 'いちごミルクの ダイニング', floor: 'checker', base: '#fff3e6', line: '#f2c6d4', main: '#f5e1ce', accent: '#d96383', variant: 'round' },
     ],
   },
   {
@@ -128,6 +130,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'steel', name: 'ピカピカ ステンレスの キッチン', floor: 'tile', base: '#e8edf2', line: '#c5cfd8', main: '#b8c2cc', accent: '#3a86ff' },
       { id: 'island', name: 'しまの ある アイランド キッチン', floor: 'wood', base: '#f3e3c9', line: '#d8bf95', main: '#ffffff', accent: '#ff8fab', variant: 'island' },
       { id: 'retro', name: 'レトロな タイルの キッチン', floor: 'checker', base: '#fff8ec', line: '#ffcf99', main: '#e76f51', accent: '#2a9d8f' },
+      { id: 'mint', name: 'ミントの アイランド キッチン', floor: 'tile', base: '#f7f4e9', line: '#d8dfcb', main: '#95cbb4', accent: '#dba35d', variant: 'island' },
     ],
   },
   {
@@ -138,6 +141,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'tile', name: 'しろい タイルの おふろ', floor: 'tile', base: '#f4f9fb', line: '#cfe3ea', main: '#ffffff', accent: '#8ed1f0' },
       { id: 'bubble', name: 'あわあわ ジャグジーの おふろ', floor: 'tile', base: '#e6f0ff', line: '#c4d7f5', main: '#ffffff', accent: '#b39ddb', variant: 'bubble' },
       { id: 'onsen', name: 'いわぶろの おんせん', floor: 'stone', base: '#bdb6aa', line: '#8d867a', main: '#8d8579', accent: '#9ad7d6', variant: 'onsen' },
+      { id: 'ocean', name: 'うみいろの あわあわ おふろ', floor: 'tile', base: '#cdeff1', line: '#8dcbd1', main: '#effcff', accent: '#4aa9ba', variant: 'bubble' },
     ],
   },
   {
@@ -148,6 +152,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'flower', name: 'おはなの トイレ', floor: 'tile', base: '#ffe8f0', line: '#ffc8dc', main: '#ffffff', accent: '#ff7aa8', variant: 'flower' },
       { id: 'hotel', name: 'ホテルみたいな トイレ', floor: 'marble', base: '#45455a', line: '#6a6a82', main: '#ffffff', accent: '#d4af37' },
       { id: 'forest', name: 'もりの トイレ', floor: 'wood', base: '#dcc39e', line: '#b89a6e', main: '#ffffff', accent: '#6ab04c', variant: 'plant' },
+      { id: 'lemon', name: 'レモンいろの トイレ', floor: 'checker', base: '#fff8cf', line: '#e6d88f', main: '#fffef2', accent: '#9abb65', variant: 'plant' },
     ],
   },
   {
@@ -157,6 +162,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'white', name: 'まっしろな せんめんじょ', floor: 'tile', base: '#f7f7f7', line: '#dedede', main: '#ffffff', accent: '#74b9ff' },
       { id: 'marine', name: 'マリンな せんめんじょ', floor: 'tile', base: '#e3f2fd', line: '#90caf9', main: '#ffffff', accent: '#1e88e5', variant: 'marine' },
       { id: 'wood', name: 'もくせいの せんめんじょ', floor: 'wood', base: '#e6cfa7', line: '#c7a878', main: '#b07d48', accent: '#81c784' },
+      { id: 'peach', name: 'ももいろの せんめんじょ', floor: 'tile', base: '#fff0e8', line: '#e8c4b4', main: '#f4c1ac', accent: '#c98370' },
     ],
   },
   {
@@ -167,6 +173,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'princess', name: 'おひめさまの しんしつ', floor: 'carpet', base: '#ffe4ef', line: '#ffc6dc', main: '#ffffff', accent: '#ff8fb8', variant: 'canopy' },
       { id: 'hotel', name: 'ホテルみたいな しんしつ', floor: 'wood', base: '#c8b39b', line: '#a8917a', main: '#ffffff', accent: '#34495e', variant: 'twin' },
       { id: 'starry', name: 'ほしぞらの しんしつ', floor: 'carpet', base: '#1f2a5a', line: '#2c3a74', main: '#ffffff', accent: '#ffd54f', variant: 'stars' },
+      { id: 'moon', name: 'つきあかりの しんしつ', floor: 'carpet', base: '#404866', line: '#697394', main: '#e6edf5', accent: '#f8de8c', variant: 'stars' },
     ],
   },
   {
@@ -177,6 +184,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'flower', name: 'おはなばたけの こどもべや', floor: 'carpet', base: '#e8f8e0', line: '#c5ebb3', main: '#ffffff', accent: '#ff70a6', variant: 'flower' },
       { id: 'dino', name: 'きょうりゅうの こどもべや', floor: 'wood', base: '#e9d8a6', line: '#cbb57d', main: '#ffffff', accent: '#57cc99', variant: 'dino' },
       { id: 'train', name: 'でんしゃの こどもべや', floor: 'carpet', base: '#e3f2fd', line: '#bbdefb', main: '#ffffff', accent: '#ef476f', variant: 'train' },
+      { id: 'foresttrain', name: 'もりの でんしゃの こどもべや', floor: 'wood', base: '#e4d4b2', line: '#bea67f', main: '#fff5d9', accent: '#4d9d78', variant: 'train' },
     ],
   },
   {
@@ -187,6 +195,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'tea', name: 'おちゃの わしつ', floor: 'tatami', base: '#d9e7af', line: '#b0c47a', main: '#5c3d2e', accent: '#2e7d32', variant: 'tea' },
       { id: 'kotatsu', name: 'こたつの わしつ', floor: 'tatami', base: '#dbe9ab', line: '#b4c97c', main: '#e76f51', accent: '#f4a261', variant: 'kotatsu' },
       { id: 'tokonoma', name: 'かけじくの わしつ', floor: 'tatami', base: '#cde09b', line: '#a3ba66', main: '#6d4c41', accent: '#ef5350', variant: 'tokonoma' },
+      { id: 'sakura', name: 'さくらいろの こたつの わしつ', floor: 'tatami', base: '#e2e7b7', line: '#b6c48a', main: '#d98ba6', accent: '#f5d5e0', variant: 'kotatsu' },
     ],
   },
   {
@@ -196,6 +205,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'stone', name: 'いしだたみの げんかん', floor: 'stone', base: '#d3ccc1', line: '#a39a8c', main: '#8d6e63', accent: '#e57373' },
       { id: 'wood', name: 'きの げんかん', floor: 'wood', base: '#e3c194', line: '#c19a6b', main: '#a1887f', accent: '#64b5f6' },
       { id: 'tile', name: 'タイルの げんかん', floor: 'checker', base: '#ffffff', line: '#b0bec5', main: '#78909c', accent: '#ffb74d' },
+      { id: 'sea', name: 'あおい タイルの げんかん', floor: 'checker', base: '#eef9fc', line: '#81b7c8', main: '#ddc097', accent: '#397b9b' },
     ],
   },
   {
@@ -205,6 +215,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'wood', name: 'きの かいだん', floor: 'wood', base: '#e0bb8a', line: '#b98e5b', main: '#c49a6c', accent: '#8d6e63' },
       { id: 'white', name: 'しろい かいだん', floor: 'tile', base: '#fafafa', line: '#e0e0e0', main: '#ffffff', accent: '#90a4ae' },
       { id: 'spiral', name: 'くるくる らせんかいだん', floor: 'tile', base: '#eceff1', line: '#cfd8dc', main: '#b0bec5', accent: '#546e7a', variant: 'spiral' },
+      { id: 'walnut', name: 'こげちゃいろの かいだん', floor: 'wood', base: '#aa815f', line: '#745337', main: '#826044', accent: '#e0bf7a' },
     ],
   },
   {
@@ -214,6 +225,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'wood', name: 'きの ろうか', floor: 'wood', base: '#ecd3ac', line: '#cdb083', main: '#a1887f', accent: '#ffcc80' },
       { id: 'runner', name: 'あかい じゅうたんの ろうか', floor: 'wood', base: '#e2c49a', line: '#c4a273', main: '#a1887f', accent: '#c62828', variant: 'runner' },
       { id: 'shiny', name: 'ピカピカの ろうか', floor: 'marble', base: '#f5f5f5', line: '#e0e0e0', main: '#bdbdbd', accent: '#64b5f6' },
+      { id: 'mint', name: 'みどりの じゅうたんの ろうか', floor: 'wood', base: '#efdcc0', line: '#ccb18a', main: '#b48a65', accent: '#4d9a7c', variant: 'runner' },
     ],
   },
 ]
@@ -222,7 +234,7 @@ export const ROOM_TYPES: readonly RoomType[] = [
 
 export type ExteriorOption<Id extends string> = { id: Id; name: string }
 
-export type WallId = 'white' | 'brick' | 'wood' | 'pink' | 'sky' | 'log' | 'wa' | 'stone' | 'mint' | 'cream' | 'navy' | 'lavender'
+export type WallId = 'white' | 'brick' | 'wood' | 'pink' | 'sky' | 'log' | 'wa' | 'stone' | 'mint' | 'cream' | 'navy' | 'lavender' | 'whitebrick' | 'terracotta' | 'sage'
 export type WallKind = 'plain' | 'brick' | 'siding' | 'log' | 'wa' | 'stone'
 export const WALLS: readonly (ExteriorOption<WallId> & { kind: WallKind; base: string; line: string })[] = [
   { id: 'white', name: 'しろい かべ', kind: 'plain', base: '#fbf8f0', line: '#e2dccd' },
@@ -237,9 +249,12 @@ export const WALLS: readonly (ExteriorOption<WallId> & { kind: WallKind; base: s
   { id: 'cream', name: 'クリームいろの かべ', kind: 'plain', base: '#ffe9b4', line: '#d9bd83' },
   { id: 'navy', name: 'こんいろの かべ', kind: 'siding', base: '#385571', line: '#23394e' },
   { id: 'lavender', name: 'むらさきの かべ', kind: 'plain', base: '#dfd0f1', line: '#ae94cc' },
+  { id: 'whitebrick', name: 'しろい レンガの かべ', kind: 'brick', base: '#f4eadb', line: '#c5b5a2' },
+  { id: 'terracotta', name: 'オレンジの ぬりかべ', kind: 'plain', base: '#eeb28b', line: '#bf7857' },
+  { id: 'sage', name: 'くさの いろの かべ', kind: 'siding', base: '#a5b995', line: '#667e61' },
 ]
 
-export type RoofId = 'red' | 'blue' | 'choco' | 'kawara' | 'flat' | 'tongari' | 'green' | 'orange' | 'shed'
+export type RoofId = 'red' | 'blue' | 'choco' | 'kawara' | 'flat' | 'tongari' | 'green' | 'orange' | 'shed' | 'rose' | 'purple'
 export type RoofKind = 'gable' | 'kawara' | 'flat' | 'steep' | 'shed'
 export const ROOFS: readonly (ExteriorOption<RoofId> & { kind: RoofKind; color: string; dark: string })[] = [
   { id: 'red', name: 'あかい さんかく やね', kind: 'gable', color: '#d9493b', dark: '#a3302a' },
@@ -251,6 +266,8 @@ export const ROOFS: readonly (ExteriorOption<RoofId> & { kind: RoofKind; color: 
   { id: 'green', name: 'もりいろの やね', kind: 'gable', color: '#4d826c', dark: '#315b4a' },
   { id: 'orange', name: 'オレンジの やね', kind: 'gable', color: '#e9954a', dark: '#ae5c2d' },
   { id: 'shed', name: 'ななめの やね', kind: 'shed', color: '#566b7f', dark: '#314456' },
+  { id: 'rose', name: 'いちごいろの やね', kind: 'gable', color: '#d96c8d', dark: '#953e62' },
+  { id: 'purple', name: 'すみれいろの とんがり やね', kind: 'steep', color: '#9374bd', dark: '#604481' },
 ]
 
 export type WindowId = 'square' | 'round' | 'arch' | 'shoji' | 'flowerbox' | 'shutters' | 'wide'
@@ -310,7 +327,16 @@ export const POOLS: readonly ExteriorOption<PoolId>[] = [
   { id: 'rectangle', name: 'おおきな プール' },
 ]
 
-export type ExtraId = 'mailbox' | 'bike' | 'swing' | 'chimney' | 'solar' | 'fence' | 'koinobori' | 'balcony' | 'picnic' | 'fountain'
+export const OUTDOOR_EXTRAS = [
+  { id: 'tent', name: 'さんかく テント' },
+  { id: 'teepee', name: 'とんがり テント' },
+  { id: 'gazebo', name: 'あずまや' },
+  { id: 'slide', name: 'すべりだい' },
+  { id: 'sandbox', name: 'すなば' },
+  { id: 'hammock', name: 'ハンモック' },
+] as const
+export type OutdoorExtraId = typeof OUTDOOR_EXTRAS[number]['id']
+export type ExtraId = 'mailbox' | 'bike' | 'swing' | 'chimney' | 'solar' | 'fence' | 'koinobori' | 'balcony' | 'picnic' | 'fountain' | OutdoorExtraId
 export const EXTRAS: readonly ExteriorOption<ExtraId>[] = [
   { id: 'mailbox', name: 'ポスト' },
   { id: 'bike', name: 'じてんしゃ' },
@@ -322,6 +348,7 @@ export const EXTRAS: readonly ExteriorOption<ExtraId>[] = [
   { id: 'balcony', name: 'ベランダ' },
   { id: 'picnic', name: 'パラソルと テーブル' },
   { id: 'fountain', name: 'ふんすい' },
+  ...OUTDOOR_EXTRAS,
 ]
 
 export type Exterior = {
@@ -354,6 +381,10 @@ export const EXTERIOR_STYLES: readonly ExteriorStyle[] = [
   { id: 'seaside', name: 'うみべの おうち', facade: { wall: 'mint', roof: 'blue', window: 'shutters', door: 'blue' } },
   { id: 'modern', name: 'モダンな おうち', facade: { wall: 'navy', roof: 'shed', window: 'wide', door: 'white' } },
   { id: 'storybook', name: 'ものがたりの おうち', facade: { wall: 'lavender', roof: 'tongari', window: 'arch', door: 'double' } },
+  { id: 'strawberry', name: 'いちごの おうち', facade: { wall: 'whitebrick', roof: 'rose', window: 'flowerbox', door: 'red' } },
+  { id: 'mediterranean', name: 'たいようの おうち', facade: { wall: 'terracotta', roof: 'orange', window: 'arch', door: 'blue' } },
+  { id: 'herb', name: 'ハーブの おうち', facade: { wall: 'sage', roof: 'choco', window: 'shutters', door: 'wood' } },
+  { id: 'fairytale', name: 'まほうの おうち', facade: { wall: 'whitebrick', roof: 'purple', window: 'round', door: 'double' } },
 ]
 
 // ---------------- さがす ----------------

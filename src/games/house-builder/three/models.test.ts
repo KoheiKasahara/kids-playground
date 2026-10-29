@@ -203,11 +203,12 @@ describe('house-builder 3D outside', () => {
     for (const [pool, garden] of [['round', 'strawberries'], ['rectangle', 'orchard']] as const) {
       const design: HouseDesign = {
         ...createDesign('hiraya', 'narrow'),
-        exterior: exterior({ pool, garden, parking: 'two', doghouse: 'log', extras: ['picnic', 'fountain', 'swing', 'bike', 'mailbox'] }),
+        exterior: exterior({ pool, garden, parking: 'two', doghouse: 'log', extras: EXTRAS.map((item) => item.id) }),
       }
       const yard = yardLayout(design)
       const built = buildExterior(design)
       const items: [string, Box2][] = [[`pool-${pool}`, yard.pool!], [garden, yard.plot!], ['picnic', yard.picnic!], ['fountain', yard.fountain!]]
+      for (const { id, box } of yard.outdoor) items.push([id, box])
       for (const [name, space] of items) {
         const item = built.root.getObjectByName(name)
         expect(item, name).toBeDefined()
@@ -230,7 +231,7 @@ describe('house-builder 3D outside', () => {
   })
 
   test('ふえた かべの いろが 3D の かべにも つく', () => {
-    for (const wall of WALLS.filter((option) => ['mint', 'cream', 'navy', 'lavender'].includes(option.id))) {
+    for (const wall of WALLS.filter((option) => ['mint', 'cream', 'navy', 'lavender', 'whitebrick', 'terracotta', 'sage'].includes(option.id))) {
       const built = buildExterior({ ...createDesign('hiraya', 'square'), exterior: exterior({ wall: wall.id }) })
       const colors: string[] = []
       built.root.getObjectByName('house')!.traverse((obj) => {
