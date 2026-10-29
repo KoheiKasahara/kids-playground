@@ -6,18 +6,21 @@ import { useSoundToggle } from '../../audio/useSoundToggle'
 import { primeAudio } from '../../audio/sound'
 import { vibrate } from '../../utils/haptics'
 import { ActionArt, BouquetArt, FlowerArt, GardenScenery, RabbitArt } from './GardenArt'
-import { createGarden, gardenHint, pickedCount, PLOT_ACTION, PLOT_COUNT, tendPlot } from './garden'
+import { createGarden, flowerName, gardenHint, pickedCount, PLOT_ACTION, PLOT_COUNT, requestedPlot, tendPlot, type GardenTool } from './garden'
 import { playGardenSound, type GardenSound } from './sounds'
 import styles from './PixelGardenPlay.module.css'
 
 export default function PixelGardenPlay() {
   const [garden, setGarden] = useState(createGarden)
+  const [tool, setTool] = useState<GardenTool>('water')
+  const [feedback, setFeedback] = useState('')
   const [started, setStarted] = useState(false)
   const [sound, toggleSound] = useSoundToggle()
   const replayRef = useRef<HTMLButtonElement>(null)
   const firstPlotRef = useRef<HTMLButtonElement>(null)
   const picked = pickedCount(garden)
   const complete = picked === PLOT_COUNT
+  const request = requestedPlot(garden)
   useGameIntroPlaying(started)
 
   useEffect(() => {
@@ -26,8 +29,14 @@ export default function PixelGardenPlay() {
   }, [complete, garden.round])
 
   function tend(index: number) {
-    const next = tendPlot(garden, index)
-    if (next === garden) return
+    const next = tendPlot(garden, index, tool)
+    if (next === garden) {
+      if (garden.plots[index] !== 'picked') setFeedback(garden.plots[index] === 'flower'
+        ? 'おねがいと おなじ おはなは どれかな？'
+        : garden.plots[index] === 'bud' ? '☀ つぼみには おひさまを えらんでね' : '💧 めには おみずを えらんでね')
+      return
+    }
+    setFeedback('')
     primeAudio()
     const stage = next.plots[index]
     const kind: GardenSound = pickedCount(next) === PLOT_COUNT ? 'complete'
@@ -42,6 +51,8 @@ export default function PixelGardenPlay() {
     primeAudio()
     playGardenSound('plant')
     setGarden(createGarden(garden.round + 1))
+    setTool('water')
+    setFeedback('')
   }
 
   const content = <div className={styles.page}>
@@ -59,7 +70,20 @@ export default function PixelGardenPlay() {
         <div className={styles.rabbit}><RabbitArt /></div>
       </div>
       <div className={styles.field}>
-        <p className={styles.hint} role="status">{complete ? 'はなたば できたね！' : gardenHint(garden)}</p>
+        <p className={styles.hint} role="status">{complete ? 'はなたば できたね！' : feedback || gardenHint(garden)}</p>
+        {request !== undefined && <>
+          <div className={styles.request} role="img" aria-label={`うさぎさんの おねがい：${request + 1}ばんの ${flowerName(request, garden.round)}`}>
+            <span>つぎは これ！<small>おなじ おはなを つんでね</small></span>
+            <FlowerArt variant={request + garden.round} />
+            <span className={styles.requestNumber}>{request + 1}</span>
+          </div>
+          <div className={styles.tools} role="group" aria-label="おせわの どうぐ">
+            {(['water', 'sun'] as const).map((value) => <button key={value} type="button" aria-pressed={tool === value}
+              onClick={() => { setTool(value); setFeedback(''); primeAudio(); playGardenSound('plant') }}>
+              {value === 'water' ? '💧 おみず' : '☀ おひさま'}
+            </button>)}
+          </div>
+        </>}
         {!complete && <div className={styles.plots} role="group" aria-label="おはなばたけ">
           {garden.plots.map((stage, index) => <button
             key={index}
@@ -71,9 +95,10 @@ export default function PixelGardenPlay() {
             aria-disabled={stage === 'picked'}
             onClick={() => tend(index)}
           >
+            <span className={styles.plotNumber} aria-hidden="true">{index + 1}</span>
             <span className={styles.plant} key={stage}><FlowerArt stage={stage} variant={index + garden.round} /></span>
             {(stage === 'sprout' || stage === 'bud' || stage === 'flower') && <span className={styles.action}>
-              <ActionArt water={stage !== 'flower'} />
+              {stage === 'bud' ? <span aria-hidden="true">☀</span> : <ActionArt water={stage === 'sprout'} />}
             </span>}
           </button>)}
         </div>}
@@ -91,7 +116,7 @@ export default function PixelGardenPlay() {
           <p>うさぎさんに おはなの おくりもの</p>
           <button ref={replayRef} className={styles.replay} type="button" onClick={replay}>もういちど <span aria-hidden="true">↻</span></button>
         </div>}
-        {!complete && <p className={styles.caption}>たね → おみず → おはな</p>}
+        {!complete && <p className={styles.caption}>たね → 💧 → ☀ → おねがいの おはな</p>}
       </div>
     </main>
   </div>

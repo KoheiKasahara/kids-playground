@@ -54,6 +54,14 @@
   background-size: 12px 12px;
 }
 .hint { min-height: 24px; margin: 0 0 18px; text-align: center; font-weight: 800; font-size: 16px; }
+.request { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; padding: 4px 8px; background: #fff8dc; border: 2px solid #b28b5e; font-weight: 800; }
+.request small { display: block; font-size: 11px; margin-top: 4px; }
+.request > svg { width: 46px; height: 54px; }
+.requestNumber, .plotNumber { border-radius: 50%; background: #fff8dc; color: #385448; font-size: 12px; font-weight: 800; width: 22px; height: 22px; display: grid; place-items: center; }
+.plotNumber { position: absolute; top: 4px; left: 4px; }
+.tools { display: flex; gap: 10px; margin-bottom: 18px; }
+.tools button { flex: 1; min-height: 48px; border: 3px solid #8b9c72; background: #f2eedb; color: #385448; font: inherit; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+.tools button[aria-pressed='true'] { border-color: #385448; background: #fff8dc; box-shadow: 0 3px #385448; }
 .plots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 14px; }
 .plot {
   position: relative;
