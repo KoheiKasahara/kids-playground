@@ -140,7 +140,7 @@ export default function JellyMergePlay() {
             <div className={styles.squish} key={`${piece.tier}-${motion ?? ''}`}><JellyFace tier={piece.tier} /></div>
           </div>
         })}
-        {frame?.kind === 'merge' && <div className={styles.burst} key={`${game.turn}-${chain}`} style={position(frame.focus)} aria-hidden="true">
+        {frame?.kind === 'merge' && <div className={styles.burst} key={`burst-${game.turn}-${chain}`} style={position(frame.focus)} aria-hidden="true">
           <span className={styles.ring} />{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ '--angle': `${i * 45}deg` } as CSSProperties} />)}
           <b>+{2 ** (frame.focus.tier - 1) * 10 * chain}</b>
         </div>}
@@ -160,7 +160,7 @@ export default function JellyMergePlay() {
               if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault()
             }} />)}
         </div>
-        <div className={`${styles.callout} ${chain > 1 ? styles.combo : ''}`} key={`${game.turn}-${chain}`} role="status" aria-live="polite">{status}</div>
+        <div className={`${styles.callout} ${chain > 1 ? styles.combo : ''}`} key={`callout-${game.turn}-${chain}`} role="status" aria-live="polite">{status}</div>
         {game.status !== 'playing' && <section className={styles.result} aria-label="けっか">
           {game.status === 'won' && <div className={styles.confetti} aria-hidden="true">{Array.from({ length: 18 }, (_, i) => <i key={i} style={{ '--i': i } as CSSProperties} />)}</div>}
           <div className={styles.resultJelly}><JellyFace tier={game.status === 'won' ? 5 : game.current} /></div>

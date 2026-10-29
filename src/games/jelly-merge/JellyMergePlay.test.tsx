@@ -38,6 +38,7 @@ const touch = (x: number, pointerId = 1) => ({ clientX: x, clientY: 250, pointer
 const finish = () => act(() => { vi.runAllTimers() })
 
 test('drag previews without dropping, release drops once, animates a chain, and undo restores queue and score', () => {
+  const consoleError = vi.spyOn(console, 'error')
   const { board } = setup()
   fireEvent.pointerDown(board, touch(50))
   expect(screen.getByTestId('jelly-preview').style.getPropertyValue('--col')).toBe('0')
@@ -58,6 +59,7 @@ test('drag previews without dropping, release drops once, animates a chain, and 
   expect(board).toHaveAttribute('data-turn', '0')
   expect(screen.getByLabelText('てんすう 0')).toBeInTheDocument()
   expect(screen.getByLabelText('つぎは 2、1')).toBeInTheDocument()
+  expect(consoleError).not.toHaveBeenCalled()
 })
 
 test('tap works without drag; synthetic follow-up click does not drop a second jelly', () => {
