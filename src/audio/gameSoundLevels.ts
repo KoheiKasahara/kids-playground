@@ -37,6 +37,7 @@ export const GAME_SOUND_LEVEL_DB: Readonly<Record<string, number>> = {
   'homerun-derby': 2.5,
   'hoshi-tsunagi': 2.5,
   'jishaku-pitatto': 7.5,
+  'jelly-merge': 2,
   'kaiten-sushi': 5,
   'koma-battle': 2.5,
   'kurukuru-rokuro': 4,

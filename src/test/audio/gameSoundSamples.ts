@@ -10,6 +10,7 @@
  */
 import type { SoundSample } from './soundMeter'
 import { playGardenSound } from '../../games/pixel-garden/sounds'
+import { playJellySound } from '../../games/jelly-merge/sounds'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
 import * as gochiso from '../../games/gochiso-race/sounds'
 import { playDerbySound } from '../../games/homerun-derby/sounds'
@@ -402,6 +403,14 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('よろこぶ', dotAquarium.playHappySound),
     sample('しんじゅ', dotAquarium.playPearlSound),
     ...songs(['day', 'night'] as const, dotAquarium.startBgm),
+  ],
+  'jelly-merge': [
+    sample('おとす', () => playJellySound('drop')),
+    sample('ちゃくち', () => playJellySound('land')),
+    ...[1, 2, 3, 4, 5, 6].map((chain) => sample(`${chain}れんさ`, () => playJellySound('merge', chain))),
+    sample('クリア', () => playJellySound('win')),
+    sample('いっぱい', () => playJellySound('full')),
+    sample('もどす', () => playJellySound('undo')),
   ],
   'pixel-garden': [
     sample('たねまき', () => playGardenSound('plant')),

@@ -1325,6 +1325,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'jelly-merge',
+    slug: 'jelly-merge',
+    title: 'ぽんぽん ゼリーがったい！',
+    emoji: '🍮',
+    category: 'learning',
+    seo: {
+      headline: 'ぽんぽん ゼリーがったい！｜タッチで落として、ぷるぷる連鎖パズル',
+      description: '盤面をタッチしてゼリーを落とす幼児向けの合体パズル。ドラッグ中は落ちる場所を確認でき、指を離すと落下します。同じ数字をくっつけて連鎖を作り、虹のゼリーを目指しましょう。縦・横画面で遊べて、ひとつ戻すこともできます。',
+    },
+    intro: {
+      howToPlay: [
+        'おとす ばしょを さわろう。ゆびを うごかして、はなすと おちるよ',
+        'おなじ すうじを くっつけて、にじの「5」を つくろう',
+        'せんまで つむと おしまい。「↶」で ひとつ もどせるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

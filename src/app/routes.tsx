@@ -46,6 +46,7 @@ const playRoute = (element: ReactElement) => <GamePlaySurface>{element}</GamePla
 const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 
 export const routes: RouteObject[] = [
+  { path: '/games/jelly-merge', element: lazyRoute(() => import('../games/jelly-merge/JellyMergePlay')) },
   // 花束の完成画面では長押し抑制を外すため、プレイ面はゲーム内で包む。
   { path: '/games/pixel-garden', element: lazyRoute(() => import('../games/pixel-garden/PixelGardenPlay')) },
   // コース・にんずう えらびと すごろくが 同じrouteにあるため、プレイ面はゲーム内で包む。
