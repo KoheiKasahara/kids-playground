@@ -1059,18 +1059,14 @@ function GardenSwatch({ id }: { id: GardenId }) {
 }
 
 function ExtraSwatch({ id }: { id: ExtraId }) {
+  const outdoor = OUTDOOR_EXTRAS.find((item) => item.id === id)
+  if (outdoor) return <g transform="translate(12 0) scale(.6)"><OutdoorArt id={outdoor.id} /></g>
   switch (id) {
     case 'mailbox': return <Mailbox x={44} y={86} />
     case 'bike': return <Bike x={10} y={78} />
     case 'swing': return <g transform="translate(-4 4) scale(.7)"><Swing x={20} y={118} /></g>
     case 'picnic': return <g transform="translate(19 5) scale(.55)"><Picnic x={0} y={146} /></g>
     case 'fountain': return <g transform="translate(21 6) scale(.76)"><Fountain x={0} y={94} /></g>
-    case 'tent':
-    case 'teepee':
-    case 'gazebo':
-    case 'slide':
-    case 'sandbox':
-    case 'hammock': return <g transform="translate(12 0) scale(.6)"><OutdoorArt id={id} /></g>
     case 'chimney':
       return (
         <g>

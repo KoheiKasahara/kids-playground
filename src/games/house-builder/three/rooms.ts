@@ -8,6 +8,7 @@ import { roomSize, type HouseDesign, type PlacedRoom } from '../plan'
 import { Kit, ball, block, disposeObject, group, mesh, mix, tube, type Built, type Cutaway, type Tick, type V3 } from './kit'
 import { innerDoorPanel, openingPanel } from './openings'
 import { floorTexture } from './textures'
+import { library, music, art, playroom, pet, laundry, closet, plants } from './hobbyRooms'
 
 const T = .14
 const LOW = .22
@@ -840,6 +841,7 @@ function hall(c: Ctx) {
 
 const FURNISH: Readonly<Record<RoomTypeId, (c: Ctx) => void>> = {
   living, dining, kitchen, bath, toilet, washroom, bedroom, kids, washitsu, entrance, stairs, hall,
+  library, music, art, playroom, pet, laundry, closet, plants,
 }
 
 // ---------------- ゆか と かべ ----------------

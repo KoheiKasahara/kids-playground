@@ -25,7 +25,8 @@ function shuffle<T>(rand: Rand, list: readonly T[]): T[] {
 const GROUND_ROOMS: readonly RoomTypeId[] = ['entrance', 'living', 'kitchen', 'bath', 'toilet', 'washroom', 'dining']
 const UPPER_ROOMS: readonly RoomTypeId[] = ['bedroom', 'kids', 'toilet']
 /** あいている ところに ふやす へや。 */
-const EXTRA_ROOMS: readonly RoomTypeId[] = ['bedroom', 'kids', 'washitsu', 'hall', 'toilet', 'washroom', 'living']
+const EXTRA_ROOMS: readonly RoomTypeId[] = ['bedroom', 'kids', 'washitsu', 'hall', 'toilet', 'washroom', 'living',
+  'library', 'music', 'art', 'playroom', 'pet', 'laundry', 'closet', 'plants']
 const EXTRA_TRIES = 6
 
 type Spot = Pick<PlacedRoom, 'size' | 'turned' | 'x' | 'y'>

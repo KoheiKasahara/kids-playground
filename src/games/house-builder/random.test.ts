@@ -54,5 +54,7 @@ describe('house-builder random', () => {
     expect(new Set(designs.map((d) => d.houseType)).size).toBe(HOUSE_TYPES.length)
     expect(new Set(designs.map((d) => d.shape)).size).toBe(SHAPES.length)
     expect(new Set(designs.map((d) => d.exterior.wall)).size).toBeGreaterThan(5)
+    const rooms = new Set(designs.flatMap((d) => d.rooms.map((r) => r.type)))
+    for (const type of ['library', 'music', 'art', 'playroom', 'pet', 'laundry', 'closet', 'plants'] as const) expect(rooms.has(type), type).toBe(true)
   })
 })

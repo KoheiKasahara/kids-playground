@@ -168,6 +168,7 @@ export type Opening = { kind: OpeningKind; center: number; span: number; roomId?
 export const OPENING_BY_ROOM: Readonly<Record<RoomTypeId, OpeningKind>> = {
   living: 'big', dining: 'big', kitchen: 'window', bath: 'small', toilet: 'small', washroom: 'small',
   bedroom: 'window', kids: 'window', washitsu: 'big', entrance: 'door', stairs: 'slim', hall: 'slim',
+  library: 'window', music: 'window', art: 'big', playroom: 'big', pet: 'window', laundry: 'small', closet: 'small', plants: 'big',
 }
 
 /**

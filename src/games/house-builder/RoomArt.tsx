@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { findRoomStyle, findRoomType, type RoomStyle, type RoomTypeId } from './data'
+import { HobbyRoomArt } from './HobbyRoomArt'
 
 // まどりずの へやを うえから みた え。1マスは 100。ゆかの もようと かぐは すべて コードで かいた オリジナル。
 
@@ -594,6 +595,14 @@ function Hall({ b, s }: { b: Box; s: RoomStyle }) {
 const FURNITURE: Record<RoomTypeId, (props: { b: Box; s: RoomStyle }) => ReactNode> = {
   living: Living, dining: Dining, kitchen: Kitchen, bath: Bath, toilet: Toilet, washroom: Washroom,
   bedroom: Bedroom, kids: Kids, washitsu: Washitsu, entrance: Entrance, stairs: Stairs, hall: Hall,
+  library: (p) => <HobbyRoomArt {...p} type="library" />,
+  music: (p) => <HobbyRoomArt {...p} type="music" />,
+  art: (p) => <HobbyRoomArt {...p} type="art" />,
+  playroom: (p) => <HobbyRoomArt {...p} type="playroom" />,
+  pet: (p) => <HobbyRoomArt {...p} type="pet" />,
+  laundry: (p) => <HobbyRoomArt {...p} type="laundry" />,
+  closet: (p) => <HobbyRoomArt {...p} type="closet" />,
+  plants: (p) => <HobbyRoomArt {...p} type="plants" />,
 }
 
 type RoomArtProps = {
