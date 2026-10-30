@@ -91,6 +91,7 @@ export type HouseSound =
 export const ROOM_VOICE: Readonly<Record<RoomTypeId, HouseSound>> = {
   living: 'music', dining: 'eat', kitchen: 'sizzle', bath: 'splash', toilet: 'flush', washroom: 'water',
   bedroom: 'sleep', kids: 'toy', washitsu: 'koto', entrance: 'bell', stairs: 'step', hall: 'step',
+  library: 'tap', music: 'music', art: 'paint', playroom: 'toy', pet: 'toy', laundry: 'water', closet: 'bell', plants: 'water',
 }
 
 export function playHouseSound(kind: HouseSound): void {

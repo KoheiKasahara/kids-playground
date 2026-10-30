@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { DEFAULT_EXTERIOR, DOORS, EXTRAS, GARDENS, POOLS, ROOFS, WALLS, WINDOWS } from './data'
+import { DEFAULT_EXTERIOR, DOORS, EXTRAS, GARDENS, POOLS, ROOFS, ROOM_SIZES, ROOM_TYPES, WALLS, WINDOWS } from './data'
 import { addRoom, createDesign, type HouseDesign } from './plan'
 import {
   ALBUM_LIMIT, parseAlbum, parseDesign, putHouse, readAlbum, readDraft, removeHouse, sameDesign, writeAlbum, writeDraft,
@@ -16,6 +16,16 @@ afterEach(() => {
 })
 
 describe('house-builder save', () => {
+  test('すべての へやの みため・おおきさ・むきを アルバムと つくりかけに のこす', () => {
+    for (const type of ROOM_TYPES) for (const style of type.styles) for (const size of ROOM_SIZES) for (const turned of [false, true]) {
+      const base = createDesign('hiraya', 'wide')
+      const { design } = addRoom(base, 0, { type: type.id, style: style.id, size: size.id, turned }, { x: 0, y: 0 })!
+      const withExtras = { ...design, exterior: { ...design.exterior, extras: EXTRAS.map((e) => e.id) } }
+      const label = `${type.id}/${style.id}/${size.id}/${turned}`
+      expect(parseDesign(JSON.parse(JSON.stringify(withExtras))), label).toEqual(withExtras)
+      expect(parseAlbum([{ id: 1, savedAt: 100, design: withExtras }]), label).toEqual([{ id: 1, savedAt: 100, design: withExtras }])
+    }
+  })
   test('ほぞんした おうちを そのまま もどせる', () => {
     const design = sample()
     expect(parseDesign(JSON.parse(JSON.stringify(design)))).toEqual(design)

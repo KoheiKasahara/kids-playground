@@ -36,6 +36,23 @@ afterEach(() => {
 })
 
 describe('house-builder 3D rooms', () => {
+  test('趣味と くらしの へやは 色だけでなく かぐの かたちも かわる', () => {
+    for (const id of ['library', 'music', 'art', 'playroom', 'pet', 'laundry', 'closet', 'plants'] as const) {
+      const type = ROOM_TYPES.find((t) => t.id === id)!
+      const models = new Set<string>()
+      for (const style of type.styles) {
+        const { design, room } = place(createDesign('hiraya', 'wide'), 0, { type: id, style: style.id, size: 'm', turned: false }, 0, 0)
+        const built = buildRoom(design, room)
+        const parts: object[] = []
+        built.root.getObjectByName('furniture')!.traverse((o) => {
+          if (o instanceof THREE.Mesh) parts.push({ geometry: o.geometry.type, count: o.geometry.getAttribute('position').count, position: o.position.toArray(), scale: o.scale.toArray(), rotation: o.rotation.toArray() })
+        })
+        models.add(JSON.stringify(parts))
+        built.dispose()
+      }
+      expect(models.size, type.name).toBe(type.styles.length)
+    }
+  })
   test('ぜんぶの へや・みため・おおきさ・むきで、へやの おおきさの ゆかに かぐが おさまる', () => {
     const design = createDesign('hiraya', 'wide') // 10×7
     for (const type of ROOM_TYPES) {

@@ -865,6 +865,8 @@ const ROOM_TALK: Readonly<Record<RoomTypeId, string>> = {
   living: 'みんなで くつろごう', dining: 'いただきます！', kitchen: 'じゅうじゅう おりょうり', bath: 'ちゃぷん！ いいゆだな',
   toilet: 'じゃー！ すっきり', washroom: 'てを あらおうね', bedroom: 'おやすみなさい', kids: 'なにして あそぶ？',
   washitsu: 'ほっと ひといき', entrance: 'ただいま！', stairs: 'とん とん とん', hall: 'てくてく',
+  library: 'どの ほんを よもうかな', music: 'いっしょに えんそうしよう', art: 'なにを つくろうかな', playroom: 'いっぱい あそぼう！',
+  pet: 'いっしょに あそぼうね', laundry: 'おせんたく ぴかぴか', closet: 'どの ふくに しようかな', plants: 'すくすく そだってね',
 }
 
 const HOTSPOT: Readonly<Record<Hotspot, { sound: HouseSound; text: string }>> = {

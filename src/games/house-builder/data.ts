@@ -64,6 +64,7 @@ export const SHAPES: readonly Shape[] = [
 export type RoomTypeId =
   | 'living' | 'dining' | 'kitchen' | 'bath' | 'toilet' | 'washroom'
   | 'bedroom' | 'kids' | 'washitsu' | 'entrance' | 'stairs' | 'hall'
+  | 'library' | 'music' | 'art' | 'playroom' | 'pet' | 'laundry' | 'closet' | 'plants'
 
 export type RoomSizeId = 's' | 'm' | 'l'
 
@@ -228,6 +229,78 @@ export const ROOM_TYPES: readonly RoomType[] = [
       { id: 'mint', name: 'みどりの じゅうたんの ろうか', floor: 'wood', base: '#efdcc0', line: '#ccb18a', main: '#b48a65', accent: '#4d9a7c', variant: 'runner' },
     ],
   },
+  {
+    id: 'library', name: 'ほんのへや', short: 'ほん',
+    sizes: { s: [2, 2], m: [3, 2], l: [3, 3] },
+    styles: [
+      { id: 'library', name: 'としょしつの ほんのへや', floor: 'wood', base: '#ead4b2', line: '#c5a278', main: '#a5774c', accent: '#719b80', variant: 'library' },
+      { id: 'picturebooks', name: 'えほんの ほんのへや', floor: 'carpet', base: '#fff1d2', line: '#e8cd92', main: '#e7a45b', accent: '#e77b95', variant: 'picturebooks' },
+      { id: 'study', name: 'ひみつの しょさい', floor: 'wood', base: '#c7b294', line: '#9c8060', main: '#71513f', accent: '#5e8996', variant: 'study' },
+    ],
+  },
+  {
+    id: 'music', name: 'おんがくのへや', short: 'おんがく',
+    sizes: { s: [2, 2], m: [3, 2], l: [4, 3] },
+    styles: [
+      { id: 'piano', name: 'ピアノの おんがくのへや', floor: 'wood', base: '#ecd7b5', line: '#c4a37d', main: '#414353', accent: '#dbad55', variant: 'piano' },
+      { id: 'drums', name: 'ドラムの おんがくのへや', floor: 'carpet', base: '#d8e5f2', line: '#a5bcd5', main: '#d76d65', accent: '#efc456', variant: 'drums' },
+      { id: 'guitar', name: 'ギターの おんがくのへや', floor: 'wood', base: '#e4c69d', line: '#b18a5e', main: '#b97d42', accent: '#579b91', variant: 'guitar' },
+    ],
+  },
+  {
+    id: 'art', name: 'おえかきのへや', short: 'おえかき',
+    sizes: { s: [2, 2], m: [3, 2], l: [3, 3] },
+    styles: [
+      { id: 'painting', name: 'イーゼルの おえかきのへや', floor: 'wood', base: '#f0debd', line: '#cbb38b', main: '#bd8e5d', accent: '#e9807d', variant: 'painting' },
+      { id: 'craft', name: 'こうさくの アトリエ', floor: 'checker', base: '#fff4d9', line: '#c9dfdf', main: '#78aaa8', accent: '#e8b34e', variant: 'craft' },
+      { id: 'pottery', name: 'ねんどの アトリエ', floor: 'stone', base: '#e0d1bf', line: '#baa58e', main: '#b97f61', accent: '#8eb39a', variant: 'pottery' },
+    ],
+  },
+  {
+    id: 'playroom', name: 'あそびべや', short: 'あそび',
+    sizes: { s: [2, 2], m: [3, 2], l: [4, 3] },
+    styles: [
+      { id: 'balls', name: 'ボールプールの あそびべや', floor: 'carpet', base: '#fff0c6', line: '#ead29b', main: '#78bdd1', accent: '#ee829b', variant: 'balls' },
+      { id: 'blocks', name: 'つみきの あそびべや', floor: 'carpet', base: '#e0f0db', line: '#b9d5b0', main: '#dbb76c', accent: '#6ca4d3', variant: 'blocks' },
+      { id: 'slide', name: 'すべりだいの あそびべや', floor: 'carpet', base: '#ffe5de', line: '#e8bcb4', main: '#85c2b0', accent: '#f1a15f', variant: 'slide' },
+    ],
+  },
+  {
+    id: 'pet', name: 'ペットのへや', short: 'ペット',
+    sizes: { s: [2, 2], m: [3, 2], l: [3, 3] },
+    styles: [
+      { id: 'cat', name: 'ねこの ペットのへや', floor: 'wood', base: '#ead5b6', line: '#c5a57e', main: '#c09a76', accent: '#df9c96', variant: 'cat' },
+      { id: 'dog', name: 'いぬの ペットのへや', floor: 'checker', base: '#f6ebd3', line: '#c6d8c2', main: '#81ae91', accent: '#dfa660', variant: 'dog' },
+      { id: 'rabbit', name: 'うさぎの ペットのへや', floor: 'carpet', base: '#f1e4ee', line: '#d4bbcf', main: '#d6b79b', accent: '#96bd90', variant: 'rabbit' },
+    ],
+  },
+  {
+    id: 'laundry', name: 'せんたくのへや', short: 'せんたく',
+    sizes: { s: [2, 2], m: [3, 2], l: [3, 3] },
+    styles: [
+      { id: 'washer', name: 'せんたくきの へや', floor: 'tile', base: '#eef6fb', line: '#c4dbe9', main: '#f8fcff', accent: '#81b9d5', variant: 'washer' },
+      { id: 'drying', name: 'ものほしの へや', floor: 'tile', base: '#edf6e4', line: '#c3d8ae', main: '#f6faf1', accent: '#94b77a', variant: 'drying' },
+      { id: 'ironing', name: 'アイロンの へや', floor: 'checker', base: '#fff0e1', line: '#e2c8b1', main: '#e4bd9a', accent: '#d58b8b', variant: 'ironing' },
+    ],
+  },
+  {
+    id: 'closet', name: 'クローゼット', short: 'ふく',
+    sizes: { s: [1, 2], m: [2, 2], l: [3, 2] },
+    styles: [
+      { id: 'wardrobe', name: 'きの クローゼット', floor: 'wood', base: '#e9d4b4', line: '#c4a37a', main: '#b38963', accent: '#7eaaa4', variant: 'wardrobe' },
+      { id: 'costume', name: 'へんしんの いしょうべや', floor: 'carpet', base: '#fbe5ee', line: '#e3bbce', main: '#e4adc6', accent: '#a087bd', variant: 'costume' },
+      { id: 'boutique', name: 'おみせふうの クローゼット', floor: 'tile', base: '#f7efe4', line: '#d8c8b3', main: '#f2e5ce', accent: '#7695ae', variant: 'boutique' },
+    ],
+  },
+  {
+    id: 'plants', name: 'しょくぶつのへや', short: 'しょくぶつ',
+    sizes: { s: [2, 2], m: [3, 2], l: [3, 3] },
+    styles: [
+      { id: 'leafy', name: 'みどりの しょくぶつのへや', floor: 'wood', base: '#e2d7b6', line: '#b9ab7e', main: '#b78961', accent: '#64a675', variant: 'leafy' },
+      { id: 'flowers', name: 'はなの しょくぶつのへや', floor: 'tile', base: '#fff0df', line: '#dfc7ac', main: '#d6a780', accent: '#de8dad', variant: 'flowers' },
+      { id: 'hanging', name: 'つるくさの しょくぶつのへや', floor: 'stone', base: '#e4e7d8', line: '#b9c2a5', main: '#ad8b64', accent: '#69a692', variant: 'hanging' },
+    ],
+  },
 ]
 
 // ---------------- そとがわ ----------------
@@ -334,6 +407,16 @@ export const OUTDOOR_EXTRAS = [
   { id: 'slide', name: 'すべりだい' },
   { id: 'sandbox', name: 'すなば' },
   { id: 'hammock', name: 'ハンモック' },
+  { id: 'seesaw', name: 'シーソー' },
+  { id: 'trampoline', name: 'トランポリン' },
+  { id: 'playhouse', name: 'にわの おうち' },
+  { id: 'basketball', name: 'バスケットゴール' },
+  { id: 'flowerarch', name: 'はなの アーチ' },
+  { id: 'bench', name: 'ベンチ' },
+  { id: 'bbq', name: 'バーベキューセット' },
+  { id: 'birdhouse', name: 'とりの おうち' },
+  { id: 'greenhouse', name: 'おんしつ' },
+  { id: 'yardlights', name: 'にわの あかり' },
 ] as const
 export type OutdoorExtraId = typeof OUTDOOR_EXTRAS[number]['id']
 export type ExtraId = 'mailbox' | 'bike' | 'swing' | 'chimney' | 'solar' | 'fence' | 'koinobori' | 'balcony' | 'picnic' | 'fountain' | OutdoorExtraId

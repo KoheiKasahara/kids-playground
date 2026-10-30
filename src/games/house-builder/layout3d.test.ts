@@ -151,15 +151,13 @@ describe('house-builder 3D layout', () => {
     for (let mask = 0; mask < 2 ** OUTDOOR_EXTRAS.length; mask++) {
       const extras = OUTDOOR_EXTRAS.filter((_, i) => mask & (1 << i)).map((item) => item.id)
       const yard = yardLayout({ ...base, exterior: { ...base.exterior, extras } })
-      expect(yard.outdoor.map((item) => item.id)).toEqual(extras)
+      const label = extras.join(',') || 'なし'
+      expect(yard.outdoor.map((item) => item.id), label).toEqual(extras)
       const boxes = [yard.house, yard.path, ...yard.outdoor.map((item) => item.box)]
-      boxes.forEach((a, i) => boxes.slice(i + 1).forEach((b) => expect(overlaps(a, b)).toBe(false)))
-      for (const { box } of yard.outdoor) {
-        expect(box.minX).toBeGreaterThan(yard.yard.minX)
-        expect(box.maxX).toBeLessThan(yard.yard.maxX)
-        expect(box.maxZ).toBeLessThan(yard.yard.maxZ)
-      }
-      expect(yard.yard.maxZ > plain.yard.maxZ).toBe(extras.length > 0)
+      // 全組み合わせ・全ペアの検査は維持し、数百万回の matcher 呼び出しを避ける。
+      expect(boxes.every((a, i) => boxes.slice(i + 1).every((b) => !overlaps(a, b))), label).toBe(true)
+      expect(yard.outdoor.every(({ box }) => box.minX > yard.yard.minX && box.maxX < yard.yard.maxX && box.maxZ < yard.yard.maxZ), label).toBe(true)
+      expect(yard.yard.maxZ > plain.yard.maxZ, label).toBe(extras.length > 0)
     }
   })
 })

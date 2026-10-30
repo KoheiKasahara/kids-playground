@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../../app/App'
 import { resetGameShelfCache } from '../../pages/gameShelfStore'
 import HouseBuilderPlay from './HouseBuilderPlay'
-import { EXTERIOR_STYLES, EXTRAS, GARDENS, OUTDOOR_EXTRAS } from './data'
+import { EXTERIOR_STYLES, EXTRAS, GARDENS, OUTDOOR_EXTRAS, findRoomType } from './data'
 import { ALBUM_LIMIT } from './save'
 import { playHouseSound, startBgm } from './sounds'
 
@@ -93,6 +93,38 @@ function pickRoom(type: string, style?: string, size?: RegExp) {
 }
 
 describe('house-builder play', () => {
+  test('趣味と くらしの へやを えらび、ほぞんして なかを みて、また なおせる', async () => {
+    const types = ['library', 'music', 'art', 'playroom', 'pet', 'laundry', 'closet', 'plants'] as const
+    startHouse(/^ひらや/, /^ひろい/)
+    types.forEach((id, i) => {
+      const type = findRoomType(id)
+      pickRoom(type.name, type.styles[1].name, /^ちいさい/)
+      click(cell(1 + i % 4 * 2, 1 + Math.floor(i / 4) * 2))
+      expect(saved().rooms.at(-1)).toMatchObject({ type: id, style: type.styles[1].id })
+    })
+    click(/そとがわを つくる/)
+    click('かんせい！')
+    await screen.findByRole('group', { name: /^できあがった おうち（3D）/ })
+    click(/おうちを ほぞんする/)
+    const design = album()[0].design
+    cleanup()
+    window.localStorage.removeItem(KEY)
+    renderGame()
+    click('1ばんめの おうちを ひらく（ひらや・へや 8こ）')
+    await screen.findByRole('group', { name: /^できあがった おうち（3D）/ })
+    click('なかを みる')
+    for (const id of types) {
+      const type = findRoomType(id)
+      click(`1かいの ${type.styles[1].name}`)
+      spot('room')
+      expect(screen.getByRole('status')).toHaveTextContent(type.styles[1].name)
+      expect(screen.getByRole('status')).not.toHaveTextContent('undefined')
+      expect(scene.show).toHaveBeenLastCalledWith(expect.anything(), { kind: 'room', roomId: design.rooms.find((r: { type: string }) => r.type === id).id })
+    }
+    click('まどりを なおす')
+    expect(saved().rooms).toEqual(design.rooms)
+    for (const id of types) expect(screen.getByRole('button', { name: `おいた ${findRoomType(id).styles[1].name}` })).toBeInTheDocument()
+  })
   test('あたらしい へやと キャンプの おうちを ほぞんし、よみなおして なおせる', () => {
     startHouse(/^ひらや/, /^しかく/)
     pickRoom('リビング', 'うみいろの リビング')
