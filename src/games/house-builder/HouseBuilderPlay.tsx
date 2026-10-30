@@ -951,7 +951,7 @@ function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, on
   }
 
   const hint = view === 'outside'
-    ? 'ゆびで うごかすと まわるよ。ドアや いぬ、くるまを タップしてみてね'
+    ? '1ほんゆびで まわす。2ほんゆびで ずらす・ちかづく。ドアや いぬ、くるまを タップしてみてね'
     : room ? 'ゆびで うごかすと まわるよ。へやを タップしてみてね' : 'へやを タップしてみてね'
 
   let stage: ReactNode

@@ -1,4 +1,4 @@
-// かんせいした おうちを 3D で みせる がめん。ゆびで ドラッグすると まわり、2ほんゆび・ホイールで ちかづく。
+// かんせいした おうちを 3D で みせる がめん。1ほんゆびで まわし、2ほんゆびで そとを ずらす・ちかづく。
 // タップした ものは spot で しらせる。うごかして いない ときは かかない（でんちを つかいすぎない）。
 
 import * as THREE from 'three'
@@ -84,6 +84,8 @@ export function createHouseScene(host: HTMLDivElement, design: HouseDesign, view
   let shownDesign: HouseDesign | null = null
   let kind: keyof typeof LIMITS = 'outside'
   let orbit: Orbit = { ...LIMITS.outside.start }
+  const panOffset = new THREE.Vector3()
+  let viewDistance = 1
   let intro: { from: Orbit; start: number } | null = null
   let ambientUntil = 0
   let raf = 0
@@ -112,7 +114,8 @@ export function createHouseScene(host: HTMLDivElement, design: HouseDesign, view
     const framing = built.framing ? fitExterior(built.framing, o.yaw, o.pitch, vfov, hfov) : null
     const fit = framing?.distance ?? built.radius / Math.sin(Math.min(vfov, hfov) / 2)
     const dist = fit / o.zoom
-    const t = framing?.target ?? built.target
+    viewDistance = dist
+    const t = new THREE.Vector3().copy(framing?.target ?? built.target).add(panOffset)
     camera.position.set(
       t.x + Math.sin(o.yaw) * Math.cos(o.pitch) * dist,
       t.y + Math.sin(o.pitch) * dist,
@@ -179,6 +182,7 @@ export function createHouseScene(host: HTMLDivElement, design: HouseDesign, view
     Object.assign(sun.shadow.camera, { left: -r * 1.6, right: r * 1.6, top: r * 1.6, bottom: -r * 1.6, near: .5, far: r * 6 })
     sun.shadow.camera.updateProjectionMatrix()
     if (!sameView) {
+      panOffset.set(0, 0, 0)
       const start = { ...LIMITS[kind].start, yaw: built.yaw ?? LIMITS[kind].start.yaw }
       intro = reducedMotion ? null : { from: { yaw: start.yaw + .9, pitch: start.pitch + .12, zoom: start.zoom * .75 }, start: performance.now() }
       orbit = start
@@ -262,6 +266,13 @@ export function createHouseScene(host: HTMLDivElement, design: HouseDesign, view
     if (pointers.size >= 2) {
       const [a, b] = [...pointers.values()]
       const d = Math.hypot(a.x - b.x, a.y - b.y)
+      if (kind === 'outside') {
+        // がめんの よこ・たてに そって、2ほんの ゆびの まんなかに あわせて ずらす。
+        place(performance.now())
+        const scale = 2 * viewDistance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / Math.max(1, host.clientHeight)
+        panOffset.addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0), -dx * scale / 2)
+        panOffset.addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1), dy * scale / 2)
+      }
       if (pinch > 0 && d > 0) orbit = { ...orbit, zoom: clamp(orbit.zoom * (d / pinch), ZOOM[0], ZOOM[1]) }
       pinch = d
       wake()
