@@ -183,6 +183,53 @@ test('ドア・いぬを タップすると しらせ、ドラッグは まわ�
   scene.dispose()
 })
 
+test('2ほんゆびで そとを よこ・たてに ずらし、ピンチで ちかづける', () => {
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+  const { design } = designWithRooms()
+  const { host, callbacks, scene } = setup(design)
+  flush(performance.now())
+  const house = lastScene().getObjectByName('house')!
+  const before = screenOf(house)
+  const rotation = lastCamera().quaternion.clone()
+  pointer(host, 'pointerdown', 120, 200, 1)
+  pointer(host, 'pointerdown', 280, 200, 2)
+  pointer(host, 'pointermove', 160, 230, 1)
+  pointer(host, 'pointermove', 320, 230, 2)
+  flush(performance.now())
+  const after = screenOf(house)
+  expect(after.x - before.x).toBeGreaterThan(30)
+  expect(after.y - before.y).toBeGreaterThan(20)
+  expect(lastCamera().quaternion.angleTo(rotation)).toBeLessThan(1e-6)
+
+  // まんなかを うごかさずに ひろげると、むきは かわらず おおきく みえる。
+  const width = () => new THREE.Vector3(1, 0, 0).project(lastCamera()).distanceTo(new THREE.Vector3(-1, 0, 0).project(lastCamera()))
+  const initialWidth = width()
+  pointer(host, 'pointermove', 120, 230, 1)
+  pointer(host, 'pointermove', 360, 230, 2)
+  flush(performance.now())
+  expect(width()).toBeGreaterThan(initialWidth)
+  expect(lastCamera().quaternion.angleTo(rotation)).toBeLessThan(1e-6)
+  pointer(host, 'pointerup', 120, 230, 1)
+  pointer(host, 'pointerup', 360, 230, 2)
+  expect(callbacks.spot).not.toHaveBeenCalled()
+  const door = screenOf(lastScene().getObjectByName('door')!.children[0])
+  pointer(host, 'pointerdown', door.x, door.y)
+  pointer(host, 'pointerup', door.x, door.y)
+  expect(callbacks.spot).toHaveBeenLastCalledWith('door')
+  callbacks.spot.mockClear()
+
+  // キャンセルした あとも、1ほんゆびで まわせる。
+  pointer(host, 'pointerdown', 120, 200, 1)
+  pointer(host, 'pointerdown', 280, 200, 2)
+  pointer(host, 'pointercancel', 120, 200, 1)
+  pointer(host, 'pointermove', 300, 200, 2)
+  flush(performance.now())
+  expect(lastCamera().quaternion.angleTo(rotation)).toBeGreaterThan(.1)
+  pointer(host, 'pointerup', 300, 200, 2)
+  expect(callbacks.spot).not.toHaveBeenCalled()
+  scene.dispose()
+})
+
 test('へやに きりかえると まえの いえを すて、カメラに ちかい かべを ひくく する', () => {
   const { design, living, entrance } = designWithRooms()
   const { host, callbacks, scene } = setup(design)
@@ -278,6 +325,12 @@ test('そとで ズームして まわしても、へやに はいると いつ�
 
   const withYard = { ...design, exterior: { ...design.exterior, pool: 'rectangle' as const, extras: ['picnic', 'fountain'] as const } }
   const active = setup(withYard)
+  pointer(active.host, 'pointerdown', 120, 200, 1)
+  pointer(active.host, 'pointerdown', 280, 200, 2)
+  pointer(active.host, 'pointermove', 160, 230, 1)
+  pointer(active.host, 'pointermove', 320, 230, 2)
+  pointer(active.host, 'pointerup', 160, 230, 1)
+  pointer(active.host, 'pointerup', 320, 230, 2)
   active.scene.zoom(1)
   active.scene.turn(4)
   flush(performance.now())

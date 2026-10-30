@@ -65,7 +65,7 @@ export default function House3D({ design, view, label, onSpot, onStatus }: Props
         ref={host}
         className={styles.canvas3d}
         role="group"
-        aria-label={`${label}。ゆびで うごかすと まわるよ`}
+        aria-label={`${label}。ゆびで うごかすと まわるよ${view.kind === 'outside' ? '。2ほんゆびで ずらせるよ' : ''}`}
         tabIndex={0}
         onKeyDown={onKeyDown}
       />
