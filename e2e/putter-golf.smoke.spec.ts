@@ -84,7 +84,13 @@ test('コースを選ぶと景色が切り替わり、描画量が上限に収�
   expect(errors).toEqual([])
 })
 
-test('ひっぱって打ち、はらっぱの全4ホールを回ってスコアカードと再挑戦まで進める', async ({ page }) => {
+// 動き続ける3D画面のDOM snapshotの記録負荷が、全4ホール共通の180秒枠に積み重なる。
+// このケースだけsnapshotを省き、操作trace・ソース・各ホール/失敗時PNG・状態の診断は残す。
+const roundTest = test.extend({
+  trace: { mode: 'retain-on-failure', screenshots: false, snapshots: false, sources: true, attachments: false },
+})
+
+roundTest('ひっぱって打ち、はらっぱの全4ホールを回ってスコアカードと再挑戦まで進める', async ({ page }) => {
   test.setTimeout(180_000)
   const errors = capturePageErrors(page)
   watchShaderErrors(page, errors)
