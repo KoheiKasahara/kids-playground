@@ -122,6 +122,21 @@ it('アームの状態を画面と data 属性へ知らせる', async () => {
   expect(app.host.dataset.drawCalls).toBe('42')
 })
 
+it('100ms間隔でもアームが実時間の距離を進み、長い中断は100msまでに制限する', async () => {
+  const app = setup()
+  await waitFor(() => expect(app.status).toContain('ready'))
+  runFrames(1)
+  act(() => app.engine.move('x'))
+  runFrames(10)
+  // 横移動は0.3m/s。10 FPSでも1秒で0.3m進み、余分なスローモーションにならない。
+  expect(Number(app.host.dataset.clawX)).toBeCloseTo(HOME.x + 0.3, 2)
+  const world = mocks.createWorld.mock.results[0]!.value
+  world.step.mockClear()
+  runFrames(1, 1000)
+  // 復帰直後に1秒ぶんを一気に計算することは引き続き防ぐ。
+  expect(world.step.mock.calls.length).toBeLessThanOrEqual(12)
+})
+
 it('よこボタンでアームが動き出し、もう一度おすと止まる', async () => {
   const app = setup()
   await waitFor(() => expect(app.status).toContain('ready'))

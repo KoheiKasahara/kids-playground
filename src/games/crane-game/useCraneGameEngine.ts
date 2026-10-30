@@ -54,8 +54,10 @@ type Options = {
 }
 
 const STEP = 1 / 120
-/** 1フレームで進める物理の上限。タブ復帰などで一気に進めないようにする。 */
-const MAX_STEPS = 10
+/** タブ復帰などで一気に進めないよう、1フレームの経過時間は100msまでにする。 */
+const MAX_FRAME_TIME = 0.1
+/** 経過時間の上限を120Hzで消化する。10ステップでは低FPS時に時間の1/6を捨ててしまう。 */
+const MAX_STEPS = Math.ceil(MAX_FRAME_TIME / STEP)
 
 export function useCraneGameEngine(options: Options) {
   const [container, registerContainer] = useState<HTMLDivElement | null>(null)
@@ -150,7 +152,7 @@ export function useCraneGameEngine(options: Options) {
     function animate(now: number) {
       frame = requestAnimationFrame(animate)
       if (!scene || !world) return
-      const dt = previous ? Math.min((now - previous) / 1000, 0.1) : 0
+      const dt = previous ? Math.min((now - previous) / 1000, MAX_FRAME_TIME) : 0
       previous = now
       if (document.hidden) { accumulator = 0; return }
       accumulator += dt
