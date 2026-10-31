@@ -24,6 +24,15 @@ npm install
 npm ci
 ```
 
+PWAビルドの `@rollup/plugin-node-resolve` が使う `deepmerge` は、
+`package.json` の限定的な `overrides` で `@stackline/deepmerge@1.1.0` に置き換えています。
+元の最新版 `deepmerge@4.3.1` には [CVE-2026-93753](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)
+の修正版がなく、返り値のプロトタイプを汚染できるためです。
+互換版は `__proto__` を除外し、既存の設定マージAPIを維持します。
+上流で修正済みの依存に移行できたら、このoverrideの撤去を検討してください。
+`scripts/project-health/deepmerge-security.test.mjs` は実際にresolverが解決する実装に対し、
+汚染の回帰防止と設定マージの互換性を確認します。
+
 ## ローカルでの起動
 
 ```bash
