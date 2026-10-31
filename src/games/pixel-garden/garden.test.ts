@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createGarden, gardenHint, pickedCount, PLOT_COUNT, requestedPlot, tendPlot } from './garden'
+import { createGarden, gardenHint, pickedCount, PLOT_COUNT, rainOnGarden, requestedPlot, tendPlot } from './garden'
 
 describe('おはなばたけの進行', () => {
   test('道具で育ててお願いの順に摘む。元の状態は変えない', () => {
@@ -24,7 +24,7 @@ describe('おはなばたけの進行', () => {
     }
     expect(requestedPlot(garden)).toBeUndefined()
     expect(initial.plots.every((stage) => stage === 'soil')).toBe(true)
-    expect(createGarden(1)).toEqual({ round: 1, plots: initial.plots })
+    expect(createGarden(1)).toEqual({ round: 1, plots: initial.plots, rainUsed: false })
   })
 
   test('次の花束はお願いが変わり、どの周回も全ての花を摘める', () => {
@@ -45,5 +45,18 @@ describe('おはなばたけの進行', () => {
   test('範囲外や不正な花壇は進行しない', () => {
     const garden = createGarden()
     for (const index of [-1, PLOT_COUNT, NaN, Infinity, 0.5]) expect(tendPlot(garden, index, 'water')).toBe(garden)
+  })
+
+  test('雨は芽だけをまとめて育て、効果があるときに一度だけ使える', () => {
+    const initial = createGarden()
+    expect(rainOnGarden(initial)).toBe(initial)
+    const garden = { ...initial, plots: ['soil', 'sprout', 'bud', 'flower', 'picked', 'sprout'] as const }
+    const next = rainOnGarden(garden)
+    expect(next.plots).toEqual(['soil', 'bud', 'bud', 'flower', 'picked', 'bud'])
+    expect(garden.plots[1]).toBe('sprout')
+    expect(next.rainUsed).toBe(true)
+    const later = tendPlot(next, 0, 'water')
+    expect(rainOnGarden(later)).toBe(later)
+    expect(createGarden(1).rainUsed).toBe(false)
   })
 })

@@ -5,8 +5,9 @@ import { useGameIntroPlaying } from '../../components/gameIntroState'
 import { useSoundToggle } from '../../audio/useSoundToggle'
 import { primeAudio } from '../../audio/sound'
 import { vibrate } from '../../utils/haptics'
-import { ActionArt, BouquetArt, FlowerArt, GardenScenery, RabbitArt } from './GardenArt'
-import { createGarden, flowerName, gardenHint, pickedCount, PLOT_ACTION, PLOT_COUNT, requestedPlot, tendPlot, type GardenTool } from './garden'
+import { ActionArt, BouquetArt, FlowerArt, FriendArt, GardenScenery, RabbitArt } from './GardenArt'
+import { createGarden, flowerName, gardenHint, pickedCount, PLOT_ACTION, PLOT_COUNT, rainOnGarden, requestedPlot, tendPlot, type GardenTool } from './garden'
+import { earnFriend, GARDEN_FRIENDS, readFriends, saveFriends, toggleFriend, type GardenFriends } from './friends'
 import { playGardenSound, type GardenSound } from './sounds'
 import styles from './PixelGardenPlay.module.css'
 
@@ -15,8 +16,14 @@ export default function PixelGardenPlay() {
   const [tool, setTool] = useState<GardenTool>('water')
   const [feedback, setFeedback] = useState('')
   const [started, setStarted] = useState(false)
+  const [friends, setFriends] = useState(readFriends)
+  const [delivered, setDelivered] = useState(false)
+  const [giftMessage, setGiftMessage] = useState('')
+  const [persisted, setPersisted] = useState(true)
   const [sound, toggleSound] = useSoundToggle()
   const replayRef = useRef<HTMLButtonElement>(null)
+  const deliveryRef = useRef<HTMLButtonElement>(null)
+  const deliveryClaimed = useRef(false)
   const firstPlotRef = useRef<HTMLButtonElement>(null)
   const picked = pickedCount(garden)
   const complete = picked === PLOT_COUNT
@@ -24,9 +31,37 @@ export default function PixelGardenPlay() {
   useGameIntroPlaying(started)
 
   useEffect(() => {
-    if (complete) replayRef.current?.focus({ preventScroll: true })
+    if (complete) (delivered ? replayRef : deliveryRef).current?.focus({ preventScroll: true })
     else if (garden.round > 0) firstPlotRef.current?.focus({ preventScroll: true })
-  }, [complete, garden.round])
+  }, [complete, delivered, garden.round])
+
+  function updateFriends(next: GardenFriends) {
+    setFriends(next)
+    setPersisted(saveFriends(next))
+  }
+
+  function deliver() {
+    if (!complete || deliveryClaimed.current) return
+    deliveryClaimed.current = true
+    const next = earnFriend(friends)
+    setGiftMessage(next === friends ? 'みんな はなたばに おおよろこび！' : `${GARDEN_FRIENDS[friends.unlocked]}が あそびに きたよ！`)
+    updateFriends(next)
+    setDelivered(true)
+    primeAudio()
+    playGardenSound('complete')
+    vibrate('celebrate')
+  }
+
+  function rain() {
+    const next = rainOnGarden(garden)
+    if (next === garden) return
+    setGarden(next)
+    setStarted(true)
+    setFeedback('あめで めが そだったよ！ つぎは ☀')
+    primeAudio()
+    playGardenSound('water')
+    vibrate('success')
+  }
 
   function tend(index: number) {
     const next = tendPlot(garden, index, tool)
@@ -48,11 +83,15 @@ export default function PixelGardenPlay() {
   }
 
   function replay() {
+    if (!delivered) return
     primeAudio()
     playGardenSound('plant')
     setGarden(createGarden(garden.round + 1))
     setTool('water')
     setFeedback('')
+    setDelivered(false)
+    deliveryClaimed.current = false
+    setGiftMessage('')
   }
 
   const content = <div className={styles.page}>
@@ -68,9 +107,11 @@ export default function PixelGardenPlay() {
         <h1>ドットの おはなばたけ</h1>
         <GardenScenery />
         <div className={styles.rabbit}><RabbitArt /></div>
+        {friends.decorations.map((id) => <span key={id} className={styles.friend} data-friend={id}
+          role="img" aria-label={`にわの ${GARDEN_FRIENDS[id]}`}><FriendArt id={id} /></span>)}
       </div>
       <div className={styles.field}>
-        <p className={styles.hint} role="status">{complete ? 'はなたば できたね！' : feedback || gardenHint(garden)}</p>
+        <p className={styles.hint} role="status">{delivered ? giftMessage : complete ? 'はなたば できたね！' : feedback || gardenHint(garden)}</p>
         {request !== undefined && <>
           <div className={styles.request} role="img" aria-label={`うさぎさんの おねがい：${request + 1}ばんの ${flowerName(request, garden.round)}`}>
             <span>つぎは これ！<small>おなじ おはなを つんでね</small></span>
@@ -82,6 +123,11 @@ export default function PixelGardenPlay() {
               onClick={() => { setTool(value); setFeedback(''); primeAudio(); playGardenSound('plant') }}>
               {value === 'water' ? '💧 おみず' : '☀ おひさま'}
             </button>)}
+            <button className={styles.rain} type="button" onClick={rain}
+              disabled={garden.rainUsed || !garden.plots.includes('sprout')}>
+              {garden.rainUsed ? '☂ あめは おやすみ' : '☂ あめを よぶ'}
+              <small>{garden.rainUsed ? 'つぎの はなたばで またね' : 'めを まとめて そだてる・1かい'}</small>
+            </button>
           </div>
         </>}
         {!complete && <div className={styles.plots} role="group" aria-label="おはなばたけ">
@@ -113,10 +159,29 @@ export default function PixelGardenPlay() {
           <span className={styles.count}>{picked} <span>/ {PLOT_COUNT}</span></span>
         </div>}
         {complete && <div className={styles.finish}>
-          <p>うさぎさんに おはなの おくりもの</p>
-          <button ref={replayRef} className={styles.replay} type="button" onClick={replay}>もういちど <span aria-hidden="true">↻</span></button>
+          <p>{delivered ? 'ありがとう！ また そだてよう' : 'うさぎさんに おはなの おくりもの'}</p>
+          {delivered
+            ? <button key="replay" ref={replayRef} className={styles.replay} type="button" onClick={replay}>もういちど <span aria-hidden="true">↻</span></button>
+            : <button key="deliver" ref={deliveryRef} className={styles.replay} type="button" onClick={deliver}>はなたばを とどける</button>}
         </div>}
         {!complete && <p className={styles.caption}>たね → 💧 → ☀ → おねがいの おはな</p>}
+        <details className={styles.collection}>
+          <summary>にわの なかま {friends.unlocked} / {GARDEN_FRIENDS.length}</summary>
+          <p>{friends.unlocked < GARDEN_FRIENDS.length
+            ? `はなたばを とどけると ${GARDEN_FRIENDS[friends.unlocked]}が くるよ`
+            : 'みんな あつまったね！'}</p>
+          <div className={styles.friendChoices}>
+            {GARDEN_FRIENDS.map((name, id) => <button key={name} type="button"
+              disabled={id >= friends.unlocked} aria-pressed={friends.decorations.includes(id)}
+              aria-label={`${name}を かざる`} onClick={() => {
+                updateFriends(toggleFriend(friends, id)); primeAudio(); playGardenSound('pick')
+              }}>
+              {id < friends.unlocked ? <FriendArt id={id} /> : <span aria-hidden="true">？</span>}
+              <span>{name}</span><small>{id >= friends.unlocked ? `はなたば ${id + 1}こ` : friends.decorations.includes(id) ? '✓ かざりちゅう' : 'かざる'}</small>
+            </button>)}
+          </div>
+        </details>
+        {!persisted && <p className={styles.saveNotice}>きろくを ほぞんできなかったよ。この がめんでは あそべるよ。</p>}
       </div>
     </main>
   </div>

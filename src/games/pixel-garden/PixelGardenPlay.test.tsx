@@ -2,13 +2,14 @@ import { StrictMode } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import App from '../../app/App'
 import { isSoundEnabled } from '../../audio/sound'
 import { resetGameShelfCache } from '../../pages/gameShelfStore'
 import surfaceStyles from '../../components/GamePlaySurface.module.css'
 import PixelGardenPlay from './PixelGardenPlay'
 import { playGardenSound } from './sounds'
+import { FRIENDS_KEY } from './friends'
 
 vi.mock('./sounds', () => ({ playGardenSound: vi.fn() }))
 vi.mock('../../utils/haptics', async (importOriginal) => ({
@@ -16,12 +17,75 @@ vi.mock('../../utils/haptics', async (importOriginal) => ({
   vibrate: vi.fn(),
 }))
 
-afterEach(() => vi.clearAllMocks())
+beforeEach(() => localStorage.removeItem(FRIENDS_KEY))
+afterEach(() => vi.restoreAllMocks())
 
 const plots = () => within(screen.getByRole('group', { name: 'おはなばたけ' })).getAllByRole('button')
 const renderGame = () => render(<StrictMode><MemoryRouter><PixelGardenPlay /></MemoryRouter></StrictMode>)
+const finishWithRain = (round = 0) => {
+  for (const plot of plots()) fireEvent.click(plot)
+  fireEvent.click(screen.getByRole('button', { name: /あめを よぶ/ }))
+  fireEvent.click(screen.getByRole('button', { name: '☀ おひさま' }))
+  for (const plot of plots()) fireEvent.click(plot)
+  for (const index of [2, 5, 0, 4, 1, 3]) fireEvent.click(plots()[(index + round) % 6])
+}
 
 describe('PixelGardenPlay', () => {
+  test('雨を使う時機を選び、次の花束では再び使える', () => {
+    renderGame()
+    const rain = screen.getByRole('button', { name: /あめを よぶ/ })
+    expect(rain).toBeDisabled()
+    fireEvent.click(plots()[0])
+    fireEvent.click(plots()[1])
+    expect(rain).toBeEnabled()
+    fireEvent.click(rain)
+    expect(plots()[0]).toHaveAttribute('data-stage', 'bud')
+    expect(plots()[1]).toHaveAttribute('data-stage', 'bud')
+    expect(plots()[2]).toHaveAttribute('data-stage', 'soil')
+    expect(screen.getByRole('button', { name: /あめは おやすみ/ })).toBeDisabled()
+    fireEvent.click(plots()[2])
+    expect(screen.getByRole('button', { name: /あめは おやすみ/ })).toBeDisabled()
+  })
+
+  test('届けるたびに仲間が増え、飾り方を再入場後も復元する', () => {
+    const { unmount } = renderGame()
+    for (let round = 0; round < 4; round++) {
+      finishWithRain(round)
+      const delivery = screen.getByRole('button', { name: 'はなたばを とどける' })
+      fireEvent.click(delivery)
+      fireEvent.click(delivery)
+      expect(JSON.parse(localStorage.getItem(FRIENDS_KEY)!)).toMatchObject({ unlocked: Math.min(round + 1, 3) })
+      if (round === 3) expect(screen.getByRole('status')).toHaveTextContent('みんな はなたばに おおよろこび！')
+      fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
+      expect(screen.getByRole('button', { name: /あめを よぶ/ })).toBeDisabled()
+    }
+    fireEvent.click(screen.getByText('にわの なかま 3 / 3'))
+    fireEvent.click(screen.getByRole('button', { name: 'はちを かざる' }))
+    expect(screen.queryByRole('img', { name: 'にわの はち' })).not.toBeInTheDocument()
+    unmount()
+    renderGame()
+    expect(screen.getByRole('img', { name: 'にわの ちょうちょ' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'にわの ことり' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'にわの はち' })).not.toBeInTheDocument()
+    expect(plots().every((plot) => plot.dataset.stage === 'soil')).toBe(true)
+  })
+
+  test('保存できなくても受け取った仲間と次の花束で遊べる', () => {
+    renderGame()
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
+    finishWithRain()
+    fireEvent.click(screen.getByRole('button', { name: 'はなたばを とどける' }))
+    expect(screen.getByText(/きろくを ほぞんできなかったよ/)).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'にわの ちょうちょ' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'もういちど' }))
+    expect(plots()).toHaveLength(6)
+    write.mockRestore()
+    fireEvent.click(screen.getByText('にわの なかま 1 / 3'))
+    fireEvent.click(screen.getByRole('button', { name: 'ちょうちょを かざる' }))
+    expect(screen.queryByText(/きろくを ほぞんできなかったよ/)).not.toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem(FRIENDS_KEY)!)).toEqual({ unlocked: 1, decorations: [] })
+  })
+
   test('たねまき→水やり→開花→花つみ→花束→もういちどを通せる', () => {
     const { container } = renderGame()
     expect(container.querySelector(`.${surfaceStyles.surface}`)).not.toBeNull()
@@ -56,6 +120,11 @@ describe('PixelGardenPlay', () => {
     expect(container.querySelector(`.${surfaceStyles.surface}`)).toBeNull()
     expect(screen.getByLabelText('つんだ おはな 6 / 6')).toBeInTheDocument()
     expect(playGardenSound).toHaveBeenLastCalledWith('complete')
+    const delivery = screen.getByRole('button', { name: 'はなたばを とどける' })
+    expect(delivery).toHaveFocus()
+    fireEvent.click(delivery)
+    expect(screen.getByRole('status')).toHaveTextContent('ちょうちょが あそびに きたよ！')
+    expect(screen.getByRole('img', { name: 'にわの ちょうちょ' })).toBeInTheDocument()
     const replay = screen.getByRole('button', { name: 'もういちど' })
     expect(replay).toHaveFocus()
     fireEvent.click(replay)
