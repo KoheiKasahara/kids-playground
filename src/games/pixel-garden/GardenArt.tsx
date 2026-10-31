@@ -59,6 +59,17 @@ export function RabbitArt() {
   </svg>
 }
 
+export function FriendArt({ id }: { id: number }) {
+  const rows = [
+    ['.pp...pp.', 'pPPpkpPPp', 'pPPPkPPPp', '.pppkppp.', '..ppkpp..', '.pPPkPPp.', '..pp.pp..'],
+    ['..ww.ww..', '.wWWwWWw.', '..wwwww..', '.yykyky..', 'yYYkYkYk.', '.yykyky..', '...k.k...'],
+    ['....bbbb.', '...bBBkb.', '..bBBBBby', 'bbBBBBbb.', '.bBBBBb..', '..bbbb...', '...k.k...'],
+  ][id]
+  return <svg viewBox="0 0 12 12" aria-hidden="true" shapeRendering="crispEdges">
+    <Pixels rows={rows} x={1} y={2} colors={{ p: '#a85a88', P: '#f6abd0', k: '#4a4943', w: '#98bfc2', W: '#eafaff', y: '#b98a31', Y: '#ffe088', b: '#467f98', B: '#99d6e6' }} />
+  </svg>
+}
+
 export function BouquetArt({ round }: { round: number }) {
   return <svg viewBox="0 0 120 92" aria-hidden="true" shapeRendering="crispEdges">
     {[[22, 13], [46, 5], [70, 13], [32, 30], [56, 26], [75, 33]].map(([x, y], index) =>

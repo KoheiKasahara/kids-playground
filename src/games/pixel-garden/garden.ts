@@ -1,7 +1,7 @@
 export const PLOT_COUNT = 6
 
 export type PlotStage = 'soil' | 'sprout' | 'bud' | 'flower' | 'picked'
-export type Garden = { round: number; plots: readonly PlotStage[] }
+export type Garden = { round: number; plots: readonly PlotStage[]; rainUsed: boolean }
 export type GardenTool = 'water' | 'sun'
 export const FLOWER_NAMES = ['ももいろ チューリップ', 'きいろの おはな', 'むらさきの おはな', 'オレンジの チューリップ', 'ピンクの おはな', 'みずいろの おはな'] as const
 
@@ -28,7 +28,12 @@ const NEXT: Record<PlotStage, PlotStage> = {
 }
 
 export function createGarden(round = 0): Garden {
-  return { round, plots: Array.from({ length: PLOT_COUNT }, () => 'soil') }
+  return { round, plots: Array.from({ length: PLOT_COUNT }, () => 'soil'), rainUsed: false }
+}
+
+export function rainOnGarden(garden: Garden): Garden {
+  if (garden.rainUsed || !garden.plots.includes('sprout')) return garden
+  return { ...garden, rainUsed: true, plots: garden.plots.map((stage) => stage === 'sprout' ? 'bud' : stage) }
 }
 
 export function tendPlot(garden: Garden, index: number, tool: GardenTool): Garden {
