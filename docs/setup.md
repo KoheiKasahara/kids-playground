@@ -24,6 +24,22 @@ npm install
 npm ci
 ```
 
+PWAビルドの `@rollup/plugin-node-resolve` が使う `deepmerge` は、
+`package.json` の限定的な `overrides` で `@stackline/deepmerge@1.1.0` に置き換えています。
+元の最新版 `deepmerge@4.3.1` には [CVE-2026-93753](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)
+の修正版がなく、返り値のプロトタイプを汚染できるためです。
+互換版は `__proto__` を除外し、既存の設定マージAPIを維持します。
+上流で修正済みの依存に移行できたら、このoverrideの撤去を検討してください。
+`scripts/project-health/deepmerge-security.test.mjs` は実際にresolverが解決する実装に対し、
+汚染の回帰防止と設定マージの互換性を確認します。
+
+同じく `overrides` で `minimatch@11.0.3` と、Workboxが使う `glob@14.0.3` を固定しています。
+[minimatchのパターン増幅](https://github.com/advisories/GHSA-g3hv-75wg-m249)と
+[globの中断後の探索継続](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)を修正した公式版です。
+これらは上流の依存指定を越えるメジャー更新のため、撤去・更新時には全検証に加えて
+`scripts/project-health/glob-security.test.mjs` で探索の中断、パターン増幅の制限、
+古いFileListが利用する `minimatch.match` APIの互換性も確認してください。
+
 ## ローカルでの起動
 
 ```bash
