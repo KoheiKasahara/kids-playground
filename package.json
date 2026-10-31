@@ -72,6 +72,10 @@
   "overrides": {
     "@rollup/plugin-node-resolve": {
       "deepmerge": "npm:@stackline/deepmerge@1.1.0"
+    },
+    "minimatch": "11.0.3",
+    "workbox-build": {
+      "glob": "14.0.3"
     }
   }
 }
