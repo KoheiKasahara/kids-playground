@@ -72,5 +72,38 @@ for (const viewport of [{ width: 667, height: 375 }, { width: 844, height: 390 }
       await expect(page.getByTestId('puzzle-part')).toHaveCount(1)
       await expect(board).toBeInViewport({ ratio: 1 })
     })
+
+    test('ピンボールの全体表示が操作列の高さに縮まない [flag-pinball]', async ({ page }) => {
+      await page.goto('/games/flag-pinball')
+      for (const name of ['にほん', 'かんこく', 'ちゅうごく', 'あそぶ！']) {
+        await page.getByRole('button', { name, exact: true }).tap()
+      }
+      const board = page.getByTestId('pinball-board')
+      await expect(board).toBeInViewport({ ratio: 1 })
+      expect((await board.boundingBox())!.height).toBeGreaterThan(280)
+      await page.getByRole('button', { name: 'ばんめんを おおきく', exact: true }).tap()
+      await page.getByRole('button', { name: 'ばんめんを ぜんたいひょうじ', exact: true }).tap()
+      await expect(board).toBeInViewport({ ratio: 1 })
+      expect((await board.boundingBox())!.height).toBeGreaterThan(280)
+    })
+
+    test('ぼうけんの全体表示が操作列の高さに縮まない [flag-roll-adventure]', async ({ page }) => {
+      await page.goto('/games/flag-roll-adventure')
+      await page.getByRole('button', { name: 'にほん', exact: true }).tap()
+      await page.getByRole('button', { name: 'スタート！', exact: true }).tap()
+      const board = page.getByTestId('adventure-board')
+      await expect(board).toBeInViewport({ ratio: 1 })
+      expect((await board.boundingBox())!.height).toBeGreaterThan(280)
+    })
+
+    test('すいしゃの回転とやりなおしが重ならない [water-wheel-maze]', async ({ page }) => {
+      await page.goto('/games/water-wheel-maze')
+      await page.getByRole('button', { name: '1 はじめての みずみち', exact: true }).tap()
+      const right = page.getByRole('button', { name: 'みぎへ まわす', exact: true })
+      const reset = page.getByRole('button', { name: '↻ もういちど', exact: true })
+      await expect(right).toBeInViewport({ ratio: 1 })
+      await expect(reset).toBeInViewport({ ratio: 1 })
+      expect(boxesOverlap(await right.boundingBox(), await reset.boundingBox())).toBe(false)
+    })
   })
 }

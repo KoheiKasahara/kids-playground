@@ -68,3 +68,5 @@
   white-space: nowrap;
   border: 0;
 }
+
+.stageArea > [data-board-viewport] { position: absolute; inset: 0; height: auto; }

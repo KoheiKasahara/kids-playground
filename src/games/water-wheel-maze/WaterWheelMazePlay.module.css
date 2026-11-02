@@ -126,3 +126,8 @@
  .actions { grid-row: 4; }
  .goal .meter { width: 100%; min-height: 28px; }
 }
+
+@media (orientation: landscape), (min-width: 860px) {
+ .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: center; gap: 6px; }
+ .controls button { min-width: 0; font-size: 14px; }
+}

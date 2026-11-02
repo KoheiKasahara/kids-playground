@@ -150,7 +150,7 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
   return (
     <BoardViewport>
       <div ref={containerRef} className={styles.fit}>
-        <div className={styles.stage} style={{ width, height }}>
+        <div className={styles.stage} data-testid="pinball-board" style={{ width, height }}>
           <div
             className={`${styles.logical} ${theme.boardClassName}`}
             style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT, transform: `scale(${scale})` }}

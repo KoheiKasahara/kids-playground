@@ -151,7 +151,7 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
   return (
     <BoardViewport>
       <div ref={containerRef} className={styles.fit}>
-        <div className={styles.stage} style={{ width, height }}>
+        <div className={styles.stage} data-testid="adventure-board" style={{ width, height }}>
           <div
             className={styles.viewport}
             style={{ width: AREA_WIDTH, height: AREA_HEIGHT, transform: `scale(${scale})` }}
