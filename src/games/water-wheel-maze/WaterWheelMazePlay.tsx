@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import BoardViewport from '../../components/BoardViewport'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
@@ -50,25 +51,27 @@ function Board({ index, back, select, next, record, cleared }: {
           <b aria-hidden="true">🎡 {'⭐'.repeat(game.riders)}{'☆'.repeat(TOTAL_RIDERS - game.riders)}</b>
         </div>
       </div>
-      <section className={styles.board} aria-label="まるい めいろ">
-        <canvas ref={canvasRef} {...game.canvasProps} className={styles.canvas} tabIndex={0}
-          aria-label="まるい めいろ。ゆびで まわすと みずが おちるよ。キーボードは ひだり・みぎの やじるしで まわせるよ">
-          めいろを まわして、まんなかの みずを すいしゃへ おとそう。
-        </canvas>
-        {game.cleared && <div className={styles.overlay}>
-          <div className={styles.card}>
-            <p className={styles.sparkles} aria-hidden="true">✨ 🎡 ✨</p>
-            <h2>かんらんしゃが まわった！</h2>
-            <p>{game.maze.remaining === 0
-              ? 'みずを のこさず とどけた！ かんぺき！'
-              : `どうぶつ ${TOTAL_RIDERS}とう みんな のれたよ！`}</p>
-            <div className={styles.cardButtons}>
-              <button onClick={game.retry}>↻ もういちど</button>
-              <button autoFocus onClick={last ? select : next}>{last ? 'ステージを えらぶ' : 'つぎへ →'}</button>
+      <BoardViewport className={styles.boardViewport}>
+        <section className={styles.board} aria-label="まるい めいろ">
+          <canvas ref={canvasRef} {...game.canvasProps} className={styles.canvas} tabIndex={0}
+            aria-label="まるい めいろ。ゆびで まわすと みずが おちるよ。キーボードは ひだり・みぎの やじるしで まわせるよ">
+            めいろを まわして、まんなかの みずを すいしゃへ おとそう。
+          </canvas>
+          {game.cleared && <div className={styles.overlay}>
+            <div className={styles.card}>
+              <p className={styles.sparkles} aria-hidden="true">✨ 🎡 ✨</p>
+              <h2>かんらんしゃが まわった！</h2>
+              <p>{game.maze.remaining === 0
+                ? 'みずを のこさず とどけた！ かんぺき！'
+                : `どうぶつ ${TOTAL_RIDERS}とう みんな のれたよ！`}</p>
+              <div className={styles.cardButtons}>
+                <button onClick={game.retry}>↻ もういちど</button>
+                <button autoFocus onClick={last ? select : next}>{last ? 'ステージを えらぶ' : 'つぎへ →'}</button>
+              </div>
             </div>
-          </div>
-        </div>}
-      </section>
+          </div>}
+        </section>
+      </BoardViewport>
       <p className={styles.notice} role="status">
         {game.unavailable ? 'ばんめんを ひらけなかったよ。もういちど ひらいてね'
           : game.cleared ? ''

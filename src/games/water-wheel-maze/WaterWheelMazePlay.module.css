@@ -111,3 +111,18 @@
   .notice { grid-column: 1; grid-row: 1; }
   .controls { grid-row: 2; }
 }
+
+.boardViewport { min-height: 0; }
+@media (orientation: landscape), (min-width: 860px) {
+  .boardViewport { grid-column: 2; grid-row: 1 / -1; }
+  .goal { grid-column: 1; grid-row: 1; flex-direction: column; }
+  .board { flex: none; }
+}
+
+@media (orientation: landscape), (min-width: 860px) {
+ .workspace { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+ .notice { grid-row: 2; }
+ .controls { grid-row: 3; }
+ .actions { grid-row: 4; }
+ .goal .meter { width: 100%; min-height: 28px; }
+}

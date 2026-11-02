@@ -1382,3 +1382,44 @@
     font-size: 11px;
   }
 }
+
+.doneIntro, .doneExtras { display: contents; }
+@media (orientation: landscape) and (max-height: 560px) {
+ .page:has(.planLayout), .page:has(.doneLayout), .page:has(.outsideLayout) { height: 100dvh; min-height: 0; padding-block: 4px; gap: 4px; }
+ .page:has(.planLayout) .title, .page:has(.doneLayout) .title, .page:has(.outsideLayout) .title { font-size: 22px; }
+ .soundButton { height: 44px; flex-basis: 44px; }
+ .steps { max-width: none; }
+ .step { padding: 1px; font-size: 11px; }
+ .planLayout { flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) 260px; grid-template-rows: minmax(0, 1fr) auto; gap: 6px 12px; }
+ .planMain { grid-column: 1; grid-row: 1 / -1; overflow-y: auto; gap: 4px; }
+ .planLayout > .panel { grid-column: 2; grid-row: 1; height: 100%; overflow-y: auto; }
+ .planLayout > .footer { grid-column: 2; grid-row: 2; }
+ .planMain .board { width: min(100%, calc((100dvh - 180px) * var(--aspect, 1))); }
+ .planMain .message { margin: 0; padding: 3px; font-size: 12px; }
+ .doneLayout { flex: 1; min-height: 0; max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) 260px; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
+ .doneIntro, .doneExtras { grid-column: 2; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+ .doneIntro { grid-row: 1; }
+ .doneExtras { grid-row: 2; }
+ .stage3d, .doneLayout > .inside, .doneLayout > .frontWrap { grid-column: 1; grid-row: 1 / -1; height: 100%; min-height: 0; }
+ .doneTitle { font-size: 16px; margin: 0; }
+ .summary { font-size: 12px; padding: 2px 6px; }
+ .bubble { font-size: 12px; padding: 4px; }
+ .viewToggle { flex-wrap: wrap; justify-content: center; gap: 4px; }
+ .viewToggle .tab { min-height: 44px; padding: 4px; font-size: 13px; }
+ .doneExtras .btn { min-height: 44px; min-width: 0; font-size: 14px; padding: 5px; }
+ .doneButtons { flex-direction: column; width: 100%; }
+ .outsideLayout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 260px; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px 12px; }
+ .outsideLayout > .frontWrap { grid-column: 1; grid-row: 1 / -1; }
+ .outsideLayout .panel { grid-column: 2; grid-row: 2; height: 100%; overflow-y: auto; }
+ .outsideLayout .message, .outsideLayout .footer { grid-column: 2; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+ .doneLayout { align-items: stretch; }
+ .doneIntro, .doneExtras { height: 100%; max-height: 100%; }
+ .doneIntro > *, .doneExtras > * { flex-shrink: 0; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+ .page:has(.planLayout), .page:has(.doneLayout), .page:has(.outsideLayout) { padding-top: calc(4px + var(--safe-top)); padding-bottom: calc(4px + var(--safe-bottom)); }
+}

@@ -161,3 +161,34 @@
   .plant, .plot[data-stage='flower'] .plant, .collected, .bouquet, .friend { animation: none; }
   .plot:active:not([aria-disabled='true']) { transform: none; }
 }
+
+/* Smartphone landscape play area. */
+@media (orientation: landscape) and (max-height: 560px) {
+ .page { padding-bottom: 6px; }
+ .header { min-height: 48px; margin-bottom: 4px; }
+ .garden { max-width: 1000px; height: calc(100dvh - 70px - var(--safe-top) - var(--safe-bottom)); display: grid; grid-template-rows: 34px minmax(0, 1fr); }
+ .sky { height: 34px; }
+ .sky h1 { padding-top: 0; font-size: 20px; }
+ .sky > svg, .rabbit { display: none; }
+ .field { min-height: 0; overflow-y: auto; padding: 8px 12px; display: grid; grid-template-columns: 190px minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 6px 14px; }
+ .hint { grid-column: 1; grid-row: 1; margin: 0; font-size: 12px; min-height: 0; }
+ .request { grid-column: 1; grid-row: 2; margin: 0; font-size: 13px; }
+ .request > svg { height: 36px; width: 30px; }
+ .request small { margin: 0; }
+ .tools { grid-column: 1; grid-row: 3 / 5; margin: 0; gap: 6px; align-content: start; }
+ .tools button { font-size: 13px; }
+ .plots { grid-column: 2; grid-row: 1 / 4; align-content: center; gap: 12px; }
+ .plot { height: clamp(60px, calc((100dvh - 200px) / 2), 100px); }
+ .basket { grid-column: 2; grid-row: 4; margin: 0; padding: 0 8px; }
+ .flowers svg { height: 26px; }
+ .caption { display: none; }
+ .collection, .saveNotice { grid-column: 1 / -1; margin: 0; }
+ .bouquet, .finish { grid-column: 2; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+ .plot { height: clamp(52px, calc((100dvh - 238px) / 2), 90px); }
+ .plots { min-height: 0; align-self: start; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) { .sky .friend { width: 24px; height: 24px; bottom: 4px; } }

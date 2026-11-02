@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, type CSSProperties } from 'react'
+import BoardViewport from '../../components/BoardViewport'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import {
   AREA_HEIGHT,
@@ -148,105 +149,127 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
   })
 
   return (
-    <div ref={containerRef} className={styles.fit}>
-      <div className={styles.stage} style={{ width, height }}>
-        <div
-          className={styles.viewport}
-          style={{ width: AREA_WIDTH, height: AREA_HEIGHT, transform: `scale(${scale})` }}
-        >
+    <BoardViewport>
+      <div ref={containerRef} className={styles.fit}>
+        <div className={styles.stage} style={{ width, height }}>
           <div
-            ref={registerWorld}
-            className={styles.world}
-            style={{ width: WORLD_SIZE.width, height: WORLD_SIZE.height }}
+            className={styles.viewport}
+            style={{ width: AREA_WIDTH, height: AREA_HEIGHT, transform: `scale(${scale})` }}
           >
-            {AREAS.map((area) => (
-              <div
-                key={area.id}
-                className={[styles.area, styles[`theme${area.theme[0].toUpperCase()}${area.theme.slice(1)}`]].join(' ')}
-                style={{ left: area.origin.x, top: area.origin.y, width: AREA_WIDTH, height: AREA_HEIGHT }}
-              >
-                <AreaBackground theme={area.theme} />
+            <div
+              ref={registerWorld}
+              className={styles.world}
+              style={{ width: WORLD_SIZE.width, height: WORLD_SIZE.height }}
+            >
+              {AREAS.map((area) => (
+                <div
+                  key={area.id}
+                  className={[styles.area, styles[`theme${area.theme[0].toUpperCase()}${area.theme.slice(1)}`]].join(' ')}
+                  style={{ left: area.origin.x, top: area.origin.y, width: AREA_WIDTH, height: AREA_HEIGHT }}
+                >
+                  <AreaBackground theme={area.theme} />
 
-                <div className={styles.course} style={{ zIndex: ADVENTURE_LAYER_Z_INDEX.course }} aria-hidden="true">
-                  {(area.zones ?? []).map((zone) => {
-                    const key = gimmickElementKey(zone.kind, zone.id)
-                    if (zone.kind === 'cannon') {
+                  <div className={styles.course} style={{ zIndex: ADVENTURE_LAYER_Z_INDEX.course }} aria-hidden="true">
+                    {(area.zones ?? []).map((zone) => {
+                      const key = gimmickElementKey(zone.kind, zone.id)
+                      if (zone.kind === 'cannon') {
+                        return (
+                          <div
+                            key={zone.id}
+                            ref={(element) => {
+                              gimmickElementsRef.current.set(key, element)
+                            }}
+                            className={styles.cannon}
+                            data-gimmick-id={zone.id}
+                            style={{
+                              left: zone.x - zone.radius,
+                              top: zone.y - zone.radius,
+                              width: zone.radius * 2,
+                              height: zone.radius * 2,
+                              transform: `rotate(${zone.angle}rad)`,
+                            }}
+                          >
+                            <span
+                              className={styles.cannonBarrel}
+                              style={{ '--cannon-barrel-length': `${CANNON_MUZZLE_OFFSET + 18}px` } as CSSProperties}
+                            />
+                            <span className={styles.cannonMuzzle} />
+                            <span className={styles.cannonArrow}>➜</span>
+                          </div>
+                        )
+                      }
+                      if (zone.kind === 'boost') {
+                        return (
+                          <div
+                            key={zone.id}
+                            ref={(element) => {
+                              gimmickElementsRef.current.set(key, element)
+                            }}
+                            className={styles.boostLane}
+                            data-gimmick-id={zone.id}
+                            style={{
+                              left: zone.x - zone.width / 2,
+                              top: zone.y - zone.height / 2,
+                              width: zone.width,
+                              height: zone.height,
+                              transform: `rotate(${zone.angle}rad)`,
+                            }}
+                          >
+                            <span className={styles.boostArrows}>» » »</span>
+                          </div>
+                        )
+                      }
                       return (
                         <div
                           key={zone.id}
-                          ref={(element) => {
-                            gimmickElementsRef.current.set(key, element)
-                          }}
-                          className={styles.cannon}
-                          data-gimmick-id={zone.id}
-                          style={{
-                            left: zone.x - zone.radius,
-                            top: zone.y - zone.radius,
-                            width: zone.radius * 2,
-                            height: zone.radius * 2,
-                            transform: `rotate(${zone.angle}rad)`,
-                          }}
-                        >
-                          <span
-                            className={styles.cannonBarrel}
-                            style={{ '--cannon-barrel-length': `${CANNON_MUZZLE_OFFSET + 18}px` } as CSSProperties}
-                          />
-                          <span className={styles.cannonMuzzle} />
-                          <span className={styles.cannonArrow}>➜</span>
-                        </div>
-                      )
-                    }
-                    if (zone.kind === 'boost') {
-                      return (
-                        <div
-                          key={zone.id}
-                          ref={(element) => {
-                            gimmickElementsRef.current.set(key, element)
-                          }}
-                          className={styles.boostLane}
+                          className={styles.floatZone}
                           data-gimmick-id={zone.id}
                           style={{
                             left: zone.x - zone.width / 2,
                             top: zone.y - zone.height / 2,
                             width: zone.width,
                             height: zone.height,
-                            transform: `rotate(${zone.angle}rad)`,
                           }}
                         >
-                          <span className={styles.boostArrows}>» » »</span>
+                          <span className={styles.floatDots}>· · ·</span>
                         </div>
                       )
-                    }
-                    return (
-                      <div
-                        key={zone.id}
-                        className={styles.floatZone}
-                        data-gimmick-id={zone.id}
-                        style={{
-                          left: zone.x - zone.width / 2,
-                          top: zone.y - zone.height / 2,
-                          width: zone.width,
-                          height: zone.height,
-                        }}
-                      >
-                        <span className={styles.floatDots}>· · ·</span>
-                      </div>
-                    )
-                  })}
+                    })}
 
-                  {(area.toys ?? []).map((toy) => {
-                    const key = toyElementKey(area.id, toy.id)
-                    const gimmickKey = gimmickElementKey(toy.kind, toy.id)
-                    if (toy.kind === 'spinner') {
+                    {(area.toys ?? []).map((toy) => {
+                      const key = toyElementKey(area.id, toy.id)
+                      const gimmickKey = gimmickElementKey(toy.kind, toy.id)
+                      if (toy.kind === 'spinner') {
+                        return (
+                          <div
+                            key={toy.id}
+                            ref={(element) => {
+                              gimmickElementsRef.current.set(gimmickKey, element)
+                              // 既存の画面テストではToy未対応のHookモックも使うため、登録関数がない場合は描画だけ続ける。
+                              registerToy?.(key, element)
+                            }}
+                            className={[styles.toy, styles.toySpinner].join(' ')}
+                            data-toy-id={toy.id}
+                            data-toy-kind={toy.kind}
+                            style={{
+                              left: toy.x - toy.radius,
+                              top: toy.y - toy.radius,
+                              width: toy.radius * 2,
+                              height: toy.radius * 2,
+                            }}
+                          >
+                            <span className={styles.spinnerBlade} />
+                            <span className={styles.spinnerHub} />
+                          </div>
+                        )
+                      }
                       return (
                         <div
                           key={toy.id}
                           ref={(element) => {
                             gimmickElementsRef.current.set(gimmickKey, element)
-                            // 既存の画面テストではToy未対応のHookモックも使うため、登録関数がない場合は描画だけ続ける。
-                            registerToy?.(key, element)
                           }}
-                          className={[styles.toy, styles.toySpinner].join(' ')}
+                          className={[styles.toy, styles.toyLifter].join(' ')}
                           data-toy-id={toy.id}
                           data-toy-kind={toy.kind}
                           style={{
@@ -256,180 +279,160 @@ export default function AdventureStage({ flag, runId, onAreaEnter, onGoal }: Adv
                             height: toy.radius * 2,
                           }}
                         >
-                          <span className={styles.spinnerBlade} />
-                          <span className={styles.spinnerHub} />
+                          <span className={styles.lifterIcon} aria-hidden="true">
+                            {area.theme === 'forest' ? '🍄' : area.theme === 'river' ? '💦' : '☁️'}
+                          </span>
                         </div>
                       )
-                    }
-                    return (
-                      <div
-                        key={toy.id}
-                        ref={(element) => {
-                          gimmickElementsRef.current.set(gimmickKey, element)
-                        }}
-                        className={[styles.toy, styles.toyLifter].join(' ')}
-                        data-toy-id={toy.id}
-                        data-toy-kind={toy.kind}
-                        style={{
-                          left: toy.x - toy.radius,
-                          top: toy.y - toy.radius,
-                          width: toy.radius * 2,
-                          height: toy.radius * 2,
-                        }}
-                      >
-                        <span className={styles.lifterIcon} aria-hidden="true">
-                          {area.theme === 'forest' ? '🍄' : area.theme === 'river' ? '💦' : '☁️'}
-                        </span>
-                      </div>
-                    )
-                  })}
+                    })}
 
-                  {area.objects.map((object) => {
-                    if (object.kind === 'wall') {
-                      return (
-                        <div
-                          key={object.id}
-                          className={styles.wall}
-                          data-object-id={object.id}
-                          style={{
-                            left: object.x - object.width / 2,
-                            top: object.y - object.height / 2,
-                            width: object.width,
-                            height: object.height,
-                            transform: `rotate(${object.angle}rad)`,
-                          }}
-                        />
-                      )
-                    }
-                    if (object.kind === 'jump') {
-                      const key = gimmickElementKey(object.kind, object.id)
+                    {area.objects.map((object) => {
+                      if (object.kind === 'wall') {
+                        return (
+                          <div
+                            key={object.id}
+                            className={styles.wall}
+                            data-object-id={object.id}
+                            style={{
+                              left: object.x - object.width / 2,
+                              top: object.y - object.height / 2,
+                              width: object.width,
+                              height: object.height,
+                              transform: `rotate(${object.angle}rad)`,
+                            }}
+                          />
+                        )
+                      }
+                      if (object.kind === 'jump') {
+                        const key = gimmickElementKey(object.kind, object.id)
+                        return (
+                          <div
+                            key={object.id}
+                            ref={(element) => {
+                              gimmickElementsRef.current.set(key, element)
+                            }}
+                            className={styles.jumpPad}
+                            data-object-id={object.id}
+                            style={{
+                              left: object.x - object.width / 2,
+                              top: object.y - object.height / 2,
+                              width: object.width,
+                              height: object.height,
+                              transform: `rotate(${object.angle}rad)`,
+                            }}
+                          >
+                            <span
+                              className={styles.jumpArrow}
+                              style={{ transform: `rotate(${object.launchAngle - object.angle}rad)` }}
+                            >
+                              ↑
+                            </span>
+                          </div>
+                        )
+                      }
                       return (
                         <div
                           key={object.id}
                           ref={(element) => {
-                            gimmickElementsRef.current.set(key, element)
+                            pinElementsRef.current.set(object.id, element)
                           }}
-                          className={styles.jumpPad}
+                          className={styles.pin}
                           data-object-id={object.id}
                           style={{
-                            left: object.x - object.width / 2,
-                            top: object.y - object.height / 2,
-                            width: object.width,
-                            height: object.height,
-                            transform: `rotate(${object.angle}rad)`,
+                            left: object.x - object.radius,
+                            top: object.y - object.radius,
+                            width: object.radius * 2,
+                            height: object.radius * 2,
                           }}
-                        >
-                          <span
-                            className={styles.jumpArrow}
-                            style={{ transform: `rotate(${object.launchAngle - object.angle}rad)` }}
-                          >
-                            ↑
-                          </span>
-                        </div>
+                        />
                       )
-                    }
-                    return (
+                    })}
+
+                    {areaGroundRects(area).map((rect, index) => (
                       <div
-                        key={object.id}
-                        ref={(element) => {
-                          pinElementsRef.current.set(object.id, element)
-                        }}
-                        className={styles.pin}
-                        data-object-id={object.id}
-                        style={{
-                          left: object.x - object.radius,
-                          top: object.y - object.radius,
-                          width: object.radius * 2,
-                          height: object.radius * 2,
-                        }}
+                        key={`ground-${area.id}-${index}`}
+                        className={styles.portalFloor}
+                        style={rect}
                       />
-                    )
-                  })}
+                    ))}
 
-                  {areaGroundRects(area).map((rect, index) => (
-                    <div
-                      key={`ground-${area.id}-${index}`}
-                      className={styles.portalFloor}
-                      style={rect}
-                    />
-                  ))}
+                    {area.entries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className={[styles.portal, styles.entryPortal, portalKindClass[entry.kind]].join(' ')}
+                        data-portal-id={entry.id}
+                        data-portal-kind={entry.kind}
+                        style={{
+                          left: entry.x - EXIT_WIDTH / 2,
+                          top: entry.y - EXIT_SENSOR_HEIGHT / 2,
+                          width: EXIT_WIDTH,
+                          height: EXIT_SENSOR_HEIGHT,
+                        }}
+                      >
+                        <span className={styles.portalInner} />
+                      </div>
+                    ))}
 
-                  {area.entries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className={[styles.portal, styles.entryPortal, portalKindClass[entry.kind]].join(' ')}
-                      data-portal-id={entry.id}
-                      data-portal-kind={entry.kind}
-                      style={{
-                        left: entry.x - EXIT_WIDTH / 2,
-                        top: entry.y - EXIT_SENSOR_HEIGHT / 2,
-                        width: EXIT_WIDTH,
-                        height: EXIT_SENSOR_HEIGHT,
-                      }}
-                    >
-                      <span className={styles.portalInner} />
-                    </div>
-                  ))}
+                    {area.exits.map((exit) => (
+                      <div
+                        key={exit.id}
+                        className={[styles.portal, styles.exitPortal, portalKindClass[exit.kind]].join(' ')}
+                        data-portal-id={exit.id}
+                        data-portal-kind={exit.kind}
+                        style={{
+                          left: exit.x - exit.width / 2,
+                          top: exit.y - exit.height / 2,
+                          width: exit.width,
+                          height: exit.height,
+                        }}
+                      >
+                        <span className={styles.portalInner} />
+                      </div>
+                    ))}
 
-                  {area.exits.map((exit) => (
-                    <div
-                      key={exit.id}
-                      className={[styles.portal, styles.exitPortal, portalKindClass[exit.kind]].join(' ')}
-                      data-portal-id={exit.id}
-                      data-portal-kind={exit.kind}
-                      style={{
-                        left: exit.x - exit.width / 2,
-                        top: exit.y - exit.height / 2,
-                        width: exit.width,
-                        height: exit.height,
-                      }}
-                    >
-                      <span className={styles.portalInner} />
-                    </div>
-                  ))}
+                    {area.cup && (
+                      <div className={styles.cupBack} data-cup-id={area.cup.id} style={cupWellRect(area.cup)}>
+                        <span className={styles.cupOpening} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
 
-                  {area.cup && (
-                    <div className={styles.cupBack} data-cup-id={area.cup.id} style={cupWellRect(area.cup)}>
-                      <span className={styles.cupOpening} />
-                    </div>
-                  )}
+              <div
+                ref={registerBall}
+                className={styles.ballSlot}
+                style={{ zIndex: ADVENTURE_LAYER_Z_INDEX.ball }}
+                aria-hidden="true"
+              >
+                <div
+                  ref={registerBallVisual}
+                  className={styles.ballVisual}
+                  style={
+                    {
+                      '--exit-swallow-ms': `${EXIT_SWALLOW_MS}ms`,
+                      '--entry-emerge-ms': `${ENTRY_EMERGE_MS}ms`,
+                    } as CSSProperties
+                  }
+                >
+                  <FlagBall flag={flag} size={BALL_RADIUS * 2} />
                 </div>
               </div>
-            ))}
 
-            <div
-              ref={registerBall}
-              className={styles.ballSlot}
-              style={{ zIndex: ADVENTURE_LAYER_Z_INDEX.ball }}
-              aria-hidden="true"
-            >
-              <div
-                ref={registerBallVisual}
-                className={styles.ballVisual}
-                style={
-                  {
-                    '--exit-swallow-ms': `${EXIT_SWALLOW_MS}ms`,
-                    '--entry-emerge-ms': `${ENTRY_EMERGE_MS}ms`,
-                  } as CSSProperties
-                }
-              >
-                <FlagBall flag={flag} size={BALL_RADIUS * 2} />
-              </div>
+              {AREAS.map((area) => (
+                <AreaForeground
+                  key={area.id}
+                  theme={area.theme}
+                  entries={area.entries}
+                  exits={area.exits}
+                  cup={area.cup}
+                  style={{ left: area.origin.x, top: area.origin.y, width: AREA_WIDTH, height: AREA_HEIGHT }}
+                />
+              ))}
             </div>
-
-            {AREAS.map((area) => (
-              <AreaForeground
-                key={area.id}
-                theme={area.theme}
-                entries={area.entries}
-                exits={area.exits}
-                cup={area.cup}
-                style={{ left: area.origin.x, top: area.origin.y, width: AREA_WIDTH, height: AREA_HEIGHT }}
-              />
-            ))}
           </div>
         </div>
       </div>
-    </div>
+    </BoardViewport>
   )
 }

@@ -97,3 +97,14 @@
   /* 低い横画面では はこが高さいっぱいに映り「おべんとう できた！」が ふちに重なる。完成中は文字の下から描く。 */
   .stage:has(.celebration) .canvas { top: 72px; }
 }
+
+/* Smartphone landscape play area. */
+@media (orientation: landscape) and (max-height: 600px) {
+ .panel { display: grid; grid-template-rows: auto auto minmax(120px, 1fr) auto auto; overflow-y: auto; }
+ .panel .actions { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
+ .actions button { white-space: normal; font-size: 12px; }
+ .panel .foods { min-height: 120px; align-content: start; }
+ .foods button { flex: 1 0 28%; min-height: 54px; }
+ .placed { min-height: 48px; }
+ .cups button { min-height: 44px; }
+}

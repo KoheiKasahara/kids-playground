@@ -11,6 +11,7 @@ import {
 } from './boardLayout'
 import { getBoardConfig } from './boardConfigs'
 import { findPinballFlag } from './data/pinballFlags'
+import BoardViewport from '../../components/BoardViewport'
 import FlagBall from '../../components/flag-ball/FlagBall'
 import { useBoardScale } from './useBoardScale'
 import { usePinballEngine } from './usePinballEngine'
@@ -147,136 +148,138 @@ export default function PinballBoard({ flagIds, mode, runId, onBallScored, onFin
   })
 
   return (
-    <div ref={containerRef} className={styles.fit}>
-      <div className={styles.stage} style={{ width, height }}>
-        <div
-          className={`${styles.logical} ${theme.boardClassName}`}
-          style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT, transform: `scale(${scale})` }}
-        >
-          <div className={styles.background} aria-hidden="true" />
+    <BoardViewport>
+      <div ref={containerRef} className={styles.fit}>
+        <div className={styles.stage} style={{ width, height }}>
+          <div
+            className={`${styles.logical} ${theme.boardClassName}`}
+            style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT, transform: `scale(${scale})` }}
+          >
+            <div className={styles.background} aria-hidden="true" />
 
-          {theme.renderBackdrop ? (
-            <div className={styles.backdropLayer} aria-hidden="true">
-              {theme.renderBackdrop()}
-            </div>
-          ) : null}
+            {theme.renderBackdrop ? (
+              <div className={styles.backdropLayer} aria-hidden="true">
+                {theme.renderBackdrop()}
+              </div>
+            ) : null}
 
-          {walls.map((wall) => (
-            <div
-              key={wall.id}
-              aria-hidden="true"
-              className={wall.id.startsWith('wall-guide') ? styles.guideWall : styles.wall}
-              style={{
-                left: wall.x - wall.width / 2,
-                top: wall.y - wall.height / 2,
-                width: wall.width,
-                height: wall.height,
-                transform: `rotate(${wall.angle}rad)`,
-              }}
-            />
-          ))}
+            {walls.map((wall) => (
+              <div
+                key={wall.id}
+                aria-hidden="true"
+                className={wall.id.startsWith('wall-guide') ? styles.guideWall : styles.wall}
+                style={{
+                  left: wall.x - wall.width / 2,
+                  top: wall.y - wall.height / 2,
+                  width: wall.width,
+                  height: wall.height,
+                  transform: `rotate(${wall.angle}rad)`,
+                }}
+              />
+            ))}
 
-          {ZONE_DIVIDERS.map((divider) => (
-            <div
-              key={divider.id}
-              aria-hidden="true"
-              className={styles.divider}
-              style={{
-                left: divider.x - divider.width / 2,
-                top: divider.y - divider.height / 2,
-                width: divider.width,
-                height: divider.height,
-              }}
-            />
-          ))}
+            {ZONE_DIVIDERS.map((divider) => (
+              <div
+                key={divider.id}
+                aria-hidden="true"
+                className={styles.divider}
+                style={{
+                  left: divider.x - divider.width / 2,
+                  top: divider.y - divider.height / 2,
+                  width: divider.width,
+                  height: divider.height,
+                }}
+              />
+            ))}
 
-          {boardConfig.obstacles.map((obstacle) => (
-            <div
-              key={obstacle.id}
-              ref={(el) => {
-                obstacleElementsRef.current.set(obstacle.id, el)
-              }}
-              data-obstacle-id={obstacle.id}
-              aria-hidden="true"
-              className={obstacle.kind === 'bumper' ? styles.bumper : styles.peg}
-              style={{
-                left: obstacle.x - obstacle.radius,
-                top: obstacle.y - obstacle.radius,
-                width: obstacle.radius * 2,
-                height: obstacle.radius * 2,
-              }}
-            />
-          ))}
+            {boardConfig.obstacles.map((obstacle) => (
+              <div
+                key={obstacle.id}
+                ref={(el) => {
+                  obstacleElementsRef.current.set(obstacle.id, el)
+                }}
+                data-obstacle-id={obstacle.id}
+                aria-hidden="true"
+                className={obstacle.kind === 'bumper' ? styles.bumper : styles.peg}
+                style={{
+                  left: obstacle.x - obstacle.radius,
+                  top: obstacle.y - obstacle.radius,
+                  width: obstacle.radius * 2,
+                  height: obstacle.radius * 2,
+                }}
+              />
+            ))}
 
-          {SCORE_ZONES.map((zone) => (
-            <div
-              key={zone.id}
-              aria-hidden="true"
-              className={styles.zone}
-              data-score={zone.score}
-              style={{
-                left: zone.x,
-                top: ZONE_TOP,
-                width: zone.width,
-                height: BOARD_HEIGHT - ZONE_TOP,
-              }}
-            >
-              <span className={styles.zoneScore}>{zone.score}</span>
-            </div>
-          ))}
+            {SCORE_ZONES.map((zone) => (
+              <div
+                key={zone.id}
+                aria-hidden="true"
+                className={styles.zone}
+                data-score={zone.score}
+                style={{
+                  left: zone.x,
+                  top: ZONE_TOP,
+                  width: zone.width,
+                  height: BOARD_HEIGHT - ZONE_TOP,
+                }}
+              >
+                <span className={styles.zoneScore}>{zone.score}</span>
+              </div>
+            ))}
 
-          {pops.map((pop) => (
-            <div
-              key={pop.id}
-              aria-hidden="true"
-              className={styles.scorePop}
-              style={{ left: pop.x, width: pop.width, top: ZONE_TOP - SCORE_POP_OFFSET_Y }}
-            >
-              {pop.score}てん！
-            </div>
-          ))}
+            {pops.map((pop) => (
+              <div
+                key={pop.id}
+                aria-hidden="true"
+                className={styles.scorePop}
+                style={{ left: pop.x, width: pop.width, top: ZONE_TOP - SCORE_POP_OFFSET_Y }}
+              >
+                {pop.score}てん！
+              </div>
+            ))}
 
-          {/* おもちゃはボールより先に描き、国旗ボールを隠さないようにする。 */}
-          {boardConfig.toys.map((toy) => (
-            <PinballToy
-              key={toy.id}
-              toy={toy}
-              theme={theme}
-              registerToy={registerToy}
-              onActivate={(toyId) => {
-                if (toy.kind === 'spinner') {
-                  playPinballSpinnerSound()
-                } else if (toy.kind === 'jumppad') {
-                  playPinballJumppadSound()
-                } else if (toy.kind === 'seesaw') {
-                  playPinballSeesawSound()
-                } else {
-                  playPinballLauncherSound()
-                }
-                activateToy(toyId)
-              }}
-            />
-          ))}
+            {/* おもちゃはボールより先に描き、国旗ボールを隠さないようにする。 */}
+            {boardConfig.toys.map((toy) => (
+              <PinballToy scale={scale}
+                key={toy.id}
+                toy={toy}
+                theme={theme}
+                registerToy={registerToy}
+                onActivate={(toyId) => {
+                  if (toy.kind === 'spinner') {
+                    playPinballSpinnerSound()
+                  } else if (toy.kind === 'jumppad') {
+                    playPinballJumppadSound()
+                  } else if (toy.kind === 'seesaw') {
+                    playPinballSeesawSound()
+                  } else {
+                    playPinballLauncherSound()
+                  }
+                  activateToy(toyId)
+                }}
+              />
+            ))}
 
-          {/*
-            usePinballEngine は「.logical コンテナの原点(0,0)を基準にした
-            transform: translate(x, y)」をボール要素へ直接書き込む。FlagBall.module.css の
-            .ball は単体利用（選択画面など）でも成立するよう position: relative を既定にしており、
-            2つの CSS Modules ファイルにまたがって position を上書きすると結合順に依存し
-            確実ではない。そこで FlagBall 自体には触れず、絶対配置専用のラッパー div を
-            この盤面側だけに用意し、ref（registerBall）と position: absolute はラッパーが持つ。
-          */}
-          {flags.map((flag, ballIndex) => (
-            <div key={flag.id} ref={registerBall(ballIndex)} className={styles.ballSlot} aria-hidden="true">
-              <FlagBall flag={flag} size={BALL_RADIUS * 2} />
-            </div>
-          ))}
+            {/*
+              usePinballEngine は「.logical コンテナの原点(0,0)を基準にした
+              transform: translate(x, y)」をボール要素へ直接書き込む。FlagBall.module.css の
+              .ball は単体利用（選択画面など）でも成立するよう position: relative を既定にしており、
+              2つの CSS Modules ファイルにまたがって position を上書きすると結合順に依存し
+              確実ではない。そこで FlagBall 自体には触れず、絶対配置専用のラッパー div を
+              この盤面側だけに用意し、ref（registerBall）と position: absolute はラッパーが持つ。
+            */}
+            {flags.map((flag, ballIndex) => (
+              <div key={flag.id} ref={registerBall(ballIndex)} className={styles.ballSlot} aria-hidden="true">
+                <FlagBall flag={flag} size={BALL_RADIUS * 2} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div role="status" aria-live="polite" className={styles.announcement}>
+          {announcement}
         </div>
       </div>
-
-      <div role="status" aria-live="polite" className={styles.announcement}>
-        {announcement}
-      </div>
-    </div>
+    </BoardViewport>
   )
 }

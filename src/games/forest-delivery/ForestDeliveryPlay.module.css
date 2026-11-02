@@ -228,3 +228,17 @@
 @media (prefers-reduced-motion: reduce) {
   .talk, .talkBox, .talkNext { animation: none; }
 }
+
+/* Smartphone landscape play area. */
+@media (orientation: landscape) and (max-height: 560px) {
+ .page { padding-bottom: 4px; }
+ .header { min-height: 48px; }
+ .journey { padding-bottom: 4px; }
+ .playLayout { grid-template-columns: minmax(0, 1fr) 240px; gap: 12px; }
+ .mapFrame { width: min(100%, calc((100dvh - 98px) * 1.111)); overflow: visible; }
+ .mapSpot { min-width: 48px; min-height: 48px; }
+ .speech { left: calc(100% + 12px) !important; top: 0 !important; width: 240px; transform: none; font-size: 13px; z-index: 3; }
+ .speech::after { display: none; }
+ .controlPanel { padding-top: 110px; max-height: calc(100dvh - 100px); overflow-y: auto; }
+ .textButton { min-height: 44px; }
+}

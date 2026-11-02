@@ -1352,3 +1352,21 @@ canvas:focus-visible {
     animation: none;
   }
 }
+
+/* Smartphone landscape play area. */
+@media (orientation: landscape) {
+ .ranch .panel { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 6px; }
+ .ranch .lead { margin: 0; font-size: 12px; padding: 4px; }
+ .ranch .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+ .action { flex-direction: column; justify-content: center; padding: 4px 2px; gap: 3px; font-size: 15px; min-height: 64px; text-align: center; }
+ .action span { white-space: nowrap; }
+ .action small { display: none; }
+ .actionIcon { width: 24px; height: 24px; }
+ .monsterCard { padding: 6px; gap: 4px; }
+ .monsterCard .stats { gap: 3px 6px; }
+ .monsterCard .stat { font-size: 12px; gap: 3px; }
+ .nameIcon { width: 28px; height: 28px; }
+ .nameRow h2 { font-size: 18px; }
+ .stones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ .stoneButton { font-size: 14px; }
+}

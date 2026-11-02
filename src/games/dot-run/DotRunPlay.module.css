@@ -753,3 +753,8 @@ button.window:focus-visible {
     animation: none;
   }
 }
+
+/* Smartphone landscape play area. */
+@media (orientation: landscape) and (max-width: 760px) {
+ .track { top: calc(var(--safe-top) + 68px); width: min(56vw, 360px); }
+}
