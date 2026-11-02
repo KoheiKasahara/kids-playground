@@ -10,7 +10,7 @@ import styles from './PukupukaRescuePlay.module.css'
 // これによりビジュアルと当たり判定が同じ2D座標系のまま揃い、SVGの拡大縮小に追従する。
 // 見た目より広めに取る（幼児のタップは正確な位置に当たりにくいため）。
 
-const HIT_WIDTH = 18
+const HIT_WIDTH = 26
 const HIT_HEIGHT = 27
 
 type Props = {

@@ -5,6 +5,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import BoardViewport from '../../components/BoardViewport'
 import GameBackButton from '../../components/GameBackButton'
 import BlockPiece from './BlockPiece'
 import { BOARD_COLS, BOARD_ROWS, allBoardCells, cellKey, type BoardCell } from './board'
@@ -539,149 +540,151 @@ export default function FreeBlockPuzzle({ onBack }: Props) {
         </button>
       </header>
 
-      <div className={styles.boardArea}>
-        <div
-          className={`${styles.board} ${isComplete ? styles.boardComplete : ''}`}
-          style={{ '--board-cols': BOARD_COLS, '--board-rows': BOARD_ROWS } as CSSProperties}
-        >
-          {allBoardCells().map((cell) => {
-            const key = cellKey(cell)
-            const owner = owners.get(key)
-            const isSelected = owner !== undefined && owner.id === state.selectedPlacedBlockId
-            const content = owner ? blockShape(owner.shapeId).label : 'あき'
-            const label = `よこ${cell.col + 1} たて${cell.row + 1} ${content}${
-              isSelected ? ' せんたくちゅう' : ''
-            }`
-            return (
-              <button
-                key={key}
-                type="button"
-                className={styles.cell}
-                style={{ gridColumn: cell.col + 1, gridRow: cell.row + 1 }}
-                aria-label={label}
-                onClick={() => handleTapCell(cell)}
-                onPointerDown={(event) => handleCellPointerDown(cell, event)}
-              />
-            )
-          })}
-
-          {/* 置いたブロックはマス目の上に重ねて描く。タップは下のマスのボタンが受ける。
-              位置は盤面に対する割合(%)で決める（#483）。回転で盤面外へはみ出た
-              まだ確定していないパーツも、CSS Gridの行番号に頼らずそのまま描ける。 */}
+      <BoardViewport className={styles.boardViewport}>
+        <div className={styles.boardArea}>
           <div
-            className={styles.blockLayer}
-            aria-hidden="true"
-            ref={blockLayerRef}
-            data-testid="block-puzzle-block-layer"
+            className={`${styles.board} ${isComplete ? styles.boardComplete : ''}`}
+            style={{ '--board-cols': BOARD_COLS, '--board-rows': BOARD_ROWS } as CSSProperties}
           >
-            {state.placedBlocks.map((block) => {
-              const isSelected = block.id === state.selectedPlacedBlockId
-              // #510: ドラッグ中も元の位置（originAnchor ではなく、書き換えていない
-              // block.anchor そのもの）に薄く残し、着地候補は別の重ね（dropPreview）で見せる。
-              // こうすることで「元のパーツ位置」と「いまの着地候補」を視覚的に区別できる。
-              const isDraggingSource =
-                dragPreview !== null &&
-                dragPreview.kind === 'move' &&
-                dragPreview.moved &&
-                dragPreview.blockId === block.id
-              const cells = placedBlockCells(block)
-              const bounds = cellBounds(cells)
-              const rect = cellBoundsPercent(bounds, BOARD_COLS, BOARD_ROWS)
-              const unconfirmed = isSelected && !isDraggingSource && !isSelectedConfirmed
+            {allBoardCells().map((cell) => {
+              const key = cellKey(cell)
+              const owner = owners.get(key)
+              const isSelected = owner !== undefined && owner.id === state.selectedPlacedBlockId
+              const content = owner ? blockShape(owner.shapeId).label : 'あき'
+              const label = `よこ${cell.col + 1} たて${cell.row + 1} ${content}${
+                isSelected ? ' せんたくちゅう' : ''
+              }`
               return (
-                <BlockPiece
-                  key={block.id}
-                  shape={blockShape(block.shapeId)}
-                  cells={cells}
-                  selected={isSelected && !isDraggingSource}
-                  unconfirmed={unconfirmed}
-                  dragging={isDraggingSource}
-                  className={`${styles.placedBlock} ${isSelected ? styles.selectedPlacedBlock : ''} ${
-                    isDraggingSource ? styles.draggingPlacedBlock : ''
-                  }`}
-                  style={{
-                    left: `${rect.leftPercent}%`,
-                    top: `${rect.topPercent}%`,
-                    width: `${rect.widthPercent}%`,
-                    height: `${rect.heightPercent}%`,
-                  }}
+                <button
+                  key={key}
+                  type="button"
+                  className={styles.cell}
+                  style={{ gridColumn: cell.col + 1, gridRow: cell.row + 1 }}
+                  aria-label={label}
+                  onClick={() => handleTapCell(cell)}
+                  onPointerDown={(event) => handleCellPointerDown(cell, event)}
                 />
               )
             })}
 
-            {/* ドラッグ中の着地プレビュー（#510）。配置可能なら通常色の半透明、
-                配置不可なら赤系の警告色にするが、盤面外・重なりで置けない場合も
-                cells 自体は消さず、形なりのまま見せ続ける。 */}
-            {dropPreview
-              ? (() => {
-                  const bounds = cellBounds(dropPreview.cells)
-                  const rect = cellBoundsPercent(bounds, BOARD_COLS, BOARD_ROWS)
-                  return (
-                    <BlockPiece
-                      shape={blockShape(dropPreview.shapeId)}
-                      cells={dropPreview.cells}
-                      tone={dropPreview.valid ? 'valid' : 'invalid'}
-                      dataTestId="block-puzzle-drop-preview"
-                      className={styles.dropPreview}
-                      style={{
-                        left: `${rect.leftPercent}%`,
-                        top: `${rect.topPercent}%`,
-                        width: `${rect.widthPercent}%`,
-                        height: `${rect.heightPercent}%`,
-                      }}
-                    />
-                  )
-                })()
-              : null}
+            {/* 置いたブロックはマス目の上に重ねて描く。タップは下のマスのボタンが受ける。
+                位置は盤面に対する割合(%)で決める（#483）。回転で盤面外へはみ出た
+                まだ確定していないパーツも、CSS Gridの行番号に頼らずそのまま描ける。 */}
+            <div
+              className={styles.blockLayer}
+              aria-hidden="true"
+              ref={blockLayerRef}
+              data-testid="block-puzzle-block-layer"
+            >
+              {state.placedBlocks.map((block) => {
+                const isSelected = block.id === state.selectedPlacedBlockId
+                // #510: ドラッグ中も元の位置（originAnchor ではなく、書き換えていない
+                // block.anchor そのもの）に薄く残し、着地候補は別の重ね（dropPreview）で見せる。
+                // こうすることで「元のパーツ位置」と「いまの着地候補」を視覚的に区別できる。
+                const isDraggingSource =
+                  dragPreview !== null &&
+                  dragPreview.kind === 'move' &&
+                  dragPreview.moved &&
+                  dragPreview.blockId === block.id
+                const cells = placedBlockCells(block)
+                const bounds = cellBounds(cells)
+                const rect = cellBoundsPercent(bounds, BOARD_COLS, BOARD_ROWS)
+                const unconfirmed = isSelected && !isDraggingSource && !isSelectedConfirmed
+                return (
+                  <BlockPiece
+                    key={block.id}
+                    shape={blockShape(block.shapeId)}
+                    cells={cells}
+                    selected={isSelected && !isDraggingSource}
+                    unconfirmed={unconfirmed}
+                    dragging={isDraggingSource}
+                    className={`${styles.placedBlock} ${isSelected ? styles.selectedPlacedBlock : ''} ${
+                      isDraggingSource ? styles.draggingPlacedBlock : ''
+                    }`}
+                    style={{
+                      left: `${rect.leftPercent}%`,
+                      top: `${rect.topPercent}%`,
+                      width: `${rect.widthPercent}%`,
+                      height: `${rect.heightPercent}%`,
+                    }}
+                  />
+                )
+              })}
 
-            {/* 置けなかった・動かせなかったマスの赤枠。ブロックより後ろに置くと重なりのときに
-                隠れてしまうため、同じレイヤーのいちばん上に描く。 */}
-            {invalidCell ? (
-              <span
-                className={styles.invalidCell}
-                style={{
-                  left: `${(invalidCell.cell.col / BOARD_COLS) * 100}%`,
-                  top: `${(invalidCell.cell.row / BOARD_ROWS) * 100}%`,
-                  width: `${(1 / BOARD_COLS) * 100}%`,
-                  height: `${(1 / BOARD_ROWS) * 100}%`,
-                }}
-              />
+              {/* ドラッグ中の着地プレビュー（#510）。配置可能なら通常色の半透明、
+                  配置不可なら赤系の警告色にするが、盤面外・重なりで置けない場合も
+                  cells 自体は消さず、形なりのまま見せ続ける。 */}
+              {dropPreview
+                ? (() => {
+                    const bounds = cellBounds(dropPreview.cells)
+                    const rect = cellBoundsPercent(bounds, BOARD_COLS, BOARD_ROWS)
+                    return (
+                      <BlockPiece
+                        shape={blockShape(dropPreview.shapeId)}
+                        cells={dropPreview.cells}
+                        tone={dropPreview.valid ? 'valid' : 'invalid'}
+                        dataTestId="block-puzzle-drop-preview"
+                        className={styles.dropPreview}
+                        style={{
+                          left: `${rect.leftPercent}%`,
+                          top: `${rect.topPercent}%`,
+                          width: `${rect.widthPercent}%`,
+                          height: `${rect.heightPercent}%`,
+                        }}
+                      />
+                    )
+                  })()
+                : null}
+
+              {/* 置けなかった・動かせなかったマスの赤枠。ブロックより後ろに置くと重なりのときに
+                  隠れてしまうため、同じレイヤーのいちばん上に描く。 */}
+              {invalidCell ? (
+                <span
+                  className={styles.invalidCell}
+                  style={{
+                    left: `${(invalidCell.cell.col / BOARD_COLS) * 100}%`,
+                    top: `${(invalidCell.cell.row / BOARD_ROWS) * 100}%`,
+                    width: `${(1 / BOARD_COLS) * 100}%`,
+                    height: `${(1 / BOARD_ROWS) * 100}%`,
+                  }}
+                />
+              ) : null}
+            </div>
+
+            {/* 完成演出。盤面を隠さない薄いキラキラ＋盤面下のバナーだけを重ね、
+                盤面そのものはそのまま見えるようにする（過度に長い操作不能時間を作らない）。 */}
+            {isComplete ? (
+              <div className={styles.celebration}>
+                <div className={styles.celebrationSparkles} aria-hidden="true" key={celebrationSeq}>
+                  {CELEBRATION_SPARKLES.map((sparkle) => (
+                    <span
+                      key={`${sparkle.left}-${sparkle.top}`}
+                      className={styles.sparkle}
+                      style={{
+                        left: `${sparkle.left}%`,
+                        top: `${sparkle.top}%`,
+                        animationDelay: `${sparkle.delayMs}ms`,
+                        fontSize: `${sparkle.scale * 26}px`,
+                      }}
+                    >
+                      ✨
+                    </span>
+                  ))}
+                </div>
+                <div className={styles.celebrationBanner} role="status" aria-live="polite">
+                  <p className={styles.celebrationText}>
+                    <span aria-hidden="true">🎉</span> できた！
+                  </p>
+                  <button type="button" className={styles.againButton} onClick={handleRestart}>
+                    <span aria-hidden="true">🔁</span> もういっかい
+                  </button>
+                </div>
+              </div>
             ) : null}
           </div>
-
-          {/* 完成演出。盤面を隠さない薄いキラキラ＋盤面下のバナーだけを重ね、
-              盤面そのものはそのまま見えるようにする（過度に長い操作不能時間を作らない）。 */}
-          {isComplete ? (
-            <div className={styles.celebration}>
-              <div className={styles.celebrationSparkles} aria-hidden="true" key={celebrationSeq}>
-                {CELEBRATION_SPARKLES.map((sparkle) => (
-                  <span
-                    key={`${sparkle.left}-${sparkle.top}`}
-                    className={styles.sparkle}
-                    style={{
-                      left: `${sparkle.left}%`,
-                      top: `${sparkle.top}%`,
-                      animationDelay: `${sparkle.delayMs}ms`,
-                      fontSize: `${sparkle.scale * 26}px`,
-                    }}
-                  >
-                    ✨
-                  </span>
-                ))}
-              </div>
-              <div className={styles.celebrationBanner} role="status" aria-live="polite">
-                <p className={styles.celebrationText}>
-                  <span aria-hidden="true">🎉</span> できた！
-                </p>
-                <button type="button" className={styles.againButton} onClick={handleRestart}>
-                  <span aria-hidden="true">🔁</span> もういっかい
-                </button>
-              </div>
-            </div>
-          ) : null}
         </div>
-      </div>
 
+      </BoardViewport>
       <div className={styles.controls} role="group" aria-label="まわす・けす">
         <div
           className={`${styles.controlsPreview} ${

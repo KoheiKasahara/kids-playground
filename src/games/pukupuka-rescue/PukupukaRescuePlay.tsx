@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import BoardViewport from '../../components/BoardViewport'
 import GameBackButton from '../../components/GameBackButton'
 import PukupukaStage from './PukupukaStage'
 import { CharacterDefs, FriendIcon } from './PukupukaCharacters'
@@ -346,63 +347,65 @@ export default function PukupukaRescuePlay() {
         {cleared ? 'ゴール！ みんなを たすけたよ' : `${stage.name}：${stage.hint}`}
       </p>
 
-      <div className={styles.stageArea}>
-        <div className={styles.rescueStatus} role="status" aria-label={`なかま ${gameState.rescuedIds.length} / ${friendIds.length} たすけた`}>
-          {friendIds.map((friendId) => {
-            const kind = stage.floaters.find((floater) => floater.id === friendId)?.kind ?? 'chick'
-            const saved = gameState.rescuedIds.includes(friendId)
-            return (
-              <span key={friendId} className={`${styles.friendChip} ${saved ? styles.rescuedFriend : ''}`} data-saved={saved}>
-                <FriendIcon kind={kind} />
-                {saved ? <span className={styles.friendCheck} aria-hidden="true">✓</span> : null}
-              </span>
-            )
-          })}
-          <span className={styles.starScore} aria-label={`ほし ${gameState.collectedStarIds.length} / ${stage.stars?.length ?? 0}`}>
-            {'★'.repeat(gameState.collectedStarIds.length)}{'☆'.repeat((stage.stars?.length ?? 0) - gameState.collectedStarIds.length)}
-          </span>
-        </div>
-        {toast && !cleared ? <div key={toast.id} className={styles.toast} aria-hidden="true">{toast.text}</div> : null}
-        <PukupukaStage
-          stage={stage}
-          state={gameState}
-          onWave={handleWave}
-          faucetActive={faucetOn}
-          faucetDisabled={cleared}
-          onFaucetHoldStart={startFaucetHold}
-          onFaucetHoldEnd={stopFaucetHold}
-          onFaucetTap={tapFaucet}
-          drainOpen={gameState.drainOpen}
-          drainDisabled={cleared}
-          onDrainToggle={handleDrainToggle}
-          gateOpen={gameState.gateOpen}
-          gateDisabled={cleared}
-          onGateToggle={handleGateToggle}
-          boardFlowDirection={gameState.boardFlowDirection}
-          boardDisabled={cleared}
-          onBoardToggle={handleBoardToggle}
-          onWhaleTap={handleWhale}
-        />
-        {!cleared ? <div className={styles.waveButtons}>
-          <button type="button" onClick={() => nudge(-1)} aria-label="ひだりへ なみ">🌊 ←</button>
-          <button type="button" onClick={() => nudge(1)} aria-label="みぎへ なみ">→ 🌊</button>
-        </div> : null}
-        {cleared ? (
-          <div className={styles.clearBanner}>
-            <span className={styles.clearEmoji} aria-hidden="true">🎉</span>
-            <span className={styles.clearText}>ゴール！</span>
+      <BoardViewport className={styles.stageViewport}>
+        <div className={styles.stageArea}>
+          <div className={styles.rescueStatus} role="status" aria-label={`なかま ${gameState.rescuedIds.length} / ${friendIds.length} たすけた`}>
+            {friendIds.map((friendId) => {
+              const kind = stage.floaters.find((floater) => floater.id === friendId)?.kind ?? 'chick'
+              const saved = gameState.rescuedIds.includes(friendId)
+              return (
+                <span key={friendId} className={`${styles.friendChip} ${saved ? styles.rescuedFriend : ''}`} data-saved={saved}>
+                  <FriendIcon kind={kind} />
+                  {saved ? <span className={styles.friendCheck} aria-hidden="true">✓</span> : null}
+                </span>
+              )
+            })}
+            <span className={styles.starScore} aria-label={`ほし ${gameState.collectedStarIds.length} / ${stage.stars?.length ?? 0}`}>
+              {'★'.repeat(gameState.collectedStarIds.length)}{'☆'.repeat((stage.stars?.length ?? 0) - gameState.collectedStarIds.length)}
+            </span>
           </div>
-        ) : null}
-        <div className={`${styles.feedbackBubble} ${cleared ? styles.feedbackCleared : ''}`} aria-live="polite">
-          {cleared ? 'やったー！' : feedback}
-        </div>
-        {cleared ? (
-          <div className={styles.celebration} aria-hidden="true">
-            <span>★</span><span>●</span><span>★</span><span>●</span><span>★</span>
+          {toast && !cleared ? <div key={toast.id} className={styles.toast} aria-hidden="true">{toast.text}</div> : null}
+          <PukupukaStage
+            stage={stage}
+            state={gameState}
+            onWave={handleWave}
+            faucetActive={faucetOn}
+            faucetDisabled={cleared}
+            onFaucetHoldStart={startFaucetHold}
+            onFaucetHoldEnd={stopFaucetHold}
+            onFaucetTap={tapFaucet}
+            drainOpen={gameState.drainOpen}
+            drainDisabled={cleared}
+            onDrainToggle={handleDrainToggle}
+            gateOpen={gameState.gateOpen}
+            gateDisabled={cleared}
+            onGateToggle={handleGateToggle}
+            boardFlowDirection={gameState.boardFlowDirection}
+            boardDisabled={cleared}
+            onBoardToggle={handleBoardToggle}
+            onWhaleTap={handleWhale}
+          />
+          {!cleared ? <div className={styles.waveButtons}>
+            <button type="button" onClick={() => nudge(-1)} aria-label="ひだりへ なみ">🌊 ←</button>
+            <button type="button" onClick={() => nudge(1)} aria-label="みぎへ なみ">→ 🌊</button>
+          </div> : null}
+          {cleared ? (
+            <div className={styles.clearBanner}>
+              <span className={styles.clearEmoji} aria-hidden="true">🎉</span>
+              <span className={styles.clearText}>ゴール！</span>
+            </div>
+          ) : null}
+          <div className={`${styles.feedbackBubble} ${cleared ? styles.feedbackCleared : ''}`} aria-live="polite">
+            {cleared ? 'やったー！' : feedback}
           </div>
-        ) : null}
-      </div>
+          {cleared ? (
+            <div className={styles.celebration} aria-hidden="true">
+              <span>★</span><span>●</span><span>★</span><span>●</span><span>★</span>
+            </div>
+          ) : null}
+        </div>
 
+      </BoardViewport>
       {cleared ? <div className={styles.finishActions}>
         <button type="button" className={styles.nextStage} onClick={handleNextStage}>
           {isLastStage ? 'ステージをえらぶ' : 'つぎのステージ'}

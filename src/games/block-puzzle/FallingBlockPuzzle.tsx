@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import BoardViewport from '../../components/BoardViewport'
 import GameBackButton from '../../components/GameBackButton'
 import BlockPiece from './BlockPiece'
 import type { BoardCell } from './board'
@@ -337,101 +338,103 @@ export default function FallingBlockPuzzle({ onBack }: Props) {
         </p>
       </div>
 
-      <div className={styles.boardArea}>
-        <div
-          className={`${styles.board} ${clearNotice > 0 ? styles.boardCleared : ''}`}
-          style={{ '--board-cols': FALLING_COLS, '--board-rows': FALLING_ROWS } as CSSProperties}
-        >
-          <div className={styles.cellGrid} aria-hidden="true">
-            {Array.from({ length: FALLING_COLS * FALLING_ROWS }, (_, index) => (
-              <span key={index} className={styles.cell} />
-            ))}
-          </div>
-
-          <div className={styles.blockLayer} aria-hidden="true" data-testid="falling-block-layer">
-            {settledGroups(state.grid).map((group) => (
-              <BoardPiece
-                key={`settled-${group.cells[0].col},${group.cells[0].row}`}
-                shapeId={group.shapeId}
-                cells={group.cells}
-                testId="falling-settled"
-              />
-            ))}
-
-            {/* 着地予定の うすい ブロック。どこへ落ちるかを、おとす前に見せる。 */}
-            {ghostCells.length > 0 && state.piece ? (
-              <BoardPiece
-                shapeId={state.piece.shapeId}
-                cells={ghostCells}
-                tone="valid"
-                testId="falling-ghost"
-                className={styles.ghost}
-              />
-            ) : null}
-
-            {/* 落ちているブロック。ブロックが変わるたびに作り直して、
-                前のブロックの位置から動いてくるアニメーションにならないようにする。 */}
-            {state.piece ? (
-              <BoardPiece
-                key={`piece-${state.droppedPieces}`}
-                shapeId={state.piece.shapeId}
-                cells={pieceCells}
-                testId="falling-piece"
-                className={styles.fallingPiece}
-              />
-            ) : null}
-          </div>
-
-          {/* 置きたい場所をえらぶ列。1列まるごとが押せる大きさなので、
-              小さな指でも「ここ」と指しやすい。読み上げでは、盤面を見なくても
-              どれだけ積まれているかが分かるように、その列のブロックの数も伝える。 */}
-          <div className={styles.columnLayer} role="group" aria-label="おきたい ばしょを えらぶ">
-            {Array.from({ length: FALLING_COLS }, (_, col) => {
-              const stacked = state.grid.reduce((count, row) => (row[col] === null ? count : count + 1), 0)
-              return (
-                <button
-                  key={col}
-                  type="button"
-                  className={styles.columnButton}
-                  aria-label={`よこ${col + 1} に うごかす${stacked > 0 ? ` ブロック${stacked}こ` : ''}`}
-                  disabled={isOver}
-                  onClick={() => handleMoveToColumn(col)}
-                />
-              )
-            })}
-          </div>
-
-          {clearNotice > 0 ? (
-            <div className={styles.sparkles} aria-hidden="true" key={clearSeq}>
-              {CLEAR_SPARKLES.map((sparkle) => (
-                <span
-                  key={`${sparkle.left}-${sparkle.top}`}
-                  className={styles.sparkle}
-                  style={{
-                    left: `${sparkle.left}%`,
-                    top: `${sparkle.top}%`,
-                    animationDelay: `${sparkle.delayMs}ms`,
-                  }}
-                >
-                  ✨
-                </span>
+      <BoardViewport className={styles.boardViewport}>
+        <div className={styles.boardArea}>
+          <div
+            className={`${styles.board} ${clearNotice > 0 ? styles.boardCleared : ''}`}
+            style={{ '--board-cols': FALLING_COLS, '--board-rows': FALLING_ROWS } as CSSProperties}
+          >
+            <div className={styles.cellGrid} aria-hidden="true">
+              {Array.from({ length: FALLING_COLS * FALLING_ROWS }, (_, index) => (
+                <span key={index} className={styles.cell} />
               ))}
             </div>
-          ) : null}
 
-          {isOver ? (
-            <div className={styles.overBanner}>
-              <p className={styles.overText}>
-                <span aria-hidden="true">🫧</span> いっぱいに なっちゃった！
-              </p>
-              <button type="button" className={styles.againButton} onClick={handleRestart}>
-                <span aria-hidden="true">🔁</span> もういっかい
-              </button>
+            <div className={styles.blockLayer} aria-hidden="true" data-testid="falling-block-layer">
+              {settledGroups(state.grid).map((group) => (
+                <BoardPiece
+                  key={`settled-${group.cells[0].col},${group.cells[0].row}`}
+                  shapeId={group.shapeId}
+                  cells={group.cells}
+                  testId="falling-settled"
+                />
+              ))}
+
+              {/* 着地予定の うすい ブロック。どこへ落ちるかを、おとす前に見せる。 */}
+              {ghostCells.length > 0 && state.piece ? (
+                <BoardPiece
+                  shapeId={state.piece.shapeId}
+                  cells={ghostCells}
+                  tone="valid"
+                  testId="falling-ghost"
+                  className={styles.ghost}
+                />
+              ) : null}
+
+              {/* 落ちているブロック。ブロックが変わるたびに作り直して、
+                  前のブロックの位置から動いてくるアニメーションにならないようにする。 */}
+              {state.piece ? (
+                <BoardPiece
+                  key={`piece-${state.droppedPieces}`}
+                  shapeId={state.piece.shapeId}
+                  cells={pieceCells}
+                  testId="falling-piece"
+                  className={styles.fallingPiece}
+                />
+              ) : null}
             </div>
-          ) : null}
-        </div>
-      </div>
 
+            {/* 置きたい場所をえらぶ列。1列まるごとが押せる大きさなので、
+                小さな指でも「ここ」と指しやすい。読み上げでは、盤面を見なくても
+                どれだけ積まれているかが分かるように、その列のブロックの数も伝える。 */}
+            <div className={styles.columnLayer} role="group" aria-label="おきたい ばしょを えらぶ">
+              {Array.from({ length: FALLING_COLS }, (_, col) => {
+                const stacked = state.grid.reduce((count, row) => (row[col] === null ? count : count + 1), 0)
+                return (
+                  <button
+                    key={col}
+                    type="button"
+                    className={styles.columnButton}
+                    aria-label={`よこ${col + 1} に うごかす${stacked > 0 ? ` ブロック${stacked}こ` : ''}`}
+                    disabled={isOver}
+                    onClick={() => handleMoveToColumn(col)}
+                  />
+                )
+              })}
+            </div>
+
+            {clearNotice > 0 ? (
+              <div className={styles.sparkles} aria-hidden="true" key={clearSeq}>
+                {CLEAR_SPARKLES.map((sparkle) => (
+                  <span
+                    key={`${sparkle.left}-${sparkle.top}`}
+                    className={styles.sparkle}
+                    style={{
+                      left: `${sparkle.left}%`,
+                      top: `${sparkle.top}%`,
+                      animationDelay: `${sparkle.delayMs}ms`,
+                    }}
+                  >
+                    ✨
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {isOver ? (
+              <div className={styles.overBanner}>
+                <p className={styles.overText}>
+                  <span aria-hidden="true">🫧</span> いっぱいに なっちゃった！
+                </p>
+                <button type="button" className={styles.againButton} onClick={handleRestart}>
+                  <span aria-hidden="true">🔁</span> もういっかい
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+      </BoardViewport>
       {restartConfirmOpen ? (
         <div className={styles.restartConfirm} role="group" aria-label="さいしょから かくにん">
           <p className={styles.restartConfirmText}>さいしょから する？</p>

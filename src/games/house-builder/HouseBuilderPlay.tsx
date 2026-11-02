@@ -1002,71 +1002,75 @@ function DoneScreen({ design, saved, note, onSave, onEditPlan, onEditOutside, on
 
   return (
     <section className={styles.doneLayout} aria-labelledby="house-done-title">
-      <h2 id="house-done-title" className={styles.doneTitle}>
-        <span aria-hidden="true">🎉 </span>かんせい！ すてきな おうちが できたね
-      </h2>
-      <p className={styles.summary}>
-        {findHouseType(design.houseType).name}・{findShape(design.shape).name}・へや {total}こ
-      </p>
-      <div className={styles.viewToggle} role="group" aria-label="みかた">
-        <button type="button" className={styles.tab} aria-pressed={view === 'outside'} onClick={() => switchView('outside')}>そとから みる</button>
-        <button type="button" className={styles.tab} aria-pressed={view === 'inside'} onClick={() => switchView('inside')}>なかを みる</button>
-      </div>
-      <p className={styles.bubble} role="status" aria-live="polite" key={bubble?.key ?? 0} data-show={bubble ? true : undefined}>
-        {bubble?.text ?? hint}
-      </p>
-      {view === 'inside' && room && status === 'ready' && (
-        <div className={styles.roomNav}>
-          <button type="button" className={styles.navButton} aria-label="まえの へや" onClick={() => stepRoom(-1)}><span aria-hidden="true">◀</span></button>
-          <p className={styles.roomNow}>{roomTitle(room)}</p>
-          <button type="button" className={styles.navButton} aria-label="つぎの へや" onClick={() => stepRoom(1)}><span aria-hidden="true">▶</span></button>
+      <div className={styles.doneIntro}>
+        <h2 id="house-done-title" className={styles.doneTitle}>
+          <span aria-hidden="true">🎉 </span>かんせい！ すてきな おうちが できたね
+        </h2>
+        <p className={styles.summary}>
+          {findHouseType(design.houseType).name}・{findShape(design.shape).name}・へや {total}こ
+        </p>
+        <div className={styles.viewToggle} role="group" aria-label="みかた">
+          <button type="button" className={styles.tab} aria-pressed={view === 'outside'} onClick={() => switchView('outside')}>そとから みる</button>
+          <button type="button" className={styles.tab} aria-pressed={view === 'inside'} onClick={() => switchView('inside')}>なかを みる</button>
         </div>
-      )}
+        <p className={styles.bubble} role="status" aria-live="polite" key={bubble?.key ?? 0} data-show={bubble ? true : undefined}>
+          {bubble?.text ?? hint}
+        </p>
+        {view === 'inside' && room && status === 'ready' && (
+          <div className={styles.roomNav}>
+            <button type="button" className={styles.navButton} aria-label="まえの へや" onClick={() => stepRoom(-1)}><span aria-hidden="true">◀</span></button>
+            <p className={styles.roomNow}>{roomTitle(room)}</p>
+            <button type="button" className={styles.navButton} aria-label="つぎの へや" onClick={() => stepRoom(1)}><span aria-hidden="true">▶</span></button>
+          </div>
+        )}
+      </div>
       {stage}
-      {status === 'error' && (
-        <div className={styles.fallbackNote}>
-          <p className={styles.hint}>3Dで みられない ので、えで みせているよ</p>
-          <button
-            type="button"
-            className={styles.btn}
-            onClick={() => {
-              sfx('tap')
-              setStatus('ready')
-              setGeneration((g) => g + 1)
-            }}
-          >もういちど 3Dで みる</button>
+      <div className={styles.doneExtras}>
+        {status === 'error' && (
+          <div className={styles.fallbackNote}>
+            <p className={styles.hint}>3Dで みられない ので、えで みせているよ</p>
+            <button
+              type="button"
+              className={styles.btn}
+              onClick={() => {
+                sfx('tap')
+                setStatus('ready')
+                setGeneration((g) => g + 1)
+              }}
+            >もういちど 3Dで みる</button>
+          </div>
+        )}
+        {view === 'inside' && room && status === 'ready' && (
+          <div className={styles.roomPicker} role="group" aria-label="みる へや">
+            {Array.from({ length: floors }, (_, floor) => floor).filter((floor) => rooms.some((r) => r.floor === floor)).map((floor) => (
+              <div key={floor} className={styles.pickerFloor}>
+                <span className={styles.pickerLabel}>{floor + 1}かい</span>
+                <ul className={styles.scrollRow} aria-label={`${floor + 1}かいの へや`}>
+                  {rooms.filter((r) => r.floor === floor).map((r) => (
+                    <li key={r.id}>
+                      <button type="button" className={styles.roomChip} aria-pressed={r.id === room.id} aria-label={roomTitle(r)} onClick={() => pickRoom(r)}>
+                        <span className={styles.roomChipArt}><RoomSwatch type={r.type} style={r.style} {...roomSize(r)} /></span>
+                        <span aria-hidden="true">{findRoomType(r.type).short}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={styles.saveBox}>
+          <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} disabled={saved} onClick={onSave}>
+            {saved ? <><span aria-hidden="true">✓ </span>ほぞんずみ</> : <><span aria-hidden="true">📒 </span>おうちを ほぞんする</>}
+          </button>
+          {note && <p className={styles.saveNote} role="status">{note}</p>}
         </div>
-      )}
-      {view === 'inside' && room && status === 'ready' && (
-        <div className={styles.roomPicker} role="group" aria-label="みる へや">
-          {Array.from({ length: floors }, (_, floor) => floor).filter((floor) => rooms.some((r) => r.floor === floor)).map((floor) => (
-            <div key={floor} className={styles.pickerFloor}>
-              <span className={styles.pickerLabel}>{floor + 1}かい</span>
-              <ul className={styles.scrollRow} aria-label={`${floor + 1}かいの へや`}>
-                {rooms.filter((r) => r.floor === floor).map((r) => (
-                  <li key={r.id}>
-                    <button type="button" className={styles.roomChip} aria-pressed={r.id === room.id} aria-label={roomTitle(r)} onClick={() => pickRoom(r)}>
-                      <span className={styles.roomChipArt}><RoomSwatch type={r.type} style={r.style} {...roomSize(r)} /></span>
-                      <span aria-hidden="true">{findRoomType(r.type).short}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+        <div className={styles.doneButtons}>
+          <button type="button" className={styles.btn} onClick={onEditPlan}>まどりを なおす</button>
+          <button type="button" className={styles.btn} onClick={onEditOutside}>そとがわを なおす</button>
+          <button type="button" className={styles.btn} onClick={onRestart}>さいしょから つくる</button>
+          <button type="button" className={styles.btn} onClick={onRandom}><span aria-hidden="true">🎲 </span>もういちど おまかせ</button>
         </div>
-      )}
-      <div className={styles.saveBox}>
-        <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} disabled={saved} onClick={onSave}>
-          {saved ? <><span aria-hidden="true">✓ </span>ほぞんずみ</> : <><span aria-hidden="true">📒 </span>おうちを ほぞんする</>}
-        </button>
-        {note && <p className={styles.saveNote} role="status">{note}</p>}
-      </div>
-      <div className={styles.doneButtons}>
-        <button type="button" className={styles.btn} onClick={onEditPlan}>まどりを なおす</button>
-        <button type="button" className={styles.btn} onClick={onEditOutside}>そとがわを なおす</button>
-        <button type="button" className={styles.btn} onClick={onRestart}>さいしょから つくる</button>
-        <button type="button" className={styles.btn} onClick={onRandom}><span aria-hidden="true">🎲 </span>もういちど おまかせ</button>
       </div>
     </section>
   )

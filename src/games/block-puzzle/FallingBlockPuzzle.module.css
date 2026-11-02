@@ -614,3 +614,10 @@
   font-weight: 700;
   opacity: 0.8;
 }
+
+.boardViewport { min-height: 0; }
+.boardArea { width: 100%; height: 100%; }
+@media (orientation: landscape) and (max-height: 560px) {
+ .boardViewport { grid-column: 1; grid-row: 2 / -1; }
+ .message { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+}

@@ -90,8 +90,9 @@ describe('ブロックパズル(じゆうに ならべる): 画面と操作', ()
     expect(screen.getByRole('button', { name: /まわす/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^けす$/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /ぜんぶけす/ })).toBeInTheDocument()
-    // 盤面の全マス + パーツ9種 + もどる + ぜんぶけす + まわす + けす。
-    expect(screen.getAllByRole('button')).toHaveLength(BOARD_CELL_COUNT + BLOCK_SHAPES.length + 4)
+    // 盤面の全マス + パーツ9種 + もどる + ぜんぶけす + まわす + けす + 拡大。
+    expect(screen.getByRole('button', { name: 'ばんめんを おおきく' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button')).toHaveLength(BOARD_CELL_COUNT + BLOCK_SHAPES.length + 5)
   })
 
   test('できた！・もういっかいは、盤面が完成するまで出さない', () => {

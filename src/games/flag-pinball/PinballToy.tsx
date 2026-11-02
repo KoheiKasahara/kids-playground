@@ -6,19 +6,20 @@ export type PinballToyProps = {
   toy: ToyPlacement
   theme: PinballThemeDefinition
   registerToy: (toyId: string) => (el: HTMLElement | null) => void
+  scale?: number
   onActivate: (toyId: string) => void
 }
 
-export default function PinballToy({ toy, theme, registerToy, onActivate }: PinballToyProps) {
-  const tapDiameter = toy.tapRadius * 2
+export default function PinballToy({ toy, theme, registerToy, onActivate, scale = 1 }: PinballToyProps) {
+  const tapDiameter = Math.max(toy.tapRadius * 2, 48 / scale)
 
   return (
     <button
       type="button"
       className={styles.toyButton}
       style={{
-        left: toy.x - toy.tapRadius,
-        top: toy.y - toy.tapRadius,
+        left: toy.x - tapDiameter / 2,
+        top: toy.y - tapDiameter / 2,
         width: tapDiameter,
         height: tapDiameter,
       }}

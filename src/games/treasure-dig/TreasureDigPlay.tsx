@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import BoardViewport from '../../components/BoardViewport'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
@@ -49,32 +50,34 @@ function Board({ index, back, select, next, record, cleared }: {
           <b>💎 {game.collected} / {stage.need}</b>
         </div>
       </div>
-      <section className={styles.board} aria-label="すなの やま">
-        <canvas ref={canvasRef} {...game.canvasProps} className={styles.canvas} tabIndex={0}
-          aria-label="たからやま。なぞって ほったり おいたり できるよ。キーボードは やじるしで ばしょ、スペースで どうぐを つかうよ">
-          すなを ほって、たからを たからばこへ おとそう。
-        </canvas>
-        <p className={styles.notice} role="status">
-          {game.unavailable ? 'ばんめんを ひらけなかったよ。もういちど ひらいてね'
-            : game.status === 'stuck' ? '💧 たからが たりないよ'
-              : paused ? '⏸ とまっているよ。ほっても OK！'
-                : game.idle ? '⛏️ すなが とまったよ。もっと ほってみよう' : ''}
-        </p>
-        {game.status === 'cleared' && <div className={styles.overlay}>
-          <div className={styles.card}>
-            <p className={styles.sparkles} aria-hidden="true">✨ 💎 ✨</p>
-            <h2>たからを あつめた！</h2>
-            <p>{game.collected >= game.world.total ? 'ぜんぶ あつめた！ かんぺき！' : `💎 ${game.collected}こ ゲット！`}</p>
-            <div className={styles.cardButtons}>
-              <button onClick={game.retry}>↻ もういちど</button>
-              <button autoFocus onClick={last ? select : next}>{last ? 'ステージを えらぶ' : 'つぎへ →'}</button>
+      <BoardViewport className={styles.boardViewport}>
+        <section className={styles.board} aria-label="すなの やま">
+          <canvas ref={canvasRef} {...game.canvasProps} className={styles.canvas} tabIndex={0}
+            aria-label="たからやま。なぞって ほったり おいたり できるよ。キーボードは やじるしで ばしょ、スペースで どうぐを つかうよ">
+            すなを ほって、たからを たからばこへ おとそう。
+          </canvas>
+          <p className={styles.notice} role="status">
+            {game.unavailable ? 'ばんめんを ひらけなかったよ。もういちど ひらいてね'
+              : game.status === 'stuck' ? '💧 たからが たりないよ'
+                : paused ? '⏸ とまっているよ。ほっても OK！'
+                  : game.idle ? '⛏️ すなが とまったよ。もっと ほってみよう' : ''}
+          </p>
+          {game.status === 'cleared' && <div className={styles.overlay}>
+            <div className={styles.card}>
+              <p className={styles.sparkles} aria-hidden="true">✨ 💎 ✨</p>
+              <h2>たからを あつめた！</h2>
+              <p>{game.collected >= game.world.total ? 'ぜんぶ あつめた！ かんぺき！' : `💎 ${game.collected}こ ゲット！`}</p>
+              <div className={styles.cardButtons}>
+                <button onClick={game.retry}>↻ もういちど</button>
+                <button autoFocus onClick={last ? select : next}>{last ? 'ステージを えらぶ' : 'つぎへ →'}</button>
+              </div>
             </div>
-          </div>
-        </div>}
-        {game.status === 'stuck' && <div className={styles.retry}>
-          <button onClick={game.retry}>↻ さいしょから やってみる</button>
-        </div>}
-      </section>
+          </div>}
+          {game.status === 'stuck' && <div className={styles.retry}>
+            <button onClick={game.retry}>↻ さいしょから やってみる</button>
+          </div>}
+        </section>
+      </BoardViewport>
       <aside className={styles.tools} aria-label="どうぐ">
         <div className={styles.toolRow} role="group" aria-label="どうぐを えらぶ">
           {TOOLS.map(item => <button key={item.id} aria-label={item.name} aria-pressed={item.id === tool.id}

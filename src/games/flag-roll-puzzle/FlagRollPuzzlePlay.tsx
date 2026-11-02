@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
+import BoardViewport from '../../components/BoardViewport'
 import BigButton from '../../components/BigButton'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
@@ -520,30 +521,32 @@ export default function FlagRollPuzzlePlay() {
 
         <div className={styles.body} data-testid="puzzle-layout">
           <div className={styles.boardPane} data-testid="puzzle-board-pane">
-            <PuzzleBoard
-              parts={state.parts}
-              selectedPartId={state.selectedPartId}
-              balls={boardBalls}
-              goalArea={state.goalArea}
-              ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
-              draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
-              highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
-              cleared={state.phase === 'cleared'}
-              justPlacedPartId={justPlacedPartId}
-              rotatingPartId={rotatingPartId}
-              invalidDrop={invalidDrop}
-              containerRef={containerRef}
-              boardRef={boardRef}
-              scale={scale}
-              width={width}
-              height={height}
-              registerBall={registerBall}
-              registerPartElement={registerPartElement}
-              registerPartMotionElement={registerPartMotionElement}
-              onPointerDown={handleBoardPointerDown}
-              onPointerMove={handleDragMove}
-              onPointerUp={handleDragEnd}
-            />
+            <BoardViewport>
+              <PuzzleBoard
+                parts={state.parts}
+                selectedPartId={state.selectedPartId}
+                balls={boardBalls}
+                goalArea={state.goalArea}
+                ghost={ghostCell && drag ? { typeId: drag.typeId, cell: ghostCell } : null}
+                draggingPartId={drag?.source === 'board' && drag.moved ? (drag.partId ?? null) : null}
+                highlightGrid={editing && (drag !== null || selectedTypeId !== null)}
+                cleared={state.phase === 'cleared'}
+                justPlacedPartId={justPlacedPartId}
+                rotatingPartId={rotatingPartId}
+                invalidDrop={invalidDrop}
+                containerRef={containerRef}
+                boardRef={boardRef}
+                scale={scale}
+                width={width}
+                height={height}
+                registerBall={registerBall}
+                registerPartElement={registerPartElement}
+                registerPartMotionElement={registerPartMotionElement}
+                onPointerDown={handleBoardPointerDown}
+                onPointerMove={handleDragMove}
+                onPointerUp={handleDragEnd}
+              />
+            </BoardViewport>
           </div>
 
           {/*

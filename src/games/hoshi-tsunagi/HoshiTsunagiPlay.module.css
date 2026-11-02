@@ -649,3 +649,16 @@
     font-size: clamp(18px, 3.6vw, 26px);
   }
 }
+
+/* Smartphone landscape play area. */
+@media (orientation: landscape) and (max-height: 560px) {
+ .page:has(.sky) { display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr) auto; gap: 6px 12px; }
+ .page:has(.sky) .header { grid-column: 1 / -1; grid-row: 1; }
+ .statusRow { grid-column: 1; grid-row: 2; min-width: 0; flex-direction: column; align-items: center; }
+ .stageNav { flex-wrap: wrap; justify-content: center; }
+ .progress { flex-wrap: wrap; justify-content: center; }
+ .sky { grid-column: 2; grid-row: 2 / 4; width: auto; height: 100%; max-width: 100%; aspect-ratio: 1; justify-self: center; }
+ .page:has(.sky) > .button { grid-column: 1; grid-row: 3; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) { .page:has(.sky) > .actions { grid-column: 1; grid-row: 3; } }

@@ -116,3 +116,6 @@
     text-overflow: ellipsis;
   }
 }
+
+/* The original flex area owns the height; the viewport must not size itself from its toolbar. */
+.boardArea > [data-board-viewport] { position: absolute; inset: 0; height: auto; }

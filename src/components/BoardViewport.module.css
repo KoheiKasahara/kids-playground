@@ -1,0 +1,14 @@
+.root { position: relative; min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 52px; gap: 4px; }
+.viewport { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.content { position: relative; width: 100%; height: 100%; display: flex; }
+.root[data-enlarged='true'] .content { width: 180%; height: 180%; }
+.tools { display: flex; flex-direction: column; gap: 4px; align-self: start; }
+.tools button { flex: none; min-height: 44px; width: 48px; padding: 2px; border: 2px solid #8ea9be; border-radius: 10px; background: #fffdf4; color: #254a65; font: inherit; font-size: 22px; cursor: pointer; touch-action: manipulation; }
+.tools small { display: block; font-size: 10px; line-height: 1.2; }
+.tools button:focus-visible, .viewport:focus-visible { outline: 3px solid #f5a623; outline-offset: -3px; }
+
+/* Keep the existing full-width board on narrow portrait screens. */
+@media (orientation: portrait) {
+ .root[data-enlarged='false'] { grid-template-columns: minmax(0, 1fr); }
+ .root[data-enlarged='false'] .tools { display: none; }
+}
