@@ -3,7 +3,7 @@
 
 import { OUTDOOR_EXTRAS, findShape, type ExtraId, type OutdoorExtraId, type Shape } from './data'
 import {
-  OPENING_BY_ROOM, facadeOpenings, frontEdge, isFloorCell, roomSize, roomsOn,
+  OPENING_BY_ROOM, facadeOpenings, frontEdge, isFloorCell, roomAt, roomSize, roomsOn,
   type HouseDesign, type OpeningKind, type PlacedRoom,
 } from './plan'
 
@@ -164,29 +164,32 @@ export function roomOpenings(design: HouseDesign, room: PlacedRoom): Opening3D[]
   })
 }
 
-/**
- * となりの へやへ でる ドアの いち。そとに めんして いない へりが いちばん ながい かべの まんなか。
- * まわりが ぜんぶ そとの ときは null。
- */
-export function innerDoor(design: HouseDesign, room: PlacedRoom): { side: Side; center: number } | null {
+/** ドアが おさまる かべの はんい。となりの へやが かわる ところで わける。 */
+export function innerDoorRuns(design: HouseDesign, room: PlacedRoom): WallRun[] {
   const shape = findShape(design.shape)
-  let best: { side: Side; center: number; length: number } | null = null
-  // みえやすい おく と ひだりの かべを さきに えらぶ。
+  const runs: (WallRun & { priority: number })[] = []
   for (const side of ['back', 'left', 'right', 'front'] as const) {
-    const edge = roomEdge(room, side)
-    let start = -1
-    for (let j = edge.from; j <= edge.to; j++) {
-      const x = isAcross(side) ? j : side === 'left' ? room.x : edge.line - 1
-      const y = isAcross(side) ? (side === 'back' ? room.y : edge.line - 1) : j
-      const on = j < edge.to && isFloorCell(shape, x, y) && !isOutsideEdge(shape, x, y, side)
-      if (on && start < 0) start = j
-      if (!on && start >= 0) {
-        if (!best || j - start > best.length) best = { side, center: (start + j) / 2, length: j - start }
-        start = -1
+    const { line, from, to } = roomEdge(room, side)
+    const step = STEP[side]
+    let start = from
+    let neighbor: PlacedRoom | null | undefined
+    for (let j = from; j <= to; j++) {
+      const x = isAcross(side) ? j : line - (side === 'right' ? 1 : 0)
+      const y = isAcross(side) ? line - (side === 'front' ? 1 : 0) : j
+      const next = j < to && isFloorCell(shape, x + step.dx, y + step.dy)
+        ? roomAt(design, room.floor, x + step.dx, y + step.dy) ?? null
+        : undefined
+      if (next === neighbor) continue
+      if (neighbor !== undefined) {
+        const priority = neighbor?.type === 'hall' || neighbor?.type === 'entrance' ? 0 : neighbor === null ? 1 : 2
+        runs.push({ side, line, from: start, to: j, priority })
       }
+      start = j
+      neighbor = next
     }
   }
-  return best && { side: best.side, center: best.center }
+  return runs.sort((a, b) => a.priority - b.priority || (b.to - b.from) - (a.to - a.from))
+    .map(({ side, line, from, to }) => ({ side, line, from, to }))
 }
 
 // ---------------- にわ ----------------

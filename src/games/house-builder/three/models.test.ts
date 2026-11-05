@@ -120,7 +120,6 @@ describe('house-builder 3D rooms', () => {
     const a = panels(corner.room)
     expect(a.per.back).toBeGreaterThanOrEqual(1)
     expect(a.per.left).toBeGreaterThanOrEqual(1)
-    expect(a.yaw).toBeUndefined()
     // まんなかの トイレは まどが なく、となりへの ドアだけ。
     expect(Object.values(panels(middle.room).per).reduce((sum, n) => sum + n, 0)).toBeGreaterThan(0)
     const toilet = buildRoom(design, middle.room)
@@ -130,6 +129,26 @@ describe('house-builder 3D rooms', () => {
     expect(glass).toBe(0)
     // げんかんは おもての ドアが みえる むきから みる。
     expect(panels(entrance.room).yaw).toBeCloseTo(Math.PI - .62)
+  })
+
+  test('a small toilet beside a hall has room in front of its door', () => {
+    const hall = place(createDesign('hiraya', 'square'), 0, {
+      type: 'hall', style: 'plain', size: 's', turned: false,
+    }, 2, 1)
+    const { design, room } = place(hall.design, 0, {
+      type: 'toilet', style: 'simple', size: 's', turned: false,
+    }, 2, 3)
+    const built = buildRoom(design, room)
+    const door = built.root.getObjectByName('interior-door')!
+    expect(door.parent!.parent!.name).toBe('wall-back')
+    built.root.updateMatrixWorld(true)
+    const landing = boxOf(door)
+    landing.min.y = .05
+    landing.max.z = -.15
+    built.root.getObjectByName('furniture')!.traverse((object) => {
+      if (object instanceof THREE.Mesh) expect(boxOf(object).intersectsBox(landing)).toBe(false)
+    })
+    built.dispose()
   })
 
   test('すてると つかった かたち・ざいりょうを ぜんぶ かいほうする', () => {

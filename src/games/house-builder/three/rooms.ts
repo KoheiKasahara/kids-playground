@@ -3,7 +3,7 @@
 
 import * as THREE from 'three'
 import { findRoomStyle, type RoomStyle, type RoomTypeId } from '../data'
-import { CELL, ROOM_WALL_H, SIDES, innerDoor, roomEdge, roomOpenings, type Side } from '../layout3d'
+import { CELL, ROOM_WALL_H, SIDES, innerDoorRuns, roomEdge, roomOpenings, type Side } from '../layout3d'
 import { roomSize, type HouseDesign, type PlacedRoom } from '../plan'
 import { Kit, ball, block, disposeObject, group, mesh, mix, tube, type Built, type Cutaway, type Tick, type V3 } from './kit'
 import { innerDoorPanel, openingPanel } from './openings'
@@ -198,7 +198,7 @@ function living(c: Ctx) {
   plant(k, g, [R - .45, 0, B + .45], 1.1, pop ? '#4dc9ff' : '#d9825b')
   if (!fire && !pop) {
     // フロアランプ。
-    const fl = group(g, [L + .45, 0, B + .4])
+    const fl = group(g, [L + .34, 0, F - .45])
     tube(k, fl, .16, .03, '#37474f', [0, 0, 0])
     tube(k, fl, .02, 1.45, '#37474f', [0, .03, 0], { noShadow: true })
     fl.add(mesh(k, k.cyl(.14, .24, .3, 18, true), k.mat('#fff3d6', { emissive: '#ffd27a', glow: .6, side: THREE.DoubleSide }), [0, 1.55, 0], { noShadow: true }))
@@ -239,7 +239,7 @@ function dining(c: Ctx) {
     const n = W >= 5 ? 2 : 1
     for (let i = 0; i < n; i++) {
       const x = n === 1 ? 0 : (i ? 1 : -1) * W * .22
-      const z = B + D * .55
+      const z = B + D * .62
       roundTable(k, g, [x, 0, z], .42, .74, '#f5f5f5', '#3a3a3a')
       chair(k, g, [x - .62, 0, z], Math.PI / 2, s.main, s.accent)
       chair(k, g, [x + .62, 0, z], -Math.PI / 2, s.main, s.accent)
@@ -557,8 +557,10 @@ function bedroom(c: Ctx) {
     lamp(k, g, [x, .5, B + .24])
   }
   if (twin) {
-    for (const x of [-.85, .85]) bed(k, g, [x, 0, B + .02], 1, len, frame, cover, pillow)
-    block(k, g, [2.2, .03, .2], s.accent, [0, .5, B + len * .7], { noShadow: true })
+    for (const x of [-.85, .85]) {
+      bed(k, g, [x, 0, B + .02], 1, len, frame, cover, pillow)
+      block(k, g, [.95, .03, .2], s.accent, [x, .5, B + len * .7], { noShadow: true })
+    }
     stand(0)
   } else {
     const bw = W >= 3.6 ? 1.6 : 1.2
@@ -761,8 +763,8 @@ function entrance(c: Ctx) {
   const gd = Math.min(tataki - .2, 1.2)
   block(k, g, [.4, .95, gd], s.main, [L + .22, 0, B + rd + .1 + gd / 2], { round: .02 })
   vase(k, g, [L + .22, .95, B + rd + .1 + gd / 2], '#ffffff', s.accent)
-  for (const [x, color] of [[0, '#e53935'], [.3, '#1e88e5']] as const) {
-    for (const dz of [-.07, .07]) block(k, g, [.11, .08, .26], color, [L + .7 + x + dz, 0, F - .45], { round: .03, rot: [0, .1, 0] })
+  for (const [z, color] of [[.25, '#e53935'], [.55, '#1e88e5']] as const) {
+    for (const dx of [-.07, .07]) block(k, g, [.11, .08, .24], color, [L + .28 + dx, .18, B + z], { round: .03 })
   }
   tube(k, g, .12, .45, '#8d6e63', [R - .25, 0, F - .3])
   for (const [dx, color] of [[-.04, '#ff6b9a'], [.04, '#4dc9ff']] as const) {
@@ -877,6 +879,97 @@ function alongWall(side: Side, room: PlacedRoom, W: number, D: number, cells: nu
   }
 }
 
+type RoomPanel = { side: Side; panel: THREE.Group }
+
+/** Measure each mesh separately so the empty space between furniture still counts. */
+function furnitureBoxes(furniture: THREE.Group): THREE.Box3[] {
+  furniture.updateMatrixWorld(true)
+  const boxes: THREE.Box3[] = []
+  furniture.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return
+    const geometry = object.geometry as THREE.BufferGeometry
+    if (!geometry.boundingBox) geometry.computeBoundingBox()
+    if (geometry.boundingBox) boxes.push(geometry.boundingBox.clone().applyMatrix4(object.matrixWorld))
+  })
+  return boxes
+}
+
+function panelClearance({ side, panel }: RoomPanel, W: number, D: number, depth: number) {
+  panel.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(panel)
+  box.max.z = Math.max(box.max.z, depth)
+  box.min.z = 0
+  const { at, rotY } = wallPlace(side, W, D)
+  return box.applyMatrix4(new THREE.Matrix4().makeRotationY(rotY).setPosition(...at))
+}
+
+function obstruction(clearance: THREE.Box3, boxes: THREE.Box3[]) {
+  const overlap = new THREE.Box3()
+  return boxes.reduce((total, box) => {
+    if (box.max.y <= .04) return total // rugs and other flat floor details
+    overlap.copy(box).intersect(clearance)
+    if (overlap.isEmpty()) return total
+    return total + (overlap.max.x - overlap.min.x) * (overlap.max.z - overlap.min.z)
+      * Math.max(.02, overlap.max.y - overlap.min.y)
+  }, 0)
+}
+
+function arrangeRoom(
+  k: Kit, design: HouseDesign, room: PlacedRoom, furniture: THREE.Group,
+  W: number, D: number, exterior: RoomPanel[], frontDoor: RoomPanel | undefined,
+): RoomPanel | undefined {
+  const doorPanel = innerDoorPanel(k, room.type === 'washitsu')
+  // Leave room for trim at both ends of even a single-cell wall.
+  if (room.type === 'washitsu') doorPanel.scale.x = .83
+  const doors = innerDoorRuns(design, room).flatMap(({ side, from, to }, priority) => {
+    const centers = new Set([(from + to) / 2])
+    for (let j = from; j < to; j++) {
+      centers.add(j + .5)
+      if (room.type !== 'washitsu') {
+        centers.add(j + .35)
+        centers.add(j + .65)
+      }
+    }
+    return Array.from(centers, (center) => {
+      doorPanel.position.x = alongWall(side, room, W, D, center)
+      const entry = { side, panel: doorPanel }
+      return {
+        side, x: doorPanel.position.x, priority,
+        face: panelClearance(entry, W, D, .15),
+        landing: panelClearance(entry, W, D, .75),
+      }
+    })
+  })
+  const windows = exterior.filter((entry) => entry !== frontDoor).map((entry) => panelClearance(entry, W, D, .12))
+  const entry = frontDoor && panelClearance(frontDoor, W, D, .75)
+  const angles = W === D ? [0, Math.PI, Math.PI / 2, -Math.PI / 2] : [0, Math.PI]
+  let bestScore: number[] | undefined
+  let bestAngle = 0
+  let bestDoor: typeof doors[number] | undefined
+  for (const angle of angles) {
+    furniture.rotation.y = angle
+    const boxes = furnitureBoxes(furniture)
+    const entryObstruction = entry ? obstruction(entry, boxes) : 0
+    const windowObstruction = windows.reduce((total, window) => total + obstruction(window, boxes), 0)
+    for (const door of doors.length ? doors : [undefined]) {
+      const face = door ? obstruction(door.face, boxes) : 0
+      const landing = door ? obstruction(door.landing, boxes) : 0
+      // Prefer a clear threshold and landing before considering the neighboring room.
+      const score = [entryObstruction, face, landing, door?.priority ?? 0, windowObstruction]
+      const difference = score.findIndex((value, i) => !bestScore || Math.abs(value - bestScore[i]) > .0001)
+      if (difference < 0 || (bestScore && score[difference] > bestScore[difference])) continue
+      bestScore = score
+      bestAngle = angle
+      bestDoor = door
+    }
+  }
+  furniture.rotation.y = bestAngle
+  if (!bestDoor) return undefined
+  doorPanel.name = 'interior-door'
+  doorPanel.position.set(bestDoor.x, 0, .005)
+  return { side: bestDoor.side, panel: doorPanel }
+}
+
 /** へやを ひとつ 3D に する。まわりの かべは カメラに ちかい がわを ひくく して なかを みせる。 */
 export function buildRoom(design: HouseDesign, room: PlacedRoom): Built {
   const k = new Kit()
@@ -900,9 +993,23 @@ export function buildRoom(design: HouseDesign, room: PlacedRoom): Built {
   const inner = wallColor(room.type, s)
   const bath = room.type === 'bath' || room.type === 'washroom'
   const japanese = room.type === 'washitsu'
-  const openings = roomOpenings(design, room)
-  const door = innerDoor(design, room)
+  const furniture = group(root)
+  furniture.name = 'furniture'
+  FURNISH[room.type]({ k, g: furniture, W, D, s, ticks })
+
   const look = { window: design.exterior.window, door: design.exterior.door, inside: true }
+  let frontDoor: RoomPanel | undefined
+  const exterior = roomOpenings(design, room).map((o) => {
+    const edge = roomEdge(room, o.side)
+    const width = Math.min(o.center - edge.from, edge.to - o.center) * CELL * 2 - .2
+    const panel = openingPanel(k, o.kind, o.span, look, width)
+    panel.position.set(alongWall(o.side, room, W, D, o.center), 0, .005)
+    const entry = { side: o.side, panel }
+    if (o.kind === 'door') frontDoor = entry
+    return entry
+  })
+  const door = arrangeRoom(k, design, room, furniture, W, D, exterior, frontDoor)
+  const panels = door ? [...exterior, door] : exterior
   for (const side of SIDES) {
     const place = wallPlace(side, W, D)
     const length = place.length + T * 2
@@ -919,32 +1026,19 @@ export function buildRoom(design: HouseDesign, room: PlacedRoom): Built {
       for (const x of [-place.length / 2 + .06, place.length / 2 - .06]) block(k, full, [.12, H, .06], DARK_WOOD, [x, 0, .03])
       block(k, full, [place.length, .1, .05], DARK_WOOD, [0, 1.85, .025], { noShadow: true })
     }
-    for (const o of openings) {
-      if (o.side !== side) continue
-      const edge = roomEdge(room, side)
-      const room2wall = Math.min(o.center - edge.from, edge.to - o.center) * CELL * 2 - .2
-      const panel = openingPanel(k, o.kind, o.span, look, room2wall)
-      panel.position.set(alongWall(side, room, W, D, o.center), 0, .005)
-      full.add(panel)
-    }
-    if (door && door.side === side && !openings.some((o) => o.side === side && Math.abs(o.center - door.center) < .8)) {
-      const panel = innerDoorPanel(k, japanese)
-      panel.position.set(alongWall(side, room, W, D, door.center), 0, .005)
-      full.add(panel)
+    for (const entry of panels) {
+      if (entry.side === side) full.add(entry.panel)
     }
     low.visible = false
     cutaways.push({ normal: place.normal, full, low })
   }
 
-  const furniture = group(root)
-  furniture.name = 'furniture'
-  FURNISH[room.type]({ k, g: furniture, W, D, s, ticks })
-
-  // おもての ドアが ある へやは うしろから みて ドアを みせる。
-  const frontDoor = openings.some((o) => o.kind === 'door' && o.side === 'front')
+  // Keep the main door on a full-height wall in the initial view.
+  const doorSide = (frontDoor ?? door)?.side
+  const yaw = doorSide === 'front' ? Math.PI - .62 : doorSide === 'right' ? -.62 : undefined
   return {
     root,
-    yaw: frontDoor ? Math.PI - .62 : undefined,
+    yaw,
     target: new THREE.Vector3(0, .7, 0),
     radius: Math.hypot(W / 2 + T, D / 2 + T, 1.3) + .2,
     cutaways,
