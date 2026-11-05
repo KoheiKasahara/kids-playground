@@ -65,7 +65,7 @@ export default function BeeGardenPlay() {
             const current = path.at(-1) === cell
             const hive = cell === stage.cells[0]
             return active ? <button key={cell} className={`${styles.cell} ${available.includes(cell) ? styles.available : ''} ${visited ? styles.visited : ''} ${hint === cell ? styles.hint : ''}`}
-              aria-label={`${Math.floor(cell / 4) + 1}だん ${cell % 4 + 1}れつ ${hive ? 'おうち' : visited ? 'とおった おはな' : 'おはな'}${current ? ' はちさん' : ''}`}
+              aria-label={`${Math.floor(cell / 4) + 1}だん ${cell % 4 + 1}れつ ${hive ? 'おうち' : visited ? 'とおった おはな' : 'おはな'}${current ? ' はちさん' : ''}${available.includes(cell) ? ' とべる' : ''}${hint === cell ? ' ヒント' : ''}`}
               onClick={() => move(cell)} disabled={complete}>
               <span aria-hidden="true">{hive ? '🏠' : cell % 2 ? '🌼' : '🌸'}</span>
               {visited && !hive && <b className={styles.check} aria-hidden="true">✓</b>}
@@ -85,7 +85,10 @@ export default function BeeGardenPlay() {
           <button disabled={path.length < 2} onClick={() => { setPath(path.slice(0, -1)); setMessage(''); setHint(null); playBeeSound() }}>↶ ひとつ もどす</button>
           <button onClick={() => {
             const answer = solution(stage, path)
-            if (answer) { setHint(answer[path.length]); setMessage('✨ の ほうへ いってみよう') }
+            if (answer) {
+              const target = answer[path.length]
+              setHint(target); setMessage(`✨ ${Math.floor(target / 4) + 1}だん ${target % 4 + 1}れつへ いってみよう`)
+            }
             else setMessage('ひとつ もどって みよう ↶')
             playBeeSound()
           }}>💡 ヒント</button>
