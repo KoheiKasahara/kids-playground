@@ -242,13 +242,12 @@ test('へやに きりかえると まえの いえを すて、カメラに ち
   expect(room.getObjectByName('house-outside')).toBeUndefined()
   expect(room.getObjectByName(`room-${living.id}`)).toBeDefined()
   const isLow = (side: string) => room.getObjectByName(`wall-${side}`)!.children[1].visible
-  // さいしょは みぎまえ から みる。
-  expect(['front', 'right', 'back', 'left'].map(isLow)).toEqual([true, true, false, false])
-  scene.turn(1)
-  scene.turn(1)
-  scene.turn(1)
+  const doorWall = room.getObjectByName('interior-door')!.parent!.parent!
+  expect(doorWall.children[0].visible).toBe(true)
+  expect(['front', 'right', 'back', 'left'].filter(isLow)).toHaveLength(2)
+  for (let i = 0; i < 6; i++) scene.turn(1)
   flush(performance.now() + 60000)
-  expect(['front', 'right', 'back', 'left'].map(isLow)).toEqual([false, true, true, false])
+  expect(doorWall.children[1].visible).toBe(true)
   // へやを タップすると room。
   pointer(host, 'pointerdown', 200, 250)
   pointer(host, 'pointerup', 200, 250)

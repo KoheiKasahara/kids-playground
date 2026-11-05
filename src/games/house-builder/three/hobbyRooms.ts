@@ -219,7 +219,8 @@ export function closet(c: Context) {
   block(k, g, [2.5, .035, .035], '#a2a9ad', [0, 1.65, -1])
   for (let i = 0; i < 7; i++) {
     const x = -1.02 + i * .34
-    block(k, g, [.24, s.variant === 'costume' ? 1.05 : .7, .3], [s.accent, '#e9c675', '#d993a9'][i % 3], [x, .55, -1], { round: .04 })
+    const height = s.variant === 'costume' ? 1.05 : .7
+    block(k, g, [.24, height, .3], [s.accent, '#e9c675', '#d993a9'][i % 3], [x, 1.58 - height, -1], { round: .04 })
     g.add(mesh(k, k.torus(.065, .015, Math.PI), '#b8b5aa', [x, 1.62, -1]))
   }
   if (s.variant === 'wardrobe') {
@@ -229,12 +230,16 @@ export function closet(c: Context) {
       block(k, g, [.2, .04, .03], s.accent, [-.75, y + .12, .99])
     }
   } else {
-    block(k, g, [.75, 1.7, .08], s.main, [-.9, .05, .2])
-    block(k, g, [.6, 1.4, .02], '#c9e5e9', [-.9, .2, .251])
-    if (s.variant === 'costume') tube(k, g, .2, .23, '#e6c15d', [.65, .85, .7], { top: .3, seg: 5 })
-    else desk(k, g, [.65, 0, .7], s.main, .9)
+    const mirror = group(g, [-1.3, 0, .2], Math.PI / 2)
+    block(k, mirror, [.75, 1.7, .08], s.main, [0, 0, 0])
+    block(k, mirror, [.6, 1.4, .02], '#c9e5e9', [0, .15, .051])
   }
-  block(k, g, [.9, .35, .45], s.accent, [.65, 0, .7], { round: .08 })
+  if (s.variant === 'costume') {
+    const stand = desk(k, g, [.65, 0, .7], s.main, .9)
+    tube(k, stand, .2, .23, '#e6c15d', [0, .84, 0], { top: .3 })
+  } else {
+    block(k, g, [.9, .35, .45], s.accent, [.65, 0, .7], { round: .08 })
+  }
 }
 
 export function plants(c: Context) {

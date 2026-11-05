@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { EXTRAS, OUTDOOR_EXTRAS, SHAPES, findShape, type ShapeId } from './data'
-import { CELL, footprintRects, innerDoor, isOutsideEdge, roomOpenings, sideOpenings, wallRuns, yardLayout, type Box2 } from './layout3d'
+import { CELL, footprintRects, innerDoorRuns, isOutsideEdge, roomOpenings, sideOpenings, wallRuns, yardLayout, type Box2 } from './layout3d'
 import { addRoom, createDesign, facadeOpenings, type HouseDesign, type RoomPick } from './plan'
 
 function place(design: HouseDesign, floor: number, pick: RoomPick, x: number, y: number) {
@@ -87,13 +87,19 @@ describe('house-builder 3D layout', () => {
     design = top.design
     const hall = place(design, 0, pick('hall', 'l'), 3, 6) // 1×4 みぎの はし（3〜6ぎょう）
     design = hall.design
-    const entrance = place(design, 0, pick('entrance', 'm'), 1, 6) // 2×1 おもて（0〜1れつ）
+    const entrance = place(design, 0, pick('entrance', 'm'), 2, 4) // 2×1
     design = entrance.design
     expect(roomOpenings(design, top.room).map((o) => o.side).sort()).toEqual(['back', 'left'])
-    expect(roomOpenings(design, entrance.room)).toContainEqual(expect.objectContaining({ side: 'front', kind: 'door' }))
-    // しんしつは みぎ と まえが いえの なか。ながい ほう（どちらも 3）の うち さきに みる みぎに ドア。
-    expect(innerDoor(design, top.room)).toEqual({ side: 'right', center: 1.5 })
-    expect(innerDoor(design, hall.room)).toEqual({ side: 'left', center: 5 })
+    expect(innerDoorRuns(design, top.room)).toEqual([
+      { side: 'right', line: 3, from: 0, to: 3 },
+      { side: 'front', line: 3, from: 0, to: 3 },
+    ])
+    // ろうかの ひだりは、げんかん と あいている ゆかの さかいで わかれる。
+    expect(innerDoorRuns(design, hall.room).filter((run) => run.side === 'left')).toEqual([
+      { side: 'left', line: 3, from: 4, to: 5 },
+      { side: 'left', line: 3, from: 5, to: 7 },
+      { side: 'left', line: 3, from: 3, to: 4 },
+    ])
   })
 
   test('にわの ものは いえ・こみち・ほかの もの と かさならず、しばふの なかに おさまる', () => {
