@@ -83,6 +83,14 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
   },
   {
+    id: 'bee-garden', slug: 'bee-garden', title: 'はちさんの はなめぐり', emoji: '🐝', category: 'learning',
+    seo: {
+      headline: 'はちさんの はなめぐり｜花を一度ずつめぐる道順パズル',
+      description: 'はちさんとすべての花を一度ずつめぐり、巣へ戻る道順パズルです。小さな庭から分かれ道のある庭へ、先を考える楽しさが広がります。時間制限なしで、ヒントや一手戻す操作を使って何度でも挑戦できます。',
+    },
+    intro: { howToPlay: ['となりの おはなを タップして とぼう', 'おなじ おはなは １かいだけ。ぜんぶ めぐって おうちへ！', 'こまったら ヒントや「ひとつ もどす」を つかおう'] },
+  },
+  {
     id: 'flag-pinball',
     slug: 'flag-pinball',
     title: 'こっきピンボール',

@@ -1,3 +1,4 @@
+import { playBeeSound } from '../../games/bee-garden/sounds'
 /**
  * 音量をそろえるために測る、ゲームごとの「代表的な効果音」。
  * gameSoundLevels.test.ts がここに並んだ音を実際に描き起こして大きさを測り、
@@ -98,6 +99,7 @@ function pianoNotes(count: number): SoundSample['play'] {
 }
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
+  'bee-garden': [sample('とぶ', () => playBeeSound()), sample('クリア', () => playBeeSound(true))],
   sugoroku: [
     sample('えらぶ', () => playSugorokuSound('select')),
     sample('はじめる', () => playSugorokuSound('start')),
