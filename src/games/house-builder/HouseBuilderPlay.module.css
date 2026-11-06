@@ -18,7 +18,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: var(--ink);
   background-color: #eef7ff;
   background-image:
@@ -27,20 +27,31 @@
   background-size: 24px 24px;
 }
 
+/* もどる・タイトル・ほぞん・おと を 1ぎょうに、すすみぐあいは その したに ならべる。 */
 .header {
   width: 100%;
   max-width: 1100px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "back title pause sound"
+    "steps steps steps steps";
   align-items: center;
-  gap: 8px;
+  gap: 8px 6px;
   flex-shrink: 0;
 }
 
+.header > [data-game-back-layout-slot] { grid-area: back; }
+.header > .title { grid-area: title; }
+.header > .steps { grid-area: steps; justify-self: center; }
+.header > .pauseButton { grid-area: pause; }
+.header > .soundButton { grid-area: sound; }
+
 .title {
-  flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: clamp(22px, 6vw, 34px);
+  font-size: clamp(19px, 5.2vw, 34px);
+  white-space: nowrap;
   font-weight: 900;
   line-height: 1.2;
   letter-spacing: .06em;
@@ -50,7 +61,7 @@
 }
 
 .soundButton {
-  flex: 0 0 52px;
+  width: 52px;
   height: 52px;
   border: 3px solid var(--ink);
   border-radius: 14px;
@@ -152,6 +163,30 @@
   font-size: 21px;
 }
 
+.btnNext {
+  min-height: 56px;
+  min-width: min(100%, 300px);
+  font-size: 19px;
+}
+
+.btnSmall {
+  min-height: 48px;
+  padding: 4px 14px;
+  font-size: 16px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .btn:active,
 .card:active,
 .chip:active,
@@ -182,21 +217,30 @@
 /* ---------- いったん やめる ---------- */
 
 .pauseButton {
-  align-self: flex-end;
-  display: inline-flex;
+  width: 56px;
+  height: 52px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  min-height: 44px;
-  padding: 6px 14px;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
   border: 3px solid var(--ink);
-  border-radius: 999px;
+  border-radius: 14px;
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 3px 0 var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
   font: inherit;
-  font-size: 15px;
+  font-size: 11px;
   font-weight: 900;
+  line-height: 1.1;
   cursor: pointer;
   touch-action: manipulation;
+}
+
+.pauseIcon {
+  font-size: 22px;
+  line-height: 1;
 }
 
 .pauseButton:active {
@@ -492,7 +536,7 @@
   max-width: 1100px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
 .planMain {
@@ -501,6 +545,48 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
+}
+
+.boardWrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.planMain .board {
+  width: min(100%, 620px, calc(40dvh * var(--aspect, 1)));
+}
+
+/* できなかった ときの ひとこと。ばんの うえに かさねて、すこしで きえる。 */
+.toast {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 6px 12px;
+  transform: translateX(-50%);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: #fff7c2;
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+  pointer-events: none;
+  animation: toastLife 1.8s ease-out forwards;
+}
+
+@keyframes toastLife {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  12% { opacity: 1; transform: translate(-50%, 0); }
+  80% { opacity: 1; }
+  to { opacity: 0; }
 }
 
 .floorTabs {
@@ -512,9 +598,9 @@
 
 .floorTab {
   position: relative;
-  min-width: 76px;
-  min-height: 48px;
-  padding: 6px 14px;
+  min-width: 68px;
+  min-height: 44px;
+  padding: 4px 12px;
   border: 3px solid var(--ink);
   border-radius: 14px;
   background: var(--paper);
@@ -659,43 +745,43 @@
   max-width: 760px;
   justify-self: center;
   box-sizing: border-box;
-  padding: 8px 10px 10px;
+  padding: 6px 8px 8px;
   border: 3px solid var(--ink);
   border-radius: 18px;
   background: #fffdf8;
   box-shadow: 0 4px 0 var(--ink);
 }
 
-.panelHead {
-  margin: 4px 2px 2px;
-  font-size: 15px;
-  font-weight: 900;
-  color: #7a6656;
+.pickPanel,
+.editPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 4px;
 }
 
 .panelTitle {
-  margin: 2px 0 4px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  font-size: 18px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 17px;
   font-weight: 900;
-}
-
-.panelBadge {
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: var(--orange);
-  color: #ffffff;
-  font-size: 13px;
 }
 
 .scrollRow {
   display: flex;
   gap: 8px;
   margin: 0;
-  padding: 4px 2px 10px;
+  padding: 2px 2px 8px;
   list-style: none;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -708,9 +794,10 @@
 }
 
 .roomChip {
-  width: 92px;
+  position: relative;
+  width: 74px;
   white-space: nowrap;
-  min-height: 96px;
+  min-height: 70px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -729,8 +816,35 @@
 }
 
 .roomChipArt {
-  width: 58px;
-  height: 58px;
+  width: 42px;
+  height: 42px;
+}
+
+/* まだ かいだんが ない かいでは、かいだんを ぴょこぴょこ させて きづかせる。 */
+.roomChip[data-nudge] {
+  animation: nudge 1s ease-in-out infinite;
+}
+
+.roomChip[data-nudge]::after {
+  content: '!';
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--red);
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1;
+}
+
+@keyframes nudge {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
 }
 
 .roomChipArt svg,
@@ -750,8 +864,8 @@
 }
 
 .styleCard {
-  width: 128px;
-  min-height: 140px;
+  width: 104px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -769,36 +883,41 @@
 
 .styleArt {
   width: 100%;
-  height: 88px;
+  height: 50px;
   display: grid;
   place-items: center;
   border-radius: 8px;
   background: #f4efe6;
 }
 
+/* ながい なまえは 2ぎょうまで（ぜんぶの なまえは よみあげで わかる）。 */
 .styleName {
-  font-size: 13px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 12px;
   font-weight: 900;
-  line-height: 1.3;
+  line-height: 1.25;
   text-align: center;
 }
 
 .sizeRow {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .chip {
-  flex: 1 1 64px;
-  min-width: 64px;
-  min-height: 64px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 50px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 4px 6px;
+  padding: 4px 2px;
+  white-space: nowrap;
   border: 3px solid var(--ink);
   border-radius: 14px;
   background: var(--paper);
@@ -817,23 +936,13 @@
 }
 
 .sizeArt {
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
 }
 
 .turnArt {
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1;
-}
-
-.editButtons {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.editButtons > .btn {
-  flex: 1;
 }
 
 .footer {
@@ -1360,6 +1469,7 @@
 @media (prefers-reduced-motion: reduce) {
   .pop,
   .selectedRing,
+  .roomChip[data-nudge],
   .doneTitle,
   .bubble[data-show],
   .front[data-lively] .cloud,
@@ -1384,42 +1494,176 @@
 }
 
 .doneIntro, .doneExtras { display: contents; }
-@media (orientation: landscape) and (max-height: 560px) {
- .page:has(.planLayout), .page:has(.doneLayout), .page:has(.outsideLayout) { height: 100dvh; min-height: 0; padding-block: 4px; gap: 4px; }
- .page:has(.planLayout) .title, .page:has(.doneLayout) .title, .page:has(.outsideLayout) .title { font-size: 22px; }
- .soundButton { height: 44px; flex-basis: 44px; }
- .steps { max-width: none; }
- .step { padding: 1px; font-size: 11px; }
- .planLayout { flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) 260px; grid-template-rows: minmax(0, 1fr) auto; gap: 6px 12px; }
- .planMain { grid-column: 1; grid-row: 1 / -1; overflow-y: auto; gap: 4px; }
- .planLayout > .panel { grid-column: 2; grid-row: 1; height: 100%; overflow-y: auto; }
- .planLayout > .footer { grid-column: 2; grid-row: 2; }
- .planMain .board { width: min(100%, calc((100dvh - 180px) * var(--aspect, 1))); }
- .planMain .message { margin: 0; padding: 3px; font-size: 12px; }
- .doneLayout { flex: 1; min-height: 0; max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) 260px; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
- .doneIntro, .doneExtras { grid-column: 2; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; }
- .doneIntro { grid-row: 1; }
- .doneExtras { grid-row: 2; }
- .stage3d, .doneLayout > .inside, .doneLayout > .frontWrap { grid-column: 1; grid-row: 1 / -1; height: 100%; min-height: 0; }
- .doneTitle { font-size: 16px; margin: 0; }
- .summary { font-size: 12px; padding: 2px 6px; }
- .bubble { font-size: 12px; padding: 4px; }
- .viewToggle { flex-wrap: wrap; justify-content: center; gap: 4px; }
- .viewToggle .tab { min-height: 44px; padding: 4px; font-size: 13px; }
- .doneExtras .btn { min-height: 44px; min-width: 0; font-size: 14px; padding: 5px; }
- .doneButtons { flex-direction: column; width: 100%; }
- .outsideLayout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 260px; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px 12px; }
- .outsideLayout > .frontWrap { grid-column: 1; grid-row: 1 / -1; }
- .outsideLayout .panel { grid-column: 2; grid-row: 2; height: 100%; overflow-y: auto; }
- .outsideLayout .message, .outsideLayout .footer { grid-column: 2; }
-}
+
+/* ---------- よこむきの スマホ ---------- */
 
 @media (orientation: landscape) and (max-height: 560px) {
- .doneLayout { align-items: stretch; }
- .doneIntro, .doneExtras { height: 100%; max-height: 100%; }
- .doneIntro > *, .doneExtras > * { flex-shrink: 0; }
-}
+  .page:has(.planLayout),
+  .page:has(.doneLayout),
+  .page:has(.outsideLayout) {
+    height: 100dvh;
+    min-height: 0;
+    padding-top: calc(4px + var(--safe-top));
+    padding-bottom: calc(4px + var(--safe-bottom));
+    gap: 6px;
+  }
 
-@media (orientation: landscape) and (max-height: 560px) {
- .page:has(.planLayout), .page:has(.doneLayout), .page:has(.outsideLayout) { padding-top: calc(4px + var(--safe-top)); padding-bottom: calc(4px + var(--safe-bottom)); }
+  /* タイトル・すすみぐあい・ほぞん・おと を 1ぎょうに まとめる。 */
+  .header {
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "back title steps pause sound";
+  }
+
+  .title { font-size: 20px; }
+  .soundButton { width: 48px; height: 48px; }
+  .pauseButton { height: 48px; }
+  .steps { max-width: 560px; }
+  .step { padding: 2px; font-size: 12px; }
+
+  /* まどり: ひだりに かいの きりかえと ばん、みぎに えらぶ ところ。 */
+  .planLayout {
+    flex: 1;
+    min-height: 0;
+    max-width: none;
+    grid-template-columns: minmax(0, 1fr) clamp(300px, 42%, 440px);
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 6px 10px;
+  }
+
+  .planMain {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    min-height: 0;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .planMain .floorTabs {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding-top: 8px;
+  }
+
+  .planMain .floorTab { min-width: 64px; min-height: 44px; padding: 2px 8px; font-size: 15px; }
+
+  .planMain .boardWrap { flex: 1; height: 100%; }
+
+  .planMain .board {
+    width: min(100%, calc((100dvh - 74px - var(--safe-top) - var(--safe-bottom)) * var(--aspect, 1)));
+  }
+
+  .planLayout > .panel {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 0;
+    max-width: none;
+    overflow-y: auto;
+    align-self: stretch;
+  }
+
+  .planLayout > .footer,
+  .outsideLayout > .footer {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .planLayout .btnNext,
+  .outsideLayout .btnNext {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    font-size: 17px;
+  }
+
+  /* そとがわ */
+  .outsideLayout {
+    flex: 1;
+    min-height: 0;
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(300px, 42%, 440px);
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 6px 10px;
+  }
+
+  .outsideLayout > .frontWrap {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    align-self: center;
+    max-width: none;
+  }
+
+  .outsideLayout > .frontWrap .front { max-height: calc(100dvh - 80px - var(--safe-top) - var(--safe-bottom)); }
+
+  .outsideLayout > .panel {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 0;
+    max-width: none;
+    overflow-y: auto;
+  }
+
+  .outsideLayout .tabRow {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 2px 2px 6px;
+  }
+
+  .outsideLayout .tabRow > li { flex: 0 0 auto; }
+  .outsideLayout .tab { min-height: 44px; padding: 4px 10px; font-size: 14px; white-space: nowrap; }
+  .chip { font-size: 13px; }
+
+  /* かんせい */
+  .doneLayout {
+    flex: 1;
+    min-height: 0;
+    max-width: none;
+    display: grid;
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 36%, 400px);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 12px;
+  }
+
+  .doneIntro,
+  .doneExtras {
+    grid-column: 2;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .doneIntro > *,
+  .doneExtras > * { flex-shrink: 0; }
+
+  .doneIntro { grid-row: 1; }
+  .doneExtras { grid-row: 2; }
+
+  .stage3d,
+  .doneLayout > .inside,
+  .doneLayout > .frontWrap {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .doneTitle { font-size: 16px; margin: 0; }
+  .summary { font-size: 12px; padding: 2px 6px; }
+  .bubble { font-size: 12px; padding: 4px; }
+  .viewToggle { flex-wrap: wrap; justify-content: center; gap: 4px; }
+  .viewToggle .tab { min-height: 44px; padding: 4px 10px; font-size: 14px; }
+  .doneExtras .btn { min-height: 44px; min-width: 0; font-size: 14px; padding: 5px; }
+  .doneButtons { flex-direction: column; width: 100%; }
 }
