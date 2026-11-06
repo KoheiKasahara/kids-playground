@@ -35,7 +35,7 @@ async function fetchNightlyStatus() {
 
 async function fetchDeployStatus(status = 'completed') {
   const payload = await getJson(
-    `${apiUrl}/repos/${repository}/actions/workflows/ci.yml/runs?branch=main&event=push&status=${status}&per_page=1`,
+    `${apiUrl}/repos/${repository}/actions/workflows/ci.yml/runs?branch=main&status=${status}&per_page=1`,
   )
   const run = parseLatestRun(payload)
   if (!run?.id) {
