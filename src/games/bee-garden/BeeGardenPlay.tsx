@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import StageClearBadge from '../../components/StageClearBadge'
@@ -39,8 +39,39 @@ export default function BeeGardenPlay() {
   const available = index === null ? [] : moves(stage, path)
   const remaining = Math.max(0, stage.cells.length - path.length)
   const stuck = index !== null && !complete && available.length === 0
+  // Pointer moves can arrive faster than re-renders, so tracing reads the latest route from a ref.
+  const pathRef = useRef<number[]>([])
+  const drag = useRef<{ last: number | null } | null>(null)
+  const traced = useRef(false)
 
-  function reset(next: number[]) { setPath(next); setMessage(''); setHint(null); setShake(null) }
+  function reset(next: number[]) { pathRef.current = next; setPath(next); setMessage(''); setHint(null); setShake(null) }
+
+  function advance(current: readonly number[], cell: number) {
+    const next = [...current, cell]
+    const won = isComplete(stage, next)
+    reset(next); playBeeSound(won)
+    if (won) setProgress(progressStore.record(index!, 3))
+  }
+
+  /** Follows a finger: enter a flower next to the bee to fly there, slide back to undo. */
+  function trace(cell: number): boolean {
+    const current = pathRef.current
+    if (isComplete(stage, current)) return false
+    if (current.length > 1 && cell === current.at(-2)) { reset(current.slice(0, -1)); playBeeSound(); return true }
+    if (!moves(stage, current).includes(cell)) return false
+    advance(current, cell)
+    return true
+  }
+
+  function cellAt(event: PointerEvent): number | null {
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-cell]')
+    return target ? Number(target.dataset.cell) : null
+  }
+
+  function endDrag() {
+    drag.current = null
+    if (traced.current) setTimeout(() => { traced.current = false })
+  }
 
   function start(next: number) {
     primeAudio(); playBeeSound()
@@ -48,16 +79,14 @@ export default function BeeGardenPlay() {
   }
 
   function move(cell: number) {
+    if (traced.current) { traced.current = false; return }
     if (complete) return
     if (!available.includes(cell)) {
       setShake(prev => ({ cell, key: (prev?.key ?? 0) + 1 }))
       setMessage(cell === hive ? '🌼を ぜんぶ まわってから 🏠へ' : path.includes(cell) ? '✓ の おはなは もう いったよ' : 'やじるしの おはなへ とぼう')
       return
     }
-    const next = [...path, cell]
-    const won = isComplete(stage, next)
-    reset(next); playBeeSound(won)
-    if (won) setProgress(progressStore.record(index!, 3))
+    advance(path, cell)
   }
 
   function showHint() {
@@ -68,7 +97,7 @@ export default function BeeGardenPlay() {
   }
 
   const status = complete ? '🎉 🌼 → 🏠' : remaining ? `🌼 あと ${remaining}こ → 🔒🏠` : '🌼 ✓ → 🏠 かえろう！'
-  const guide = message || (stuck ? 'いきどまり！ ↶ で もどろう' : remaining === 0 ? 'やじるしで 🏠へ かえろう' : 'やじるしの おはなを タップ！')
+  const guide = message || (stuck ? 'いきどまり！ ↶ で もどろう' : remaining === 0 ? 'やじるしで 🏠へ かえろう' : '👆 やじるしの おはなへ とぼう')
 
   return <main className={`${styles.page} ${index !== null ? styles.playing : ''}`}>
     <header className={styles.header}>
@@ -87,7 +116,16 @@ export default function BeeGardenPlay() {
       <div className={styles.status}><strong>{index + 1}. {stage.name}</strong><span aria-live="polite">{status}</span></div>
       <GamePlaySurface>
         <div className={styles.board} style={{ '--cols': stage.cols, '--rows': stage.rows } as CSSProperties}>
-          <div className={styles.grid} aria-label="おはなの おにわ">
+          <div className={styles.grid} aria-label="おはなの おにわ"
+            onPointerDown={event => { traced.current = false; drag.current = { last: cellAt(event) } }}
+            onPointerMove={event => {
+              if (!drag.current) return
+              const cell = cellAt(event)
+              if (cell === null || cell === drag.current.last) return
+              drag.current.last = cell
+              if (trace(cell)) traced.current = true
+            }}
+            onPointerUp={endDrag} onPointerCancel={endDrag}>
             {stage.tiles.map((tile, cell) => {
               const r = row(stage, cell), c = col(stage, cell)
               const scenery = SCENERY[tile]
@@ -96,7 +134,7 @@ export default function BeeGardenPlay() {
               const visited = path.includes(cell) && !isHive
               const open = available.includes(cell)
               const dir = open ? direction(stage, head, cell) : undefined
-              return <button key={shake?.cell === cell ? `${cell}-${shake.key}` : cell}
+              return <button key={shake?.cell === cell ? `${cell}-${shake.key}` : cell} data-cell={cell}
                 className={[styles.cell, isHive && styles.hive, open && styles.available, visited && styles.visited, hint === cell && styles.hint, shake?.cell === cell && styles.shake].filter(Boolean).join(' ')}
                 aria-label={`${r + 1}だん ${c + 1}れつ ${isHive ? 'おうち' : visited ? 'とおった おはな' : 'おはな'}${head === cell ? ' はちさん' : ''}${dir ? ` ${dir[1]}へ とべる` : ''}${hint === cell ? ' ヒント' : ''}`}
                 onClick={() => move(cell)} disabled={complete}>

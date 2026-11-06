@@ -61,3 +61,31 @@ it('guides back from a dead end in a larger garden', () => {
   fireEvent.click(cell('ひとつ もどす'))
   expect(screen.getByRole('status')).not.toHaveTextContent('いきどまり')
 })
+
+it('lets a finger trace the route, slide back to undo and finish without stray taps', () => {
+  render(<MemoryRouter><BeeGardenPlay /></MemoryRouter>)
+  fireEvent.click(cell('1. ちいさな'))
+  const board = screen.getByLabelText('おはなの おにわ')
+  let under: Element | null = null
+  document.elementFromPoint = vi.fn(() => under)
+  const over = (label: string, type: 'pointerDown' | 'pointerMove' = 'pointerMove') => {
+    under = cell(label)
+    fireEvent[type](board, { clientX: 1, clientY: 1 })
+  }
+  over('1だん 1れつ', 'pointerDown')
+  over('1だん 2れつ')
+  over('2だん 2れつ')
+  expect(screen.getByText(/あと 1こ/)).toBeInTheDocument()
+  over('1だん 2れつ')
+  expect(screen.getByText(/あと 2こ/)).toBeInTheDocument()
+  over('2だん 1れつ')
+  expect(screen.getByText(/あと 2こ/)).toBeInTheDocument()
+  over('2だん 2れつ')
+  over('2だん 1れつ')
+  fireEvent.pointerUp(board)
+  fireEvent.click(cell('1だん 1れつ'))
+  expect(screen.getByText(/かえろう/, { selector: 'span' })).toBeInTheDocument()
+  expect(screen.getByRole('status')).not.toHaveTextContent('ぜんぶ')
+  fireEvent.click(cell('1だん 1れつ'))
+  expect(screen.getByRole('region', { name: 'クリア' })).toBeInTheDocument()
+})
