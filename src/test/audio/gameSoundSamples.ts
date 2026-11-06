@@ -10,6 +10,7 @@ import { playBeeSound } from '../../games/bee-garden/sounds'
  * ステージや場面で曲が変わるゲームは、1曲だけ大きいのを見逃さないよう、すべての曲を登録する。
  */
 import type { SoundSample } from './soundMeter'
+import { playCraftSound } from '../../games/block-craft/sounds'
 import { playGardenSound } from '../../games/pixel-garden/sounds'
 import { playJellySound } from '../../games/jelly-merge/sounds'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
@@ -100,6 +101,7 @@ function pianoNotes(count: number): SoundSample['play'] {
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
   'bee-garden': [sample('とぶ', () => playBeeSound()), sample('クリア', () => playBeeSound(true))],
+  'block-craft': [sample('おく', () => playCraftSound('place')), sample('こわす', () => playCraftSound('remove')), sample('えらぶ', () => playCraftSound('select'))],
   sugoroku: [
     sample('えらぶ', () => playSugorokuSound('select')),
     sample('はじめる', () => playSugorokuSound('start')),
