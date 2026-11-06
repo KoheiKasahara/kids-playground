@@ -11,10 +11,12 @@ function history() {
     lighthousePerformance: 88, accessibility: 100, vulnerabilities: 0,
     vulnerabilitiesCritical: 0, vulnerabilitiesHigh: 0, vulnerabilitiesModerate: 0, vulnerabilitiesLow: 0, vulnerabilitiesInfo: 0,
     nightly: 'success', deploy: 'success',
+    runId: '123', sourceSha: 'a'.repeat(40), publishedSha: 'b'.repeat(40),
+    publishedRunId: '456', publishedAt: now.toISOString(),
   }] }
 }
 
-for (const width of [390, 1280]) {
+for (const width of [320, 390, 1280]) {
   test(`健康状態を日本語で表示し画面幅${width}pxに収める`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.route('**/project-health/history.json', (route) => route.fulfill({ json: history() }))
@@ -27,6 +29,10 @@ for (const width of [390, 1280]) {
     await expect(page.getByRole('article', { name: '依存関係の脆弱性' })).toContainText('0件')
     await expect(page.getByRole('article', { name: '単体・画面テスト' })).toContainText('6050 / 6050')
     await expect(page.getByRole('article', { name: '初期読込のJS' })).toContainText('132.5 KB')
+    await expect(page.getByRole('article', { name: '初期読込のJS' })).toContainText('上限 160.0 KB・使用率 83%')
+    await page.getByText('計測の根拠・対象バージョン', { exact: true }).click()
+    await expect(page.getByRole('link', { name: 'テスト結果・計測レポートを見る ↗' })).toHaveAttribute('href', 'https://github.com/KoheiKasahara/kids-playground/actions/runs/123')
+    await expect(page.getByText('計測した版と最終公開成功の版が異なります。')).toBeVisible()
     const catalog = page.getByRole('region', { name: '公開中のアプリ' })
     await expect(catalog.getByText(String(GAME_CATALOG.length), { exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)

@@ -17,6 +17,36 @@ const latest = {
 }
 
 describe('Dashboard', () => {
+  it('予算超過の原因・使用率と計測根拠を表示する', async () => {
+    const sha = 'a'.repeat(40)
+    mockHistoryResponse({ entries: [{ ...latest, initialJsGzipKb: 176,
+      sourceSha: sha, publishedSha: sha, publishedRunId: '99', publishedAt: latest.recordedAt }] })
+    render(<Dashboard />)
+    expect(await screen.findByText('対応が必要です')).toBeInTheDocument()
+    const card = screen.getByRole('article', { name: '初期読込のJS' })
+    expect(card).toHaveTextContent('上限 160.0 KB・使用率 110%')
+    expect(screen.getByRole('link', { name: '初期読込のJS: 176.0 KB' })).toHaveAttribute('href', '#metric-initialJsGzipKb')
+    // detailsを展開してから、キーボードやタップで利用するリンクを確認する。
+    screen.getByText('計測の根拠・対象バージョン').click()
+    expect(screen.getByRole('link', { name: 'テスト結果・計測レポートを見る ↗' })).toHaveAttribute('href', 'https://github.com/KoheiKasahara/kids-playground/actions/runs/5')
+    expect(screen.getByRole('link', { name: '公開ログ ↗' })).toHaveAttribute('href', 'https://github.com/KoheiKasahara/kids-playground/actions/runs/99')
+    expect(screen.getByText('計測した版と最終公開成功の版は一致しています。')).toBeInTheDocument()
+  })
+
+  it('不正な識別子をリンクにせず、バージョン一致を断定しない', async () => {
+    mockHistoryResponse({ entries: [{ ...latest, runId: '../bad', sourceSha: 'bad', publishedSha: 'a'.repeat(40) }] })
+    render(<Dashboard />)
+    await screen.findByText('正常です')
+    screen.getByText('計測の根拠・対象バージョン').click()
+    expect(screen.queryByRole('link', { name: /テスト結果・計測レポート/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/バージョンの一致は未確認/)).toBeInTheDocument()
+  })
+
+  it('計測対象と最終公開成功の版が異なることを表示する', async () => {
+    mockHistoryResponse({ entries: [{ ...latest, sourceSha: 'a'.repeat(40), publishedSha: 'b'.repeat(40) }] })
+    render(<Dashboard />)
+    expect(await screen.findByText('計測した版と最終公開成功の版が異なります。')).toBeInTheDocument()
+  })
   beforeEach(() => {
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-05T06:00:00Z'))
   })
@@ -37,7 +67,7 @@ describe('Dashboard', () => {
     expect(screen.getByText('42 / 42')).toBeInTheDocument()
     expect(screen.getByText('1.80 MB')).toBeInTheDocument()
     expect(screen.getByText('前回比 ▲ 63 KB')).toBeInTheDocument()
-    expect(screen.getByText('最終計測日: 2026-09-05（日本時間）')).toBeInTheDocument()
+    expect(screen.getByText('最終計測日時: 2026/09/05 12:00（日本時間）')).toBeInTheDocument()
     expect(screen.queryByText(/Healthy|Warning|success|vulnerable/)).not.toBeInTheDocument()
   })
 

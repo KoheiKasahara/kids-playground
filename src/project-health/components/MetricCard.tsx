@@ -35,6 +35,7 @@ export default function MetricCard({ metric }: { metric: MetricViewModel }) {
         ) : null}
       </div>
       <div className="ph-card__value">{metric.value}</div>
+      {metric.budgetText && <p className="ph-card__budget">{metric.budgetText}</p>}
       <div className={`ph-card__trend ${trendClass}`}>前回比 {metric.trendText === '→' ? '変化なし' : metric.trendText}</div>
       {metric.description && <p className="ph-card__description">{metric.description}</p>}
     </article>

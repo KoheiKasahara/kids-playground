@@ -13,6 +13,11 @@ describe('toJstDateString', () => {
 })
 
 describe('parseHistoryFile', () => {
+  it('計測と公開の根拠を再読込しても維持する', () => {
+    const entry = { date: '2026-09-05', sourceSha: 'a'.repeat(40), publishedSha: 'b'.repeat(40),
+      publishedRunId: '123', publishedAt: '2026-09-05T00:00:00Z' }
+    expect(parseHistoryFile(JSON.stringify({ entries: [entry] })).entries).toEqual([entry])
+  })
   it('履歴ファイルが存在しない場合は空履歴を返す（初回実行）', () => {
     expect(parseHistoryFile(undefined)).toEqual({ entries: [] })
     expect(parseHistoryFile('')).toEqual({ entries: [] })

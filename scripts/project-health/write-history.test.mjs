@@ -21,10 +21,13 @@ test('既存の計測成果物から追加指標を保存し、過去のレコ�
   writeJson('e2e.json', { stats: { expected: 9, unexpected: 0, skipped: 0, flaky: 1 } })
   writeJson('audit.json', { metadata: { vulnerabilities: { total: 2, moderate: 1, high: 1 } } })
   writeJson('lighthouse.json', { targets: [{ name: 'ホーム画面', performance: 91, accessibility: 100 }] })
-  writeJson('context.json', { deploy: { conclusion: 'success' } })
+  writeJson('context.json', { deploy: { conclusion: 'failure' }, publishedDeploy: {
+    conclusion: 'success', headSha: 'b'.repeat(40), runId: '123', completedAt: '2026-09-01T18:00:00Z',
+  } })
   writeJson('history.json', { entries: [{ date: '2026-09-01', games: 1, vulnerabilities: 3 }] })
   const env = {
     ...process.env,
+    GITHUB_SHA: 'a'.repeat(40),
     PROJECT_HEALTH_GAME_CATALOG: join(dir, 'catalog.ts'),
     PROJECT_HEALTH_DIST_DIR: join(dir, 'dist'),
     PROJECT_HEALTH_VITEST_RESULTS: join(dir, 'vitest.json'),
@@ -48,10 +51,17 @@ test('既存の計測成果物から追加指標を保存し、過去のレコ�
     date: '2026-09-02', games: 2, unitTests: 100, unitTestsPassed: 99,
     e2eSmokeTotal: 10, e2eSmokePassed: 10, e2eSmokeFlaky: 1, e2eSmokeSkipped: 0,
     vulnerabilities: 2, vulnerabilitiesCritical: 0, vulnerabilitiesHigh: 1, vulnerabilitiesModerate: 1,
-    precacheKb: 5.9, precacheEntries: 3, nightly: 'failure', deploy: 'success', lighthouseTarget: 'ホーム画面',
+    precacheKb: 6000 / 1024, precacheEntries: 3, nightly: 'failure', deploy: 'failure', lighthouseTarget: 'ホーム画面',
+    sourceSha: 'a'.repeat(40), publishedSha: 'b'.repeat(40), publishedRunId: '123', publishedAt: '2026-09-01T18:00:00Z',
   })
   expect(history.entries[1].initialJsGzipKb).toBeTypeOf('number')
   expect(history.entries[1].initialCssGzipKb).toBeTypeOf('number')
+
+  // 誤った成功情報を受け取っても、失敗した版を公開済みとして記録しない。
+  writeJson('context.json', { publishedDeploy: { conclusion: 'failure', headSha: 'c'.repeat(40), runId: '456' } })
+  expect(spawnSync(process.execPath, [script], { env, encoding: 'utf8' }).status).toBe(0)
+  const failedDeploy = JSON.parse(readFileSync(join(dir, 'history.json'), 'utf8')).entries[1]
+  expect(failedDeploy).toMatchObject({ publishedSha: null, publishedRunId: null, publishedAt: null })
 
   // 出力先がディレクトリの場合は、更新成功と偽らずジョブに失敗を返す。
   const failed = spawnSync(process.execPath, [script], {

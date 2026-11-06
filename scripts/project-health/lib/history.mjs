@@ -11,7 +11,8 @@ const NUMERIC_KEYS = [
   'vulnerabilities', 'vulnerabilitiesCritical', 'vulnerabilitiesHigh',
   'vulnerabilitiesModerate', 'vulnerabilitiesLow', 'vulnerabilitiesInfo',
 ]
-const STRING_KEYS = ['nightly', 'deploy', 'recordedAt', 'runId', 'lighthouseTarget']
+const STRING_KEYS = ['nightly', 'deploy', 'recordedAt', 'runId', 'lighthouseTarget',
+  'sourceSha', 'publishedSha', 'publishedRunId', 'publishedAt']
 
 function normalizeEntry(entry) {
   if (!entry || typeof entry !== 'object' || typeof entry.date !== 'string') return null

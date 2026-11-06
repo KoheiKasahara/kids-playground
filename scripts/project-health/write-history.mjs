@@ -70,7 +70,8 @@ function main() {
   const distDir = process.env.PROJECT_HEALTH_DIST_DIR ?? 'dist'
   const bundle = safe('bundle size', () => measureBundleSize(distDir))
   const loading = safe('loading size', () => measureLoadingSize(distDir))
-  const toKb = (bytes) => typeof bytes === 'number' ? Math.round(bytes / 1024 * 10) / 10 : null
+  // 予算境界を丸めで隠さない。表示時だけ丸める。
+  const toKb = (bytes) => typeof bytes === 'number' ? bytes / 1024 : null
 
   const auditPath = process.env.PROJECT_HEALTH_AUDIT_FILE ?? 'project-health/npm-audit.json'
   const dependencies = safe('dependencies', () => parseNpmAudit(readJson(auditPath)))
@@ -123,6 +124,10 @@ function main() {
     deploy: deploy?.conclusion ?? null,
     recordedAt,
     runId,
+    sourceSha: process.env.GITHUB_SHA || null,
+    publishedSha: context.publishedDeploy?.conclusion === 'success' ? context.publishedDeploy.headSha ?? null : null,
+    publishedRunId: context.publishedDeploy?.conclusion === 'success' ? context.publishedDeploy.runId ?? null : null,
+    publishedAt: context.publishedDeploy?.conclusion === 'success' ? context.publishedDeploy.completedAt ?? null : null,
   }
 
   const historyPath = process.env.PROJECT_HEALTH_HISTORY_FILE ?? 'public/project-health/history.json'

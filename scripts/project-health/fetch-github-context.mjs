@@ -33,9 +33,9 @@ async function fetchNightlyStatus() {
   return parseLatestRun(payload)
 }
 
-async function fetchDeployStatus() {
+async function fetchDeployStatus(status = 'completed') {
   const payload = await getJson(
-    `${apiUrl}/repos/${repository}/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=1`,
+    `${apiUrl}/repos/${repository}/actions/workflows/ci.yml/runs?branch=main&status=${status}&per_page=1`,
   )
   const run = parseLatestRun(payload)
   if (!run?.id) {
@@ -43,15 +43,19 @@ async function fetchDeployStatus() {
   }
 
   const jobsPayload = await getJson(`${apiUrl}/repos/${repository}/actions/runs/${run.id}/jobs`)
-  return findJob(jobsPayload, 'deploy')
+  const job = findJob(jobsPayload, 'deploy')
+  if (!job || (status === 'success' && job.conclusion !== 'success')) return null
+  return { ...job, runId: String(run.id), headSha: run.headSha }
 }
 
-const context = { nightly: null, deploy: null }
+const context = { nightly: null, deploy: null, publishedDeploy: null }
 
 if (!repository) {
   console.warn('[project-health] GITHUB_REPOSITORY is not set; skipping GitHub API lookups')
 } else {
-  const [nightlyResult, deployResult] = await Promise.allSettled([fetchNightlyStatus(), fetchDeployStatus()])
+  const [nightlyResult, deployResult, publishedResult] = await Promise.allSettled([
+    fetchNightlyStatus(), fetchDeployStatus(), fetchDeployStatus('success'),
+  ])
 
   if (nightlyResult.status === 'fulfilled') {
     context.nightly = nightlyResult.value
@@ -63,6 +67,11 @@ if (!repository) {
     context.deploy = deployResult.value
   } else {
     console.warn(`[project-health] failed to fetch Deploy status: ${deployResult.reason}`)
+  }
+  if (publishedResult.status === 'fulfilled') {
+    context.publishedDeploy = publishedResult.value
+  } else {
+    console.warn(`[project-health] failed to fetch published version: ${publishedResult.reason}`)
   }
 }
 

@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { buildDashboardViewModel, computeOverallStatus, emptyDashboardViewModel, isHistoryStale, workflowLabel } from './dashboardData'
 import type { ProjectHealthHistoryEntry } from '../../scripts/project-health/lib/history.mjs'
 
+import { parseLoadingBudgets } from '../../scripts/project-health/lib/loadingBudgets.mjs'
+import configRaw from '../../.project-health.json?raw'
+const BUDGETS = parseLoadingBudgets(configRaw)
+
 const THRESHOLDS = { lighthousePerformance: 90, accessibility: 90 }
 
 function entry(overrides: Partial<ProjectHealthHistoryEntry> = {}): ProjectHealthHistoryEntry {
@@ -28,12 +32,25 @@ function entry(overrides: Partial<ProjectHealthHistoryEntry> = {}): ProjectHealt
 }
 
 describe('buildDashboardViewModel', () => {
+  it.each([
+    ['initialJsGzipKb', BUDGETS.initialJsGzipKb, '✅', 'healthy'],
+    ['initialJsGzipKb', BUDGETS.initialJsGzipKb + 0.1, '❌', 'error'],
+    ['initialCssGzipKb', BUDGETS.initialCssGzipKb + 0.1, '❌', 'error'],
+    ['precacheKb', BUDGETS.precacheBaselineKb + BUDGETS.precacheGrowthWarnKb, '✅', 'healthy'],
+    ['precacheKb', BUDGETS.precacheBaselineKb + BUDGETS.precacheGrowthWarnKb + 0.1, '⚠️', 'warning'],
+    ['precacheKb', BUDGETS.precacheWarnKb + 0.1, '⚠️', 'warning'],
+    ['initialJsGzipKb', null, '❓', 'unknown'],
+  ] as const)('容量予算の境界と欠測を総合判定へ反映する: %s=%s', (key, value, status, overall) => {
+    const view = buildDashboardViewModel([entry({ [key]: value })], THRESHOLDS, BUDGETS, null)
+    expect(view.metrics.find(metric => metric.key === key)?.status).toBe(status)
+    expect(view.overallStatus).toBe(overall)
+  })
   it('履歴が0件の場合は空のビューモデル（overallStatus: unknown）になる', () => {
-    expect(buildDashboardViewModel([], THRESHOLDS, null)).toEqual(emptyDashboardViewModel())
+    expect(buildDashboardViewModel([], THRESHOLDS, BUDGETS, null)).toEqual(emptyDashboardViewModel())
   })
 
   it('正常な最新データを指標カードへ変換する', () => {
-    const view = buildDashboardViewModel([entry({ date: '2026-09-04' }), entry()], THRESHOLDS, '2026-09-05T03:10:00Z')
+    const view = buildDashboardViewModel([entry({ date: '2026-09-04' }), entry()], THRESHOLDS, BUDGETS, '2026-09-05T03:10:00Z')
 
     expect(view.hasHistory).toBe(true)
     expect(view.latestDate).toBe('2026-09-05')
@@ -54,7 +71,7 @@ describe('buildDashboardViewModel', () => {
   })
 
   it('履歴が1件のみの場合はtrendが「—」になり、他の表示は成立する', () => {
-    const view = buildDashboardViewModel([entry()], THRESHOLDS, null)
+    const view = buildDashboardViewModel([entry()], THRESHOLDS, BUDGETS, null)
     const byKey = Object.fromEntries(view.metrics.map((m) => [m.key, m]))
 
     expect(view.hasHistory).toBe(true)
@@ -80,7 +97,7 @@ describe('buildDashboardViewModel', () => {
       vulnerabilities: 0, // 減少 => lowerIsBetterなので改善
     })
 
-    const view = buildDashboardViewModel([previous, latest], THRESHOLDS, null)
+    const view = buildDashboardViewModel([previous, latest], THRESHOLDS, BUDGETS, null)
     const byKey = Object.fromEntries(view.metrics.map((m) => [m.key, m]))
 
     expect(byKey.bundle.trendText).toBe('▲ 63 KB')
@@ -97,7 +114,7 @@ describe('buildDashboardViewModel', () => {
     const previous = entry({ date: '2026-09-04', e2eSmokePassed: 42, e2eSmokeTotal: 42 })
     const latest = entry({ date: '2026-09-05', e2eSmokePassed: 39, e2eSmokeTotal: 42 })
 
-    const view = buildDashboardViewModel([previous, latest], THRESHOLDS, null)
+    const view = buildDashboardViewModel([previous, latest], THRESHOLDS, BUDGETS, null)
     const e2e = view.metrics.find((m) => m.key === 'e2eSmoke')!
 
     expect(e2e.status).toBe('❌')
@@ -111,7 +128,7 @@ describe('buildDashboardViewModel', () => {
       deploy: null,
       unitTests: null,
     })
-    const view = buildDashboardViewModel([latest], THRESHOLDS, null)
+    const view = buildDashboardViewModel([latest], THRESHOLDS, BUDGETS, null)
     const byKey = Object.fromEntries(view.metrics.map((m) => [m.key, m]))
 
     expect(byKey.lighthousePerformance.value).toBe('—')
@@ -123,7 +140,7 @@ describe('buildDashboardViewModel', () => {
   })
 
   it('閾値未達のLighthouse/Accessibilityは⚠️（Warning）になる', () => {
-    const view = buildDashboardViewModel([entry({ lighthousePerformance: 70, accessibility: 80 })], THRESHOLDS, null)
+    const view = buildDashboardViewModel([entry({ lighthousePerformance: 70, accessibility: 80 })], THRESHOLDS, BUDGETS, null)
     const byKey = Object.fromEntries(view.metrics.map((m) => [m.key, m]))
 
     expect(byKey.lighthousePerformance.status).toBe('⚠️')
@@ -132,7 +149,7 @@ describe('buildDashboardViewModel', () => {
   })
 
   it('Nightly失敗はNightlyカードを❌にし、overallStatusをerrorにする', () => {
-    const view = buildDashboardViewModel([entry({ nightly: 'failure' })], THRESHOLDS, null)
+    const view = buildDashboardViewModel([entry({ nightly: 'failure' })], THRESHOLDS, BUDGETS, null)
     expect(view.overallStatus).toBe('error')
   })
 
@@ -142,7 +159,7 @@ describe('buildDashboardViewModel', () => {
       entry({ date: '2026-09-02', bundleKb: null }),
       entry({ date: '2026-09-03', bundleKb: 1700 }),
     ]
-    const view = buildDashboardViewModel(entries, THRESHOLDS, null)
+    const view = buildDashboardViewModel(entries, THRESHOLDS, BUDGETS, null)
     const bundleSeries = view.sparklines.find((s) => s.key === 'bundle')!
 
     expect(bundleSeries.points).toEqual([1600, null, 1700])
@@ -186,29 +203,29 @@ describe('computeOverallStatus', () => {
 describe('計測結果の正確な判定', () => {
   it('高・重大の脆弱性は件数だけの警告でなく要対応にする', () => {
     for (const severity of ['vulnerabilitiesHigh', 'vulnerabilitiesCritical']) {
-      const view = buildDashboardViewModel([entry({ vulnerabilities: 1, [severity]: 1 })], THRESHOLDS, null)
+      const view = buildDashboardViewModel([entry({ vulnerabilities: 1, [severity]: 1 })], THRESHOLDS, BUDGETS, null)
       expect(view.overallStatus).toBe('error')
       expect(view.metrics.find((metric) => metric.key === 'vulnerabilities')?.status).toBe('❌')
     }
   })
 
   it('単体テスト失敗と再試行で成功したE2Eを見落とさない', () => {
-    const failed = buildDashboardViewModel([entry({ unitTestsPassed: 637 })], THRESHOLDS, null)
+    const failed = buildDashboardViewModel([entry({ unitTestsPassed: 637 })], THRESHOLDS, BUDGETS, null)
     expect(failed.overallStatus).toBe('error')
-    const flaky = buildDashboardViewModel([entry({ e2eSmokeFlaky: 1, e2eSmokeSkipped: 0 })], THRESHOLDS, null)
+    const flaky = buildDashboardViewModel([entry({ e2eSmokeFlaky: 1, e2eSmokeSkipped: 0 })], THRESHOLDS, BUDGETS, null)
     expect(flaky.overallStatus).toBe('warning')
     expect(flaky.metrics.find((metric) => metric.key === 'e2eSmoke')?.description).toContain('再試行で成功 1件')
   })
 
   it('古い履歴の成功数や初期読込量を補完して正常にしない', () => {
-    const view = buildDashboardViewModel([entry({ unitTestsPassed: undefined, initialJsGzipKb: undefined })], THRESHOLDS, null)
+    const view = buildDashboardViewModel([entry({ unitTestsPassed: undefined, initialJsGzipKb: undefined })], THRESHOLDS, BUDGETS, null)
     expect(view.overallStatus).toBe('unknown')
     expect(view.metrics.find((metric) => metric.key === 'unitTests')?.value).toBe('? / 638')
     expect(view.metrics.find((metric) => metric.key === 'initialJsGzipKb')?.value).toBe('—')
   })
 
   it('初期読込量の増加を判定し、総容量の増加とは区別する', () => {
-    const view = buildDashboardViewModel([entry({ date: '2026-09-04' }), entry({ initialJsGzipKb: 110, bundleKb: 2000 })], THRESHOLDS, null)
+    const view = buildDashboardViewModel([entry({ date: '2026-09-04' }), entry({ initialJsGzipKb: 110, bundleKb: 2000 })], THRESHOLDS, BUDGETS, null)
     expect(view.metrics.find((metric) => metric.key === 'initialJsGzipKb')?.trendJudgement).toBe('worsened')
     expect(view.metrics.find((metric) => metric.key === 'bundle')?.trendJudgement).toBe('neutral')
   })
@@ -218,18 +235,18 @@ describe('計測結果の正確な判定', () => {
       entry({ date: '2026-09-03', e2eSmokePassed: 30, e2eSmokeTotal: 40 }),
       entry({ date: '2026-09-04', e2eSmokePassed: null, e2eSmokeTotal: 80 }),
       entry({ e2eSmokePassed: 80, e2eSmokeTotal: 80 }),
-    ], THRESHOLDS, null)
+    ], THRESHOLDS, BUDGETS, null)
     expect(view.metrics.find((metric) => metric.key === 'e2eSmoke')?.trendText).toBe('▲ 25 pt')
   })
 
   it('最新の欠測値を過去の値にすり替えない', () => {
-    const view = buildDashboardViewModel([entry({ date: '2026-09-04' }), entry({ bundleKb: null })], THRESHOLDS, null)
+    const view = buildDashboardViewModel([entry({ date: '2026-09-04' }), entry({ bundleKb: null })], THRESHOLDS, BUDGETS, null)
     expect(view.sparklines.find((series) => series.key === 'bundle')?.latestText).toBe('—')
   })
 
   it('中止・未実行は正常にせず日本語で区別する', () => {
     for (const state of ['cancelled', 'skipped']) {
-      expect(buildDashboardViewModel([entry({ nightly: state })], THRESHOLDS, null).overallStatus).toBe('warning')
+      expect(buildDashboardViewModel([entry({ nightly: state })], THRESHOLDS, BUDGETS, null).overallStatus).toBe('warning')
     }
     expect(workflowLabel('cancelled')).toBe('中止')
     expect(workflowLabel('skipped')).toBe('未実行')

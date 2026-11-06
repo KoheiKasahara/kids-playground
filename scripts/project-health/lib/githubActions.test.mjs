@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { findJob, parseLatestRun } from './githubActions.mjs'
 
 describe('parseLatestRun', () => {
+  it('計測対象のコミットを取得する', () => {
+    expect(parseLatestRun({ workflow_runs: [{ id: 42, head_sha: 'a'.repeat(40) }] }))
+      .toMatchObject({ id: 42, headSha: 'a'.repeat(40) })
+  })
   it('成功したワークフロー実行を解釈する', () => {
     expect(
       parseLatestRun({
         workflow_runs: [{ id: 1, conclusion: 'success', status: 'completed', html_url: 'https://x/1' }],
       }),
-    ).toEqual({ id: 1, conclusion: 'success', status: 'completed', htmlUrl: 'https://x/1' })
+    ).toEqual({ id: 1, conclusion: 'success', status: 'completed', htmlUrl: 'https://x/1', headSha: null })
   })
 
   it('失敗したワークフロー実行を解釈する', () => {
@@ -22,6 +26,10 @@ describe('parseLatestRun', () => {
 })
 
 describe('findJob', () => {
+  it('公開ジョブの完了日時を取得する', () => {
+    expect(findJob({ jobs: [{ name: 'deploy', completed_at: '2026-09-05T00:00:00Z' }] }, 'deploy'))
+      .toMatchObject({ completedAt: '2026-09-05T00:00:00Z' })
+  })
   it('名前でジョブを見つける', () => {
     const jobsPayload = {
       jobs: [
@@ -33,6 +41,7 @@ describe('findJob', () => {
       conclusion: 'failure',
       status: null,
       htmlUrl: 'https://x/deploy',
+      completedAt: null,
     })
   })
 

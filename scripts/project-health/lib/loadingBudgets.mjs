@@ -9,18 +9,28 @@ export function parseLoadingBudgets(raw) {
 
 export function evaluateLoadingBudgets(metrics, budgets) {
   const errors = [], warnings = []
-  const check = (bytes, limitKb, label, target) => {
+  const check = (bytes, key, label, target) => {
     if (!Number.isFinite(bytes) || bytes < 0) throw new Error(`Missing loading measurement: ${label}`)
-    if (bytes > limitKb * 1024) target.push(`${label}: ${(bytes / 1024).toFixed(1)} KiB > ${limitKb} KiB`)
+    const { overLimit, limitKb } = evaluateLoadingMetric(key, bytes / 1024, budgets)
+    if (overLimit) target.push(`${label}: ${(bytes / 1024).toFixed(1)} KiB > ${limitKb} KiB`)
   }
-  check(metrics.initial.js.gzip, budgets.initialJsGzipKb, '初期JS gzip', errors)
-  check(metrics.initial.css.gzip, budgets.initialCssGzipKb, '初期CSS gzip', errors)
-  check(metrics.precache.bytes, budgets.precacheWarnKb, 'PWA保存容量', warnings)
+  check(metrics.initial.js.gzip, 'initialJsGzipKb', '初期JS gzip', errors)
+  check(metrics.initial.css.gzip, 'initialCssGzipKb', '初期CSS gzip', errors)
+  check(metrics.precache.bytes, 'precacheKb', 'PWA保存容量', warnings)
   const growth = metrics.precache.bytes / 1024 - budgets.precacheBaselineKb
-  if (growth > budgets.precacheGrowthWarnKb) {
+  if (evaluateLoadingMetric('precacheKb', metrics.precache.bytes / 1024, budgets).overGrowth) {
     warnings.push(`PWA保存容量の基準からの増加: +${growth.toFixed(1)} KiB > ${budgets.precacheGrowthWarnKb} KiB`)
   }
   return { errors, warnings }
+}
+
+// DashboardもCIと同じ境界値で判定する。欠測は予算内と扱わない。
+export function evaluateLoadingMetric(key, valueKb, budgets) {
+  const limitKb = key === 'precacheKb' ? budgets.precacheWarnKb : budgets[key]
+  if (!Number.isFinite(valueKb) || valueKb < 0) return { status: 'unknown', limitKb, overLimit: false, overGrowth: false }
+  const overLimit = valueKb > limitKb
+  const overGrowth = key === 'precacheKb' && valueKb - budgets.precacheBaselineKb > budgets.precacheGrowthWarnKb
+  return { status: overLimit || overGrowth ? (key === 'precacheKb' ? 'warning' : 'error') : 'healthy', limitKb, overLimit, overGrowth }
 }
 
 export function renderLoadingBudgetMarkdown(metrics, budgets) {

@@ -29,6 +29,10 @@ export interface ProjectHealthHistoryEntry {
   deploy: string | null
   recordedAt: string
   runId: string | null
+  sourceSha?: string | null
+  publishedSha?: string | null
+  publishedRunId?: string | null
+  publishedAt?: string | null
 }
 
 export interface ProjectHealthHistoryFile {
