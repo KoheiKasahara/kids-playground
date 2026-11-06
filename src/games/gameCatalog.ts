@@ -1355,6 +1355,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     },
     intro: { howToPlay: ['やじるしの おはなを タップ。ゆびで なぞっても とべるよ', 'おなじ おはなは １かいだけ。ぜんぶ めぐって おうちへ！', 'こまったら ヒントや「ひとつ もどす」を つかおう'] },
   },
+  {
+    id: 'block-craft',
+    slug: 'block-craft',
+    title: 'ブロッククラフト',
+    emoji: '🧱',
+    category: 'threeD',
+    seo: {
+      headline: 'ブロッククラフト｜ブロックを置いて自由な世界づくり',
+      description: '草や木、石などのブロックを置いたり壊したりして、自分だけの立体の世界をつくる子ども向けクラフトゲームです。材料は使い放題で、時間制限もありません。視点を回して家やお城をつくり、端末に保存して続きから遊べます。',
+    },
+    intro: {
+      howToPlay: [
+        'ざいりょうを えらび、ブロックの めんを タッチして おこう',
+        '「こわす」で ブロックを けせるよ。ドラッグで まわりを みよう',
+        'おわる まえに「ほぞん」を おすと、つづきから あそべるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

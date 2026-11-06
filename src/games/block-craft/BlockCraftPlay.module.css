@@ -1,0 +1,29 @@
+.game, .title { max-width: 760px; margin: auto; color: #25463c; padding: max(10px, env(safe-area-inset-top)) 12px max(20px, env(safe-area-inset-bottom)); }
+.game button, .title button { min-height: 46px; border: 2px solid #d0dfd1; border-radius: 12px; background: #fffef7; color: #25463c; padding: 8px 12px; font: inherit; font-weight: 700; cursor: pointer; }
+.game button:focus-visible, .title button:focus-visible, .scene:focus-visible, .precise summary:focus-visible { outline: 3px solid #206ba2; outline-offset: 3px; }
+.game button[aria-pressed=true] { border-color: #267652; background: #def4d3; box-shadow: inset 0 -3px #9dce91; }
+.game button:disabled { opacity: .4; cursor: default; }
+.header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; min-height: 48px; }
+.header h1 { flex: 1; font-size: clamp(16px, 4vw, 24px); margin: 0; }
+.header button { flex-shrink: 0; }
+.scene { height: clamp(280px, 48svh, 480px); width: 100%; overflow: hidden; border-radius: 20px; background: #c6eafa; touch-action: none; }
+.scene canvas { display: block; }
+.camera, .actions, .modes { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+.camera span { font-size: 12px; }
+.camera button { padding: 4px 10px; min-width: 44px; }
+.message { min-height: 2.8em; font-size: 14px; text-align: center; margin: 6px 0; }
+.modes button { flex: 1; }
+.palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+.palette button { padding: 5px 2px; font-size: 12px; }
+.swatch { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 4px; margin: 0 auto 3px; box-shadow: inset -5px -5px #0002; font-size: 18px; }
+.precise { margin: 14px 0; padding: 8px; background: #edf3e8; border-radius: 12px; font-size: 13px; }
+.precise summary { cursor: pointer; padding: 10px 0; }
+.hint { text-align: center; font-size: 12px; line-height: 1.8; }
+.title { text-align: center; }
+.title h2 { font-size: clamp(18px, 5vw, 28px); }
+.title p { line-height: 2; }
+.hero { padding: 45px 10px; background: linear-gradient(#c6eafa 70%, #9bc77a 70%); border-radius: 24px; font-size: clamp(44px, 12vw, 80px); }
+.title .start { display: block; margin: 18px auto; padding: 16px 28px; background: #def4d3; border-color: #75aa68; }
+.confirm { padding: 16px; border: 3px solid #86ab63; background: #fff9df; border-radius: 16px; }
+.confirm button { margin: 5px; }
+@media (max-width: 480px) { .palette { grid-template-columns: repeat(4, 1fr); } }
