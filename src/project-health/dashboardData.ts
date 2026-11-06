@@ -17,8 +17,18 @@ import {
   thresholdWarningIcon,
 } from '../../scripts/project-health/lib/format.mjs'
 import type { ProjectHealthThresholds } from '../../scripts/project-health/lib/projectHealthConfig.mjs'
+import { evaluateLoadingMetric, type LoadingBudgets } from '../../scripts/project-health/lib/loadingBudgets.mjs'
 
 export const DASH = '—'
+
+export function formatMeasuredAt(value: string | null | undefined): string {
+  const date = value ? new Date(value) : null
+  if (!date || !Number.isFinite(date.getTime())) return '日時不明'
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(date) + '（日本時間）'
+}
 
 export type StatusIcon = '✅' | '⚠️' | '❌' | '❓' | '⏭️' | ''
 
@@ -33,6 +43,7 @@ export interface MetricViewModel {
   trendJudgement: 'improved' | 'worsened' | 'neutral' | null
   group?: 'quality' | 'loading' | 'delivery'
   description?: string
+  budgetText?: string
 }
 
 export interface SparklineSeries {
@@ -47,6 +58,7 @@ export interface DashboardViewModel {
   overallStatus: OverallStatus
   latestDate: string | null
   updatedAt: string | null
+  provenance: Pick<ProjectHealthHistoryEntry, 'runId' | 'sourceSha' | 'publishedSha' | 'publishedRunId' | 'publishedAt'> | null
   metrics: MetricViewModel[]
   sparklines: SparklineSeries[]
 }
@@ -115,6 +127,7 @@ export function emptyDashboardViewModel(): DashboardViewModel {
     overallStatus: 'unknown',
     latestDate: null,
     updatedAt: null,
+    provenance: null,
     metrics: [],
     sparklines: [],
   }
@@ -123,6 +136,7 @@ export function emptyDashboardViewModel(): DashboardViewModel {
 export function buildDashboardViewModel(
   entries: ProjectHealthHistoryEntry[],
   thresholds: ProjectHealthThresholds,
+  budgets: LoadingBudgets,
   updatedAt: string | null,
 ): DashboardViewModel {
   if (!Array.isArray(entries) || entries.length === 0) {
@@ -272,8 +286,13 @@ export function buildDashboardViewModel(
   ] as const) {
     const current = latest[key] ?? null
     const trend = trendText(current, previousOf(priorEntries, latestDate, key) ?? null, direction, 'KB')
+    const budget = evaluateLoadingMetric(key, current, budgets)
+    const budgetStatus = { unknown: '❓', healthy: '✅', warning: '⚠️', error: '❌' } as const
+    const budgetText = `${key === 'precacheKb' ? '警告基準' : '上限'} ${formatBytes(budget.limitKb * 1024)}`
+      + (current === null ? '・使用率は未計測' : `・使用率 ${Math.round(current / budget.limitKb * 100)}%`)
+      + (key === 'precacheKb' ? `。基準 ${formatBytes(budgets.precacheBaselineKb * 1024)} から ${formatBytes(budgets.precacheGrowthWarnKb * 1024)} を超える増加でも警告` : '')
     metrics.push({ key, label, description, group: 'loading', value: current !== null ? formatBytes(current * 1024) : DASH,
-      status: current !== null ? '' : '❓', trendText: trend.text, trendJudgement: trend.judgement })
+      status: budgetStatus[budget.status], budgetText, trendText: trend.text, trendJudgement: trend.judgement })
   }
 
   const sparklines: SparklineSeries[] = [
@@ -295,6 +314,8 @@ export function buildDashboardViewModel(
     overallStatus: computeOverallStatus(metrics),
     latestDate,
     updatedAt: latest.recordedAt ?? updatedAt,
+    provenance: { runId: latest.runId, sourceSha: latest.sourceSha, publishedSha: latest.publishedSha,
+      publishedRunId: latest.publishedRunId, publishedAt: latest.publishedAt },
     metrics,
     sparklines,
   }

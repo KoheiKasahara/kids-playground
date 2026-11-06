@@ -1,13 +1,16 @@
 import { parseProjectHealthConfig } from '../../scripts/project-health/lib/projectHealthConfig.mjs'
 import projectHealthConfigRaw from '../../.project-health.json?raw'
 import { GAME_CATALOG, GAME_CATEGORIES, type GameCategoryId } from '../games/gameCatalog'
-import { buildDashboardViewModel, emptyDashboardViewModel, isHistoryStale } from './dashboardData'
+import { buildDashboardViewModel, emptyDashboardViewModel, isHistoryStale, formatMeasuredAt } from './dashboardData'
 import { useProjectHealthHistory } from './useProjectHealthHistory'
 import OverallStatusBanner from './components/OverallStatusBanner'
 import MetricCard from './components/MetricCard'
 import TrendSection from './components/TrendSection'
+import MeasurementDetails from './components/MeasurementDetails'
+import { parseLoadingBudgets } from '../../scripts/project-health/lib/loadingBudgets.mjs'
 
 const projectHealthConfig = parseProjectHealthConfig(projectHealthConfigRaw)
+const loadingBudgets = parseLoadingBudgets(projectHealthConfigRaw)
 const groups = [
   { key: 'quality', title: 'テストと安全性', description: 'アプリ全体を対象にした定期チェックの結果です。' },
   { key: 'loading', title: '表示品質と読み込み容量', description: 'アプリが増えたときの総容量と、最初に遊び始めるための読み込み量を分けて確認できます。' },
@@ -20,7 +23,7 @@ const categories = (Object.keys(GAME_CATEGORIES) as GameCategoryId[]).map((id) =
 export default function Dashboard() {
   const historyState = useProjectHealthHistory()
   const view = historyState.status === 'ready'
-    ? buildDashboardViewModel(historyState.entries, projectHealthConfig.thresholds, historyState.updatedAt)
+    ? buildDashboardViewModel(historyState.entries, projectHealthConfig.thresholds, loadingBudgets, historyState.updatedAt)
     : emptyDashboardViewModel()
   const stale = view.hasHistory && isHistoryStale(view.updatedAt)
   const overallStatus = stale && view.overallStatus === 'healthy' ? 'warning' : view.overallStatus
@@ -39,8 +42,9 @@ export default function Dashboard() {
         <p className="ph-header__description">アプリの品質・安全性・公開状況をまとめて確認</p>
         <OverallStatusBanner status={overallStatus} />
         <p className="ph-header__meta">
-          {historyState.status === 'loading' ? 'データを読み込み中…' : view.latestDate ? `最終計測日: ${view.latestDate}（日本時間）` : '計測データなし'}
+          {historyState.status === 'loading' ? 'データを読み込み中…' : view.hasHistory ? `最終計測日時: ${formatMeasuredAt(view.updatedAt)}` : '計測データなし'}
         </p>
+        {view.provenance && <MeasurementDetails provenance={view.provenance} />}
       </header>
 
       <section className="ph-catalog" aria-labelledby="catalog-title">

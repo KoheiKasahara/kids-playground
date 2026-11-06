@@ -274,6 +274,14 @@ a:focus-visible, button:focus-visible { outline: 3px solid #304bb4; outline-offs
 }
 
 .ph-card__description { margin: 10px 0 0; font-size: 0.78rem; }
+.ph-card__budget { font-size: 0.82rem; line-height: 1.7; margin: 8px 0; }
+.ph-measurement { max-width: 680px; margin: 16px auto 0; text-align: left; font-size: 0.85rem; line-height: 1.7; overflow-wrap: anywhere; }
+.ph-measurement summary { cursor: pointer; font-weight: 600; }
+.ph-measurement summary:focus-visible { outline: 3px solid #304bb4; outline-offset: 4px; }
+.ph-measurement dl { margin: 12px 0; }
+.ph-measurement dl > div { margin: 8px 0; }
+.ph-measurement dt { color: #5c6472; }
+.ph-measurement dd { margin: 0; }
 .ph-section { margin: 32px 0; }
 .ph-section__title { font-size: 1.1rem; margin-bottom: 6px; }
 

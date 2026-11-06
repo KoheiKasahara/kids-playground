@@ -12,6 +12,7 @@ export function parseLatestRun(runsPayload) {
     conclusion: run.conclusion ?? null,
     status: run.status ?? null,
     htmlUrl: run.html_url ?? null,
+    headSha: run.head_sha ?? null,
   }
 }
 
@@ -30,5 +31,6 @@ export function findJob(jobsPayload, jobName) {
     conclusion: job.conclusion ?? null,
     status: job.status ?? null,
     htmlUrl: job.html_url ?? null,
+    completedAt: job.completed_at ?? null,
   }
 }
