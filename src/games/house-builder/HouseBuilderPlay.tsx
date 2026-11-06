@@ -326,27 +326,28 @@ export default function HouseBuilderPlay() {
       <header className={styles.header}>
         <GameBackButton to="/" onBack={current === 'type' ? undefined : back} />
         <h1 className={styles.title}>{TITLE}</h1>
+        <ol className={styles.steps} aria-label="すすみぐあい">
+          {STEPS.map((step, i) => {
+            const at = step.screens.includes(current)
+            const done = STEPS.findIndex((s) => s.screens.includes(current)) > i
+            return (
+              <li key={step.name} className={styles.step} data-current={at || undefined} data-done={done || undefined} aria-current={at ? 'step' : undefined}>
+                <span className={styles.stepNum} aria-hidden="true">{done ? '✓' : i + 1}</span>
+                {step.name}
+              </li>
+            )
+          })}
+        </ol>
+        {(current === 'plan' || current === 'outside') && (
+          <button type="button" className={styles.pauseButton} aria-label="いったん ほぞんして もどる" onClick={pause}>
+            <span className={styles.pauseIcon} aria-hidden="true">🏠</span>
+            <span aria-hidden="true">ほぞん</span>
+          </button>
+        )}
         <button type="button" className={styles.soundButton} aria-label={sound ? 'おとを けす' : 'おとを だす'} aria-pressed={sound} onClick={toggleSound}>
           <span aria-hidden="true">{sound ? '🔊' : '🔇'}</span>
         </button>
       </header>
-      <ol className={styles.steps} aria-label="すすみぐあい">
-        {STEPS.map((step, i) => {
-          const at = step.screens.includes(current)
-          const done = STEPS.findIndex((s) => s.screens.includes(current)) > i
-          return (
-            <li key={step.name} className={styles.step} data-current={at || undefined} data-done={done || undefined} aria-current={at ? 'step' : undefined}>
-              <span className={styles.stepNum} aria-hidden="true">{done ? '✓' : i + 1}</span>
-              {step.name}
-            </li>
-          )
-        })}
-      </ol>
-      {(current === 'plan' || current === 'outside') && (
-        <button type="button" className={styles.pauseButton} onClick={pause}>
-          <span aria-hidden="true">🏠 </span>いったん ほぞんして もどる
-        </button>
-      )}
       {body}
       {dialog}
     </main>
@@ -553,10 +554,24 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
   const [hover, setHover] = useState<Cell | null>(null)
   const [popId, setPopId] = useState<number | null>(null)
   const [message, setMessage] = useState(MESSAGE_START)
+  const [toast, setToast] = useState<{ key: number; text: string } | null>(null)
   const selected = design.rooms.find((room) => room.id === selectedId && room.floor === floor) ?? null
   const styleFor = (type: RoomTypeId) => styleOf[type] ?? findRoomType(type).styles[0].id
   const pick: RoomPick = { type: pickType, style: styleFor(pickType), size, turned }
   const counts = roomCounts(design)
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = window.setTimeout(() => setToast(null), 1800)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  /** できなかった ときは ばんの うえに みじかく だす（へやの ならびは ずらさない）。 */
+  function blocked(text: string) {
+    sfx('blocked', 'error')
+    setMessage(text)
+    setToast((t) => ({ key: (t?.key ?? 0) + 1, text }))
+  }
 
   let ghost: Ghost | null = null
   if (hover && !selected) {
@@ -573,8 +588,7 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
     }
     const result = addRoom(design, floor, pick, cell)
     if (!result) {
-      sfx('blocked', 'error')
-      setMessage('ここには はいらないよ。ちいさく するか、ほかの ところに おいてね')
+      blocked('ここには はいらないよ。ちいさく するか、ほかの ところに おいてね')
       return
     }
     onChange(result.design)
@@ -594,14 +608,13 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
     setSelectedId(room.id)
     setPopId(null)
     sfx('tap', 'tap')
-    setMessage(`${findRoomStyle(room.type, room.style).name}。みためや おおきさを かえられるよ`)
+    setMessage(`${findRoomStyle(room.type, room.style).name}を えらんだよ`)
   }
 
   function moveTo(room: PlacedRoom, to: Cell) {
     const next = moveRoom(design, room.id, to)
     if (!next) {
-      sfx('blocked', 'error')
-      setMessage('そこには うごかせないよ。あいている ところに もっていってね')
+      blocked('そこには うごかせないよ。あいている ところに もっていってね')
       return
     }
     onChange(next)
@@ -614,8 +627,7 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
     if (!selected) return
     const next = changeRoom(design, selected.id, patch)
     if (!next) {
-      sfx('blocked', 'error')
-      setMessage('ここでは そう できないよ。まわりを あけてみてね')
+      blocked('ここでは そう できないよ。まわりを あけてみてね')
       return
     }
     onChange(next)
@@ -657,38 +669,33 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
             ))}
           </div>
         )}
-        <p className={styles.message} role="status" aria-live="polite">{message}</p>
-        <PlanBoard
-          design={design}
-          floor={floor}
-          label={`${floor + 1}かいの まどり`}
-          selectedId={selected?.id ?? null}
-          popId={popId}
-          ghost={ghost}
-          onCell={placeAt}
-          onRoom={selectRoom}
-          onMove={moveTo}
-          onHover={setHover}
-        />
-        {needsStairs && <p className={styles.hint}>かいだんを おくと うえと したが つながるよ</p>}
+        <p className={styles.srOnly} role="status" aria-live="polite">{message}</p>
+        <div className={styles.boardWrap}>
+          <PlanBoard
+            design={design}
+            floor={floor}
+            label={`${floor + 1}かいの まどり`}
+            selectedId={selected?.id ?? null}
+            popId={popId}
+            ghost={ghost}
+            onCell={placeAt}
+            onRoom={selectRoom}
+            onMove={moveTo}
+            onHover={setHover}
+          />
+          {toast && <p key={toast.key} className={styles.toast} aria-hidden="true">{toast.text}</p>}
+        </div>
       </div>
 
       <div className={styles.panel}>
         {selected ? (
           <div className={styles.editPanel} aria-label="えらんだ へや">
-            <p className={styles.panelTitle}>
-              <span className={styles.panelBadge}>えらんだ へや</span>
-              {findRoomStyle(selected.type, selected.style).name}
-            </p>
-            <h3 className={styles.panelHead}>みため</h3>
-            <StylePicker type={selected.type} value={selected.style} {...roomSize(selected)} onPick={(style) => edit({ style }, 'paint')} />
-            <h3 className={styles.panelHead}>おおきさ</h3>
-            <SizePicker type={selected.type} size={selected.size} turned={selected.turned} onSize={(s) => edit({ size: s }, 'place')} onTurn={() => edit({ turned: !selected.turned }, 'turn')} />
-            <div className={styles.editButtons}>
-              <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={remove}>けす</button>
+            <div className={styles.editHead}>
+              <p className={styles.panelTitle}>{findRoomStyle(selected.type, selected.style).name}</p>
+              <button type="button" className={`${styles.btn} ${styles.btnSmall} ${styles.btnDanger}`} onClick={remove}>けす</button>
               <button
                 type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
+                className={`${styles.btn} ${styles.btnSmall} ${styles.btnPrimary}`}
                 onClick={() => {
                   setSelectedId(null)
                   setMessage(MESSAGE_START)
@@ -696,10 +703,11 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
                 }}
               >できた</button>
             </div>
+            <StylePicker type={selected.type} value={selected.style} {...roomSize(selected)} onPick={(style) => edit({ style }, 'paint')} />
+            <SizePicker type={selected.type} size={selected.size} turned={selected.turned} onSize={(s) => edit({ size: s }, 'place')} onTurn={() => edit({ turned: !selected.turned }, 'turn')} />
           </div>
         ) : (
-          <div>
-            <h3 className={styles.panelHead}>へや</h3>
+          <div className={styles.pickPanel}>
             <ul className={styles.scrollRow} aria-label="へやの しゅるい">
               {ROOM_TYPES.map((type) => (
                 <li key={type.id}>
@@ -707,6 +715,7 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
                     type="button"
                     className={styles.roomChip}
                     aria-pressed={pickType === type.id}
+                    data-nudge={(needsStairs && type.id === 'stairs') || undefined}
                     onClick={() => {
                       setPickType(type.id)
                       sfx('tap')
@@ -719,7 +728,6 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
                 </li>
               ))}
             </ul>
-            <h3 className={styles.panelHead}>みため</h3>
             <StylePicker
               type={pickType}
               value={pick.style}
@@ -730,7 +738,6 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
                 setMessage(`${findRoomStyle(pickType, style).name}を おこう`)
               }}
             />
-            <h3 className={styles.panelHead}>おおきさ</h3>
             <SizePicker
               type={pickType}
               size={size}
@@ -749,7 +756,7 @@ function PlanScreen({ design, onChange, onNext }: { design: HouseDesign; onChang
       </div>
 
       <div className={styles.footer}>
-        <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} onClick={onNext}>
+        <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnNext}`} onClick={onNext}>
           そとがわを つくる <span aria-hidden="true">→</span>
         </button>
       </div>
@@ -815,7 +822,7 @@ function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onCh
       <div className={styles.frontWrap}>
         <HouseFront design={design} lively title="いま つくっている おうちの そとがわ" />
       </div>
-      <p className={styles.message} role="status" aria-live="polite">{message}</p>
+      <p className={styles.srOnly} role="status" aria-live="polite">{message}</p>
       <div className={styles.panel}>
         <ul className={styles.tabRow} aria-label="えらぶ もの">
           {CATEGORIES.map((c) => (
@@ -846,12 +853,9 @@ function OutsideScreen({ design, onChange, onDone }: { design: HouseDesign; onCh
             </li>
           ))}
         </ul>
-        {category === 'extras' && <p className={styles.hint}>おまけは いくつでも つけられるよ</p>}
-        {category === 'style' && <p className={styles.hint}>セットを えらんだ あとに、かべや やねを かえても いいよ</p>}
-        {(category === 'garden' || category === 'pool') && <p className={styles.hint}>にわと プールは いっしょに おけるよ</p>}
       </div>
       <div className={styles.footer}>
-        <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} onClick={onDone}>
+        <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnNext}`} onClick={onDone}>
           かんせい！
         </button>
       </div>

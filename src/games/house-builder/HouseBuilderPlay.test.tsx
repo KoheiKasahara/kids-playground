@@ -226,12 +226,13 @@ describe('house-builder play', () => {
     expect(screen.getByRole('list', { name: 'へやの しゅるい' })).toBeInTheDocument()
   })
 
-  test('かいを きりかえて へやを おき、かいだんの ヒントが でる', () => {
+  test('かいを きりかえて へやを おき、かいだんが まだ ない かいでは かいだんを めだたせる', () => {
     startHouse(/^2かいだて/, /^ながしかく/)
-    expect(screen.getByText('かいだんを おくと うえと したが つながるよ')).toBeInTheDocument()
+    const stairs = () => within(screen.getByRole('list', { name: 'へやの しゅるい' })).getByRole('button', { name: 'かいだん' })
+    expect(stairs()).toHaveAttribute('data-nudge')
     pickRoom('かいだん')
     fireEvent.click(screen.getByRole('button', { name: cell(1, 1) }))
-    expect(screen.queryByText('かいだんを おくと うえと したが つながるよ')).not.toBeInTheDocument()
+    expect(stairs()).not.toHaveAttribute('data-nudge')
     click(/^2かい/)
     expect(sounds()).toContain('floor')
     expect(screen.getByRole('group', { name: '2かいの まどり' })).toBeInTheDocument()
