@@ -20,24 +20,22 @@ function Craft({ initial, onBack }: { initial: World; onBack: () => void }) {
   const [material, setMaterial] = useState<Material>('wood')
   const [mode, setMode] = useState<'place' | 'remove'>('place')
   const [cursor, setCursor] = useState<Position>({ x: 5, y: 0, z: 5 })
-  const [message, setMessage] = useState('ブロックの めんを タッチして おこう！')
   const [resetting, setResetting] = useState(false)
   const [sound, toggleSound] = useSoundToggle()
   const change = useCallback((next: World) => {
-    if (next === world) { setMessage('そこには おけないよ。ばしょを かえてね'); return }
+    if (next === world) return
     setHistory(previous => [...previous.slice(-29), world])
     setWorld(next)
-    setMessage(mode === 'place' ? 'おけたよ！ なにを つくろう？' : 'こわせたよ！')
     playCraftSound(mode)
     vibrate('tap')
   }, [world, mode])
   const pick = useCallback((position: Position, normal: Position) => {
     setCursor({ ...position, y: 0 })
     const target = mode === 'remove' ? position : { x: position.x + normal.x, y: position.y + normal.y, z: position.z + normal.z }
-    if (mode === 'remove' && position.y === 0) { setMessage('いちばん したの いしは のこしてね'); return }
+    if (mode === 'remove' && position.y === 0) return
     change(editWorld(world, target, material, mode))
   }, [world, material, mode, change])
-  const { setContainer, failed, api } = useCraftScene(world, cursor, pick)
+  const { setContainer, failed } = useCraftScene(world, cursor, pick)
   const move = (dx: number, dz: number) => setCursor(previous => ({ x: Math.max(0, Math.min(SIZE - 1, previous.x + dx)), y: 0, z: Math.max(0, Math.min(SIZE - 1, previous.z + dz)) }))
   const actAtCursor = () => pick(topBlock(world, cursor.x, cursor.z), { x: 0, y: 1, z: 0 })
   const undo = () => {
@@ -45,19 +43,18 @@ function Craft({ initial, onBack }: { initial: World; onBack: () => void }) {
     if (!previous) return
     setWorld(previous)
     setHistory(history.slice(0, -1))
-    setMessage('ひとつ もどしたよ')
     playCraftSound('select')
   }
   const save = () => {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(world)); setMessage('ほぞんしたよ！ つぎも つづきから あそべるよ') }
-    catch { setMessage('ほぞんできなかったよ。このまま あそべるよ') }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(world)) }
+    catch { /* ほぞんできなくても このまま あそべる */ }
     playCraftSound('select')
   }
   return <div className={styles.game}>
     <header className={styles.header}>
       <GameBackButton onBack={onBack} ariaLabel="タイトルへ もどる" />
       <h1>ブロッククラフト</h1>
-      <button onClick={toggleSound} aria-pressed={sound}>{sound ? '🔊' : '🔇'} おと</button>
+      <button className={styles.sound} onClick={toggleSound} aria-pressed={sound} aria-label="おと">{sound ? '🔊' : '🔇'}</button>
     </header>
     <GamePlaySurface>
       <div className={styles.scene} ref={setContainer} role="application" aria-label="ブロックの せかい。やじるしで ばしょを えらび、Enterで おく・こわす" tabIndex={0}
@@ -70,14 +67,6 @@ function Craft({ initial, onBack }: { initial: World; onBack: () => void }) {
           if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) actAtCursor()
         }} />
       {failed && <p role="alert">りったいの ひょうじが できなかったよ。もどって もういちど あそんでね。</p>}
-      <div className={styles.camera} aria-label="みる むき">
-        <button onClick={() => api.current?.rotate(-1)} aria-label="ひだりに まわす">↶</button>
-        <span>ドラッグで まわす</span>
-        <button onClick={() => api.current?.rotate(1)} aria-label="みぎに まわす">↷</button>
-        <button onClick={() => api.current?.zoom(1)} aria-label="ちかづく">＋</button>
-        <button onClick={() => api.current?.zoom(-1)} aria-label="はなれる">−</button>
-      </div>
-      <p className={styles.message} role="status">{message}</p>
       <div className={styles.modes}>
         <button aria-pressed={mode === 'place'} onClick={() => { setMode('place'); playCraftSound('select') }}>🧱 おく</button>
         <button aria-pressed={mode === 'remove'} onClick={() => { setMode('remove'); playCraftSound('select') }}>⛏️ こわす</button>
@@ -88,17 +77,6 @@ function Craft({ initial, onBack }: { initial: World; onBack: () => void }) {
           <span className={styles.swatch} style={{ background: item.color }} aria-hidden="true">{item.emoji}</span>{item.label}
         </button>)}
       </div>
-      <details className={styles.precise}>
-        <summary>🎯 ボタンで ばしょを えらぶ</summary>
-        <p>きいろの わく：よこ {cursor.x + 1}・たて {cursor.z + 1}（やじるしキーも つかえるよ）</p>
-        <div className={styles.actions}>
-          <button aria-label="ばしょを ひだりへ" onClick={() => move(-1, 0)}>←</button>
-          <button aria-label="ばしょを おくへ" onClick={() => move(0, -1)}>↑</button>
-          <button aria-label="ばしょを てまえへ" onClick={() => move(0, 1)}>↓</button>
-          <button aria-label="ばしょを みぎへ" onClick={() => move(1, 0)}>→</button>
-          <button onClick={actAtCursor}>{mode === 'place' ? 'ここに おく' : 'ここを こわす'}</button>
-        </div>
-      </details>
     </GamePlaySurface>
     <footer className={styles.actions}>
       <button onClick={save}>💾 ほぞん</button>
@@ -107,7 +85,7 @@ function Craft({ initial, onBack }: { initial: World; onBack: () => void }) {
     <p className={styles.hint}>ざいりょうは つかいほうだい。おうちや おしろを つくろう！<br />おわる まえに「ほぞん」を おしてね。</p>
     {resetting && <div className={styles.confirm} role="group" aria-label="せかいを もどす かくにん">
       <p>つくったものを けして、はじめの せかいに もどす？</p>
-      <button onClick={() => { change(createWorld()); setResetting(false); setMessage('はじめの せかいに もどしたよ。もどすボタンで とりけせるよ') }}>もどして あそぶ</button>
+      <button onClick={() => { change(createWorld()); setResetting(false) }}>もどして あそぶ</button>
       <button onClick={() => setResetting(false)}>やめる</button>
     </div>}
   </div>

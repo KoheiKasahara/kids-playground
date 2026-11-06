@@ -13,6 +13,17 @@ vi.mock('./sounds', () => ({ playCraftSound: vi.fn() }))
 beforeEach(() => localStorage.clear())
 function mount() { return render(<MemoryRouter><BlockCraftPlay /></MemoryRouter>) }
 
+it('shows only the essential controls', async () => {
+  const user = userEvent.setup()
+  mount()
+  await user.click(screen.getByRole('button', { name: /はじめから あそぶ/ }))
+  expect(screen.getByRole('button', { name: 'おと' })).toHaveTextContent(/^🔊$/)
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  expect(screen.queryByText(/ドラッグで まわす/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'ちかづく' })).not.toBeInTheDocument()
+  expect(screen.queryByText(/ボタンで ばしょを えらぶ/)).not.toBeInTheDocument()
+})
+
 it('keeps the new menu entry last', () => { expect(GAME_CATALOG.at(-1)?.id).toBe('block-craft') })
 
 it('starts, places and mines blocks, undoes, saves and resumes after re-entry', async () => {
@@ -40,14 +51,13 @@ it('starts, places and mines blocks, undoes, saves and resumes after re-entry', 
   expect(scene.world).toHaveLength(initialCount + 1)
 })
 
-it('supports material selection, button cursor, reset cancellation and undoing reset', async () => {
+it('supports material selection, keyboard cursor, reset cancellation and undoing reset', async () => {
   const user = userEvent.setup()
   mount()
   await user.click(screen.getByRole('button', { name: /はじめから あそぶ/ }))
   await user.click(screen.getByRole('button', { name: 'れんが' }))
-  await user.click(screen.getByText('🎯 ボタンで ばしょを えらぶ'))
-  await user.click(screen.getByRole('button', { name: 'ばしょを みぎへ' }))
-  await user.click(screen.getByRole('button', { name: 'ここに おく' }))
+  fireEvent.keyDown(screen.getByRole('application'), { key: 'ArrowRight' })
+  fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
   expect(scene.world.at(-1)).toEqual({ x: 6, y: 3, z: 5, material: 'brick' })
   const built = scene.world
   await user.click(screen.getByRole('button', { name: /はじめの せかい/ }))
@@ -70,7 +80,6 @@ it('handles invalid saves and reports storage failure without losing play state'
   const built = scene.world
   const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
   await user.click(screen.getByRole('button', { name: /ほぞん/ }))
-  expect(screen.getByRole('status')).toHaveTextContent('ほぞんできなかった')
   expect(scene.world).toEqual(built)
   spy.mockRestore()
 })
