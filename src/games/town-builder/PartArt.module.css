@@ -1,0 +1,101 @@
+.tile, .icon, .vehicle {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.icon { overflow: visible; }
+
+/* よるは マスを くらくし、つながった たてものの まどと がいとうだけ ひかる。 */
+.shade {
+  fill: #0b1640;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.window {
+  fill: #bfe6f7;
+  stroke: #46404f;
+  stroke-width: 1.4;
+  transition: fill 0.6s ease;
+}
+
+.bulb, .lamp, .headlight {
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.bulb, .headlight { fill: #fff3b0; }
+
+:global([data-night='true']) .shade { opacity: 0.55; }
+:global([data-night='true']) .window[data-lit='true'] { fill: #ffd84a; }
+:global([data-night='true']) .window[data-lit='false'] { fill: #2f3a63; }
+:global([data-night='true']) .bulb,
+:global([data-night='true']) .lamp,
+:global([data-night='true']) .headlight { opacity: 1; }
+
+.spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spin 9s linear infinite;
+}
+
+.smoke {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: smoke 2.4s ease-out infinite;
+}
+
+.spray { animation: spray 1.2s ease-in-out infinite alternate; }
+
+.pop {
+  transform-box: view-box;
+  transform-origin: 50% 90%;
+  animation: pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.dust {
+  pointer-events: none;
+  transform-box: view-box;
+  transform-origin: 50% 60%;
+  animation: dust 0.55s ease-out forwards;
+}
+
+.wants {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: wants 1.6s ease-in-out infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes smoke {
+  from { opacity: 0.9; transform: translateY(6px) scale(0.6); }
+  to { opacity: 0; transform: translateY(-6px) scale(1.3); }
+}
+
+@keyframes spray {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+
+@keyframes pop {
+  0% { transform: scale(0.3); }
+  100% { transform: scale(1); }
+}
+
+@keyframes dust {
+  from { opacity: 0.95; transform: scale(0.5); }
+  to { opacity: 0; transform: scale(1.3); }
+}
+
+@keyframes wants {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin, .smoke, .spray, .pop, .dust, .wants { animation: none; }
+  .dust { opacity: 0; }
+}
