@@ -19,7 +19,8 @@ function Craft({ initial, onBack }: { initial: World; onBack: () => void }) {
   const [history, setHistory] = useState<World[]>([])
   const [material, setMaterial] = useState<Material>('wood')
   const [mode, setMode] = useState<'place' | 'remove'>('place')
-  const [cursor, setCursor] = useState<Position>({ x: 5, y: 0, z: 5 })
+  const [cursor, setCursor] = useState<Position>({ x: SIZE / 2, y: 0, z: SIZE / 2 })
+  const [night, setNight] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [sound, toggleSound] = useSoundToggle()
   const change = useCallback((next: World) => {
@@ -35,7 +36,7 @@ function Craft({ initial, onBack }: { initial: World; onBack: () => void }) {
     if (mode === 'remove' && position.y === 0) return
     change(editWorld(world, target, material, mode))
   }, [world, material, mode, change])
-  const { setContainer, failed } = useCraftScene(world, cursor, pick)
+  const { setContainer, failed } = useCraftScene(world, cursor, pick, night)
   const move = (dx: number, dz: number) => setCursor(previous => ({ x: Math.max(0, Math.min(SIZE - 1, previous.x + dx)), y: 0, z: Math.max(0, Math.min(SIZE - 1, previous.z + dz)) }))
   const actAtCursor = () => pick(topBlock(world, cursor.x, cursor.z), { x: 0, y: 1, z: 0 })
   const undo = () => {
@@ -54,7 +55,8 @@ function Craft({ initial, onBack }: { initial: World; onBack: () => void }) {
     <header className={styles.header}>
       <GameBackButton onBack={onBack} ariaLabel="タイトルへ もどる" />
       <h1>ブロッククラフト</h1>
-      <button className={styles.sound} onClick={toggleSound} aria-pressed={sound} aria-label="おと">{sound ? '🔊' : '🔇'}</button>
+      <button className={styles.icon} onClick={() => { setNight(value => !value); playCraftSound('select') }} aria-pressed={night} aria-label="よる">{night ? '🌙' : '☀️'}</button>
+      <button className={styles.icon} onClick={toggleSound} aria-pressed={sound} aria-label="おと">{sound ? '🔊' : '🔇'}</button>
     </header>
     <GamePlaySurface>
       <div className={styles.scene} ref={setContainer} role="application" aria-label="ブロックの せかい。やじるしで ばしょを えらび、Enterで おく・こわす" tabIndex={0}
@@ -102,6 +104,6 @@ export default function BlockCraftPlay() {
     <p>おく・こわす・つみあげる。<br />じかんを きにせず、じゆうに あそぼう！</p>
     <button className={styles.start} onClick={() => { playCraftSound('select'); setInitial(createWorld()) }}>🌱 はじめから あそぶ</button>
     {saved && <button className={styles.start} onClick={() => { playCraftSound('select'); setInitial(saved) }}>💾 つづきから あそぶ</button>}
-    <p>👆 タッチで ブロックを おく<br />👉 ドラッグで まわりを みる<br />⛏️「こわす」で ブロックを けす</p>
+    <p>👆 タッチで ブロックを おく<br />👉 ドラッグで まわりを みる<br />✌️ 2ほんゆびで いどう・ちかづく<br />⛏️ じめんを ほると たからが あるかも？</p>
   </div>
 }
