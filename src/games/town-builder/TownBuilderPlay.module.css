@@ -1,0 +1,421 @@
+/* ちずを できるだけ おおきく みせるため、がめんの たかさ いっぱいを 3だん（うえ・ちず・パーツ）に わける。 */
+.screen {
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'header' 'map' 'palette';
+  gap: 6px;
+  padding: calc(6px + var(--safe-top)) calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  background: linear-gradient(#d8f0c4, #c3e3a8);
+  color: #2f4229;
+  overflow: hidden;
+  transition: background 0.6s ease, color 0.6s ease;
+}
+
+.screen[data-night='true'] {
+  background: linear-gradient(#1b2547, #2b3768);
+  color: #f1f3ff;
+}
+
+.screen button {
+  font: inherit;
+  color: #2f4229;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.screen button:focus-visible {
+  outline: 3px solid #1971c2;
+  outline-offset: 2px;
+}
+
+.header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: clamp(14px, 4vw, 22px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 4px 12px 4px 8px;
+  border: 2px solid #d9c98f;
+  border-radius: 999px;
+  background: #fffbe8;
+  color: #3d3320;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rankIcon { font-size: 26px; }
+
+.iconButton {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 2px solid #b9cf9c;
+  border-radius: 14px;
+  background: #fffdf3;
+  font-size: 26px;
+}
+
+/* ---- ちず ---- */
+
+.mapArea {
+  grid-area: map;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border: 3px solid #6c9a4f;
+  border-radius: 20px;
+  background: #86c45c;
+  overflow: hidden;
+  transition: background 0.6s ease, border-color 0.6s ease;
+}
+
+.screen[data-night='true'] .mapArea {
+  border-color: #44507d;
+  background: #222c4b;
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.map {
+  position: relative;
+  margin: auto;
+  display: grid;
+  grid-template-columns: repeat(14, var(--tile));
+  grid-auto-rows: var(--tile);
+}
+
+.tile {
+  display: block;
+  width: var(--tile);
+  height: var(--tile);
+  padding: 0;
+  border: 0;
+  background: none;
+  touch-action: pan-x pan-y;
+}
+
+.screen .tile:focus-visible {
+  position: relative;
+  z-index: 2;
+  outline: 4px solid #ffb400;
+  outline-offset: -4px;
+}
+
+/* ズームの きりかえ中に うごく くるまが スクロールの はんいを ひろげないよう、ちずの なかに とじこめる。 */
+.vehicles {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.vehicle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--tile) * 0.44);
+  height: calc(var(--tile) * 0.44);
+  transform: translate(calc(var(--x) * var(--tile) - 50%), calc(var(--y) * var(--tile) - 50%));
+  transition: transform 1s linear, filter 0.6s ease;
+}
+
+.vehicle[data-kind='train'] {
+  width: calc(var(--tile) * 0.5);
+  height: calc(var(--tile) * 0.75);
+}
+
+.vehicleBody {
+  width: 100%;
+  height: 100%;
+}
+
+.screen[data-night='true'] .vehicle { filter: brightness(0.8) drop-shadow(0 0 4px #ffe680); }
+
+.mapTools {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mapToolsLeft {
+  right: auto;
+  left: 8px;
+}
+
+.mapTools button {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border: 2px solid #7a9a62;
+  border-radius: 50%;
+  background: #fffdf3ee;
+  box-shadow: 0 3px 0 #00000030;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.mapTools button[aria-pressed='true'] { background: #ffe9a8; }
+.mapTools button:disabled { opacity: 0.45; cursor: default; }
+
+.saveFailed {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff4e6;
+  color: #8a3b00;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.celebrate {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.celebrateCard {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 16px 28px;
+  border: 4px solid #ffc94d;
+  border-radius: 26px;
+  background: #fffdf3f2;
+  box-shadow: 0 8px 0 #00000026;
+  color: #3d3320;
+  animation: celebrate 2.6s ease both;
+}
+
+.celebrateIcon { font-size: 76px; line-height: 1; }
+.celebrateText { font-size: 22px; font-weight: 900; }
+.confetti { font-size: 28px; }
+
+@keyframes celebrate {
+  0% { opacity: 0; transform: scale(0.3); }
+  12% { opacity: 1; transform: scale(1.1); }
+  20% { transform: scale(1); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: scale(0.95); }
+}
+
+.dialogBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: #00000066;
+}
+
+.dialog {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 320px);
+  padding: 18px;
+  border: 3px solid #8fb36f;
+  border-radius: 22px;
+  background: #fffdf3;
+  color: #2f4229;
+  text-align: center;
+}
+
+.dialog p {
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.dialogChoices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.dialogChoices button {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-height: 96px;
+  padding: 8px 4px;
+  border: 3px solid #c9d9b4;
+  border-radius: 16px;
+  background: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.dialogChoices button span { font-size: 36px; line-height: 1; }
+
+.dialogChoices .cancel {
+  grid-column: 1 / -1;
+  min-height: 52px;
+  background: #f1f3f5;
+}
+
+/* ---- パーツ ---- */
+
+.palette {
+  grid-area: palette;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.tab {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: clamp(54px, 7vw, 72px);
+  padding: 5px;
+  border: 2px solid #b9cf9c;
+  border-radius: 14px;
+  background: #f4f8e8;
+}
+
+.tab svg {
+  width: clamp(40px, 5.4vw, 54px);
+  height: clamp(40px, 5.4vw, 54px);
+}
+
+.tab[aria-pressed='true'] {
+  border-color: #3f7d34;
+  background: #ffffff;
+  box-shadow: inset 0 -4px 0 #9fd28a;
+}
+
+.erase { background: #fff7ef; }
+
+.erase[aria-pressed='true'] {
+  border-color: #e8590c;
+  background: #fff4e6;
+  box-shadow: inset 0 -4px 0 #ffc078;
+}
+
+.parts {
+  display: flex;
+  gap: 8px;
+  padding: 4px 2px 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.part {
+  flex: 0 0 auto;
+  width: clamp(82px, 12vw, 116px);
+  height: clamp(82px, 12vw, 116px);
+  padding: 6px;
+  border: 3px solid #c9d9b4;
+  border-radius: 18px;
+  background: #ffffff;
+  transition: transform 0.15s ease;
+}
+
+.part[aria-pressed='true'] {
+  border-color: #ff9f1c;
+  background: #fff6d8;
+  box-shadow: 0 4px 0 #f0b44a;
+  transform: translateY(-3px);
+}
+
+/* よこむきでは パーツを みぎに たてに ならべ、ちずの たかさを まもる。 */
+@media (orientation: landscape) and (min-aspect-ratio: 4/3) {
+  .screen {
+    grid-template-columns: minmax(0, 1fr) clamp(190px, 30vw, 320px);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: 'header header' 'map palette';
+  }
+
+  .palette {
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: start;
+    min-height: 0;
+  }
+
+  .tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  .parts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+    align-content: start;
+    min-height: 0;
+    overflow: hidden auto;
+  }
+
+  .part {
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+  }
+}
+
+@media (max-width: 380px) {
+  .header { gap: 6px; }
+  .title { font-size: 14px; }
+  .stats { gap: 4px; padding: 4px 8px 4px 6px; font-size: 15px; }
+  .rankIcon { font-size: 22px; }
+  .iconButton { width: 46px; height: 46px; font-size: 22px; }
+}
+
+@media (max-height: 520px) {
+  .header { min-height: 46px; }
+  .screen { gap: 4px; }
+  .mapTools button { width: 46px; height: 46px; font-size: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vehicle { transition: none; }
+  .celebrateCard { animation: none; }
+}
