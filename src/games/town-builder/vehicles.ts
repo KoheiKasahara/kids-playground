@@ -14,6 +14,9 @@ export type Vehicle = {
 }
 export type Random = () => number
 
+/** くるまと でんしゃの いろ。2D の え と 3D で おなじ いろを つかう。 */
+export const CAR_COLORS = ['#f76707', '#1c7ed6', '#fcc419', '#2f9e44', '#f1f3f5'] as const
+export const TRAIN_COLORS = ['#2f9e44', '#1971c2', '#e03131', '#f08c00', '#7048e8'] as const
 export const CAR_VARIANTS = 5
 const KINDS: readonly VehicleKind[] = ['car', 'train']
 
