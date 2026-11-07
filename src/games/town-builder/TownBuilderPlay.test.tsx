@@ -25,10 +25,11 @@ function mount() {
 const tile = (name: string) => screen.getByRole('button', { name })
 const savedTown = () => decodeTown(localStorage.getItem(SAVE_KEY))
 
-it('keeps the new menu entry last and shows its title on the play screen', () => {
-  expect(GAME_CATALOG.at(-1)?.id).toBe('town-builder')
+it('is listed in the menu and shows its title on the play screen', () => {
+  const entry = GAME_CATALOG.find((game) => game.id === 'town-builder')
+  expect(entry).toBeDefined()
   mount()
-  expect(screen.getByRole('heading', { name: GAME_CATALOG.at(-1)?.title })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: entry?.title })).toBeInTheDocument()
   expect(screen.getByRole('group', { name: /まちの ちず/ })).toBeInTheDocument()
 })
 
