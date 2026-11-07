@@ -8,13 +8,35 @@ import { ToolIcon, TileArt } from './PartArt'
 import { PARTS } from './parts'
 import { playTownSound } from './sounds'
 import { applyTool, COLS, createTown, decodeTown, encodeTown, SAVE_KEY } from './town'
+import { createTownScene, type TownSceneCallbacks, type VehicleCounts } from './three/townScene'
 import TownBuilderPlay from './TownBuilderPlay'
 
 vi.mock('./sounds', () => ({ playTownSound: vi.fn() }))
 
+// 3D は WebGL を つかうので、がめんの テストでは うごきを まねる ものに かえる。
+const scene3d = vi.hoisted(() => ({
+  counts: { car: 2, train: 0 } as VehicleCounts,
+  fail: false,
+  callbacks: null as TownSceneCallbacks | null,
+  handle: {
+    setNight: () => {}, setTour: () => {}, turn: () => {}, zoom: () => {}, ride: () => true, land: () => {}, dispose: () => {},
+  } as Record<string, (...args: never[]) => unknown>,
+}))
+vi.mock('./three/townScene', () => ({
+  createTownScene: vi.fn((_host: HTMLDivElement, _town: unknown, _night: boolean, callbacks: TownSceneCallbacks) => {
+    scene3d.callbacks = callbacks
+    if (scene3d.fail) callbacks.error()
+    else callbacks.ready(scene3d.counts)
+    return scene3d.handle
+  }),
+}))
+
 beforeEach(() => {
   localStorage.clear()
   vi.mocked(playTownSound).mockClear()
+  vi.mocked(createTownScene).mockClear()
+  scene3d.fail = false
+  for (const key of Object.keys(scene3d.handle)) scene3d.handle[key] = vi.fn(key === 'ride' ? () => true : () => {})
 })
 afterEach(() => vi.useRealTimers())
 
@@ -204,4 +226,85 @@ it('draws every part as an icon and as a tile, by day and by night', () => {
   expect(container.querySelectorAll('svg')).toHaveLength(PARTS.length * 2 + 1)
   expect(container.querySelector('[data-lit="false"]')).not.toBeNull()
   expect(container.querySelectorAll('[data-lit="true"]').length).toBeGreaterThan(10)
+})
+
+it('opens the finished town in 3D, rides a car, and comes back to building', async () => {
+  const user = userEvent.setup()
+  mount()
+  const open = screen.getByRole('button', { name: '3Dで みる' })
+  await user.click(open)
+  const dialog = await screen.findByRole('dialog', { name: '3Dで みる' })
+  expect(playTownSound).toHaveBeenCalledWith('view')
+  expect(createTownScene).toHaveBeenCalledWith(expect.any(HTMLDivElement), createTown(), false, expect.anything())
+  // うしろの ちずは さわれない。
+  expect(screen.queryByRole('group', { name: /まちの ちず/ })).not.toBeInTheDocument()
+  expect(dialog.querySelector('[role="group"][tabindex="0"]')).toHaveFocus()
+
+  await user.click(screen.getByRole('button', { name: 'よるに する' }))
+  expect(scene3d.handle.setNight).toHaveBeenLastCalledWith(true)
+  expect(screen.getByRole('button', { name: 'ひるに する' })).toHaveAttribute('aria-pressed', 'true')
+
+  await user.click(screen.getByRole('button', { name: 'ちかづく' }))
+  await user.click(screen.getByRole('button', { name: 'はなれる' }))
+  await user.click(screen.getByRole('button', { name: 'みぎに まわす' }))
+  await user.click(screen.getByRole('button', { name: 'ひだりに まわす' }))
+  expect(scene3d.handle.zoom).toHaveBeenNthCalledWith(1, 1)
+  expect(scene3d.handle.zoom).toHaveBeenNthCalledWith(2, -1)
+  expect(scene3d.handle.turn).toHaveBeenNthCalledWith(1, 1)
+  expect(scene3d.handle.turn).toHaveBeenNthCalledWith(2, -1)
+
+  const tour = screen.getByRole('button', { name: 'ぐるっと まわる' })
+  expect(tour).toHaveAttribute('aria-pressed', 'true')
+  await user.click(tour)
+  expect(scene3d.handle.setTour).toHaveBeenLastCalledWith(false)
+  expect(tour).toHaveAttribute('aria-pressed', 'false')
+  // ゆびで まわすと 3D の ほうから とまったと しらせる。
+  await user.click(tour)
+  act(() => scene3d.callbacks!.tour(false))
+  expect(screen.getByRole('button', { name: 'ぐるっと まわる' })).toHaveAttribute('aria-pressed', 'false')
+
+  expect(screen.getByRole('button', { name: 'でんしゃに のる' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'くるまに のる' }))
+  expect(scene3d.handle.ride).toHaveBeenLastCalledWith('car')
+  expect(playTownSound).toHaveBeenLastCalledWith('ride')
+  expect(screen.getByRole('button', { name: 'つぎの くるまに のる' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.queryByRole('button', { name: 'ちかづく' })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'そらから みる' }))
+  expect(scene3d.handle.land).toHaveBeenCalledOnce()
+  expect(screen.getByRole('button', { name: 'くるまに のる' })).toHaveAttribute('aria-pressed', 'false')
+
+  act(() => scene3d.callbacks!.pick({ kind: 'part', part: 'road', bridge: true }))
+  expect(screen.getByRole('status')).toHaveTextContent('みちの はし')
+  act(() => scene3d.callbacks!.pick({ kind: 'vehicle', vehicle: 'car' }))
+  expect(screen.getByRole('status')).toHaveTextContent('くるま')
+
+  await user.click(screen.getByRole('button', { name: 'まちづくりに もどる' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(scene3d.handle.dispose).toHaveBeenCalledOnce()
+  expect(screen.getByRole('button', { name: '3Dで みる' })).toHaveFocus()
+  // よるの まま もどり、2D の ちずも よるに なって いる。
+  expect(screen.getByRole('button', { name: 'ひるに する' })).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: '3Dで みる' }))
+  await screen.findByRole('dialog', { name: '3Dで みる' })
+  expect(createTownScene).toHaveBeenLastCalledWith(expect.any(HTMLDivElement), createTown(), true, expect.anything())
+  await user.keyboard('{Escape}')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+it('shows the town just built and explains when 3D cannot be shown', async () => {
+  const user = userEvent.setup()
+  mount()
+  await user.click(screen.getByRole('button', { name: 'たのしい ところ' }))
+  await user.click(screen.getByRole('button', { name: 'おしろ' }))
+  await user.click(tile('3-1 くさはら'))
+  scene3d.fail = true
+  await user.click(screen.getByRole('button', { name: '3Dで みる' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('3Dで みられなかったよ')
+  expect(vi.mocked(createTownScene).mock.lastCall?.[1][2]).toEqual({ ground: 'grass', part: 'castle' })
+  expect(screen.queryByRole('button', { name: 'くるまに のる' })).not.toBeInTheDocument()
+  const backs = screen.getAllByRole('button', { name: 'まちづくりに もどる' })
+  await user.click(backs.at(-1)!)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(tile('3-1 おしろ')).toBeInTheDocument()
 })

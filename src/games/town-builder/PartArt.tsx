@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import type { BuildingId, TilePart, ToolId } from './parts'
 import type { Ground } from './town'
 import { directions, pathOf, segmentsOf } from './trackGeometry'
+import { CAR_COLORS, TRAIN_COLORS } from './vehicles'
 import styles from './PartArt.module.css'
 
 // まちの え。どの マスも 0〜100 の viewBox に えがく。
@@ -407,9 +408,6 @@ export function ToolIcon({ tool }: { tool: ToolId }) {
 }
 
 // ---- のりもの -----------------------------------------------------------
-
-const CAR_COLORS = ['#f76707', '#1c7ed6', '#fcc419', '#2f9e44', '#f1f3f5'] as const
-const TRAIN_COLORS = ['#2f9e44', '#1971c2', '#e03131', '#f08c00', '#7048e8'] as const
 
 /** うえ（きた）むきの くるま・でんしゃ。 */
 export function VehicleArt({ kind, variant }: { kind: 'car' | 'train'; variant: number }) {

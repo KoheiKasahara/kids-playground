@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject } from 'react'
+import { lazy, memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import { useGameIntroPlaying } from '../../components/gameIntroState'
@@ -16,6 +16,9 @@ import { isOnTrack, stepVehicles, syncVehicles, vehiclePose } from './vehicles'
 import { playTownSound, type TownSound } from './sounds'
 import { comfortableZoom, tileSizeFor, ZOOM_LEVELS } from './zoom'
 import styles from './TownBuilderPlay.module.css'
+
+// 3D は three.js を つかうので、「3Dで みる」を おした ときに はじめて よみこむ。
+const Town3D = lazy(() => import('./Town3D'))
 
 const HISTORY_LIMIT = 50
 const START_CURSOR = Math.floor(ROWS / 2) * COLS + Math.floor(COLS / 2)
@@ -125,8 +128,11 @@ export default function TownBuilderPlay() {
   const [confirming, setConfirming] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
   const [started, setStarted] = useState(false)
+  const [viewing3d, setViewing3d] = useState(false)
   const [sound, toggleSound] = useSoundToggle()
   useGameIntroPlaying(started)
+  const view3dButton = useRef<HTMLButtonElement>(null)
+  const returnFocus = useRef(false)
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const size = useViewportSize(viewportRef)
@@ -156,6 +162,13 @@ export default function TownBuilderPlay() {
   }, [celebration])
 
   useEffect(() => { if (confirming) firstChoice.current?.focus() }, [confirming])
+
+  // 3D から もどったら「3Dで みる」ボタンに フォーカスを もどす。
+  useEffect(() => {
+    if (viewing3d || !returnFocus.current) return
+    returnFocus.current = false
+    view3dButton.current?.focus()
+  }, [viewing3d])
 
   function commit(next: Town) {
     setHistory((previous) => [...previous.slice(1 - HISTORY_LIMIT), town])
@@ -223,6 +236,20 @@ export default function TownBuilderPlay() {
     playTownSound('select')
   }
 
+  function open3d() {
+    primeAudio()
+    setViewing3d(true)
+    setStarted(true)
+    playTownSound('view')
+    vibrate('tap')
+  }
+
+  function close3d() {
+    returnFocus.current = true
+    setViewing3d(false)
+    playTownSound('select')
+  }
+
   function resetTown(kind: 'empty' | 'starter') {
     setConfirming(false)
     commit(kind === 'empty' ? createEmptyTown() : createTown())
@@ -284,7 +311,7 @@ export default function TownBuilderPlay() {
   const toolLabel = tool === 'erase' ? ERASE_LABEL : findPart(tool)?.label ?? ''
 
   return <GamePlaySurface>
-    <div className={styles.screen} data-night={night}>
+    <div className={styles.screen} data-night={night} inert={viewing3d} aria-hidden={viewing3d || undefined}>
       <header className={styles.header}>
         <GameBackButton to="/" />
         <h1 className={styles.title}>まちづくり</h1>
@@ -323,9 +350,13 @@ export default function TownBuilderPlay() {
               pop={effect?.index === index ? effect.stamp : 0}
               dust={effect?.index === index && effect.dust}
             />)}
-            <Vehicles town={town} />
+            {!viewing3d && <Vehicles town={town} />}
           </div>
         </div>
+
+        <button type="button" ref={view3dButton} className={styles.view3d} onClick={open3d} aria-label="3Dで みる">
+          <span aria-hidden="true">👀</span><span aria-hidden="true" className={styles.view3dText}>3D</span>
+        </button>
 
         <div className={`${styles.mapTools} ${styles.mapToolsLeft}`}>
           <button type="button" onClick={undo} disabled={!history.length} aria-label="ひとつ もどす"><span aria-hidden="true">↩</span></button>
@@ -380,5 +411,9 @@ export default function TownBuilderPlay() {
         </div>
       </nav>
     </div>
+
+    {viewing3d && <Suspense fallback={<p className={styles.loading3d} role="status">じゅんびちゅう…</p>}>
+      <Town3D town={town} night={night} onToggleNight={toggleNight} sound={sound} onToggleSound={toggleSound} onClose={close3d} />
+    </Suspense>}
   </GamePlaySurface>
 }

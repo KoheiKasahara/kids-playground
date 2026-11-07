@@ -195,6 +195,44 @@
 .mapTools button[aria-pressed='true'] { background: #ffe9a8; }
 .mapTools button:disabled { opacity: 0.45; cursor: default; }
 
+/* できた まちを 3D で みる ボタン。ちずの みぎうえに めだつ ように おく。 */
+.view3d {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 54px;
+  padding: 4px 14px 4px 10px;
+  border: 3px solid #ffb400;
+  border-radius: 999px;
+  background: #fff6d8;
+  box-shadow: 0 4px 0 #e0a10066;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.view3dText {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.loading3d {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  background: #cdeeffe6;
+  color: #2f4229;
+  font-size: 20px;
+  font-weight: 900;
+}
+
 .saveFailed {
   position: absolute;
   top: 8px;
