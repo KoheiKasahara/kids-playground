@@ -1,18 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { MATERIALS, SIZE, topBlock, type Position, type World } from './world'
+import { HEIGHT, MATERIAL_DEFS, SIZE, topBlock, type Position, type World } from './world'
 
 type Pick = (position: Position, normal: Position) => void
-type SceneApi = { update: (world: World, cursor: Position) => void; rotate: (direction: number) => void; zoom: (direction: number) => void }
+type SceneApi = { update: (world: World, cursor: Position, night: boolean) => void }
+
+const DAY = { sky: '#c6eafa', hemisphere: 2.4, sun: 2.5, sunColor: '#fff5db', glow: 0.35 }
+const NIGHT = { sky: '#1a2246', hemisphere: 0.75, sun: 0.4, sunColor: '#9fb4ff', glow: 1 }
+const CENTER = (SIZE - 1) / 2
+
+/** Keeps the two-finger panned view over the world: moves camera and target together so the angle never changes. */
+export function clampTarget(target: THREE.Vector3, camera: THREE.Vector3) {
+  const clamped = new THREE.Vector3(
+    THREE.MathUtils.clamp(target.x, -1, SIZE),
+    THREE.MathUtils.clamp(target.y, 0, HEIGHT - 2),
+    THREE.MathUtils.clamp(target.z, -1, SIZE),
+  )
+  const shift = clamped.clone().sub(target)
+  if (shift.lengthSq() === 0) return false
+  target.add(shift)
+  camera.add(shift)
+  return true
+}
 
 /** Demand rendering: no simulation, RAF, or held input survives a hidden page or unmount. */
-export function useCraftScene(world: World, cursor: Position, onPick: Pick) {
+export function useCraftScene(world: World, cursor: Position, onPick: Pick, night = false) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [failed, setFailed] = useState(false)
   const api = useRef<SceneApi | null>(null)
-  const latest = useRef({ world, cursor, onPick })
-  useEffect(() => { latest.current = { world, cursor, onPick }; api.current?.update(world, cursor) }, [world, cursor, onPick])
+  const latest = useRef({ world, cursor, onPick, night })
+  useEffect(() => { latest.current = { world, cursor, onPick, night }; api.current?.update(world, cursor, night) }, [world, cursor, onPick, night])
 
   useEffect(() => {
     if (!container) return
@@ -25,25 +43,38 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     container.appendChild(renderer.domElement)
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color('#c6eafa')
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 120)
-    camera.position.set(21, 19, 23)
+    const sky = new THREE.Color(DAY.sky)
+    scene.background = sky
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 160)
+    camera.position.set(CENTER + 16, 22, CENTER + 18)
     const controls = new OrbitControls(camera, renderer.domElement)
-    controls.target.set(5.5, 2, 5.5)
-    controls.enablePan = false
-    controls.minDistance = 10
-    controls.maxDistance = 40
+    controls.target.set(CENTER, 2, CENTER)
+    // ひとさしゆび1ぽんで まわす・2ほんで いどうと ちかづく（地面にそって うごく）
+    controls.enablePan = true
+    controls.screenSpacePanning = false
+    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
+    controls.minDistance = 6
+    controls.maxDistance = 48
     controls.minPolarAngle = 0.2
     controls.maxPolarAngle = Math.PI / 2.15
     controls.update()
-    scene.add(new THREE.HemisphereLight('#ffffff', '#74705a', 2.4))
-    const sun = new THREE.DirectionalLight('#fff5db', 2.5)
-    sun.position.set(4, 14, 9)
+    const hemisphere = new THREE.HemisphereLight('#ffffff', '#74705a', DAY.hemisphere)
+    scene.add(hemisphere)
+    const sun = new THREE.DirectionalLight(DAY.sunColor, DAY.sun)
+    sun.position.set(6, 18, 12)
     scene.add(sun)
     const geometry = new THREE.BoxGeometry(0.97, 0.97, 0.97)
-    const materials = MATERIALS.map(m => new THREE.MeshLambertMaterial({ color: m.color }))
-    const meshes = materials.map(material => {
-      const mesh = new THREE.InstancedMesh(geometry, material, SIZE * SIZE * 10)
+    const materials = MATERIAL_DEFS.map(m => new THREE.MeshLambertMaterial({
+      color: m.color,
+      transparent: m.opacity !== undefined,
+      opacity: m.opacity ?? 1,
+      depthWrite: m.opacity === undefined,
+      emissive: m.glow ? m.color : '#000000',
+      emissiveIntensity: m.glow ? DAY.glow : 0,
+    }))
+    const meshes = materials.map((material, index) => {
+      const mesh = new THREE.InstancedMesh(geometry, material, SIZE * SIZE * HEIGHT)
+      if (MATERIAL_DEFS[index].opacity !== undefined) mesh.renderOrder = 1
       mesh.count = 0
       scene.add(mesh)
       return mesh
@@ -54,14 +85,20 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick) {
     outlineBox.dispose()
     const outlineMaterial = new THREE.LineBasicMaterial({ color: '#ffef56', depthTest: false })
     const outline = new THREE.LineSegments(outlineGeometry, outlineMaterial)
-    outline.renderOrder = 1
+    outline.renderOrder = 2
     scene.add(outline)
     const render = () => renderer.render(scene, camera)
-    const update = (blocks: World, selection: Position) => {
+    const update = (blocks: World, selection: Position, night: boolean) => {
+      const theme = night ? NIGHT : DAY
+      sky.set(theme.sky)
+      hemisphere.intensity = theme.hemisphere
+      sun.intensity = theme.sun
+      sun.color.set(theme.sunColor)
+      materials.forEach((material, i) => { if (MATERIAL_DEFS[i].glow) material.emissiveIntensity = theme.glow })
       const matrix = new THREE.Matrix4()
       positions.forEach(list => { list.length = 0 })
       for (const block of blocks) {
-        const index = MATERIALS.findIndex(m => m.id === block.material)
+        const index = MATERIAL_DEFS.findIndex(m => m.id === block.material)
         const list = positions[index]
         meshes[index].setMatrixAt(list.length, matrix.makeTranslation(block.x, block.y, block.z))
         list.push(block)
@@ -85,7 +122,11 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick) {
     }
     const observer = new ResizeObserver(resize)
     observer.observe(container)
-    controls.addEventListener('change', render)
+    const changed = () => {
+      clampTarget(controls.target, camera.position)
+      render()
+    }
+    controls.addEventListener('change', changed)
     const raycaster = new THREE.Raycaster()
     let down: { x: number; y: number; id: number } | null = null
     let dragged = false
@@ -118,27 +159,13 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick) {
     canvas.addEventListener('lostpointercapture', cancel)
     const contextLost = (event: Event) => { event.preventDefault(); setFailed(true) }
     canvas.addEventListener('webglcontextlost', contextLost)
-    api.current = {
-      update,
-      rotate: direction => {
-        const offset = camera.position.clone().sub(controls.target)
-        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), direction * Math.PI / 4)
-        camera.position.copy(controls.target).add(offset)
-        controls.update()
-      },
-      zoom: direction => {
-        const offset = camera.position.clone().sub(controls.target)
-        offset.setLength(THREE.MathUtils.clamp(offset.length() * (direction > 0 ? 0.8 : 1.25), 10, 40))
-        camera.position.copy(controls.target).add(offset)
-        controls.update()
-      },
-    }
+    api.current = { update }
     resize()
-    update(latest.current.world, latest.current.cursor)
+    update(latest.current.world, latest.current.cursor, latest.current.night)
     return () => {
       api.current = null
       observer.disconnect()
-      controls.removeEventListener('change', render)
+      controls.removeEventListener('change', changed)
       controls.dispose()
       canvas.removeEventListener('pointerdown', pointerDown)
       canvas.removeEventListener('pointermove', pointerMove)

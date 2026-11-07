@@ -11,9 +11,9 @@
 .actions { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
 .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; }
 .modes button { white-space: nowrap; padding-inline: 4px; }
-.header .sound { min-width: 48px; font-size: 22px; padding: 4px 10px; }
+.header .icon { min-width: 48px; font-size: 22px; padding: 4px 8px; }
 .palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
-.palette button { padding: 5px 2px; font-size: 12px; }
+.palette button { padding: 5px 2px; font-size: 12px; white-space: nowrap; overflow: hidden; }
 .swatch { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 4px; margin: 0 auto 3px; box-shadow: inset -5px -5px #0002; font-size: 18px; }
 .hint { text-align: center; font-size: 12px; line-height: 1.8; }
 .title { text-align: center; }
@@ -23,4 +23,9 @@
 .title .start { display: block; margin: 18px auto; padding: 16px 28px; background: #def4d3; border-color: #75aa68; }
 .confirm { padding: 16px; border: 3px solid #86ab63; background: #fff9df; border-radius: 16px; }
 .confirm button { margin: 5px; }
-@media (max-width: 480px) { .palette { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 480px) {
+  .palette { gap: 4px; }
+  .palette button { min-height: 0; padding: 4px 0; font-size: 9px; letter-spacing: -.04em; border-radius: 10px; }
+  .swatch { width: 26px; height: 26px; font-size: 16px; }
+}
+@media (max-width: 350px) { .palette button { font-size: 8px; letter-spacing: -.1em; } .swatch { width: 24px; height: 24px; } }

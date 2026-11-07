@@ -1,8 +1,8 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
-import { useCraftScene } from './useCraftScene'
-import { createWorld } from './world'
+import { clampTarget, useCraftScene } from './useCraftScene'
+import { createWorld, MATERIALS, SIZE } from './world'
 
 const resources = vi.hoisted(() => ({ render: vi.fn(), rendererDispose: vi.fn(), controlsDispose: vi.fn(), disconnect: vi.fn() }))
 vi.mock('three', async importOriginal => {
@@ -17,6 +17,7 @@ vi.mock('three', async importOriginal => {
 })
 vi.mock('three/examples/jsm/controls/OrbitControls.js', () => ({ OrbitControls: class {
   target = new THREE.Vector3()
+  touches = {}
   update() {}
   addEventListener() {}
   removeEventListener() {}
@@ -48,8 +49,8 @@ it('disposes GPU resources, observer and input handlers on exit and can enter ag
     expect(removeListener.mock.calls.map(call => call[0])).toEqual(expect.arrayContaining(['pointerdown', 'pointerup', 'pointercancel', 'webglcontextlost']))
   }
   expect(geometryDispose).toHaveBeenCalledTimes(6)
-  expect(materialDispose).toHaveBeenCalledTimes(18)
-  expect(meshDispose).toHaveBeenCalledTimes(16)
+  expect(materialDispose).toHaveBeenCalledTimes((MATERIALS.length + 1) * 2)
+  expect(meshDispose).toHaveBeenCalledTimes(MATERIALS.length * 2)
 })
 
 it('reports WebGL context loss without scheduling a background rendering loop', () => {
@@ -63,4 +64,16 @@ it('reports WebGL context loss without scheduling a background rendering loop', 
   act(() => { container.querySelector('canvas')!.dispatchEvent(new Event('webglcontextlost')) })
   expect(view.result.current.failed).toBe(true)
   view.unmount()
+})
+
+it('keeps two-finger panning over the world without changing the viewing angle', () => {
+  const target = new THREE.Vector3(SIZE + 20, 30, -50)
+  const camera = new THREE.Vector3(SIZE + 30, 50, -40)
+  const offset = camera.clone().sub(target)
+  expect(clampTarget(target, camera)).toBe(true)
+  expect(target.x).toBeLessThanOrEqual(SIZE)
+  expect(target.z).toBeGreaterThanOrEqual(-1)
+  expect(target.y).toBeLessThan(SIZE)
+  expect(camera.clone().sub(target)).toEqual(offset)
+  expect(clampTarget(new THREE.Vector3(SIZE / 2, 2, SIZE / 2), new THREE.Vector3())).toBe(false)
 })
