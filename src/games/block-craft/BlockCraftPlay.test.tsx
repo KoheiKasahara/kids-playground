@@ -40,7 +40,7 @@ it('switches between day and night without adding messages', async () => {
   expect(scene.world.at(-1)?.material).toBe('diamond')
 })
 
-it('keeps the new menu entry last', () => { expect(GAME_CATALOG.at(-1)?.id).toBe('block-craft') })
+it('is listed in the menu', () => { expect(GAME_CATALOG.some((game) => game.id === 'block-craft')).toBe(true) })
 
 it('starts, places and mines blocks, undoes, saves and resumes after re-entry', async () => {
   const user = userEvent.setup()

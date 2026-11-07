@@ -1373,6 +1373,24 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'town-builder',
+    slug: 'town-builder',
+    title: 'まちづくり',
+    emoji: '🏙️',
+    category: 'learning',
+    seo: {
+      headline: 'まちづくり｜みちや たてものを 自由に おいて 自分の まちを つくろう',
+      description: '道路や線路、家、お店、学校、観覧車などのパーツを大きな地図に自由に置いて、自分だけの街をつくる幼児向けゲームです。お金の計算はなく、車や電車が走り、夜には明かりがともります。街は自動で保存されます。',
+    },
+    intro: {
+      howToPlay: [
+        'したの えを えらんで、ちずを タッチすると おけるよ',
+        'おうちを みちに つなげると ひとが すんで、まちが そだつよ',
+        '＋ − で おおきさを かえ、ゆびで ちずを うごかそう',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

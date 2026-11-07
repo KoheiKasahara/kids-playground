@@ -293,8 +293,9 @@ export function playHit(big: boolean, crit: boolean) {
   if (!ctx) return
   const t = ctx.currentTime
   const out = getSoundOutput(ctx)
-  noise(ctx, out, t, big ? .25 : .12, big ? .22 : .16, 'lowpass', big ? 2400 : 3200)
-  slide(ctx, out, big ? 220 : 320, 60, t, big ? .28 : .14, big ? .24 : .18, 'sine')
+  // ノイズと低音が重なっても、ゲームの音量補正後にピークの余裕を残す。
+  noise(ctx, out, t, big ? .25 : .12, big ? .14 : .12, 'lowpass', big ? 2400 : 3200)
+  slide(ctx, out, big ? 220 : 320, 60, t, big ? .28 : .14, big ? .16 : .14, 'sine')
   if (crit) ['E6', 'B6'].forEach((n, i) => tone(ctx, out, freq(n), t + .05 + i * .05, .08, .04, 'pulse'))
 }
 
