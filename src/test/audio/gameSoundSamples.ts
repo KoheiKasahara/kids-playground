@@ -11,6 +11,7 @@ import { playBeeSound } from '../../games/bee-garden/sounds'
  */
 import type { SoundSample } from './soundMeter'
 import { playCraftSound } from '../../games/block-craft/sounds'
+import { playIroSound } from '../../games/iro-no-yuka/sounds'
 import { playGardenSound } from '../../games/pixel-garden/sounds'
 import { playJellySound } from '../../games/jelly-merge/sounds'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
@@ -102,6 +103,17 @@ function pianoNotes(count: number): SoundSample['play'] {
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
   'bee-garden': [sample('とぶ', () => playBeeSound()), sample('クリア', () => playBeeSound(true))],
   'block-craft': [sample('おく', () => playCraftSound('place')), sample('こわす', () => playCraftSound('remove')), sample('えらぶ', () => playCraftSound('select'))],
+  'iro-no-yuka': [
+    sample('カウント', () => playIroSound('count')),
+    sample('スタート', () => playIroSound('go')),
+    sample('いどう', () => playIroSound('step')),
+    sample('かんばんが かわる', () => playIroSound('switch')),
+    sample('しずむ', () => playIroSound('drop')),
+    sample('セーフ', () => playIroSound('safe')),
+    sample('ざぶん', () => playIroSound('fall')),
+    sample('1い', () => playIroSound('win')),
+    sample('おしまい', () => playIroSound('lose')),
+  ],
   sugoroku: [
     sample('えらぶ', () => playSugorokuSound('select')),
     sample('はじめる', () => playSugorokuSound('start')),

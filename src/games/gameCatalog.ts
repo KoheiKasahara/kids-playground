@@ -1373,6 +1373,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'iro-no-yuka',
+    slug: 'iro-no-yuka',
+    title: 'のこれ！いろのゆか',
+    emoji: '🟨',
+    category: 'learning',
+    seo: {
+      headline: 'のこれ！いろのゆか｜おだいの色のゆかへ走る勝ちのこりゲーム',
+      description:
+        'かんばんに出た色のゆかへ走り、ほかの色のゆかが水にしずむ前に乗りうつる、どうぶつたちとの勝ちのこりゲームです。ゆかは色と形の記号で見分けられ、とちゅうで色がかわるフェイントも。ハートがなくなるまで何回のこれるかな。',
+    },
+    intro: {
+      howToPlay: [
+        'かんばんと おなじ いろの ゆかを タッチして にげよう',
+        'ほかの いろは しずむよ。ハートが なくなったら おしまい',
+        'さいごまで のこったら 1い！ いろが かわる ときも あるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {

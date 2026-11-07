@@ -48,6 +48,8 @@ const MATH_QUIZ_MODES: MathQuizMode[] = ['add', 'sub', 'mul', 'div']
 export const routes: RouteObject[] = [
   { path: '/games/bee-garden', element: lazyRoute(() => import('../games/bee-garden/BeeGardenPlay')) },
   { path: '/games/block-craft', element: lazyRoute(() => import('../games/block-craft/BlockCraftPlay')) },
+  // むずかしさ えらびと しょうぶが 同じrouteにあるため、プレイ面はゲーム内で包む。
+  { path: '/games/iro-no-yuka', element: lazyRoute(() => import('../games/iro-no-yuka/IroNoYukaPlay')) },
   { path: '/games/jelly-merge', element: lazyRoute(() => import('../games/jelly-merge/JellyMergePlay')) },
   // 花束の完成画面では長押し抑制を外すため、プレイ面はゲーム内で包む。
   { path: '/games/pixel-garden', element: lazyRoute(() => import('../games/pixel-garden/PixelGardenPlay')) },

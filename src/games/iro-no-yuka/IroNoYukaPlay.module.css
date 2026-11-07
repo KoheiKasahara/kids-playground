@@ -1,0 +1,631 @@
+.page {
+  height: 100dvh;
+  min-height: 460px;
+  box-sizing: border-box;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: linear-gradient(180deg, #e3f4ff 0%, #fff8e7 100%);
+  color: #23405a;
+}
+
+.page button {
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.page button:focus-visible {
+  outline: 4px solid #7256c8;
+  outline-offset: 2px;
+}
+
+.header {
+  min-height: 52px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: #1f5f8b;
+  font-size: clamp(16px, 4.6vw, 26px);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.soundToggle {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 2px solid #b9d6ea;
+  border-radius: 14px;
+  background: #fff;
+  font-size: 24px;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---- かんばん と なかまの ハート ---------------------------------------------- */
+
+.hud {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  width: min(100%, 640px);
+  margin: 0 auto;
+}
+
+.sign {
+  position: relative;
+  flex: 1 1 52%;
+  min-height: 66px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-inline: 30px;
+  padding-bottom: 8px;
+  overflow: hidden;
+  border: 3px solid rgb(0 0 0 / 0.14);
+  border-radius: 18px;
+  background: var(--tile-color);
+  color: #fff;
+  animation: sign-in 0.3s ease-out;
+}
+
+.signWaiting {
+  background: #dce6ee;
+  color: #8796a5;
+  animation: none;
+}
+
+.signSymbol {
+  font-size: 34px;
+  line-height: 1;
+  text-shadow: 0 2px 0 rgb(0 0 0 / 0.18);
+}
+
+.signName {
+  font-size: clamp(22px, 7vw, 30px);
+  font-weight: 900;
+  text-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+}
+
+.signSwitched {
+  animation: switch-shake 0.45s ease-out;
+}
+
+.signAlert {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #d32f2f;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
+  animation: bob 0.5s ease-in-out infinite;
+}
+
+.round {
+  position: absolute;
+  top: 3px;
+  left: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.timer {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.35);
+}
+
+.timer span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.roster {
+  flex: 1 1 48%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.rosterItem {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 1px 4px;
+  border: 2px solid #d3e3ee;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.rosterMe {
+  border-color: #ff9800;
+  background: #fff4dc;
+}
+
+.rosterOut {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+.rosterEmoji {
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.hearts {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.heartOn {
+  color: #e8384f;
+}
+
+.heartOff {
+  color: #c8d2da;
+}
+
+/* ---- ゆかの フィールド -------------------------------------------------------- */
+
+/* のこりの はば・たかさ いっぱいに フィールドを ひろげる（ゆかの ならびも この形から きめる）。 */
+.arenaBox {
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * --size は ゆか1まいぶんの大きさ。.arenaBox（size コンテナ）の はば・たかさの どちらにも
+ * おさまるように きめ、フィールドの中の大きさは すべて これを もとにする。
+ */
+.arena {
+  --pad: 6px;
+  --size: min((100cqw - 2 * var(--pad)) / var(--cols), (100cqh - 2 * var(--pad)) / var(--rows));
+  position: relative;
+  padding: var(--pad);
+  border-radius: calc(var(--size) * 0.28);
+  background:
+    radial-gradient(circle at 20% 25%, rgb(255 255 255 / 0.22) 0 4%, transparent 5%),
+    radial-gradient(circle at 75% 70%, rgb(255 255 255 / 0.18) 0 3%, transparent 4%),
+    linear-gradient(160deg, #62bdf0 0%, #2d82c6 100%);
+  box-shadow: inset 0 0 0 calc(var(--size) * 0.05) rgb(255 255 255 / 0.35);
+}
+
+.field {
+  position: relative;
+  width: calc(var(--size) * var(--cols));
+  height: calc(var(--size) * var(--rows));
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+  touch-action: none;
+}
+
+.shaking {
+  animation: shake 0.3s ease-out;
+}
+
+.page .tile {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  margin: calc(var(--size) * 0.045);
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 18%;
+  background: var(--tile-color);
+  box-shadow: inset 0 calc(var(--size) * -0.05) 0 rgb(0 0 0 / 0.16), 0 calc(var(--size) * 0.045) 0 rgb(0 0 0 / 0.2);
+}
+
+.page .tile:disabled {
+  cursor: default;
+}
+
+.symbol {
+  color: rgb(255 255 255 / 0.78);
+  font-size: calc(var(--size) * 0.36);
+  line-height: 1;
+}
+
+.page .aim {
+  outline: calc(var(--size) * 0.05) dashed #fff;
+  outline-offset: calc(var(--size) * -0.09);
+}
+
+.sink {
+  animation: sink 0.7s ease-in 0.08s forwards;
+}
+
+.rise {
+  animation: rise 0.45s ease-out both;
+}
+
+.runner {
+  position: absolute;
+  z-index: 2;
+  width: calc(var(--size) * 0.66);
+  height: calc(var(--size) * 0.66);
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -62%);
+  transition: left 40ms linear, top 40ms linear;
+  pointer-events: none;
+}
+
+.body {
+  position: relative;
+  z-index: 1;
+  font-size: calc(var(--size) * 0.53);
+  line-height: 1;
+  filter: drop-shadow(0 calc(var(--size) * 0.035) 0 rgb(0 0 0 / 0.25));
+}
+
+.me {
+  z-index: 3;
+}
+
+.me::before {
+  content: '';
+  position: absolute;
+  inset: 4% 4% -8%;
+  border: calc(var(--size) * 0.045) solid #ff9800;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.4);
+}
+
+.marker {
+  position: absolute;
+  top: calc(var(--size) * -0.25);
+  color: #ff6d00;
+  font-size: calc(var(--size) * 0.25);
+  line-height: 1;
+  text-shadow: 0 0 3px #fff;
+  animation: bob 0.8s ease-in-out infinite;
+}
+
+.falling .body {
+  animation: fall 0.85s ease-in forwards;
+}
+
+.falling.me::before,
+.falling .marker {
+  display: none;
+}
+
+.splash {
+  position: absolute;
+  bottom: calc(var(--size) * -0.1);
+  font-size: calc(var(--size) * 0.4);
+  animation: splash 0.9s ease-out 0.35s both;
+}
+
+.back {
+  animation: runner-pop 0.5s ease-out;
+}
+
+.safe .body {
+  animation: hop 0.45s ease-out;
+}
+
+.okBubble {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--size) * -0.45);
+  font-size: calc(var(--size) * 0.35);
+  animation: pop-in 0.35s ease-out;
+}
+
+.countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: calc(var(--size) * 2);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 calc(var(--size) * 0.08) 0 rgb(0 0 0 / 0.25);
+  pointer-events: none;
+  animation: count-pop 0.8s ease-out both;
+}
+
+/* ---- はじめる・けっか（フィールドの上に かさねる） ----------------------------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.4cqmin;
+  padding: 4cqmin;
+  border-radius: inherit;
+  background: rgb(255 255 255 / 0.74);
+  text-align: center;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.lead {
+  margin: 0;
+  color: #1f5f8b;
+  font-size: clamp(17px, 6.4cqmin, 32px);
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.lead span {
+  font-size: clamp(22px, 8cqmin, 40px);
+  white-space: nowrap;
+}
+
+.choices {
+  width: 100%;
+  max-width: 480px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3cqmin;
+}
+
+.page .choice {
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 3px solid #1f5f8b;
+  border-radius: 18px;
+  background: #fff;
+  color: #1f5f8b;
+  font-size: clamp(16px, 5.4cqmin, 26px);
+  font-weight: 900;
+  box-shadow: 0 4px 0 #1f5f8b33;
+}
+
+.choiceEmoji {
+  font-size: clamp(28px, 10cqmin, 52px);
+  line-height: 1;
+}
+
+.medal {
+  margin: 0;
+  font-size: clamp(44px, 16cqmin, 96px);
+  line-height: 1;
+  animation: pop-in 0.5s ease-out;
+}
+
+.resultText {
+  margin: 0;
+  color: #1f5f8b;
+  font-size: clamp(20px, 7cqmin, 40px);
+  font-weight: 900;
+}
+
+.standings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: 2cqmin;
+}
+
+.standings li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.6cqmin 2.2cqmin;
+  border-radius: 12px;
+  background: #fff;
+  font-size: clamp(24px, 7cqmin, 40px);
+  line-height: 1.1;
+}
+
+.standings b {
+  font-size: clamp(13px, 3.6cqmin, 20px);
+  color: #546e7a;
+}
+
+.page .standingMe {
+  outline: 3px solid #ff9800;
+}
+
+.stars {
+  margin: 0;
+  font-size: clamp(22px, 7cqmin, 40px);
+  line-height: 1;
+}
+
+.starOn {
+  color: #f6b100;
+}
+
+.starOff {
+  color: #cfd8dc;
+}
+
+.note {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 横長で高さが足りない画面では、かんばんを左に たてに ならべて フィールドを広げる。 */
+@media (orientation: landscape) and (max-height: 620px) {
+  .page {
+    min-height: 300px;
+  }
+
+  .header {
+    min-height: 44px;
+  }
+
+  .main {
+    flex-direction: row;
+  }
+
+  .hud {
+    flex-direction: column;
+    width: min(32%, 240px);
+    margin: 0;
+  }
+
+  .sign {
+    flex: 0 0 auto;
+    min-height: 92px;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .roster {
+    flex: 0 0 auto;
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes sign-in {
+  from { transform: scale(0.85); }
+}
+
+@keyframes switch-shake {
+  0% { transform: scale(0.8) rotate(-6deg); }
+  30% { transform: scale(1.08) rotate(5deg); }
+  60% { transform: rotate(-3deg); }
+}
+
+@keyframes shake {
+  25% { transform: translate(-0.6%, 0.4%); }
+  50% { transform: translate(0.6%, -0.4%); }
+  75% { transform: translate(-0.3%, 0.2%); }
+}
+
+@keyframes sink {
+  to { transform: translateY(10%) scale(0.5); opacity: 0; }
+}
+
+@keyframes rise {
+  from { transform: scale(0.4); opacity: 0; }
+  70% { transform: scale(1.06); opacity: 1; }
+}
+
+@keyframes fall {
+  20% { transform: translateY(-25%) scale(1.05); }
+  100% { transform: translateY(60%) scale(0.2) rotate(240deg); opacity: 0; }
+}
+
+@keyframes splash {
+  from { transform: scale(0.3); opacity: 0; }
+  40% { transform: scale(1.2); opacity: 1; }
+  to { transform: scale(1); opacity: 0; }
+}
+
+@keyframes runner-pop {
+  from { transform: translate(-50%, -62%) scale(0.2); }
+  60% { transform: translate(-50%, -62%) scale(1.15); }
+}
+
+@keyframes pop-in {
+  from { transform: scale(0.2); }
+  60% { transform: scale(1.15); }
+}
+
+@keyframes hop {
+  40% { transform: translateY(-30%); }
+}
+
+@keyframes bob {
+  50% { transform: translateY(-20%); }
+}
+
+@keyframes count-pop {
+  from { transform: scale(1.6); opacity: 0; }
+  25% { transform: scale(1); opacity: 1; }
+  to { opacity: 0.2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sign,
+  .signSwitched,
+  .signAlert,
+  .shaking,
+  .rise,
+  .marker,
+  .back,
+  .safe .body,
+  .medal,
+  .countdown {
+    animation: none;
+  }
+
+  .runner {
+    transition: none;
+  }
+
+  /* しずむ ゆかと なかまは、うごかさずに うすくして わかるようにする。 */
+  .sink,
+  .falling .body {
+    animation: fade-out 0.5s forwards;
+  }
+}
+
+@keyframes fade-out {
+  to { opacity: 0.12; }
+}
