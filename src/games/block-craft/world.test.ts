@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createWorld, decodeWorld, editWorld, HEIGHT, inside, key, MAX_SAVE_LENGTH, SIZE, topBlock, type Block } from './world'
+import {
+  blockAt, brushCells, createWorld, decodeWorld, editWorld, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree, HEIGHT, inside, key, MATERIALS,
+  MAX_SAVE_LENGTH, settleWalker, SIZE, startWalker, surfaceOf, topBlock, TREASURES, walk, type Block, type World,
+} from './world'
+
+const waterAt = (world: World) => world.filter(b => b.material === 'water')
 
 describe('block world', () => {
   it('starts with unique bounded terrain, water and trees, with an unbreakable floor', () => {
@@ -76,5 +81,118 @@ describe('minecraft-like features', () => {
     expect(topBlock(loaded, SIZE - 1, SIZE - 1).material).toBe('grass')
     expect(decodeWorld(JSON.stringify(loaded))).toEqual(loaded)
     expect(decodeWorld(JSON.stringify(legacy.slice(1)))).toBeNull()
+  })
+  it('fills both palette layouts with complete rows', () => {
+    expect(MATERIALS.length % 6).toBe(0)
+    expect(MATERIALS.length % 9).toBe(0)
+  })
+})
+
+describe('flowing water', () => {
+  it('spreads a few cells sideways over the ground', () => {
+    const before = createWorld()
+    const world = editWorld(before, { x: 8, y: 3, z: 8 }, 'water', 'place')
+    const added = waterAt(world).filter(b => b.y === 3)
+    expect(added.length).toBeGreaterThan(5)
+    expect(added.every(b => Math.abs(b.x - 8) + Math.abs(b.z - 8) <= FLOW_REACH)).toBe(true)
+    expect(waterAt(world).length - waterAt(before).length).toBe(added.length)
+  })
+  it('falls off the edge of a tower and spreads again at the bottom, within a limit', () => {
+    let world = createWorld()
+    for (let y = 3; y <= 6; y++) world = editWorld(world, { x: 5, y, z: 5 }, 'brick', 'place')
+    const before = waterAt(world).length
+    world = editWorld(world, { x: 5, y: 7, z: 5 }, 'water', 'place')
+    expect(blockAt(world, { x: 6, y: 3, z: 5 })?.material).toBe('water')
+    expect(blockAt(world, { x: 6, y: 5, z: 5 })?.material).toBe('water')
+    expect(waterAt(world).length - before).toBeLessThanOrEqual(FLOW_LIMIT + 1)
+    expect(new Set(world.map(key)).size).toBe(world.length)
+  })
+  it('flows into a hole dug beside it, but a removed water block stays empty', () => {
+    let world = createWorld()
+    world = editWorld(world, { x: 4, y: 2, z: 2 }, 'wood', 'remove')
+    expect(blockAt(world, { x: 4, y: 2, z: 2 })?.material).toBe('water')
+    world = editWorld(world, { x: 4, y: 2, z: 0 }, 'wood', 'remove')
+    expect(blockAt(world, { x: 4, y: 2, z: 0 })).toBeUndefined()
+  })
+  it('lets blocks be placed into water to dam it', () => {
+    const world = editWorld(createWorld(), { x: 4, y: 2, z: 1 }, 'brick', 'place')
+    expect(blockAt(world, { x: 4, y: 2, z: 1 })?.material).toBe('brick')
+    expect(editWorld(createWorld(), { x: 4, y: 2, z: 1 }, 'water', 'place')).toEqual(createWorld())
+  })
+})
+
+describe('wide brush', () => {
+  it('covers the 3×3 plane facing the touched side', () => {
+    const center = { x: 5, y: 5, z: 5 }
+    expect(brushCells(center, { x: 0, y: 1, z: 0 }, false)).toEqual([center])
+    const flat = brushCells(center, { x: 0, y: 1, z: 0 }, true)
+    expect(flat[0]).toEqual(center)
+    expect(flat).toHaveLength(9)
+    expect(flat.every(p => p.y === 5)).toBe(true)
+    expect(brushCells(center, { x: 1, y: 0, z: 0 }, true).every(p => p.x === 5)).toBe(true)
+    expect(brushCells(center, { x: 0, y: 0, z: -1 }, true).every(p => p.z === 5)).toBe(true)
+  })
+  it('places and mines the whole area in one change, skipping the floor and the outside', () => {
+    const initial = createWorld()
+    const wall = editWorld(initial, brushCells({ x: 0, y: 3, z: 8 }, { x: 0, y: 1, z: 0 }, true), 'brick', 'place')
+    expect(wall.length - initial.length).toBe(6)
+    const mined = editWorld(wall, brushCells({ x: 8, y: 1, z: 8 }, { x: 0, y: 0, z: 1 }, true), 'wood', 'remove')
+    expect(mined.filter(b => b.y === 0)).toHaveLength(SIZE * SIZE)
+    expect(blockAt(mined, { x: 8, y: 2, z: 8 })).toBeUndefined()
+  })
+})
+
+describe('saplings, treasure and walking', () => {
+  it('grows a sapling into a tree only when there is room above', () => {
+    const world = createWorld()
+    const sapling = world.find(b => b.material === 'sapling')!
+    const grown = growTree(world, sapling)
+    expect(blockAt(grown, sapling)?.material).toBe('wood')
+    expect(blockAt(grown, { ...sapling, y: sapling.y + 4 })?.material).toBe('leaf')
+    expect(new Set(grown.map(key)).size).toBe(grown.length)
+    expect(growTree(grown, sapling)).toBe(grown)
+    const blocked = editWorld(world, { ...sapling, y: sapling.y + 1 }, 'stone', 'place')
+    expect(growTree(blocked, sapling)).toBe(blocked)
+  })
+  it('counts a treasure as found once it is dug out of its spot', () => {
+    let world = createWorld()
+    expect(foundTreasures(world)).toEqual([])
+    const [first] = TREASURES
+    world = editWorld(world, { ...first, y: 2 }, 'wood', 'remove')
+    expect(foundTreasures(world)).toEqual([])
+    world = editWorld(world, first, 'wood', 'remove')
+    expect(foundTreasures(world)).toEqual([first])
+  })
+  it('walks one cell at a time, climbs one step, drops down and never leaves the world', () => {
+    let world = createWorld()
+    const start = startWalker(world, 8, 8)
+    expect(start).toEqual({ x: 8, y: 3, z: 8 })
+    world = editWorld(world, { x: 9, y: 3, z: 8 }, 'stone', 'place')
+    const up = walk(world, start, { x: 1, z: 0 })
+    expect(up).toEqual({ x: 9, y: 4, z: 8 })
+    expect(walk(world, up, { x: 0, z: 1 })).toEqual({ x: 9, y: 3, z: 9 })
+    world = editWorld(world, { x: 9, y: 4, z: 8 }, 'stone', 'place')
+    expect(walk(world, start, { x: 1, z: 0 })).toBe(start)
+    const edge = startWalker(world, 0, 8)
+    expect(walk(world, edge, { x: -1, z: 0 })).toBe(edge)
+    // みずと くさばなは とおりぬけられる
+    expect(walk(createWorld(), startWalker(createWorld(), 4, 2), { x: 0, z: -1 })).toEqual({ x: 4, y: 2, z: 1 })
+    expect(walk(createWorld(), { x: 6, y: 3, z: 8 }, { x: 0, z: 1 })).toEqual({ x: 6, y: 3, z: 9 })
+  })
+  it('moves the walker up when a block fills its feet and down when the ground is dug', () => {
+    let world = createWorld()
+    const walker = startWalker(world, 8, 8)
+    world = editWorld(world, walker, 'stone', 'place')
+    expect(settleWalker(world, walker)).toEqual({ x: 8, y: 4, z: 8 })
+    world = editWorld(createWorld(), { x: 8, y: 2, z: 8 }, 'stone', 'remove')
+    expect(settleWalker(world, walker)).toEqual({ x: 8, y: 2, z: 8 })
+    for (let y = 1; y < HEIGHT; y++) world = editWorld(world, { x: 3, y, z: 3 }, 'stone', 'place')
+    expect(settleWalker(world, { x: 3, y: 1, z: 3 }).y).toBe(HEIGHT - 1)
+  })
+  it('finds the ground for animals, ignoring flowers', () => {
+    const surface = surfaceOf(createWorld())
+    expect(surface(6, 9)?.material).toBe('grass')
+    expect(surface(12, 6)?.material).toBe('snow')
+    expect(surface(4, 0)?.material).toBe('water')
   })
 })
