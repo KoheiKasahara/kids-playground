@@ -103,7 +103,11 @@ function pianoNotes(count: number): SoundSample['play'] {
 
 export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSample[]>> = {
   'bee-garden': [sample('とぶ', () => playBeeSound()), sample('クリア', () => playBeeSound(true))],
-  'block-craft': [sample('おく', () => playCraftSound('place')), sample('こわす', () => playCraftSound('remove')), sample('えらぶ', () => playCraftSound('select'))],
+  'block-craft': [
+    sample('おく', () => playCraftSound('place')), sample('こわす', () => playCraftSound('remove')), sample('えらぶ', () => playCraftSound('select')),
+    sample('そだつ', () => playCraftSound('grow')), sample('たから', () => playCraftSound('treasure')), sample('ぜんぶ みつけた', () => playCraftSound('complete')),
+    sample('どうぶつ', () => playCraftSound('pet')), sample('あるく', () => playCraftSound('step')),
+  ],
   'town-builder': [sample('おく', () => playTownSound('build')), sample('みち', () => playTownSound('road')), sample('けす', () => playTownSound('erase')), sample('そだつ', () => playTownSound('grow')), sample('3Dで みる', () => playTownSound('view')), sample('のる', () => playTownSound('ride'))],
   'iro-no-yuka': [
     sample('カウント', () => playIroSound('count')),

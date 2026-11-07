@@ -1,14 +1,41 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { HEIGHT, MATERIAL_DEFS, SIZE, topBlock, type Position, type World } from './world'
+import { observeGameActivity } from '../../utils/gameActivity'
+import { ANIMAL_SPAWNS, nextCell, type AnimalKind, type Cell } from './animals'
+import { blockPixels, TEXTURE_SIZE } from './textures'
+import { HEIGHT, MATERIAL_DEFS, SIZE, surfaceOf, topBlock, type Material, type Position, type World } from './world'
 
 type Pick = (position: Position, normal: Position) => void
-type SceneApi = { update: (world: World, cursor: Position, night: boolean) => void }
+export type Heading = { x: number; z: number }
+export type SceneApi = {
+  /** あるく ときに むいている ほうこう（まえ・うしろ・ひだり・みぎの どれか）。 */
+  heading: () => Heading
+  turn: (side: 'left' | 'right') => void
+  /** がめんの まんなかの ブロックを おく・こわす（pick）か えらぶ（hold）。 */
+  actAtCenter: (kind: 'pick' | 'hold') => void
+}
+export type CraftSceneOptions = {
+  world: World
+  cursor: Position
+  night?: boolean
+  /** あるく モードの あしもと。null なら そらから ながめる。 */
+  walker?: Position | null
+  onPick: Pick
+  onHold?: (position: Position) => void
+  onPet?: (kind: AnimalKind) => void
+}
 
 const DAY = { sky: '#c6eafa', hemisphere: 2.4, sun: 2.5, sunColor: '#fff5db', glow: 0.35 }
 const NIGHT = { sky: '#1a2246', hemisphere: 0.75, sun: 0.4, sunColor: '#9fb4ff', glow: 1 }
 const CENTER = (SIZE - 1) / 2
+/** あしもとの ブロックの まんなかから めまでの たかさ。 */
+const EYE = 1.1
+/** あるく ときに てが とどく きょり。 */
+const REACH = 7
+/** ながおしで ブロックを えらぶまでの じかん [ms]。 */
+export const HOLD_MS = 450
+const DRAG_PX = 7
 
 /** Keeps the two-finger panned view over the world: moves camera and target together so the angle never changes. */
 export function clampTarget(target: THREE.Vector3, camera: THREE.Vector3) {
@@ -24,13 +51,48 @@ export function clampTarget(target: THREE.Vector3, camera: THREE.Vector3) {
   return true
 }
 
-/** Demand rendering: no simulation, RAF, or held input survives a hidden page or unmount. */
-export function useCraftScene(world: World, cursor: Position, onPick: Pick, night = false) {
+/** むいている かくどを、いちばん ちかい まえ・うしろ・ひだり・みぎ に そろえる。 */
+export function headingFromYaw(yaw: number): Heading {
+  const x = -Math.sin(yaw)
+  const z = -Math.cos(yaw)
+  return Math.abs(x) > Math.abs(z) ? { x: Math.sign(x), z: 0 } : { x: 0, z: Math.sign(z) || -1 }
+}
+
+const ANIMAL_COLORS = { wool: '#f4f1ea', face: '#4a4038', leg: '#5b4a3e', comb: '#e2463c', beak: '#f2b632', fur: '#c9a27e' } as const
+type AnimalColor = keyof typeof ANIMAL_COLORS
+type Part = readonly [AnimalColor, readonly [number, number, number], readonly [number, number, number]]
+/** はこを くみあわせた どうぶつ（まえが +z）。 */
+const ANIMAL_PARTS: Record<AnimalKind, readonly Part[]> = {
+  sheep: [
+    ['wool', [0.7, 0.5, 0.9], [0, 0.55, 0]], ['face', [0.36, 0.36, 0.36], [0, 0.75, 0.5]],
+    ['leg', [0.14, 0.3, 0.14], [0.22, 0.15, 0.3]], ['leg', [0.14, 0.3, 0.14], [-0.22, 0.15, 0.3]],
+    ['leg', [0.14, 0.3, 0.14], [0.22, 0.15, -0.3]], ['leg', [0.14, 0.3, 0.14], [-0.22, 0.15, -0.3]],
+  ],
+  chicken: [
+    ['wool', [0.36, 0.36, 0.44], [0, 0.35, 0]], ['wool', [0.24, 0.28, 0.24], [0, 0.62, 0.2]],
+    ['comb', [0.06, 0.1, 0.14], [0, 0.8, 0.2]], ['beak', [0.1, 0.08, 0.1], [0, 0.6, 0.36]],
+    ['beak', [0.05, 0.18, 0.05], [0.08, 0.09, 0]], ['beak', [0.05, 0.18, 0.05], [-0.08, 0.09, 0]],
+  ],
+  rabbit: [
+    ['fur', [0.4, 0.36, 0.56], [0, 0.28, 0]], ['fur', [0.3, 0.3, 0.3], [0, 0.48, 0.3]],
+    ['fur', [0.08, 0.3, 0.06], [0.08, 0.75, 0.28]], ['fur', [0.08, 0.3, 0.06], [-0.08, 0.75, 0.28]],
+    ['wool', [0.14, 0.14, 0.1], [0, 0.34, -0.3]],
+  ],
+}
+type AnimalState = { kind: AnimalKind; group: THREE.Group; from: Cell; to: Cell; t: number; wait: number; hop: number }
+const ease = (t: number) => t * t * (3 - 2 * t)
+
+/**
+ * Renders on demand while the page is hidden; a RAF loop (animals, water, walking camera) runs
+ * only while the game is active and stops on hidden page, blur, context loss or unmount.
+ */
+export function useCraftScene(options: CraftSceneOptions) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [failed, setFailed] = useState(false)
   const api = useRef<SceneApi | null>(null)
-  const latest = useRef({ world, cursor, onPick, night })
-  useEffect(() => { latest.current = { world, cursor, onPick, night }; api.current?.update(world, cursor, night) }, [world, cursor, onPick, night])
+  const sync = useRef<(() => void) | null>(null)
+  const latest = useRef(options)
+  useEffect(() => { latest.current = options; sync.current?.() })
 
   useEffect(() => {
     if (!container) return
@@ -46,6 +108,7 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick, nigh
     const sky = new THREE.Color(DAY.sky)
     scene.background = sky
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 160)
+    camera.rotation.order = 'YXZ'
     camera.position.set(CENTER + 16, 22, CENTER + 18)
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.target.set(CENTER, 2, CENTER)
@@ -63,9 +126,21 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick, nigh
     const sun = new THREE.DirectionalLight(DAY.sunColor, DAY.sun)
     sun.position.set(6, 18, 12)
     scene.add(sun)
+
     const geometry = new THREE.BoxGeometry(0.97, 0.97, 0.97)
-    const materials = MATERIAL_DEFS.map(m => new THREE.MeshLambertMaterial({
-      color: m.color,
+    const textures = MATERIAL_DEFS.map(m => {
+      const texture = new THREE.DataTexture(blockPixels(m.id as Material), TEXTURE_SIZE, TEXTURE_SIZE)
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.magFilter = THREE.NearestFilter
+      texture.minFilter = THREE.NearestFilter
+      texture.wrapS = THREE.RepeatWrapping
+      texture.wrapT = THREE.RepeatWrapping
+      texture.needsUpdate = true
+      return texture
+    })
+    const waterTexture = textures[MATERIAL_DEFS.findIndex(m => m.id === 'water')]
+    const materials = MATERIAL_DEFS.map((m, i) => new THREE.MeshLambertMaterial({
+      map: textures[i],
       transparent: m.opacity !== undefined,
       opacity: m.opacity ?? 1,
       depthWrite: m.opacity === undefined,
@@ -87,20 +162,77 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick, nigh
     const outline = new THREE.LineSegments(outlineGeometry, outlineMaterial)
     outline.renderOrder = 2
     scene.add(outline)
+
+    // どうぶつ
+    const unit = new THREE.BoxGeometry(1, 1, 1)
+    const animalMaterials = Object.fromEntries(Object.entries(ANIMAL_COLORS).map(([name, color]) => [name, new THREE.MeshLambertMaterial({ color })])) as Record<AnimalColor, THREE.MeshLambertMaterial>
+    let surface = surfaceOf(latest.current.world)
+    const groundTop = (cell: Cell) => (surface(cell.x, cell.z)?.y ?? 0) + 0.5
+    const animals: AnimalState[] = ANIMAL_SPAWNS.map(spawn => {
+      const group = new THREE.Group()
+      for (const [color, size, position] of ANIMAL_PARTS[spawn.kind]) {
+        const part = new THREE.Mesh(unit, animalMaterials[color])
+        part.scale.set(...size)
+        part.position.set(...position)
+        group.add(part)
+      }
+      const cell = { x: spawn.x, z: spawn.z }
+      group.position.set(cell.x, groundTop(cell), cell.z)
+      scene.add(group)
+      return { kind: spawn.kind, group, from: cell, to: cell, t: 1, wait: Math.random() * 2, hop: 0 }
+    })
+    const animalGroups = animals.map(a => a.group)
+
+    // あるく モード
+    let walking: Position | null = null
+    let yaw = 0
+    let yawTarget = 0
+    let pitch = -0.15
+    const orbitPosition = new THREE.Vector3()
+    const orbitTarget = new THREE.Vector3()
+    const eye = new THREE.Vector3()
+    const aimCamera = (blend: number) => {
+      if (!walking) return
+      eye.set(walking.x, walking.y + EYE, walking.z)
+      camera.position.lerp(eye, blend)
+      yaw += (yawTarget - yaw) * blend
+      camera.rotation.set(pitch, yaw, 0)
+    }
+    const setWalking = (next: Position | null) => {
+      if (!next !== !walking) {
+        if (next) {
+          orbitPosition.copy(camera.position)
+          orbitTarget.copy(controls.target)
+          const look = controls.target.clone().sub(camera.position)
+          yaw = yawTarget = Math.atan2(-look.x, -look.z)
+          pitch = -0.15
+          controls.enabled = false
+          camera.fov = 70
+          camera.position.set(next.x, next.y + EYE, next.z)
+        } else {
+          camera.position.copy(orbitPosition)
+          controls.target.copy(orbitTarget)
+          controls.enabled = true
+          camera.fov = 40
+          controls.update()
+        }
+        camera.updateProjectionMatrix()
+        outline.visible = !next
+      }
+      walking = next
+    }
+
     const render = () => renderer.render(scene, camera)
-    const update = (blocks: World, selection: Position, night: boolean) => {
-      const theme = night ? NIGHT : DAY
-      sky.set(theme.sky)
-      hemisphere.intensity = theme.hemisphere
-      sun.intensity = theme.sun
-      sun.color.set(theme.sunColor)
-      materials.forEach((material, i) => { if (MATERIAL_DEFS[i].glow) material.emissiveIntensity = theme.glow })
-      const matrix = new THREE.Matrix4()
+    const matrix = new THREE.Matrix4()
+    let shownWorld: World | null = null
+    const rebuild = (blocks: World) => {
       positions.forEach(list => { list.length = 0 })
       for (const block of blocks) {
         const index = MATERIAL_DEFS.findIndex(m => m.id === block.material)
         const list = positions[index]
-        meshes[index].setMatrixAt(list.length, matrix.makeTranslation(block.x, block.y, block.z))
+        if (MATERIAL_DEFS[index].plant) matrix.makeScale(0.45, 0.6, 0.45).setPosition(block.x, block.y - 0.2, block.z)
+        else matrix.makeTranslation(block.x, block.y, block.z)
+        meshes[index].setMatrixAt(list.length, matrix)
         list.push(block)
       }
       meshes.forEach((mesh, i) => {
@@ -108,10 +240,68 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick, nigh
         mesh.instanceMatrix.needsUpdate = true
         mesh.computeBoundingSphere()
       })
-      const top = topBlock(blocks, selection.x, selection.z)
+      surface = surfaceOf(blocks)
+      shownWorld = blocks
+    }
+    let frame = 0
+    const update = () => {
+      const { world, cursor, night = false, walker = null } = latest.current
+      const theme = night ? NIGHT : DAY
+      sky.set(theme.sky)
+      hemisphere.intensity = theme.hemisphere
+      sun.intensity = theme.sun
+      sun.color.set(theme.sunColor)
+      materials.forEach((material, i) => { if (MATERIAL_DEFS[i].glow) material.emissiveIntensity = theme.glow })
+      if (world !== shownWorld) rebuild(world)
+      const top = topBlock(world, cursor.x, cursor.z)
       outline.position.set(top.x, top.y, top.z)
+      setWalking(walker)
+      if (!frame) aimCamera(1)
       render()
     }
+
+    const tick = (dt: number, time: number) => {
+      for (const animal of animals) {
+        if (animal.t < 1) animal.t = Math.min(1, animal.t + dt / 0.55)
+        else if ((animal.wait -= dt) <= 0) {
+          animal.from = animal.to
+          const next = nextCell(surface, animal.from, Math.random)
+          if (next !== animal.from) animal.group.rotation.y = Math.atan2(next.x - animal.from.x, next.z - animal.from.z)
+          animal.to = next
+          animal.t = next === animal.from ? 1 : 0
+          animal.wait = 0.6 + Math.random() * 2.2
+        }
+        animal.hop = Math.max(0, animal.hop - dt * 2)
+        const s = ease(animal.t)
+        const bounce = Math.sin(Math.PI * animal.t) * 0.18 + Math.sin(Math.PI * animal.hop) * 0.7
+        animal.group.position.set(
+          animal.from.x + (animal.to.x - animal.from.x) * s,
+          groundTop(animal.from) + (groundTop(animal.to) - groundTop(animal.from)) * s + bounce,
+          animal.from.z + (animal.to.z - animal.from.z) * s,
+        )
+      }
+      waterTexture.offset.y = (time / 5000) % 1
+      if (latest.current.night) {
+        const pulse = NIGHT.glow * (0.8 + 0.2 * Math.sin(time / 380))
+        materials.forEach((material, i) => { if (MATERIAL_DEFS[i].glow) material.emissiveIntensity = pulse })
+      }
+      aimCamera(1 - Math.exp(-dt * 12))
+    }
+    let last = 0
+    const loop = (time: number) => {
+      const dt = last ? Math.min(0.05, (time - last) / 1000) : 0
+      last = time
+      tick(dt, time)
+      render()
+      frame = requestAnimationFrame(loop)
+    }
+    let lost = false
+    const stop = () => { cancelAnimationFrame(frame); frame = 0 }
+    const stopActivity = observeGameActivity(active => {
+      if (active && !lost && !frame) { last = 0; frame = requestAnimationFrame(loop) }
+      else if (!active) stop()
+    })
+
     const resize = () => {
       const width = container.clientWidth || 320
       const height = container.clientHeight || 360
@@ -127,29 +317,82 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick, nigh
       render()
     }
     controls.addEventListener('change', changed)
+
     const raycaster = new THREE.Raycaster()
-    let down: { x: number; y: number; id: number } | null = null
+    const ndc = new THREE.Vector2()
+    type Hit = { animal: AnimalState } | { position: Position; normal: Position }
+    const hitAt = (x: number, y: number): Hit | null => {
+      ndc.set(x, y)
+      raycaster.setFromCamera(ndc, camera)
+      raycaster.far = walking ? REACH : Infinity
+      const hit = raycaster.intersectObjects([...meshes, ...animalGroups], true)[0]
+      if (!hit) return null
+      const animal = animals.find(a => a.group === hit.object.parent)
+      if (animal) return { animal }
+      const index = meshes.findIndex(mesh => mesh === hit.object)
+      if (index < 0 || hit.instanceId === undefined || !hit.face) return null
+      const normal = { x: Math.round(hit.face.normal.x), y: Math.round(hit.face.normal.y), z: Math.round(hit.face.normal.z) }
+      return { position: positions[index][hit.instanceId], normal }
+    }
+    const hitAtClient = (clientX: number, clientY: number) => {
+      const rect = renderer.domElement.getBoundingClientRect()
+      return hitAt((clientX - rect.left) / rect.width * 2 - 1, -(clientY - rect.top) / rect.height * 2 + 1)
+    }
+    const act = (hit: Hit | null, kind: 'pick' | 'hold') => {
+      if (!hit) return
+      if ('animal' in hit) {
+        if (kind === 'hold') return
+        hit.animal.hop = 1
+        latest.current.onPet?.(hit.animal.kind)
+        if (!frame) render()
+        return
+      }
+      if (kind === 'hold') latest.current.onHold?.(hit.position)
+      else latest.current.onPick(hit.position, hit.normal)
+    }
+
+    let down: { x: number; y: number; lastX: number; lastY: number; id: number } | null = null
     let dragged = false
+    let held = false
+    let holdTimer: ReturnType<typeof setTimeout> | undefined
+    const clearHold = () => { clearTimeout(holdTimer); holdTimer = undefined }
     const pointerDown = (event: PointerEvent) => {
-      if (down || !event.isPrimary || event.button !== 0) { dragged = true; return }
-      down = { x: event.clientX, y: event.clientY, id: event.pointerId }
+      if (down || !event.isPrimary || event.button !== 0) { dragged = true; clearHold(); return }
+      down = { x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, id: event.pointerId }
       dragged = false
+      held = false
+      clearHold()
+      // ながおしで その ブロックを えらぶ（スポイト）
+      holdTimer = setTimeout(() => {
+        holdTimer = undefined
+        if (!down || dragged) return
+        const hit = hitAtClient(down.x, down.y)
+        if (!hit || 'animal' in hit) return
+        held = true
+        act(hit, 'hold')
+      }, HOLD_MS)
     }
     const pointerMove = (event: PointerEvent) => {
-      if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 7) dragged = true
+      if (!down || down.id !== event.pointerId) return
+      if (walking) {
+        yaw -= (event.clientX - down.lastX) * 0.008
+        yawTarget = yaw
+        pitch = THREE.MathUtils.clamp(pitch - (event.clientY - down.lastY) * 0.008, -1.2, 1)
+        camera.rotation.set(pitch, yaw, 0)
+        if (!frame) render()
+      }
+      down.lastX = event.clientX
+      down.lastY = event.clientY
+      if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > DRAG_PX) { dragged = true; clearHold() }
     }
-    const cancel = () => { down = null }
+    const cancel = () => { down = null; clearHold() }
     const pointerUp = (event: PointerEvent) => {
       if (!down || down.id !== event.pointerId) return
-      const wasDragged = dragged
+      clearHold()
+      const skip = dragged || held
       down = null
-      if (wasDragged) return
-      const rect = renderer.domElement.getBoundingClientRect()
-      raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), camera)
-      const hit = raycaster.intersectObjects(meshes)[0]
-      if (!hit || hit.instanceId === undefined || !hit.face) return
-      const position = positions[meshes.findIndex(mesh => mesh === hit.object)][hit.instanceId]
-      latest.current.onPick(position, hit.face.normal)
+      if (skip) return
+      act(hitAtClient(event.clientX, event.clientY), 'pick')
     }
     const canvas = renderer.domElement
     canvas.addEventListener('pointerdown', pointerDown)
@@ -157,13 +400,26 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick, nigh
     canvas.addEventListener('pointerup', pointerUp)
     canvas.addEventListener('pointercancel', cancel)
     canvas.addEventListener('lostpointercapture', cancel)
-    const contextLost = (event: Event) => { event.preventDefault(); setFailed(true) }
+    const contextLost = (event: Event) => { event.preventDefault(); lost = true; stop(); setFailed(true) }
     canvas.addEventListener('webglcontextlost', contextLost)
-    api.current = { update }
+
+    api.current = {
+      heading: () => headingFromYaw(yawTarget),
+      turn: side => {
+        yawTarget += side === 'left' ? Math.PI / 2 : -Math.PI / 2
+        if (!frame) { aimCamera(1); render() }
+      },
+      actAtCenter: kind => act(hitAt(0, 0), kind),
+    }
+    sync.current = update
     resize()
-    update(latest.current.world, latest.current.cursor, latest.current.night)
+    update()
     return () => {
       api.current = null
+      sync.current = null
+      stop()
+      stopActivity()
+      clearHold()
       observer.disconnect()
       controls.removeEventListener('change', changed)
       controls.dispose()
@@ -174,7 +430,10 @@ export function useCraftScene(world: World, cursor: Position, onPick: Pick, nigh
       canvas.removeEventListener('lostpointercapture', cancel)
       canvas.removeEventListener('webglcontextlost', contextLost)
       geometry.dispose()
+      unit.dispose()
+      textures.forEach(texture => texture.dispose())
       materials.forEach(material => material.dispose())
+      Object.values(animalMaterials).forEach(material => material.dispose())
       meshes.forEach(mesh => mesh.dispose())
       outlineGeometry.dispose()
       outlineMaterial.dispose()

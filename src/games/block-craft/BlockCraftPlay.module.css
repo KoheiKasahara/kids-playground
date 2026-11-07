@@ -4,15 +4,24 @@
 .game button[aria-pressed=true] { border-color: #267652; background: #def4d3; box-shadow: inset 0 -3px #9dce91; }
 .game button:disabled { opacity: .4; cursor: default; }
 .header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; min-height: 48px; }
-.header h1 { flex: 1; font-size: clamp(16px, 4vw, 24px); margin: 0; }
+.header h1 { flex: 1; min-width: 0; font-size: clamp(16px, 4vw, 24px); margin: 0; }
 .header button { flex-shrink: 0; }
-.scene { height: clamp(280px, 48svh, 480px); width: 100%; overflow: hidden; border-radius: 20px; background: #c6eafa; touch-action: none; }
+.stage { position: relative; }
+.scene { height: clamp(280px, 48svh, 480px); width: 100%; overflow: hidden; border-radius: 20px; background: #c6eafa; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .scene canvas { display: block; }
+.crosshair { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 30px; font-weight: 900; text-shadow: 0 0 3px #000a; pointer-events: none; }
+.toast { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 16px; border: 3px solid #e2b43c; border-radius: 16px; background: #fff9df; font-weight: 800; white-space: nowrap; pointer-events: none; animation: pop .35s ease-out; }
+@keyframes pop { from { transform: translateX(-50%) scale(.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+.game .walkToggle { position: absolute; right: 10px; bottom: 10px; background: #fffef7e6; box-shadow: 0 2px 6px #0003; }
+.walkPad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+.walkPad button { min-height: 56px; font-size: 26px; }
 .actions { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
-.modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; }
+.treasure { padding: 10px 12px; border-radius: 12px; background: #fff3c4; font-weight: 800; white-space: nowrap; }
+.modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
 .modes button { white-space: nowrap; padding-inline: 4px; }
 .header .icon { min-width: 48px; font-size: 22px; padding: 4px 8px; }
-.palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+.palette { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; }
 .palette button { padding: 5px 2px; font-size: 12px; white-space: nowrap; overflow: hidden; }
 .swatch { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 4px; margin: 0 auto 3px; box-shadow: inset -5px -5px #0002; font-size: 18px; }
 .hint { text-align: center; font-size: 12px; line-height: 1.8; }
@@ -24,8 +33,9 @@
 .confirm { padding: 16px; border: 3px solid #86ab63; background: #fff9df; border-radius: 16px; }
 .confirm button { margin: 5px; }
 @media (max-width: 480px) {
-  .palette { gap: 4px; }
-  .palette button { min-height: 0; padding: 4px 0; font-size: 9px; letter-spacing: -.04em; border-radius: 10px; }
+  .modes button { font-size: 14px; }
+  .palette { grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .palette button { min-height: 0; padding: 4px 0; font-size: 11px; letter-spacing: -.04em; border-radius: 10px; }
   .swatch { width: 26px; height: 26px; font-size: 16px; }
 }
-@media (max-width: 350px) { .palette button { font-size: 8px; letter-spacing: -.1em; } .swatch { width: 24px; height: 24px; } }
+@media (max-width: 350px) { .modes button { font-size: 12px; } .palette button { font-size: 10px; letter-spacing: -.08em; } .swatch { width: 24px; height: 24px; } }
