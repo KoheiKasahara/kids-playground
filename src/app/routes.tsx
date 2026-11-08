@@ -51,6 +51,8 @@ export const routes: RouteObject[] = [
   { path: '/games/town-builder', element: lazyRoute(() => import('../games/town-builder/TownBuilderPlay')) },
   // むずかしさ えらびと しょうぶが 同じrouteにあるため、プレイ面はゲーム内で包む。
   { path: '/games/iro-no-yuka', element: lazyRoute(() => import('../games/iro-no-yuka/IroNoYukaPlay')) },
+  // むずかしさ えらびと パレードが 同じrouteにあるため、プレイ面はゲーム内で包む。
+  { path: '/games/kazoete-parade', element: lazyRoute(() => import('../games/kazoete-parade/KazoeteParadePlay')) },
   { path: '/games/jelly-merge', element: lazyRoute(() => import('../games/jelly-merge/JellyMergePlay')) },
   // 花束の完成画面では長押し抑制を外すため、プレイ面はゲーム内で包む。
   { path: '/games/pixel-garden', element: lazyRoute(() => import('../games/pixel-garden/PixelGardenPlay')) },

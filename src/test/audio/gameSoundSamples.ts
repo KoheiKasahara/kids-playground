@@ -13,6 +13,7 @@ import type { SoundSample } from './soundMeter'
 import { playCraftSound } from '../../games/block-craft/sounds'
 import { playTownSound } from '../../games/town-builder/sounds'
 import { playIroSound } from '../../games/iro-no-yuka/sounds'
+import { playParadeSound } from '../../games/kazoete-parade/sounds'
 import { playGardenSound } from '../../games/pixel-garden/sounds'
 import { playJellySound } from '../../games/jelly-merge/sounds'
 import { playFishingSound } from '../../games/fishing-pond/sounds'
@@ -119,6 +120,19 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('ざぶん', () => playIroSound('fall')),
     sample('1い', () => playIroSound('win')),
     sample('おしまい', () => playIroSound('lose')),
+  ],
+  'kazoete-parade': [
+    sample('はじまり', () => playParadeSound('show')),
+    sample('スタート', () => playParadeSound('go')),
+    sample('かぞえる', () => playParadeSound('tap')),
+    sample('へらす', () => playParadeSound('untap')),
+    sample('おしまい', () => playParadeSound('stop')),
+    sample('OK', () => playParadeSound('ok')),
+    sample('こたえあわせ', () => playParadeSound('count', 4)),
+    sample('ぴったり', () => playParadeSound('correct')),
+    sample('おしい', () => playParadeSound('miss')),
+    sample('1い', () => playParadeSound('win')),
+    sample('2いいか', () => playParadeSound('lose')),
   ],
   sugoroku: [
     sample('えらぶ', () => playSugorokuSound('select')),
