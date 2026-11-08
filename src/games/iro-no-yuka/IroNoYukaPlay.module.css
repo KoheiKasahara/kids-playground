@@ -77,8 +77,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding-inline: 30px;
+  gap: 6px;
+  /* ラウンド表示と「!」は うえの すみに あるので、よこの よはくは ちいさく して 3もじの いろも 1ぎょうに おさめる。 */
+  padding-inline: 10px;
   padding-bottom: 8px;
   overflow: hidden;
   border: 3px solid rgb(0 0 0 / 0.14);
@@ -95,13 +96,16 @@
 }
 
 .signSymbol {
-  font-size: 34px;
+  flex: 0 0 auto;
+  font-size: clamp(26px, 8vw, 34px);
   line-height: 1;
   text-shadow: 0 2px 0 rgb(0 0 0 / 0.18);
 }
 
 .signName {
-  font-size: clamp(22px, 7vw, 30px);
+  min-width: 0;
+  white-space: nowrap;
+  font-size: clamp(18px, 6vw, 30px);
   font-weight: 900;
   text-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
 }
