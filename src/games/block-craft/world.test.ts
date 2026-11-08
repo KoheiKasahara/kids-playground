@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  blockAt, brushCells, createWorld, decodeWorld, editWorld, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree, HEIGHT, inside, key, MATERIALS,
+  blockAt, brushCells, createWorld, decodeWorld, editWorld, FLOW_LIMIT, FLOW_REACH, foundTreasures, growTree, HEIGHT, inside, isStable, key, PALETTE, pickAs, tendCrops, wheatAt,
   MAX_SAVE_LENGTH, settleWalker, SIZE, startWalker, surfaceOf, topBlock, TREASURES, walk, type Block, type World,
 } from './world'
 
@@ -83,8 +83,8 @@ describe('minecraft-like features', () => {
     expect(decodeWorld(JSON.stringify(legacy.slice(1)))).toBeNull()
   })
   it('fills both palette layouts with complete rows', () => {
-    expect(MATERIALS.length % 6).toBe(0)
-    expect(MATERIALS.length % 9).toBe(0)
+    expect(PALETTE.length % 6).toBe(0)
+    expect(PALETTE.length % 10).toBe(0)
   })
 })
 
@@ -194,5 +194,72 @@ describe('saplings, treasure and walking', () => {
     expect(surface(6, 9)?.material).toBe('grass')
     expect(surface(12, 6)?.material).toBe('snow')
     expect(surface(4, 0)?.material).toBe('water')
+  })
+})
+
+describe('lava, ice and farming', () => {
+  it('hardens lava that touches water or ice into obsidian, melting the ice', () => {
+    expect(isStable(createWorld())).toBe(true)
+    const intoWater = editWorld(createWorld(), { x: 4, y: 2, z: 1 }, 'lava', 'place')
+    expect(blockAt(intoWater, { x: 4, y: 2, z: 1 })?.material).toBe('obsidian')
+    expect(isStable(intoWater)).toBe(true)
+    let world = editWorld(createWorld(), { x: 8, y: 3, z: 8 }, 'lava', 'place')
+    expect(blockAt(world, { x: 8, y: 3, z: 8 })?.material).toBe('lava')
+    world = editWorld(world, { x: 9, y: 3, z: 8 }, 'ice', 'place')
+    expect(blockAt(world, { x: 8, y: 3, z: 8 })?.material).toBe('obsidian')
+    expect(blockAt(world, { x: 9, y: 3, z: 8 })?.material).toBe('water')
+  })
+  it('freezes water that touches snow', () => {
+    const world = editWorld(createWorld(), { x: 4, y: 3, z: 1 }, 'snow', 'place')
+    expect(blockAt(world, { x: 4, y: 2, z: 1 })?.material).toBe('ice')
+    expect(blockAt(world, { x: 3, y: 2, z: 1 })?.material).toBe('water')
+  })
+  it('plants seeds only on soil, tilling it into farmland', () => {
+    const world = editWorld(createWorld(), { x: 8, y: 3, z: 8 }, 'seed', 'place')
+    expect(blockAt(world, { x: 8, y: 3, z: 8 })?.material).toBe('seed')
+    expect(blockAt(world, { x: 8, y: 2, z: 8 })?.material).toBe('farmland')
+    const stone = editWorld(createWorld(), { x: 8, y: 3, z: 8 }, 'stone', 'place')
+    expect(editWorld(stone, { x: 8, y: 4, z: 8 }, 'seed', 'place')).toBe(stone)
+    const sand = createWorld()
+    expect(editWorld(sand, { x: 4, y: 3, z: 2 }, 'seed', 'place')).toBe(sand)
+    // ひろく で 3×3 の はたけ
+    const field = editWorld(createWorld(), brushCells({ x: 8, y: 3, z: 8 }, { x: 0, y: 1, z: 0 }, true), 'seed', 'place')
+    expect(field.filter(b => b.material === 'farmland')).toHaveLength(9)
+  })
+  it('grows crops one stage per tap and harvests wheat back into seeds', () => {
+    const seed = { x: 8, y: 3, z: 8 }
+    let world = editWorld(createWorld(), seed, 'seed', 'place')
+    const stages: string[] = []
+    let harvested = 0
+    for (let i = 0; i < 3; i++) {
+      const result = tendCrops(world, [seed])
+      world = result.world
+      harvested += result.harvested
+      stages.push(blockAt(world, seed)!.material)
+      if (i === 1) expect(wheatAt(world, [seed, { x: 0, y: 1, z: 0 }])).toBe(1)
+    }
+    expect(stages).toEqual(['sprout', 'wheat', 'seed'])
+    expect(harvested).toBe(1)
+    const plain = createWorld()
+    expect(tendCrops(plain, [{ x: 8, y: 2, z: 8 }])).toEqual({ world: plain, harvested: 0 })
+    expect([pickAs('wheat'), pickAs('sprout'), pickAs('farmland'), pickAs('stone')]).toEqual(['seed', 'seed', 'dirt', 'stone'])
+  })
+  it('takes away plants when the ground under them is dug', () => {
+    const world = editWorld(createWorld(), { x: 6, y: 2, z: 9 }, 'wood', 'remove')
+    expect(blockAt(world, { x: 6, y: 3, z: 9 })).toBeUndefined()
+  })
+  it('slides the walker across ice and never steps onto lava', () => {
+    let world = createWorld()
+    for (let x = 5; x <= 8; x++) world = editWorld(world, { x, y: 3, z: 8 }, 'ice', 'place')
+    expect(walk(world, { x: 4, y: 3, z: 8 }, { x: 1, z: 0 })).toEqual({ x: 9, y: 3, z: 8 })
+    // とちゅうに かべが あれば そこで とまる
+    const walled = editWorld(world, { x: 8, y: 4, z: 8 }, 'stone', 'place')
+    expect(walk(walled, { x: 4, y: 3, z: 8 }, { x: 1, z: 0 })).toEqual({ x: 7, y: 4, z: 8 })
+    const lava = editWorld(createWorld(), { x: 5, y: 3, z: 8 }, 'lava', 'place')
+    const from = { x: 4, y: 3, z: 8 }
+    expect(walk(lava, from, { x: 1, z: 0 })).toBe(from)
+    let pit = editWorld(createWorld(), { x: 5, y: 2, z: 8 }, 'wood', 'remove')
+    pit = editWorld(pit, { x: 5, y: 2, z: 8 }, 'lava', 'place')
+    expect(walk(pit, from, { x: 1, z: 0 })).toBe(from)
   })
 })
