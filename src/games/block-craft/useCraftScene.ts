@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { observeGameActivity } from '../../utils/gameActivity'
-import { ANIMAL_SPAWNS, nextCell, type AnimalKind, type Cell } from './animals'
+import { nextCell, type Animal, type AnimalKind, type Cell, type Herd } from './animals'
 import { blockPixels, TEXTURE_SIZE } from './textures'
-import { HEIGHT, MATERIAL_DEFS, SIZE, surfaceOf, topBlock, type Material, type Position, type World } from './world'
+import { HEIGHT, MATERIAL_DEFS, SIZE, surfaceOf, topBlock, type Material, type Position, type WoolColor, type World } from './world'
 
 type Pick = (position: Position, normal: Position) => void
 export type Heading = { x: number; z: number }
@@ -21,9 +21,14 @@ export type CraftSceneOptions = {
   night?: boolean
   /** あるく モードの あしもと。null なら そらから ながめる。 */
   walker?: Position | null
+  /** せかいに いる どうぶつ。 */
+  herd?: Herd
+  /** ひるの そらの いろ（ちけいごとに かわる）。 */
+  sky?: string
   onPick: Pick
   onHold?: (position: Position) => void
-  onPet?: (kind: AnimalKind) => void
+  /** どうぶつを タッチした。cell は いま いる ばしょ。 */
+  onAnimal?: (animal: Animal, cell: Cell) => void
 }
 
 const DAY = { sky: '#c6eafa', hemisphere: 2.4, sun: 2.5, sunColor: '#fff5db', glow: 0.35 }
@@ -58,8 +63,16 @@ export function headingFromYaw(yaw: number): Heading {
   return Math.abs(x) > Math.abs(z) ? { x: Math.sign(x), z: 0 } : { x: 0, z: Math.sign(z) || -1 }
 }
 
-const ANIMAL_COLORS = { wool: '#f4f1ea', face: '#4a4038', leg: '#5b4a3e', comb: '#e2463c', beak: '#f2b632', fur: '#c9a27e' } as const
+const ANIMAL_COLORS = {
+  wool: '#f4f1ea', face: '#4a4038', leg: '#5b4a3e', comb: '#e2463c', beak: '#f2b632', fur: '#c9a27e',
+  pink: '#f5a8c8', yellow: '#f3d75e', blue: '#8fcdf2', skin: '#efcdb9', heart: '#ff4f7b',
+} as const
 type AnimalColor = keyof typeof ANIMAL_COLORS
+const WOOL_PART: Record<WoolColor, AnimalColor> = { white: 'wool', pink: 'pink', yellow: 'yellow', blue: 'blue' }
+/** なかよしの しるしの ハート（はこ 3つ）。 */
+const HEART_PARTS: readonly (readonly [readonly [number, number, number], readonly [number, number, number], number])[] = [
+  [[0.16, 0.16, 0.08], [-0.08, 0.06, 0], 0], [[0.16, 0.16, 0.08], [0.08, 0.06, 0], 0], [[0.18, 0.18, 0.08], [0, -0.04, 0], Math.PI / 4],
+]
 type Part = readonly [AnimalColor, readonly [number, number, number], readonly [number, number, number]]
 /** はこを くみあわせた どうぶつ（まえが +z）。 */
 const ANIMAL_PARTS: Record<AnimalKind, readonly Part[]> = {
@@ -79,7 +92,10 @@ const ANIMAL_PARTS: Record<AnimalKind, readonly Part[]> = {
     ['wool', [0.14, 0.14, 0.1], [0, 0.34, -0.3]],
   ],
 }
-type AnimalState = { kind: AnimalKind; group: THREE.Group; from: Cell; to: Cell; t: number; wait: number; hop: number }
+type AnimalState = {
+  data: Animal; group: THREE.Group; body: THREE.Mesh; heart: THREE.Group
+  from: Cell; to: Cell; t: number; wait: number; hop: number
+}
 const ease = (t: number) => t * t * (3 - 2 * t)
 
 /**
@@ -139,6 +155,7 @@ export function useCraftScene(options: CraftSceneOptions) {
       return texture
     })
     const waterTexture = textures[MATERIAL_DEFS.findIndex(m => m.id === 'water')]
+    const lavaTexture = textures[MATERIAL_DEFS.findIndex(m => m.id === 'lava')]
     const materials = MATERIAL_DEFS.map((m, i) => new THREE.MeshLambertMaterial({
       map: textures[i],
       transparent: m.opacity !== undefined,
@@ -168,20 +185,57 @@ export function useCraftScene(options: CraftSceneOptions) {
     const animalMaterials = Object.fromEntries(Object.entries(ANIMAL_COLORS).map(([name, color]) => [name, new THREE.MeshLambertMaterial({ color })])) as Record<AnimalColor, THREE.MeshLambertMaterial>
     let surface = surfaceOf(latest.current.world)
     const groundTop = (cell: Cell) => (surface(cell.x, cell.z)?.y ?? 0) + 0.5
-    const animals: AnimalState[] = ANIMAL_SPAWNS.map(spawn => {
+    const animals = new Map<number, AnimalState>()
+    let animalGroups: THREE.Group[] = []
+    const box = (color: AnimalColor, size: readonly [number, number, number], position: readonly [number, number, number]) => {
+      const part = new THREE.Mesh(unit, animalMaterials[color])
+      part.scale.set(...size)
+      part.position.set(...position)
+      return part
+    }
+    const createAnimal = (data: Animal): AnimalState => {
       const group = new THREE.Group()
-      for (const [color, size, position] of ANIMAL_PARTS[spawn.kind]) {
-        const part = new THREE.Mesh(unit, animalMaterials[color])
-        part.scale.set(...size)
-        part.position.set(...position)
-        group.add(part)
-      }
-      const cell = { x: spawn.x, z: spawn.z }
+      group.userData.animalId = data.id
+      const parts = ANIMAL_PARTS[data.kind].map(([color, size, position]) => box(color, size, position))
+      group.add(...parts)
+      const heart = new THREE.Group()
+      for (const [size, position, rotation] of HEART_PARTS) heart.add(box('heart', size, position).rotateZ(rotation))
+      heart.position.y = 1.15
+      group.add(heart)
+      const cell = { x: data.x, z: data.z }
       group.position.set(cell.x, groundTop(cell), cell.z)
       scene.add(group)
-      return { kind: spawn.kind, group, from: cell, to: cell, t: 1, wait: Math.random() * 2, hop: 0 }
-    })
-    const animalGroups = animals.map(a => a.group)
+      return { data, group, body: parts[0], heart, from: cell, to: cell, t: 1, wait: Math.random() * 2, hop: 0 }
+    }
+    /** ひつじの けの いろ・けを とった すがた・あかちゃんの おおきさ・なかよしの ハート。 */
+    const dress = ({ data, body, group, heart }: AnimalState) => {
+      if (data.kind === 'sheep') {
+        body.material = animalMaterials[data.sheared ? 'skin' : WOOL_PART[data.wool ?? 'white']]
+        if (data.sheared) body.scale.set(0.5, 0.38, 0.76)
+        else body.scale.set(0.7, 0.5, 0.9)
+      }
+      group.scale.setScalar(data.baby ? 0.55 : 1)
+      heart.visible = !!data.love
+    }
+    let shownHerd: Herd | null = null
+    const syncHerd = (herd: Herd) => {
+      if (herd === shownHerd) return
+      shownHerd = herd
+      const ids = new Set(herd.map(a => a.id))
+      for (const [id, animal] of animals) {
+        if (ids.has(id)) continue
+        scene.remove(animal.group)
+        animals.delete(id)
+      }
+      for (const data of herd) {
+        const animal = animals.get(data.id) ?? createAnimal(data)
+        animal.data = data
+        animals.set(data.id, animal)
+        dress(animal)
+      }
+      animalGroups = [...animals.values()].map(a => a.group)
+    }
+    syncHerd(latest.current.herd ?? [])
 
     // あるく モード
     let walking: Position | null = null
@@ -230,7 +284,9 @@ export function useCraftScene(options: CraftSceneOptions) {
       for (const block of blocks) {
         const index = MATERIAL_DEFS.findIndex(m => m.id === block.material)
         const list = positions[index]
-        if (MATERIAL_DEFS[index].plant) matrix.makeScale(0.45, 0.6, 0.45).setPosition(block.x, block.y - 0.2, block.z)
+        const { plant, height = 0.6 } = MATERIAL_DEFS[index]
+        // くさばなは じめんに たつ ように、したを そろえて ちいさく する
+        if (plant) matrix.makeScale(0.45, height, 0.45).setPosition(block.x, block.y - 0.485 * (1 - height), block.z)
         else matrix.makeTranslation(block.x, block.y, block.z)
         meshes[index].setMatrixAt(list.length, matrix)
         list.push(block)
@@ -245,9 +301,10 @@ export function useCraftScene(options: CraftSceneOptions) {
     }
     let frame = 0
     const update = () => {
-      const { world, cursor, night = false, walker = null } = latest.current
+      const { world, cursor, night = false, walker = null, herd = [], sky: daySky = DAY.sky } = latest.current
       const theme = night ? NIGHT : DAY
-      sky.set(theme.sky)
+      sky.set(night ? NIGHT.sky : daySky)
+      syncHerd(herd)
       hemisphere.intensity = theme.hemisphere
       sun.intensity = theme.sun
       sun.color.set(theme.sunColor)
@@ -261,7 +318,11 @@ export function useCraftScene(options: CraftSceneOptions) {
     }
 
     const tick = (dt: number, time: number) => {
-      for (const animal of animals) {
+      for (const animal of animals.values()) {
+        if (animal.heart.visible) {
+          animal.heart.rotation.y = time / 450
+          animal.heart.position.y = 1.15 + Math.sin(time / 260) * 0.08
+        }
         if (animal.t < 1) animal.t = Math.min(1, animal.t + dt / 0.55)
         else if ((animal.wait -= dt) <= 0) {
           animal.from = animal.to
@@ -281,6 +342,7 @@ export function useCraftScene(options: CraftSceneOptions) {
         )
       }
       waterTexture.offset.y = (time / 5000) % 1
+      lavaTexture.offset.x = (time / 9000) % 1
       if (latest.current.night) {
         const pulse = NIGHT.glow * (0.8 + 0.2 * Math.sin(time / 380))
         materials.forEach((material, i) => { if (MATERIAL_DEFS[i].glow) material.emissiveIntensity = pulse })
@@ -327,7 +389,9 @@ export function useCraftScene(options: CraftSceneOptions) {
       raycaster.far = walking ? REACH : Infinity
       const hit = raycaster.intersectObjects([...meshes, ...animalGroups], true)[0]
       if (!hit) return null
-      const animal = animals.find(a => a.group === hit.object.parent)
+      let owner: THREE.Object3D | null = hit.object
+      while (owner && owner.userData.animalId === undefined) owner = owner.parent
+      const animal = owner && animals.get(owner.userData.animalId as number)
       if (animal) return { animal }
       const index = meshes.findIndex(mesh => mesh === hit.object)
       if (index < 0 || hit.instanceId === undefined || !hit.face) return null
@@ -343,7 +407,7 @@ export function useCraftScene(options: CraftSceneOptions) {
       if ('animal' in hit) {
         if (kind === 'hold') return
         hit.animal.hop = 1
-        latest.current.onPet?.(hit.animal.kind)
+        latest.current.onAnimal?.(hit.animal.data, hit.animal.to)
         if (!frame) render()
         return
       }

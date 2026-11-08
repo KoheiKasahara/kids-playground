@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
 import { clampTarget, headingFromYaw, useCraftScene, type CraftSceneOptions } from './useCraftScene'
+import { ANIMAL_SPAWNS, herdFrom } from './animals'
 import { createWorld, MATERIALS, SIZE, startWalker } from './world'
 
 const resources = vi.hoisted(() => ({ render: vi.fn(), rendererDispose: vi.fn(), controlsDispose: vi.fn(), disconnect: vi.fn() }))
@@ -26,7 +27,7 @@ vi.mock('three/examples/jsm/controls/OrbitControls.js', () => ({ OrbitControls: 
 } }))
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks(); vi.useRealTimers() })
 
-const ANIMAL_MATERIALS = 6
+const ANIMAL_MATERIALS = 11
 function options(overrides: Partial<CraftSceneOptions> = {}): CraftSceneOptions {
   return { world: createWorld(), cursor: { x: 5, y: 0, z: 5 }, onPick: vi.fn(), ...overrides }
 }
@@ -110,6 +111,27 @@ it('switches to walking, turns, and keeps animating animals without errors', () 
   view.rerender(options({ world, walker: null }))
   expect(resources.render).toHaveBeenCalled()
   view.unmount()
+})
+
+it('adds, dresses and removes animals as the herd changes, sharing their materials', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const frames = stubFrames()
+  const materialDispose = vi.spyOn(THREE.Material.prototype, 'dispose')
+  const add = vi.spyOn(THREE.Scene.prototype, 'add')
+  const remove = vi.spyOn(THREE.Scene.prototype, 'remove')
+  const herd = herdFrom(ANIMAL_SPAWNS)
+  const container = document.createElement('div')
+  const view = renderHook(props => useCraftScene(props), { initialProps: options({ herd, sky: '#f4dfae' }) })
+  act(() => view.result.current.setContainer(container))
+  const animalsAdded = () => add.mock.calls.filter(([object]) => object.userData.animalId !== undefined).length
+  expect(animalsAdded()).toBe(ANIMAL_SPAWNS.length)
+  const changed = [...herd.slice(1).map(a => a.kind === 'sheep' ? { ...a, sheared: true, love: true } : a), { id: 9, kind: 'sheep' as const, x: 3, z: 3, wool: 'blue' as const, baby: true }]
+  view.rerender(options({ herd: changed, night: true }))
+  expect(animalsAdded()).toBe(ANIMAL_SPAWNS.length + 1)
+  expect(remove).toHaveBeenCalledTimes(1)
+  for (let time = 16; time < 2000; time += 16) frames.run(time)
+  view.unmount()
+  expect(materialDispose).toHaveBeenCalledTimes(MATERIALS.length + ANIMAL_MATERIALS + 1)
 })
 
 it('treats a long press as choosing a block, never as placing one', () => {

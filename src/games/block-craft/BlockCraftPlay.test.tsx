@@ -5,9 +5,12 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { isSoundEnabled } from '../../audio/sound'
 import { GAME_CATALOG } from '../gameCatalog'
 import BlockCraftPlay from './BlockCraftPlay'
+import type { Animal, Cell } from './animals'
+import { biome, BIOMES } from './biomes'
+import { readGame, WOOL_KEY } from './save'
 import type { CraftSceneOptions, SceneApi } from './useCraftScene'
 import { playCraftSound } from './sounds'
-import { createWorld, decodeWorld, MATERIALS, SAVE_KEY, TREASURES, type Position, type World } from './world'
+import { blockAt, createWorld, decodeWorld, PALETTE, SAVE_KEY, TREASURES, type Position, type World } from './world'
 
 const scene = vi.hoisted(() => ({ options: null as unknown as CraftSceneOptions, api: { current: null as SceneApi | null } }))
 vi.mock('./useCraftScene', () => ({ useCraftScene: (options: CraftSceneOptions) => { scene.options = options; return { setContainer: () => {}, failed: false, api: scene.api } } }))
@@ -18,7 +21,7 @@ function mount() { return render(<MemoryRouter><BlockCraftPlay /></MemoryRouter>
 async function start() {
   const user = userEvent.setup()
   mount()
-  await user.click(screen.getByRole('button', { name: /はじめから あそぶ/ }))
+  await user.click(screen.getByRole('button', { name: 'くさはら' }))
   return user
 }
 const tap = (position: Position, normal: Position = { x: 0, y: 1, z: 0 }) => act(() => scene.options.onPick(position, normal))
@@ -32,7 +35,7 @@ it('shows only the essential controls', async () => {
   expect(screen.queryByText(/ボタンで ばしょを えらぶ/)).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'よる' })).toHaveTextContent(/^☀️$/)
   // ヘッダー（もどる・よる・おと）、あるく、おく・こわす・ひろく・もどす、ざいりょう、ほぞん・はじめの せかい
-  expect(screen.getAllByRole('button')).toHaveLength(3 + 1 + 4 + MATERIALS.length + 2)
+  expect(screen.getAllByRole('button')).toHaveLength(3 + 1 + 4 + PALETTE.length + 2)
 })
 
 it('switches between day and night without adding messages', async () => {
@@ -52,7 +55,7 @@ it('is listed in the menu', () => { expect(GAME_CATALOG.some((game) => game.id =
 it('starts, places and mines blocks, undoes, saves and resumes after re-entry', async () => {
   const user = userEvent.setup()
   const view = mount()
-  await user.click(screen.getByRole('button', { name: /はじめから あそぶ/ }))
+  await user.click(screen.getByRole('button', { name: 'くさはら' }))
   const initialCount = world().length
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
   expect(world()).toHaveLength(initialCount + 1)
@@ -96,7 +99,7 @@ it('handles invalid saves and reports storage failure without losing play state'
   const user = userEvent.setup()
   mount()
   expect(screen.queryByRole('button', { name: /つづきから/ })).not.toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: /はじめから あそぶ/ }))
+  await user.click(screen.getByRole('button', { name: 'くさはら' }))
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
   const built = world()
   const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
@@ -207,8 +210,125 @@ it('walks around the world with the pad and keyboard, climbing one step and acti
   expect(screen.queryByRole('button', { name: 'まえへ すすむ' })).not.toBeInTheDocument()
 })
 
-it('makes an animal hop with a sound when it is tapped', async () => {
+const herd = () => scene.options.herd!
+const touch = (animal: Animal, cell: Cell = animal) => act(() => scene.options.onAnimal?.(animal, cell))
+const wheatCount = (n: number) => screen.getByLabelText(`もっている こむぎ ${n}こ`)
+/** はたけに たねを うえて、3かい タッチして こむぎを とる。 */
+async function harvest(user: ReturnType<typeof userEvent.setup>, times = 1) {
+  await user.click(screen.getByRole('button', { name: 'たね' }))
+  tap({ x: 8, y: 2, z: 8 })
+  const seed = { x: 8, y: 3, z: 8 }
+  expect(blockAt(world(), { x: 8, y: 2, z: 8 })?.material).toBe('farmland')
+  for (let i = 0; i < times * 3; i++) tap(seed)
+}
+
+it('makes an animal hop with a sound when it is tapped without wheat', async () => {
   await start()
-  act(() => scene.options.onPet?.('sheep'))
+  const before = herd()
+  touch(before[0])
   expect(playCraftSound).toHaveBeenLastCalledWith('pet')
+  expect(herd()).toBe(before)
+  expect(screen.getByRole('button', { name: '↩ もどす' })).toBeDisabled()
+})
+
+it('starts in a chosen world with its own sky and animals, and resumes it after saving', async () => {
+  const user = userEvent.setup()
+  const view = mount()
+  expect(screen.getAllByRole('button', { name: /^(くさはら|さばく|ゆきやま|しま)$/ })).toHaveLength(BIOMES.length)
+  await user.click(screen.getByRole('button', { name: 'さばく' }))
+  expect(world()).toEqual(biome('desert').create())
+  expect(scene.options.sky).toBe(biome('desert').sky)
+  expect(herd().filter(a => a.wool === 'yellow')).toHaveLength(2)
+  fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
+  await user.click(screen.getByRole('button', { name: /ほぞん/ }))
+  view.unmount()
+  mount()
+  await user.click(screen.getByRole('button', { name: /つづきから あそぶ/ }))
+  expect(scene.options.sky).toBe(biome('desert').sky)
+  await user.click(screen.getByRole('button', { name: /はじめの せかい/ }))
+  await user.click(screen.getByRole('button', { name: 'もどして あそぶ' }))
+  expect(world()).toEqual(biome('desert').create())
+})
+
+it('grows seeds on farmland into wheat to harvest, by tapping and by mining', async () => {
+  const user = await start()
+  wheatCount(0)
+  await harvest(user)
+  expect(wheatCount(1)).toHaveTextContent('🌾 1')
+  expect(screen.getByRole('status')).toHaveTextContent('こむぎが 1こ とれた')
+  expect(playCraftSound).toHaveBeenLastCalledWith('harvest')
+  expect(blockAt(world(), { x: 8, y: 3, z: 8 })?.material).toBe('seed')
+  // ながおしすると たねを えらぶ
+  act(() => scene.options.onHold?.({ x: 8, y: 2, z: 8 }))
+  expect(screen.getByRole('button', { name: 'つち' })).toHaveAttribute('aria-pressed', 'true')
+  tap({ x: 8, y: 3, z: 8 })
+  tap({ x: 8, y: 3, z: 8 })
+  await user.click(screen.getByRole('button', { name: '⛏️ こわす' }))
+  tap({ x: 8, y: 3, z: 8 })
+  expect(wheatCount(2)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: '↩ もどす' }))
+  expect(wheatCount(1)).toBeInTheDocument()
+})
+
+it('feeds wheat to animals to make friends and babies, and keeps them in the save', async () => {
+  const user = await start()
+  await harvest(user, 3)
+  const [white, pink] = herd().filter(a => a.kind === 'sheep')
+  touch(white)
+  expect(screen.getByRole('status')).toHaveTextContent('なかよし')
+  expect(herd().find(a => a.id === white.id)?.love).toBe(true)
+  touch(pink, { x: 3, z: 4 })
+  expect(playCraftSound).toHaveBeenLastCalledWith('baby')
+  expect(screen.getByRole('status')).toHaveTextContent('あかちゃん')
+  const baby = herd().at(-1)!
+  expect(baby).toMatchObject({ kind: 'sheep', baby: true, x: 3, z: 4, wool: 'pink' })
+  touch(baby)
+  expect(herd().at(-1)?.baby).toBeUndefined()
+  expect(wheatCount(0)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /ほぞん/ }))
+  expect(readGame()?.herd).toEqual(herd())
+  await user.click(screen.getByRole('button', { name: '↩ もどす' }))
+  expect(herd().at(-1)?.baby).toBe(true)
+  expect(wheatCount(1)).toBeInTheDocument()
+})
+
+it('shears sheep in mining mode to collect wool colors for the palette', async () => {
+  const user = await start()
+  const locked = screen.getAllByRole('button', { name: 'ひつじの けを とると つかえる' })
+  expect(locked).toHaveLength(4)
+  expect(locked.every(button => (button as HTMLButtonElement).disabled)).toBe(true)
+  await user.click(screen.getByRole('button', { name: '⛏️ こわす' }))
+  const pink = herd().find(a => a.wool === 'pink')!
+  touch(pink)
+  expect(playCraftSound).toHaveBeenLastCalledWith('shear')
+  expect(screen.getByRole('status')).toHaveTextContent('ピンクの けいとが とれた')
+  expect(herd().find(a => a.id === pink.id)?.sheared).toBe(true)
+  expect(JSON.parse(localStorage.getItem(WOOL_KEY)!)).toEqual(['pink'])
+  await user.click(screen.getByRole('button', { name: 'ピンク' }))
+  tap({ x: 8, y: 2, z: 8 })
+  expect(world().at(-1)?.material).toBe('wool_pink')
+  // けが ないと もう とれない
+  vi.mocked(playCraftSound).mockClear()
+  await user.click(screen.getByRole('button', { name: '⛏️ こわす' }))
+  touch(herd().find(a => a.id === pink.id)!)
+  expect(playCraftSound).toHaveBeenLastCalledWith('pet')
+  expect(screen.getAllByRole('button', { name: 'ひつじの けを とると つかえる' })).toHaveLength(3)
+})
+
+it('hardens lava that touches water with a sizzle', async () => {
+  const user = await start()
+  await user.click(screen.getByRole('button', { name: 'ようがん' }))
+  // みずうみ（z<2）の なかへ おくと すぐ かたまる
+  tap({ x: 4, y: 2, z: 2 }, { x: 0, y: 0, z: -1 })
+  expect(playCraftSound).toHaveBeenLastCalledWith('cool')
+  expect(screen.getByRole('status')).toHaveTextContent('ようがんが かたまった')
+  expect(blockAt(world(), { x: 4, y: 2, z: 1 })?.material).toBe('obsidian')
+  // ようがんの したを ほると みずが ながれこんで かたまる
+  tap({ x: 6, y: 2, z: 2 })
+  expect(playCraftSound).toHaveBeenLastCalledWith('place')
+  expect(blockAt(world(), { x: 6, y: 3, z: 2 })?.material).toBe('lava')
+  await user.click(screen.getByRole('button', { name: '⛏️ こわす' }))
+  tap({ x: 6, y: 2, z: 2 })
+  expect(playCraftSound).toHaveBeenLastCalledWith('cool')
+  expect(blockAt(world(), { x: 6, y: 3, z: 2 })?.material).toBe('obsidian')
 })

@@ -108,6 +108,8 @@ export const GAME_SOUND_SAMPLES: Readonly<Record<string, readonly GameSoundSampl
     sample('おく', () => playCraftSound('place')), sample('こわす', () => playCraftSound('remove')), sample('えらぶ', () => playCraftSound('select')),
     sample('そだつ', () => playCraftSound('grow')), sample('たから', () => playCraftSound('treasure')), sample('ぜんぶ みつけた', () => playCraftSound('complete')),
     sample('どうぶつ', () => playCraftSound('pet')), sample('あるく', () => playCraftSound('step')),
+    sample('ようがんが かたまる', () => playCraftSound('cool')), sample('こむぎ', () => playCraftSound('harvest')), sample('えさ', () => playCraftSound('feed')),
+    sample('あかちゃん', () => playCraftSound('baby')), sample('けいと', () => playCraftSound('shear')),
   ],
   'town-builder': [sample('おく', () => playTownSound('build')), sample('みち', () => playTownSound('road')), sample('けす', () => playTownSound('erase')), sample('そだつ', () => playTownSound('grow')), sample('3Dで みる', () => playTownSound('view')), sample('のる', () => playTownSound('ride'))],
   'iro-no-yuka': [

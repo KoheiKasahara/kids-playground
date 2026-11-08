@@ -17,11 +17,12 @@
 .walkPad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
 .walkPad button { min-height: 56px; font-size: 26px; }
 .actions { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
-.treasure { padding: 10px 12px; border-radius: 12px; background: #fff3c4; font-weight: 800; white-space: nowrap; }
+.treasure, .wheat { padding: 10px 12px; border-radius: 12px; background: #fff3c4; font-weight: 800; white-space: nowrap; }
+.wheat { background: #f4ecc8; }
 .modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
 .modes button { white-space: nowrap; padding-inline: 4px; }
 .header .icon { min-width: 48px; font-size: 22px; padding: 4px 8px; }
-.palette { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; }
+.palette { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
 .palette button { padding: 5px 2px; font-size: 12px; white-space: nowrap; overflow: hidden; }
 .swatch { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 4px; margin: 0 auto 3px; box-shadow: inset -5px -5px #0002; font-size: 18px; }
 .hint { text-align: center; font-size: 12px; line-height: 1.8; }
@@ -30,6 +31,9 @@
 .title p { line-height: 2; }
 .hero { padding: 45px 10px; background: linear-gradient(#c6eafa 70%, #9bc77a 70%); border-radius: 24px; font-size: clamp(44px, 12vw, 80px); }
 .title .start { display: block; margin: 18px auto; padding: 16px 28px; background: #def4d3; border-color: #75aa68; }
+.biomes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 420px; margin: 18px auto; }
+.title .biome { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px; border-color: #9cbfa8; font-size: 18px; }
+.biome span { font-size: 40px; line-height: 1.1; }
 .confirm { padding: 16px; border: 3px solid #86ab63; background: #fff9df; border-radius: 16px; }
 .confirm button { margin: 5px; }
 @media (max-width: 480px) {

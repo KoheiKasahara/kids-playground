@@ -3,11 +3,19 @@ export const HEIGHT = 12
 /** Worlds saved before the world was widened (same key and format, smaller floor). */
 const LEGACY_SIZE = 12
 
-type MaterialDef = {
+export type WoolColor = 'white' | 'pink' | 'yellow' | 'blue'
+export type MaterialDef = {
   id: string; label: string; color: string; emoji: string
   opacity?: number; glow?: boolean; falls?: boolean
   /** くさばなのように ちいさく、とおりぬけられる。 */
   plant?: boolean
+  /** くさばなの たかさ（ブロック 1つぶんが 1）。 */
+  height?: number
+  /** パレットには ださない（はたけや そだつ とちゅうの さくもつ）。ながおしでは pickAs を えらぶ。 */
+  hidden?: boolean
+  pickAs?: string
+  /** ひつじの けを とると つかえる けいと。 */
+  wool?: WoolColor
 }
 export const MATERIALS = [
   { id: 'grass', label: 'くさ', color: '#78ba50', emoji: '🌱' },
@@ -28,6 +36,21 @@ export const MATERIALS = [
   { id: 'diamond', label: 'ダイヤ', color: '#5ee3e0', emoji: '💎' },
   { id: 'sapling', label: 'なえぎ', color: '#5fae3e', emoji: '🌿', plant: true },
   { id: 'flower', label: 'はな', color: '#f06fa4', emoji: '🌷', plant: true },
+  { id: 'lava', label: 'ようがん', color: '#ff6a1a', emoji: '🌋', glow: true },
+  { id: 'obsidian', label: 'くろいし', color: '#3d3150', emoji: '⬛' },
+  { id: 'ice', label: 'こおり', color: '#a9dcf6', emoji: '🧊', opacity: 0.8 },
+  { id: 'sandstone', label: 'さばくいし', color: '#e2c07e', emoji: '🏜️' },
+  { id: 'seed', label: 'たね', color: '#9cc25a', emoji: '🌾', plant: true, height: 0.25 },
+  { id: 'mushroom', label: 'きのこ', color: '#dc4a3c', emoji: '🍄', plant: true, height: 0.45 },
+  { id: 'coral', label: 'さんご', color: '#ff7f8f', emoji: '🪸' },
+  { id: 'shell', label: 'かいがら', color: '#fbe0cc', emoji: '🐚', plant: true, height: 0.3 },
+  { id: 'wool_white', label: 'しろ', color: '#f4f1ea', emoji: '🧶', wool: 'white' },
+  { id: 'wool_pink', label: 'ピンク', color: '#f5a8c8', emoji: '🧶', wool: 'pink' },
+  { id: 'wool_yellow', label: 'きいろ', color: '#f3d75e', emoji: '🧶', wool: 'yellow' },
+  { id: 'wool_blue', label: 'みずいろ', color: '#8fcdf2', emoji: '🧶', wool: 'blue' },
+  { id: 'sprout', label: 'め', color: '#79c94c', emoji: '🌱', plant: true, height: 0.5, hidden: true, pickAs: 'seed' },
+  { id: 'wheat', label: 'こむぎ', color: '#e8c25a', emoji: '🌾', plant: true, height: 0.85, hidden: true, pickAs: 'seed' },
+  { id: 'farmland', label: 'はたけ', color: '#7b5233', emoji: '🟫', hidden: true, pickAs: 'dirt' },
 ] as const satisfies readonly MaterialDef[]
 export const MATERIAL_DEFS: readonly MaterialDef[] = MATERIALS
 export type Material = typeof MATERIALS[number]['id']
@@ -39,8 +62,18 @@ export function inside(p: Position): boolean {
   return [p.x, p.y, p.z].every(Number.isInteger) && p.x >= 0 && p.x < SIZE && p.z >= 0 && p.z < SIZE && p.y >= 0 && p.y < HEIGHT
 }
 export const materialDef = (id: Material): MaterialDef => MATERIAL_DEFS.find(m => m.id === id)!
+/** パレットに ならぶ ブロック（けいとは ひつじの けを とるまで「？」）。 */
+export const PALETTE = MATERIALS.filter(m => !('hidden' in m))
+/** ながおしで えらぶ ざいりょう（そだつ とちゅうの さくもつは たね、はたけは つち）。 */
+export const pickAs = (id: Material): Material => (materialDef(id).pickAs ?? id) as Material
+export const woolMaterial = (color: WoolColor): Material => MATERIALS.find(m => 'wool' in m && m.wool === color)!.id
 /** あるく ひとや どうぶつが ぶつかる ブロック（みずと くさばなは とおりぬけられる）。 */
 export const isSolid = (material: Material) => material !== 'water' && !materialDef(material).plant
+/** たね → め → こむぎ。タッチするたびに そだち、こむぎは とれて また たねに なる。 */
+export const CROP_STAGES = ['seed', 'sprout', 'wheat'] as const satisfies readonly Material[]
+export const isCrop = (material: Material) => (CROP_STAGES as readonly Material[]).includes(material)
+/** たねを うえられる じめん（うえると はたけに なる）。 */
+const TILLABLE: readonly Material[] = ['dirt', 'grass', 'farmland']
 
 /** つちの なかに かくれた たから。ほると みつかる。 */
 export const TREASURES: readonly Block[] = ([
@@ -48,7 +81,7 @@ export const TREASURES: readonly Block[] = ([
   [2, 13, 'gold'], [9, 10, 'gold'], [14, 9, 'gold'], [5, 5, 'gold'],
 ] as const).map(([x, z, material]) => ({ x, y: 1, z, material }))
 
-function flatColumn(x: number, z: number): Block[] {
+export function flatColumn(x: number, z: number): Block[] {
   const treasure = TREASURES.find(t => t.x === x && t.z === z)?.material
   return [
     { x, y: 0, z, material: 'stone' },
@@ -79,7 +112,7 @@ export function createWorld(): World {
 }
 
 /** みきが 3だん、そのうえに はっぱ。 */
-function treeBlocks({ x, y, z }: Position): Block[] {
+export function treeBlocks({ x, y, z }: Position): Block[] {
   const blocks: Block[] = []
   for (let dy = 0; dy < 3; dy++) blocks.push({ x, y: y + dy, z, material: 'wood' })
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) blocks.push({ x: x + dx, y: y + 3, z: z + dz, material: 'leaf' })
@@ -178,6 +211,12 @@ export function editWorld(world: World, target: Position | readonly Position[], 
     const flooded = holes.filter(p => isWater({ ...p, y: p.y + 1 }) || SIDES.some(s => isWater({ x: p.x + s.x, y: p.y, z: p.z + s.z })))
     for (const p of flooded) cells.set(key(p), { ...p, material: 'water' })
     flow(cells, flooded)
+    // じめんが なくなった くさばなは いっしょに なくなる
+    for (const p of removed) {
+      const above = cells.get(key({ ...p, y: p.y + 1 }))
+      if (above && materialDef(above.material).plant) cells.delete(key(above))
+    }
+    react(cells)
     return settle([...cells.values()])
   }
   const attached = (p: Position) => [...SIDES.map(s => ({ x: p.x + s.x, y: p.y, z: p.z + s.z })), { ...p, y: p.y - 1 }, { ...p, y: p.y + 1 }]
@@ -188,13 +227,65 @@ export function editWorld(world: World, target: Position | readonly Position[], 
     // みずの なかには ほかの ブロックを おける（みずを せきとめられる）
     if (existing && (existing.material !== 'water' || material === 'water')) continue
     if (!attached(p)) continue
+    if (material === 'seed') {
+      // たねは つち・くさの うえに うえ、そこを はたけに する
+      const ground = cells.get(key({ ...p, y: p.y - 1 }))
+      if (!ground || !TILLABLE.includes(ground.material)) continue
+      cells.set(key(ground), { ...ground, material: 'farmland' })
+    }
     if (existing) cells.delete(key(p))
     cells.set(key(p), { ...p, material })
     placed.push(p)
   }
   if (!placed.length) return world
   if (material === 'water') flow(cells, placed)
+  react(cells)
   return settle([...cells.values()])
+}
+
+const AROUND = [...SIDES.map(s => ({ ...s, y: 0 })), { x: 0, y: 1, z: 0 }, { x: 0, y: -1, z: 0 }]
+/** ようがんは みず・こおりに ふれると くろいしに なり、こおりは ようがんで とけ、みずは ゆきに ふれると こおる。 */
+function react(cells: Map<string, Block>) {
+  for (let pass = 0; pass < 4; pass++) {
+    const changes: Block[] = []
+    for (const block of cells.values()) {
+      const touches = (material: Material) => AROUND.some(d => cells.get(key({ x: block.x + d.x, y: block.y + d.y, z: block.z + d.z }))?.material === material)
+      const next: Material | null = block.material === 'lava' && (touches('water') || touches('ice')) ? 'obsidian'
+        : block.material === 'ice' && touches('lava') ? 'water'
+          : block.material === 'water' && touches('snow') ? 'ice'
+            : null
+      if (next) changes.push({ ...block, material: next })
+    }
+    if (!changes.length) return
+    for (const block of changes) cells.set(key(block), block)
+  }
+}
+/** へんかが おきない せかいか（はじめの せかいの たしかめ用）。 */
+export function isStable(world: World): boolean {
+  const cells = new Map(world.map(b => [key(b), b]))
+  react(cells)
+  return [...cells.values()].every((b, i) => b === world[i])
+}
+
+/** さくもつを タッチすると 1だん そだち、こむぎは とれて たねに もどる。 */
+export function tendCrops(world: World, targets: readonly Position[]): { world: World; harvested: number } {
+  const cells = new Map(world.map(b => [key(b), b]))
+  let changed = false
+  let harvested = 0
+  for (const p of targets) {
+    const block = cells.get(key(p))
+    if (!block || !isCrop(block.material)) continue
+    const stage = (CROP_STAGES as readonly Material[]).indexOf(block.material)
+    if (block.material === 'wheat') harvested++
+    cells.set(key(p), { ...block, material: CROP_STAGES[(stage + 1) % CROP_STAGES.length] })
+    changed = true
+  }
+  return changed ? { world: [...cells.values()], harvested } : { world, harvested: 0 }
+}
+/** こわすと とれる こむぎの かず。 */
+export function wheatAt(world: World, targets: readonly Position[]): number {
+  const wanted = new Set(targets.map(key))
+  return world.filter(b => b.material === 'wheat' && wanted.has(key(b))).length
 }
 
 /** なえぎを タッチすると きに そだつ。うえが つかえていると そだたない。 */
@@ -242,16 +333,34 @@ export function startWalker(world: World, x: number, z: number): Position {
   return settleWalker(world, { x, y: 1, z })
 }
 
-/** 1マス すすむ。1だんまでは のぼれ、たかい ところからは おりられる。 */
+/**
+ * 1マス すすむ。1だんまでは のぼれ、たかい ところからは おりられる。
+ * あつい ようがんの うえには のらず、こおりの うえでは とまれる ところまで つるっと すべる。
+ */
 export function walk(world: World, from: Position, dir: { x: number; z: number }): Position {
-  const next = { x: from.x + dir.x, y: from.y, z: from.z + dir.z }
-  if (!inside(next)) return from
   const solid = solidCells(world)
-  if (bodyFree(solid, next)) return fall(solid, next)
-  const up = { ...next, y: from.y + 1 }
-  const headroom = from.y + 2 >= HEIGHT || !solid.has(key({ ...from, y: from.y + 2 }))
-  if (up.y < HEIGHT && headroom && bodyFree(solid, up)) return up
-  return from
+  const materials = new Map(world.map(b => [key(b), b.material]))
+  const ground = (p: Position) => materials.get(key({ ...p, y: p.y - 1 }))
+  const step = (at: Position, climb: boolean): Position | null => {
+    const next = { x: at.x + dir.x, y: at.y, z: at.z + dir.z }
+    if (!inside(next)) return null
+    let to: Position | null = null
+    if (bodyFree(solid, next)) to = fall(solid, next)
+    else if (climb) {
+      const up = { ...next, y: at.y + 1 }
+      const headroom = at.y + 2 >= HEIGHT || !solid.has(key({ ...at, y: at.y + 2 }))
+      if (up.y < HEIGHT && headroom && bodyFree(solid, up)) to = up
+    }
+    return to && ground(to) !== 'lava' ? to : null
+  }
+  let at = step(from, true)
+  if (!at) return from
+  for (let i = 0; i < SIZE && ground(at) === 'ice'; i++) {
+    const next = step(at, false)
+    if (!next) break
+    at = next
+  }
+  return at
 }
 
 export const SAVE_KEY = 'kids-playground:block-craft:v1'
