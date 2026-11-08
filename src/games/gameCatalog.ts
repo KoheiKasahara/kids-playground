@@ -1410,6 +1410,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'kazoete-parade',
+    slug: 'kazoete-parade',
+    title: 'かぞえて！どうぶつパレード',
+    emoji: '🐾',
+    category: 'learning',
+    seo: {
+      headline: 'かぞえて！どうぶつパレード｜とおりすぎる どうぶつを かぞえる 数あそび',
+      description:
+        'パレードで目の前をとおりすぎるどうぶつのなかから、おだいのどうぶつだけを数える幼児向けの数あそびです。パンダやきつねたちと数をくらべ、ぴったりならメダルをもらえます。こたえあわせでは1ぴきずつ数えなおせます。',
+    },
+    intro: {
+      howToPlay: [
+        'おだいの どうぶつが とおったら「かぞえる」を タッチ',
+        'パレードの あとで かずを なおして「これで OK」',
+        'ぴったりなら 🏅！ 5かいで いちばん おおいと 1い',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
