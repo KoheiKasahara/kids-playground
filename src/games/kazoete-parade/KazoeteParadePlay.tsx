@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import GameBackButton from '../../components/GameBackButton'
 import GamePlaySurface from '../../components/GamePlaySurface'
 import StageClearBadge from '../../components/StageClearBadge'
@@ -315,7 +315,7 @@ export default function KazoeteParadePlay() {
     </div>
   )
 
-  let controls
+  let controls: ReactNode = null
   if (playing && phase === 'answer') {
     controls = (
       <div className={styles.answerPanel}>

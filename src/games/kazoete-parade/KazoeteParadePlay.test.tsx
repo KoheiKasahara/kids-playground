@@ -77,7 +77,7 @@ describe('KazoeteParadePlay', () => {
     expect(clicker()).toHaveAccessibleName('かぞえる いま 3')
 
     advance(parade.endMs)
-    expect(screen.getByText(`${target.name}は なんびき いた？`)).toBeInTheDocument()
+    expect(screen.getByText('なんびき いた？').parentElement).toHaveTextContent(`${target.name}は なんびき いた？`)
     expect(answerValue()).toHaveTextContent('3')
     for (let i = 0; i < 5; i++) fireEvent.click(screen.getByRole('button', { name: '1 へらす' }))
     expect(answerValue()).toHaveTextContent('0')

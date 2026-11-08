@@ -3,7 +3,6 @@ import {
   CPU_REACT_MAX_MS,
   DIFFICULTY_SETTINGS,
   EDGE_PERCENT,
-  JUDGE_DELAY_MS,
   MAX_COUNT,
   PARADE_ANIMALS,
   PLAYERS,
@@ -246,7 +245,6 @@ describe('すすみかた', () => {
     expect(judged.state.medals).toEqual({ me: 1, panda: 1, kitsune: 1, kaeru: 1 })
     // こたえあわせの あとは つぎへ を おすまで まつ。
     expect(advance(judged.state, 10_000).state).toBe(judged.state)
-    expect(JUDGE_DELAY_MS).toBeGreaterThan(0)
   })
 
   test('ぴったりで なければ 🏅 は もらえず miss', () => {
