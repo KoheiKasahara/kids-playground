@@ -1429,6 +1429,25 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
       ],
     },
   },
+  {
+    id: 'hanabi-don',
+    slug: 'hanabi-don',
+    title: 'どーん！はなび',
+    emoji: '🎆',
+    category: 'learning',
+    seo: {
+      headline: 'どーん！はなび｜よぞらを タッチして はなびで ほしを ともす 幼児向けあそび',
+      description:
+        'よぞらをタッチすると、そこへ花火があがって「どーん」とひらく幼児向けのあそびです。花火のわのなかの星にあかりがつき、ぜんぶともすとクリア。時間せいげんはなく、うごく星をねらって少ない花火でともすと★がふえます。',
+    },
+    intro: {
+      howToPlay: [
+        'よぞらの ほしの ちかくを タッチして はなびを あげよう',
+        'はなびの わに はいった ほしに あかりが つくよ',
+        'すくない はなびで ぜんぶ ともすと ★が ふえるよ',
+      ],
+    },
+  },
 ]
 
 export function findGameBySlug(slug: string): GameCatalogEntry | undefined {
