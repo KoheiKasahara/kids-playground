@@ -1,0 +1,576 @@
+.page {
+  position: relative;
+  height: 100dvh;
+  min-height: 480px;
+  box-sizing: border-box;
+  padding: calc(var(--space-sm) + var(--safe-top)) calc(var(--space-sm) + var(--safe-right))
+    calc(var(--space-sm) + var(--safe-bottom)) calc(var(--space-sm) + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  background: linear-gradient(170deg, #e5dbff 0%, var(--color-background) 55%, #fff3bf 100%);
+}
+
+.header {
+  position: relative;
+  width: 100%;
+  min-height: 52px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding-right: 56px;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(17px, 5vw, 28px);
+  line-height: 1.25;
+  text-align: center;
+}
+
+.instruction {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: clamp(20px, 6vw, var(--font-size-large));
+  font-weight: 700;
+  text-align: center;
+}
+
+.stageGrid {
+  width: min(100%, 420px);
+  margin-top: var(--space-sm);
+  display: grid;
+  gap: var(--space-md);
+}
+
+.stageButton {
+  min-height: 88px;
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  border: 3px solid #5f3dc4;
+  border-radius: var(--radius-lg);
+  color: #fff;
+  background: linear-gradient(160deg, #364fc7 0%, #5f3dc4 100%);
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.stageButton:active {
+  transform: scale(0.97);
+}
+
+.stageButton:focus-visible,
+.button:focus-visible,
+.soundToggle:focus-visible {
+  outline: 4px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.stageEmoji {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.stageText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stageName {
+  font-size: var(--font-size-large);
+  font-weight: 900;
+}
+
+.stageHint {
+  font-size: 17px;
+  font-weight: 700;
+  color: #e5dbff;
+}
+
+.hud {
+  flex: 0 0 auto;
+  width: min(100%, 520px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+
+.meter {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  font-size: clamp(18px, 5.4vw, 26px);
+  line-height: 1;
+}
+
+.meterOn {
+  color: #f59f00;
+}
+
+.meterOff {
+  color: #868e96;
+}
+
+.shots {
+  margin: 0;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-base);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+/* よぞらは 3:4 の たてながに たもつ。のこりの たかさと はばの ちいさい ほうに あわせる。 */
+.skyBox {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
+}
+
+.sky {
+  position: relative;
+  width: min(100cqw, 75cqh, 560px);
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #1c1f4a 0%, #3b2f7a 62%, #a4508b 100%);
+  box-shadow: inset 0 0 0 3px #5f3dc4;
+  touch-action: none;
+  cursor: pointer;
+  /* なかの ほし・はなび・もじは よぞらの はばに あわせる。 */
+  container-type: size;
+}
+
+.sky[data-stage='yuugata'] {
+  background: linear-gradient(180deg, #2b3a8c 0%, #7950f2 50%, #ff8787 85%, #ffc078 100%);
+}
+
+.sky[data-stage='mayonaka'] {
+  background: linear-gradient(180deg, #0b1030 0%, #1c1f4a 60%, #3b2f7a 100%);
+}
+
+.moon {
+  position: absolute;
+  top: 5%;
+  right: 7%;
+  width: 11%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #fff3bf;
+  box-shadow: 0 0 18px 6px rgb(255 243 191 / 45%);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.ground {
+  position: absolute;
+  left: -5%;
+  right: -5%;
+  bottom: -6%;
+  height: 16%;
+  border-radius: 50% 50% 0 0;
+  background: #101433;
+  pointer-events: none;
+}
+
+.star {
+  position: absolute;
+  --star-size: clamp(44px, 15cqw, 76px);
+  width: var(--star-size);
+  height: var(--star-size);
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  transform: translate(-50%, -50%);
+  transition: left 0.05s linear, top 0.05s linear;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* あかりが ついた ほしは おせなくなるが、うすい はいいろには しない。 */
+.star:disabled {
+  color: #000;
+  cursor: default;
+}
+
+.star:focus-visible {
+  outline: 4px solid #fff;
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+.starFace {
+  display: block;
+  font-size: calc(var(--star-size) * 0.62);
+  line-height: 1;
+  /* まだ ともっていない ほしは うすぐらく。あかりが つくと きごうも かわる。 */
+  filter: saturate(0.7);
+  opacity: 0.5;
+  animation: hanabi-twinkle 2.4s ease-in-out infinite;
+}
+
+.starLit .starFace {
+  filter: drop-shadow(0 0 10px #ffe066);
+  opacity: 1;
+  animation: hanabi-lit 0.9s ease-out forwards;
+}
+
+.shell {
+  position: absolute;
+  width: 10px;
+  height: 26px;
+  border-radius: 50%;
+  transform: translate(-50%, 0);
+  transition: top 0.05s linear;
+  background: linear-gradient(180deg, #fff 0%, var(--hanabi-color) 45%, transparent 100%);
+  box-shadow: 0 0 10px 2px var(--hanabi-color);
+  pointer-events: none;
+}
+
+.burst {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  /* ひらく はんけいは hanabiGame の BURST_RADIUS（よこはばの 17%）と そろえる。 */
+  --burst-radius: 17cqw;
+}
+
+.ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(var(--burst-radius) * 2);
+  height: calc(var(--burst-radius) * 2);
+  border-radius: 50%;
+  border: 3px solid var(--hanabi-color);
+  transform: translate(-50%, -50%) scale(0.1);
+  animation: hanabi-ring 0.7s ease-out forwards;
+}
+
+.spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  --spark-size: 2.4cqw;
+  --spark-reach: 1.2;
+  width: var(--spark-size);
+  /* そとへ のびる ひかりの すじ。さきが あかるく、うしろへ きえていく。 */
+  height: calc(var(--spark-size) * 3.2);
+  margin: calc(var(--spark-size) / -2);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff 0%, var(--hanabi-color) 28%, transparent 100%);
+  filter: drop-shadow(0 0 1.6cqw var(--hanabi-color));
+  transform-origin: 50% calc(var(--spark-size) / 2);
+  animation: hanabi-spark 1.2s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+}
+
+.sparkInner {
+  --spark-size: 1.8cqw;
+  --spark-reach: 0.66;
+  background: linear-gradient(180deg, #fff 0%, #fff3bf 30%, transparent 100%);
+}
+
+.flash {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(var(--burst-radius) * 2.6);
+  height: calc(var(--burst-radius) * 2.6);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, var(--hanabi-color) 22%, transparent 68%);
+  transform: translate(-50%, -50%) scale(0.1);
+  animation: hanabi-flash 0.6s ease-out forwards;
+}
+
+.burstBig .spark {
+  --spark-size: 3.4cqw;
+}
+
+.combo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 2px 10px;
+  border-radius: var(--radius-round);
+  background: #fff;
+  color: #e8590c;
+  font-size: clamp(16px, 5cqw, 24px);
+  font-weight: 900;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  animation: hanabi-combo 1.2s ease-out forwards;
+}
+
+.hint,
+.finale {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  margin: 0;
+  padding: 4px var(--space-md);
+  border-radius: var(--radius-round);
+  background: rgb(255 255 255 / 92%);
+  color: var(--color-primary-dark);
+  font-size: clamp(17px, 5.5cqw, 26px);
+  font-weight: 900;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.finale {
+  bottom: auto;
+  top: 42%;
+  color: #e8590c;
+  animation: hanabi-pop 0.5s ease-out;
+}
+
+.resultStars {
+  margin: 0;
+  font-size: 44px;
+  line-height: 1;
+}
+
+.starOn {
+  color: #fab005;
+}
+
+.starOff {
+  color: var(--color-surface-muted);
+}
+
+.resultEmoji {
+  margin: var(--space-md) 0 0;
+  font-size: clamp(56px, 20vw, 96px);
+  line-height: 1;
+}
+
+.resultMessage {
+  margin: 0;
+  color: var(--color-primary-dark);
+  font-size: clamp(22px, 6.5vw, var(--font-size-large));
+  font-weight: 900;
+  text-align: center;
+}
+
+.resultShots {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-weight: 700;
+  text-align: center;
+}
+
+.actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.button {
+  min-height: 48px;
+  padding: 6px var(--space-lg);
+  border: none;
+  border-radius: var(--radius-round);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.start {
+  color: var(--color-text-on-primary);
+  background: var(--color-success-dark);
+}
+
+.retry {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+}
+
+.soundToggle {
+  position: absolute;
+  top: calc(var(--space-sm) + var(--safe-top));
+  right: calc(var(--space-sm) + var(--safe-right));
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+@keyframes hanabi-twinkle {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(0.88);
+  }
+}
+
+@keyframes hanabi-lit {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.6) rotate(20deg);
+  }
+
+  100% {
+    transform: scale(0.2) rotate(60deg);
+    opacity: 0;
+  }
+}
+
+@keyframes hanabi-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes hanabi-flash {
+  0% {
+    transform: translate(-50%, -50%) scale(0.1);
+    opacity: 0.95;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes hanabi-spark {
+  0% {
+    transform: rotate(var(--angle)) translateY(0) scale(1);
+    opacity: 1;
+  }
+
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: rotate(var(--angle)) translateY(calc(var(--burst-radius) * -1 * var(--spark-reach))) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes hanabi-combo {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0;
+  }
+
+  25% {
+    transform: translate(-50%, -90%) scale(1.1);
+    opacity: 1;
+  }
+
+  75% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(-50%, -150%) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes hanabi-pop {
+  0% {
+    transform: translateX(-50%) scale(0.3);
+  }
+
+  70% {
+    transform: translateX(-50%) scale(1.15);
+  }
+
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .starFace,
+  .finale {
+    animation: none;
+  }
+
+  .starLit .starFace {
+    animation-duration: 0.01s;
+  }
+}
+
+/* 横画面では高さが足りなくなるため、周りの余白を詰めて よぞらを ひろく とる。 */
+@media (orientation: landscape) {
+  .page {
+    min-height: 0;
+    gap: var(--space-xs);
+  }
+
+  .header {
+    min-height: 44px;
+  }
+
+  .stageGrid {
+    width: min(100%, 760px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .stageButton {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .resultEmoji {
+    margin-top: 0;
+    font-size: clamp(40px, 9vw, 72px);
+  }
+}
