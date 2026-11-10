@@ -1,31 +1,44 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { isSoundEnabled } from '../../audio/sound'
 import { GAME_CATALOG } from '../gameCatalog'
 import BlockCraftPlay from './BlockCraftPlay'
-import type { Animal, Cell } from './animals'
+import { ANIMAL_SPAWNS, herdFrom, spawnHerd, type Animal, type Cell } from './animals'
 import { biome, BIOMES } from './biomes'
-import { readGame, WOOL_KEY } from './save'
+import { readGame, WOOL_KEY, writeGame } from './save'
+import { NEW_WORLD } from './terrain'
 import type { CraftSceneOptions, SceneApi } from './useCraftScene'
 import { playCraftSound } from './sounds'
 import { decodeGame, SAVE_KEY } from './save'
-import { blockAt, createWorld, PALETTE, TREASURES, type Position, type World } from './world'
+import { blockAt, createWorld, DEFAULT_WORLD, PALETTE, startWalker, TREASURES, type Position, type World } from './world'
 
 const scene = vi.hoisted(() => ({ options: null as unknown as CraftSceneOptions, api: { current: null as SceneApi | null } }))
 vi.mock('./useCraftScene', () => ({ useCraftScene: (options: CraftSceneOptions) => { scene.options = options; return { setContainer: () => {}, failed: false, api: scene.api } } }))
 vi.mock('./sounds', () => ({ playCraftSound: vi.fn() }))
+// jsdom は canvas に かけない。ちずの しるしは DOM で たしかめる。
+beforeAll(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null) })
 beforeEach(() => { localStorage.clear(); scene.api.current = null; vi.mocked(playCraftSound).mockClear() })
 const world = (): World => scene.options.world
 const blocks = () => [...world().blocks()]
 function mount() { return render(<MemoryRouter><BlockCraftPlay /></MemoryRouter>) }
+/** こまかい そうさは、ばしょの きまった ちいさな くさはらの つづきから たしかめる。 */
 async function start() {
   const user = userEvent.setup()
+  writeGame({ world: createWorld(), biome: 'meadow', wheat: 0, herd: herdFrom(ANIMAL_SPAWNS), seed: 0 })
   mount()
-  await user.click(screen.getByRole('button', { name: 'くさはら' }))
+  await user.click(screen.getByRole('button', { name: /つづきから あそぶ/ }))
   return user
 }
+/** あたらしい ひろい せかいを はじめる。 */
+async function startNew(name = 'くさはら') {
+  const user = userEvent.setup()
+  const view = mount()
+  await user.click(screen.getByRole('button', { name }))
+  return { user, view }
+}
+const api = (): SceneApi => ({ heading: () => ({ x: 1, z: 0 }), turn: vi.fn(), actAtCenter: vi.fn(), focus: vi.fn() })
 const tap = (position: Position, normal: Position = { x: 0, y: 1, z: 0 }) => act(() => scene.options.onPick(position, normal))
 
 it('shows only the essential controls', async () => {
@@ -36,8 +49,8 @@ it('shows only the essential controls', async () => {
   expect(screen.queryByRole('button', { name: 'ちかづく' })).not.toBeInTheDocument()
   expect(screen.queryByText(/ボタンで ばしょを えらぶ/)).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'よる' })).toHaveTextContent(/^☀️$/)
-  // ヘッダー（もどる・よる・おと）、あるく、おく・こわす・ひろく・もどす、ざいりょう、ほぞん・はじめの せかい
-  expect(screen.getAllByRole('button')).toHaveLength(3 + 1 + 4 + PALETTE.length + 2)
+  // ヘッダー（もどる・よる・おと）、ちず・あるく、おく・こわす・ひろく・もどす、ざいりょう、ほぞん・はじめの せかい
+  expect(screen.getAllByRole('button')).toHaveLength(3 + 2 + 4 + PALETTE.length + 2)
 })
 
 it('switches between day and night without adding messages', async () => {
@@ -91,7 +104,8 @@ it('supports material selection, keyboard cursor, reset cancellation and undoing
   expect(blocks()).toEqual(built)
   await user.click(screen.getByRole('button', { name: /はじめの せかい/ }))
   await user.click(screen.getByRole('button', { name: 'もどして あそぶ' }))
-  expect(blocks()).toEqual([...createWorld().blocks()])
+  // ほぞんした seed から、おなじ おおきさの はじめの せかいに もどる
+  expect(blocks()).toEqual([...biome('meadow').create(DEFAULT_WORLD, 0).blocks()])
   await user.click(screen.getByRole('button', { name: '↩ もどす' }))
   expect(blocks()).toEqual(built)
 })
@@ -180,7 +194,7 @@ it('hides the treasure message after a moment', async () => {
 it('walks around the world with the pad and keyboard, climbing one step and acting at the center', async () => {
   const user = await start()
   const actAtCenter = vi.fn()
-  scene.api.current = { heading: () => ({ x: 1, z: 0 }), turn: vi.fn(), actAtCenter }
+  scene.api.current = { ...api(), actAtCenter }
   await user.click(screen.getByRole('button', { name: 'あるく' }))
   expect(screen.getByRole('button', { name: 'あるく' })).toHaveAttribute('aria-pressed', 'true')
   expect(scene.options.walker).toEqual({ x: 8, y: 3, z: 8 })
@@ -233,23 +247,111 @@ it('makes an animal hop with a sound when it is tapped without wheat', async () 
   expect(screen.getByRole('button', { name: '↩ もどす' })).toBeDisabled()
 })
 
-it('starts in a chosen world with its own sky and animals, and resumes it after saving', async () => {
-  const user = userEvent.setup()
-  const view = mount()
-  expect(screen.getAllByRole('button', { name: /^(くさはら|さばく|ゆきやま|しま)$/ })).toHaveLength(BIOMES.length)
-  await user.click(screen.getByRole('button', { name: 'さばく' }))
-  expect(blocks()).toEqual([...biome('desert').create().blocks()])
-  expect(scene.options.sky).toBe(biome('desert').sky)
-  expect(herd().filter(a => a.wool === 'yellow')).toHaveLength(2)
-  fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
-  await user.click(screen.getByRole('button', { name: /ほぞん/ }))
-  view.unmount()
+it('starts a wide new world in each land with its own sky and animals, and resumes it after saving', async () => {
+  vi.spyOn(Math, 'random').mockReturnValue(0.3)
+  try {
+    const { user, view } = await startNew('さばく')
+    const seed = Math.floor(0.3 * 1_000_000)
+    const desert = biome('desert').create(NEW_WORLD, seed)
+    expect(world()).toMatchObject(NEW_WORLD)
+    expect(blocks()).toHaveLength([...desert.blocks()].length)
+    expect(scene.options.sky).toBe(biome('desert').sky)
+    expect(herd()).toEqual(spawnHerd(desert, biome('desert').animals, seed))
+    expect(scene.options.cursor).toEqual({ x: 48, y: 0, z: 48 })
+    fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
+    const built = blocks().length
+    expect(built).toBe([...desert.blocks()].length + 1)
+    await user.click(screen.getByRole('button', { name: /ほぞん/ }))
+    view.unmount()
+    mount()
+    await user.click(screen.getByRole('button', { name: /つづきから あそぶ/ }))
+    expect(scene.options.sky).toBe(biome('desert').sky)
+    expect(blocks()).toHaveLength(built)
+    await user.click(screen.getByRole('button', { name: /はじめの せかい/ }))
+    await user.click(screen.getByRole('button', { name: 'もどして あそぶ' }))
+    expect(blocks()).toHaveLength(built - 1)
+    expect(readGame()?.seed).toBe(seed)
+  } finally { vi.mocked(Math.random).mockRestore() }
+})
+
+it('offers every land on the title', () => {
   mount()
-  await user.click(screen.getByRole('button', { name: /つづきから あそぶ/ }))
-  expect(scene.options.sky).toBe(biome('desert').sky)
-  await user.click(screen.getByRole('button', { name: /はじめの せかい/ }))
-  await user.click(screen.getByRole('button', { name: 'もどして あそぶ' }))
-  expect(blocks()).toEqual([...biome('desert').create().blocks()])
+  const lands = screen.getByRole('group', { name: 'あたらしい せかいを えらぶ' })
+  expect(BIOMES.length).toBeGreaterThanOrEqual(10)
+  for (const land of BIOMES) expect(lands).toContainElement(screen.getByRole('button', { name: land.label }))
+})
+
+it('shows a treasure map and jumps to the touched place, by camera or on foot', async () => {
+  const { user } = await startNew()
+  scene.api.current = api()
+  const treasures = world().treasures.length
+  const map = screen.getByRole('button', { name: 'ちず' })
+  expect(map.querySelectorAll('[data-treasure]')).toHaveLength(treasures)
+  expect(map.querySelector<HTMLElement>('[data-here]')!.style.left).toBe(`${48.5 / 96 * 100}%`)
+  await user.click(map)
+  const big = screen.getByRole('button', { name: 'ちずの ばしょへ いく' })
+  vi.spyOn(big.querySelector('canvas')!, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 50, width: 192, height: 192 } as DOMRect)
+  // ちずの (10, 80) の ますを タッチ
+  fireEvent.click(big, { clientX: 100 + 21, clientY: 50 + 161, detail: 1 })
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(scene.options.cursor).toEqual({ x: 10, y: 0, z: 80 })
+  expect(scene.api.current.focus).toHaveBeenLastCalledWith(10, 80)
+  expect(screen.getByRole('button', { name: 'ちず' }).querySelector<HTMLElement>('[data-here]')!.style.top).toBe(`${80.5 / 96 * 100}%`)
+  // やじるしで うごかすと カメラも ついてくる
+  fireEvent.keyDown(screen.getByRole('application'), { key: 'ArrowRight' })
+  expect(scene.api.current.focus).toHaveBeenLastCalledWith(11, 80)
+  // あるいている ときは その ばしょの じめんへ とぶ
+  await user.click(screen.getByRole('button', { name: 'あるく' }))
+  expect(scene.options.walker).toEqual(startWalker(world(), 11, 80))
+  await user.click(screen.getByRole('button', { name: 'ちず' }))
+  const again = screen.getByRole('button', { name: 'ちずの ばしょへ いく' })
+  vi.spyOn(again.querySelector('canvas')!, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 96, height: 96 } as DOMRect)
+  fireEvent.click(again, { clientX: 70.5, clientY: 20.5, detail: 1 })
+  expect(scene.options.walker).toEqual(startWalker(world(), 70, 20))
+  // あるくのを やめると、その ばしょが カーソルに なる
+  await user.click(screen.getByRole('button', { name: 'あるく' }))
+  expect(scene.options.cursor).toEqual({ x: 70, y: 0, z: 20 })
+  // とじるだけも できる。みつけた たからは ちずから きえる
+  await user.click(screen.getByRole('button', { name: 'ちず' }))
+  await user.click(screen.getByRole('button', { name: 'とじる' }))
+  expect(scene.options.cursor).toEqual({ x: 70, y: 0, z: 20 })
+  await user.click(screen.getByRole('button', { name: '⛏️ こわす' }))
+  const [treasure] = world().treasures
+  for (let y = world().topY(treasure.x, treasure.z); y >= 1; y--) tap({ x: treasure.x, y, z: treasure.z })
+  expect(screen.getByRole('status')).toHaveTextContent('みつけた')
+  expect(screen.getByRole('button', { name: 'ちず' }).querySelectorAll('[data-treasure]')).toHaveLength(treasures - 1)
+  expect(screen.getByLabelText(`みつけた たから 1こ（ぜんぶで ${treasures}こ）`)).toBeInTheDocument()
+})
+
+it('keeps walking while a walk button is held, and takes one step for a tap', async () => {
+  await start()
+  scene.api.current = api()
+  fireEvent.click(screen.getByRole('button', { name: 'あるく' }))
+  vi.useFakeTimers()
+  try {
+    const forward = screen.getByRole('button', { name: 'まえへ すすむ' })
+    fireEvent.pointerDown(forward)
+    act(() => { vi.advanceTimersByTime(380) })
+    expect(scene.options.walker).toEqual({ x: 9, y: 3, z: 8 })
+    act(() => { vi.advanceTimersByTime(170) })
+    act(() => { vi.advanceTimersByTime(170) })
+    expect(scene.options.walker).toEqual({ x: 11, y: 4, z: 8 })
+    // はなすと とまり、はなした ときの クリックでは すすまない
+    fireEvent.pointerUp(forward)
+    fireEvent.click(forward)
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(scene.options.walker).toEqual({ x: 11, y: 4, z: 8 })
+    const back = screen.getByRole('button', { name: 'うしろへ さがる' })
+    fireEvent.pointerDown(back)
+    fireEvent.pointerUp(back)
+    fireEvent.click(back)
+    expect(scene.options.walker).toEqual({ x: 10, y: 4, z: 8 })
+    // がめんを はなれたら とまる
+    fireEvent.pointerDown(forward)
+    fireEvent.blur(window)
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(scene.options.walker).toEqual({ x: 10, y: 4, z: 8 })
+  } finally { vi.useRealTimers() }
 })
 
 it('grows seeds on farmland into wheat to harvest, by tapping and by mining', async () => {

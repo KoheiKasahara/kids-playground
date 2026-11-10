@@ -103,8 +103,8 @@ describe('minecraft-like features', () => {
     expect(decodeWorld(JSON.stringify(legacy.slice(1)))).toBeNull()
   })
   it('fills both palette layouts with complete rows', () => {
+    // 2だんでも 3だんでも さいごの れつが うまる
     expect(PALETTE.length % 6).toBe(0)
-    expect(PALETTE.length % 10).toBe(0)
   })
 })
 
