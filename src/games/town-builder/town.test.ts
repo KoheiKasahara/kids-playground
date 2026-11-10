@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CATEGORIES, PARTS, partsInCategory } from './parts'
 import {
-  applyTool, COLS, createEmptyTown, createTown, decodeTown, encodeTown, isConnected, populationOf, railMask,
+  applyTool, CENTER_INDEX, COLS, createEmptyTown, decodeTown, encodeTown, isConnected, populationOf, railMask,
   rankOf, RANKS, roadMask, ROWS, waterMask, wantsRoad, type Town,
 } from './town'
 
@@ -22,15 +22,6 @@ describe('parts', () => {
 })
 
 describe('town', () => {
-  it('starts with a full starter town: a river, a bridge and houses connected by a road', () => {
-    const town = createTown()
-    expect(town).toHaveLength(COLS * ROWS)
-    expect(town.some((tile) => tile.ground === 'water' && tile.part === 'road')).toBe(true)
-    expect(town.filter((tile) => tile.part === 'house' || tile.part === 'house-blue')).toHaveLength(2)
-    expect(populationOf(town)).toBe(8)
-    expect(createEmptyTown().every((tile) => tile.ground === 'grass' && tile.part === null)).toBe(true)
-  })
-
   it('places and replaces buildings, filling in water, and ignores repeats', () => {
     const empty = createEmptyTown()
     const house = applyTool(empty, 0, 'house')
@@ -41,6 +32,9 @@ describe('town', () => {
     expect(lake[5]).toEqual({ ground: 'water', part: null })
     expect(applyTool(lake, 5, 'water')).toBe(lake)
     expect(applyTool(lake, 5, 'tree')[5]).toEqual({ ground: 'grass', part: 'tree' })
+    expect(createEmptyTown()).toHaveLength(COLS * ROWS)
+    expect(empty.every((tile) => tile.ground === 'grass' && tile.part === null)).toBe(true)
+    expect(CENTER_INDEX).toBe(Math.floor(ROWS / 2) * COLS + Math.floor(COLS / 2))
     expect(applyTool(empty, -1, 'house')).toBe(empty)
     expect(applyTool(empty, COLS * ROWS, 'house')).toBe(empty)
   })
@@ -55,6 +49,23 @@ describe('town', () => {
     expect(crossing[3].part).toBe('crossing')
     expect(applyTool(crossing, 3, 'road')).toBe(crossing)
     expect(build([[4, 'rail'], [4, 'road']])[4].part).toBe('crossing')
+  })
+
+  it('lays sand and snow under whatever stands there, and builds on them without changing the ground', () => {
+    const beach = build([[0, 'house'], [0, 'sand'], [1, 'sand'], [1, 'palm'], [2, 'road'], [2, 'snow'], [3, 'snow'], [3, 'igloo']])
+    expect(beach.slice(0, 4)).toEqual([
+      { ground: 'sand', part: 'house' }, { ground: 'sand', part: 'palm' }, { ground: 'snow', part: 'road' }, { ground: 'snow', part: 'igloo' },
+    ])
+    expect(applyTool(beach, 1, 'sand')).toBe(beach)
+    expect(applyTool(beach, 1, 'palm')).toBe(beach)
+    // すなに みずを ひくと、たてものは なくなり みちは はしに なる。
+    expect(build([[0, 'water'], [2, 'water']], beach).slice(0, 3)).toEqual([
+      { ground: 'water', part: null }, { ground: 'sand', part: 'palm' }, { ground: 'water', part: 'road' },
+    ])
+    // けすと まず のって いる もの、つぎに じめんが くさはらに もどる。
+    const cleared = build([[1, 'erase'], [1, 'erase']], beach)
+    expect(cleared[1]).toEqual({ ground: 'grass', part: null })
+    expect(populationOf(build([[4, 'road']], beach))).toBe(2)
   })
 
   it('erases the part first, then the water, and does nothing on bare grass', () => {
@@ -97,26 +108,58 @@ describe('town', () => {
 })
 
 describe('saving', () => {
-  it('round-trips every kind of tile', () => {
-    const town = build([[0, 'water'], [0, 'road'], [1, 'rail'], [1, 'road'], [2, 'ferris'], [3, 'water'], [4, 'tv-tower']], createTown())
-    expect(decodeTown(encodeTown(town))).toEqual(town)
+  it('round-trips every kind of tile in a compact form', () => {
+    const town = build([
+      [0, 'water'], [0, 'road'], [1, 'rail'], [1, 'road'], [2, 'ferris'], [3, 'water'], [4, 'tv-tower'], [5, 'sand'], [5, 'pyramid'],
+      [6, 'snow'], [7, 'snow'], [7, 'snowman'], [COLS * ROWS - 1, 'lighthouse'],
+    ])
+    const raw = encodeTown(town)
+    expect(decodeTown(raw)).toEqual(town)
+    // なにも ない ところは まとめて ほぞん する。
+    expect(raw.length).toBeLessThan(400)
+    expect(decodeTown(encodeTown(createEmptyTown()))).toEqual(createEmptyTown())
   })
 
-  it('rejects missing, broken, resized or impossible saves', () => {
-    const tiles = createEmptyTown().map(() => 'g')
-    const save = (patch: object) => JSON.stringify({ version: 1, cols: COLS, rows: ROWS, tiles, ...patch })
+  it('keeps a town saved on the old small map, placed in the middle of the wide one', () => {
+    const old = Array.from({ length: 14 * 14 }, () => 'g')
+    old[0] = 'g:castle'
+    old[1] = 'w:road'
+    old[14 * 14 - 1] = 'g:house'
+    const town = decodeTown(JSON.stringify({ version: 1, cols: 14, rows: 14, tiles: old }))
+    const corner = at((COLS - 14) / 2, (ROWS - 14) / 2)
+    expect(town).toHaveLength(COLS * ROWS)
+    expect(town?.[corner]).toEqual({ ground: 'grass', part: 'castle' })
+    expect(town?.[corner + 1]).toEqual({ ground: 'water', part: 'road' })
+    expect(town?.[at((COLS - 14) / 2 + 13, (ROWS - 14) / 2 + 13)]).toEqual({ ground: 'grass', part: 'house' })
+    expect(town?.filter((tile) => tile.part !== null)).toHaveLength(3)
+  })
+
+  it('rejects missing, broken, oversized or impossible saves', () => {
+    const save = (patch: object) => JSON.stringify({ version: 2, cols: COLS, rows: ROWS, tiles: [`g*${COLS * ROWS}`], ...patch })
+    const first = (tile: string) => save({ tiles: [tile, `g*${COLS * ROWS - 1}`] })
     expect(decodeTown(null)).toBeNull()
     expect(decodeTown('{broken')).toBeNull()
     expect(decodeTown('42')).toBeNull()
-    expect(decodeTown(save({ version: 2 }))).toBeNull()
+    expect(decodeTown(save({ version: 3 }))).toBeNull()
+    expect(decodeTown(save({ cols: COLS + 1 }))).toBeNull()
     expect(decodeTown(save({ cols: 12 }))).toBeNull()
-    expect(decodeTown(save({ tiles: tiles.slice(1) }))).toBeNull()
-    expect(decodeTown(save({ tiles: ['g:spaceship', ...tiles.slice(1)] }))).toBeNull()
-    expect(decodeTown(save({ tiles: ['g:water', ...tiles.slice(1)] }))).toBeNull()
-    expect(decodeTown(save({ tiles: ['w:house', ...tiles.slice(1)] }))).toBeNull()
-    expect(decodeTown(save({ tiles: ['x', ...tiles.slice(1)] }))).toBeNull()
-    expect(decodeTown(save({ tiles: [7, ...tiles.slice(1)] }))).toBeNull()
-    expect(decodeTown(save({ tiles: ['g:road:x', ...tiles.slice(1)] }))).toBeNull()
+    expect(decodeTown(save({ rows: 0 }))).toBeNull()
+    expect(decodeTown(save({ rows: 1.5 }))).toBeNull()
+    expect(decodeTown(save({ tiles: 'g' }))).toBeNull()
+    expect(decodeTown(save({ tiles: [`g*${COLS * ROWS - 1}`] }))).toBeNull()
+    expect(decodeTown(save({ tiles: [`g*${COLS * ROWS + 1}`] }))).toBeNull()
+    expect(decodeTown(save({ tiles: ['g*0', `g*${COLS * ROWS}`] }))).toBeNull()
+    expect(decodeTown(save({ tiles: ['g*2*3', `g*${COLS * ROWS - 2}`] }))).toBeNull()
+    // まえの かたちでは「*かず」を つかえない。
+    expect(decodeTown(save({ version: 1 }))).toBeNull()
+    expect(decodeTown(first('g:spaceship'))).toBeNull()
+    expect(decodeTown(first('g:water'))).toBeNull()
+    expect(decodeTown(first('g:sand'))).toBeNull()
+    expect(decodeTown(first('w:house'))).toBeNull()
+    expect(decodeTown(first('x'))).toBeNull()
+    expect(decodeTown(first('g:road:x'))).toBeNull()
+    expect(decodeTown(save({ tiles: [7, `g*${COLS * ROWS - 1}`] }))).toBeNull()
     expect(decodeTown(save({}))).toEqual(createEmptyTown())
+    expect(decodeTown(first('s:cactus'))?.[0]).toEqual({ ground: 'sand', part: 'cactus' })
   })
 })
