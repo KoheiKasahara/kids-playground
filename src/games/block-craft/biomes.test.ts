@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { walkable } from './animals'
 import { BIOMES, biome, isBiomeId, type BiomeId } from './biomes'
-import { foundTreasures, HEIGHT, inside, isStable, key, SIZE, surfaceOf } from './world'
+import { foundTreasures, inside, isStable, key, surfaceOf } from './world'
 
 describe.each(BIOMES.map(b => [b.id, b] as const))('%s world', (_, land) => {
   const world = land.create()
+  const blocks = [...world.blocks()]
   it('is a valid world with a full floor and every treasure hidden in place', () => {
-    expect(new Set(world.map(key)).size).toBe(world.length)
-    expect(world.every(inside)).toBe(true)
-    expect(world.filter(b => b.y === 0)).toHaveLength(SIZE * SIZE)
-    expect(world.every(b => b.y < HEIGHT)).toBe(true)
+    expect(new Set(blocks.map(key)).size).toBe(blocks.length)
+    expect(blocks.every(b => inside(world, b))).toBe(true)
+    expect(blocks.filter(b => b.y === 0)).toHaveLength(world.area)
+    expect(blocks.every(b => b.y < world.height)).toBe(true)
     expect(foundTreasures(world)).toEqual([])
-    expect(land.create()).toEqual(world)
+    expect([...land.create().blocks()]).toEqual(blocks)
   })
   it('does not change by itself under the lava, ice and snow rules', () => {
     expect(isStable(world)).toBe(true)
@@ -32,7 +33,7 @@ describe.each(BIOMES.map(b => [b.id, b] as const))('%s world', (_, land) => {
 
 describe('biomes', () => {
   it('each has its own look and features', () => {
-    const has = (id: BiomeId, material: string) => biome(id).create().some(b => b.material === material)
+    const has = (id: BiomeId, material: string) => [...biome(id).create().blocks()].some(b => b.material === material)
     expect(has('desert', 'sandstone') && has('desert', 'lava') && has('desert', 'cactus')).toBe(true)
     expect(has('snow', 'ice') && has('snow', 'mushroom')).toBe(true)
     expect(has('island', 'coral') && has('island', 'lava') && has('island', 'shell')).toBe(true)

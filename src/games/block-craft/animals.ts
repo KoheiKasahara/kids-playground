@@ -1,8 +1,7 @@
-import { SIZE, type Block, type WoolColor } from './world'
+import { DEFAULT_WORLD, landmark, materialCode, type World, type Block, type WoolColor } from './world'
 
 export type AnimalKind = 'sheep' | 'chicken' | 'rabbit'
 export type Cell = { x: number; z: number }
-export type Surface = (x: number, z: number) => Block | undefined
 export type Spawn = Cell & { kind: AnimalKind; wool?: WoolColor }
 
 /** せかいに いる どうぶつ。x・z は うまれた ばしょ（あるいている ばしょは ほぞんしない）。 */
@@ -28,8 +27,10 @@ export const ANIMAL_SPAWNS: readonly Spawn[] = [
   { kind: 'rabbit', x: 9, z: 4 },
 ]
 
-export const herdFrom = (spawns: readonly Spawn[]): Herd => spawns.map((spawn, id) => ({ ...spawn, id }))
+export const herdFrom = (spawns: readonly Spawn[], size = DEFAULT_WORLD.size): Herd =>
+  spawns.map((spawn, id) => ({ ...spawn, x: landmark(spawn.x, size), z: landmark(spawn.z, size), id }))
 
+const WATER = materialCode('water'), CACTUS = materialCode('cactus'), LAVA = materialCode('lava')
 const STEPS: readonly Cell[] = [{ x: 1, z: 0 }, { x: -1, z: 0 }, { x: 0, z: 1 }, { x: 0, z: -1 }]
 
 /** どうぶつが のれる じめん：みず・サボテン・ようがんの うえには いかない。 */
@@ -37,18 +38,22 @@ export function walkable(ground: Block | undefined): ground is Block {
   return !!ground && ground.material !== 'water' && ground.material !== 'cactus' && ground.material !== 'lava'
 }
 
-/** となりの 1マスへ。だんさが 1より おおきい ところや せかいの そとへは いかない。 */
-export function nextCell(surface: Surface, at: Cell, random: () => number): Cell {
-  const here = surface(at.x, at.z)
-  const options = STEPS
-    .map(step => ({ x: at.x + step.x, z: at.z + step.z }))
-    .filter(cell => cell.x >= 0 && cell.x < SIZE && cell.z >= 0 && cell.z < SIZE)
-    .filter(cell => {
-      const ground = surface(cell.x, cell.z)
-      return walkable(ground) && (!here || Math.abs(ground.y - here.y) <= 1)
-    })
-  if (!options.length) return at
-  return options[Math.min(options.length - 1, Math.floor(random() * options.length))]
+/** Reuse the destination and direction buffer in the animation loop. */
+export function chooseAnimalStep(world: World, from: Cell, to: Cell, options: Int8Array, random: () => number) {
+  const here = world.topY(from.x, from.z, true)
+  let count = 0
+  for (let i = 0; i < STEPS.length; i++) {
+    const x = from.x + STEPS[i].x, z = from.z + STEPS[i].z
+    const y = world.topY(x, z, true)
+    if (y < 0 || (here >= 0 && Math.abs(y - here) > 1)) continue
+    const ground = world.codeAt(x, y, z)
+    if (ground !== WATER && ground !== CACTUS && ground !== LAVA) options[count++] = i
+  }
+  if (!count) return false
+  const step = STEPS[options[Math.min(count - 1, Math.floor(random() * count))]]
+  to.x = from.x + step.x
+  to.z = from.z + step.z
+  return true
 }
 
 export type FeedResult = 'grow' | 'wool' | 'love' | 'baby'
@@ -83,15 +88,15 @@ export function shearSheep(herd: Herd, id: number): { herd: Herd; wool: WoolColo
   return { herd: herd.map(a => a === sheep ? { ...a, sheared: true } : a), wool: sheep.wool }
 }
 
-const isCellNumber = (value: unknown) => Number.isInteger(value) && (value as number) >= 0 && (value as number) < SIZE
+const isCellNumber = (value: unknown, size: number) => Number.isInteger(value) && (value as number) >= 0 && (value as number) < size
 const optionalFlag = (value: unknown) => value === undefined || typeof value === 'boolean'
 /** ほぞんした どうぶつを よみこむ。こわれていたら null。 */
-export function decodeHerd(data: unknown): Herd | null {
+export function decodeHerd(data: unknown, size = DEFAULT_WORLD.size): Herd | null {
   if (!Array.isArray(data) || data.length > MAX_HERD) return null
   const ids = new Set<number>()
   for (const a of data) {
     if (!a || typeof a !== 'object' || !Number.isInteger(a.id) || ids.has(a.id)) return null
-    if (!ANIMAL_KINDS.includes(a.kind) || !isCellNumber(a.x) || !isCellNumber(a.z)) return null
+    if (!ANIMAL_KINDS.includes(a.kind) || !isCellNumber(a.x, size) || !isCellNumber(a.z, size)) return null
     if (a.wool !== undefined && (a.kind !== 'sheep' || !WOOL_COLORS.includes(a.wool))) return null
     if (![a.sheared, a.baby, a.love].every(optionalFlag)) return null
     ids.add(a.id)

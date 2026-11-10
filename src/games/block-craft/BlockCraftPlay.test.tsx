@@ -10,13 +10,15 @@ import { biome, BIOMES } from './biomes'
 import { readGame, WOOL_KEY } from './save'
 import type { CraftSceneOptions, SceneApi } from './useCraftScene'
 import { playCraftSound } from './sounds'
-import { blockAt, createWorld, decodeWorld, PALETTE, SAVE_KEY, TREASURES, type Position, type World } from './world'
+import { decodeGame, SAVE_KEY } from './save'
+import { blockAt, createWorld, PALETTE, TREASURES, type Position, type World } from './world'
 
 const scene = vi.hoisted(() => ({ options: null as unknown as CraftSceneOptions, api: { current: null as SceneApi | null } }))
 vi.mock('./useCraftScene', () => ({ useCraftScene: (options: CraftSceneOptions) => { scene.options = options; return { setContainer: () => {}, failed: false, api: scene.api } } }))
 vi.mock('./sounds', () => ({ playCraftSound: vi.fn() }))
 beforeEach(() => { localStorage.clear(); scene.api.current = null; vi.mocked(playCraftSound).mockClear() })
 const world = (): World => scene.options.world
+const blocks = () => [...world().blocks()]
 function mount() { return render(<MemoryRouter><BlockCraftPlay /></MemoryRouter>) }
 async function start() {
   const user = userEvent.setup()
@@ -47,7 +49,7 @@ it('switches between day and night without adding messages', async () => {
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'ダイヤ' }))
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
-  expect(world().at(-1)?.material).toBe('diamond')
+  expect(blockAt(world(), { x: 8, y: 3, z: 8 })?.material).toBe('diamond')
 })
 
 it('is listed in the menu', () => { expect(GAME_CATALOG.some((game) => game.id === 'block-craft')).toBe(true) })
@@ -56,17 +58,17 @@ it('starts, places and mines blocks, undoes, saves and resumes after re-entry', 
   const user = userEvent.setup()
   const view = mount()
   await user.click(screen.getByRole('button', { name: 'くさはら' }))
-  const initialCount = world().length
+  const initialCount = blocks().length
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
-  expect(world()).toHaveLength(initialCount + 1)
+  expect(blocks()).toHaveLength(initialCount + 1)
   await user.click(screen.getByRole('button', { name: '🧱 おく' }))
   await user.click(screen.getByRole('button', { name: '⛏️ こわす' }))
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
-  expect(world()).toHaveLength(initialCount)
+  expect(blocks()).toHaveLength(initialCount)
   await user.click(screen.getByRole('button', { name: '↩ もどす' }))
-  expect(world()).toHaveLength(initialCount + 1)
+  expect(blocks()).toHaveLength(initialCount + 1)
   await user.click(screen.getByRole('button', { name: /ほぞん/ }))
-  expect(decodeWorld(localStorage.getItem(SAVE_KEY))).toEqual(world())
+  expect([...decodeGame(localStorage.getItem(SAVE_KEY))!.world.blocks()]).toEqual(blocks())
   await user.click(screen.getByRole('button', { name: /おと/ }))
   expect(isSoundEnabled()).toBe(false)
   await user.click(screen.getByRole('button', { name: 'タイトルへ もどる' }))
@@ -74,7 +76,7 @@ it('starts, places and mines blocks, undoes, saves and resumes after re-entry', 
   view.unmount()
   mount()
   await user.click(screen.getByRole('button', { name: /つづきから あそぶ/ }))
-  expect(world()).toHaveLength(initialCount + 1)
+  expect(blocks()).toHaveLength(initialCount + 1)
 })
 
 it('supports material selection, keyboard cursor, reset cancellation and undoing reset', async () => {
@@ -82,16 +84,16 @@ it('supports material selection, keyboard cursor, reset cancellation and undoing
   await user.click(screen.getByRole('button', { name: 'れんが' }))
   fireEvent.keyDown(screen.getByRole('application'), { key: 'ArrowRight' })
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
-  expect(world().at(-1)).toEqual({ x: 9, y: 3, z: 8, material: 'brick' })
-  const built = world()
+  expect(blockAt(world(), { x: 9, y: 3, z: 8 })).toEqual({ x: 9, y: 3, z: 8, material: 'brick' })
+  const built = blocks()
   await user.click(screen.getByRole('button', { name: /はじめの せかい/ }))
   await user.click(screen.getByRole('button', { name: 'やめる' }))
-  expect(world()).toEqual(built)
+  expect(blocks()).toEqual(built)
   await user.click(screen.getByRole('button', { name: /はじめの せかい/ }))
   await user.click(screen.getByRole('button', { name: 'もどして あそぶ' }))
-  expect(world()).toEqual(createWorld())
+  expect(blocks()).toEqual([...createWorld().blocks()])
   await user.click(screen.getByRole('button', { name: '↩ もどす' }))
-  expect(world()).toEqual(built)
+  expect(blocks()).toEqual(built)
 })
 
 it('handles invalid saves and reports storage failure without losing play state', async () => {
@@ -101,47 +103,47 @@ it('handles invalid saves and reports storage failure without losing play state'
   expect(screen.queryByRole('button', { name: /つづきから/ })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'くさはら' }))
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
-  const built = world()
+  const built = blocks()
   const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
   await user.click(screen.getByRole('button', { name: /ほぞん/ }))
-  expect(world()).toEqual(built)
+  expect(blocks()).toEqual(built)
   spy.mockRestore()
 })
 
 it('places and mines a 3×3 area at once when ひろく is on, and undoes it in one step', async () => {
   const user = await start()
-  const initial = world()
+  const initial = blocks()
   await user.click(screen.getByRole('button', { name: 'いし' }))
   await user.click(screen.getByRole('button', { name: '🔲 ひろく' }))
   expect(screen.getByRole('button', { name: '🔲 ひろく' })).toHaveAttribute('aria-pressed', 'true')
   tap({ x: 8, y: 2, z: 8 })
-  expect(world().filter(b => b.y === 3 && b.material === 'stone')).toHaveLength(9)
+  expect(blocks().filter(b => b.y === 3 && b.material === 'stone')).toHaveLength(9)
   await user.click(screen.getByRole('button', { name: '⛏️ こわす' }))
   tap({ x: 8, y: 3, z: 8 })
-  expect(world().filter(b => b.y === 3 && b.material === 'stone')).toHaveLength(0)
+  expect(blocks().filter(b => b.y === 3 && b.material === 'stone')).toHaveLength(0)
   await user.click(screen.getByRole('button', { name: '↩ もどす' }))
   await user.click(screen.getByRole('button', { name: '↩ もどす' }))
-  expect(world()).toEqual(initial)
+  expect(blocks()).toEqual(initial)
 })
 
 it('grows a sapling into a tree when it is tapped', async () => {
   await start()
-  const sapling = world().find(b => b.material === 'sapling')!
+  const sapling = blocks().find(b => b.material === 'sapling')!
   tap(sapling)
-  expect(world().some(b => b.material === 'sapling')).toBe(false)
-  expect(world().filter(b => b.x === sapling.x && b.z === sapling.z && b.material === 'wood')).toHaveLength(3)
+  expect(blocks().some(b => b.material === 'sapling')).toBe(false)
+  expect(blocks().filter(b => b.x === sapling.x && b.z === sapling.z && b.material === 'wood')).toHaveLength(3)
   expect(playCraftSound).toHaveBeenLastCalledWith('grow')
 })
 
 it('copies a material with a long press, using either touch or Shift+Enter', async () => {
   const user = await start()
   await user.click(screen.getByRole('button', { name: '⛏️ こわす' }))
-  act(() => scene.options.onHold?.(world().find(b => b.material === 'pumpkin')!))
+  act(() => scene.options.onHold?.(blocks().find(b => b.material === 'pumpkin')!))
   expect(screen.getByRole('button', { name: 'かぼちゃ' })).toHaveAttribute('aria-pressed', 'true')
   expect(screen.getByRole('button', { name: '🧱 おく' })).toHaveAttribute('aria-pressed', 'true')
-  const before = world()
+  const before = blocks()
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter', shiftKey: true })
-  expect(world()).toBe(before)
+  expect(blocks()).toEqual(before)
   expect(screen.getByRole('button', { name: 'くさ' })).toHaveAttribute('aria-pressed', 'true')
 })
 
@@ -236,7 +238,7 @@ it('starts in a chosen world with its own sky and animals, and resumes it after 
   const view = mount()
   expect(screen.getAllByRole('button', { name: /^(くさはら|さばく|ゆきやま|しま)$/ })).toHaveLength(BIOMES.length)
   await user.click(screen.getByRole('button', { name: 'さばく' }))
-  expect(world()).toEqual(biome('desert').create())
+  expect(blocks()).toEqual([...biome('desert').create().blocks()])
   expect(scene.options.sky).toBe(biome('desert').sky)
   expect(herd().filter(a => a.wool === 'yellow')).toHaveLength(2)
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
@@ -247,7 +249,7 @@ it('starts in a chosen world with its own sky and animals, and resumes it after 
   expect(scene.options.sky).toBe(biome('desert').sky)
   await user.click(screen.getByRole('button', { name: /はじめの せかい/ }))
   await user.click(screen.getByRole('button', { name: 'もどして あそぶ' }))
-  expect(world()).toEqual(biome('desert').create())
+  expect(blocks()).toEqual([...biome('desert').create().blocks()])
 })
 
 it('grows seeds on farmland into wheat to harvest, by tapping and by mining', async () => {
@@ -306,7 +308,7 @@ it('shears sheep in mining mode to collect wool colors for the palette', async (
   expect(JSON.parse(localStorage.getItem(WOOL_KEY)!)).toEqual(['pink'])
   await user.click(screen.getByRole('button', { name: 'ピンク' }))
   tap({ x: 8, y: 2, z: 8 })
-  expect(world().at(-1)?.material).toBe('wool_pink')
+  expect(blocks().some(b => b.material === 'wool_pink')).toBe(true)
   // けが ないと もう とれない
   vi.mocked(playCraftSound).mockClear()
   await user.click(screen.getByRole('button', { name: '⛏️ こわす' }))
@@ -331,4 +333,55 @@ it('hardens lava that touches water with a sizzle', async () => {
   tap({ x: 6, y: 2, z: 2 })
   expect(playCraftSound).toHaveBeenLastCalledWith('cool')
   expect(blockAt(world(), { x: 6, y: 3, z: 2 })?.material).toBe('obsidian')
+})
+
+it('reports save failure and resumes the previous complete save', async () => {
+  const user = await start()
+  await harvest(user)
+  await user.click(screen.getByRole('button', { name: /ほぞん/ }))
+  const saved = localStorage.getItem(SAVE_KEY)
+  expect(saved).not.toBeNull()
+  touch(herd()[0])
+  await user.click(screen.getByRole('button', { name: 'れんが' }))
+  tap({ x: 9, y: 2, z: 8 })
+  const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError') })
+  try {
+    await user.click(screen.getByRole('button', { name: /ほぞん/ }))
+    expect(screen.getByRole('alert')).toHaveTextContent('ほぞん できなかった')
+    expect(localStorage.getItem(SAVE_KEY)).toBe(saved)
+    await user.click(screen.getByRole('button', { name: 'タイトルへ もどる' }))
+    await user.click(screen.getByRole('button', { name: /つづきから あそぶ/ }))
+    expect(wheatCount(1)).toBeInTheDocument()
+    expect(herd()[0].love).toBeUndefined()
+    expect(blockAt(world(), { x: 9, y: 3, z: 8 })).toBeUndefined()
+  } finally { storage.mockRestore() }
+})
+
+it('undoes a reset after construction, harvesting and an animal edit, then undoes earlier edits', async () => {
+  const user = await start()
+  const undo = () => user.click(screen.getByRole('button', { name: '↩ もどす' }))
+  await user.click(screen.getByRole('button', { name: 'れんが' }))
+  tap({ x: 9, y: 2, z: 8 })
+  await harvest(user, 2)
+  touch(herd()[0])
+  const before = blocks()
+  const animals = herd()
+  expect(animals[0].love).toBe(true)
+  expect(wheatCount(1)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /はじめの せかい/ }))
+  await user.click(screen.getByRole('button', { name: 'もどして あそぶ' }))
+  expect(wheatCount(0)).toBeInTheDocument()
+  expect(herd()[0].love).toBeUndefined()
+  await undo()
+  expect(blocks()).toEqual(before)
+  expect(herd()).toEqual(animals)
+  expect(wheatCount(1)).toBeInTheDocument()
+  await undo()
+  expect(blocks()).toEqual(before)
+  expect(herd()[0].love).toBeUndefined()
+  expect(wheatCount(2)).toBeInTheDocument()
+  await undo()
+  expect(wheatCount(1)).toBeInTheDocument()
+  expect(blockAt(world(), { x: 8, y: 3, z: 8 })?.material).toBe('wheat')
+  expect(blockAt(world(), { x: 9, y: 3, z: 8 })?.material).toBe('brick')
 })
