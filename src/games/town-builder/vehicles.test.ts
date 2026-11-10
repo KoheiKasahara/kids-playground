@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { applyTool, carriesRail, carriesRoad, COLS, createEmptyTown, createTown, neighborIndex, type Dir, type Town } from './town'
+import { applyTool, carriesRail, carriesRoad, COLS, createEmptyTown, neighborIndex, type Dir, type Town } from './town'
+import { createTown } from './worlds'
 import { isOnTrack, stepVehicle, stepVehicles, syncVehicles, vehiclePose, vehicleTarget, type Vehicle } from './vehicles'
 
 const at = (col: number, row: number) => row * COLS + col
@@ -28,7 +29,10 @@ describe('vehicles', () => {
     expect(vehicleTarget(line('rail', 0, 0, 2), 'train')).toBe(1)
     let big = createEmptyTown()
     for (let row = 0; row < 12; row += 1) big = line('road', row, 0, COLS - 1, big)
-    expect(vehicleTarget(big, 'car')).toBe(10)
+    expect(vehicleTarget(big, 'car')).toBe(36)
+    let rails = createEmptyTown()
+    for (let row = 0; row < 12; row += 1) rails = line('rail', row, 0, COLS - 1, rails)
+    expect(vehicleTarget(rails, 'train')).toBe(8)
   })
 
   it('spawns only on connected track, drops vehicles whose track was erased and keeps ids unique', () => {

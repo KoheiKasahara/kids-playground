@@ -362,6 +362,79 @@ const BUILDERS: Record<BuildingId, (f: Frame, c: BuildContext) => void> = {
     }
     c.animate(holder, (seconds) => { blades.rotation.z = -seconds * 0.9 })
   },
+  igloo: (f, c) => {
+    f.ball('#eef7ff', 0.36, [0, 0, 0], 1, 0.82)
+    f.cyl('#dcebf7', 0.13, 0.16, [0, 0, 0.3], 10, 0.9)
+    door(f, '#5b6b82', 0.13, 0.13, 0, 0.52, 0.17)
+    f.box(windowMat(f, c), [0.08, 0.06, 0.02], [0, 0.05, 0.435])
+  },
+  lighthouse: (f) => {
+    f.cyl('#ffffff', 0.17, 0.74, [0, 0, 0], 14, 0.6)
+    f.cyl('#e5484d', 0.151, 0.14, [0, 0.2, 0], 14, 0.92)
+    f.cyl('#e5484d', 0.123, 0.12, [0, 0.52, 0], 14, 0.93)
+    f.cyl('#5b6b82', 0.13, 0.02, [0, 0.74, 0], 14)
+    f.cyl(f.kit.glow('bulb'), 0.085, 0.11, [0, 0.76, 0], 10)
+    f.cone('#e5484d', 0.13, 0.12, [0, 0.87, 0], 10)
+    door(f, '#8d5a2b', 0.07, 0.13, 0, 0.33)
+  },
+  pine: (f, c) => {
+    const size = 0.85 + c.noise(1) * 0.35
+    const x = (c.noise(2) - 0.5) * 0.2
+    const z = (c.noise(3) - 0.5) * 0.2
+    f.cyl('#7b4a2c', 0.04 * size, 0.16 * size, [x, 0, z], 7)
+    f.cone('#2f8f5b', 0.26 * size, 0.3 * size, [x, 0.12 * size, z], 8)
+    f.cone('#37a268', 0.2 * size, 0.28 * size, [x, 0.28 * size, z], 8)
+    f.cone('#2f8f5b', 0.13 * size, 0.24 * size, [x, 0.44 * size, z], 8)
+    f.cone('#ffffff', 0.05 * size, 0.09 * size, [x, 0.6 * size, z], 8)
+  },
+  palm: (f, c) => {
+    const size = 0.9 + c.noise(1) * 0.3
+    const turn = c.noise(2) * Math.PI * 2
+    f.cyl('#b9864a', 0.04, 0.56 * size, [0, 0, 0], 7, 0.7, [0.08, turn, 0.1])
+    const top: [number, number, number] = [-0.05, 0.55 * size, 0.04]
+    for (let n = 0; n < 6; n += 1) {
+      const angle = turn + (n / 6) * Math.PI * 2
+      const x = top[0] + Math.cos(angle) * 0.14
+      const z = top[2] - Math.sin(angle) * 0.14
+      f.put(f.kit.ball(0), n % 2 ? '#4fae5b' : '#5fbf6a', [x, top[1] - 0.03, z], [0.17, 0.025, 0.06], [0, angle, -0.35])
+    }
+    f.ball('#7b4a2c', 0.035, [top[0] + 0.03, top[1] - 0.05, top[2]], 0)
+    f.ball('#7b4a2c', 0.035, [top[0] - 0.03, top[1] - 0.05, top[2] + 0.03], 0)
+  },
+  cactus: (f, c) => {
+    const size = 0.8 + c.noise(1) * 0.4
+    f.cyl('#6dbb63', 0.085 * size, 0.46 * size, [0, 0, 0], 10)
+    f.ball('#6dbb63', 0.085 * size, [0, 0.46 * size, 0], 1)
+    for (const side of [-1, 1]) {
+      const y = (side < 0 ? 0.16 : 0.24) * size
+      f.box('#5fa55a', [0.12 * size, 0.06 * size, 0.06 * size], [side * 0.12 * size, y, 0])
+      f.cyl('#5fa55a', 0.035 * size, 0.14 * size, [side * 0.17 * size, y, 0], 8)
+      f.ball('#5fa55a', 0.035 * size, [side * 0.17 * size, y + 0.14 * size, 0], 0)
+    }
+    f.ball('#ff8cc6', 0.035 * size, [0, 0.55 * size, 0], 0, 0.6)
+  },
+  snowman: (f) => {
+    f.ball('#ffffff', 0.2, [0, 0.17, 0], 1)
+    f.ball('#ffffff', 0.14, [0, 0.44, 0], 1)
+    f.cyl('#e5484d', 0.115, 0.04, [0, 0.31, 0], 12)
+    f.cyl('#46404f', 0.13, 0.015, [0, 0.55, 0], 12)
+    f.cyl('#46404f', 0.085, 0.11, [0, 0.56, 0], 12)
+    f.cone('#ff922b', 0.025, 0.1, [0, 0.44, 0.13], 6, [Math.PI / 2, 0, 0])
+    for (const x of [-0.05, 0.05]) f.ball('#46404f', 0.018, [x, 0.49, 0.125], 0)
+  },
+  pyramid: (f) => {
+    f.box('#d4a548', [0.92, 0.03, 0.92], [0, 0, 0])
+    f.pyramid('#e9c46a', [0.86, 0.62, 0.86], [0, 0.03, 0])
+    f.pyramid('#f4d98a', [0.16, 0.115, 0.16], [0, 0.535, 0])
+    door(f, '#7b5a2c', 0.1, 0.1, 0, 0.84)
+  },
+  tent: (f) => {
+    f.gable('#ff922b', [0.5, 0.36, 0.62], [-0.08, 0, -0.04], [0, Math.PI / 2, 0])
+    f.box('#7b4a2c', [0.14, 0.2, 0.01], [-0.08, 0, 0.275])
+    f.cyl('#8d5a2b', 0.012, 0.42, [-0.08, 0, -0.04], 6)
+    for (const turn of [0, Math.PI / 2]) f.box('#8d5a2b', [0.14, 0.03, 0.03], [0.3, 0, 0.28], [0, turn, 0])
+    f.cone(f.kit.glow('bulb'), 0.04, 0.1, [0.3, 0.03, 0.28], 6)
+  },
 }
 
 export function buildBuilding(part: BuildingId, f: Frame, context: BuildContext): void {

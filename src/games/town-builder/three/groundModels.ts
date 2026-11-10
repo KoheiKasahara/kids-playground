@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { colOf, COLS, railMask, roadMask, rowOf, ROWS, type Town } from '../town'
+import { colOf, COLS, railMask, roadMask, rowOf, ROWS, type Ground, type Town } from '../town'
 import { directions, segmentsOf } from '../trackGeometry'
 import { Frame, matrixOf, type Mat, type TownKit } from './townKit'
 import { tileCenter, tileNoise, type Point } from './townLayout'
@@ -7,7 +7,11 @@ import { tileCenter, tileNoise, type Point } from './townLayout'
 // じめん・かわ・みち・せんろ。マスの うえの めんが y=0。
 // みちと せんろの かたちは 2D と おなじ trackGeometry の せんから つくる。
 
-const GRASS = ['#9bd66f', '#92ce66'] as const
+const LAND: Record<Exclude<Ground, 'water'>, readonly [string, string]> = {
+  grass: ['#9bd66f', '#92ce66'],
+  sand: ['#f4dfa6', '#eed597'],
+  snow: ['#fbfdff', '#edf3f9'],
+}
 const SOIL = '#b07a4a'
 const WATER = '#5bbde8'
 const BRIDGE = '#8d6e52'
@@ -214,12 +218,13 @@ export function buildGround(kit: TownKit, town: Town, root: THREE.Group): Ground
     const center = tileCenter(index)
     const base = matrixOf([center.x, 0, center.z])
     const flat = new Frame(kit, base, false)
-    const water = tile.ground === 'water'
-    if (water) {
+    const ground = tile.ground
+    const water = ground === 'water'
+    if (ground === 'water') {
       // かわは くさはらより すこし ひくく して、きしを みせる。
       flat.box(kit.mat(WATER, { rough: 0.18, metal: 0.05 }), [1, 0.06, 1], [0, -0.1, 0])
     } else {
-      flat.box(GRASS[(colOf(index) + rowOf(index)) % 2], [1, 0.1, 1], [0, -0.1, 0])
+      flat.box(LAND[ground][(colOf(index) + rowOf(index)) % 2], [1, 0.1, 1], [0, -0.1, 0])
     }
     const part = tile.part
     if (part === 'road' || part === 'crossing') road(flat, roadMask(town, index), water)
@@ -227,7 +232,7 @@ export function buildGround(kit: TownKit, town: Town, root: THREE.Group): Ground
     if (part === 'crossing') crossings.push(crossingSignals(kit, index, root))
     const standing = new Frame(kit, base)
     if (part === 'road' && !water && (colOf(index) + rowOf(index)) % 2 === 0) lamp(standing, pool)
-    if (!part && !water) tufts(flat, index)
+    if (!part && ground === 'grass') tufts(flat, index)
   })
   return { crossings, pool }
 }

@@ -280,6 +280,86 @@ const BUILDINGS: Record<BuildingId, BuildingArt> = {
     </g>,
     windows: [[46, 52, 8, 9]],
   },
+  igloo: {
+    body: <g>{shadow}
+      <path d="M12 86 Q12 30 50 30 Q88 30 88 86 Z" fill="#eef7ff" {...LINE} />
+      <path d="M16 62 L84 62 M24 46 L76 46 M50 30 L50 46 M34 46 L34 62 M66 46 L66 62 M24 62 L24 86 M76 62 L76 86" stroke="#a9c7e0" strokeWidth="2" fill="none" />
+      <path d="M38 86 L38 70 Q50 56 62 70 L62 86 Z" fill="#5b6b82" {...LINE} />
+    </g>,
+    windows: [[45, 73, 10, 9]],
+  },
+  lighthouse: {
+    body: <g>{shadow}
+      <path d="M36 88 L42 30 L58 30 L64 88 Z" fill="#ffffff" {...LINE} />
+      <path d="M38.3 66 L61.7 66 L60.4 53 L39.6 53 Z" fill="#e5484d" />
+      <path d="M41.2 40 L58.8 40 L58 30 L42 30 Z" fill="#e5484d" />
+      <path d="M36 88 L42 30 L58 30 L64 88 Z" fill="none" {...LINE} />
+      <rect x="38" y="16" width="24" height="14" rx="2" fill="#5b6b82" {...LINE} />
+      <path d="M36 16 L50 5 L64 16 Z" fill="#e5484d" {...LINE} />
+      <rect x="45" y="74" width="10" height="14" rx="2" fill="#8d5a2b" {...LINE} strokeWidth={1.8} />
+    </g>,
+    windows: [[42, 19, 16, 8]],
+    bulbs: [[50, 23, 5]],
+  },
+  pine: {
+    body: <g>{shadow}
+      <rect x="45" y="66" width="10" height="21" rx="2" fill="#7b4a2c" {...LINE} />
+      <path d="M50 8 L74 42 L62 42 L80 70 L20 70 L38 42 L26 42 Z" fill="#2f8f5b" {...LINE} />
+      <path d="M50 8 L58 20 L50 17 L42 20 Z" fill="#ffffff" />
+    </g>,
+  },
+  palm: {
+    body: <g>{shadow}
+      <path d="M46 88 Q42 60 52 36 L59 38 Q51 62 56 88 Z" fill="#b9864a" {...LINE} />
+      {[[-62, 30], [-28, 34], [8, 36], [44, 34], [78, 30]].map(([angle, length]) => <path key={angle} transform={`rotate(${angle} 55 36)`}
+        d={`M55 36 Q${55 + length / 2} ${22} ${55 + length} 34 Q${55 + length / 2} 32 55 36 Z`} fill="#4fae5b" {...LINE} strokeWidth={2} />)}
+      <circle cx="52" cy="40" r="4" fill="#7b4a2c" />
+      <circle cx="59" cy="42" r="4" fill="#7b4a2c" />
+    </g>,
+  },
+  cactus: {
+    body: <g>{shadow}
+      <path d="M26 58 L26 46 Q26 40 31 40 Q36 40 36 46 L36 52 L42 52 L42 66 L34 66 Q26 66 26 58 Z" fill="#5fa55a" {...LINE} />
+      <path d="M74 50 L74 38 Q74 32 69 32 Q64 32 64 38 L64 44 L58 44 L58 58 L66 58 Q74 58 74 50 Z" fill="#5fa55a" {...LINE} />
+      <rect x="40" y="18" width="20" height="70" rx="10" fill="#6dbb63" {...LINE} />
+      <path d="M50 26 L50 80" stroke="#4d9450" strokeWidth="2" strokeDasharray="3 6" />
+      <circle cx="50" cy="17" r="5" fill="#ff8cc6" {...LINE} strokeWidth={1.6} />
+    </g>,
+  },
+  snowman: {
+    body: <g>{shadow}
+      <circle cx="50" cy="66" r="22" fill="#ffffff" {...LINE} />
+      <circle cx="50" cy="36" r="15" fill="#ffffff" {...LINE} />
+      <rect x="38" y="8" width="24" height="14" rx="2" fill="#46404f" />
+      <rect x="32" y="20" width="36" height="5" rx="2" fill="#46404f" />
+      <circle cx="44" cy="33" r="2" fill="#46404f" />
+      <circle cx="56" cy="33" r="2" fill="#46404f" />
+      <path d="M50 37 L62 40 L50 42 Z" fill="#ff922b" />
+      <path d="M36 48 Q50 56 64 48 L64 53 Q50 61 36 53 Z" fill="#e5484d" />
+      <circle cx="50" cy="62" r="2" fill="#46404f" />
+      <circle cx="50" cy="72" r="2" fill="#46404f" />
+    </g>,
+  },
+  pyramid: {
+    body: <g>{shadow}
+      <path d="M50 12 L92 86 L8 86 Z" fill="#e9c46a" {...LINE} />
+      <path d="M50 12 L92 86 L62 86 Z" fill="#d4a548" />
+      <path d="M40 30 L60 30 M30 48 L70 48 M20 66 L80 66" stroke="#b98a3a" strokeWidth="2" />
+      <path d="M50 12 L92 86 L8 86 Z" fill="none" {...LINE} />
+      <path d="M44 86 L44 76 Q50 70 56 76 L56 86 Z" fill="#7b5a2c" />
+    </g>,
+  },
+  tent: {
+    body: <g>{shadow}
+      <path d="M40 22 L84 84 L8 84 Z" fill="#ff922b" {...LINE} />
+      <path d="M40 22 L56 84 L26 84 Z" fill="#7b4a2c" />
+      <path d="M40 22 L41 84" stroke="#ffd8a8" strokeWidth="2" />
+      <path d="M40 22 L84 84 L8 84 Z" fill="none" {...LINE} />
+      <path d="M76 88 L80 72 L84 88 Z" fill="#8d5a2b" />
+      <path d="M80 60 Q88 70 80 78 Q72 70 80 60 Z" fill="#ff6b35" />
+    </g>,
+    bulbs: [[80, 72, 4]],
+  },
 }
 
 // ---- じめんと みち・せんろ -------------------------------------------------
@@ -319,13 +399,20 @@ function roundedRect(radii: readonly [number, number, number, number]): string {
   return `M${tl} 0 L${100 - tr} 0 Q100 0 100 ${tr} L100 ${100 - br} Q100 100 ${100 - br} 100 L${bl} 100 Q0 100 0 ${100 - bl} L0 ${tl} Q0 0 ${tl} 0 Z`
 }
 
-function GroundArt({ ground, waterMask, checker }: { ground: Ground; waterMask: number; checker: boolean }) {
-  const grass = <rect width="100" height="100" fill={checker ? '#9bd66f' : '#92ce66'} />
-  if (ground === 'grass') return grass
+const GROUND_FILL: Record<Exclude<Ground, 'water'>, readonly [string, string]> = {
+  grass: ['#9bd66f', '#92ce66'],
+  sand: ['#f4dfa6', '#eed597'],
+  snow: ['#fbfdff', '#edf3f9'],
+}
+
+function GroundArt({ ground, bank, waterMask, checker }: { ground: Ground; bank: Ground; waterMask: number; checker: boolean }) {
+  const land = ground === 'water' ? (bank === 'water' ? 'grass' : bank) : ground
+  const base = <rect width="100" height="100" fill={GROUND_FILL[land][checker ? 0 : 1]} />
+  if (ground !== 'water') return base
   const open = (dir: number) => !(waterMask & (1 << dir))
   const radius = (a: number, b: number) => (open(a) && open(b) ? 30 : 0)
   return <g>
-    {grass}
+    {base}
     <path d={roundedRect([radius(0, 3), radius(0, 1), radius(1, 2), radius(2, 3)])} fill="#5bbde8" />
     <path d="M18 34 q8 -6 16 0 M58 70 q8 -6 16 0" stroke="#d6f3ff" strokeWidth="3" fill="none" strokeLinecap="round" />
   </g>
@@ -335,6 +422,8 @@ function GroundArt({ ground, waterMask, checker }: { ground: Ground; waterMask: 
 
 export type TileArtProps = {
   ground: Ground
+  /** みずの かどから のぞく きしの じめん（みず いがいの マスは じぶんの じめん）。 */
+  bank: Ground
   part: TilePart | null
   roadMask: number
   railMask: number
@@ -348,12 +437,12 @@ export type TileArtProps = {
   dust: boolean
 }
 
-export function TileArt({ ground, part, roadMask, railMask, waterMask, checker, lit, wantsRoad, pop, dust }: TileArtProps) {
+export function TileArt({ ground, bank, part, roadMask, railMask, waterMask, checker, lit, wantsRoad, pop, dust }: TileArtProps) {
   const bridge = ground === 'water'
   const building = part && part !== 'road' && part !== 'rail' && part !== 'crossing' ? BUILDINGS[part] : undefined
   const hasRoad = part === 'road' || part === 'crossing'
   return <svg viewBox="0 0 100 100" className={styles.tile} aria-hidden="true" focusable="false">
-    <GroundArt ground={ground} waterMask={waterMask} checker={checker} />
+    <GroundArt ground={ground} bank={bank} waterMask={waterMask} checker={checker} />
     <g key={pop} className={pop ? styles.pop : undefined}>
       {hasRoad && <Road mask={roadMask} bridge={bridge} />}
       {(part === 'rail' || part === 'crossing') && <Rail mask={railMask} bridge={bridge} overRoad={part === 'crossing'} />}
@@ -397,6 +486,8 @@ export function ToolIcon({ tool }: { tool: ToolId }) {
   else if (tool === 'road') art = <g><rect width="100" height="100" rx="18" fill="#92ce66" /><Road mask={10} bridge={false} /></g>
   else if (tool === 'rail') art = <g><rect width="100" height="100" rx="18" fill="#92ce66" /><Rail mask={10} bridge={false} overRoad={false} /></g>
   else if (tool === 'water') art = <g><rect width="100" height="100" rx="18" fill="#5bbde8" /><path d="M18 34 q8 -6 16 0 M58 70 q8 -6 16 0 M36 54 q8 -6 16 0" stroke="#d6f3ff" strokeWidth="4" fill="none" strokeLinecap="round" /></g>
+  else if (tool === 'sand') art = <g><rect width="100" height="100" rx="18" fill="#f4dfa6" /><path d="M14 40 q12 -10 24 0 t24 0 t24 0 M14 66 q12 -10 24 0 t24 0 t24 0" stroke="#d9b96a" strokeWidth="4" fill="none" strokeLinecap="round" /></g>
+  else if (tool === 'snow') art = <g><rect width="100" height="100" rx="18" fill="#dcebf7" />{[0, 60, 120].map((angle) => <path key={angle} transform={`rotate(${angle} 50 50)`} d="M50 18 L50 82 M42 26 L50 34 L58 26 M42 74 L50 66 L58 74" stroke="#ffffff" strokeWidth="6" fill="none" strokeLinecap="round" />)}</g>
   else {
     const building = BUILDINGS[tool]
     art = <g>

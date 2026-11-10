@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { afterEach, expect, it, vi } from 'vitest'
 import { isBuilding, PARTS, type BuildingId } from '../parts'
-import { applyTool, COLS, createEmptyTown, createTown, ROWS, type Town } from '../town'
+import { applyTool, COLS, createEmptyTown, ROWS, type Town } from '../town'
+import { createTown } from '../worlds'
 import { buildTownModel } from './townModel'
 
 afterEach(() => vi.restoreAllMocks())

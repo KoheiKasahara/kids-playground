@@ -1,12 +1,13 @@
-import { findPart, isBuilding, type NetworkId, type TilePart, type ToolId } from './parts'
+import { findPart, isBuilding, isGroundTool, type NetworkId, type TilePart, type ToolId } from './parts'
 
 // まちの ちずの モデル。がめん（React）を もたない じゅんすいな かんすう だけを おく。
 
-export const COLS = 14
-export const ROWS = 14
+/** ちずの おおきさ。まえの 14×14 の まちは まんなかに おいて よみこむ。 */
+export const COLS = 48
+export const ROWS = 48
 export const SAVE_KEY = 'kids-playground:town-builder:v1'
 
-export type Ground = 'grass' | 'water'
+export type Ground = 'grass' | 'water' | 'sand' | 'snow'
 export type Tile = { readonly ground: Ground; readonly part: TilePart | null }
 export type Town = readonly Tile[]
 
@@ -21,44 +22,16 @@ export const RANKS = [
   { min: 60, icon: '🏙️', label: 'とし' },
   { min: 140, icon: '🌆', label: 'だいとし' },
   { min: 300, icon: '🌟', label: 'きらきら メガシティ' },
+  { min: 700, icon: '🚀', label: 'みらいの とし' },
+  { min: 1500, icon: '👑', label: 'ゆめの おうこく' },
 ] as const
 
 const GRASS: Tile = { ground: 'grass', part: null }
 
-// はじめの まち。かわと はし、みちと おうちが すこし だけ ある。
-const STARTER_MAP = [
-  'tt.........~~.',
-  't..........~~.',
-  '...........~~.',
-  '..k........~~.',
-  '..........~~..',
-  '..........~~.t',
-  '....h.H...~~..',
-  '..========bb==',
-  '....t.s...~~..',
-  '..........~~..',
-  '.t.......~~...',
-  '.........~~.tt',
-  '....f...~~...t',
-  '........~~....',
-] as const
+export const GROUND_LABELS: Record<Ground, string> = { grass: 'くさはら', water: 'みず', sand: 'すな', snow: 'ゆき' }
 
-const STARTER_LEGEND: Record<string, Tile> = {
-  '.': GRASS,
-  '~': { ground: 'water', part: null },
-  '=': { ground: 'grass', part: 'road' },
-  b: { ground: 'water', part: 'road' },
-  h: { ground: 'grass', part: 'house' },
-  H: { ground: 'grass', part: 'house-blue' },
-  s: { ground: 'grass', part: 'shop' },
-  t: { ground: 'grass', part: 'tree' },
-  k: { ground: 'grass', part: 'sakura' },
-  f: { ground: 'grass', part: 'flowers' },
-}
-
-export function createTown(): Town {
-  return STARTER_MAP.flatMap((row) => [...row].map((cell) => STARTER_LEGEND[cell]))
-}
+/** ちずの まんなかの マス。はじめに みえる ばしょで、どの せかいも ここに むらが ある。 */
+export const CENTER_INDEX = Math.floor(ROWS / 2) * COLS + Math.floor(COLS / 2)
 
 export function createEmptyTown(): Town {
   return Array.from({ length: COLS * ROWS }, () => GRASS)
@@ -121,26 +94,24 @@ function combineNetwork(part: TilePart | null, tool: NetworkId): TilePart {
 }
 
 function placeTile(tile: Tile, tool: ToolId): Tile {
-  switch (tool) {
-    case 'erase':
-      if (tile.part) return { ground: tile.ground, part: null }
-      return tile.ground === 'water' ? GRASS : tile
-    case 'water': {
-      // みちや せんろの したに かわを つくると はしに なる。
-      const keep = tile.part !== null && !isBuilding(tile.part) ? tile.part : null
-      if (tile.ground === 'water' && tile.part === keep) return tile
-      return { ground: 'water', part: keep }
-    }
-    case 'road':
-    case 'rail': {
-      const part = combineNetwork(tile.part, tool)
-      return part === tile.part ? tile : { ground: tile.ground, part }
-    }
-    default:
-      // たてものや しぜんは かわを うめたてて おく。おなじ ものなら かわらない。
-      if (tile.ground === 'grass' && tile.part === tool) return tile
-      return { ground: 'grass', part: tool }
+  if (tool === 'erase') {
+    if (tile.part) return { ground: tile.ground, part: null }
+    return tile.ground === 'grass' ? tile : GRASS
   }
+  if (isGroundTool(tool)) {
+    // みちや せんろの したに みずを つくると はしに なる。たてものは みずの うえに たてない。
+    const keep = tool === 'water' && isBuilding(tile.part) ? null : tile.part
+    if (tile.ground === tool && tile.part === keep) return tile
+    return { ground: tool, part: keep }
+  }
+  if (tool === 'road' || tool === 'rail') {
+    const part = combineNetwork(tile.part, tool)
+    return part === tile.part ? tile : { ground: tile.ground, part }
+  }
+  // たてものや しぜんは みずを うめたてて おく。おなじ ものなら かわらない。
+  const ground = tile.ground === 'water' ? 'grass' : tile.ground
+  if (tile.ground === ground && tile.part === tool) return tile
+  return { ground, part: tool }
 }
 
 /** どうぐを つかった あとの まち。かわらない ときは おなじ town を かえす。 */
@@ -181,51 +152,77 @@ export function wantsRoad(town: Town, index: number): boolean {
 
 // ---- ほぞん ---------------------------------------------------------------
 
-type SavedTown = { version: 1; cols: number; rows: number; tiles: string[] }
+/** tiles は「じめん[:パーツ]」。おなじ マスが つづく ときは「*かず」を つけて まとめる。 */
+type SavedTown = { version: 1 | 2; cols: number; rows: number; tiles: string[] }
 
+const GROUND_CODES: Record<Ground, string> = { grass: 'g', water: 'w', sand: 's', snow: 'n' }
+const GROUND_BY_CODE = new Map<string, Ground>(Object.entries(GROUND_CODES).map(([ground, code]) => [code, ground as Ground]))
 const TILE_PARTS = new Set<string>(['road', 'rail', 'crossing'])
 
 function isTilePart(value: string): value is TilePart {
   if (TILE_PARTS.has(value)) return true
   const part = findPart(value)
-  return part !== undefined && part.id !== 'water' && part.id !== 'road' && part.id !== 'rail'
+  return part !== undefined && !isGroundTool(part.id) && part.id !== 'road' && part.id !== 'rail'
+}
+
+function tileCode(tile: Tile): string {
+  return `${GROUND_CODES[tile.ground]}${tile.part ? `:${tile.part}` : ''}`
 }
 
 export function encodeTown(town: Town): string {
-  const saved: SavedTown = {
-    version: 1,
-    cols: COLS,
-    rows: ROWS,
-    tiles: town.map((tile) => `${tile.ground === 'water' ? 'w' : 'g'}${tile.part ? `:${tile.part}` : ''}`),
+  const tiles: string[] = []
+  let run = 0
+  for (let index = 0; index < town.length; index += 1) {
+    run += 1
+    const code = tileCode(town[index])
+    if (index + 1 < town.length && tileCode(town[index + 1]) === code) continue
+    tiles.push(run > 1 ? `${code}*${run}` : code)
+    run = 0
   }
+  const saved: SavedTown = { version: 2, cols: COLS, rows: ROWS, tiles }
   return JSON.stringify(saved)
 }
 
-function decodeTile(value: unknown): Tile | null {
-  if (typeof value !== 'string') return null
-  const [ground, part, ...rest] = value.split(':')
-  if (rest.length || (ground !== 'g' && ground !== 'w')) return null
-  if (part === undefined) return ground === 'w' ? { ground: 'water', part: null } : GRASS
+function decodeTile(value: string): Tile | null {
+  const [code, part, ...rest] = value.split(':')
+  const ground = GROUND_BY_CODE.get(code)
+  if (rest.length || !ground) return null
+  if (part === undefined) return ground === 'grass' ? GRASS : { ground, part: null }
   if (!isTilePart(part)) return null
-  if (ground === 'w' && isBuilding(part)) return null
-  return { ground: ground === 'w' ? 'water' : 'grass', part }
+  if (ground === 'water' && isBuilding(part)) return null
+  return { ground, part }
 }
 
-/** こわれた データや ちがう おおきさの データは null（はじめの まちで あそぶ）。 */
+function decodeTiles(values: readonly unknown[], count: number, runs: boolean): Tile[] | null {
+  const tiles: Tile[] = []
+  for (const value of values) {
+    if (typeof value !== 'string') return null
+    const [code, length, ...rest] = value.split('*')
+    if (rest.length || (length !== undefined && (!runs || !/^[1-9]\d*$/.test(length)))) return null
+    const tile = decodeTile(code)
+    const run = length === undefined ? 1 : Number(length)
+    if (!tile || tiles.length + run > count) return null
+    for (let n = 0; n < run; n += 1) tiles.push(tile)
+  }
+  return tiles.length === count ? tiles : null
+}
+
+/** こわれた データは null（はじめの まちで あそぶ）。ちいさい ちずの データは くさはらの まんなかに おく。 */
 export function decodeTown(raw: string | null): Town | null {
   if (!raw) return null
   let data: unknown
   try { data = JSON.parse(raw) } catch { return null }
   if (!data || typeof data !== 'object') return null
   const saved = data as Partial<SavedTown>
-  if (saved.version !== 1 || saved.cols !== COLS || saved.rows !== ROWS || !Array.isArray(saved.tiles)) return null
-  if (saved.tiles.length !== COLS * ROWS) return null
-  const tiles: Tile[] = []
-  for (const value of saved.tiles) {
-    const tile = decodeTile(value)
-    if (!tile) return null
-    tiles.push(tile)
-  }
-  return tiles
+  if ((saved.version !== 1 && saved.version !== 2) || !Array.isArray(saved.tiles)) return null
+  const { cols, rows } = saved
+  if (!Number.isInteger(cols) || !Number.isInteger(rows) || !cols || !rows || cols < 1 || rows < 1 || cols > COLS || rows > ROWS) return null
+  const tiles = decodeTiles(saved.tiles, cols * rows, saved.version === 2)
+  if (!tiles) return null
+  if (cols === COLS && rows === ROWS) return tiles
+  const town = createEmptyTown().slice()
+  const left = Math.floor((COLS - cols) / 2)
+  const top = Math.floor((ROWS - rows) / 2)
+  tiles.forEach((tile, index) => { town[(top + Math.floor(index / cols)) * COLS + left + (index % cols)] = tile })
+  return town
 }
-
