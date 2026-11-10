@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
 import { clampTarget, headingFromYaw, useCraftScene, type CraftSceneOptions } from './useCraftScene'
 import { ANIMAL_SPAWNS, herdFrom } from './animals'
-import { createWorld, MATERIALS, SIZE, startWalker } from './world'
+import { createWorld, DEFAULT_WORLD, editWorld, MATERIALS, startWalker } from './world'
 
 const resources = vi.hoisted(() => ({ render: vi.fn(), rendererDispose: vi.fn(), controlsDispose: vi.fn(), disconnect: vi.fn() }))
 vi.mock('three', async importOriginal => {
@@ -20,14 +20,15 @@ vi.mock('three/examples/jsm/controls/OrbitControls.js', () => ({ OrbitControls: 
   target = new THREE.Vector3()
   touches = {}
   enabled = true
-  update() {}
+  constructor(private camera: THREE.Camera) {}
+  update() { this.camera.lookAt(this.target) }
   addEventListener() {}
   removeEventListener() {}
   dispose = resources.controlsDispose
 } }))
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks(); vi.useRealTimers() })
 
-const ANIMAL_MATERIALS = 11
+const SIZE = DEFAULT_WORLD.size
 function options(overrides: Partial<CraftSceneOptions> = {}): CraftSceneOptions {
   return { world: createWorld(), cursor: { x: 5, y: 0, z: 5 }, onPick: vi.fn(), ...overrides }
 }
@@ -50,6 +51,7 @@ it('disposes GPU resources, observer, timers and input handlers on exit and can 
   const meshDispose = vi.spyOn(THREE.InstancedMesh.prototype, 'dispose')
   const props = options()
   const container = document.createElement('div')
+  let meshesCreated = 0
   for (let entry = 1; entry <= 2; entry++) {
     const view = renderHook(() => useCraftScene(props))
     act(() => view.result.current.setContainer(container))
@@ -57,6 +59,8 @@ it('disposes GPU resources, observer, timers and input handlers on exit and can 
     const removeListener = vi.spyOn(canvas, 'removeEventListener')
     expect(canvas).not.toBeNull()
     expect(view.result.current.api.current).not.toBeNull()
+    const [scene] = resources.render.mock.lastCall as [THREE.Scene]
+    scene.traverse(object => { if (object instanceof THREE.InstancedMesh) meshesCreated++ })
     view.unmount()
     expect(view.result.current.api.current).toBeNull()
     expect(container.children).toHaveLength(0)
@@ -67,9 +71,10 @@ it('disposes GPU resources, observer, timers and input handlers on exit and can 
   }
   // ブロック・どうぶつ・わく（わくの もとの はこは つくる ときに すてる）
   expect(geometryDispose).toHaveBeenCalledTimes(4 * 2)
-  expect(materialDispose).toHaveBeenCalledTimes((MATERIALS.length + ANIMAL_MATERIALS + 1) * 2)
+  expect(materialDispose).toHaveBeenCalledTimes((MATERIALS.length + 2) * 2)
   expect(textureDispose).toHaveBeenCalledTimes(MATERIALS.length * 2)
-  expect(meshDispose).toHaveBeenCalledTimes(MATERIALS.length * 2)
+  expect(meshesCreated).toBeGreaterThan(2)
+  expect(meshDispose).toHaveBeenCalledTimes(meshesCreated)
 })
 
 it('animates only while the game is visible and stops the loop on blur, context loss and exit', () => {
@@ -94,6 +99,23 @@ it('animates only while the game is visible and stops the loop on blur, context 
   expect(frames.pending()).toBe(0)
 })
 
+it('draws slowly for visible water alone and redraws immediately after an edit', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const frames = stubFrames()
+  const container = document.createElement('div')
+  const props = options()
+  const view = renderHook(next => useCraftScene(next), { initialProps: props })
+  act(() => view.result.current.setContainer(container))
+  resources.render.mockClear()
+  for (let time = 16; time <= 160; time += 16) frames.run(time)
+  expect(resources.render).toHaveBeenCalledTimes(2)
+  const changes = editWorld(props.world, { x: 5, y: 3, z: 5 }, 'brick', 'place')
+  expect(changes).toHaveLength(1)
+  view.rerender({ ...props })
+  expect(resources.render).toHaveBeenCalledTimes(3)
+  view.unmount()
+})
+
 it('switches to walking, turns, and keeps animating animals without errors', () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   const frames = stubFrames()
@@ -113,25 +135,79 @@ it('switches to walking, turns, and keeps animating animals without errors', () 
   view.unmount()
 })
 
-it('adds, dresses and removes animals as the herd changes, sharing their materials', () => {
+it('batches animals and preserves wool, shearing, babies and hearts', () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   const frames = stubFrames()
-  const materialDispose = vi.spyOn(THREE.Material.prototype, 'dispose')
-  const add = vi.spyOn(THREE.Scene.prototype, 'add')
-  const remove = vi.spyOn(THREE.Scene.prototype, 'remove')
+  vi.spyOn(Math, 'random').mockReturnValue(0.9)
   const herd = herdFrom(ANIMAL_SPAWNS)
   const container = document.createElement('div')
-  const view = renderHook(props => useCraftScene(props), { initialProps: options({ herd, sky: '#f4dfae' }) })
+  const props = options({ herd, sky: '#f4dfae' })
+  const view = renderHook(next => useCraftScene(next), { initialProps: props })
   act(() => view.result.current.setContainer(container))
-  const animalsAdded = () => add.mock.calls.filter(([object]) => object.userData.animalId !== undefined).length
-  expect(animalsAdded()).toBe(ANIMAL_SPAWNS.length)
-  const changed = [...herd.slice(1).map(a => a.kind === 'sheep' ? { ...a, sheared: true, love: true } : a), { id: 9, kind: 'sheep' as const, x: 3, z: 3, wool: 'blue' as const, baby: true }]
-  view.rerender(options({ herd: changed, night: true }))
-  expect(animalsAdded()).toBe(ANIMAL_SPAWNS.length + 1)
-  expect(remove).toHaveBeenCalledTimes(1)
-  for (let time = 16; time < 2000; time += 16) frames.run(time)
+  const [scene] = resources.render.mock.lastCall as [THREE.Scene]
+  const [mesh] = scene.children.filter(o => o instanceof THREE.InstancedMesh)
+  expect(mesh.count).toBe(23)
+  const color = new THREE.Color()
+  mesh.getColorAt(6, color)
+  expect(color.getHexString()).toBe('f5a8c8')
+  const changed = [...herd.slice(1).map(a => a.kind === 'sheep' ? { ...a, sheared: true, love: true } : a),
+    { id: 9, kind: 'sheep' as const, x: 3, z: 3, wool: 'blue' as const, baby: true }]
+  view.rerender({ ...props, herd: changed, night: true })
+  expect(scene.children.filter(o => o instanceof THREE.InstancedMesh)).toEqual([mesh])
+  expect(mesh.count).toBe(26)
+  mesh.getColorAt(0, color)
+  expect(color.getHexString()).toBe('efcdb9')
+  mesh.getColorAt(6, color)
+  expect(color.getHexString()).toBe('ff4f7b')
+  mesh.getColorAt(20, color)
+  expect(color.getHexString()).toBe('8fcdf2')
+  const matrix = new THREE.Matrix4()
+  mesh.getMatrixAt(0, matrix)
+  expect(matrix.elements[0]).toBeCloseTo(0.5)
+  mesh.getMatrixAt(20, matrix)
+  expect(matrix.elements[0]).toBeCloseTo(0.7 * 0.55)
+  const topY = vi.spyOn(props.world, 'topY')
+  for (let time = 16; time <= 160; time += 16) frames.run(time)
+  expect(topY).not.toHaveBeenCalled()
+  editWorld(props.world, { x: changed[0].x, y: 3, z: changed[0].z }, 'brick', 'place')
+  expect(topY.mock.calls).toEqual([[changed[0].x, changed[0].z, true], [changed[0].x, changed[0].z, true]])
   view.unmount()
-  expect(materialDispose).toHaveBeenCalledTimes(MATERIALS.length + ANIMAL_MATERIALS + 1)
+})
+
+it('selects the animal when it is in front of terrain and shows its tap hop', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const frames = stubFrames()
+  vi.spyOn(Math, 'random').mockReturnValue(0.9)
+  const herd = herdFrom([ANIMAL_SPAWNS[0]])
+  const onAnimal = vi.fn()
+  const props = options({ herd, onAnimal })
+  const view = renderHook(next => useCraftScene(next), { initialProps: props })
+  act(() => view.result.current.setContainer(document.createElement('div')))
+  const [scene, camera] = resources.render.mock.lastCall as [THREE.Scene, THREE.PerspectiveCamera]
+  const [mesh] = scene.children.filter(o => o instanceof THREE.InstancedMesh)
+  const matrix = new THREE.Matrix4()
+  mesh.getMatrixAt(0, matrix)
+  const target = new THREE.Vector3().setFromMatrixPosition(matrix)
+  // The legacy raycaster tested the hidden heart parts as well.
+  camera.position.set(herd[0].x - 0.08, target.y + 0.66, herd[0].z + 2)
+  camera.lookAt(herd[0].x - 0.08, target.y + 0.66, herd[0].z)
+  act(() => view.result.current.api.current?.actAtCenter('pick'))
+  expect(onAnimal).toHaveBeenCalledOnce()
+  onAnimal.mockClear()
+  camera.position.copy(target).add(new THREE.Vector3(0, 5, 0))
+  camera.lookAt(target)
+  act(() => view.result.current.api.current?.actAtCenter('pick'))
+  expect(onAnimal).toHaveBeenCalledWith(herd[0], { x: herd[0].x, z: herd[0].z })
+  expect(props.onPick).not.toHaveBeenCalled()
+  for (let time = 16; time <= 160; time += 16) frames.run(time)
+  mesh.getMatrixAt(0, matrix)
+  expect(matrix.elements[13]).toBeGreaterThan(target.y + 0.3)
+  onAnimal.mockClear()
+  for (let y = 3; y <= 6; y++) editWorld(props.world, { x: herd[0].x, y, z: herd[0].z }, 'brick', 'place')
+  act(() => view.result.current.api.current?.actAtCenter('pick'))
+  expect(onAnimal).not.toHaveBeenCalled()
+  expect(props.onPick).toHaveBeenCalledWith({ x: herd[0].x, y: 6, z: herd[0].z }, { x: 0, y: 1, z: 0 })
+  view.unmount()
 })
 
 it('treats a long press as choosing a block, never as placing one', () => {
@@ -166,10 +242,10 @@ it('keeps two-finger panning over the world without changing the viewing angle',
   const target = new THREE.Vector3(SIZE + 20, 30, -50)
   const camera = new THREE.Vector3(SIZE + 30, 50, -40)
   const offset = camera.clone().sub(target)
-  expect(clampTarget(target, camera)).toBe(true)
+  expect(clampTarget(target, camera, DEFAULT_WORLD)).toBe(true)
   expect(target.x).toBeLessThanOrEqual(SIZE)
   expect(target.z).toBeGreaterThanOrEqual(-1)
   expect(target.y).toBeLessThan(SIZE)
   expect(camera.clone().sub(target)).toEqual(offset)
-  expect(clampTarget(new THREE.Vector3(SIZE / 2, 2, SIZE / 2), new THREE.Vector3())).toBe(false)
+  expect(clampTarget(new THREE.Vector3(SIZE / 2, 2, SIZE / 2), new THREE.Vector3(), DEFAULT_WORLD)).toBe(false)
 })

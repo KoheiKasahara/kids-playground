@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { ANIMAL_SPAWNS, decodeHerd, feedAnimal, herdFrom, MAX_HERD, nextCell, shearSheep } from './animals'
-import { createWorld, editWorld, SIZE, surfaceOf } from './world'
+import { ANIMAL_SPAWNS, decodeHerd, feedAnimal, herdFrom, MAX_HERD, chooseAnimalStep, shearSheep } from './animals'
+import { createWorld, DEFAULT_WORLD, editWorld, surfaceOf } from './world'
+
+const SIZE = DEFAULT_WORLD.size
 
 describe('animals', () => {
   it('start on dry ground inside the world', () => {
@@ -12,13 +14,15 @@ describe('animals', () => {
     }
   })
   it('step to a neighbor, never into water, onto cactus, up high steps or outside', () => {
-    const surface = surfaceOf(createWorld())
+    const world = createWorld()
+    const surface = surfaceOf(world)
+    const options = new Int8Array(4)
     for (let i = 0; i < 40; i++) {
       const random = () => i / 40
       for (let x = 0; x < SIZE; x++) for (let z = 0; z < SIZE; z++) {
         const here = surface(x, z)!
-        const next = nextCell(surface, { x, z }, random)
-        if (next.x === x && next.z === z) continue
+        const next = { x, z }
+        if (!chooseAnimalStep(world, { x, z }, next, options, random)) continue
         expect(Math.abs(next.x - x) + Math.abs(next.z - z)).toBe(1)
         const ground = surface(next.x, next.z)!
         expect(['water', 'cactus']).not.toContain(ground.material)
@@ -27,13 +31,13 @@ describe('animals', () => {
     }
   })
   it('stays put when fenced in', () => {
-    let world = createWorld()
+    const world = createWorld()
     for (const [x, z] of [[4, 5], [6, 5], [5, 4], [5, 6]]) {
-      world = editWorld(world, { x, y: 3, z }, 'stone', 'place')
-      world = editWorld(world, { x, y: 4, z }, 'stone', 'place')
+      editWorld(world, { x, y: 3, z }, 'stone', 'place')
+      editWorld(world, { x, y: 4, z }, 'stone', 'place')
     }
     const at = { x: 5, z: 5 }
-    expect(nextCell(surfaceOf(world), at, () => 0.5)).toBe(at)
+    expect(chooseAnimalStep(world, at, { ...at }, new Int8Array(4), () => 0.5)).toBe(false)
   })
 })
 
