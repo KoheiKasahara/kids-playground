@@ -6,7 +6,7 @@ import { chooseAnimalStep, MAX_HERD, type Animal, type AnimalKind, type Cell, ty
 import { BLOCK_WIDTH, hitBlock } from './raycast'
 import { createTerrainMeshes, viewDepth, WALK_DRAW_DISTANCE } from './terrainMeshes'
 import { blockPixels, TEXTURE_SIZE } from './textures'
-import { DEFAULT_WORLD, materialCode, MATERIAL_DEFS, topBlock, type Dimensions, type Material, type Position, type WoolColor, type World } from './world'
+import { materialCode, MATERIAL_DEFS, topBlock, type Dimensions, type Material, type Position, type WoolColor, type World } from './world'
 
 type Pick = (position: Position, normal: Position) => void
 export type Heading = { x: number; z: number }
@@ -16,6 +16,8 @@ export type SceneApi = {
   turn: (side: 'left' | 'right') => void
   /** がめんの まんなかの ブロックを おく・こわす（pick）か えらぶ（hold）。 */
   actAtCenter: (kind: 'pick' | 'hold') => void
+  /** そらから ながめる カメラを、その ばしょの うえへ はこぶ（むきと きょりは そのまま）。 */
+  focus: (x: number, z: number) => void
 }
 export type CraftSceneOptions = {
   world: World
@@ -127,18 +129,20 @@ export function useCraftScene(options: CraftSceneOptions) {
     scene.background = sky
     const dimensions = latest.current.world
     const center = (dimensions.size - 1) / 2
-    const zoom = dimensions.size / DEFAULT_WORLD.size
+    // はじめは カーソルの まわりを ちかくで ながめる。ひろい せかいは ひいて みわたせる。
+    const start = latest.current.cursor
+    const startY = Math.max(2, dimensions.topY(start.x, start.z, true))
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, Math.max(160, dimensions.size * 4))
     camera.rotation.order = 'YXZ'
-    camera.position.set(center + 16 * zoom, 22 * zoom, center + 18 * zoom)
+    camera.position.set(start.x + 16, startY + 20, start.z + 18)
     const controls = new OrbitControls(camera, renderer.domElement)
-    controls.target.set(center, 2, center)
+    controls.target.set(start.x, startY, start.z)
     // ひとさしゆび1ぽんで まわす・2ほんで いどうと ちかづく（地面にそって うごく）
     controls.enablePan = true
     controls.screenSpacePanning = false
     controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
     controls.minDistance = 6
-    controls.maxDistance = 48 * zoom
+    controls.maxDistance = Math.max(48, dimensions.size * 1.3)
     controls.minPolarAngle = 0.2
     controls.maxPolarAngle = Math.PI / 2.15
     controls.update()
@@ -309,7 +313,7 @@ export function useCraftScene(options: CraftSceneOptions) {
     let walking: Position | null = null
     let yaw = 0
     let yawTarget = 0
-    let pitch = -0.15
+    let pitch = -0.1
     const orbitPosition = new THREE.Vector3()
     const orbitTarget = new THREE.Vector3()
     const eye = new THREE.Vector3()
@@ -327,13 +331,15 @@ export function useCraftScene(options: CraftSceneOptions) {
           orbitTarget.copy(controls.target)
           const look = controls.target.clone().sub(camera.position)
           yaw = yawTarget = Math.atan2(-look.x, -look.z)
-          pitch = -0.15
+          pitch = -0.1
           controls.enabled = false
           camera.fov = 70
           camera.position.set(next.x, next.y + EYE, next.z)
         } else {
-          camera.position.copy(orbitPosition)
-          controls.target.copy(orbitTarget)
+          // あるいて きた ばしょを、まえと おなじ むき・きょりで ながめる
+          eye.set(walking!.x - orbitTarget.x, walking!.y - orbitTarget.y, walking!.z - orbitTarget.z)
+          camera.position.copy(orbitPosition).add(eye)
+          controls.target.copy(orbitTarget).add(eye)
           controls.enabled = true
           camera.fov = 40
           controls.update()
@@ -558,6 +564,16 @@ export function useCraftScene(options: CraftSceneOptions) {
         if (!frame) { aimCamera(1); render() }
       },
       actAtCenter: kind => act(hitAt(0, 0), kind),
+      focus: (x, z) => {
+        if (walking) return
+        const world = latest.current.world
+        eye.set(x, Math.max(0, world.topY(x, z, true)), z).sub(controls.target)
+        controls.target.add(eye)
+        camera.position.add(eye)
+        clampTarget(controls.target, camera.position, world)
+        controls.update()
+        render()
+      },
     }
     sync.current = update
     resize()

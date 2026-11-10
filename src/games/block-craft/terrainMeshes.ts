@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 import { PLANT_WIDTH_SCALE, plantCenterY } from './raycast'
-import { definitionAt, materialCode, type Changes, type World } from './world'
+import { definitionAt, materialCode, MATERIAL_DEFS, type Changes, type World } from './world'
 
 export const CHUNK_SIZE = 16
-export const WALK_DRAW_DISTANCE = 36
+export const WALK_DRAW_DISTANCE = 48
 /** Matches the view-space depth used by Three's fog shader. */
 export function viewDepth(camera: THREE.Camera, x: number, y: number, z: number) {
   const m = camera.matrixWorldInverse.elements
@@ -13,13 +13,22 @@ const water = materialCode('water') - 1
 const lava = materialCode('lava') - 1
 const lamp = materialCode('lamp') - 1
 
+/** まわりを すきまなく かくす ブロック（くさばな・すける ブロックは かくさない）。 */
+const SOLID = Uint8Array.from([0, ...MATERIAL_DEFS.map(m => Number(!m.plant && m.opacity === undefined))])
+const SIDES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]] as const
+/** 6めんとも ブロックに かこまれて、どこからも みえない。せかいの そこは みえない ものと する。 */
+export function isBuried(world: World, x: number, y: number, z: number) {
+  if (y > 0 && !SOLID[world.codeAt(x, y - 1, z)]) return false
+  return SIDES.every(([dx, dy, dz]) => SOLID[world.codeAt(x + dx, y + dy, z + dz)])
+}
+
 type Chunk = {
   group: THREE.Group
   meshes: (THREE.InstancedMesh | undefined)[]
   bounds: THREE.Box3
 }
 
-/** 0.97-wide boxes leave open sightlines, so all occupied cells retain their geometry. */
+/** Draws every cell with an exposed face. Buried cells get their geometry back when a neighbour is dug out. */
 export function createTerrainMeshes(scene: THREE.Scene, geometry: THREE.BoxGeometry, materials: readonly THREE.Material[]) {
   const chunks = new Map<number, Chunk>()
   const dirty = new Set<number>()
@@ -28,8 +37,14 @@ export function createTerrainMeshes(scene: THREE.Scene, geometry: THREE.BoxGeome
   let world: World | undefined
   let span = 0
   let unsubscribe: (() => void) | undefined
+  const markCell = (x: number, z: number) => {
+    if (x >= 0 && z >= 0 && x < span * CHUNK_SIZE && z < span * CHUNK_SIZE) dirty.add(Math.floor(x / CHUNK_SIZE) + Math.floor(z / CHUNK_SIZE) * span)
+  }
   const mark = (changes: Changes) => {
-    for (const { x, z } of changes) dirty.add(Math.floor(x / CHUNK_SIZE) + Math.floor(z / CHUNK_SIZE) * span)
+    for (const { x, z } of changes) {
+      // となりの チャンクの ブロックが みえるように なることが ある
+      markCell(x, z); markCell(x + 1, z); markCell(x - 1, z); markCell(x, z + 1); markCell(x, z - 1)
+    }
   }
 
   const dispose = () => {
@@ -52,7 +67,7 @@ export function createTerrainMeshes(scene: THREE.Scene, geometry: THREE.BoxGeome
         const top = grid.topY(x, z)
         for (let y = 0; y <= top; y++) {
           const code = grid.codeAt(x, y, z)
-          if (code) block(x, y, z, code)
+          if (code && !(SOLID[code] && isBuried(grid, x, y, z))) block(x, y, z, code)
         }
       }
     }

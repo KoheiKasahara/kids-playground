@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { herdFrom } from './animals'
+import { ANIMAL_SPAWNS, herdFrom, spawnHerd } from './animals'
 import { biome } from './biomes'
 import { decodeExtra, decodeGame, encodeGame, EXTRA_KEY, MAX_WHEAT, newGame, readGame, readWool, SAVE_KEY, WOOL_KEY, writeGame, writeWool, type Game } from './save'
 import { createWorld, editWorld, MATERIALS, World, type Block } from './world'
 import { encodeGrid, LEGACY_SAVE_KEY } from './saveCodec'
+import { NEW_WORLD } from './terrain'
 
 const snapshot = ({ world, ...rest }: Game) => ({ ...rest, size: world.size, height: world.height, blocks: [...world.blocks()] })
 
@@ -16,15 +17,34 @@ const localStorage = {
 beforeEach(() => { store.clear(); vi.stubGlobal('localStorage', localStorage) })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
-it('saves and reads back the world with its land, wheat and animals', () => {
+/** ひろい せかいは ブロックを ならべずに、ほぞんした かたちで くらべる。 */
+const packed = ({ world, ...rest }: Game) => ({ ...rest, ...encodeGrid(world) })
+
+it('saves and reads back the wide world with its land, seed, wheat and animals', () => {
   const game = { ...newGame('snow'), wheat: 4 }
+  expect(game.world).toMatchObject(NEW_WORLD)
+  expect(game.herd).toEqual(spawnHerd(game.world, biome('snow').animals, game.seed))
   expect(writeGame(game)).toBe(true)
-  expect(snapshot(readGame()!)).toEqual(snapshot(game))
+  expect(packed(readGame()!)).toEqual(packed(game))
+})
+
+it('makes a different world each time, and the same world again from its seed', () => {
+  const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.75)
+  const [first, second] = [newGame('forest'), newGame('forest')]
+  random.mockRestore()
+  expect(first.seed).not.toBe(second.seed)
+  expect(packed(first)).not.toEqual(packed(second))
+  expect(packed(newGame('forest', first.world, first.seed))).toEqual(packed(first))
+  // まえの ばんの ほぞんには seed が なく、こわれた seed も 0 に する
+  const { seed: _seed, ...old } = JSON.parse(encodeGame(first))
+  expect(_seed).toBe(first.seed)
+  expect(decodeGame(JSON.stringify(old))?.seed).toBe(0)
+  expect(decodeGame(JSON.stringify({ ...old, seed: -3 }))?.seed).toBe(0)
 })
 
 it('reads a save from before lands and animals were kept as the meadow', () => {
   localStorage.setItem(LEGACY_SAVE_KEY, JSON.stringify([...createWorld().blocks()]))
-  expect(snapshot(readGame()!)).toEqual(snapshot(newGame('meadow')))
+  expect(snapshot(readGame()!)).toEqual(snapshot({ world: createWorld(), biome: 'meadow', wheat: 0, herd: spawnHerd(createWorld(), biome('meadow').animals), seed: 0 }))
   localStorage.setItem(EXTRA_KEY, '{broken')
   expect(readGame()?.biome).toBe('meadow')
   localStorage.removeItem(LEGACY_SAVE_KEY)
@@ -32,9 +52,11 @@ it('reads a save from before lands and animals were kept as the meadow', () => {
 })
 
 it('falls back for each broken field without losing the others', () => {
-  expect(decodeExtra(JSON.stringify({ biome: 'island', wheat: -1, herd: 'oops' }))).toEqual({ biome: 'island', wheat: 0, herd: herdFrom(biome('island').spawns) })
-  expect(decodeExtra(JSON.stringify({ biome: 'moon', wheat: MAX_WHEAT + 5, herd: [] }))).toEqual({ biome: 'meadow', wheat: MAX_WHEAT, herd: [] })
-  expect(decodeExtra('7').biome).toBe('meadow')
+  const world = createWorld()
+  expect(decodeExtra(JSON.stringify({ biome: 'island', wheat: -1, herd: 'oops' }), world)).toEqual({ biome: 'island', wheat: 0, herd: spawnHerd(world, biome('island').animals), seed: 0 })
+  expect(decodeExtra(JSON.stringify({ biome: 'moon', wheat: MAX_WHEAT + 5, herd: [] }), world)).toEqual({ biome: 'meadow', wheat: MAX_WHEAT, herd: [], seed: 0 })
+  expect(decodeExtra(JSON.stringify({ herd: herdFrom(ANIMAL_SPAWNS) }), world).herd).toEqual(herdFrom(ANIMAL_SPAWNS))
+  expect(decodeExtra('7', world).biome).toBe('meadow')
 })
 
 it('keeps collected wool colors in order, ignoring unknown ones and storage failures', () => {
@@ -92,11 +114,11 @@ it('rejects unknown palettes, nonmatching dimensions, truncated, zero and overfl
     { cells: btoa(String.fromCharCode(1, 0, 0)) }, { cells: btoa(String.fromCharCode(1, 255, 255)) },
     { cells: btoa(String.fromCharCode(1, 1)) }, { cells: btoa(String.fromCharCode(255, 1, 0)) },
     { cells: btoa(String.fromCharCode(0, 0, 12)) }, // complete but empty floor
-    { cells: '!%*' }, { herd: [{ id: 0, kind: 'rabbit', x: 16, z: 0 }] },
+    { cells: '!%*' }, { herd: [{ id: 0, kind: 'rabbit', x: valid.size, z: 0 }] },
   ]) expect(decodeGame(JSON.stringify({ ...valid, ...patch })), JSON.stringify(patch)).toBeNull()
 })
 
-it.each(['meadow', 'desert', 'snow', 'island'] as const)('round trips a large %s build and farm together', biome => {
+it.each(['meadow', 'desert', 'snow', 'island', 'sky', 'castle'] as const)('round trips a large %s build and farm together', biome => {
   const game = { ...newGame(biome, { size: 64, height: 24 }), wheat: 11 }
   const { world } = game
   const y = world.topY(62, 62) + 1
@@ -106,7 +128,7 @@ it.each(['meadow', 'desert', 'snow', 'island'] as const)('round trips a large %s
   const raw = encodeGame(game)
   expect(raw.length).toBeLessThan(JSON.stringify([...world.blocks()]).length / 10)
   expect(snapshot(decodeGame(raw)!)).toEqual(snapshot(game))
-  expect(snapshot(decodeGame(JSON.stringify({ version: 2, ...encodeGrid(world, 'columns'), biome, wheat: game.wheat, herd: game.herd }))!)).toEqual(snapshot(game))
+  expect(snapshot(decodeGame(JSON.stringify({ version: 2, ...encodeGrid(world, 'columns'), biome, wheat: game.wheat, herd: game.herd, seed: game.seed }))!)).toEqual(snapshot(game))
 })
 
 it('stores dense seeded random material layouts with the bounded byte fallback', () => {

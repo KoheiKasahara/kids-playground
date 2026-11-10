@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BIOMES } from './biomes'
-import { herdFrom, walkable } from './animals'
+import { spawnHerd, walkable } from './animals'
 import { referenceEdit } from './referenceEdit.test-fixture'
 import {
   brushCells, createWorld, editWorld, foundTreasures, growTree, key, materialCode, netMaterialChange, settleWalker,
@@ -12,12 +12,14 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 describe.each([21, 64, 128])('%i-wide worlds', size => {
   it('generates each biome, treasures and animal spawns within its own dimensions', () => {
     for (const land of BIOMES) {
-      const world = land.create({ size, height: 24 })
+      const world = land.create({ size, height: 24 }, size)
       expect(world.size).toBe(size)
       expect(world.height).toBe(24)
       expect(foundTreasures(world)).toEqual([])
       const surface = surfaceOf(world)
-      for (const animal of herdFrom(land.spawns, size)) {
+      const herd = spawnHerd(world, land.animals, size)
+      expect(herd).toHaveLength(land.animals.length)
+      for (const animal of herd) {
         expect(walkable(surface(animal.x, animal.z))).toBe(true)
       }
     }

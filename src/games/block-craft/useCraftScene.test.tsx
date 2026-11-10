@@ -5,7 +5,10 @@ import { clampTarget, headingFromYaw, useCraftScene, type CraftSceneOptions } fr
 import { ANIMAL_SPAWNS, herdFrom } from './animals'
 import { createWorld, DEFAULT_WORLD, editWorld, MATERIALS, startWalker } from './world'
 
-const resources = vi.hoisted(() => ({ render: vi.fn(), rendererDispose: vi.fn(), controlsDispose: vi.fn(), disconnect: vi.fn() }))
+const resources = vi.hoisted(() => ({
+  render: vi.fn(), rendererDispose: vi.fn(), controlsDispose: vi.fn(), disconnect: vi.fn(),
+  orbit: null as { target: THREE.Vector3; camera: THREE.Camera } | null,
+}))
 vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof THREE>()
   return { ...actual, WebGLRenderer: class {
@@ -20,7 +23,7 @@ vi.mock('three/examples/jsm/controls/OrbitControls.js', () => ({ OrbitControls: 
   target = new THREE.Vector3()
   touches = {}
   enabled = true
-  constructor(private camera: THREE.Camera) {}
+  constructor(public camera: THREE.Camera) { resources.orbit = this }
   update() { this.camera.lookAt(this.target) }
   addEventListener() {}
   removeEventListener() {}
@@ -132,6 +135,39 @@ it('switches to walking, turns, and keeps animating animals without errors', () 
   for (let time = 16; time < 5000; time += 16) frames.run(time)
   view.rerender(options({ world, walker: null }))
   expect(resources.render).toHaveBeenCalled()
+  view.unmount()
+})
+
+it('starts close to the cursor in a wide world, follows focus, and views the place walked to', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  stubFrames()
+  const world = createWorld({ size: 96, height: 32 })
+  const container = document.createElement('div')
+  const cursor = { x: 48, y: 0, z: 48 }
+  const view = renderHook(props => useCraftScene(props), { initialProps: options({ world, cursor }) })
+  act(() => view.result.current.setContainer(container))
+  const { target, camera } = resources.orbit!
+  const ground = world.topY(48, 48, true)
+  expect(target.toArray()).toEqual([48, ground, 48])
+  // せかいの ひろさに かかわらず、ブロックが よく みえる きょりから はじまる
+  const offset = camera.position.clone().sub(target)
+  expect(offset.length()).toBeLessThan(40)
+  const api = view.result.current.api.current!
+  resources.render.mockClear()
+  act(() => api.focus(80, 12))
+  expect(target.toArray()).toEqual([80, world.topY(80, 12, true), 12])
+  expect(camera.position.clone().sub(target).toArray()).toEqual(offset.toArray())
+  expect(resources.render).toHaveBeenCalled()
+  // あるいた さきで やめると、その ばしょを おなじ むきで ながめる
+  view.rerender(options({ world, cursor, walker: startWalker(world, 80, 12) }))
+  const far = startWalker(world, 20, 70)
+  view.rerender(options({ world, cursor, walker: far }))
+  act(() => api.focus(5, 5))
+  expect(target.toArray()).toEqual([80, world.topY(80, 12, true), 12])
+  view.rerender(options({ world, cursor, walker: null }))
+  expect(target.toArray()).toEqual([far.x, far.y, far.z])
+  const after = camera.position.clone().sub(target)
+  expect(after.distanceTo(offset)).toBeLessThan(1e-9)
   view.unmount()
 })
 

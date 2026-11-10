@@ -43,6 +43,12 @@ export const MATERIALS = [
   { id: 'mushroom', label: 'きのこ', color: '#dc4a3c', emoji: '🍄', plant: true, height: 0.45 },
   { id: 'coral', label: 'さんご', color: '#ff7f8f', emoji: '🪸' },
   { id: 'shell', label: 'かいがら', color: '#fbe0cc', emoji: '🐚', plant: true, height: 0.3 },
+  { id: 'cloud', label: 'くも', color: '#f3f8ff', emoji: '☁️' },
+  { id: 'crystal', label: 'クリスタル', color: '#b98cf5', emoji: '🔮', glow: true },
+  { id: 'stonebrick', label: 'いしれんが', color: '#8f97a3', emoji: '🏰' },
+  { id: 'mushcap', label: 'あかきのこ', color: '#e2513f', emoji: '🔴' },
+  { id: 'melon', label: 'すいか', color: '#58a845', emoji: '🍉' },
+  { id: 'honey', label: 'はちみつ', color: '#f2a93b', emoji: '🍯', opacity: 0.8 },
   { id: 'wool_white', label: 'しろ', color: '#f4f1ea', emoji: '🧶', wool: 'white' },
   { id: 'wool_pink', label: 'ピンク', color: '#f5a8c8', emoji: '🧶', wool: 'pink' },
   { id: 'wool_yellow', label: 'きいろ', color: '#f3d75e', emoji: '🧶', wool: 'yellow' },
@@ -92,7 +98,31 @@ export const TREASURES: readonly Block[] = ([
   [2, 13, 'gold'], [9, 10, 'gold'], [14, 9, 'gold'], [5, 5, 'gold'],
 ] as const).map(([x, z, material]) => ({ x, y: 1, z, material }))
 
-const treasuresFor = (size: number) => TREASURES.map(t => ({ ...t, x: landmark(t.x, size), z: landmark(t.z, size) }))
+/** ひろい せかいで たからを ふやす ます目の おおきさ。 */
+const TREASURE_GRID = 16
+const mix = (a: number, b: number, c: number) => {
+  let h = Math.imul(a + 1, 374761393) ^ Math.imul(b + 1, 668265263) ^ Math.imul(c + 1, 1274126177)
+  h = Math.imul(h ^ (h >>> 13), 1274126177)
+  return (h ^ (h >>> 16)) >>> 0
+}
+/** もとの 7こに くわえて、ひろい せかいでは ます目ごとに 1こずつ かくす（おおきさだけで きまる）。 */
+function treasuresFor(size: number): Block[] {
+  const treasures = TREASURES.map(t => ({ ...t, x: landmark(t.x, size), z: landmark(t.z, size) }))
+  const cells = Math.floor(size / TREASURE_GRID)
+  if (cells < 2) return treasures
+  const taken = new Set(treasures.map(t => t.x + t.z * size))
+  const center = Math.floor(size / 2)
+  for (let gx = 0; gx < cells; gx++) for (let gz = 0; gz < cells; gz++) {
+    if ((gx + gz) % 2) continue
+    const roll = mix(gx, gz, size)
+    const x = gx * TREASURE_GRID + 2 + roll % (TREASURE_GRID - 4)
+    const z = gz * TREASURE_GRID + 2 + (roll >>> 8) % (TREASURE_GRID - 4)
+    if (taken.has(x + z * size) || (Math.abs(x - center) < 3 && Math.abs(z - center) < 3)) continue
+    taken.add(x + z * size)
+    treasures.push({ x, y: 1, z, material: (roll >>> 16) % 3 ? 'gold' : 'diamond' })
+  }
+  return treasures
+}
 export const treasureColumns = (size: number) => new Map(treasuresFor(size).map(t => [t.x + t.z * size, t.material]))
 
 export function flatColumn(x: number, z: number, shore = 2, treasure: Material | null | undefined = TREASURES.find(t => t.x === x && t.z === z)?.material): Block[] {
@@ -473,8 +503,9 @@ export function settleWalker(world: World, walker: Position): Position {
   return fall(world, { ...walker, y })
 }
 
+/** その れつの いちばん うえの じめんに たつ（そらの しまや やねの うえでも、みえている ばしょから はじまる）。 */
 export function startWalker(world: World, x: number, z: number): Position {
-  return settleWalker(world, { x, y: 1, z })
+  return settleWalker(world, { x, y: Math.max(1, world.topY(x, z, true) + 1), z })
 }
 
 export function walk(world: World, from: Position, dir: { x: number; z: number }): Position {

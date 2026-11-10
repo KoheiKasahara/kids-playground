@@ -1,4 +1,5 @@
-import { DEFAULT_WORLD, landmark, materialCode, type World, type Block, type WoolColor } from './world'
+import { seeded } from './terrain'
+import { DEFAULT_WORLD, landmark, materialCode, materialId, type Material, type World, type Block, type WoolColor } from './world'
 
 export type AnimalKind = 'sheep' | 'chicken' | 'rabbit'
 export type Cell = { x: number; z: number }
@@ -29,6 +30,34 @@ export const ANIMAL_SPAWNS: readonly Spawn[] = [
 
 export const herdFrom = (spawns: readonly Spawn[], size = DEFAULT_WORLD.size): Herd =>
   spawns.map((spawn, id) => ({ ...spawn, x: landmark(spawn.x, size), z: landmark(spawn.z, size), id }))
+
+/** どうぶつが はじめに たつ じめん。 */
+export const SPAWN_GROUND: readonly Material[] = ['grass', 'sand', 'snow', 'dirt', 'stone', 'sandstone', 'cloud']
+/** はじめの どうぶつを、まんなかの ちかくの ひらけた じめんに ならべる（おなじ seed なら おなじ ばしょ）。 */
+export function spawnHerd(world: World, animals: readonly Omit<Spawn, 'x' | 'z'>[], seed = 0): Herd {
+  const center = Math.floor(world.size / 2)
+  const home = world.topY(center, center, true)
+  const random = seeded(seed * 31 + 7)
+  const cells: (Cell & { order: number })[] = []
+  for (let x = 0; x < world.size; x++) for (let z = 0; z < world.size; z++) {
+    const y = world.topY(x, z, true)
+    const ground = materialId(world.codeAt(x, y, z))
+    // くさばなの うえや きの したには たたない
+    if (!ground || !SPAWN_GROUND.includes(ground) || world.topY(x, z) !== y) continue
+    const distance = Math.hypot(x - center, z - center)
+    // ちかくて たかさの ちかい ばしょを さきに えらぶ
+    const far = distance < 2 ? 40 : distance > 13 ? distance : 0
+    cells.push({ x, z, order: far + Math.max(0, Math.abs(y - home) - 1) * 20 + random() })
+  }
+  cells.sort((a, b) => a.order - b.order)
+  const chosen: Cell[] = []
+  for (const gap of [3, 0]) for (const cell of cells) {
+    if (chosen.length >= animals.length) break
+    if (chosen.some(c => c === cell || Math.hypot(c.x - cell.x, c.z - cell.z) < gap)) continue
+    chosen.push(cell)
+  }
+  return chosen.map(({ x, z }, id) => ({ ...animals[id], x, z, id }))
+}
 
 const WATER = materialCode('water'), CACTUS = materialCode('cactus'), LAVA = materialCode('lava')
 const STEPS: readonly Cell[] = [{ x: 1, z: 0 }, { x: -1, z: 0 }, { x: 0, z: 1 }, { x: 0, z: -1 }]
