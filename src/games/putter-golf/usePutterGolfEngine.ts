@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { initializeRapier } from '../../physics/rapierLoader'
-import { aimPose, followPose, lerpPose, lookHeading, lookTarget, overviewPose, viewHeading, type CameraPose } from './golfCamera'
+import { angleHeading, ballPose, cupPose, headingAngle, lerpPose, overviewPose, turnToward, viewHeading, type CameraPose } from './golfCamera'
 import type { CourseDefinition, GolfBallId, Vec2 } from './golfCourses'
 import { buildHoleGeometry, type HoleGeometry } from './golfGeometry'
 import { BALL_RADIUS, BIG_CUP_RADIUS, CUP_RADIUS, MAX_STEPS_PER_FRAME, PHYSICS_STEP, powerForDistance, rollingDecel, type Vec3 } from './golfPhysics'
@@ -115,10 +115,15 @@ export function usePutterGolfEngine(options: Options) {
     /** いけに おちた ボールが しずんでいくところ。 */
     let sink: { from: Vec3; drift: Vec2; time: number } | null = null
     let pose: CameraPose | null = null
+    /** ボールの まわりを まわる カメラの 角度と、うしろへ さがる ぐあい（0: ねらう、1: おいかける）。null なら つぎの フレームで すぐ 合わせる。 */
+    let orbit: { angle: number; follow: number } | null = null
+    /** カップインの あと、カップの まわりを まわる 角度。 */
+    let cupAngle: number | null = null
+    /** ぜんたいから ボールの カメラへ もどる あいだ、位置を つなぐ のこり時間。 */
+    let blend = 0
     let aimKey = ''
-    let look: { key: string; point: Vec2 } | null = null
-    /** いまの 場所からの おすすめの うつ むき。ねらう カメラの むきの もとに つかう。 */
-    let suggested: Vec2 | null = null
+    /** いまの 場所から みちなりに すすむ ほう。ねらう カメラの むきの もとに つかう。 */
+    let suggested: Vec2 = { x: 0, z: -1 }
     let lastFeedback = ''
     let drag: { id: number; x: number; y: number; time: number; moved: boolean; forward: Vec2; saved: { direction: Vec2; power: number } } | null = null
 
@@ -147,8 +152,9 @@ export function usePutterGolfEngine(options: Options) {
 
     function aimAtSuggestion() {
       if (!world) return
-      direction = world.suggestShot().direction
-      suggested = direction
+      const shot = world.suggestShot()
+      direction = shot.direction
+      suggested = shot.view
       aimKey = ''
     }
 
@@ -171,7 +177,9 @@ export function usePutterGolfEngine(options: Options) {
       heading = direction
       introTime = latest.current.active && !latest.current.reducedMotion ? INTRO_SECONDS : 0
       pose = null
-      look = null
+      orbit = null
+      cupAngle = null
+      blend = 0
       host.dataset.hole = hole.id
       publish()
     }
@@ -201,6 +209,7 @@ export function usePutterGolfEngine(options: Options) {
           const speed = Math.hypot(velocity.x, velocity.z)
           if (speed > 0.1) heading = { x: velocity.x / speed, z: velocity.z / speed }
           pose = null
+          orbit = null
         }
         if (event.kind === 'land') scene.effect('dust', event.position, event.strength)
         if (event.kind === 'splash') {
@@ -213,42 +222,46 @@ export function usePutterGolfEngine(options: Options) {
         }
         if (event.kind === 'lost') returnTimer = 0.6
         if (event.kind === 'cup') scene.effect(strokes === 1 ? 'fireworks' : 'confetti', geometry.cup)
-        if (event.kind === 'rest') {
-          aimAtSuggestion()
-          // 曲がり角で止まったとき、前の打球を追っていたカメラから
-          // 新しいねらいへ補間すると、一時的に別の方向を向いてしまう。
-          // 次の打ち始めは、ボールの後ろの正しい位置から見せる。
-          pose = null
-        }
+        // 止まったら、みちなりに すすむ ほうへ ねらいと カメラを 向けなおす。
+        // カメラは ボールの まわりを まわって 向きを 変えるので、とちゅうで あさっての ほうを 向かない。
+        if (event.kind === 'rest') aimAtSuggestion()
         latest.current.onEvent(event)
       }
       // うった・止まった・入ったは、ボタンの有効・無効にすぐ効くよう待たずに知らせる。
       if (events.length) publish()
     }
 
-    /** ねらうときに見る点。ボールが止まっている間は同じなので、場所ごとに覚えておく。 */
-    function lookAt(ball: Vec3): Vec2 {
-      if (!geometry) return ball
-      const key = `${ball.x.toFixed(2)}:${ball.z.toFixed(2)}:${suggested?.x.toFixed(3)}:${suggested?.z.toFixed(3)}`
-      if (look?.key !== key) {
-        const { course, holeIndex } = latest.current
-        const hole = course.holes[holeIndex] ?? course.holes[0]!
-        const point = lookTarget(ball, geometry.cup, hole.route, geometry)
-        const heading = lookHeading(ball, point, suggested)
-        look = { key, point: { x: ball.x + heading.x, z: ball.z + heading.z } }
-      }
-      return look.point
-    }
-
-    function desiredPose(): CameraPose | null {
+    /** ボールを 見る カメラ。dt が 0 なら（はじめ・ワープ・もどった 直後）すぐ 合わせる。 */
+    function ballCamera(dt: number): CameraPose | null {
       if (!scene || !world || !geometry) return null
       const aspect = scene.aspect
-      const overview = overviewPose(geometry.bounds, aspect)
-      if (!latest.current.active || latest.current.camera === 'overview') return overview
       const ball = world.ball().position
-      // ねらうときは カップの ほう（見とおせなければ みちすじの 先、おすすめが 大きく それるなら その むき）を 見る。
-      // うつ向きに あわせて まわすと、まがりかどや もどった あとに うしろを むいてしまう。
-      const target = world.phase === 'rolling' || world.phase === 'out' ? followPose(ball, heading, aspect) : aimPose(ball, viewHeading(ball, lookAt(ball), direction), aspect)
+      const snap = latest.current.reducedMotion || dt <= 0
+      if (world.phase === 'holed') {
+        // カップインの あとは、カップの まわりを ゆっくり まわって よろこぶ。
+        const from = orbit ? orbit.angle : headingAngle(heading)
+        cupAngle = cupAngle === null ? from : cupAngle + (latest.current.reducedMotion ? 0 : dt * 0.35)
+        const around = cupPose(geometry.cup, cupAngle, aspect)
+        return !pose || snap ? around : lerpPose(pose, around, 1 - Math.exp(-dt * 3))
+      }
+      cupAngle = null
+      const rolling = world.phase === 'rolling' || world.phase === 'out'
+      // ねらうときは みちなりに すすむ ほう（おすすめの うち方が 向く ほう）を 見る。
+      // うつ向きに ぴったり あわせて まわすと、ねらいを かえるたびに 景色が 大きく ゆれる。
+      const goal = headingAngle(rolling ? heading : viewHeading(ball, { x: ball.x + suggested.x, z: ball.z + suggested.z }, direction))
+      const follow = rolling ? 1 : 0
+      orbit = !orbit || snap
+        ? { angle: goal, follow }
+        : { angle: turnToward(orbit.angle, goal, 1 - Math.exp(-dt * (rolling ? 3 : 5.5))), follow: orbit.follow + (follow - orbit.follow) * (1 - Math.exp(-dt * 3.5)) }
+      return ballPose(ball, angleHeading(orbit.angle), aspect, orbit.follow)
+    }
+
+    function desiredPose(dt: number): CameraPose | null {
+      if (!scene || !world || !geometry) return null
+      const overview = overviewPose(geometry.bounds, scene.aspect)
+      if (!latest.current.active || latest.current.camera === 'overview') { orbit = null; return overview }
+      const target = ballCamera(pose && introTime <= 0 ? dt : 0)
+      if (!target) return null
       return introTime > 0 ? lerpPose(overview, target, ease(1 - introTime / INTRO_SECONDS)) : target
     }
 
@@ -274,6 +287,7 @@ export function usePutterGolfEngine(options: Options) {
             world.returnToRest()
             aimAtSuggestion()
             pose = null
+            orbit = null
             current.onEvent({ kind: 'returned' })
           }
         }
@@ -291,15 +305,20 @@ export function usePutterGolfEngine(options: Options) {
         scene.setFlagLifted(world.phase === 'holed' || (world.phase === 'rolling' && Math.hypot(state.position.x - cup.x, state.position.z - cup.z) < 2.4))
         const speed = Math.hypot(state.velocity.x, state.velocity.z)
         if (world.phase === 'rolling' && speed > 0.4) {
-          const k = 1 - Math.exp(-dt * 2.5)
+          const k = 1 - Math.exp(-dt * 2.2)
           const next = { x: heading.x + (state.velocity.x / speed - heading.x) * k, z: heading.z + (state.velocity.z / speed - heading.z) * k }
           const length = Math.hypot(next.x, next.z) || 1
           heading = { x: next.x / length, z: next.z / length }
         } else if (world.phase === 'ready') heading = direction
         // ひっぱっている間はカメラを止める。動くと、ひっぱる向きの基準がずれてしまう。
         if (!drag?.moved) {
-          const desired = desiredPose()
-          if (desired) pose = !pose || current.reducedMotion || introTime > 0 ? desired : lerpPose(pose, desired, 1 - Math.exp(-dt * 4.5))
+          // ボールを 見る カメラは 角度で なめらかに まわすので そのまま 使う。ぜんたいとの きりかえだけ 位置を つなぐ。
+          const wasBall = orbit !== null
+          const desired = desiredPose(dt)
+          // ぜんたい → ボールへ もどるときは、しばらく 位置を つないでから ボールの カメラに まかせる。
+          if (!wasBall && orbit !== null && pose) blend = 0.7
+          blend = Math.max(0, blend - dt)
+          if (desired) pose = !pose || current.reducedMotion || introTime > 0 || (orbit !== null && blend <= 0) ? desired : lerpPose(pose, desired, 1 - Math.exp(-dt * (orbit ? 8 : 4.5)))
         }
         // ボールの手前にある景色だけ消す。ぜんたい表示や コース選びでは消さない。
         if (pose) scene.setCamera(pose, current.active && current.camera === 'ball'
@@ -415,6 +434,7 @@ export function usePutterGolfEngine(options: Options) {
           if (!world) return
           introTime = latest.current.reducedMotion ? 0 : INTRO_SECONDS
           pose = null
+          orbit = null
           aimAtSuggestion()
         },
         setBallStyle(id) { scene?.setBallStyle(id) },
@@ -455,10 +475,13 @@ export function usePutterGolfEngine(options: Options) {
           returnTimer = 0
           sink = null
           world.placeBall(spot)
+          pose = null
+          orbit = null
           const dx = cup.x - spot.x
           const dz = cup.z - spot.z
           const distance = Math.hypot(dx, dz) || 1
           direction = { x: dx / distance, z: dz / distance }
+          suggested = direction
           power = Math.min(0.5, powerForDistance(distance + 0.4, rollingDecel('green', course.gravity, course.rollingScale)))
           hintTarget = null
           latest.current.onEvent({ kind: 'assisted' })

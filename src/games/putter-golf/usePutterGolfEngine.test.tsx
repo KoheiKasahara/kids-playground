@@ -1,7 +1,7 @@
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { GOLF_COURSES } from './golfCourses'
-import { aimPose, lookHeading, viewHeading } from './golfCamera'
+import { aimPose, viewHeading } from './golfCamera'
 import type { GolfEvent } from './golfWorld'
 import { aimFromDrag, usePutterGolfEngine, type EngineEvent, type GolfCamera, type GolfFeedback } from './usePutterGolfEngine'
 
@@ -37,7 +37,7 @@ function fakeWorld() {
     placeBall: vi.fn((point: { x: number; z: number }) => { state.phase = 'ready'; state.position = { x: point.x, y: 0.15, z: point.z }; return state.position }),
     returnToRest: vi.fn(() => { state.phase = 'ready'; return state.position }),
     aimPath: vi.fn(() => [{ x: 0, y: 0.15, z: 4.5 }, { x: 0, y: 0.15, z: 1 }]),
-    suggestShot: vi.fn(() => ({ direction: { x: 0, z: -1 }, power: 0.63, target: { x: 0, z: -4.1 } })),
+    suggestShot: vi.fn(() => ({ direction: { x: 0, z: -1 }, power: 0.63, target: { x: 0, z: -4.1 }, view: { x: 0, z: -1 } })),
     dispose: vi.fn(),
   }
 }
@@ -149,11 +149,12 @@ it('「うつ！」はおすすめの向きと、えらんだ強さでうち、�
   expect(app.feedback.at(-1)).toMatchObject({ phase: 'rolling', strokes: 1 })
 })
 
-it('打ち終わったら、ボールの後ろから おすすめの ほうを 見るよう カメラを置き直す（カップから 大きく それるとき）', async () => {
+it('打ち終わったら、ボールの後ろから みちなりに すすむ ほうを 見るよう カメラを置き直す', async () => {
   const app = setup()
   await waitFor(() => expect(app.status).toContain('ready'))
   runFrames(2)
-  const next = { direction: { x: 1, z: 0 }, power: 0.5, target: { x: 3, z: 4.5 } }
+  // うしろへ もどる おすすめ。カメラは うつ むきでは なく、みちなりに すすむ ほう（view）を 見る。
+  const next = { direction: { x: 0, z: 1 }, power: 0.5, target: { x: 0, z: 6 }, view: { x: 1, z: 0 } }
   world().suggestShot.mockReturnValueOnce(next)
   world().state.phase = 'ready'
   world().queue({ kind: 'rest', position: world().state.position })
@@ -161,12 +162,16 @@ it('打ち終わったら、ボールの後ろから おすすめの ほうを �
   runFrames(1)
 
   const ball = world().state.position
-  // カップの ほうから 大きく それた おすすめなので、おすすめの むきを 見る。
-  const heading = lookHeading(ball, GOLF_COURSES[0]!.holes[0]!.cup, next.direction)
-  expect(heading).toEqual(next.direction)
-  const pose = aimPose(ball, viewHeading(ball, { x: ball.x + heading.x, z: ball.z + heading.z }, next.direction), 1)
+  expect(app.host.dataset.aimZ).toBe('1.000')
+  const heading = viewHeading(ball, { x: ball.x + next.view.x, z: ball.z + next.view.z }, next.direction)
+  const pose = aimPose(ball, heading, 1)
+  const last = scene().setCamera.mock.lastCall as [typeof pose, number]
+  for (const key of ['x', 'y', 'z'] as const) {
+    expect(last[0].position[key]).toBeCloseTo(pose.position[key], 5)
+    expect(last[0].target[key]).toBeCloseTo(pose.target[key], 5)
+  }
   // カメラとボールの距離もわたす。手前の景色だけを消すために使う。
-  expect(scene().setCamera).toHaveBeenLastCalledWith(pose, Math.hypot(pose.position.x - ball.x, pose.position.y - ball.y, pose.position.z - ball.z))
+  expect(last[1]).toBeCloseTo(Math.hypot(pose.position.x - ball.x, pose.position.y - ball.y, pose.position.z - ball.z), 5)
 })
 
 it('ホールぜんたいを見るときは、景色を消さない', async () => {
