@@ -38,6 +38,7 @@ function fakeWorld() {
     returnToRest: vi.fn(() => { state.phase = 'ready'; return state.position }),
     aimPath: vi.fn(() => [{ x: 0, y: 0.15, z: 4.5 }, { x: 0, y: 0.15, z: 1 }]),
     suggestShot: vi.fn(() => ({ direction: { x: 0, z: -1 }, power: 0.63, target: { x: 0, z: -4.1 }, view: { x: 0, z: -1 } })),
+    distanceToCup: vi.fn(() => 8.6),
     dispose: vi.fn(),
   }
 }

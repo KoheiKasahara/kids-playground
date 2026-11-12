@@ -186,7 +186,7 @@ export const JOURNEY_HOLES: readonly HoleDefinition[] = [
   }),
   winding({
     id: 'journey-5',
-    name: 'ちょうロング だいぼうけん',
+    name: 'ちょう ロング',
     par: 10,
     path: [{ x: -8, z: 22 }, { x: -8, z: 10 }, { x: -2, z: 4 }, { x: 6, z: 4 }, { x: 6, z: -6 }, { x: -2, z: -6 }, { x: -8, z: -12 }, { x: -8, z: -22 }, { x: 2, z: -22 }, { x: 8, z: -16 }],
     half: 1.4,

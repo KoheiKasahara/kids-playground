@@ -18,7 +18,8 @@ import { createGolfWorld, type GolfEvent, type GolfPhase, type GolfWorld } from 
 export type GolfStatus = 'loading' | 'ready' | 'error'
 export type GolfCamera = 'ball' | 'overview'
 export type EngineEvent = GolfEvent | { kind: 'returned' } | { kind: 'assisted' } | { kind: 'hint' } | { kind: 'aimed' }
-export type GolfFeedback = { phase: GolfPhase; strokes: number; power: number; aiming: boolean; returning: boolean }
+/** remaining は カップまでの みちのり[m]（かべを まわりこむ ぶんも 数える）。まだ 分からないときは null。 */
+export type GolfFeedback = { phase: GolfPhase; strokes: number; power: number; aiming: boolean; returning: boolean; remaining: number | null }
 
 type Options = {
   course: CourseDefinition
@@ -109,6 +110,7 @@ export function usePutterGolfEngine(options: Options) {
     let heading: Vec2 = { x: 0, z: -1 }
     let power = 0.5
     let strokes = 0
+    let remaining: number | null = null
     let introTime = 0
     let returnTimer = 0
     let hintTarget: Vec2 | null = null
@@ -129,7 +131,13 @@ export function usePutterGolfEngine(options: Options) {
 
     function publish() {
       if (!world) return
-      const feedback: GolfFeedback = { phase: world.phase, strokes, power: Math.round(power * 100) / 100, aiming: drag?.moved ?? false, returning: returnTimer > 0 }
+      // のこりの みちのりは、止まっている あいだだけ 数えなおす（ころがっている あいだは 前の 数の まま）。
+      if (world.phase === 'holed') remaining = 0
+      else if (world.phase === 'ready') {
+        const distance = world.distanceToCup()
+        remaining = Number.isFinite(distance) ? Math.max(1, Math.round(distance)) : null
+      }
+      const feedback: GolfFeedback = { phase: world.phase, strokes, power: Math.round(power * 100) / 100, aiming: drag?.moved ?? false, returning: returnTimer > 0, remaining }
       const key = JSON.stringify(feedback)
       if (key !== lastFeedback) { lastFeedback = key; latest.current.onFeedback(feedback) }
       const ball = world.ball().position
@@ -168,6 +176,7 @@ export function usePutterGolfEngine(options: Options) {
       world = createGolfWorld(course, hole, geometry)
       scene.setHole(course, hole, geometry, holeIndex + 1)
       strokes = 0
+      remaining = null
       returnTimer = 0
       sink = null
       hintTarget = null
@@ -193,7 +202,16 @@ export function usePutterGolfEngine(options: Options) {
       if (!world || !scene || !geometry) return
       const events = world.consumeEvents()
       for (const event of events) {
-        if (event.kind === 'shot') { strokes++; scene.swingClub(); heading = direction }
+        if (event.kind === 'shot') {
+          strokes++
+          scene.swingClub()
+          heading = direction
+          // うった しゅんかんの わと、つよく うったときの つちけむり。
+          scene.effect('ring', { x: event.position.x, y: event.position.y - BALL_RADIUS, z: event.position.z })
+          if (event.power > 0.45) scene.effect('dust', event.position, event.power)
+        }
+        // かべに つよく あたると、こなが ぱっと ちる。
+        if (event.kind === 'wall' && event.strength > 0.4) scene.effect('dust', event.position, Math.min(1, event.strength) * 0.7)
         if (event.kind === 'bumper') { scene.pulseBumper(event.id); scene.effect('sparkle', event.position) }
         if (event.kind === 'reflector') { scene.pulseBumper(event.id); scene.effect('sparkle', event.position) }
         if (event.kind === 'critter') scene.effect('sparkle', event.position)
