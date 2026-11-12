@@ -716,12 +716,12 @@ function cliff(points: readonly Vec2[], top: number, bottom: number, strata: rea
 
 /** かべの もよう。木の いたの コースと、いわ・こおり・クッキーの コースがある。 */
 const WALL_PATTERN: Record<CourseId, keyof GolfTextures> = {
-  meadow: 'wood', beach: 'wood', moon: 'rock', snow: 'ice', candy: 'sand', dino: 'rock', forest: 'wood', downhill: 'wood', river: 'wood', canyon: 'rock', factory: 'powder', sky: 'wood',
+  meadow: 'wood', beach: 'wood', moon: 'rock', snow: 'ice', candy: 'sand', dino: 'rock', forest: 'wood', downhill: 'wood', river: 'wood', canyon: 'rock', factory: 'powder', sky: 'wood', journey: 'wood',
 }
 
 /** コースの 床の もよう。芝の コースは 芝、ゆきと 月は こなの ような じめん。 */
 const FLOOR_PATTERN: Record<CourseId, keyof GolfTextures> = {
-  meadow: 'grass', beach: 'grass', moon: 'powder', snow: 'powder', candy: 'grass', dino: 'grass', forest: 'grass', downhill: 'grass', river: 'grass', canyon: 'grass', factory: 'grass', sky: 'grass',
+  meadow: 'grass', beach: 'grass', moon: 'powder', snow: 'powder', candy: 'grass', dino: 'grass', forest: 'grass', downhill: 'grass', river: 'grass', canyon: 'grass', factory: 'grass', sky: 'grass', journey: 'grass',
 }
 
 /** まわりの じめんの もようと もりあがり。うみべ・おつきさま・そらのしまは じめんが ない。 */
@@ -735,6 +735,7 @@ const TERRAIN: Partial<Record<CourseId, { pattern: keyof GolfTextures; hills: nu
   river: { pattern: 'grass', hills: 1.1 },
   canyon: { pattern: 'rock', hills: 9 },
   factory: { pattern: 'powder', hills: 0.35 },
+  journey: { pattern: 'grass', hills: 1.4 },
 }
 
 /**
@@ -1247,7 +1248,7 @@ export function createGolfScene(container: HTMLElement) {
         const group = new THREE.Group()
         group.position.set(gadget.x, ground, gadget.z)
         const r = gadget.radius
-        if (course.id === 'meadow') {
+        if (course.id === 'meadow' || course.id === 'journey') {
           // きのこ
           const stem = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.72, r * 0.86, BUMPER_HEIGHT * 0.7, 16), new THREE.MeshStandardMaterial({ color: look.bumperCap, roughness: 0.6 }))
           stem.position.y = BUMPER_HEIGHT * 0.35
@@ -1953,7 +1954,52 @@ export function createGolfScene(container: HTMLElement) {
         for (let k = 0; k < 4; k++) soft.add('sphere', '#ffffff', x + (k - 1.5) * 1.6, y + (k % 2) * 0.5, z + hash(i * 4 + k) * 1.2, 2.6 + hash(k + i) * 1.6, 1.6, 2.2)
       }
     }
-    if (course.id === 'meadow') {
+    if (course.id === 'journey') {
+      // あきの おか。あかや きいろに いろづいた 木と、そらに うかぶ ききゅう。ながい ホールに あわせて ひろく まく。
+      const width = bounds.maxX - bounds.minX
+      const depth = bounds.maxZ - bounds.minZ
+      const autumn = ['#e0662f', '#f0a030', '#d9452f', '#f2c83e', '#b8552a', '#8fae4a']
+      for (let i = 0; i < 150; i++) {
+        const x = cx + (hash(i * 1.9 + 5) - 0.5) * (width + 46)
+        const z = cz + (hash(i * 2.7 + 9) - 0.5) * (depth + 46)
+        const size = 0.8 + hash(i + 3) * 0.9
+        if (!clear(x, z, 1.6 + size * 0.6)) continue
+        if (i % 4) broadleafTree(solid, x, groundAt(x, z), z, size * 0.9, i, autumn)
+        else pineTree(solid, x, groundAt(x, z), z, size * 0.85, i)
+      }
+      // おちば と きのこ。
+      for (let i = 0; i < 150; i++) {
+        const x = cx + (hash(i * 3.1 + 500) - 0.5) * (width + 16)
+        const z = cz + (hash(i * 4.3 + 700) - 0.5) * (depth + 16)
+        if (!clear(x, z, 0.7)) continue
+        const y = groundAt(x, z)
+        if (i % 5) solid.add('sphere', autumn[i % 4]!, x, y + 0.03, z, 0.3, 0.05, 0.22, 0, hash(i) * 3, 0)
+        else {
+          solid.add('cylinder', '#fff3e0', x, y + 0.12, z, 0.12, 0.24, 0.12)
+          solid.add('sphere', '#c8472f', x, y + 0.26, z, 0.36, 0.26, 0.36)
+        }
+      }
+      scatterTufts(150, 18, '#b7b055')
+      for (const [x, z, s] of [[-44, -30, 13], [-10, -62, 16], [34, -48, 13], [50, 12, 11], [-46, 26, 12]] as const) {
+        soft.add('sphere', '#c9a85a', cx + x, groundAt(cx + x, cz + z) - s * 0.2, cz + z, s * 2.4, s, s * 2)
+      }
+      // ききゅう。ゆっくり うかんで ゆれる。
+      for (const [index, [x, y, z, color]] of ([[-14, 9, -12, '#ff6f61'], [16, 12, -26, '#ffd23f'], [20, 8, 10, '#5fb8ff']] as const).entries()) {
+        const balloon = new THREE.Group()
+        const envelope = new THREE.Mesh(new THREE.SphereGeometry(1.6, 20, 14), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }))
+        envelope.scale.y = 1.15
+        const band = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.12, 8, 24), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.5 }))
+        band.rotation.x = Math.PI / 2
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.3, 0.8, 12, 1, true), new THREE.MeshStandardMaterial({ color, roughness: 0.5, side: THREE.DoubleSide }))
+        neck.position.y = -1.9
+        const basket = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.6), new THREE.MeshStandardMaterial({ color: '#8a5a34', roughness: 0.8 }))
+        basket.position.y = -2.9
+        balloon.add(envelope, band, neck, basket)
+        balloon.position.set(cx + x, y, cz + z)
+        root.add(balloon)
+        floaters.push({ object: balloon, base: y, phase: index * 2.1 })
+      }
+    } else if (course.id === 'meadow') {
       const greens = ['#4f9d5b', '#62aa62', '#7cb867', '#3f8a5a', '#8fc26a']
       for (let i = 0; i < 90; i++) {
         const angle = hash(i + 1) * Math.PI * 2
@@ -2585,7 +2631,7 @@ export function createGolfScene(container: HTMLElement) {
     sun.shadow.camera.updateProjectionMatrix()
     const moon = course.id === 'moon'
     hemisphere.color.set(moon ? '#b3b8ff' : '#eef8ff')
-    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : course.id === 'candy' ? '#ffdcc0' : course.id === 'dino' ? '#c08a5e' : course.id === 'forest' ? '#4a7a46' : course.id === 'canyon' ? '#c9865a' : course.id === 'factory' ? '#a9b3c2' : course.id === 'sky' ? '#cfe8ff' : '#7fa35a')
+    hemisphere.groundColor.set(moon ? '#3a3552' : course.id === 'beach' ? '#d8c89a' : course.id === 'candy' ? '#ffdcc0' : course.id === 'dino' ? '#c08a5e' : course.id === 'forest' ? '#4a7a46' : course.id === 'canyon' ? '#c9865a' : course.id === 'factory' ? '#a9b3c2' : course.id === 'sky' ? '#cfe8ff' : course.id === 'journey' ? '#b89a58' : '#7fa35a')
     // まわりからの 明かりを ひかえめにして、日なたと かげの 差で 立体感を 出す。
     hemisphere.intensity = moon ? 0.8 : 0.75
     sun.color.set(moon ? '#f2f0ff' : '#fff1d6')
